@@ -1207,6 +1207,99 @@
   .coopin { font-family:Impact,'Arial Narrow',sans-serif; font-size:1.9rem; text-transform:uppercase; letter-spacing:0.28em;
     text-align:center; width:100%; box-sizing:border-box; padding:0.45rem; border-radius:12px; border:2px solid #4A6B35;
     background:#141810; color:#EDEADF; }
+
+  /* ================= THE XP CEREMONY (v1.25) =================
+     Every payout in the game pours into ONE bar up here — campaign,
+     battleground, co-op, invasion, win or loss. It hangs ABOVE the win and
+     lose screens (z26, over #sabrite's 24) and it is pointer-events:none all
+     the way down, so Continue stays live underneath the whole time and a
+     single tap both SKIPS the ceremony and presses the button.
+     ⚠ It sits at the TOP of the screen on purpose: .overlay centres its title,
+     medals, prose and button, and on a 375px-tall phone that column already
+     owns the middle. */
+  #xpjuice { position:fixed; inset:0; z-index:26; pointer-events:none; overflow:hidden;
+    font-family:Impact,'Arial Narrow',sans-serif; }
+  #xpjuice.hidden { display:none; }
+  #xpjuice.out { opacity:0; transition:opacity 0.2s linear; }
+  /* ⚠ ONE SLIM RIBBON, not a panel. On an 812x375 phone the win screen's column
+     (title + medals + prose + Continue) measures 357px of the 375 available —
+     there is no free band at the top and none in the flow either, so a 45px card
+     buried the top third of CARPET SECURED. A 25px pill flush to the top edge
+     clears the title's cap-height, and putting the labels INSIDE the track means
+     the fill sweeps behind the words instead of needing a row of its own. */
+  .xj-card { position:absolute; top:clamp(2px,0.8vh,8px); left:50%; transform:translateX(-50%);
+    width:min(520px,92vw); height:clamp(20px,6.4vh,29px); box-sizing:border-box;
+    display:flex; align-items:center; justify-content:space-between; overflow:hidden;
+    padding:0 clamp(9px,1.7vw,15px);
+    background:rgba(20,16,12,0.84); border:2px solid #4A6B35; border-radius:999px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.5); }
+  /* the fill is a TRANSITION, never an animation — it survives the reduced-motion
+     kill-list below on purpose, because a progress bar sliding is information */
+  .xj-fill { position:absolute; left:0; top:0; bottom:0; width:0%; transition:width 0.09s linear;
+    background:linear-gradient(180deg,#C6E39A,#7FA35C); box-shadow:0 0 12px rgba(191,227,154,0.6); }
+  .xj-fill.slide { transition:width 0.3s ease-out; }
+  .xj-lvl, .xj-num { position:relative; z-index:2; white-space:nowrap;
+    font-size:clamp(0.62rem,2.4vh,0.95rem); letter-spacing:0.09em;
+    text-shadow:0 1px 3px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7); }
+  .xj-lvl { color:#FFD24A; } .xj-num { color:#FFF3C4; }
+  .xj-shine { position:absolute; inset:0; opacity:0;
+    background:linear-gradient(90deg,rgba(255,255,255,0) 38%,rgba(255,255,255,0.9) 50%,rgba(255,255,255,0) 62%); }
+  .xj-card.pop { animation:xjpop 0.28s ease-out; }
+  @keyframes xjpop { 0%,100% { transform:translateX(-50%) scale(1); } 45% { transform:translateX(-50%) scale(1.06); } }
+  .xj-card.flash .xj-shine { animation:xjshine 0.46s ease-out; }
+  @keyframes xjshine { 0% { opacity:0.95; transform:translateX(-100%); } 100% { opacity:0; transform:translateX(100%); } }
+
+  /* STAR BITS: one span each, flying its own arc off the carpet into the bar */
+  .xj-bits { position:absolute; inset:0; }
+  .xj-bit { position:absolute; left:0; top:0; width:16px; height:16px; margin:-8px 0 0 -8px;
+    font-size:16px; line-height:16px; text-align:center; opacity:0;
+    text-shadow:0 0 8px currentColor;
+    transform:translate(var(--x0),var(--y0)) scale(0.5);
+    animation:xjfly var(--dur) cubic-bezier(0.42,0.02,0.32,1) var(--delay) forwards; }
+  @keyframes xjfly {
+    0%   { transform:translate(var(--x0),var(--y0)) scale(0.5) rotate(0deg); opacity:0; }
+    14%  { opacity:1; }
+    62%  { transform:translate(var(--xm),var(--ym)) scale(1.2) rotate(200deg); opacity:1; }
+    100% { transform:translate(var(--x1),var(--y1)) scale(0.3) rotate(400deg); opacity:0; } }
+
+  /* THE RANK-UP CARD: the fanfare. Rays, a shockwave ring and a brass plaque. */
+  .xj-up { position:absolute; left:50%; top:50%; display:flex; flex-direction:column; align-items:center;
+    text-align:center; padding:clamp(8px,2.2vh,18px) clamp(18px,5vw,44px); border-radius:20px;
+    background:linear-gradient(180deg,rgba(52,82,38,0.97),rgba(24,32,17,0.97));
+    border:3px solid #FFD24A; box-shadow:0 0 44px rgba(255,210,74,0.5),0 10px 30px rgba(0,0,0,0.6);
+    transform:translate(-50%,-50%); animation:xjcard 0.4s cubic-bezier(0.2,1.55,0.4,1) both; }
+  .xj-up.hidden { display:none; }
+  @keyframes xjcard { 0% { transform:translate(-50%,-50%) scale(0.45) rotate(-7deg); opacity:0; }
+    100% { transform:translate(-50%,-50%) scale(1) rotate(0deg); opacity:1; } }
+  .xj-up.out { animation:xjcardout 0.26s ease-in forwards; }
+  @keyframes xjcardout { to { transform:translate(-50%,-50%) scale(1.14); opacity:0; } }
+  .xj-kick { font-size:clamp(0.72rem,2.2vh,1rem); letter-spacing:0.34em; color:#FFD24A; padding-left:0.34em; }
+  .xj-big { font-size:clamp(1.7rem,7.2vh,3.4rem); line-height:1.02; color:#FFF3C4; letter-spacing:0.03em;
+    text-shadow:0 3px 0 rgba(0,0,0,0.45); margin:2px 0; }
+  .xj-sub { font-size:clamp(0.66rem,2vh,0.92rem); letter-spacing:0.16em; color:#BFE39A; padding-left:0.16em; }
+  .xj-bars { display:flex; gap:5px; margin:3px 0 4px; }
+  .xj-bars i { display:block; width:clamp(11px,2.4vh,17px); height:clamp(5px,1.1vh,8px); border-radius:2px;
+    background:#E8C25A; box-shadow:0 1px 0 #8A6420; }
+  .xj-rays, .xj-burst { position:absolute; left:50%; top:50%; pointer-events:none; }
+  .xj-rays { width:min(900px,190vmax); height:min(900px,190vmax);
+    margin:calc(min(900px,190vmax) / -2) 0 0 calc(min(900px,190vmax) / -2); border-radius:50%;
+    background:conic-gradient(from 0deg, rgba(255,210,74,0.26) 0 5deg, rgba(255,210,74,0) 5deg 24deg);
+    animation:xjrays 1.35s ease-out both; }
+  @keyframes xjrays { 0% { transform:rotate(0deg) scale(0.15); opacity:0; } 16% { opacity:0.9; }
+    100% { transform:rotate(120deg) scale(1); opacity:0; } }
+  .xj-burst { width:120px; height:120px; margin:-60px 0 0 -60px; border-radius:50%;
+    border:6px solid rgba(255,243,196,0.9); animation:xjburst 0.62s ease-out both; }
+  @keyframes xjburst { 0% { transform:scale(0.12); opacity:1; } 100% { transform:scale(5.2); opacity:0; } }
+
+  /* ⚠ ID-SCOPED AND LAST, the v1.11/v1.21 rule: an override has to FOLLOW every
+     rule it cancels and outrank two-class selectors. Under reduce, the JS gate
+     never builds the bits or the rays at all — this is the belt to that brace.
+     .xj-fill keeps its TRANSITION (a transition is not an animation), so the
+     bar still slides calmly to where it ended up. */
+  @media (prefers-reduced-motion: reduce){
+    #xpjuice .xj-card, #xpjuice .xj-shine, #xpjuice .xj-bit,
+    #xpjuice .xj-up, #xpjuice .xj-rays, #xpjuice .xj-burst, #xpjuice * { animation:none; }
+  }
 </style>
 </head>
 <body>
@@ -1223,7 +1316,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.24</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.25</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1250,6 +1343,11 @@
   <button class="btn hidden" id="pickOutBtn" style="margin-bottom:0.2rem">FULLY DECORATED — BACK TO HQ</button>
   <div id="pickRow" class="pickrow"></div>
 </div>
+
+<!-- THE XP CEREMONY (v1.25). A TOP-LEVEL sibling above every end screen, and
+     pointer-events:none from the root down — it decorates the win/lose screen,
+     it never stands in front of it. Built and torn down by xpCeremony(). -->
+<div id="xpjuice" class="hidden" aria-hidden="true"></div>
 
 <div class="overlay hidden menuwrap" id="menu">
   <div id="menuBody" class="menubody"></div>
@@ -1327,6 +1425,20 @@ const BF_COST   = Object.assign({}, COSTS, { bfjeep:250, bftank:500 });
 const BF_BOUNTY = { rifleman:20, minesweeper:60, flame:75, mgunner:50, radioman:50, bazooka:75, mortar:100, sarge:50, bfjeep:125, bftank:250 };
 const BF_TICK   = 20;    // dog tags per 10s passive drip
 const BF_START  = 210;   // opening purse — the campaign's exact wallet
+// ===== SARGE'S RESPAWN COOLDOWN (v1.25, Wyatt 7/25: "10 seconds") =====
+// He is the only free man on the shelf and there is only ever one of him, so
+// before this he could be dropped again the same frame he fell — the tray card
+// went from ★ straight back to FREE and losing him cost nothing at all. Now
+// losing Sarge costs TEN SECONDS, and every one of them is on the card: the
+// number ticks 10 → 0 over a draining fill, then the card flashes SARGE READY
+// and he can go back in. One constant, Wyatt's to overrule.
+// ⚠ It binds every chair equally — yours, your friends', and the computer's
+// (the brain reads it out of the view so it never wastes an order on a man it
+// cannot have). ⚠ A RELAYED order is exempt, the same way it is exempt from
+// the purse and the placement rules: that commander already served their own
+// countdown on their own clock, and rejecting theirs over a few hundred
+// milliseconds of lag would put a man on their carpet and not on ours.
+const BF_SARGE_DOWN = 10;
 // a breakthrough is a FREE LEAK: reach the base, deal this, vanish. ~12 = a KO.
 // ⚠ the jeep's 12 is measured, not guessed: harnessed against a hard AI board it
 // reaches the box 93% of the time (its pace IS its armour — it is inside any one
@@ -1860,6 +1972,170 @@ function xpFor(frac){ return Math.max(1, Math.round(xpNeed()*frac)); }   // a fr
 // pay it in and promote as far as it carries (one award is at most one rank)
 function grantXP(amt){ META.xp+=amt; let p=0; while(META.xp>=xpNeed()){ META.xp-=xpNeed(); META.lvl++; META.pendingPicks++; p++; } return p; }
 function promoTag(p){ return p>0? ' · PROMOTED TO LEVEL '+META.lvl+'!' : ''; }
+
+// ================= THE XP CEREMONY (v1.25) =================
+// Wyatt 7/25: "XP gains must be JUICY and level-ups must feel REALLY GOOD."
+// So a payout stopped being a line of text. Every one of them — campaign,
+// battleground, co-op, invasion, win OR loss — pours into the same bar: star
+// bits streaming in off the carpet, the counter running up, and when the bar
+// fills, the rank-up card goes off with the works.
+//
+// THREE RULES it never breaks, in this order:
+//  1. THE GRANT IS SYNCHRONOUS AND UNCONDITIONAL. grantXP() still runs on the
+//     spot, before a single pixel moves — the ceremony only ever SHOWS what has
+//     already happened to the save. Skip it, mute it, run it under reduced
+//     motion, close the tab mid-fanfare: META lands identical either way.
+//  2. IT NEVER BLOCKS INPUT. The overlay is pointer-events:none from the root
+//     down, and the skip listener is capture-phase + passive, so it consumes
+//     nothing: one tap both skips the ceremony AND presses Continue under it.
+//  3. reducedMotion() GATES EVERY EFFECT (the v1.12 gate). No bits, no rays, no
+//     burst, no pop — the bar slides to where it ended up, the card states the
+//     new rank, and the whole thing is gone in well under a second.
+const XPJ_BITS=14,        // star bits per payout — enough to read as a stream
+      XPJ_FILL=1.05,      // seconds of pour. FAST: this is a garnish, not a cutscene
+      XPJ_HOLD=1.15,      // how long the rank-up card holds
+      XPJ_QUIET=0.55,     // ...and how long a plain gain lingers before it fades
+      XPJ_RM_FILL=0.32, XPJ_RM_HOLD=0.85,   // the calm run: same information, no motion
+      XPJ_LEAD=200;       // let the end screen land first, THEN pour
+let XPJ=null, XPJ_PEND=0;
+
+// EVERY XP award in the game comes through here. `forcePromo` is v0.6's rule
+// — the first mission always promotes — applied BEFORE the ceremony reads the
+// end state, so that promotion gets its fanfare like any other.
+function xpAward(amt, opts){
+  opts=opts||{};
+  const a={ lvl0:META.lvl, xp0:META.xp, need0:xpNeed(), amt:amt, src:(opts.src||'') };
+  let promos=grantXP(amt);
+  if(opts.forcePromo && promos===0){ META.lvl++; META.pendingPicks++; META.xp=0; promos=1; }
+  a.promos=promos; a.lvl1=META.lvl; a.xp1=META.xp; a.need1=xpNeed();
+  xpQueue(a);
+  return promos;
+}
+// where the bar stands after pouring `pour` XP in — grantXP's own walk, read
+// only, so the animation can never disagree with the save it is describing
+function xpWalk(lvl,xp,pour){
+  let L=lvl, X=xp+pour, n=100+(L-1)*50, guard=0;
+  while(X>=n && guard++<9999){ X-=n; L++; n=100+(L-1)*50; }
+  return { lvl:L, xp:X, need:n };
+}
+function xpPct(xp,need){ return Math.max(0,Math.min(100, 100*xp/Math.max(1,need))).toFixed(2)+'%'; }
+function xpQueue(a){
+  if(XPJ_PEND) clearTimeout(XPJ_PEND);
+  XPJ_PEND=setTimeout(()=>{ XPJ_PEND=0; try{ xpCeremony(a); }catch(e){ xpTeardown(); } },
+                      reducedMotion()? 90 : XPJ_LEAD);
+}
+function xpCeremony(a){
+  const root=document.getElementById('xpjuice'); if(!root) return;
+  xpTeardown();                                   // one ceremony at a time
+  const RM=reducedMotion();
+  root.innerHTML=
+      '<div class="xj-card" id="xjCard">'
+    +   '<div class="xj-fill'+(RM?' slide':'')+'" id="xjFill"></div><div class="xj-shine"></div>'
+    +   '<span class="xj-lvl" id="xjLvl">LEVEL '+a.lvl0+'</span>'
+    +   '<span class="xj-num" id="xjNum">+0 XP</span>'
+    + '</div>'
+    + '<div class="xj-bits" id="xjBits"></div>'
+    + '<div class="xj-up hidden" id="xjUp"></div>';
+  root.classList.remove('hidden','out');
+  XPJ={ a:a, RM:RM, t0:performance.now(), dispLvl:a.lvl0, leveled:false, skipping:false,
+        dur:(RM?XPJ_RM_FILL:XPJ_FILL)*(a.promos>0?1:0.82), tickT:0, raf:0, holdT:0, outT:0,
+        el:{ card:document.getElementById('xjCard'), lvl:document.getElementById('xjLvl'),
+             num:document.getElementById('xjNum'),
+             fill:document.getElementById('xjFill'), bits:document.getElementById('xjBits'),
+             up:document.getElementById('xjUp') } };
+  XPJ.el.fill.style.width=xpPct(a.xp0,a.need0);
+  if(!RM) xpBits();
+  window.addEventListener('pointerdown', xpSkip, true);
+  XPJ.raf=requestAnimationFrame(xpFrame);
+}
+// star bits stream off the carpet into the bar. PURE CSS — one keyframed span
+// each carrying its own arc in custom properties — so fourteen of them cost the
+// compositor nothing and no rAF has to shepherd them.
+function xpBits(){
+  const J=XPJ, r=J.el.card.getBoundingClientRect();
+  const tx=(r.left+r.width*0.5)|0, ty=(r.top+r.height*0.5)|0;
+  const W=window.innerWidth||812, H=window.innerHeight||375;
+  let s='';
+  for(let i=0;i<XPJ_BITS;i++){
+    const x0=W*(0.12+0.76*Math.random()), y0=H*(0.44+0.5*Math.random());
+    const xm=x0+(tx-x0)*0.45+(Math.random()-0.5)*W*0.16, ym=y0+(ty-y0)*0.5-H*(0.1+0.16*Math.random());
+    s+='<span class="xj-bit" style="color:'+(i%4===3?'#BFE39A':'#FFD24A')
+      +';--x0:'+(x0|0)+'px;--y0:'+(y0|0)+'px;--xm:'+(xm|0)+'px;--ym:'+(ym|0)+'px'
+      +';--x1:'+tx+'px;--y1:'+ty+'px;--delay:'+(0.03+i*0.028).toFixed(3)+'s'
+      +';--dur:'+(0.46+Math.random()*0.16).toFixed(3)+'s">★</span>';
+  }
+  J.el.bits.innerHTML=s;
+}
+function xpFrame(){
+  const J=XPJ; if(!J) return;
+  const p=J.dur>0? Math.min(1,(performance.now()-J.t0)/(J.dur*1000)) : 1;
+  xpRender(1-Math.pow(1-p,3));            // ease-out cubic: quick off the mark, soft landing
+  if(p>=1){ J.raf=0; xpSettle(); return; }
+  J.raf=requestAnimationFrame(xpFrame);
+}
+function xpRender(e){
+  const J=XPJ; if(!J) return; const a=J.a;
+  const pour=a.amt*e;
+  // at the end we show the SAVE's own numbers, not the walk's — that is what
+  // makes a forced first-mission promotion land with the fanfare on it
+  const st = e>=1? { lvl:a.lvl1, xp:a.xp1, need:a.need1 } : xpWalk(a.lvl0,a.xp0,pour);
+  J.el.num.textContent='+'+Math.round(pour)+' XP';
+  J.el.fill.style.width=xpPct(st.xp,st.need);
+  if(st.lvl!==J.dispLvl){ J.dispLvl=st.lvl; J.el.lvl.textContent='LEVEL '+st.lvl; xpRankUp(st.lvl); }
+  if(!J.RM && e<1){ const now=performance.now();
+    if(now-J.tickT>105){ J.tickT=now; SFX.xptick(st.xp/Math.max(1,st.need)); } }
+}
+function xpRankUp(lvl){
+  const J=XPJ; if(!J) return;
+  J.leveled=true;
+  if(J.skipping) return;                  // you asked to move on — no fanfare at your back
+  const el=J.el;
+  el.card.classList.remove('flash','pop'); void el.card.offsetWidth;
+  el.card.classList.add('flash'); if(!J.RM) el.card.classList.add('pop');
+  el.up.innerHTML=(J.RM? '' : '<div class="xj-rays"></div><div class="xj-burst"></div>')
+    + '<div class="xj-kick">PROMOTION</div>'
+    + '<div class="xj-big">LEVEL '+lvl+'</div>'
+    + '<div class="xj-bars">'+new Array(Math.min(5,1+((lvl-1)%5))+1).join('<i></i>')+'</div>'
+    + '<div class="xj-sub">'+(META.pendingPicks>0? 'A SOLDIER IS READY FOR PROMOTION' : 'FIELD PROMOTION EARNED')+'</div>';
+  // a SECOND rank in one payout (a squad win can carry you two) has to restart
+  // the card's own entrance — replacing its children does not
+  el.up.style.animation='none'; void el.up.offsetWidth; el.up.style.animation='';
+  el.up.classList.remove('hidden','out');
+  SFX.fanfare();
+}
+function xpSettle(){
+  const J=XPJ; if(!J||J.holdT||J.outT) return;
+  J.holdT=setTimeout(xpFade, (J.leveled? (J.RM?XPJ_RM_HOLD:XPJ_HOLD) : (J.RM?0.2:XPJ_QUIET))*1000);
+}
+function xpFade(){
+  const J=XPJ; if(!J||J.outT) return;
+  if(J.holdT){ clearTimeout(J.holdT); J.holdT=0; }
+  if(J.el.up && !J.el.up.classList.contains('hidden')) J.el.up.classList.add('out');
+  const root=document.getElementById('xpjuice'); if(root) root.classList.add('out');
+  J.outT=setTimeout(xpTeardown, 230);
+}
+// A TAP ANYWHERE ENDS IT — on the end state, never on a half-poured bar. The
+// listener is capture-phase and passive, so the very same tap goes on to reach
+// whatever button it actually landed on.
+function xpSkip(){
+  const J=XPJ; if(!J) return;
+  if(performance.now()-J.t0 < 140) return;   // never eat the tap that opened the screen
+  J.skipping=true;
+  if(J.raf){ cancelAnimationFrame(J.raf); J.raf=0; }
+  try{ xpRender(1); }catch(e){}
+  xpFade();
+}
+function xpTeardown(){
+  if(XPJ_PEND){ clearTimeout(XPJ_PEND); XPJ_PEND=0; }
+  const J=XPJ;
+  if(J){ if(J.raf) cancelAnimationFrame(J.raf);
+         if(J.holdT) clearTimeout(J.holdT);
+         if(J.outT) clearTimeout(J.outT); }
+  window.removeEventListener('pointerdown', xpSkip, true);
+  XPJ=null;
+  const root=document.getElementById('xpjuice');
+  if(root){ root.classList.add('hidden'); root.classList.remove('out'); root.innerHTML=''; }
+}
 // ============ THE HUNDRED-RANK LADDER (Wyatt 7/25) ============
 // Every unit and every one of Sarge's weapons levels to 100 now, not 5. But
 // every formula in this file was a straight line — +10% damage a rank, +3 sniper
@@ -2362,7 +2638,20 @@ const SFX = {
   twink:  ()=>{ tone(1400,2600,0.22,'sine',0.05);
                 setTimeout(()=>tone(2100,3400,0.2,'sine',0.035),90);
                 setTimeout(()=>tone(2800,4200,0.18,'sine',0.025),180); },
-  squeak: ()=>{ tone(700,1500,0.11,'sine',0.075); setTimeout(()=>tone(1500,620,0.15,'sine',0.06),110); }
+  squeak: ()=>{ tone(700,1500,0.11,'sine',0.075); setTimeout(()=>tone(1500,620,0.15,'sine',0.06),110); },
+  // ===== THE XP CEREMONY (v1.25) =====
+  // one grain of XP landing in the bar. Pitched UP as the bar fills (k = 0..1),
+  // so a payout audibly climbs instead of chattering on one note.
+  xptick: (k)=>{ k=Math.max(0,Math.min(1,k||0)); tone(720+520*k, 1100+680*k, 0.045,'square',0.03); },
+  // THE RANK-UP. Four notes up the bugle, a snare swell under them, and a fifth
+  // ringing over the top — the loudest happy noise in the game, and it lasts
+  // under a second because the card does too.
+  fanfare:()=>{ noise(0.42,0.05,1000);
+    [523,659,784,1047].forEach((f,i)=>setTimeout(()=>{ tone(f,f,0.12,'square',0.07); tone(f*2,f*2,0.1,'triangle',0.026); }, i*88));
+    setTimeout(()=>{ tone(1047,1047,0.46,'square',0.08); tone(1568,1568,0.46,'triangle',0.04);
+                     tone(784,784,0.46,'sawtooth',0.028); noise(0.26,0.05,5200); }, 370); },
+  // SARGE IS BACK ON HIS FEET — a short two-note "ready" chirp off the tray
+  ready: ()=>{ tone(680,1020,0.09,'square',0.06); setTimeout(()=>tone(1020,1400,0.12,'square',0.055),90); }
 };
 
 // ================= BOOT CAMP COACH =================
@@ -2436,7 +2725,8 @@ function startBattle(levelN, rival){
 function rivalRaidWaves(m){
   return ['column','pincer','redcoat','push'].map(k=>waveFromKey(k, m, Math.random));
 }
-function hideAllOverlays(){ ['title','lose','win','menu','picker','wartable','worldrank','toyshop','sabrite'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
+function hideAllOverlays(){ xpTeardown();   // a ceremony must never survive into the next screen
+  ['title','lose','win','menu','picker','wartable','worldrank','toyshop','sabrite','xpjuice'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
 
 // ================= INVASION (challenge mode: YOU are the Tan) =================
 const INVADE_CARDS = [
@@ -2494,7 +2784,7 @@ function endInvasion(won){
   const inv=S.invasion;
   // a raid pays either way: 15% of a level for taking the room, and the same
   // tenth every defeat in the game pays for the walk home
-  const xpGain=xpFor(won? XP_INVASION_WIN : XP_LOSS), promos=grantXP(xpGain);
+  const xpGain=xpFor(won? XP_INVASION_WIN : XP_LOSS), promos=xpAward(xpGain,{src:'invasion'});
   const spoils=(won? ' · +2★ spoils of war':'')+' · +'+xpGain+' XP'+promoTag(promos);
   fetch(NET+'/challenge',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({device:META.deviceId,target:inv.uid,won:!!won})})
@@ -3561,7 +3851,7 @@ function endBattlefield(reason, fromRelay){
     // YOUR seat only. 3v3+ feed nothing but the lifetime totals and the medals.
     const wrR=ranked && META.bfRecord[bf.team]; if(wrR){ wrR.w++; wrR.s+=starGain; }
     META.starBank+=starGain; META.starsLifetime+=starGain;
-    const promos=grantXP(xpGain);
+    const promos=xpAward(xpGain,{src:'battleground'});
     const spoils=' · +'+starGain+'★ SPOILS · +'+xpGain+' XP'+promoTag(promos)
       +(friendly? ' · FRIENDLY (no ladder)' : '');
     const wt=document.getElementById('winTitle'); wt.style.color='#7FA35C'; wt.innerHTML=copy[0];
@@ -3582,7 +3872,7 @@ function endBattlefield(reason, fromRelay){
     META.bfLosses++;
     const wrL=ranked && META.bfRecord[bf.team]; if(wrL) wrL.l++;
     // a beating is still a lesson — every defeat pays a tenth of a level
-    const xpGain=xpFor(XP_LOSS), promos=grantXP(xpGain);
+    const xpGain=xpFor(XP_LOSS), promos=xpAward(xpGain,{src:'battleground'});
     document.getElementById('loseTitle').innerHTML=copy[0];
     document.getElementById('loseText').textContent=margin+' · '+copy[1]+' · +'+xpGain+' XP'+promoTag(promos);
     SFX.ouch();
@@ -3650,6 +3940,22 @@ function bfMySeat(){ return S.bf? (S.bf.mySeat|0) : 0; }
 function bfMyTeam(){ return (S.bf && S.bf.myTeam) || 'you'; }
 function bfFoeTeam(){ return bfMyTeam()==='you'? 'foe' : 'you'; }
 function bfMe(){ return { side:bfMyTeam(), seat:bfMySeat() }; }   // tray cards + the dragged figure
+// ===== SARGE IS DOWN: the ten-second clock (v1.25) =====
+// One reader and one writer, so the tray, the gate, the AI's view and the test
+// rig all agree about the same number.
+function bfSargeCd(seat){ const bf=S.bf; if(!bf) return 0;
+  const st=bf.seats[seat]; return st? Math.max(0, st.sargeCd||0) : 0; }
+function bfSargeDown(u){
+  if(!S.bf || u.type!=='sarge' || u.seat==null) return;
+  const st=S.bf.seats[u.seat]; if(!st) return;
+  st.sargeCd=BF_SARGE_DOWN;
+  // YOUR Sarge going over is an event; the other nineteen chairs are not, and a
+  // float apiece would bury the carpet at 10v10
+  if(st.me){
+    S.floats.push({x:u.x, y:u.y-70, txt:'SARGE DOWN — '+BF_SARGE_DOWN+'s', t:0, col:'#FFD24A'});
+    if(bfVis(u.x) && !reducedMotion()) S.shake=Math.max(S.shake,0.22);
+  }
+}
 function bfHumanU(u){ return !S.bf || u.seat===bfMySeat(); }
 function unitSargeStats(u){
   if(u && u.coopSW) return u.coopSW;           // the ally's Sarge carries the ALLY's loadout
@@ -3717,8 +4023,15 @@ function applyDeploy(seat,type,x,y,relay){
   x=Math.round(x); y=Math.round(y);                        // wire form and sim agree
   const cost=BF_COST[type];
   if(type==='sarge' && S.units.some(u=>!u.dead&&u.seat===seat&&u.type==='sarge')) return null;   // one Sarge per PLAYER
-  if(relay){ x=Math.max(40,Math.min(WORLD_W-40,x)); y=Math.max(74,Math.min(H-96,y)); }
+  if(relay){ x=Math.max(40,Math.min(WORLD_W-40,x)); y=Math.max(74,Math.min(H-96,y));
+    // that commander served their ten seconds on their own clock — take their
+    // word for it and clear ours, rather than argue with them over the lag
+    if(type==='sarge') st.sargeCd=0;
+  }
   else {
+    // SARGE'S TEN SECONDS (v1.25) — the local gate, in with the purse and the
+    // ground rules, because those are the checks a RELAYED order skips too
+    if(type==='sarge' && (st.sargeCd||0)>0) return null;
     // you can only field a machine you actually own. YOUR chair only — vehOwns()
     // reads YOUR save, so it has nothing to say about anybody else's motor pool.
     if(st.me && VEH_ORDER.indexOf(type)>=0 && !vehOwns(type)) return null;
@@ -3853,6 +4166,7 @@ function bfAtBase(u,b){ return Math.hypot(u.x-b.x,u.y-b.y)<LEAK_R; }
 function bfLeak(u){
   const bf=S.bf, b=bf.base[enemySide(u)], dmg=BF_BASEDMG[u.type]||6;
   b.hp=Math.max(0,b.hp-dmg); b.dmgTaken+=dmg; u.dead=true;
+  bfSargeDown(u);                         // spending Sarge on their toy box costs the same ten seconds
   SFX.ouch();
   S.fx.push({k:'ring',x:b.x-10,y:b.y-10,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
   S.floats.push({x:b.x,y:b.y-84,txt:'−'+dmg,t:0,col:u.side==='you'?'#BFE39A':'#D96A55'});
@@ -3962,6 +4276,7 @@ function bfTick(dt){
     }
   }
   if(bf.resolved||bf.ending) return;
+  if(bf.sargeFlash>0) bf.sargeFlash=Math.max(0,bf.sargeFlash-dt);   // the "he's back" flash on the tray card
   bf.timeLeft-=dt;
   const secs=Math.max(0,Math.ceil(bf.timeLeft));
   if(secs<=15 && secs!==bf.lastTick){ bf.lastTick=secs; if(secs>0) SFX.blip(); }   // the last fifteen tick
@@ -3976,6 +4291,16 @@ function bfTick(dt){
   const boost={ you:(my<th?1.25:1), foe:(th<my?1.25:1) };
   const inc=(BF_AI[bf.ai.diff]||{}).inc||1;        // the one visible handicap: enemy passive ticks slower on lower tiers
   for(const st of bf.seats){
+    // SARGE'S TEN SECONDS. Counted here, on the sim's own dt, so it runs at the
+    // same rate the rest of the match does and a 2× toggle can't cheat it.
+    if(st.sargeCd>0){
+      st.sargeCd=Math.max(0, st.sargeCd-dt);
+      if(st.sargeCd===0 && st.me){
+        const b=bf.base[bfMyTeam()];
+        S.floats.push({x:b.x+46, y:b.y-96, txt:'SARGE READY!', t:0, col:'#BFE39A'});
+        SFX.ready(); bf.sargeFlash=0.9;      // the tray card flashes him back in
+      }
+    }
     st.tagT += dt*otm*boost[st.team]*(st.team==='foe'? inc : 1);
     if(st.tagT>=10){ st.tagT-=10;
       if(st.me){ S.plastic+=BF_TICK;
@@ -4028,7 +4353,7 @@ function buildBFView(dt, st){
       side: mir? (u.side==='you'?'foe':'you') : u.side,
       x: mir? (WORLD_W-u.x)|0 : u.x|0, y:u.y|0, hp:u.hp, dropT:u.dropT }); }
   const mine=bf.base[st.team], theirs=bf.base[st.team==='you'?'foe':'you'];
-  return { dt, timeLeft:bf.timeLeft, phase:bf.phase, overtime:bf.ot,
+  return { dt, timeLeft:bf.timeLeft, phase:bf.phase, overtime:bf.ot, sargeCd:(st.sargeCd||0),
     myBaseHP:mine.hp, foeBaseHP:theirs.hp, myPurse:st.purse, mySeat:st.i, laneBias:st.laneBias,
     cp:(x,y,t)=>canPlace(Math.round(mir? WORLD_W-x : x), Math.round(y), t, st.team),
     units, map:{ width:WORLD_W, rocks:S.cfg.terrain.rocks, rivers:S.cfg.terrain.rivers,
@@ -4068,7 +4393,10 @@ OpponentBrain.prototype.decide=function(view,budget){
   this.cd=this.d.every;
   const mine=view.units.filter(u=>u.side==='foe'), theirs=view.units.filter(u=>u.side==='you');
   const own=mine.filter(u=>u.seat===view.mySeat);        // the men THIS purse bought
-  const hasSarge=own.some(u=>u.type==='sarge');          // one Sarge per player, not per team
+  // one Sarge per player, not per team — and for ten seconds after he goes over,
+  // none at all (v1.25). The brain reads the clock so it never burns a decision
+  // on an order applyDeploy is only going to refuse.
+  const hasSarge=own.some(u=>u.type==='sarge') || (view.sargeCd||0)>0;
   const afford=BF_TYPES.filter(t=>BF_COST[t]<=budget && (t!=='sarge'||!hasSarge));
   if(!afford.length) return [];
   const pressure = theirs.some(u=>u.dropT<=0&&u.x>MID-80) || own.length<2;
@@ -5051,7 +5379,7 @@ function endBattle(win){
   document.getElementById(win?'win':'lose').classList.remove('hidden');
   if(!win){
     // you still learned the ground — a defeat pays a tenth of a level
-    const xpGain=xpFor(XP_LOSS), promos=grantXP(xpGain);
+    const xpGain=xpFor(XP_LOSS), promos=xpAward(xpGain,{src:'campaign'});
     document.getElementById('loseTitle').innerHTML='THE TOY BOX<br>HAS FALLEN';
     document.getElementById('loseText').textContent='The Tan flag flies over your carpet. Sarge would like a word. · +'+xpGain+' XP for the trouble'+promoTag(promos);
     checkAch(); saveMeta();   // a lost battle still locks in its ace, its medals and its XP
@@ -5103,8 +5431,9 @@ function endBattle(win){
   if(S.bossKilled && !S.rival) msg = 'BOSS DOWN! '+msg+' · +2★ bounty';
   if(sargeNew.length) msg += ' · ⚔ SARGE UNLOCKED THE '+sargeNew.join(' & ')+'! Equip it at the Training Academy';
   msg += ' · +'+xpGain+' XP' + (stars>0? ' · +'+stars+'★':'');
-  let promos=grantXP(xpGain);
-  if(firstEver && promos===0){ META.lvl++; META.pendingPicks++; promos=1; META.xp=0; }  // first mission always promotes — pick your favorite soldier
+  // the first mission ALWAYS promotes — xpAward applies that rule itself, so the
+  // ceremony sees the real end state and that promotion earns its own fanfare
+  const promos=xpAward(xpGain,{src:(coopSquad()?'squad':'campaign'), forcePromo:firstEver});
   if(promos>0) msg += ' · PROMOTED TO LEVEL '+META.lvl+'!';
   if(S.coop && COOP && coopSquad()){
     const n=coopHumans();
@@ -5646,6 +5975,7 @@ function hitCheck(f,u){
   if(f.side){
     if(f.dead || f.hp>0) return;
     f.dead=true;
+    bfSargeDown(f);                       // if that was a Sarge, his chair starts counting
     if(u && u.kills!=null){ u.kills++; noteAce(u); }
     S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(f.def.vehicle?3.14:(Math.random()<0.5?-1.83:1.83)),
       w:unitW(f.type), img:unitImg(f.type,f), flip:(f.side==='foe') });
@@ -6381,16 +6711,43 @@ function drawHUD(){
       const x=x0+i*(tw+gap);
       trayRects[i]=[x,y0,tw,th];
       const placed = t==='sarge' && S.units.some(u=>!u.dead&&u.seat===bfMySeat()&&u.type==='sarge');
-      const afford = !placed && S.plastic>=BF_COST[t];
+      // SARGE'S TEN SECONDS, on the card (v1.25). Not a silent refusal: the card
+      // goes dark, a fill climbs back up it, and the seconds count down in the
+      // middle of it, so you can see exactly when he is coming back.
+      const cd = t==='sarge'? bfSargeCd(bfMySeat()) : 0;
+      const afford = !placed && cd<=0 && S.plastic>=BF_COST[t];
       cx.fillStyle= afford? 'rgba(38,40,31,0.92)':'rgba(38,40,31,0.6)';
       rr(x,y0,tw,th,10); cx.fill();
+      if(cd>0){   // the recharge climbing back up behind him
+        // ⚠ a 26%-alpha green here was all but invisible on a warm carpet — the
+        // card behind it is only 60% opaque, so the rug shows through and eats
+        // the hue. Half alpha and a solid leading edge, so the climb reads.
+        const k=1-cd/BF_SARGE_DOWN, fh=Math.max(1,th*k);
+        cx.save(); rr(x,y0,tw,th,10); cx.clip();
+        cx.fillStyle='rgba(120,170,80,0.5)'; cx.fillRect(x,y0+th-fh,tw,fh);
+        cx.fillStyle='#BFE39A'; cx.fillRect(x,y0+th-fh,tw,3);
+        cx.restore();
+      }
       if(S.drag&&S.drag.type===t){ cx.strokeStyle='#fff'; cx.lineWidth=2; rr(x,y0,tw,th,10); cx.stroke(); }
-      cx.globalAlpha=afford?1:0.35;
+      // he's back — a gold rim on the card, fading out over the next beat
+      else if(t==='sarge' && cd<=0 && S.bf.sargeFlash>0){
+        cx.save(); cx.globalAlpha=reducedMotion()? 0.85 : Math.min(1,S.bf.sargeFlash/0.9);
+        cx.strokeStyle='#FFD24A'; cx.lineWidth=3; rr(x,y0,tw,th,10); cx.stroke(); cx.restore();
+      }
+      cx.globalAlpha= cd>0? 0.16 : (afford?1:0.35);
       drawSprite(t, x+tw/2-14, y0+th-18, 44,0,0,unitImg(t,bfMe()));
       cx.globalAlpha=1;
-      cx.font='bold 17px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center';
-      cx.fillStyle= afford? '#FFF3C4':'#8b8f7a';
-      cx.fillText(t==='sarge'? (placed?'★':'FREE') : BF_COST[t], x+tw-24, y0+th-12);
+      cx.textAlign='center';
+      if(cd>0){                                     // the count itself, dead centre
+        cx.font='bold 30px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#FFD24A';
+        cx.fillText(Math.ceil(cd), x+tw/2, y0+th/2+11);
+        cx.font='bold 11px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#D2B489';
+        cx.fillText('DOWN', x+tw/2, y0+th-8);
+      } else {
+        cx.font='bold 17px "Arial Narrow", Impact, sans-serif';
+        cx.fillStyle= afford? '#FFF3C4':'#8b8f7a';
+        cx.fillText(t==='sarge'? (placed?'★':'FREE') : BF_COST[t], x+tw-24, y0+th-12);
+      }
       cx.fillStyle=afford?CREAM:'#8b8f7a'; cx.font='bold 12px "Arial Narrow", Impact, sans-serif';
       cx.fillText(UDEF[t].name, x+tw/2, y0+13);
     });
@@ -6510,7 +6867,8 @@ cv.addEventListener('pointerdown', e=>{
     for(let i=0;i<TT.length;i++){
       if(inRect(p.x,p.y,trayRects[i])){
         const t=TT[i];
-        const placed = t==='sarge' && S.units.some(u=>!u.dead&&u.seat===bfMySeat()&&u.type==='sarge');
+        const placed = (t==='sarge' && S.units.some(u=>!u.dead&&u.seat===bfMySeat()&&u.type==='sarge'))
+                    || (t==='sarge' && bfSargeCd(bfMySeat())>0);   // he's still down — the card says so
         if(!placed && S.plastic>=BF_COST[t]){ const w=evPosW(e); S.drag={type:t,x:w.x,y:w.y-DRAG_OFF,unit:null}; }
         else SFX.clack();
         S.sel=null; return;
@@ -8593,6 +8951,37 @@ window.GVT = {
       invasion:xpFor(XP_INVASION_WIN), loss:xpFor(XP_LOSS) } }; },
   lvl(n,xp){ META.lvl=Math.max(1,n|0); META.xp=Math.max(0,xp|0); META.pendingPicks=0; saveMeta();
     return { lvl:META.lvl, xp:META.xp, need:xpNeed() }; },
+  // ===== THE XP CEREMONY rig (v1.25) =====
+  // xpFire pays REAL XP through the REAL award path — the same call the four end
+  // screens make — so a test can never "verify" a ceremony the game never runs.
+  xpFire(amt,opts){ const p=xpAward(Math.max(1,amt|0), opts||{src:'rig'}); saveMeta();
+    return { promos:p, lvl:META.lvl, xp:META.xp, need:xpNeed() }; },
+  xpJuice(){ const r=document.getElementById('xpjuice');
+    const anim=(el)=>{ try{ return el&&el.getAnimations? el.getAnimations().length : 0; }catch(e){ return 0; } };
+    const up=document.getElementById('xjUp'), card=document.getElementById('xjCard');
+    return { live:!!XPJ, pending:!!XPJ_PEND, rm:(XPJ? XPJ.RM : reducedMotion()),
+      hidden:!!(r&&r.classList.contains('hidden')), pe:(r? getComputedStyle(r).pointerEvents : null),
+      bits:document.querySelectorAll('#xpjuice .xj-bit').length,
+      rays:document.querySelectorAll('#xpjuice .xj-rays').length,
+      leveled:!!(XPJ&&XPJ.leveled), dispLvl:(XPJ? XPJ.dispLvl : null),
+      num:(document.getElementById('xjNum')||{}).textContent||null,
+      lvlText:(document.getElementById('xjLvl')||{}).textContent||null,
+      fill:(document.getElementById('xjFill')||{style:{}}).style.width||null,
+      cardUp:!!(up && !up.classList.contains('hidden')),
+      bigText:(up? (up.querySelector('.xj-big')||{}).textContent : null)||null,
+      anims:anim(card)+anim(up) }; },
+  // ===== SARGE'S RESPAWN COOLDOWN rig (v1.25) =====
+  bfSarge(seat){ if(!S.bf) return null;
+    const s=(seat==null? bfMySeat() : seat|0), st=S.bf.seats[s];
+    return { seat:s, cd:+bfSargeCd(s).toFixed(2), max:BF_SARGE_DOWN, ready:bfSargeCd(s)<=0,
+      flash:+(S.bf.sargeFlash||0).toFixed(2),
+      onField:S.units.some(u=>!u.dead&&u.seat===s&&u.type==='sarge'),
+      seats:S.bf.seats.map(q=>+Math.max(0,q.sargeCd||0).toFixed(2)),
+      me:!!(st&&st.me) }; },
+  bfKillSarge(seat){ if(!S.bf) return null;
+    const s=(seat==null? bfMySeat() : seat|0);
+    const u=S.units.find(q=>!q.dead&&q.seat===s&&q.type==='sarge'); if(!u) return null;
+    u.hp=0; hitCheck(u,null); return GVT.bfSarge(s); },
   bfRec(n,w,l){ if(n){ META.bfRecord[n]={w:w|0,l:l|0,s:0}; saveMeta(); } return META.bfRecord; },
   // piggy test rig: GVT.pig(12) = 12-day streak defended yesterday, unclaimed
   pig(streak,opts){ opts=opts||{};
