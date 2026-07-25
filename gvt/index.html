@@ -830,7 +830,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.18</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.19</div>
   <div class="scanlines"></div>
 </div>
 
@@ -2954,7 +2954,13 @@ function tanHit(u,fx,fy){
   if(saberBlocks(u)) return;                 // deflected off the blade
   u.hits++; u.hitT=0;
   S.fx.push({k:'tracer',x1:fx-14,y1:fy-26,x2:u.x,y2:u.y-18,t:0,dur:0.1,col:'#EDD9A8'});
-  if(u.hits>=gritCap(u)){ knock(u,fx,fy); }
+  // ONE ROUND, ONE SAVE (7/25): this round already rolled against the blade and
+  // got through — the knockdown it earned must not roll a SECOND time. It did,
+  // and that quietly squared his block: at rank 5 the deflect reads as 75% on
+  // the card but stopped 93.75% of knockdowns, which is most of why he felt
+  // untouchable. Every other caller of knock() is a direct hit that has not
+  // rolled yet, so they still do.
+  if(u.hits>=gritCap(u)){ knock(u,fx,fy,true); }
 }
 // LIGHTSABER (7/24 rework, Wyatt): Sarge DASHES at the nearest foe, carves it
 // up — and if anyone else is still in reach he presses the attack, strike
@@ -3010,7 +3016,7 @@ function updateSaber(u,dt,sw){
   // battlefield: where the dash began, then the march resumes from idle)
   const dx=u.home.x-u.x, dy=u.home.y-u.y, d=Math.hypot(dx,dy);
   if(d>4){ const sp=390; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }
-  else { u.x=u.home.x; u.y=u.home.y; u.saberState='idle'; }
+  else { u.x=u.home.x; u.y=u.home.y; u.saberState='idle'; u.saberTarget=null; }   // home clean — no stale man on the hook
 }
 function frng(f){ return f.def.rng + (S.invasion?15:0); }   // your invaders shoot with conviction
 function tanShoot(f){
@@ -3029,6 +3035,43 @@ function hasGreenTarget(f){
     if(u.down) continue;
     if(S.drag&&S.drag.unit===u) continue;
     if(Math.hypot(u.x-f.x,u.y-f.y)<=frng(f)) return true;
+  }
+  return false;
+}
+// ===== A BLADE IN YOUR FACE (7/25, Wyatt: "enemies seem to not target him while
+// he dashes around next to them") =====
+// Nothing ever excluded the dashing Sarge from the tan target scan — tanShoot
+// picks the nearest green and that is him. MEASURED against a rifle line he
+// could not kill, he drew 22 rounds at rank 0 and 32 at rank 5. The problem was
+// never WHO they aim at; it was that they never live long enough to aim.
+// A tan rifle needs 3.2s to come round again and then presents for another
+// 0.55s — 3.75s to the first round — and the blade clears everything in reach
+// in under 3. Against a line he CAN kill, the measurement was zero rounds
+// fired. Ever. The men died mid-present-arms.
+// So: a man with a blade on top of him does not finish the parade routine. He
+// snaps the rifle up on whatever charge he has and fires. Same halt-aim-fire
+// everyone else uses — still a visible wind-up, still your kill window, just a
+// short one — and every round that arrives still rolls against the blade.
+// Scoped to a saber Sarge inside SABER_PANIC_R and nothing else, so no other
+// engagement in the game changes by a frame.
+const SABER_PANIC_R=92,          // "he's on top of me" — twice the blade's cleave
+      SABER_PANIC_CD=0.9,        // the fastest a frightened man works a bolt
+      SABER_PANIC_AIM=0.22;      // snapped up, not presented
+// the blades actually on the carpet this frame — gathered ONCE per update and
+// passed down, so a forty-man wave doesn't re-derive sargeStats() forty times
+function saberMen(){
+  const out=[];
+  for(const u of S.units){
+    if(u.type!=='sarge'||u.down) continue;
+    if(S.drag&&S.drag.unit===u) continue;                    // a figure in your hand isn't threatening anyone
+    if(unitSargeStats(u).w!=='lightsaber') continue;
+    out.push(u);
+  }
+  return out;
+}
+function saberOnTopOf(f,men){
+  for(const u of (men||saberMen())){
+    if(Math.hypot(u.x-f.x,u.y-f.y)<=SABER_PANIC_R) return true;
   }
   return false;
 }
@@ -3058,10 +3101,21 @@ function canPlace(x,y,type,side){
   for(const u of S.units){ if(Math.hypot(u.x-x,u.y-y)<40) return false; }
   return true;
 }
-function knock(u, srcx, srcy){
+function knock(u, srcx, srcy, rolled){
   if(u.down) return;
-  if(saberBlocks(u)) return;                 // the blade turns it aside
+  if(!rolled && saberBlocks(u)) return;      // the blade turns it aside (unless this round already rolled)
   u.down=true; u.downT=0; u.hits=0; S.downsLevel++; SFX.clack();
+  // KNOCKED OUT OF THE CHARGE: a man on his back is not still lunging. The run
+  // ends where he falls — no stale target he was mid-swing on, no half-spent
+  // recovery — and he wakes up falling back to his post with the blade
+  // re-arming. Covers every knockdown source, since they all come through here.
+  // (saberCd is only ever DECREMENTED in the units-fire loop head — setting it
+  // here can't double-tick it.)
+  if(u.type==='sarge' && u.saberState && u.saberState!=='idle'){
+    const sw=unitSargeStats(u);
+    u.saberState='back'; u.saberTarget=null; u.saberSwing=0;
+    u.saberCd=Math.max(u.saberCd||0, sw.cd||2.1);
+  }
   S.fx.push({k:'ring', x:u.x, y:u.y-20, r:6, R:26, t:0, dur:0.35, col:'rgba(255,255,255,0.7)'});
   if(S.invasion && !S.invasion.resolved){
     S.invasion.budget+=8;   // his dog tag, your war chest — knockdowns pay the invader
@@ -3811,6 +3865,7 @@ function update(dt){
   }
 
   // foes
+  const blades=S.foes.length? saberMen() : [];   // who has a blade out, for the panic rule below
   for(let i=S.foes.length-1;i>=0;i--){
     const f=S.foes[i];
     let aura=1;
@@ -3892,7 +3947,10 @@ function update(dt){
     // a visible half-second wind-up where they're standing still and you can
     // drop them first. Then they fire and keep coming.
     if((f.type==='tanrifle'||f.type==='tanmg'||f.type==='crawler') && !f.burrow && f.x<W-10 && f.x>-40){
-      if(f.form && f.form.kind==='redcoat'){
+      const panic=blades.length>0 && saberOnTopOf(f,blades);   // the blade is inside his personal space
+      // a redcoat waits for the order — unless he is about to be cut in half,
+      // and then he breaks ranks and defends himself like anybody would
+      if(f.form && f.form.kind==='redcoat' && !panic){
         if(f.form.doVolley) tanShoot(f);
       } else if(f.burst>0){
         f.burstT-=dt;   // the MG walks his burst in — brrrt, one grit hit per round
@@ -3907,7 +3965,10 @@ function update(dt){
         f.shot+=dt;
         // when YOU are the Tan (invasions), infantry fire like the Green riflemen do
         const cd=f.def.fireCd*(f.fireMul||1)*(S.invasion?0.45:1);
-        if(f.shot>=cd && hasGreenTarget(f)){ f.aimT=S.invasion?0.35:0.55; }   // halt... aim...
+        const rdy=panic? Math.min(cd,SABER_PANIC_CD) : cd;
+        if(f.shot>=rdy && hasGreenTarget(f)){                                  // halt... aim...
+          f.aimT = panic? SABER_PANIC_AIM : (S.invasion?0.35:0.55);
+        }
       }
     }
     // officer potshot
@@ -6307,6 +6368,17 @@ window.GVT = {
   endCoach(){ coachDone(); },
   boss(t){ if(S.mode!=='play') startBattle(3,null); spawnGroup({f:'boss',t:(t||'rex')}); return S.foes.filter(f=>f.boss).map(f=>f.type); },
   sarge(w,rank){ if(w&&w!=='pistol'&&META.sargeUnlocked.indexOf(w)<0) META.sargeUnlocked.push(w); META.sargeWeapon=w||'pistol'; if(rank!=null){ const r=Math.max(0,Math.min(RANK_MAX,rank|0)); if(w==='pistol') META.up.sarge=r; else META.sargeUp[w]=r; } saveMeta(); return sargeStats(); },
+  // THE BLADE IN YOUR FACE test rig: the whole saber state machine in one call,
+  // plus how many tan are close enough to stop presenting arms and just shoot him
+  saberState(){ const u=S.units.find(x=>x.type==='sarge'); if(!u) return null;
+    const sw=unitSargeStats(u);
+    return { w:sw.w, rank:sw.r, block:sw.block||0, state:u.saberState||null,
+      target:!!u.saberTarget, swing:+(u.saberSwing||0).toFixed(2), cd:+(u.saberCd||0).toFixed(2),
+      down:!!u.down, hits:u.hits, grit:gritCap(u),
+      x:Math.round(u.x), y:Math.round(u.y),
+      home:u.home?{x:Math.round(u.home.x),y:Math.round(u.home.y)}:null,
+      atHome: !!u.home && Math.hypot(u.x-u.home.x,u.y-u.home.y)<5,
+      panicking: S.bf? 0 : (()=>{ const m=saberMen(); return S.foes.filter(f=>saberOnTopOf(f,m)).length; })() }; },
   // ===== THE HUNDRED-RANK LADDER test rig =====
   // GVT.rank('rifleman',50) puts a unit on any rung and reports what it bought;
   // GVT.curve(100) reads the WHOLE table at a rank without touching your save —
