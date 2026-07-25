@@ -239,6 +239,7 @@
   .accard .chev, .accard small { margin-top:auto; }  /* footers align even when a name wraps */
   .accard.eq { border-color:#7FA35C; background:rgba(127,163,92,0.14); box-shadow:0 0 16px rgba(127,163,92,0.35); }
   .accard.lock b { opacity:0.5; }
+  .accard.lock img { opacity:0.55; }
   .acflag { position:absolute; top:-11px; left:50%; transform:translateX(-50%); background:#7FA35C; color:#141810;
     font-weight:bold; font-size:0.72rem; letter-spacing:0.09em; padding:3px 9px; border-radius:9px; white-space:nowrap; }
   .chev { width:66px; height:13px; display:block; margin:6px auto 0; }
@@ -813,6 +814,17 @@ SPRITES_SRC.rollpig = '<circle cx="70" cy="72" r="46" fill="currentColor"/>'
 // BLADEHEX — whatever colour you picked. The classic figure already holds
 // his sidearm, so 'pistol' just uses SPRITES_SRC.sarge.
 const SARGE_ART = {
+  // heads ride FORWARD over the action (rifleman convention: head leads the
+  // lean) — centered heads on leaning bodies read as facing backwards at
+  // academy card size. The pistol portrait is the classic figure w/ the same
+  // head-forward treatment; the in-game sprite stays untouched.
+  pistol: BASE+'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">'
+    +'<path d="M40 122 L54 96" stroke-width="11"/><path d="M76 118 L58 96" stroke-width="11"/>'
+    +'<path d="M56 96 L58 68" stroke-width="16"/>'
+    +'<path d="M60 72 L76 48" stroke-width="8"/><path d="M58 76 L81 72" stroke-width="8"/></g>'
+    +'<rect x="74" y="34" width="11" height="5" rx="1.5" fill="currentColor"/>'
+    +'<rect x="74" y="34" width="4.5" height="10" rx="1.5" fill="currentColor"/>'
+    +'<g transform="translate(57,50)">'+HEAD+'</g>',
   shotgun: BASE
     +'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">'
     +'<path d="M40 122 L54 96" stroke-width="11"/><path d="M76 118 L58 96" stroke-width="11"/>'
@@ -822,7 +834,7 @@ const SARGE_ART = {
     +'<path d="M46 82 L62 77" stroke="#3a2c1c" stroke-width="9"/>'
     +'<path d="M60 77 L104 68" stroke="#26261f" stroke-width="6"/>'
     +'<path d="M74 76.5 L86 74" stroke="#5a4a34" stroke-width="4"/></g>'
-    +'<g transform="translate(52,52)">'+HEAD+'</g>',
+    +'<g transform="translate(64,56)">'+HEAD+'</g>',
   sniper: BASE
     +'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">'
     +'<path d="M40 122 L54 96" stroke-width="11"/><path d="M76 118 L58 96" stroke-width="11"/>'
@@ -832,7 +844,7 @@ const SARGE_ART = {
     +'<path d="M44 84 L60 79" stroke="#3a2c1c" stroke-width="8"/>'
     +'<path d="M58 79 L116 63" stroke="#26261f" stroke-width="4.5"/></g>'
     +'<rect x="66" y="65" width="13" height="6" rx="3" fill="#26261f" transform="rotate(-15 72.5 68)"/>'
-    +'<g transform="translate(52,52)">'+HEAD+'</g>',
+    +'<g transform="translate(65,54)">'+HEAD+'</g>',
   lightsaber: BASE
     +'<ellipse cx="94" cy="28" rx="16" ry="30" fill="BLADEHEX" opacity="0.12" transform="rotate(33 94 28)"/>'
     +'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">'
@@ -846,7 +858,7 @@ const SARGE_ART = {
     +'<path d="M81 47.6 L107 8.5" stroke="BLADEHEX" stroke-width="7"/>'
     +'<path d="M81 47.6 L107 8.5" stroke="#fff" stroke-width="3"/></g>'
     +'<circle cx="107" cy="8.5" r="3.2" fill="#fff"/>'
-    +'<g transform="translate(52,52)">'+HEAD+'</g>'
+    +'<g transform="translate(61,53)">'+HEAD+'</g>'
 };
 function sargeWepURI(wk, bodyHex, bladeHex){
   const art = SARGE_ART[wk] || SPRITES_SRC.sarge;
@@ -3526,8 +3538,8 @@ function panelHTML(id){
         const rank=wk==='pistol'?(META.up.sarge||0):(META.sargeUp[wk]||0);
         const dl=' style="animation-delay:-'+(i*0.7)+'s"';
         if(!unlocked){
-          // a dark figure on the shelf — the glowing blade still teases what's coming
-          h+='<div class="accard lock"><img src="'+sargeWepURI(wk,'#171a13')+'"'+dl+'><b>'+wd.name+'</b><small>🔒 LEVEL '+wd.unlock+'</small></div>';
+          // locked = your own army colour, just dimmed — the lit blade still teases
+          h+='<div class="accard lock"><img src="'+sargeWepURI(wk,dye)+'"'+dl+'><b>'+wd.name+'</b><small>🔒 LEVEL '+wd.unlock+'</small></div>';
         } else {
           const sab=(wk==='lightsaber');
           const glow=(eq&&sab)? ' style="border-color:'+saberHex()+';box-shadow:0 0 18px '+saberHex()+'66;background:linear-gradient(180deg,'+saberHex()+'22,rgba(255,255,255,0.05))"':'';
@@ -3546,7 +3558,7 @@ function panelHTML(id){
         const dl=' style="animation-delay:-'+(i*0.5)+'s"';
         h+= own
           ? '<div class="accard" onclick="UI.classInfo(\''+k+'\')"><img src="'+sprURI(k,dye)+'"'+dl+'><b>'+UDEF[k].name+'</b>'+chevSVG(META.up[k]||0)+'</div>'
-          : '<div class="accard lock" onclick="UI.classInfo(\''+k+'\')"><img src="'+sprURI(k,'#171a13')+'"'+dl+'><b>'+UDEF[k].name+'</b><small>IN THE SHOP</small></div>';
+          : '<div class="accard lock" onclick="UI.classInfo(\''+k+'\')"><img src="'+sprURI(k,dye)+'"'+dl+'><b>'+UDEF[k].name+'</b><small>IN THE SHOP</small></div>';
       });
       return h+'</div>';
     }
