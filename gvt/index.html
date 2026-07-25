@@ -729,7 +729,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.14</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.15</div>
   <div class="scanlines"></div>
 </div>
 
@@ -2269,6 +2269,61 @@ function applyDeploy(seat,type,x,y){
   return u;
 }
 
+// ================= WALKING ROUND THE ROCKS =================
+// A rock's shoulder used to be a pure push-OUT: whoever wanted to go somewhere
+// behind a rock walked straight into it, got shoved straight back, and stood
+// there grinding for the rest of the match. Worse, two rocks whose shoulders
+// overlap made a POCKET with no way through at all — and a marching block
+// carries a much wider shoulder than one man, so pairs that a single soldier
+// could squeeze between were a dead end for a formation. Campaign L13's pair
+// overlapped by 35px: every wave wedged, S.foes never emptied, and the wave
+// gate below (which needs an empty field to call the wave clear) could never
+// fire. The level was unwinnable. 39 of the first 100 rock seeds had one.
+//
+// So the shoulder STEERS now. If a rock stands between you and where you're
+// headed, you take the tangent round it — the side that leaves you closer to
+// the goal and doesn't walk you into the next rock. The push-out stays exactly
+// as it was underneath (rocks still block, still shoulder, still can't be
+// stood on); this only decides which way you WALK while it does.
+const ROCK_PAD_FOE=16, ROCK_PAD_FORM=40;   // shoulder room: one man / a whole block
+function rockSteer(x,y,gx,gy,pad){
+  const RK=S.cfg.terrain.rocks;
+  if(!RK||!RK.length) return null;
+  let dx=gx-x, dy=gy-y; const gd=Math.hypot(dx,dy);
+  if(gd<1) return null;
+  dx/=gd; dy/=gd;
+  // the first rock actually standing on the line we want to walk
+  let blk=null, ba=1e9;
+  for(const rk of RK){
+    const R=rk.r+pad, vx=rk.x-x, vy=rk.y-y;
+    const along=vx*dx+vy*dy;
+    if(along<=0 || along-R>gd) continue;              // behind us, or past the goal
+    if(Math.abs(vx*dy-vy*dx)>=R) continue;            // the line clears it
+    // the place we're headed is ON this rock (a boulder parked on the bridge).
+    // Rounding it would orbit forever — walk in and let the shoulder settle it.
+    if(Math.hypot(gx-rk.x, gy-rk.y)<R) continue;
+    if(along<ba){ ba=along; blk=rk; }
+  }
+  if(!blk) return null;                               // clean walk — carry on
+  // round it on the better side: keep the side we're already drifting to
+  // unless it runs us into another rock or off the carpet
+  const R=blk.r+pad+6, vx=blk.x-x, vy=blk.y-y, cross=vx*dy-vy*dx;
+  let bx=0, by=0, bs=1e9;
+  for(const s of (cross>=0 ? [1,-1] : [-1,1])){
+    const px=blk.x-dy*s*R, py=blk.y+dx*s*R;
+    let sc=Math.hypot(gx-px,gy-py);
+    if(py<80||py>H-100) sc+=900;                      // don't steer off the carpet
+    for(const o of RK){
+      if(o===blk) continue;
+      const od=Math.hypot(o.x-px,o.y-py), om=o.r+pad;
+      if(od<om) sc+=1400+(om-od)*8;                   // that way is another rock
+    }
+    if(sc<bs){ bs=sc; bx=px; by=py; }
+  }
+  const bd=Math.hypot(bx-x,by-y);
+  return bd<1 ? null : { x:(bx-x)/bd, y:(by-y)/bd };
+}
+
 // ================= BATTLEFIELD: MOVEMENT + THE FREE LEAK =================
 function bfAggro(u){
   if(u.def.ram) return 0;                    // the jeep halts for nothing — it drives THROUGH you
@@ -2312,9 +2367,10 @@ function bfMarch(u,dt,goal){
     }
   }
   const dx=gx-u.x, dy=gy-u.y, d=Math.hypot(dx,dy)||1, sp=(u.def.moveSpd||36)*(u.gait||1)*bfGround(u);
-  u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt;
+  const st=rockSteer(u.x,u.y,gx,gy,ROCK_PAD_FOE);   // walk ROUND the blocks, not into them
+  u.x+=(st?st.x:dx/d)*sp*dt; u.y+=(st?st.y:dy/d)*sp*dt;
   for(const rk of S.cfg.terrain.rocks){          // rocks shoulder him aside (reused kernel)
-    const ax=u.x-rk.x, ay=u.y-rk.y, dd=Math.hypot(ax,ay), min=rk.r+16;
+    const ax=u.x-rk.x, ay=u.y-rk.y, dd=Math.hypot(ax,ay), min=rk.r+ROCK_PAD_FOE;
     if(dd>0.1&&dd<min){ u.x+=ax/dd*(min-dd)*Math.min(1,dt*8); u.y+=ay/dd*(min-dd)*Math.min(1,dt*8); }
   }
   for(const bl of (S.cfg.terrain.balls||[])){    // the wrecking ball is a rock that's going places
@@ -2833,6 +2889,7 @@ function spawnFoe(type,x,y,form,gu){
     spdMul:(m.spd||1), fireMul:(m.fire||1), bountyMul:(m.bounty||1),
     shot:(type==='officer'?3:(type==='tanrifle'?2.4:(type==='tanmg'?1.8:0))), rammed:{}, form:form||null, off:null,
     gu:!!gu, dash:false, burrow:false, gt:Math.random()*0.8, tgt:null, crossed:false, aimT:0, burst:0, burstT:0,
+    best:null, stall:0, squeeze:false, goalTag:null,   // ground-gained watch — see the squeeze backstop in update()
     boss:!!d.boss, spin:0 };
   S.foes.push(f);
   return f;
@@ -2910,6 +2967,7 @@ function spawnGroup(g){
   }
   if(g.officer){ const rear=Math.min.apply(null, list.map(o=>o.fx)); list.push({t:'officer', fx:rear-48, fy:0}); }
   const form={ x:ep.x, y:ep.y, kind:g.f, timer:Math.random(), halted:false, dir:{x:-1,y:0}, members:[],
+    best:null, stall:0,                    // ranks break if the block stops gaining ground
     speed:Math.min.apply(null, list.map(o=>FDEF[o.t].spd)) };
   const d0=Math.hypot(T.x-ep.x,T.y-ep.y);
   form.dir={x:(T.x-ep.x)/d0, y:(T.y-ep.y)/d0};
@@ -3519,14 +3577,28 @@ function update(dt){
     const RV=S.cfg.terrain.river;
     const fgoal = (RV && fo.x>RV.x+RV.w+40) ? {x:RV.x+RV.w/2, y:RV.bridgeY} : T;
     const d=Math.hypot(fgoal.x-fo.x, fgoal.y-fo.y);
+    // a block of men is WIDE. If the anchor stops gaining ground on its goal —
+    // a gap the formation can't fit through, a pinch against the edge — the
+    // ranks BREAK and the men go round one at a time, on their own narrower
+    // shoulders. Same beat as the river break, just triggered by the ground.
+    // (Redcoats halt to volley on purpose; that halt is not a stall.)
+    if(fo.best==null || d<fo.best-1){ fo.best=d; fo.stall=0; }
+    else if(!fo.halted) fo.stall=(fo.stall||0)+dt;
     // ranks break early at a river — no formation fits on a popsicle bridge
-    if(d<115 || (RV && fo.x<RV.x+RV.w+80 && fo.x>RV.x-20)){
+    if(d<115 || (RV && fo.x<RV.x+RV.w+80 && fo.x>RV.x-20) || fo.stall>2.5){
       fo.members.forEach(m=>{ m.form=null; }); S.forms.splice(i,1); continue;
     }
-    fo.dir={x:(fgoal.x-fo.x)/d, y:(fgoal.y-fo.y)/d};
+    // wheel onto the heading (round a rock if one's in the way) rather than
+    // snapping to it — a block of men turns, it doesn't strafe
+    const stf=rockSteer(fo.x,fo.y,fgoal.x,fgoal.y,ROCK_PAD_FORM);
+    const mx=stf?stf.x:(fgoal.x-fo.x)/d, my=stf?stf.y:(fgoal.y-fo.y)/d;
+    const k=Math.min(1,dt*4);
+    let nx=fo.dir.x+(mx-fo.dir.x)*k, ny=fo.dir.y+(my-fo.dir.y)*k;
+    const nl=Math.hypot(nx,ny)||1;
+    fo.dir={x:nx/nl, y:ny/nl};
     fo.x+=fo.dir.x*spd*dt; fo.y+=fo.dir.y*spd*dt;
     for(const rk of S.cfg.terrain.rocks){
-      const dx=fo.x-rk.x, dy=fo.y-rk.y, dd=Math.hypot(dx,dy), min=rk.r+40;
+      const dx=fo.x-rk.x, dy=fo.y-rk.y, dd=Math.hypot(dx,dy), min=rk.r+ROCK_PAD_FORM;
       if(dd>0.1&&dd<min){ fo.x+=dx/dd*(min-dd)*Math.min(1,dt*6); fo.y+=dy/dd*(min-dd)*Math.min(1,dt*6); }
     }
   }
@@ -3544,6 +3616,12 @@ function update(dt){
     else {
     // the river funnels everyone to the bridge — except crawlers, who slip under
     const RV=S.cfg.terrain.river;
+    // ...and except a man who has stood at the crossing for seconds without
+    // gaining an inch. He is never going to find that bridge — a boulder can
+    // land square on it — so he gives up on the plank and WADES. Only ever
+    // fires once the stall watch below has given up on him, so a crossing
+    // that works never sees this.
+    if(RV && f.squeeze && !f.crossed) f.crossed=true;
     const goal = (RV && !f.crossed && f.type!=='crawler' && !f.boss && f.x>RV.x+RV.w)
       ? { x:RV.x+RV.w/2, y:RV.bridgeY } : T;
     if(RV && f.x<=RV.x-4) f.crossed=true;
@@ -3561,7 +3639,8 @@ function update(dt){
       f.gt-=dt;
       if(f.burrow){
         const d=Math.hypot(T.x-f.x,T.y-f.y);
-        if(d>1){ const sp=f.def.spd*aura*0.7; f.x+=(T.x-f.x)/d*sp*dt; f.y+=(T.y-f.y)/d*sp*dt; }
+        if(d>1){ const sp=f.def.spd*aura*0.7, st=rockSteer(f.x,f.y,T.x,T.y,f.squeeze?3:ROCK_PAD_FOE);
+          f.x+=(st?st.x:(T.x-f.x)/d)*sp*dt; f.y+=(st?st.y:(T.y-f.y)/d)*sp*dt; }
         if(f.gt<=0){ f.burrow=false; f.dash=true; f.gt=0.8+Math.random()*0.4;
           f.tgt={ x:f.x+(T.x-f.x)*0.3+(Math.random()-0.5)*90, y:f.y+(T.y-f.y)*0.3+(Math.random()-0.5)*90 };
           S.fx.push({k:'ring',x:f.x,y:f.y,r:4,R:22,t:0,dur:0.3,col:'rgba(154,90,74,0.9)'}); }
@@ -3575,12 +3654,29 @@ function update(dt){
       }
     } else {
       const d=Math.hypot(goal.x-f.x, goal.y-f.y);
-      if(d>1){ const sp=f.def.spd*aura; f.x+=(goal.x-f.x)/d*sp*dt; f.y+=(goal.y-f.y)/d*sp*dt; }
+      if(d>1){ const sp=f.def.spd*aura, st=rockSteer(f.x,f.y,goal.x,goal.y,f.squeeze?3:ROCK_PAD_FOE);
+        f.x+=(st?st.x:(goal.x-f.x)/d)*sp*dt; f.y+=(st?st.y:(goal.y-f.y)/d)*sp*dt; }
     }
+    // NOBODY STANDS STILL FOREVER. Steering gets a man round any rock we can
+    // see; this is the backstop for the ones we can't — a pile-up, a pinch
+    // against the carpet edge, a seed nobody ever played. Stop gaining ground
+    // and he starts SQUEEZING: the shoulder shrinks to nothing and he scrapes
+    // past the stone. The field always empties, so the wave always clears.
+    if(f.form) f.stall=0;
+    else {
+      // stepping off the bridge swaps the goal for the Toy Box, and the
+      // distance jumps with it — that's a new march, not a stall
+      const tag = goal===T ? 'box' : 'br';
+      if(f.goalTag!==tag){ f.goalTag=tag; f.best=null; f.stall=0; }
+      const gd=Math.hypot(goal.x-f.x, goal.y-f.y);
+      if(f.best==null || gd<f.best-1){ f.best=gd; f.stall=0; }
+      else f.stall=(f.stall||0)+dt;
+    }
+    f.squeeze = (f.stall||0)>2.5;
     }
     // rocks shoulder everyone aside (burrowers too — roots)
     for(const rk of S.cfg.terrain.rocks){
-      const dx=f.x-rk.x, dy=f.y-rk.y, d=Math.hypot(dx,dy), min=rk.r+16;
+      const dx=f.x-rk.x, dy=f.y-rk.y, d=Math.hypot(dx,dy), min=rk.r+(f.squeeze?3:ROCK_PAD_FOE);
       if(d>0.1&&d<min){ f.x+=dx/d*(min-d)*Math.min(1,dt*8); f.y+=dy/d*(min-d)*Math.min(1,dt*8); }
     }
     if(dt>0){ f.vx=(f.x-px)/dt; f.vy=(f.y-py)/dt; }
