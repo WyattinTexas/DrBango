@@ -1316,7 +1316,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.25</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.26</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1517,6 +1517,11 @@ for(const k in BF_MOVE) BF_MOVE[k].moveSpd=Math.round(BF_MOVE[k].moveSpd*BF_PACE
 // which is FDEF.tank to the point, and a maxed jeep at 32 finally shrugs off the
 // second machine gun. Tier 0 is deliberately a bad buy on its own: the hub is the
 // purchase, the plates are the piece.
+// The eight placeable classes, in tray order. It lived down beside the HUD until
+// v1.26, when the medal case started sizing FULL MUSTER off its length — a const
+// is in the temporal dead zone until its own line runs, so a goal computed at
+// medal-build time needs it declared above, not merely somewhere in the file.
+const TRAY_ORDER=['rifleman','mgunner','bazooka','mortar','minesweeper','flame','radioman','sarge'];
 const VEH_ORDER=['bfjeep','bftank'];
 const VEH_TIERS=4;                                             // four plates over the factory chassis
 const VEH_HP={ bfjeep:[16,20,24,28,32], bftank:[20,30,40,50,60] };
@@ -1766,7 +1771,13 @@ const META_DEFAULT = {
   unlocked:['rifleman','mgunner','bazooka','mortar','sarge'],
   lasers:[], laserOn:null, dyes:[], dyeOn:null,
   avatar:'rifleman', deviceId:'', name:'',
-  ach:{}, stats:{ standUps:0, tags:0, crawlerKills:0, rivalWins:0, vets:0, bestUnitKills:0, bfKills:0 },
+  // ⚠ THREE NEW COUNTERS (v1.26, for the second fifty medals). They are here and
+  // not derived, because nothing else in the save could answer them after the
+  // fact: vehKills needs the killer's identity at the moment of the kill,
+  // coopMost needs the roster that was standing when the level fell, and
+  // roomGames needs to know a battlefield was PRIVATE once it has resolved.
+  ach:{}, stats:{ standUps:0, tags:0, crawlerKills:0, rivalWins:0, vets:0, bestUnitKills:0, bfKills:0,
+                  vehKills:0, coopMost:0, roomGames:0 },
   rivalDays:{},                                       // 'YYYY-MM-DD' -> color beaten
   // THE PIGGY BANK: survives every day you beat the invaders of the day. Five
   // days in a row = a new coat of paint; a painted piggy pays its tier in stars
@@ -3841,6 +3852,10 @@ function endBattlefield(reason, fromRelay){
   const priv=!!bf.room;
   const ranked=!priv || (COOP? (COOP.ranked==null?1:COOP.ranked)!==0 : true);
   const friendly=priv && !ranked;
+  // A private battle counts on the OPEN DOOR ladder win or lose, and whether or
+  // not the ladder took it — turning up for your friends is the achievement, and
+  // a FRIENDLY (past ROOM_RANK_CAP) is still an evening of playing together.
+  if(priv) META.stats.roomGames++;
   if(won){
     // WIN = +25★ AND VERY NEARLY A PROMOTION (Wyatt 7/24): 91% of the level
     // you're on at 1v1, the whole thing at 10v10 — the biggest single payout in
@@ -5298,11 +5313,456 @@ const badgeArt = (function(){
     }
   }
 
+  /* ======== THE SECOND FIFTY (v1.26) — five more idioms ====================
+     Same rules as the first five: one 100x120 box, flat toy-plastic fills,
+     chunky round-capped strokes for anything that reads as a limb, and the
+     METAL law (1-3 bronze, 4-6 silver, 7-9 gold, 10 radiant) carried by the
+     frame so the tier is legible before you read the name. */
+
+  // a plastic soldier, ~22 tall at scale 1, standing ON (x,y). `up` waves.
+  function manFig(x,y,s,col,up){
+    const arms = up ? 'M0 -12 L-5.5 -17 M0 -12 L5.5 -17' : 'M0 -11.5 L-5 -6.5 M0 -11.5 L5 -6.5';
+    return '<g transform="translate('+x+','+y+') scale('+s+')">'
+      +'<circle cx="0" cy="-16.5" r="3.5" fill="'+col+'"/>'
+      +'<path d="M0 -13.4 L0 -6" stroke="'+col+'" stroke-width="5.2" stroke-linecap="round"/>'
+      +'<path d="'+arms+'" stroke="'+col+'" stroke-width="3" stroke-linecap="round"/>'
+      +'<path d="M0 -6 L-3.6 0 M0 -6 L3.6 0" stroke="'+col+'" stroke-width="3.4" stroke-linecap="round"/></g>';
+  }
+
+  /* ---- WING 6 · THE MOTOR POOL: bolted steel plates ----------------------- */
+  const MOCT='M34 20 L66 20 L81 35 L81 79 L66 94 L34 94 L19 79 L19 35 Z';
+  function mplate(m){
+    let b='';
+    for(const [x,y] of [[28,29],[72,29],[28,85],[72,85]])
+      b+='<circle cx="'+x+'" cy="'+y+'" r="2.5" fill="'+m.l+'" stroke="'+m.d+'" stroke-width="1"/>';
+    return '<path d="'+MOCT+'" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="3"/>'
+      +'<path d="M40 26 L60 26 L75 41 L75 73 L60 88 L40 88 L25 73 L25 41 Z" fill="'+IRON+'" stroke="'+IRON_D+'" stroke-width="2"/>'+b;
+  }
+  function jeepArt(x,y,s,col){
+    return '<g transform="translate('+x+','+y+') scale('+s+')">'
+      +'<path d="M-16 0 L-16 -6 L-9 -6 L-6 -12 L4 -12 L6 -6 L16 -6 L16 0 Z" fill="'+(col||GREEN)+'" stroke="'+DGREEN+'" stroke-width="1.6" stroke-linejoin="round"/>'
+      +'<path d="M-5 -11 L3 -11 L4.6 -6.6 L-6.4 -6.6 Z" fill="#8FB3D9" opacity="0.7"/>'
+      +'<circle cx="-9" cy="1.5" r="4.2" fill="#22262a" stroke="#0d0a07" stroke-width="1.2"/>'
+      +'<circle cx="9" cy="1.5" r="4.2" fill="#22262a" stroke="#0d0a07" stroke-width="1.2"/>'
+      +'<circle cx="-9" cy="1.5" r="1.5" fill="'+IRON_L+'"/><circle cx="9" cy="1.5" r="1.5" fill="'+IRON_L+'"/></g>';
+  }
+  function tankArt(x,y,s,col,lift){
+    return '<g transform="translate('+x+','+y+') scale('+s+')">'
+      +'<rect x="-17" y="-5" width="34" height="8" rx="4" fill="#22262a" stroke="#0d0a07" stroke-width="1.2"/>'
+      +'<circle cx="-11" cy="-1" r="2" fill="'+IRON_L+'"/><circle cx="0" cy="-1" r="2" fill="'+IRON_L+'"/><circle cx="11" cy="-1" r="2" fill="'+IRON_L+'"/>'
+      +'<path d="M-15 -6 L-13 -13 L13 -13 L15 -6 Z" fill="'+(col||GREEN)+'" stroke="'+DGREEN+'" stroke-width="1.6" stroke-linejoin="round"/>'
+      +'<rect x="-7" y="-19" width="14" height="7" rx="2.6" fill="'+(col||GREEN)+'" stroke="'+DGREEN+'" stroke-width="1.5"/>'
+      +'<g transform="rotate('+(lift||0)+' 6 -16)"><rect x="6" y="-17.4" width="16" height="3.2" rx="1.6" fill="'+(col||GREEN)+'" stroke="'+DGREEN+'" stroke-width="1.2"/></g></g>';
+  }
+  // the armour chips that count the plates, left to right under the machine
+  function chips(n,m){
+    let s='';
+    for(let k=0;k<VEH_TIERS;k++){
+      const on=k<n, x=33.5+k*8.4;
+      s+='<rect x="'+x+'" y="76" width="6.4" height="7.6" rx="1.6" fill="'+(on?m.f:'#1b1712')+'" stroke="'+(on?m.d:'#3a352b')+'" stroke-width="1.2"/>';
+      if(on) s+='<circle cx="'+(x+3.2)+'" cy="79.8" r="0.9" fill="'+m.l+'"/>';
+    }
+    return s;
+  }
+  function vehBadge(i){
+    const m=METAL[tierOf(i)];
+    switch(i){
+      case 0: return mplate(m)+jeepArt(50,62,1.15,GREEN)
+        +'<path d="M33 72 L67 72" stroke="'+IRON_L+'" stroke-width="1.6" stroke-dasharray="4 3" opacity="0.7"/>';
+      case 1: return mplate(m)+jeepArt(50,50,0.82,GREEN)+tankArt(50,80,0.78,GREEN)
+        +'<circle cx="31" cy="64" r="4.6" fill="none" stroke="'+m.l+'" stroke-width="1.8"/>'
+        +'<path d="M35 64 L44 64 M42 64 L42 67.5 M45 64 L45 66.5" stroke="'+m.l+'" stroke-width="1.8" stroke-linecap="round"/>';
+      case 2: return mplate(m)+tankArt(50,68,1.02,GREEN)+chips(1,m);
+      case 3: return mplate(m)+tankArt(50,68,1.02,GREEN)+chips(3,m);
+      case 4: return mplate(m)+tankArt(50,68,1.02,GREEN)+chips(VEH_TIERS,m)
+        +'<path d="M38 40 L44 34 L56 34 L62 40" fill="none" stroke="'+m.l+'" stroke-width="2" stroke-linecap="round"/>';
+      case 5: return mplate(m)+jeepArt(50,48,0.8,GREEN)+tankArt(50,74,0.8,GREEN)
+        +chips(VEH_TIERS,m)
+        +'<path d="M27 58 L73 58" stroke="'+m.f+'" stroke-width="2" opacity="0.75"/>';
+      case 6: { let tr='';
+        for(let k=0;k<7;k++) tr+='<rect x="'+(30+k*6)+'" y="'+(78-k*1.2)+'" width="4.4" height="8" rx="1.4" fill="'+IRON_D+'" opacity="'+(0.35+k*0.09).toFixed(2)+'"/>';
+        return mplate(m)+tr+tankArt(50,66,1.05,GREEN)
+          +'<path d="M31 88 L69 88" stroke="'+m.d+'" stroke-width="1.4" opacity="0.6"/>'; }
+      case 7: { let sh='';
+        for(const [x,y,r] of [[70,40,18],[76,49,-6],[66,32,30]])
+          sh+='<g transform="translate('+x+','+y+') rotate('+r+')"><ellipse cx="0" cy="0" rx="4.4" ry="2" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1"/></g>';
+        return mplate(m)+tankArt(48,74,1.02,GREEN,-16)+sh
+          +'<path d="M62 60 q5 -3 9 -1" stroke="'+m.l+'" stroke-width="1.6" fill="none" opacity="0.8"/>'; }
+      // the fist rides the tread — knuckles as bumps on a rounded mass, the same
+      // way the CENTURION's helmet reads over in BATTLEFIELD — KILLS
+      case 8: return mplate(m)
+        +'<rect x="31" y="74" width="38" height="8.4" rx="4.2" fill="#22262a" stroke="#0d0a07" stroke-width="1.4"/>'
+        +'<circle cx="39" cy="78.2" r="1.9" fill="'+IRON_L+'"/><circle cx="50" cy="78.2" r="1.9" fill="'+IRON_L+'"/><circle cx="61" cy="78.2" r="1.9" fill="'+IRON_L+'"/>'
+        +'<rect x="35" y="53" width="30" height="18" rx="5" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="2.2"/>'
+        +'<circle cx="39.5" cy="52.5" r="4.4" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="2"/>'
+        +'<circle cx="48" cy="50.6" r="4.6" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="2"/>'
+        +'<circle cx="56.5" cy="50.6" r="4.6" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="2"/>'
+        +'<circle cx="63.5" cy="53.5" r="4" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="2"/>'
+        +'<path d="M36 62 Q50 66 64 62" stroke="'+m.d+'" stroke-width="1.5" fill="none" opacity="0.8"/>'
+        +'<path d="M35 60 Q30 58 30.5 52 Q31.5 47 36 50" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="2" stroke-linejoin="round"/>'
+        +'<rect x="34" y="70" width="32" height="5" rx="2.2" fill="'+m.d+'"/>';
+      case 9: return rays(50,57,30,44)+mplate(METAL[3])
+        +tankArt(50,72,1.24,'#D9A544',-12)
+        +wreath(50,62,25,0.5,1.35,'#6B7436')
+        +star(50,34,1.5,'#FFF3C4','#8a6a14')
+        +star(24,46,0.8,'#FFD34D')+star(77,44,0.8,'#FFD34D')+star(73,84,0.7,'#FFD34D');
+    }
+  }
+
+  /* ---- WING 7 · BROTHERS IN ARMS: men standing together ------------------- */
+  const BLUE='#5B84C4', BLUE_D='#2E3F55';
+  function coopRing(m){ return '<circle cx="50" cy="58" r="27" fill="#2A2A20" stroke="'+m.f+'" stroke-width="4.5"/>'
+    +'<circle cx="50" cy="58" r="27" fill="none" stroke="'+m.d+'" stroke-width="1" opacity="0.7"/>'; }
+  // ⚠ the ring is r27 about (50,58), so EVERYTHING has to live inside it — a man
+  // whose boots land at y86 dangles outside the badge and reads as a mistake.
+  // Inscribed working box: roughly x 31-69, y 39-77.
+  function manRow(n,y,s){
+    const gap = n<=2? 18 : n<=4? 10.5 : 9;
+    let r=''; for(let k=0;k<n;k++) r+=manFig(50+(k-(n-1)/2)*gap, y, s, (k%2?BLUE:GREEN));
+    return r;
+  }
+  // the count on a little cloth tab, so the ladder reads as numbers at a glance
+  function coopTab(n){ return '<path d="M34 38 L66 38 L66 50 L50 46.5 L34 50 Z" fill="'+GREEN+'" stroke="'+DGREEN+'" stroke-width="1.7"/>'
+    +'<text x="50" y="48" text-anchor="middle" font-size="9.5" font-weight="900" fill="'+CREAM+'">'+n+'</text>'; }
+  function coopBadge(i){
+    const m=METAL[tierOf(i)];
+    switch(i){
+      case 0: return coopRing(m)+manRow(2,74,1)+star(50,44,1.15,m.f,m.d);
+      // the handshake: two forearms meeting in the middle of the ring
+      case 1: return coopRing(m)
+        +'<path d="M33 70 L46 61" stroke="'+GREEN+'" stroke-width="6.5" stroke-linecap="round"/>'
+        +'<path d="M67 70 L54 61" stroke="'+BLUE+'" stroke-width="6.5" stroke-linecap="round"/>'
+        +'<circle cx="50" cy="59.5" r="6.6" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.8"/>'
+        +'<path d="M46.5 57 a 5 5 0 0 1 3 -2" stroke="'+m.l+'" stroke-width="1.4" fill="none" opacity="0.7"/>'
+        +coopTab(5);
+      case 2: return coopRing(m)+manRow(2,74,0.95)+coopTab(10);
+      case 3: return coopRing(m)+manRow(4,74,0.82)+coopTab(25);
+      case 4: return coopRing(m)+manRow(5,74,0.76)+coopTab(50);
+      // THE LINE HELD: four commanders dug in behind the same sandbags
+      case 5: return coopRing(m)+manRow(4,71,0.85)
+        +'<path d="M33 70 L67 70 L67 79 L33 79 Z" fill="#6B5B3A" stroke="#3f2c17" stroke-width="1.8"/>'
+        +'<path d="M33 74.5 L67 74.5 M42 70 L42 79 M50 70 L50 79 M58 70 L58 79" stroke="#3f2c17" stroke-width="1.2" opacity="0.8"/>'
+        +star(50,44,1,m.f,m.d);
+      // FULL LOBBY: ten chairs, all of them taken
+      case 6: { let ring='';
+        for(let k=0;k<10;k++){ const a=-Math.PI/2+k*Math.PI/5;
+          ring+=manFig(50+Math.cos(a)*16, 62+Math.sin(a)*16, 0.55, (k%2?BLUE:GREEN)); }
+        return coopRing(m)+ring+star(50,58,1.35,m.l,m.d); }
+      // the private room: a door standing open, with the light on
+      case 7: return coopRing(m)
+        +'<rect x="36" y="42" width="27" height="36" rx="2.5" fill="#3f2c17" stroke="#2a1c0d" stroke-width="2"/>'
+        +'<path d="M39 45 L60 45 L60 78 L39 75 Z" fill="'+WOOD+'" stroke="#3f2c17" stroke-width="1.7"/>'
+        +'<path d="M60 45 L68 50 L68 78 L60 78 Z" fill="#D9A544" opacity="0.3"/>'
+        +'<circle cx="56.5" cy="61" r="2" fill="'+m.l+'" stroke="'+m.d+'" stroke-width="1"/>'
+        +manFig(64,77,0.6,GREEN,1);
+      // HOUSE RULES: your own house, and the people you let in
+      case 8: return coopRing(m)
+        +'<path d="M50 39 L70 52 L70 78 L30 78 L30 52 Z" fill="'+WOOD+'" stroke="#3f2c17" stroke-width="2.2" stroke-linejoin="round"/>'
+        +'<path d="M50 37 L72 52 L28 52 Z" fill="#8a6540" stroke="#3f2c17" stroke-width="1.8" stroke-linejoin="round"/>'
+        +'<rect x="36" y="58" width="28" height="20" rx="2" fill="#241C12" stroke="#3f2c17" stroke-width="1.4"/>'
+        +manRow(3,76,0.56)
+        +star(50,46,0.8,m.l,m.d);
+      /* ===== rung 10, and Wyatt asked for it BY NAME: THE GIANT BANANA =====
+         Every commander in a group of 2+ that beats all 100 campaign levels
+         together gets one. It is the silliest thing in the case on purpose —
+         so it is the room's own plush banana (same curve, same colours, same
+         daft face as bananaArt()), only now it is wearing a crown, standing on
+         a burst of glory, and being held up by two very small soldiers. */
+      case 9: {
+        const NANA='M55.3 92 C 34 73, 38.7 45, 65 27';
+        return rays(50,58,26,46)
+          +'<ellipse cx="50" cy="97" rx="26" ry="4.6" fill="#000" opacity="0.3"/>'
+          // the fruit itself
+          +'<path d="'+NANA+'" stroke="#E0B02F" stroke-width="21" fill="none" stroke-linecap="round"/>'
+          +'<path d="'+NANA+'" stroke="#F2CE45" stroke-width="16.5" fill="none" stroke-linecap="round"/>'
+          +'<path d="M51 88 C 32 71, 36.5 47, 60.5 31" stroke="#FBE486" stroke-width="3.4" fill="none" stroke-linecap="round" opacity="0.75"/>'
+          +'<path d="M60 87 C 42 71, 46 49, 68 33" stroke="#D9A22A" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>'
+          +'<path d="M65 27 l2.6 -5.5" stroke="#7A5A22" stroke-width="4.4" fill="none" stroke-linecap="round"/>'
+          +'<ellipse cx="55.6" cy="93.5" rx="5.6" ry="2.8" fill="#7A5A22"/>'
+          // ...and the daft face, which is the whole point
+          +'<circle cx="40.5" cy="61" r="4.3" fill="#fff"/><circle cx="50" cy="55.5" r="4.3" fill="#fff"/>'
+          +'<circle cx="41.4" cy="62" r="2" fill="#2A2118"/><circle cx="51" cy="56.4" r="2" fill="#2A2118"/>'
+          +'<circle cx="42.2" cy="61.2" r="0.7" fill="#fff"/><circle cx="51.8" cy="55.6" r="0.7" fill="#fff"/>'
+          +'<path d="M38.5 70.5 q6 5.5 11.5 -1.2" stroke="#2A2118" stroke-width="1.9" fill="none" stroke-linecap="round"/>'
+          // a crown, because it beat all one hundred of them
+          +'<g transform="rotate(14 66 20)">'
+          +'<path d="M57 20 L57 12 L61 16 L66 9.5 L71 16 L75 12 L75 20 Z" fill="#FFD34D" stroke="#8a6a14" stroke-width="1.5" stroke-linejoin="round"/>'
+          +'<circle cx="66" cy="8" r="1.7" fill="'+RED+'" stroke="#7E2D1F" stroke-width="0.8"/></g>'
+          // the two commanders who did it, cheering, very small
+          +manFig(23,95,0.94,GREEN,1)+manFig(78,95,0.94,BLUE,1)
+          +star(20,40,0.85,'#FFD34D')+star(80,58,0.8,'#FFD34D')+star(30,24,0.7,'#FFF3C4')
+          +'<path d="M84 30 l0 6 M81 33 l6 0" stroke="#FFF3C4" stroke-width="1.6" stroke-linecap="round"/>'
+          +'<path d="M14 66 l0 5 M11.5 68.5 l5 0" stroke="#FFF3C4" stroke-width="1.5" stroke-linecap="round"/>';
+      }
+    }
+  }
+
+  /* ---- WING 8 · THE ARSENAL: gunmetal plaques ----------------------------- */
+  function armPlaque(m){
+    return '<rect x="19" y="22" width="62" height="72" rx="9" fill="#2E3238" stroke="'+m.f+'" stroke-width="3"/>'
+      +'<rect x="24" y="27" width="52" height="62" rx="5" fill="#23262b" stroke="'+m.d+'" stroke-width="1.2"/>'
+      +'<circle cx="28" cy="31" r="1.7" fill="'+m.l+'"/><circle cx="72" cy="31" r="1.7" fill="'+m.l+'"/>'
+      +'<circle cx="28" cy="85" r="1.7" fill="'+m.l+'"/><circle cx="72" cy="85" r="1.7" fill="'+m.l+'"/>';
+  }
+  // a blade crystal in its vial — the shop's own idiom, shrunk
+  function vial(x,y,s,hex){
+    return '<g transform="translate('+x+','+y+') scale('+s+')">'
+      +'<rect x="-4.6" y="-11" width="9.2" height="22" rx="4.6" fill="#1b1f24" stroke="#5c646d" stroke-width="1.3"/>'
+      +'<path d="M0 -7 L3.2 -1 L0 7 L-3.2 -1 Z" fill="'+hex+'"/>'
+      +'<path d="M0 -7 L3.2 -1 L0 7 L-3.2 -1 Z" fill="none" stroke="#fff" stroke-width="0.7" opacity="0.55"/>'
+      +'<rect x="-4.6" y="-11" width="9.2" height="4" rx="2" fill="#7d868e"/></g>';
+  }
+  function hilt(x,y,rot){
+    return '<g transform="translate('+x+','+y+') rotate('+(rot||0)+')">'
+      +'<rect x="-3.4" y="0" width="6.8" height="22" rx="2.4" fill="#3a3f46" stroke="#22262a" stroke-width="1.3"/>'
+      +'<rect x="-4.8" y="-2.6" width="9.6" height="5" rx="1.8" fill="#7d868e" stroke="#4a4f55" stroke-width="1"/>'
+      +'<path d="M-3.4 8 L3.4 8 M-3.4 13 L3.4 13" stroke="#22262a" stroke-width="1.1"/></g>';
+  }
+  function armBadge(i){
+    const m=METAL[tierOf(i)];
+    switch(i){
+      // ⚠ the plaque's usable field is x 24-76, y 27-89 — a gun drawn on the
+      // 100-wide box's own scale runs straight out through the frame.
+      // the shotgun: short barrel, wide cone
+      case 0: return armPlaque(m)
+        +'<path d="M32 68 L58 60" stroke="#3a2c1c" stroke-width="6" stroke-linecap="round"/>'
+        +'<path d="M45 64 L58 60.5" stroke="#5a4a34" stroke-width="2.4" stroke-linecap="round"/>'
+        +'<path d="M32 68 L27 73 L31 75.5 L36 71 Z" fill="'+WOOD+'" stroke="#3f2c17" stroke-width="1.4"/>'
+        +'<path d="M61 59 L71 52 M61 61 L73 60 M61 63 L71 69" stroke="'+m.f+'" stroke-width="1.8" stroke-linecap="round" opacity="0.85"/>';
+      // the sniper: the longest gun on the carpet, with its glass
+      case 1: return armPlaque(m)
+        +'<path d="M30 73 L70 52" stroke="#26261f" stroke-width="4.4" stroke-linecap="round"/>'
+        +'<path d="M30 73 L26 77.5 L30 80.5 L35 76 Z" fill="'+WOOD+'" stroke="#3f2c17" stroke-width="1.4"/>'
+        +'<g transform="rotate(-27.7 49 60)">'
+        +'<rect x="41" y="57.4" width="16" height="5.2" rx="2.6" fill="#3a3f46" stroke="'+m.d+'" stroke-width="1.2"/>'
+        +'<circle cx="54" cy="60" r="1.7" fill="#8FB3D9" opacity="0.9"/></g>'
+        +'<path d="M66 51 L72.5 47.5" stroke="'+m.f+'" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/>';
+      // the hilt, dark — he has it, he has not lit it
+      case 2: return armPlaque(m)+hilt(50,48,0)
+        +'<path d="M50 46 L50 30" stroke="#5c646d" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="3 4" opacity="0.8"/>'
+        +'<path d="M38 78 L62 78" stroke="'+m.f+'" stroke-width="2" stroke-linecap="round" opacity="0.8"/>';
+      // FIRST LIGHT: the blade is on, in the blue it comes out of the box wearing
+      case 3: return armPlaque(m)+hilt(50,60,0)
+        +'<path d="M50 58 L50 30" stroke="#4DA6FF" stroke-width="8.5" stroke-linecap="round" opacity="0.3"/>'
+        +'<path d="M50 58 L50 30" stroke="#4DA6FF" stroke-width="4.6" stroke-linecap="round"/>'
+        +'<path d="M50 57 L50 32" stroke="#EAF6FF" stroke-width="1.8" stroke-linecap="round"/>'
+        +'<circle cx="50" cy="30" r="5" fill="#4DA6FF" opacity="0.22"/>';
+      case 4: return armPlaque(m)+vial(41,58,0.95,'#4DA6FF')+vial(59,58,0.95,'#FF4D4D')
+        +'<path d="M34 80 L66 80" stroke="'+m.f+'" stroke-width="2" stroke-linecap="round" opacity="0.8"/>';
+      // the whole spectrum: all six crystals, in the order the shop racks them
+      case 5: { let v='';
+        SABER_COLORS.forEach((c,k)=>{ const a=-Math.PI*0.82+k*Math.PI*0.264;
+          v+=vial(50+Math.cos(a)*20, 62+Math.sin(a)*20, 0.66, c.hex); });
+        return armPlaque(m)+v+star(50,62,1.05,m.l,m.d); }
+      // FIRST MOD: a cog and a spanner — the bench, not the ladder
+      case 6: { let teeth='';
+        for(let k=0;k<8;k++){ const a=k*Math.PI/4;
+          teeth+='<rect x="-2.8" y="-15.5" width="5.6" height="6" rx="1.4" transform="rotate('+(k*45)+' 0 0)" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1"/>'; }
+        return armPlaque(m)
+          +'<g transform="translate(53,60)">'+teeth
+          +'<circle cx="0" cy="0" r="11" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="2"/>'
+          +'<circle cx="0" cy="0" r="4.2" fill="#23262b" stroke="'+m.d+'" stroke-width="1.4"/></g>'
+          +'<g transform="rotate(-38 34 74)"><rect x="31.6" y="60" width="4.8" height="20" rx="2.4" fill="'+IRON_L+'" stroke="'+IRON_D+'" stroke-width="1.2"/>'
+          +'<path d="M30 60 L38 60 L38 55 L35.6 57 L32.4 57 L30 55 Z" fill="'+IRON_L+'" stroke="'+IRON_D+'" stroke-width="1.2" stroke-linejoin="round"/></g>'; }
+      case 7: { let c='';
+        for(let k=0;k<3;k++) c+='<g transform="translate('+(35+k*15)+',58) scale(0.62)">'
+          +'<circle cx="0" cy="0" r="11" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="2.6"/>'
+          +'<circle cx="0" cy="0" r="4.2" fill="#23262b" stroke="'+m.d+'" stroke-width="2"/></g>';
+        return armPlaque(m)+c
+          +'<rect x="28" y="72" width="44" height="6" rx="2" fill="'+WOOD+'" stroke="#3f2c17" stroke-width="1.4"/>'
+          +'<path d="M33 78 L33 86 M67 78 L67 86" stroke="#3f2c17" stroke-width="2.4" stroke-linecap="round"/>'; }
+      // the full bench: five parts on the rack, one per soldier
+      case 8: { let p='';
+        for(let k=0;k<ENH_ORDER.length;k++){ const x=31+k*9.5;
+          p+='<rect x="'+(x-3.4)+'" y="44" width="6.8" height="11" rx="2" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.2"/>'
+            +'<circle cx="'+x+'" cy="62" r="3.2" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.2"/>'; }
+        return armPlaque(m)+p
+          +'<rect x="26" y="70" width="48" height="7" rx="2.4" fill="'+WOOD+'" stroke="#3f2c17" stroke-width="1.6"/>'
+          +'<path d="M30 77 L30 87 M70 77 L70 87" stroke="#3f2c17" stroke-width="2.6" stroke-linecap="round"/>'
+          +'<path d="M26 40 L74 40" stroke="'+m.d+'" stroke-width="1.4" opacity="0.7"/>'; }
+      // everything, all at once
+      case 9: return rays(50,57,27,43)+armPlaque(METAL[3])
+        +'<path d="M28 74 L72 52" stroke="#26261f" stroke-width="3.6" stroke-linecap="round"/>'
+        +'<path d="M72 74 L28 52" stroke="#3a2c1c" stroke-width="4.6" stroke-linecap="round"/>'
+        +hilt(50,62,0)
+        +'<path d="M50 60 L50 36" stroke="#D9A544" stroke-width="7.5" stroke-linecap="round" opacity="0.3"/>'
+        +'<path d="M50 60 L50 36" stroke="#FFD34D" stroke-width="4" stroke-linecap="round"/>'
+        +'<path d="M50 59 L50 38" stroke="#FFF8D9" stroke-width="1.6" stroke-linecap="round"/>'
+        +vial(30,44,0.55,'#FF4D4D')+vial(70,44,0.55,'#5BE870')
+        +wreath(50,64,25,0.52,1.32,'#6B7436')
+        +star(50,28,1.2,'#FFF3C4','#8a6a14');
+    }
+  }
+
+  /* ---- WING 9 · THE LONG SERVICE: chevrons and rank plates ---------------- */
+  function rankPlate(m){
+    return '<rect x="21" y="20" width="58" height="76" rx="7" fill="#2F3A26" stroke="'+m.f+'" stroke-width="3"/>'
+      +'<rect x="26" y="25" width="48" height="66" rx="4" fill="#26301F" stroke="'+m.d+'" stroke-width="1.2"/>';
+  }
+  // the game's own chevron shape (the STRIPES ribbon pendant), parameterised
+  function chev(cy,w,fill,stroke){
+    const d=w*0.667;
+    return '<path d="M'+(50-w)+' '+cy+' L50 '+(cy+d)+' L'+(50+w)+' '+cy
+      +' L'+(50+w)+' '+(cy+5.6)+' L50 '+(cy+d+5.6)+' L'+(50-w)+' '+(cy+5.6)+' Z"'
+      +' fill="'+fill+'" stroke="'+stroke+'" stroke-width="1.5" stroke-linejoin="round"/>';
+  }
+  function chevStack(n,m,y0,w,gap){
+    let s=''; for(let k=0;k<n;k++) s+=chev((y0||40)+k*(gap||11), w||15, m.f, m.d);
+    return s;
+  }
+  function rankBadge(i){
+    const m=METAL[tierOf(i)];
+    switch(i){
+      case 0: return rankPlate(m)+chevStack(1,m,52,16);
+      case 1: return rankPlate(m)+chevStack(2,m,46,16);
+      case 2: return rankPlate(m)+chevStack(3,m,40,16);
+      case 3: return rankPlate(m)+chevStack(3,m,34,16)
+        +'<rect x="33" y="72" width="34" height="15" rx="3" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.6"/>'
+        +'<text x="50" y="84" text-anchor="middle" font-size="12" font-weight="900" fill="#3a2a10">100</text>';
+      case 4: return rankPlate(m)+chevStack(2,m,54,16)+star(50,40,1.7,m.f,m.d);
+      case 5: return rankPlate(m)+chevStack(3,m,50,15)+wreath(50,58,24,0.55,1.3,'#6B7436')
+        +star(50,34,1.3,m.f,m.d);
+      case 6: return rankPlate(m)+chevStack(3,m,52,15)
+        +'<rect x="34" y="32" width="32" height="6" rx="2" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.4"/>'
+        +'<rect x="34" y="41" width="32" height="6" rx="2" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.4"/>'
+        +star(50,90,0.9,m.l,m.d);
+      case 7: return rankPlate(m)+wreath(50,60,26,0.42,1.42,'#6B7436')
+        +'<circle cx="50" cy="60" r="18" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="2.4"/>'
+        +'<text x="50" y="66" text-anchor="middle" font-size="16" font-weight="900" fill="#3a2a10">100</text>'
+        +star(50,30,1.1,m.l,m.d);
+      case 8: { let fan='';
+        for(let k=0;k<5;k++) fan+=chev(34+k*10.5,17-k*0.8,m.f,m.d);
+        return rankPlate(m)+fan+star(50,90,0.95,m.l,m.d); }
+      case 9: { const baton=(rot)=>'<g transform="rotate('+rot+' 50 60)">'
+          +'<rect x="47.9" y="30" width="4.2" height="60" rx="2.1" fill="'+WOOD+'" stroke="#3f2c17" stroke-width="1.1"/>'
+          +'<rect x="46.4" y="27.5" width="7.2" height="5.2" rx="2.2" fill="#FFD34D" stroke="#8a6a14" stroke-width="1.1"/>'
+          +'<rect x="46.4" y="87" width="7.2" height="5.2" rx="2.2" fill="#FFD34D" stroke="#8a6a14" stroke-width="1.1"/></g>';
+        return rays(50,58,28,44)+rankPlate(METAL[3])+baton(46)+baton(-46)
+          +wreath(50,60,25,0.5,1.35,'#6B7436')
+          +chev(50,15,'#FFD34D','#8a6a14')+chev(61,15,'#FFD34D','#8a6a14')
+          +star(50,36,1.5,'#FFF3C4','#8a6a14')
+          +star(23,50,0.75,'#FFD34D')+star(78,52,0.75,'#FFD34D'); }
+    }
+  }
+
+  /* ---- WING 10 · THE HOME FRONT: wooden toy-box plaques ------------------- */
+  function woodPlaque(m){
+    return '<rect x="18" y="22" width="64" height="72" rx="8" fill="'+WOOD+'" stroke="#3f2c17" stroke-width="2.8"/>'
+      +'<rect x="23" y="27" width="54" height="62" rx="4" fill="#8a6540" stroke="#4a3319" stroke-width="1.4"/>'
+      +'<path d="M23 27 L38 27 L23 42 Z" fill="#fff" opacity="0.07"/>'
+      +'<path d="M18 30 L18 26 Q18 22 22 22 L26 22" fill="none" stroke="'+m.f+'" stroke-width="2.6" stroke-linecap="round"/>'
+      +'<path d="M82 30 L82 26 Q82 22 78 22 L74 22" fill="none" stroke="'+m.f+'" stroke-width="2.6" stroke-linecap="round"/>'
+      +'<path d="M18 86 L18 90 Q18 94 22 94 L26 94" fill="none" stroke="'+m.f+'" stroke-width="2.6" stroke-linecap="round"/>'
+      +'<path d="M82 86 L82 90 Q82 94 78 94 L74 94" fill="none" stroke="'+m.f+'" stroke-width="2.6" stroke-linecap="round"/>';
+  }
+  function coin(x,y,r,m){ return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.4"/>'
+    +'<path d="M'+(x-r*0.6)+' '+(y-r*0.25)+' a '+r+' '+r+' 0 0 1 '+(r*0.5)+' '+(-r*0.42)+'" stroke="'+m.l+'" stroke-width="1.1" fill="none" opacity="0.7"/>'; }
+  function homeBadge(i){
+    const m=METAL[tierOf(i)];
+    switch(i){
+      case 0: return woodPlaque(m)+coin(42,68,7,m)+coin(56,70,7,m)+star(50,50,1.5,m.f,m.d);
+      case 1: return woodPlaque(m)
+        +'<path d="M31 58 Q31 48 50 48 Q69 48 69 58 Z" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.8"/>'
+        +'<rect x="31" y="58" width="38" height="22" rx="2" fill="#6B5B3A" stroke="#3f2c17" stroke-width="1.8"/>'
+        +'<rect x="31" y="56" width="38" height="5" rx="2" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.4"/>'
+        +'<rect x="45" y="61" width="10" height="9" rx="2" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.4"/>'
+        +star(38,44,1,m.l)+star(50,40,1.2,m.l)+star(62,44,1,m.l);
+      case 2: { let pile='';
+        for(const [x,y,s] of [[40,74,1.5],[52,76,1.5],[46,66,1.6],[58,68,1.4],[50,57,1.9],[36,64,1.2],[63,58,1.2]])
+          pile+=star(x,y,s,m.f,m.d);
+        return woodPlaque(m)+pile
+          +'<path d="M30 82 L70 82" stroke="'+m.d+'" stroke-width="2" stroke-linecap="round" opacity="0.7"/>'; }
+      // the elephant
+      case 3: return woodPlaque(m)
+        +'<ellipse cx="52" cy="64" rx="17" ry="14" fill="#9AA6B4" stroke="#5d6672" stroke-width="1.8"/>'
+        +'<circle cx="38" cy="58" r="10" fill="#9AA6B4" stroke="#5d6672" stroke-width="1.8"/>'
+        +'<path d="M30 56 q-8 -6 -3 -12 q6 -3 8 6 Z" fill="#8492A1" stroke="#5d6672" stroke-width="1.5"/>'
+        +'<path d="M31 62 q-8 6 -4 14 q3 5 7 1" fill="none" stroke="#9AA6B4" stroke-width="5.4" stroke-linecap="round"/>'
+        +'<circle cx="40" cy="55" r="1.7" fill="#2b2118"/>'
+        +'<path d="M44 76 L44 84 M56 77 L56 84 M64 74 L64 82" stroke="#9AA6B4" stroke-width="5" stroke-linecap="round"/>';
+      // the train
+      case 4: return woodPlaque(m)
+        +'<rect x="26" y="70" width="48" height="4" rx="2" fill="#5d4a2e"/>'
+        +'<path d="M29 70 L29 66 M38 70 L38 66 M47 70 L47 66 M56 70 L56 66 M65 70 L65 66 M72 70 L72 66" stroke="#5d4a2e" stroke-width="1.6"/>'
+        +'<rect x="27" y="55" width="22" height="15" rx="2.5" fill="'+RED+'" stroke="#7E2D1F" stroke-width="1.8"/>'
+        +'<rect x="30" y="46" width="10" height="10" rx="2" fill="'+RED+'" stroke="#7E2D1F" stroke-width="1.6"/>'
+        +'<rect x="42" y="49" width="5" height="7" rx="1.5" fill="#3a2c1c"/>'
+        +'<circle cx="44" cy="45" r="3.4" fill="#DCD6C8" opacity="0.75"/><circle cx="49" cy="40" r="2.4" fill="#DCD6C8" opacity="0.6"/>'
+        +'<rect x="52" y="58" width="20" height="12" rx="2.5" fill="'+GREEN+'" stroke="'+DGREEN+'" stroke-width="1.8"/>'
+        +'<circle cx="33" cy="72" r="3.6" fill="#3a2c1c"/><circle cx="44" cy="72" r="3.6" fill="#3a2c1c"/>'
+        +'<circle cx="57" cy="72" r="3" fill="#3a2c1c"/><circle cx="68" cy="72" r="3" fill="#3a2c1c"/>';
+      // the whole floor: robot, banana and elephant lined up on the rug
+      case 5: return woodPlaque(m)
+        +'<rect x="26" y="78" width="48" height="6" rx="3" fill="#5E4A8C" stroke="#3b2c5a" stroke-width="1.4"/>'
+        +'<rect x="30" y="58" width="13" height="14" rx="2.5" fill="'+IRON_L+'" stroke="'+IRON_D+'" stroke-width="1.5"/>'
+        +'<rect x="32.5" y="49" width="8" height="8" rx="2" fill="'+IRON_L+'" stroke="'+IRON_D+'" stroke-width="1.4"/>'
+        +'<circle cx="34.8" cy="53" r="1.2" fill="#8FE3FF"/><circle cx="38.2" cy="53" r="1.2" fill="#8FE3FF"/>'
+        +'<path d="M36.5 49 L36.5 45" stroke="'+IRON_D+'" stroke-width="1.2"/><circle cx="36.5" cy="44" r="1.3" fill="'+RED+'"/>'
+        +'<path d="M31 72 L31 78 M42 72 L42 78" stroke="'+IRON_D+'" stroke-width="2.4" stroke-linecap="round"/>'
+        +'<path d="M53 78 C 47 68, 49 58, 57 51" stroke="#E0B02F" stroke-width="9" fill="none" stroke-linecap="round"/>'
+        +'<path d="M53 78 C 47 68, 49 58, 57 51" stroke="#F2CE45" stroke-width="6.4" fill="none" stroke-linecap="round"/>'
+        +'<circle cx="51.6" cy="65" r="1.5" fill="#fff"/><circle cx="55" cy="61" r="1.5" fill="#fff"/>'
+        +'<circle cx="51.9" cy="65.4" r="0.75" fill="#2A2118"/><circle cx="55.3" cy="61.4" r="0.75" fill="#2A2118"/>'
+        +'<ellipse cx="69" cy="70" rx="7.5" ry="6.4" fill="#9AA6B4" stroke="#5d6672" stroke-width="1.4"/>'
+        +'<circle cx="63" cy="66" r="4.6" fill="#9AA6B4" stroke="#5d6672" stroke-width="1.4"/>'
+        +'<path d="M59.5 68 q-3.4 3 -1.6 6.4" fill="none" stroke="#9AA6B4" stroke-width="2.6" stroke-linecap="round"/>'
+        +'<path d="M65 76 L65 80 M72 76 L72 80" stroke="#9AA6B4" stroke-width="2.6" stroke-linecap="round"/>';
+      // the strongbox
+      case 6: return woodPlaque(m)
+        +'<rect x="30" y="48" width="40" height="34" rx="3" fill="'+IRON+'" stroke="'+IRON_D+'" stroke-width="2.4"/>'
+        +'<rect x="34" y="52" width="32" height="26" rx="2" fill="none" stroke="'+m.f+'" stroke-width="1.6"/>'
+        +'<circle cx="50" cy="65" r="7" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.8"/>'
+        +'<path d="M50 58.5 L50 71.5 M43.5 65 L56.5 65 M45.4 60.4 L54.6 69.6 M54.6 60.4 L45.4 69.6" stroke="'+m.d+'" stroke-width="1.5"/>'
+        +'<circle cx="50" cy="65" r="2.4" fill="'+IRON_D+'"/>'
+        +'<path d="M40 40 q10 -8 20 0" fill="'+PINK+'" stroke="'+PINK_S+'" stroke-width="1.4"/>'
+        +'<circle cx="44" cy="38" r="1.5" fill="'+PINK_S+'"/><circle cx="56" cy="38" r="1.5" fill="'+PINK_S+'"/>';
+      // the marble vault, pillars and all
+      case 7: return woodPlaque(m)
+        +'<path d="M26 44 L50 32 L74 44 Z" fill="#E4E0D4" stroke="#9a9484" stroke-width="1.8" stroke-linejoin="round"/>'
+        +'<rect x="27" y="44" width="46" height="4" rx="1.5" fill="#E4E0D4" stroke="#9a9484" stroke-width="1.4"/>'
+        +'<rect x="31" y="48" width="6" height="28" rx="2" fill="#EFEDE4" stroke="#9a9484" stroke-width="1.3"/>'
+        +'<rect x="47" y="48" width="6" height="28" rx="2" fill="#EFEDE4" stroke="#9a9484" stroke-width="1.3"/>'
+        +'<rect x="63" y="48" width="6" height="28" rx="2" fill="#EFEDE4" stroke="#9a9484" stroke-width="1.3"/>'
+        +'<rect x="27" y="76" width="46" height="5" rx="1.8" fill="#E4E0D4" stroke="#9a9484" stroke-width="1.4"/>'
+        +'<circle cx="50" cy="62" r="7.5" fill="'+PINK+'" stroke="'+PINK_S+'" stroke-width="1.5"/>'
+        +'<circle cx="47.5" cy="60.5" r="1.2" fill="#2b2118"/><circle cx="52.5" cy="60.5" r="1.2" fill="#2b2118"/>'
+        +'<ellipse cx="50" cy="64.5" rx="3.4" ry="2.4" fill="'+PINK_I+'" stroke="'+PINK_S+'" stroke-width="1"/>'
+        +star(38,38,0.85,m.f,m.d)+star(62,38,0.85,m.f,m.d);
+      // full muster: the whole squad out of the shop
+      case 8: { let row='';
+        for(let k=0;k<TRAY_ORDER.length;k++) row+=manFig(29+k*6.1, (k%2?80:83), 0.5, GREEN);
+        return woodPlaque(m)+row
+          +'<path d="M27 85 L73 85" stroke="#4a3319" stroke-width="1.6" opacity="0.7"/>'
+          +'<rect x="33" y="38" width="34" height="16" rx="3" fill="'+m.f+'" stroke="'+m.d+'" stroke-width="1.6"/>'
+          +'<text x="50" y="50.5" text-anchor="middle" font-size="11" font-weight="900" fill="#3a2a10">'+TRAY_ORDER.length+'</text>'; }
+      // the room, finished
+      case 9: { let row='';
+        for(let k=0;k<5;k++) row+=manFig(34+k*8, 88, 0.46, GREEN);
+        return rays(50,57,28,44)+woodPlaque(METAL[3])
+          +'<rect x="26" y="80" width="48" height="5" rx="2.5" fill="#5E4A8C" stroke="#3b2c5a" stroke-width="1.3"/>'
+          +'<path d="M27 46 L50 34 L73 46 Z" fill="#E4E0D4" stroke="#9a9484" stroke-width="1.6" stroke-linejoin="round"/>'
+          +'<rect x="32" y="46" width="5" height="22" rx="2" fill="#EFEDE4" stroke="#9a9484" stroke-width="1.2"/>'
+          +'<rect x="63" y="46" width="5" height="22" rx="2" fill="#EFEDE4" stroke="#9a9484" stroke-width="1.2"/>'
+          +'<circle cx="50" cy="57" r="8" fill="'+PINK+'" stroke="'+PINK_S+'" stroke-width="1.5"/>'
+          +'<circle cx="47.3" cy="55.4" r="1.2" fill="#2b2118"/><circle cx="52.7" cy="55.4" r="1.2" fill="#2b2118"/>'
+          +'<ellipse cx="50" cy="59.6" rx="3.5" ry="2.5" fill="'+PINK_I+'" stroke="'+PINK_S+'" stroke-width="1"/>'
+          +'<path d="M42 78 C 38 71, 39 64, 44 59" stroke="#E0B02F" stroke-width="7" fill="none" stroke-linecap="round"/>'
+          +'<path d="M42 78 C 38 71, 39 64, 44 59" stroke="#F2CE45" stroke-width="4.8" fill="none" stroke-linecap="round"/>'
+          +'<rect x="59" y="66" width="10" height="11" rx="2" fill="'+IRON_L+'" stroke="'+IRON_D+'" stroke-width="1.3"/>'
+          +'<rect x="61" y="59" width="6" height="6" rx="1.6" fill="'+IRON_L+'" stroke="'+IRON_D+'" stroke-width="1.2"/>'
+          +'<circle cx="62.6" cy="62" r="0.95" fill="#8FE3FF"/><circle cx="65.4" cy="62" r="0.95" fill="#8FE3FF"/>'
+          +row
+          +star(50,28,1.35,'#FFF3C4','#8a6a14')
+          +star(24,44,0.75,'#FFD34D')+star(77,42,0.75,'#FFD34D'); }
+    }
+  }
+
   // core medals are ribbons keyed by id; a ladder rung picks art by its index.
   // sfx keeps clipPath ids unique when the inspect card re-draws a grid badge.
   return function(id,i,cat,sfx){
     if(!cat || cat==='core') return drapeRibbon(id+(sfx||''), RIBBONS[id].s, RIBBONS[id].p);
-    return {ace:aceBadge,bfk:bfkBadge,bfw:bfwBadge,pig:pigBadge}[cat](i);
+    return {ace:aceBadge,bfk:bfkBadge,bfw:bfwBadge,pig:pigBadge,
+            veh:vehBadge,coop:coopBadge,arm:armBadge,rank:rankBadge,home:homeBadge}[cat](i);
   };
 })();
 // the medal grid stashes what it drew here so a tap can inspect by index
@@ -5348,6 +5808,143 @@ ACH.push(...achLadder('bfw','bfw', n=>'Win '+n+' battlefield'+(n===1?'':'s'), ()
 ACH.push(...achLadder('pig','pig', n=>'Defend the piggy bank from '+n+' daily invasions', ()=>META.stats.rivalWins, [
   [2,'PIGGY GUARD'],[4,'PIGGY PATROL'],[6,'BODYGUARD'],[8,"PIGGY'S PAL"],[10,'SWINE SHIELD'],
   [15,'BANK SECURITY'],[20,'VAULT KEEPER'],[30,"PIGGY'S CHAMPION"],[40,'GUARDIAN OF THE HOARD'],[50,"PIGGY'S HERO"]]));
+
+// ============ THE SECOND FIFTY (v1.26) — FIVE MORE WINGS ============
+// Wyatt 7/25: "increase the amount of medals times two." Fifty more badges, so
+// the case holds a HUNDRED.
+//
+// ⚠ THE CALL — NEW WINGS, NOT LONGER LADDERS. The obvious reading is to bolt ten
+// rungs onto each of the five wings that exist, and it is the wrong one twice
+// over. A wing here is not a bucket, it is ONE ART IDIOM and ONE THEME — pigs,
+// target steel, iron shields — and a jeep does not belong on a piggy. And the
+// only way to extend a finished ladder is to inflate it: MARKSMANSHIP already
+// tops out at fifty kills by one man, BATTLEFIELD-KILLS at fifteen hundred, so
+// rungs 11-20 would be four thousand kills and a longer grind, which is not what
+// "more medals" means to anybody. So: five new wings of ten, aimed squarely at
+// the systems that landed tonight and had nothing to award — the motor pool, the
+// two co-op modes and the private room, the arsenal (crystals and bench parts),
+// the hundred-rank ladder, and the room itself. Ten wings, ten rungs, 100.
+//
+// ⚠ INVASIONS ARE COMING OUT (Wyatt, ~1pm) — so not one new medal below is
+// triggered by one. Campaign LEVELS are fine and used freely; the level ladder
+// survives the battlefield-campaign swap. Nothing existing was deleted, but see
+// the retire note under `ACH_INVASION` at the foot of this block.
+//
+// Every rung is one stat against one goal, exactly like achLadder — which is
+// what buys the progress bar, the NEXT UP frame and the inspect card for free.
+function achSet(cat,list){
+  return list.map(r=>({ id:r[0], cat, name:r[1], desc:r[2], goal:r[3], stat:r[4], f:()=>r[4]()>=r[3] }));
+}
+// --- readers the new wings share (kept beside them, not scattered) ---
+const vehOwnCount = ()=>(META.vehOwned||[]).length;
+const vehPlateBest = ()=>VEH_ORDER.reduce((m,k)=>Math.max(m,(META.vehUp||{})[k]|0),0);
+const vehFullPlated = ()=>VEH_ORDER.filter(k=>((META.vehUp||{})[k]|0)>=VEH_TIERS).length;
+const coopLevelCount = ()=>(META.coopLevels||[]).length;
+const sargeHas = w=>((META.sargeUnlocked||[]).indexOf(w)>=0?1:0);
+const sabColCount = ()=>(META.sabColOwned||[]).length;
+const enhOwnCount = ()=>((META.enh&&META.enh.own)||[]).length;
+// the whole arsenal in one number, so the capstone gets an honest bar:
+// 3 of Sarge's specials + 6 blade crystals + 5 bench parts = 14
+const arsenalScore = ()=>Math.min(3,(META.sargeUnlocked||[]).length)+Math.min(SABER_COLORS.length,sabColCount())+Math.min(ENH_ORDER.length,enhOwnCount());
+const ARSENAL_ALL = 3+SABER_COLORS.length+ENH_ORDER.length;
+// ranks: the best single ladder anyone is on, and every rank in the army at once
+const rankBest = ()=>Math.max(0,...TRAY_ORDER.map(k=>(META.up||{})[k]|0),...SARGE_ORDER.map(k=>(META.sargeUp||{})[k]|0));
+const rankTotal = ()=>TRAY_ORDER.reduce((s,k)=>s+((META.up||{})[k]|0),0)+SARGE_ORDER.slice(1).reduce((s,k)=>s+((META.sargeUp||{})[k]|0),0);
+const decorCount = ()=>((META.decor&&META.decor.own)||[]).length;
+// the room, finished: every decoration on the floor, the grandest bank, the
+// full squad out of the shop. 5 + 3 + 8 = 16
+const quartersScore = ()=>Math.min(DECOR_ORDER.length,decorCount())+bankTier()+Math.min(TRAY_ORDER.length,(META.unlocked||[]).length);
+const QUARTERS_ALL = DECOR_ORDER.length+BANK_TIERS.length+TRAY_ORDER.length;
+
+// WING 6 — THE MOTOR POOL. Owning the machines, plating them, and what they run
+// over. vehKills is scored by the KILLER's own vehicle flag (see noteKill).
+ACH.push(...achSet('veh',[
+  ['veh1','MOTOR POOL',   'Own your first vehicle',                            1, vehOwnCount],
+  ['veh2','BOTH SETS OF KEYS','Own the jeep AND the tank',                     2, vehOwnCount],
+  ['veh3','FIRST PLATE',  'Bolt one armour plate onto a vehicle',              1, vehPlateBest],
+  ['veh4','UP-ARMOURED',  'Get a vehicle to three plates',                     3, vehPlateBest],
+  ['veh5','FULL PLATE',   'Get a vehicle to full armour',           VEH_TIERS,    vehPlateBest],
+  ['veh6','IRON COLUMN',  'Both machines at full armour',                      2, vehFullPlated],
+  ['veh7','TREAD MARKS',  'Knock over 25 enemies with your vehicles',         25, ()=>META.stats.vehKills],
+  ['veh8','STEEL RAIN',   'Knock over 100 enemies with your vehicles',       100, ()=>META.stats.vehKills],
+  ['veh9','ARMOURED FIST','Knock over 250 enemies with your vehicles',       250, ()=>META.stats.vehKills],
+  ['veh10','THE MACHINE', 'Knock over 500 enemies with your vehicles',       500, ()=>META.stats.vehKills]
+]));
+// WING 7 — BROTHERS IN ARMS. Both co-op modes (v1.9's pair and v1.23's ten-man
+// lobby) write META.coopLevels, and the private room writes roomGames.
+// ⚠ THE GIANT BANANA (Wyatt, by name): every member of any group of 2+ that
+// beats ALL 100 campaign levels together. It reads the same union-synced list
+// every other rung here does, so each commander earns it off their OWN record —
+// which is exactly "every member of the group", without a group ever having to
+// be a thing the save knows about. ⚠ Levels beaten in co-op BEFORE v1.23 laid
+// the tracking are unknowable and are not credited; only tracked levels count.
+ACH.push(...achSet('coop',[
+  ['co1','WING MAN',        'Beat a campaign level with a real commander beside you',  1, coopLevelCount],
+  ['co2','SIDE BY SIDE',    'Beat 5 campaign levels in co-op',                         5, coopLevelCount],
+  ['co3','THE PAIR',        'Beat 10 campaign levels in co-op',                       10, coopLevelCount],
+  ['co4','BAND OF BROTHERS','Beat 25 campaign levels in co-op',                       25, coopLevelCount],
+  ['co5','FIFTY TOGETHER',  'Beat 50 campaign levels in co-op',                       50, coopLevelCount],
+  ['co6','THE LINE HELD',   'Win a co-op level with 4 real commanders on the carpet',  4, ()=>META.stats.coopMost],
+  ['co7','FULL LOBBY',      'Win a co-op level with all 10 commanders on the carpet', 10, ()=>META.stats.coopMost],
+  ['co8','OPEN DOOR',       'Play a battle in a private room with friends',            1, ()=>META.stats.roomGames],
+  ['co9','HOUSE RULES',     'Play 10 battles in private rooms',                       10, ()=>META.stats.roomGames],
+  ['co10','THE GIANT BANANA','Beat ALL 100 campaign levels in co-op. Every commander who was there gets one.', 100, coopLevelCount]
+]));
+// WING 8 — THE ARSENAL. Sarge's three specials, the six blade crystals (v1.18)
+// and the five bench parts (v1.22). Every rung reads a save field that already
+// existed — this wing needed no new tracking at all.
+ACH.push(...achSet('arm',[
+  ['arm1','THE SCATTERGUN','Unlock Sarge\'s shotgun',                       1, ()=>sargeHas('shotgun')],
+  ['arm2','THE LONG SHOT', 'Unlock Sarge\'s sniper rifle',                  1, ()=>sargeHas('sniper')],
+  ['arm3','THE BLADE',     'Unlock Sarge\'s saber',                         1, ()=>sargeHas('lightsaber')],
+  ['arm4','FIRST LIGHT',   'Choose the colour of his blade',                1, ()=>META.saberColor?1:0],
+  ['arm5','TWO CRYSTALS',  'Own a second blade colour',                     2, sabColCount],
+  ['arm6','THE WHOLE SPECTRUM','Own every blade colour', SABER_COLORS.length,  sabColCount],
+  ['arm7','FIRST MOD',     'Buy a part at the Mod Bench',                   1, enhOwnCount],
+  ['arm8','KITTED OUT',    'Own three bench parts',                         3, enhOwnCount],
+  ['arm9','THE FULL BENCH','Own every bench part',       ENH_ORDER.length,     enhOwnCount],
+  ['arm10','THE COMPLETE ARSENAL','Every weapon, every crystal, every part', ARSENAL_ALL, arsenalScore]
+]));
+// WING 9 — THE LONG SERVICE. v1.17 took every ladder to 100 and nothing marked
+// the climb. Commander level first, then the deepest single unit rank, then the
+// whole army's ranks added together (ceiling 1100: 8 units + 3 weapons).
+ACH.push(...achSet('rank',[
+  ['rk1','FIELD PROMOTION','Reach Commander Level 10',                      10, ()=>META.lvl],
+  ['rk2','TWENTY-FIVE',    'Reach Commander Level 25',                      25, ()=>META.lvl],
+  ['rk3','HALF A HUNDRED', 'Reach Commander Level 50',                      50, ()=>META.lvl],
+  ['rk4','A HUNDRED RANKS','Reach Commander Level 100',                    100, ()=>META.lvl],
+  ['rk5','VETERAN CADRE',  'Take any soldier or gun to rank 10',            10, rankBest],
+  ['rk6','OLD GUARD',      'Take any soldier or gun to rank 25',            25, rankBest],
+  ['rk7','LIFER',          'Take any soldier or gun to rank 50',            50, rankBest],
+  ['rk8','MAXED OUT',      'Take any soldier or gun all the way to rank 100',100, rankBest],
+  ['rk9','THE WHOLE SQUAD','250 ranks earned across the whole army',       250, rankTotal],
+  ['rk10','NOTHING LEFT TO LEARN','800 ranks earned across the whole army',800, rankTotal]
+]));
+// WING 10 — THE HOME FRONT. The star faucet, the six things on the floor (v1.21),
+// the piggy's bank tiers, and the squad coming out of the shop.
+ACH.push(...achSet('home',[
+  ['hm1','POCKET MONEY',   'Earn 500 stars, lifetime',                     500, ()=>META.starsLifetime],
+  ['hm2','WAR CHEST',      'Earn 2,500 stars, lifetime',                  2500, ()=>META.starsLifetime],
+  ['hm3','THE TREASURY',   'Earn 10,000 stars, lifetime',                10000, ()=>META.starsLifetime],
+  ['hm4','HOME COMFORTS',  'Put a decoration on your floor',                 1, decorCount],
+  ['hm5','INTERIOR DECORATOR','Own three decorations',                       3, decorCount],
+  ['hm6','THE FULL FLOOR', 'Own every decoration',      DECOR_ORDER.length,     decorCount],
+  ['hm7','THE STRONGBOX',  'Upgrade the piggy bank once',                    1, bankTier],
+  ['hm8','THE MARBLE VAULT','Upgrade the piggy bank all the way', BANK_TIERS.length, bankTier],
+  ['hm9','FULL MUSTER',    'Unlock every soldier in the shop', TRAY_ORDER.length, ()=>(META.unlocked||[]).length],
+  ['hm10','THE GENERAL\'S QUARTERS','The whole floor, the marble bank and the whole squad', QUARTERS_ALL, quartersScore]
+]));
+// ⚠ RETIRE-FLAG, NOT A DELETION (Wyatt, 7/25: invasions come out in a later
+// link today). These ELEVEN medals are the only ones in the case that ride the
+// daily-invasion counter `META.stats.rivalWins` — the whole PIGGY BANK DEFENSE
+// wing plus RIVAL SLAYER in the service record. When invasions go, nothing
+// increments that counter and all eleven become unearnable for anyone who has
+// not already got them (already-earned ones are safe: META.ach only ever gains).
+// They are left in place on purpose — deleting a wing would renumber the case
+// and take badges off walls people have already filled. Whoever pulls invasions
+// should decide between re-pointing this list at whatever replaces the daily
+// rival, or hanging it as a retired wing. Nothing new in v1.26 touches it.
+const ACH_INVASION=['rival','pig2','pig4','pig6','pig8','pig10','pig15','pig20','pig30','pig40','pig50'];
 function checkAch(){
   // a returning save can earn a stack at once — stagger them down the screen
   let n=0;
@@ -5442,7 +6039,12 @@ function endBattle(win){
   // THE CO-OP SERVICE RECORD (groundwork, v1.23): this campaign level, beaten with
   // real people beside you. Both modes write it, and it only counts with 2+ humans
   // actually still on the carpet — the GIANT BANANA will read it, nothing else does.
-  if(!S.rival && S.coop && COOP && coopHumans()>=2) noteCoopLevel(S.levelN);
+  if(!S.rival && S.coop && COOP && coopHumans()>=2){
+    noteCoopLevel(S.levelN);
+    // ...and the size of the company you held it with. A high-water mark, not a
+    // tally: BROTHERS IN ARMS asks how big the biggest line you ever won on was.
+    if(coopHumans() > (META.stats.coopMost||0)) META.stats.coopMost = coopHumans();
+  }
   document.getElementById('medalText').textContent = msg;
   if(!S.rival){
     // your winning line becomes your defense snapshot — this is the room
@@ -5965,9 +6567,34 @@ function radioAura(u){
 // a kill just landed on u's tally — is it a personal best for one of YOUR men?
 // (invasion defenders aren't yours; on the battlefield only seat 0 is you)
 function noteAce(u){
-  if(!u || u.kills==null || S.invasion) return;
-  if(S.bf && u.seat!==0) return;
+  if(!u || u.kills==null) return;
+  if(!killIsMine(u)) return;
   if(u.kills > (S.aceKills||0)) S.aceKills = u.kills;
+}
+// ⚠ ONE OWNERSHIP LAW, like enhU() (v1.22) — because "did I do that?" is asked by
+// three different medals now and they must never disagree. An INVASION's men
+// belong to the player being raided; on a carpet an ALLY's men are relayed and
+// carry coopBy; and on the battlefield only MY chair counts.
+// ⚠ `u.seat!==0` was the old test and it has been wrong since v1.24 put a
+// commander in any chair of a private room — a guest in seat 3 banked no ace at
+// all. The seat you are sitting in is bfMySeat(), never the number nought.
+function killIsMine(u){
+  if(!u || S.invasion) return false;
+  if(u.coopBy) return false;
+  if(S.bf) return u.seat===bfMySeat();
+  return true;
+}
+// A kill just landed. Everything the service record wants to remember about WHO
+// got it goes through here, so the campaign branch and the battlefield branch of
+// hitCheck can never drift apart again (the v1.5 noteAce bug, which shipped
+// counting battlefield aces and missing every campaign one).
+function noteKill(u,f){
+  noteAce(u);
+  if(!f || !killIsMine(u)) return;
+  // THE MOTOR POOL's medals: knockovers scored BY one of your machines. The
+  // vehicle flag lives on the killer's own def, so a jeep that rams and a tank
+  // that shells both count, and a man standing next to one never does.
+  if(u.def && u.def.vehicle) META.stats.vehKills++;
 }
 function hitCheck(f,u){
   // BATTLEFIELD combatant (campaign foes never carry a `side`): flag him dead,
@@ -5976,7 +6603,7 @@ function hitCheck(f,u){
     if(f.dead || f.hp>0) return;
     f.dead=true;
     bfSargeDown(f);                       // if that was a Sarge, his chair starts counting
-    if(u && u.kills!=null){ u.kills++; noteAce(u); }
+    if(u && u.kills!=null){ u.kills++; noteKill(u,f); }
     S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(f.def.vehicle?3.14:(Math.random()<0.5?-1.83:1.83)),
       w:unitW(f.type), img:unitImg(f.type,f), flip:(f.side==='foe') });
     if(S.corpses.length>90) S.corpses.shift();
@@ -5995,7 +6622,7 @@ function hitCheck(f,u){
     const idx=S.foes.indexOf(f);
     if(idx>=0){
       S.foes.splice(idx,1);
-      if(u){ u.kills++; noteAce(u); }
+      if(u){ u.kills++; noteKill(u,f); }
       // the fallen stay where they fell — flipped over like real toys
       S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(f.def.vehicle?3.14:(Math.random()<0.5?-1.83:1.83)), w:f.def.w, img:foeImg(f.type) });
       if(S.corpses.length>90) S.corpses.shift();
@@ -6644,7 +7271,7 @@ function drawFoe(f){
 }
 
 // ================= HUD =================
-const TRAY_ORDER=['rifleman','mgunner','bazooka','mortar','minesweeper','flame','radioman','sarge'];
+// (TRAY_ORDER now sits up with VEH_ORDER — the medal case needs it at build time.)
 function TRAY(){ return TRAY_ORDER.filter(t=>META.unlocked.indexOf(t)>=0).map(t=>({t})); }
 const trayRects=[], btnRects={};
 function bfClock(){
@@ -8289,8 +8916,12 @@ function panelHTML(id){
       // THE MEDAL CASE. Fifty badges hung in five wings, going straight down --
       // each wing a brass plate over a felt board. Names only in the grid; the
       // story lives behind a tap (UI.medal), which keeps the wall of text off.
+      // TEN wings now, still going straight down (v1.26). The first five are the
+      // original hall; the second five hang the systems that shipped tonight.
       const wings=[['core','SERVICE RECORD'],['ace','MARKSMANSHIP'],['bfk','BATTLEFIELD — KILLS'],
-                   ['bfw','BATTLEFIELD — WINS'],['pig','PIGGY BANK DEFENSE']];
+                   ['bfw','BATTLEFIELD — WINS'],['pig','PIGGY BANK DEFENSE'],
+                   ['veh','THE MOTOR POOL'],['coop','BROTHERS IN ARMS'],['arm','THE ARSENAL'],
+                   ['rank','THE LONG SERVICE'],['home','THE HOME FRONT']];
       MC=[]; let done=0, tot=0, h='';
       for(const [cat,title] of wings){
         const list=ACH.filter(a=>(a.cat||'core')===cat);
