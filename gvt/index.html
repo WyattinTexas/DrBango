@@ -7846,7 +7846,7 @@ function reset(){
   S.plastic=170; S.lives=10; S.wave=0; S.waveActive=false; S.queue=[]; S.waveT=0;
   S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
-  S.ffLevel=0; S.downsLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.hitStop=0;
+  S.ffLevel=0; S.downsLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.hitStop=0; S.tanBase=null;
   S.coop=null;    // co-op battles re-arm this right after startBattle
   S.sq=null;      // …and a squad mission arms its streaming ticker there too
   S.aceKills=0;   // best single-soldier kill count this battle (yours only)
@@ -7895,6 +7895,9 @@ function startCampaign(n){
   startBattle(n||META.campaign+1, null);
   sqScaleCfg(S.cfg, 1);
   S.sq={ p:1, t:0, nextT:SQ_GRACE };
+  // v1.31: the crate the Tan walk out of. Smash it to win — it is the ONLY win.
+  const bh=CAMP_BASE_HP(S.levelN);
+  S.tanBase={ x:W-130, y:300, hp:bh, hpMax:bh, hitT:0 };
   S.ann={ txt:'LEVEL '+S.levelN+' — HOLD THE LINE', t:2.8 };
 }
 // The room-defense sortie: short, varied, escalating. Opener → flank → spectacle
@@ -8421,6 +8424,9 @@ function coopStartBattle(){
     const p=Math.max(1,Math.min(SQ_MAX,COOP.pc|0));
     sqScaleCfg(S.cfg,p);
     S.sq={ p, t:0, nextT:SQ_GRACE };
+    // the squad's crate grows on the same sub-linear law as the army guarding it
+    const bh=Math.round(CAMP_BASE_HP(S.levelN)*sqEnemyMul(p));
+    S.tanBase={ x:W-130, y:300, hp:bh, hpMax:bh, hitT:0 };
     coopSeatColours();
     S.ann={txt:tf(p===1? 'HOLD THE LINE — LEVEL %1 · %2 COMMANDER'
                          : 'HOLD THE LINE — LEVEL %1 · %2 COMMANDERS', S.levelN, p), t:3.2};
@@ -8439,6 +8445,8 @@ function coopStartBattle(){
     // left in place for a client cached on an older build.
     sqScaleCfg(S.cfg,2);
     S.sq={ p:2, t:0, nextT:SQ_GRACE };
+    const bh2=Math.round(CAMP_BASE_HP(S.levelN)*sqEnemyMul(2));
+    S.tanBase={ x:W-130, y:300, hp:bh2, hpMax:bh2, hitT:0 };
     S.ann={txt:tf('ALLIED MISSION — LEVEL %1', S.levelN), t:2.8};
   }
   SFX.horn();
@@ -8513,15 +8521,19 @@ function sqRef(){ return !S.coop || coopIsHost(); }
 // dead between waves, and the whole point of this mode is that nothing stops.
 function sqTick(dt){
   const sq=S.sq; sq.t+=dt;
-  if(sqRef() && S.wave<S.cfg.waves.length && sq.t>=sq.nextT) sqPushWave(S.wave+1);
+  // v1.31: while the enemy crate stands, the waves NEVER run out — the level's
+  // list cycles. No crate (rival/classic doors) keeps the finite count.
+  const more = S.tanBase? !S.tanBase.dead : S.wave<S.cfg.waves.length;
+  if(sqRef() && more && sq.t>=sq.nextT) sqPushWave(S.wave+1);
 }
 // ADD a wave to whatever is already walking on. `at` is rebased onto the running
 // spawn clock, so a group that used to arrive "3s into its wave" still does.
 function sqPushWave(n,remote){
   if(!S.sq || S.mode!=='play') return;
-  n=Math.max(1,Math.min(S.cfg.waves.length,n|0));
+  n=Math.max(1,n|0);
+  if(!S.tanBase) n=Math.min(S.cfg.waves.length,n);   // cycling is the crate's law only
   if(n<=S.wave) return;                          // replay-safe, like every other command
-  const w=S.cfg.waves[n-1];
+  const w=S.cfg.waves[(n-1)%S.cfg.waves.length];
   for(const g of w.groups) S.queue.push(Object.assign({},g,{at:S.waveT+(g.at||0)}));
   S.wave=n; S.waveActive=true;
   S.ann = w.boss? {txt:t(w.name),t:3.0,warn:true} : {txt:tf('WAVE %1 — %2!', n, t(w.name)),t:2.0};
@@ -8538,7 +8550,8 @@ function sqPushWave(n,remote){
 // assault, and the men on the carpet are the point. (The pair mission's
 // coopCatchUp does the opposite on purpose — it has a wave GATE to keep in step.)
 function sqCatchUp(n){
-  n=Math.max(0,Math.min(S.cfg.waves.length, n|0));
+  n=Math.max(0,n|0);
+  if(!S.tanBase) n=Math.min(S.cfg.waves.length,n);   // a cycling stream has no ceiling to clamp to
   if(!S.sq || S.mode!=='play' || n<=S.wave) return;
   S.wave=n-1;
   sqPushWave(n, true);
@@ -9557,7 +9570,66 @@ function bfUnitStep(u,dt){
 // figure walks. bfMarch moves him, so rocks, stalls and the squeeze rule are
 // the same law on both carpets; return true = stand and fight, false = the
 // frame was spent walking (bfUnitStep's own convention).
-const CAMP_FRONT_X=600;   // the forward line — the Tan keep the right third of the carpet to walk on in formation
+// ================= THE ENEMY BASE (v1.31) =================
+// Wyatt, 7/26: "You have to destroy the enemy base. That's how you beat a
+// level." The Tan get their own toy box at the right end of the carpet — the
+// crate their whole army walks out of — and the ONLY way to win a campaign
+// level is to march over there and knock it apart. The waves never run out:
+// they CYCLE the level's own list for as long as the crate stands, so a pure
+// defence can no longer win a level. Your lives are still how you LOSE — their
+// leaks smash your box exactly as they always did. Rival sorties and the
+// classic regression door have no crate, so they keep the old survive-the-waves
+// win; everything hangs off `S.tanBase` being set.
+// ⚠ 240 IS MEASURED, NOT GUESSED: at 80 a four-man opener with Sarge razed the
+// crate at t=58 on L1 — during WAVE ONE, 10/10 lives, the level's whole army
+// unmet. 240 puts the fall 2-3 stream-cycles deep, so a push has to live in the
+// gaps between waves and the campaign's authored opposition actually plays.
+// Growth is GENTLE (2%/level) because the whack table rides the promotion curve
+// (see campSmash) — both sides grow, so time-to-kill stays roughly a level's.
+const CAMP_BASE_HP=n=>Math.round(240*(1+0.02*(Math.max(1,n)-1)));  // L1 240 … L100 715
+const CAMP_SIEGE_CD=2.0;      // one whack every two seconds per man at the crate
+// ⚠ THE WRECKING CREW — measured, not guessed: siege damage scales with
+// HEADCOUNT × cadence, so a rebuying commander walked TEN men over and deleted
+// a 240 crate in ~7 seconds of contact, wave one still on the carpet. A crate
+// has only so many corners to batter: THREE men swing at once, everyone else
+// stands the ring — and since every idle man auto-fights whatever walks into
+// his reach, the extras become the escort, which is the actual job. Objective
+// dps is capped (~16/s at stock ranks); more men buy fewer interruptions, not
+// a faster demolition. The counter lives on S and resets every frame.
+const CAMP_CREW=3;
+// ⚠ DEPLOYS LAND ON YOUR HALF NOW (the battleground's own law): with a crate to
+// kill, a drop beside it would be a free siege that skips the whole march. The
+// rest of the carpet is ground you TAKE, not ground you're given.
+const CAMP_DEPLOY_X=480;
+// a man at the crate batters it — flat table damage, the same numbers a
+// breakthrough deals a battleground box, so a Sarge (18) is worth three rifles
+function campSmash(u){
+  const b=S.tanBase; if(!b||b.dead) return;
+  // the whack rides the SAME rank law as every other hit — vet ×1.5, promotion
+  // taper, and a relayed ally batters at the ALLY's rank (coopUM), so a crate
+  // that grows with the level meets an army that grew with the player
+  const dmg=Math.round((BF_BASEDMG[u.type]||6)*(u.vet?1.5:1)*(u.coopUM!=null?u.coopUM:upMul(u.type)));
+  b.hp=Math.max(0,b.hp-dmg); b.hitT=0.25;
+  bfSfx(SFX.thock,u.x);
+  S.fx.push({k:'ring',x:b.x-6,y:b.y-40,r:6,R:34,t:0,dur:0.3,col:'rgba(255,243,196,0.8)'});
+  S.floats.push({x:b.x,y:b.y-96,txt:'−'+dmg,t:0,col:'#BFE39A'});
+  if(b.hp<=0){
+    b.dead=true;
+    // their crate comes apart — the one hit that gets to be dramatic (bfLeak's
+    // own KO beat: shake, slow-mo, then the card). ⚠ Only the referee calls the
+    // verdict; a guest sim's copy of the crate can die early and it just gets
+    // the fireworks while it waits for the word.
+    S.shake=1.0; S.speed=0.35; SFX.boom();
+    for(let i=0;i<3;i++) S.fx.push({k:'puff',x:b.x+(Math.random()-0.5)*70,y:b.y-30-Math.random()*60,t:0,dur:0.6,R:26});
+    S.fx.push({k:'ring',x:b.x,y:b.y-30,r:12,R:110,t:0,dur:0.6,col:'rgba(255,210,74,0.9)'});
+    setTimeout(()=>{ S.speed=1;
+      if(S.mode==='play' && !S.cleared && !coopGuest()){ S.cleared=true; endBattle(true); }
+    },900);
+  }
+}
+// THE FORWARD LINE survives only where there is no crate to take (the rival
+// sortie, the classic regression door): men advance to here and stand guard.
+const CAMP_FRONT_X=600;
 // …except where the seed parked the RIVER under that exact line: a watch stood
 // in the water is nonsense, so on those carpets the line is the east bank.
 function campFrontX(){
@@ -9594,13 +9666,31 @@ function campUnitStep(u,dt){
   else if(u.type==='radioman') rng=UDEF.rifleman.rng;   // he halts where the rifle line halts — a step behind the fight, where an aura belongs
   else rng=u.def.rng*radioAura(u).rng*((u.type==='bazooka'&&enhU(u,'longtube'))?ENH_BAZ_RNG:1);
   if(rng!=null && campFoeInReach(u,rng)){ u.marching=false; return true; }   // a target in reach → halt and FIGHT
-  const FL=campFrontX();
-  if(u.x>=FL-6){ u.marching=false; return true; }    // standing his watch on the line
+  const TB=S.tanBase;
+  if(TB){
+    // THE SIEGE (v1.31): at the crate with nothing shooting at him, he batters
+    // it — on his own cadence, staggered so ten men never swing as one
+    // metronome. Defenders interrupt for free: the foes-first halt above IS the
+    // interruption, and a downed man never reaches this line at all.
+    if(!TB.dead && Math.hypot(TB.x-u.x,TB.y-u.y)<LEAK_R+8){
+      u.marching=false;
+      if((S.crew|0)>=CAMP_CREW) return true;   // the crew is full — he stands the ring (and his gun still covers it)
+      S.crew=(S.crew|0)+1;
+      if(u.siegeT==null) u.siegeT=0.5+Math.random()*0.9;   // walk up, wind up
+      u.siegeT-=dt;
+      if(u.siegeT<=0){ u.siegeT=CAMP_SIEGE_CD; campSmash(u); }
+      return true;                       // the sweeper still seeds, the guns still cover
+    }
+    if(TB.dead){ u.marching=false; return true; }   // the crate is falling — stand and watch it go
+  }
+  if(!TB && u.x>=campFrontX()-6){ u.marching=false; return true; }   // no crate to take: stand the forward line
   if(u.pauseT>0){ u.pauseT-=dt; u.marching=false; return false; }   // picking his footing
-  // his own lane, his own zig — the battleground's walk, pointed up the carpet
+  // his own lane, his own zig — the battleground's walk, pointed at the crate
+  // (or, with no crate to take, at the forward line)
   let goal;
   const lane=(u.laneY!=null?u.laneY:u.y);
-  if(FL-u.x<200){ u.wp=null; goal={x:FL, y:lane}; }
+  const gx=TB? TB.x : campFrontX(), gy=TB? TB.y : lane;
+  if(gx-u.x<200){ u.wp=null; goal={x:gx, y:gy}; }
   else {
     u.wpT=(u.wpT||0)-dt;
     if(!u.wp || u.wpT<=0 || (Math.abs(u.wp.x-u.x)<14 && Math.abs(u.wp.y-u.y)<14)){
@@ -10143,6 +10233,9 @@ function canPlace(x,y,type,side){
   }
   if(x<58||x>W-24||y<70||y>H-92) return false;
   if(x<215&&y>200&&y<380) return false; // toy box zone
+  // v1.31: with an enemy crate to take, drops land on YOUR HALF (the
+  // battleground's own law) — a drop beside their box is a siege you didn't march for
+  if(S.tanBase && x>CAMP_DEPLOY_X) return false;
   const RV=S.cfg.terrain.river;
   if(RV && x>RV.x-14 && x<RV.x+RV.w+14) return false;        // no standing in the river (or hogging the bridge)
   for(const rk of S.cfg.terrain.rocks){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }
@@ -11487,7 +11580,9 @@ function update(dt){
     if(S.queue.length===0 && S.foes.length===0){
       S.waveActive=false;
       // allied mission: the guest sim never calls the verdict — the referee does
-      if(S.wave>=S.cfg.waves.length){ if(!S.cleared && !coopGuest()){ S.cleared=true; setTimeout(()=>endBattle(true),700); } }
+      // ⚠ v1.31: with an enemy crate on the carpet, clearing waves wins NOTHING —
+      // the stream cycles and the only door out is the crate at zero.
+      if(!S.tanBase && S.wave>=S.cfg.waves.length){ if(!S.cleared && !coopGuest()){ S.cleared=true; setTimeout(()=>endBattle(true),700); } }
       else if(S.sq){ /* a lull, not a wave clear — no bonus, no breather, the ticker owns the cadence */ }
       else {
         S.plastic+=30; S.floats.push({x:W/2,y:110,txt:'WAVE CLEAR +30',t:0,col:CREAM});
@@ -11503,6 +11598,7 @@ function update(dt){
     if(S.interT<=0){ if(coopGuest()){ S.interT=0.01; } else { S.interT=0; spawnWave(); } }
   }
   if(S.ann){ S.ann.t-=dt; if(S.ann.t<=0) S.ann=null; }
+  if(S.tanBase && S.tanBase.hitT>0) S.tanBase.hitT-=dt;   // the crate's hit flash cools here, on sim time
 
   // formations: anchors wheel toward the Toy Box
   for(let i=S.forms.length-1;i>=0;i--){
@@ -11716,6 +11812,7 @@ function update(dt){
   }
 
   // units fire
+  S.crew=0;   // the wrecking crew re-forms every frame — first three at the crate swing
   for(const u of S.units){
     if(u.sprue>0) u.sprue-=dt;
     if(u.saberCd>0) u.saberCd-=dt;   // saber rest ticks even mid-march (BF) — he dashes in without the stand-and-wait
@@ -12447,6 +12544,31 @@ function drawBase(side){
   cx.beginPath(); cx.moveTo(bx,by-176); cx.lineTo(bx+36*dir,by-166+wav); cx.lineTo(bx,by-150); cx.closePath(); cx.fill();
   cx.strokeStyle='rgba(26,18,10,0.9)'; cx.lineWidth=2; cx.stroke();
 }
+// THE ENEMY CRATE (v1.31) — the campaign's tan toy box, drawn with drawBase's
+// own recipe (mirrored crate that visibly falls apart, cracks, a flag in the
+// army's colour) but read off S.tanBase, because there is no battlefield here.
+function drawTanBase(){
+  const b=S.tanBase, im=IMG.toybox;
+  const bx=W-120, by=352, w=150, k=Math.max(0,b.hp/b.hpMax);
+  if(im){
+    const h=w*(im.height/im.width);
+    cx.save(); cx.translate(bx,by); cx.scale(-1,1);
+    cx.globalAlpha=(b.hitT>0? 1 : 0.55+0.45*k);        // it visibly falls apart; a hit relights it for a beat
+    cx.drawImage(im,-w/2,-h+h*0.08,w,h);
+    cx.restore(); cx.globalAlpha=1;
+  }
+  if(k<0.55){
+    cx.globalAlpha=Math.min(0.9,(0.55-k)*1.8); cx.strokeStyle='#3a2a1c'; cx.lineWidth=3; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(bx+32,by-34); cx.lineTo(bx+6,by-72); cx.lineTo(bx-20,by-40); cx.stroke();
+    cx.globalAlpha=1;
+  }
+  const wav=Math.sin(S.t*3+2)*4;
+  cx.strokeStyle='#6e5130'; cx.lineWidth=4; cx.lineCap='butt';
+  cx.beginPath(); cx.moveTo(bx,by-96); cx.lineTo(bx,by-176); cx.stroke();
+  cx.fillStyle='#C09E6C';
+  cx.beginPath(); cx.moveTo(bx,by-176); cx.lineTo(bx-36,by-166+wav); cx.lineTo(bx,by-150); cx.closePath(); cx.fill();
+  cx.strokeStyle='rgba(26,18,10,0.9)'; cx.lineWidth=2; cx.stroke();
+}
 
 function draw(){
   cx.save();
@@ -12456,13 +12578,20 @@ function draw(){
   if(S.bf) cx.translate(-S.bf.cam.x, 0);
   drawRug();
   if(S.bf){ drawBase('you'); drawBase('foe'); }
-  else drawSprite('toybox',120,352,150,0,0);
+  else { drawSprite('toybox',120,352,150,0,0); if(S.tanBase) drawTanBase(); }
 
   // selection / drag rings
   if(S.sel && !S.sel.down){
     ring(S.sel.x,S.sel.y,S.sel.def.minRng?200:S.sel.def.rng,'rgba(255,255,255,0.10)','rgba(255,255,255,0.7)');
   }
   if(S.drag){
+    // v1.31: with an enemy crate on the carpet your half is the deploy zone —
+    // shade the ground you must TAKE, so a refused drop explains itself
+    if(!S.bf && S.tanBase){
+      cx.fillStyle='rgba(166,59,42,0.07)'; cx.fillRect(CAMP_DEPLOY_X,64,W-CAMP_DEPLOY_X-4,H-64-88);
+      cx.strokeStyle='rgba(255,243,196,0.4)'; cx.lineWidth=2; cx.setLineDash([10,10]);
+      cx.beginPath(); cx.moveTo(CAMP_DEPLOY_X,70); cx.lineTo(CAMP_DEPLOY_X,H-92); cx.stroke(); cx.setLineDash([]);
+    }
     const ok=S.drag.unit? true : canPlace(S.drag.x,S.drag.y,S.drag.type,S.bf?bfMyTeam():undefined);
     const def=UDEF[S.drag.type];
     // the jeep has no reach to show, so it shows its bumper instead — a 250-tag
@@ -12640,9 +12769,13 @@ function drawBaseBar(bx,by,bw,k,label,col){
 // report — either the next one is on its way, or the last one is on the carpet.
 function sqHudLine(){
   const tot=S.cfg.waves.length;
+  const left=Math.max(0,Math.ceil(S.sq.nextT-S.sq.t));
+  // v1.31: while the enemy crate stands the stream cycles — the honest total is
+  // ∞, and the numbers are tokenised out of the key, so every language gets it
+  if(S.tanBase) return S.wave===0? tf('DIG IN! FIRST WAVE IN %1S', left)
+                                 : tf('WAVE %1 / %2 — NEXT IN %3S', S.wave, '∞', left);
   if(S.wave>=tot) return S.foes.length||S.queue.length? TXT('LAST WAVE — CLEAR THE CARPET!') :
     TXT(S.coop?'CARPET CLEAR — HQ CONFIRMING…':'ALL WAVES CLEAR');
-  const left=Math.max(0,Math.ceil(S.sq.nextT-S.sq.t));
   if(S.wave===0) return tf('DIG IN! FIRST WAVE IN %1S', left);
   return tf('WAVE %1 / %2 — NEXT IN %3S', S.wave, tot, left);
 }
@@ -12895,7 +13028,16 @@ function drawHUD(){
   }
   cx.textAlign='right';
   fitText(cx, S.bf? (S.bf.team>1? S.bf.team+'v'+S.bf.team : S.bf.rival.name) : tf('TOY BOX ×%1', S.lives), VW-16, 23, 180, 'bold', 23, 12);
-  if(S.bf) drawBFBars(); else drawBossBar();
+  if(S.bf) drawBFBars();
+  else {
+    drawBossBar();
+    // v1.31: the objective, always on screen — their crate's plastic, in the
+    // battlefield scoreboard's own right-hand slot (clears the boss bar by 3px)
+    if(S.tanBase){
+      const bw=Math.min(240,(VW-40)*0.27), k=S.tanBase.hp/S.tanBase.hpMax;
+      drawBaseBar(VW-16-bw, 54, bw, k, tf('THEIR TOY BOX %1', Math.max(0,Math.ceil(S.tanBase.hp))), k>0.35?'#C0473A':'#8a2f26');
+    }
+  }
   // buttons: speed, sound & retreat to HQ (always available — even mid-Level 1)
   btn('spd', VW/2+110, 6, 62, 32, S.speed+'×');
   btn('snd', VW/2+180, 6, 52, 32, soundOn?'♪':'×');
@@ -15104,7 +15246,7 @@ window.GVT = {
   cash(n){ S.plastic=n; },
   start(){ spawnWave(); },
   step(sec){ const n=Math.round(sec*60); for(let i=0;i<n;i++){ if(S.mode==='play') update(1/60); } draw(); },
-  snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, level:S.levelN, rival:S.rival&&S.rival.id, active:S.waveActive, foes:S.foes.length, mines:S.mines.length, units:S.units.map(u=>({t:u.type,down:u.down,kills:u.kills,vet:u.vet,hits:u.hits})), queue:S.queue.length }; },
+  snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, level:S.levelN, rival:S.rival&&S.rival.id, active:S.waveActive, foes:S.foes.length, mines:S.mines.length, base:S.tanBase? Math.ceil(S.tanBase.hp) : null, units:S.units.map(u=>({t:u.type,down:u.down,kills:u.kills,vet:u.vet,hits:u.hits})), queue:S.queue.length }; },
   meta(){ return JSON.parse(JSON.stringify(META)); },
   startLevel(n){ startCampaign(n); return GVT.sq(); },
   // the retired wave-gated build of a level, for regression rigs only — no door
