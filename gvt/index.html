@@ -37,7 +37,7 @@
   @keyframes waddle { from { transform:rotate(-4.5deg);} to { transform:rotate(4.5deg);} }
   .coinop { position:absolute; bottom:3%; width:100%; text-align:center; font-family:'Arial Narrow', Impact, sans-serif; font-weight:bold; font-size:0.75rem; letter-spacing:0.22em; color:#5A5D4C; text-transform:uppercase; pointer-events:none; }
   .scanlines { position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,0.16) 2px 4px); }
-  @media (prefers-reduced-motion: reduce){ .press,.strip,.rivsquad,.rivfig,.vicfig,.doorlight,.roomtag.alarm,.pigwrap.hop,.starfloat,.wt-flank,.wt-play,.accard img,.promobanner,.wr-flank,.wr-act,.wr-tgt{ animation:none; } }
+  @media (prefers-reduced-motion: reduce){ .press,.strip,.rivsquad,.rivfig,.vicfig,.doorlight,.roomtag.alarm,.pigwrap.hop,.starfloat,.wt-flank,.wt-play,.accard img,.promobanner,.wr-flank,.wr-act{ animation:none; } }
   @media (orientation: portrait) {
     #rotate { display:flex; z-index:50; }
   }
@@ -246,8 +246,9 @@
   .wr-nm { flex:1; text-align:left; font-size:clamp(12px,2.6vh,21px); letter-spacing:0.04em;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .wr-nm small { color:#BFE39A; font-size:0.72em; letter-spacing:0.1em; }
-  .wr-tgt { color:#D96A55; font-size:clamp(13px,2.8vh,22px); flex-shrink:0; animation:wrpulse 1.6s ease-in-out infinite; }
-  @keyframes wrpulse { 0%,100% { opacity:0.75; } 50% { opacity:1; } }
+  /* v1.28: not a target any more — a tap affordance on every row, so it sits
+     quiet. The old .wr-tgt pulsed red because exactly ONE row ever wore it. */
+  .wr-ch { color:#C8A24A; font-size:clamp(11px,2.3vh,18px); flex-shrink:0; opacity:0.72; }
   .wr-vl { color:#FFD24A; font-size:clamp(12px,2.6vh,21px); font-variant-numeric:tabular-nums; flex-shrink:0;
     text-shadow:0 1px 0 rgba(0,0,0,0.5); }
   .wr-row.you { background:rgba(46,58,34,0.9); border:2px solid #BFE39A; border-radius:12px;
@@ -1316,7 +1317,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.27</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.28</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1849,7 +1850,6 @@ function enhOn(id){ return enhOwns(id) && (META.enh.on||[]).indexOf(id)>=0; }
 function enhU(u,id){
   const inf=ENH_INFO[id];
   if(!inf || !u || u.type!==inf.unit) return false;
-  if(S.invasion) return false;                 // those are the DEFENDER's men — you are the Tan today
   if(u.coopMods)                               // relayed: an ally's squad carries the ALLY's bench
     return u.coopMods.indexOf(id)>=0;
   if(S.bf && !bfHumanU(u)) return false;        // every other seat on the battlefield fields factory stock
@@ -2055,7 +2055,6 @@ function wrLoad(){
   }).catch(()=>{ WR.err=true; if(wrIsOpen()) renderWorldRank(); });
 }
 
-let chalTarget=null;
 // ================= THE XP ECONOMY =================
 // Every payout is a FRACTION OF THE LEVEL YOU'RE STANDING ON, never a flat
 // number. The ladder gets taller as you climb (100 + 50 a rung), so a flat
@@ -2065,7 +2064,6 @@ let chalTarget=null;
 const XP_BF_WIN=0.90, XP_BF_TEAM=0.01,   // 1v1 pays 91% of a level, 10v10 the whole thing
       XP_CAMPAIGN_WIN=0.50,              // two carpets secured = one promotion, at EVERY rank
       XP_BOSS=0.10,                      // a felled boss pays a little on top
-      XP_INVASION_WIN=0.15,              // raiding someone else's room is a short sortie
       XP_LOSS=0.10,                      // ten defeats still promote you — losing is progress
       // HOLD THE LINE (v1.23). Wyatt: winning one of these must feel GREAT, and pay
       // at LEAST the battleground win. The battleground caps at exactly one level
@@ -2309,7 +2307,31 @@ function pigCheck(){
 // pink, streakless piggy still has something for you every day (v1.21).
 function pigPayout(){ return pigTier()+bankTier(); }
 function pigClaimable(){ pigCheck(); return pigPayout()>0 && META.piggy.claimed!==todayStr(); }
-// the one-line piggy report used by the rival panel — where the invasion lives
+// BEATING TODAY'S RIVAL — one function, because two modes ask now. The campaign
+// sortie still calls it (GVT.rivalRaid), and since v1.28 so does the BATTLEFIELD:
+// the daily raid is a quick 1v1 against the rival's army, which is the shape the
+// rest of the game already had. ⚠ THIS IS WHAT KEEPS ELEVEN MEDALS ALIVE — the
+// whole PIGGY BANK DEFENSE wing and RIVAL SLAYER read `META.stats.rivalWins`, and
+// retiring invasions without re-pointing it would have left them unearnable
+// (the v1.26 note under ACH_INVASION asked whoever pulled invasions to make
+// exactly this call).
+function rivalDayWin(id){
+  const day=todayStr();
+  if(META.rivalDays[day]) return { stars:1, msg:'Rival already beaten today — +1★ for the drill.', first:false };
+  META.rivalDays[day]=id; META.stats.rivalWins++;
+  let msg='DAILY RIVAL DOWN · BONUS +5★';
+  // THE PIGGY BANK LIVES ANOTHER DAY. A missed day has already dropped the
+  // streak (pigCheck), so this either extends the run or starts one at 1.
+  pigCheck();
+  const before=pigTier();
+  META.piggy.streak++; META.piggy.last=day;
+  const after=pigTier();
+  if(after>before) msg+=' · 🐷 THE PIGGY BANK TURNED '+PIG_COLORS[after].name+' — IT PAYS +'+after+'★ EVERY DAY NOW';
+  else if(after>0) msg+=' · 🐷 PIGGY SAFE — DAY '+META.piggy.streak;
+  else msg+=' · 🐷 PIGGY SAFE — DAY '+META.piggy.streak+' OF 5 TO '+PIG_COLORS[1].name;
+  return { stars:5, msg, first:true };
+}
+// the one-line piggy report used by the rival panel — where the daily raid lives
 function pigPanelLine(){
   pigCheck();
   const p=META.piggy, t=pigTier(), b=bankTier();
@@ -2762,8 +2784,14 @@ const SFX = {
 
 // ================= BOOT CAMP COACH =================
 // FAVOR-style guiding finger, once per device (localStorage gvt_coach).
-// Steps: 1 drag first soldier → 2 drag second → 3 tap START → 4 first
-// knockdown (slow-mo until he's stood up) → 5 dog-tag toast → 6 reposition.
+// ⚠ REMAPPED IN v1.28 FOR THE STREAMING CAMPAIGN. Two of the six steps taught
+// things the game no longer does: step 3 pointed a finger at a START WAVE button
+// that is never drawn now, and step 6 said "between waves", which is a moment
+// that no longer exists. Both are now about the thing that replaced them — the
+// Tan arrive on their own, and your men move whenever you like.
+// Steps: 1 drag first soldier → 2 drag second → 3 dig in (the wave comes to YOU)
+// → 4 first knockdown (slow-mo until he's stood up) → 5 dog-tag toast → 6 move
+// a man mid-battle.
 let coach = null;
 function coachStart(){
   try{ if(localStorage.getItem('gvt_coach')) return; }catch(e){}
@@ -2773,7 +2801,9 @@ function coachDone(){ coach=null; try{ localStorage.setItem('gvt_coach','1'); }c
 function coachEvent(ev,u){
   if(!coach) return;
   if(ev==='place'){ if(coach.step===1){coach.step=2;coach.t=0;} else if(coach.step===2){coach.step=3;coach.t=0;} }
-  else if(ev==='wave'){ if(coach.step<=3){coach.step=4;coach.t=0;} else if(coach.step===6){ coachDone(); } }
+  // the wave that walks on by itself both ENDS the dig-in lesson and, later,
+  // stands in for the reposition window step 5 used to hand over to
+  else if(ev==='wave'){ if(coach.step<=3){coach.step=4;coach.t=0;} else if(coach.step===5){coach.step=6;coach.t=0;} }
   else if(ev==='down'){ if(coach.step===4&&!coach.target){ coach.target=u; coach.t=0; } }
   else if(ev==='up'){ if(coach.step===4&&coach.target){ coach.target=null; coach.step=5; coach.t=0; } }
   else if(ev==='tag'){ if(coach.step===5&&coach.toast===0){ coach.toast=3.2; } }
@@ -2795,7 +2825,7 @@ function reset(){
   S.plastic=170; S.lives=10; S.wave=0; S.waveActive=false; S.queue=[]; S.waveT=0;
   S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.maxDown=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
-  S.ffLevel=0; S.downsLevel=0; S.invasion=null; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.hitStop=0;
+  S.ffLevel=0; S.downsLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.hitStop=0;
   S.coop=null;    // co-op battles re-arm this right after startBattle
   S.sq=null;      // …and a squad mission arms its streaming ticker there too
   S.aceKills=0;   // best single-soldier kill count this battle (yours only)
@@ -2826,96 +2856,48 @@ function startBattle(levelN, rival){
   // no boot-camp coach mid co-op — the ally IS the coach
   if(META.campaign===0 && levelN===1 && !coopLaunching) coachStart();
 }
+// ================= THE CAMPAIGN (v1.28) =================
+// Wyatt, 7/25: there is ONE campaign now and it is the battlefield-style one.
+// Playing alone is not a different mode — it is a LOBBY OF ONE. Same level
+// ladder (META.campaign 1-100, untouched), same seeded terrain, the same
+// opponents in the same kinds of formations; the waves simply stream in on the
+// ticker and never wait, exactly as they do with nine friends beside you. The
+// original wave-gated tower defense is unreachable from any door: no START
+// WAVE button, no reposition window, and your men move the whole match.
+//
+// ⚠ sqScaleCfg AT ONE COMMANDER IS ARITHMETICALLY IDENTITY — pow(1,0.82)===1,
+// every boss group is authored n:1, and Math.round leaves the rest alone — so a
+// solo carpet fields the campaign's own army, exactly as it always did. It is
+// still called, on purpose: solo and a one-man lobby must not be able to drift
+// apart if either constant is ever tuned.
+function startCampaign(n){
+  startBattle(n||META.campaign+1, null);
+  sqScaleCfg(S.cfg, 1);
+  S.sq={ p:1, t:0, nextT:SQ_GRACE };
+  S.ann={ txt:'LEVEL '+S.levelN+' — HOLD THE LINE', t:2.8 };
+}
 // The room-defense sortie: short, varied, escalating. Opener → flank → spectacle
 // → big finish. Entertaining precisely because it never outstays its welcome.
+// (v1.28: the daily rival is fought on the BATTLEFIELD now — these waves are
+// only reachable through GVT.rivalRaid, kept because the mods that shape them
+// are the same ARMIES table the battleground's seat plan reads.)
 function rivalRaidWaves(m){
   return ['column','pincer','redcoat','push'].map(k=>waveFromKey(k, m, Math.random));
 }
 function hideAllOverlays(){ xpTeardown();   // a ceremony must never survive into the next screen
   ['title','lose','win','menu','picker','wartable','worldrank','toyshop','sabrite','xpjuice'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
 
-// ================= INVASION (challenge mode: YOU are the Tan) =================
-const INVADE_CARDS = [
-  { key:'squad',    name:'SQUAD ×5',    cost:25, f:'column',    t:'tanrifle', n:5 },
-  { key:'line',     name:'LINE ×8',     cost:40, f:'line',      t:'tanrifle', n:8 },
-  { key:'crawlers', name:'CRAWLER ×4',  cost:20, f:'guerrilla', t:'crawler',  n:4 },
-  { key:'mg',       name:'MG TEAM ×3',  cost:35, f:'line',      t:'tanmg',    n:3 },
-  { key:'redcoats', name:'REDCOATS',    cost:60, f:'redcoat',   t:'tanrifle', n:10, officer:true },
-  { key:'jeep',     name:'JEEP',        cost:25, f:'solo',      t:'jeep',     n:1 },
-  { key:'tank',     name:'TANK',        cost:60, f:'wedge',     t:'tank',     n:1, escort:4 }
-];
-function defaultDefense(stars, uid){
-  // personas & snapshotless players still man the line, scaled to their rank
-  const R=(s=>{ let x=0; for(const ch of s) x=(x*31+ch.charCodeAt(0))>>>0; return ()=>{ x=(x*9301+49297)%233280; return x/233280; }; })(uid||'x');
-  const n=3+Math.min(7,Math.floor((stars||0)/120));
-  const types=['rifleman','rifleman','mgunner','bazooka','rifleman','mortar','mgunner','sarge','rifleman','bazooka'];
-  const out=[];
-  for(let i=0;i<n;i++){
-    out.push({t:types[i%types.length], x:250+R()*420, y:110+R()*400, vet:R()<(stars>400?0.5:0.15)});
-  }
-  return out;
-}
-function startInvasion(target){
-  if(typeof bfQueueTeardown==='function') bfQueueTeardown();   // a battle outranks a queue
-  reset();
-  S.levelN=0; S.rival=null;
-  // COLOURS: you invade in YOUR army's colour, they defend in the one on their
-  // account. If those are the same nobody can read the carpet — they go factory
-  // green so the two sides always tell apart.
-  const mine=dyeHex();
-  const ta=target.color && ARMIES.find(a=>a.id===target.color);
-  let theirs=ta? ta.hex : null;
-  if(theirs && mine && theirs.toLowerCase()===mine.toLowerCase()) theirs=null;
-  if(mine) buildFoeTint(mine);
-  if(theirs) buildUnitTint(theirs);
-  S.invasion={ uid:target.uid, name:target.name, budget:Math.max(120,Math.min(400,120+Math.floor((target.stars||0)/8))), spent:0, resolved:false, myHex:mine, theirHex:theirs };
-  S.cfg=levelCfg(2+(target.stars||0)%3); S.cfg.waves=[];   // their terrain, no authored waves
-  const dfn=(target.defense&&target.defense.length? target.defense : defaultDefense(target.stars, target.uid));
-  dfn.forEach(u=>{
-    if(!UDEF[u.t]) return;
-    const p=placeUnit(u.t, Math.max(80,Math.min(W-40,u.x)), Math.max(80,Math.min(H-110,u.y)));
-    p.vet=!!u.vet;
-  });
-  S.plastic=0;
-  hideAllOverlays();
-  S.mode='play';
-  S.ann={txt:'INVADE '+target.name.toUpperCase()+'!', t:2.6};
-  SFX.horn();
-}
-function invadeRemaining(){ return S.invasion? S.invasion.budget-S.invasion.spent : 0; }
-function endInvasion(won){
-  if(!S.invasion||S.invasion.resolved) return;
-  S.invasion.resolved=true;
-  S.mode=won?'win':'lose';
-  const inv=S.invasion;
-  // a raid pays either way: 15% of a level for taking the room, and the same
-  // tenth every defeat in the game pays for the walk home
-  const xpGain=xpFor(won? XP_INVASION_WIN : XP_LOSS), promos=xpAward(xpGain,{src:'invasion'});
-  const spoils=(won? ' · +2★ spoils of war':'')+' · +'+xpGain+' XP'+promoTag(promos);
-  fetch(NET+'/challenge',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({device:META.deviceId,target:inv.uid,won:!!won})})
-    .then(r=>r.json()).then(d=>{
-      const el=document.getElementById('medalText');
-      if(el&&won){ el.textContent = (d.bonus>0? ('FIRST WIN TODAY vs '+inv.name+' — BONUS +'+d.bonus+'★ ('+d.capLeft+' bonus wins left today)')
-                                   : ('Already beat '+inv.name+' today — rematch glory')) + spoils;
-        if(d.bonus>0){ META.starBank+=d.bonus; META.starsLifetime+=d.bonus; saveMeta(); } }
-    }).catch(()=>{});
-  document.getElementById(won?'win':'lose').classList.remove('hidden');
-  if(won){
-    // a WIN screen that looks like one — you broke their box, fly the flag
-    META.starBank+=2; META.starsLifetime+=2; saveMeta(); netSync();   // spoils of war — every raid pays
-    const wt=document.getElementById('winTitle');
-    wt.innerHTML='INVASION<br>VICTORIOUS'; wt.style.color='#D2B489';
-    document.getElementById('medalRow').textContent='⚑ ⚑ ⚑';
-    document.getElementById('medalText').textContent='Their toy box is broken — the room is yours.'+spoils;
-  } else {
-    saveMeta();
-    document.getElementById('loseTitle').innerHTML='INVASION<br>REPELLED';
-    document.getElementById('loseText').textContent='Their line held and your budget ran dry. Regroup and hit that room again.'+spoils;
-    SFX.ouch();
-  }
-}
-
+// ============ INVASIONS ARE RETIRED (v1.28, Wyatt 7/25) ============
+// The whole raid-somebody's-room mode came out of the client the day before the
+// App Store submission: no INVADE buttons, no ⌖ target, no challenge modal, no
+// Tan tray, and no `S.invasion` — the state machine is GONE rather than gated,
+// because a mode that is merely unreachable leaves its branches live in every
+// draw and update path and this one had leaked into HQ twice before.
+// What replaced it is a DIRECT CHALLENGE: you pick a commander off World
+// Rankings and fight them on the BATTLEFIELD (see duelSend/duelInbox below).
+// ⚠ THE SERVER ENDPOINT `/gvt/challenge` STAYS UP. Clients cached before today
+// still post to it — and this build still uses it itself, for the battlefield's
+// first-win-of-the-day bonus. See the memory for its deprecation plan.
 // ================= BATTLEFIELD: SESSION =================
 // two same-family armies have to be readable at a glance, so a colour clash
 // gets bumped rather than left ambiguous
@@ -3425,6 +3407,15 @@ function coopStartBattle(){
     const mine=(dyeHex()||'').toLowerCase();
     if(!hx || hx.toLowerCase()===mine) hx = (mine==='#5b84c4'? '#4AA5A0' : '#5B84C4');
     COOP.mateHex=hx; buildUnitTint(hx);
+    // ⚠ v1.28: THE PAIR MISSION STREAMS TOO. "One campaign, the battlefield one"
+    // has to mean every door — and the two-player mission was the last place the
+    // old wave-gated campaign was still reachable by a player. Two commanders is
+    // a lobby of two: same ticker, same cap, same sub-linear tan army. The relay
+    // needs nothing new (`sqw` was already a wire key and sqCatchUp is generic),
+    // and the pair's own wave gate — coopCatchUp, the guest's interT floor — is
+    // left in place for a client cached on an older build.
+    sqScaleCfg(S.cfg,2);
+    S.sq={ p:2, t:0, nextT:SQ_GRACE };
     S.ann={txt:'ALLIED MISSION — LEVEL '+S.levelN, t:2.8};
   }
   SFX.horn();
@@ -3489,11 +3480,17 @@ function sqScaleCfg(cfg,p){
 // how many of the men out there are MINE — an ally's don't count against my cap
 function sqMine(){ let k=0; for(const u of S.units){ if(!u.coopBy && !u.dead) k++; } return k; }
 function sqAtCap(){ return !!S.sq && sqMine()>=SQ_CAP; }
+// WHO PUMPS THE WAVES. ⚠ NEVER `coopIsHost()` on its own — it answers false for
+// a commander playing alone, and since v1.28 that is the ordinary campaign, so
+// the stream would simply never start and the carpet would stay empty forever.
+// Alone there is nobody else to be referee; in a party it is whoever holds the
+// chair. (`S.coop` is the party, not the mode — solo leaves it null.)
+function sqRef(){ return !S.coop || coopIsHost(); }
 // the referee's ticker. ⚠ It runs on its OWN clock, not S.waveT — that one stops
 // dead between waves, and the whole point of this mode is that nothing stops.
 function sqTick(dt){
   const sq=S.sq; sq.t+=dt;
-  if(coopIsHost() && S.wave<S.cfg.waves.length && sq.t>=sq.nextT) sqPushWave(S.wave+1);
+  if(sqRef() && S.wave<S.cfg.waves.length && sq.t>=sq.nextT) sqPushWave(S.wave+1);
 }
 // ADD a wave to whatever is already walking on. `at` is rebased onto the running
 // spawn clock, so a group that used to arrive "3s into its wave" still does.
@@ -3507,9 +3504,10 @@ function sqPushWave(n,remote){
   S.ann = w.boss? {txt:w.name,t:3.0,warn:true} : {txt:'WAVE '+n+' — '+w.name+'!',t:2.0};
   S.sq.nextT=S.sq.t+SQ_GAP;
   SFX.horn();
+  coachEvent('wave');   // ⚠ the coach used to hear this from spawnWave, which the stream never calls
   // one push per frame and the clock resets with it, so a host coming back from a
   // stall sends ONE wave, never a burst of the five it slept through.
-  if(!remote && coopIsHost()) coopSend({k:'sqw', n});
+  if(!remote && sqRef()) coopSend({k:'sqw', n});   // coopSend is a no-op when you're alone
 }
 // The referee is further along than this sim is — a dropped command, or a client
 // that just reconnected. SKIP to that wave rather than marching every wave we
@@ -3522,6 +3520,62 @@ function sqCatchUp(n){
   S.wave=n-1;
   sqPushWave(n, true);
 }
+// ============ DIRECT CHALLENGES (v1.28) ============
+// Wyatt, 7/25: invasions come out, and what replaces them is one commander
+// challenging another to a REAL BATTLE. Tap a row on World Rankings, tap
+// CHALLENGE, and you are sitting in a private 1v1 room with their name on it.
+//
+// THE ONE DESIGN CALL, and it is what makes this kid-simple: **a challenge is a
+// message, not a match.** The challenger opens the room and waits in it; the
+// challenge itself is one row in HQ's inbox carrying that room's code. If the
+// other commander is playing right now they see the chip within a poll and are
+// on the carpet seconds later — that is the "both online" case, and it needed no
+// special path. If they are not, the row is still there the next time they open
+// the game, which is the case an invasion could never handle at all (it fought a
+// SNAPSHOT of somebody's army; this fights the person).
+// ⚠ A CHALLENGE CAN GO STALE ON PURPOSE. The room dies with its host's patience,
+// so an accept can arrive at a code that no longer answers. That is not an error
+// state to engineer around — it is turned straight back into an offer to
+// challenge them back, which is the thing the kid wanted anyway.
+const DUEL_POLL=12000;                      // HQ only, and only while you're in it
+let DUEL={ inbox:[], sent:[], pollT:0, busy:false, sig:'' };
+function duelPost(ep,body){
+  return fetch(NET+'/duel/'+ep,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(Object.assign({device:META.deviceId},body||{}))}).then(r=>r.json());
+}
+function duelSig(){ return DUEL.inbox.map(x=>x.frm+':'+x.code).join('|'); }
+function duelStop(){ clearTimeout(DUEL.pollT); DUEL.pollT=0; }
+// ⚠ RE-RENDER ONLY WHEN THE INBOX ACTUALLY MOVED. renderMenu() rebuilds the whole
+// room, which restarts every decoration's CSS animation — a train that resets to
+// the station every twelve seconds is a bug you can see from across the room.
+function duelTick(){
+  duelStop();
+  if(S.mode!=='menu') return;               // never poll from inside a battle
+  DUEL.pollT=setTimeout(duelTick, DUEL_POLL);
+  if(DUEL.busy) return;
+  DUEL.busy=true;
+  duelPost('list').then(r=>{
+    DUEL.busy=false;
+    if(!r||!r.ok) return;
+    DUEL.inbox=r.inbox||[]; DUEL.sent=r.sent||[];
+    const sig=duelSig();
+    if(sig!==DUEL.sig){
+      const grew=DUEL.inbox.length && sig.length>DUEL.sig.length;
+      DUEL.sig=sig;
+      if(S.mode==='menu'){ renderMenu(); if(grew) SFX.blip(); }
+    }
+  }).catch(()=>{ DUEL.busy=false; });
+}
+// the chip: one gold button in the room's own header, so it cannot collide with
+// the furniture and a kid cannot miss it
+function duelChipHTML(){
+  if(!DUEL.inbox.length) return '';
+  const f=DUEL.inbox[0], more=DUEL.inbox.length-1;
+  return '<button class="mbtn alt" style="padding:0.2rem 0.7rem;font-size:0.85rem;margin-left:10px;background:#8a6d1c;border-color:#D9A544"'
+    +' onclick="UI.duelOpen()">⚔ '+escH(String(f.name||'SOMEONE').toUpperCase())
+    +' WANTS A FIGHT!'+(more>0? ' +'+more : '')+'</button>';
+}
+
 // ============ THE PRIVATE BATTLEFIELD ROOM (v1.24) ============
 // Wyatt 7/25: friends should be able to play the battleground TOGETHER, up to
 // 10v10, behind an invite — the same modes, the same maps, the same clock. So
@@ -3719,7 +3773,7 @@ function coopPanelHTML(){
     return '<div id="coopPanel"><h3>🤝 PLAY WITH FRIENDS</h3>'
       +'<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 10px">Pick your kind of game. Fight the Tan together, or fight <b>each other</b>.</p>'
       +(c&&c.note? '<p style="color:#D2B489;font-size:0.98rem">'+escH(c.note)+'</p>':'')
-      +'<button class="coopbtn" onclick="UI.coopMode(\'pair\')"><span class="ico">🤝</span><span>TWO-PLAYER MISSION<small>You and one friend, a normal campaign level</small></span></button>'
+      +'<button class="coopbtn" onclick="UI.coopMode(\'pair\')"><span class="ico">🤝</span><span>TWO-PLAYER MISSION<small>You and one friend, one campaign level</small></span></button>'
       +'<button class="coopbtn" onclick="UI.coopMode(\'squad\')"><span class="ico">🎖</span><span>HOLD THE LINE<small>Up to TEN of you — the Tan never stop coming</small></span></button>'
       +'<button class="coopbtn" onclick="UI.coopMode(\'room\')"><span class="ico">⚔</span><span>PRIVATE BATTLE<small>Your friends only — up to 10 v 10 on the battlefield</small></span></button>'
       +'</div>';
@@ -3728,7 +3782,7 @@ function coopPanelHTML(){
   let h='<div id="coopPanel"><h3>'+(squad?'🎖 HOLD THE LINE':'🤝 TWO-PLAYER MISSION')+'</h3>';
   const rule=squad
     ? '<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 8px">Up to <b>10 real commanders</b> on one carpet. The Tan come in <b>without stopping</b> — no breaks between waves. Beat the level and <b>every</b> campaign advances. <b>'+SQ_CAP+' men each</b>, so everybody matters.</p>'
-    : '<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 8px">Team up! You play the level of whichever commander is <b>furthest</b> — beat it and <b>both</b> campaigns advance.</p>';
+    : '<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 8px">Team up! You play the level of whichever commander is <b>furthest</b> — beat it and <b>both</b> campaigns advance. The Tan come in <b>without stopping</b>, same as always. <b>'+SQ_CAP+' men each</b>.</p>';
   const back='<p style="text-align:center;margin:10px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopPick();return false">← other missions</a></p>';
   if(c.ui==='idle'){
     h+=rule
@@ -3841,6 +3895,12 @@ function roomPanelHTML(c){
     +'<div class="coopcode">'+escH(c.code||'·····')+'</div>'
     +'<button class="mbtn" style="width:100%" onclick="UI.coopShare()">'+(navigator.share?'📤 SEND THE INVITE LINK':'📋 COPY THE INVITE LINK')+'</button>'
     +'<div id="coopNote" style="text-align:center;font-size:0.95rem;opacity:0.7;margin-top:6px">or read them the code — it goes in ENTER A ROOM CODE</div>';
+  // a room opened by a CHALLENGE says whose name is on it, and says out loud that
+  // nobody has to wait around for anybody
+  if(c.duelName) h='<div id="coopPanel"><h3>⚔ CHALLENGE SENT</h3>'
+    +'<p style="font-size:1.05rem;margin:2px 0 8px"><b>'+escH(String(c.duelName).toUpperCase())+'</b> has been challenged. '
+    +'If they\'re playing right now they\'ll be here in a moment — if not, they\'ll see it the next time they play.</p>'
+    + h.slice(h.indexOf('<p style="text-align:center;font-size:1.05rem;margin:2px 0 0">ROOM CODE'));
   if(amHost){
     h+='<div style="display:flex;align-items:center;gap:8px;margin:12px 0 2px">'
       +'<span style="font-size:1.05rem">TEAM SIZE</span>'
@@ -3998,9 +4058,18 @@ function endBattlefield(reason, fromRelay){
     const promos=xpAward(xpGain,{src:'battleground'});
     const spoils=' · +'+starGain+'★ SPOILS · +'+xpGain+' XP'+promoTag(promos)
       +(friendly? ' · FRIENDLY (no ladder)' : '');
-    const wt=document.getElementById('winTitle'); wt.style.color='#7FA35C'; wt.innerHTML=copy[0];
+    // THE DAILY RAID's own purse, on top of the battleground's — first win of the
+    // day only, and it is what keeps the piggy bank's streak alive.
+    let raidMsg='';
+    if(bf.raid && !priv){
+      const rd=rivalDayWin(bf.rival.id);
+      META.starBank+=rd.stars; META.starsLifetime+=rd.stars;
+      raidMsg=' · '+rd.msg+(rd.first?'':' (+1★)');
+    }
+    const wt=document.getElementById('winTitle'); wt.style.color='#7FA35C';
+    wt.innerHTML = bf.raid? (bf.rival.name.toUpperCase()+'<br>DEFEATED') : copy[0];
     document.getElementById('medalRow').textContent='⚑ ⚑ ⚑';
-    document.getElementById('medalText').textContent=margin+' · '+copy[1]+spoils;
+    document.getElementById('medalText').textContent=margin+' · '+copy[1]+spoils+raidMsg;
     // report the win to HQ the same way an invasion does — /challenge pays the
     // first-of-the-day bonus. NEVER route rewards through /sync (it clamps).
     // ⚠ Not from a private room: that bonus is for beating the DAILY RIVAL, and
@@ -4010,7 +4079,7 @@ function endBattlefield(reason, fromRelay){
       .then(r=>r.json()).then(d=>{
         const el=document.getElementById('medalText');
         if(el&&d&&d.bonus>0){ META.starBank+=d.bonus; META.starsLifetime+=d.bonus; saveMeta();
-          el.textContent=margin+' · FIRST BATTLEFIELD WIN TODAY — BONUS +'+d.bonus+'★ ('+d.capLeft+' left today)'+spoils; }
+          el.textContent=margin+' · FIRST BATTLEFIELD WIN TODAY — BONUS +'+d.bonus+'★ ('+d.capLeft+' left today)'+spoils+raidMsg; }
       }).catch(()=>{});
   } else {
     META.bfLosses++;
@@ -4877,7 +4946,7 @@ function updateSaber(u,dt,sw){
   if(d>4){ const sp=390; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }
   else { u.x=u.home.x; u.y=u.home.y; u.saberState='idle'; u.saberTarget=null; }   // home clean — no stale man on the hook
 }
-function frng(f){ return f.def.rng + (S.invasion?15:0); }   // your invaders shoot with conviction
+function frng(f){ return f.def.rng; }
 function tanShoot(f){
   let best=null,bd=1e9;
   for(const u of S.units){
@@ -4977,10 +5046,6 @@ function knock(u, srcx, srcy, rolled){
     u.saberCd=Math.max(u.saberCd||0, sw.cd||2.1);
   }
   S.fx.push({k:'ring', x:u.x, y:u.y-20, r:6, R:26, t:0, dur:0.35, col:'rgba(255,255,255,0.7)'});
-  if(S.invasion && !S.invasion.resolved){
-    S.invasion.budget+=8;   // his dog tag, your war chest — knockdowns pay the invader
-    S.floats.push({x:u.x,y:u.y-64,txt:'+8 TAGS',t:0,col:'#FFF3C4'});
-  }
   coachEvent('down', u);
 }
 function standUp(u){
@@ -5029,8 +5094,8 @@ function buildFoeTint(hex){
     im.src='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+vb+'">'+body+'</svg>');
   });
 }
-// invading = these are YOUR men in YOUR colour; defending = the rival army's
-function foeImg(k){ const hex = S.invasion? S.invasion.myHex : (S.rival&&S.rival.hex); return (hex&&IMGT[hex]&&IMGT[hex][k])||IMG[k]; }
+// the daily rival's army wears its own colour; everyone else is factory tan
+function foeImg(k){ const hex = S.rival&&S.rival.hex; return (hex&&IMGT[hex]&&IMGT[hex][k])||IMG[k]; }
 // DYE KITS: your whole army repainted in a rival's color (shop, 20★ a color)
 const IMGU={};
 const GREEN_UNITS=['rifleman','mgunner','bazooka','mortar','sarge','minesweeper','flame','radioman','bfjeep','bftank'];
@@ -5098,8 +5163,6 @@ function unitImg(k,u){
   const pick=h=>(rim&&h&&IMGR[h]&&IMGR[h][k])||(h&&IMGU[h]&&IMGU[h][k])||(rim&&IMGR[GREEN]&&IMGR[GREEN][k])||IMG[k];
   if(S.bf && u && u.seat!=null){ const st=S.bf.seats[u.seat]; return pick(st&&st.hex); }
   if(S.bf && u && u.side) return pick(S.bf.hex[u.side]);
-  // in an invasion these are THEIR defenders — their account colour, not yours
-  if(S.invasion) return pick(S.invasion.theirHex);
   // an allied commander's men wear the ALLY's colour — you can always tell whose is whose
   if(u && u.coopHex) return pick(u.coopHex);
   return pick(dyeHex());
@@ -5109,7 +5172,7 @@ function unitImg(k,u){
 // and his corpse are always the same size (the vehicles dwarf the infantry)
 function unitW(t){ return t==='bftank'? 92 : t==='bfjeep'? 76 : t==='mortar'? 58 : 54; }
 // the veteran stripe has to contrast with whatever colour that army is wearing
-function vetStripe(){ const h=S.invasion? S.invasion.theirHex : dyeHex(); return (h&&h.toUpperCase()==='#E8E8E8')?'#4A4A4A':'#fff'; }
+function vetStripe(){ const h=dyeHex(); return (h&&h.toUpperCase()==='#E8E8E8')?'#4A4A4A':'#fff'; }
 function spawnGroup(g){
   if(g.f==='boss'){
     // one boss, dead center, marching straight for the toy box — but a SQUAD
@@ -6194,9 +6257,9 @@ function checkAch(){
 }
 
 function endBattle(win){
-  // the battle's ace goes straight in the service record — win, lose, first-
-  // battle mercy, all of it. (Invasions end elsewhere; those men aren't yours.)
-  if(!S.invasion && (S.aceKills||0) > META.stats.bestUnitKills) META.stats.bestUnitKills = S.aceKills;
+  // the battle's ace goes straight in the service record — win, lose and
+  // first-battle mercy alike
+  if((S.aceKills||0) > META.stats.bestUnitKills) META.stats.bestUnitKills = S.aceKills;
   // Your first battle is always a victory. No matter what. That's the rule.
   // (Except allied missions — the referee's verdict is the verdict.)
   if(!win && S.levelN===1 && !S.rival && META.campaign===0 && !S.coop){
@@ -6208,6 +6271,7 @@ function endBattle(win){
     return;
   }
   S.mode = win?'win':'lose';
+  if(coach) coachDone();   // boot camp lasts one battle — it never follows you to level 2
   // ALLIED MISSION: the host sim is the referee — it files the verdict with HQ,
   // which advances BOTH campaigns on a win and relays the word to the ally.
   if(S.coop && COOP && !COOP.ended){
@@ -6233,20 +6297,8 @@ function endBattle(win){
   let msg = 'Victory' + (m2? ' · Untouched Toy Box':'') + (m3? ' · No soldier left behind':'');
 
   if(S.rival){
-    const day=todayStr();
-    if(!META.rivalDays[day]){
-      META.rivalDays[day]=S.rival.id; META.stats.rivalWins++;
-      stars=5; msg='DAILY RIVAL DOWN · BONUS +5★';
-      // THE PIGGY BANK LIVES ANOTHER DAY. A missed day has already dropped the
-      // streak (pigCheck), so this either extends the run or starts one at 1.
-      pigCheck();
-      const before=pigTier();
-      META.piggy.streak++; META.piggy.last=day;
-      const after=pigTier();
-      if(after>before) msg+=' · 🐷 THE PIGGY BANK TURNED '+PIG_COLORS[after].name+' — IT PAYS +'+after+'★ EVERY DAY NOW';
-      else if(after>0) msg+=' · 🐷 PIGGY SAFE — DAY '+META.piggy.streak;
-      else msg+=' · 🐷 PIGGY SAFE — DAY '+META.piggy.streak+' OF 5 TO '+PIG_COLORS[1].name;
-    } else { stars=1; msg='Rival already beaten today — +1★ for the drill.'; }
+    const r=rivalDayWin(S.rival.id);
+    stars=r.stars; msg=r.msg;
   } else {
     // stars flow freely (7/22): every win pays its medals in full, replays too
     const prev=META.levelStars['l'+S.levelN]||0;
@@ -6328,12 +6380,6 @@ function update(dt){
     S.interT-=dt;
     // allied mission: the host calls every wave — the guest holds the line here
     if(S.interT<=0){ if(coopGuest()){ S.interT=0.01; } else { S.interT=0; spawnWave(); } }
-  }
-  // invasion: out of budget, out of soldiers, box still standing → repelled
-  if(S.invasion && !S.invasion.resolved && S.lives>0
-     && invadeRemaining()<Math.min.apply(null,INVADE_CARDS.map(c=>c.cost))
-     && S.foes.length===0 && S.queue.length===0){
-    endInvasion(false);
   }
   if(S.ann){ S.ann.t-=dt; if(S.ann.t<=0) S.ann=null; }
 
@@ -6478,11 +6524,10 @@ function update(dt){
         }
       } else {
         f.shot+=dt;
-        // when YOU are the Tan (invasions), infantry fire like the Green riflemen do
-        const cd=f.def.fireCd*(f.fireMul||1)*(S.invasion?0.45:1);
+        const cd=f.def.fireCd*(f.fireMul||1);
         const rdy=panic? Math.min(cd,SABER_PANIC_CD) : cd;
         if(f.shot>=rdy && hasGreenTarget(f)){                                  // halt... aim...
-          f.aimT = panic? SABER_PANIC_AIM : (S.invasion?0.35:0.55);
+          f.aimT = panic? SABER_PANIC_AIM : 0.55;
         }
       }
     }
@@ -6542,10 +6587,9 @@ function update(dt){
       if(f.boss){ S.shake=0.7; S.floats.push({x:T.x,y:T.y-70,txt:'THE BOSS BROKE THROUGH!',t:0,col:'#D96A55'}); }
       S.fx.push({k:'ring',x:T.x-10,y:T.y-10,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
       if(S.lives<=0){ S.lives=0;
-        if(S.invasion){ endInvasion(true); }
         // allied mission: the guest's local count can run hot — the referee's
         // beacon restores the truth, or delivers the loss, within a second
-        else if(!coopGuest()){ endBattle(false); }
+        if(!coopGuest()){ endBattle(false); }
         return; }
     }
   }
@@ -6806,21 +6850,21 @@ function radioAura(u){
   return RADIO_NONE;
 }
 // a kill just landed on u's tally — is it a personal best for one of YOUR men?
-// (invasion defenders aren't yours; on the battlefield only seat 0 is you)
+// (on the battlefield, only the chair you are actually sitting in is yours)
 function noteAce(u){
   if(!u || u.kills==null) return;
   if(!killIsMine(u)) return;
   if(u.kills > (S.aceKills||0)) S.aceKills = u.kills;
 }
 // ⚠ ONE OWNERSHIP LAW, like enhU() (v1.22) — because "did I do that?" is asked by
-// three different medals now and they must never disagree. An INVASION's men
+// three different medals now and they must never disagree. An ally's men
 // belong to the player being raided; on a carpet an ALLY's men are relayed and
 // carry coopBy; and on the battlefield only MY chair counts.
 // ⚠ `u.seat!==0` was the old test and it has been wrong since v1.24 put a
 // commander in any chair of a private room — a guest in seat 3 banked no ace at
 // all. The seat you are sitting in is bfMySeat(), never the number nought.
 function killIsMine(u){
-  if(!u || S.invasion) return false;
+  if(!u) return false;
   if(u.coopBy) return false;
   if(S.bf) return u.seat===bfMySeat();
   return true;
@@ -6867,7 +6911,7 @@ function hitCheck(f,u){
       // the fallen stay where they fell — flipped over like real toys
       S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(f.def.vehicle?3.14:(Math.random()<0.5?-1.83:1.83)), w:f.def.w, img:foeImg(f.type) });
       if(S.corpses.length>90) S.corpses.shift();
-      if(!S.invasion) S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)),t:0});   // their dog tag — your bounty (invaders don't loot their own dead)
+      S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)),t:0});   // their dog tag — your bounty
       if(f.type==='crawler'){ META.stats.crawlerKills++; }
       if(f.boss){
         // a boss goes down LOUD: shake, a burst of smoke, and a victory shout
@@ -7444,13 +7488,13 @@ function drawCoach(){
   if(!coach||S.mode!=='play') return;
   if(coach.step===1){ coachPill('DRAG A RIFLEMAN ONTO THE CARPET'); fingerDrag(236,540,620,280); }
   else if(coach.step===2){ coachPill('ADD A SECOND SOLDIER — TWO GUNS BEAT ONE'); fingerDrag(236,540,620,390); }
-  else if(coach.step===3){ coachPill('NOW TAP START — HERE THEY COME'); if(btnRects.wave) fingerTap(btnRects.wave[0]+btnRects.wave[2]/2, btnRects.wave[1]+btnRects.wave[3]/2); }
+  else if(coach.step===3){ coachPill('DIG IN — THE TAN ARE ALREADY ON THE WAY'); }
   else if(coach.step===4){
     if(coach.target&&coach.target.down){ coachPill("HE'S HIT! TAP HIM — HE ALWAYS GETS BACK UP"); fingerTap(coach.target.x, coach.target.y-16); }
   }
   else if(coach.step===5){ if(coach.toast>0) coachPill('DOG TAGS BUY REINFORCEMENTS — SPEND THEM IN THE TRAY'); }
   else if(coach.step===6){
-    coachPill('BETWEEN WAVES, DRAG YOUR MEN TO BETTER GROUND');
+    coachPill('DRAG YOUR MEN ANY TIME — THE WAVES NEVER STOP');
     const u=S.units.find(x=>x.type!=='sarge')||S.units[0];
     if(u&&!(S.drag&&S.drag.unit===u)) fingerDrag(u.x,u.y-14,Math.max(90,u.x-130),Math.max(90,u.y-60));
   }
@@ -7686,7 +7730,7 @@ function drawHUD(){
   cx.textBaseline='middle';
   drawTag(32,23,11);
   cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM; cx.textAlign='left';
-  cx.fillText(S.invasion? ('TAGS '+invadeRemaining()) : S.plastic, 52, 23);
+  cx.fillText(S.plastic, 52, 23);
   cx.textAlign='center';
   if(S.bf){
     const urgent=S.bf.timeLeft<=15, sudden=S.bf.phase==='sudden';
@@ -7704,8 +7748,7 @@ function drawHUD(){
     }
   } else {
     const coopHold = coopGuest() && !S.waveActive;
-    cx.fillText(S.invasion? ('INVADING '+S.invasion.name.toUpperCase())
-      : S.sq? sqHudLine()
+    cx.fillText(S.sq? sqHudLine()
       : S.waveActive? ('WAVE '+S.wave+' / '+S.cfg.waves.length)
       : (S.wave>=S.cfg.waves.length? (S.coop?'CARPET CLEAR — HQ CONFIRMING…':'ALL WAVES CLEAR')
       : (coopHold && S.interT<=0.5? ('WAVE '+(S.wave+1)+' — ON '+((COOP.mate&&COOP.mate.name)||'YOUR ALLY').toUpperCase()+"'S ORDER")
@@ -7714,7 +7757,7 @@ function drawHUD(){
     if(S.sq){
       const n=coopHumans();
       cx.font='bold 14px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#BFE39A';
-      cx.fillText('🎖 HOLD THE LINE · '+n+' COMMANDER'+(n===1?'':'S')+' · YOUR MEN '+sqMine()+'/'+SQ_CAP, VW/2-60, 56);
+      cx.fillText('🎖 HOLD THE LINE'+(n>1? ' · '+n+' COMMANDERS':'')+' · YOUR MEN '+sqMine()+'/'+SQ_CAP, VW/2-60, 56);
       cx.font='bold 23px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=CREAM;
     } else if(S.coop && COOP && COOP.mate){
       cx.font='bold 14px "Arial Narrow", Impact, sans-serif'; cx.fillStyle='#BFE39A';
@@ -7723,7 +7766,7 @@ function drawHUD(){
     }
   }
   cx.textAlign='right';
-  cx.fillText(S.bf? (S.bf.team>1? S.bf.team+'v'+S.bf.team : S.bf.rival.name) : ((S.invasion?'THEIR BOX ×':'TOY BOX ×')+S.lives), VW-16, 23);
+  cx.fillText(S.bf? (S.bf.team>1? S.bf.team+'v'+S.bf.team : S.bf.rival.name) : ('TOY BOX ×'+S.lives), VW-16, 23);
   if(S.bf) drawBFBars(); else drawBossBar();
   // buttons: speed, sound & retreat to HQ (always available — even mid-Level 1)
   btn('spd', VW/2+110, 6, 62, 32, S.speed+'×');
@@ -7796,28 +7839,6 @@ function drawHUD(){
   } else btnRects.wave=null;
 
   // tray — sized and lifted for thumbs (phone bottom edge steals touches)
-  if(S.invasion){
-    const nC=INVADE_CARDS.length, gap2=6, tw2=Math.min(140,(((W-24)-(nC-1)*gap2)/nC)|0), th2=70, tot=nC*tw2+(nC-1)*gap2, xI=(W-tot)/2, yI=H-th2-16;
-    cx.textBaseline='alphabetic';
-    trayRects.length=INVADE_CARDS.length;
-    INVADE_CARDS.forEach((cd,i)=>{
-      const x=xI+i*(tw2+gap2);
-      trayRects[i]=[x,yI,tw2,th2];
-      const ok=invadeRemaining()>=cd.cost;
-      cx.fillStyle= ok?'rgba(60,45,30,0.94)':'rgba(60,45,30,0.55)';
-      rr(x,yI,tw2,th2,10); cx.fill();
-      cx.globalAlpha=ok?1:0.4;
-      drawSprite(cd.t, x+30, yI+th2-14, cd.t==='tank'?40:36,0,0,foeImg(cd.t));  // your invaders, your colour
-      cx.globalAlpha=1;
-      cx.font='bold 13px "Arial Narrow", Impact, sans-serif'; cx.textAlign='left';
-      cx.fillStyle= ok?'#EDD9B4':'#8b8f7a';
-      cx.fillText(cd.name, x+52, yI+28);
-      cx.fillStyle= ok?'#FFF3C4':'#8b8f7a'; cx.font='bold 17px "Arial Narrow", Impact, sans-serif';
-      cx.fillText(cd.cost, x+52, yI+52);
-    });
-    btnRects.vet=null; btnRects.wave=null;
-    return;
-  }
   const tray=TRAY();
   const tw=Math.min(112,((W-60)-(tray.length-1)*10)/tray.length)|0, th=84, gap=10, total=tray.length*tw+(tray.length-1)*gap, x0=(W-total)/2, y0=H-th-18;
   trayRects.length=tray.length;
@@ -7905,21 +7926,6 @@ cv.addEventListener('pointerdown', e=>{
     }
     S.pan={ sx:e.clientX, cam0:S.bf.cam.x, lx:e.clientX, lt:S.t, vx:0, moved:false };
     S.bf.cam.vx=0; S.sel=null; return;
-  }
-  // invasion: tray sends Tan formations; defenders are not yours to touch
-  if(S.invasion){
-    for(let i=0;i<INVADE_CARDS.length;i++){
-      if(inRect(p.x,p.y,trayRects[i])){
-        const cd=INVADE_CARDS[i];
-        if(invadeRemaining()>=cd.cost && !S.invasion.resolved){
-          S.invasion.spent+=cd.cost;
-          spawnGroup({f:cd.f,t:cd.t,n:cd.n,e:['right','right-top','right-bottom'][i%3],officer:cd.officer,escort:cd.escort});
-          SFX.horn();
-        } else SFX.clack();
-        return;
-      }
-    }
-    return;
   }
   // tray
   const tray=TRAY();
@@ -8495,7 +8501,7 @@ const ROOM_SPOTS=[
 ];
 let lastMarch=0;
 function showMenu(){
-  S.mode='menu'; S.invasion=null;   // never carry an invasion home to HQ
+  S.mode='menu';
   S.bf=null; S.pan=null; S.speed=1; resize();   // ...nor a battlefield: the room is 960 wide again
   S.coop=null;                      // the battle flag only — the party (COOP) rides on
   S.sq=null;                        // ...and the streaming ticker stops at the door
@@ -8504,6 +8510,7 @@ function showMenu(){
   renderMenu();
   sizeRoom();
   netSync();
+  duelTick();          // has anybody challenged you while you were out?
   // a friend's invite link brought them here — connect the two right now
   if(coopJoinPend){ const code=coopJoinPend, md=coopJoinMode; coopJoinPend=null;
     SFX.blip(); if(COOP) coopLeave(); COOP=coopFresh('enter',md); UI.coopJoin(code); }
@@ -8534,6 +8541,7 @@ function renderMenu(){
       +'<b>COMMANDER · LV '+META.lvl+'</b>'
       +'<div class="xpbar" style="flex:1;max-width:220px;margin:0 12px"><div style="width:'+Math.min(100,Math.round(100*META.xp/xpNeed()))+'%"></div></div>'
       +(META.pendingPicks>0?'<button class="mbtn alt" style="padding:0.2rem 0.7rem;font-size:0.85rem" onclick="UI.promote()">PROMOTION!</button>':'')
+      +duelChipHTML()
       +'<span style="margin-left:auto">'+tierName(META.starsLifetime)+' · ★ '+META.starBank+'</span></div>'
     + '</div>';
   sizeRoom();
@@ -8665,12 +8673,19 @@ function closeWarTable(){ document.getElementById('wartable').classList.add('hid
 // A TOP-LEVEL sibling at z20 — never inside .roomstage (transform:scale would
 // shrink it ~62% on a phone), and under the queue UI so PLAY 1v1 keeps you here
 // while the pill ticks. ALL 100 is the only thing on the screen that scrolls.
-const WR_TABS = [ {id:'inv', lab:'⚔ INVASIONS'}, {id:'bf1', lab:'1v1'}, {id:'bf2', lab:'2v2'} ];
-const WR_CTA = { inv:'⚔ INVADE', bf1:'⚔ PLAY 1v1', bf2:'⚔⚔ PLAY 2v2' };
-const WR_REWARD = { inv:'★ FIRST WIN TODAY +5★', bf1:'★ WIN = +25★ + XP', bf2:'★ GRAB AN ALLY · +25★ + XP' };
-const WR_EMPTY = { inv:'WIN A BATTLE TO REPORT IN', bf1:'WIN A 1v1 TO GET ON THE BOARD', bf2:'WIN A 2v2 TO GET ON THE BOARD' };
-const WR_TITLE = { inv:'WORLD RANKINGS — INVASIONS', bf1:'WORLD RANKINGS — 1v1', bf2:'WORLD RANKINGS — 2v2' };
-let WR = { tab:'inv', data:null, err:false, muster:false, rename:false, target:null };
+// ⚠ v1.28: THE INVASIONS TAB IS GONE. The board it carried is not — it was never
+// an invasion board, it was the STARS ladder with an invade button bolted to the
+// side, and the stars ladder is still the main measure of a commander. What
+// changed is the ACTION: every row is now a challenge to a real battle, so the
+// tab is named after what it ranks and the one big CTA on the side comes off
+// (each ROW is the button here — there is no single "correct" opponent any more,
+// which is exactly why the pulsing ⌖ went with the invasions).
+const WR_TABS = [ {id:'stars', lab:'★ STARS'}, {id:'bf1', lab:'1v1'}, {id:'bf2', lab:'2v2'} ];
+const WR_CTA = { bf1:'⚔ PLAY 1v1', bf2:'⚔⚔ PLAY 2v2' };
+const WR_REWARD = { stars:'⚔ TAP A COMMANDER TO CHALLENGE THEM', bf1:'★ WIN = +25★ + XP', bf2:'★ GRAB AN ALLY · +25★ + XP' };
+const WR_EMPTY = { stars:'WIN A BATTLE TO REPORT IN', bf1:'WIN A 1v1 TO GET ON THE BOARD', bf2:'WIN A 2v2 TO GET ON THE BOARD' };
+const WR_TITLE = { stars:'WORLD RANKINGS — STARS', bf1:'WORLD RANKINGS — 1v1', bf2:'WORLD RANKINGS — 2v2' };
+let WR = { tab:'stars', data:null, err:false, muster:false, rename:false };
 function wrIsOpen(){ const el=document.getElementById('worldrank'); return !!el && !el.classList.contains('hidden'); }
 function wrHash(s){ let x=0; s=String(s); for(let i=0;i<s.length;i++) x=(x*31+s.charCodeAt(i))>>>0; return x; }
 // An undyed player still gets an army colour up here — eight identical green
@@ -8685,7 +8700,7 @@ function wrHex(r){
 function wrKind(r){ return r.rank===1? 'sarge' : (wrHash(r.uid)%3===0? 'bazooka':'rifleman'); }
 function wrList(tab){
   const d=WR.data; if(!d) return [];
-  if(tab==='inv') return (d.board||[]).map((r,i)=>({ uid:r.uid, name:r.name, val:(r.stars||0)+'★',
+  if(tab==='stars') return (d.board||[]).map((r,i)=>({ uid:r.uid, name:r.name, val:(r.stars||0)+'★',
     color:r.color, you:!!r.you, rank:i+1, tier:r.tier, stars:r.stars||0 }));
   return ((tab==='bf1'? d.bf1 : d.bf2)||[]).map((r,i)=>({ uid:r.uid, name:r.name, val:(r.w||0)+'W',
     color:r.color, you:!!r.you, rank:r.rank||i+1, tier:r.tier, stars:r.stars||0, w:r.w||0, l:r.l||0 }));
@@ -8706,35 +8721,25 @@ function renderWorldRank(){
   const el=document.getElementById('worldrank'); if(!el) return;
   const tab=WR.tab, list=wrList(tab), top=wrTop(list);
   const riv=todaysRival(), mine=dyeHex()||'#7FA35C';
-  const yi=top.findIndex(r=>r.you);
-  // THE TARGET, WORDLESSLY: ⌖ rides the row above you. Top of the board and it
-  // drops to #2 — your closest challenger. Not on the board at all and it sits
-  // on the bottom rung, the one you can actually take.
-  let ti=-1;
-  if(tab==='inv' && top.length){
-    ti = yi<0 ? top.length-1 : (yi===0 ? 1 : yi-1);
-    if(ti<0 || ti>=top.length || top[ti].you) ti=-1;
-  }
-  WR.target = ti>=0 ? top[ti].uid : null;
   const rows = top.length
     ? top.map(r=>'<button type="button" class="wr-row'+(r.you?' you':'')+'"'
-        +((r.you||tab!=='inv')?'':' onclick="UI.wrRow(\''+r.uid+'\')"')+'>'
+        +((r.you||tab!=='stars')?'':' onclick="UI.wrRow(\''+r.uid+'\')"')+'>'
         +'<span class="wr-rk'+(r.rank<=3?' m'+r.rank:'')+'">'+r.rank+'</span>'
         +'<img src="'+sprURI(wrKind(r), wrHex(r))+'" alt="">'
         +'<span class="wr-nm">'+escH(r.name)+(r.you?' <small>— YOU</small>':'')+'</span>'
-        +(top.indexOf(r)===ti?'<span class="wr-tgt">⌖</span>':'')
+        +((!r.you&&tab==='stars')?'<span class="wr-ch">⚔</span>':'')
         +'<span class="wr-vl">'+r.val+'</span></button>').join('')
     : '<div class="wr-empty">'+(WR.err? 'HQ UNREACHABLE — CHECK BACK AFTER THE NEXT PATROL'
         : WR.data? WR_EMPTY[tab] : 'RADIOING HQ…')+'</div>';
-  const rec=(tab==='inv')? '' : (()=>{ const r=wrRec(tab==='bf1'?1:2);
+  const rec=(tab==='stars')? '' : (()=>{ const r=wrRec(tab==='bf1'?1:2);
     return (r.w+r.l>0)? '<div class="wr-rec">RECORD <b>'+r.w+'W · '+r.l+'L</b></div>' : ''; })();
-  const canAct = (tab!=='inv') || !!WR.target;
+  const canAct = !!WR_CTA[tab];
   el.innerHTML =
-    '<div id="wrBg" class="'+(tab==='inv'?'inv':'bf')+'"></div>'
+    '<div id="wrBg" class="'+(tab==='stars'?'inv':'bf')+'"></div>'
     +'<div class="wr-top"><div class="wr-wordmark">WORLD <b>RANKINGS</b></div>'
       +'<div class="wr-tabs">'+WR_TABS.map(t=>'<button type="button" class="wr-tab'+(t.id===tab?' on':'')+'"'
         +' onclick="UI.wrTab(\''+t.id+'\')">'+t.lab
-        +((t.id!=='inv' && (META.wrSeen||[]).indexOf(t.id)<0)?'<span class="wr-new">NEW</span>':'')
+        +((t.id!=='stars' && (META.wrSeen||[]).indexOf(t.id)<0)?'<span class="wr-new">NEW</span>':'')
         +'</button>').join('')+'</div>'
       +'<div class="wr-spacer"></div>'
       +'<button type="button" class="wr-you" onclick="UI.wrRename()">YOU:&nbsp;<b>'+escH(META.name)+'</b><span class="pen">✎</span></button>'
@@ -8742,7 +8747,7 @@ function renderWorldRank(){
     +'<div class="wr-main"><div class="wr-board">'+rows+'</div>'
       +'<div class="wr-side">'
         +'<div class="wr-flanks"><img class="wr-flank" src="'+sprURI('rifleman',mine)+'" alt="">'
-        +'<img class="wr-flank r" src="'+sprURI('tanrifle', tab==='inv'? riv.hex : TAN)+'" alt=""></div>'
+        +'<img class="wr-flank r" src="'+sprURI('tanrifle', tab==='stars'? riv.hex : TAN)+'" alt=""></div>'
         +(canAct? '<button type="button" class="wr-act" onclick="UI.wrAct()">'+WR_CTA[tab]+'</button>':'')
         +'<div class="wr-reward">'+WR_REWARD[tab]+'</div>'
         +rec
@@ -8759,12 +8764,12 @@ function wrMusterHTML(list){
       '<div class="wr-mrow'+(r.you?' you':'')+'"><span class="rk">'+r.rank+'.</span>'
       +'<span class="dot" style="background:'+wrHex(r)+'"></span>'
       +'<span class="nm">'+escH(r.name)+(r.you?' — YOU':'')+'</span>'
-      +'<span class="tr">'+(tab==='inv'? escH(r.tier||'') : (r.w+'W · '+r.l+'L'))+'</span>'
+      +'<span class="tr">'+(tab==='stars'? escH(r.tier||'') : (r.w+'W · '+r.l+'L'))+'</span>'
       +'<span class="vl">'+r.val+'</span>'
-      +(r.you?'':'<button type="button" class="go" onclick="UI.wrRow(\''+r.uid+'\')">⚔</button>')+'</div>').join('')
+      +((r.you||tab!=='stars')?'':'<button type="button" class="go" onclick="UI.wrRow(\''+r.uid+'\')">⚔</button>')+'</div>').join('')
     : '<div class="wr-empty" style="padding:18px 0">'+(WR.err?'HQ UNREACHABLE':WR_EMPTY[tab])+'</div>';
-  const ladder = (tab==='inv')
-    ? 'Ranks: Private 0★ · Bronze Bagged 100★ · Silver Sprue 250★ · Gold Footlocker 500★ · Diamond Shelf 1000★ · <b>Legendary Toy Box 2000★</b>. Tap any soldier to ⚔ invade.'
+  const ladder = (tab==='stars')
+    ? 'Ranks: Private 0★ · Bronze Bagged 100★ · Silver Sprue 250★ · Gold Footlocker 500★ · Diamond Shelf 1000★ · <b>Legendary Toy Box 2000★</b>. Tap any soldier to ⚔ challenge them to a battle.'
     : 'Every '+(tab==='bf1'?'1v1':'2v2')+' battleground win climbs this ladder. Win = <b>+25★ + XP</b>; first win of the day <b>+5★</b> extra.';
   return '<div class="wr-mback" onclick="UI.wrMusterClose(event)"><div class="wr-mcard" onclick="event.stopPropagation()">'
     +'<h3>'+WR_TITLE[tab]+'<button type="button" class="wr-mx" onclick="UI.wrMusterClose()">✕</button></h3>'
@@ -9266,6 +9271,7 @@ function panelHTML(id){
   const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()];
   switch(id){
     case 'campaign': return '<h3>CAMPAIGN</h3><p>LEVEL '+nextL+' · '+cfgN.waves.length+' WAVES · '+terr+'</p>'
+      +'<p style="font-size:0.98rem;opacity:0.8;margin:2px 0 9px">The Tan come in <b>without stopping</b> — no start button, no waiting. Move your men whenever you like. <b>'+SQ_CAP+' on the carpet at a time.</b></p>'
       +'<button class="mbtn" onclick="UI.play()">DEPLOY — LEVEL '+nextL+'</button>'
       +'<button class="mbtn alt" style="margin-top:10px" onclick="UI.coopOpen()">🤝 PLAY WITH FRIENDS — UP TO 10</button>'
       +(META.campaign>0?'<p style="margin-top:10px;font-size:0.9rem">Replay: '+Array.from({length:Math.min(META.campaign,5)},(_,i)=>'<a href="#" style="color:#7FA35C" onclick="UI.play('+(i+1)+');return false">L'+(i+1)+' '+'★'.repeat(META.levelStars['l'+(i+1)]||0)+'</a>').join(' · ')+'</p>':'');
@@ -9275,6 +9281,7 @@ function panelHTML(id){
       +'<p>"'+riv.blurb+'"</p>'
       +'<p>'+(rivDone?'✓ Beaten today — +5★ collected. Rematches pay +1★.':'First win today: <b>+5★</b>')+'</p>'
       +pigPanelLine()
+      +'<p style="font-size:0.96rem;opacity:0.75;margin:2px 0 8px">A quick <b>1 v 1 battle</b> against their army — in and out.</p>'
       +'<button class="mbtn alt" onclick="UI.rival()">'+(rivDone?'REMATCH':'FIGHT '+riv.name)+'</button>';
     case 'promo': {
       // stepping into the academy clears the "NEW WEAPON" nudge
@@ -9398,8 +9405,11 @@ function showPicker(){
     : 'Every soldier in the box is decorated to the hilt. Your promotions keep — spend them on the next unit you unlock.';
 }
 window.UI = {
-  play(n){ audio(); startBattle(n||META.campaign+1, null); },
-  rival(){ audio(); const r=todaysRival(); startBattle(Math.max(1,Math.min(META.campaign+1,5)), r); },
+  play(n){ audio(); startCampaign(n); },
+  // THE DAILY RAID (v1.28): a quick 1v1 on the battleground against the rival's
+  // own army — the same opponent, on the mode the whole game is built around now.
+  // `raid` is set AFTER startBattlefield because that function builds S.bf fresh.
+  rival(){ audio(); startBattlefield(META.bfMap, null, 1); if(S.bf) S.bf.raid=true; },
   // WAR TABLE: every size button is a launcher — tap = queue that size right now
   wtPlay(n){ audio(); SFX.blip(); bfQueueStart(n); },
   // the War Table's own door into HOLD THE LINE — straight to the squad panel,
@@ -9415,14 +9425,15 @@ window.UI = {
   wtClose(){ SFX.clack(); closeWarTable(); },
   // ---- WORLD RANKINGS ----
   wrTab(id){ audio(); SFX.blip(); WR.tab=id; WR.muster=false; WR.rename=false;
-    if(id!=='inv' && (META.wrSeen||[]).indexOf(id)<0){ META.wrSeen.push(id); saveMeta(); }
+    if(id!=='stars' && (META.wrSeen||[]).indexOf(id)<0){ META.wrSeen.push(id); saveMeta(); }
     renderWorldRank(); },
-  // the one button: invade the ⌖ row, or queue the battleground
+  // the one button, on the battleground tabs only: queue a match. The stars
+  // board's action lives on every ROW now (a challenge needs a name on it).
   wrAct(){ audio(); SFX.blip();
-    if(WR.tab==='inv'){ if(WR.target) UI.wrRow(WR.target); return; }
+    if(!WR_CTA[WR.tab]) return;
     bfQueueStart(WR.tab==='bf1'?1:2); },
   // a row IS a challenge — the modal lives over the room, so the scene stands down
-  wrRow(uid){ audio(); SFX.blip(); closeWorldRank(); UI.challenge(uid); },
+  wrRow(uid){ audio(); SFX.blip(); closeWorldRank(); UI.duelPick(uid); },
   wrMuster(){ SFX.blip(); WR.muster=true; renderWorldRank(); },
   wrMusterClose(ev){ if(ev&&ev.target!==ev.currentTarget) return; SFX.clack(); WR.muster=false; WR.rename=false; renderWorldRank(); },
   wrRename(){ SFX.blip(); WR.muster=true; WR.rename=true; renderWorldRank();
@@ -9649,11 +9660,13 @@ window.UI = {
   coopJoin(code){
     const i=document.getElementById('coopIn');
     code=String(code||(i&&i.value)||'').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
-    if(!/^[A-Z2-9]{4,8}$/.test(code)){ if(COOP){ COOP.note='That doesn\'t look like a code — 5 letters and numbers.'; roomModal(coopPanelHTML()); } SFX.clack(); return; }
+    if(!/^[A-Z2-9]{4,8}$/.test(code)){ if(COOP){ COOP.note='That doesn\'t look like a code — 5 letters and numbers.'; roomModal(coopPanelHTML()); } SFX.clack(); return Promise.resolve(false); }
     if(!COOP) COOP=coopFresh('enter');
     const sq=coopSquad(), rm=coopRoom(), grp=sq||rm;
-    coopPost('join',{code}).then(r=>{
-      if(!COOP) return;
+    // ⚠ RETURNS whether the join landed — an accepted challenge needs to know,
+    // because a room whose host got bored is a perfectly ordinary outcome here.
+    return coopPost('join',{code}).then(r=>{
+      if(!COOP) return false;
       if(r&&r.ok){
         COOP.code=r.code; COOP.host=!!r.host; if(r.level!=null) COOP.level=r.level; COOP.note=null;
         if(grp){ COOP.seat=r.seat|0; COOP.role=String(r.seat|0); COOP.members=r.members||[];
@@ -9663,6 +9676,7 @@ window.UI = {
                 else coopSeatColours(); }
         else  { COOP.role='g'; COOP.mate=r.mate; COOP.state=r.state||'paired'; COOP.ui='paired'; }
         SFX.horn(); coopPanelOpen(); coopTick();
+        return true;
       } else {
         const what=rm?'room':sq?'squad':'party';
         COOP.note = r&&r.err==='own code'? 'That\'s YOUR code — your friend types it, not you!'
@@ -9672,8 +9686,9 @@ window.UI = {
         COOP.ui='enter'; roomModal(coopPanelHTML());
         const j=document.getElementById('coopIn'); if(j){ j.value=code; j.focus(); }
         SFX.clack();
+        return false;
       }
-    }).catch(()=>{ if(COOP){ COOP.note='HQ is unreachable — try again in a minute.'; roomModal(coopPanelHTML()); } });
+    }).catch(()=>{ if(COOP){ COOP.note='HQ is unreachable — try again in a minute.'; roomModal(coopPanelHTML()); } return false; });
   },
   // PAIR: sit on a bench until somebody sits down beside you. SQUAD: HQ walks you
   // straight into the public lobby closest to full, so ten strangers converge on
@@ -9741,20 +9756,65 @@ window.UI = {
       +'</div>';
     el.classList.remove('hidden'); },
   medalClose(){ const el=document.getElementById('mcInsp'); if(el) el.classList.add('hidden'); },
-  challenge(uid){
-    const row=(window.__gvtBoard||[]).find(r=>r.uid===uid); if(!row) return;
-    roomModal('<h3>⚔ CHALLENGE</h3><p>Radioing for '+escH(row.name)+"'s room layout…</p>");
-    fetch(NET+'/defense?uid='+uid).then(r=>r.json()).then(d=>{
-      chalTarget={uid, name:row.name, stars:row.stars, defense:(d&&d.defense)||null, color:(d&&d.color)||row.color||null};
-      const ma=dyeHex(), ta=chalTarget.color&&ARMIES.find(a=>a.id===chalTarget.color);
-      roomModal('<h3>⚔ INVADE '+escH(row.name).toUpperCase()+'</h3>'
-        +'<p>'+escH(row.tier)+' · ★'+row.stars+(d&&d.defense?' · defends with their real loadout':' · defends with a standing garrison')+'</p>'
-        +'<p><span class="rivalchip" style="background:'+(ma||'#4A6B35')+'"></span>your army &nbsp;vs&nbsp; <span class="rivalchip" style="background:'+(ta?ta.hex:'#4A6B35')+'"></span>'+(ta?ta.id.toUpperCase():'FACTORY GREEN')+'</p>'
-        +'<p>You command the invasion: spend a wave budget, break their toy box. First win vs each player each day: <b>+5★</b> (max 10 bonus wins/day).</p>'
-        +'<button class="mbtn alt" onclick="UI.invadeGo()">LAUNCH THE INVASION</button>');
-    }).catch(()=>{ roomModal('<h3>⚔ CHALLENGE</h3><p>HQ unreachable — try again shortly.</p>'); });
+  // ---- CHALLENGE A COMMANDER TO A BATTLE (v1.28) ----
+  duelPick(uid,name){
+    const row=(window.__gvtBoard||[]).find(r=>r.uid===uid);
+    name=name||(row&&row.name)||'COMMANDER';
+    const ta=row&&row.color&&ARMIES.find(a=>a.id===row.color);
+    roomModal('<h3>⚔ CHALLENGE '+escH(String(name).toUpperCase())+'</h3>'
+      +'<p>'+(row? escH(row.tier||'')+' · ★'+(row.stars|0)+' · ':'')+'a <b>1 v 1 battle</b>, just the two of you.</p>'
+      +'<p><span class="rivalchip" style="background:'+(dyeHex()||'#4A6B35')+'"></span>your army &nbsp;vs&nbsp; '
+        +'<span class="rivalchip" style="background:'+(ta?ta.hex:'#C09E6C')+'"></span>'+escH(String(name).toUpperCase())+'</p>'
+      +'<p style="font-size:1.02rem;opacity:0.85">You\'ll get a room of your own. If they\'re playing right now they can jump straight in — if not, they\'ll see your challenge the next time they play. Winner gets <b>+25★ and XP</b>.</p>'
+      +'<button class="mbtn alt" onclick="UI.duelSend(\''+escH(uid)+'\',\''+escH(String(name).replace(/'/g,''))+'\')">⚔ SEND THE CHALLENGE</button>');
   },
-  invadeGo(){ if(chalTarget){ audio(); startInvasion(chalTarget); } },
+  // open the room FIRST, then post the message that points at it — a challenge
+  // with no room behind it is an invitation to nowhere
+  duelSend(uid,name){
+    audio(); SFX.blip();
+    if(COOP) coopLeave();
+    COOP=coopFresh('lobby','room');
+    COOP.team=1; COOP.map=META.bfMap; COOP.duelName=name;
+    roomModal(coopPanelHTML());
+    coopPost('create',{team:1, map:COOP.map}).then(r=>{
+      if(!COOP||COOP.ui!=='lobby') return;
+      if(!(r&&r.ok)){ UI.coopCancel('HQ is unreachable — try again in a minute.'); return; }
+      COOP.code=r.code; COOP.host=true; COOP.seat=r.seat|0; COOP.role=String(r.seat|0);
+      COOP.side=r.side||'y'; COOP.slot=r.slot|0; COOP.team=r.team||1; COOP.map=r.map||COOP.map;
+      COOP.members=[Object.assign({},coopMe(),{seat:r.seat|0,side:COOP.side,slot:COOP.slot,seen:0,host:true})];
+      COOP.state='open'; roomModal(coopPanelHTML()); coopTick();
+      duelPost('send',{target:uid, code:COOP.code}).then(d=>{
+        if(COOP && !(d&&d.ok)) { COOP.note='That commander could not be reached — you can still fight the computer in here.'; coopPanelSync(); }
+      }).catch(()=>{});
+    }).catch(()=>{ if(COOP&&COOP.ui==='lobby') UI.coopCancel('HQ is unreachable — try again in a minute.'); });
+  },
+  duelOpen(){
+    audio(); SFX.blip();
+    if(!DUEL.inbox.length){ roomModal('<h3>⚔ CHALLENGES</h3><p>Nobody has challenged you yet. Beat some commanders on the World Rankings and they will.</p>'); return; }
+    roomModal('<h3>⚔ CHALLENGES</h3>'
+      +'<p style="font-size:1.02rem;opacity:0.85">These commanders want to fight you on the battlefield. Tap FIGHT and you go straight to their carpet.</p>'
+      +DUEL.inbox.map(f=>{
+        const nm=String(f.name||'COMMANDER');
+        return '<div class="coopally" style="margin:6px 0"><span class="rivalchip" style="background:#C09E6C"></span>'
+          +'<b>'+escH(nm.toUpperCase())+'</b>'
+          +'<button class="mbtn alt" style="margin-left:auto;padding:2px 14px" onclick="UI.duelAccept(\''+escH(f.frm)+'\',\''+escH(f.code)+'\',\''+escH(nm.replace(/'/g,''))+'\')">⚔ FIGHT</button>'
+          +'<button class="mbtn" style="margin-left:6px;padding:2px 10px" onclick="UI.duelDrop(\''+escH(f.frm)+'\')">✕</button></div>';
+      }).join(''));
+  },
+  duelAccept(frm,code,name){
+    audio(); SFX.blip();
+    duelPost('drop',{frm}).catch(()=>{});
+    DUEL.inbox=DUEL.inbox.filter(x=>x.frm!==frm); DUEL.sig=duelSig(); renderMenu();
+    if(COOP) coopLeave();
+    COOP=coopFresh('enter','room'); COOP.duelName=name;
+    const p=UI.coopJoin(code);
+    // ⚠ their room may well be gone — they got bored, or it swept. That is an
+    // OFFER, not an error: challenge them straight back.
+    if(p&&p.then) p.then(ok=>{ if(!ok) UI.duelPick(frm,name); });
+  },
+  duelDrop(frm){ SFX.clack(); duelPost('drop',{frm}).catch(()=>{});
+    DUEL.inbox=DUEL.inbox.filter(x=>x.frm!==frm); DUEL.sig=duelSig(); renderMenu();
+    if(DUEL.inbox.length) UI.duelOpen(); else UI.closeModal(); },
   renameStart(){
     const b=document.getElementById('renameBox'); if(!b) return;
     b.classList.remove('hidden');
@@ -9831,7 +9891,7 @@ document.getElementById('title').addEventListener('pointerdown', ()=>{
   audio(); SFX.blip();
   // an invite link outranks the virgin-L1 fast path — get them connected first
   if(META.campaign>0 || coopJoinPend) showMenu();
-  else startBattle(1, null);
+  else startCampaign(1);
 });
 (function fillStrip(){
   // two armies marching past each other, waddling like they own the carpet
@@ -9847,15 +9907,14 @@ document.getElementById('title').addEventListener('pointerdown', ()=>{
 document.getElementById('retryBtn').addEventListener('click', ()=>{
   audio();
   if(S.coop && COOP){ showMenu(); UI.coopOpen(); return; }   // back to the party — go again together
-  if(S.bf){ startBattlefield(S.bf.mapId, null, S.bf.team); return; }   // instant rematch, same size, no queue
-  if(S.invasion && chalTarget){ startInvasion(chalTarget); }
-  else startBattle(S.levelN, S.rival);
+  if(S.bf){ const raid=!!S.bf.raid, m=S.bf.mapId, t=S.bf.team;
+    startBattlefield(m, null, t); if(raid && S.bf) S.bf.raid=true; return; }   // instant rematch, same size, no queue
+  startCampaign(S.levelN);
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
   audio();
   if(S.coop && COOP){ if(META.pendingPicks>0) showPicker(); else { showMenu(); UI.coopOpen(); } return; }
   if(S.bf){ if(META.pendingPicks>0) showPicker(); else showMenu(); return; }   // battlefield XP can promote you
-  if(S.invasion){ S.invasion=null; if(META.pendingPicks>0) showPicker(); else showMenu(); return; }   // a raid can promote you too
   if(META.pendingPicks>0) showPicker(); else showMenu();
 });
 document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); showMenu(); });
@@ -9890,13 +9949,24 @@ window.GVT = {
   step(sec){ const n=Math.round(sec*60); for(let i=0;i<n;i++){ if(S.mode==='play') update(1/60); } draw(); },
   snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, level:S.levelN, rival:S.rival&&S.rival.id, active:S.waveActive, foes:S.foes.length, mines:S.mines.length, units:S.units.map(u=>({t:u.type,down:u.down,kills:u.kills,vet:u.vet,hits:u.hits})), queue:S.queue.length }; },
   meta(){ return JSON.parse(JSON.stringify(META)); },
-  startLevel(n,rivalId){ startBattle(n, rivalId? ARMIES.find(a=>a.id===rivalId) : null); },
-  invade(t){ startInvasion(t||{uid:'persona_test',name:'Test Dummy',stars:240,defense:null}); },
+  startLevel(n){ startCampaign(n); return GVT.sq(); },
+  // the retired wave-gated build of a level, for regression rigs only — no door
+  // in the game reaches it any more
+  classicLevel(n){ startBattle(n||META.campaign+1, null); return {levelN:S.levelN, sq:!!S.sq}; },
+  rivalRaid(){ const r=todaysRival(); startBattle(Math.max(1,Math.min(META.campaign+1,5)), r); return r.id; },
   menu(){ showMenu(); },
+  // DIRECT CHALLENGE test rig (v1.28)
+  duel(uid,name){ UI.duelPick(uid||'persona_test', name||'Test Dummy'); return true; },
+  duelSend(uid,name){ UI.duelSend(uid||'persona_test', name||'Test Dummy'); return true; },
+  duelState(){ return { inbox:DUEL.inbox.map(f=>f.name+':'+f.code), sent:DUEL.sent.length,
+    polling:!!DUEL.pollT, chip:!!DUEL.inbox.length,
+    room:COOP? {code:COOP.code, mode:COOP.mode, team:COOP.team, duelName:COOP.duelName||null} : null }; },
+  duelPoll(){ duelTick(); return DUEL.inbox.length; },
+  duelAccept(frm,code,name){ UI.duelAccept(frm,code,name); return true; },
   // WORLD RANKINGS test rig: GVT.wr('bf1') opens a tab, GVT.wrState() reads it
   wr(tab){ openWorldRank(); if(tab) UI.wrTab(tab); return WR.tab; },
   wrState(){ return { open:wrIsOpen(), tab:WR.tab, muster:WR.muster, err:WR.err,
-    target:WR.target, rows:wrTop(wrList(WR.tab)).map(r=>r.rank+' '+r.name+' '+r.val),
+    rows:wrTop(wrList(WR.tab)).map(r=>r.rank+' '+r.name+' '+r.val),
     counts:WR.data? {board:WR.data.board.length,bf1:WR.data.bf1.length,bf2:WR.data.bf2.length} : null }; },
   // MEDAL CASE test rig: GVT.medals() hangs the case, GVT.medalState() reads the wall
   medals(){ UI.room('ach'); return MC.length; },
@@ -10000,7 +10070,7 @@ window.GVT = {
   xp(){ return { lvl:META.lvl, xp:META.xp, need:xpNeed(), picks:META.pendingPicks,
     pays:{ bf1v1:xpFor(XP_BF_WIN+XP_BF_TEAM), bf10v10:xpFor(Math.min(1,XP_BF_WIN+XP_BF_TEAM*10)),
       campaign:xpFor(XP_CAMPAIGN_WIN), boss:xpFor(XP_CAMPAIGN_WIN+XP_BOSS),
-      invasion:xpFor(XP_INVASION_WIN), loss:xpFor(XP_LOSS) } }; },
+      loss:xpFor(XP_LOSS) } }; },
   lvl(n,xp){ META.lvl=Math.max(1,n|0); META.xp=Math.max(0,xp|0); META.pendingPicks=0; saveMeta();
     return { lvl:META.lvl, xp:META.xp, need:xpNeed() }; },
   // ===== THE XP CEREMONY rig (v1.25) =====
@@ -10044,7 +10114,7 @@ window.GVT = {
   coachStep(){ return coach? coach.step : null; },
   beginCoach(){ try{localStorage.removeItem('gvt_coach');}catch(e){} coachStart(); },
   endCoach(){ coachDone(); },
-  boss(t){ if(S.mode!=='play') startBattle(3,null); spawnGroup({f:'boss',t:(t||'rex')}); return S.foes.filter(f=>f.boss).map(f=>f.type); },
+  boss(t){ if(S.mode!=='play') startCampaign(3); spawnGroup({f:'boss',t:(t||'rex')}); return S.foes.filter(f=>f.boss).map(f=>f.type); },
   sarge(w,rank){ if(w&&w!=='pistol'&&META.sargeUnlocked.indexOf(w)<0) META.sargeUnlocked.push(w); META.sargeWeapon=w||'pistol'; if(rank!=null){ const r=Math.max(0,Math.min(RANK_MAX,rank|0)); if(w==='pistol') META.up.sarge=r; else META.sargeUp[w]=r; } saveMeta(); return sargeStats(); },
   // THE BLADE IN YOUR FACE test rig: the whole saber state machine in one call,
   // plus how many tan are close enough to stop presenting arms and just shoot him
