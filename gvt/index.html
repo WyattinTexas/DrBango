@@ -6507,6 +6507,11 @@ const BF_MOVE = {
   bfjeep:     { moveSpd:130, hp:24 },
   bftank:     { moveSpd:22,  hp:40 }
 };
+// THE MARCHING CAMPAIGN (v1.30) reads this table RAW: BF_PACE exists because the
+// battleground carpet is twice as deep as the table's assumed ~900px walk — and
+// ~900px is exactly the campaign carpet. At the raw column a rifleman closes at
+// 44 against Tan marching 34-54, so both armies meet at toy-soldier pace.
+const CAMP_SPD={}; for(const k in BF_MOVE) CAMP_SPD[k]=BF_MOVE[k].moveSpd;
 for(const k in BF_MOVE) BF_MOVE[k].moveSpd=Math.round(BF_MOVE[k].moveSpd*BF_PACE);
 // ===== THE VEHICLE HUB (v1.20, Wyatt 7/25) =====
 // "the tank and the machine" — the motor pool stops being something the
@@ -8386,6 +8391,7 @@ function coopApply(cm){
   const u=coopUnit(cm.id); if(!u) return;
   if(cm.k==='mv'){
     u.x=Math.max(58,Math.min(W-24,cm.x|0)); u.y=Math.max(70,Math.min(H-92,cm.y|0)); u.sprue=0.2;
+    u.laneY=u.y; u.wp=null; u.wade=null;           // the ally set his lane — he marches on in it
     if(u.type==='sarge'){ u.home={x:u.x,y:u.y}; u.saberState='idle'; }
     return;
   }
@@ -9541,6 +9547,93 @@ function bfUnitStep(u,dt){
   return true;
 }
 
+// ================= THE MARCHING CAMPAIGN (v1.30) =================
+// Wyatt, 7/26: the campaign is fought in the BATTLEGROUND'S style — your men
+// MOVE. A placed man advances on the Tan up to the forward line, halts the
+// moment a target walks into his own reach (the untouched weapon code below
+// does the fighting, exactly as it always has), and presses on when his lane is
+// clear. Knockdown, grit, the tap-him-up rule, the waves, lives, stars and the
+// coach all ride unchanged — the one new fact on the carpet is that a green
+// figure walks. bfMarch moves him, so rocks, stalls and the squeeze rule are
+// the same law on both carpets; return true = stand and fight, false = the
+// frame was spent walking (bfUnitStep's own convention).
+const CAMP_FRONT_X=600;   // the forward line — the Tan keep the right third of the carpet to walk on in formation
+// …except where the seed parked the RIVER under that exact line: a watch stood
+// in the water is nonsense, so on those carpets the line is the east bank.
+function campFrontX(){
+  const RV=S.cfg.terrain.river;
+  return (RV && CAMP_FRONT_X>RV.x-30 && CAMP_FRONT_X<RV.x+RV.w+36)? RV.x+RV.w+36 : CAMP_FRONT_X;
+}
+// the same "could my gun actually take him" test the weapon loop applies, so a
+// man never halts for a target his trigger would refuse (offscreen, burrowed)
+function campFoeInReach(u,rng){
+  for(const f of S.foes){
+    if(f.burrow) continue;
+    if(f.x>W-10||f.x<-40||f.y<-30||f.y>H+30) continue;
+    if(Math.hypot(f.x-u.x,f.y-u.y)<=rng) return true;
+  }
+  return false;
+}
+function campUnitStep(u,dt){
+  // the jump tank reads the OWNER'S bench, and for a relayed man that bench is
+  // only known once the placement has landed — so the pace is written on his
+  // first step, never at placeUnit time (same number, correct owner).
+  if(!u.mchI){ u.mchI=1; if(u.type==='flame'&&enhU(u,'jumptank')) u.def.moveSpd=Math.round((u.def.moveSpd||26)*ENH_FLAME_PACE); }
+  // the mortar sees the whole carpet from anywhere (its 9999 is bounded by the
+  // rug itself) — the one piece that digs in where you put it and stays put
+  if(u.def.rng>=9000){ u.marching=false; return true; }
+  let rng=null;
+  if(u.type==='sarge'){
+    const sw=unitSargeStats(u);
+    if(sw.w==='lightsaber'){
+      if(!u.home) u.home={x:u.x,y:u.y};       // his post starts under his feet; bfMarch carries it forward
+      if(u.saberState && u.saberState!=='idle') return true;   // mid-dash: the blade owns his feet
+      if(saberNext(u,sw)){ u.marching=false; return true; }    // work inside his aggro — stand and let the blade take it
+    } else rng=(sw.rng||u.def.rng)*radioAura(u).rng;
+  }
+  else if(u.type==='radioman') rng=UDEF.rifleman.rng;   // he halts where the rifle line halts — a step behind the fight, where an aura belongs
+  else rng=u.def.rng*radioAura(u).rng*((u.type==='bazooka'&&enhU(u,'longtube'))?ENH_BAZ_RNG:1);
+  if(rng!=null && campFoeInReach(u,rng)){ u.marching=false; return true; }   // a target in reach → halt and FIGHT
+  const FL=campFrontX();
+  if(u.x>=FL-6){ u.marching=false; return true; }    // standing his watch on the line
+  if(u.pauseT>0){ u.pauseT-=dt; u.marching=false; return false; }   // picking his footing
+  // his own lane, his own zig — the battleground's walk, pointed up the carpet
+  let goal;
+  const lane=(u.laneY!=null?u.laneY:u.y);
+  if(FL-u.x<200){ u.wp=null; goal={x:FL, y:lane}; }
+  else {
+    u.wpT=(u.wpT||0)-dt;
+    if(!u.wp || u.wpT<=0 || (Math.abs(u.wp.x-u.x)<14 && Math.abs(u.wp.y-u.y)<14)){
+      u.wp={ x:u.x+90+Math.random()*110,
+             y:Math.max(84,Math.min(H-104,(lane+(Math.random()-0.5)*100)*0.6+u.y*0.4)) };
+      u.wpT=1.0+Math.random()*1.3;
+      if(Math.random()<0.10) u.pauseT=0.15+Math.random()*0.3;
+    }
+    goal=u.wp;
+  }
+  // the river funnels a marching man onto the popsicle bridge, exactly like the
+  // Tan coming the other way — and a man who stalls at the crossing gives up on
+  // the plank and WADES (v1.15's rule, now standing for both armies)
+  const RV=S.cfg.terrain.river; let wade=1;
+  if(RV){
+    if(!u.wade && u.squeeze && u.x>RV.x-60 && u.x<RV.x+RV.w+30) u.wade=true;
+    if(!u.wade && u.x<RV.x+RV.w && goal.x>RV.x){
+      goal = (Math.abs(u.y-RV.bridgeY) > RV.bw*0.3)
+        ? { x:RV.x-30, y:RV.bridgeY }            // walk the bank to the bridge mouth first
+        : { x:RV.x+RV.w+30, y:RV.bridgeY };      // then straight over the planks
+    }
+    if(u.x>RV.x-4 && u.x<RV.x+RV.w+4 && Math.abs(u.y-RV.bridgeY)>RV.bw*0.55){
+      wade=0.42;                                 // in the water, off the planks — a wade, at wading pace
+      if(Math.random()<0.08) S.fx.push({k:'ring',x:u.x,y:u.y-2,r:4,R:18,t:0,dur:0.4,col:'#6E9DC4'});
+    }
+  }
+  const g=u.gait||1; u.gait=g*wade;
+  bfMarch(u,dt,goal);
+  u.gait=g;
+  u.marching=true;
+  return false;
+}
+
 // ================= BATTLEFIELD: CLOCK, ECONOMY, OPPONENT =================
 function bfBounty(type){ return (BF_BOUNTY[type]||1) * (S.bf&&S.bf.ot?2:1); }
 function clampCam(x){ return Math.max(0, Math.min(WORLD_W-VW, x)); }
@@ -9808,8 +9901,8 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
 
 function placeUnit(type,x,y,side,seat){
   const u = { id:idc++, type, x, y, def:UDEF[type], cd:0, down:false, downT:0, vet:false, phase:Math.random()*6.28, sprue:0.45, kills:0, hits:0, hitT:0 };
-  // BATTLEFIELD combatant: HP + death + a marching goal. Campaign callers pass no
-  // `side`, so their unit objects stay exactly as they were.
+  // BATTLEFIELD combatant: HP + death + a marching goal. Campaign callers pass
+  // no `side` — their men get the campaign's own march kit in the else below.
   if(S.bf && side){
     const b=S.bf.base[side==='you'?'foe':'you'];
     u.side=side;
@@ -9836,6 +9929,14 @@ function placeUnit(type,x,y,side,seat){
       // 7/24 (Wyatt): a lightsaber Sarge wades into melee now — double the plastic (HP +100%)
       if(unitSargeStats(u).w==='lightsaber'){ u.hpMax*=2; u.hp=u.hpMax; }
     }
+  } else {
+    // THE MARCHING CAMPAIGN (v1.30, Wyatt: the campaign fights in the
+    // battleground's style — your men MOVE). A campaign man carries his own def
+    // copy now too: his march pace lives on it (the raw table — see CAMP_SPD)
+    // and the jump tank writes into it on his first step. Grit, reach, rate and
+    // every knockdown rule read the same numbers they always did.
+    u.def=Object.assign({}, UDEF[type], { moveSpd:CAMP_SPD[type]||26 });
+    u.laneY=y; u.gait=0.92+Math.random()*0.16; u.wp=null; u.wpT=0; u.pauseT=0; u.marching=false;
   }
   S.units.push(u); S.placedAny=true; SFX.snap();
   coachEvent('place');
@@ -11636,6 +11737,9 @@ function update(dt){
       continue;
     }
     if(S.drag && S.drag.unit===u) continue; // sarge being carried
+    // THE MARCHING CAMPAIGN (v1.30): a green figure walks now — advance on the
+    // Tan, halt in reach, fight, press on. False = the frame was spent walking.
+    if(!S.bf && !campUnitStep(u,dt)) continue;
     // ===== SARGE'S ARSENAL: specials get their own handling; the pistol falls
     // through to the default path below (and keeps its SARGE-unit upgrade). =====
     if(u.type==='sarge'){
@@ -13012,7 +13116,8 @@ cv.addEventListener('pointerup', e=>{
   // the squad cap gates NEW men only — a man already on the carpet can always be
   // picked up and moved, cap or no cap (there is no reposition window to wait for)
   if(canPlace(p.x,dy,d.type) && (d.unit || !sqAtCap())){
-    if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; if(d.unit.type==='sarge'){ d.unit.home={x:p.x,y:dy}; d.unit.saberState='idle'; } SFX.thock(); coachEvent('move');
+    if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; d.unit.laneY=dy; d.unit.wp=null; d.unit.wade=null;   // he marches on in the lane you set him
+      if(d.unit.type==='sarge'){ d.unit.home={x:p.x,y:dy}; d.unit.saberState='idle'; } SFX.thock(); coachEvent('move');
       if(S.coop && d.unit.cid) coopSend({k:'mv', id:d.unit.cid, x:p.x|0, y:dy|0}); }
     else { S.plastic-=COSTS[d.type]; const nu=placeUnit(d.type,p.x,dy); coopPlaced(nu); }
   } else if(d.unit){ SFX.clack(); } // he returns to his old spot
