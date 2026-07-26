@@ -1316,7 +1316,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.26</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.27</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1644,7 +1644,102 @@ const BF_MAPS = [
         {x:MID-625,y:252,r:14},{x:MID-458,y:214,r:13},{x:MID-462,y:386,r:14},
         {x:MID-295,y:296,r:13},{x:MID-192,y:182,r:12},{x:MID-622,y:344,r:13},
         {x:MID-105,y:392,r:14},{x:MID-55,y:120,r:12} ],
-      rivers:[], tracks:[ {x0:120,x1:MID,y:487,h:38} ] }) }
+      rivers:[], tracks:[ {x0:120,x1:MID,y:487,h:38} ] }) },
+  // ===================== THE WINTER FIELD (v1.27) =====================
+  // Wyatt: "one snow map with multiple winding trails and passages." The
+  // Christmas box went over — cotton-wool plough banks, a bag of fake snow in
+  // the low ground, the village set's mirror tile frozen across the gate. Same
+  // toy-accident fiction as THE SPILL's sippy cup, so snow arrives on the
+  // bedroom carpet without the game becoming a different game (the rug frame
+  // stays visible: the snow lies ON it).
+  //
+  // THE SHAPE, in one sentence: each half has TWO bank lines with THREE
+  // passages between them and TWO winding trails threading those passages, and
+  // the middle of the board is left open. Your half is the logistics puzzle;
+  // the fight is still at the chalk line.
+  //
+  // EVERY NUMBER HERE IS MEASURED, not eyeballed — the design doc ships a live
+  // validator (~/gvt-snow-map-prompt.md, ~/gvt/design/snowmap/snow-map.html)
+  // that re-checks all of it: chains overlap internally (-30px), a sealing
+  // chain reaches past the y74-504 clamp, no two chains pinch closer than
+  // r1+r2+2*ROCK_PAD_FOE, no gap under 90px against a field edge, no trail
+  // drawn through a mound, no ice within 40px of a bank or 200px of a box.
+  // That list exists because of v1.15: two mounds whose shoulders overlap make
+  // a closed pocket, and a pocket is where men grind for the rest of the match.
+  //
+  // Coordinates are MID-relative so the puzzle stays at the front line as the
+  // carpet grows with the team size -- EXCEPT the two base aprons, which are
+  // absolute x so they ride the toy box instead of stranding themselves at
+  // 10v10. Mirroring works on absolute x for free (WORLD_W - x).
+  { id:'winter', name:'THE WINTER FIELD', ground:'snow',
+    blurb:'The Christmas box went over. Trodden trails wind through the plough banks \u2014 take a gap, wade the deep stuff, or slide across the gate ice.',
+    build:()=>({
+      rocks:[
+        // THE PLOUGH BANK - one chain across the middle of your half, a gap at
+        // each field edge (NORTH 138px / SOUTH 140px clear). Radii vary so the
+        // chain reads as a lumpy crest, not three stacked snowballs.
+        {x:MID-560,y:246,r:34,art:'drift',chain:'a'},
+        {x:MID-560,y:288,r:38,art:'drift',chain:'a'},
+        {x:MID-560,y:330,r:34,art:'drift',chain:'a'},
+        // THE LONE HUMP - bends the north trail. A single mound is the safest
+        // blocker there is: rockSteer's two-sided scoring solves it every time.
+        {x:MID-455,y:230,r:32,art:'drift',chain:'b'},
+        // THE SHOVELLED BANK - sealed at BOTH field edges, one wide gate in the
+        // middle (228px). Staggered against the plough bank on purpose: that is
+        // what makes every route wind instead of run straight.
+        {x:MID-290,y:68, r:34,art:'drift',chain:'c'},
+        {x:MID-290,y:110,r:38,art:'drift',chain:'c'},
+        {x:MID-290,y:152,r:34,art:'drift',chain:'c'},
+        {x:MID-290,y:452,r:38,art:'drift',chain:'d'},
+        {x:MID-290,y:494,r:34,art:'drift',chain:'d'},
+        // snow clods - the STONE ROW pebble trick, a small weave tax exactly
+        // where the two armies meet
+        {x:MID-150,y:140,r:13,art:'clod'},{x:MID-172,y:478,r:13,art:'clod'},
+        {x:MID-62, y:180,r:13,art:'clod'},{x:MID-62, y:420,r:13,art:'clod'} ],
+      // ⚠ THE GATE IS AN EXPLICIT FUNNEL, AND THIS IS WHERE THAT TRADE IS RIGHT.
+      // A "dry river" (no water, no planks — v1.7 shipped the open:true dry-bank
+      // crossing on THE SPILL) rewrites a man's goal to the gate whenever his
+      // path crosses the shovelled bank line, which GUARANTEES the crossing
+      // instead of hoping a greedy local solve finds it.
+      //
+      // The soak is why it is here, and the failure it fixes is worth writing
+      // down: rockSteer scores only TWO tangents around the NEAREST mound, and
+      // penalises steering off the carpet (+900) LESS than steering into
+      // another rock (+1400). At the sealed end of a chain, both sides are bad
+      // — so it picks off-the-carpet, the y-clamp catches him, and he grinds
+      // there for the rest of the match. Measured: men parked on the top and
+      // bottom edges for 44s at 1v1. A chain that seals a field edge cannot be
+      // solved locally, because the way out is to walk AWAY from your goal.
+      //
+      // It costs nothing in route choice, which is the usual price of a funnel:
+      // it only engages within ~200px of the bank, by which point the north /
+      // south decision at the plough bank has already been made — and both
+      // routes were always designed to converge here anyway. The plough bank
+      // and the hump stay purely geometric.
+      rivers:[ {x:MID-294,w:8,dry:true,bridges:[{y:302,bw:228,open:true}]} ],
+      // DEEP SNOW - slow to cross, but you MAY stand in it. The one deliberate
+      // divergence from ponds, and it is what makes the drifts a choice rather
+      // than a wall.
+      drifts:[ {x:MID-660,y:300,rx:105,ry:78},   // the "don't cut the corner" pillow
+               {x:MID-490,y:288,rx:70, ry:60},   // in the lee of the plough bank
+               {x:MID-345,y:118,rx:90, ry:46},
+               {x:MID-350,y:470,rx:90, ry:44},
+               {x:140,y:166,rx:78,ry:56},        // ABSOLUTE x - the apron rides the box
+               {x:150,y:478,rx:76,ry:34} ],      // ABSOLUTE x
+      ice:[ {x:MID-290,y:302,rx:86,ry:66},       // THE GATE ICE - everyone converges, everyone slides
+            {x:MID-620,y:462,rx:66,ry:32} ],     // a frozen puddle: the south route's risk premium
+      // PACKED TRAILS - the only genuinely new geometry on this map. tracks are
+      // axis-aligned rectangles, so a WINDING trail cannot be one; a trail is a
+      // polyline and bfGround takes the minimum point-to-segment distance.
+      trails:[
+        { w:44, pts:[[MID-800,330],[MID-700,252],[MID-620,168],[MID-560,140],[MID-500,146],
+                     [MID-455,120],[MID-390,190],[MID-330,262],[MID-290,302],[MID-180,300],[MID-60,300]] },
+        { w:44, pts:[[MID-800,382],[MID-700,452],[MID-620,462],[MID-560,436],[MID-500,452],
+                     [MID-430,462],[MID-360,392],[MID-290,318],[MID-170,320],[MID-50,330]] } ],
+      // no snowball: a moving hazard needs 108px of centre clearance from every
+      // mound and this map's corridors are 270px, so a ball only fits in the
+      // open middle - the one place Wyatt already flagged as maybe too punishing
+      balls:[] }) }
 ];
 // AI difficulty. Economy is IDENTICAL to yours at every tier — the difficulty is
 // decisions, never resources. blunderP is the humanizing dial.
@@ -2836,7 +2931,14 @@ function bfMap(id){ return BF_MAPS.find(m=>m.id===id)||BF_MAPS[0]; }
 // A feature that already straddles the middle IS its own mirror — stamp it once.
 function bfTerrain(map){
   const half=map.build();
-  const rocks=(half.rocks||[]).flatMap(r=> Math.abs((WORLD_W-r.x)-r.x)<1 ? [{...r}] : [{...r},{...r,x:WORLD_W-r.x}]);
+  const rocks=(half.rocks||[]).flatMap(r=>{
+    if(Math.abs((WORLD_W-r.x)-r.x)<1) return [{...r}];
+    const m={...r, x:WORLD_W-r.x};
+    // a mirrored bank is its OWN chain, or the union pass that draws a ridge
+    // would weld the two halves of the carpet into one continuous snowbank
+    if(r.chain) m.chain=r.chain+'~';
+    return [{...r}, m];
+  });
   const rivers=(half.rivers||[]).flatMap(rv=>{
     const a={...rv, bridges:rv.bridges.map(b=>({...b}))};
     const mx=WORLD_W-rv.x-rv.w;
@@ -2851,8 +2953,34 @@ function bfTerrain(map){
     const m={...t, x0:WORLD_W-t.x1, x1:WORLD_W-t.x0};
     return (Math.abs(m.x0-t.x0)<1 && Math.abs(m.x1-t.x1)<1) ? [{...t}] : [{...t}, m];
   });
-  return { rocks, river:null, rivers, ponds, balls, tracks };
+  // THE WINTER FIELD's three new lists. Ellipses mirror like ponds; a trail
+  // mirrors by flipping every point's x (and a trail that straddles the middle
+  // would be its own mirror, same rule as everything else here).
+  const drifts=(half.drifts||[]).flatMap(d=> Math.abs((WORLD_W-d.x)-d.x)<1 ? [{...d}] : [{...d},{...d,x:WORLD_W-d.x}]);
+  const ice=(half.ice||[]).flatMap(i=> Math.abs((WORLD_W-i.x)-i.x)<1 ? [{...i}] : [{...i},{...i,x:WORLD_W-i.x}]);
+  const trails=(half.trails||[]).flatMap(t=>{
+    const a={...t, pts:t.pts.map(p=>[p[0],p[1]])};
+    const m={...t, pts:t.pts.map(p=>[WORLD_W-p[0],p[1]])};
+    return t.pts.every((p,i)=>Math.abs(m.pts[i][0]-p[0])<1) ? [a] : [a,m];
+  });
+  const ground=map.ground||'carpet';
+  return { rocks, river:null, rivers, ponds, balls, tracks, drifts, ice, trails, ground,
+           flakes:(ground==='snow'? snowFlakes() : null) };
 }
+// Falling snow, seeded ONCE here and never in a draw call (v1.7's block-tilt
+// lesson: RNG inside draw flickers). One fixed seed, so every screen in a
+// private room gets the same weather and a seeded replay stays a replay.
+function snowFlakes(){
+  let s=20260725;
+  const rnd=()=>{ s=(s*9301+49297)%233280; return s/233280; };
+  const out=[];
+  for(let i=0;i<150;i++) out.push({ x:70+rnd()*(WORLD_W-140), y:60+rnd()*(H-120),
+    r:0.9+rnd()*1.5, v:9+rnd()*16, s:0.7+rnd()*1.1, p:rnd()*6.283 });
+  return out;
+}
+// is the ground underfoot snow? One reader, and it is BF-only by construction:
+// campaign terrain comes out of levelCfg, which has never had a `ground` field.
+function snowField(){ return !!(S.bf && S.cfg && S.cfg.terrain && S.cfg.terrain.ground==='snow'); }
 // slower ramp (7/24): 25★ wins climb the ladder fast, so hard sits far out —
 // most players live on easy/medium, which are tuned for ~80% player wins
 function bfDifficulty(){ return META.starsLifetime>=1200?'hard' : META.starsLifetime>=250?'medium' : 'easy'; }
@@ -3757,6 +3885,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
   const seats=(plan && plan.length===team*2)? plan : bfSeatPlan(team,riv);
   for(const st of seats){ st.purse=BF_START; st.tagT=0; st.mir=(st.team==='you');
     buildUnitTint(st.hex);
+    if(map.ground==='snow'){ buildUnitRim(st.hex); buildUnitRim(GREEN); }   // both armies, on white
     // every commander but you draws his Sarge's weapon out of the crate, once,
     // here — so a seat's Sarge carries the same thing all match, even if he goes
     // down and gets bought again. Seat 0 keeps your Academy loadout untouched.
@@ -4126,24 +4255,58 @@ function bfAggro(u){
 }
 // the ground underfoot, checked on the march only (diggers-in hold their spot):
 // pond juice slows him to a wade, the race track flank doubles his hustle
+// distance from a point to a line segment - the whole reason a winding trail can
+// be a polyline at all. 2 trails x <=11 points = 18 segment tests per marching
+// man per frame, which is nothing beside the rock loop right below it.
+function segDist(px,py,ax,ay,bx,by){
+  const vx=bx-ax, vy=by-ay, wx=px-ax, wy=py-ay;
+  const t=Math.max(0,Math.min(1,(wx*vx+wy*vy)/((vx*vx+vy*vy)||1)));
+  return Math.hypot(px-(ax+t*vx), py-(ay+t*vy));
+}
+function trailDist(x,y,t){
+  let d=1e9;
+  for(let i=0;i<t.pts.length-1;i++)
+    d=Math.min(d, segDist(x,y,t.pts[i][0],t.pts[i][1],t.pts[i+1][0],t.pts[i+1][1]));
+  return d;
+}
+// PRECEDENCE IS FIRST MATCH WINS, and these never multiply: deep snow, then
+// juice, then ice, then the trodden trail, then the race track, then open
+// ground. (A man standing in a drift on a trail is wading, full stop.)
 function bfGround(u){
-  let m=1, wet=false;
-  for(const p of (S.cfg.terrain.ponds||[])){
+  const T=S.cfg.terrain, fx=!u.probe;
+  let m=1, wet=false, onIce=false, hit=false;
+  // DEEP SNOW: 40% of your pace, and you may stand in it
+  for(const d of (T.drifts||[])){
+    const nx=(u.x-d.x)/d.rx, ny=(u.y-d.y)/d.ry;
+    if(nx*nx+ny*ny<1){ m=0.6; wet=true; hit=true;
+      if(fx && !u.wet) S.fx.push({k:'ring',x:u.x,y:u.y-2,r:4,R:22,t:0,dur:0.4,col:'rgba(122,146,175,0.85)'});
+      break; }
+  }
+  if(!hit) for(const p of (S.cfg.terrain.ponds||[])){
     const nx=(u.x-p.x)/p.rx, ny=(u.y-p.y)/p.ry;
-    if(nx*nx+ny*ny<1){ m=0.42; wet=true;
-      if(!u.wet) S.fx.push({k:'ring',x:u.x,y:u.y-2,r:4,R:20,t:0,dur:0.4,col:p.col2||'#6E9DC4'});
+    if(nx*nx+ny*ny<1){ m=0.42; wet=true; hit=true;
+      if(fx && !u.wet) S.fx.push({k:'ring',x:u.x,y:u.y-2,r:4,R:20,t:0,dur:0.4,col:p.col2||'#6E9DC4'});
       break; }
   }
   if(!wet){
-    if(u.wet) S.fx.push({k:'ring',x:u.x,y:u.y-2,r:4,R:16,t:0,dur:0.3,col:'rgba(237,234,223,0.7)'});
-    for(const tk of (S.cfg.terrain.tracks||[])){
+    if(fx && u.wet) S.fx.push({k:'ring',x:u.x,y:u.y-2,r:4,R:16,t:0,dur:0.3,col:fxSnow('rgba(237,234,223,0.7)')});
+    // ICE: faster than snow, but you keep your old heading (the skid is in
+    // bfMarch). A pure multiplier would be indistinguishable from a trail.
+    for(const ic of (T.ice||[])){
+      const nx=(u.x-ic.x)/ic.rx, ny=(u.y-ic.y)/ic.ry;
+      if(nx*nx+ny*ny<1){ m=1.25; onIce=true; hit=true; break; }
+    }
+    if(!hit) for(const tr of (T.trails||[])){
+      if(trailDist(u.x,u.y,tr) < tr.w/2){ m=1.22; hit=true; break; }
+    }
+    if(!hit) for(const tk of (S.cfg.terrain.tracks||[])){
       if(u.y>tk.y-tk.h/2 && u.y<tk.y+tk.h/2 && u.x>tk.x0 && u.x<tk.x1){
         m=1.35;
-        if(Math.random()<0.06) S.fx.push({k:'puff',x:u.x+(u.side==='you'?-14:14),y:u.y-4,t:0,dur:0.25,R:9});
+        if(fx && Math.random()<0.06) S.fx.push({k:'puff',x:u.x+(u.side==='you'?-14:14),y:u.y-4,t:0,dur:0.25,R:9});
         break; }
     }
   }
-  u.wet=wet;
+  u.wet=wet; u.onIce=onIce;
   return m;
 }
 function bfMarch(u,dt,goal){
@@ -4160,12 +4323,39 @@ function bfMarch(u,dt,goal){
     }
   }
   const dx=gx-u.x, dy=gy-u.y, d=Math.hypot(dx,dy)||1, sp=(u.def.moveSpd||36)*(u.gait||1)*bfGround(u);
-  const st=rockSteer(u.x,u.y,gx,gy,ROCK_PAD_FOE);   // walk ROUND the blocks, not into them
-  u.x+=(st?st.x:dx/d)*sp*dt; u.y+=(st?st.y:dy/d)*sp*dt;
+  const pad=u.squeeze?3:ROCK_PAD_FOE;
+  const st=rockSteer(u.x,u.y,gx,gy,pad);          // walk ROUND the blocks, not into them
+  let nx=st?st.x:dx/d, ny=st?st.y:dy/d;
+  // YOU CANNOT TURN ON ICE. Applied AFTER the steering, so the steering is
+  // damped too - that's the joke, and it's what makes ice ICE instead of just a
+  // faster patch of ground: you overshoot the gap and come back round for it.
+  // Deterministic and frame-rate independent (no RNG), so a private room's
+  // twenty sims and any seeded replay stay in lockstep.
+  if(u.onIce){
+    const k=Math.pow(0.82, dt*60), sx=(u.slide?u.slide.x:nx), sy=(u.slide?u.slide.y:ny);
+    nx=sx*k+nx*(1-k); ny=sy*k+ny*(1-k);
+    const nl=Math.hypot(nx,ny)||1; nx/=nl; ny/=nl;
+  }
+  u.slide={x:nx,y:ny};                            // always current, only read on ice
+  u.x+=nx*sp*dt; u.y+=ny*sp*dt;
   for(const rk of S.cfg.terrain.rocks){          // rocks shoulder him aside (reused kernel)
-    const ax=u.x-rk.x, ay=u.y-rk.y, dd=Math.hypot(ax,ay), min=rk.r+ROCK_PAD_FOE;
+    const ax=u.x-rk.x, ay=u.y-rk.y, dd=Math.hypot(ax,ay), min=rk.r+pad;
     if(dd>0.1&&dd<min){ u.x+=ax/dd*(min-dd)*Math.min(1,dt*8); u.y+=ay/dd*(min-dd)*Math.min(1,dt*8); }
   }
+  // v1.15's STALL ESCAPE, finally ported to the battleground. The campaign got
+  // it and BF never did, for the good reason that BF had no walls until this
+  // map. Progress-based, never a clock: cover no ground for 2.5s and your
+  // shoulder shrinks to nothing until you scrape past. With this in, no bank
+  // geometry anywhere can cost more than two and a half seconds.
+  //
+  // ⚠ The ruler is GROUND COVERED, not distance-to-goal, which is what the
+  // campaign uses. BF re-rolls a wandering waypoint every second or so
+  // (bfUnitStep, so nobody marches a ruler line), and against a goal that keeps
+  // moving, "am I closing on it" answers a question nobody asked. A wedged man
+  // is a man who is not going anywhere at all — measure that.
+  if(!u.anchor || Math.hypot(u.x-u.anchor.x, u.y-u.anchor.y)>20){ u.anchor={x:u.x,y:u.y}; u.stall=0; }
+  else u.stall=(u.stall||0)+dt;
+  u.squeeze=(u.stall||0)>2.5;
   for(const bl of (S.cfg.terrain.balls||[])){    // the wrecking ball is a rock that's going places
     const ax=u.x-bl.x, ay=u.y-bl.y, dd=Math.hypot(ax,ay), min=bl.r+16;
     if(dd>0.1&&dd<min){ u.x+=ax/dd*(min-dd)*Math.min(1,dt*8); u.y+=ay/dd*(min-dd)*Math.min(1,dt*8); }
@@ -4372,7 +4562,10 @@ function buildBFView(dt, st){
     myBaseHP:mine.hp, foeBaseHP:theirs.hp, myPurse:st.purse, mySeat:st.i, laneBias:st.laneBias,
     cp:(x,y,t)=>canPlace(Math.round(mir? WORLD_W-x : x), Math.round(y), t, st.team),
     units, map:{ width:WORLD_W, rocks:S.cfg.terrain.rocks, rivers:S.cfg.terrain.rivers,
-                 ponds:S.cfg.terrain.ponds||[], balls:S.cfg.terrain.balls||[], tracks:S.cfg.terrain.tracks||[] } };
+                 ponds:S.cfg.terrain.ponds||[], balls:S.cfg.terrain.balls||[], tracks:S.cfg.terrain.tracks||[],
+                 // the brains ignore terrain today; this is groundwork, same as ponds/balls were
+                 drifts:S.cfg.terrain.drifts||[], ice:S.cfg.terrain.ice||[], trails:S.cfg.terrain.trails||[],
+                 ground:S.cfg.terrain.ground||'carpet' } };
 }
 function bfCounter(t,mine,theirs){
   const live=theirs.filter(u=>u.dropT<=0);
@@ -4750,6 +4943,7 @@ function canPlace(x,y,type,side){
     if(s==='you' && x>MID-MID_BUFFER) return false;
     if(s==='foe' && x<MID+MID_BUFFER) return false;
     for(const rv of (S.cfg.terrain.rivers||[])){
+      if(rv.dry) continue;          // ⚠ a dry funnel is bare ground — banning it would wall the map
       if(x>rv.x-16 && x<rv.x+rv.w+16 && y>(rv.y0!=null?rv.y0:56)-16 && y<(rv.y1!=null?rv.y1:H-56)+16) return false; }
     for(const rk of S.cfg.terrain.rocks){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }
     for(const p of (S.cfg.terrain.ponds||[])){
@@ -4852,16 +5046,63 @@ function buildUnitTint(hex){
     im.src='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+vb+'">'+body+'</svg>');
   });
 }
+// ⚠ THE DROP-SHADOW LESSON, INVERTED. v1.0 gave the river figures a dark rim
+// because #C09E6C tan vanished on a #C8A170 tan floor. SNOW FLIPS WHICH COLOURS
+// FAIL: the carpet is a mid tone so the dark armies pop and only the light ones
+// struggle — but #E9EEF4 snow is brighter than half the palette. Measured WCAG
+// ratios against the snow field: white #E8E8E8 = 1.05:1, BF yellow 1.10, mint
+// 1.26, sky 1.63, lime 1.76, gold 1.91, pink 1.95. ELEVEN of the twenty-two
+// army colours land under 3:1 and seven dissolve outright, and the battleground
+// fields up to twenty at once.
+//
+// One change fixes all twenty-two: a #141A14 rim, 15.2:1 against snow and
+// 14.4:1 against the white army's own body. BAKE IT INTO THE SPRITE data-URI —
+// canvas can't use the CSS drop-shadow that saved the room art, and the
+// per-draw alternative (cx.shadowBlur round every drawImage) runs on every
+// sprite every frame, which at a 10v10's 152 units is a real bill. This way the
+// rim costs one extra Image per colour, built once, and nothing per frame.
+const IMGR={};
+//
+// ⚠ AND IT HAS TO BE A DILATE, NOT A BLUR. The design specced two feDropShadows
+// (stdDeviation 1.7 + 1.2) and that measures a fine 7.68:1 — at the sprite's
+// NATURAL 120px. The game draws a man at 54. A 1.7-unit blur scales to 0.77 of
+// a screen pixel, averages into the snow, and the white army's rim measured
+// **2.05:1 — not one pixel of it reached 4.5:1.** A morphology dilate is a hard,
+// opaque outline instead of a gradient, so it survives the downscale intact:
+// **14.85:1 at 54px AND at 120px**, which is the 15.2:1 the design predicted and
+// the blur quietly lost. Measure a sprite effect at the size it SHIPS at.
+const RIM_DEF='<defs><filter id="rm" x="-30%" y="-30%" width="160%" height="160%">'
+  +'<feMorphology in="SourceAlpha" operator="dilate" radius="3" result="d"/>'
+  +'<feFlood flood-color="#141A14" flood-opacity="1"/>'
+  +'<feComposite in2="d" operator="in" result="o"/>'
+  +'<feMerge><feMergeNode in="o"/><feMergeNode in="SourceGraphic"/></feMerge>'
+  +'</filter></defs>';   // ⚠ the region is not optional — without it Chrome clips the rim off
+function buildUnitRim(hex){
+  if(!hex||IMGR[hex]) return;
+  IMGR[hex]={};
+  GREEN_UNITS.forEach(k=>{
+    const vb=(k==='bfjeep'||k==='bftank')?'0 0 140 140':'0 0 120 140';
+    const body=SPRITES_SRC[k].split('currentColor').join(hex);
+    const im=new Image();
+    im.onload=()=>{ IMGR[hex][k]=im; };
+    im.src='data:image/svg+xml;utf8,'+encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+vb+'">'+RIM_DEF+'<g filter="url(#rm)">'+body+'</g></svg>');
+  });
+}
 function unitImg(k,u){
   // BATTLEFIELD fields up to TWENTY armies out of the same family, so the tint
-  // resolves per combatant by his SEAT — never from a global flag.
-  if(S.bf && u && u.seat!=null){ const st=S.bf.seats[u.seat], h=st&&st.hex; return (h&&IMGU[h]&&IMGU[h][k])||IMG[k]; }
-  if(S.bf && u && u.side){ const h=S.bf.hex[u.side]; return (h&&IMGU[h]&&IMGU[h][k])||IMG[k]; }
+  // resolves per combatant by his SEAT — never from a global flag. On snow the
+  // rimmed set is preferred and the plain tint is the fallback, so a rim that
+  // hasn't finished decoding yet just means one frame of the old sprite.
+  const rim=snowField();
+  const pick=h=>(rim&&h&&IMGR[h]&&IMGR[h][k])||(h&&IMGU[h]&&IMGU[h][k])||(rim&&IMGR[GREEN]&&IMGR[GREEN][k])||IMG[k];
+  if(S.bf && u && u.seat!=null){ const st=S.bf.seats[u.seat]; return pick(st&&st.hex); }
+  if(S.bf && u && u.side) return pick(S.bf.hex[u.side]);
   // in an invasion these are THEIR defenders — their account colour, not yours
-  if(S.invasion){ const h=S.invasion.theirHex; return (h&&IMGU[h]&&IMGU[h][k])||IMG[k]; }
+  if(S.invasion) return pick(S.invasion.theirHex);
   // an allied commander's men wear the ALLY's colour — you can always tell whose is whose
-  if(u && u.coopHex){ const h=u.coopHex; return (IMGU[h]&&IMGU[h][k])||IMG[k]; }
-  const hx=dyeHex(); return (hx&&IMGU[hx]&&IMGU[hx][k])||IMG[k];
+  if(u && u.coopHex) return pick(u.coopHex);
+  return pick(dyeHex());
 }
 // (bfMe() replaced the old const BF_ME here in v1.24 — your chair moves now)
 // how big a figure is drawn on the carpet — one answer, so the man, his ghost
@@ -6714,19 +6955,36 @@ function drawRug(){
   cx.fillStyle='#8C4B3C'; cx.fillRect(0,0,WD,H);
   cx.strokeStyle='#6E3A2E'; cx.lineWidth=56; cx.strokeRect(0,0,WD,H);
   cx.strokeStyle='#A8604C'; cx.lineWidth=7; cx.strokeRect(42,42,WD-84,H-84);
-  cx.globalAlpha=0.5; cx.fillStyle='#6E3A2E';
-  [[112,112],[WD-112,112],[112,H-112],[WD-112,H-112]].forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
-  cx.globalAlpha=0.32; cx.strokeStyle='#7d4234'; cx.lineWidth=2;
-  for(let y=90;y<H-60;y+=56){ cx.beginPath(); cx.moveTo(30,y); cx.lineTo(WD-30,y); cx.stroke(); }
-  cx.globalAlpha=1;
+  const snow=snowField();
+  if(snow){
+    // THE SNOW LIES ON THE RUG — the carpet frame is deliberately kept, which is
+    // what makes this a toy-box blizzard rather than a different game. The field
+    // is #E9EEF4 and NOT white: pure white glares, and it would spend the whole
+    // contrast budget the figure rims need.
+    cx.fillStyle='#E9EEF4'; cx.fillRect(56,56,WD-112,H-112);
+    cx.globalAlpha=0.75; cx.strokeStyle='#D7E1EC'; cx.lineWidth=3;   // wind combing, in place of the pile lines
+    for(let y=96;y<H-70;y+=48){
+      cx.beginPath(); cx.moveTo(60,y);
+      for(let x=60;x<WD-60;x+=60) cx.quadraticCurveTo(x+30,y+((x/60)%2?5:-5),x+60,y);
+      cx.stroke(); }
+    cx.globalAlpha=1;
+  } else {
+    cx.globalAlpha=0.5; cx.fillStyle='#6E3A2E';
+    [[112,112],[WD-112,112],[112,H-112],[WD-112,H-112]].forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
+    cx.globalAlpha=0.32; cx.strokeStyle='#7d4234'; cx.lineWidth=2;
+    for(let y=90;y<H-60;y+=56){ cx.beginPath(); cx.moveTo(30,y); cx.lineTo(WD-30,y); cx.stroke(); }
+    cx.globalAlpha=1;
+  }
   if(S.bf){
     // the halfway chalk line, and the no-drop strip either side of it that stops
-    // anyone parachuting a spawn ghost straight into the enemy line
-    cx.globalAlpha=0.16; cx.fillStyle='#EDEADF';
+    // anyone parachuting a spawn ghost straight into the enemy line.
+    // ⚠ #EDEADF is invisible on snow — on the winter field both go slate.
+    cx.globalAlpha=snow?0.13:0.16; cx.fillStyle=snow?'#5A6E86':'#EDEADF';
     cx.fillRect(MID-MID_BUFFER,56,MID_BUFFER*2,H-112);
-    cx.globalAlpha=0.55; cx.strokeStyle='#EDEADF'; cx.lineWidth=4; cx.setLineDash([16,14]);
+    cx.globalAlpha=snow?0.85:0.55; cx.strokeStyle=snow?'#5A6E86':'#EDEADF'; cx.lineWidth=4; cx.setLineDash([16,14]);
     cx.beginPath(); cx.moveTo(MID,56); cx.lineTo(MID,H-56); cx.stroke();
     cx.setLineDash([]); cx.globalAlpha=1;
+    if(snow) drawSnowTerrain();
   } else {
     // rug runner (decor only — the Tan go anywhere they please now)
     cx.lineCap='round'; cx.globalAlpha=0.35;
@@ -6738,6 +6996,7 @@ function drawRug(){
   // the wet part (THE SPILL's stream pours from the cup down into its pond);
   // an open:true "bridge" is dry carpet, so it gets a funnel and no planks.
   for(const rv of (S.bf? (S.cfg.terrain.rivers||[]) : [])){
+    if(rv.dry) continue;            // an invisible funnel: the snowbank IS the crossing
     const y0=rv.y0!=null?rv.y0:56, y1=rv.y1!=null?rv.y1:H-56;
     cx.fillStyle=rv.col||'#4E7FA8'; cx.fillRect(rv.x,y0,rv.w,y1-y0);
     cx.beginPath(); cx.ellipse(rv.x+rv.w/2,y0,rv.w/2,9,0,0,7); cx.fill();   // rounded spout
@@ -6807,6 +7066,7 @@ function drawRug(){
   for(const rk of S.cfg.terrain.rocks){
     if(rk.art==='cup'){ drawCupRock(rk); continue; }
     if(rk.art==='block'){ drawToyBlock(rk); continue; }
+    if(rk.art==='drift'||rk.art==='clod') continue;     // snowbanks draw as CHAINS, in drawSnowTerrain
     cx.fillStyle='rgba(0,0,0,0.25)'; cx.beginPath(); cx.ellipse(rk.x+4,rk.y+rk.r*0.55,rk.r*1.05,rk.r*0.4,0,0,7); cx.fill();
     cx.fillStyle='#8B8578'; cx.beginPath();
     cx.ellipse(rk.x,rk.y,rk.r,rk.r*0.8,0.2,0,7); cx.fill();
@@ -6815,6 +7075,139 @@ function drawRug(){
   }
   // wrecking balls last — tallest thing on the carpet
   for(const bl of (S.bf? (S.cfg.terrain.balls||[]) : [])) drawWreckBall(bl);
+  if(snow) drawSnowFall(WD);          // under the figures: drawRug runs first
+}
+// ================= THE WINTER FIELD: the ground itself =================
+// Draw order is the reading order: the deep drifts you shouldn't cross, the
+// trodden trails over them, the ice in the gate, the banks (the tallest thing
+// out there) and the loose clods last.
+function drawSnowTerrain(){
+  const T=S.cfg.terrain;
+  for(const d of (T.drifts||[])) drawDeepDrift(d);
+  for(const t of (T.trails||[])) drawSnowTrail(t);
+  for(const ic of (T.ice||[])) drawIceSheet(ic);
+  const chains={};
+  for(const rk of T.rocks){ if(rk.art!=='drift') continue;
+    const tag=rk.chain||'_'; (chains[tag]=chains[tag]||[]).push(rk); }
+  for(const tag in chains) drawSnowBank(chains[tag]);
+  for(const rk of T.rocks){ if(rk.art==='clod') drawSnowClod(rk); }
+}
+// ⚠ THREE UNION PASSES OVER THE WHOLE CHAIN — rim, then shade, then lit face,
+// each one a union of the SAME circles — and never per-mound outlines. A
+// per-mound highlight is precisely what makes a ridge read as a stack of
+// snowballs instead of one ploughed bank, which is what the first mockup did.
+// One crest highlight for the chain, not one per mound, for the same reason.
+function drawSnowBank(list){
+  cx.fillStyle='rgba(60,74,92,0.20)';
+  for(const m of list){ cx.beginPath(); cx.ellipse(m.x+6,m.y+m.r*0.55,m.r*1.08,m.r*0.44,0,0,7); cx.fill(); }
+  // ⚠ the three radii have to STEP DOWN, not just offset. Rim r+3 under a face
+  // of r-1 offset up-left leaves the rim a sub-pixel sliver that antialiasing
+  // eats at game scale — measured, and the bank read as a white blob on white.
+  cx.fillStyle='#8C9AAD';
+  for(const m of list){ cx.beginPath(); cx.arc(m.x,m.y,m.r+4,0,7); cx.fill(); }
+  cx.fillStyle='#CFDBE9';
+  for(const m of list){ cx.beginPath(); cx.arc(m.x+2,m.y+3,m.r-1,0,7); cx.fill(); }
+  cx.fillStyle='#F9FCFF';
+  for(const m of list){ cx.beginPath(); cx.arc(m.x-2,m.y-3,m.r-3,0,7); cx.fill(); }
+  const a=list[0], b=list[list.length-1];
+  cx.globalAlpha=0.62; cx.fillStyle='#FFFFFF'; cx.strokeStyle='#FFFFFF'; cx.lineCap='round';
+  if(list.length===1){ cx.beginPath(); cx.arc(a.x-a.r*0.24,a.y-a.r*0.30,a.r*0.4,0,7); cx.fill(); }
+  else { cx.lineWidth=Math.min(a.r,b.r)*0.62;
+    cx.beginPath(); cx.moveTo(a.x-a.r*0.24,a.y-a.r*0.30); cx.lineTo(b.x-b.r*0.24,b.y-b.r*0.30); cx.stroke(); }
+  cx.globalAlpha=1; cx.lineCap='butt';
+}
+function drawSnowClod(rk){
+  cx.fillStyle='rgba(60,74,92,0.22)'; cx.beginPath(); cx.arc(rk.x+2,rk.y+4,rk.r,0,7); cx.fill();
+  cx.fillStyle='#F9FCFF'; cx.beginPath(); cx.arc(rk.x,rk.y,rk.r,0,7); cx.fill();
+  cx.strokeStyle='#8C9AAD'; cx.lineWidth=2; cx.stroke();
+}
+// DEEP SNOW: a feathered edge and wind scallops combed across it. Deliberately
+// NOT concentric rings — rings read as water, and this is the one piece of
+// terrain you're allowed to stand in.
+function drawDeepDrift(d){
+  cx.globalAlpha=0.35; cx.fillStyle='#B4C8DE';
+  cx.beginPath(); cx.ellipse(d.x,d.y,d.rx+7,d.ry+6,0,0,7); cx.fill(); cx.globalAlpha=1;
+  cx.fillStyle='#D6E2F0'; cx.beginPath(); cx.ellipse(d.x,d.y,d.rx,d.ry,0,0,7); cx.fill();
+  cx.strokeStyle='#B4C8DE'; cx.lineWidth=2.4; cx.stroke();
+  cx.globalAlpha=0.75; cx.lineWidth=2;
+  for(let k=-2;k<=2;k++){
+    const yy=d.y+k*d.ry*0.34, w=d.rx*Math.sqrt(Math.max(0.08,1-(k*0.34)*(k*0.34)))*0.82;
+    cx.beginPath(); cx.moveTo(d.x-w,yy);
+    cx.quadraticCurveTo(d.x-w*0.5,yy-7,d.x,yy);
+    cx.quadraticCurveTo(d.x+w*0.5,yy+7,d.x+w,yy); cx.stroke();
+  }
+  cx.globalAlpha=1; cx.fillStyle='#FFFFFF';
+  cx.beginPath(); cx.arc(d.x-d.rx*0.42,d.y+d.ry*0.4,1.9,0,7); cx.fill();
+  cx.beginPath(); cx.arc(d.x+d.rx*0.48,d.y-d.ry*0.34,1.6,0,7); cx.fill();
+}
+// the boot-packed trail: casing, band, and staggered dents. The dents hang off
+// the segment index, so there is no RNG in the draw and they never flicker.
+function drawSnowTrail(t){
+  const line=()=>{ cx.beginPath(); cx.moveTo(t.pts[0][0],t.pts[0][1]);
+    for(let i=1;i<t.pts.length;i++) cx.lineTo(t.pts[i][0],t.pts[i][1]); cx.stroke(); };
+  cx.lineCap='round'; cx.lineJoin='round';
+  cx.strokeStyle='#B7C2D1'; cx.lineWidth=t.w+5; line();
+  cx.strokeStyle='#CFD7E1'; cx.lineWidth=t.w; line();
+  cx.fillStyle='#A9B5C6';
+  for(let i=0;i<t.pts.length-1;i++){
+    const ax=t.pts[i][0], ay=t.pts[i][1], bx=t.pts[i+1][0], by=t.pts[i+1][1];
+    const len=Math.hypot(bx-ax,by-ay), n=Math.max(2,Math.round(len/26)), ang=Math.atan2(by-ay,bx-ax);
+    for(let k=0;k<n;k++){
+      const f=(k+0.5)/n, px=ax+(bx-ax)*f, py=ay+(by-ay)*f, off=(k%2?7:-7);
+      cx.save(); cx.translate(px-Math.sin(ang)*off, py+Math.cos(ang)*off); cx.rotate(ang);
+      cx.beginPath(); cx.ellipse(0,0,4.6,3,0,0,7); cx.fill(); cx.restore();
+    }
+  }
+  cx.lineCap='butt'; cx.lineJoin='miter';
+}
+// the village set's mirror tile, cracked where boots crossed it
+function drawIceSheet(i){
+  cx.fillStyle='#BFD9E8'; cx.beginPath(); cx.ellipse(i.x,i.y,i.rx,i.ry,0,0,7); cx.fill();
+  cx.save(); cx.beginPath(); cx.ellipse(i.x,i.y,i.rx,i.ry,0,0,7); cx.clip();
+  cx.strokeStyle='#8FBFDA'; cx.lineWidth=2.6; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(i.x-i.rx*0.8,i.y-i.ry*0.2); cx.lineTo(i.x-i.rx*0.1,i.y+i.ry*0.45);
+  cx.lineTo(i.x+i.rx*0.55,i.y-i.ry*0.3); cx.lineTo(i.x+i.rx*0.85,i.y+i.ry*0.1); cx.stroke();
+  cx.globalAlpha=0.75; cx.lineWidth=1.8;
+  cx.beginPath(); cx.moveTo(i.x-i.rx*0.45,i.y+i.ry*0.7); cx.lineTo(i.x+i.rx*0.2,i.y-i.ry*0.6); cx.stroke();
+  cx.globalAlpha=0.8; cx.fillStyle='#FFFFFF';
+  cx.beginPath(); cx.ellipse(i.x-i.rx*0.36,i.y-i.ry*0.42,i.rx*0.3,i.ry*0.2,0,0,7); cx.fill();
+  cx.globalAlpha=1; cx.restore();
+  cx.strokeStyle='#6E93AC'; cx.lineWidth=2.4; cx.lineCap='butt';
+  cx.beginPath(); cx.ellipse(i.x,i.y,i.rx,i.ry,0,0,7); cx.stroke();
+}
+// ⚠ WHITE FLAKES ON A WHITE FIELD ARE NOT VISIBLE AT ALL — every flake needs a
+// cool shadow under it. Pure function of S.t off the build-time seed, so no
+// per-frame state and no drift between two screens watching the same battle.
+function drawSnowFall(WD){
+  const F=S.cfg.terrain.flakes; if(!F||!F.length) return;
+  const calm=reducedMotion(), n=calm? (F.length*0.4)|0 : F.length, top=56, bot=H-56, span=bot-top;
+  for(let i=0;i<n;i++){
+    const f=F[i];
+    const y=calm? f.y : top+(((f.y-top)+S.t*f.v)%span);
+    const x=calm? f.x : f.x+Math.sin(S.t*f.s+f.p)*7;
+    cx.fillStyle='rgba(110,132,158,0.34)';
+    cx.beginPath(); cx.arc(x,y+1.2,f.r+0.6,0,7); cx.fill();
+    cx.fillStyle='#FFFFFF';
+    cx.beginPath(); cx.arc(x,y,f.r,0,7); cx.fill();
+  }
+}
+// ⚠ THE WHITE-ON-WHITE SWEEP. The effects layer was authored on a mid-tone
+// carpet, so a lot of it is white or cream — and on snow that is nothing at
+// all. ONE swap at DRAW time covers every push site at once (knockdown and
+// stand-up rings, the wade ring, track dust) and it cannot leak into the
+// campaign, because only a battleground map can ever be snow.
+function fxSnow(col){
+  if(!col || !snowField()) return col;
+  let r,g,b,a=1;
+  if(col.charAt(0)==='#'){
+    const h=col.length<7? col.charAt(1)+col.charAt(1)+col.charAt(2)+col.charAt(2)+col.charAt(3)+col.charAt(3) : col.slice(1,7);
+    r=parseInt(h.slice(0,2),16); g=parseInt(h.slice(2,4),16); b=parseInt(h.slice(4,6),16);
+  } else {
+    const m=col.match(/[\d.]+/g); if(!m||m.length<3) return col;
+    r=+m[0]; g=+m[1]; b=+m[2]; if(m[3]!=null) a=+m[3];
+  }
+  if(0.2126*r+0.7152*g+0.0722*b < 188) return col;      // already dark enough to read
+  return 'rgba(46,62,84,'+a+')';                        // slate — 8.6:1 on #E9EEF4
 }
 // THE SPILL's cup, knocked clean over, mouth to the carpet — the stream draws
 // from just under it, so together they read as one long accident
@@ -6955,8 +7348,8 @@ function draw(){
       cx.strokeStyle='#ffffff'; cx.lineWidth=3.4; cx.lineCap='round';
       cx.beginPath(); cx.moveTo(e.x1+(e.x2-e.x1)*b,e.y1+(e.y2-e.y1)*b); cx.lineTo(p,q); cx.stroke();
       cx.lineCap='butt'; cx.fillStyle='#FFF6D0'; cx.beginPath(); cx.arc(p,q,3.2,0,7); cx.fill(); }
-    else if(e.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle='#e8e0cc'; cx.beginPath(); cx.arc(e.x,e.y,e.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; }
-    else if(e.k==='ring'){ cx.globalAlpha=1-k; cx.strokeStyle=e.col; cx.lineWidth=3; cx.beginPath(); cx.arc(e.x,e.y,e.r+(e.R-e.r)*k,0,7); cx.stroke(); cx.globalAlpha=1; }
+    else if(e.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle=fxSnow('#e8e0cc'); cx.beginPath(); cx.arc(e.x,e.y,e.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; }
+    else if(e.k==='ring'){ cx.globalAlpha=1-k; cx.strokeStyle=fxSnow(e.col); cx.lineWidth=3; cx.beginPath(); cx.arc(e.x,e.y,e.r+(e.R-e.r)*k,0,7); cx.stroke(); cx.globalAlpha=1; }
     else if(e.k==='smoke'){ cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb'; cx.beginPath(); cx.arc(e.x,e.y,3+5*k,0,7); cx.fill(); cx.globalAlpha=1; }
     else if(e.k==='cone'){ // the shotgun blast — a quick fan of buckshot
       cx.globalAlpha=(1-k)*0.5; cx.fillStyle='#FFE39A';
@@ -6964,7 +7357,12 @@ function draw(){
   }
 
   // floats
-  for(const fl of S.floats){ cx.globalAlpha=Math.min(1,2-fl.t*1.8); cx.font='bold 19px "Arial Narrow", Impact, sans-serif'; cx.fillStyle=fl.col; cx.textAlign='center'; cx.fillText(fl.txt,fl.x,fl.y); cx.globalAlpha=1; }
+  const snowFl=snowField();
+  for(const fl of S.floats){ cx.globalAlpha=Math.min(1,2-fl.t*1.8); cx.font='bold 19px "Arial Narrow", Impact, sans-serif'; cx.textAlign='center';
+    // the tag and damage floats are cream and pale green — on snow they keep
+    // their colour (it's how you tell yours from theirs) and get an ink outline
+    if(snowFl){ cx.strokeStyle='rgba(20,26,20,0.85)'; cx.lineWidth=3.5; cx.lineJoin='round'; cx.strokeText(fl.txt,fl.x,fl.y); }
+    cx.fillStyle=fl.col; cx.fillText(fl.txt,fl.x,fl.y); cx.globalAlpha=1; }
 
   // dragged unit on top
   if(S.drag){ drawSprite(S.drag.type,S.drag.x,S.drag.y,unitW(S.drag.type),0,0,unitImg(S.drag.type,S.bf?bfMe():null));
@@ -7187,6 +7585,10 @@ function drawBFUnit(u,w,im){
   // into the gentle idle sway — the difference is what makes the field read.
   // A vehicle does NEITHER: a rocking chassis reads as broken, not alive (the
   // campaign's drawFoe has zeroed the wobble on jeeps and tanks since v0.2).
+  // on snow a figure with no shadow reads as a sticker on white paper — the rim
+  // gives him a silhouette, this gives him a floor
+  if(snowField()){ cx.fillStyle='rgba(74,90,120,0.30)';
+    cx.beginPath(); cx.ellipse(u.x,u.y-1,(u.def.vehicle? w*0.34 : 15),(u.def.vehicle? 7 : 5),0,0,7); cx.fill(); }
   if(u.duckT>0){ drawDuck(u,w,im,flip); return; }   // he is in the hole — the bar can wait
   const wob = u.def.vehicle? 0 : (u.marching? Math.sin(S.t*7+u.phase)*0.05 : Math.sin(S.t*2.2+u.phase)*0.024);
   drawSprite(u.type,u.x,u.y,w,0, wob, im, flip);
@@ -8190,9 +8592,28 @@ const WT_MAP_GLYPHS = {
   spill:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><path d="M10 8v10M36 8v10" stroke="#7A4E8E" stroke-width="4"/><ellipse cx="10" cy="21.5" rx="6" ry="3.4" fill="#7A4E8E"/><ellipse cx="36" cy="21.5" rx="6" ry="3.4" fill="#7A4E8E"/><rect x="6" y="2.5" width="8" height="6" rx="2" fill="#C0483B" transform="rotate(-24 10 5.5)"/><rect x="32" y="2.5" width="8" height="6" rx="2" fill="#C0483B" transform="rotate(24 36 5.5)"/><rect x="6.5" y="11" width="7" height="3" rx="1" fill="#D9B36C"/><rect x="32.5" y="11" width="7" height="3" rx="1" fill="#D9B36C"/><circle cx="19.5" cy="15" r="3.2" fill="#3B3B44"/><circle cx="26.5" cy="15" r="3.2" fill="#3B3B44"/>',
   stone:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><ellipse cx="10" cy="8" rx="5" ry="3.6" fill="#9A9A90"/><ellipse cx="23" cy="13" rx="5.5" ry="4" fill="#8A8A80"/><ellipse cx="37" cy="7" rx="4.5" ry="3.2" fill="#9A9A90"/><circle cx="16" cy="18" r="1.6" fill="#8A8A80"/><circle cx="31" cy="17" r="1.5" fill="#9A9A90"/><circle cx="7" cy="15" r="1.4" fill="#8A8A80"/><rect x="2" y="22.5" width="42" height="4.6" rx="2" fill="#D97B2E"/><path d="M6 24.8h4M14 24.8h4M22 24.8h4M30 24.8h4M38 24.8h4" stroke="#FFF" stroke-width="1.1" opacity="0.6"/>',
   open:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/><g fill="#E4C98F"><rect x="4" y="3" width="6" height="6" rx="1" stroke="#C0483B" stroke-width="0.9"/><rect x="13" y="4.5" width="5.5" height="5.5" rx="1" stroke="#4E7FA8" stroke-width="0.9"/><rect x="26" y="3" width="5.5" height="5.5" rx="1" stroke="#6E8F4E" stroke-width="0.9"/><rect x="35" y="4" width="6" height="6" rx="1" stroke="#C7913B" stroke-width="0.9"/><rect x="5" y="21" width="6" height="6" rx="1" stroke="#6E8F4E" stroke-width="0.9"/><rect x="15" y="21.5" width="5.5" height="5.5" rx="1" stroke="#C7913B" stroke-width="0.9"/><rect x="26.5" y="21" width="6" height="6" rx="1" stroke="#C0483B" stroke-width="0.9"/><rect x="35.5" y="21.5" width="5.5" height="5.5" rx="1" stroke="#4E7FA8" stroke-width="0.9"/></g><circle cx="23" cy="15" r="3.4" fill="#3B3B44"/>'
+,
+  // the real geometry, scaled: world x 0..1920 -> 3..43, y 74..504 -> 4..27.
+  // Two bank lines per half with their gaps, one winding trail, the gate ice.
+  winter:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/>'
+    +'<rect x="3" y="3" width="40" height="24" rx="3" fill="#E9EEF4"/>'
+    +'<g fill="none" stroke="#BFC9D6" stroke-width="3.4" stroke-linecap="round">'
+    +'<path d="M3.5 15.5 Q8 7.5 11.6 7.6 Q15 8.4 17 15.6 L23 15.6"/>'
+    +'<path d="M42.5 15.5 Q38 7.5 34.4 7.6 Q31 8.4 29 15.6 L23 15.6"/></g>'
+    +'<g fill="#F9FCFF" stroke="#8C9AAD" stroke-width="1">'
+    +'<rect x="9.3" y="10.8" width="5" height="9.2" rx="2.5"/>'
+    +'<rect x="14.8" y="2.4" width="4.6" height="7.8" rx="2.3"/>'
+    +'<rect x="14.8" y="19.9" width="4.6" height="7.8" rx="2.3"/>'
+    +'<rect x="31.7" y="10.8" width="5" height="9.2" rx="2.5"/>'
+    +'<rect x="26.6" y="2.4" width="4.6" height="7.8" rx="2.3"/>'
+    +'<rect x="26.6" y="19.9" width="4.6" height="7.8" rx="2.3"/></g>'
+    +'<g fill="#BFD9E8" stroke="#6E93AC" stroke-width="0.9">'
+    +'<ellipse cx="17.1" cy="15.4" rx="2.5" ry="2"/><ellipse cx="28.9" cy="15.4" rx="2.5" ry="2"/></g>'
+    +'<g fill="#FFFFFF" stroke="#A9BACD" stroke-width="0.5">'
+    +'<circle cx="6.6" cy="23" r="1.1"/><circle cx="23" cy="6.4" r="1"/><circle cx="39" cy="21.6" r="1.1"/></g>'
 };
-// CROSSING leads (the flagship), OPEN CARPET last
-const WT_MAP_ORDER = ['crossing','spill','stone','open'];
+// CROSSING leads (the flagship), the new WINTER FIELD second, OPEN CARPET last
+const WT_MAP_ORDER = ['crossing','winter','spill','stone','open'];
 function renderWarTable(){
   const riv=todaysRival();
   const w=META.bfWins||0, l=META.bfLosses||0;
@@ -9719,6 +10140,10 @@ window.GVT = {
   coopQuit(){ coopLeave(); },
   // ===== BATTLEFIELD =====
   battlefield(mapId,diff,team){ startBattlefield(mapId, diff, team); return S.bf.mapId+' '+S.bf.team+'v'+S.bf.team+' vs '+S.bf.rival.id+' ('+S.bf.ai.diff+')'; },
+  // THE EXACT ground factor under a point. Probe this, never time a marching
+  // unit: 10% footing pauses and the waypoint wiggle make that measurement
+  // noisy enough to lose a whole run to (v1.7 did).
+  ground(x,y){ const p={x,y,wet:true,probe:true}, m=bfGround(p); return { m:+m.toFixed(4), ice:!!p.onIce }; },
   bfQueue(size){ bfQueueStart(size); return BFQ && { size:BFQ.size, joined:BFQ.joined }; },
   bfQueueCancel(){ bfQueueCancel(); },
   bfSpawn(s,type,x,y){ if(!S.bf) return null;
