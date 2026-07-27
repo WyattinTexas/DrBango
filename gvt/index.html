@@ -729,7 +729,11 @@
     border-radius:4px; border:2px solid rgba(90,80,60,0.38); margin-bottom:clamp(1px,0.5vh,4px);
     box-shadow:inset 0 0 12px rgba(70,60,40,0.28);
     background:linear-gradient(150deg,rgba(255,255,255,0.32),rgba(255,255,255,0.05) 42%,rgba(120,140,160,0.10) 66%,rgba(255,255,255,0.18)); }
-  .sh-dwin svg { max-width:94%; max-height:94%; width:auto; height:auto;
+  /* ⚠ explicit 94%×94%, never auto+max: WebKit gives an inline svg no
+     intrinsic size to cap, so auto could land anywhere from 0 to the 300×150
+     default. A definite box + the viewBox's own xMidYMid meet letterboxing
+     renders identically where auto happened to work, and works everywhere. */
+  .sh-dwin svg { width:94%; height:94%;
     filter:drop-shadow(0 3px 2px rgba(0,0,0,0.28)); }
   .sh-dn { display:block; font-size:clamp(8px,1.95vh,15px); letter-spacing:0.04em; line-height:1.05; color:#3A2A14; }
   .sh-dsub { display:block; font-size:clamp(4px,0.95vh,8px); letter-spacing:0.16em; color:#7d6d50; }
@@ -763,7 +767,7 @@
      svg, the svg sized itself off the window, and the whole bank measured 0px. */
   .sh-bwin { position:relative; flex:1 1 auto; min-height:0; width:100%;
     display:flex; align-items:center; justify-content:center; }
-  .sh-bwin svg { max-height:100%; max-width:100%; width:auto; height:auto; filter:drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
+  .sh-bwin svg { width:100%; height:100%; filter:drop-shadow(0 3px 3px rgba(0,0,0,0.5)); }
   .sh-bnext { position:absolute; left:2%; top:2%; font-style:normal; font-size:clamp(5px,1.15vh,9px);
     letter-spacing:0.22em; color:#8FBF63; }
   .sh-btx { display:block; text-align:center; line-height:1.1; }
@@ -778,9 +782,15 @@
   .sh-nan::before { content:''; position:absolute; inset:0; border-radius:5px; pointer-events:none;
     background:repeating-linear-gradient(90deg,rgba(120,95,60,0.13) 0 1px,transparent 1px 9px); }
   .sh-nan:active { transform:translateY(2px); }
-  /* it does not fit in the box, so it does not fit in the box */
-  .sh-nwin { flex:0 0 auto; height:112%; align-self:center; display:flex; align-items:center; }
-  .sh-nwin svg { height:100%; width:auto; filter:drop-shadow(0 4px 4px rgba(0,0,0,0.45)); }
+  /* it does not fit in the box, so it does not fit in the box.
+     ⚠ v1.34: the window carries an EXPLICIT aspect-ratio (NANA_VB's own 118:340)
+     and the svg fills it 100%×100% — an inline <svg> sized width:auto has no
+     intrinsic width, and while Chrome will infer one from the viewBox, WebKit
+     will not: on every iPhone the window shrank to the svg, the svg sized
+     itself off the window, and the banana measured 0px wide. Nothing here may
+     ask the engine to infer a size. */
+  .sh-nwin { flex:0 0 auto; height:112%; aspect-ratio:118/340; align-self:center; display:flex; align-items:center; }
+  .sh-nwin svg { width:100%; height:100%; filter:drop-shadow(0 4px 4px rgba(0,0,0,0.45)); }
   .sh-ntx { flex:1 1 auto; min-width:0; }
   .sh-ntx b { display:block; font-size:clamp(9px,2.2vh,17px); letter-spacing:0.04em; line-height:1.05; color:#3A2A14; }
   .sh-ntx i { display:block; font-style:normal; font-size:clamp(4px,0.95vh,8px); letter-spacing:0.16em; color:#7d6d50; }
@@ -1169,15 +1179,38 @@
   /* THE TOY TRAIN — three cars on one loop, spaced by negative delay. The
      keyframes are the track sampled at UNIFORM ARC LENGTH, so the gap between
      cars holds all the way round instead of collapsing in the turns. The base
-     transform is where each car parks when the animation is off. */
-  .trcar { transform:translate(268px,530px); animation:trloop 16s linear infinite; }
-  .trcar.c2 { transform:translate(301.8px,530px); }
-  .trcar.c3 { transform:translate(335.6px,530px); }
-  @keyframes trloop { 0%{transform:translate(268px,530px)} 32.105%{transform:translate(392px,530px)} 33.895%{transform:translate(398.8px,531.1px)} 35.684%{transform:translate(404.9px,534.2px)} 37.474%{transform:translate(409.8px,539.1px)} 39.263%{transform:translate(412.9px,545.2px)} 41.053%{transform:translate(414px,552px)} 42.842%{transform:translate(412.9px,558.8px)} 44.632%{transform:translate(409.8px,564.9px)} 46.421%{transform:translate(404.9px,569.8px)} 48.211%{transform:translate(398.8px,572.9px)} 50%{transform:translate(392px,574px)} 82.105%{transform:translate(268px,574px)} 83.895%{transform:translate(261.2px,572.9px)} 85.684%{transform:translate(255.1px,569.8px)} 87.474%{transform:translate(250.2px,564.9px)} 89.263%{transform:translate(247.1px,558.8px)} 91.053%{transform:translate(246px,552px)} 92.842%{transform:translate(247.1px,545.2px)} 94.632%{transform:translate(250.2px,539.1px)} 96.421%{transform:translate(255.1px,534.2px)} 98.211%{transform:translate(261.2px,531.1px)} 100%{transform:translate(268px,530px)} }
-  .trpuff { transform-box:fill-box; transform-origin:50% 90%; animation:trchuff 1.7s ease-out infinite; }
-  @keyframes trchuff { 0% { opacity:0.85; transform:scale(0.35) translateY(0); }
-    100% { opacity:0; transform:scale(2.3) translateY(-11px); } }
-  .dec-train.react .trpuff { animation:trchuff 0.5s ease-out infinite; }
+     transform is where each car parks when the animation is off.
+     v1.34: the LOCO LEADS now (delays run -2.8/-1.4/0 down the consist, so the
+     loco is always furthest ALONG the loop), and every keyframe carries a
+     scale() beside its translate(): the x factor is the true side-view
+     foreshortening of a car rounding the end of the oval (cos of the tangent,
+     never quite 0 — end-on a toy still has a nose), so each car turns to FACE
+     its direction of travel, and the shared magnitude leans 0.94 far leg →
+     1.06 near leg for a touch of depth. ⚠ translate()+scale() only stays
+     ambiguity-free with the origin PINNED: transform-box:view-box + origin 0 0
+     is user-space (0,0) (the room viewBox is 0 0 960 600), where the
+     conjugation is identity — never fill-box, whose breathing bbox (the steam)
+     would wander the flip axis. */
+  .trcar { transform-box:view-box; transform-origin:0 0;
+    transform:translate(268px,530px) scale(0.94,0.94); animation:trloop 16s linear infinite; }
+  .trcar.c2 { transform:translate(301.8px,530px) scale(0.94,0.94); }
+  .trcar.c1 { transform:translate(335.6px,530px) scale(0.94,0.94); }
+  @keyframes trloop { 0%{transform:translate(268px,530px) scale(0.94,0.94)} 32.105%{transform:translate(392px,530px) scale(0.94,0.94)} 33.895%{transform:translate(398.8px,531.1px) scale(0.897,0.943)} 35.684%{transform:translate(404.9px,534.2px) scale(0.77,0.951)} 37.474%{transform:translate(409.8px,539.1px) scale(0.567,0.965)} 39.263%{transform:translate(412.9px,545.2px) scale(0.303,0.981)} 41.053%{transform:translate(414px,552px) scale(0.28,1)} 42.842%{transform:translate(412.9px,558.8px) scale(-0.315,1.019)} 44.632%{transform:translate(409.8px,564.9px) scale(-0.609,1.035)} 46.421%{transform:translate(404.9px,569.8px) scale(-0.849,1.049)} 48.211%{transform:translate(398.8px,572.9px) scale(-1.005,1.057)} 50%{transform:translate(392px,574px) scale(-1.06,1.06)} 82.105%{transform:translate(268px,574px) scale(-1.06,1.06)} 83.895%{transform:translate(261.2px,572.9px) scale(-1.005,1.057)} 85.684%{transform:translate(255.1px,569.8px) scale(-0.849,1.049)} 87.474%{transform:translate(250.2px,564.9px) scale(-0.609,1.035)} 89.263%{transform:translate(247.1px,558.8px) scale(-0.315,1.019)} 91.053%{transform:translate(246px,552px) scale(-0.28,1)} 92.842%{transform:translate(247.1px,545.2px) scale(0.303,0.981)} 94.632%{transform:translate(250.2px,539.1px) scale(0.567,0.965)} 96.421%{transform:translate(255.1px,534.2px) scale(0.77,0.951)} 98.211%{transform:translate(261.2px,531.1px) scale(0.897,0.943)} 100%{transform:translate(268px,530px) scale(0.94,0.94)} }
+  /* two puffs off the stack, drifting toward the tail (-x is always the rear,
+     whichever way the car is flipped); parked = ONE still wisp, the v1.33 rule */
+  .trpuff { transform-box:fill-box; transform-origin:50% 90%;
+    opacity:0.5; transform:scale(0.55); animation:trchuff 1.7s ease-out infinite; }
+  .trpuff.p2 { opacity:0; animation-delay:-0.85s; }
+  @keyframes trchuff { 0% { opacity:0.85; transform:translate(0,0) scale(0.35); }
+    100% { opacity:0; transform:translate(-7px,-13px) scale(1.9); } }
+  /* wheels spin and the side rod cranks a 2px circle — loop speed is ~24px/s
+     against an r=5 wheel, so 1.2s a turn reads as rolling, not sliding */
+  .trwheel { transform-box:fill-box; transform-origin:50% 50%; animation:trspin 1.2s linear infinite; }
+  @keyframes trspin { to { transform:rotate(360deg); } }
+  .trrod { animation:trrod 1.2s linear infinite; }
+  @keyframes trrod { 0%{transform:translate(2px,0)} 25%{transform:translate(0,2px)}
+    50%{transform:translate(-2px,0)} 75%{transform:translate(0,-2px)} 100%{transform:translate(2px,0)} }
+  .dec-train.react .trpuff { animation-duration:0.5s; }
   /* ROBO-SARGE 3000 — bounded by construction: no wander keyframe is more than
      150px out from where he's parked, so he can never leave the rug. */
   .robwalk { animation:robwander 19s linear infinite; }
@@ -1244,7 +1277,10 @@
      which are two classes deep and would otherwise win on specificity. */
   @media (prefers-reduced-motion: reduce){
     #decEleph, #decTrain, #decRobot, #decNana, #decSpace, #decBank,
-    #decEleph *, #decTrain *, #decRobot *, #decNana *, #decSpace *, #decBank * { animation:none; }
+    #decEleph *, #decTrain *, #decRobot *, #decNana *, #decSpace *, #decBank *,
+    /* the shop cards draw the same art with the same animated classes on it —
+       the ID-scoped windows park them too (v1.34) */
+    #toyshop .sh-dwin *, #toyshop .sh-nwin *, #toyshop .sh-bwin * { animation:none; }
   }
   /* CO-OP: allied campaign — big friendly buttons in the room-modal family */
   .coopbtn { display:flex; align-items:center; gap:14px; width:100%; text-align:left; margin-top:12px; padding:13px 16px;
@@ -13561,30 +13597,74 @@ function elephSVG(){
 // nothing rotates there is no transform-origin/transform-box to get wrong on an
 // SVG group. Each car is the same animation with a negative delay — the same
 // trick the marching rival squad uses for its waddle.
+// The three cars, drawn ONCE for the room loop and the shop box art alike —
+// origin on the track path, FACING +x (the keyframes' scale() flips the whole
+// group, so +x is simply "the way this car is going"). Front overhang is free
+// (nothing runs ahead of the cowcatcher); tails stay inside ±17 so the 33.8px
+// arc gap between cars always reads as couplers, never a pile-up.
+function trainCarArt(){
+  const wheel=(cx,cy,r)=>'<g class="trwheel"><circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.6"/>'
+    +'<path d="M'+(cx-r+1.5)+' '+cy+' H'+(cx+r-1.5)+' M'+cx+' '+(cy-r+1.5)+' V'+(cy+r-1.5)+'" stroke="#3A2C1C" stroke-width="1.2"/>'
+    +'<circle cx="'+cx+'" cy="'+cy+'" r="1.4" fill="#7A5A22"/></g>';
+  const loco='<g>'
+    +'<circle class="trpuff" cx="14.9" cy="-21" r="5" fill="#E8E4D4"/>'
+    +'<circle class="trpuff p2" cx="14.9" cy="-21" r="5" fill="#E8E4D4"/>'
+    +'<rect x="-17" y="5" width="37" height="3.5" rx="1.5" fill="#22262B"/>'
+    +'<path d="M20 4.5 L26.5 11.5 L20 11.5 z" fill="#A63B2A"/>'
+    +'<rect x="12.6" y="-16.5" width="4.6" height="8.5" rx="1" fill="#22262B"/>'
+    +'<rect x="11.4" y="-18" width="7" height="3.2" rx="1.5" fill="#22262B"/>'
+    +'<rect x="-5" y="-9" width="24" height="14" rx="6.5" fill="#2E3A44"/>'
+    +'<rect x="15" y="-9" width="5.5" height="14" rx="2.5" fill="#454F5A"/>'
+    +'<circle cx="20.4" cy="-5.5" r="1.7" fill="#FFD98A" stroke="#7A5A22" stroke-width="0.8"/>'
+    +'<rect x="3.4" y="-9" width="1.4" height="14" fill="#D9A544"/>'
+    +'<rect x="9.4" y="-9" width="1.4" height="14" fill="#D9A544"/>'
+    +'<path d="M4.6 -9 a3.4 3.4 0 0 1 6.8 0 z" fill="#D9A544"/>'
+    +'<rect x="-18.5" y="3" width="2" height="3" rx="1" fill="#22262B"/>'
+    +'<rect x="-17" y="-14" width="13" height="19.5" rx="2" fill="#A63B2A"/>'
+    +'<rect x="-14.6" y="-11" width="8" height="6.5" rx="1" fill="#BFD4DE" stroke="#7E2A1E" stroke-width="1.2"/>'
+    +'<rect x="-19" y="-16.5" width="17" height="3.4" rx="1.6" fill="#7E2A1E"/>'
+    +'<circle cx="14" cy="7" r="3.4" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.6"/>'
+    +'<circle cx="14" cy="7" r="1.1" fill="#7A5A22"/>'
+    +wheel(-10,5.5,5)+wheel(3,5.5,5)
+    +'<rect class="trrod" x="-12.2" y="4.6" width="17.4" height="1.8" rx="0.9" fill="#C9CDD4"/>'
+    +'</g>';
+  const coal='<g>'
+    +'<rect x="-13" y="4.5" width="26" height="3" rx="1.5" fill="#22262B"/>'
+    +'<rect x="-14.5" y="3" width="2" height="3" rx="1" fill="#22262B"/>'
+    +'<rect x="12.5" y="3" width="2" height="3" rx="1" fill="#22262B"/>'
+    +'<path d="M-10 -7 Q-6 -12 -1 -9.5 Q3 -12.5 7 -9 L10 -7 z" fill="#22262B"/>'
+    +'<circle cx="-4" cy="-9" r="1" fill="#4A5560"/><circle cx="3" cy="-9.6" r="0.9" fill="#4A5560"/>'
+    +'<rect x="-13" y="-7" width="26" height="13" rx="2" fill="#3B4A55"/>'
+    +'<rect x="-10.5" y="-4.5" width="21" height="8" rx="1.5" fill="#46586A"/>'
+    +'<rect x="-13" y="-0.5" width="26" height="1.2" fill="#D9A544" opacity="0.8"/>'
+    +wheel(-7.5,6,4.2)+wheel(7.5,6,4.2)+'</g>';
+  const boose='<g>'
+    +'<rect x="-13.5" y="4.5" width="27" height="3" rx="1.5" fill="#22262B"/>'
+    +'<rect x="13" y="3" width="2" height="3" rx="1" fill="#22262B"/>'
+    +'<path d="M-14.8 3.6 V-1.5 M14.8 3.6 V-1.5" stroke="#22262B" stroke-width="1.2" stroke-linecap="round"/>'
+    +'<rect x="-6.5" y="-17" width="13" height="2.6" rx="1.3" fill="#7E2A1E"/>'
+    +'<rect x="-5" y="-15.5" width="10" height="7" rx="1.2" fill="#A63B2A"/>'
+    +'<rect x="-3" y="-14.2" width="6" height="3.4" rx="0.8" fill="#BFD4DE"/>'
+    +'<rect x="-13" y="-8" width="26" height="15" rx="2" fill="#C1533E"/>'
+    +'<rect x="-13" y="1.6" width="26" height="1.1" fill="#D9A544" opacity="0.85"/>'
+    +'<rect x="-9.5" y="-5" width="5.5" height="5" rx="1" fill="#BFD4DE" stroke="#7E2A1E" stroke-width="1.2"/>'
+    +'<rect x="4" y="-5" width="5.5" height="5" rx="1" fill="#BFD4DE" stroke="#7E2A1E" stroke-width="1.2"/>'
+    +'<rect x="-15.5" y="-10" width="31" height="3" rx="1.5" fill="#7E2A1E"/>'
+    +'<circle cx="-15" cy="-0.2" r="1.3" fill="#FF5A3C"/>'
+    +wheel(-8,6,4.2)+wheel(8,6,4.2)+'</g>';
+  return {loco:loco, coal:coal, boose:boose};
+}
 function trainSVG(){
+  const A=trainCarArt();
   const car=(art,delay,cls)=>'<g class="trcar '+cls+'" style="animation-delay:'+delay+'s">'+art+'</g>';
-  const wheels='<circle cx="-9" cy="10" r="4.6" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.6"/>'
-    +'<circle cx="9" cy="10" r="4.6" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.6"/>';
-  const loco='<g><rect x="-16" y="-4" width="32" height="14" rx="3" fill="#A63B2A"/>'
-    +'<rect x="-15" y="-15" width="13" height="12" rx="2.5" fill="#3B4A55"/>'
-    +'<rect x="-12" y="-12" width="7" height="6" rx="1" fill="#BFD4DE"/>'
-    +'<rect x="0" y="-11" width="16" height="8" rx="4" fill="#2E3A44"/>'
-    +'<rect x="11" y="-17" width="6" height="7" rx="1.5" fill="#2E3A44"/>'
-    +'<circle class="trpuff" cx="14" cy="-21" r="5" fill="#E8E4D4" opacity="0.85"/>'
-    +wheels+'</g>';
-  const coal='<g><rect x="-14" y="-6" width="28" height="16" rx="2.5" fill="#3B4A55"/>'
-    +'<rect x="-10" y="-10" width="20" height="6" rx="2" fill="#22262B"/>'+wheels+'</g>';
-  const boose='<g><rect x="-14" y="-5" width="28" height="15" rx="2.5" fill="#C1533E"/>'
-    +'<rect x="-12" y="-14" width="24" height="10" rx="2" fill="#D4644E"/>'
-    +'<rect x="-7" y="-12" width="6" height="5" rx="1" fill="#BFD4DE"/>'
-    +'<rect x="2" y="-12" width="6" height="5" rx="1" fill="#BFD4DE"/>'+wheels+'</g>';
   return '<g class="dec dec-train" id="decTrain">'
     // ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers
     +'<path d="M268 530 H392 a22 22 0 0 1 0 44 H268 a22 22 0 0 1 0 -44 z" fill="#8E7A5C" opacity="0.5"/>'
     +'<path d="M268 530 H392 a22 22 0 0 1 0 44 H268 a22 22 0 0 1 0 -44 z" fill="none" stroke="#7A6448" stroke-width="15" stroke-dasharray="3.5 12"/>'
     +'<path d="M268 535 H392 a17 17 0 0 1 0 34 H268 a17 17 0 0 1 0 -34 z" fill="none" stroke="#9AA2AE" stroke-width="2.4"/>'
     +'<path d="M268 525 H392 a27 27 0 0 1 0 54 H268 a27 27 0 0 1 0 -54 z" fill="none" stroke="#9AA2AE" stroke-width="2.4"/>'
-    +car(loco,0,'c1')+car(coal,-1.4,'c2')+car(boose,-2.8,'c3')
+    // ⚠ the LOCO gets the most-negative delay: furthest along the loop = leading
+    +car(A.loco,-2.8,'c1')+car(A.coal,-1.4,'c2')+car(A.boose,0,'c3')
     +'</g>';
 }
 // ROBO-SARGE 3000 — an 80s chrome robot that trundles about the rug on his own
@@ -13645,7 +13725,11 @@ function bananaArt(){
       +'<path d="M36 320 q10 6 4 16" stroke="rgba(122,90,34,0.35)" stroke-width="2.5" fill="none" stroke-dasharray="4 5"/>'
     +'</g>';
 }
-const NANA_VB='10 240 100 330';
+// ⚠ crop measured against the INK, stroke and sway included, not the path
+// spine: the 58-wide round-capped stroke reaches x≈0.5 and y≈575, and nanasway
+// leans the tip ±7px — the old '10 240 100 330' box shaved the left belly and
+// the butt cap flat. Keep the 118:340 ratio in step with .sh-nwin's aspect-ratio.
+const NANA_VB='-6 240 118 340';
 function bananaSVG(){ return '<g class="dec dec-nana" id="decNana">'+bananaArt()+'</g>'; }
 // THE SPACE RUG — the same rug, only now it is deep space. Stars twinkle on
 // staggered delays, a ringed planet turns, and a comet crosses every few
@@ -14420,25 +14504,16 @@ function decShopArt(id){
   if(id==='robot')    return '<svg viewBox="'+ROBO_VB+'">'+roboArt()+'</svg>';
   if(id==='banana')   return '<svg viewBox="'+NANA_VB+'">'+bananaArt()+'</svg>';
   if(id==='train'){
-    // a straight length of track for the box art — the loop is what it does at home
-    const wh='<circle cx="-9" cy="10" r="4.6" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.6"/>'
-      +'<circle cx="9" cy="10" r="4.6" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.6"/>';
-    return '<svg viewBox="0 0 152 60">'
+    // a straight length of track for the box art — the loop is what it does at
+    // home. Same cars the room runs (one drawing, two framings), and the LOCO
+    // AT THE HEAD facing the way the whole consist reads: caboose · coal · loco →
+    const A=trainCarArt();
+    return '<svg viewBox="0 -12 152 72">'
       +'<path d="M6 46 H146" stroke="#7A6448" stroke-width="15" stroke-dasharray="3.5 13"/>'
       +'<path d="M6 42 H146 M6 50 H146" stroke="#9AA2AE" stroke-width="2.6"/>'
-      +'<g transform="translate(34,34)"><rect x="-16" y="-4" width="32" height="14" rx="3" fill="#A63B2A"/>'
-        +'<rect x="-15" y="-15" width="13" height="12" rx="2.5" fill="#3B4A55"/>'
-        +'<rect x="-12" y="-12" width="7" height="6" rx="1" fill="#BFD4DE"/>'
-        +'<rect x="0" y="-11" width="16" height="8" rx="4" fill="#2E3A44"/>'
-        +'<rect x="11" y="-17" width="6" height="7" rx="1.5" fill="#2E3A44"/>'
-        +'<circle cx="14" cy="-24" r="6" fill="#E8E4D4" opacity="0.8"/>'
-        +'<circle cx="20" cy="-33" r="4" fill="#E8E4D4" opacity="0.5"/>'+wh+'</g>'
-      +'<g transform="translate(76,34)"><rect x="-14" y="-6" width="28" height="16" rx="2.5" fill="#3B4A55"/>'
-        +'<rect x="-10" y="-10" width="20" height="6" rx="2" fill="#22262B"/>'+wh+'</g>'
-      +'<g transform="translate(118,34)"><rect x="-14" y="-5" width="28" height="15" rx="2.5" fill="#C1533E"/>'
-        +'<rect x="-12" y="-14" width="24" height="10" rx="2" fill="#D4644E"/>'
-        +'<rect x="-7" y="-12" width="6" height="5" rx="1" fill="#BFD4DE"/>'
-        +'<rect x="2" y="-12" width="6" height="5" rx="1" fill="#BFD4DE"/>'+wh+'</g></svg>';
+      +'<g transform="translate(34,34)">'+A.boose+'</g>'
+      +'<g transform="translate(76,34)">'+A.coal+'</g>'
+      +'<g transform="translate(120,34)">'+A.loco+'</g></svg>';
   }
   // the space rug: a swatch of the real thing, stars and planet and all
   return '<svg viewBox="0 0 150 112">'
