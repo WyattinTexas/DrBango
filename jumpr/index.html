@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>JUMPR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0E0B16">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JUMPR">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  :root {
+    --bg:#0E0B16; --panel:#171226; --panel2:#1E1732; --line:#2C2344;
+    --ink:#EDE9F6; --muted:#8D85A3; --violet:#A78BFA; --violet-deep:#7C5CFF;
+    --amber:#F5B455; --ok:#6EE7A8; --bad:#F87171;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font: 16px/1.45 -apple-system, system-ui, sans-serif; }
+  body { padding: env(safe-area-inset-top) 0 0 0; min-height: 100svh; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 12px 16px 140px; }
+
+  header { display:flex; align-items:center; gap:10px; padding: 10px 2px 14px; }
+  .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .logo span { color: var(--violet); }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--muted); flex:0 0 auto; }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 8px rgba(110,231,168,.6); }
+  .dot.asleep { background: var(--amber); }
+  .macline { font-family: var(--mono); font-size: 11.5px; color: var(--muted); flex:1; }
+  .gear { background:none; border:none; color:var(--muted); font-size:20px; padding:6px; cursor:pointer; }
+
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .label { font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; }
+
+  .seg { display:flex; gap:6px; }
+  .seg button { flex:1; padding:10px 4px; border-radius:10px; border:1px solid var(--line);
+    background:var(--panel2); color:var(--muted); font-weight:600; font-size:13.5px; cursor:pointer; }
+  .seg button.on { background:var(--violet); color:#14101F; border-color:var(--violet); }
+
+  textarea { width:100%; min-height:110px; background:var(--panel2); color:var(--ink);
+    border:1px solid var(--line); border-radius:10px; padding:12px; font:16px/1.45 -apple-system, system-ui, sans-serif;
+    resize:vertical; }
+  textarea:focus { outline:2px solid var(--violet); outline-offset:1px; border-color:var(--violet); }
+  .addrow { display:flex; gap:8px; margin-top:8px; }
+  .btn { border:none; border-radius:10px; padding:12px 16px; font-weight:700; font-size:15px; cursor:pointer; }
+  .btn.ghost { background:var(--panel2); color:var(--violet); border:1px solid var(--line); flex:1; }
+  .btn.ghost:active { background:var(--line); }
+
+  .note { display:flex; gap:10px; align-items:flex-start; background:var(--panel2);
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-top:8px; }
+  .note p { margin:0; flex:1; font-size:14.5px; white-space:pre-wrap; word-break:break-word; }
+  .note button { background:none; border:none; color:var(--muted); font-size:16px; padding:2px 4px; cursor:pointer; }
+  .padmeta { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-top:10px; display:flex; justify-content:space-between; }
+  .padmeta button { background:none; border:none; color:var(--bad); font-family:var(--mono); font-size:11.5px; cursor:pointer; padding:0; }
+
+  .gobar { position:fixed; left:0; right:0; bottom:0; padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--bg) 70%, transparent); }
+  .gobar .inner { max-width:560px; margin:0 auto; }
+  #go { width:100%; padding:19px; border:none; border-radius:16px; background:var(--violet);
+    color:#14101F; font-size:19px; font-weight:800; letter-spacing:.02em; cursor:pointer; }
+  #go:active { background:var(--violet-deep); color:#fff; }
+  #go:disabled { background:var(--panel2); color:var(--muted); }
+
+  .sent-item { display:flex; gap:10px; align-items:baseline; padding:9px 2px; border-bottom:1px solid var(--line); }
+  .sent-item:last-child { border-bottom:none; }
+  .st { font-family:var(--mono); font-size:11px; flex:0 0 86px; }
+  .st.sending { color:var(--amber); } .st.delivered { color:var(--violet); }
+  .st.queued { color:var(--ok); } .st.failed { color:var(--bad); }
+  .sent-item p { margin:0; flex:1; font-size:13px; color:var(--muted);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .statrow { display:flex; gap:8px; flex-wrap:wrap; font-family:var(--mono); font-size:12px; }
+  .chip { background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:6px 9px; color:var(--muted); }
+  .chip b { color:var(--ink); font-weight:600; }
+  .queue-lines { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin:10px 0 0; line-height:1.7;
+    overflow:hidden; }
+
+  /* lock screen + settings */
+  .sheet { position:fixed; inset:0; background:var(--bg); z-index:50; padding: max(40px, env(safe-area-inset-top)) 20px 20px; overflow:auto; }
+  .sheet .inner { max-width:420px; margin:0 auto; display:flex; flex-direction:column; gap:14px; }
+  .sheet h2 { margin:10px 0 0; font-size:26px; letter-spacing:-0.02em; }
+  .sheet p { color:var(--muted); font-size:14.5px; margin:0; }
+  .sheet input { width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:10px;
+    padding:13px; color:var(--ink); font-family:var(--mono); font-size:14px; }
+  .sheet input:focus { outline:2px solid var(--violet); }
+  .btn.primary { background:var(--violet); color:#14101F; }
+  .btn.danger { background:none; border:1px solid var(--line); color:var(--bad); }
+  .hidden { display:none !important; }
+  .toast { position:fixed; top:calc(10px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+    background:var(--panel2); border:1px solid var(--violet); color:var(--ink); border-radius:10px;
+    padding:10px 16px; font-size:14px; z-index:99; max-width:88vw; text-align:center; }
+  @media (prefers-reduced-motion: no-preference) {
+    .toast { animation: pop .18s ease-out; }
+    @keyframes pop { from { opacity:0; transform:translateX(-50%) translateY(-6px);} }
+  }
+  button:focus-visible, textarea:focus-visible, input:focus-visible { outline:2px solid var(--violet); outline-offset:2px; }
+</style>
+</head>
+<body>
+
+<!-- LOCK / FIRST-RUN -->
+<div class="sheet" id="lock">
+  <div class="inner">
+    <div class="logo" style="font-size:34px;">🦘 <span>JUMPR</span></div>
+    <h2>Link this phone</h2>
+    <p>Paste your channel key. It stays on this phone — every note is encrypted before it leaves.</p>
+    <input id="keyin" placeholder="channel key" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button class="btn primary" id="keysave">Save key</button>
+    <p style="font-size:12.5px;">Tip: opening a link like <span style="font-family:var(--mono)">drbango.com/jumpr/#k=…</span> fills this in automatically.</p>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="sheet hidden" id="settings">
+  <div class="inner">
+    <h2>Settings</h2>
+    <div class="card">
+      <p class="label">Model for new tasks</p>
+      <div class="seg" id="modelseg">
+        <button data-m="fable">Fable</button>
+        <button data-m="opus">Opus</button>
+      </div>
+    </div>
+    <div class="card">
+      <p class="label">Channel key</p>
+      <p id="keymask" style="font-family:var(--mono); font-size:13px;"></p>
+    </div>
+    <button class="btn ghost" id="clearsent">Clear sent history</button>
+    <button class="btn danger" id="keyclear">Unlink this phone</button>
+    <button class="btn primary" id="settingsdone">Done</button>
+  </div>
+</div>
+
+<div class="wrap" id="main">
+  <header>
+    <div class="logo">🦘 <span>JUMPR</span></div>
+    <div class="macline" id="macline"><span class="dot" id="macdot"></span> checking…</div>
+    <button class="gear" id="gear" aria-label="Settings">⚙︎</button>
+  </header>
+
+  <div class="card">
+    <p class="label">Project</p>
+    <div class="seg" id="projseg">
+      <button data-p="gvt">GVT</button>
+      <button data-p="nation">Nation</button>
+      <button data-p="favor">FAVOR</button>
+      <button data-p="home">Home</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="label">Notes</p>
+    <textarea id="pad" placeholder="Talk it out — Wispr Flow lands here. Paint the picture."></textarea>
+    <div class="addrow">
+      <button class="btn ghost" id="addnote">＋ Add note</button>
+    </div>
+    <div id="notes"></div>
+    <div class="padmeta">
+      <span id="padcount"></span>
+      <button id="scratch">scratch pad</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="label">Mac status</p>
+    <div class="statrow" id="statrow"><span class="chip">waiting for first report…</span></div>
+    <p class="queue-lines" id="queuelines"></p>
+  </div>
+
+  <div class="card">
+    <p class="label">Sent</p>
+    <div id="sentlist"><p style="color:var(--muted); font-size:13.5px; margin:0;">Nothing sent yet.</p></div>
+  </div>
+</div>
+
+<div class="gobar"><div class="inner">
+  <button id="go">SEND TO JUMPR 🦘</button>
+</div></div>
+
+<script>
+"use strict";
+/* ---------- constants ---------- */
+const DB = "https://testroom-75200-default-rtdb.firebaseio.com/jumpr_remote";
+const CWDS = { gvt:"/Users/drbango/gvt", nation:"/Users/drbango/wkspaces/Nation",
+               favor:"/Users/drbango/playfavor", home:"/Users/drbango" };
+const LS = {
+  key:"jr_key", model:"jr_model", proj:"jr_proj", pad:"jr_pad", outbox:"jr_outbox"
+};
+const $ = id => document.getElementById(id);
+const enc8 = s => new TextEncoder().encode(s);
+const hex = b => [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
+const unhex = h => new Uint8Array((h.match(/../g)||[]).map(x=>parseInt(x,16)));
+
+/* ---------- crypto: HMAC-SHA256 stream + MAC (mirrors jumpr-remote on the Mac) ---------- */
+let KEYSTR = localStorage.getItem(LS.key) || "";
+let HKEY = null, CHAN = "";
+async function initKey() {
+  if (!KEYSTR) return false;
+  HKEY = await crypto.subtle.importKey("raw", enc8(KEYSTR), {name:"HMAC", hash:"SHA-256"}, false, ["sign"]);
+  const d = await crypto.subtle.digest("SHA-256", enc8("jumpr-remote-channel:" + KEYSTR));
+  CHAN = hex(d).slice(0, 24);
+  return true;
+}
+async function hmac(bytes) { return new Uint8Array(await crypto.subtle.sign("HMAC", HKEY, bytes)); }
+function cat(...arrs) {
+  const n = arrs.reduce((s,a)=>s+a.length,0), out = new Uint8Array(n);
+  let o = 0; for (const a of arrs) { out.set(a,o); o += a.length; } return out;
+}
+function be32(i) { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0,i); return b; }
+async function encMsg(obj) {
+  const pt = enc8(JSON.stringify(obj));
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(pt.length);
+  for (let i = 0; i * 32 < pt.length; i++) {
+    const ks = await hmac(cat(nonce, be32(i)));
+    for (let j = 0; j < 32 && i*32+j < pt.length; j++) ct[i*32+j] = pt[i*32+j] ^ ks[j];
+  }
+  const mac = await hmac(cat(enc8("mac"), nonce, ct));
+  return { v:1, n:hex(nonce), c:hex(ct), m:hex(mac) };
+}
+async function decMsg(msg) {
+  try {
+    const nonce = unhex(msg.n), ct = unhex(msg.c);
+    const mac = await hmac(cat(enc8("mac"), nonce, ct));
+    if (hex(mac) !== msg.m) return null;
+    const pt = new Uint8Array(ct.length);
+    for (let i = 0; i * 32 < ct.length; i++) {
+      const ks = await hmac(cat(nonce, be32(i)));
+      for (let j = 0; j < 32 && i*32+j < ct.length; j++) pt[i*32+j] = ct[i*32+j] ^ ks[j];
+    }
+    return JSON.parse(new TextDecoder().decode(pt));
+  } catch (e) { return null; }
+}
+
+/* ---------- tiny state ---------- */
+const getJ = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
+const setJ = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+let pad = getJ(LS.pad, []);
+let outbox = getJ(LS.outbox, []);
+let proj = localStorage.getItem(LS.proj) || "gvt";
+let model = localStorage.getItem(LS.model) || "fable";
+
+function toast(t) {
+  const el = document.createElement("div"); el.className = "toast"; el.textContent = t;
+  document.body.appendChild(el); setTimeout(()=>el.remove(), 2600);
+}
+
+/* ---------- render ---------- */
+function renderSeg(el, attr, val) {
+  [...el.children].forEach(b => b.classList.toggle("on", b.dataset[attr] === val));
+}
+function renderPad() {
+  $("notes").innerHTML = "";
+  pad.forEach((t, i) => {
+    const d = document.createElement("div"); d.className = "note";
+    const p = document.createElement("p"); p.textContent = t;
+    const x = document.createElement("button"); x.textContent = "✕"; x.ariaLabel = "delete note";
+    x.onclick = () => { pad.splice(i,1); setJ(LS.pad, pad); renderPad(); };
+    d.append(p, x); $("notes").appendChild(d);
+  });
+  const chars = pad.join("\n\n").length;
+  $("padcount").textContent = pad.length ? `${pad.length} note${pad.length>1?"s":""} · ${chars} chars` : "";
+  $("scratch").style.display = pad.length ? "" : "none";
+  updateGo();
+}
+function updateGo() {
+  const has = pad.length || $("pad").value.trim();
+  $("go").disabled = !has;
+  $("go").textContent = has ? "SEND TO JUMPR 🦘" : "ADD NOTES FIRST";
+}
+function renderSent() {
+  const el = $("sentlist");
+  if (!outbox.length) { el.innerHTML = '<p style="color:var(--muted); font-size:13.5px; margin:0;">Nothing sent yet.</p>'; return; }
+  el.innerHTML = "";
+  [...outbox].reverse().forEach(o => {
+    const d = document.createElement("div"); d.className = "sent-item";
+    const s = document.createElement("span");
+    s.className = "st " + o.state;
+    s.textContent = o.state === "queued" ? ("🦘 " + (o.task || "queued")) :
+                    o.state === "delivered" ? "☁️ delivered" :
+                    o.state === "failed" ? "✕ failed" : "⏳ sending…";
+    const p = document.createElement("p"); p.textContent = o.preview;
+    d.append(s, p); el.appendChild(d);
+  });
+}
+
+/* ---------- send pipeline ---------- */
+function collectPadIntoNotes() {
+  const t = $("pad").value.trim();
+  if (t) { pad.push(t); $("pad").value = ""; setJ(LS.pad, pad); }
+}
+async function go() {
+  collectPadIntoNotes();
+  if (!pad.length) return;
+  const text = pad.join("\n\n");
+  const payload = { kind:"task", text, project: proj, cwd: CWDS[proj], model,
+                    ts: new Date().toISOString(), cid: Math.random().toString(36).slice(2,10) };
+  const encd = await encMsg(payload);
+  const entry = { id: payload.cid, state:"sending", preview: text.slice(0,90).replace(/\s+/g," "),
+                  ts: Date.now(), enc: encd, pid: null, task: null };
+  outbox.push(entry); outbox = outbox.slice(-30); setJ(LS.outbox, outbox);
+  pad = []; setJ(LS.pad, pad);
+  renderPad(); renderSent();
+  toast("Sending to jumpr…");
+  flushOutbox();
+}
+let flushing = false;
+async function flushOutbox() {
+  if (flushing || !CHAN) return; flushing = true;
+  try {
+    for (const o of outbox) {
+      if (o.state !== "sending") continue;
+      try {
+        const r = await fetch(`${DB}/${CHAN}/outbox.json`, { method:"POST", body: JSON.stringify(o.enc) });
+        if (r.ok) { const j = await r.json(); o.pid = j.name; o.state = "delivered"; setJ(LS.outbox, outbox); renderSent(); }
+      } catch (e) { /* offline — retry later */ }
+    }
+  } finally { flushing = false; }
+}
+
+/* ---------- acks + status ---------- */
+async function pollAcks() {
+  if (!CHAN) return;
+  const waiting = outbox.filter(o => o.state === "delivered" && o.pid);
+  if (!waiting.length) return;
+  try {
+    const r = await fetch(`${DB}/${CHAN}/acks.json`);
+    if (!r.ok) return;
+    const acks = await r.json() || {};
+    for (const o of waiting) {
+      if (acks[o.pid]) {
+        const a = await decMsg(acks[o.pid]);
+        if (a) {
+          o.state = a.error ? "failed" : "queued";
+          o.task = a.error ? a.error : (a.task || "").replace(/\.md$/,"").slice(0,10);
+          setJ(LS.outbox, outbox); renderSent();
+          if (!a.error) toast(`Queued as ${a.task} (#${a.pos} in line)`);
+          fetch(`${DB}/${CHAN}/acks/${o.pid}.json`, { method:"DELETE" }).catch(()=>{});
+        }
+      }
+    }
+  } catch (e) { /* offline */ }
+}
+async function pollStatus() {
+  if (!CHAN) return;
+  try {
+    const r = await fetch(`${DB}/${CHAN}/status.json`);
+    if (!r.ok) return;
+    const raw = await r.json(); if (!raw) return;
+    const s = await decMsg(raw); if (!s) return;
+    const age = (Date.now()/1000) - (s.ts || 0);
+    const dot = $("macdot"), line = $("macline");
+    if (age < 180) { dot.className = "dot ok"; line.innerHTML = ""; line.append(dot, ` Mac online · ${Math.round(age)}s ago`); }
+    else { dot.className = "dot asleep"; line.innerHTML = ""; line.append(dot, ` Mac asleep — notes land on wake`); }
+    const rows = [
+      `<span class="chip">${s.armed ? "⛓ chain <b>ARMED</b>" : "chain idle"}</span>`,
+      `<span class="chip">queue <b>${s.queue_n}</b></span>`,
+      `<span class="chip">jumps <b>${s.jumps}</b>/${s.cap}</span>`
+    ];
+    if (s.watching) rows.push(`<span class="chip">now: <b>${s.watching.slice(0,34)}</b></span>`);
+    $("statrow").innerHTML = rows.join("");
+    $("queuelines").textContent = (s.queue_lines || []).slice(0,6).join("\n");
+  } catch (e) { /* offline */ }
+}
+
+/* ---------- wiring ---------- */
+function showLock(show) { $("lock").classList.toggle("hidden", !show); $("main").classList.toggle("hidden", show); }
+async function boot() {
+  // key from #k= fragment
+  const m = location.hash.match(/[#&]k=([a-f0-9]{16,64})/i);
+  if (m) { KEYSTR = m[1]; localStorage.setItem(LS.key, KEYSTR); history.replaceState(null,"",location.pathname); }
+  const ok = await initKey();
+  showLock(!ok);
+  renderSeg($("projseg"), "p", proj); renderSeg($("modelseg"), "m", model);
+  renderPad(); renderSent();
+  if (ok) { flushOutbox(); pollStatus(); pollAcks(); }
+  $("keymask").textContent = KEYSTR ? KEYSTR.slice(0,4) + "…" + KEYSTR.slice(-4) : "—";
+}
+$("keysave").onclick = async () => {
+  const v = $("keyin").value.trim();
+  if (v.length < 16) { toast("That key looks too short."); return; }
+  KEYSTR = v; localStorage.setItem(LS.key, v);
+  await initKey(); showLock(false); boot();
+};
+$("gear").onclick = () => $("settings").classList.remove("hidden");
+$("settingsdone").onclick = () => $("settings").classList.add("hidden");
+$("keyclear").onclick = () => { if (confirm("Unlink this phone?")) { localStorage.removeItem(LS.key); location.reload(); } };
+$("clearsent").onclick = () => { outbox = []; setJ(LS.outbox, outbox); renderSent(); toast("Sent history cleared."); };
+$("projseg").onclick = e => { const b = e.target.closest("button"); if (!b) return;
+  proj = b.dataset.p; localStorage.setItem(LS.proj, proj); renderSeg($("projseg"),"p",proj); };
+$("modelseg").onclick = e => { const b = e.target.closest("button"); if (!b) return;
+  model = b.dataset.m; localStorage.setItem(LS.model, model); renderSeg($("modelseg"),"m",model); };
+$("addnote").onclick = () => { collectPadIntoNotes(); renderPad(); $("pad").focus(); };
+$("scratch").onclick = () => { if (confirm("Throw away all notes?")) { pad = []; setJ(LS.pad, pad); $("pad").value=""; renderPad(); } };
+$("pad").addEventListener("input", updateGo);
+$("go").onclick = go;
+
+setInterval(() => { flushOutbox(); pollAcks(); }, 15000);
+setInterval(pollStatus, 20000);
+addEventListener("online", flushOutbox);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { flushOutbox(); pollStatus(); pollAcks(); } });
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+boot();
+</script>
+</body>
+</html>
