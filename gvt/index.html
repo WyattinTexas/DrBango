@@ -1391,6 +1391,48 @@
     #xpjuice .xj-card, #xpjuice .xj-shine, #xpjuice .xj-bit,
     #xpjuice .xj-up, #xpjuice .xj-rays, #xpjuice .xj-burst, #xpjuice * { animation:none; }
   }
+
+  /* ===== SARGE COMMS (v1.41): the Star Fox transmission window. DOM, not
+     canvas, on purpose — Russian renders in the DOM stacks (no Impact-Cyrillic
+     problem) and the typewriter writes .nodeValue inside a data-notr subtree,
+     so a partial string never walks back through the translating setters.
+     Two modes on one root: .brief blocks and SWALLOWS its taps (it sits over a
+     live tray — the deliberate inversion of the v1.25 skip-through law);
+     .say is pointer-events:none from the root down (the v1.25 law verbatim). */
+  #comms { position:fixed; inset:0; z-index:23; display:none; font-family:var(--ui); }
+  #comms.brief { display:flex; align-items:center; justify-content:center;
+    background:rgba(10,8,5,0.42); touch-action:none; }
+  #comms.say { display:block; pointer-events:none; background:none; }
+  .cm-win { display:flex; gap:0.55em; align-items:flex-start; text-align:left;
+    background:linear-gradient(180deg,rgba(30,33,23,0.97),rgba(19,21,14,0.97));
+    border:2px solid #6E7A4E; border-radius:10px; box-sizing:border-box;
+    box-shadow:0 8px 26px rgba(0,0,0,0.55), inset 0 0 0 2px rgba(0,0,0,0.3);
+    padding:0.5em 0.6em; }
+  #comms.brief .cm-win { width:min(92vw,600px); font-size:clamp(15px,4.6vh,21px); }
+  #comms.brief .cm-txt { min-height:4.3em; }
+  .cm-left { flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:0.22em; }
+  .cm-port { position:relative; width:3.4em; height:3.4em; overflow:hidden; border-radius:7px;
+    border:2px solid #7FA35C; background:#10130c; box-shadow:inset 0 0 14px rgba(0,0,0,0.8); }
+  .cm-port img { display:block; width:100%; height:100%; }
+  .cm-scan { position:absolute; inset:0; pointer-events:none; opacity:0.5;
+    background:repeating-linear-gradient(180deg, rgba(191,227,154,0.13) 0 1px, rgba(0,0,0,0) 1px 3px);
+    animation:cmscan 7s linear infinite; }
+  @keyframes cmscan { 0% { background-position:0 0; } 100% { background-position:0 42px; } }
+  .cm-name { font-family:var(--uih); font-size:0.55em; letter-spacing:0.14em; color:#FFD24A;
+    background:rgba(0,0,0,0.4); border-radius:4px; padding:0.1em 0.5em 0.06em; }
+  .cm-txt { flex:1; min-width:0; color:#EDEADF; font-size:0.86em; line-height:1.38;
+    min-height:2.5em; text-shadow:0 1px 2px rgba(0,0,0,0.8); padding-top:0.1em;
+    overflow-wrap:break-word; }
+  .cm-hint { flex:0 0 auto; align-self:flex-end; color:#BFE39A; font-size:0.7em;
+    visibility:hidden; animation:cmbob 0.9s ease-in-out infinite alternate; }
+  #comms.say .cm-hint { display:none; }
+  @keyframes cmbob { from { transform:translateY(-0.15em); } to { transform:translateY(0.15em); } }
+  /* the reduce override, ID-scoped and AFTER everything it cancels (the
+     v1.11/v1.21 law); the JS gate never attaches .cm-scan under reduce at all —
+     this rule is the belt to that brace */
+  @media (prefers-reduced-motion: reduce){
+    #comms .cm-scan, #comms .cm-hint { animation:none; }
+  }
 </style>
 </head>
 <body>
@@ -1407,7 +1449,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.29.2</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.41</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1439,6 +1481,11 @@
      pointer-events:none from the root down — it decorates the win/lose screen,
      it never stands in front of it. Built and torn down by xpCeremony(). -->
 <div id="xpjuice" class="hidden" aria-hidden="true"></div>
+
+<!-- SARGE COMMS (v1.41). One root, two behaviors: a blocking pre-combat
+     briefing that swallows its own taps, and a pointer-events:none in-combat
+     soundbite. Built and torn down by commWin()/commClear(). -->
+<div id="comms"></div>
 
 <div class="overlay hidden menuwrap" id="menu">
   <div id="menuBody" class="menubody"></div>
@@ -2540,6 +2587,25 @@ const TR_DATA={
 "📋 COPY THE INVITE LINK":"📋 しょうたいリンクをコピー",
 "📤 SEND THE INVITE LINK":"📤 しょうたいリンクをおくる",
 "🤝 TWO-COMMANDER VICTORY — %1'S CAMPAIGN ADVANCED TOO!":"🤝 ふたりの司令官のしょうり — %1 のキャンペーンも進んだ！",
+"Alright soldier. Here's the situation. There's a foreign force that's about to invade our home.":"いいか、しんぺい。じょうきょうはこうだ。よその軍が、おれたちのホームにせめこもうとしている。",
+"We have sworn to protect it at all costs.":"おれたちは、なにがあってもここをまもるとちかったんだ。",
+"These enemies are well learned in the arts of war. They will show us no mercy.":"てきは戦いのプロだ。ようしゃはしてこないぞ。",
+"We have never let an enemy force inside those four walls, and we don't intend to let today be any different!":"あの四つのかべの中にてきを入れたことは一どもない。きょうだって、ぜったいに入れないぞ！",
+"Keep your head on a swivel and be prepared for whatever they send our way. Good luck soldier!":"まわりをよく見て、なにが来てもいいようにそなえろ。こううんをいのる、しんぺい！",
+"Well, you sure are stepping up in the world, soldier. Our army is under pressure from a new force unlike any other.":"ほう、しゅっせしたな、しんぺい。おれたちの軍は、見たこともない新しいてきにおされている。",
+"I always thought I'd seen everything. But in front of you stands the fearsome Black Army.":"なんでも見てきたつもりだった。だが目の前にいるのは、おそろしいブラックアーミーだ。",
+"They are an elite legion of unpredictable units. They are relentless and will not stop until they have taken everything we hold dear.":"やつらは何をしてくるかわからないエリートぐんだんだ。おれたちのたいせつなものをぜんぶうばうまで、ぜったいに止まらない。",
+"You must push forward and retake all of their positions, if we are to win this thing!":"前へおしすすんで、やつらのじんちをぜんぶとりかえせ。それがしょうりへのみちだ！",
+"There will be all the latest gear and tech that we have to offer. If you show your metal out on the battlefield, we'll give you the medals to upgrade accordingly!":"さいしんのそうびとテクをそろえてあるぞ。せんじょうでこんじょうを見せれば、アップグレードのメダルをやろう！",
+"Spend wisely soldier and make sure to check in for all the latest updates!":"かしこくつかえよ、しんぺい。さいしんじょうほうのチェックもわすれるな！",
+"Stop that leak soldier!":"とおされたぞ！ふせげ、しんぺい！",
+"Watch your flanks!":"よこがわに気をつけろ！",
+"Not done yet, soldier! Tangos inbound!":"まだおわってないぞ、しんぺい！つぎが来る！",
+"Keep it up soldier!":"そのちょうしだ、しんぺい！",
+"Get up soldier, these boys keep coming!":"立て、しんぺい。やつらはまだまだ来るぞ！",
+"Wait a minute. What is THAT?!":"まてよ。なんだ、アレは？！",
+"This is the last stand, soldier!":"これがさいごのたたかいだ、しんぺい！",
+"By all that I hold green!":"グリーンのめいよにかけて！",
 },
 "ko":{
 "PROMOTIONS ⚔NEW":"진급 ⚔NEW",
@@ -3333,6 +3399,25 @@ const TR_DATA={
 "📋 COPY THE INVITE LINK":"📋 초대 링크 복사",
 "📤 SEND THE INVITE LINK":"📤 초대 링크 보내기",
 "🤝 TWO-COMMANDER VICTORY — %1'S CAMPAIGN ADVANCED TOO!":"🤝 두 사령관의 승리 — %1 의 캠페인도 나아갔어!",
+"Alright soldier. Here's the situation. There's a foreign force that's about to invade our home.":"잘 들어, 신병. 상황은 이렇다. 낯선 군대가 우리 집에 쳐들어오려 하고 있어.",
+"We have sworn to protect it at all costs.":"우리는 무슨 일이 있어도 여길 지키기로 맹세했다.",
+"These enemies are well learned in the arts of war. They will show us no mercy.":"저 적들은 전쟁이라면 도가 튼 놈들이야. 자비란 없을 거다.",
+"We have never let an enemy force inside those four walls, and we don't intend to let today be any different!":"저 네 벽 안에 적을 들인 적은 단 한 번도 없다. 오늘도 절대 다르지 않을 거야!",
+"Keep your head on a swivel and be prepared for whatever they send our way. Good luck soldier!":"사방을 잘 살피고 뭐가 와도 준비해 둬라. 행운을 빈다, 신병!",
+"Well, you sure are stepping up in the world, soldier. Our army is under pressure from a new force unlike any other.":"이야, 출세했구나, 신병. 우리 군대가 지금껏 본 적 없는 새로운 세력에 밀리고 있다.",
+"I always thought I'd seen everything. But in front of you stands the fearsome Black Army.":"난 다 봤다고 생각했지. 그런데 네 앞에 서 있는 건 무시무시한 블랙 아미다.",
+"They are an elite legion of unpredictable units. They are relentless and will not stop until they have taken everything we hold dear.":"예측할 수 없는 정예 군단이야. 우리 소중한 걸 전부 빼앗을 때까지 절대 멈추지 않는다.",
+"You must push forward and retake all of their positions, if we are to win this thing!":"밀고 나가서 놈들의 진지를 전부 되찾아라. 그래야 이 싸움에서 이긴다!",
+"There will be all the latest gear and tech that we have to offer. If you show your metal out on the battlefield, we'll give you the medals to upgrade accordingly!":"최신 장비와 기술을 다 준비해 뒀다. 전장에서 근성을 보여 주면, 업그레이드할 메달을 주지!",
+"Spend wisely soldier and make sure to check in for all the latest updates!":"현명하게 써라, 신병. 최신 소식도 꼭 확인하고!",
+"Stop that leak soldier!":"뚫렸다! 막아라, 신병!",
+"Watch your flanks!":"측면을 조심해!",
+"Not done yet, soldier! Tangos inbound!":"아직 안 끝났다, 신병! 다음 놈들이 온다!",
+"Keep it up soldier!":"그 기세다, 신병!",
+"Get up soldier, these boys keep coming!":"일어나라, 신병. 놈들은 계속 온다!",
+"Wait a minute. What is THAT?!":"잠깐. 저건... 뭐지?!",
+"This is the last stand, soldier!":"이게 마지막 방어선이다, 신병!",
+"By all that I hold green!":"그린의 이름을 걸고!",
 },
 "zh-Hans":{
 "PROMOTIONS ⚔NEW":"晋升 ⚔NEW",
@@ -4126,6 +4211,25 @@ const TR_DATA={
 "📋 COPY THE INVITE LINK":"📋 复制邀请链接",
 "📤 SEND THE INVITE LINK":"📤 发送邀请链接",
 "🤝 TWO-COMMANDER VICTORY — %1'S CAMPAIGN ADVANCED TOO!":"🤝 双指挥官胜利 — %1 的战役也推进了！",
+"Alright soldier. Here's the situation. There's a foreign force that's about to invade our home.":"听好了，士兵。情况是这样：一支外来部队正要入侵我们的家。",
+"We have sworn to protect it at all costs.":"我们发过誓，无论如何都要守住这里。",
+"These enemies are well learned in the arts of war. They will show us no mercy.":"这些敌人精通战争之道，绝不会手下留情。",
+"We have never let an enemy force inside those four walls, and we don't intend to let today be any different!":"我们从没让敌人踏进这四面墙一步，今天也绝不例外！",
+"Keep your head on a swivel and be prepared for whatever they send our way. Good luck soldier!":"眼观六路，做好万全准备。祝你好运，士兵！",
+"Well, you sure are stepping up in the world, soldier. Our army is under pressure from a new force unlike any other.":"哟，出息了啊，士兵。我们的军队正被一支前所未见的新势力压着打。",
+"I always thought I'd seen everything. But in front of you stands the fearsome Black Army.":"我以为自己什么都见过了。可站在你面前的，是可怕的黑军。",
+"They are an elite legion of unpredictable units. They are relentless and will not stop until they have taken everything we hold dear.":"他们是一支难以捉摸的精锐军团，不夺走我们珍视的一切绝不罢休。",
+"You must push forward and retake all of their positions, if we are to win this thing!":"你必须向前推进，夺回他们所有的阵地，我们才能赢下这一仗！",
+"There will be all the latest gear and tech that we have to offer. If you show your metal out on the battlefield, we'll give you the medals to upgrade accordingly!":"最新的装备和科技都给你备齐了。在战场上亮出真本事，我们就发勋章让你升级！",
+"Spend wisely soldier and make sure to check in for all the latest updates!":"花得聪明点，士兵，记得常回来看看最新消息！",
+"Stop that leak soldier!":"被突破了！堵住，士兵！",
+"Watch your flanks!":"小心侧翼！",
+"Not done yet, soldier! Tangos inbound!":"还没完呢，士兵！下一波来了！",
+"Keep it up soldier!":"就这个劲头，士兵！",
+"Get up soldier, these boys keep coming!":"起来，士兵，他们还在源源不断地来！",
+"Wait a minute. What is THAT?!":"等等。那是……什么？！",
+"This is the last stand, soldier!":"这是最后一战，士兵！",
+"By all that I hold green!":"以绿军之名！",
 },
 "de":{
 "PROMOTIONS ⚔NEW":"BEFÖRDERUNGEN ⚔NEW",
@@ -4920,6 +5024,25 @@ const TR_DATA={
 "📋 COPY THE INVITE LINK":"📋 EINLADUNGSLINK KOPIEREN",
 "📤 SEND THE INVITE LINK":"📤 EINLADUNGSLINK SENDEN",
 "🤝 TWO-COMMANDER VICTORY — %1'S CAMPAIGN ADVANCED TOO!":"🤝 SIEG ZU ZWEIT — AUCH %1S FELDZUG RÜCKTE VOR!",
+"Alright soldier. Here's the situation. There's a foreign force that's about to invade our home.":"Also gut, Soldat. Die Lage ist die: Eine fremde Streitmacht will gleich in unser Zuhause einmarschieren.",
+"We have sworn to protect it at all costs.":"Wir haben geschworen, es um jeden Preis zu verteidigen.",
+"These enemies are well learned in the arts of war. They will show us no mercy.":"Diese Feinde kennen sich im Kriegshandwerk bestens aus. Sie werden keine Gnade zeigen.",
+"We have never let an enemy force inside those four walls, and we don't intend to let today be any different!":"Wir haben noch nie einen Feind in diese vier Wände gelassen — und heute wird das ganz sicher nicht anders!",
+"Keep your head on a swivel and be prepared for whatever they send our way. Good luck soldier!":"Augen offen halten und auf alles gefasst sein, was sie uns schicken. Viel Glück, Soldat!",
+"Well, you sure are stepping up in the world, soldier. Our army is under pressure from a new force unlike any other.":"Sieh an, du steigst ja richtig auf, Soldat. Unsere Armee steht unter Druck — eine neue Macht, wie es sie noch nie gab.",
+"I always thought I'd seen everything. But in front of you stands the fearsome Black Army.":"Ich dachte, ich hätte alles gesehen. Aber vor dir steht die furchterregende Schwarze Armee.",
+"They are an elite legion of unpredictable units. They are relentless and will not stop until they have taken everything we hold dear.":"Eine Elitelegion, völlig unberechenbar. Sie sind unerbittlich und hören nicht auf, bis sie uns alles genommen haben, was uns lieb ist.",
+"You must push forward and retake all of their positions, if we are to win this thing!":"Du musst vorrücken und alle ihre Stellungen zurückerobern, wenn wir das hier gewinnen wollen!",
+"There will be all the latest gear and tech that we have to offer. If you show your metal out on the battlefield, we'll give you the medals to upgrade accordingly!":"Es wartet die allerneueste Ausrüstung und Technik, die wir zu bieten haben. Zeig auf dem Schlachtfeld, aus welchem Holz du geschnitzt bist, und wir geben dir die Orden zum Aufrüsten!",
+"Spend wisely soldier and make sure to check in for all the latest updates!":"Gib sie klug aus, Soldat — und schau regelmäßig rein, damit du nichts Neues verpasst!",
+"Stop that leak soldier!":"Stopf das Leck, Soldat!",
+"Watch your flanks!":"Achte auf deine Flanken!",
+"Not done yet, soldier! Tangos inbound!":"Noch nicht vorbei, Soldat! Nachschub im Anmarsch!",
+"Keep it up soldier!":"Weiter so, Soldat!",
+"Get up soldier, these boys keep coming!":"Aufstehen, Soldat, die hören nicht auf zu kommen!",
+"Wait a minute. What is THAT?!":"Moment mal. Was ist DAS?!",
+"This is the last stand, soldier!":"Das ist das letzte Gefecht, Soldat!",
+"By all that I hold green!":"Bei allem, was grün ist!",
 },
 "ru":{
 "PROMOTIONS ⚔NEW":"ПОВЫШЕНИЯ ⚔NEW",
@@ -5713,6 +5836,25 @@ const TR_DATA={
 "📋 COPY THE INVITE LINK":"📋 СКОПИРОВАТЬ ССЫЛКУ",
 "📤 SEND THE INVITE LINK":"📤 ОТПРАВИТЬ ССЫЛКУ",
 "🤝 TWO-COMMANDER VICTORY — %1'S CAMPAIGN ADVANCED TOO!":"🤝 ПОБЕДА ВДВОЁМ — КАМПАНИЯ %1 ТОЖЕ ПРОДВИНУЛАСЬ!",
+"Alright soldier. Here's the situation. There's a foreign force that's about to invade our home.":"Так, боец. Обстановка такая: чужая армия вот-вот вторгнется в наш дом.",
+"We have sworn to protect it at all costs.":"Мы поклялись защищать его любой ценой.",
+"These enemies are well learned in the arts of war. They will show us no mercy.":"Эти враги отлично обучены военному делу. Пощады от них не жди.",
+"We have never let an enemy force inside those four walls, and we don't intend to let today be any different!":"Мы ни разу не пускали врага в эти четыре стены — и сегодня ничего не изменится!",
+"Keep your head on a swivel and be prepared for whatever they send our way. Good luck soldier!":"Гляди в оба и будь готов ко всему, что они пошлют. Удачи, боец!",
+"Well, you sure are stepping up in the world, soldier. Our army is under pressure from a new force unlike any other.":"Ну и ну, да ты идёшь в гору, боец. На нашу армию давит новая сила, какой ещё не бывало.",
+"I always thought I'd seen everything. But in front of you stands the fearsome Black Army.":"Я думал, что видел всё. Но перед тобой стоит грозная Чёрная армия.",
+"They are an elite legion of unpredictable units. They are relentless and will not stop until they have taken everything we hold dear.":"Это элитный легион, который невозможно предугадать. Они не остановятся, пока не отберут всё, что нам дорого.",
+"You must push forward and retake all of their positions, if we are to win this thing!":"Иди вперёд и отбей все их позиции — только так мы победим!",
+"There will be all the latest gear and tech that we have to offer. If you show your metal out on the battlefield, we'll give you the medals to upgrade accordingly!":"Тут всё самое новое снаряжение и техника, что у нас есть. Покажи себя на поле боя — и получишь медали на прокачку!",
+"Spend wisely soldier and make sure to check in for all the latest updates!":"Трать с умом, боец, и заглядывай почаще за свежими новостями!",
+"Stop that leak soldier!":"Заткни брешь, боец!",
+"Watch your flanks!":"Следи за флангами!",
+"Not done yet, soldier! Tangos inbound!":"Ещё не всё, боец! Идут новые!",
+"Keep it up soldier!":"Так держать, боец!",
+"Get up soldier, these boys keep coming!":"Подъём, боец, они всё прут и прут!",
+"Wait a minute. What is THAT?!":"Погоди-ка. Это ещё ЧТО?!",
+"This is the last stand, soldier!":"Это последний рубеж, боец!",
+"By all that I hold green!":"Клянусь всем зелёным!",
 },
 "es":{
 "PROMOTIONS ⚔NEW":"ASCENSOS ⚔NEW",
@@ -6507,6 +6649,25 @@ const TR_DATA={
 "📋 COPY THE INVITE LINK":"📋 COPIAR EL ENLACE",
 "📤 SEND THE INVITE LINK":"📤 ENVIAR EL ENLACE",
 "🤝 TWO-COMMANDER VICTORY — %1'S CAMPAIGN ADVANCED TOO!":"🤝 VICTORIA DE DOS — ¡LA CAMPAÑA DE %1 TAMBIÉN AVANZÓ!",
+"Alright soldier. Here's the situation. There's a foreign force that's about to invade our home.":"Muy bien, soldado. La situación es esta: una fuerza extranjera está a punto de invadir nuestro hogar.",
+"We have sworn to protect it at all costs.":"Hemos jurado protegerlo a toda costa.",
+"These enemies are well learned in the arts of war. They will show us no mercy.":"Estos enemigos dominan las artes de la guerra. No tendrán piedad.",
+"We have never let an enemy force inside those four walls, and we don't intend to let today be any different!":"Jamás hemos dejado entrar a un enemigo entre estas cuatro paredes, ¡y hoy no va a ser diferente!",
+"Keep your head on a swivel and be prepared for whatever they send our way. Good luck soldier!":"Mantén los ojos bien abiertos y prepárate para lo que sea que nos manden. ¡Buena suerte, soldado!",
+"Well, you sure are stepping up in the world, soldier. Our army is under pressure from a new force unlike any other.":"Vaya, cómo subes de rango, soldado. Nuestro ejército está bajo presión: una fuerza nueva como ninguna otra.",
+"I always thought I'd seen everything. But in front of you stands the fearsome Black Army.":"Creía haberlo visto todo. Pero ante ti se alza el temible Ejército Negro.",
+"They are an elite legion of unpredictable units. They are relentless and will not stop until they have taken everything we hold dear.":"Son una legión de élite impredecible. No pararán hasta habernos quitado todo lo que queremos.",
+"You must push forward and retake all of their positions, if we are to win this thing!":"¡Tienes que avanzar y recuperar todas sus posiciones si queremos ganar esta guerra!",
+"There will be all the latest gear and tech that we have to offer. If you show your metal out on the battlefield, we'll give you the medals to upgrade accordingly!":"Tendrás lo último en equipo y tecnología que podemos ofrecer. Si demuestras tu temple en el campo de batalla, ¡te daremos las medallas para mejorar como corresponde!",
+"Spend wisely soldier and make sure to check in for all the latest updates!":"¡Gasta con cabeza, soldado, y no olvides pasarte por aquí para las últimas novedades!",
+"Stop that leak soldier!":"¡Tapa esa brecha, soldado!",
+"Watch your flanks!":"¡Vigila los flancos!",
+"Not done yet, soldier! Tangos inbound!":"¡Aún no hemos terminado, soldado! ¡Vienen más!",
+"Keep it up soldier!":"¡Sigue así, soldado!",
+"Get up soldier, these boys keep coming!":"¡Arriba, soldado, que no dejan de venir!",
+"Wait a minute. What is THAT?!":"Un momento. ¿¡Qué es ESO!?",
+"This is the last stand, soldier!":"¡Esta es la última línea, soldado!",
+"By all that I hold green!":"¡Por todo lo que es verde!",
 },
 };
 for(const L in TR_DATA) TR[L]=TR_DATA[L];
@@ -7051,7 +7212,10 @@ const META_DEFAULT = {
   // SARGE'S GEAR (v1.39): campaign-milestone unlocks, orthogonal to the weapon
   // in his hands — the JET PACK at L40 is the first. Never sold; the campaign
   // is the only door. gearSeen drives the room card's ⚔NEW nudge, like sargeSeen.
-  gearUnlocked:[], gearSeen:[]
+  gearUnlocked:[], gearSeen:[],
+  // SARGE COMMS (v1.41): which opening briefings this save has sat through.
+  // Once each, ever — the window is an introduction, not a toll gate.
+  comms:{ camp:0, bf:0 }
 };
 let META = META_DEFAULT;
 try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); META.piggy=Object.assign({},META_DEFAULT.piggy,m.piggy||{}); } } catch(e) {}
@@ -7113,6 +7277,11 @@ if((META.bfWins||0)+(META.bfLosses||0)===0) META.bfMap='crossing';
 (function(){ const e=META.enh||{};
   const own=(Array.isArray(e.own)? e.own : []).filter(id=>ENH_ORDER.indexOf(id)>=0);
   META.enh={ own, on:(Array.isArray(e.on)? e.on : []).filter(id=>own.indexOf(id)>=0) }; })();
+// SARGE COMMS (v1.41) — `comms` is NESTED like enh/decor, so the Object.assign
+// above hands an older save the DEFAULT object itself and the first briefing
+// would mark itself seen inside META_DEFAULT. Build a fresh one.
+(function(){ const c=META.comms||{};
+  META.comms={ camp:c.camp?1:0, bf:c.bf?1:0 }; })();
 function saveMeta(){ try{ localStorage.setItem('gvt_meta', JSON.stringify(META)); }catch(e){} }
 // LANGUAGE IS SETTLED BEFORE THE FIRST PIXEL. ?lang= beats the save, the save
 // beats the phone, the phone beats English — and ?l10n=audit turns on the
@@ -8083,6 +8252,210 @@ const SFX = {
                setTimeout(()=>tone(1900,1350,0.28,'sine',0.03),450); }
 };
 
+// ================= SARGE COMMS (v1.41) =================
+// The Star Fox transmission window: Sarge's portrait in a framed box, a name
+// plate, and his words TYPING OUT over a funny garbled per-character voice.
+// The gibberish IS the localization strategy — zero voice acting, zero sound
+// files, and the joke lands the same in all seven languages. Two behaviors:
+//   BRIEFINGS — blocking, pre-combat, once per save (META.comms). The tap that
+//     completes / advances / dismisses a page is SWALLOWED: this window sits
+//     over a live tray, and it must never also place a unit underneath (the
+//     deliberate INVERSION of the v1.25 skip-through law — that law protects a
+//     POST-battle ceremony; this is PRE-battle). Skipped, and NOT marked seen,
+//     in any lobby of 2+ commanders — never hold a shared clock for one
+//     reader; they get it solo later.
+//   SOUNDBITES — non-blocking combat flair: pointer-events:none from the root
+//     down (the v1.25 law verbatim), auto-dismiss, one global cooldown plus a
+//     per-event sanity on the leak line. Boss lines bypass the cooldown —
+//     they are rare, and Sarge reacting IS the reveal.
+// Comms are LOCAL-ONLY: no wire keys, CMD_KEYS untouched, zero server change.
+const COMM_CD=18;           // global soundbite cooldown, sim seconds
+const COMM_LEAK_CD=15;      // extra per-event sanity on the leak lines
+const COMM_HOLD=3;          // soundbite hold once fully typed, wall seconds
+const COMM_TYPE=28;         // ms per character (CJK types the same — it just reads faster, and that's fine)
+const COMM_HZ=112;          // blip center pitch — low and gruff, it's Sarge
+const COMM_JIT=0.5;         // per-character pitch jitter, fraction of center
+const COMM_BOSS_LEAD=0.9;   // Sarge reacts FIRST; the red card credits the boss a beat later
+const COMM_PORT_VB='24 20 66 66';   // head-and-shoulders crop of the 120x140 figure box
+// The dialogue. English strings ARE the keys (v1.29 law) — every line lands in
+// all six translation tables. No digits in any of them; keep it that way.
+const COMM_LINES={
+  camp:[
+    "Alright soldier. Here's the situation. There's a foreign force that's about to invade our home.",
+    "We have sworn to protect it at all costs.",
+    "These enemies are well learned in the arts of war. They will show us no mercy.",
+    "We have never let an enemy force inside those four walls, and we don't intend to let today be any different!",
+    "Keep your head on a swivel and be prepared for whatever they send our way. Good luck soldier!"
+  ],
+  bf:[
+    "Well, you sure are stepping up in the world, soldier. Our army is under pressure from a new force unlike any other.",
+    "I always thought I'd seen everything. But in front of you stands the fearsome Black Army.",
+    "They are an elite legion of unpredictable units. They are relentless and will not stop until they have taken everything we hold dear.",
+    "You must push forward and retake all of their positions, if we are to win this thing!",
+    "There will be all the latest gear and tech that we have to offer. If you show your metal out on the battlefield, we'll give you the medals to upgrade accordingly!",
+    "Spend wisely soldier and make sure to check in for all the latest updates!"
+  ],
+  leak:[ "Stop that leak soldier!", "Watch your flanks!" ],
+  wave:[ "Not done yet, soldier! Tangos inbound!", "Keep it up soldier!",
+         "Get up soldier, these boys keep coming!" ],
+  boss:[ "Wait a minute. What is THAT?!", "This is the last stand, soldier!",
+         "By all that I hold green!" ]
+};
+let COMM={ brief:null, say:null, cd:0, leakCd:0, last:{}, timer:0,
+           heldAnn:null, heldCoach:null, blips:0, blipTry:0 };
+// one garbled syllable — a short FILTERED square burst, pitch jittered per
+// character so a sentence babbles instead of beeping. Rides the same soundOn
+// switch as tone(), and counts what it schedules so a rig can prove a muted
+// run schedules nothing.
+function commBlip(code){
+  COMM.blipTry++;
+  if(!soundOn) return; const ac=audio(); if(!ac) return;
+  try{
+    const r=((((code|0)*2654435761)>>>0)%1000)/1000;   // per-char, deterministic
+    const f0=COMM_HZ*(1+COMM_JIT*(r-0.35));
+    const o=ac.createOscillator(), fl=ac.createBiquadFilter(), g=ac.createGain();
+    o.type='square';
+    o.frequency.setValueAtTime(f0*1.3, ac.currentTime);
+    o.frequency.exponentialRampToValueAtTime(Math.max(30,f0*0.8), ac.currentTime+0.05);
+    fl.type='lowpass'; fl.frequency.value=1050; fl.Q.value=2.2;
+    g.gain.setValueAtTime(0.055, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+0.055);
+    o.connect(fl); fl.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime+0.06);
+    COMM.blips++;
+  }catch(e){}
+}
+// the comm-open chirp: two quick rising squares — a radio keying up
+function commChirp(){ tone(520,880,0.06,'square',0.05); setTimeout(()=>tone(760,1240,0.07,'square',0.045),70); }
+// build the window fresh each time. ⚠ data-notr on the whole subtree: every
+// string in here is resolved through TXT() ONCE by hand, and the typewriter
+// then writes .nodeValue — a partial substring must never re-enter the
+// translating setters (it could match another key mid-type and audit-spam).
+function commWin(mode){
+  const el=document.getElementById('comms'); if(!el) return null;
+  clearTimeout(COMM.timer); COMM.timer=0;
+  el.innerHTML='';
+  el.className=mode;
+  const win=document.createElement('div'); win.className='cm-win';
+  win.setAttribute('data-notr','');
+  const port=document.createElement('div'); port.className='cm-port';
+  const img=document.createElement('img'); img.alt='';
+  img.src=sprURI('sarge', dyeHex()||null, COMM_PORT_VB);   // the game's own Sarge, in YOUR army colour
+  port.appendChild(img);
+  if(!reducedMotion()){ const sc=document.createElement('div'); sc.className='cm-scan'; port.appendChild(sc); }
+  const nm=document.createElement('div'); nm.className='cm-name';
+  nm.appendChild(document.createTextNode(TXT('SARGE')));
+  const left=document.createElement('div'); left.className='cm-left';
+  left.appendChild(port); left.appendChild(nm);
+  const txt=document.createElement('div'); txt.className='cm-txt';
+  const tn=document.createTextNode(''); txt.appendChild(tn);
+  const hint=document.createElement('div'); hint.className='cm-hint';
+  hint.appendChild(document.createTextNode('▼'));
+  win.appendChild(left); win.appendChild(txt); win.appendChild(hint);
+  el.appendChild(win);
+  return { el, win, txt, tn, hint, done:false };
+}
+// the typewriter. The FULL translated string comes in; the reveal is dumb
+// slicing into one text node. Blips skip spaces and punctuation; commas and
+// full stops hold a beat instead — that is the Star Fox cadence. Under
+// reducedMotion the page lands whole with ONE blip: calm is SHORTER (v1.25).
+const COMM_SKIP=' 　,.、。！？!?…·—"\'';
+function commType(h, full, done){
+  h.done=false; h.hint.style.visibility='hidden';
+  clearTimeout(COMM.timer);
+  if(reducedMotion()){
+    h.tn.nodeValue=full; h.done=true; commBlip(full.charCodeAt(0)||65);
+    h.hint.style.visibility='visible'; if(done) done(); return;
+  }
+  let i=0;
+  const step=()=>{
+    i++;
+    h.tn.nodeValue=full.slice(0,i);
+    const ch=full.charAt(i-1);
+    if(COMM_SKIP.indexOf(ch)<0) commBlip(full.charCodeAt(i-1));
+    if(i>=full.length){ h.done=true; h.hint.style.visibility='visible'; if(done) done(); return; }
+    const pause=(ch===','||ch==='、')? COMM_TYPE*7
+      : (ch==='.'||ch==='。'||ch==='!'||ch==='！'||ch==='?'||ch==='？')? COMM_TYPE*10
+      : COMM_TYPE;
+    COMM.timer=setTimeout(step, pause);
+  };
+  COMM.timer=setTimeout(step, COMM_TYPE);
+}
+// ---- SOUNDBITES ----
+function commSay(ev){
+  const pool=COMM_LINES[ev];
+  if(!pool || S.mode!=='play' || COMM.brief) return false;
+  if(ev!=='boss'){                       // boss lines are rare and always land
+    if(COMM.cd>0) return false;
+    if(ev==='leak' && COMM.leakCd>0) return false;
+  }
+  // random pick, never the same line back to back. Presentation-only RNG — no
+  // sim state is read or written, so co-op sims cannot drift on it (v1.15 law
+  // binds SIM decisions, not stagecraft).
+  let k=pool[(Math.random()*pool.length)|0];
+  if(pool.length>1 && k===COMM.last[ev]) k=pool[(pool.indexOf(k)+1)%pool.length];
+  COMM.last[ev]=k;
+  COMM.cd=COMM_CD; if(ev==='leak') COMM.leakCd=COMM_LEAK_CD;
+  const h=commWin('say'); if(!h) return false;
+  // anchored in WORLD units off the canvas's own transform: the left edge,
+  // just below the top HUD cluster — the one spot that overlaps neither the
+  // tray, the base bars nor the wave line at 812x375 (battery-asserted).
+  const r=cv.getBoundingClientRect();
+  h.win.style.position='absolute';
+  h.win.style.left=Math.round(r.left+10*scale)+'px';
+  h.win.style.top=Math.round(r.top+88*scale)+'px';
+  h.win.style.width=Math.round(330*scale)+'px';
+  h.win.style.fontSize=Math.max(10,Math.round(20*scale))+'px';
+  COMM.say=h;
+  commChirp();
+  commType(h, TXT(k), ()=>{
+    COMM.timer=setTimeout(()=>{ if(!COMM.brief) commClear(); },
+      reducedMotion()? 1600 : COMM_HOLD*1000);
+  });
+  return true;
+}
+// ---- BRIEFINGS ----
+function commBriefing(kind){
+  const pool=COMM_LINES[kind]; if(!pool) return false;
+  if(S.coop && coopHumans()>1) return false;   // 2+ commanders: skipped, NOT marked seen
+  if(META.comms && META.comms[kind]) return false;
+  const h=commWin('brief'); if(!h) return false;
+  const pages=pool.map(x=>TXT(x));   // the whole translated string, resolved once each
+  COMM.brief={ kind, pages, i:0, h };
+  COMM.heldAnn=S.ann; S.ann=null;                 // the LEVEL card waits its turn
+  if(coach){ COMM.heldCoach=coach; coach=null; }  // ...and so does the boot-camp coach
+  h.el.onpointerdown=commAdvance;                 // the tap lands HERE, and nowhere else
+  commChirp();
+  commType(h, pages[0], null);
+  return true;
+}
+// tap anywhere: complete the typing page, then advance, then dismiss — and
+// every one of those taps is swallowed by the backdrop it landed on.
+function commAdvance(e){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  const b=COMM.brief; if(!b) return false;
+  if(!b.h.done){
+    clearTimeout(COMM.timer);
+    b.h.tn.nodeValue=b.pages[b.i]; b.h.done=true;
+    b.h.hint.style.visibility='visible';
+    return true;
+  }
+  b.i++;
+  if(b.i<b.pages.length){ commChirp(); commType(b.h, b.pages[b.i], null); return true; }
+  if(META.comms){ META.comms[b.kind]=1; saveMeta(); }   // seen — once per save
+  commClear();
+  return true;
+}
+// tear down whatever is up and hand back what a briefing was holding
+function commClear(){
+  clearTimeout(COMM.timer); COMM.timer=0;
+  const el=document.getElementById('comms');
+  if(el){ el.onpointerdown=null; el.className=''; el.innerHTML=''; }
+  COMM.brief=null; COMM.say=null;
+  if(COMM.heldAnn){ S.ann=COMM.heldAnn; COMM.heldAnn=null; }
+  if(COMM.heldCoach){ coach=COMM.heldCoach; COMM.heldCoach=null; }
+}
+
 // ================= BOOT CAMP COACH =================
 // FAVOR-style guiding finger, once per device (localStorage gvt_coach).
 // ⚠ REMAPPED IN v1.28 FOR THE STREAMING CAMPAIGN, AND AGAIN IN v1.32 FOR
@@ -8132,6 +8505,8 @@ function reset(){
   S.ffLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.hitStop=0; S.tanBase=null;
   S.sargeCd=0; S.sargeFlash=0; S.tagT=0; S.lostLevel=0;   // casualties + Sarge's clock + the faucet (v1.32)
   S.chargeAnn=false; S.lidAnn=false;                      // v1.40: the CHARGE bugle + THE LID HOLDS each speak once a level
+  S.annWait=null;                                         // v1.41: a deferred boss card dies with the battle it was staged for
+  COMM.cd=0; COMM.leakCd=0; COMM.last={};                 // ...and the comm cooldowns re-arm fresh each battle
   S.jetCd=0; S.jetFlash=0; S.jetAim=null;                 // the jet re-arms fresh each battle (v1.39)
   S.coop=null;    // co-op battles re-arm this right after startBattle
   S.sq=null;      // …and a squad mission arms its streaming ticker there too
@@ -8193,6 +8568,11 @@ function startCampaign(n){
   // but the line still said HOLD THE LINE — and, composed by +, it dodged the
   // translation table too; tf() with a real key fixes both at once)
   S.ann={ txt:tf('LEVEL %1 — SMASH THEIR TOY BOX', S.levelN), t:2.8 };
+  // SARGE COMMS (v1.41): the campaign opening briefing — once per save, and
+  // this door is always a lobby of one. It stashes the LEVEL card and the
+  // boot-camp coach and hands both back on dismissal, so a virgin L1 reads
+  // briefing FIRST, then coach — never stacked.
+  commBriefing('camp');
 }
 // The room-defense sortie: short, varied, escalating. Opener → flank → spectacle
 // → big finish. Entertaining precisely because it never outstays its welcome.
@@ -8203,6 +8583,7 @@ function rivalRaidWaves(m){
   return ['column','pincer','redcoat','push'].map(k=>waveFromKey(k, m, Math.random));
 }
 function hideAllOverlays(){ xpTeardown();   // a ceremony must never survive into the next screen
+  commClear();                              // ...and neither may a comm window (v1.41)
   ['title','lose','win','menu','picker','wartable','worldrank','toyshop','sabrite','xpjuice'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
 
 // ============ INVASIONS ARE RETIRED (v1.28, Wyatt 7/25) ============
@@ -8784,6 +9165,11 @@ function coopStartBattle(){
     S.ann={txt:tf('LEVEL %1 — SMASH THEIR TOY BOX · %2 COMMANDERS', S.levelN, 2), t:2.8};
   }
   SFX.horn();
+  // SARGE COMMS (v1.41): a LOBBY OF ONE is solo in every sense that matters, so
+  // the door still owes an unseen save its briefing. commBriefing itself skips
+  // (and leaves unmarked) any lobby of 2+ — never hold a shared clock for one
+  // reader's pace; they get it the next time they play alone.
+  commBriefing('camp');
   coopTick();
 }
 
@@ -8895,9 +9281,20 @@ function sqPushWave(n,remote){
   // card; a BOSS or SET PIECE gets the red warning card + the sting; and the
   // last wave of a bossless level announces itself as THE FINAL WAVE, so the
   // biggest fight of the night never sneaks on unlit. One flag each to revert.
-  if(w.piece || w.boss){ S.ann={txt:t(w.name), t:3.2, warn:true}; SFX.sting(); }
+  if(w.piece || w.boss){
+    // SARGE COMMS LEADS THE REVEAL (v1.41): Sarge reacts first ("what is
+    // THAT?!"), and the red card + sting land a beat later to credit the boss
+    // by name. Pure presentation — the spawn breaths (1.6/3.2/3.4) are
+    // authored sim data and are untouched.
+    if(commSay('boss')) S.annWait={ ann:{txt:t(w.name), t:3.2, warn:true}, in:COMM_BOSS_LEAD, sting:true };
+    else { S.ann={txt:t(w.name), t:3.2, warn:true}; SFX.sting(); }
+  }
   else if(w.premiere) S.ann={txt:t(w.name), t:2.6};
   else if(n===S.cfg.waves.length && S.tanBase){ S.ann={txt:t('THE FINAL WAVE!'), t:2.8, warn:true}; SFX.sting(); }
+  // an ORDINARY advance stays unannounced (v1.32) — but Sarge may mutter about
+  // it from the corner: the wave-completed soundbite, throttled by COMM_CD,
+  // never on wave one (nothing has been fought yet) and never over a card.
+  else if(n>1) commSay('wave');
   S.sq.nextT=S.sq.t+sqGapFor(S.levelN);
   coachEvent('wave');   // ⚠ the coach used to hear this from spawnWave, which the stream never calls
   // one push per frame and the clock resets with it, so a host coming back from a
@@ -9369,6 +9766,11 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
   S.mode='play';
   S.ann={ txt:(team>1? tf('%1 v %1 — %2', team, t(map.name)) : tf('BATTLEFIELD — %1', t(map.name))), t:2.6 };
   SFX.horn();
+  // SARGE COMMS (v1.41): the battlefield opening briefing, before the first
+  // deploy — it names the fearsome Black Army. Same once-per-save flag, same
+  // 2+-commander skip inside; while it is open, update() holds bfTick so the
+  // AI cannot build an army under a kid who is still reading.
+  commBriefing('bf');
 }
 const BF_END = {
   ko:        ['THEIR BASE<br>IS RUBBLE','Knocked their toy box clean off the carpet.'],
@@ -9405,6 +9807,7 @@ function endBattlefield(reason, fromRelay){
     return;
   }
   bf.resolved=true; bf.ending=false; S.speed=1; S.drag=null; S.pan=null;
+  commClear();   // a comm must never survive onto the verdict screen (v1.41)
   if(bfMyTeam()==='foe') reason=BF_FLIP[reason]||reason;
   const won=(reason==='ko'||reason==='time'||reason==='sudden'||reason==='edge');
   // lifetime tallies land win OR lose — the kills happened either way
@@ -9897,6 +10300,9 @@ function bfLeak(u){
   b.hp=Math.max(0,b.hp-dmg); b.dmgTaken+=dmg; u.dead=true;
   bfSargeDown(u);                         // spending Sarge on their toy box costs the same ten seconds
   SFX.ouch();
+  // Sarge only barks when it is YOUR box being reached (v1.41) — your own men
+  // leaking into theirs is the plan working, not a breach
+  if(enemySide(u)===bfMyTeam()) commSay('leak');
   S.fx.push({k:'ring',x:b.x-10,y:b.y-10,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
   S.floats.push({x:b.x,y:b.y-84,txt:'−'+dmg,t:0,col:u.side==='you'?'#BFE39A':'#D96A55'});
   // ⚠ ONLY THE REFEREE CALLS IT. In a private room every sim has its own copy of
@@ -12265,6 +12671,7 @@ function checkAch(){
 }
 
 function endBattle(win){
+  commClear();   // a comm must never survive onto the verdict screen (v1.41)
   // the battle's ace goes straight in the service record — win, lose and
   // first-battle mercy alike
   if((S.aceKills||0) > META.stats.bestUnitKills) META.stats.bestUnitKills = S.aceKills;
@@ -12379,7 +12786,10 @@ function update(dt){
   if(S.shake>0) S.shake=Math.max(0,S.shake-dt*3);
   // BATTLEFIELD drives the clock, both purses, the opponent and the camera.
   // S.foes stays empty below, so the whole wave/boss path just sits there.
-  if(S.bf) bfTick(dt);
+  // ⚠ an open SARGE COMMS briefing holds the WHOLE battlefield (v1.41): it is
+  // solo by construction (2+ lobbies never open one), and the AI must not
+  // build an army while a kid is still reading the introduction.
+  if(S.bf && !COMM.brief) bfTick(dt);
 
   // SARGE'S TEN SECONDS, campaign edition (v1.32) — the battleground's own
   // clock, counted on the sim's dt so a 2× toggle can't cheat it, with the same
@@ -12404,10 +12814,16 @@ function update(dt){
     if(S.jetCd===0) S.jetFlash=0.9;
   }
   if(S.jetFlash>0) S.jetFlash-=dt;
+  // SARGE COMMS cooldowns drain on sim dt like every other clock (v1.41)
+  if(COMM.cd>0) COMM.cd=Math.max(0,COMM.cd-dt);
+  if(COMM.leakCd>0) COMM.leakCd=Math.max(0,COMM.leakCd-dt);
   // HOLD THE LINE pumps its own waves, on its own clock, whether or not the last
   // one is dead. It has to run OUTSIDE the S.waveActive gate below, because a
   // briefly-empty carpet is exactly the moment the next wave has to be on its way.
-  if(S.sq && S.mode==='play') sqTick(dt);
+  // ⚠ v1.41: an open briefing HOLDS the stream clock, so the v1.32 dig-in
+  // grace cannot expire under a slow reader — wave one arrives late, never
+  // missed. Solo only by construction: a lobby of 2+ never opens a briefing.
+  if(S.sq && S.mode==='play' && !COMM.brief) sqTick(dt);
   // THE FAUCET (v1.32, Wyatt: "a slow passive amount like in battlegrounds") —
   // the battleground's own drip, same idiom and rate-shape, into the campaign
   // purse: +CAMP_TICK every 10s, floated off your toy box. Every commander's
@@ -12455,6 +12871,10 @@ function update(dt){
     if(S.interT<=0){ if(coopGuest()){ S.interT=0.01; } else { S.interT=0; spawnWave(); } }
   }
   if(S.ann){ S.ann.t-=dt; if(S.ann.t<=0) S.ann=null; }
+  // a deferred announce (the boss card waiting its beat behind Sarge's comm —
+  // v1.41) fires here; presentation only, never a spawn time
+  if(S.annWait){ S.annWait.in-=dt;
+    if(S.annWait.in<=0){ S.ann=S.annWait.ann; if(S.annWait.sting) SFX.sting(); S.annWait=null; } }
   if(S.tanBase && S.tanBase.hitT>0) S.tanBase.hitT-=dt;   // the crate's hit flash cools here, on sim time
 
   // formations: anchors wheel toward the Toy Box
@@ -12679,6 +13099,7 @@ function update(dt){
     }
     if(Math.hypot(T.x-f.x, T.y-f.y)<LEAK_R){
       S.foes.splice(i,1); S.lives-=f.def.leak; SFX.ouch();
+      commSay('leak');   // Sarge barks about the breach (v1.41; throttled inside)
       if(f.boss){ S.shake=0.7; S.floats.push({x:T.x,y:T.y-70,txt:'THE BOSS BROKE THROUGH!',t:0,col:'#D96A55'}); }
       S.fx.push({k:'ring',x:T.x-10,y:T.y-10,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
       if(S.lives<=0){ S.lives=0;
@@ -14196,6 +14617,10 @@ function evPos(e){ const r=cv.getBoundingClientRect(); return { x:(e.clientX-r.l
 function evPosW(e){ const p=evPos(e); if(S.bf) p.x+=S.bf.cam.x; return p; }
 cv.addEventListener('pointerdown', e=>{
   if(S.mode!=='play') return;
+  // an open briefing owns every tap (v1.41). The DOM backdrop swallows them
+  // before they ever reach the canvas — this guard is the belt to that brace,
+  // so no pointer path can place a unit or press a button under the window.
+  if(COMM.brief) return;
   audio();
   const p=evPos(e);
   // buttons
@@ -16433,6 +16858,19 @@ window.GVT = {
   tansarge(){ return S.foes.filter(f=>f.type==='tansarge').map(f=>({
     x:Math.round(f.x), y:Math.round(f.y), hp:f.hp, st:f.saberState||'idle',
     tgt:!!f.saberTarget, swing:+(f.saberSwing||0).toFixed(2) })); },
+  // ---- SARGE COMMS RIG (v1.41) ----
+  comm(ev){ return commSay(ev); },
+  commBrief(k){ return commBriefing(k||'camp'); },
+  commAdv(){ return commAdvance(); },
+  commState(){ const e=document.querySelector('#comms .cm-txt');
+    return { brief:COMM.brief? { kind:COMM.brief.kind, page:COMM.brief.i,
+        pages:COMM.brief.pages.length, done:!!COMM.brief.h.done } : null,
+      say:!!COMM.say, cd:+COMM.cd.toFixed(2), leakCd:+COMM.leakCd.toFixed(2),
+      annWait:S.annWait? +S.annWait.in.toFixed(2) : null,
+      blips:COMM.blips, blipTry:COMM.blipTry,
+      seen:META.comms? Object.assign({},META.comms) : null,
+      txt:e? e.textContent : '' }; },
+  commReset(){ META.comms={camp:0,bf:0}; saveMeta(); commClear(); return true; },
   // the retired wave-gated build of a level, for regression rigs only — no door
   // in the game reaches it any more. ⚠ v1.32: the CASUALTY LAW applies here too
   // (knock/tanHit are the shared funnel, so a fallen man is gone and refunds
