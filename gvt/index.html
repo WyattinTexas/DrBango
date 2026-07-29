@@ -1575,7 +1575,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.59</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.60</div>
   <div class="scanlines"></div>
 </div>
 
@@ -8640,6 +8640,20 @@ function sargeStats(){
 // ===== FORMATION INVASIONS: the Tan come from anywhere, in style =====
 const T = { x:130, y:300 };           // the Toy Box
 const LEAK_R = 64;
+// v1.60 THE RUG HAS EDGES (Wyatt 7/28: "enemies... moving off screen... you
+// don't see them until they move down into your base"): a live ground foe may
+// never STAND off the rug's top or bottom, and no steering target may point
+// him there. The wide pre-wrap formations (line/redcoat) carry unbounded fy
+// slots, so a deep-count line seeded ranks at y 700-919 — invisible, and
+// invalid to every green trigger (campFoeInReach's off-screen filter), so
+// they marched unseen to the box. Overflow FOLDS onto the band at 0.3x
+// instead of hard-clamping so edge ranks stagger rather than stack on one
+// pixel (the v1.38 wrap-law philosophy, enforced in world space). X is
+// deliberately free: the walk-on from W+60 IS the authorized entry transit.
+// FOE_TOP clears a full standing figure below the canvas lip; FOE_BOT keeps
+// his feet on the felt.
+const FOE_TOP=56, FOE_BOT=H-12;
+function foeBandY(y){ return y<FOE_TOP? FOE_TOP+(FOE_TOP-y)*0.3 : y>FOE_BOT? FOE_BOT-(y-FOE_BOT)*0.3 : y; }
 // All invasions arrive from the RIGHT — the enemy horizon (Wyatt+Dylan 7/21).
 // 'right-top'/'right-bottom' bias the entry lane for pincers and flanks.
 function edgePt(e){
@@ -12941,7 +12955,7 @@ function spawnGroup(g){
   form.dir={x:(T.x-ep.x)/d0, y:(T.y-ep.y)/d0};
   list.forEach(o=>{
     const sx=form.x+form.dir.x*o.fx-form.dir.y*o.fy, sy=form.y+form.dir.y*o.fx+form.dir.x*o.fy;
-    const foe=spawnFoe(o.t, sx, sy, form, false);
+    const foe=spawnFoe(o.t, sx, foeBandY(sy), form, false);   // v1.60: no rank seeds off the rug
     foe.off=o;
     form.members.push(foe);
   });
@@ -14281,7 +14295,10 @@ function update(dt){
     if(RV && f.x<=RV.x-4) f.crossed=true;
     if(f.form){
       const fo=f.form, o=f.off;
-      const sx=fo.x+fo.dir.x*o.fx-fo.dir.y*o.fy, sy=fo.y+fo.dir.y*o.fx+fo.dir.x*o.fy;
+      // v1.60: the slot's world target folds onto the rug band — a wheeling
+      // anchor could otherwise rotate an on-camera man's slot off the bottom
+      // edge and he'd vanish mid-march (measured: 13.8s gone on an L21 line)
+      const sx=fo.x+fo.dir.x*o.fx-fo.dir.y*o.fy, sy=foeBandY(fo.y+fo.dir.y*o.fx+fo.dir.x*o.fy);
       const dd=Math.hypot(sx-f.x, sy-f.y);
       if(dd>2){
         const sp=(fo.halted&&dd<24)?0 : f.def.spd*aura*(dd>70?1.8:1.15);
@@ -14342,6 +14359,10 @@ function update(dt){
       const dx=f.x-rk.x, dy=f.y-rk.y, d=Math.hypot(dx,dy), min=rk.r+(f.squeeze?3:ROCK_PAD_FOE);
       if(d>0.1&&d<min){ f.x+=dx/d*(min-d)*Math.min(1,dt*8); f.y+=dy/d*(min-d)*Math.min(1,dt*8); }
     }
+    // v1.60 backstop: whatever moved him this frame, a ground foe ends it ON
+    // the rug — the band the spawn fold and slot fold already hold. Y only:
+    // the right-edge walk-on (and the leak exit at the box) live in X.
+    if(f.y<FOE_TOP) f.y=FOE_TOP; else if(f.y>FOE_BOT) f.y=FOE_BOT;
     if(dt>0){ f.vx=(f.x-px)/dt; f.vy=(f.y-py)/dt; }
 
     // return fire: redcoats volley on the halt. Everyone else STOPS to shoot —
