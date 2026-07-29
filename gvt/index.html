@@ -1718,7 +1718,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.73</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.74</div>
   <div class="scanlines"></div>
 </div>
 
@@ -10034,8 +10034,11 @@ function sargeGearURI(gk, bodyHex){
 // ===== v1.38 THEIR SARGE — the academy's own saber composite on a TAN body,
 // mirrored to face left like every Tan model. His blade is FIXED RED #FF4D4D,
 // never saberHex() — that is YOUR colour, and his gear reads nothing of yours.
-// The baked lit blade is the walking tell. (Not in buildFoeTint's list: he is
-// a named character, factory tan under every rival army — like the rex.)
+// The baked lit blade is the walking tell. (v1.74 put him IN buildFoeTint's
+// list: a tan-dyed player's campaign re-molds the whole Tan army green, and
+// their commander re-molds with his men — only the currentColor body tints,
+// so the red blade and the gunmetal ride every skin. Rival armies still never
+// show him tinted, for the old v1.38 reason: no rival wave fields a boss.)
 SPRITES_SRC.tansarge = MIRROR(SARGE_ART.lightsaber.split('BLADEHEX').join('#FF4D4D'));
 // five rank slots, chevrons earned in gold — the academy speaks stripes, not
 // bars. Ranks run to 100 now and nobody can read a hundred chevrons, so the row
@@ -10583,6 +10586,7 @@ function startBattle(levelN, rival){
     S.ann={txt:'DEFEND THE ROOM!',t:2.2};
   } else {
     S.plastic = 210;    // campaign: +40 dog tags to work with (Wyatt 7/24)
+    const fs=foeSkinHex(); if(fs) buildFoeTint(fs);   // v1.74: bake the green re-mold before the first Tan walks on
   }
   hideAllOverlays();
   S.mode='play';
@@ -14196,7 +14200,7 @@ const IMGT = {};
 function buildFoeTint(hex){
   if(IMGT[hex]) return;
   IMGT[hex]={};
-  ['tanrifle','tanmg','crawler','officer','jeep','tank','giant','rollpig'].forEach(k=>{
+  ['tanrifle','tanmg','crawler','officer','jeep','tank','giant','rollpig','tansarge'].forEach(k=>{
     const vb=(k==='jeep'||k==='tank'||k==='rollpig')?'0 0 140 140':'0 0 120 140';
     const body=SPRITES_SRC[k].split('currentColor').join(hex);
     const im=new Image();
@@ -14204,8 +14208,24 @@ function buildFoeTint(hex){
     im.src='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+vb+'">'+body+'</svg>');
   });
 }
-// the daily rival's army wears its own colour; everyone else is factory tan
-function foeImg(k){ const hex = S.rival&&S.rival.hex; return (hex&&IMGT[hex]&&IMGT[hex][k])||IMG[k]; }
+// ===== v1.74 GREEN FOR THE TAN PLAYER (Wyatt 7/29, verbatim: "If you are
+// playing as the tan color in campaign, please make the enemy color of the
+// army green.") — a tan-dyed army against the Tan is an unreadable mirror
+// match, so when YOUR dye is the Tan's exact swatch the campaign's foes
+// re-mold in the classic green instead. The trigger is dyeHex()===TAN and no
+// wider; cosmetic and PER-SIM (a co-op ally's screen answers from their OWN
+// dye — nothing rides the wire); the crate pennant and every flag ceremony
+// keep campFoeHex's tan — the Tan's FLAG is still the Tan's flag, their men
+// just stop wearing your colour. The rival branch outranks it: a sortie
+// army's hex is its identity, whatever you wear.
+function foeSkinHex(){ return dyeHex()===TAN ? GREEN : null; }
+// the daily rival's army wears its own colour; everyone else is factory tan —
+// or the green re-mold when the swap above is on
+function foeImg(k){
+  const hex = (S.rival&&S.rival.hex) || foeSkinHex();
+  if(hex&&!IMGT[hex]) buildFoeTint(hex);   // lazy: every door into a foe draw self-heals
+  return (hex&&IMGT[hex]&&IMGT[hex][k])||IMG[k];
+}
 // DYE KITS: your whole army repainted in a rival's color (shop, 20★ a color)
 const IMGU={};
 const GREEN_UNITS=['rifleman','mgunner','bazooka','mortar','sarge','minesweeper','flame','radioman','bfjeep','bftank'];
@@ -20999,6 +21019,9 @@ window.GVT = {
   tansarge(){ return S.foes.filter(f=>f.type==='tansarge').map(f=>({
     x:Math.round(f.x), y:Math.round(f.y), hp:f.hp, st:f.saberState||'idle',
     tgt:!!f.saberTarget, swing:+(f.saberSwing||0).toFixed(2) })); },
+  // v1.74: which mold the campaign's foes are wearing on THIS screen
+  foeSkin(k){ k=k||'tanrifle'; return { hex:foeSkinHex(), dye:META.dyeOn||null,
+    img: foeImg(k)===IMG[k]? 'factory' : 'skin' }; },
   // ---- SARGE COMMS RIG (v1.41) ----
   comm(ev){ return commSay(ev); },
   commBrief(k){ return commBriefing(k||'camp'); },
