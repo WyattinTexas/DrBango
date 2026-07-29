@@ -1495,30 +1495,63 @@
   @keyframes duckwob { 0% { transform:rotate(0); } 14% { transform:rotate(-13deg); }
     36% { transform:rotate(11deg); } 58% { transform:rotate(-8deg); }
     78% { transform:rotate(4.5deg); } 100% { transform:rotate(0); } }
-  /* THE WIND-UP RACECAR (v1.71) — the battlefield's prize. Parked it strains at
-     the leash (a wound spring does not sleep: a fast 0.8px jiggle + the key
-     creeping); tap = the key spins itself out, the wheels blur and the whole
-     car shimmies up its stretch of floorboard and rolls back. The shimmy is
-     pure translate on .rczip (no origin to get wrong — the v1.21 law) and the
-     spins are fill-box on stable-bbox leaf groups (the trwheel law). */
+  /* THE WIND-UP RACECAR (v1.71, THE LAP v1.78) — the battlefield's prize.
+     Parked it strains at the leash (a wound spring does not sleep: a fast
+     0.8px jiggle + the key creeping); tap = THE LAP: it drags itself BACK
+     like a pull-back racer, blasts off the RIGHT edge of the room flat out,
+     and comes back in off the LEFT edge — it went all the way around the
+     world — braking, overshooting its spot and skidding home. The travel is
+     pure translateX on .rczip (no origin to get wrong — the v1.21 law); the
+     wheelie/skid rotations live on their own .rctilt group pinned by the
+     v1.34 train recipe (view-box + origin 0 0 = the car's own local origin;
+     NEVER fill-box on the car — animated children breathe that bbox); the
+     smoke lives OUTSIDE .rczip so every puff stays on the floor the car
+     already left (the v1.34 steam-puff law).
+     ⚠ THE WRAP: the exit keyframe carries steps(1,end), so the right-edge →
+     left-edge hop is a hold-then-snap between two OFFSCREEN values — a plain
+     segment would interpolate the car BACKWARD across the whole visible room. */
   .rcjig { animation:rcjig 0.32s linear infinite alternate; }
   @keyframes rcjig { from { transform:translateY(0); } to { transform:translateY(-0.8px); } }
   .rckey { transform-box:fill-box; transform-origin:50% 90%; animation:rcwind 2.3s ease-in-out infinite alternate; }
   @keyframes rcwind { from { transform:rotate(0); } to { transform:rotate(-26deg); } }
   .rcwheel { transform-box:fill-box; transform-origin:50% 50%; }
+  .rctilt { transform-box:view-box; transform-origin:0 0; }
   /* base value law (v1.21) + a pinned origin: the puff keyframes carry scale(),
      and an unpinned CSS scale on an SVG leaf works from the VIEWBOX centre —
      fill-box is safe here, a lone circle's bbox never breathes (the trwheel law) */
-  .rcpuff { opacity:0; transform-box:fill-box; transform-origin:50% 50%; }
-  .dec-racer.react .rczip { animation:rczip 1.4s cubic-bezier(.3,.7,.4,1); }
-  @keyframes rczip { 0% { transform:translateX(0); } 26% { transform:translateX(27px); }
-    44% { transform:translateX(16px); } 68% { transform:translateX(30px); } 100% { transform:translateX(0); } }
-  .dec-racer.react .rckey { animation:rcunwind 1.35s cubic-bezier(.2,.6,.3,1); }
-  @keyframes rcunwind { from { transform:rotate(-720deg); } to { transform:rotate(0); } }
+  .rctp, .rcdust { opacity:0; transform-box:fill-box; transform-origin:50% 50%; }
+  .dec-racer.react .rczip { animation:rczoom 2.1s linear; }
+  @keyframes rczoom {
+    0%   { transform:translateX(0);      animation-timing-function:cubic-bezier(.45,0,.6,1); }
+    13%  { transform:translateX(-15px); }
+    20%  { transform:translateX(-15px);  animation-timing-function:cubic-bezier(.55,0,.85,.45); }
+    47%  { transform:translateX(980px);  animation-timing-function:steps(1,end); }
+    52%  { transform:translateX(-262px); animation-timing-function:cubic-bezier(.15,.5,.3,1); }
+    84%  { transform:translateX(16px);   animation-timing-function:cubic-bezier(.4,0,.5,1); }
+    100% { transform:translateX(0); }
+  }
+  .dec-racer.react .rctilt { animation:rctiltz 2.1s linear; }
+  @keyframes rctiltz { 0%,17% { transform:rotate(0); } 24% { transform:rotate(-6deg); }
+    36% { transform:rotate(-2.4deg); } 45%,76% { transform:rotate(0); }
+    87% { transform:rotate(3.4deg); } 100% { transform:rotate(0); } }
+  /* the key rides the drag winding one last notch tighter, then spins itself
+     out over the blast — the spring is spent by the time it rolls home */
+  .dec-racer.react .rckey { animation:rckeyz 2.1s linear; }
+  @keyframes rckeyz { 0% { transform:rotate(-700deg); } 18% { transform:rotate(-740deg); }
+    72% { transform:rotate(0); } 100% { transform:rotate(0); } }
   .dec-racer.react .rcwheel { animation:trspin 0.22s linear infinite; }
-  .dec-racer.react .rcpuff { animation:rcpuff 1.4s ease-out; }
-  @keyframes rcpuff { 0% { opacity:0; transform:translate(0,0) scale(0.6); } 12% { opacity:0.85; }
-    55% { opacity:0.35; } 100% { opacity:0; transform:translate(-26px,-14px) scale(1.9); } }
+  /* the smoke trail: positive delays timed to the tailpipe passing each puff's
+     patch of floor (the car accelerates, so the gaps close toward the door) */
+  .dec-racer.react .rctp.o { animation:rcpf 0.55s ease-out 0.42s; }
+  .dec-racer.react .rctp.a { animation:rcpf 0.5s ease-out 0.69s; }
+  .dec-racer.react .rctp.b { animation:rcpf 0.5s ease-out 0.81s; }
+  .dec-racer.react .rctp.c { animation:rcpf 0.5s ease-out 0.89s; }
+  .dec-racer.react .rctp.d { animation:rcpf 0.5s ease-out 0.97s; }
+  @keyframes rcpf { 0% { opacity:0; transform:translate(0,0) scale(0.5); } 18% { opacity:0.8; }
+    100% { opacity:0; transform:translate(-14px,-11px) scale(1.7); } }
+  .dec-racer.react .rcdust { animation:rcdz 0.5s ease-out 1.74s; }
+  @keyframes rcdz { 0% { opacity:0; transform:scale(0.5); } 25% { opacity:0.7; }
+    100% { opacity:0; transform:translate(10px,-6px) scale(1.8); } }
   /* THE TEDDY BEAR (v1.76) — sat at the foot of the bed, breathing in his
      sleep. Tap = the SQUEEZE: the whole bear squashes like a hugged plush and
      jiggles back out (nanawob's decay family), the arms fold in, the head
@@ -1796,7 +1829,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.77</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.78</div>
   <div class="scanlines"></div>
 </div>
 
@@ -10369,11 +10402,18 @@ const SFX = {
   // the rubber ducky (v1.71): the banana's squeak family, an octave honkier —
   // two triangle swoops down is as close to a toy quack as a synth gets
   quack: ()=>{ tone(640,300,0.12,'triangle',0.09); setTimeout(()=>tone(520,260,0.16,'triangle',0.07),130); },
-  // the wind-up racecar (v1.71): three ratchet ticks winding out, a sawtooth
-  // motor swelling under them, and a little doppler tail as it comes back
-  zoom: ()=>{ [0,70,140].forEach((d,i)=>setTimeout(()=>tone(1300-i*140,900-i*90,0.04,'square',0.05),d));
-    setTimeout(()=>{ tone(210,980,0.34,'sawtooth',0.055); tone(140,620,0.34,'square',0.03); },200);
-    setTimeout(()=>tone(880,240,0.22,'sawtooth',0.04),560); },
+  // the wind-up racecar (v1.71, retimed for the v1.78 lap): four ratchet
+  // ticks winding tighter through the pull-back, the spring lets go and the
+  // motor dopplers OFF the right edge, swells back in from the left edge,
+  // then a skid-squeal and two low putts park it. The beat map is rczoom's
+  // own: drag 0–0.42s · blast 0.42–1.0 · re-entry 1.06 · skid ~1.62 · home.
+  zoom: ()=>{ [0,80,160,240].forEach((d,i)=>setTimeout(()=>tone(1150+i*110,860,0.035,'square',0.05),d));
+    setTimeout(()=>{ tone(540,170,0.5,'sawtooth',0.06); tone(300,110,0.5,'square',0.032); },420);
+    setTimeout(()=>tone(900,320,0.2,'sawtooth',0.028),760);
+    setTimeout(()=>{ tone(190,640,0.42,'sawtooth',0.05); tone(120,340,0.42,'square',0.028); },1060);
+    setTimeout(()=>{ noise(0.2,0.07,2400); tone(1550,900,0.16,'sine',0.045); },1620);
+    setTimeout(()=>tone(170,120,0.1,'square',0.045),1920);
+    setTimeout(()=>tone(150,105,0.12,'square',0.04),2060); },
   // ===== THE XP CEREMONY (v1.25) =====
   // one grain of XP landing in the bar. Pitched UP as the bar fills (k = 0..1),
   // so a payout audibly climbs instead of chattering on one note.
@@ -18666,39 +18706,77 @@ const DUCKY_VB='-37 -29 70 68';
 function duckySVG(){
   return '<g class="dec dec-ducky" id="decDucky" transform="translate(585,196) scale(0.88)">'+duckyArt()+'</g>';
 }
-// THE WIND-UP RACECAR (v1.71) — the battlefield's prize: a tin racer with a
-// green army man at the wheel, a gold wind-up key that never quite sleeps,
-// and a star roundel on the door. Parked nose-east on the clear stretch of
-// floorboard between the banana and the railway — the tap shimmy runs up
-// that stretch and rolls home, so he never reaches the track.
+// THE WIND-UP RACECAR (v1.71, redrawn + THE LAP v1.78) — the battlefield's
+// prize: a low-slung tin midget racer, a green army man at the wheel (helmet,
+// goggles, both arms on the wheel), a tail fin, a chrome tailpipe, a star
+// roundel on the door and the gold wind-up key that never quite sleeps.
+// Parked nose-east between the banana and the railway; the tap lap runs OFF
+// the right edge and back in from the left, crossing IN FRONT of the railway
+// (the racecar is drawn last in decorSVG) and UNDER every label pill and
+// door (those are DIVs stacked over the SVG, and the car carries no pointer
+// handler of its own — its tap anchor stays parked, so mid-flight it can
+// neither block a door nor ghost-trigger one).
 function racecarArt(){
-  const wheel=(cx)=>'<g class="rcwheel"><circle cx="'+cx+'" cy="13" r="8.5" fill="#22262B"/>'
-    +'<circle cx="'+cx+'" cy="13" r="4.6" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.3"/>'
-    +'<path d="M'+(cx-4)+' 13 H'+(cx+4)+' M'+cx+' 9 V17" stroke="#3A2C1C" stroke-width="1.1"/>'
-    +'<circle cx="'+cx+'" cy="13" r="1.2" fill="#7A5A22"/></g>';
-  return '<ellipse cx="0" cy="22" rx="33" ry="5" fill="#000" opacity="0.25"/>'
+  const wheel=(cx,cy,r)=>'<g class="rcwheel"><circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="#22262B"/>'
+    +'<circle cx="'+cx+'" cy="'+cy+'" r="'+(r*0.56).toFixed(1)+'" fill="#E0CFA4" stroke="#3A2C1C" stroke-width="1.4"/>'
+    +'<path d="M'+(cx-r*0.44).toFixed(1)+' '+cy+' H'+(cx+r*0.44).toFixed(1)+' M'+cx+' '+(cy-r*0.44).toFixed(1)+' V'+(cy+r*0.44).toFixed(1)+'" stroke="#3A2C1C" stroke-width="1.2"/>'
+    +'<circle cx="'+cx+'" cy="'+cy+'" r="1.4" fill="#7A5A22"/></g>';
+  return '<ellipse cx="1" cy="22" rx="40" ry="5.5" fill="#000" opacity="0.25"/>'
     +'<g class="rcjig">'
-      +'<circle class="rcpuff" cx="-33" cy="2" r="5" fill="#E8E4D4"/>'
-      +'<path d="M-30 -2 h-5 q-2 0 -2 2 v2 h7 z" fill="#4A4F58"/>'
-      +'<path d="M-28 8 q-3 -12 12 -14 l7 -1 q16 -1 26 5 q9 5 11 10 q1 4 -3 4 h-49 q-3 0 -4 -4 z" fill="#C05A4A"/>'
-      +'<path d="M-26 3 q20 -6 52 0" stroke="#E0906A" stroke-width="2.4" fill="none" opacity="0.75"/>'
-      +'<path d="M12 -7 q6 0 8 5 l-12 0 z" fill="#BFD4DE"/>'
-      +'<circle cx="-1" cy="-9" r="6" fill="#7FA35C"/>'
-      +'<path d="M-7.5 -9 a6.5 6.5 0 0 1 13 0 z" fill="#5E7C42"/>'
-      +'<g class="rckey"><rect x="-13.5" y="-21" width="3" height="10" rx="1.5" fill="#D9A544"/>'
-        +'<path d="M-19 -23 a7 7 0 0 1 14 0 a3.4 3.4 0 0 1 -14 0 z" fill="none" stroke="#D9A544" stroke-width="3.4"/></g>'
-      +'<circle cx="18" cy="1" r="6.5" fill="#F0E2C2" stroke="#8A3A1E" stroke-width="1.6"/>'
-      +'<g transform="translate(18,1) scale(0.72)">'+STAR5+' fill="#8A3A1E"/></g>'
-      +wheel(-17)+wheel(17)
+      // far-side wheels: dark slivers under the hull, for depth
+      +'<circle cx="-15" cy="8.5" r="8.8" fill="#15181C"/>'
+      +'<circle cx="25" cy="10.5" r="6.6" fill="#15181C"/>'
+      // chrome tailpipe out the back
+      +'<path d="M-34 2 h-6.6 q-2.4 0 -2.4 2.4 v1.4 q0 2.2 2.4 2.2 h6.6 z" fill="#9AA2AE"/>'
+      +'<ellipse cx="-43.2" cy="5" rx="1.7" ry="2.9" fill="#4A4F58"/>'
+      // the hull: long tin teardrop, tail high, nose raked down
+      +'<path d="M-40 14 L-40 3 Q-40 -3 -33 -4 L18 -6 Q34 -6 43 2 Q47 6 46 10 Q45 14 40 14 z" fill="#C05A4A"/>'
+      +'<rect x="-40" y="9.5" width="85" height="4.5" rx="2" fill="#A34434"/>'
+      +'<path d="M-39 -2.5 Q-36.5 -13.5 -30 -3.2 z" fill="#A34434"/>'
+      +'<path d="M-30 -1.8 Q0 -4.8 33 -1 " stroke="#E0906A" stroke-width="2.2" fill="none" opacity="0.75"/>'
+      +'<path d="M-33 1.5 Q0 -0.5 38 2" stroke="#A34434" stroke-width="1" fill="none" opacity="0.7"/>'
+      +'<g fill="#E0906A" opacity="0.85"><circle cx="-26" cy="1" r="0.9"/><circle cx="-14" cy="0.4" r="0.9"/>'
+        +'<circle cx="26" cy="0.9" r="0.9"/><circle cx="33" cy="1.6" r="0.9"/></g>'
+      // cockpit opening, and the man himself leaning into the wind
+      +'<path d="M-14 -4.7 Q-12 -8.6 -8 -8.8 L4 -9.3 Q8.5 -9.3 9.3 -5.7 z" fill="#5A2A20"/>'
+      +'<path d="M-9 -5 Q-9 -14.5 -1 -14.5 Q7 -14.5 7 -5.6 Q-1 -8.4 -9 -5 z" fill="#5E7C42"/>'
+      +'<path d="M-2 -12.5 Q5 -11.5 9.5 -8.2" stroke="#52713A" stroke-width="3.2" fill="none" stroke-linecap="round"/>'
+      +'<path d="M-5 -11 Q2.5 -10 7.5 -7" stroke="#5E7C42" stroke-width="3.4" fill="none" stroke-linecap="round"/>'
+      +'<circle cx="10.5" cy="-8" r="3.3" fill="none" stroke="#2E2420" stroke-width="1.8"/>'
+      +'<path d="M10.5 -8 L13.5 -5.2" stroke="#2E2420" stroke-width="1.6"/>'
+      +'<circle cx="-1.5" cy="-18.4" r="5.2" fill="#7FA35C"/>'
+      +'<rect x="-5.8" y="-18.6" width="9" height="3" rx="1.5" fill="#BFD4DE" stroke="#3A2C1C" stroke-width="0.9"/>'
+      +'<path d="M-8 -19.4 a6.6 6.6 0 0 1 13.2 0 z" fill="#4A6B35"/>'
+      +'<rect x="-8.8" y="-20.4" width="14.8" height="2" rx="1" fill="#52713A"/>'
+      // windscreen ahead of the wheel
+      +'<path d="M13 -5.9 L16.8 -13.2 L18.8 -13 L15.6 -5.8 z" fill="#BFD4DE" stroke="#8A9AA6" stroke-width="0.8"/>'
+      // the key on the tail deck — same gold bow the v1.71 car wound
+      +'<g class="rckey"><rect x="-23.6" y="-17" width="3.2" height="13" rx="1.6" fill="#D9A544"/>'
+        +'<path d="M-29 -20 a7 7 0 0 1 14 0 a3.4 3.4 0 0 1 -14 0 z" fill="none" stroke="#D9A544" stroke-width="3.4"/></g>'
+      // the star roundel on the door, and the nose furniture
+      +'<circle cx="0" cy="3.8" r="7" fill="#F0E2C2" stroke="#8A3A1E" stroke-width="1.7"/>'
+      +'<g transform="translate(0,3.8) scale(0.85)">'+STAR5+' fill="#8A3A1E"/></g>'
+      +'<ellipse cx="42.3" cy="6.3" rx="2.3" ry="3.5" fill="#7E2A1E"/>'
+      +'<path d="M45.8 3.2 q2.6 3.2 0.6 7.2" stroke="#BFD4DE" stroke-width="1.8" fill="none" stroke-linecap="round"/>'
+      +wheel(-19,11,10.5)+wheel(23,13,8)
     +'</g>';
 }
-const RACER_VB='-40 -33 78 63';
+const RACER_VB='-48 -32 98 62';
 // same park law as the duck: the id-carrier holds the attribute transform, the
-// tap shimmy lives on the INNER .rczip group (pure translateX), so the two can
-// never fight over one transform slot
+// lap lives on the INNER .rczip group (pure translateX) with the wheelie on
+// .rctilt inside it, so no two animated slots ever fight. The smoke circles
+// sit OUTSIDE .rczip at fixed patches of floor along the lap (car-local x,
+// so the 0.88 park scale places them): each pops as the tailpipe passes and
+// stays where the car left it. All of it parks at opacity 0 (base value law).
 function racecarSVG(){
   return '<g class="dec dec-racer" id="decRacer" transform="translate(166,574) scale(0.88)">'
-    +'<g class="rczip">'+racecarArt()+'</g></g>';
+    +'<circle class="rctp o" cx="-52" cy="3" r="6" fill="#E8E4D4"/>'
+    +'<circle class="rctp a" cx="170" cy="4" r="5.5" fill="#E8E4D4"/>'
+    +'<circle class="rctp b" cx="400" cy="4" r="5.5" fill="#E8E4D4"/>'
+    +'<circle class="rctp c" cx="630" cy="4" r="5.5" fill="#E8E4D4"/>'
+    +'<circle class="rctp d" cx="860" cy="4" r="5.5" fill="#E8E4D4"/>'
+    +'<circle class="rcdust" cx="10" cy="13" r="7" fill="#D8C9A8"/>'
+    +'<g class="rczip"><g class="rctilt">'+racecarArt()+'</g></g></g>';
 }
 // THE TEDDY BEAR (v1.76) — a honey-brown plush sat on the floorboards at the
 // foot of the bed, paws out, wearing the army's own green bow. Banana-family
@@ -18753,7 +18831,7 @@ function teddyArt(){
       +'<rect x="13" y="-6" width="9.5" height="9.5" rx="2" fill="none" stroke="rgba(0,0,0,0.2)" stroke-width="1.4" stroke-dasharray="2.5 2.5"/>'
     +'</g>'
     // the squeeze pops a felt heart out over his head — sibling of .tedw, never
-    // inside it (see the bbox note above); parked invisible, the rcpuff idiom
+    // inside it (see the bbox note above); parked invisible, the racecar-smoke idiom
     +'<g class="tedheart" transform="translate(15,-76)"><path d="M0 3.4 C -1.6 0.4 -6.4 -0.8 -6.4 -4.8 C -6.4 -8 -3.6 -9.6 -1.6 -8.4 C -0.6 -7.8 0 -7 0 -6.6 C 0 -7 0.6 -7.8 1.6 -8.4 C 3.6 -9.6 6.4 -8 6.4 -4.8 C 6.4 -0.8 1.6 0.4 0 3.4 z" fill="#C05A4A"/></g>';
 }
 // ⚠ crop measured against INK: arms reach x ±33.5 with their 11-wide stroke,
@@ -18893,7 +18971,10 @@ const DECOR_SPOTS={
   // the car below the promotions easel's floor (y546) — measured against
   // ROOM_SPOTS AND the label pills, not guessed
   ducky:    { x:552, y:166, w:66,  h:60 },
-  racecar:  { x:130, y:548, w:74,  h:48 },
+  // v1.78: widened to the redrawn racer's ink (126..210 × 548..596) — still
+  // under the promotions easel's hotspot (ends y546) and shy of the railway's
+  // (starts x240); the anchor STAYS PARKED while the car laps, on purpose
+  racecar:  { x:126, y:548, w:84,  h:48 },
   // v1.76: the bear's whole rectangle at the foot of the bed — see teddySVG's
   // survey note; starts x850 so the trophy's WORLD RANKINGS door (ends 842)
   // keeps a clear 8px gutter, ends y304 shy of that door's own label pill
@@ -18919,10 +19000,14 @@ const DECOR_REACT={
   banana:  { el:'decNana',  ms:1300, sfx:'squeak'  },
   teddy:   { el:'decTeddy', ms:1150, sfx:'cuddle'  },
   ducky:   { el:'decDucky', ms:1200, sfx:'quack'   },
-  racecar: { el:'decRacer', ms:1500, sfx:'zoom'    }
+  // solo (v1.78): the lap must FINISH — a re-tap mid-flight would restart the
+  // animation and teleport the car home from the middle of the room
+  racecar: { el:'decRacer', ms:2350, sfx:'zoom', solo:true }
 };
 function decorReact(id){
   const d=DECOR_REACT[id]; if(!d) return;
+  if(d.solo){ const g=document.getElementById(d.el);
+    if(g && g.classList.contains('react')) return; }
   if(SFX[d.sfx]) SFX[d.sfx]();
   const el=document.getElementById(d.el); if(!el) return;
   el.classList.remove('react'); void el.getBoundingClientRect(); el.classList.add('react');
@@ -21313,6 +21398,14 @@ window.GVT = {
   decorTap(id){ decorReact(id); const d=DECOR_REACT[id];
     const el=d&&document.getElementById(d.el);
     return el? el.className.baseVal||el.className : null; },
+  // v1.78: the racecar's lap — geometry + a live read of the travel group,
+  // so a battery can sample the drive without touching the animation
+  rcLap(){ const el=document.getElementById('decRacer');
+    const zip=el&&el.querySelector('.rczip');
+    return { owned:decOwns('racecar'), on:decorOn('racecar'),
+      react:!!(el&&el.classList.contains('react')),
+      ms:DECOR_REACT.racecar.ms, vb:RACER_VB, spot:DECOR_SPOTS.racecar,
+      tx: zip? (getComputedStyle(zip).transform||'none') : null }; },
   bank(n){ META.bankTier=Math.max(0,Math.min(BANK_TIERS.length,n|0)); saveMeta(); renderMenu(); shopRefresh(); return bankTier(); },
   decorGive(id){ if(DECOR_ORDER.indexOf(id)<0 && !decEarned(id)) return null;
     if(!decOwns(id)) META.decor.own.push(id);
