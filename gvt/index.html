@@ -1563,6 +1563,43 @@
   @media (prefers-reduced-motion: reduce){
     #comms .cm-scan, #comms .cm-hint { animation:none; }
   }
+  /* ===== THE MYSTERY BOX (v1.63) ===== */
+  #pickMb { color:#D9A544; font-size:0.98rem; margin:0.1rem 0 0.4rem; }
+  #pickMb::before { content:'🎁 '; }
+  #mboxPop { position:fixed; inset:0; z-index:26; display:flex; align-items:center; justify-content:center;
+    padding:10px; background:rgba(10,8,5,0.82); }
+  #mboxPop.hidden { display:none; }
+  #mboxPop, #mboxPop * { box-sizing:border-box; }
+  .mb-card { position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
+    width:min(92vw,360px); max-height:94vh; overflow:hidden; padding:0 14px 12px; border-radius:14px;
+    background:linear-gradient(180deg,#2E2618,#1C160C); border:3px solid #D9A544;
+    box-shadow:0 12px 40px rgba(0,0,0,0.65), 0 0 26px rgba(217,165,68,0.28);
+    color:#EDEADF; font-family:var(--uih); font-weight:bold;
+    animation:mbpop 0.42s cubic-bezier(0.2,1.6,0.4,1); }
+  .mb-band { align-self:stretch; margin:0 -14px; padding:0.34em 0.5em 0.28em; background:#A63B2A;
+    color:#FFE9B0; font-size:clamp(11px,2.4vh,15px); letter-spacing:0.18em; }
+  .mb-h { margin:0.3em 0 0; font-size:clamp(20px,5.4vh,34px); letter-spacing:0.06em; color:#FFD24A;
+    text-shadow:0 2px 0 rgba(0,0,0,0.5); }
+  .mb-win { position:relative; width:min(58vw,190px); height:clamp(100px,24vh,160px); margin:8px 0 2px;
+    display:flex; align-items:center; justify-content:center; }
+  .mb-rays { position:absolute; inset:-28%; width:156%; height:156%; animation:mbspin 9s linear infinite; }
+  .mb-win img, .mb-win svg:not(.mb-rays) { position:relative; max-width:100%; max-height:100%;
+    width:auto; height:100%; filter:drop-shadow(0 6px 8px rgba(0,0,0,0.5)); }
+  .mb-name { font-size:clamp(15px,3.6vh,22px); letter-spacing:0.08em; color:#FFF3C4; margin-top:2px; }
+  .mb-line { font-family:var(--ui); font-weight:normal; font-size:clamp(12px,2.6vh,15px); line-height:1.35;
+    color:#D8CFA8; max-width:24em; margin:0.35em 0 0.75em; }
+  .mb-take { border:none; cursor:pointer; border-radius:10px; background:linear-gradient(180deg,#E8C25A,#C9992F);
+    color:#2a1f08; font-family:inherit; font-weight:bold; font-size:clamp(14px,3.4vh,20px);
+    letter-spacing:0.06em; padding:0.5em 1.6em; box-shadow:0 3px 0 #8a6a1d; }
+  .mb-take:active { transform:translateY(2px); box-shadow:0 1px 0 #8a6a1d; }
+  @keyframes mbpop { 0% { opacity:0; transform:scale(0.62); } 62% { opacity:1; transform:scale(1.05); }
+    100% { opacity:1; transform:scale(1); } }
+  @keyframes mbspin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+  /* the reduce override, ID-scoped and AFTER everything it cancels (the
+     v1.11/v1.21 law) — the pop lands standing, the rays hold still */
+  @media (prefers-reduced-motion: reduce){
+    #mboxPop .mb-card, #mboxPop .mb-rays { animation:none; }
+  }
 </style>
 </head>
 <body>
@@ -1579,7 +1616,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.62</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.63</div>
   <div class="scanlines"></div>
 </div>
 
@@ -1600,6 +1637,9 @@
 <div class="overlay hidden" id="picker">
   <h1 style="color:#7FA35C; font-size:2.2rem">PROMOTION!</h1>
   <p id="pickHint">Choose a soldier to promote — permanent damage, every battle, forever. Every rank counts, all the way to 100.</p>
+  <!-- THE MYSTERY BOX line (v1.63) — Wyatt's copy, on the screen where the
+       levels it talks about actually happen -->
+  <p id="pickMb">Earn a mystery box every time you reach level five.</p>
   <!-- the door. Only appears when every rank is maxed — see showPicker. It sits
        ABOVE the cards on purpose: eleven MAXED cards push anything below them
        off the bottom of a phone, and this is the only way off this screen. -->
@@ -1641,6 +1681,11 @@
 <!-- THE BLADE CEREMONY: the one free saber colour. Sits ABOVE the shop (z24), so
      the crystal case can hand you your free pick instead of selling you one. -->
 <div id="sabrite" class="hidden"></div>
+
+<!-- THE MYSTERY BOX (v1.63). A top-level pop above whatever screen the
+     promotion routed to — deliberately NOT in hideAllOverlays' list, so the
+     picker/menu behind it stands ready the moment it is dismissed. -->
+<div id="mboxPop" class="hidden"></div>
 
 <div class="overlay" id="rotate">
   <h1>&#8635;</h1>
@@ -1981,6 +2026,23 @@ const TR_DATA={
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE RADIO MAN</b>":"<i>グリーンぐん · たなシリーズ</i><b>つうしんへい</b>",
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE SWEEPER</b>":"<i>グリーンぐん · たなシリーズ</i><b>じらいへい</b>",
 "<i>GREEN ARMY · SPECIAL ISSUE</i><b>THE EMERGENCY PACKAGE</b>":"<i>グリーンぐん · とくべつしきゅう</i><b>きんきゅうパック</b>",
+"THE EMERGENCY PACKAGE":"きんきゅうパック",
+"Earn a mystery box every time you reach level five.":"レベル5にとうたつするたびに、ミステリーボックスがもらえるよ。",
+"MYSTERY BOX!":"ミステリーボックス！",
+"CONGRATS!":"おめでとう！",
+"IT'S MINE!":"もらった！",
+"THE %1 CRYSTAL":"%1のクリスタル",
+"THE %1 LASER":"%1のレーザー",
+"AN ARMOUR PLATE — %1":"そうこうプレート — %1",
+"A new soldier joins your army!":"あたらしいへいしがぐんにくわわった！",
+"A new toy for your room!":"へやにあたらしいおもちゃ！",
+"Your piggy bank pays +{0}★ a day more!":"ちょきんばこが1日にはらう★が +{0} ふえるよ！",
+"A new colour for Sarge's blade!":"サージのやいばにあたらしいいろ！",
+"Laser fire for your whole army!":"ぐんぜんいんがレーザーをうてる！",
+"A fresh coat of paint for your whole army!":"ぐんぜんいんをぬりかえるペンキ！",
+"A new machine for the motor pool!":"モータープールにあたらしいマシン！",
+"One more armour plate on the hull!":"そうこうプレートがもう1まい！",
+"A new part — already fitted and switched on!":"あたらしいパーツ — もうとりつけずみ！",
 "GREEN ARMY · SPECIAL ISSUE":"グリーンぐん · とくべつしきゅう",
 "ONE RESCUE PER BATTLE! Five surprises inside — you never know which.":"1かいのバトルに1どだけ! なかみは5しゅるい — なにがでるかおたのしみ。",
 "IN THE KIT ✓":"そうびOK ✓",
@@ -2844,6 +2906,23 @@ const TR_DATA={
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE RADIO MAN</b>":"<i>그린 군 · 진열 시리즈</i><b>통신병</b>",
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE SWEEPER</b>":"<i>그린 군 · 진열 시리즈</i><b>지뢰병</b>",
 "<i>GREEN ARMY · SPECIAL ISSUE</i><b>THE EMERGENCY PACKAGE</b>":"<i>그린 군 · 특별 보급</i><b>긴급 패키지</b>",
+"THE EMERGENCY PACKAGE":"긴급 패키지",
+"Earn a mystery box every time you reach level five.":"레벨 5에 도달할 때마다 미스터리 박스를 받아요.",
+"MYSTERY BOX!":"미스터리 박스!",
+"CONGRATS!":"축하해요!",
+"IT'S MINE!":"내 거야!",
+"THE %1 CRYSTAL":"%1 크리스털",
+"THE %1 LASER":"%1 레이저",
+"AN ARMOUR PLATE — %1":"장갑판 — %1",
+"A new soldier joins your army!":"새 병사가 부대에 합류했어요!",
+"A new toy for your room!":"방에 새 장난감이 생겼어요!",
+"Your piggy bank pays +{0}★ a day more!":"저금통이 하루에 +{0}★ 더 줘요!",
+"A new colour for Sarge's blade!":"사지의 검날에 새 색깔!",
+"Laser fire for your whole army!":"부대 전체가 레이저를 쏴요!",
+"A fresh coat of paint for your whole army!":"부대 전체에 새 페인트!",
+"A new machine for the motor pool!":"차량 정비고에 새 기계!",
+"One more armour plate on the hull!":"장갑판이 하나 더!",
+"A new part — already fitted and switched on!":"새 부품 — 이미 장착 완료!",
 "GREEN ARMY · SPECIAL ISSUE":"그린 군 · 특별 보급",
 "ONE RESCUE PER BATTLE! Five surprises inside — you never know which.":"한 전투에 딱 한 번! 다섯 가지 깜짝 구조 — 뭐가 나올지 몰라요.",
 "IN THE KIT ✓":"장비 완료 ✓",
@@ -3707,6 +3786,23 @@ const TR_DATA={
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE RADIO MAN</b>":"<i>绿军 · 货架系列</i><b>通讯兵</b>",
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE SWEEPER</b>":"<i>绿军 · 货架系列</i><b>布雷兵</b>",
 "<i>GREEN ARMY · SPECIAL ISSUE</i><b>THE EMERGENCY PACKAGE</b>":"<i>绿军 · 特别配给</i><b>紧急包裹</b>",
+"THE EMERGENCY PACKAGE":"紧急包裹",
+"Earn a mystery box every time you reach level five.":"每次达到5级，就能获得一个神秘宝箱。",
+"MYSTERY BOX!":"神秘宝箱！",
+"CONGRATS!":"恭喜！",
+"IT'S MINE!":"是我的了！",
+"THE %1 CRYSTAL":"%1水晶",
+"THE %1 LASER":"%1激光",
+"AN ARMOUR PLATE — %1":"装甲板 — %1",
+"A new soldier joins your army!":"新士兵加入你的军队！",
+"A new toy for your room!":"房间里多了一件新玩具！",
+"Your piggy bank pays +{0}★ a day more!":"存钱罐每天多付 +{0}★！",
+"A new colour for Sarge's blade!":"萨吉的剑刃有了新颜色！",
+"Laser fire for your whole army!":"全军发射激光！",
+"A fresh coat of paint for your whole army!":"给全军刷上新漆！",
+"A new machine for the motor pool!":"车辆库里的新机器！",
+"One more armour plate on the hull!":"又加了一块装甲板！",
+"A new part — already fitted and switched on!":"新零件 — 已经装好开启！",
 "GREEN ARMY · SPECIAL ISSUE":"绿军 · 特别配给",
 "ONE RESCUE PER BATTLE! Five surprises inside — you never know which.":"每场战斗只能用一次! 五种惊喜救援 — 打开才知道。",
 "IN THE KIT ✓":"已入装备 ✓",
@@ -4570,6 +4666,23 @@ const TR_DATA={
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE RADIO MAN</b>":"<i>GRÜNE ARMEE · REGAL-SERIE</i><b>DER FUNKER</b>",
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE SWEEPER</b>":"<i>GRÜNE ARMEE · REGAL-SERIE</i><b>DER MINENLEGER</b>",
 "<i>GREEN ARMY · SPECIAL ISSUE</i><b>THE EMERGENCY PACKAGE</b>":"<i>GRÜNE ARMEE · SONDERAUSGABE</i><b>DAS NOTFALL-PAKET</b>",
+"THE EMERGENCY PACKAGE":"DAS NOTFALL-PAKET",
+"Earn a mystery box every time you reach level five.":"Jedes Mal, wenn du Level 5 erreichst, gibt es eine Wundertüte.",
+"MYSTERY BOX!":"WUNDERTÜTE!",
+"CONGRATS!":"GLÜCKWUNSCH!",
+"IT'S MINE!":"MEINS!",
+"THE %1 CRYSTAL":"DER KRISTALL — %1",
+"THE %1 LASER":"DER LASER — %1",
+"AN ARMOUR PLATE — %1":"EINE PANZERPLATTE — %1",
+"A new soldier joins your army!":"Ein neuer Soldat tritt deiner Armee bei!",
+"A new toy for your room!":"Ein neues Spielzeug für dein Zimmer!",
+"Your piggy bank pays +{0}★ a day more!":"Dein Sparschwein zahlt +{0}★ mehr am Tag!",
+"A new colour for Sarge's blade!":"Eine neue Farbe für Sarges Klinge!",
+"Laser fire for your whole army!":"Laserfeuer für deine ganze Armee!",
+"A fresh coat of paint for your whole army!":"Ein neuer Anstrich für deine ganze Armee!",
+"A new machine for the motor pool!":"Eine neue Maschine für den Fuhrpark!",
+"One more armour plate on the hull!":"Noch eine Panzerplatte drauf!",
+"A new part — already fitted and switched on!":"Ein neues Teil — schon montiert und an!",
 "GREEN ARMY · SPECIAL ISSUE":"GRÜNE ARMEE · SONDERAUSGABE",
 "ONE RESCUE PER BATTLE! Five surprises inside — you never know which.":"EINE RETTUNG PRO SCHLACHT! Fünf Überraschungen drin — man weiß nie, welche kommt.",
 "IN THE KIT ✓":"IM GEPÄCK ✓",
@@ -5434,6 +5547,23 @@ const TR_DATA={
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE RADIO MAN</b>":"<i>ЗЕЛЁНАЯ АРМИЯ · ПОЛОЧНАЯ СЕРИЯ</i><b>РАДИСТ</b>",
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE SWEEPER</b>":"<i>ЗЕЛЁНАЯ АРМИЯ · ПОЛОЧНАЯ СЕРИЯ</i><b>САПЁР</b>",
 "<i>GREEN ARMY · SPECIAL ISSUE</i><b>THE EMERGENCY PACKAGE</b>":"<i>ЗЕЛЁНАЯ АРМИЯ · ОСОБЫЙ ВЫПУСК</i><b>АВАРИЙНЫЙ НАБОР</b>",
+"THE EMERGENCY PACKAGE":"АВАРИЙНЫЙ НАБОР",
+"Earn a mystery box every time you reach level five.":"Каждый раз, когда достигаешь 5-го уровня, получаешь таинственную коробку.",
+"MYSTERY BOX!":"ТАИНСТВЕННАЯ КОРОБКА!",
+"CONGRATS!":"ПОЗДРАВЛЯЕМ!",
+"IT'S MINE!":"МОЁ!",
+"THE %1 CRYSTAL":"КРИСТАЛЛ — %1",
+"THE %1 LASER":"ЛАЗЕР — %1",
+"AN ARMOUR PLATE — %1":"БРОНЕПЛАСТИНА — %1",
+"A new soldier joins your army!":"Новый солдат вступает в твою армию!",
+"A new toy for your room!":"Новая игрушка для твоей комнаты!",
+"Your piggy bank pays +{0}★ a day more!":"Копилка платит на +{0}★ в день больше!",
+"A new colour for Sarge's blade!":"Новый цвет для клинка Сарджа!",
+"Laser fire for your whole army!":"Лазерный огонь для всей твоей армии!",
+"A fresh coat of paint for your whole army!":"Свежая краска для всей твоей армии!",
+"A new machine for the motor pool!":"Новая машина в автопарк!",
+"One more armour plate on the hull!":"Ещё одна бронепластина на корпусе!",
+"A new part — already fitted and switched on!":"Новая деталь — уже установлена и включена!",
 "GREEN ARMY · SPECIAL ISSUE":"ЗЕЛЁНАЯ АРМИЯ · ОСОБЫЙ ВЫПУСК",
 "ONE RESCUE PER BATTLE! Five surprises inside — you never know which.":"ОДНО СПАСЕНИЕ ЗА БОЙ! Внутри пять сюрпризов — никогда не знаешь, какой выпадет.",
 "IN THE KIT ✓":"В НАБОРЕ ✓",
@@ -6297,6 +6427,23 @@ const TR_DATA={
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE RADIO MAN</b>":"<i>EJÉRCITO VERDE · SERIE DE ESTANTE</i><b>EL RADIOOPERADOR</b>",
 "<i>GREEN ARMY · SHELF SERIES</i><b>THE SWEEPER</b>":"<i>EJÉRCITO VERDE · SERIE DE ESTANTE</i><b>EL MINADOR</b>",
 "<i>GREEN ARMY · SPECIAL ISSUE</i><b>THE EMERGENCY PACKAGE</b>":"<i>EJÉRCITO VERDE · EDICIÓN ESPECIAL</i><b>EL PAQUETE DE EMERGENCIA</b>",
+"THE EMERGENCY PACKAGE":"EL PAQUETE DE EMERGENCIA",
+"Earn a mystery box every time you reach level five.":"Gana una caja misteriosa cada vez que llegues al nivel cinco.",
+"MYSTERY BOX!":"¡CAJA MISTERIOSA!",
+"CONGRATS!":"¡FELICIDADES!",
+"IT'S MINE!":"¡ES MÍO!",
+"THE %1 CRYSTAL":"EL CRISTAL — %1",
+"THE %1 LASER":"EL LÁSER — %1",
+"AN ARMOUR PLATE — %1":"UNA PLACA DE BLINDAJE — %1",
+"A new soldier joins your army!":"¡Un nuevo soldado se une a tu ejército!",
+"A new toy for your room!":"¡Un juguete nuevo para tu cuarto!",
+"Your piggy bank pays +{0}★ a day more!":"¡Tu hucha paga +{0}★ más al día!",
+"A new colour for Sarge's blade!":"¡Un color nuevo para la hoja de Sarge!",
+"Laser fire for your whole army!":"¡Fuego láser para todo tu ejército!",
+"A fresh coat of paint for your whole army!":"¡Una mano de pintura para todo tu ejército!",
+"A new machine for the motor pool!":"¡Una máquina nueva para el parque móvil!",
+"One more armour plate on the hull!":"¡Una placa de blindaje más!",
+"A new part — already fitted and switched on!":"¡Una pieza nueva — ya montada y activada!",
 "GREEN ARMY · SPECIAL ISSUE":"EJÉRCITO VERDE · EDICIÓN ESPECIAL",
 "ONE RESCUE PER BATTLE! Five surprises inside — you never know which.":"¡UN RESCATE POR BATALLA! Cinco sorpresas dentro — nunca sabes cuál tocará.",
 "IN THE KIT ✓":"EN EL EQUIPO ✓",
@@ -7979,6 +8126,10 @@ const META_DEFAULT = {
   vehOwned:[], vehUp:{}, vehGift:0,
   // THE EMERGENCY PACKAGE (v1.62): one flag — bought once, an ace every battle.
   emg:false,
+  // THE MYSTERY BOX (v1.63): the ledger — which promotion cards have paid out
+  // their level-5 box ('u:rifleman' / 'w:shotgun' → 1). One box per card, ever,
+  // so a reload can never pay twice.
+  mbox:{},
   // ROOM DECORATIONS: which ones are on the floor, what colour the elephant is,
   // and how grand the piggy's bank has got (each bank tier pays +1★ a day).
   decor:{ own:[], eleph:null }, bankTier:0,
@@ -8015,6 +8166,10 @@ if((META.bfWins||0)+(META.bfLosses||0)===0) META.bfMap='crossing';
   if(!Array.isArray(META.wrSeen)) META.wrSeen=[];
   // mapSeen is an object default — rebuild it fresh (the coopLevels alias law)
   META.mapSeen = Object.assign({}, META.mapSeen||{});
+  // the mystery-box ledger is an object default too — same rebuild, same
+  // reason: Object.assign above hands an older save META_DEFAULT's own {} and
+  // the first box would write straight into the default (v1.63)
+  META.mbox = Object.assign({}, META.mbox||{});
   // ⚠ Object.assign hands a save with no coopLevels the DEFAULT ARRAY ITSELF, so
   // the first co-op win would push into META_DEFAULT and every later `new` profile
   // would be born having beaten it. Build a fresh one — the same trap META.enh hit.
@@ -18615,6 +18770,117 @@ function showPicker(){
     ? 'Choose a soldier to promote — permanent damage, every battle, forever. Every rank counts, all the way to 100.'
     : 'Every soldier in the box is decorated to the hilt. Your promotions keep — spend them on the next unit you unlock.';
 }
+// ===== THE MYSTERY BOX (v1.63, Wyatt 7/28): reach level five, win a prize =====
+// "Earn a mystery box every time you reach level five." Every card on the
+// promotions screen carries ONE box, paid the first time a promotion lands it
+// on rank 5 or past it — an older save's rank-40 man collects his on his next
+// promotion (the v1.20 err-toward-the-gift law), and META.mbox is the ledger,
+// so a reload can never pay twice. The box holds one star-purchasable ownable
+// the save does NOT own; the roll is UNIFORM over the missing items, one entry
+// each (an owned vehicle stakes its NEXT plate, the bank its NEXT tier), and
+// the grant is the buy button's own mutation minus the star charge, so the
+// shop reads it owned the moment the card closes. Single-slot loadout choices
+// (worn dye, equipped laser, fitted blade colour) are deliberately NOT
+// switched — a box must never repaint an army mid-collection — while a bench
+// part arrives fitted, because that is the buy's own documented behaviour and
+// a switch the player can flip off. Crystals only enter the pool once the
+// case is actually selling (saber unlocked, free pick spent) so the v1.18
+// ceremony is never collided with; Sarge's GEAR is campaign-only and never
+// sold, so it never enters at all. Empty pool = no box, and the card's debt
+// STAYS OPEN — it pays the day the shop stocks something new.
+const MB_LINES={
+  fig:  'A new soldier joins your army!',
+  decor:'A new toy for your room!',
+  bank: 'Your piggy bank pays +1★ a day more!',
+  sab:  "A new colour for Sarge's blade!",
+  laser:'Laser fire for your whole army!',
+  dye:  'A fresh coat of paint for your whole army!',
+  veh:  'A new machine for the motor pool!',
+  vehup:'One more armour plate on the hull!',
+  mod:  'A new part — already fitted and switched on!'
+};
+function mboxPool(){
+  const pool=[];
+  for(const s of SHOP_ITEMS) if(META.unlocked.indexOf(s.t)<0)
+    pool.push({k:'fig', id:s.t, name:s.name, line:MB_LINES.fig,
+      art:'<img src="'+sprURI(s.t)+'" alt="">',
+      g(){ META.unlocked.push(s.t); }});
+  if(!emgOwned())
+    pool.push({k:'emg', id:'emg', name:'THE EMERGENCY PACKAGE',
+      line:'ONE RESCUE PER BATTLE! Five surprises inside — you never know which.',
+      art:'<img src="'+emgURI()+'" alt="">',
+      g(){ META.emg=true; }});
+  for(const id of DECOR_ORDER) if(!decOwns(id))
+    pool.push({k:'decor', id, name:DECOR_INFO[id].name, line:MB_LINES.decor,
+      art:decShopArt(id),
+      g(){ META.decor.own.push(id);
+           if(id==='elephant' && !META.decor.eleph) META.decor.eleph=dyeHex()||'#7FA35C'; }});
+  { const r=bankTier();
+    if(r<BANK_TIERS.length)
+      pool.push({k:'bank', id:'t'+(r+1), name:BANK_TIERS[r].name, line:MB_LINES.bank,
+        art:'<svg viewBox="'+BANK_VB+'">'+bankArt(r+1)+pigSvg(true)+'</svg>',
+        g(){ META.bankTier=r+1; }}); }
+  if(sabHasSaber() && !sabRiteOwed())
+    for(const c of SABER_COLORS) if(!sabOwns(c.hex))
+      pool.push({k:'sab', id:c.id, name:tf('THE %1 CRYSTAL', TXT(c.id.toUpperCase())), notr:1,
+        line:MB_LINES.sab, art:vialSVG(c.hex,true),
+        g(){ META.sabColOwned.push(c.hex); }});
+  for(const a of LASER_COLORS) if(META.lasers.indexOf(a.id)<0)
+    pool.push({k:'laser', id:a.id, name:tf('THE %1 LASER', TXT(a.id.toUpperCase())), notr:1,
+      line:MB_LINES.laser, art:'<img src="'+rayURI(a.hex)+'" alt="">',
+      g(){ META.lasers.push(a.id); }});
+  for(const a of ARMIES) if(META.dyes.indexOf(a.id)<0)
+    pool.push({k:'dye', id:a.id, name:a.name, line:MB_LINES.dye,
+      art:'<img src="'+sprURI('rifleman',a.hex)+'" alt="">',
+      g(){ META.dyes.push(a.id); }});
+  for(const t of VEH_ORDER){
+    if(!vehOwns(t))
+      pool.push({k:'veh', id:t, name:VEH_INFO[t].name, line:MB_LINES.veh,
+        art:'<img src="'+vehURI(t)+'" alt="">',
+        g(){ META.vehOwned.push(t); }});
+    else { const r=vehTier(t);
+      if(r<VEH_TIERS)
+        pool.push({k:'vehup', id:t, name:tf('AN ARMOUR PLATE — %1', TXT(VEH_INFO[t].name)), notr:1,
+          line:MB_LINES.vehup, art:'<img src="'+vehURI(t)+'" alt="">',
+          g(){ META.vehUp[t]=r+1; }}); } }
+  for(const id of ENH_ORDER) if(!enhOwns(id))
+    pool.push({k:'mod', id, name:ENH_INFO[id].name, line:MB_LINES.mod,
+      art:enhPartSVG(id),
+      g(){ META.enh.own.push(id); META.enh.on.push(id); }});
+  return pool;
+}
+// the one door: UI.pick/pickW call this with the card's ledger key and the rank
+// it just landed on. The grant and the paid mark land BEFORE the caller's
+// saveMeta; the caller pops the returned entry AFTER it routes screens, and the
+// pop is not in hideAllOverlays' list, so it rides above whatever came next.
+function mboxRoll(key, rank){
+  if(rank<5 || META.mbox[key]) return null;
+  const pool=mboxPool();
+  if(!pool.length) return null;              // owns the whole shop — the debt stays open
+  const e=pool[Math.floor(Math.random()*pool.length)];
+  e.g(); META.mbox[key]=1; checkAch();
+  return e;
+}
+const MB_RAYS='<svg class="mb-rays" viewBox="0 0 100 100"><g fill="#D9A544" opacity="0.5">'
+  +Array.from({length:12},(_,i)=>'<path d="M50 50 L'+(50+46*Math.cos(i*Math.PI/6-0.09)).toFixed(1)+' '
+  +(50+46*Math.sin(i*Math.PI/6-0.09)).toFixed(1)+' L'+(50+46*Math.cos(i*Math.PI/6+0.09)).toFixed(1)+' '
+  +(50+46*Math.sin(i*Math.PI/6+0.09)).toFixed(1)+' z"/>').join('')+'</g></svg>';
+function mboxOpen(e){
+  const p=document.getElementById('mboxPop'); if(!p) return;
+  // composed names (crystal/laser/plate) are tf()'d at build and carry data-notr
+  // so the walker neither re-translates nor audits them; everything else is a
+  // plain table key the innerHTML hook translates like any other card
+  p.innerHTML='<div class="mb-card">'
+    +'<span class="mb-band">MYSTERY BOX!</span>'
+    +'<h2 class="mb-h">CONGRATS!</h2>'
+    +'<span class="mb-win">'+MB_RAYS+e.art+'</span>'
+    +'<b class="mb-name"'+(e.notr?' data-notr="1"':'')+'>'+e.name+'</b>'
+    +'<span class="mb-line">'+e.line+'</span>'
+    +'<button type="button" class="mb-take" onclick="UI.mboxTake()">IT\'S MINE!</button>'
+    +'</div>';
+  p.classList.remove('hidden');
+  SFX.thock(); setTimeout(()=>SFX.coin(), 140);
+}
 window.UI = {
   play(n){ audio(); startCampaign(n); },
   // THE DAILY RAID (v1.28): a quick 1v1 on the battleground against the rival's
@@ -18782,11 +19048,20 @@ window.UI = {
   // a tap on a decoration standing in the room: noise, wobble, nothing else
   decorTap(id){ audio(); decorReact(id); },
   pick(t){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=RANK_MAX) return;
-    META.up[t]=(META.up[t]||0)+1; META.pendingPicks--; checkAch(); saveMeta();
-    if(META.pendingPicks>0) showPicker(); else showMenu(); },
+    META.up[t]=(META.up[t]||0)+1; META.pendingPicks--; checkAch();
+    const mb=mboxRoll('u:'+t, META.up[t]); saveMeta();
+    if(META.pendingPicks>0) showPicker(); else showMenu();
+    if(mb) mboxOpen(mb); },
   pickW(wk){ if(META.pendingPicks<=0) return; if(!SARGE_WEAPONS[wk]) return; if((META.sargeUp[wk]||0)>=RANK_MAX) return;
-    META.sargeUp[wk]=(META.sargeUp[wk]||0)+1; META.pendingPicks--; saveMeta();
-    if(META.pendingPicks>0) showPicker(); else showMenu(); },
+    META.sargeUp[wk]=(META.sargeUp[wk]||0)+1; META.pendingPicks--;
+    const mb=mboxRoll('w:'+wk, META.sargeUp[wk]); saveMeta();
+    if(META.pendingPicks>0) showPicker(); else showMenu();
+    if(mb) mboxOpen(mb); },
+  // the mystery box's one button: fold the card, and repaint the room — a new
+  // toy may have landed on the floor while it was up (v1.63)
+  mboxTake(){ SFX.blip(); const p=document.getElementById('mboxPop');
+    if(p){ p.classList.add('hidden'); p.innerHTML=''; }
+    renderMenu(); },
   equipSarge(wk){ if(wk!=='pistol' && META.sargeUnlocked.indexOf(wk)<0) return;
     META.sargeWeapon=wk; SFX.snap(); saveMeta(); renderMenu(); roomModal(panelHTML('promo')); },
   // an owned blade toggles for nothing, from the academy row (choosing one still
@@ -19529,6 +19804,13 @@ window.GVT = {
       hp:(u.hp!=null?u.hp:null),hits:u.hits|0,seat:(u.seat!=null?u.seat:null)})) }; },
   emgGrant(on){ META.emg=(on!==false); saveMeta(); return META.emg; },
   emgForce(n,veh){ if(!emgActivate(n|0, veh||null)) return null; return GVT.emg(); },
+  // ===== THE MYSTERY BOX (v1.63) — read-only; the battery drives the REAL
+  // door (UI.pick/UI.pickW) and reads the state back through this =====
+  mbox(){ const p=document.getElementById('mboxPop'), open=!!p&&!p.classList.contains('hidden');
+    const q=s=>{ const el=p&&p.querySelector(s); return el? el.textContent : ''; };
+    return { pool:mboxPool().map(e=>e.k+':'+e.id), paid:Object.assign({},META.mbox), open,
+      name:open? q('.mb-name') : '', line:open? q('.mb-line') : '',
+      band:open? q('.mb-band') : '', head:open? q('.mb-h') : '', btn:open? q('.mb-take') : '' }; },
   jetGrant(on){ if(on===false){ META.gearUnlocked=META.gearUnlocked.filter(g=>g!=='jetpack'); META.gearSeen=META.gearSeen.filter(g=>g!=='jetpack'); }
     else if(META.gearUnlocked.indexOf('jetpack')<0) META.gearUnlocked.push('jetpack');
     saveMeta(); return META.gearUnlocked.slice(); },
