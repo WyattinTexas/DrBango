@@ -143,12 +143,7 @@
 
   <div class="card">
     <p class="label">Project</p>
-    <div class="seg" id="projseg">
-      <button data-p="gvt">GVT</button>
-      <button data-p="nation">Nation</button>
-      <button data-p="favor">FAVOR</button>
-      <button data-p="home">Home</button>
-    </div>
+    <div class="seg" id="projseg"></div>
   </div>
 
   <div class="card">
@@ -186,8 +181,15 @@
 const DB = "https://testroom-75200-default-rtdb.firebaseio.com/jumpr_remote";
 const CWDS = { gvt:"/Users/drbango/gvt", nation:"/Users/drbango/wkspaces/Nation",
                favor:"/Users/drbango/playfavor", home:"/Users/drbango" };
+/* Default buttons (drbango's channel). Any other Mac's poller that publishes a
+   `projects` list in its encrypted status heartbeat gets ITS names here instead. */
+const DEFAULT_PROJECTS = [
+  { id:"gvt", label:"GVT" }, { id:"nation", label:"Nation" },
+  { id:"favor", label:"FAVOR" }, { id:"home", label:"Home" }
+];
 const LS = {
-  key:"jr_key", model:"jr_model", proj:"jr_proj", pad:"jr_pad", outbox:"jr_outbox"
+  key:"jr_key", model:"jr_model", proj:"jr_proj", pad:"jr_pad", outbox:"jr_outbox",
+  projmeta:"jr_projmeta"
 };
 const $ = id => document.getElementById(id);
 const enc8 = s => new TextEncoder().encode(s);
@@ -240,6 +242,7 @@ const getJ = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; 
 const setJ = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 let pad = getJ(LS.pad, []);
 let outbox = getJ(LS.outbox, []);
+let projects = getJ(LS.projmeta, DEFAULT_PROJECTS);
 let proj = localStorage.getItem(LS.proj) || "gvt";
 let model = localStorage.getItem(LS.model) || "fable";
 
@@ -251,6 +254,15 @@ function toast(t) {
 /* ---------- render ---------- */
 function renderSeg(el, attr, val) {
   [...el.children].forEach(b => b.classList.toggle("on", b.dataset[attr] === val));
+}
+function renderProjButtons() {
+  const seg = $("projseg"); seg.innerHTML = "";
+  projects.forEach(p => {
+    const b = document.createElement("button");
+    b.dataset.p = p.id; b.textContent = p.label; seg.appendChild(b);
+  });
+  if (!projects.some(p => p.id === proj)) { proj = projects[0].id; localStorage.setItem(LS.proj, proj); }
+  renderSeg(seg, "p", proj);
 }
 function renderPad() {
   $("notes").innerHTML = "";
@@ -351,6 +363,15 @@ async function pollStatus() {
     if (!r.ok) return;
     const raw = await r.json(); if (!raw) return;
     const s = await decMsg(raw); if (!s) return;
+    if (Array.isArray(s.projects) && s.projects.length) {
+      const inc = s.projects
+        .map(p => ({ id: String(p.id || "").toLowerCase().slice(0,24),
+                     label: String(p.label || p.id || "").slice(0,14) }))
+        .filter(p => p.id).slice(0, 6);
+      if (inc.length && JSON.stringify(inc) !== JSON.stringify(projects)) {
+        projects = inc; setJ(LS.projmeta, projects); renderProjButtons();
+      }
+    }
     const age = (Date.now()/1000) - (s.ts || 0);
     const dot = $("macdot"), line = $("macline");
     if (age < 180) { dot.className = "dot ok"; line.innerHTML = ""; line.append(dot, ` Mac online · ${Math.round(age)}s ago`); }
@@ -369,12 +390,25 @@ async function pollStatus() {
 /* ---------- wiring ---------- */
 function showLock(show) { $("lock").classList.toggle("hidden", !show); $("main").classList.toggle("hidden", show); }
 async function boot() {
-  // key from #k= fragment
+  // key from #k= fragment — but NEVER silently replace a different key this
+  // phone is already linked to (someone else's link must not hijack the pad).
   const m = location.hash.match(/[#&]k=([a-f0-9]{16,64})/i);
-  if (m) { KEYSTR = m[1]; localStorage.setItem(LS.key, KEYSTR); history.replaceState(null,"",location.pathname); }
+  if (m) {
+    const incoming = m[1];
+    if (!KEYSTR || incoming === KEYSTR) {
+      KEYSTR = incoming; localStorage.setItem(LS.key, KEYSTR);
+    } else if (confirm("This link is for a DIFFERENT jumpr channel (" + incoming.slice(0,4) +
+                       "…). Unlink this phone from its current jumpr and switch?")) {
+      KEYSTR = incoming; localStorage.setItem(LS.key, KEYSTR);
+      outbox = []; setJ(LS.outbox, outbox);
+      projects = DEFAULT_PROJECTS; localStorage.removeItem(LS.projmeta);
+      proj = projects[0].id; localStorage.setItem(LS.proj, proj);
+    }
+    history.replaceState(null,"",location.pathname);
+  }
   const ok = await initKey();
   showLock(!ok);
-  renderSeg($("projseg"), "p", proj); renderSeg($("modelseg"), "m", model);
+  renderProjButtons(); renderSeg($("modelseg"), "m", model);
   renderPad(); renderSent();
   if (ok) { flushOutbox(); pollStatus(); pollAcks(); }
   $("keymask").textContent = KEYSTR ? KEYSTR.slice(0,4) + "…" + KEYSTR.slice(-4) : "—";

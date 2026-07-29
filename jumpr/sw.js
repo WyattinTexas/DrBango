@@ -1,6 +1,6 @@
 /* JUMPR shell cache — cache-first so the pad opens in dead zones,
    background refresh so deploys still arrive. */
-const V = "jr-v1";
+const V = "jr-v2";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
