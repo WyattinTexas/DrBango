@@ -1575,7 +1575,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.60</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.61</div>
   <div class="scanlines"></div>
 </div>
 
@@ -14837,9 +14837,14 @@ function hitCheck(f,u){
     if(idx>=0){
       S.foes.splice(idx,1);
       if(u){ u.kills++; noteKill(u,f); }
-      // the fallen stay where they fell — flipped over like real toys
-      S.corpses.push({ type:f.type, x:f.x, y:f.y, rot:(f.def.vehicle?3.14:(Math.random()<0.5?-1.83:1.83)), w:f.def.w, img:foeImg(f.type) });
-      if(S.corpses.length>90) S.corpses.shift();
+      // v1.61: the campaign fallen FADE — the same casualty beat your own men
+      // play in knock(), so both armies leave the carpet the same way and a
+      // long siege never piles up ninety bodies. Persistent corpses are the
+      // BATTLEFIELD's law now (the f.side branch above, both armies). A
+      // vehicle melts rolled onto its back (3.14 — its old corpse pose).
+      const RM=reducedMotion();
+      S.fx.push({k:'fallen', type:f.type, img:foeImg(f.type), w:f.def.w,
+                 x:f.x, y:f.y, t:0, dur:RM?0.4:1.1, rot:(f.def.vehicle?3.14:undefined)});
       S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)),t:0});   // their dog tag — your bounty
       if(f.type==='crawler'){ META.stats.crawlerKills++; }
       if(f.boss){
@@ -15632,11 +15637,12 @@ function draw(){
       cx.beginPath(); cx.arc(e.x+e.vx*e.t, e.y+e.vy*e.t-(e.up||0)*e.t*e.t, e.r0+(e.r1-e.r0)*k,0,7); cx.fill();
       cx.globalAlpha=1; }
     else if(e.k==='fallen'){ // THE CASUALTY BEAT (v1.32): he tips over like a toy
-      // and melts away — the Tan's own corpse rake (−1.36) so both armies fall
-      // the same way; reducedMotion ships a shorter dur, so the calm run is
-      // quicker, not just quieter (the v1.25 rule).
+      // and melts away — both armies play it in the campaign now (v1.61);
+      // reducedMotion ships a shorter dur, so the calm run is quicker, not
+      // just quieter (the v1.25 rule). A vehicle overrides the rake (3.14)
+      // to roll onto its back the way its corpse used to pose.
       cx.globalAlpha=1-k*k;
-      drawSprite(e.type, e.x, e.y+3*k, e.w, -1.36*Math.min(1,k*2.6), 0, e.img);
+      drawSprite(e.type, e.x, e.y+3*k, e.w, (e.rot!=null?e.rot:-1.36)*Math.min(1,k*2.6), 0, e.img);
       cx.globalAlpha=1; }
     else if(e.k==='cone'){ // the shotgun blast — a quick fan of buckshot
       cx.globalAlpha=(1-k)*0.5; cx.fillStyle='#FFE39A';
