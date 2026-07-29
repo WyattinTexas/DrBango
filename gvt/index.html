@@ -484,6 +484,10 @@
   /* the page has no global box-sizing reset — the store needs one, or the aisle's
      department width (and with it the snap arithmetic) drifts by its padding */
   #toyshop, #toyshop *, #toyshop *::before, #toyshop *::after { box-sizing:border-box; }
+  /* v1.75: the departments scroll under a thumb now — a pan that begins on a
+     card must never paint the OS's translucent tap box over it (the v1.53 law
+     the room's hotspots already live by) */
+  #toyshop, #toyshop * { -webkit-tap-highlight-color:rgba(0,0,0,0); }
   #toyshop button { font:inherit; color:inherit; }
   /* the door out, the hanging shop sign, the plaques, the register */
   .sh-bar { position:relative; z-index:3; flex:0 0 auto; display:flex; align-items:center;
@@ -521,9 +525,22 @@
   .sh-aisle { position:relative; flex:1; min-height:0; display:flex; overflow-x:auto; overflow-y:hidden;
     scroll-snap-type:x mandatory; scroll-behavior:smooth; -webkit-overflow-scrolling:touch; }
   .sh-aisle::-webkit-scrollbar { display:none; }
-  .sh-dept { position:relative; flex:0 0 auto; width:var(--dw); height:100%; overflow:hidden;
+  /* v1.75: a department is a vertical scroller — when its goods won't fit at
+     reading size the shelf runs DOWN instead of squeezing (Wyatt named DECOR
+     and MODS). The aisle still owns the x axis: overflow-x stays hidden here,
+     a sideways pan chains up to the aisle, and the snap math never moves
+     because a display:none scrollbar takes no layout space.
+     ⚠ deliberately NO touch-action and NO overscroll-behavior on this box —
+     touch-action:pan-y would kill the aisle swipe that starts on a card, and
+     overscroll-behavior-x:contain on a box that cannot scroll x itself would
+     eat the chain to the aisle entirely. A department that fits keeps zero
+     overflow and renders exactly as it always did. */
+  .sh-dept { position:relative; flex:0 0 auto; width:var(--dw); height:100%;
+    overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    scrollbar-width:none; -ms-overflow-style:none;
     scroll-snap-align:start; display:flex; flex-direction:column;
     padding:clamp(2px,0.8vh,8px) clamp(8px,1.6vw,20px) clamp(4px,1vh,10px); }
+  .sh-dept::-webkit-scrollbar { display:none; }
   .sh-end { flex:0 0 calc(100vw - var(--dw)); }
   .sh-dept h2 { margin:0 0 2px; font-size:clamp(11px,2.6vh,20px); letter-spacing:0.2em; color:#D2B489; }
   .sh-dept h2 small { display:block; font-size:clamp(6px,1.4vh,11px); letter-spacing:0.16em; color:#9a8a6a; margin-top:1px; }
@@ -711,7 +728,12 @@
     background:radial-gradient(circle, #1A1309 2.1px, transparent 2.7px) 10px 12px/24px 24px,
       linear-gradient(180deg,#3E3120,#2A2014); }
   #shMods h2 { color:#D9C08A; }
-  .sh-modrow { flex:1 1 50%; min-height:0; display:flex; align-items:stretch; justify-content:center;
+  /* v1.75: a parts row can no longer be squeezed below reading size — basis
+     auto + shrink 0 means a row is never shorter than its own goods (de's
+     longer contract lines included), min-height is the comfort floor, and the
+     department scrolls to pay for it. grow keeps a tall desktop filling out
+     the way the old 50/50 split did. */
+  .sh-modrow { flex:1 0 auto; min-height:clamp(148px,46vh,320px); display:flex; align-items:stretch; justify-content:center;
     gap:clamp(4px,1.2vw,14px); padding:clamp(1px,0.5vh,5px) 0; }
   .sh-modrow2 { justify-content:center; }
   .sh-modrow2 .sh-mbox { flex:0 1 34%; }
@@ -731,14 +753,17 @@
     filter:drop-shadow(0 3px 3px rgba(0,0,0,0.35)); }
   .sh-mwho { width:20%; height:auto; max-height:96%; object-fit:contain;
     filter:drop-shadow(0 0 2px rgba(0,0,0,0.8)) drop-shadow(0 3px 3px rgba(0,0,0,0.45)); }
-  .sh-mn { display:block; font-size:clamp(9px,2.1vh,17px); letter-spacing:0.04em; line-height:1.06;
+  /* v1.75: the raised px floors ARE the readability half of the scroll — the
+     old vh minimums rendered 6px and 4.5px at phone height; the caps and the
+     vh middles are untouched, so a tall desktop renders byte-identically */
+  .sh-mn { display:block; font-size:clamp(12px,2.1vh,17px); letter-spacing:0.04em; line-height:1.06;
     color:#3A2A14; }
-  .sh-msub { display:block; font-size:clamp(4.5px,1.05vh,9px); letter-spacing:0.16em; color:#7d6d50;
+  .sh-msub { display:block; font-size:clamp(8px,1.05vh,9px); letter-spacing:0.16em; color:#7d6d50;
     line-height:1.1; margin-bottom:2px; }
   /* the contract: what it gives you, and what it costs you, in that order and in
      two colours a five-year-old already knows */
   .sh-mup, .sh-mdn { display:block; font-family:var(--hand); font-weight:normal; text-align:left;
-    font-size:clamp(6px,1.42vh,11px); line-height:1.14; margin-top:1px; width:100%; }
+    font-size:clamp(9px,1.42vh,11px); line-height:1.14; margin-top:1px; width:100%; }
   .sh-mup { color:#2F5C1E; } .sh-mdn { color:#9A2E18; }
   .sh-mup i, .sh-mdn i { font-style:normal; font-weight:bold; margin-right:3px; }
   .sh-mprice { position:absolute; right:-4%; top:6%; width:23%; aspect-ratio:1; border-radius:50%;
@@ -753,7 +778,7 @@
   .sh-msw .sh-mknob { position:absolute; left:2px; top:50%; transform:translateY(-50%);
     width:clamp(11px,2.6vh,18px); height:clamp(11px,2.6vh,18px); border-radius:50%; background:#8A8578;
     box-shadow:0 1px 3px rgba(0,0,0,0.6); transition:left 0.16s, background 0.16s; }
-  .sh-mcap { font-size:clamp(5px,1.25vh,10px); letter-spacing:0.14em; color:#9a8a6a;
+  .sh-mcap { font-size:clamp(8px,1.25vh,10px); letter-spacing:0.14em; color:#9a8a6a;
     padding-right:8px; white-space:nowrap; overflow:hidden; }
   .sh-msw.on { background:linear-gradient(180deg,#5C8038,var(--deepgreen)); border-color:#8FBF63;
     justify-content:flex-start; }
@@ -780,7 +805,7 @@
   .sh-mod.gated .sh-mtop, .sh-mod.gated .sh-mn, .sh-mod.gated .sh-msub,
   .sh-mod.gated .sh-mup, .sh-mod.gated .sh-mdn { opacity:0.38; filter:saturate(0.45); }
   .sh-mlock { display:block; margin-top:2px; width:100%; font-family:var(--hand);
-    font-size:clamp(6px,1.42vh,11px); line-height:1.14; color:#8a6d1f; text-align:left; }
+    font-size:clamp(9px,1.42vh,11px); line-height:1.14; color:#8a6d1f; text-align:left; }
   .sh-mod.deny .sh-mlock { animation:shno 0.42s; }
   /* ⚠ AFTER every rule it cancels, or it loses on source order (the v1.11 lesson).
      Same call the decor shelf makes: the travelling goods stop, the flash and the
@@ -788,9 +813,8 @@
   @media (prefers-reduced-motion:reduce){
     .sh-mod.buying .sh-mpart svg { animation:none; }
     .sh-msw .sh-mknob { transition:none; } }
-  /* two rows of parts is a lot of small print — the sub-line is the first thing
-     to go when the department gets short, never the two contract lines */
-  @media (max-height:340px) { .sh-msub { display:none; } }
+  /* v1.75: the short-screen dodge that hid the sub-line is gone — the
+     department scrolls now, so no line has to be sacrificed to fit */
   /* --- dept 4: PAINT & DYE, the paint shelf --- */
   #shPaint { border-right:6px solid #171008; background:linear-gradient(180deg,#2E2318,#241B12); }
   .sh-shelf { position:relative; flex:0 0 auto; }
@@ -873,10 +897,12 @@
      renders identically where auto happened to work, and works everywhere. */
   .sh-dwin svg { width:94%; height:94%;
     filter:drop-shadow(0 3px 2px rgba(0,0,0,0.28)); }
-  .sh-dn { display:block; font-size:clamp(8px,1.95vh,15px); letter-spacing:0.04em; line-height:1.05; color:#3A2A14; }
-  .sh-dsub { display:block; font-size:clamp(4px,0.95vh,8px); letter-spacing:0.16em; color:#7d6d50; }
+  /* v1.75 floors: the vh minimums rendered 8/4/6px at phone height — the toy
+     cards are the objects Wyatt asked to be able to READ. Caps untouched. */
+  .sh-dn { display:block; font-size:clamp(11px,1.95vh,15px); letter-spacing:0.04em; line-height:1.05; color:#3A2A14; }
+  .sh-dsub { display:block; font-size:clamp(7px,0.95vh,8px); letter-spacing:0.16em; color:#7d6d50; }
   .sh-dtag { display:block; margin-top:1px; font-family:var(--hand); font-weight:normal;
-    font-size:clamp(6px,1.45vh,11px); color:#8A3A1E; line-height:1.05; }
+    font-size:clamp(9px,1.45vh,11px); color:#8A3A1E; line-height:1.05; }
   .sh-dprice { position:absolute; right:-5%; top:6%; width:30%; aspect-ratio:1; border-radius:50%;
     display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--hand);
     font-size:clamp(8px,1.9vh,15px); transform:rotate(-11deg);
@@ -884,7 +910,7 @@
     border:2px dashed rgba(255,255,255,0.55); box-shadow:0 3px 6px rgba(0,0,0,0.45); }
   .sh-dstamp, .sh-dec.buying::after, .sh-nan.buying::after { position:absolute; left:50%; top:6%; white-space:nowrap;
     transform:translateX(-50%) rotate(-7deg); border:3px double var(--deepgreen); color:var(--deepgreen);
-    border-radius:6px; padding:0 6px; font-size:clamp(7px,1.6vh,12px); letter-spacing:0.14em;
+    border-radius:6px; padding:0 6px; font-size:clamp(9px,1.6vh,12px); letter-spacing:0.14em;
     background:rgba(237,228,204,0.72); }
   .sh-dec.own .sh-dtag { visibility:hidden; }
   /* v1.71: an owned card IS the switch now — tapped away it dims on the shelf,
@@ -894,7 +920,7 @@
   /* an EARNED prize before it's earned: the art dims to the academy's 55 and
      the lock line sits where the price sticker would — never sold, never a price */
   .sh-dec.lock .sh-dwin { opacity:0.55; }
-  .sh-dlk { display:block; margin-top:1px; font-size:clamp(5.5px,1.3vh,10px); letter-spacing:0.06em;
+  .sh-dlk { display:block; margin-top:1px; font-size:clamp(9px,1.3vh,10px); letter-spacing:0.06em;
     color:#7A5A22; font-weight:bold; line-height:1.15; }
   /* the elephant's colour rail: ten army colours, two rows of five */
   .sh-drail { flex:0 0 auto; display:grid; grid-template-columns:repeat(5,1fr); gap:clamp(1px,0.4vw,4px); }
@@ -905,6 +931,28 @@
   /* the bottom shelf: the bank rail and the banana crate, side by side */
   .sh-decbig { flex:1 1 46%; min-height:0; display:flex; align-items:stretch; justify-content:center;
     gap:clamp(5px,1.8vw,22px); padding-bottom:clamp(1px,0.6vh,6px); }
+  /* v1.75: under 900px the six-across shelf was the squeeze Wyatt named — the
+     toys go THREE to a row at reading size and the department scrolls down to
+     hold them all (more prizes will land here; three-a-row scales to any
+     count). At ≥900px the single row fits at reading size, so it does not
+     change at all. ⚠ the row height is FIXED, never minmax(...,auto): the
+     card's %-sized window and its 94% svg need a DEFINITE height to resolve
+     (the v1.21/v1.34 trap family — an auto max let the svg's intrinsic ratio
+     swell a row to 341px, measured). Long captions squeeze the WINDOW, which
+     is the card's one flexible part — text never clips, art gives way. */
+  @media (max-width:900px) {
+    .sh-decrow { flex:0 0 auto; display:grid; grid-template-columns:repeat(3,1fr);
+      grid-auto-rows:clamp(140px,42vh,240px); }
+    /* a 3-wide card would hand a width-sized sticker a dinner plate — the
+       centrepiece crate's own law: size the tag off HEIGHT (the v1.21 lesson) */
+    .sh-decrow .sh-dprice { width:auto; height:26%; font-size:clamp(10px,1.9vh,15px); }
+    .sh-decrow .sh-dot { width:clamp(14px,2.7vh,18px); height:clamp(14px,2.7vh,18px); }
+    /* ⚠ DEFINITE height, never min-height on an auto basis: the banana window
+       is height:112% + aspect-ratio, and a % against an auto-height parent
+       falls back to the svg's 300px default — the crate measured 871px tall
+       before this was a height (the v1.21/v1.34 trap class, third sighting) */
+    .sh-decbig { flex:0 0 auto; height:clamp(115px,34vh,230px); }
+  }
   .sh-bank { flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
     gap:clamp(1px,0.5vh,4px); border-radius:6px; padding:clamp(2px,0.8vh,7px) 6px;
     background:linear-gradient(180deg,rgba(255,240,200,0.07),rgba(0,0,0,0.22));
@@ -1718,7 +1766,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.74</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.75</div>
   <div class="scanlines"></div>
 </div>
 
@@ -19742,6 +19790,11 @@ function shopBankHTML(){
 }
 function renderShop(){
   const el=document.getElementById('toyshop'); if(!el) return;
+  // v1.75: a department remembers how far DOWN it was scrolled across the
+  // re-render every purchase and toggle fires — without this the card you just
+  // tapped teleports back to the top of the shelf out from under your thumb
+  const keptY={};
+  el.querySelectorAll('.sh-dept').forEach(d=>{ if(d.scrollTop>0) keptY[d.id]=d.scrollTop; });
   const jars2=ARMIES.slice(5).map(shopJarHTML).join('')
     +'<button type="button" class="sh-bucket'+(META.dyeOn?'':' off')+'" onclick="UI.dye(null)">'
     +SH_BUCKET+'<small>wash it off — free</small></button>';
@@ -19799,6 +19852,7 @@ function renderShop(){
   const a=document.getElementById('shAisle');
   a.addEventListener('scroll', shopScroll, {passive:true});
   shopJump(SHOP.tab, false);
+  for(const k in keptY){ const d=document.getElementById(k); if(d) d.scrollTop=keptY[k]; }
 }
 // Which department you're standing in front of, from where the aisle stopped.
 function shopScroll(){
@@ -19849,6 +19903,9 @@ function openShop(){
   SHOP.tab='figs';                                   // you always come in the front door
   document.getElementById('toyshop').classList.remove('hidden');
   renderShop();                                      // ...after it's visible, or the aisle measures 0 wide
+  // v1.75: a fresh visit starts at the TOP of every shelf — the DOM survives a
+  // close, so yesterday's scroll would otherwise still be in the departments
+  document.querySelectorAll('#toyshop .sh-dept').forEach(d=>{ d.scrollTop=0; });
 }
 function closeShop(){ const el=document.getElementById('toyshop'); if(el) el.classList.add('hidden'); }
 
@@ -21083,6 +21140,14 @@ window.GVT = {
     lasers:META.lasers.slice(), laserOn:META.laserOn,
     packs:SHOP_ITEMS.map(s=>s.t+':'+(META.unlocked.indexOf(s.t)>=0?'own':'shelf')),
     vials:SABER_COLORS.map(c=>c.id+':'+(sabOwns(c.hex)?(saberHex()===c.hex?'hilt':'own'):'shelf')) }; },
+  // v1.75: THE FOLD — which departments can scroll DOWN and where each sits.
+  // scrolls means the shelf runs past the viewport at this size; a department
+  // that fits reads sh===ch and never moved.
+  shopFold(){ const o={};
+    document.querySelectorAll('#toyshop .sh-dept').forEach(d=>{
+      o[d.id]={ ch:d.clientHeight, sh:d.scrollHeight, top:Math.round(d.scrollTop),
+                scrolls:d.scrollHeight>d.clientHeight+1 }; });
+    return o; },
   // THE BLADE test rig: GVT.blades() reads the whole colour economy in one call,
   // GVT.rite() forces the ceremony open, GVT.blade('teal') asserts what a tap does
   blades(){ return { price:SABER_PRICE, saber:sabHasSaber(), free:!!META.sabColFree,
