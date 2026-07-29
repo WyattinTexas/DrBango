@@ -1540,7 +1540,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.56</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.57</div>
   <div class="scanlines"></div>
 </div>
 
@@ -2584,6 +2584,7 @@ const TR_DATA={
 "WAVE %1 — %2!":"ウェーブ %1 — %2！",
 "WAVE %1 — ON %2'S ORDER":"ウェーブ %1 — %2 のあいずまち",
 "WAVE CLEAR +{0}":"ウェーブ クリア +{0}",
+"WESTERN LAND":"ウエスタンランド",
 "FIGHT A BATTLE TO GET RATED":"バトルするとレーティングがつくよ",
 "WIN A {0}v{1} TO GET ON THE BOARD":"{0}v{1} に勝つとランキングにのるよ",
 "WING MAN":"よくきものアイツ",
@@ -3435,6 +3436,7 @@ const TR_DATA={
 "WAVE %1 — %2!":"웨이브 %1 — %2!",
 "WAVE %1 — ON %2'S ORDER":"웨이브 %1 — %2 의 신호 대기",
 "WAVE CLEAR +{0}":"웨이브 클리어 +{0}",
+"WESTERN LAND":"웨스턴 랜드",
 "FIGHT A BATTLE TO GET RATED":"전투를 하면 레이팅이 생겨",
 "WIN A {0}v{1} TO GET ON THE BOARD":"{0}v{1} 에서 이기면 순위에 올라",
 "WING MAN":"윙맨",
@@ -4286,6 +4288,7 @@ const TR_DATA={
 "WAVE %1 — %2!":"第 %1 波 — %2！",
 "WAVE %1 — ON %2'S ORDER":"第 %1 波 — 等 %2 下令",
 "WAVE CLEAR +{0}":"清波 +{0}",
+"WESTERN LAND":"西部乐园",
 "FIGHT A BATTLE TO GET RATED":"打一场就有评分",
 "WIN A {0}v{1} TO GET ON THE BOARD":"赢一场 {0}v{1} 就能上榜",
 "WING MAN":"僚机",
@@ -5138,6 +5141,7 @@ const TR_DATA={
 "WAVE %1 — %2!":"WELLE %1 — %2!",
 "WAVE %1 — ON %2'S ORDER":"WELLE %1 — AUF %2S BEFEHL",
 "WAVE CLEAR +{0}":"WELLE GESCHAFFT +{0}",
+"WESTERN LAND":"WESTERN-LAND",
 "FIGHT A BATTLE TO GET RATED":"KÄMPFE EINE SCHLACHT FÜR DEINE WERTUNG",
 "WIN A {0}v{1} TO GET ON THE BOARD":"GEWINN EIN {0}v{1}, UM AUFS BRETT ZU KOMMEN",
 "WING MAN":"FLÜGELMANN",
@@ -5989,6 +5993,7 @@ const TR_DATA={
 "WAVE %1 — %2!":"ВОЛНА %1 — %2!",
 "WAVE %1 — ON %2'S ORDER":"ВОЛНА %1 — ПО КОМАНДЕ %2",
 "WAVE CLEAR +{0}":"ВОЛНА ОТБИТА +{0}",
+"WESTERN LAND":"ДИКИЙ ЗАПАД",
 "FIGHT A BATTLE TO GET RATED":"СЫГРАЙ БОЙ — ПОЛУЧИШЬ РЕЙТИНГ",
 "WIN A {0}v{1} TO GET ON THE BOARD":"ВЫИГРАЙ {0}v{1}, ЧТОБЫ ПОПАСТЬ В ТАБЛИЦУ",
 "WING MAN":"ВЕДОМЫЙ",
@@ -6841,6 +6846,7 @@ const TR_DATA={
 "WAVE %1 — %2!":"¡OLEADA %1 — %2!",
 "WAVE %1 — ON %2'S ORDER":"OLEADA %1 — A LA ORDEN DE %2",
 "WAVE CLEAR +{0}":"OLEADA LIMPIA +{0}",
+"WESTERN LAND":"TIERRA DEL OESTE",
 "FIGHT A BATTLE TO GET RATED":"JUEGA UNA BATALLA PARA TENER PUNTUACIÓN",
 "WIN A {0}v{1} TO GET ON THE BOARD":"GANA UN {0}v{1} PARA ENTRAR EN LA TABLA",
 "WING MAN":"COMPAÑERO DE ALA",
@@ -7027,6 +7033,11 @@ const COSTS = { rifleman:40, mgunner:100, bazooka:150, mortar:200, sarge:0, mine
 // armies. WORLD_W/MID are LET and set per match by startBattlefield — campaign
 // code never reads them, so nothing outside the battlefield notices.
 let WORLD_W=1920, MID=960;
+// v1.57 WESTERN LAND: the world can be TALLER than the screen now, exactly the
+// way it has been wider since the battlefield shipped — WORLD_H is a per-match
+// let (H × the map's hMul), reset to H with every battle so the campaign and
+// every hMul-1 map compute byte-identical numbers through the shared clamps.
+let WORLD_H=600;
 // DROP_T 5→2 (Wyatt 7/24): spawn-in is a quick two-count now — still a
 // prediction, just a snappy one.
 const BASE_HP=70, DROP_T=2, MID_BUFFER=120, BF_MAX_TEAM=10;
@@ -7246,6 +7257,106 @@ function elephHex(){ return (META.decor&&META.decor.eleph) || dyeHex() || '#7FA3
 // at bridges only; y0/y1 bound the water, open:true bridges are dry gaps),
 // ponds (wade through at 0.42x speed), tracks (race track — 1.35x speed),
 // balls (wrecking balls that patrol y0..y1 and plow everyone aside).
+// ===================== WESTERN LAND (v1.57) =====================
+// Wyatt 7/28, verbatim: "Implement the railroad map into Battlegrounds. The
+// railroad map is double the height of a regular map and the same width...
+// there is a railroad track that goes around. At one point on the track, it
+// splits into two directions... it can intersect with one part of the level,
+// or it could kind of go off-screen and then come back around. If the railroad
+// collides with any unit, that unit is immediately destroyed... add a trench
+// where the units are kind of below... units that are not in the trench can't
+// fire at the units that are in the trench. Of course, the mortar and the
+// bazooka are exceptions." Kalimari Desert (MK64) is the reference; the name
+// is Wyatt's own. Every number below is ONE const for his feel pass.
+const TRAIN_SPD=260,        // px/s down the line
+      TRAIN_CARS=3,         // cars behind the loco (tender + two boxcars)
+      TRAIN_CARL=78,        // one car, buffer to buffer
+      TRAIN_GAP=92,         // car spacing along the arc (length + coupling)
+      TRAIN_KILL_R=30,      // the kill capsule around each car's axle line
+      SIGNAL_LEAD=2.5,      // seconds of crossbuck warning before the loco arrives
+      TRENCH_W=64,          // the sunken lane's width
+      TRK_BAN=38;           // no-drop margin around every rail (march across, never camp on)
+// THE TRACK is a θ: one ring, one chord, ONE junction — at J the line either
+// takes the chord east through the middle of the battle (crossing the trench
+// once at a grade crossing) or carries on south and dips OFF THE MAT through
+// the rug border, running dark below the world before climbing back to R.
+// Authored ABSOLUTE (side legs ride the crates at 10v10, the middle rides MID)
+// and never mirrored — fair by construction: the north ring passes both crates
+// identically on every lap, and the chord crosses dead centre. Laps alternate
+// chord / dip by the cycle's own structure, so branch choice is lap%2 with no
+// RNG anywhere — a private room's twenty sims agree on the train by clock.
+function westRail(){
+  const LX=230, RX=WORLD_W-230, TY=150, JY=560;
+  // the north ring — the shared return of EVERY lap (R up and over to J)
+  const N=[[RX,JY],[RX,240],[RX-8,196],[RX-36,162],[RX-78,TY],
+           [LX+78,TY],[LX+36,162],[LX+8,196],[LX,240],[LX,JY]];
+  // branch A: the chord, J east to R — bowed just north of the crates' latitude
+  const A=[[LX,JY],[LX+90,532],[MID-330,516],[MID-140,508],[MID,514],
+           [MID+140,508],[MID+330,516],[RX-90,532],[RX,JY]];
+  // branch B: the dip, J south, off the mat below the border, back up to R
+  const B=[[LX,JY],[LX,960],[LX+8,1004],[LX+36,1038],[LX+80,1050],
+           [MID-560,1050],[MID-430,1082],[MID-330,1150],[MID-260,1250],
+           [MID-140,1330],[MID+140,1330],
+           [MID+260,1250],[MID+330,1150],[MID+430,1082],[MID+560,1050],
+           [RX-80,1050],[RX-36,1038],[RX-8,1004],[RX,960],[RX,JY]];
+  // the closed cycle the train drives: lap A = chord + ring, lap B = dip + ring
+  const pts=A.concat(N.slice(1), B.slice(1), N.slice(1));
+  const cum=[0];
+  for(let i=1;i<pts.length;i++) cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]));
+  return { pts, cum, len:cum[cum.length-1],
+    lapALen:cum[A.length-1+N.length-1],                  // arc where lap A hands over to lap B
+    cross:{ x:MID, y:514, arc:cum[4] },                  // the grade crossing = A's centre vertex
+    sigs:[ {x:MID-70,y:478}, {x:MID+70,y:556} ],         // crossbucks flanking both approaches
+    ban:[ {pts:N}, {pts:A}, {pts:B} ] };                 // canPlace refuses the whole line
+}
+// THE TRENCH: one winding-but-linear sunken lane, wound around the chalk line
+// so both armies reach it in the same walk. It ends short of the top leg and
+// the dip corners, and its whole width lives inside the MID_BUFFER no-drop
+// strip — nobody DROPS into cover, they march in. It never blocks movement and
+// never slows a boot: the cover IS the payoff. The chord crosses it exactly
+// once (the trench's y is monotonic through the chord's band — one crossing by
+// construction), so campers meet the train on interior laps.
+function westTrench(){
+  return { w:TRENCH_W, pts:[[MID-30,238],[MID+70,320],[MID+85,400],[MID+30,468],
+    [MID,514],[MID-40,560],[MID-85,640],[MID-70,730],[MID+50,820],[MID+80,900],[MID+10,972]] };
+}
+// sample the cycle at arc s — position + heading, wrap-safe
+function railPoint(rl,s){
+  s=((s%rl.len)+rl.len)%rl.len;
+  let i=1; while(i<rl.cum.length-1 && rl.cum[i]<s) i++;
+  const a=rl.pts[i-1], b=rl.pts[i], seg=rl.cum[i]-rl.cum[i-1]||1, k=(s-rl.cum[i-1])/seg;
+  return { x:a[0]+(b[0]-a[0])*k, y:a[1]+(b[1]-a[1])*k, ang:Math.atan2(b[1]-a[1],b[0]-a[0]) };
+}
+// the whole consist as a pure function of the battle clock: loco front at
+// trainT×TRAIN_SPD, every car sampled by ARC LENGTH behind it (the room
+// toy-train law — uniform arc, never uniform segment, so the couplings never
+// stretch in a curve). `off` = below the mat, on the dark run: not drawn, and
+// it kills nobody (no one can stand there anyway).
+function trainCars(bf){
+  const rl=S.cfg.terrain.rail; if(!rl) return null;
+  const s=(bf.trainT||0)*TRAIN_SPD, cars=[];
+  for(let i=0;i<=TRAIN_CARS;i++){
+    const f=railPoint(rl, s-i*TRAIN_GAP), b2=railPoint(rl, s-i*TRAIN_GAP-TRAIN_CARL);
+    cars.push({ i, fx:f.x, fy:f.y, bx:b2.x, by:b2.y,
+      x:(f.x+b2.x)/2, y:(f.y+b2.y)/2,
+      ang:Math.atan2(f.y-b2.y,f.x-b2.x),
+      off:(f.y+b2.y)/2 > WORLD_H+34 });
+  }
+  const sm=((s%rl.len)+rl.len)%rl.len;
+  let d=rl.cross.arc-sm; if(d<0) d+=rl.len;              // arc still to run before the crossing
+  return { cars, s:sm, lap:(sm<rl.lapALen?0:1), warn:d < TRAIN_SPD*SIGNAL_LEAD };
+}
+// THE KILL LAW. No hurt() and none of its gates — no blade deflect, no duck,
+// no riot plate turns a locomotive. hitCheck with NO killer is the whole
+// bounty/medal law in one argument: nobody's kills++, nobody's purse, no blob,
+// no ace — and Sarge's ten-second clock still feeds, because hitCheck feeds it.
+function trainKill(u){
+  u.hp=0;
+  S.fx.push({k:'ring',x:u.x,y:u.y-10,r:6,R:40,t:0,dur:0.35,col:'rgba(255,255,255,0.85)'});
+  S.fx.push({k:'puff',x:u.x,y:u.y-8,t:0,dur:0.4,R:22});
+  bfSfx(SFX.thock,u.x,u.y);
+  hitCheck(u,null);
+}
 const BF_MAPS = [
   { id:'open', name:'OPEN CARPET', blurb:'The toy bin tipped over everything. One clean lane is left — and the wrecking balls roll right across it. Time your push.',
     build:()=>({ rocks:[
@@ -7373,7 +7484,35 @@ const BF_MAPS = [
       // no snowball: a moving hazard needs 108px of centre clearance from every
       // mound and this map's corridors are 270px, so a ball only fits in the
       // open middle - the one place Wyatt already flagged as maybe too punishing
-      balls:[] }) }
+      balls:[] }) },
+  // ===================== WESTERN LAND (v1.57) =====================
+  // The train set took over: a desert mat DOUBLE the height of every other
+  // battlefield (hMul 2 — the only tall map, so camY exists for it alone), the
+  // θ-track and its junction, the sunken trench on the chalk line. Mesas and
+  // cacti are rocks in costume (the winter drift/clod recipe): mirrored,
+  // shouldered, steered around — isolated singles only, the safe blocker shape
+  // the winter soak proved. The middle stays open: the fight is the feature.
+  // The mesa at absolute x 118 rides the toy box corner at 10v10, same law as
+  // winter's aprons; the cacti hold MID-relative station at the front.
+  // FIELD #8B3E1E IS MEASURED, not eyeballed (the v1.47 method): Kalimari's
+  // own #C87F42 put the GREEN army at 1.11:1 and the orange army at 1.01 —
+  // the exact green-on-terracotta failure Wyatt already called out once. At
+  // #8B3E1E every light/mid army reads >=1.5 (green 2.6, tan 3.0, orange
+  // 2.3) and the dark armies keep the same ink-outline read they have on
+  // the shipped crimson.
+  { id:'western', name:'WESTERN LAND', ground:'sand', hMul:2,
+    blurb:'The train set took over the desert. Watch the crossbucks, hold the trench below the gunfire — and never, ever stand on the rails.',
+    build:()=>({
+      rocks:[
+        {x:MID-620,y:262,r:52,art:'mesa'},
+        {x:MID-660,y:854,r:44,art:'mesa'},
+        {x:118,y:212,r:38,art:'mesa'},                 // ABSOLUTE - the butte rides the box
+        {x:MID-360,y:236,r:13,art:'cactus'},
+        {x:MID-268,y:764,r:13,art:'cactus'},
+        {x:MID-470,y:948,r:12,art:'cactus'},
+        {x:MID-190,y:396,r:12,art:'cactus'} ],
+      rivers:[],
+      rail:westRail(), trench:westTrench() }) }
 ];
 // AI difficulty. Economy is IDENTICAL to yours at every tier — the difficulty is
 // decisions, never resources. blunderP is the humanizing dial.
@@ -9151,6 +9290,7 @@ let idc=1;
 
 function reset(){
   S.plastic=170; S.lives=10; S.wave=0; S.waveActive=false; S.queue=[]; S.waveT=0;
+  WORLD_H=H;      // only a tall battlefield map raises it (startBattlefield, right after this wipe)
   S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
   S.ffLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.hitStop=0; S.tanBase=null; S.vflag=null;
@@ -9298,7 +9438,11 @@ function bfTerrain(map){
     return t.pts.every((p,i)=>Math.abs(m.pts[i][0]-p[0])<1) ? [a] : [a,m];
   });
   const ground=map.ground||'carpet';
+  // WESTERN LAND's railroad + trench ride through UNMIRRORED (v1.57): both are
+  // authored absolute and fair by construction — running them through the
+  // mirror pass is exactly how the winter own-chain weld happened.
   return { rocks, river:null, rivers, ponds, balls, tracks, drifts, ice, trails, ground,
+           rail:half.rail||null, trench:half.trench||null,
            flakes:(ground==='snow'? snowFlakes() : null) };
 }
 // Falling snow, seeded ONCE here and never in a draw call (v1.7's block-tilt
@@ -9315,6 +9459,8 @@ function snowFlakes(){
 // is the ground underfoot snow? One reader, and it is BF-only by construction:
 // campaign terrain comes out of levelCfg, which has never had a `ground` field.
 function snowField(){ return !!(S.bf && S.cfg && S.cfg.terrain && S.cfg.terrain.ground==='snow'); }
+// ...and is it desert? Same one-reader law, BF-only by construction (v1.57).
+function sandField(){ return !!(S.bf && S.cfg && S.cfg.terrain && S.cfg.terrain.ground==='sand'); }
 // slower ramp (7/24): 25★ wins climb the ladder fast, so hard sits far out —
 // most players live on easy/medium, which are tuned for ~80% player wins
 function bfDifficulty(){ return META.starsLifetime>=1200?'hard' : META.starsLifetime>=250?'medium' : 'easy'; }
@@ -10485,6 +10631,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
   const team=Math.max(1,Math.min(BF_MAX_TEAM, teamSize||META.bfTeam||1));
   const diff=diffOverride||bfDifficulty();
   WORLD_W=bfWidth(team); MID=WORLD_W/2;        // a bigger war gets a bigger carpet
+  WORLD_H=H*(map.hMul||1);                     // WESTERN LAND is two carpets TALL (v1.57); every other map keeps H to the pixel
   const seats=(plan && plan.length===team*2)? plan : bfSeatPlan(team,riv);
   for(const st of seats){ st.purse=BF_START; st.tagT=0; st.mir=(st.team==='you');
     buildUnitTint(st.hex);
@@ -10499,7 +10646,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
     // chasing the same "weakest lane" is a scrum in one lane and a highway
     // everywhere else. The human takes whatever lane they please.
     const idx=(st.i%team);
-    st.laneBias = team>1 ? 110 + (idx+0.5)*((H-220)/team) : null;   // 1v1 keeps the tuned solo brain untouched
+    st.laneBias = team>1 ? 110 + (idx+0.5)*((WORLD_H-220)/team) : null;   // 1v1 keeps the tuned solo brain untouched; a tall map spreads the whole front
   }
   const bhp=bfBaseHP(team);
   // WHICH ONE IS MINE. In every solo battleground that is seat 0 on the left, and
@@ -10512,11 +10659,14 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
   S.bf = { resolved:false, ending:false, mapId:map.id, mapName:map.name, phase:'live',
     team, timeLeft:bfClockFor(team), ot:false, seats, myKills:0,
     mySeat:meSeat.i, myTeam,
-    base:{ you:{x:130,y:300,hp:bhp,hpMax:bhp,dmgTaken:0},
-           foe:{x:WORLD_W-130,y:300,hp:bhp,hpMax:bhp,dmgTaken:0} },
+    base:{ you:{x:130,y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0},
+           foe:{x:WORLD_W-130,y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0} },
     ai:{ diff },
     rival:riv, hex:{ you:seats[0].hex, foe:seats[team].hex },
-    cam:{ x:(myTeam==='foe'? Math.max(0,WORLD_W-VW) : 0), vx:0 } };
+    // a tall map opens looking at the crates' own latitude (mid-height); on
+    // every hMul-1 map the y clamp is 0..0, so nothing that shipped moves
+    cam:{ x:(myTeam==='foe'? Math.max(0,WORLD_W-VW) : 0), vx:0,
+          y:Math.max(0,(WORLD_H-H)/2), vy:0 } };
   S.plastic=BF_START;                          // every purse starts level
   META.bfMap=map.id; META.bfTeam=team;
   // v1.44: the scroll nudge is a LESSON now — arm it for the first three
@@ -10676,6 +10826,7 @@ function bfNearestEnemy(u,range){
   let best=null, bd=range;
   for(const o of S.units){
     if(o.dead || o.side===u.side || o.dropT>0 || o.jetT>0) continue;   // airborne (v1.39): foes march on past him
+    if(!bfCanTarget(u,o)) continue;   // the trench sight law (v1.57) — covers the march-halt AND the saber's acquire
     const d=Math.hypot(o.x-u.x,o.y-u.y);
     if(d<bd){ bd=d; best=o; }
   }
@@ -10685,6 +10836,34 @@ function bfNearestEnemy(u,range){
 // which of them do I want. Campaign answers are unchanged.
 function TGT(u){ return S.bf ? bfEnemies(u.side) : S.foes; }
 function PRIO(u,f){ return S.bf ? Math.hypot(u.x-f.x,u.y-f.y) : Math.hypot(T.x-f.x,T.y-f.y); }
+// ===== WESTERN LAND: THE TRENCH SIGHT LAW (v1.57) =====
+// Wyatt, verbatim: "units that are not in the trench can't fire at the units
+// that are in the trench. Of course, the mortar and the bazooka are exceptions
+// here." ONE predicate, asked at every eligibility site — the enhU()/
+// killIsMine() ownership-law shape. It governs TARGETING only: splash at a
+// legally-aimed impact still hits whoever stands in the radius, a mine is
+// ground, a bumper and the train are physics. Trench men fire OUT
+// unrestricted (that is what a trench is); both-in-trench is a normal fight;
+// a vehicle in the band gains nothing (never "in"); and the trench never
+// blocks or slows anyone's walk — the cover IS the payoff.
+const TRENCH_EXEMPT={ mortar:1, bazooka:1 };
+function trenchAt(x,y){
+  const tr=S.cfg && S.cfg.terrain && S.cfg.terrain.trench;
+  return !!tr && trailDist(x,y,tr) < TRENCH_W/2;
+}
+function inTrench(u){
+  if(!S.bf || !u || u.dead) return false;
+  if(u.def && u.def.vehicle) return false;   // a tank in the band is just a tank in a ditch
+  if(u._trT===S.t) return u._tr;             // one geometry test per man per frame
+  u._trT=S.t; u._tr=trenchAt(u.x,u.y);
+  return u._tr;
+}
+function bfCanTarget(u,o){
+  if(!S.bf || !S.cfg.terrain.trench) return true;   // identity off WESTERN LAND — and always in the campaign
+  if(!inTrench(o)) return true;                     // target in the open: anyone may engage
+  if(TRENCH_EXEMPT[u.type]) return true;            // the two lobbers see over the lip
+  return inTrench(u);                               // everyone else climbs down and goes in after them
+}
 // the AI's Sarge carries the service pistol; YOURS (seat 0 — the human, on any
 // team size) carries whatever you equipped. Teammate seats are AI too.
 const BF_AI_SARGE={ w:'pistol', r:0, rng:108, rate:PISTOL_RATE, dmg:1.5 };
@@ -10738,7 +10917,7 @@ function bfSargeDown(u){
   // float apiece would bury the carpet at 10v10
   if(st.me){
     S.floats.push({x:u.x, y:u.y-70, txt:tf('SARGE DOWN — %1s', BF_SARGE_DOWN), t:0, col:'#FFD24A'});
-    if(bfVis(u.x) && !reducedMotion()) S.shake=Math.max(S.shake,0.22);
+    if(bfVis(u.x,u.y) && !reducedMotion()) S.shake=Math.max(S.shake,0.22);
   }
 }
 function bfHumanU(u){ return !S.bf || u.seat===bfMySeat(); }
@@ -10799,8 +10978,15 @@ function counterDmg(tgt,dmg,src){
 }
 // at 10v10 forty guns firing across a 3000px carpet would be a wall of bleeps —
 // battle sounds only play when the fight is actually on (or near) your screen
-function bfVis(x){ return !S.bf || Math.abs(x-(S.bf.cam.x+VW/2)) < VW/2+260; }
-function bfSfx(fn,x){ if(bfVis(x)) fn(); }
+// (v1.57: the tall map gates on BOTH axes. y is optional — every caller that
+// omits it keeps the old x-only answer, and on an hMul-1 map any legal y is
+// inside the window anyway, so nothing that shipped changes by a decibel.)
+function bfVis(x,y){
+  if(!S.bf) return true;
+  if(Math.abs(x-(S.bf.cam.x+VW/2)) >= VW/2+260) return false;
+  return y==null || Math.abs(y-((S.bf.cam.y||0)+H/2)) < H/2+260;
+}
+function bfSfx(fn,x,y){ if(bfVis(x,y)) fn(); }
 // every damage site funnels through here so the blade can turn a round aside
 function hurt(f,dmg,src){
   if(S.bf && f.side && f.jetT>0) return;       // airborne (v1.39): untouchable on the battlefield too
@@ -10869,7 +11055,7 @@ function applyDeploy(seat,type,x,y,relay){
   x=Math.round(x); y=Math.round(y);                        // wire form and sim agree
   const cost=BF_COST[type];
   if(type==='sarge' && S.units.some(u=>!u.dead&&u.seat===seat&&u.type==='sarge')) return null;   // one Sarge per PLAYER
-  if(relay){ x=Math.max(40,Math.min(WORLD_W-40,x)); y=Math.max(74,Math.min(H-96,y));
+  if(relay){ x=Math.max(40,Math.min(WORLD_W-40,x)); y=Math.max(74,Math.min(WORLD_H-96,y));
     // that commander served their ten seconds on their own clock — take their
     // word for it and clear ours, rather than argue with them over the lag
     if(type==='sarge') st.sargeCd=0;
@@ -10889,7 +11075,7 @@ function applyDeploy(seat,type,x,y,relay){
   // the landing reticle: a ring that closes on the spot he's dropping into
   S.fx.push({ k:'ring', x, y:y-6, r:56, R:15, t:0, dur:0.55,
     col: st.team==='you'?'rgba(191,227,154,0.95)':'rgba(230,140,110,0.95)' });
-  bfSfx(SFX.blip, x);
+  bfSfx(SFX.blip, x, y);
   return u;
 }
 
@@ -10936,7 +11122,7 @@ function rockSteer(x,y,gx,gy,pad){
   for(const s of (cross>=0 ? [1,-1] : [-1,1])){
     const px=blk.x-dy*s*R, py=blk.y+dx*s*R;
     let sc=Math.hypot(gx-px,gy-py);
-    if(py<80||py>H-100) sc+=900;                      // don't steer off the carpet
+    if(py<80||py>WORLD_H-100) sc+=900;                // don't steer off the carpet (WORLD_H === H everywhere but the tall map)
     for(const o of RK){
       if(o===blk) continue;
       const od=Math.hypot(o.x-px,o.y-py), om=o.r+pad;
@@ -11062,7 +11248,7 @@ function bfMarch(u,dt,goal){
     const ax=u.x-bl.x, ay=u.y-bl.y, dd=Math.hypot(ax,ay), min=bl.r+16;
     if(dd>0.1&&dd<min){ u.x+=ax/dd*(min-dd)*Math.min(1,dt*8); u.y+=ay/dd*(min-dd)*Math.min(1,dt*8); }
   }
-  u.y=Math.max(74,Math.min(H-96,u.y));
+  u.y=Math.max(74,Math.min(WORLD_H-96,u.y));
   if(u.home){ u.home.x=u.x; u.home.y=u.y; }      // Sarge's post travels with him
 }
 // same collide as the campaign toy box (Wyatt 7/24: "boop, you hit it")
@@ -11124,12 +11310,12 @@ function bfRam(u){
     if(Math.hypot(o.x-u.x,o.y-u.y)>R) continue;
     u.rammed[o.id]=1;
     S.fx.push({k:'puff',x:o.x,y:o.y-18,t:0,dur:0.3,R:20});
-    bfSfx(SFX.thock, u.x);
+    bfSfx(SFX.thock, u.x, u.y);
     // v1.40: collide with a jeep and the blade loses — a saber-wielding Sarge
     // is destroyed outright (straight to hp 0, never through hurt(), so his
     // own deflect can't turn the bumper aside). His chair starts its clock
     // like any battlefield death. Everyone else takes the same ram as ever.
-    if(saberArm(o)){ o.hp=0; hitCheck(o,u); bfSfx(SFX.boom,u.x); }
+    if(saberArm(o)){ o.hp=0; hitCheck(o,u); bfSfx(SFX.boom, u.x, u.y); }
     else hurt(o, u.def.ram, u);
   }
   // rooster tail of carpet dust off the back wheels — you can hear it coming
@@ -11144,7 +11330,7 @@ function bfUnitStep(u,dt){
     u.dropT-=dt;
     if(u.dropT<=0){
       u.dropT=0;
-      bfSfx(SFX.thock, u.x);
+      bfSfx(SFX.thock, u.x, u.y);
       S.fx.push({k:'ring',x:u.x,y:u.y-4,r:6,R:30,t:0,dur:0.3,col:'rgba(255,255,255,0.85)'});
       S.fx.push({k:'puff',x:u.x,y:u.y-8,t:0,dur:0.3,R:18});
     }
@@ -11167,7 +11353,7 @@ function bfUnitStep(u,dt){
       if(!u.wp || u.wpT<=0 || (Math.abs(u.wp.x-u.x)<14 && Math.abs(u.wp.y-u.y)<14)){
         const dir=(u.side==='you')?1:-1, lane=(u.laneY!=null?u.laneY:b.y);
         u.wp={ x:u.x+dir*(90+Math.random()*110),
-               y:Math.max(84,Math.min(H-104,(lane+(Math.random()-0.5)*100)*0.6+u.y*0.4)) };
+               y:Math.max(84,Math.min(WORLD_H-104,(lane+(Math.random()-0.5)*100)*0.6+u.y*0.4)) };
         u.wpT=1.0+Math.random()*1.3;
         if(Math.random()<0.10) u.pauseT=0.15+Math.random()*0.3;
       }
@@ -11268,7 +11454,9 @@ function startVictoryFlag(x,dir,old,hex,done,foeWin){
   // sits exactly over your toy box, hiding the flag it just caused (v1.56)
   commClear();
   const rm=reducedMotion();   // the calm run is SHORTER, not just stiller: flag snaps to the cap
-  S.vflag={x, y:352, dir, old:rm?null:old, hex:hex||GREEN, t:0, foeWin:!!foeWin,
+  // the pole stands on the DRAWN crate: base.y+52 on a battlefield (352 on
+  // every hMul-1 map to the pixel), the campaign's own 352 everywhere else
+  S.vflag={x, y:(S.bf? S.bf.base.you.y+52 : 352), dir, old:rm?null:old, hex:hex||GREEN, t:0, foeWin:!!foeWin,
            lag:rm?0:VFLAG_LAG, rise:rm?0:VFLAG_RISE,
            dur:(rm?0:VFLAG_LAG+VFLAG_RISE)+VFLAG_HOLD, burst:rm, done:done||null};
   if(foeWin) SFX.defeat(); else SFX.victory();
@@ -11277,8 +11465,10 @@ function vflagTick(dt){
   const v=S.vflag; v.t+=dt;
   // the battlefield camera walks over to watch — the crate may be a world away
   // (never fighting a live finger-pan, never after the whistle)
-  if(S.bf && !S.bf.resolved && !S.pan)
+  if(S.bf && !S.bf.resolved && !S.pan){
     S.bf.cam.x=clampCam(S.bf.cam.x+((v.x-VW*0.55)-S.bf.cam.x)*Math.min(1,dt*3.2));
+    S.bf.cam.y=clampCamY((S.bf.cam.y||0)+((v.y-436)-(S.bf.cam.y||0))*Math.min(1,dt*3.2));   // ...and climbs to the pole on the tall map (clamps to 0 everywhere else)
+  }
   if(!v.burst && v.t>=v.lag+v.rise){
     v.burst=true;
     S.fx.push({k:'ring',x:v.x,y:v.y-176,r:6,R:70,t:0,dur:0.5,col:'rgba(255,210,74,0.9)'});
@@ -11307,18 +11497,18 @@ function campSmash(u,dist){
   const tx=b.x-10+(Math.random()-0.5)*30, ty=b.y-42+(Math.random()-0.5)*26;
   if(arm==='lightsaber'){
     S.fx.push({k:'ring',x:tx,y:ty,r:5,R:42,t:0,dur:0.24,col:saberHexU(u)});
-    bfSfx(SFX.laser,u.x);
+    bfSfx(SFX.laser, u.x, u.y);
   } else if((dist||0)>LEAK_R+10){
-    if(arm==='sniper'){ bfSfx(SFX.crack,u.x);
+    if(arm==='sniper'){ bfSfx(SFX.crack, u.x, u.y);
       S.fx.push({k:'tracer',x1:u.x+48,y1:u.y-37,x2:tx,y2:ty,t:0,dur:0.2,col:'#FFF3C4',w:3}); }
-    else if(arm==='bazooka'){ bfSfx(SFX.rocket,u.x);
+    else if(arm==='bazooka'){ bfSfx(SFX.rocket, u.x, u.y);
       S.fx.push({k:'puff',x:tx,y:ty,t:0,dur:0.35,R:18}); }
-    else if(arm==='flame'){ bfSfx(SFX.mg,u.x);
+    else if(arm==='flame'){ bfSfx(SFX.mg, u.x, u.y);
       S.fx.push({k:'puff',x:(u.x+tx)/2,y:(u.y+ty)/2-12,t:0,dur:0.25,R:14}); }
-    else { bfSfx(arm==='mgunner'?SFX.mg:SFX.pew,u.x);
+    else { bfSfx(arm==='mgunner'?SFX.mg:SFX.pew, u.x, u.y);
       S.fx.push({k:'tracer',x1:u.x+16,y1:u.y-26,x2:tx,y2:ty,t:0,dur:0.09}); }
   } else {
-    bfSfx(SFX.thock,u.x);
+    bfSfx(SFX.thock, u.x, u.y);
   }
   S.fx.push({k:'ring',x:b.x-6,y:b.y-40,r:6,R:34,t:0,dur:0.3,col:'rgba(255,243,196,0.8)'});
   S.floats.push({x:b.x,y:b.y-96,txt:'−'+dmg,t:0,col:'#BFE39A'});
@@ -11519,6 +11709,7 @@ function campUnitStep(u,dt){
 // ================= BATTLEFIELD: CLOCK, ECONOMY, OPPONENT =================
 function bfBounty(type){ return (BF_BOUNTY[type]||1) * (S.bf&&S.bf.ot?2:1); }
 function clampCam(x){ return Math.max(0, Math.min(WORLD_W-VW, x)); }
+function clampCamY(y){ return Math.max(0, Math.min(WORLD_H-H, y)); }   // 0..0 on every map but the tall one
 function bfTick(dt){
   const bf=S.bf;
   if(bf.hintT>0) bf.hintT-=dt;                    // the scroll nudge burns down (v1.44)
@@ -11526,6 +11717,36 @@ function bfTick(dt){
     bf.cam.x=clampCam(bf.cam.x+bf.cam.vx*dt);
     bf.cam.vx*=Math.pow(0.02,dt);
     if(Math.abs(bf.cam.vx)<8 || bf.cam.x<=0 || bf.cam.x>=WORLD_W-VW) bf.cam.vx=0;
+  }
+  if(!S.pan && bf.cam.vy){                        // ...and the same physics up and down the tall map
+    bf.cam.y=clampCamY(bf.cam.y+bf.cam.vy*dt);
+    bf.cam.vy*=Math.pow(0.02,dt);
+    if(Math.abs(bf.cam.vy)<8 || bf.cam.y<=0 || bf.cam.y>=WORLD_H-H) bf.cam.vy=0;
+  }
+  // ===== WESTERN LAND: THE TRAIN (v1.57) =====
+  // Steps here with the balls — before the resolved-check, so the railroad
+  // keeps running behind the flag ceremony and the verdict card. Kills stop
+  // the moment the match is decided; the wheels never do.
+  if(S.cfg.terrain.rail){
+    bf.trainT=(bf.trainT||0)+dt;
+    const tr=trainCars(bf); bf.train=tr;
+    const rl=S.cfg.terrain.rail, loco=tr.cars[0];
+    // one whistle per approach, at the crossing the crossbucks guard
+    if(tr.warn && !bf.trainWhis){ bf.trainWhis=true; bfSfx(SFX.train, rl.cross.x, rl.cross.y); }
+    else if(!tr.warn) bf.trainWhis=false;
+    // smoke off the stack while the loco is on the mat and on your screen
+    if(!loco.off && !reducedMotion() && Math.random()<0.3 && bfVis(loco.x,loco.y))
+      S.fx.push({k:'smoke',x:loco.x+Math.cos(loco.ang)*22,y:loco.y-42,t:0,dur:0.7});
+    // THE KILL LAW: any unit a car touches is destroyed on the spot — both
+    // armies, vehicles, Sarge. Spawn ghosts, the airborne and the fallen are
+    // exempt (the wrecking-ball precedent). Flagged, never spliced.
+    if(!bf.resolved && !bf.ending) for(const u of S.units){
+      if(u.dead||u.dropT>0||u.jetT>0) continue;
+      for(const c of tr.cars){
+        if(c.off) continue;
+        if(segDist(u.x,u.y,c.fx,c.fy,c.bx,c.by)<TRAIN_KILL_R){ trainKill(u); break; }
+      }
+    }
   }
   // toy wrecking balls patrol their beat — anyone in the way gets plowed aside
   // (standing, firing, doesn't matter; only spawn ghosts and the fallen escape)
@@ -11538,7 +11759,7 @@ function bfTick(dt){
       const ax=u.x-bl.x, ay=u.y-bl.y, dd=Math.hypot(ax,ay), min=bl.r+16;
       if(dd>0.1&&dd<min){
         u.x+=ax/dd*(min-dd)*Math.min(1,dt*10); u.y+=ay/dd*(min-dd)*Math.min(1,dt*10);
-        u.y=Math.max(74,Math.min(H-96,u.y));
+        u.y=Math.max(74,Math.min(WORLD_H-96,u.y));
         if(u.home){ u.home.x=u.x; u.home.y=u.y; }
       }
     }
@@ -11733,9 +11954,9 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
   const lo=MID+MID_BUFFER+24, hi=WORLD_W-70;
   const live=theirs.filter(u=>u.dropT<=0);
   const ours=(mine||[]).filter(u=>u.dropT<=0);
-  let focusY=300;
+  let focusY=WORLD_H/2;
   if(this.d.focus==='center'){
-    focusY=110+Math.random()*(H-230);                       // easy just picks a lane at random
+    focusY=110+Math.random()*(WORLD_H-230);                 // easy just picks a lane at random
   } else if(live.length){
     let best=null, bs=-1e9;
     for(const e of live){
@@ -11744,12 +11965,12 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
       const s = (e.x/WORLD_W)*3 - cover*1.4 + Math.random()*(this.d.focus==='focus'?0.15:0.7);
       if(s>bs){ bs=s; best=e; }
     }
-    focusY=best? best.y : 300;
+    focusY=best? best.y : WORLD_H/2;
   } else {
     // nobody to answer — spread our own push across the thinnest lane instead of
     // stacking one column they can wall off with a single man
     let bs=-1e9;
-    for(let y=130; y<=H-140; y+=70){
+    for(let y=130; y<=WORLD_H-140; y+=70){
       let near=0; for(const m of ours) if(Math.abs(m.y-y)<80) near++;
       const s=-near+Math.random()*0.5;
       if(s>bs){ bs=s; focusY=y; }
@@ -11758,7 +11979,7 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
   // a wild placement ignores the lane read entirely — the humanizing miss that
   // actually moves win rates (a blundered UNIT still lands in the right lane;
   // a blundered LANE is what a player can punish)
-  if(this.d.wildP && Math.random()<this.d.wildP) focusY=110+Math.random()*(H-220);
+  if(this.d.wildP && Math.random()<this.d.wildP) focusY=110+Math.random()*(WORLD_H-220);
   // a team seat leans toward its own slice of the front; interception still
   // pulls it off-lane when someone is genuinely breaking through
   if(view && view.laneBias!=null) focusY = focusY*0.55 + view.laneBias*0.45;
@@ -11767,7 +11988,7 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
   for(let i=0;i<24;i++){          // 24 tries, not 16 — the strewn maps eat candidates
     const x=Math.round(lo+Math.random()*(hi-lo));
     const spread=(this.d.focus==='focus'?110:(this.d.focus==='weak'?190:300));
-    const y=Math.round(Math.max(92,Math.min(H-108, focusY+(Math.random()-0.5)*spread)));
+    const y=Math.round(Math.max(92,Math.min(WORLD_H-108, focusY+(Math.random()-0.5)*spread)));
     if(!view.cp(x,y,type)) continue;         // the view knows which half is legal (and un-mirrors)
     const fwd=(x-lo)/(hi-lo);
     let s=(back? fwd : 1-fwd)*1.5;
@@ -11840,7 +12061,7 @@ function saberBlocks(u){
   const sw=unitSargeStats(u);
   if(sw.w!=='lightsaber') return false;
   if(sw.block && Math.random()<sw.block){
-    S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:22,t:0,dur:0.2,col:saberHexU(u)}); bfSfx(SFX.snap,u.x); return true;
+    S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:22,t:0,dur:0.2,col:saberHexU(u)}); bfSfx(SFX.snap, u.x, u.y); return true;
   }
   return false;
 }
@@ -11859,7 +12080,7 @@ function enhDuck(u){
   if(u.duckCd>0 || !enhU(u,'foxhole')) return false;
   if(Math.random()>=ENH_DUCK_P) return false;
   u.duckT=ENH_DUCK_T; u.duckCd=ENH_DUCK_T+ENH_DUCK_REST;
-  bfSfx(SFX.thock, u.x);
+  bfSfx(SFX.thock, u.x, u.y);
   S.fx.push({k:'puff',x:u.x,y:u.y-6,t:0,dur:0.3,R:16});
   S.floats.push({x:u.x,y:u.y-58,txt:'COVER!',t:0,col:'#BFE39A'});
   return true;
@@ -11870,8 +12091,8 @@ function enhDuck(u){
 // The battleground has no knockdown and no friendly fire, so there the blast
 // comes out of his own plastic instead. Either way the shot is gone.
 function enhBackfire(u){
-  bfSfx(SFX.boom, u.x); bfSfx(SFX.clack, u.x);
-  if(bfVis(u.x) && !reducedMotion()) S.shake=Math.max(S.shake,0.32);
+  bfSfx(SFX.boom, u.x, u.y); bfSfx(SFX.clack, u.x, u.y);
+  if(bfVis(u.x,u.y) && !reducedMotion()) S.shake=Math.max(S.shake,0.32);
   S.floats.push({x:u.x,y:u.y-64,txt:'BACKFIRE!',t:0,col:'#D96A55'});
   S.fx.push({k:'puff',x:u.x+6,y:u.y-30,t:0,dur:0.5,R:26});
   S.fx.push({k:'ring',x:u.x,y:u.y-20,r:6,R:40,t:0,dur:0.3,col:'#FF9A3D'});
@@ -11898,7 +12119,7 @@ function sargeAbsorbs(u){
   if(unitSargeStats(u).w!=='shotgun') return false;
   if((u.absN||0)>=ENH_SHIELD_N) return false;
   u.absN=(u.absN||0)+1;
-  bfSfx(SFX.thock, u.x);
+  bfSfx(SFX.thock, u.x, u.y);
   S.fx.push({k:'ring',x:u.x,y:u.y-24,r:5,R:30,t:0,dur:0.22,col:'#D8D8D8'});
   S.floats.push({x:u.x,y:u.y-72,txt:'ABSORBED!',t:0,col:'#D8D8D8'});   // raw key — floats translate at draw
   return true;
@@ -11940,7 +12161,7 @@ function updateSaber(u,dt,sw){
   if(u.saberState==='idle'){
     if(u.saberCd>0) return;
     const best=saberNext(u,sw);
-    if(best){ u.saberState='out'; u.saberTarget=best; bfSfx(SFX.laser,u.x); }
+    if(best){ u.saberState='out'; u.saberTarget=best; bfSfx(SFX.laser, u.x, u.y); }
     return;
   }
   if(u.saberState==='out'){
@@ -11958,11 +12179,11 @@ function updateSaber(u,dt,sw){
       const vm=(u.vet?1.5:1), cm=rollCrit(u)?CRIT_MULT:1;
       if(cm>1) critFx(f);
       hurt(f,sw.dmg*vm*cm,u);                     // massive strike
-      for(const g of TGT(u)){ if(g!==f && !g.burrow && !g.dead && Math.hypot(g.x-u.x,g.y-u.y)<46){ hurt(g,sw.dmg*0.5*vm*cm,u); } }  // a cleave to whatever else is close
+      for(const g of TGT(u)){ if(g!==f && !g.burrow && !g.dead && bfCanTarget(u,g) && Math.hypot(g.x-u.x,g.y-u.y)<46){ hurt(g,sw.dmg*0.5*vm*cm,u); } }  // a cleave to whatever else is close (never down into the cut he isn't in — v1.57)
       S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:50,t:0,dur:0.26,col:saberHexU(u)});
       // twenty commanders can now draw a blade — an offscreen strike must not
       // shove the camera around, and only YOUR Sarge gets to rock the room
-      bfSfx(SFX.laser,u.x); if(bfHumanU(u)) S.shake=0.2; u.saberSwing=0.5;
+      bfSfx(SFX.laser, u.x, u.y); if(bfHumanU(u)) S.shake=0.2; u.saberSwing=0.5;
       const nx=saberNext(u,sw);                   // anyone still in reach? keep carving forward
       if(nx){ u.saberTarget=nx; return; }
       u.saberState='back'; u.saberCd=sw.cd;
@@ -12004,7 +12225,7 @@ function updateFoeSaber(f,dt){
   if(!f.saberState) f.saberState='idle';
   if(f.saberState==='idle'){
     const best=foeSaberNext(f,sb.aggro);
-    if(best){ f.home={x:f.x,y:f.y}; f.saberState='out'; f.saberTarget=best; bfSfx(SFX.laser,f.x); }
+    if(best){ f.home={x:f.x,y:f.y}; f.saberState='out'; f.saberTarget=best; bfSfx(SFX.laser, f.x, f.y); }
     return;
   }
   if(f.saberState==='out'){
@@ -12021,7 +12242,7 @@ function updateFoeSaber(f,dt){
     else if(f.saberSwing<=0){
       knock(u, f.x, f.y);                             // unrolled — one roll per strike, inside the funnel
       S.fx.push({k:'ring',x:f.x,y:f.y-16,r:6,R:50,t:0,dur:0.26,col:'#FF4D4D'});
-      bfSfx(SFX.laser,f.x);
+      bfSfx(SFX.laser, f.x, f.y);
       f.saberSwing=sb.swing;
       const nx=foeSaberNext(f,sb.aggro);              // anyone still in reach? keep carving
       if(nx){ f.saberTarget=nx; return; }
@@ -12120,10 +12341,10 @@ function jetSarge(){                        // MY launchable Sarge, or null
 // landing beside other men is fine, and the toy-box zone is harmless ground.
 function jetLandOK(x,y){
   if(S.bf){
-    if(x<40||x>WORLD_W-40||y<74||y>H-96) return false;
+    if(x<40||x>WORLD_W-40||y<74||y>WORLD_H-96) return false;
     for(const rv of (S.cfg.terrain.rivers||[])){
       if(rv.dry) continue;          // a dry funnel is bare ground
-      if(x>rv.x-16 && x<rv.x+rv.w+16 && y>(rv.y0!=null?rv.y0:56)-16 && y<(rv.y1!=null?rv.y1:H-56)+16) return false; }
+      if(x>rv.x-16 && x<rv.x+rv.w+16 && y>(rv.y0!=null?rv.y0:56)-16 && y<(rv.y1!=null?rv.y1:WORLD_H-56)+16) return false; }
     for(const rk of S.cfg.terrain.rocks){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }
     for(const p of (S.cfg.terrain.ponds||[])){
       const nx=(x-p.x)/(p.rx+12), ny=(y-p.y)/(p.ry+12); if(nx*nx+ny*ny<1) return false; }
@@ -12164,7 +12385,7 @@ function jetResolve(u,tx,ty){
                      : (S.tanBase ? (Math.sign(S.tanBase.x-u.x)||1) : 1);
     tx=u.x+dir*JET_DIST; ty=u.y;
   }
-  if(S.bf){ tx=Math.max(40,Math.min(WORLD_W-40,tx)); ty=Math.max(74,Math.min(H-96,ty)); }
+  if(S.bf){ tx=Math.max(40,Math.min(WORLD_W-40,tx)); ty=Math.max(74,Math.min(WORLD_H-96,ty)); }
   else    { tx=Math.max(58,Math.min(W-24,tx));       ty=Math.max(70,Math.min(H-92,ty)); }
   const dx=tx-u.x, dy=ty-u.y, d=Math.hypot(dx,dy);
   if(d>JET_RANGE){ tx=u.x+dx/d*JET_RANGE; ty=u.y+dy/d*JET_RANGE; }
@@ -12184,7 +12405,7 @@ function jetLaunch(u,tx,ty,relay){
     // absolute world coords, applied VERBATIM (the v1.24 law): the sender
     // already clamped and legality-nudged — re-nudging here would tear the
     // two renditions apart. Bounds clamp only, exactly like the mv order.
-    if(S.bf){ to={ x:Math.max(40,Math.min(WORLD_W-40,tx|0)), y:Math.max(74,Math.min(H-96,ty|0)) }; }
+    if(S.bf){ to={ x:Math.max(40,Math.min(WORLD_W-40,tx|0)), y:Math.max(74,Math.min(WORLD_H-96,ty|0)) }; }
     else    { to={ x:Math.max(58,Math.min(W-24,tx|0)),       y:Math.max(70,Math.min(H-92,ty|0)) }; }
     if(S.drag && S.drag.unit===u) S.drag=null;   // can't keep holding a man the wire just launched
   } else {
@@ -12199,7 +12420,7 @@ function jetLaunch(u,tx,ty,relay){
   u.jetFrom={x:u.x,y:u.y};
   u.jetTo=to;
   if(S.sel===u) S.sel=null;
-  bfSfx(SFX.jet,u.x);
+  bfSfx(SFX.jet, u.x, u.y);
   S.fx.push({k:'puff',x:u.x,y:u.y-6,t:0,dur:0.4,R:22});  // the takeoff kick
   if(!relay){
     S.jetCd=JET_CD;                                      // MY clock — a relayed flight never touches it
@@ -12231,7 +12452,7 @@ function jetStep(u,dt){
   u.jetFrom=null; u.jetTo=null;
   S.fx.push({k:'ring',x:u.x,y:u.y-4,r:6,R:30,t:0,dur:0.3,col:'rgba(255,255,255,0.85)'});
   S.fx.push({k:'puff',x:u.x,y:u.y-8,t:0,dur:0.3,R:18});
-  bfSfx(SFX.thock,u.x);
+  bfSfx(SFX.thock, u.x, u.y);
   // only YOUR Sarge gets to rock the room (the 10382 law)
   if(bfHumanU(u) && !u.coopBy && !reducedMotion()) S.shake=Math.max(S.shake,0.15);
 }
@@ -12320,7 +12541,7 @@ function paraSpot(u){
   if(tx==null){ tx=B.lo+(B.hi-B.lo)*PARA_DEEP; ty=(u.laneY!=null?u.laneY:u.y); }
   tx+=(Math.random()-0.5)*70; ty+=(Math.random()-0.5)*70;           // never twice on the same square foot
   tx=Math.max(B.lo,Math.min(B.hi,tx));                              // ⚠ the clamp comes AFTER the jitter — the standoff is a law, not a preference
-  ty=Math.max(S.bf?84:80, Math.min(H-100, ty));
+  ty=Math.max(S.bf?84:80, Math.min(WORLD_H-100, ty));   // the tall map's rear rank is a real latitude (v1.57)
   const p={x:Math.round(tx),y:Math.round(ty)};
   const s=jetLandSpot(u,p.x,p.y,p);                                 // no river, no rock, no pond — the jet's own deterministic ring
   return {x:Math.round(s.x), y:Math.round(s.y)};
@@ -12351,7 +12572,7 @@ function radioCall(u){
   paraChute(p,to.x,to.y);
   if(S.bf) roomPlaced(p.seat,'rifleman',to.x,to.y,true);   // no-op outside a private room
   else     coopPlaced(p);                                  // no-op outside co-op
-  bfSfx(commChirp,u.x);                            // the set keying up, at the RADIO MAN — the tell is where the call came from
+  bfSfx(commChirp, u.x, u.y);                            // the set keying up, at the RADIO MAN — the tell is where the call came from
   S.fx.push({k:'ring',x:u.x,y:u.y-52,r:6,R:38,t:0,dur:0.45,col:'rgba(140,196,236,0.9)'});
   S.floats.push({x:to.x,y:to.y-96,txt:'PARATROOPER!',t:0,col:'#8CC4EC'});   // raw key — floats translate at draw
   return p;
@@ -12377,13 +12598,19 @@ function canPlace(x,y,type,side){
   // BATTLEFIELD: your half only, with a no-drop strip either side of centre so
   // nobody can drop an invulnerable spawn ghost right on top of the enemy line.
   if(S.bf){
-    if(x<40||x>WORLD_W-40||y<74||y>H-96) return false;
+    if(x<40||x>WORLD_W-40||y<74||y>WORLD_H-96) return false;
     const s=side||bfMyTeam();
     if(s==='you' && x>MID-MID_BUFFER) return false;
     if(s==='foe' && x<MID+MID_BUFFER) return false;
     for(const rv of (S.cfg.terrain.rivers||[])){
       if(rv.dry) continue;          // ⚠ a dry funnel is bare ground — banning it would wall the map
-      if(x>rv.x-16 && x<rv.x+rv.w+16 && y>(rv.y0!=null?rv.y0:56)-16 && y<(rv.y1!=null?rv.y1:H-56)+16) return false; }
+      if(x>rv.x-16 && x<rv.x+rv.w+16 && y>(rv.y0!=null?rv.y0:56)-16 && y<(rv.y1!=null?rv.y1:WORLD_H-56)+16) return false; }
+    // WESTERN LAND (v1.57): the whole line is off-limits — bed, margin, both
+    // branches, the ring. A no-drop zone must visibly BE track; marching ACROSS
+    // is allowed, and that is the risk. (The trench is bare ground: placeable
+    // in principle, though the MID buffer already owns every inch of it.)
+    for(const pl of ((S.cfg.terrain.rail&&S.cfg.terrain.rail.ban)||[])){
+      if(trailDist(x,y,pl)<TRK_BAN) return false; }
     for(const rk of S.cfg.terrain.rocks){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }
     for(const p of (S.cfg.terrain.ponds||[])){
       const nx=(x-p.x)/(p.rx+12), ny=(y-p.y)/(p.ry+12); if(nx*nx+ny*ny<1) return false; }
@@ -14218,7 +14445,7 @@ function update(dt){
         const ra=radioAura(u), rb=ra.rng;
         const list=TGT(u);
         let best=null,bs=1e9;
-        for(const f of list){ if(f.burrow||f.jetT>0) continue; if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>H+30)) continue;
+        for(const f of list){ if(f.burrow||f.jetT>0) continue; if(!bfCanTarget(u,f)) continue; if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>H+30)) continue;
           const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>sw.rng*rb) continue; const db=PRIO(u,f); if(db<bs){bs=db;best=f;} }
         if(!best) continue;
         u.cd=1/(sw.rate*ra.rate); const vm=(u.vet?1.5:1);
@@ -14227,9 +14454,10 @@ function update(dt){
         const wdir=(S.bf&&u.side==='foe')?-1:1;
         if(sw.w==='shotgun'){
           // a wide CONE aimed at the nearest cluster — flattens everyone inside it
-          bfSfx(SFX.thock, u.x); bfSfx(SFX.pew, u.x);
+          bfSfx(SFX.thock, u.x, u.y); bfSfx(SFX.pew, u.x, u.y);
           const ang=Math.atan2(best.y-u.y,best.x-u.x);
           for(let j=list.length-1;j>=0;j--){ const f=list[j]; if(f.burrow||f.dead||f.jetT>0) continue;
+            if(!bfCanTarget(u,f)) continue;   // the cone is aimed fire, pellet by pellet — not splash (v1.57)
             const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>sw.rng*rb) continue;
             let da=Math.abs(Math.atan2(f.y-u.y,f.x-u.x)-ang); if(da>Math.PI) da=2*Math.PI-da;
             if(da<=sw.cone){ hurt(f,sw.dmg*vm*cm,u); } }
@@ -14261,7 +14489,7 @@ function update(dt){
           // yours alone. A dozen commanders taking turns freezing your clock
           // would be a stutter, not a punch.
           const mine=bfHumanU(u);
-          bfSfx(SFX.crack, u.x); if(mine) S.shake=RM?0.05:0.34;
+          bfSfx(SFX.crack, u.x, u.y); if(mine) S.shake=RM?0.05:0.34;
           if(mine && !RM && !S.coop) S.hitStop=0.07;             // the punch — never in co-op: two sims, one clock
           u.snipeT=SNIPE_KICK;                                   // the barrel rocks back on the figure
           // MUZZLE SMOKE, NOT A WORD (v1.33, Wyatt: drop the 'CRACK!' — "maybe a
@@ -14317,9 +14545,9 @@ function update(dt){
         // is what goes off.
         S.mines.push({ owner:u.id, side:u.side||null, seat:(u.seat!=null?u.seat:null),
           x:Math.max(24,Math.min((S.bf?WORLD_W:W)-30,mx)),
-          y:Math.max(70,Math.min(H-100,u.y+(Math.random()-0.5)*90)), armT:0.8,
+          y:Math.max(70,Math.min(WORLD_H-100,u.y+(Math.random()-0.5)*90)), armT:0.8,
           big:enhU(u,'bigbangers') });
-        bfSfx(SFX.snap, u.x);
+        bfSfx(SFX.snap, u.x, u.y);
       } else u.cd=1;
       continue;
     }
@@ -14331,6 +14559,7 @@ function update(dt){
     for(const f of TGT(u)){
       if(f.burrow) continue;                 // under the rug: can't be hit
       if(f.jetT>0) continue;                 // in the air (v1.39): same rule, other direction
+      if(!bfCanTarget(u,f)) continue;        // below the lip (v1.57): only the lobbers reach in from outside
       if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>H+30)) continue;  // no shooting offscreen
       const d=Math.hypot(f.x-u.x,f.y-u.y);
       if(d>def.rng*rngMul) continue;
@@ -14351,7 +14580,7 @@ function update(dt){
     if(tube && Math.random()<ENH_BAZ_BACK){ enhBackfire(u); continue; }   // no rocket leaves the tube
     const WX = S.bf? WORLD_W : W;
     if(u.type==='flame'){
-      bfSfx(SFX.mg, u.x);
+      bfSfx(SFX.mg, u.x, u.y);
       extra.slice(0,def.multi).forEach(f=>{
         S.fx.push({k:'puff',x:(u.x+f.x)/2,y:(u.y+f.y)/2-14,t:0,dur:0.25,R:14});
         hurt(f,dmg,u);
@@ -14364,8 +14593,8 @@ function update(dt){
       // pipeline, just with a fraction of the bazooka's scatter and no anti-
       // vehicle bonus. A visible tank rocks the room a little when it fires;
       // one offscreen does not (twenty seats' worth of shake would be a mess).
-      bfSfx(SFX.boom, u.x);
-      if(bfVis(u.x) && !reducedMotion()) S.shake=Math.max(S.shake,0.11);
+      bfSfx(SFX.boom, u.x, u.y);
+      if(bfVis(u.x,u.y) && !reducedMotion()) S.shake=Math.max(S.shake,0.11);
       const a=Math.random()*6.283, r=Math.random()*def.scatter;
       const tx=Math.max(20,Math.min(WX-20,best.x+Math.cos(a)*r)), ty=Math.max(20,Math.min(H-20,best.y+Math.sin(a)*r));
       const mzx=u.x+42*mzl, mzy=u.y-44;
@@ -14373,13 +14602,13 @@ function update(dt){
       S.fx.push({k:'flash',x:mzx,y:mzy,ang:Math.atan2(ty-mzy,tx-mzx),R:20,lw:3.2,t:0,dur:0.13});   // so the flash sits on top of it
       S.shots.push({k:'rocket',x:mzx,y:mzy,tx,ty,spd:520,dmg,splash:def.splash,vx2:false,src:u});
     } else if(u.type==='bazooka'){
-      bfSfx(SFX.rocket, u.x);
+      bfSfx(SFX.rocket, u.x, u.y);
       // dumb-fire: he shoots where they WERE, roughly. It's a big rocket.
       const a=Math.random()*6.283, r=Math.random()*def.scatter;
       const tx=Math.max(20,Math.min(WX-20,best.x+Math.cos(a)*r)), ty=Math.max(20,Math.min(H-20,best.y+Math.sin(a)*r));
       S.shots.push({k:'rocket',x:u.x+14*mzl,y:u.y-30,tx,ty,spd:280,dmg,splash:def.splash,vx2:true,src:u});
     } else if(u.type==='mortar'){
-      bfSfx(SFX.rocket, u.x);
+      bfSfx(SFX.rocket, u.x, u.y);
       // aims at where they are + scatter — he can lead them or whiff entirely
       const a=Math.random()*6.283, r=Math.random()*def.scatter;
       const tx=Math.max(20,Math.min(WX-20,best.x+Math.cos(a)*r)), ty=Math.max(20,Math.min(H-20,best.y+Math.sin(a)*r));
@@ -14388,7 +14617,7 @@ function update(dt){
       let dmgF = (best.type==='crawler'&&u.type==='rifleman')? dmg*0.1 : dmg;   // crawlers shrug off rifle fire
       if(rollCrit(u)){ dmgF*=CRIT_MULT; critFx(best); }   // the trigger-men: rifleman / MG / Sarge's pistol
       const lz = (META.laserOn && !(S.bf&&!bfHumanU(u)))? ARMIES.find(ar=>ar.id===META.laserOn) : null;   // only YOUR figures pack lasers
-      if(lz){ bfSfx(SFX.laser, u.x); } else { bfSfx(u.type==='mgunner'?SFX.mg:SFX.pew, u.x); }
+      if(lz){ bfSfx(SFX.laser, u.x, u.y); } else { bfSfx(u.type==='mgunner'?SFX.mg:SFX.pew, u.x, u.y); }
       hurt(best,dmgF,u);
       // v1.50: Sarge's rounds leave the raised SIDEARM now (drawSargeWeapon puts
       // its muzzle at +16,-41), not his chest — and the gun bucks with a little
@@ -14529,8 +14758,8 @@ function hitCheck(f,u){
     if(st && st.me){ S.blobs.push({x:f.x,y:f.y-8,v,t:0}); S.bf.myKills=(S.bf.myKills||0)+1; }
     else if(st && !st.human) st.purse+=v;   // a friend banks their own kills, on their own screen
     // a man clatters over; a vehicle goes up (same beat the campaign gives them)
-    if(f.def.vehicle){ bfSfx(SFX.boom, f.x); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
-    else bfSfx(SFX.clack, f.x);
+    if(f.def.vehicle){ bfSfx(SFX.boom, f.x, f.y); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
+    else bfSfx(SFX.clack, f.x, f.y);
     return;
   }
   if(f.hp<=0){
@@ -14560,7 +14789,7 @@ function hitCheck(f,u){
 // against a vehicle on EITHER carpet, and only the big-banger mine passes it,
 // so nothing that shipped before moves by a hair.
 function splash(x,y,R,dmg,vx2,src,mach){
-  bfSfx(SFX.boom, x);
+  bfSfx(SFX.boom, x, y);
   S.fx.push({k:'puff',x,y:y-10,t:0,dur:0.45,R:R});
   // BATTLEFIELD: no friendly fire (Wyatt 7/24 — "in a battlefield, there is
   // no friendly fire"). One blast, and only the enemy feels it. The campaign
@@ -14615,7 +14844,7 @@ function resize(){
   cv.width=VW*scale*dpr; cv.height=H*scale*dpr;
   cv.style.width=(VW*scale)+'px'; cv.style.height=(H*scale)+'px';
   cx.setTransform(scale*dpr,0,0,scale*dpr,0,0);
-  if(S.bf) S.bf.cam.x=clampCam(S.bf.cam.x);
+  if(S.bf){ S.bf.cam.x=clampCam(S.bf.cam.x); S.bf.cam.y=clampCamY(S.bf.cam.y||0); }
 }
 window.addEventListener('resize',resize); resize();
 
@@ -14633,32 +14862,45 @@ function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h
 
 function drawRug(){
   const WD = S.bf? WORLD_W : W;      // the battlefield is two carpets wide
+  const HT = S.bf? WORLD_H : H;      // ...and WESTERN LAND is two carpets tall (v1.57; HT===H everywhere else)
   // v1.47 (Wyatt: "tough to see the green army guys on the rug"): terracotta →
   // deep bedroom-rug crimson. The olive figure and the old #8C4B3C field were
   // near-identical luminance (1.08:1 — measured, which is why greens vanished);
   // #63251C sits below EVERY army colour, so green reads 1.9:1, tan 4.6:1, and
   // even the BLACK army keeps its old separation (1.3:1, was 1.35).
-  cx.fillStyle='#63251C'; cx.fillRect(0,0,WD,H);
-  cx.strokeStyle='#4A1A12'; cx.lineWidth=56; cx.strokeRect(0,0,WD,H);
-  cx.strokeStyle='#8F4634'; cx.lineWidth=7; cx.strokeRect(42,42,WD-84,H-84);
-  const snow=snowField();
+  cx.fillStyle='#63251C'; cx.fillRect(0,0,WD,HT);
+  cx.strokeStyle='#4A1A12'; cx.lineWidth=56; cx.strokeRect(0,0,WD,HT);
+  cx.strokeStyle='#8F4634'; cx.lineWidth=7; cx.strokeRect(42,42,WD-84,HT-84);
+  const snow=snowField(), sand=sandField();
   if(snow){
     // THE SNOW LIES ON THE RUG — the carpet frame is deliberately kept, which is
     // what makes this a toy-box blizzard rather than a different game. The field
     // is #E9EEF4 and NOT white: pure white glares, and it would spend the whole
     // contrast budget the figure rims need.
-    cx.fillStyle='#E9EEF4'; cx.fillRect(56,56,WD-112,H-112);
+    cx.fillStyle='#E9EEF4'; cx.fillRect(56,56,WD-112,HT-112);
     cx.globalAlpha=0.75; cx.strokeStyle='#D7E1EC'; cx.lineWidth=3;   // wind combing, in place of the pile lines
-    for(let y=96;y<H-70;y+=48){
+    for(let y=96;y<HT-70;y+=48){
+      cx.beginPath(); cx.moveTo(60,y);
+      for(let x=60;x<WD-60;x+=60) cx.quadraticCurveTo(x+30,y+((x/60)%2?5:-5),x+60,y);
+      cx.stroke(); }
+    cx.globalAlpha=1;
+  } else if(sand){
+    // THE DESERT MAT LIES ON THE RUG — the winter law, in Kalimari paint. The
+    // field is a warm mid-orange and NOT the toy-tan (#C09E6C would dissolve
+    // the tan army the way white dissolved on snow); the combing is the
+    // snow recipe with heat-haze colours.
+    cx.fillStyle='#8B3E1E'; cx.fillRect(56,56,WD-112,HT-112);
+    cx.globalAlpha=0.5; cx.strokeStyle='#7A3318'; cx.lineWidth=3;
+    for(let y=96;y<HT-70;y+=48){
       cx.beginPath(); cx.moveTo(60,y);
       for(let x=60;x<WD-60;x+=60) cx.quadraticCurveTo(x+30,y+((x/60)%2?5:-5),x+60,y);
       cx.stroke(); }
     cx.globalAlpha=1;
   } else {
     cx.globalAlpha=0.5; cx.fillStyle='#4A1A12';
-    [[112,112],[WD-112,112],[112,H-112],[WD-112,H-112]].forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
+    [[112,112],[WD-112,112],[112,HT-112],[WD-112,HT-112]].forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
     cx.globalAlpha=0.35; cx.strokeStyle='#7A3627'; cx.lineWidth=2;
-    for(let y=90;y<H-60;y+=56){ cx.beginPath(); cx.moveTo(30,y); cx.lineTo(WD-30,y); cx.stroke(); }
+    for(let y=90;y<HT-60;y+=56){ cx.beginPath(); cx.moveTo(30,y); cx.lineTo(WD-30,y); cx.stroke(); }
     cx.globalAlpha=1;
   }
   if(S.bf){
@@ -14666,11 +14908,12 @@ function drawRug(){
     // anyone parachuting a spawn ghost straight into the enemy line.
     // ⚠ #EDEADF is invisible on snow — on the winter field both go slate.
     cx.globalAlpha=snow?0.13:0.16; cx.fillStyle=snow?'#5A6E86':'#EDEADF';
-    cx.fillRect(MID-MID_BUFFER,56,MID_BUFFER*2,H-112);
+    cx.fillRect(MID-MID_BUFFER,56,MID_BUFFER*2,HT-112);
     cx.globalAlpha=snow?0.85:0.55; cx.strokeStyle=snow?'#5A6E86':'#EDEADF'; cx.lineWidth=4; cx.setLineDash([16,14]);
-    cx.beginPath(); cx.moveTo(MID,56); cx.lineTo(MID,H-56); cx.stroke();
+    cx.beginPath(); cx.moveTo(MID,56); cx.lineTo(MID,HT-56); cx.stroke();
     cx.setLineDash([]); cx.globalAlpha=1;
     if(snow) drawSnowTerrain();
+    if(sand) drawDesertTerrain();
   } else {
     // rug runner (decor only — the Tan go anywhere they please now)
     cx.lineCap='round'; cx.globalAlpha=0.35;
@@ -14683,7 +14926,7 @@ function drawRug(){
   // an open:true "bridge" is dry carpet, so it gets a funnel and no planks.
   for(const rv of (S.bf? (S.cfg.terrain.rivers||[]) : [])){
     if(rv.dry) continue;            // an invisible funnel: the snowbank IS the crossing
-    const y0=rv.y0!=null?rv.y0:56, y1=rv.y1!=null?rv.y1:H-56;
+    const y0=rv.y0!=null?rv.y0:56, y1=rv.y1!=null?rv.y1:WORLD_H-56;
     cx.fillStyle=rv.col||'#4E7FA8'; cx.fillRect(rv.x,y0,rv.w,y1-y0);
     cx.beginPath(); cx.ellipse(rv.x+rv.w/2,y0,rv.w/2,9,0,0,7); cx.fill();   // rounded spout
     cx.fillStyle=rv.col2||'#6E9DC4'; cx.globalAlpha=0.6;
@@ -14753,6 +14996,8 @@ function drawRug(){
     if(rk.art==='cup'){ drawCupRock(rk); continue; }
     if(rk.art==='block'){ drawToyBlock(rk); continue; }
     if(rk.art==='drift'||rk.art==='clod') continue;     // snowbanks draw as CHAINS, in drawSnowTerrain
+    if(rk.art==='mesa'){ drawMesa(rk); continue; }      // WESTERN LAND's rocks in costume (v1.57)
+    if(rk.art==='cactus'){ drawCactus(rk); continue; }
     cx.fillStyle='rgba(0,0,0,0.25)'; cx.beginPath(); cx.ellipse(rk.x+4,rk.y+rk.r*0.55,rk.r*1.05,rk.r*0.4,0,0,7); cx.fill();
     cx.fillStyle='#8B8578'; cx.beginPath();
     cx.ellipse(rk.x,rk.y,rk.r,rk.r*0.8,0.2,0,7); cx.fill();
@@ -14806,6 +15051,176 @@ function drawSnowClod(rk){
   cx.fillStyle='rgba(60,74,92,0.22)'; cx.beginPath(); cx.arc(rk.x+2,rk.y+4,rk.r,0,7); cx.fill();
   cx.fillStyle='#F9FCFF'; cx.beginPath(); cx.arc(rk.x,rk.y,rk.r,0,7); cx.fill();
   cx.strokeStyle='#8C9AAD'; cx.lineWidth=2; cx.stroke();
+}
+// ================= WESTERN LAND: the ground itself (v1.57) =================
+// Draw order is the reading order: the trench is CUT INTO the mat so it goes
+// down first; the gravel bed, sleepers and rails lie over everything (they are
+// the tallest thing glued to the ground); the crossing planks bridge the cut
+// where the chord meets it. Mesas and cacti ride the shared rocks loop.
+function pathPts(P){
+  cx.beginPath(); cx.moveTo(P[0][0],P[0][1]);
+  for(let i=1;i<P.length;i++) cx.lineTo(P[i][0],P[i][1]);
+}
+function drawDesertTerrain(){
+  const T=S.cfg.terrain, tr=T.trench, rl=T.rail;
+  if(tr){
+    const P=tr.pts;
+    cx.lineJoin='round'; cx.lineCap='round';
+    cx.strokeStyle='#9A5A28'; cx.lineWidth=TRENCH_W+8; pathPts(P); cx.stroke();   // the spoil lip
+    cx.strokeStyle='#5E2E14'; cx.lineWidth=TRENCH_W;   pathPts(P); cx.stroke();   // the cut
+    cx.strokeStyle='#47200C'; cx.lineWidth=TRENCH_W-18; pathPts(P); cx.stroke();  // the floor, deepest at the middle
+    // the sunlit north-west rim — the one line that says "below grade" at 54px
+    cx.save(); cx.translate(-3,-3);
+    cx.strokeStyle='rgba(242,197,132,0.65)'; cx.lineWidth=3.5; pathPts(P); cx.stroke();
+    cx.restore();
+    // duckboards across the floor, and a ladder out at each end
+    cx.strokeStyle='rgba(140,94,52,0.85)'; cx.lineWidth=3;
+    for(let i=0;i<P.length-1;i++){
+      const ax=P[i][0],ay=P[i][1],bx=P[i+1][0],by=P[i+1][1];
+      const L=Math.hypot(bx-ax,by-ay)||1, nx=-(by-ay)/L, ny=(bx-ax)/L;
+      for(let d=30;d<L-12;d+=52){
+        const px=ax+(bx-ax)*d/L, py=ay+(by-ay)*d/L;
+        cx.beginPath(); cx.moveTo(px-nx*14,py-ny*14); cx.lineTo(px+nx*14,py+ny*14); cx.stroke();
+      }
+    }
+    for(const e of [P[0],P[P.length-1]]){
+      cx.strokeStyle='#B98A48'; cx.lineWidth=3;
+      cx.beginPath(); cx.moveTo(e[0]-7,e[1]-20); cx.lineTo(e[0]-7,e[1]+16); cx.moveTo(e[0]+7,e[1]-20); cx.lineTo(e[0]+7,e[1]+16); cx.stroke();
+      cx.lineWidth=2.5;
+      for(let ry=e[1]-14;ry<=e[1]+12;ry+=8){ cx.beginPath(); cx.moveTo(e[0]-7,ry); cx.lineTo(e[0]+7,ry); cx.stroke(); }
+    }
+    cx.lineCap='butt';
+  }
+  if(rl){
+    cx.lineJoin='round';
+    for(const pl of rl.ban){
+      const P=pl.pts;
+      cx.lineCap='round';
+      cx.strokeStyle='#9A8266'; cx.lineWidth=34; cx.globalAlpha=0.9; pathPts(P); cx.stroke(); cx.globalAlpha=1;   // the gravel bed
+      cx.lineCap='butt';
+      cx.strokeStyle='#6B4A2C'; cx.lineWidth=24; cx.setLineDash([6,12]); pathPts(P); cx.stroke(); cx.setLineDash([]);   // sleepers
+      cx.strokeStyle='#4A423A'; cx.lineWidth=3;                                       // twin rails, segment-wise offset
+      for(let i=0;i<P.length-1;i++){
+        const ax=P[i][0],ay=P[i][1],bx=P[i+1][0],by=P[i+1][1];
+        const L=Math.hypot(bx-ax,by-ay)||1, nx=-(by-ay)/L*5.5, ny=(bx-ax)/L*5.5;
+        cx.beginPath(); cx.moveTo(ax+nx,ay+ny); cx.lineTo(bx+nx,by+ny); cx.stroke();
+        cx.beginPath(); cx.moveTo(ax-nx,ay-ny); cx.lineTo(bx-nx,by-ny); cx.stroke();
+      }
+    }
+    // the grade crossing: planks bridge the cut under the rails
+    cx.save(); cx.translate(rl.cross.x, rl.cross.y);
+    cx.fillStyle='#B48A54'; cx.fillRect(-44,-15,88,30);
+    cx.strokeStyle='#8a683e'; cx.lineWidth=3;
+    for(let k=0;k<4;k++){ const yy=-15+5+k*(30-10)/3; cx.beginPath(); cx.moveTo(-42,yy); cx.lineTo(42,yy); cx.stroke(); }
+    cx.restore();
+    // fence posts + wire along the top leg — the reference's ranch line
+    const TY=150, x0=270, x1=WORLD_W-270;
+    cx.strokeStyle='#7A553A'; cx.lineWidth=3;
+    for(let x=x0;x<=x1;x+=96){ cx.beginPath(); cx.moveTo(x,TY-34); cx.lineTo(x,TY-22); cx.stroke(); }
+    cx.strokeStyle='rgba(122,85,58,0.55)'; cx.lineWidth=1.4;
+    cx.beginPath(); cx.moveTo(x0,TY-31); cx.lineTo(x1,TY-31); cx.stroke();
+  }
+}
+// A flat-topped butte in toy plastic: stacked bands, a cream caprock, its own
+// long shadow. The hitbox stays the plain circle the steering already knows.
+function drawMesa(rk){
+  const r=rk.r;
+  cx.fillStyle='rgba(60,26,10,0.25)';
+  cx.beginPath(); cx.ellipse(rk.x+r*0.22,rk.y+r*0.62,r*1.12,r*0.42,0,0,7); cx.fill();
+  cx.fillStyle='#A64B28'; cx.beginPath(); cx.ellipse(rk.x,rk.y+r*0.28,r,r*0.5,0,0,7); cx.fill();     // talus base
+  cx.fillStyle='#B4552E'; rr(rk.x-r*0.86,rk.y-r*0.62,r*1.72,r*0.95,r*0.2); cx.fill();               // lower band
+  cx.fillStyle='#C9713C'; rr(rk.x-r*0.78,rk.y-r*1.02,r*1.56,r*0.5,r*0.16); cx.fill();               // upper band
+  cx.fillStyle='#DB8B4C'; cx.beginPath(); cx.ellipse(rk.x,rk.y-r*1.02,r*0.8,r*0.26,0,0,7); cx.fill(); // caprock
+  cx.strokeStyle='rgba(90,38,16,0.5)'; cx.lineWidth=2;
+  cx.beginPath(); cx.moveTo(rk.x-r*0.6,rk.y-r*0.28); cx.lineTo(rk.x-r*0.6,rk.y+r*0.2);
+  cx.moveTo(rk.x+r*0.34,rk.y-r*0.44); cx.lineTo(rk.x+r*0.34,rk.y+r*0.24); cx.stroke();              // erosion streaks
+}
+// A saguaro off the toy shelf: trunk, two arms, moulding ridges.
+function drawCactus(rk){
+  const r=rk.r;
+  cx.fillStyle='rgba(60,26,10,0.25)';
+  cx.beginPath(); cx.ellipse(rk.x+2,rk.y+r*0.5,r*1.1,r*0.4,0,0,7); cx.fill();
+  cx.strokeStyle='#4E7F46'; cx.lineCap='round';
+  cx.lineWidth=r*0.85;
+  cx.beginPath(); cx.moveTo(rk.x,rk.y+r*0.4); cx.lineTo(rk.x,rk.y-r*1.7); cx.stroke();              // trunk
+  cx.lineWidth=r*0.6;
+  cx.beginPath(); cx.moveTo(rk.x-r*0.75,rk.y-r*0.2); cx.lineTo(rk.x-r*0.75,rk.y-r*1.05); cx.stroke();
+  cx.beginPath(); cx.moveTo(rk.x+r*0.75,rk.y+r*0.1); cx.lineTo(rk.x+r*0.75,rk.y-r*0.75); cx.stroke();
+  cx.strokeStyle='rgba(34,64,30,0.6)'; cx.lineWidth=1.2;
+  cx.beginPath(); cx.moveTo(rk.x-r*0.14,rk.y+r*0.2); cx.lineTo(rk.x-r*0.14,rk.y-r*1.5);
+  cx.moveTo(rk.x+r*0.14,rk.y+r*0.2); cx.lineTo(rk.x+r*0.14,rk.y-r*1.5); cx.stroke();
+  cx.lineCap='butt';
+}
+// THE TOY TRAIN — the reference in moulded plastic: black boiler and cab, gold
+// smokebox door, red cow-catcher and spoked wheels, red tender heaped with
+// coal, green boxcars with brown roofs. Drawn along the path tangent; heading
+// west it MIRRORS instead of rolling over (rotate π alone puts the wheels in
+// the sky).
+function drawTrainCar(c){
+  cx.save(); cx.translate(c.x,c.y); cx.rotate(c.ang);
+  if(Math.cos(c.ang)<0) cx.scale(1,-1);
+  cx.globalAlpha=0.28; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(0,24,42,9,0,0,7); cx.fill(); cx.globalAlpha=1;
+  const wheel=(wx,wr)=>{
+    cx.fillStyle='#C0392B'; cx.beginPath(); cx.arc(wx,18,wr,0,7); cx.fill();
+    cx.strokeStyle='#7E241A'; cx.lineWidth=2;
+    cx.beginPath(); cx.moveTo(wx-wr*0.7,18); cx.lineTo(wx+wr*0.7,18);
+    cx.moveTo(wx,18-wr*0.7); cx.lineTo(wx,18+wr*0.7); cx.stroke();
+    cx.fillStyle='#2b2117'; cx.beginPath(); cx.arc(wx,18,2.2,0,7); cx.fill();
+  };
+  if(c.i===0){
+    wheel(-24,8); wheel(-4,8); wheel(18,10);
+    cx.fillStyle='#C0392B';
+    cx.beginPath(); cx.moveTo(30,22); cx.lineTo(44,22); cx.lineTo(30,0); cx.closePath(); cx.fill();  // cow-catcher
+    cx.fillStyle='#23211E'; rr(-12,-12,42,26,6); cx.fill();                                          // boiler
+    cx.fillStyle='#3A3733'; rr(14,-26,9,15,2); cx.fill();                                            // stack
+    cx.fillStyle='#2E2B27'; rr(-36,-28,26,42,4); cx.fill();                                          // cab
+    cx.fillStyle='#C0392B'; rr(-39,-33,32,8,3); cx.fill();                                           // cab roof
+    cx.fillStyle='#F7E9C4'; rr(-31,-22,12,10,2); cx.fill();                                          // window
+    cx.fillStyle='#F2C531'; cx.beginPath(); cx.arc(30,1,6,0,7); cx.fill();                           // the gold door
+    cx.strokeStyle='#8a6a1e'; cx.lineWidth=1.5; cx.beginPath(); cx.arc(30,1,6,0,7); cx.stroke();
+  } else if(c.i===1){
+    wheel(-18,8); wheel(18,8);
+    cx.fillStyle='#C0392B'; rr(-32,-14,64,30,5); cx.fill();                                          // tender
+    cx.strokeStyle='#7E241A'; cx.lineWidth=2; rr(-32,-14,64,30,5); cx.stroke();
+    cx.fillStyle='#1E1B18';
+    cx.beginPath(); cx.arc(-14,-14,9,3.14,0); cx.arc(2,-16,10,3.14,0); cx.arc(18,-14,8,3.14,0); cx.fill();   // the coal heap
+  } else {
+    wheel(-18,8); wheel(18,8);
+    cx.fillStyle='#4E7F46'; rr(-32,-20,64,36,5); cx.fill();                                          // boxcar
+    cx.strokeStyle='#33552F'; cx.lineWidth=2; rr(-32,-20,64,36,5); cx.stroke();
+    cx.fillStyle='#7A553A'; rr(-35,-25,70,8,3); cx.fill();                                           // roof
+    cx.fillStyle='#3C6236'; rr(-7,-15,14,28,2); cx.fill();                                           // door
+    cx.strokeStyle='#2E4A2A'; cx.lineWidth=1.5;
+    cx.beginPath(); cx.moveTo(0,-15); cx.lineTo(0,13); cx.stroke();
+  }
+  cx.restore();
+}
+// The crossbuck pair. Idle it is furniture; for SIGNAL_LEAD seconds before the
+// loco reaches the crossing the twin lamps blink red — the fair warning the
+// reference promises, and the cheapest one there is.
+function drawSignal(sg){
+  const warn=!!(S.bf && S.bf.train && S.bf.train.warn);
+  cx.save(); cx.translate(sg.x,sg.y);
+  cx.globalAlpha=0.25; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(2,3,9,3.5,0,0,7); cx.fill(); cx.globalAlpha=1;
+  cx.strokeStyle='#EFE7D8'; cx.lineWidth=4;
+  cx.beginPath(); cx.moveTo(0,0); cx.lineTo(0,-44); cx.stroke();
+  cx.save(); cx.translate(0,-44);
+  cx.fillStyle='#EFE7D8'; cx.strokeStyle='#5A5148'; cx.lineWidth=1.2;
+  cx.save(); cx.rotate(0.45); rr(-15,-3.2,30,6.4,3); cx.fill(); cx.stroke(); cx.restore();
+  cx.save(); cx.rotate(-0.45); rr(-15,-3.2,30,6.4,3); cx.fill(); cx.stroke(); cx.restore();
+  cx.restore();
+  const blink=warn && ((S.t*5|0)%2===0);
+  for(const s2 of [-1,1]){
+    const lit=warn && ((s2<0)===blink);
+    cx.fillStyle=lit? '#FF5A44' : '#5A2E20';
+    cx.beginPath(); cx.arc(s2*6.5,-28,4,0,7); cx.fill();
+    cx.strokeStyle='#3a2c1c'; cx.lineWidth=1.2; cx.stroke();
+    if(lit){ cx.globalAlpha=0.35; cx.fillStyle='#FF5A44';
+      cx.beginPath(); cx.arc(s2*6.5,-28,8,0,7); cx.fill(); cx.globalAlpha=1; }
+  }
+  cx.restore();
 }
 // DEEP SNOW: a feathered edge and wind scallops combed across it. Deliberately
 // NOT concentric rings — rings read as water, and this is the one piece of
@@ -14944,7 +15359,9 @@ function pathStroke(){ cx.beginPath(); cx.moveTo(PATH_PTS[0].x,PATH_PTS[0].y); f
 // mirrored, so the two halves read as one carpet folded down the middle.
 function drawBase(side){
   const bf=S.bf, b=bf.base[side], im=IMG.toybox;
-  const bx=(side==='you'?120:WORLD_W-120), by=352, w=150, dir=(side==='you'?1:-1);
+  // by rides the base's own latitude (b.y+52 === the old 352 on every hMul-1
+  // map) so the crate stands at mid-height on the tall map (v1.57)
+  const bx=(side==='you'?120:WORLD_W-120), by=b.y+52, w=150, dir=(side==='you'?1:-1);
   const k=Math.max(0,b.hp/b.hpMax);
   if(im){
     const h=w*(im.height/im.width);
@@ -15032,7 +15449,7 @@ function draw(){
   if(S.shake>0) cx.translate((Math.random()-0.5)*8*S.shake,(Math.random()-0.5)*8*S.shake);
   // ONE line pans the whole world. drawHUD runs after the restore below, so the
   // HUD stays screen-fixed and every actor, shot, fx and float pans for free.
-  if(S.bf) cx.translate(-S.bf.cam.x, 0);
+  if(S.bf) cx.translate(-S.bf.cam.x, -(S.bf.cam.y||0));
   drawRug();
   if(S.bf){ drawBase('you'); drawBase('foe'); }
   else { drawSprite('toybox',120,352,150,0,0); if(S.tanBase) drawTanBase(); }
@@ -15095,7 +15512,22 @@ function draw(){
   const actors=[];
   for(const u of S.units) if(!u.dead && !(S.drag&&S.drag.unit===u)) actors.push({y:u.y,f:()=>drawUnit(u)});
   for(const f of S.foes) actors.push({y:f.y,f:()=>drawFoe(f)});
+  // WESTERN LAND (v1.57): the consist and the crossbucks sort WITH the men, so
+  // a soldier below the line walks in front of the boxcars and one above is
+  // hidden behind them — the train is an actor, not wallpaper
+  if(S.bf && S.cfg.terrain.rail){
+    const trn=S.bf.train || (S.bf.train=trainCars(S.bf));   // the briefing holds bfTick; draw self-serves at t=0
+    for(const c of trn.cars){ if(!c.off) actors.push({y:c.y+24, f:()=>drawTrainCar(c)}); }
+    for(const sg of S.cfg.terrain.rail.sigs) actors.push({y:sg.y+4, f:()=>drawSignal(sg)});
+  }
   actors.sort((a,b)=>a.y-b.y).forEach(a=>a.f());
+  // the shade inside the cut, laid OVER the men standing in it — "below grade"
+  // in one pass, no per-unit branch, and only WESTERN LAND carries a trench
+  if(S.bf && S.cfg.terrain.trench){
+    cx.save(); cx.globalAlpha=0.16; cx.strokeStyle='#2A1408';
+    cx.lineWidth=TRENCH_W-6; cx.lineJoin='round'; cx.lineCap='round';
+    pathPts(S.cfg.terrain.trench.pts); cx.stroke(); cx.restore();
+  }
 
   // shots
   for(const sh of S.shots){
@@ -15943,7 +16375,7 @@ function hqClose(){ if(!HQS.on) return; HQS.on=false;
 // evPos = SCREEN space, for HUD/tray/button hits (must ignore the camera).
 // evPosW = WORLD space, for anything on the carpet.
 function evPos(e){ const r=cv.getBoundingClientRect(); return { x:(e.clientX-r.left)/scale, y:(e.clientY-r.top)/scale }; }
-function evPosW(e){ const p=evPos(e); if(S.bf) p.x+=S.bf.cam.x; return p; }
+function evPosW(e){ const p=evPos(e); if(S.bf){ p.x+=S.bf.cam.x; p.y+=S.bf.cam.y||0; } return p; }
 cv.addEventListener('pointerdown', e=>{
   if(S.mode!=='play') return;
   // an open briefing owns every tap (v1.41). The DOM backdrop swallows them
@@ -15992,8 +16424,9 @@ cv.addEventListener('pointerdown', e=>{
         S.sel=null; return;
       }
     }
-    S.pan={ sx:e.clientX, cam0:S.bf.cam.x, lx:e.clientX, lt:S.t, vx:0, moved:false };
-    S.bf.cam.vx=0; S.sel=null; return;
+    S.pan={ sx:e.clientX, sy:e.clientY, cam0:S.bf.cam.x, cam0y:S.bf.cam.y||0,
+            lx:e.clientX, ly:e.clientY, lt:S.t, vx:0, vy:0, moved:false };
+    S.bf.cam.vx=0; S.bf.cam.vy=0; S.sel=null; return;
   }
   // tray
   const tray=TRAY();
@@ -16030,13 +16463,18 @@ cv.addEventListener('pointermove', e=>{
     return; }
   if(S.drag){ const p=evPosW(e); S.drag.x=p.x; S.drag.y=p.y-DRAG_OFF; return; }
   if(S.pan && S.bf){
-    const dx=(e.clientX-S.pan.sx)/scale;
-    if(Math.abs(dx)>10) S.pan.moved=true;                 // the same 10px the tap/move test uses
+    const dx=(e.clientX-S.pan.sx)/scale, dy=(e.clientY-S.pan.sy)/scale;
+    if(Math.abs(dx)>10 || Math.abs(dy)>10) S.pan.moved=true;   // the same 10px the tap/move test uses
     if(S.pan.moved){
       S.bf.cam.x=clampCam(S.pan.cam0-dx);
+      S.bf.cam.y=clampCamY(S.pan.cam0y-dy);               // the tall map pans both ways; everywhere else the clamp pins y at 0
       S.bf.panned=true;
       const dt2=S.t-S.pan.lt;
-      if(dt2>0.008){ S.pan.vx=-((e.clientX-S.pan.lx)/scale)/dt2; S.pan.lx=e.clientX; S.pan.lt=S.t; }
+      if(dt2>0.008){
+        S.pan.vx=-((e.clientX-S.pan.lx)/scale)/dt2; S.pan.lx=e.clientX;
+        S.pan.vy=-((e.clientY-S.pan.ly)/scale)/dt2; S.pan.ly=e.clientY;
+        S.pan.lt=S.t;
+      }
     }
   }
 });
@@ -16047,7 +16485,9 @@ cv.addEventListener('pointerup', e=>{
     if(js) jetLaunch(js, a.moved? a.x : null, a.moved? a.y : null);   // released under 10px = the forward tap
     return;
   }
-  if(S.pan){ const pn=S.pan; S.pan=null; if(S.bf && pn.moved) S.bf.cam.vx=Math.max(-2600,Math.min(2600,pn.vx)); }
+  if(S.pan){ const pn=S.pan; S.pan=null;
+    if(S.bf && pn.moved){ S.bf.cam.vx=Math.max(-2600,Math.min(2600,pn.vx));
+                          S.bf.cam.vy=Math.max(-2600,Math.min(2600,pn.vy||0)); } }
   if(!S.drag) return;
   const d=S.drag; S.drag=null;
   if(S.bf){
@@ -16759,9 +17199,27 @@ const WT_MAP_GLYPHS = {
     +'<ellipse cx="17.1" cy="15.4" rx="2.5" ry="2"/><ellipse cx="28.9" cy="15.4" rx="2.5" ry="2"/></g>'
     +'<g fill="#FFFFFF" stroke="#A9BACD" stroke-width="0.5">'
     +'<circle cx="6.6" cy="23" r="1.1"/><circle cx="23" cy="6.4" r="1"/><circle cx="39" cy="21.6" r="1.1"/></g>'
+,
+  // WESTERN LAND (v1.57): the θ in miniature — desert mat, the ring, the chord
+  // through the middle, the dip poking off the mat, the trench's dark wind,
+  // mesa chips in the corners and the loco itself on the chord.
+  western:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/>'
+    +'<rect x="3" y="2.5" width="40" height="25" rx="3" fill="#8B3E1E"/>'
+    +'<path d="M22.5 7.5 Q25 9.5 24.5 12 Q22 14.5 21.5 17 Q24 19.5 23 22.5" stroke="#47200C" stroke-width="2.6" fill="none" stroke-linecap="round"/>'
+    +'<g fill="none" stroke="#5C4432" stroke-width="1.8">'
+    +'<rect x="7.8" y="5.2" width="30.4" height="19.4" rx="2.5"/>'
+    +'<path d="M7.8 14.5 Q23 11.6 38.2 14.5"/>'
+    +'<path d="M16.5 24.6 Q20 29.3 23 29.3 Q26 29.3 29.5 24.6"/></g>'
+    +'<g fill="#B4552E" stroke="#8a3f20" stroke-width="0.6">'
+    +'<rect x="4.4" y="7.6" width="3.4" height="2.4" rx="0.8"/><rect x="38.2" y="7.6" width="3.4" height="2.4" rx="0.8"/>'
+    +'<rect x="4.6" y="19.4" width="3" height="2.2" rx="0.8"/><rect x="38.4" y="19.4" width="3" height="2.2" rx="0.8"/></g>'
+    +'<rect x="27" y="11" width="5" height="2.9" rx="0.9" fill="#23211E"/>'
+    +'<rect x="31.6" y="11.5" width="1.5" height="2" rx="0.5" fill="#C0392B"/>'
+    +'<circle cx="26" cy="9.9" r="0.9" fill="#EFE7D8" opacity="0.8"/>'
 };
-// CROSSING leads (the flagship), the new WINTER FIELD second, OPEN CARPET last
-const WT_MAP_ORDER = ['crossing','winter','spill','stone','open'];
+// WESTERN LAND debuts up front ("Boom, new"), CROSSING second (the flagship),
+// the WINTER FIELD third, OPEN CARPET last
+const WT_MAP_ORDER = ['western','crossing','winter','spill','stone','open'];
 // v1.43 ONE GREEN BUTTON (Wyatt 7/27: the table had grown 17 tappables and the
 // hero was 8% of the screen — "simplicity wins"). The entry keeps FOUR things:
 // PLAY, 2v2, one MORE BATTLES door, ✕. The rival chip folds into PLAY's own
@@ -18612,7 +19070,18 @@ window.GVT = {
   bfEnd(r){ endBattlefield(r||'time'); },
   bfCash(n){ S.plastic=n; if(S.bf) S.bf.seats.forEach(st=>{ if(!st.human) st.purse=n; }); },
   bfClock(t){ if(S.bf) S.bf.timeLeft=t; },
-  bfCam(x){ if(S.bf){ S.bf.cam.x=clampCam(x); S.bf.cam.vx=0; } return S.bf&&S.bf.cam.x; },
+  bfCam(x,y){ if(S.bf){ S.bf.cam.x=clampCam(x); S.bf.cam.vx=0;
+    if(y!=null){ S.bf.cam.y=clampCamY(y); S.bf.cam.vy=0; } } return S.bf&&S.bf.cam.x; },
+  // ---- WESTERN LAND RIG (v1.57) ----
+  west(){ if(!S.bf || !S.cfg.terrain.rail) return null;
+    const t2=S.bf.train || trainCars(S.bf), rl=S.cfg.terrain.rail;
+    return { t:+(S.bf.trainT||0).toFixed(3), s:+t2.s.toFixed(1), lap:t2.lap, warn:t2.warn,
+      cars:t2.cars.map(c=>({x:+c.x.toFixed(1), y:+c.y.toFixed(1), off:c.off})),
+      len:+rl.len.toFixed(1), lapA:+rl.lapALen.toFixed(1), cross:rl.cross,
+      camY:+((S.bf.cam.y||0)).toFixed(1), worldH:WORLD_H }; },
+  westT(t2){ if(S.bf && S.cfg.terrain.rail){ S.bf.trainT=t2; S.bf.train=trainCars(S.bf); } return GVT.west(); },
+  trench(x,y){ return trenchAt(x,y); },
+  inTr(id){ const u=S.units.find(u2=>u2.id===id); return u? inTrench(u) : null; },
   bfSnap(){ if(!S.bf) return null; const b=S.bf;
     return { map:b.mapId, team:b.team, phase:b.phase, t:+b.timeLeft.toFixed(1), ot:b.ot, resolved:b.resolved,
       worldW:WORLD_W, purse:{you:S.plastic, foe:b.seats[b.team].purse}, diff:b.ai.diff, rival:b.rival.id,
@@ -18620,7 +19089,7 @@ window.GVT = {
         sw:st.human? sargeStats().w : (st.kit&&st.kit.w)})),
       baseHP:{you:b.base.you.hp, foe:b.base.foe.hp},
       razed:{you:b.base.foe.dmgTaken, them:b.base.you.dmgTaken},
-      cam:Math.round(b.cam.x), vw:Math.round(VW), corpses:S.corpses.length,
+      cam:Math.round(b.cam.x), camY:Math.round(b.cam.y||0), worldH:WORLD_H, vw:Math.round(VW), corpses:S.corpses.length,
       units:S.units.filter(u=>!u.dead).map(u=>({s:u.side,st:u.seat,t:u.type,x:u.x|0,y:u.y|0,hp:u.hp,
         drop:+(u.dropT||0).toFixed(1), marching:!!u.marching})) }; }
 };
