@@ -1718,7 +1718,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.71</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.72</div>
   <div class="scanlines"></div>
 </div>
 
@@ -9345,6 +9345,24 @@ function levelCfg(n){
   // (rolled FIRST, so nothing below can ever move a seed — the v1.40 law)
   if(n===2||n===4||(n>5&&R()<0.5)) cfg.terrain.rocks=[{x:520+R()*180,y:160+R()*90,r:40+R()*14},{x:420+R()*160,y:380+R()*110,r:36+R()*16}].concat(n>=4?[{x:680+R()*120,y:300+R()*80,r:30+R()*12}]:[]);
   if(n===3||n===5||(n>5&&R()<0.5)) cfg.terrain.river={x:470+((R()*80)|0), w:56, bridgeY:170+((R()*260)|0), bw:76};
+  // v1.72 (Wyatt 7/29: "there was a rock on the bridge and it made it kind of
+  // glitchy to get past it — let's remove that rock"): a seeded rock whose
+  // shoulder reaches the CROSSING — the planks plus the 40px funnel throat
+  // either side (the march aims men at RV.x∓30, so the throat IS the lane) —
+  // stands in the one corridor both armies are steered through. The whole
+  // class goes, not one level's: 18 of 100 levels carried one (L9,21,24,28,32,
+  // 36,40,44,54,58,63,65,69,77,81,89,93,99 — every one keeps its other two
+  // rocks). The filter runs AFTER the rolls, so not one R() draw moves and
+  // every other level's terrain + all 100 wave sets stay byte-identical (the
+  // v1.40 nothing-moves-a-seed law).
+  if(cfg.terrain.river && cfg.terrain.rocks.length){
+    const RVt=cfg.terrain.river;
+    cfg.terrain.rocks=cfg.terrain.rocks.filter(rk=>{
+      const dx=Math.max(RVt.x-40-rk.x, 0, rk.x-(RVt.x+RVt.w+40));
+      const dy=Math.max(RVt.bridgeY-RVt.bw/2-rk.y, 0, rk.y-(RVt.bridgeY+RVt.bw/2));
+      return Math.hypot(dx,dy) > rk.r+14;   // r+14 = the same shoulder canPlace honours
+    });
+  }
   const c=x=>Math.max(1,Math.round(x*cfg.cntMul));
   // v1.40: the set is FINITE — the list IS the level. L1 stays the hand-
   // authored six the coach teaches on; v1.46 sprint rungs run 8 (doc LAW C).
@@ -11217,6 +11235,16 @@ const SQ_GAP=15;         // and another every fifteen after that, cleared or not
 // a little deeper as the ladder deepens. Byte-identical through L8 (measured
 // healthy), +1.5s per level after, capped at +12 (L16 on = 27s). Wyatt's to
 // overrule — one line.
+// v1.72 (Wyatt 7/29: "speed up the rate of the enemy coming units by about
+// 10% in campaign... the level 20s have been very easy, and we need the
+// campaign opponents to be at least a little more difficult after level 20"):
+// past L20 every stream gap tightens ×0.9 — waves arrive ~10% more often. The
+// bands keep their shape (a sprint rung is still the fast drum, a siege rung
+// still breathes deeper, the sprint floor rides down with everything else) —
+// the whole drum just beats faster. Applied AFTER the bands so it is a flat
+// 10% at every rung ≥21; L1-20 (the tutorial ramp and v1.32's measured L15
+// knife-edge) are byte-untouched. One knob, Wyatt's to overrule.
+const CAMP_LATE_PACE=0.9;
 function sqGapFor(n){
   // v1.46: DEPTH BREATHES — from L55 the cadence cap widens 12 → 20 (27s →
   // 35s between waves). The proven lever (v1.32's own L15 fix was cadence):
@@ -11224,11 +11252,12 @@ function sqGapFor(n){
   // OVERLAP — waves arriving before the last one resolved. A veteran's rung
   // is a chain of full battles now, not a standing mass. One const each.
   const base=SQ_GAP + Math.min((n|0)>=55?20:12, Math.max(0,(n|0)-8)*1.5);
+  const late=((n|0)>=21)? CAMP_LATE_PACE : 1;
   // tempo bands (doc LAW C): sprint rungs run a fast drum, siege rungs
   // breathe deeper — the wc half of the law lives in levelCfg.
-  if(campSprint(n)) return Math.max(14, base-9);
-  if(campSiege(n))  return base+3;
-  return base;
+  if(campSprint(n)) return Math.max(14, base-9)*late;
+  if(campSiege(n))  return (base+3)*late;
+  return base*late;
 }
 // ⚠ THE SUB-LINEAR CALL (Wyatt: "a LITTLE easier with 10 — I want a
 // ten-people-together-win situation"). Each commander may field SQ_CAP men, so
@@ -12663,6 +12692,10 @@ const CAMP_SIEGE_CD=2.0;      // one whack every two seconds per man at the crat
 // still get 3), and siege throughput grows linearly while crate hp grows
 // sub-linearly — time-to-raze ∝ p^-0.18, gently kinder with company, same law
 // as the defence itself.
+// v1.72: the cap is a DAMAGE SHARE now, not a turn-away — every man in reach
+// swings (Wyatt: the fourth man "just standing next to the base" read as a
+// bug, because it looked exactly like one) and past three attackers each hit
+// scales by 3/n, so this number still bounds the crate's intake per commander.
 const CAMP_CREW=3;
 // ⚠ DEPLOYS LAND ON YOUR HALF NOW (the battleground's own law): with a crate to
 // kill, a drop beside it would be a free siege that skips the whole march. The
@@ -12750,8 +12783,18 @@ function campSmash(u,dist){
   const b=S.tanBase; if(!b||b.dead) return;
   // the hit rides the SAME rank law as every other hit — vet ×1.5, promotion
   // taper, and a relayed ally batters at the ALLY's rank (coopUM), so a crate
-  // that grows with the level meets an army that grew with the player
-  const dmg=Math.round((BF_BASEDMG[u.type]||6)*(u.vet?1.5:1)*(u.coopUM!=null?u.coopUM:upMul(u.type)));
+  // that grows with the level meets an army that grew with the player.
+  // v1.72 THE DAMAGE SHARE: with the whole line firing now (every man in reach
+  // attacks — no more idle ring), the crew cap moved from the TRIGGER to the
+  // TABLE: past CAMP_CREW attackers each hit is scaled by crew/attackers, so
+  // the crate's intake stays a three-man crew's worth per commander (v1.31's
+  // law) while every rifle visibly works. At three or fewer the share is 1 and
+  // the arithmetic is byte-identical to what shipped. The census is LAST
+  // frame's finished count (S.crewN — swapped at the loop head), so a mid-walk
+  // swing never reads a half-built number.
+  const nAtk=(S.crewN&&S.crewN[u.coopBy||'me'])|0;
+  const share=Math.min(1, CAMP_CREW/Math.max(1,nAtk));
+  const dmg=Math.max(1, Math.round((BF_BASEDMG[u.type]||6)*(u.vet?1.5:1)*(u.coopUM!=null?u.coopUM:upMul(u.type))*share));
   b.hp=Math.max(0, b.hp-dmg); b.hitT=0.25;
   sqSiegeHaste(dmg);   // v1.48 THE ALARM: a battered crate hurries the next wave out
   // v1.40 (Wyatt: "have the units attack the base with their guns — or their
@@ -12922,18 +12965,24 @@ function campUnitStep(u,dt){
     if(!TB.dead){
       const d=Math.hypot(TB.x-u.x,TB.y-u.y);
       if(d<=campSiegeRng(u)){
+        // v1.72 (Wyatt 7/29: "player units are walking next to the base
+        // instead of shooting the base — some shoot it correctly, others just
+        // stand next to it"): EVERY man in reach attacks now. The wrecking-
+        // crew cap used to turn the fourth man away — he pressed up to the
+        // ring and stood there idle, which is exactly what Wyatt watched. The
+        // cap survives as a DAMAGE SHARE instead (campSmash divides by the
+        // census below): the crate still takes about a three-man crew's worth
+        // of hurt per commander however many pile on — v1.31's measured law,
+        // objective dps must not scale with headcount or headcount is the win
+        // button — but every man SWINGS, muzzle up, on his own stagger.
         const ck=u.coopBy||'me';                 // v1.37: YOUR crew, not THE crew
         if(!S.crew) S.crew={};
-        if((S.crew[ck]|0)<CAMP_CREW){
-          S.crew[ck]=(S.crew[ck]|0)+1;
-          u.marching=false;
-          if(u.siegeT==null) u.siegeT=0.5+Math.random()*0.9;   // shoulder the rifle, wind up
-          u.siegeT-=dt;
-          if(u.siegeT<=0){ u.siegeT=CAMP_SIEGE_CD; campSmash(u,d); }
-          return true;                       // the sweeper still seeds, the guns still cover
-        }
-        if(d<LEAK_R+8){ u.marching=false; return true; }   // crew's full — he stands the ring
-        // crew's full and he's only at gun range: fall through and press up to the ring
+        S.crew[ck]=(S.crew[ck]|0)+1;             // the census — campSmash shares by LAST frame's finished count
+        u.marching=false;
+        if(u.siegeT==null) u.siegeT=0.5+Math.random()*0.9;   // shoulder the rifle, wind up
+        u.siegeT-=dt;
+        if(u.siegeT<=0){ u.siegeT=CAMP_SIEGE_CD; campSmash(u,d); }
+        return true;                       // the sweeper still seeds, the guns still cover
       }
     }
     if(TB.dead){ u.marching=false; return true; }   // the crate is falling — stand and watch it go
@@ -15812,7 +15861,8 @@ function update(dt){
   }
 
   // units fire
-  S.crew={};  // the wrecking crews re-form every frame — each commander's first three at the crate swing
+  S.crewN=S.crew||{};  // v1.72: last frame's FINISHED siege census — campSmash's damage share reads this, never the half-built count below
+  S.crew={};  // the census re-forms every frame — every attacker in reach counts himself in (the share does the capping now)
   for(const u of S.units){
     if(u.dead) continue;             // a casualty is out of the fight the frame he falls (swept below)
     if(u.sprue>0) u.sprue-=dt;
