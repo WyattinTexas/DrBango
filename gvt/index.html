@@ -1,8 +1,29 @@
 <!DOCTYPE html>
+<!--
+  GVT — GREEN VS. TAN
+  © 2026 Corkscrew Games. All rights reserved.
+
+  Proprietary. This game and its source are not licensed for redistribution,
+  rehosting, or derivative works. The official free versions live at
+  https://playgvt.net and https://drbango.com/gvt/ — play them there.
+  Enquiries: wyatt@corkscrewgames.com
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- v1.85 SECURITY: the directives a <meta> CSP can actually carry (GitHub Pages
+     serves static files with a fixed header set — frame-ancestors, X-Frame-Options
+     and HSTS are response headers we cannot set from here, so framing is handled
+     by the JS frame-bust in the boot block instead).
+       connect-src — the API and nothing else, so an injected string can never
+         exfiltrate a save to a foreign host (127.0.0.1/localhost stay open for
+         the dev + screenshot rigs, which point NET at a local scratch server);
+       img-src data: — the entire sprite pipeline is data: URIs;
+       'unsafe-inline' — the game IS one inline <script> and thousands of inline
+         style attributes; what the directive still buys is that no EXTERNAL
+         script or stylesheet can ever be loaded into the page. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://nationgame.live http://127.0.0.1:* http://localhost:*; img-src 'self' data:; media-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>GVT — Green vs. Tan (Prototype)</title>
 <style>
   /* ============ LOCALIZATION (v1.29): ONE TYPE STACK PER SCRIPT ============
@@ -1228,6 +1249,18 @@
      tap here supplies its own answer. rgba(0,0,0,0), the documented disable
      value — desktop engines paint no highlight and simply ignore this. */
   .roomstage, .roomstage * { -webkit-tap-highlight-color:rgba(0,0,0,0); }
+  /* v1.85: the ownership line. It lives in the room rather than on the attract
+     screen because v1.0 deliberately took Corkscrew OFF the title. Bottom-left
+     corner, under every label pill, and pointer-events:none so it can never
+     eat a tap meant for the furniture. */
+  .roomcr { position:absolute; left:12px; top:576px; font-size:0.62rem; letter-spacing:0.04em;
+            color:#EDEADF; opacity:0.34; pointer-events:none; user-select:none; white-space:nowrap; }
+  /* v1.85: shown ONLY on a host that is not one of ours — a rehosted copy says
+     so out loud. pointer-events:none: it must never swallow a tap, even here. */
+  #unofficial { position:fixed; left:0; right:0; bottom:0; z-index:60; pointer-events:none;
+            background:rgba(20,24,16,0.88); color:#E8C46A; font-family:var(--ui);
+            font-size:0.78rem; text-align:center; padding:5px 8px; letter-spacing:0.03em;
+            border-top:2px solid #8a6d1c; }
   .roomtag { position:absolute; transform:translate(-50%,-50%); background:rgba(38,40,31,0.9); color:#fff; font-weight:bold; font-size:14px; letter-spacing:0.06em; padding:3px 12px; border-radius:12px; cursor:pointer; white-space:nowrap; text-transform:uppercase; }
   .roomtag:hover { background:#4A6B35; }
   .roomhead { position:absolute; top:0; left:0; right:0; height:46px; background:rgba(20,16,12,0.85); display:flex; align-items:center; padding:0 14px; color:#EDEADF; font-weight:bold; font-size:15px; letter-spacing:0.04em; }
@@ -1944,7 +1977,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.84</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.85</div>
   <div class="scanlines"></div>
 </div>
 
@@ -2030,6 +2063,40 @@
 <script>
 'use strict';
 window.onerror = function(m, s, l){ var e=document.getElementById('err'); e.style.display='block'; e.textContent='ERR: '+m+' @'+l; document.title='ERR:'+m; };
+
+// ============ v1.85 SECURITY: WHERE THIS PAGE IS ALLOWED TO LIVE ============
+// Two boot-time guards, both deliberately gentle. Neither can brick a real
+// player: the shells load https://drbango.com/gvt/ as their TOP document (so
+// self===top and the hostname is on the list), and an unknown host still gets
+// the whole single-player game — it just cannot talk to HQ.
+//
+//  1. FRAME-BUST. Embedding the game in someone else's page is how a rehost
+//     wears our work as its own (and how a clickjacker steals a tap). Break
+//     out if we can; if the parent is cross-origin and won't let us, empty
+//     the document rather than play inside their frame.
+//  2. HOST GATE. On a host we don't recognise, the game still boots and still
+//     plays — but netAllowed() is false, so HQ is never called: no rehosted
+//     copy writes to our board, spends our capacity, or shows kids a ladder it
+//     did not earn. Every net call site already handles "HQ said no", so this
+//     is the SAME degraded path as an offline phone, not a new failure mode.
+try{
+  if(self !== top){
+    try{ top.location = self.location; }
+    catch(e){ document.documentElement.innerHTML =
+      '<body style="background:#141810;color:#EDEADF;font:16px system-ui;text-align:center;padding:3rem">'
+      +'GREEN VS. TAN<br><br>Play the real game, free, at '
+      +'<a href="https://playgvt.net" style="color:#7FA35C">playgvt.net</a></body>'; }
+  }
+}catch(e){}
+// Both public homes (+ www), plus the local rigs. A hostname is compared whole —
+// never with indexOf — so playgvt.net.evil.example is not our house.
+const HOME_HOSTS = ['playgvt.net','www.playgvt.net','drbango.com','www.drbango.com',
+                    'localhost','127.0.0.1','[::1]',''];
+// '' is the empty hostname of a file:// or bundled-asset document — treated as
+// KNOWN on purpose: a future shell that ships the page inside the app must not
+// lose HQ. A rehost is a WEB host, and those all carry a real hostname.
+const HOST_OK = HOME_HOSTS.indexOf(String(location.hostname||'').toLowerCase()) >= 0;
+function netAllowed(){ return HOST_OK; }
 
 // ==================== LOCALIZATION (v1.29) ====================
 // THE WHOLE GAME, IN SEVEN LANGUAGES.
@@ -2522,6 +2589,7 @@ const TR_DATA={
 "The Soul goes to: %1 — forever?":"たましいをおくるのは: %1 — ずっとだよ、いい？",
 "FOREVER — I'M SURE":"ずっと — きめた！",
 "not yet — think it over. The gift will wait.":"まだにする — ゆっくりかんがえよう。おくりものは まっててくれるよ。",
+"UNOFFICIAL COPY — play the real GREEN VS. TAN free at playgvt.net":"にせもの — ほんもののGREEN VS. TANは playgvt.net でむりょう",
 "THE SOUL LIVES HERE: %1":"たましいは ここにやどる: %1",
 "FOREVER ✦":"ずっと ✦",
 "✦ SOUL":"✦ たましい",
@@ -3532,6 +3600,7 @@ const TR_DATA={
 "The Soul goes to: %1 — forever?":"혼을 줄 상대는: %1 — 영원히, 정말이죠?",
 "FOREVER — I'M SURE":"영원히 — 확실해요!",
 "not yet — think it over. The gift will wait.":"아직은요 — 천천히 생각해요. 선물은 기다려 줘요.",
+"UNOFFICIAL COPY — play the real GREEN VS. TAN free at playgvt.net":"비공식 복제본 — 진짜 GREEN VS. TAN은 playgvt.net에서 무료",
 "THE SOUL LIVES HERE: %1":"혼이 여기 깃들었다: %1",
 "FOREVER ✦":"영원히 ✦",
 "✦ SOUL":"✦ 혼",
@@ -4542,6 +4611,7 @@ const TR_DATA={
 "The Soul goes to: %1 — forever?":"把魂送给: %1 — 永远，确定吗？",
 "FOREVER — I'M SURE":"永远 — 我确定！",
 "not yet — think it over. The gift will wait.":"先不选 — 好好想想。礼物会等你的。",
+"UNOFFICIAL COPY — play the real GREEN VS. TAN free at playgvt.net":"非官方复制版 — 正版 GREEN VS. TAN 在 playgvt.net 免费畅玩",
 "THE SOUL LIVES HERE: %1":"魂在这里安家: %1",
 "FOREVER ✦":"永远 ✦",
 "✦ SOUL":"✦ 魂",
@@ -5552,6 +5622,7 @@ const TR_DATA={
 "The Soul goes to: %1 — forever?":"Die Seele geht an: %1 — für immer?",
 "FOREVER — I'M SURE":"FÜR IMMER — ICH BIN SICHER",
 "not yet — think it over. The gift will wait.":"noch nicht — überleg es dir. Das Geschenk wartet.",
+"UNOFFICIAL COPY — play the real GREEN VS. TAN free at playgvt.net":"INOFFIZIELLE KOPIE — das echte GREEN VS. TAN gibt es gratis auf playgvt.net",
 "THE SOUL LIVES HERE: %1":"HIER WOHNT DIE SEELE: %1",
 "FOREVER ✦":"FÜR IMMER ✦",
 "✦ SOUL":"✦ SEELE",
@@ -6563,6 +6634,7 @@ const TR_DATA={
 "The Soul goes to: %1 — forever?":"Душа достанется: %1 — навсегда?",
 "FOREVER — I'M SURE":"НАВСЕГДА — Я УВЕРЕН",
 "not yet — think it over. The gift will wait.":"не сейчас — подумай. Подарок подождёт.",
+"UNOFFICIAL COPY — play the real GREEN VS. TAN free at playgvt.net":"НЕОФИЦИАЛЬНАЯ КОПИЯ — настоящая GREEN VS. TAN бесплатно на playgvt.net",
 "THE SOUL LIVES HERE: %1":"ДУША ЖИВЁТ ЗДЕСЬ: %1",
 "FOREVER ✦":"НАВСЕГДА ✦",
 "✦ SOUL":"✦ ДУША",
@@ -7573,6 +7645,7 @@ const TR_DATA={
 "The Soul goes to: %1 — forever?":"El Alma va para: %1 — ¿para siempre?",
 "FOREVER — I'M SURE":"PARA SIEMPRE — ESTOY SEGURO",
 "not yet — think it over. The gift will wait.":"todavía no — piénsalo bien. El regalo esperará.",
+"UNOFFICIAL COPY — play the real GREEN VS. TAN free at playgvt.net":"COPIA NO OFICIAL — el GREEN VS. TAN de verdad es gratis en playgvt.net",
 "THE SOUL LIVES HERE: %1":"EL ALMA VIVE AQUÍ: %1",
 "FOREVER ✦":"PARA SIEMPRE ✦",
 "✦ SOUL":"✦ ALMA",
@@ -9632,7 +9705,7 @@ window.GVTN = {
   appleSignIn(){ try{ webkit.messageHandlers.gvtSign.postMessage({cmd:'apple_signin'}); }catch(e){} },
   _appleResult(r){
     if(!r||!r.ok){ S.floats.push({x:W/2,y:150,txt:'SIGN-IN CANCELED',t:0,col:'#D96A55'}); return; }
-    fetch(NET+'/link',{method:'POST',headers:{'Content-Type':'application/json'},
+    netFetch(NET+'/link',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({device:META.deviceId,provider:'apple',sub:r.sub,name:r.name||META.name})})
       .then(x=>x.json()).then(d=>{
         if(!d.ok) return;
@@ -9647,6 +9720,13 @@ window.GVTN = {
   }
 };
 const NET='https://nationgame.live/gvt';
+// v1.85: ONE door to HQ. On a host we don't recognise it answers the way HQ
+// answers when it is busy — a resolved reply whose body says {ok:false} — so
+// every caller takes the path it already has for an unreachable HQ (WR.err,
+// coopMiss, "HQ is unreachable — try again in a minute"), and nothing throws
+// an unhandled rejection. This is also where a 429 lands, unchanged.
+const NET_OFF={ ok:false, status:0, json:()=>Promise.resolve({ok:false, err:'offline'}) };
+function netFetch(u, o){ return netAllowed()? fetch(u, o) : Promise.resolve(NET_OFF); }
 // a friend's invite link (?coop=CODE): stash the code, scrub the URL so a
 // refresh doesn't re-join, and connect the moment they reach the room
 let coopJoinPend=null, coopJoinMode='pair';
@@ -9659,7 +9739,7 @@ function netSync(){
   const now=Date.now(); if(now-lastSync<15000) return Promise.resolve(); lastSync=now;
   try{
     // colour rides along so invaders see the right army defending
-    return fetch(NET+'/sync',{method:'POST',headers:{'Content-Type':'application/json'},
+    return netFetch(NET+'/sync',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({device:META.deviceId,name:META.name,stars:META.starsLifetime,lvl:META.lvl,campaign:META.campaign,color:META.dyeOn||null,defense:META.defense||undefined,
         // the battleground ladders report in here; /challenge still pays every star
         bf1w:META.bfRecord[1].w,bf1l:META.bfRecord[1].l,bf2w:META.bfRecord[2].w,bf2l:META.bfRecord[2].l,
@@ -9701,7 +9781,7 @@ function escH(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;'
 // battleground ladders. Rows land in WR.data; the challenge flow reads the
 // merged roster out of window.__gvtBoard.
 function wrLoad(){
-  return fetch(NET+'/board?device='+META.deviceId).then(r=>r.json()).then(d=>{
+  return netFetch(NET+'/board?device='+META.deviceId).then(r=>r.json()).then(d=>{
     if(!d||!d.ok) throw new Error('board');
     WR.err=false;
     WR.data={ board:d.board||[], bf1:d.bf1||[], bf2:d.bf2||[], rat:d.rat||[] };
@@ -12031,7 +12111,7 @@ function coopFam(){ return coopRoom()? '/room/' : coopSquad()? '/lobby/' : '/coo
 // can no longer be asked which family it belongs to — see coopLeave.
 function coopPost(ep,body,fam){
   fam = fam || coopFam();
-  return fetch(NET+fam+ep,{method:'POST',headers:{'Content-Type':'application/json'},
+  return netFetch(NET+fam+ep,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify(Object.assign({device:META.deviceId, me:coopMe()},body||{}))}).then(r=>r.json());
 }
 function coopFresh(ui,mode){
@@ -12742,7 +12822,7 @@ function sqCatchUp(n){
 const DUEL_POLL=12000;                      // HQ only, and only while you're in it
 let DUEL={ inbox:[], sent:[], pollT:0, busy:false, sig:'' };
 function duelPost(ep,body){
-  return fetch(NET+'/duel/'+ep,{method:'POST',headers:{'Content-Type':'application/json'},
+  return netFetch(NET+'/duel/'+ep,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify(Object.assign({device:META.deviceId},body||{}))}).then(r=>r.json());
 }
 function duelSig(){ return DUEL.inbox.map(x=>x.frm+':'+x.code).join('|'); }
@@ -13306,14 +13386,14 @@ function endBattlefield(reason, fromRelay){
       raidMsg=' · '+rd.msg+(rd.first?'':' '+t('(+1★)'));
     }
     const wt=document.getElementById('winTitle'); wt.style.color='#7FA35C';
-    wt.innerHTML = bf.raid? (bf.rival.name.toUpperCase()+'<br>'+t('DEFEATED')) : t(copy[0]);
+    wt.innerHTML = bf.raid? (escH(bf.rival.name.toUpperCase())+'<br>'+t('DEFEATED')) : t(copy[0]);
     document.getElementById('medalRow').textContent='⚑ ⚑ ⚑';
     document.getElementById('medalText').textContent=margin+' · '+t(copy[1])+spoils+raidMsg;
     // report the win to HQ the same way an invasion does — /challenge pays the
     // first-of-the-day bonus. NEVER route rewards through /sync (it clamps).
     // ⚠ Not from a private room: that bonus is for beating the DAILY RIVAL, and
     // a room has no rival in it — the seats belong to your friends.
-    if(!priv) fetch(NET+'/challenge',{method:'POST',headers:{'Content-Type':'application/json'},
+    if(!priv) netFetch(NET+'/challenge',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({device:META.deviceId,target:'bf_'+bf.rival.id,won:true})})
       .then(r=>r.json()).then(d=>{
         const el=document.getElementById('medalText');
@@ -13339,7 +13419,7 @@ function endBattlefield(reason, fromRelay){
   // bot the formula already knows.
   if(!priv || ranked){
     const opp=(priv && COOP && COOP.duelOpp)? COOP.duelOpp : null;
-    fetch(NET+'/rated',{method:'POST',headers:{'Content-Type':'application/json'},
+    netFetch(NET+'/rated',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({device:META.deviceId, won:won, opp:opp})})
       .then(r=>r.json()).then(dd=>{
         if(dd&&dd.ok&&typeof dd.rating==='number'){ WR.mine=dd.rating; if(wrIsOpen()) wrLoad(); }
@@ -16911,7 +16991,7 @@ function endBattle(win){
   const firstEver = !S.rival && S.levelN===1 && META.campaign===0;
   const wtEl=document.getElementById('winTitle'); wtEl.style.color='#7FA35C';
   wtEl.__enHTML=undefined;   // v1.79: bust the boot-cached static title (see the lose-title note) — non-EN clobbered EVERY dynamic title here to CARPET SECURED
-  wtEl.innerHTML = S.momRaid? t('MOM<br>GIVES UP!') : S.rival? (S.rival.name+'<br>'+t('DEFEATED')) : t(S.bossKilled? 'BOSS<br>DEFEATED' : 'CARPET<br>SECURED');
+  wtEl.innerHTML = S.momRaid? t('MOM<br>GIVES UP!') : S.rival? (escH(S.rival.name)+'<br>'+t('DEFEATED')) : t(S.bossKilled? 'BOSS<br>DEFEATED' : 'CARPET<br>SECURED');
   // the third star reads LITERALLY now (v1.32): no man of yours was lost.
   // (It used to ask "nobody down longer than ~3s"; with casualties there is no
   // down to time — the words on the win screen never changed.)
@@ -20871,6 +20951,10 @@ function renderMenu(){
       +duelChipHTML()
       +'<span style="margin-left:auto">'+t(tierName(META.starsLifetime))+' · ★ '+META.starBank+'</span>'
       +'<button class="mbtn alt langchip" title="LANGUAGE" onclick="UI.langPanel()">🌐</button></div>'
+    // v1.85: the ownership line, English on purpose (a copyright notice is
+    // conventionally left in the owner's language) and data-notr so the l10n
+    // audit never counts it as a missing translation
+    + '<div class="roomcr" data-notr>© 2026 Corkscrew Games</div>'
     + '</div>';
   sizeRoom();
 }
@@ -20989,7 +21073,7 @@ function renderWarTable(){
   const lockerOpen=!!(oldLk && !oldLk.classList.contains('hidden'));
   const maps=WT_MAP_ORDER.map(id=>{ const m=bfMap(id);
     return '<button type="button" class="wt-map'+(META.bfMap===id?' on':'')+'" onclick="UI.wtMap(\''+id+'\')">'
-      +'<svg viewBox="0 0 46 30">'+WT_MAP_GLYPHS[id]+'</svg><span class="nm">'+m.name+'</span>'
+      +'<svg viewBox="0 0 46 30">'+WT_MAP_GLYPHS[id]+'</svg><span class="nm">'+escH(m.name)+'</span>'
       +(wtMapIsNew(id)?'<i class="wt-new">NEW!</i>':'')+'</button>'; }).join('');
   const cur=bfMap(META.bfMap);
   document.getElementById('wartable').innerHTML =
@@ -21003,7 +21087,7 @@ function renderWarTable(){
       // the rival line is COMPOSED (tf + translated army name) so every language
       // may reorder it, and data-notr so the finished line is never offered back
       // to the table as a key (the v1.37 share-text law)
-      +'<span class="sub"><span class="wt-sdot" style="background:'+riv.hex+';box-shadow:0 0 9px '+riv.hex+'"></span>'
+      +'<span class="sub"><span class="wt-sdot" style="background:'+escH(riv.hex)+';box-shadow:0 0 9px '+escH(riv.hex)+'"></span>'
       +'<span data-notr>1v1 · '+tf('TODAY: %1', TXT(riv.name))+'</span></span></button>'
       +'<img class="wt-flank r" src="'+sprURI('tanrifle',riv.hex)+'" alt="">'
       +'</div>'
@@ -21016,7 +21100,7 @@ function renderWarTable(){
       // opening anything.
       +'<button type="button" class="wt-mapchip" onclick="UI.wtMapChip()">'
       +'<svg viewBox="0 0 46 30">'+WT_MAP_GLYPHS[cur.id]+'</svg>'
-      +'<span class="mc-lab">THE MAP</span><span class="nm">'+cur.name+'</span>'
+      +'<span class="mc-lab">THE MAP</span><span class="nm">'+escH(cur.name)+'</span>'
       +(WT_NEW_IDS.some(wtMapIsNew)?'<i class="wt-new">NEW!</i>':'')+'</button>'
       // data-notr on the art-only crate: without it tryWhole offers the whole
       // button (art + label) to the table as one junk key on every open
@@ -21890,7 +21974,7 @@ function renderSabRite(){
       +'<span class="sr-name">'+(sel? sabName(sel).toUpperCase() : 'PICK A CRYSTAL')
       +'<small>'+(sel? 'ready when you are' : 'six in the tray · one is yours')+'</small></span></div>'
     +'<div class="sr-crys">'+SABER_COLORS.map(c=>'<button type="button" class="sr-cry'+(sel===c.hex?' on':'')
-        +'" style="--vhex:'+c.hex+'" onclick="UI.sabRitePick(\''+c.hex+'\')">'+vialSVG(c.hex, sel===c.hex)
+        +'" style="--vhex:'+escH(c.hex)+'" onclick="UI.sabRitePick(\''+escH(c.hex)+'\')">'+vialSVG(c.hex, sel===c.hex)
         +'<span class="sr-cn">'+c.id.toUpperCase()+'</span></button>').join('')+'</div>'
     +(sel? '<button class="sr-go" onclick="UI.sabRiteTake()">THIS BLADE IS MINE</button>' : '')
     +'<button class="sr-later" onclick="UI.sabRiteLater()">not yet — the academy will hold it</button>';
@@ -21987,13 +22071,13 @@ function panelHTML(id){
       +'<p>Shoot her while she is picking toys up and she DROPS them!</p>'
       +pigPanelLine()
       +'<button class="mbtn alt" onclick="UI.momFight()">FIGHT OFF MOM</button>';
-    return '<h3><span class="rivalchip" style="background:'+riv.hex+'"></span> '+riv.name+'</h3>'
+    return '<h3><span class="rivalchip" style="background:'+riv.hex+'"></span> '+escH(riv.name)+'</h3>'
       +'<div style="text-align:center;margin:4px 0 8px"><img src="'+sprURI('tanrifle',riv.hex)+'" style="width:72px"><img src="'+sprURI('tanmg',riv.hex)+'" style="width:72px"><img src="'+sprURI('crawler',riv.hex)+'" style="width:72px"><img src="'+sprURI('officer',riv.hex)+'" style="width:72px"></div>'
       +'<p>"'+riv.blurb+'"</p>'
       +'<p>'+(rivDone?'✓ Beaten today — +5★ collected. Rematches pay +1★.':'First win today: <b>+5★</b>')+'</p>'
       +pigPanelLine()
       +'<p style="font-size:0.96rem;opacity:0.75;margin:2px 0 8px">A quick <b>1 v 1 battle</b> against their army — in and out.</p>'
-      +'<button class="mbtn alt" onclick="UI.rival()">'+(rivDone?'REMATCH':'FIGHT '+riv.name)+'</button>';
+      +'<button class="mbtn alt" onclick="UI.rival()">'+(rivDone?'REMATCH':'FIGHT '+escH(riv.name))+'</button>';
     case 'promo': {
       // stepping into the academy clears the "NEW WEAPON" nudge — and the gear one
       META.sargeUnlocked.forEach(wk=>{ if(META.sargeSeen.indexOf(wk)<0) META.sargeSeen.push(wk); });
@@ -22322,7 +22406,7 @@ function gearOpen(gk){
   const p=document.getElementById('milePop'); if(!p) return;
   p.innerHTML='<div class="mb-card">'
     +'<span class="mb-band">LEVEL '+gd.unlock+'!</span>'
-    +'<h2 class="mb-h">'+gd.name+'</h2>'
+    +'<h2 class="mb-h">'+escH(gd.name)+'</h2>'
     +'<span class="mb-win">'+MB_RAYS+'<img src="'+sargeGearURI(gk, dyeHex()||undefined)+'" alt=""></span>'
     +'<span class="mb-line">'+GEAR_LINE[gk]+'</span>'
     +'<button type="button" class="mb-take" onclick="UI.mileTake()">IT\'S MINE!</button>'
@@ -22477,7 +22561,7 @@ function mboxOpen(e){
     +'<span class="mb-band">MYSTERY BOX!</span>'
     +'<h2 class="mb-h">CONGRATS!</h2>'
     +'<span class="mb-win">'+MB_RAYS+e.art+'</span>'
-    +'<b class="mb-name"'+(e.notr?' data-notr="1"':'')+'>'+e.name+'</b>'
+    +'<b class="mb-name"'+(e.notr?' data-notr="1"':'')+'>'+escH(e.name)+'</b>'
     +'<span class="mb-line">'+e.line+'</span>'
     +'<button type="button" class="mb-take" onclick="UI.mboxTake()">IT\'S MINE!</button>'
     +'</div>';
@@ -23118,6 +23202,17 @@ window.UI = {
   }
 };
 
+// v1.85: on a host that is not one of ours, say so — once, quietly, and without
+// taking the game away from whoever ended up there. HQ is already unreachable
+// (netAllowed()), so this only explains what they are already seeing.
+(function unofficialMark(){
+  if(HOST_OK) return;
+  try{
+    const b=document.createElement('div'); b.id='unofficial';
+    b.textContent=t('UNOFFICIAL COPY — play the real GREEN VS. TAN free at playgvt.net');
+    document.body.appendChild(b);
+  }catch(e){}
+})();
 // PRESS START: the whole screen is the button, like god and 1985 intended
 document.getElementById('title').addEventListener('pointerdown', ()=>{
   audio(); SFX.blip();
