@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
-<!-- TRAINSET v1.2 -->
-<meta name="trainset-version" content="1.2">
+<!-- TRAINSET v1.3 -->
+<meta name="trainset-version" content="1.3">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -25,6 +25,27 @@
   }
   #mark{ left:12px; cursor:default; color:#F2C531; }
   #mute{ right:12px; }
+  #menuChip{ right:76px; }
+  /* ---- the bedroom menu (E3): DOM chrome floats over the painted room ---- */
+  #menu{
+    position:absolute; inset:0; z-index:6; display:none; flex-direction:column;
+    align-items:center; justify-content:flex-end; gap:14px;
+    padding-bottom:calc(24px + env(safe-area-inset-bottom)); pointer-events:none;
+  }
+  #menu>*{ pointer-events:auto; }
+  #mbtns{ display:flex; gap:14px; }   /* a ROW — EXPANSION-5's CAMPAIGN joins beside PLAY */
+  .mbtn{
+    background:linear-gradient(#3a2a18,#241a0e); border:3px solid #6e5130; border-radius:16px;
+    color:#F7E9C4; font-family:inherit; font-size:24px; letter-spacing:3px;
+    padding:16px 52px; cursor:pointer; box-shadow:0 10px 26px rgba(0,0,0,0.5);
+  }
+  .mbtn:active{ transform:translateY(2px); }
+  #paint{ display:flex; align-items:center; gap:8px; background:rgba(20,14,8,0.82);
+    border:2px solid #513a24; border-radius:14px; padding:7px 10px; }
+  #paintCap{ font-size:10px; letter-spacing:1px; color:#8f7a52; margin-right:2px; }
+  .sw{ background:#170f08; border:2px solid #513a24; border-radius:10px; padding:3px; cursor:pointer; }
+  .sw canvas{ width:56px; height:34px; display:block; pointer-events:none; }
+  .sw.on{ border-color:#F2C531; }
   /* ---- bottom bar ---- */
   #bar{
     position:absolute; left:0; right:0; bottom:0; z-index:6;
@@ -103,6 +124,10 @@
     #goBtn{ font-size:16px; min-width:88px; }
     #bar{ gap:6px; }
     .ptab{ font-size:8px; padding:4px 4px; }
+    .mbtn{ font-size:17px; padding:11px 30px; letter-spacing:2px; }
+    .sw canvas{ width:44px; height:27px; }
+    #paintCap{ display:none; }
+    #menu{ gap:9px; padding-bottom:14px; }
   }
 </style>
 </head>
@@ -110,6 +135,7 @@
 <canvas id="cv"></canvas>
 <div class="chip" id="mark">🚂 TRAIN SET</div>
 <div class="chip" id="mute">🔊</div>
+<div class="chip" id="menuChip">🏠 MENU</div>
 <div id="bar">
   <span id="palTabs"><button class="ptab on" id="tabTrack" type="button">TRACK</button><button class="ptab" id="tabScen" type="button">SCENERY</button><button class="ptab" id="tabTown" type="button">TOWN</button></span>
   <span id="palSlot" style="display:flex;gap:8px;"></span>
@@ -129,6 +155,10 @@
       <span id="tidyAsk">SWEEP THE WHOLE RUG CLEAN? <button id="tidyYes">YES</button> <button id="tidyNo">NO</button></span>
     </span>
   </div>
+</div>
+<div id="menu">
+  <div id="mbtns"><button id="playBtn" class="mbtn" type="button">PLAY ▶</button></div>
+  <div id="paint"><span id="paintCap">PAINT SHOP</span><span id="swatches" style="display:flex;gap:6px;"></span></div>
 </div>
 <div id="toast"></div>
 <div id="rot"><div>🔁</div>TURN YOUR PHONE SIDEWAYS</div>
@@ -164,6 +194,23 @@ const ANIMAL_SET=['cow','sheep','chick'];             // animal set, palette ord
 const CHIRP_VOL=1.0;                                  // moo/baa/cluck loudness (already quiet-HUD quiet)
 const REACT_R=1;                                      // react radius, cells — the train charms animals this close
 const HERD_SPEED=1.0;                                 // herd idle tempo: graze / nibble / peck speed
+// ---- Wyatt dials (EXPANSION 3 — one const each) ----
+const MENU_PROPS=['sign','bed','toybox','blocks','door','lamp'];  // room props list
+const ATT_SCALE=0.85;         // attract oval size (scale of the real 4×2 loop)
+const ATT_SPEED=70;           // attract loop speed, px/s — slow; SPEED stays the game's
+const PLAY_LABEL='PLAY ▶';    // button copy
+const MENU_MUSIC=false;       // menu music: false = NONE (quiet-HUD default) · true = soft lullaby
+// THE LIVERY LAW: the chosen colour paints ONLY the red livery parts — loco roof +
+// cowcatcher, tender tub, caboose body. Wheels stay red-spoked, boiler stays dark,
+// gold door stays gold, cargo cars untouched. m = body, d = dark stroke, s = cupola shade.
+const LIVERY={
+  red:   {m:'#C0392B', d:'#7E241A', s:'#8f2020'},   // byte-identical to the v1.2 art — never touch
+  yellow:{m:'#D9A93B', d:'#8F6B1E', s:'#B08427'},   // the 4 non-red rows are dials — tune on the rug
+  blue:  {m:'#3E6E9E', d:'#28486B', s:'#335C86'},
+  green: {m:'#4E7F46', d:'#33552F', s:'#3C6236'},
+  purple:{m:'#7B5AA6', d:'#523C73', s:'#664990'},
+};
+const SWATCHES=['red','yellow','blue','green','purple'];   // paint-shop order (RED is default)
 
 const TAU=Math.PI*2;
 const perf=()=>performance.now()/1000;
@@ -174,6 +221,11 @@ let W=0,H=0,BAR=118,SC=1,OX=0,OY=0,DPR=1;
 // ---- state ----
 const grid=new Map();                 // "cx,cy" -> {t,r, ra:{k}|null, pop, sel, latch}
 const scen=new Map();                 // "cx,cy" -> {t:'bush'|'tree'|'rv'|'ppl', v, ra, pop, wave}
+let RGRID=grid;                       // the rail graph the riders read — the attract loop swaps
+                                      // its own tiny oval in (menuUpdate/drawMenu), restores after
+let SCREEN='menu';                    // 'menu' | 'game' — never persisted, boot always lands on the menu
+let COLOR='red';                      // the train's livery (save v:3)
+const AT={ grid:new Map(), cars:[], smoke:[], wheel:0, smokeT:0, musT:2 };   // the attract loop
 let LIVE=false;                       // true only while the real consist advances (pass-latch writes)
 let yayCd=0, pplSeq=0, chirpN=0;      // chirpN: charm chirps fired, for the rig
 let consist=['tender','box'];         // cars behind the loco
@@ -208,7 +260,7 @@ const BASE={
 const PATHS={};
 for(const t in BASE){ PATHS[t]=[]; for(let r=0;r<4;r++) PATHS[t].push(BASE[t].map(b=>mkPath(b.ports,b.pts,r))); }
 
-const pieceAt=(x,y)=>grid.get(key(x,y))||null;
+const pieceAt=(x,y)=>RGRID.get(key(x,y))||null;
 const pathsOf=pc=>PATHS[pc.t][pc.r];
 const scenAt=(x,y)=>scen.get(key(x,y))||null;
 function mkPiece(t,r,sel){
@@ -839,10 +891,13 @@ function drawChick(s,t,ph){
   cx.lineCap='butt';
 }
 // ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers (GVT)
-function drawTrack(){
+// Takes the rail map to paint (default: the rug grid) so the menu's attract oval
+// is painted by this very function — zero duplicate art.
+function drawTrack(g){
+  g=g||grid;
   const bed=new Path2D(), rails=new Path2D();
   const anim=[];
-  for(const [k,pc] of grid){
+  for(const [k,pc] of g){
     if(pc.ra||pc.pop>0){ anim.push([k,pc]); continue; }
     const [gx,gy]=k.split(',').map(Number), ox=GX+gx*C, oy=GY+gy*C;
     for(const p of pathsOf(pc)){
@@ -860,7 +915,7 @@ function drawTrack(){
   cx.lineCap='butt';
   cx.strokeStyle='#6B4A2C'; cx.lineWidth=24; cx.setLineDash([6,12]); cx.stroke(bed); cx.setLineDash([]);
   cx.strokeStyle='#4A423A'; cx.lineWidth=3; cx.stroke(rails);
-  for(const [k,pc] of grid){
+  for(const [k,pc] of g){
     if(pc.ra||pc.pop>0) continue;
     const [gx,gy]=k.split(',').map(Number);
     drawPieceDecor(pc,GX+gx*C,GY+gy*C);
@@ -1001,7 +1056,8 @@ function wheel(wx,wr,rot){
   cx.restore();
   cx.fillStyle='#2b2117'; cx.beginPath(); cx.arc(wx,18,2.2,0,7); cx.fill();
 }
-function drawCar(type,x,y,artAng,squash,wrot){
+function drawCar(type,x,y,artAng,squash,wrot,liv){
+  liv=liv||LIVERY[COLOR];   // THE LIVERY LAW — only the red livery parts read this
   cx.save(); cx.translate(x,y); cx.rotate(artAng);
   if(Math.cos(artAng)<0) cx.scale(1,-1);
   cx.scale(KART,KART);
@@ -1010,19 +1066,19 @@ function drawCar(type,x,y,artAng,squash,wrot){
   cx.beginPath(); cx.ellipse(0,24,42,9,0,0,7); cx.fill(); cx.globalAlpha=1;
   if(type==='loco'){
     wheel(-24,8,wrot); wheel(-4,8,wrot); wheel(18,10,wrot*0.8);
-    cx.fillStyle='#C0392B';
+    cx.fillStyle=liv.m;
     cx.beginPath(); cx.moveTo(30,22); cx.lineTo(44,22); cx.lineTo(30,0); cx.closePath(); cx.fill();
     cx.fillStyle='#23211E'; rr(-12,-12,42,26,6); cx.fill();
     cx.fillStyle='#3A3733'; rr(14,-26,9,15,2); cx.fill();
     cx.fillStyle='#2E2B27'; rr(-36,-28,26,42,4); cx.fill();
-    cx.fillStyle='#C0392B'; rr(-39,-33,32,8,3); cx.fill();
+    cx.fillStyle=liv.m; rr(-39,-33,32,8,3); cx.fill();
     cx.fillStyle='#F7E9C4'; rr(-31,-22,12,10,2); cx.fill();
     cx.fillStyle='#F2C531'; cx.beginPath(); cx.arc(30,1,6,0,7); cx.fill();
     cx.strokeStyle='#8a6a1e'; cx.lineWidth=1.5; cx.beginPath(); cx.arc(30,1,6,0,7); cx.stroke();
   } else if(type==='tender'){
     wheel(-18,8,wrot); wheel(18,8,wrot);
-    cx.fillStyle='#C0392B'; rr(-32,-14,64,30,5); cx.fill();
-    cx.strokeStyle='#7E241A'; cx.lineWidth=2; rr(-32,-14,64,30,5); cx.stroke();
+    cx.fillStyle=liv.m; rr(-32,-14,64,30,5); cx.fill();
+    cx.strokeStyle=liv.d; cx.lineWidth=2; rr(-32,-14,64,30,5); cx.stroke();
     cx.fillStyle='#1E1B18';
     cx.beginPath(); cx.arc(-14,-14,9,3.14,0); cx.arc(2,-16,10,3.14,0); cx.arc(18,-14,8,3.14,0); cx.fill();
   } else if(type==='box'){
@@ -1049,18 +1105,18 @@ function drawCar(type,x,y,artAng,squash,wrot){
     cx.fillStyle='#7A553A'; rr(-18,-22,36,8,4); cx.fill();
   } else if(type==='cab'){
     wheel(-18,8,wrot); wheel(18,8,wrot);
-    cx.fillStyle='#C0392B'; rr(-30,-18,60,34,5); cx.fill();
-    cx.strokeStyle='#7E241A'; cx.lineWidth=2; rr(-30,-18,60,34,5); cx.stroke();
-    cx.fillStyle='#8f2020'; rr(-12,-28,24,12,3); cx.fill();
+    cx.fillStyle=liv.m; rr(-30,-18,60,34,5); cx.fill();
+    cx.strokeStyle=liv.d; cx.lineWidth=2; rr(-30,-18,60,34,5); cx.stroke();
+    cx.fillStyle=liv.s; rr(-12,-28,24,12,3); cx.fill();
     cx.fillStyle='#7A553A'; rr(-33,-21,66,7,3); cx.fill();
     cx.fillStyle='#F7E9C4'; rr(-22,-11,10,9,2); cx.fill(); rr(12,-11,10,9,2); cx.fill(); rr(-5,-27,10,7,2); cx.fill();
   }
   cx.restore();
 }
-function drawTrain(){
-  if(!TRAIN.placed) return;
-  for(let i=TRAIN.cars.length-1;i>=0;i--){
-    const c=TRAIN.cars[i];
+// cars-on-rails painter, shared by the rug train and the menu's attract loop
+function drawCarsOnRails(cars,wheelRot){
+  for(let i=cars.length-1;i>=0;i--){
+    const c=cars[i];
     const f=clone(c.rd), b=clone(c.rd);
     const rf=advance(f,AX), rb=back(b,AX);
     let ang,x,y;
@@ -1069,8 +1125,12 @@ function drawTrain(){
       ang=Math.atan2(pf.y-pb.y,pf.x-pb.x); x=(pf.x+pb.x)/2; y=(pf.y+pb.y)/2;
     } else { const p=pos(c.rd); ang=p.ang; x=p.x; y=p.y; }
     const artAng=ang+(c.face<0?Math.PI:0);
-    drawCar(c.type,x,y,artAng,c.squash,wheelPhase*(c.face<0?-1:1));
+    drawCar(c.type,x,y,artAng,c.squash||0,wheelRot*(c.face<0?-1:1));
   }
+}
+function drawTrain(){
+  if(!TRAIN.placed) return;
+  drawCarsOnRails(TRAIN.cars,wheelPhase);
 }
 function drawGhosts(){
   if(!DRAG) return;
@@ -1165,6 +1225,166 @@ function draw(){
 }
 
 /* =====================================================================
+   THE BEDROOM MENU (E3) — the GVT bedroom, re-themed for TRAIN SET.
+   Wood floor + plank seams, warm lamplight, the crimson rug in the
+   middle, and on the rug a tiny REAL loop run by the actual engine and
+   painters. The menu IS the toy.
+   ===================================================================== */
+const MRUG={x:350,y:180,w:620,h:470};                       // the crimson rug on the boards
+const ATT={ ox:MRUG.x+MRUG.w/2-192*ATT_SCALE,               // oval bbox centre (192,96) lands on
+            oy:MRUG.y+MRUG.h/2-96*ATT_SCALE };              // ...the rug's centre
+function star5(px,py,k,col){                                // the toybox star, gone travelling
+  cx.save(); cx.translate(px,py); cx.scale(k,k); cx.fillStyle=col;
+  cx.beginPath(); cx.moveTo(0,-12);
+  for(let i=1;i<10;i++){ const a=-Math.PI/2+i*Math.PI/5, r=i%2?5.2:12; cx.lineTo(Math.cos(a)*r,Math.sin(a)*r); }
+  cx.closePath(); cx.fill(); cx.restore();
+}
+function menuFloor(){
+  // GVT bedroom floorboards, scaled from the 960×600 room to this 1296×912 world
+  cx.fillStyle='#C8A170'; cx.fillRect(0,0,WORLD_W,WORLD_H);
+  cx.strokeStyle='#B08A58'; cx.globalAlpha=0.6; cx.lineWidth=3.4;
+  cx.beginPath(); for(let y=104;y<WORLD_H;y+=104){ cx.moveTo(0,y); cx.lineTo(WORLD_W,y); } cx.stroke();
+  cx.lineWidth=2.7; cx.beginPath();
+  [[320,0],[944,104],[560,208],[240,312],[1024,416],[456,520],[832,624],[272,728],[672,832]]
+    .forEach(p=>{ cx.moveTo(p[0],p[1]); cx.lineTo(p[0],p[1]+104); });
+  cx.stroke(); cx.globalAlpha=1;
+}
+function menuLamp(){
+  // warm lamplight pooling over the middle of the room
+  const g=cx.createRadialGradient(648,240,60,648,240,760);
+  g.addColorStop(0,'rgba(255,246,220,0.16)'); g.addColorStop(1,'rgba(255,246,220,0)');
+  cx.fillStyle=g; cx.fillRect(0,0,WORLD_W,WORLD_H);
+}
+function menuRug(){
+  // the GVT crimson rug recipe (drawRug), folded into a mat on the boards
+  const {x,y,w,h}=MRUG;
+  rr(x,y,w,h,20); cx.fillStyle='#4A1A12'; cx.fill();
+  rr(x+30,y+30,w-60,h-60,12); cx.fillStyle='#63251C'; cx.fill();
+  cx.strokeStyle='#8F4634'; cx.lineWidth=5; rr(x+44,y+44,w-88,h-88,9); cx.stroke();
+  cx.globalAlpha=0.5; cx.fillStyle='#4A1A12';
+  [[x+62,y+62],[x+w-62,y+62],[x+62,y+h-62],[x+w-62,y+h-62]]
+    .forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],8,0,7); cx.fill(); });
+  cx.globalAlpha=0.35; cx.strokeStyle='#7A3627'; cx.lineWidth=2;
+  cx.save(); rr(x+30,y+30,w-60,h-60,12); cx.clip();
+  cx.beginPath(); for(let ly=y+52;ly<y+h-40;ly+=32){ cx.moveTo(x+18,ly); cx.lineTo(x+w-18,ly); } cx.stroke();
+  cx.restore(); cx.globalAlpha=1;
+}
+function menuDoor(){
+  // the door gap and the hall light spilling in (it has to FALL OFF — GVT law)
+  const g=cx.createLinearGradient(1221,0,966,0);
+  g.addColorStop(0,'rgba(255,246,220,0.5)'); g.addColorStop(0.5,'rgba(255,246,220,0.2)'); g.addColorStop(1,'rgba(255,246,220,0)');
+  cx.fillStyle=g; cx.beginPath();
+  cx.moveTo(1221,556); cx.lineTo(966,588); cx.lineTo(966,704); cx.lineTo(1221,726); cx.closePath(); cx.fill();
+  cx.fillStyle='#3a2c1c'; rr(1221,560,74,162,8); cx.fill();
+}
+function menuBed(){
+  cx.fillStyle='#8FA98F'; rr(945,46,310,189,13); cx.fill();
+  cx.fillStyle='#E8E4D4'; rr(945,46,75,189,13); cx.fill();
+  cx.fillStyle='#fff'; rr(958,84,51,113,11); cx.fill();
+}
+function spillPiece(t,r,px,py,rot,s){
+  cx.save(); cx.translate(px,py); cx.rotate(rot); cx.scale(s,s); cx.translate(-C/2,-C/2);
+  drawPieceArt(mkPiece(t,r),0,0); cx.restore();
+}
+function menuToybox(){
+  // THE TRACK BOX — the toy chest this game comes out of, track spilling onto the boards
+  cx.save(); cx.translate(64,296); cx.scale(1.6,1.6);
+  cx.globalAlpha=0.3; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(80,126,66,10,0,0,7); cx.fill(); cx.globalAlpha=1;
+  cx.fillStyle='#8f6b3f'; rr(20,52,120,70,6); cx.fill();
+  cx.strokeStyle='#6e5130'; cx.lineWidth=3; rr(20,52,120,70,6); cx.stroke();
+  cx.fillStyle='#a37c4a'; rr(12,36,136,26,6); cx.fill(); rr(12,36,136,26,6); cx.stroke();
+  star5(80,87,1.05,'#e8d9b0');
+  cx.restore();
+  spillPiece('s',0, 268,556,-0.31,0.55);
+  spillPiece('c',0, 300,634, 0.42,0.55);
+}
+function menuBlocks(){
+  const block=(bx,by,c,rot)=>{ cx.save(); cx.translate(bx,by);
+    cx.globalAlpha=0.18; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(0,15,20,5,0,0,7); cx.fill(); cx.globalAlpha=1;
+    cx.rotate(rot*Math.PI/180); cx.fillStyle=c; rr(-16,-12,32,25,4); cx.fill(); cx.restore(); };
+  block(150,724,'#D9A544',14); block(212,752,'#4A6B8A',-19); block(168,788,'#C85A4A',6);
+}
+function menuSign(){
+  // the title on a wooden plank — toy-chest wood, cream ALL-CAPS
+  const sx=WORLD_W/2;
+  cx.strokeStyle='#6e5130'; cx.lineWidth=10; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(sx-176,152); cx.lineTo(sx-176,70); cx.moveTo(sx+176,152); cx.lineTo(sx+176,70); cx.stroke();
+  cx.lineCap='butt';
+  cx.fillStyle='#8f6b3f'; rr(sx-250,40,500,88,10); cx.fill();
+  cx.strokeStyle='#6e5130'; cx.lineWidth=4; rr(sx-250,40,500,88,10); cx.stroke();
+  cx.fillStyle='#a37c4a'; rr(sx-242,48,484,72,7); cx.fill();
+  cx.fillStyle='#F7E9C4'; cx.textAlign='center';
+  cx.font='bold 46px "Arial Black",Impact,sans-serif';
+  cx.fillText('TRAIN SET', sx, 100);
+  star5(sx-208,84,0.85,'#e8d9b0'); star5(sx+208,84,0.85,'#e8d9b0');
+}
+// the attract loop: a REAL 4×2 oval of real pieces, ridden by real riders
+function buildAttract(){
+  AT.grid.clear();
+  const put=(x,y,t,r)=>AT.grid.set(key(x,y),mkPiece(t,r));
+  put(0,0,'c',1); put(1,0,'s',0); put(2,0,'s',0); put(3,0,'c',2);
+  put(0,1,'c',0); put(1,1,'s',0); put(2,1,'s',0); put(3,1,'c',3);
+  RGRID=AT.grid;
+  try{
+    const loco={cx:1,cy:0,pi:0,dir:1,s:48};
+    AT.cars=[{type:'loco',rd:loco,face:1,squash:0}];
+    const tail=['tender','cab'];                       // the loco + 2 cars, both in livery
+    for(let i=1;i<=tail.length;i++){
+      const rd=clone(loco); back(rd,GAP*i);
+      AT.cars.push({type:tail[i-1],rd,face:1,squash:0});
+    }
+  } finally { RGRID=grid; }
+}
+function menuUpdate(dt){
+  RGRID=AT.grid;
+  try{
+    const step=ATT_SPEED*dt;
+    for(const c of AT.cars) advance(c.rd,step);       // a closed oval — advance never fails
+    AT.wheel+=step/8;
+    AT.smokeT-=dt;
+    if(AT.smokeT<=0){
+      AT.smokeT=0.34;
+      const loco=AT.cars[0], p=pos(loco.rd);
+      const artAng=p.ang+(loco.face<0?Math.PI:0);
+      const flip=Math.cos(artAng)<0;
+      const lx=18*KART, ly=(flip?28:-28)*KART;
+      const ca=Math.cos(artAng), sa=Math.sin(artAng);
+      AT.smoke.push({ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly, t:0, dur:1.2,
+                      vx:(Math.random()-0.5)*10, vy:-30, r:3+Math.random()*2 });
+    }
+  } finally { RGRID=grid; }
+  for(const s of AT.smoke){ s.t+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy-=8*dt; }
+  AT.smoke=AT.smoke.filter(s=>s.t<s.dur);
+  if(MENU_MUSIC){ AT.musT-=dt; if(AT.musT<=0){ AT.musT=5.5; SND.lull(); } }
+}
+function drawMenu(){
+  cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cvs.width,cvs.height);
+  cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
+  menuFloor();
+  if(MENU_PROPS.includes('lamp')) menuLamp();
+  menuRug();
+  if(MENU_PROPS.includes('door')) menuDoor();
+  if(MENU_PROPS.includes('bed')) menuBed();
+  if(MENU_PROPS.includes('toybox')) menuToybox();
+  if(MENU_PROPS.includes('blocks')) menuBlocks();
+  // the attract loop, painted by the real track + car painters
+  cx.save();
+  cx.translate(ATT.ox,ATT.oy); cx.scale(ATT_SCALE,ATT_SCALE); cx.translate(-GX,-GY);
+  RGRID=AT.grid;
+  try{
+    drawTrack(AT.grid);
+    drawCarsOnRails(AT.cars,AT.wheel);
+    for(const s of AT.smoke){ const k=s.t/s.dur;
+      cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb';
+      cx.beginPath(); cx.arc(s.x,s.y,s.r+9*k,0,7); cx.fill(); }
+    cx.globalAlpha=1;
+  } finally { RGRID=grid; }
+  cx.restore();
+  if(MENU_PROPS.includes('sign')) menuSign();
+}
+
+/* =====================================================================
    SOUND — small synth kit through one gate (GVT palette)
    ===================================================================== */
 const AU={ctx:null,g:null,on:true};
@@ -1219,6 +1439,10 @@ const SND={
          tone(440,0.14,'triangle',0.075*CHIRP_VOL,349,0.18); },
   cluck(){ tone(988,0.05,'square',0.05*CHIRP_VOL,659); tone(831,0.07,'square',0.045*CHIRP_VOL,554,0.09); },
   bloop(){ tone(340,0.12,'sine',0.22,190); },
+  // the paint shop's soft whistle chirp — a happy two-note mini whistle
+  chirp(){ tone(494,0.1,'triangle',0.1); tone(659,0.16,'triangle',0.09,undefined,0.08); },
+  // menu lullaby — plays only if the MENU_MUSIC dial is flipped on (default NONE)
+  lull(){ tone(392,0.5,'sine',0.05); tone(494,0.5,'sine',0.045,undefined,0.55); tone(587,0.8,'sine',0.05,undefined,1.1); },
   whistle(){ tone(440,0.85,'triangle',0.22); tone(554,0.85,'triangle',0.2); noise(0.6,1200,0.05,'lowpass'); },
   toot(){ tone(440,0.28,'triangle',0.24); tone(554,0.28,'triangle',0.2); },
   bugle(){ tone(392,0.18,'triangle',0.3); tone(523,0.18,'triangle',0.3,undefined,0.16);
@@ -1233,7 +1457,7 @@ function save(){
     const g=[]; for(const [k,pc] of grid) g.push([k,pc.t,pc.r,pc.sel|0]);
     const sc=[]; for(const [k,s] of scen) sc.push([k,s.t,s.v|0]);
     localStorage.setItem('TRAINSET', JSON.stringify({
-      v:2, grid:g, scen:sc, consist,
+      v:3, grid:g, scen:sc, consist, color:COLOR,
       train: TRAIN.placed? { cars:TRAIN.cars.map(c=>({t:c.type,cx:c.rd.cx,cy:c.rd.cy,pi:c.rd.pi,dir:c.rd.dir,s:c.rd.s,f:c.face})), F:TRAIN.F } : null,
       hints:hintStage, lap:lapDone, mute:!AU.on,
     }));
@@ -1242,10 +1466,12 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem('TRAINSET')||'null'); if(!d) return;
-    // v:1 rows are [k,t,r] (no sel, no scen block) — they load clean, scenery empty
+    // v:1 rows are [k,t,r] (no sel, no scen block) — they load clean, scenery empty.
+    // v:1/v:2 carry no colour — they migrate to v:3 as RED (today's exact art).
     for(const [k,t,r,sel] of (d.grid||[])) if(PATHS[t]) grid.set(k,mkPiece(t,r,sel));
     for(const [k,t,v] of (d.scen||[])) if(SCENDEF[t]) scen.set(k,{t,v:v|0,ra:null,pop:0,wave:0});
     if(Array.isArray(d.consist)) consist=d.consist.filter(t=>CARDEF[t]).slice(0,MAXCARS);
+    COLOR=(d.color&&LIVERY[d.color])? d.color : 'red';
     hintStage=d.hints|0; lapDone=!!d.lap; AU.on=!d.mute;
     if(d.train && d.train.cars && d.train.cars.length){
       let ok=true;
@@ -1304,6 +1530,7 @@ function swRotate(gx,gy){
   pc.r=(pc.r+1)%4; pc.ra={k:1}; pc.latch=null; SND.click(); save();
 }
 cvs.addEventListener('pointerdown',e=>{
+  if(SCREEN!=='game') return;         // the menu room is scenery — its buttons are DOM
   ac(); e.preventDefault();
   const [wx,wy]=worldXY(e);
   if(TRAIN.placed){
@@ -1498,6 +1725,7 @@ function buildPalette(){
   $('tabScen').addEventListener('click',()=>{ ac(); SND.click(); sync('scen'); });
   $('tabTown').addEventListener('click',()=>{ ac(); SND.click(); sync('town'); });
 }
+const PART_CVS=[];    // shed part icons — repainted when the livery changes
 function buildParts(){
   const wrap=$('parts');
   for(const t in CARDEF){
@@ -1505,13 +1733,21 @@ function buildParts(){
     const cv=document.createElement('canvas'); const lb=document.createElement('small');
     lb.textContent='+ '+CARDEF[t]; b.appendChild(cv); b.appendChild(lb); wrap.appendChild(b);
     cv.width=116; cv.height=80;
-    const g=cv.getContext('2d'); g.setTransform(1,0,0,1,58,42);
-    withCtx(g,()=>drawCar(t,0,0,0,0,0.6));
+    PART_CVS.push([t,cv]);
     b.addEventListener('click',()=>{
       ac();
       if(consist.length>=MAXCARS){ wiggle(b); toast('SIX CARS IS PLENTY!'); return; }
       consist.push(t); SND.clank(); consistChanged();
     });
+  }
+  repaintPartIcons();
+}
+function repaintPartIcons(){
+  for(const [t,cv] of PART_CVS){
+    const g=cv.getContext('2d');
+    g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
+    g.setTransform(1,0,0,1,58,42);
+    withCtx(g,()=>drawCar(t,0,0,0,0,0.6));
   }
 }
 const CONW=520, CONH=64, CONSP=54, CON0=44;
@@ -1546,6 +1782,53 @@ function goBtnSync(){
   else { b.textContent='GO ▶'; b.classList.remove('run'); }
 }
 function muteSync(){ $('mute').textContent=AU.on?'🔊':'🔇'; }
+// ---- the menu ⇄ game switch (E3). Screen is never persisted — boot lands on the menu.
+// The sim simply doesn't tick while SCREEN==='menu'; PLAY resumes exactly where you were.
+function cancelDrag(){
+  if(!DRAG) return;
+  if(DRAG.kind==='movePiece'){ grid.set(key(DRAG.from[0],DRAG.from[1]),mkPiece(DRAG.t,DRAG.r,DRAG.sel)); }
+  else if(DRAG.kind==='moveScen'){ scen.set(key(DRAG.from[0],DRAG.from[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0}); }
+  else if(DRAG.kind==='train' && DRAG.prev){
+    TRAIN.cars=DRAG.prev.map(c=>({type:c.type,rd:clone(c.rd),face:c.face,squash:0}));
+    TRAIN.placed=true; TRAIN.F=DRAG.prevF;
+  }
+  DRAG=null; hover=null; save();
+}
+function showScreen(s){
+  SCREEN=s;
+  const menu=s==='menu';
+  if(menu){ cancelDrag(); down=null; shedShow(false); }
+  $('menu').style.display=menu?'flex':'none';
+  $('bar').style.display=menu?'none':'flex';
+  $('mark').style.display=menu?'none':'block';
+  $('menuChip').style.display=menu?'none':'block';
+  goBtnSync();
+  resize();
+}
+function liveryChanged(){ repaintPartIcons(); paintConsist(); syncSwatches(); }
+function syncSwatches(){
+  for(const b of document.querySelectorAll('#swatches .sw')) b.classList.toggle('on',b.dataset.c===COLOR);
+}
+function buildMenu(){
+  $('playBtn').textContent=PLAY_LABEL;
+  $('playBtn').addEventListener('click',()=>{ ac(); SND.tok(); showScreen('game'); });
+  $('menuChip').addEventListener('click',()=>{ ac(); SND.click(); showScreen('menu'); });
+  // THE PAINT SHOP: 5 mini locos painted by the real painter — they ARE the swatches
+  const sw=$('swatches');
+  for(const name of SWATCHES){
+    const b=document.createElement('button'); b.className='sw'; b.type='button'; b.dataset.c=name;
+    const cv2=document.createElement('canvas'); cv2.width=124; cv2.height=76; b.appendChild(cv2);
+    const g=cv2.getContext('2d'); g.setTransform(1.45,0,0,1.45,59,41);
+    withCtx(g,()=>drawCar('loco',0,0,0,0,0.6,LIVERY[name]));
+    b.addEventListener('click',()=>{
+      ac();
+      if(COLOR===name){ SND.click(); return; }
+      COLOR=name; SND.chirp(); liveryChanged(); save();   // the attract train repaints next frame
+    });
+    sw.appendChild(b);
+  }
+  syncSwatches();
+}
 $('goBtn').addEventListener('click',()=>{
   ac();
   if(!TRAIN.placed){ wiggle($('shedBtn')); toast('BUILD YOUR TRAIN IN THE SHED FIRST!'); return; }
@@ -1582,19 +1865,20 @@ $('mute').addEventListener('click',()=>{ AU.on=!AU.on; if(AU.on){ ac(); SND.clic
 // ---- boot ----
 function resize(){
   W=innerWidth; H=innerHeight; DPR=Math.min(2,devicePixelRatio||1);
-  BAR=$('bar').offsetHeight||118;
+  BAR=SCREEN==='menu'? 0 : ($('bar').offsetHeight||118);   // the menu room gets the whole window
   cvs.width=Math.round(W*DPR); cvs.height=Math.round(H*DPR);
   cvs.style.width=W+'px'; cvs.style.height=H+'px';
   SC=Math.min(W/WORLD_W,(H-BAR)/WORLD_H);
   OX=(W-WORLD_W*SC)/2; OY=(H-BAR-WORLD_H*SC)/2;
 }
 window.addEventListener('resize',resize);
-load(); buildPalette(); buildParts(); resize(); goBtnSync(); shedSync(); muteSync();
+load(); buildPalette(); buildParts(); buildMenu(); buildAttract();
+showScreen('menu'); goBtnSync(); shedSync(); muteSync();
 let last=performance.now();
 function frame(t){
   const dt=Math.min(0.05,(t-last)/1000); last=t;
-  if(TS.auto) update(dt);
-  draw();
+  if(TS.auto){ if(SCREEN==='menu') menuUpdate(dt); else update(dt); }
+  if(SCREEN==='menu') drawMenu(); else draw();
   requestAnimationFrame(frame);
 }
 
@@ -1620,12 +1904,18 @@ window.TS={
   go(){ const ok=goTrain(); save(); return ok; },
   stop(){ TRAIN.running=false; goBtnSync(); save(); },
   home(){ trainHome(true); save(); },
-  step(dt){ update(dt||1/60); },
-  state(){ return { placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F, pieces:grid.size,
+  menu(){ showScreen('menu'); return SCREEN; },
+  play(){ showScreen('game'); return SCREEN; },
+  color(name){ if(!LIVERY[name]) return false; COLOR=name; liveryChanged(); save(); return COLOR; },
+  step(dt){ const d=dt||1/60; if(SCREEN==='menu') menuUpdate(d); else update(d); },
+  state(){ return { screen:SCREEN, color:COLOR,
+    placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F, pieces:grid.size,
     consist:consist.slice(), lap:lapDone, hint:hintStage, pauseT:TRAIN.pauseT,
     scenery:scen.size, chirps:chirpN,
     scen:[...scen].map(([k,s])=>[k,s.t,s.v,+(s.wave>0)]),
     sw:[...grid].filter(([k,pc])=>pc.t==='sw').map(([k,pc])=>[k,pc.r,pc.sel,pc.latch?1:0]),
+    at:(()=>{ if(SCREEN!=='menu') return null;
+      RGRID=AT.grid; try{ const p=pos(AT.cars[0].rd); return {x:p.x,y:p.y}; } finally{ RGRID=grid; } })(),
     loco:TRAIN.placed? Object.assign({},TRAIN.cars[0].rd,pos(TRAIN.cars[0].rd)) : null,
     cars:TRAIN.cars.map(c=>{ const p=pos(c.rd); return {t:c.type,cx:c.rd.cx,cy:c.rd.cy,x:p.x,y:p.y}; }) }; },
   mute(b){ AU.on=!b; muteSync(); },
