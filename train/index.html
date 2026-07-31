@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
-<!-- TRAINSET v1.0 -->
-<meta name="trainset-version" content="1.0">
+<!-- TRAINSET v1.1 -->
+<meta name="trainset-version" content="1.1">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -40,6 +40,10 @@
   }
   .pbtn canvas{ width:52px; height:52px; pointer-events:none; }
   .pbtn small{ font-size:8.5px; letter-spacing:0.5px; pointer-events:none; }
+  #palTabs{ display:flex; flex-direction:column; gap:4px; }
+  .ptab{ background:#170f08; border:2px solid #513a24; border-radius:9px; color:#8f7a52;
+    font-family:inherit; font-size:9px; letter-spacing:1px; padding:7px 7px; cursor:pointer; }
+  .ptab.on{ color:#F2C531; border-color:#F2C531; }
   .wig{ animation:wig 0.4s; }
   @keyframes wig{ 0%,100%{transform:rotate(0)} 25%{transform:rotate(-6deg)} 75%{transform:rotate(6deg)} }
   #shedBtn,#goBtn{
@@ -98,6 +102,7 @@
     #shedBtn,#goBtn{ padding:11px 12px; font-size:14px; min-width:78px; }
     #goBtn{ font-size:16px; min-width:88px; }
     #bar{ gap:6px; }
+    .ptab{ font-size:8px; padding:5px 4px; }
   }
 </style>
 </head>
@@ -106,6 +111,7 @@
 <div class="chip" id="mark">🚂 TRAIN SET</div>
 <div class="chip" id="mute">🔊</div>
 <div id="bar">
+  <span id="palTabs"><button class="ptab on" id="tabTrack" type="button">TRACK</button><button class="ptab" id="tabScen" type="button">SCENERY</button></span>
   <span id="palSlot" style="display:flex;gap:8px;"></span>
   <span id="barSpace"></span>
   <button id="shedBtn">THE SHED 🚂</button>
@@ -144,6 +150,13 @@ const KART=0.8;             // car art scale vs GVT's original painter
 const AX=20;                // half axle span used to sample a car's heading
 const MAXCARS=6;
 const STATION_PAUSE=1.2;
+// ---- Wyatt dials (EXPANSION 1 — one const each) ----
+const TREE_GREENS=['#33552F','#3C6236','#4E7F46']; // bottle-brush trio, dark → light
+const RIVER_BLUE='#7CA7D8';                        // toy-water base (bank/sparkle derive below)
+const PPL_COLS=['#4E7F46','#C0392B','#F2C531'];    // molded-plastic figure colours (pose 0/1/2)
+const SW_DEFAULT=0;                                // splitter default hand: 0 = straight branch
+const RUMBLE=1.0;                                  // bridge rumble volume
+const RIVER_BANK='#4F6F9B', RIVER_LIGHT='#9DBFE6', RIVER_GLINT='#EAF3FC';
 
 const TAU=Math.PI*2;
 const perf=()=>performance.now()/1000;
@@ -152,7 +165,10 @@ let cx=cvs.getContext('2d');                     // rebindable: icons borrow the
 let W=0,H=0,BAR=118,SC=1,OX=0,OY=0,DPR=1;
 
 // ---- state ----
-const grid=new Map();                 // "cx,cy" -> {t,r, ra:{k}|null, pop}
+const grid=new Map();                 // "cx,cy" -> {t,r, ra:{k}|null, pop, sel, latch}
+const scen=new Map();                 // "cx,cy" -> {t:'bush'|'tree'|'rv'|'ppl', v, ra, pop, wave}
+let LIVE=false;                       // true only while the real consist advances (pass-latch writes)
+let yayCd=0, pplSeq=0;
 let consist=['tender','box'];         // cars behind the loco
 const TRAIN={ placed:false, cars:[], F:true, running:false, pauseT:0, stKey:null,
               dist:0, startSig:null, goDist:0 };
@@ -172,18 +188,36 @@ function mkPath(ports,pts,r){
   return { ports:ports.map(p=>p==null?null:(p+r)%4), pts:P, cum, len:cum[cum.length-1] };
 }
 const arcPts=[]; for(let i=0;i<=10;i++){ const th=Math.PI-(Math.PI/2)*(i/10); arcPts.push([C+(C/2)*Math.cos(th),(C/2)*Math.sin(th)]); }
+const swArc=[]; for(let i=0;i<=10;i++){ const a=-Math.PI/2+(Math.PI/2)*(i/10); swArc.push([(C/2)*Math.cos(a),C+(C/2)*Math.sin(a)]); }
 const BASE={
   s :[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]} ],
   c :[ {ports:[0,1], pts:arcPts} ],
   x :[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]}, {ports:[0,2], pts:[[C/2,0],[C/2,C]]} ],
   b :[ {ports:[0,null], pts:[[C/2,0],[C/2,C/2+10]]} ],
   st:[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]} ],
+  br:[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]} ],                              // a straight in fancy dress
+  sw:[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]}, {ports:[3,2], pts:swArc} ],    // facing W; branches E / S
 };
 const PATHS={};
 for(const t in BASE){ PATHS[t]=[]; for(let r=0;r<4;r++) PATHS[t].push(BASE[t].map(b=>mkPath(b.ports,b.pts,r))); }
 
 const pieceAt=(x,y)=>grid.get(key(x,y))||null;
 const pathsOf=pc=>PATHS[pc.t][pc.r];
+const scenAt=(x,y)=>scen.get(key(x,y))||null;
+function mkPiece(t,r,sel){
+  return {t,r:(r|0)%4,ra:null,pop:0,sel:sel==null?(t==='sw'?SW_DEFAULT:0):(sel?1:0),latch:null};
+}
+// THE ONE-PREDICATE LAW: the drag ghost tint and the drop both call these, nobody else decides.
+function canPlaceTrack(t,x,y){
+  if(pieceAt(x,y)) return false;
+  const s=scenAt(x,y); if(!s) return true;
+  return s.t==='rv' && t==='br';        // only a bridge may span water
+}
+function canPlaceScen(t,x,y){
+  if(scenAt(x,y)) return false;
+  const pc=pieceAt(x,y); if(!pc) return true;
+  return t==='rv' && pc.t==='br';       // a river may flow in under a bridge
+}
 
 // ---- riders on the graph (the GVT railPoint pattern) ----
 function enter(rd,exitPort){
@@ -192,6 +226,26 @@ function enter(rd,exitPort){
   if(nx<0||ny<0||nx>=GW||ny>=GH) return false;
   const pc=pieceAt(nx,ny); if(!pc) return false;
   const entry=(exitPort+2)%4, ps=pathsOf(pc);
+  if(pc.t==='sw'){
+    // Splitter routing law. facing = ports[0] of both branch paths.
+    //  · facing entry  -> the lever picks the branch
+    //  · branch entry  -> trailing move, merge out the facing port (no derail, toy kindness)
+    //  · PASS LATCH: the first LIVE rider of the consist latches its port-pair on the piece;
+    //    every rider entering while the latch is live rides the latched pair (kills the
+    //    follower trap AND makes mid-pass reversals retrace their own entry path).
+    const facing=ps[0].ports[0];
+    let pi=-1;
+    if(pc.latch && (pc.latch.a===entry||pc.latch.b===entry)) pi=pc.latch.pi;
+    else if(entry===facing) pi=pc.sel?1:0;
+    else if(ps[0].ports[1]===entry) pi=0;
+    else if(ps[1].ports[1]===entry) pi=1;
+    if(pi<0) return false;
+    const p=ps[pi];
+    rd.cx=nx; rd.cy=ny; rd.pi=pi;
+    if(p.ports[0]===entry){ rd.dir=1; rd.s=0; } else { rd.dir=-1; rd.s=p.len; }
+    if(LIVE) pc.latch={pi,a:p.ports[0],b:p.ports[1]};
+    return true;
+  }
   for(let i=0;i<ps.length;i++){
     if(ps[i].ports[0]===entry){ rd.cx=nx; rd.cy=ny; rd.pi=i; rd.dir=1;  rd.s=0;         return true; }
     if(ps[i].ports[1]===entry){ rd.cx=nx; rd.cy=ny; rd.pi=i; rd.dir=-1; rd.s=ps[i].len; return true; }
@@ -254,7 +308,9 @@ function placeTrainAt(cxl,cyl){
 }
 function trainHome(quiet){
   if(TRAIN.placed && !quiet){ for(const c of TRAIN.cars){ const p=pos(c.rd); puff(p.x,p.y-8,16); } SND.pop(); }
-  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; goBtnSync(); shedSync();
+  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
+  for(const pc of grid.values()) pc.latch=null;
+  goBtnSync(); shedSync();
 }
 function reverseTrain(){
   const lead=TRAIN.F? TRAIN.cars[0] : TRAIN.cars[TRAIN.cars.length-1];
@@ -276,6 +332,12 @@ function update(dt){
     if(pc.ra){ pc.ra.k-=dt*8; if(pc.ra.k<=0) pc.ra=null; }
     if(pc.pop>0) pc.pop=Math.max(0,pc.pop-dt*5);
   }
+  for(const s of scen.values()){
+    if(s.ra){ s.ra.k-=dt*8; if(s.ra.k<=0) s.ra=null; }
+    if(s.pop>0) s.pop=Math.max(0,s.pop-dt*5);
+    if(s.wave>0) s.wave-=dt;
+  }
+  if(yayCd>0) yayCd-=dt;
   for(const c of TRAIN.cars) if(c.squash>0) c.squash=Math.max(0,c.squash-dt*4);
 
   if(TRAIN.placed && TRAIN.running){
@@ -287,10 +349,19 @@ function update(dt){
       const step=r.ok? d : Math.max(0,r.moved-0.5);
       if(step>1e-4){
         const locoPrev=key(TRAIN.cars[0].rd.cx,TRAIN.cars[0].rd.cy);
-        for(const c of TRAIN.cars) advance(c.rd,step);
+        LIVE=true; for(const c of TRAIN.cars) advance(c.rd,step); LIVE=false;
         TRAIN.dist+=step; TRAIN.goDist+=step;
         wheelPhase+=step/8;
-        chugAcc+=step; if(chugAcc>52){ chugAcc=0; SND.chuff(); }
+        chugAcc+=step; if(chugAcc>52){ chugAcc=0;
+          const lp=pieceAt(TRAIN.cars[0].rd.cx,TRAIN.cars[0].rd.cy);
+          SND.chuff(!!lp&&lp.t==='br'); }
+        // THE CHARM LAW: little people wave at a passing train
+        for(const c of TRAIN.cars){
+          for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+            const s=scen.get(key(c.rd.cx+dx,c.rd.cy+dy));
+            if(s && s.t==='ppl' && !(s.wave>0)){ s.wave=1.3; if(yayCd<=0){ yayCd=3; SND.yay(); } }
+          }
+        }
         smokeT-=dt; if(smokeT<=0){ smokeT=0.16; stackPuff(); }
         // station: the loco crossing a platform's centre
         const lc=TRAIN.cars[0].rd, lpc=pieceAt(lc.cx,lc.cy), lk=key(lc.cx,lc.cy);
@@ -311,6 +382,21 @@ function update(dt){
       }
       if(!r.ok) reverseTrain();
     }
+  }
+  // pass-latch upkeep: a latch lives while any car BODY overlaps the splitter cell.
+  // Body = rider centre probed ±30px along its own path — this bridges the tiny
+  // between-cars gap on the short curve branch (no mid-consist lever flip can tear
+  // the train) yet releases the points the moment the train is truly clear.
+  let hasLatch=false;
+  for(const pc of grid.values()) if(pc.latch){ hasLatch=true; break; }
+  if(hasLatch){
+    const occ=new Set();
+    if(TRAIN.placed) for(const c of TRAIN.cars){
+      occ.add(key(c.rd.cx,c.rd.cy));
+      const f=clone(c.rd); if(advance(f,30).moved>0) occ.add(key(f.cx,f.cy));
+      const b=clone(c.rd); if(back(b,30).moved>0) occ.add(key(b.cx,b.cy));
+    }
+    for(const [k,pc] of grid) if(pc.latch && !occ.has(k)) pc.latch=null;
   }
   for(const s of smoke){ s.t+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy-=8*dt; }
   smoke=smoke.filter(s=>s.t<s.dur);
@@ -366,6 +452,121 @@ function drawRug(){
 function addPoly(P2,pts,ox,oy){
   P2.moveTo(ox+pts[0][0],oy+pts[0][1]);
   for(let i=1;i<pts.length;i++) P2.lineTo(ox+pts[i][0],oy+pts[i][1]);
+}
+// ---- rivers: cell water that reads its shape from its neighbours (track-connectivity idea) ----
+function riverMask(x,y){
+  let m=0, s;
+  if((s=scenAt(x,y-1))&&s.t==='rv') m|=1;
+  if((s=scenAt(x+1,y))&&s.t==='rv') m|=2;
+  if((s=scenAt(x,y+1))&&s.t==='rv') m|=4;
+  if((s=scenAt(x-1,y))&&s.t==='rv') m|=8;
+  return m;
+}
+function drawRivers(){
+  let any=false;
+  const chan=new Path2D(), ponds=[];
+  for(const [k,s] of scen){
+    if(s.t!=='rv') continue; any=true;
+    const [x,y]=k.split(',').map(Number), mx=GX+x*C+C/2, my=GY+y*C+C/2, m=riverMask(x,y);
+    if(!m){ ponds.push([mx,my]); continue; }
+    if(m&1){ chan.moveTo(mx,my); chan.lineTo(mx,my-C/2); }
+    if(m&2){ chan.moveTo(mx,my); chan.lineTo(mx+C/2,my); }
+    if(m&4){ chan.moveTo(mx,my); chan.lineTo(mx,my+C/2); }
+    if(m&8){ chan.moveTo(mx,my); chan.lineTo(mx-C/2,my); }
+  }
+  if(!any) return;
+  cx.lineCap='round'; cx.lineJoin='round';
+  cx.strokeStyle=RIVER_BANK; cx.lineWidth=58; cx.stroke(chan);
+  cx.strokeStyle=RIVER_BLUE; cx.lineWidth=46; cx.stroke(chan);
+  cx.globalAlpha=0.55; cx.strokeStyle=RIVER_LIGHT; cx.lineWidth=24; cx.stroke(chan); cx.globalAlpha=1;
+  // sparkle combing — the GVT snow-combing recipe, in blue
+  cx.globalAlpha=0.75; cx.strokeStyle=RIVER_GLINT; cx.lineWidth=3; cx.lineCap='butt';
+  cx.setLineDash([7,21]); cx.stroke(chan); cx.setLineDash([]); cx.globalAlpha=1;
+  for(const [mx,my] of ponds){
+    cx.fillStyle=RIVER_BANK; cx.beginPath(); cx.arc(mx,my,31,0,7); cx.fill();
+    cx.fillStyle=RIVER_BLUE; cx.beginPath(); cx.arc(mx,my,25,0,7); cx.fill();
+    cx.globalAlpha=0.55; cx.fillStyle=RIVER_LIGHT; cx.beginPath(); cx.arc(mx,my,14,0,7); cx.fill();
+    cx.globalAlpha=0.75; cx.strokeStyle=RIVER_GLINT; cx.lineWidth=3; cx.setLineDash([6,10]);
+    cx.beginPath(); cx.arc(mx,my,17,0,7); cx.stroke(); cx.setLineDash([]); cx.globalAlpha=1;
+  }
+}
+function drawRiverBlob(mx,my){
+  cx.fillStyle=RIVER_BANK; cx.beginPath(); cx.arc(mx,my,31,0,7); cx.fill();
+  cx.fillStyle=RIVER_BLUE; cx.beginPath(); cx.arc(mx,my,25,0,7); cx.fill();
+}
+function drawRiverGhost(x,y){
+  const m=riverMask(x,y), mx=GX+x*C+C/2, my=GY+y*C+C/2;
+  if(!m){ drawRiverBlob(mx,my); return; }
+  const chan=new Path2D();
+  if(m&1){ chan.moveTo(mx,my); chan.lineTo(mx,my-C/2); }
+  if(m&2){ chan.moveTo(mx,my); chan.lineTo(mx+C/2,my); }
+  if(m&4){ chan.moveTo(mx,my); chan.lineTo(mx,my+C/2); }
+  if(m&8){ chan.moveTo(mx,my); chan.lineTo(mx-C/2,my); }
+  cx.lineCap='round'; cx.lineJoin='round';
+  cx.strokeStyle=RIVER_BANK; cx.lineWidth=58; cx.stroke(chan);
+  cx.strokeStyle=RIVER_BLUE; cx.lineWidth=46; cx.stroke(chan);
+}
+// ---- bushes, trees, tiny people (bottle-brush + molded-plastic laws) ----
+function drawScen(){
+  const t=perf();
+  for(const [k,s] of scen){
+    if(s.t==='rv') continue;
+    const [x,y]=k.split(',').map(Number);
+    drawScenItem(s,GX+x*C,GY+y*C,t);
+  }
+}
+function drawScenItem(s,ox,oy,t){
+  cx.save(); cx.translate(ox+C/2,oy+C/2);
+  if(s.pop>0){ const k2=1+0.16*s.pop; cx.scale(k2,k2); }
+  if(s.ra) cx.rotate(Math.sin((1-s.ra.k)*18)*0.14*s.ra.k);   // happy rustle wiggle
+  cx.globalAlpha=0.25; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(0,s.t==='ppl'?21:27,s.t==='tree'?20:24,6.5,0,0,7); cx.fill();
+  cx.globalAlpha=1;
+  if(s.t==='bush') drawBush();
+  else if(s.t==='tree') drawTree();
+  else if(s.t==='ppl') drawPerson(s,t);
+  cx.restore();
+}
+function cone(x0,yb,w,h,col){
+  cx.fillStyle=col; cx.strokeStyle=col; cx.lineWidth=7; cx.lineJoin='round';
+  cx.beginPath(); cx.moveTo(x0-w/2,yb); cx.lineTo(x0+w/2,yb); cx.lineTo(x0,yb-h); cx.closePath();
+  cx.fill(); cx.stroke();
+}
+function drawTree(){
+  cx.fillStyle='#6B4A2C'; cx.fillRect(-4,16,8,11);
+  cone(0,18,42,24,TREE_GREENS[0]);
+  cone(0,4,34,22,TREE_GREENS[1]);
+  cone(0,-9,25,20,TREE_GREENS[2]);
+}
+function drawBush(){
+  cx.fillStyle='#6B4A2C'; cx.fillRect(-3,20,6,7);
+  const tuft=(x,y,r,col)=>{ cx.fillStyle=col; cx.beginPath(); cx.arc(x,y,r,0,7); cx.fill(); };
+  tuft(-11,12,13,TREE_GREENS[0]); tuft(11,13,12,TREE_GREENS[1]); tuft(0,4,14,TREE_GREENS[2]);
+}
+function drawPerson(s,t){
+  const col=PPL_COLS[s.v%PPL_COLS.length], pose=s.v%3;
+  const waving=s.wave>0, wv=waving? Math.sin(t*11)*4 : 0;
+  cx.strokeStyle=col; cx.fillStyle=col; cx.lineWidth=5.6; cx.lineCap='round'; cx.lineJoin='round';
+  if(pose===2){  // sitting
+    cx.beginPath(); cx.arc(0,-7,5.6,0,7); cx.fill();
+    cx.beginPath(); cx.moveTo(0,-2); cx.lineTo(0,9); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,9); cx.lineTo(8,10); cx.lineTo(9,18); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,9); cx.lineTo(-7,11); cx.lineTo(-6,19); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,0); cx.lineTo(-6,6); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,0);
+    if(waving) cx.lineTo(6,-16+wv); else cx.lineTo(7,5);
+    cx.stroke();
+  } else {       // standing / the always-waving optimist
+    cx.beginPath(); cx.arc(0,-13,5.6,0,7); cx.fill();
+    cx.beginPath(); cx.moveTo(0,-8); cx.lineTo(0,6); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,6); cx.lineTo(-5,20); cx.moveTo(0,6); cx.lineTo(5,20); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,-5); cx.lineTo(-7,3); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,-5);
+    if(waving) cx.lineTo(7,-22+wv);
+    else if(pose===1) cx.lineTo(7,-20+Math.sin(t*2.4)*2);
+    else cx.lineTo(7,3);
+    cx.stroke();
+  }
 }
 // ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers (GVT)
 function drawTrack(){
@@ -459,6 +660,65 @@ function drawPieceDecor(pc,ox,oy){
     cx.fillStyle='#4E7F46'; cx.beginPath(); cx.moveTo(-34,-2); cx.lineTo(-22,2); cx.lineTo(-34,6); cx.closePath(); cx.fill();
     cx.restore();
   }
+  if(pc.t==='br'){
+    cx.save(); cx.translate(ox+C/2,oy+C/2); cx.rotate(pc.r*Math.PI/2);
+    // stilts + shadows showing the water (or rug) beneath
+    cx.globalAlpha=0.22; cx.fillStyle='#000';
+    cx.beginPath(); cx.ellipse(-34,24,11,4,0,0,7); cx.fill();
+    cx.beginPath(); cx.ellipse(34,24,11,4,0,0,7); cx.fill();
+    cx.globalAlpha=1;
+    cx.fillStyle='#5b3a22'; cx.fillRect(-38,12,6,12); cx.fillRect(32,12,6,12);
+    // side girders: wood beams, red posts, cream handrail — both sides
+    for(const sy of [-1,1]){
+      const gy=sy*15;
+      cx.fillStyle='#C0392B';
+      for(let px=-36;px<=36;px+=18) cx.fillRect(px-2.5,gy-10,5,12);
+      cx.fillStyle='#7A553A'; rr(-46,gy-3,92,7,3); cx.fill();
+      cx.strokeStyle='#F7E9C4'; cx.lineWidth=3; cx.lineCap='butt';
+      cx.beginPath(); cx.moveTo(-44,gy-10); cx.lineTo(44,gy-10); cx.stroke();
+    }
+    cx.restore();
+  }
+  if(pc.t==='sw'){
+    // A kid must SEE the setting: chosen branch connected, other branch gapped at the frog.
+    const ps=pathsOf(pc), open=ps[pc.sel?0:1], chosen=ps[pc.sel?1:0];
+    const gap=pathSeg(open,12,30);
+    cx.strokeStyle='#9A8266'; cx.lineWidth=27; cx.lineCap='butt'; cx.lineJoin='round';
+    cx.beginPath(); cx.moveTo(ox+gap[0][0],oy+gap[0][1]);
+    for(let i=1;i<gap.length;i++) cx.lineTo(ox+gap[i][0],oy+gap[i][1]);
+    cx.stroke();
+    // the points blade hugs the chosen route
+    const blade=pathSeg(chosen,5,34);
+    cx.strokeStyle='#4A423A'; cx.lineWidth=4.5; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(ox+blade[0][0],oy+blade[0][1]);
+    for(let i=1;i<blade.length;i++) cx.lineTo(ox+blade[i][0],oy+blade[i][1]);
+    cx.stroke();
+    // the lever in the free corner — TAP ME: knob points at the chosen branch
+    cx.save(); cx.translate(ox+C/2,oy+C/2); cx.rotate(pc.r*Math.PI/2);
+    cx.fillStyle='#3A3733'; rr(11,-39,26,24,5); cx.fill();
+    cx.strokeStyle='#5A5148'; cx.lineWidth=2; rr(11,-39,26,24,5); cx.stroke();
+    const lx=24, ly=-27;
+    cx.strokeStyle='#F7E9C4'; cx.lineWidth=4; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(lx,ly);
+    if(pc.sel) cx.lineTo(lx,ly+9); else cx.lineTo(lx+9,ly);
+    cx.stroke();
+    cx.fillStyle='#C0392B'; cx.beginPath();
+    if(pc.sel) cx.arc(lx,ly+9,4.4,0,7); else cx.arc(lx+9,ly,4.4,0,7);
+    cx.fill();
+    cx.fillStyle='#F2C531'; cx.beginPath(); cx.arc(lx,ly,2.6,0,7); cx.fill();
+    cx.restore();
+  }
+}
+// sub-polyline of a path between arc lengths s0..s1 (for the frog gap + points blade)
+function pathSeg(p,s0,s1){
+  s0=Math.max(0,Math.min(p.len,s0)); s1=Math.max(0,Math.min(p.len,s1));
+  const at=s=>{ let i=1; while(i<p.cum.length-1&&p.cum[i]<s) i++;
+    const a=p.pts[i-1],b=p.pts[i],L=p.cum[i]-p.cum[i-1]||1,k=(s-p.cum[i-1])/L;
+    return [a[0]+(b[0]-a[0])*k, a[1]+(b[1]-a[1])*k]; };
+  const out=[at(s0)];
+  for(let i=0;i<p.pts.length;i++) if(p.cum[i]>s0&&p.cum[i]<s1) out.push(p.pts[i]);
+  out.push(at(s1));
+  return out;
 }
 // GVT drawTrainCar, adapted: same wheels, same shadow, same flip-upright law,
 // wheel spokes actually spin, three new cars in the same palette
@@ -544,21 +804,31 @@ function drawTrain(){
 }
 function drawGhosts(){
   if(!DRAG) return;
-  if(DRAG.kind==='newPiece'||DRAG.kind==='movePiece'){
+  const isPiece=DRAG.kind==='newPiece'||DRAG.kind==='movePiece';
+  const isScen=DRAG.kind==='newScen'||DRAG.kind==='moveScen';
+  if(isPiece||isScen){
     cx.globalAlpha=0.18; cx.strokeStyle='#F7E9C4'; cx.lineWidth=2;
     for(let gx=0;gx<=GW;gx++) for(let gy=0;gy<=GH;gy++){
       const x=GX+gx*C, y=GY+gy*C;
       cx.beginPath(); cx.moveTo(x-5,y); cx.lineTo(x+5,y); cx.moveTo(x,y-5); cx.lineTo(x,y+5); cx.stroke();
     }
     cx.globalAlpha=1;
+    const mock=isScen? {t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0} : {t:DRAG.t,r:DRAG.r,sel:DRAG.sel|0,latch:null};
     if(hover){
-      const ok=!pieceAt(hover[0],hover[1]);
+      const ok=isPiece? canPlaceTrack(DRAG.t,hover[0],hover[1]) : canPlaceScen(DRAG.t,hover[0],hover[1]);
       cx.globalAlpha=0.28; cx.fillStyle=ok?'#7CFC66':'#FF5A44';
       rr(GX+hover[0]*C+3,GY+hover[1]*C+3,C-6,C-6,10); cx.fill(); cx.globalAlpha=1;
-      if(ok){ cx.globalAlpha=0.8; drawPieceArt({t:DRAG.t,r:DRAG.r},GX+hover[0]*C,GY+hover[1]*C); cx.globalAlpha=1; }
+      if(ok){ cx.globalAlpha=0.8;
+        if(isPiece) drawPieceArt(mock,GX+hover[0]*C,GY+hover[1]*C);
+        else if(DRAG.t==='rv') drawRiverGhost(hover[0],hover[1]);
+        else drawScenItem(mock,GX+hover[0]*C,GY+hover[1]*C,perf());
+        cx.globalAlpha=1; }
     } else if(DRAG.x!=null){
       cx.globalAlpha=0.8; cx.save(); cx.translate(DRAG.x-C/2,DRAG.y-C/2);
-      drawPieceArt({t:DRAG.t,r:DRAG.r},0,0); cx.restore(); cx.globalAlpha=1;
+      if(isPiece) drawPieceArt(mock,0,0);
+      else if(DRAG.t==='rv') drawRiverBlob(C/2,C/2);
+      else drawScenItem(mock,0,0,perf());
+      cx.restore(); cx.globalAlpha=1;
     }
   }
   if(DRAG.kind==='train' && DRAG.x!=null){
@@ -607,13 +877,15 @@ function drawLapCard(){
 function draw(){
   cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cvs.width,cvs.height);
   cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
-  drawRug(); drawTrack(); drawTrain();
+  drawRug(); drawRivers(); drawTrack(); drawScen(); drawTrain();
   for(const s of smoke){ const k=s.t/s.dur;
     cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb';
     cx.beginPath(); cx.arc(s.x,s.y,s.r+9*k,0,7); cx.fill(); cx.globalAlpha=1; }
   for(const e of fx){ const k=e.t/e.dur;
     if(e.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle='#e8e0cc';
-      cx.beginPath(); cx.arc(e.x,e.y,e.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; } }
+      cx.beginPath(); cx.arc(e.x,e.y,e.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; }
+    if(e.k==='rip'){ cx.globalAlpha=(1-k)*0.7; cx.strokeStyle=RIVER_GLINT; cx.lineWidth=2.5;
+      cx.beginPath(); cx.arc(e.x,e.y,10+e.R*k,0,7); cx.stroke(); cx.globalAlpha=1; } }
   drawGhosts();
   cx.setTransform(DPR,0,0,DPR,0,0);
   for(const p of confetti){ cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot);
@@ -665,7 +937,12 @@ const SND={
   clank(){ tone(520,0.06,'square',0.13); tone(1400,0.05,'triangle',0.1); noise(0.04,3000,0.2); },
   boing(){ tone(180,0.35,'triangle',0.5,70); tone(363,0.22,'sine',0.18,120); },
   ding(){ tone(1568,0.35,'sine',0.22); tone(1568,0.35,'sine',0.22,undefined,0.19); },
-  chuff(){ chuffSide=!chuffSide; noise(0.07,chuffSide?750:640,0.16,'bandpass'); },
+  chuff(deep){ chuffSide=!chuffSide;
+    if(deep) noise(0.09,260,0.2*RUMBLE,'lowpass');           // bridge rumble: one filter tweak
+    else noise(0.07,chuffSide?750:640,0.16,'bandpass'); },
+  rustle(){ noise(0.09,520,0.35,'lowpass'); noise(0.06,1500,0.1,'highpass'); },
+  yay(){ tone(880,0.09,'sine',0.09); tone(1175,0.12,'sine',0.08,undefined,0.09); },
+  bloop(){ tone(340,0.12,'sine',0.22,190); },
   whistle(){ tone(440,0.85,'triangle',0.22); tone(554,0.85,'triangle',0.2); noise(0.6,1200,0.05,'lowpass'); },
   toot(){ tone(440,0.28,'triangle',0.24); tone(554,0.28,'triangle',0.2); },
   bugle(){ tone(392,0.18,'triangle',0.3); tone(523,0.18,'triangle',0.3,undefined,0.16);
@@ -677,9 +954,10 @@ const SND={
    ===================================================================== */
 function save(){
   try{
-    const g=[]; for(const [k,pc] of grid) g.push([k,pc.t,pc.r]);
+    const g=[]; for(const [k,pc] of grid) g.push([k,pc.t,pc.r,pc.sel|0]);
+    const sc=[]; for(const [k,s] of scen) sc.push([k,s.t,s.v|0]);
     localStorage.setItem('TRAINSET', JSON.stringify({
-      v:1, grid:g, consist,
+      v:2, grid:g, scen:sc, consist,
       train: TRAIN.placed? { cars:TRAIN.cars.map(c=>({t:c.type,cx:c.rd.cx,cy:c.rd.cy,pi:c.rd.pi,dir:c.rd.dir,s:c.rd.s,f:c.face})), F:TRAIN.F } : null,
       hints:hintStage, lap:lapDone, mute:!AU.on,
     }));
@@ -688,7 +966,9 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem('TRAINSET')||'null'); if(!d) return;
-    for(const [k,t,r] of (d.grid||[])) if(PATHS[t]) grid.set(k,{t,r:(r|0)%4,ra:null,pop:0});
+    // v:1 rows are [k,t,r] (no sel, no scen block) — they load clean, scenery empty
+    for(const [k,t,r,sel] of (d.grid||[])) if(PATHS[t]) grid.set(k,mkPiece(t,r,sel));
+    for(const [k,t,v] of (d.scen||[])) if(SCENDEF[t]) scen.set(k,{t,v:v|0,ra:null,pop:0,wave:0});
     if(Array.isArray(d.consist)) consist=d.consist.filter(t=>CARDEF[t]).slice(0,MAXCARS);
     hintStage=d.hints|0; lapDone=!!d.lap; AU.on=!d.mute;
     if(d.train && d.train.cars && d.train.cars.length){
@@ -706,7 +986,9 @@ function load(){
 /* =====================================================================
    INPUT + CHROME
    ===================================================================== */
-const PIECES=[ ['s','STRAIGHT'], ['c','CURVE'], ['x','CROSSING'], ['b','BUMPER'], ['st','STATION'] ];
+const PIECES=[ ['s','STRAIGHT'], ['c','CURVE'], ['x','CROSSING'], ['b','BUMPER'], ['st','STATION'], ['br','BRIDGE'], ['sw','SPLITTER'] ];
+const SCEN_PIECES=[ ['bush','BUSH'], ['tree','TREE'], ['rv','RIVER'], ['ppl','PEOPLE'] ];  // palette order — Wyatt dial
+const SCENDEF={ bush:1, tree:1, rv:1, ppl:1 };
 const CARDEF={ tender:'TENDER', box:'BOXCAR', tank:'TANKER', flat:'FLATCAR', cab:'CABOOSE' };
 const $=id=>document.getElementById(id);
 function worldXY(e){ return [ (e.clientX-OX)/SC, (e.clientY-OY)/SC ]; }
@@ -723,6 +1005,14 @@ function toast(msg){
 function hintPass(n){ if(hintStage===n){ hintStage=n+1; save(); } }
 function wiggle(el){ el.classList.remove('wig'); void el.offsetWidth; el.classList.add('wig'); }
 
+function swRotate(gx,gy){
+  const pc=pieceAt(gx,gy); if(!pc) return;
+  if(TRAIN.placed && trainCells().has(key(gx,gy))){
+    if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); return; }
+    trainHome(false);
+  }
+  pc.r=(pc.r+1)%4; pc.ra={k:1}; pc.latch=null; SND.click(); save();
+}
 cvs.addEventListener('pointerdown',e=>{
   ac(); e.preventDefault();
   const [wx,wy]=worldXY(e);
@@ -731,7 +1021,16 @@ cvs.addEventListener('pointerdown',e=>{
     if(Math.hypot(wx-p.x,wy-p.y)<36){ down={x:e.clientX,y:e.clientY,what:'loco'}; return; }
   }
   const cell=cellXY(wx,wy);
-  if(cell && pieceAt(cell[0],cell[1])){ down={x:e.clientX,y:e.clientY,what:'piece',cell}; return; }
+  if(cell && pieceAt(cell[0],cell[1])){
+    down={x:e.clientX,y:e.clientY,what:'piece',cell};
+    // splitter: tap = throw the points, so rotation moves to a long-press
+    if(pieceAt(cell[0],cell[1]).t==='sw'){
+      const d=down;
+      d.lp=setTimeout(()=>{ if(down===d){ down=null; swRotate(cell[0],cell[1]); } },550);
+    }
+    return;
+  }
+  if(cell && scenAt(cell[0],cell[1])){ down={x:e.clientX,y:e.clientY,what:'scen',cell}; return; }
   down=null;
 });
 window.addEventListener('pointermove',e=>{
@@ -744,7 +1043,8 @@ window.addEventListener('pointermove',e=>{
   if(!down) return;
   if(Math.hypot(e.clientX-down.x,e.clientY-down.y)<8) return;
   e.preventDefault();
-  if(down.what==='pal'){ DRAG={kind:'newPiece',t:down.t,r:0}; }
+  if(down.lp){ clearTimeout(down.lp); down.lp=null; }
+  if(down.what==='pal'){ DRAG=down.layer==='scen'? {kind:'newScen',t:down.t,v:down.v|0} : {kind:'newPiece',t:down.t,r:0}; }
   else if(down.what==='piece'){
     const [gx,gy]=down.cell, pc=pieceAt(gx,gy);
     if(pc){
@@ -753,7 +1053,14 @@ window.addEventListener('pointermove',e=>{
         trainHome(false); toast('BACK IN THE SHED');
       }
       grid.delete(key(gx,gy)); save();
-      DRAG={kind:'movePiece',t:pc.t,r:pc.r,from:[gx,gy]};
+      DRAG={kind:'movePiece',t:pc.t,r:pc.r,sel:pc.sel|0,from:[gx,gy]};
+    }
+  }
+  else if(down.what==='scen'){
+    const [gx,gy]=down.cell, s=scenAt(gx,gy);
+    if(s){
+      scen.delete(key(gx,gy)); save();
+      DRAG={kind:'moveScen',t:s.t,v:s.v|0,from:[gx,gy]};
     }
   }
   else if(down.what==='loco'){
@@ -768,16 +1075,30 @@ window.addEventListener('pointerup',e=>{
   if(DRAG){
     const [wx,wy]=worldXY(e); hover=cellXY(wx,wy);
     if(DRAG.kind==='newPiece'||DRAG.kind==='movePiece'){
-      if(hover && !pieceAt(hover[0],hover[1])){
-        grid.set(key(hover[0],hover[1]),{t:DRAG.t,r:DRAG.r,ra:null,pop:1});
+      if(hover && canPlaceTrack(DRAG.t,hover[0],hover[1])){
+        const pc=mkPiece(DRAG.t,DRAG.r,DRAG.sel); pc.pop=1;
+        grid.set(key(hover[0],hover[1]),pc);
         SND.tok(); puff(GX+hover[0]*C+C/2,GY+hover[1]*C+C/2,14);
         hintPass(0); if(grid.size>=3) hintPass(1);
         save();
       } else if(hover){
-        if(DRAG.kind==='movePiece'){ grid.set(key(DRAG.from[0],DRAG.from[1]),{t:DRAG.t,r:DRAG.r,ra:null,pop:0}); save(); }
-        toast('THAT SPOT IS TAKEN');
+        if(DRAG.kind==='movePiece'){ grid.set(key(DRAG.from[0],DRAG.from[1]),mkPiece(DRAG.t,DRAG.r,DRAG.sel)); save(); }
+        const s=scenAt(hover[0],hover[1]);
+        toast(s&&s.t==='rv'&&!pieceAt(hover[0],hover[1])?'ONLY A BRIDGE CAN CROSS THE RIVER!':'THAT SPOT IS TAKEN');
       } else {
         if(DRAG.kind==='movePiece'){ SND.pop(); puff(wx,wy,14); save(); }
+      }
+    }
+    else if(DRAG.kind==='newScen'||DRAG.kind==='moveScen'){
+      if(hover && canPlaceScen(DRAG.t,hover[0],hover[1])){
+        scen.set(key(hover[0],hover[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:1,wave:0});
+        SND.tok(); puff(GX+hover[0]*C+C/2,GY+hover[1]*C+C/2,14);
+        save();
+      } else if(hover){
+        if(DRAG.kind==='moveScen'){ scen.set(key(DRAG.from[0],DRAG.from[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0}); save(); }
+        toast(DRAG.t==='rv'&&pieceAt(hover[0],hover[1])?'WATER AND TRACK DON\'T MIX — TRY A BRIDGE!':'THAT SPOT IS TAKEN');
+      } else {
+        if(DRAG.kind==='moveScen'){ SND.pop(); puff(wx,wy,14); save(); }
       }
     }
     else if(DRAG.kind==='train'){
@@ -796,16 +1117,30 @@ window.addEventListener('pointerup',e=>{
     DRAG=null; hover=null; return;
   }
   if(!down) return;
+  if(down.lp){ clearTimeout(down.lp); down.lp=null; }
   const dist=Math.hypot(e.clientX-down.x,e.clientY-down.y);
   if(dist<8){
     if(down.what==='loco'){ SND.whistle(); for(let i=0;i<3;i++) setTimeout(stackPuff,i*90); }
     else if(down.what==='piece'){
       const [gx,gy]=down.cell, pc=pieceAt(gx,gy);
       if(pc){
-        if(TRAIN.placed && trainCells().has(key(gx,gy))){
+        if(pc.t==='sw'){
+          // TAP THE PIECE = THROW THE POINTS (rotation lives on a long-press)
+          if(TRAIN.placed && (pc.latch || trainCells().has(key(gx,gy)))){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
+          else { pc.sel^=1; SND.click(); save(); }
+        }
+        else if(TRAIN.placed && trainCells().has(key(gx,gy))){
           if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
           else { trainHome(false); pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); save(); }
         } else { pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); hintPass(1); save(); }
+      }
+    }
+    else if(down.what==='scen'){
+      const [gx,gy]=down.cell, s=scenAt(gx,gy);
+      if(s){
+        if(s.t==='ppl'){ s.wave=1.3; SND.yay(); }
+        else if(s.t==='rv'){ fx.push({k:'rip',x:GX+gx*C+C/2,y:GY+gy*C+C/2,R:26,t:0,dur:0.5}); SND.bloop(); }
+        else { s.ra={k:1}; SND.rustle(); }
       }
     }
     else if(down.what==='pal'){ wiggle(down.el); toast('DRAG IT ONTO THE RUG!'); }
@@ -816,19 +1151,49 @@ window.addEventListener('pointerup',e=>{
 
 // ---- chrome: palette, shed, GO, mute ----
 function withCtx(g,fn){ const old=cx; cx=g; try{ fn(); } finally{ cx=old; } }
+function scenIcon(g,t){
+  withCtx(g,()=>{
+    if(t==='rv'){
+      cx.lineCap='round'; cx.lineJoin='round';
+      cx.strokeStyle=RIVER_BANK; cx.lineWidth=58;
+      cx.beginPath(); cx.moveTo(-2,C/2); cx.lineTo(C+2,C/2); cx.stroke();
+      cx.strokeStyle=RIVER_BLUE; cx.lineWidth=46;
+      cx.beginPath(); cx.moveTo(-2,C/2); cx.lineTo(C+2,C/2); cx.stroke();
+      cx.globalAlpha=0.55; cx.strokeStyle=RIVER_LIGHT; cx.lineWidth=24;
+      cx.beginPath(); cx.moveTo(0,C/2); cx.lineTo(C,C/2); cx.stroke(); cx.globalAlpha=1;
+      cx.globalAlpha=0.75; cx.strokeStyle=RIVER_GLINT; cx.lineWidth=3; cx.setLineDash([7,21]); cx.lineCap='butt';
+      cx.beginPath(); cx.moveTo(4,C/2); cx.lineTo(C-4,C/2); cx.stroke(); cx.setLineDash([]); cx.globalAlpha=1;
+    } else {
+      drawScenItem({t,v:t==='ppl'?1:0,ra:null,pop:0,wave:0},0,0,1.2);
+    }
+  });
+}
 function buildPalette(){
   const slot=$('palSlot');
-  for(const [t,name] of PIECES){
+  const groups={ track:document.createElement('span'), scen:document.createElement('span') };
+  for(const k2 in groups){ groups[k2].style.cssText='display:flex;gap:8px;'; slot.appendChild(groups[k2]); }
+  groups.scen.style.display='none';
+  const mk=(layer,t,name,paint)=>{
     const b=document.createElement('button'); b.className='pbtn'; b.type='button';
     const cv=document.createElement('canvas'); const lb=document.createElement('small');
-    lb.textContent=name; b.appendChild(cv); b.appendChild(lb); slot.appendChild(b);
+    lb.textContent=name; b.appendChild(cv); b.appendChild(lb); groups[layer].appendChild(b);
     cv.width=104; cv.height=104;
     const g=cv.getContext('2d'), s=104/(C+16);
     g.setTransform(s,0,0,s,8*s,8*s);
-    withCtx(g,()=>drawPieceArt({t,r:t==='c'?1:0},0,0));
+    paint(g);
     b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
-      down={x:e.clientX,y:e.clientY,what:'pal',t,el:b}; });
-  }
+      down={x:e.clientX,y:e.clientY,what:'pal',t,el:b,layer,v:t==='ppl'?(pplSeq++%3):0}; });
+  };
+  for(const [t,name] of PIECES) mk('track',t,name,g=>withCtx(g,()=>drawPieceArt({t,r:t==='c'?1:0,sel:0,latch:null},0,0)));
+  for(const [t,name] of SCEN_PIECES) mk('scen',t,name,g=>scenIcon(g,t));
+  const sync=tab=>{
+    groups.track.style.display=tab==='track'?'flex':'none';
+    groups.scen.style.display=tab==='scen'?'flex':'none';
+    $('tabTrack').classList.toggle('on',tab==='track');
+    $('tabScen').classList.toggle('on',tab==='scen');
+  };
+  $('tabTrack').addEventListener('click',()=>{ ac(); SND.click(); sync('track'); });
+  $('tabScen').addEventListener('click',()=>{ ac(); SND.click(); sync('scen'); });
 }
 function buildParts(){
   const wrap=$('parts');
@@ -905,7 +1270,7 @@ $('consist').addEventListener('click',e=>{
 $('tidy').addEventListener('click',()=>{ $('tidyAsk').classList.add('on'); $('tidy').classList.add('off'); });
 $('tidyNo').addEventListener('click',()=>{ $('tidyAsk').classList.remove('on'); $('tidy').classList.remove('off'); });
 $('tidyYes').addEventListener('click',()=>{
-  grid.clear(); trainHome(true); SND.pop(); save();
+  grid.clear(); scen.clear(); trainHome(true); SND.pop(); save();
   $('tidyAsk').classList.remove('on'); $('tidy').classList.remove('off');
   shedShow(false); toast('ALL TIDY!');
 });
@@ -933,12 +1298,20 @@ function frame(t){
 // ---- debug rig (the GVT window.GVT pattern) — drive it headless ----
 window.TS={
   auto:true,
-  place(t,r,gx,gy){ if(!PATHS[t]||gx<0||gy<0||gx>=GW||gy>=GH||pieceAt(gx,gy)) return false;
-    grid.set(key(gx,gy),{t,r:(r|0)%4,ra:null,pop:0}); save(); return true; },
+  place(t,r,gx,gy){ if(!PATHS[t]||gx<0||gy<0||gx>=GW||gy>=GH||!canPlaceTrack(t,gx,gy)) return false;
+    grid.set(key(gx,gy),mkPiece(t,r)); save(); return true; },
   remove(gx,gy){ const k=key(gx,gy); if(!grid.has(k)) return false;
     if(TRAIN.placed && trainCells().has(k)){ if(TRAIN.running) return false; trainHome(true); }
     grid.delete(k); save(); return true; },
-  clear(){ grid.clear(); trainHome(true); save(); },
+  scen(t,v,gx,gy){ if(!SCENDEF[t]||gx<0||gy<0||gx>=GW||gy>=GH||!canPlaceScen(t,gx,gy)) return false;
+    scen.set(key(gx,gy),{t,v:v|0,ra:null,pop:0,wave:0}); save(); return true; },
+  unscen(gx,gy){ const ok=scen.delete(key(gx,gy)); if(ok) save(); return ok; },
+  toggle(gx,gy){ const pc=pieceAt(gx,gy); if(!pc||pc.t!=='sw') return null;
+    if(TRAIN.placed && (pc.latch || trainCells().has(key(gx,gy)))) return false;
+    pc.sel^=1; save(); return pc.sel; },
+  canTrack(t,gx,gy){ return canPlaceTrack(t,gx,gy); },
+  canScen(t,gx,gy){ return canPlaceScen(t,gx,gy); },
+  clear(){ grid.clear(); scen.clear(); trainHome(true); save(); },
   consist(arr){ consist=(arr||[]).filter(t=>CARDEF[t]).slice(0,MAXCARS); consistChanged(); return consist.slice(); },
   placeTrain(gx,gy){ const ok=placeTrainAt(gx,gy); goBtnSync(); shedSync(); save(); return ok; },
   go(){ const ok=goTrain(); save(); return ok; },
@@ -947,8 +1320,11 @@ window.TS={
   step(dt){ update(dt||1/60); },
   state(){ return { placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F, pieces:grid.size,
     consist:consist.slice(), lap:lapDone, hint:hintStage, pauseT:TRAIN.pauseT,
+    scenery:scen.size,
+    scen:[...scen].map(([k,s])=>[k,s.t,s.v,+(s.wave>0)]),
+    sw:[...grid].filter(([k,pc])=>pc.t==='sw').map(([k,pc])=>[k,pc.r,pc.sel,pc.latch?1:0]),
     loco:TRAIN.placed? Object.assign({},TRAIN.cars[0].rd,pos(TRAIN.cars[0].rd)) : null,
-    cars:TRAIN.cars.map(c=>{ const p=pos(c.rd); return {t:c.type,x:p.x,y:p.y}; }) }; },
+    cars:TRAIN.cars.map(c=>{ const p=pos(c.rd); return {t:c.type,cx:c.rd.cx,cy:c.rd.cy,x:p.x,y:p.y}; }) }; },
   mute(b){ AU.on=!b; muteSync(); },
 };
 requestAnimationFrame(frame);
