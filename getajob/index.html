@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GET A JOB — tailor your resume to every posting</title>
+<!-- GETAJOB v=1 -->
+<meta name="getajob-version" content="1.0">
+<meta name="description" content="One master resume, tailored to every job posting. Paste a job description, see which keywords you're missing, rewrite your bullets to match — then apply and track it. Free, private, runs in your browser.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💼</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --desk:#E6EAEF;          /* steel-blue desk */
+  --desk-deep:#D7DDE5;
+  --ink:#1B2733;           /* navy ink */
+  --ink-soft:#51606E;
+  --ink-faint:#8A97A3;
+  --paper:#FFFFFF;
+  --edge:#C9D1D9;
+  --manila:#F1E9D2;        /* folder tabs only */
+  --manila-edge:#D8CBA6;
+  --hl:#FFE34D;            /* highlighter — reserved for keyword matches */
+  --hl-soft:#FFF3B8;
+  --pen:#2456A6;           /* pen blue */
+  --stamp-red:#C6402E;
+  --ok:#2E7D4F;
+  --ok-soft:#E3F1E8;
+  --red-soft:#FBE9E5;
+  --radius:10px;
+  --shadow-sheet:0 1px 2px rgba(27,39,51,.10), 0 14px 34px rgba(27,39,51,.14);
+  --shadow-card:0 1px 2px rgba(27,39,51,.07), 0 6px 18px rgba(27,39,51,.08);
+}
+*{ margin:0; padding:0; box-sizing:border-box; }
+html{ -webkit-text-size-adjust:100%; }
+body{
+  background:var(--desk);
+  background-image:radial-gradient(1200px 500px at 50% -200px, #F2F5F8 0%, var(--desk) 60%);
+  color:var(--ink);
+  font-family:'Public Sans',system-ui,-apple-system,sans-serif;
+  font-size:16px; line-height:1.5;
+  min-height:100vh;
+}
+::selection{ background:var(--hl); color:var(--ink); }
+
+/* ---------- masthead ---------- */
+.masthead{ max-width:1200px; margin:0 auto; padding:34px 20px 0; }
+.mast-row{ display:flex; align-items:flex-end; justify-content:space-between; gap:18px; flex-wrap:wrap; }
+.logo-stamp{
+  display:inline-block; font-family:Archivo,sans-serif; font-weight:900;
+  font-size:clamp(26px,4.4vw,40px); letter-spacing:.04em; color:var(--stamp-red);
+  border:4px solid var(--stamp-red); border-radius:8px; padding:2px 16px 4px;
+  transform:rotate(-2.5deg); user-select:none; line-height:1.15;
+}
+.tagline{ font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); font-size:14px; margin:10px 0 0 4px; }
+.tagline b{ color:var(--ink); font-weight:600; }
+.mast-side{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-faint); text-align:right; padding-bottom:6px; }
+
+/* ---------- folder tabs ---------- */
+.folder-tabs{ display:flex; gap:6px; margin-top:26px; padding:0 6px; position:relative; z-index:2; flex-wrap:wrap; }
+.ftab{
+  appearance:none; border:1px solid var(--manila-edge); border-bottom:none; cursor:pointer;
+  background:linear-gradient(#F6F0DE,var(--manila));
+  border-radius:12px 12px 0 0; padding:11px 20px 13px;
+  font-family:Archivo,sans-serif; font-weight:800; font-size:14px; letter-spacing:.06em;
+  color:var(--ink-soft); display:flex; align-items:center; gap:9px;
+  transform:translateY(3px); transition:transform .12s ease, background .12s ease;
+}
+.ftab:hover{ transform:translateY(1px); }
+.ftab .step{
+  font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:11px;
+  border:1.5px solid currentColor; border-radius:50%; width:20px; height:20px;
+  display:inline-flex; align-items:center; justify-content:center; opacity:.75;
+}
+.ftab.active{
+  background:var(--paper); color:var(--ink); border-color:var(--edge);
+  transform:translateY(1px); box-shadow:0 -6px 14px rgba(27,39,51,.06);
+  position:relative;
+}
+.ftab.active::after{ content:""; position:absolute; left:0; right:0; bottom:-2px; height:4px; background:var(--paper); }
+
+/* ---------- desk / views ---------- */
+.deskarea{
+  max-width:1200px; margin:0 auto 60px; padding:26px 20px 34px;
+  background:var(--paper); border:1px solid var(--edge); border-radius:0 var(--radius) var(--radius) var(--radius);
+  box-shadow:var(--shadow-card); position:relative; z-index:1;
+}
+.view{ display:none; }
+.view.active{ display:block; }
+.view-intro{ display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
+.view-intro h2{ font-family:Archivo,sans-serif; font-weight:900; font-size:22px; letter-spacing:.02em; }
+.view-intro p{ color:var(--ink-soft); font-size:14.5px; max-width:640px; }
+.intro-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+
+/* ---------- buttons & inputs ---------- */
+.btn{
+  appearance:none; cursor:pointer; border-radius:8px; border:1.5px solid var(--ink);
+  background:var(--ink); color:#fff; font-family:Archivo,sans-serif; font-weight:700;
+  font-size:13.5px; letter-spacing:.03em; padding:9px 16px;
+  transition:transform .08s ease, opacity .12s ease; display:inline-flex; align-items:center; gap:7px;
+}
+.btn:hover{ opacity:.92; } .btn:active{ transform:translateY(1px); }
+.btn.blue{ background:var(--pen); border-color:var(--pen); }
+.btn.ghost{ background:transparent; color:var(--ink); }
+.btn.ghost:hover{ background:#F2F5F8; opacity:1; }
+.btn.danger{ background:transparent; border-color:var(--stamp-red); color:var(--stamp-red); }
+.btn.small{ padding:5px 10px; font-size:12px; }
+.btn[disabled]{ opacity:.45; cursor:default; }
+.btn .spin{ display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+input[type=text], input[type=url], textarea, select{
+  width:100%; border:1.5px solid var(--edge); border-radius:8px; background:#FDFDFE;
+  padding:9px 11px; font:inherit; font-size:14.5px; color:var(--ink);
+}
+input:focus, textarea:focus, select:focus{ outline:none; border-color:var(--pen); box-shadow:0 0 0 3px rgba(36,86,166,.12); }
+textarea{ resize:vertical; min-height:74px; line-height:1.45; }
+label.f{ display:block; font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); margin:12px 0 4px; }
+label.f:first-child{ margin-top:0; }
+
+/* ---------- generic card ---------- */
+.card{ border:1px solid var(--edge); border-radius:var(--radius); background:#FBFCFD; padding:18px; }
+.hint{ font-size:13px; color:var(--ink-soft); }
+.hint code{ font-family:'IBM Plex Mono',monospace; font-size:12px; background:#EEF1F4; padding:1px 5px; border-radius:4px; }
+
+/* ---------- RESUME view ---------- */
+.resume-grid{ display:grid; grid-template-columns:minmax(340px,5fr) minmax(360px,6fr); gap:26px; align-items:start; }
+.editor-col .card{ margin-bottom:16px; }
+.exp-card{ position:relative; }
+.exp-card .rowline{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.card-tools{ position:absolute; top:10px; right:10px; display:flex; gap:5px; }
+.icon-btn{
+  appearance:none; cursor:pointer; border:1px solid var(--edge); background:#fff; color:var(--ink-soft);
+  border-radius:6px; width:26px; height:26px; font-size:13px; line-height:1;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.icon-btn:hover{ color:var(--ink); border-color:var(--ink-soft); }
+.add-row{ display:flex; gap:10px; flex-wrap:wrap; }
+
+/* ---------- the paper sheet ---------- */
+.sheet-wrap{ position:sticky; top:18px; }
+.sheet-label{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-soft); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.sheet{
+  background:var(--paper); border:1px solid var(--edge); box-shadow:var(--shadow-sheet);
+  padding:44px 46px; font-family:Georgia,'Times New Roman',serif; color:#151B21;
+  font-size:13.5px; line-height:1.5; border-radius:2px;
+}
+.sheet .s-name{ font-size:23px; font-weight:700; letter-spacing:.10em; text-transform:uppercase; text-align:center; }
+.sheet .s-contact{ text-align:center; font-size:11.5px; color:#39434D; margin-top:4px; }
+.sheet .s-h{ font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; border-bottom:1.5px solid #151B21; padding-bottom:2px; margin:18px 0 8px; }
+.sheet .s-summary{ font-size:13px; }
+.sheet .s-job{ margin-bottom:11px; }
+.sheet .s-job-head{ display:flex; justify-content:space-between; gap:12px; font-weight:700; font-size:13px; }
+.sheet .s-job-sub{ display:flex; justify-content:space-between; gap:12px; font-style:italic; font-size:12px; color:#39434D; }
+.sheet ul{ margin:5px 0 0 18px; }
+.sheet li{ margin-bottom:3px; }
+.sheet .s-skills{ font-size:12.5px; }
+.sheet .s-edu-head{ display:flex; justify-content:space-between; gap:12px; font-size:13px; }
+.sheet mark{ background:var(--hl); padding:0 2px; border-radius:2px; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+.sheet:empty::after{ content:"Your resume preview appears here."; color:var(--ink-faint); font-family:'Public Sans',sans-serif; }
+
+/* ---------- JOBS view ---------- */
+.job-search{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+.job-search input{ flex:1; min-width:230px; }
+.board-links{ display:flex; gap:8px; flex-wrap:wrap; }
+.board-btn{
+  appearance:none; cursor:pointer; border:1.5px solid var(--pen); color:var(--pen); background:#fff;
+  border-radius:999px; padding:7px 14px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:600;
+}
+.board-btn:hover{ background:var(--pen); color:#fff; }
+.roles-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; margin-top:18px; }
+.role-card h3{ font-family:Archivo,sans-serif; font-size:15.5px; font-weight:800; letter-spacing:.02em; margin-bottom:2px; }
+.role-card .why{ font-size:12.5px; color:var(--ink-soft); margin-bottom:10px; }
+.role-card .links{ display:flex; flex-wrap:wrap; gap:6px; }
+.role-card a{
+  font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:600; color:var(--pen);
+  text-decoration:none; border:1px solid #BCCBE4; border-radius:6px; padding:4px 8px; background:#fff;
+}
+.role-card a:hover{ border-color:var(--pen); background:#EFF4FB; }
+.jobs-tip{ margin-top:20px; background:var(--hl-soft); border:1px solid #E8D677; }
+
+/* ---------- TAILOR view ---------- */
+.tailor-setup .rowline{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.tailor-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; align-items:center; }
+#tailorResults{ margin-top:26px; }
+.scoreboard{
+  display:flex; gap:22px; align-items:center; flex-wrap:wrap;
+  border:1px solid var(--edge); border-radius:var(--radius); background:#FBFCFD; padding:16px 20px; margin-bottom:18px;
+}
+.stamp{
+  font-family:Archivo,sans-serif; font-weight:900; text-transform:uppercase; letter-spacing:.09em;
+  font-size:17px; border:3px solid currentColor; border-radius:7px; padding:3px 13px;
+  transform:rotate(-3deg); white-space:nowrap;
+}
+.stamp.red{ color:var(--stamp-red); } .stamp.ink{ color:var(--ink); } .stamp.green{ color:var(--ok); }
+.meter-wrap{ flex:1; min-width:220px; }
+.meter-top{ display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-soft); margin-bottom:5px; }
+.meter{ height:14px; border:1.5px solid var(--ink); border-radius:7px; background:#fff; overflow:hidden; }
+.meter > i{ display:block; height:100%; background:repeating-linear-gradient(-45deg,var(--hl) 0 8px,#F5D93C 8px 16px); border-right:1.5px solid var(--ink); transition:width .5s ease; }
+.score-note{ font-size:12.5px; color:var(--ink-soft); max-width:280px; }
+
+.kw-panel{ margin-bottom:20px; }
+.kw-panel h3, .work-h{ font-family:Archivo,sans-serif; font-weight:800; font-size:15px; letter-spacing:.03em; margin-bottom:8px; }
+.kw-list{ display:flex; flex-wrap:wrap; gap:7px; }
+.kw{
+  font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:600; cursor:default;
+  border-radius:6px; padding:4px 9px; border:1.5px solid; display:inline-flex; align-items:center; gap:6px;
+}
+.kw.hit{ color:var(--ok); border-color:var(--ok); background:var(--ok-soft); }
+.kw.miss{ color:var(--stamp-red); border-style:dashed; border-color:var(--stamp-red); background:var(--red-soft); cursor:pointer; }
+.kw.miss:hover{ background:#F7D9D2; }
+.kw .cnt{ font-size:10.5px; opacity:.75; }
+.kw-drawer{
+  display:none; margin-top:10px; border:1px dashed var(--stamp-red); border-radius:8px;
+  background:#FFF7F5; padding:12px 14px; font-size:13.5px;
+}
+.kw-drawer.open{ display:block; }
+.kw-drawer .d-kw{ font-family:'IBM Plex Mono',monospace; font-weight:600; color:var(--stamp-red); }
+.kw-drawer ul{ margin:7px 0 8px 18px; }
+.kw-drawer .fit{ font-size:12.5px; color:var(--ink-soft); margin-top:6px; }
+.kw-drawer .d-tools{ margin-top:9px; display:flex; gap:8px; flex-wrap:wrap; }
+
+.workspace{ display:grid; grid-template-columns:minmax(340px,11fr) minmax(280px,7fr); gap:24px; align-items:start; }
+.tw-block{ border:1px solid var(--edge); border-radius:var(--radius); background:#fff; padding:16px; margin-bottom:14px; }
+.tw-block .tw-head{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.tw-block .tw-title{ font-weight:700; font-size:15px; }
+.tw-block .tw-sub{ font-size:12.5px; color:var(--ink-soft); font-style:italic; }
+.bullet-row{ display:flex; gap:8px; align-items:flex-start; padding:7px 0; border-top:1px dashed #E2E7EC; }
+.bullet-row:first-of-type{ border-top:none; }
+.bullet-view{ flex:1; font-size:14px; }
+.bullet-view mark{ background:var(--hl); padding:0 2px; border-radius:2px; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+.bullet-edit{ flex:1; display:none; }
+.bullet-row.editing .bullet-view{ display:none; }
+.bullet-row.editing .bullet-edit{ display:block; }
+.tw-summary textarea{ min-height:64px; }
+.skills-edit{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.skill-chip{
+  font-size:13px; border:1px solid var(--edge); background:#F5F7F9; border-radius:999px;
+  padding:3px 10px; display:inline-flex; gap:6px; align-items:center;
+}
+.skill-chip.hl{ background:var(--hl-soft); border-color:#E0CC55; }
+.skill-chip b{ cursor:pointer; color:var(--ink-faint); font-weight:600; }
+.skill-chip b:hover{ color:var(--stamp-red); }
+.skill-add{ width:150px !important; padding:4px 8px !important; font-size:13px !important; }
+.jd-panel{ position:sticky; top:18px; }
+.jd-panel .jd-text{
+  border:1px solid var(--edge); border-radius:var(--radius); background:#FDFDF6;
+  padding:14px 16px; font-size:13px; line-height:1.55; max-height:520px; overflow:auto; white-space:pre-wrap;
+}
+.jd-panel .jd-text mark{ background:var(--hl); padding:0 2px; border-radius:2px; }
+.ai-banner{
+  display:none; background:#EFF4FB; border:1px solid #BCCBE4; border-radius:8px;
+  padding:10px 14px; font-size:13.5px; margin-bottom:14px;
+}
+.ai-banner.show{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center; }
+.final-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; padding-top:16px; border-top:1px solid var(--edge); }
+
+/* ---------- TRACKER view ---------- */
+.tracker-add{ margin-bottom:20px; }
+.tracker-add .rowline{ display:grid; grid-template-columns:1.2fr 1.2fr 1.6fr .9fr auto; gap:10px; align-items:end; }
+.app-row{
+  display:grid; grid-template-columns:auto 1.3fr 1.2fr 1.4fr auto; gap:14px; align-items:center;
+  border:1px solid var(--edge); border-radius:var(--radius); background:#fff; padding:12px 16px; margin-bottom:10px;
+}
+.app-row .co{ font-weight:700; }
+.app-row .co a{ color:var(--pen); text-decoration:none; }
+.app-row .co a:hover{ text-decoration:underline; }
+.app-row .role{ font-size:14px; color:var(--ink-soft); }
+.app-row .notes input{ font-size:13px; padding:6px 9px; }
+.app-row .when{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-faint); }
+.status-sel{
+  font-family:Archivo,sans-serif; font-weight:800; letter-spacing:.05em; text-transform:uppercase; font-size:12px;
+  border:2.5px solid; border-radius:6px; padding:4px 8px; width:auto; background:#fff; transform:rotate(-2deg); cursor:pointer;
+}
+.st-saved{ color:var(--ink-soft); border-color:var(--ink-soft); }
+.st-tailored{ color:var(--pen); border-color:var(--pen); }
+.st-applied{ color:var(--ink); border-color:var(--ink); }
+.st-interview{ color:#8A6D00; border-color:#8A6D00; }
+.st-offer{ color:var(--ok); border-color:var(--ok); }
+.st-rejected{ color:var(--stamp-red); border-color:var(--stamp-red); }
+.tracker-empty{ text-align:center; color:var(--ink-faint); padding:40px 0 30px; font-size:14.5px; }
+.tracker-empty .stamp{ display:inline-block; margin-bottom:12px; }
+
+/* ---------- modal ---------- */
+.modal-back{ display:none; position:fixed; inset:0; background:rgba(27,39,51,.45); z-index:50; align-items:flex-start; justify-content:center; padding:6vh 16px; overflow:auto; }
+.modal-back.open{ display:flex; }
+.modal{ background:#fff; border-radius:12px; box-shadow:0 24px 60px rgba(0,0,0,.3); max-width:600px; width:100%; padding:26px 28px; }
+.modal h3{ font-family:Archivo,sans-serif; font-weight:900; font-size:19px; margin-bottom:6px; }
+.modal .sub{ color:var(--ink-soft); font-size:14px; margin-bottom:16px; }
+.modal .opt{ border:1px solid var(--edge); border-radius:10px; padding:14px 16px; margin-bottom:12px; }
+.modal .opt h4{ font-size:15px; margin-bottom:4px; }
+.modal .opt p{ font-size:13px; color:var(--ink-soft); margin-bottom:10px; }
+.modal .close-x{ float:right; }
+
+/* ---------- toast ---------- */
+#toast{
+  position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(80px);
+  background:var(--ink); color:#fff; font-family:'IBM Plex Mono',monospace; font-size:13px;
+  padding:10px 18px; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.25);
+  transition:transform .25s ease; z-index:99; max-width:90vw; text-align:center;
+}
+#toast.show{ transform:translateX(-50%) translateY(0); }
+
+/* ---------- footer ---------- */
+.site-foot{
+  max-width:1200px; margin:0 auto 40px; padding:0 20px; display:flex; gap:16px; flex-wrap:wrap;
+  justify-content:space-between; align-items:center; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-faint);
+}
+.site-foot a{ color:var(--ink-soft); } .site-foot .foot-tools{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.site-foot button{ appearance:none; border:none; background:none; cursor:pointer; color:var(--ink-soft); font:inherit; text-decoration:underline; }
+
+/* ---------- print ---------- */
+#printSheet{ display:none; }
+@media print{
+  body{ background:#fff; }
+  body > *{ display:none !important; }
+  #printSheet{ display:block !important; }
+  #printSheet .sheet{ border:none; box-shadow:none; padding:0; font-size:11.5pt; }
+  #printSheet .sheet mark{ background:transparent; padding:0; } /* recruiters never see the highlighter */
+  @page{ margin:0.75in; }
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:980px){
+  .resume-grid, .workspace{ grid-template-columns:1fr; }
+  .sheet-wrap, .jd-panel{ position:static; }
+  .tracker-add .rowline{ grid-template-columns:1fr 1fr; }
+  .app-row{ grid-template-columns:auto 1fr; grid-auto-rows:auto; }
+  .sheet{ padding:30px 24px; }
+}
+@media (max-width:560px){
+  .exp-card .rowline, .tailor-setup .rowline, .tracker-add .rowline{ grid-template-columns:1fr; }
+  .ftab{ padding:9px 12px 11px; font-size:12.5px; }
+  .ftab .step{ display:none; }
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="mast-row">
+    <div>
+      <div class="logo-stamp">GET A JOB!</div>
+      <p class="tagline">One resume. <b>Tailored for every posting.</b> Free &amp; private — nothing leaves this browser.</p>
+    </div>
+    <div class="mast-side">RESUME TAILOR + JOB TRACKER<br>remote · client services · account mgmt</div>
+  </div>
+  <nav class="folder-tabs" id="tabs">
+    <button class="ftab" data-tab="resume"><span class="step">1</span>YOUR RESUME</button>
+    <button class="ftab" data-tab="jobs"><span class="step">2</span>FIND JOBS</button>
+    <button class="ftab" data-tab="tailor"><span class="step">3</span>TAILOR IT</button>
+    <button class="ftab" data-tab="tracker"><span class="step">4</span>TRACK APPS</button>
+  </nav>
+</header>
+
+<main class="deskarea">
+
+  <!-- ============ VIEW: RESUME ============ -->
+  <section class="view" id="view-resume">
+    <div class="view-intro">
+      <div>
+        <h2>Build your master resume</h2>
+        <p>Write everything once — every job, every bullet. The Tailor step reshapes this master copy for each posting, so be generous: include the “small” stuff. It’s often transferable gold.</p>
+      </div>
+      <div class="intro-actions">
+        <button class="btn ghost" id="btnSample">Load sample: Sally 🥐</button>
+        <button class="btn danger" id="btnClearResume">Clear</button>
+      </div>
+    </div>
+
+    <div class="resume-grid">
+      <div class="editor-col" id="resumeEditor"><!-- built by JS --></div>
+      <div class="sheet-wrap">
+        <div class="sheet-label">
+          <span>MASTER COPY — live preview</span>
+          <span><button class="btn small ghost" id="btnPrintMaster">🖨 Print / PDF</button></span>
+        </div>
+        <div class="sheet" id="masterPreview"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VIEW: JOBS ============ -->
+  <section class="view" id="view-jobs">
+    <div class="view-intro">
+      <div>
+        <h2>Find remote openings</h2>
+        <p>Pre-filtered searches for remote client services, account manager, and account executive roles. Open a board, find a posting you like, then copy its full job description and bring it to <b>Tailor It</b>.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:6px;">
+      <label class="f">Search any title, everywhere</label>
+      <div class="job-search">
+        <input type="text" id="jobQuery" placeholder="e.g. Client Services Coordinator" value="Account Executive">
+        <div class="board-links" id="customBoards"></div>
+      </div>
+      <p class="hint">Opens the board in a new tab with your search + remote filter pre-applied.</p>
+    </div>
+
+    <div class="roles-grid" id="rolesGrid"></div>
+
+    <div class="card jobs-tip">
+      <b>The loop:</b> find a posting → copy the <i>entire</i> job description → paste it into <b>Tailor It</b> → apply with the tailored version → log it in <b>Track Apps</b>. Ten tailored applications beat a hundred identical ones.
+    </div>
+  </section>
+
+  <!-- ============ VIEW: TAILOR ============ -->
+  <section class="view" id="view-tailor">
+    <div class="view-intro">
+      <div>
+        <h2>Tailor your resume to this job</h2>
+        <p>Paste the job description. We pull out the words the hiring team actually cares about, <mark style="background:var(--hl);padding:0 3px;border-radius:2px;">highlight</mark> what your resume already covers, and help you honestly rework the rest.</p>
+      </div>
+    </div>
+
+    <div class="card tailor-setup">
+      <div class="rowline">
+        <div><label class="f">Company</label><input type="text" id="tCompany" placeholder="Brightline Software"></div>
+        <div><label class="f">Role</label><input type="text" id="tRole" placeholder="Account Executive"></div>
+      </div>
+      <label class="f">Job description — paste the whole thing</label>
+      <textarea id="tJD" rows="9" placeholder="Paste the full posting here: responsibilities, requirements, all of it. More text = better analysis."></textarea>
+      <div class="tailor-actions">
+        <button class="btn blue" id="btnAnalyze">Analyze &amp; highlight →</button>
+        <button class="btn ghost" id="btnSampleJD">Try a sample posting</button>
+        <span class="hint" id="analyzeHint"></span>
+      </div>
+    </div>
+
+    <div id="tailorResults" style="display:none;">
+      <div class="scoreboard">
+        <span class="stamp red" id="scoreStamp">NEEDS WORK</span>
+        <div class="meter-wrap">
+          <div class="meter-top"><span id="scoreLabel">MATCH SCORE</span><span id="scorePct">0%</span></div>
+          <div class="meter"><i id="scoreBar" style="width:0%"></i></div>
+        </div>
+        <p class="score-note" id="scoreNote"></p>
+      </div>
+
+      <div class="kw-panel">
+        <h3>What they’re looking for <span class="hint" style="font-weight:400;">— click a red term for ideas on working it in</span></h3>
+        <div class="kw-list" id="kwList"></div>
+        <div class="kw-drawer" id="kwDrawer"></div>
+      </div>
+
+      <div class="ai-banner" id="aiBanner">
+        <span>✨ <b>AI draft loaded.</b> Read every line — it only reframes what you gave it, but you own what you send.</span>
+        <button class="btn small ghost" id="btnRevertAI">Revert to my version</button>
+      </div>
+
+      <div class="workspace">
+        <div class="work-col">
+          <div class="work-h">Your resume, tailored for <span id="workRole">this role</span></div>
+
+          <div class="tw-block tw-summary">
+            <div class="tw-head"><span class="tw-title">Professional summary</span><span class="hint">rewrite it to mirror the posting</span></div>
+            <textarea id="twSummary"></textarea>
+          </div>
+
+          <div class="tw-block">
+            <div class="tw-head"><span class="tw-title">Skills</span><span class="hint">add the JD’s words for skills you truly have</span></div>
+            <div class="skills-edit" id="twSkills"></div>
+          </div>
+
+          <div id="twExperiences"><!-- experience blocks --></div>
+
+          <div class="final-actions">
+            <button class="btn blue" id="btnAI">✨ AI-tailor with Claude</button>
+            <button class="btn" id="btnPrintTailored">🖨 Print / Save PDF</button>
+            <button class="btn ghost" id="btnCopyText">Copy as text</button>
+            <button class="btn ghost" id="btnCopyPrompt">Copy AI prompt</button>
+            <button class="btn ghost" id="btnLogApp">＋ Log in tracker</button>
+          </div>
+        </div>
+
+        <aside class="jd-panel">
+          <div class="sheet-label"><span>THE POSTING — matches highlighted</span></div>
+          <div class="jd-text" id="jdHighlighted"></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VIEW: TRACKER ============ -->
+  <section class="view" id="view-tracker">
+    <div class="view-intro">
+      <div>
+        <h2>Track your applications</h2>
+        <p>Every application, one desk. Update the stamp as you move through the pipeline — and keep applying while you wait.</p>
+      </div>
+    </div>
+
+    <div class="card tracker-add">
+      <div class="rowline">
+        <div><label class="f">Company</label><input type="text" id="trCompany" placeholder="Brightline Software"></div>
+        <div><label class="f">Role</label><input type="text" id="trRole" placeholder="Account Executive"></div>
+        <div><label class="f">Posting link (optional)</label><input type="url" id="trLink" placeholder="https://…"></div>
+        <div><label class="f">Status</label>
+          <select id="trStatus">
+            <option>Saved</option><option>Tailored</option><option selected>Applied</option>
+            <option>Interview</option><option>Offer</option><option>Rejected</option>
+          </select>
+        </div>
+        <div><button class="btn" id="btnAddApp">Add</button></div>
+      </div>
+    </div>
+
+    <div id="appList"></div>
+  </section>
+
+</main>
+
+<footer class="site-foot">
+  <span>GET A JOB v1.0 · built at <a href="https://drbango.com">drbango.com</a></span>
+  <span class="foot-tools">
+    <span>your data stays on this device</span>
+    <button id="btnExport">export backup</button>
+    <button id="btnImport">import</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none;">
+  </span>
+</footer>
+
+<!-- print target -->
+<div id="printSheet"><div class="sheet" id="printInner"></div></div>
+
+<!-- AI modal -->
+<div class="modal-back" id="aiModal">
+  <div class="modal">
+    <button class="icon-btn close-x" id="aiClose">✕</button>
+    <h3>✨ AI-tailor this resume</h3>
+    <p class="sub">Two ways to get a real AI rewrite. Both use the same rule: <b>reframe, never invent.</b> No fake employers, titles, dates, or numbers.</p>
+    <div class="opt">
+      <h4>Option A — Copy the prompt (free, works anywhere)</h4>
+      <p>Copies a complete prompt — your resume + this job description + tailoring instructions. Paste it into Claude, ChatGPT, or any AI chat, then copy the rewritten bullets back in by hand.</p>
+      <button class="btn ghost" id="btnModalCopyPrompt">Copy the full prompt</button>
+    </div>
+    <div class="opt">
+      <h4>Option B — One-click with a Claude API key</h4>
+      <p>Paste an Anthropic API key (<a href="https://platform.claude.com/" target="_blank" rel="noopener">get one here</a>) and the rewrite happens right in this page. The key is stored only in this browser and sent only to Anthropic.</p>
+      <input type="text" id="apiKeyInput" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+        <button class="btn blue" id="btnRunAI">Tailor it now</button>
+        <button class="btn ghost small" id="btnForgetKey">Forget saved key</button>
+      </div>
+      <p class="hint" id="aiStatus" style="margin-top:8px;"></p>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   GET A JOB v1.0 — resume tailor + job tracker. Single file, localStorage.
+   ===================================================================== */
+
+/* ---------------- state ---------------- */
+const LS_KEY = "getajob_state_v1";
+const LS_API = "getajob_apikey"; /* separate from state so backups never contain it */
+let state = null;
+let uid = () => "id" + Math.random().toString(36).slice(2, 9);
+
+function blankResume(){
+  return { name:"", contact:"", summary:"", skills:[], experience:[], education:[] };
+}
+function blankState(){
+  return {
+    resume: blankResume(),
+    tailor: null,        /* { company, role, jd, keywords, overrides:{summary,skills,bullets:{expId:[..]}}, preAI, aiUsed } */
+    tracker: [],
+    ui: { tab:"resume" }
+  };
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){ state = JSON.parse(raw); }
+  }catch(e){}
+  if(!state || !state.resume) state = blankState();
+  state.resume.skills = state.resume.skills || [];
+  state.resume.experience = state.resume.experience || [];
+  state.resume.education = state.resume.education || [];
+  state.tracker = state.tracker || [];
+  state.ui = state.ui || { tab:"resume" };
+}
+let saveT = null;
+function save(){
+  clearTimeout(saveT);
+  saveT = setTimeout(()=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }, 250);
+}
+
+/* ---------------- tiny helpers ---------------- */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+function esc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove("show"), 2600);
+}
+function copyText(text, okMsg){
+  const done = ()=>toast(okMsg||"Copied.");
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done, ()=>fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); }catch(e){}
+  document.body.removeChild(ta); done();
+}
+
+/* =====================================================================
+   KEYWORD ENGINE
+   ===================================================================== */
+const TAXONOMY = [
+  /* [term, weight, category] — categories feed the suggestion phrasebook */
+  ["account management",3,"rel"],["account executive",3,"sales"],["account manager",3,"rel"],
+  ["client services",3,"rel"],["client relationships",3,"rel"],["customer relationships",3,"rel"],
+  ["relationship building",3,"rel"],["customer success",3,"rel"],["book of business",3,"rel"],
+  ["client onboarding",3,"rel"],["onboarding",3,"rel"],["stakeholders",3,"rel"],["point of contact",2,"rel"],
+  ["account growth",2,"sales"],["retention",3,"ret"],["renewals",3,"ret"],["churn",2,"ret"],
+  ["upsell",3,"sales"],["cross-sell",3,"sales"],["quota",3,"sales"],["pipeline",3,"sales"],
+  ["prospecting",3,"sales"],["cold calling",3,"sales"],["cold calls",3,"sales"],["outbound",2,"sales"],
+  ["inbound",2,"sales"],["lead generation",2,"sales"],["discovery calls",2,"sales"],["demos",2,"sales"],
+  ["negotiation",3,"sales"],["closing",2,"sales"],["revenue",2,"sales"],["sales targets",3,"sales"],
+  ["forecasting",2,"sales"],["territory",2,"sales"],["deal cycle",2,"sales"],["win rate",2,"sales"],
+  ["crm",3,"tools"],["salesforce",3,"tools"],["hubspot",3,"tools"],["zendesk",2,"tools"],
+  ["google workspace",2,"tools"],["microsoft office",2,"tools"],["excel",2,"tools"],["powerpoint",1,"tools"],
+  ["slack",1,"tools"],["zoom",1,"tools"],["spreadsheets",2,"tools"],["data analysis",2,"tools"],
+  ["reporting",2,"tools"],["dashboards",1,"tools"],
+  ["escalations",2,"svc"],["customer service",2,"svc"],["conflict resolution",2,"svc"],
+  ["problem solving",2,"svc"],["complaints",1,"svc"],["empathy",1,"svc"],["active listening",2,"svc"],
+  ["sla",2,"ops"],["slas",2,"ops"],["kpi",2,"ops"],["kpis",2,"ops"],["nps",2,"ops"],["csat",2,"ops"],
+  ["qbr",2,"ops"],["qbrs",2,"ops"],["project management",2,"ops"],["time management",2,"ops"],
+  ["prioritization",2,"ops"],["deadlines",2,"ops"],["fast-paced",1,"ops"],["multitask",1,"ops"],
+  ["attention to detail",2,"ops"],["organized",1,"ops"],["inventory",1,"ops"],["scheduling",1,"ops"],
+  ["cash handling",1,"ops"],["pos",1,"tools"],["process improvement",2,"ops"],
+  ["communication",2,"comms"],["communication skills",2,"comms"],["presentation",2,"comms"],
+  ["presentations",2,"comms"],["written communication",2,"comms"],["verbal communication",2,"comms"],
+  ["collaboration",2,"comms"],["cross-functional",2,"comms"],["follow-up",2,"comms"],
+  ["training",1,"comms"],["mentoring",1,"comms"],["team player",1,"comms"],["teamwork",1,"comms"],
+  ["self-starter",1,"ops"],["saas",2,"sales"],["b2b",2,"sales"],["contracts",2,"sales"],
+  ["client retention",3,"ret"],["customer experience",2,"svc"],["remote",1,"ops"]
+];
+const STOP = new Set(("a,about,above,after,again,against,all,am,an,and,any,are,as,at,be,because,been,before,being,below,between,both,but,by,can,could,did,do,does,doing,down,during,each,few,for,from,further,had,has,have,having,he,her,here,hers,him,his,how,i,if,in,into,is,it,its,itself,just,ll,me,more,most,my,no,nor,not,now,of,off,on,once,only,or,other,our,ours,out,over,own,re,s,same,she,should,so,some,such,t,than,that,the,their,theirs,them,then,there,these,they,this,those,through,to,too,under,until,up,ve,very,was,we,were,what,when,where,which,while,who,whom,why,will,with,you,your,yours,yourself," +
+"job,role,position,company,team,work,working,candidate,candidates,applicants,apply,application,ideal,looking,seeking,join,us,who,plus,bonus,required,requirements,preferred,qualifications,responsibilities,duties,years,year,experience,experienced,ability,able,strong,excellent,good,great,skills,skill,including,include,includes,etc,eg,ie,within,across,various,related,relevant,must,may,want,like,new,help,ensure,provide,support,per,day,week,daily,weekly,monthly,every,type,types,based,using,use,used,well,high,level,levels,degree,bachelor,bachelors,equivalent,full,time,full-time,part,part-time,benefits,salary,pay,paid,insurance,pto,vacation,401k,dental,vision,equal,opportunity,employer,diversity,employment,offer,offers,environment,culture,mission,other,others,someone,person,people,make,made,get,take,drive,driven,proven,track,record,detail,oriented,-,–,—").split(","));
+
+function stemWord(w){
+  return w.length > 4 ? w.replace(/(ings|ing|ies|ied|ers|es|ed|s)$/,"") : w;
+}
+function norm(w){ return stemWord(w.toLowerCase()); }
+function escRe(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
+/* regex matching a term with light stem flexibility:
+   "cold calling" must hit "cold-called", "renewals" must hit "renewal", etc. */
+function termRegex(term){
+  const parts = term.trim().split(/[\s\-\/]+/).map(w=>{
+    const s = stemWord(w.toLowerCase());
+    return s.length > 2 ? escRe(s) + "(?:e|es|ed|d|y|ies|ing|ings|er|ers|s)?" : escRe(w);
+  });
+  return new RegExp("\\b" + parts.join("[\\s\\-\\/]+") + "\\b","gi");
+}
+function countMatches(re, text){
+  re.lastIndex = 0; let n = 0;
+  while(re.exec(text)) n++;
+  return n;
+}
+
+function extractKeywords(jd){
+  const text = jd.toLowerCase();
+  const picked = [];   /* {term, weight, cat, jdCount, re} */
+  const covered = new Set();
+
+  /* 1) taxonomy terms, longest first so phrases beat their own words */
+  const tax = TAXONOMY.slice().sort((a,b)=>b[0].length - a[0].length);
+  for(const [term,weight,cat] of tax){
+    const re = termRegex(term);
+    const c = countMatches(re, text);
+    if(c > 0){
+      const inside = picked.some(p => p.term.includes(term) && p.jdCount >= c);
+      if(!inside && !covered.has(term)){
+        picked.push({term, weight, cat, jdCount:c, re});
+        term.split(/[\s\-\/]+/).forEach(w=>covered.add(norm(w)));
+        covered.add(term);
+      }
+    }
+  }
+
+  /* 2) generic frequent words the taxonomy missed */
+  const tokens = text.replace(/[^a-z0-9\s\-]/g," ").split(/\s+/).filter(Boolean);
+  const uni = {};
+  for(const t of tokens){
+    if(t.length < 4 || STOP.has(t) || /^\d+$/.test(t)) continue;
+    const n = norm(t);
+    if(covered.has(n)) continue;
+    uni[n] = uni[n] || { count:0, display:t };
+    uni[n].count++;
+    if(t.length < uni[n].display.length) uni[n].display = t;
+  }
+  const gen = Object.values(uni).filter(u=>u.count >= 3)
+    .sort((a,b)=>b.count - a.count).slice(0,6);
+  for(const g of gen){
+    picked.push({ term:g.display, weight:1, cat:"gen", jdCount:g.count, re:termRegex(g.display) });
+  }
+
+  /* rank: weight desc, then frequency desc; cap the list */
+  picked.sort((a,b)=> (b.weight - a.weight) || (b.jdCount - a.jdCount));
+  return picked.slice(0,18);
+}
+
+function resumePlainText(overridden){
+  const r = state.resume, o = overridden ? effectiveTailored() : null;
+  const parts = [];
+  parts.push(o ? o.summary : r.summary);
+  parts.push((o ? o.skills : r.skills).join(" "));
+  for(const ex of r.experience){
+    parts.push(ex.title + " " + ex.org);
+    const bullets = o && o.bullets[ex.id] ? o.bullets[ex.id] : ex.bullets;
+    parts.push(bullets.join(" "));
+  }
+  for(const ed of r.education) parts.push([ed.school, ed.degree, ed.extra].join(" "));
+  return parts.join("\n").toLowerCase();
+}
+
+function scoreKeywords(){
+  const t = state.tailor; if(!t) return { pct:0, hits:0, total:0 };
+  const body = resumePlainText(true);
+  let got = 0, tot = 0, hits = 0;
+  for(const k of t.keywords){
+    const re = termRegex(k.term);
+    k.resCount = countMatches(re, body);
+    tot += k.weight;
+    if(k.resCount > 0){ got += k.weight; hits++; }
+  }
+  const pct = tot ? Math.round(100 * got / tot) : 0;
+  return { pct, hits, total:t.keywords.length };
+}
+
+/* ---------------- suggestion phrasebook ---------------- */
+const PHRASEBOOK = {
+  rel: [
+    "Built ongoing relationships with [regulars / repeat clients], becoming their go-to contact for [orders, questions, issues]",
+    "Owned the full customer relationship from first hello to follow-up — greeting, understanding needs, and making sure they came back"
+  ],
+  sales: [
+    "Recommended add-ons and upgrades at the [counter / register], lifting the average order",
+    "Pitched [products / packages] to new and returning customers and closed the sale on the spot"
+  ],
+  ret: [
+    "Turned first-time visitors into regulars through consistent service and remembering their usual order",
+    "Won back unhappy customers by fixing problems fast — keeping the relationship (and the revenue)"
+  ],
+  ops: [
+    "Kept [orders / inventory / schedules] on track under daily deadlines during peak rushes",
+    "Juggled competing priorities in a fast-paced environment without dropping the details"
+  ],
+  comms: [
+    "Communicated across customers, teammates, and vendors to keep every order moving",
+    "Trained and coached new team members on [systems, service standards, daily routines]"
+  ],
+  svc: [
+    "Resolved complaints on the spot, protecting the relationship and the sale",
+    "Listened first, then fixed it — de-escalated tough moments into repeat business"
+  ],
+  tools: [
+    "Picked up new systems quickly ([POS, spreadsheets, scheduling apps]) with no formal training",
+    "Tracked [sales / orders / inventory] in [spreadsheets / the POS] and reported totals to the owner"
+  ],
+  gen: [
+    "Work it into the bullet where it genuinely happened — mirror the posting’s exact word",
+    "If it’s a skill you have, add it to your Skills line using the posting’s wording"
+  ]
+};
+
+/* =====================================================================
+   SAMPLE DATA — Sally, straight out of Buffalo
+   ===================================================================== */
+function sampleResume(){
+  return {
+    name: "Sally Bennett",
+    contact: "Buffalo, NY · (716) 555-0148 · sally.bennett@email.com · linkedin.com/in/sallybennett",
+    summary: "Recent communications graduate who spent four years on the busiest counter in Elmwood Village. Comfortable talking to anyone, keeping ten orders straight at once, and turning first-timers into regulars.",
+    skills: ["Customer service","POS systems (Square)","Google Workspace","Canva","Scheduling","Cash handling","Social media"],
+    experience: [
+      { id:"exp_bakery", title:"Shift Lead (promoted from Counter Staff)", org:"Sweet Loaf Bakery", loc:"Buffalo, NY", start:"2022", end:"2026", bullets:[
+        "Ran the front counter through 200+ customer morning rushes, keeping the line moving and the orders right",
+        "Knew 50+ regulars by name and by order; customers asked for me by name for custom cake consultations",
+        "Handled custom order intake from first call to pickup — quotes, changes, deadlines, and the occasional crisis",
+        "Trained 6 new hires on the register, food safety, and how we talk to customers",
+        "Balanced the register and closed out daily sales; flagged and fixed a recurring $40/week till discrepancy",
+        "Resolved complaints in person and by phone — refunds, remakes, and saving the relationship",
+        "Made a lot of coffee. A lot of coffee.",
+        "Posted daily specials to Instagram and Facebook, growing the page to 2,300 followers"
+      ]},
+      { id:"exp_paper", title:"Ad Sales Associate", org:"The Spectrum (campus newspaper)", loc:"University at Buffalo", start:"2024", end:"2026", bullets:[
+        "Cold-called and emailed local businesses to sell print and web ad packages",
+        "Managed a list of 30 returning advertisers — renewals, upsells to bigger placements, and check-ins",
+        "Hit or beat the weekly sales target 11 of 14 weeks in spring semester",
+        "Wrote my own outreach scripts and tracked every lead in a spreadsheet"
+      ]}
+    ],
+    education: [
+      { id:"edu_ub", school:"University at Buffalo (SUNY)", degree:"B.A. Communications", year:"2026", extra:"Dean's List (3 semesters) · VP, Communications Club · Intro to Marketing, Public Speaking, Interpersonal Comm" }
+    ]
+  };
+}
+const SAMPLE_JD = `Account Executive (Remote — US)
+Brightline Software · Full-time
+
+Brightline makes scheduling software for independent food and retail businesses. We're a 40-person remote team looking for an Account Executive to own the full sales cycle for our small-business segment.
+
+What you'll do
+- Own a pipeline of inbound and outbound leads from first discovery call to close
+- Run product demos over Zoom tailored to each prospect's business
+- Manage client relationships after the sale, partnering with Customer Success on onboarding and renewals
+- Prospect via cold calling and email outreach to local retail and food-service businesses
+- Consistently hit a monthly quota and keep your pipeline and forecasting updated in our CRM (HubSpot)
+- Handle objections and negotiation on pricing and contracts
+- Communicate customer feedback to the product team
+
+What we're looking for
+- Excellent communication skills — written and verbal — and real empathy for small-business owners
+- Experience in customer service, retail, food service, or another customer-facing role
+- Proven relationship building: you turn one-time buyers into repeat customers
+- Comfortable in a fast-paced environment with strong time management and attention to detail
+- Self-starter who is organized and can multitask without dropping the ball
+- Familiarity with a CRM (HubSpot, Salesforce) and Google Workspace a plus
+- Retention mindset: you care about renewals and churn, not just closing
+
+Nice to have
+- Experience with upsell / cross-sell motions
+- Training or mentoring experience
+
+Remote-first. Base + commission. We hire for hustle and coachability over resumes — this is a great first Account Executive role.`;
+
+/* =====================================================================
+   TABS
+   ===================================================================== */
+function setTab(tab, push){
+  state.ui.tab = tab; save();
+  $$(".ftab").forEach(b=>b.classList.toggle("active", b.dataset.tab === tab));
+  $$(".view").forEach(v=>v.classList.toggle("active", v.id === "view-"+tab));
+  if(push !== false){ try{ history.replaceState(null,"","#"+tab); }catch(e){} }
+  window.scrollTo({top:0});
+}
+$("#tabs").addEventListener("click", e=>{
+  const b = e.target.closest(".ftab"); if(b) setTab(b.dataset.tab);
+});
+
+/* =====================================================================
+   RESUME VIEW
+   ===================================================================== */
+function buildResumeEditor(){
+  const r = state.resume;
+  const el = $("#resumeEditor");
+  const expCards = r.experience.map((ex,i)=>`
+    <div class="card exp-card" data-exp="${ex.id}">
+      <div class="card-tools">
+        <button class="icon-btn" data-act="up" title="Move up">↑</button>
+        <button class="icon-btn" data-act="down" title="Move down">↓</button>
+        <button class="icon-btn" data-act="del" title="Remove">✕</button>
+      </div>
+      <label class="f">Job title</label>
+      <input type="text" data-k="title" value="${esc(ex.title)}" placeholder="Counter Staff / Shift Lead">
+      <div class="rowline">
+        <div><label class="f">Company</label><input type="text" data-k="org" value="${esc(ex.org)}" placeholder="Sweet Loaf Bakery"></div>
+        <div><label class="f">Location</label><input type="text" data-k="loc" value="${esc(ex.loc)}" placeholder="Buffalo, NY"></div>
+      </div>
+      <div class="rowline">
+        <div><label class="f">Start</label><input type="text" data-k="start" value="${esc(ex.start)}" placeholder="2022"></div>
+        <div><label class="f">End</label><input type="text" data-k="end" value="${esc(ex.end)}" placeholder="present"></div>
+      </div>
+      <label class="f">What you did — one bullet per line</label>
+      <textarea data-k="bullets" rows="6" placeholder="Ran the front counter through 200+ customer morning rushes…">${esc(ex.bullets.join("\n"))}</textarea>
+    </div>`).join("");
+
+  const eduCards = r.education.map(ed=>`
+    <div class="card exp-card" data-edu="${ed.id}">
+      <div class="card-tools"><button class="icon-btn" data-act="del" title="Remove">✕</button></div>
+      <div class="rowline">
+        <div><label class="f">School</label><input type="text" data-k="school" value="${esc(ed.school)}" placeholder="University at Buffalo (SUNY)"></div>
+        <div><label class="f">Year</label><input type="text" data-k="year" value="${esc(ed.year)}" placeholder="2026"></div>
+      </div>
+      <label class="f">Degree</label>
+      <input type="text" data-k="degree" value="${esc(ed.degree)}" placeholder="B.A. Communications">
+      <label class="f">Honors, activities, coursework (optional)</label>
+      <input type="text" data-k="extra" value="${esc(ed.extra)}" placeholder="Dean's List · VP, Communications Club">
+    </div>`).join("");
+
+  el.innerHTML = `
+    <div class="card">
+      <label class="f">Full name</label>
+      <input type="text" data-r="name" value="${esc(r.name)}" placeholder="Sally Bennett">
+      <label class="f">Contact line</label>
+      <input type="text" data-r="contact" value="${esc(r.contact)}" placeholder="Buffalo, NY · (716) 555-0148 · you@email.com">
+      <label class="f">Professional summary</label>
+      <textarea data-r="summary" rows="3" placeholder="Two or three sentences on who you are and what you bring.">${esc(r.summary)}</textarea>
+      <label class="f">Skills — comma separated</label>
+      <input type="text" data-r="skills" value="${esc(r.skills.join(", "))}" placeholder="Customer service, POS systems, Google Workspace">
+    </div>
+    ${expCards}
+    ${eduCards}
+    <div class="add-row">
+      <button class="btn ghost" id="btnAddExp">＋ Add a job</button>
+      <button class="btn ghost" id="btnAddEdu">＋ Add education</button>
+    </div>`;
+
+  $("#btnAddExp").onclick = ()=>{
+    r.experience.push({id:uid(), title:"", org:"", loc:"", start:"", end:"", bullets:[]});
+    buildResumeEditor(); renderMaster(); save();
+  };
+  $("#btnAddEdu").onclick = ()=>{
+    r.education.push({id:uid(), school:"", degree:"", year:"", extra:""});
+    buildResumeEditor(); renderMaster(); save();
+  };
+}
+
+$("#resumeEditor").addEventListener("input", e=>{
+  const r = state.resume, t = e.target;
+  if(t.dataset.r){
+    if(t.dataset.r === "skills") r.skills = t.value.split(",").map(s=>s.trim()).filter(Boolean);
+    else r[t.dataset.r] = t.value;
+  } else {
+    const expEl = t.closest("[data-exp]"), eduEl = t.closest("[data-edu]");
+    if(expEl){
+      const ex = r.experience.find(x=>x.id === expEl.dataset.exp);
+      if(ex){
+        if(t.dataset.k === "bullets") ex.bullets = t.value.split("\n").map(s=>s.replace(/^[-•]\s*/,"").trim()).filter(Boolean);
+        else ex[t.dataset.k] = t.value;
+      }
+    } else if(eduEl){
+      const ed = r.education.find(x=>x.id === eduEl.dataset.edu);
+      if(ed) ed[t.dataset.k] = t.value;
+    }
+  }
+  renderMaster(); save();
+});
+$("#resumeEditor").addEventListener("click", e=>{
+  const b = e.target.closest(".icon-btn"); if(!b) return;
+  const r = state.resume;
+  const expEl = b.closest("[data-exp]"), eduEl = b.closest("[data-edu]");
+  if(expEl){
+    const i = r.experience.findIndex(x=>x.id === expEl.dataset.exp);
+    if(b.dataset.act === "del") r.experience.splice(i,1);
+    if(b.dataset.act === "up" && i > 0) r.experience.splice(i-1,0,r.experience.splice(i,1)[0]);
+    if(b.dataset.act === "down" && i < r.experience.length-1) r.experience.splice(i+1,0,r.experience.splice(i,1)[0]);
+  } else if(eduEl && b.dataset.act === "del"){
+    const i = r.education.findIndex(x=>x.id === eduEl.dataset.edu);
+    r.education.splice(i,1);
+  } else return;
+  buildResumeEditor(); renderMaster(); save();
+});
+
+/* sheet HTML (shared by preview + print + tailored) */
+function sheetHTML(opts){
+  const r = state.resume;
+  const o = opts && opts.tailored ? effectiveTailored() : null;
+  const marks = opts && opts.marks ? opts.marks : null;
+  const M = txt => marks ? highlight(txt, marks) : esc(txt);
+  const summary = o ? o.summary : r.summary;
+  const skills = o ? o.skills : r.skills;
+  if(!r.name && !summary && !r.experience.length) return "";
+  let h = "";
+  if(r.name) h += `<div class="s-name">${esc(r.name)}</div>`;
+  if(r.contact) h += `<div class="s-contact">${esc(r.contact)}</div>`;
+  if(summary) h += `<div class="s-h">Summary</div><p class="s-summary">${M(summary)}</p>`;
+  if(skills.length) h += `<div class="s-h">Skills</div><p class="s-skills">${M(skills.join(" · "))}</p>`;
+  if(r.experience.length){
+    h += `<div class="s-h">Experience</div>`;
+    for(const ex of r.experience){
+      const bullets = o && o.bullets[ex.id] ? o.bullets[ex.id] : ex.bullets;
+      h += `<div class="s-job">
+        <div class="s-job-head"><span>${esc(ex.title||"")}</span><span>${esc([ex.start,ex.end].filter(Boolean).join("–"))}</span></div>
+        <div class="s-job-sub"><span>${esc(ex.org||"")}</span><span>${esc(ex.loc||"")}</span></div>
+        <ul>${bullets.map(b=>`<li>${M(b)}</li>`).join("")}</ul>
+      </div>`;
+    }
+  }
+  if(r.education.length){
+    h += `<div class="s-h">Education</div>`;
+    for(const ed of r.education){
+      h += `<div class="s-job">
+        <div class="s-edu-head"><span><b>${esc(ed.school||"")}</b> — ${esc(ed.degree||"")}</span><span>${esc(ed.year||"")}</span></div>
+        ${ed.extra ? `<div style="font-size:12px;color:#39434D;">${esc(ed.extra)}</div>` : ""}
+      </div>`;
+    }
+  }
+  return h;
+}
+function renderMaster(){ $("#masterPreview").innerHTML = sheetHTML({}); }
+
+/* highlight text against a list of {re} keyword regexes (escape-safe) */
+function highlight(text, kws){
+  let out = esc(text);
+  const found = [];
+  kws.forEach((k,i)=>{
+    const re = new RegExp(k.re.source, "gi");
+    out = out.replace(re, m=>{ found.push(m); return "\x01"+(found.length-1)+"\x02"; });
+  });
+  return out.replace(/\x01(\d+)\x02/g, (_,i)=>"<mark>"+esc(found[+i])+"</mark>");
+}
+
+/* =====================================================================
+   JOBS VIEW
+   ===================================================================== */
+const BOARDS = [
+  { name:"LinkedIn",  url:q=>`https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(q)}&f_WT=2` },
+  { name:"Indeed",    url:q=>`https://www.indeed.com/jobs?q=${encodeURIComponent(q)}&l=Remote` },
+  { name:"WWRemotely",url:q=>`https://weworkremotely.com/remote-jobs/search?term=${encodeURIComponent(q)}` },
+  { name:"BuiltIn",   url:q=>`https://builtin.com/jobs/remote?search=${encodeURIComponent(q)}` },
+  { name:"Wellfound", url:q=>`https://wellfound.com/jobs?q=${encodeURIComponent(q)}` },
+  { name:"Google Jobs", url:q=>`https://www.google.com/search?q=${encodeURIComponent('"'+q+'" remote jobs')}&ibp=htl;jobs` }
+];
+const ROLES = [
+  { title:"Account Executive", why:"Own the sale start to finish. Commission upside; great fit if you like the close.", q:"Account Executive" },
+  { title:"Account Manager", why:"Keep and grow existing clients. The relationship side of revenue.", q:"Account Manager" },
+  { title:"Client Services Rep", why:"The front door of the company. Every service job you've had counts here.", q:"Client Services Representative" },
+  { title:"Customer Success Manager", why:"Onboarding, renewals, retention — client services with a SaaS badge.", q:"Customer Success Manager" },
+  { title:"Sales Development Rep", why:"The classic entry ramp to Account Executive. Prospecting + cold outreach.", q:"Sales Development Representative" },
+  { title:"Client Services Coordinator", why:"Organization-heavy, great first rung into account teams.", q:"Client Services Coordinator" }
+];
+function buildJobs(){
+  $("#rolesGrid").innerHTML = ROLES.map(r=>`
+    <div class="card role-card">
+      <h3>${r.title}</h3>
+      <p class="why">${r.why}</p>
+      <div class="links">${BOARDS.map(b=>`<a href="${b.url(r.q)}" target="_blank" rel="noopener">${b.name} ↗</a>`).join("")}</div>
+    </div>`).join("");
+  $("#customBoards").innerHTML = BOARDS.map((b,i)=>`<button class="board-btn" data-b="${i}">${b.name} ↗</button>`).join("");
+}
+$("#customBoards").addEventListener("click", e=>{
+  const btn = e.target.closest(".board-btn"); if(!btn) return;
+  const q = $("#jobQuery").value.trim() || "Account Executive";
+  window.open(BOARDS[+btn.dataset.b].url(q), "_blank", "noopener");
+});
+
+/* =====================================================================
+   TAILOR VIEW
+   ===================================================================== */
+function effectiveTailored(){
+  const t = state.tailor, r = state.resume;
+  if(!t) return null;
+  return {
+    summary: t.overrides.summary ?? r.summary,
+    skills: t.overrides.skills ?? r.skills.slice(),
+    bullets: t.overrides.bullets || {}
+  };
+}
+
+$("#btnSampleJD").onclick = ()=>{
+  $("#tCompany").value = "Brightline Software";
+  $("#tRole").value = "Account Executive";
+  $("#tJD").value = SAMPLE_JD;
+  if(!state.resume.name){ $("#analyzeHint").textContent = "Tip: load Sally's sample resume in step 1 to see the full demo."; }
+  toast("Sample posting loaded — hit Analyze.");
+};
+
+$("#btnAnalyze").onclick = ()=>{
+  const jd = $("#tJD").value.trim();
+  if(jd.length < 120){ toast("Paste the full job description (the more, the better)."); return; }
+  if(!state.resume.name && !state.resume.experience.length){
+    toast("Build your resume in step 1 first (or load Sally's sample).");
+    return;
+  }
+  state.tailor = {
+    company: $("#tCompany").value.trim(),
+    role: $("#tRole").value.trim(),
+    jd,
+    keywords: extractKeywords(jd),
+    overrides: { summary:null, skills:null, bullets:{} },
+    preAI: null, aiUsed:false
+  };
+  save();
+  renderTailor();
+  $("#tailorResults").style.display = "block";
+  $("#tailorResults").scrollIntoView({behavior:"smooth", block:"start"});
+};
+
+function renderTailor(){
+  const t = state.tailor; if(!t) return;
+  /* keywords need live regexes after a state reload */
+  t.keywords.forEach(k=>{ if(!k.re || !(k.re instanceof RegExp)) k.re = termRegex(k.term); });
+
+  $("#workRole").textContent = [t.role, t.company].filter(Boolean).join(" @ ") || "this role";
+  renderScore();
+  renderKeywordChips();
+  renderWorkspace();
+  $("#jdHighlighted").innerHTML = highlight(t.jd, t.keywords);
+  $("#aiBanner").classList.toggle("show", !!t.aiUsed);
+}
+
+function renderScore(){
+  const {pct, hits, total} = scoreKeywords();
+  $("#scorePct").textContent = pct + "%";
+  $("#scoreBar").style.width = pct + "%";
+  $("#scoreBar").style.borderRight = pct ? "" : "none";
+  const stamp = $("#scoreStamp");
+  stamp.classList.remove("red","ink","green");
+  if(pct >= 80){ stamp.textContent = "STRONG MATCH"; stamp.classList.add("green"); }
+  else if(pct >= 55){ stamp.textContent = "ALMOST THERE"; stamp.classList.add("ink"); }
+  else { stamp.textContent = "NEEDS WORK"; stamp.classList.add("red"); }
+  $("#scoreNote").textContent = `Your resume covers ${hits} of ${total} key terms from this posting. Work in the red ones you honestly have — even a few points helps you clear the first screen.`;
+}
+
+let openDrawerKw = null;
+function renderKeywordChips(){
+  const t = state.tailor;
+  $("#kwList").innerHTML = t.keywords.map((k,i)=>{
+    const hit = k.resCount > 0;
+    return `<span class="kw ${hit?"hit":"miss"}" data-kw="${i}">${hit?"✓":"＋"} ${esc(k.term)} <span class="cnt">${hit ? "×"+k.resCount : "in posting ×"+k.jdCount}</span></span>`;
+  }).join("");
+  const dr = $("#kwDrawer");
+  if(openDrawerKw === null){ dr.classList.remove("open"); dr.innerHTML = ""; }
+}
+$("#kwList").addEventListener("click", e=>{
+  const chip = e.target.closest(".kw.miss"); if(!chip) return;
+  const t = state.tailor, i = +chip.dataset.kw, k = t.keywords[i];
+  const dr = $("#kwDrawer");
+  if(openDrawerKw === i){ openDrawerKw = null; dr.classList.remove("open"); return; }
+  openDrawerKw = i;
+  const ideas = (PHRASEBOOK[k.cat] || PHRASEBOOK.gen);
+  const fit = bestFitBullet(k);
+  dr.innerHTML = `
+    <div><b class="d-kw">“${esc(k.term)}”</b> shows up ${k.jdCount}× in the posting but isn’t on your resume yet. If it’s true of you, borrow their exact wording:</div>
+    <ul>${ideas.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>
+    ${fit ? `<div class="fit"><b>Likely spot:</b> your bullet “${esc(fit.text.slice(0,90))}${fit.text.length>90?"…":""}” <i>(${esc(fit.org)})</i></div>` : ""}
+    <div class="d-tools">
+      <button class="btn small ghost" data-addskill="${esc(k.term)}">＋ Add to skills</button>
+      <span class="hint">Only claim what’s real — interviews follow resumes.</span>
+    </div>`;
+  dr.classList.add("open");
+});
+$("#kwDrawer").addEventListener("click", e=>{
+  const b = e.target.closest("[data-addskill]"); if(!b) return;
+  const t = state.tailor;
+  const skills = t.overrides.skills ?? state.resume.skills.slice();
+  if(!skills.some(s=>s.toLowerCase() === b.dataset.addskill.toLowerCase())){
+    skills.push(b.dataset.addskill);
+    t.overrides.skills = skills; save();
+    openDrawerKw = null;
+    renderTailor();
+    toast("Added to skills for this application.");
+  }
+});
+/* find the master bullet most related to a missing keyword's category */
+function bestFitBullet(k){
+  const catTerms = TAXONOMY.filter(x=>x[2] === k.cat).map(x=>x[0]);
+  let best = null, bestScore = 0;
+  for(const ex of state.resume.experience){
+    for(const b of ex.bullets){
+      let s = 0;
+      const low = b.toLowerCase();
+      for(const ct of catTerms){ if(countMatches(termRegex(ct), low)) s++; }
+      if(s > bestScore){ bestScore = s; best = { text:b, org:ex.org }; }
+    }
+  }
+  return best;
+}
+
+function renderWorkspace(){
+  const t = state.tailor, r = state.resume, eff = effectiveTailored();
+  $("#twSummary").value = eff.summary || "";
+  /* skills */
+  $("#twSkills").innerHTML = eff.skills.map((s,i)=>{
+    const isNew = !r.skills.some(x=>x.toLowerCase() === s.toLowerCase());
+    return `<span class="skill-chip ${isNew?"hl":""}">${esc(s)} <b data-rmskill="${i}" title="Remove for this application">✕</b></span>`;
+  }).join("") + `<input type="text" class="skill-add" id="skillAdd" placeholder="＋ add skill…">`;
+  /* experiences */
+  $("#twExperiences").innerHTML = r.experience.map(ex=>{
+    const bullets = eff.bullets[ex.id] || ex.bullets;
+    return `<div class="tw-block" data-twexp="${ex.id}">
+      <div class="tw-head">
+        <span class="tw-title">${esc(ex.title)} — ${esc(ex.org)}</span>
+        <button class="btn small ghost" data-sort="${ex.id}">Sort bullets by match</button>
+      </div>
+      ${bullets.map((b,bi)=>`
+        <div class="bullet-row" data-bi="${bi}">
+          <div class="bullet-view">• ${highlight(b, t.keywords)}</div>
+          <div class="bullet-edit"><textarea rows="2" data-bedit>${esc(b)}</textarea></div>
+          <button class="icon-btn" data-beditbtn title="Edit this bullet">✎</button>
+        </div>`).join("")}
+    </div>`;
+  }).join("");
+}
+
+/* summary editing */
+$("#twSummary").addEventListener("input", e=>{
+  const t = state.tailor; if(!t) return;
+  t.overrides.summary = e.target.value; save();
+  debounceScore();
+});
+/* skills add/remove (delegated) */
+$("#twSkills").addEventListener("click", e=>{
+  const rm = e.target.closest("[data-rmskill]"); if(!rm) return;
+  const t = state.tailor;
+  const skills = t.overrides.skills ?? state.resume.skills.slice();
+  skills.splice(+rm.dataset.rmskill,1);
+  t.overrides.skills = skills; save(); renderTailor();
+});
+$("#twSkills").addEventListener("keydown", e=>{
+  if(e.target.id === "skillAdd" && e.key === "Enter"){
+    e.preventDefault();
+    const v = e.target.value.trim(); if(!v) return;
+    const t = state.tailor;
+    const skills = t.overrides.skills ?? state.resume.skills.slice();
+    skills.push(v); t.overrides.skills = skills; save(); renderTailor();
+    setTimeout(()=>{ const el = $("#skillAdd"); if(el) el.focus(); },0);
+  }
+});
+/* bullet edit + sort (delegated) */
+$("#twExperiences").addEventListener("click", e=>{
+  const editBtn = e.target.closest("[data-beditbtn]");
+  if(editBtn){
+    const row = editBtn.closest(".bullet-row");
+    row.classList.toggle("editing");
+    if(row.classList.contains("editing")){
+      editBtn.textContent = "✓"; row.querySelector("textarea").focus();
+    } else {
+      editBtn.textContent = "✎";
+      commitBullet(row);
+    }
+    return;
+  }
+  const sortBtn = e.target.closest("[data-sort]");
+  if(sortBtn){
+    const t = state.tailor, ex = state.resume.experience.find(x=>x.id === sortBtn.dataset.sort);
+    const bullets = (t.overrides.bullets[ex.id] || ex.bullets).slice();
+    bullets.sort((a,b)=> bulletScore(b) - bulletScore(a));
+    t.overrides.bullets[ex.id] = bullets; save(); renderTailor();
+    toast("Bullets sorted — most relevant first.");
+  }
+});
+$("#twExperiences").addEventListener("input", e=>{
+  if(e.target.matches("[data-bedit]")) debounceCommit(e.target.closest(".bullet-row"));
+});
+let commitT = null;
+function debounceCommit(row){ clearTimeout(commitT); commitT = setTimeout(()=>commitBullet(row, true), 400); }
+function commitBullet(row, keepEditing){
+  const t = state.tailor; if(!t || !row) return;
+  const expId = row.closest("[data-twexp]").dataset.twexp;
+  const bi = +row.dataset.bi;
+  const ex = state.resume.experience.find(x=>x.id === expId);
+  const bullets = (t.overrides.bullets[expId] || ex.bullets).slice();
+  bullets[bi] = row.querySelector("textarea").value.trim();
+  /* keep empties while typing so row indexes stay stable; drop them on final commit */
+  t.overrides.bullets[expId] = keepEditing ? bullets : bullets.filter(Boolean);
+  save();
+  row.querySelector(".bullet-view").innerHTML = "• " + highlight(bullets[bi]||"", t.keywords);
+  debounceScore();
+  if(!keepEditing) renderTailor();
+}
+function bulletScore(b){
+  const t = state.tailor; let s = 0;
+  const low = b.toLowerCase();
+  for(const k of t.keywords){ if(countMatches(termRegex(k.term), low)) s += k.weight; }
+  return s;
+}
+let scoreT = null;
+function debounceScore(){ clearTimeout(scoreT); scoreT = setTimeout(()=>{ renderScore(); renderKeywordChips(); }, 350); }
+
+/* ---------------- print / copy / log ---------------- */
+function printResume(tailored){
+  $("#printInner").innerHTML = sheetHTML(tailored ? {tailored:true} : {});
+  window.print();
+}
+$("#btnPrintMaster").onclick = ()=>printResume(false);
+$("#btnPrintTailored").onclick = ()=>printResume(true);
+
+function tailoredAsText(){
+  const r = state.resume, eff = effectiveTailored() || { summary:r.summary, skills:r.skills, bullets:{} };
+  const L = [];
+  L.push(r.name.toUpperCase());
+  if(r.contact) L.push(r.contact);
+  if(eff.summary){ L.push("", "SUMMARY", eff.summary); }
+  if(eff.skills.length){ L.push("", "SKILLS", eff.skills.join(" · ")); }
+  if(r.experience.length){
+    L.push("", "EXPERIENCE");
+    for(const ex of r.experience){
+      L.push("", `${ex.title} — ${ex.org}` + (ex.loc ? ` (${ex.loc})` : ""), [ex.start,ex.end].filter(Boolean).join("–"));
+      for(const b of (eff.bullets[ex.id] || ex.bullets)) L.push("• " + b);
+    }
+  }
+  if(r.education.length){
+    L.push("", "EDUCATION");
+    for(const ed of r.education){
+      L.push(`${ed.school} — ${ed.degree}` + (ed.year ? `, ${ed.year}` : ""));
+      if(ed.extra) L.push(ed.extra);
+    }
+  }
+  return L.join("\n");
+}
+$("#btnCopyText").onclick = ()=>copyText(tailoredAsText(), "Tailored resume copied as text.");
+
+$("#btnLogApp").onclick = ()=>{
+  const t = state.tailor; if(!t) return;
+  state.tracker.unshift({ id:uid(), company:t.company||"—", role:t.role||"—", link:"", status:"Tailored", notes:"", when:Date.now() });
+  save(); buildTracker(); setTab("tracker");
+  toast("Logged. Update the stamp when you apply.");
+};
+
+/* =====================================================================
+   AI — copy-prompt + BYO Anthropic key (direct browser fetch)
+   ===================================================================== */
+function aiPrompt(forChat){
+  const t = state.tailor, r = state.resume;
+  const expBlock = r.experience.map(ex=>
+    `[${ex.id}] ${ex.title} — ${ex.org} (${[ex.start,ex.end].filter(Boolean).join("–")})\n` +
+    ex.bullets.map(b=>"  • "+b).join("\n")
+  ).join("\n\n");
+  const eduBlock = r.education.map(ed=>`${ed.school} — ${ed.degree}, ${ed.year}. ${ed.extra||""}`).join("\n");
+  return `You are an expert resume writer. Tailor the resume below to the job posting, following these rules strictly:
+
+RULES
+1. NEVER invent employers, job titles, dates, tools, metrics, or numbers that are not in the resume. Reframe honestly; do not fabricate.
+2. Mirror the posting's exact vocabulary wherever it is truthfully supported by the candidate's experience (transferable skills count: e.g. bakery regulars → client relationships, counter upsells → upselling).
+3. Keep each bullet to one sentence, starting with a strong verb. 3–6 bullets per job, most relevant first.
+4. Rewrite the professional summary (2–3 sentences) to speak directly to this role.
+5. Suggest a skills list that keeps the candidate's real skills, reworded to match the posting where honest.
+
+THE JOB POSTING (${[t.role,t.company].filter(Boolean).join(" at ")})
+---
+${t.jd}
+---
+
+THE CANDIDATE'S MASTER RESUME
+Name: ${r.name}
+Summary: ${r.summary}
+Skills: ${r.skills.join(", ")}
+
+EXPERIENCE (keep the [ids] with your rewrites)
+${expBlock}
+
+EDUCATION
+${eduBlock}
+${forChat ? `
+OUTPUT: plain text — the rewritten summary, the skills list, then each job's rewritten bullets under its [id].` : ""}`;
+}
+
+$("#btnCopyPrompt").onclick = ()=>copyText(aiPrompt(true), "Prompt copied — paste it into any AI chat.");
+$("#btnModalCopyPrompt").onclick = ()=>copyText(aiPrompt(true), "Prompt copied — paste it into any AI chat.");
+
+$("#btnAI").onclick = ()=>{
+  $("#apiKeyInput").value = localStorage.getItem(LS_API) || "";
+  $("#aiStatus").textContent = "";
+  $("#aiModal").classList.add("open");
+};
+$("#aiClose").onclick = ()=>$("#aiModal").classList.remove("open");
+$("#aiModal").addEventListener("click", e=>{ if(e.target.id === "aiModal") $("#aiModal").classList.remove("open"); });
+$("#btnForgetKey").onclick = ()=>{ localStorage.removeItem(LS_API); $("#apiKeyInput").value = ""; toast("Key forgotten."); };
+
+const TAILOR_SCHEMA = {
+  type:"object",
+  properties:{
+    summary:{ type:"string", description:"Rewritten 2-3 sentence professional summary tailored to the posting." },
+    skills:{ type:"array", items:{ type:"string" }, description:"Tailored skills list using the candidate's real skills." },
+    experiences:{ type:"array", items:{
+      type:"object",
+      properties:{
+        id:{ type:"string", description:"The [id] from the master resume, e.g. exp_bakery." },
+        bullets:{ type:"array", items:{ type:"string" } }
+      },
+      required:["id","bullets"], additionalProperties:false
+    }},
+    note:{ type:"string", description:"One sentence for the candidate on the biggest reframe you made." }
+  },
+  required:["summary","skills","experiences","note"], additionalProperties:false
+};
+
+$("#btnRunAI").onclick = async ()=>{
+  const key = $("#apiKeyInput").value.trim();
+  if(!/^sk-ant-/.test(key)){ $("#aiStatus").textContent = "That doesn't look like an Anthropic key (they start with sk-ant-)."; return; }
+  localStorage.setItem(LS_API, key);
+  const btn = $("#btnRunAI");
+  btn.disabled = true; btn.innerHTML = `<span class="spin"></span> Claude is tailoring… (can take a minute)`;
+  $("#aiStatus").textContent = "";
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), 180000);
+  try{
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST",
+      signal: ctrl.signal,
+      headers:{
+        "content-type":"application/json",
+        "x-api-key": key,
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
+      },
+      body: JSON.stringify({
+        model:"claude-opus-5",
+        max_tokens:16000,
+        output_config:{ format:{ type:"json_schema", schema:TAILOR_SCHEMA } },
+        messages:[{ role:"user", content: aiPrompt(false) }]
+      })
+    });
+    const data = await res.json();
+    if(!res.ok){ throw new Error((data.error && data.error.message) || ("API error " + res.status)); }
+    if(data.stop_reason === "refusal"){ throw new Error("Claude declined this request. Try the copy-prompt route instead."); }
+    const textBlock = (data.content||[]).find(b=>b.type === "text");
+    if(!textBlock) throw new Error("No text in response.");
+    const out = JSON.parse(textBlock.text);
+    applyAIResult(out);
+    $("#aiModal").classList.remove("open");
+    toast("✨ Tailored. Now read every line.");
+  }catch(err){
+    $("#aiStatus").textContent = (err.name === "AbortError") ? "Timed out — try again." : ("Error: " + err.message);
+  }finally{
+    clearTimeout(timer);
+    btn.disabled = false; btn.textContent = "Tailor it now";
+  }
+};
+
+function applyAIResult(out){
+  const t = state.tailor; if(!t) return;
+  t.preAI = JSON.parse(JSON.stringify(t.overrides));
+  if(out.summary) t.overrides.summary = out.summary;
+  if(Array.isArray(out.skills) && out.skills.length) t.overrides.skills = out.skills.map(String);
+  if(Array.isArray(out.experiences)){
+    for(const e of out.experiences){
+      if(e && e.id && Array.isArray(e.bullets) && state.resume.experience.some(x=>x.id === e.id)){
+        t.overrides.bullets[e.id] = e.bullets.map(String).filter(Boolean);
+      }
+    }
+  }
+  t.aiUsed = true;
+  save(); renderTailor();
+  if(out.note) toast("Claude: " + out.note);
+}
+$("#btnRevertAI").onclick = ()=>{
+  const t = state.tailor; if(!t || !t.preAI) return;
+  t.overrides = t.preAI; t.preAI = null; t.aiUsed = false;
+  save(); renderTailor(); toast("Back to your version.");
+};
+
+/* =====================================================================
+   TRACKER VIEW
+   ===================================================================== */
+const STATUSES = ["Saved","Tailored","Applied","Interview","Offer","Rejected"];
+function stClass(s){ return "st-" + s.toLowerCase(); }
+function buildTracker(){
+  const list = $("#appList");
+  if(!state.tracker.length){
+    list.innerHTML = `<div class="tracker-empty"><span class="stamp red">NOTHING YET</span><br>Tailor a resume in step 3 and log your first application.</div>`;
+    return;
+  }
+  list.innerHTML = state.tracker.map(a=>`
+    <div class="app-row" data-app="${a.id}">
+      <select class="status-sel ${stClass(a.status)}" data-status>
+        ${STATUSES.map(s=>`<option ${s===a.status?"selected":""}>${s}</option>`).join("")}
+      </select>
+      <div class="co">${a.link ? `<a href="${esc(a.link)}" target="_blank" rel="noopener">${esc(a.company)} ↗</a>` : esc(a.company)}</div>
+      <div class="role">${esc(a.role)}</div>
+      <div class="notes"><input type="text" data-notes value="${esc(a.notes)}" placeholder="notes — contact, next step, salary…"></div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="when">${new Date(a.when).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</span>
+        <button class="icon-btn" data-delapp title="Remove">✕</button>
+      </div>
+    </div>`).join("");
+}
+$("#btnAddApp").onclick = ()=>{
+  const co = $("#trCompany").value.trim(), role = $("#trRole").value.trim();
+  if(!co && !role){ toast("Give it at least a company or a role."); return; }
+  state.tracker.unshift({ id:uid(), company:co||"—", role:role||"—", link:$("#trLink").value.trim(), status:$("#trStatus").value, notes:"", when:Date.now() });
+  $("#trCompany").value = ""; $("#trRole").value = ""; $("#trLink").value = "";
+  save(); buildTracker();
+};
+$("#appList").addEventListener("change", e=>{
+  const row = e.target.closest("[data-app]"); if(!row) return;
+  const a = state.tracker.find(x=>x.id === row.dataset.app); if(!a) return;
+  if(e.target.matches("[data-status]")){
+    a.status = e.target.value; save();
+    e.target.className = "status-sel " + stClass(a.status);
+    if(a.status === "Offer") toast("🎉 GET A JOB indeed. Congrats.");
+  }
+});
+$("#appList").addEventListener("input", e=>{
+  const row = e.target.closest("[data-app]"); if(!row) return;
+  const a = state.tracker.find(x=>x.id === row.dataset.app);
+  if(a && e.target.matches("[data-notes]")){ a.notes = e.target.value; save(); }
+});
+$("#appList").addEventListener("click", e=>{
+  const del = e.target.closest("[data-delapp]"); if(!del) return;
+  const row = del.closest("[data-app]");
+  state.tracker = state.tracker.filter(x=>x.id !== row.dataset.app);
+  save(); buildTracker();
+});
+
+/* =====================================================================
+   SAMPLE / CLEAR / EXPORT / IMPORT
+   ===================================================================== */
+$("#btnSample").onclick = ()=>{
+  state.resume = sampleResume();
+  buildResumeEditor(); renderMaster(); save();
+  toast("Meet Sally: 4 years at a bakery + campus ad sales. Now try Tailor It →");
+};
+$("#btnClearResume").onclick = ()=>{
+  if(!confirm("Clear the whole resume? (Tracker and tailoring stay.)")) return;
+  state.resume = blankResume();
+  buildResumeEditor(); renderMaster(); save();
+};
+$("#btnExport").onclick = ()=>{
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "getajob-backup.json";
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$("#btnImport").onclick = ()=>$("#importFile").click();
+$("#importFile").addEventListener("change", e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    try{
+      const data = JSON.parse(rd.result);
+      if(!data.resume) throw new Error("not a GET A JOB backup");
+      state = data; save();
+      boot(false);
+      toast("Backup restored.");
+    }catch(err){ toast("Couldn't read that file: " + err.message); }
+  };
+  rd.readAsText(f);
+});
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+function boot(first){
+  if(first) loadState();
+  buildResumeEditor();
+  renderMaster();
+  buildJobs();
+  buildTracker();
+  if(state.tailor && state.tailor.jd){
+    $("#tCompany").value = state.tailor.company || "";
+    $("#tRole").value = state.tailor.role || "";
+    $("#tJD").value = state.tailor.jd;
+    renderTailor();
+    $("#tailorResults").style.display = "block";
+  }
+  const hashTab = (location.hash||"").replace("#","");
+  setTab(["resume","jobs","tailor","tracker"].includes(hashTab) ? hashTab : (state.ui.tab || "resume"), false);
+}
+boot(true);
+</script>
+</body>
+</html>
