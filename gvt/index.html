@@ -2013,7 +2013,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.88</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.89</div>
   <div class="scanlines"></div>
 </div>
 
@@ -9745,6 +9745,7 @@ function enhWire(){ const a=ENH_ORDER.filter(enhOn); return a.length? a : null; 
 const META_DEFAULT = {
   v:1, lvl:1, xp:0, pendingPicks:0, up:{},           // player level + unit upgrade ranks (+10% dmg a rank, tapering, to RANK_MAX)
   campaign:0, levelStars:{},                          // highest level beaten, stars per level
+  lossRun:{},                                         // 0098 QUIET MERCY: consecutive solo losses per level — 'l36':3; reset on that level's win; device-local (the levelStars precedent — never crosses the wire)
   starBank:0, starsLifetime:0,                        // spendable + lifetime (rating later)
   unlocked:['rifleman','mgunner','bazooka','mortar','sarge'],
   lasers:[], laserOn:null, dyes:[], dyeOn:null,
@@ -9851,6 +9852,9 @@ if((META.bfWins||0)+(META.bfLosses||0)===0) META.bfMap='crossing';
   // line and a const in its TDZ throws, the v1.26 law; the announce sweep
   // itself runs at showMenu time, long after every const exists.)
   META.wpnMile = Object.assign({}, META.wpnMile||{});
+  // the QUIET MERCY loss-run ledger (0098): same object-default rebuild, same
+  // alias reason — an older save must never write into META_DEFAULT's own {}.
+  META.lossRun = Object.assign({}, META.lossRun||{});
   // ⚠ Object.assign hands a save with no coopLevels the DEFAULT ARRAY ITSELF, so
   // the first co-op win would push into META_DEFAULT and every later `new` profile
   // would be born having beaten it. Build a fresh one — the same trap META.enh hit.
@@ -10579,24 +10583,29 @@ function campBossRung(n){ return (n>=3 && n%3===0) || !!SET_PIECES[n]; }
 // headlines — four guards keep its crown: no red bar for a tease (drawBossBar),
 // the quiet gold card not the warning (sqPushWave), S.bossKilled stays
 // finale-only (hitCheck), and a lobby fields ONE tease (sqScaleCfg).
-// SELECTIVE by my logged pick, not universal: every OTHER cycle-boss rung
-// from 45 (45,51,57,63,69,75,81,87,93,99 — half the deep finales keep their
-// full surprise) plus the set-piece rungs whose finale hides a monster (74
-// pig, 88 giant; 58's convoy hides none, so THEIR SARGE walks early himself —
-// "he studied your playbook", the doc's OPTION B). EXCLUDED by law: L100
-// (hand-authored — its joke-column wave 1 is sacred), premieres 52/68 (their
-// wave 1 IS the reveal), everything <45 (a young finale is reachable anyway),
-// L1 (byte-identity gate). The levelCfg pass consumes ZERO R(), so every
-// non-tease rung's cfg and all 100 terrains stand byte-identical.
+// 0098 (Wyatt 7/30: "improve by having the boss start out"): the marquee
+// walks on at wave 1 across the whole ladder now, not just the deep end —
+// EVERY cycle-boss rung from L12 up to 44 (12,15,…,42), then v1.81's own
+// every-other law from 45 (45,51,57,63,69,75,81,87,93,99 — half the deep
+// finales keep their full surprise, which honours his "maybe not all of
+// them") plus the set-piece rungs whose finale hides a monster (74 pig, 88
+// giant; 58's convoy hides none, so THEIR SARGE walks early himself — "he
+// studied your playbook", the doc's OPTION B). Set pieces stay a ≥45 door:
+// L14 THE DUEL and the young THEIR-SARGE pieces (26/44) keep their pure
+// wave 1. EXCLUDED by law: L100 (hand-authored — its joke-column wave 1 is
+// sacred), premieres 52/68 (their wave 1 IS the reveal), L3-11 (the first
+// meetings stay pure — LAW A1), L1 (byte-identity gate). The levelCfg pass
+// consumes ZERO R(), so every non-tease rung's cfg and all 100 terrains
+// stand byte-identical.
 const TEASE_HP=0.30;   // the tease walks on at this fraction of the finale monster's hp
                        // (0.35 walked hot at the rex rungs — his full-strength stomp on a
                        // wave-1 cluster ran casualties past the survivability bar; 0.30 is
                        // one stomp cycle lighter and the walk holds it green)
 function campTease(n){
-  if(n<45 || n===100) return false;
+  if(n===100) return false;
   for(const k in FORM_PREMIERE) if(FORM_PREMIERE[k]===n) return false;
-  if(n%3===0 && ((n/3)%2)===1) return true;
-  return !!SET_PIECES[n];
+  if(n%3===0 && n>=12 && (n<45 || ((n/3)%2)===1)) return true;
+  return n>=45 && !!SET_PIECES[n];
 }
 // the finale's own headliner: the cycle formula on boss rungs, else the first
 // non-tansarge monster in the set piece — else THEIR SARGE himself (L58).
@@ -10636,6 +10645,8 @@ function levelCfg(n){
   // rifleman never needs more than 3-4 max-rank rounds; the toy fantasy holds),
   // and the spike/breather rhythm: boss rungs ride x1.08 count, the level
   // after one breathes at x0.92 — the knife-edges land ON the story beats.
+  // (0098: everywhere cnt0 sits below the plateau, that is — once counts hit
+  // the L33 line the spike stops buying bodies; see the cap on the product.)
   const spike=campBossRung(n), breather=!spike && campBossRung(n-1);
   // ⚠ THE PLATEAU (measured, not guessed): ten lives against leak-1 foes means
   // the defense must kill ~90% of every wave — once a single wave passes ~50
@@ -10644,13 +10655,19 @@ function levelCfg(n){
   // plateau). Counts climb to the L33 line (4.84) and hold; depth's difficulty
   // rides hp (to x6 at L65), the boss pairs, the spike rungs and the tempo
   // bands instead of raw bodies. One const to overrule.
-  const cnt0 = n<=30 ? 1+0.12*Math.max(0,n-1) : Math.min(4.84, 4.48+0.06*(n-30));
+  // 0098 (Wyatt 7/30: "36 was proving especially difficult"): the cap binds
+  // the whole PRODUCT now, not just cnt0 — the ×1.08 spike used to multiply
+  // THROUGH the plateau, so exactly at L36 the finale's redcoat guard crossed
+  // 50 bodies for the first time, escorting the first matured rex. Deep boss
+  // rungs ride the BOSS and the finale law for their drama, not extra bodies.
+  const CNT_PLATEAU=4.84;   // the L33 line — one const to overrule (was inline ×2)
+  const cnt0 = n<=30 ? 1+0.12*Math.max(0,n-1) : Math.min(CNT_PLATEAU, 4.48+0.06*(n-30));
   // ⚠ hp holds the L48 line for the same measured reason counts hold L33's:
   // with counts flat, the walk battery's knife-edge band was hp 4.4-4.9 and
   // every rung past hp ~5 went red at any rank — and a plastic rifleman
   // should never need more than ~3 max-rank rounds anyway. One const.
   const cfg = { n, hpMul: Math.min(4.7, 1+0.08*Math.max(0,n-2)),
-    cntMul: cnt0*(spike?1.08:breather?0.92:1),
+    cntMul: Math.min(cnt0*(spike?1.08:breather?0.92:1), CNT_PLATEAU),   // 0098: the plateau's own law, applied to the product (breathers only ever sit below it)
     // bosses climb toward FULL hp growth as the ladder deepens (0.5 -> 1.0
     // across L30-L50): half-growth was tuned for a shallow ladder, and it is
     // exactly why a L75 giant weighed 7% of a parade (doc LAW A2).
@@ -12150,9 +12167,15 @@ function startCampaign(n){
   startBattle(n||META.campaign+1, null);
   W=CAMP_W; resize();   // v1.40 THE LONG FRONT — room to see the war coming, both ways
   sqScaleCfg(S.cfg, 1);
+  // 0098 QUIET MERCY — see the block comment at mercyRelief. Foes AND bosses
+  // read hpMul at spawn (spawnFoe; bosses through 1+(hpMul·mr−1)×bossF, a
+  // touch gentler — they are the set dressing), and the regroup/sally patrols
+  // inherit it too. Identity at ×1: the guard leaves the float untouched.
+  const mr=mercyRelief(S.levelN);
+  if(mr<1) S.cfg.hpMul*=mr;
   S.sq={ p:1, t:0, nextT:SQ_GRACE };
   // v1.31: the crate the Tan walk out of. Smash it to win — it is the ONLY win.
-  const bh=CAMP_BASE_HP(S.levelN);
+  const bh=Math.round(CAMP_BASE_HP(S.levelN)*mr);   // ×1 → the identical integer
   S.tanBase={ x:W-130, y:300, hp:bh, hpMax:bh, hitT:0 };
   // v1.32: the announce finally says what the mode IS (v1.31 shipped the crate
   // but the line still said HOLD THE LINE — and, composed by +, it dodged the
@@ -12883,6 +12906,28 @@ function sqGapFor(n){
   if(campSprint(n)) return Math.max(14, base-9)*late;
   if(campSiege(n))  return (base+3)*late;
   return base*late;
+}
+// ===== 0098 QUIET MERCY (Wyatt 7/30: "if someone keeps losing a level, it
+// should probably reduce the difficulty a little, slightly after a few
+// attempts, to make sure they pass it"). A commander who keeps losing a level
+// gets the NEXT attempt eased — INVISIBLY: no banner, no string, no card; a
+// kid must never be told he is being helped. SOLO ONLY (the v1.23
+// mirrored-sim law — a lobby's sims must stay identical, and co-op is already
+// 1.51× kinder); rival sorties, MOM, the battleground, classic and L1 are
+// exempt by construction (none of them mint S.sq through startCampaign, and
+// only that door applies the relief). Relief starts on the attempt AFTER the
+// 2nd straight loss, −6% foe hp per further loss, floor ×0.80; the crate
+// eases by the same factor (the march is mandatory, so a shorter crate
+// shortens the win path honestly — and since v1.48 the raze is a win path
+// from the first whack). A win — solo OR co-op — clears the level's run.
+// Stars, levelStars, medals and XP pay exactly as normal on a relieved win.
+// At 0-1 losses this is arithmetic IDENTITY. Counts, waves, terrain and
+// cadence are untouched at every step — a relieved level LOOKS identical.
+const MERCY_AFTER=2, MERCY_STEP=0.06, MERCY_FLOOR=0.80;
+function mercyRelief(n){
+  if(n<=1) return 1;                                  // L1 is the coach's — never eased
+  const k=((META.lossRun||{})['l'+n])|0;
+  return k<MERCY_AFTER? 1 : Math.max(MERCY_FLOOR, 1-MERCY_STEP*(k-1));
 }
 // ⚠ THE SUB-LINEAR CALL (Wyatt: "a LITTLE easier with 10 — I want a
 // ten-people-together-win situation"). Each commander may field SQ_CAP men, so
@@ -17343,6 +17388,12 @@ function endBattle(win){
     // v1.56: a rival sortie raises the RIVAL'S colours, so the prose can't
     // name the Tan — the army-agnostic line covers all ten rival armies
     document.getElementById('loseText').textContent=t(S.momRaid? "The room is SO clean. Your army is in the toy bin. She'll be back — fight her off next time!" : S.rival? 'Their flag flies over your carpet. Sarge would like a word.' : 'The Tan flag flies over your carpet. Sarge would like a word.')+' · '+tf('+%1 XP for the trouble', xpGain)+promoTag(promos);
+    // 0098 QUIET MERCY — a solo campaign defeat feeds the level's run. Sorties,
+    // MOM, classic and co-op never mint S.sq through this door; L1 is the
+    // coach's (and its first-battle mercy returned above anyway). Quits never
+    // reach endBattle(false), so exploring a level costs nothing.
+    if(S.sq && !S.coop && S.levelN>1)
+      META.lossRun['l'+S.levelN]=(META.lossRun['l'+S.levelN]|0)+1;
     checkAch(); saveMeta();   // a lost battle still locks in its ace, its medals and its XP
     SFX.ouch(); return;
   }
@@ -17378,6 +17429,10 @@ function endBattle(win){
     const prev=META.levelStars['l'+S.levelN]||0;
     META.levelStars['l'+S.levelN]=Math.max(prev,stars);
     if(S.levelN>META.campaign) META.campaign=S.levelN;
+    // 0098 QUIET MERCY: a win — solo OR co-op — clears the level's loss run
+    // (per-sim save write, the mirrored-sim law untouched). Rides this
+    // branch's own checkAch(); saveMeta(); netSync() at the foot.
+    if(META.lossRun['l'+S.levelN]) delete META.lossRun['l'+S.levelN];
   }
   // SARGE unlocks a new weapon as the campaign advances — announced right here
   let sargeNew=[];
@@ -23717,6 +23772,11 @@ window.GVT = {
   snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, level:S.levelN, rival:S.rival&&S.rival.id, active:S.waveActive, foes:S.foes.length, mines:S.mines.length, base:S.tanBase? Math.ceil(S.tanBase.hp) : null, lost:S.lostLevel|0, sargeCd:+(S.sargeCd||0).toFixed(2), units:S.units.map(u=>({t:u.type,kills:u.kills,vet:u.vet,hits:u.hits})), queue:S.queue.length }; },
   meta(){ return JSON.parse(JSON.stringify(META)); },
   startLevel(n){ startCampaign(n); return GVT.sq(); },
+  // 0098 QUIET MERCY rig — read the run + the relief the NEXT solo attempt
+  // would get; seed a run for a battery (debug-only, the blades()/saberState()
+  // precedent — no door in the game reaches these)
+  mercy(){ return { run:Object.assign({},META.lossRun), relief:mercyRelief(S.levelN|0) }; },
+  mercySet(n,k){ META.lossRun['l'+n]=k|0; saveMeta(); return Object.assign({},META.lossRun); },
   // v1.38 FORMATIONS + SET PIECES rig: spawn any shape to inspect its geometry
   // (needs a battle on; n overrides every group's count), read a level's final
   // wave, and read THEIR SARGE's state machine off the live carpet
