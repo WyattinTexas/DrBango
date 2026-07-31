@@ -1503,6 +1503,13 @@
   .starfloat { position:absolute; color:#FFF3C4; font-weight:bold; font-size:24px; pointer-events:none; text-shadow:0 2px 5px rgba(0,0,0,0.6); animation:starup 0.9s ease-out forwards; }
   @keyframes starup { from { transform:translateY(0); opacity:1;} to { transform:translateY(-46px); opacity:0;} }
   .starfloat.big { font-size:32px; color:#FFE97A; animation-duration:1.1s; }
+  /* 0099 THE PAYOFF RUN's counter: parked (no float-away) while the run lives;
+     each tap re-fires .tick's little pulse. Dropping .run mid-flight hands the
+     div back to starup for the ordinary send-off. */
+  .starfloat.run { animation:none; }
+  .starfloat.run.tick { animation:pigtick 0.34s ease-out; }
+  @keyframes pigtick { 0% { transform:scale(1);} 30% { transform:scale(1.3);} 100% { transform:scale(1);} }
+  @media (prefers-reduced-motion: reduce){ .starfloat.run.tick { animation:none; } }
   /* the piggy's "nothing left today" answer: a little puff out of the back hole */
   .pigpuff { position:absolute; width:17px; height:17px; border-radius:50%; pointer-events:none;
     background:radial-gradient(circle at 40% 40%, rgba(213,219,187,0.85), rgba(152,162,118,0.45) 58%, rgba(120,130,95,0) 78%);
@@ -2013,7 +2020,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.89</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.90</div>
   <div class="scanlines"></div>
 </div>
 
@@ -9829,7 +9836,12 @@ const META_DEFAULT = {
   jetLvl:3,
   // SARGE COMMS (v1.41): which opening briefings this save has sat through.
   // Once each, ever — the window is an introduction, not a toll gate.
-  comms:{ camp:0, bf:0 }
+  comms:{ camp:0, bf:0 },
+  // 0099 THE COMET SECRET: 1 once a comet on the space rug has been caught
+  // mid-flight — the once-ever 100★ gift. A flat primitive (the jetLvl law):
+  // Object.assign migrates every older save to 0 free, and any truthy value
+  // blocks the grant forever, so garbage can only ever under-grant.
+  comet:0
 };
 let META = META_DEFAULT;
 try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); META.piggy=Object.assign({},META_DEFAULT.piggy,m.piggy||{}); } } catch(e) {}
@@ -11745,8 +11757,20 @@ const SFX = {
   // reverent, not a fanfare (the fanfare is the card's; this is the vow).
   soul:  ()=>{ tone(523,523,0.5,'sine',0.05); setTimeout(()=>tone(784,784,0.5,'sine',0.05),120);
                setTimeout(()=>{ tone(1047,1047,0.65,'sine',0.045); noise(0.3,0.012,6000); },240); },
+  // 0099 THE COMET: a quiet rising streak that resolves into the coin — soft
+  // like the soul, never a fanfare. It's a secret, not a ceremony.
+  comet: ()=>{ tone(1560,3120,0.5,'sine',0.05); noise(0.25,0.015,7000);
+               setTimeout(()=>SFX.coin(),380); },
   ouch:  ()=>tone(240,80,0.4,'sawtooth',0.1),
   coin:  ()=>{ tone(1180,1560,0.07,'sine',0.07); setTimeout(()=>tone(1560,2100,0.09,'sine',0.05),60); },
+  // 0099 THE PAYOFF LADDER: each collect tap dings one step up a major-
+  // pentatonic scale, so every stopping point lands somewhere happy. The tap
+  // index picks the rung — pitch resets with every new run by construction —
+  // and the final coin resolves the climb in its own 1180–2100 register.
+  pigDing:(k)=>{ const PS=[0,2,4,7,9,12,14,16,19,21];
+    const f=740*Math.pow(2,PS[Math.min(k,PS.length-1)]/12);
+    tone(f,f*1.26,0.09,'sine',0.075);
+    setTimeout(()=>tone(f*1.5,f*1.9,0.05,'sine',0.035),45); },
   // the empty piggy's little raspberry — quiet, low, and very funny to a kid
   toot:  ()=>{ tone(150,62,0.24,'sawtooth',0.05); setTimeout(()=>noise(0.1,0.03,340),30); },
   // distant boots on the landing — quiet, so it reads as "out there", not "in here"
@@ -21021,6 +21045,12 @@ function rugStarField(){
   }
   return out;
 }
+// 0099 THE COMET SECRET: catch a comet mid-flight on the space rug and it
+// pays 100★ — once, ever, per save. BANK ONLY (the IAP precedent): a gift
+// must not move the world board, jump a tier, tick a medal ladder or harden
+// the AI ramp, all of which key off starsLifetime. No hint anywhere, on
+// purpose — it stays a secret.
+const COMET_STARS=100;
 function roomRugSVG(){
   if(!decorOn('spacerug'))
     return '<rect x="60" y="96" width="560" height="420" rx="18" fill="#5F7290"/>'
@@ -21047,12 +21077,23 @@ function roomRugSVG(){
         +'<ellipse cx="300" cy="152" rx="58" ry="15" fill="none" stroke="#E8C878" stroke-width="2.4" opacity="0.9"/></g>'
       +'<circle class="rugmoon" cx="176" cy="278" r="13" fill="#C9CDD4"/>'
       +'<circle cx="171" cy="274" r="3.4" fill="#A8AEB8"/><circle cx="180" cy="283" r="2.4" fill="#A8AEB8"/>'
-      // two comets on the house, and a third that only flies when you tap
-      +'<g class="rugcomet a"><path d="M0 0 L-62 -26" stroke="#FFF6DC" stroke-width="3" stroke-linecap="round" opacity="0.55"/>'
+      // two comets on the house, and a third that only flies when you tap.
+      // 0099: each carries the secret's handler + an invisible hit pad (the
+      // head alone is a ~5px target at phone scale; r=30 ≈ a 38px thumb pad
+      // riding the animated transform). Parked comets sit OUTSIDE #rugclip and
+      // the clip clips hit-testing too, so only a comet actually mid-flight
+      // can ever be caught — the handler's opacity gate is the second lock.
+      +'<g class="rugcomet a" onclick="UI.cometTap(event)" pointer-events="all" style="cursor:pointer">'
+        +'<circle cx="0" cy="0" r="30" fill="none"/>'
+        +'<path d="M0 0 L-62 -26" stroke="#FFF6DC" stroke-width="3" stroke-linecap="round" opacity="0.55"/>'
         +'<circle cx="0" cy="0" r="4" fill="#FFF6DC"/></g>'
-      +'<g class="rugcomet b"><path d="M0 0 L-52 20" stroke="#BFE39A" stroke-width="2.6" stroke-linecap="round" opacity="0.5"/>'
+      +'<g class="rugcomet b" onclick="UI.cometTap(event)" pointer-events="all" style="cursor:pointer">'
+        +'<circle cx="0" cy="0" r="30" fill="none"/>'
+        +'<path d="M0 0 L-52 20" stroke="#BFE39A" stroke-width="2.6" stroke-linecap="round" opacity="0.5"/>'
         +'<circle cx="0" cy="0" r="3.4" fill="#EDFBDA"/></g>'
-      +'<g class="rugzip"><path d="M0 0 L-86 -34" stroke="#FFF3C4" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>'
+      +'<g class="rugzip" onclick="UI.cometTap(event)" pointer-events="all" style="cursor:pointer">'
+        +'<circle cx="0" cy="0" r="30" fill="none"/>'
+        +'<path d="M0 0 L-86 -34" stroke="#FFF3C4" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>'
         +'<circle cx="0" cy="0" r="6" fill="#FFFFFF"/></g>'
     +'</g>'
     +'<rect x="78" y="114" width="524" height="384" rx="12" fill="none" stroke="#5A4EA8" stroke-width="7"/>'
@@ -21381,30 +21422,96 @@ function renderMenu(){
 // A painted piggy pays its daily stars ON THE TAP: hop + star = the payout.
 // Once it's been fed you for the day (or it's still plain pink), the tap gets
 // you a little puff of smoke out of the back hole instead. Also a reward.
+// 0099 THE PAYOFF RUN (Wyatt: "If it's more than once, you should have to
+// click it twice… ding, ding, ding!"): a 2★+ day spreads the SHOW over
+// min(T,5) taps — each one hops the pig, ticks the counter up a chunk and
+// dings one step up the ladder — but ALL the value banks at tap 1 in one
+// saveMeta, so a reload mid-run has already paid in full and only theater
+// is lost. The run itself is session-only and never saved.
+const PIG_TAPS_MAX=5;   // Wyatt's own five booms — the biggest payout stays snappy
+let PIGRUN=null;        // the live run {day,chunks,i,total,paid,settleT} — never persisted
+// one tap of the run: hop already retriggered at piggyHop's head; pay the next
+// chunk into the counter, burst a few small stars, ding the next rung up
+function pigRunAdvance(){
+  const st=document.getElementById('roomStage');
+  const k=PIGRUN.i++;
+  PIGRUN.paid+=PIGRUN.chunks[k];
+  if(st){
+    // the counter over her head — created on the first boom, self-healing if a
+    // stray renderMenu rebuilt the stage mid-run (recreated at the cumulative)
+    let f=document.getElementById('pigrunF');
+    if(!f){ f=document.createElement('div'); f.id='pigrunF';
+      f.className='starfloat big run';
+      f.style.left='126px'; f.style.top='96px'; st.appendChild(f); }
+    f.textContent='+'+PIGRUN.paid+'★';
+    f.classList.remove('tick'); void f.getBoundingClientRect(); f.classList.add('tick');
+    for(let i=0;i<Math.min(PIGRUN.chunks[k],3);i++){
+      const s=document.createElement('div');
+      s.className='starfloat'; s.textContent='★';
+      s.style.left=(120+Math.random()*56)+'px'; s.style.top=(104+Math.random()*14)+'px';
+      s.style.animationDelay=(0.06+i*0.09)+'s';
+      st.appendChild(s); setTimeout(()=>{ try{ s.remove(); }catch(e){} }, 1150+i*90);
+    }
+  }
+  SFX.pigDing(k);
+  if(PIGRUN.i>=PIGRUN.chunks.length) pigRunEnd(true);   // the top rung — resolve
+  else { clearTimeout(PIGRUN.settleT); PIGRUN.settleT=setTimeout(()=>pigRunEnd(false), 6000); }
+}
+// close the run out: on the final tap the coin resolves the ladder; on the 6s
+// idle settle the counter just completes to the full total (honest — it was
+// all banked at tap 1) and floats away quietly. Either way the deferred
+// renderMenu catches the header ★ up, exactly the single-tap path's shape.
+function pigRunEnd(coin){
+  if(!PIGRUN) return;
+  const total=PIGRUN.total;
+  clearTimeout(PIGRUN.settleT); PIGRUN=null;
+  const f=document.getElementById('pigrunF');
+  if(f){ f.textContent='+'+total+'★'; f.removeAttribute('id');
+    // dropping .run hands the div back to starup — the ordinary float-away
+    f.classList.remove('run','tick'); void f.getBoundingClientRect();
+    setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1200); }
+  if(coin) setTimeout(()=>SFX.coin(), 90);
+  setTimeout(()=>{ if(S.mode==='menu') renderMenu(); }, 1250);
+}
 function piggyHop(){
   const g=document.getElementById('piggyG');
   if(g){ g.classList.remove('hop'); void g.getBoundingClientRect(); g.classList.add('hop'); }
   const st=document.getElementById('roomStage');
+  // a run left open across midnight is a corpse — discard it and fall through
+  // (the new day's own collect, if any, starts clean below)
+  if(PIGRUN && PIGRUN.day!==todayStr()){ clearTimeout(PIGRUN.settleT); PIGRUN=null; }
+  if(PIGRUN){ pigRunAdvance(); return; }
   if(pigClaimable()){
     const t=pigPayout();          // paint streak + bank tier — one tap, one number
     META.piggy.claimed=todayStr();
     META.starBank+=t; META.starsLifetime+=t; saveMeta();
-    SFX.coin();
-    if(st){
-      const f=document.createElement('div');
-      f.className='starfloat big'; f.textContent='+'+t+'★';
-      f.style.left='126px'; f.style.top='96px';
-      st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120);
-      for(let i=0;i<Math.min(t,4);i++){
-        const s=document.createElement('div');
-        s.className='starfloat'; s.textContent='★';
-        s.style.left=(120+Math.random()*56)+'px'; s.style.top=(104+Math.random()*14)+'px';
-        s.style.animationDelay=(0.08+i*0.09)+'s';
-        st.appendChild(s); setTimeout(()=>{ try{ s.remove(); }catch(e){} }, 1150+i*90);
+    if(t<2){
+      // a 1★ day keeps the one-tap shape it always had: coin, float, done
+      SFX.coin();
+      if(st){
+        const f=document.createElement('div');
+        f.className='starfloat big'; f.textContent='+'+t+'★';
+        f.style.left='126px'; f.style.top='96px';
+        st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120);
+        for(let i=0;i<Math.min(t,4);i++){
+          const s=document.createElement('div');
+          s.className='starfloat'; s.textContent='★';
+          s.style.left=(120+Math.random()*56)+'px'; s.style.top=(104+Math.random()*14)+'px';
+          s.style.animationDelay=(0.08+i*0.09)+'s';
+          st.appendChild(s); setTimeout(()=>{ try{ s.remove(); }catch(e){} }, 1150+i*90);
+        }
       }
+      // the label pill and the header bank are stale now — refresh once the show ends
+      setTimeout(()=>{ if(S.mode==='menu') renderMenu(); }, 1250);
+    } else {
+      // 2★+ ⇒ at least two taps (Wyatt's law), capped at five. Chunks ascend
+      // and sum EXACTLY to t, so the ladder crescendos into the biggest chunk
+      // on the top note: base first, the +1s last.
+      const N=Math.min(t,PIG_TAPS_MAX), base=Math.floor(t/N), rem=t%N, chunks=[];
+      for(let i=0;i<N;i++) chunks.push(i<N-rem? base : base+1);
+      PIGRUN={ day:todayStr(), chunks:chunks, i:0, total:t, paid:0, settleT:0 };
+      pigRunAdvance();              // the starting tap IS the first boom
     }
-    // the label pill and the header bank are stale now — refresh once the show ends
-    setTimeout(()=>{ if(S.mode==='menu') renderMenu(); }, 1250);
   } else {
     SFX.toot();
     if(st){
@@ -23261,6 +23368,29 @@ window.UI = {
   },
   // a tap on a decoration standing in the room: noise, wobble, nothing else
   decorTap(id){ audio(); decorReact(id); },
+  // 0099 THE COMET SECRET: only a comet actually mid-flight counts (parked
+  // ones sit outside #rugclip and the clip clips hit-testing too — the
+  // opacity gate here is the second lock). Flag first, credit second, all
+  // synchronous, so a double-tap on two comets in the same second reads
+  // truthy and stops. A spent comet ignores taps entirely: it is just a
+  // comet again, and quiet is the point.
+  cometTap(ev){ audio();
+    const g=ev&&ev.currentTarget; if(!g) return;
+    if(parseFloat(getComputedStyle(g).opacity||'0')<0.2) return;
+    if(ev.stopPropagation) ev.stopPropagation();
+    if(META.comet) return;
+    META.comet=1; META.starBank+=COMET_STARS; saveMeta();
+    SFX.comet();
+    const st=document.getElementById('roomStage');
+    if(st){
+      const f=document.createElement('div');
+      f.className='starfloat big'; f.textContent='+'+COMET_STARS+'★';
+      f.style.left='300px'; f.style.top='250px';
+      st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120);
+    }
+    // the header ★ catches up quietly once the float has gone
+    setTimeout(()=>{ if(S.mode==='menu') renderMenu(); }, 1200);
+  },
   pick(t){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=RANK_MAX) return;
     META.up[t]=(META.up[t]||0)+1; META.pendingPicks--; checkAch();
     const mb=mboxRoll('u:'+t, META.up[t]); saveMeta();
@@ -23918,6 +24048,14 @@ window.GVT = {
   // owned branch) — hand-rolled saves clamp themselves through decorOn()
   decorFlip(id){ if(!decOwns(id)) return null; UI.decorBuy(id);
     return { off:(META.decor.off||[]).slice(), on:decorOn(id) }; },
+  // 0099 rig doors: the live payoff run, the comet's whole state, and a
+  // testing-only flag reset (no star clawback — the grant already banked)
+  pigRun(){ return PIGRUN? { active:true, day:PIGRUN.day, i:PIGRUN.i,
+      n:PIGRUN.chunks.length, chunks:PIGRUN.chunks.slice(),
+      paid:PIGRUN.paid, total:PIGRUN.total } : { active:false }; },
+  cometState(){ return { taken:!!META.comet, rugOn:decorOn('spacerug'),
+    groups:document.querySelectorAll('#decSpace .rugcomet, #decSpace .rugzip').length }; },
+  cometReset(){ META.comet=0; saveMeta(); return { taken:!!META.comet }; },
   // ===== THE MOTOR POOL RIG =====
   motor(){ const o={ stars:META.starBank, tray:bfTray(), gifted:!!META.vehGift };
     VEH_ORDER.forEach(t=>{ const r=vehTier(t);
