@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>TRAIN SET</title>
+<!-- TRAINSET v1.0 -->
+<meta name="trainset-version" content="1.0">
+<style>
+  /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ width:100%; height:100%; overflow:hidden; }
+  body{
+    background:#221910;
+    background-image:repeating-linear-gradient(90deg,#241b11 0 118px,#1e1509 118px 122px);
+    font-family:'Arial Black',Impact,'Arial Bold',sans-serif;
+    color:#F7E9C4; user-select:none; -webkit-user-select:none;
+    position:fixed; inset:0; touch-action:none;
+  }
+  canvas#cv{ position:absolute; inset:0; touch-action:none; }
+  .chip{
+    position:absolute; top:10px; z-index:5; background:rgba(20,14,8,0.82);
+    border:2px solid #513a24; border-radius:12px; padding:7px 13px;
+    font-size:15px; letter-spacing:1px; color:#F7E9C4; cursor:pointer;
+  }
+  #mark{ left:12px; cursor:default; color:#F2C531; }
+  #mute{ right:12px; }
+  /* ---- bottom bar ---- */
+  #bar{
+    position:absolute; left:0; right:0; bottom:0; z-index:6;
+    background:linear-gradient(#3a2a18,#241a0e);
+    border-top:3px solid #513a24;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+  }
+  .pbtn{
+    width:72px; background:#170f08; border:2px solid #513a24; border-radius:12px;
+    padding:4px 2px 3px; text-align:center; cursor:grab; color:#CBB88C;
+    display:flex; flex-direction:column; align-items:center; gap:1px; touch-action:none;
+  }
+  .pbtn canvas{ width:52px; height:52px; pointer-events:none; }
+  .pbtn small{ font-size:8.5px; letter-spacing:0.5px; pointer-events:none; }
+  .wig{ animation:wig 0.4s; }
+  @keyframes wig{ 0%,100%{transform:rotate(0)} 25%{transform:rotate(-6deg)} 75%{transform:rotate(6deg)} }
+  #shedBtn,#goBtn{
+    border-radius:14px; border:3px solid #513a24; background:#170f08;
+    color:#F7E9C4; font-family:inherit; font-size:16px; letter-spacing:1px;
+    padding:14px 18px; cursor:pointer; min-width:96px;
+  }
+  #goBtn{ background:#1e4d1e; border-color:#2f7a2f; color:#CFF7C4; min-width:110px; font-size:19px; }
+  #goBtn.run{ background:#5a1717; border-color:#8f2f2f; color:#F7C4C4; }
+  #barSpace{ width:14px; }
+  /* ---- the shed panel ---- */
+  #shed{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) scale(0.92);
+    width:min(92vw,560px); z-index:10; background:#241a12;
+    border:3px solid #F2C531; border-radius:18px; padding:14px 16px 12px;
+    box-shadow:0 18px 60px rgba(0,0,0,0.65); opacity:0; pointer-events:none;
+    transition:opacity 0.15s, transform 0.15s;
+  }
+  #shed.open{ opacity:1; pointer-events:auto; transform:translate(-50%,-50%) scale(1); }
+  #shed h2{ font-size:19px; letter-spacing:2px; color:#F2C531; margin-bottom:8px; }
+  #shedX{ position:absolute; right:10px; top:8px; font-size:18px; padding:4px 10px;
+    cursor:pointer; color:#CBB88C; border:none; background:none; font-family:inherit; }
+  #parts{ display:flex; gap:8px; justify-content:center; margin-bottom:10px; flex-wrap:wrap; }
+  .cbtn{ background:#170f08; border:2px solid #513a24; border-radius:10px;
+    padding:3px 4px 2px; text-align:center; cursor:pointer; color:#CBB88C; }
+  .cbtn canvas{ width:58px; height:40px; pointer-events:none; }
+  .cbtn small{ display:block; font-size:8.5px; letter-spacing:0.5px; pointer-events:none; }
+  #consistWrap{ background:#170f08; border:2px solid #513a24; border-radius:12px;
+    padding:6px 8px 2px; margin-bottom:10px; text-align:center; }
+  #consistWrap p{ font-size:9px; color:#8f7a52; letter-spacing:1px; margin-bottom:2px; }
+  #consist{ width:100%; height:64px; touch-action:none; }
+  #handle{
+    border:2px dashed #F2C531; border-radius:12px; padding:13px 10px; text-align:center;
+    font-size:15px; letter-spacing:1px; color:#F2C531; cursor:grab; touch-action:none;
+  }
+  #handle.home{ border-style:solid; cursor:pointer; }
+  #shedFoot{ display:flex; justify-content:flex-end; align-items:center; margin-top:9px; }
+  #tidy,#tidyYes,#tidyNo{ background:none; border:none; color:#8f7a52; font-family:inherit;
+    font-size:11px; letter-spacing:1px; cursor:pointer; padding:4px 6px; }
+  #tidyYes{ color:#FF7A5C; } #tidyNo{ color:#CFF7C4; }
+  #tidyAsk{ display:none; font-size:11px; color:#CBB88C; } #tidyAsk.on{ display:inline; } #tidy.off{ display:none; }
+  /* ---- toast + rotate ---- */
+  #toast{
+    position:absolute; left:50%; bottom:132px; transform:translateX(-50%);
+    background:rgba(20,14,8,0.92); border:2px solid #F2C531; color:#F7E9C4;
+    padding:9px 18px; border-radius:12px; font-size:14px; letter-spacing:1px;
+    opacity:0; transition:opacity 0.2s; pointer-events:none; z-index:9; white-space:nowrap;
+  }
+  #toast.on{ opacity:1; }
+  #rot{ display:none; position:absolute; inset:0; z-index:20; background:rgba(18,12,6,0.94);
+    text-align:center; padding-top:34vh; font-size:19px; letter-spacing:1px; color:#F7E9C4; }
+  #rot div{ font-size:52px; margin-bottom:14px; }
+  @media (orientation:portrait) and (max-width:560px){ #rot{ display:block; } }
+  @media (max-width:820px){
+    .pbtn{ width:60px; } .pbtn canvas{ width:42px; height:42px; }
+    #shedBtn,#goBtn{ padding:11px 12px; font-size:14px; min-width:78px; }
+    #goBtn{ font-size:16px; min-width:88px; }
+    #bar{ gap:6px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="chip" id="mark">🚂 TRAIN SET</div>
+<div class="chip" id="mute">🔊</div>
+<div id="bar">
+  <span id="palSlot" style="display:flex;gap:8px;"></span>
+  <span id="barSpace"></span>
+  <button id="shedBtn">THE SHED 🚂</button>
+  <button id="goBtn">GO ▶</button>
+</div>
+<div id="shed">
+  <h2>THE TRAIN SHED</h2>
+  <button id="shedX">✕</button>
+  <div id="parts"></div>
+  <div id="consistWrap"><p>YOUR TRAIN — TAP A CAR TO UNCOUPLE IT</p><canvas id="consist"></canvas></div>
+  <div id="handle">🚂 DRAG ME ONTO THE TRACK</div>
+  <div id="shedFoot">
+    <span>
+      <button id="tidy">🧹 TIDY UP</button>
+      <span id="tidyAsk">SWEEP THE WHOLE RUG CLEAN? <button id="tidyYes">YES</button> <button id="tidyNo">NO</button></span>
+    </span>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="rot"><div>🔁</div>TURN YOUR PHONE SIDEWAYS</div>
+<script>
+'use strict';
+/* =====================================================================
+   TRAIN SET — a little railroad on the GVT bedroom rug.
+   Single file, no deps, works from file://. Sibling of Green vs Tan:
+   the rug, the rail recipe, the train painter and the uniform-arc
+   follower law all come from GVT (drawRug / WESTERN LAND / drawTrainCar).
+   ===================================================================== */
+
+// ---- world ----
+const C=96, GW=12, GH=8, GX=72, GY=72;
+const WORLD_W=GW*C+2*GX, WORLD_H=GH*C+2*GY;      // 1296 × 912
+const SPEED=220;            // px/s down the line (Wyatt dial)
+const GAP=78;               // car spacing along the arc — uniform arc, never uniform segment
+const KART=0.8;             // car art scale vs GVT's original painter
+const AX=20;                // half axle span used to sample a car's heading
+const MAXCARS=6;
+const STATION_PAUSE=1.2;
+
+const TAU=Math.PI*2;
+const perf=()=>performance.now()/1000;
+const cvs=document.getElementById('cv');
+let cx=cvs.getContext('2d');                     // rebindable: icons borrow the painters
+let W=0,H=0,BAR=118,SC=1,OX=0,OY=0,DPR=1;
+
+// ---- state ----
+const grid=new Map();                 // "cx,cy" -> {t,r, ra:{k}|null, pop}
+let consist=['tender','box'];         // cars behind the loco
+const TRAIN={ placed:false, cars:[], F:true, running:false, pauseT:0, stKey:null,
+              dist:0, startSig:null, goDist:0 };
+let DRAG=null;
+let hover=null;
+let hintStage=0, lapDone=false;
+let smoke=[], fx=[], confetti=[], lapCardT=0;
+let wheelPhase=0, chugAcc=0, smokeT=0;
+const key=(x,y)=>x+','+y;
+
+// ---- piece geometry: port-to-port polylines with cumulative arc length ----
+// ports: 0=N 1=E 2=S 3=W. Every path runs ports[0] -> ports[1].
+function rotPt(p,r){ let x=p[0],y=p[1]; for(let i=0;i<r;i++){ const t=x; x=C-y; y=t; } return [x,y]; }
+function mkPath(ports,pts,r){
+  const P=pts.map(p=>rotPt(p,r));
+  const cum=[0]; for(let i=1;i<P.length;i++) cum.push(cum[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));
+  return { ports:ports.map(p=>p==null?null:(p+r)%4), pts:P, cum, len:cum[cum.length-1] };
+}
+const arcPts=[]; for(let i=0;i<=10;i++){ const th=Math.PI-(Math.PI/2)*(i/10); arcPts.push([C+(C/2)*Math.cos(th),(C/2)*Math.sin(th)]); }
+const BASE={
+  s :[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]} ],
+  c :[ {ports:[0,1], pts:arcPts} ],
+  x :[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]}, {ports:[0,2], pts:[[C/2,0],[C/2,C]]} ],
+  b :[ {ports:[0,null], pts:[[C/2,0],[C/2,C/2+10]]} ],
+  st:[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]} ],
+};
+const PATHS={};
+for(const t in BASE){ PATHS[t]=[]; for(let r=0;r<4;r++) PATHS[t].push(BASE[t].map(b=>mkPath(b.ports,b.pts,r))); }
+
+const pieceAt=(x,y)=>grid.get(key(x,y))||null;
+const pathsOf=pc=>PATHS[pc.t][pc.r];
+
+// ---- riders on the graph (the GVT railPoint pattern) ----
+function enter(rd,exitPort){
+  const D=[[0,-1],[1,0],[0,1],[-1,0]][exitPort];
+  const nx=rd.cx+D[0], ny=rd.cy+D[1];
+  if(nx<0||ny<0||nx>=GW||ny>=GH) return false;
+  const pc=pieceAt(nx,ny); if(!pc) return false;
+  const entry=(exitPort+2)%4, ps=pathsOf(pc);
+  for(let i=0;i<ps.length;i++){
+    if(ps[i].ports[0]===entry){ rd.cx=nx; rd.cy=ny; rd.pi=i; rd.dir=1;  rd.s=0;         return true; }
+    if(ps[i].ports[1]===entry){ rd.cx=nx; rd.cy=ny; rd.pi=i; rd.dir=-1; rd.s=ps[i].len; return true; }
+  }
+  return false;
+}
+function advance(rd,dist){
+  let moved=0;
+  for(let guard=0; guard<400 && dist>1e-6; guard++){
+    const pc=pieceAt(rd.cx,rd.cy); if(!pc) return {ok:false,moved};
+    const path=pathsOf(pc)[rd.pi];
+    if(rd.dir>0){
+      const room=path.len-rd.s;
+      if(dist<=room){ rd.s+=dist; return {ok:true,moved:moved+dist}; }
+      moved+=room; dist-=room;
+      const ex=path.ports[1];
+      if(ex==null || !enter(rd,ex)){ rd.s=path.len; return {ok:false,moved}; }
+    } else {
+      const room=rd.s;
+      if(dist<=room){ rd.s-=dist; return {ok:true,moved:moved+dist}; }
+      moved+=room; dist-=room;
+      const ex=path.ports[0];
+      if(!enter(rd,ex)){ rd.s=0; return {ok:false,moved}; }
+    }
+  }
+  return {ok:true,moved};
+}
+function back(rd,dist){ rd.dir*=-1; const r=advance(rd,dist); rd.dir*=-1; return r; }
+const clone=rd=>({cx:rd.cx,cy:rd.cy,pi:rd.pi,dir:rd.dir,s:rd.s});
+function pos(rd){
+  const pc=pieceAt(rd.cx,rd.cy); if(!pc) return {x:GX,y:GY,ang:0};
+  const p=pathsOf(pc)[rd.pi], s=Math.max(0,Math.min(p.len,rd.s));
+  let i=1; while(i<p.cum.length-1 && p.cum[i]<s) i++;
+  const a=p.pts[i-1], b=p.pts[i], L=p.cum[i]-p.cum[i-1]||1, k=(s-p.cum[i-1])/L;
+  let ang=Math.atan2(b[1]-a[1],b[0]-a[0]); if(rd.dir<0) ang+=Math.PI;
+  return { x:GX+rd.cx*C+a[0]+(b[0]-a[0])*k, y:GY+rd.cy*C+a[1]+(b[1]-a[1])*k, ang };
+}
+
+// ---- train assembly / placement ----
+function trainCells(){ const s=new Set(); for(const c of TRAIN.cars) s.add(key(c.rd.cx,c.rd.cy)); return s; }
+function placeTrainAt(cxl,cyl){
+  const pc=pieceAt(cxl,cyl); if(!pc) return false;
+  const p0=pathsOf(pc)[0];
+  const loco={cx:cxl,cy:cyl,pi:0,dir:1,s:p0.len/2};
+  const n=1+consist.length, need=GAP*(n-1)+34;
+  const probe=clone(loco), r=back(probe,need);
+  if(!r.ok){
+    const extra=need-r.moved, f=advance(loco,extra+2);
+    if(!f.ok) return false;
+    const probe2=clone(loco), r2=back(probe2,need);
+    if(!r2.ok) return false;
+  }
+  TRAIN.cars=[{type:'loco',rd:loco,face:1,squash:0}];
+  for(let i=1;i<n;i++){
+    const rd=clone(loco); back(rd,GAP*i);
+    TRAIN.cars.push({type:consist[i-1],rd,face:1,squash:0});
+  }
+  TRAIN.placed=true; TRAIN.F=true; TRAIN.pauseT=0; TRAIN.stKey=null; TRAIN.startSig=null;
+  return true;
+}
+function trainHome(quiet){
+  if(TRAIN.placed && !quiet){ for(const c of TRAIN.cars){ const p=pos(c.rd); puff(p.x,p.y-8,16); } SND.pop(); }
+  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; goBtnSync(); shedSync();
+}
+function reverseTrain(){
+  const lead=TRAIN.F? TRAIN.cars[0] : TRAIN.cars[TRAIN.cars.length-1];
+  lead.squash=1;
+  for(const c of TRAIN.cars){ c.rd.dir*=-1; c.face*=-1; }
+  TRAIN.F=!TRAIN.F; SND.boing();
+}
+function goTrain(){
+  if(!TRAIN.placed) return false;
+  TRAIN.running=true;
+  const lc=TRAIN.cars[0].rd;
+  TRAIN.startSig=key(lc.cx,lc.cy)+':'+lc.pi+':'+lc.dir; TRAIN.goDist=0;
+  goBtnSync(); return true;
+}
+
+// ---- update ----
+function update(dt){
+  for(const pc of grid.values()){
+    if(pc.ra){ pc.ra.k-=dt*8; if(pc.ra.k<=0) pc.ra=null; }
+    if(pc.pop>0) pc.pop=Math.max(0,pc.pop-dt*5);
+  }
+  for(const c of TRAIN.cars) if(c.squash>0) c.squash=Math.max(0,c.squash-dt*4);
+
+  if(TRAIN.placed && TRAIN.running){
+    if(TRAIN.pauseT>0){ TRAIN.pauseT-=dt; }
+    else{
+      const d=SPEED*dt;
+      const lead=TRAIN.F? TRAIN.cars[0] : TRAIN.cars[TRAIN.cars.length-1];
+      const probe=clone(lead.rd), r=advance(probe,d);
+      const step=r.ok? d : Math.max(0,r.moved-0.5);
+      if(step>1e-4){
+        const locoPrev=key(TRAIN.cars[0].rd.cx,TRAIN.cars[0].rd.cy);
+        for(const c of TRAIN.cars) advance(c.rd,step);
+        TRAIN.dist+=step; TRAIN.goDist+=step;
+        wheelPhase+=step/8;
+        chugAcc+=step; if(chugAcc>52){ chugAcc=0; SND.chuff(); }
+        smokeT-=dt; if(smokeT<=0){ smokeT=0.16; stackPuff(); }
+        // station: the loco crossing a platform's centre
+        const lc=TRAIN.cars[0].rd, lpc=pieceAt(lc.cx,lc.cy), lk=key(lc.cx,lc.cy);
+        if(lpc && lpc.t==='st'){
+          const mid=pathsOf(lpc)[lc.pi].len/2;
+          if(Math.abs(lc.s-mid)<step+0.6 && TRAIN.stKey!==lk){
+            TRAIN.stKey=lk; TRAIN.pauseT=STATION_PAUSE; SND.ding();
+          }
+        }
+        if(lk!==locoPrev){
+          if(TRAIN.stKey && TRAIN.stKey!==lk) TRAIN.stKey=null;
+          // first lap — the loco re-enters where GO was pressed, same heading
+          const sig=lk+':'+lc.pi+':'+lc.dir;
+          if(!lapDone && TRAIN.startSig && sig===TRAIN.startSig && TRAIN.goDist>3*C){
+            lapDone=true; firstLap();
+          }
+        }
+      }
+      if(!r.ok) reverseTrain();
+    }
+  }
+  for(const s of smoke){ s.t+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy-=8*dt; }
+  smoke=smoke.filter(s=>s.t<s.dur);
+  for(const e of fx) e.t+=dt;
+  fx=fx.filter(e=>e.t<e.dur);
+  for(const p of confetti){ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=260*dt; p.rot+=p.vr*dt; }
+  confetti=confetti.filter(p=>p.t<p.dur);
+  if(lapCardT>0) lapCardT-=dt;
+}
+function stackPuff(){
+  if(!TRAIN.placed||!TRAIN.cars.length) return;
+  const loco=TRAIN.cars[0], p=pos(loco.rd);
+  const artAng=p.ang+(loco.face<0?Math.PI:0);
+  const flip=Math.cos(artAng)<0;
+  const lx=18*KART, ly=(flip?28:-28)*KART;
+  const ca=Math.cos(artAng), sa=Math.sin(artAng);
+  smoke.push({ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly, t:0, dur:1.1,
+               vx:(Math.random()-0.5)*14, vy:-34, r:3+Math.random()*2 });
+}
+function puff(x,y,R){ fx.push({k:'puff',x,y,R,t:0,dur:0.4}); }
+function firstLap(){
+  lapCardT=2.8; SND.bugle(); SND.whistle();
+  for(let i=0;i<90;i++) confetti.push({
+    x:Math.random()*W, y:-14-Math.random()*90,
+    vx:(Math.random()-0.5)*70, vy:60+Math.random()*130, vr:(Math.random()-0.5)*9,
+    rot:Math.random()*TAU, t:0, dur:2.4+Math.random(),
+    col:['#F2C531','#C0392B','#4E7F46','#F7E9C4','#7CA7D8'][Math.floor(Math.random()*5)] });
+  save();
+}
+
+/* =====================================================================
+   PAINT — the GVT recipes
+   ===================================================================== */
+function rr(x,y,w,h,r){
+  cx.beginPath();
+  cx.moveTo(x+r,y); cx.lineTo(x+w-r,y); cx.quadraticCurveTo(x+w,y,x+w,y+r);
+  cx.lineTo(x+w,y+h-r); cx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  cx.lineTo(x+r,y+h); cx.quadraticCurveTo(x,y+h,x,y+h-r);
+  cx.lineTo(x,y+r); cx.quadraticCurveTo(x,y,x+r,y); cx.closePath();
+}
+// the GVT bedroom rug, verbatim recipe (v1.47 crimson)
+function drawRug(){
+  cx.fillStyle='#63251C'; cx.fillRect(0,0,WORLD_W,WORLD_H);
+  cx.strokeStyle='#4A1A12'; cx.lineWidth=56; cx.strokeRect(0,0,WORLD_W,WORLD_H);
+  cx.strokeStyle='#8F4634'; cx.lineWidth=7; cx.strokeRect(42,42,WORLD_W-84,WORLD_H-84);
+  cx.globalAlpha=0.5; cx.fillStyle='#4A1A12';
+  [[112,112],[WORLD_W-112,112],[112,WORLD_H-112],[WORLD_W-112,WORLD_H-112]]
+    .forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
+  cx.globalAlpha=0.35; cx.strokeStyle='#7A3627'; cx.lineWidth=2;
+  for(let y=90;y<WORLD_H-60;y+=56){ cx.beginPath(); cx.moveTo(30,y); cx.lineTo(WORLD_W-30,y); cx.stroke(); }
+  cx.globalAlpha=1;
+}
+function addPoly(P2,pts,ox,oy){
+  P2.moveTo(ox+pts[0][0],oy+pts[0][1]);
+  for(let i=1;i<pts.length;i++) P2.lineTo(ox+pts[i][0],oy+pts[i][1]);
+}
+// ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers (GVT)
+function drawTrack(){
+  const bed=new Path2D(), rails=new Path2D();
+  const anim=[];
+  for(const [k,pc] of grid){
+    if(pc.ra||pc.pop>0){ anim.push([k,pc]); continue; }
+    const [gx,gy]=k.split(',').map(Number), ox=GX+gx*C, oy=GY+gy*C;
+    for(const p of pathsOf(pc)){
+      addPoly(bed,p.pts,ox,oy);
+      for(let i=0;i<p.pts.length-1;i++){
+        const ax=ox+p.pts[i][0], ay=oy+p.pts[i][1], bx=ox+p.pts[i+1][0], by=oy+p.pts[i+1][1];
+        const L=Math.hypot(bx-ax,by-ay)||1, nx=-(by-ay)/L*5.5, ny=(bx-ax)/L*5.5;
+        rails.moveTo(ax+nx,ay+ny); rails.lineTo(bx+nx,by+ny);
+        rails.moveTo(ax-nx,ay-ny); rails.lineTo(bx-nx,by-ny);
+      }
+    }
+  }
+  cx.lineJoin='round'; cx.lineCap='round';
+  cx.strokeStyle='#9A8266'; cx.lineWidth=34; cx.globalAlpha=0.9; cx.stroke(bed); cx.globalAlpha=1;
+  cx.lineCap='butt';
+  cx.strokeStyle='#6B4A2C'; cx.lineWidth=24; cx.setLineDash([6,12]); cx.stroke(bed); cx.setLineDash([]);
+  cx.strokeStyle='#4A423A'; cx.lineWidth=3; cx.stroke(rails);
+  for(const [k,pc] of grid){
+    if(pc.ra||pc.pop>0) continue;
+    const [gx,gy]=k.split(',').map(Number);
+    drawPieceDecor(pc,GX+gx*C,GY+gy*C);
+  }
+  for(const [k,pc] of anim){
+    const [gx,gy]=k.split(',').map(Number), ox=GX+gx*C, oy=GY+gy*C;
+    cx.save(); cx.translate(ox+C/2,oy+C/2);
+    if(pc.ra) cx.rotate(-(Math.PI/2)*Math.max(0,pc.ra.k));
+    if(pc.pop>0){ const s=1+0.16*pc.pop; cx.scale(s,s); }
+    cx.translate(-C/2,-C/2);
+    drawPieceArt(pc,0,0);
+    cx.restore();
+  }
+}
+// one piece painted whole (ghost, palette icons, animating pieces)
+function drawPieceArt(pc,ox,oy){
+  cx.lineJoin='round';
+  for(const p of pathsOf(pc)){
+    cx.lineCap='round'; cx.strokeStyle='#9A8266'; cx.lineWidth=34; cx.globalAlpha=0.9;
+    cx.beginPath(); cx.moveTo(ox+p.pts[0][0],oy+p.pts[0][1]);
+    for(let i=1;i<p.pts.length;i++) cx.lineTo(ox+p.pts[i][0],oy+p.pts[i][1]);
+    cx.stroke(); cx.globalAlpha=1; cx.lineCap='butt';
+    cx.strokeStyle='#6B4A2C'; cx.lineWidth=24; cx.setLineDash([6,12]); cx.stroke(); cx.setLineDash([]);
+    cx.strokeStyle='#4A423A'; cx.lineWidth=3;
+    for(let i=0;i<p.pts.length-1;i++){
+      const ax=ox+p.pts[i][0], ay=oy+p.pts[i][1], bx=ox+p.pts[i+1][0], by=oy+p.pts[i+1][1];
+      const L=Math.hypot(bx-ax,by-ay)||1, nx=-(by-ay)/L*5.5, ny=(bx-ax)/L*5.5;
+      cx.beginPath(); cx.moveTo(ax+nx,ay+ny); cx.lineTo(bx+nx,by+ny); cx.stroke();
+      cx.beginPath(); cx.moveTo(ax-nx,ay-ny); cx.lineTo(bx-nx,by-ny); cx.stroke();
+    }
+  }
+  drawPieceDecor(pc,ox,oy);
+}
+function drawPieceDecor(pc,ox,oy){
+  if(pc.t==='b'){
+    cx.save(); cx.translate(ox+C/2,oy+C/2); cx.rotate(pc.r*Math.PI/2);
+    // the buffer block: red/white stripes on two posts, square across the line
+    cx.fillStyle='#3A3733'; cx.fillRect(-9,4,4,10); cx.fillRect(5,4,4,10);
+    cx.save(); cx.translate(0,16);
+    cx.fillStyle='#C0392B'; rr(-16,-7,32,14,4); cx.fill();
+    cx.fillStyle='#F7E9C4'; cx.fillRect(-10,-7,7,14); cx.fillRect(4,-7,7,14);
+    cx.strokeStyle='#7E241A'; cx.lineWidth=2; rr(-16,-7,32,14,4); cx.stroke();
+    cx.restore(); cx.restore();
+  }
+  if(pc.t==='st'){
+    cx.save(); cx.translate(ox+C/2,oy+C/2); cx.rotate(pc.r*Math.PI/2);
+    // platform on the south side, canopy stripes, one small green stationmaster
+    cx.fillStyle='#B48A54'; rr(-42,16,84,26,4); cx.fill();
+    cx.strokeStyle='#8a683e'; cx.lineWidth=2.5; rr(-42,16,84,26,4); cx.stroke();
+    cx.strokeStyle='#8a683e'; cx.lineWidth=1.6;
+    cx.beginPath(); for(let x=-28;x<=28;x+=14){ cx.moveTo(x,18); cx.lineTo(x,40); } cx.stroke();
+    for(let i=0;i<5;i++){ cx.fillStyle=i%2?'#F7E9C4':'#C0392B'; cx.fillRect(-35+i*14,9,14,7); }
+    cx.strokeStyle='#5A5148'; cx.lineWidth=1.4; cx.strokeRect(-35,9,70,7);
+    // the little green man, molded-plastic law: thick round-capped strokes
+    const wob=Math.sin(perf()*2.2)*0.35;
+    cx.save(); cx.translate(26,28);
+    cx.strokeStyle='#4E7F46'; cx.fillStyle='#4E7F46'; cx.lineWidth=4.6; cx.lineCap='round';
+    cx.beginPath(); cx.arc(0,-11,4.6,0,7); cx.fill();
+    cx.beginPath(); cx.moveTo(0,-7); cx.lineTo(0,4); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(-6,1); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(6,-12+wob*3); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,4); cx.lineTo(-4,11); cx.moveTo(0,4); cx.lineTo(4,11); cx.stroke();
+    cx.lineCap='butt'; cx.restore();
+    // green flag on a post at the platform's end
+    cx.strokeStyle='#EFE7D8'; cx.lineWidth=3;
+    cx.beginPath(); cx.moveTo(-34,16); cx.lineTo(-34,-2); cx.stroke();
+    cx.fillStyle='#4E7F46'; cx.beginPath(); cx.moveTo(-34,-2); cx.lineTo(-22,2); cx.lineTo(-34,6); cx.closePath(); cx.fill();
+    cx.restore();
+  }
+}
+// GVT drawTrainCar, adapted: same wheels, same shadow, same flip-upright law,
+// wheel spokes actually spin, three new cars in the same palette
+function wheel(wx,wr,rot){
+  cx.fillStyle='#C0392B'; cx.beginPath(); cx.arc(wx,18,wr,0,7); cx.fill();
+  cx.save(); cx.translate(wx,18); cx.rotate(rot);
+  cx.strokeStyle='#7E241A'; cx.lineWidth=2;
+  cx.beginPath(); cx.moveTo(-wr*0.7,0); cx.lineTo(wr*0.7,0);
+  cx.moveTo(0,-wr*0.7); cx.lineTo(0,wr*0.7); cx.stroke();
+  cx.restore();
+  cx.fillStyle='#2b2117'; cx.beginPath(); cx.arc(wx,18,2.2,0,7); cx.fill();
+}
+function drawCar(type,x,y,artAng,squash,wrot){
+  cx.save(); cx.translate(x,y); cx.rotate(artAng);
+  if(Math.cos(artAng)<0) cx.scale(1,-1);
+  cx.scale(KART,KART);
+  if(squash>0) cx.scale(1-0.22*squash, 1+0.22*squash);
+  cx.globalAlpha=0.28; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(0,24,42,9,0,0,7); cx.fill(); cx.globalAlpha=1;
+  if(type==='loco'){
+    wheel(-24,8,wrot); wheel(-4,8,wrot); wheel(18,10,wrot*0.8);
+    cx.fillStyle='#C0392B';
+    cx.beginPath(); cx.moveTo(30,22); cx.lineTo(44,22); cx.lineTo(30,0); cx.closePath(); cx.fill();
+    cx.fillStyle='#23211E'; rr(-12,-12,42,26,6); cx.fill();
+    cx.fillStyle='#3A3733'; rr(14,-26,9,15,2); cx.fill();
+    cx.fillStyle='#2E2B27'; rr(-36,-28,26,42,4); cx.fill();
+    cx.fillStyle='#C0392B'; rr(-39,-33,32,8,3); cx.fill();
+    cx.fillStyle='#F7E9C4'; rr(-31,-22,12,10,2); cx.fill();
+    cx.fillStyle='#F2C531'; cx.beginPath(); cx.arc(30,1,6,0,7); cx.fill();
+    cx.strokeStyle='#8a6a1e'; cx.lineWidth=1.5; cx.beginPath(); cx.arc(30,1,6,0,7); cx.stroke();
+  } else if(type==='tender'){
+    wheel(-18,8,wrot); wheel(18,8,wrot);
+    cx.fillStyle='#C0392B'; rr(-32,-14,64,30,5); cx.fill();
+    cx.strokeStyle='#7E241A'; cx.lineWidth=2; rr(-32,-14,64,30,5); cx.stroke();
+    cx.fillStyle='#1E1B18';
+    cx.beginPath(); cx.arc(-14,-14,9,3.14,0); cx.arc(2,-16,10,3.14,0); cx.arc(18,-14,8,3.14,0); cx.fill();
+  } else if(type==='box'){
+    wheel(-18,8,wrot); wheel(18,8,wrot);
+    cx.fillStyle='#4E7F46'; rr(-32,-20,64,36,5); cx.fill();
+    cx.strokeStyle='#33552F'; cx.lineWidth=2; rr(-32,-20,64,36,5); cx.stroke();
+    cx.fillStyle='#7A553A'; rr(-35,-25,70,8,3); cx.fill();
+    cx.fillStyle='#3C6236'; rr(-7,-15,14,28,2); cx.fill();
+    cx.strokeStyle='#2E4A2A'; cx.lineWidth=1.5;
+    cx.beginPath(); cx.moveTo(0,-15); cx.lineTo(0,13); cx.stroke();
+  } else if(type==='tank'){
+    wheel(-18,8,wrot); wheel(18,8,wrot);
+    cx.fillStyle='#8A8F96'; rr(-32,-16,64,30,14); cx.fill();
+    cx.strokeStyle='#5C6167'; cx.lineWidth=2; rr(-32,-16,64,30,14); cx.stroke();
+    cx.fillStyle='#5C6167'; cx.fillRect(-24,-16,5,30); cx.fillRect(19,-16,5,30);
+    cx.fillStyle='#B9BDC4'; rr(-7,-24,14,10,4); cx.fill();
+    cx.strokeStyle='#5C6167'; cx.lineWidth=1.5; rr(-7,-24,14,10,4); cx.stroke();
+  } else if(type==='flat'){
+    wheel(-18,8,wrot); wheel(18,8,wrot);
+    cx.fillStyle='#B48A54'; rr(-32,0,64,12,3); cx.fill();
+    cx.strokeStyle='#8a683e'; cx.lineWidth=2; rr(-32,0,64,12,3); cx.stroke();
+    cx.fillStyle='#7A553A'; rr(-28,-8,56,8,4); cx.fill();
+    cx.fillStyle='#8a6544'; rr(-24,-15,48,8,4); cx.fill();
+    cx.fillStyle='#7A553A'; rr(-18,-22,36,8,4); cx.fill();
+  } else if(type==='cab'){
+    wheel(-18,8,wrot); wheel(18,8,wrot);
+    cx.fillStyle='#C0392B'; rr(-30,-18,60,34,5); cx.fill();
+    cx.strokeStyle='#7E241A'; cx.lineWidth=2; rr(-30,-18,60,34,5); cx.stroke();
+    cx.fillStyle='#8f2020'; rr(-12,-28,24,12,3); cx.fill();
+    cx.fillStyle='#7A553A'; rr(-33,-21,66,7,3); cx.fill();
+    cx.fillStyle='#F7E9C4'; rr(-22,-11,10,9,2); cx.fill(); rr(12,-11,10,9,2); cx.fill(); rr(-5,-27,10,7,2); cx.fill();
+  }
+  cx.restore();
+}
+function drawTrain(){
+  if(!TRAIN.placed) return;
+  for(let i=TRAIN.cars.length-1;i>=0;i--){
+    const c=TRAIN.cars[i];
+    const f=clone(c.rd), b=clone(c.rd);
+    const rf=advance(f,AX), rb=back(b,AX);
+    let ang,x,y;
+    if(rf.moved>1||rb.moved>1){
+      const pf=rf.ok||rf.moved>1? pos(f):pos(c.rd), pb=rb.ok||rb.moved>1? pos(b):pos(c.rd);
+      ang=Math.atan2(pf.y-pb.y,pf.x-pb.x); x=(pf.x+pb.x)/2; y=(pf.y+pb.y)/2;
+    } else { const p=pos(c.rd); ang=p.ang; x=p.x; y=p.y; }
+    const artAng=ang+(c.face<0?Math.PI:0);
+    drawCar(c.type,x,y,artAng,c.squash,wheelPhase*(c.face<0?-1:1));
+  }
+}
+function drawGhosts(){
+  if(!DRAG) return;
+  if(DRAG.kind==='newPiece'||DRAG.kind==='movePiece'){
+    cx.globalAlpha=0.18; cx.strokeStyle='#F7E9C4'; cx.lineWidth=2;
+    for(let gx=0;gx<=GW;gx++) for(let gy=0;gy<=GH;gy++){
+      const x=GX+gx*C, y=GY+gy*C;
+      cx.beginPath(); cx.moveTo(x-5,y); cx.lineTo(x+5,y); cx.moveTo(x,y-5); cx.lineTo(x,y+5); cx.stroke();
+    }
+    cx.globalAlpha=1;
+    if(hover){
+      const ok=!pieceAt(hover[0],hover[1]);
+      cx.globalAlpha=0.28; cx.fillStyle=ok?'#7CFC66':'#FF5A44';
+      rr(GX+hover[0]*C+3,GY+hover[1]*C+3,C-6,C-6,10); cx.fill(); cx.globalAlpha=1;
+      if(ok){ cx.globalAlpha=0.8; drawPieceArt({t:DRAG.t,r:DRAG.r},GX+hover[0]*C,GY+hover[1]*C); cx.globalAlpha=1; }
+    } else if(DRAG.x!=null){
+      cx.globalAlpha=0.8; cx.save(); cx.translate(DRAG.x-C/2,DRAG.y-C/2);
+      drawPieceArt({t:DRAG.t,r:DRAG.r},0,0); cx.restore(); cx.globalAlpha=1;
+    }
+  }
+  if(DRAG.kind==='train' && DRAG.x!=null){
+    if(hover && pieceAt(hover[0],hover[1])){
+      cx.globalAlpha=0.28; cx.fillStyle='#7CFC66';
+      rr(GX+hover[0]*C+3,GY+hover[1]*C+3,C-6,C-6,10); cx.fill(); cx.globalAlpha=1;
+    }
+    const n=1+consist.length;
+    for(let i=n-1;i>=0;i--){
+      const t=i===0?'loco':consist[i-1];
+      cx.globalAlpha=0.85;
+      drawCar(t, DRAG.x - i*GAP*0.62, DRAG.y + Math.sin(perf()*6+i)*2, 0, 0, wheelPhase);
+      cx.globalAlpha=1;
+    }
+  }
+}
+const HINTS=[
+  'DRAG A PIECE OF TRACK ONTO THE RUG',
+  'TAP A PIECE TO TURN IT · DRAG IT TO MOVE IT',
+  'OPEN THE SHED — YOUR TRAIN IS WAITING',
+  'DRAG YOUR TRAIN ONTO THE TRACK',
+  'PRESS GO!',
+];
+function drawHint(){
+  if(hintStage>=HINTS.length) return;
+  cx.globalAlpha=0.7+0.3*Math.sin(perf()*4);
+  cx.font='bold 20px "Arial Black",Impact,sans-serif'; cx.textAlign='center'; cx.fillStyle='#F7E9C4';
+  const txt=HINTS[hintStage], w=cx.measureText(txt).width;
+  if(w>W-40) cx.font='bold '+Math.max(11,Math.floor(20*(W-40)/w))+'px "Arial Black",Impact,sans-serif';
+  cx.fillText(txt, W/2, H-BAR-16);
+  cx.globalAlpha=1;
+}
+function drawLapCard(){
+  if(lapCardT<=0) return;
+  const k=Math.min(1,(2.8-lapCardT)*5), out=Math.min(1,lapCardT*2.5);
+  cx.globalAlpha=Math.min(k,out);
+  const cw=Math.min(360,W-60), chh=104, x=(W-cw)/2, y=(H-BAR)/2-70;
+  cx.fillStyle='#1e1610'; rr(x,y,cw,chh,16); cx.fill();
+  cx.strokeStyle='#F2C531'; cx.lineWidth=4; rr(x,y,cw,chh,16); cx.stroke();
+  cx.fillStyle='#F2C531'; cx.textAlign='center';
+  cx.font='bold 34px "Arial Black",Impact,sans-serif'; cx.fillText('FIRST LAP!', W/2, y+46);
+  cx.fillStyle='#F7E9C4'; cx.font='bold 13px "Arial Black",Impact,sans-serif';
+  cx.fillText('ROUND AND ROUND, FOREVER!', W/2, y+76);
+  cx.globalAlpha=1;
+}
+function draw(){
+  cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cvs.width,cvs.height);
+  cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
+  drawRug(); drawTrack(); drawTrain();
+  for(const s of smoke){ const k=s.t/s.dur;
+    cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb';
+    cx.beginPath(); cx.arc(s.x,s.y,s.r+9*k,0,7); cx.fill(); cx.globalAlpha=1; }
+  for(const e of fx){ const k=e.t/e.dur;
+    if(e.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle='#e8e0cc';
+      cx.beginPath(); cx.arc(e.x,e.y,e.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; } }
+  drawGhosts();
+  cx.setTransform(DPR,0,0,DPR,0,0);
+  for(const p of confetti){ cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot);
+    cx.globalAlpha=Math.min(1,(p.dur-p.t)*2); cx.fillStyle=p.col; cx.fillRect(-4,-2.5,8,5); cx.restore(); }
+  cx.globalAlpha=1;
+  drawHint(); drawLapCard();
+}
+
+/* =====================================================================
+   SOUND — small synth kit through one gate (GVT palette)
+   ===================================================================== */
+const AU={ctx:null,g:null,on:true};
+function ac(){
+  if(!AU.ctx){
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return null;
+    AU.ctx=new AC(); AU.g=AU.ctx.createGain(); AU.g.gain.value=0.5; AU.g.connect(AU.ctx.destination);
+  }
+  if(AU.ctx.state==='suspended') AU.ctx.resume();
+  return AU.ctx;
+}
+function tone(f,dur,type,vol,slideTo,when){
+  const a=ac(); if(!a||!AU.on) return;
+  const t0=a.currentTime+(when||0);
+  const o=a.createOscillator(), g=a.createGain();
+  o.type=type||'sine'; o.frequency.setValueAtTime(f,t0);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30,slideTo),t0+dur);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.linearRampToValueAtTime(vol,t0+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(g); g.connect(AU.g); o.start(t0); o.stop(t0+dur+0.05);
+}
+let NBUF=null;
+function noise(dur,freq,vol,type,when){
+  const a=ac(); if(!a||!AU.on) return;
+  if(!NBUF){ NBUF=a.createBuffer(1,a.sampleRate*0.5,a.sampleRate);
+    const d=NBUF.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; }
+  const t0=a.currentTime+(when||0);
+  const s=a.createBufferSource(); s.buffer=NBUF; s.loop=true;
+  const f=a.createBiquadFilter(); f.type=type||'bandpass'; f.frequency.value=freq; f.Q.value=1.1;
+  const g=a.createGain();
+  g.gain.setValueAtTime(vol,t0); g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  s.connect(f); f.connect(g); g.connect(AU.g); s.start(t0); s.stop(t0+dur+0.05);
+}
+let chuffSide=false;
+const SND={
+  tok(){ tone(170,0.09,'sine',0.5); noise(0.05,900,0.3,'lowpass'); },
+  click(){ noise(0.03,2400,0.25,'highpass'); },
+  pop(){ tone(300,0.08,'triangle',0.35,560); },
+  clank(){ tone(520,0.06,'square',0.13); tone(1400,0.05,'triangle',0.1); noise(0.04,3000,0.2); },
+  boing(){ tone(180,0.35,'triangle',0.5,70); tone(363,0.22,'sine',0.18,120); },
+  ding(){ tone(1568,0.35,'sine',0.22); tone(1568,0.35,'sine',0.22,undefined,0.19); },
+  chuff(){ chuffSide=!chuffSide; noise(0.07,chuffSide?750:640,0.16,'bandpass'); },
+  whistle(){ tone(440,0.85,'triangle',0.22); tone(554,0.85,'triangle',0.2); noise(0.6,1200,0.05,'lowpass'); },
+  toot(){ tone(440,0.28,'triangle',0.24); tone(554,0.28,'triangle',0.2); },
+  bugle(){ tone(392,0.18,'triangle',0.3); tone(523,0.18,'triangle',0.3,undefined,0.16);
+           tone(659,0.4,'triangle',0.32,undefined,0.32); },
+};
+
+/* =====================================================================
+   SAVE
+   ===================================================================== */
+function save(){
+  try{
+    const g=[]; for(const [k,pc] of grid) g.push([k,pc.t,pc.r]);
+    localStorage.setItem('TRAINSET', JSON.stringify({
+      v:1, grid:g, consist,
+      train: TRAIN.placed? { cars:TRAIN.cars.map(c=>({t:c.type,cx:c.rd.cx,cy:c.rd.cy,pi:c.rd.pi,dir:c.rd.dir,s:c.rd.s,f:c.face})), F:TRAIN.F } : null,
+      hints:hintStage, lap:lapDone, mute:!AU.on,
+    }));
+  }catch(e){}
+}
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem('TRAINSET')||'null'); if(!d) return;
+    for(const [k,t,r] of (d.grid||[])) if(PATHS[t]) grid.set(k,{t,r:(r|0)%4,ra:null,pop:0});
+    if(Array.isArray(d.consist)) consist=d.consist.filter(t=>CARDEF[t]).slice(0,MAXCARS);
+    hintStage=d.hints|0; lapDone=!!d.lap; AU.on=!d.mute;
+    if(d.train && d.train.cars && d.train.cars.length){
+      let ok=true;
+      const cars=d.train.cars.map(c=>{
+        const pc=pieceAt(c.cx,c.cy);
+        if(!pc || !pathsOf(pc)[c.pi]) ok=false;
+        return {type:c.t,rd:{cx:c.cx,cy:c.cy,pi:c.pi,dir:c.dir>0?1:-1,s:+c.s||0},face:c.f<0?-1:1,squash:0};
+      });
+      if(ok){ TRAIN.cars=cars; TRAIN.placed=true; TRAIN.F=d.train.F!==false; }
+    }
+  }catch(e){}
+}
+
+/* =====================================================================
+   INPUT + CHROME
+   ===================================================================== */
+const PIECES=[ ['s','STRAIGHT'], ['c','CURVE'], ['x','CROSSING'], ['b','BUMPER'], ['st','STATION'] ];
+const CARDEF={ tender:'TENDER', box:'BOXCAR', tank:'TANKER', flat:'FLATCAR', cab:'CABOOSE' };
+const $=id=>document.getElementById(id);
+function worldXY(e){ return [ (e.clientX-OX)/SC, (e.clientY-OY)/SC ]; }
+function cellXY(wx,wy){
+  const gx=Math.floor((wx-GX)/C), gy=Math.floor((wy-GY)/C);
+  return (gx>=0&&gy>=0&&gx<GW&&gy<GH)? [gx,gy] : null;
+}
+let down=null;
+function toast(msg){
+  const el=$('toast');
+  el.textContent=msg; el.classList.add('on');
+  clearTimeout(toast.tm); toast.tm=setTimeout(()=>el.classList.remove('on'),2000);
+}
+function hintPass(n){ if(hintStage===n){ hintStage=n+1; save(); } }
+function wiggle(el){ el.classList.remove('wig'); void el.offsetWidth; el.classList.add('wig'); }
+
+cvs.addEventListener('pointerdown',e=>{
+  ac(); e.preventDefault();
+  const [wx,wy]=worldXY(e);
+  if(TRAIN.placed){
+    const p=pos(TRAIN.cars[0].rd);
+    if(Math.hypot(wx-p.x,wy-p.y)<36){ down={x:e.clientX,y:e.clientY,what:'loco'}; return; }
+  }
+  const cell=cellXY(wx,wy);
+  if(cell && pieceAt(cell[0],cell[1])){ down={x:e.clientX,y:e.clientY,what:'piece',cell}; return; }
+  down=null;
+});
+window.addEventListener('pointermove',e=>{
+  if(DRAG){
+    e.preventDefault();
+    const [wx,wy]=worldXY(e);
+    DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy);
+    return;
+  }
+  if(!down) return;
+  if(Math.hypot(e.clientX-down.x,e.clientY-down.y)<8) return;
+  e.preventDefault();
+  if(down.what==='pal'){ DRAG={kind:'newPiece',t:down.t,r:0}; }
+  else if(down.what==='piece'){
+    const [gx,gy]=down.cell, pc=pieceAt(gx,gy);
+    if(pc){
+      if(TRAIN.placed && trainCells().has(key(gx,gy))){
+        if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); down=null; return; }
+        trainHome(false); toast('BACK IN THE SHED');
+      }
+      grid.delete(key(gx,gy)); save();
+      DRAG={kind:'movePiece',t:pc.t,r:pc.r,from:[gx,gy]};
+    }
+  }
+  else if(down.what==='loco'){
+    DRAG={kind:'train',wasRunning:TRAIN.running,
+          prev:TRAIN.cars.map(c=>({type:c.type,rd:clone(c.rd),face:c.face})),prevF:TRAIN.F};
+    TRAIN.running=false; TRAIN.placed=false; TRAIN.cars=[]; goBtnSync();
+  }
+  else if(down.what==='handle'){ DRAG={kind:'train',wasRunning:false,prev:null}; shedShow(false); }
+  if(DRAG){ const [wx,wy]=worldXY(e); DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy); down=null; }
+},{passive:false});
+window.addEventListener('pointerup',e=>{
+  if(DRAG){
+    const [wx,wy]=worldXY(e); hover=cellXY(wx,wy);
+    if(DRAG.kind==='newPiece'||DRAG.kind==='movePiece'){
+      if(hover && !pieceAt(hover[0],hover[1])){
+        grid.set(key(hover[0],hover[1]),{t:DRAG.t,r:DRAG.r,ra:null,pop:1});
+        SND.tok(); puff(GX+hover[0]*C+C/2,GY+hover[1]*C+C/2,14);
+        hintPass(0); if(grid.size>=3) hintPass(1);
+        save();
+      } else if(hover){
+        if(DRAG.kind==='movePiece'){ grid.set(key(DRAG.from[0],DRAG.from[1]),{t:DRAG.t,r:DRAG.r,ra:null,pop:0}); save(); }
+        toast('THAT SPOT IS TAKEN');
+      } else {
+        if(DRAG.kind==='movePiece'){ SND.pop(); puff(wx,wy,14); save(); }
+      }
+    }
+    else if(DRAG.kind==='train'){
+      let placedOk=false;
+      if(hover && pieceAt(hover[0],hover[1])) placedOk=placeTrainAt(hover[0],hover[1]);
+      if(placedOk){
+        SND.clank(); hintPass(3);
+        if(DRAG.wasRunning) goTrain();
+      } else {
+        if(hover && pieceAt(hover[0],hover[1])) toast('TOO SHORT FOR THIS TRAIN!');
+        if(DRAG.prev){ TRAIN.cars=DRAG.prev.map(c=>({type:c.type,rd:clone(c.rd),face:c.face,squash:0})); TRAIN.placed=true; TRAIN.F=DRAG.prevF; }
+        else toast('BACK IN THE SHED');
+      }
+      goBtnSync(); shedSync(); save();
+    }
+    DRAG=null; hover=null; return;
+  }
+  if(!down) return;
+  const dist=Math.hypot(e.clientX-down.x,e.clientY-down.y);
+  if(dist<8){
+    if(down.what==='loco'){ SND.whistle(); for(let i=0;i<3;i++) setTimeout(stackPuff,i*90); }
+    else if(down.what==='piece'){
+      const [gx,gy]=down.cell, pc=pieceAt(gx,gy);
+      if(pc){
+        if(TRAIN.placed && trainCells().has(key(gx,gy))){
+          if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
+          else { trainHome(false); pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); save(); }
+        } else { pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); hintPass(1); save(); }
+      }
+    }
+    else if(down.what==='pal'){ wiggle(down.el); toast('DRAG IT ONTO THE RUG!'); }
+    else if(down.what==='handle'){ toast('DRAG IT ONTO THE TRACK!'); }
+  }
+  down=null;
+});
+
+// ---- chrome: palette, shed, GO, mute ----
+function withCtx(g,fn){ const old=cx; cx=g; try{ fn(); } finally{ cx=old; } }
+function buildPalette(){
+  const slot=$('palSlot');
+  for(const [t,name] of PIECES){
+    const b=document.createElement('button'); b.className='pbtn'; b.type='button';
+    const cv=document.createElement('canvas'); const lb=document.createElement('small');
+    lb.textContent=name; b.appendChild(cv); b.appendChild(lb); slot.appendChild(b);
+    cv.width=104; cv.height=104;
+    const g=cv.getContext('2d'), s=104/(C+16);
+    g.setTransform(s,0,0,s,8*s,8*s);
+    withCtx(g,()=>drawPieceArt({t,r:t==='c'?1:0},0,0));
+    b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
+      down={x:e.clientX,y:e.clientY,what:'pal',t,el:b}; });
+  }
+}
+function buildParts(){
+  const wrap=$('parts');
+  for(const t in CARDEF){
+    const b=document.createElement('button'); b.className='cbtn'; b.type='button';
+    const cv=document.createElement('canvas'); const lb=document.createElement('small');
+    lb.textContent='+ '+CARDEF[t]; b.appendChild(cv); b.appendChild(lb); wrap.appendChild(b);
+    cv.width=116; cv.height=80;
+    const g=cv.getContext('2d'); g.setTransform(1,0,0,1,58,42);
+    withCtx(g,()=>drawCar(t,0,0,0,0,0.6));
+    b.addEventListener('click',()=>{
+      ac();
+      if(consist.length>=MAXCARS){ wiggle(b); toast('SIX CARS IS PLENTY!'); return; }
+      consist.push(t); SND.clank(); consistChanged();
+    });
+  }
+}
+const CONW=520, CONH=64, CONSP=54, CON0=44;
+function paintConsist(){
+  const cv=$('consist'); cv.width=CONW*2; cv.height=CONH*2;
+  const g=cv.getContext('2d'); g.setTransform(2,0,0,2,0,0);
+  withCtx(g,()=>{
+    for(let i=0;i<=consist.length;i++){
+      const t=i===0?'loco':consist[i-1];
+      drawCar(t, CON0+i*CONSP, 36, 0, 0, 0.6);
+    }
+  });
+}
+function consistChanged(){
+  if(TRAIN.placed){
+    const lc=TRAIN.cars[0].rd, wasCell=[lc.cx,lc.cy];
+    TRAIN.running=false;
+    if(!placeTrainAt(wasCell[0],wasCell[1])){ trainHome(false); toast('TOO SHORT FOR THIS TRAIN!'); }
+  }
+  goBtnSync(); shedSync(); save();
+}
+function shedShow(b){ $('shed').classList.toggle('open',b); if(b){ shedSync(); hintPass(2); } }
+function shedSync(){
+  paintConsist();
+  const h=$('handle');
+  if(TRAIN.placed){ h.textContent='🏠 ON THE RAILS — TAP TO BRING IT HOME'; h.classList.add('home'); }
+  else { h.textContent='🚂 DRAG ME ONTO THE TRACK'; h.classList.remove('home'); }
+}
+function goBtnSync(){
+  const b=$('goBtn');
+  if(TRAIN.running){ b.textContent='STOP ■'; b.classList.add('run'); }
+  else { b.textContent='GO ▶'; b.classList.remove('run'); }
+}
+function muteSync(){ $('mute').textContent=AU.on?'🔊':'🔇'; }
+$('goBtn').addEventListener('click',()=>{
+  ac();
+  if(!TRAIN.placed){ wiggle($('shedBtn')); toast('BUILD YOUR TRAIN IN THE SHED FIRST!'); return; }
+  if(TRAIN.running){ TRAIN.running=false; SND.click(); }
+  else { goTrain(); SND.whistle(); hintPass(4); }
+  goBtnSync(); save();
+});
+$('shedBtn').addEventListener('click',()=>{ ac(); shedShow(true); });
+$('shedX').addEventListener('click',()=>shedShow(false));
+$('handle').addEventListener('pointerdown',e=>{
+  ac(); e.preventDefault();
+  if(TRAIN.placed) return;                    // acts as a button then
+  down={x:e.clientX,y:e.clientY,what:'handle'};
+});
+$('handle').addEventListener('click',()=>{
+  if(TRAIN.placed){ trainHome(false); toast('BACK IN THE SHED'); shedSync(); goBtnSync(); save(); }
+});
+$('consist').addEventListener('click',e=>{
+  const el=$('consist'), rect=el.getBoundingClientRect();
+  const x=(e.clientX-rect.left)/rect.width*CONW;
+  const i=Math.round((x-CON0)/CONSP);
+  if(i<=0){ SND.toot(); return; }
+  if(i>=1 && i<=consist.length){ consist.splice(i-1,1); SND.pop(); consistChanged(); }
+});
+$('tidy').addEventListener('click',()=>{ $('tidyAsk').classList.add('on'); $('tidy').classList.add('off'); });
+$('tidyNo').addEventListener('click',()=>{ $('tidyAsk').classList.remove('on'); $('tidy').classList.remove('off'); });
+$('tidyYes').addEventListener('click',()=>{
+  grid.clear(); trainHome(true); SND.pop(); save();
+  $('tidyAsk').classList.remove('on'); $('tidy').classList.remove('off');
+  shedShow(false); toast('ALL TIDY!');
+});
+$('mute').addEventListener('click',()=>{ AU.on=!AU.on; if(AU.on){ ac(); SND.click(); } muteSync(); save(); });
+
+// ---- boot ----
+function resize(){
+  W=innerWidth; H=innerHeight; DPR=Math.min(2,devicePixelRatio||1);
+  BAR=$('bar').offsetHeight||118;
+  cvs.width=Math.round(W*DPR); cvs.height=Math.round(H*DPR);
+  cvs.style.width=W+'px'; cvs.style.height=H+'px';
+  SC=Math.min(W/WORLD_W,(H-BAR)/WORLD_H);
+  OX=(W-WORLD_W*SC)/2; OY=(H-BAR-WORLD_H*SC)/2;
+}
+window.addEventListener('resize',resize);
+load(); buildPalette(); buildParts(); resize(); goBtnSync(); shedSync(); muteSync();
+let last=performance.now();
+function frame(t){
+  const dt=Math.min(0.05,(t-last)/1000); last=t;
+  if(TS.auto) update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+// ---- debug rig (the GVT window.GVT pattern) — drive it headless ----
+window.TS={
+  auto:true,
+  place(t,r,gx,gy){ if(!PATHS[t]||gx<0||gy<0||gx>=GW||gy>=GH||pieceAt(gx,gy)) return false;
+    grid.set(key(gx,gy),{t,r:(r|0)%4,ra:null,pop:0}); save(); return true; },
+  remove(gx,gy){ const k=key(gx,gy); if(!grid.has(k)) return false;
+    if(TRAIN.placed && trainCells().has(k)){ if(TRAIN.running) return false; trainHome(true); }
+    grid.delete(k); save(); return true; },
+  clear(){ grid.clear(); trainHome(true); save(); },
+  consist(arr){ consist=(arr||[]).filter(t=>CARDEF[t]).slice(0,MAXCARS); consistChanged(); return consist.slice(); },
+  placeTrain(gx,gy){ const ok=placeTrainAt(gx,gy); goBtnSync(); shedSync(); save(); return ok; },
+  go(){ const ok=goTrain(); save(); return ok; },
+  stop(){ TRAIN.running=false; goBtnSync(); save(); },
+  home(){ trainHome(true); save(); },
+  step(dt){ update(dt||1/60); },
+  state(){ return { placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F, pieces:grid.size,
+    consist:consist.slice(), lap:lapDone, hint:hintStage, pauseT:TRAIN.pauseT,
+    loco:TRAIN.placed? Object.assign({},TRAIN.cars[0].rd,pos(TRAIN.cars[0].rd)) : null,
+    cars:TRAIN.cars.map(c=>{ const p=pos(c.rd); return {t:c.type,x:p.x,y:p.y}; }) }; },
+  mute(b){ AU.on=!b; muteSync(); },
+};
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
