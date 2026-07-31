@@ -2029,7 +2029,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.92</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.93</div>
   <div class="scanlines"></div>
 </div>
 
@@ -12195,7 +12195,7 @@ function coachEvent(ev,u){
 const S = {
   mode:'title', plastic:170, lives:10, wave:0, waveActive:false, queue:[], waveT:0,
   units:[], foes:[], forms:[], shots:[], fx:[], blobs:[], floats:[], corpses:[], mines:[],
-  sel:null, drag:null, speed:1, shake:0, t:0, ann:null, interT:0,
+  sel:null, drag:null, speed:1, slowmo:1, spdI:0, shake:0, t:0, ann:null, interT:0,
   placedAny:false, hintT:0, cleared:false,
   sargeCd:0, sargeFlash:0, tagT:0, lostLevel:0,
   jetCd:0, jetFlash:0, jetAim:null,   // THE JET PACK: one clock (mine only) + the aim gesture (v1.39)
@@ -12208,7 +12208,7 @@ function reset(){
   WORLD_H=H;      // only a tall battlefield map raises it (startBattlefield, right after this wipe)
   S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
-  S.ffLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.hitStop=0; S.tanBase=null; S.vflag=null;
+  S.ffLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.slowmo=1; S.spdI=0; S.hitStop=0; S.tanBase=null; S.vflag=null;
   S.momRaid=false;   // v1.79: a stale mom flag would leak her interT/floor/verdict into the next battle
   S.sargeCd=0; S.sargeFlash=0; S.tagT=0; S.lostLevel=0;   // casualties + Sarge's clock + the faucet (v1.32)
   S.chargeAnn=false;                      // v1.40: the CHARGE bugle speaks once a level
@@ -12223,6 +12223,33 @@ function reset(){
   S.sq=null;      // …and a squad mission arms its streaming ticker there too
   S.aceKills=0;   // best single-soldier kill count this battle (yours only)
 }
+// ===== SPEED DEFAULTS (v1.93, Wyatt 7/31) =====
+// "Set the default speed in campaign to .65x speed: (say its .75x speed) so
+// new players can quickly adjust to the game. Also decrease the battle ground
+// default speed to 90%." The campaign OPENS at ×0.65 real while the button
+// says ×0.75 — both numbers are his and the gap is deliberate; do not
+// reconcile them. The battleground opens at an honest ×0.9. The old ×1 and
+// ×2 stay on the ladder as absolutes — these are new DEFAULTS, not new
+// ceilings — so the button cycles base → ×1 → ×2 and a returning player's
+// known speeds are the exact sim rates that shipped. The chosen rung persists
+// per surface (META.spdC/spdB — device-local like levelStars, never on the
+// sync wire); the sortie, the mom fight and the classic rigs keep the shipped
+// ×1↔×2 toggle. Co-op pins ×1 at the S.coop arm sites: every sim in a lobby
+// — old-build clients included — must run the SAME multiplier, and old
+// builds run 1. The boom slow-mo rides S.slowmo now, so a dramatic beat can
+// never overwrite the dial.
+const SPD_MODES={
+  c:{ real:[0.65,1,2], show:[0.75,1,2], k:'spdC' },
+  b:{ real:[0.90,1,2], show:[0.90,1,2], k:'spdB' },
+  o:{ real:[1,2],      show:[1,2],      k:null   }
+};
+function spdMode(){ return S.bf? 'b' : S.sq? 'c' : 'o'; }
+function spdInit(){ const M=SPD_MODES[spdMode()];
+  const i=M.k? (META[M.k]|0) : 0;
+  S.spdI=(i>=0 && i<M.real.length)? i : 0;   // reader-clamped — garbage in the save never crashes the dial
+  S.speed=M.real[S.spdI]; }
+function spdShow(){ const M=SPD_MODES[spdMode()];
+  return M.show[Math.min(S.spdI,M.show.length-1)]; }
 function startBattle(levelN, rival){
   if(typeof bfQueueTeardown==='function') bfQueueTeardown();   // a battle outranks a queue
   reset();
@@ -12279,6 +12306,7 @@ function startCampaign(n){
   const mr=mercyRelief(S.levelN);
   if(mr<1) S.cfg.hpMul*=mr;
   S.sq={ p:1, t:0, nextT:SQ_GRACE };
+  spdInit();   // the gentle default — or the rung this device already chose (v1.93)
   // v1.31: the crate the Tan walk out of. Smash it to win — it is the ONLY win.
   const bh=Math.round(CAMP_BASE_HP(S.levelN)*mr);   // ×1 → the identical integer
   S.tanBase={ x:W-130, y:300, hp:bh, hpMax:bh, hitT:0 };
@@ -12929,6 +12957,7 @@ function coopStartBattle(){
   coopLaunching=false;
   W=CAMP_W; resize();   // v1.40: every co-op door is a crate door — the same long front as solo, on every sim
   S.coop=COOP;
+  S.speed=1;   // lockstep pin (v1.93): every sim in the lobby — old builds included — runs ×1
   if(coopSquad()){
     // HOLD THE LINE: same level, same terrain, same kinds of formations — sized
     // for the squad and streamed at us without a break. `pc` came off HQ and is
@@ -13448,6 +13477,7 @@ function roomStartBattle(){
   startBattlefield(COOP.map, null, team, roomSeatPlan(team));
   coopLaunching=false;
   S.coop=COOP;
+  S.speed=1;   // lockstep pin (v1.93): startBattlefield just armed the ×0.9 default — a room runs ×1 on every sim
   S.bf.room=true;
   const ppl=Math.max(1,(COOP.members||[]).length);
   S.ann={ txt:tf(ppl===1? 'PRIVATE BATTLE — %1 v %1 · %2 REAL COMMANDER'
@@ -13807,6 +13837,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
   resize();                                    // the world just got wider — refit
   hideAllOverlays();
   S.mode='play';
+  spdInit();   // ×0.9 out of the box — or the rung this device already chose (v1.93)
   S.ann={ txt:(team>1? tf('%1 v %1 — %2', team, t(map.name)) : tf('BATTLEFIELD — %1', t(map.name))), t:2.6 };
   SFX.horn();
   // SARGE COMMS (v1.41): the battlefield opening briefing, before the first
@@ -13844,13 +13875,13 @@ function endBattlefield(reason, fromRelay){
   // path beats two, and the ladder is exactly the thing that must not be racy.
   if(roomBattle() && !fromRelay){
     if(!coopIsHost() || COOP.ended) return;   // a guest never judges; the relay will tell it
-    COOP.ended=true; bf.ending=true; S.speed=1; S.drag=null; S.pan=null;
+    COOP.ended=true; bf.ending=true; S.slowmo=1; S.drag=null; S.pan=null;
     coopPost('end',{code:COOP.code, reason:reason}).catch(()=>{});
     // ...and if HQ never answers, nobody is left standing on a finished carpet
     setTimeout(()=>{ if(S.bf===bf && !bf.resolved) endBattlefield(reason, true); }, 6000);
     return;
   }
-  bf.resolved=true; bf.ending=false; S.speed=1; S.drag=null; S.pan=null;
+  bf.resolved=true; bf.ending=false; S.slowmo=1; S.drag=null; S.pan=null;
   commClear();   // a comm must never survive onto the verdict screen (v1.41)
   if(bfMyTeam()==='foe') reason=BF_FLIP[reason]||reason;
   const won=(reason==='ko'||reason==='time'||reason==='sudden'||reason==='edge');
@@ -14426,10 +14457,10 @@ function bfLeak(u){
     // and when YOUR team took the crate, the flag ceremony before the card
     // (v1.47). The !bf.ending gate keeps a second KO from racing the first's
     // longer fuse; a loss keeps the old 900ms exactly.
-    bf.ending=true; S.shake=1.0; S.speed=0.35; SFX.boom();
+    bf.ending=true; S.shake=1.0; S.slowmo=0.35; SFX.boom();
     const won=(u.side==='you'), es=enemySide(u);
     const verdict=()=>{ if(ref) endBattlefield(won?'ko':'koLoss'); else bf.ending=false; };
-    setTimeout(()=>{ S.speed=1;
+    setTimeout(()=>{ S.slowmo=1;
       // ⚠ the ceremony anchors on the DRAWN crate (120 / WORLD_W-120), not the
       // base object's x (130) — drawBase and the pennant-suppression equality
       // both live on the drawn coordinate
@@ -14720,10 +14751,10 @@ function campSmash(u,dist){
     // own KO beat: shake, slow-mo, then the card). ⚠ Only the referee calls the
     // verdict; a guest sim's copy of the crate can die early and it just gets
     // the fireworks while it waits for the word.
-    S.shake=1.0; S.speed=0.35; SFX.boom();
+    S.shake=1.0; S.slowmo=0.35; SFX.boom();
     for(let i=0;i<3;i++) S.fx.push({k:'puff',x:b.x+(Math.random()-0.5)*70,y:b.y-30-Math.random()*60,t:0,dur:0.6,R:26});
     S.fx.push({k:'ring',x:b.x,y:b.y-30,r:12,R:110,t:0,dur:0.6,col:'rgba(255,210,74,0.9)'});
-    setTimeout(()=>{ S.speed=1;
+    setTimeout(()=>{ S.slowmo=1;
       // v1.47: as the smoke clears, the tan colours come down and the green
       // flag runs up their pole — the verdict rides the ceremony's fuse now,
       // same guarded call as ever (guests see the flag, the referee speaks)
@@ -20357,8 +20388,10 @@ function hqRender(){
   d.innerHTML='<div class="hqs-card">'
     +'<button type="button" class="hqs-back" onclick="UI.hqBack()">⚔ BACK TO THE BATTLE</button>'
     +'<button type="button" class="hqs-row" onclick="UI.hqSound()">'+(soundOn?'♪ SOUND ON':'✕ SOUND OFF')+'</button>'
-    // two sims, one clock — the speed row simply isn't offered in co-op
-    +(S.coop? '' : '<button type="button" class="hqs-row" onclick="UI.hqSpeed()">▶ SPEED ×'+S.speed+'</button>')
+    // two sims, one clock — the speed row simply isn't offered in co-op.
+    // ⚠ the label speaks spdShow(), not S.speed — the campaign's opening rung
+    // runs ×0.65 and SAYS ×0.75 by design (v1.93, Wyatt's two numbers)
+    +(S.coop? '' : '<button type="button" class="hqs-row" onclick="UI.hqSpeed()">▶ SPEED ×'+spdShow()+'</button>')
     +'<button type="button" class="hqs-quit" onclick="UI.hqRetreat()">🏳 RETREAT TO HQ</button>'
   +'</div>';
 }
@@ -21463,7 +21496,7 @@ const ROOM_SPOTS=[
 let lastMarch=0;
 function showMenu(){
   S.mode='menu';
-  S.bf=null; S.pan=null; S.speed=1; S.vflag=null; W=BASE_W; resize();   // ...nor a battlefield, nor the long front, nor a mid-rise flag: the room is 960 wide again
+  S.bf=null; S.pan=null; S.speed=1; S.slowmo=1; S.vflag=null; W=BASE_W; resize();   // ...nor a battlefield, nor the long front, nor a mid-rise flag: the room is 960 wide again
   S.coop=null;                      // the battle flag only — the party (COOP) rides on
   S.sq=null;                        // ...and the streaming ticker stops at the door
   hideAllOverlays();
@@ -23297,7 +23330,11 @@ window.UI = {
   // ---- THE HQ SHEET (v1.44) ----
   hqBack(){ SFX.clack(); hqClose(); },
   hqSound(){ soundOn=!soundOn; SFX.blip(); hqRender(); },
-  hqSpeed(){ if(S.coop){ SFX.clack(); return; } S.speed=S.speed===1?2:1; SFX.blip(); hqRender(); },
+  hqSpeed(){ if(S.coop){ SFX.clack(); return; }
+    const M=SPD_MODES[spdMode()];
+    S.spdI=(S.spdI+1)%M.real.length; S.speed=M.real[S.spdI];
+    if(M.k){ META[M.k]=S.spdI; saveMeta(); }   // the rung is a preference now — it survives the battle and the reboot (v1.93)
+    SFX.blip(); hqRender(); },
   hqRetreat(){ S.drag=null; hqClose(); if(S.coop) coopLeave(); showMenu(); },  // walking out still folds the party
   // the War Table's door into a PRIVATE BATTLE — no chooser in the way
   wtRoom(){ audio(); SFX.blip(); closeWarTable();
@@ -24017,7 +24054,7 @@ function frame(ts){
   // v1.44: an open HQ sheet HOLDS the solo sim (the v1.41 law). With company the
   // sims must stay in lockstep, so the war runs on behind the card.
   if(S.mode==='play' && !(HQS.on && !S.coop)){
-    update(dt*S.speed*slow);
+    update(dt*S.speed*S.slowmo*slow);   // dial × KO-beat × coach/hit-stop — three knobs, never one variable (v1.93)
     if(coach){ coach.t+=dt;
       if(coach.step===4&&coach.lostT>0){ coach.lostT-=dt; if(coach.lostT<=0){ coach.lostT=0; coach.step=5; coach.t=0; } }
       if(coach.step===5&&coach.toast>0){ coach.toast-=dt; if(coach.toast<0)coach.toast=-1; } }
@@ -24060,6 +24097,9 @@ window.GVT = {
   // would get; seed a run for a battery (debug-only, the blades()/saberState()
   // precedent — no door in the game reaches these)
   mercy(){ return { run:Object.assign({},META.lossRun), relief:mercyRelief(S.levelN|0) }; },
+  speed(){ return { mode:spdMode(), i:S.spdI, real:S.speed, slowmo:S.slowmo, show:spdShow() }; },
+  speedSet(i){ const M=SPD_MODES[spdMode()]; S.spdI=Math.max(0,Math.min(M.real.length-1,i|0));
+    if(!S.coop) S.speed=M.real[S.spdI]; return this.speed(); },
   mercySet(n,k){ META.lossRun['l'+n]=k|0; saveMeta(); return Object.assign({},META.lossRun); },
   // v1.38 FORMATIONS + SET PIECES rig: spawn any shape to inspect its geometry
   // (needs a battle on; n overrides every group's count), read a level's final
