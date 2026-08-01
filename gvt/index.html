@@ -612,6 +612,12 @@
     border-radius:6px; padding:1px 9px; font-size:clamp(11px,2.2vh,17px); letter-spacing:0.2em;
     background:rgba(237,228,204,0.55); }
   .sh-pack.own .sh-bub img, .sh-pack.own .sh-tagline { visibility:hidden; }
+  /* ...but the SPECIAL ISSUE packs keep their toy ON the card (v1.97, Wyatt 7/31:
+     "keep their image in the store — don't have it be an empty cell"): they have
+     no step-out figure to replace it, so the kit stays in the bubble, resting
+     exactly where the buy ceremony's drop leaves it (shdrop's 100% keyframe). */
+  #shpk-emg.own .sh-bub img, #shpk-fw.own .sh-bub img {
+    visibility:visible; transform:translateY(21%) rotate(6deg); }
   /* the figure steps out of the bubble and stands in front — dark rim so a tan or
      white army never vanishes into the cardstock */
   .sh-step { position:absolute; bottom:22%; left:50%; height:43%; width:auto; transform:translateX(-50%);
@@ -2031,7 +2037,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.96</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.97</div>
   <div class="scanlines"></div>
 </div>
 
@@ -9032,6 +9038,10 @@ const EMG_HEAL_HP=2;        // battleground: his literal 2 hp per second, clampe
 const EMG_LIFE_EVERY=4;
 const EMG_PARA_N=4;         // effect 1: four canopies at their backline, staggered
 const EMG_PARA_GAP=0.4;     // ...this far apart, so it reads as a stick of jumpers
+// v1.97 (Wyatt 7/31): "it's not usable until after the first 45 seconds" — the
+// arming clock. BATTLE seconds, like every other package clock (the speed dial
+// changes how fast the battle runs, never how much battle the wait covers).
+const EMG_ARM_T=45;
 function emgOwned(){ return !!META.emg; }
 // WHOSE PACKAGE REACHES THIS MAN — the enhU() ownership shape, resolved through
 // this sim's own local view: on the battleground a man's seat; on the campaign
@@ -9043,7 +9053,7 @@ function emgTagU(u){
 function emgRateMul(u){ return (S.emgFire && S.emgFire[emgTagU(u)]>0)? EMG_BUFF_MUL : 1; }
 function emgMoveMul(u){ return (S.emgMove && S.emgMove[emgTagU(u)]>0)? EMG_BUFF_MUL : 1; }
 function emgReady(){
-  return emgOwned() && S.mode==='play' && !S.emgUsed
+  return emgOwned() && S.mode==='play' && !S.emgUsed && !(S.emgCd>0)
     && !(S.bf && (S.bf.resolved||S.bf.ending));
 }
 // the announce: a plain-words card + the horn for YOUR package; an ally's lands
@@ -9179,6 +9189,11 @@ function emgVehicle(veh){
 // the 2x toggle cannot stretch a 5-second buff and the HQ sheet's solo hold
 // (which skips update() entirely) holds these too.
 function emgTick(dt){
+  // v1.97: the arming clock counts the battle's first 45 seconds down, and the
+  // gold rim announces READY the moment it lands (the jet's re-arm tell,
+  // verbatim: no float, no sound — the lit lamp says the rest).
+  if(S.emgCd>0){ S.emgCd-=dt;
+    if(S.emgCd<=0){ S.emgCd=0; if(emgOwned() && !S.emgUsed) S.emgFlash=0.9; } }
   if(S.emgFire) for(const k in S.emgFire){ S.emgFire[k]-=dt; if(S.emgFire[k]<=0) delete S.emgFire[k]; }
   if(S.emgMove) for(const k in S.emgMove){ S.emgMove[k]-=dt; if(S.emgMove[k]<=0) delete S.emgMove[k]; }
   if(S.emgPq && S.emgPq.length){
@@ -12295,7 +12310,8 @@ function reset(){
   S.jetCd=0; S.jetFlash=0; S.jetAim=null;                 // the jet re-arms fresh each battle (v1.39)
   // THE EMERGENCY PACKAGE re-arms each battle too (v1.62): the spent flag, the
   // buff clocks, the mend, the stick of pending canopies, the per-sender dedupe
-  S.emgUsed=false; S.emgFlash=0; S.emgFire={}; S.emgMove={}; S.emgHeal=[]; S.emgPq=[]; S.emgDone={};
+  // — and since v1.97 the 45s arming clock starts fresh with every battle
+  S.emgUsed=false; S.emgFlash=0; S.emgCd=EMG_ARM_T; S.emgFire={}; S.emgMove={}; S.emgHeal=[]; S.emgPq=[]; S.emgDone={};
   S.planes=[];    // 0091: the bomber overlay re-arms fresh each battle too
   S.coop=null;    // co-op battles re-arm this right after startBattle
   S.sq=null;      // …and a squad mission arms its streaming ticker there too
@@ -20448,19 +20464,34 @@ function drawJetBtn(){
 }
 // ===== THE EMERGENCY BUTTON (v1.62) — the jet's card, one slot up (or in the
 // jet's own corner before L40). Icon-only, zero i18n: an olive crate with a
-// red beacon lamp on the lid. Two states, per the v1.44 quiet-HUD law: READY
-// (lit, the lamp breathes) and SPENT (dim for the rest of the battle — it does
-// not disappear, a kid should see it will be back next fight). Never drawn at
-// all until the package is bought, so the strip carries zero new pixels for
-// everyone else. btnRects.emg is nulled first — stale rects ghost-fire.
+// red beacon lamp on the lid. Three states, per the v1.44 quiet-HUD law:
+// ARMING (v1.97 — dark face, climbing fill, amber seconds counting the
+// battle's first 45 down), READY (lit, the lamp breathes) and SPENT (dim for
+// the rest of the battle — it does not disappear, a kid should see it will be
+// back next fight). Never drawn at all until the package is bought, so the
+// strip carries zero new pixels for everyone else. btnRects.emg is nulled
+// first — stale rects ghost-fire.
 function drawEmgBtn(){
   btnRects.emg=null;
   if(!emgOwned() || S.mode!=='play') return;
   const bw=64, bh=56, x=VW-88, y=jetOwned()? H-296 : H-232;
   btnRects.emg=[x,y,bw,bh];
   const on=emgReady();
+  // v1.97 ARMING: the battle's first 45 seconds belong to the battle — the
+  // card wears the jet's cooling face (v1.25 Sarge-card law: a wait is
+  // VISIBLE, never a silent delay): dark face, climbing fill with its solid
+  // leading edge, amber seconds dead centre. Digits are information, so they
+  // stay under reduced motion — a once-a-second change is not motion.
+  const arm = S.emgCd>0 && !S.emgUsed && !(S.bf && (S.bf.resolved||S.bf.ending));
   cx.fillStyle = on? 'rgba(38,40,31,0.92)' : 'rgba(38,40,31,0.6)';
   rr(x,y,bw,bh,12); cx.fill();
+  if(arm){   // the recharge climbing up behind the glyph (the jet's own recipe)
+    const k=1-S.emgCd/EMG_ARM_T, fh=Math.max(1,bh*k);
+    cx.save(); rr(x,y,bw,bh,12); cx.clip();
+    cx.fillStyle='rgba(120,170,80,0.5)'; cx.fillRect(x,y+bh-fh,bw,fh);
+    cx.fillStyle='#BFE39A'; cx.fillRect(x,y+bh-fh,bw,3);
+    cx.restore();
+  }
   if(S.emgFlash>0){
     cx.save(); cx.globalAlpha=reducedMotion()? 0.85 : Math.min(1,S.emgFlash/0.9);
     cx.strokeStyle='#FFD24A'; cx.lineWidth=3; rr(x,y,bw,bh,12); cx.stroke(); cx.restore();
@@ -20486,6 +20517,11 @@ function drawEmgBtn(){
   cx.fillStyle='#E05038';
   cx.beginPath(); cx.arc(gx,gy-17,4.4,Math.PI,0); cx.closePath(); cx.fill();
   cx.globalAlpha=1;
+  if(arm){   // the count itself, dead centre (the jet's digits, verbatim)
+    cx.textAlign='center';
+    cx.font=cf('bold 26px'); cx.fillStyle='#FFD24A';
+    cx.fillText(Math.ceil(S.emgCd), x+bw/2, y+bh/2+9);
+  }
 }
 // ===== THE BOMBER BUTTON (0091) — the right-edge stack's third rung, walking
 // up past whichever of the jet and emergency cards this save owns. Icon-only
@@ -20591,7 +20627,8 @@ cv.addEventListener('pointerdown', e=>{
     S.sel=null; return;
   }
   // THE EMERGENCY PACKAGE (v1.62): one tap, one roll, once a battle. A spent
-  // button clacks (no dead disabled buttons — the dim face already says why).
+  // or still-arming button clacks (no dead disabled buttons — the dim face
+  // and the v1.97 countdown already say why).
   if(inRect(p.x,p.y,btnRects.emg)){
     if(!emgActivate()) SFX.clack();
     S.sel=null; return;
@@ -24597,6 +24634,7 @@ window.GVT = {
   // overridden (n 0-4; veh only matters at 4) — gates, relay and the spent
   // flag all intact, so a battery drives each of the five on either carpet.
   emg(){ return { owned:emgOwned(), used:!!S.emgUsed, ready:emgReady(), price:EMG_PRICE,
+    arm:+(S.emgCd||0).toFixed(2), armT:EMG_ARM_T,
     fire:Object.assign({},S.emgFire||{}), move:Object.assign({},S.emgMove||{}),
     heal:(S.emgHeal||[]).map(h=>({side:h.side, t:+h.t.toFixed(2)})),
     pq:(S.emgPq||[]).length, done:Object.keys(S.emgDone||{}),
