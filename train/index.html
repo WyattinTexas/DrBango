@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v1.4 -->
-<meta name="trainset-version" content="1.4">
+<!-- TRAINSET v1.5 -->
+<meta name="trainset-version" content="1.5">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -27,6 +27,7 @@
   #mark{ left:12px; cursor:default; color:#F2C531; }
   #mute{ right:12px; }
   #menuChip{ right:76px; }
+  #backChip{ right:76px; display:none; }
   /* ---- the bedroom menu (E3): DOM chrome floats over the painted room ---- */
   #menu{
     position:absolute; inset:0; z-index:6; display:none; flex-direction:column;
@@ -47,6 +48,25 @@
   .sw{ background:#170f08; border:2px solid #513a24; border-radius:10px; padding:3px; cursor:pointer; }
   .sw canvas{ width:56px; height:34px; display:block; pointer-events:none; }
   .sw.on{ border-color:#F2C531; }
+  /* ---- the level board (E5): ten cream tickets on toy-chest wood ---- */
+  #board{ position:absolute; inset:0; z-index:6; display:none; align-items:center; justify-content:center; padding:12px; }
+  #bpanel{ background:linear-gradient(#3a2a18,#241a0e); border:3px solid #6e5130; border-radius:20px;
+    padding:18px 20px 14px; box-shadow:0 14px 44px rgba(0,0,0,0.55); text-align:center; max-width:min(94vw,760px); }
+  #bpanel h1{ font-size:26px; letter-spacing:4px; color:#F2C531; }
+  #bsub{ font-size:10px; letter-spacing:1px; color:#CBB88C; margin:6px 0 14px; }
+  #tickets{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  .tk{ position:relative; background:#F7E9C4; border:2px solid #B48A54; border-radius:11px;
+    padding:10px 4px 8px; cursor:pointer; font-family:inherit; color:#3a2a18; min-width:86px; }
+  .tk b{ display:block; font-size:24px; }
+  .tk small{ display:block; font-size:7.5px; letter-spacing:0.4px; margin-top:3px; }
+  .tk .star{ position:absolute; top:-10px; right:-8px; font-size:20px; transform:rotate(12deg); pointer-events:none;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,0.4)); }
+  .tk.lock{ background:#241a0e; border-color:#513a24; color:#6d5c3d; cursor:default; }
+  #bback{ margin-top:14px; background:none; border:none; color:#8f7a52; font-family:inherit;
+    font-size:12px; letter-spacing:1px; cursor:pointer; padding:6px 8px; }
+  #nextBtn{ position:absolute; left:50%; bottom:150px; transform:translateX(-50%); z-index:8; display:none;
+    border-color:#F2C531; color:#F2C531; }
+  #nextBtn:active{ transform:translateX(-50%) translateY(2px); }
   /* ---- bottom bar ---- */
   #bar{
     position:absolute; left:0; right:0; bottom:0; z-index:6;
@@ -130,6 +150,15 @@
     .sw canvas{ width:44px; height:27px; }
     #paintCap{ display:none; }
     #menu{ gap:9px; padding-bottom:14px; }
+    #bpanel{ padding:10px 10px 6px; }
+    #bpanel h1{ font-size:18px; letter-spacing:2px; }
+    #bsub{ margin:4px 0 8px; font-size:8px; }
+    #tickets{ gap:6px; }
+    .tk{ min-width:54px; padding:6px 2px 5px; }
+    .tk b{ font-size:16px; } .tk small{ font-size:6px; }
+    .tk .star{ font-size:14px; top:-7px; right:-5px; }
+    #bback{ margin-top:8px; font-size:10px; }
+    #nextBtn{ bottom:118px; }
   }
 </style>
 </head>
@@ -138,6 +167,7 @@
 <div class="chip" id="mark">🚂 TRAIN SET</div>
 <div class="chip" id="mute">🔊</div>
 <div class="chip" id="menuChip">🏠 MENU</div>
+<div class="chip" id="backChip">🎫 LEVELS</div>
 <div id="bar">
   <span id="palTabs"><button class="ptab on" id="tabTrack" type="button">TRACK</button><button class="ptab" id="tabScen" type="button">SCENERY</button><button class="ptab" id="tabTown" type="button">TOWN</button></span>
   <span id="palSlot" style="display:flex;gap:8px;"></span>
@@ -159,9 +189,16 @@
   </div>
 </div>
 <div id="menu">
-  <div id="mbtns"><button id="playBtn" class="mbtn" type="button">PLAY ▶</button></div>
+  <div id="mbtns"><button id="playBtn" class="mbtn" type="button">PLAY ▶</button><button id="campBtn" class="mbtn" type="button">CAMPAIGN 🎫</button></div>
   <div id="paint"><span id="paintCap">PAINT SHOP</span><span id="swatches" style="display:flex;gap:6px;"></span></div>
 </div>
+<div id="board"><div id="bpanel">
+  <h1>TEN LITTLE LINES</h1>
+  <div id="bsub">BUILD A LINE THAT LOOPS — AND VISITS EVERY STATION</div>
+  <div id="tickets"></div>
+  <button id="bback" type="button">⬅ BACK TO THE BEDROOM</button>
+</div></div>
+<button id="nextBtn" class="mbtn" type="button">NEXT LEVEL ▶</button>
 <div id="toast"></div>
 <div id="rot"><div>🔁</div>TURN YOUR PHONE SIDEWAYS</div>
 <script>
@@ -220,6 +257,13 @@ const TRESTLE_COL='#8a683e', TRESTLE_DARK='#6B4A2C';   // trestle wood (GVT pale
 const SPIRAL_TURNS=1.5;     // drawn turns — quarter-multiples land the exit on a port
 const SPIRAL_CELLS=2;       // footprint edge, cells (2 = a 2×2 tower)
 const SHADOW_SOFT=1.0;      // elevated-shadow strength (0 = none, 1 = default)
+// ---- Wyatt dials (EXPANSION 5 — one const each) ----
+const CAMP_SEQ=true;          // unlock law: true = winning N opens N+1 · false = every ticket open
+const CAMP_WIP=true;          // persist the current level's work-in-progress across reloads
+const CAMP_STAR='⭐';         // the stamp on a finished ticket (star art)
+const CAMP_WIN_WINDOW=90;     // the battery bar: every reference solution must win inside this many sim-seconds
+const CAMP_LABEL='CAMPAIGN 🎫';   // the menu button copy (PLAY's new neighbour)
+// + the LEVELS table below IS the per-level dial sheet: exact obstacle coords + goal-card copy
 
 const TAU=Math.PI*2;
 const perf=()=>performance.now()/1000;
@@ -243,7 +287,7 @@ let LIVE=false;                       // true only while the real consist advanc
 let yayCd=0, pplSeq=0, chirpN=0;      // chirpN: charm chirps fired, for the rig
 let consist=['tender','box'];         // cars behind the loco
 const TRAIN={ placed:false, cars:[], F:true, running:false, pauseT:0, stKey:null,
-              dist:0, startSig:null, goDist:0 };
+              dist:0, startSig:null, goDist:0, revSinceGo:false };
 let DRAG=null;
 let hover=null;
 let hintStage=0, lapDone=false;
@@ -559,13 +603,15 @@ function reverseTrain(){
   const lead=TRAIN.F? TRAIN.cars[0] : TRAIN.cars[TRAIN.cars.length-1];
   lead.squash=1;
   for(const c of TRAIN.cars){ c.rd.dir*=-1; c.face*=-1; }
-  TRAIN.F=!TRAIN.F; SND.boing();
+  TRAIN.F=!TRAIN.F; TRAIN.revSinceGo=true; SND.boing();
 }
 function goTrain(){
   if(!TRAIN.placed) return false;
   TRAIN.running=true;
   const lc=TRAIN.cars[0].rd;
   TRAIN.startSig=key(lc.cx,lc.cy)+':'+(lc.el?1:0)+':'+lc.pi+':'+lc.dir; TRAIN.goDist=0;
+  TRAIN.revSinceGo=false;                  // a campaign win wants a TRUE loop, not a ping-pong
+  if(CAMP.on) CAMP.visited=new Set();      // station visits count "since GO" (E5 win law)
   goBtnSync(); return true;
 }
 
@@ -574,10 +620,12 @@ function update(dt){
   for(const pc of grid.values()){
     if(pc.ra){ pc.ra.k-=dt*8; if(pc.ra.k<=0) pc.ra=null; }
     if(pc.pop>0) pc.pop=Math.max(0,pc.pop-dt*5);
+    if(pc.wob>0) pc.wob=Math.max(0,pc.wob-dt*2.5);
   }
   for(const pc of hgrid.values()){
     if(pc.ra){ pc.ra.k-=dt*8; if(pc.ra.k<=0) pc.ra=null; }
     if(pc.pop>0) pc.pop=Math.max(0,pc.pop-dt*5);
+    if(pc.wob>0) pc.wob=Math.max(0,pc.wob-dt*2.5);
   }
   for(const s of scen.values()){
     if(s.ra){ s.ra.k-=dt*8; if(s.ra.k<=0) s.ra=null; }
@@ -621,14 +669,18 @@ function update(dt){
           const mid=pathsOf(lpc)[lc.pi].len/2;
           if(Math.abs(lc.s-mid)<step+0.6 && TRAIN.stKey!==lk){
             TRAIN.stKey=lk; TRAIN.pauseT=STATION_PAUSE; SND.ding();
+            if(CAMP.on) CAMP.visited.add(lk);       // pause-visited, since GO (the E5 win check)
           }
         }
         if(lk!==locoPrev){
           if(TRAIN.stKey && TRAIN.stKey!==lk) TRAIN.stKey=null;
-          // first lap — the loco re-enters where GO was pressed, same heading, SAME LEVEL
+          // a lap — the loco re-enters where GO was pressed, same heading, SAME LEVEL.
+          // Free play keeps its once-per-save FIRST LAP! card; the campaign listens to the
+          // very same machinery every lap and never touches the free-play flag.
           const sig=lk+':'+lc.pi+':'+lc.dir;
-          if(!lapDone && TRAIN.startSig && sig===TRAIN.startSig && TRAIN.goDist>3*C){
-            lapDone=true; firstLap();
+          if(TRAIN.startSig && sig===TRAIN.startSig && TRAIN.goDist>3*C){
+            if(CAMP.on) campLap();
+            else if(!lapDone){ lapDone=true; firstLap(); }
           }
         }
       }
@@ -659,6 +711,8 @@ function update(dt){
   for(const p of confetti){ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=260*dt; p.rot+=p.vr*dt; }
   confetti=confetti.filter(p=>p.t<p.dur);
   if(lapCardT>0) lapCardT-=dt;
+  if(goalT>0) goalT-=dt;
+  if(winT>0) winT-=dt;
 }
 function stackPuff(){
   if(!TRAIN.placed||!TRAIN.cars.length) return;
@@ -671,13 +725,16 @@ function stackPuff(){
                vx:(Math.random()-0.5)*14, vy:-34, r:3+Math.random()*2 });
 }
 function puff(x,y,R){ fx.push({k:'puff',x,y,R,t:0,dur:0.4}); }
-function firstLap(){
-  lapCardT=2.8; SND.bugle(); SND.whistle();
-  for(let i=0;i<90;i++) confetti.push({
+function confettiBurst(n){
+  for(let i=0;i<n;i++) confetti.push({
     x:Math.random()*W, y:-14-Math.random()*90,
     vx:(Math.random()-0.5)*70, vy:60+Math.random()*130, vr:(Math.random()-0.5)*9,
     rot:Math.random()*TAU, t:0, dur:2.4+Math.random(),
     col:['#F2C531','#C0392B','#4E7F46','#F7E9C4','#7CA7D8'][Math.floor(Math.random()*5)] });
+}
+function firstLap(){
+  lapCardT=2.8; SND.bugle(); SND.whistle();
+  confettiBurst(90);
   save();
 }
 
@@ -727,10 +784,13 @@ function fenceMask(x,y){
 }
 function drawRivers(){
   let any=false;
-  const chan=new Path2D(), ponds=[];
+  const chan=new Path2D(), ponds=[], fills=[];
   for(const [k,s] of scen){
     if(s.t!=='rv') continue; any=true;
     const [x,y]=k.split(',').map(Number), mx=GX+x*C+C/2, my=GY+y*C+C/2, m=riverMask(x,y);
+    // a 2×2 (or bigger) block of water: fill the square between the four cell centres,
+    // else the channel strokes leave a rug-coloured hole in the pond's middle (E5 ponds)
+    if((m&2)&&(m&4)){ const d=scenAt(x+1,y+1); if(d&&d.t==='rv') fills.push([mx,my]); }
     if(!m){ ponds.push([mx,my]); continue; }
     if(m&1){ chan.moveTo(mx,my); chan.lineTo(mx,my-C/2); }
     if(m&2){ chan.moveTo(mx,my); chan.lineTo(mx+C/2,my); }
@@ -740,6 +800,8 @@ function drawRivers(){
   if(!any) return;
   cx.lineCap='round'; cx.lineJoin='round';
   cx.strokeStyle=RIVER_BANK; cx.lineWidth=58; cx.stroke(chan);
+  cx.fillStyle=RIVER_BLUE;
+  for(const [mx,my] of fills) cx.fillRect(mx-1,my-1,C+2,C+2);
   cx.strokeStyle=RIVER_BLUE; cx.lineWidth=46; cx.stroke(chan);
   cx.globalAlpha=0.55; cx.strokeStyle=RIVER_LIGHT; cx.lineWidth=24; cx.stroke(chan); cx.globalAlpha=1;
   // sparkle combing — the GVT snow-combing recipe, in blue
@@ -1211,10 +1273,11 @@ function slopeItems(pc,ox,oy,items){
     items.push({z:1.0005, fn:()=>slopeChunkPaint(p,idxAt(p,p.len-20),p.pts.length-1,ox,oy,true)});
   }
 }
-function drawAnimPiece(row,S,lift){   // a piece mid-wiggle (rotate/pop), drawn alone
+function drawAnimPiece(row,S,lift){   // a piece mid-wiggle (rotate/pop/glued-wobble), drawn alone
   const [ox,oy,pc]=row;
   cx.save(); cx.translate(ox+S/2,oy+S/2-(lift||0));
   if(pc.ra) cx.rotate(-(Math.PI/2)*Math.max(0,pc.ra.k));
+  if(pc.wob>0) cx.rotate(Math.sin(pc.wob*26)*0.05*pc.wob);   // the tiny "it's stuck" shiver (E5)
   if(pc.pop>0){ const s2=1+0.16*pc.pop; cx.scale(s2,s2); }
   cx.translate(-S/2,-S/2);
   if(pc.t==='rp'||pc.t==='sp'){
@@ -1228,12 +1291,12 @@ function drawTrackAll(g,hg,carItems,midHook){
     if(pc.t==='ref') continue;
     const [gx,gy]=k.split(',').map(Number), row=[GX+gx*C,GY+gy*C,pc];
     if(pc.t==='rp'||pc.t==='sp') sloped.push(row);
-    else if(pc.ra||pc.pop>0) anim.push(row);
+    else if(pc.ra||pc.pop>0||pc.wob>0) anim.push(row);
     else flat.push(row);
   }
   for(const [k,pc] of hg){
     const [gx,gy]=k.split(',').map(Number), row=[GX+gx*C,GY+gy*C,pc];
-    if(pc.ra||pc.pop>0) hanim.push(row); else hflat.push(row);
+    if(pc.ra||pc.pop>0||pc.wob>0) hanim.push(row); else hflat.push(row);
   }
   batchTrack(flat);
   for(const row of anim) drawAnimPiece(row,C,0);
@@ -1594,7 +1657,7 @@ function draw(){
   for(const p of confetti){ cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot);
     cx.globalAlpha=Math.min(1,(p.dur-p.t)*2); cx.fillStyle=p.col; cx.fillRect(-4,-2.5,8,5); cx.restore(); }
   cx.globalAlpha=1;
-  drawHint(); drawLapCard();
+  drawHint(); drawLapCard(); drawCampCards();
 }
 
 /* =====================================================================
@@ -1825,17 +1888,51 @@ const SND={
 /* =====================================================================
    SAVE
    ===================================================================== */
+// one serializer, three callers: the save file, the free-play stash the campaign
+// swaps out (E5 — FREE PLAY IS SACRED), and the campaign WIP (which drops glued rows)
+function serWorld(){
+  const g=[];
+  for(const [k,pc] of grid){ if(pc.t==='ref') continue; g.push([k,pc.t,pc.r,pc.sel|0,pc.elev|0]); }
+  for(const [k,pc] of hgrid) g.push([k,pc.t,pc.r,pc.sel|0,1]);
+  const sc=[]; for(const [k,s] of scen) sc.push([k,s.t,s.v|0]);
+  return { grid:g, scen:sc, consist:consist.slice(),
+    train: TRAIN.placed? { cars:TRAIN.cars.map(c=>({t:c.type,cx:c.rd.cx,cy:c.rd.cy,pi:c.rd.pi,dir:c.rd.dir,s:c.rd.s,f:c.face,e:c.rd.el?1:0})), F:TRAIN.F } : null };
+}
+// apply a serialized world verbatim (load + the campaign's free-play restore)
+function appWorld(d){
+  grid.clear(); hgrid.clear(); scen.clear();
+  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
+  // v:1 rows are [k,t,r] (no sel, no scen block) — they load clean, scenery empty.
+  // v:1/v:2 carry no colour — they migrate to v:3 as RED (today's exact art).
+  // v:1/v:2/v:3 rows carry no elev — they migrate to v:4 all on the ground.
+  for(const [k,t,r,sel,elev] of (d.grid||[])){
+    if(!PATHS[t]) continue;
+    const [x,y]=k.split(',').map(Number);
+    setTrackPiece(t,r,sel,t==='rp'||t==='sp'?0:(elev?1:0),x,y);
+  }
+  for(const [k,t,v] of (d.scen||[])) if(SCENDEF[t]) scen.set(k,{t,v:v|0,ra:null,pop:0,wave:0});
+  if(Array.isArray(d.consist)) consist=d.consist.filter(t=>CARDEF[t]).slice(0,MAXCARS);
+  if(d.train && d.train.cars && d.train.cars.length){
+    let ok=true;
+    const cars=d.train.cars.map(c=>{
+      const rd={cx:c.cx,cy:c.cy,pi:c.pi,dir:c.dir>0?1:-1,s:+c.s||0,el:c.e?1:0};
+      const pc=pieceOf(rd);
+      if(!pc || !pathsOf(pc)[c.pi]) ok=false;
+      return {type:c.t,rd,face:c.f<0?-1:1,squash:0};
+    });
+    if(ok){ TRAIN.cars=cars; TRAIN.placed=true; TRAIN.F=d.train.F!==false; }
+  }
+}
 function save(){
   try{
-    // v:4 — every piece carries elev; the spiral saves once (anchor + rotation),
-    // its footprint stubs are derived on load
-    const g=[];
-    for(const [k,pc] of grid){ if(pc.t==='ref') continue; g.push([k,pc.t,pc.r,pc.sel|0,pc.elev|0]); }
-    for(const [k,pc] of hgrid) g.push([k,pc.t,pc.r,pc.sel|0,1]);
-    const sc=[]; for(const [k,s] of scen) sc.push([k,s.t,s.v|0]);
+    // v:5 — the rug fields are the FREE-PLAY world, always: while the campaign is on,
+    // the stashed free-play snapshot is written back verbatim (never the level), and
+    // the level's work-in-progress rides in camp.wip instead. Cleared on win.
+    const w=CAMP.on? FREE : serWorld();
     localStorage.setItem('TRAINSET', JSON.stringify({
-      v:4, grid:g, scen:sc, consist, color:COLOR,
-      train: TRAIN.placed? { cars:TRAIN.cars.map(c=>({t:c.type,cx:c.rd.cx,cy:c.rd.cy,pi:c.rd.pi,dir:c.rd.dir,s:c.rd.s,f:c.face,e:c.rd.el?1:0})), F:TRAIN.F } : null,
+      v:5, grid:w.grid, scen:w.scen, consist:w.consist, color:COLOR, train:w.train,
+      camp:{ done:[...CAMP.done], all:CAMP.all?1:0,
+             wip: CAMP.on? (CAMP_WIP&&!CAMP.won? serWip():null) : (CAMP_WIP? CAMP.wip:null) },
       hints:hintStage, lap:lapDone, mute:!AU.on,
     }));
   }catch(e){}
@@ -1843,29 +1940,235 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem('TRAINSET')||'null'); if(!d) return;
-    // v:1 rows are [k,t,r] (no sel, no scen block) — they load clean, scenery empty.
-    // v:1/v:2 carry no colour — they migrate to v:3 as RED (today's exact art).
-    // v:1/v:2/v:3 rows carry no elev — they migrate to v:4 all on the ground.
-    for(const [k,t,r,sel,elev] of (d.grid||[])){
-      if(!PATHS[t]) continue;
-      const [x,y]=k.split(',').map(Number);
-      setTrackPiece(t,r,sel,t==='rp'||t==='sp'?0:(elev?1:0),x,y);
-    }
-    for(const [k,t,v] of (d.scen||[])) if(SCENDEF[t]) scen.set(k,{t,v:v|0,ra:null,pop:0,wave:0});
-    if(Array.isArray(d.consist)) consist=d.consist.filter(t=>CARDEF[t]).slice(0,MAXCARS);
+    appWorld(d);
     COLOR=(d.color&&LIVERY[d.color])? d.color : 'red';
     hintStage=d.hints|0; lapDone=!!d.lap; AU.on=!d.mute;
-    if(d.train && d.train.cars && d.train.cars.length){
-      let ok=true;
-      const cars=d.train.cars.map(c=>{
-        const rd={cx:c.cx,cy:c.cy,pi:c.pi,dir:c.dir>0?1:-1,s:+c.s||0,el:c.e?1:0};
-        const pc=pieceOf(rd);
-        if(!pc || !pathsOf(pc)[c.pi]) ok=false;
-        return {type:c.t,rd,face:c.f<0?-1:1,squash:0};
-      });
-      if(ok){ TRAIN.cars=cars; TRAIN.placed=true; TRAIN.F=d.train.F!==false; }
-    }
+    const cp=d.camp||{};   // v:1..v:4 saves carry no camp block — the campaign arrives fresh (v:5 migration)
+    CAMP.done=new Set((cp.done||[]).filter(n=>n>=1&&n<=LEVELS.length));
+    CAMP.all=!!cp.all;
+    CAMP.wip=(CAMP_WIP&&cp.wip&&cp.wip.level>=1&&cp.wip.level<=LEVELS.length)? cp.wip : null;
   }catch(e){}
+}
+
+/* =====================================================================
+   THE CAMPAIGN (E5) — TEN LITTLE LINES. Puzzles without failure: the
+   landscape is glued to the rug and bends your line; that IS the whole
+   challenge. Win = the lap machinery fires AND every glued station has
+   pause-visited since GO. Free play is sacred: the campaign runs on its
+   own stash and never touches the kid's rug.
+   ===================================================================== */
+// LEVELS ARE DATA — Wyatt adds level 11 by adding a row, zero new code.
+//   name/hint  the ticket + goal-card copy (dials)
+//   glued      scenery rows [kind,x,y,v?] glued to the rug (water is a SOFT wall —
+//              bridges cross it; buildings + fence are the TRUE walls)
+//   stations   glued STATION track rows [x,y,r?] — every one is required
+const LEVELS=[
+  { name:'THE POND', hint:'LOOP YOUR LINE AROUND THE WATER — OR BRIDGE STRAIGHT ACROSS!',
+    glued:[['rv',5,3],['rv',6,3],['rv',5,4],['rv',6,4]], stations:[] },
+  { name:'THREE TREES', hint:'WEAVE A LOOP THROUGH THE MEADOW!',
+    glued:[['tree',3,2],['tree',6,5],['tree',8,3],['bush',5,3],['bush',1,4],['bush',10,2]], stations:[] },
+  { name:'THE COTTAGE STOP', hint:'RUN YOUR LOOP THROUGH THE STATION — AND STOP THERE!',
+    glued:[['house',5,3],['shop',6,4]], stations:[[2,5]] },
+  { name:'RIVERSIDE', hint:'A LOOP MUST CROSS THE RIVER TWICE — TWO BRIDGES!',
+    glued:[['rv',6,0],['rv',6,1],['rv',6,2],['rv',6,3],['rv',6,4],['rv',6,5],['rv',6,6],['rv',6,7]], stations:[] },
+  { name:'THE FARM', hint:'GO THE LONG WAY ROUND THE PADDOCK TO THE STATION!',
+    glued:[['fence',3,2],['fence',4,2],['fence',5,2],['fence',6,2],['fence',7,2],['fence',8,2],
+           ['fence',3,3],['fence',8,3],['fence',3,4],['fence',8,4],
+           ['fence',3,5],['fence',4,5],['fence',5,5],['fence',6,5],['fence',7,5],['fence',8,5],
+           ['barn',5,3],['cow',4,4,0],['cow',6,4,1],['cow',7,3,2]], stations:[[10,6]] },
+  { name:'TWIN PONDS', hint:'WEAVE BETWEEN THE PONDS AND STOP AT THE STATION!',
+    glued:[['rv',2,2],['rv',3,2],['rv',2,3],['rv',3,3],['rv',8,4],['rv',9,4],['rv',8,5],['rv',9,5]],
+    stations:[[5,1]] },
+  { name:'MAIN STREET', hint:'THREAD THE GAPS OR RING THE WHOLE STREET — VISIT BOTH STATIONS!',
+    glued:[['house',3,3],['shop',5,3],['hall',7,3],['house',9,3]], stations:[[1,6],[10,1]] },
+  { name:'RIVER FARM', hint:'BRIDGE THE RIVER AND SKIRT THE FARM TO THE STATION!',
+    glued:[['rv',0,4],['rv',1,4],['rv',2,4],['rv',3,4],['rv',4,4],['rv',5,4],['rv',6,4],['rv',7,4],['rv',8,4],['rv',9,4],['rv',10,4],['rv',11,4],
+           ['fence',2,5],['fence',3,5],['fence',4,5],['fence',5,5],['fence',2,6],['fence',5,6],
+           ['fence',2,7],['fence',3,7],['fence',4,7],['fence',5,7],['cow',3,6,0],['cow',4,6,2]],
+    stations:[[9,1]] },
+  { name:'TOWN SQUARE', hint:'THREAD THE ALLEYS — OR RING THE SQUARE — VISIT BOTH STATIONS!',
+    glued:[['house',4,2],['shop',7,2],['hall',4,5],['house',7,5],
+           ['fence',5,2],['fence',4,3],['fence',4,4],['fence',7,3],['fence',7,4],['fence',5,5],
+           ['rv',5,3]], stations:[[1,1],[10,6]] },
+  { name:'THE GRAND TOUR', hint:'EVERYTHING AT ONCE — ONE GRAND LINE, BOTH STATIONS!',
+    glued:[['rv',3,0],['rv',3,1],['rv',3,2],['rv',3,3],['rv',3,4],['rv',4,4],['rv',5,4],['rv',6,4],['rv',7,4],['rv',8,4],
+           ['rv',10,1],['rv',11,1],['rv',10,2],['rv',11,2],
+           ['fence',0,5],['fence',1,5],['fence',2,5],['fence',2,6],['fence',2,7],
+           ['barn',0,6],['cow',1,6,0],['cow',0,7,1],['cow',1,7,2],
+           ['house',6,7],['house',8,2]], stations:[[5,6],[10,4]] },
+];
+// THE SOLVABILITY LAW — every level ships a scripted reference solution;
+// TS.camp.solve(n) builds it and the battery proves all ten win. A level whose
+// reference stops fitting refuses to ship (battery red).
+function ringRows(x0,y0,x1,y1,skip){    // a rectangle of track; skip = the glued station cells on it
+  const rows=[], S=new Set((skip||[]).map(c2=>key(c2[0],c2[1])));
+  const put=(t,r,x,y)=>{ if(!S.has(key(x,y))) rows.push([t,r,x,y]); };
+  put('c',1,x0,y0); put('c',2,x1,y0); put('c',3,x1,y1); put('c',0,x0,y1);
+  for(let x=x0+1;x<x1;x++){ put('s',0,x,y0); put('s',0,x,y1); }
+  for(let y=y0+1;y<y1;y++){ put('s',1,x0,y); put('s',1,x1,y); }
+  return rows;
+}
+const swapBr=(rows,cells)=>rows.map(r=>cells.some(c2=>c2[0]===r[2]&&c2[1]===r[3])? ['br',r[1],r[2],r[3]] : r);
+const SOLVE=[
+  { start:[5,2], rows:ringRows(4,2,7,5) },                                  // round the pond
+  { start:[3,1], rows:ringRows(2,1,9,6) },                                  // round the meadow
+  { start:[2,4], rows:ringRows(1,4,3,5,[[2,5]]) },                          // the little cottage loop
+  { start:[4,2], rows:swapBr(ringRows(3,2,9,5),[[6,2],[6,5]]) },            // two bridges over the river
+  { start:[2,1], rows:ringRows(1,1,11,6,[[10,6]]) },                        // the big detour round the paddock
+  { start:[2,6], rows:ringRows(1,1,10,6,[[5,1]]) },                         // round both ponds
+  { start:[2,1], rows:ringRows(0,1,11,6,[[10,1],[1,6]]) },                  // ring the whole street
+  { start:[7,6], rows:swapBr(ringRows(6,1,10,6,[[9,1]]),[[6,4],[10,4]]) },  // bridge twice, east of the farm
+  { start:[2,1], rows:ringRows(0,1,11,6,[[1,1],[10,6]]) },                  // ring the square
+  { start:[7,5], rows:[ ['c',1,3,5],['s',0,4,5],['s',0,5,5],['s',0,6,5],['s',0,7,5],['s',0,8,5],
+      ['c',3,9,5],['c',1,9,4],['c',2,11,4],['s',1,11,5],['c',3,11,6],
+      ['s',0,10,6],['s',0,9,6],['s',0,8,6],['s',0,7,6],['s',0,6,6],['s',0,4,6],['c',0,3,6] ] },  // the grand tour
+];
+// the campaign's own state object — free play's grid/consist/save is NEVER touched
+const CAMP={ on:false, level:0, won:false, tugT:false, stations:[], visited:new Set(),
+             done:new Set(), all:false, wip:null };
+let FREE=null;            // the stashed free-play world while a level is open
+let goalT=0, winT=0;      // the goal card + the LINE COMPLETE! card
+function campUnlocked(n){ return !CAMP_SEQ || CAMP.all || n===1 || CAMP.done.has(n-1); }
+function serWip(){        // the level's work-in-progress — glued rows regenerate from LEVELS, never saved
+  const g=[];
+  for(const [k,pc] of grid){ if(pc.t==='ref'||pc.glued) continue; g.push([k,pc.t,pc.r,pc.sel|0,pc.elev|0]); }
+  for(const [k,pc] of hgrid) g.push([k,pc.t,pc.r,pc.sel|0,1]);
+  const sc=[]; for(const [k,s] of scen){ if(s.glued) continue; sc.push([k,s.t,s.v|0]); }
+  return { level:CAMP.level, grid:g, scen:sc, consist:consist.slice() };
+}
+function clearPlayer(){   // sweep everything the PLAYER built; the glued land stays
+  for(const [k,pc] of [...grid]){ if(pc.t==='ref'||pc.glued) continue;
+    const [x,y]=k.split(',').map(Number); removeTrackPiece(x,y,pc); }
+  for(const [k,pc] of [...hgrid]){ const [x,y]=k.split(',').map(Number); removeTrackPiece(x,y,pc); }
+  for(const [k,s] of [...scen]) if(!s.glued) scen.delete(k);
+  trainHome(true);
+}
+function campEnter(n){
+  const L=LEVELS[n-1]; if(!L||!campUnlocked(n)) return false;
+  if(CAMP.on){ if(CAMP_WIP&&!CAMP.won) CAMP.wip=serWip(); }
+  else FREE=serWorld();                       // stash the kid's rug — restored verbatim on exit
+  CAMP.on=true; CAMP.level=n; CAMP.won=false; CAMP.tugT=false;
+  CAMP.visited=new Set(); winT=0;
+  grid.clear(); hgrid.clear(); scen.clear();
+  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
+  for(const g of L.glued) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
+  CAMP.stations=[];
+  for(const st of L.stations){
+    const pc=setTrackPiece('st',st[2]|0,null,0,st[0],st[1]); pc.glued=1;
+    CAMP.stations.push(key(st[0],st[1])+':0');
+  }
+  if(CAMP_WIP && CAMP.wip && CAMP.wip.level===n){   // the level data may have moved under a saved wip — skip what no longer fits
+    for(const [k,t,r,sel,elev] of (CAMP.wip.grid||[])){
+      if(!PATHS[t]) continue;
+      const [x,y]=k.split(',').map(Number), el=(t==='rp'||t==='sp')?0:(elev?1:0);
+      const cells=t==='sp'? spiralCells(x,y) : [[x,y]];
+      let ok=true;
+      for(const [x2,y2] of cells){
+        if(x2<0||y2<0||x2>=GW||y2>=GH||cellBlocksTrack(t,x2,y2)){ ok=false; break; }
+        const lo=pieceAt(x2,y2);
+        if(el? (pieceHi(x2,y2)||(lo&&spans2(lo))) : lo){ ok=false; break; }
+      }
+      if(ok) setTrackPiece(t,r,sel,el,x,y);
+    }
+    for(const [k,t,v] of (CAMP.wip.scen||[])){
+      if(!SCENDEF[t]) continue;
+      const [x,y]=k.split(',').map(Number);
+      if(x>=0&&y>=0&&x<GW&&y<GH&&canPlaceScen(t,x,y)) scen.set(k,{t,v:v|0,ra:null,pop:0,wave:0});
+    }
+    consist=(CAMP.wip.consist||consist).filter(t=>CARDEF[t]).slice(0,MAXCARS);
+  }
+  goalT=4.2;
+  $('mark').textContent='🎫 LEVEL '+n;
+  showScreen('game'); goBtnSync(); shedSync(); save();
+  return true;
+}
+function campExit(dest){
+  if(!CAMP.on){ showScreen(dest); return; }
+  CAMP.wip=(CAMP_WIP&&!CAMP.won)? serWip() : null;   // cleared on win, kept mid-build
+  CAMP.on=false; CAMP.level=0; CAMP.won=false; goalT=0; winT=0;
+  appWorld(FREE||{grid:[],scen:[],consist:consist,train:null}); FREE=null;
+  $('mark').textContent='🚂 TRAIN SET';
+  showScreen(dest); goBtnSync(); shedSync(); save();
+}
+function campLap(){          // the lap machinery fired inside a level
+  if(CAMP.won) return;
+  if(TRAIN.revSinceGo) return;                                 // a TRUE loop — ping-pongs don't count
+  if(!CAMP.stations.every(k=>CAMP.visited.has(k))) return;     // ...AND every station pause-visited
+  campWin();
+}
+function campWin(){
+  CAMP.won=true; CAMP.done.add(CAMP.level); CAMP.wip=null;
+  winT=3.6; SND.bugle(); SND.whistle();
+  confettiBurst(CAMP.level===LEVELS.length? 180 : 90);         // GRAND OPENING! gets the double burst
+  boardSync(); winSync(); save();
+}
+// a tug on the glued land: tiny wobble, one toast per level, then quiet
+function gluedTug(pc,s){
+  if(pc) pc.wob=1;
+  if(s) s.ra={k:1};
+  SND.tok();
+  if(CAMP.on&&!CAMP.tugT){ CAMP.tugT=true; toast("IT'S PART OF THE LAND!"); }
+}
+function drawCampCards(){
+  if(!CAMP.on) return;
+  const L=LEVELS[CAMP.level-1]; if(!L) return;
+  const card=(T,total,title,sub,subCol)=>{
+    const k=Math.min(1,(total-T)*5), out=Math.min(1,T*2.5);
+    cx.globalAlpha=Math.max(0,Math.min(k,out));
+    const cw=Math.min(600,W-40), chh=112, x=(W-cw)/2, y=(H-BAR)/2-76;
+    cx.fillStyle='#1e1610'; rr(x,y,cw,chh,16); cx.fill();
+    cx.strokeStyle='#F2C531'; cx.lineWidth=4; rr(x,y,cw,chh,16); cx.stroke();
+    cx.textAlign='center'; cx.fillStyle='#F2C531';
+    let f=28; cx.font='bold '+f+'px "Arial Black",Impact,sans-serif';
+    const w1=cx.measureText(title).width;
+    if(w1>cw-36){ f=Math.max(13,Math.floor(f*(cw-36)/w1)); cx.font='bold '+f+'px "Arial Black",Impact,sans-serif'; }
+    cx.fillText(title,W/2,y+46);
+    cx.fillStyle=subCol; let f2=13; cx.font='bold 13px "Arial Black",Impact,sans-serif';
+    const w2=cx.measureText(sub).width;
+    if(w2>cw-30){ f2=Math.max(8,Math.floor(13*(cw-30)/w2)); cx.font='bold '+f2+'px "Arial Black",Impact,sans-serif'; }
+    cx.fillText(sub,W/2,y+80);
+    cx.globalAlpha=1;
+  };
+  if(goalT>0) card(goalT,4.2,'LEVEL '+CAMP.level+' — '+L.name,L.hint,'#F7E9C4');
+  if(winT>0) card(winT,3.6,CAMP.level===LEVELS.length?'GRAND OPENING!':'LINE COMPLETE!',
+                  L.name+'  '+CAMP_STAR,'#CFF7C4');
+}
+// ---- the level board: a wooden panel of ten numbered tickets ----
+function buildBoard(){
+  const tk=$('tickets');
+  for(let n=1;n<=LEVELS.length;n++){
+    const b=document.createElement('button'); b.className='tk'; b.type='button'; b.dataset.n=n;
+    b.innerHTML='<b></b><small></small><span class="star"></span>';
+    b.addEventListener('click',()=>{
+      ac();
+      if(!campUnlocked(n)){ wiggle(b); SND.click(); toast('WIN TICKET '+(n-1)+' TO OPEN THIS ONE!'); return; }
+      SND.tok(); campEnter(n);
+    });
+    tk.appendChild(b);
+  }
+  $('campBtn').textContent=CAMP_LABEL;
+  $('campBtn').addEventListener('click',()=>{ ac(); SND.tok(); showScreen('board'); });
+  $('bback').addEventListener('click',()=>{ ac(); SND.click(); showScreen('menu'); });
+  $('backChip').addEventListener('click',()=>{ ac(); SND.click(); campExit('board'); });
+  $('nextBtn').addEventListener('click',()=>{
+    ac(); SND.tok();
+    if(CAMP.level<LEVELS.length) campEnter(CAMP.level+1); else campExit('board');
+  });
+}
+function boardSync(){
+  document.querySelectorAll('#tickets .tk').forEach(b=>{
+    const n=+b.dataset.n, open=campUnlocked(n), done=CAMP.done.has(n);
+    b.classList.toggle('lock',!open);
+    b.querySelector('b').textContent=open? n : '🔒';
+    b.querySelector('small').textContent=open? LEVELS[n-1].name : 'LOCKED';
+    b.querySelector('.star').textContent=done? CAMP_STAR : '';
+  });
+}
+function winSync(){
+  const b=$('nextBtn');
+  const show=SCREEN==='game'&&CAMP.on&&CAMP.won;
+  b.style.display=show?'block':'none';
+  if(show) b.textContent=CAMP.level<LEVELS.length? 'NEXT LEVEL ▶' : 'BACK TO THE BOARD 🎫';
 }
 
 /* =====================================================================
@@ -1907,6 +2210,7 @@ function wiggle(el){ el.classList.remove('wig'); void el.offsetWidth; el.classLi
 
 function swRotate(gx,gy){
   const pc=pieceTop(gx,gy); if(!pc) return;
+  if(pc.glued){ gluedTug(pc,null); return; }
   if(TRAIN.placed && trainOn(gx,gy,pc)){
     if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); return; }
     trainHome(false);
@@ -1949,6 +2253,7 @@ window.addEventListener('pointermove',e=>{
   else if(down.what==='piece'){
     const [gx,gy]=down.cell, pc=pieceTop(gx,gy);
     if(pc){
+      if(pc.glued){ gluedTug(pc,null); down=null; return; }   // IT'S PART OF THE LAND!
       if(TRAIN.placed && trainOn(gx,gy,pc)){
         if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); down=null; return; }
         trainHome(false); toast('BACK IN THE SHED');
@@ -1961,6 +2266,7 @@ window.addEventListener('pointermove',e=>{
   else if(down.what==='scen'){
     const [gx,gy]=down.cell, s=scenAt(gx,gy);
     if(s){
+      if(s.glued){ gluedTug(null,s); down=null; return; }     // IT'S PART OF THE LAND!
       scen.delete(key(gx,gy)); save();
       DRAG={kind:'moveScen',t:s.t,v:s.v|0,from:[gx,gy]};
     }
@@ -2039,7 +2345,8 @@ window.addEventListener('pointerup',e=>{
     else if(down.what==='piece'){
       const [gx,gy]=down.cell, pc=pieceTop(gx,gy);
       if(pc){
-        if(pc.t==='sw'){
+        if(pc.glued){ gluedTug(pc,null); }        // no rotating the glued land either
+        else if(pc.t==='sw'){
           // TAP THE PIECE = THROW THE POINTS (rotation lives on a long-press)
           if(TRAIN.placed && (pc.latch || trainOn(gx,gy,pc))){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
           else { pc.sel^=1; SND.click(); save(); }
@@ -2190,13 +2497,18 @@ function cancelDrag(){
   DRAG=null; hover=null; save();
 }
 function showScreen(s){
+  if(s!=='game' && CAMP.on){ campExit(s); return; }   // leaving a level always lands you out clean
   SCREEN=s;
-  const menu=s==='menu';
-  if(menu){ cancelDrag(); down=null; shedShow(false); }
-  $('menu').style.display=menu?'flex':'none';
-  $('bar').style.display=menu?'none':'flex';
-  $('mark').style.display=menu?'none':'block';
-  $('menuChip').style.display=menu?'none':'block';
+  const game=s==='game';
+  if(!game){ cancelDrag(); down=null; shedShow(false); }
+  $('menu').style.display=s==='menu'?'flex':'none';
+  $('board').style.display=s==='board'?'flex':'none';
+  if(s==='board') boardSync();
+  $('bar').style.display=game?'flex':'none';
+  $('mark').style.display=game?'block':'none';
+  $('menuChip').style.display=(game&&!CAMP.on)?'block':'none';
+  $('backChip').style.display=(game&&CAMP.on)?'block':'none';
+  winSync();
   goBtnSync();
   resize();
 }
@@ -2251,7 +2563,9 @@ $('consist').addEventListener('click',e=>{
 $('tidy').addEventListener('click',()=>{ $('tidyAsk').classList.add('on'); $('tidy').classList.add('off'); });
 $('tidyNo').addEventListener('click',()=>{ $('tidyAsk').classList.remove('on'); $('tidy').classList.remove('off'); });
 $('tidyYes').addEventListener('click',()=>{
-  grid.clear(); hgrid.clear(); scen.clear(); trainHome(true); SND.pop(); save();
+  if(CAMP.on) clearPlayer();                 // sweep the kid's line; the glued land stays put
+  else { grid.clear(); hgrid.clear(); scen.clear(); trainHome(true); }
+  SND.pop(); save();
   $('tidyAsk').classList.remove('on'); $('tidy').classList.remove('off');
   shedShow(false); toast('ALL TIDY!');
 });
@@ -2260,20 +2574,20 @@ $('mute').addEventListener('click',()=>{ AU.on=!AU.on; if(AU.on){ ac(); SND.clic
 // ---- boot ----
 function resize(){
   W=innerWidth; H=innerHeight; DPR=Math.min(2,devicePixelRatio||1);
-  BAR=SCREEN==='menu'? 0 : ($('bar').offsetHeight||118);   // the menu room gets the whole window
+  BAR=SCREEN!=='game'? 0 : ($('bar').offsetHeight||118);   // the menu room + board get the whole window
   cvs.width=Math.round(W*DPR); cvs.height=Math.round(H*DPR);
   cvs.style.width=W+'px'; cvs.style.height=H+'px';
   SC=Math.min(W/WORLD_W,(H-BAR)/WORLD_H);
   OX=(W-WORLD_W*SC)/2; OY=(H-BAR-WORLD_H*SC)/2;
 }
 window.addEventListener('resize',resize);
-load(); buildPalette(); buildParts(); buildMenu(); buildAttract();
+load(); buildPalette(); buildParts(); buildMenu(); buildBoard(); buildAttract();
 showScreen('menu'); goBtnSync(); shedSync(); muteSync();
 let last=performance.now();
 function frame(t){
   const dt=Math.min(0.05,(t-last)/1000); last=t;
-  if(TS.auto){ if(SCREEN==='menu') menuUpdate(dt); else update(dt); }
-  if(SCREEN==='menu') drawMenu(); else draw();
+  if(TS.auto){ if(SCREEN==='game') update(dt); else menuUpdate(dt); }   // the board keeps the bedroom alive behind it
+  if(SCREEN==='game') draw(); else drawMenu();
   requestAnimationFrame(frame);
 }
 
@@ -2285,7 +2599,7 @@ window.TS={
   query(t,r,gx,gy){ return placeQuery(t,r|0,gx,gy); },   // {ok,elev,why} — ghost AND drop ask this same fn
   remove(gx,gy,el){
     const pc=el==null? pieceTop(gx,gy) : (el? pieceHi(gx,gy):pieceAt(gx,gy));
-    if(!pc) return false;
+    if(!pc||pc.glued) return false;
     if(TRAIN.placed && trainOn(gx,gy,pc)){ if(TRAIN.running) return false; trainHome(true); }
     removeTrackPiece(gx,gy,pc); save(); return true; },
   scen(t,v,gx,gy){ if(!SCENDEF[t]||gx<0||gy<0||gx>=GW||gy>=GH||!canPlaceScen(t,gx,gy)) return false;
@@ -2293,6 +2607,7 @@ window.TS={
   unscen(gx,gy){ const ok=scen.delete(key(gx,gy)); if(ok) save(); return ok; },
   toggle(gx,gy,el){ const pc=el==null? pieceTop(gx,gy) : (el? pieceHi(gx,gy):pieceAt(gx,gy));
     if(!pc||pc.t!=='sw') return null;
+    if(pc.glued) return false;
     if(TRAIN.placed && (pc.latch || trainOn(gx,gy,pc))) return false;
     pc.sel^=1; save(); return pc.sel; },
   canTrack(t,gx,gy,r){ return placeQuery(t,r|0,gx,gy).ok; },
@@ -2306,7 +2621,35 @@ window.TS={
   menu(){ showScreen('menu'); return SCREEN; },
   play(){ showScreen('game'); return SCREEN; },
   color(name){ if(!LIVERY[name]) return false; COLOR=name; liveryChanged(); save(); return COLOR; },
-  step(dt){ const d=dt||1/60; if(SCREEN==='menu') menuUpdate(d); else update(d); },
+  step(dt){ const d=dt||1/60; if(SCREEN==='game') update(d); else menuUpdate(d); },
+  xy(gx,gy){ return { x:OX+SC*(GX+gx*C+C/2), y:OY+SC*(GY+gy*C+C/2) }; },   // cell centre in client px (pointer rigs)
+  // ---- the campaign rig (E5) ----
+  camp:{
+    winWindow:CAMP_WIN_WINDOW,
+    open(){ showScreen('board'); return SCREEN; },
+    enter(n){ return campEnter(n); },
+    exit(){ campExit('board'); return SCREEN; },
+    unlockAll(){ CAMP.all=true; save(); if(SCREEN==='board') boardSync(); return true; },
+    reset(){ if(CAMP.on) campExit('board'); CAMP.done.clear(); CAMP.all=false; CAMP.wip=null; save(); boardSync(); return true; },
+    // THE SOLVABILITY LAW: build level n's scripted reference solution, ready for GO.
+    // Returns {ok:true} or {ok:false,why,at} — a level whose reference stops fitting refuses to ship.
+    solve(n){
+      if(!(CAMP.on&&CAMP.level===n)){ if(!campEnter(n)) return {ok:false,why:'locked'}; }
+      clearPlayer();
+      const S=SOLVE[n-1]; if(!S) return {ok:false,why:'no-solution'};
+      for(const row of S.rows){
+        const [t,r,x,y]=row, q=placeQuery(t,r,x,y);
+        if(!q.ok) return {ok:false,why:q.why,at:row};
+        setTrackPiece(t,r,null,q.elev,x,y);
+      }
+      if(!placeTrainAt(S.start[0],S.start[1],0)) return {ok:false,why:'train'};
+      goBtnSync(); shedSync(); save();
+      return {ok:true};
+    },
+    state(){ return { on:CAMP.on, level:CAMP.level, won:CAMP.won, all:CAMP.all,
+      done:[...CAMP.done].sort((a,b)=>a-b), stations:CAMP.stations.slice(),
+      visited:[...CAMP.visited], wip:CAMP.wip? CAMP.wip.level:null, tugToast:CAMP.tugT }; },
+  },
   state(){ return { screen:SCREEN, color:COLOR,
     placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F,
     pieces:[...grid.values()].filter(pc=>pc.t!=='ref').length+hgrid.size,
@@ -2317,7 +2660,8 @@ window.TS={
     scen:[...scen].map(([k,s])=>[k,s.t,s.v,+(s.wave>0)]),
     sw:[...grid].filter(([k,pc])=>pc.t==='sw').map(([k,pc])=>[k,pc.r,pc.sel,pc.latch?1:0,0])
       .concat([...hgrid].filter(([k,pc])=>pc.t==='sw').map(([k,pc])=>[k,pc.r,pc.sel,pc.latch?1:0,1])),
-    at:(()=>{ if(SCREEN!=='menu') return null;
+    camp:{ on:CAMP.on, level:CAMP.level, won:CAMP.won, done:[...CAMP.done].sort((a,b)=>a-b) },
+    at:(()=>{ if(SCREEN==='game') return null;
       RGRID=AT.grid; HGRID=AT.hg; try{ const p=pos(AT.cars[0].rd); return {x:p.x,y:p.y}; } finally{ RGRID=grid; HGRID=hgrid; } })(),
     loco:TRAIN.placed? Object.assign({},TRAIN.cars[0].rd,pos(TRAIN.cars[0].rd)) : null,
     cars:TRAIN.cars.map(c=>{ const p=pos(c.rd); return {t:c.type,cx:c.rd.cx,cy:c.rd.cy,el:c.rd.el?1:0,x:p.x,y:p.y,z:p.z}; }) }; },
