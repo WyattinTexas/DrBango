@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
-<!-- TRAINSET v1.3 -->
-<meta name="trainset-version" content="1.3">
+<link rel="icon" href="data:,">
+<!-- TRAINSET v1.4 -->
+<meta name="trainset-version" content="1.4">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -119,10 +120,11 @@
   #rot div{ font-size:52px; margin-bottom:14px; }
   @media (orientation:portrait) and (max-width:560px){ #rot{ display:block; } }
   @media (max-width:820px){
-    .pbtn{ width:60px; } .pbtn canvas{ width:42px; height:42px; }
-    #shedBtn,#goBtn{ padding:11px 12px; font-size:14px; min-width:78px; }
-    #goBtn{ font-size:16px; min-width:88px; }
-    #bar{ gap:6px; }
+    .pbtn{ width:54px; } .pbtn canvas{ width:38px; height:38px; }
+    #shedBtn,#goBtn{ padding:11px 10px; font-size:14px; min-width:72px; }
+    #goBtn{ font-size:16px; min-width:84px; }
+    #bar{ gap:4px; }
+    #palSlot>span{ gap:4px !important; }
     .ptab{ font-size:8px; padding:4px 4px; }
     .mbtn{ font-size:17px; padding:11px 30px; letter-spacing:2px; }
     .sw canvas{ width:44px; height:27px; }
@@ -211,6 +213,13 @@ const LIVERY={
   purple:{m:'#7B5AA6', d:'#523C73', s:'#664990'},
 };
 const SWATCHES=['red','yellow','blue','green','purple'];   // paint-shop order (RED is default)
+// ---- Wyatt dials (EXPANSION 4 — one const each) ----
+const LIFT=26;              // px of lift per elevation level (z=1 paints at y-LIFT)
+const TRESTLE_SPACE=34;     // px between trestle bents under ramps and the spiral
+const TRESTLE_COL='#8a683e', TRESTLE_DARK='#6B4A2C';   // trestle wood (GVT palette)
+const SPIRAL_TURNS=1.5;     // drawn turns — quarter-multiples land the exit on a port
+const SPIRAL_CELLS=2;       // footprint edge, cells (2 = a 2×2 tower)
+const SHADOW_SOFT=1.0;      // elevated-shadow strength (0 = none, 1 = default)
 
 const TAU=Math.PI*2;
 const perf=()=>performance.now()/1000;
@@ -219,13 +228,17 @@ let cx=cvs.getContext('2d');                     // rebindable: icons borrow the
 let W=0,H=0,BAR=118,SC=1,OX=0,OY=0,DPR=1;
 
 // ---- state ----
-const grid=new Map();                 // "cx,cy" -> {t,r, ra:{k}|null, pop, sel, latch}
+// TWO LEVELS (E4): grid holds elev-0 pieces, ramps, and the spiral (anchor + 'ref'
+// stubs on its other cells); hgrid holds pure elev-1 pieces. A cell may hold one of
+// each — over/under — except ramp/spiral cells, which claim both levels.
+const grid=new Map();                 // "cx,cy" -> {t,r,elev, ra:{k}|null, pop, sel, latch}
+const hgrid=new Map();                // "cx,cy" -> the elev-1 piece riding trestles above
 const scen=new Map();                 // "cx,cy" -> {t:'bush'|'tree'|'rv'|'ppl', v, ra, pop, wave}
-let RGRID=grid;                       // the rail graph the riders read — the attract loop swaps
+let RGRID=grid, HGRID=hgrid;          // the rail graph the riders read — the attract loop swaps
                                       // its own tiny oval in (menuUpdate/drawMenu), restores after
 let SCREEN='menu';                    // 'menu' | 'game' — never persisted, boot always lands on the menu
 let COLOR='red';                      // the train's livery (save v:3)
-const AT={ grid:new Map(), cars:[], smoke:[], wheel:0, smokeT:0, musT:2 };   // the attract loop
+const AT={ grid:new Map(), hg:new Map(), cars:[], smoke:[], wheel:0, smokeT:0, musT:2 };   // the attract loop
 let LIVE=false;                       // true only while the real consist advances (pass-latch writes)
 let yayCd=0, pplSeq=0, chirpN=0;      // chirpN: charm chirps fired, for the rig
 let consist=['tender','box'];         // cars behind the loco
@@ -240,14 +253,20 @@ const key=(x,y)=>x+','+y;
 
 // ---- piece geometry: port-to-port polylines with cumulative arc length ----
 // ports: 0=N 1=E 2=S 3=W. Every path runs ports[0] -> ports[1].
-function rotPt(p,r){ let x=p[0],y=p[1]; for(let i=0;i<r;i++){ const t=x; x=C-y; y=t; } return [x,y]; }
-function mkPath(ports,pts,r){
+// E4: a path may carry z (one 0..1 per point, PAINT-ONLY — riders keep the xy arc
+// metric, the uniform-arc law is untouched) and pcell (which cell of a multi-cell
+// prefab each endpoint lives in; null for every 1×1 piece).
+function rotPtS(p,r,S){ let x=p[0],y=p[1]; for(let i=0;i<r;i++){ const t=x; x=S-y; y=t; } return [x,y]; }
+const rotPt=(p,r)=>rotPtS(p,r,C);
+function mkPath(ports,pts,r,z){
   const P=pts.map(p=>rotPt(p,r));
   const cum=[0]; for(let i=1;i<P.length;i++) cum.push(cum[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));
-  return { ports:ports.map(p=>p==null?null:(p+r)%4), pts:P, cum, len:cum[cum.length-1] };
+  return { ports:ports.map(p=>p==null?null:(p+r)%4), pts:P, cum, len:cum[cum.length-1], z:z||null, pcell:null };
 }
 const arcPts=[]; for(let i=0;i<=10;i++){ const th=Math.PI-(Math.PI/2)*(i/10); arcPts.push([C+(C/2)*Math.cos(th),(C/2)*Math.sin(th)]); }
 const swArc=[]; for(let i=0;i<=10;i++){ const a=-Math.PI/2+(Math.PI/2)*(i/10); swArc.push([(C/2)*Math.cos(a),C+(C/2)*Math.sin(a)]); }
+// the RAMP: a straight whose polyline climbs z 0 -> 1, low port W, high port E at r0
+const rampPts=[], rampZ=[]; for(let i=0;i<=8;i++){ rampPts.push([C*i/8,C/2]); rampZ.push(i/8); }
 const BASE={
   s :[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]} ],
   c :[ {ports:[0,1], pts:arcPts} ],
@@ -256,15 +275,67 @@ const BASE={
   st:[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]} ],
   br:[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]} ],                              // a straight in fancy dress
   sw:[ {ports:[3,1], pts:[[0,C/2],[C,C/2]]}, {ports:[3,2], pts:swArc} ],    // facing W; branches E / S
+  rp:[ {ports:[3,1], pts:rampPts, z:rampZ} ],                               // the ramp: W low -> E high
 };
 const PATHS={};
-for(const t in BASE){ PATHS[t]=[]; for(let r=0;r<4;r++) PATHS[t].push(BASE[t].map(b=>mkPath(b.ports,b.pts,r))); }
+for(const t in BASE){ PATHS[t]=[]; for(let r=0;r<4;r++) PATHS[t].push(BASE[t].map(b=>mkPath(b.ports,b.pts,r,b.z))); }
+// THE SPIRAL (E4): one SPIRAL_CELLS² prefab — a lead-in, SPIRAL_TURNS around the
+// tower, a lead-out one level up. Internally just a longer polyline with z ramping,
+// so riders follow it natively under the uniform-arc law.
+const SPN=SPIRAL_CELLS, SPS=SPN*C;
+function spiralCells(ax,ay){ const o=[]; for(let dy=0;dy<SPN;dy++)for(let dx=0;dx<SPN;dx++) o.push([ax+dx,ay+dy]); return o; }
+function edgePort(x,y){        // block-edge point -> {side, cell offset within the prefab}
+  const cl=v=>Math.max(0,Math.min(SPN-1,Math.floor(v/C)));
+  if(y>=SPS-0.5) return {side:2, cell:[cl(x),SPN-1]};
+  if(y<=0.5)     return {side:0, cell:[cl(x),0]};
+  if(x<=0.5)     return {side:3, cell:[0,cl(y)]};
+  return {side:1, cell:[SPN-1,cl(y)]};
+}
+{
+  const M=SPS/2, R=M-C/2, lead=M, sweep=SPIRAL_TURNS*TAU;
+  const pts=[], z=[];
+  for(let i=0;i<=8;i++) pts.push([C/2, SPS-lead*i/8]);                      // in: S edge, heading N
+  const NA=Math.max(24,Math.round(sweep/(Math.PI/24)));
+  for(let i=1;i<=NA;i++){ const a=Math.PI+sweep*i/NA; pts.push([M+R*Math.cos(a),M+R*Math.sin(a)]); }
+  const aE=Math.PI+sweep, hx=-Math.sin(aE), hy=Math.cos(aE);                // exit heading = arc tangent
+  const ex=M+R*Math.cos(aE), ey=M+R*Math.sin(aE);
+  for(let i=1;i<=8;i++) pts.push([ex+hx*lead*i/8, ey+hy*lead*i/8]);
+  const cum=[0]; for(let i=1;i<pts.length;i++) cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+  for(let i=0;i<pts.length;i++) z.push(cum[i]/cum[cum.length-1]);           // z climbs 0 -> 1 over the ride
+  PATHS.sp=[];
+  for(let r=0;r<4;r++){
+    const P=pts.map(p=>rotPtS(p,r,SPS));
+    const cu=[0]; for(let i=1;i<P.length;i++) cu.push(cu[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));
+    const e0=edgePort(P[0][0],P[0][1]), e1=edgePort(P[P.length-1][0],P[P.length-1][1]);
+    PATHS.sp.push([{ports:[e0.side,e1.side], pcell:[e0.cell,e1.cell], pts:P, cum:cu, len:cu[cu.length-1], z}]);
+  }
+}
 
-const pieceAt=(x,y)=>RGRID.get(key(x,y))||null;
+function pieceAt(x,y){                            // the elev-0 layer (spiral stubs deref to the anchor)
+  let pc=RGRID.get(key(x,y));
+  if(pc&&pc.t==='ref') pc=RGRID.get(key(pc.ax,pc.ay));
+  return pc||null;
+}
+const pieceHi=(x,y)=>HGRID.get(key(x,y))||null;   // the elev-1 layer
+const pieceTop=(x,y)=>pieceHi(x,y)||pieceAt(x,y); // what a finger lands on: the visible top piece
+const pieceOf=rd=>rd.el? pieceHi(rd.cx,rd.cy) : pieceAt(rd.cx,rd.cy);   // the piece a rider rides
 const pathsOf=pc=>PATHS[pc.t][pc.r];
+const spans2=pc=>pc.t==='rp'||pc.t==='sp';        // ramps + spiral claim BOTH levels of their cells
 const scenAt=(x,y)=>scen.get(key(x,y))||null;
-function mkPiece(t,r,sel){
-  return {t,r:(r|0)%4,ra:null,pop:0,sel:sel==null?(t==='sw'?SW_DEFAULT:0):(sel?1:0),latch:null};
+function mkPiece(t,r,sel,elev){
+  return {t,r:(r|0)%4,elev:elev|0,ra:null,pop:0,sel:sel==null?(t==='sw'?SW_DEFAULT:0):(sel?1:0),latch:null};
+}
+// one writer for track placement — spiral spreads 'ref' stubs over its footprint
+function setTrackPiece(t,r,sel,elev,x,y){
+  const pc=mkPiece(t,r,sel,elev);
+  if(t==='sp'){ pc.ax=x; pc.ay=y;
+    for(const [x2,y2] of spiralCells(x,y)) grid.set(key(x2,y2),(x2===x&&y2===y)?pc:{t:'ref',ax:x,ay:y});
+  } else (elev?hgrid:grid).set(key(x,y),pc);
+  return pc;
+}
+function removeTrackPiece(x,y,pc){
+  if(pc.t==='sp'){ for(const [x2,y2] of spiralCells(pc.ax,pc.ay)) grid.delete(key(x2,y2)); }
+  else (pc.elev?hgrid:grid).delete(key(x,y));
 }
 // THE ONE-PREDICATE LAW: the drag ghost tint and the drop both call these, nobody else decides.
 // E2 generalized it: every scenery kind carries a blocks-track flag in SCENDEF; the river's
@@ -274,54 +345,137 @@ function cellBlocksTrack(t,x,y){
   if(s.t==='rv') return t!=='br';       // only a bridge may span water
   return !!SCENDEF[s.t].blocks;
 }
-function canPlaceTrack(t,x,y){
-  if(pieceAt(x,y)) return false;
-  return !cellBlocksTrack(t,x,y);
+// E4 — ELEVATION IS INFERRED, NEVER CHOSEN. Every aligned mate votes for the level
+// that would join it; the piece takes the level that joins the most (the ground on a
+// tie, never floating without a vote). A mate at the WRONG height is merely passed
+// by (that's how a line threads under or over — two pieces per cell), EXCEPT a
+// ramp/spiral mate: its cells hold both levels, nothing can pass, the joint is a
+// true abutment -> {ok:false, why:'ramp'} — NEEDS A RAMP!
+// This is THE predicate: ghost tint, drop, and TS.place all ask it, nobody else decides.
+function placeQuery(t,r,x,y){
+  if(!PATHS[t]) return {ok:false,why:'oob'};
+  r=(r|0)%4;
+  const cells=t==='sp'? spiralCells(x,y) : [[x,y]];
+  for(const [x2,y2] of cells){
+    if(x2<0||y2<0||x2>=GW||y2>=GH) return {ok:false,why:'oob'};
+    if(cellBlocksTrack(t,x2,y2)) return {ok:false,why:'scenery'};
+  }
+  const own=new Set(cells.map(c2=>key(c2[0],c2[1])));
+  const climber=(t==='rp'||t==='sp');
+  const votes=[0,0], hard=[false,false];
+  for(const p of PATHS[t][r]){
+    for(const end of [0,1]){
+      const side=p.ports[end]; if(side==null) continue;
+      const pz=p.z? Math.round(p.z[end?p.z.length-1:0]) : 0;   // this port's climb within the piece
+      const [px,py]=p.pcell? [x+p.pcell[end][0], y+p.pcell[end][1]] : [x,y];
+      const D=[[0,-1],[1,0],[0,1],[-1,0]][side];
+      const nx=px+D[0], ny=py+D[1];
+      if(own.has(key(nx,ny))) continue;
+      const lo=pieceAt(nx,ny), hi=pieceHi(nx,ny);
+      let m0=false, m1=false, climberMate=false;       // mate elevations aligned at this port
+      for(const q of (hi&&hi!==lo? [lo,hi] : [lo])){
+        if(!q) continue;
+        for(const qp of pathsOf(q)) for(const qe of [0,1]){
+          if(qp.ports[qe]!==(side+2)%4) continue;
+          if(qp.pcell){ const qx=q.ax+qp.pcell[qe][0], qy=q.ay+qp.pcell[qe][1]; if(qx!==nx||qy!==ny) continue; }
+          const me=(q.elev|0)+(qp.z? Math.round(qp.z[qe?qp.z.length-1:0]) : 0);
+          if(me===0) m0=true; else if(me===1) m1=true;
+          if(spans2(q)) climberMate=true;
+        }
+      }
+      if(!m0&&!m1) continue;                           // nothing aligned — this port is free air
+      for(const e of [0,1]){
+        const pe=e+pz;
+        if(pe>1){ hard[e]=true; continue; }            // level 2 is reserved
+        if(pe? m1:m0) votes[e]++;                      // a mate at this height — joined
+        else if(climberMate) hard[e]=true;             // abutting a climber at the wrong height
+      }
+    }
+  }
+  const free=e=>{                                      // is that level open on every footprint cell?
+    for(const [x2,y2] of cells){
+      const lo=pieceAt(x2,y2), hi=pieceHi(x2,y2);
+      if(climber){ if(lo||hi) return false; }
+      else if(e){ if(hi||(lo&&spans2(lo))) return false; }
+      else if(lo) return false;
+    }
+    return true;
+  };
+  const okAt=e=>!hard[e] && free(e) && (e===0 || (votes[1]>0 && !climber));
+  const c0=okAt(0), c1=okAt(1);
+  if(c0&&c1) return {ok:true,elev:votes[1]>votes[0]?1:0};   // the level that joins more; ground on ties
+  if(c0) return {ok:true,elev:0};
+  if(c1) return {ok:true,elev:1};
+  return {ok:false, why:(hard[0]||hard[1])?'ramp':'occupied'};
 }
+function canPlaceTrack(t,x,y,r){ return placeQuery(t,r|0,x,y).ok; }
 function canPlaceScen(t,x,y){
   if(scenAt(x,y)) return false;
-  const pc=pieceAt(x,y); if(!pc) return true;
-  if(t==='rv') return pc.t==='br';      // a river may flow in under a bridge
-  return !SCENDEF[t].blocks;            // small critters may graze among the rails
+  const lo=pieceAt(x,y), hi=pieceHi(x,y);
+  if(!lo&&!hi) return true;
+  if(t==='rv') return !!lo&&lo.t==='br'&&!hi;   // a river may flow in under a ground bridge
+  return !SCENDEF[t].blocks;                    // small critters may graze among (or under) the rails
 }
 
 // ---- riders on the graph (the GVT railPoint pattern) ----
+// E4: riders carry el (which level's piece they ride). A joint only connects when the
+// two port ELEVATIONS agree — a ramp's high port mates level-1 track, its low port the
+// ground, and a mismatched joint is simply a dead end (boing), never a teleport.
 function enter(rd,exitPort){
+  const pc0=pieceOf(rd); if(!pc0) return false;
+  const p0=pathsOf(pc0)[rd.pi];
+  const end0=rd.dir>0?1:0;
+  const exitElev=(pc0.elev|0)+(p0.z? Math.round(p0.z[end0?p0.z.length-1:0]) : 0);
+  const fx=p0.pcell? rd.cx+p0.pcell[end0][0] : rd.cx;
+  const fy=p0.pcell? rd.cy+p0.pcell[end0][1] : rd.cy;
   const D=[[0,-1],[1,0],[0,1],[-1,0]][exitPort];
-  const nx=rd.cx+D[0], ny=rd.cy+D[1];
+  const nx=fx+D[0], ny=fy+D[1];
   if(nx<0||ny<0||nx>=GW||ny>=GH) return false;
-  const pc=pieceAt(nx,ny); if(!pc) return false;
-  const entry=(exitPort+2)%4, ps=pathsOf(pc);
-  if(pc.t==='sw'){
-    // Splitter routing law. facing = ports[0] of both branch paths.
-    //  · facing entry  -> the lever picks the branch
-    //  · branch entry  -> trailing move, merge out the facing port (no derail, toy kindness)
-    //  · PASS LATCH: the first LIVE rider of the consist latches its port-pair on the piece;
-    //    every rider entering while the latch is live rides the latched pair (kills the
-    //    follower trap AND makes mid-pass reversals retrace their own entry path).
-    const facing=ps[0].ports[0];
-    let pi=-1;
-    if(pc.latch && (pc.latch.a===entry||pc.latch.b===entry)) pi=pc.latch.pi;
-    else if(entry===facing) pi=pc.sel?1:0;
-    else if(ps[0].ports[1]===entry) pi=0;
-    else if(ps[1].ports[1]===entry) pi=1;
-    if(pi<0) return false;
-    const p=ps[pi];
-    rd.cx=nx; rd.cy=ny; rd.pi=pi;
-    if(p.ports[0]===entry){ rd.dir=1; rd.s=0; } else { rd.dir=-1; rd.s=p.len; }
-    if(LIVE) pc.latch={pi,a:p.ports[0],b:p.ports[1]};
-    return true;
-  }
-  for(let i=0;i<ps.length;i++){
-    if(ps[i].ports[0]===entry){ rd.cx=nx; rd.cy=ny; rd.pi=i; rd.dir=1;  rd.s=0;         return true; }
-    if(ps[i].ports[1]===entry){ rd.cx=nx; rd.cy=ny; rd.pi=i; rd.dir=-1; rd.s=ps[i].len; return true; }
+  const entry=(exitPort+2)%4;
+  const lo=pieceAt(nx,ny), hi=pieceHi(nx,ny);
+  for(const pc of (hi&&hi!==lo? [lo,hi] : [lo])){
+    if(!pc) continue;
+    const ps=pathsOf(pc), base=pc.elev|0;
+    if(pc.t==='sw'){
+      // Splitter routing law. facing = ports[0] of both branch paths.
+      //  · facing entry  -> the lever picks the branch
+      //  · branch entry  -> trailing move, merge out the facing port (no derail, toy kindness)
+      //  · PASS LATCH: the first LIVE rider of the consist latches its port-pair on the piece;
+      //    every rider entering while the latch is live rides the latched pair (kills the
+      //    follower trap AND makes mid-pass reversals retrace their own entry path).
+      if(base!==exitElev) continue;
+      const facing=ps[0].ports[0];
+      let pi=-1;
+      if(pc.latch && (pc.latch.a===entry||pc.latch.b===entry)) pi=pc.latch.pi;
+      else if(entry===facing) pi=pc.sel?1:0;
+      else if(ps[0].ports[1]===entry) pi=0;
+      else if(ps[1].ports[1]===entry) pi=1;
+      if(pi<0) continue;
+      const p=ps[pi];
+      rd.cx=nx; rd.cy=ny; rd.pi=pi; rd.el=base?1:0;
+      if(p.ports[0]===entry){ rd.dir=1; rd.s=0; } else { rd.dir=-1; rd.s=p.len; }
+      if(LIVE) pc.latch={pi,a:p.ports[0],b:p.ports[1]};
+      return true;
+    }
+    for(let i=0;i<ps.length;i++){
+      const p=ps[i];
+      for(const e2 of [0,1]){
+        if(p.ports[e2]!==entry) continue;
+        if(base+(p.z? Math.round(p.z[e2?p.z.length-1:0]) : 0)!==exitElev) continue;
+        if(p.pcell){ if(pc.ax+p.pcell[e2][0]!==nx || pc.ay+p.pcell[e2][1]!==ny) continue; }
+        rd.cx=p.pcell? pc.ax:nx; rd.cy=p.pcell? pc.ay:ny;
+        rd.pi=i; rd.el=base?1:0;
+        if(e2===0){ rd.dir=1; rd.s=0; } else { rd.dir=-1; rd.s=p.len; }
+        return true;
+      }
+    }
   }
   return false;
 }
 function advance(rd,dist){
   let moved=0;
   for(let guard=0; guard<400 && dist>1e-6; guard++){
-    const pc=pieceAt(rd.cx,rd.cy); if(!pc) return {ok:false,moved};
+    const pc=pieceOf(rd); if(!pc) return {ok:false,moved};
     const path=pathsOf(pc)[rd.pi];
     if(rd.dir>0){
       const room=path.len-rd.s;
@@ -340,22 +494,44 @@ function advance(rd,dist){
   return {ok:true,moved};
 }
 function back(rd,dist){ rd.dir*=-1; const r=advance(rd,dist); rd.dir*=-1; return r; }
-const clone=rd=>({cx:rd.cx,cy:rd.cy,pi:rd.pi,dir:rd.dir,s:rd.s});
+const clone=rd=>({cx:rd.cx,cy:rd.cy,pi:rd.pi,dir:rd.dir,s:rd.s,el:rd.el|0});
 function pos(rd){
-  const pc=pieceAt(rd.cx,rd.cy); if(!pc) return {x:GX,y:GY,ang:0};
+  const pc=pieceOf(rd); if(!pc) return {x:GX,y:GY,ang:0,z:0};
   const p=pathsOf(pc)[rd.pi], s=Math.max(0,Math.min(p.len,rd.s));
   let i=1; while(i<p.cum.length-1 && p.cum[i]<s) i++;
   const a=p.pts[i-1], b=p.pts[i], L=p.cum[i]-p.cum[i-1]||1, k=(s-p.cum[i-1])/L;
   let ang=Math.atan2(b[1]-a[1],b[0]-a[0]); if(rd.dir<0) ang+=Math.PI;
-  return { x:GX+rd.cx*C+a[0]+(b[0]-a[0])*k, y:GY+rd.cy*C+a[1]+(b[1]-a[1])*k, ang };
+  const z=p.z? p.z[i-1]+(p.z[i]-p.z[i-1])*k : (pc.elev|0);
+  return { x:GX+rd.cx*C+a[0]+(b[0]-a[0])*k, y:GY+rd.cy*C+a[1]+(b[1]-a[1])*k, ang, z };
 }
 
 // ---- train assembly / placement ----
-function trainCells(){ const s=new Set(); for(const c of TRAIN.cars) s.add(key(c.rd.cx,c.rd.cy)); return s; }
-function placeTrainAt(cxl,cyl){
-  const pc=pieceAt(cxl,cyl); if(!pc) return false;
+// THE CELL-KEY AUDIT (E4): every cell-keyed behavior — this lock, the station re-arm,
+// the splitter pass-latch, lap detection — now keys on (cell, elev), so a train crossing
+// the top never trips the track beneath it, and vice versa.
+function trainCells(){
+  const s=new Set();
+  for(const c of TRAIN.cars){
+    const pc=pieceOf(c.rd);
+    if(pc&&pc.t==='sp'){ for(const [x2,y2] of spiralCells(pc.ax,pc.ay)){ s.add(key(x2,y2)+':0'); s.add(key(x2,y2)+':1'); } }
+    else{ s.add(key(c.rd.cx,c.rd.cy)+':'+(c.rd.el?1:0)); if(pc&&pc.t==='rp') s.add(key(c.rd.cx,c.rd.cy)+':1'); }
+  }
+  return s;
+}
+function trainOn(x,y,pc){                 // is the train using THIS piece (at its level)?
+  if(!TRAIN.placed) return false;
+  const tc=trainCells();
+  if(spans2(pc)||pc.t==='sp') return tc.has(key(x,y)+':0')||tc.has(key(x,y)+':1');
+  return tc.has(key(x,y)+':'+(pc.elev?1:0));
+}
+function placeTrainAt(cxl,cyl,prefEl){
+  // prefEl asks for a specific level and FAILS if that slot is empty — placement
+  // asserts stay elevation-aware; the kid's drop (no prefEl) takes the visible top
+  const pc=prefEl==null? pieceTop(cxl,cyl) : (prefEl? pieceHi(cxl,cyl):pieceAt(cxl,cyl));
+  if(!pc) return false;
+  if(pc.t==='sp'){ cxl=pc.ax; cyl=pc.ay; }
   const p0=pathsOf(pc)[0];
-  const loco={cx:cxl,cy:cyl,pi:0,dir:1,s:p0.len/2};
+  const loco={cx:cxl,cy:cyl,pi:0,dir:1,s:p0.len/2,el:(pc.elev|0)?1:0};
   const n=1+consist.length, need=GAP*(n-1)+34;
   const probe=clone(loco), r=back(probe,need);
   if(!r.ok){
@@ -373,9 +549,10 @@ function placeTrainAt(cxl,cyl){
   return true;
 }
 function trainHome(quiet){
-  if(TRAIN.placed && !quiet){ for(const c of TRAIN.cars){ const p=pos(c.rd); puff(p.x,p.y-8,16); } SND.pop(); }
+  if(TRAIN.placed && !quiet){ for(const c of TRAIN.cars){ const p=pos(c.rd); puff(p.x,p.y-8-LIFT*(p.z||0),16); } SND.pop(); }
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
   for(const pc of grid.values()) pc.latch=null;
+  for(const pc of hgrid.values()) pc.latch=null;
   goBtnSync(); shedSync();
 }
 function reverseTrain(){
@@ -388,13 +565,17 @@ function goTrain(){
   if(!TRAIN.placed) return false;
   TRAIN.running=true;
   const lc=TRAIN.cars[0].rd;
-  TRAIN.startSig=key(lc.cx,lc.cy)+':'+lc.pi+':'+lc.dir; TRAIN.goDist=0;
+  TRAIN.startSig=key(lc.cx,lc.cy)+':'+(lc.el?1:0)+':'+lc.pi+':'+lc.dir; TRAIN.goDist=0;
   goBtnSync(); return true;
 }
 
 // ---- update ----
 function update(dt){
   for(const pc of grid.values()){
+    if(pc.ra){ pc.ra.k-=dt*8; if(pc.ra.k<=0) pc.ra=null; }
+    if(pc.pop>0) pc.pop=Math.max(0,pc.pop-dt*5);
+  }
+  for(const pc of hgrid.values()){
     if(pc.ra){ pc.ra.k-=dt*8; if(pc.ra.k<=0) pc.ra=null; }
     if(pc.pop>0) pc.pop=Math.max(0,pc.pop-dt*5);
   }
@@ -414,12 +595,12 @@ function update(dt){
       const probe=clone(lead.rd), r=advance(probe,d);
       const step=r.ok? d : Math.max(0,r.moved-0.5);
       if(step>1e-4){
-        const locoPrev=key(TRAIN.cars[0].rd.cx,TRAIN.cars[0].rd.cy);
+        const lr0=TRAIN.cars[0].rd, locoPrev=key(lr0.cx,lr0.cy)+':'+(lr0.el?1:0);
         LIVE=true; for(const c of TRAIN.cars) advance(c.rd,step); LIVE=false;
         TRAIN.dist+=step; TRAIN.goDist+=step;
         wheelPhase+=step/8;
         chugAcc+=step; if(chugAcc>52){ chugAcc=0;
-          const lp=pieceAt(TRAIN.cars[0].rd.cx,TRAIN.cars[0].rd.cy);
+          const lp=pieceOf(TRAIN.cars[0].rd);
           SND.chuff(!!lp&&lp.t==='br'); }
         // THE CHARM LAW: people wave, cows look up, sheep hop, chickens flap at a passing
         // train — one shared chirp gate (yayCd) so passes never stack noise.
@@ -433,8 +614,9 @@ function update(dt){
           }
         }
         smokeT-=dt; if(smokeT<=0){ smokeT=0.16; stackPuff(); }
-        // station: the loco crossing a platform's centre
-        const lc=TRAIN.cars[0].rd, lpc=pieceAt(lc.cx,lc.cy), lk=key(lc.cx,lc.cy);
+        // station: the loco crossing a platform's centre — keyed (cell, elev), so a
+        // high train crossing above a ground station never dings it (the E4 audit)
+        const lc=TRAIN.cars[0].rd, lpc=pieceOf(lc), lk=key(lc.cx,lc.cy)+':'+(lc.el?1:0);
         if(lpc && lpc.t==='st'){
           const mid=pathsOf(lpc)[lc.pi].len/2;
           if(Math.abs(lc.s-mid)<step+0.6 && TRAIN.stKey!==lk){
@@ -443,7 +625,7 @@ function update(dt){
         }
         if(lk!==locoPrev){
           if(TRAIN.stKey && TRAIN.stKey!==lk) TRAIN.stKey=null;
-          // first lap — the loco re-enters where GO was pressed, same heading
+          // first lap — the loco re-enters where GO was pressed, same heading, SAME LEVEL
           const sig=lk+':'+lc.pi+':'+lc.dir;
           if(!lapDone && TRAIN.startSig && sig===TRAIN.startSig && TRAIN.goDist>3*C){
             lapDone=true; firstLap();
@@ -459,14 +641,16 @@ function update(dt){
   // the train) yet releases the points the moment the train is truly clear.
   let hasLatch=false;
   for(const pc of grid.values()) if(pc.latch){ hasLatch=true; break; }
+  if(!hasLatch) for(const pc of hgrid.values()) if(pc.latch){ hasLatch=true; break; }
   if(hasLatch){
     const occ=new Set();
     if(TRAIN.placed) for(const c of TRAIN.cars){
-      occ.add(key(c.rd.cx,c.rd.cy));
-      const f=clone(c.rd); if(advance(f,30).moved>0) occ.add(key(f.cx,f.cy));
-      const b=clone(c.rd); if(back(b,30).moved>0) occ.add(key(b.cx,b.cy));
+      occ.add(key(c.rd.cx,c.rd.cy)+':'+(c.rd.el?1:0));
+      const f=clone(c.rd); if(advance(f,30).moved>0) occ.add(key(f.cx,f.cy)+':'+(f.el?1:0));
+      const b=clone(c.rd); if(back(b,30).moved>0) occ.add(key(b.cx,b.cy)+':'+(b.el?1:0));
     }
-    for(const [k,pc] of grid) if(pc.latch && !occ.has(k)) pc.latch=null;
+    for(const [k,pc] of grid) if(pc.latch && !occ.has(k+':0')) pc.latch=null;
+    for(const [k,pc] of hgrid) if(pc.latch && !occ.has(k+':1')) pc.latch=null;
   }
   for(const s of smoke){ s.t+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy-=8*dt; }
   smoke=smoke.filter(s=>s.t<s.dur);
@@ -483,7 +667,7 @@ function stackPuff(){
   const flip=Math.cos(artAng)<0;
   const lx=18*KART, ly=(flip?28:-28)*KART;
   const ca=Math.cos(artAng), sa=Math.sin(artAng);
-  smoke.push({ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly, t:0, dur:1.1,
+  smoke.push({ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly-LIFT*(p.z||0), t:0, dur:1.1,
                vx:(Math.random()-0.5)*14, vy:-34, r:3+Math.random()*2 });
 }
 function puff(x,y,R){ fx.push({k:'puff',x,y,R,t:0,dur:0.4}); }
@@ -891,15 +1075,13 @@ function drawChick(s,t,ph){
   cx.lineCap='butt';
 }
 // ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers (GVT)
-// Takes the rail map to paint (default: the rug grid) so the menu's attract oval
-// is painted by this very function — zero duplicate art.
-function drawTrack(g){
-  g=g||grid;
+// E4 pipeline: ground three-pass -> elevated ground shadows -> trestles -> a z-SORTED
+// item list (ramp/spiral deck chunks · the level-1 three-pass batch · every car by its
+// own z). Within each level the three-pass seamless-join recipe holds untouched.
+const EMPTY_MAP=new Map();
+function batchTrack(list){            // the three-pass recipe over [ox,oy,pc] rows
   const bed=new Path2D(), rails=new Path2D();
-  const anim=[];
-  for(const [k,pc] of g){
-    if(pc.ra||pc.pop>0){ anim.push([k,pc]); continue; }
-    const [gx,gy]=k.split(',').map(Number), ox=GX+gx*C, oy=GY+gy*C;
+  for(const [ox,oy,pc] of list){
     for(const p of pathsOf(pc)){
       addPoly(bed,p.pts,ox,oy);
       for(let i=0;i<p.pts.length-1;i++){
@@ -915,23 +1097,181 @@ function drawTrack(g){
   cx.lineCap='butt';
   cx.strokeStyle='#6B4A2C'; cx.lineWidth=24; cx.setLineDash([6,12]); cx.stroke(bed); cx.setLineDash([]);
   cx.strokeStyle='#4A423A'; cx.lineWidth=3; cx.stroke(rails);
-  for(const [k,pc] of g){
-    if(pc.ra||pc.pop>0) continue;
-    const [gx,gy]=k.split(',').map(Number);
-    drawPieceDecor(pc,GX+gx*C,GY+gy*C);
+  for(const [ox,oy,pc] of list) drawPieceDecor(pc,ox,oy);
+}
+function pathPD(p,s){                 // point + unit direction + z at arc length s
+  s=Math.max(0,Math.min(p.len,s));
+  let i=1; while(i<p.cum.length-1 && p.cum[i]<s) i++;
+  const a=p.pts[i-1], b=p.pts[i], L=p.cum[i]-p.cum[i-1]||1, k=(s-p.cum[i-1])/L;
+  return { x:a[0]+(b[0]-a[0])*k, y:a[1]+(b[1]-a[1])*k,
+           dx:(b[0]-a[0])/L, dy:(b[1]-a[1])/L,
+           z:p.z? p.z[i-1]+(p.z[i]-p.z[i-1])*k : 0 };
+}
+function chunkRanges(p){              // ~34px runs of a sloped path, painted low-to-high
+  const out=[]; let i0=0;
+  while(i0<p.pts.length-1){
+    let i1=i0+1;
+    while(i1<p.pts.length-1 && p.cum[i1]-p.cum[i0]<34) i1++;
+    out.push([i0,i1]); i0=i1;
   }
-  for(const [k,pc] of anim){
-    const [gx,gy]=k.split(',').map(Number), ox=GX+gx*C, oy=GY+gy*C;
-    cx.save(); cx.translate(ox+C/2,oy+C/2);
-    if(pc.ra) cx.rotate(-(Math.PI/2)*Math.max(0,pc.ra.k));
-    if(pc.pop>0){ const s=1+0.16*pc.pop; cx.scale(s,s); }
-    cx.translate(-C/2,-C/2);
-    drawPieceArt(pc,0,0);
-    cx.restore();
+  return out;
+}
+function strokePts(pts){ cx.beginPath(); cx.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) cx.lineTo(pts[i][0],pts[i][1]); cx.stroke(); }
+function slopeChunkPaint(p,i0,i1,ox,oy,railsOnly){
+  const pts=[]; for(let i=i0;i<=i1;i++) pts.push([ox+p.pts[i][0], oy+p.pts[i][1]-LIFT*p.z[i]]);
+  cx.lineJoin='round'; cx.lineCap='butt';
+  if(!railsOnly){
+    cx.strokeStyle='#9A8266'; cx.lineWidth=34; cx.globalAlpha=0.9;
+    strokePts(pts); cx.globalAlpha=1;
+  }
+  cx.strokeStyle='#6B4A2C'; cx.lineWidth=24;
+  cx.setLineDash([6,12]); cx.lineDashOffset=-p.cum[i0]; strokePts(pts);
+  cx.setLineDash([]); cx.lineDashOffset=0;
+  cx.strokeStyle='#4A423A'; cx.lineWidth=3;
+  for(let i=0;i<pts.length-1;i++){
+    const ax=pts[i][0], ay=pts[i][1], bx=pts[i+1][0], by=pts[i+1][1];
+    const L=Math.hypot(bx-ax,by-ay)||1, nx=-(by-ay)/L*5.5, ny=(bx-ax)/L*5.5;
+    cx.beginPath(); cx.moveTo(ax+nx,ay+ny); cx.lineTo(bx+nx,by+ny); cx.stroke();
+    cx.beginPath(); cx.moveTo(ax-nx,ay-ny); cx.lineTo(bx-nx,by-ny); cx.stroke();
   }
 }
+// the soft shadow STAYS ON THE GROUND and shrinks with height — free depth
+function slopeShadow(pc,ox,oy){
+  if(SHADOW_SOFT<=0) return;
+  cx.lineJoin='round'; cx.lineCap='round'; cx.strokeStyle='#000';
+  const BANDS=5;
+  for(let b2=0;b2<BANDS;b2++){
+    const z0=b2/BANDS, z1=(b2+1)/BANDS, zm=(z0+z1)/2;
+    const path=new Path2D(); let any=false;
+    for(const p of pathsOf(pc)){
+      if(!p.z) continue;
+      let open=false;
+      for(let i=0;i<p.pts.length-1;i++){
+        const z=(p.z[i]+p.z[i+1])/2;
+        if(z>=z0&&z<z1+(b2===BANDS-1?0.001:0)){
+          if(!open){ path.moveTo(ox+p.pts[i][0],oy+p.pts[i][1]); open=true; any=true; }
+          path.lineTo(ox+p.pts[i+1][0],oy+p.pts[i+1][1]);
+        } else open=false;
+      }
+    }
+    if(!any) continue;
+    cx.globalAlpha=0.15*SHADOW_SOFT*(1-0.5*zm); cx.lineWidth=30-9*zm; cx.stroke(path);
+  }
+  cx.globalAlpha=1;
+}
+function hiShadow(rows){
+  if(!rows.length||SHADOW_SOFT<=0) return;
+  const path=new Path2D();
+  for(const [ox,oy,pc] of rows) for(const p of pathsOf(pc)) addPoly(path,p.pts,ox,oy);
+  cx.lineJoin='round'; cx.lineCap='round';
+  cx.globalAlpha=0.075*SHADOW_SOFT; cx.strokeStyle='#000'; cx.lineWidth=21; cx.stroke(path);
+  cx.globalAlpha=1;
+}
+// trestle bents: two wooden legs + a cross-brace, GVT wood palette
+function postPair(wx,wy,dx,dy,h){
+  if(h<6) return;
+  const nx=-dy, ny=dx;
+  cx.lineCap='round';
+  for(const s2 of [-1,1]){
+    const bx=wx+nx*13*s2, by=wy+ny*13*s2;
+    cx.strokeStyle=TRESTLE_DARK; cx.lineWidth=6;
+    cx.beginPath(); cx.moveTo(bx,by+2); cx.lineTo(bx,by-h); cx.stroke();
+    cx.strokeStyle=TRESTLE_COL; cx.lineWidth=3.2;
+    cx.beginPath(); cx.moveTo(bx,by+2); cx.lineTo(bx,by-h); cx.stroke();
+  }
+  cx.strokeStyle=TRESTLE_COL; cx.lineWidth=2.4;
+  cx.beginPath(); cx.moveTo(wx+nx*13,wy+ny*13-h*0.45); cx.lineTo(wx-nx*13,wy-ny*13-h*0.45); cx.stroke();
+  cx.lineCap='butt';
+}
+function slopeTrestles(pc,ox,oy){
+  for(const p of pathsOf(pc)){
+    if(!p.z) continue;
+    for(let s=TRESTLE_SPACE*0.7; s<p.len-8; s+=TRESTLE_SPACE){
+      const d=pathPD(p,s);
+      postPair(ox+d.x,oy+d.y,d.dx,d.dy,LIFT*d.z-3);
+    }
+  }
+}
+function hiTrestles(pc,ox,oy){
+  for(const p of pathsOf(pc)){
+    for(const s of [11,p.len-11]){
+      const d=pathPD(p,s);
+      postPair(ox+d.x,oy+d.y,d.dx,d.dy,LIFT-3);
+    }
+  }
+}
+function idxAt(p,s){ let i=0; while(i<p.cum.length-1 && p.cum[i]<s) i++; return Math.max(0,i-1); }
+function slopeItems(pc,ox,oy,items){
+  for(const p of pathsOf(pc)){
+    if(!p.z) continue;
+    for(const [i0,i1] of chunkRanges(p))
+      items.push({z:Math.min(p.z[i0],p.z[i1]), fn:()=>slopeChunkPaint(p,i0,i1,ox,oy,false)});
+    // repaint the crest's ties+rails above the level-1 batch, so a mated high bed's
+    // round cap never swallows the last few px of climbing rail at the joint
+    items.push({z:1.0005, fn:()=>slopeChunkPaint(p,idxAt(p,p.len-20),p.pts.length-1,ox,oy,true)});
+  }
+}
+function drawAnimPiece(row,S,lift){   // a piece mid-wiggle (rotate/pop), drawn alone
+  const [ox,oy,pc]=row;
+  cx.save(); cx.translate(ox+S/2,oy+S/2-(lift||0));
+  if(pc.ra) cx.rotate(-(Math.PI/2)*Math.max(0,pc.ra.k));
+  if(pc.pop>0){ const s2=1+0.16*pc.pop; cx.scale(s2,s2); }
+  cx.translate(-S/2,-S/2);
+  if(pc.t==='rp'||pc.t==='sp'){
+    for(const p of pathsOf(pc)) if(p.z) for(const [i0,i1] of chunkRanges(p)) slopeChunkPaint(p,i0,i1,0,0,false);
+  } else drawPieceBody(pc,0,0);
+  cx.restore();
+}
+function drawTrackAll(g,hg,carItems,midHook){
+  const flat=[], anim=[], sloped=[], hflat=[], hanim=[];
+  for(const [k,pc] of g){
+    if(pc.t==='ref') continue;
+    const [gx,gy]=k.split(',').map(Number), row=[GX+gx*C,GY+gy*C,pc];
+    if(pc.t==='rp'||pc.t==='sp') sloped.push(row);
+    else if(pc.ra||pc.pop>0) anim.push(row);
+    else flat.push(row);
+  }
+  for(const [k,pc] of hg){
+    const [gx,gy]=k.split(',').map(Number), row=[GX+gx*C,GY+gy*C,pc];
+    if(pc.ra||pc.pop>0) hanim.push(row); else hflat.push(row);
+  }
+  batchTrack(flat);
+  for(const row of anim) drawAnimPiece(row,C,0);
+  for(const row of sloped) slopeShadow(row[2],row[0],row[1]);
+  hiShadow(hflat.concat(hanim));
+  for(const row of sloped) slopeTrestles(row[2],row[0],row[1]);
+  for(const row of hflat) hiTrestles(row[2],row[0],row[1]);
+  for(const row of hanim) hiTrestles(row[2],row[0],row[1]);
+  if(midHook) midHook();
+  const items=[];
+  for(const row of sloped){
+    if(row[2].ra||row[2].pop>0) items.push({z:0.0001, fn:()=>drawAnimPiece(row,row[2].t==='sp'?SPS:C,0)});
+    else slopeItems(row[2],row[0],row[1],items);
+  }
+  if(hflat.length) items.push({z:1, fn(){ cx.save(); cx.translate(0,-LIFT); batchTrack(hflat); cx.restore(); }});
+  for(const row of hanim) items.push({z:1.001, fn:()=>drawAnimPiece(row,C,LIFT)});
+  if(carItems) for(const it of carItems) items.push(it);
+  items.sort((a,b)=>a.z-b.z);
+  for(const it of items) it.fn();
+}
+function drawTrack(g){ drawTrackAll(g||grid,EMPTY_MAP,null,null); }
 // one piece painted whole (ghost, palette icons, animating pieces)
 function drawPieceArt(pc,ox,oy){
+  if(pc.t==='rp'||pc.t==='sp'){
+    slopeShadow(pc,ox,oy); slopeTrestles(pc,ox,oy);
+    for(const p of pathsOf(pc)) if(p.z) for(const [i0,i1] of chunkRanges(p)) slopeChunkPaint(p,i0,i1,ox,oy,false);
+    return;
+  }
+  const lift=(pc.elev|0)?LIFT:0;
+  if(lift){
+    hiShadow([[ox,oy,pc]]); hiTrestles(pc,ox,oy);
+    cx.save(); cx.translate(0,-lift);
+    drawPieceBody(pc,ox,oy);
+    cx.restore(); return;
+  }
+  drawPieceBody(pc,ox,oy);
+}
+function drawPieceBody(pc,ox,oy){
   cx.lineJoin='round';
   for(const p of pathsOf(pc)){
     cx.lineCap='round'; cx.strokeStyle='#9A8266'; cx.lineWidth=34; cx.globalAlpha=0.9;
@@ -1056,14 +1396,27 @@ function wheel(wx,wr,rot){
   cx.restore();
   cx.fillStyle='#2b2117'; cx.beginPath(); cx.arc(wx,18,2.2,0,7); cx.fill();
 }
-function drawCar(type,x,y,artAng,squash,wrot,liv){
+function drawCar(type,x,y,artAng,squash,wrot,liv,z){
   liv=liv||LIVERY[COLOR];   // THE LIVERY LAW — only the red livery parts read this
-  cx.save(); cx.translate(x,y); cx.rotate(artAng);
+  const lift=(z||0)*LIFT;
+  if(lift>0.5){             // the shadow stays on the ground, shrinking with height
+    const k2=Math.min(1,z);
+    cx.save(); cx.translate(x,y); cx.rotate(artAng);
+    if(Math.cos(artAng)<0) cx.scale(1,-1);
+    cx.scale(KART,KART);
+    cx.globalAlpha=0.28*(1-0.55*k2); cx.fillStyle='#000';
+    cx.beginPath(); cx.ellipse(0,24,42*(1-0.3*k2),9*(1-0.3*k2),0,0,7); cx.fill();
+    cx.restore();
+  }
+  cx.save(); cx.translate(x,y-lift); cx.rotate(artAng);
   if(Math.cos(artAng)<0) cx.scale(1,-1);
   cx.scale(KART,KART);
   if(squash>0) cx.scale(1-0.22*squash, 1+0.22*squash);
-  cx.globalAlpha=0.28; cx.fillStyle='#000';
-  cx.beginPath(); cx.ellipse(0,24,42,9,0,0,7); cx.fill(); cx.globalAlpha=1;
+  if(lift<=0.5){
+    cx.globalAlpha=0.28; cx.fillStyle='#000';
+    cx.beginPath(); cx.ellipse(0,24,42,9,0,0,7); cx.fill();
+  }
+  cx.globalAlpha=1;
   if(type==='loco'){
     wheel(-24,8,wrot); wheel(-4,8,wrot); wheel(18,10,wrot*0.8);
     cx.fillStyle=liv.m;
@@ -1113,24 +1466,37 @@ function drawCar(type,x,y,artAng,squash,wrot,liv){
   }
   cx.restore();
 }
-// cars-on-rails painter, shared by the rug train and the menu's attract loop
+// cars-on-rails: pose sampled two axle points apart so headings stay honest in curves;
+// on a climb the LIFTED axle points set the tilt, and z rides along for paint order
+function carPose(c){
+  const f=clone(c.rd), b=clone(c.rd);
+  const rf=advance(f,AX), rb=back(b,AX);
+  let ang,x,y,z;
+  if(rf.moved>1||rb.moved>1){
+    const pf=rf.ok||rf.moved>1? pos(f):pos(c.rd), pb=rb.ok||rb.moved>1? pos(b):pos(c.rd);
+    ang=Math.atan2((pf.y-LIFT*pf.z)-(pb.y-LIFT*pb.z),pf.x-pb.x);
+    x=(pf.x+pb.x)/2; y=(pf.y+pb.y)/2; z=(pf.z+pb.z)/2;
+  } else { const p=pos(c.rd); ang=p.ang; x=p.x; y=p.y; z=p.z; }
+  return {x,y,ang,z:z||0};
+}
 function drawCarsOnRails(cars,wheelRot){
   for(let i=cars.length-1;i>=0;i--){
-    const c=cars[i];
-    const f=clone(c.rd), b=clone(c.rd);
-    const rf=advance(f,AX), rb=back(b,AX);
-    let ang,x,y;
-    if(rf.moved>1||rb.moved>1){
-      const pf=rf.ok||rf.moved>1? pos(f):pos(c.rd), pb=rb.ok||rb.moved>1? pos(b):pos(c.rd);
-      ang=Math.atan2(pf.y-pb.y,pf.x-pb.x); x=(pf.x+pb.x)/2; y=(pf.y+pb.y)/2;
-    } else { const p=pos(c.rd); ang=p.ang; x=p.x; y=p.y; }
-    const artAng=ang+(c.face<0?Math.PI:0);
-    drawCar(c.type,x,y,artAng,c.squash||0,wheelRot*(c.face<0?-1:1));
+    const c=cars[i], p=carPose(c);
+    const artAng=p.ang+(c.face<0?Math.PI:0);
+    drawCar(c.type,p.x,p.y,artAng,c.squash||0,wheelRot*(c.face<0?-1:1),null,p.z);
   }
 }
-function drawTrain(){
-  if(!TRAIN.placed) return;
-  drawCarsOnRails(TRAIN.cars,wheelPhase);
+// the rug train as z-items: TRAINS SORT INTO PAINT ORDER BY THEIR CURRENT z (E4 law),
+// so a train slips under the high line and rides over it, fractional mid-ramp
+function trainCarItems(){
+  if(!TRAIN.placed) return null;
+  const items=[];
+  for(let i=TRAIN.cars.length-1;i>=0;i--){
+    const c=TRAIN.cars[i], p=carPose(c);
+    const artAng=p.ang+(c.face<0?Math.PI:0);
+    items.push({z:p.z+0.05, fn:()=>drawCar(c.type,p.x,p.y,artAng,c.squash||0,wheelPhase*(c.face<0?-1:1),null,p.z)});
+  }
+  return items;
 }
 function drawGhosts(){
   if(!DRAG) return;
@@ -1143,18 +1509,22 @@ function drawGhosts(){
       cx.beginPath(); cx.moveTo(x-5,y); cx.lineTo(x+5,y); cx.moveTo(x,y-5); cx.lineTo(x,y+5); cx.stroke();
     }
     cx.globalAlpha=1;
-    const mock=isScen? {t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0} : {t:DRAG.t,r:DRAG.r,sel:DRAG.sel|0,latch:null};
+    const mock=isScen? {t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0} : {t:DRAG.t,r:DRAG.r,sel:DRAG.sel|0,elev:0,latch:null};
+    const span=DRAG.t==='sp'? SPN:1;
     if(hover){
-      const ok=isPiece? canPlaceTrack(DRAG.t,hover[0],hover[1]) : canPlaceScen(DRAG.t,hover[0],hover[1]);
+      // the ghost tint asks THE predicate — and paints at the elevation it infers
+      let ok;
+      if(isPiece){ const q=placeQuery(DRAG.t,DRAG.r,hover[0],hover[1]); ok=q.ok; if(q.ok) mock.elev=q.elev; }
+      else ok=canPlaceScen(DRAG.t,hover[0],hover[1]);
       cx.globalAlpha=0.28; cx.fillStyle=ok?'#7CFC66':'#FF5A44';
-      rr(GX+hover[0]*C+3,GY+hover[1]*C+3,C-6,C-6,10); cx.fill(); cx.globalAlpha=1;
+      rr(GX+hover[0]*C+3,GY+hover[1]*C+3,C*span-6,C*span-6,10); cx.fill(); cx.globalAlpha=1;
       if(ok){ cx.globalAlpha=0.8;
         if(isPiece) drawPieceArt(mock,GX+hover[0]*C,GY+hover[1]*C);
         else if(DRAG.t==='rv') drawRiverGhost(hover[0],hover[1]);
         else drawScenItem(mock,GX+hover[0]*C,GY+hover[1]*C,perf());
         cx.globalAlpha=1; }
     } else if(DRAG.x!=null){
-      cx.globalAlpha=0.8; cx.save(); cx.translate(DRAG.x-C/2,DRAG.y-C/2);
+      cx.globalAlpha=0.8; cx.save(); cx.translate(DRAG.x-C*span/2,DRAG.y-C*span/2);
       if(isPiece) drawPieceArt(mock,0,0);
       else if(DRAG.t==='rv') drawRiverBlob(C/2,C/2);
       else drawScenItem(mock,0,0,perf());
@@ -1162,7 +1532,7 @@ function drawGhosts(){
     }
   }
   if(DRAG.kind==='train' && DRAG.x!=null){
-    if(hover && pieceAt(hover[0],hover[1])){
+    if(hover && pieceTop(hover[0],hover[1])){
       cx.globalAlpha=0.28; cx.fillStyle='#7CFC66';
       rr(GX+hover[0]*C+3,GY+hover[1]*C+3,C-6,C-6,10); cx.fill(); cx.globalAlpha=1;
     }
@@ -1207,7 +1577,10 @@ function drawLapCard(){
 function draw(){
   cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cvs.width,cvs.height);
   cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
-  drawRug(); drawRivers(); drawTrack(); drawScen(); drawTrain();
+  drawRug(); drawRivers();
+  // scenery slides in as the midHook: over the ground pass, under the decks and
+  // the z-sorted cars — so a cow can graze beneath the high line
+  drawTrackAll(grid,hgrid,trainCarItems(),drawScen);
   for(const s of smoke){ const k=s.t/s.dur;
     cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb';
     cx.beginPath(); cx.arc(s.x,s.y,s.r+9*k,0,7); cx.fill(); cx.globalAlpha=1; }
@@ -1325,19 +1698,19 @@ function buildAttract(){
   const put=(x,y,t,r)=>AT.grid.set(key(x,y),mkPiece(t,r));
   put(0,0,'c',1); put(1,0,'s',0); put(2,0,'s',0); put(3,0,'c',2);
   put(0,1,'c',0); put(1,1,'s',0); put(2,1,'s',0); put(3,1,'c',3);
-  RGRID=AT.grid;
+  RGRID=AT.grid; HGRID=AT.hg;
   try{
-    const loco={cx:1,cy:0,pi:0,dir:1,s:48};
+    const loco={cx:1,cy:0,pi:0,dir:1,s:48,el:0};
     AT.cars=[{type:'loco',rd:loco,face:1,squash:0}];
     const tail=['tender','cab'];                       // the loco + 2 cars, both in livery
     for(let i=1;i<=tail.length;i++){
       const rd=clone(loco); back(rd,GAP*i);
       AT.cars.push({type:tail[i-1],rd,face:1,squash:0});
     }
-  } finally { RGRID=grid; }
+  } finally { RGRID=grid; HGRID=hgrid; }
 }
 function menuUpdate(dt){
-  RGRID=AT.grid;
+  RGRID=AT.grid; HGRID=AT.hg;
   try{
     const step=ATT_SPEED*dt;
     for(const c of AT.cars) advance(c.rd,step);       // a closed oval — advance never fails
@@ -1353,7 +1726,7 @@ function menuUpdate(dt){
       AT.smoke.push({ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly, t:0, dur:1.2,
                       vx:(Math.random()-0.5)*10, vy:-30, r:3+Math.random()*2 });
     }
-  } finally { RGRID=grid; }
+  } finally { RGRID=grid; HGRID=hgrid; }
   for(const s of AT.smoke){ s.t+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy-=8*dt; }
   AT.smoke=AT.smoke.filter(s=>s.t<s.dur);
   if(MENU_MUSIC){ AT.musT-=dt; if(AT.musT<=0){ AT.musT=5.5; SND.lull(); } }
@@ -1371,7 +1744,7 @@ function drawMenu(){
   // the attract loop, painted by the real track + car painters
   cx.save();
   cx.translate(ATT.ox,ATT.oy); cx.scale(ATT_SCALE,ATT_SCALE); cx.translate(-GX,-GY);
-  RGRID=AT.grid;
+  RGRID=AT.grid; HGRID=AT.hg;
   try{
     drawTrack(AT.grid);
     drawCarsOnRails(AT.cars,AT.wheel);
@@ -1379,7 +1752,7 @@ function drawMenu(){
       cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb';
       cx.beginPath(); cx.arc(s.x,s.y,s.r+9*k,0,7); cx.fill(); }
     cx.globalAlpha=1;
-  } finally { RGRID=grid; }
+  } finally { RGRID=grid; HGRID=hgrid; }
   cx.restore();
   if(MENU_PROPS.includes('sign')) menuSign();
 }
@@ -1454,11 +1827,15 @@ const SND={
    ===================================================================== */
 function save(){
   try{
-    const g=[]; for(const [k,pc] of grid) g.push([k,pc.t,pc.r,pc.sel|0]);
+    // v:4 — every piece carries elev; the spiral saves once (anchor + rotation),
+    // its footprint stubs are derived on load
+    const g=[];
+    for(const [k,pc] of grid){ if(pc.t==='ref') continue; g.push([k,pc.t,pc.r,pc.sel|0,pc.elev|0]); }
+    for(const [k,pc] of hgrid) g.push([k,pc.t,pc.r,pc.sel|0,1]);
     const sc=[]; for(const [k,s] of scen) sc.push([k,s.t,s.v|0]);
     localStorage.setItem('TRAINSET', JSON.stringify({
-      v:3, grid:g, scen:sc, consist, color:COLOR,
-      train: TRAIN.placed? { cars:TRAIN.cars.map(c=>({t:c.type,cx:c.rd.cx,cy:c.rd.cy,pi:c.rd.pi,dir:c.rd.dir,s:c.rd.s,f:c.face})), F:TRAIN.F } : null,
+      v:4, grid:g, scen:sc, consist, color:COLOR,
+      train: TRAIN.placed? { cars:TRAIN.cars.map(c=>({t:c.type,cx:c.rd.cx,cy:c.rd.cy,pi:c.rd.pi,dir:c.rd.dir,s:c.rd.s,f:c.face,e:c.rd.el?1:0})), F:TRAIN.F } : null,
       hints:hintStage, lap:lapDone, mute:!AU.on,
     }));
   }catch(e){}
@@ -1468,7 +1845,12 @@ function load(){
     const d=JSON.parse(localStorage.getItem('TRAINSET')||'null'); if(!d) return;
     // v:1 rows are [k,t,r] (no sel, no scen block) — they load clean, scenery empty.
     // v:1/v:2 carry no colour — they migrate to v:3 as RED (today's exact art).
-    for(const [k,t,r,sel] of (d.grid||[])) if(PATHS[t]) grid.set(k,mkPiece(t,r,sel));
+    // v:1/v:2/v:3 rows carry no elev — they migrate to v:4 all on the ground.
+    for(const [k,t,r,sel,elev] of (d.grid||[])){
+      if(!PATHS[t]) continue;
+      const [x,y]=k.split(',').map(Number);
+      setTrackPiece(t,r,sel,t==='rp'||t==='sp'?0:(elev?1:0),x,y);
+    }
     for(const [k,t,v] of (d.scen||[])) if(SCENDEF[t]) scen.set(k,{t,v:v|0,ra:null,pop:0,wave:0});
     if(Array.isArray(d.consist)) consist=d.consist.filter(t=>CARDEF[t]).slice(0,MAXCARS);
     COLOR=(d.color&&LIVERY[d.color])? d.color : 'red';
@@ -1476,9 +1858,10 @@ function load(){
     if(d.train && d.train.cars && d.train.cars.length){
       let ok=true;
       const cars=d.train.cars.map(c=>{
-        const pc=pieceAt(c.cx,c.cy);
+        const rd={cx:c.cx,cy:c.cy,pi:c.pi,dir:c.dir>0?1:-1,s:+c.s||0,el:c.e?1:0};
+        const pc=pieceOf(rd);
         if(!pc || !pathsOf(pc)[c.pi]) ok=false;
-        return {type:c.t,rd:{cx:c.cx,cy:c.cy,pi:c.pi,dir:c.dir>0?1:-1,s:+c.s||0},face:c.f<0?-1:1,squash:0};
+        return {type:c.t,rd,face:c.f<0?-1:1,squash:0};
       });
       if(ok){ TRAIN.cars=cars; TRAIN.placed=true; TRAIN.F=d.train.F!==false; }
     }
@@ -1488,7 +1871,8 @@ function load(){
 /* =====================================================================
    INPUT + CHROME
    ===================================================================== */
-const PIECES=[ ['s','STRAIGHT'], ['c','CURVE'], ['x','CROSSING'], ['b','BUMPER'], ['st','STATION'], ['br','BRIDGE'], ['sw','SPLITTER'] ];
+// palette order — Wyatt dial (E4 adds RAMP + SPIRAL: over & under, up & around)
+const PIECES=[ ['s','STRAIGHT'], ['c','CURVE'], ['rp','RAMP'], ['x','CROSSING'], ['b','BUMPER'], ['st','STATION'], ['br','BRIDGE'], ['sw','SPLITTER'], ['sp','SPIRAL'] ];
 const SCEN_NAME={ house:'HOUSE', shop:'SHOP', hall:'TOWN HALL', barn:'BARN', wtr:'WATER TOWER',
                   fence:'FENCE', cow:'COW', sheep:'SHEEP', chick:'CHICKEN' };
 const SCEN_PIECES=[ ['bush','BUSH'], ['tree','TREE'], ['rv','RIVER'], ['ppl','PEOPLE'],
@@ -1522,8 +1906,8 @@ function hintPass(n){ if(hintStage===n){ hintStage=n+1; save(); } }
 function wiggle(el){ el.classList.remove('wig'); void el.offsetWidth; el.classList.add('wig'); }
 
 function swRotate(gx,gy){
-  const pc=pieceAt(gx,gy); if(!pc) return;
-  if(TRAIN.placed && trainCells().has(key(gx,gy))){
+  const pc=pieceTop(gx,gy); if(!pc) return;
+  if(TRAIN.placed && trainOn(gx,gy,pc)){
     if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); return; }
     trainHome(false);
   }
@@ -1535,13 +1919,13 @@ cvs.addEventListener('pointerdown',e=>{
   const [wx,wy]=worldXY(e);
   if(TRAIN.placed){
     const p=pos(TRAIN.cars[0].rd);
-    if(Math.hypot(wx-p.x,wy-p.y)<36){ down={x:e.clientX,y:e.clientY,what:'loco'}; return; }
+    if(Math.hypot(wx-p.x,wy-(p.y-LIFT*(p.z||0)))<36){ down={x:e.clientX,y:e.clientY,what:'loco'}; return; }
   }
   const cell=cellXY(wx,wy);
-  if(cell && pieceAt(cell[0],cell[1])){
+  if(cell && pieceTop(cell[0],cell[1])){
     down={x:e.clientX,y:e.clientY,what:'piece',cell};
     // splitter: tap = throw the points, so rotation moves to a long-press
-    if(pieceAt(cell[0],cell[1]).t==='sw'){
+    if(pieceTop(cell[0],cell[1]).t==='sw'){
       const d=down;
       d.lp=setTimeout(()=>{ if(down===d){ down=null; swRotate(cell[0],cell[1]); } },550);
     }
@@ -1563,14 +1947,15 @@ window.addEventListener('pointermove',e=>{
   if(down.lp){ clearTimeout(down.lp); down.lp=null; }
   if(down.what==='pal'){ DRAG=down.layer!=='track'? {kind:'newScen',t:down.t,v:down.v|0} : {kind:'newPiece',t:down.t,r:0}; }
   else if(down.what==='piece'){
-    const [gx,gy]=down.cell, pc=pieceAt(gx,gy);
+    const [gx,gy]=down.cell, pc=pieceTop(gx,gy);
     if(pc){
-      if(TRAIN.placed && trainCells().has(key(gx,gy))){
+      if(TRAIN.placed && trainOn(gx,gy,pc)){
         if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); down=null; return; }
         trainHome(false); toast('BACK IN THE SHED');
       }
-      grid.delete(key(gx,gy)); save();
-      DRAG={kind:'movePiece',t:pc.t,r:pc.r,sel:pc.sel|0,from:[gx,gy]};
+      removeTrackPiece(gx,gy,pc); save();
+      DRAG={kind:'movePiece',t:pc.t,r:pc.r,sel:pc.sel|0,elev:pc.elev|0,
+            from:pc.t==='sp'?[pc.ax,pc.ay]:[gx,gy]};
     }
   }
   else if(down.what==='scen'){
@@ -1592,20 +1977,27 @@ window.addEventListener('pointerup',e=>{
   if(DRAG){
     const [wx,wy]=worldXY(e); hover=cellXY(wx,wy);
     if(DRAG.kind==='newPiece'||DRAG.kind==='movePiece'){
-      if(hover && canPlaceTrack(DRAG.t,hover[0],hover[1])){
-        const pc=mkPiece(DRAG.t,DRAG.r,DRAG.sel); pc.pop=1;
-        grid.set(key(hover[0],hover[1]),pc);
+      // the drop asks THE predicate — the same one the ghost tint asked all along
+      const q=hover? placeQuery(DRAG.t,DRAG.r,hover[0],hover[1]) : null;
+      if(q&&q.ok){
+        const pc=setTrackPiece(DRAG.t,DRAG.r,DRAG.sel,q.elev,hover[0],hover[1]); pc.pop=1;
         SND.tok(); puff(GX+hover[0]*C+C/2,GY+hover[1]*C+C/2,14);
         hintPass(0); if(grid.size>=3) hintPass(1);
         save();
       } else if(hover){
-        if(DRAG.kind==='movePiece'){ grid.set(key(DRAG.from[0],DRAG.from[1]),mkPiece(DRAG.t,DRAG.r,DRAG.sel)); save(); }
-        const s=scenAt(hover[0],hover[1]);
+        if(DRAG.kind==='movePiece'){ setTrackPiece(DRAG.t,DRAG.r,DRAG.sel,DRAG.elev|0,DRAG.from[0],DRAG.from[1]); save(); }
         let msg='THAT SPOT IS TAKEN';
-        if(s && !pieceAt(hover[0],hover[1])){
-          if(s.t==='rv') msg='ONLY A BRIDGE CAN CROSS THE RIVER!';
-          else if(s.t==='fence') msg='THE FENCE IS IN THE WAY!';
-          else if(SCENDEF[s.t].knock) msg='THE TOWN IS IN THE WAY!';
+        if(q&&q.why==='ramp') msg='NEEDS A RAMP!';
+        else if(q&&q.why==='scenery'){
+          let s=null;
+          for(const [x2,y2] of (DRAG.t==='sp'? spiralCells(hover[0],hover[1]):[hover])){
+            const s2=scenAt(x2,y2); if(s2&&cellBlocksTrack(DRAG.t,x2,y2)){ s=s2; break; }
+          }
+          if(s){
+            if(s.t==='rv') msg='ONLY A BRIDGE CAN CROSS THE RIVER!';
+            else if(s.t==='fence') msg='THE FENCE IS IN THE WAY!';
+            else if(SCENDEF[s.t].knock) msg='THE TOWN IS IN THE WAY!';
+          }
         }
         toast(msg);
       } else {
@@ -1626,12 +2018,12 @@ window.addEventListener('pointerup',e=>{
     }
     else if(DRAG.kind==='train'){
       let placedOk=false;
-      if(hover && pieceAt(hover[0],hover[1])) placedOk=placeTrainAt(hover[0],hover[1]);
+      if(hover && pieceTop(hover[0],hover[1])) placedOk=placeTrainAt(hover[0],hover[1]);
       if(placedOk){
         SND.clank(); hintPass(3);
         if(DRAG.wasRunning) goTrain();
       } else {
-        if(hover && pieceAt(hover[0],hover[1])) toast('TOO SHORT FOR THIS TRAIN!');
+        if(hover && pieceTop(hover[0],hover[1])) toast('TOO SHORT FOR THIS TRAIN!');
         if(DRAG.prev){ TRAIN.cars=DRAG.prev.map(c=>({type:c.type,rd:clone(c.rd),face:c.face,squash:0})); TRAIN.placed=true; TRAIN.F=DRAG.prevF; }
         else toast('BACK IN THE SHED');
       }
@@ -1645,14 +2037,14 @@ window.addEventListener('pointerup',e=>{
   if(dist<8){
     if(down.what==='loco'){ SND.whistle(); for(let i=0;i<3;i++) setTimeout(stackPuff,i*90); }
     else if(down.what==='piece'){
-      const [gx,gy]=down.cell, pc=pieceAt(gx,gy);
+      const [gx,gy]=down.cell, pc=pieceTop(gx,gy);
       if(pc){
         if(pc.t==='sw'){
           // TAP THE PIECE = THROW THE POINTS (rotation lives on a long-press)
-          if(TRAIN.placed && (pc.latch || trainCells().has(key(gx,gy)))){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
+          if(TRAIN.placed && (pc.latch || trainOn(gx,gy,pc))){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
           else { pc.sel^=1; SND.click(); save(); }
         }
-        else if(TRAIN.placed && trainCells().has(key(gx,gy))){
+        else if(TRAIN.placed && trainOn(gx,gy,pc)){
           if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
           else { trainHome(false); pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); save(); }
         } else { pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); hintPass(1); save(); }
@@ -1712,7 +2104,10 @@ function buildPalette(){
       down={x:e.clientX,y:e.clientY,what:'pal',t,el:b,layer,
             v:SCENDEF[t]&&SCENDEF[t].react?(pplSeq++%3):0}; });
   };
-  for(const [t,name] of PIECES) mk('track',t,name,g=>withCtx(g,()=>drawPieceArt({t,r:t==='c'?1:0,sel:0,latch:null},0,0)));
+  for(const [t,name] of PIECES) mk('track',t,name,g=>{
+    if(t==='sp'){ const s2=104/(SPS+28); g.setTransform(s2,0,0,s2,14*s2,14*s2); }   // the 2×2 tower, shrunk to fit
+    withCtx(g,()=>drawPieceArt({t,r:t==='c'?1:0,sel:0,elev:0,latch:null},0,0));
+  });
   for(const [t,name] of SCEN_PIECES) mk('scen',t,name,g=>scenIcon(g,t));
   for(const [t,name] of TOWN_PIECES) mk('town',t,name,g=>scenIcon(g,t));
   const sync=tab=>{
@@ -1763,9 +2158,9 @@ function paintConsist(){
 }
 function consistChanged(){
   if(TRAIN.placed){
-    const lc=TRAIN.cars[0].rd, wasCell=[lc.cx,lc.cy];
+    const lc=TRAIN.cars[0].rd, wasCell=[lc.cx,lc.cy], wasEl=lc.el?1:0;
     TRAIN.running=false;
-    if(!placeTrainAt(wasCell[0],wasCell[1])){ trainHome(false); toast('TOO SHORT FOR THIS TRAIN!'); }
+    if(!placeTrainAt(wasCell[0],wasCell[1],wasEl)){ trainHome(false); toast('TOO SHORT FOR THIS TRAIN!'); }
   }
   goBtnSync(); shedSync(); save();
 }
@@ -1786,7 +2181,7 @@ function muteSync(){ $('mute').textContent=AU.on?'🔊':'🔇'; }
 // The sim simply doesn't tick while SCREEN==='menu'; PLAY resumes exactly where you were.
 function cancelDrag(){
   if(!DRAG) return;
-  if(DRAG.kind==='movePiece'){ grid.set(key(DRAG.from[0],DRAG.from[1]),mkPiece(DRAG.t,DRAG.r,DRAG.sel)); }
+  if(DRAG.kind==='movePiece'){ setTrackPiece(DRAG.t,DRAG.r,DRAG.sel,DRAG.elev|0,DRAG.from[0],DRAG.from[1]); }
   else if(DRAG.kind==='moveScen'){ scen.set(key(DRAG.from[0],DRAG.from[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0}); }
   else if(DRAG.kind==='train' && DRAG.prev){
     TRAIN.cars=DRAG.prev.map(c=>({type:c.type,rd:clone(c.rd),face:c.face,squash:0}));
@@ -1856,7 +2251,7 @@ $('consist').addEventListener('click',e=>{
 $('tidy').addEventListener('click',()=>{ $('tidyAsk').classList.add('on'); $('tidy').classList.add('off'); });
 $('tidyNo').addEventListener('click',()=>{ $('tidyAsk').classList.remove('on'); $('tidy').classList.remove('off'); });
 $('tidyYes').addEventListener('click',()=>{
-  grid.clear(); scen.clear(); trainHome(true); SND.pop(); save();
+  grid.clear(); hgrid.clear(); scen.clear(); trainHome(true); SND.pop(); save();
   $('tidyAsk').classList.remove('on'); $('tidy').classList.remove('off');
   shedShow(false); toast('ALL TIDY!');
 });
@@ -1885,22 +2280,26 @@ function frame(t){
 // ---- debug rig (the GVT window.GVT pattern) — drive it headless ----
 window.TS={
   auto:true,
-  place(t,r,gx,gy){ if(!PATHS[t]||gx<0||gy<0||gx>=GW||gy>=GH||!canPlaceTrack(t,gx,gy)) return false;
-    grid.set(key(gx,gy),mkPiece(t,r)); save(); return true; },
-  remove(gx,gy){ const k=key(gx,gy); if(!grid.has(k)) return false;
-    if(TRAIN.placed && trainCells().has(k)){ if(TRAIN.running) return false; trainHome(true); }
-    grid.delete(k); save(); return true; },
+  place(t,r,gx,gy){ const q=placeQuery(t,r|0,gx,gy); if(!q.ok) return false;
+    setTrackPiece(t,r,null,q.elev,gx,gy); save(); return true; },
+  query(t,r,gx,gy){ return placeQuery(t,r|0,gx,gy); },   // {ok,elev,why} — ghost AND drop ask this same fn
+  remove(gx,gy,el){
+    const pc=el==null? pieceTop(gx,gy) : (el? pieceHi(gx,gy):pieceAt(gx,gy));
+    if(!pc) return false;
+    if(TRAIN.placed && trainOn(gx,gy,pc)){ if(TRAIN.running) return false; trainHome(true); }
+    removeTrackPiece(gx,gy,pc); save(); return true; },
   scen(t,v,gx,gy){ if(!SCENDEF[t]||gx<0||gy<0||gx>=GW||gy>=GH||!canPlaceScen(t,gx,gy)) return false;
     scen.set(key(gx,gy),{t,v:v|0,ra:null,pop:0,wave:0}); save(); return true; },
   unscen(gx,gy){ const ok=scen.delete(key(gx,gy)); if(ok) save(); return ok; },
-  toggle(gx,gy){ const pc=pieceAt(gx,gy); if(!pc||pc.t!=='sw') return null;
-    if(TRAIN.placed && (pc.latch || trainCells().has(key(gx,gy)))) return false;
+  toggle(gx,gy,el){ const pc=el==null? pieceTop(gx,gy) : (el? pieceHi(gx,gy):pieceAt(gx,gy));
+    if(!pc||pc.t!=='sw') return null;
+    if(TRAIN.placed && (pc.latch || trainOn(gx,gy,pc))) return false;
     pc.sel^=1; save(); return pc.sel; },
-  canTrack(t,gx,gy){ return canPlaceTrack(t,gx,gy); },
+  canTrack(t,gx,gy,r){ return placeQuery(t,r|0,gx,gy).ok; },
   canScen(t,gx,gy){ return canPlaceScen(t,gx,gy); },
-  clear(){ grid.clear(); scen.clear(); trainHome(true); save(); },
+  clear(){ grid.clear(); hgrid.clear(); scen.clear(); trainHome(true); save(); },
   consist(arr){ consist=(arr||[]).filter(t=>CARDEF[t]).slice(0,MAXCARS); consistChanged(); return consist.slice(); },
-  placeTrain(gx,gy){ const ok=placeTrainAt(gx,gy); goBtnSync(); shedSync(); save(); return ok; },
+  placeTrain(gx,gy,el){ const ok=placeTrainAt(gx,gy,el==null?null:el); goBtnSync(); shedSync(); save(); return ok; },
   go(){ const ok=goTrain(); save(); return ok; },
   stop(){ TRAIN.running=false; goBtnSync(); save(); },
   home(){ trainHome(true); save(); },
@@ -1909,15 +2308,19 @@ window.TS={
   color(name){ if(!LIVERY[name]) return false; COLOR=name; liveryChanged(); save(); return COLOR; },
   step(dt){ const d=dt||1/60; if(SCREEN==='menu') menuUpdate(d); else update(d); },
   state(){ return { screen:SCREEN, color:COLOR,
-    placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F, pieces:grid.size,
+    placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F,
+    pieces:[...grid.values()].filter(pc=>pc.t!=='ref').length+hgrid.size,
+    track:[...grid].filter(([k,pc])=>pc.t!=='ref').map(([k,pc])=>[k,pc.t,pc.r,pc.elev|0])
+      .concat([...hgrid].map(([k,pc])=>[k,pc.t,pc.r,1])),
     consist:consist.slice(), lap:lapDone, hint:hintStage, pauseT:TRAIN.pauseT,
     scenery:scen.size, chirps:chirpN,
     scen:[...scen].map(([k,s])=>[k,s.t,s.v,+(s.wave>0)]),
-    sw:[...grid].filter(([k,pc])=>pc.t==='sw').map(([k,pc])=>[k,pc.r,pc.sel,pc.latch?1:0]),
+    sw:[...grid].filter(([k,pc])=>pc.t==='sw').map(([k,pc])=>[k,pc.r,pc.sel,pc.latch?1:0,0])
+      .concat([...hgrid].filter(([k,pc])=>pc.t==='sw').map(([k,pc])=>[k,pc.r,pc.sel,pc.latch?1:0,1])),
     at:(()=>{ if(SCREEN!=='menu') return null;
-      RGRID=AT.grid; try{ const p=pos(AT.cars[0].rd); return {x:p.x,y:p.y}; } finally{ RGRID=grid; } })(),
+      RGRID=AT.grid; HGRID=AT.hg; try{ const p=pos(AT.cars[0].rd); return {x:p.x,y:p.y}; } finally{ RGRID=grid; HGRID=hgrid; } })(),
     loco:TRAIN.placed? Object.assign({},TRAIN.cars[0].rd,pos(TRAIN.cars[0].rd)) : null,
-    cars:TRAIN.cars.map(c=>{ const p=pos(c.rd); return {t:c.type,cx:c.rd.cx,cy:c.rd.cy,x:p.x,y:p.y}; }) }; },
+    cars:TRAIN.cars.map(c=>{ const p=pos(c.rd); return {t:c.type,cx:c.rd.cx,cy:c.rd.cy,el:c.rd.el?1:0,x:p.x,y:p.y,z:p.z}; }) }; },
   mute(b){ AU.on=!b; muteSync(); },
 };
 requestAnimationFrame(frame);
