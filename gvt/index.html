@@ -2037,7 +2037,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.97</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v1.98</div>
   <div class="scanlines"></div>
 </div>
 
@@ -10731,10 +10731,38 @@ const CAMP_PROPS={
   88:[{art:'cactus',x:160,y:140,r:12},{art:'cactus',x:350,y:510,r:12},{art:'cactus',x:880,y:200,r:11}],
   100:[{art:'clod',x:160,y:480,r:13},{art:'clod',x:330,y:140,r:12},{art:'clod',x:860,y:200,r:13},{art:'clod',x:760,y:500,r:12},{art:'clod',x:250,y:330,r:11}]
 };
-// the stage's marquee name for the door card's sub-line — both keys already
-// ship in all six languages (v1.27/v1.57), so the announce owes zero strings
+// the stage's marquee name for the door card's sub-line — all three keys
+// already ship in all six languages (v1.27/v1.57 map names + the OPEN CARPET
+// blister), so the announce owes zero strings. v1.98: a PLAIN grand rug is
+// the OPEN CARPET — that map's whole identity is "the big cleared span".
 function campStageName(){ const g=S.cfg&&S.cfg.terrain&&S.cfg.terrain.ground;
-  return g==='snow'?'THE WINTER FIELD' : g==='sand'?'WESTERN LAND' : null; }
+  return g==='snow'?'THE WINTER FIELD' : g==='sand'?'WESTERN LAND'
+       : (S.gk>1)?'OPEN CARPET' : null; }
+// ===== v1.98 THE GRAND CAMPAIGN RUGS (Wyatt 8/1: "Adjust 20 of the 100
+// campaign levels to include a larger map size. The size of the battlegrounds
+// Western World is a perfect size for an exciting level. The Winter Level
+// size & the Open Carpet is also a great size of an exciting level.") =====
+// TWENTY rungs fight on a battleground-sized world: W becomes the named maps'
+// own 1920 (Western Land, the Winter Field and the Open Carpet all fight that
+// span at 1v1) and the campaign gains the battlefield's pan/flick camera plus
+// an ESCORT CAMERA that walks the view to the war (campCamTick). The six
+// v1.96 stage rungs all ride — their look finally gets its SIZE — and the
+// plain rungs play the same span as the OPEN CARPET, door card and all.
+// THE SET: the deep milestones (every ×5 from the L20 debut), the six staged
+// rungs, both deep premieres (52 envelope / 68 ironwall — a wide shape wants
+// a wide rug) and the L99 tease rung. EXCLUDED by law: everything under 20
+// (the young ladder stays pure — 0098), 36 (its escort retune is tuned
+// ground — 0098), 58 (HE STUDIED YOUR PLAYBOOK — the playbook IS your own
+// 1240 rug, the v1.96 call).
+// GEOMETRY: one factor S.gk=W/CAMP_W stretches the deploy line, the forward
+// line and the seeded terrain x (campGrandArm — copies for props, tables
+// never mutated), so the proven 1240 layout scales instead of crowding the
+// home half. The crate (W-130), the wave horizon (edgePt W+60) and the boss
+// walk-on (W+70) already read the live W. On every other rung S.gk===1 and
+// every number this touches computes byte-identically; levelCfg itself is
+// UNTOUCHED, so the all-100 cfg dump stays byte-equal against HEAD.
+const CAMP_GRAND={ 20:1,25:1,30:1,35:1,40:1,44:1,50:1,52:1,60:1,65:1,68:1,70:1,74:1,80:1,85:1,88:1,90:1,95:1,99:1,100:1 };
+const CAMP_GRAND_W=1920;   // the battleground's own 1v1 span — one const for Wyatt's feel pass
 // v1.46 THE FINALE LAW (doc LAW A): from L60 the cycle monsters hunt in PAIRS —
 // each pairing is two different problems at once (wall+rusher, rusher+bruiser,
 // bruiser+wall).
@@ -12302,6 +12330,7 @@ function reset(){
   S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
   S.ffLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.slowmo=1; S.spdI=0; S.hitStop=0; S.tanBase=null; S.vflag=null;
+  S.gk=1; S.cCam={x:0,y:0,vx:0,vy:0}; S.camHold=0;   // v1.98: the grand-rug factor + the campaign camera re-arm with every battle
   S.momRaid=false;   // v1.79: a stale mom flag would leak her interT/floor/verdict into the next battle
   S.sargeCd=0; S.sargeFlash=0; S.tagT=0; S.lostLevel=0;   // casualties + Sarge's clock + the faucet (v1.32)
   S.chargeAnn=false;                      // v1.40: the CHARGE bugle speaks once a level
@@ -12389,9 +12418,28 @@ function startBattle(levelN, rival){
 // solo carpet fields the campaign's own army, exactly as it always did. It is
 // still called, on purpose: solo and a one-man lobby must not be able to drift
 // apart if either constant is ever tuned.
+// v1.98: arm the grand rug at the crate doors ONLY (this one + every co-op
+// deploy) — the sortie, the mom fight and the classic rig door never call it,
+// so their rugs and their cfgs stay byte-identical. Terrain stretches by the
+// ONE factor so the river keeps its exact relation to the deploy line and the
+// forward line (all three scale together); props are COPIED because
+// CAMP_PROPS is a shared table and a battle must never write into it. Runs
+// on every sim in a lobby from the same levelN, so co-op stays mirrored-by-
+// construction with zero wire change (the v1.96 §3.7 law).
+function campGrandArm(){
+  S.gk=1;
+  if(!CAMP_GRAND[S.levelN]) return;
+  S.gk=CAMP_GRAND_W/CAMP_W;
+  W=CAMP_GRAND_W; resize();
+  const t=S.cfg.terrain;
+  t.rocks.forEach(rk=>{ rk.x=Math.round(rk.x*S.gk); });
+  if(t.river) t.river.x=Math.round(t.river.x*S.gk);
+  if(t.props) t.props=t.props.map(pr=>Object.assign({},pr,{x:Math.round(pr.x*S.gk)}));
+}
 function startCampaign(n){
   startBattle(n||META.campaign+1, null);
   W=CAMP_W; resize();   // v1.40 THE LONG FRONT — room to see the war coming, both ways
+  campGrandArm();       // v1.98 — and twenty rungs stretch it to the battleground's own span
   sqScaleCfg(S.cfg, 1);
   // 0098 QUIET MERCY — see the block comment at mercyRelief. Foes AND bosses
   // read hpMul at spawn (spawnFoe; bosses through 1+(hpMul·mr−1)×bossF, a
@@ -13055,6 +13103,7 @@ function coopStartBattle(){
   startBattle(COOP.level, null);
   coopLaunching=false;
   W=CAMP_W; resize();   // v1.40: every co-op door is a crate door — the same long front as solo, on every sim
+  campGrandArm();       // v1.98: the grand rugs ride the SAME levelN on every sim — mirrored by construction, zero wire change
   S.coop=COOP;
   S.speed=1;   // lockstep pin (v1.93): every sim in the lobby — old builds included — runs ×1
   if(coopSquad()){
@@ -14252,9 +14301,13 @@ function counterDmg(tgt,dmg,src){
 // omits it keeps the old x-only answer, and on an hMul-1 map any legal y is
 // inside the window anyway, so nothing that shipped changes by a decibel.)
 function bfVis(x,y){
-  if(!S.bf) return true;
-  if(Math.abs(x-(S.bf.cam.x+VW/2)) >= VW/2+260) return false;
-  return y==null || Math.abs(y-((S.bf.cam.y||0)+H/2)) < H/2+260;
+  // v1.98: the grand campaign rug gates its noise the same way (a volley at
+  // their crate is a world away from your deploy line); every narrow rug
+  // still answers TRUE unconditionally — nothing that shipped loses a beep.
+  const cm=S.bf? S.bf.cam : (W>VW? S.cCam : null);
+  if(!cm) return true;
+  if(Math.abs(x-(cm.x+VW/2)) >= VW/2+260) return false;
+  return y==null || Math.abs(y-((cm.y||0)+H/2)) < H/2+260;
 }
 function bfSfx(fn,x,y){ if(bfVis(x,y)) fn(); }
 // every damage site funnels through here so the blade can turn a round aside
@@ -14723,6 +14776,10 @@ const CAMP_CREW=3;
 // kill, a drop beside it would be a free siege that skips the whole march. The
 // rest of the carpet is ground you TAKE, not ground you're given.
 const CAMP_DEPLOY_X=480;
+// v1.98: on a grand rug your half stretches with the world — one factor, the
+// same one the forward line and the seeded terrain ride, so the three never
+// drift apart. Identity (480 exactly) on every rug where S.gk is 1.
+function campDeployX(){ return Math.round(CAMP_DEPLOY_X*(S.gk||1)); }
 // v1.48 THE LID COMES OFF (Wyatt 7/28: "if you need to be able to destroy
 // their base before the final wave, that's fine, and the level should be over.
 // It's another way to beat the level"). v1.40's 20% floor and v1.46's
@@ -14789,6 +14846,11 @@ function vflagTick(dt){
   if(S.bf && !S.bf.resolved && !S.pan){
     S.bf.cam.x=clampCam(S.bf.cam.x+((v.x-VW*0.55)-S.bf.cam.x)*Math.min(1,dt*3.2));
     S.bf.cam.y=clampCamY((S.bf.cam.y||0)+((v.y-436)-(S.bf.cam.y||0))*Math.min(1,dt*3.2));   // ...and climbs to the pole on the tall map (clamps to 0 everywhere else)
+  }
+  // v1.98: the grand campaign rug walks over the same way — the crate that
+  // fell may be a world away from wherever the escort camera was looking
+  else if(!S.bf && W>VW && S.cCam && !S.pan){
+    S.cCam.x=clampCam(S.cCam.x+((v.x-VW*0.55)-S.cCam.x)*Math.min(1,dt*3.2));
   }
   if(!v.burst && v.t>=v.lag+v.rise){
     v.burst=true;
@@ -14889,8 +14951,9 @@ const CAMP_FRONT_X=600;
 // …except where the seed parked the RIVER under that exact line: a watch stood
 // in the water is nonsense, so on those carpets the line is the east bank.
 function campFrontX(){
+  const fx=Math.round(CAMP_FRONT_X*(S.gk||1));   // v1.98: the forward line rides the grand stretch (identity at gk 1)
   const RV=S.cfg.terrain.river;
-  return (RV && CAMP_FRONT_X>RV.x-30 && CAMP_FRONT_X<RV.x+RV.w+36)? RV.x+RV.w+36 : CAMP_FRONT_X;
+  return (RV && fx>RV.x-30 && fx<RV.x+RV.w+36)? RV.x+RV.w+36 : fx;
 }
 // v1.40: how far out a man can ATTACK the crate from — his own gun's reach.
 // The MORTAR never (rng 9999 would shell it from spawn and the turtle would
@@ -15066,8 +15129,47 @@ function campUnitStep(u,dt){
 
 // ================= BATTLEFIELD: CLOCK, ECONOMY, OPPONENT =================
 function bfBounty(type){ return (BF_BOUNTY[type]||1) * (S.bf&&S.bf.ot?2:1); }
-function clampCam(x){ return Math.max(0, Math.min(WORLD_W-VW, x)); }
+function clampCam(x){ return Math.max(0, Math.min((S.bf?WORLD_W:W)-VW, x)); }   // v1.98: the grand campaign rug pans too — its world is W (0..0 on every narrow rug)
 function clampCamY(y){ return Math.max(0, Math.min(WORLD_H-H, y)); }   // 0..0 on every map but the tall one
+// ===== v1.98 THE ESCORT CAMERA (campaign only) =====
+// The grand rugs (CAMP_GRAND) are wider than the screen, so the campaign
+// gains the battlefield's pan/flick — plus a follow the BF never had: the
+// view walks itself to wherever the war actually is, because a seven-year-
+// old watching his men march off the right edge of the screen must not need
+// to learn a pan gesture before he can see them fight. FOCUS = the nearer of
+// (your front-most living man) and (the front-most Tan actually on the rug):
+// the push while you're pushing, and the breach the moment one slips behind
+// your line — losing lives off-screen is the one unforgivable camera sin.
+// A manual pan owns the view for CAMP_CAM_HOLD seconds (flick inertia
+// included); a tray drag walks the view HOME because the deploy zone is
+// where that figure can land, and the held figure rides the FINGER, not the
+// rug (the drag delta-shift below); a unit drag or a jet aim freezes the
+// camera outright (never slide ground out from under an aiming hand). Pure
+// lerp on sim dt — no RNG, so seeded battery runs stay deterministic; on
+// every narrow rug (W<=VW) the camera is pinned at 0 and everything here is
+// arithmetic the shipped game never sees.
+const CAMP_CAM_HOLD=5;
+function campCamTick(dt){
+  const c=S.cCam; if(!c || S.bf) return;
+  if(W<=VW){ c.x=0; c.y=0; c.vx=0; c.vy=0; return; }
+  if(S.camHold>0) S.camHold-=dt;
+  if(!S.pan && c.vx){                          // flick inertia — the battlefield's own physics
+    c.x=clampCam(c.x+c.vx*dt);
+    c.vx*=Math.pow(0.02,dt);
+    if(Math.abs(c.vx)<8 || c.x<=0 || c.x>=W-VW) c.vx=0;
+  }
+  if(S.pan || S.camHold>0 || c.vx || S.jetAim || (S.drag&&S.drag.unit)) return;
+  let tx;
+  if(S.drag) tx=0;                             // a tray drag pans home — the deploy zone is where he lands
+  else {
+    let mx=0; for(const u of S.units){ if(!u.dead && u.x>mx) mx=u.x; }
+    let fx=1e9; for(const f of S.foes){ if(!f.burrow && f.x<W-10 && f.x<fx) fx=f.x; }
+    tx=clampCam(Math.min(mx||T.x, fx)-VW*0.55);
+  }
+  const prev=c.x;
+  if(Math.abs(tx-c.x)>2) c.x=clampCam(c.x+(tx-c.x)*Math.min(1,dt*2.2));
+  if(S.drag && c.x!==prev) S.drag.x+=c.x-prev;   // the held figure rides the FINGER, not the rug
+}
 function bfTick(dt){
   const bf=S.bf;
   if(bf.hintT>0) bf.hintT-=dt;                    // the scroll nudge burns down (v1.44)
@@ -16055,7 +16157,7 @@ function paraBand(u){
   } else {
     dir=1;
     const TB=S.tanBase;
-    a=(TB? CAMP_DEPLOY_X : campFrontX())+100;
+    a=(TB? campDeployX() : campFrontX())+100;
     b=(TB? TB.x-PARA_STANDOFF : W-200);
   }
   let lo=Math.min(a,b), hi=Math.max(a,b);
@@ -16162,7 +16264,7 @@ function canPlace(x,y,type,side){
   if(x<215&&y>200&&y<380) return false; // toy box zone
   // v1.31: with an enemy crate to take, drops land on YOUR HALF (the
   // battleground's own law) — a drop beside their box is a siege you didn't march for
-  if(S.tanBase && x>CAMP_DEPLOY_X) return false;
+  if(S.tanBase && x>campDeployX()) return false;
   const RV=S.cfg.terrain.river;
   if(RV && x>RV.x-14 && x<RV.x+RV.w+14) return false;        // no standing in the river (or hogging the bridge)
   for(const rk of S.cfg.terrain.rocks){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }
@@ -17886,6 +17988,9 @@ function update(dt){
   // solo by construction (2+ lobbies never open one), and the AI must not
   // build an army while a kid is still reading the introduction.
   if(S.bf && !COMM.brief) bfTick(dt);
+  // v1.98: the campaign camera ticks beside it, under the same briefing hold
+  // (a pinned view under an open letter, exactly like the battlefield's).
+  if(!S.bf && S.mode==='play' && !COMM.brief) campCamTick(dt);
 
   // SARGE'S TEN SECONDS, campaign edition (v1.32) — the battleground's own
   // clock, counted on the sim's dt so a 2× toggle can't cheat it, with the same
@@ -18755,13 +18860,20 @@ let scale=1;
 let VW=W;
 function resize(){
   const ww=window.innerWidth, wh=window.innerHeight;
-  scale=Math.min(ww/W, wh/H);
-  VW = S.bf ? Math.min(WORLD_W, ww/scale) : W;
+  // v1.98: the scale basis caps at the LONG FRONT — a grand W widens the
+  // WORLD, never shrinks the figures. Identity everywhere that shipped: the
+  // room/BF basis is 960 and the campaign's 1240, both under the cap — and a
+  // narrow campaign rug keeps VW===W EXACT (never through an ww/scale round
+  // trip, which FP does not promise returns W).
+  const wcap=Math.min(W,CAMP_W);
+  scale=Math.min(ww/wcap, wh/H);
+  VW = S.bf? Math.min(WORLD_W, ww/scale) : (W>wcap? Math.min(W, ww/scale) : W);
   const dpr=Math.min(2,window.devicePixelRatio||1);
   cv.width=VW*scale*dpr; cv.height=H*scale*dpr;
   cv.style.width=(VW*scale)+'px'; cv.style.height=(H*scale)+'px';
   cx.setTransform(scale*dpr,0,0,scale*dpr,0,0);
   if(S.bf){ S.bf.cam.x=clampCam(S.bf.cam.x); S.bf.cam.y=clampCamY(S.bf.cam.y||0); }
+  else if(S.cCam){ S.cCam.x=clampCam(S.cCam.x); S.cCam.y=clampCamY(S.cCam.y||0); }
 }
 window.addEventListener('resize',resize); resize();
 
@@ -19321,7 +19433,7 @@ function drawWreckBall(bl){
   cx.restore();
   cx.fillStyle='rgba(255,255,255,0.5)'; cx.beginPath(); cx.ellipse(bl.x-bl.r*0.34,bl.y-bl.r*0.42,bl.r*0.16,bl.r*0.1,-0.6,0,7); cx.fill();
 }
-function pathStroke(){ cx.beginPath(); cx.moveTo(PATH_PTS[0].x,PATH_PTS[0].y); for(let i=1;i<PATH_PTS.length;i+=3) cx.lineTo(PATH_PTS[i].x,PATH_PTS[i].y); cx.stroke(); }
+function pathStroke(){ const k=S.gk||1; cx.beginPath(); cx.moveTo(PATH_PTS[0].x*k,PATH_PTS[0].y); for(let i=1;i<PATH_PTS.length;i+=3) cx.lineTo(PATH_PTS[i].x*k,PATH_PTS[i].y); cx.stroke(); }   // v1.98: the rug runner stretches with the grand rug (identity at gk 1; y and stroke width untouched)
 // Each army's toy box, flying its own colours. The enemy's is the same box
 // mirrored, so the two halves read as one carpet folded down the middle.
 function drawBase(side){
@@ -19455,7 +19567,9 @@ function draw(){
   if(S.shake>0) cx.translate((Math.random()-0.5)*8*S.shake,(Math.random()-0.5)*8*S.shake);
   // ONE line pans the whole world. drawHUD runs after the restore below, so the
   // HUD stays screen-fixed and every actor, shot, fx and float pans for free.
-  if(S.bf) cx.translate(-S.bf.cam.x, -(S.bf.cam.y||0));
+  // (v1.98: the grand campaign rug rides the same line through its own camera.)
+  const camv=S.bf? S.bf.cam : ((W>VW&&S.cCam)||null);
+  if(camv) cx.translate(-camv.x, -(camv.y||0));
   drawRug();
   if(S.bf){ drawBase('you'); drawBase('foe'); }
   else { drawSprite('toybox',120,352,150,0,0); if(S.tanBase) drawTanBase(); }
@@ -19469,9 +19583,10 @@ function draw(){
     // v1.31: with an enemy crate on the carpet your half is the deploy zone —
     // shade the ground you must TAKE, so a refused drop explains itself
     if(!S.bf && S.tanBase){
-      cx.fillStyle='rgba(166,59,42,0.07)'; cx.fillRect(CAMP_DEPLOY_X,64,W-CAMP_DEPLOY_X-4,H-64-88);
+      const dpx=campDeployX();   // v1.98: the line rides the grand stretch
+      cx.fillStyle='rgba(166,59,42,0.07)'; cx.fillRect(dpx,64,W-dpx-4,H-64-88);
       cx.strokeStyle='rgba(255,243,196,0.4)'; cx.lineWidth=2; cx.setLineDash([10,10]);
-      cx.beginPath(); cx.moveTo(CAMP_DEPLOY_X,70); cx.lineTo(CAMP_DEPLOY_X,H-92); cx.stroke(); cx.setLineDash([]);
+      cx.beginPath(); cx.moveTo(dpx,70); cx.lineTo(dpx,H-92); cx.stroke(); cx.setLineDash([]);
     }
     const ok=S.drag.unit? true : canPlace(S.drag.x,S.drag.y,S.drag.type,S.bf?bfMyTeam():undefined);
     const def=UDEF[S.drag.type];
@@ -20593,7 +20708,7 @@ function hqClose(){ if(!HQS.on) return; HQS.on=false;
 // evPos = SCREEN space, for HUD/tray/button hits (must ignore the camera).
 // evPosW = WORLD space, for anything on the carpet.
 function evPos(e){ const r=cv.getBoundingClientRect(); return { x:(e.clientX-r.left)/scale, y:(e.clientY-r.top)/scale }; }
-function evPosW(e){ const p=evPos(e); if(S.bf){ p.x+=S.bf.cam.x; p.y+=S.bf.cam.y||0; } return p; }
+function evPosW(e){ const p=evPos(e); const cm=S.bf? S.bf.cam : ((W>VW&&S.cCam)||null); if(cm){ p.x+=cm.x; p.y+=cm.y||0; } return p; }   // v1.98: the grand campaign rug maps fingers through its camera too
 cv.addEventListener('pointerdown', e=>{
   if(S.mode!=='play') return;
   // an open briefing owns every tap (v1.41). The DOM backdrop swallows them
@@ -20666,25 +20781,36 @@ cv.addEventListener('pointerdown', e=>{
     if(inRect(p.x,p.y,trayRects[i])){
       const t=tray[i].t;
       if(sqAtCap()){ SFX.clack(); S.sel=null; return; }   // that many each — that's the squad rule
+      const wt=evPosW(e);   // v1.98: the figure seeds in WORLD space — a grand rug may be panned
       // one Sarge EACH in co-op — and while his ten seconds run, the card says
       // DOWN and the shelf refuses (the same gate the battleground applies)
-      if(t==='sarge'){ if(!(S.sargeCd>0) && !S.units.some(u=>u.type==='sarge'&&!u.coopBy&&!u.dead)) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null}; else SFX.clack(); }
-      else if(S.plastic>=COSTS[t]) S.drag={type:t,x:p.x,y:p.y-DRAG_OFF,unit:null};
+      if(t==='sarge'){ if(!(S.sargeCd>0) && !S.units.some(u=>u.type==='sarge'&&!u.coopBy&&!u.dead)) S.drag={type:t,x:wt.x,y:wt.y-DRAG_OFF,unit:null}; else SFX.clack(); }
+      else if(S.plastic>=COSTS[t]) S.drag={type:t,x:wt.x,y:wt.y-DRAG_OFF,unit:null};
       S.sel=null; return;
     }
   }
   // units: select / pick up (tap-to-stand is RETIRED — a casualty is gone, v1.32)
+  // v1.98: the men live in WORLD space, so the finger looks for them there
+  const w=evPosW(e);
   let hit=null,hd=1e9;
-  for(const u of S.units){ if(u.jetT>0) continue; const d=Math.hypot(u.x-p.x,(u.y-20)-p.y); if(d<30&&d<hd){hd=d;hit=u;} }   // can't grab a flying man (v1.39)
+  for(const u of S.units){ if(u.jetT>0) continue; const d=Math.hypot(u.x-w.x,(u.y-20)-w.y); if(d<30&&d<hd){hd=d;hit=u;} }   // can't grab a flying man (v1.39)
   if(hit){
     // HOLD THE LINE never stops for a reposition window, so it can't borrow the
     // campaign's "only between waves" rule — your men stay movable throughout.
     if(hit.type==='sarge' || !S.waveActive || S.sq){
       // between waves every man is movable — pick him up
-      S.drag={type:hit.type,x:p.x,y:p.y-DRAG_OFF,unit:hit,ox:p.x,oy:p.y}; S.sel=null;
+      S.drag={type:hit.type,x:w.x,y:w.y-DRAG_OFF,unit:hit,ox:w.x,oy:w.y}; S.sel=null;
     }
     else S.sel = (S.sel===hit? null : hit);
     return;
+  }
+  // v1.98: on a grand rug, empty carpet is a PAN — the battlefield's own
+  // gesture, same shape, through the campaign camera. Narrow rugs never
+  // reach this (W===VW), so a tap stays exactly the deselect it always was.
+  if(W>VW && S.cCam){
+    S.pan={ sx:e.clientX, sy:e.clientY, cam0:S.cCam.x, cam0y:S.cCam.y||0,
+            lx:e.clientX, ly:e.clientY, lt:S.t, vx:0, vy:0, moved:false };
+    S.cCam.vx=0; S.cCam.vy=0;
   }
   S.sel=null;
 });
@@ -20694,13 +20820,15 @@ cv.addEventListener('pointermove', e=>{
     if(Math.hypot(p.x-S.jetAim.sx,p.y-S.jetAim.sy)>10) S.jetAim.moved=true;   // the file's own tap threshold
     return; }
   if(S.drag){ const p=evPosW(e); S.drag.x=p.x; S.drag.y=p.y-DRAG_OFF; return; }
-  if(S.pan && S.bf){
+  if(S.pan){
+    const c=S.bf? S.bf.cam : S.cCam;   // v1.98: one gesture, whichever camera owns this rug
     const dx=(e.clientX-S.pan.sx)/scale, dy=(e.clientY-S.pan.sy)/scale;
     if(Math.abs(dx)>10 || Math.abs(dy)>10) S.pan.moved=true;   // the same 10px the tap/move test uses
-    if(S.pan.moved){
-      S.bf.cam.x=clampCam(S.pan.cam0-dx);
-      S.bf.cam.y=clampCamY(S.pan.cam0y-dy);               // the tall map pans both ways; everywhere else the clamp pins y at 0
-      S.bf.panned=true;
+    if(S.pan.moved && c){
+      c.x=clampCam(S.pan.cam0-dx);
+      c.y=clampCamY(S.pan.cam0y-dy);               // the tall map pans both ways; everywhere else the clamp pins y at 0
+      if(S.bf) S.bf.panned=true;
+      else S.camHold=CAMP_CAM_HOLD;                // v1.98: a manual pan owns the escort camera for a beat
       const dt2=S.t-S.pan.lt;
       if(dt2>0.008){
         S.pan.vx=-((e.clientX-S.pan.lx)/scale)/dt2; S.pan.lx=e.clientX;
@@ -20718,8 +20846,10 @@ cv.addEventListener('pointerup', e=>{
     return;
   }
   if(S.pan){ const pn=S.pan; S.pan=null;
-    if(S.bf && pn.moved){ S.bf.cam.vx=Math.max(-2600,Math.min(2600,pn.vx));
-                          S.bf.cam.vy=Math.max(-2600,Math.min(2600,pn.vy||0)); } }
+    const c=S.bf? S.bf.cam : S.cCam;   // v1.98: the flick lands on whichever camera owns this rug
+    if(c && pn.moved){ c.vx=Math.max(-2600,Math.min(2600,pn.vx));
+                       c.vy=Math.max(-2600,Math.min(2600,pn.vy||0));
+                       if(!S.bf) S.camHold=CAMP_CAM_HOLD; } }
   if(!S.drag) return;
   const d=S.drag; S.drag=null;
   if(S.bf){
@@ -20730,7 +20860,7 @@ cv.addEventListener('pointerup', e=>{
     else SFX.clack();
     return;
   }
-  const p=evPos(e);
+  const p=evPosW(e);   // v1.98: he lands in WORLD space — the grand rug may be panned
   if(d.unit && d.ox!==undefined && Math.hypot(p.x-d.ox,p.y-d.oy)<10){
     S.sel = (S.sel===d.unit? null : d.unit);   // a tap, not a move — inspect/vet
     return;
@@ -24284,7 +24414,10 @@ window.GVT = {
   cash(n){ S.plastic=n; },
   start(){ spawnWave(); },
   step(sec){ const n=Math.round(sec*60); for(let i=0;i<n;i++){ if(S.mode==='play') update(1/60); } draw(); },
-  snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, level:S.levelN, rival:S.rival&&S.rival.id, active:S.waveActive, foes:S.foes.length, mines:S.mines.length, base:S.tanBase? Math.ceil(S.tanBase.hp) : null, lost:S.lostLevel|0, sargeCd:+(S.sargeCd||0).toFixed(2), units:S.units.map(u=>({t:u.type,kills:u.kills,vet:u.vet,hits:u.hits})), queue:S.queue.length }; },
+  snap(){ return { mode:S.mode, plastic:S.plastic, lives:S.lives, wave:S.wave, level:S.levelN, rival:S.rival&&S.rival.id, active:S.waveActive, foes:S.foes.length, mines:S.mines.length, base:S.tanBase? Math.ceil(S.tanBase.hp) : null, lost:S.lostLevel|0, sargeCd:+(S.sargeCd||0).toFixed(2), units:S.units.map(u=>({t:u.type,kills:u.kills,vet:u.vet,hits:u.hits})), queue:S.queue.length, cw:W, gk:+(S.gk||1).toFixed(4), cam:S.cCam?Math.round(S.cCam.x):0, vw:Math.round(VW) }; },
+  // v1.98: the campaign camera's rig door — park it, read it, and (hold=true)
+  // pin it against the escort follow for a battery's framing shots
+  campCam(x,hold){ if(S.cCam && !S.bf){ S.cCam.x=clampCam(x); S.cCam.vx=0; S.cCam.vy=0; if(hold) S.camHold=9999; } return S.cCam&&S.cCam.x; },
   meta(){ return JSON.parse(JSON.stringify(META)); },
   startLevel(n){ startCampaign(n); return GVT.sq(); },
   // 0098 QUIET MERCY rig — read the run + the relief the NEXT solo attempt
