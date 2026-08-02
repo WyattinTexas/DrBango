@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v2.2 -->
+<!-- TRAINSET v2.3 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
-<meta name="trainset-version" content="2.2">
+<meta name="trainset-version" content="2.3">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -542,6 +542,15 @@ const hintWords=h=>h.replace(/[^A-Z ]/g,'').split(/\s+/).filter(Boolean);
 const GAP_GLOW=true;          // level 2's missing cells breathe a soft gold (5-year-old kindness)
 const TOY_CARD='NEW TOY!';    // the ceremony headline over each freshly-won toy
 const TICKET_ICONS=true;      // each ticket wears its headline toy — locked ones as a silhouette
+// ---- Wyatt dials (EXPANSION 14 — one const each) ----
+// THE SCENERY BONUS: beat a level having planted different kinds of your OWN
+// scenery (the glued land counts for nothing) and the game stops to say so.
+const SCEN_BONUS_KINDS=2;     // distinct PLAYER-placed scenery kinds to earn it
+const SCEN_BONUS_EVERY=true;  // true = the bonus rides EVERY win · false = first clear only
+const PRETTY_T=3.0;           // seconds the compliment card holds
+const PRETTY_POOL=['SO PRETTY!','BEAUTIFUL!','WHAT A LOVELY LINE!','YOU MADE IT SO NICE!'];   // kid words only (the E8 law)
+// THE ROLLING START: drag the train onto the track and it just goes — no GO press.
+let AUTO_GO='camp';           // 'camp' = campaign only · 'all' · 'off' (a let: the battery flips it live)
 // ---- Wyatt dials (EXPANSION 6 — one const each) ----
 const BUILD_LABEL='BUILD 🔨';        // the third big button: PLAY ▶ · CAMPAIGN 🎫 · BUILD 🔨
 const PLAY_MARK='🚂 PLAY!';          // the wordmark chip while the wind-up rug is out
@@ -679,7 +688,7 @@ const BELL_IDS=['bl_ding','bl_bell','bl_cuckoo','bl_cow'];
 const MODEL_IDS=['fount','stat','fire','arch','flag','mail2','bench','clock'];
 const COLL_NO_SALE=[];        // of the fifty, ids Wyatt pulls off the shelf (default: all sell)
 // THE STAR BANK — every mint amount is a dial; all of it generous, none of it a wall
-const MINT={ lap:1, station:1, bonk:1, clear:10, firstLap:5 };
+const MINT={ lap:1, station:1, bonk:1, clear:10, firstLap:5, pretty:1 };   // pretty = E14's scenery bonus
 const FART_PITCH=1;           // the fart's pitch (×) — Wyatt's most important dial
 const CLOCK_SPIN=0.02;        // TOWN CLOCK hour hand, rad/s — the hands actually turn, slowly
 const baseColl=()=>new Set([...STARTERS,...STORE_FREE]);
@@ -1266,7 +1275,9 @@ function update(dt){
   flights=flights.filter(f=>f.t<f.dur);
   if(lapCardT>0) lapCardT-=dt;
   if(goalT>0) goalT-=dt;
-  if(winT>0){ winT-=dt; if(winT<0) winT=0; }
+  if(winT>0){ winT-=dt; if(winT<0) winT=0;
+    if(!winT&&prettyPend){ prettyPend=false; prettyT=PRETTY_T; SND.ding(); } }   // E14: the compliment follows the win card out
+  if(prettyT>0){ prettyT-=dt; if(prettyT<0) prettyT=0; }
   if(CAMP.on) toyTick(dt);
 }
 // E7 — trackside furniture watches the trains go by, keyed (cell, elev) like everything:
@@ -3761,6 +3772,9 @@ const CAMP={ on:false, level:0, won:false, tugT:false, stations:[], visited:new 
              done:new Set(), all:false, wip:null, crossed:false };
 let FREE=null;            // the stashed free-play world while a level is open
 let goalT=0, winT=0;      // the goal card + the LINE COMPLETE! card
+// E14: the compliment card — pend waits for LINE COMPLETE! to fade, prettyT holds the
+// card, prettyN rotates the pool. Session-only, never persisted (no save bump).
+let prettyT=0, prettyPend=false, prettyMsg='', prettyN=0;
 let toyQ=[], toyCard=null, toyT=0;   // E8: the NEW TOY! queue, the card on screen, its clock
 function campUnlocked(n){ return !CAMP_SEQ || CAMP.all || n===1 || CAMP.done.has(n-1); }
 function serWip(){        // the level's work-in-progress — glued rows regenerate from LEVELS, never saved
@@ -3783,7 +3797,7 @@ function campEnter(n){
   else FREE=serWorld();                       // stash the kid's rug — restored verbatim on exit
   applyDims('sm');                            // E10: every level plays on the sm board, whatever BUILD grew to
   CAMP.on=true; CAMP.level=n; CAMP.won=false; CAMP.tugT=false;
-  CAMP.visited=new Set(); winT=0;
+  CAMP.visited=new Set(); winT=0; prettyT=0; prettyPend=false;
   grid.clear(); hgrid.clear(); scen.clear();
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
   for(const g of L.glued) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
@@ -3824,7 +3838,7 @@ function campEnter(n){
 function campExit(dest){
   if(!CAMP.on){ showScreen(dest); return; }
   CAMP.wip=(CAMP_WIP&&!CAMP.won)? serWip() : null;   // cleared on win, kept mid-build
-  CAMP.on=false; CAMP.level=0; CAMP.won=false; goalT=0; winT=0;
+  CAMP.on=false; CAMP.level=0; CAMP.won=false; goalT=0; winT=0; prettyT=0; prettyPend=false;
   applyDims(SIZE);                                   // E10: the BUILD rug comes back at its own size
   appWorld(FREE||{grid:[],scen:[],consist:consist,train:null}); FREE=null;
   $('mark').textContent='🚂 TRAIN SET';
@@ -3838,12 +3852,31 @@ function campLap(){          // the lap machinery fired inside a level
   if(L&&L.cross&&!CAMP.crossed) return;                        // ...AND the diamond was ridden (level 7)
   campWin();
 }
+// E14 THE SCENERY BONUS — the count the bonus sees: distinct scenery KINDS the
+// PLAYER placed (entries without the glued flag). Glued land counts for nothing;
+// track counts for nothing (it lives in grid, not scen); two bushes = one kind.
+// Also hands back one of their pieces, so the minted star flies FROM the decoration.
+function campPretty(){
+  const kinds=new Set(); let at=null;
+  if(CAMP.on) for(const [k,s] of scen){ if(s.glued) continue; kinds.add(s.t); if(!at) at=k; }
+  const c2=at? at.split(',').map(Number) : [GW/2,GH/2];
+  return { n:kinds.size, wx:GX+c2[0]*C+C/2, wy:GY+c2[1]*C+C/2 };
+}
 function campWin(){
   const firstClear=!CAMP.done.has(CAMP.level);   // E9: +10★ rides the FIRST clear only
   CAMP.won=true; CAMP.done.add(CAMP.level); CAMP.wip=null;
   winT=3.6; SND.bugle(); SND.whistle();
   voiceAt('win');   // E12: "You did it" — NOT gated on firstClear; the celebration is not the reward
   if(firstClear) starMint(MINT.clear, GX+GW*C/2, GY+GH*C/2);   // on top of the level's toy bundle
+  // E14 THE SCENERY BONUS — they decorated the line themselves: ★ from the decoration
+  // now, the compliment card once LINE COMPLETE! clears. Decorating is the behaviour
+  // being rewarded, so it rides every win (SCEN_BONUS_EVERY) — and when it wasn't
+  // earned: silence, never scolding.
+  const pk=campPretty();
+  if(pk.n>=SCEN_BONUS_KINDS && (SCEN_BONUS_EVERY||firstClear)){
+    starMint(MINT.pretty, pk.wx, pk.wy);
+    prettyPend=true; prettyMsg=PRETTY_POOL[prettyN++ % PRETTY_POOL.length];
+  }
   confettiBurst(CAMP.level===LEVELS.length? 180 : 90);         // GRAND OPENING! gets the double burst
   // THE NEW TOY! CEREMONY (E8) — the best moment in the game. grantBundle reports the
   // ids it actually added (re-winning adds nothing, so a replay is quiet), the level's
@@ -3863,7 +3896,7 @@ function toyNext(){
 }
 function toyTick(dt){
   if(toyT<9) toyT+=dt;
-  if(!toyCard && !winT && toyQ.length && CAMP.won) toyNext();   // the win card clears, the toys come out
+  if(!toyCard && !winT && !prettyT && !prettyPend && toyQ.length && CAMP.won) toyNext();   // the win card clears (E14: and the compliment), the toys come out
 }
 function toyTap(){            // a tap anywhere advances the ceremony
   if(!toyCard) return false;
@@ -3899,6 +3932,8 @@ function drawCampCards(){
   if(goalT>0) card(goalT,4.2,'LEVEL '+CAMP.level+' — '+L.name,L.hint,'#F7E9C4');
   if(winT>0) card(winT,3.6,CAMP.level===LEVELS.length?'GRAND OPENING!':'LINE COMPLETE!',
                   L.name+'  '+CAMP_STAR,'#CFF7C4');
+  // E14: the compliment — same gold recipe, the number always read off the dial
+  else if(prettyT>0) card(prettyT,PRETTY_T,prettyMsg,'SCENERY BONUS  ★'+MINT.pretty,'#F7E9C4');
   drawToyCard();
 }
 // THE NEW TOY! CARD — the same gold recipe as LINE COMPLETE!, but the toy's own
@@ -4456,6 +4491,12 @@ window.addEventListener('pointerup',e=>{
       if(placedOk){
         SND.clank(); hintPass(3);
         if(DRAG.wasRunning) goTrain();
+        // E14 THE ROLLING START — drag it on and off it goes. Human pointer path ONLY
+        // (TS.placeTrain and solve() choreograph place-then-go themselves), and always
+        // goTrain() itself, never TRAIN.running=true — the E5 win law (startSig,
+        // revSinceGo, visited) lives in there. The whistle sells the toy, and a train
+        // that rolls itself has passed the PRESS GO! lesson too.
+        else if(AUTO_GO==='all'||(AUTO_GO==='camp'&&CAMP.on)){ goTrain(); SND.whistle(); hintPass(4); }
       } else {
         if(hover && pieceTop(hover[0],hover[1])) toast('TOO SHORT FOR THIS TRAIN!');
         if(DRAG.prev){ TRAIN.cars=DRAG.prev.map(c=>({type:c.type,rd:clone(c.rd),face:c.face,squash:0})); TRAIN.placed=true; TRAIN.F=DRAG.prevF; }
@@ -5386,7 +5427,7 @@ function bankLedger(){
   // picture rows, kid words, ≤2 words a row — the numbers are the LIVE MINT dial
   const rows=[['lap','LAP',MINT.lap,''],['station','STOP',MINT.station,''],
               ['bonk','CRASH',MINT.bonk,'PLAY'],['clear','WIN',MINT.clear,''],
-              ['firstLap','FIRST LAP',MINT.firstLap,'']];
+              ['pretty','PRETTY',MINT.pretty,''],['firstLap','FIRST LAP',MINT.firstLap,'']];
   const lg=$('bkledger'); lg.innerHTML='';
   for(const [kind,word,val,tag] of rows){
     const r=document.createElement('div'); r.className='bkrow2';
@@ -5406,6 +5447,14 @@ function bankIcon(cv,kind){
     const s=96/(C+16);
     g.setTransform(s,0,0,s,8*s,8*s);
     withCtx(g,()=>drawPieceArt({t:'st',r:0,sel:0,elev:0,latch:null},0,0));
+    return;
+  }
+  if(kind==='pretty'){               // E14 — two different kinds, planted; the real painters teach it
+    const s=54/(C+16);
+    g.setTransform(s,0,0,s,2,42); scenIcon(g,'tree');
+    g.setTransform(s,0,0,s,44,42); scenIcon(g,'flw');
+    g.setTransform(1,0,0,1,48,22);
+    withCtx(g,()=>star5(0,0,1.15,'#F2C531'));
     return;
   }
   g.setTransform(1,0,0,1,48,48);
@@ -5765,6 +5814,7 @@ window.TS={
     // the ceremony's own door — the battery taps through the cards the way a kid does
     toyTap(){ return toyTap(); },
     hints(){ return LEVELS.map(L=>L.hint); },
+    pretty(){ return campPretty().n; },   // E14: the kind-count the scenery bonus would see right now
   },
   state(){ return { screen:SCREEN, color:COLOR,
     size:SIZE, land:LAND, weather:WEATHER, gw:GW, gh:GH,
