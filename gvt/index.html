@@ -2037,7 +2037,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.03</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.04</div>
   <div class="scanlines"></div>
 </div>
 
@@ -20761,11 +20761,13 @@ function drawFinger(x,y,press){
 function ease(k){ return k<0.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2; }
 function coachPill(txt){
   txt=TXT(txt); cx.textAlign='center'; cx.textBaseline='middle';
-  fitFont(cx, txt, W-80, 'bold', 23, 13);
+  // v2.04: VW, never W — the coach only ever runs on the narrow L1 (VW===W
+  // there), but every screen-fixed pill speaks viewport by law now
+  fitFont(cx, txt, VW-80, 'bold', 23, 13);
   const w2=cx.measureText(txt).width/2+26;
-  cx.fillStyle='rgba(38,40,31,0.94)'; rr(W/2-w2,H-158,w2*2,44,10); cx.fill();
-  cx.strokeStyle='#7FA35C'; cx.lineWidth=2.5; rr(W/2-w2,H-158,w2*2,44,10); cx.stroke();
-  cx.fillStyle='#FFF3C4'; cx.fillText(txt, W/2, H-135);
+  cx.fillStyle='rgba(38,40,31,0.94)'; rr(VW/2-w2,H-158,w2*2,44,10); cx.fill();
+  cx.strokeStyle='#7FA35C'; cx.lineWidth=2.5; rr(VW/2-w2,H-158,w2*2,44,10); cx.stroke();
+  cx.fillStyle='#FFF3C4'; cx.fillText(txt, VW/2, H-135);
   cx.textBaseline='alphabetic';
 }
 function fingerDrag(x1,y1,x2,y2){
@@ -20831,7 +20833,7 @@ function drawBossBar(){
   // a squad mission can field three of them — one bar for the whole set, or the
   // player watches a full bar while two more monsters walk in behind it
   let hp=0, mx=0; for(const b of bs){ hp+=Math.max(0,b.hp); mx+=b.hpMax; }
-  const k=mx? hp/mx : 0, bw=W*0.46, b0=bs[0];
+  const k=mx? hp/mx : 0, bw=VW*0.46, b0=bs[0];   // v2.04: the bar is HUD — VW, never the grand world W
   // v1.79: mom's plate counts her fills — one %-key covers all three rounds
   const nm=b0.type==='mom'? tf('MOM · ROUND %1 OF %2', S.wave, S.cfg.waves.length)
     : TXT(BOSSDEF[b0.type]?BOSSDEF[b0.type].wave:'⚠ BOSS ⚠');
@@ -21453,9 +21455,12 @@ function drawHUD(){
   drawEmgBtn();
   drawBmbBtn();
 
-  // tray — sized and lifted for thumbs (phone bottom edge steals touches)
+  // tray — sized and lifted for thumbs (phone bottom edge steals touches).
+  // v2.04: sized and centered on VW, never W — a grand rug (v1.98) widens the
+  // WORLD, but the shelf is furniture and sits on the SCREEN, the same law the
+  // battlefield tray above has always obeyed. On a narrow rug VW===W exactly.
   const tray=TRAY();
-  const tw=Math.min(112,((W-60)-(tray.length-1)*10)/tray.length)|0, th=84, gap=10, total=tray.length*tw+(tray.length-1)*gap, x0=(W-total)/2, y0=H-th-18;
+  const tw=Math.min(112,((VW-60)-(tray.length-1)*10)/tray.length)|0, th=84, gap=10, total=tray.length*tw+(tray.length-1)*gap, x0=(VW-total)/2, y0=H-th-18;
   trayRects.length=tray.length;
   cx.textBaseline='alphabetic';
   tray.forEach((s,i)=>{
@@ -21508,7 +21513,11 @@ function drawHUD(){
   btnRects.vet=null;
   if(S.sel && !S.sel.vet && S.sel.type!=='sarge' && S.mode==='play'){
     const cost=COSTS[S.sel.type]*2, ok=S.plastic>=cost;
-    const bw=150,bh=36, bx=Math.min(W-bw-10,Math.max(10,S.sel.x-bw/2)), by=Math.max(50,S.sel.y-108);
+    // v2.04: the selected man lives in WORLD space but this popup draws on the
+    // SCREEN (drawHUD runs after the camera restore) — map him through the
+    // campaign camera and clamp inside the viewport (VW, never the grand W)
+    const cm=(W>VW&&S.cCam)||null, sx=S.sel.x-(cm?cm.x:0), sy=S.sel.y-(cm?(cm.y||0):0);
+    const bw=150,bh=36, bx=Math.min(VW-bw-10,Math.max(10,sx-bw/2)), by=Math.max(50,sy-108);
     cx.fillStyle= ok?'#4A6B35':'rgba(38,40,31,0.85)'; rr(bx,by,bw,bh,8); cx.fill();
     cx.fillStyle= ok?'#fff':'#8b8f7a'; cx.font=cf('bold 18px'); cx.textAlign='center'; cx.textBaseline='middle';
     fitText(cx, tf('★ VETERAN · %1', cost), bx+bw/2, by+bh/2+1, bw-12, 'bold', 18, 10);
