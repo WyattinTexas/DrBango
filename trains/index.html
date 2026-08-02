@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v2.9 -->
+<!-- TRAINSET v3.0 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -625,6 +625,17 @@ const SHELF_ORDER=['train','cars','engines'];   // shelf layout, left to right
 const UI_SHY_SEC=3.0;          // idle seconds before the chrome returns
 const SHY_FADE_MS=300;         // chrome fade duration, both directions
 const BEDROOM_KINDS=['s','c','st'];  // the mini palette — the E16 tutorial three
+// ---- Wyatt dials (EXPANSION 21 — one block) ----
+// THE SURPRISE TRAIN: in campaign the train is a GIFT — the kid brings the
+// engine, the game packs the cars. The shelf paints the stock little train;
+// every track drop rolls SURPRISE_MIN..MAX fresh cars off the FULL roster,
+// owned or not (TRY-THEN-OWN: the campaign is the showroom — nothing is ever
+// granted, THE FIFTY STAY FIFTY), and picking the train up and dropping it
+// again is the do-it-again button. Rolled fresh, never persisted.
+const SURPRISE_MIN=2, SURPRISE_MAX=4;    // cars per roll (the engine stays the kid's)
+const SURPRISE_STOCK=['tender','box'];   // what the campaign shelf paints behind the engine
+const SURPRISE_W={ tender:1, box:1, tank:1.5, flat:1, cab:1.2, coach:1.2, mail:1, circus:1.6 };  // gentle weights — the fancy cars turn up enough to delight
+const SURPRISE_POOL=['SURPRISE!','ALL ABOARD!','WOW!','CHOO CHOO!'];  // the first-drop word, kid words only (the E8 law)
 // ---- Wyatt dials (EXPANSION 15 — one block) ----
 // A. GRAVITY AS DRAMA. grade is measured in ELEVATION LEVELS PER CELL of arc
 // (pos().z interps levels along the path; LIFT px per level is the height it
@@ -3668,9 +3679,13 @@ function drawGhosts(){
       cx.globalAlpha=0.28; cx.fillStyle='#7CFC66';
       rr(GX+hover[0]*C+3,GY+hover[1]*C+3,C-6,C-6,10); cx.fill(); cx.globalAlpha=1;
     }
-    const n=1+consist.length;
+    // E21: in a level the hand holds what it GRABBED — the shelf drag holds the
+    // stock little train, a picked-up train holds its own cars. The next roll
+    // only ever exists ON the rails: the surprise never leaks into the hand.
+    const gcars=CAMP.on? (DRAG.prev? DRAG.prev.slice(1).map(c=>c.type) : SURPRISE_STOCK) : consist;
+    const n=1+gcars.length;
     for(let i=n-1;i>=0;i--){
-      const t=i===0?ENGINE:consist[i-1];
+      const t=i===0?ENGINE:gcars[i-1];
       cx.globalAlpha=0.85;
       drawCar(t, DRAG.x - i*GAP*0.62, DRAG.y + Math.sin(perf()*6+i)*2, 0, 0, wheelPhase, livFor(i));
       cx.globalAlpha=1;
@@ -4659,7 +4674,9 @@ function serWip(){        // the level's work-in-progress — glued rows regener
   for(const [k,pc] of grid){ if(pc.t==='ref'||pc.glued) continue; g.push([k,pc.t,pc.r,pc.sel|0,pc.elev|0]); }
   for(const [k,pc] of hgrid) g.push([k,pc.t,pc.r,pc.sel|0,1]);
   const sc=[]; for(const [k,s] of scen){ if(s.glued) continue; sc.push([k,s.t,s.v|0]); }
-  return { level:CAMP.level, grid:g, scen:sc, consist:consist.slice() };
+  // E21: a wip carries the kid's TRACK work only — the cars are the game's gift,
+  // rolled fresh at every drop and never persisted (old wips' consist is ignored).
+  return { level:CAMP.level, grid:g, scen:sc };
 }
 function clearPlayer(){   // sweep everything the PLAYER built; the glued land stays
   for(const [k,pc] of [...grid]){ if(pc.t==='ref'||pc.glued) continue;
@@ -4668,6 +4685,25 @@ function clearPlayer(){   // sweep everything the PLAYER built; the glued land s
   for(const [k,s] of [...scen]) if(!s.glued) scen.delete(k);
   trainHome(true);
 }
+// E21 THE SURPRISE ROLL — the game packs the cars: SURPRISE_MIN..MAX DISTINCT
+// kinds off the FULL roster (owned or not — the showroom law), gently weighted
+// so the fancy cars turn up often enough to delight. Fresh every drop, never
+// saved, and it never touches the toy box: nothing is granted, ever.
+function surpriseRoll(){
+  const pool=Object.keys(CARDEF);
+  const n=SURPRISE_MIN+Math.floor(Math.random()*(SURPRISE_MAX-SURPRISE_MIN+1));
+  const out=[];
+  while(out.length<n && pool.length){
+    let tot=0; for(const t of pool) tot+=SURPRISE_W[t]||1;
+    let r=Math.random()*tot;
+    for(let i=0;i<pool.length;i++){
+      r-=SURPRISE_W[pool[i]]||1;
+      if(r<=0||i===pool.length-1){ out.push(pool.splice(i,1)[0]); break; }
+    }
+  }
+  return out;
+}
+let surpT=false;   // the first campaign drop of the SESSION gets a word — then quiet
 function campEnter(n){
   const L=LEVELS[n-1]; if(!L||!campUnlocked(n)) return false;
   if(CAMP.on){ if(CAMP_WIP&&!CAMP.won) CAMP.wip=serWip(); }
@@ -4706,8 +4742,11 @@ function campEnter(n){
       const [x,y]=k.split(',').map(Number);
       if(x>=0&&y>=0&&x<GW&&y<GH&&canPlaceScen(t,x,y)) scen.set(k,{t,v:v|0,ra:null,pop:0,wave:0});
     }
-    consist=(CAMP.wip.consist||consist).filter(t=>CARDEF[t]).slice(0,MAXCARS);
   }
+  // E21 THE SURPRISE TRAIN — the level opens with cars already packed (solve()
+  // and the rig place with these; every HUMAN drop re-rolls). The kid's BUILD
+  // consist sits safe in FREE, restored verbatim on exit — the roll never leaks.
+  consist=surpriseRoll();
   goalT=4.2;
   $('mark').textContent='🎫 LEVEL '+n;
   showScreen('game'); shelfSync(); save();
@@ -5306,7 +5345,9 @@ cvs.addEventListener('pointerdown',e=>{
   }
   if(TRAIN.placed){
     const ci=trainHitAt(wx,wy);      // 1 = the loco (it wins ties: grab it = the whole train)
-    if(ci===1){ down={x:e.clientX,y:e.clientY,what:'loco'}; return; }
+    // E21: in a level EVERY car is the handle — no uncoupling there, the whole
+    // gift lifts, and putting it down again re-rolls (the do-it-again button).
+    if(ci===1 || (ci>1&&CAMP.on)){ down={x:e.clientX,y:e.clientY,what:'loco'}; return; }
     if(ci>1){ down={x:e.clientX,y:e.clientY,what:'tcar',idx:ci-1}; return; }   // E16: pull a car = uncouple
   }
   const cell=cellXY(wx,wy);
@@ -5482,9 +5523,14 @@ function upCore(e){
     }
     else if(DRAG.kind==='train'){
       let placedOk=false;
-      if(hover && pieceTop(hover[0],hover[1])) placedOk=placeTrainAt(hover[0],hover[1]);
+      if(hover && pieceTop(hover[0],hover[1])){
+        if(CAMP.on) consist=surpriseRoll();   // E21 THE SURPRISE — the game packs the cars, fresh every drop
+        placedOk=placeTrainAt(hover[0],hover[1]);
+      }
       if(placedOk){
         SND.clank(); hintPass(2); hintPass(3);
+        // E21: the first unboxing of the session gets a word (kid words only — the E8 law)
+        if(CAMP.on&&!surpT){ surpT=true; toast(SURPRISE_POOL[Math.floor(Math.random()*SURPRISE_POOL.length)]); }
         if(DRAG.wasRunning) goTrain();
         // E16 PICK UP AND GO — dropped means going, EVERYWHERE (E14's rolling start
         // widened to the whole game; no GO button exists). Human pointer path ONLY
@@ -5494,7 +5540,9 @@ function upCore(e){
         else if(AUTO_GO==='all'||(AUTO_GO==='camp'&&CAMP.on)){ goTrain(); SND.whistle(); hintPass(4); }
       } else {
         if(hover && pieceTop(hover[0],hover[1])) toast('TOO SHORT FOR THIS TRAIN!');
-        if(DRAG.prev){ TRAIN.cars=DRAG.prev.map(c=>({type:c.type,rd:clone(c.rd),face:c.face,squash:0})); TRAIN.placed=true; TRAIN.F=DRAG.prevF; }
+        if(DRAG.prev){ TRAIN.cars=DRAG.prev.map(c=>({type:c.type,rd:clone(c.rd),face:c.face,squash:0})); TRAIN.placed=true; TRAIN.F=DRAG.prevF;
+          if(CAMP.on) consist=DRAG.prev.slice(1).map(c=>c.type);   // E21: a refused drop hands the SAME gift back — the roll un-rolls
+        }
         else toast('BACK ON THE SHELF');
       }
       shelfSync(); save();
@@ -5937,12 +5985,15 @@ function paintShelfTrain(){
   if(!shelfTrainCv) return;
   const cv=shelfTrainCv, g=cv.getContext('2d');
   g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
-  const n=1+consist.length;
+  // E21: inside a level the shelf paints the STOCK little train, whatever the
+  // kid owns or the roll produced — the drop is the surprise, never the shelf.
+  const list=CAMP.on? SURPRISE_STOCK : consist;
+  const n=1+list.length;
   const x0=cv.width-52*ICON_RES, sp=n>1? Math.min(58*ICON_RES,(cv.width-104*ICON_RES)/(n-1)) : 0;
   const fd=TRAIN.placed? 0.35 : undefined;   // out on the rails = a ghost minds the slot
   withCtx(g,()=>{
     for(let i=n-1;i>=0;i--){
-      const t=i===0?ENGINE:consist[i-1];
+      const t=i===0?ENGINE:list[i-1];
       cx.setTransform(1.05*ICON_RES,0,0,1.05*ICON_RES,x0-i*sp,56*ICON_RES);
       drawCar(t,0,0,0,0,0.6,livFor(i),0,fd);
     }
@@ -5998,8 +6049,13 @@ function shelfSync(){
     tb.classList.toggle('home',TRAIN.placed);
     tb.querySelector('small').textContent=TRAIN.placed? 'BRING IT HOME':'DRAG ME OUT!';
   }
-  // THE GATE LAW (E7/E8): owned cars only, in BUILD and in the campaign alike —
-  // the toy box is the one source of what you may put on the rug.
+  // THE GATE LAW (E7/E8): owned cars only — the toy box is the one source of
+  // what you may put on the rug. E21: inside a level the shelf is JUST the
+  // train — the game packs the cars, so car management never shows there
+  // (no couple, no uncouple, no engine swap; BUILD keeps them all).
+  const cw=$('shelfCars'), ew=$('shelfEng');
+  if(cw) cw.style.display=CAMP.on?'none':'';
+  if(ew) ew.style.display=CAMP.on?'none':'';
   for(const [t,cv,b] of SHELF_CAR_BTNS) b.style.display=coll.has(PART_COLL[t])?'':'none';
   const exp=coll.has('exp');
   for(const [t,cv,b] of SHELF_ENG_BTNS){
@@ -6018,6 +6074,7 @@ function cancelDrag(){
   else if(DRAG.kind==='train' && DRAG.prev){
     TRAIN.cars=DRAG.prev.map(c=>({type:c.type,rd:clone(c.rd),face:c.face,squash:0}));
     TRAIN.placed=true; TRAIN.F=DRAG.prevF;
+    if(CAMP.on) consist=DRAG.prev.slice(1).map(c=>c.type);   // E21: the hand-back matches the cars
   }
   DRAG=null; hover=null; save();
 }
@@ -6817,12 +6874,15 @@ window.TS={
   placeTrain(gx,gy,el){ const ok=placeTrainAt(gx,gy,el==null?null:el); shelfSync(); save(); return ok; },
   go(){ const ok=goTrain(); save(); return ok; },
   stop(){ TRAIN.running=false; shelfSync(); save(); },
-  // E16 — what the shelf would draw right now (the battery asserts against it)
+  // E16 — what the shelf would draw right now (the battery asserts against it).
+  // E21: inside a level the shelf is just the train — cars/engines empty there,
+  // and `painted` is what the mini actually shows behind the engine (the stock).
   shelf(){ return {
-    cars: Object.keys(CARDEF).filter(t=>coll.has(PART_COLL[t])),
-    engines: coll.has('exp')? ['loco','exp'] : ['loco'],
+    cars: CAMP.on? [] : Object.keys(CARDEF).filter(t=>coll.has(PART_COLL[t])),
+    engines: CAMP.on? [] : (coll.has('exp')? ['loco','exp'] : ['loco']),
     engine: ENGINE,
     consist: consist.slice(),
+    painted: CAMP.on? SURPRISE_STOCK.slice() : consist.slice(),
     placed: TRAIN.placed,
   }; },
   home(){ trainHome(true); save(); },
@@ -6989,6 +7049,8 @@ window.TS={
     toyTap(){ return toyTap(); },
     hints(){ return LEVELS.map(L=>L.hint); },
     pretty(){ return campPretty().n; },   // E14: the kind-count the scenery bonus would see right now
+    roll(){ return surpriseRoll(); },     // E21: sample the surprise (pure — mutates nothing; the battery reads the odds)
+    pool(){ return SURPRISE_POOL.slice(); },   // E21: the first-drop words (the battery greps them against the kid list)
   },
   state(){ return { screen:SCREEN, color:COLOR,
     size:SIZE, land:LAND, weather:WEATHER, gw:GW, gh:GH,
