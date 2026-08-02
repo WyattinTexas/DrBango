@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v2.3 -->
+<!-- TRAINSET v2.4 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
-<meta name="trainset-version" content="2.3">
+<meta name="trainset-version" content="2.4">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -31,6 +31,10 @@
   #backChip{ right:76px; display:none; }
   /* ---- the HOME chip (E10): bottom-right, appears only while zoomed in ---- */
   #homeChip{ top:auto; right:12px; bottom:132px; display:none; }
+  /* ---- the RIDE ALONG chip (E15): floats above HOME — a chip, NEVER a #palTabs
+     tab (the bar must not grow a pixel — the E10 sm-fit byte-identical law) ---- */
+  #rideChip{ top:auto; right:12px; bottom:180px; display:none; }
+  #rideChip.on{ border-color:#F2C531; color:#F2C531; }
   .pbtn.on{ border-color:#F2C531; color:#F2C531; }   /* E10: the picked SIZE / LAND / WEATHER tile */
   /* ---- the bedroom menu (E3): DOM chrome floats over the painted room ---- */
   #menu{
@@ -206,6 +210,29 @@
     font-size:11px; letter-spacing:1px; cursor:pointer; padding:5px 8px; }
   @keyframes starPulse{ 0%,100%{ transform:scale(1); } 40%{ transform:scale(1.3); } }
   .pulse{ animation:starPulse 0.45s; }
+  /* ---- E15 THE NAME PLATE — the word-bank picker. The drawCampCards gold-card
+     recipe in DOM (dark card, gold border) so a two-year-old's taps are real
+     buttons. NO text input exists anywhere in this game — words only. ---- */
+  #namer{ position:absolute; inset:0; z-index:12; display:none; align-items:center; justify-content:center;
+    padding:10px; background:rgba(10,6,3,0.45); }
+  #nmpanel{ background:#1e1610; border:4px solid #F2C531; border-radius:16px;
+    padding:12px 16px 8px; text-align:center; max-width:min(94vw,600px);
+    box-shadow:0 14px 44px rgba(0,0,0,0.55); }
+  #nmpanel h1{ font-size:17px; letter-spacing:3px; color:#F2C531; margin-bottom:6px; }
+  #nmprev{ font-size:15px; letter-spacing:1px; color:#F7E9C4; background:#170f08;
+    border:2px solid #513a24; border-radius:10px; padding:6px 12px; margin-bottom:8px; }
+  #nmcols{ display:flex; gap:10px; justify-content:center; margin-bottom:8px; }
+  #nmc1,#nmc2{ display:grid; grid-template-columns:repeat(2,1fr); gap:4px; }
+  .nmw{ background:#170f08; border:2px solid #513a24; border-radius:9px; color:#CBB88C;
+    font-family:inherit; font-size:11px; letter-spacing:1px; padding:6px 9px; cursor:pointer; }
+  .nmw.on{ border-color:#F2C531; color:#F2C531; }
+  #nmsfx{ background:#170f08; border:2px solid #513a24; border-radius:10px; color:#F7E9C4;
+    font-family:inherit; font-size:13px; letter-spacing:2px; padding:7px 18px; cursor:pointer; margin-bottom:8px; }
+  #nmdone{ display:inline-block; background:linear-gradient(#F7D14A,#D9A93B); color:#3A2A18;
+    border:3px solid #8F6B1E; border-radius:14px; font-family:inherit; font-size:15px; letter-spacing:2px;
+    padding:9px 26px; cursor:pointer; font-weight:bold; }
+  #nmback{ display:block; margin:4px auto 0; background:none; border:none; color:#8f7a52;
+    font-family:inherit; font-size:10px; letter-spacing:1px; cursor:pointer; padding:4px 8px; }
   /* ---- bottom bar ---- */
   #bar{
     position:absolute; left:0; right:0; bottom:0; z-index:6;
@@ -350,6 +377,16 @@
     #bkshop{ font-size:13px; padding:8px 22px; border-radius:12px; }
     #bkback{ font-size:9px; margin-top:1px; }
     #stback{ font-size:9px; margin-top:0; }
+    #rideChip{ font-size:12px; padding:6px 9px; }
+    #nmpanel{ padding:7px 8px 4px; }
+    #nmpanel h1{ font-size:12px; letter-spacing:2px; margin-bottom:3px; }
+    #nmprev{ font-size:11px; padding:4px 8px; margin-bottom:5px; }
+    #nmcols{ gap:6px; margin-bottom:5px; }
+    #nmc1,#nmc2{ gap:3px; }
+    .nmw{ font-size:8px; padding:3px 5px; border-radius:7px; }
+    #nmsfx{ font-size:10px; padding:4px 12px; margin-bottom:5px; }
+    #nmdone{ font-size:12px; padding:6px 18px; }
+    #nmback{ font-size:8px; margin-top:2px; }
   }
 </style>
 </head>
@@ -361,6 +398,7 @@
 <div class="chip" id="backChip">🎫 LEVELS</div>
 <div class="chip" id="starChip">★ 0</div>
 <div class="chip" id="homeChip">🔎 WHOLE RUG</div>
+<div class="chip" id="rideChip">🚂 RIDE ALONG</div>
 <div id="bar">
   <span id="palTabs"><button class="ptab on" id="tabTrack" type="button">TRACK</button><button class="ptab" id="tabScen" type="button">SCENERY</button><button class="ptab" id="tabTown" type="button">TOWN</button><button class="ptab" id="tabFriends" type="button">FRIENDS</button><button class="ptab" id="tabRug" type="button">RUG</button></span>
   <span id="palSlot" style="display:flex;gap:8px;"></span>
@@ -370,7 +408,7 @@
 </div>
 <div id="ptray"></div>
 <div id="shed">
-  <h2>THE TRAIN SHED</h2>
+  <h2 id="shedTitle">THE TRAIN SHED</h2>
   <button id="shedX">✕</button>
   <div id="engRow"><p>THE ENGINE — TAP TO SWAP WHO LEADS</p><div id="engBtns"></div></div>
   <div id="parts"></div>
@@ -393,6 +431,14 @@
   <div id="ststage"><canvas id="stgcv"></canvas><div id="stgside"><div id="stgplate"><b id="stgname"></b><small id="stgcap"></small></div><button id="stgchip" class="pc" type="button"></button></div></div>
   <div id="staisle"></div>
   <button id="stback" type="button">⬇ CLOSE THE SHOP</button>
+</div></div>
+<div id="namer"><div id="nmpanel">
+  <h1>NAME YOUR RAILROAD</h1>
+  <div id="nmprev"></div>
+  <div id="nmcols"><div id="nmc1"></div><div id="nmc2"></div></div>
+  <button id="nmsfx" type="button"></button>
+  <div><button id="nmdone" type="button">✓ DONE</button></div>
+  <button id="nmback" type="button">⬇ NOT NOW</button>
 </div></div>
 <div id="bank"><div id="bkpanel">
   <h1>🏦 THE BANK</h1>
@@ -551,6 +597,37 @@ const PRETTY_T=3.0;           // seconds the compliment card holds
 const PRETTY_POOL=['SO PRETTY!','BEAUTIFUL!','WHAT A LOVELY LINE!','YOU MADE IT SO NICE!'];   // kid words only (the E8 law)
 // THE ROLLING START: drag the train onto the track and it just goes — no GO press.
 let AUTO_GO='camp';           // 'camp' = campaign only · 'all' · 'off' (a let: the battery flips it live)
+// ---- Wyatt dials (EXPANSION 15 — one block) ----
+// A. GRAVITY AS DRAMA. grade is measured in ELEVATION LEVELS PER CELL of arc
+// (pos().z interps levels along the path; LIFT px per level is the height it
+// paints at) — so a full RAMP reads exactly 1.0 and pins the climb floor,
+// the gentler SPIRAL reads ~0.15. Flat track reads 0 ⇒ mul stays EXACTLY 1.0
+// ⇒ byte-identical motion — the physics gates itself, no mode gate exists.
+const GRAV_K=1.1;            // grade → speed authority
+const GRAV_UP_MIN=0.55;      // climb floor — the never-stalls law (well above zero: this is a toy)
+const GRAV_DN_MAX=1.35;      // downhill ceiling
+const GRAV_EASE=6;           // per-second lerp toward the target mul (no steps at joints)
+const GRAV_PROBE=12;         // px sampled ahead + behind the loco to read its grade
+const CLACK_BELOW=0.85;      // climbing harder than this = the chain-lift clacks
+const CLACK_SPACE=34;        // px of climb between clacks (the chugAcc pattern)
+// B. ALL ABOARD. Waiters are AMBIENT — never in scen, never saved, never
+// placeable, never counted (THE FIFTY STAY FIFTY). Riders are PAINT — zero
+// physics, zero save, they exist per-run.
+const RIDER_CARS=['coach','flat','cab'];      // cars little people may ride
+const RIDER_CAP={coach:3,flat:2,cab:1};       // seats per car
+const WAIT_MAX=3;            // waiters per platform
+const WAIT_REGROW=8;         // seconds per regrown waiter
+const RIDERS_PLAY=false;     // PLAY-mode boarding (ships off — PLAY is the smash mode)
+// C. RIDE ALONG. The chip is DOM beside HOME, NEVER a palette tab.
+const FOLLOW_ZOOM=0.8;       // ride-along zoom (clamped [fit, 1×] like every zoom)
+const FOLLOW_EASE=5;         // camera chase lerp /s
+const FOLLOW_CAMP=false;     // campaign follow (ships false — the camGate law holds)
+// D. THE NAME PLATE. Words only, never a keyboard — the kindergarten law.
+const NAME_WORDS=[
+  ['SUNNY','BIG','HAPPY','RED','BLUE','FAST','LITTLE','SUPER','SLEEPY','BRAVE','SILLY','GOLD'],
+  ['DUCK','BEAR','STAR','TRAIN','RIVER','MOUNTAIN','COW','DOG','PONY','TIGER','MOON','APPLE'],
+];
+const NAME_SUFFIX=['RAILROAD','EXPRESS','LINE'];
 // ---- Wyatt dials (EXPANSION 6 — one const each) ----
 const BUILD_LABEL='BUILD 🔨';        // the third big button: PLAY ▶ · CAMPAIGN 🎫 · BUILD 🔨
 const PLAY_MARK='🚂 PLAY!';          // the wordmark chip while the wind-up rug is out
@@ -722,7 +799,7 @@ function clampView(){
   VIEW.ox= ww<=vw? (vw-ww)/2 : Math.max(vw-ww,Math.min(0,VIEW.ox));
   VIEW.oy= wh<=vh? (vh-wh)/2 : Math.max(vh-wh,Math.min(0,VIEW.oy));
 }
-function viewFit(){ VIEW.s=fitScale(); VIEW.vx=VIEW.vy=0; clampView(); viewApply(); }
+function viewFit(){ followSet(false); VIEW.s=fitScale(); VIEW.vx=VIEW.vy=0; clampView(); viewApply(); }   // E15: HOME is a camera hand — follow lets go
 function viewResize(){
   const f=fitScale();
   if(!camGate() || VIEW.s<=f+1e-9) VIEW.s=f;     // a fitted (or fresh) camera refits; a zoomed one keeps its zoom
@@ -751,6 +828,43 @@ function camGlide(dt){                           // flick-to-glide — the GVT c
 function homeSync(){                             // the HOME chip appears only when zoomed in (quiet-HUD)
   const el=document.getElementById('homeChip'); if(!el) return;
   el.style.display=(camGate() && VIEW.s>fitScale()+1e-6)?'block':'none';
+  rideSync();
+}
+/* =====================================================================
+   RIDE ALONG (E15) — E10's camera glued to the engine, so a kid can
+   watch their own layout stream past. One floating chip beside HOME
+   (DOM, NEVER a #palTabs tab — the bar must not grow a pixel). ANY
+   HAND WINS INSTANTLY: a pan-press, pinch, wheel, HOME tap or second
+   chip tap exits follow and the camera stays where the kid left it —
+   no snap-back. Screen changes and campaign entry exit too (camGate
+   already locks campaign at fit; FOLLOW_CAMP ships false). Editing
+   while following is allowed — only camera-hand gestures exit. Follow
+   state is never saved; VIEW never was.
+   ===================================================================== */
+const FOLLOW={on:false};
+const followGate=()=>SCREEN==='game' && (!CAMP.on || FOLLOW_CAMP);
+function rideSync(){                             // visible only with a rug camera + a placed train
+  const el=document.getElementById('rideChip'); if(!el) return;
+  el.style.display=(followGate() && TRAIN.placed)?'block':'none';
+  if(!FOLLOW.on) el.classList.remove('on');
+}
+function followSet(b){
+  FOLLOW.on=!!b && followGate() && TRAIN.placed;
+  const el=document.getElementById('rideChip');
+  if(el) el.classList.toggle('on',FOLLOW.on);
+  return FOLLOW.on;
+}
+function followTick(dt){                         // presentation only, like camGlide — sim untouched
+  if(!FOLLOW.on) return;
+  if(!followGate()||!TRAIN.placed){ followSet(false); return; }
+  if(PINCH||(down&&down.what==='pan')) return;   // a live hand owns the camera (belt + braces)
+  const p=pos(TRAIN.cars[0].rd);
+  const k=1-Math.exp(-FOLLOW_EASE*dt);
+  VIEW.s+=(Math.max(fitScale(),Math.min(zoomMax(),FOLLOW_ZOOM))-VIEW.s)*k;   // clamped [fit, 1×] like every zoom
+  const tx=W/2-p.x*VIEW.s, ty=(H-BAR)/2-(p.y-LIFT*(p.z||0))*VIEW.s;
+  VIEW.ox+=(tx-VIEW.ox)*k; VIEW.oy+=(ty-VIEW.oy)*k;
+  VIEW.vx=VIEW.vy=0;
+  clampView(); viewApply();                      // the camera never leaves the rug
 }
 // E10 — GROWING KEEPS EVERYTHING (new cells arrive empty, anchored top-left,
 // nothing moves); SHRINKING NEVER DELETES A CHILD'S WORK: if any piece,
@@ -797,6 +911,167 @@ let smoke=[], fx=[], confetti=[], lapCardT=0;
 let wheelPhase=0, chugAcc=0, smokeT=0;
 const key=(x,y)=>x+','+y;
 
+/* =====================================================================
+   GRAVITY AS DRAMA (E15) — the hill works the engine. ONE multiplier
+   for the WHOLE consist: the uniform-arc follower stays untouched, we
+   only scale the shared step (modulating cars individually would break
+   the couplings law and the game). The collision probe, the bumper,
+   the station and the pause all see the SAME modified d — one variable,
+   used everywhere the old d was. Flat track ⇒ grade 0 ⇒ mul eases to
+   (and holds) EXACTLY 1.0 ⇒ byte-identical motion, so BUILD ovals,
+   PLAY's figure-8, the attract oval and all ten campaign levels are
+   provably untouched — the physics gates itself, no mode gates exist.
+   GRAV_UP_MIN is THE NEVER-STALLS LAW: the engine always makes the
+   hill, it just WORKS for it. No failure, no rollback — this is a toy.
+   ===================================================================== */
+const GRAV={mul:1,crest:false};
+let clackAcc=0;
+function gravTick(dt){
+  const lc=TRAIN.cars[0].rd;                        // the LOCO reads the hill for everyone
+  const f=clone(lc), b=clone(lc);
+  const rf=advance(f,GRAV_PROBE), rb=back(b,GRAV_PROBE);
+  const run=rf.moved+rb.moved;
+  const grade=run>2? (pos(f).z-pos(b).z)*C/run : 0; // levels per cell of arc; >0 = climbing
+  const tgt=Math.max(GRAV_UP_MIN,Math.min(GRAV_DN_MAX,1-GRAV_K*grade));
+  GRAV.mul+=(tgt-GRAV.mul)*Math.min(1,GRAV_EASE*dt);
+  // THE CREST: a climb latches, the first descent after it whooshes — ONCE.
+  // Flat never latches and never whooshes (the byte-identical audio law).
+  if(grade>0.08) GRAV.crest=true;
+  else if(grade<-0.08 && GRAV.crest){ GRAV.crest=false; SND.whoosh(); riderYay(); }
+  return GRAV.mul;
+}
+
+/* =====================================================================
+   ALL ABOARD (E15) — the world uses what you built. Waiters BELONG TO
+   THE STATION, not the toy box: ambient little platform people, drawn
+   with the station, never in scen, never placeable, never saved, never
+   counted (THE FIFTY STAY FIFTY). Boarding rides the pause that already
+   exists; riders are PAINT in the cars (zero physics, zero save state,
+   per-run only) and they REACT to the layout — that is the RCT magic.
+   Modes: BUILD + campaign; PLAY keeps its glued platform people as-is
+   (RIDERS_PLAY ships off — boarding there is noise).
+   ===================================================================== */
+const PLAT=new Map();         // "cx,cy:el" -> {n, t, wv} — the platform's waiters
+let BOARDERS=[];              // walk tweens {x0,y0,x1,y1,t,dur,col,kind:'board'|'leave',car}
+const RIDERS={pose:null,poseT:0,pri:0};   // ONE pose timer per train — poses are paint
+const WAIT_SLOTS=[-26,-8,10]; // waiter spots on the platform (the stationmaster keeps 26)
+function aboardN(cars){ let n=0; for(const c of cars) n+=c.rid|0; return n; }
+function poseSet(p,t,pri){
+  if(RIDERS.poseT>0 && RIDERS.pri>pri) return;
+  RIDERS.pose=p; RIDERS.poseT=t; RIDERS.pri=pri;
+}
+function poseReset(){ RIDERS.pose=null; RIDERS.poseT=0; RIDERS.pri=0; }
+function riderYay(){          // the downhill whoosh — arms UP + a tiny yay (riders only)
+  if(!aboardN(TRAIN.cars)) return;
+  poseSet('up',1.8,3); SND.yay();
+}
+// stations own their waiters: one record per placed station, regrown one waiter
+// every WAIT_REGROW seconds, swept the moment its station leaves the rug
+function platTick(dt){
+  if(PLAY.on&&!RIDERS_PLAY){ if(PLAT.size) PLAT.clear(); return; }
+  let n=0;
+  for(const g of [grid,hgrid]) for(const [k,pc] of g){
+    if(pc.t!=='st') continue; n++;
+    const pk=k+':'+(pc.elev?1:0);
+    let p=PLAT.get(pk);
+    if(!p) PLAT.set(pk,p={n:WAIT_MAX,t:0,wv:0});
+    if(p.n<WAIT_MAX){ p.t+=dt; if(p.t>=WAIT_REGROW){ p.t=0; p.n=Math.min(WAIT_MAX,p.n+1); } }
+    else p.t=0;
+    if(p.wv>0) p.wv-=dt;
+  }
+  if(PLAT.size>n) for(const pk of [...PLAT.keys()]){
+    const i=pk.lastIndexOf(':'), k=pk.slice(0,i);
+    const pc=+pk.slice(i+1)? hgrid.get(k) : grid.get(k);
+    if(!pc||pc.t!=='st') PLAT.delete(pk);
+  }
+}
+function platSlotXY(pk,i){    // waiter slot i of platform pk, in world px
+  const ci=pk.lastIndexOf(':'), k=pk.slice(0,ci), el=+pk.slice(ci+1);
+  const [gx,gy]=k.split(',').map(Number);
+  const pc=el? hgrid.get(k) : grid.get(k);
+  const r=pc? pc.r:0, vx=WAIT_SLOTS[i%WAIT_SLOTS.length], vy=28;
+  const R=[[vx,vy],[-vy,vx],[-vx,-vy],[vy,-vx]][r%4];
+  return { x:GX+gx*C+C/2+R[0], y:GY+gy*C+C/2+R[1]-LIFT*el };
+}
+// BOARDING RIDES THE PAUSE. Arrivals step off onto THIS platform first (walk-away
+// tween, then absorbed — ambient people never accumulate), then the platform's
+// waiters walk over and board whatever rider cars have seats. No rider car (or no
+// seat)? The waiters just do the CHARM-LAW wave. Nothing refuses, nothing fails.
+function boardAt(cars,lk){
+  const p=PLAT.get(lk);
+  let slot=0;
+  for(const c of cars){
+    if(!(c.rid>0)) continue;
+    const cp=carPose(c);
+    for(let i=0;i<c.rid;i++){
+      const s2=platSlotXY(lk,slot++);
+      BOARDERS.push({ x0:cp.x, y0:cp.y-LIFT*(cp.z||0), x1:s2.x, y1:s2.y,
+        t:-0.06*BOARDERS.length, dur:0.5, col:PPL_COLS[(slot+i)%PPL_COLS.length], kind:'leave', car:null });
+    }
+    c.rid=0;
+  }
+  if(!p) return;
+  let boarded=0;
+  for(const c of cars){
+    const cap=RIDER_CAP[c.type]; if(cap==null) continue;
+    while(p.n>0 && (c.rid|0)+pendingFor(c)<cap && boarded<WAIT_MAX*2){
+      const i=--p.n, s2=platSlotXY(lk,i), cp=carPose(c);
+      BOARDERS.push({ x0:s2.x, y0:s2.y, x1:cp.x, y1:cp.y-LIFT*(cp.z||0),
+        t:-0.12*boarded, dur:0.5, col:PPL_COLS[i%PPL_COLS.length], kind:'board', car:c });
+      boarded++;
+    }
+  }
+  if(!boarded) p.wv=1.3;      // nobody could get on — the platform waves instead
+}
+function pendingFor(c){ let n=0; for(const b of BOARDERS) if(b.kind==='board'&&b.car===c) n++; return n; }
+function boardTick(dt){
+  let done=false;
+  for(const b of BOARDERS){
+    b.t+=dt;
+    if(b.t>=b.dur){ done=true;
+      if(b.kind==='board'&&b.car&&(b.car.rid|0)<RIDER_CAP[b.car.type]) b.car.rid=(b.car.rid|0)+1; }
+  }
+  if(done) BOARDERS=BOARDERS.filter(b=>b.t<b.dur);
+  if(RIDERS.poseT>0){ RIDERS.poseT-=dt; if(RIDERS.poseT<=0) poseReset(); }
+}
+function ridersOff(){ PLAT.clear(); BOARDERS=[]; poseReset(); }
+// the little walkers between platform and train — drawn on the ground layer
+function drawBoarders(){
+  if(!BOARDERS.length) return;
+  cx.save();                  // leak nothing downstream (the drawNameSign lesson)
+  for(const b of BOARDERS){
+    if(b.t<=0) continue;
+    const k=Math.min(1,b.t/b.dur), e=k*k*(3-2*k);
+    const x=b.x0+(b.x1-b.x0)*e, y=b.y0+(b.y1-b.y0)*e;
+    cx.save(); cx.translate(x,y-Math.abs(Math.sin(k*Math.PI*5))*2.2);
+    cx.globalAlpha=Math.min(1,Math.min(k,1-k)*6+0.15);
+    cx.scale(0.8,0.8);
+    const step2=Math.sin(k*22)*4;
+    cx.strokeStyle=b.col; cx.fillStyle=b.col; cx.lineWidth=5.6; cx.lineCap='round'; cx.lineJoin='round';
+    cx.beginPath(); cx.arc(0,-13,5.6,0,7); cx.fill();
+    cx.beginPath(); cx.moveTo(0,-8); cx.lineTo(0,6); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,6); cx.lineTo(-5+step2,20); cx.moveTo(0,6); cx.lineTo(5-step2,20); cx.stroke();
+    cx.beginPath(); cx.moveTo(0,-5); cx.lineTo(-6,3); cx.moveTo(0,-5); cx.lineTo(6,3); cx.stroke();
+    cx.restore();
+  }
+  cx.restore();
+}
+// one waiter, molded-plastic law (the stationmaster's own recipe, in PPL colours)
+function drawWaiter(px,py,col,t,ph,wav){
+  cx.save(); cx.translate(px,py);
+  const wob=Math.sin(t*2.1+ph)*0.35;
+  cx.strokeStyle=col; cx.fillStyle=col; cx.lineWidth=4.6; cx.lineCap='round'; cx.lineJoin='round';
+  cx.beginPath(); cx.arc(0,-11,4.6,0,7); cx.fill();
+  cx.beginPath(); cx.moveTo(0,-7); cx.lineTo(0,4); cx.stroke();
+  cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(-6,1); cx.stroke();
+  cx.beginPath(); cx.moveTo(0,-4);
+  if(wav) cx.lineTo(6,-16+Math.sin(t*11+ph)*3);   // the CHARM-LAW wave
+  else cx.lineTo(6,-12+wob*3);
+  cx.stroke();
+  cx.beginPath(); cx.moveTo(0,4); cx.lineTo(-4,11); cx.moveTo(0,4); cx.lineTo(4,11); cx.stroke();
+  cx.lineCap='butt'; cx.restore();
+}
+
 // ---- THE STAR BANK (E9, save v:7) ----
 // LAW 0: stars are only ever EARNED — never lost as a penalty, never expiring, never
 // gating the campaign or PLAY. Buying in the store is the one thing they're for.
@@ -833,9 +1108,12 @@ function hudPulse(){          // can't afford it: the star HUD pulses (no dialog
 
 // ---- piece geometry: port-to-port polylines with cumulative arc length ----
 // ports: 0=N 1=E 2=S 3=W. Every path runs ports[0] -> ports[1].
-// E4: a path may carry z (one 0..1 per point, PAINT-ONLY — riders keep the xy arc
-// metric, the uniform-arc law is untouched) and pcell (which cell of a multi-cell
-// prefab each endpoint lives in; null for every 1×1 piece).
+// E4, AMENDED BY E15: a path may carry z (one 0..1 per point) and pcell (which
+// cell of a multi-cell prefab each endpoint lives in; null for every 1×1 piece).
+// THE Z LAW AS OF E15: z still NEVER touches the xy arc metric — every rider
+// advances the identical arc length, so the couplings/geometry law is intact —
+// but slope MAY modulate the SHARED step (gravTick: one multiplier for the whole
+// consist, never per-car). Everywhere else z remains paint-only.
 function rotPtS(p,r,S){ let x=p[0],y=p[1]; for(let i=0;i<r;i++){ const t=x; x=S-y; y=t; } return [x,y]; }
 const rotPt=(p,r)=>rotPtS(p,r,C);
 function mkPath(ports,pts,r,z){
@@ -1134,6 +1412,7 @@ function trainHome(quiet){
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
   for(const pc of grid.values()) pc.latch=null;
   for(const pc of hgrid.values()) pc.latch=null;
+  BOARDERS=[]; poseReset();    // E15: riders live per-run — home = everyone's out
   goBtnSync(); shedSync();
 }
 function reverseTrain(){
@@ -1148,6 +1427,7 @@ function goTrain(){
   const lc=TRAIN.cars[0].rd;
   TRAIN.startSig=key(lc.cx,lc.cy)+':'+(lc.el?1:0)+':'+lc.pi+':'+lc.dir; TRAIN.goDist=0;
   TRAIN.revSinceGo=false;                  // a campaign win wants a TRUE loop, not a ping-pong
+  GRAV.mul=1; GRAV.crest=false; clackAcc=0;   // E15: every run starts flat-hearted
   if(CAMP.on) CAMP.visited=new Set();      // station visits count "since GO" (E5 win law)
   goBtnSync(); return true;
 }
@@ -1170,6 +1450,8 @@ function update(dt){
     if(s.wave>0) s.wave-=dt;
   }
   if(yayCd>0) yayCd-=dt;
+  platTick(dt);                // E15: the platforms keep their little crowds
+  boardTick(dt);               // ...and the walkers walk even while the train waits
   // E10: the rain's single distant rumble — long random timer, quiet, and only
   // ever on the free-build rug (campaign + PLAY read their own weather: clear)
   if(activeWeather()==='rain'){
@@ -1181,7 +1463,7 @@ function update(dt){
   if(TRAIN.placed && TRAIN.running){
     if(TRAIN.pauseT>0){ TRAIN.pauseT-=dt; }
     else{
-      const d=SPEED*dt;
+      const d=SPEED*gravTick(dt)*dt;   // E15: the hill modulates the ONE shared step
       const lead=TRAIN.F? TRAIN.cars[0] : TRAIN.cars[TRAIN.cars.length-1];
       const probe=clone(lead.rd), r=advance(probe,d);
       const step=r.ok? d : Math.max(0,r.moved-0.5);
@@ -1193,18 +1475,36 @@ function update(dt){
         chugAcc+=step; if(chugAcc>52){ chugAcc=0;
           const lp=pieceOf(TRAIN.cars[0].rd);
           SND.chuff(!!lp&&lp.t==='br', !!lp&&lp.t==='tun'); }   // E7: the tunnel muffles the chuff
+        // E15: the chain lift — dry clacks while the engine is working the climb.
+        // Distance-based like the chuff (which already quickens downhill for free),
+        // so nothing ever clacks on the flat: the byte-identical audio law.
+        if(GRAV.mul<CLACK_BELOW){ clackAcc+=step; if(clackAcc>CLACK_SPACE){ clackAcc=0; SND.clack(); } }
+        else clackAcc=0;
         // THE CHARM LAW: people wave, cows look up, sheep hop, chickens flap at a passing
         // train — one shared chirp gate (yayCd) so passes never stack noise. E7's cat and
         // snowman charm silently, so they neither spend nor need the gate.
+        let charmed=false;
         for(const c of TRAIN.cars){
           for(let dy=-REACT_R;dy<=REACT_R;dy++) for(let dx=-REACT_R;dx<=REACT_R;dx++){
             const s=scen.get(key(c.rd.cx+dx,c.rd.cy+dy));
             if(s && SCENDEF[s.t].react && !(s.wave>0)){
-              s.wave=1.3;
+              s.wave=1.3; charmed=true;
               const ch=CHIRP[s.t];
               if(ch && yayCd<=0){ yayCd=3; chirpN++; SND[ch](); }
             }
           }
+        }
+        // E15 THE REACTION LAW — riders respond to the layout (paint-only, ONE
+        // pose timer per train): through a tunnel they duck, over a bridge they
+        // look down, at a charmed scene they wave BACK at the ground people. The
+        // downhill arms-up (+ SND.yay) rides the crest whoosh in gravTick.
+        if(aboardN(TRAIN.cars)){
+          if(charmed) poseSet('wave',1.3,1);
+          let tun=false, brg=false;
+          for(const c of TRAIN.cars){ if(!(c.rid>0)) continue;
+            const p2=pieceOf(c.rd); if(p2){ if(p2.t==='tun') tun=true; else if(p2.t==='br') brg=true; } }
+          if(tun) poseSet('duck',0.4,4);
+          else if(brg) poseSet('look',0.4,2);
         }
         smokeT-=dt; if(smokeT<=0){ smokeT=0.16; stackPuff(); }
         // station: the loco crossing a platform's centre — keyed (cell, elev), so a
@@ -1214,6 +1514,7 @@ function update(dt){
           const mid=pathsOf(lpc)[lc.pi].len/2;
           if(Math.abs(lc.s-mid)<step+0.6 && TRAIN.stKey!==lk){
             TRAIN.stKey=lk; TRAIN.pauseT=STATION_PAUSE; SND.ding();
+            boardAt(TRAIN.cars,lk);                 // E15: riders off, waiters aboard — inside the pause
             if(CAMP.on) CAMP.visited.add(lk);       // pause-visited, since GO (the E5 win check)
             // E9: a station stop pays 1★ in BUILD (the campaign pays per first clear
             // instead). Re-armed by the stKey cell-exit law — no parking-on-the-station farm.
@@ -1339,6 +1640,86 @@ function firstLap(){
   const p=TRAIN.placed? pos(TRAIN.cars[0].rd) : {x:GX+GW*C/2,y:GY+GH*C/2,z:0};
   starMint(MINT.firstLap,p.x,p.y-LIFT*(p.z||0));
   save();
+}
+
+/* =====================================================================
+   THE NAME PLATE (E15) — it's YOURS now. A wooden sign on the BUILD
+   rug's top frame (the frame is OUTSIDE the grid: no cell, blocks
+   nothing, needs no audit). Naming = the word bank, NEVER a keyboard —
+   no text input element exists anywhere in this game. The name shows
+   up where pride lives: the sign, THE SHED header, the FIRST LAP card.
+   Save v:9 carries it; BUILD only — campaign and PLAY never show a
+   sign. Paint = the E5/E3 wooden board recipe.
+   ===================================================================== */
+let NAME=null;                 // {w1,w2,s} straight off the word bank — save v:9; null = MY RAILROAD
+const signText=()=>NAME? 'THE '+NAME.w1+' '+NAME.w2+' '+NAME.s : 'MY RAILROAD';
+let SIGN_RECT=null;            // world-px rect of the painted sign — the tap target
+function drawNameSign(){
+  // ⚠ save/restore is LAW here — leak no state into the world's painters.
+  // ⚠ THE PROOF LAW (E15): ANY extra op in a shared frame shifts hairline AA
+  // batching elsewhere in that frame (Skia), so migration byte-proofs run with
+  // THIS painter suppressed (drawNameSign=()=>{}) and the chip hidden; the real
+  // frame is then proven to a ≤hairline tolerance. Menu/campaign frames carry
+  // no sign and stay raw byte-identical.
+  cx.save();
+  const txt=signText();
+  let f=19; cx.font='bold '+f+'px "Arial Black",Impact,sans-serif';
+  const w=Math.min(Math.max(cx.measureText(txt).width+64,240),WORLD_W-220), h=38, x=(WORLD_W-w)/2, y=6;
+  cx.fillStyle='#8f6b3f'; rr(x,y,w,h,8); cx.fill();
+  cx.strokeStyle='#6e5130'; cx.lineWidth=3; rr(x,y,w,h,8); cx.stroke();
+  cx.fillStyle='#a37c4a'; rr(x+5,y+5,w-10,h-10,5); cx.fill();
+  cx.fillStyle='#F2C531';      // two gold tacks — it's a plaque, tap it
+  cx.beginPath(); cx.arc(x+14,y+h/2,2.6,0,7); cx.fill();
+  cx.beginPath(); cx.arc(x+w-14,y+h/2,2.6,0,7); cx.fill();
+  cx.fillStyle='#F7E9C4'; cx.textAlign='center';
+  const mw=cx.measureText(txt).width;
+  if(mw>w-56){ f=Math.max(10,Math.floor(f*(w-56)/mw)); cx.font='bold '+f+'px "Arial Black",Impact,sans-serif'; }
+  cx.fillText(txt, x+w/2, y+h/2+f*0.36);
+  cx.restore();
+  SIGN_RECT={x,y,w,h};
+}
+// ---- the word-bank picker (DOM, the gold-card recipe — see #namer) ----
+const NM={w1:0,w2:0,si:0};
+function nmSync(){
+  document.querySelectorAll('#nmc1 .nmw').forEach((b,i)=>b.classList.toggle('on',i===NM.w1));
+  document.querySelectorAll('#nmc2 .nmw').forEach((b,i)=>b.classList.toggle('on',i===NM.w2));
+  $('nmsfx').textContent='🔁 '+NAME_SUFFIX[NM.si];
+  $('nmprev').textContent='THE '+NAME_WORDS[0][NM.w1]+' '+NAME_WORDS[1][NM.w2]+' '+NAME_SUFFIX[NM.si];
+}
+function namerShow(b){
+  const el=$('namer'); if(!el) return;
+  el.style.display=b?'flex':'none';
+  if(b){
+    NM.w1=NAME? Math.max(0,NAME_WORDS[0].indexOf(NAME.w1)) : 0;
+    NM.w2=NAME? Math.max(0,NAME_WORDS[1].indexOf(NAME.w2)) : 0;
+    NM.si=NAME? Math.max(0,NAME_SUFFIX.indexOf(NAME.s)) : 0;
+    nmSync();
+  }
+}
+function nameApply(w1,w2,sfx){ // the ONE writer — the rig and the DONE button both use it
+  if(w1==null){ NAME=null; shedSync(); save(); return signText(); }
+  if(!NAME_WORDS[0].includes(w1)||!NAME_WORDS[1].includes(w2)||!NAME_SUFFIX.includes(sfx)) return false;
+  NAME={w1,w2,s:sfx};
+  shedSync(); save();
+  return signText();
+}
+function buildNamer(){
+  const mkw=(wrap,col,pick)=>{
+    NAME_WORDS[col].forEach((w,i)=>{
+      const b=document.createElement('button'); b.className='nmw'; b.type='button'; b.textContent=w;
+      b.addEventListener('click',()=>{ ac(); SND.tok(); pick(i); nmSync(); });
+      wrap.appendChild(b);
+    });
+  };
+  mkw($('nmc1'),0,i=>NM.w1=i);
+  mkw($('nmc2'),1,i=>NM.w2=i);
+  $('nmsfx').addEventListener('click',()=>{ ac(); SND.click(); NM.si=(NM.si+1)%NAME_SUFFIX.length; nmSync(); });
+  $('nmdone').addEventListener('click',()=>{
+    ac();
+    nameApply(NAME_WORDS[0][NM.w1],NAME_WORDS[1][NM.w2],NAME_SUFFIX[NM.si]);
+    SND.ding(); namerShow(false);
+  });
+  $('nmback').addEventListener('click',()=>{ ac(); SND.click(); namerShow(false); });
 }
 
 /* =====================================================================
@@ -2778,6 +3159,16 @@ function drawPieceDecor(pc,ox,oy){
     cx.strokeStyle='#EFE7D8'; cx.lineWidth=3;
     cx.beginPath(); cx.moveTo(-34,16); cx.lineTo(-34,-2); cx.stroke();
     cx.fillStyle='#4E7F46'; cx.beginPath(); cx.moveTo(-34,-2); cx.lineTo(-22,2); cx.lineTo(-34,6); cx.closePath(); cx.fill();
+    // E15 ALL ABOARD: the platform's ambient waiters — drawn WITH the station,
+    // never in scen, never saved, never counted. Icons and ghosts land off-grid,
+    // find no platform record, and stay exactly as they always looked.
+    const pk2=key(Math.round((ox-GX)/C),Math.round((oy-GY)/C))+':'+(pc.elev?1:0);
+    const pl=PLAT.get(pk2);
+    if(pl&&pl.n>0){
+      const t2=perf();
+      for(let i=0;i<pl.n;i++)
+        drawWaiter(WAIT_SLOTS[i%WAIT_SLOTS.length],28,PPL_COLS[i%PPL_COLS.length],t2,i*2.1,pl.wv>0);
+    }
     cx.restore();
   }
   if(pc.t==='br'){
@@ -2841,7 +3232,38 @@ function pathSeg(p,s0,s1){
   return out;
 }
 // GVT drawTrainCar, adapted: same wheels, same shadow, same flip-upright law,
-// wheel spokes actually spin, three new cars in the same palette
+// wheel spokes actually spin, three new cars in the same palette.
+// E15: rid/pose paint the REAL riders into rider cars on the rug. rid==null
+// (shed, icons, ghosts, tray, attract, PLAY) keeps every car's art exactly as
+// it always was — the coach's three decorative faces included. The whole car
+// context already flip-uprights, so a rider's face never hangs upside-down.
+function flatRider(x,pose,i){          // a sat little figure on the flatcar's lumber
+  const col=PPL_COLS[(i+1)%PPL_COLS.length];
+  cx.strokeStyle=col; cx.fillStyle=col; cx.lineWidth=4.4; cx.lineCap='round'; cx.lineJoin='round';
+  const hy=pose==='duck'? -26 : -31;   // ducked = tucked down against the load
+  cx.beginPath(); cx.arc(x,hy,4.2,0,7); cx.fill();
+  cx.beginPath(); cx.moveTo(x,hy+4); cx.lineTo(x,-18); cx.stroke();
+  cx.beginPath(); cx.moveTo(x,-18); cx.lineTo(x+6,-17); cx.lineTo(x+7,-12); cx.stroke();
+  cx.lineWidth=3.6;
+  if(pose==='up'){ cx.beginPath(); cx.moveTo(x,hy+6); cx.lineTo(x-6,hy-9); cx.moveTo(x,hy+6); cx.lineTo(x+6,hy-9); cx.stroke(); }
+  else if(pose==='wave'){ cx.beginPath(); cx.moveTo(x,hy+6); cx.lineTo(x+6,hy-8+Math.sin(perf()*11+i)*2); cx.stroke(); }
+  else if(pose==='look'){ cx.beginPath(); cx.moveTo(x,hy+6); cx.lineTo(x+7,hy+9); cx.stroke(); }
+  else { cx.beginPath(); cx.moveTo(x,hy+6); cx.lineTo(x+5,hy+9); cx.stroke(); }
+  cx.lineCap='butt';
+}
+function cabRider(pose){               // one rider up in the caboose cupola
+  const col=PPL_COLS[2];
+  cx.fillStyle=col; cx.strokeStyle=col; cx.lineCap='round';
+  if(pose==='duck'){ cx.beginPath(); cx.arc(0,-20.5,2.9,Math.PI,0); cx.closePath(); cx.fill(); }
+  else{
+    cx.beginPath(); cx.arc(0,-23.5,2.9,0,7); cx.fill();
+    if(pose==='up'){ cx.lineWidth=2.2;
+      cx.beginPath(); cx.moveTo(-2,-26); cx.lineTo(-5,-33); cx.moveTo(2,-26); cx.lineTo(5,-33); cx.stroke(); }
+    else if(pose==='wave'){ cx.lineWidth=2.2;
+      cx.beginPath(); cx.moveTo(2,-26); cx.lineTo(5,-32+Math.sin(perf()*11)*1.5); cx.stroke(); }
+  }
+  cx.lineCap='butt';
+}
 function wheel(wx,wr,rot){
   cx.fillStyle='#C0392B'; cx.beginPath(); cx.arc(wx,18,wr,0,7); cx.fill();
   cx.save(); cx.translate(wx,18); cx.rotate(rot);
@@ -2851,7 +3273,7 @@ function wheel(wx,wr,rot){
   cx.restore();
   cx.fillStyle='#2b2117'; cx.beginPath(); cx.arc(wx,18,2.2,0,7); cx.fill();
 }
-function drawCar(type,x,y,artAng,squash,wrot,liv,z,fd){
+function drawCar(type,x,y,artAng,squash,wrot,liv,z,fd,rid,pose){
   liv=liv||LIVERY[COLOR];   // THE LIVERY LAW — only the red livery parts read this
   const fade=fd==null?1:fd; // E6: crashed play trains tumble-FADE through this
   const lift=(z||0)*LIFT;
@@ -2912,6 +3334,7 @@ function drawCar(type,x,y,artAng,squash,wrot,liv,z,fd){
     cx.fillStyle='#7A553A'; rr(-28,-8,56,8,4); cx.fill();
     cx.fillStyle='#8a6544'; rr(-24,-15,48,8,4); cx.fill();
     cx.fillStyle='#7A553A'; rr(-18,-22,36,8,4); cx.fill();
+    if(rid>0) for(let i=0;i<Math.min(rid,2);i++) flatRider(i? 13:-13,pose,i);   // E15: sat riders on the load
   } else if(type==='cab'){
     wheel(-18,8,wrot); wheel(18,8,wrot);
     cx.fillStyle=liv.m; rr(-30,-18,60,34,5); cx.fill();
@@ -2919,19 +3342,36 @@ function drawCar(type,x,y,artAng,squash,wrot,liv,z,fd){
     cx.fillStyle=liv.s; rr(-12,-28,24,12,3); cx.fill();
     cx.fillStyle='#7A553A'; rr(-33,-21,66,7,3); cx.fill();
     cx.fillStyle='#F7E9C4'; rr(-22,-11,10,9,2); cx.fill(); rr(12,-11,10,9,2); cx.fill(); rr(-5,-27,10,7,2); cx.fill();
+    if(rid>0) cabRider(pose);                   // E15: one rider up in the cupola
   } else if(type==='coach'){
     wheel(-18,8,wrot); wheel(18,8,wrot);
     cx.fillStyle='#EFE0BC'; rr(-32,-18,64,34,5); cx.fill();
     cx.strokeStyle='#B48A54'; cx.lineWidth=2; rr(-32,-18,64,34,5); cx.stroke();
     cx.fillStyle='#7A553A'; rr(-35,-23,70,8,3); cx.fill();
     cx.fillStyle='#C0392B'; rr(-32,8,64,8,3); cx.fill();
-    for(let i=0;i<3;i++){                       // three windows, tiny faces riding along
+    // E15: on the rug the windows carry the REAL riders (rid) in the train's pose;
+    // rid==null keeps the three decorative faces byte-for-byte as they always were.
+    const rn=rid==null? 3 : Math.min(rid,3);
+    for(let i=0;i<3;i++){
       const wx=-25+i*19;
       cx.fillStyle='#9DBFE6'; rr(wx,-12,13,13,2.5); cx.fill();
       cx.strokeStyle='#B48A54'; cx.lineWidth=2; rr(wx,-12,13,13,2.5); cx.stroke();
+      if(i>=rn) continue;
       cx.fillStyle=PPL_COLS[i%PPL_COLS.length];
+      if(rid!=null&&pose==='duck'){             // ducked: just the top of a head peeking up
+        cx.beginPath(); cx.arc(wx+6.5,1,3.2,Math.PI,0); cx.closePath(); cx.fill();
+        continue;
+      }
       cx.beginPath(); cx.arc(wx+6.5,1,4.2,Math.PI,0); cx.closePath(); cx.fill();
-      cx.beginPath(); cx.arc(wx+6.5,-5,3.2,0,7); cx.fill();
+      const hy=rid!=null&&pose==='look'? -3.4 : -5;   // looking down over the sill
+      cx.beginPath(); cx.arc(wx+6.5,hy,3.2,0,7); cx.fill();
+      if(rid!=null&&(pose==='up'||pose==='wave')){    // arms out the window — up, or waving back
+        cx.strokeStyle=PPL_COLS[i%PPL_COLS.length]; cx.lineWidth=2.2; cx.lineCap='round';
+        const wv=pose==='wave'? Math.sin(perf()*11+i)*1.6 : 0;
+        cx.beginPath(); cx.moveTo(wx+2.5,-3); cx.lineTo(wx+0.5,-13+wv); cx.stroke();
+        if(pose==='up'){ cx.beginPath(); cx.moveTo(wx+10.5,-3); cx.lineTo(wx+12.5,-13); cx.stroke(); }
+        cx.lineCap='butt';
+      }
     }
   } else if(type==='mail'){
     wheel(-18,8,wrot); wheel(18,8,wrot);
@@ -3027,11 +3467,12 @@ function drawCarsOnRails(cars,wheelRot){
 // so a train slips under the high line and rides over it, fractional mid-ramp
 function trainCarItems(){
   if(!TRAIN.placed) return null;
-  const items=[];
+  const items=[], ps=RIDERS.poseT>0? RIDERS.pose : null;   // E15: one pose, whole train
   for(let i=TRAIN.cars.length-1;i>=0;i--){
     const c=TRAIN.cars[i], p=carPose(c), liv=livFor(i);
     const artAng=p.ang+(c.face<0?Math.PI:0);
-    items.push({z:p.z+0.05, fn:()=>drawCar(c.type,p.x,p.y,artAng,c.squash||0,wheelPhase*(c.face<0?-1:1),liv,p.z)});
+    const rid=RIDER_CAP[c.type]!=null? (c.rid|0) : undefined;   // E15: real occupancy on the rug
+    items.push({z:p.z+0.05, fn:()=>drawCar(c.type,p.x,p.y,artAng,c.squash||0,wheelPhase*(c.face<0?-1:1),liv,p.z,undefined,rid,ps)});
   }
   return items;
 }
@@ -3107,7 +3548,12 @@ function drawLapCard(){
   cx.fillStyle='#1e1610'; rr(x,y,cw,chh,16); cx.fill();
   cx.strokeStyle='#F2C531'; cx.lineWidth=4; rr(x,y,cw,chh,16); cx.stroke();
   cx.fillStyle='#F2C531'; cx.textAlign='center';
-  cx.font='bold 34px "Arial Black",Impact,sans-serif'; cx.fillText('FIRST LAP!', W/2, y+46);
+  // E15: a NAMED railroad's first lap says so; unnamed = today's card, verbatim
+  const title=NAME? signText()+' — FIRST LAP!' : 'FIRST LAP!';
+  cx.font='bold 34px "Arial Black",Impact,sans-serif';
+  if(NAME){ const tw=cx.measureText(title).width;
+    if(tw>cw-30) cx.font='bold '+Math.max(13,Math.floor(34*(cw-30)/tw))+'px "Arial Black",Impact,sans-serif'; }
+  cx.fillText(title, W/2, y+46);
   cx.fillStyle='#F7E9C4'; cx.font='bold 13px "Arial Black",Impact,sans-serif';
   cx.fillText('ROUND AND ROUND, FOREVER!', W/2, y+76);
   cx.globalAlpha=1;
@@ -3132,10 +3578,13 @@ function drawGaps(){
 function draw(){
   cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cvs.width,cvs.height);
   cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
-  drawRug(); drawRivers(); drawPonds(); drawGaps();
+  drawRug();
+  if(camGate()) drawNameSign(); else SIGN_RECT=null;   // E15: BUILD only — no sign in campaign or PLAY
+  drawRivers(); drawPonds(); drawGaps();
   // scenery slides in as the midHook: over the ground pass, under the decks and
   // the z-sorted cars — so a cow can graze beneath the high line
   drawTrackAll(grid,hgrid,PLAY.on? playCarItems():trainCarItems(),drawScen);
+  drawBoarders();   // E15: little walkers between platform and train, on the ground
   drawArches();     // E9: balloon arches bow over the line — the train drives under them
   drawBalloons();   // E7: balloons fly above the whole rug, shadows drifting along
   for(const s of smoke){ const k=s.t/s.dur;
@@ -3445,6 +3894,10 @@ const SND={
     else noise(0.07,chuffSide?750:640,0.16,'bandpass'); },
   rustle(){ noise(0.09,520,0.35,'lowpass'); noise(0.06,1500,0.1,'highpass'); },
   yay(){ tone(880,0.09,'sine',0.09); tone(1175,0.12,'sine',0.08,undefined,0.09); },
+  // E15 — the chain-lift tick + the one crest whoosh. Pure synth (the E9 no-mp3
+  // law holds) and never the loudest thing in the game.
+  clack(){ tone(1240,0.03,'square',0.09,900); noise(0.02,3400,0.1,'highpass'); },
+  whoosh(){ noise(0.55,1400,0.12,'bandpass',0,320); noise(0.4,620,0.06,'lowpass',0.05,240); },
   // the herd (E2) — tiny, quiet-HUD, one per pass through the yayCd gate
   moo(){ tone(175,0.32,'sine',0.12*CHIRP_VOL,131); tone(87,0.3,'triangle',0.09*CHIRP_VOL,65); },
   baa(){ tone(440,0.08,'triangle',0.085*CHIRP_VOL,392);
@@ -3586,8 +4039,9 @@ function save(){
     // E6: the wind-up rug stashes the same way and persists NOTHING of its own.
     const w=CAMP.on? FREE : (PLAY.on? PFREE : serWorld());
     localStorage.setItem('TRAINSET', JSON.stringify({
-      v:8, grid:w.grid, scen:w.scen, consist:w.consist, color:COLOR, train:w.train,
+      v:9, grid:w.grid, scen:w.scen, consist:w.consist, color:COLOR, train:w.train,
       coll:[...coll], eng:ENGINE,
+      name:NAME? {w1:NAME.w1,w2:NAME.w2,s:NAME.s} : null,   // v:9 — THE NAME PLATE (E15); the ONLY thing E15 persists
       size:SIZE, land:LAND, weather:WEATHER,   // v:8 — BIG COUNTRY (E10); VIEW is NOT saved — every boot opens fitted
       stars:stars, equip:{...equip},   // v:7 — THE STAR BANK + the equipped sound packs (E9)
       e8:1,   // E8 arrived: the ten levels are new land, so any wip saved before this is void (once)
@@ -3608,6 +4062,12 @@ function load(){
     LAND=(d.land&&LANDS.includes(d.land))? d.land : 'rug';
     WEATHER=(d.weather&&WEATHERS.includes(d.weather))? d.weather : 'clear';
     applyDims(SIZE);
+    // v:9 — THE NAME PLATE (E15). A v≤8 save migrates to name:null: the sign
+    // paints MY RAILROAD and every other pixel proves byte-identical (the E10
+    // frozen-clock proof pattern). Only words off the bank ever load.
+    NAME=null;
+    if(d.name && NAME_WORDS[0].includes(d.name.w1) && NAME_WORDS[1].includes(d.name.w2) && NAME_SUFFIX.includes(d.name.s))
+      NAME={w1:d.name.w1,w2:d.name.w2,s:d.name.s};
     COLOR=(d.color&&LIVERY[d.color])? d.color : 'red';
     hintStage=d.hints|0; lapDone=!!d.lap; AU.on=!d.mute;
     const cp=d.camp||{};   // v:1..v:4 saves carry no camp block — the campaign arrives fresh (v:5 migration)
@@ -3798,6 +4258,7 @@ function campEnter(n){
   applyDims('sm');                            // E10: every level plays on the sm board, whatever BUILD grew to
   CAMP.on=true; CAMP.level=n; CAMP.won=false; CAMP.tugT=false;
   CAMP.visited=new Set(); winT=0; prettyT=0; prettyPend=false;
+  ridersOff();                                // E15: fresh platforms for the level's stations
   grid.clear(); hgrid.clear(); scen.clear();
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
   for(const g of L.glued) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
@@ -3839,6 +4300,7 @@ function campExit(dest){
   if(!CAMP.on){ showScreen(dest); return; }
   CAMP.wip=(CAMP_WIP&&!CAMP.won)? serWip() : null;   // cleared on win, kept mid-build
   CAMP.on=false; CAMP.level=0; CAMP.won=false; goalT=0; winT=0; prettyT=0; prettyPend=false;
+  ridersOff();                                       // E15: the level's platforms empty out
   applyDims(SIZE);                                   // E10: the BUILD rug comes back at its own size
   appWorld(FREE||{grid:[],scen:[],consist:consist,train:null}); FREE=null;
   $('mark').textContent='🚂 TRAIN SET';
@@ -4160,6 +4622,7 @@ function playUpdate(dt){
     if(lpc&&lpc.t==='st'){
       const mid=pathsOf(lpc)[lc.pi].len/2;
       if(Math.abs(lc.s-mid)<step+0.6 && tr.stKey!==lk){ tr.stKey=lk; tr.pauseT=STATION_PAUSE; SND.ding();
+        if(RIDERS_PLAY) boardAt(tr.cars,lk);        // E15: PLAY boarding rides a dial, ships off
         const sp2=pos(lc); starMint(MINT.station,sp2.x,sp2.y); }   // E9: the stop pays, per train
     }
     if(lk!==tr.cellKey){ if(tr.stKey&&tr.stKey!==lk) tr.stKey=null; tr.cellKey=lk; }
@@ -4190,6 +4653,7 @@ function playEnter(){
   PFREE=serWorld();                      // the build rug, stashed — restored verbatim on exit
   applyDims('sm');                       // E10: the wind-up rug is the sm rug, always
   PLAY.on=true; PLAY.trains=[]; PLAY.crashes=0; PLAY.respawnT=PLAY_RESPAWN; PLAY.nextId=1;
+  ridersOff();                           // E15: the wind-up rug keeps its glued people only
   grid.clear(); hgrid.clear(); scen.clear();
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
   for(const g of PLAYMAP.scen) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
@@ -4203,6 +4667,7 @@ function playEnter(){
 function playExit(dest){
   if(!PLAY.on){ showScreen(dest); return; }
   PLAY.on=false; PLAY.trains=[]; PLAY.loop=null;
+  ridersOff();                           // E15: the BUILD rug's platforms restock next tick
   applyDims(SIZE);                       // E10: back to the BUILD rug at its own size
   appWorld(PFREE||{grid:[],scen:[],consist:consist,train:null}); PFREE=null;
   $('mark').textContent='🚂 TRAIN SET';
@@ -4223,9 +4688,11 @@ function playCarItems(){
     const fd=tr.dying? Math.max(0,tr.crashT/CRASH_TUMBLE) : 1;
     for(let i=tr.cars.length-1;i>=0;i--){
       const c=tr.cars[i], p=carPose(c), artAng=p.ang+(c.face<0?Math.PI:0);
+      // E15: PLAY cars stay decorative unless the RIDERS_PLAY dial is flipped on
+      const prid=RIDERS_PLAY&&RIDER_CAP[c.type]!=null? (c.rid|0) : undefined;
       items.push({z:p.z+0.05, fn: tr.dying?
         ()=>drawCar(c.type, p.x+c.tum.vx*tt, p.y+c.tum.vy*tt+130*tt*tt, artAng+c.tum.vr*tt, c.squash, tr.wheel, liv, p.z, fd) :
-        ()=>drawCar(c.type, p.x, p.y, artAng, c.squash||0, tr.wheel*(c.face<0?-1:1), liv, p.z)});
+        ()=>drawCar(c.type, p.x, p.y, artAng, c.squash||0, tr.wheel*(c.face<0?-1:1), liv, p.z, undefined, prid, null)});
     }
   }
   return items;
@@ -4300,6 +4767,7 @@ const PTRS=new Map();
 let PINCH=null;
 let DTAP={t:0,x:0,y:0};
 function pinchStart(){
+  followSet(false);                              // E15: two fingers own the camera now
   const pts=[...PTRS.values()];
   const d0=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)||1;
   const mx=(pts[0].x+pts[1].x)/2, my=(pts[0].y+pts[1].y)/2;
@@ -4343,6 +4811,12 @@ cvs.addEventListener('pointerdown',e=>{
   }
   if(toyTap()) return;                           // E8: the NEW TOY! card owns the tap while it's up
   const [wx,wy]=worldXY(e);
+  // E15: a tap on the name sign opens the word-bank picker (BUILD only — the
+  // sign only paints, and SIGN_RECT only exists, while camGate holds)
+  if(SIGN_RECT && camGate() && wx>=SIGN_RECT.x && wx<=SIGN_RECT.x+SIGN_RECT.w &&
+     wy>=SIGN_RECT.y && wy<=SIGN_RECT.y+SIGN_RECT.h){
+    SND.tok(); namerShow(true); down=null; return;
+  }
   if(SCREEN==='play'){
     // E6: taps do what taps already do — a finger on a train gets first claim (whistle);
     // everything else falls through to the usual piece/scenery taps (wobble/charm/knock)
@@ -4366,6 +4840,7 @@ cvs.addEventListener('pointerdown',e=>{
   if(cell && scenAt(cell[0],cell[1])){ down={x:e.clientX,y:e.clientY,what:'scen',cell}; return; }
   // E10: the press started on NOTHING — that is the one place a pan may begin
   if(camGate()){
+    followSet(false);                            // E15: a pan-press wins instantly, no snap-back
     VIEW.vx=VIEW.vy=0;                           // a grab always catches a gliding rug
     down={x:e.clientX,y:e.clientY,what:'pan',ox:VIEW.ox,oy:VIEW.oy,
           lx:e.clientX,ly:e.clientY,lt:perf(),vx:0,vy:0,on:false};
@@ -4556,6 +5031,7 @@ window.addEventListener('pointercancel',e=>{     // E10: the OS took the finger 
 window.addEventListener('wheel',e=>{
   if(!camGate()||e.target!==cvs) return;
   e.preventDefault();
+  followSet(false);                              // E15: the wheel is a camera hand too
   zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*0.0016));
 },{passive:false});
 
@@ -4845,6 +5321,8 @@ function consistChanged(){
 }
 function shedShow(b){ $('shed').classList.toggle('open',b); if(b){ shedSync(); hintPass(2); } }
 function shedSync(){
+  // E15: the shed header wears the railroad's name — where pride lives
+  $('shedTitle').textContent=NAME? signText() : 'THE TRAIN SHED';
   paintConsist();
   // THE GATE LAW (E8): the shed offers owned cars only, in BUILD and in the campaign
   // alike — the toy box is the one source of what you may put on the rug.
@@ -4858,6 +5336,7 @@ function goBtnSync(){
   const b=$('goBtn');
   if(TRAIN.running){ b.textContent='STOP ■'; b.classList.add('run'); }
   else { b.textContent='GO ▶'; b.classList.remove('run'); }
+  rideSync();   // E15: the RIDE ALONG chip follows the train on and off the rails
 }
 function muteSync(){ $('mute').textContent=AU.on?'🔊':'🔇'; }
 // ---- the menu ⇄ game switch (E3). Screen is never persisted — boot lands on the menu.
@@ -4875,6 +5354,7 @@ function cancelDrag(){
 function showScreen(s){
   if(s!=='game' && CAMP.on){ campExit(s); return; }   // leaving a level always lands you out clean
   if(s!=='play' && PLAY.on){ playExit(s); return; }   // leaving the wind-up rug restores the build rug
+  followSet(false);                                   // E15: a screen change lets the camera go
   SCREEN=s;
   const game=s==='game', play=s==='play';
   if(!game){ cancelDrag(); down=null; shedShow(false); PINCH=null; PTRS.clear(); }
@@ -4891,6 +5371,7 @@ function showScreen(s){
   boxShow(false);       // the lid closes on any screen change
   storeShow(false);     // ...and so does the shop
   bankShow(false);      // ...and the bank (E13)
+  namerShow(false);     // ...and the name picker (E15)
   winSync();
   goBtnSync();
   paletteSync();        // THE GATE follows the mode: BUILD owned-only, campaign full
@@ -5625,6 +6106,7 @@ $('tidyYes').addEventListener('click',()=>{
 });
 $('mute').addEventListener('click',()=>{ AU.on=!AU.on; if(AU.on){ ac(); SND.click(); } muteSync(); save(); });
 $('homeChip').addEventListener('click',()=>{ ac(); SND.click(); viewFit(); });   // E10: snap back to the whole rug
+$('rideChip').addEventListener('click',()=>{ ac(); SND.click(); followSet(!FOLLOW.on); });   // E15: glue the camera to the engine / let it go
 
 // ---- boot ----
 function resize(){
@@ -5639,15 +6121,17 @@ function resize(){
   if(SCREEN==='game'||SCREEN==='play') viewResize();
   else { SC=Math.min(W/MENU_W,(H-BAR)/MENU_H); OX=(W-MENU_W*SC)/2; OY=(H-BAR-MENU_H*SC)/2; }
   const hc=$('homeChip'); if(hc) hc.style.bottom=(BAR+14)+'px';
+  const rc=$('rideChip'); if(rc) rc.style.bottom=(BAR+62)+'px';   // E15: stacked above HOME
   homeSync();
 }
 window.addEventListener('resize',resize);
-load(); buildPalette(); buildParts(); buildEngines(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildAttract();
+load(); buildPalette(); buildParts(); buildEngines(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
 showScreen('menu'); goBtnSync(); shedSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
   const dt=Math.min(0.05,(t-last)/1000); last=t;
   camGlide(dt);        // E10: the flicked rug glides — presentation only, sim untouched
+  followTick(dt);      // E15: ride-along chases the engine — presentation only, same law
   if(TS.auto){
     if(SCREEN==='game') update(dt);
     else if(SCREEN==='play'){ update(dt); playUpdate(dt); }             // the shared juice + the wind-up trains
@@ -5698,9 +6182,20 @@ window.TS={
     fit(){ viewFit(); return TS.view.get(); },
     set(s,ox,oy){ VIEW.s=+s||fitScale(); if(ox!=null) VIEW.ox=+ox; if(oy!=null) VIEW.oy=+oy;
       VIEW.vx=VIEW.vy=0; clampView(); viewApply(); return TS.view.get(); },
-    get(){ return { scale:SC, ox:OX, oy:OY, fit:fitScale(), max:zoomMax() }; },
+    get(){ return { scale:SC, ox:OX, oy:OY, fit:fitScale(), max:zoomMax(), follow:FOLLOW.on }; },   // E15: follow rides along
     toRug(px,py){ return [ (px-OX)/SC, (py-OY)/SC ]; },   // THE one inverse, exposed for the rigs
   },
+  // ---- the E15 rig: gravity · riders · ride-along · the name ----
+  grav(){ return GRAV.mul; },                    // the current eased multiplier (flat = exactly 1)
+  riders(){
+    const waiting={}; for(const [k,p] of PLAT) waiting[k]=p.n;
+    const ps=RIDERS.poseT>0? RIDERS.pose : null;
+    const cars=PLAY.on? [] : TRAIN.cars;
+    return { waiting, pose:ps,
+      aboard: cars.filter(c=>RIDER_CAP[c.type]!=null).map(c=>({car:c.type,n:c.rid|0,pose:ps})) };
+  },
+  follow(on){ return followSet(on==null? !FOLLOW.on : !!on); },
+  setName(w1,w2,sfx){ return nameApply(w1,w2,sfx); },   // null clears; returns the sign text or false
   step(dt){ const d=dt||1/60;
     if(SCREEN==='game') update(d);
     else if(SCREEN==='play'){ update(d); playUpdate(d); }
@@ -5818,6 +6313,7 @@ window.TS={
   },
   state(){ return { screen:SCREEN, color:COLOR,
     size:SIZE, land:LAND, weather:WEATHER, gw:GW, gh:GH,
+    name:NAME? {w1:NAME.w1,w2:NAME.w2,s:NAME.s,text:signText()} : null,   // E15
     view:{ scale:SC, ox:OX, oy:OY },
     placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F,
     pieces:[...grid.values()].filter(pc=>pc.t!=='ref').length+hgrid.size,
