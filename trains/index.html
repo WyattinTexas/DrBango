@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v1.9 -->
-<meta name="trainset-version" content="1.9">
+<!-- TRAINSET v2.0 -->
+<meta name="trainset-version" content="2.0">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -28,6 +28,9 @@
   #mute{ right:12px; }
   #menuChip{ right:76px; }
   #backChip{ right:76px; display:none; }
+  /* ---- the HOME chip (E10): bottom-right, appears only while zoomed in ---- */
+  #homeChip{ top:auto; right:12px; bottom:132px; display:none; }
+  .pbtn.on{ border-color:#F2C531; color:#F2C531; }   /* E10: the picked SIZE / LAND / WEATHER tile */
   /* ---- the bedroom menu (E3): DOM chrome floats over the painted room ---- */
   #menu{
     position:absolute; inset:0; z-index:6; display:none; flex-direction:column;
@@ -149,7 +152,10 @@
   }
   .pbtn canvas{ width:52px; height:52px; pointer-events:none; }
   .pbtn small{ font-size:8.5px; letter-spacing:0.5px; pointer-events:none; }
-  #palTabs{ display:flex; flex-direction:column; gap:4px; }
+  /* E10: two rows, columns flow sideways — the RUG tab joins WITHOUT making the
+     stack taller than the piece buttons (74px), so the bar (and with it the sm
+     rug's fit) stays to the pixel: 2×27px tabs + 4px gap = 58px < 74px, always */
+  #palTabs{ display:grid; grid-template-rows:repeat(2,auto); grid-auto-flow:column; gap:4px; }
   .ptab{ background:#170f08; border:2px solid #513a24; border-radius:9px; color:#8f7a52;
     font-family:inherit; font-size:9px; letter-spacing:1px; padding:5px 7px; cursor:pointer; }
   .ptab.on{ color:#F2C531; border-color:#F2C531; }
@@ -262,8 +268,9 @@
 <div class="chip" id="menuChip">🏠 MENU</div>
 <div class="chip" id="backChip">🎫 LEVELS</div>
 <div class="chip" id="starChip">★ 0</div>
+<div class="chip" id="homeChip">🔎 WHOLE RUG</div>
 <div id="bar">
-  <span id="palTabs"><button class="ptab on" id="tabTrack" type="button">TRACK</button><button class="ptab" id="tabScen" type="button">SCENERY</button><button class="ptab" id="tabTown" type="button">TOWN</button><button class="ptab" id="tabFriends" type="button">FRIENDS</button></span>
+  <span id="palTabs"><button class="ptab on" id="tabTrack" type="button">TRACK</button><button class="ptab" id="tabScen" type="button">SCENERY</button><button class="ptab" id="tabTown" type="button">TOWN</button><button class="ptab" id="tabFriends" type="button">FRIENDS</button><button class="ptab" id="tabRug" type="button">RUG</button></span>
   <span id="palSlot" style="display:flex;gap:8px;"></span>
   <span id="barSpace"></span>
   <button id="shedBtn">THE SHED 🚂</button>
@@ -319,8 +326,49 @@
    ===================================================================== */
 
 // ---- world ----
-const C=96, GW=12, GH=8, GX=72, GY=72;
-const WORLD_W=GW*C+2*GX, WORLD_H=GH*C+2*GY;      // 1296 × 912
+// E10 BIG COUNTRY — THE RUG GROWS UP. GW/GH are LET now (the exact GVT
+// WORLD_W/MID trap: a const grid dimension read at module scope silently pins
+// the old size). sm is today's rug, byte-identical, the default forever;
+// campaign and PLAY force the ACTIVE board back to sm — size lives in the
+// free-build world only.
+const C=96, GX=72, GY=72;
+const SIZES={ sm:{gw:12,gh:8}, lg:{gw:18,gh:12}, xl:{gw:26,gh:18} };   // lg/xl dims — Wyatt dials
+let SIZE='sm';                                   // the BUILD rug's size (save v:8)
+let GW=SIZES.sm.gw, GH=SIZES.sm.gh;              // the ACTIVE board dims
+let WORLD_W=GW*C+2*GX, WORLD_H=GH*C+2*GY;        // 1296 × 912 at sm
+const MENU_W=12*C+2*GX, MENU_H=8*C+2*GY;         // the bedroom is a PAINTING — it never grows
+function applyDims(id){                          // swap the active board; the camera refits next resize
+  const s=SIZES[id]||SIZES.sm;
+  GW=s.gw; GH=s.gh; WORLD_W=GW*C+2*GX; WORLD_H=GH*C+2*GY;
+  VIEW.s=0;
+}
+// ---- Wyatt dials (EXPANSION 10 — one const each) ----
+const LANDS=['rug','west','snow'], WEATHERS=['clear','snowfall','dust','rain'];
+let LAND='rug', WEATHER='clear';                 // free-build only (save v:8) — paint, never physics
+const LAND_SEED=20260801;                        // ground decorations seed
+const MESA_CELLS=160;                            // one low mesa per this many cells (min 2)
+const CACTI_PER_100=4.5, BRUSH_PER_100=5;        // western decoration density
+const DRIFT_CELLS=72, CLOD_PER_100=5;            // winter drift/clod density
+const FLAKE_PER_CELL=1.15, FLAKE_MAX=380, FLAKE_FALL=1.0;   // snowfall count cap + fall speed
+const DUST_PER_CELL=0.22, DUST_MAX=100;
+const RAIN_PER_CELL=0.75, RAIN_MAX=300, RAIN_SLANT=0.32;    // rain count cap + slant
+const RAIN_RUMBLE=[14,34];                       // seconds between distant rumbles (random in range)
+const ZOOM_MAX=1;                                // camera: 1× max, fit-scale min
+const FLICK_FRICTION=0.02, FLICK_STOP=8;         // GVT campCam glide feel (v1.98), lifted
+const FIT_PAD=0;                                 // px of margin at fit (0 = today's letterbox exactly)
+// which land/weather a mode ACTUALLY shows: a campaign level may declare its
+// own (default: none do — every level keeps the crimson rug and a clear sky),
+// PLAY may via PLAYMAP; the free-build rug reads the kid's choice.
+function activeLand(){
+  if(CAMP.on){ const L=LEVELS[CAMP.level-1]; return (L&&L.land)||'rug'; }
+  if(PLAY.on) return PLAYMAP.land||'rug';
+  return LAND;
+}
+function activeWeather(){
+  if(CAMP.on){ const L=LEVELS[CAMP.level-1]; return (L&&L.weather)||'clear'; }
+  if(PLAY.on) return PLAYMAP.weather||'clear';
+  return WEATHER;
+}
 const SPEED=220;            // px/s down the line (Wyatt dial)
 const GAP=78;               // car spacing along the arc — uniform arc, never uniform segment
 const KART=0.8;             // car art scale vs GVT's original painter
@@ -546,6 +594,76 @@ const perf=()=>performance.now()/1000;
 const cvs=document.getElementById('cv');
 let cx=cvs.getContext('2d');                     // rebindable: icons borrow the painters
 let W=0,H=0,BAR=118,SC=1,OX=0,OY=0,DPR=1;
+
+/* =====================================================================
+   THE CAMERA (E10) — 🚨 ONE transform, one inverse. SC/OX/OY stay the
+   single screen←world transform everything already reads (draw, worldXY,
+   TS.xy, the star flights); VIEW just decides what they are each frame.
+   At fit it reproduces the old letterbox to the pixel — which is what
+   keeps sm byte-identical. The camera lives on the FREE-BUILD rug only:
+   campaign and PLAY stay at fit, exactly as they shipped.
+   ===================================================================== */
+const VIEW={s:0,ox:0,oy:0,vx:0,vy:0};            // s=0 → fit on the next resize
+const camGate=()=>SCREEN==='game'&&!CAMP.on;
+const fitScale=()=>Math.min((W-2*FIT_PAD)/WORLD_W,(H-BAR-2*FIT_PAD)/WORLD_H);
+const zoomMax=()=>Math.max(ZOOM_MAX,fitScale());
+function viewApply(){ SC=VIEW.s; OX=VIEW.ox; OY=VIEW.oy; homeSync(); }
+function clampView(){
+  VIEW.s=Math.max(fitScale(),Math.min(zoomMax(),VIEW.s));
+  const vw=W, vh=H-BAR, ww=WORLD_W*VIEW.s, wh=WORLD_H*VIEW.s;
+  VIEW.ox= ww<=vw? (vw-ww)/2 : Math.max(vw-ww,Math.min(0,VIEW.ox));
+  VIEW.oy= wh<=vh? (vh-wh)/2 : Math.max(vh-wh,Math.min(0,VIEW.oy));
+}
+function viewFit(){ VIEW.s=fitScale(); VIEW.vx=VIEW.vy=0; clampView(); viewApply(); }
+function viewResize(){
+  const f=fitScale();
+  if(!camGate() || VIEW.s<=f+1e-9) VIEW.s=f;     // a fitted (or fresh) camera refits; a zoomed one keeps its zoom
+  VIEW.s=Math.min(VIEW.s,zoomMax());
+  clampView(); viewApply();
+}
+function zoomAt(px,py,f){
+  const s0=VIEW.s||fitScale(), s1=Math.max(fitScale(),Math.min(zoomMax(),s0*f));
+  VIEW.ox=px-(px-VIEW.ox)*(s1/s0); VIEW.oy=py-(py-VIEW.oy)*(s1/s0);
+  VIEW.s=s1; clampView(); viewApply();
+}
+function camGlide(dt){                           // flick-to-glide — the GVT campCam feel, lifted
+  if(!camGate()||PINCH||(down&&down.what==='pan')) return;
+  if(!VIEW.vx&&!VIEW.vy) return;
+  const tx=VIEW.ox+VIEW.vx*dt, ty=VIEW.oy+VIEW.vy*dt;
+  VIEW.ox=tx; VIEW.oy=ty;
+  clampView();
+  if(VIEW.ox!==tx) VIEW.vx=0;                    // the rug hit its edge — the glide stops there
+  if(VIEW.oy!==ty) VIEW.vy=0;
+  const f=Math.pow(FLICK_FRICTION,dt);
+  VIEW.vx*=f; VIEW.vy*=f;
+  if(Math.abs(VIEW.vx)<FLICK_STOP) VIEW.vx=0;
+  if(Math.abs(VIEW.vy)<FLICK_STOP) VIEW.vy=0;
+  viewApply();
+}
+function homeSync(){                             // the HOME chip appears only when zoomed in (quiet-HUD)
+  const el=document.getElementById('homeChip'); if(!el) return;
+  el.style.display=(camGate() && VIEW.s>fitScale()+1e-6)?'block':'none';
+}
+// E10 — GROWING KEEPS EVERYTHING (new cells arrive empty, anchored top-left,
+// nothing moves); SHRINKING NEVER DELETES A CHILD'S WORK: if any piece,
+// scenery item or the train sits outside the smaller rug, refuse with the
+// friendly toast and stay put. Clearing first is the child's choice, never ours.
+function worldFits(gw,gh){
+  const bad=k2=>{ const i=k2.indexOf(','); return +k2.slice(0,i)>=gw || +k2.slice(i+1)>=gh; };
+  for(const k2 of grid.keys()) if(bad(k2)) return false;
+  for(const k2 of hgrid.keys()) if(bad(k2)) return false;
+  for(const k2 of scen.keys()) if(bad(k2)) return false;
+  if(TRAIN.placed) for(const c2 of TRAIN.cars) if(c2.rd.cx>=gw||c2.rd.cy>=gh) return false;
+  return true;
+}
+function sizeSet(id){
+  if(!SIZES[id]||CAMP.on||PLAY.on) return false; // campaign + PLAY are sm, always
+  if(id===SIZE){ rugSync(); return true; }
+  const s=SIZES[id];
+  if((s.gw<GW||s.gh<GH)&&!worldFits(s.gw,s.gh)){ SND.toot(); toast('TOO BIG FOR THAT RUG!'); return false; }
+  SIZE=id; applyDims(id); resize(); SND.tok(); rugSync(); save();
+  return true;
+}
 
 // ---- state ----
 // TWO LEVELS (E4): grid holds elev-0 pieces, ramps, and the spiral (anchor + 'ref'
@@ -939,6 +1057,12 @@ function update(dt){
     if(s.wave>0) s.wave-=dt;
   }
   if(yayCd>0) yayCd-=dt;
+  // E10: the rain's single distant rumble — long random timer, quiet, and only
+  // ever on the free-build rug (campaign + PLAY read their own weather: clear)
+  if(activeWeather()==='rain'){
+    rainT-=dt;
+    if(rainT<=0){ rainT=RAIN_RUMBLE[0]+Math.random()*(RAIN_RUMBLE[1]-RAIN_RUMBLE[0]); SND.rumble(); }
+  }
   for(const c of TRAIN.cars) if(c.squash>0) c.squash=Math.max(0,c.squash-dt*4);
 
   if(TRAIN.placed && TRAIN.running){
@@ -1111,17 +1235,272 @@ function rr(x,y,w,h,r){
   cx.lineTo(x+r,y+h); cx.quadraticCurveTo(x,y+h,x,y+h-r);
   cx.lineTo(x,y+r); cx.quadraticCurveTo(x,y,x+r,y); cx.closePath();
 }
-// the GVT bedroom rug, verbatim recipe (v1.47 crimson)
+// the GVT bedroom rug, verbatim recipe (v1.47 crimson). E10: THREE LANDS —
+// the GVT stage law, lifted whole: THE SNOW (and the sand) LIES ON THE RUG.
+// The carpet frame stays, the stage field fills inside it, wind combing over
+// the top — sand #8B3E1E/#7A3318 and snow #E9EEF4/#D7E1EC are GVT's own
+// measured hexes. Land is PAINT ONLY: zero effect on placement or physics.
 function drawRug(){
+  const land=activeLand();
   cx.fillStyle='#63251C'; cx.fillRect(0,0,WORLD_W,WORLD_H);
   cx.strokeStyle='#4A1A12'; cx.lineWidth=56; cx.strokeRect(0,0,WORLD_W,WORLD_H);
   cx.strokeStyle='#8F4634'; cx.lineWidth=7; cx.strokeRect(42,42,WORLD_W-84,WORLD_H-84);
+  if(land==='west'){ drawLandField('#8B3E1E','#7A3318',0.5); return; }
+  if(land==='snow'){ drawLandField('#E9EEF4','#D7E1EC',0.75); return; }
   cx.globalAlpha=0.5; cx.fillStyle='#4A1A12';
   [[112,112],[WORLD_W-112,112],[112,WORLD_H-112],[WORLD_W-112,WORLD_H-112]]
     .forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
   cx.globalAlpha=0.35; cx.strokeStyle='#7A3627'; cx.lineWidth=2;
   for(let y=90;y<WORLD_H-60;y+=56){ cx.beginPath(); cx.moveTo(30,y); cx.lineTo(WORLD_W-30,y); cx.stroke(); }
   cx.globalAlpha=1;
+}
+function drawLandField(field,comb,a){
+  cx.fillStyle=field; cx.fillRect(56,56,WORLD_W-112,WORLD_H-112);
+  cx.globalAlpha=a; cx.strokeStyle=comb; cx.lineWidth=3;     // the GVT wind combing
+  for(let y=96;y<WORLD_H-70;y+=48){
+    cx.beginPath(); cx.moveTo(60,y);
+    for(let x=60;x<WORLD_W-60;x+=60) cx.quadraticCurveTo(x+30,y+((x/60)%2?5:-5),x+60,y);
+    cx.stroke();
+  }
+  cx.globalAlpha=1;
+  drawLandDecor();
+}
+/* =====================================================================
+   GROUND DECORATIONS (E10) — seeded ONCE per (land, size, seed), the
+   GVT snowFlakes discipline: never inside a draw call. They paint with
+   the ground, UNDER every piece, train and ghost, and they block
+   nothing: a cactus is the land talking, not a toy in the way.
+   Mesa / cactus / drift / clod / ice painters are GVT's shipped
+   recipes, lifted hex-for-hex from the blob.
+   ===================================================================== */
+let LDEC={key:null,items:[]};
+function landDecor(){
+  const land=activeLand(), k2=land+':'+GW+'x'+GH;
+  if(LDEC.key===k2) return LDEC.items;
+  let s=LAND_SEED; const rnd=()=>{ s=(s*9301+49297)%233280; return s/233280; };
+  const items=[], cells=GW*GH;
+  const fx0=80, fx1=WORLD_W-80, fy0=86, fy1=WORLD_H-86;
+  if(land==='west'){
+    const nM=Math.max(2,Math.round(cells/MESA_CELLS));       // a couple of low mesas on the far edge
+    for(let i=0;i<nM;i++){
+      const r=34+rnd()*14;                                   // the whole butte sits INSIDE the field
+      items.push({t:'mesa', x:fx0+120+(fx1-fx0-240)*(nM===1?0.5:i/(nM-1))+ (rnd()-0.5)*90,
+                  y:66+r*1.3+rnd()*22, r});
+    }
+    const nC=Math.round(cells*CACTI_PER_100/100);
+    for(let i=0;i<nC;i++) items.push({t:'cactus', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:11+rnd()*3});
+    const nB=Math.round(cells*BRUSH_PER_100/100);
+    for(let i=0;i<nB;i++) items.push({t:'brush', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:6+rnd()*4});
+  } else if(land==='snow'){
+    const nD=Math.max(3,Math.round(cells/DRIFT_CELLS));      // deep-snow drifts along the edges
+    for(let i=0;i<nD;i++){
+      const side=i%4, rx=60+rnd()*45, ry=28+rnd()*26;
+      let x,y;
+      if(side===0){ x=fx0+rnd()*(fx1-fx0); y=fy0+ry*0.5+rnd()*30; }
+      else if(side===1){ x=fx0+rnd()*(fx1-fx0); y=fy1-ry*0.5-rnd()*30; }
+      else if(side===2){ x=fx0+rx*0.4+rnd()*40; y=fy0+rnd()*(fy1-fy0); }
+      else { x=fx1-rx*0.4-rnd()*40; y=fy0+rnd()*(fy1-fy0); }
+      items.push({t:'drift',x,y,rx,ry});
+    }
+    const nK=Math.round(cells*CLOD_PER_100/100);
+    for(let i=0;i<nK;i++) items.push({t:'clod', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:9+rnd()*6});
+    const nI=cells>300?2:1;                                  // the frozen-pond sheen
+    for(let i=0;i<nI;i++) items.push({t:'ice', x:fx0+120+rnd()*(fx1-fx0-240), y:fy0+80+rnd()*(fy1-fy0-160),
+                                      rx:70+rnd()*30, ry:40+rnd()*20});
+  }
+  LDEC={key:k2,items};
+  return items;
+}
+function drawLandDecor(){
+  for(const it of landDecor()){
+    if(it.t==='mesa') drawMesa(it);
+    else if(it.t==='cactus') drawCactusDec(it);
+    else if(it.t==='brush') drawBrush(it);
+    else if(it.t==='drift') drawDeepDrift(it);
+    else if(it.t==='clod') drawSnowClod(it);
+    else if(it.t==='ice') drawIceSheet(it);
+  }
+}
+// A flat-topped butte in toy plastic: stacked bands, a cream caprock, its own
+// long shadow (GVT WESTERN LAND recipe).
+function drawMesa(rk){
+  const r=rk.r;
+  cx.fillStyle='rgba(60,26,10,0.25)';
+  cx.beginPath(); cx.ellipse(rk.x+r*0.22,rk.y+r*0.62,r*1.12,r*0.42,0,0,7); cx.fill();
+  cx.fillStyle='#A64B28'; cx.beginPath(); cx.ellipse(rk.x,rk.y+r*0.28,r,r*0.5,0,0,7); cx.fill();
+  cx.fillStyle='#B4552E'; rr(rk.x-r*0.86,rk.y-r*0.62,r*1.72,r*0.95,r*0.2); cx.fill();
+  cx.fillStyle='#C9713C'; rr(rk.x-r*0.78,rk.y-r*1.02,r*1.56,r*0.5,r*0.16); cx.fill();
+  cx.fillStyle='#DB8B4C'; cx.beginPath(); cx.ellipse(rk.x,rk.y-r*1.02,r*0.8,r*0.26,0,0,7); cx.fill();
+  cx.strokeStyle='rgba(90,38,16,0.5)'; cx.lineWidth=2;
+  cx.beginPath(); cx.moveTo(rk.x-r*0.6,rk.y-r*0.28); cx.lineTo(rk.x-r*0.6,rk.y+r*0.2);
+  cx.moveTo(rk.x+r*0.34,rk.y-r*0.44); cx.lineTo(rk.x+r*0.34,rk.y+r*0.24); cx.stroke();
+}
+// A saguaro off the toy shelf: trunk, two arms, moulding ridges (GVT recipe).
+function drawCactusDec(rk){
+  const r=rk.r;
+  cx.fillStyle='rgba(60,26,10,0.25)';
+  cx.beginPath(); cx.ellipse(rk.x+2,rk.y+r*0.5,r*1.1,r*0.4,0,0,7); cx.fill();
+  cx.strokeStyle='#4E7F46'; cx.lineCap='round';
+  cx.lineWidth=r*0.85;
+  cx.beginPath(); cx.moveTo(rk.x,rk.y+r*0.4); cx.lineTo(rk.x,rk.y-r*1.7); cx.stroke();
+  cx.lineWidth=r*0.6;
+  cx.beginPath(); cx.moveTo(rk.x-r*0.75,rk.y-r*0.2); cx.lineTo(rk.x-r*0.75,rk.y-r*1.05); cx.stroke();
+  cx.beginPath(); cx.moveTo(rk.x+r*0.75,rk.y+r*0.1); cx.lineTo(rk.x+r*0.75,rk.y-r*0.75); cx.stroke();
+  cx.strokeStyle='rgba(34,64,30,0.6)'; cx.lineWidth=1.2;
+  cx.beginPath(); cx.moveTo(rk.x-r*0.14,rk.y+r*0.2); cx.lineTo(rk.x-r*0.14,rk.y-r*1.5);
+  cx.moveTo(rk.x+r*0.14,rk.y+r*0.2); cx.lineTo(rk.x+r*0.14,rk.y-r*1.5); cx.stroke();
+  cx.lineCap='butt';
+}
+// dry brush: a fan of little dead-grass arcs, molded-plastic weight
+function drawBrush(b){
+  cx.globalAlpha=0.9; cx.lineCap='round';
+  cx.strokeStyle='#8F6B1E'; cx.lineWidth=2.2;
+  cx.beginPath();
+  for(let i=-2;i<=2;i++){
+    cx.moveTo(b.x,b.y);
+    cx.quadraticCurveTo(b.x+i*b.r*0.5,b.y-b.r*1.2,b.x+i*b.r*0.8,b.y-b.r*(1.5+((i&1)?0.3:0)));
+  }
+  cx.stroke();
+  cx.strokeStyle='#B08427'; cx.lineWidth=1.6;
+  cx.beginPath(); cx.moveTo(b.x,b.y); cx.quadraticCurveTo(b.x-1,b.y-b.r,b.x+1,b.y-b.r*1.7);
+  cx.moveTo(b.x,b.y); cx.quadraticCurveTo(b.x+3,b.y-b.r*0.8,b.x+b.r*0.5,b.y-b.r*1.35); cx.stroke();
+  cx.globalAlpha=1; cx.lineCap='butt';
+}
+// DEEP SNOW: a feathered edge and wind scallops combed across it (GVT recipe —
+// deliberately NOT concentric rings; rings read as water).
+function drawDeepDrift(d){
+  cx.globalAlpha=0.35; cx.fillStyle='#B4C8DE';
+  cx.beginPath(); cx.ellipse(d.x,d.y,d.rx+7,d.ry+6,0,0,7); cx.fill(); cx.globalAlpha=1;
+  cx.fillStyle='#D6E2F0'; cx.beginPath(); cx.ellipse(d.x,d.y,d.rx,d.ry,0,0,7); cx.fill();
+  cx.strokeStyle='#B4C8DE'; cx.lineWidth=2.4; cx.stroke();
+  cx.globalAlpha=0.75; cx.lineWidth=2;
+  for(let k=-2;k<=2;k++){
+    const yy=d.y+k*d.ry*0.34, w=d.rx*Math.sqrt(Math.max(0.08,1-(k*0.34)*(k*0.34)))*0.82;
+    cx.beginPath(); cx.moveTo(d.x-w,yy);
+    cx.quadraticCurveTo(d.x-w*0.5,yy-7,d.x,yy);
+    cx.quadraticCurveTo(d.x+w*0.5,yy+7,d.x+w,yy); cx.stroke();
+  }
+  cx.globalAlpha=1; cx.fillStyle='#FFFFFF';
+  cx.beginPath(); cx.arc(d.x-d.rx*0.42,d.y+d.ry*0.4,1.9,0,7); cx.fill();
+  cx.beginPath(); cx.arc(d.x+d.rx*0.48,d.y-d.ry*0.34,1.6,0,7); cx.fill();
+}
+function drawSnowClod(rk){
+  cx.fillStyle='rgba(60,74,92,0.22)'; cx.beginPath(); cx.arc(rk.x+2,rk.y+4,rk.r,0,7); cx.fill();
+  cx.fillStyle='#F9FCFF'; cx.beginPath(); cx.arc(rk.x,rk.y,rk.r,0,7); cx.fill();
+  cx.strokeStyle='#8C9AAD'; cx.lineWidth=2; cx.stroke();
+}
+// the village set's mirror tile — the frozen-pond sheen (GVT ice recipe)
+function drawIceSheet(i){
+  cx.fillStyle='#BFD9E8'; cx.beginPath(); cx.ellipse(i.x,i.y,i.rx,i.ry,0,0,7); cx.fill();
+  cx.save(); cx.beginPath(); cx.ellipse(i.x,i.y,i.rx,i.ry,0,0,7); cx.clip();
+  cx.strokeStyle='#8FBFDA'; cx.lineWidth=2.6; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(i.x-i.rx*0.8,i.y-i.ry*0.2); cx.lineTo(i.x-i.rx*0.1,i.y+i.ry*0.45);
+  cx.lineTo(i.x+i.rx*0.55,i.y-i.ry*0.3); cx.lineTo(i.x+i.rx*0.85,i.y+i.ry*0.1); cx.stroke();
+  cx.globalAlpha=0.75; cx.lineWidth=1.8;
+  cx.beginPath(); cx.moveTo(i.x-i.rx*0.45,i.y+i.ry*0.7); cx.lineTo(i.x+i.rx*0.2,i.y-i.ry*0.6); cx.stroke();
+  cx.globalAlpha=0.8; cx.fillStyle='#FFFFFF';
+  cx.beginPath(); cx.ellipse(i.x-i.rx*0.36,i.y-i.ry*0.42,i.rx*0.3,i.ry*0.2,0,0,7); cx.fill();
+  cx.globalAlpha=1; cx.restore();
+  cx.strokeStyle='#6E93AC'; cx.lineWidth=2.4; cx.lineCap='butt';
+  cx.beginPath(); cx.ellipse(i.x,i.y,i.rx,i.ry,0,0,7); cx.stroke();
+}
+/* =====================================================================
+   THE WEATHER (E10) — paint only, NEVER physics. Nothing in this game
+   ever slows down, slips or fails. Particles are seeded ONCE per
+   (weather, size) — snowFlakes lifted verbatim from the GVT blob, same
+   LCG, same field ranges — and every frame is a PURE FUNCTION of the
+   clock off that seed: no per-frame state, nothing to drift. Counts are
+   CAPPED by rug area so xl + snow still holds 60fps on a phone.
+   ===================================================================== */
+let WXP={key:null,flakes:[],motes:[],drops:[],rings:[]};
+let rainT=0;                 // the one distant rumble, on a long random timer
+function weatherSeed(){
+  const w=activeWeather(), k2=w+':'+GW+'x'+GH;
+  if(WXP.key===k2) return;
+  let s=20260725; const rnd=()=>{ s=(s*9301+49297)%233280; return s/233280; };   // the GVT snowFlakes seed
+  WXP={key:k2,flakes:[],motes:[],drops:[],rings:[]};
+  const cells=GW*GH;
+  if(w==='snowfall'){
+    const n=Math.min(FLAKE_MAX,Math.round(cells*FLAKE_PER_CELL));
+    for(let i=0;i<n;i++) WXP.flakes.push({ x:70+rnd()*(WORLD_W-140), y:60+rnd()*(WORLD_H-120),
+      r:0.9+rnd()*1.5, v:(9+rnd()*16)*FLAKE_FALL, s:0.7+rnd()*1.1, p:rnd()*6.283 });
+  } else if(w==='dust'){
+    const n=Math.min(DUST_MAX,Math.round(cells*DUST_PER_CELL));
+    for(let i=0;i<n;i++) WXP.motes.push({ x:rnd()*WORLD_W, y:66+rnd()*(WORLD_H-132),
+      r:1.3+rnd()*2.1, v:14+rnd()*22, a:0.16+rnd()*0.18, s:0.5+rnd()*0.9, p:rnd()*6.283 });
+  } else if(w==='rain'){
+    const n=Math.min(RAIN_MAX,Math.round(cells*RAIN_PER_CELL));
+    for(let i=0;i<n;i++) WXP.drops.push({ x:rnd()*WORLD_W, y:rnd()*WORLD_H,
+      l:9+rnd()*8, v:520+rnd()*260, p:rnd()*6.283 });
+    const nr=Math.max(6,Math.round(n/14));
+    for(let i=0;i<nr;i++) WXP.rings.push({ x:80+rnd()*(WORLD_W-160), y:80+rnd()*(WORLD_H-160),
+      T:1.1+rnd()*1.6, p:rnd()*3 });
+  }
+}
+function drawWeather(){
+  const w=activeWeather(); if(w==='clear') return;
+  weatherSeed();
+  const t=perf(), calm=RM();
+  // GVT authored its particles for a 1:1 view; under the camera they keep their
+  // WORLD positions (the rug-span seeding law) but draw at k× so they hold their
+  // designed SCREEN size at any zoom — at 1× k=1 and the recipe is verbatim.
+  const k9=Math.max(1,1/SC);
+  if(w==='snowfall'){
+    // GVT drawSnowFall, lifted: every flake carries its cool shadow (the
+    // white-on-white law), and the size/speed spread IS the gentle parallax —
+    // big flakes fall fast up front, small ones drift slow behind.
+    const F=WXP.flakes, n=calm? (F.length*0.4)|0 : F.length, top=56, bot=WORLD_H-56, span=bot-top;
+    const vs=WORLD_H/MENU_H;                     // a taller rug falls proportionally faster
+    for(let i=0;i<n;i++){
+      const f=F[i];
+      const y=calm? f.y : top+(((f.y-top)+t*f.v*vs)%span);
+      const x=calm? f.x : f.x+Math.sin(t*f.s+f.p)*7;
+      cx.fillStyle='rgba(110,132,158,0.34)';
+      cx.beginPath(); cx.arc(x,y+1.2*k9,(f.r+0.6)*k9,0,7); cx.fill();
+      cx.fillStyle='#FFFFFF';
+      cx.beginPath(); cx.arc(x,y,f.r*k9,0,7); cx.fill();
+    }
+  } else if(w==='dust'){
+    // slow warm motes riding east + a faint heat shimmer along the horizon
+    const M=WXP.motes, n=calm? (M.length*0.4)|0 : M.length;
+    for(let i=0;i<n;i++){
+      const m=M[i];
+      const x=calm? m.x : (m.x+t*m.v)%WORLD_W;
+      const y=m.y+Math.sin(t*m.s+m.p)*9;
+      cx.globalAlpha=m.a*(0.7+0.3*Math.sin(t*m.s*1.7+m.p));
+      cx.fillStyle='#F2C584';
+      cx.beginPath(); cx.arc(x,y,m.r*k9,0,7); cx.fill();
+    }
+    cx.globalAlpha=calm?0.05:0.05+0.02*Math.sin(t*1.3);
+    cx.strokeStyle='#FFE9C0'; cx.lineWidth=5*k9;
+    for(let k of [0,1,2]){
+      const y=74+k*16*k9;
+      cx.beginPath(); cx.moveTo(60,y);
+      for(let x=60;x<WORLD_W-60;x+=48) cx.quadraticCurveTo(x+24,y+(calm?0:Math.sin(t*2+x*0.07+k)*3),x+48,y);
+      cx.stroke();
+    }
+    cx.globalAlpha=1;
+  } else if(w==='rain'){
+    // thin slanted strokes + occasional ring-splashes on the ground
+    const D=WXP.drops, n=calm? (D.length*0.4)|0 : D.length;
+    cx.strokeStyle='rgba(157,191,230,0.5)'; cx.lineWidth=1.6*k9; cx.lineCap='round';
+    cx.beginPath();
+    for(let i=0;i<n;i++){
+      const f=D[i];
+      const y=calm? f.y : (f.y+t*f.v)%WORLD_H;
+      const x=calm? f.x : (f.x+t*f.v*RAIN_SLANT)%WORLD_W;
+      cx.moveTo(x,y); cx.lineTo(x-f.l*k9*RAIN_SLANT,y-f.l*k9);
+    }
+    cx.stroke(); cx.lineCap='butt';
+    if(!calm) for(const g of WXP.rings){
+      const k=((t+g.p)%g.T)/g.T;
+      if(k>=0.35) continue;
+      const q=k/0.35;
+      cx.globalAlpha=0.5*(1-q); cx.strokeStyle=RIVER_LIGHT; cx.lineWidth=2*k9;
+      cx.beginPath(); cx.ellipse(g.x,g.y,(4+30*q)*k9,(4+30*q)*0.45*k9,0,0,7); cx.stroke();
+      cx.globalAlpha=1;
+    }
+  }
 }
 function addPoly(P2,pts,ox,oy){
   P2.moveTo(ox+pts[0][0],oy+pts[0][1]);
@@ -2655,6 +3034,7 @@ function draw(){
       for(let i=0;i<6;i++){ const a=e.a+i*TAU/6+k*2.4, r2=8+64*k;
         star5(e.x+Math.cos(a)*r2, e.y+Math.sin(a)*r2*0.6-16*k, 0.9-0.4*k, '#F2C531'); }
       cx.globalAlpha=1; } }
+  drawWeather();    // E10: weather drifts over everything — but never over the ghost
   drawGhosts();
   cx.setTransform(DPR,0,0,DPR,0,0);
   for(const p of confetti){ cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot);
@@ -2683,10 +3063,11 @@ function star5(px,py,k,col){                                // the toybox star, 
   cx.closePath(); cx.fill(); cx.restore();
 }
 function menuFloor(){
-  // GVT bedroom floorboards, scaled from the 960×600 room to this 1296×912 world
-  cx.fillStyle='#C8A170'; cx.fillRect(0,0,WORLD_W,WORLD_H);
+  // GVT bedroom floorboards, scaled from the 960×600 room to this 1296×912 world.
+  // E10: the room is a PAINTING at MENU_W×MENU_H — it never grows with the rug.
+  cx.fillStyle='#C8A170'; cx.fillRect(0,0,MENU_W,MENU_H);
   cx.strokeStyle='#B08A58'; cx.globalAlpha=0.6; cx.lineWidth=3.4;
-  cx.beginPath(); for(let y=104;y<WORLD_H;y+=104){ cx.moveTo(0,y); cx.lineTo(WORLD_W,y); } cx.stroke();
+  cx.beginPath(); for(let y=104;y<MENU_H;y+=104){ cx.moveTo(0,y); cx.lineTo(MENU_W,y); } cx.stroke();
   cx.lineWidth=2.7; cx.beginPath();
   [[320,0],[944,104],[560,208],[240,312],[1024,416],[456,520],[832,624],[272,728],[672,832]]
     .forEach(p=>{ cx.moveTo(p[0],p[1]); cx.lineTo(p[0],p[1]+104); });
@@ -2696,7 +3077,7 @@ function menuLamp(){
   // warm lamplight pooling over the middle of the room
   const g=cx.createRadialGradient(648,240,60,648,240,760);
   g.addColorStop(0,'rgba(255,246,220,0.16)'); g.addColorStop(1,'rgba(255,246,220,0)');
-  cx.fillStyle=g; cx.fillRect(0,0,WORLD_W,WORLD_H);
+  cx.fillStyle=g; cx.fillRect(0,0,MENU_W,MENU_H);
 }
 function menuRug(){
   // the GVT crimson rug recipe (drawRug), folded into a mat on the boards
@@ -2750,7 +3131,7 @@ function menuBlocks(){
 }
 function menuSign(){
   // the title on a wooden plank — toy-chest wood, cream ALL-CAPS
-  const sx=WORLD_W/2;
+  const sx=MENU_W/2;
   cx.strokeStyle='#6e5130'; cx.lineWidth=10; cx.lineCap='round';
   cx.beginPath(); cx.moveTo(sx-176,152); cx.lineTo(sx-176,70); cx.moveTo(sx+176,152); cx.lineTo(sx+176,70); cx.stroke();
   cx.lineCap='butt';
@@ -2955,6 +3336,8 @@ const SND={
   quack(){ tone(300,0.1,'square',0.07*CHIRP_VOL,210); tone(255,0.09,'square',0.055*CHIRP_VOL,190,0.11); },
   yip(){ tone(900,0.06,'square',0.06*CHIRP_VOL,1400); tone(760,0.08,'square',0.05*CHIRP_VOL,1150,0.08); },
   bloop(){ tone(340,0.12,'sine',0.22,190); },
+  // E10 — the rain's distant rumble: low, long, quiet — never the loudest thing
+  rumble(){ noise(1.3,110,0.05,'lowpass'); tone(48,1.5,'sine',0.04,34); },
   // the paint shop's soft whistle chirp — a happy two-note mini whistle
   chirp(){ tone(494,0.1,'triangle',0.1); tone(659,0.16,'triangle',0.09,undefined,0.08); },
   // menu lullaby — plays only if the MENU_MUSIC dial is flipped on (default NONE)
@@ -3018,8 +3401,9 @@ function save(){
     // E6: the wind-up rug stashes the same way and persists NOTHING of its own.
     const w=CAMP.on? FREE : (PLAY.on? PFREE : serWorld());
     localStorage.setItem('TRAINSET', JSON.stringify({
-      v:7, grid:w.grid, scen:w.scen, consist:w.consist, color:COLOR, train:w.train,
+      v:8, grid:w.grid, scen:w.scen, consist:w.consist, color:COLOR, train:w.train,
       coll:[...coll], eng:ENGINE,
+      size:SIZE, land:LAND, weather:WEATHER,   // v:8 — BIG COUNTRY (E10); VIEW is NOT saved — every boot opens fitted
       stars:stars, equip:{...equip},   // v:7 — THE STAR BANK + the equipped sound packs (E9)
       e8:1,   // E8 arrived: the ten levels are new land, so any wip saved before this is void (once)
       camp:{ done:[...CAMP.done], all:CAMP.all?1:0,
@@ -3032,6 +3416,13 @@ function load(){
   try{
     const d=JSON.parse(localStorage.getItem('TRAINSET')||'null'); if(!d) return;
     appWorld(d);
+    // v:8 — BIG COUNTRY. A v≤7 save migrates to exactly sm/rug/clear and must
+    // render byte-identically to before: sm is today's board, rug is today's
+    // paint, clear draws nothing. Grids, coll, stars, camp — untouched.
+    SIZE=(d.size&&SIZES[d.size])? d.size : 'sm';
+    LAND=(d.land&&LANDS.includes(d.land))? d.land : 'rug';
+    WEATHER=(d.weather&&WEATHERS.includes(d.weather))? d.weather : 'clear';
+    applyDims(SIZE);
     COLOR=(d.color&&LIVERY[d.color])? d.color : 'red';
     hintStage=d.hints|0; lapDone=!!d.lap; AU.on=!d.mute;
     const cp=d.camp||{};   // v:1..v:4 saves carry no camp block — the campaign arrives fresh (v:5 migration)
@@ -3216,6 +3607,7 @@ function campEnter(n){
   const L=LEVELS[n-1]; if(!L||!campUnlocked(n)) return false;
   if(CAMP.on){ if(CAMP_WIP&&!CAMP.won) CAMP.wip=serWip(); }
   else FREE=serWorld();                       // stash the kid's rug — restored verbatim on exit
+  applyDims('sm');                            // E10: every level plays on the sm board, whatever BUILD grew to
   CAMP.on=true; CAMP.level=n; CAMP.won=false; CAMP.tugT=false;
   CAMP.visited=new Set(); winT=0;
   grid.clear(); hgrid.clear(); scen.clear();
@@ -3259,6 +3651,7 @@ function campExit(dest){
   if(!CAMP.on){ showScreen(dest); return; }
   CAMP.wip=(CAMP_WIP&&!CAMP.won)? serWip() : null;   // cleared on win, kept mid-build
   CAMP.on=false; CAMP.level=0; CAMP.won=false; goalT=0; winT=0;
+  applyDims(SIZE);                                   // E10: the BUILD rug comes back at its own size
   appWorld(FREE||{grid:[],scen:[],consist:consist,train:null}); FREE=null;
   $('mark').textContent='🚂 TRAIN SET';
   showScreen(dest); goBtnSync(); shedSync(); save();
@@ -3584,6 +3977,7 @@ function playUpdate(dt){
 function playEnter(){
   if(PLAY.on||CAMP.on) return PLAY.on;
   PFREE=serWorld();                      // the build rug, stashed — restored verbatim on exit
+  applyDims('sm');                       // E10: the wind-up rug is the sm rug, always
   PLAY.on=true; PLAY.trains=[]; PLAY.crashes=0; PLAY.respawnT=PLAY_RESPAWN; PLAY.nextId=1;
   grid.clear(); hgrid.clear(); scen.clear();
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
@@ -3598,6 +3992,7 @@ function playEnter(){
 function playExit(dest){
   if(!PLAY.on){ showScreen(dest); return; }
   PLAY.on=false; PLAY.trains=[]; PLAY.loop=null;
+  applyDims(SIZE);                       // E10: back to the BUILD rug at its own size
   appWorld(PFREE||{grid:[],scen:[],consist:consist,train:null}); PFREE=null;
   $('mark').textContent='🚂 TRAIN SET';
   showScreen(dest); goBtnSync(); shedSync();
@@ -3685,6 +4080,31 @@ function cellXY(wx,wy){
   return (gx>=0&&gy>=0&&gx<GW&&gy<GH)? [gx,gy] : null;
 }
 let down=null;
+// ---- E10 camera gestures: pinch state + double-tap memory ----
+// Pan must LOSE to the existing drag laws — a press that lands on a train, a
+// piece or scenery takes the old path untouched; pan begins only when the
+// press starts on NOTHING. Pinch may start anywhere (two kid fingers land
+// where they land) but never steals an already-running drag.
+const PTRS=new Map();
+let PINCH=null;
+let DTAP={t:0,x:0,y:0};
+function pinchStart(){
+  const pts=[...PTRS.values()];
+  const d0=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)||1;
+  const mx=(pts[0].x+pts[1].x)/2, my=(pts[0].y+pts[1].y)/2;
+  if(down&&down.lp){ clearTimeout(down.lp); }
+  down=null; VIEW.vx=VIEW.vy=0;
+  PINCH={d0, s0:VIEW.s||fitScale(), wx:(mx-OX)/SC, wy:(my-OY)/SC};
+}
+function pinchMove(){
+  const pts=[...PTRS.values()].slice(0,2);
+  if(pts.length<2) return;
+  const d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)||1;
+  const mx=(pts[0].x+pts[1].x)/2, my=(pts[0].y+pts[1].y)/2;
+  VIEW.s=Math.max(fitScale(),Math.min(zoomMax(),PINCH.s0*d/PINCH.d0));
+  VIEW.ox=mx-PINCH.wx*VIEW.s; VIEW.oy=my-PINCH.wy*VIEW.s;
+  clampView(); viewApply();
+}
 function toast(msg){
   const el=$('toast');
   el.textContent=msg; el.classList.add('on');
@@ -3705,6 +4125,11 @@ function swRotate(gx,gy){
 cvs.addEventListener('pointerdown',e=>{
   if(SCREEN!=='game'&&SCREEN!=='play') return;   // the menu room is scenery — its buttons are DOM
   ac(); e.preventDefault();
+  if(camGate()){                                 // E10: two fingers on the rug = pinch zoom
+    PTRS.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(PTRS.size===2&&!DRAG){ pinchStart(); return; }
+    if(PINCH) return;
+  }
   if(toyTap()) return;                           // E8: the NEW TOY! card owns the tap while it's up
   const [wx,wy]=worldXY(e);
   if(SCREEN==='play'){
@@ -3728,9 +4153,18 @@ cvs.addEventListener('pointerdown',e=>{
     return;
   }
   if(cell && scenAt(cell[0],cell[1])){ down={x:e.clientX,y:e.clientY,what:'scen',cell}; return; }
+  // E10: the press started on NOTHING — that is the one place a pan may begin
+  if(camGate()){
+    VIEW.vx=VIEW.vy=0;                           // a grab always catches a gliding rug
+    down={x:e.clientX,y:e.clientY,what:'pan',ox:VIEW.ox,oy:VIEW.oy,
+          lx:e.clientX,ly:e.clientY,lt:perf(),vx:0,vy:0,on:false};
+    return;
+  }
   down=null;
 });
 window.addEventListener('pointermove',e=>{
+  if(PTRS.has(e.pointerId)) PTRS.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(PINCH){ if(PTRS.size>=2){ e.preventDefault(); pinchMove(); } return; }
   if(DRAG){
     e.preventDefault();
     const [wx,wy]=worldXY(e);
@@ -3738,6 +4172,18 @@ window.addEventListener('pointermove',e=>{
     return;
   }
   if(!down) return;
+  if(down.what==='pan'){                         // E10: one-finger drag on empty rug pans the camera
+    if(!down.on && Math.hypot(e.clientX-down.x,e.clientY-down.y)<8) return;
+    e.preventDefault();
+    down.on=true;
+    VIEW.ox=down.ox+(e.clientX-down.x); VIEW.oy=down.oy+(e.clientY-down.y);
+    const t2=perf(), dt2=Math.max(0.001,t2-down.lt);
+    down.vx=down.vx*0.7+((e.clientX-down.lx)/dt2)*0.3;   // smoothed flick velocity
+    down.vy=down.vy*0.7+((e.clientY-down.ly)/dt2)*0.3;
+    down.lx=e.clientX; down.ly=e.clientY; down.lt=t2;
+    clampView(); viewApply();
+    return;
+  }
   if(Math.hypot(e.clientX-down.x,e.clientY-down.y)<8) return;
   e.preventDefault();
   if(down.lp){ clearTimeout(down.lp); down.lp=null; }
@@ -3772,6 +4218,19 @@ window.addEventListener('pointermove',e=>{
   if(DRAG){ const [wx,wy]=worldXY(e); DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy); down=null; }
 },{passive:false});
 window.addEventListener('pointerup',e=>{
+  PTRS.delete(e.pointerId);
+  if(PINCH){ if(PTRS.size<2) PINCH=null; return; }
+  if(down&&down.what==='pan'){                   // E10: flick to glide / double-tap to fit
+    if(down.on){
+      if(perf()-down.lt<0.12){ VIEW.vx=down.vx; VIEW.vy=down.vy; }
+    } else {
+      const t2=perf();
+      if(DTAP.t&&t2-DTAP.t<0.35&&Math.hypot(e.clientX-DTAP.x,e.clientY-DTAP.y)<30){
+        DTAP={t:0,x:0,y:0}; SND.click(); viewFit();     // double-tap empty rug = HOME
+      } else DTAP={t:t2,x:e.clientX,y:e.clientY};
+    }
+    down=null; return;
+  }
   if(DRAG){
     const [wx,wy]=worldXY(e); hover=cellXY(wx,wy);
     if(DRAG.kind==='newPiece'||DRAG.kind==='movePiece'){
@@ -3870,6 +4329,18 @@ window.addEventListener('pointerup',e=>{
   }
   down=null;
 });
+window.addEventListener('pointercancel',e=>{     // E10: the OS took the finger — let the camera go cleanly
+  PTRS.delete(e.pointerId);
+  if(PINCH&&PTRS.size<2) PINCH=null;
+  if(down&&down.what==='pan') down=null;
+});
+// E10: wheel zoom, cursor-anchored — only over the rug canvas itself, so the
+// store / toy box shelves keep their own scroll untouched
+window.addEventListener('wheel',e=>{
+  if(!camGate()||e.target!==cvs) return;
+  e.preventDefault();
+  zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*0.0016));
+},{passive:false});
 
 // ---- chrome: palette, shed, GO, mute ----
 function withCtx(g,fn){ const old=cx; cx=g; try{ fn(); } finally{ cx=old; } }
@@ -3893,13 +4364,99 @@ function scenIcon(g,t){
   });
 }
 const PAL_BTNS=[];      // every palette button + the toy id that unlocks it (THE GATE)
+const RUG_TILES=[];     // E10: the SIZE / LAND / WEATHER tiles (never gated — the rug is everyone's)
 let palTab='track';
+// ---- the RUG tab's picture tiles (E10): painted straight in 104×104 px ----
+function rugTileSize(g,id){
+  const dims={sm:[46,32],lg:[66,46],xl:[90,62]}[id], w=dims[0], h=dims[1];
+  const x=(104-w)/2, y=(104-h)/2;
+  g.fillStyle='#4A1A12'; g.fillRect(x-5,y-5,w+10,h+10);
+  g.fillStyle='#63251C'; g.fillRect(x,y,w,h);
+  g.strokeStyle='#8F4634'; g.lineWidth=2; g.strokeRect(x+4,y+4,w-8,h-8);
+  g.globalAlpha=0.4; g.strokeStyle='#7A3627'; g.lineWidth=1.5;
+  g.beginPath();
+  for(let yy=y+10;yy<y+h-6;yy+=9){ g.moveTo(x+6,yy); g.lineTo(x+w-6,yy); }
+  g.stroke(); g.globalAlpha=1;
+}
+function rugTileLand(g,id){
+  const x=8, y=20, w=88, h=64;
+  g.fillStyle='#4A1A12'; g.fillRect(x-4,y-4,w+8,h+8);
+  g.fillStyle= id==='west'? '#8B3E1E' : id==='snow'? '#E9EEF4' : '#63251C';
+  g.fillRect(x,y,w,h);
+  if(id==='rug'){
+    g.strokeStyle='#8F4634'; g.lineWidth=2; g.strokeRect(x+5,y+5,w-10,h-10);
+    g.globalAlpha=0.4; g.strokeStyle='#7A3627'; g.lineWidth=1.5;
+    g.beginPath(); for(const yy of [y+22,y+34,y+46]){ g.moveTo(x+8,yy); g.lineTo(x+w-8,yy); } g.stroke();
+    g.globalAlpha=1;
+  } else if(id==='west'){
+    g.globalAlpha=0.5; g.strokeStyle='#7A3318'; g.lineWidth=2;
+    g.beginPath(); for(const yy of [y+16,y+34,y+52]){ g.moveTo(x+6,yy); g.quadraticCurveTo(x+w/2,yy-4,x+w-6,yy); } g.stroke();
+    g.globalAlpha=1;
+    g.strokeStyle='#4E7F46'; g.lineCap='round';
+    g.lineWidth=8; g.beginPath(); g.moveTo(x+24,y+52); g.lineTo(x+24,y+18); g.stroke();
+    g.lineWidth=5; g.beginPath(); g.moveTo(x+15,y+40); g.lineTo(x+15,y+27); g.moveTo(x+33,y+44); g.lineTo(x+33,y+31); g.stroke();
+    g.lineCap='butt';
+    g.fillStyle='#C9713C';
+    g.beginPath(); g.moveTo(x+56,y+44); g.lineTo(x+62,y+22); g.lineTo(x+78,y+22); g.lineTo(x+84,y+44); g.closePath(); g.fill();
+    g.fillStyle='#DB8B4C'; g.fillRect(x+61,y+18,18,6);
+  } else {
+    g.globalAlpha=0.75; g.strokeStyle='#D7E1EC'; g.lineWidth=2;
+    g.beginPath(); for(const yy of [y+16,y+32,y+48]){ g.moveTo(x+6,yy); g.quadraticCurveTo(x+w/2,yy+4,x+w-6,yy); } g.stroke();
+    g.globalAlpha=1;
+    g.fillStyle='#F9FCFF'; g.beginPath(); g.ellipse(x+26,y+46,16,9,0,0,7); g.fill();
+    g.strokeStyle='#8C9AAD'; g.lineWidth=2; g.beginPath(); g.ellipse(x+26,y+46,16,9,0,0,7); g.stroke();
+    g.fillStyle='#BFD9E8'; g.beginPath(); g.ellipse(x+62,y+24,14,8,0,0,7); g.fill();
+    g.strokeStyle='#6E93AC'; g.lineWidth=1.5; g.beginPath(); g.ellipse(x+62,y+24,14,8,0,0,7); g.stroke();
+  }
+}
+function rugTileWx(g,id){
+  if(id==='clear'){
+    g.fillStyle='#F2C531'; g.beginPath(); g.arc(52,50,18,0,7); g.fill();
+    g.strokeStyle='#F2C531'; g.lineWidth=4; g.lineCap='round';
+    for(let i=0;i<8;i++){ const a=i*Math.PI/4;
+      g.beginPath(); g.moveTo(52+Math.cos(a)*26,50+Math.sin(a)*26);
+      g.lineTo(52+Math.cos(a)*34,50+Math.sin(a)*34); g.stroke(); }
+    g.lineCap='butt';
+  } else if(id==='snowfall'){
+    for(const [px,py,r] of [[30,28,4],[62,20,3],[80,42,4.5],[44,52,3.5],[22,66,4],[58,72,3],[84,78,3.5],[38,84,2.8]]){
+      g.fillStyle='rgba(110,132,158,0.4)'; g.beginPath(); g.arc(px,py+2,r+0.8,0,7); g.fill();
+      g.fillStyle='#FFFFFF'; g.beginPath(); g.arc(px,py,r,0,7); g.fill();
+    }
+  } else if(id==='dust'){
+    g.strokeStyle='rgba(242,197,132,0.65)'; g.lineWidth=3; g.lineCap='round';
+    g.beginPath(); g.moveTo(16,60); g.quadraticCurveTo(42,44,66,56); g.quadraticCurveTo(84,64,90,52); g.stroke();
+    g.lineCap='butt';
+    g.fillStyle='#F2C584';
+    for(const [px,py,r] of [[28,40,3],[52,32,2.4],[74,38,3.2],[40,68,2.6],[64,74,3],[86,66,2.2]]){
+      g.beginPath(); g.arc(px,py,r,0,7); g.fill();
+    }
+  } else {
+    g.strokeStyle='#9DBFE6'; g.lineWidth=3; g.lineCap='round';
+    g.beginPath();
+    for(const [px,py] of [[30,18],[52,14],[74,20],[40,44],[64,40],[86,46]]){
+      g.moveTo(px,py); g.lineTo(px-7,py+22);
+    }
+    g.stroke(); g.lineCap='butt';
+    g.strokeStyle='#9DBFE6'; g.lineWidth=2.5;
+    g.beginPath(); g.ellipse(46,82,16,6,0,0,7); g.stroke();
+    g.beginPath(); g.ellipse(76,74,9,3.5,0,0,7); g.stroke();
+  }
+}
+// the picked tile wears the gold border; called on every pick, load and mode swap
+function rugSync(){
+  for(const t of RUG_TILES){
+    const on= t.kind==='size'? SIZE===t.id : t.kind==='land'? LAND===t.id : WEATHER===t.id;
+    t.el.classList.toggle('on',on);
+  }
+}
 function buildPalette(){
   const slot=$('palSlot');
   const groups={ track:document.createElement('span'), scen:document.createElement('span'),
-                 town:document.createElement('span'), friends:document.createElement('span') };
+                 town:document.createElement('span'), friends:document.createElement('span'),
+                 rug:document.createElement('span') };
   for(const k2 in groups){ groups[k2].style.cssText='display:flex;gap:8px;'; slot.appendChild(groups[k2]); }
   groups.scen.style.display='none'; groups.town.style.display='none'; groups.friends.style.display='none';
+  groups.rug.style.display='none';
   const mk=(layer,t,name,paint)=>{
     const b=document.createElement('button'); b.className='pbtn'; b.type='button';
     const cv=document.createElement('canvas'); const lb=document.createElement('small');
@@ -3920,6 +4477,25 @@ function buildPalette(){
   for(const t of SCEN_TAB) mk('scen',t,defOf(t).name,g=>scenIcon(g,t));
   for(const t of TOWN_TAB) mk('town',t,defOf(t).name,g=>scenIcon(g,t));
   for(const t of FRIEND_TAB) mk('friends',t,defOf(t).name,g=>scenIcon(g,t));
+  // ---- THE RUG TAB (E10): SIZE · LAND · WEATHER — picture tiles, tap to pick ----
+  const mkRug=(kind,id,name,paint)=>{
+    const b=document.createElement('button'); b.className='pbtn'; b.type='button';
+    const cv=document.createElement('canvas'); const lb=document.createElement('small');
+    lb.textContent=name; b.appendChild(cv); b.appendChild(lb); groups.rug.appendChild(b);
+    cv.width=104; cv.height=104;
+    paint(cv.getContext('2d'));
+    b.addEventListener('click',()=>{
+      ac();
+      if(kind==='size'){ sizeSet(id); return; }
+      if(kind==='land'){ if(LAND!==id){ LAND=id; SND.tok(); save(); } else SND.click(); }
+      else { if(WEATHER!==id){ WEATHER=id; SND.tok(); save(); } else SND.click(); }
+      rugSync();
+    });
+    RUG_TILES.push({kind,id,el:b});
+  };
+  for(const [id,name] of [['sm','SMALL'],['lg','BIG'],['xl','HUGE']]) mkRug('size',id,name,g=>rugTileSize(g,id));
+  for(const [id,name] of [['rug','THE RUG'],['west','WESTERN'],['snow','WINTER']]) mkRug('land',id,name,g=>rugTileLand(g,id));
+  for(const [id,name] of [['clear','CLEAR'],['snowfall','SNOW'],['dust','DUST'],['rain','RAIN']]) mkRug('weather',id,name,g=>rugTileWx(g,id));
   // the MORE TOYS… end-cap: BUILD's door into the toy box (E7)
   const more=document.createElement('button'); more.id='moreToys'; more.className='pbtn'; more.type='button';
   more.innerHTML='<b>🧸</b><small>'+BOX_MORE+'</small>';
@@ -3932,12 +4508,14 @@ function buildPalette(){
     $('tabScen').classList.toggle('on',tab==='scen');
     $('tabTown').classList.toggle('on',tab==='town');
     $('tabFriends').classList.toggle('on',tab==='friends');
+    $('tabRug').classList.toggle('on',tab==='rug');
   };
   buildPalette.sync=sync;
   $('tabTrack').addEventListener('click',()=>{ ac(); SND.click(); sync('track'); });
   $('tabScen').addEventListener('click',()=>{ ac(); SND.click(); sync('scen'); });
   $('tabTown').addEventListener('click',()=>{ ac(); SND.click(); sync('town'); });
   $('tabFriends').addEventListener('click',()=>{ ac(); SND.click(); sync('friends'); });
+  $('tabRug').addEventListener('click',()=>{ ac(); SND.click(); sync('rug'); });
 }
 // THE GATE LAW (E7): BUILD's palette offers OWNED toys only. The campaign keeps the
 // FULL palette in this version (its gate arrives in E8 with the new levels). Tabs with
@@ -3957,6 +4535,10 @@ function paletteSync(){
   const tabIds={track:'tabTrack',scen:'tabScen',town:'tabTown',friends:'tabFriends'};
   for(const k2 in tabIds) $(tabIds[k2]).style.display=vis[k2]?'':'none';
   $('moreToys').style.display=CAMP.on?'none':'flex';   // the box is BUILD's door; a level has its board
+  // E10: SIZE / LAND / WEATHER live in the free-build world only — a campaign
+  // level keeps its own land, and its rug is always the sm rug.
+  $('tabRug').style.display=CAMP.on?'none':'';
+  vis.rug=CAMP.on?0:1;
   if(!vis[palTab]) buildPalette.sync('track');
 }
 const PART_CVS=[];    // shed part icons — repainted when the livery changes
@@ -4078,7 +4660,7 @@ function showScreen(s){
   if(s!=='play' && PLAY.on){ playExit(s); return; }   // leaving the wind-up rug restores the build rug
   SCREEN=s;
   const game=s==='game', play=s==='play';
-  if(!game){ cancelDrag(); down=null; shedShow(false); }
+  if(!game){ cancelDrag(); down=null; shedShow(false); PINCH=null; PTRS.clear(); }
   $('menu').style.display=s==='menu'?'flex':'none';
   $('board').style.display=s==='board'?'flex':'none';
   if(s==='board') boardSync();
@@ -4513,6 +5095,7 @@ $('tidyYes').addEventListener('click',()=>{
   shedShow(false); toast('ALL TIDY!');
 });
 $('mute').addEventListener('click',()=>{ AU.on=!AU.on; if(AU.on){ ac(); SND.click(); } muteSync(); save(); });
+$('homeChip').addEventListener('click',()=>{ ac(); SND.click(); viewFit(); });   // E10: snap back to the whole rug
 
 // ---- boot ----
 function resize(){
@@ -4522,15 +5105,20 @@ function resize(){
      :0;                                                   // the menu room + board get the whole window
   cvs.width=Math.round(W*DPR); cvs.height=Math.round(H*DPR);
   cvs.style.width=W+'px'; cvs.style.height=H+'px';
-  SC=Math.min(W/WORLD_W,(H-BAR)/WORLD_H);
-  OX=(W-WORLD_W*SC)/2; OY=(H-BAR-WORLD_H*SC)/2;
+  // E10: the rug screens ride THE CAMERA (fit by default — the old letterbox to
+  // the pixel); the bedroom + board are a fixed painting at MENU_W×MENU_H.
+  if(SCREEN==='game'||SCREEN==='play') viewResize();
+  else { SC=Math.min(W/MENU_W,(H-BAR)/MENU_H); OX=(W-MENU_W*SC)/2; OY=(H-BAR-MENU_H*SC)/2; }
+  const hc=$('homeChip'); if(hc) hc.style.bottom=(BAR+14)+'px';
+  homeSync();
 }
 window.addEventListener('resize',resize);
 load(); buildPalette(); buildParts(); buildEngines(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildAttract();
-showScreen('menu'); goBtnSync(); shedSync(); muteSync(); syncSwatches(); starHudSync();
+showScreen('menu'); goBtnSync(); shedSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
   const dt=Math.min(0.05,(t-last)/1000); last=t;
+  camGlide(dt);        // E10: the flicked rug glides — presentation only, sim untouched
   if(TS.auto){
     if(SCREEN==='game') update(dt);
     else if(SCREEN==='play'){ update(dt); playUpdate(dt); }             // the shared juice + the wind-up trains
@@ -4570,6 +5158,19 @@ window.TS={
   menu(){ showScreen('menu'); return SCREEN; },
   play(){ showScreen('game'); return SCREEN; },
   color(name){ if(!LIVERY[name]) return false; COLOR=name; liveryChanged(); save(); return COLOR; },
+  // ---- the BIG COUNTRY rig (E10) ----
+  size(id){ return sizeSet(id)? SIZE : false; },
+  land(id){ if(!LANDS.includes(id)||CAMP.on||PLAY.on) return false;
+    LAND=id; rugSync(); save(); return LAND; },
+  weather(id){ if(!WEATHERS.includes(id)||CAMP.on||PLAY.on) return false;
+    WEATHER=id; rugSync(); save(); return WEATHER; },
+  view:{
+    fit(){ viewFit(); return TS.view.get(); },
+    set(s,ox,oy){ VIEW.s=+s||fitScale(); if(ox!=null) VIEW.ox=+ox; if(oy!=null) VIEW.oy=+oy;
+      VIEW.vx=VIEW.vy=0; clampView(); viewApply(); return TS.view.get(); },
+    get(){ return { scale:SC, ox:OX, oy:OY, fit:fitScale(), max:zoomMax() }; },
+    toRug(px,py){ return [ (px-OX)/SC, (py-OY)/SC ]; },   // THE one inverse, exposed for the rigs
+  },
   step(dt){ const d=dt||1/60;
     if(SCREEN==='game') update(d);
     else if(SCREEN==='play'){ update(d); playUpdate(d); }
@@ -4665,6 +5266,8 @@ window.TS={
     hints(){ return LEVELS.map(L=>L.hint); },
   },
   state(){ return { screen:SCREEN, color:COLOR,
+    size:SIZE, land:LAND, weather:WEATHER, gw:GW, gh:GH,
+    view:{ scale:SC, ox:OX, oy:OY },
     placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F,
     pieces:[...grid.values()].filter(pc=>pc.t!=='ref').length+hgrid.size,
     track:[...grid].filter(([k,pc])=>pc.t!=='ref').map(([k,pc])=>[k,pc.t,pc.r,pc.elev|0])
