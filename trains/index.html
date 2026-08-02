@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v2.6 -->
+<!-- TRAINSET v2.7 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
-<meta name="trainset-version" content="2.6">
+<meta name="trainset-version" content="2.7">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -260,6 +260,30 @@
   #shelfTrain{ width:auto; border-color:#F2C531; border-style:dashed; color:#F2C531; }
   #shelfTrain canvas{ width:110px; height:52px; }
   #shelfTrain.home{ border-style:solid; border-color:#513a24; color:#CBB88C; cursor:pointer; }
+  /* ---- THE SHY UI (E18): touch the attract rug and the chrome gets out of the
+     way — opacity + pointer-events ONLY, nothing moves or reflows, so the return
+     is seamless. The bedroom tools fade IN with the chrome faded out; they are
+     part of the shy state. Durations are stamped from SHY_FADE_MS at boot. ---- */
+  #menu,#mute{ transition:opacity var(--shyms,0.3s) ease; }
+  body.shy #menu,body.shy #mute{ opacity:0; }
+  body.shy #menu>*,body.shy #mute{ pointer-events:none; }
+  /* visibility:hidden at rest — an opacity-0 layer over the canvas still shifts
+     compositing by ±1px-channel (measured); hidden paints EXACTLY like absent,
+     which keeps the untouched menu byte-identical. The delayed visibility flip
+     lets the opacity fade finish before the tools stop painting. */
+  #bedbar{ position:absolute; left:0; right:0; bottom:0; z-index:6; display:none;
+    align-items:center; justify-content:safe center; gap:10px;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    overflow-x:auto; visibility:hidden; opacity:0; pointer-events:none;
+    transition:opacity var(--shyms,0.3s) ease, visibility 0s var(--shyms,0.3s); }
+  body.shy #bedbar{ visibility:visible; opacity:1;
+    transition:opacity var(--shyms,0.3s) ease, visibility 0s 0s; }
+  body.shy #bedbar button{ pointer-events:auto; }
+  #bedpal{ display:flex; gap:8px; }
+  @media (max-width:820px){
+    #bedbar{ gap:3px; }
+    #bedpal{ gap:3px; }
+  }
   /* ---- toast + rotate ---- */
   #toast{
     position:absolute; left:50%; bottom:132px; transform:translateX(-50%);
@@ -369,6 +393,7 @@
   <span id="shelf"></span>
 </div>
 <div id="ptray"></div>
+<div id="bedbar"><span id="bedpal"></span></div>
 <div id="menu">
   <div id="mbtns"><button id="playBtn" class="mbtn" type="button">PLAY ▶</button><button id="campBtn" class="mbtn" type="button">CAMPAIGN 🎫</button><button id="buildBtn" class="mbtn" type="button">BUILD 🔨</button></div>
   <span style="display:flex;gap:10px;"><button id="boxChip" type="button">🧸 TOY BOX</button><button id="starMenu" type="button">★ 0</button></span>
@@ -428,6 +453,10 @@ const C=96, GX=72, GY=72;
 const SIZES={ sm:{gw:12,gh:8}, lg:{gw:18,gh:12}, xl:{gw:26,gh:18} };   // lg/xl dims — Wyatt dials
 let SIZE='sm';                                   // the BUILD rug's size (save v:8)
 let GW=SIZES.sm.gw, GH=SIZES.sm.gh;              // the ACTIVE board dims
+let GX0=0, GY0=0;                                // the board's LOWER cell bound — always 0 except
+                                                 // inside E18's bedroom wrapper (the attract floor
+                                                 // spreads one cell left+up of the stock oval, so
+                                                 // the oval's keys — and its PIXELS — never move)
 let WORLD_W=GW*C+2*GX, WORLD_H=GH*C+2*GY;        // 1296 × 912 at sm
 const MENU_W=12*C+2*GX, MENU_H=8*C+2*GY;         // the bedroom is a PAINTING — it never grows
 function applyDims(id){                          // swap the active board; the camera refits next resize
@@ -552,6 +581,14 @@ const PRETTY_POOL=['SO PRETTY!','BEAUTIFUL!','WHAT A LOVELY LINE!','YOU MADE IT 
 let AUTO_GO='all';            // 'all' = every human drop rolls · 'camp' · 'off' (a let: flip it live)
 const STARTER_LINE=true;      // a fresh save's rug arrives with the little oval already built
 const SHELF_ORDER=['train','cars','engines'];   // shelf layout, left to right
+// ---- Wyatt dials (EXPANSION 18 — one block) ----
+// THE BEDROOM SET & THE SHY UI: touch the attract rug and the chrome fades away;
+// leave it alone and it drifts back. While it's away the rug is a real little
+// building floor — mini palette + the train shelf — and NOTHING is ever saved:
+// the bedroom set is a sandcastle, the tide is a reload (THE EPHEMERAL LAW).
+const UI_SHY_SEC=3.0;          // idle seconds before the chrome returns
+const SHY_FADE_MS=300;         // chrome fade duration, both directions
+const BEDROOM_KINDS=['s','c','st'];  // the mini palette — the E16 tutorial three
 // ---- Wyatt dials (EXPANSION 15 — one block) ----
 // A. GRAVITY AS DRAMA. grade is measured in ELEVATION LEVELS PER CELL of arc
 // (pos().z interps levels along the path; LIFT px per level is the height it
@@ -918,9 +955,11 @@ function sizeSet(id){
 // TWO LEVELS (E4): grid holds elev-0 pieces, ramps, and the spiral (anchor + 'ref'
 // stubs on its other cells); hgrid holds pure elev-1 pieces. A cell may hold one of
 // each — over/under — except ramp/spiral cells, which claim both levels.
-const grid=new Map();                 // "cx,cy" -> {t,r,elev, ra:{k}|null, pop, sel, latch}
-const hgrid=new Map();                // "cx,cy" -> the elev-1 piece riding trestles above
-const scen=new Map();                 // "cx,cy" -> {t:'bush'|'tree'|'rv'|'ppl', v, ra, pop, wave}
+// E18: LET, not const — the bedroom wrapper (inBed) aliases these onto the
+// attract maps while the menu machinery runs, so the ONE pipeline serves both.
+let grid=new Map();                   // "cx,cy" -> {t,r,elev, ra:{k}|null, pop, sel, latch}
+let hgrid=new Map();                  // "cx,cy" -> the elev-1 piece riding trestles above
+let scen=new Map();                   // "cx,cy" -> {t:'bush'|'tree'|'rv'|'ppl', v, ra, pop, wave}
 let RGRID=grid, HGRID=hgrid;          // the rail graph the riders read — the attract loop swaps
                                       // its own tiny oval in (menuUpdate/drawMenu), restores after
 let SCREEN='menu';                    // 'menu' | 'game' — never persisted, boot always lands on the menu
@@ -1243,7 +1282,7 @@ function placeQuery(t,r,x,y){
   r=(r|0)%4;
   const cells=t==='sp'? spiralCells(x,y) : [[x,y]];
   for(const [x2,y2] of cells){
-    if(x2<0||y2<0||x2>=GW||y2>=GH) return {ok:false,why:'oob'};
+    if(x2<GX0||y2<GY0||x2>=GW||y2>=GH) return {ok:false,why:'oob'};   // GX0/GY0 = 0 outside E18's bedroom
     if(cellBlocksTrack(t,x2,y2)) return {ok:false,why:'scenery'};
   }
   const own=new Set(cells.map(c2=>key(c2[0],c2[1])));
@@ -1316,7 +1355,7 @@ function enter(rd,exitPort){
   const fy=p0.pcell? rd.cy+p0.pcell[end0][1] : rd.cy;
   const D=[[0,-1],[1,0],[0,1],[-1,0]][exitPort];
   const nx=fx+D[0], ny=fy+D[1];
-  if(nx<0||ny<0||nx>=GW||ny>=GH) return false;
+  if(nx<GX0||ny<GY0||nx>=GW||ny>=GH) return false;   // GX0/GY0 = 0 outside E18's bedroom
   const entry=(exitPort+2)%4;
   const lo=pieceAt(nx,ny), hi=pieceHi(nx,ny);
   for(const pc of (hi&&hi!==lo? [lo,hi] : [lo])){
@@ -3526,7 +3565,7 @@ function drawGhosts(){
   const isScen=DRAG.kind==='newScen'||DRAG.kind==='moveScen';
   if(isPiece||isScen){
     cx.globalAlpha=0.18; cx.strokeStyle='#F7E9C4'; cx.lineWidth=2;
-    for(let gx=0;gx<=GW;gx++) for(let gy=0;gy<=GH;gy++){
+    for(let gx=GX0;gx<=GW;gx++) for(let gy=GY0;gy<=GH;gy++){   // GX0/GY0 = 0 outside E18's bedroom
       const x=GX+gx*C, y=GY+gy*C;
       cx.beginPath(); cx.moveTo(x-5,y); cx.lineTo(x+5,y); cx.moveTo(x,y-5); cx.lineTo(x,y+5); cx.stroke();
     }
@@ -3563,6 +3602,19 @@ function drawGhosts(){
       const t=i===0?ENGINE:consist[i-1];
       cx.globalAlpha=0.85;
       drawCar(t, DRAG.x - i*GAP*0.62, DRAG.y + Math.sin(perf()*6+i)*2, 0, 0, wheelPhase, livFor(i));
+      cx.globalAlpha=1;
+    }
+  }
+  // E18: the stock attract toy rides the finger — the 'train' ghost recipe, stock consist
+  if(DRAG.kind==='atrain' && DRAG.x!=null){
+    if(hover && pieceTop(hover[0],hover[1])){
+      cx.globalAlpha=0.28; cx.fillStyle='#7CFC66';
+      rr(GX+hover[0]*C+3,GY+hover[1]*C+3,C-6,C-6,10); cx.fill(); cx.globalAlpha=1;
+    }
+    const tail=['loco','tender','cab'];
+    for(let i=tail.length-1;i>=0;i--){
+      cx.globalAlpha=0.85;
+      drawCar(tail[i], DRAG.x - i*GAP*0.62, DRAG.y + Math.sin(perf()*6+i)*2, 0, 0, wheelPhase, livFor(i));
       cx.globalAlpha=1;
     }
   }
@@ -3772,9 +3824,185 @@ function menuSign(){
   cx.fillText('TRAIN SET', sx, 100);
   star5(sx-208,84,0.85,'#e8d9b0'); star5(sx+208,84,0.85,'#e8d9b0');
 }
-// the attract loop: a REAL 4×2 oval of real pieces, ridden by real riders
+/* =====================================================================
+   THE BEDROOM SET & THE SHY UI (E18) — the menu stops being a menu.
+   Touch the attract rug and the chrome (title, the three big buttons,
+   chips) fades away; leave it alone for UI_SHY_SEC and it fades back.
+   While it's away the rug is a REAL little building floor: a mini
+   palette (s/c/st) + the E16 train shelf, and every press routes into
+   the SAME machinery BUILD's rug reads — swapped onto the attract grid
+   by inBed(), which aliases the world globals for the duration of one
+   call. THE EPHEMERAL LAW: save/toast/hintPass are inert inside the
+   wrapper; nothing here ever touches localStorage. The bedroom floor
+   is BR_GW×BR_GH cells with the stock oval at (1,1)-(4,2) — the paint
+   transform shifts one cell so an untouched menu stays PIXEL-IDENTICAL.
+   ===================================================================== */
+const BR_LO=-1, BR_GW=5, BR_GH=3;     // the bedroom floor: cells (-1..4)×(-1..2) — 6×4 on the rug,
+                                      // ringing the stock oval at its ORIGINAL keys (0,0)-(3,1)
+const TFIELDS=['placed','cars','F','running','pauseT','stKey','dist','startSig','goDist','revSinceGo'];
+const bedTrain0=()=>({placed:false,cars:[],F:true,running:false,pauseT:0,stKey:null,dist:0,startSig:null,goDist:0,revSinceGo:false});
+const BED={ on:false, shy:false, a:1, idleT:0, ctx:0, s:null,
+            train:bedTrain0(), consist:[], eng:'loco', boarders:[],
+            fx:[], smoke:[], scen:new Map(), wheel:0,
+            grav:{mul:1,crest:false}, clack:0 };
+function bedAcq(){                    // swap the world globals for the bedroom's
+  if(BED.ctx++) return;               // re-entrant: only the outermost call swaps
+  BED.s={grid,hgrid,scen,RGRID,HGRID,GW,GH,GX0,GY0,consist,ENGINE,fx,smoke,BOARDERS,
+         gm:GRAV.mul,gc:GRAV.crest,ca:clackAcc};
+  grid=AT.grid; hgrid=AT.hg; RGRID=AT.grid; HGRID=AT.hg; scen=BED.scen;
+  GW=BR_GW; GH=BR_GH; GX0=BR_LO; GY0=BR_LO;
+  consist=BED.consist; ENGINE=BED.eng; fx=BED.fx; smoke=BED.smoke;
+  BOARDERS=BED.boarders;
+  GRAV.mul=BED.grav.mul; GRAV.crest=BED.grav.crest; clackAcc=BED.clack;
+  for(const f of TFIELDS){ const v=TRAIN[f]; TRAIN[f]=BED.train[f]; BED.train[f]=v; }
+}
+function bedRel(){
+  if(--BED.ctx) return;
+  for(const f of TFIELDS){ const v=TRAIN[f]; TRAIN[f]=BED.train[f]; BED.train[f]=v; }
+  BED.consist=consist; BED.eng=ENGINE; BED.fx=fx; BED.smoke=smoke; BED.boarders=BOARDERS;
+  BED.grav.mul=GRAV.mul; BED.grav.crest=GRAV.crest; BED.clack=clackAcc;
+  const s=BED.s; BED.s=null;
+  grid=s.grid; hgrid=s.hgrid; scen=s.scen; RGRID=s.RGRID; HGRID=s.HGRID;
+  GW=s.GW; GH=s.GH; GX0=s.GX0; GY0=s.GY0;
+  consist=s.consist; ENGINE=s.ENGINE; fx=s.fx; smoke=s.smoke;
+  BOARDERS=s.BOARDERS; GRAV.mul=s.gm; GRAV.crest=s.gc; clackAcc=s.ca;
+}
+function inBed(fn){ bedAcq(); try{ return fn(); } finally{ bedRel(); } }
+const withBed=fn=>SCREEN==='menu'&&BED.on? inBed(fn) : fn();   // shelf handlers serve both rooms
+const bedRun=fn=>()=>{ if(SCREEN==='menu'&&BED.on) inBed(fn); };   // deferred puffs re-enter the room
+// ---- THE SHY UI ----
+function shySync(){ document.body.classList.toggle('shy',BED.shy); }
+function shyTouch(){ BED.idleT=0; if(!BED.shy){ BED.shy=true; shySync(); } }
+function shyTick(dt){
+  if(BED.shy){
+    if(down||DRAG) BED.idleT=0;       // a held finger keeps the room cleared
+    else{
+      BED.idleT+=dt;
+      // LAW: a child is NEVER locked out of the three big buttons for longer
+      // than UI_SHY_SEC + the fade.
+      if(BED.idleT>=UI_SHY_SEC){ BED.shy=false; shySync(); }
+    }
+  }
+  const tgt=BED.shy?0:1, stp=dt*1000/SHY_FADE_MS;   // the canvas sign fades in step with the DOM
+  BED.a=tgt>BED.a? Math.min(tgt,BED.a+stp) : Math.max(tgt,BED.a-stp);
+}
+// ---- the stock attract train: grabbing it picks it up — the toy law, everywhere ----
+function atHitAt(wx,wy){
+  for(const c of AT.cars){ const p=pos(c.rd); if(Math.hypot(wx-p.x,wy-p.y)<36) return true; }
+  return false;
+}
+function atCellOn(cell){ return AT.cars.some(c=>c.rd.cx===cell[0]&&c.rd.cy===cell[1]); }
+function atPlace(cxl,cyl){            // seat the stock toy back on the graph — placeTrainAt's probe law
+  const pc=pieceTop(cxl,cyl); if(!pc) return false;
+  const p0=pathsOf(pc)[0];
+  const loco={cx:cxl,cy:cyl,pi:0,dir:1,s:p0.len/2,el:(pc.elev|0)?1:0};
+  const tail=['tender','cab'], need=GAP*tail.length+34;
+  const probe=clone(loco), r=back(probe,need);
+  if(!r.ok){
+    const f=advance(loco,need-r.moved+2);
+    if(!f.ok) return false;
+    if(!back(clone(loco),need).ok) return false;
+  }
+  AT.cars=[{type:'loco',rd:loco,face:1,squash:0}];
+  for(let i=1;i<=tail.length;i++){ const rd=clone(loco); back(rd,GAP*i); AT.cars.push({type:tail[i-1],rd,face:1,squash:0}); }
+  return true;
+}
+// every bedroom train moves by the attract law: one shared step, and a dead end
+// simply turns the toy around (the BUILD tick's probe + partial-step recipe)
+function attRun(cars,step){
+  if(!cars.length) return;
+  const probe=clone(cars[0].rd), r=advance(probe,step);
+  if(r.ok){ for(const c of cars) advance(c.rd,step); return; }
+  const part=Math.max(0,r.moved-0.5);
+  if(part>1e-4) for(const c of cars) advance(c.rd,part);
+  for(const c of cars){ c.rd.dir*=-1; c.face*=-1; }
+  cars[0].squash=1; SND.boing();
+}
+// ---- a hand on the bedroom rug ----
+function bedDown(e){
+  const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;
+  if(mx<MRUG.x||mx>MRUG.x+MRUG.w||my<MRUG.y||my>MRUG.y+MRUG.h) return;   // the room is scenery
+  ac(); e.preventDefault();
+  shyTouch();                          // the chrome gets out of the way
+  if(DRAG||down) return;               // one hand at a time
+  inBed(()=>{
+    const [wx,wy]=worldXY(e);
+    if(TRAIN.placed){
+      const ci=trainHitAt(wx,wy);      // the kid's train reads exactly BUILD's ladder
+      if(ci===1){ down={x:e.clientX,y:e.clientY,what:'loco'}; return; }
+      if(ci>1){ down={x:e.clientX,y:e.clientY,what:'tcar',idx:ci-1}; return; }
+    }
+    if(atHitAt(wx,wy)){ down={x:e.clientX,y:e.clientY,what:'atrain'}; return; }
+    const cell=cellXY(wx,wy);
+    if(cell&&atCellOn(cell)){ down={x:e.clientX,y:e.clientY,what:'atrain'}; return; }   // track under the toy = the toy
+    if(cell&&pieceTop(cell[0],cell[1])){ down={x:e.clientX,y:e.clientY,what:'piece',cell}; return; }
+    down=null;                         // bare rug — the touch alone cleared the room
+  });
+}
+// ---- the bedroom rides the menu painting: live on menu+board, discarded by the game ----
+function bedCancel(){                  // put down whatever the hand held — the SAME cancel machinery
+  down=null;
+  if(!DRAG) return;
+  inBed(()=>{
+    if(DRAG.kind==='atrain'&&DRAG.prev){ AT.cars=DRAG.prev; DRAG=null; hover=null; }
+    else cancelDrag();                 // movePiece/train restore as BUILD does (save is inert here)
+  });
+}
+function bedScreen(s){
+  if(s==='menu'||s==='board'){
+    if(!BED.on) bedReset();            // fresh from the game — the tide rebuilt the sandcastle
+    $('bedbar').style.display=s==='menu'? 'flex':'none';
+    if(s!=='menu'){
+      if(BED.shy){ BED.shy=false; shySync(); }
+      bedCancel();
+    }
+  } else if(BED.on) bedDrop();
+}
+function bedReset(){
+  BED.on=true;
+  buildAttract();                      // the stock oval, pristine — THE EPHEMERAL LAW's tide
+  AT.smoke.length=0; AT.wheel=0; AT.smokeT=0;
+  BED.scen.clear(); BED.fx=[]; BED.smoke=AT.smoke; BED.boarders=[]; BED.wheel=0;
+  BED.grav={mul:1,crest:false}; BED.clack=0;
+  BED.train=bedTrain0(); BED.consist=consist.slice(); BED.eng=ENGINE;
+  BED.shy=false; BED.a=1; BED.idleT=0; shySync();
+  $('bedbar').appendChild($('shelf')); // the E16 shelf serves the bedroom while the menu is up
+  inBed(shelfSync);
+}
+function bedDrop(){
+  bedCancel();                         // the hand lets go first (BED.on still true for the wrapper)
+  BED.on=false;
+  if(BED.shy){ BED.shy=false; shySync(); }
+  BED.a=1; BED.idleT=0;
+  $('bedbar').style.display='none';
+  $('bar').appendChild($('shelf'));    // the shelf goes home to the BUILD bar
+}
+// ---- the mini palette: the E16 tutorial three, kid-scale, no gates ----
+function buildBedPal(){
+  const wrap=$('bedpal');
+  for(const t of BEDROOM_KINDS){
+    const b=document.createElement('button'); b.className='pbtn'; b.type='button';
+    const cv=document.createElement('canvas'); const lb=document.createElement('small');
+    lb.textContent=(PIECES.find(p=>p[0]===t)||[t,t])[1];
+    b.appendChild(cv); b.appendChild(lb); wrap.appendChild(b);
+    cv.width=104; cv.height=104;
+    const g=cv.getContext('2d'), s=104/(C+16);
+    g.setTransform(s,0,0,s,8*s,8*s);
+    withCtx(g,()=>drawPieceArt({t,r:t==='c'?1:0,sel:0,elev:0,latch:null},0,0));
+    b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
+      BED.idleT=0;
+      down={x:e.clientX,y:e.clientY,what:'pal',t,el:b,layer:'track',v:0}; });
+  }
+  // the fade obeys the ONE dial, DOM and canvas alike (--shyms feeds the CSS)
+  document.documentElement.style.setProperty('--shyms',(SHY_FADE_MS/1000)+'s');
+}
+
+// the attract loop: a REAL 4×2 oval of real pieces, ridden by real riders.
+// E18: the oval keeps its EXACT keys and transform (any re-key shifts float
+// operands and hairline AA — measured); the bedroom floor instead spreads to
+// negative cells around it via the GX0/GY0 lower bound inside the wrapper.
 function buildAttract(){
-  AT.grid.clear();
+  AT.grid.clear(); AT.hg.clear();
   const put=(x,y,t,r)=>AT.grid.set(key(x,y),mkPiece(t,r));
   put(0,0,'c',1); put(1,0,'s',0); put(2,0,'s',0); put(3,0,'c',2);
   put(0,1,'c',0); put(1,1,'s',0); put(2,1,'s',0); put(3,1,'c',3);
@@ -3790,25 +4018,39 @@ function buildAttract(){
   } finally { RGRID=grid; HGRID=hgrid; }
 }
 function menuUpdate(dt){
-  RGRID=AT.grid; HGRID=AT.hg;
-  try{
+  if(SCREEN==='menu') shyTick(dt);     // E18: the board keeps the oval turning, but only the menu is shy
+  inBed(()=>{                          // E18: the world globals ARE the bedroom's in here
     const step=ATT_SPEED*dt;
-    for(const c of AT.cars) advance(c.rd,step);       // a closed oval — advance never fails
+    attRun(AT.cars,step);              // the stock toy — a closed oval never turns around
+    const kid=TRAIN.placed&&TRAIN.running;
+    if(kid){ attRun(TRAIN.cars,step); BED.wheel+=step/8; TRAIN.dist+=step; }
     AT.wheel+=step/8;
     AT.smokeT-=dt;
     if(AT.smokeT<=0){
       AT.smokeT=0.34;
-      const loco=AT.cars[0], p=pos(loco.rd);
-      const artAng=p.ang+(loco.face<0?Math.PI:0);
-      const flip=Math.cos(artAng)<0;
-      const lx=18*KART, ly=(flip?28:-28)*KART;
-      const ca=Math.cos(artAng), sa=Math.sin(artAng);
-      AT.smoke.push({ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly, t:0, dur:1.2,
-                      vx:(Math.random()-0.5)*10, vy:-30, r:3+Math.random()*2 });
+      for(const cars of (kid? [AT.cars,TRAIN.cars] : [AT.cars])){   // every running loco puffs
+        if(!cars.length) continue;
+        const loco=cars[0], p=pos(loco.rd);
+        const artAng=p.ang+(loco.face<0?Math.PI:0);
+        const flip=Math.cos(artAng)<0;
+        const lx=18*KART, ly=(flip?28:-28)*KART;
+        const ca=Math.cos(artAng), sa=Math.sin(artAng);
+        AT.smoke.push({ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly, t:0, dur:1.2,
+                        vx:(Math.random()-0.5)*10, vy:-30, r:3+Math.random()*2 });
+      }
     }
-  } finally { RGRID=grid; HGRID=hgrid; }
+    // E18: the bedroom pieces pop/settle exactly like BUILD's (grid is AT.grid here)
+    for(const pc of grid.values()){
+      if(pc.ra){ pc.ra.k-=dt*8; if(pc.ra.k<=0) pc.ra=null; }
+      if(pc.pop>0) pc.pop=Math.max(0,pc.pop-dt*5);
+    }
+    for(const c of AT.cars) if(c.squash>0) c.squash=Math.max(0,c.squash-dt*4);
+    for(const c of TRAIN.cars) if(c.squash>0) c.squash=Math.max(0,c.squash-dt*4);
+    for(let i=fx.length-1;i>=0;i--){ fx[i].t+=dt; if(fx[i].t>=fx[i].dur) fx.splice(i,1); }
+  });
   for(const s of AT.smoke){ s.t+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy-=8*dt; }
-  AT.smoke=AT.smoke.filter(s=>s.t<s.dur);
+  // in place, never reassigned — BED.smoke aliases this array (whistle puffs land here)
+  for(let i=AT.smoke.length-1;i>=0;i--) if(AT.smoke[i].t>=AT.smoke[i].dur) AT.smoke.splice(i,1);
   if(MENU_MUSIC){ AT.musT-=dt; if(AT.musT<=0){ AT.musT=5.5; SND.lull(); } }
 }
 function drawMenu(){
@@ -3821,20 +4063,33 @@ function drawMenu(){
   if(MENU_PROPS.includes('bed')) menuBed();
   if(MENU_PROPS.includes('toybox')) menuToybox();
   if(MENU_PROPS.includes('blocks')) menuBlocks();
-  // the attract loop, painted by the real track + car painters
+  // the attract loop, painted by the real track + car painters (E18: transform
+  // UNTOUCHED — the bedroom's extra room lives in negative cells, not a shift)
   cx.save();
   cx.translate(ATT.ox,ATT.oy); cx.scale(ATT_SCALE,ATT_SCALE); cx.translate(-GX,-GY);
   RGRID=AT.grid; HGRID=AT.hg;
   try{
     drawTrack(AT.grid);
     drawCarsOnRails(AT.cars,AT.wheel);
+    if(BED.train.placed||(BED.ctx&&TRAIN.placed))                       // E18: the kid's train, beside the stock toy
+      drawCarsOnRails(BED.ctx? TRAIN.cars:BED.train.cars,BED.wheel);
     for(const s of AT.smoke){ const k=s.t/s.dur;
       cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb';
       cx.beginPath(); cx.arc(s.x,s.y,s.r+9*k,0,7); cx.fill(); }
     cx.globalAlpha=1;
+    for(const e2 of BED.fx){ const k=e2.t/e2.dur;                       // E18: drop-puffs — draw()'s exact recipe
+      if(e2.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle='#e8e0cc';
+        cx.beginPath(); cx.arc(e2.x,e2.y,e2.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; } }
+    if(DRAG&&BED.on) inBed(drawGhosts);                                 // E18: the SAME ghost pipeline, swapped in
   } finally { RGRID=grid; HGRID=hgrid; }
   cx.restore();
-  if(MENU_PROPS.includes('sign')) menuSign();
+  if(MENU_PROPS.includes('sign')){
+    // E18 THE SHY UI: the painted title fades with the DOM chrome. An untouched
+    // menu holds a===1 and paints the sign exactly as before — byte-identical.
+    if(BED.a>=1) menuSign();
+    else if(BED.a>0.002){ const k=BED.a*BED.a*(3-2*BED.a);
+      cx.globalAlpha=k; menuSign(); cx.globalAlpha=1; }
+  }
 }
 
 /* =====================================================================
@@ -4096,6 +4351,7 @@ function appWorld(d){
   }
 }
 function save(){
+  if(BED.ctx) return;   // E18 THE EPHEMERAL LAW — the bedroom set is NEVER saved
   try{
     // v:5 — the rug fields are the FREE-PLAY world, always: while the campaign is on,
     // the stashed free-play snapshot is written back verbatim (never the level), and
@@ -4859,10 +5115,19 @@ const CARDEF={ tender:'TENDER', box:'BOXCAR', tank:'TANKER', flat:'FLATCAR', cab
 const PART_COLL={ tender:'loco', box:'box', tank:'tank', flat:'flat', cab:'cab',
                   coach:'coach', mail:'mail', circus:'circus' };
 const $=id=>document.getElementById(id);
-function worldXY(e){ return [ (e.clientX-OX)/SC, (e.clientY-OY)/SC ]; }
+function worldXY(e){
+  // E18: THE ONE-INVERSE LAW (the E10 pointer-transform law, menu edition) — while
+  // the bedroom wrapper holds, every pointer routes menu-letterbox → attract-local
+  // through this single mapping, the exact inverse of drawMenu's paint transform.
+  if(BED.ctx){
+    const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;
+    return [ (mx-ATT.ox)/ATT_SCALE+GX, (my-ATT.oy)/ATT_SCALE+GY ];
+  }
+  return [ (e.clientX-OX)/SC, (e.clientY-OY)/SC ];
+}
 function cellXY(wx,wy){
   const gx=Math.floor((wx-GX)/C), gy=Math.floor((wy-GY)/C);
-  return (gx>=0&&gy>=0&&gx<GW&&gy<GH)? [gx,gy] : null;
+  return (gx>=GX0&&gy>=GY0&&gx<GW&&gy<GH)? [gx,gy] : null;   // GX0/GY0 = 0 outside E18's bedroom
 }
 let down=null;
 // ---- E10 camera gestures: pinch state + double-tap memory ----
@@ -4892,11 +5157,12 @@ function pinchMove(){
   clampView(); viewApply();
 }
 function toast(msg){
+  if(BED.ctx) return;   // E18 — no toasts on the bedroom floor: no hints, no ceremony
   const el=$('toast');
   el.textContent=msg; el.classList.add('on');
   clearTimeout(toast.tm); toast.tm=setTimeout(()=>el.classList.remove('on'),2000);
 }
-function hintPass(n){ if(hintStage===n){ hintStage=n+1; save(); } }
+function hintPass(n){ if(BED.ctx) return; if(hintStage===n){ hintStage=n+1; save(); } }   // E18: the menu coaches nobody
 function wiggle(el){ el.classList.remove('wig'); void el.offsetWidth; el.classList.add('wig'); }
 
 function swRotate(gx,gy){
@@ -4909,7 +5175,10 @@ function swRotate(gx,gy){
   pc.r=(pc.r+1)%4; pc.ra={k:1}; pc.latch=null; SND.click(); save();
 }
 cvs.addEventListener('pointerdown',e=>{
-  if(SCREEN!=='game'&&SCREEN!=='play') return;   // the menu room is scenery — its buttons are DOM
+  if(SCREEN!=='game'&&SCREEN!=='play'){          // the menu room's buttons are DOM — but the RUG is alive (E18)
+    if(SCREEN==='menu'&&BED.on) bedDown(e);
+    return;
+  }
   ac(); e.preventDefault();
   if(camGate()){                                 // E10: two fingers on the rug = pinch zoom
     PTRS.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -4956,7 +5225,14 @@ cvs.addEventListener('pointerdown',e=>{
   }
   down=null;
 });
+// E18: ONE body serves both rooms. On the menu the same code runs inside the
+// bedroom wrapper — worldXY maps through the attract transform, the grid is the
+// attract grid, and save/toast/hintPass are inert. Zero duplicated pipeline.
 window.addEventListener('pointermove',e=>{
+  if(SCREEN==='menu'){ if(down||DRAG){ BED.idleT=0; inBed(()=>moveCore(e)); } return; }
+  moveCore(e);
+},{passive:false});
+function moveCore(e){
   if(PTRS.has(e.pointerId)) PTRS.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(PINCH){ if(PTRS.size>=2){ e.preventDefault(); pinchMove(); } return; }
   if(DRAG){
@@ -5029,9 +5305,17 @@ window.addEventListener('pointermove',e=>{
   else if(down.what==='shelfCar'){ DRAG={kind:'car',t:down.t}; }     // E16: couple by drag
   else if(down.what==='shelfEng'){ DRAG={kind:'eng',t:down.t}; }     // E16: swap by drag
   else if(down.what==='tray'){ DRAG={kind:'ptrain',color:down.color}; }   // E16: PLAY drags too
+  else if(down.what==='atrain'){                                     // E18: the stock attract train lifts WHOLE
+    DRAG={kind:'atrain',prev:AT.cars};                               // any car of it = the toy law's handle
+    AT.cars=[];
+  }
   if(DRAG){ const [wx,wy]=worldXY(e); DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy); down=null; }
-},{passive:false});
+}
 window.addEventListener('pointerup',e=>{
+  if(SCREEN==='menu'){ if(down||DRAG){ BED.idleT=0; inBed(()=>upCore(e)); } return; }   // E18
+  upCore(e);
+});
+function upCore(e){
   PTRS.delete(e.pointerId);
   if(PINCH){ if(PTRS.size<2) PINCH=null; return; }
   if(down&&down.what==='pan'){                   // E10: flick to glide / double-tap to fit
@@ -5133,13 +5417,29 @@ window.addEventListener('pointerup',e=>{
       if(d0!=null){ const r=playAdd(DRAG.color,null,null,d0); if(!r.ok) SND.toot(); }
       else { SND.pop(); puff(wx,wy,14); }
     }
+    else if(DRAG.kind==='atrain'){
+      // E18 — the stock attract toy goes back down. On track: seated by the
+      // placeTrainAt probe law, mid-chug (running is its nature — no GO exists
+      // here or anywhere). Anywhere else: right back where it was picked up.
+      let ok=false;
+      if(hover && pieceTop(hover[0],hover[1])) ok=atPlace(hover[0],hover[1]);
+      if(ok) SND.clank();
+      else AT.cars=DRAG.prev;
+    }
     DRAG=null; hover=null; return;
   }
   if(!down) return;
   if(down.lp){ clearTimeout(down.lp); down.lp=null; }
   const dist=Math.hypot(e.clientX-down.x,e.clientY-down.y);
   if(dist<8){
-    if(down.what==='loco'||down.what==='tcar'){ SND.whistle(); for(let i=0;i<3;i++) setTimeout(stackPuff,i*90); }
+    // E18: on the menu the deferred puffs re-enter the bedroom wrapper (the smoke
+    // pool and the train are the bedroom's); in BUILD this is byte-identical.
+    if(down.what==='loco'||down.what==='tcar'){ const sp=BED.ctx? bedRun(stackPuff):stackPuff;
+      SND.whistle(); for(let i=0;i<3;i++) setTimeout(sp,i*90); }
+    else if(down.what==='atrain'){                 // E18: tap the stock toy = whistle, like any loco
+      SND.whistle();
+      for(let i=0;i<3;i++) setTimeout(bedRun(()=>{ if(AT.cars.length) puffLoco(AT.cars[0]); }),i*90);
+    }
     else if(down.what==='ptrain'){
       const tr=down.tr; SND.whistle();
       if(!tr.dying) for(let i=0;i<3;i++) setTimeout(()=>{ if(PLAY.on&&!tr.dying&&tr.cars.length) puffLoco(tr.cars[0]); },i*90);
@@ -5178,7 +5478,7 @@ window.addEventListener('pointerup',e=>{
     else if(down.what==='tray'){ wiggle(down.el); SND.chirp(); }   // alive — but nothing spawns
   }
   down=null;
-});
+}
 window.addEventListener('pointercancel',e=>{     // E10: the OS took the finger — let the camera go cleanly
   PTRS.delete(e.pointerId);
   if(PINCH&&PTRS.size<2) PINCH=null;
@@ -5432,11 +5732,16 @@ function buildShelf(){
   tb.appendChild(shelfTrainCv); tb.appendChild(tlb);
   tb.addEventListener('pointerdown',e=>{
     ac(); e.preventDefault();
-    if(TRAIN.placed) return;                 // it acts as the bring-home button then
-    down={x:e.clientX,y:e.clientY,what:'handle'};
+    if(SCREEN==='menu') BED.idleT=0;         // E18: shelf touches hold the chrome away
+    withBed(()=>{                            // E18: on the menu, TRAIN is the bedroom's
+      if(TRAIN.placed) return;               // it acts as the bring-home button then
+      down={x:e.clientX,y:e.clientY,what:'handle'};
+    });
   });
   tb.addEventListener('click',()=>{
-    if(TRAIN.placed){ trainHome(false); toast('BACK ON THE SHELF'); save(); }
+    withBed(()=>{                            // E18: menu = bedroom train home (toast+save inert there)
+      if(TRAIN.placed){ trainHome(false); toast('BACK ON THE SHELF'); save(); }
+    });
   });
   parts.train=tb;
   // owned cars — drag one onto the placed train to couple it at the tail
@@ -5448,6 +5753,7 @@ function buildShelf(){
     b.appendChild(cv); b.appendChild(lb); carWrap.appendChild(b);
     SHELF_CAR_BTNS.push([t,cv,b]);
     b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
+      if(SCREEN==='menu') BED.idleT=0;   // E18
       down={x:e.clientX,y:e.clientY,what:'shelfCar',t,el:b}; });
   }
   parts.cars=carWrap;
@@ -5460,6 +5766,7 @@ function buildShelf(){
     b.appendChild(cv); b.appendChild(lb); engWrap.appendChild(b);
     SHELF_ENG_BTNS.push([t,cv,b]);
     b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
+      if(SCREEN==='menu') BED.idleT=0;   // E18
       down={x:e.clientX,y:e.clientY,what:'shelfEng',t,el:b}; });
   }
   parts.engines=engWrap;
@@ -5467,6 +5774,7 @@ function buildShelf(){
   repaintShelfIcons();
 }
 function paintShelfTrain(){
+  if(BED.on&&SCREEN==='menu'&&!BED.ctx) return inBed(paintShelfTrain);   // E18: the shelf shows the BEDROOM's train there
   if(!shelfTrainCv) return;
   const cv=shelfTrainCv, g=cv.getContext('2d');
   g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
@@ -5520,8 +5828,11 @@ function consistChanged(){
   }
   shelfSync(); save();
 }
-// ONE sync for the whole shelf — every job the retired shed + GO chrome synced
+// ONE sync for the whole shelf — every job the retired shed + GO chrome synced.
+// E18: while the shelf serves the bedroom, an unwrapped call re-enters through
+// the wrapper so it paints the BEDROOM's train/consist, never BUILD's.
 function shelfSync(){
+  if(BED.on&&SCREEN==='menu'&&!BED.ctx) return inBed(shelfSync);
   paintShelfTrain();
   const tb=$('shelfTrain');
   if(tb){
@@ -5554,6 +5865,7 @@ function cancelDrag(){
 function showScreen(s){
   if(s!=='game' && CAMP.on){ campExit(s); return; }   // leaving a level always lands you out clean
   if(s!=='play' && PLAY.on){ playExit(s); return; }   // leaving the wind-up rug restores the build rug
+  bedScreen(s);                                       // E18: the bedroom set lives on menu+board, dies at the game's door
   followSet(false);                                   // E15: a screen change lets the camera go
   SCREEN=s;
   const game=s==='game', play=s==='play';
@@ -6293,7 +6605,7 @@ function resize(){
   homeSync();
 }
 window.addEventListener('resize',resize);
-load(); buildPalette(); buildShelf(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
+load(); buildPalette(); buildShelf(); buildBedPal(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
 showScreen('menu'); shelfSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
@@ -6345,6 +6657,11 @@ window.TS={
     placed: TRAIN.placed,
   }; },
   home(){ trainHome(true); save(); },
+  // E18 — the bedroom set, for the battery: shy state, chrome alpha, pieces on
+  // the attract floor (stock oval = 8), trains riding it (stock + the kid's).
+  bedroom(){ return { on:BED.on, shy:BED.shy, a:+BED.a.toFixed(3),
+    pieces:AT.grid.size+AT.hg.size,
+    trains:(AT.cars.length?1:0)+((BED.ctx? TRAIN.placed : BED.train.placed)?1:0) }; },
   menu(){ showScreen('menu'); return SCREEN; },
   play(){ showScreen('game'); return SCREEN; },
   color(name){ if(!LIVERY[name]) return false; COLOR=name; liveryChanged(); save(); return COLOR; },
@@ -6509,7 +6826,7 @@ window.TS={
     camp:{ on:CAMP.on, level:CAMP.level, won:CAMP.won, done:[...CAMP.done].sort((a,b)=>a-b) },
     play:{ on:PLAY.on, count:PLAY.trains.filter(t=>!t.dying).length, crashes:PLAY.crashes,
       map:PLAY.mapIdx, playIdx:PLAYI|0 },   // E17: the active rug + the persisted cycle
-    at:(()=>{ if(SCREEN==='game') return null;
+    at:(()=>{ if(SCREEN==='game'||!AT.cars.length) return null;   // E18: null while a hand holds the stock toy
       RGRID=AT.grid; HGRID=AT.hg; try{ const p=pos(AT.cars[0].rd); return {x:p.x,y:p.y}; } finally{ RGRID=grid; HGRID=hgrid; } })(),
     loco:TRAIN.placed? Object.assign({},TRAIN.cars[0].rd,pos(TRAIN.cars[0].rd)) : null,
     cars:TRAIN.cars.map(c=>{ const p=pos(c.rd); return {t:c.type,cx:c.rd.cx,cy:c.rd.cy,el:c.rd.el?1:0,x:p.x,y:p.y,z:p.z}; }) }; },
