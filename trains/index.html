@@ -439,7 +439,7 @@
 </div></div>
 <div id="bank"><div id="bkpanel">
   <h1>🏦 THE BANK</h1>
-  <div id="bkrow"><canvas id="bkpig" width="192" height="156"></canvas><div id="bkcount">★ 0</div></div>
+  <div id="bkrow"><canvas id="bkpig" width="384" height="312"></canvas><div id="bkcount">★ 0</div></div>
   <div id="bkledger"></div>
   <button id="bkshop" type="button">🛒 SHOP</button>
   <button id="bkback" type="button">⬇ CLOSE THE BANK</button>
@@ -507,6 +507,11 @@ const RAIN_RUMBLE=[14,34];                       // seconds between distant rumb
 // move, in every mode. HOME and double-tap-empty-rug still fit the whole rug.
 const BASE_MUL=2;                                // "about twice" — Wyatt's dial
 const ZOOM_MAX=2;                                // camera: was 1× — the hand can go closer still
+// Chrome icon canvases (palette / shelf / tray / bedpal / piggy) keep a FIXED
+// backing store; at --ui:2 they display at ~their old attr size, so retina
+// needs the attrs doubled to keep v2.8's 2× crispness headroom. Store cards
+// and the world canvas already repaint at rect×DPR and need nothing.
+const ICON_RES=2;
 const FLICK_FRICTION=0.02, FLICK_STOP=8;         // GVT campCam glide feel (v1.98), lifted
 const FIT_PAD=0;                                 // px of margin at fit (0 = today's letterbox exactly)
 // which land/weather a mode ACTUALLY shows: a campaign level may declare its
@@ -4058,8 +4063,8 @@ function buildBedPal(){
     const cv=document.createElement('canvas'); const lb=document.createElement('small');
     lb.textContent=(PIECES.find(p=>p[0]===t)||[t,t])[1];
     b.appendChild(cv); b.appendChild(lb); wrap.appendChild(b);
-    cv.width=104; cv.height=104;
-    const g=cv.getContext('2d'), s=104/(C+16);
+    cv.width=104*ICON_RES; cv.height=104*ICON_RES;
+    const g=cv.getContext('2d'), s=104*ICON_RES/(C+16);
     g.setTransform(s,0,0,s,8*s,8*s);
     withCtx(g,()=>drawPieceArt({t,r:t==='c'?1:0,sel:0,elev:0,latch:null},0,0));
     b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
@@ -4830,7 +4835,7 @@ function drawToyCard(){
   cx.font='bold '+(26*u)+'px "Arial Black",Impact,sans-serif';
   cx.fillText(TOY_CARD,W/2,y+44*u);
   // the real painter, scaled up on its own little canvas so the shelf art is the law
-  const box=168*u, tmp=document.createElement('canvas'); tmp.width=tmp.height=96;
+  const box=168*u, tmp=document.createElement('canvas'); tmp.width=tmp.height=96*ICON_RES;   // E20: 2× res for the big card
   const keep=coll.has(toyCard); if(!keep) coll.add(toyCard);   // draw it OWNED (never a silhouette here)
   slotIcon(tmp,toyCard);
   if(!keep) coll.delete(toyCard);
@@ -5144,8 +5149,8 @@ function buildTray(){
   const tw=$('ptray');
   for(const name of TRAY_ORDER){
     const b=document.createElement('button'); b.className='tray'; b.type='button';
-    const cv2=document.createElement('canvas'); cv2.width=124; cv2.height=76; b.appendChild(cv2);
-    const g=cv2.getContext('2d'); g.setTransform(1.45,0,0,1.45,59,41);
+    const cv2=document.createElement('canvas'); cv2.width=124*ICON_RES; cv2.height=76*ICON_RES; b.appendChild(cv2);
+    const g=cv2.getContext('2d'); g.setTransform(1.45*ICON_RES,0,0,1.45*ICON_RES,59*ICON_RES,41*ICON_RES);
     withCtx(g,()=>drawCar('loco',0,0,0,0,0.6,LIVERY[name]));
     b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
       down={x:e.clientX,y:e.clientY,what:'tray',color:name,el:b}; });
@@ -5715,8 +5720,8 @@ function buildPalette(){
     const b=document.createElement('button'); b.className='pbtn drg'; b.type='button';   // E20: drg = a toy the hand lifts OUT — the shelf never grab-scrolls from it
     const cv=document.createElement('canvas'); const lb=document.createElement('small');
     lb.textContent=name; b.appendChild(cv); b.appendChild(lb); groups[layer].appendChild(b);
-    cv.width=104; cv.height=104;
-    const g=cv.getContext('2d'), s=104/(C+16);
+    cv.width=104*ICON_RES; cv.height=104*ICON_RES;
+    const g=cv.getContext('2d'), s=104*ICON_RES/(C+16);
     g.setTransform(s,0,0,s,8*s,8*s);
     paint(g);
     b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
@@ -5725,7 +5730,7 @@ function buildPalette(){
     PAL_BTNS.push({t,layer,el:b});
   };
   for(const [t,name] of PIECES) mk('track',t,name,g=>{
-    if(t==='sp'){ const s2=104/(SPS+28); g.setTransform(s2,0,0,s2,14*s2,14*s2); }   // the 2×2 tower, shrunk to fit
+    if(t==='sp'){ const s2=104*ICON_RES/(SPS+28); g.setTransform(s2,0,0,s2,14*s2,14*s2); }   // the 2×2 tower, shrunk to fit
     withCtx(g,()=>drawPieceArt({t,r:t==='c'?1:0,sel:0,elev:0,latch:null},0,0));
   });
   for(const t of SCEN_TAB) mk('scen',t,defOf(t).name,g=>scenIcon(g,t));
@@ -5737,8 +5742,9 @@ function buildPalette(){
     b.style.touchAction='pan-x';   // E20: a tap-tile is shelf wood — swipes scroll the bar, taps pick
     const cv=document.createElement('canvas'); const lb=document.createElement('small');
     lb.textContent=name; b.appendChild(cv); b.appendChild(lb); groups.rug.appendChild(b);
-    cv.width=104; cv.height=104;
-    paint(cv.getContext('2d'));
+    cv.width=104*ICON_RES; cv.height=104*ICON_RES;
+    const gr=cv.getContext('2d'); gr.scale(ICON_RES,ICON_RES);   // tiles paint absolute in 104-space
+    paint(gr);
     b.addEventListener('click',()=>{
       if(barDragged()) return;     // E20: a scrolled shelf never picks (the E13 aisle law)
       ac();
@@ -5880,7 +5886,7 @@ function buildShelf(){
   const wrap=$('shelf'), parts={};
   // the train itself — ONE drag item, the old #handle reborn in the bar
   const tb=document.createElement('button'); tb.id='shelfTrain'; tb.className='pbtn drg'; tb.type='button';   // E20: a drag source, never shelf wood
-  shelfTrainCv=document.createElement('canvas'); shelfTrainCv.width=220; shelfTrainCv.height=104;
+  shelfTrainCv=document.createElement('canvas'); shelfTrainCv.width=220*ICON_RES; shelfTrainCv.height=104*ICON_RES;
   const tlb=document.createElement('small'); tlb.textContent='DRAG ME OUT!';
   tb.appendChild(shelfTrainCv); tb.appendChild(tlb);
   tb.addEventListener('pointerdown',e=>{
@@ -5932,12 +5938,12 @@ function paintShelfTrain(){
   const cv=shelfTrainCv, g=cv.getContext('2d');
   g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
   const n=1+consist.length;
-  const x0=cv.width-52, sp=n>1? Math.min(58,(cv.width-104)/(n-1)) : 0;
+  const x0=cv.width-52*ICON_RES, sp=n>1? Math.min(58*ICON_RES,(cv.width-104*ICON_RES)/(n-1)) : 0;
   const fd=TRAIN.placed? 0.35 : undefined;   // out on the rails = a ghost minds the slot
   withCtx(g,()=>{
     for(let i=n-1;i>=0;i--){
       const t=i===0?ENGINE:consist[i-1];
-      cx.setTransform(1.05,0,0,1.05,x0-i*sp,56);
+      cx.setTransform(1.05*ICON_RES,0,0,1.05*ICON_RES,x0-i*sp,56*ICON_RES);
       drawCar(t,0,0,0,0,0.6,livFor(i),0,fd);
     }
     cx.setTransform(1,0,0,1,0,0);
@@ -5947,13 +5953,13 @@ function repaintShelfIcons(){
   for(const [t,cv] of SHELF_CAR_BTNS){
     const g=cv.getContext('2d');
     g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
-    g.setTransform(1,0,0,1,52,56);
+    g.setTransform(ICON_RES,0,0,ICON_RES,52*ICON_RES,56*ICON_RES);
     withCtx(g,()=>drawCar(t,0,0,0,0,0.6));
   }
   for(const [t,cv] of SHELF_ENG_BTNS){
     const g=cv.getContext('2d');
     g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
-    g.setTransform(0.72,0,0,0.72,52,60);
+    g.setTransform(0.72*ICON_RES,0,0,0.72*ICON_RES,52*ICON_RES,60*ICON_RES);
     withCtx(g,()=>drawCar(t,0,0,0,0,0.6));
   }
   paintShelfTrain();
@@ -6071,24 +6077,27 @@ function collChanged(){
 function boxShow(b){ $('toybox').style.display=b?'flex':'none'; if(b) boxSync(); }
 function slotIcon(cv,id,fullCol){   // E9: fullCol=true skips the silhouette (the store dims by CSS instead)
   const g=cv.getContext('2d');
-  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,96,96);
+  // E20: resolution-aware — k=1 for the 96px toybox/ticket slots (byte-identical),
+  // larger canvases (the NEW TOY! card's 192) paint the same art at full res
+  const k=cv.width/96;
+  g.setTransform(k,0,0,k,0,0); g.clearRect(0,0,96,96);
   const def=defOf(id);
   if(def.cat==='train'||def.cat==='paint'){
-    g.setTransform(0.95,0,0,0.95,48,54);
+    g.setTransform(0.95*k,0,0,0.95*k,48*k,54*k);
     withCtx(g,()=>drawCar(def.cat==='paint'?'loco':id,0,0,0,0,0.6,
                           def.cat==='paint'? LIVERY[id.slice(3)] : null));
   } else if(def.cat==='track'){
-    let s=96/(C+16), o=8;
-    if(id==='sp'){ s=96/(SPS+28); o=14; }
+    let s=96*k/(C+16), o=8;
+    if(id==='sp'){ s=96*k/(SPS+28); o=14; }
     g.setTransform(s,0,0,s,o*s,o*s);
     withCtx(g,()=>drawPieceArt({t:id,r:id==='c'?1:0,sel:0,elev:0,latch:null},0,0));
   } else {
-    const s=96/(C+16);
+    const s=96*k/(C+16);
     g.setTransform(s,0,0,s,8*s,8*s);
     scenIcon(g,id);
   }
   if(!fullCol&&!coll.has(id)){   // locked = a dark silhouette on the shelf (SIL_DARK dial)
-    g.setTransform(1,0,0,1,0,0);
+    g.setTransform(k,0,0,k,0,0);
     g.globalCompositeOperation='source-atop';
     g.fillStyle='rgba(16,10,5,'+SIL_DARK+')'; g.fillRect(0,0,96,96);
     g.globalCompositeOperation='source-over';
@@ -6643,8 +6652,8 @@ function bankIcon(cv,kind){
 }
 function bankPig(){                  // the molded piggy on the rug, coin halfway in
   const cv=$('bkpig'), g=cv.getContext('2d');
-  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,192,156);
-  g.setTransform(2,0,0,2,96,84);
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
+  g.setTransform(2*ICON_RES,0,0,2*ICON_RES,96*ICON_RES,84*ICON_RES);
   withCtx(g,()=>{
     cx.lineJoin='round'; cx.lineCap='round';
     cx.globalAlpha=0.25; cx.fillStyle='#000';
