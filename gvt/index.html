@@ -2037,7 +2037,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.00</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.01</div>
   <div class="scanlines"></div>
 </div>
 
@@ -11203,6 +11203,57 @@ const BOSSDEF = {
   // (one tokenized key covers all three fills) — this row is the fallback shape.
   mom:     { title:'MOM',                 wave:'⚠ MOM IS CLEANING THE ROOM ⚠' }
 };
+// ===== CAMPAIGN EDITS — authored in the campaign editor (FM-GVT-EDIT-01) =====
+// Wyatt edits the order of battle in the editor, exports this object, and it drops in
+// here. An EMPTY object is byte-identical to no overlay at all — the all-100 cfg dump
+// proves it, and that is what lets this ship before any unit work. levelCfg itself keeps
+// its exact bytes: nothing below consumes an R() draw, so no seed can move (the v1.40 law).
+// ⚠ THIS MUST LIVE IN THE SHIPPED FILE. Co-op relays only the level NUMBER — both sims
+// rebuild the army from levelCfg, so an override in localStorage, a ?param or a fetch
+// desyncs every co-op lobby. "Resubmit to update the game" means COMMIT.
+const CAMP_EDITS = {};
+if(CAMP_EDITS && CAMP_EDITS.v){
+  const E = CAMP_EDITS;
+  if(E.fdef)     for(const k in E.fdef)     FDEF[k]    = Object.assign({}, FDEF[k]||{}, E.fdef[k]);
+  if(E.bossdef)  for(const k in E.bossdef)  BOSSDEF[k] = Object.assign({}, BOSSDEF[k]||{}, E.bossdef[k]);
+  if(E.pieces)   for(const k in E.pieces)   { if(E.pieces[k]===null) delete SET_PIECES[k];      else SET_PIECES[k]=E.pieces[k]; }
+  if(E.premiere) for(const k in E.premiere) { if(E.premiere[k]===null) delete FORM_PREMIERE[k]; else FORM_PREMIERE[k]=E.premiere[k]; }
+  if(E.stages)   for(const k in E.stages)   { if(E.stages[k]===null) delete CAMP_STAGES[k];     else CAMP_STAGES[k]=E.stages[k]; }
+  if(E.grand)    for(const k in E.grand)    { if(E.grand[k]===null) delete CAMP_GRAND[k];       else CAMP_GRAND[k]=E.grand[k]; }
+  // every group is rebuilt fresh — sqScaleCfg mutates cfg groups in place, so a shared
+  // reference would let one battle's scaling leak into the next (the 11055 law)
+  const _mk = (g,c) => { const q={f:g.f,t:g.t,n:(g.raw?(g.n||1):c(g.n||1)),e:g.e,at:g.at};
+    if(g.officer) q.officer=true;
+    if(g.escort)  q.escort = g.escortRaw ? g.escort : c(g.escort);
+    if(g.tease)   q.tease=true; return q; };
+  if(E.forms){
+    const _wfk = waveFromKey;
+    waveFromKey = function(key,m,R,lvl){
+      const o = E.forms[key]; if(!o) return _wfk(key,m,R,lvl);
+      const c = x=>Math.max(1,Math.round(x*m));
+      return { name:o.name, groups:o.groups.map(g=>_mk(g,c)) };
+    };
+  }
+  if(E.levels){
+    const _lc = levelCfg;
+    levelCfg = function(n){
+      const cfg=_lc(n), o=E.levels[n]; if(!o) return cfg;
+      if(o.hpMul!=null)  cfg.hpMul=o.hpMul;
+      if(o.cntMul!=null) cfg.cntMul=o.cntMul;
+      if(o.bossF!=null)  cfg.bossF=o.bossF;
+      if(o.waves){
+        const c = x=>Math.max(1,Math.round(x*cfg.cntMul));
+        cfg.waves = o.waves.map(w=>{
+          const q={ name:w.name, groups:w.groups.map(g=>_mk(g,c)) };
+          if(w.boss) q.boss=w.boss;
+          if(w.piece) q.piece=true; if(w.tease) q.tease=true; if(w.premiere) q.premiere=true;
+          return q;
+        });
+      }
+      return cfg;
+    };
+  }
+}
 // ===== SARGE'S ARSENAL =====
 // The pistol is his default and needs no unlock. The three specials unlock as
 // the campaign rolls on. ALL FOUR rank through META.sargeUp at the promotion
