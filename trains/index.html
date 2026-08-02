@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v2.7 -->
+<!-- TRAINSET v2.8 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.7">
 <style>
@@ -5129,6 +5129,30 @@ function cellXY(wx,wy){
   const gx=Math.floor((wx-GX)/C), gy=Math.floor((wy-GY)/C);
   return (gx>=GX0&&gy>=GY0&&gx<GW&&gy<GH)? [gx,gy] : null;   // GX0/GY0 = 0 outside E18's bedroom
 }
+// ---- E19 LIFT AND LOOK: THE TOY SITS ON TOP OF THE HAND ----
+// On a phone the finger IS the occlusion — so while a finger drags, the effective
+// drag point rides DRAG_LIFT *screen* px above the touch: the hand holds the toy
+// from below and the eyes see everything. The ghost, the hover cell, THE
+// predicate and the drop all read this one lifted point through dragXY — nobody
+// computes their own. Mouse and pen lift 0: a desktop cursor hides nothing (and
+// the mouse-driven byte-identity proofs must not move). The lift is screen-space,
+// applied BEFORE the camera inverse, so it feels identical at every zoom.
+const DRAG_LIFT=64;            // screen px the toy rides above a finger
+const LIFT_RAMP=0.12;          // s — the pickup eases up, no teleport
+function liftNow(e){
+  if(e.pointerType!=='touch'||!DRAG) return 0;
+  const k=(perf()-DRAG.t0)/LIFT_RAMP;
+  return k>0? DRAG_LIFT*Math.min(1,k) : 0;
+}
+function dragXY(e){
+  const L=liftNow(e);
+  return L? worldXY({clientX:e.clientX,clientY:e.clientY-L}) : worldXY(e);
+}
+function dragSync(){           // paint-time: the ramp eases the toy up even under a still finger
+  if(!DRAG||DRAG.pt!=='touch'||DRAG.cx==null) return;
+  const [wx,wy]=dragXY({clientX:DRAG.cx,clientY:DRAG.cy,pointerType:'touch'});
+  DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy);
+}
 let down=null;
 // ---- E10 camera gestures: pinch state + double-tap memory ----
 // Pan must LOSE to the existing drag laws — a press that lands on a train, a
@@ -5237,7 +5261,8 @@ function moveCore(e){
   if(PINCH){ if(PTRS.size>=2){ e.preventDefault(); pinchMove(); } return; }
   if(DRAG){
     e.preventDefault();
-    const [wx,wy]=worldXY(e);
+    DRAG.cx=e.clientX; DRAG.cy=e.clientY;        // E19: dragSync re-lifts these every frame
+    const [wx,wy]=dragXY(e);
     DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy);
     return;
   }
@@ -5309,7 +5334,8 @@ function moveCore(e){
     DRAG={kind:'atrain',prev:AT.cars};                               // any car of it = the toy law's handle
     AT.cars=[];
   }
-  if(DRAG){ const [wx,wy]=worldXY(e); DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy); down=null; }
+  if(DRAG){ DRAG.t0=perf(); DRAG.pt=e.pointerType; DRAG.cx=e.clientX; DRAG.cy=e.clientY;   // E19: the grab stamp — the lift ramps from here
+    const [wx,wy]=dragXY(e); DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy); down=null; }
 }
 window.addEventListener('pointerup',e=>{
   if(SCREEN==='menu'){ if(down||DRAG){ BED.idleT=0; inBed(()=>upCore(e)); } return; }   // E18
@@ -5330,7 +5356,7 @@ function upCore(e){
     down=null; return;
   }
   if(DRAG){
-    const [wx,wy]=worldXY(e); hover=cellXY(wx,wy);
+    const [wx,wy]=dragXY(e); hover=cellXY(wx,wy);   // E19: the drop reads the SAME lifted point the ghost did
     if(DRAG.kind==='newPiece'||DRAG.kind==='movePiece'){
       // the drop asks THE predicate — the same one the ghost tint asked all along
       const q=hover? placeQuery(DRAG.t,DRAG.r,hover[0],hover[1]) : null;
@@ -6617,6 +6643,7 @@ function frame(t){
     else if(SCREEN==='play'){ update(dt); playUpdate(dt); }             // the shared juice + the wind-up trains
     else menuUpdate(dt);                                                // the board keeps the bedroom alive behind it
   }
+  if(DRAG) withBed(dragSync);          // E19: the lift ramp is paint-time — it rises under a still finger
   if(SCREEN==='game'||SCREEN==='play') draw(); else drawMenu();
   if($('store').style.display==='flex') aisleFrame();   // E13: the aisle's live cards (visible ones only)
   requestAnimationFrame(frame);
@@ -6662,6 +6689,16 @@ window.TS={
   bedroom(){ return { on:BED.on, shy:BED.shy, a:+BED.a.toFixed(3),
     pieces:AT.grid.size+AT.hg.size,
     trains:(AT.cars.length?1:0)+((BED.ctx? TRAIN.placed : BED.train.placed)?1:0) }; },
+  // E19 — the lifted hand, for the battery: the live drag + hover cell, the lift
+  // constants, and both pointer transforms (rug and attract) so a rig can aim a
+  // REAL finger anywhere and compute where the lifted point must land.
+  lift(){ return {
+    drag: DRAG? { kind:DRAG.kind, x:DRAG.x, y:DRAG.y, pt:DRAG.pt||null, t0:DRAG.t0||0 } : null,
+    hover: hover? hover.slice() : null,
+    LIFT:DRAG_LIFT, RAMP:LIFT_RAMP,
+    rug:{ ox:OX, oy:OY, s:SC, GX, GY, C },
+    att:{ ox:ATT.ox, oy:ATT.oy, s:ATT_SCALE },
+  }; },
   menu(){ showScreen('menu'); return SCREEN; },
   play(){ showScreen('game'); return SCREEN; },
   color(name){ if(!LIVERY[name]) return false; COLOR=name; liveryChanged(); save(); return COLOR; },
