@@ -5,11 +5,16 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v2.8 -->
+<!-- TRAINSET v2.9 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
-<meta name="trainset-version" content="2.7">
+<meta name="trainset-version" content="2.9">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
+  /* E20 TWICE AS BIG — ONE dial. Every px of game chrome is calc(var(--ui)*Npx),
+     so the whole hand-world scales together and overflow SCROLLS instead of
+     shrinking. At --ui:1 the chrome lands on v2.8's exact pixels (the proof dial).
+     The sm viewport rides 1.7 — 2.0 can't hold a row on a 375px-tall phone. */
+  :root{ --ui:2; }   /* at --ui:1 the BAR + canvas cards land on v2.8's exact pixels (the proof dial) */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ width:100%; height:100%; overflow:hidden; }
   body{
@@ -21,14 +26,15 @@
   }
   canvas#cv{ position:absolute; inset:0; touch-action:none; }
   .chip{
-    position:absolute; top:10px; z-index:5; background:rgba(20,14,8,0.82);
-    border:2px solid #513a24; border-radius:12px; padding:7px 13px;
-    font-size:15px; letter-spacing:1px; color:#F7E9C4; cursor:pointer;
+    position:absolute; top:calc(var(--ui)*7px); z-index:5; background:rgba(20,14,8,0.82);
+    border:calc(var(--ui)*2px) solid #513a24; border-radius:calc(var(--ui)*12px);
+    padding:calc(var(--ui)*7px) calc(var(--ui)*13px);
+    font-size:calc(var(--ui)*15px); letter-spacing:1px; color:#F7E9C4; cursor:pointer;
   }
   #mark{ left:12px; cursor:default; color:#F2C531; }
   #mute{ right:12px; }
-  #menuChip{ right:76px; }
-  #backChip{ right:76px; display:none; }
+  #menuChip{ right:calc(var(--ui)*66px); }
+  #backChip{ right:calc(var(--ui)*66px); display:none; }
   /* ---- the HOME chip (E10): bottom-right, appears only while zoomed in ---- */
   #homeChip{ top:auto; right:12px; bottom:132px; display:none; }
   /* ---- the RIDE ALONG chip (E15): floats above HOME — a chip, NEVER a #palTabs
@@ -79,12 +85,12 @@
   #ptray{
     position:absolute; left:0; right:0; bottom:0; z-index:6; display:none;
     background:linear-gradient(#3a2a18,#241a0e); border-top:3px solid #513a24;
-    align-items:center; justify-content:center; gap:18px;
-    padding:10px 10px calc(10px + env(safe-area-inset-bottom));
+    align-items:center; justify-content:center; gap:calc(var(--ui)*18px);
+    padding:calc(var(--ui)*10px) calc(var(--ui)*10px) calc(var(--ui)*10px + env(safe-area-inset-bottom));
   }
-  .tray{ width:78px; height:78px; border-radius:50%; background:#170f08; border:3px solid #513a24;
+  .tray{ width:calc(var(--ui)*78px); height:calc(var(--ui)*78px); border-radius:50%; background:#170f08; border:3px solid #513a24;
     cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; touch-action:none; }
-  .tray canvas{ width:62px; height:38px; pointer-events:none; }
+  .tray canvas{ width:calc(var(--ui)*62px); height:calc(var(--ui)*38px); pointer-events:none; }
   .tray:active{ transform:translateY(2px); }
   /* ---- the toy box (E7): a wooden shelf of fifty little slots ---- */
   #boxChip{ background:rgba(20,14,8,0.82); border:2px solid #513a24; border-radius:12px;
@@ -104,25 +110,27 @@
   .tbslot.lock{ border-color:#2e2114; }
   #tbback{ margin-top:2px; background:none; border:none; color:#8f7a52; font-family:inherit;
     font-size:11px; letter-spacing:1px; cursor:pointer; padding:5px 8px; }
-  #moreToys b,#tidyBtn b{ font-size:20px; pointer-events:none; }
+  #moreToys b,#tidyBtn b{ font-size:calc(var(--ui)*20px); pointer-events:none; }
   #tidyBtn.ask{ border-color:#FF7A5C; color:#FF7A5C; }
   /* ---- the store (E9): the ★ bank chip + the wooden shop counter ---- */
-  #starChip{ right:170px; color:#F2C531; display:none; }
+  #starChip{ right:calc(var(--ui)*178px); color:#F2C531; display:none; }
   #starMenu{ background:rgba(20,14,8,0.82); border:2px solid #513a24; border-radius:12px;
     color:#F2C531; font-family:inherit; font-size:13px; letter-spacing:1px; padding:7px 14px; cursor:pointer; }
   #store{ position:absolute; inset:0; z-index:12; display:none; align-items:center; justify-content:center;
     padding:10px; background:rgba(10,6,3,0.45); }
   #stpanel{ background:linear-gradient(#3a2a18,#241a0e); border:3px solid #6e5130; border-radius:20px;
-    padding:14px 18px 8px; box-shadow:0 14px 44px rgba(0,0,0,0.55); width:min(96vw,860px); text-align:center; }
+    padding:calc(var(--ui)*10px) calc(var(--ui)*12px) calc(var(--ui)*6px);
+    box-shadow:0 14px 44px rgba(0,0,0,0.55); width:min(96vw,calc(var(--ui)*640px)); text-align:center;
+    max-height:96vh; overflow-y:auto; }   /* E20: a tall shop SCROLLS — chrome never shrinks to fit */
   #stlid{ display:flex; align-items:baseline; justify-content:space-between; gap:14px; margin-bottom:8px; }
-  #stlid h1{ font-size:20px; letter-spacing:3px; color:#F2C531; }
-  #stStars{ font-size:14px; letter-spacing:2px; color:#F2C531; background:#170f08;
-    border:2px solid #513a24; border-radius:10px; padding:4px 10px; }
+  #stlid h1{ font-size:calc(var(--ui)*16px); letter-spacing:3px; color:#F2C531; }
+  #stStars{ font-size:calc(var(--ui)*12px); letter-spacing:2px; color:#F2C531; background:#170f08;
+    border:2px solid #513a24; border-radius:calc(var(--ui)*10px); padding:calc(var(--ui)*4px) calc(var(--ui)*10px); }
   /* ---- E13 THE TOY AISLE: one horizontal strip, card size IS rarity ---- */
-  #staisle{ position:relative; display:flex; align-items:flex-end; gap:10px;
-    overflow-x:auto; overflow-y:hidden; padding:16px 10px 8px;
+  #staisle{ position:relative; display:flex; align-items:flex-end; gap:calc(var(--ui)*10px);
+    overflow-x:auto; overflow-y:hidden; padding:calc(var(--ui)*16px) calc(var(--ui)*10px) calc(var(--ui)*8px);
     scroll-snap-type:x proximity; touch-action:pan-x; cursor:grab;
-    border-bottom:5px solid #6e5130;   /* the shelf floor the goods sit on */
+    border-bottom:calc(var(--ui)*5px) solid #6e5130;   /* the shelf floor the goods sit on */
     scrollbar-width:thin; scrollbar-color:#6e5130 #170f08; }
   #staisle::-webkit-scrollbar{ height:9px; }
   #staisle::-webkit-scrollbar-track{ background:#170f08; border-radius:5px; }
@@ -133,8 +141,8 @@
     background:linear-gradient(#241a12,#120c06); border:3px solid #513a24; border-radius:16px;
     scroll-snap-align:center; cursor:pointer; }
   .stcard canvas{ flex:1 1 auto; width:100%; min-height:0; pointer-events:none; }
-  .stcard small{ font-size:10px; letter-spacing:1px; color:#F7E9C4; pointer-events:none;
-    background:#170f08; border:1px solid #513a24; border-radius:8px; padding:2px 8px;
+  .stcard small{ font-size:calc(var(--ui)*8px); letter-spacing:1px; color:#F7E9C4; pointer-events:none;
+    background:#170f08; border:1px solid #513a24; border-radius:calc(var(--ui)*8px); padding:calc(var(--ui)*2px) calc(var(--ui)*8px);
     max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .stcard.md{ border-color:#E67E22; }     /* the orange frame — the screenshot's "UP" card */
   .stcard.bg{ border-color:#C0392B; }     /* deep red + corner badge */
@@ -153,23 +161,23 @@
   .stsign::before{ content:''; position:absolute; top:4px; bottom:0; left:50%; width:9px; margin-left:-4.5px;
     background:#3a2a18; border-radius:4px; }
   .stsign b{ position:relative; background:linear-gradient(#7A553A,#5C3F28); border:3px solid #3a2a18;
-    border-radius:12px; color:#F2C531; font-size:14px; letter-spacing:2px; padding:12px 8px;
+    border-radius:12px; color:#F2C531; font-size:calc(var(--ui)*10px); letter-spacing:2px; padding:calc(var(--ui)*9px) calc(var(--ui)*6px);
     text-align:center; transform:rotate(-2deg); box-shadow:0 6px 14px rgba(0,0,0,0.45); }
   /* the showcase stage — the screenshot's top half, name plate and all */
   #ststage{ position:relative; display:flex; align-items:center; gap:12px; margin-bottom:8px;
     padding:6px 12px; background:linear-gradient(#2e2113,#1c1309); border:3px solid #513a24; border-radius:16px; }
   #ststage.md{ border-color:#E67E22; } #ststage.bg{ border-color:#C0392B; } #ststage.star{ border-color:#F2C531; }
-  #stgcv{ width:132px; height:132px; flex:0 0 auto;
+  #stgcv{ width:calc(var(--ui)*100px); height:calc(var(--ui)*100px); flex:0 0 auto;
     background:radial-gradient(ellipse 62% 30% at 50% 78%,#4A1A12 0%,#63251C 55%,transparent 56%); }
   #stgside{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
   #stgplate{ background:#170f08; border:2px solid #513a24; border-radius:10px; padding:5px 14px; max-width:100%; }
-  #stgname{ display:block; font-size:17px; letter-spacing:2px; color:#F7E9C4; white-space:nowrap;
+  #stgname{ display:block; font-size:calc(var(--ui)*14px); letter-spacing:2px; color:#F7E9C4; white-space:nowrap;
     overflow:hidden; text-overflow:ellipsis; }
-  #stgcap{ display:block; font-size:8.5px; letter-spacing:1.5px; color:#CBB88C; margin-top:2px; }
+  #stgcap{ display:block; font-size:calc(var(--ui)*7.5px); letter-spacing:1.5px; color:#CBB88C; margin-top:2px; }
   .pc{ font-size:9px; letter-spacing:0.5px; color:#F2C531; background:#170f08;
     border:1px solid #513a24; border-radius:7px; padding:1px 6px; }
   .pc.own{ color:#CFF7C4; }
-  .stcard .pc,#ststage .pc{ font-size:12px; letter-spacing:1px; border-radius:10px; padding:3px 12px;
+  .stcard .pc,#ststage .pc{ font-size:calc(var(--ui)*10px); letter-spacing:1px; border-radius:calc(var(--ui)*10px); padding:calc(var(--ui)*3px) calc(var(--ui)*10px);
     border-width:2px; pointer-events:none; font-family:inherit; }
   .stcard .pc.buy,#ststage .pc.buy{ background:linear-gradient(#F7D14A,#D9A93B); color:#3A2A18;
     border-color:#8F6B1E; font-weight:bold; pointer-events:auto; cursor:pointer; }
@@ -177,29 +185,31 @@
   /* ---- E13 THE BANK — the place you stop BEFORE the shop ---- */
   #bank{ position:absolute; inset:0; z-index:12; display:none; align-items:center; justify-content:center;
     padding:10px; background:rgba(10,6,3,0.45); }
-  #bkpanel{ position:relative; text-align:center; max-width:min(96vw,560px);
+  #bkpanel{ position:relative; text-align:center; max-width:min(96vw,calc(var(--ui)*400px));
     background:repeating-linear-gradient(0deg,rgba(143,70,52,0.16) 0 2px,transparent 2px 12px),
       linear-gradient(#6d2a1f,#4A1A12);   /* the piggy sits on the rug, weave and all */
     border:3px solid #8F4634; border-radius:20px;
-    padding:14px 20px 8px; box-shadow:0 14px 44px rgba(0,0,0,0.55); }
-  #bkpanel h1{ font-size:20px; letter-spacing:3px; color:#F2C531; margin-bottom:6px; }
-  #bkrow{ display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:8px; }
-  #bkpig{ width:96px; height:78px; }
-  #bkcount{ font-size:46px; letter-spacing:3px; color:#F2C531; text-shadow:0 3px 0 rgba(0,0,0,0.35); }
-  #bkledger{ display:flex; flex-direction:column; gap:4px; margin:0 auto 10px; max-width:340px; }
-  .bkrow2{ display:flex; align-items:center; gap:10px; background:#170f08; border:2px solid #513a24;
-    border-radius:12px; padding:3px 12px 3px 6px; }
-  .bkrow2 canvas{ width:34px; height:34px; flex:0 0 auto; }
-  .bkrow2 b{ font-size:12px; letter-spacing:2px; color:#F7E9C4; }
-  .bkrow2 i{ font-style:normal; font-size:8px; letter-spacing:1px; color:#8f7a52; }
-  .bkrow2 span{ margin-left:auto; font-size:14px; letter-spacing:1px; color:#F2C531; }
+    padding:calc(var(--ui)*10px) calc(var(--ui)*14px) calc(var(--ui)*6px);
+    box-shadow:0 14px 44px rgba(0,0,0,0.55);
+    max-height:96vh; overflow-y:auto; }   /* E20: a tall bank SCROLLS */
+  #bkpanel h1{ font-size:calc(var(--ui)*15px); letter-spacing:3px; color:#F2C531; margin-bottom:calc(var(--ui)*5px); }
+  #bkrow{ display:flex; align-items:center; justify-content:center; gap:calc(var(--ui)*11px); margin-bottom:calc(var(--ui)*6px); }
+  #bkpig{ width:calc(var(--ui)*72px); height:calc(var(--ui)*58px); }
+  #bkcount{ font-size:calc(var(--ui)*35px); letter-spacing:3px; color:#F2C531; text-shadow:0 3px 0 rgba(0,0,0,0.35); }
+  #bkledger{ display:flex; flex-direction:column; gap:calc(var(--ui)*3px); margin:0 auto calc(var(--ui)*8px); max-width:calc(var(--ui)*265px); }
+  .bkrow2{ display:flex; align-items:center; gap:calc(var(--ui)*8px); background:#170f08; border:2px solid #513a24;
+    border-radius:12px; padding:calc(var(--ui)*2px) calc(var(--ui)*9px) calc(var(--ui)*2px) calc(var(--ui)*5px); }
+  .bkrow2 canvas{ width:calc(var(--ui)*26px); height:calc(var(--ui)*26px); flex:0 0 auto; }
+  .bkrow2 b{ font-size:calc(var(--ui)*9px); letter-spacing:2px; color:#F7E9C4; }
+  .bkrow2 i{ font-style:normal; font-size:calc(var(--ui)*6px); letter-spacing:1px; color:#8f7a52; }
+  .bkrow2 span{ margin-left:auto; font-size:calc(var(--ui)*11px); letter-spacing:1px; color:#F2C531; }
   #bkshop{ display:block; margin:0 auto; background:linear-gradient(#F7D14A,#D9A93B); color:#3A2A18;
-    border:3px solid #8F6B1E; border-radius:16px; font-family:inherit; font-size:18px; letter-spacing:2px;
-    padding:12px 34px; cursor:pointer; font-weight:bold; }
+    border:3px solid #8F6B1E; border-radius:16px; font-family:inherit; font-size:calc(var(--ui)*14px); letter-spacing:2px;
+    padding:calc(var(--ui)*9px) calc(var(--ui)*26px); cursor:pointer; font-weight:bold; }
   #bkback{ margin-top:4px; background:none; border:none; color:#CBB88C; font-family:inherit;
-    font-size:11px; letter-spacing:1px; cursor:pointer; padding:5px 8px; }
+    font-size:calc(var(--ui)*9px); letter-spacing:1px; cursor:pointer; padding:5px 8px; }
   #stback{ margin-top:2px; background:none; border:none; color:#8f7a52; font-family:inherit;
-    font-size:11px; letter-spacing:1px; cursor:pointer; padding:5px 8px; }
+    font-size:calc(var(--ui)*9px); letter-spacing:1px; cursor:pointer; padding:5px 8px; }
   @keyframes starPulse{ 0%,100%{ transform:scale(1); } 40%{ transform:scale(1.3); } }
   .pulse{ animation:starPulse 0.45s; }
   /* ---- E15 THE NAME PLATE — the word-bank picker. The drawCampCards gold-card
@@ -225,40 +235,46 @@
     padding:9px 26px; cursor:pointer; font-weight:bold; }
   #nmback{ display:block; margin:4px auto 0; background:none; border:none; color:#8f7a52;
     font-family:inherit; font-size:10px; letter-spacing:1px; cursor:pointer; padding:4px 8px; }
-  /* ---- bottom bar ---- */
+  /* ---- bottom bar — E20: ONE horizontal shelf. Everything rides the --ui dial,
+     the bar may grow taller (the E10/E16 byte-equal bar law is REPEALED — the new
+     law is the RUG VIEWPORT keeps ≥60% of the screen), and overflow SCROLLS with
+     the E13 aisle feel: native pan-x for touch, grab-drag + fling for the mouse.
+     No custom scrollbar skin here — a classic scrollbar would eat bar height. ---- */
   #bar{
     position:absolute; left:0; right:0; bottom:0; z-index:6;
     background:linear-gradient(#3a2a18,#241a0e);
     border-top:3px solid #513a24;
-    display:flex; align-items:center; justify-content:safe center; gap:10px;
-    padding:8px 10px calc(8px + env(safe-area-inset-bottom));
-    overflow-x:auto;   /* a full toy box on a small phone scrolls rather than clips */
+    display:flex; align-items:center; justify-content:safe center; gap:calc(var(--ui)*10px);
+    padding:calc(var(--ui)*8px) calc(var(--ui)*10px) calc(var(--ui)*8px + env(safe-area-inset-bottom));
+    overflow-x:auto;   /* a full toy box scrolls rather than clips — on every screen now */
+    scroll-snap-type:x proximity; touch-action:pan-x; cursor:grab;
   }
+  #bar .pbtn,#bar .ptab{ scroll-snap-align:center; }
   .pbtn{
-    width:72px; background:#170f08; border:2px solid #513a24; border-radius:12px;
-    padding:4px 2px 3px; text-align:center; cursor:grab; color:#CBB88C;
-    display:flex; flex-direction:column; align-items:center; gap:1px; touch-action:none;
+    width:calc(var(--ui)*72px); background:#170f08; border:2px solid #513a24; border-radius:calc(var(--ui)*12px);
+    padding:calc(var(--ui)*4px) calc(var(--ui)*2px) calc(var(--ui)*3px); text-align:center; cursor:grab; color:#CBB88C;
+    display:flex; flex-direction:column; align-items:center; gap:calc(var(--ui)*1px); touch-action:none;
   }
-  .pbtn canvas{ width:52px; height:52px; pointer-events:none; }
-  .pbtn small{ font-size:8.5px; letter-spacing:0.5px; pointer-events:none; }
-  /* E10: two rows, columns flow sideways — the RUG tab joins WITHOUT making the
-     stack taller than the piece buttons (74px), so the bar (and with it the sm
-     rug's fit) stays to the pixel: 2×27px tabs + 4px gap = 58px < 74px, always */
-  #palTabs{ display:grid; grid-template-rows:repeat(2,auto); grid-auto-flow:column; gap:4px; }
-  .ptab{ background:#170f08; border:2px solid #513a24; border-radius:9px; color:#8f7a52;
-    font-family:inherit; font-size:9px; letter-spacing:1px; padding:5px 7px; cursor:pointer; }
+  .pbtn canvas{ width:calc(var(--ui)*52px); height:calc(var(--ui)*52px); pointer-events:none; }
+  .pbtn small{ font-size:calc(var(--ui)*8.5px); letter-spacing:0.5px; pointer-events:none; }
+  /* E20: the E10 two-row tab grid is DEAD (and the taller-bar trap with it) —
+     the tabs ride the one shelf in a single row and scroll with everything else */
+  #palTabs{ display:flex; gap:calc(var(--ui)*4px); }
+  .ptab{ background:#170f08; border:2px solid #513a24; border-radius:calc(var(--ui)*9px); color:#8f7a52;
+    font-family:inherit; font-size:calc(var(--ui)*9px); letter-spacing:1px; padding:calc(var(--ui)*5px) calc(var(--ui)*7px);
+    cursor:pointer; touch-action:pan-x; }   /* pan-x: a tab is also shelf wood — swipes scroll, taps pick */
   .ptab.on{ color:#F2C531; border-color:#F2C531; }
   .wig{ animation:wig 0.4s; }
   @keyframes wig{ 0%,100%{transform:rotate(0)} 25%{transform:rotate(-6deg)} 75%{transform:rotate(6deg)} }
-  #barSpace{ width:14px; }
+  #barSpace{ width:calc(var(--ui)*14px); flex:0 0 auto; }
   /* ---- THE TRAIN SHELF (E16) — the shed's jobs, out in the open. Every item is
      a .pbtn so the bar's pixel height CANNOT grow (the E10 sm-fit law: the 74px
      piece-button column stays the tallest thing in the bar, both viewports). ---- */
-  #shelf{ display:flex; gap:8px; align-items:center; }
-  #shelfCars,#shelfEng{ display:flex; gap:6px; }
-  #shelfCars .pbtn,#shelfEng .pbtn{ width:56px; }
+  #shelf{ display:flex; gap:calc(var(--ui)*8px); align-items:center; }
+  #shelfCars,#shelfEng{ display:flex; gap:calc(var(--ui)*6px); }
+  #shelfCars .pbtn,#shelfEng .pbtn{ width:calc(var(--ui)*56px); }
   #shelfTrain{ width:auto; border-color:#F2C531; border-style:dashed; color:#F2C531; }
-  #shelfTrain canvas{ width:110px; height:52px; }
+  #shelfTrain canvas{ width:calc(var(--ui)*110px); height:calc(var(--ui)*52px); }
   #shelfTrain.home{ border-style:solid; border-color:#513a24; color:#CBB88C; cursor:pointer; }
   /* ---- THE SHY UI (E18): touch the attract rug and the chrome gets out of the
      way — opacity + pointer-events ONLY, nothing moves or reflows, so the return
@@ -272,23 +288,24 @@
      which keeps the untouched menu byte-identical. The delayed visibility flip
      lets the opacity fade finish before the tools stop painting. */
   #bedbar{ position:absolute; left:0; right:0; bottom:0; z-index:6; display:none;
-    align-items:center; justify-content:safe center; gap:10px;
-    padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    align-items:center; justify-content:safe center; gap:calc(var(--ui)*10px);
+    padding:calc(var(--ui)*8px) calc(var(--ui)*10px) calc(var(--ui)*8px + env(safe-area-inset-bottom));
     overflow-x:auto; visibility:hidden; opacity:0; pointer-events:none;
     transition:opacity var(--shyms,0.3s) ease, visibility 0s var(--shyms,0.3s); }
   body.shy #bedbar{ visibility:visible; opacity:1;
     transition:opacity var(--shyms,0.3s) ease, visibility 0s 0s; }
   body.shy #bedbar button{ pointer-events:auto; }
-  #bedpal{ display:flex; gap:8px; }
+  #bedpal{ display:flex; gap:calc(var(--ui)*8px); }
   @media (max-width:820px){
     #bedbar{ gap:3px; }
     #bedpal{ gap:3px; }
   }
-  /* ---- toast + rotate ---- */
+  /* ---- toast + rotate (toast bottom rides the LIVE bar height — resize() sets it) ---- */
   #toast{
     position:absolute; left:50%; bottom:132px; transform:translateX(-50%);
     background:rgba(20,14,8,0.92); border:2px solid #F2C531; color:#F7E9C4;
-    padding:9px 18px; border-radius:12px; font-size:14px; letter-spacing:1px;
+    padding:calc(var(--ui)*9px) calc(var(--ui)*18px); border-radius:calc(var(--ui)*12px);
+    font-size:calc(var(--ui)*14px); letter-spacing:1px;
     opacity:0; transition:opacity 0.2s; pointer-events:none; z-index:9; white-space:nowrap;
   }
   #toast.on{ opacity:1; }
@@ -297,23 +314,30 @@
   #rot div{ font-size:52px; margin-bottom:14px; }
   @media (orientation:portrait) and (max-width:560px){ #rot{ display:block; } }
   @media (max-width:820px){
-    .pbtn{ width:47px; } .pbtn canvas{ width:33px; height:33px; }
-    .pbtn small{ font-size:7px; }
-    #bar{ gap:3px; }
-    #barSpace{ width:5px; }
-    #palSlot{ gap:3px !important; }
-    #palSlot>span{ gap:3px !important; }
-    #shelf{ gap:3px; } #shelfCars,#shelfEng{ gap:3px; }
-    #shelfCars .pbtn,#shelfEng .pbtn{ width:39px; }
-    #shelfTrain canvas{ width:70px; height:33px; }
-    .ptab{ font-size:7.5px; padding:4px 3px; }
-    #moreToys b,#tidyBtn b{ font-size:16px; }
+    /* E20: the sm bar rides the SAME dial at 1.7 — 2.0 can't hold a row inside
+       the ≥60%-viewport law on a 375px-tall phone (measured; Wyatt said "about") */
+    :root{ --ui:1.7; }
+    .pbtn{ width:calc(var(--ui)*47px); } .pbtn canvas{ width:calc(var(--ui)*33px); height:calc(var(--ui)*33px); }
+    .pbtn small{ font-size:calc(var(--ui)*7px); }
+    #bar{ gap:calc(var(--ui)*3px); }
+    #barSpace{ width:calc(var(--ui)*5px); }
+    #palSlot{ gap:calc(var(--ui)*3px) !important; }
+    #palSlot>span{ gap:calc(var(--ui)*3px) !important; }
+    #shelf{ gap:calc(var(--ui)*3px); } #shelfCars,#shelfEng{ gap:calc(var(--ui)*3px); }
+    #shelfCars .pbtn,#shelfEng .pbtn{ width:calc(var(--ui)*39px); }
+    #shelfTrain canvas{ width:calc(var(--ui)*70px); height:calc(var(--ui)*33px); }
+    .ptab{ font-size:calc(var(--ui)*7.5px); padding:calc(var(--ui)*4px) calc(var(--ui)*3px); }
+    #moreToys b,#tidyBtn b{ font-size:calc(var(--ui)*16px); }
     .mbtn{ font-size:17px; padding:11px 30px; letter-spacing:2px; }
-    .tray{ width:58px; height:58px; }
-    .tray canvas{ width:46px; height:28px; }
-    #ptray{ gap:10px; padding:7px 8px calc(7px + env(safe-area-inset-bottom)); }
+    .tray{ width:calc(var(--ui)*58px); height:calc(var(--ui)*58px); }
+    .tray canvas{ width:calc(var(--ui)*46px); height:calc(var(--ui)*28px); }
+    #ptray{ gap:calc(var(--ui)*10px); padding:calc(var(--ui)*7px) calc(var(--ui)*8px) calc(var(--ui)*7px + env(safe-area-inset-bottom)); }
     .sw canvas{ width:44px; height:27px; }
     #paintCap{ display:none; }
+    /* chips stay today-sized on a phone — they were already thumb-sized, and a
+       375px screen has no room to double its corners (builder's-eye call) */
+    .chip{ font-size:15px; padding:7px 13px; border-radius:12px; border-width:2px; top:10px; }
+    #menuChip,#backChip{ right:76px; }
     #menu{ gap:9px; padding-bottom:14px; }
     #bpanel{ padding:10px 10px 6px; }
     #bpanel h1{ font-size:18px; letter-spacing:2px; }
@@ -337,13 +361,13 @@
     #stpanel{ padding:8px 8px 3px; }
     #stlid{ margin-bottom:5px; } #stlid h1{ font-size:14px; letter-spacing:2px; }
     #stStars{ font-size:11px; padding:3px 8px; }
-    .stcard{ height:calc(var(--ch)*0.62*1px); border-radius:12px; padding:4px 5px 5px; gap:2px; }
+    .stcard{ height:calc(var(--ch)*0.55*1px); border-radius:12px; padding:4px 5px 5px; gap:2px; }
     .stcard small{ font-size:7.5px; padding:1px 6px; }
     .pc{ font-size:8px; padding:1px 4px; }
     .stcard .pc,#ststage .pc{ font-size:9px; padding:2px 8px; }
     .bdg{ width:18px; height:18px; font-size:9px; top:-7px; right:-7px; }
     .bdg.s{ font-size:11px; }
-    .stsign{ width:calc(var(--ch)*0.62*0.46*1px); }
+    .stsign{ width:calc(var(--ch)*0.55*0.46*1px); }
     .stsign b{ font-size:9px; letter-spacing:1px; padding:8px 5px; border-width:2px; }
     #staisle{ gap:6px; padding:10px 6px 6px; border-bottom-width:4px; }
     #ststage{ gap:8px; padding:4px 8px; margin-bottom:5px; }
@@ -475,7 +499,14 @@ const FLAKE_PER_CELL=1.15, FLAKE_MAX=380, FLAKE_FALL=1.0;   // snowfall count ca
 const DUST_PER_CELL=0.22, DUST_MAX=100;
 const RAIN_PER_CELL=0.75, RAIN_MAX=300, RAIN_SLANT=0.32;    // rain count cap + slant
 const RAIN_RUMBLE=[14,34];                       // seconds between distant rumbles (random in range)
-const ZOOM_MAX=1;                                // camera: 1× max, fit-scale min
+// ---- Wyatt dials (EXPANSION 20 — one block) ----
+// TWICE AS BIG. Wyatt 8/2: "Everything in the game needs to be about twice the
+// size… you'll just scroll through things and UI and pan around the screen."
+// The FIT view stops being the default: every rug ENTRY lands at baseScale() —
+// about twice fit — centered on the action, and panning is the normal way to
+// move, in every mode. HOME and double-tap-empty-rug still fit the whole rug.
+const BASE_MUL=2;                                // "about twice" — Wyatt's dial
+const ZOOM_MAX=2;                                // camera: was 1× — the hand can go closer still
 const FLICK_FRICTION=0.02, FLICK_STOP=8;         // GVT campCam glide feel (v1.98), lifted
 const FIT_PAD=0;                                 // px of margin at fit (0 = today's letterbox exactly)
 // which land/weather a mode ACTUALLY shows: a campaign level may declare its
@@ -611,9 +642,12 @@ const WAIT_MAX=3;            // waiters per platform
 const WAIT_REGROW=8;         // seconds per regrown waiter
 const RIDERS_PLAY=false;     // PLAY-mode boarding (ships off — PLAY is the smash mode)
 // C. RIDE ALONG. The chip is DOM beside HOME, NEVER a palette tab.
-const FOLLOW_ZOOM=0.8;       // ride-along zoom (clamped [fit, 1×] like every zoom)
+// E20 re-aim: the zoom is RELATIVE now — riding along must feel CLOSER than the
+// big default, never further (the old absolute 0.8 read as a zoom-OUT next to
+// baseScale on desktop and a zoom-IN on phones; relative feels the same everywhere).
+const FOLLOW_MUL=1.15;       // ride-along zoom = baseScale()×this (clamped [fit, ZOOM_MAX] like every zoom)
 const FOLLOW_EASE=5;         // camera chase lerp /s
-const FOLLOW_CAMP=false;     // campaign follow (ships false — the camGate law holds)
+const FOLLOW_CAMP=false;     // campaign follow (ships false — the followGate law holds)
 // D. THE NAME PLATE. Words only, never a keyboard — the kindergarten law.
 const NAME_WORDS=[
   ['SUNNY','BIG','HAPPY','RED','BLUE','FAST','LITTLE','SUPER','SLEEPY','BRAVE','SILLY','GOLD'],
@@ -843,19 +877,30 @@ const perf=()=>performance.now()/1000;
 const cvs=document.getElementById('cv');
 let cx=cvs.getContext('2d');                     // rebindable: icons borrow the painters
 let W=0,H=0,BAR=118,SC=1,OX=0,OY=0,DPR=1;
+let UIS=2;   // E20: the live --ui dial (resize() reads the computed style) — canvas chrome painters scale by it
 
 /* =====================================================================
    THE CAMERA (E10) — 🚨 ONE transform, one inverse. SC/OX/OY stay the
    single screen←world transform everything already reads (draw, worldXY,
    TS.xy, the star flights); VIEW just decides what they are each frame.
-   At fit it reproduces the old letterbox to the pixel — which is what
-   keeps sm byte-identical. The camera lives on the FREE-BUILD rug only:
-   campaign and PLAY stay at fit, exactly as they shipped.
+   At fit it reproduces the old letterbox to the pixel. E20 TWICE AS BIG:
+   the camera now lives on EVERY rug — BUILD, campaign and PLAY all pan,
+   pinch, flick and wheel (the fit-default and campaign-fit-lock laws are
+   REPEALED); only the menu/board diorama keeps its own fixed painting.
+   Every rug ENTRY lands at baseScale(), centered on the action.
    ===================================================================== */
 const VIEW={s:0,ox:0,oy:0,vx:0,vy:0};            // s=0 → fit on the next resize
-const camGate=()=>SCREEN==='game'&&!CAMP.on;
+const camGate=()=>SCREEN==='game'||SCREEN==='play';   // E20: every rug pans (campaign rides SCREEN 'game')
+const buildGate=()=>SCREEN==='game'&&!CAMP.on;   // the FREE-BUILD rug (the old camGate) — the name sign lives here only
 const fitScale=()=>Math.min((W-2*FIT_PAD)/WORLD_W,(H-BAR-2*FIT_PAD)/WORLD_H);
 const zoomMax=()=>Math.max(ZOOM_MAX,fitScale());
+const baseScale=()=>Math.min(BASE_MUL*fitScale(),zoomMax());   // E20: "about twice" — the big default
+const CAM={off:false};   // E20: a hand (pan/pinch/wheel/follow) carried the camera off the default
+// E20 quiet-HUD amendment: at a zoomed DEFAULT the old rule ("show HOME while
+// zoomed past fit") would light the chip forever. New rule, ONE predicate: the
+// chip means "you LEFT the default" — closer than base (5% grace) or panned away.
+// At the whole rug there is nothing to go home from, so it hides there too.
+const offBase=()=> VIEW.s>fitScale()+1e-6 && (VIEW.s>baseScale()*1.05 || CAM.off);
 function viewApply(){ SC=VIEW.s; OX=VIEW.ox; OY=VIEW.oy; homeSync(); }
 function clampView(){
   VIEW.s=Math.max(fitScale(),Math.min(zoomMax(),VIEW.s));
@@ -863,7 +908,26 @@ function clampView(){
   VIEW.ox= ww<=vw? (vw-ww)/2 : Math.max(vw-ww,Math.min(0,VIEW.ox));
   VIEW.oy= wh<=vh? (vh-wh)/2 : Math.max(vh-wh,Math.min(0,VIEW.oy));
 }
-function viewFit(){ followSet(false); VIEW.s=fitScale(); VIEW.vx=VIEW.vy=0; clampView(); viewApply(); }   // E15: HOME is a camera hand — follow lets go
+function viewFit(){ followSet(false); CAM.off=false; VIEW.s=fitScale(); VIEW.vx=VIEW.vy=0; clampView(); viewApply(); }   // E15: HOME is a camera hand — follow lets go
+// E20 — where the big default LOOKS: the placed train if there is one, else the
+// middle of everything on the rug (starter line, glued campaign land, the PLAY
+// map — one scan serves all three), else the rug's own centre.
+function baseAim(){
+  if(TRAIN.placed&&TRAIN.cars.length){ const p=pos(TRAIN.cars[0].rd); return [p.x,p.y-LIFT*(p.z||0)]; }
+  let n=0,sx=0,sy=0;
+  const add=k2=>{ const i=k2.indexOf(','); sx+=GX+(+k2.slice(0,i))*C+C/2; sy+=GY+(+k2.slice(i+1))*C+C/2; n++; };
+  for(const k2 of grid.keys()) add(k2);
+  for(const k2 of hgrid.keys()) add(k2);
+  for(const k2 of scen.keys()) add(k2);
+  return n? [sx/n,sy/n] : [WORLD_W/2,WORLD_H/2];
+}
+function viewBase(){   // the E20 entry view: close to the toys, centered on the action
+  followSet(false); CAM.off=false;
+  VIEW.s=baseScale(); VIEW.vx=VIEW.vy=0;
+  const [ax,ay]=baseAim();
+  VIEW.ox=W/2-ax*VIEW.s; VIEW.oy=(H-BAR)/2-ay*VIEW.s;
+  clampView(); viewApply();
+}
 function viewResize(){
   const f=fitScale();
   if(!camGate() || VIEW.s<=f+1e-9) VIEW.s=f;     // a fitted (or fresh) camera refits; a zoomed one keeps its zoom
@@ -873,6 +937,7 @@ function viewResize(){
 function zoomAt(px,py,f){
   const s0=VIEW.s||fitScale(), s1=Math.max(fitScale(),Math.min(zoomMax(),s0*f));
   VIEW.ox=px-(px-VIEW.ox)*(s1/s0); VIEW.oy=py-(py-VIEW.oy)*(s1/s0);
+  CAM.off=true;                                  // E20: the wheel is a hand — HOME lights up
   VIEW.s=s1; clampView(); viewApply();
 }
 function camGlide(dt){                           // flick-to-glide — the GVT campCam feel, lifted
@@ -889,9 +954,9 @@ function camGlide(dt){                           // flick-to-glide — the GVT c
   if(Math.abs(VIEW.vy)<FLICK_STOP) VIEW.vy=0;
   viewApply();
 }
-function homeSync(){                             // the HOME chip appears only when zoomed in (quiet-HUD)
+function homeSync(){                             // the HOME chip appears only off the default (quiet-HUD, E20)
   const el=document.getElementById('homeChip'); if(!el) return;
-  el.style.display=(camGate() && VIEW.s>fitScale()+1e-6)?'block':'none';
+  el.style.display=(camGate() && offBase())?'block':'none';
   rideSync();
 }
 /* =====================================================================
@@ -924,7 +989,8 @@ function followTick(dt){                         // presentation only, like camG
   if(PINCH||(down&&down.what==='pan')) return;   // a live hand owns the camera (belt + braces)
   const p=pos(TRAIN.cars[0].rd);
   const k=1-Math.exp(-FOLLOW_EASE*dt);
-  VIEW.s+=(Math.max(fitScale(),Math.min(zoomMax(),FOLLOW_ZOOM))-VIEW.s)*k;   // clamped [fit, 1×] like every zoom
+  CAM.off=true;                                  // E20: riding along leaves the default — HOME shows
+  VIEW.s+=(Math.max(fitScale(),Math.min(zoomMax(),baseScale()*FOLLOW_MUL))-VIEW.s)*k;   // E20: closer than base, never further
   const tx=W/2-p.x*VIEW.s, ty=(H-BAR)/2-(p.y-LIFT*(p.z||0))*VIEW.s;
   VIEW.ox+=(tx-VIEW.ox)*k; VIEW.oy+=(ty-VIEW.oy)*k;
   VIEW.vx=VIEW.vy=0;
@@ -3646,32 +3712,39 @@ const HINTS=[
   'DRAG YOUR TRAIN ONTO THE TRACK',
   'PICK UP THE ENGINE TO STOP IT',
 ];
+// E20 — canvas chrome rides the --ui dial too. Each painter scales by uiCard():
+// the dial, clamped so the card still fits the rug viewport and NEVER drops
+// below 1× (at --ui:1 every formula collapses to v2.8's exact numbers — the
+// pixel-proof dial; on a small phone the clamp simply keeps today's size).
+const uiCard=h0=>Math.max(1,Math.min(UIS,(H-BAR-24)/h0));
 function drawHint(){
   if(PLAY.on) return;               // zero reading on the wind-up rug (E6)
   if(hintStage>=HINTS.length) return;
+  const u=Math.max(1,UIS);
   cx.globalAlpha=0.7+0.3*Math.sin(perf()*4);
-  cx.font='bold 20px "Arial Black",Impact,sans-serif'; cx.textAlign='center'; cx.fillStyle='#F7E9C4';
+  cx.font='bold '+(20*u)+'px "Arial Black",Impact,sans-serif'; cx.textAlign='center'; cx.fillStyle='#F7E9C4';
   const txt=HINTS[hintStage], w=cx.measureText(txt).width;
-  if(w>W-40) cx.font='bold '+Math.max(11,Math.floor(20*(W-40)/w))+'px "Arial Black",Impact,sans-serif';
-  cx.fillText(txt, W/2, H-BAR-16);
+  if(w>W-40) cx.font='bold '+Math.max(11,Math.floor(20*u*(W-40)/w))+'px "Arial Black",Impact,sans-serif';
+  cx.fillText(txt, W/2, H-BAR-16*u);
   cx.globalAlpha=1;
 }
 function drawLapCard(){
   if(lapCardT<=0) return;
   const k=Math.min(1,(2.8-lapCardT)*5), out=Math.min(1,lapCardT*2.5);
   cx.globalAlpha=Math.min(k,out);
-  const cw=Math.min(360,W-60), chh=104, x=(W-cw)/2, y=(H-BAR)/2-70;
-  cx.fillStyle='#1e1610'; rr(x,y,cw,chh,16); cx.fill();
-  cx.strokeStyle='#F2C531'; cx.lineWidth=4; rr(x,y,cw,chh,16); cx.stroke();
+  const u=uiCard(104);
+  const cw=Math.min(360*u,W-60), chh=104*u, x=(W-cw)/2, y=(H-BAR)/2-70*u;
+  cx.fillStyle='#1e1610'; rr(x,y,cw,chh,16*u); cx.fill();
+  cx.strokeStyle='#F2C531'; cx.lineWidth=4*u; rr(x,y,cw,chh,16*u); cx.stroke();
   cx.fillStyle='#F2C531'; cx.textAlign='center';
   // E15: a NAMED railroad's first lap says so; unnamed = today's card, verbatim
   const title=NAME? signText()+' — FIRST LAP!' : 'FIRST LAP!';
-  cx.font='bold 34px "Arial Black",Impact,sans-serif';
+  cx.font='bold '+(34*u)+'px "Arial Black",Impact,sans-serif';
   if(NAME){ const tw=cx.measureText(title).width;
-    if(tw>cw-30) cx.font='bold '+Math.max(13,Math.floor(34*(cw-30)/tw))+'px "Arial Black",Impact,sans-serif'; }
-  cx.fillText(title, W/2, y+46);
-  cx.fillStyle='#F7E9C4'; cx.font='bold 13px "Arial Black",Impact,sans-serif';
-  cx.fillText('ROUND AND ROUND, FOREVER!', W/2, y+76);
+    if(tw>cw-30) cx.font='bold '+Math.max(13,Math.floor(34*u*(cw-30)/tw))+'px "Arial Black",Impact,sans-serif'; }
+  cx.fillText(title, W/2, y+46*u);
+  cx.fillStyle='#F7E9C4'; cx.font='bold '+(13*u)+'px "Arial Black",Impact,sans-serif';
+  cx.fillText('ROUND AND ROUND, FOREVER!', W/2, y+76*u);
   cx.globalAlpha=1;
 }
 // a kid who asked the OS for calm gets a steady ring instead of a breathing one
@@ -3695,7 +3768,7 @@ function draw(){
   cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cvs.width,cvs.height);
   cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
   drawRug();
-  if(camGate()) drawNameSign(); else SIGN_RECT=null;   // E15: BUILD only — no sign in campaign or PLAY
+  if(buildGate()) drawNameSign(); else SIGN_RECT=null;   // E15: BUILD only — no sign in campaign or PLAY (E20: camGate opened, so the sign gates on buildGate now)
   drawRivers(); drawPonds(); drawGaps();
   // scenery slides in as the midHook: over the ground pass, under the decks and
   // the z-sorted cars — so a cow can graze beneath the high line
@@ -4716,18 +4789,19 @@ function drawCampCards(){
   const card=(T,total,title,sub,subCol)=>{
     const k=Math.min(1,(total-T)*5), out=Math.min(1,T*2.5);
     cx.globalAlpha=Math.max(0,Math.min(k,out));
-    const cw=Math.min(600,W-40), chh=112, x=(W-cw)/2, y=(H-BAR)/2-76;
-    cx.fillStyle='#1e1610'; rr(x,y,cw,chh,16); cx.fill();
-    cx.strokeStyle='#F2C531'; cx.lineWidth=4; rr(x,y,cw,chh,16); cx.stroke();
+    const u=uiCard(112);   // E20: the gold card rides the dial (1× exactly at --ui:1)
+    const cw=Math.min(600*u,W-40), chh=112*u, x=(W-cw)/2, y=(H-BAR)/2-76*u;
+    cx.fillStyle='#1e1610'; rr(x,y,cw,chh,16*u); cx.fill();
+    cx.strokeStyle='#F2C531'; cx.lineWidth=4*u; rr(x,y,cw,chh,16*u); cx.stroke();
     cx.textAlign='center'; cx.fillStyle='#F2C531';
-    let f=28; cx.font='bold '+f+'px "Arial Black",Impact,sans-serif';
+    let f=28*u; cx.font='bold '+f+'px "Arial Black",Impact,sans-serif';
     const w1=cx.measureText(title).width;
     if(w1>cw-36){ f=Math.max(13,Math.floor(f*(cw-36)/w1)); cx.font='bold '+f+'px "Arial Black",Impact,sans-serif'; }
-    cx.fillText(title,W/2,y+46);
-    cx.fillStyle=subCol; let f2=13; cx.font='bold 13px "Arial Black",Impact,sans-serif';
+    cx.fillText(title,W/2,y+46*u);
+    cx.fillStyle=subCol; let f2=13*u; cx.font='bold '+f2+'px "Arial Black",Impact,sans-serif';
     const w2=cx.measureText(sub).width;
-    if(w2>cw-30){ f2=Math.max(8,Math.floor(13*(cw-30)/w2)); cx.font='bold '+f2+'px "Arial Black",Impact,sans-serif'; }
-    cx.fillText(sub,W/2,y+80);
+    if(w2>cw-30){ f2=Math.max(8,Math.floor(f2*(cw-30)/w2)); cx.font='bold '+f2+'px "Arial Black",Impact,sans-serif'; }
+    cx.fillText(sub,W/2,y+80*u);
     cx.globalAlpha=1;
   };
   if(goalT>0) card(goalT,4.2,'LEVEL '+CAMP.level+' — '+L.name,L.hint,'#F7E9C4');
@@ -4743,30 +4817,31 @@ function drawCampCards(){
 function drawToyCard(){
   if(!toyCard) return;
   const def=COLL_BY[toyCard]; if(!def) return;
-  const cw=Math.min(420,W-40), chh=260, x=(W-cw)/2, y=(H-BAR)/2-140;
+  const u=uiCard(260);   // E20: the ceremony rides the dial (the clamp keeps it 1× on a small phone)
+  const cw=Math.min(420*u,W-40), chh=260*u, x=(W-cw)/2, y=(H-BAR)/2-140*u;
   const pop=Math.min(1,toyT*4), sc=0.7+0.3*Math.min(1,toyT*3.2);
   // the rug dims behind the prize — otherwise the card reads muddy over track and train
   cx.globalAlpha=0.5*pop; cx.fillStyle='#120c07'; cx.fillRect(0,0,W,H);
   cx.globalAlpha=pop;
-  cx.fillStyle='#1e1610'; rr(x,y,cw,chh,18); cx.fill();
-  cx.fillStyle='#1e1610'; rr(x,y,cw,chh,18); cx.fill();   // twice: fully opaque over the scrim
-  cx.strokeStyle='#F2C531'; cx.lineWidth=5; rr(x,y,cw,chh,18); cx.stroke();
+  cx.fillStyle='#1e1610'; rr(x,y,cw,chh,18*u); cx.fill();
+  cx.fillStyle='#1e1610'; rr(x,y,cw,chh,18*u); cx.fill();   // twice: fully opaque over the scrim
+  cx.strokeStyle='#F2C531'; cx.lineWidth=5*u; rr(x,y,cw,chh,18*u); cx.stroke();
   cx.textAlign='center'; cx.fillStyle='#F2C531';
-  cx.font='bold 26px "Arial Black",Impact,sans-serif';
-  cx.fillText(TOY_CARD,W/2,y+44);
+  cx.font='bold '+(26*u)+'px "Arial Black",Impact,sans-serif';
+  cx.fillText(TOY_CARD,W/2,y+44*u);
   // the real painter, scaled up on its own little canvas so the shelf art is the law
-  const box=168, tmp=document.createElement('canvas'); tmp.width=tmp.height=96;
+  const box=168*u, tmp=document.createElement('canvas'); tmp.width=tmp.height=96;
   const keep=coll.has(toyCard); if(!keep) coll.add(toyCard);   // draw it OWNED (never a silhouette here)
   slotIcon(tmp,toyCard);
   if(!keep) coll.delete(toyCard);
-  cx.save(); cx.translate(W/2,y+140); cx.scale(sc,sc);
+  cx.save(); cx.translate(W/2,y+140*u); cx.scale(sc,sc);
   cx.drawImage(tmp,-box/2,-box/2,box,box);
   cx.restore();
-  cx.fillStyle='#F7E9C4'; cx.font='bold 22px "Arial Black",Impact,sans-serif';
-  cx.fillText(def.name,W/2,y+222);
+  cx.fillStyle='#F7E9C4'; cx.font='bold '+(22*u)+'px "Arial Black",Impact,sans-serif';
+  cx.fillText(def.name,W/2,y+222*u);
   cx.fillStyle='rgba(247,233,196,0.55)';
-  cx.font='bold 12px "Arial Black",Impact,sans-serif';
-  cx.fillText(toyQ.length? 'TAP FOR THE NEXT ONE':'TAP TO KEEP PLAYING',W/2,y+248);
+  cx.font='bold '+(12*u)+'px "Arial Black",Impact,sans-serif';
+  cx.fillText(toyQ.length? 'TAP FOR THE NEXT ONE':'TAP TO KEEP PLAYING',W/2,y+248*u);
   cx.globalAlpha=1;
 }
 // ---- the level board: a wooden panel of ten numbered tickets ----
@@ -5178,6 +5253,7 @@ function pinchMove(){
   const mx=(pts[0].x+pts[1].x)/2, my=(pts[0].y+pts[1].y)/2;
   VIEW.s=Math.max(fitScale(),Math.min(zoomMax(),PINCH.s0*d/PINCH.d0));
   VIEW.ox=mx-PINCH.wx*VIEW.s; VIEW.oy=my-PINCH.wy*VIEW.s;
+  CAM.off=true;                                  // E20: two fingers are a hand too
   clampView(); viewApply();
 }
 function toast(msg){
@@ -5212,8 +5288,8 @@ cvs.addEventListener('pointerdown',e=>{
   if(toyTap()) return;                           // E8: the NEW TOY! card owns the tap while it's up
   const [wx,wy]=worldXY(e);
   // E15: a tap on the name sign opens the word-bank picker (BUILD only — the
-  // sign only paints, and SIGN_RECT only exists, while camGate holds)
-  if(SIGN_RECT && camGate() && wx>=SIGN_RECT.x && wx<=SIGN_RECT.x+SIGN_RECT.w &&
+  // sign only paints, and SIGN_RECT only exists, while buildGate holds)
+  if(SIGN_RECT && buildGate() && wx>=SIGN_RECT.x && wx<=SIGN_RECT.x+SIGN_RECT.w &&
      wy>=SIGN_RECT.y && wy<=SIGN_RECT.y+SIGN_RECT.h){
     SND.tok(); namerShow(true); down=null; return;
   }
@@ -5270,7 +5346,8 @@ function moveCore(e){
   if(down.what==='pan'){                         // E10: one-finger drag on empty rug pans the camera
     if(!down.on && Math.hypot(e.clientX-down.x,e.clientY-down.y)<8) return;
     e.preventDefault();
-    down.on=true;
+    down.on=true; CAM.off=true;                  // E20: a real pan began — HOME knows the way back
+
     VIEW.ox=down.ox+(e.clientX-down.x); VIEW.oy=down.oy+(e.clientY-down.y);
     const t2=perf(), dt2=Math.max(0.001,t2-down.lt);
     down.vx=down.vx*0.7+((e.clientX-down.lx)/dt2)*0.3;   // smoothed flick velocity
@@ -5635,7 +5712,7 @@ function buildPalette(){
   groups.scen.style.display='none'; groups.town.style.display='none'; groups.friends.style.display='none';
   groups.rug.style.display='none';
   const mk=(layer,t,name,paint)=>{
-    const b=document.createElement('button'); b.className='pbtn'; b.type='button';
+    const b=document.createElement('button'); b.className='pbtn drg'; b.type='button';   // E20: drg = a toy the hand lifts OUT — the shelf never grab-scrolls from it
     const cv=document.createElement('canvas'); const lb=document.createElement('small');
     lb.textContent=name; b.appendChild(cv); b.appendChild(lb); groups[layer].appendChild(b);
     cv.width=104; cv.height=104;
@@ -5657,11 +5734,13 @@ function buildPalette(){
   // ---- THE RUG TAB (E10): SIZE · LAND · WEATHER — picture tiles, tap to pick ----
   const mkRug=(kind,id,name,paint)=>{
     const b=document.createElement('button'); b.className='pbtn'; b.type='button';
+    b.style.touchAction='pan-x';   // E20: a tap-tile is shelf wood — swipes scroll the bar, taps pick
     const cv=document.createElement('canvas'); const lb=document.createElement('small');
     lb.textContent=name; b.appendChild(cv); b.appendChild(lb); groups.rug.appendChild(b);
     cv.width=104; cv.height=104;
     paint(cv.getContext('2d'));
     b.addEventListener('click',()=>{
+      if(barDragged()) return;     // E20: a scrolled shelf never picks (the E13 aisle law)
       ac();
       if(kind==='size'){ sizeSet(id); return; }
       if(kind==='land'){ if(LAND!==id){ LAND=id; SND.tok(); save(); } else SND.click(); }
@@ -5675,16 +5754,19 @@ function buildPalette(){
   for(const [id,name] of [['clear','CLEAR'],['snowfall','SNOW'],['dust','DUST'],['rain','RAIN']]) mkRug('weather',id,name,g=>rugTileWx(g,id));
   // the MORE TOYS… end-cap: BUILD's door into the toy box (E7)
   const more=document.createElement('button'); more.id='moreToys'; more.className='pbtn'; more.type='button';
+  more.style.touchAction='pan-x';   // E20: tap-buttons are shelf wood
   more.innerHTML='<b>🧸</b><small>'+BOX_MORE+'</small>';
-  more.addEventListener('click',()=>{ ac(); SND.tok(); boxShow(true); });
+  more.addEventListener('click',()=>{ if(barDragged()) return; ac(); SND.tok(); boxShow(true); });
   slot.appendChild(more);
   // TIDY UP (E16): the sweep-the-rug button, out of the retired shed's foot.
   // Still two taps — the first arms it, a moment of nothing disarms it.
   const tidy=document.createElement('button'); tidy.id='tidyBtn'; tidy.className='pbtn'; tidy.type='button';
+  tidy.style.touchAction='pan-x';   // E20: tap-buttons are shelf wood
   tidy.innerHTML='<b>🧹</b><small>TIDY UP</small>';
   let tidyArm=0;
   const tidyOff=()=>{ tidyArm=0; tidy.classList.remove('ask'); tidy.querySelector('small').textContent='TIDY UP'; };
   tidy.addEventListener('click',()=>{
+    if(barDragged()) return;        // E20: a scrolled shelf never sweeps the rug
     ac();
     if(tidyArm){
       clearTimeout(tidyArm); tidyOff();
@@ -5707,11 +5789,56 @@ function buildPalette(){
     $('tabRug').classList.toggle('on',tab==='rug');
   };
   buildPalette.sync=sync;
-  $('tabTrack').addEventListener('click',()=>{ ac(); SND.click(); sync('track'); });
-  $('tabScen').addEventListener('click',()=>{ ac(); SND.click(); sync('scen'); });
-  $('tabTown').addEventListener('click',()=>{ ac(); SND.click(); sync('town'); });
-  $('tabFriends').addEventListener('click',()=>{ ac(); SND.click(); sync('friends'); });
-  $('tabRug').addEventListener('click',()=>{ ac(); SND.click(); sync('rug'); });
+  // E20: tab taps ride the shelf — a tap that travelled is a scroll, not a pick
+  const tabTap=(id,tab)=>$(id).addEventListener('click',()=>{ if(barDragged()) return; ac(); SND.click(); sync(tab); });
+  tabTap('tabTrack','track'); tabTap('tabScen','scen'); tabTap('tabTown','town');
+  tabTap('tabFriends','friends'); tabTap('tabRug','rug');
+}
+/* =====================================================================
+   THE BIG HAND'S SHELF (E20) — the whole bar is ONE horizontal shelf,
+   E13's aisle recipe lifted: touch pans natively (pan-x on the wood,
+   the tabs and the tap-buttons), the mouse grabs and flings, and a tap
+   that travelled >8px is a scroll, never a pick. DRAG-SOURCE toys keep
+   touch-action:none and never start a grab-scroll — the hand lifting a
+   piece out of the palette always wins.
+   ===================================================================== */
+let BARSC={down:false,moved:0,x:0,y:0,sl:0,vx:0,lx:0,lt:0,id:null,mouse:false};
+const barDragged=()=>BARSC.moved>8;
+function barFling(v){               // a mouse flick keeps the shelf rolling (touch gets this natively)
+  const el=$('bar'); let lt=performance.now();
+  const step=t=>{
+    const dt2=Math.min(0.05,(t-lt)/1000); lt=t;
+    el.scrollLeft+=v*dt2;
+    v*=Math.pow(0.04,dt2);
+    if(Math.abs(v)>40&&!BARSC.down) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function buildBarScroll(){
+  const el=$('bar');
+  el.addEventListener('pointerdown',e=>{
+    if(e.target.closest&&e.target.closest('.drg')) return;   // a toy in the hand beats the shelf
+    BARSC={down:true,moved:0,x:e.clientX,y:e.clientY,sl:el.scrollLeft,vx:0,
+      lx:e.clientX,lt:performance.now(),id:e.pointerId,mouse:e.pointerType!=='touch'};
+  });
+  el.addEventListener('pointermove',e=>{
+    const d2=BARSC; if(!d2.down) return;
+    d2.moved=Math.max(d2.moved,Math.hypot(e.clientX-d2.x,e.clientY-d2.y));
+    if(d2.mouse&&d2.moved>8){        // a mouse drags the shelf by hand; touch pans natively
+      if(d2.id!=null){ try{ el.setPointerCapture(d2.id); }catch(err){} d2.id=null; }
+      el.scrollLeft=d2.sl-(e.clientX-d2.x);
+      const now=performance.now(), dt2=(now-d2.lt)/1000;
+      if(dt2>0.001) d2.vx=0.7*d2.vx+0.3*((d2.lx-e.clientX)/dt2);
+      d2.lx=e.clientX; d2.lt=now;
+    }
+  });
+  const barUp=()=>{
+    const d2=BARSC; if(!d2.down) return;
+    d2.down=false;
+    if(d2.mouse&&d2.moved>8&&Math.abs(d2.vx)>60) barFling(d2.vx);
+  };
+  el.addEventListener('pointerup',barUp);
+  el.addEventListener('pointercancel',barUp);
 }
 // THE GATE LAW (E7): BUILD's palette offers OWNED toys only. The campaign keeps the
 // FULL palette in this version (its gate arrives in E8 with the new levels). Tabs with
@@ -5752,7 +5879,7 @@ let shelfTrainCv=null;
 function buildShelf(){
   const wrap=$('shelf'), parts={};
   // the train itself — ONE drag item, the old #handle reborn in the bar
-  const tb=document.createElement('button'); tb.id='shelfTrain'; tb.className='pbtn'; tb.type='button';
+  const tb=document.createElement('button'); tb.id='shelfTrain'; tb.className='pbtn drg'; tb.type='button';   // E20: a drag source, never shelf wood
   shelfTrainCv=document.createElement('canvas'); shelfTrainCv.width=220; shelfTrainCv.height=104;
   const tlb=document.createElement('small'); tlb.textContent='DRAG ME OUT!';
   tb.appendChild(shelfTrainCv); tb.appendChild(tlb);
@@ -5773,7 +5900,7 @@ function buildShelf(){
   // owned cars — drag one onto the placed train to couple it at the tail
   const carWrap=document.createElement('span'); carWrap.id='shelfCars';
   for(const t in CARDEF){
-    const b=document.createElement('button'); b.className='pbtn'; b.type='button';
+    const b=document.createElement('button'); b.className='pbtn drg'; b.type='button';   // E20: drag source
     const cv=document.createElement('canvas'); cv.width=104; cv.height=104;
     const lb=document.createElement('small'); lb.textContent=CARDEF[t];
     b.appendChild(cv); b.appendChild(lb); carWrap.appendChild(b);
@@ -5786,7 +5913,7 @@ function buildShelf(){
   // the engines — both on the shelf once the BIG EXPRESS is owned
   const engWrap=document.createElement('span'); engWrap.id='shelfEng';
   for(const t of ['loco','exp']){
-    const b=document.createElement('button'); b.className='pbtn'; b.type='button'; b.dataset.e=t;
+    const b=document.createElement('button'); b.className='pbtn drg'; b.type='button'; b.dataset.e=t;   // E20: drag source
     const cv=document.createElement('canvas'); cv.width=104; cv.height=104;
     const lb=document.createElement('small'); lb.textContent=COLL_BY[t].name;
     b.appendChild(cv); b.appendChild(lb); engWrap.appendChild(b);
@@ -5914,6 +6041,7 @@ function showScreen(s){
   shelfSync();
   paletteSync();        // THE GATE follows the mode: BUILD owned-only, campaign full
   resize();
+  if(game||play) viewBase();   // E20 THE BIG DEFAULT — every rug entry lands close to the toys, centered on the action
 }
 function liveryChanged(){ repaintShelfIcons(); syncSwatches(); }
 function syncSwatches(){
@@ -6009,7 +6137,7 @@ function buildToybox(){
    ===================================================================== */
 // ---- THE DIALS (E13) — one block, every knob of the aisle ----
 const TIER_MID=13, TIER_BIG=20, TIER_STAR=30;      // ★ price bands → card tier
-const CARD_H={sm:150,md:190,bg:235,star:280};      // card px, desktop; the phone media query rides at 0.62
+const CARD_H={sm:190,md:240,bg:300,star:360};      // card px, desktop (E20: ~1.27× — bigger cards, fonts ride --ui); the phone media query rides at 0.55
 const UNOWNED_DIM=1.0;      // 1.0 = full-colour goods on the shelf; 0.4 restores E9's dim look
 const SHOP_CHIP=true;       // the tiny wallet ★ in the shop lid (prices need a wallet to read against)
 const BANK_ROLL=1.2;        // seconds the bank count takes to roll up
@@ -6617,6 +6745,9 @@ $('rideChip').addEventListener('click',()=>{ ac(); SND.click(); followSet(!FOLLO
 // ---- boot ----
 function resize(){
   W=innerWidth; H=innerHeight; DPR=Math.min(2,devicePixelRatio||1);
+  UIS=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui'))||1;   // E20: ONE dial
+  // E20: BAR is DERIVED, always — the E10/E16 "bar height byte-equal" law is
+  // REPEALED; the law now is the rug viewport keeps ≥60% of the screen (battery).
   BAR=SCREEN==='game'? ($('bar').offsetHeight||118)
      :SCREEN==='play'? ($('ptray').offsetHeight||104)      // the tray is the play mode's whole chrome
      :0;                                                   // the menu room + board get the whole window
@@ -6626,12 +6757,14 @@ function resize(){
   // the pixel); the bedroom + board are a fixed painting at MENU_W×MENU_H.
   if(SCREEN==='game'||SCREEN==='play') viewResize();
   else { SC=Math.min(W/MENU_W,(H-BAR)/MENU_H); OX=(W-MENU_W*SC)/2; OY=(H-BAR-MENU_H*SC)/2; }
-  const hc=$('homeChip'); if(hc) hc.style.bottom=(BAR+14)+'px';
-  const rc=$('rideChip'); if(rc) rc.style.bottom=(BAR+62)+'px';   // E15: stacked above HOME
+  const hc=$('homeChip'); if(hc) hc.style.bottom=(BAR+14*UIS)+'px';
+  const rc=$('rideChip'); if(rc) rc.style.bottom=(BAR+66*UIS)+'px';   // E15: stacked above HOME (E20: the gap rides the dial)
+  const tt=$('toast'); if(tt) tt.style.bottom=(BAR+14*UIS)+'px';      // E20: the toast clears whatever the bar grew into
+  const nb=$('nextBtn'); if(nb) nb.style.bottom=(BAR+40*UIS)+'px';    // E20: NEXT floats above the live bar
   homeSync();
 }
 window.addEventListener('resize',resize);
-load(); buildPalette(); buildShelf(); buildBedPal(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
+load(); buildPalette(); buildShelf(); buildBarScroll(); buildBedPal(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
 showScreen('menu'); shelfSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
@@ -6710,9 +6843,11 @@ window.TS={
     WEATHER=id; rugSync(); save(); return WEATHER; },
   view:{
     fit(){ viewFit(); return TS.view.get(); },
+    base(){ viewBase(); return TS.view.get(); },   // E20: the big default, re-aimed on demand
     set(s,ox,oy){ VIEW.s=+s||fitScale(); if(ox!=null) VIEW.ox=+ox; if(oy!=null) VIEW.oy=+oy;
       VIEW.vx=VIEW.vy=0; clampView(); viewApply(); return TS.view.get(); },
-    get(){ return { scale:SC, ox:OX, oy:OY, fit:fitScale(), max:zoomMax(), follow:FOLLOW.on }; },   // E15: follow rides along
+    get(){ return { scale:SC, ox:OX, oy:OY, fit:fitScale(), max:zoomMax(), follow:FOLLOW.on,
+      base:baseScale(), off:offBase(), bar:BAR, ui:UIS, aim:baseAim() }; },   // E15: follow rides along · E20: the big-default telemetry
     toRug(px,py){ return [ (px-OX)/SC, (py-OY)/SC ]; },   // THE one inverse, exposed for the rigs
   },
   // ---- the E15 rig: gravity · riders · ride-along · the name ----
