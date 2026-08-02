@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v3.1 -->
+<!-- TRAINSET v3.2 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -698,6 +698,36 @@ const SURPRISE_MIN=2, SURPRISE_MAX=4;    // cars per roll (the engine stays the 
 const SURPRISE_STOCK=['tender','box'];   // what the campaign shelf paints behind the engine
 const SURPRISE_W={ tender:1, box:1, tank:1.5, flat:1, cab:1.2, coach:1.2, mail:1, circus:1.6 };  // gentle weights — the fancy cars turn up enough to delight
 const SURPRISE_POOL=['SURPRISE!','ALL ABOARD!','WOW!','CHOO CHOO!'];  // the first-drop word, kid words only (the E8 law)
+// ---- Wyatt dials (EXPANSION 23 — one block) ----
+// THE PIGGY BEDROOM. Wyatt 8/2 (evening): "add the piggy bank also to the
+// bedroom and have the same system as we do in GVT for generating stars that
+// you're allowed to get for free each day… you should be allowed to build
+// anywhere on the screen, so you're not just limited to the carpet."
+// The GVT daily piggy, lifted as a SYSTEM: one claim per calendar day;
+// consecutive days build a streak; every PIG_TIER_DAYS days a fresh coat of
+// paint raises the pay. She sits on the bedroom boards — FURNITURE, not a
+// collectable (THE FIFTY STAY FIFTY) — and tapping her always pays in joy:
+// stars while she has them, a hop + a puff out the back when she's empty.
+// GVT law verbatim: tapping it should pay you back in joy, not a menu.
+const PIG_PAYS=2;              // base stars a day (seeds MINT.piggy — the ledger reads the DIAL)
+const PIG_TIER_DAYS=5;         // consecutive days per coat of paint
+const PIG_TIER_BONUS=1;        // +stars a day, per coat
+// the paint ladder — the paint shop's own rows (LIVERY hexes), pink first,
+// RAINBOW on top: parts take turns through RAIN_ORDER, like the rainbow livery
+const PIG_COLORS=[
+  {name:'PINK',   m:'#E08FB8', d:'#A85C86'},
+  {name:'YELLOW', m:'#D9A93B', d:'#8F6B1E'},
+  {name:'BLUE',   m:'#3E6E9E', d:'#28486B'},
+  {name:'GREEN',  m:'#4E7F46', d:'#33552F'},
+  {name:'PURPLE', m:'#7B5AA6', d:'#523C73'},
+  {name:'ORANGE', m:'#D97B29', d:'#8F4F16'},
+  {name:'WHITE',  m:'#F7E9C4', d:'#CBB88C'},
+  {name:'BLACK',  m:'#3A3733', d:'#23211E'},
+  {name:'GOLD',   m:'#F2C531', d:'#8F6B1E'},
+  {name:'RAINBOW',m:'#E08FB8', d:'#A85C86'},   // painted per-part via RAIN_ORDER — these hexes are the fallback
+];
+const PIG_SPOT={x:1178,y:390,s:1.35};   // menu coords: the open boards between the bed and the door
+let PIG_SHOW=true;             // rig door — the byte-proof battery hides the painter
 // ---- Wyatt dials (EXPANSION 15 — one block) ----
 // A. GRAVITY AS DRAMA. grade is measured in ELEVATION LEVELS PER CELL of arc
 // (pos().z interps levels along the path; LIFT px per level is the height it
@@ -941,7 +971,7 @@ const BELL_IDS=['bl_ding','bl_bell','bl_cuckoo','bl_cow'];
 const MODEL_IDS=['fount','stat','fire','arch','flag','mail2','bench','clock'];
 const COLL_NO_SALE=[];        // of the fifty, ids Wyatt pulls off the shelf (default: all sell)
 // THE STAR BANK — every mint amount is a dial; all of it generous, none of it a wall
-const MINT={ lap:1, station:1, bonk:1, clear:10, firstLap:5, pretty:1 };   // pretty = E14's scenery bonus
+const MINT={ lap:1, station:1, bonk:1, clear:10, firstLap:5, pretty:1, piggy:PIG_PAYS };   // pretty = E14's scenery bonus · piggy = E23's daily base
 const FART_PITCH=1;           // the fart's pitch (×) — Wyatt's most important dial
 const CLOCK_SPIN=0.02;        // TOWN CLOCK hour hand, rad/s — the hands actually turn, slowly
 const baseColl=()=>new Set([...STARTERS,...STORE_FREE]);
@@ -1291,6 +1321,11 @@ let flights=[];               // little gold star5s flying event → HUD counter
 function starTarget(){
   const el=$('starChip');
   if(el&&el.style.display!=='none'){ const r=el.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; }
+  // E23: on the menu the ★ lives in the SHOP chip — the piggy's pay flies there.
+  // offsetParent gates it: in campaign #menu is display:none and the old
+  // top-right fallback stands byte-for-byte.
+  const em=$('starMenu');
+  if(em&&em.offsetParent){ const r=em.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; }
   return {x:W-46,y:24};
 }
 function starMint(n,wx,wy){   // n★ minted at world (wx,wy) — the flight IS the teaching
@@ -1411,6 +1446,10 @@ function removeTrackPiece(x,y,pc){
 // E2 generalized it: every scenery kind carries a blocks-track flag in SCENDEF; the river's
 // bridge exception stays special-cased here. Animals don't block — a cow between the rails is the toy.
 function cellBlocksTrack(t,x,y){
+  // E23: on the bedroom floor the piggy's spot and the big-button rows are
+  // FURNITURE — blocked cells through THE predicate, so the ghost tint and the
+  // drop agree for free. BED.blk only exists inside the bedroom wrapper's world.
+  if(BED.ctx&&BED.blk&&BED.blk.has(key(x,y))) return true;
   const s=scenAt(x,y); if(!s) return false;
   if(s.t==='rv'||s.t==='pond') return t!=='br';   // only a bridge may span water (E7: the pond is water too)
   return !!SCENDEF[s.t].blocks;
@@ -1480,6 +1519,7 @@ function placeQuery(t,r,x,y){
 }
 function canPlaceTrack(t,x,y,r){ return placeQuery(t,r|0,x,y).ok; }
 function canPlaceScen(t,x,y){
+  if(BED.ctx&&BED.blk&&BED.blk.has(key(x,y))) return false;   // E23: the piggy + button cells refuse scenery too
   if(scenAt(x,y)) return false;
   const lo=pieceAt(x,y), hi=pieceHi(x,y);
   if(!lo&&!hi) return true;
@@ -4000,13 +4040,19 @@ const bedTrain0=()=>({placed:false,cars:[],F:true,running:false,pauseT:0,stKey:n
 const BED={ on:false, shy:false, a:1, idleT:0, ctx:0, s:null,
             train:bedTrain0(), consist:[], eng:'loco', boarders:[],
             fx:[], smoke:[], scen:new Map(), wheel:0,
-            grav:{mul:1,crest:false}, clack:0 };
+            grav:{mul:1,crest:false}, clack:0,
+            // E23 THE WHOLE FLOOR: the bedroom's live bounds (viewport-derived by
+            // bedBounds; these defaults are E18's strip until the first resize)
+            // and the blocked-cell set (the piggy's spot + the big-button rows).
+            gx0:BR_LO, gy0:BR_LO, gw:BR_GW, gh:BR_GH, blk:null };
 function bedAcq(){                    // swap the world globals for the bedroom's
   if(BED.ctx++) return;               // re-entrant: only the outermost call swaps
   BED.s={grid,hgrid,scen,RGRID,HGRID,GW,GH,GX0,GY0,consist,ENGINE,fx,smoke,BOARDERS,
          gm:GRAV.mul,gc:GRAV.crest,ca:clackAcc};
   grid=AT.grid; hgrid=AT.hg; RGRID=AT.grid; HGRID=AT.hg; scen=BED.scen;
-  GW=BR_GW; GH=BR_GH; GX0=BR_LO; GY0=BR_LO;
+  // E23: the floor is every cell the screen can hold (bedBounds re-derives on
+  // resize). The OVAL NEVER MOVES — these are extend-only bounds, same keys.
+  GW=BED.gw; GH=BED.gh; GX0=BED.gx0; GY0=BED.gy0;
   consist=BED.consist; ENGINE=BED.eng; fx=BED.fx; smoke=BED.smoke;
   BOARDERS=BED.boarders;
   GRAV.mul=BED.grav.mul; GRAV.crest=BED.grav.crest; clackAcc=BED.clack;
@@ -4076,8 +4122,11 @@ function attRun(cars,step){
 }
 // ---- a hand on the bedroom rug ----
 function bedDown(e){
-  const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;
-  if(mx<MRUG.x||mx>MRUG.x+MRUG.w||my<MRUG.y||my>MRUG.y+MRUG.h) return;   // the room is scenery
+  // E23 THE WHOLE FLOOR IS YOURS — the E18 MRUG gate is OPEN: every board the
+  // screen shows is building floor now (Wyatt: "build anywhere on the screen,
+  // so you're not just limited to the carpet"). The DOM chrome still swallows
+  // its own taps before the canvas ever sees them, and the piggy answered
+  // first back in the pointerdown ladder.
   ac(); e.preventDefault();
   shyTouch();                          // the chrome gets out of the way
   if(DRAG||down) return;               // one hand at a time
@@ -4153,6 +4202,148 @@ function buildBedPal(){
   document.documentElement.style.setProperty('--shyms',(SHY_FADE_MS/1000)+'s');
 }
 
+/* =====================================================================
+   THE PIGGY BEDROOM (E23) — GVT's daily free-stars piggy on the boards.
+   One claim per calendar day; consecutive days build a streak; every
+   PIG_TIER_DAYS days a fresh coat of paint (PIG_COLORS) raises the pay.
+   Empty = hop + a puff out the back + TOMORROW! — never a menu.
+   ⚠ THE EPHEMERAL LAW GETS ONE CARVED EXCEPTION (amends E18): bedroom
+   BUILDS still write NOTHING — but the piggy claim is REAL. It mints
+   into the actual bank and it saves, exactly once, through pigTap's
+   starMint. pigTap runs OUTSIDE the inBed wrapper, so save()'s BED.ctx
+   guard never sees it: the line between sandcastle and piggy is the
+   wrapper itself. Shy-UI does NOT hide her — she's a toy on the floor,
+   not chrome.
+   ===================================================================== */
+let PIGGY={claimed:'',streak:0};   // the save's piggy block (v:11); fresh = never claimed
+const PIG={hop:0,puffs:[],dayOv:null,x:PIG_SPOT.x,y:PIG_SPOT.y};   // garnish + placement (never saved)
+const pigFmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function todayStr(){ return PIG.dayOv || pigFmt(new Date()); }     // GVT recipe; dayOv = the battery's calendar
+function dayBack(n){ const [y,m,dd]=todayStr().split('-').map(Number); return pigFmt(new Date(y,m-1,dd-n)); }
+function pigTier(s){ return Math.min(PIG_COLORS.length-1, Math.floor((s|0)/PIG_TIER_DAYS)); }
+function pigPayout(s){ return (MINT.piggy|0)+PIG_TIER_BONUS*pigTier(s==null? PIGGY.streak : s); }
+// the streak a claim TODAY would set: consecutive extends, a skipped day
+// restarts at 1 (GVT's pigCheck, folded in lazily — no writes outside a claim)
+function pigNextStreak(){ return PIGGY.claimed===dayBack(1)? (PIGGY.streak|0)+1 : 1; }
+// the paint she WEARS right now: a missed day pops her back to pink on sight,
+// write-free — the save only ever changes on a claim
+function pigLiveStreak(){ const c=PIGGY.claimed; return (c===todayStr()||c===dayBack(1))? PIGGY.streak|0 : 0; }
+function pigClaimable(){ return PIGGY.claimed!==todayStr() && pigPayout(pigNextStreak())>0; }
+function pigTodayPays(){ return pigPayout(PIGGY.claimed===todayStr()? PIGGY.streak : pigNextStreak()); }
+function pigHit(e){
+  if(!PIG_SHOW||SCREEN!=='menu') return false;
+  const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // the menu painting's own inverse
+  return Math.abs(mx-PIG.x)<58*PIG_SPOT.s && Math.abs(my-(PIG.y-8*PIG_SPOT.s))<52*PIG_SPOT.s;
+}
+function pigTap(){
+  ac();
+  PIG.hop=1;                            // the hop answers EVERY tap (GVT law)
+  if(BED.shy) BED.idleT=0;              // a hand on the piggy is still a hand in the room
+  if(!pigClaimable()){
+    // empty today: joy, not a menu — a hop, a puff out the back, one kid word
+    SND.pop();
+    for(let i=0;i<3;i++) PIG.puffs.push({t:-i*0.08,dur:0.8,i});
+    toast('TOMORROW!');
+    return;                             // and ZERO writes — the spy proves it
+  }
+  PIGGY={claimed:todayStr(), streak:pigNextStreak()};
+  SND.boing();
+  // starMint = coin + HUD sync + the star flight + THE ONE SAVE (PIGGY rides in it)
+  starMint(pigPayout(), PIG.x, PIG.y-46*PIG_SPOT.s);
+  voiceAt('piggy');                     // "Nice" — you were given something
+}
+// the pig herself — one molded painter for the floor pig and the bank ledger.
+// RAINBOW (the top coat) paints per-part through RAIN_ORDER, exactly how the
+// rainbow livery paints per-car.
+function pigArt(t,coin){
+  const rain=t===PIG_COLORS.length-1;
+  const P=i=>rain? LIVERY[RAIN_ORDER[i%RAIN_ORDER.length]] : PIG_COLORS[t];
+  cx.lineJoin='round'; cx.lineCap='round';
+  let c=P(1);
+  for(const px of [-20,11]){
+    cx.fillStyle=c.m; rr(px,16,9,11,3); cx.fill();
+    cx.strokeStyle=c.d; cx.lineWidth=2.5; rr(px,16,9,11,3); cx.stroke();
+  }
+  c=P(0);
+  cx.fillStyle=c.m; cx.beginPath(); cx.ellipse(0,0,30,23,0,0,7); cx.fill();
+  cx.strokeStyle=c.d; cx.lineWidth=2.5; cx.beginPath(); cx.ellipse(0,0,30,23,0,0,7); cx.stroke();
+  c=P(2);
+  cx.fillStyle=c.m; cx.beginPath(); cx.moveTo(14,-22); cx.lineTo(25,-29); cx.lineTo(24,-14); cx.closePath(); cx.fill();
+  cx.strokeStyle=c.d; cx.beginPath(); cx.moveTo(14,-22); cx.lineTo(25,-29); cx.lineTo(24,-14); cx.closePath(); cx.stroke();
+  c=P(3);
+  cx.fillStyle=c.m; cx.beginPath(); cx.ellipse(27,3,7.5,6,0,0,7); cx.fill();
+  cx.strokeStyle=c.d; cx.beginPath(); cx.ellipse(27,3,7.5,6,0,0,7); cx.stroke();
+  cx.fillStyle=c.d; cx.beginPath(); cx.arc(25,3,1.6,0,7); cx.fill();
+  cx.beginPath(); cx.arc(30,3,1.6,0,7); cx.fill();
+  cx.fillStyle='#23211E'; cx.beginPath(); cx.arc(13,-7,2.2,0,7); cx.fill();
+  c=P(4);
+  cx.strokeStyle=c.d; cx.lineWidth=2.2;
+  cx.beginPath(); cx.moveTo(-30,2); cx.quadraticCurveTo(-38,-2,-34,-7); cx.quadraticCurveTo(-30,-11,-34,-13); cx.stroke();
+  cx.fillStyle='#7E5A0E'; rr(-8,-26,16,4.5,2); cx.fill();
+  if(coin){   // the coin halfway in = there's pay waiting today (the gold tell)
+    cx.fillStyle='#F2C531'; cx.beginPath(); cx.ellipse(0,-30,9,7,0,Math.PI,0); cx.closePath(); cx.fill();
+    cx.strokeStyle='#8F6B1E'; cx.lineWidth=2; cx.beginPath(); cx.ellipse(0,-30,9,7,0,Math.PI,0); cx.stroke();
+  }
+  cx.lineCap='butt';
+}
+function drawPig(){
+  const s=PIG_SPOT.s, j=1-PIG.hop, hy=PIG.hop>0? -22*Math.sin(Math.PI*j) : 0;
+  cx.save(); cx.translate(PIG.x,PIG.y); cx.scale(s,s);
+  // the shadow stays on the boards while she hops (the E4 shadow law)
+  cx.globalAlpha=0.25; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(0,26,34+hy*0.25,7+hy*0.06,0,0,7); cx.fill(); cx.globalAlpha=1;
+  cx.translate(0,hy); if(PIG.hop>0) cx.rotate(0.05*Math.sin(j*9));
+  pigArt(pigTier(pigLiveStreak()), pigClaimable());
+  cx.restore();
+  // the "nothing left today" answer — a little puff out of the back hole (GVT recipe)
+  for(const p of PIG.puffs){ if(p.t<=0) continue;
+    const k=Math.min(1,p.t/p.dur);
+    cx.globalAlpha=0.9*(1-k); cx.fillStyle='#e8e0cc';
+    cx.beginPath();
+    cx.arc(PIG.x-(40+18*k+p.i*6)*s, PIG.y-(6+13*k-p.i*4)*s, (5+9*k)*s, 0, 7);
+    cx.fill(); cx.globalAlpha=1;
+  }
+}
+// THE WHOLE FLOOR IS YOURS (E23) — derive the bedroom bounds from the viewport
+// at boot/resize: every cell the screen can hold, minus nothing (the button
+// rows and the piggy are BLOCKED cells, not missing ones). Extend-only,
+// anchored on the attract grid, so every existing cell keeps its key and the
+// oval keeps its pixels (the float-ulp law). Shrinking a window strands toys
+// off-screen — they wait there, never deleted (E10's shrink-law spirit).
+function bedBounds(){
+  const cs=C*ATT_SCALE, s=PIG_SPOT.s;
+  // the piggy holds her spot unless the big buttons would ever reach it
+  // (tall thin windows) — then she scoots up the wall, never under a button
+  let py=PIG_SPOT.y;
+  const menuUp=$('menu').style.display!=='none';
+  const mb=menuUp? $('mbtns').getBoundingClientRect() : null;
+  if(mb&&mb.height){
+    const tx0=(mb.left-OX)/SC, tx1=(mb.right-OX)/SC, ty=(mb.top-OY)/SC;
+    if(PIG_SPOT.x+44*s>tx0 && PIG_SPOT.x-44*s<tx1) py=Math.min(py, ty-46*s-6);
+  }
+  PIG.x=PIG_SPOT.x; PIG.y=Math.max(300,py);
+  // bounds: the visible menu rect, in attract cells (extend-only vs E18's strip)
+  const mx0=(0-OX)/SC, my0=(0-OY)/SC, mx1=(W-OX)/SC, my1=(H-OY)/SC;
+  BED.gx0=Math.min(BR_LO, Math.floor((mx0-ATT.ox)/cs));
+  BED.gy0=Math.min(BR_LO, Math.floor((my0-ATT.oy)/cs));
+  BED.gw =Math.max(BR_GW, Math.floor((mx1-ATT.ox)/cs)+1);
+  BED.gh =Math.max(BR_GH, Math.floor((my1-ATT.oy)/cs)+1);
+  // blocked cells: the piggy's footprint + every #menu child block (the three
+  // big buttons, the toybox/shop chips, the paint shop) — measured, per resize
+  const blk=new Set();
+  const addRect=(x0,y0,x1,y1)=>{
+    for(let gx=Math.floor((x0-ATT.ox)/cs); gx<=Math.floor((x1-ATT.ox)/cs); gx++)
+      for(let gy=Math.floor((y0-ATT.oy)/cs); gy<=Math.floor((y1-ATT.oy)/cs); gy++)
+        blk.add(key(gx,gy));
+  };
+  addRect(PIG.x-44*s, PIG.y-40*s, PIG.x+40*s, PIG.y+30*s);
+  if(menuUp) for(const el of $('menu').children){
+    const r=el.getBoundingClientRect();
+    if(r.width&&r.height) addRect((r.left-OX)/SC,(r.top-OY)/SC,(r.right-OX)/SC,(r.bottom-OY)/SC);
+  }
+  BED.blk=blk;
+}
+
 // the attract loop: a REAL 4×2 oval of real pieces, ridden by real riders.
 // E18: the oval keeps its EXACT keys and transform (any re-key shifts float
 // operands and hairline AA — measured); the bedroom floor instead spreads to
@@ -4207,6 +4398,14 @@ function menuUpdate(dt){
   for(const s of AT.smoke){ s.t+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy-=8*dt; }
   // in place, never reassigned — BED.smoke aliases this array (whistle puffs land here)
   for(let i=AT.smoke.length-1;i>=0;i--) if(AT.smoke[i].t>=AT.smoke[i].dur) AT.smoke.splice(i,1);
+  // E23: the piggy's garnish — hop decay, back-hole puffs, and the star
+  // flights her pay rides on (update() ticks these for the game screens;
+  // the menu ticks its own). All empty on an untouched menu: zero paint.
+  if(PIG.hop>0) PIG.hop=Math.max(0,PIG.hop-dt*2.6);
+  for(const p of PIG.puffs) p.t+=dt;
+  for(let i=PIG.puffs.length-1;i>=0;i--) if(PIG.puffs[i].t>=PIG.puffs[i].dur) PIG.puffs.splice(i,1);
+  for(const f of flights) f.t+=dt;
+  flights=flights.filter(f=>f.t<f.dur);
   if(MENU_MUSIC){ AT.musT-=dt; if(AT.musT<=0){ AT.musT=5.5; SND.lull(); } }
 }
 function drawMenu(){
@@ -4219,6 +4418,7 @@ function drawMenu(){
   if(MENU_PROPS.includes('bed')) menuBed();
   if(MENU_PROPS.includes('toybox')) menuToybox();
   if(MENU_PROPS.includes('blocks')) menuBlocks();
+  if(PIG_SHOW) drawPig();   // E23: the piggy on the boards — furniture, under the toys
   // the attract loop, painted by the real track + car painters (E18: transform
   // UNTOUCHED — the bedroom's extra room lives in negative cells, not a shift)
   cx.save();
@@ -4246,6 +4446,13 @@ function drawMenu(){
     else if(BED.a>0.002){ const k=BED.a*BED.a*(3-2*BED.a);
       cx.globalAlpha=k; menuSign(); cx.globalAlpha=1; }
   }
+  // E23: minted stars fly on the menu too (the piggy's pay) — draw()'s exact
+  // recipe in screen space. An empty list paints nothing: byte-proofs hold.
+  cx.setTransform(DPR,0,0,DPR,0,0);
+  for(const f of flights){ if(f.t<=0) continue;
+    const k=f.t/f.dur, e2=k*k*(3-2*k);
+    star5(f.x+(f.tx-f.x)*e2, f.y+(f.ty-f.y)*e2-Math.sin(Math.PI*k)*36, 0.9+0.35*(1-k), '#F2C531'); }
+  cx.globalAlpha=1;
 }
 
 /* =====================================================================
@@ -4427,6 +4634,7 @@ const VOICE = {
 };
 const VOICE_AT = {          // moment -> line. Wyatt re-aims the whole feature here (null = that moment goes quiet).
   win:'youdidit', firstLap:'youdidit', toy:'nice', buy:'okay',
+  piggy:'nice',   // E23: the piggy GAVE you something — same word as the toy card
 };
 let voiceVol=VOICE_VOL, voiceCur=null, voiceNextOk=0;
 const VOICE_LOG=[];         // append-only {id,t,dropped,why?} per request — how a battery proves the gap law
@@ -4515,8 +4723,9 @@ function save(){
     // E6: the wind-up rug stashes the same way and persists NOTHING of its own.
     const w=CAMP.on? FREE : (PLAY.on? PFREE : serWorld());
     localStorage.setItem('TRAINSET', JSON.stringify({
-      v:10, grid:w.grid, scen:w.scen, consist:w.consist, color:COLOR, train:w.train,
+      v:11, grid:w.grid, scen:w.scen, consist:w.consist, color:COLOR, train:w.train,
       coll:[...coll], eng:ENGINE,
+      piggy:{claimed:PIGGY.claimed,streak:PIGGY.streak|0},   // v:11 — THE PIGGY BEDROOM (E23); the daily claim + streak
       playIdx:PLAYI|0,   // v:10 — THREE RUGS (E17); the ONLY thing PLAY remembers
       name:NAME? {w1:NAME.w1,w2:NAME.w2,s:NAME.s} : null,   // v:9 — THE NAME PLATE (E15); the ONLY thing E15 persists
       size:SIZE, land:LAND, weather:WEATHER,   // v:8 — BIG COUNTRY (E10); VIEW is NOT saved — every boot opens fitted
@@ -4580,6 +4789,12 @@ function load(){
       const id=d.equip[k2];
       if(id&&PACKS[id]&&sndSlot(id)===k2) equip[k2]=id;
     }
+    // v:11 — THE PIGGY BEDROOM (E23). A v≤10 save meets the piggy FRESH:
+    // {claimed:'',streak:0}, zero stars minted retroactively, bank untouched —
+    // she starts paying tomorrow's tap, not yesterday's history.
+    PIGGY={claimed:'',streak:0};
+    if(d.piggy && typeof d.piggy.claimed==='string' && /^\d{4}-\d\d-\d\d$/.test(d.piggy.claimed))
+      PIGGY={claimed:d.piggy.claimed, streak:Math.max(0,Math.floor(+d.piggy.streak||0))};
   }catch(e){}
 }
 
@@ -5383,6 +5598,7 @@ function swRotate(gx,gy){
 }
 cvs.addEventListener('pointerdown',e=>{
   if(SCREEN!=='game'&&SCREEN!=='play'){          // the menu room's buttons are DOM — but the RUG is alive (E18)
+    if(SCREEN==='menu'&&!DRAG&&!down&&pigHit(e)){ e.preventDefault(); pigTap(); return; }   // E23: the piggy answers first
     if(SCREEN==='menu'&&BED.on) bedDown(e);
     return;
   }
@@ -6792,7 +7008,9 @@ function bankLedger(){
   // picture rows, kid words, ≤2 words a row — the numbers are the LIVE MINT dial
   const rows=[['lap','LAP',MINT.lap,''],['station','STOP',MINT.station,''],
               ['bonk','CRASH',MINT.bonk,'PLAY'],['clear','WIN',MINT.clear,''],
-              ['pretty','PRETTY',MINT.pretty,''],['firstLap','FIRST LAP',MINT.firstLap,'']];
+              ['pretty','PRETTY',MINT.pretty,''],
+              ['piggy','PIGGY',pigTodayPays(),'EVERY DAY'],   // E23 — what today's tap pays (MINT.piggy + the paint)
+              ['firstLap','FIRST LAP',MINT.firstLap,'']];
   const lg=$('bkledger'); lg.innerHTML='';
   for(const [kind,word,val,tag] of rows){
     const r=document.createElement('div'); r.className='bkrow2';
@@ -6812,6 +7030,11 @@ function bankIcon(cv,kind){
     const s=96/(C+16);
     g.setTransform(s,0,0,s,8*s,8*s);
     withCtx(g,()=>drawPieceArt({t:'st',r:0,sel:0,elev:0,latch:null},0,0));
+    return;
+  }
+  if(kind==='piggy'){                // E23 — the pig herself, wearing today's coat, coin waiting
+    g.setTransform(1.1,0,0,1.1,48,56);
+    withCtx(g,()=>pigArt(pigTier(pigLiveStreak()),true));
     return;
   }
   if(kind==='pretty'){               // E14 — two different kinds, planted; the real painters teach it
@@ -6988,7 +7211,10 @@ function resize(){
   // E10: the rug screens ride THE CAMERA (fit by default — the old letterbox to
   // the pixel); the bedroom + board are a fixed painting at MENU_W×MENU_H.
   if(SCREEN==='game'||SCREEN==='play') viewResize();
-  else { SC=Math.min(W/MENU_W,(H-BAR)/MENU_H); OX=(W-MENU_W*SC)/2; OY=(H-BAR-MENU_H*SC)/2; }
+  else {
+    SC=Math.min(W/MENU_W,(H-BAR)/MENU_H); OX=(W-MENU_W*SC)/2; OY=(H-BAR-MENU_H*SC)/2;
+    bedBounds();   // E23: the bedroom floor is every cell the screen can hold — re-derived here
+  }
   const hc=$('homeChip'); if(hc) hc.style.bottom=(BAR+14*UIS)+'px';
   const rc=$('rideChip'); if(rc) rc.style.bottom=(BAR+66*UIS)+'px';   // E15: stacked above HOME (E20: the gap rides the dial)
   const tt=$('toast'); if(tt) tt.style.bottom=(BAR+14*UIS)+'px';      // E20: the toast clears whatever the bar grew into
@@ -7057,7 +7283,25 @@ window.TS={
   // the attract floor (stock oval = 8), trains riding it (stock + the kid's).
   bedroom(){ return { on:BED.on, shy:BED.shy, a:+BED.a.toFixed(3),
     pieces:AT.grid.size+AT.hg.size,
-    trains:(AT.cars.length?1:0)+((BED.ctx? TRAIN.placed : BED.train.placed)?1:0) }; },
+    trains:(AT.cars.length?1:0)+((BED.ctx? TRAIN.placed : BED.train.placed)?1:0),
+    // E23 — the whole-floor bounds + the blocked furniture cells, for the battery
+    gx0:BED.gx0, gy0:BED.gy0, gw:BED.gw, gh:BED.gh,
+    blocked:BED.blk? [...BED.blk] : [] }; },
+  // E23 — the piggy rig: state, the battery's calendar, seeding (never saves),
+  // and the byte-proof door. tap() walks the REAL pigTap path.
+  piggy:{
+    state(){ return { claimed:PIGGY.claimed, streak:PIGGY.streak|0,
+      today:todayStr(), tier:pigTier(pigLiveStreak()), pays:pigTodayPays(),
+      claimable:pigClaimable(), x:PIG.x, y:PIG.y, show:PIG_SHOW }; },
+    tap(){ pigTap(); return TS.piggy.state(); },
+    day(s){ PIG.dayOv=s||null; return todayStr(); },
+    set(claimed,streak){ PIGGY={claimed:String(claimed||''),streak:Math.max(0,streak|0)}; return TS.piggy.state(); },
+    show(b){ PIG_SHOW=b!==false; return PIG_SHOW; },
+  },
+  // E23 — THE predicate, asked from inside the bedroom wrapper (what the ghost
+  // tint and the drop see on the menu floor). Battery doors, mutation-free.
+  bedq(t,r,gx,gy){ return SCREEN==='menu'&&BED.on? inBed(()=>placeQuery(t,r|0,gx,gy)) : null; },
+  bedscen(t,gx,gy){ return SCREEN==='menu'&&BED.on? inBed(()=>canPlaceScen(t,gx,gy)) : null; },
   // E19 — the lifted hand, for the battery: the live drag + hover cell, the lift
   // constants, and both pointer transforms (rug and attract) so a rig can aim a
   // REAL finger anywhere and compute where the lifted point must land.
