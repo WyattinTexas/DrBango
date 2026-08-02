@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v1.7 -->
-<meta name="trainset-version" content="1.7">
+<!-- TRAINSET v1.8 -->
+<meta name="trainset-version" content="1.8">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -258,7 +258,7 @@
 </div></div>
 <div id="board"><div id="bpanel">
   <h1>TEN LITTLE LINES</h1>
-  <div id="bsub">BUILD A LINE THAT LOOPS — AND VISITS EVERY STATION</div>
+  <div id="bsub">BUILD A LINE THAT LOOPS</div>
   <div id="tickets"></div>
   <button id="bback" type="button">⬅ BACK TO THE BEDROOM</button>
 </div></div>
@@ -328,6 +328,19 @@ const CAMP_STAR='⭐';         // the stamp on a finished ticket (star art)
 const CAMP_WIN_WINDOW=90;     // the battery bar: every reference solution must win inside this many sim-seconds
 const CAMP_LABEL='CAMPAIGN 🎫';   // the menu button copy (PLAY's new neighbour)
 // + the LEVELS table below IS the per-level dial sheet: exact obstacle coords + goal-card copy
+// ---- Wyatt dials (EXPANSION 8 — one const each) ----
+// THE LANGUAGE LAW. Wyatt 8/1: level 2's card said "WEAVE A LOOP THROUGH THE
+// MEADOW!" and the fancy word WAS the complaint. Goal cards are read out loud to
+// five-year-olds, so a hint may use at most HINT_MAX words and every one of them
+// must come off this list. The battery greps all ten against it — a level that
+// invents a word refuses to ship. WEAVE, THREAD and their cousins are gone forever.
+const HINT_MAX=5;
+const HINT_WORDS=new Set(('BUILD FINISH GO GET AROUND OVER THROUGH STOP AT USE LET VISIT '+
+  'THE A AND BOTH POND TRACK WOODS RIVER FARM STATION STATIONS CROSSING TUNNEL SPLIT TOWN').split(' '));
+const hintWords=h=>h.replace(/[^A-Z ]/g,'').split(/\s+/).filter(Boolean);
+const GAP_GLOW=true;          // level 2's missing cells breathe a soft gold (5-year-old kindness)
+const TOY_CARD='NEW TOY!';    // the ceremony headline over each freshly-won toy
+const TICKET_ICONS=true;      // each ticket wears its headline toy — locked ones as a silhouette
 // ---- Wyatt dials (EXPANSION 6 — one const each) ----
 const BUILD_LABEL='BUILD 🔨';        // the third big button: PLAY ▶ · CAMPAIGN 🎫 · BUILD 🔨
 const PLAY_MARK='🚂 PLAY!';          // the wordmark chip while the wind-up rug is out
@@ -834,6 +847,13 @@ function update(dt){
             if(CAMP.on) CAMP.visited.add(lk);       // pause-visited, since GO (the E5 win check)
           }
         }
+        // the diamond (E8, level 7): the loco having ridden a named cell since GO.
+        // Cell-keyed like everything else the E4 audit touched — a high train passing
+        // over the crossing is not the same thing as going through it.
+        if(CAMP.on && !CAMP.crossed){
+          const L8=LEVELS[CAMP.level-1];
+          if(L8 && L8.cross && lc.cx===L8.cross[0] && lc.cy===L8.cross[1] && !lc.el) CAMP.crossed=true;
+        }
         if(lk!==locoPrev){
           if(TRAIN.stKey && TRAIN.stKey!==lk) TRAIN.stKey=null;
           // a lap — the loco re-enters where GO was pressed, same heading, SAME LEVEL.
@@ -875,7 +895,8 @@ function update(dt){
   confetti=confetti.filter(p=>p.t<p.dur);
   if(lapCardT>0) lapCardT-=dt;
   if(goalT>0) goalT-=dt;
-  if(winT>0) winT-=dt;
+  if(winT>0){ winT-=dt; if(winT<0) winT=0; }
+  if(CAMP.on) toyTick(dt);
 }
 // E7 — trackside furniture watches the trains go by, keyed (cell, elev) like everything:
 // a WHISTLE POST toots once when a loco enters its patch and re-arms on exit (the
@@ -2263,10 +2284,27 @@ function drawLapCard(){
   cx.fillText('ROUND AND ROUND, FOREVER!', W/2, y+76);
   cx.globalAlpha=1;
 }
+// a kid who asked the OS for calm gets a steady ring instead of a breathing one
+const RM=()=>{ try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } };
+// FINISH THE TRACK's tell (E8): the missing cells breathe a soft gold ring so a
+// five-year-old sees exactly where the pieces go. Empty cells only — the glow retires
+// the instant a piece lands, which is its own little reward. Still under reduced motion.
+function drawGaps(){
+  if(!GAP_GLOW||!CAMP.on) return;
+  const L=LEVELS[CAMP.level-1]; if(!L||!L.gaps) return;
+  const k=RM()? 0.5 : 0.5+0.5*Math.sin(perf()*2.6);
+  for(const [gx,gy] of L.gaps){
+    if(pieceAt(gx,gy)) continue;
+    const x=GX+gx*C, y=GY+gy*C;
+    cx.globalAlpha=0.18+0.30*k; cx.strokeStyle='#F2C531'; cx.lineWidth=4;
+    rr(x+7,y+7,C-14,C-14,12); cx.stroke();
+    cx.globalAlpha=1;
+  }
+}
 function draw(){
   cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cvs.width,cvs.height);
   cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
-  drawRug(); drawRivers(); drawPonds();
+  drawRug(); drawRivers(); drawPonds(); drawGaps();
   // scenery slides in as the midHook: over the ground pass, under the decks and
   // the z-sorted cars — so a cow can graze beneath the high line
   drawTrackAll(grid,hgrid,PLAY.on? playCarItems():trainCarItems(),drawScen);
@@ -2571,6 +2609,7 @@ function save(){
     localStorage.setItem('TRAINSET', JSON.stringify({
       v:6, grid:w.grid, scen:w.scen, consist:w.consist, color:COLOR, train:w.train,
       coll:[...coll], eng:ENGINE,
+      e8:1,   // E8 arrived: the ten levels are new land, so any wip saved before this is void (once)
       camp:{ done:[...CAMP.done], all:CAMP.all?1:0,
              wip: CAMP.on? (CAMP_WIP&&!CAMP.won? serWip():null) : (CAMP_WIP? CAMP.wip:null) },
       hints:hintStage, lap:lapDone, mute:!AU.on,
@@ -2587,6 +2626,10 @@ function load(){
     CAMP.done=new Set((cp.done||[]).filter(n=>n>=1&&n<=LEVELS.length));
     CAMP.all=!!cp.all;
     CAMP.wip=(CAMP_WIP&&cp.wip&&cp.wip.level>=1&&cp.wip.level<=LEVELS.length)? cp.wip : null;
+    // E8 replaced all ten levels wholesale, so a work-in-progress saved against the OLD
+    // land is meaningless — drop it exactly once, on the first boot after the update.
+    // Stars (camp.done) and the toy box are untouched: those were earned.
+    if(!d.e8) CAMP.wip=null;
     // v:6 — the toy box. A v≤5 save migrates to the 5 starters PLUS the full bundle of
     // every level already in camp.done (they earned them). The save's color/engine stays
     // even if its paint chip / engine toy is technically unowned — grandfathered, never
@@ -2606,39 +2649,92 @@ function load(){
    own stash and never touches the kid's rug.
    ===================================================================== */
 // LEVELS ARE DATA — Wyatt adds level 11 by adding a row, zero new code.
-//   name/hint  the ticket + goal-card copy (dials)
+//   name/hint  the ticket + goal-card copy (dials; hint obeys THE LANGUAGE LAW)
 //   glued      scenery rows [kind,x,y,v?] glued to the rug (water is a SOFT wall —
-//              bridges cross it; buildings + fence are the TRUE walls)
-//   stations   glued STATION track rows [x,y,r?] — every one is required
+//              bridges cross it; buildings, fence, trees, pines and rocks are TRUE walls)
+//   track      glued TRACK rows [t,r,x,y] — TRY-THEN-OWN (E8): a level that stars a
+//              special piece glues a WORKING copy in so the kid rides it before the
+//              win puts their own in the toy box. Never required, never removable.
+//   stations   glued STATION rows [x,y,r?] — every one of these IS required
+//   cross      [x,y] the loco must have passed this cell since GO (level 7)
+//   gaps       [x,y] cells that breathe gold — the finish-the-track tell (level 2)
+//   toy        the headline toy of this level's bundle (ticket icon + first NEW TOY! card)
+// THE EASY LAWS (E8): the land shows the answer — every level is visibly a ring, a
+// corridor or a finish-the-gap. Only STRAIGHT, CURVE and (from 4 on) BRIDGE are ever
+// REQUIRED; every other piece arrives glued. Reference solutions stay under
+// SOLVE_CAP pieces, and the battery proves each one only places toys owned by then.
+const SOLVE_CAP=[14,14,14,14,14,22,22,22,22,22];
+const fillRows=(kind,x0,y0,x1,y1,alt)=>{      // a block of glued scenery; alt checkers a second kind in
+  const r=[];
+  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++) r.push([(alt&&((x+y)&1))?alt:kind,x,y]);
+  return r;
+};
 const LEVELS=[
-  { name:'THE POND', hint:'LOOP YOUR LINE AROUND THE WATER — OR BRIDGE STRAIGHT ACROSS!',
+  // 1 — THE POND. Wyatt approved this one as it stands: the pond sits mid-rug and
+  // the answer is the shape of the water. Kept verbatim; only the card got simpler.
+  { name:'THE POND', hint:'GO AROUND THE POND!', toy:'duck',
     glued:[['rv',5,3],['rv',6,3],['rv',5,4],['rv',6,4]], stations:[] },
-  { name:'THREE TREES', hint:'WEAVE A LOOP THROUGH THE MEADOW!',
-    glued:[['tree',3,2],['tree',6,5],['tree',8,3],['bush',5,3],['bush',1,4],['bush',10,2]], stations:[] },
-  { name:'THE COTTAGE STOP', hint:'RUN YOUR LOOP THROUGH THE STATION — AND STOP THERE!',
-    glued:[['house',5,3],['shop',6,4]], stations:[[2,5]] },
-  { name:'RIVERSIDE', hint:'A LOOP MUST CROSS THE RIVER TWICE — TWO BRIDGES!',
-    glued:[['rv',6,0],['rv',6,1],['rv',6,2],['rv',6,3],['rv',6,4],['rv',6,5],['rv',6,6],['rv',6,7]], stations:[] },
-  { name:'THE FARM', hint:'GO THE LONG WAY ROUND THE PADDOCK TO THE STATION!',
-    glued:[['fence',3,2],['fence',4,2],['fence',5,2],['fence',6,2],['fence',7,2],['fence',8,2],
-           ['fence',3,3],['fence',8,3],['fence',3,4],['fence',8,4],
-           ['fence',3,5],['fence',4,5],['fence',5,5],['fence',6,5],['fence',7,5],['fence',8,5],
-           ['barn',5,3],['cow',4,4,0],['cow',6,4,1],['cow',7,3,2]], stations:[[10,6]] },
-  { name:'TWIN PONDS', hint:'WEAVE BETWEEN THE PONDS AND STOP AT THE STATION!',
-    glued:[['rv',2,2],['rv',3,2],['rv',2,3],['rv',3,3],['rv',8,4],['rv',9,4],['rv',8,5],['rv',9,5]],
-    stations:[[5,1]] },
-  { name:'MAIN STREET', hint:'THREAD THE GAPS OR RING THE WHOLE STREET — VISIT BOTH STATIONS!',
-    glued:[['house',3,3],['shop',5,3],['hall',7,3],['house',9,3]], stations:[[1,6],[10,1]] },
-  { name:'RIVER FARM', hint:'BRIDGE THE RIVER AND SKIRT THE FARM TO THE STATION!',
-    glued:[['rv',0,4],['rv',1,4],['rv',2,4],['rv',3,4],['rv',4,4],['rv',5,4],['rv',6,4],['rv',7,4],['rv',8,4],['rv',9,4],['rv',10,4],['rv',11,4],
-           ['fence',2,5],['fence',3,5],['fence',4,5],['fence',5,5],['fence',2,6],['fence',5,6],
-           ['fence',2,7],['fence',3,7],['fence',4,7],['fence',5,7],['cow',3,6,0],['cow',4,6,2]],
-    stations:[[9,1]] },
-  { name:'TOWN SQUARE', hint:'THREAD THE ALLEYS — OR RING THE SQUARE — VISIT BOTH STATIONS!',
-    glued:[['house',4,2],['shop',7,2],['hall',4,5],['house',7,5],
-           ['fence',5,2],['fence',4,3],['fence',4,4],['fence',7,3],['fence',7,4],['fence',5,5],
-           ['rv',5,3]], stations:[[1,1],[10,6]] },
-  { name:'THE GRAND TOUR', hint:'EVERYTHING AT ONCE — ONE GRAND LINE, BOTH STATIONS!',
+  // 2 — FINISH THE TRACK. The simplest possible second level: an oval already on the
+  // rug with three cells missing. The gaps breathe gold; two straights and one curve
+  // close it. The station rides along for free so level 6 can ASK for one later.
+  { name:'FINISH THE TRACK', hint:'FINISH THE TRACK!', toy:'st',
+    glued:[['bush',1,1],['flw',10,6],['flw',1,6],['bush',10,1]],
+    track:[['c',1,3,2],['s',0,4,2],['s',0,7,2],
+           ['s',1,3,3],['s',1,3,4],['s',1,8,3],['s',1,8,4],
+           ['c',0,3,5],['c',3,8,5],['st',0,4,5],['s',0,5,5],['s',0,6,5],['s',0,7,5]],
+    gaps:[[5,2],[6,2],[8,2]], stations:[] },
+  // 3 — THROUGH THE WOODS. Wyatt asked for "a ton of woods, and clearly there's a
+  // narrow passage". The forest packs both flanks solid and leaves a two-wide lane
+  // all the way round an island of pines — the clearing IS the answer, drawn in trees.
+  // The forest IS the instruction: it packs every edge solid and leaves one clearing —
+  // a two-wide lane running all the way round an island of pines. There is exactly one
+  // shape that fits in it, and a five-year-old can see the shape from across the room.
+  { name:'THROUGH THE WOODS', hint:'BUILD THROUGH THE WOODS!', toy:'br',
+    glued:[...fillRows('tree',0,0,2,7,'pine'), ...fillRows('tree',10,0,11,7,'pine'),
+           ...fillRows('pine',3,0,9,0,'tree'), ...fillRows('pine',3,7,9,7,'tree'),
+           ...fillRows('pine',5,3,7,4,'tree'), ['dog',4,6,0]],
+    stations:[] },
+  // 4 — OVER THE RIVER. The river splits the rug top to bottom, so any loop crosses
+  // it twice: two bridges, the toy level 3 just handed over.
+  { name:'OVER THE RIVER', hint:'GET OVER THE RIVER!', toy:'tank',
+    glued:[['rv',6,0],['rv',6,1],['rv',6,2],['rv',6,3],['rv',6,4],['rv',6,5],['rv',6,6],['rv',6,7],
+           ['ppl',3,6],['duck',8,6,0]],
+    stations:[] },
+  // 5 — THE FARM. A pen in the middle and a big friendly detour round it. The station
+  // stays as scenery ONLY — Wyatt's "make them easier" applied literally: no goal but
+  // the loop itself, and the animals are the reward for going the long way.
+  { name:'THE FARM', hint:'GO AROUND THE FARM!', toy:'cow',
+    glued:[['fence',4,2],['fence',5,2],['fence',6,2],['fence',4,3],['fence',6,3],['barn',5,3],
+           ['cow',9,2,0],['cow',9,4,1],['cow',2,5,2],['sheep',10,3,0],['hay',1,2],['chick',8,6,0]],
+    track:[['st',0,9,6]], stations:[] },
+  // 6 — MAIN STREET. The first level that ASKS for a station stop, taught four levels
+  // earlier by the freebie on level 2. Shops line the middle; ring the whole street.
+  { name:'MAIN STREET', hint:'STOP AT THE STATION!', toy:'house',
+    glued:[['house',3,3],['shop',5,3],['hall',7,3],['house',8,3],['lamp',4,3],['lamp',6,3],
+           ['ppl',5,6],['cat',10,6,0]],
+    stations:[[5,5]] },
+  // 7 — THE CROSSING. One glued crossing sits on the line and the loop has to use it.
+  // TRY-THEN-OWN in its purest form: ride the diamond, then it's yours.
+  { name:'THE CROSSING', hint:'USE THE CROSSING!', toy:'x',
+    glued:[['sig',6,3],['whis',2,6],['cat',10,3,0],['bush',10,6]],
+    track:[['x',0,6,1]], cross:[6,1], stations:[] },
+  // 8 — THE TUNNEL. A rock-and-pine ridge walls off the top half with exactly one way
+  // through it. The land forces the whole rest of the shape — win is just the lap.
+  { name:'THE TUNNEL', hint:'GO THROUGH THE TUNNEL!', toy:'tun',
+    glued:[['rock',6,0],['rock',6,1],['rock',6,3],['rock',6,4],
+           ['pine',5,0],['pine',7,0],['pine',5,4],['pine',7,4],['pine',5,1],['pine',7,1],
+           ['wind',2,6],['rock',9,1],['pine',9,0]],
+    track:[['tun',0,6,2]], stations:[] },
+  // 9 — THE SPLIT. A working siding arrives glued at both ends; the kid closes the big
+  // ring around it and the train takes turns down the branch all by itself.
+  { name:'THE SPLIT', hint:'LET THE TRACK SPLIT!', toy:'sw',
+    glued:[['hall',1,6],['wtr',10,6],['flw',1,2],['bush',10,2]],
+    track:[['sw',0,4,4],['s',0,5,4],['s',0,6,4],['sw',0,7,4],
+           ['c',0,4,5],['s',0,5,5],['s',0,6,5],['c',3,7,5]],
+    stations:[] },
+  // 10 — THE GRAND TOUR. The finale land stands exactly as it shipped: river, pond,
+  // farm and houses all at once, two stations far apart, and the double confetti.
+  { name:'THE GRAND TOUR', hint:'VISIT BOTH STATIONS!', toy:'exp',
     glued:[['rv',3,0],['rv',3,1],['rv',3,2],['rv',3,3],['rv',3,4],['rv',4,4],['rv',5,4],['rv',6,4],['rv',7,4],['rv',8,4],
            ['rv',10,1],['rv',11,1],['rv',10,2],['rv',11,2],
            ['fence',0,5],['fence',1,5],['fence',2,5],['fence',2,6],['fence',2,7],
@@ -2657,25 +2753,29 @@ function ringRows(x0,y0,x1,y1,skip){    // a rectangle of track; skip = the glue
   return rows;
 }
 const swapBr=(rows,cells)=>rows.map(r=>cells.some(c2=>c2[0]===r[2]&&c2[1]===r[3])? ['br',r[1],r[2],r[3]] : r);
+// Every row below places ONLY pieces the kid owns by that level — straights and
+// curves throughout, plus bridges from 4 on (level 3's bundle hands them over).
+// The glued cells of each level are skipped: a reference never re-places the land.
 const SOLVE=[
-  { start:[5,2], rows:ringRows(4,2,7,5) },                                  // round the pond
-  { start:[3,1], rows:ringRows(2,1,9,6) },                                  // round the meadow
-  { start:[2,4], rows:ringRows(1,4,3,5,[[2,5]]) },                          // the little cottage loop
-  { start:[4,2], rows:swapBr(ringRows(3,2,9,5),[[6,2],[6,5]]) },            // two bridges over the river
-  { start:[2,1], rows:ringRows(1,1,11,6,[[10,6]]) },                        // the big detour round the paddock
-  { start:[2,6], rows:ringRows(1,1,10,6,[[5,1]]) },                         // round both ponds
-  { start:[2,1], rows:ringRows(0,1,11,6,[[10,1],[1,6]]) },                  // ring the whole street
-  { start:[7,6], rows:swapBr(ringRows(6,1,10,6,[[9,1]]),[[6,4],[10,4]]) },  // bridge twice, east of the farm
-  { start:[2,1], rows:ringRows(0,1,11,6,[[1,1],[10,6]]) },                  // ring the square
+  { start:[5,2], rows:ringRows(4,2,7,5) },                                  // 1 round the pond
+  { start:[6,5], rows:[ ['s',0,5,2],['s',0,6,2],['c',2,8,2] ] },            // 2 close the three gaps
+  { start:[5,2], rows:ringRows(4,2,8,5) },                                  // 3 the lane through the woods
+  { start:[4,3], rows:swapBr(ringRows(4,2,8,5),[[6,2],[6,5]]) },            // 4 two bridges over the river
+  { start:[4,1], rows:ringRows(3,1,7,4) },                                  // 5 the detour round the pen
+  { start:[3,1], rows:ringRows(2,1,9,5,[[5,5]]) },                          // 6 ring the street, through the stop
+  { start:[4,1], rows:ringRows(3,1,9,5,[[6,1]]) },                          // 7 ring it through the crossing
+  { start:[5,2], rows:ringRows(4,2,8,5,[[6,2]]) },                          // 8 through the tunnel, home below
+  { start:[5,1], rows:ringRows(3,1,8,4,[[4,4],[5,4],[6,4],[7,4]]) },        // 9 close the ring round the siding
   { start:[7,5], rows:[ ['c',1,3,5],['s',0,4,5],['s',0,5,5],['s',0,6,5],['s',0,7,5],['s',0,8,5],
       ['c',3,9,5],['c',1,9,4],['c',2,11,4],['s',1,11,5],['c',3,11,6],
-      ['s',0,10,6],['s',0,9,6],['s',0,8,6],['s',0,7,6],['s',0,6,6],['s',0,4,6],['c',0,3,6] ] },  // the grand tour
+      ['s',0,10,6],['s',0,9,6],['s',0,8,6],['s',0,7,6],['s',0,6,6],['s',0,4,6],['c',0,3,6] ] },  // 10 the grand tour
 ];
 // the campaign's own state object — free play's grid/consist/save is NEVER touched
 const CAMP={ on:false, level:0, won:false, tugT:false, stations:[], visited:new Set(),
-             done:new Set(), all:false, wip:null };
+             done:new Set(), all:false, wip:null, crossed:false };
 let FREE=null;            // the stashed free-play world while a level is open
 let goalT=0, winT=0;      // the goal card + the LINE COMPLETE! card
+let toyQ=[], toyCard=null, toyT=0;   // E8: the NEW TOY! queue, the card on screen, its clock
 function campUnlocked(n){ return !CAMP_SEQ || CAMP.all || n===1 || CAMP.done.has(n-1); }
 function serWip(){        // the level's work-in-progress — glued rows regenerate from LEVELS, never saved
   const g=[];
@@ -2700,6 +2800,10 @@ function campEnter(n){
   grid.clear(); hgrid.clear(); scen.clear();
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
   for(const g of L.glued) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
+  // TRY-THEN-OWN (E8): the level's own working pieces, glued down. They are part of
+  // the land exactly like the scenery — a tug wobbles them and nothing removes them.
+  for(const tr of (L.track||[])){ const pc=setTrackPiece(tr[0],tr[1]|0,null,0,tr[2],tr[3]); pc.glued=1; }
+  CAMP.crossed=false;
   CAMP.stations=[];
   for(const st of L.stations){
     const pc=setTrackPiece('st',st[2]|0,null,0,st[0],st[1]); pc.glued=1;
@@ -2742,14 +2846,36 @@ function campLap(){          // the lap machinery fired inside a level
   if(CAMP.won) return;
   if(TRAIN.revSinceGo) return;                                 // a TRUE loop — ping-pongs don't count
   if(!CAMP.stations.every(k=>CAMP.visited.has(k))) return;     // ...AND every station pause-visited
+  const L=LEVELS[CAMP.level-1];
+  if(L&&L.cross&&!CAMP.crossed) return;                        // ...AND the diamond was ridden (level 7)
   campWin();
 }
 function campWin(){
   CAMP.won=true; CAMP.done.add(CAMP.level); CAMP.wip=null;
   winT=3.6; SND.bugle(); SND.whistle();
   confettiBurst(CAMP.level===LEVELS.length? 180 : 90);         // GRAND OPENING! gets the double burst
-  grantBundle(CAMP.level);   // E7: the win silently fills the toy box (E8 adds the NEW TOY! ceremony)
+  // THE NEW TOY! CEREMONY (E8) — the best moment in the game. grantBundle reports the
+  // ids it actually added (re-winning adds nothing, so a replay is quiet), the level's
+  // headline toy goes first, and the cards queue up behind the LINE COMPLETE! card.
+  const won=grantBundle(CAMP.level), L=LEVELS[CAMP.level-1];
+  if(L&&L.toy) won.sort((a,b)=>(b===L.toy)-(a===L.toy));
+  toyQ=won; toyCard=null; toyT=0;
   boardSync(); winSync(); save();
+}
+// one card per freshly-won toy: the real painter draws it BIG, its name beneath, a
+// pinch of confetti, tap for the next. NEXT LEVEL waits until the box is empty.
+function toyNext(){
+  if(!toyQ.length){ toyCard=null; winSync(); return; }
+  toyCard=toyQ.shift(); toyT=0;
+  SND.ding(); confettiBurst(24);
+}
+function toyTick(dt){
+  if(toyT<9) toyT+=dt;
+  if(!toyCard && !winT && toyQ.length && CAMP.won) toyNext();   // the win card clears, the toys come out
+}
+function toyTap(){            // a tap anywhere advances the ceremony
+  if(!toyCard) return false;
+  toyNext(); return true;
 }
 // a tug on the glued land: tiny wobble, one toast per level, then quiet
 function gluedTug(pc,s){
@@ -2781,13 +2907,54 @@ function drawCampCards(){
   if(goalT>0) card(goalT,4.2,'LEVEL '+CAMP.level+' — '+L.name,L.hint,'#F7E9C4');
   if(winT>0) card(winT,3.6,CAMP.level===LEVELS.length?'GRAND OPENING!':'LINE COMPLETE!',
                   L.name+'  '+CAMP_STAR,'#CFF7C4');
+  drawToyCard();
+}
+// THE NEW TOY! CARD — the same gold recipe as LINE COMPLETE!, but the toy's own
+// painter draws it big in the middle. Reuses the toy box's slotIcon by borrowing cx,
+// so a toy can never look different here than it does on the shelf.
+function drawToyCard(){
+  if(!toyCard) return;
+  const def=COLL_BY[toyCard]; if(!def) return;
+  const cw=Math.min(420,W-40), chh=260, x=(W-cw)/2, y=(H-BAR)/2-140;
+  const pop=Math.min(1,toyT*4), sc=0.7+0.3*Math.min(1,toyT*3.2);
+  // the rug dims behind the prize — otherwise the card reads muddy over track and train
+  cx.globalAlpha=0.5*pop; cx.fillStyle='#120c07'; cx.fillRect(0,0,W,H);
+  cx.globalAlpha=pop;
+  cx.fillStyle='#1e1610'; rr(x,y,cw,chh,18); cx.fill();
+  cx.fillStyle='#1e1610'; rr(x,y,cw,chh,18); cx.fill();   // twice: fully opaque over the scrim
+  cx.strokeStyle='#F2C531'; cx.lineWidth=5; rr(x,y,cw,chh,18); cx.stroke();
+  cx.textAlign='center'; cx.fillStyle='#F2C531';
+  cx.font='bold 26px "Arial Black",Impact,sans-serif';
+  cx.fillText(TOY_CARD,W/2,y+44);
+  // the real painter, scaled up on its own little canvas so the shelf art is the law
+  const box=168, tmp=document.createElement('canvas'); tmp.width=tmp.height=96;
+  const keep=coll.has(toyCard); if(!keep) coll.add(toyCard);   // draw it OWNED (never a silhouette here)
+  slotIcon(tmp,toyCard);
+  if(!keep) coll.delete(toyCard);
+  cx.save(); cx.translate(W/2,y+140); cx.scale(sc,sc);
+  cx.drawImage(tmp,-box/2,-box/2,box,box);
+  cx.restore();
+  cx.fillStyle='#F7E9C4'; cx.font='bold 22px "Arial Black",Impact,sans-serif';
+  cx.fillText(def.name,W/2,y+222);
+  cx.fillStyle='rgba(247,233,196,0.55)';
+  cx.font='bold 12px "Arial Black",Impact,sans-serif';
+  cx.fillText(toyQ.length? 'TAP FOR THE NEXT ONE':'TAP TO KEEP PLAYING',W/2,y+248);
+  cx.globalAlpha=1;
 }
 // ---- the level board: a wooden panel of ten numbered tickets ----
+const TICKET_CVS=[];
 function buildBoard(){
   const tk=$('tickets');
   for(let n=1;n<=LEVELS.length;n++){
     const b=document.createElement('button'); b.className='tk'; b.type='button'; b.dataset.n=n;
     b.innerHTML='<b></b><small></small><span class="star"></span>';
+    // E8: every ticket wears its headline toy. Owned = the real painter, locked = a
+    // silhouette — so an eight-year-old can see what's waiting three levels out.
+    if(TICKET_ICONS && LEVELS[n-1].toy){
+      const cv=document.createElement('canvas'); cv.width=cv.height=96; cv.className='tkicon';
+      cv.style.cssText='width:34px;height:34px;display:block;margin:2px auto -2px;';
+      b.insertBefore(cv,b.firstChild); TICKET_CVS.push([n,cv]);
+    }
     b.addEventListener('click',()=>{
       ac();
       if(!campUnlocked(n)){ wiggle(b); SND.click(); toast('WIN TICKET '+(n-1)+' TO OPEN THIS ONE!'); return; }
@@ -2812,10 +2979,13 @@ function boardSync(){
     b.querySelector('small').textContent=open? LEVELS[n-1].name : 'LOCKED';
     b.querySelector('.star').textContent=done? CAMP_STAR : '';
   });
+  for(const [n,cv] of TICKET_CVS) slotIcon(cv,LEVELS[n-1].toy);   // owned art or silhouette, by the box's own rule
 }
 function winSync(){
   const b=$('nextBtn');
-  const show=SCREEN==='game'&&CAMP.on&&CAMP.won;
+  // NEXT LEVEL waits for the toys: a kid should not be able to skip past their own
+  // prizes, and a button under the card is just something to fat-finger (E8).
+  const show=SCREEN==='game'&&CAMP.on&&CAMP.won&&!toyCard&&!toyQ.length;
   b.style.display=show?'block':'none';
   if(show) b.textContent=CAMP.level<LEVELS.length? 'NEXT LEVEL ▶' : 'BACK TO THE BOARD 🎫';
 }
@@ -3101,6 +3271,7 @@ function swRotate(gx,gy){
 cvs.addEventListener('pointerdown',e=>{
   if(SCREEN!=='game'&&SCREEN!=='play') return;   // the menu room is scenery — its buttons are DOM
   ac(); e.preventDefault();
+  if(toyTap()) return;                           // E8: the NEW TOY! card owns the tap while it's up
   const [wx,wy]=worldXY(e);
   if(SCREEN==='play'){
     // E6: taps do what taps already do — a finger on a train gets first claim (whistle);
@@ -3338,7 +3509,11 @@ function buildPalette(){
 // FULL palette in this version (its gate arrives in E8 with the new levels). Tabs with
 // nothing to offer hide; PLAY has no palette at all.
 function paletteSync(){
-  const full=CAMP.on;
+  // E8: THE GATE now covers the campaign too — a level offers the toys you own and
+  // nothing else, which is what makes winning one mean something. The award schedule
+  // guarantees solvability (every reference solution places only owned pieces), and
+  // whatever the level needs beyond that arrives GLUED. MORE TOYS… stays BUILD's door.
+  const full=false;
   const vis={track:0,scen:0,town:0,friends:0};
   for(const b of PAL_BTNS){
     const on=full||coll.has(b.t);
@@ -3347,7 +3522,7 @@ function paletteSync(){
   }
   const tabIds={track:'tabTrack',scen:'tabScen',town:'tabTown',friends:'tabFriends'};
   for(const k2 in tabIds) $(tabIds[k2]).style.display=vis[k2]?'':'none';
-  $('moreToys').style.display=full?'none':'flex';
+  $('moreToys').style.display=CAMP.on?'none':'flex';   // the box is BUILD's door; a level has its board
   if(!vis[palTab]) buildPalette.sync('track');
 }
 const PART_CVS=[];    // shed part icons — repainted when the livery changes
@@ -3438,8 +3613,9 @@ function consistChanged(){
 function shedShow(b){ $('shed').classList.toggle('open',b); if(b){ shedSync(); hintPass(2); } }
 function shedSync(){
   paintConsist();
-  // THE GATE LAW: BUILD's shed offers owned cars only; the campaign shed stays full (E8 gates it)
-  for(const [t,b] of PART_BTNS) b.style.display=(CAMP.on||coll.has(PART_COLL[t]))?'':'none';
+  // THE GATE LAW (E8): the shed offers owned cars only, in BUILD and in the campaign
+  // alike — the toy box is the one source of what you may put on the rug.
+  for(const [t,b] of PART_BTNS) b.style.display=coll.has(PART_COLL[t])?'':'none';
   engSync();
   const h=$('handle');
   if(TRAIN.placed){ h.textContent='🏠 ON THE RAILS — TAP TO BRING IT HOME'; h.classList.add('home'); }
@@ -3499,10 +3675,10 @@ function syncSwatches(){
    that names its level. The tiny lid counter is the whole meta.
    ===================================================================== */
 function grantBundle(lvl){
-  let any=false;
-  for(const id of bundleOf(lvl)) if(!coll.has(id)){ coll.add(id); any=true; }
-  if(any) collChanged();
-  return any;
+  const won=[];
+  for(const id of bundleOf(lvl)) if(!coll.has(id)){ coll.add(id); won.push(id); }
+  if(won.length) collChanged();
+  return won;          // E8: the ceremony needs to know WHICH toys were new
 }
 function collChanged(){
   paletteSync(); shedSync(); syncSwatches();
@@ -3721,6 +3897,11 @@ window.TS={
       if(!(CAMP.on&&CAMP.level===n)){ if(!campEnter(n)) return {ok:false,why:'locked'}; }
       clearPlayer();
       const S=SOLVE[n-1]; if(!S) return {ok:false,why:'no-solution'};
+      // THE SOLVABILITY LAW (E8): a reference may place ONLY toys the kid owns by now.
+      // With the campaign gated, a solution that reaches for an unearned piece is a
+      // level nobody can finish — so it fails here, loudly, instead of on a kid's rug.
+      for(const row of S.rows) if(!coll.has(row[0])) return {ok:false,why:'unowned:'+row[0],at:row};
+      if(S.rows.length>SOLVE_CAP[n-1]) return {ok:false,why:'too-many:'+S.rows.length,at:SOLVE_CAP[n-1]};
       for(const row of S.rows){
         const [t,r,x,y]=row, q=placeQuery(t,r,x,y);
         if(!q.ok) return {ok:false,why:q.why,at:row};
@@ -3728,11 +3909,15 @@ window.TS={
       }
       if(!placeTrainAt(S.start[0],S.start[1],0)) return {ok:false,why:'train'};
       goBtnSync(); shedSync(); save();
-      return {ok:true};
+      return {ok:true,rows:S.rows.length,cap:SOLVE_CAP[n-1]};
     },
     state(){ return { on:CAMP.on, level:CAMP.level, won:CAMP.won, all:CAMP.all,
       done:[...CAMP.done].sort((a,b)=>a-b), stations:CAMP.stations.slice(),
-      visited:[...CAMP.visited], wip:CAMP.wip? CAMP.wip.level:null, tugToast:CAMP.tugT }; },
+      visited:[...CAMP.visited], wip:CAMP.wip? CAMP.wip.level:null, tugToast:CAMP.tugT,
+      crossed:CAMP.crossed, toyCard:toyCard, toyQueue:toyQ.slice() }; },
+    // the ceremony's own door — the battery taps through the cards the way a kid does
+    toyTap(){ return toyTap(); },
+    hints(){ return LEVELS.map(L=>L.hint); },
   },
   state(){ return { screen:SCREEN, color:COLOR,
     placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F,
