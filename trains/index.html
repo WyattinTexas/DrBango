@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v2.1 -->
+<!-- TRAINSET v2.2 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
-<meta name="trainset-version" content="2.1">
+<meta name="trainset-version" content="2.2">
 <style>
   /* ---- the toy chest chrome: GVT's dark wood, cream caps, gold accents ---- */
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -117,22 +117,91 @@
   #store{ position:absolute; inset:0; z-index:12; display:none; align-items:center; justify-content:center;
     padding:10px; background:rgba(10,6,3,0.45); }
   #stpanel{ background:linear-gradient(#3a2a18,#241a0e); border:3px solid #6e5130; border-radius:20px;
-    padding:14px 18px 8px; box-shadow:0 14px 44px rgba(0,0,0,0.55); max-width:min(96vw,860px); text-align:center; }
+    padding:14px 18px 8px; box-shadow:0 14px 44px rgba(0,0,0,0.55); width:min(96vw,860px); text-align:center; }
   #stlid{ display:flex; align-items:baseline; justify-content:space-between; gap:14px; margin-bottom:8px; }
   #stlid h1{ font-size:20px; letter-spacing:3px; color:#F2C531; }
   #stStars{ font-size:14px; letter-spacing:2px; color:#F2C531; background:#170f08;
     border:2px solid #513a24; border-radius:10px; padding:4px 10px; }
-  #sttabs{ display:flex; gap:6px; justify-content:center; margin-bottom:8px; flex-wrap:wrap; }
-  #stshelves{ max-height:min(58vh,520px); overflow-y:auto; scrollbar-width:thin; scrollbar-color:#6e5130 #170f08; }
-  #stshelves .tbrow{ flex-wrap:wrap; }   /* a 14-toy shelf wraps rather than scrolling sideways */
-  .stitem{ display:flex; flex-direction:column; align-items:center; gap:1px; padding:2px 2px 3px; }
-  .stitem canvas{ width:48px; height:48px; display:block; pointer-events:none; }
-  .stitem.dim canvas{ opacity:0.4; }   /* locked = the real painter at 40% — see what you're saving for */
-  .stitem.on{ border-color:#F2C531; }
-  .stitem small{ font-size:7px; letter-spacing:0.4px; color:#CBB88C; pointer-events:none; max-width:56px; }
+  /* ---- E13 THE TOY AISLE: one horizontal strip, card size IS rarity ---- */
+  #staisle{ position:relative; display:flex; align-items:flex-end; gap:10px;
+    overflow-x:auto; overflow-y:hidden; padding:16px 10px 8px;
+    scroll-snap-type:x proximity; touch-action:pan-x; cursor:grab;
+    border-bottom:5px solid #6e5130;   /* the shelf floor the goods sit on */
+    scrollbar-width:thin; scrollbar-color:#6e5130 #170f08; }
+  #staisle::-webkit-scrollbar{ height:9px; }
+  #staisle::-webkit-scrollbar-track{ background:#170f08; border-radius:5px; }
+  #staisle::-webkit-scrollbar-thumb{ background:#6e5130; border-radius:5px; }
+  .stcard{ position:relative; flex:0 0 auto; display:flex; flex-direction:column; align-items:center;
+    justify-content:flex-end; gap:3px; padding:6px 7px 7px;
+    height:calc(var(--ch)*1px); aspect-ratio:27/20; font-family:inherit;
+    background:linear-gradient(#241a12,#120c06); border:3px solid #513a24; border-radius:16px;
+    scroll-snap-align:center; cursor:pointer; }
+  .stcard canvas{ flex:1 1 auto; width:100%; min-height:0; pointer-events:none; }
+  .stcard small{ font-size:10px; letter-spacing:1px; color:#F7E9C4; pointer-events:none;
+    background:#170f08; border:1px solid #513a24; border-radius:8px; padding:2px 8px;
+    max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stcard.md{ border-color:#E67E22; }     /* the orange frame — the screenshot's "UP" card */
+  .stcard.bg{ border-color:#C0392B; }     /* deep red + corner badge */
+  .stcard.star{ border-color:#F2C531; }   /* gold + ★ badge + the slow glint */
+  .bdg{ position:absolute; top:-9px; right:-9px; width:26px; height:26px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:13px; pointer-events:none;
+    border:2px solid #170f08; }
+  .bdg.b{ background:#C0392B; color:#F7E9C4; }
+  .bdg.s{ background:#F2C531; color:#7E5A0E; font-size:15px; }
+  .stcard.star::after,#ststage.star::after{ content:''; position:absolute; inset:0; border-radius:13px;
+    pointer-events:none; background:linear-gradient(115deg,transparent 42%,rgba(255,242,190,0.32) 50%,transparent 58%);
+    background-size:280% 100%; animation:glint 3.4s linear infinite; }
+  @keyframes glint{ 0%{ background-position:130% 0; } 100%{ background-position:-70% 0; } }
+  .stsign{ position:relative; flex:0 0 auto; align-self:stretch; width:calc(var(--ch)*0.46px);
+    display:flex; align-items:center; justify-content:center; scroll-snap-align:start; }
+  .stsign::before{ content:''; position:absolute; top:4px; bottom:0; left:50%; width:9px; margin-left:-4.5px;
+    background:#3a2a18; border-radius:4px; }
+  .stsign b{ position:relative; background:linear-gradient(#7A553A,#5C3F28); border:3px solid #3a2a18;
+    border-radius:12px; color:#F2C531; font-size:14px; letter-spacing:2px; padding:12px 8px;
+    text-align:center; transform:rotate(-2deg); box-shadow:0 6px 14px rgba(0,0,0,0.45); }
+  /* the showcase stage — the screenshot's top half, name plate and all */
+  #ststage{ position:relative; display:flex; align-items:center; gap:12px; margin-bottom:8px;
+    padding:6px 12px; background:linear-gradient(#2e2113,#1c1309); border:3px solid #513a24; border-radius:16px; }
+  #ststage.md{ border-color:#E67E22; } #ststage.bg{ border-color:#C0392B; } #ststage.star{ border-color:#F2C531; }
+  #stgcv{ width:132px; height:132px; flex:0 0 auto;
+    background:radial-gradient(ellipse 62% 30% at 50% 78%,#4A1A12 0%,#63251C 55%,transparent 56%); }
+  #stgside{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
+  #stgplate{ background:#170f08; border:2px solid #513a24; border-radius:10px; padding:5px 14px; max-width:100%; }
+  #stgname{ display:block; font-size:17px; letter-spacing:2px; color:#F7E9C4; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; }
+  #stgcap{ display:block; font-size:8.5px; letter-spacing:1.5px; color:#CBB88C; margin-top:2px; }
   .pc{ font-size:9px; letter-spacing:0.5px; color:#F2C531; background:#170f08;
     border:1px solid #513a24; border-radius:7px; padding:1px 6px; }
   .pc.own{ color:#CFF7C4; }
+  .stcard .pc,#ststage .pc{ font-size:12px; letter-spacing:1px; border-radius:10px; padding:3px 12px;
+    border-width:2px; pointer-events:none; font-family:inherit; }
+  .stcard .pc.buy,#ststage .pc.buy{ background:linear-gradient(#F7D14A,#D9A93B); color:#3A2A18;
+    border-color:#8F6B1E; font-weight:bold; pointer-events:auto; cursor:pointer; }
+  .stcard .pc.own,#ststage .pc.own{ background:#1e4d1e; border-color:#2f7a2f; color:#CFF7C4; }
+  /* ---- E13 THE BANK — the place you stop BEFORE the shop ---- */
+  #bank{ position:absolute; inset:0; z-index:12; display:none; align-items:center; justify-content:center;
+    padding:10px; background:rgba(10,6,3,0.45); }
+  #bkpanel{ position:relative; text-align:center; max-width:min(96vw,560px);
+    background:repeating-linear-gradient(0deg,rgba(143,70,52,0.16) 0 2px,transparent 2px 12px),
+      linear-gradient(#6d2a1f,#4A1A12);   /* the piggy sits on the rug, weave and all */
+    border:3px solid #8F4634; border-radius:20px;
+    padding:14px 20px 8px; box-shadow:0 14px 44px rgba(0,0,0,0.55); }
+  #bkpanel h1{ font-size:20px; letter-spacing:3px; color:#F2C531; margin-bottom:6px; }
+  #bkrow{ display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:8px; }
+  #bkpig{ width:96px; height:78px; }
+  #bkcount{ font-size:46px; letter-spacing:3px; color:#F2C531; text-shadow:0 3px 0 rgba(0,0,0,0.35); }
+  #bkledger{ display:flex; flex-direction:column; gap:4px; margin:0 auto 10px; max-width:340px; }
+  .bkrow2{ display:flex; align-items:center; gap:10px; background:#170f08; border:2px solid #513a24;
+    border-radius:12px; padding:3px 12px 3px 6px; }
+  .bkrow2 canvas{ width:34px; height:34px; flex:0 0 auto; }
+  .bkrow2 b{ font-size:12px; letter-spacing:2px; color:#F7E9C4; }
+  .bkrow2 i{ font-style:normal; font-size:8px; letter-spacing:1px; color:#8f7a52; }
+  .bkrow2 span{ margin-left:auto; font-size:14px; letter-spacing:1px; color:#F2C531; }
+  #bkshop{ display:block; margin:0 auto; background:linear-gradient(#F7D14A,#D9A93B); color:#3A2A18;
+    border:3px solid #8F6B1E; border-radius:16px; font-family:inherit; font-size:18px; letter-spacing:2px;
+    padding:12px 34px; cursor:pointer; font-weight:bold; }
+  #bkback{ margin-top:4px; background:none; border:none; color:#CBB88C; font-family:inherit;
+    font-size:11px; letter-spacing:1px; cursor:pointer; padding:5px 8px; }
   #stback{ margin-top:2px; background:none; border:none; color:#8f7a52; font-family:inherit;
     font-size:11px; letter-spacing:1px; cursor:pointer; padding:5px 8px; }
   @keyframes starPulse{ 0%,100%{ transform:scale(1); } 40%{ transform:scale(1.3); } }
@@ -254,10 +323,32 @@
     #stpanel{ padding:8px 8px 3px; }
     #stlid{ margin-bottom:5px; } #stlid h1{ font-size:14px; letter-spacing:2px; }
     #stStars{ font-size:11px; padding:3px 8px; }
-    #stshelves{ max-height:52vh; }
-    .stitem canvas{ width:32px; height:32px; }
-    .stitem small{ font-size:6px; max-width:40px; }
+    .stcard{ height:calc(var(--ch)*0.62*1px); border-radius:12px; padding:4px 5px 5px; gap:2px; }
+    .stcard small{ font-size:7.5px; padding:1px 6px; }
     .pc{ font-size:8px; padding:1px 4px; }
+    .stcard .pc,#ststage .pc{ font-size:9px; padding:2px 8px; }
+    .bdg{ width:18px; height:18px; font-size:9px; top:-7px; right:-7px; }
+    .bdg.s{ font-size:11px; }
+    .stsign{ width:calc(var(--ch)*0.62*0.46*1px); }
+    .stsign b{ font-size:9px; letter-spacing:1px; padding:8px 5px; border-width:2px; }
+    #staisle{ gap:6px; padding:10px 6px 6px; border-bottom-width:4px; }
+    #ststage{ gap:8px; padding:4px 8px; margin-bottom:5px; }
+    #stgcv{ width:76px; height:76px; }
+    #stgname{ font-size:12px; letter-spacing:1px; }
+    #stgcap{ font-size:7px; letter-spacing:1px; margin-top:1px; }
+    #stgside{ gap:3px; }
+    #bkpanel{ padding:8px 10px 4px; max-width:min(96vw,640px); }
+    #bkpanel h1{ font-size:14px; letter-spacing:2px; margin-bottom:3px; }
+    #bkrow{ gap:8px; margin-bottom:5px; }
+    #bkpig{ width:56px; height:46px; }
+    #bkcount{ font-size:26px; letter-spacing:2px; }
+    #bkledger{ display:grid; grid-template-columns:1fr 1fr; gap:3px; max-width:460px; }
+    .bkrow2{ gap:5px; padding:2px 8px 2px 4px; border-radius:9px; }
+    .bkrow2 canvas{ width:22px; height:22px; }
+    .bkrow2 b{ font-size:9px; letter-spacing:1px; } .bkrow2 i{ font-size:6px; }
+    .bkrow2 span{ font-size:10px; }
+    #bkshop{ font-size:13px; padding:8px 22px; border-radius:12px; }
+    #bkback{ font-size:9px; margin-top:1px; }
     #stback{ font-size:9px; margin-top:0; }
   }
 </style>
@@ -299,9 +390,16 @@
 </div>
 <div id="store"><div id="stpanel">
   <div id="stlid"><h1>🛒 THE STORE</h1><span id="stStars">★ 0</span></div>
-  <div id="sttabs"></div>
-  <div id="stshelves"></div>
+  <div id="ststage"><canvas id="stgcv"></canvas><div id="stgside"><div id="stgplate"><b id="stgname"></b><small id="stgcap"></small></div><button id="stgchip" class="pc" type="button"></button></div></div>
+  <div id="staisle"></div>
   <button id="stback" type="button">⬇ CLOSE THE SHOP</button>
+</div></div>
+<div id="bank"><div id="bkpanel">
+  <h1>🏦 THE BANK</h1>
+  <div id="bkrow"><canvas id="bkpig" width="192" height="156"></canvas><div id="bkcount">★ 0</div></div>
+  <div id="bkledger"></div>
+  <button id="bkshop" type="button">🛒 SHOP</button>
+  <button id="bkback" type="button">⬇ CLOSE THE BANK</button>
 </div></div>
 <div id="toybox"><div id="tbpanel">
   <div id="tblid"><h1>🧸 THE TOY BOX</h1><span id="tbcount"></span></div>
@@ -712,6 +810,11 @@ function starMint(n,wx,wy){   // n★ minted at world (wx,wy) — the flight IS 
 function starHudSync(){
   const t='★ '+stars;
   $('starChip').textContent=t; $('starMenu').textContent=t; $('stStars').textContent=t;
+  // E13: the bank's giant count follows too — unless the roll ceremony is mid-climb
+  // (the roll is garnish and lands on this same number anyway; see bankRoll)
+  if(typeof BANK_T0!=='undefined'&&BANK_T0==null){
+    const bc=$('bkcount'); if(bc){ bc.dataset.n=String(stars); bc.textContent=t; }
+  }
 }
 function hudPulse(){          // can't afford it: the star HUD pulses (no dialog, ever)
   for(const id of ['starChip','starMenu','stStars']){
@@ -4417,7 +4520,7 @@ window.addEventListener('wheel',e=>{
 
 // ---- chrome: palette, shed, GO, mute ----
 function withCtx(g,fn){ const old=cx; cx=g; try{ fn(); } finally{ cx=old; } }
-function scenIcon(g,t){
+function scenIcon(g,t,time){   // E13: `time` animates the aisle cards; omitted = the old still (1.2)
   withCtx(g,()=>{
     if(t==='rv'){
       cx.lineCap='round'; cx.lineJoin='round';
@@ -4432,7 +4535,7 @@ function scenIcon(g,t){
     } else {
       const z=IZOOM[t];
       if(z){ cx.translate(C/2,C/2); cx.scale(z,z); cx.translate(-C/2,-C/2); }
-      drawScenItem({t,v:t==='ppl'?1:0,ra:null,pop:0,wave:0},0,0,1.2);
+      drawScenItem({t,v:t==='ppl'?1:0,ra:null,pop:0,wave:0},0,0,time==null?1.2:time);
     }
   });
 }
@@ -4746,6 +4849,7 @@ function showScreen(s){
   $('starChip').style.display=((game&&!CAMP.on)||play)?'block':'none';
   boxShow(false);       // the lid closes on any screen change
   storeShow(false);     // ...and so does the shop
+  bankShow(false);      // ...and the bank (E13)
   winSync();
   goBtnSync();
   paletteSync();        // THE GATE follows the mode: BUILD owned-only, campaign full
@@ -4833,15 +4937,54 @@ function buildToybox(){
 }
 
 /* =====================================================================
-   THE STORE (E9) — the shop counter. Same construction as the toy box
-   shelf: a wooden panel of slot rows, one overlay, tap plumbing shared.
-   Rules that keep it honest: locked rows show the REAL painter at 40%;
-   buying is ONE TAP, no dialog, no confirm; a sound's picture always
-   PREVIEWS (its gold price chip is the buy button — buying a sound you
-   haven't heard is cruel); can't afford = chip nudge + star HUD pulse.
+   THE STORE (E9, refit E13 THE TOY AISLE) — one long toy-store aisle you
+   flick through sideways. No tabs: the four categories ride one strip
+   behind big molded shelf signs, and CARD SIZE IS RARITY (the price band
+   picks the tier). The lid carries a showcase stage — tap any locked toy
+   and it mounts BIG, name plate and all. THE TOUCH LAW: the picture
+   looks/hears, the gold chip buys — on every card (E9's hear-before-buy
+   law kept verbatim; unified in the SAFE direction: a picture never
+   debits). Buying stays ONE TAP, no dialog; can't afford = wiggle +
+   star HUD pulse. Same goods, same order, same prices — new furniture.
    ===================================================================== */
-let stTab='sets';
+// ---- THE DIALS (E13) — one block, every knob of the aisle ----
+const TIER_MID=13, TIER_BIG=20, TIER_STAR=30;      // ★ price bands → card tier
+const CARD_H={sm:150,md:190,bg:235,star:280};      // card px, desktop; the phone media query rides at 0.62
+const UNOWNED_DIM=1.0;      // 1.0 = full-colour goods on the shelf; 0.4 restores E9's dim look
+const SHOP_CHIP=true;       // the tiny wallet ★ in the shop lid (prices need a wallet to read against)
+const BANK_ROLL=1.2;        // seconds the bank count takes to roll up
+const BACK_TO_BANK=false;   // shop back-button returns to the game (true = back through the bank)
+const SHOWCASE_DEFAULT='dream';   // 'dream' = priciest unowned · 'first' = aisle order
+const stTier=p=>p>=TIER_STAR?'star':p>=TIER_BIG?'bg':p>=TIER_MID?'md':'sm';
 const stOwned=id=>id==='pt_red'||coll.has(id);
+// ---- the showcase captions — ≤4 kid words on the name plate, every one a dial ----
+const STG_CAP={
+  pt_red:'EVERY TRAIN STARTS RED', pt_yellow:'PAINT IT SUNSHINE', pt_blue:'PAINT IT SKY',
+  pt_green:'PAINT IT MEADOW', pt_purple:'PAINT IT BERRY', pt_black:'THE MIDNIGHT COAT',
+  pt_white:'THE SNOW COAT', pt_orange:'THE SUNSET COAT', pt_pink:'THE BUBBLEGUM COAT',
+  pt_rain:'EVERY CAR A COLOUR',
+  wh_peep:'THE CLASSIC PEEP', wh_horn:'THE BIG LOW BLAST', wh_chime:'THREE PIPES SINGING',
+  wh_toot:'A PARTY EVERY TOOT', wh_quack:'THE TRAIN SAYS QUACK', wh_fart:'THE FAMOUS FART',
+  cr_bonk:'THE CLASSIC BONK', cr_bang:'CYMBALS EVERYWHERE', cr_boing:'BOING BOING BOING',
+  cr_smash:'A BIG SILLY SMASH', cr_thud:'ONE MIGHTY OOF', cr_pfft:'THE FART’S BEST FRIEND',
+  bl_ding:'THE STATION DING', bl_bell:'RING THE BRASS', bl_cuckoo:'A BIRD LIVES INSIDE',
+  bl_cow:'MOO MEANS STOP',
+  fount:'THE WATER DANCES', stat:'A HERO IN BRASS', fire:'WARM AND CRACKLY',
+  arch:'DRIVE UNDER BALLOONS', flag:'IT REALLY RIPPLES', mail2:'POST YOUR LETTERS',
+  bench:'A SEAT FOR TWO', clock:'THE HANDS REALLY TURN',
+  st:'ALL ABOARD HERE', br:'CROSS THE RIVER', b:'THE END OF THE LINE', x:'TRACKS THAT CROSS',
+  sw:'PICK A WAY', rp:'UP SHE GOES', sp:'ROUND AND ROUND UP', tun:'THROUGH THE MOUNTAIN',
+  tank:'FULL OF MILK', flat:'IT CARRIES ANYTHING', cab:'THE COSY RED END', coach:'SEATS FOR EVERYONE',
+  mail:'LETTERS RIDE INSIDE', circus:'THE LION RIDES ALONG', exp:'THE BIGGEST ENGINE',
+  bush:'A ROUND GREEN FRIEND', flw:'A POCKET GARDEN', rock:'A BIG GREY BOULDER', pond:'DUCK BATH',
+  rv:'WATER ON THE MOVE', fence:'KEEP THE COWS IN', house:'SOMEBODY LIVES HERE', shop:'OPEN FOR BUSINESS',
+  hall:'THE TOWN’S OWN HOUSE', barn:'HOME OF THE HERD', wtr:'DRINKS FOR THIRSTY TRAINS',
+  wind:'IT REALLY SPINS', pine:'A TALL GREEN HAT',
+  ppl:'LITTLE WAVING FRIENDS', cow:'SHE SAYS MOO', sheep:'A WALKING CLOUD', chick:'PECK PECK PECK',
+  duck:'QUACK QUACK', dog:'A VERY GOOD BOY', cat:'SHE WALKS THE ROOFS', hay:'A ROLLED-UP FIELD',
+  lamp:'A LITTLE NIGHT SUN', whis:'BLOW AS YOU PASS', sig:'RED MEANS WAIT',
+  bal:'UP UP AND AWAY', snow:'A COLD ROUND FELLOW',
+};
 function stRowOf(id){
   const d=defOf(id), snd=sndSlot(id);
   return { id,
@@ -5004,22 +5147,39 @@ function drawSndIcon(id){
   }
   cx.lineCap='butt';
 }
-function stIcon(cv,id){
+function stIcon(cv,id,t){
+  // E13: paints ANY canvas at ITS OWN resolution — card, stage, whatever size the
+  // furniture asks for. Everything the E9 painters authored in a 96-box rescales by
+  // k, so a 280px RAINBOW is repainted sharp, never a CSS-stretched 96px bitmap.
+  // `t` drives the animated painters (fountain bobs, clock hands, flag ripples);
+  // omitted = the old still frame (1.2), which is what the toybox keeps using.
+  const g=cv.getContext('2d'), CW=cv.width, CH=cv.height, k=Math.min(CW,CH)/96;
+  const ox=(CW-96*k)/2, oy=(CH-96*k)/2, tt=t==null?1.2:t;
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,CW,CH);
   if(id.startsWith('pt_')){          // liveries: the mini-loco swatch (RAINBOW gets its rainbow)
-    const g=cv.getContext('2d');
-    g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,96,96);
-    g.setTransform(0.9,0,0,0.9,48,56);
+    g.setTransform(0.9*k,0,0,0.9*k,ox+48*k,oy+56*k);
     withCtx(g,()=>livPaint(id.slice(3)));
     return;
   }
   if(sndSlot(id)){                   // sounds: the painted glyph shelf
-    const g=cv.getContext('2d');
-    g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,96,96);
-    g.setTransform(1,0,0,1,48,50);
+    g.setTransform(k,0,0,k,ox+48*k,oy+50*k);
     withCtx(g,()=>drawSndIcon(id));
     return;
   }
-  slotIcon(cv,id,true);              // models + the fifty: the real painter, full color (CSS dims locked rows)
+  const def=defOf(id);               // models + the fifty: the real painter, live time
+  if(def.cat==='train'){
+    g.setTransform(0.95*k,0,0,0.95*k,ox+48*k,oy+54*k);
+    withCtx(g,()=>drawCar(id,0,0,0,0,0.6,null));
+  } else if(def.cat==='track'){
+    let s=96/(C+16), o=8;
+    if(id==='sp'){ s=96/(SPS+28); o=14; }
+    g.setTransform(s*k,0,0,s*k,ox+o*s*k,oy+o*s*k);
+    withCtx(g,()=>drawPieceArt({t:id,r:id==='c'?1:0,sel:0,elev:0,latch:null},0,0));
+  } else {
+    const s=96/(C+16);
+    g.setTransform(s*k,0,0,s*k,ox+8*s*k,oy+8*s*k);
+    scenIcon(g,id,tt);
+  }
 }
 function storeBuy(id,el){
   if(stOwned(id)) return {ok:false,why:'owned'};
@@ -5052,64 +5212,310 @@ function storeRowTap(id,el){
   else { SND.tok(); wiggle(el); toast(defOf(id).name); }        // owned model: a proud little wiggle
 }
 function mkStItem(row){
+  // E13: a CARD on the aisle. The price band picks the tier, the tier picks the
+  // size and the frame — rarity you can read from across the room.
+  const tier=stTier(row.price);
   const b=document.createElement('button');
-  b.className='tbslot stitem'+(row.owned?'':' dim')+(row.eq?' on':''); b.type='button';
-  const cv=document.createElement('canvas'); cv.width=96; cv.height=96; b.appendChild(cv);
-  stIcon(cv,row.id);
+  b.className='stcard '+tier; b.type='button'; b.dataset.id=row.id;
+  b.style.setProperty('--ch',CARD_H[tier]);
+  const cv=document.createElement('canvas'); cv.width=0; cv.height=0;   // sized to the card on first visible paint
+  if(!row.owned&&UNOWNED_DIM<1) cv.style.opacity=UNOWNED_DIM;   // goods on a shelf look delicious (1.0); 0.4 = E9's ghosts
+  b.appendChild(cv);
   const nm=document.createElement('small'); nm.textContent=row.name; b.appendChild(nm);
-  const pc=document.createElement('span'); pc.className='pc'+(row.owned?' own':'');
+  const pc=document.createElement('span');
+  pc.className='pc '+(row.owned?'own':'buy');
   pc.textContent=row.owned? (row.eq?'✓ ON':'✓') : '★ '+row.price;
   b.appendChild(pc);
-  if(sndSlot(row.id)&&!row.owned){
-    // a locked sound: the PICTURE previews (mandatory — hear it before you own it),
-    // the gold price chip is the one-tap buy button
-    pc.style.cursor='pointer';
-    pc.addEventListener('click',ev=>{ ev.stopPropagation(); ac(); storeBuy(row.id,b); });
-    b.addEventListener('click',()=>{ ac(); PACKS[row.id](); wiggle(b); });
+  if(tier==='bg'){ const d2=document.createElement('span'); d2.className='bdg b'; d2.textContent='◆'; b.appendChild(d2); }
+  if(tier==='star'){ const d2=document.createElement('span'); d2.className='bdg s'; d2.textContent='★'; b.appendChild(d2); }
+  if(!row.owned){
+    // THE TOUCH LAW: picture = look/hear, gold chip = buy — on every card. A locked
+    // sound's picture previews (hear it before you own it — E9's law verbatim); a
+    // locked toy's picture mounts the showcase. ONLY the gold chip ever debits.
+    pc.addEventListener('click',ev=>{ ev.stopPropagation(); if(aisleDragged()) return; ac(); storeBuy(row.id,b); });
+    b.addEventListener('click',()=>{ if(aisleDragged()) return; ac();
+      if(sndSlot(row.id)){ PACKS[row.id](); wiggle(b); } else stageMount(row.id); });
   } else {
-    b.addEventListener('click',()=>{ ac(); storeRowTap(row.id,b); });
+    // owned cards keep v1.9's charm byte-for-byte: storeRowTap is the spec
+    b.addEventListener('click',()=>{ if(aisleDragged()) return; ac(); storeRowTap(row.id,b); });
   }
   return b;
 }
-function storeSync(){
-  for(const b of document.querySelectorAll('#sttabs .ptab')) b.classList.toggle('on',b.dataset.t===stTab);
-  $('stStars').textContent='★ '+stars;
-  const sh=$('stshelves'); sh.innerHTML='';
-  const shelf=(label,ids)=>{
-    if(!ids.length) return;
-    const row=document.createElement('div'); row.className='tbrow';
-    if(label){ const lb=document.createElement('small'); lb.textContent=label;
-      lb.style.cssText='font-size:7px;letter-spacing:1px;color:#8f7a52;align-self:center;'; row.appendChild(lb); }
-    for(const id of ids) row.appendChild(mkStItem(stRowOf(id)));
-    sh.appendChild(row);
-  };
-  if(stTab==='sets'){        // the wardrobe: the five you can win + the five shop-only sets
-    shelf('',SET_ROW_A);
-    shelf('',SET_ROW_B);
-  } else if(stTab==='whis'){ shelf('',WHISTLE_IDS); }
-  else if(stTab==='crash'){ shelf('',CRASH_IDS); }
-  else {                     // MODELS & BITS: the shop's eight, the bing-ding bells, then
-    shelf('THE SHOP',MODEL_IDS);                       // every one of the fifty not owned yet
-    shelf('BING DING',BELL_IDS);
-    for(const [lb,cat] of [['TRACK','track'],['TRAINS','train'],['LAND','land'],['EXTRAS','extra']])
-      shelf(lb,COLL.filter(r=>r[2]===cat&&!coll.has(r[0])&&!COLL_NO_SALE.includes(r[0])).map(r=>r[0]));
+// ---- the aisle machinery: who's on screen, live paint, drag-to-scroll ----
+const AISLE_VIS=new Set();         // the cards on screen right now — the only ones painted
+let AISLE_PAINTS={};               // id -> repaint count (the perf battery reads this via TS.store.paints)
+let AISLE_IO=null;
+let AISLE_DRAG={down:false,moved:0,x:0,y:0,sl:0,vx:0,lx:0,lt:0,id:null,mouse:false};
+const aisleDragged=()=>AISLE_DRAG.moved>8;   // a tap that travelled is a scroll, not a tap
+let stChipOn=SHOP_CHIP;
+function aisleObserve(){
+  if(AISLE_IO) AISLE_IO.disconnect();
+  AISLE_VIS.clear();
+  if(!window.IntersectionObserver){ for(const c2 of $('staisle').querySelectorAll('.stcard')) AISLE_VIS.add(c2); return; }
+  AISLE_IO=new IntersectionObserver(es=>{
+    for(const e of es){ if(e.isIntersecting) AISLE_VIS.add(e.target); else AISLE_VIS.delete(e.target); }
+  },{root:$('staisle'),rootMargin:'0px 80px'});
+  for(const c2 of $('staisle').querySelectorAll('.stcard')) AISLE_IO.observe(c2);
+}
+function cardPaint(el,t){
+  const cv=el.firstChild, r=cv.getBoundingClientRect();
+  if(!r.width||!r.height) return;
+  const w=Math.round(r.width*DPR), h=Math.round(r.height*DPR);
+  if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; }
+  stIcon(cv,el.dataset.id,t);
+  AISLE_PAINTS[el.dataset.id]=(AISLE_PAINTS[el.dataset.id]|0)+1;
+}
+function aisleFrame(){             // rides frame() while the shop is open: VISIBLE cards only
+  const t=perf();
+  for(const el of AISLE_VIS) cardPaint(el,t);
+  if(STAGE_ID){
+    const sg=$('stgcv'), r=sg.getBoundingClientRect();
+    if(r.width&&r.height){
+      const w=Math.round(r.width*DPR), h=Math.round(r.height*DPR);
+      if(sg.width!==w||sg.height!==h){ sg.width=w; sg.height=h; }
+      stIcon(sg,STAGE_ID,t);
+    }
   }
+}
+function aisleFling(v){            // a mouse flick keeps rolling (touch gets this natively)
+  const ai=$('staisle'); let lt=performance.now();
+  const step=t=>{
+    const dt2=Math.min(0.05,(t-lt)/1000); lt=t;
+    ai.scrollLeft+=v*dt2;
+    v*=Math.pow(0.04,dt2);
+    if(Math.abs(v)>40&&!AISLE_DRAG.down) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+// ---- the showcase stage: tap a toy, it mounts BIG under its name plate ----
+let STAGE_ID=null;
+function stAisleIds(){             // aisle order — exactly the shelves' membership
+  const out=[...SET_ROW_A,...SET_ROW_B,...WHISTLE_IDS,...CRASH_IDS,...MODEL_IDS,...BELL_IDS];
+  for(const cat of ['track','train','land','extra'])
+    for(const r of COLL) if(r[2]===cat&&!coll.has(r[0])&&!COLL_NO_SALE.includes(r[0])) out.push(r[0]);
+  return out;
+}
+function stageDream(){             // the priciest unowned thing in the shop — walk in and see the RAINBOW
+  const ids=stAisleIds(); let best=null,bp=-1;
+  for(const id of ids){ const row=stRowOf(id); if(!row.owned&&row.price>bp){ bp=row.price; best=id; } }
+  return best||ids[0];
+}
+function stageMount(id){
+  if(id!=='pt_red'&&!defOf(id)) return null;
+  STAGE_ID=id;
+  if(sndSlot(id)&&PACKS[id]) PACKS[id]();   // the stage version of hear-before-buy
+  stageSync();
+  return id;
+}
+function stageSync(){
+  if(!STAGE_ID) return;
+  const row=stRowOf(STAGE_ID);
+  $('ststage').className=stTier(row.price);
+  $('stgname').textContent=row.name;
+  $('stgcap').textContent=STG_CAP[STAGE_ID]||'';
+  const pc=$('stgchip');
+  pc.className='pc '+(row.owned?'own':'buy');
+  pc.textContent=row.owned? (row.eq?'✓ ON':'✓') : '★ '+row.price;
+}
+function storeSync(){
+  $('stStars').textContent='★ '+stars;                  // the wallet chip — a number, not a ceremony
+  $('stStars').style.display=stChipOn?'':'none';
+  const ai=$('staisle'), keep=ai.scrollLeft;
+  ai.innerHTML='';
+  const sign=(k2,label)=>{
+    const s=document.createElement('div'); s.className='stsign'; s.dataset.k=k2;
+    s.style.setProperty('--ch',CARD_H.bg);
+    const b=document.createElement('b'); b.textContent=label; s.appendChild(b);
+    ai.appendChild(s);
+  };
+  const shelf=ids=>{ for(const id of ids) ai.appendChild(mkStItem(stRowOf(id))); };
+  for(const [k2,label] of STORE_TABS){                  // the four categories ride the strip in tab order
+    sign(k2,label);
+    if(k2==='sets'){ shelf(SET_ROW_A); shelf(SET_ROW_B); }   // the wardrobe: the winnable five, then the shop five
+    else if(k2==='whis') shelf(WHISTLE_IDS);
+    else if(k2==='crash') shelf(CRASH_IDS);
+    else {                                              // MODELS & BITS: the shop's eight, the bells, then
+      shelf(MODEL_IDS); shelf(BELL_IDS);                // every one of the fifty not owned yet
+      for(const cat of ['track','train','land','extra'])
+        shelf(COLL.filter(r=>r[2]===cat&&!coll.has(r[0])&&!COLL_NO_SALE.includes(r[0])).map(r=>r[0]));
+    }
+  }
+  ai.scrollLeft=keep;                                   // a rebuild never flings the kid back to the start
+  aisleObserve();
+  stageSync();
 }
 function storeShow(b){
   $('store').style.display=b?'flex':'none';
-  if(b){ starHudSync(); storeSync(); }
+  if(b){
+    bankShow(false);                                    // the shop and the bank are never both open
+    starHudSync(); storeSync();
+    stageMount(SHOWCASE_DEFAULT==='dream'? stageDream() : stAisleIds()[0]);
+  }
+}
+/* =====================================================================
+   THE BANK (E13) — a PLACE you stop before the shop, never during. The
+   count rolls up (garnish — it lands on the true number), the ledger
+   tells a kid how stars happen by READING the MINT dial at render time
+   (a re-tuned dial can never make the bank lie), and the one gold door
+   leads to the store. Past the door, no ceremony: just the wallet chip.
+   ===================================================================== */
+let BANK_T0=null, BANK_TICK=0;
+function bankShow(b){
+  $('bank').style.display=b?'flex':'none';
+  if(b){
+    storeShow(false);
+    bankPig(); bankLedger();
+    $('bkcount').dataset.n='0'; $('bkcount').textContent='★ 0';
+    BANK_T0=performance.now(); BANK_TICK=0;
+    requestAnimationFrame(bankRoll);
+  } else BANK_T0=null;
+}
+function bankRoll(){
+  if(BANK_T0==null) return;
+  const el=$('bkcount'), k=BANK_ROLL>0? Math.min(1,(performance.now()-BANK_T0)/1000/BANK_ROLL) : 1;
+  const n=Math.round(stars*(1-Math.pow(1-k,3)));   // eased 0→N; at k=1 that IS stars — the count never lies
+  if(String(n)!==el.dataset.n){
+    el.dataset.n=String(n); el.textContent='★ '+n;
+    const now=performance.now();
+    if(now>=BANK_TICK){ SND.tok(); BANK_TICK=now+90; }   // ticks as it climbs, never a machine gun
+  }
+  if(k<1) requestAnimationFrame(bankRoll);
+  else { BANK_T0=null; el.dataset.n=String(stars); el.textContent='★ '+stars; }
+}
+function bankLedger(){
+  // picture rows, kid words, ≤2 words a row — the numbers are the LIVE MINT dial
+  const rows=[['lap','LAP',MINT.lap,''],['station','STOP',MINT.station,''],
+              ['bonk','CRASH',MINT.bonk,'PLAY'],['clear','WIN',MINT.clear,''],
+              ['firstLap','FIRST LAP',MINT.firstLap,'']];
+  const lg=$('bkledger'); lg.innerHTML='';
+  for(const [kind,word,val,tag] of rows){
+    const r=document.createElement('div'); r.className='bkrow2';
+    const cv=document.createElement('canvas'); cv.width=96; cv.height=96; r.appendChild(cv);
+    bankIcon(cv,kind);
+    const b=document.createElement('b'); b.textContent=word; r.appendChild(b);
+    if(tag){ const i=document.createElement('i'); i.textContent=tag; r.appendChild(i); }
+    const v=document.createElement('span'); v.textContent='★'+val; r.appendChild(v);
+    lg.appendChild(r);
+  }
+}
+function bankIcon(cv,kind){
+  // molded ledger pictures — the loop, the station, the bonk, the ticket, the rosette
+  const g=cv.getContext('2d');
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,96,96);
+  if(kind==='station'){              // the real station piece — the STOP a kid already knows
+    const s=96/(C+16);
+    g.setTransform(s,0,0,s,8*s,8*s);
+    withCtx(g,()=>drawPieceArt({t:'st',r:0,sel:0,elev:0,latch:null},0,0));
+    return;
+  }
+  g.setTransform(1,0,0,1,48,48);
+  withCtx(g,()=>{
+    cx.lineJoin='round'; cx.lineCap='round';
+    if(kind==='lap'){                // a little loop of track
+      cx.strokeStyle='#7A553A'; cx.lineWidth=7;
+      for(let i=0;i<12;i++){ const a=i*TAU/12;
+        cx.beginPath(); cx.moveTo(Math.cos(a)*20,Math.sin(a)*15);
+        cx.lineTo(Math.cos(a)*34,Math.sin(a)*26); cx.stroke(); }
+      cx.strokeStyle='#8A8F96'; cx.lineWidth=4.5;
+      cx.beginPath(); cx.ellipse(0,0,30,23,0,0,7); cx.stroke();
+      cx.beginPath(); cx.ellipse(0,0,23,17,0,0,7); cx.stroke();
+    } else if(kind==='bonk'){        // the classic BONK burst
+      star5(0,-4,2,'#F2C531');
+      star5(-19,10,1,'#F2C531'); star5(19,8,1.2,'#F2C531'); star5(3,21,0.8,'#F2C531');
+    } else if(kind==='clear'){       // the golden ticket
+      cx.save(); cx.rotate(-0.12);
+      cx.fillStyle='#F2C531'; rr(-32,-20,64,40,7); cx.fill();
+      cx.strokeStyle='#8F6B1E'; cx.lineWidth=3; rr(-32,-20,64,40,7); cx.stroke();
+      cx.setLineDash([5,5]); cx.lineWidth=2; rr(-25,-13,50,26,5); cx.stroke(); cx.setLineDash([]);
+      star5(0,0,1.5,'#7E5A0E');
+      cx.restore();
+    } else {                         // firstLap — the rosette for the very first time
+      cx.fillStyle='#C0392B';
+      cx.beginPath(); cx.moveTo(-9,10); cx.lineTo(-16,34); cx.lineTo(-6,26); cx.closePath(); cx.fill();
+      cx.beginPath(); cx.moveTo(9,10); cx.lineTo(16,34); cx.lineTo(6,26); cx.closePath(); cx.fill();
+      for(let i=0;i<8;i++){ const a=i*TAU/8;
+        cx.fillStyle=i%2?'#C0392B':'#E67E22';
+        cx.save(); cx.rotate(a); cx.beginPath();
+        cx.moveTo(0,0); cx.lineTo(-8,-22); cx.lineTo(8,-22); cx.closePath(); cx.fill(); cx.restore(); }
+      cx.fillStyle='#F2C531'; cx.beginPath(); cx.arc(0,0,12,0,7); cx.fill();
+      cx.strokeStyle='#8F6B1E'; cx.lineWidth=2.5; cx.beginPath(); cx.arc(0,0,12,0,7); cx.stroke();
+      star5(0,0,0.9,'#7E5A0E');
+    }
+    cx.lineCap='butt';
+  });
+}
+function bankPig(){                  // the molded piggy on the rug, coin halfway in
+  const cv=$('bkpig'), g=cv.getContext('2d');
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,192,156);
+  g.setTransform(2,0,0,2,96,84);
+  withCtx(g,()=>{
+    cx.lineJoin='round'; cx.lineCap='round';
+    cx.globalAlpha=0.25; cx.fillStyle='#000';
+    cx.beginPath(); cx.ellipse(0,26,34,7,0,0,7); cx.fill(); cx.globalAlpha=1;
+    for(const px of [-20,11]){
+      cx.fillStyle='#E08FB8'; rr(px,16,9,11,3); cx.fill();
+      cx.strokeStyle='#A85C86'; cx.lineWidth=2.5; rr(px,16,9,11,3); cx.stroke();
+    }
+    cx.fillStyle='#E08FB8';
+    cx.beginPath(); cx.ellipse(0,0,30,23,0,0,7); cx.fill();
+    cx.strokeStyle='#A85C86'; cx.lineWidth=2.5;
+    cx.beginPath(); cx.ellipse(0,0,30,23,0,0,7); cx.stroke();
+    cx.fillStyle='#E08FB8';
+    cx.beginPath(); cx.moveTo(14,-22); cx.lineTo(25,-29); cx.lineTo(24,-14); cx.closePath(); cx.fill();
+    cx.strokeStyle='#A85C86'; cx.beginPath(); cx.moveTo(14,-22); cx.lineTo(25,-29); cx.lineTo(24,-14); cx.closePath(); cx.stroke();
+    cx.fillStyle='#E08FB8';
+    cx.beginPath(); cx.ellipse(27,3,7.5,6,0,0,7); cx.fill();
+    cx.strokeStyle='#A85C86'; cx.beginPath(); cx.ellipse(27,3,7.5,6,0,0,7); cx.stroke();
+    cx.fillStyle='#A85C86';
+    cx.beginPath(); cx.arc(25,3,1.6,0,7); cx.fill();
+    cx.beginPath(); cx.arc(30,3,1.6,0,7); cx.fill();
+    cx.fillStyle='#23211E'; cx.beginPath(); cx.arc(13,-7,2.2,0,7); cx.fill();
+    cx.strokeStyle='#A85C86'; cx.lineWidth=2.2;
+    cx.beginPath(); cx.moveTo(-30,2); cx.quadraticCurveTo(-38,-2,-34,-7); cx.quadraticCurveTo(-30,-11,-34,-13); cx.stroke();
+    cx.fillStyle='#7E5A0E'; rr(-8,-26,16,4.5,2); cx.fill();
+    cx.fillStyle='#F2C531';
+    cx.beginPath(); cx.ellipse(0,-30,9,7,0,Math.PI,0); cx.closePath(); cx.fill();
+    cx.strokeStyle='#8F6B1E'; cx.lineWidth=2;
+    cx.beginPath(); cx.ellipse(0,-30,9,7,0,Math.PI,0); cx.stroke();
+  });
 }
 function buildStore(){
-  $('starChip').addEventListener('click',()=>{ ac(); SND.tok(); storeShow(true); });
-  $('starMenu').addEventListener('click',()=>{ ac(); SND.tok(); storeShow(true); });
-  $('stback').addEventListener('click',()=>{ ac(); SND.click(); storeShow(false); });
-  const tabs=$('sttabs');
-  for(const [k2,label] of STORE_TABS){
-    const b=document.createElement('button'); b.className='ptab'; b.type='button';
-    b.textContent=label; b.dataset.t=k2;
-    b.addEventListener('click',()=>{ ac(); SND.click(); stTab=k2; storeSync(); });
-    tabs.appendChild(b);
-  }
+  // E13 FLOW LAW: every path into the shop passes the bank — the ★ chips open the
+  // BANK, the bank's gold door opens the store. The shop's back button returns to
+  // the game exactly as today (BACK_TO_BANK loops it through the bank if Wyatt asks).
+  $('starChip').addEventListener('click',()=>{ ac(); SND.tok(); bankShow(true); });
+  $('starMenu').addEventListener('click',()=>{ ac(); SND.tok(); bankShow(true); });
+  $('bkshop').addEventListener('click',()=>{ ac(); SND.tok(); storeShow(true); });
+  $('bkback').addEventListener('click',()=>{ ac(); SND.click(); bankShow(false); });
+  $('stback').addEventListener('click',()=>{ ac(); SND.click(); storeShow(false); if(BACK_TO_BANK) bankShow(true); });
+  $('stgchip').addEventListener('click',()=>{
+    if(!STAGE_ID) return; ac();
+    if(!stOwned(STAGE_ID)) storeBuy(STAGE_ID,$('ststage'));
+    else storeRowTap(STAGE_ID,$('ststage'));
+  });
+  const ai=$('staisle');
+  ai.addEventListener('pointerdown',e=>{
+    AISLE_DRAG={down:true,moved:0,x:e.clientX,y:e.clientY,sl:ai.scrollLeft,vx:0,
+      lx:e.clientX,lt:performance.now(),id:e.pointerId,mouse:e.pointerType!=='touch'};
+  });
+  ai.addEventListener('pointermove',e=>{
+    const d2=AISLE_DRAG; if(!d2.down) return;
+    d2.moved=Math.max(d2.moved,Math.hypot(e.clientX-d2.x,e.clientY-d2.y));
+    if(d2.mouse&&d2.moved>8){          // a mouse drags the shelf by hand; touch pans natively
+      if(d2.id!=null){ try{ ai.setPointerCapture(d2.id); }catch(err){} d2.id=null; }
+      ai.scrollLeft=d2.sl-(e.clientX-d2.x);
+      const now=performance.now(), dt2=(now-d2.lt)/1000;
+      if(dt2>0.001) d2.vx=0.7*d2.vx+0.3*((d2.lx-e.clientX)/dt2);
+      d2.lx=e.clientX; d2.lt=now;
+    }
+  });
+  const aisleUp=()=>{
+    const d2=AISLE_DRAG; if(!d2.down) return;
+    d2.down=false;
+    if(d2.mouse&&d2.moved>8&&Math.abs(d2.vx)>60) aisleFling(d2.vx);
+  };
+  ai.addEventListener('pointerup',aisleUp);
+  ai.addEventListener('pointercancel',aisleUp);
 }
 function buildMenu(){
   // E6: exactly three big buttons — PLAY ▶ (the wind-up rug) · CAMPAIGN 🎫 · BUILD 🔨.
@@ -5199,6 +5605,7 @@ function frame(t){
     else menuUpdate(dt);                                                // the board keeps the bedroom alive behind it
   }
   if(SCREEN==='game'||SCREEN==='play') draw(); else drawMenu();
+  if($('store').style.display==='flex') aisleFrame();   // E13: the aisle's live cards (visible ones only)
   requestAnimationFrame(frame);
 }
 
@@ -5282,11 +5689,31 @@ window.TS={
     add(n){ stars+=n|0; starHudSync(); save(); return stars; },
     set(n){ stars=Math.max(0,n|0); starHudSync(); save(); return stars; },
   },
-  // ---- the store rig (E9) ----
+  // ---- the bank rig (E13) ----
+  bank:{
+    open(){ bankShow(true); return true; },
+    close(){ bankShow(false); return true; },
+    mint(p){ if(p) Object.assign(MINT,p); return {...MINT}; },   // the mint dial — re-tune it and the ledger must follow
+  },
+  // ---- the store rig (E9; E13 re-aims tab, adds select/paints/chip) ----
   store:{
     open(){ storeShow(true); return true; },
     close(){ storeShow(false); return true; },
-    tab(k2){ if(STORE_TABS.some(t2=>t2[0]===k2)){ stTab=k2; storeSync(); } return stTab; },
+    tab(k2){                     // same name, new furniture: scrolls the aisle to that shelf sign
+      const ai=$('staisle');
+      if(STORE_TABS.some(t2=>t2[0]===k2)){
+        const sg=ai.querySelector('.stsign[data-k="'+k2+'"]');
+        if(sg) ai.scrollLeft=Math.max(0,sg.offsetLeft-10);
+        return k2;
+      }
+      let cur=STORE_TABS[0][0];
+      for(const sg of ai.querySelectorAll('.stsign'))
+        if(sg.offsetLeft<=ai.scrollLeft+ai.clientWidth/2) cur=sg.dataset.k;
+      return cur;
+    },
+    select(id){ return stageMount(id); },              // mount the showcase; returns the mounted id
+    paints(reset){ const o={...AISLE_PAINTS}; if(reset) AISLE_PAINTS={}; return o; },
+    chip(b){ if(b!=null){ stChipOn=!!b; $('stStars').style.display=stChipOn?'':'none'; } return stChipOn; },
     list(){
       const ids=[...SET_ROW_A,...SET_ROW_B,...WHISTLE_IDS,...CRASH_IDS,...BELL_IDS,...MODEL_IDS,
         ...COLL.filter(r=>r[2]!=='paint'&&!coll.has(r[0])&&!COLL_NO_SALE.includes(r[0])).map(r=>r[0])];
