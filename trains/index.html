@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v3.6 -->
+<!-- TRAINSET v3.7 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -1088,6 +1088,9 @@ const STORE=[
   ['pt_black','COAL BLACK','set',20], ['pt_white','SNOW WHITE','set',20],
   ['pt_orange','SUNSET ORANGE','set',18], ['pt_pink','BUBBLEGUM','set',18],
   ['pt_rain','RAINBOW','set',40],                       // the one thing worth saving for
+  // TRAILS (E28) — train dressing: buy it and she streams it behind her as she
+  // runs. STORE rows by the E9 law — never COLL, never the toy-box "n / 50".
+  ['tr_rain','RAINBOW TRAIL','trail',30], ['tr_spark','STARDUST','trail',18],
   // WHISTLES — what the loco says (wh_peep is free: today's whistle, byte-identical)
   ['wh_peep','PEEP','whistle',0], ['wh_horn','BIG HORN','whistle',10],
   ['wh_chime','STEAM CHIME','whistle',12], ['wh_toot','PARTY TOOT','whistle',8],
@@ -1111,6 +1114,7 @@ const defOf=id=>COLL_BY[id]||STORE_BY[id];
 const STORE_TABS=[['sets','TRAIN SETS'],['whis','WHISTLES'],['crash','CRASHES'],['bits','MODELS & BITS']];
 const SET_ROW_A=['pt_red','pt_yellow','pt_blue','pt_green','pt_purple'];   // pt_red = the free default, always owned
 const SET_ROW_B=['pt_black','pt_white','pt_orange','pt_pink','pt_rain'];
+const TRAIL_IDS=['tr_rain','tr_spark'];   // E28: TRAIN SETS shelf, after the liveries (a trail is train dressing)
 const WHISTLE_IDS=['wh_peep','wh_horn','wh_chime','wh_toot','wh_quack','wh_fart'];
 const CRASH_IDS=['cr_bonk','cr_bang','cr_boing','cr_smash','cr_thud','cr_pfft'];
 const BELL_IDS=['bl_ding','bl_bell','bl_cuckoo','bl_cow'];
@@ -1818,11 +1822,13 @@ function placeTrainAt(cxl,cyl,prefEl){
     TRAIN.cars.push({type:consist[i-1],rd,face:1,squash:0});
   }
   TRAIN.placed=true; TRAIN.F=true; TRAIN.pauseT=0; TRAIN.stKey=null; TRAIN.startSig=null;
+  trailClear();                // E28: a fresh placement starts a fresh trail
   return true;
 }
 function trainHome(quiet){
   if(TRAIN.placed && !quiet){ for(const c of TRAIN.cars){ const p=pos(c.rd); puff(p.x,p.y-8-LIFT*(p.z||0),16); } SND.pop(); }
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
+  trailClear();                // E28: home = gone — a grab-off keeps its fade, home doesn't
   for(const pc of grid.values()) pc.latch=null;
   for(const pc of hgrid.values()) pc.latch=null;
   BOARDERS=[]; poseReset();    // E15: riders live per-run — home = everyone's out
@@ -1872,6 +1878,7 @@ function update(dt){
     if(rainT<=0){ rainT=RAIN_RUMBLE[0]+Math.random()*(RAIN_RUMBLE[1]-RAIN_RUMBLE[0]); SND.rumble(); }
   }
   for(const c of TRAIN.cars) if(c.squash>0) c.squash=Math.max(0,c.squash-dt*4);
+  trailTick(dt);               // E28: the grab-off fade + the sparkles' little lives — sim-clocked
 
   if(TRAIN.placed && TRAIN.running){
     if(TRAIN.pauseT>0){ TRAIN.pauseT-=dt; }
@@ -1885,6 +1892,7 @@ function update(dt){
         LIVE=true; for(const c of TRAIN.cars) advance(c.rd,step); LIVE=false;
         TRAIN.dist+=step; TRAIN.goDist+=step;
         wheelPhase+=step/8;
+        trailEmit(step);       // E28 THE MAGIC TRAIL — exhaust, not physics: reads poses, writes nothing back
         chugAcc+=step; if(chugAcc>52){ chugAcc=0;
           const lp=pieceOf(TRAIN.cars[0].rd);
           SND.chuff(!!lp&&lp.t==='br', !!lp&&lp.t==='tun'); }   // E7: the tunnel muffles the chuff
@@ -3891,6 +3899,130 @@ function trainCarItems(){
   }
   return items;
 }
+/* =====================================================================
+   E28 THE MAGIC TRAIL — shop-bought exhaust. LAW: a trail is PAINT, not
+   physics. It is emitted from the coupling face that trails the MOTION
+   (reverseTrain flips every rd.dir, so back() re-aims for free), in
+   world space, from the existing per-frame step — advance, collision,
+   lap/startSig, gravity and every cell-keyed law never hear of it.
+   equip.trail is the ONE dial: 'none' and the whole feature vanishes.
+   Campaign wears the kid's equip (the gift is HER train); PLAY wears
+   NOTHING (five stateless tray trains × particles = mud); the menu
+   room and bedroom never tick or paint any of this by construction.
+   ===================================================================== */
+const TRAIL_LEN=260;          // px of ridden path the rainbow covers (Wyatt dial)
+const TRAIL_PTS=48;           // ribbon ring slots — allocated once, reused forever
+const TRAIL_FADE=1;           // seconds the ribbon lets go after a grab-off (Wyatt dial)
+const SPARK_MAX=40;           // stardust cap — the pool IS the allocation, made once here
+const TRAIL_SPC=TRAIL_LEN/TRAIL_PTS;   // px between ribbon samples (~5.4 — hugs the curves)
+const TRAIL={ n:0, head:0, acc:0, fade:0, sTick:0, mk:0,
+  x:new Float32Array(TRAIL_PTS), y:new Float32Array(TRAIL_PTS),
+  z:new Float32Array(TRAIL_PTS), b:new Uint8Array(TRAIL_PTS),   // b = break: no segment back to the previous point
+  sparks:[] };
+for(let i=0;i<SPARK_MAX;i++) TRAIL.sparks.push({on:false,x:0,y:0,z:0,vx:0,vy:0,t:0,life:0.8,sz:1,ph:0,gold:false});
+function trailClear(){ TRAIL.n=0; TRAIL.head=0; TRAIL.acc=0; TRAIL.fade=0;
+  for(const s of TRAIL.sparks) s.on=false; }
+function trailWear(id){       // the ONE wear door — buy, tap, rig all walk through here
+  const w=TRAIL_IDS.includes(id)? id : 'none';
+  if(equip.trail!==w){ equip.trail=w; trailClear(); }   // the dial turns → the old magic vanishes at once
+  return equip.trail;
+}
+function trailTailRd(){       // the rider at the coupling face that trails the direction of travel
+  const c=TRAIN.F? TRAIN.cars[TRAIN.cars.length-1] : TRAIN.cars[0];
+  const rd=clone(c.rd); back(rd,GAP*0.55);
+  return rd;
+}
+function trailEmit(step){     // called ONLY from the running step, after the cars advanced
+  if(equip.trail==='none'||!TRAIN.cars.length) return;
+  TRAIL.fade=1;
+  const rd=trailTailRd(), p=pos(rd);
+  if(equip.trail==='tr_rain'){
+    TRAIL.acc+=step;
+    if(TRAIL.acc>=TRAIL_SPC){
+      TRAIL.acc%=TRAIL_SPC;
+      const h=TRAIL.head, pv=(h-1+TRAIL_PTS)%TRAIL_PTS;
+      const jump=TRAIL.n>0? Math.hypot(p.x-TRAIL.x[pv],p.y-TRAIL.y[pv]) : 0;
+      TRAIL.x[h]=p.x; TRAIL.y[h]=p.y; TRAIL.z[h]=p.z||0;
+      TRAIL.b[h]=(TRAIL.n===0||jump>TRAIL_SPC*3)?1:0;   // a jumping tail (re-place, ping-pong flip) BREAKS the ribbon, never bridges it
+      TRAIL.head=(h+1)%TRAIL_PTS; if(TRAIL.n<TRAIL_PTS) TRAIL.n++;
+    }
+  } else {
+    // STARDUST — 2-3 a frame at the tail while she moves; the cap caps the fleet
+    const bx=Math.cos(p.ang+Math.PI), by=Math.sin(p.ang+Math.PI);
+    const want=2+(TRAIL.sTick++&1);
+    for(let i=0,made=0;i<SPARK_MAX&&made<want;i++){
+      const s=TRAIL.sparks[i]; if(s.on) continue;
+      s.on=true; s.t=0; s.life=0.65+Math.random()*0.3;
+      s.x=p.x+(Math.random()-0.5)*10; s.y=p.y+(Math.random()-0.5)*8; s.z=p.z||0;
+      s.vx=bx*(14+Math.random()*18)+(Math.random()-0.5)*10;
+      s.vy=by*(14+Math.random()*18)*0.4-(26+Math.random()*18);   // up-and-back
+      s.sz=0.8+Math.random()*0.7; s.ph=Math.random()*TAU; s.gold=(TRAIL.mk&1)===0;
+      TRAIL.mk++; made++;
+    }
+  }
+}
+function trailTick(dt){       // sim-clocked decay — deterministic under the battery's TS.step
+  if(TRAIL.fade>0&&!TRAIN.placed){          // grabbed off: the ribbon lets go over TRAIL_FADE
+    TRAIL.fade=Math.max(0,TRAIL.fade-dt/TRAIL_FADE);
+    if(TRAIL.fade===0){ TRAIL.n=0; TRAIL.head=0; TRAIL.acc=0; }
+  }
+  for(const s of TRAIL.sparks){ if(!s.on) continue;
+    s.t+=dt; if(s.t>=s.life){ s.on=false; continue; }
+    s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy-=dt*8;   // a little buoyancy — sparkles float
+  }
+}
+function star4(px,py,k,col,a){   // a 4-point twinkle — the sparkle's whole anatomy
+  cx.globalAlpha=a; cx.fillStyle=col;
+  cx.beginPath();
+  cx.moveTo(px,py-7*k); cx.quadraticCurveTo(px+1.6*k,py-1.6*k,px+7*k,py);
+  cx.quadraticCurveTo(px+1.6*k,py+1.6*k,px,py+7*k);
+  cx.quadraticCurveTo(px-1.6*k,py+1.6*k,px-7*k,py);
+  cx.quadraticCurveTo(px-1.6*k,py-1.6*k,px,py-7*k);
+  cx.closePath(); cx.fill(); cx.globalAlpha=1;
+}
+function trailRunPaint(i0,N,a,b2){ return ()=>{   // one contiguous same-shelf run of ribbon segments
+  cx.lineCap='round'; cx.lineJoin='round';
+  for(let i=a;i<=b2;i++){
+    const pv=(i0+i-1+TRAIL_PTS)%TRAIL_PTS, cu=(i0+i)%TRAIL_PTS;
+    const x0=TRAIL.x[pv], y0=TRAIL.y[pv]-LIFT*TRAIL.z[pv];
+    const x1=TRAIL.x[cu], y1=TRAIL.y[cu]-LIFT*TRAIL.z[cu];
+    const L=Math.hypot(x1-x0,y1-y0)||1, nx=-(y1-y0)/L, ny=(x1-x0)/L;
+    cx.globalAlpha=(i/(N-1))*TRAIL.fade*0.85;     // alpha ramps to 0 at the old end
+    for(let b3=0;b3<5;b3++){
+      const o=(b3-2)*3.3;
+      cx.strokeStyle=LIVERY[RAIN_ORDER[b3]].m; cx.lineWidth=3.4;
+      cx.beginPath(); cx.moveTo(x0+nx*o,y0+ny*o); cx.lineTo(x1+nx*o,y1+ny*o); cx.stroke();
+    }
+  }
+  cx.globalAlpha=1; cx.lineCap='butt';
+}; }
+function trailRibbonItems(out){   // ribbon segments as z-ITEMS: under the cars (+0.05), over the
+  const N=TRAIL.n, i0=(TRAIL.head-N+TRAIL_PTS)%TRAIL_PTS;   // track — the E4 paint-z law for free
+  let runA=-1, runZ=0;
+  const flush=(a,b2,zq)=>{ if(a>=0&&b2>=a) out.push({z:zq+0.02, fn:trailRunPaint(i0,N,a,b2)}); };
+  for(let i=1;i<N;i++){
+    const cu=(i0+i)%TRAIL_PTS;
+    if(TRAIL.b[cu]){ flush(runA,i-1,runZ); runA=-1; continue; }
+    const zq=Math.round(Math.max(TRAIL.z[(i0+i-1+TRAIL_PTS)%TRAIL_PTS],TRAIL.z[cu])*4)/4;
+    if(runA<0){ runA=i; runZ=zq; }
+    else if(zq!==runZ){ flush(runA,i-1,runZ); runA=i; runZ=zq; }
+  }
+  flush(runA,N-1,runZ);
+}
+function trailCarItems(){     // the rug train's items + the rainbow's — draw()'s one seam
+  const out=trainCarItems()||[];
+  if(equip.trail==='tr_rain'&&TRAIL.n>1&&TRAIL.fade>0) trailRibbonItems(out);
+  return out.length? out : null;
+}
+function trailSparkPaint(){   // stardust floats OVER the cars — same world transform, camera free
+  if(PLAY.on||equip.trail!=='tr_spark') return;   // PLAY wears NOTHING — the law in writing
+  const t=perf();
+  for(const s of TRAIL.sparks){ if(!s.on) continue;
+    const k=s.t/s.life, tw=0.65+0.35*Math.sin(t*9+s.ph);
+    star4(s.x+Math.sin((t+s.ph)*7)*1.5, s.y-LIFT*s.z, s.sz*(1-k*0.6)*tw,
+      s.gold?'#F2C531':'#F7E9C4', (1-k)*0.9*tw);
+  }
+}
 function drawGhosts(){
   if(!DRAG) return;
   const isPiece=DRAG.kind==='newPiece'||DRAG.kind==='movePiece';
@@ -4047,8 +4179,9 @@ function draw(){
   drawRivers(); drawPonds(); drawGaps();
   // scenery slides in as the midHook: over the ground pass, under the decks and
   // the z-sorted cars — so a cow can graze beneath the high line
-  drawTrackAll(grid,hgrid,PLAY.on? playCarItems():trainCarItems(),drawScen);
+  drawTrackAll(grid,hgrid,PLAY.on? playCarItems():trailCarItems(),drawScen);   // E28: trailCarItems = the cars + the rainbow's z-items; PLAY's branch byte-untouched
   drawBoarders();   // E15: little walkers between platform and train, on the ground
+  trailSparkPaint();   // E28: stardust floats OVER the cars (PLAY/none = early out, zero paint)
   drawArches();     // E9: balloon arches bow over the line — the train drives under them
   drawBalloons();   // E7: balloons fly above the whole rug, shadows drifting along
   for(const s of smoke){ const k=s.t/s.dur;
@@ -5030,7 +5163,8 @@ const PACKS={
   bl_cow(){ tone(560,0.12,'square',0.16,505); tone(845,0.1,'square',0.1,790); noise(0.05,2600,0.15,'highpass');
             tone(540,0.14,'square',0.14,490,0.17); tone(820,0.1,'square',0.09,770,0.17); },
 };
-const EQ_DEF={ whistle:'wh_peep', crash:'cr_bonk', bell:'bl_ding' };
+const EQ_DEF={ whistle:'wh_peep', crash:'cr_bonk', bell:'bl_ding',
+               trail:'none' };   // E28: ADDITIVE — save v:11 stands, load() tolerates its absence
 const sndSlot=id=>typeof id==='string'&&id.startsWith('wh_')?'whistle':
                   typeof id==='string'&&id.startsWith('cr_')?'crash':
                   typeof id==='string'&&id.startsWith('bl_')?'bell':null;
@@ -5164,7 +5298,7 @@ function serWorld(){
 // apply a serialized world verbatim (load + the campaign's free-play restore)
 function appWorld(d){
   grid.clear(); hgrid.clear(); scen.clear();
-  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
+  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; trailClear();   // E28: a swapped world starts clean
   // v:1 rows are [k,t,r] (no sel, no scen block) — they load clean, scenery empty.
   // v:1/v:2 carry no colour — they migrate to v:3 as RED (today's exact art).
   // v:1/v:2/v:3 rows carry no elev — they migrate to v:4 all on the ground.
@@ -5259,6 +5393,9 @@ function load(){
     equip={...EQ_DEF};
     if(d.equip) for(const k2 in EQ_DEF){
       const id=d.equip[k2];
+      // E28: the E9 trap re-audited — the trail slot validates against ITS ids,
+      // not the sound packs, or a bought trail silently vanishes on reload.
+      if(k2==='trail'){ if(TRAIL_IDS.includes(id)) equip.trail=id; continue; }
       if(id&&PACKS[id]&&sndSlot(id)===k2) equip[k2]=id;
     }
     // v:11 — THE PIGGY BEDROOM (E23). A v≤10 save meets the piggy FRESH:
@@ -5463,7 +5600,7 @@ function campEnter(n){
   CAMP.visited=new Set(); winT=0; prettyT=0; prettyPend=false;
   ridersOff();                                // E15: fresh platforms for the level's stations
   grid.clear(); hgrid.clear(); scen.clear();
-  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
+  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; trailClear();   // E28: no ghost ribbon on a fresh level
   for(const g of L.glued) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
   // TRY-THEN-OWN (E8): the level's own working pieces, glued down. They are part of
   // the land exactly like the scenery — a tug wobbles them and nothing removes them.
@@ -5887,7 +6024,7 @@ function playEnter(forceI){
   PLAY.on=true; PLAY.trains=[]; PLAY.crashes=0; PLAY.respawnT=PLAY_RESPAWN; PLAY.nextId=1;
   ridersOff();                           // E15: the wind-up rug keeps its glued people only
   grid.clear(); hgrid.clear(); scen.clear();
-  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
+  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; trailClear();   // E28: PLAY is byte-identical ALWAYS
   const M=playMap();
   for(const g of M.scen) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
   for(const [t,r,x,y] of M.track){ const pc=setTrackPiece(t,r,null,0,x,y); pc.glued=1; }
@@ -7297,6 +7434,7 @@ const STG_CAP={
   pt_green:'PAINT IT MEADOW', pt_purple:'PAINT IT BERRY', pt_black:'THE MIDNIGHT COAT',
   pt_white:'THE SNOW COAT', pt_orange:'THE SUNSET COAT', pt_pink:'THE BUBBLEGUM COAT',
   pt_rain:'EVERY CAR A COLOUR',
+  tr_rain:'SHE LEAVES A RAINBOW', tr_spark:'A TRAIL OF STARS',   // E28 — the magic trail
   wh_peep:'THE CLASSIC PEEP', wh_horn:'THE BIG LOW BLAST', wh_chime:'THREE PIPES SINGING',
   wh_toot:'A PARTY EVERY TOOT', wh_quack:'THE TRAIN SAYS QUACK', wh_fart:'THE FAMOUS FART',
   cr_bonk:'THE CLASSIC BONK', cr_bang:'CYMBALS EVERYWHERE', cr_boing:'BOING BOING BOING',
@@ -7326,7 +7464,9 @@ function stRowOf(id){
     name: id==='pt_red'? 'RED' : d.name,
     price: id==='pt_red'? 0 : (d.price|0),
     owned: stOwned(id),
-    eq: snd? equip[snd]===id : (id.startsWith('pt_')? COLOR===id.slice(3) : false) };
+    eq: snd? equip[snd]===id :
+        id.startsWith('tr_')? equip.trail===id :               // E28: the worn trail shows the liveries' tell
+        (id.startsWith('pt_')? COLOR===id.slice(3) : false) };
 }
 // the little painted glyphs for the sound shelves — molded plastic, GVT palette
 function drawSndIcon(id){
@@ -7496,6 +7636,31 @@ function stIcon(cv,id,t){
     withCtx(g,()=>livPaint(id.slice(3)));
     return;
   }
+  if(id.startsWith('tr_')){          // E28 trails: a tiny loco STREAMS the goods — the card is alive
+    g.setTransform(0.8*k,0,0,0.8*k,ox+64*k,oy+58*k);
+    withCtx(g,()=>{
+      if(id==='tr_rain'){
+        cx.lineCap='round';
+        for(let b2=0;b2<5;b2++){
+          cx.strokeStyle=LIVERY[RAIN_ORDER[b2]].m; cx.lineWidth=4.6; cx.globalAlpha=0.9;
+          const yy=-12+(b2-2)*4.8;
+          cx.beginPath(); cx.moveTo(-92,yy+Math.sin(tt*2.6+b2*0.9)*3);
+          cx.quadraticCurveTo(-52,yy+Math.sin(tt*2.6+b2*0.9+1.4)*4,-16,yy);
+          cx.stroke();
+        }
+        cx.globalAlpha=1; cx.lineCap='butt';
+      } else {
+        for(let i=0;i<8;i++){
+          const dr=(tt*22+i*17)%64, a2=Math.max(0,1-dr/64);
+          const tw=0.5+0.5*Math.sin(tt*8+i*2.3);
+          star4(-20-dr,-12-((i*23)%22)+Math.sin(tt*3+i*2.1)*2.5,
+            (0.55+(i*7)%3*0.22)*(0.6+0.6*tw),(i&1)?'#F7E9C4':'#F2C531',0.35+0.6*a2*tw);
+        }
+      }
+      drawCar('loco',0,0,0,0,tt*2.2,LIVERY[COLOR==='rain'?'red':COLOR]);   // HER engine, wheels rolling
+    });
+    return;
+  }
   if(sndSlot(id)){                   // sounds: the painted glyph shelf
     g.setTransform(k,0,0,k,ox+48*k,oy+50*k);
     withCtx(g,()=>drawSndIcon(id));
@@ -7529,6 +7694,7 @@ function storeBuy(id,el){
   const snd=sndSlot(id);
   if(snd) equip[snd]=id;                                        // a bought sound goes straight on the train
   if(id.startsWith('pt_')&&LIVERY[id.slice(3)]){ COLOR=id.slice(3); liveryChanged(); }   // wear it out of the shop
+  if(id.startsWith('tr_')) trailWear(id);                       // E28: a bought trail streams out of the shop (same grammar)
   SND.coin(); SND.win();             // the coin-into-win flourish
   voiceAt('buy');                    // E12: "Okay" — the shopkeeper's nod (never on the can't-afford path)
   if(el) wiggle(el);
@@ -7543,6 +7709,10 @@ function storeRowTap(id,el){
     const c2=id.slice(3);
     if(COLOR!==c2){ COLOR=c2; SND.chirp(); liveryChanged(); save(); } else SND.click();
     storeSync();
+  }
+  else if(id.startsWith('tr_')){                                // E28 owned trail: wear it; tap the WORN one = take it off
+    if(equip.trail!==id){ trailWear(id); SND.chirp(); } else { trailWear('none'); SND.click(); }
+    save(); storeSync();
   }
   else { SND.tok(); wiggle(el); toast(defOf(id).name); }        // owned model: a proud little wiggle
 }
@@ -7685,7 +7855,7 @@ function aisleMeasure(){
 // ---- the showcase stage: tap a toy, it mounts BIG under its name plate ----
 let STAGE_ID=null;
 function stAisleIds(){             // aisle order — exactly the shelves' membership
-  const out=[...SET_ROW_A,...SET_ROW_B,...WHISTLE_IDS,...CRASH_IDS,...MODEL_IDS,...BELL_IDS];
+  const out=[...SET_ROW_A,...SET_ROW_B,...TRAIL_IDS,...WHISTLE_IDS,...CRASH_IDS,...MODEL_IDS,...BELL_IDS];
   for(const cat of ['track','train','land','extra'])
     for(const r of COLL) if(r[2]===cat&&!coll.has(r[0])&&!COLL_NO_SALE.includes(r[0])) out.push(r[0]);
   return out;
@@ -7749,7 +7919,7 @@ function storeSync(){
   for(const [k2,label] of STORE_TABS){                  // the four categories ride the strip in tab order
     solo();                                             // a straggler never leaks into the next department
     sign(k2,label);
-    if(k2==='sets'){ shelf(SET_ROW_A); shelf(SET_ROW_B); }   // the wardrobe: the winnable five, then the shop five
+    if(k2==='sets'){ shelf(SET_ROW_A); shelf(SET_ROW_B); shelf(TRAIL_IDS); }   // the wardrobe: the winnable five, the shop five, then the trails (E28 — after the liveries, before nothing)
     else if(k2==='whis') shelf(WHISTLE_IDS);
     else if(k2==='crash') shelf(CRASH_IDS);
     else {                                              // MODELS & BITS: the shop's eight, the bells, then
@@ -8244,6 +8414,20 @@ window.TS={
     shown(){ return SCREEN==='game'? HANDY.filter(h=>coll.has(h.t)).map(h=>h.t) : []; },
     clear(){ HANDY.length=0; handySync(); return true; },
   },
+  // ---- the magic trail rig (E28) — the one dial + the buffers, for the battery ----
+  trail:{
+    get(){ return { worn:equip.trail, pts:TRAIL.n, fade:+TRAIL.fade.toFixed(3),
+      sparks:TRAIL.sparks.reduce((n,s)=>n+(s.on?1:0),0), cap:SPARK_MAX,
+      pool:TRAIL.sparks.length, spawned:TRAIL.mk }; },
+    set(id){ if(id!=='none'&&!(TRAIL_IDS.includes(id)&&stOwned(id))) return false;
+      trailWear(id); save(); storeSync(); return TS.trail.get(); },
+    list(){ return TRAIL_IDS.slice(); },
+    pts(){ const N=TRAIL.n, i0=(TRAIL.head-N+TRAIL_PTS)%TRAIL_PTS, out=[];
+      for(let i=0;i<N;i++){ const j=(i0+i)%TRAIL_PTS;
+        out.push([+TRAIL.x[j].toFixed(2),+TRAIL.y[j].toFixed(2),+TRAIL.z[j].toFixed(2),TRAIL.b[j]]); }
+      return { ribbon:out,   // oldest→newest world points + break flags
+        sparks:TRAIL.sparks.filter(s=>s.on).map(s=>[+s.x.toFixed(2),+s.y.toFixed(2),+s.z.toFixed(2)]) }; },
+  },
   // ---- the corner toy box rig (E25) — state + a door for the battery ----
   tbox:{
     open(b){ tboxShow(b!==false); return TBOX.open; },
@@ -8297,7 +8481,7 @@ window.TS={
     paints(reset){ const o={...AISLE_PAINTS}; if(reset) AISLE_PAINTS={}; return o; },
     chip(b){ if(b!=null){ stChipOn=!!b; $('stStars').style.display=stChipOn?'':'none'; } return stChipOn; },
     list(){
-      const ids=[...SET_ROW_A,...SET_ROW_B,...WHISTLE_IDS,...CRASH_IDS,...BELL_IDS,...MODEL_IDS,
+      const ids=[...SET_ROW_A,...SET_ROW_B,...TRAIL_IDS,...WHISTLE_IDS,...CRASH_IDS,...BELL_IDS,...MODEL_IDS,
         ...COLL.filter(r=>r[2]!=='paint'&&!coll.has(r[0])&&!COLL_NO_SALE.includes(r[0])).map(r=>r[0])];
       return ids.map(stRowOf);
     },
@@ -8307,6 +8491,10 @@ window.TS={
       if(snd){ if(!coll.has(id)) return false; equip[snd]=id; save(); storeSync(); return {...equip}; }
       if(typeof id==='string'&&id.startsWith('pt_')&&LIVERY[id.slice(3)]&&stOwned(id)){
         COLOR=id.slice(3); liveryChanged(); save(); return COLOR; }
+      if(id==='none'||(typeof id==='string'&&id.startsWith('tr_'))){   // E28: the trail slot
+        if(id!=='none'&&!(TRAIL_IDS.includes(id)&&stOwned(id))) return false;
+        trailWear(id); save(); storeSync(); return {...equip};
+      }
       return false;
     },
     equipped(){ return {...equip, color:COLOR}; },
