@@ -2152,7 +2152,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.20</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.21</div>
   <div class="scanlines"></div>
 </div>
 
@@ -11343,6 +11343,14 @@ function momDue(){ return !META.mom.done && placedCount()>=MOM_TRIGGER_N; }
 // in three reads on every screen where she has no business.
 const MOM_FUSE=7.0;      // seconds of open-room time before she storms in
 let momFuse=0, momAuto=true;
+// v2.21: a REPLAY loss re-arms her return (one shot, session-local) — once
+// done=1, momDue() can never carry the real-loss law ("she is back at the
+// next attack") because it is false forever, so this flag does. The tick
+// below re-checks the same boxing valve (≥MOM_TRIGGER_N toys out), so a
+// tidied room still calls her off exactly as it always has, and ANY raid
+// start consumes the flag. DIAL: quiet replay losses = delete endBattle's
+// one arm line (search momRematch=true).
+let momRematch=false;
 function momFuseHeld(){
   if(S.mode!=='menu' || document.hidden) return true;
   if(COOP || coopJoinPend) return true;                  // never hijack a party
@@ -11351,12 +11359,37 @@ function momFuseHeld(){
   return !!document.querySelector('#roomModal .rmback'); // any open room modal
 }
 function momFuseTick(){
-  if(!momAuto || !momDue()){ momFuse=0; return; }
+  if(!momAuto || !(momDue() || (momRematch && placedCount()>=MOM_TRIGGER_N))){ momFuse=0; return; }
   if(momFuseHeld()) return;
   momFuse+=0.25;
   if(momFuse>=MOM_FUSE){ momFuse=0; startMomRaid(); }
 }
 setInterval(momFuseTick, 250);   // her clock never stops — the gates above do the deciding
+// v2.21 THE MEDAL IS A DOORKNOB (Wyatt 8/3, for Tess and as an Easter egg:
+// "Make it so we can replay the Mom level by just clicking the defeated Mom
+// achievement in the medals screen"). Beaten, she never returns on her own —
+// momDue() is false forever and the fuse above reads it — so the earned
+// MOM DEFEATED badge in the case is the ONLY road back, which is the point.
+// UI.medal routes an earned-hm11 tap here; the guards mirror the fuse's own
+// outranking laws (never over a battle or her own raid, never hijack a
+// party, never double-book a mom-due day), and a guarded-off tap falls
+// back to the ordinary inspect card instead of dead-tapping. Same fight,
+// TODAY's floor (momDecorBake reads the room at raid start); only the pay
+// differs — endBattle's momFirst seam.
+function momReplay(){
+  // mode is the authoritative live-battle gate: no battle, raid or sim runs
+  // under 'menu' (startMomRaid/startBattle flip to 'play' synchronously).
+  // ⚠ Never gate on S.momRaid here — the v2.08 KNOWN stale flag rides every
+  // post-raid menu (reset() clears it only at the NEXT battle), and it would
+  // dead-tap the medal forever after the first rematch of a session.
+  if(S.mode!=='menu') return false;
+  if(COOP || coopJoinPend) return false;   // a party outranks her, always
+  if(momDue()) return false;               // she's already at the door — the war table has the button
+  audio();
+  UI.closeModal();                         // the case must not survive over her raid
+  startMomRaid();
+  return true;
+}
 // ===== SHE KICKS TOYS (0140, the fun-pass) — props scattered on the floor;
 // on a per-phase cadence she punts the nearest one across the carpet: it
 // flies, fells your men along its path (knock() — the v1.32 casualty, exactly
@@ -13640,6 +13673,7 @@ function startMomRaid(){
   reset();
   if(W!==BASE_W){ W=BASE_W; resize(); }   // the room is 960 wide — roomSVG's own viewBox
   S.momRaid=true;
+  momRematch=false;   // v2.21: any start of hers consumes a pending rematch return
   S.levelN=0; S.rival=null;
   S.cfg=levelCfg(1);
   S.cfg.terrain={rocks:[],river:null};    // the bedroom floor is bare BY CONSTRUCTION — never trust a seed
@@ -19440,6 +19474,12 @@ function endBattle(win){
     // v1.56: a rival sortie raises the RIVAL'S colours, so the prose can't
     // name the Tan — the army-agnostic line covers all ten rival armies
     document.getElementById('loseText').textContent=t(S.momRaid? "The room is SO clean. Your army is in the toy bin. She'll be back — fight her off next time!" : S.rival? 'Their flag flies over your carpet. Sarge would like a word.' : 'The Tan flag flies over your carpet. Sarge would like a word.')+' · '+tf('+%1 XP for the trouble', xpGain)+promoTag(promos);
+    // v2.21: a REPLAY loss (done already 1) re-arms her return by flag — the
+    // line above promises "She'll be back", and momDue() can't deliver it any
+    // more. Same ~MOM_FUSE seconds of open-room time after HQ, same boxing
+    // valve. A first-run loss changes nothing here: momDue() still carries it.
+    // DIAL: delete this line if Wyatt wants replay losses quiet.
+    if(S.momRaid && META.mom.done) momRematch=true;
     // 0098 QUIET MERCY — a solo campaign defeat feeds the level's run. Sorties,
     // MOM, classic and co-op never mint S.sq through this door; L1 is the
     // coach's (and its first-battle mercy returned above anyway). Quits never
@@ -19462,6 +19502,16 @@ function endBattle(win){
   document.getElementById('medalRow').textContent = (m1?'★':'☆')+' '+(m2?'★':'☆')+' '+(m3?'★':'☆');
   let msg = t('Victory') + (m2? ' · '+t('Untouched Toy Box'):'') + (m3? ' · '+t('No soldier left behind'):'');
 
+  // v2.21: medal-replay wins land in this same branch. momFirst is captured
+  // BEFORE done is written and alone decides the pay: the first-ever win
+  // keeps the whole jackpot (the allowance headline here, xpToLevels' three
+  // promotions at the foot); a replay pays a boss level's own replay rate —
+  // xpFor(XP_CAMPAIGN_WIN+XP_BOSS) below + rivalDayWin's day-capped stars
+  // (5★ first defense of the day, 1★ for the drill after — the exact purse
+  // every daily rival pays, so the medal can never be a faucet). DIALS for
+  // Wyatt: the replay XP fraction, and whether a replay banks the piggy day
+  // at all (it does — she counts as the day's attacker, rematch or not).
+  const momFirst = S.momRaid && !META.mom.done;
   if(S.momRaid){
     // THE MOM VERDICT (v1.79): done is FOREVER — momDue() goes false, the
     // colored rivals resume tomorrow, and the allowance joins pigPayout for
@@ -19472,7 +19522,11 @@ function endBattle(win){
     META.mom.done=1;
     const r=rivalDayWin('mom');
     stars=r.stars;
-    msg=t('💵 YOUR ALLOWANCE STARTS TODAY — Mom adds +'+MOM_ALLOW+'★ to your piggy bank EVERY DAY, forever. She will never raid the room again.')+' · '+r.msg;
+    msg = momFirst
+      ? t('💵 YOUR ALLOWANCE STARTS TODAY — Mom adds +'+MOM_ALLOW+'★ to your piggy bank EVERY DAY, forever. She will never raid the room again.')+' · '+r.msg
+      // a replay is a rematch, not a second allowance — the plain victory
+      // line composed above + the day's piggy report, all existing keys
+      : msg+' · '+r.msg;
     // 0140: the medal lands LOUD — checkAch at the foot banks hm11 this same
     // tick (done=1 is already written), so the un-earned test here is exactly
     // "this is the first-ever win" and the line can never repeat.
@@ -19561,7 +19615,9 @@ function endBattle(win){
   // of the game. Her branch is flat on purpose — no +XP_BOSS stacking, the
   // number IS the ceremony (grantXP walks all three rungs, three picks
   // queue, and the v1.25 ceremony fires three plaques' worth for free).
-  const xpGain = S.momRaid? xpToLevels(MOM_LEVELS)
+  // v2.21: momFirst keeps that jackpot to the FIRST win — a medal replay
+  // pays a boss level's own replay rate instead (0.60 of a level; DIAL).
+  const xpGain = S.momRaid? (momFirst? xpToLevels(MOM_LEVELS) : xpFor(XP_CAMPAIGN_WIN+XP_BOSS))
     : xpFor(coopSquad()
     ? XP_SQUAD_WIN + XP_SQUAD_MATE*Math.max(0,coopHumans()-1) + (S.bossKilled? XP_BOSS:0)
     : XP_CAMPAIGN_WIN + (S.bossKilled? XP_BOSS:0));
@@ -26924,7 +26980,14 @@ window.UI = {
   },
   closeModal(ev){ if(ev&&ev.target!==ev.currentTarget) return; const m=document.getElementById('roomModal'); if(m) m.innerHTML=''; },
   // tap a badge: it steps forward on its own card, with the story and the count
-  medal(n){ const b=MC[n]; if(!b) return; const el=document.getElementById('mcInsp'); if(!el) return;
+  medal(n){ const b=MC[n]; if(!b) return;
+    // v2.21 THE EASTER EGG (Wyatt 8/3): the EARNED mom medal is a doorknob —
+    // tap it and she comes back for a rematch (momReplay; guards inside, and
+    // a guarded-off tap falls through to the plain inspect card below).
+    // Unearned stays a locked badge like any other — discovering that the
+    // won medal opens her door is the whole gag.
+    if(b.id==='hm11' && b.on && momReplay()) return;
+    const el=document.getElementById('mcInsp'); if(!el) return;
     SFX.blip();
     el.innerHTML='<div class="inspcard'+(b.on?'':' lk')+'">'
       +'<svg viewBox="0 0 100 120">'+badgeArt(b.id,b.i,b.cat,'i')+'</svg>'
@@ -27238,7 +27301,7 @@ window.GVT = {
   // ---- THE MOM BOSS rig (v1.79 · 0140) ----
   mom(){ return { since:META.mom.since, done:META.mom.done, due:momDue(), allow:momAllow(),
     placed:placedCount(), need:MOM_TRIGGER_N, n:decorCount(), all:DECOR_ALL_N,
-    auto:momAuto, fuse:+momFuse.toFixed(2) }; },
+    auto:momAuto, fuse:+momFuse.toFixed(2), rematch:momRematch }; },
   // v2.08: any rig seed with 7+ toys ON gets raided MOM_FUSE seconds after
   // the room opens — batteries that want a quiet ROOM call GVT.momBoot(false)
   // first (it disarms the fuse; same door name as 0140's latch, same call
