@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v4.2 -->
+<!-- TRAINSET v4.3 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -876,6 +876,8 @@ const BOX_CARD=35;             // spread card width ×--ui (≤820px viewports r
 const EAGER_PAN=0.4;           // C THE EAGER TRAIN: seconds of camera ease when she arrives off-screen
 const EAGER_WHISTLE=true;      // the far whistle that announces her
 const EAGER_COACH='PUT DOWN A STATION';   // BUILD's stationless finished line — once a session, then silence
+const KL_GHOST=1;              // E34 KEEP LAYING: the faint next-piece hint in a live continue zone (0 = off)
+const KL_GHOST_A=0.30;         // ...and how loud it whispers (the drag ghost speaks at 0.8)
 // ---- Wyatt dials (EXPANSION 15 — one block) ----
 // A. GRAVITY AS DRAMA. grade is measured in ELEVATION LEVELS PER CELL of arc
 // (pos().z interps levels along the path; LIFT px per level is the height it
@@ -4810,6 +4812,7 @@ function draw(){
         star5(e.x+Math.cos(a)*r2, e.y+Math.sin(a)*r2*0.6-16*k, 0.9-0.4*k, '#F2C531'); }
       cx.globalAlpha=1; } }
   drawWeather();    // E10: weather drifts over everything — but never over the ghost
+  klGhost();        // E34: the continue-zone whisper — under the live drag ghost
   drawGhosts();
   cx.setTransform(DPR,0,0,DPR,0,0);
   for(const p of confetti){ cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot);
@@ -6956,7 +6959,9 @@ cvs.addEventListener('pointerdown',e=>{
     }
     return;
   }
-  if(cell && scenAt(cell[0],cell[1])){ down={x:e.clientX,y:e.clientY,what:'scen',cell}; return; }
+  // E34: a zone-hot scenery cell (river under a bridge chain, a cow among the
+  // rails) marks the press — the TAP prefers the lay; a drag still moves the scen
+  if(cell && scenAt(cell[0],cell[1])){ down={x:e.clientX,y:e.clientY,what:'scen',cell,kz:klHot(cell[0],cell[1])?1:0}; return; }
   // E10: the press started on NOTHING — that is the one place a pan may begin
   if(camGate()){
     followSet(false);                            // E15: a pan-press wins instantly, no snap-back
@@ -7093,6 +7098,10 @@ function upCore(e){
     if(down.on){
       if(perf()-down.lt<0.12){ VIEW.vx=down.vx; VIEW.vy=down.vy; }
     } else {
+      // E34 KEEP LAYING — a tap on a live continue zone lays the next piece
+      // and never arms DTAP; every other empty-cell tap falls through byte-true.
+      if(SCREEN==='game'){ const wz=worldXY(e), cz=cellXY(wz[0],wz[1]);
+        if(cz&&klTap(cz[0],cz[1])){ down=null; return; } }
       const t2=perf();
       if(DTAP.t&&t2-DTAP.t<0.35&&Math.hypot(e.clientX-DTAP.x,e.clientY-DTAP.y)<30){
         DTAP={t:0,x:0,y:0}; SND.click(); viewFit();     // double-tap empty rug = HOME
@@ -7106,12 +7115,7 @@ function upCore(e){
       // the drop asks THE predicate — the same one the ghost tint asked all along
       const q=hover? placeQuery(DRAG.t,DRAG.r,hover[0],hover[1]) : null;
       if(q&&q.ok){
-        const pc=setTrackPiece(DRAG.t,DRAG.r,DRAG.sel,q.elev,hover[0],hover[1]); pc.pop=1;
-        SND.tok(); puff(GX+hover[0]*C+C/2,GY+hover[1]*C+C/2,14);
-        hintPass(0); if(grid.size>=3) hintPass(1);
-        save();
-        if(!BED.ctx) EAGER.last={x:hover[0],y:hover[1],el:q.elev?1:0};   // E27: the hand's newest piece — the arrival's fallback anchor
-        eagerTry();                                                      // E27: mutation + finished + trainless = she comes
+        layAt(DRAG.t,DRAG.r,DRAG.sel,hover[0],hover[1],q);   // E34: the one hand-lay ceremony — the continue-tap speaks it too
       } else if(hover){
         if(DRAG.kind==='movePiece'){ setTrackPiece(DRAG.t,DRAG.r,DRAG.sel,DRAG.elev|0,DRAG.from[0],DRAG.from[1]); save(); }
         let msg='THAT SPOT IS TAKEN';
@@ -7255,7 +7259,8 @@ function upCore(e){
     else if(down.what==='scen'){
       const [gx,gy]=down.cell, s=scenAt(gx,gy);
       if(s){
-        if(s.t==='ppl'){ s.wave=1.3; SND.yay(); }
+        if(down.kz&&klTap(gx,gy)){}   // E34: the chain's door through a scenery cell — the lay wins the tap
+        else if(s.t==='ppl'){ s.wave=1.3; SND.yay(); }
         else if(s.t==='rv'||s.t==='pond'||s.t==='fount'){ fx.push({k:'rip',x:GX+gx*C+C/2,y:GY+gy*C+C/2,R:26,t:0,dur:0.5}); SND.bloop(); }
         else if(SCENDEF[s.t].react){ s.ra={k:1}; s.wave=1.3;                // critters wiggle AND charm —
           const ch=CHIRP[s.t]; if(ch) SND[ch](); else SND.rustle(); }       // the quiet ones just wiggle
@@ -7713,6 +7718,85 @@ function eagerVerdict(pc,x,y){  // both directions from one seed → done? stati
   }
   return ok? {pieces,st} : null;
 }
+/* =====================================================================
+   E34 KEEP LAYING (FM-TS-37) — the Roller Coaster Tycoon move. The last
+   piece the hand laid arms the cell(s) past its open end(s); a tap
+   there lays the SAME piece again, continuing the heading (curves keep
+   turning — one curve + three taps closes the circle and the eager
+   train rolls in). A bonus gesture, never a MODE: zones derive fresh
+   from the anchor on every ask, die by identity the moment it moves,
+   and every other tap and drag stays byte-true. THE predicate
+   (placeQuery) rules every lay — E1's water law included, reused never
+   forked. Session-only; nothing here ever saves except the lay itself.
+   ===================================================================== */
+let KL=null;                    // {pc,x,y} the chain anchor — a HAND-laid piece, BUILD+campaign only
+function klClear(){ KL=null; }
+function klSeed(pc,x,y){        // sp = footprint set-piece, b = end-cap: neither says "onward"
+  KL=(SCREEN==='game'&&!BED.ctx&&pc.t!=='sp'&&pc.t!=='b')? {pc,x,y} : null;
+}
+// one writer for the whole hand-lay ceremony — the drag drop and the
+// continue-tap both speak it, so the eager train / hints / coach hear
+// a chain tap exactly as they hear a drop
+function layAt(t,r,sel,cx2,cy2,q){
+  const pc=setTrackPiece(t,r,sel,q.elev,cx2,cy2); pc.pop=1;
+  SND.tok(); puff(GX+cx2*C+C/2,GY+cy2*C+C/2,14);
+  hintPass(0); if(grid.size>=3) hintPass(1);
+  save();
+  if(!BED.ctx) EAGER.last={x:cx2,y:cy2,el:q.elev?1:0};   // E27: the hand's newest piece — the arrival's fallback anchor
+  eagerTry();                                            // E27: mutation + finished + trainless = she comes
+  klSeed(pc,cx2,cy2);                                    // E34: the newest piece is the chain's head
+  return pc;
+}
+function klZones(){
+  if(!KL) return [];
+  const pc=KL.pc, at=pc.elev? pieceHi(KL.x,KL.y) : pieceAt(KL.x,KL.y);
+  if(at!==pc){ KL=null; return []; }        // moved / removed / tidied / new grid — died by identity
+  const out=[];
+  for(const p of pathsOf(pc)) for(const e of [0,1]){
+    const side=p.ports[e], other=p.ports[1-e];
+    if(side==null||other==null) continue;                 // a one-door path can't say "onward"
+    const D=[[0,-1],[1,0],[0,1],[-1,0]][side];
+    const nx=KL.x+D[0], ny=KL.y+D[1];
+    if(pieceTop(nx,ny)) continue;                         // THE OBSTRUCTION LAW — never build into track
+    if(out.some(z=>z.x===nx&&z.y===ny)) continue;         // sw shares its facing door — first path wins
+    const delta=(side-((other+2)%4)+4)%4;                 // the anchor's own turn, walked out this door
+    const entry=(side+2)%4, exit=(side+delta)%4;
+    for(const rc of [pc.r,(pc.r+1)%4,(pc.r+2)%4,(pc.r+3)%4]){
+      if(!PATHS[pc.t][rc].some(p2=>(p2.ports[0]===entry&&p2.ports[1]===exit)||(p2.ports[0]===exit&&p2.ports[1]===entry))) continue;
+      const q=placeQuery(pc.t,rc,nx,ny);                  // THE predicate — terrain, water, elevation, all of it
+      if(!q.ok) continue;                                 // a refused rotation keeps searching (the ramp's valley)
+      out.push({x:nx,y:ny,t:pc.t,r:rc,elev:q.elev,sel:pc.t==='sw'?pc.sel:null});
+      break;
+    }
+  }
+  return out;
+}
+function klHot(gx,gy){ return klZones().some(z=>z.x===gx&&z.y===gy); }
+function klTap(gx,gy){
+  // the continue-tap: live zone -> lay the same piece, re-seed, consume.
+  // A miss is SILENT (never a toast) — the tap falls through to today.
+  for(const z of klZones()){
+    if(z.x!==gx||z.y!==gy) continue;
+    const q=placeQuery(z.t,z.r,gx,gy);
+    if(!q.ok) return false;
+    layAt(z.t,z.r,z.sel,gx,gy,q);
+    return true;
+  }
+  return false;
+}
+function klGhost(){
+  // PAINT-ONLY: a faint next-piece in every armed zone — much quieter
+  // than the drag ghost, and hidden while a drag owns the hand.
+  if(!KL_GHOST||!KL||DRAG||SCREEN!=='game') return;
+  for(const z of klZones()){
+    const mock={t:z.t,r:z.r,sel:z.sel|0,elev:z.elev,latch:null};
+    cx.globalAlpha=KL_GHOST_A*0.5; cx.fillStyle='#F7E9C4';
+    rr(GX+z.x*C+3,GY+z.y*C+3,C-6,C-6,10); cx.fill();
+    cx.globalAlpha=KL_GHOST_A;
+    drawPieceArt(mock,GX+z.x*C,GY+z.y*C);
+    cx.globalAlpha=1;
+  }
+}
 function lineDone(){
   // candidates in arrival-anchor order: every station first, the hand's
   // newest piece next, then the rest — the first DONE line wins. (No
@@ -7986,6 +8070,7 @@ function showScreen(s){
   if(s!=='play' && PLAY.on){ playExit(s); return; }   // leaving the wind-up rug restores the build rug
   bedScreen(s);                                       // E18: the bedroom set lives on menu+board, dies at the game's door
   followSet(false);                                   // E15: a screen change lets the camera go
+  klClear();                                          // E34: chains never survive a room change
   SCREEN=s;
   const game=s==='game', play=s==='play';
   document.body.classList.toggle('rugmode',game||play);   // E26: the sideways prompt is the rug modes' only (the room is portrait-proof)
@@ -8993,6 +9078,14 @@ window.TS={
     placed: TRAIN.placed,
   }; },
   home(){ trainHome(true); save(); },
+  // E34 — the KEEP LAYING rig: the chain anchor + its live zones (the battery's
+  // truth), and the clear door byte-proofs park with. TS.place never seeds.
+  kl:{
+    state(){ return KL? {t:KL.pc.t, r:KL.pc.r, x:KL.x, y:KL.y, elev:KL.pc.elev|0} : null; },
+    zones(){ return klZones().map(z=>({x:z.x,y:z.y,t:z.t,r:z.r,elev:z.elev})); },
+    hot(gx,gy){ return klHot(gx,gy); },
+    clear(){ klClear(); },
+  },
   // E18 — the bedroom set, for the battery: shy state, chrome alpha, pieces on
   // the attract floor (stock oval = 8), trains riding it (stock + the kid's).
   bedroom(){ return { on:BED.on, shy:BED.shy, a:+BED.a.toFixed(3),
