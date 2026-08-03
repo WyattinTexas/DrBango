@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v3.8 -->
+<!-- TRAINSET v3.9 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -647,7 +647,7 @@ function applyDims(id){                          // swap the active board; the c
   VIEW.s=0;
 }
 // ---- Wyatt dials (EXPANSION 10 — one const each) ----
-const LANDS=['rug','west','snow'], WEATHERS=['clear','snowfall','dust','rain'];
+const LANDS=['rug','west','snow','mountain'], WEATHERS=['clear','snowfall','dust','rain'];   // E30: the mountain joins the doorway
 let LAND='rug', WEATHER='clear';                 // free-build only (save v:8) — paint, never physics
 const LAND_SEED=20260801;                        // ground decorations seed
 const MESA_CELLS=160;                            // one low mesa per this many cells (min 2)
@@ -923,8 +923,16 @@ const PLAY_POOL=['box','tank','flat','cab'];  // tray spawns tow 1-2 random cars
 // THREE RUGS TO PLAY ON: every PLAY press winds up the NEXT little world — same
 // toy, three moods — and the cycle survives the app closing (save v:10 carries
 // playIdx, the ONLY thing PLAY remembers; the E6 stateless law holds for all else).
-const PLAY_CYCLE=3;             // maps in rotation (the PLAYMAPS length)
+const PLAY_CYCLE=4;             // maps in rotation (the PLAYMAPS length — E30 added the pass)
 const FRONTIER_WEATHER='clear'; // map 2 weather ('dust' if it reads well — taste call, default clear)
+// ---- Wyatt dials (EXPANSION 30 — one block) ----
+// THE MOUNTAIN PASS: E4 elevation + E15 gravity, dormant on flat maps since they
+// shipped, switched on as CONTENT. The pass is map 4; the land is the 4th rug.
+const MTN_WEATHER='clear';     // the pass sky (SNOW DAY and ICE own the white — GALAXY.md lean)
+const PEAK_CELLS=54;           // one horizon peak per this many cells (min 2)
+const CRAG_PER_100=3.5;        // granite outcrop density
+const MFLW_PER_100=7;          // meadow-flower dot density
+const EAG_R=34, EAG_SPEED=0.3; // the eagle's circle (px, rad/s) — lazy and high
 // PLAYMAPS — three const tables in the campaign-level shape (E6's one PLAYMAP,
 // now one per mood; same fields, land/weather stay PAINT ONLY — the E10 law).
 // activeLand()/activeWeather() read the ACTIVE map whenever PLAY.on.
@@ -1012,6 +1020,46 @@ const PLAYMAPS=[
     ['house',9,4],                   // the cozy cabin
     ['ppl',4,5,0],                   // one waiting at the station
     ['dog',3,5,0],                   // the snow dog
+  ],
+},
+// 4 — THE MOUNTAIN PASS (E30): the world E4 + E15 were built for, switched on
+// as content. One alpine circuit that CLIMBS: the valley run past the campfire
+// village, up the meadow side, round and round the SPIRAL (the long chain-clack
+// grade, top-left where a kid sees the whole tower), one held beat across the
+// high TRESTLE over the gorge, then the ramp and the WHOOSH — every rider's
+// arms in the air — and home. Track rows may carry a 5th field: elev 1 rides
+// the trestles (the mount law at playEnter; rows without it land at 0, so the
+// three flat rugs above are byte-untouched).
+{ name:'THE MOUNTAIN PASS', land:'mountain', weather:MTN_WEATHER,
+  riders:1,                          // the pass BOARDS (per-map door — RIDERS_PLAY stays the global dial)
+  home:['tender','coach'],           // the resident brings seats: lap one owns the magic moment
+  start:[7,5],                       // the resident's home straight (valley floor, east of the station)
+  track:[
+    // the valley run, westbound past the village (st r2 — the walk heads W, so the climb comes first)
+    ['st',2,6,5],['s',0,5,5],['s',0,4,5],['s',0,3,5],['s',0,2,5],['c',0,1,5],
+    // up the meadow side...
+    ['s',1,1,4],['s',1,1,3],
+    // ...and round the tower: in at the bottom-left, out one level up
+    ['sp',0,1,1],
+    // the crest: out of the spiral onto the high line — the trestle over the gorge
+    ['c',0,2,3,1],['s',0,3,3,1],['s',0,4,3,1],['s',0,5,3,1],['s',0,6,3,1],
+    // the whoosh: down the ramp (its high W port mates the trestle, its low E the valley)
+    ['rp',2,7,3],
+    // the valley run home
+    ['s',0,8,3],['s',0,9,3],['c',2,10,3],['s',1,10,4],['c',3,10,5],
+    ['s',0,9,5],['s',0,8,5],['s',0,7,5],
+  ],
+  scen:[
+    ['gorge',4,3],['gorge',5,3],     // the chasm the trestle spans (ground layer — the high line rides above)
+    ['goat',3,2],['goat',6,2],       // goats on their ledges, turning to watch the crossing
+    ['eag',9,1],                     // the eagle, circling high over the valley
+    ['fire',5,6],                    // the campfire village by the station...
+    ['ppl',4,6,0],['ppl',6,6,2],     // ...tiny people standing and sitting in its glow
+    ['rock',0,4],['rock',7,1],['rock',9,4],['rock',2,7],   // granite scatter
+    ['flw',3,4],['flw',5,4],['flw',4,4],['flw',8,6],       // meadow flowers in the pockets
+    ['pine',0,1],['pine',0,2],['pine',3,0],['pine',5,0],['pine',8,0],['pine',10,0],   // pines in ranks — the ridge line...
+    ['pine',3,1],['pine',7,2],['pine',9,2],['pine',2,4],   // ...the pass notch and the climb elbow
+    ['pine',0,6],['pine',2,6],['pine',3,7],['pine',8,7],['pine',11,6],['pine',11,4],['pine',11,1],   // ...and the flanks
   ],
 },
 ];
@@ -1358,7 +1406,7 @@ function riderYay(){          // the downhill whoosh — arms UP + a tiny yay (r
 // stations own their waiters: one record per placed station, regrown one waiter
 // every WAIT_REGROW seconds, swept the moment its station leaves the rug
 function platTick(dt){
-  if(PLAY.on&&!RIDERS_PLAY){ if(PLAT.size) PLAT.clear(); return; }
+  if(PLAY.on&&!playRiders()){ if(PLAT.size) PLAT.clear(); return; }   // E30: the per-map door (maps 1-3 keep empty platforms, byte-true)
   let n=0;
   for(const g of [grid,hgrid]) for(const [k,pc] of g){
     if(pc.t!=='st') continue; n++;
@@ -2167,6 +2215,7 @@ function drawRug(){
   cx.strokeStyle='#8F4634'; cx.lineWidth=7; cx.strokeRect(42,42,WORLD_W-84,WORLD_H-84);
   if(land==='west'){ drawLandField('#8B3E1E','#7A3318',0.5); return; }
   if(land==='snow'){ drawLandField('#E9EEF4','#D7E1EC',0.75); return; }
+  if(land==='mountain'){ drawLandField('#7C9A55','#6C8A49',0.55); return; }   // E30: the alpine meadow
   cx.globalAlpha=0.5; cx.fillStyle='#4A1A12';
   [[112,112],[WORLD_W-112,112],[112,WORLD_H-112],[WORLD_W-112,WORLD_H-112]]
     .forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
@@ -2227,6 +2276,20 @@ function landDecor(){
     const nI=cells>300?2:1;                                  // the frozen-pond sheen
     for(let i=0;i<nI;i++) items.push({t:'ice', x:fx0+120+rnd()*(fx1-fx0-240), y:fy0+80+rnd()*(fy1-fy0-160),
                                       rx:70+rnd()*30, ry:40+rnd()*20});
+  } else if(land==='mountain'){
+    // E30 — snowcapped PEAKS on the horizon (the mesa placement law: big, far
+    // edge, whole silhouette inside the field), granite crags + meadow-flower
+    // dots scattered light, so the middle stays a calm canvas for the kid's line.
+    const nP=Math.max(2,Math.round(cells/PEAK_CELLS));
+    for(let i=0;i<nP;i++){
+      const r=38+rnd()*16;
+      items.push({t:'peak', x:fx0+110+(fx1-fx0-220)*(nP===1?0.5:i/(nP-1))+(rnd()-0.5)*80,
+                  y:66+r*1.55+rnd()*14, r});
+    }
+    const nG=Math.round(cells*CRAG_PER_100/100);
+    for(let i=0;i<nG;i++) items.push({t:'crag', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:9+rnd()*7});
+    const nF=Math.round(cells*MFLW_PER_100/100);
+    for(let i=0;i<nF;i++) items.push({t:'mflw', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:3+rnd()*2.5, v:i%3});
   }
   LDEC={key:k2,items};
   return items;
@@ -2239,6 +2302,9 @@ function drawLandDecor(){
     else if(it.t==='drift') drawDeepDrift(it);
     else if(it.t==='clod') drawSnowClod(it);
     else if(it.t==='ice') drawIceSheet(it);
+    else if(it.t==='peak') drawPeakDec(it);
+    else if(it.t==='crag') drawCragDec(it);
+    else if(it.t==='mflw') drawMFlwDec(it);
   }
 }
 // A flat-topped butte in toy plastic: stacked bands, a cream caprock, its own
@@ -2323,6 +2389,58 @@ function drawIceSheet(i){
   cx.globalAlpha=1; cx.restore();
   cx.strokeStyle='#6E93AC'; cx.lineWidth=2.4; cx.lineCap='butt';
   cx.beginPath(); cx.ellipse(i.x,i.y,i.rx,i.ry,0,0,7); cx.stroke();
+}
+// E30 THE MOUNTAIN — the molded-toy alpine set. A peak is granite in two facets
+// with a snow cap and a treeline of tiny pines at its feet: the horizon, not a wall.
+function drawPeakDec(pk){
+  const r=pk.r, ax=pk.x, ay=pk.y-r*1.55;
+  cx.fillStyle='rgba(40,52,34,0.22)';
+  cx.beginPath(); cx.ellipse(pk.x+r*0.18,pk.y+3,r*1.15,r*0.22,0,0,7); cx.fill();
+  cx.fillStyle='#8C9096';                     // the sunny face
+  cx.beginPath(); cx.moveTo(pk.x-r*1.1,pk.y); cx.lineTo(ax,ay); cx.lineTo(pk.x+r*0.16,pk.y); cx.closePath(); cx.fill();
+  cx.fillStyle='#787D85';                     // the shaded face
+  cx.beginPath(); cx.moveTo(pk.x+r*0.16,pk.y); cx.lineTo(ax,ay); cx.lineTo(pk.x+r*1.1,pk.y); cx.closePath(); cx.fill();
+  const cy2=ay+r*0.62, half=r*0.44;           // the snow cap, zigzag hem
+  cx.fillStyle='#F4F8FC';
+  cx.beginPath(); cx.moveTo(ax,ay);
+  cx.lineTo(ax+half,cy2); cx.lineTo(ax+half*0.55,cy2-r*0.1); cx.lineTo(ax+half*0.18,cy2+r*0.08);
+  cx.lineTo(ax-half*0.2,cy2-r*0.09); cx.lineTo(ax-half*0.6,cy2+r*0.07); cx.lineTo(ax-half,cy2-r*0.04);
+  cx.closePath(); cx.fill();
+  cx.strokeStyle='rgba(60,68,78,0.4)'; cx.lineWidth=1.6;   // one moulding seam
+  cx.beginPath(); cx.moveTo(ax,ay+r*0.34); cx.lineTo(pk.x-r*0.34,pk.y-r*0.06); cx.stroke();
+  cx.fillStyle='#33552F';                     // the treeline at its feet
+  for(const dx of [-0.72,-0.3,0.5,0.88]){
+    const px2=pk.x+r*dx, ph2=r*0.34;
+    cx.beginPath(); cx.moveTo(px2-ph2*0.32,pk.y+2); cx.lineTo(px2+ph2*0.32,pk.y+2); cx.lineTo(px2,pk.y+2-ph2); cx.closePath(); cx.fill();
+  }
+}
+// a granite outcrop: two facets, one snow dust, a moulding seam
+function drawCragDec(rk){
+  const r=rk.r;
+  cx.fillStyle='rgba(40,52,34,0.22)';
+  cx.beginPath(); cx.ellipse(rk.x+2,rk.y+r*0.5,r*1.2,r*0.4,0,0,7); cx.fill();
+  cx.fillStyle='#8C9096';
+  cx.beginPath(); cx.moveTo(rk.x-r,rk.y+r*0.5); cx.lineTo(rk.x-r*0.55,rk.y-r*0.7); cx.lineTo(rk.x-r*0.05,rk.y-r*0.15);
+  cx.lineTo(rk.x+r*0.4,rk.y-r*0.95); cx.lineTo(rk.x+r,rk.y+r*0.5); cx.closePath(); cx.fill();
+  cx.fillStyle='#787D85';
+  cx.beginPath(); cx.moveTo(rk.x+r*0.4,rk.y-r*0.95); cx.lineTo(rk.x+r,rk.y+r*0.5); cx.lineTo(rk.x+r*0.1,rk.y+r*0.5); cx.closePath(); cx.fill();
+  cx.fillStyle='#F4F8FC';
+  cx.beginPath(); cx.moveTo(rk.x+r*0.4,rk.y-r*0.95); cx.lineTo(rk.x+r*0.58,rk.y-r*0.52); cx.lineTo(rk.x+r*0.22,rk.y-r*0.6); cx.closePath(); cx.fill();
+  cx.strokeStyle='rgba(60,68,78,0.45)'; cx.lineWidth=1.4;
+  cx.beginPath(); cx.moveTo(rk.x-r*0.55,rk.y-r*0.7); cx.lineTo(rk.x-r*0.4,rk.y+r*0.44); cx.stroke();
+}
+// meadow-flower dots — three little blooms on thin stems, three colorways
+function drawMFlwDec(f){
+  const cols=[['#E8638C','#F2C531'],['#F2C531','#E8638C'],['#FFFFFF','#F2C531']][(f.v|0)%3];
+  cx.strokeStyle='#4E7F46'; cx.lineWidth=1.4; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(f.x-3,f.y+4); cx.lineTo(f.x-4,f.y-1);
+  cx.moveTo(f.x+3,f.y+4); cx.lineTo(f.x+4.5,f.y);
+  cx.moveTo(f.x,f.y+4); cx.lineTo(f.x,f.y-2); cx.stroke(); cx.lineCap='butt';
+  cx.fillStyle=cols[0];
+  cx.beginPath(); cx.arc(f.x-4,f.y-2.5,f.r*0.55,0,7); cx.fill();
+  cx.beginPath(); cx.arc(f.x+4.5,f.y-1,f.r*0.5,0,7); cx.fill();
+  cx.fillStyle=cols[1];
+  cx.beginPath(); cx.arc(f.x,f.y-3.5,f.r*0.6,0,7); cx.fill();
 }
 /* =====================================================================
    THE WEATHER (E10) — paint only, NEVER physics. Nothing in this game
@@ -2497,7 +2615,7 @@ function drawRiverGhost(x,y){
 function drawScen(){
   const t=perf();
   for(const [k,s] of scen){
-    if(s.t==='rv'||s.t==='pond'||s.t==='bal'||s.t==='arch') continue;   // water paints early, balloons + arches fly late
+    if(s.t==='rv'||s.t==='pond'||s.t==='bal'||s.t==='arch'||s.t==='gorge'||s.t==='eag') continue;   // water + the gorge paint early, balloons + arches + the eagle fly late
     const [x,y]=k.split(',').map(Number);
     drawScenItem(s,GX+x*C,GY+y*C,t);
   }
@@ -2532,6 +2650,90 @@ function drawBalloons(){
     cx.restore();
   }
 }
+// E30 — the gorge: the chasm the trestle spans. Ground art (paints with the
+// rivers, under every rail, deck and bent); adjacent cells seam into one canyon.
+function drawGorgeCell(ox,oy){
+  cx.fillStyle='#565B63'; cx.fillRect(ox,oy+4,C,C-8);            // the shadowed walls
+  cx.fillStyle='#3A3D43'; cx.fillRect(ox,oy+26,C,C-52);          // the deep middle
+  cx.fillStyle='#22242A';                                        // the very bottom of the dark
+  cx.beginPath(); cx.ellipse(ox+C/2,oy+C/2,C*0.46,C*0.16,0,0,7); cx.fill();
+  cx.strokeStyle='#8FB8D4'; cx.lineWidth=2.2; cx.lineCap='round'; // a thread of water, way down
+  cx.beginPath(); cx.moveTo(ox+6,oy+C/2+4);
+  cx.quadraticCurveTo(ox+C*0.3,oy+C/2-3,ox+C*0.55,oy+C/2+3);
+  cx.quadraticCurveTo(ox+C*0.8,oy+C/2+8,ox+C-6,oy+C/2+1); cx.stroke(); cx.lineCap='butt';
+  cx.fillStyle='#787D85';                                        // the rocky lips, top…
+  cx.beginPath(); cx.moveTo(ox,oy+4); cx.lineTo(ox+C,oy+4);
+  cx.lineTo(ox+C,oy+14); cx.lineTo(ox+C*0.72,oy+9); cx.lineTo(ox+C*0.45,oy+16); cx.lineTo(ox+C*0.2,oy+10); cx.lineTo(ox,oy+15);
+  cx.closePath(); cx.fill();
+  cx.beginPath(); cx.moveTo(ox,oy+C-4); cx.lineTo(ox+C,oy+C-4);  // …and bottom
+  cx.lineTo(ox+C,oy+C-13); cx.lineTo(ox+C*0.68,oy+C-8); cx.lineTo(ox+C*0.4,oy+C-15); cx.lineTo(ox+C*0.16,oy+C-9); cx.lineTo(ox,oy+C-14);
+  cx.closePath(); cx.fill();
+}
+function drawGorges(){
+  for(const [k,s] of scen){
+    if(s.t!=='gorge') continue;
+    const [x,y]=k.split(',').map(Number);
+    drawGorgeCell(GX+x*C,GY+y*C);
+  }
+}
+// E30 — the eagle, circling high over the pass (the balloon law: it flies above
+// the whole rug, its little shadow sweeping the meadow far below).
+function drawEagles(){
+  const t=perf();
+  for(const [k,s] of scen){
+    if(s.t!=='eag') continue;
+    const [x,y]=k.split(',').map(Number);
+    const ph=((((x*13+y*29)%23)+23)%23/23 + (s.v|0)*0.37)*TAU;
+    const a=t*EAG_SPEED+ph;
+    const ex=GX+x*C+C/2+Math.cos(a)*EAG_R, ey=GY+y*C+C/2+Math.sin(a)*EAG_R*0.6;
+    const flap=Math.sin(t*2.6+ph);
+    cx.save();
+    cx.globalAlpha=0.13; cx.fillStyle='#000';
+    cx.beginPath(); cx.ellipse(ex,ey+64,13,4,0,0,7); cx.fill();
+    cx.globalAlpha=1; cx.translate(ex,ey);
+    cx.rotate(Math.cos(a)*0.2);                          // banks into its circle
+    cx.fillStyle='#5C4632';
+    cx.beginPath(); cx.ellipse(0,0,4.5,7,0,0,7); cx.fill();
+    cx.fillStyle='#F4F8FC'; cx.beginPath(); cx.arc(0,-6.5,3,0,7); cx.fill();
+    cx.fillStyle='#F2C531';
+    cx.beginPath(); cx.moveTo(-1.4,-9); cx.lineTo(0,-12); cx.lineTo(1.4,-9); cx.closePath(); cx.fill();
+    cx.strokeStyle='#5C4632'; cx.lineWidth=3.4; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(-3,-1); cx.quadraticCurveTo(-13,-5-flap*2.5,-22,-2+flap*3);
+    cx.moveTo(3,-1); cx.quadraticCurveTo(13,-5-flap*2.5,22,-2+flap*3); cx.stroke();
+    cx.lineCap='butt';
+    cx.restore();
+  }
+}
+// E30 — the mountain goat on its own granite ledge (molded plastic, white coat,
+// little curled horns). Grazing in profile until the train passes — then it
+// TURNS TO WATCH: head up, face out, the charm law's wave timer doing the turning.
+function drawGoat(s,t,ph){
+  const watch=s.wave>0;
+  cx.fillStyle='#8C9096'; rr(-21,13,42,12,4); cx.fill();       // the ledge
+  cx.fillStyle='#787D85'; rr(-21,21,42,4,2); cx.fill();        // its shaded lip
+  const wob=Math.sin(t*2.2+ph)*0.8;
+  cx.strokeStyle='#E9EDF2'; cx.lineWidth=4; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(-9,10); cx.lineTo(-9,15); cx.moveTo(-3,10); cx.lineTo(-3,15);
+  cx.moveTo(4,10); cx.lineTo(4,15); cx.moveTo(10,10); cx.lineTo(10,15); cx.stroke();
+  cx.fillStyle='#F4F8FC'; rr(-14,-4,28,16,7); cx.fill();       // the body
+  cx.fillStyle='#E9EDF2'; rr(-14,5,28,7,5); cx.fill();         // belly shade
+  if(watch){                                                    // TURNED: face out, horns up
+    cx.fillStyle='#F4F8FC'; cx.beginPath(); cx.arc(9,-8,7.5,0,7); cx.fill();
+    cx.strokeStyle='#C9CFD8'; cx.lineWidth=2.6;
+    cx.beginPath(); cx.arc(4,-15,4,Math.PI*0.9,Math.PI*1.7); cx.stroke();
+    cx.beginPath(); cx.arc(14,-15,4,Math.PI*1.3,Math.PI*2.1); cx.stroke();
+    cx.fillStyle='#23211E';
+    cx.beginPath(); cx.arc(6.6,-9,1.3,0,7); cx.fill();
+    cx.beginPath(); cx.arc(11.4,-9,1.3,0,7); cx.fill();
+    cx.fillStyle='#D8AEB8'; cx.beginPath(); cx.arc(9,-5.2,1.5,0,7); cx.fill();
+  } else {                                                      // grazing profile
+    cx.fillStyle='#F4F8FC'; cx.beginPath(); cx.ellipse(13,-1+wob,6.5,5.5,0.5,0,7); cx.fill();
+    cx.strokeStyle='#C9CFD8'; cx.lineWidth=2.4;
+    cx.beginPath(); cx.arc(10,-6+wob,4,Math.PI*0.8,Math.PI*1.6); cx.stroke();
+    cx.fillStyle='#23211E'; cx.beginPath(); cx.arc(15,-2.5+wob,1.2,0,7); cx.fill();
+  }
+  cx.lineCap='butt';
+}
 // drop-shadow ellipse per kind: [y, rx] (v1.1 values for bush/tree/ppl kept verbatim;
 // the fence paints its own linear shadow so it has no entry)
 const SCEN_SH={ bush:[27,24], tree:[27,20], ppl:[21,24],
@@ -2539,7 +2741,8 @@ const SCEN_SH={ bush:[27,24], tree:[27,20], ppl:[21,24],
   cow:[21,21], sheep:[19,16], chick:[15,8],
   flw:[26,15], rock:[26,24], wind:[30,17], pine:[27,13], duck:[16,9], dog:[20,14],
   cat:[18,13], hay:[26,21], lamp:[29,8], whis:[28,7], sig:[29,9], snow:[26,15],
-  fount:[27,27], stat:[28,17], fire:[26,17], flag:[29,7], mail2:[28,13], bench:[28,25], clock:[29,8] };
+  fount:[27,27], stat:[28,17], fire:[26,17], flag:[29,7], mail2:[28,13], bench:[28,25], clock:[29,8],
+  goat:[26,20] };   // E30 — the goat's ledge sits in the standard shadow
 function drawScenItem(s,ox,oy,t){
   // real cells land on integer grid coords; palette icons / free-drag ghosts land outside,
   // where fenceMask reads 0 (lone bit of fence) and the herd phase is just fixed.
@@ -2588,6 +2791,7 @@ function drawScenItem(s,ox,oy,t){
   else if(s.t==='mail2') drawMail2();
   else if(s.t==='bench') drawBench();
   else if(s.t==='clock') drawClock(t);
+  else if(s.t==='goat') drawGoat(s,t,ph);   // E30 — the mountain goat on its ledge
   cx.restore();
 }
 function cone(x0,yb,w,h,col){
@@ -4176,7 +4380,7 @@ function draw(){
   cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
   drawRug();
   if(buildGate()) drawNameSign(); else SIGN_RECT=null;   // E15: BUILD only — no sign in campaign or PLAY (E20: camGate opened, so the sign gates on buildGate now)
-  drawRivers(); drawPonds(); drawGaps();
+  drawRivers(); drawGorges(); drawPonds(); drawGaps();   // E30: the gorge is ground — every deck and bent stands over it
   // scenery slides in as the midHook: over the ground pass, under the decks and
   // the z-sorted cars — so a cow can graze beneath the high line
   drawTrackAll(grid,hgrid,PLAY.on? playCarItems():trailCarItems(),drawScen);   // E28: trailCarItems = the cars + the rainbow's z-items; PLAY's branch byte-untouched
@@ -4184,6 +4388,7 @@ function draw(){
   trailSparkPaint();   // E28: stardust floats OVER the cars (PLAY/none = early out, zero paint)
   drawArches();     // E9: balloon arches bow over the line — the train drives under them
   drawBalloons();   // E7: balloons fly above the whole rug, shadows drifting along
+  drawEagles();     // E30: the eagle circles higher still
   for(const s of smoke){ const k=s.t/s.dur;
     cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb';
     cx.beginPath(); cx.arc(s.x,s.y,s.r+9*k,0,7); cx.fill(); cx.globalAlpha=1; }
@@ -5840,6 +6045,34 @@ let PFREE=null;               // the stashed build-rug world while the wind-up r
 // advances and saves (v:10). The ONLY thing PLAY remembers; attract, campaign
 // and BUILD never touch it.
 let PLAYI=0;
+// E30 — GRAVITY COMES TO PLAY (the E15 probe, verbatim, per train). Self-gating
+// exactly like BUILD's: flat track ⇒ grade 0 ⇒ mul eases to (and HOLDS) exactly
+// 1.0 ⇒ the three flat rugs step byte-identically (×1 is float-exact). One eased
+// mul per consist, never per car; a climb latches the crest and the FIRST
+// descent after it whooshes — once — and throws every rider's arms in the air.
+function playGravTick(tr,dt){
+  const lc=tr.cars[0].rd, f=clone(lc), b=clone(lc);
+  const rf=advance(f,GRAV_PROBE), rb=back(b,GRAV_PROBE);
+  const run=rf.moved+rb.moved;
+  const grade=run>2? (pos(f).z-pos(b).z)*C/run : 0;
+  const tgt=Math.max(GRAV_UP_MIN,Math.min(GRAV_DN_MAX,1-GRAV_K*grade));
+  tr.grav+=(tgt-tr.grav)*Math.min(1,GRAV_EASE*dt);
+  if(grade>0.08) tr.crest=true;
+  else if(grade<-0.08 && tr.crest){ tr.crest=false; SND.whoosh(); playYay(tr); }
+  return tr.grav;
+}
+let playClackAcc=0;   // ONE chain-lift clock for the whole rug (the chug law) — flat maps never feed it
+// E30 — the pass BOARDS: riders in PLAY ride a PER-MAP door, so maps 1-3 stay
+// exactly the smash mode they always were (RIDERS_PLAY remains the global dial).
+const playRiders=()=>PLAY.on&&(RIDERS_PLAY||!!playMap().riders);
+function playPose(tr,p,t,pri){   // the E15 pose ladder, per PLAY train — poses are paint
+  if(tr.poseT>0 && tr.pri>pri) return;
+  tr.pose=p; tr.poseT=t; tr.pri=pri;
+}
+function playYay(tr){            // the downhill whoosh, per train — arms UP + a tiny yay (riders only)
+  if(!aboardN(tr.cars)) return;
+  playPose(tr,'up',1.8,3); SND.yay();
+}
 // Walk the glued circuit once and rule it: (cell,elev,path) -> arc coordinate. Every
 // map's circuit is ONE closed path (a figure-8 crosses its own diamond twice on
 // different paths), so every rider and every spawn lives on this single ruler.
@@ -5923,7 +6156,8 @@ function playAdd(color,speed,cars,atD){
   const tr={ id:PLAY.nextId++, color,
     speed: speed!=null? Math.max(0.1,+speed) : PLAY_SPEED_R[0]+Math.random()*(PLAY_SPEED_R[1]-PLAY_SPEED_R[0]),
     cars:[{type:'loco',rd:head,face:1,squash:0}],
-    pauseT:0, stKey:null, cellKey:null, dying:false, crashT:0, wheel:0, smokeT:0.2 };
+    pauseT:0, stKey:null, cellKey:null, dying:false, crashT:0, wheel:0, smokeT:0.2,
+    grav:1, crest:false, pose:null, poseT:0, pri:0 };   // E30: each train carries its own hill-heart (flat maps: mul holds 1.0, pose never arms)
   for(let i=1;i<=tail.length;i++){ const rd=clone(head); back(rd,GAP*i); tr.cars.push({type:tail[i-1],rd,face:1,squash:0}); }
   PLAY.trains.push(tr);
   SND.whistle(); const p=pos(head); puff(p.x,p.y-10,18);
@@ -5954,14 +6188,15 @@ function playUpdate(dt){
   // THE NEVER-EMPTY LAW: an empty rug re-arms itself — a fresh red train in ~2s
   if(!PLAY.trains.length){
     PLAY.respawnT-=dt;
-    if(PLAY.respawnT<=0){ PLAY.respawnT=PLAY_RESPAWN; playAdd('red',1,PLAY_HOME_CARS); }
+    if(PLAY.respawnT<=0){ PLAY.respawnT=PLAY_RESPAWN; playAdd('red',1,playMap().home||PLAY_HOME_CARS); }
   } else PLAY.respawnT=PLAY_RESPAWN;
   const live=PLAY.trains.filter(tr=>!tr.dying);
   let top=0;
   for(const tr of live){
+    if(tr.poseT>0){ tr.poseT-=dt; if(tr.poseT<=0){ tr.pose=null; tr.pri=0; } }   // E30: poses are paint — they decay even at the platform
     if(tr.pauseT>0){ tr.pauseT-=dt; continue; }       // paused at the platform (and catchable there)
     if(tr.speed>top) top=tr.speed;
-    const step=SPEED*tr.speed*dt;
+    const step=SPEED*tr.speed*playGravTick(tr,dt)*dt; // E30: the hill modulates each train's OWN step (flat = ×1, float-exact — byte-true)
     for(const c of tr.cars) advance(c.rd,step);       // a closed glued loop — advance never dead-ends
     tr.wheel+=step/8;
     // E9: every train pays its own laps — the ruler is the loop's own arc length
@@ -5970,22 +6205,32 @@ function playUpdate(dt){
       const lp=pos(tr.cars[0].rd); starMint(MINT.lap,lp.x,lp.y); }
     tr.smokeT-=dt; if(tr.smokeT<=0){ tr.smokeT=0.2; puffLoco(tr.cars[0]); }
     // THE CHARM LAW, shared gate: people wave, the herd startles, ≤1 chirp per pass
+    let charmed=false;
     for(const c of tr.cars){
       for(let dy=-REACT_R;dy<=REACT_R;dy++) for(let dx=-REACT_R;dx<=REACT_R;dx++){
         const s=scen.get(key(c.rd.cx+dx,c.rd.cy+dy));
         if(s && SCENDEF[s.t].react && !(s.wave>0)){
-          s.wave=1.3;
+          s.wave=1.3; charmed=true;
           const ch=CHIRP[s.t];
           if(ch && yayCd<=0){ yayCd=3; chirpN++; SND[ch](); }
         }
       }
+    }
+    // E30 — the REACTION LAW rides along (per train, paint only): riders wave
+    // BACK at charmed ground people, look down from the trestle (this world's
+    // bridge — el 1 exists nowhere flat), and the arms-up rides the whoosh.
+    if(playRiders()&&aboardN(tr.cars)){
+      if(charmed) playPose(tr,'wave',1.3,1);
+      let hi=false;
+      for(const c of tr.cars) if((c.rid|0)>0&&c.rd.el) hi=true;
+      if(hi) playPose(tr,'look',0.4,2);
     }
     // the station pause, per train, keyed (cell,elev) — the bunching machine
     const lc=tr.cars[0].rd, lpc=pieceOf(lc), lk=key(lc.cx,lc.cy)+':'+(lc.el?1:0);
     if(lpc&&lpc.t==='st'){
       const mid=pathsOf(lpc)[lc.pi].len/2;
       if(Math.abs(lc.s-mid)<step+0.6 && tr.stKey!==lk){ tr.stKey=lk; tr.pauseT=STATION_PAUSE; SND.ding();
-        if(RIDERS_PLAY) boardAt(tr.cars,lk);        // E15: PLAY boarding rides a dial, ships off
+        if(playRiders()) boardAt(tr.cars,lk);       // E15→E30: PLAY boarding rides the per-map door (the pass boards; the flat rugs never)
         const sp2=pos(lc); starMint(MINT.station,sp2.x,sp2.y); }   // E9: the stop pays, per train
     }
     if(lk!==tr.cellKey){ if(tr.stKey&&tr.stKey!==lk) tr.stKey=null; tr.cellKey=lk; }
@@ -5998,6 +6243,12 @@ function playUpdate(dt){
       for(const tr of live){ const p=pieceOf(tr.cars[0].rd);
         if(p){ if(p.t==='br') deep=true; if(p.t==='tun') muff=true; } }
       SND.chuff(deep,muff); } }
+  // E30: the chain lift — ONE clock for the whole rug (the chug law verbatim),
+  // paced by the hardest-working climber. Flat maps never feed it: byte-silent.
+  let climbStep=0;
+  for(const tr of live) if(tr.pauseT<=0&&tr.grav<CLACK_BELOW) climbStep=Math.max(climbStep,SPEED*tr.speed*tr.grav*dt);
+  if(climbStep>0){ playClackAcc+=climbStep; if(playClackAcc>CLACK_SPACE){ playClackAcc=0; SND.clack(); } }
+  else playClackAcc=0;
   // the crash sweep: any two live trains sharing a (cell,elev) go BONK together
   const sets=live.map(tr=>{ const s=new Set();
     for(const c of tr.cars) s.add(key(c.rd.cx,c.rd.cy)+':'+(c.rd.el?1:0)); return s; });
@@ -6022,14 +6273,17 @@ function playEnter(forceI){
   PFREE=serWorld();                      // the build rug, stashed — restored verbatim on exit
   applyDims('sm');                       // E10: the wind-up rug is the sm rug, always
   PLAY.on=true; PLAY.trains=[]; PLAY.crashes=0; PLAY.respawnT=PLAY_RESPAWN; PLAY.nextId=1;
+  playClackAcc=0;                        // E30: the chain-lift clock starts quiet every visit
   ridersOff();                           // E15: the wind-up rug keeps its glued people only
   grid.clear(); hgrid.clear(); scen.clear();
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; trailClear();   // E28: PLAY is byte-identical ALWAYS
   const M=playMap();
   for(const g of M.scen) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
-  for(const [t,r,x,y] of M.track){ const pc=setTrackPiece(t,r,null,0,x,y); pc.glued=1; }
+  // E30: a track row may carry elev as its 5th field — the pass rides trestles.
+  // Rows without it mount at 0 exactly as before; climbers force 0 (the v:4 law).
+  for(const [t,r,x,y,el] of M.track){ const pc=setTrackPiece(t,r,null,(t==='rp'||t==='sp')?0:(el?1:0),x,y); pc.glued=1; }
   buildLoopMap();
-  playAdd('red',1,PLAY_HOME_CARS);       // one red train, already running — the lid opens mid-chug
+  playAdd('red',1,M.home||PLAY_HOME_CARS);   // one red train, already running — the lid opens mid-chug (E30: the pass's resident brings seats)
   $('mark').textContent=PLAY_MARK;
   showScreen('play');
   if(COACH_PAN&&!coachT){ coachT=true; toast(COACH_LINE); }   // E24: the coach speaks once a session
@@ -6057,13 +6311,14 @@ function playCarItems(){
     const liv=LIVERY[tr.color]||LIVERY.red;
     const tt=tr.dying? CRASH_TUMBLE-tr.crashT : 0;
     const fd=tr.dying? Math.max(0,tr.crashT/CRASH_TUMBLE) : 1;
+    const ps=tr.poseT>0? tr.pose : null;   // E30: each train wears its own pose (E15 law, per consist)
     for(let i=tr.cars.length-1;i>=0;i--){
       const c=tr.cars[i], p=carPose(c), artAng=p.ang+(c.face<0?Math.PI:0);
-      // E15: PLAY cars stay decorative unless the RIDERS_PLAY dial is flipped on
-      const prid=RIDERS_PLAY&&RIDER_CAP[c.type]!=null? (c.rid|0) : undefined;
+      // E15→E30: PLAY cars stay decorative unless the map (or the old dial) boards
+      const prid=playRiders()&&RIDER_CAP[c.type]!=null? (c.rid|0) : undefined;
       items.push({z:p.z+0.05, fn: tr.dying?
         ()=>drawCar(c.type, p.x+c.tum.vx*tt, p.y+c.tum.vy*tt+130*tt*tt, artAng+c.tum.vr*tt, c.squash, tr.wheel, liv, p.z, fd) :
-        ()=>drawCar(c.type, p.x, p.y, artAng, c.squash||0, tr.wheel*(c.face<0?-1:1), liv, p.z, undefined, prid, null)});
+        ()=>drawCar(c.type, p.x, p.y, artAng, c.squash||0, tr.wheel*(c.face<0?-1:1), liv, p.z, undefined, prid, ps)});
     }
   }
   return items;
@@ -6112,8 +6367,12 @@ const SCENDEF={
   // train drives right under it. The campfire blocks (nobody drives a train through a fire).
   fount:{blocks:1}, stat:{blocks:1,knock:1}, fire:{blocks:1}, arch:{},
   flag:{blocks:1,knock:1}, mail2:{blocks:1,knock:1}, bench:{blocks:1,knock:1}, clock:{blocks:1,knock:1},
+  // E30 — the mountain's own (glued-map kinds, never in a palette tab, never in
+  // COLL: THE FIFTY STAY FIFTY). The goat turns to watch; the eagle flies above
+  // everything (the balloon law); the gorge is ground the trestle spans.
+  goat:{react:1}, eag:{}, gorge:{blocks:1},
 };
-const CHIRP={ ppl:'yay', cow:'moo', sheep:'baa', chick:'cluck', duck:'quack', dog:'yip' };
+const CHIRP={ ppl:'yay', cow:'moo', sheep:'baa', chick:'cluck', duck:'quack', dog:'yip', goat:'baa' };
 const IZOOM={ cow:1.35, sheep:1.5, chick:2.1, duck:1.9, dog:1.5, cat:1.55, flw:1.2, snow:1.05,
   fount:1.15, stat:1.2, fire:1.25, arch:1.3, flag:1.05, mail2:1.3, bench:1.25, clock:1.05 };
 const CARDEF={ tender:'TENDER', box:'BOXCAR', tank:'TANKER', flat:'FLATCAR', cab:'CABOOSE',
@@ -6637,7 +6896,7 @@ function rugTileSize(g,id){
 function rugTileLand(g,id){
   const x=8, y=20, w=88, h=64;
   g.fillStyle='#4A1A12'; g.fillRect(x-4,y-4,w+8,h+8);
-  g.fillStyle= id==='west'? '#8B3E1E' : id==='snow'? '#E9EEF4' : '#63251C';
+  g.fillStyle= id==='west'? '#8B3E1E' : id==='snow'? '#E9EEF4' : id==='mountain'? '#7C9A55' : '#63251C';
   g.fillRect(x,y,w,h);
   if(id==='rug'){
     g.strokeStyle='#8F4634'; g.lineWidth=2; g.strokeRect(x+5,y+5,w-10,h-10);
@@ -6655,6 +6914,23 @@ function rugTileLand(g,id){
     g.fillStyle='#C9713C';
     g.beginPath(); g.moveTo(x+56,y+44); g.lineTo(x+62,y+22); g.lineTo(x+78,y+22); g.lineTo(x+84,y+44); g.closePath(); g.fill();
     g.fillStyle='#DB8B4C'; g.fillRect(x+61,y+18,18,6);
+  } else if(id==='mountain'){
+    // E30 — meadow combing, one snowcapped peak, one proud pine
+    g.globalAlpha=0.55; g.strokeStyle='#6C8A49'; g.lineWidth=2;
+    g.beginPath(); for(const yy of [y+42,y+54]){ g.moveTo(x+6,yy); g.quadraticCurveTo(x+w/2,yy-4,x+w-6,yy); } g.stroke();
+    g.globalAlpha=1;
+    g.fillStyle='#8C9096';
+    g.beginPath(); g.moveTo(x+14,y+46); g.lineTo(x+38,y+8); g.lineTo(x+62,y+46); g.closePath(); g.fill();
+    g.fillStyle='#787D85';
+    g.beginPath(); g.moveTo(x+38,y+8); g.lineTo(x+62,y+46); g.lineTo(x+45,y+46); g.closePath(); g.fill();
+    g.fillStyle='#F4F8FC';
+    g.beginPath(); g.moveTo(x+38,y+8); g.lineTo(x+48,y+23); g.lineTo(x+42,y+20); g.lineTo(x+38,y+25);
+    g.lineTo(x+33,y+19); g.lineTo(x+28,y+23); g.closePath(); g.fill();
+    g.fillStyle='#6B4A2C'; g.fillRect(x+70,y+48,5,9);
+    g.fillStyle='#33552F';
+    g.beginPath(); g.moveTo(x+61,y+51); g.lineTo(x+83,y+51); g.lineTo(x+72,y+31); g.closePath(); g.fill();
+    g.fillStyle='#3C6236';
+    g.beginPath(); g.moveTo(x+64,y+41); g.lineTo(x+80,y+41); g.lineTo(x+72,y+23); g.closePath(); g.fill();
   } else {
     g.globalAlpha=0.75; g.strokeStyle='#D7E1EC'; g.lineWidth=2;
     g.beginPath(); for(const yy of [y+16,y+32,y+48]){ g.moveTo(x+6,yy); g.quadraticCurveTo(x+w/2,yy+4,x+w-6,yy); } g.stroke();
@@ -6755,7 +7031,7 @@ function buildPalette(){
     RUG_TILES.push({kind,id,el:b});
   };
   for(const [id,name] of [['sm','SMALL'],['lg','BIG'],['xl','HUGE']]) mkRug('size',id,name,g=>rugTileSize(g,id));
-  for(const [id,name] of [['rug','THE RUG'],['west','WESTERN'],['snow','WINTER']]) mkRug('land',id,name,g=>rugTileLand(g,id));
+  for(const [id,name] of [['rug','THE RUG'],['west','WESTERN'],['snow','WINTER'],['mountain','MOUNTAIN']]) mkRug('land',id,name,g=>rugTileLand(g,id));   // E30
   for(const [id,name] of [['clear','CLEAR'],['snowfall','SNOW'],['dust','DUST'],['rain','RAIN']]) mkRug('weather',id,name,g=>rugTileWx(g,id));
   // the MORE TOYS… end-cap: BUILD's door into the toy box (E7).
   // E27: it lives on the square's pinned FOOTER now — outside the scroll area,
@@ -8397,6 +8673,8 @@ window.TS={
       loopLen:PLAY.loop? PLAY.loop.len:0, respawnT:PLAY.respawnT,
       trains:PLAY.trains.map(tr=>({ id:tr.id, color:tr.color, speed:tr.speed, dying:!!tr.dying,
         pauseT:tr.pauseT, d:loopCoord(tr.cars[0].rd),
+        grav:tr.grav, crest:!!tr.crest, pose:tr.poseT>0? tr.pose:null,   // E30: the hill-heart, readable
+        rid:tr.cars.reduce((n,c)=>n+(c.rid|0),0),
         cars:tr.cars.map(c=>[c.rd.cx,c.rd.cy,c.rd.el?1:0]) })) }; },
   },
   // ---- the eager train rig (E27) — the predicate + the arrival, rig-forced ----
