@@ -1651,6 +1651,47 @@
   .radeye { animation:radeye 1.05s steps(1,end) infinite; }
   @keyframes radeye { 0%,32% { opacity:1; } 33%,100% { opacity:0.22; } }
   @media (prefers-reduced-motion: reduce){ .radeye { animation:none; } }
+  /* v2.11 THE OPEN DOOR: the door squad WANDERS its corner now instead of
+     standing rooted (Wyatt 8/2: they "looked strange" planted at the jamb).
+     Composition law (v1.21): the wander lives on a WRAPPER group so the
+     figure's own .rivfig waddle underneath never fights it for transform;
+     per-figure variance rides inline animation-duration/-delay LONGHANDS on
+     each wrapper — never the shorthand, so the kill list below still wins
+     animation-name. Small CLOSED loops, ease-in-out, which buys a little
+     footing pause at every waypoint: a patrol, not a conveyor belt. Three
+     loop shapes × five different durations + negative delays = never in
+     step. Each man's door-light shadow rides inside his wrapper, so it
+     stays under his feet the whole walk. */
+  .rwA { animation:rwalkA 8s ease-in-out infinite; }
+  .rwB { animation:rwalkB 8s ease-in-out infinite; }
+  .rwC { animation:rwalkC 8s ease-in-out infinite; }
+  @keyframes rwalkA { 0%,100% { transform:translate(0,0); } 30% { transform:translate(12px,6px); } 55% { transform:translate(2px,12px); } 78% { transform:translate(-8px,5px); } }
+  @keyframes rwalkB { 0%,100% { transform:translate(0,0); } 26% { transform:translate(-10px,8px); } 52% { transform:translate(5px,14px); } 76% { transform:translate(11px,4px); } }
+  @keyframes rwalkC { 0%,100% { transform:translate(0,0); } 34% { transform:translate(9px,-7px); } 62% { transform:translate(-6px,7px); } }
+  /* v2.11 THE BLOCKS ARE YOURS: data-ci walks the four letter-block hexes
+     one step per tap (each block reads its own --cN slot, so all three stay
+     distinct by construction); the stroke TRANSITION is the color-swap
+     itself — information, not decoration — so it survives reduced motion
+     below, where only the hop dies. */
+  #tblocks { cursor:pointer; --c0:#C0483B; --c1:#4E7FA8; --c2:#6E8F4E; }
+  #tblocks rect, #tblocks path { transition:stroke 0.28s; }
+  #tblocks[data-ci="1"] { --c0:#4E7FA8; --c1:#6E8F4E; --c2:#C7913B; }
+  #tblocks[data-ci="2"] { --c0:#6E8F4E; --c1:#C7913B; --c2:#C0483B; }
+  #tblocks[data-ci="3"] { --c0:#C7913B; --c1:#C0483B; --c2:#4E7FA8; }
+  #tblocks .tbk { transform-box:fill-box; transform-origin:50% 60%; }
+  #tblocks.react .tb0 { animation:tbhop0 0.9s ease-in-out; }
+  #tblocks.react .tb1 { animation:tbhop1 0.9s ease-in-out; }
+  #tblocks.react .tb2 { animation:tbhop2 0.9s ease-in-out; }
+  @keyframes tbhop0 { 0%,100% { transform:translate(0,0) rotate(0deg); } 45% { transform:translate(22px,-24px) rotate(108deg); } }
+  @keyframes tbhop1 { 0%,100% { transform:translate(0,0) rotate(0deg); } 45% { transform:translate(-20px,-18px) rotate(-124deg); } }
+  @keyframes tbhop2 { 0%,100% { transform:translate(0,0) rotate(0deg); } 42% { transform:translate(-3px,-30px) rotate(152deg); } }
+  /* the reduced-motion kill for this corner sits BELOW every rule it cancels
+     (the v1.21/v1.11 law) — and it re-covers the squad/door classes the
+     line-102 list lost to the cascade when their rules ended up beneath it:
+     under reduced motion the invaders STAND still, your victory men stand,
+     the door light holds steady, and the blocks still swap colors on tap
+     (the transition above) but nothing hops. */
+  @media (prefers-reduced-motion: reduce){ .rwA,.rwB,.rwC,.rivsquad,.rivfig,.vicfig,.doorlight,#tblocks.react .tb0,#tblocks.react .tb1,#tblocks.react .tb2 { animation:none; } }
   /* THE GIANT BANANA — leans in the corner, wobbles on its base when you poke it */
   .nanaw { transform-box:fill-box; transform-origin:38% 98%; animation:nanasway 5.6s ease-in-out infinite alternate; }
   @keyframes nanasway { from { transform:rotate(-1.1deg); } to { transform:rotate(1.5deg); } }
@@ -2049,7 +2090,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.10</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.11</div>
   <div class="scanlines"></div>
 </div>
 
@@ -22572,21 +22613,43 @@ function medal(cx, on, disc, ribbon){
 // Every figure faces left by construction (the tan models are MIRROR()'d, the
 // officer and crawler are drawn facing left) so the whole squad reads as coming IN.
 function doorSquad(riv, rivDone){
+  // v2.11 THE OPEN DOOR: nobody stands rooted at the jamb any more — each
+  // man wanders his own little patrol loop through the corner (.rwA/.rwB/
+  // .rwC wrappers; five different durations + NEGATIVE delays so the loops
+  // never sync), still facing the room, still menacing. His shadow rides
+  // INSIDE his wrapper so it stays under his feet the whole walk (the
+  // v1.0.2 own-shadow law, kept moving). Excursions are sized to the
+  // survey: nobody's ink rises past the DAILY RIVAL pill band (~375) and
+  // the doorway man's east drift just carries him half through the open
+  // door, which is the point of a door being open.
   const fig=(k,x,y,w,d)=>'<image class="rivfig" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
   // shadows thrown by the door light — they point at the toy box
   const cast=(cx,cy,r)=>'<ellipse cx="'+(cx-26)+'" cy="'+cy+'" rx="'+r+'" ry="'+(r*0.11).toFixed(1)+'" fill="#000" opacity="0.15"/>';
+  const walk=(cls,dur,del,inner)=>'<g class="'+cls+'" style="animation-duration:'+dur+'s;animation-delay:'+del+'s">'+inner+'</g>';
   if(rivDone){
-    return '<g opacity="0.55">'+cast(846,528,40)
-      +'<image class="rivdown" href="'+sprURI('tanrifle',riv.hex)+'" x="794" y="440" width="84" height="98" transform="rotate(84 836 528)"/>'
-      +'<image class="rivdown" href="'+sprURI('tanmg',riv.hex)+'" x="902" y="398" width="64" height="74.7" opacity="0.75"/></g>';
+    // BEATEN (Wyatt 8/2: "knocked down is fine") — the whole squad flat on
+    // their backs, dropped where the fight found them, the crawler tipped
+    // clean over (a vertical mirror: a prone sprite rotated near 180 about
+    // its foot pivot would land off-canvas). Static on purpose: downed men
+    // don't wander, so this branch adds zero reduced-motion surface. Every
+    // body keeps its OWN door-light shadow or the pile floats (v1.0.2).
+    const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
+      return '<image class="rivdown" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/>'; };
+    return '<g opacity="0.55">'
+      +cast(836,530,46)+cast(906,500,42)+cast(936,468,36)+cast(945,504,30)+cast(834,584,40)
+      +flat('officer',764,432,92,96)
+      +flat('tanrifle',838,408,84,-84)
+      +flat('tanmg',878,398,64,88)
+      +flat('tanrifle',888,436,62,-95)
+      +'<g transform="translate(0,1074.7) scale(1,-1)"><image class="rivdown" href="'+sprURI('crawler',riv.hex)+'" x="764" y="486" width="88" height="102.7"/></g>'
+      +'</g>';
   }
   return '<g class="rivsquad">'
-    +cast(786,545,50)+cast(846,525,48)+cast(900,506,44)+cast(922,484,38)+cast(933,452,32)
-    +fig('tanrifle',902,386,62,-0.07)
-    +fig('tanmg',884,404,76,-0.31)
-    +fig('tanrifle',858,418,84,-0.19)
-    +fig('officer',800,428,92,0)
-    +fig('crawler',742,452,88,-0.24)
+    +walk('rwA',7.6,-2.1, cast(933,452,32)+fig('tanrifle',902,386,62,-0.07))
+    +walk('rwB',9.3,-5.4, cast(922,484,38)+fig('tanmg',884,404,76,-0.31))
+    +walk('rwC',8.1,-3.2, cast(900,506,44)+fig('tanrifle',858,418,84,-0.19))
+    +walk('rwB',11.2,-7.6,cast(846,525,48)+fig('officer',800,428,92,0))
+    +walk('rwC',6.7,-1.5, cast(786,545,50)+fig('crawler',742,452,88,-0.24))
     +'</g>';
 }
 // THE OCCUPATION. They are not waiting politely by the door — they are IN the
@@ -22597,10 +22660,6 @@ function roomRuckus(riv){
   const fig=(k,x,y,w,d)=>'<image class="rivfig" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
   const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
     return '<image class="rivdown" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/>'; };
-  // blocks knocked off the stack — each needs its own little shadow or they
-  // read as stickers floating over the floorboards
-  const block=(x,y,c,r)=>'<ellipse cx="'+(x+12)+'" cy="'+(y+21)+'" rx="15" ry="4" fill="#000" opacity="0.18"/>'
-    +'<rect x="'+x+'" y="'+y+'" width="24" height="19" rx="3" fill="'+c+'" transform="rotate('+r+' '+(x+12)+' '+(y+9.5)+')"/>';
   return '<g>'
     +flat('tanmg',745,70,58,82)              // sprawled out in YOUR bed
     +fig('tanrifle',856,48,56,-0.17)         // and one more standing on it
@@ -22613,14 +22672,13 @@ function roomRuckus(riv){
     +fig('tanrifle',58,150,54,-0.42)         // shoving from the left
     +fig('tanmg',150,120,46,-0.6)            // reaching over the top
     +flat('crawler',104,206,58,4)            // one flat underneath, dragging it out
-    // v2.10: the knocked blocks ARE the tower's three hexes, so the whole
-    // vandal scene rode east with it — the knocker stands half in front of
-    // the stack (ends x846: shy of the teddy's x846+ patch), the scatter
-    // hugs its new foot in the lane between the tower's ground (314) and
-    // the DAILY RIVAL pill band (~349+), one block flung west toward the
-    // elephant (shy of his x734 anchor)
-    +fig('tanmg',794,240,52,-0.23)           // the one who knocked the blocks over
-    +block(744,318,'#D9A544',18)+block(820,316,'#4A6B8A',-24)+block(736,270,'#C85A4A',7)
+    // v2.11: the scattered blocks left the invasion for good — they're the
+    // room's own letter blocks now (tblocksSVG, by the open door, EVERY
+    // room state). The mg man still has business on this floor: he's the
+    // one going through your RADAR TOWER, half in front of its base (ends
+    // x846: shy of the teddy's x850 anchor) — tampering with the room's
+    // alarm instead of knocking over toys that are no longer his story.
+    +fig('tanmg',794,240,52,-0.23)
     +'</g>';
 }
 // AFTER THE WIN: the room is yours again, and your own army is loose in it —
@@ -22640,26 +22698,50 @@ function roomVictory(){
     +'</g>';
 }
 // ================= MOM DAYS (v1.79) =================
-// While momDue(), the invaders' two slots swap for these. No colored squad in
-// the doorway, no ruckus — instead the room says CLEANING is coming: her
-// supplies staged by the door, one giant slipper already in the gap, and the
-// blocks the ruckus usually scatters sitting in a suspiciously NEAT stack.
-// ⚠ Zero new CSS animation (only the existing .doorlight/.blinker classes
-// breathe on mom days) = zero new reduced-motion surface. Placement proven by
-// SCREENSHOT against the label pills — never rectangle math (the v1.71 law).
-function momLurk(){
-  return '<g>'
-    // the block stack, TIDIED — same blocks roomRuckus knocks over, in a
-    // column. v2.10: rode east with the tower to its new foot — beside the
-    // base, its own ground (330) a step in FRONT of the tower's (314) so the
-    // two shadows never double up, right edge 854 shy of the teddy's art
-    // (863) and the sparkle over its head clear of the askew top block
-    +'<ellipse cx="842" cy="330" rx="26" ry="5" fill="#000" opacity="0.18"/>'
-    +'<rect x="830" y="306" width="24" height="19" rx="3" fill="#D9A544"/>'
-    +'<rect x="830" y="287" width="24" height="19" rx="3" fill="#4A6B8A"/>'
-    +'<rect x="830" y="268" width="24" height="19" rx="3" fill="#C85A4A"/>'
-    +'<path d="M842 248 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 z" fill="#FFF3C4" opacity="0.8"/>'
-    +'</g>';
+// While momDue(), the invaders' slots swap for momDoor()'s staging. No colored
+// squad in the doorway, no ruckus — the room says CLEANING is coming: her
+// supplies staged by the door, one giant slipper already in the gap. (The
+// suspiciously-neat blocks moved into tblocksSVG below in v2.11 — they're the
+// room's own toy now, and mom days just show them TIDIED.)
+// v2.11 THE BLOCKS ARE YOURS (Wyatt 8/2: "no longer associated with invading
+// army") — the spilled blocks stopped being the vandals' set dressing and
+// became the room's own letter blocks: OPEN CARPET's letter-block palette,
+// the L30 rug's own letters (G·V·T), on the floor in EVERY room state, and a
+// tap jumbles them into new colors (UI.blocksTap advances data-ci one palette
+// step; the CSS hop sells the shuffle; an innerHTML rebuild just resets the
+// jumble — same law as every decor react). Letters are stroked PATHS, never
+// <text>: nothing for the l10n walk to offer or miss.
+// THE FLOOR: x845-958 × y305-350 is div-free floor by the open door, measured
+// against every neighbor: teddy hotspot ends y304/x946 (bake-crop ink y300),
+// the tower's door ends x840/y322, the DAILY RIVAL pill band sits ~349-375,
+// the corner door starts y378 — so the group's OWN pointer-events tap (the
+// comet's idiom) really lands. Grounded shadows sit OUTSIDE the hop groups
+// so no block's shadow ever jumps with it (the v2.08 airborne-shadow law),
+// and each block keeps its own or the scatter floats (v1.0.2).
+function tblocksSVG(momD){
+  const sh=(cx,cy)=>'<ellipse cx="'+cx+'" cy="'+cy+'" rx="16" ry="4.2" fill="#000" opacity="0.18"/>';
+  const G='M17.5 9.5 Q13 6 9.5 9 Q6.5 12.5 9 16.5 Q12.5 20 17 17.5 L17 13.5 L13.5 13.5';
+  const V='M8.5 8 L13 19 L17.5 8';
+  const T='M8.5 8 L17.5 8 M13 8 L13 19';
+  const bk=(x,y,rot,k,ltr)=>sh(x+13,y+27)
+    +'<g transform="translate('+x+','+y+') rotate('+rot+' 13 13)"><g class="tbk tb'+k+'">'
+    +'<rect x="2" y="2" width="26" height="26" rx="3" fill="#B9975B"/>'
+    +'<rect x="0" y="0" width="26" height="26" rx="3" fill="#E4C98F"/>'
+    +'<rect x="3" y="3" width="20" height="20" rx="2" fill="none" stroke-width="2.6" style="stroke:var(--c'+k+')"/>'
+    +'<path d="'+ltr+'" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--c'+k+')"/>'
+    +'</g></g>';
+  const art = momD
+    // mom due: the same three blocks in a suspiciously NEAT row, sparkle and
+    // all — her tidiness, your toys
+    ? bk(856,318,0,0,G)+bk(888,318,0,1,V)+bk(920,318,0,2,T)
+      +'<path d="M948 304 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 z" fill="#FFF3C4" opacity="0.8"/>'
+    : bk(850,314,16,0,G)+bk(890,317,-21,1,V)+bk(926,308,8,2,T);
+  // ⚠ the base --c vars live in the #tblocks CSS rule, NEVER inline here —
+  // inline style outranks every selector, so baked-in vars would make the
+  // [data-ci] overrides unreachable (measured: the swap went dead)
+  return '<g id="tblocks" data-ci="0" pointer-events="all" onclick="UI.blocksTap(event)">'
+    +'<rect x="845" y="303" width="113" height="46" fill="none"/>'
+    +art+'</g>';
 }
 function momDoor(){
   return '<g>'
@@ -23370,8 +23452,24 @@ function roomSVG(){
   +'</g>'
   // bed top-right
   +'<rect x="700" y="34" width="230" height="140" rx="10" fill="#8FA98F"/><rect x="700" y="34" width="56" height="140" rx="10" fill="#E8E4D4"/><rect x="710" y="62" width="38" height="84" rx="8" fill="#fff"/>'
-  // door gap lower-right + light spill (it breathes while they're still out there)
+  // v2.11 THE OPEN DOOR (Wyatt 8/2: "needs to look more like a door open") —
+  // not a bare dark gap any more: trim-white casing in the bed's own #E8E4D4
+  // family, the hall dark beyond the frame, and the door LEAF swung out
+  // toward the hall on its north hinge — two inset panels, a knob, and its
+  // free edge catching a bright slice of hall light, so the spill visibly
+  // wraps AROUND the open door. The squad renders later and walks in front
+  // of it / through it; on mom days her broom still leans across the frame.
   +'<rect x="905" y="415" width="55" height="120" rx="6" fill="#3a2c1c"/>'
+  +'<path d="M946 428 L960 433 L960 520 L946 508 z" fill="#FFF6DC" opacity="0.55"/>'
+  +'<path d="M908 419 L946 432 L946 507 L908 487 z" fill="#DDD8C6"/>'
+  +'<path d="M908 419 L946 432 L946 507 L908 487 z" fill="#000" opacity="0.10"/>'
+  +'<path d="M913 428 L940 437 L940 460 L913 449 z" fill="none" stroke="#B8B29E" stroke-width="2"/>'
+  +'<path d="M913 456 L940 466 L940 496 L913 480 z" fill="none" stroke="#B8B29E" stroke-width="2"/>'
+  +'<path d="M946 432 L946 507" stroke="#FFF3DC" stroke-width="2.5"/>'
+  +'<circle cx="941" cy="470" r="2.6" fill="#C7913B"/>'
+  +'<rect x="901" y="407" width="8" height="136" rx="3" fill="#E8E4D4"/>'
+  +'<rect x="901" y="407" width="59" height="7" rx="3" fill="#E8E4D4"/>'
+  +'<rect x="901" y="536" width="59" height="7" rx="3" fill="#D8D2C0"/>'
   +'<path'+(rivDone?'':' class="doorlight"')+' d="M905 412 L716 436 L716 522 L905 538 z" fill="url(#spillg)" opacity="'+(rivDone?'0.45':'1')+'"/>'
   // toy box (campaign)
   +'<g transform="translate(150,210) scale(1.35)">'+SPRITES_SRC.toybox.replace(/viewBox[^>]*>/,'')+'</g>'
@@ -23433,10 +23531,13 @@ function roomSVG(){
   // ROOM DECORATIONS: the loose ones — train, banana, elephant, robot. Before
   // the invaders, who are always in front of your furniture.
   +decorSVG()
+  // v2.11: your letter blocks by the open door — EVERY state (they stopped
+  // being the invasion's props); mom days show them tidied into a neat row
+  +tblocksSVG(momD)
   // today's rival: a squad in the doorway AND the run of your room —
   // or, once they're beaten, your own men enjoying the quiet.
   // v1.79 MOM DAYS: no colored army at all — her supplies are staged instead
-  +(momD? momLurk() : (rivDone? roomVictory() : roomRuckus(riv)))
+  +(momD? '' : (rivDone? roomVictory() : roomRuckus(riv)))
   +(momD? momDoor() : doorSquad(riv, rivDone))
   // your figure (avatar) standing on the rug
   +'<image href="'+sprURI(META.avatar, dyeHex()||'#4A6B35')+'" x="330" y="330" width="82" height="96"/>'
@@ -25625,6 +25726,18 @@ window.UI = {
   },
   // a tap on a decoration standing in the room: noise, wobble, nothing else
   decorTap(id){ audio(); decorReact(id); },
+  // v2.11 THE BLOCKS ARE YOURS: one palette step + the CSS hop. No save, no
+  // held state — data-ci lives on the element and dies with the next
+  // innerHTML repaint, exactly like every decor react (and that reset is
+  // harmless: the jumble is a toy, not a record). The remove/reflow/add is
+  // decorReact's own restart idiom.
+  blocksTap(ev){ audio(); if(ev&&ev.stopPropagation) ev.stopPropagation();
+    const g=document.getElementById('tblocks'); if(!g) return;
+    SFX.clack();
+    g.dataset.ci=String(((+g.dataset.ci||0)+1)%4);
+    g.classList.remove('react'); void g.getBoundingClientRect(); g.classList.add('react');
+    setTimeout(()=>{ try{ g.classList.remove('react'); }catch(e){} }, 950);
+  },
   // 0099 THE COMET SECRET: only a comet actually mid-flight counts (parked
   // ones sit outside #rugclip and the clip clips hit-testing too — the
   // opacity gate here is the second lock). Flag first, credit second, all
