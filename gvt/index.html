@@ -1552,7 +1552,7 @@
   @keyframes rivpace { from { transform:translateX(3px);} to { transform:translateX(-9px);} }
   /* the tan army on tan floorboards is near-invisible without a rim — this dark
      halo is what makes ALL ten army colours read against the wood */
-  .rivfig,.rivdown,.vicfig,.vicdown { filter:drop-shadow(0 0 2.5px rgba(26,18,10,0.95)) drop-shadow(3px 5px 5px rgba(0,0,0,0.4)); }
+  .rivfig,.rivdown,.vicfig { filter:drop-shadow(0 0 2.5px rgba(26,18,10,0.95)) drop-shadow(3px 5px 5px rgba(0,0,0,0.4)); }
   .rivfig { transform-box:fill-box; transform-origin:50% 94%; animation:waddle 0.48s ease-in-out infinite alternate; }
   /* your lot aren't marching — they're bobbing about enjoying the place */
   .vicfig { transform-box:fill-box; transform-origin:50% 94%; animation:bobble 1.7s ease-in-out infinite alternate; }
@@ -2152,7 +2152,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.16</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.17</div>
   <div class="scanlines"></div>
 </div>
 
@@ -23136,44 +23136,55 @@ function medal(cx, on, disc, ribbon){
 // over the threshold and marching on your toy box. Beat them and they retreat.
 // Every figure faces left by construction (the tan models are MIRROR()'d, the
 // officer and crawler are drawn facing left) so the whole squad reads as coming IN.
-function doorSquad(riv, rivDone){
-  // v2.11 THE OPEN DOOR: nobody stands rooted at the jamb any more — each
-  // man wanders his own little patrol loop through the corner (.rwA/.rwB/
-  // .rwC wrappers; five different durations + NEGATIVE delays so the loops
-  // never sync), still facing the room, still menacing. His shadow rides
-  // INSIDE his wrapper so it stays under his feet the whole walk (the
-  // v1.0.2 own-shadow law, kept moving). Excursions are sized to the
-  // survey: nobody's ink rises past the DAILY RIVAL pill band (~375) and
-  // the doorway man's east drift just carries him half through the open
-  // door, which is the point of a door being open.
+function towerSquad(riv, rivDone){
+  // v2.17 THE SQUAD LEFT THE DOORWAY (Wyatt 8/3: "It's hard to look at a
+  // door with invading troops. Maybe it would be better to just have
+  // invading troops around the broadcast tower") — the five wanderers moved
+  // to the radar tower's quarter, which has been the rival's own tap door
+  // since v2.10 and whose red eye is the room's threat light: they are after
+  // the ALARM now, the story v2.11's lone tamperer already started (his slot
+  // is absorbed here — six men at one tower would rebuild the pile Wyatt is
+  // deleting). Same five patrol loops (.rwA/.rwB/.rwC, per-figure duration
+  // + NEGATIVE delay longhands so nothing ever syncs), same own-shadow law,
+  // but each shadow sits CENTERED under its man — the door's long light
+  // throw stayed at the door. The whole group renders INSIDE #ro-rival, so
+  // the squad rides the tower's drag delta live: move the alarm and the men
+  // trying to reach it come along (the piggy's show-rides-the-delta law).
+  // Posts are surveyed against the neighbors' REAL ink (getBBox, not table
+  // rects): elephant ends x727 · teddy starts x869 · tower stack 766-822
+  // over ground 314 · blocks pocket 845+/y303-349 · rival pill band
+  // 349-376 · trophy 652-720×139-209. The NW scout keeps every excursion
+  // shy of the tilted LED (x777-789), the front pair straddles the base so
+  // the stack and its eye stay readable between them, and the forecourt
+  // pair patrols BELOW the pill band with real gaps — spread is the point.
   const fig=(k,x,y,w,d)=>'<image class="rivfig" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
-  // shadows thrown by the door light — they point at the toy box
-  const cast=(cx,cy,r)=>'<ellipse cx="'+(cx-26)+'" cy="'+cy+'" rx="'+r+'" ry="'+(r*0.11).toFixed(1)+'" fill="#000" opacity="0.15"/>';
+  const sh=(x,y,w,r)=>'<ellipse cx="'+(x+w/2)+'" cy="'+(y+w*7/6).toFixed(1)+'" rx="'+r+'" ry="'+(r*0.11).toFixed(1)+'" fill="#000" opacity="0.15"/>';
   const walk=(cls,dur,del,inner)=>'<g class="'+cls+'" style="animation-duration:'+dur+'s;animation-delay:'+del+'s">'+inner+'</g>';
   if(rivDone){
-    // BEATEN (Wyatt 8/2: "knocked down is fine") — the whole squad flat on
-    // their backs, dropped where the fight found them, the crawler tipped
-    // clean over (a vertical mirror: a prone sprite rotated near 180 about
-    // its foot pivot would land off-canvas). Static on purpose: downed men
-    // don't wander, so this branch adds zero reduced-motion surface. Every
-    // body keeps its OWN door-light shadow or the pile floats (v1.0.2).
+    // BEATEN (the v2.11 rule, kept: "knocked down is fine") — flat on their
+    // backs where the tower fight found them: two against the base, two on
+    // the forecourt, the crawler tipped clean over (vertical mirror about
+    // his own midline — a near-180 rotate about the foot pivot lands him
+    // off-canvas). Static on purpose: zero reduced-motion surface. Every
+    // body keeps its OWN shadow or the pile floats (v1.0.2).
     const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
       return '<image class="rivdown" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/>'; };
+    const psh=(cx,cy,r)=>'<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+r+'" ry="'+(r*0.11).toFixed(1)+'" fill="#000" opacity="0.15"/>';
     return '<g opacity="0.55">'
-      +cast(836,530,46)+cast(906,500,42)+cast(936,468,36)+cast(945,504,30)+cast(834,584,40)
-      +flat('officer',764,432,92,96)
-      +flat('tanrifle',838,408,84,-84)
-      +flat('tanmg',878,398,64,88)
-      +flat('tanrifle',888,436,62,-95)
-      +'<g transform="translate(0,1074.7) scale(1,-1)"><image class="rivdown" href="'+sprURI('crawler',riv.hex)+'" x="764" y="486" width="88" height="102.7"/></g>'
+      +psh(802,320,28)+psh(743,318,33)+psh(840,442,30)+psh(715,446,29)+psh(776,464,34)
+      +flat('tanmg',776,262,52,82)
+      +flat('officer',712,250,62,96)
+      +flat('tanrifle',812,378,56,-84)
+      +flat('tanrifle',688,384,54,-95)
+      +'<g transform="translate(0,858.7) scale(1,-1)"><image class="rivdown" href="'+sprURI('crawler',riv.hex)+'" x="744" y="392" width="64" height="74.7"/></g>'
       +'</g>';
   }
   return '<g class="rivsquad">'
-    +walk('rwA',7.6,-2.1, cast(933,452,32)+fig('tanrifle',902,386,62,-0.07))
-    +walk('rwB',9.3,-5.4, cast(922,484,38)+fig('tanmg',884,404,76,-0.31))
-    +walk('rwC',8.1,-3.2, cast(900,506,44)+fig('tanrifle',858,418,84,-0.19))
-    +walk('rwB',11.2,-7.6,cast(846,525,48)+fig('officer',800,428,92,0))
-    +walk('rwC',6.7,-1.5, cast(786,545,50)+fig('crawler',742,452,88,-0.24))
+    +walk('rwA',7.6,-2.1, sh(700,178,56,30)+fig('tanrifle',700,178,56,-0.07))
+    +walk('rwB',9.3,-5.4, sh(734,258,52,27)+fig('tanmg',734,258,52,-0.31))
+    +walk('rwC',8.1,-3.2, sh(796,254,62,33)+fig('officer',796,254,62,0))
+    +walk('rwB',11.2,-7.6,sh(700,382,64,36)+fig('crawler',700,382,64,-0.24))
+    +walk('rwC',6.7,-1.5, sh(800,392,54,29)+fig('tanrifle',800,392,54,-0.19))
     +'</g>';
 }
 // THE OCCUPATION. They are not waiting politely by the door — they are IN the
@@ -23184,9 +23195,11 @@ function roomRuckus(riv){
   const fig=(k,x,y,w,d)=>'<image class="rivfig" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
   const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
     return '<image class="rivdown" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/>'; };
+  // v2.17: the two bed squatters moved into bedRuckus (they render inside the
+  // bed's drag wrapper now and ride wherever it's dragged), and v2.11's lone
+  // tower tamperer is absorbed by the relocated squad — towerSquad IS the
+  // going-through-your-alarm story, five men strong.
   return '<g>'
-    +flat('tanmg',745,70,58,82)              // sprawled out in YOUR bed
-    +fig('tanrifle',856,48,56,-0.17)         // and one more standing on it
     +fig('tanrifle',224,200,56,-0.29)        // on top of the toy box, like they own it
     // THE PIGGY-BANK HEIST: a whole crew trying to make off with your savings —
     // one shoving from the left, one hauling from the right, a crawler dragging
@@ -23196,14 +23209,18 @@ function roomRuckus(riv){
     +fig('tanrifle',58,150,54,-0.42)         // shoving from the left
     +fig('tanmg',150,120,46,-0.6)            // reaching over the top
     +flat('crawler',104,206,58,4)            // one flat underneath, dragging it out
-    // v2.11: the scattered blocks left the invasion for good — they're the
-    // room's own letter blocks now (tblocksSVG, by the open door, EVERY
-    // room state). The mg man still has business on this floor: he's the
-    // one going through your RADAR TOWER, half in front of its base (ends
-    // x846: shy of the teddy's x850 anchor) — tampering with the room's
-    // alarm instead of knocking over toys that are no longer his story.
-    +fig('tanmg',794,240,52,-0.23)
     +'</g>';
+}
+// the bed's own squatters (rival-active): one sprawled on the pillow, one
+// stood on the blanket. Split out of roomRuckus in v2.17 so they render
+// INSIDE #ro-bed — the bed is draggable furniture now, and whoever is ON the
+// furniture drags with it (the piggy's bank-and-pig one-wrapper law).
+function bedRuckus(riv){
+  const fig=(k,x,y,w,d)=>'<image class="rivfig" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
+  const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
+    return '<image class="rivdown" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/>'; };
+  return flat('tanmg',745,70,58,82)          // sprawled out in YOUR bed
+    +fig('tanrifle',856,48,56,-0.17);        // and one more standing on it
 }
 // AFTER THE WIN: the room is yours again, and your own army is loose in it —
 // bobbing about, feet up on the bed they just won back, Sarge stood on the toy
@@ -23211,16 +23228,18 @@ function roomRuckus(riv){
 function roomVictory(){
   const hex = dyeHex() || '#4A6B35';
   const fig=(k,x,y,w,d,uri)=>'<image class="vicfig" href="'+(uri||sprURI(k,hex))+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
-  const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
-    return '<image class="vicdown" href="'+sprURI(k,hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/>'; };
   // v2.12 ARRANGE YOUR ROOM: each man rides his own #ro-vtN wrapper — your
   // troops are draggable possessions now, remembered like the furniture
   // (VTROOPS beside the drag controller carries their grab rects). And Sarge
   // holds his EQUIPPED weapon up on that box — saber crystal and all — through
   // the same one reader every other owned-by-you surface uses (menuSargeURI).
+  // v2.17: the bed sleeper (vt0) is GONE — Wyatt 8/3: "One of the army men is
+  // upside down by default. Let's remove him" — a prone-sprite mgunner spun
+  // 80° read as a man stood on his head, in the bed and anywhere he was
+  // dropped. His slot number retired with him so vt1-vt4's saved deltas stay
+  // their own men's; a clean bed is part of the won-back room now.
   const vt=(n,inner)=>'<g id="ro-vt'+n+'"'+rpT('vt'+n)+'>'+inner+'</g>';
   return '<g>'
-    +vt(0, flat('mgunner',762,72,56,80))         // feet up in the bed he just won back
     +vt(1, fig('sarge',236,198,58,-0.5, menuSargeURI(hex)))  // Sarge up on the toy box, surveying his room
     +vt(2, fig('rifleman',196,146,54,-0.9))      // keeping the piggy bank company
     +vt(3, fig('mgunner',534,300,52,-0.2))       // and a couple just enjoying the rug
@@ -23244,7 +23263,8 @@ function roomVictory(){
 // THE FLOOR: x845-958 × y305-350 is div-free floor by the open door, measured
 // against every neighbor: teddy hotspot ends y304/x946 (bake-crop ink y300),
 // the tower's door ends x840/y322, the DAILY RIVAL pill band sits ~349-375,
-// the corner door starts y378 — so the group's OWN pointer-events tap (the
+// the door casing starts y404 (v2.17: the corner tap row retired with the
+// squad's move to the tower) — so the group's OWN pointer-events tap (the
 // comet's idiom) really lands. Grounded shadows sit OUTSIDE the hop groups
 // so no block's shadow ever jumps with it (the v2.08 airborne-shadow law),
 // and each block keeps its own or the scatter floats (v1.0.2).
@@ -23334,7 +23354,9 @@ function elephArt(c){
 }
 const ELEPH_VB='0 6 98 90';
 function elephSVG(){
-  return '<g class="dec dec-eleph" id="decEleph" transform="translate(632,240)">'+elephArt(elephHex())+'</g>';
+  // v2.17: the outer #ro- wrapper carries ONLY the drag delta — the art's own
+  // translate lives untouched underneath (the v1.21 transform-layer law)
+  return '<g id="ro-elephant"'+rpT('elephant')+'><g class="dec dec-eleph" id="decEleph" transform="translate(632,240)">'+elephArt(elephHex())+'</g></g>';
 }
 // THE TOY TRAIN — a stadium of track on the floorboards at the back of the room
 // with three cars going round it, forever. ⚠ THE LOOP IS PURE translate(): the
@@ -23574,14 +23596,18 @@ const RACER_VB='-48 -32 98 62';
 // so the 0.88 park scale places them): each pops as the tailpipe passes and
 // stays where the car left it. All of it parks at opacity 0 (base value law).
 function racecarSVG(){
-  return '<g class="dec dec-racer" id="decRacer" transform="translate(166,574) scale(0.88)">'
+  // v2.17: draggable — the whole show (lap keyframes, smoke patches and all)
+  // rides the outer wrapper's delta, so the car laps FROM wherever it parks;
+  // dragged far east its farthest smoke pops land off-board, which is the
+  // same clip every ride-along accepts (the doorstep pill precedent)
+  return '<g id="ro-racecar"'+rpT('racecar')+'><g class="dec dec-racer" id="decRacer" transform="translate(166,574) scale(0.88)">'
     +'<circle class="rctp o" cx="-52" cy="3" r="6" fill="#E8E4D4"/>'
     +'<circle class="rctp a" cx="170" cy="4" r="5.5" fill="#E8E4D4"/>'
     +'<circle class="rctp b" cx="400" cy="4" r="5.5" fill="#E8E4D4"/>'
     +'<circle class="rctp c" cx="630" cy="4" r="5.5" fill="#E8E4D4"/>'
     +'<circle class="rctp d" cx="860" cy="4" r="5.5" fill="#E8E4D4"/>'
     +'<circle class="rcdust" cx="10" cy="13" r="7" fill="#D8C9A8"/>'
-    +'<g class="rczip"><g class="rctilt">'+racecarArt()+'</g></g></g>';
+    +'<g class="rczip"><g class="rctilt">'+racecarArt()+'</g></g></g></g>';
 }
 // THE WAR HELMET (v1.80) — the co-op campaign's first prize: one classic
 // green pot, molded-plastic idiom, sat slightly proud on the floor between
@@ -23749,7 +23775,8 @@ const TEDDY_VB='-40 -86 80 121';
 // clear of his x863 ink). Measured against ROOM_SPOTS AND the label pills,
 // then screenshot-proved (the v1.71 duck law).
 function teddySVG(){
-  return '<g class="dec dec-teddy" id="decTeddy" transform="translate(900,268) scale(0.92)">'+teddyArt()+'</g>';
+  // v2.17: draggable — outer wrapper holds the delta, inner keeps its own park
+  return '<g id="ro-teddy"'+rpT('teddy')+'><g class="dec dec-teddy" id="decTeddy" transform="translate(900,268) scale(0.92)">'+teddyArt()+'</g></g>';
 }
 // THE SPACE RUG — the same rug, only now it is deep space. Stars twinkle on
 // staggered delays, a ringed planet turns, and a comet crosses every few
@@ -23917,8 +23944,10 @@ function decorSpots(){
   let s='';
   for(const id in DECOR_SPOTS){
     if(!decorOn(id)) continue;
-    const p=DECOR_SPOTS[id];
-    s+='<div onclick="UI.decorTap(\''+id+'\')" style="position:absolute;left:'+p.x+'px;top:'+p.y
+    // v2.17: anchors wear deterministic ids and any saved drag delta, so a
+    // repaint lands a dragged toy's tap zone where its art actually is
+    const p=DECOR_SPOTS[id], d=rpXY(id);
+    s+='<div id="dspot-'+id+'" onclick="UI.decorTap(\''+id+'\')" style="position:absolute;left:'+(p.x+d[0])+'px;top:'+(p.y+d[1])
       +'px;width:'+p.w+'px;height:'+p.h+'px;cursor:pointer"></div>';
   }
   return s;
@@ -23984,26 +24013,35 @@ function roomSVG(){
   +'<g fill="#FF5A3C"><path d="M112 18 l5 9 5 -9 z"/><path d="M126 32 l5 9 5 -9 z"/><path d="M118 46 l5 9 5 -9 z"/><rect x="128" y="14" width="10" height="3"/></g>'
   +'<path d="M76 42 L82 56 L76 52 L70 56 z" fill="#EDEADF"/>'
   +'</g></g>'
-  // bed top-right
+  // bed top-right — draggable furniture since v2.17: the frame and whoever is
+  // ON it share one wrapper, so the ruckus pair sleep wherever the bed goes
+  // (the piggy's bank-and-pig one-wrapper law). Base y34 sits above the 48px
+  // header floor by architecture — rdragClamp's band only binds objects that
+  // start BELOW it, so home is always reachable again.
+  +'<g id="ro-bed"'+rpT('bed')+'>'
   +'<rect x="700" y="34" width="230" height="140" rx="10" fill="#8FA98F"/><rect x="700" y="34" width="56" height="140" rx="10" fill="#E8E4D4"/><rect x="710" y="62" width="38" height="84" rx="8" fill="#fff"/>'
-  // v2.11 THE OPEN DOOR (Wyatt 8/2: "needs to look more like a door open") —
-  // not a bare dark gap any more: trim-white casing in the bed's own #E8E4D4
-  // family, the hall dark beyond the frame, and the door LEAF swung out
-  // toward the hall on its north hinge — two inset panels, a knob, and its
-  // free edge catching a bright slice of hall light, so the spill visibly
-  // wraps AROUND the open door. The squad renders later and walks in front
-  // of it / through it; on mom days her broom still leans across the frame.
-  +'<rect x="905" y="415" width="55" height="120" rx="6" fill="#3a2c1c"/>'
-  +'<path d="M946 428 L960 433 L960 520 L946 508 z" fill="#FFF6DC" opacity="0.55"/>'
-  +'<path d="M908 419 L946 432 L946 507 L908 487 z" fill="#DDD8C6"/>'
-  +'<path d="M908 419 L946 432 L946 507 L908 487 z" fill="#000" opacity="0.10"/>'
-  +'<path d="M913 428 L940 437 L940 460 L913 449 z" fill="none" stroke="#B8B29E" stroke-width="2"/>'
-  +'<path d="M913 456 L940 466 L940 496 L913 480 z" fill="none" stroke="#B8B29E" stroke-width="2"/>'
-  +'<path d="M946 432 L946 507" stroke="#FFF3DC" stroke-width="2.5"/>'
-  +'<circle cx="941" cy="470" r="2.6" fill="#C7913B"/>'
-  +'<rect x="901" y="407" width="8" height="136" rx="3" fill="#E8E4D4"/>'
-  +'<rect x="901" y="407" width="59" height="7" rx="3" fill="#E8E4D4"/>'
-  +'<rect x="901" y="536" width="59" height="7" rx="3" fill="#D8D2C0"/>'
+  +((momD||rivDone)? '' : bedRuckus(riv))
+  +'</g>'
+  // v2.17 THE ENTRY DOOR, CALMED DOWN (Wyatt 8/3: "really messy and hard to
+  // look at… hard to look at a door with invading troops") — the squad moved
+  // to the broadcast tower (towerSquad), and the door was redrawn to be READ,
+  // not fought over: one warm-dark hall, lamplight pooling low in the
+  // opening, ONE bright leaf swung to the hall on its west hinge (two clean
+  // panels, brass knob, lit free edge, its own foot shadow), and trim casing
+  // all round in the bed's #E8E4D4 family. Footprint and floor spill kept —
+  // mom's broom still leans across this exact frame on her days.
+  +'<rect x="903" y="410" width="57" height="128" rx="5" fill="#2A1F12"/>'
+  +'<ellipse cx="936" cy="524" rx="30" ry="9" fill="#FFF6DC" opacity="0.28"/>'
+  +'<path d="M948 420 L960 426 L960 516 L948 508 z" fill="#FFF6DC" opacity="0.5"/>'
+  +'<path d="M908 416 L948 428 L948 512 L908 498 z" fill="#E4DFC9"/>'
+  +'<path d="M913 425 L942 435 L942 462 L913 450 z" fill="none" stroke="#C9C2AC" stroke-width="2.2"/>'
+  +'<path d="M913 458 L942 469 L942 498 L913 484 z" fill="none" stroke="#C9C2AC" stroke-width="2.2"/>'
+  +'<path d="M948 428 L948 512" stroke="#FFF3DC" stroke-width="2.6"/>'
+  +'<circle cx="942" cy="472" r="2.8" fill="#C7913B"/>'
+  +'<path d="M908 498 L948 512 L948 518 L908 503 z" fill="#000" opacity="0.14"/>'
+  +'<rect x="899" y="404" width="8" height="140" rx="3" fill="#E8E4D4"/>'
+  +'<rect x="899" y="404" width="61" height="8" rx="3" fill="#E8E4D4"/>'
+  +'<rect x="899" y="537" width="61" height="7" rx="3" fill="#D8D2C0"/>'
   +'<path'+(rivDone?'':' class="doorlight"')+' d="M905 412 L716 436 L716 522 L905 538 z" fill="url(#spillg)" opacity="'+(rivDone?'0.45':'1')+'"/>'
   // toy box (campaign)
   +'<g id="ro-campaign"'+rpT('campaign')+'><g transform="translate(150,210) scale(1.35)">'+SPRITES_SRC.toybox.replace(/viewBox[^>]*>/,'')+'</g></g>'
@@ -24062,7 +24100,12 @@ function roomSVG(){
   // beaten. The rival's army color moved OFF the light — the door squad and
   // the pill still wear the army's own hex.
   +'<g id="ro-rival"'+rpT('rival')+'><g transform="translate(754,196)"><ellipse cx="40" cy="118" rx="38" ry="7" fill="#000" opacity="0.25"/><rect x="12" y="84" width="56" height="30" rx="4" fill="#C85A4A"/><rect x="18" y="56" width="44" height="28" rx="4" fill="#4A6B8A"/>'
-  +'<g'+(rivDone?'':' transform="rotate(-13 40 56)"')+'><rect x="24" y="32" width="32" height="24" rx="4" fill="#D9A544"/><path d="M40 32 L40 8" stroke="#555" stroke-width="3"/><circle cx="40" cy="6" r="6" fill="#FF5A3C"'+((momD||!rivDone)?' class="radeye"':' opacity="0.35"')+'/></g></g></g>'
+  +'<g'+(rivDone?'':' transform="rotate(-13 40 56)"')+'><rect x="24" y="32" width="32" height="24" rx="4" fill="#D9A544"/><path d="M40 32 L40 8" stroke="#555" stroke-width="3"/><circle cx="40" cy="6" r="6" fill="#FF5A3C"'+((momD||!rivDone)?' class="radeye"':' opacity="0.35"')+'/></g></g>'
+  // v2.17: the invading squad renders INSIDE the tower's wrapper — around
+  // the alarm they came for, riding its drag delta live (mom days field no
+  // squad at all; her staging keeps the doorway, momDoor below)
+  +(momD? '' : towerSquad(riv, rivDone))
+  +'</g>'
   // TRAINING ACADEMY (promotions) — an easel of chevrons, not a workbench.
   // v2.12 (Wyatt 8/2): with a promotion waiting the three stripes light up
   // SEQUENTIALLY bottom→top — a rank climbing the board — instead of the old
@@ -24116,11 +24159,11 @@ function roomSVG(){
   // v2.11: your letter blocks by the open door — EVERY state (they stopped
   // being the invasion's props); mom days show them tidied into a neat row
   +tblocksSVG(momD)
-  // today's rival: a squad in the doorway AND the run of your room —
-  // or, once they're beaten, your own men enjoying the quiet.
-  // v1.79 MOM DAYS: no colored army at all — her supplies are staged instead
+  // today's rival: the run of your room (the squad itself wanders the tower,
+  // inside #ro-rival above) — or, once they're beaten, your own men enjoying
+  // the quiet. v1.79 MOM DAYS: no colored army at all — her supplies instead.
   +(momD? '' : (rivDone? roomVictory() : roomRuckus(riv)))
-  +(momD? momDoor() : doorSquad(riv, rivDone))
+  +(momD? momDoor() : '')
   // your figure (avatar) standing on the rug — a sarge avatar stands here
   // holding his EQUIPPED weapon, crystal color and all (v2.12, one reader)
   +'<g id="ro-avatar"'+rpT('avatar')+'><image href="'+(META.avatar==='sarge'? menuSargeURI(dyeHex()||'#4A6B35') : sprURI(META.avatar, dyeHex()||'#4A6B35'))+'" x="330" y="330" width="82" height="96"/></g>'
@@ -24129,8 +24172,9 @@ function roomSVG(){
 // v2.12 ARRANGE YOUR ROOM (Wyatt 8/2): rows carrying `mv` are DRAGGABLE — the
 // key names the object's slot in META.roomPos and its art wrapper (#ro-<mv>)
 // in roomSVG, so the hotspot, the label pill and the drawing all ride one
-// [dx,dy]. The doorway corner row has NO mv on purpose: the door is
-// architecture, and the invaders standing in it are nobody's furniture.
+// [dx,dy]. (v2.17: the mv-less doorway corner row is gone with the squad's
+// move to the tower — the door really is pure architecture now, and the
+// rival's whole identity lives on the tower's own draggable row.)
 const ROOM_SPOTS=[
   { id:'campaign', x:150, y:200, w:220, h:180, mv:'campaign',
     // a mustering squad shows on the card itself — the room says "your buddies
@@ -24152,24 +24196,29 @@ const ROOM_SPOTS=[
   // Hotspot h 120→150: the storefront stands taller than the crate did and
   // its doorstep (the 200..230 strip, measured dead floor) taps as the shop.
   { id:'shop',     x:378, y:80,  w:150, h:150, mv:'shop', label:()=>'SARGE\'S SURPLUS', lx:494, ly:244 },
-  { id:'rival',    x:736, y:378, w:224, h:196,
-    // ⚠ v1.36: translated at the point of composition (the v1.29.2 law) — the
-    // old concatenation left nine of ten armies' invasion lines English in
-    // every language, because only the audit-day army ever got a table row.
-    // v1.79/0140: while she's due the pill is HERS — raw key, the DOM door
-    // translates. (0140 killed the day-gate, so rivalDays[today] CAN be set
-    // while she's due — beat the colored rival, then place the 7th toy. momDue
-    // winning the pill is still right: her fight is the room's live threat,
-    // and rivalDayWin('mom') on an already-won day just pays the +1★ drill —
-    // the allowance still starts because done=1 is written before the call in
-    // endBattle's mom branch. Beating HER mid-day flips momDue false at once,
-    // so the colored rival is reachable again the SAME day.)
+  // v2.17 ONE RIVAL DOOR (Wyatt 8/3): the doorway corner row is GONE — the
+  // squad wanders the TOWER now (towerSquad, inside #ro-rival), so the tap,
+  // the art AND the pill are one draggable possession. This is also the fix
+  // for "the text of the broadcast tower needs to follow it around": the old
+  // split kept the label on the mv-less corner row, so rdragApply had no
+  // #rtag-rival to move — merged, the pill rides the drag like every other.
+  // Pill lane unchanged (788,362 — the surveyed band under the tower, below
+  // the blocks' y349 floor); tap door = the tower's own (art 756-832 ×
+  // 196-321, ends x840 so the teddy's x846+ patch keeps its gutter).
+  // ⚠ v1.36: translated at the point of composition (the v1.29.2 law) — the
+  // old concatenation left nine of ten armies' invasion lines English in
+  // every language, because only the audit-day army ever got a table row.
+  // v1.79/0140: while she's due the pill is HERS — raw key, the DOM door
+  // translates. (0140 killed the day-gate, so rivalDays[today] CAN be set
+  // while she's due — beat the colored rival, then place the 7th toy. momDue
+  // winning the pill is still right: her fight is the room's live threat,
+  // and rivalDayWin('mom') on an already-won day just pays the +1★ drill —
+  // the allowance still starts because done=1 is written before the call in
+  // endBattle's mom branch. Beating HER mid-day flips momDue false at once,
+  // so the colored rival is reachable again the SAME day.)
+  { id:'rival',    x:748, y:190, w:92,  h:132, mv:'rival',
     label:()=>momDue()? 'MOM IS COMING TO CLEAN!' : META.rivalDays[todayStr()]? 'BEATEN TODAY ✓' : tf('%1 IS INVADING', t(todaysRival().name)),
     cls:()=>META.rivalDays[todayStr()]? '' : 'alarm', lx:788, ly:362 },
-  // v2.10 SWAP: the radar tower's own tap door rode east with it (art
-  // 756-832 × 196-321); ends x840 so the teddy's x846+ patch keeps its
-  // gutter (the old trophy door's ≤842 law, now this door's to keep)
-  { id:'rival',    x:748, y:190, w:92,  h:132, mv:'rival', label:null, lx:0, ly:0 },
   // v2.12: promo pill lx 170→206 — at 18px the longest localized label
   // ('PROMOTIONS (n) ⚔NEW') reached left past the banana's anchor (ends
   // x100, renders after pills, wins the tap — the v2.10 law); re-centered
@@ -24235,17 +24284,26 @@ const ROOM_SPOTS=[
 // already plays. Deltas persist in META.roomPos on release, clamped so
 // nothing parks off the 960×600 boards or under the 46px header band.
 const RDRAG_T=10;
-// the victory men's grab rects (base ink, pre-delta) — vt0 is the bed
-// sleeper's ROTATED bbox (his 56×65 image spun 80° about the foot pivot,
-// corners worked out by hand), the rest are the plain x/y/w/h their <image>
-// tags declare in roomVictory. Order matches roomVictory's vt() calls.
+// the victory men's grab rects (base ink, pre-delta), keyed to their vt slot
+// — the plain x/y/w/h their <image> tags declare in roomVictory. v2.17: vt0,
+// the bed sleeper, is REMOVED (Wyatt 8/3: "One of the army men is upside
+// down by default. Let's remove him") — his slot number retired WITH him so
+// every other man's saved delta stays his own; an old save's vt0 pair is a
+// harmless orphan the loader keeps and nothing reads.
 const VTROOPS=[
-  {x:779, y:93,  w:74, h:67},
-  {x:236, y:198, w:58, h:68},
-  {x:196, y:146, w:54, h:63},
-  {x:534, y:300, w:52, h:61},
-  {x:470, y:392, w:54, h:63}
+  {k:'vt1', x:236, y:198, w:58, h:68},
+  {k:'vt2', x:196, y:146, w:54, h:63},
+  {k:'vt3', x:534, y:300, w:52, h:61},
+  {k:'vt4', x:470, y:392, w:54, h:63}
 ];
+// v2.17 (Wyatt 8/3): the three loose toys he named drag like furniture —
+// their DECOR_SPOTS anchors are the grab rects, listed here in REVERSE paint
+// order so the later-drawn toy wins an overlapped grab — and the BED drags
+// with them (its rect is its own: the bed was never a tap door, so it lives
+// beside the controller, not in ROOM_SPOTS, and it is tested LAST — every
+// smaller thing sitting on or near it wins first).
+const RDRAG_DECOR=['racecar','teddy','elephant'];
+const RDRAG_BED={x:700, y:34, w:230, h:140};
 let RDRAG=null;
 function rpXY(k){ const v=META.roomPos && META.roomPos[k]; return (v && v.length===2)? v : [0,0]; }
 function rpT(k){ const v=rpXY(k); return (v[0]||v[1])? ' transform="translate('+v[0]+','+v[1]+')"' : ''; }
@@ -24260,7 +24318,10 @@ function rdragPt(e){
 }
 function rdragClamp(base, dx, dy){
   dx=Math.max(-base.x, Math.min(960-base.w-base.x, dx));
-  dy=Math.max(48-base.y, Math.min(600-base.h-base.y, dy));
+  // the 48px header band must never FORCE an object below its own home — the
+  // bed lives at y34 by architecture (v2.17), so the band binds only objects
+  // that start under it; everything else keeps the exact old bound
+  dy=Math.max(Math.min(48-base.y,0), Math.min(600-base.h-base.y, dy));
   return [Math.round(dx), Math.round(dy)];
 }
 function rdragPick(p){
@@ -24273,15 +24334,27 @@ function rdragPick(p){
     if(p.x>=(b.left-sr.left)/s && p.x<=(b.right-sr.left)/s && p.y>=(b.top-sr.top)/s && p.y<=(b.bottom-sr.top)/s)
       return { k:sp.mv, base:{x:sp.x, y:sp.y, w:sp.w, h:sp.h} };
   }
-  if(document.getElementById('ro-vt0'))
-    for(let i=VTROOPS.length-1;i>=0;i--){ const tb=VTROOPS[i], d=rpXY('vt'+i);
+  if(document.getElementById('ro-vt1'))
+    for(let i=VTROOPS.length-1;i>=0;i--){ const tb=VTROOPS[i], d=rpXY(tb.k);
       if(p.x>=tb.x+d[0] && p.x<=tb.x+tb.w+d[0] && p.y>=tb.y+d[1] && p.y<=tb.y+tb.h+d[1])
-        return { k:'vt'+i, base:tb }; }
+        return { k:tb.k, base:tb }; }
+  // v2.17: the named toys — after the troops (a man on the rug outranks the
+  // toy under him), before the furniture rows (the toys sit ON the room)
+  for(const k of RDRAG_DECOR){
+    if(!decorOn(k)) continue;
+    const b=DECOR_SPOTS[k], d=rpXY(k);
+    if(p.x>=b.x+d[0] && p.x<=b.x+b.w+d[0] && p.y>=b.y+d[1] && p.y<=b.y+b.h+d[1])
+      return { k:k, base:b };
+  }
   for(let i=ROOM_SPOTS.length-1;i>=0;i--){ const sp=ROOM_SPOTS[i];
     if(!sp.mv) continue;
     const d=rpXY(sp.mv);
     if(p.x>=sp.x+d[0] && p.x<=sp.x+sp.w+d[0] && p.y>=sp.y+d[1] && p.y<=sp.y+sp.h+d[1])
       return { k:sp.mv, base:{x:sp.x, y:sp.y, w:sp.w, h:sp.h} }; }
+  // v2.17: the bed last of all — the biggest, bottom-most piece of furniture
+  { const d=rpXY('bed');
+    if(p.x>=RDRAG_BED.x+d[0] && p.x<=RDRAG_BED.x+RDRAG_BED.w+d[0] && p.y>=RDRAG_BED.y+d[1] && p.y<=RDRAG_BED.y+RDRAG_BED.h+d[1])
+      return { k:'bed', base:RDRAG_BED }; }
   return null;
 }
 // paint one object at [dx,dy]: SVG wrapper + hotspot div + label pill, all
@@ -24295,6 +24368,11 @@ function rdragApply(k, dx, dy){
     const tg=document.getElementById('rtag-'+k);
     if(tg){ tg.style.left=(sp.lx+dx)+'px'; tg.style.top=(sp.ly+dy)+'px'; }
     break; }
+  // v2.17: a dragged toy's tap anchor rides too (the decor divs render after
+  // the pills and WIN overlapped taps — v2.10 law — so the zone must follow)
+  const dp=DECOR_SPOTS[k];
+  if(dp){ const dv=document.getElementById('dspot-'+k);
+    if(dv){ dv.style.left=(dp.x+dx)+'px'; dv.style.top=(dp.y+dy)+'px'; } }
 }
 function rdragEnd(){
   const d=RDRAG; RDRAG=null;
@@ -24324,7 +24402,11 @@ document.addEventListener('pointermove', e=>{
   RDRAG.moved=true;
   e.preventDefault();
   const p=rdragPt(e); if(!p) return;
-  const d=rdragClamp(RDRAG.base, RDRAG.d0[0]+mx/p.s, RDRAG.d0[1]+my/p.s);
+  // v2.17 (Wyatt 8/3: "offset slightly so you can see where you're putting
+  // it") — the dragged object rides DRAG_OFF above the grab, the battle
+  // drags' own float, and it LANDS exactly where it shows: ghost = placement,
+  // the same contract the deploy drag has honored since v0.5
+  const d=rdragClamp(RDRAG.base, RDRAG.d0[0]+mx/p.s, RDRAG.d0[1]+my/p.s-DRAG_OFF);
   RDRAG.dx=d[0]; RDRAG.dy=d[1];
   rdragApply(RDRAG.k, d[0], d[1]);
 }, {passive:false});
