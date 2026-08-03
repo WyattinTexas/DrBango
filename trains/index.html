@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v3.3 -->
+<!-- TRAINSET v3.4 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -25,21 +25,26 @@
     position:fixed; inset:0; touch-action:none;
   }
   canvas#cv{ position:absolute; inset:0; touch-action:none; }
+  /* ---- E25 THE CORNER CLUSTER: every chip rides the sm v2.8 chip size on EVERY
+     viewport now (sm already pinned chips there — proven), so the cluster stays
+     tiny while the rug takes the whole screen. It folds away with the shy fold
+     below whenever a hand is live on the rug. ---- */
   .chip{
-    position:absolute; top:calc(var(--ui)*7px); z-index:5; background:rgba(20,14,8,0.82);
-    border:calc(var(--ui)*2px) solid #513a24; border-radius:calc(var(--ui)*12px);
-    padding:calc(var(--ui)*7px) calc(var(--ui)*13px);
-    font-size:calc(var(--ui)*15px); letter-spacing:1px; color:#F7E9C4; cursor:pointer;
+    position:absolute; top:10px; z-index:5; background:rgba(20,14,8,0.82);
+    border:2px solid #513a24; border-radius:12px;
+    padding:7px 13px;
+    font-size:15px; letter-spacing:1px; color:#F7E9C4; cursor:pointer;
   }
   #mark{ left:12px; cursor:default; color:#F2C531; }
   #mute{ right:12px; }
-  #menuChip{ right:calc(var(--ui)*66px); }
-  #backChip{ right:calc(var(--ui)*66px); display:none; }
-  /* ---- the HOME chip (E10): bottom-right, appears only while zoomed in ---- */
-  #homeChip{ top:auto; right:12px; bottom:132px; display:none; }
-  /* ---- the RIDE ALONG chip (E15): floats above HOME — a chip, NEVER a #palTabs
-     tab (the bar must not grow a pixel — the E10 sm-fit byte-identical law) ---- */
-  #rideChip{ top:auto; right:12px; bottom:180px; display:none; }
+  #menuChip{ right:76px; }
+  #backChip{ right:76px; display:none; }
+  /* ---- the HOME chip (E10): in the corner cluster since E25, second row —
+     appears only while zoomed off the default (rows sit 48px apart: the chips
+     stand 43px tall, so 42px rows kissed by a pixel — measured) ---- */
+  #homeChip{ top:58px; right:12px; display:none; }
+  /* ---- the RIDE ALONG chip (E15): stacked under HOME in the cluster (E25) ---- */
+  #rideChip{ top:106px; right:12px; display:none; }
   #rideChip.on{ border-color:#F2C531; color:#F2C531; }
   .pbtn.on{ border-color:#F2C531; color:#F2C531; }   /* E10: the picked SIZE / LAND / WEATHER tile */
   /* ---- the bedroom menu (E3): DOM chrome floats over the painted room ---- */
@@ -81,12 +86,11 @@
   #nextBtn{ position:absolute; left:50%; bottom:150px; transform:translateX(-50%); z-index:8; display:none;
     border-color:#F2C531; color:#F2C531; }
   #nextBtn:active{ transform:translateX(-50%) translateY(2px); }
-  /* ---- the PLAY tray (E6): five giant round one-tap train buttons ---- */
-  #ptray{
-    position:absolute; left:0; right:0; bottom:0; z-index:6; display:none;
-    background:linear-gradient(#3a2a18,#241a0e); border-top:3px solid #513a24;
-    align-items:center; justify-content:center; gap:calc(var(--ui)*18px);
-    padding:calc(var(--ui)*10px) calc(var(--ui)*10px) calc(var(--ui)*10px + env(safe-area-inset-bottom));
+  /* ---- the PLAY tray (E6 → E25): the five round train buttons ride the toy box
+     spread now — same buttons, same E16 drags, new furniture ---- */
+  #spTray{
+    display:none; align-items:center; gap:calc(var(--ui)*18px);
+    padding:calc(var(--ui)*10px); overflow-x:auto; max-width:100%; touch-action:pan-x;
   }
   .tray{ width:calc(var(--ui)*78px); height:calc(var(--ui)*78px); border-radius:50%; background:#170f08; border:3px solid #513a24;
     cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; touch-action:none; }
@@ -112,8 +116,10 @@
     font-size:11px; letter-spacing:1px; cursor:pointer; padding:5px 8px; }
   #moreToys b,#tidyBtn b{ font-size:calc(var(--ui)*20px); pointer-events:none; }
   #tidyBtn.ask{ border-color:#FF7A5C; color:#FF7A5C; }
-  /* ---- the store (E9): the ★ bank chip + the wooden shop counter ---- */
-  #starChip{ right:calc(var(--ui)*178px); color:#F2C531; display:none; }
+  /* ---- the store (E9): the ★ bank chip + the wooden shop counter.
+     E25: seated in the cluster at the sm-proven size on every viewport (the old
+     sm seat let SHOP and MENU kiss by 28px — measured; 204 clears it) ---- */
+  #starChip{ right:204px; color:#F2C531; display:none; font-size:12px; --ui:1; padding:13px 9px 6px; }
   #starMenu{ background:rgba(20,14,8,0.82); border:2px solid #513a24; border-radius:12px;
     color:#F2C531; font-family:inherit; font-size:13px; letter-spacing:1px; padding:7px 14px; cursor:pointer; }
   #store{ position:absolute; inset:0; z-index:12; display:none; align-items:center; justify-content:center;
@@ -290,21 +296,38 @@
     padding:9px 26px; cursor:pointer; font-weight:bold; }
   #nmback{ display:block; margin:4px auto 0; background:none; border:none; color:#8f7a52;
     font-family:inherit; font-size:10px; letter-spacing:1px; cursor:pointer; padding:4px 8px; }
-  /* ---- bottom bar — E20: ONE horizontal shelf. Everything rides the --ui dial,
-     the bar may grow taller (the E10/E16 byte-equal bar law is REPEALED — the new
-     law is the RUG VIEWPORT keeps ≥60% of the screen), and overflow SCROLLS with
-     the E13 aisle feel: native pan-x for touch, grab-drag + fling for the mouse.
-     No custom scrollbar skin here — a classic scrollbar would eat bar height. ---- */
-  #bar{
-    position:absolute; left:0; right:0; bottom:0; z-index:6;
-    background:linear-gradient(#3a2a18,#241a0e);
-    border-top:3px solid #513a24;
-    display:flex; align-items:center; justify-content:safe center; gap:calc(var(--ui)*10px);
-    padding:calc(var(--ui)*8px) calc(var(--ui)*10px) calc(var(--ui)*8px + env(safe-area-inset-bottom));
-    overflow-x:auto;   /* a full toy box scrolls rather than clips — on every screen now */
-    scroll-snap-type:x proximity; touch-action:pan-x; cursor:grab;
-  }
-  #bar .pbtn,#bar .ptab{ scroll-snap-align:center; }
+  /* ---- E25 THE TOY BOX ON THE RUG — #bar and #ptray are DEAD. The rug gets the
+     whole screen; the only resident gameplay chrome is a little wooden toy box
+     tucked bottom-left. Tap it and a wooden tray SPREAD rises out of it (≤40% of
+     the screen, stamped from SPREAD_VH) carrying EXACTLY what the bar carried —
+     the E16 drag laws, THE GATE, the E13 lifted scroll — and it puts itself away
+     the moment a drag leaves it or a finger lands on the map. ---- */
+  #tbox{ position:absolute; left:calc(var(--ui)*5px); bottom:calc(var(--ui)*5px + env(safe-area-inset-bottom));
+    z-index:7; width:calc(var(--ui)*36px); height:calc(var(--ui)*36px);
+    background:none; border:none; padding:0; cursor:pointer; touch-action:none; display:none; }
+  #tbox canvas{ width:100%; height:100%; display:block; pointer-events:none;
+    filter:drop-shadow(0 calc(var(--ui)*2px) calc(var(--ui)*4px) rgba(0,0,0,0.45)); }
+  #spread{ position:absolute; left:calc(var(--ui)*5px); bottom:calc(var(--ui)*38px + env(safe-area-inset-bottom));
+    z-index:6; max-width:calc(100vw - var(--ui)*10px); max-height:40vh; overflow:hidden;
+    background:linear-gradient(rgba(58,42,24,0.93),rgba(36,26,14,0.93));
+    border:calc(var(--ui)*2px) solid #6e5130; border-radius:calc(var(--ui)*14px);
+    box-shadow:0 calc(var(--ui)*7px) calc(var(--ui)*22px) rgba(0,0,0,0.5);
+    display:flex; align-items:flex-end;
+    transform-origin:calc(var(--ui)*18px) 100%;
+    transform:translateY(calc(var(--ui)*14px)) scale(0.3,0.06); opacity:0;
+    visibility:hidden; pointer-events:none;
+    transition:transform var(--tbms,0.2s) ease, opacity var(--tbms,0.2s) ease, visibility 0s var(--tbms,0.2s); }
+  #spread.open{ transform:none; opacity:1; visibility:visible; pointer-events:auto;
+    transition:transform var(--tbms,0.2s) ease, opacity var(--tbms,0.2s) ease, visibility 0s 0s; }
+  /* the shelf row inside the spread — E20's one-shelf law, re-housed verbatim:
+     native pan-x for touch, grab-drag + fling for the mouse, a travelled tap is
+     a scroll never a pick. ⚠ NO scrollbar skin here — the classic-scrollbar
+     trap died with the bar; do not resurrect it in the spread. */
+  #spShelf{ display:flex; align-items:center; gap:calc(var(--ui)*10px);
+    padding:calc(var(--ui)*8px) calc(var(--ui)*10px);
+    overflow-x:auto; max-width:100%;
+    scroll-snap-type:x proximity; touch-action:pan-x; cursor:grab; }
+  #spShelf .pbtn,#spShelf .ptab{ scroll-snap-align:center; }
   .pbtn{
     width:calc(var(--ui)*72px); background:#170f08; border:2px solid #513a24; border-radius:calc(var(--ui)*12px);
     padding:calc(var(--ui)*4px) calc(var(--ui)*2px) calc(var(--ui)*3px); text-align:center; cursor:grab; color:#CBB88C;
@@ -355,6 +378,14 @@
     #bedbar{ gap:3px; }
     #bedpal{ gap:3px; }
   }
+  /* ---- THE SHY FOLD (E25): while a hand is live on the rug — a toy mid-drag or
+     a real pan-press — the box AND the corner cluster fade to nothing (ONE dial,
+     --shygame, stamped from SHY_GAME_MS) and the map is all there is. Release
+     and the chrome breathes back. opacity + pointer-events ONLY, nothing moves.
+     The spread needs no fold: dismiss laws 1 and 2 have already shut it before
+     any hand is live. ---- */
+  #tbox,#mark,#menuChip,#backChip,#starChip,#homeChip,#rideChip{ transition:opacity var(--shygame,0.25s) ease; }
+  body.shygame :is(#tbox,#mark,#mute,#menuChip,#backChip,#starChip,#homeChip,#rideChip){ opacity:0; pointer-events:none; }
   /* ---- toast + rotate (toast bottom rides the LIVE bar height — resize() sets it) ---- */
   #toast{
     position:absolute; left:50%; bottom:132px; transform:translateX(-50%);
@@ -374,7 +405,7 @@
     :root{ --ui:1.7; }
     .pbtn{ width:calc(var(--ui)*47px); } .pbtn canvas{ width:calc(var(--ui)*33px); height:calc(var(--ui)*33px); }
     .pbtn small{ font-size:calc(var(--ui)*7px); }
-    #bar{ gap:calc(var(--ui)*3px); }
+    #spShelf{ gap:calc(var(--ui)*3px); }
     #barSpace{ width:calc(var(--ui)*5px); }
     #palSlot{ gap:calc(var(--ui)*3px) !important; }
     #palSlot>span{ gap:calc(var(--ui)*3px) !important; }
@@ -386,13 +417,11 @@
     .mbtn{ font-size:17px; padding:11px 30px; letter-spacing:2px; }
     .tray{ width:calc(var(--ui)*58px); height:calc(var(--ui)*58px); }
     .tray canvas{ width:calc(var(--ui)*46px); height:calc(var(--ui)*28px); }
-    #ptray{ gap:calc(var(--ui)*10px); padding:calc(var(--ui)*7px) calc(var(--ui)*8px) calc(var(--ui)*7px + env(safe-area-inset-bottom)); }
+    #spTray{ gap:calc(var(--ui)*10px); padding:calc(var(--ui)*7px) calc(var(--ui)*8px); }
     .sw canvas{ width:44px; height:27px; }
     #paintCap{ display:none; }
-    /* chips stay today-sized on a phone — they were already thumb-sized, and a
-       375px screen has no room to double its corners (builder's-eye call) */
-    .chip{ font-size:15px; padding:7px 13px; border-radius:12px; border-width:2px; top:10px; }
-    #menuChip,#backChip{ right:76px; }
+    /* E25: the chips ride the v2.8 size on EVERY viewport now — the sm overrides
+       that proved that size are the base rules */
     #menu{ gap:9px; padding-bottom:14px; }
     #bpanel{ padding:10px 10px 6px; }
     #bpanel h1{ font-size:18px; letter-spacing:2px; }
@@ -402,7 +431,6 @@
     .tk b{ font-size:16px; } .tk small{ font-size:6px; }
     .tk .star{ font-size:14px; top:-7px; right:-5px; }
     #bback{ margin-top:8px; font-size:10px; }
-    #nextBtn{ bottom:118px; }
     #boxChip{ font-size:11px; padding:5px 10px; }
     #tbpanel{ padding:8px 8px 3px; }
     #tblid{ margin-bottom:5px; }
@@ -411,7 +439,6 @@
     .tbrow{ gap:3px; padding:2px 2px 4px; margin-bottom:4px; border-bottom-width:4px; }
     .tbslot canvas{ width:30px; height:30px; }
     #tbback{ font-size:9px; margin-top:0; }
-    #starChip{ right:158px; font-size:12px; --ui:1; padding:13px 9px 6px; }
     #starMenu{ font-size:11px; padding:5px 10px; --ui:1; }
     /* E22: the lid plaques + the showroom ride a LOCAL dial on a phone — one
        number keeps awning, stripes and letters proportional at thumb size */
@@ -448,7 +475,6 @@
     #bkshop{ --ui:1.15; border-radius:11px; }
     #bkback{ font-size:9px; margin-top:1px; }
     #stback{ font-size:9px; margin-top:0; }
-    #rideChip{ font-size:12px; padding:6px 9px; }
     #nmpanel{ padding:7px 8px 4px; }
     #nmpanel h1{ font-size:12px; letter-spacing:2px; margin-bottom:3px; }
     #nmprev{ font-size:11px; padding:4px 8px; margin-bottom:5px; }
@@ -470,13 +496,19 @@
 <div class="chip" id="starChip"><b>SHOP</b><span id="starChipN">★ 0</span></div>
 <div class="chip" id="homeChip">🔎 WHOLE RUG</div>
 <div class="chip" id="rideChip">🚂 RIDE ALONG</div>
-<div id="bar">
-  <span id="palTabs"><button class="ptab on" id="tabTrack" type="button">TRACK</button><button class="ptab" id="tabScen" type="button">SCENERY</button><button class="ptab" id="tabTown" type="button">TOWN</button><button class="ptab" id="tabFriends" type="button">FRIENDS</button><button class="ptab" id="tabRug" type="button">RUG</button></span>
-  <span id="palSlot" style="display:flex;gap:8px;"></span>
-  <span id="barSpace"></span>
-  <span id="shelf"></span>
+<!-- E25: the toy box on the rug — screen-space DOM ("that is at least the UI"),
+     it never pans with the world. The face canvas keeps a fixed backing store
+     (TBOX_PX×2×ICON_RES) like every chrome icon. -->
+<button id="tbox" type="button"><canvas id="tboxCv" width="144" height="144"></canvas></button>
+<div id="spread">
+  <div id="spShelf">
+    <span id="palTabs"><button class="ptab on" id="tabTrack" type="button">TRACK</button><button class="ptab" id="tabScen" type="button">SCENERY</button><button class="ptab" id="tabTown" type="button">TOWN</button><button class="ptab" id="tabFriends" type="button">FRIENDS</button><button class="ptab" id="tabRug" type="button">RUG</button></span>
+    <span id="palSlot" style="display:flex;gap:8px;"></span>
+    <span id="barSpace"></span>
+    <span id="shelf"></span>
+  </div>
+  <div id="spTray"></div>
 </div>
-<div id="ptray"></div>
 <div id="bedbar"><span id="bedpal"></span></div>
 <div id="menu">
   <div id="mbtns"><button id="playBtn" class="mbtn" type="button">PLAY ▶</button><button id="campBtn" class="mbtn" type="button">CAMPAIGN 🎫</button><button id="buildBtn" class="mbtn" type="button">BUILD 🔨</button></div>
@@ -739,6 +771,22 @@ let PIG_SHOW=true;             // rig door — the byte-proof battery hides the 
 const COACH_PAN=true;          // the once-a-session coach toast, IN by default
 const COACH_LINE='SLIDE THE RUG TO LOOK AROUND';   // kid words only — every word rides the E8 allowlist
 let coachT=false;              // once per SESSION, first campaign or PLAY entry — a let, never saved (like surpT)
+// ---- Wyatt dials (EXPANSION 25 — one block) ----
+// THE TOY BOX ON THE RUG. Wyatt 8/2 (night, Way 3 off FM-TS-25): "Tucked in on
+// the bottom left… just the little toy box. You hit it, and then you could see
+// the things you can drag on… once you drag it on the map, whatever it was,
+// the toy box dismisses itself… and so you are back in your beautiful map
+// world." #bar and #ptray are DEAD; their height leaves the fit math ON
+// PURPOSE — the rug gets the whole screen. THE BOX SHOWS WHAT THE BAR SHOWED:
+// membership per mode is byte-for-byte today's logic (paletteSync/shelfSync/
+// buildTray untouched), only the furniture changed.
+const TBOX_SIDE='left';        // the corner the box tucks into ('left'|'right') — his words: bottom-left
+const TBOX_PX=36;              // box face size ×--ui (~72px closed at the desk dial; ≥44px physical everywhere)
+const SPREAD_VH=40;            // the spread's height cap, % of the screen
+const TBOX_MS=200;             // the spread's rise/collapse, ms (--tbms)
+const TBOX_BREATH_S=4.5;       // seconds between idle lid breaths — a quiet pick-me, never a modal
+const SHY_GAME=true;           // THE SHY FOLD: chrome fades while a drag or a real pan is live
+const SHY_GAME_MS=250;         // the fold's fade, ms (--shygame)
 // ---- Wyatt dials (EXPANSION 15 — one block) ----
 // A. GRAVITY AS DRAMA. grade is measured in ELEVATION LEVELS PER CELL of arc
 // (pos().z interps levels along the path; LIFT px per level is the height it
@@ -1969,6 +2017,7 @@ function namerShow(b){
   const el=$('namer'); if(!el) return;
   el.style.display=b?'flex':'none';
   if(b){
+    tboxShow(false);   // E25 law 3: an overlay shuts the corner box
     NM.w1=NAME? Math.max(0,NAME_WORDS[0].indexOf(NAME.w1)) : 0;
     NM.w2=NAME? Math.max(0,NAME_WORDS[1].indexOf(NAME.w2)) : 0;
     NM.si=NAME? Math.max(0,NAME_SUFFIX.indexOf(NAME.s)) : 0;
@@ -3859,7 +3908,9 @@ function drawHint(){
   cx.font='bold '+(20*u)+'px "Arial Black",Impact,sans-serif'; cx.textAlign='center'; cx.fillStyle='#F7E9C4';
   const txt=HINTS[hintStage], w=cx.measureText(txt).width;
   if(w>W-40) cx.font='bold '+Math.max(11,Math.floor(20*u*(W-40)/w))+'px "Arial Black",Impact,sans-serif';
-  cx.fillText(txt, W/2, H-BAR-16*u);
+  // E25: the bar is gone (BAR=0) — the words seat just above the corner toy
+  // box's zone ((5+36)*--ui tall) so they never sit in the box's lap at sm
+  cx.fillText(txt, W/2, H-BAR-16*u-41*UIS);
   cx.globalAlpha=1;
 }
 function drawLapCard(){
@@ -4191,7 +4242,7 @@ function bedDrop(){
   if(BED.shy){ BED.shy=false; shySync(); }
   BED.a=1; BED.idleT=0;
   $('bedbar').style.display='none';
-  $('bar').appendChild($('shelf'));    // the shelf goes home to the BUILD bar
+  $('spShelf').appendChild($('shelf'));   // the shelf goes home to the spread's row (E25 — the bar is dead)
 }
 // ---- the mini palette: the E16 tutorial three, kid-scale, no gates ----
 function buildBedPal(){
@@ -5476,7 +5527,7 @@ function playCarItems(){
 // tapping to have them created") — drag the mini-loco onto the track and it lands
 // there and runs. A bare tap wiggles and chirps: alive, but nothing spawns.
 function buildTray(){
-  const tw=$('ptray');
+  const tw=$('spTray');   // E25: the tray rides the toy box spread now
   for(const name of TRAY_ORDER){
     const b=document.createElement('button'); b.className='tray'; b.type='button';
     const cv2=document.createElement('canvas'); cv2.width=124*ICON_RES; cv2.height=76*ICON_RES; b.appendChild(cv2);
@@ -5619,6 +5670,11 @@ cvs.addEventListener('pointerdown',e=>{
     return;
   }
   ac(); e.preventDefault();
+  // E25 DISMISS LAW 2 — a finger on the map shuts the toy box AND the press
+  // still does its whole normal job (pans, grabs a train, taps a piece).
+  // ⚠ NEVER swallow this first tap — the GVT briefing tap-swallow trap is the
+  // named anti-pattern here; nothing below may return because of the box.
+  if(TBOX.open) tboxShow(false);
   if(camGate()){                                 // E10: two fingers on the rug = pinch zoom
     PTRS.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(PTRS.size===2&&!DRAG){ pinchStart(); return; }
@@ -5772,7 +5828,12 @@ function moveCore(e){
     DRAG={kind:'atrain',prev:AT.cars};                               // any car of it = the toy law's handle
     AT.cars=[];
   }
-  if(DRAG){ DRAG.t0=perf(); DRAG.pt=e.pointerType; DRAG.cx=e.clientX; DRAG.cy=e.clientY;   // E19: the grab stamp — the lift ramps from here
+  if(DRAG){
+    // E25 DISMISS LAW 1 — the moment a DRAG is born of the spread, the box
+    // shuts itself while the E19 lift carries the toy: placing always happens
+    // on a full-screen rug.
+    if(TBOX.open&&SPREAD_SRC.has(down.what)) tboxShow(false);
+    DRAG.t0=perf(); DRAG.pt=e.pointerType; DRAG.cx=e.clientX; DRAG.cy=e.clientY;   // E19: the grab stamp — the lift ramps from here
     const [wx,wy]=dragXY(e); DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy); down=null; }
 }
 window.addEventListener('pointerup',e=>{
@@ -6164,17 +6225,17 @@ function buildPalette(){
   tabTap('tabFriends','friends'); tabTap('tabRug','rug');
 }
 /* =====================================================================
-   THE BIG HAND'S SHELF (E20) — the whole bar is ONE horizontal shelf,
-   E13's aisle recipe lifted: touch pans natively (pan-x on the wood,
-   the tabs and the tap-buttons), the mouse grabs and flings, and a tap
-   that travelled >8px is a scroll, never a pick. DRAG-SOURCE toys keep
-   touch-action:none and never start a grab-scroll — the hand lifting a
-   piece out of the palette always wins.
+   THE BIG HAND'S SHELF (E20 → E25) — the ONE horizontal shelf lives in
+   the toy box spread now, recipe unchanged: E13's aisle feel, touch
+   pans natively (pan-x on the wood, the tabs and the tap-buttons), the
+   mouse grabs and flings, and a tap that travelled >8px is a scroll,
+   never a pick. DRAG-SOURCE toys keep touch-action:none and never
+   start a grab-scroll — the hand lifting a piece out always wins.
    ===================================================================== */
 let BARSC={down:false,moved:0,x:0,y:0,sl:0,vx:0,lx:0,lt:0,id:null,mouse:false};
 const barDragged=()=>BARSC.moved>8;
 function barFling(v){               // a mouse flick keeps the shelf rolling (touch gets this natively)
-  const el=$('bar'); let lt=performance.now();
+  const el=$('spShelf'); let lt=performance.now();
   const step=t=>{
     const dt2=Math.min(0.05,(t-lt)/1000); lt=t;
     el.scrollLeft+=v*dt2;
@@ -6184,7 +6245,7 @@ function barFling(v){               // a mouse flick keeps the shelf rolling (to
   requestAnimationFrame(step);
 }
 function buildBarScroll(){
-  const el=$('bar');
+  const el=$('spShelf');
   el.addEventListener('pointerdown',e=>{
     if(e.target.closest&&e.target.closest('.drg')) return;   // a toy in the hand beats the shelf
     BARSC={down:true,moved:0,x:e.clientX,y:e.clientY,sl:el.scrollLeft,vx:0,
@@ -6208,6 +6269,76 @@ function buildBarScroll(){
   };
   el.addEventListener('pointerup',barUp);
   el.addEventListener('pointercancel',barUp);
+}
+/* =====================================================================
+   THE TOY BOX ON THE RUG (E25) — the only resident gameplay chrome.
+   A little wooden chest tucked in the corner, screen-space DOM (it
+   does NOT pan with the world), face painted in the game's own art
+   (the E18 menu chest is the model). Tap it → the spread rises out
+   (~TBOX_MS). THE DISMISS LAWS, all three:
+     1. drag-out — the moment a DRAG is born of the spread, it shuts
+        itself while the E19 lift carries the toy (moveCore).
+     2. tap-the-map — any pointerdown on the canvas shuts it AND STILL
+        DOES ITS NORMAL WORK. ⚠ NEVER swallow that first tap (the GVT
+        briefing tap-swallow trap is the named anti-pattern).
+     3. any overlay opening (bank, shop, board, namer, menu) shuts it.
+   Idle, the lid sits a hair ajar and breathes every TBOX_BREATH_S —
+   a quiet pick-me, never a modal. Nothing in here ever saves.
+   ===================================================================== */
+const TBOX={open:false,k:-1};
+const SPREAD_SRC=new Set(['pal','handle','shelfCar','shelfEng','tray']);   // a DRAG born of one of these came OUT of the spread
+function tboxPaint(k){         // k = lid lift 0..1 (the breath); TBOX.open leans the lid right back
+  const cv=$('tboxCv'); if(!cv) return;
+  const g=cv.getContext('2d'), u=cv.width/160;
+  g.setTransform(u,0,0,u,0,0); g.clearRect(0,0,160,160);
+  withCtx(g,()=>{                                  // the E18 menu chest, shrunk to a corner pick-me
+    cx.globalAlpha=0.3; cx.fillStyle='#000';
+    cx.beginPath(); cx.ellipse(80,148,62,8,0,0,7); cx.fill(); cx.globalAlpha=1;
+    cx.fillStyle='#8f6b3f'; rr(20,62,120,84,8); cx.fill();
+    cx.strokeStyle='#6e5130'; cx.lineWidth=5; rr(20,62,120,84,8); cx.stroke();
+    cx.fillStyle='#170f08'; rr(26,62,108,10,4); cx.fill();   // the dark mouth the ajar lid shows
+    star5(80,108,1.35,'#e8d9b0');
+    const open=TBOX.open?1:0;
+    const lift=4+10*k+8*open, tilt=-(0.035+0.10*k+0.5*open);
+    cx.save(); cx.translate(20,62-lift); cx.rotate(tilt);
+    cx.fillStyle='#a37c4a'; rr(-6,-26,136,28,8); cx.fill();
+    cx.strokeStyle='#6e5130'; cx.lineWidth=5; rr(-6,-26,136,28,8); cx.stroke();
+    cx.restore();
+  });
+}
+function tboxShow(b){          // pure state — callers speak (sounds live at the tap sites)
+  b=!!b;
+  if(TBOX.open===b) return;
+  TBOX.open=b;
+  $('spread').classList.toggle('open',b);
+  tboxPaint(b?1:0);
+}
+function tboxBreath(tms){      // rides frame(): the idle lid sigh, skipped under reduced motion
+  if((SCREEN!=='game'&&SCREEN!=='play')||TBOX.open) return;
+  const ph=(tms/1000)%TBOX_BREATH_S;
+  const k=(RM()||ph>=0.9)? 0 : 0.5*Math.sin(Math.PI*ph/0.9);
+  if(Math.abs(k-TBOX.k)>0.004){ TBOX.k=k; tboxPaint(k); }
+}
+const SHYG={on:false};
+function shyGameSync(){        // THE SHY FOLD — one truth, read every frame, writes only on change
+  const on=SHY_GAME && (SCREEN==='game'||SCREEN==='play') &&
+    ( !!DRAG || !!PINCH || !!(down&&down.what==='pan'&&down.on) );
+  if(on!==SHYG.on){ SHYG.on=on; document.body.classList.toggle('shygame',on); }
+}
+function buildTbox(){
+  document.documentElement.style.setProperty('--tbms',(TBOX_MS/1000)+'s');
+  document.documentElement.style.setProperty('--shygame',(SHY_GAME_MS/1000)+'s');
+  const sp=$('spread'); sp.style.maxHeight=SPREAD_VH+'vh';
+  if(TBOX_SIDE==='right'){     // the corner is a dial — flip both residents together
+    for(const el of [$('tbox'),sp]){ el.style.left='auto'; el.style.right='calc(var(--ui)*5px)'; }
+    sp.style.transformOrigin='calc(100% - var(--ui)*18px) 100%';
+  }
+  $('tbox').addEventListener('click',()=>{
+    ac();
+    const b=!TBOX.open; SND[b?'tok':'click']();
+    tboxShow(b);
+  });
+  tboxPaint(0);
 }
 // THE GATE LAW (E7): BUILD's palette offers OWNED toys only. The campaign keeps the
 // FULL palette in this version (its gate arrives in E8 with the new levels). Tabs with
@@ -6404,8 +6535,10 @@ function showScreen(s){
   $('menu').style.display=s==='menu'?'flex':'none';
   $('board').style.display=s==='board'?'flex':'none';
   if(s==='board') boardSync();
-  $('bar').style.display=game?'flex':'none';
-  $('ptray').style.display=play?'flex':'none';
+  $('tbox').style.display=(game||play)?'block':'none';   // E25: the box is the rug modes' only resident chrome
+  $('spShelf').style.display=game?'flex':'none';         // THE BOX SHOWS WHAT THE BAR SHOWED —
+  $('spTray').style.display=play?'flex':'none';          // ...same rows, same sync laws, new furniture
+  tboxShow(false);      // E25 DISMISS LAW 3 — the box shuts on every screen change, like the lids below
   $('mark').style.display=(game||play)?'block':'none';
   $('menuChip').style.display=((game&&!CAMP.on)||play)?'block':'none';
   $('backChip').style.display=(game&&CAMP.on)?'block':'none';
@@ -6446,7 +6579,7 @@ function collChanged(){
   paletteSync(); shelfSync(); syncSwatches();
   if($('toybox').style.display==='flex') boxSync();
 }
-function boxShow(b){ $('toybox').style.display=b?'flex':'none'; if(b) boxSync(); }
+function boxShow(b){ $('toybox').style.display=b?'flex':'none'; if(b){ tboxShow(false); boxSync(); } }   // E25 law 3: an overlay shuts the corner box
 function slotIcon(cv,id,fullCol){   // E9: fullCol=true skips the silhouette (the store dims by CSS instead)
   const g=cv.getContext('2d');
   // E20: resolution-aware — k=1 for the 96px toybox/ticket slots (byte-identical),
@@ -7005,6 +7138,7 @@ function storeSync(){
 function storeShow(b){
   $('store').style.display=b?'flex':'none';
   if(b){
+    tboxShow(false);                                    // E25 law 3: an overlay shuts the corner box
     bankShow(false);                                    // the shop and the bank are never both open
     starHudSync(); storeSync();
     stageMount(SHOWCASE_DEFAULT==='dream'? stageDream() : stAisleIds()[0]);
@@ -7021,6 +7155,7 @@ let BANK_T0=null, BANK_TICK=0;
 function bankShow(b){
   $('bank').style.display=b?'flex':'none';
   if(b){
+    tboxShow(false);                                    // E25 law 3: an overlay shuts the corner box
     storeShow(false);
     bankPig(); bankLedger();
     $('bkcount').dataset.n='0'; $('bkcount').textContent='★ 0';
@@ -7237,11 +7372,12 @@ $('rideChip').addEventListener('click',()=>{ ac(); SND.click(); followSet(!FOLLO
 function resize(){
   W=innerWidth; H=innerHeight; DPR=Math.min(2,devicePixelRatio||1);
   UIS=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui'))||1;   // E20: ONE dial
-  // E20: BAR is DERIVED, always — the E10/E16 "bar height byte-equal" law is
-  // REPEALED; the law now is the rug viewport keeps ≥60% of the screen (battery).
-  BAR=SCREEN==='game'? ($('bar').offsetHeight||118)
-     :SCREEN==='play'? ($('ptray').offsetHeight||104)      // the tray is the play mode's whole chrome
-     :0;                                                   // the menu room + board get the whole window
+  // E25: the shelf is DEAD and its height leaves the fit math ON PURPOSE — the
+  // rug gets the WHOLE screen in every mode (this fitScale change is the point,
+  // not a regression; the menu always had 0). BAR stays a variable so every
+  // formula that seated on the bar now seats on the screen edge, and the E20
+  // ≥60%-viewport law retires at 100%.
+  BAR=0;
   cvs.width=Math.round(W*DPR); cvs.height=Math.round(H*DPR);
   cvs.style.width=W+'px'; cvs.style.height=H+'px';
   // E10: the rug screens ride THE CAMERA (fit by default — the old letterbox to
@@ -7251,15 +7387,16 @@ function resize(){
     SC=Math.min(W/MENU_W,(H-BAR)/MENU_H); OX=(W-MENU_W*SC)/2; OY=(H-BAR-MENU_H*SC)/2;
     bedBounds();   // E23: the bedroom floor is every cell the screen can hold — re-derived here
   }
-  const hc=$('homeChip'); if(hc) hc.style.bottom=(BAR+14*UIS)+'px';
-  const rc=$('rideChip'); if(rc) rc.style.bottom=(BAR+66*UIS)+'px';   // E15: stacked above HOME (E20: the gap rides the dial)
-  const tt=$('toast'); if(tt) tt.style.bottom=(BAR+14*UIS)+'px';      // E20: the toast clears whatever the bar grew into
-  const nb=$('nextBtn'); if(nb) nb.style.bottom=(BAR+40*UIS)+'px';    // E20: NEXT floats above the live bar
+  // E25 re-seats: homeChip + rideChip live in the top-right cluster (CSS) now;
+  // toast + NEXT seat on the screen floor + the safe area — the old BAR+k*UIS
+  // tail is dead with the bar.
+  const tt=$('toast'); if(tt) tt.style.bottom='calc('+(14*UIS)+'px + env(safe-area-inset-bottom))';
+  const nb=$('nextBtn'); if(nb) nb.style.bottom='calc('+(40*UIS)+'px + env(safe-area-inset-bottom))';
   if($('store').style.display==='flex') storeSync();   // E22: the shelf count follows the geometry
   homeSync();
 }
 window.addEventListener('resize',resize);
-load(); buildPalette(); buildShelf(); buildBarScroll(); buildBedPal(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
+load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedPal(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
 showScreen('menu'); shelfSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
@@ -7272,6 +7409,8 @@ function frame(t){
     else menuUpdate(dt);                                                // the board keeps the bedroom alive behind it
   }
   if(DRAG) withBed(dragSync);          // E19: the lift ramp is paint-time — it rises under a still finger
+  shyGameSync();                       // E25: the shy fold reads the live hand every frame
+  tboxBreath(t);                       // E25: the idle lid sigh — paint only, never a save
   if(SCREEN==='game'||SCREEN==='play') draw(); else drawMenu();
   if($('store').style.display==='flex') aisleFrame();   // E13: the aisle's live cards (visible ones only)
   requestAnimationFrame(frame);
@@ -7399,6 +7538,17 @@ window.TS={
       trains:PLAY.trains.map(tr=>({ id:tr.id, color:tr.color, speed:tr.speed, dying:!!tr.dying,
         pauseT:tr.pauseT, d:loopCoord(tr.cars[0].rd),
         cars:tr.cars.map(c=>[c.rd.cx,c.rd.cy,c.rd.el?1:0]) })) }; },
+  },
+  // ---- the corner toy box rig (E25) — state + a door for the battery ----
+  tbox:{
+    open(b){ tboxShow(b!==false); return TBOX.open; },
+    state(){
+      const b=$('tbox').getBoundingClientRect(), s=$('spread').getBoundingClientRect();
+      return { open:TBOX.open, side:TBOX_SIDE, shy:document.body.classList.contains('shygame'),
+        box:{x:b.left,y:b.top,w:b.width,h:b.height},
+        spread:{x:s.left,y:s.top,w:s.width,h:s.height,
+          vis:getComputedStyle($('spread')).visibility} };
+    },
   },
   // ---- the toy box rig (E7) ----
   coll:{
