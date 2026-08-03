@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v3.5 -->
+<!-- TRAINSET v3.6 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -97,15 +97,15 @@
   #nextBtn{ position:absolute; left:50%; bottom:150px; transform:translateX(-50%); z-index:8; display:none;
     border-color:#F2C531; color:#F2C531; }
   #nextBtn:active{ transform:translateX(-50%) translateY(2px); }
-  /* ---- the PLAY tray (E6 → E25): the five round train buttons ride the toy box
-     spread now — same buttons, same E16 drags, new furniture ---- */
+  /* ---- the PLAY tray (E6 → E25 → E27): the five round train buttons ride the
+     toy box spread — E27 seats them on the square's own BOX_COLS grid ---- */
   #spTray{
-    display:none; align-items:center; gap:calc(var(--ui)*18px);
-    padding:calc(var(--ui)*10px); overflow-x:auto; max-width:100%; touch-action:pan-x;
+    display:none; gap:calc(var(--ui)*8px); align-content:center; justify-content:center;
+    padding:calc(var(--ui)*8px); overflow-y:auto; max-width:100%; flex:1; touch-action:pan-y;
   }
-  .tray{ width:calc(var(--ui)*78px); height:calc(var(--ui)*78px); border-radius:50%; background:#170f08; border:3px solid #513a24;
+  .tray{ width:calc(var(--ui)*var(--tc,46)*1px); height:calc(var(--ui)*var(--tc,46)*1px); border-radius:50%; background:#170f08; border:3px solid #513a24;
     cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; touch-action:none; }
-  .tray canvas{ width:calc(var(--ui)*62px); height:calc(var(--ui)*38px); pointer-events:none; }
+  .tray canvas{ width:calc(var(--ui)*var(--tc,46)*0.8*1px); height:calc(var(--ui)*var(--tc,46)*0.49*1px); pointer-events:none; }
   .tray:active{ transform:translateY(2px); }
   /* ---- the toy box (E7): a wooden shelf of fifty little slots ---- */
   #toybox{ position:absolute; inset:0; z-index:12; display:none; align-items:center; justify-content:center;
@@ -304,36 +304,75 @@
     font-family:inherit; font-size:10px; letter-spacing:1px; cursor:pointer; padding:4px 8px; }
   /* ---- E25 THE TOY BOX ON THE RUG — #bar and #ptray are DEAD. The rug gets the
      whole screen; the only resident gameplay chrome is a little wooden toy box
-     tucked bottom-left. Tap it and a wooden tray SPREAD rises out of it (≤40% of
-     the screen, stamped from SPREAD_VH) carrying EXACTLY what the bar carried —
-     the E16 drag laws, THE GATE, the E13 lifted scroll — and it puts itself away
-     the moment a drag leaves it or a finger lands on the map. ---- */
+     tucked bottom-left. Tap it and a wooden tray SPREAD rises out of it
+     carrying EXACTLY what the bar carried — the E16 drag laws, THE GATE, the
+     E13 lifted scroll — and it puts itself away the moment a drag leaves it or
+     a finger lands on the map.
+     E27 THE SQUARE BOX: the spread stops being a bench across the screen — a
+     compact near-square panel (resize() stamps its width/height: the 40vh law
+     where it's roomy, width- and chip-clearance-capped on phones, SPREAD_AR
+     wide), tabs re-furnitured as a vertical plaque SPINE down the left wall
+     (the E22 department grammar), cards in a BOX_COLS grid that scrolls
+     VERTICALLY (the E13 recipe rotated 90°), TIDY UP + MORE TOYS pinned as a
+     footer. #shelfTrain is DEAD here (E27 THE EAGER TRAIN) — the CSS scoping
+     below hides it only while the #shelf node is home in the spread; the
+     bedroom borrows the node and keeps the whole train shelf. ---- */
   #tbox{ position:absolute; left:calc(var(--ui)*5px); bottom:calc(var(--ui)*5px + env(safe-area-inset-bottom));
     z-index:7; width:calc(var(--ui)*36px); height:calc(var(--ui)*36px);
     background:none; border:none; padding:0; cursor:pointer; touch-action:none; display:none; }
   #tbox canvas{ width:100%; height:100%; display:block; pointer-events:none;
     filter:drop-shadow(0 calc(var(--ui)*2px) calc(var(--ui)*4px) rgba(0,0,0,0.45)); }
   #spread{ position:absolute; left:calc(var(--ui)*5px); bottom:calc(var(--ui)*38px + env(safe-area-inset-bottom));
-    z-index:6; max-width:calc(100vw - var(--ui)*10px); max-height:40vh; overflow:hidden;
+    z-index:6; max-width:calc(100vw - var(--ui)*10px); overflow:hidden;
     background:linear-gradient(rgba(58,42,24,0.93),rgba(36,26,14,0.93));
     border:calc(var(--ui)*2px) solid #6e5130; border-radius:calc(var(--ui)*14px);
     box-shadow:0 calc(var(--ui)*7px) calc(var(--ui)*22px) rgba(0,0,0,0.5);
-    display:flex; align-items:flex-end;
+    display:flex; align-items:stretch;
     transform-origin:calc(var(--ui)*18px) 100%;
     transform:translateY(calc(var(--ui)*14px)) scale(0.3,0.06); opacity:0;
     visibility:hidden; pointer-events:none;
     transition:transform var(--tbms,0.2s) ease, opacity var(--tbms,0.2s) ease, visibility 0s var(--tbms,0.2s); }
   #spread.open{ transform:none; opacity:1; visibility:visible; pointer-events:auto;
     transition:transform var(--tbms,0.2s) ease, opacity var(--tbms,0.2s) ease, visibility 0s 0s; }
-  /* the shelf row inside the spread — E20's one-shelf law, re-housed verbatim:
-     native pan-x for touch, grab-drag + fling for the mouse, a travelled tap is
-     a scroll never a pick. ⚠ NO scrollbar skin here — the classic-scrollbar
-     trap died with the bar; do not resurrect it in the spread. */
-  #spShelf{ display:flex; align-items:center; gap:calc(var(--ui)*10px);
-    padding:calc(var(--ui)*8px) calc(var(--ui)*10px);
-    overflow-x:auto; max-width:100%;
-    scroll-snap-type:x proximity; touch-action:pan-x; cursor:grab; }
-  #spShelf .pbtn,#spShelf .ptab{ scroll-snap-align:center; }
+  /* the card grid inside the square (E27) — E20's one shelf, rotated 90°:
+     native pan-y for touch, grab-drag + fling for the mouse, a travelled tap is
+     a scroll never a pick. The wrapper spans (palSlot, its groups, shelf,
+     shelfCars, shelfEng) flatten away with display:contents so every card is a
+     grid item — the SAME nodes serve the bedroom untouched when it borrows the
+     #shelf. ⚠ NO scrollbar skin here — the classic-scrollbar trap died with
+     the bar; do not resurrect it in the spread. */
+  #spBody{ flex:1; display:none; flex-direction:column; min-width:0; min-height:0; }
+  #spShelf{ flex:1; min-height:0; display:grid; gap:calc(var(--ui)*5px);
+    align-content:start; justify-content:start;
+    padding:calc(var(--ui)*5px);
+    overflow-y:auto; overflow-x:hidden;
+    scroll-snap-type:y proximity; touch-action:pan-y; cursor:grab; }
+  #spread #spShelf .pbtn{ scroll-snap-align:center; width:calc(var(--ui)*var(--bc,35)*1px); }
+  #spread #spShelf .pbtn canvas{ width:calc(var(--ui)*var(--bc,35)*0.7*1px); height:calc(var(--ui)*var(--bc,35)*0.7*1px); }
+  #spread #spShelf .pbtn small{ font-size:calc(var(--ui)*var(--bc,35)*0.17*1px); }
+  #spShelf #palSlot,#spShelf #palSlot>span,#spShelf #shelf,#spShelf #shelfCars,#spShelf #shelfEng{ display:contents; }
+  #spShelf #barSpace,#spShelf #shelfTrain{ display:none; }
+  #spFoot{ flex:0 0 auto; display:flex; gap:calc(var(--ui)*6px);
+    padding:calc(var(--ui)*4px) calc(var(--ui)*5px);
+    border-top:calc(var(--ui)*2px) solid #6e5130; align-items:center; justify-content:center; }
+  /* the footer's two doors are slim pills — a row, never a shelf of big cards */
+  #spFoot .pbtn{ width:auto; flex-direction:row; gap:calc(var(--ui)*3px);
+    padding:calc(var(--ui)*3px) calc(var(--ui)*7px); }
+  #spFoot .pbtn b{ font-size:calc(var(--ui)*10px); }
+  #spFoot .pbtn small{ font-size:calc(var(--ui)*6.5px); }
+  /* ---- THE HANDY FIVE (E27): the last-used pieces stacked on the LEFT edge,
+     centered between the wordmark/LEVEL chip and the toy box — grab and go, no
+     box trip. Icon-only, DOM chrome (touches never reach the canvas), folds
+     with the shy fold and yields the edge while the box is out. ---- */
+  #handy{ position:absolute; left:calc(var(--ui)*5px); top:60px;
+    bottom:calc(var(--ui)*44px + env(safe-area-inset-bottom));
+    z-index:5; display:none; flex-direction:column; justify-content:center;
+    gap:calc(var(--ui)*3px); pointer-events:none;
+    transition:opacity var(--shygame,0.25s) ease; }
+  #handy .pbtn{ pointer-events:auto; width:calc(var(--ui)*var(--hc,32)*1px); padding:calc(var(--ui)*2px); }
+  #handy .pbtn canvas{ width:100%; height:auto; }
+  body.shygame #handy,body.tboxopen #handy{ opacity:0; }
+  body.shygame #handy .pbtn,body.tboxopen #handy .pbtn{ pointer-events:none; }
   .pbtn{
     width:calc(var(--ui)*72px); background:#170f08; border:2px solid #513a24; border-radius:calc(var(--ui)*12px);
     padding:calc(var(--ui)*4px) calc(var(--ui)*2px) calc(var(--ui)*3px); text-align:center; cursor:grab; color:#CBB88C;
@@ -341,13 +380,19 @@
   }
   .pbtn canvas{ width:calc(var(--ui)*52px); height:calc(var(--ui)*52px); pointer-events:none; }
   .pbtn small{ font-size:calc(var(--ui)*8.5px); letter-spacing:0.5px; pointer-events:none; }
-  /* E20: the E10 two-row tab grid is DEAD (and the taller-bar trap with it) —
-     the tabs ride the one shelf in a single row and scroll with everything else */
-  #palTabs{ display:flex; gap:calc(var(--ui)*4px); }
-  .ptab{ background:#170f08; border:2px solid #513a24; border-radius:calc(var(--ui)*9px); color:#8f7a52;
-    font-family:inherit; font-size:calc(var(--ui)*9px); letter-spacing:1px; padding:calc(var(--ui)*5px) calc(var(--ui)*7px);
-    cursor:pointer; touch-action:pan-x; }   /* pan-x: a tab is also shelf wood — swipes scroll, taps pick */
-  .ptab.on{ color:#F2C531; border-color:#F2C531; }
+  /* E27: the tabs are a SPINE — a vertical column of little wooden department
+     plaques down the square's left wall (the E22 .shtab grammar, active one
+     lit). They live OUTSIDE the scroll area now: plain taps, no shelf-wood
+     touch-action, no travelled-tap guard. */
+  #palTabs{ display:none; flex-direction:column; gap:calc(var(--ui)*3px);
+    padding:calc(var(--ui)*4px); overflow-y:auto; flex:0 0 auto;
+    border-right:calc(var(--ui)*2px) solid #6e5130; align-content:start; }
+  .ptab{ background:linear-gradient(#7A553A,#5C3F28); border:2px solid #3a2a18; border-radius:calc(var(--ui)*7px);
+    color:#F2E2B8; font-family:inherit; font-size:calc(var(--ui)*6.5px); letter-spacing:1px;
+    padding:calc(var(--ui)*4px) calc(var(--ui)*5px); cursor:pointer; text-align:center;
+    text-shadow:0 1px 0 rgba(0,0,0,0.35); }
+  .ptab.on{ background:linear-gradient(#F7D14A,#D9A93B); border-color:#8F6B1E; color:#3A2A18;
+    font-weight:bold; text-shadow:none; }
   .wig{ animation:wig 0.4s; }
   @keyframes wig{ 0%,100%{transform:rotate(0)} 25%{transform:rotate(-6deg)} 75%{transform:rotate(6deg)} }
   #barSpace{ width:calc(var(--ui)*14px); flex:0 0 auto; }
@@ -415,18 +460,15 @@
     .pbtn{ width:calc(var(--ui)*47px); } .pbtn canvas{ width:calc(var(--ui)*33px); height:calc(var(--ui)*33px); }
     .pbtn small{ font-size:calc(var(--ui)*7px); }
     #spShelf{ gap:calc(var(--ui)*3px); }
-    #barSpace{ width:calc(var(--ui)*5px); }
-    #palSlot{ gap:calc(var(--ui)*3px) !important; }
-    #palSlot>span{ gap:calc(var(--ui)*3px) !important; }
-    #shelf{ gap:calc(var(--ui)*3px); } #shelfCars,#shelfEng{ gap:calc(var(--ui)*3px); }
-    #shelfCars .pbtn,#shelfEng .pbtn{ width:calc(var(--ui)*39px); }
-    #shelfTrain canvas{ width:calc(var(--ui)*70px); height:calc(var(--ui)*33px); }
-    .ptab{ font-size:calc(var(--ui)*7.5px); padding:calc(var(--ui)*4px) calc(var(--ui)*3px); }
+    /* E27: the spread cards ride the --bc dial (resize() stamps the sm value);
+       the bedroom keeps its own exact sm sizes — it borrows the #shelf node */
+    #bedbar #shelf{ gap:calc(var(--ui)*3px); } #bedbar #shelfCars,#bedbar #shelfEng{ gap:calc(var(--ui)*3px); }
+    #bedbar #shelfCars .pbtn,#bedbar #shelfEng .pbtn{ width:calc(var(--ui)*39px); }
+    #bedbar #shelfTrain canvas{ width:calc(var(--ui)*70px); height:calc(var(--ui)*33px); }
+    .ptab{ font-size:calc(var(--ui)*6px); padding:calc(var(--ui)*3px) calc(var(--ui)*3px); }
     #moreToys b,#tidyBtn b{ font-size:calc(var(--ui)*16px); }
     .mbtn{ font-size:17px; padding:11px 30px; letter-spacing:2px; }
-    .tray{ width:calc(var(--ui)*58px); height:calc(var(--ui)*58px); }
-    .tray canvas{ width:calc(var(--ui)*46px); height:calc(var(--ui)*28px); }
-    #spTray{ gap:calc(var(--ui)*10px); padding:calc(var(--ui)*7px) calc(var(--ui)*8px); }
+    #spTray{ gap:calc(var(--ui)*6px); padding:calc(var(--ui)*6px); }
     .sw canvas{ width:44px; height:27px; }
     #paintCap{ display:none; }
     /* E25: the chips ride the v2.8 size on EVERY viewport now — the sm overrides
@@ -509,12 +551,19 @@
      it never pans with the world. The face canvas keeps a fixed backing store
      (TBOX_PX×2×ICON_RES) like every chrome icon. -->
 <button id="tbox" type="button"><canvas id="tboxCv" width="144" height="144"></canvas></button>
+<!-- E27 THE HANDY FIVE: the recently-used stack on the left edge — DOM chrome,
+     empty = hidden, session-only (handySync builds the cards) -->
+<div id="handy"></div>
+<!-- E27 THE SQUARE BOX: plaque spine | vertical card grid + pinned footer | tray -->
 <div id="spread">
-  <div id="spShelf">
-    <span id="palTabs"><button class="ptab on" id="tabTrack" type="button">TRACK</button><button class="ptab" id="tabScen" type="button">SCENERY</button><button class="ptab" id="tabTown" type="button">TOWN</button><button class="ptab" id="tabFriends" type="button">FRIENDS</button><button class="ptab" id="tabRug" type="button">RUG</button></span>
-    <span id="palSlot" style="display:flex;gap:8px;"></span>
-    <span id="barSpace"></span>
-    <span id="shelf"></span>
+  <span id="palTabs"><button class="ptab on" id="tabTrack" type="button">TRACK</button><button class="ptab" id="tabScen" type="button">SCENERY</button><button class="ptab" id="tabTown" type="button">TOWN</button><button class="ptab" id="tabFriends" type="button">FRIENDS</button><button class="ptab" id="tabRug" type="button">RUG</button></span>
+  <div id="spBody">
+    <div id="spShelf">
+      <span id="palSlot"></span>
+      <span id="barSpace"></span>
+      <span id="shelf"></span>
+    </div>
+    <div id="spFoot"></div>
   </div>
   <div id="spTray"></div>
 </div>
@@ -715,7 +764,7 @@ const CAMP_LABEL='TICKETS';   // E26: the wall board's pill (was the CAMPAIGN bu
 const HINT_MAX=5;
 const HINT_WORDS=new Set(('BUILD FINISH GO GET AROUND OVER THROUGH STOP AT USE LET VISIT '+
   'THE A AND BOTH POND TRACK WOODS RIVER FARM STATION STATIONS CROSSING TUNNEL SPLIT TOWN '+
-  'SLIDE RUG TO LOOK').split(' '));   // E24: the pan coach's words join the kid list
+  'SLIDE RUG TO LOOK PUT DOWN').split(' '));   // E24: the pan coach's words join the kid list · E27: the station coach's too
 const hintWords=h=>h.replace(/[^A-Z ]/g,'').split(/\s+/).filter(Boolean);
 const GAP_GLOW=true;          // level 2's missing cells breathe a soft gold (5-year-old kindness)
 const TOY_CARD='NEW TOY!';    // the ceremony headline over each freshly-won toy
@@ -811,6 +860,20 @@ const TBOX_MS=200;             // the spread's rise/collapse, ms (--tbms)
 const TBOX_BREATH_S=4.5;       // seconds between idle lid breaths — a quiet pick-me, never a modal
 const SHY_GAME=true;           // THE SHY FOLD: chrome fades while a drag or a real pan is live
 const SHY_GAME_MS=250;         // the fold's fade, ms (--shygame)
+// ---- Wyatt dials (EXPANSION 27 — one block) ----
+// CLOSE AT HAND & THE EAGER TRAIN. Wyatt 8/3, reviewing the spread on his
+// phone: "it shouldn't be this rectangle across the screen… maybe more of a
+// square… an area for recently used pieces vertically… maybe five… the train
+// should start immediately when you finish the track. It shouldn't be under
+// friends. Once the track's finished with the station boom it goes."
+const SPREAD_AR=1.15;          // A THE SQUARE BOX: width = height × this (shape law: 0.8..1.25)
+const BOX_COLS=3;              // cards per row on the square's grid
+const BOX_CARD=35;             // spread card width ×--ui (≤820px viewports ride 29 — resize() stamps --bc)
+const HANDY_MAX=5;             // B THE HANDY FIVE: recently-used pieces in the stack (his five)
+const HANDY_CARD=32;           // stack card width ×--ui, ~64px at the desk dial (≤820px rides 26 — --hc)
+const EAGER_PAN=0.4;           // C THE EAGER TRAIN: seconds of camera ease when she arrives off-screen
+const EAGER_WHISTLE=true;      // the far whistle that announces her
+const EAGER_COACH='PUT DOWN A STATION';   // BUILD's stationless finished line — once a session, then silence
 // ---- Wyatt dials (EXPANSION 15 — one block) ----
 // A. GRAVITY AS DRAMA. grade is measured in ELEVATION LEVELS PER CELL of arc
 // (pos().z interps levels along the path; LIFT px per level is the height it
@@ -1099,7 +1162,7 @@ function clampView(){
   VIEW.ox= ww<=vw? (vw-ww)/2 : Math.max(vw-ww,Math.min(0,VIEW.ox));
   VIEW.oy= wh<=vh? (vh-wh)/2 : Math.max(vh-wh,Math.min(0,VIEW.oy));
 }
-function viewFit(){ followSet(false); CAM.off=false; VIEW.s=fitScale(); VIEW.vx=VIEW.vy=0; clampView(); viewApply(); }   // E15: HOME is a camera hand — follow lets go
+function viewFit(){ followSet(false); CAM.off=false; EAGERC=null; VIEW.s=fitScale(); VIEW.vx=VIEW.vy=0; clampView(); viewApply(); }   // E15: HOME is a camera hand — follow lets go (E27: and the arrival ease)
 // E20 — where the big default LOOKS: the placed train if there is one, else the
 // middle of everything on the rug (starter line, glued campaign land, the PLAY
 // map — one scan serves all three), else the rug's own centre.
@@ -1113,7 +1176,7 @@ function baseAim(){
   return n? [sx/n,sy/n] : [WORLD_W/2,WORLD_H/2];
 }
 function viewBase(){   // the E20 entry view: close to the toys, centered on the action
-  followSet(false); CAM.off=false;
+  followSet(false); CAM.off=false; EAGERC=null;   // E27: the entry camera outranks the arrival ease
   VIEW.s=baseScale(); VIEW.vx=VIEW.vy=0;
   const [ax,ay]=baseAim();
   VIEW.ox=W/2-ax*VIEW.s; VIEW.oy=(H-BAR)/2-ay*VIEW.s;
@@ -3915,8 +3978,11 @@ function drawGhosts(){
 const HINTS=[
   'DRAG A PIECE OF TRACK ONTO THE RUG',
   'TAP A PIECE TO TURN IT · DRAG IT TO MOVE IT',
-  'NOW DRAG YOUR TRAIN ONTO THE TRACK',
-  'DRAG YOUR TRAIN ONTO THE TRACK',
+  // E27: the drag-the-train-on ritual is DEAD — the eager train arrives when
+  // the line is finished, so stages 2/3 coach the finish (arrival passes them,
+  // exactly where the old drop did)
+  'FINISH THE TRACK',
+  'FINISH THE TRACK',
   'PICK UP THE ENGINE TO STOP IT',
 ];
 // E20 — canvas chrome rides the --ui dial too. Each painter scales by uiCard():
@@ -6005,6 +6071,7 @@ function swRotate(gx,gy){
     trainHome(false);
   }
   pc.r=(pc.r+1)%4; pc.ra={k:1}; pc.latch=null; SND.click(); save();
+  eagerTry();   // E27: a long-press turn is a track mutation too
 }
 cvs.addEventListener('pointerdown',e=>{
   if(SCREEN!=='game'&&SCREEN!=='play'){          // the menu room is furniture + a live floor (E18→E26)
@@ -6124,7 +6191,7 @@ function moveCore(e){
   if(Math.hypot(e.clientX-down.x,e.clientY-down.y)<8) return;
   e.preventDefault();
   if(down.lp){ clearTimeout(down.lp); down.lp=null; }
-  if(down.what==='pal'){ DRAG=down.layer!=='track'? {kind:'newScen',t:down.t,v:down.v|0} : {kind:'newPiece',t:down.t,r:0}; }
+  if(down.what==='pal'){ DRAG=down.layer!=='track'? {kind:'newScen',t:down.t,v:down.v|0,layer:down.layer} : {kind:'newPiece',t:down.t,r:0}; }   // E27: the layer rides along — the HANDY stack files by it
   else if(down.what==='piece'){
     const [gx,gy]=down.cell, pc=pieceTop(gx,gy);
     if(pc){
@@ -6179,8 +6246,9 @@ function moveCore(e){
   if(DRAG){
     // E25 DISMISS LAW 1 — the moment a DRAG is born of the spread, the box
     // shuts itself while the E19 lift carries the toy: placing always happens
-    // on a full-screen rug.
-    if(TBOX.open&&SPREAD_SRC.has(down.what)) tboxShow(false);
+    // on a full-screen rug. E27: a HANDY-stack drag (down.hf) is NOT of the
+    // spread — it never opens or closes the box.
+    if(TBOX.open&&SPREAD_SRC.has(down.what)&&!down.hf) tboxShow(false);
     DRAG.t0=perf(); DRAG.pt=e.pointerType; DRAG.cx=e.clientX; DRAG.cy=e.clientY;   // E19: the grab stamp — the lift ramps from here
     const [wx,wy]=dragXY(e); DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy); down=null; }
 }
@@ -6212,6 +6280,9 @@ function upCore(e){
         SND.tok(); puff(GX+hover[0]*C+C/2,GY+hover[1]*C+C/2,14);
         hintPass(0); if(grid.size>=3) hintPass(1);
         save();
+        if(!BED.ctx) EAGER.last={x:hover[0],y:hover[1],el:q.elev?1:0};   // E27: the hand's newest piece — the arrival's fallback anchor
+        if(DRAG.kind==='newPiece') handyBump(DRAG.t,'track');            // E27: the stack learns what the hand uses
+        eagerTry();                                                      // E27: mutation + finished + trainless = she comes
       } else if(hover){
         if(DRAG.kind==='movePiece'){ setTrackPiece(DRAG.t,DRAG.r,DRAG.sel,DRAG.elev|0,DRAG.from[0],DRAG.from[1]); save(); }
         let msg='THAT SPOT IS TAKEN';
@@ -6230,7 +6301,7 @@ function upCore(e){
         }
         toast(msg);
       } else {
-        if(DRAG.kind==='movePiece'){ SND.pop(); puff(wx,wy,14); save(); }
+        if(DRAG.kind==='movePiece'){ SND.pop(); puff(wx,wy,14); save(); eagerTry(); }   // E27: a removal is a track mutation too
       }
     }
     else if(DRAG.kind==='newScen'||DRAG.kind==='moveScen'){
@@ -6238,6 +6309,7 @@ function upCore(e){
         scen.set(key(hover[0],hover[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:1,wave:0});
         SND.tok(); puff(GX+hover[0]*C+C/2,GY+hover[1]*C+C/2,14);
         save();
+        if(DRAG.kind==='newScen') handyBump(DRAG.t,DRAG.layer);   // E27: scenery joins the stack (track law: no eager — the graph didn't change)
       } else if(hover){
         if(DRAG.kind==='moveScen'){ scen.set(key(DRAG.from[0],DRAG.from[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0}); save(); }
         toast((DRAG.t==='rv'||DRAG.t==='pond')&&pieceAt(hover[0],hover[1])?'WATER AND TRACK DON\'T MIX — TRY A BRIDGE!':'THAT SPOT IS TAKEN');
@@ -6263,9 +6335,18 @@ function upCore(e){
         // revSinceGo, visited) lives in there. The whistle sells the toy.
         else if(AUTO_GO==='all'||(AUTO_GO==='camp'&&CAMP.on)){ goTrain(); SND.whistle(); hintPass(4); }
       } else {
-        if(hover && pieceTop(hover[0],hover[1])) toast('TOO SHORT FOR THIS TRAIN!');
-        if(DRAG.prev){ TRAIN.cars=DRAG.prev.map(c=>({type:c.type,rd:clone(c.rd),face:c.face,squash:0})); TRAIN.placed=true; TRAIN.F=DRAG.prevF;
-          if(CAMP.on) consist=DRAG.prev.slice(1).map(c=>c.type);   // E21: a refused drop hands the SAME gift back — the roll un-rolls
+        const onTrack=hover && pieceTop(hover[0],hover[1]);
+        if(onTrack) toast('TOO SHORT FOR THIS TRAIN!');
+        if(DRAG.prev){
+          if(onTrack||BED.ctx){   // a REFUSED drop hands her back (and the bedroom keeps its restore law)
+            TRAIN.cars=DRAG.prev.map(c=>({type:c.type,rd:clone(c.rd),face:c.face,squash:0})); TRAIN.placed=true; TRAIN.F=DRAG.prevF;
+            if(CAMP.on) consist=DRAG.prev.slice(1).map(c=>c.type);   // E21: a refused drop hands the SAME gift back — the roll un-rolls
+          } else {
+            // E27 GRAB HER OFF — dropped off the line, she goes quiet (no
+            // shelf item exists to bring her home any other way). Quiet until
+            // the next track edit calls her back; latches + riders sweep too.
+            trainHome(true); SND.pop(); puff(wx,wy,16);
+          }
         }
         else toast('BACK ON THE SHELF');
       }
@@ -6327,16 +6408,20 @@ function upCore(e){
     else if(down.what==='piece'){
       const [gx,gy]=down.cell, pc=pieceTop(gx,gy);
       if(pc){
-        if(pc.glued){ gluedTug(pc,null); }        // no rotating the glued land either
+        // E27 TAP THE STATION = CALL THE TRAIN — on a finished trainless line
+        // the station is the do-it-again button (in a level it re-rolls the
+        // gift). Glued stations answer too; a running train keeps today's ladder.
+        if(pc.t==='st' && !TRAIN.placed && eagerSummon(gx,gy)){}
+        else if(pc.glued){ gluedTug(pc,null); }   // no rotating the glued land either
         else if(pc.t==='sw'){
           // TAP THE PIECE = THROW THE POINTS (rotation lives on a long-press)
           if(TRAIN.placed && (pc.latch || trainOn(gx,gy,pc))){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
-          else { pc.sel^=1; SND.click(); save(); }
+          else { pc.sel^=1; SND.click(); save(); eagerTry(); }   // E27: thrown points re-route the line
         }
         else if(TRAIN.placed && trainOn(gx,gy,pc)){
           if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
           else { trainHome(false); pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); save(); }
-        } else { pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); hintPass(1); save(); }
+        } else { pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); hintPass(1); save(); eagerTry(); }   // E27: a turn is a track mutation
       }
     }
     else if(down.what==='scen'){
@@ -6350,7 +6435,10 @@ function upCore(e){
         else { s.ra={k:1}; SND.rustle(); }
       }
     }
-    else if(down.what==='pal'){ wiggle(down.el); toast('DRAG IT ONTO THE RUG!'); }
+    else if(down.what==='pal'){
+      if(down.hf){ wiggle(down.el); SND.chirp(); }   // E27: a stack tap is alive — but only drags spawn (the E16 tray law)
+      else { wiggle(down.el); toast('DRAG IT ONTO THE RUG!'); }
+    }
     else if(down.what==='handle'){ toast('DRAG IT ONTO THE TRACK!'); }
     // E16 — the shelf speaks drag: a bare tap wiggles and points at the verb
     else if(down.what==='shelfCar'){ wiggle(down.el); toast('DRAG IT ONTO YOUR TRAIN!'); }
@@ -6485,7 +6573,9 @@ function buildPalette(){
   const groups={ track:document.createElement('span'), scen:document.createElement('span'),
                  town:document.createElement('span'), friends:document.createElement('span'),
                  rug:document.createElement('span') };
-  for(const k2 in groups){ groups[k2].style.cssText='display:flex;gap:8px;'; slot.appendChild(groups[k2]); }
+  // E27: a visible group is display:contents (stylesheet) — its cards flatten
+  // straight into the square's grid; hidden groups stay display:none inline.
+  for(const k2 in groups) slot.appendChild(groups[k2]);
   groups.scen.style.display='none'; groups.town.style.display='none'; groups.friends.style.display='none';
   groups.rug.style.display='none';
   const mk=(layer,t,name,paint)=>{
@@ -6511,7 +6601,7 @@ function buildPalette(){
   // ---- THE RUG TAB (E10): SIZE · LAND · WEATHER — picture tiles, tap to pick ----
   const mkRug=(kind,id,name,paint)=>{
     const b=document.createElement('button'); b.className='pbtn'; b.type='button';
-    b.style.touchAction='pan-x';   // E20: a tap-tile is shelf wood — swipes scroll the bar, taps pick
+    b.style.touchAction='pan-y';   // E20→E27: a tap-tile is shelf wood — swipes scroll the (vertical) shelf, taps pick
     const cv=document.createElement('canvas'); const lb=document.createElement('small');
     lb.textContent=name; b.appendChild(cv); b.appendChild(lb); groups.rug.appendChild(b);
     cv.width=104*ICON_RES; cv.height=104*ICON_RES;
@@ -6530,45 +6620,47 @@ function buildPalette(){
   for(const [id,name] of [['sm','SMALL'],['lg','BIG'],['xl','HUGE']]) mkRug('size',id,name,g=>rugTileSize(g,id));
   for(const [id,name] of [['rug','THE RUG'],['west','WESTERN'],['snow','WINTER']]) mkRug('land',id,name,g=>rugTileLand(g,id));
   for(const [id,name] of [['clear','CLEAR'],['snowfall','SNOW'],['dust','DUST'],['rain','RAIN']]) mkRug('weather',id,name,g=>rugTileWx(g,id));
-  // the MORE TOYS… end-cap: BUILD's door into the toy box (E7)
+  // the MORE TOYS… end-cap: BUILD's door into the toy box (E7).
+  // E27: it lives on the square's pinned FOOTER now — outside the scroll area,
+  // so the travelled-tap guard retired with the shelf-wood touch-action.
   const more=document.createElement('button'); more.id='moreToys'; more.className='pbtn'; more.type='button';
-  more.style.touchAction='pan-x';   // E20: tap-buttons are shelf wood
   more.innerHTML='<b>🧸</b><small>'+BOX_MORE+'</small>';
-  more.addEventListener('click',()=>{ if(barDragged()) return; ac(); SND.tok(); boxShow(true); });
-  slot.appendChild(more);
+  more.addEventListener('click',()=>{ ac(); SND.tok(); boxShow(true); });
+  $('spFoot').appendChild(more);
   // TIDY UP (E16): the sweep-the-rug button, out of the retired shed's foot.
   // Still two taps — the first arms it, a moment of nothing disarms it.
   const tidy=document.createElement('button'); tidy.id='tidyBtn'; tidy.className='pbtn'; tidy.type='button';
-  tidy.style.touchAction='pan-x';   // E20: tap-buttons are shelf wood
   tidy.innerHTML='<b>🧹</b><small>TIDY UP</small>';
   let tidyArm=0;
   const tidyOff=()=>{ tidyArm=0; tidy.classList.remove('ask'); tidy.querySelector('small').textContent='TIDY UP'; };
   tidy.addEventListener('click',()=>{
-    if(barDragged()) return;        // E20: a scrolled shelf never sweeps the rug
     ac();
     if(tidyArm){
       clearTimeout(tidyArm); tidyOff();
       if(CAMP.on) clearPlayer();             // sweep the kid's line; the glued land stays put
       else { grid.clear(); hgrid.clear(); scen.clear(); trainHome(true); }
       SND.pop(); save(); toast('ALL TIDY!');
+      eagerTry();   // E27: the sweep is a track mutation — a finished glued line may call her
     } else {
       SND.click(); tidy.classList.add('ask'); tidy.querySelector('small').textContent='TAP AGAIN';
       tidyArm=setTimeout(tidyOff,2600);
     }
   });
-  slot.appendChild(tidy);
+  $('spFoot').appendChild(tidy);
   const sync=tab=>{
     palTab=tab;
-    for(const k2 in groups) groups[k2].style.display=tab===k2?'flex':'none';
+    for(const k2 in groups) groups[k2].style.display=tab===k2?'':'none';   // E27: '' = the stylesheet's display:contents (grid items)
     $('tabTrack').classList.toggle('on',tab==='track');
     $('tabScen').classList.toggle('on',tab==='scen');
     $('tabTown').classList.toggle('on',tab==='town');
     $('tabFriends').classList.toggle('on',tab==='friends');
     $('tabRug').classList.toggle('on',tab==='rug');
+    $('spShelf').scrollTop=0;   // a fresh department opens at its top shelf
   };
   buildPalette.sync=sync;
-  // E20: tab taps ride the shelf — a tap that travelled is a scroll, not a pick
-  const tabTap=(id,tab)=>$(id).addEventListener('click',()=>{ if(barDragged()) return; ac(); SND.click(); sync(tab); });
+  // E27: the plaques live on the SPINE, outside the scroll area — plain taps
+  // (the travelled-tap guard would read the LAST shelf gesture forever here)
+  const tabTap=(id,tab)=>$(id).addEventListener('click',()=>{ ac(); SND.click(); sync(tab); });
   tabTap('tabTrack','track'); tabTap('tabScen','scen'); tabTap('tabTown','town');
   tabTap('tabFriends','friends'); tabTap('tabRug','rug');
 }
@@ -6580,40 +6672,40 @@ function buildPalette(){
    never a pick. DRAG-SOURCE toys keep touch-action:none and never
    start a grab-scroll — the hand lifting a piece out always wins.
    ===================================================================== */
-let BARSC={down:false,moved:0,x:0,y:0,sl:0,vx:0,lx:0,lt:0,id:null,mouse:false};
+let BARSC={down:false,moved:0,x:0,y:0,st:0,vy:0,ly:0,lt:0,id:null,mouse:false};
 const barDragged=()=>BARSC.moved>8;
 function barFling(v){               // a mouse flick keeps the shelf rolling (touch gets this natively)
   const el=$('spShelf'); let lt=performance.now();
   const step=t=>{
     const dt2=Math.min(0.05,(t-lt)/1000); lt=t;
-    el.scrollLeft+=v*dt2;
+    el.scrollTop+=v*dt2;
     v*=Math.pow(0.04,dt2);
     if(Math.abs(v)>40&&!BARSC.down) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
 }
-function buildBarScroll(){
+function buildBarScroll(){          // E27: the E13 recipe rotated 90° — the square's grid scrolls DOWN
   const el=$('spShelf');
   el.addEventListener('pointerdown',e=>{
     if(e.target.closest&&e.target.closest('.drg')) return;   // a toy in the hand beats the shelf
-    BARSC={down:true,moved:0,x:e.clientX,y:e.clientY,sl:el.scrollLeft,vx:0,
-      lx:e.clientX,lt:performance.now(),id:e.pointerId,mouse:e.pointerType!=='touch'};
+    BARSC={down:true,moved:0,x:e.clientX,y:e.clientY,st:el.scrollTop,vy:0,
+      ly:e.clientY,lt:performance.now(),id:e.pointerId,mouse:e.pointerType!=='touch'};
   });
   el.addEventListener('pointermove',e=>{
     const d2=BARSC; if(!d2.down) return;
     d2.moved=Math.max(d2.moved,Math.hypot(e.clientX-d2.x,e.clientY-d2.y));
     if(d2.mouse&&d2.moved>8){        // a mouse drags the shelf by hand; touch pans natively
       if(d2.id!=null){ try{ el.setPointerCapture(d2.id); }catch(err){} d2.id=null; }
-      el.scrollLeft=d2.sl-(e.clientX-d2.x);
+      el.scrollTop=d2.st-(e.clientY-d2.y);
       const now=performance.now(), dt2=(now-d2.lt)/1000;
-      if(dt2>0.001) d2.vx=0.7*d2.vx+0.3*((d2.lx-e.clientX)/dt2);
-      d2.lx=e.clientX; d2.lt=now;
+      if(dt2>0.001) d2.vy=0.7*d2.vy+0.3*((d2.ly-e.clientY)/dt2);
+      d2.ly=e.clientY; d2.lt=now;
     }
   });
   const barUp=()=>{
     const d2=BARSC; if(!d2.down) return;
     d2.down=false;
-    if(d2.mouse&&d2.moved>8&&Math.abs(d2.vx)>60) barFling(d2.vx);
+    if(d2.mouse&&d2.moved>8&&Math.abs(d2.vy)>60) barFling(d2.vy);
   };
   el.addEventListener('pointerup',barUp);
   el.addEventListener('pointercancel',barUp);
@@ -6634,7 +6726,9 @@ function buildBarScroll(){
    a quiet pick-me, never a modal. Nothing in here ever saves.
    ===================================================================== */
 const TBOX={open:false,k:-1};
-const SPREAD_SRC=new Set(['pal','handle','shelfCar','shelfEng','tray']);   // a DRAG born of one of these came OUT of the spread
+const SPREAD_SRC=new Set(['pal','shelfCar','shelfEng','tray']);   // a DRAG born of one of these came OUT of the spread
+// E27: 'handle' left with the train item — the only #shelfTrain alive is the
+// bedroom's (the borrowed #shelf node), and the bedroom has no spread.
 function tboxPaint(k){         // k = lid lift 0..1 (the breath); TBOX.open leans the lid right back
   const cv=$('tboxCv'); if(!cv) return;
   const g=cv.getContext('2d'), u=cv.width/160;
@@ -6659,6 +6753,7 @@ function tboxShow(b){          // pure state — callers speak (sounds live at t
   if(TBOX.open===b) return;
   TBOX.open=b;
   $('spread').classList.toggle('open',b);
+  document.body.classList.toggle('tboxopen',b);   // E27: the HANDY stack yields the left edge while the box is out
   tboxPaint(b?1:0);
 }
 function tboxBreath(tms){      // rides frame(): the idle lid sigh, skipped under reduced motion
@@ -6676,9 +6771,11 @@ function shyGameSync(){        // THE SHY FOLD — one truth, read every frame, 
 function buildTbox(){
   document.documentElement.style.setProperty('--tbms',(TBOX_MS/1000)+'s');
   document.documentElement.style.setProperty('--shygame',(SHY_GAME_MS/1000)+'s');
-  const sp=$('spread'); sp.style.maxHeight=SPREAD_VH+'vh';
+  const sp=$('spread');   // E27: the square's size is stamped by resize() (the shape law)
+  $('spShelf').style.gridTemplateColumns='repeat('+BOX_COLS+',max-content)';   // the BOX_COLS dial
+  $('spTray').style.gridTemplateColumns='repeat('+BOX_COLS+',max-content)';
   if(TBOX_SIDE==='right'){     // the corner is a dial — flip both residents together
-    for(const el of [$('tbox'),sp]){ el.style.left='auto'; el.style.right='calc(var(--ui)*5px)'; }
+    for(const el of [$('tbox'),sp,$('handy')]){ el.style.left='auto'; el.style.right='calc(var(--ui)*5px)'; }
     sp.style.transformOrigin='calc(100% - var(--ui)*18px) 100%';
   }
   $('tbox').addEventListener('click',()=>{
@@ -6687,6 +6784,185 @@ function buildTbox(){
     tboxShow(b);
   });
   tboxPaint(0);
+}
+/* =====================================================================
+   THE HANDY FIVE (E27) — the last-used pieces, stacked on the LEFT
+   edge so repeat placements never reopen the box. MRU LAW: every
+   SUCCESSFUL placement of a palette kind (spread OR stack) tops it; a
+   kind appears once; over HANDY_MAX the bottom falls off. Ephemeral —
+   session-only, ZERO localStorage writes, resets on reload. PLAY shows
+   no stack (the tray is its whole game); the bedroom stays pure.
+   Drag semantics IDENTICAL to the source card: same down.what='pal'
+   descriptor (hf marks it stack-born so the box never opens/closes),
+   same ghost/rotate/E19 lift/E24 exemptions. Bare tap = E16 wiggle+
+   chirp. Gates re-checked at paint: the same coll predicate the spread
+   uses — entries hide, never grey.
+   ===================================================================== */
+const HANDY=[];                 // newest-first {t,layer} — never saved (C persists nothing)
+function handyBump(t,layer){
+  if(BED.ctx||SCREEN==='play') return;           // the tray is PLAY's game; the bedroom sandcastle stays pure
+  const i=HANDY.findIndex(h=>h.t===t);
+  if(i>=0) HANDY.splice(i,1);                    // a kind appears once — re-place re-tops
+  HANDY.unshift({t,layer:layer||'track'});
+  if(HANDY.length>HANDY_MAX) HANDY.length=HANDY_MAX;   // the bottom falls off
+  handySync();
+}
+function handySync(){
+  const el=$('handy'); if(!el) return;
+  const list=SCREEN==='game'? HANDY.filter(h=>coll.has(h.t)) : [];   // the spread's own gate, re-asked at paint
+  el.style.display=list.length?'flex':'none';    // empty = hidden entirely — a fresh kid sees zero new chrome
+  el.textContent='';
+  for(const h of list){
+    const b=document.createElement('button'); b.className='pbtn drg'; b.type='button';
+    const cv=document.createElement('canvas');
+    cv.width=104*ICON_RES; cv.height=104*ICON_RES;
+    const g=cv.getContext('2d');
+    if(h.layer==='track'){                       // the palette's own painters, icon-only
+      let s=104*ICON_RES/(C+16), o=8;
+      if(h.t==='sp'){ s=104*ICON_RES/(SPS+28); o=14; }
+      g.setTransform(s,0,0,s,o*s,o*s);
+      withCtx(g,()=>drawPieceArt({t:h.t,r:h.t==='c'?1:0,sel:0,elev:0,latch:null},0,0));
+    } else {
+      const s=104*ICON_RES/(C+16); g.setTransform(s,0,0,s,8*s,8*s);
+      scenIcon(g,h.t);
+    }
+    b.appendChild(cv);
+    const t=h.t, layer=h.layer;
+    b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
+      down={x:e.clientX,y:e.clientY,what:'pal',t,el:b,layer,
+            v:SCENDEF[t]&&SCENDEF[t].react?(pplSeq++%3):0, hf:1}; });   // hf: stack-born — the box stays as it is
+    el.appendChild(b);
+  }
+}
+/* =====================================================================
+   THE EAGER TRAIN (E27) — a finished line calls its own train.
+   #shelfTrain left the spread; the ritual died with it. THE ARRIVAL
+   LAW: after every track mutation (place / turn / remove / thrown
+   points / tidy) and on every BUILD/campaign entry — if the line is
+   DONE and no train is on the board, she ARRIVES: far whistle, puffs,
+   seated AT THE STATION on that line (campaign with no station → the
+   last-placed piece — levels must never soft-lock), and departs
+   through goTrain(), never a hand-set flag (the E5 law; the exact
+   drop-pipeline tail, hint passes included). No latch, no hidden
+   state: mutation + finished + trainless = she comes. In BUILD a
+   stationless finished line coaches once — PUT DOWN A STATION — then
+   silence forever. The walk below is the train's OWN routing (enter();
+   no new physics): DONE = the walk closes on itself, or caps at a
+   bumper BOTH ways; the too-short law stays placeTrainAt's.
+   ===================================================================== */
+const EAGER={last:null};        // the hand's newest piece {x,y,el} — session-only
+let stCoachT=false;             // the stationless coach — once a session, then silence
+let EAGERC=null;                // the one gentle camera ease {t,x0,y0,x1,y1}
+function eagerWalk(pc,x0,y0,dir){
+  // one direction: port-hop the REAL graph from mid-piece. Verdicts:
+  // 'loop' (a state repeats — the train would run forever) · 'cap' (a
+  // bumper's null port) · 'open' (the line just stops). Collects the
+  // pieces touched and the first station crossed (the arrival anchor).
+  const rd={cx:pc.t==='sp'?pc.ax:x0, cy:pc.t==='sp'?pc.ay:y0, pi:0, dir, s:0, el:(pc.elev|0)?1:0};
+  const seen=new Set(), pieces=new Set(); let st=null;
+  for(let g=0; g<4096; g++){
+    const cur=pieceOf(rd); if(!cur) return {end:'open',pieces,st};
+    pieces.add(cur);
+    if(cur.t==='st'&&!st) st={x:rd.cx,y:rd.cy,el:rd.el?1:0};
+    const sig=rd.cx+','+rd.cy+':'+(rd.el?1:0)+':'+rd.pi+':'+rd.dir;
+    if(seen.has(sig)) return {end:'loop',pieces,st};
+    seen.add(sig);
+    const p=pathsOf(cur)[rd.pi], ex=p.ports[rd.dir>0?1:0];
+    if(ex==null) return {end:'cap',pieces,st};   // only the bumper owns a null port
+    if(!enter(rd,ex)) return {end:'open',pieces,st};
+  }
+  return {end:'open',pieces,st};
+}
+function eagerVerdict(pc,x,y){  // both directions from one seed → done? station? pieces?
+  const fwd=eagerWalk(pc,x,y,1);
+  let ok=fwd.end==='loop', st=fwd.st;
+  const pieces=fwd.pieces;
+  if(fwd.end==='cap'){
+    const bk=eagerWalk(pc,x,y,-1);
+    for(const q of bk.pieces) pieces.add(q);
+    if(!st) st=bk.st;
+    ok= bk.end==='cap'||bk.end==='loop';
+  }
+  return ok? {pieces,st} : null;
+}
+function lineDone(){
+  // candidates in arrival-anchor order: every station first, the hand's
+  // newest piece next, then the rest — the first DONE line wins. (No
+  // component dedup: a splitter can route differently per seed, and the
+  // board is small — correctness beats cleverness here.)
+  const cands=[];
+  for(const [k,pc] of grid) if(pc.t==='st') cands.push([pc,k]);
+  for(const [k,pc] of hgrid) if(pc.t==='st') cands.push([pc,k]);
+  const lp=EAGER.last;
+  if(lp){ const pc=lp.el? pieceHi(lp.x,lp.y):pieceAt(lp.x,lp.y); if(pc) cands.push([pc,lp.x+','+lp.y]); }
+  for(const [k,pc] of grid) cands.push([pc,k]);
+  for(const [k,pc] of hgrid) cands.push([pc,k]);
+  let stationless=false;
+  for(const [pc,k] of cands){
+    if(!pc||pc.t==='ref') continue;
+    const i=k.indexOf(','), x=+k.slice(0,i), y=+k.slice(i+1);
+    const hit=eagerVerdict(pc,x,y);
+    if(!hit) continue;
+    if(hit.st) return {done:true, x:hit.st.x, y:hit.st.y, el:hit.st.el};
+    if(CAMP.on){
+      // no station on the line → the last-placed piece (soft-lock law);
+      // the walk's own seed if the hand's piece sits on another line
+      if(lp){ const lpc=lp.el? pieceHi(lp.x,lp.y):pieceAt(lp.x,lp.y);
+        if(lpc&&hit.pieces.has(lpc)) return {done:true, x:lp.x, y:lp.y, el:lp.el|0}; }
+      return {done:true, x:pc.t==='sp'?pc.ax:x, y:pc.t==='sp'?pc.ay:y, el:(pc.elev|0)?1:0};
+    }
+    stationless=true;   // BUILD asks for a station — the coach's moment
+  }
+  return {done:false, coach:stationless};
+}
+function eagerArrive(ax,ay,el){
+  if(TRAIN.placed) return false;
+  if(CAMP.on) consist=surpriseRoll();   // E21's gift law — every arrival packs fresh cars, exactly as if dropped
+  if(!placeTrainAt(ax,ay,el==null?null:(el?1:0))) return false;   // the too-short law lives in there
+  for(const c of TRAIN.cars){ const p=pos(c.rd); c.squash=1; puff(p.x,p.y-8-LIFT*(p.z||0),14); }   // she rolls in on a breath of steam
+  if(EAGER_WHISTLE) SND.whistle();      // the far whistle announces her
+  hintPass(2); hintPass(3);             // the old drop's lesson ladder — the arrival IS the drop now
+  goTrain();                            // the E5 law: startSig/revSinceGo/visited live in there
+  hintPass(4);                          // exactly the drop-pipeline tail
+  eagerPan();
+  return true;
+}
+function eagerTry(){
+  // THE ARRIVAL LAW — asked fresh after every mutation and entry; no latch.
+  if(BED.ctx||SCREEN!=='game'||TRAIN.placed||PLAY.on) return false;
+  const v=lineDone();
+  if(v.done) return eagerArrive(v.x,v.y,v.el);
+  if(v.coach&&!stCoachT){ stCoachT=true; toast(EAGER_COACH); }   // once, then silence forever
+  return false;
+}
+function eagerSummon(gx,gy){
+  // TAP THE STATION = CALL THE TRAIN — only a station on a finished
+  // trainless line answers; everything else falls through to today's ladder.
+  if(BED.ctx||SCREEN!=='game'||TRAIN.placed) return false;
+  const pc=pieceTop(gx,gy); if(!pc||pc.t!=='st') return false;
+  if(!eagerVerdict(pc,gx,gy)) return false;
+  return eagerArrive(gx,gy,(pc.elev|0)?1:0);
+}
+function eagerPan(){
+  // one gentle ease when she arrives off-screen (the E20 center-on-action
+  // grammar, eased over EAGER_PAN) — any hand cancels it, entry cameras outrank it
+  if(!TRAIN.placed||!TRAIN.cars.length) return;
+  const p=pos(TRAIN.cars[0].rd), sx=OX+SC*p.x, sy=OY+SC*(p.y-LIFT*(p.z||0));
+  const m=40;
+  if(sx>=m&&sx<=W-m&&sy>=m&&sy<=H-m) return;     // she's already in view — stay put
+  EAGERC={t:0, x0:VIEW.ox, y0:VIEW.oy,
+          x1:W/2-p.x*VIEW.s, y1:(H-BAR)/2-(p.y-LIFT*(p.z||0))*VIEW.s};
+}
+function eagerCamTick(dt){
+  if(!EAGERC) return;
+  if(PINCH||DRAG||FOLLOW.on||(down&&down.what==='pan')){ EAGERC=null; return; }   // the hand always wins
+  EAGERC.t+=dt;
+  const k=Math.min(1,EAGERC.t/Math.max(0.001,EAGER_PAN)), e=k*k*(3-2*k);
+  VIEW.ox=EAGERC.x0+(EAGERC.x1-EAGERC.x0)*e;
+  VIEW.oy=EAGERC.y0+(EAGERC.y1-EAGERC.y0)*e;
+  CAM.off=true; VIEW.vx=VIEW.vy=0;               // a camera move happened — HOME knows the way back (the followTick precedent)
+  clampView(); viewApply();
+  if(k>=1) EAGERC=null;
 }
 // THE GATE LAW (E7): BUILD's palette offers OWNED toys only. The campaign keeps the
 // FULL palette in this version (its gate arrives in E8 with the new levels). Tabs with
@@ -6885,8 +7161,9 @@ function showScreen(s){
   $('board').style.display=s==='board'?'flex':'none';
   if(s==='board') boardSync();
   $('tbox').style.display=(game||play)?'block':'none';   // E25: the box is the rug modes' only resident chrome
-  $('spShelf').style.display=game?'flex':'none';         // THE BOX SHOWS WHAT THE BAR SHOWED —
-  $('spTray').style.display=play?'flex':'none';          // ...same rows, same sync laws, new furniture
+  $('palTabs').style.display=game?'flex':'none';         // E27: the plaque spine is BUILD/campaign furniture
+  $('spBody').style.display=game?'flex':'none';          // THE BOX SHOWS WHAT THE BAR SHOWED —
+  $('spTray').style.display=play?'grid':'none';          // ...same rows, same sync laws, new furniture
   tboxShow(false);      // E25 DISMISS LAW 3 — the box shuts on every screen change, like the lids below
   $('mark').style.display=(game||play)?'block':'none';
   $('menuChip').style.display=((game&&!CAMP.on)||play)?'block':'none';
@@ -6901,6 +7178,8 @@ function showScreen(s){
   winSync();
   shelfSync();
   paletteSync();        // THE GATE follows the mode: BUILD owned-only, campaign full
+  handySync();          // E27: the stack follows the screen (game only; empty = hidden)
+  if(game) eagerTry();  // E27: a finished trainless line greets you already rolling — that IS the toy
   resize();
   if(game||play) viewBase();   // E20 THE BIG DEFAULT — every rug entry lands close to the toys, centered on the action
 }
@@ -6927,6 +7206,7 @@ function grantBundle(lvl){
 }
 function collChanged(){
   paletteSync(); shelfSync(); syncSwatches();
+  handySync();   // E27: fresh toys can reveal hidden stack entries — the gate re-asks at paint
   if($('toybox').style.display==='flex') boxSync();
 }
 function boxShow(b){ $('toybox').style.display=b?'flex':'none'; if(b){ tboxShow(false); boxSync(); } }   // E25 law 3: an overlay shuts the corner box
@@ -7768,6 +8048,20 @@ function resize(){
     bedBounds();   // E23: the bedroom floor is every cell the screen can hold — re-derived here
     if(ROOM.cards) boxCardsPlace();   // E26: the box's cards ride the painting through a resize
   }
+  // E27 THE SQUARE BOX — the spread is a fixed near-square: the old 40vh law
+  // where it's roomy (desk), width- and chip-clearance-capped where it isn't
+  // (phones; his "roughly 300×280" at 812×375), SPREAD_AR wide, tail still
+  // anchored to the box. The card dials stamp here too (--bc/--tc/--hc), so
+  // the ≤820px viewports ride their own values under the ONE --ui dial.
+  const sp=$('spread');
+  if(sp){
+    const sh=Math.round(Math.min(0.40*W, 0.75*H, Math.max(SPREAD_VH*H/100,280), H-38*UIS-60));
+    sp.style.height=sh+'px';
+    sp.style.width=Math.round(sh*SPREAD_AR)+'px';
+    $('spShelf').style.setProperty('--bc', W<=820? 29 : BOX_CARD);
+    $('spTray').style.setProperty('--tc', W<=820? 36 : 46);
+    const hd=$('handy'); if(hd) hd.style.setProperty('--hc', W<=820? 26 : HANDY_CARD);
+  }
   // E25 re-seats: homeChip + rideChip live in the top-right cluster (CSS) now;
   // toast + NEXT seat on the screen floor + the safe area — the old BAR+k*UIS
   // tail is dead with the bar.
@@ -7784,6 +8078,7 @@ function frame(t){
   const dt=Math.min(0.05,(t-last)/1000); last=t;
   camGlide(dt);        // E10: the flicked rug glides — presentation only, sim untouched
   followTick(dt);      // E15: ride-along chases the engine — presentation only, same law
+  eagerCamTick(dt);    // E27: the arrival's one gentle ease — presentation only, any hand cancels
   if(TS.auto){
     if(SCREEN==='game') update(dt);
     else if(SCREEN==='play'){ update(dt); playUpdate(dt); }             // the shared juice + the wind-up trains
@@ -7933,6 +8228,21 @@ window.TS={
       trains:PLAY.trains.map(tr=>({ id:tr.id, color:tr.color, speed:tr.speed, dying:!!tr.dying,
         pauseT:tr.pauseT, d:loopCoord(tr.cars[0].rd),
         cars:tr.cars.map(c=>[c.rd.cx,c.rd.cy,c.rd.el?1:0]) })) }; },
+  },
+  // ---- the eager train rig (E27) — the predicate + the arrival, rig-forced ----
+  eager:{
+    done(){ const v=lineDone(); return { done:!!v.done, coach:!!v.coach,
+      at:v.done? [v.x,v.y,v.el|0]:null }; },   // the raw predicate — mutates nothing
+    arrive(){ return eagerTry(); },            // force one arrival check (the mutation hook's own path)
+    summon(gx,gy){ return eagerSummon(gx,gy); },
+    last(){ return EAGER.last? {...EAGER.last} : null; },
+    coach(b){ if(b!=null) stCoachT=!!b; return stCoachT; },   // read/seed the once-a-session latch
+  },
+  // ---- the handy five rig (E27) — the MRU stack, ephemeral by law ----
+  handy:{
+    list(){ return HANDY.map(h=>h.t); },       // raw MRU, newest first
+    shown(){ return SCREEN==='game'? HANDY.filter(h=>coll.has(h.t)).map(h=>h.t) : []; },
+    clear(){ HANDY.length=0; handySync(); return true; },
   },
   // ---- the corner toy box rig (E25) — state + a door for the battery ----
   tbox:{
