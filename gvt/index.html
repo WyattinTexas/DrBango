@@ -2109,7 +2109,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.14</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.15</div>
   <div class="scanlines"></div>
 </div>
 
@@ -9746,7 +9746,12 @@ function elephHex(){ return (META.decor&&META.decor.eleph) || dyeHex() || '#7FA3
 // Terrain kit: rocks (block+shoulder; art:'cup'/'block' reskins), rivers (cross
 // at bridges only; y0/y1 bound the water, open:true bridges are dry gaps),
 // ponds (wade through at 0.42x speed), tracks (race track — 1.35x speed),
-// balls (wrecking balls that patrol y0..y1 and plow everyone aside).
+// balls (wrecking balls that patrol y0..y1 — and on the BATTLEGROUND, since
+// v2.15, they DESTROY any non-tank figure they touch; the campaign's dressed
+// rugs keep the old plow-aside), jax (v2.15 — little toy jacks lying in the
+// lanes: neutral one-time mines EITHER army trips; they ride S.mines with the
+// phantom side 'jax', so the sweeper's own trigger/blast law serves them),
+// riverDuck (v2.15 — THE CROSSING's once-a-battle shot-blocking rubber duck).
 // ===================== WESTERN LAND (v1.57) =====================
 // Wyatt 7/28, verbatim: "Implement the railroad map into Battlegrounds. The
 // railroad map is double the height of a regular map and the same width...
@@ -9766,6 +9771,18 @@ const TRAIN_SPD=260,        // px/s down the line
       SIGNAL_LEAD=2.5,      // seconds of crossbuck warning before the loco arrives
       TRENCH_W=64,          // the sunken lane's width
       TRK_BAN=38;           // no-drop margin around every rail (march across, never camp on)
+// ===== THE CROSSING'S RUBBER DUCK (v2.15) =====
+// Wyatt 8/2, verbatim: "The Crossing battleground level need a Rubber duck to
+// be floating on the river once per battle; blocking any incoming projectile
+// that comes in contact including Sniper Shots, Bazooka, Commando beam, Rifle
+// shots (any regular weapon shots)". He sets sail at a FIXED second and sails
+// the channel top to bottom exactly once — pure f(the battle's own clock),
+// zero RNG (the trainCars law), so every sim in a private room sails the same
+// duck at the same moment. The mortar's lob arcs OVER him on purpose (the
+// trench-law family: the lobbers go over what flat fire cannot pass).
+const CROSSDUCK_AT=26,     // sim-seconds into the battle he sets sail — ⚠ WYATT'S DIAL
+      CROSSDUCK_SPD=46,    // px/s downstream (one full pass ≈ 15s)
+      CROSSDUCK_R=24;      // the block circle around the floating body
 // THE TRACK is a θ: one ring, one chord, ONE junction — at J the line either
 // takes the chord east through the middle of the battle (crossing the trench
 // once at a grade crossing) or carries on south and dips OFF THE MAT through
@@ -9847,6 +9864,45 @@ function trainKill(u){
   bfSfx(SFX.thock,u.x,u.y);
   hitCheck(u,null);
 }
+// ===== v2.15 THE CROSSING'S DUCK — the three laws in three small functions.
+// crossDuck: where the duck IS, as a pure function of the battle's own clock
+// (negative = not yet; past the south edge = gone, and the window never
+// reopens, which IS "once per battle"). The tiny sine is deterministic too —
+// it reads off the same accumulator, never Math.random(), never wall time.
+function crossDuck(t){
+  const rd=S.cfg.terrain.riverDuck; if(!rd) return null;
+  const k=t-CROSSDUCK_AT; if(k<0) return null;
+  const y=-40+k*CROSSDUCK_SPD;
+  if(y>WORLD_H+40) return null;
+  return { x:rd.cx+Math.sin(k*1.15)*7, y, r:CROSSDUCK_R };
+}
+// duckBlock: does the segment muzzle→mark cross the floating body? Returns the
+// FIRST entry point (for the tracer to die on) or null. The block circle sits
+// a little above the waterline (d.y-12) because that is where the body is —
+// shots fly at chest height and the maths should agree with the picture.
+function duckBlock(x1,y1,x2,y2){
+  const d=S.bf&&S.bf.duck; if(!d) return null;
+  const ex=d.x, ey=d.y-12, dx=x2-x1, dy=y2-y1, fx=x1-ex, fy=y1-ey;
+  const a=dx*dx+dy*dy; if(a<1e-9) return null;
+  const b=2*(fx*dx+fy*dy), c=fx*fx+fy*fy-d.r*d.r;
+  let q=b*b-4*a*c; if(q<0) return null;
+  q=Math.sqrt(q);
+  const t=(-b-q)/(2*a);
+  if(t<0||t>1) return null;
+  return { x:x1+dx*t, y:y1+dy*t };
+}
+// duckBlockFx: the shot dying on the toy — a puff every round, but the squeak
+// and the gold ring at most once per 90ms, so a shotgun's nine pellets land as
+// ONE indignant squeak instead of a rattle. Throttled on S.t (the sim's own
+// clock) through bf state — cosmetics only, the block above never throttles.
+function duckBlockFx(p){
+  const bf=S.bf; if(!bf) return;
+  S.fx.push({k:'puff',x:p.x,y:p.y+4,t:0,dur:0.3,R:9});
+  if(S.t-(bf.duckFxT||-9)<0.09) return;
+  bf.duckFxT=S.t;
+  bfSfx(SFX.squeak,p.x,p.y);
+  S.fx.push({k:'ring',x:p.x,y:p.y-2,r:3,R:22,t:0,dur:0.22,col:'#FFE38A'});
+}
 const BF_MAPS = [
   { id:'open', name:'OPEN CARPET', blurb:'The toy bin tipped over everything. One clean lane is left — and the wrecking balls roll right across it. Time your push.',
     build:()=>({ rocks:[
@@ -9869,8 +9925,11 @@ const BF_MAPS = [
       ponds:[ {x:MID-400,y:406,rx:96,ry:50,duck:true,col:'#7A4E8E',col2:'#9C6FB2'} ],
       balls:[ {x:MID-110,y0:170,y1:432,r:40,spd:52} ] }) },
   { id:'crossing', name:'THE CROSSING', blurb:'A spill from the fish tank splits the carpet. Two popsicle bridges — hold one and you hold the match.',
+    // riverDuck (v2.15): once a battle the rubber duck sails this channel and
+    // eats every flat shot that touches him — see the CROSSDUCK consts.
     build:()=>({ rocks:[{x:330,y:150,r:34},{x:330,y:452,r:34}],
-                 rivers:[{x:MID-36,w:72,bridges:[{y:172,bw:78},{y:428,bw:78}]}] }) },
+                 rivers:[{x:MID-36,w:72,bridges:[{y:172,bw:78},{y:428,bw:78}]}],
+                 riverDuck:{cx:MID} }) },
   { id:'stone', name:'STONE ROW', blurb:'Pebbles and boulders litter the middle — pick a seam and weave, or floor it down the race track flank.',
     build:()=>({ rocks:[
         {x:MID-710,y:180,r:30},{x:MID-710,y:420,r:30},{x:MID-540,y:300,r:32},
@@ -9879,7 +9938,12 @@ const BF_MAPS = [
         {x:MID-625,y:252,r:14},{x:MID-458,y:214,r:13},{x:MID-462,y:386,r:14},
         {x:MID-295,y:296,r:13},{x:MID-192,y:182,r:12},{x:MID-622,y:344,r:13},
         {x:MID-105,y:392,r:14},{x:MID-55,y:120,r:12} ],
-      rivers:[], tracks:[ {x0:120,x1:MID,y:487,h:38} ] }) },
+      rivers:[], tracks:[ {x0:120,x1:MID,y:487,h:38} ],
+      // v2.15 JAX (Wyatt: "Add 5 Jax mines to the Stone Row level"): one dead
+      // centre + two authored-left pairs in the weave seams = FIVE after the
+      // mirror, fair by construction. Coords picked clear of every rock's art
+      // (nearest pebble 37px) and just outside the track's band.
+      jax:[ {x:MID,y:300}, {x:MID-130,y:180}, {x:MID-130,y:420} ] }) },
   // ===================== THE WINTER FIELD (v1.27) =====================
   // Wyatt: "one snow map with multiple winding trails and passages." The
   // Christmas box went over — cotton-wool plough banks, a bag of fake snow in
@@ -10002,6 +10066,11 @@ const BF_MAPS = [
         {x:MID-470,y:948,r:12,art:'cactus'},
         {x:MID-190,y:396,r:12,art:'cactus'} ],
       rivers:[],
+      // v2.15 JAX (Wyatt: "Little Jax. 1 time mines. Add 3 of them onto the
+      // Western Land Map"): one on the north marching lane (40px shy of the
+      // ring rail, 10px clear of the trench's mouth) + a pair on the south
+      // drag at the crates' latitude = THREE after the mirror.
+      jax:[ {x:MID,y:190}, {x:MID-240,y:660} ],
       rail:westRail(), trench:westTrench() }) }
 ];
 // AI difficulty. Economy is IDENTICAL to yours at every tier — the difficulty is
@@ -13410,6 +13479,9 @@ function bfTerrain(map){
   // would be its own mirror, same rule as everything else here).
   const drifts=(half.drifts||[]).flatMap(d=> Math.abs((WORLD_W-d.x)-d.x)<1 ? [{...d}] : [{...d},{...d,x:WORLD_W-d.x}]);
   const ice=(half.ice||[]).flatMap(i=> Math.abs((WORLD_W-i.x)-i.x)<1 ? [{...i}] : [{...i},{...i,x:WORLD_W-i.x}]);
+  // v2.15 JAX: points mirror like ponds — one authored ON the line is its own
+  // mirror, which is how Wyatt's odd counts (3 and 5) stay fair by construction
+  const jax=(half.jax||[]).flatMap(j=> Math.abs((WORLD_W-j.x)-j.x)<1 ? [{...j}] : [{...j},{...j,x:WORLD_W-j.x}]);
   const trails=(half.trails||[]).flatMap(t=>{
     const a={...t, pts:t.pts.map(p=>[p[0],p[1]])};
     const m={...t, pts:t.pts.map(p=>[WORLD_W-p[0],p[1]])};
@@ -13419,8 +13491,9 @@ function bfTerrain(map){
   // WESTERN LAND's railroad + trench ride through UNMIRRORED (v1.57): both are
   // authored absolute and fair by construction — running them through the
   // mirror pass is exactly how the winter own-chain weld happened.
-  return { rocks, river:null, rivers, ponds, balls, tracks, drifts, ice, trails, ground,
+  return { rocks, river:null, rivers, ponds, balls, tracks, drifts, ice, trails, ground, jax,
            rail:half.rail||null, trench:half.trench||null,
+           riverDuck:half.riverDuck||null,   // v2.15: authored ON the mirror line — its own mirror, the rail's law
            flakes:(ground==='snow'? snowFlakes(WORLD_W) : null) };
 }
 // Falling snow, seeded ONCE here and never in a draw call (v1.7's block-tilt
@@ -14851,6 +14924,19 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
     // every hMul-1 map the y clamp is 0..0, so nothing that shipped moves
     cam:{ x:(myTeam==='foe'? Math.max(0,WORLD_W-VW) : 0), vx:0,
           y:Math.max(0,(WORLD_H-H)/2), vy:0 } };
+  // ===== v2.15 JAX: the map's little toy jacks go down BEFORE the first boot.
+  // They ride S.mines so the sweeper's own loop serves them whole: armT 0 =
+  // live from the whistle, big/sl false = the stock 26-trigger and the stock
+  // MINE_BLAST charge, and ONE splice per jack = Wyatt's "1 time mines" by the
+  // loop's own construction. The phantom side 'jax' is the whole neutrality
+  // law: bfEnemies('jax') answers EVERY standing figure (either army trips
+  // them), and splash()'s no-friendly-fire test exempts nobody from a side
+  // no seat sits on — while a typeless, seatless src pays no bounty and
+  // credits no kill (hitCheck's own dead-sapper arithmetic, unchanged).
+  // Fixed authored coords off the map row — never per-client random — so a
+  // private room's twenty sims bury identical jacks (the relPos law's spirit).
+  for(const j of (S.cfg.terrain.jax||[]))
+    S.mines.push({ owner:null, side:'jax', seat:null, x:j.x, y:j.y, armT:0, big:false, sl:false, jx:true });
   S.plastic=BF_START;                          // every purse starts level
   META.bfMap=map.id; META.bfTeam=team;
   // v1.44: the scroll nudge is a LESSON now — arm it for the first three
@@ -16147,8 +16233,16 @@ function bfTick(dt){
       }
     }
   }
-  // toy wrecking balls patrol their beat — anyone in the way gets plowed aside
-  // (standing, firing, doesn't matter; only spawn ghosts and the fallen escape)
+  // toy wrecking balls patrol their beat. v2.15 (Wyatt, verbatim): "The Balls
+  // in the Spill and Open Carpet levels need to auto destroy any non Tank unit
+  // on collision. That's how the balls will work." — so on the BATTLEGROUND
+  // the ball is the train's second wheel now: contact DESTROYS, through the
+  // very same trainKill (no bounty, no blame, Sarge's clock still feeds), with
+  // the train's own exemptions (ghosts, the airborne, the fallen). Only the
+  // HEAVY TANK outweighs it — the tank, the airborne, and everyone once the
+  // match is decided, still get the old plow-aside so nothing overlaps a
+  // rolling ball. (The campaign's dressed rugs keep the pure plow — that is
+  // campBallTick, a knockdown world where nobody dies.)
   for(const bl of (S.cfg.terrain.balls||[])){
     bl.y+=bl.dir*bl.spd*dt;
     if(bl.y>=bl.y1){ bl.y=bl.y1; bl.dir=-1; } else if(bl.y<=bl.y0){ bl.y=bl.y0; bl.dir=1; }
@@ -16157,11 +16251,23 @@ function bfTick(dt){
       if(u.dead||u.dropT>0) continue;
       const ax=u.x-bl.x, ay=u.y-bl.y, dd=Math.hypot(ax,ay), min=bl.r+16;
       if(dd>0.1&&dd<min){
+        if(u.type!=='bftank' && !(u.jetT>0) && !bf.resolved && !bf.ending){ trainKill(u); continue; }
         u.x+=ax/dd*(min-dd)*Math.min(1,dt*10); u.y+=ay/dd*(min-dd)*Math.min(1,dt*10);
         u.y=Math.max(74,Math.min(WORLD_H-96,u.y));
         if(u.home){ u.home.x=u.x; u.home.y=u.y; }
       }
     }
+  }
+  // ===== THE CROSSING: THE RUBBER DUCK (v2.15) =====
+  // Ticked with the train and the balls — before the resolved gate, so the
+  // drift never freezes behind the flag ceremony. bf.duck is recomputed whole
+  // from the accumulator every frame (pure f(clock), the trainCars law): no
+  // RNG, no camera reads, so every sim in a room sails the same duck.
+  if(S.cfg.terrain.riverDuck){
+    bf.duckClk=(bf.duckClk||0)+dt;
+    const d=crossDuck(bf.duckClk);
+    if(d && !bf.duck) bfSfx(SFX.squeak, d.x, d.y);   // one hello squeak as he sets sail
+    bf.duck=d;
   }
   if(bf.resolved||bf.ending) return;
   if(bf.sargeFlash>0) bf.sargeFlash=Math.max(0,bf.sargeFlash-dt);   // the "he's back" flash on the tray card
@@ -17062,6 +17168,12 @@ function cmdoBeamHit(sh,f){
   const u=sh.src;
   const gone = S.bf? (!f||f.dead||f.hp<=0) : (!f||S.foes.indexOf(f)<0);
   if(gone) return;
+  // v2.15 THE CROSSING's duck — "Commando beam" is on Wyatt's own list: the
+  // bolt meant for a man across the water dies on the toy instead, and the
+  // storm coil's chain never starts from a hit that never landed. Checked at
+  // LANDING time (the queue is a schedule, the duck is a moving thing).
+  const dkb=duckBlock(sh.x,sh.y,f.x,f.y-18);
+  if(dkb){ duckBlockFx(dkb); return; }
   S.fx.push({k:'flash',x:f.x,y:f.y-18,ang:Math.atan2((f.y-18)-sh.y,f.x-sh.x),R:12,lw:2.2,t:0,dur:0.12});
   hurt(f,sh.dmg,u);
   if(!sh.coil) return;
@@ -19901,7 +20013,10 @@ function update(dt){
             if(!bfCanTarget(u,f)) continue;   // the cone is aimed fire, pellet by pellet — not splash (v1.57)
             const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>sw.rng*rb) continue;
             let da=Math.abs(Math.atan2(f.y-u.y,f.x-u.x)-ang); if(da>Math.PI) da=2*Math.PI-da;
-            if(da<=sw.cone){ hurt(f,sw.dmg*vm*cm,u); } }
+            // v2.15: each pellet is aimed fire, so each pellet can die on the
+            // duck — the man behind him is safe, the man beside him is not
+            if(da<=sw.cone){ const dkb=duckBlock(u.x+35*wdir,u.y-34,f.x,f.y-18);
+              if(dkb) duckBlockFx(dkb); else hurt(f,sw.dmg*vm*cm,u); } }
           // v1.50: the blast leaves the MUZZLE now (the fan used to start in his
           // chest) — a star flash over it, a wisp or two, and the forend racks.
           u.pumpT=PUMP_T;
@@ -19922,7 +20037,11 @@ function update(dt){
           // the streak or the hard flash.
           const RM=reducedMotion();
           const mzx=u.x+48*wdir, mzy=u.y-37;                     // the muzzle, where drawSargeWeapon leaves the barrel (v1.50: flipped with the figure)
-          const htx=best.x, hty=best.y-18;
+          // v2.15: even the long gun's round dies on the duck — "including
+          // Sniper Shots", Wyatt's first-named. The whole show (tracer, slug,
+          // dust, rings) lands where the round actually stopped.
+          const dkb=duckBlock(mzx,mzy,best.x,best.y-18);
+          const htx=dkb?dkb.x:best.x, hty=dkb?dkb.y:best.y-18;
           const ang=Math.atan2(hty-mzy,htx-mzx);
           // 7/25: the armory roll means a 10v10 can field a dozen snipers. The
           // whole visual read (flash, tracer, slug, rings, dust) stays on every
@@ -19956,7 +20075,7 @@ function update(dt){
           S.fx.push({k:'flash',x:htx,y:hty,ang:ang+Math.PI,R:RM?12:20,lw:3,t:0,dur:0.14});
           S.fx.push({k:'ring',x:htx,y:hty,r:4, R:32,t:0,dur:0.22,col:'#FFFFFF'});
           S.fx.push({k:'ring',x:htx,y:hty,r:10,R:54,t:0,dur:0.34,col:'#FFD24A'});
-          hurt(best,sw.dmg*vm*cm,u);
+          if(dkb) duckBlockFx(dkb); else hurt(best,sw.dmg*vm*cm,u);
         }
         continue;
       }
@@ -20109,17 +20228,22 @@ function update(dt){
       if(rollCrit(u)){ dmgF*=CRIT_MULT; critFx(tgt); }   // the trigger-men: rifleman / MG / Sarge's pistol
       const lz = (META.laserOn && !(S.bf&&!bfHumanU(u)))? ARMIES.find(ar=>ar.id===META.laserOn) : null;   // only YOUR figures pack lasers
       if(lz){ bfSfx(SFX.laser, u.x, u.y); } else { bfSfx(u.type==='mgunner'?SFX.mg:SFX.pew, u.x, u.y); }
-      hurt(tgt,dmgF,u);
       const mox=u.x+(off?16.5:16)*mzl, moy=(u.type==='sarge')? (off? u.y-30.7 : u.y-41) : u.y-26;
+      // THE CROSSING's duck (v2.15): a round that crosses the floating body
+      // dies on it — Wyatt's "Rifle shots (any regular weapon shots)". The
+      // tracer dies where the round did, so the block reads true.
+      const dkb=duckBlock(mox,moy,tgt.x,tgt.y-18);
+      if(dkb) duckBlockFx(dkb); else hurt(tgt,dmgF,u);
+      const tex=dkb?dkb.x:tgt.x, tey=dkb?dkb.y:tgt.y-18;
       if(u.type==='sarge'){ if(off) u.pist2T=PISTOL_KICK; else u.pistT=PISTOL_KICK;
         if(!lz){ const RM=reducedMotion();
           const fxx=u.x+(off?18:17.5)*mzl, fxy=off? u.y-31 : u.y-41.5;
           S.fx.push({k:'flash',x:fxx,y:fxy,ang:Math.atan2((tgt.y-18)-fxy,tgt.x-fxx),R:RM?6:9,lw:RM?1.6:2.2,t:0,dur:0.08}); } }
       if(lz){
-        S.fx.push({k:'tracer',x1:mox,y1:moy,x2:tgt.x,y2:tgt.y-18,t:0,dur:0.14,col:lz.hex,w:4});
-        S.fx.push({k:'tracer',x1:mox,y1:moy,x2:tgt.x,y2:tgt.y-18,t:0,dur:0.1,col:'#ffffff',w:1.5});
+        S.fx.push({k:'tracer',x1:mox,y1:moy,x2:tex,y2:tey,t:0,dur:0.14,col:lz.hex,w:4});
+        S.fx.push({k:'tracer',x1:mox,y1:moy,x2:tex,y2:tey,t:0,dur:0.1,col:'#ffffff',w:1.5});
       } else {
-        S.fx.push({k:'tracer',x1:mox,y1:moy,x2:tgt.x,y2:tgt.y-18,t:0,dur:0.08});
+        S.fx.push({k:'tracer',x1:mox,y1:moy,x2:tex,y2:tey,t:0,dur:0.08});
       }
     }
   }
@@ -20140,7 +20264,15 @@ function update(dt){
     if(sh.k==='rocket'){
       const dx=sh.tx-sh.x, dy=(sh.ty-14)-sh.y, d=Math.hypot(dx,dy);
       if(d<10){ S.shots.splice(i,1); if(sh.refl) cmdoReflLand(sh); else if(sh.foe) foeSplash(sh.tx,sh.ty,sh.splash,sh.src); else splash(sh.tx,sh.ty,sh.splash,sh.dmg,true,sh.src); }
-      else { sh.x+=dx/d*sh.spd*dt; sh.y+=dy/d*sh.spd*dt; if((S.t*60|0)%2===0) S.fx.push({k:'smoke',x:sh.x,y:sh.y,t:0,dur:0.4}); }
+      else { sh.x+=dx/d*sh.spd*dt; sh.y+=dy/d*sh.spd*dt;
+        // v2.15 THE CROSSING's duck swallows a rocket WHOLE — "Bazooka" is
+        // Wyatt's own list, and the tank's shell rides the same pipeline (a
+        // reflected shell too: it is still a projectile in contact). No
+        // splash anywhere: the blast died in the water. The mortar's lob
+        // arcs OVER him on purpose — it never flies this branch.
+        const dq=S.bf&&S.bf.duck;
+        if(dq && Math.hypot(sh.x-dq.x,sh.y-(dq.y-12))<dq.r+6){ S.shots.splice(i,1); duckBlockFx({x:sh.x,y:sh.y}); }
+        else if((S.t*60|0)%2===0) S.fx.push({k:'smoke',x:sh.x,y:sh.y,t:0,dur:0.4}); }
     } else if(sh.k==='lob'){
       sh.t+=dt;
       if(sh.t>=sh.dur){ S.shots.splice(i,1); if(sh.refl) cmdoReflLand(sh); else if(sh.foe) foeSplash(sh.tx,sh.ty,sh.splash,sh.src); else splash(sh.tx,sh.ty,sh.splash,sh.dmg,false,sh.src); }
@@ -20504,6 +20636,10 @@ function drawRug(){
         cx.beginPath(); cx.ellipse(rv.x+rv.w/2+(k-1)*14, y1-2+3*Math.sin(ph), 7+2*Math.sin(ph*1.3), 3, 0, 0, 7); cx.fill(); }
       cx.globalAlpha=1;
     }
+    // v2.15 THE CROSSING's duck sails HERE — after the water, before the
+    // planks, so he slides UNDER a popsicle bridge exactly like a real bath
+    // toy would (the planks a few lines down draw over him).
+    if(S.bf&&S.bf.duck && Math.abs(S.bf.duck.x-(rv.x+rv.w/2))<rv.w) drawCrossDuck(S.bf.duck);
     for(const br of rv.bridges){
       if(br.open) continue;
       cx.fillStyle='#B48A54'; cx.fillRect(rv.x-10, br.y-br.bw/2, rv.w+20, br.bw);
@@ -20739,6 +20875,43 @@ function drawCactus(rk){
   cx.beginPath(); cx.moveTo(rk.x-r*0.14,rk.y+r*0.2); cx.lineTo(rk.x-r*0.14,rk.y-r*1.5);
   cx.moveTo(rk.x+r*0.14,rk.y+r*0.2); cx.lineTo(rk.x+r*0.14,rk.y-r*1.5); cx.stroke();
   cx.lineCap='butt';
+}
+// ===== v2.15 THE JACK — a little six-pronged toy lying in the lane, drawn in
+// the figures' own molded round-capped-stroke idiom, but STEEL: the one thing
+// on the floor wearing nobody's army colour, because it is nobody's weapon.
+// Two splayed floor arms behind, two lit arms above, the upright post, the
+// hub over the (implied) sixth prong it stands on — ball tips like the real
+// die-cast toy. No red arm-eye: a jack is armed by BEING a jack.
+function drawJack(mn){
+  const x=mn.x, y=mn.y;
+  cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(x+2,y+5,13,4.5,0,0,7); cx.fill();
+  cx.lineCap='round';
+  const arm=(dx,dy,lw,col)=>{ cx.strokeStyle=col; cx.lineWidth=lw;
+    cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x+dx,y+dy); cx.stroke();
+    cx.fillStyle=col; cx.beginPath(); cx.arc(x+dx,y+dy,lw*0.7,0,7); cx.fill(); };
+  arm(-10,4,4.4,'#77828C'); arm(10,4,4.4,'#77828C');       // the floor pair, in shadow steel
+  arm(-8,-7,4.4,'#9AA9B5'); arm(8,-7,4.4,'#9AA9B5');       // the raised pair
+  arm(0,-12,4.6,'#B9C6D0');                                // the upright post
+  cx.fillStyle='#C7D2DA'; cx.beginPath(); cx.arc(x,y,4.2,0,7); cx.fill();           // the hub
+  cx.fillStyle='#EDF2F6'; cx.beginPath(); cx.arc(x-1.3,y-1.5,1.5,0,7); cx.fill();   // the glint
+  cx.lineCap='butt';
+}
+// ===== v2.15 THE CROSSING'S DUCK — the spill pond's own resident (v1.7),
+// scaled up to a blocker and set sailing. Same yellows, same beak, same eye;
+// a pale wake parts the water under him. The bob and the little rock ride the
+// duck's own clock (visual only) and sit still for reduced motion — the duck
+// itself keeps drifting, because where he IS is the mechanic.
+function drawCrossDuck(d){
+  const t=(S.bf&&S.bf.duckClk)||0, RM=reducedMotion();
+  cx.globalAlpha=0.45; cx.fillStyle='#EDEADF';
+  cx.beginPath(); cx.ellipse(d.x,d.y+7,25,6,0,0,7); cx.fill(); cx.globalAlpha=1;
+  cx.save(); cx.translate(d.x, d.y+(RM?0:Math.sin(t*1.6)*1.6)); cx.rotate(RM?0:Math.sin(t*1.3)*0.08);
+  cx.scale(1.9,1.9);
+  cx.fillStyle='#F2C531'; cx.beginPath(); cx.ellipse(0,0,13,9,0,0,7); cx.fill();
+  cx.beginPath(); cx.arc(8,-9,6.5,0,7); cx.fill();
+  cx.fillStyle='#E07B2E'; cx.beginPath(); cx.moveTo(13.5,-10); cx.lineTo(20,-8); cx.lineTo(13.5,-6.5); cx.closePath(); cx.fill();
+  cx.fillStyle='#2b2117'; cx.beginPath(); cx.arc(9.5,-11,1.3,0,7); cx.fill();
+  cx.restore();
 }
 // THE TOY TRAIN — the reference in moulded plastic: black boiler and cab, gold
 // smokebox door, red cow-catcher and spoked wheels, red tender heaped with
@@ -21217,8 +21390,9 @@ function draw(){
   for(const c of S.corpses) drawSprite(c.type,c.x,c.y,c.w,c.rot,0,c.img,c.flip);
   cx.globalAlpha=1;
 
-  // mines (armed = red eye)
+  // mines (armed = red eye) — a jack (v2.15) wears its own toy sprite instead
   for(const mn of S.mines){
+    if(mn.jx){ drawJack(mn); continue; }
     cx.fillStyle='#3a3a3a'; cx.beginPath(); cx.arc(mn.x,mn.y,9,0,7); cx.fill();
     cx.fillStyle=mn.armT>0?'#8b8f7a':'#A63B2A'; cx.beginPath(); cx.arc(mn.x,mn.y-3,3,0,7); cx.fill();
   }
@@ -26798,7 +26972,14 @@ window.GVT = {
     const took=enhDuck(u); return { forced:took, wasDucked:was>0, duckT:u.duckT, drawn:took }; },
   modBackfire(){ const u=S.units.find(x=>x.type==='bazooka'&&!x.dead); if(!u) return null;
     enhBackfire(u); return { unit:u.id, dead:!!u.dead, hp:u.hp }; },
-  mines(){ return S.mines.map(m=>({x:m.x|0,y:m.y|0,big:!!m.big,armT:+(m.armT||0).toFixed(2)})); },
+  mines(){ return S.mines.map(m=>({x:m.x|0,y:m.y|0,big:!!m.big,armT:+(m.armT||0).toFixed(2),jx:!!m.jx})); },
+  // v2.15 hazard rig: the jax on the ground, the duck's live fix, the balls'
+  // beat — everything a battery needs to referee the battleground hazards
+  bfHaz(){ return S.bf? { map:S.bf.mapId,
+    jax:S.mines.filter(m=>m.jx).map(m=>({x:m.x|0,y:m.y|0})),
+    duck:S.bf.duck? {x:+S.bf.duck.x.toFixed(1),y:+S.bf.duck.y.toFixed(1),r:S.bf.duck.r} : null,
+    duckClk:+(S.bf.duckClk||0).toFixed(2),
+    balls:(S.cfg.terrain.balls||[]).map(b=>({x:b.x|0,y:Math.round(b.y),r:b.r,dir:b.dir})) } : null; },
   // XP test rig: GVT.xp() reads the whole economy at your current rank,
   // GVT.lvl(n,xp) puts you on any rung to prove the payouts scale with it
   xp(){ return { lvl:META.lvl, xp:META.xp, need:xpNeed(), picks:META.pendingPicks,
