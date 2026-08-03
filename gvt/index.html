@@ -2152,7 +2152,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.17</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.18</div>
   <div class="scanlines"></div>
 </div>
 
@@ -10543,9 +10543,18 @@ if((META.bfWins||0)+(META.bfLosses||0)===0) META.bfMap='crossing';
   // v2.12 ARRANGE YOUR ROOM: nested object of [dx,dy] pairs — build it FRESH
   // (the same alias law) and keep only well-formed finite pairs, so a garbage
   // save can never park the piggy bank at NaN,NaN.
-  (function(){ const src=META.roomPos||{}, rp={};
+  // v2.18 (Wyatt 8/3): ONLY TOYS AND TROOPS arrange the room now — every core
+  // button (campaign, shop, rival tower, promo, board, ach, bf, avatar,
+  // piggy) and the bed live at their AUTHORED spots, so any other key a
+  // v2.12–v2.17 save banked is PURGED right here and the buttons snap home on
+  // every device; the player's own toy arrangement survives. ⚠ the list is an
+  // INLINED literal on purpose: VTROOPS/RDRAG_DECOR live 14k lines down and
+  // are TDZ while this load path runs (the v1.26 const law) — keep the three
+  // lists in step by hand.
+  (function(){ const src=META.roomPos||{}, rp={},
+      ok=['vt1','vt2','vt3','vt4','racecar','ducky','teddy','elephant','train'];
     for(const k in src){ const v=src[k];
-      if(Array.isArray(v) && v.length===2 && isFinite(v[0]) && isFinite(v[1])) rp[k]=[v[0]|0, v[1]|0]; }
+      if(ok.indexOf(k)>=0 && Array.isArray(v) && v.length===2 && isFinite(v[0]) && isFinite(v[1])) rp[k]=[v[0]|0, v[1]|0]; }
     META.roomPos=rp; })();
   // ⚠ Object.assign hands a save with no coopLevels the DEFAULT ARRAY ITSELF, so
   // the first co-op win would push into META_DEFAULT and every later `new` profile
@@ -23425,7 +23434,14 @@ function trainCarArt(){
 function trainSVG(){
   const A=trainCarArt();
   const car=(art,delay,cls)=>'<g class="trcar '+cls+'" style="animation-delay:'+delay+'s">'+art+'</g>';
-  return '<g class="dec dec-train" id="decTrain">'
+  // v2.18 (Wyatt 8/3: "The train set should be draggable around"): the whole
+  // set — ballast, rails AND the looping cars — rides one #ro-train wrapper
+  // that carries ONLY the drag delta (the v1.21 transform-layer law). The
+  // cars' keyframes stay pinned by the view-box + origin 0 0 recipe below,
+  // whose conjugation is identity in the wrapper's own space too, so a
+  // dragged loop is the same loop on a moved floor (the racecar's mid-lap
+  // ride proved the composition in v2.17).
+  return '<g id="ro-train"'+rpT('train')+'><g class="dec dec-train" id="decTrain">'
     // ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers
     +'<path d="M268 530 H392 a22 22 0 0 1 0 44 H268 a22 22 0 0 1 0 -44 z" fill="#8E7A5C" opacity="0.5"/>'
     +'<path d="M268 530 H392 a22 22 0 0 1 0 44 H268 a22 22 0 0 1 0 -44 z" fill="none" stroke="#7A6448" stroke-width="15" stroke-dasharray="3.5 12"/>'
@@ -23433,7 +23449,7 @@ function trainSVG(){
     +'<path d="M268 525 H392 a27 27 0 0 1 0 54 H268 a27 27 0 0 1 0 -54 z" fill="none" stroke="#9AA2AE" stroke-width="2.4"/>'
     // ⚠ the LOCO gets the most-negative delay: furthest along the loop = leading
     +car(A.loco,-2.8,'c1')+car(A.coal,-1.4,'c2')+car(A.boose,0,'c3')
-    +'</g>';
+    +'</g></g>';
 }
 // ROBO-SARGE 3000 — an 80s chrome robot that trundles about the rug on his own
 // business. ⚠ THE WANDER IS BOUNDED BY CONSTRUCTION: the keyframes are hand-
@@ -23531,7 +23547,10 @@ const DUCKY_VB='-37 -29 70 68';
 // shipped locale — measured left edges: EN 628 · ru 623 · es 627, ja/de/ko/zh
 // narrower still.
 function duckySVG(){
-  return '<g class="dec dec-ducky" id="decDucky" transform="translate(585,196) scale(0.88)">'+duckyArt()+'</g>';
+  // v2.18 (Wyatt 8/3): the ducky is one of the five toys that drag — the
+  // outer wrapper holds ONLY the delta (v1.21 layer law); the static park
+  // stays on the id-carrier group exactly as the note above prescribes
+  return '<g id="ro-ducky"'+rpT('ducky')+'><g class="dec dec-ducky" id="decDucky" transform="translate(585,196) scale(0.88)">'+duckyArt()+'</g></g>';
 }
 // THE WIND-UP RACECAR (v1.71, redrawn + THE LAP v1.78) — the battlefield's
 // prize: a low-slung tin midget racer, a green army man at the wheel (helmet,
@@ -24169,12 +24188,15 @@ function roomSVG(){
   +'<g id="ro-avatar"'+rpT('avatar')+'><image href="'+(META.avatar==='sarge'? menuSargeURI(dyeHex()||'#4A6B35') : sprURI(META.avatar, dyeHex()||'#4A6B35'))+'" x="330" y="330" width="82" height="96"/></g>'
   +'</svg>';
 }
-// v2.12 ARRANGE YOUR ROOM (Wyatt 8/2): rows carrying `mv` are DRAGGABLE — the
-// key names the object's slot in META.roomPos and its art wrapper (#ro-<mv>)
-// in roomSVG, so the hotspot, the label pill and the drawing all ride one
-// [dx,dy]. (v2.17: the mv-less doorway corner row is gone with the squad's
-// move to the tower — the door really is pure architecture now, and the
-// rival's whole identity lives on the tower's own draggable row.)
+// v2.12 ARRANGE YOUR ROOM / v2.18 ONLY TOYS & TROOPS (Wyatt 8/3: "remove the
+// drag-and-drop functionality from the campaign box, the medals, the bed, the
+// battlefield, the promotions, and the piggy bank… all of the core buttons
+// are in their original places"): `mv` no longer makes a row draggable — it
+// survives as the row's ID KEY (#ro-/#rspot-/#rtag-<mv> in roomSVG and
+// renderMenu), and the load path purges every mv key out of META.roomPos, so
+// each button renders at exactly the x/y/lx/ly written here. (v2.17's note
+// stands: the doorway corner row is gone, the rival's whole identity lives on
+// the tower's own row — just a FIXED row again, like the rest.)
 const ROOM_SPOTS=[
   { id:'campaign', x:150, y:200, w:220, h:180, mv:'campaign',
     // a mustering squad shows on the card itself — the room says "your buddies
@@ -24267,22 +24289,28 @@ const ROOM_SPOTS=[
     notr:1,
     cls:()=>(pigPayout()>0 && META.piggy.claimed!==todayStr())?'gold':'', lx:148, ly:106 }
 ];
-// ================== v2.12 ARRANGE YOUR ROOM ==================
-// Wyatt 8/2, verbatim: "Allow dragging objects around in menu; including the
-// bank; promotions battlefield and shop, etc. Your troops in the menu need to
-// be draggable." One pointer controller on the DOCUMENT: the stage is
-// innerHTML-rebuilt on every buy and payout, so per-element listeners would
-// die with each repaint — ids are deterministic instead (#ro-/#rspot-/#rtag-)
-// and a mid-gesture rebuild self-heals by re-query. A gesture only BECOMES a
-// drag past RDRAG_T screen px (the battle drags' own threshold): under it,
-// nothing is claimed and the tap falls through to the exact onclick it always
-// hit — zero dispatch changes, the v2.10 decor tap-priority law untouched.
-// Hit-testing is geometric: label pills first (the topmost HTML), then the
-// victory troops (their ink rides above the furniture divs that blanket them
-// — Sarge stands INSIDE the campaign hotspot and still drags as himself),
-// then the spots in reverse render order, the same "later wins" the DOM
-// already plays. Deltas persist in META.roomPos on release, clamped so
-// nothing parks off the 960×600 boards or under the 46px header band.
+// ============ v2.12 ARRANGE YOUR ROOM · v2.18 TOYS & TROOPS ONLY ============
+// Wyatt 8/2 opened the whole room to dragging; Wyatt 8/3, verbatim: "Please
+// remove the drag-and-drop functionality from the campaign box, the medals,
+// the bed, the battlefield, the promotions, and the piggy bank. Just let the
+// player be able to drag around the pieces as well as the decorations." So
+// the controller keeps its v2.12 shape — one pointer controller on the
+// DOCUMENT (the stage is innerHTML-rebuilt on every buy and payout, so
+// per-element listeners would die with each repaint; ids are deterministic
+// instead and a mid-gesture rebuild self-heals by re-query), a gesture only
+// BECOMES a drag past RDRAG_T screen px (under it nothing is claimed and the
+// tap falls through to the exact onclick it always hit — zero dispatch
+// changes, the v2.10 decor tap-priority law untouched), the DRAG_OFF lift and
+// the 350ms release-click eater both stay — but rdragPick now answers for
+// exactly TWO families: the victory troops (the "pieces" — their ink rides
+// above the furniture divs that blanket them; Sarge stands INSIDE the
+// campaign hotspot and still drags as himself), then the five named toys in
+// reverse paint order, the same "later wins" the DOM already plays. Every
+// pill, door, hotspot and the bed is FIXED architecture again — a grab on one
+// claims nothing, and its tap opens what it always opened. Deltas persist in
+// META.roomPos on release, clamped so nothing parks off the 960×600 boards or
+// under the 46px header band; the load path's whitelist purge guarantees no
+// core-button key can reach that object from any era's save.
 const RDRAG_T=10;
 // the victory men's grab rects (base ink, pre-delta), keyed to their vt slot
 // — the plain x/y/w/h their <image> tags declare in roomVictory. v2.17: vt0,
@@ -24296,14 +24324,16 @@ const VTROOPS=[
   {k:'vt3', x:534, y:300, w:52, h:61},
   {k:'vt4', x:470, y:392, w:54, h:63}
 ];
-// v2.17 (Wyatt 8/3): the three loose toys he named drag like furniture —
-// their DECOR_SPOTS anchors are the grab rects, listed here in REVERSE paint
-// order so the later-drawn toy wins an overlapped grab — and the BED drags
-// with them (its rect is its own: the bed was never a tap door, so it lives
-// beside the controller, not in ROOM_SPOTS, and it is tested LAST — every
-// smaller thing sitting on or near it wins first).
-const RDRAG_DECOR=['racecar','teddy','elephant'];
-const RDRAG_BED={x:700, y:34, w:230, h:140};
+// v2.18 (Wyatt 8/3): the five loose toys — "The elephant, little rubber
+// ducky, teddy bear, and car can be dragged around" + "The train set should
+// be draggable around." Their DECOR_SPOTS anchors are the grab rects, listed
+// here in REVERSE paint order (decorSVG's own z) so the later-drawn toy wins
+// an overlapped grab. The racecar and train anchors STAY PARKED while they
+// lap (v1.78 law): grab rect = home rect, and a drag shifts the whole loop's
+// origin through the #ro- wrapper. The BED went back to plain furniture with
+// the rest of the room — RDRAG_BED is deleted with its rdragPick test, and
+// its squatters sleep at the authored 700,34 for good.
+const RDRAG_DECOR=['racecar','ducky','teddy','elephant','train'];
 let RDRAG=null;
 function rpXY(k){ const v=META.roomPos && META.roomPos[k]; return (v && v.length===2)? v : [0,0]; }
 function rpT(k){ const v=rpXY(k); return (v[0]||v[1])? ' transform="translate('+v[0]+','+v[1]+')"' : ''; }
@@ -24324,52 +24354,35 @@ function rdragClamp(base, dx, dy){
   dy=Math.max(Math.min(48-base.y,0), Math.min(600-base.h-base.y, dy));
   return [Math.round(dx), Math.round(dy)];
 }
+// v2.18: exactly two families answer a grab — troops, then toys. The label
+// pills, the ROOM_SPOTS doors and the bed all fell out of this function (the
+// whole "core buttons are in their original places" fix): a grab on any of
+// them claims nothing, so the gesture is a plain tap on the button it always
+// was. Coordinates are pure room-space geometry — p arrives from rdragPt.
 function rdragPick(p){
-  const st=document.getElementById('roomStage'); if(!st) return null;
-  const sr=st.getBoundingClientRect(), s=sr.width/960;
-  for(let i=ROOM_SPOTS.length-1;i>=0;i--){ const sp=ROOM_SPOTS[i];
-    if(!sp.mv || !sp.label) continue;
-    const el=document.getElementById('rtag-'+sp.mv); if(!el) continue;
-    const b=el.getBoundingClientRect();
-    if(p.x>=(b.left-sr.left)/s && p.x<=(b.right-sr.left)/s && p.y>=(b.top-sr.top)/s && p.y<=(b.bottom-sr.top)/s)
-      return { k:sp.mv, base:{x:sp.x, y:sp.y, w:sp.w, h:sp.h} };
-  }
   if(document.getElementById('ro-vt1'))
     for(let i=VTROOPS.length-1;i>=0;i--){ const tb=VTROOPS[i], d=rpXY(tb.k);
       if(p.x>=tb.x+d[0] && p.x<=tb.x+tb.w+d[0] && p.y>=tb.y+d[1] && p.y<=tb.y+tb.h+d[1])
         return { k:tb.k, base:tb }; }
-  // v2.17: the named toys — after the troops (a man on the rug outranks the
-  // toy under him), before the furniture rows (the toys sit ON the room)
+  // the named toys — after the troops (a man on the rug outranks the toy
+  // under him); reverse paint order between themselves (RDRAG_DECOR's law)
   for(const k of RDRAG_DECOR){
     if(!decorOn(k)) continue;
     const b=DECOR_SPOTS[k], d=rpXY(k);
     if(p.x>=b.x+d[0] && p.x<=b.x+b.w+d[0] && p.y>=b.y+d[1] && p.y<=b.y+b.h+d[1])
       return { k:k, base:b };
   }
-  for(let i=ROOM_SPOTS.length-1;i>=0;i--){ const sp=ROOM_SPOTS[i];
-    if(!sp.mv) continue;
-    const d=rpXY(sp.mv);
-    if(p.x>=sp.x+d[0] && p.x<=sp.x+sp.w+d[0] && p.y>=sp.y+d[1] && p.y<=sp.y+sp.h+d[1])
-      return { k:sp.mv, base:{x:sp.x, y:sp.y, w:sp.w, h:sp.h} }; }
-  // v2.17: the bed last of all — the biggest, bottom-most piece of furniture
-  { const d=rpXY('bed');
-    if(p.x>=RDRAG_BED.x+d[0] && p.x<=RDRAG_BED.x+RDRAG_BED.w+d[0] && p.y>=RDRAG_BED.y+d[1] && p.y<=RDRAG_BED.y+RDRAG_BED.h+d[1])
-      return { k:'bed', base:RDRAG_BED }; }
   return null;
 }
-// paint one object at [dx,dy]: SVG wrapper + hotspot div + label pill, all
-// re-queried by id (the repaint self-heal law above)
+// paint one object at [dx,dy]: SVG wrapper + (for a toy) its tap anchor, all
+// re-queried by id (the repaint self-heal law above). v2.18: the rspot/rtag
+// branch is GONE with the doors' draggability — k can only name a troop or a
+// toy now, and neither owns a pill.
 function rdragApply(k, dx, dy){
   const g=document.getElementById('ro-'+k);
   if(g){ if(dx||dy) g.setAttribute('transform','translate('+dx+','+dy+')'); else g.removeAttribute('transform'); }
-  for(const sp of ROOM_SPOTS){ if(sp.mv!==k) continue;
-    const dv=document.getElementById('rspot-'+k);
-    if(dv){ dv.style.left=(sp.x+dx)+'px'; dv.style.top=(sp.y+dy)+'px'; }
-    const tg=document.getElementById('rtag-'+k);
-    if(tg){ tg.style.left=(sp.lx+dx)+'px'; tg.style.top=(sp.ly+dy)+'px'; }
-    break; }
-  // v2.17: a dragged toy's tap anchor rides too (the decor divs render after
-  // the pills and WIN overlapped taps — v2.10 law — so the zone must follow)
+  // a dragged toy's tap anchor rides too (the decor divs render after the
+  // pills and WIN overlapped taps — v2.10 law — so the zone must follow)
   const dp=DECOR_SPOTS[k];
   if(dp){ const dv=document.getElementById('dspot-'+k);
     if(dv){ dv.style.left=(dp.x+dx)+'px'; dv.style.top=(dp.y+dy)+'px'; } }
