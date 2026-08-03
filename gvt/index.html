@@ -2109,7 +2109,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.13</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.14</div>
   <div class="scanlines"></div>
 </div>
 
@@ -13162,33 +13162,47 @@ function reset(){
   S.sq=null;      // …and a squad mission arms its streaming ticker there too
   S.aceKills=0;   // best single-soldier kill count this battle (yours only)
 }
-// ===== SPEED DEFAULTS (v1.93, Wyatt 7/31) =====
-// "Set the default speed in campaign to .65x speed: (say its .75x speed) so
-// new players can quickly adjust to the game. Also decrease the battle ground
-// default speed to 90%." The campaign OPENS at ×0.65 real while the button
-// says ×0.75 — both numbers are his and the gap is deliberate; do not
-// reconcile them. The battleground opens at an honest ×0.9. The old ×1 and
-// ×2 stay on the ladder as absolutes — these are new DEFAULTS, not new
-// ceilings — so the button cycles base → ×1 → ×2 and a returning player's
-// known speeds are the exact sim rates that shipped. The chosen rung persists
-// per surface (META.spdC/spdB — device-local like levelStars, never on the
-// sync wire); the sortie, the mom fight and the classic rigs keep the shipped
-// ×1↔×2 toggle. Co-op pins ×1 at the S.coop arm sites: every sim in a lobby
-// — old-build clients included — must run the SAME multiplier, and old
-// builds run 1. The boom slow-mo rides S.slowmo now, so a dramatic beat can
-// never overwrite the dial.
+// ===== THE CAMPAIGN SPEED LADDER (v2.14, Wyatt 8/2) =====
+// "Campaign gradual speed up; first bump to 80% speed is at level 10. Then
+// 85% at level 25. Then 90% at 40, then regular 100% at 50. (With the option
+// to slow it down; and it saves the speed to your setting so they don't have
+// to adjust the speed every time they play." — the campaign dial reads a
+// LADDER keyed on the level the campaign card itself shows (META.campaign+1,
+// the player's PROGRESS — a veteran replaying L1 keeps their full pace): the
+// highest row at-or-below it is the level's DEFAULT AND ITS CEILING, and
+// every row beneath is the "slow it down" menu. The ×1/×2 absolutes leave
+// the campaign — a ceiling of ×1.00 at L50 IS Wyatt's "regular" — and this
+// retires v1.93's ×0.65-real/×0.75-shown fiction: the ladder is honest, the
+// button says the sim rate. ⚠ WYATT'S DIALS: the pre-L10 rung is MY 0.75
+// (one notch under his first bump — his four numbers are rows 2-5); and if
+// he wants the old fib back it is a show column away. A tap landing BELOW
+// the ceiling saves the VALUE to META.spdCV (device-local like spdB, never
+// on the sync wire) and auto-applies next battle; a tap landing ON the
+// ceiling clears it (0 = ride the ladder), so a player who never slows down
+// speeds up with their own progress. The battleground (×0.9 → ×1 → ×2,
+// META.spdB), the sortie/mom ×1↔×2 bucket and the co-op ×1 pins are
+// byte-what-shipped (v1.93); the boom slow-mo rides S.slowmo, so a dramatic
+// beat still can never overwrite the dial.
+const SPD_LADDER=[ {lvl:1,spd:0.75},{lvl:10,spd:0.80},{lvl:25,spd:0.85},{lvl:40,spd:0.90},{lvl:50,spd:1.00} ];
 const SPD_MODES={
-  c:{ real:[0.65,1,2], show:[0.75,1,2], k:'spdC' },
-  b:{ real:[0.90,1,2], show:[0.90,1,2], k:'spdB' },
-  o:{ real:[1,2],      show:[1,2],      k:null   }
+  c:{ k:'spdCV' },                    // rungs come off SPD_LADDER — spdRungs()
+  b:{ real:[0.90,1,2], k:'spdB' },
+  o:{ real:[1,2],      k:null   }
 };
 function spdMode(){ return S.bf? 'b' : S.sq? 'c' : 'o'; }
-function spdInit(){ const M=SPD_MODES[spdMode()];
-  const i=M.k? (META[M.k]|0) : 0;
-  S.spdI=(i>=0 && i<M.real.length)? i : 0;   // reader-clamped — garbage in the save never crashes the dial
-  S.speed=M.real[S.spdI]; }
-function spdShow(){ const M=SPD_MODES[spdMode()];
-  return M.show[Math.min(S.spdI,M.show.length-1)]; }
+function spdRungs(){ const m=spdMode();
+  if(m!=='c') return SPD_MODES[m].real;
+  const lv=(META.campaign|0)+1;   // the level on the campaign card — progress, never the replayed n
+  const r=[]; for(const s of SPD_LADDER){ if(s.lvl<=lv) r.push(s.spd); }
+  return r.length? r : [SPD_LADDER[0].spd]; }
+function spdInit(){ const M=SPD_MODES[spdMode()], R=spdRungs();
+  if(spdMode()==='c'){ const i=R.indexOf(+META[M.k]||0);   // ||, not |: 0.75 must survive the read
+    S.spdI=(i>=0 && i<R.length-1)? i : R.length-1; }       // only a genuine slow-down is a preference — the top rung re-reads the ladder
+  else { const i=M.k? (META[M.k]|0) : 0;
+    S.spdI=(i>=0 && i<R.length)? i : 0; }                  // reader-clamped — garbage in the save never crashes the dial
+  S.speed=R[S.spdI]; }
+function spdShow(){ const R=spdRungs();
+  return R[Math.min(S.spdI,R.length-1)]; }
 function startBattle(levelN, rival){
   if(typeof bfQueueTeardown==='function') bfQueueTeardown();   // a battle outranks a queue
   reset();
@@ -13277,7 +13291,7 @@ function startCampaign(n){
   const mr=mercyRelief(S.levelN);
   if(mr<1) S.cfg.hpMul*=mr;
   S.sq={ p:1, t:0, nextT:SQ_GRACE };
-  spdInit();   // the gentle default — or the rung this device already chose (v1.93)
+  spdInit();   // the ladder rung this progress earns — or the slow-down this device already chose (v2.14)
   // v1.31: the crate the Tan walk out of. Smash it to win — it is the ONLY win.
   const bh=Math.round(CAMP_BASE_HP(S.levelN)*mr);   // ×1 → the identical integer
   S.tanBase={ x:W-130, y:300, hp:bh, hpMax:bh, hitT:0 };
@@ -22389,8 +22403,8 @@ function hqRender(){
     +'<button type="button" class="hqs-back" onclick="UI.hqBack()">⚔ BACK TO THE BATTLE</button>'
     +'<button type="button" class="hqs-row" onclick="UI.hqSound()">'+(soundOn?'♪ SOUND ON':'✕ SOUND OFF')+'</button>'
     // two sims, one clock — the speed row simply isn't offered in co-op.
-    // ⚠ the label speaks spdShow(), not S.speed — the campaign's opening rung
-    // runs ×0.65 and SAYS ×0.75 by design (v1.93, Wyatt's two numbers)
+    // the label speaks spdShow() — honest since v2.14: the campaign dial is
+    // the SPEED LADDER now and the button says the real sim rate
     +(S.coop? '' : '<button type="button" class="hqs-row" onclick="UI.hqSpeed()">▶ SPEED ×'+spdShow()+'</button>')
     +'<button type="button" class="hqs-quit" onclick="UI.hqRetreat()">🏳 RETREAT TO HQ</button>'
   +'</div>';
@@ -25760,9 +25774,13 @@ window.UI = {
   hqBack(){ SFX.clack(); hqClose(); },
   hqSound(){ soundOn=!soundOn; SFX.blip(); hqRender(); },
   hqSpeed(){ if(S.coop){ SFX.clack(); return; }
-    const M=SPD_MODES[spdMode()];
-    S.spdI=(S.spdI+1)%M.real.length; S.speed=M.real[S.spdI];
-    if(M.k){ META[M.k]=S.spdI; saveMeta(); }   // the rung is a preference now — it survives the battle and the reboot (v1.93)
+    const M=SPD_MODES[spdMode()], R=spdRungs();
+    if(R.length<2){ SFX.clack(); return; }   // pre-L10 the ladder has one rung — nothing to cycle yet
+    S.spdI=(S.spdI+1)%R.length; S.speed=R[S.spdI];
+    // the choice survives the battle and the reboot (v1.93) — campaign saves
+    // the VALUE, and only a true slow-down (the ceiling itself means "ride
+    // the ladder", so a level-up keeps raising a never-slowed player)
+    if(M.k){ META[M.k]= spdMode()==='c'? (S.spdI<R.length-1? R[S.spdI] : 0) : S.spdI; saveMeta(); }
     SFX.blip(); hqRender(); },
   hqRetreat(){ S.drag=null; hqClose(); if(S.coop) coopLeave(); showMenu(); },  // walking out still folds the party
   // the War Table's door into a PRIVATE BATTLE — no chooser in the way
@@ -26556,9 +26574,9 @@ window.GVT = {
   // would get; seed a run for a battery (debug-only, the blades()/saberState()
   // precedent — no door in the game reaches these)
   mercy(){ return { run:Object.assign({},META.lossRun), relief:mercyRelief(S.levelN|0) }; },
-  speed(){ return { mode:spdMode(), i:S.spdI, real:S.speed, slowmo:S.slowmo, show:spdShow() }; },
-  speedSet(i){ const M=SPD_MODES[spdMode()]; S.spdI=Math.max(0,Math.min(M.real.length-1,i|0));
-    if(!S.coop) S.speed=M.real[S.spdI]; return this.speed(); },
+  speed(){ return { mode:spdMode(), i:S.spdI, real:S.speed, slowmo:S.slowmo, show:spdShow(), rungs:spdRungs() }; },
+  speedSet(i){ const R=spdRungs(); S.spdI=Math.max(0,Math.min(R.length-1,i|0));
+    if(!S.coop) S.speed=R[S.spdI]; return this.speed(); },
   mercySet(n,k){ META.lossRun['l'+n]=k|0; saveMeta(); return Object.assign({},META.lossRun); },
   // v1.38 FORMATIONS + SET PIECES rig: spawn any shape to inspect its geometry
   // (needs a battle on; n overrides every group's count), read a level's final
