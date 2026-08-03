@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v4.0 -->
+<!-- TRAINSET v4.1 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -6545,12 +6545,20 @@ function playSpot(n){
   return best>=PLAY_CLEAR? bestD : null;
 }
 // E16 — the loop coordinate under a rug cell (mid-piece), or null off the line.
-// The crossing hosts two arcs; the first seg found takes the drop — either way
-// the train lands on the diamond and runs, which is all a two-year-old asked.
+// E32 — the finger follows BUILD's law (the E4 audit): pieceTop resolves the
+// drop to the VISIBLE deck, so an over/under cell lands the train on the
+// trestle the child sees, never the tunnel beneath it; the spiral's other
+// cells deref to their anchor exactly like pieceAt, so the whole tower takes
+// the drop. One deck may still host two arcs (the crossing); the first seg
+// found takes it — either way the train lands on the diamond and runs, which
+// is all a two-year-old asked.
 function playDropD(cell){
   if(!PLAY.loop||!cell) return null;
-  const k2=key(cell[0],cell[1]);
-  for(const sg of PLAY.loop.segs) if(sg.k===k2) return sg.d0+sg.len/2;
+  const pc=pieceTop(cell[0],cell[1]);
+  if(!pc) return null;
+  const k2=pc.t==='sp'? key(pc.ax,pc.ay) : key(cell[0],cell[1]);
+  const el=(pc.elev|0)?1:0;
+  for(const sg of PLAY.loop.segs) if(sg.k===k2&&sg.el===el) return sg.d0+sg.len/2;
   return null;
 }
 // THE HAND PLACES THE TRAIN (E16, was: the tap is the whole gesture): a tray train
@@ -6574,7 +6582,7 @@ function playAdd(color,speed,cars,atD){
     grav:1, crest:false, pose:null, poseT:0, pri:0 };   // E30: each train carries its own hill-heart (flat maps: mul holds 1.0, pose never arms)
   for(let i=1;i<=tail.length;i++){ const rd=clone(head); back(rd,GAP*i); tr.cars.push({type:tail[i-1],rd,face:1,squash:0}); }
   PLAY.trains.push(tr);
-  SND.whistle(); const p=pos(head); puff(p.x,p.y-10,18);
+  SND.whistle(); const p=pos(head); puff(p.x,p.y-10-LIFT*(p.z||0),18);   // E32: the breath at the railhead (BUILD's idiom)
   return {ok:true,id:tr.id};
 }
 // THE CRASH LAW: riders of two DIFFERENT trains on the same (cell, elev) — rear-end
@@ -6616,7 +6624,7 @@ function playUpdate(dt){
     // E9: every train pays its own laps — the ruler is the loop's own arc length
     tr.lapAcc=(tr.lapAcc||0)+step;
     if(PLAY.loop&&tr.lapAcc>=PLAY.loop.len){ tr.lapAcc-=PLAY.loop.len;
-      const lp=pos(tr.cars[0].rd); starMint(MINT.lap,lp.x,lp.y); }
+      const lp=pos(tr.cars[0].rd); starMint(MINT.lap,lp.x,lp.y-LIFT*(lp.z||0)); }   // E32: the star departs the RAILHEAD (BUILD's idiom)
     tr.smokeT-=dt; if(tr.smokeT<=0){ tr.smokeT=0.2; puffLoco(tr.cars[0]); }
     // THE CHARM LAW, shared gate: people wave, the herd startles, ≤1 chirp per pass
     let charmed=false;
@@ -6645,7 +6653,7 @@ function playUpdate(dt){
       const mid=pathsOf(lpc)[lc.pi].len/2;
       if(Math.abs(lc.s-mid)<step+0.6 && tr.stKey!==lk){ tr.stKey=lk; tr.pauseT=STATION_PAUSE; SND.ding();
         if(playRiders()) boardAt(tr.cars,lk);       // E15→E30: PLAY boarding rides the per-map door (the pass boards; the flat rugs never)
-        const sp2=pos(lc); starMint(MINT.station,sp2.x,sp2.y); }   // E9: the stop pays, per train
+        const sp2=pos(lc); starMint(MINT.station,sp2.x,sp2.y-LIFT*(sp2.z||0)); }   // E9: the stop pays, per train (E32: from the railhead)
     }
     if(lk!==tr.cellKey){ if(tr.stKey&&tr.stKey!==lk) tr.stKey=null; tr.cellKey=lk; }
   }
