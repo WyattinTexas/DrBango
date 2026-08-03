@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN SET</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v3.2 -->
+<!-- TRAINSET v3.3 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -658,7 +658,8 @@ const CAMP_LABEL='CAMPAIGN 🎫';   // the menu button copy (PLAY's new neighbou
 // invents a word refuses to ship. WEAVE, THREAD and their cousins are gone forever.
 const HINT_MAX=5;
 const HINT_WORDS=new Set(('BUILD FINISH GO GET AROUND OVER THROUGH STOP AT USE LET VISIT '+
-  'THE A AND BOTH POND TRACK WOODS RIVER FARM STATION STATIONS CROSSING TUNNEL SPLIT TOWN').split(' '));
+  'THE A AND BOTH POND TRACK WOODS RIVER FARM STATION STATIONS CROSSING TUNNEL SPLIT TOWN '+
+  'SLIDE RUG TO LOOK').split(' '));   // E24: the pan coach's words join the kid list
 const hintWords=h=>h.replace(/[^A-Z ]/g,'').split(/\s+/).filter(Boolean);
 const GAP_GLOW=true;          // level 2's missing cells breathe a soft gold (5-year-old kindness)
 const TOY_CARD='NEW TOY!';    // the ceremony headline over each freshly-won toy
@@ -728,6 +729,16 @@ const PIG_COLORS=[
 ];
 const PIG_SPOT={x:1178,y:390,s:1.35};   // menu coords: the open boards between the bed and the door
 let PIG_SHOW=true;             // rig door — the byte-proof battery hides the painter
+// ---- Wyatt dials (EXPANSION 24 — one block) ----
+// GRAB THE LAND. Wyatt 8/2 (night, off the FM-TS-25 mockups): "The camera
+// grabbed the land. That's how we want to do it: be able to pan around the
+// map. Super important." Dressed rooms are glued wall-to-wall — at the phone
+// entry zoom a frame often holds ZERO empty cells, so E10's empty-cell-only
+// pan had nowhere to begin. THE LAW: a move that starts on GLUED becomes a
+// pan; a tap on GLUED keeps the tug (grabLand, in moveCore's glued branches).
+const COACH_PAN=true;          // the once-a-session coach toast, IN by default
+const COACH_LINE='SLIDE THE RUG TO LOOK AROUND';   // kid words only — every word rides the E8 allowlist
+let coachT=false;              // once per SESSION, first campaign or PLAY entry — a let, never saved (like surpT)
 // ---- Wyatt dials (EXPANSION 15 — one block) ----
 // A. GRAVITY AS DRAMA. grade is measured in ELEVATION LEVELS PER CELL of arc
 // (pos().z interps levels along the path; LIFT px per level is the height it
@@ -5028,6 +5039,7 @@ function campEnter(n){
   goalT=4.2;
   $('mark').textContent='🎫 LEVEL '+n;
   showScreen('game'); shelfSync(); save();
+  if(COACH_PAN&&!coachT){ coachT=true; toast(COACH_LINE); }   // E24: the coach speaks once a session
   return true;
 }
 function campExit(dest){
@@ -5423,6 +5435,7 @@ function playEnter(forceI){
   playAdd('red',1,PLAY_HOME_CARS);       // one red train, already running — the lid opens mid-chug
   $('mark').textContent=PLAY_MARK;
   showScreen('play');
+  if(COACH_PAN&&!coachT){ coachT=true; toast(COACH_LINE); }   // E24: the coach speaks once a session
   return true;
 }
 function playExit(dest){
@@ -5553,9 +5566,12 @@ function dragSync(){           // paint-time: the ramp eases the toy up even und
 let down=null;
 // ---- E10 camera gestures: pinch state + double-tap memory ----
 // Pan must LOSE to the existing drag laws — a press that lands on a train, a
-// piece or scenery takes the old path untouched; pan begins only when the
-// press starts on NOTHING. Pinch may start anywhere (two kid fingers land
-// where they land) but never steals an already-running drag.
+// piece or scenery takes the old path untouched; pan begins when the press
+// starts on NOTHING (E10) — or, since E24, when a MOVE starts on GLUED land
+// (grabLand below: glued can never be dragged anywhere, so its drag gesture
+// belongs to the camera; a TAP on glued still tugs). Pinch may start anywhere
+// (two kid fingers land where they land) but never steals an already-running
+// drag.
 const PTRS=new Map();
 let PINCH=null;
 let DTAP={t:0,x:0,y:0};
@@ -5657,6 +5673,26 @@ window.addEventListener('pointermove',e=>{
   if(SCREEN==='menu'){ if(down||DRAG){ BED.idleT=0; inBed(()=>moveCore(e)); } return; }
   moveCore(e);
 },{passive:false});
+// E24 GRAB THE LAND: a move that STARTS on glued becomes a pan — silently
+// (the tug is tap-only now; no TOOT on the grab). The down record converts
+// into the exact pan record pointerdown builds: the ORIGINAL press x/y stays
+// so the already-moved 8px catches up in one frame (imperceptible), ox/oy
+// seed from the CURRENT view, the flick fields start at zero, and on:true
+// marks the pan live (release runs the flick check, never tap/double-tap).
+// ⚠ ONLY when camGate() — the bedroom (SCREEN 'menu' via inBed) has no
+// camera, so a move on the attract oval's glued land must KEEP the tug, or
+// the wrapper starts mutating VIEW on the menu.
+function grabLand(e){
+  if(!camGate()) return false;
+  if(down.lp){ clearTimeout(down.lp); down.lp=null; }
+  followSet(false);                            // E15: the grab wins instantly, no snap-back
+  CAM.off=true;                                // E20: a real pan began — HOME knows the way back
+  VIEW.vx=VIEW.vy=0;                           // a grab always catches a gliding rug
+  down={x:down.x,y:down.y,what:'pan',ox:VIEW.ox,oy:VIEW.oy,
+        lx:e.clientX,ly:e.clientY,lt:perf(),vx:0,vy:0,on:true};
+  moveCore(e);                                 // the normal pan path runs NOW — flick-glide rides along for free
+  return true;
+}
 function moveCore(e){
   if(PTRS.has(e.pointerId)) PTRS.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(PINCH){ if(PTRS.size>=2){ e.preventDefault(); pinchMove(); } return; }
@@ -5688,7 +5724,7 @@ function moveCore(e){
   else if(down.what==='piece'){
     const [gx,gy]=down.cell, pc=pieceTop(gx,gy);
     if(pc){
-      if(pc.glued){ gluedTug(pc,null); down=null; return; }   // IT'S PART OF THE LAND!
+      if(pc.glued){ if(grabLand(e)) return; gluedTug(pc,null); down=null; return; }   // E24: the move pans; the menu (no camera) keeps IT'S PART OF THE LAND!
       if(TRAIN.placed && trainOn(gx,gy,pc)){
         if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); down=null; return; }
         trainHome(false); toast('BACK ON THE SHELF');
@@ -5701,7 +5737,7 @@ function moveCore(e){
   else if(down.what==='scen'){
     const [gx,gy]=down.cell, s=scenAt(gx,gy);
     if(s){
-      if(s.glued){ gluedTug(null,s); down=null; return; }     // IT'S PART OF THE LAND!
+      if(s.glued){ if(grabLand(e)) return; gluedTug(null,s); down=null; return; }     // E24: the move pans; the menu (no camera) keeps IT'S PART OF THE LAND!
       scen.delete(key(gx,gy)); save();
       DRAG={kind:'moveScen',t:s.t,v:s.v|0,from:[gx,gy]};
     }
