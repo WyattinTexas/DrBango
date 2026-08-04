@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v5.2 -->
+<!-- TRAINSET v5.3 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -751,7 +751,7 @@ const CHIRP_VOL=1.0;                                  // moo/baa/cluck loudness 
 const REACT_R=1;                                      // react radius, cells — the train charms animals this close
 const HERD_SPEED=1.0;                                 // herd idle tempo: graze / nibble / peck speed
 // ---- Wyatt dials (EXPANSION 3 — one const each) ----
-const MENU_PROPS=['sign','bed','toybox','blocks','door','lamp','station','store','tickets'];  // room props list (E26 adds the three new fixtures)
+const MENU_PROPS=['sign','bed','toybox','blocks','door','lamp','station','store','tickets','board'];  // room props list (E26 adds the three new fixtures; E44 the departure board)
 const ATT_SCALE=0.85;         // attract oval size (scale of the real 4×2 loop)
 const ATT_SPEED=70;           // attract loop speed, px/s — slow; SPEED stays the game's
 const PLAY_LABEL='PLAY';      // E26: the train station's pill (was the big button's copy — re-aimed, never orphaned)
@@ -761,6 +761,19 @@ const SIGN_TOP=6;             // the 2× plank's top edge (v3.4 sat at 40; the b
 const SHOP_LABEL='SHOP';      // the storefront's pill
 const TOYS_CARD='MY TOYS';    // the box's second card (BUILD_LABEL feeds the first)
 const STATION_S=1;            // station art scale — Wyatt's dial
+/* ---- E44 THE DEPARTURE BOARD (NEMO frame #4: a station signed with a PICTURE) ---- */
+const BOARD_SPOT={x:294,y:742};  // face centre, menu coords — the open floor beside the platform's left
+const BOARD_W=100, BOARD_H=84;   // the picture face — big enough to read at 812×375
+const BOARD_GS=1.05;             // glyph scale on the face
+// one glyph per world, keyed by the map's land (unique per map). ⚠ THE SILENT-CACTUS
+// LAW: every entry MUST be a real drawScenItem branch — an unknown kind paints
+// NOTHING, silently. A land without a row falls back to 'tree', never to a blank sign.
+const BOARD_PIC={ rug:'tree', west:'wtr', snow:'snow', mountain:'pine', jungle:'eleph',
+                  island:'palm', cloud:'puffc', ice:'peng', canyon:'bcact' };
+// the face wears its world's postcard colour (the snowman is cream — on a cream
+// face he would vanish; each tint is also land recognition for a pre-reader)
+const BOARD_SKY={ rug:'#F3E6C0', west:'#F4D9A8', snow:'#D7E8F6', mountain:'#CFE3F2',
+                  jungle:'#DDEBC8', island:'#BEE6E6', cloud:'#E8DFF2', ice:'#D3EEF4', canyon:'#F2C9A0' };
 const PICKME_S=6;             // seconds per attract window: exactly ONE pick-me each (the Putt-Putt law)
 const DOG_EVERY=6;            // every Nth window belongs to the roaming gag instead
 const ROOM_GAG='dog';         // 'dog' = the E2 dog from the lit doorway · 'none' — Wyatt's gag dial
@@ -6870,6 +6883,38 @@ function menuStation(){
   drawWaiter(72,60,PPL_COLS[2],t,2.3,false);
   cx.restore();
 }
+function boardNext(){
+  // the next departure — the rug the next station tap mounts (the v26 law:
+  // PLAYI is "visits banked / next seed"; at the menu that IS the next rug)
+  return PLAYMAPS[(((PLAYI|0)%PLAY_CYCLE)+PLAY_CYCLE)%PLAY_CYCLE];
+}
+function menuBoard(){
+  // E44 THE DEPARTURE BOARD — a toy trackside sign beside the platform carrying
+  // ONE framed picture: where the next train from this station goes (NEMO frame
+  // #4: a station signed with a PICTURE — a pre-reader reads pictures). No words,
+  // no tap, no sound: signage. Tap the station and you go where the picture said;
+  // coming home from PLAY flips the sign to the new next stop by construction.
+  const m=boardNext(), pic=BOARD_PIC[m.land]||'tree', sky=BOARD_SKY[m.land]||'#F3E6C0';
+  const hw=BOARD_W/2, hh=BOARD_H/2;
+  cx.save(); cx.translate(BOARD_SPOT.x,BOARD_SPOT.y);
+  cx.globalAlpha=0.25; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(0,134,56,9,0,0,7); cx.fill(); cx.globalAlpha=1;
+  // twin posts down to the boards (the sign family's wood)
+  cx.strokeStyle='#6e5130'; cx.lineWidth=9; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(-hw+16,130); cx.lineTo(-hw+16,0); cx.moveTo(hw-16,130); cx.lineTo(hw-16,0); cx.stroke();
+  cx.lineCap='butt';
+  // plank frame + the postcard face (the world's own colour — land recognition)
+  cx.fillStyle='#8f6b3f'; rr(-hw-6,-hh-6,BOARD_W+12,BOARD_H+12,8); cx.fill();
+  cx.strokeStyle='#6e5130'; cx.lineWidth=3; rr(-hw-6,-hh-6,BOARD_W+12,BOARD_H+12,8); cx.stroke();
+  cx.fillStyle=sky; rr(-hw,-hh,BOARD_W,BOARD_H,5); cx.fill();
+  // the picture — the shipped card recipe (mock scen item, still friendly pose),
+  // clipped to the face so no glyph ever leans off the sign
+  cx.save(); cx.beginPath(); rr(-hw,-hh,BOARD_W,BOARD_H,5); cx.clip();
+  cx.translate(0,6); cx.scale(BOARD_GS,BOARD_GS);
+  drawScenItem({t:pic,v:0,ra:null,pop:0,wave:0},-C/2,-C/2,1.2);
+  cx.restore();
+  cx.restore();
+}
 function menuStore(){
   // SHOP = A LITTLE STOREFRONT — the E22 door recipe stood up on the boards:
   // dark toy-chest wood, the red/cream scalloped awning, a gold star sign, a
@@ -7601,6 +7646,11 @@ function bedBounds(){
   // E26: every object's footprint (pill included) is furniture — blocked cells
   // through THE predicate, exactly like the piggy's spot
   for(const o of ROOM_OBJS) addRect(o.hit.x,o.hit.y,o.hit.x+o.hit.w,o.hit.y+o.hit.h);
+  // E44: the departure board is furniture too (frame + posts + shadow). A pre-v5.3
+  // room that already parked a toy here KEEPS it (row-forgiving law) — it simply
+  // stands in front of the sign; only NEW drops are refused.
+  addRect(BOARD_SPOT.x-BOARD_W/2-6, BOARD_SPOT.y-BOARD_H/2-6,
+          BOARD_SPOT.x+BOARD_W/2+6, BOARD_SPOT.y+140);
   BED.blk=blk;
 }
 
@@ -7682,6 +7732,7 @@ function drawMenu(){
   if(MENU_PROPS.includes('toybox')) menuToybox();
   if(MENU_PROPS.includes('blocks')) menuBlocks();
   if(MENU_PROPS.includes('station')) menuStation();   // E26: the floor buildings, south of the rug
+  if(MENU_PROPS.includes('board')) menuBoard();       // E44: the departure board, beside the platform
   if(MENU_PROPS.includes('store')) menuStore();
   if(PIG_SHOW) drawPig();   // E23: the piggy on the boards — furniture, under the toys
   // the attract loop, painted by the real track + car painters (E18: transform
@@ -11377,6 +11428,9 @@ window.TS={
       dog:ROOM.dog? {t:+ROOM.dog.t.toFixed(3),k:ROOM.dog.k} : null,
       gag:ROOM_GAG, every:DOG_EVERY, window:PICKME_S }; },
     sign(){ return { x:MENU_W/2-250*SIGN_K, y:SIGN_TOP, w:500*SIGN_K, h:88*SIGN_K, k:SIGN_K }; },
+    board(){ const m=boardNext();   // E44 — the departure board, for the battery
+      return { pic:BOARD_PIC[m.land]||'tree', land:m.land, name:m.name, sky:BOARD_SKY[m.land]||'#F3E6C0',
+        box:{ x:BOARD_SPOT.x-BOARD_W/2, y:BOARD_SPOT.y-BOARD_H/2, w:BOARD_W, h:BOARD_H } }; },
     vis(){ return menuVis(); },
     tap(id){ const o=ROOM_OBJS.find(o2=>o2.id===id); if(!o) return false; o.tap(); return true; },
     cards(b){ boxCards(b!==false); return ROOM.cards; },
