@@ -2150,7 +2150,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.27</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.28</div>
   <div class="scanlines"></div>
 </div>
 
@@ -9964,7 +9964,8 @@ function crossDuck(t){
 // a little above the waterline (d.y-12) because that is where the body is —
 // shots fly at chest height and the maths should agree with the picture.
 function duckBlock(x1,y1,x2,y2){
-  const d=S.bf&&S.bf.duck; if(!d) return null;
+  const d=S.bf? S.bf.duck : S.cduck; if(!d) return null;   // v2.28: one answer for both carpets — the campaign caches his own duck
+
   const ex=d.x, ey=d.y-12, dx=x2-x1, dy=y2-y1, fx=x1-ex, fy=y1-ey;
   const a=dx*dx+dy*dy; if(a<1e-9) return null;
   const b=2*(fx*dx+fy*dy), c=fx*fx+fy*fy-d.r*d.r;
@@ -9979,12 +9980,32 @@ function duckBlock(x1,y1,x2,y2){
 // ONE indignant squeak instead of a rattle. Throttled on S.t (the sim's own
 // clock) through bf state — cosmetics only, the block above never throttles.
 function duckBlockFx(p){
-  const bf=S.bf; if(!bf) return;
+  const st=S.bf||S;   // v2.28: the campaign's duck throttles on S itself — same clock, same 90ms
   S.fx.push({k:'puff',x:p.x,y:p.y+4,t:0,dur:0.3,R:9});
-  if(S.t-(bf.duckFxT||-9)<0.09) return;
-  bf.duckFxT=S.t;
+  if(S.t-(st.duckFxT||-9)<0.09) return;
+  st.duckFxT=S.t;
   bfSfx(SFX.squeak,p.x,p.y);
   S.fx.push({k:'ring',x:p.x,y:p.y-2,r:3,R:22,t:0,dur:0.22,col:'#FFE38A'});
+}
+// ===== v2.28 THE TOY CHEST'S DUCK — crossDuck's campaign twin. Any rug whose
+// terrain carries a river (seeded or authored) and whose dress row says
+// duck:true gets the same bath toy: he sets sail at a FIXED second of the
+// campaign's own clock, sails the channel top to bottom exactly ONCE per
+// battle (negative = not yet; past the south edge = gone, the window never
+// reopens), and eats every flat shot from EITHER army — he is neutral chaos,
+// sometimes shielding their column, sometimes eating their sniper's round.
+// The mortar and tanmortar lob over him (the trench-law family, both tubes).
+// Pure f(the accumulator), zero RNG — an allied lobby's two sims sail the
+// same duck at the same moment (the trainCars law, campaign edition).
+const CAMP_DUCK_AT=26,     // sim-seconds into the battle he sets sail — ⚠ WYATT'S DIAL
+      CAMP_DUCK_SPD=46,    // px/s downstream (one full pass of the 600 rug ≈ 15s)
+      CAMP_DUCK_R=24;      // the block circle — the crossing's own three numbers
+function campDuck(t){
+  const rd=S.cfg.terrain.riverDuck; if(!rd) return null;
+  const k=t-CAMP_DUCK_AT; if(k<0) return null;
+  const y=-40+k*CAMP_DUCK_SPD;
+  if(y>H+40) return null;
+  return { x:rd.cx+Math.sin(k*1.15)*7, y, r:CAMP_DUCK_R };
 }
 const BF_MAPS = [
   { id:'open', name:'OPEN CARPET', blurb:'The toy bin tipped over everything. One clean lane is left — and the wrecking balls roll right across it. Time your push.',
@@ -11519,6 +11540,13 @@ const CAMP_GRAND_W=1920;   // the battleground's own 1v1 span — one const for 
 // MOVING THINGS are the toy wrecking balls, BF math verbatim (a patrol that
 // plows both armies aside and never kills — campBallTick). The train stays
 // on WESTERN LAND: the θ-track is that map's identity and needs the tall mat.
+// 0194 THE TOY CHEST adds two authored-only rows (no shipped rung carries
+// either — every default deal stays byte-still): jax:[{x,y,big?}] = the
+// battleground's neutral one-time jacks, spots landing VERBATIM in the
+// rung's live span (never mirrored, never re-scaled; big:true = the
+// anti-tank charge per spot); duck:true = the crossing's shot-eating rubber
+// duck on any rug whose FINAL terrain carries a river (armed in
+// campGrandArm, sails once per battle on the campaign's own clock).
 // Authored straight in each rung's LIVE span — every shipped row below sits
 // on a grand rung, so these numbers are the ARMED 1920's (merged AFTER
 // campGrandArm's x-scale pass, so nothing here is ever re-scaled; 0193 opened
@@ -13633,6 +13661,7 @@ function reset(){
   S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[];
   S.sel=null; S.drag=null; S.shake=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
   S.ffLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.slowmo=1; S.spdI=0; S.hitStop=0; S.tanBase=null; S.vflag=null;
+  S.cduck=null; S.cduckClk=0;   // v2.28: a fresh battle deals a fresh duck — replaying the level sails him again (the crossing's own once-per-battle law)
   S.gk=1; S.cCam={x:0,y:0,vx:0,vy:0}; S.camHold=0; S.camOwn=false;   // v1.98: the grand-rug factor + the campaign camera re-arm with every battle — v2.09: and the pan claim re-arms with them (a NEW battle's escort walks again until its own first pan)
   S.momRaid=false; S.momToys=null;   // v1.79/0140: a stale mom flag (or her scattered props) would leak into the next battle
   S.sargeCd=0; S.sargeFlash=0; S.tagT=0; S.lostLevel=0;   // casualties + Sarge's clock + the faucet (v1.32)
@@ -13775,7 +13804,25 @@ function campGrandArm(){
     if(D.trench) t.trench={ w:D.trench.w, pts:D.trench.pts };
     if(D.balls)  t.balls=D.balls.map(b=>Object.assign({},b,{y:b.y0,dir:1,roll:0}));
     if(D.props)  t.props=(t.props||[]).concat(D.props.map(p=>Object.assign({},p)));
+    // 0194 THE TOY CHEST: jax spots land VERBATIM (no mirror flatMap — a rug
+    // is not symmetric, the editor owns fairness), COPY-merged like the rest;
+    // the duck is one flag, armed only where the FINAL river actually runs
+    // (seeded, authored via the wrapper, or stretched by the grand pass above
+    // — this line reads whatever survived all three).
+    if(D.jax)    t.jax=D.jax.map(j=>Object.assign({},j));
+    if(D.duck && t.river) t.riverDuck={cx:t.river.x+t.river.w/2};
   }
+  // ===== 0194 JAX, campaign edition: the little toy jacks go down BEFORE the
+  // first boot — the battleground's own idiom (v2.15, startBattlefield). They
+  // ride S.mines so the sweeper's loop serves them whole: armT 0 = live from
+  // the whistle, ONE splice per jack = "1 time mines" by the loop's own
+  // construction, and the phantom side 'jax' keeps every purse out of it.
+  // big:true per authored spot = the anti-tank charge on the big-banger's own
+  // arithmetic (trigger and blast both). Zero RNG, fixed authored coords:
+  // both crate doors run this pass from the same levelN, so an allied lobby's
+  // sims bury identical jacks (the relPos law's spirit).
+  for(const j of (t.jax||[]))
+    S.mines.push({ owner:null, side:'jax', seat:null, x:j.x, y:j.y, armT:0, big:!!j.big, sl:false, jx:true });
 }
 function startCampaign(n){
   startBattle(n||META.campaign+1, null);
@@ -17403,7 +17450,15 @@ function tanPick(f){
 }
 function tanShoot(f){
   const best=tanPick(f);
-  if(best){ (f.type==='tanmg'?SFX.mg:f.type==='tansniper'?SFX.crack:SFX.tpew)(); tanHit(best,f.x,f.y); return true; }
+  if(best){ (f.type==='tanmg'?SFX.mg:f.type==='tansniper'?SFX.crack:SFX.tpew)();
+    // v2.28: the duck blocks the TAN line too — he is neutral chaos, not a
+    // green ally. Same segment tanHit's tracer draws (their muzzle to the
+    // chest), so the round visibly dies on the toy; a blocked round rolls
+    // NO save (it never arrived — the plate, blade and grit never hear it).
+    const dkb=duckBlock(f.x-14,f.y-26,best.x,best.y-18);
+    if(dkb){ S.fx.push({k:'tracer',x1:f.x-14,y1:f.y-26,x2:dkb.x,y2:dkb.y,t:0,dur:0.1,col:'#EDD9A8'}); duckBlockFx(dkb); }
+    else tanHit(best,f.x,f.y);
+    return true; }
   return false;
 }
 // ===== 0117 the multi-target tan triggers. Every victim funnels through
@@ -17422,7 +17477,10 @@ function tanCone(f){
     if(!bfCanTarget(f,u)) continue;         // 0129: the cone is aimed fire, pellet by pellet — the green shotgun's own trench rule, mirrored
     const d=Math.hypot(u.x-f.x,u.y-f.y); if(d>R) continue;
     let da=Math.abs(Math.atan2(u.y-f.y,u.x-f.x)-ang); if(da>Math.PI) da=2*Math.PI-da;
-    if(da<=f.def.cone) tanHit(u,f.x,f.y);
+    // v2.28: each pellet is aimed fire (the green cone's own v2.15 law,
+    // mirrored) — the pellet at the duck dies on him, the pellet beside sails
+    if(da<=f.def.cone){ const dkb=duckBlock(f.x-14,f.y-26,u.x,u.y-18);
+      if(dkb) duckBlockFx(dkb); else tanHit(u,f.x,f.y); }
   }
   const mzx=f.x-30, mzy=f.y-30;
   S.fx.push({k:'cone',x:mzx,y:mzy,ang,spread:f.def.cone,rng:R,t:0,dur:0.16});
@@ -19999,6 +20057,19 @@ function update(dt){
   // 0129: and the dressed rugs' wrecking balls beside THAT, same hold, same
   // sim dt — an open letter freezes the whole toy room, patrols included.
   if(!S.bf && S.mode==='play' && !COMM.brief) campBallTick(dt);
+  // v2.28 THE TOY CHEST's duck ticks beside the balls — same hold, same sim
+  // dt, and mode 'play' spans the WHOLE vflag ceremony (endBattle flips it
+  // only when the card lands), so the drift never freezes behind the flag:
+  // the trainCars/duckClk law on the campaign's own clock. S.cduck is
+  // recomputed WHOLE from the accumulator every frame (pure f(clock), no
+  // RNG, no camera reads) so both sims in an allied lobby sail the same
+  // duck; every rug without the flag pays one truthy test.
+  if(!S.bf && S.mode==='play' && !COMM.brief && S.cfg.terrain.riverDuck){
+    S.cduckClk=(S.cduckClk||0)+dt;
+    const d=campDuck(S.cduckClk);
+    if(d && !S.cduck) bfSfx(SFX.squeak, d.x, d.y);   // one hello squeak as he sets sail
+    S.cduck=d;
+  }
   // 0140: mom's kicked toys fly on the same clock (a toy she punted still
   // lands mid-lull — she is off refilling, the room isn't). Null everywhere
   // but her raid (reset wipes it), so every other mode pays one truthy test.
@@ -20319,7 +20390,12 @@ function update(dt){
         f.shot=0;
         let best=null,bd=1e9;
         for(const u of S.units){ if(u.dead||u.jetT>0) continue; if(!bfCanTarget(f,u)) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<130&&d<bd){bd=d;best=u;} }   // 0129: a pistol potshot respects the lip like any rifle
-        if(best){ knock(best,f.x,f.y); S.fx.push({k:'tracer',x1:f.x,y1:f.y-30,x2:best.x,y2:best.y-20,t:0,dur:0.12}); }
+        if(best){
+          // v2.28: a pistol potshot is flat fire — the duck eats it like any
+          // rifle round, and the tracer dies where the round actually did
+          const dkb=duckBlock(f.x,f.y-30,best.x,best.y-20);
+          if(dkb){ S.fx.push({k:'tracer',x1:f.x,y1:f.y-30,x2:dkb.x,y2:dkb.y,t:0,dur:0.12}); duckBlockFx(dkb); }
+          else { knock(best,f.x,f.y); S.fx.push({k:'tracer',x1:f.x,y1:f.y-30,x2:best.x,y2:best.y-20,t:0,dur:0.12}); } }
       }
     }
     // jeep ram — a flying man is skipped BEFORE the rammed[] mark burns (v1.39:
@@ -20338,8 +20414,15 @@ function update(dt){
       if(f.shot>=8){
         f.shot=0;
         const cands=S.units.filter(u=>!u.dead&&!(u.jetT>0)&&bfCanTarget(f,u)&&Math.hypot(u.x-f.x,u.y-f.y)<220);   // 0129: the cannon fires flat — a trench man is below it (the BF tank has never been in TRENCH_EXEMPT either)
-        if(cands.length){ const u=cands[(Math.random()*cands.length)|0]; knock(u,f.x,f.y); SFX.boom(); S.shake=0.5;
-          S.fx.push({k:'puff',x:u.x,y:u.y-16,t:0,dur:0.5,R:34}); }
+        if(cands.length){ const u=cands[(Math.random()*cands.length)|0];
+          // v2.28: "the cannon fires flat" (0129's own words on the line
+          // above) — and flat fire dies on the duck like every tank shell on
+          // the crossing did; only the lobbers arc over him. The cannon still
+          // booms (it fired), but the hit, the shake and the dust never land.
+          const dkb=duckBlock(f.x-42,f.y-44,u.x,u.y-18);
+          if(dkb){ SFX.boom(); duckBlockFx(dkb); }
+          else { knock(u,f.x,f.y); SFX.boom(); S.shake=0.5;
+            S.fx.push({k:'puff',x:u.x,y:u.y-16,t:0,dur:0.5,R:34}); } }
       }
     }
     // ===== BOSS attacks (only once they're on the carpet) =====
@@ -20737,8 +20820,10 @@ function update(dt){
         // Wyatt's own list, and the tank's shell rides the same pipeline (a
         // reflected shell too: it is still a projectile in contact). No
         // splash anywhere: the blast died in the water. The mortar's lob
-        // arcs OVER him on purpose — it never flies this branch.
-        const dq=S.bf&&S.bf.duck;
+        // arcs OVER him on purpose — it never flies this branch. v2.28: the
+        // campaign's duck answers here too, and tan ordnance (foe:true)
+        // rides this same lane — one swallow serves both armies' rockets.
+        const dq=S.bf? S.bf.duck : S.cduck;
         if(dq && Math.hypot(sh.x-dq.x,sh.y-(dq.y-12))<dq.r+6){ S.shots.splice(i,1); duckBlockFx({x:sh.x,y:sh.y}); }
         else if((S.t*60|0)%2===0) S.fx.push({k:'smoke',x:sh.x,y:sh.y,t:0,dur:0.4}); }
     } else if(sh.k==='lob'){
@@ -20759,13 +20844,23 @@ function update(dt){
     const mn=S.mines[i];
     if(mn.armT>0){ mn.armT-=dt; continue; }
     const trig=mn.big? 26*ENH_MINE_TRIG : 26;
-    for(const f of (S.bf? bfEnemies(mn.side) : S.foes)){
+    // v2.28: a campaign JAX answers to EVERY standing boot — the battlefield
+    // got this free from bfEnemies('jax'), but the campaign's armies live in
+    // two arrays, so the phantom side reads both here: the foes as ever, plus
+    // every green who is actually ON the ground (not dead, not mid-drop, not
+    // riding the player's finger — landing ON a jack still triggers it, the
+    // campaign's own fairness law). A sapper's mine keeps its foes-only list.
+    for(const f of (S.bf? bfEnemies(mn.side) : (mn.jx? S.foes.concat(S.units.filter(o=>!o.dead&&!(o.dropT>0)&&!(S.drag&&S.drag.unit===o))) : S.foes))){
       if(f.burrow) continue;
       if(f.jetT>0) continue;   // a mine can't reach a flying man (v1.39) — landing ON one triggers it, fairly
       if(Math.hypot(f.x-mn.x,f.y-mn.y)<trig){ S.mines.splice(i,1);
         // the sapper may already be dead — the mine still knows whose it was
         splash(mn.x,mn.y, mn.big?MINE_BLAST*ENH_MINE_R:MINE_BLAST, 3*(mn.sl?SOUL_MUL:1), false,
-          S.units.find(u=>u.id===mn.owner&&!u.dead) || (S.bf?{side:mn.side,seat:mn.seat}:null),
+          // v2.28: a campaign jax passes the same phantom src the battlefield
+          // always did — typeless, seatless, kill-less — so splash and
+          // hitCheck can tell NOBODY'S boom from a sapper's (a dead sapper's
+          // campaign mine still passes null, byte-what-it-was)
+          S.units.find(u=>u.id===mn.owner&&!u.dead) || ((S.bf||mn.jx)?{side:mn.side,seat:mn.seat}:null),
           !!mn.big); break; }   // a double charge is an ANTI-TANK mine, on either carpet
     }
   }
@@ -20864,7 +20959,10 @@ function hitCheck(f,u){
     const idx=S.foes.indexOf(f);
     if(idx>=0){
       S.foes.splice(idx,1);
-      if(u){ u.kills++; noteKill(u,f); }
+      // v2.28: the battlefield branch's own dead-sapper arithmetic, campaign
+      // edition — a jax's phantom src carries no kills field, so nobody's
+      // tally moves; every real unit ships kills:0 from the moulding line
+      if(u && u.kills!=null){ u.kills++; noteKill(u,f); }
       // v1.61: the campaign fallen FADE — the same casualty beat your own men
       // play in knock(), so both armies leave the carpet the same way and a
       // long siege never piles up ninety bodies. Persistent corpses are the
@@ -20873,7 +20971,11 @@ function hitCheck(f,u){
       const RM=reducedMotion();
       S.fx.push({k:'fallen', type:f.type, img:foeImg(f.type), w:f.def.w,
                  x:f.x, y:f.y, t:0, dur:RM?0.4:1.1, rot:(f.def.vehicle?3.14:undefined)});
-      S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)),t:0});   // their dog tag — your bounty
+      // v2.28: a JAX kill mints NO tag — pays nobody is the whole neutrality
+      // law, and a five-jack rug must never be a plastic faucet. Every other
+      // death still drops the dog tag exactly as it always has.
+      if(!(u&&u.side==='jax'))
+        S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)),t:0});   // their dog tag — your bounty
       if(f.type==='crawler'){ META.stats.crawlerKills++; }
       if(f.boss){
         // a boss goes down LOUD: shake, a burst of smoke, and a victory shout
@@ -20941,8 +21043,12 @@ function splash(x,y,R,dmg,vx2,src,mach,refl){
     if(u.jetT>0) continue;   // your own shell bursts under his flight path (v1.39) — no FRIENDLY FIRE mid-arc
     if(S.drag&&S.drag.unit===u) continue;
     if(Math.hypot(u.x-x,u.y-y)<=R*0.9){
-      knock(u,x,y); S.ffLevel++;
-      S.floats.push({x:u.x,y:u.y-62,txt:'FRIENDLY FIRE!',t:0,col:'#D96A55'});
+      // v2.28: a JAX is nobody's shell — the knock still lands (one boom
+      // hurts BOTH armies, the neutrality law) but the FRIENDLY FIRE ledger
+      // stays clean: the stamp is an accusation, and the phantom side fired.
+      knock(u,x,y);
+      if(!(src&&src.side==='jax')){ S.ffLevel++;
+        S.floats.push({x:u.x,y:u.y-62,txt:'FRIENDLY FIRE!',t:0,col:'#D96A55'}); }
     }
   }
 }
@@ -21155,6 +21261,10 @@ function drawRug(){
     cx.fillStyle='#6E9DC4'; cx.globalAlpha=0.6;
     for(let y=70;y<H-70;y+=44){ cx.beginPath(); cx.ellipse(RV.x+RV.w/2+10*Math.sin(y*0.14+S.t*1.4), y, 12, 4, 0, 0, 7); cx.fill(); }
     cx.globalAlpha=1;
+    // v2.28 the campaign's duck sails HERE — after the water, before the
+    // planks, so he slides UNDER the popsicle bridge exactly like a real
+    // bath toy would (v2.15's own layering, the crossing's law).
+    if(S.cduck) drawCrossDuck(S.cduck);
     const by=RV.bridgeY;
     cx.fillStyle='#B48A54'; cx.fillRect(RV.x-10, by-RV.bw/2, RV.w+20, RV.bw);
     cx.strokeStyle='#8a683e'; cx.lineWidth=3;
@@ -21370,7 +21480,7 @@ function drawJack(mn){
 // duck's own clock (visual only) and sit still for reduced motion — the duck
 // itself keeps drifting, because where he IS is the mechanic.
 function drawCrossDuck(d){
-  const t=(S.bf&&S.bf.duckClk)||0, RM=reducedMotion();
+  const t=(S.bf? S.bf.duckClk : S.cduckClk)||0, RM=reducedMotion();   // v2.28: the bob rides whichever carpet's clock is sailing him
   cx.globalAlpha=0.45; cx.fillStyle='#EDEADF';
   cx.beginPath(); cx.ellipse(d.x,d.y+7,25,6,0,0,7); cx.fill(); cx.globalAlpha=1;
   cx.save(); cx.translate(d.x, d.y+(RM?0:Math.sin(t*1.6)*1.6)); cx.rotate(RM?0:Math.sin(t*1.3)*0.08);
