@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v4.8 -->
+<!-- TRAINSET v4.9 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -689,7 +689,7 @@ function applyDims(id){                          // swap the active board; the c
   VIEW.s=0;
 }
 // ---- Wyatt dials (EXPANSION 10 — one const each) ----
-const LANDS=['rug','west','snow','mountain','jungle'], WEATHERS=['clear','snowfall','dust','rain'];   // E30 the mountain, E31 the jungle join the doorway
+const LANDS=['rug','west','snow','mountain','jungle','island'], WEATHERS=['clear','snowfall','dust','rain'];   // E30 the mountain, E31 the jungle, E40 the island join the doorway
 let LAND='rug', WEATHER='clear';                 // free-build only (save v:8) — paint, never physics
 const LAND_SEED=20260801;                        // ground decorations seed
 const MESA_CELLS=160;                            // one low mesa per this many cells (min 2)
@@ -985,7 +985,7 @@ const PLAY_POOL=['box','tank','flat','cab'];  // tray spawns tow 1-2 random cars
 // THREE RUGS TO PLAY ON: every PLAY press winds up the NEXT little world — same
 // toy, three moods — and the cycle survives the app closing (save v:10 carries
 // playIdx, the ONLY thing PLAY remembers; the E6 stateless law holds for all else).
-const PLAY_CYCLE=5;             // maps in rotation (the PLAYMAPS length — E31 added the jungle)
+const PLAY_CYCLE=6;             // maps in rotation (the PLAYMAPS length — E40 added the island)
 const FRONTIER_WEATHER='clear'; // map 2 weather ('dust' if it reads well — taste call, default clear)
 // ---- Wyatt dials (EXPANSION 30 — one block) ----
 // THE MOUNTAIN PASS: E4 elevation + E15 gravity, dormant on flat maps since they
@@ -1008,6 +1008,21 @@ const ORCH_PER_100=4;          // orchid dot density (the one orchid pink)
 const DAPL_PER_100=5.5;        // sun-dapple pool density (α whisper — the canopy light)
 const BFLY_R=16, BFLY_SPEED=0.5;            // the butterflies' drift (px, rad/s)
 const BFLY_COLS=['#E86BA8','#F2C531','#7CA7D8'];   // orchid pink · gold · sky
+// ---- Wyatt dials (EXPANSION 40 — one block) ----
+// THE ISLAND LINE: the E1 water law dressed turquoise — sandy islands, a living
+// lagoon, and THE GIANT SQUID: a RARE gentle event, never on demand.
+const ISLAND_WEATHER='clear';       // turquoise sunshine (the jungle owns the rain, snow owns the white)
+const LAGOON_BANK='#2E8F9C', LAGOON_BLUE='#4FC9CE',
+      LAGOON_LIGHT='#8FE3E2', LAGOON_GLINT='#F0FCFA';   // the lagoon palette (island land only — seaCols)
+const SQUID_N=6;                    // the squid surfaces ~1 in N crossings (GALAXY.md lean)
+const SQUID_CD=40;                  // …and never twice within this many sim-seconds
+const SQUID_DUR=3.6;                // rise → wave → sink, sim-clocked
+const FRINGE_CELLS=26;              // one lagoon scallop per this many cells (min 4, edge law)
+const SHELL_PER_100=6;              // shell + starfish dots on the sand
+const TUFT_PER_100=3.5;             // pale beach-grass tufts
+const FISH_N=6, FISH_R=17, FISH_SPEED=0.4;   // the school's shared sweep (they turn as ONE)
+const SHK_R=19, SHK_SPEED=0.55;              // the smiling fin's circle
+const DPOD_N=3;                              // dolphins per arc
 // PLAYMAPS — three const tables in the campaign-level shape (E6's one PLAYMAP,
 // now one per mood; same fields, land/weather stay PAINT ONLY — the E10 law).
 // activeLand()/activeWeather() read the ACTIVE map whenever PLAY.on.
@@ -1183,6 +1198,57 @@ const PLAYMAPS=[
     ['bleaf',0,0],['bleaf',11,0],['bleaf',0,3],['bleaf',4,0],['bleaf',11,4],['bleaf',0,7],['bleaf',11,7],['bleaf',8,3],
     ['tree',6,0],['tree',0,4],['tree',11,3],['tree',3,7],['tree',10,7],
     ['bush',2,4],['bush',8,5],['bush',4,7],['bush',9,2],
+  ],
+},
+// 6 — THE ISLAND LINE (E40): sandy islands in a turquoise lagoon, the ring
+// HOPPING island to island — THREE causeway crossings, more water than any rug
+// in the galaxy (a sixth silhouette: a ring with a harbor STAIR in its SW
+// corner, the line stepping down through the cove). ALL FLAT: this world's
+// drama is the LIVING SEA — dolphin pods arc beside the causeways, schools of
+// fish bank as one, smiling fins circle and wave, and once in a while THE
+// GIANT SQUID surfaces beside a crossing, waves one tentacle, and slips under.
+// Sea creatures ARE water cells (the SEA paint law) and never sit adjacent —
+// a plain rv rides between any two, so every channel arm exists. Utopian
+// always: every creature is a friend.
+{ name:'THE ISLAND LINE', land:'island', weather:ISLAND_WEATHER,
+  riders:1,                          // the island BOARDS (E30 per-map door — riders look down from every causeway)
+  home:['tender','coach'],           // the resident brings seats: lap one owns the pod
+  squid:{'6,6':[6,4],'8,1':[8,0],'2,5':[0,5]},   // bridge cell → where she surfaces (plain rv, open water)
+  start:[8,6],                       // the resident's home straight (big island shore, east of the strait)
+  track:[
+    // the harbor quay, eastbound — the first thing every lap does is cross
+    // the mid strait on the causeway
+    ['c',0,2,6],['s',0,3,6],['st',0,4,6],['s',0,5,6],['br',0,6,6],['s',0,7,6],['s',0,8,6],['s',0,9,6],['c',3,10,6],
+    // up the big island's shore
+    ['s',1,10,5],['s',1,10,4],['s',1,10,3],['s',1,10,2],['c',2,10,1],
+    // the top run, westbound — over the north strait, past palm cove
+    ['s',0,9,1],['br',0,8,1],['s',0,7,1],['s',0,6,1],['s',0,5,1],['s',0,4,1],['s',0,3,1],['s',0,2,1],['c',1,1,1],
+    // down the west shore — and the HARBOR STAIR: two steps and a little
+    // bridge over the bay, down into the quay
+    ['s',1,1,2],['s',1,1,3],['c',0,1,4],['c',2,2,4],['br',1,2,5],
+  ],
+  scen:[
+    // the lagoon — three straits, 1-wide and organic (the E5 pond-fill law is
+    // for ponds): the central strait winds in from the bottom edge, out the
+    // top, into the NE lagoon arm; the bay comes in from the west edge and
+    // ends in the harbor cove. Causeways ride (6,6), (8,1) and (2,5).
+    ['rv',6,6],['rv',6,4],['rv',6,3],['rv',7,2],['rv',8,1],['rv',8,0],['rv',10,0],['rv',11,0],
+    ['rv',0,5],['rv',2,5],
+    // THE SEA IS ALIVE — the pods by the causeways, the schools in the
+    // straits, the smiling fins off the points, the boats in the cove
+    ['shark',6,7],['dolph',6,5],['fish',7,3],['dolph',8,2,1],['fish',9,0,1],
+    ['shark',1,5,1],['boat',3,5],
+    // PALM COVE — palms, shells, THE SANDCASTLE, a kid out watching
+    ['palm',0,0],['palm',3,0],['palm',0,3],['palm',4,2,1],
+    ['scast',3,3],['shell',2,2],['shell',0,4,1],['shell',5,3,2],
+    ['bfly',3,2],['ppl',2,3,0],
+    // the BIG ISLAND — 0166's jungle inside, a palm on its beach
+    ['vtree',8,3],['vtree',9,5],['vtree',11,2],
+    ['bleaf',7,4],['bleaf',9,2],['bleaf',11,4],
+    ['monk',9,3],['parr',8,5],['bfly',8,4],
+    ['tree',11,5],['bush',7,5],['bush',11,1],['palm',7,0,1],
+    // HARBOR ISLAND — folks on the quay, the harbor lamp, the beach bits
+    ['ppl',4,7,1],['ppl',5,7,2],['lamp',2,7],['shell',1,7],['palm',0,6],
   ],
 },
 ];
@@ -2406,6 +2472,7 @@ function drawRug(){
   if(land==='snow'){ drawLandField('#E9EEF4','#D7E1EC',0.75); return; }
   if(land==='mountain'){ drawLandField('#7C9A55','#6C8A49',0.55); return; }   // E30: the alpine meadow
   if(land==='jungle'){ drawLandField('#456F36','#3A6130',0.55); return; }     // E31: the jungle floor — deep, cozy, never dark
+  if(land==='island'){ drawLandField('#EBD9A9','#DFCC93',0.5); return; }      // E40: warm beach sand — the lagoon fringe rides landDecor
   cx.globalAlpha=0.5; cx.fillStyle='#4A1A12';
   [[112,112],[WORLD_W-112,112],[112,WORLD_H-112],[WORLD_W-112,WORLD_H-112]]
     .forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
@@ -2501,6 +2568,24 @@ function landDecor(){
     for(let i=0;i<nM;i++) items.push({t:'moss', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:8+rnd()*6});
     const nO=Math.round(cells*ORCH_PER_100/100);
     for(let i=0;i<nO;i++) items.push({t:'orch', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:3+rnd()*2, v:i%3});
+  } else if(land==='island'){
+    // E40 — THE LAGOON FRINGE first (the sea reaching in from every rug edge —
+    // the drift/frond edge-placement law: around every island rug at every
+    // size), then shell + starfish dots, then pale beach-grass tufts. The
+    // middle stays a calm sand canvas for the kid's own line.
+    const nL=Math.max(4,Math.round(cells/FRINGE_CELLS));
+    for(let i=0;i<nL;i++){
+      const side=i%4; let x,y,a;
+      if(side===0){ x=fx0+rnd()*(fx1-fx0); y=fy0+4+rnd()*10; a=0; }
+      else if(side===1){ x=fx0+rnd()*(fx1-fx0); y=fy1-4-rnd()*10; a=Math.PI; }
+      else if(side===2){ x=fx0+4+rnd()*10; y=fy0+rnd()*(fy1-fy0); a=-Math.PI/2; }
+      else { x=fx1-4-rnd()*10; y=fy0+rnd()*(fy1-fy0); a=Math.PI/2; }
+      items.push({t:'lago', x, y, rx:52+rnd()*34, ry:20+rnd()*12, a});
+    }
+    const nS=Math.round(cells*SHELL_PER_100/100);
+    for(let i=0;i<nS;i++) items.push({t:'shl', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:3+rnd()*2.5, v:i%3});
+    const nT=Math.round(cells*TUFT_PER_100/100);
+    for(let i=0;i<nT;i++) items.push({t:'tuft', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:6+rnd()*4});
   }
   LDEC={key:k2,items};
   return items;
@@ -2520,7 +2605,60 @@ function drawLandDecor(){
     else if(it.t==='frond') drawFrondDec(it);
     else if(it.t==='moss') drawMossDec(it);
     else if(it.t==='orch') drawOrchDec(it);
+    else if(it.t==='lago') drawLagoDec(it);
+    else if(it.t==='shl') drawShlDec(it);
+    else if(it.t==='tuft') drawTuftDec(it);
   }
+}
+// E40 — the lagoon fringe: a turquoise scallop of open sea reaching in from
+// the rug edge, wet-sand rim then water then a soft foam lip. PAINT ONLY.
+function drawLagoDec(d){
+  cx.save(); cx.translate(d.x,d.y); cx.rotate(d.a);
+  cx.globalAlpha=0.5; cx.fillStyle='#C9B387';                       // the wet-sand rim
+  cx.beginPath(); cx.ellipse(0,-d.ry*0.12,d.rx+10,d.ry+7,0,0,7); cx.fill();
+  cx.globalAlpha=0.85; cx.fillStyle=LAGOON_BLUE;                    // the sea itself
+  cx.beginPath(); cx.ellipse(0,-d.ry*0.3,d.rx,d.ry,0,0,7); cx.fill();
+  cx.globalAlpha=0.5; cx.fillStyle=LAGOON_LIGHT;
+  cx.beginPath(); cx.ellipse(0,-d.ry*0.5,d.rx*0.62,d.ry*0.5,0,0,7); cx.fill();
+  cx.globalAlpha=0.8; cx.strokeStyle=LAGOON_GLINT; cx.lineWidth=2.4; cx.lineCap='round';   // the foam lip
+  cx.beginPath(); cx.moveTo(-d.rx*0.8,d.ry*0.42);
+  cx.quadraticCurveTo(-d.rx*0.4,d.ry*0.62,0,d.ry*0.46);
+  cx.quadraticCurveTo(d.rx*0.4,d.ry*0.3,d.rx*0.8,d.ry*0.5); cx.stroke();
+  cx.lineCap='butt'; cx.globalAlpha=1; cx.restore();
+}
+// a shell or a starfish underfoot, tiny — the beach talking, not a toy
+function drawShlDec(d){
+  const r=d.r;
+  if(d.v===2){                                                      // the starfish
+    cx.fillStyle='#E8935A';
+    cx.beginPath();
+    for(let i=0;i<5;i++){ const a=-Math.PI/2+i*TAU/5, b=a+TAU/10;
+      cx.lineTo(d.x+Math.cos(a)*r*1.25,d.y+Math.sin(a)*r*1.25);
+      cx.lineTo(d.x+Math.cos(b)*r*0.5,d.y+Math.sin(b)*r*0.5); }
+    cx.closePath(); cx.fill();
+  } else {
+    cx.fillStyle=d.v? '#F2E3D5':'#EFC9CF';                          // scallop fan, cream or pink
+    cx.beginPath(); cx.moveTo(d.x,d.y+r*0.7);
+    cx.arc(d.x,d.y-r*0.15,r,Math.PI*0.15,Math.PI*0.85,true); cx.closePath(); cx.fill();
+    cx.strokeStyle='rgba(140,100,80,0.4)'; cx.lineWidth=0.9;
+    cx.beginPath();
+    for(const k of [-0.5,0,0.5]){ cx.moveTo(d.x,d.y+r*0.7); cx.lineTo(d.x+k*r*0.8,d.y-r*0.7); }
+    cx.stroke();
+  }
+}
+// pale beach grass: the dry-brush fan, sea-oat coloured
+function drawTuftDec(b){
+  cx.globalAlpha=0.85; cx.lineCap='round';
+  cx.strokeStyle='#B9AE72'; cx.lineWidth=2;
+  cx.beginPath();
+  for(let i=-2;i<=2;i++){
+    cx.moveTo(b.x,b.y);
+    cx.quadraticCurveTo(b.x+i*b.r*0.5,b.y-b.r*1.1,b.x+i*b.r*0.8,b.y-b.r*(1.4+((i&1)?0.3:0)));
+  }
+  cx.stroke();
+  cx.strokeStyle='#D3C98F'; cx.lineWidth=1.5;
+  cx.beginPath(); cx.moveTo(b.x,b.y); cx.quadraticCurveTo(b.x-1,b.y-b.r,b.x+1,b.y-b.r*1.6); cx.stroke();
+  cx.globalAlpha=1; cx.lineCap='butt';
 }
 // A flat-topped butte in toy plastic: stacked bands, a cream caprock, its own
 // long shadow (GVT WESTERN LAND recipe).
@@ -2816,11 +2954,19 @@ function addPoly(P2,pts,ox,oy){
   for(let i=1;i<pts.length;i++) P2.lineTo(ox+pts[i][0],oy+pts[i][1]);
 }
 // ---- rivers: cell water that reads its shape from its neighbours (track-connectivity idea) ----
+// E40 — THE SEA-LIFE LAW: a sea creature IS its water cell (one scen per cell
+// is the shipped truth), so these kinds are water to the PAINT exactly like the
+// waterfall — every neighbouring channel arm reaches their pools and the lagoon
+// is seamless by construction. NOT the predicate: no shipped rug and no palette
+// can make one, so every other mask reads byte-identically. They only RECEIVE
+// arms (their own cell paints a pool, not a channel) — so sea kinds never sit
+// orthogonally adjacent; a plain rv rides between any two (the map obeys).
+const SEA={dolph:1,fish:1,shark:1,boat:1};
 function riverMask(x,y){
   // E31: the WATERFALL is water to the PAINT (the channel arm reaches its plunge
   // pool so the seam is perfect by construction) but NOT to the predicate — no
   // shipped rug and no palette can make a wfall, so every other mask is byte-true.
-  const wet=s=>s.t==='rv'||s.t==='wfall';
+  const wet=s=>s.t==='rv'||s.t==='wfall'||SEA[s.t];
   let m=0, s;
   if((s=scenAt(x,y-1))&&wet(s)) m|=1;
   if((s=scenAt(x+1,y))&&wet(s)) m|=2;
@@ -2837,6 +2983,13 @@ function fenceMask(x,y){
   if((s=scenAt(x-1,y))&&s.t==='fence') m|=8;
   return m;
 }
+// E40 — THE LAGOON TINT: on the island land the water IS the lagoon. One gate,
+// the softRain pattern: everywhere else every expression computes the shipped
+// RIVER_* bytes (pixel-proven), and wtr/wfall/gorge keep raw RIVER_* — a water
+// tank is a water tank.
+const seaCols=()=>activeLand()==='island'?
+  {bank:LAGOON_BANK,blue:LAGOON_BLUE,light:LAGOON_LIGHT,glint:LAGOON_GLINT}:
+  {bank:RIVER_BANK,blue:RIVER_BLUE,light:RIVER_LIGHT,glint:RIVER_GLINT};
 function drawRivers(){
   let any=false;
   const chan=new Path2D(), ponds=[], fills=[];
@@ -2853,26 +3006,28 @@ function drawRivers(){
     if(m&8){ chan.moveTo(mx,my); chan.lineTo(mx-C/2,my); }
   }
   if(!any) return;
+  const P=seaCols();   // E40: the lagoon tint — RIVER_* bytes everywhere but the island
   cx.lineCap='round'; cx.lineJoin='round';
-  cx.strokeStyle=RIVER_BANK; cx.lineWidth=58; cx.stroke(chan);
-  cx.fillStyle=RIVER_BLUE;
+  cx.strokeStyle=P.bank; cx.lineWidth=58; cx.stroke(chan);
+  cx.fillStyle=P.blue;
   for(const [mx,my] of fills) cx.fillRect(mx-1,my-1,C+2,C+2);
-  cx.strokeStyle=RIVER_BLUE; cx.lineWidth=46; cx.stroke(chan);
-  cx.globalAlpha=0.55; cx.strokeStyle=RIVER_LIGHT; cx.lineWidth=24; cx.stroke(chan); cx.globalAlpha=1;
+  cx.strokeStyle=P.blue; cx.lineWidth=46; cx.stroke(chan);
+  cx.globalAlpha=0.55; cx.strokeStyle=P.light; cx.lineWidth=24; cx.stroke(chan); cx.globalAlpha=1;
   // sparkle combing — the GVT snow-combing recipe, in blue
-  cx.globalAlpha=0.75; cx.strokeStyle=RIVER_GLINT; cx.lineWidth=3; cx.lineCap='butt';
+  cx.globalAlpha=0.75; cx.strokeStyle=P.glint; cx.lineWidth=3; cx.lineCap='butt';
   cx.setLineDash([7,21]); cx.stroke(chan); cx.setLineDash([]); cx.globalAlpha=1;
   for(const [mx,my] of ponds){
-    cx.fillStyle=RIVER_BANK; cx.beginPath(); cx.arc(mx,my,31,0,7); cx.fill();
-    cx.fillStyle=RIVER_BLUE; cx.beginPath(); cx.arc(mx,my,25,0,7); cx.fill();
-    cx.globalAlpha=0.55; cx.fillStyle=RIVER_LIGHT; cx.beginPath(); cx.arc(mx,my,14,0,7); cx.fill();
-    cx.globalAlpha=0.75; cx.strokeStyle=RIVER_GLINT; cx.lineWidth=3; cx.setLineDash([6,10]);
+    cx.fillStyle=P.bank; cx.beginPath(); cx.arc(mx,my,31,0,7); cx.fill();
+    cx.fillStyle=P.blue; cx.beginPath(); cx.arc(mx,my,25,0,7); cx.fill();
+    cx.globalAlpha=0.55; cx.fillStyle=P.light; cx.beginPath(); cx.arc(mx,my,14,0,7); cx.fill();
+    cx.globalAlpha=0.75; cx.strokeStyle=P.glint; cx.lineWidth=3; cx.setLineDash([6,10]);
     cx.beginPath(); cx.arc(mx,my,17,0,7); cx.stroke(); cx.setLineDash([]); cx.globalAlpha=1;
   }
 }
 function drawRiverBlob(mx,my){
-  cx.fillStyle=RIVER_BANK; cx.beginPath(); cx.arc(mx,my,31,0,7); cx.fill();
-  cx.fillStyle=RIVER_BLUE; cx.beginPath(); cx.arc(mx,my,25,0,7); cx.fill();
+  const P=seaCols();
+  cx.fillStyle=P.bank; cx.beginPath(); cx.arc(mx,my,31,0,7); cx.fill();
+  cx.fillStyle=P.blue; cx.beginPath(); cx.arc(mx,my,25,0,7); cx.fill();
 }
 function drawRiverGhost(x,y){
   const m=riverMask(x,y), mx=GX+x*C+C/2, my=GY+y*C+C/2;
@@ -2882,15 +3037,16 @@ function drawRiverGhost(x,y){
   if(m&2){ chan.moveTo(mx,my); chan.lineTo(mx+C/2,my); }
   if(m&4){ chan.moveTo(mx,my); chan.lineTo(mx,my+C/2); }
   if(m&8){ chan.moveTo(mx,my); chan.lineTo(mx-C/2,my); }
+  const P=seaCols();
   cx.lineCap='round'; cx.lineJoin='round';
-  cx.strokeStyle=RIVER_BANK; cx.lineWidth=58; cx.stroke(chan);
-  cx.strokeStyle=RIVER_BLUE; cx.lineWidth=46; cx.stroke(chan);
+  cx.strokeStyle=P.bank; cx.lineWidth=58; cx.stroke(chan);
+  cx.strokeStyle=P.blue; cx.lineWidth=46; cx.stroke(chan);
 }
 // ---- bushes, trees, tiny people (bottle-brush + molded-plastic laws) ----
 function drawScen(){
   const t=perf();
   for(const [k,s] of scen){
-    if(s.t==='rv'||s.t==='pond'||s.t==='bal'||s.t==='arch'||s.t==='gorge'||s.t==='eag'||s.t==='bfly') continue;   // water + the gorge paint early; balloons + arches + the eagle + the butterflies fly late
+    if(s.t==='rv'||s.t==='pond'||s.t==='bal'||s.t==='arch'||s.t==='gorge'||s.t==='eag'||s.t==='bfly'||SEA[s.t]) continue;   // water + the gorge paint early; balloons + arches + the eagle + the butterflies fly late; E40 the sea lives in drawSea
     const [x,y]=k.split(',').map(Number);
     drawScenItem(s,GX+x*C,GY+y*C,t);
   }
@@ -3006,6 +3162,216 @@ function drawBflies(){
       cx.restore();
     }
   }
+}
+/* =====================================================================
+   THE LIVING SEA (E40) — pools + creatures paint with the ground water
+   (drawSea rides beside drawPonds, UNDER the track pass: a fin glides
+   beneath the causeway deck, the pod arcs beside it). Transforms = the
+   drawPonds recipe so taps feel alive. Pools knit first, creatures
+   swim second, and — above them all, once in a while — THE GIANT SQUID.
+   ===================================================================== */
+const SQ={on:0,t:0,x:0,y:0,cd:0,force:0};   // the squid EVENT (sim-clocked; reset with every PLAY visit)
+function seaPool(P){
+  cx.fillStyle=P.bank; cx.beginPath(); cx.arc(0,0,31,0,7); cx.fill();
+  cx.fillStyle=P.blue; cx.beginPath(); cx.arc(0,0,25,0,7); cx.fill();
+  cx.globalAlpha=0.55; cx.fillStyle=P.light; cx.beginPath(); cx.arc(-3,-2,14,0,7); cx.fill(); cx.globalAlpha=1;
+}
+function drawSea(){
+  let anyS=false;
+  for(const [,s] of scen) if(SEA[s.t]){ anyS=true; break; }
+  if(!anyS&&!SQ.on) return;
+  const t=perf(), P=seaCols();
+  for(const [k,s] of scen){                     // every pool first — the surface knits before anyone swims
+    if(!SEA[s.t]) continue;
+    const [x,y]=k.split(',').map(Number);
+    cx.save(); cx.translate(GX+x*C+C/2,GY+y*C+C/2);
+    if(s.pop>0){ const k2=1+0.16*s.pop; cx.scale(k2,k2); }
+    seaPool(P); cx.restore();
+  }
+  for(const [k,s] of scen){
+    if(!SEA[s.t]) continue;
+    const [x,y]=k.split(',').map(Number);
+    const ph=((((x*13+y*29)%23)+23)%23/23 + (s.v|0)*0.37)*TAU;
+    cx.save(); cx.translate(GX+x*C+C/2,GY+y*C+C/2);
+    if(s.pop>0){ const k2=1+0.16*s.pop; cx.scale(k2,k2); }
+    if(s.ra) cx.rotate(Math.sin((1-s.ra.k)*18)*0.06*s.ra.k);
+    if(s.t==='dolph') drawDolph(s,t,ph,P);
+    else if(s.t==='fish') drawFishSchool(s,t,ph,P);
+    else if(s.t==='shark') drawShark(s,t,ph,P);
+    else if(s.t==='boat') drawBoats(s,t,ph,P);
+    cx.restore();
+  }
+  if(SQ.on) drawSquid(t,P);
+}
+// E40 — THE POD: two glossy backs cruising; the reaction is THE ARC — three
+// dolphins leap in sequence clean across the pool, splashes at entry and exit.
+function drawDolph(s,t,ph,P){
+  const wv=s.wave>0? (1.3-s.wave)/1.3 : -1;     // -1 idle, else 0..1 through the arc
+  if(wv<0){
+    for(let i=0;i<2;i++){
+      const a=t*0.7*(i?-1:1)+ph+i*2.6;
+      cx.save(); cx.translate(Math.cos(a)*13,Math.sin(a)*8); cx.rotate(Math.cos(a)*(i?-0.3:0.3));
+      cx.fillStyle='#7B8FB8';
+      cx.beginPath(); cx.ellipse(0,0,8,2.6,0,Math.PI,0); cx.fill();
+      cx.beginPath(); cx.moveTo(-1,-2); cx.quadraticCurveTo(1,-7,4,-2); cx.closePath(); cx.fill();
+      cx.restore();
+    }
+  } else {
+    for(let i=0;i<DPOD_N;i++){
+      const p=(wv-i*0.16)/0.52;
+      if(p<=0||p>=1){
+        if(p>=1){ cx.globalAlpha=0.35; cx.strokeStyle=P.glint; cx.lineWidth=1.6;
+          cx.beginPath(); cx.arc(26-i*7,6,5,0,7); cx.stroke(); cx.globalAlpha=1; }
+        continue;
+      }
+      const lx=-26+52*p, ly=-Math.sin(Math.PI*p)*26+4;
+      const ang=Math.atan2(-Math.cos(Math.PI*p)*26*Math.PI,52)*0.9;
+      cx.save(); cx.translate(lx-i*7,ly); cx.rotate(ang);
+      cx.fillStyle='#7B8FB8';
+      cx.beginPath(); cx.ellipse(0,0,10,3.6,0,0,7); cx.fill();
+      cx.fillStyle='#AEC1DF';
+      cx.beginPath(); cx.ellipse(0,1.4,8.5,2,0,0,7); cx.fill();
+      cx.fillStyle='#7B8FB8';
+      cx.beginPath(); cx.moveTo(0,-3); cx.quadraticCurveTo(2,-8,5,-3); cx.closePath(); cx.fill();
+      cx.beginPath(); cx.moveTo(-9,0); cx.lineTo(-14,-4); cx.lineTo(-14,4); cx.closePath(); cx.fill();
+      cx.fillStyle='#23211E'; cx.beginPath(); cx.arc(7,-0.8,0.9,0,7); cx.fill();
+      cx.restore();
+      if(p<0.18||p>0.85){
+        const sx2=(p<0.5? -26:26)-i*7;
+        cx.globalAlpha=0.5; cx.fillStyle=P.glint;
+        for(const [qx,qy] of [[-3,-6],[0,-9],[3,-5]]){ cx.beginPath(); cx.arc(sx2+qx,4+qy,1.4,0,7); cx.fill(); }
+        cx.globalAlpha=1;
+      }
+    }
+  }
+}
+// E40 — THE SCHOOL: six little fish under the surface on one shared sweep —
+// the whole school banks and turns as ONE, a glint shimmering exactly at the turn.
+function drawFishSchool(s,t,ph,P){
+  const sw=Math.sin(t*FISH_SPEED+ph), cs=Math.cos(t*FISH_SPEED+ph);
+  const dir=cs>=0? 1:-1, turn=Math.abs(cs);
+  cx.globalAlpha=0.85;
+  for(let i=0;i<FISH_N;i++){
+    const fx2=sw*FISH_R*(0.7+((i*53)%23)/23*0.5)+(((i*29)%13)-6)*1.2;
+    const fy2=(((i*37)%17)-8)*1.15+Math.sin(t*1.7+i*1.9+ph)*1.4;
+    cx.save(); cx.translate(fx2,fy2); cx.scale(dir,1);
+    cx.fillStyle=i===2?'#F2C531':'#C7D6E8';   // one gold one in every school
+    cx.beginPath(); cx.ellipse(0,0,3.4,1.5,0,0,7); cx.fill();
+    cx.beginPath(); cx.moveTo(-3,0); cx.lineTo(-5.4,-1.6); cx.lineTo(-5.4,1.6); cx.closePath(); cx.fill();
+    cx.restore();
+  }
+  cx.globalAlpha=1;
+  if(turn<0.25){
+    cx.globalAlpha=(0.25-turn)/0.25*0.7; cx.strokeStyle=P.glint; cx.lineWidth=1.8; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(sw*FISH_R-8,-5); cx.lineTo(sw*FISH_R+8,-2);
+    cx.moveTo(sw*FISH_R-6,3); cx.lineTo(sw*FISH_R+7,6); cx.stroke();
+    cx.lineCap='butt'; cx.globalAlpha=1;
+  }
+}
+// E40 — the SMILING FIN: it circles its pool, the happy face faint through the
+// water; the reaction RISES — big smile, round eyes, one flipper waving hello.
+function drawShark(s,t,ph,P){
+  const up=s.wave>0? Math.sin(Math.PI*Math.min(1,(1.3-s.wave)/1.3*1.15)) : 0;
+  const a=t*SHK_SPEED+ph;
+  cx.save(); cx.translate(Math.cos(a)*SHK_R*(1-up*0.8),Math.sin(a)*SHK_R*0.62*(1-up*0.8));
+  if(up>0.05){
+    const k=up;
+    cx.fillStyle='#8FA3B8';
+    cx.beginPath(); cx.ellipse(0,2-10*k,10+3*k,9*k+2,0,0,7); cx.fill();
+    cx.fillStyle='#DCE7F0';
+    cx.beginPath(); cx.ellipse(0,5-8*k,7+2*k,5*k+1.2,0,0,7); cx.fill();
+    if(k>0.45){
+      cx.fillStyle='#23211E';
+      cx.beginPath(); cx.arc(-4,-12*k+3,1.4,0,7); cx.fill();
+      cx.beginPath(); cx.arc(4,-12*k+3,1.4,0,7); cx.fill();
+      cx.strokeStyle='#23211E'; cx.lineWidth=1.6; cx.lineCap='round';
+      cx.beginPath(); cx.arc(0,-7*k+3,4.4,Math.PI*0.15,Math.PI*0.85); cx.stroke();   // THE SMILE
+      const wvv=Math.sin(t*10);
+      cx.strokeStyle='#8FA3B8'; cx.lineWidth=3.6;
+      cx.beginPath(); cx.moveTo(9+3*k,4-2*k);
+      cx.quadraticCurveTo(15+3*k,2-8*k+wvv*1.5,18+3*k,1-13*k+wvv*2.5); cx.stroke();   // the waving flipper
+      cx.lineCap='butt';
+    }
+  } else {
+    cx.rotate(a+Math.PI/2);
+    cx.globalAlpha=0.3; cx.fillStyle='#8FA3B8';
+    cx.beginPath(); cx.ellipse(0,3,9,4,0,0,7); cx.fill();
+    cx.globalAlpha=1; cx.fillStyle='#8FA3B8';
+    cx.beginPath(); cx.moveTo(-3,2); cx.quadraticCurveTo(0,-9,4,2); cx.closePath(); cx.fill();
+    cx.globalAlpha=0.5; cx.strokeStyle=P.glint; cx.lineWidth=1.4;
+    cx.beginPath(); cx.moveTo(-6,4); cx.quadraticCurveTo(-10,5,-13,4); cx.stroke(); cx.globalAlpha=1;
+  }
+  cx.restore();
+}
+// E40 — the moored toy boats: two little sailboats bobbing on the cove swell
+// beside their mooring post. Wooden boats knock (the tap ladder's tok).
+function drawBoats(s,t,ph,P){
+  cx.fillStyle='#7A553A'; rr(24,-6,5,11,2); cx.fill();   // the mooring post on the quay side
+  for(let i=0;i<2;i++){
+    const bob=Math.sin(t*1.4+ph+i*2.1)*1.6, tilt=Math.sin(t*1.1+ph+i*1.3)*0.08;
+    cx.save(); cx.translate(i?8:-10,(i?6:-4)+bob*0.4); cx.rotate(tilt);
+    cx.globalAlpha=0.4; cx.strokeStyle=P.glint; cx.lineWidth=1.4;
+    cx.beginPath(); cx.moveTo(-9,5); cx.quadraticCurveTo(0,7,9,5); cx.stroke(); cx.globalAlpha=1;
+    cx.fillStyle=i?'#C0392B':'#3D6EA8';                  // one red hull, one blue
+    cx.beginPath(); cx.moveTo(-9,1); cx.lineTo(9,1); cx.lineTo(5,6); cx.lineTo(-5,6); cx.closePath(); cx.fill();
+    cx.strokeStyle='#8A6B4A'; cx.lineWidth=1.8;
+    cx.beginPath(); cx.moveTo(0,1); cx.lineTo(0,-12); cx.stroke();
+    cx.fillStyle='#F7F3E8';
+    cx.beginPath(); cx.moveTo(0.8,-12); cx.lineTo(7.5,-2); cx.lineTo(0.8,-2); cx.closePath(); cx.fill();
+    cx.restore();
+  }
+}
+// E40 — THE GIANT SQUID (the magic moment): she rises from the water beside
+// the crossing, looks right at the train, waves ONE tentacle hello, and slips
+// gently back under. The waterline band paints over the seam so she truly
+// surfaces. Warm coral-rose, big friendly eyes — utopian always.
+function drawSquid(t,P){
+  const mx=GX+SQ.x*C+C/2, my=GY+SQ.y*C+C/2;
+  const k=SQ.t<0.7? SQ.t/0.7 : SQ.t>SQUID_DUR-0.8? Math.max(0,(SQUID_DUR-SQ.t)/0.8) : 1;
+  const e=k*k*(3-2*k);
+  cx.save(); cx.translate(mx,my);
+  cx.globalAlpha=0.4*Math.min(1,SQ.t*2); cx.strokeStyle=P.glint; cx.lineWidth=2;
+  const rp=(SQ.t*0.7)%1;
+  cx.beginPath(); cx.ellipse(0,4,16+rp*22,(16+rp*22)*0.4,0,0,7); cx.stroke();
+  cx.globalAlpha=1;
+  if(e>0.01){
+    cx.save();
+    cx.beginPath(); cx.rect(-64,-100,128,100); cx.clip();   // she exists above the waterline only
+    cx.translate(0,(1-e)*100);
+    cx.fillStyle='#E8837E';                                 // the head — warm coral-rose
+    cx.beginPath(); cx.ellipse(0,-58,26,30,0,0,7); cx.fill();
+    cx.fillStyle='#F2A29B';
+    cx.beginPath(); cx.ellipse(-7,-64,12,16,0.3,0,7); cx.fill();
+    cx.fillStyle='#D96F6C';                                 // two round fins up top
+    cx.beginPath(); cx.ellipse(-20,-80,9,13,0.6,0,7); cx.fill();
+    cx.beginPath(); cx.ellipse(20,-80,9,13,-0.6,0,7); cx.fill();
+    cx.fillStyle='#F4F8FC';                                 // the big friendly eyes
+    cx.beginPath(); cx.arc(-9,-52,6.5,0,7); cx.fill();
+    cx.beginPath(); cx.arc(9,-52,6.5,0,7); cx.fill();
+    cx.fillStyle='#23211E';
+    cx.beginPath(); cx.arc(-8,-51,3,0,7); cx.fill();
+    cx.beginPath(); cx.arc(10,-51,3,0,7); cx.fill();
+    cx.strokeStyle='#23211E'; cx.lineWidth=1.6; cx.lineCap='round';
+    cx.beginPath(); cx.arc(0,-44,5,Math.PI*0.2,Math.PI*0.8); cx.stroke();   // the happy mouth
+    cx.strokeStyle='#D96F6C'; cx.lineWidth=6;               // resting curls at the waterline
+    for(const [tx,bend] of [[-18,-6],[-6,-3],[6,3],[18,6]]){
+      cx.beginPath(); cx.moveTo(tx*0.8,-34);
+      cx.quadraticCurveTo(tx+bend,-16,tx,-2); cx.stroke();
+    }
+    const wv=e>0.98? Math.sin(t*6)*0.35 : 0;                // THE WAVING TENTACLE — hello
+    cx.strokeStyle='#E8837E'; cx.lineWidth=7;
+    cx.beginPath(); cx.moveTo(24,-44);
+    cx.quadraticCurveTo(40,-64+wv*10,34+wv*14,-88+wv*6); cx.stroke();
+    cx.fillStyle='#E8837E';
+    cx.beginPath(); cx.arc(34+wv*14,-88+wv*6,4.6,0,7); cx.fill();
+    cx.lineCap='butt';
+    cx.restore();
+  }
+  cx.fillStyle=P.bank; cx.beginPath(); cx.ellipse(0,6,30,10,0,0,7); cx.fill();   // the waterline band
+  cx.fillStyle=P.blue; cx.beginPath(); cx.ellipse(0,5,26,8,0,0,7); cx.fill();
+  cx.globalAlpha=0.55; cx.fillStyle=P.light;
+  cx.beginPath(); cx.ellipse(-3,3.5,15,4.5,0,0,7); cx.fill(); cx.globalAlpha=1;
+  cx.restore();
 }
 // E31 — the WATERFALL at the river's head: a mossy rock shelf, three white
 // cascade ribbons (pure f(t)), the plunge pool reaching down to meet the
@@ -3222,6 +3588,69 @@ function drawBigLeaf(){
     cx.globalAlpha=1; cx.restore();
   }
 }
+// E40 — the leaning palm: a curved trunk, a fan of swaying fronds, two
+// coconuts. The whole crown breathes in the sea breeze (pure f(t)).
+function drawPalm(t,ph){
+  cx.strokeStyle='#8A6B4A'; cx.lineWidth=7; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(-6,27); cx.quadraticCurveTo(-2,8,6,-10); cx.stroke();
+  cx.strokeStyle='rgba(90,62,38,0.5)'; cx.lineWidth=1.6;
+  for(const q of [0.3,0.55,0.8]){
+    const bx=-6+12*q, by=27-37*q;
+    cx.beginPath(); cx.moveTo(bx-3,by); cx.quadraticCurveTo(bx,by-2,bx+3,by); cx.stroke();
+  }
+  cx.save(); cx.translate(6,-10); cx.rotate(Math.sin(t*1.1+ph)*0.05);
+  cx.lineCap='round';
+  for(let i=0;i<6;i++){
+    const a=-Math.PI/2+(i-2.5)*0.62, L=20+((i*7)%3)*3;
+    const dx=Math.cos(a)*L, dy=Math.sin(a)*L;
+    cx.strokeStyle=i%2?'#3F7233':'#35622B'; cx.lineWidth=6.5;
+    cx.beginPath(); cx.moveTo(0,0); cx.quadraticCurveTo(dx*0.55,dy*0.55-4,dx,dy+5); cx.stroke();
+  }
+  cx.fillStyle='#6B4A2C';
+  cx.beginPath(); cx.arc(-3,3,3,0,7); cx.fill();
+  cx.beginPath(); cx.arc(3,4,3,0,7); cx.fill();
+  cx.restore(); cx.lineCap='butt';
+}
+// E40 — beach treasure: a scallop fan + a spiral shell + one orange starfish
+function drawShell(s){
+  cx.fillStyle='#EFC9CF';                                  // the scallop
+  cx.beginPath(); cx.moveTo(-10,8); cx.arc(-10,2,7,Math.PI*0.15,Math.PI*0.85,true); cx.closePath(); cx.fill();
+  cx.strokeStyle='rgba(140,100,80,0.45)'; cx.lineWidth=1;
+  cx.beginPath();
+  for(const k of [-0.5,0,0.5]){ cx.moveTo(-10,8); cx.lineTo(-10+k*6,-4); }
+  cx.stroke();
+  cx.fillStyle='#F2E3D5';                                  // the little spiral
+  cx.beginPath(); cx.ellipse(8,-4,5.5,4.5,0.4,0,7); cx.fill();
+  cx.strokeStyle='rgba(140,100,80,0.5)'; cx.lineWidth=1.2;
+  cx.beginPath(); cx.arc(8,-4,3,0,Math.PI*1.5); cx.stroke();
+  cx.fillStyle='#E8935A';                                  // the starfish
+  cx.beginPath();
+  for(let i=0;i<5;i++){ const a=-Math.PI/2+i*TAU/5, b=a+TAU/10;
+    cx.lineTo(2+Math.cos(a)*7,14+Math.sin(a)*7);
+    cx.lineTo(2+Math.cos(b)*2.8,14+Math.sin(b)*2.8); }
+  cx.closePath(); cx.fill();
+}
+// E40 — THE SANDCASTLE: two bucket-molded towers, a wall, a paper flag waving.
+// Somebody built it this morning. Nobody lives in it (the E39 LIT law holds).
+function drawScast(t,ph){
+  cx.fillStyle='#D9C08A';                                  // the wall
+  rr(-16,6,32,14,3); cx.fill();
+  cx.strokeStyle='rgba(150,118,66,0.5)'; cx.lineWidth=1.4;
+  rr(-16,6,32,14,3); cx.stroke();
+  for(const tx of [-13,7]){                                // the towers
+    cx.fillStyle='#E2CB96'; rr(tx,-12,10,22,2.5); cx.fill();
+    cx.strokeStyle='rgba(150,118,66,0.5)'; rr(tx,-12,10,22,2.5); cx.stroke();
+    cx.fillStyle='#D9C08A';
+    for(const mx of [0,4,8]) cx.fillRect(tx+mx-1,-15,3.4,4);   // the crenels
+  }
+  cx.fillStyle='#B99B62'; rr(-4,12,8,8,2); cx.fill();      // the little gate
+  const fl=Math.sin(t*2.3+ph)*2;                            // the paper flag
+  cx.strokeStyle='#8A6B4A'; cx.lineWidth=1.6;
+  cx.beginPath(); cx.moveTo(-8,-12); cx.lineTo(-8,-24); cx.stroke();
+  cx.fillStyle='#C0392B';
+  cx.beginPath(); cx.moveTo(-8,-24); cx.quadraticCurveTo(-2+fl,-22.5,2+fl,-21);
+  cx.lineTo(-8,-18); cx.closePath(); cx.fill();
+}
 // E30 — the mountain goat on its own granite ledge (molded plastic, white coat,
 // little curled horns). Grazing in profile until the train passes — then it
 // TURNS TO WATCH: head up, face out, the charm law's wave timer doing the turning.
@@ -3262,7 +3691,8 @@ const SCEN_SH={ bush:[27,24], tree:[27,20], ppl:[21,24],
   fount:[27,27], stat:[28,17], fire:[26,17], flag:[29,7], mail2:[28,13], bench:[28,25], clock:[29,8],
   goat:[26,20],    // E30 — the goat's ledge sits in the standard shadow
   monk:[26,16], parr:[24,11], eleph:[26,24], vtree:[27,17], bleaf:[26,20],   // E31 — the jungle (bfly + wfall carry their own)
-  wolf:[21,20] };  // E35 — the wolf sits cow-tall
+  wolf:[21,20],    // E35 — the wolf sits cow-tall
+  palm:[27,18], scast:[26,22] };   // E40 — the beach (shell lies flat; the sea kinds carry water, never shadows)
 function drawScenItem(s,ox,oy,t){
   // real cells land on integer grid coords; palette icons / free-drag ghosts land outside,
   // where fenceMask reads 0 (lone bit of fence) and the herd phase is just fixed.
@@ -3319,6 +3749,9 @@ function drawScenItem(s,ox,oy,t){
   else if(s.t==='vtree') drawVineTree(t,ph);
   else if(s.t==='bleaf') drawBigLeaf();
   else if(s.t==='wfall') drawWfallCell(s,t);
+  else if(s.t==='palm') drawPalm(t,ph);     // E40 — the beach
+  else if(s.t==='shell') drawShell(s);
+  else if(s.t==='scast') drawScast(t,ph);
   if((s.lit>0||(s.litH||0)>0.02)&&LIT[s.t]) drawScenLit(s);   // E39: somebody is home
   cx.restore();
 }
@@ -5006,7 +5439,7 @@ function draw(){
   cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
   drawRug();
   if(buildGate()) drawNameSign(); else SIGN_RECT=null;   // E15: BUILD only — no sign in campaign or PLAY (E20: camGate opened, so the sign gates on buildGate now)
-  drawRivers(); drawGorges(); drawPonds(); drawGaps();   // E30: the gorge is ground — every deck and bent stands over it
+  drawRivers(); drawGorges(); drawPonds(); drawSea(); drawGaps();   // E30: the gorge is ground — every deck and bent stands over it; E40: the sea lives in the same water pass
   // scenery slides in as the midHook: over the ground pass, under the decks and
   // the z-sorted cars — so a cow can graze beneath the high line
   drawTrackAll(grid,hgrid,PLAY.on? playCarItems():trailCarItems(),drawScen);   // E28: trailCarItems = the cars + the rainbow's z-items; PLAY's branch byte-untouched
@@ -6295,6 +6728,12 @@ const SND={
   tweet(){ tone(1319,0.07,'sine',0.07*CHIRP_VOL,1760); tone(1175,0.1,'sine',0.055*CHIRP_VOL,1568,0.11); },
   trump(){ tone(196,0.3,'sawtooth',0.05*CHIRP_VOL,294); tone(392,0.22,'triangle',0.045*CHIRP_VOL,523,0.08);
            noise(0.14,700,0.035,'bandpass',0.02); },
+  // E40 — the sea voices: the dolphin's bright squeak, the shark's soft bubble
+  // (both ride the yayCd gate), and the squid's watery two-note hello (the
+  // event's own sound, once per rare surfacing — never the loudest thing).
+  eek(){ tone(1175,0.07,'sine',0.065*CHIRP_VOL,1568); tone(1319,0.09,'sine',0.05*CHIRP_VOL,1760,0.09); },
+  blub(){ tone(220,0.09,'sine',0.1*CHIRP_VOL,150); tone(180,0.1,'sine',0.07*CHIRP_VOL,130,0.1); },
+  sqhi(){ tone(262,0.22,'sine',0.09,330); tone(196,0.28,'triangle',0.05,262,0.12); noise(0.12,500,0.03,'lowpass',0.02); },
   bloop(){ tone(340,0.12,'sine',0.22,190); },
   // E10 — the rain's distant rumble: low, long, quiet — never the loudest thing
   rumble(){ noise(1.3,110,0.05,'lowpass'); tone(48,1.5,'sine',0.04,34); },
@@ -7085,8 +7524,24 @@ function playCrash(a,b,ck){
   fx.push({k:'stars',x:wx,y:wy,a:Math.random()*TAU,t:0,dur:0.9});
   starMint(MINT.bonk,wx,wy);   // E9: crashing on purpose is the point — pay for it
 }
+// E40 — THE GIANT SQUID: a RARE gentle event, never on demand. The map lists
+// its spots (bridge cell → open-water cell); when a loco ENTERS a listed
+// crossing and no squid is up and the cooldown is spent, one roll in SQUID_N.
+// Sim-clocked (frozen-clock deterministic), PLAY-only, reset with every visit.
+// TS.squid() arms force-next-crossing for the battery; TS.squid(i) surfaces NOW.
+function squidRoll(sp){
+  if(SQ.on||(SQ.cd>0&&!SQ.force)) return;
+  if(SQ.force||Math.random()*SQUID_N<1){
+    SQ.on=1; SQ.t=0; SQ.x=sp[0]; SQ.y=sp[1]; SQ.force=0; SND.sqhi();
+  }
+}
+function squidTick(dt){
+  if(SQ.cd>0) SQ.cd-=dt;
+  if(SQ.on){ SQ.t+=dt; if(SQ.t>=SQUID_DUR){ SQ.on=0; SQ.cd=SQUID_CD; } }
+}
 function playUpdate(dt){
   if(!PLAY.on) return;
+  squidTick(dt);
   for(const tr of PLAY.trains) if(tr.dying){ tr.crashT-=dt;
     for(const c of tr.cars) if(c.squash>0) c.squash=Math.max(0,c.squash-dt*2.5); }
   PLAY.trains=PLAY.trains.filter(tr=>!tr.dying||tr.crashT>0);
@@ -7120,6 +7575,13 @@ function playUpdate(dt){
           if(ch && yayCd<=0){ yayCd=3; chirpN++; SND[ch](); }
         }
       }
+    }
+    // E40 — the squid roll: the loco entering a listed crossing (cell-change
+    // latch, the stKey grammar). Maps without the field never ask.
+    const sqm=playMap().squid;
+    if(sqm){
+      const lc0=tr.cars[0].rd, sk=lc0.cx+','+lc0.cy;
+      if(sk!==tr.sqKey){ tr.sqKey=sk; const sp=sqm[sk]; if(sp) squidRoll(sp); }
     }
     // E30 — the REACTION LAW rides along (per train, paint only): riders wave
     // BACK at charmed ground people, look down from the trestle (this world's
@@ -7179,6 +7641,7 @@ function playEnter(forceI){
   applyDims('sm');                       // E10: the wind-up rug is the sm rug, always
   PLAY.on=true; PLAY.trains=[]; PLAY.crashes=0; PLAY.respawnT=PLAY_RESPAWN; PLAY.nextId=1;
   PLAY.wx=null;                          // E35: the wind-up rug opens under its map's own sky (stateless law)
+  SQ.on=0; SQ.t=0; SQ.cd=0; SQ.force=0;  // E40: the squid keeps no memory between visits (stateless law)
   playClackAcc=0;                        // E30: the chain-lift clock starts quiet every visit
   ridersOff();                           // E15: the wind-up rug keeps its glued people only
   grid.clear(); hgrid.clear(); scen.clear();
@@ -7198,6 +7661,7 @@ function playEnter(forceI){
 function playExit(dest){
   if(!PLAY.on){ showScreen(dest); return; }
   PLAY.on=false; PLAY.trains=[]; PLAY.loop=null; PLAY.wx=null;   // E35: the sky pill override dies with the visit
+  SQ.on=0; SQ.t=0; SQ.cd=0; SQ.force=0;  // E40: …and so does the squid
   ridersOff();                           // E15: the BUILD rug's platforms restock next tick
   applyDims(SIZE);                       // E10: back to the BUILD rug at its own size
   appWorld(PFREE||{grid:[],scen:[],consist:consist,train:null}); PFREE=null;
@@ -7287,6 +7751,13 @@ const SCENDEF={
   // E35 — the wolf: an animal (the herd law — she never blocks track), and
   // her charm is THE HOWL through the same shared gate.
   wolf:{react:1},
+  // E40 — the island. Sea creatures ARE water cells (the SEA paint law — water
+  // to riverMask only, never the predicate): the pod and the fin react through
+  // the one charm gate, the school is already dancing (the butterfly law), the
+  // boats knock like the wooden toys they are. The beach kinds are land. All
+  // glued-map-only — never a palette tab, never COLL: THE FIFTY STAY FIFTY.
+  dolph:{blocks:1,react:1}, fish:{blocks:1}, shark:{blocks:1,react:1}, boat:{blocks:1,knock:1},
+  palm:{blocks:1}, shell:{}, scast:{blocks:1,knock:1},
 };
 // E39 SOMEBODY IS HOME — tap a dwelling and somebody answers: the windows glow warm
 // gold with the knock, a small head rises into one pane, looks at you, and ducks just
@@ -7305,7 +7776,8 @@ const LIT={                    // pane rects + the peek pane, painter-local coor
   barn: {win:[[-7,-27,14,11]],           peek:[-7,-27,14,11],head:'chick',r:3.6},
 };
 const CHIRP={ ppl:'yay', cow:'moo', sheep:'baa', chick:'cluck', duck:'quack', dog:'yip', goat:'baa',
-  monk:'chit', parr:'tweet', eleph:'trump', wolf:'howl' };   // E31 — the jungle voices; E35 — the wolf's hello. Same quiet-HUD gate
+  monk:'chit', parr:'tweet', eleph:'trump', wolf:'howl',
+  dolph:'eek', shark:'blub' };   // E31 — the jungle voices; E35 — the wolf's hello; E40 — the sea's. Same quiet-HUD gate
 const IZOOM={ cow:1.35, sheep:1.5, chick:2.1, duck:1.9, dog:1.5, cat:1.55, flw:1.2, snow:1.05,
   fount:1.15, stat:1.2, fire:1.25, arch:1.3, flag:1.05, mail2:1.3, bench:1.25, clock:1.05,
   vtree:1.0, bleaf:1.1, wolf:1.35 };   // E31 — the jungle plants' card zoom; E35 — the wolf
@@ -7756,7 +8228,7 @@ function upCore(e){
       if(s){
         if(down.kz&&klTap(gx,gy)){}   // E34: the chain's door through a scenery cell — the lay wins the tap
         else if(s.t==='ppl'){ s.wave=1.3; SND.yay(); }
-        else if(s.t==='rv'||s.t==='pond'||s.t==='fount'){ fx.push({k:'rip',x:GX+gx*C+C/2,y:GY+gy*C+C/2,R:26,t:0,dur:0.5}); SND.bloop(); }
+        else if(s.t==='rv'||s.t==='pond'||s.t==='fount'||s.t==='fish'){ fx.push({k:'rip',x:GX+gx*C+C/2,y:GY+gy*C+C/2,R:26,t:0,dur:0.5}); SND.bloop(); }   // E40: the school is water — it ripples
         else if(SCENDEF[s.t].react){ s.ra={k:1}; s.wave=1.3;                // critters wiggle AND charm —
           const ch=CHIRP[s.t]; if(ch) SND[ch](); else SND.rustle(); }       // the quiet ones just wiggle
         else if(SCENDEF[s.t].knock){ s.ra={k:1}; SND.tok();                 // a wooden knock for the town —
@@ -7827,7 +8299,7 @@ function rugTileSize(g,id){
 function rugTileLand(g,id){
   const x=8, y=20, w=88, h=64;
   g.fillStyle='#4A1A12'; g.fillRect(x-4,y-4,w+8,h+8);
-  g.fillStyle= id==='west'? '#8B3E1E' : id==='snow'? '#E9EEF4' : id==='mountain'? '#7C9A55' : id==='jungle'? '#456F36' : '#63251C';
+  g.fillStyle= id==='west'? '#8B3E1E' : id==='snow'? '#E9EEF4' : id==='mountain'? '#7C9A55' : id==='jungle'? '#456F36' : id==='island'? '#EBD9A9' : '#63251C';
   g.fillRect(x,y,w,h);
   if(id==='rug'){
     g.strokeStyle='#8F4634'; g.lineWidth=2; g.strokeRect(x+5,y+5,w-10,h-10);
@@ -7884,6 +8356,28 @@ function rugTileLand(g,id){
     g.beginPath(); g.arc(x+70,y+22,3,0,7); g.fill();
     g.beginPath(); g.arc(x+76,y+25,2.6,0,7); g.fill();
     g.fillStyle='#F2C531'; g.beginPath(); g.arc(x+73,y+25,1.6,0,7); g.fill();
+  } else if(id==='island'){
+    // E40 — sand combing, the lagoon lapping one corner, a tiny leaning palm
+    g.globalAlpha=0.5; g.strokeStyle='#DFCC93'; g.lineWidth=2;
+    g.beginPath(); for(const yy of [y+18,y+34]){ g.moveTo(x+6,yy); g.quadraticCurveTo(x+w/2,yy-4,x+w-6,yy); } g.stroke();
+    g.globalAlpha=1;
+    g.fillStyle=LAGOON_BLUE;                                 // the lagoon corner
+    g.beginPath(); g.moveTo(x,y+h); g.quadraticCurveTo(x+34,y+h-26,x+w*0.62,y+h);
+    g.closePath(); g.fill();
+    g.globalAlpha=0.5; g.fillStyle=LAGOON_LIGHT;
+    g.beginPath(); g.moveTo(x+6,y+h); g.quadraticCurveTo(x+30,y+h-16,x+w*0.5,y+h);
+    g.closePath(); g.fill();
+    g.globalAlpha=0.9; g.strokeStyle=LAGOON_GLINT; g.lineWidth=2; g.lineCap='round';
+    g.beginPath(); g.moveTo(x+8,y+h-9); g.quadraticCurveTo(x+26,y+h-15,x+w*0.52,y+h-4); g.stroke();
+    g.lineCap='butt'; g.globalAlpha=1;
+    g.strokeStyle='#8A6B4A'; g.lineWidth=4; g.lineCap='round';   // the palm
+    g.beginPath(); g.moveTo(x+62,y+52); g.quadraticCurveTo(x+64,y+36,x+70,y+24); g.stroke();
+    g.lineWidth=3.6;
+    for(const [dx2,dy2] of [[-12,-4],[-7,-10],[2,-12],[10,-8],[13,0]]){
+      g.strokeStyle=(dx2+dy2)%2?'#3F7233':'#35622B';
+      g.beginPath(); g.moveTo(x+70,y+24); g.quadraticCurveTo(x+70+dx2*0.6,y+24+dy2-3,x+70+dx2,y+24+dy2+3); g.stroke();
+    }
+    g.lineCap='butt';
   } else {
     g.globalAlpha=0.75; g.strokeStyle='#D7E1EC'; g.lineWidth=2;
     g.beginPath(); for(const yy of [y+16,y+32,y+48]){ g.moveTo(x+6,yy); g.quadraticCurveTo(x+w/2,yy+4,x+w-6,yy); } g.stroke();
@@ -8018,7 +8512,7 @@ function buildPalette(){
     RUG_TILES.push({kind,id,el:b});
   };
   for(const [id,name] of [['sm','SMALL'],['lg','BIG'],['xl','HUGE']]) mkRug('size',id,name,g=>rugTileSize(g,id));
-  for(const [id,name] of [['rug','THE RUG'],['west','WESTERN'],['snow','WINTER'],['mountain','MOUNTAIN'],['jungle','JUNGLE']]) mkRug('land',id,name,g=>rugTileLand(g,id));   // E30 + E31
+  for(const [id,name] of [['rug','THE RUG'],['west','WESTERN'],['snow','WINTER'],['mountain','MOUNTAIN'],['jungle','JUNGLE'],['island','ISLAND']]) mkRug('land',id,name,g=>rugTileLand(g,id));   // E30 + E31 + E40
   for(const [id,name] of [['clear','CLEAR'],['snowfall','SNOW'],['dust','DUST'],['rain','RAIN']]) mkRug('weather',id,name,g=>rugTileWx(g,id));
   // TIDY UP (E16): the sweep-the-rug button, out of the retired shed's foot.
   // E33: the MORE TOYS… pill RETIRED — the corner chest is BUILD's look-book
@@ -9700,6 +10194,14 @@ window.TS={
   // timer, so a battery can assert a reaction armed on a REAL pass without
   // reading pixels. Mutation-free.
   charm(gx,gy){ const s=scen.get(key(gx,gy)); return s? {t:s.t, v:s.v|0, wave:+(s.wave||0).toFixed(3)} : null; },
+  // E40 battery doors — FLAT keys (the v48 rig dup-key trap). squid() arms
+  // force-next-crossing; squid(i) surfaces at the map's i-th spot NOW.
+  squid(i){ if(!PLAY.on) return false;
+    const sqm=playMap().squid; if(!sqm) return false;
+    if(i==null){ SQ.force=1; return true; }
+    const sp=Object.values(sqm)[i|0]; if(!sp) return false;
+    SQ.on=1; SQ.t=0; SQ.x=sp[0]; SQ.y=sp[1]; SQ.force=0; SND.sqhi(); return true; },
+  squidState(){ return {on:SQ.on,t:+SQ.t.toFixed(3),x:SQ.x,y:SQ.y,cd:+SQ.cd.toFixed(3),force:SQ.force}; },
   // ---- the wind-up rug rig (E6) ----
   play:{
     enter(){ return playEnter(); },
