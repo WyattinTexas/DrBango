@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v4.6 -->
+<!-- TRAINSET v4.7 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -920,6 +920,22 @@ const EAGER_WHISTLE=true;      // the far whistle that announces her
 const EAGER_COACH='PUT DOWN A STATION';   // BUILD's stationless finished line — once a session, then silence
 const KL_GHOST=1;              // E34 KEEP LAYING: the faint next-piece hint in a live continue zone (0 = off)
 const KL_GHOST_A=0.30;         // ...and how loud it whispers (the drag ghost speaks at 0.8)
+// ---- Wyatt dials (EXPANSION 38 — one block) ----
+// THE WHISTLE YOU CAN SEE (NEMO frame 01) + TWO COLOURS OF SMOKE (frame 04).
+// The burst lives ONLY on the three loco-tap branches — the whistle SOUND has
+// nine call sites (win/firstLap/eagerArrive/auto-go/spawn/swap) and hooking it
+// would make every ceremony in the game vent sideways. The tap is the child's
+// act; the burst is the train answering BIG.
+const WHISTLE_PUFF={n:7,sp:150,spread:14,ly:12,r:5.5,rj:2.5,a:0.72,dur:0.55,up:26};
+const SMOKE_RAMP_K=2.2;        // effort (1-mul) → colour weight
+const SMOKE_W_MAX=1;           // full soot at the climb floor (mul 0.55)
+const SMOKE_W_MIN=-0.7;        // palest wisp at the downhill ceiling (mul 1.35)
+const SMOKE_HARD=120;          // working-hard grey pole (#bbb = 187 is the flat baseline)
+const SMOKE_SOFT=226;          // coasting grey pole
+const SMOKE_W_EPS=0.02;        // below this the puff stays UNSTAMPED — GRAV.mul's post-hill
+                               // float convergence must never ghost-stamp a flat puff
+const SMOKE_PLAY=false;        // DIAL: two-colour smoke on PLAY rugs too (tr.grav is already
+                               // wired) — ships FALSE: the study's guard, keeps rugs byte-provable
 // ---- Wyatt dials (EXPANSION 15 — one block) ----
 // A. GRAVITY AS DRAMA. grade is measured in ELEVATION LEVELS PER CELL of arc
 // (pos().z interps levels along the path; LIFT px per level is the height it
@@ -2198,7 +2214,7 @@ function trackSideWatch(){
     } else s.red=near(cars,px,py)?1:0;
   }
 }
-function puffLoco(loco){                 // one stack puff from any loco (E6: play trains puff too)
+function puffLoco(loco,mul){             // one stack puff from any loco (E6: play trains puff too)
   const tp=pieceOf(loco.rd);
   if(tp&&tp.t==='tun') return;           // E7: the smoke holds its breath inside the mountain
   const p=pos(loco.rd);
@@ -2206,13 +2222,61 @@ function puffLoco(loco){                 // one stack puff from any loco (E6: pl
   const flip=Math.cos(artAng)<0;
   const lx=18*KART, ly=(flip?28:-28)*KART;
   const ca=Math.cos(artAng), sa=Math.sin(artAng);
-  smoke.push({ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly-LIFT*(p.z||0), t:0, dur:1.1,
-               vx:(Math.random()-0.5)*14, vy:-34, r:3+Math.random()*2 });
+  const s={ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly-LIFT*(p.z||0), t:0, dur:1.1,
+            vx:(Math.random()-0.5)*14, vy:-34, r:3+Math.random()*2 };
+  const w=smokeW(mul);                   // E38: the hill writes the exhaust (flat = exactly 0)
+  if(w) smokeDress(s,w);
+  smoke.push(s);
 }
 function stackPuff(){
   if(!TRAIN.placed||!TRAIN.cars.length) return;
   puffLoco(TRAIN.cars[0]);
 }
+/* =====================================================================
+   THE WHISTLE YOU CAN SEE (E38, NEMO frame 01) — the loco tap already
+   whistles; now the whistle is VISIBLE: one wide white burst venting
+   SIDEWAYS from the boiler the same instant. Gated on the TAP BRANCHES,
+   NEVER on SND.whistle (nine call sites — hook the sound and every
+   ceremony in the game vents). Particles ride the existing smoke pool:
+   existing tick, existing painters, zero new systems.
+   TWO COLOURS OF SMOKE (frame 04) — the hill writes the exhaust: each
+   puff stamps colour/weight at spawn from the gravity mul. Flat track
+   holds mul EXACTLY 1.0 (the E15 float law) ⇒ w exactly 0 ⇒ nothing
+   stamped ⇒ byte-identical — the physics gates itself.
+   ===================================================================== */
+function smokeW(mul){                  // effort → colour weight; 0 = untouched puff
+  if(BED.ctx) return 0;                              // the room's toy stays storybook-grey
+  if(PLAY.on&&!SMOKE_PLAY) return 0;                 // THE GUARD (the study's) — SMOKE_PLAY relaxes
+  const w=SMOKE_RAMP_K*(1-(mul!=null?mul:GRAV.mul));
+  if(Math.abs(w)<SMOKE_W_EPS) return 0;              // post-hill float dust never stamps (the byte law stays strict)
+  return Math.max(SMOKE_W_MIN,Math.min(SMOKE_W_MAX,w));
+}
+function smokeDress(s,w){              // stamps c/a/r — absent at w 0 (the byte law)
+  const g=Math.round(187+((w>0?SMOKE_HARD:SMOKE_SOFT)-187)*Math.abs(w));
+  s.c='rgb('+g+','+g+','+g+')';
+  s.a=0.4+(w>0?0.22:0.14)*w;
+  s.r=Math.max(2,s.r+(w>0?1.8:1.2)*w);
+}
+function whistleBurst(loco){
+  const tp=pieceOf(loco.rd);
+  if(tp&&tp.t==='tun') return;         // the burst holds its breath too (puffLoco's law)
+  const p=pos(loco.rd);
+  const artAng=p.ang+(loco.face<0?Math.PI:0);
+  const flip=Math.cos(artAng)<0;
+  const ca=Math.cos(artAng), sa=Math.sin(artAng);
+  const by=(flip?WHISTLE_PUFF.ly:-WHISTLE_PUFF.ly)*KART;   // boiler height (the stack sits ±28)
+  for(let i=0;i<WHISTLE_PUFF.n;i++){
+    const side=i%2?1:-1;                                    // vents BOTH ways = wide
+    const lx=(6+side*(4+Math.random()*WHISTLE_PUFF.spread))*KART;
+    const sp=WHISTLE_PUFF.sp*(0.55+Math.random()*0.45)*side;
+    smoke.push({ x:p.x+ca*lx-sa*by, y:p.y+sa*lx+ca*by-LIFT*(p.z||0),
+                 t:0, dur:WHISTLE_PUFF.dur*(0.8+Math.random()*0.4),
+                 vx:ca*sp, vy:sa*sp-WHISTLE_PUFF.up*(0.5+Math.random()*0.8),
+                 r:WHISTLE_PUFF.r+Math.random()*WHISTLE_PUFF.rj,
+                 c:'#fff', a:WHISTLE_PUFF.a });
+  }
+}
+const whistleVent=()=>{ if(TRAIN.placed&&TRAIN.cars.length) whistleBurst(TRAIN.cars[0]); };
 function puff(x,y,R){ fx.push({k:'puff',x,y,R,t:0,dur:0.4}); }
 function confettiBurst(n){
   for(let i=0;i<n;i++) confetti.push({
@@ -4904,7 +4968,7 @@ function draw(){
   drawBalloons();   // E7: balloons fly above the whole rug, shadows drifting along
   drawEagles();     // E30: the eagle circles higher still
   for(const s of smoke){ const k=s.t/s.dur;
-    cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb';
+    cx.globalAlpha=(1-k)*(s.a||0.4); cx.fillStyle=s.c||'#bbb';   // E38: unstamped = today's exact math
     cx.beginPath(); cx.arc(s.x,s.y,s.r+9*k,0,7); cx.fill(); cx.globalAlpha=1; }
   for(const e of fx){ const k=e.t/e.dur;
     if(e.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle='#e8e0cc';
@@ -6004,7 +6068,7 @@ function drawMenu(){
     if(BED.train.placed||(BED.ctx&&TRAIN.placed))                       // E18: the kid's train, beside the stock toy
       drawCarsOnRails(BED.ctx? TRAIN.cars:BED.train.cars,BED.wheel);
     for(const s of AT.smoke){ const k=s.t/s.dur;
-      cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb';
+      cx.globalAlpha=(1-k)*(s.a||0.4); cx.fillStyle=s.c||'#bbb';   // E38: unstamped = today's exact math
       cx.beginPath(); cx.arc(s.x,s.y,s.r+9*k,0,7); cx.fill(); }
     cx.globalAlpha=1;
     for(const e2 of BED.fx){ const k=e2.t/e2.dur;                       // E18: drop-puffs — draw()'s exact recipe
@@ -6995,7 +7059,7 @@ function playUpdate(dt){
     tr.lapAcc=(tr.lapAcc||0)+step;
     if(PLAY.loop&&tr.lapAcc>=PLAY.loop.len){ tr.lapAcc-=PLAY.loop.len;
       const lp=pos(tr.cars[0].rd); starMint(MINT.lap,lp.x,lp.y-LIFT*(lp.z||0)); }   // E32: the star departs the RAILHEAD (BUILD's idiom)
-    tr.smokeT-=dt; if(tr.smokeT<=0){ tr.smokeT=0.2; puffLoco(tr.cars[0]); }
+    tr.smokeT-=dt; if(tr.smokeT<=0){ tr.smokeT=0.2; puffLoco(tr.cars[0],tr.grav); }   // E38: the hill-heart rides along (SMOKE_PLAY dial)
     // THE CHARM LAW, shared gate: people wave, the herd startles, ≤1 chirp per pass
     let charmed=false;
     for(const c of tr.cars){
@@ -7591,14 +7655,17 @@ function upCore(e){
     // E18: on the menu the deferred puffs re-enter the bedroom wrapper (the smoke
     // pool and the train are the bedroom's); in BUILD this is byte-identical.
     if(down.what==='loco'||down.what==='tcar'){ const sp=BED.ctx? bedRun(stackPuff):stackPuff;
-      SND.whistle(); for(let i=0;i<3;i++) setTimeout(sp,i*90); }
+      SND.whistle(); (BED.ctx? bedRun(whistleVent):whistleVent)();   // E38: the whistle you can SEE — same instant
+      for(let i=0;i<3;i++) setTimeout(sp,i*90); }
     else if(down.what==='atrain'){                 // E18: tap the stock toy = whistle, like any loco
       SND.whistle();
+      bedRun(()=>{ if(AT.cars.length) whistleBurst(AT.cars[0]); })();   // E38: the toy answers BIG
       for(let i=0;i<3;i++) setTimeout(bedRun(()=>{ if(AT.cars.length) puffLoco(AT.cars[0]); }),i*90);
     }
     else if(down.what==='ptrain'){
       const tr=down.tr; SND.whistle();
-      if(!tr.dying) for(let i=0;i<3;i++) setTimeout(()=>{ if(PLAY.on&&!tr.dying&&tr.cars.length) puffLoco(tr.cars[0]); },i*90);
+      if(!tr.dying&&tr.cars.length) whistleBurst(tr.cars[0]);          // E38: same instant, same frame
+      if(!tr.dying) for(let i=0;i<3;i++) setTimeout(()=>{ if(PLAY.on&&!tr.dying&&tr.cars.length) puffLoco(tr.cars[0],tr.grav); },i*90);
     }
     else if(down.what==='piece'){
       const [gx,gy]=down.cell, pc=pieceTop(gx,gy);
