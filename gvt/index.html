@@ -2150,7 +2150,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.29</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.30</div>
   <div class="scanlines"></div>
 </div>
 
@@ -9854,6 +9854,22 @@ const TRAIN_SPD=260,        // px/s down the line
       SIGNAL_LEAD=2.5,      // seconds of crossbuck warning before the loco arrives
       TRENCH_W=64,          // the sunken lane's width
       TRK_BAN=38;           // no-drop margin around every rail (march across, never camp on)
+// ===== 0196 THE CROSSING LINE (Level Maker V2 Phase 5a) =====
+// Wyatt 8/3, verbatim: "Maybe even the train, with the tracks. Even if it's a
+// preset direction, so it's simple." A dress row — train:{x, preset:'crossing'}
+// — lays ONE straight vertical line at the authored x on a BIG CARPET rug: no
+// geometry authoring, the preset IS the direction. The consist is the western's
+// own toy train (same cars, same paint, same drawTrainCar) looping top→bottom
+// with an off-edge wrap (the dark-run idiom: `off` cars aren't drawn and touch
+// nobody), position pure f(the campaign clock), arc-sampled — zero RNG, the
+// trainCars law, so seeded snaps and allied lobbies agree by clock. THE LAW:
+// on a campaign rug the train PLOWS like the campaign ball (campBallTick's own
+// push — both armies shoved aside, boss/burrow exempt) and NEVER kills; the
+// battleground's kill law rides each authored row as kill:true (MEAN TRAIN —
+// Wyatt's dial, shipped OFF and on no row anywhere).
+const CTRAIN_SPD=170,      // px/s down the line (the western runs 260 — a rug crossing reads better slower)
+      CTRAIN_OFF=160,      // the off-edge apron past each rug edge: cars materialize and vanish out of sight
+      CTRAIN_RET=3200;     // the dark run home, in arc px — first pass ≈17s in, a pass ≈ every 24s after
 // ===== THE CROSSING'S RUBBER DUCK (v2.15) =====
 // Wyatt 8/2, verbatim: "The Crossing battleground level need a Rubber duck to
 // be floating on the river once per battle; blocking any incoming projectile
@@ -10006,6 +10022,33 @@ function campDuck(t){
   const y=-40+k*CAMP_DUCK_SPD;
   if(y>H+40) return null;
   return { x:rd.cx+Math.sin(k*1.15)*7, y, r:CAMP_DUCK_R };
+}
+// 0196: the crossing line's whole consist as a pure function of the campaign
+// clock — the trainCars law on a straight rail. One cycle = the run down the
+// line (both aprons included) + the dark run home (CTRAIN_RET), phased so
+// second 0 parks the consist just INTO the dark: no battle ever opens with a
+// caboose mid-rug, the first pass shows up ≈17s in, and the cadence is ONE
+// dial (CTRAIN_RET). Every car samples by arc exactly like the western's —
+// front buffer leads, back derived along the LINE, never through the wrap, so
+// the seam can't tear a car in half. warn lights SIGNAL_LEAD seconds before
+// the nose makes the mat and HOLDS while any car is still crossing (a real
+// crossbuck flashes through the whole pass; the western's point-crossing
+// blinks on approach only, and both keep the same measured lead).
+function ctrainCars(clk){
+  const ct=S.cfg.terrain.ctrain; if(!ct) return null;
+  const run=H+2*CTRAIN_OFF, cyc=run+CTRAIN_RET,
+        tail=TRAIN_CARS*TRAIN_GAP+TRAIN_CARL,
+        s=(clk*CTRAIN_SPD+run+tail+6)%cyc, cars=[];
+  let on=false;
+  for(let i=0;i<=TRAIN_CARS;i++){
+    const cs=((s-i*TRAIN_GAP)%cyc+cyc)%cyc,
+          fy=cs-CTRAIN_OFF, by=fy-TRAIN_CARL,
+          off=cs>run;
+    cars.push({ i, fx:ct.x, fy, bx:ct.x, by, x:ct.x, y:(fy+by)/2, ang:Math.PI/2, off });
+    if(!off && fy>-40 && by<H+40) on=true;
+  }
+  let d=(CTRAIN_OFF-40)-s; if(d<0) d+=cyc;
+  return { cars, s, warn: d<CTRAIN_SPD*SIGNAL_LEAD || on };
 }
 const BF_MAPS = [
   { id:'open', name:'OPEN CARPET', blurb:'The toy bin tipped over everything. One clean lane is left — and the wrecking balls roll right across it. Time your push.',
@@ -11550,6 +11593,12 @@ const CAMP_GRAND_W=1920;   // the battleground's own 1v1 span — one const for 
 // anti-tank charge per spot); duck:true = the crossing's shot-eating rubber
 // duck on any rug whose FINAL terrain carries a river (armed in
 // campGrandArm, sails once per battle on the campaign's own clock).
+// 0196 THE CROSSING LINE adds a third: train:{x, preset:'crossing'} = one
+// straight vertical rail at the authored x (a BIG CARPET row — the editor
+// owns the size gate), the western's own consist looping top→bottom on the
+// campaign clock. It PLOWS (campBallTick's push, both armies, boss/burrow
+// exempt) and never kills; kill:true per row is the battleground's law as
+// Wyatt's MEAN TRAIN dial, shipped OFF. No shipped rung carries one.
 // Authored straight in each rung's LIVE span — every shipped row below sits
 // on a grand rung, so these numbers are the ARMED 1920's (merged AFTER
 // campGrandArm's x-scale pass, so nothing here is ever re-scaled; 0193 opened
@@ -13667,6 +13716,7 @@ function reset(){
   S.sel=null; S.drag=null; S.shake=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
   S.ffLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.slowmo=1; S.spdI=0; S.hitStop=0; S.tanBase=null; S.vflag=null;
   S.cduck=null; S.cduckClk=0;   // v2.28: a fresh battle deals a fresh duck — replaying the level sails him again (the crossing's own once-per-battle law)
+  S.ctrain=null; S.ctrainClk=0; S.ctrainWhis=false;   // 0196: the crossing line re-arms with every battle — a replay runs the same timetable from second 0
   S.gk=1; S.cCam={x:0,y:0,vx:0,vy:0}; S.camHold=0; S.camOwn=false;   // v1.98: the grand-rug factor + the campaign camera re-arm with every battle — v2.09: and the pan claim re-arms with them (a NEW battle's escort walks again until its own first pan)
   S.momRaid=false; S.momToys=null;   // v1.79/0140: a stale mom flag (or her scattered props) would leak into the next battle
   S.sargeCd=0; S.sargeFlash=0; S.tagT=0; S.lostLevel=0;   // casualties + Sarge's clock + the faucet (v1.32)
@@ -13816,6 +13866,10 @@ function campGrandArm(){
     // — this line reads whatever survived all three).
     if(D.jax)    t.jax=D.jax.map(j=>Object.assign({},j));
     if(D.duck && t.river) t.riverDuck={cx:t.river.x+t.river.w/2};
+    // 0196 THE CROSSING LINE rides the same door — a COPY like the rest
+    // (the authored x lands VERBATIM in the rung's live span, never
+    // re-scaled; the editor owns span coherence on a size flip).
+    if(D.train)  t.ctrain=Object.assign({},D.train);
   }
   // ===== 0194 JAX, campaign edition: the little toy jacks go down BEFORE the
   // first boot — the battleground's own idiom (v2.15, startBattlefield). They
@@ -18107,6 +18161,12 @@ function canPlace(x,y,type,side){
   if(S.tanBase && x>campDeployX()) return false;
   const RV=S.cfg.terrain.river;
   if(RV && x>RV.x-14 && x<RV.x+RV.w+14) return false;        // no standing in the river (or hogging the bridge)
+  // 0196: the crossing line is off-limits — march across, never camp on (the
+  // western's own TRK_BAN, one truthy test on every rug that never asked).
+  // The authored x lives EAST of the deploy line by the editor's ghost law,
+  // so this line is belt-and-braces for hand-authored rows.
+  const CT=S.cfg.terrain.ctrain;
+  if(CT && Math.abs(x-CT.x)<TRK_BAN) return false;
   for(const rk of S.cfg.terrain.rocks){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }
   for(const u of S.units){ if(Math.hypot(u.x-x,u.y-y)<40) return false; }
   return true;
@@ -20103,6 +20163,68 @@ function update(dt){
     if(d && !S.cduck) bfSfx(SFX.squeak, d.x, d.y);   // one hello squeak as he sets sail
     S.cduck=d;
   }
+  // 0196 THE CROSSING LINE ticks beside the duck — same briefing hold, same
+  // sim dt, and mode 'play' spans the whole vflag ceremony, so the wheels
+  // keep rolling behind the flag (the trainCars/duckClk law — the clock
+  // accumulates ahead of every ceremony gate). Position is pure f(the clock),
+  // zero RNG (the smoke puffs ride a clock-edge, never Math.random — the one
+  // place this deliberately outdoes the western's own stack). THE PLOW is
+  // campBallTick's push on each car's axle capsule: both armies shoved aside,
+  // boss/burrow exempt, the dragged and the dropping untouched, NOBODY dies.
+  // kill:true on the authored row is MEAN TRAIN (Wyatt's dial, shipped OFF):
+  // the wheels take what they touch — a green man through knock() (the
+  // campaign's own casualty ceremony, half-tag law and all; his plate or
+  // blade may eat one wheel, the next wheel settles it), the Tan through
+  // hitCheck's phantom-side door (the v2.28 jax idiom — NO blob, no tally,
+  // no ace: a train pays nobody). Kills stand down the moment the flag is up
+  // (the western's own resolved gate, campaign edition); the plow never does.
+  if(!S.bf && S.mode==='play' && !COMM.brief && S.cfg.terrain.ctrain){
+    const ct=S.cfg.terrain.ctrain, pc=S.ctrainClk||0;
+    S.ctrainClk=pc+dt;
+    const tr=ctrainCars(S.ctrainClk); S.ctrain=tr;
+    if(tr.warn && !S.ctrainWhis){ S.ctrainWhis=true; bfSfx(SFX.train, ct.x, H/2); }
+    else if(!tr.warn) S.ctrainWhis=false;
+    const loco=tr.cars[0];
+    if(!loco.off && loco.y>-60 && loco.y<H+60 && !reducedMotion() && ((S.ctrainClk*18|0)!==(pc*18|0)))
+      S.fx.push({k:'smoke',x:loco.x+Math.cos(loco.ang)*22,y:loco.y-42,t:0,dur:0.7});
+    const kills=(ct.kill && !S.vflag)? [] : null, min=TRAIN_KILL_R+16;
+    for(const c of tr.cars){
+      if(c.off) continue;
+      const y0=Math.min(c.fy,c.by), y1=Math.max(c.fy,c.by);
+      for(const u of S.units){
+        if(u.dead||u.dropT>0) continue;
+        if(S.drag&&S.drag.unit===u) continue;
+        const py=Math.max(y0,Math.min(y1,u.y)), ax=u.x-ct.x, ay=u.y-py, dd=Math.hypot(ax,ay);
+        if(dd>=min) continue;
+        if(kills && !(u.jetT>0) && dd<TRAIN_KILL_R){ knock(u,c.fx,c.fy); continue; }
+        if(dd>0.1){
+          u.x+=ax/dd*(min-dd)*Math.min(1,dt*10); u.y+=ay/dd*(min-dd)*Math.min(1,dt*10);
+          u.y=Math.max(74,Math.min(WORLD_H-96,u.y));
+          if(u.home){ u.home.x=u.x; u.home.y=u.y; }
+        }
+      }
+      for(const f of S.foes){
+        if(f.boss||f.burrow) continue;
+        const py=Math.max(y0,Math.min(y1,f.y)), ax=f.x-ct.x, ay=f.y-py, dd=Math.hypot(ax,ay);
+        if(dd>=min) continue;
+        if(kills && dd<TRAIN_KILL_R){ kills.push(f); continue; }
+        if(dd>0.1){
+          f.x+=ax/dd*(min-dd)*Math.min(1,dt*10); f.y+=ay/dd*(min-dd)*Math.min(1,dt*10);
+          if(f.y<FOE_TOP) f.y=FOE_TOP; else if(f.y>FOE_BOT) f.y=FOE_BOT;
+        }
+      }
+    }
+    // the collected fall AFTER the sweep — hitCheck splices S.foes, and a
+    // live for..of must never watch its own array shrink (the mid-frame law)
+    if(kills) for(const f of kills){
+      if(f.hp<=0) continue;
+      f.hp=0;
+      S.fx.push({k:'ring',x:f.x,y:f.y-10,r:6,R:40,t:0,dur:0.35,col:'rgba(255,255,255,0.85)'});
+      S.fx.push({k:'puff',x:f.x,y:f.y-8,t:0,dur:0.4,R:22});
+      bfSfx(SFX.thock,f.x,f.y);
+      hitCheck(f,{side:'jax'});
+    }
+  }
   // 0140: mom's kicked toys fly on the same clock (a toy she punted still
   // lands mid-lull — she is off refilling, the room isn't). Null everywhere
   // but her raid (reset wipes it), so every other mode pays one truthy test.
@@ -21226,6 +21348,11 @@ function drawRug(){
   // the only trench any battlefield map carries is WESTERN LAND's, and that
   // is sand). Same recipe, three palettes — see TRENCH_PAL.
   if(!sand && S.cfg.terrain.trench) drawTrenchCut(S.cfg.terrain.trench, trenchPal());
+  // 0196 THE CROSSING LINE's bed lies on the rug next — over the runner and
+  // the cut, under the water, the rocks and every figure (the western's own
+  // reading order, one straight line of it). Campaign rows only; the
+  // battlefield's rail draws in its own artist and never carries ctrain.
+  if(!S.bf && S.cfg.terrain.ctrain) drawCtrainBed(S.cfg.terrain.ctrain);
   // battlefield rivers: fish-tank water or spilled juice, mirrored. y0/y1 bound
   // the wet part (THE SPILL's stream pours from the cup down into its pond);
   // an open:true "bridge" is dry carpet, so it gets a funnel and no planks.
@@ -21574,11 +21701,27 @@ function drawTrainCar(c){
   }
   cx.restore();
 }
+// 0196: the crossing line's bed — the western's exact recipe (gravel bed,
+// sleepers, twin rails) laid dead straight down the rug and run off both
+// edges, so the line reads as passing THROUGH the world, not parked on it.
+// Planks are planks: one paint on all three grounds, the trench-law's own
+// precedent.
+function drawCtrainBed(ct){
+  const y0=-20, y1=H+20, line=()=>{ cx.beginPath(); cx.moveTo(ct.x,y0); cx.lineTo(ct.x,y1); cx.stroke(); };
+  cx.lineJoin='round'; cx.lineCap='round';
+  cx.strokeStyle='#9A8266'; cx.lineWidth=34; cx.globalAlpha=0.9; line(); cx.globalAlpha=1;   // the gravel bed
+  cx.lineCap='butt';
+  cx.strokeStyle='#6B4A2C'; cx.lineWidth=24; cx.setLineDash([6,12]); line(); cx.setLineDash([]);   // sleepers
+  cx.strokeStyle='#4A423A'; cx.lineWidth=3;                                       // twin rails
+  for(const s2 of [-5.5,5.5]){ cx.beginPath(); cx.moveTo(ct.x+s2,y0); cx.lineTo(ct.x+s2,y1); cx.stroke(); }
+}
 // The crossbuck pair. Idle it is furniture; for SIGNAL_LEAD seconds before the
 // loco reaches the crossing the twin lamps blink red — the fair warning the
-// reference promises, and the cheapest one there is.
+// reference promises, and the cheapest one there is. (0196: on a campaign
+// crossing line the lamps read the campaign consist — same lamps, same blink,
+// whichever carpet's train is coming.)
 function drawSignal(sg){
-  const warn=!!(S.bf && S.bf.train && S.bf.train.warn);
+  const warn=!!(S.bf? (S.bf.train && S.bf.train.warn) : (S.ctrain && S.ctrain.warn));
   cx.save(); cx.translate(sg.x,sg.y);
   cx.globalAlpha=0.25; cx.fillStyle='#000';
   cx.beginPath(); cx.ellipse(2,3,9,3.5,0,0,7); cx.fill(); cx.globalAlpha=1;
@@ -22027,6 +22170,16 @@ function draw(){
     const trn=S.bf.train || (S.bf.train=trainCars(S.bf));   // the briefing holds bfTick; draw self-serves at t=0
     for(const c of trn.cars){ if(!c.off) actors.push({y:c.y+24, f:()=>drawTrainCar(c)}); }
     for(const sg of S.cfg.terrain.rail.sigs) actors.push({y:sg.y+4, f:()=>drawSignal(sg)});
+  }
+  // 0196 THE CROSSING LINE: the campaign consist and its crossbucks sort with
+  // the men the same way — the train is an actor, not wallpaper. The y-cull
+  // keeps the aprons free (a car materializing off the rug edge draws
+  // nothing); the crossbucks flank the line mid-rug, furniture from second 0.
+  else if(!S.bf && S.cfg.terrain.ctrain){
+    const ct=S.cfg.terrain.ctrain;
+    const trn=S.ctrain || (S.ctrain=ctrainCars(S.ctrainClk||0));   // the briefing holds update; draw self-serves at t=0
+    for(const c of trn.cars){ if(!c.off && c.y>-70 && c.y<H+70) actors.push({y:c.y+24, f:()=>drawTrainCar(c)}); }
+    for(const sg of [{x:ct.x-46,y:H/2-38},{x:ct.x+46,y:H/2+38}]) actors.push({y:sg.y+4, f:()=>drawSignal(sg)});
   }
   actors.sort((a,b)=>a.y-b.y).forEach(a=>a.f());
   // 0140: mom's ONE airborne toy sails OVER the figures (it is in the air);
