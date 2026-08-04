@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v5.8 -->
+<!-- TRAINSET v5.9 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -81,7 +81,8 @@
   /* ---- the level board (E5): ten cream tickets on toy-chest wood ---- */
   #board{ position:absolute; inset:0; z-index:6; display:none; align-items:center; justify-content:center; padding:12px; }
   #bpanel{ background:linear-gradient(#3a2a18,#241a0e); border:3px solid #6e5130; border-radius:20px;
-    padding:18px 20px 14px; box-shadow:0 14px 44px rgba(0,0,0,0.55); text-align:center; max-width:min(94vw,760px); }
+    padding:18px 20px 14px; box-shadow:0 14px 44px rgba(0,0,0,0.55); text-align:center; max-width:min(94vw,760px);
+    max-height:94vh; overflow-y:auto; }   /* E50: two panels can outgrow a phone — the board scrolls, the back button always reachable */
   #bpanel h1{ font-size:26px; letter-spacing:4px; color:#F2C531; }
   #bsub{ font-size:10px; letter-spacing:1px; color:#CBB88C; margin:6px 0 14px; }
   #tickets{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
@@ -92,6 +93,13 @@
   .tk .star{ position:absolute; top:-10px; right:-8px; font-size:20px; transform:rotate(12deg); pointer-events:none;
     filter:drop-shadow(0 2px 2px rgba(0,0,0,0.4)); }
   .tk.lock{ background:#241a0e; border-color:#513a24; color:#6d5c3d; cursor:default; }
+  /* ---- E50: the PUMPKIN LINES panel — the pack's own little board under the ten ---- */
+  #pkhead{ font-size:15px; letter-spacing:3px; color:#E8912E; margin-top:16px;
+    padding-top:12px; border-top:2px solid #513a24; }
+  #pksub{ font-size:9px; letter-spacing:1px; color:#CBA27A; margin:5px 0 10px; }
+  #pktickets{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  .tk.pk{ background:#F7DCA9; border-color:#C9772E; }
+  .tk.pk.lock{ background:#241a0e; border-color:#513a24; }
   #bback{ margin-top:14px; background:none; border:none; color:#8f7a52; font-family:inherit;
     font-size:12px; letter-spacing:1px; cursor:pointer; padding:6px 8px; }
   #nextBtn{ position:absolute; left:50%; bottom:150px; transform:translateX(-50%); z-index:8; display:none;
@@ -517,6 +525,9 @@
     #bpanel h1{ font-size:18px; letter-spacing:2px; }
     #bsub{ margin:4px 0 8px; font-size:8px; }
     #tickets{ gap:6px; }
+    #pktickets{ gap:6px; }
+    #pkhead{ font-size:12px; letter-spacing:2px; margin-top:9px; padding-top:7px; }
+    #pksub{ margin:3px 0 6px; font-size:7px; }
     .tk{ min-width:54px; padding:6px 2px 5px; }
     .tk b{ font-size:16px; } .tk small{ font-size:6px; }
     .tk .star{ font-size:14px; top:-7px; right:-5px; }
@@ -653,6 +664,9 @@
   <h1>TEN LITTLE LINES</h1>
   <div id="bsub">BUILD A LINE THAT LOOPS</div>
   <div id="tickets"></div>
+  <div id="pkhead">🎃 PUMPKIN LINES</div>
+  <div id="pksub">TAKE THE PUMPKINS TO EVERY STOP</div>
+  <div id="pktickets"></div>
   <button id="bback" type="button">⬅ BACK TO THE BEDROOM</button>
 </div></div>
 <button id="nextBtn" class="mbtn" type="button">NEXT LEVEL ▶</button>
@@ -718,7 +732,7 @@ const FIT_PAD=0;                                 // px of margin at fit (0 = tod
 // own (default: none do — every level keeps the crimson rug and a clear sky),
 // PLAY reads its ACTIVE map's fields (E17); the free-build rug reads the kid's choice.
 function activeLand(){
-  if(CAMP.on){ const L=LEVELS[CAMP.level-1]; return (L&&L.land)||'rug'; }
+  if(CAMP.on){ const L=bookL()[CAMP.level-1]; return (L&&L.land)||'rug'; }   // E50: the open book's level
   if(PLAY.on) return PLAY.landOv||playMap().land||'rug';   // E48: the portal may hold the visit in ANOTHER world — session slot, the wx grammar (cleared at entry+exit, never saved)
   if(SCREEN==='room') return 'rug';   // E49: the big room's floor is boards — the halo/ice/breath guards must never see the kid's BUILD land there
   return LAND;
@@ -727,7 +741,7 @@ function activeWeather(){
   // E35: the SKY PILLS may override the sky for THIS visit only — PLAY.wx and
   // CAMP.wx are session slots (cleared at every entry, never saved: PLAY stays
   // stateless, a level's win machinery never sees the sky). Paint only, ever.
-  if(CAMP.on){ const L=LEVELS[CAMP.level-1]; return CAMP.wx||(L&&L.weather)||'clear'; }
+  if(CAMP.on){ const L=bookL()[CAMP.level-1]; return CAMP.wx||(L&&L.weather)||'clear'; }   // E50: the open book's level
   if(PLAY.on) return PLAY.wx||playMap().weather||'clear';
   return WEATHER;
 }
@@ -838,11 +852,18 @@ const CAMP_LABEL='TICKETS';   // E26: the wall board's pill (was the CAMPAIGN bu
 const HINT_MAX=5;
 const HINT_WORDS=new Set(('BUILD FINISH GO GET AROUND OVER THROUGH STOP AT USE LET VISIT '+
   'THE A AND BOTH POND TRACK WOODS RIVER FARM STATION STATIONS CROSSING TUNNEL SPLIT TOWN '+
-  'SLIDE RUG TO LOOK PUT DOWN').split(' '));   // E24: the pan coach's words join the kid list · E27: the station coach's too
+  'SLIDE RUG TO LOOK PUT DOWN '+
+  'PUMPKINS TAKE EVERY KITCHEN').split(' '));   // E24: the pan coach's words join the kid list · E27: the station coach's too · E50: the patch's four
 const hintWords=h=>h.replace(/[^A-Z ]/g,'').split(/\s+/).filter(Boolean);
 const GAP_GLOW=true;          // level 2's missing cells breathe a soft gold (5-year-old kindness)
 const TOY_CARD='NEW TOY!';    // the ceremony headline over each freshly-won toy
 const TICKET_ICONS=true;      // each ticket wears its headline toy — locked ones as a silhouette
+// ---- Wyatt dials (EXPANSION 50 — THE PUMPKIN KING'S PATCH) ----
+// PUMPKIN LINES is a second BOOK through the one campaign engine — ADDITIVE
+// until GALAXY.md §4 is answered: its own panel on the TICKETS screen, its own
+// save key (pk:), the ten and FREE PLAY untouched. Pack toys are STORE rows —
+// THE FIFTY STAY FIFTY. The King's on-screen name is the STORE row (a dial).
+const LANT_GLOW=0.3;          // the lantern's warm halo — golden light, always (lamps LOOK lit)
 // ---- Wyatt dials (EXPANSION 14 — one const each) ----
 // THE SCENERY BONUS: beat a level having planted different kinds of your OWN
 // scenery (the glued land counts for nothing) and the game stops to say so.
@@ -1645,6 +1666,12 @@ const STORE=[
   // beside every pass) and THE BLOOM CACTUS (nature — the desert is beautiful
   // too). STORE rows by the E9 law: never COLL, never the toy-box "n / 50".
   ['roadr','ROADRUNNER','model',16], ['bcact','BLOOM CACTUS','model',12],
+  // E50 — the patch comes home: PUMPKIN LINES' six, granted by pack wins AND
+  // sold like everything else (the ten's buy-or-win law). STORE rows by the
+  // E9 law: never COLL, never the toy-box "n / 50". THE PUMPKIN KING is an
+  // ORIGINAL happy harvest fellow (the IP law: nothing evokes that movie).
+  ['pum','PUMPKIN','model',10], ['scrow','SCARECROW','model',14], ['crow','CROW','model',12],
+  ['atree','FALL TREE','model',12], ['lant','LANTERN','model',10], ['king','PUMPKIN KING','model',30],
 ];
 const STORE_BY={}; for(const [id,name,cat,price] of STORE) STORE_BY[id]={id,name,cat,price:price|0};
 const STORE_FREE=STORE.filter(r=>!r[3]).map(r=>r[0]);   // wh_peep · cr_bonk · bl_ding — everyone's
@@ -1657,7 +1684,7 @@ const TRAIL_IDS=['tr_rain','tr_spark'];   // E28: TRAIN SETS shelf, after the li
 const WHISTLE_IDS=['wh_peep','wh_horn','wh_chime','wh_toot','wh_quack','wh_fart'];
 const CRASH_IDS=['cr_bonk','cr_bang','cr_boing','cr_smash','cr_thud','cr_pfft'];
 const BELL_IDS=['bl_ding','bl_bell','bl_cuckoo','bl_cow'];
-const MODEL_IDS=['fount','stat','fire','arch','flag','mail2','bench','clock','vtree','bleaf','wolf','peng','iglu','roadr','bcact'];   // E31: the jungle plants join the bits shelf; E35: the wolf; E42: the penguin + the igloo; E43: the roadrunner + the bloom cactus
+const MODEL_IDS=['fount','stat','fire','arch','flag','mail2','bench','clock','vtree','bleaf','wolf','peng','iglu','roadr','bcact','pum','scrow','crow','atree','lant','king'];   // E31: the jungle plants join the bits shelf; E35: the wolf; E42: the penguin + the igloo; E43: the roadrunner + the bloom cactus; E50: the patch's six
 const COLL_NO_SALE=[];        // of the fifty, ids Wyatt pulls off the shelf (default: all sell)
 // THE STAR BANK — every mint amount is a dial; all of it generous, none of it a wall
 const MINT={ lap:1, station:1, bonk:1, clear:10, firstLap:5, pretty:1, piggy:PIG_PAYS };   // pretty = E14's scenery bonus · piggy = E23's daily base
@@ -2644,7 +2671,7 @@ function update(dt){
         // Cell-keyed like everything else the E4 audit touched — a high train passing
         // over the crossing is not the same thing as going through it.
         if(CAMP.on && !CAMP.crossed){
-          const L8=LEVELS[CAMP.level-1];
+          const L8=bookL()[CAMP.level-1];   // E50: the open book's level (no pack level names a diamond today)
           if(L8 && L8.cross && lc.cx===L8.cross[0] && lc.cy===L8.cross[1] && !lc.el) CAMP.crossed=true;
         }
         if(lk!==locoPrev){
@@ -4622,7 +4649,8 @@ const SCEN_SH={ bush:[27,24], tree:[27,20], ppl:[21,24],
   wolf:[21,20],    // E35 — the wolf sits cow-tall
   palm:[27,18], scast:[26,22],     // E40 — the beach (shell lies flat; the sea kinds carry water, never shadows)
   peng:[19,12], iglu:[24,26], cub:[20,16],   // E42 — the ice (the seal is a flat hole, the arch flies: no shadows)
-  roadr:[20,10], tmbl:[20,14], bcact:[26,18] };   // E43 — the canyon (the coyote's butte + the stone arch paint their own)
+  roadr:[20,10], tmbl:[20,14], bcact:[26,18],   // E43 — the canyon (the coyote's butte + the stone arch paint their own)
+  pum:[26,17], atree:[27,20], lant:[28,9], scrow:[26,14], crow:[24,10], king:[28,26] };   // E50 — the patch
 function drawScenItem(s,ox,oy,t){
   // real cells land on integer grid coords; palette icons / free-drag ghosts land outside,
   // where fenceMask reads 0 (lone bit of fence) and the herd phase is just fixed.
@@ -4693,6 +4721,12 @@ function drawScenItem(s,ox,oy,t){
   else if(s.t==='coyo') drawCoyo(s,t,ph);                    // …the coyote on his butte (silent law)
   else if(s.t==='bcact') drawBcact(s,ph);                    // …the bloom cactus
   else if(s.t==='sarch') drawSarchSprite(0,t,ph);            // compact — the rug span rides drawArches
+  else if(s.t==='pum') drawPum(s);                           // E50 — the patch
+  else if(s.t==='atree') drawAtree();
+  else if(s.t==='lant') drawLant();
+  else if(s.t==='scrow') drawScrow(s,t);
+  else if(s.t==='crow') drawCrow(s,t,ph);
+  else if(s.t==='king') drawKing(s,t);
   if((s.lit>0||(s.litH||0)>0.02)&&LIT[s.t]) drawScenLit(s);   // E39: somebody is home
   cx.restore();
 }
@@ -5596,6 +5630,161 @@ function drawSarchSprite(rug,t,ph){
   cx.fillStyle='#FFF3C9'; cx.globalAlpha=0.75*g1;
   cx.beginPath(); cx.arc(14,-32,1.8,0,7); cx.fill();
   cx.globalAlpha=1; cx.restore();
+}
+// ---- THE PUMPKIN KING'S PATCH (E50): six autumn kinds, molded-toy style ----
+// Golden light, never spooky dark — the whole set reads cozy harvest. The
+// King is an ORIGINAL happy harvest fellow (the IP law: no skeleton, no
+// gothic spindle, no night palette — nothing evokes that movie).
+function drawPum(s){
+  // three sizes by v (the patch grammar): 1 small · 0 middle · 2 BIG
+  const k=[1,0.66,1.38][s.v%3];
+  cx.save(); cx.translate(0,26-25*k); cx.scale(k,k);
+  cx.lineJoin='round';
+  cx.fillStyle='#C96A1E';                        // the body
+  cx.beginPath(); cx.ellipse(0,10,20,15,0,0,7); cx.fill();
+  cx.fillStyle='#E8862E';                        // the sunlit middle
+  cx.beginPath(); cx.ellipse(0,9.4,13,14.6,0,0,7); cx.fill();
+  cx.strokeStyle='rgba(122,54,10,0.5)'; cx.lineWidth=2;   // the ridges
+  cx.beginPath(); cx.ellipse(0,10,13.5,14,0,0,7); cx.stroke();
+  cx.beginPath(); cx.ellipse(0,10,6.5,14.4,0,0,7); cx.stroke();
+  cx.strokeStyle='#5E7A23'; cx.lineWidth=4.6; cx.lineCap='round';   // the stem
+  cx.beginPath(); cx.moveTo(0,-3); cx.quadraticCurveTo(-1,-9,-4,-11); cx.stroke();
+  cx.strokeStyle='#7A9A2E'; cx.lineWidth=2;      // the little curl
+  cx.beginPath(); cx.moveTo(2,-6); cx.quadraticCurveTo(9,-10,8,-4); cx.stroke();
+  cx.restore();
+}
+function drawAtree(){
+  // drawTree's exact geometry wearing autumn: deep red, amber, gold
+  cx.fillStyle='#6B4A2C'; cx.fillRect(-4,16,8,11);
+  cone(0,18,42,24,'#B7541E');
+  cone(0,4,34,22,'#D98A2B');
+  cone(0,-9,25,20,'#E8B23C');
+}
+function drawLant(){
+  // the lamp's wooden cousin: a post lantern with warm glass. Lamps LOOK lit
+  // (the E39 law — the glow is its own art, never a LIT row; LANT_GLOW dial).
+  cx.globalAlpha=LANT_GLOW;                      // the halo — golden light, always
+  const g=cx.createRadialGradient(0,-8,2,0,-8,26);
+  g.addColorStop(0,'#FFD98C'); g.addColorStop(1,'rgba(255,217,140,0)');
+  cx.fillStyle=g; cx.beginPath(); cx.arc(0,-8,26,0,7); cx.fill();
+  cx.globalAlpha=1;
+  cx.lineJoin='round';
+  cx.fillStyle='#6B4A2C'; cx.fillRect(-2.5,2,5,24);        // the post
+  cx.fillStyle='#8a5a30'; cx.fillRect(-6,24,12,4);
+  cx.fillStyle='#3A2A18'; rr(-8,-18,16,20,3); cx.fill();   // the lantern box
+  cx.strokeStyle='#241A0E'; cx.lineWidth=2; rr(-8,-18,16,20,3); cx.stroke();
+  cx.fillStyle='#FFD98C'; rr(-5,-15,10,14,2); cx.fill();   // the warm glass
+  cx.fillStyle='#FFF3C9'; cx.beginPath(); cx.ellipse(0,-8,2.6,4,0,0,7); cx.fill();
+  cx.fillStyle='#241A0E'; rr(-6,-22,12,5,2); cx.fill();    // the little roof
+}
+function drawScrow(s,t){
+  // the friendly scarecrow: straw cuffs, button eyes, a stitched SMILE, a
+  // floppy hat — waves the ppl arm law, charms in SILENCE (cat/snowman law)
+  const waving=s.wave>0, wv=waving? Math.sin(t*11)*4 : 0;
+  cx.lineJoin='round'; cx.lineCap='round';
+  cx.fillStyle='#6B4A2C'; cx.fillRect(-2,6,4,20);          // the post
+  cx.fillStyle='#8F5E2E'; rr(-8,-4,16,15,4); cx.fill();    // the coat
+  cx.strokeStyle='#E8B23C'; cx.lineWidth=2;                // straw at the hem
+  for(const hx of [-5,-1.5,2,5.5]){ cx.beginPath(); cx.moveTo(hx,10); cx.lineTo(hx-1,15); cx.stroke(); }
+  cx.strokeStyle='#8F5E2E'; cx.lineWidth=5;                // crossbar arms — one lifts to wave
+  cx.beginPath(); cx.moveTo(0,-1); cx.lineTo(-11,2); cx.stroke();
+  cx.beginPath(); cx.moveTo(0,-1);
+  if(waving) cx.lineTo(9,-14+wv); else cx.lineTo(11,2);
+  cx.stroke();
+  cx.strokeStyle='#E8B23C'; cx.lineWidth=1.8;              // straw at the cuffs
+  cx.beginPath(); cx.moveTo(-11,2); cx.lineTo(-14,4); cx.moveTo(-11,2); cx.lineTo(-13,0); cx.stroke();
+  if(!waving){ cx.beginPath(); cx.moveTo(11,2); cx.lineTo(14,4); cx.moveTo(11,2); cx.lineTo(13,0); cx.stroke(); }
+  cx.fillStyle='#EBD9A9';                                  // the burlap head
+  cx.beginPath(); cx.arc(0,-11,7,0,7); cx.fill();
+  cx.strokeStyle='#B48A54'; cx.lineWidth=1.6;
+  cx.beginPath(); cx.arc(0,-11,7,0,7); cx.stroke();
+  cx.strokeStyle='#6B4A2C'; cx.lineWidth=1.6;              // the stitched smile
+  cx.beginPath(); cx.arc(0,-10.4,3.4,0.35,Math.PI-0.35); cx.stroke();
+  cx.fillStyle='#6B4A2C';                                  // button eyes
+  cx.beginPath(); cx.arc(-2.6,-12.6,1.1,0,7); cx.fill();
+  cx.beginPath(); cx.arc(2.6,-12.6,1.1,0,7); cx.fill();
+  cx.fillStyle='#8F4634';                                  // the floppy hat
+  cx.beginPath(); cx.ellipse(0,-16.5,9.5,3,0,0,7); cx.fill();
+  cx.fillStyle='#A6543E'; rr(-5,-24,10,8,3); cx.fill();
+}
+function drawCrow(s,t,ph){
+  // a small ROUND glossy bird — curious, never ominous: she tilts her head at
+  // the world and FLAP-HOPS when the train passes. Silent (the coyote law).
+  const react=s.wave>0;
+  const hop=react? Math.abs(Math.sin(t*10))*6 : 0;
+  const flap=react? Math.sin(t*22)*0.9 : 0;
+  const tilt=react? 0 : Math.sin(t*0.8+ph)*0.16;           // the curious idle
+  if(s.v&1) cx.scale(-1,1);
+  cx.translate(0,14-hop); cx.rotate(tilt);
+  cx.lineJoin='round';
+  cx.strokeStyle='#E8B23C'; cx.lineWidth=1.8; cx.lineCap='round';   // little legs
+  cx.beginPath(); cx.moveTo(-1,6); cx.lineTo(-1,10+hop*0.8); cx.moveTo(3,6); cx.lineTo(3,10+hop*0.8); cx.stroke();
+  cx.fillStyle='#2E2E38';                                  // the round body
+  cx.beginPath(); cx.ellipse(0,0,9.5,8,0,0,7); cx.fill();
+  cx.fillStyle='#3D3D4C';                                  // the blue-grey sheen
+  cx.beginPath(); cx.ellipse(-2,-2.5,6,4.4,-0.4,0,7); cx.fill();
+  cx.fillStyle='#23232C';                                  // the tail
+  cx.beginPath(); cx.moveTo(-8,1); cx.lineTo(-14,-1); cx.lineTo(-13,3); cx.closePath(); cx.fill();
+  cx.save(); cx.translate(-2,-1); cx.rotate(-flap);        // the wing
+  cx.fillStyle='#23232C'; cx.beginPath(); cx.ellipse(-3,1,6,3.6,-0.5,0,7); cx.fill();
+  cx.restore();
+  cx.fillStyle='#2E2E38';                                  // the head
+  cx.beginPath(); cx.arc(6.5,-6,5,0,7); cx.fill();
+  cx.fillStyle='#E8B23C';                                  // the gold beak
+  cx.beginPath(); cx.moveTo(10.5,-6.5); cx.lineTo(15,-5); cx.lineTo(10.5,-4); cx.closePath(); cx.fill();
+  cx.fillStyle='#FFF';                                     // the bright eye
+  cx.beginPath(); cx.arc(7.6,-6.8,1.7,0,7); cx.fill();
+  cx.fillStyle='#23232C'; cx.beginPath(); cx.arc(8,-6.6,0.9,0,7); cx.fill();
+}
+function drawKing(s,t){
+  // THE PUMPKIN KING — a BIG round jolly harvest fellow: ridged pumpkin body,
+  // stubby arms, little boots, rosy cheeks, a huge smile and a green
+  // leaf-coronet (that's the KING). THE KING'S WAVE: on every pass his arm
+  // goes up and a warm glow blooms behind him — paint-only, rides s.wave.
+  const waving=s.wave>0, wv=waving? Math.sin(t*11)*4 : 0;
+  const glow=waving? Math.min(1,s.wave/0.9) : 0;
+  cx.lineJoin='round'; cx.lineCap='round';
+  if(glow>0){                                    // the light-up — golden, never spooky
+    cx.globalAlpha=0.34*glow;
+    const g=cx.createRadialGradient(0,0,4,0,0,34);
+    g.addColorStop(0,'#FFE29A'); g.addColorStop(1,'rgba(255,226,154,0)');
+    cx.fillStyle=g; cx.beginPath(); cx.arc(0,0,34,0,7); cx.fill();
+    cx.globalAlpha=1;
+  }
+  cx.fillStyle='#3A2A18';                        // little boots
+  cx.beginPath(); cx.ellipse(-8,25,5.5,3.4,0,0,7); cx.fill();
+  cx.beginPath(); cx.ellipse(8,25,5.5,3.4,0,0,7); cx.fill();
+  cx.fillStyle='#C96A1E';                        // the big round body
+  cx.beginPath(); cx.ellipse(0,4,23,21,0,0,7); cx.fill();
+  cx.fillStyle='#E8862E';
+  cx.beginPath(); cx.ellipse(0,3.4,15,20.4,0,0,7); cx.fill();
+  cx.strokeStyle='rgba(122,54,10,0.5)'; cx.lineWidth=2.4;   // the ridges
+  cx.beginPath(); cx.ellipse(0,4,15.5,19.6,0,0,7); cx.stroke();
+  cx.beginPath(); cx.ellipse(0,4,7.5,20,0,0,7); cx.stroke();
+  cx.strokeStyle='#C96A1E'; cx.lineWidth=6.5;    // stubby arms — one waves
+  cx.beginPath(); cx.moveTo(-19,0); cx.lineTo(-27,8); cx.stroke();
+  cx.beginPath(); cx.moveTo(19,0);
+  if(waving) cx.lineTo(26,-16+wv); else cx.lineTo(27,8);
+  cx.stroke();
+  cx.fillStyle='#F7E9C4';                        // mitten hands
+  cx.beginPath(); cx.arc(-27,8,3.6,0,7); cx.fill();
+  cx.beginPath(); cx.arc(waving?26:27,waving?-16+wv:8,3.6,0,7); cx.fill();
+  cx.fillStyle='#3A2A18';                        // the happy face
+  cx.beginPath(); cx.arc(-6,-4,2.4,0,7); cx.fill();
+  cx.beginPath(); cx.arc(6,-4,2.4,0,7); cx.fill();
+  cx.strokeStyle='#3A2A18'; cx.lineWidth=2.6;    // the huge smile
+  cx.beginPath(); cx.arc(0,-1,8.5,0.3,Math.PI-0.3); cx.stroke();
+  cx.fillStyle='rgba(199,64,29,0.4)';            // rosy cheeks
+  cx.beginPath(); cx.ellipse(-11,0,3.4,2.4,0,0,7); cx.fill();
+  cx.beginPath(); cx.ellipse(11,0,3.4,2.4,0,0,7); cx.fill();
+  cx.strokeStyle='#5E7A23'; cx.lineWidth=4;      // the stem
+  cx.beginPath(); cx.moveTo(0,-16); cx.lineTo(0,-22); cx.stroke();
+  cx.fillStyle='#7A9A2E';                        // the leaf-coronet
+  for(const lx of [-9,0,9]){
+    cx.beginPath(); cx.moveTo(lx-4,-15); cx.quadraticCurveTo(lx,-24,lx+4,-15); cx.closePath(); cx.fill();
+  }
+  cx.fillStyle='#E8B23C';                        // gold tips on the crown
+  for(const lx of [-9,0,9]){ cx.beginPath(); cx.arc(lx,-20.5,1.3,0,7); cx.fill(); }
 }
 function drawCat(s,t,ph){
   const react=s.wave>0;
@@ -6907,7 +7096,7 @@ const RM=()=>{ try{ return matchMedia('(prefers-reduced-motion: reduce)').matche
 // the instant a piece lands, which is its own little reward. Still under reduced motion.
 function drawGaps(){
   if(!GAP_GLOW||!CAMP.on) return;
-  const L=LEVELS[CAMP.level-1]; if(!L||!L.gaps) return;
+  const L=bookL()[CAMP.level-1]; if(!L||!L.gaps) return;   // E50: the open book's gaps — never the other book's gold
   const k=RM()? 0.5 : 0.5+0.5*Math.sin(perf()*2.6);
   for(const [gx,gy] of L.gaps){
     if(pieceAt(gx,gy)) continue;
@@ -8527,6 +8716,10 @@ const SND={
   // yayCd gate; the coyote and the tumbleweed are silent by law.
   pip(){ tone(988,0.05,'sine',0.06*CHIRP_VOL,1175); tone(1175,0.05,'sine',0.055*CHIRP_VOL,1319,0.06);
          tone(1319,0.07,'sine',0.05*CHIRP_VOL,1568,0.12); },
+  // E50 — the Pumpkin King's hello: a soft warm two-note "ho-ho" — low, round,
+  // jolly, never the loudest thing in the game. Rides the yayCd gate; the
+  // scarecrow and the crow are silent by law (silence reads curious).
+  hoho(){ tone(262,0.13,'sine',0.085*CHIRP_VOL,220); tone(196,0.17,'sine',0.075*CHIRP_VOL,165,0.13); },
   sqhi(){ tone(262,0.22,'sine',0.09,330); tone(196,0.28,'triangle',0.05,262,0.12); noise(0.12,500,0.03,'lowpass',0.02); },
   phiss(){ noise(0.55,760,0.05,'lowpass',0,240); tone(392,0.22,'sine',0.028,523,0.06); },   // E48: the portal's soft steam — a breath, not a bell
   bloop(){ tone(340,0.12,'sine',0.22,190); },
@@ -8674,7 +8867,9 @@ function save(){
       stars:stars, equip:{...equip},   // v:7 — THE STAR BANK + the equipped sound packs (E9)
       e8:1,   // E8 arrived: the ten levels are new land, so any wip saved before this is void (once)
       camp:{ done:[...CAMP.done], all:CAMP.all?1:0,
-             wip: CAMP.on? (CAMP_WIP&&!CAMP.won? serWip():null) : (CAMP_WIP? CAMP.wip:null) },
+             wip: (CAMP.on&&CAMP.book==='ten')? (CAMP_WIP&&!CAMP.won? serWip():null) : (CAMP_WIP? CAMP.wip:null) },
+      pk:{ done:[...PKC.done],   // E50 — PUMPKIN LINES' own key (additive; GALAXY.md §4 open)
+           wip: (CAMP.on&&CAMP.book==='pk')? (CAMP_WIP&&!CAMP.won? serWip():null) : (CAMP_WIP? PKC.wip:null) },
       hints:hintStage, lap:lapDone, mute:!AU.on,
     }));
   }catch(e){}
@@ -8712,6 +8907,10 @@ function load(){
     // land is meaningless — drop it exactly once, on the first boot after the update.
     // Stars (camp.done) and the toy box are untouched: those were earned.
     if(!d.e8) CAMP.wip=null;
+    // E50 — PUMPKIN LINES (the additive pk: key; absent = the pack is fresh).
+    const pkd=d.pk||{};
+    PKC.done=new Set((pkd.done||[]).filter(n=>n>=1&&n<=PK_LEVELS.length));
+    PKC.wip=(CAMP_WIP&&pkd.wip&&pkd.wip.level>=1&&pkd.wip.level<=PK_LEVELS.length)? pkd.wip : null;
     // v:6 — the toy box. A v≤5 save migrates to the 5 starters PLUS the full bundle of
     // every level already in camp.done (they earned them). The save's color/engine stays
     // even if its paint chip / engine toy is technically unowned — grandfathered, never
@@ -8883,15 +9082,104 @@ const SOLVE=[
       ['s',0,10,6],['s',0,9,6],['s',0,8,6],['s',0,7,6],['s',0,6,6],['s',0,4,6],['c',0,3,6] ] },  // 10 the grand tour
 ];
 // the campaign's own state object — free play's grid/consist/save is NEVER touched
-const CAMP={ on:false, level:0, won:false, tugT:false, stations:[], visited:new Set(),
-             done:new Set(), all:false, wip:null, crossed:false, wx:null };   // wx = E35 sky-pill override, per visit
+const CAMP={ on:false, book:'ten', level:0, won:false, tugT:false, stations:[], visited:new Set(),
+             done:new Set(), all:false, wip:null, crossed:false, wx:null };   // wx = E35 sky-pill override, per visit · book = E50 (ten | pk)
+/* =====================================================================
+   THE PUMPKIN KING'S PATCH (E50) — PUMPKIN LINES, the second BOOK.
+   Wyatt, verbatim: "You're going to help the Pumpkin King build a
+   railroad through his pumpkin patch to help deliver his pumpkins."
+   Five glued levels in the LEVELS grammar verbatim, through the ONE
+   campaign engine — ADDITIVE until GALAXY.md §4 is answered: its own
+   panel on the TICKETS screen, its own save key (pk:), the ten and
+   FREE PLAY untouched. "Deliver" IS the shipped win law — loop + visit
+   every station. References use STARTERS ONLY (s/c — st arrives glued)
+   so a fresh save can win the whole pack: it is NOT gated behind the
+   ten. bundle = the win's STORE ids (THE FIFTY STAY FIFTY — granted
+   through THE ONE GATE, coll.add, exactly like a purchase).
+   ===================================================================== */
+const PK_CAP=[14,14,14,14,22];
+const PK_LEVELS=[
+  // 1 — THE PUMPKIN PATCH. The POND grammar in orange: a 2×2 pumpkin block
+  // mid-rug IS the answer, and the King watches from beside the line.
+  { name:'THE PUMPKIN PATCH', hint:'GO AROUND THE PUMPKINS!', toy:'pum', bundle:['pum'],
+    glued:[['pum',5,3,2],['pum',6,3,0],['pum',5,4,1],['pum',6,4,2],['king',8,3],
+           ['hay',2,5],['atree',1,1],['atree',10,1],['atree',1,6],['atree',10,6],
+           ['crow',3,2,0],['crow',8,5,1]], stations:[] },
+  // 2 — THE FARM STAND. The first delivery: one glued stop at the stand.
+  { name:'THE FARM STAND', hint:'TAKE PUMPKINS TO THE STOP!', toy:'scrow', bundle:['scrow'],
+    glued:[['hay',4,6],['pum',6,6,1],['scrow',2,3],['king',8,4],
+           ['atree',1,1],['atree',10,5],['crow',2,6,0]], stations:[[5,5]] },
+  // 3 — THE BARN. Two stops — the visit-EVERY law arrives (taught by the ten's
+  // level 2 freebie grammar: the stand's stop came glued one level ago).
+  { name:'THE BARN', hint:'VISIT EVERY STOP!', toy:'crow', bundle:['crow'],
+    glued:[['barn',4,1],['hay',7,5],['pum',8,5,2],['fence',1,5],['fence',2,5],
+           ['crow',2,4,1],['king',9,3],['atree',0,0],['atree',11,1],['atree',0,7]],
+    stations:[[4,2],[7,4]] },
+  // 4 — THE PIE KITCHEN. The WOODS grammar in gold: fall-forest flanks, a
+  // lantern-lit lane, the kitchen at the top of the loop.
+  { name:'THE PIE KITCHEN', hint:'STOP AT THE KITCHEN!', toy:'lant', bundle:['lant','atree'],
+    glued:[...fillRows('atree',0,0,1,7,'pine'), ...fillRows('atree',10,0,11,7,'pine'),
+           ['shop',5,1],['lant',4,1],['lant',6,1],
+           ['atree',5,3],['atree',6,3],['lant',5,4],['lant',6,4],
+           ['pum',2,6,0],['pum',8,6,1],['king',8,5],['crow',8,3,0]], stations:[[5,2]] },
+  // 5 — THE BIG DELIVERY. The GRAND TOUR of the patch: barn stop, stand stop,
+  // kitchen stop, and the King mid-rug beside the kitchen platform — he waves
+  // the whole delivery home. Finale = GRAND OPENING! double burst.
+  { name:'THE BIG DELIVERY', hint:'TAKE PUMPKINS TO EVERY STOP!', toy:'king', bundle:['king'],
+    glued:[['barn',4,0],['hay',10,3],['hay',3,6],
+           ['pum',10,2,1],['pum',5,3,0],['pum',4,4,1],['pum',6,4,2],['pum',0,3,2],['pum',11,4,0],
+           ['shop',5,6],['lant',4,6],['lant',6,6],['king',5,4],['scrow',8,4],
+           ['crow',3,2,0],['crow',7,2,1],
+           ['atree',0,0],['atree',11,0],['atree',0,7],['atree',11,7],['atree',1,6]],
+    stations:[[4,1],[9,3,1],[5,5]] },
+];
+// Every reference row below is a STARTER (s/c) — a brand-new save wins the
+// whole pack. The glued station cells are skipped exactly like the ten's.
+const PK_SOLVE=[
+  { start:[5,2], rows:ringRows(4,2,7,5) },                                  // 1 round the pumpkins
+  { start:[4,2], rows:ringRows(3,2,7,5,[[5,5]]) },                          // 2 through the stand's stop
+  { start:[5,2], rows:ringRows(3,2,8,4,[[4,2],[7,4]]) },                    // 3 barn stop, stand stop
+  { start:[6,2], rows:ringRows(4,2,7,5,[[5,2]]) },                          // 4 the lantern lane to the kitchen
+  { start:[6,1], rows:ringRows(2,1,9,5,[[4,1],[9,3],[5,5]]) },              // 5 the big delivery
+];
+const PKC={ done:new Set(), wip:null };   // the pack's own state — save key pk: (additive, §4 open)
+// THE BOOK SEAM (E50): 'ten' routes to the exact old objects, so the old
+// campaign's behavior is byte-true by construction; 'pk' is the patch. The
+// bare calls read CAMP.book and are only ever made while a level is open.
+const bookL=b=>(b||CAMP.book)==='pk'? PK_LEVELS : LEVELS;
+const bookSolve=b=>(b||CAMP.book)==='pk'? PK_SOLVE : SOLVE;
+const bookCap=b=>(b||CAMP.book)==='pk'? PK_CAP : SOLVE_CAP;
+const bookDone=b=>(b||CAMP.book)==='pk'? PKC.done : CAMP.done;
+const getWip=b=>((b||CAMP.book)==='pk'? PKC : CAMP).wip;
+const setWip=(b,w)=>{ if((b||CAMP.book)==='pk') PKC.wip=w; else CAMP.wip=w; };
+// THE SOLVABILITY LAW, both books (E50 — one solver, the E9 dispatcher way):
+// build level n's scripted reference, ready for GO. A reference may place ONLY
+// toys the kid owns by now — with the campaign gated, a solution that reaches
+// for an unearned piece is a level nobody can finish, so it fails here,
+// loudly, instead of on a kid's rug. Returns {ok:true} or {ok:false,why,at}.
+function refSolve(n,b){
+  b=b||'ten';
+  if(!(CAMP.on&&CAMP.book===b&&CAMP.level===n)){ if(!campEnter(n,b)) return {ok:false,why:'locked'}; }
+  clearPlayer();
+  const S=bookSolve(b)[n-1]; if(!S) return {ok:false,why:'no-solution'};
+  for(const row of S.rows) if(!coll.has(row[0])) return {ok:false,why:'unowned:'+row[0],at:row};
+  if(S.rows.length>bookCap(b)[n-1]) return {ok:false,why:'too-many:'+S.rows.length,at:bookCap(b)[n-1]};
+  for(const row of S.rows){
+    const [t,r,x,y]=row, q=placeQuery(t,r,x,y);
+    if(!q.ok) return {ok:false,why:q.why,at:row};
+    setTrackPiece(t,r,null,q.elev,x,y);
+  }
+  if(!placeTrainAt(S.start[0],S.start[1],0)) return {ok:false,why:'train'};
+  shelfSync(); save();
+  return {ok:true,rows:S.rows.length,cap:bookCap(b)[n-1]};
+}
 let FREE=null;            // the stashed free-play world while a level is open
 let goalT=0, winT=0;      // the goal card + the LINE COMPLETE! card
 // E14: the compliment card — pend waits for LINE COMPLETE! to fade, prettyT holds the
 // card, prettyN rotates the pool. Session-only, never persisted (no save bump).
 let prettyT=0, prettyPend=false, prettyMsg='', prettyN=0;
 let toyQ=[], toyCard=null, toyT=0;   // E8: the NEW TOY! queue, the card on screen, its clock
-function campUnlocked(n){ return !CAMP_SEQ || CAMP.all || n===1 || CAMP.done.has(n-1); }
+function campUnlocked(n,b){ return !CAMP_SEQ || CAMP.all || n===1 || bookDone(b).has(n-1); }   // E50: sequential per book; CAMP.all opens both
 function serWip(){        // the level's work-in-progress — glued rows regenerate from LEVELS, never saved
   const g=[];
   for(const [k,pc] of grid){ if(pc.t==='ref'||pc.glued) continue; g.push([k,pc.t,pc.r,pc.sel|0,pc.elev|0]); }
@@ -8927,12 +9215,13 @@ function surpriseRoll(){
   return out;
 }
 let surpT=false;   // the first campaign drop of the SESSION gets a word — then quiet
-function campEnter(n){
-  const L=LEVELS[n-1]; if(!L||!campUnlocked(n)) return false;
-  if(CAMP.on){ if(CAMP_WIP&&!CAMP.won) CAMP.wip=serWip(); }
+function campEnter(n,b){
+  b=b||'ten';                                 // E50: the book — 'ten' (default, the old campaign verbatim) or 'pk'
+  const L=bookL(b)[n-1]; if(!L||!campUnlocked(n,b)) return false;
+  if(CAMP.on){ if(CAMP_WIP&&!CAMP.won) setWip(CAMP.book,serWip()); }   // E50: the OPEN book keeps its wip
   else FREE=serWorld();                       // stash the kid's rug — restored verbatim on exit
   applyDims('sm');                            // E10: every level plays on the sm board, whatever BUILD grew to
-  CAMP.on=true; CAMP.level=n; CAMP.won=false; CAMP.tugT=false; CAMP.wx=null;   // E35: every level opens under its own sky
+  CAMP.on=true; CAMP.book=b; CAMP.level=n; CAMP.won=false; CAMP.tugT=false; CAMP.wx=null;   // E35: every level opens under its own sky
   CAMP.visited=new Set(); winT=0; prettyT=0; prettyPend=false;
   ridersOff();                                // E15: fresh platforms for the level's stations
   grid.clear(); hgrid.clear(); scen.clear();
@@ -8947,8 +9236,9 @@ function campEnter(n){
     const pc=setTrackPiece('st',st[2]|0,null,0,st[0],st[1]); pc.glued=1;
     CAMP.stations.push(key(st[0],st[1])+':0');
   }
-  if(CAMP_WIP && CAMP.wip && CAMP.wip.level===n){   // the level data may have moved under a saved wip — skip what no longer fits
-    for(const [k,t,r,sel,elev] of (CAMP.wip.grid||[])){
+  const bw=getWip(b);   // E50: each book restores its own work-in-progress
+  if(CAMP_WIP && bw && bw.level===n){   // the level data may have moved under a saved wip — skip what no longer fits
+    for(const [k,t,r,sel,elev] of (bw.grid||[])){
       if(!PATHS[t]) continue;
       const [x,y]=k.split(',').map(Number), el=(t==='rp'||t==='sp')?0:(elev?1:0);
       const cells=t==='sp'? spiralCells(x,y) : [[x,y]];
@@ -8960,7 +9250,7 @@ function campEnter(n){
       }
       if(ok) setTrackPiece(t,r,sel,el,x,y);
     }
-    for(const [k,t,v] of (CAMP.wip.scen||[])){
+    for(const [k,t,v] of (bw.scen||[])){
       if(!SCENDEF[t]) continue;
       const [x,y]=k.split(',').map(Number);
       if(x>=0&&y>=0&&x<GW&&y<GH&&canPlaceScen(t,x,y)) scen.set(k,{t,v:v|0,ra:null,pop:0,wave:0});
@@ -8971,14 +9261,14 @@ function campEnter(n){
   // consist sits safe in FREE, restored verbatim on exit — the roll never leaks.
   consist=surpriseRoll();
   goalT=4.2;
-  $('mark').textContent='🎫 LEVEL '+n;
+  $('mark').textContent=(b==='pk'? '🎃 LEVEL ':'🎫 LEVEL ')+n;   // E50: the patch wears its pumpkin
   showScreen('game'); shelfSync(); save();
   if(COACH_PAN&&!coachT){ coachT=true; toast(COACH_LINE); }   // E24: the coach speaks once a session
   return true;
 }
 function campExit(dest){
   if(!CAMP.on){ showScreen(dest); return; }
-  CAMP.wip=(CAMP_WIP&&!CAMP.won)? serWip() : null;   // cleared on win, kept mid-build
+  setWip(CAMP.book,(CAMP_WIP&&!CAMP.won)? serWip() : null);   // cleared on win, kept mid-build (E50: per book)
   CAMP.on=false; CAMP.level=0; CAMP.won=false; CAMP.wx=null; goalT=0; winT=0; prettyT=0; prettyPend=false;   // E35: the sky pill override dies with the visit
   ridersOff();                                       // E15: the level's platforms empty out
   applyDims(SIZE);                                   // E10: the BUILD rug comes back at its own size
@@ -8990,7 +9280,7 @@ function campLap(){          // the lap machinery fired inside a level
   if(CAMP.won) return;
   if(TRAIN.revSinceGo) return;                                 // a TRUE loop — ping-pongs don't count
   if(!CAMP.stations.every(k=>CAMP.visited.has(k))) return;     // ...AND every station pause-visited
-  const L=LEVELS[CAMP.level-1];
+  const L=bookL()[CAMP.level-1];   // E50: the open book's level
   if(L&&L.cross&&!CAMP.crossed) return;                        // ...AND the diamond was ridden (level 7)
   campWin();
 }
@@ -9005,8 +9295,8 @@ function campPretty(){
   return { n:kinds.size, wx:GX+c2[0]*C+C/2, wy:GY+c2[1]*C+C/2 };
 }
 function campWin(){
-  const firstClear=!CAMP.done.has(CAMP.level);   // E9: +10★ rides the FIRST clear only
-  CAMP.won=true; CAMP.done.add(CAMP.level); CAMP.wip=null;
+  const firstClear=!bookDone().has(CAMP.level);   // E9: +10★ rides the FIRST clear only (E50: per book)
+  CAMP.won=true; bookDone().add(CAMP.level); setWip(CAMP.book,null);
   winT=3.6; SND.bugle(); SND.whistle();
   voiceAt('win');   // E12: "You did it" — NOT gated on firstClear; the celebration is not the reward
   if(firstClear) starMint(MINT.clear, GX+GW*C/2, GY+GH*C/2);   // on top of the level's toy bundle
@@ -9019,11 +9309,12 @@ function campWin(){
     starMint(MINT.pretty, pk.wx, pk.wy);
     prettyPend=true; prettyMsg=PRETTY_POOL[prettyN++ % PRETTY_POOL.length];
   }
-  confettiBurst(CAMP.level===LEVELS.length? 180 : 90);         // GRAND OPENING! gets the double burst
+  confettiBurst(CAMP.level===bookL().length? 180 : 90);        // GRAND OPENING! gets the double burst (E50: either book's finale)
   // THE NEW TOY! CEREMONY (E8) — the best moment in the game. grantBundle reports the
   // ids it actually added (re-winning adds nothing, so a replay is quiet), the level's
   // headline toy goes first, and the cards queue up behind the LINE COMPLETE! card.
-  const won=grantBundle(CAMP.level), L=LEVELS[CAMP.level-1];
+  // E50: the pack's bundles are STORE ids through grantPack — the same one gate.
+  const won=CAMP.book==='pk'? grantPack(CAMP.level) : grantBundle(CAMP.level), L=bookL()[CAMP.level-1];
   if(L&&L.toy) won.sort((a,b)=>(b===L.toy)-(a===L.toy));
   toyQ=won; toyCard=null; toyT=0;
   boardSync(); winSync(); save();
@@ -9053,7 +9344,7 @@ function gluedTug(pc,s){
 }
 function drawCampCards(){
   if(!CAMP.on) return;
-  const L=LEVELS[CAMP.level-1]; if(!L) return;
+  const L=bookL()[CAMP.level-1]; if(!L) return;   // E50: the open book's copy
   const card=(T,total,title,sub,subCol)=>{
     const k=Math.min(1,(total-T)*5), out=Math.min(1,T*2.5);
     cx.globalAlpha=Math.max(0,Math.min(k,out));
@@ -9073,7 +9364,7 @@ function drawCampCards(){
     cx.globalAlpha=1;
   };
   if(goalT>0) card(goalT,4.2,'LEVEL '+CAMP.level+' — '+L.name,L.hint,'#F7E9C4');
-  if(winT>0) card(winT,3.6,CAMP.level===LEVELS.length?'GRAND OPENING!':'LINE COMPLETE!',
+  if(winT>0) card(winT,3.6,CAMP.level===bookL().length?'GRAND OPENING!':'LINE COMPLETE!',
                   L.name+'  '+CAMP_STAR,'#CFF7C4');
   // E14: the compliment — same gold recipe, the number always read off the dial
   else if(prettyT>0) card(prettyT,PRETTY_T,prettyMsg,'SCENERY BONUS  ★'+MINT.pretty,'#F7E9C4');
@@ -9084,7 +9375,7 @@ function drawCampCards(){
 // so a toy can never look different here than it does on the shelf.
 function drawToyCard(){
   if(!toyCard) return;
-  const def=COLL_BY[toyCard]; if(!def) return;
+  const def=defOf(toyCard); if(!def) return;   // E50: the pack's prizes are STORE rows — COLL resolves first, byte-true
   const u=uiCard(260);   // E20: the ceremony rides the dial (the clamp keeps it 1× on a small phone)
   const cw=Math.min(420*u,W-40), chh=260*u, x=(W-cw)/2, y=(H-BAR)/2-140*u;
   const pop=Math.min(1,toyT*4), sc=0.7+0.3*Math.min(1,toyT*3.2);
@@ -9114,6 +9405,7 @@ function drawToyCard(){
 }
 // ---- the level board: a wooden panel of ten numbered tickets ----
 const TICKET_CVS=[];
+const PK_TICKET_CVS=[];   // E50: the pack panel's icons, its own list
 function buildBoard(){
   const tk=$('tickets');
   for(let n=1;n<=LEVELS.length;n++){
@@ -9128,28 +9420,55 @@ function buildBoard(){
     }
     b.addEventListener('click',()=>{
       ac();
-      if(!campUnlocked(n)){ wiggle(b); SND.click(); toast('WIN TICKET '+(n-1)+' TO OPEN THIS ONE!'); return; }
-      SND.tok(); campEnter(n);
+      if(!campUnlocked(n,'ten')){ wiggle(b); SND.click(); toast('WIN TICKET '+(n-1)+' TO OPEN THIS ONE!'); return; }
+      SND.tok(); campEnter(n,'ten');
     });
     tk.appendChild(b);
+  }
+  // E50 — the PUMPKIN LINES panel: the pack's own tickets under the ten
+  // (ADDITIVE until §4 — the same wall door, its own little board + save key)
+  const pk=$('pktickets');
+  for(let n=1;n<=PK_LEVELS.length;n++){
+    const b=document.createElement('button'); b.className='tk pk'; b.type='button'; b.dataset.n=n;
+    b.innerHTML='<b></b><small></small><span class="star"></span>';
+    if(TICKET_ICONS && PK_LEVELS[n-1].toy){
+      const cv=document.createElement('canvas'); cv.width=cv.height=96; cv.className='tkicon';
+      cv.style.cssText='width:34px;height:34px;display:block;margin:2px auto -2px;';
+      b.insertBefore(cv,b.firstChild); PK_TICKET_CVS.push([n,cv]);
+    }
+    b.addEventListener('click',()=>{
+      ac();
+      if(!campUnlocked(n,'pk')){ wiggle(b); SND.click(); toast('WIN TICKET '+(n-1)+' TO OPEN THIS ONE!'); return; }
+      SND.tok(); campEnter(n,'pk');
+    });
+    pk.appendChild(b);
   }
   // E26: the CAMPAIGN button died — the wall board's painted stubs are the door now
   $('bback').addEventListener('click',()=>{ ac(); SND.click(); showScreen('menu'); });
   $('backChip').addEventListener('click',()=>{ ac(); SND.click(); campExit('board'); });
   $('nextBtn').addEventListener('click',()=>{
     ac(); SND.tok();
-    if(CAMP.level<LEVELS.length) campEnter(CAMP.level+1); else campExit('board');
+    if(CAMP.level<bookL().length) campEnter(CAMP.level+1,CAMP.book); else campExit('board');   // E50: NEXT stays inside the open book
   });
 }
 function boardSync(){
   document.querySelectorAll('#tickets .tk').forEach(b=>{
-    const n=+b.dataset.n, open=campUnlocked(n), done=CAMP.done.has(n);
+    const n=+b.dataset.n, open=campUnlocked(n,'ten'), done=CAMP.done.has(n);
     b.classList.toggle('lock',!open);
     b.querySelector('b').textContent=open? n : '🔒';
     b.querySelector('small').textContent=open? LEVELS[n-1].name : 'LOCKED';
     b.querySelector('.star').textContent=done? CAMP_STAR : '';
   });
   for(const [n,cv] of TICKET_CVS) slotIcon(cv,LEVELS[n-1].toy);   // owned art or silhouette, by the box's own rule
+  // E50 — the pack panel syncs by the exact same laws, against its own book
+  document.querySelectorAll('#pktickets .tk').forEach(b=>{
+    const n=+b.dataset.n, open=campUnlocked(n,'pk'), done=PKC.done.has(n);
+    b.classList.toggle('lock',!open);
+    b.querySelector('b').textContent=open? n : '🔒';
+    b.querySelector('small').textContent=open? PK_LEVELS[n-1].name : 'LOCKED';
+    b.querySelector('.star').textContent=done? CAMP_STAR : '';
+  });
+  for(const [n,cv] of PK_TICKET_CVS) slotIcon(cv,PK_LEVELS[n-1].toy);
 }
 function winSync(){
   const b=$('nextBtn');
@@ -9157,7 +9476,7 @@ function winSync(){
   // prizes, and a button under the card is just something to fat-finger (E8).
   const show=SCREEN==='game'&&CAMP.on&&CAMP.won&&!toyCard&&!toyQ.length;
   b.style.display=show?'block':'none';
-  if(show) b.textContent=CAMP.level<LEVELS.length? 'NEXT LEVEL ▶' : 'BACK TO THE BOARD 🎫';
+  if(show) b.textContent=CAMP.level<bookL().length? 'NEXT LEVEL ▶' : 'BACK TO THE BOARD 🎫';   // E50: per book
 }
 
 /* =====================================================================
@@ -9541,9 +9860,9 @@ function buildTray(){
    ===================================================================== */
 // palette order — Wyatt dial (E4 added RAMP + SPIRAL; E7 adds the TUNNEL + a FRIENDS tab)
 const PIECES=[ ['s','STRAIGHT'], ['c','CURVE'], ['rp','RAMP'], ['x','CROSSING'], ['b','BUMPER'], ['st','STATION'], ['br','BRIDGE'], ['tun','TUNNEL'], ['sw','SPLITTER'], ['sp','SPIRAL'] ];
-const SCEN_TAB=['bush','tree','pine','vtree','bleaf','flw','rock','pond','rv','hay','fire','bcact'];   // nature (+ the campfire E9, + the jungle plants E31, + the bloom cactus E43)
-const TOWN_TAB=[...TOWN_SET,'fence','lamp','wind','whis','sig',...MODEL_IDS.filter(t=>t!=='fire'&&t!=='vtree'&&t!=='bleaf'&&t!=='wolf'&&t!=='peng'&&t!=='roadr'&&t!=='bcact')];   // built things (the store's — nature/friend-shelved ids excluded; E42: the igloo builds, the penguin lives; E43: the roadrunner runs, the cactus grows)
-const FRIEND_TAB=['ppl',...ANIMAL_SET,'duck','dog','cat','wolf','peng','roadr','snow','bal'];      // living things (+ the balloon; E35: the wolf; E42: the penguin; E43: the roadrunner)
+const SCEN_TAB=['bush','tree','pine','vtree','bleaf','flw','rock','pond','rv','hay','fire','bcact','pum','atree'];   // nature (+ the campfire E9, + the jungle plants E31, + the bloom cactus E43, + the pumpkin and the fall tree E50)
+const TOWN_TAB=[...TOWN_SET,'fence','lamp','wind','whis','sig',...MODEL_IDS.filter(t=>t!=='fire'&&t!=='vtree'&&t!=='bleaf'&&t!=='wolf'&&t!=='peng'&&t!=='roadr'&&t!=='bcact'&&t!=='pum'&&t!=='scrow'&&t!=='crow'&&t!=='atree'&&t!=='king')];   // built things (the store's — nature/friend-shelved ids excluded; E42: the igloo builds, the penguin lives; E43: the roadrunner runs, the cactus grows; E50: the lantern builds, the rest grow or live)
+const FRIEND_TAB=['ppl',...ANIMAL_SET,'duck','dog','cat','wolf','peng','roadr','scrow','crow','king','snow','bal'];      // living things (+ the balloon; E35: the wolf; E42: the penguin; E43: the roadrunner; E50: the scarecrow, the crow and the King)
 // per-kind flags, all data-driven so E5 can pre-place any of these glued down without new code:
 //  blocks = refuses track (cellBlocksTrack reads this) · react = charms at a passing train ·
 //  knock = wooden tap sound (buildings + fence). Unknown kinds in a save are skipped, never crash.
@@ -9608,6 +9927,16 @@ const SCENDEF={
   // the balloon arch's cousin: blocks nothing, she drives right under.
   roadr:{react:1}, tmbl:{react:1}, coyo:{blocks:1,react:1},
   bcact:{blocks:1}, sarch:{},
+  // E50 — the patch. The pumpkin, the fall tree and the planted scarecrow are
+  // solid things (nobody drives a train through a pumpkin); the lantern is the
+  // lamp's wooden cousin (knocks, LOOKS lit — never a LIT row, the E39 law);
+  // the crow is a bird (the herd law — never blocks). THE PUMPKIN KING blocks
+  // his cell (he is the biggest thing on the rug) and reacts — THE KING'S
+  // WAVE + his warm glow ride the one charm gate, with a soft ho-ho. The
+  // scarecrow and the crow charm in SILENCE (the cat/snowman law — silence
+  // reads curious). All six are STORE rows: THE FIFTY STAY FIFTY.
+  pum:{blocks:1}, atree:{blocks:1}, lant:{blocks:1,knock:1},
+  scrow:{blocks:1,react:1}, crow:{react:1}, king:{blocks:1,react:1},
 };
 // E39 SOMEBODY IS HOME — tap a dwelling and somebody answers: the windows glow warm
 // gold with the knock, a small head rises into one pane, looks at you, and ducks just
@@ -9630,11 +9959,13 @@ const CHIRP={ ppl:'yay', cow:'moo', sheep:'baa', chick:'cluck', duck:'quack', do
   monk:'chit', parr:'tweet', eleph:'trump', wolf:'howl',
   dolph:'eek', shark:'blub',
   peng:'wee', seal:'arf',
-  roadr:'pip' };   // E31 — the jungle voices; E35 — the wolf's hello; E40 — the sea's; E42 — the ice's (the cub is silent); E43 — the racer's trill (the coyote + tumbleweed are silent). Same quiet-HUD gate
+  roadr:'pip',
+  king:'hoho' };   // E31 — the jungle voices; E35 — the wolf's hello; E40 — the sea's; E42 — the ice's (the cub is silent); E43 — the racer's trill (the coyote + tumbleweed are silent); E50 — the King's soft ho-ho (the scarecrow + crow are silent). Same quiet-HUD gate
 const IZOOM={ cow:1.35, sheep:1.5, chick:2.1, duck:1.9, dog:1.5, cat:1.55, flw:1.2, snow:1.05,
   fount:1.15, stat:1.2, fire:1.25, arch:1.3, flag:1.05, mail2:1.3, bench:1.25, clock:1.05,
   vtree:1.0, bleaf:1.1, wolf:1.35, peng:1.5, iglu:1.15,
-  roadr:1.5, bcact:1.05 };   // E31 — the jungle plants' card zoom; E35 — the wolf; E42 — the ice pair; E43 — the canyon pair
+  roadr:1.5, bcact:1.05,
+  pum:1.3, scrow:1.05, crow:1.8 };   // E31 — the jungle plants' card zoom; E35 — the wolf; E42 — the ice pair; E43 — the canyon pair; E50 — the patch (the King + trees stand full-size)
 const CARDEF={ tender:'TENDER', box:'BOXCAR', tank:'TANKER', flat:'FLATCAR', cab:'CABOOSE',
                coach:'COACH', mail:'MAIL CAR', circus:'CIRCUS CAR' };   // E7: three new cars join the shed
 // which toy gates each shed part — the tender rides with the RED PUFFER, one toy
@@ -11050,6 +11381,12 @@ function grantBundle(lvl){
   if(won.length) collChanged();
   return won;          // E8: the ceremony needs to know WHICH toys were new
 }
+function grantPack(lvl){   // E50: the pack's bundles — STORE ids through THE ONE GATE (a win
+  const won=[];            // grants exactly what a purchase would; bought-early = a quiet win)
+  for(const id of (PK_LEVELS[lvl-1].bundle||[])) if(!coll.has(id)){ coll.add(id); won.push(id); }
+  if(won.length) collChanged();
+  return won;
+}
 function collChanged(){
   paletteSync(); shelfSync(); syncSwatches();
   bedShelfSync();   // E37: a toy bought in the room's own shop appears on the room's shelf at once
@@ -12310,25 +12647,9 @@ window.TS={
     unlockAll(){ CAMP.all=true; save(); if(SCREEN==='board') boardSync(); return true; },
     reset(){ if(CAMP.on) campExit('board'); CAMP.done.clear(); CAMP.all=false; CAMP.wip=null; save(); boardSync(); return true; },
     // THE SOLVABILITY LAW: build level n's scripted reference solution, ready for GO.
-    // Returns {ok:true} or {ok:false,why,at} — a level whose reference stops fitting refuses to ship.
-    solve(n){
-      if(!(CAMP.on&&CAMP.level===n)){ if(!campEnter(n)) return {ok:false,why:'locked'}; }
-      clearPlayer();
-      const S=SOLVE[n-1]; if(!S) return {ok:false,why:'no-solution'};
-      // THE SOLVABILITY LAW (E8): a reference may place ONLY toys the kid owns by now.
-      // With the campaign gated, a solution that reaches for an unearned piece is a
-      // level nobody can finish — so it fails here, loudly, instead of on a kid's rug.
-      for(const row of S.rows) if(!coll.has(row[0])) return {ok:false,why:'unowned:'+row[0],at:row};
-      if(S.rows.length>SOLVE_CAP[n-1]) return {ok:false,why:'too-many:'+S.rows.length,at:SOLVE_CAP[n-1]};
-      for(const row of S.rows){
-        const [t,r,x,y]=row, q=placeQuery(t,r,x,y);
-        if(!q.ok) return {ok:false,why:q.why,at:row};
-        setTrackPiece(t,r,null,q.elev,x,y);
-      }
-      if(!placeTrainAt(S.start[0],S.start[1],0)) return {ok:false,why:'train'};
-      shelfSync(); save();
-      return {ok:true,rows:S.rows.length,cap:SOLVE_CAP[n-1]};
-    },
+    // Returns {ok:true} or {ok:false,why,at} — a level whose reference stops fitting
+    // refuses to ship. E50: refSolve is the one solver, both books.
+    solve(n){ return refSolve(n,'ten'); },
     state(){ return { on:CAMP.on, level:CAMP.level, won:CAMP.won, all:CAMP.all,
       done:[...CAMP.done].sort((a,b)=>a-b), stations:CAMP.stations.slice(),
       visited:[...CAMP.visited], wip:CAMP.wip? CAMP.wip.level:null, tugToast:CAMP.tugT,
@@ -12339,6 +12660,19 @@ window.TS={
     pretty(){ return campPretty().n; },   // E14: the kind-count the scenery bonus would see right now
     roll(){ return surpriseRoll(); },     // E21: sample the surprise (pure — mutates nothing; the battery reads the odds)
     pool(){ return SURPRISE_POOL.slice(); },   // E21: the first-drop words (the battery greps them against the kid list)
+  },
+  // ---- the pack rig (E50 — PUMPKIN LINES, the second book) ----
+  pk:{
+    open(){ showScreen('board'); return SCREEN; },
+    enter(n){ return campEnter(n,'pk'); },
+    exit(){ campExit('board'); return SCREEN; },
+    solve(n){ return refSolve(n,'pk'); },
+    reset(){ if(CAMP.on&&CAMP.book==='pk') campExit('board'); PKC.done.clear(); PKC.wip=null; save(); if(SCREEN==='board') boardSync(); return true; },
+    state(){ return { on:CAMP.on&&CAMP.book==='pk', book:CAMP.book, level:CAMP.level, won:CAMP.won,
+      done:[...PKC.done].sort((a,b)=>a-b), stations:CAMP.stations.slice(),
+      visited:[...CAMP.visited], wip:PKC.wip? PKC.wip.level:null,
+      toyCard:toyCard, toyQueue:toyQ.slice() }; },
+    hints(){ return PK_LEVELS.map(L=>L.hint); },
   },
   state(){ return { screen:SCREEN, color:COLOR,
     size:SIZE, land:LAND, weather:WEATHER, gw:GW, gh:GH,
