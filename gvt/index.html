@@ -2150,7 +2150,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.25</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.26</div>
   <div class="scanlines"></div>
 </div>
 
@@ -11519,8 +11519,11 @@ const CAMP_GRAND_W=1920;   // the battleground's own 1v1 span — one const for 
 // MOVING THINGS are the toy wrecking balls, BF math verbatim (a patrol that
 // plows both armies aside and never kills — campBallTick). The train stays
 // on WESTERN LAND: the θ-track is that map's identity and needs the tall mat.
-// Authored straight in the ARMED 1920 span (merged AFTER campGrandArm's
-// x-scale pass, so nothing here is ever re-scaled), validated against every
+// Authored straight in each rung's LIVE span — every shipped row below sits
+// on a grand rung, so these numbers are the ARMED 1920's (merged AFTER
+// campGrandArm's x-scale pass, so nothing here is ever re-scaled; 0193 opened
+// the merge to every size, and an edited row on a plain rung is authored in
+// the 1240 it plays on). Validated against every
 // rung's seeded rocks: pinch ≥ r1+r2+2·ROCK_PAD_FOE, bridge lanes + funnel
 // throats clear (the v1.72 law), ball beats ≥108px from every mound (the
 // winter moving-hazard law) and fully EAST of the deploy line — so the
@@ -12138,6 +12141,7 @@ if(CAMP_EDITS && CAMP_EDITS.v){
   if(E.premiere) for(const k in E.premiere) { if(E.premiere[k]===null) delete FORM_PREMIERE[k]; else FORM_PREMIERE[k]=E.premiere[k]; }
   if(E.stages)   for(const k in E.stages)   { if(E.stages[k]===null) delete CAMP_STAGES[k];     else CAMP_STAGES[k]=E.stages[k]; }
   if(E.grand)    for(const k in E.grand)    { if(E.grand[k]===null) delete CAMP_GRAND[k];       else CAMP_GRAND[k]=E.grand[k]; }
+  if(E.dress)    for(const k in E.dress)    { if(E.dress[k]===null) delete CAMP_DRESS[k];       else CAMP_DRESS[k]=E.dress[k]; }
   // every group is rebuilt fresh — sqScaleCfg mutates cfg groups in place, so a shared
   // reference would let one battle's scaling leak into the next (the 11055 law)
   const _mk = (g,c) => { const q={f:g.f,t:g.t,n:(g.raw?(g.n||1):c(g.n||1)),e:g.e,at:g.at};
@@ -12161,6 +12165,17 @@ if(CAMP_EDITS && CAMP_EDITS.v){
       if(o.hpMul!=null)  cfg.hpMul=o.hpMul;
       if(o.cntMul!=null) cfg.cntMul=o.cntMul;
       if(o.bossF!=null)  cfg.bossF=o.bossF;
+      // 0193: the ground rides the seam — the river (null = no river) and an
+      // authored rock set replace the SEED'S OWN OUTPUT, strictly after _lc
+      // returns: zero R() draws, so no other level's deal can move (the v1.40
+      // law, same slot the stage pass proved). COPIES, never shared rows —
+      // campGrandArm stretches x IN PLACE on a grand rung, and a shared
+      // reference would write that stretch back into this overlay table, so
+      // the SECOND battle would stretch it again (the 11055 law, ground edition).
+      if(o.terrain){
+        if('river' in o.terrain) cfg.terrain.river = o.terrain.river ? Object.assign({}, o.terrain.river) : null;
+        if(o.terrain.rocks) cfg.terrain.rocks = o.terrain.rocks.map(r=>Object.assign({},r));
+      }
       if(o.waves){
         const c = x=>Math.max(1,Math.round(x*cfg.cntMul));
         cfg.waves = o.waves.map(w=>{
@@ -13627,25 +13642,35 @@ function startBattle(levelN, rival){
 // construction with zero wire change (the v1.96 §3.7 law).
 function campGrandArm(){
   S.gk=1;
-  if(!CAMP_GRAND[S.levelN]) return;
-  S.gk=CAMP_GRAND_W/CAMP_W;
-  W=CAMP_GRAND_W; resize();
   const t=S.cfg.terrain;
-  t.rocks.forEach(rk=>{ rk.x=Math.round(rk.x*S.gk); });
-  if(t.river) t.river.x=Math.round(t.river.x*S.gk);
-  if(t.props) t.props=t.props.map(pr=>Object.assign({},pr,{x:Math.round(pr.x*S.gk)}));
-  // 0129 THE DRESSING rides the same door, AFTER the stretch: authored
-  // straight in the armed 1920 span, so nothing here is ever re-scaled.
+  if(CAMP_GRAND[S.levelN]){
+    S.gk=CAMP_GRAND_W/CAMP_W;
+    W=CAMP_GRAND_W; resize();
+    t.rocks.forEach(rk=>{ rk.x=Math.round(rk.x*S.gk); });
+    if(t.river) t.river.x=Math.round(t.river.x*S.gk);
+    if(t.props) t.props=t.props.map(pr=>Object.assign({},pr,{x:Math.round(pr.x*S.gk)}));
+  }
+  // 0129 THE DRESSING rides the same door, AFTER the stretch — and 0193 opens
+  // it to EVERY size: the merge sits past the grand block now instead of below
+  // an early return, so an authored dress row lands on a 1240 rug exactly as
+  // it lands on a 1920 one. The x-stretch above touches ONLY the seeded
+  // terrain (already applied by the time the merge runs); a dress row is
+  // authored in its rung's LIVE span and is never re-scaled (the 0129 law,
+  // unchanged — the editor owns span coherence when a rung's size flips).
   // Everything lands as a COPY — CAMP_DRESS is a shared table and a battle
   // must never write into it (a ball's y/dir/roll are LIVE state; the BF
   // arm's own {y:y0, dir:1, roll:0} start, so every sim in a lobby arms the
   // identical patrol). Same levelN on every sim → mirrored by construction,
-  // zero wire change, zero RNG — the seeded snaps stand.
+  // zero wire change, zero RNG — the seeded snaps stand. 0193: props join as
+  // the fourth row, on CAMP_PROPS' own contract (pure decor, ZERO hitbox,
+  // never in terrain.rocks) — COPY-merged beside any stage props the rung
+  // already carries, because the drawn table is shared exactly like the rest.
   const D=CAMP_DRESS[S.levelN];
   if(D){
     if(D.rocks)  t.rocks=t.rocks.concat(D.rocks.map(r=>Object.assign({},r)));
     if(D.trench) t.trench={ w:D.trench.w, pts:D.trench.pts };
     if(D.balls)  t.balls=D.balls.map(b=>Object.assign({},b,{y:b.y0,dir:1,roll:0}));
+    if(D.props)  t.props=(t.props||[]).concat(D.props.map(p=>Object.assign({},p)));
   }
 }
 function startCampaign(n){
