@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v4.5 -->
+<!-- TRAINSET v4.6 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -446,9 +446,28 @@
     transition:opacity var(--shyms,0.3s) ease, visibility 0s 0s; }
   body.shy #bedbar button{ pointer-events:auto; }
   #bedpal{ display:flex; gap:calc(var(--ui)*8px); }
+  /* E37 DESIGN THE ROOM — the decor shelf (the wood scrolls, the toys lift),
+     the sky pills (the E35 plaque grammar, room edition) and TIDY UP. All live
+     inside #bedbar so the E18 shy visibility law carries them for free. */
+  #bedshelf{ display:flex; align-items:center; gap:calc(var(--ui)*6px);
+    flex:1 1 auto; min-width:calc(var(--ui)*70px); overflow-x:auto; touch-action:pan-x;
+    padding:calc(var(--ui)*4px) calc(var(--ui)*2px); scrollbar-width:none; }
+  #bedshelf::-webkit-scrollbar{ display:none; }
+  /* the room's palette + decor cards wear a bedroom card dial (--bbc) so the
+     strip keeps 3-4 toys in view beside the pills; the train shelf keeps its
+     E16 sizes untouched */
+  #bedpal .pbtn,#bedshelf .pbtn{ width:calc(var(--ui)*46px); }
+  #bedpal .pbtn canvas,#bedshelf .pbtn canvas{ width:calc(var(--ui)*34px); height:calc(var(--ui)*34px); }
+  #bedpal .pbtn small,#bedshelf .pbtn small{ font-size:calc(var(--ui)*7px); }
+  #bedsky{ display:grid; grid-template-columns:auto auto; gap:calc(var(--ui)*3px); flex:0 0 auto; }
+  #bedsky .ptab{ font-size:calc(var(--ui)*7.5px); padding:calc(var(--ui)*5px) calc(var(--ui)*4px); }
+  #bedtidy b{ font-size:calc(var(--ui)*20px); pointer-events:none; }
+  #bedtidy.ask{ border-color:#FF7A5C; color:#FF7A5C; }
   @media (max-width:820px){
     #bedbar{ gap:3px; }
     #bedpal{ gap:3px; }
+    #bedshelf{ gap:3px; }
+    #bedsky .ptab{ font-size:calc(var(--ui)*6.5px); }
   }
   /* ---- THE SHY FOLD (E25): while a hand is live on the rug — a toy mid-drag or
      a real pan-press — the box AND the corner cluster fade to nothing (ONE dial,
@@ -590,7 +609,7 @@
   <div id="railFoot"></div>
 </div>
 <div id="spread"><div id="spTray"></div></div>
-<div id="bedbar"><span id="bedpal"></span></div>
+<div id="bedbar"><span id="bedpal"></span><span id="bedshelf"></span><span id="bedsky"></span></div>
 <!-- E26 THE LIVING ROOM: the big buttons and the chips are PAINTED FURNITURE now
      (station · toy box · storefront · ticket board, each with a pill label —
      the pigHit pattern). The paint shop keeps its little DOM row; the box's
@@ -5467,7 +5486,10 @@ function bedReset(){
   BED.shy=false; BED.a=1; BED.idleT=0; shySync();
   $('bedbar').appendChild($('shelf')); // the E16 shelf serves the bedroom while the menu is up
   $('shelf').style.display='';         // E33: a folded TRAINS plaque must not follow it here
-  inBed(shelfSync);
+  roomApply();                         // E37 THE ROOM REMEMBERS — the saved room dresses the stock
+                                       // floor (no save = a no-op = exactly the old tide)
+  inBed(shelfSync);                    // after the apply, so the shelf paints the ROOM's consist
+  bedShelfSync(); bedSkySync();        // E37: the decor shelf + the sky pills wear the room's truth
 }
 function bedDrop(){
   bedCancel();                         // the hand lets go first (BED.on still true for the wrapper)
@@ -5496,6 +5518,250 @@ function buildBedPal(){
   }
   // the fade obeys the ONE dial, DOM and canvas alike (--shyms feeds the CSS)
   document.documentElement.style.setProperty('--shyms',(SHY_FADE_MS/1000)+'s');
+  buildBedShelf(); buildBedSky(); buildBedTidy();   // E37: the room's own tools ride the same bar
+}
+
+/* =====================================================================
+   DESIGN THE ROOM — THE ROOM REMEMBERS (E37). Wyatt: "It should also
+   save whatever you have done to the room… you could make the room
+   snowy… you can do anything you do in the build mode." The bedroom's
+   mutations now persist under the room's OWN localStorage key (the
+   game's TRAINSET key gets ZERO bedroom writes — the E18/E23 line, the
+   wrapper, is unchanged; only where the wrapper's writes LAND changed).
+   Write-through, synchronous: WKWebView flushes localStorage on
+   BACKGROUND (the ios-shell trap) — a deferred save is a lost room.
+   THE HEART LAW: the stock oval's 8 cells are never serialized and
+   always come home on reset/reload; the stock attract toy likewise
+   (the room's pet). A fresh profile = a stock room, byte-identical.
+   ===================================================================== */
+const ROOM_KEY='TRAINSET_ROOM';       // v:1 — separate from the game save: nothing existing migrates
+const OVAL_KEYS=new Set(['0,0','1,0','2,0','3,0','0,1','1,1','2,1','3,1']);   // the heart — buildAttract's exact keys
+let ROOMWX='clear';                   // the room's own sky (E35 words; persisted in the room save)
+let BEDSKY=[];                        // the room's pill row (bedSkySync marks it)
+function roomSave(){
+  if(!BED.on) return;
+  if(!BED.ctx){ if(SCREEN!=='menu') return; inBed(roomSave); return; }   // self-wrap: serWorld must read the ROOM
+  try{
+    const w=serWorld();
+    localStorage.setItem(ROOM_KEY, JSON.stringify({ v:1,
+      grid:w.grid.filter(r2=>!OVAL_KEYS.has(r2[0])),   // the heart is never written down
+      scen:w.scen, consist:w.consist, eng:ENGINE, train:w.train, wx:ROOMWX }));
+  }catch(e){}
+}
+function roomApply(){
+  // the saved room dresses the stock floor — row-forgiving exactly like
+  // appWorld: junk rows skip, valid rows land, a garbage blob is a stock room.
+  let d=null;
+  try{ d=JSON.parse(localStorage.getItem(ROOM_KEY)||'null'); }catch(e){}
+  ROOMWX=(d&&WEATHERS.includes(d.wx))? d.wx : 'clear';
+  WXR.key=null;                        // a fresh sky re-seeds its particles
+  if(!d||d.v!==1) return;
+  inBed(()=>{ try{
+    for(const [k2,t,r,sel,elev] of (d.grid||[])){
+      if(elev||!PATHS[t]||OVAL_KEYS.has(k2)||grid.has(k2)) continue;   // ground pieces only; the heart wins
+      const [x,y]=String(k2).split(',').map(Number);
+      if(!isFinite(x)||!isFinite(y)) continue;
+      setTrackPiece(t,r|0,sel|0,0,x,y);
+    }
+    for(const [k2,t,v] of (d.scen||[])){
+      if(!SCENDEF[t]) continue;
+      const [x,y]=String(k2).split(',').map(Number);
+      if(!isFinite(x)||!isFinite(y)) continue;
+      scen.set(k2,{t,v:v|0,ra:null,pop:0,wave:0});
+    }
+    if(Array.isArray(d.consist)) consist=d.consist.filter(t=>CARDEF[t]).slice(0,MAXCARS);
+    ENGINE=d.eng==='exp'? 'exp':'loco';
+    if(d.train && d.train.cars && d.train.cars.length){
+      let ok=true;                     // appWorld's exact validation recipe — every car must find its piece
+      const cars=d.train.cars.map(c2=>{
+        const rd={cx:c2.cx,cy:c2.cy,pi:c2.pi,dir:c2.dir>0?1:-1,s:+c2.s||0,el:0};
+        const pc=pieceOf(rd);
+        if(!pc || !pathsOf(pc)[c2.pi]) ok=false;
+        return {type:c2.t,rd,face:c2.f<0?-1:1,squash:0};
+      });
+      if(ok){ TRAIN.cars=cars; TRAIN.placed=true; TRAIN.F=d.train.F!==false;
+        TRAIN.running=true;            // the alive-room law: running is a bedroom train's nature
+      }
+    }
+  }catch(e){} });
+}
+// ---- THE ROOM SKY (E37) — the E35 pill grammar, room edition. ROOMWX is the
+// room's own dial: activeWeather()/rugSync stay the GAME's seams, untouched.
+function bedSkySync(){ for(const m of BEDSKY) m.el.classList.toggle('on',ROOMWX===m.id); }
+function buildBedSky(){
+  const wrap=$('bedsky');
+  for(const [id,ico,name] of [['clear','☀️','CLEAR'],['snowfall','❄️','SNOW'],
+                              ['rain','🌧','RAIN'],['dust','🌪','DUST']]){
+    const b=document.createElement('button'); b.className='ptab'; b.type='button';
+    b.textContent=ico+' '+name;
+    b.addEventListener('click',()=>{ ac(); BED.idleT=0;
+      if(ROOMWX===id){ SND.click(); return; }           // already this sky — the pill ceremony verbatim
+      ROOMWX=id; WXR.key=null; SND.tok(); bedSkySync(); roomSave(); });
+    wrap.appendChild(b); BEDSKY.push({id,el:b});
+  }
+  bedSkySync();
+}
+// ---- THE DECOR SHELF (E37) — the build vocabulary walks through E23's door:
+// every OWNED scenery/town/friend, the rail's card recipe verbatim, the same
+// down={what:'pal'} record — from there the shipped pipeline does everything.
+function bedShelfSync(){
+  const wrap=$('bedshelf'); if(!wrap) return;
+  wrap.textContent='';
+  const seen=new Set();
+  for(const [t,layer] of [...SCEN_TAB.map(t=>[t,'scen']),...TOWN_TAB.map(t=>[t,'town']),
+                          ...FRIEND_TAB.map(t=>[t,'friends'])]){
+    if(seen.has(t)||!coll.has(t)) continue; seen.add(t);   // THE GATE LAW: owned-only, hidden never grey
+    const b=document.createElement('button'); b.className='pbtn drg'; b.type='button';
+    const cv=document.createElement('canvas'); const lb=document.createElement('small');
+    lb.textContent=defOf(t).name; b.appendChild(cv); b.appendChild(lb); wrap.appendChild(b);
+    cv.width=104*ICON_RES; cv.height=104*ICON_RES;
+    const g=cv.getContext('2d'), s=104*ICON_RES/(C+16);
+    g.setTransform(s,0,0,s,8*s,8*s);
+    scenIcon(g,t);
+    b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault(); BED.idleT=0;
+      down={x:e.clientX,y:e.clientY,what:'pal',t,el:b,layer,
+            v:SCENDEF[t]&&SCENDEF[t].react?(pplSeq++%3):0}; });
+  }
+}
+function buildBedShelf(){ bedShelfSync(); }
+// ---- TIDY UP (E37) — the E16 two-tap sweep, room edition: the saved room is
+// forgotten, the sky clears, the stock room returns. Kids need an undo for chaos.
+function buildBedTidy(){
+  const b=document.createElement('button'); b.id='bedtidy'; b.className='pbtn'; b.type='button';
+  b.innerHTML='<b>🧹</b><small>TIDY UP</small>';
+  let arm=0;
+  const off=()=>{ arm=0; b.classList.remove('ask'); b.querySelector('small').textContent='TIDY UP'; };
+  b.addEventListener('click',()=>{ ac(); BED.idleT=0;
+    if(arm){
+      clearTimeout(arm); off();
+      try{ localStorage.removeItem(ROOM_KEY); }catch(e){}
+      ROOMWX='clear'; WXR.key=null;
+      bedReset();                                        // the stock room, nothing to apply
+      SND.pop(); toast('ALL TIDY!');                     // outside the wrapper — the one ceremony word shows
+    } else {
+      SND.click(); b.classList.add('ask'); b.querySelector('small').textContent='TAP AGAIN';
+      arm=setTimeout(off,2600);
+    }
+  });
+  $('bedbar').appendChild(b);
+}
+// ---- THE ROOM'S WEATHER (E37) — the three shipped recipes, room-span copies.
+// The game's weatherSeed/drawWeather/WXP are UNTOUCHED (their byte proofs must
+// hold with zero effort); the room seeds its own particles off menuVis() with
+// the same seed chain, the same density dials, the same painters' constants.
+// clear paints NOTHING — a fresh room stays byte-identical.
+let WXR={key:null,flakes:[],motes:[],drops:[],rings:[],dress:[]};
+function roomSeed(){
+  const v0=menuVis();
+  const v={x0:Math.round(v0.x0),y0:Math.round(v0.y0),x1:Math.round(v0.x1),y1:Math.round(v0.y1)};
+  const k2=ROOMWX+':'+v.x0+','+v.y0+','+v.x1+','+v.y1;   // a resize re-seeds, deterministically
+  if(WXR.key===k2) return v;
+  let s=20260725; const rnd=()=>{ s=(s*9301+49297)%233280; return s/233280; };   // the GVT seed chain
+  WXR={key:k2,flakes:[],motes:[],drops:[],rings:[],dress:[]};
+  const w0=v.x1-v.x0, h0=v.y1-v.y0, cells=Math.max(1,Math.round(w0*h0/(C*C)));
+  if(ROOMWX==='snowfall'){
+    const n=Math.min(FLAKE_MAX,Math.round(cells*FLAKE_PER_CELL));
+    for(let i=0;i<n;i++) WXR.flakes.push({ x:v.x0+rnd()*w0, y:v.y0+rnd()*h0,
+      r:0.9+rnd()*1.5, v:(9+rnd()*16)*FLAKE_FALL, s:0.7+rnd()*1.1, p:rnd()*6.283 });
+    // THE SNOW BLANKET — "make the room snowy" means the floor too: the E10
+    // winter set (drift/clod/ice, the shipped painters verbatim) on the boards,
+    // under the rug and the furniture. Only snow dresses the floor (dial).
+    const fx0=v.x0+60, fx1=v.x1-60, fy0=Math.max(46,v.y0+46), fy1=v.y1-40;
+    const nD=Math.max(3,Math.round(cells/DRIFT_CELLS));
+    for(let i=0;i<nD;i++){
+      const side=i%4, rx=60+rnd()*45, ry=28+rnd()*26;
+      let x,y;
+      if(side===0){ x=fx0+rnd()*(fx1-fx0); y=fy0+ry*0.5+rnd()*30; }
+      else if(side===1){ x=fx0+rnd()*(fx1-fx0); y=fy1-ry*0.5-rnd()*30; }
+      else if(side===2){ x=fx0+rx*0.4+rnd()*40; y=fy0+rnd()*(fy1-fy0); }
+      else { x=fx1-rx*0.4-rnd()*40; y=fy0+rnd()*(fy1-fy0); }
+      WXR.dress.push({t:'drift',x,y,rx,ry});
+    }
+    const nK=Math.round(cells*CLOD_PER_100/100);
+    for(let i=0;i<nK;i++) WXR.dress.push({t:'clod', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:9+rnd()*6});
+    const nI=cells>300?2:1;
+    for(let i=0;i<nI;i++) WXR.dress.push({t:'ice', x:fx0+120+rnd()*Math.max(60,fx1-fx0-240),
+      y:fy0+80+rnd()*Math.max(40,fy1-fy0-160), rx:70+rnd()*30, ry:40+rnd()*20});
+  } else if(ROOMWX==='dust'){
+    const n=Math.min(DUST_MAX,Math.round(cells*DUST_PER_CELL));
+    for(let i=0;i<n;i++) WXR.motes.push({ x:v.x0+rnd()*w0, y:v.y0+66+rnd()*Math.max(40,h0-132),
+      r:1.3+rnd()*2.1, v:14+rnd()*22, a:0.16+rnd()*0.18, s:0.5+rnd()*0.9, p:rnd()*6.283 });
+  } else if(ROOMWX==='rain'){
+    const n=Math.min(RAIN_MAX,Math.round(cells*RAIN_PER_CELL));   // the room rains full — soft is the jungle's
+    for(let i=0;i<n;i++) WXR.drops.push({ x:v.x0+rnd()*w0, y:v.y0+rnd()*h0,
+      l:9+rnd()*8, v:520+rnd()*260, p:rnd()*6.283 });
+    const nr=Math.max(6,Math.round(n/14));
+    for(let i=0;i<nr;i++) WXR.rings.push({ x:v.x0+80+rnd()*Math.max(60,w0-160),
+      y:v.y0+80+rnd()*Math.max(60,h0-160), T:1.1+rnd()*1.6, p:rnd()*3 });
+  }
+  return v;
+}
+function roomGroundDress(){
+  if(ROOMWX!=='snowfall') return;      // only snow dresses the floor (dial)
+  roomSeed();
+  for(const it of WXR.dress){
+    if(it.t==='drift') drawDeepDrift(it);
+    else if(it.t==='clod') drawSnowClod(it);
+    else if(it.t==='ice') drawIceSheet(it);
+  }
+}
+function menuWeather(){
+  if(ROOMWX==='clear') return;         // a clear room paints NOTHING — the byte proofs' friend
+  const v=roomSeed();
+  const t=perf(), calm=RM();
+  const k9=Math.max(1,1/SC);           // flakes hold their designed SCREEN size (the E10 camera law)
+  const w0=v.x1-v.x0, h0=v.y1-v.y0;
+  if(ROOMWX==='snowfall'){
+    const F=WXR.flakes, n=calm? (F.length*0.4)|0 : F.length;
+    const top=v.y0, span=h0, vs=h0/MENU_H;
+    for(let i=0;i<n;i++){
+      const f=F[i];
+      const y=calm? f.y : top+(((f.y-top)+t*f.v*vs)%span);
+      const x=calm? f.x : f.x+Math.sin(t*f.s+f.p)*7;
+      cx.fillStyle='rgba(110,132,158,0.34)';
+      cx.beginPath(); cx.arc(x,y+1.2*k9,(f.r+0.6)*k9,0,7); cx.fill();
+      cx.fillStyle='#FFFFFF';
+      cx.beginPath(); cx.arc(x,y,f.r*k9,0,7); cx.fill();
+    }
+  } else if(ROOMWX==='dust'){
+    const M=WXR.motes, n=calm? (M.length*0.4)|0 : M.length;
+    for(let i=0;i<n;i++){
+      const m=M[i];
+      const x=calm? m.x : v.x0+((m.x-v.x0)+t*m.v)%w0;
+      const y=m.y+Math.sin(t*m.s+m.p)*9;
+      cx.globalAlpha=m.a*(0.7+0.3*Math.sin(t*m.s*1.7+m.p));
+      cx.fillStyle='#F2C584';
+      cx.beginPath(); cx.arc(x,y,m.r*k9,0,7); cx.fill();
+    }
+    cx.globalAlpha=calm?0.05:0.05+0.02*Math.sin(t*1.3);
+    cx.strokeStyle='#FFE9C0'; cx.lineWidth=5*k9;
+    for(let k of [0,1,2]){
+      const y=74+k*16*k9;
+      cx.beginPath(); cx.moveTo(v.x0+60,y);
+      for(let x=v.x0+60;x<v.x1-60;x+=48) cx.quadraticCurveTo(x+24,y+(calm?0:Math.sin(t*2+x*0.07+k)*3),x+48,y);
+      cx.stroke();
+    }
+    cx.globalAlpha=1;
+  } else if(ROOMWX==='rain'){
+    const D=WXR.drops, n=calm? (D.length*0.4)|0 : D.length, sl=RAIN_SLANT;
+    cx.strokeStyle='rgba(157,191,230,0.5)'; cx.lineWidth=1.6*k9; cx.lineCap='round';
+    cx.beginPath();
+    for(let i=0;i<n;i++){
+      const f=D[i];
+      const y=v.y0+((f.y-v.y0)+t*f.v)%h0;
+      const x=v.x0+((f.x-v.x0)+t*f.v*sl)%w0;
+      cx.moveTo(x,y); cx.lineTo(x-f.l*k9*sl,y-f.l*k9);
+    }
+    cx.stroke(); cx.lineCap='butt';
+    if(!calm) for(const g of WXR.rings){
+      const k=((t+g.p)%g.T)/g.T;
+      if(k>=0.35) continue;
+      const q=k/0.35;
+      cx.globalAlpha=0.5*(1-q); cx.strokeStyle=RIVER_LIGHT; cx.lineWidth=2*k9;
+      cx.beginPath(); cx.ellipse(g.x,g.y,(4+30*q)*k9,(4+30*q)*0.45*k9,0,0,7); cx.stroke();
+      cx.globalAlpha=1;
+    }
+  }
 }
 
 /* =====================================================================
@@ -5714,6 +5980,7 @@ function drawMenu(){
   cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cvs.width,cvs.height);
   cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
   menuFloor();
+  roomGroundDress();   // E37 THE SNOW BLANKET — the winter set on the boards (only while snowy)
   if(MENU_PROPS.includes('lamp')) menuLamp();
   menuRug();
   if(MENU_PROPS.includes('door')) menuDoor();
@@ -5730,7 +5997,9 @@ function drawMenu(){
   cx.translate(ATT.ox,ATT.oy); cx.scale(ATT_SCALE,ATT_SCALE); cx.translate(-GX,-GY);
   RGRID=AT.grid; HGRID=AT.hg;
   try{
+    if(BED.scen.size) inBed(()=>{ drawRivers(); drawPonds(); });   // E37: water is ground — under the track (a bridge could span it)
     drawTrack(AT.grid);
+    if(BED.scen.size) inBed(drawScen);                             // E37: the room's toys — over the track, under the cars
     drawCarsOnRails(AT.cars,AT.wheel);
     if(BED.train.placed||(BED.ctx&&TRAIN.placed))                       // E18: the kid's train, beside the stock toy
       drawCarsOnRails(BED.ctx? TRAIN.cars:BED.train.cars,BED.wheel);
@@ -5741,10 +6010,12 @@ function drawMenu(){
     for(const e2 of BED.fx){ const k=e2.t/e2.dur;                       // E18: drop-puffs — draw()'s exact recipe
       if(e2.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle='#e8e0cc';
         cx.beginPath(); cx.arc(e2.x,e2.y,e2.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; } }
+    if(BED.scen.size) inBed(()=>{ drawArches(); drawBalloons(); });     // E37: fliers fly late (the game's layering law)
     if(DRAG&&BED.on) inBed(drawGhosts);                                 // E18: the SAME ghost pipeline, swapped in
   } finally { RGRID=grid; HGRID=hgrid; }
   cx.restore();
   drawRoomDog();   // E26: the gag trots in FRONT of the furniture, under the labels
+  menuWeather();   // E37 THE ROOM SKY — over the room, under the labels (clear = zero paint)
   // E26: the pills — furniture labels, painted like the piggy: always on, never shy
   for(const o of ROOM_OBJS) drawPill(o.px,o.py,o.label());
   if(MENU_PROPS.includes('sign')){
@@ -6037,7 +6308,9 @@ function appWorld(d){
   }
 }
 function save(){
-  if(BED.ctx) return;   // E18 THE EPHEMERAL LAW — the bedroom set is NEVER saved
+  if(BED.ctx) return roomSave();   // E18→E37 THE EPHEMERAL LAW AMENDED: the wrapper is still the line —
+                                   // the game's book gets ZERO bedroom writes, but the room's mutations
+                                   // now land in the room's OWN key (THE ROOM REMEMBERS) instead of the bin
   try{
     // v:5 — the rug fields are the FREE-PLAY world, always: while the campaign is on,
     // the stashed free-play snapshot is written back verbatim (never the level), and
@@ -8223,6 +8496,7 @@ function grantBundle(lvl){
 }
 function collChanged(){
   paletteSync(); shelfSync(); syncSwatches();
+  bedShelfSync();   // E37: a toy bought in the room's own shop appears on the room's shelf at once
   if($('toybox').style.display==='flex') boxSync();
 }
 function boxShow(b){ $('toybox').style.display=b?'flex':'none'; if(b) boxSync(); }
@@ -9218,6 +9492,19 @@ window.TS={
     tap(id){ const o=ROOM_OBJS.find(o2=>o2.id===id); if(!o) return false; o.tap(); return true; },
     cards(b){ boxCards(b!==false); return ROOM.cards; },
     reset(){ ROOM.t=0; ROOM.win=-1; ROOM.fx=null; ROOM.dog=null; return true; },
+    // E37 — the room-remembers doors: the sky dial, the memory state, the sweep
+    wx(id){ if(id&&WEATHERS.includes(id)&&id!==ROOMWX){ ROOMWX=id; WXR.key=null; bedSkySync(); roomSave(); }
+      return ROOMWX; },
+    mem(){ let d=null; try{ d=JSON.parse(localStorage.getItem(ROOM_KEY)||'null'); }catch(e){}
+      return { wx:ROOMWX, saved:!!d, key:ROOM_KEY,
+        pieces:AT.grid.size, scen:BED.scen.size,
+        train:!!(BED.ctx? TRAIN.placed : BED.train.placed),
+        running:!!(BED.ctx? TRAIN.running : BED.train.running),
+        consist:(BED.ctx? consist : BED.consist).slice(), eng:BED.ctx? ENGINE : BED.eng }; },
+    clearRoom(){ try{ localStorage.removeItem(ROOM_KEY); }catch(e){}
+      ROOMWX='clear'; WXR.key=null;
+      if(SCREEN==='menu'||SCREEN==='board'){ BED.on=false; bedScreen(SCREEN); }
+      return true; },
   },
   // E23 — THE predicate, asked from inside the bedroom wrapper (what the ghost
   // tint and the drop see on the menu floor). Battery doors, mutation-free.
