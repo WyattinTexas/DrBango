@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v5.7 -->
+<!-- TRAINSET v5.8 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -720,6 +720,7 @@ const FIT_PAD=0;                                 // px of margin at fit (0 = tod
 function activeLand(){
   if(CAMP.on){ const L=LEVELS[CAMP.level-1]; return (L&&L.land)||'rug'; }
   if(PLAY.on) return PLAY.landOv||playMap().land||'rug';   // E48: the portal may hold the visit in ANOTHER world — session slot, the wx grammar (cleared at entry+exit, never saved)
+  if(SCREEN==='room') return 'rug';   // E49: the big room's floor is boards — the halo/ice/breath guards must never see the kid's BUILD land there
   return LAND;
 }
 function activeWeather(){
@@ -778,6 +779,17 @@ const PICKME_S=6;             // seconds per attract window: exactly ONE pick-me
 const DOG_EVERY=6;            // every Nth window belongs to the roaming gag instead
 const ROOM_GAG='dog';         // 'dog' = the E2 dog from the lit doorway · 'none' — Wyatt's gag dial
 const MENU_MUSIC=false;       // menu music: false = NONE (quiet-HUD default) · true = soft lullaby
+/* ---- E49 THE BIG ROOM (NEMO frames 10+11 — the galaxy answer, opened by hand) ---- */
+const RM_W=2*MENU_W, RM_H=MENU_H;   // the room's painting: ~2 bedrooms wide (the width dial) — fixed, own fit, NEVER camGate
+const BIG_DWELL=6;                  // seconds the tour stands INSIDE each world — that stand IS the pick-me (study lean)
+const BIG_RING={w:26,h:5};          // the one glued oval, in cells (ring corners wear the attract oval's own r pattern)
+const BIG_OX=290, BIG_OY=288;       // where the ring transform seats on the room's boards
+// model cells on the ring, PLAYMAPS rotation order — top run 0-4 left→right, bottom
+// run 5-8 right→left, so the touring train visits the worlds in rotation order.
+// A future world (a holiday pack's rug) appears by ADDING ONE CELL here — the
+// models themselves derive from PLAYMAPS: toys arrive in a real house overnight.
+const BIG_CELLS=[[3,0],[7,0],[11,0],[15,0],[19,0],[20,4],[15,4],[10,4],[5,4]];
+const BIG_DOOR={x:0,y:540,w:340,h:200};   // the way home — the LEFT wall's light wedge (the hand's target, painting space)
 // THE LIVERY LAW: the chosen colour paints ONLY the red livery parts — loco roof +
 // cowcatcher, tender tub, caboose body. Wheels stay red-spoked, boiler stays dark,
 // gold door stays gold, cargo cars untouched. m = body, d = dark stroke, s = cupola shade.
@@ -7334,6 +7346,14 @@ const ROOM_OBJS=[
     tap(){ SND.tok(); bankShow(true); } },
   { id:'tickets', hit:{x:4,  y:6,  w:148,h:196}, px:76,  py:184, label:()=>CAMP_LABEL,
     tap(){ SND.tok(); showScreen('board'); } },
+  // E49 THE FRONT DOOR IS A HAND — the 5th row is the hall light menuDoor()
+  // has painted since E3: the wedge ∪ the slab it spills from, NEVER the slab
+  // alone (30×67 sm px — half the smallest thing in the room). No pill, no
+  // hint: the light IS the handle, nothing to read. Its footprint enters
+  // BED.blk below like every object's — 15 far-right floor cells, on purpose
+  // (where a tap opens the room, a drop must refuse — the piggy law).
+  { id:'door', hit:{x:966,y:556,w:329,h:170}, px:1090, py:764, nopill:1, label:()=>'',
+    tap(){ SND.tok(); bigEnter(); } },
 ];
 function objHit(e){
   const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // pigHit's own inverse
@@ -7387,6 +7407,254 @@ function drawRoomDog(){
   else { cx.rotate(0.16); cx.translate(-2,3+Math.sin(d.t*10)*1.5); }   // nose to the boards
   drawDog({v:flip,wave:0},ROOM.t,0);
   cx.restore();
+}
+
+/* =====================================================================
+   E49 THE BIG ROOM (NEMO frames 10+11 — THE GALAXY ANSWER). Behind the
+   bedroom door's spilling light is a PLACE, not a list: a room two
+   bedrooms wide in the E26 grammar — boards edge to edge, one model of
+   EACH shipped world standing on the floor at toy-box size, ONE glued
+   oval threading all of them, the stock train touring forever. The tour
+   DWELLS inside each world; whichever model the train is currently
+   INSIDE takes the pick-me — the room points at itself, and a
+   pre-reader taps the thing the train went into. Tap a model → that
+   world through the UNTOUCHED playEnter grammar (a forced entry: mounts
+   exactly that rug, never bumps PLAYI, never saves — §4-B's law, shipped
+   since E17). The station keeps its one-tap surprise byte-true: two
+   doors, two grammars. The screen is a FIXED PAINTING with its own
+   objHit-style inverse — NEVER camGate; no camera, no drags, no words.
+   Models DERIVE from PLAYMAPS + E44's own glyph/sky tables, so a
+   holiday pack's world simply APPEARS standing on the floor the morning
+   its rug ships. Everything here is session furniture: zero saves.
+   ===================================================================== */
+const BIG={t:0,grid:new Map(),hg:new Map(),cars:[],wheel:0,smoke:[],smokeT:0,
+           pause:0,at:-1,arm:'',px:0};
+function bigN(){ return Math.min(PLAY_CYCLE,BIG_CELLS.length); }
+// the per-world dress: wall/trim/roof colours + roof shape + one flourish —
+// every palette lifted from the world's own shipped recipes. An unknown future
+// land falls back to the playroom's wood (the E44 fallback law: never a blank).
+const BIG_DRESS={
+  rug:     {w:'#8f6b3f',t:'#6e5130',r:'#C0392B',shape:'flat',sil(){   // toy blocks by the wall
+             const blk=(bx,by,c,rot)=>{ cx.save(); cx.translate(bx,by); cx.rotate(rot);
+               cx.fillStyle=c; rr(-11,-9,22,18,3); cx.fill(); cx.restore(); };
+             blk(84,26,'#D9A544',0.24); blk(102,34,'#4A6B8A',-0.3); }},
+  west:    {w:'#B48A54',t:'#8a683e',r:'#9A6B3F',shape:'flat',sil(){   // a coil of rope
+             cx.strokeStyle='#C9AE6E'; cx.lineWidth=4.5;
+             cx.beginPath(); cx.arc(88,30,9,0,7); cx.stroke();
+             cx.beginPath(); cx.arc(88,30,4,0,7); cx.stroke(); }},
+  snow:    {w:'#DCE9F4',t:'#9DB6CC',r:'#F4FAFF',shape:'peak',sil(){   // drifts at the feet
+             cx.fillStyle='#F4FAFF';
+             cx.beginPath(); cx.ellipse(-76,34,18,7,0,0,7); cx.fill();
+             cx.beginPath(); cx.ellipse(80,36,22,8,0,0,7); cx.fill(); }},
+  mountain:{w:'#8C9AA6',t:'#5F6E7C',r:'#7D8C99',shape:'peak',cap:1,sil(){   // a granite crag
+             cx.fillStyle='#5F6E7C'; cx.beginPath();
+             cx.moveTo(-92,38); cx.lineTo(-78,8); cx.lineTo(-64,38); cx.closePath(); cx.fill(); }},
+  jungle:  {w:'#3C6236',t:'#2C4827',r:'#4E7F46',shape:'dome',sil(){   // vines off the canopy
+             cx.strokeStyle='#2C4827'; cx.lineWidth=3; cx.lineCap='round'; cx.beginPath();
+             cx.moveTo(-62,-70); cx.quadraticCurveTo(-66,-46,-58,-30);
+             cx.moveTo(58,-74); cx.quadraticCurveTo(64,-50,56,-34); cx.stroke(); cx.lineCap='butt'; }},
+  island:  {w:'#EBD9A9',t:'#C9AE6E',r:'#4FC9CE',shape:'dome',sil(){   // a little white sail
+             cx.fillStyle='#fff'; cx.beginPath();
+             cx.moveTo(84,32); cx.lineTo(84,6); cx.lineTo(100,28); cx.closePath(); cx.fill();
+             cx.strokeStyle='#8a683e'; cx.lineWidth=2;
+             cx.beginPath(); cx.moveTo(84,36); cx.lineTo(84,4); cx.stroke(); }},
+  cloud:   {w:'#F3EFF7',t:'#C9BEDC',r:'#E8DFF2',shape:'dome',sil(){   // a mini rainbow at the shoulder
+             for(let i=0;i<3;i++){ cx.strokeStyle=['#C0392B','#D9A544','#4E7F46'][i];
+               cx.globalAlpha=0.7; cx.lineWidth=3;
+               cx.beginPath(); cx.arc(72,-58,20-i*4,Math.PI,Math.PI*1.6); cx.stroke(); }
+             cx.globalAlpha=1; }},
+  ice:     {w:'#D3EEF4',t:'#8FC3D4',r:'#EAF7FB',shape:'peak',sil(){   // icicles under the eave
+             cx.fillStyle='#EAF7FB';
+             for(const ix of [-58,-46,50,62]){ cx.beginPath();
+               cx.moveTo(ix-4,-54); cx.lineTo(ix,-38); cx.lineTo(ix+4,-54); cx.closePath(); cx.fill(); } }},
+  canyon:  {w:'#C97C4A',t:'#8F4F16',r:'#B3641F',shape:'flat',sil(){   // banded stone walls
+             cx.strokeStyle='#8F4F16'; cx.globalAlpha=0.55; cx.lineWidth=3; cx.beginPath();
+             cx.moveTo(-68,-24); cx.lineTo(-42,-24); cx.moveTo(42,-24); cx.lineTo(68,-24);
+             cx.moveTo(-68,2); cx.lineTo(-42,2); cx.moveTo(42,2); cx.lineTo(68,2);
+             cx.stroke(); cx.globalAlpha=1; }},
+};
+function bigDress(land){ return BIG_DRESS[land]||BIG_DRESS.rug; }
+function bigBuild(){
+  // the one glued oval — REAL pieces in the attract grammar; ring corners wear
+  // the attract oval's own explicit r's (the v56 law: LEGAL is not MATING)
+  BIG.grid.clear(); BIG.hg.clear();
+  const put=(x,y,t,r)=>BIG.grid.set(key(x,y),mkPiece(t,r));
+  const w=BIG_RING.w-1, h=BIG_RING.h-1;
+  put(0,0,'c',1); put(w,0,'c',2); put(w,h,'c',3); put(0,h,'c',0);
+  for(let x=1;x<w;x++){ put(x,0,'s',0); put(x,h,'s',0); }
+  for(let y=1;y<h;y++){ put(0,y,'s',1); put(w,y,'s',1); }
+  RGRID=BIG.grid; HGRID=BIG.hg;
+  try{
+    const loco={cx:1,cy:0,pi:0,dir:1,s:48,el:0};
+    BIG.cars=[{type:'loco',rd:loco,face:1,squash:0}];
+    const tail=['tender','cab'];                       // the stock toy, in the kid's livery
+    for(let i=1;i<=tail.length;i++){
+      const rd=clone(loco); back(rd,GAP*i);
+      BIG.cars.push({type:tail[i-1],rd,face:1,squash:0});
+    }
+    BIG.px=pos(loco).x;
+  } finally { RGRID=grid; HGRID=hgrid; }
+  BIG.t=0; BIG.wheel=0; BIG.smoke.length=0; BIG.smokeT=0;
+  BIG.pause=0; BIG.at=-1; BIG.arm='';
+}
+function bigEnter(){ bigBuild(); showScreen('room'); }   // fresh tour every visit — the tide law
+function bigTick(dt){
+  BIG.t+=dt;
+  RGRID=BIG.grid; HGRID=BIG.hg;
+  try{
+    if(BIG.pause>0) BIG.pause=Math.max(0,BIG.pause-dt);   // standing INSIDE a world — the dwell IS the pick-me
+    else{
+      const step=ATT_SPEED*dt;
+      attRun(BIG.cars,step); BIG.wheel+=step/8;
+      const p=pos(BIG.cars[0].rd);
+      BIG.at=-1;
+      for(let i=0;i<bigN();i++){ const [mx,my]=BIG_CELLS[i];
+        const cx0=GX+mx*C+48, cy0=GY+my*C+48;
+        if(Math.abs(p.y-cy0)<40&&Math.abs(p.x-cx0)<=64){
+          BIG.at=i;
+          const k2=key(mx,my);   // center-crossing arms the dwell once per visit (the stKey grammar)
+          if(BIG.arm!==k2&&(BIG.px-cx0)*(p.x-cx0)<=0){ BIG.pause=BIG_DWELL; BIG.arm=k2; }
+          break;
+        }
+      }
+      if(BIG.at<0) BIG.arm='';
+      BIG.px=p.x;
+    }
+    BIG.smokeT-=dt;   // the menu oval's puff math, deterministic (the frozen-clock law: no Math.random in the room)
+    if(BIG.smokeT<=0){
+      BIG.smokeT=0.34;
+      const loco=BIG.cars[0], p=pos(loco.rd);
+      const artAng=p.ang+(loco.face<0?Math.PI:0);
+      const flip=Math.cos(artAng)<0;
+      const lx=18*KART, ly=(flip?28:-28)*KART;
+      const ca=Math.cos(artAng), sa=Math.sin(artAng);
+      BIG.smoke.push({ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly, t:0, dur:1.2,
+                       vx:Math.sin(BIG.t*7)*6, vy:-30, r:3+(BIG.t*3.7%1)*2 });
+    }
+  } finally { RGRID=grid; HGRID=hgrid; }
+  for(const s of BIG.smoke){ s.t+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy-=8*dt; }
+  for(let i=BIG.smoke.length-1;i>=0;i--) if(BIG.smoke[i].t>=BIG.smoke[i].dur) BIG.smoke.splice(i,1);
+}
+function bigFloor(){
+  // the bedroom's board recipe, tiled at room size (menuFloor's own palette)
+  const v={ x0:Math.min(0,(0-OX)/SC)-2,   y0:Math.min(0,(0-OY)/SC)-2,
+            x1:Math.max(RM_W,(W-OX)/SC)+2, y1:Math.max(RM_H,(H-OY)/SC)+2 };
+  cx.fillStyle='#C8A170'; cx.fillRect(v.x0,0,v.x1-v.x0,v.y1);
+  if(v.y0<0){   // the far wall steps in above the boards (the E26 portrait law)
+    cx.fillStyle='#E9DFC6'; cx.fillRect(v.x0,v.y0,v.x1-v.x0,-v.y0);
+    cx.fillStyle='#8f6b3f'; cx.fillRect(v.x0,-16,v.x1-v.x0,16);
+    cx.fillStyle='#6e5130'; cx.fillRect(v.x0,-4,v.x1-v.x0,4);
+  }
+  cx.strokeStyle='#B08A58'; cx.globalAlpha=0.6; cx.lineWidth=3.4;
+  cx.beginPath(); for(let y=104;y<v.y1;y+=104){ cx.moveTo(v.x0,y); cx.lineTo(v.x1,y); }
+  cx.lineWidth=2.7;
+  for(let y=0;y<v.y1;y+=104){   // plank butts: deterministic per row band (frozen-clock law)
+    const off=(((y/104)|0)*137)%296;
+    for(let x=Math.floor(v.x0/296)*296+off; x<v.x1; x+=296){ cx.moveTo(x,y); cx.lineTo(x,Math.min(y+104,v.y1)); }
+  }
+  cx.stroke(); cx.globalAlpha=1;
+}
+function bigDoorHome(){
+  // the way home — the bedroom's own light, spilling in from the LEFT (you came
+  // from there); menuDoor's recipe, mirrored. The light is the handle here too.
+  const g=cx.createLinearGradient(64,0,330,0);
+  g.addColorStop(0,'rgba(255,246,220,0.5)'); g.addColorStop(0.5,'rgba(255,246,220,0.2)'); g.addColorStop(1,'rgba(255,246,220,0)');
+  cx.fillStyle=g; cx.beginPath();
+  cx.moveTo(64,556); cx.lineTo(330,588); cx.lineTo(330,704); cx.lineTo(64,726); cx.closePath(); cx.fill();
+  cx.fillStyle='#3a2c1c'; rr(-10,560,74,162,8); cx.fill();
+}
+function bigModelRect(i){   // painting-space bbox — the hand's target, generous
+  const [mx,my]=BIG_CELLS[i];
+  const px=BIG_OX+(mx*C+48)*ATT_SCALE, py=BIG_OY+(my*C+48)*ATT_SCALE;
+  return { x:px-95*ATT_SCALE, y:py-180*ATT_SCALE, w:190*ATT_SCALE, h:224*ATT_SCALE };
+}
+function bigModelBack(i){
+  // the world's own sky, standing behind the line — the train drives INTO it
+  const [mx,my]=BIG_CELLS[i], m=PLAYMAPS[i]||{};
+  const x0=GX+mx*C+48, y0=GY+my*C+48;
+  cx.fillStyle=BOARD_SKY[m.land]||'#F3E6C0'; rr(x0-54,y0-64,108,92,8); cx.fill();
+  if(BIG.at===i){   // warm hearth-light while the train stands inside
+    const g=cx.createRadialGradient(x0,y0-16,4,x0,y0-16,74);
+    g.addColorStop(0,'rgba(255,246,220,0.55)'); g.addColorStop(1,'rgba(255,246,220,0)');
+    cx.fillStyle=g; cx.fillRect(x0-74,y0-90,148,116);
+  }
+}
+function bigModelFront(i){
+  const [mx,my]=BIG_CELLS[i], m=PLAYMAPS[i]||{};
+  const d=bigDress(m.land);
+  cx.save(); cx.translate(GX+mx*C+48,GY+my*C+48);
+  if(BIG.at===i){   // the pick-me BREATHES — motion reads across the room at any fit
+    const k2=1+0.04*Math.sin(BIG.t*3);
+    cx.translate(0,38); cx.scale(k2,k2); cx.translate(0,-38);
+  }
+  cx.globalAlpha=0.22; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(0,38,88,10,0,0,7); cx.fill(); cx.globalAlpha=1;
+  // the arch the line runs through: two side walls…
+  cx.fillStyle=d.w; rr(-68,-56,26,94,6); cx.fill(); rr(42,-56,26,94,6); cx.fill();
+  cx.strokeStyle=d.t; cx.lineWidth=2.5; rr(-68,-56,26,94,6); cx.stroke(); rr(42,-56,26,94,6); cx.stroke();
+  // …and the roof, by shape
+  cx.fillStyle=d.r; cx.strokeStyle=d.t; cx.lineWidth=2.5;
+  if(d.shape==='peak'){
+    cx.beginPath(); cx.moveTo(-78,-56); cx.lineTo(0,-112); cx.lineTo(78,-56); cx.closePath();
+    cx.fill(); cx.stroke();
+    if(d.cap){ cx.fillStyle='#F4FAFF'; cx.beginPath();
+      cx.moveTo(-24,-95); cx.lineTo(0,-112); cx.lineTo(24,-95);
+      cx.quadraticCurveTo(8,-100,0,-94); cx.quadraticCurveTo(-8,-100,-24,-95);
+      cx.closePath(); cx.fill(); }
+  } else if(d.shape==='dome'){
+    cx.beginPath(); cx.ellipse(0,-56,78,46,0,Math.PI,0); cx.closePath();
+    cx.fill(); cx.stroke();
+  } else {
+    rr(-78,-96,156,40,7); cx.fill(); cx.stroke();
+  }
+  d.sil&&d.sil();   // the world's one flourish
+  // the brow sign — E44's postcard, miniaturized: signed with a PICTURE
+  const pic=BOARD_PIC[m.land]||'tree', sky=BOARD_SKY[m.land]||'#F3E6C0';
+  cx.fillStyle='#8f6b3f'; rr(-28,-158,56,46,6); cx.fill();
+  cx.strokeStyle='#6e5130'; cx.lineWidth=2.5; rr(-28,-158,56,46,6); cx.stroke();
+  cx.fillStyle=sky; rr(-23,-153,46,36,4); cx.fill();
+  cx.save(); cx.beginPath(); rr(-23,-153,46,36,4); cx.clip();
+  cx.translate(0,-131); cx.scale(0.55,0.55);
+  const wv=BIG.at===i? 0.5+0.5*Math.sin(BIG.t*4) : 0;   // the glyph WAVES its shipped charm pose
+  drawScenItem({t:pic,v:0,ra:null,pop:0,wave:wv},-C/2,-C/2,BIG.at===i? BIG.t:1.2);
+  cx.restore();
+  if(BIG.at===i){ const tw=0.75+0.25*Math.sin(BIG.t*6);   // the star glint — the pick-me's crown
+    star5(0,-176,tw*1.9,'#F2C531'); }
+  cx.restore();
+}
+function drawBig(){
+  cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cvs.width,cvs.height);
+  cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
+  bigFloor();
+  bigDoorHome();
+  cx.save();
+  cx.translate(BIG_OX,BIG_OY); cx.scale(ATT_SCALE,ATT_SCALE); cx.translate(-GX,-GY);
+  RGRID=BIG.grid; HGRID=BIG.hg;
+  try{
+    for(let i=0;i<bigN();i++) bigModelBack(i);     // world skies, behind the line
+    drawTrack(BIG.grid);
+    drawCarsOnRails(BIG.cars,BIG.wheel);
+    for(const s of BIG.smoke){ const k=s.t/s.dur;
+      cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb';
+      cx.beginPath(); cx.arc(s.x,s.y,s.r+9*k,0,7); cx.fill(); }
+    cx.globalAlpha=1;
+    for(let i=0;i<bigN();i++) bigModelFront(i);    // arches in front — the train is INSIDE
+  } finally { RGRID=grid; HGRID=hgrid; }
+  cx.restore();
+}
+function bigDown(e){
+  // the room's whole hand: model taps + the way home. Answered at pointerdown
+  // with the expiring swallow (the E26 tap's-tail law). No drags, no camera.
+  ac(); e.preventDefault();
+  const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // the fixed painting's own inverse
+  if(mx>=BIG_DOOR.x&&mx<=BIG_DOOR.x+BIG_DOOR.w&&my>=BIG_DOOR.y&&my<=BIG_DOOR.y+BIG_DOOR.h){
+    SND.tok(); showScreen('menu'); tapSwallow(); return;
+  }
+  for(let i=0;i<bigN();i++){ const r2=bigModelRect(i);
+    if(mx>=r2.x&&mx<=r2.x+r2.w&&my>=r2.y&&my<=r2.y+r2.h){
+      SND.tok(); playEnter(i); tapSwallow(); return;   // the UNTOUCHED forced-entry grammar: no cycle bump, no save
+    }
+  }
 }
 
 /* =====================================================================
@@ -8079,7 +8347,7 @@ function drawMenu(){
   drawRoomDog();   // E26: the gag trots in FRONT of the furniture, under the labels
   menuWeather();   // E37 THE ROOM SKY — over the room, under the labels (clear = zero paint)
   // E26: the pills — furniture labels, painted like the piggy: always on, never shy
-  for(const o of ROOM_OBJS) drawPill(o.px,o.py,o.label());
+  for(const o of ROOM_OBJS) if(!o.nopill) drawPill(o.px,o.py,o.label());   // E49: the door wears no label — the light is the handle
   if(MENU_PROPS.includes('sign')){
     // E18 THE SHY UI: the painted title fades with the DOM chrome. An untouched
     // menu holds a===1 and paints the sign exactly as before — byte-identical.
@@ -9463,6 +9731,7 @@ function swRotate(gx,gy){
 }
 cvs.addEventListener('pointerdown',e=>{
   if(SCREEN!=='game'&&SCREEN!=='play'){          // the menu room is furniture + a live floor (E18→E26)
+    if(SCREEN==='room'){ bigDown(e); return; }   // E49: the big room — models + the way home, nothing else
     if(SCREEN==='menu'&&!DRAG&&!down&&pigHit(e)){ e.preventDefault(); pigTap(); return; }   // E23: the piggy answers first
     if(SCREEN==='menu'&&!DRAG&&!down){
       const o=objHit(e);                         // E26: then the furniture — station · box · shop · board
@@ -10743,7 +11012,7 @@ function showScreen(s){
   document.body.classList.toggle('playshelf',play);      // E36 THE TRAIN SHELF: five trains, always out, no door
   toastSeat();          // E36: the coach line seats above the shelf on the wind-up rug
   $('mark').style.display=(game||play)?'block':'none';
-  $('menuChip').style.display=((game&&!CAMP.on)||play)?'block':'none';
+  $('menuChip').style.display=((game&&!CAMP.on)||play||s==='room')?'block':'none';   // E49: the big room shows the way home too
   $('backChip').style.display=(game&&CAMP.on)?'block':'none';
   // E9: the ★ chip lives top-right in BUILD and PLAY (the campaign keeps its quiet HUD)
   $('starChip').style.display=((game&&!CAMP.on)||play)?'block':'none';
@@ -11653,6 +11922,9 @@ function resize(){
   // E10: the rug screens ride THE CAMERA (fit by default — the old letterbox to
   // the pixel); the bedroom + board are a fixed painting at MENU_W×MENU_H.
   if(SCREEN==='game'||SCREEN==='play') viewResize();
+  else if(SCREEN==='room'){   // E49: the big room is its own fixed painting — own fit, never camGate
+    SC=Math.min(W/RM_W,H/RM_H); OX=(W-RM_W*SC)/2; OY=(H-RM_H*SC)/2;
+  }
   else {
     SC=Math.min(W/MENU_W,(H-BAR)/MENU_H); OX=(W-MENU_W*SC)/2; OY=(H-BAR-MENU_H*SC)/2;
     bedBounds();   // E23: the bedroom floor is every cell the screen can hold — re-derived here
@@ -11693,12 +11965,13 @@ function frame(t){
   if(TS.auto){
     if(SCREEN==='game') update(dt);
     else if(SCREEN==='play'){ update(dt); playUpdate(dt); }             // the shared juice + the wind-up trains
+    else if(SCREEN==='room') bigTick(dt);                               // E49: the big room's tour (dt only — frozen-clock safe)
     else menuUpdate(dt);                                                // the board keeps the bedroom alive behind it
   }
   if(DRAG) withBed(dragSync);          // E19: the lift ramp is paint-time — it rises under a still finger
   shyGameSync();                       // E25: the shy fold reads the live hand every frame
   tboxBreath(t);                       // E25: the idle lid sigh — paint only, never a save
-  if(SCREEN==='game'||SCREEN==='play') draw(); else drawMenu();
+  if(SCREEN==='game'||SCREEN==='play') draw(); else if(SCREEN==='room') drawBig(); else drawMenu();
   if($('store').style.display==='flex') aisleFrame();   // E13: the aisle's live cards (visible ones only)
   requestAnimationFrame(frame);
 }
@@ -11799,6 +12072,25 @@ window.TS={
       ROOMWX='clear'; WXR.key=null;
       if(SCREEN==='menu'||SCREEN==='board'){ BED.on=false; bedScreen(SCREEN); }
       return true; },
+  },
+  // E49 — the big-room rig: the tour's whole state (model rects in painting
+  // space, the dwell, the loco), the two doors, and a model tap that walks the
+  // REAL playEnter(i) path. Deterministic: the room rides dt only.
+  big:{
+    enter(){ bigEnter(); return SCREEN; },
+    door(){ if(SCREEN==='room') showScreen('menu'); return SCREEN; },
+    tap(i){ if(SCREEN!=='room'||i<0||i>=bigN()) return false; playEnter(i); return true; },
+    state(){ RGRID=BIG.grid; HGRID=BIG.hg;
+      try{ const p=BIG.cars.length? pos(BIG.cars[0].rd) : null;
+        return { on:SCREEN==='room', t:+BIG.t.toFixed(3), at:BIG.at,
+          pause:+BIG.pause.toFixed(3), dwell:BIG_DWELL, n:bigN(),
+          loco:p? {x:+p.x.toFixed(1), y:+p.y.toFixed(1)} : null,
+          fit:{ sc:SC, ox:OX, oy:OY, w:RM_W, h:RM_H },
+          door:{...BIG_DOOR},
+          models:BIG_CELLS.slice(0,bigN()).map((c2,i2)=>({ i:i2, cell:c2.slice(),
+            land:(PLAYMAPS[i2]||{}).land, name:(PLAYMAPS[i2]||{}).name,
+            rect:bigModelRect(i2) })) };
+      } finally { RGRID=grid; HGRID=hgrid; } },
   },
   // E23 — THE predicate, asked from inside the bedroom wrapper (what the ghost
   // tint and the drop see on the menu floor). Battery doors, mutation-free.
