@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v5.3 -->
+<!-- TRAINSET v5.4 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -1844,6 +1844,20 @@ const PLAT=new Map();         // "cx,cy:el" -> {n, t, wv} — the platform's wai
 let BOARDERS=[];              // walk tweens {x0,y0,x1,y1,t,dur,col,kind:'board'|'leave',car}
 const RIDERS={pose:null,poseT:0,pri:0};   // ONE pose timer per train — poses are paint
 const WAIT_SLOTS=[-26,-8,10]; // waiter spots on the platform (the stationmaster keeps 26)
+/* E45 THE CAB FRIEND — her first train has a friend in it. One honey teddy
+   waits at HER STOP; tap the train while the engine stands there (the whistle
+   tap, unchanged — the toot IS the "all aboard!") and the teddy chases the
+   cab and hops in. THE SEAT THE CHILD FILLS: nothing ever automates it —
+   arrivals come empty, waiters never board an engine (RIDER_CAP has no
+   engine entry), and the teddy leaves only when the train goes home.
+   Machinery like the waiters: never in scen, never saved, never counted
+   (THE FIFTY STAY FIFTY). BUILD + campaign only; PLAY and the bedroom never. */
+let CAB_FRIEND=true;          // the whole feature — false and the teddy was never here
+const FRIEND={at:null,aboard:false};   // at = platform key of her stop; per-run, NEVER saved
+const friendOn=()=>CAB_FRIEND&&FRIEND.aboard;
+const TED_COL='#C9985C';      // molded-plastic honey
+const TED_EYE='#4A3620';
+const TED_SPOT=[-38,29];      // her platform spot — left end, beside the flag post
 function aboardN(cars){ let n=0; for(const c of cars) n+=c.rid|0; return n; }
 function poseSet(p,t,pri){
   if(RIDERS.poseT>0 && RIDERS.pri>pri) return;
@@ -1851,7 +1865,7 @@ function poseSet(p,t,pri){
 }
 function poseReset(){ RIDERS.pose=null; RIDERS.poseT=0; RIDERS.pri=0; }
 function riderYay(){          // the downhill whoosh — arms UP + a tiny yay (riders only)
-  if(!aboardN(TRAIN.cars)) return;
+  if(!aboardN(TRAIN.cars)&&!friendOn()) return;   // E45: the teddy counts — she rides day one
   poseSet('up',1.8,3); SND.yay();
 }
 // stations own their waiters: one record per placed station, regrown one waiter
@@ -1873,6 +1887,13 @@ function platTick(dt){
     const pc=+pk.slice(i+1)? hgrid.get(k) : grid.get(k);
     if(!pc||pc.t!=='st') PLAT.delete(pk);
   }
+  // E45 THE RE-HOME LAW: a teddy who is nowhere waits at the first station on
+  // the rug (grid-scan order, deterministic); her stop leaving the rug clears
+  // her the same way. PLAY never — the tray trains aren't hers.
+  if(CAB_FRIEND&&!PLAY.on&&!FRIEND.aboard){
+    if(FRIEND.at&&!PLAT.has(FRIEND.at)) FRIEND.at=null;
+    if(!FRIEND.at&&PLAT.size) FRIEND.at=PLAT.keys().next().value;
+  }
 }
 function platSlotXY(pk,i){    // waiter slot i of platform pk, in world px
   const ci=pk.lastIndexOf(':'), k=pk.slice(0,ci), el=+pk.slice(ci+1);
@@ -1881,6 +1902,36 @@ function platSlotXY(pk,i){    // waiter slot i of platform pk, in world px
   const r=pc? pc.r:0, vx=WAIT_SLOTS[i%WAIT_SLOTS.length], vy=28;
   const R=[[vx,vy],[-vy,vx],[-vx,-vy],[vy,-vx]][r%4];
   return { x:GX+gx*C+C/2+R[0], y:GY+gy*C+C/2+R[1]-LIFT*el };
+}
+// E45: the teddy's spot on platform pk, in world px (platSlotXY's rotation law)
+function platTedXY(pk){
+  const ci=pk.lastIndexOf(':'), k=pk.slice(0,ci), el=+pk.slice(ci+1);
+  const [gx,gy]=k.split(',').map(Number);
+  const pc=el? hgrid.get(k) : grid.get(k);
+  const r=pc? pc.r:0, vx=TED_SPOT[0], vy=TED_SPOT[1];
+  const R=[[vx,vy],[-vy,vx],[-vx,-vy],[vy,-vx]][r%4];
+  return { x:GX+gx*C+C/2+R[0], y:GY+gy*C+C/2+R[1]-LIFT*el };
+}
+function nearestPlatPk(x,y){  // the closest platform to a world point (null if none)
+  let best=null,bd=1e9;
+  for(const pk of PLAT.keys()){
+    const p=platTedXY(pk), d=Math.hypot(p.x-x,p.y-y);
+    if(d<bd){ bd=d; best=pk; }
+  }
+  return best;
+}
+// E45 — tap the train while the engine stands at her stop: the teddy runs for
+// the cab. The CHILD fills the seat; this is the only door in the game.
+function friendTry(){
+  if(!CAB_FRIEND||BED.ctx||SCREEN!=='game'||PLAY.on) return false;
+  if(!TRAIN.placed||!TRAIN.cars.length||FRIEND.aboard||!FRIEND.at) return false;
+  if(BOARDERS.some(b=>b.kind==='fb')) return false;   // she's already running
+  const lc=TRAIN.cars[0].rd;
+  if(key(lc.cx,lc.cy)+':'+(lc.el?1:0)!==FRIEND.at) return false;
+  const s2=platTedXY(FRIEND.at), cp=pos(lc);
+  BOARDERS.push({ x0:s2.x, y0:s2.y, x1:cp.x, y1:cp.y-LIFT*(cp.z||0),
+    t:0, dur:0.55, col:TED_COL, kind:'fb', car:null });
+  return true;
 }
 // BOARDING RIDES THE PAUSE. Arrivals step off onto THIS platform first (walk-away
 // tween, then absorbed — ambient people never accumulate), then the platform's
@@ -1916,14 +1967,21 @@ function pendingFor(c){ let n=0; for(const b of BOARDERS) if(b.kind==='board'&&b
 function boardTick(dt){
   let done=false;
   for(const b of BOARDERS){
+    // E45: the teddy CHASES — her target is wherever the cab is now, so a
+    // train that pulls away mid-run gets caught (trainHome kills the run)
+    if(b.kind==='fb'&&TRAIN.placed&&TRAIN.cars.length){
+      const cp=pos(TRAIN.cars[0].rd); b.x1=cp.x; b.y1=cp.y-LIFT*(cp.z||0);
+    }
     b.t+=dt;
     if(b.t>=b.dur){ done=true;
-      if(b.kind==='board'&&b.car&&(b.car.rid|0)<RIDER_CAP[b.car.type]) b.car.rid=(b.car.rid|0)+1; }
+      if(b.kind==='board'&&b.car&&(b.car.rid|0)<RIDER_CAP[b.car.type]) b.car.rid=(b.car.rid|0)+1;
+      else if(b.kind==='fb'){ FRIEND.aboard=true; FRIEND.at=null; } }   // E45: she's in
   }
   if(done) BOARDERS=BOARDERS.filter(b=>b.t<b.dur);
   if(RIDERS.poseT>0){ RIDERS.poseT-=dt; if(RIDERS.poseT<=0) poseReset(); }
 }
-function ridersOff(){ PLAT.clear(); BOARDERS=[]; poseReset(); }
+function ridersOff(){ PLAT.clear(); BOARDERS=[]; poseReset();
+  FRIEND.at=null; FRIEND.aboard=false; }   // E45: each room re-homes its own teddy
 // the little walkers between platform and train — drawn on the ground layer
 function drawBoarders(){
   if(!BOARDERS.length) return;
@@ -1936,11 +1994,26 @@ function drawBoarders(){
     cx.globalAlpha=Math.min(1,Math.min(k,1-k)*6+0.15);
     cx.scale(0.8,0.8);
     const step2=Math.sin(k*22)*4;
-    cx.strokeStyle=b.col; cx.fillStyle=b.col; cx.lineWidth=5.6; cx.lineCap='round'; cx.lineJoin='round';
-    cx.beginPath(); cx.arc(0,-13,5.6,0,7); cx.fill();
-    cx.beginPath(); cx.moveTo(0,-8); cx.lineTo(0,6); cx.stroke();
-    cx.beginPath(); cx.moveTo(0,6); cx.lineTo(-5+step2,20); cx.moveTo(0,6); cx.lineTo(5-step2,20); cx.stroke();
-    cx.beginPath(); cx.moveTo(0,-5); cx.lineTo(-6,3); cx.moveTo(0,-5); cx.lineTo(6,3); cx.stroke();
+    if(b.kind==='fb'||b.kind==='fl'){
+      // E45: the teddy runs — round body, round head, two round ears
+      cx.strokeStyle=TED_COL; cx.fillStyle=TED_COL; cx.lineWidth=4.4; cx.lineCap='round'; cx.lineJoin='round';
+      cx.beginPath(); cx.moveTo(-3,9); cx.lineTo(-4+step2*0.7,19); cx.moveTo(3,9); cx.lineTo(4-step2*0.7,19); cx.stroke();
+      cx.beginPath(); cx.ellipse(0,3,6.5,8,0,0,7); cx.fill();
+      cx.lineWidth=4;
+      cx.beginPath(); cx.moveTo(-5,-1); cx.lineTo(-9,3+step2*0.5); cx.moveTo(5,-1); cx.lineTo(9,3-step2*0.5); cx.stroke();
+      cx.beginPath(); cx.arc(-4.5,-16,2.6,0,7); cx.fill();
+      cx.beginPath(); cx.arc(4.5,-16,2.6,0,7); cx.fill();
+      cx.beginPath(); cx.arc(0,-11,6,0,7); cx.fill();
+      cx.fillStyle=TED_EYE;
+      cx.beginPath(); cx.arc(-2,-11.5,0.9,0,7); cx.fill();
+      cx.beginPath(); cx.arc(2,-11.5,0.9,0,7); cx.fill();
+    } else {
+      cx.strokeStyle=b.col; cx.fillStyle=b.col; cx.lineWidth=5.6; cx.lineCap='round'; cx.lineJoin='round';
+      cx.beginPath(); cx.arc(0,-13,5.6,0,7); cx.fill();
+      cx.beginPath(); cx.moveTo(0,-8); cx.lineTo(0,6); cx.stroke();
+      cx.beginPath(); cx.moveTo(0,6); cx.lineTo(-5+step2,20); cx.moveTo(0,6); cx.lineTo(5-step2,20); cx.stroke();
+      cx.beginPath(); cx.moveTo(0,-5); cx.lineTo(-6,3); cx.moveTo(0,-5); cx.lineTo(6,3); cx.stroke();
+    }
     cx.restore();
   }
   cx.restore();
@@ -1958,6 +2031,27 @@ function drawWaiter(px,py,col,t,ph,wav){
   else cx.lineTo(6,-12+wob*3);
   cx.stroke();
   cx.beginPath(); cx.moveTo(0,4); cx.lineTo(-4,11); cx.moveTo(0,4); cx.lineTo(4,11); cx.stroke();
+  cx.lineCap='butt'; cx.restore();
+}
+// E45: the teddy who waits — molded-plastic law, honey, round ears. She bobs
+// gently; when the platform waves (p.wv) she waves too.
+function drawTeddy(px,py,t,wav){
+  cx.save(); cx.translate(px,py+Math.sin(t*2.4)*0.6);
+  cx.strokeStyle=TED_COL; cx.fillStyle=TED_COL; cx.lineWidth=4; cx.lineCap='round'; cx.lineJoin='round';
+  cx.beginPath(); cx.moveTo(-3,4); cx.lineTo(-4,11); cx.moveTo(3,4); cx.lineTo(4,11); cx.stroke();
+  cx.beginPath(); cx.ellipse(0,-1,5.5,6.5,0,0,7); cx.fill();
+  cx.lineWidth=3.6;
+  cx.beginPath(); cx.moveTo(-4.5,-4); cx.lineTo(-8,0); cx.stroke();
+  cx.beginPath(); cx.moveTo(4.5,-4);
+  if(wav) cx.lineTo(7,-14+Math.sin(t*11)*3);   // the CHARM-LAW wave, hers too
+  else cx.lineTo(8,0);
+  cx.stroke();
+  cx.beginPath(); cx.arc(-3.8,-15.3,2.2,0,7); cx.fill();
+  cx.beginPath(); cx.arc(3.8,-15.3,2.2,0,7); cx.fill();
+  cx.beginPath(); cx.arc(0,-11,5,0,7); cx.fill();
+  cx.fillStyle=TED_EYE;
+  cx.beginPath(); cx.arc(-1.8,-11.5,0.8,0,7); cx.fill();
+  cx.beginPath(); cx.arc(1.8,-11.5,0.8,0,7); cx.fill();
   cx.lineCap='butt'; cx.restore();
 }
 
@@ -2325,12 +2419,23 @@ function placeTrainAt(cxl,cyl,prefEl){
   return true;
 }
 function trainHome(quiet){
+  // E45: the teddy hops down BEFORE the train vanishes — she walks to the
+  // nearest platform and that becomes her stop (no stations = indoors until
+  // one lands; the re-home law watches for it)
+  const fp=(friendOn()&&!BED.ctx&&TRAIN.placed&&TRAIN.cars.length)? pos(TRAIN.cars[0].rd) : null;
   if(TRAIN.placed && !quiet){ for(const c of TRAIN.cars){ const p=pos(c.rd); puff(p.x,p.y-8-LIFT*(p.z||0),16); } SND.pop(); }
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[];
   trailClear();                // E28: home = gone — a grab-off keeps its fade, home doesn't
   for(const pc of grid.values()) pc.latch=null;
   for(const pc of hgrid.values()) pc.latch=null;
   BOARDERS=[]; poseReset();    // E15: riders live per-run — home = everyone's out
+  if(fp){
+    FRIEND.aboard=false;
+    FRIEND.at=nearestPlatPk(fp.x,fp.y);
+    if(FRIEND.at){ const s2=platTedXY(FRIEND.at);
+      BOARDERS.push({ x0:fp.x, y0:fp.y-LIFT*(fp.z||0), x1:s2.x, y1:s2.y,
+        t:0, dur:0.55, col:TED_COL, kind:'fl', car:null }); }
+  }
   shelfSync();
 }
 function reverseTrain(){
@@ -2426,10 +2531,10 @@ function update(dt){
         // pose timer per train): through a tunnel they duck, over a bridge they
         // look down, at a charmed scene they wave BACK at the ground people. The
         // downhill arms-up (+ SND.yay) rides the crest whoosh in gravTick.
-        if(aboardN(TRAIN.cars)){
+        if(aboardN(TRAIN.cars)||friendOn()){   // E45: the teddy counts from day one
           if(charmed) poseSet('wave',1.3,1);
           let tun=false, brg=false;
-          for(const c of TRAIN.cars){ if(!(c.rid>0)) continue;
+          for(const c of TRAIN.cars){ if(!(c.rid>0)&&!(friendOn()&&c===TRAIN.cars[0])) continue;
             const p2=pieceOf(c.rd); if(p2){ if(p2.t==='tun') tun=true; else if(p2.t==='br') brg=true; } }
           if(tun) poseSet('duck',0.4,4);
           else if(brg) poseSet('look',0.4,2);
@@ -6009,6 +6114,12 @@ function drawPieceDecor(pc,ox,oy){
       for(let i=0;i<pl.n;i++)
         drawWaiter(WAIT_SLOTS[i%WAIT_SLOTS.length],28,PPL_COLS[i%PPL_COLS.length],t2,i*2.1,pl.wv>0);
     }
+    // E45: the teddy waits at HER stop — the game rug only (icons/ghosts/shop
+    // cards compute foreign keys and stay byte-true; the menu + PLAY are gated
+    // outright; while she's walking, the walker is the only teddy on the rug)
+    if(CAB_FRIEND&&SCREEN==='game'&&!PLAY.on&&!FRIEND.aboard&&FRIEND.at===pk2
+       &&!BOARDERS.some(b=>b.kind==='fb'||b.kind==='fl'))
+      drawTeddy(TED_SPOT[0],TED_SPOT[1],perf(),pl? pl.wv>0:false);
     cx.restore();
   }
   if(pc.t==='br'){
@@ -6091,6 +6202,28 @@ function flatRider(x,pose,i){          // a sat little figure on the flatcar's l
   else { cx.beginPath(); cx.moveTo(x,hy+6); cx.lineTo(x+5,hy+9); cx.stroke(); }
   cx.lineCap='butt';
 }
+// E45: the teddy in the engine's own cab window — head + ears over the cream
+// glass, in the train's one pose. (wx,wy) = the window's centre per engine.
+function engFriend(pose,wx,wy){
+  cx.fillStyle=TED_COL; cx.strokeStyle=TED_COL; cx.lineCap='round';
+  if(pose==='duck'){   // just the top of a round head above the sill
+    cx.beginPath(); cx.arc(wx,-11.8,3,Math.PI,0); cx.closePath(); cx.fill();
+    cx.lineCap='butt'; return;
+  }
+  const hy=pose==='look'? wy+2 : wy+0.3;
+  cx.beginPath(); cx.arc(wx-2.6,hy-3.4,1.6,0,7); cx.fill();
+  cx.beginPath(); cx.arc(wx+2.6,hy-3.4,1.6,0,7); cx.fill();
+  cx.beginPath(); cx.arc(wx,hy,3.4,0,7); cx.fill();
+  if(pose==='up'){ cx.lineWidth=2;
+    cx.beginPath(); cx.moveTo(wx-2.6,hy+2); cx.lineTo(wx-4.8,hy-6.5);
+    cx.moveTo(wx+2.6,hy+2); cx.lineTo(wx+4.8,hy-6.5); cx.stroke(); }
+  else if(pose==='wave'){ cx.lineWidth=2;
+    cx.beginPath(); cx.moveTo(wx+2.6,hy+2); cx.lineTo(wx+4.6,hy-5.5+Math.sin(perf()*11)*1.5); cx.stroke(); }
+  cx.fillStyle=TED_EYE;
+  cx.beginPath(); cx.arc(wx-1.2,hy+0.2,0.7,0,7); cx.fill();
+  cx.beginPath(); cx.arc(wx+1.2,hy+0.2,0.7,0,7); cx.fill();
+  cx.lineCap='butt';
+}
 function cabRider(pose){               // one rider up in the caboose cupola
   const col=PPL_COLS[2];
   cx.fillStyle=col; cx.strokeStyle=col; cx.lineCap='round';
@@ -6146,6 +6279,7 @@ function drawCar(type,x,y,artAng,squash,wrot,liv,z,fd,rid,pose){
     cx.fillStyle='#F7E9C4'; rr(-31,-22,12,10,2); cx.fill();
     cx.fillStyle='#F2C531'; cx.beginPath(); cx.arc(30,1,6,0,7); cx.fill();
     cx.strokeStyle='#8a6a1e'; cx.lineWidth=1.5; cx.beginPath(); cx.arc(30,1,6,0,7); cx.stroke();
+    if(rid>0) engFriend(pose,-25,-16.3);   // E45: the cab friend — rid rides from trainCarItems ONLY
   } else if(type==='tender'){
     wheel(-18,8,wrot); wheel(18,8,wrot);
     cx.fillStyle=liv.m; rr(-32,-14,64,30,5); cx.fill();
@@ -6265,6 +6399,7 @@ function drawCar(type,x,y,artAng,squash,wrot,liv,z,fd,rid,pose){
     cx.beginPath(); cx.moveTo(-2,-13); cx.lineTo(-2,14); cx.moveTo(20,-13); cx.lineTo(20,14); cx.stroke();
     cx.fillStyle='#F2C531'; cx.beginPath(); cx.arc(36,0,6,0,7); cx.fill();
     cx.strokeStyle='#8a6a1e'; cx.lineWidth=1.5; cx.beginPath(); cx.arc(36,0,6,0,7); cx.stroke();
+    if(rid>0) engFriend(pose,-31.5,-17);   // E45: the BIG EXPRESS seats her too
   }
   cx.restore();
 }
@@ -6311,7 +6446,9 @@ function trainCarItems(){
   for(let i=TRAIN.cars.length-1;i>=0;i--){
     const c=TRAIN.cars[i], p=carPose(c), liv=livFor(i);
     const artAng=p.ang+(c.face<0?Math.PI:0);
-    const rid=RIDER_CAP[c.type]!=null? (c.rid|0) : undefined;   // E15: real occupancy on the rug
+    const rid=RIDER_CAP[c.type]!=null? (c.rid|0)
+             : (i===0&&friendOn()? 1 : undefined);   // E15: real occupancy on the rug · E45: the
+                                                     // engine's window seat — THIS SEAM ONLY (17-site law)
     items.push({z:p.z+0.05, fn:()=>drawCar(c.type,p.x,p.y,artAng,c.squash||0,wheelPhase*(c.face<0?-1:1),liv,p.z,undefined,rid,ps)});
   }
   return items;
@@ -9429,6 +9566,7 @@ function upCore(e){
     // pool and the train are the bedroom's); in BUILD this is byte-identical.
     if(down.what==='loco'||down.what==='tcar'){ const sp=BED.ctx? bedRun(stackPuff):stackPuff;
       SND.whistle(); (BED.ctx? bedRun(whistleVent):whistleVent)();   // E38: the whistle you can SEE — same instant
+      friendTry();   // E45: at her stop the toot is the "all aboard!" — the teddy answers it
       for(let i=0;i<3;i++) setTimeout(sp,i*90); }
     else if(down.what==='atrain'){                 // E18: tap the stock toy = whistle, like any loco
       SND.whistle();
@@ -11497,6 +11635,12 @@ window.TS={
     return { waiting, pose:ps,
       aboard: cars.filter(c=>RIDER_CAP[c.type]!=null).map(c=>({car:c.type,n:c.rid|0,pose:ps})) };
   },
+  friend(on){                    // E45 — the cab friend: state, and Wyatt's live dial
+    if(on!=null){ CAB_FRIEND=!!on; if(!CAB_FRIEND){ FRIEND.at=null; FRIEND.aboard=false; } }
+    return { on:CAB_FRIEND, at:FRIEND.at, aboard:FRIEND.aboard,
+             walking:BOARDERS.some(b=>b.kind==='fb'||b.kind==='fl') };
+  },
+  friendSeat(v){ FRIEND.aboard=!!v; if(v) FRIEND.at=null; return TS.friend(); },   // shot staging only
   follow(on){ return followSet(on==null? !FOLLOW.on : !!on); },
   setName(w1,w2,sfx){ return nameApply(w1,w2,sfx); },   // null clears; returns the sign text or false
   step(dt){ const d=dt||1/60;
