@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v4.4 -->
+<!-- TRAINSET v4.5 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -97,11 +97,12 @@
   #nextBtn{ position:absolute; left:50%; bottom:150px; transform:translateX(-50%); z-index:8; display:none;
     border-color:#F2C531; color:#F2C531; }
   #nextBtn:active{ transform:translateX(-50%) translateY(2px); }
-  /* ---- the PLAY tray (E6 → E25 → E27): the five round train buttons ride the
-     toy box spread — E27 seats them on the square's own BOX_COLS grid ---- */
+  /* ---- the PLAY tray (E6 → E25 → E27 → E36): the five round train buttons —
+     one flat row on the resident shelf now; the overflow is a seatbelt the
+     five never engage ---- */
   #spTray{
-    display:none; gap:calc(var(--ui)*8px); align-content:center; justify-content:center;
-    padding:calc(var(--ui)*8px); overflow-y:auto; max-width:100%; flex:1; touch-action:pan-y;
+    display:flex; gap:calc(var(--ui)*8px); align-items:center; justify-content:center;
+    padding:calc(var(--ui)*8px); overflow-x:auto; overflow-y:hidden; max-width:100%; flex:1; touch-action:pan-x;
   }
   .tray{ width:calc(var(--ui)*var(--tc,46)*1px); height:calc(var(--ui)*var(--tc,46)*1px); border-radius:50%; background:#170f08; border:3px solid #513a24;
     cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; touch-action:none; }
@@ -321,24 +322,30 @@
      spread's whole cargo moves to a resident RAIL down the left wall (every
      department plaque always out, the open one unfolds in place), the spread
      keeps ONLY PLAY's tray, and the chest becomes BUILD's door to the E7
-     look-book. "Get to work and keep just dragging from the left." ---- */
+     look-book. "Get to work and keep just dragging from the left."
+     E36 FEWER COMPARTMENTS: the pop-up dies too — the spread is PLAY's
+     resident TRAIN SHELF, one flat row bottom-center, out from the moment
+     the rug mounts. No door, no rise, no dismiss laws: see train, grab
+     train, train is on the track ("we want almost a two-year-old to be able
+     to play the 'Play Mode'"). The chest leaves PLAY with its job; it stays
+     BUILD's look-book door. The shelf fades with the shy fold instead of
+     dismissing. ---- */
   #tbox{ position:absolute; left:calc(var(--ui)*5px); bottom:calc(var(--ui)*5px + env(safe-area-inset-bottom));
     z-index:7; width:calc(var(--ui)*36px); height:calc(var(--ui)*36px);
     background:none; border:none; padding:0; cursor:pointer; touch-action:none; display:none; }
   #tbox canvas{ width:100%; height:100%; display:block; pointer-events:none;
     filter:drop-shadow(0 calc(var(--ui)*2px) calc(var(--ui)*4px) rgba(0,0,0,0.45)); }
-  #spread{ position:absolute; left:calc(var(--ui)*5px); bottom:calc(var(--ui)*38px + env(safe-area-inset-bottom));
+  #spread{ position:absolute; left:50%; transform:translateX(-50%);
+    bottom:calc(var(--ui)*5px + env(safe-area-inset-bottom));
     z-index:6; max-width:calc(100vw - var(--ui)*10px); overflow:hidden;
     background:linear-gradient(rgba(58,42,24,0.93),rgba(36,26,14,0.93));
     border:calc(var(--ui)*2px) solid #6e5130; border-radius:calc(var(--ui)*14px);
     box-shadow:0 calc(var(--ui)*7px) calc(var(--ui)*22px) rgba(0,0,0,0.5);
-    display:flex; align-items:stretch;
-    transform-origin:calc(var(--ui)*18px) 100%;
-    transform:translateY(calc(var(--ui)*14px)) scale(0.3,0.06); opacity:0;
-    visibility:hidden; pointer-events:none;
-    transition:transform var(--tbms,0.2s) ease, opacity var(--tbms,0.2s) ease, visibility 0s var(--tbms,0.2s); }
-  #spread.open{ transform:none; opacity:1; visibility:visible; pointer-events:auto;
-    transition:transform var(--tbms,0.2s) ease, opacity var(--tbms,0.2s) ease, visibility 0s 0s; }
+    display:none; align-items:stretch;
+    transition:opacity var(--shygame,0.25s) ease; }
+  body.playshelf #spread{ display:flex; }
+  body.shygame #spread{ opacity:0; }
+  body.shygame #spread *{ pointer-events:none; }
   /* ---- E33 THE LEFT RAIL: the toybox, unrolled down the left wall — resident
      BUILD/campaign chrome in the spread's own wood, seated exactly where the
      HANDY FIVE stood (clears the wordmark above, the chest below). The scroll
@@ -872,10 +879,11 @@ let coachT=false;              // once per SESSION, first campaign or PLAY entry
 // PURPOSE — the rug gets the whole screen. THE BOX SHOWS WHAT THE BAR SHOWED:
 // membership per mode is byte-for-byte today's logic (paletteSync/shelfSync/
 // buildTray untouched), only the furniture changed.
-const TBOX_SIDE='left';        // the corner the box tucks into ('left'|'right') — his words: bottom-left
+const TBOX_SIDE='left';        // the corner the chest tucks into ('left'|'right') — his words: bottom-left
+                               // (E36: flips chest + rail; the centered TRAIN SHELF is side-neutral)
 const TBOX_PX=36;              // box face size ×--ui (~72px closed at the desk dial; ≥44px physical everywhere)
-const SPREAD_VH=40;            // the spread's height cap, % of the screen
-const TBOX_MS=200;             // the spread's rise/collapse, ms (--tbms)
+// E36 FEWER COMPARTMENTS: SPREAD_VH + TBOX_MS retired with the pop-up — the
+// spread is PLAY's resident shelf (CSS sizes it from its five cards).
 const TBOX_BREATH_S=4.5;       // seconds between idle lid breaths — a quiet pick-me, never a modal
 const SHY_GAME=true;           // THE SHY FOLD: chrome fades while a drag or a real pan is live
 const SHY_GAME_MS=250;         // the fold's fade, ms (--shygame)
@@ -885,9 +893,9 @@ const SHY_GAME_MS=250;         // the fold's fade, ms (--shygame)
 // square… an area for recently used pieces vertically… maybe five… the train
 // should start immediately when you finish the track. It shouldn't be under
 // friends. Once the track's finished with the station boom it goes."
-const SPREAD_AR=1.15;          // A THE SQUARE BOX: width = height × this (shape law: 0.8..1.25)
-const BOX_COLS=3;              // cards per row on the square's grid
-const BOX_CARD=35;             // spread card width ×--ui (≤820px viewports ride 29 — resize() stamps --bc)
+// E36: SPREAD_AR + BOX_COLS retired — the square box died with the pop-up;
+// PLAY's five trays sit in one flat row (the E36 finger law bumps --tc on touch).
+const BOX_CARD=35;             // rail card width ×--ui (≤820px viewports ride 29 — resize() stamps --bc)
 const EAGER_PAN=0.4;           // C THE EAGER TRAIN: seconds of camera ease when she arrives off-screen
 const EAGER_WHISTLE=true;      // the far whistle that announces her
 const EAGER_COACH='PUT DOWN A STATION';   // BUILD's stationless finished line — once a session, then silence
@@ -2253,7 +2261,6 @@ function namerShow(b){
   const el=$('namer'); if(!el) return;
   el.style.display=b?'flex':'none';
   if(b){
-    tboxShow(false);   // E25 law 3: an overlay shuts the corner box
     NM.w1=NAME? Math.max(0,NAME_WORDS[0].indexOf(NAME.w1)) : 0;
     NM.w2=NAME? Math.max(0,NAME_WORDS[1].indexOf(NAME.w2)) : 0;
     NM.si=NAME? Math.max(0,NAME_SUFFIX.indexOf(NAME.s)) : 0;
@@ -7006,11 +7013,9 @@ cvs.addEventListener('pointerdown',e=>{
     return;
   }
   ac(); e.preventDefault();
-  // E25 DISMISS LAW 2 — a finger on the map shuts the toy box AND the press
-  // still does its whole normal job (pans, grabs a train, taps a piece).
-  // ⚠ NEVER swallow this first tap — the GVT briefing tap-swallow trap is the
-  // named anti-pattern here; nothing below may return because of the box.
-  if(TBOX.open) tboxShow(false);
+  // E36: the E25 dismiss laws died with the pop-up — the TRAIN SHELF is
+  // resident furniture, so a finger on the map has nothing to shut. The
+  // tap-swallow law stands: this first press does its whole normal job.
   if(camGate()){                                 // E10: two fingers on the rug = pinch zoom
     PTRS.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(PTRS.size===2&&!DRAG){ pinchStart(); return; }
@@ -7167,11 +7172,8 @@ function moveCore(e){
     AT.cars=[];
   }
   if(DRAG){
-    // E25 DISMISS LAW 1 — the moment a DRAG is born of the spread, the box
-    // shuts itself while the E19 lift carries the toy: placing always happens
-    // on a full-screen rug. E33: only PLAY raises a spread now — a rail-born
-    // drag finds TBOX.open false and nothing to shut. The rail never shuts.
-    if(TBOX.open&&SPREAD_SRC.has(down.what)) tboxShow(false);
+    // E36: dismiss law 1 died with the pop-up — a shelf-born drag leaves the
+    // shelf standing; the shy fold fades it while the E19 lift carries the toy.
     DRAG.t0=perf(); DRAG.pt=e.pointerType; DRAG.cx=e.clientX; DRAG.cy=e.clientY;   // E19: the grab stamp — the lift ramps from here
     const [wx,wy]=dragXY(e); DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy); down=null; }
 }
@@ -7708,28 +7710,23 @@ function buildBarScroll(){          // E27→E33: the E13 recipe rotated 90° �
   el.addEventListener('pointercancel',barUp);
 }
 /* =====================================================================
-   THE TOY BOX ON THE RUG (E25 → E33) — the corner chest, screen-space
-   DOM (it does NOT pan with the world), face painted in the game's own
-   art (the E18 menu chest is the model). E33 split its job: in PLAY a
-   tap still raises the tray spread (~TBOX_MS); in BUILD the rail
-   carries the whole palette, so the chest opens THE TOY BOX — E7's big
-   look-book — instead (nothing gated behind it, pure looking); a level
-   hides the chest (the board is its meta). THE DISMISS LAWS, all
-   three, now PLAY's:
-     1. drag-out — the moment a DRAG is born of the spread, it shuts
-        itself while the E19 lift carries the toy (moveCore).
-     2. tap-the-map — any pointerdown on the canvas shuts it AND STILL
-        DOES ITS NORMAL WORK. ⚠ NEVER swallow that first tap (the GVT
-        briefing tap-swallow trap is the named anti-pattern).
-     3. any overlay opening (bank, shop, board, namer, menu) shuts it.
+   THE TOY BOX ON THE RUG (E25 → E33 → E36) — the corner chest, screen-
+   space DOM (it does NOT pan with the world), face painted in the
+   game's own art (the E18 menu chest is the model). E36 FEWER
+   COMPARTMENTS ended its PLAY job: the tray spread it used to raise is
+   resident furniture now (THE TRAIN SHELF — see the #spread CSS), so
+   the chest lives in BUILD only, where it opens THE TOY BOX — E7's big
+   look-book (nothing gated behind it, pure looking); a level hides the
+   chest (the board is its meta). The E25 dismiss laws and the pop-up
+   lifecycle (tboxShow/TBOX.open/TBOX_MS) retired with the door — the
+   shelf never shuts; it fades under the shy fold like the rail.
    Idle, the lid sits a hair ajar and breathes every TBOX_BREATH_S —
    a quiet pick-me, never a modal. Nothing in here ever saves.
    ===================================================================== */
-const TBOX={open:false,k:-1};
-const SPREAD_SRC=new Set(['pal','shelfCar','shelfEng','tray']);   // a DRAG born of one of these came OUT of the spread (only 'tray' can, since E33)
+const TBOX={k:-1};
 // E27: 'handle' left with the train item — the only #shelfTrain alive is the
 // bedroom's (the borrowed #shelf node), and the bedroom has no spread.
-function tboxPaint(k){         // k = lid lift 0..1 (the breath); TBOX.open leans the lid right back
+function tboxPaint(k){         // k = lid lift 0..1 (the breath; E36 — the lid never leans open, the door is gone)
   const cv=$('tboxCv'); if(!cv) return;
   const g=cv.getContext('2d'), u=cv.width/160;
   g.setTransform(u,0,0,u,0,0); g.clearRect(0,0,160,160);
@@ -7740,23 +7737,15 @@ function tboxPaint(k){         // k = lid lift 0..1 (the breath); TBOX.open lean
     cx.strokeStyle='#6e5130'; cx.lineWidth=5; rr(20,62,120,84,8); cx.stroke();
     cx.fillStyle='#170f08'; rr(26,62,108,10,4); cx.fill();   // the dark mouth the ajar lid shows
     star5(80,108,1.35,'#e8d9b0');
-    const open=TBOX.open?1:0;
-    const lift=4+10*k+8*open, tilt=-(0.035+0.10*k+0.5*open);
+    const lift=4+10*k, tilt=-(0.035+0.10*k);
     cx.save(); cx.translate(20,62-lift); cx.rotate(tilt);
     cx.fillStyle='#a37c4a'; rr(-6,-26,136,28,8); cx.fill();
     cx.strokeStyle='#6e5130'; cx.lineWidth=5; rr(-6,-26,136,28,8); cx.stroke();
     cx.restore();
   });
 }
-function tboxShow(b){          // pure state — callers speak (sounds live at the tap sites)
-  b=!!b;
-  if(TBOX.open===b) return;
-  TBOX.open=b;
-  $('spread').classList.toggle('open',b);
-  tboxPaint(b?1:0);
-}
 function tboxBreath(tms){      // rides frame(): the idle lid sigh, skipped under reduced motion
-  if((SCREEN!=='game'&&SCREEN!=='play')||TBOX.open) return;
+  if(SCREEN!=='game') return;  // E36: the chest is BUILD furniture only
   const ph=(tms/1000)%TBOX_BREATH_S;
   const k=(RM()||ph>=0.9)? 0 : 0.5*Math.sin(Math.PI*ph/0.9);
   if(Math.abs(k-TBOX.k)>0.004){ TBOX.k=k; tboxPaint(k); }
@@ -7768,18 +7757,12 @@ function shyGameSync(){        // THE SHY FOLD — one truth, read every frame, 
   if(on!==SHYG.on){ SHYG.on=on; document.body.classList.toggle('shygame',on); }
 }
 function buildTbox(){
-  document.documentElement.style.setProperty('--tbms',(TBOX_MS/1000)+'s');
   document.documentElement.style.setProperty('--shygame',(SHY_GAME_MS/1000)+'s');
-  const sp=$('spread');   // E27: the square's size is stamped by resize() (the shape law)
-  $('spTray').style.gridTemplateColumns='repeat('+BOX_COLS+',max-content)';   // the BOX_COLS dial
-  if(TBOX_SIDE==='right'){     // the corner is a dial — flip all three residents together
-    for(const el of [$('tbox'),sp,$('rail')]){ el.style.left='auto'; el.style.right='calc(var(--ui)*5px)'; }
-    sp.style.transformOrigin='calc(100% - var(--ui)*18px) 100%';
+  if(TBOX_SIDE==='right'){     // the corner is a dial — chest + rail flip together (E36: the centered shelf is side-neutral)
+    for(const el of [$('tbox'),$('rail')]){ el.style.left='auto'; el.style.right='calc(var(--ui)*5px)'; }
   }
   $('tbox').addEventListener('click',()=>{
-    ac();
-    if(SCREEN==='play'){ const b=!TBOX.open; SND[b?'tok':'click'](); tboxShow(b); }
-    else { SND.tok(); boxShow(true); }   // E33: BUILD's chest opens the big look-book — the rail carries the palette
+    ac(); SND.tok(); boxShow(true);   // E33: BUILD's chest opens the big look-book — E36: that is its whole job now
   });
   tboxPaint(0);
 }
@@ -8194,11 +8177,11 @@ function showScreen(s){
   $('menu').style.display=s==='menu'?'flex':'none';
   $('board').style.display=s==='board'?'flex':'none';
   if(s==='board') boardSync();
-  $('tbox').style.display=(play||(game&&!CAMP.on))?'block':'none';   // E33: PLAY's tray chest + BUILD's look-book door; a level's rail carries it all
+  $('tbox').style.display=(game&&!CAMP.on)?'block':'none';   // E36: the chest is BUILD's look-book door only; a level's rail carries it all
   $('rail').style.display=(game||play)?'flex':'none';    // E33: the left rail is BUILD/campaign furniture — E35: PLAY gets it too, worn short
   $('rail').classList.toggle('magiconly',play);          // E35: on the wind-up rug the rail hugs the sky pills alone
-  $('spTray').style.display=play?'grid':'none';          // the spread is PLAY's tray house now
-  tboxShow(false);      // E25 DISMISS LAW 3 — the box shuts on every screen change, like the lids below
+  document.body.classList.toggle('playshelf',play);      // E36 THE TRAIN SHELF: five trains, always out, no door
+  toastSeat();          // E36: the coach line seats above the shelf on the wind-up rug
   $('mark').style.display=(game||play)?'block':'none';
   $('menuChip').style.display=((game&&!CAMP.on)||play)?'block':'none';
   $('backChip').style.display=(game&&CAMP.on)?'block':'none';
@@ -8242,7 +8225,7 @@ function collChanged(){
   paletteSync(); shelfSync(); syncSwatches();
   if($('toybox').style.display==='flex') boxSync();
 }
-function boxShow(b){ $('toybox').style.display=b?'flex':'none'; if(b){ tboxShow(false); boxSync(); } }   // E25 law 3: an overlay shuts the corner box
+function boxShow(b){ $('toybox').style.display=b?'flex':'none'; if(b) boxSync(); }
 function slotIcon(cv,id,fullCol){   // E9: fullCol=true skips the silhouette (the store dims by CSS instead)
   const g=cv.getContext('2d');
   // E20: resolution-aware — k=1 for the 96px toybox/ticket slots (byte-identical),
@@ -8833,7 +8816,6 @@ function storeSync(){
 function storeShow(b){
   $('store').style.display=b?'flex':'none';
   if(b){
-    tboxShow(false);                                    // E25 law 3: an overlay shuts the corner box
     bankShow(false);                                    // the shop and the bank are never both open
     starHudSync(); storeSync();
     stageMount(SHOWCASE_DEFAULT==='dream'? stageDream() : stAisleIds()[0]);
@@ -8850,7 +8832,6 @@ let BANK_T0=null, BANK_TICK=0;
 function bankShow(b){
   $('bank').style.display=b?'flex':'none';
   if(b){
-    tboxShow(false);                                    // E25 law 3: an overlay shuts the corner box
     storeShow(false);
     bankPig(); bankLedger();
     $('bkcount').dataset.n='0'; $('bkcount').textContent='★ 0';
@@ -9114,27 +9095,28 @@ function resize(){
     bedBounds();   // E23: the bedroom floor is every cell the screen can hold — re-derived here
     if(ROOM.cards) boxCardsPlace();   // E26: the box's cards ride the painting through a resize
   }
-  // E27 THE SQUARE BOX — the spread (PLAY's tray house since E33) is a fixed
-  // near-square: the old 40vh law where it's roomy (desk), width- and
-  // chip-clearance-capped where it isn't (phones; his "roughly 300×280" at
-  // 812×375), SPREAD_AR wide, tail still anchored to the box. The card dials
-  // stamp here too (--bc on the rail, --tc on the tray), so the ≤820px
-  // viewports ride their own values under the ONE --ui dial.
-  const sp=$('spread');
-  if(sp){
-    const sh=Math.round(Math.min(0.40*W, 0.75*H, Math.max(SPREAD_VH*H/100,280), H-38*UIS-60));
-    sp.style.height=sh+'px';
-    sp.style.width=Math.round(sh*SPREAD_AR)+'px';
-    $('rail').style.setProperty('--bc', W<=820? 29 : BOX_CARD);
-    $('spTray').style.setProperty('--tc', W<=820? 36 : 46);
-  }
+  // E36 THE TRAIN SHELF — the spread is PLAY's resident shelf now (one flat
+  // row, bottom-center; CSS sizes it from its cards). Only the card dials
+  // stamp here under the ONE --ui dial: --bc on the rail, --tc on the root
+  // for the tray — touch viewports ride the toddler bump (the finger law).
+  $('rail').style.setProperty('--bc', W<=820? 29 : BOX_CARD);
+  document.documentElement.style.setProperty('--tc', W<=820? 42 : 46);
   // E25 re-seats: homeChip + rideChip live in the top-right cluster (CSS) now;
   // toast + NEXT seat on the screen floor + the safe area — the old BAR+k*UIS
-  // tail is dead with the bar.
-  const tt=$('toast'); if(tt) tt.style.bottom='calc('+(14*UIS)+'px + env(safe-area-inset-bottom))';
+  // tail is dead with the bar. E36: the toast seat is toastSeat()'s (it rises
+  // above the shelf on the wind-up rug).
+  toastSeat();
   const nb=$('nextBtn'); if(nb) nb.style.bottom='calc('+(40*UIS)+'px + env(safe-area-inset-bottom))';
   if($('store').style.display==='flex') storeSync();   // E22: the shelf count follows the geometry
   homeSync();
+}
+// E36: ONE truth for the coach line's seat — the screen floor everywhere,
+// lifted clear of the TRAIN SHELF on the wind-up rug (card + padding + air).
+// Stamped by resize() and by showScreen() (the shelf exists only in PLAY).
+function toastSeat(){
+  const tt=$('toast'); if(!tt) return;
+  const lift=SCREEN==='play'? (W<=820?42:46)+34 : 14;
+  tt.style.bottom='calc('+(lift*UIS)+'px + env(safe-area-inset-bottom))';
 }
 window.addEventListener('resize',resize);
 load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedPal(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
@@ -9348,15 +9330,16 @@ window.TS={
       return { ribbon:out,   // oldest→newest world points + break flags
         sparks:TRAIL.sparks.filter(s=>s.on).map(s=>[+s.x.toFixed(2),+s.y.toFixed(2),+s.z.toFixed(2)]) }; },
   },
-  // ---- the corner toy box rig (E25) — state + a door for the battery ----
+  // ---- the chest + TRAIN SHELF rig (E25 → E36) — state only; the pop-up's
+  // open() door died with the pop-up (the shelf is resident furniture) ----
   tbox:{
-    open(b){ tboxShow(b!==false); return TBOX.open; },
     state(){
       const b=$('tbox').getBoundingClientRect(), s=$('spread').getBoundingClientRect();
-      return { open:TBOX.open, side:TBOX_SIDE, shy:document.body.classList.contains('shygame'),
-        box:{x:b.left,y:b.top,w:b.width,h:b.height},
-        spread:{x:s.left,y:s.top,w:s.width,h:s.height,
-          vis:getComputedStyle($('spread')).visibility} };
+      return { resident:SCREEN==='play', side:TBOX_SIDE, shy:document.body.classList.contains('shygame'),
+        box:{x:b.left,y:b.top,w:b.width,h:b.height,vis:getComputedStyle($('tbox')).display},
+        shelf:{x:s.left,y:s.top,w:s.width,h:s.height,
+          vis:getComputedStyle($('spread')).display,
+          cards:document.querySelectorAll('#spTray .tray').length} };
     },
   },
   // ---- the toy box rig (E7) ----
