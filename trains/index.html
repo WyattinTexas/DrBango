@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v4.7 -->
+<!-- TRAINSET v4.8 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -2049,6 +2049,12 @@ function update(dt){
     if(s.ra){ s.ra.k-=dt*8; if(s.ra.k<=0) s.ra=null; }
     if(s.pop>0) s.pop=Math.max(0,s.pop-dt*5);
     if(s.wave>0) s.wave-=dt;
+    // E39: the windows' little clock, and the head that answers then ducks — the
+    // follower eases toward up while time remains, down when the duck moment comes,
+    // so a re-knock mid-duck raises it smoothly and nothing ever snaps.
+    if(s.lit>0) s.lit=Math.max(0,s.lit-dt);
+    if(s.litH!==undefined&&(s.lit>0||s.litH>0.001))
+      s.litH+=((s.lit>HEAD_DUCK_AT?1:0)-s.litH)*Math.min(1,dt*HEAD_EASE);
   }
   if(yayCd>0) yayCd-=dt;
   platTick(dt);                // E15: the platforms keep their little crowds
@@ -3313,6 +3319,7 @@ function drawScenItem(s,ox,oy,t){
   else if(s.t==='vtree') drawVineTree(t,ph);
   else if(s.t==='bleaf') drawBigLeaf();
   else if(s.t==='wfall') drawWfallCell(s,t);
+  if((s.lit>0||(s.litH||0)>0.02)&&LIT[s.t]) drawScenLit(s);   // E39: somebody is home
   cx.restore();
 }
 function cone(x0,yb,w,h,col){
@@ -3439,6 +3446,48 @@ function drawBarn(){
   cx.beginPath(); cx.moveTo(-14,4); cx.lineTo(0,30); cx.moveTo(0,4); cx.lineTo(-14,30);
   cx.moveTo(0,4); cx.lineTo(14,30); cx.moveTo(14,4); cx.lineTo(0,30);
   cx.moveTo(0,4); cx.lineTo(0,30); cx.stroke();
+}
+// E39 SOMEBODY IS HOME — the answer, painted inside the knock's own transform so the
+// glow and the head ride the wiggle like every charm. Pure f(s.lit, s.litH): no perf
+// clock, no random — a stepped frame is a deterministic frame. Untapped buildings
+// never reach here (the call gates on the transient fields), so RAW proofs hold.
+function drawScenLit(s){
+  const L=LIT[s.t]; if(!L) return;
+  const g=Math.min(1,(s.lit||0)/LIT_FADE);            // lights snap ON, fade at the tail
+  if(g>0) for(const [x,y,w,h] of L.win){
+    cx.globalAlpha=g*0.92; cx.fillStyle='#FFDF7E';
+    rr(x+1.2,y+1.2,w-2.4,h-2.4,1.5); cx.fill();
+    const hx=x+w/2, hy=y+h/2, R=Math.max(w,h)*1.35;   // the warm halo past the frame
+    const gr=cx.createRadialGradient(hx,hy,1,hx,hy,R);
+    gr.addColorStop(0,'rgba(255,215,110,0.55)'); gr.addColorStop(1,'rgba(255,215,110,0)');
+    cx.globalAlpha=g; cx.fillStyle=gr;
+    cx.beginPath(); cx.arc(hx,hy,R,0,7); cx.fill();
+  }
+  const up=s.litH||0;
+  if(up>0.02){                                        // the head, clipped to its pane
+    const [x,y,w,h]=L.peek, r=L.r, hx=x+w/2;
+    cx.globalAlpha=1;
+    cx.save(); cx.beginPath(); cx.rect(x+1,y+1,w-2,h-2); cx.clip();
+    const hidden=y+h+r*1.1, upTo=y+h-h*0.62;          // below the sill → 62% up the pane
+    const heady=hidden+(upTo-hidden)*up;
+    cx.fillStyle=L.head==='chick'? '#F2C531' : '#E8C39A';
+    cx.beginPath(); cx.arc(hx,heady,r,0,7); cx.fill();
+    if(L.head==='keeper'){                            // a cap of dark hair for the keeper
+      cx.fillStyle='#6B4A2C';
+      cx.beginPath(); cx.arc(hx,heady,r,Math.PI*1.12,Math.PI*1.88); cx.fill();
+    }
+    if(L.head==='chick'){                             // the little beak, face-on
+      cx.fillStyle='#E8892B';
+      cx.beginPath(); cx.moveTo(hx-1.2,heady+0.5); cx.lineTo(hx+1.2,heady+0.5);
+      cx.lineTo(hx,heady+2.3); cx.closePath(); cx.fill();
+    }
+    cx.fillStyle='#23211E';                           // the eyes — looking at YOU
+    const ey=heady-r*0.22, ex=r*0.38, er=Math.max(0.75,r*0.24);
+    cx.beginPath(); cx.arc(hx-ex,ey,er,0,7); cx.fill();
+    cx.beginPath(); cx.arc(hx+ex,ey,er,0,7); cx.fill();
+    cx.restore();
+  }
+  cx.globalAlpha=1;
 }
 function drawWTower(){
   cx.lineJoin='round'; cx.lineCap='round';
@@ -7239,6 +7288,22 @@ const SCENDEF={
   // her charm is THE HOWL through the same shared gate.
   wolf:{react:1},
 };
+// E39 SOMEBODY IS HOME — tap a dwelling and somebody answers: the windows glow warm
+// gold with the knock, a small head rises into one pane, looks at you, and ducks just
+// before the lights fade. THE LIT SET LAW: an explicit dwellings-only table, NEVER
+// SCENDEF.knock (16 kinds — a glowing fence with a head in it is a lie; wtr stays
+// dark, nobody lives in the tank). s.lit/s.litH are born at first tap; serWorld
+// writes [k,t,v], so the light can never reach a save — transient by construction.
+const LIGHT_SEC=3;             // how long the windows stay lit (dial)
+const LIT_FADE=0.45;           // the fade tail (dial)
+const HEAD_DUCK_AT=0.55;       // the head ducks this long before the lights dim (dial)
+const HEAD_EASE=7;             // rise/duck speed (dial)
+const LIT={                    // pane rects + the peek pane, painter-local coords
+  house:{win:[[-20,0,9,9],[12,0,9,9]],   peek:[12,0,9,9],   head:'kid',   r:3.4},
+  shop: {win:[[-24,8,20,16]],            peek:[-24,8,20,16],head:'keeper',r:4.4},
+  hall: {win:[[-24,0,9,10],[15,0,9,10]], peek:[15,0,9,10],  head:'kid',   r:3.4},
+  barn: {win:[[-7,-27,14,11]],           peek:[-7,-27,14,11],head:'chick',r:3.6},
+};
 const CHIRP={ ppl:'yay', cow:'moo', sheep:'baa', chick:'cluck', duck:'quack', dog:'yip', goat:'baa',
   monk:'chit', parr:'tweet', eleph:'trump', wolf:'howl' };   // E31 — the jungle voices; E35 — the wolf's hello. Same quiet-HUD gate
 const IZOOM={ cow:1.35, sheep:1.5, chick:2.1, duck:1.9, dog:1.5, cat:1.55, flw:1.2, snow:1.05,
@@ -7694,7 +7759,8 @@ function upCore(e){
         else if(s.t==='rv'||s.t==='pond'||s.t==='fount'){ fx.push({k:'rip',x:GX+gx*C+C/2,y:GY+gy*C+C/2,R:26,t:0,dur:0.5}); SND.bloop(); }
         else if(SCENDEF[s.t].react){ s.ra={k:1}; s.wave=1.3;                // critters wiggle AND charm —
           const ch=CHIRP[s.t]; if(ch) SND[ch](); else SND.rustle(); }       // the quiet ones just wiggle
-        else if(SCENDEF[s.t].knock){ s.ra={k:1}; SND.tok(); }               // a wooden knock for the town
+        else if(SCENDEF[s.t].knock){ s.ra={k:1}; SND.tok();                 // a wooden knock for the town —
+          if(LIT[s.t]){ s.lit=LIGHT_SEC; if(s.litH===undefined) s.litH=0; } }   // E39: and somebody is home
         else { s.ra={k:1}; SND.rustle(); }
       }
     }
@@ -9495,6 +9561,8 @@ window.TS={
   scen(t,v,gx,gy){ if(!SCENDEF[t]||gx<0||gy<0||gx>=GW||gy>=GH||!canPlaceScen(t,gx,gy)) return false;
     scen.set(key(gx,gy),{t,v:v|0,ra:null,pop:0,wave:0}); save(); return true; },
   unscen(gx,gy){ const ok=scen.delete(key(gx,gy)); if(ok) save(); return ok; },
+  litAt(gx,gy){ const s=scen.get(key(gx,gy));       // E39 battery door — read-only. NOT under a
+    return s&&s.lit!==undefined? {lit:s.lit,h:s.litH||0} : null; },   // 'home' key: the rig's home() = train-home (:9589 wins the literal)
   toggle(gx,gy,el){ const pc=el==null? pieceTop(gx,gy) : (el? pieceHi(gx,gy):pieceAt(gx,gy));
     if(!pc||pc.t!=='sw') return null;
     if(pc.glued) return false;
