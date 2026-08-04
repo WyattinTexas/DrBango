@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v5.5 -->
+<!-- TRAINSET v5.6 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -806,6 +806,10 @@ const TRESTLE_COL='#8a683e', TRESTLE_DARK='#6B4A2C';   // trestle wood (GVT pale
 const SPIRAL_TURNS=1.5;     // drawn turns — quarter-multiples land the exit on a port
 const SPIRAL_CELLS=2;       // footprint edge, cells (2 = a 2×2 tower)
 const SHADOW_SOFT=1.0;      // elevated-shadow strength (0 = none, 1 = default)
+// ---- Wyatt dials (EXPANSION 47 — one const each) ----
+let VIADUCT_MIN=3;          // high straights in a line that paint as ONE girder span (0 = legs everywhere, the live look)
+const GIRDER_COL='#4E7F46', GIRDER_DARK='#33552F';   // girder green (the GREEN livery / tree family)
+const GIRDER_SPACE=24;      // px between lattice X's along a span
 // ---- Wyatt dials (EXPANSION 5 — one const each) ----
 const CAMP_SEQ=true;          // unlock law: true = winning N opens N+1 · false = every ticket open
 const CAMP_WIP=true;          // persist the current level's work-in-progress across reloads
@@ -6028,6 +6032,64 @@ function hiTrestles(pc,ox,oy){
     }
   }
 }
+// E47 THE GREEN GIRDER BRIDGE — ≥VIADUCT_MIN high straights in a HORIZONTAL line
+// paint as ONE lattice girder span instead of per-piece legs. Horizontal only: on
+// vertical runs the deck hides every pixel of under-structure (measured — the
+// round-cap bed covers the legs exactly), so they keep legs, byte-true. Straights
+// only, runs key (cell,elev). Wob-only pieces stay run members (a tugged glued
+// piece rattles ON the bridge); pop/ra pieces break the run — the bridge assembles
+// when the piece settles. PAINT ONLY: computed from the draw buckets, zero sim reads.
+function viaductSpans(hflat,hanim){
+  if(!VIADUCT_MIN||hflat.length+hanim.length<VIADUCT_MIN) return null;
+  const m=new Map();
+  const put=row=>{ const pc=row[2];
+    if(pc.t!=='s'||(pc.r&1)) return;              // horizontal straights enter the walk
+    m.set(((row[0]-GX)/C)+','+((row[1]-GY)/C)+','+(pc.elev|0),row);
+  };
+  for(const row of hflat) put(row);
+  for(const row of hanim) if(!row[2].ra&&!(row[2].pop>0)) put(row);
+  if(m.size<VIADUCT_MIN) return null;
+  let rows=null, spans=null;
+  for(const [k,row0] of m){
+    const [gx,gy,el]=k.split(',').map(Number);
+    if(m.has((gx-1)+','+gy+','+el)) continue;      // not a run start — walked from its start
+    let n=1;
+    while(m.has((gx+n)+','+gy+','+el)) n++;
+    if(n<VIADUCT_MIN) continue;
+    if(!spans){ spans=[]; rows=new Set(); }
+    spans.push({gx,gy,n});
+    for(let i=0;i<n;i++) rows.add(m.get((gx+i)+','+gy+','+el));
+  }
+  return spans? {rows,spans} : null;
+}
+function girderSpan(sp){
+  const H=LIFT-3;
+  const y=GY+sp.gy*C+C/2, x0=GX+sp.gx*C, x1=x0+sp.n*C;
+  postPair(x0+9,y,1,0,H); postPair(x1-9,y,1,0,H);   // the two wooden feet
+  cx.lineCap='butt';
+  for(const s2 of [-1,1]){
+    const yT=y+13*s2-H, yB=y+13*s2+2;
+    // chords + end verticals: dark core under green face (the postPair technique)
+    for(const [col,w] of [[GIRDER_DARK,5],[GIRDER_COL,2.6]]){
+      cx.strokeStyle=col; cx.lineWidth=w;
+      cx.beginPath();
+      cx.moveTo(x0+3,yT); cx.lineTo(x1-3,yT);
+      cx.moveTo(x0+3,yB); cx.lineTo(x1-3,yB);
+      cx.moveTo(x0+3,yT); cx.lineTo(x0+3,yB);
+      cx.moveTo(x1-3,yT); cx.lineTo(x1-3,yB);
+      cx.stroke();
+    }
+    // the lattice — continuous across cell seams; that continuity IS "one structure"
+    cx.strokeStyle=GIRDER_COL; cx.lineWidth=2.4;
+    cx.beginPath();
+    for(let x=x0+3;x<x1-3;x+=GIRDER_SPACE){
+      const xe=Math.min(x+GIRDER_SPACE,x1-3);
+      cx.moveTo(x,yB); cx.lineTo(xe,yT);
+      cx.moveTo(x,yT); cx.lineTo(xe,yB);
+    }
+    cx.stroke();
+  }
+}
 function idxAt(p,s){ let i=0; while(i<p.cum.length-1 && p.cum[i]<s) i++; return Math.max(0,i-1); }
 function slopeItems(pc,ox,oy,items){
   for(const p of pathsOf(pc)){
@@ -6069,8 +6131,10 @@ function drawTrackAll(g,hg,carItems,midHook){
   for(const row of sloped) slopeShadow(row[2],row[0],row[1]);
   hiShadow(hflat.concat(hanim));
   for(const row of sloped) slopeTrestles(row[2],row[0],row[1]);
-  for(const row of hflat) hiTrestles(row[2],row[0],row[1]);
-  for(const row of hanim) hiTrestles(row[2],row[0],row[1]);
+  const VD=viaductSpans(hflat,hanim);   // E47: runs of high straights become ONE girder span
+  for(const row of hflat) if(!VD||!VD.rows.has(row)) hiTrestles(row[2],row[0],row[1]);
+  for(const row of hanim) if(!VD||!VD.rows.has(row)) hiTrestles(row[2],row[0],row[1]);
+  if(VD) for(const sp of VD.spans) girderSpan(sp);
   if(midHook) midHook();
   const items=[];
   for(const row of sloped){
