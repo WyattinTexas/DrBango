@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v5.0 -->
+<!-- TRAINSET v5.1 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -689,7 +689,7 @@ function applyDims(id){                          // swap the active board; the c
   VIEW.s=0;
 }
 // ---- Wyatt dials (EXPANSION 10 — one const each) ----
-const LANDS=['rug','west','snow','mountain','jungle','island','cloud'], WEATHERS=['clear','snowfall','dust','rain'];   // E30 the mountain, E31 the jungle, E40 the island, E41 the cloud join the doorway
+const LANDS=['rug','west','snow','mountain','jungle','island','cloud','ice'], WEATHERS=['clear','snowfall','dust','rain'];   // E30 the mountain, E31 the jungle, E40 the island, E41 the cloud, E42 the ice join the doorway
 let LAND='rug', WEATHER='clear';                 // free-build only (save v:8) — paint, never physics
 const LAND_SEED=20260801;                        // ground decorations seed
 const MESA_CELLS=160;                            // one low mesa per this many cells (min 2)
@@ -985,7 +985,7 @@ const PLAY_POOL=['box','tank','flat','cab'];  // tray spawns tow 1-2 random cars
 // THREE RUGS TO PLAY ON: every PLAY press winds up the NEXT little world — same
 // toy, three moods — and the cycle survives the app closing (save v:10 carries
 // playIdx, the ONLY thing PLAY remembers; the E6 stateless law holds for all else).
-const PLAY_CYCLE=7;             // maps in rotation (the PLAYMAPS length — E41 added the cloud)
+const PLAY_CYCLE=8;             // maps in rotation (the PLAYMAPS length — E42 added the ice)
 const FRONTIER_WEATHER='clear'; // map 2 weather ('dust' if it reads well — taste call, default clear)
 // ---- Wyatt dials (EXPANSION 30 — one block) ----
 // THE MOUNTAIN PASS: E4 elevation + E15 gravity, dormant on flat maps since they
@@ -1051,6 +1051,32 @@ const BIRD_GAP=34;                  // arc px between them, behind the tail car
 // attract oval reaches batchTrack through drawTrack(AT.grid) and must stay
 // byte-true crimson (the menu RAW proof seals it)
 const cloudGround=()=>SCREEN!=='menu'&&activeLand()==='cloud';
+// ---- Wyatt dials (EXPANSION 42 — one block) ----
+// THE ICE WORLD: "all of the possible ice world" — glacial dusk on GLASS,
+// beyond SNOW DAY, never instead of it. The cold toolkit is enumerated in
+// EXPANSION-42.md §0; what shipped rides these dials, what didn't stays there.
+const ICE_WEATHER='snowfall';       // the rug's sky (E10 verbatim layer; 'clear' = the one-word revert)
+const ICE_FIELD='#DCEAF4', ICE_COMB='#C4D9EA';       // glacial pale blue — glassier than snow, never dark
+const ICE_BANK='#8FB6CE', ICE_BLUE='#BFE0EF',
+      ICE_LIGHT='#E8F6FC', ICE_GLINT='#FFFFFF';      // the FROZEN palette (ice land only — seaCols: kid rivers freeze over)
+const LAKE_COL='#BFE0EF', LAKE_DEEP='#A9D2E8', LAKE_RIM='#F4FAFD';   // the frozen lake's glass
+const LAKE_FX=0.5634, LAKE_FY=0.8243;               // lake #1 centre, field fractions — pinned so the sm GLIDE bisects it
+const LAKE_RX=0.19, LAKE_RY=0.142;                  // …and its pane, field fractions
+const AUR_N=3;                      // aurora ribbons breathing across the top band
+const AUR_A=0.22;                   // …their loudest alpha (they breathe below it)
+const AUR_SPEED=0.07;               // …their sideways drift, cycles/s — slow, a sky exhaling
+const AUR_COLS=['#7CE09B','#B48FE0','#8FD8D0'];      // green · violet · teal
+const AUR_Y=[66,104,142], AUR_TH=[34,30,26];         // ribbon seats + thicknesses (world px, the wire-cloud law: top band, every size)
+const BREATH_LANDS=['ice'];         // where the loco's breath shows (add 'snow' = SNOW DAY breathes — breaks its byte-proof ON PURPOSE, one word)
+const BREATH_RATE=0.55, BREATH_A=0.35;               // wisp cycle speed + loudest alpha — tiny, per the plan
+const PENG_SLIDE=26;                // how far the belly-slide glides out (px, out-and-back)
+const SEAL_PEEK=0.14;               // the shy peek cycle, cycles/s
+const FROST_PER_100=6;              // frost-star twinkle density on the ice field
+const ICE_DRIFT_CELLS=30;           // one deep edge drift per this many cells (min 4 — the snow painters, reused)
+const ICE_CLOD_PER_100=4;           // snow clods, sparser than the snow field's
+// the aurora + breath + lake-glow gate: ice land on a WORLD screen only — the
+// bedroom's attract oval must stay byte-true crimson (the cloudGround law)
+const iceGround=()=>SCREEN!=='menu'&&activeLand()==='ice';
 // PLAYMAPS — three const tables in the campaign-level shape (E6's one PLAYMAP,
 // now one per mood; same fields, land/weather stay PAINT ONLY — the E10 law).
 // activeLand()/activeWeather() read the ACTIVE map whenever PLAY.on.
@@ -1328,6 +1354,54 @@ const PLAYMAPS=[
     ['ppl',2,5,0],['ppl',6,7,2],['ppl',3,1,1],
   ],
 },
+// 8 — THE ICE WORLD (E42): glacial dusk on GLASS — "all of the possible ice
+// world". An eighth silhouette: THE SKATING RING — the only pure calm oval in
+// the galaxy (every other rug jogs, weaves, humps, stairs or waves; the ice
+// line GLIDES), its southern run THE GLIDE: station then a dead-straight shot
+// clean across the FROZEN LAKE — no bridge, ice is solid, that is the whole
+// point (the map's first with ZERO water cells; the lake is landDecor glass).
+// ALL FLAT. The drama is THE LAKE CROSSING: her lamplight doubles in the ice
+// beneath her, a penguin escort belly-slides alongside, seals pop from their
+// holes, the cub waves from the drift, and the aurora breathes overhead while
+// the snow falls. Igloos answer when you knock (E39 — somebody is ALWAYS home
+// on the ice). Utopian always: the cold itself is cozy.
+{ name:'THE ICE WORLD', land:'ice', weather:ICE_WEATHER,
+  riders:1,                          // the ice BOARDS (E30 per-map door — lap one owns the crossing)
+  home:['tender','coach'],           // the resident brings seats
+  start:[3,6],                       // the resident's home straight — just west of the lake: her first act is THE GLIDE
+  track:[
+    // the station straight, eastbound — THE GLIDE: the longest uninterrupted
+    // straight in the galaxy (8 cells), dead across the frozen lake
+    ['st',0,2,6],['s',0,3,6],['s',0,4,6],['s',0,5,6],['s',0,6,6],['s',0,7,6],['s',0,8,6],['s',0,9,6],
+    ['c',3,10,6],
+    // up the east shore
+    ['s',1,10,5],['s',1,10,4],['s',1,10,3],['s',1,10,2],['c',2,10,1],
+    // the top run, westbound — under the ICICLE ARCH, through the aurora's light
+    ['s',0,9,1],['s',0,8,1],['s',0,7,1],['s',0,6,1],['s',0,5,1],['s',0,4,1],['s',0,3,1],['s',0,2,1],
+    ['c',1,1,1],
+    // down the west shore past the igloo village, and home
+    ['s',1,1,2],['s',1,1,3],['s',1,1,4],['s',1,1,5],['c',0,1,6],
+  ],
+  scen:[
+    // the ICICLE ARCH over the top run — the balloon-arch law: she drives under
+    ['iarch',6,1],
+    // the igloo village, NW pocket — warm windows, somebody always home
+    ['iglu',2,0],['iglu',4,0,1],['iglu',0,2],['ppl',3,0,0],
+    // the penguins — one pair each side of the glide, one pair ON the lake
+    ['peng',3,5],['peng',7,5,1],['peng',5,7,2],
+    // the seals — holes in the lake's glass
+    ['seal',6,5],['seal',7,7,1],
+    // the polar bear cub on the NE drift, waving at the corner
+    ['cub',10,0],
+    // lakeside folk + the warm lamp by the station. ⚠ THE GATE ORDER LAW: the
+    // sitter watches from OFF charm range (3,4) on purpose — park a person
+    // beside the home straight and every lap's ONE chirp goes to them, and the
+    // penguin escort glides in silence forever (battery-earned).
+    ['ppl',3,4,2],['ppl',9,0,1],['lamp',2,7],
+    // sparse pines at the corners — the drifts do the framing here
+    ['pine',0,0],['pine',11,0],['pine',0,7],['pine',11,7],['pine',11,3],['pine',6,0],
+  ],
+},
 ];
 const playMap=()=>PLAYMAPS[PLAY.mapIdx]||PLAYMAPS[0];   // the ACTIVE map (set at entry)
 // E31 — THE SOFT RAIN GATE: true only on a PLAY map that declares soft:1 (the
@@ -1431,6 +1505,10 @@ const STORE=[
   // STORE row by the E9 law: never COLL, never the toy-box "n / 50";
   // FRIENDS-shelved in the palette (a living thing, the nature-shelved idiom).
   ['wolf','WOLF','model',16],
+  // E42 — the ice comes home: THE PENGUIN (a FRIEND — she belly-slides hello
+  // at every pass) and THE IGLOO (a dwelling — E39: knock and somebody's home).
+  // STORE rows by the E9 law: never COLL, never the toy-box "n / 50".
+  ['peng','PENGUIN','model',16], ['iglu','IGLOO','model',18],
 ];
 const STORE_BY={}; for(const [id,name,cat,price] of STORE) STORE_BY[id]={id,name,cat,price:price|0};
 const STORE_FREE=STORE.filter(r=>!r[3]).map(r=>r[0]);   // wh_peep · cr_bonk · bl_ding — everyone's
@@ -1443,7 +1521,7 @@ const TRAIL_IDS=['tr_rain','tr_spark'];   // E28: TRAIN SETS shelf, after the li
 const WHISTLE_IDS=['wh_peep','wh_horn','wh_chime','wh_toot','wh_quack','wh_fart'];
 const CRASH_IDS=['cr_bonk','cr_bang','cr_boing','cr_smash','cr_thud','cr_pfft'];
 const BELL_IDS=['bl_ding','bl_bell','bl_cuckoo','bl_cow'];
-const MODEL_IDS=['fount','stat','fire','arch','flag','mail2','bench','clock','vtree','bleaf','wolf'];   // E31: the jungle plants join the bits shelf; E35: the wolf
+const MODEL_IDS=['fount','stat','fire','arch','flag','mail2','bench','clock','vtree','bleaf','wolf','peng','iglu'];   // E31: the jungle plants join the bits shelf; E35: the wolf; E42: the penguin + the igloo
 const COLL_NO_SALE=[];        // of the fifty, ids Wyatt pulls off the shelf (default: all sell)
 // THE STAR BANK — every mint amount is a dial; all of it generous, none of it a wall
 const MINT={ lap:1, station:1, bonk:1, clear:10, firstLap:5, pretty:1, piggy:PIG_PAYS };   // pretty = E14's scenery bonus · piggy = E23's daily base
@@ -2551,6 +2629,7 @@ function drawRug(){
   if(land==='jungle'){ drawLandField('#456F36','#3A6130',0.55); return; }     // E31: the jungle floor — deep, cozy, never dark
   if(land==='island'){ drawLandField('#EBD9A9','#DFCC93',0.5); return; }      // E40: warm beach sand — the lagoon fringe rides landDecor
   if(land==='cloud'){ drawLandField(CLOUD_FIELD,CLOUD_COMB,0.55); return; }   // E41: the pearl deck — tinted, never white (the readability law)
+  if(land==='ice'){ drawLandField(ICE_FIELD,ICE_COMB,0.6); return; }          // E42: glacial glass — bluer than snow, dusk-cozy, never dark
   cx.globalAlpha=0.5; cx.fillStyle='#4A1A12';
   [[112,112],[WORLD_W-112,112],[112,WORLD_H-112],[WORLD_W-112,WORLD_H-112]]
     .forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
@@ -2694,6 +2773,36 @@ function landDecor(){
                   y:70+rnd()*46, r:30+rnd()*14, p:rnd()*6.283});
     for(let i=0;i<SBEAM_N;i++)
       items.push({t:'sbeam', x:fx0+60+rnd()*(fx1-fx0-260), w:90+rnd()*70, p:rnd()*6.283});
+  } else if(land==='ice'){
+    // E42 — THE FROZEN LAKE first (glass ON the floor, under everything: the
+    // BUILD ice land is a frozen-lake floor, and the sm PLAY ring's GLIDE is
+    // authored to bisect lake #1 — its centre is PINNED by fraction, never
+    // rolled; only the cracks' seed rolls). Big rugs earn a second pane (the
+    // snow land's two-sheet idiom). Then the snow land's OWN deep drifts +
+    // clods, reused verbatim at ice densities (cold recipes shareable —
+    // 0187b's law), then frost stars twinkling on the glass.
+    const nL=cells>300?2:1;
+    for(let i=0;i<nL;i++){
+      const cxL=i? fx0+(fx1-fx0)*0.30+(rnd()-0.5)*60 : fx0+(fx1-fx0)*LAKE_FX;
+      const cyL=i? fy0+(fy1-fy0)*0.30+(rnd()-0.5)*40 : fy0+(fy1-fy0)*LAKE_FY;
+      const rxL=i? (fx1-fx0)*0.13 : (fx1-fx0)*LAKE_RX;
+      const ryL=i? (fy1-fy0)*0.10 : (fy1-fy0)*LAKE_RY;
+      items.push({t:'lake', x:cxL, y:cyL, rx:rxL, ry:ryL, p:rnd()*6.283});
+    }
+    const nD=Math.max(4,Math.round(cells/ICE_DRIFT_CELLS));
+    for(let i=0;i<nD;i++){
+      const side=i%4, rx=60+rnd()*45, ry=28+rnd()*26;
+      let x,y;
+      if(side===0){ x=fx0+rnd()*(fx1-fx0); y=fy0+ry*0.5+rnd()*30; }
+      else if(side===1){ x=fx0+rnd()*(fx1-fx0); y=fy1-ry*0.5-rnd()*30; }
+      else if(side===2){ x=fx0+rx*0.4+rnd()*40; y=fy0+rnd()*(fy1-fy0); }
+      else { x=fx1-rx*0.4-rnd()*40; y=fy0+rnd()*(fy1-fy0); }
+      items.push({t:'drift',x,y,rx,ry});
+    }
+    const nK=Math.round(cells*ICE_CLOD_PER_100/100);
+    for(let i=0;i<nK;i++) items.push({t:'clod', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:9+rnd()*6});
+    const nF=Math.round(cells*FROST_PER_100/100);
+    for(let i=0;i<nF;i++) items.push({t:'frost', x:fx0+rnd()*(fx1-fx0), y:fy0+rnd()*(fy1-fy0), r:1.6+rnd()*1.6, p:rnd()*6.283});
   }
   LDEC={key:k2,items};
   return items;
@@ -2720,7 +2829,52 @@ function drawLandDecor(){
     else if(it.t==='cstar') drawCstarDec(it);
     else if(it.t==='wcl') drawWclShadow(it);   // E41: the deck shadow — its cloud flies late (drawWireClouds)
     else if(it.t==='sbeam') drawSbeamDec(it);
+    else if(it.t==='lake') drawLake(it);       // E42: the frozen lake — glass on the floor
+    else if(it.t==='frost') drawFrostDec(it);
   }
+}
+// E42 — THE FROZEN LAKE: a glassy pane ON the land floor. Ice-white rim, pale
+// glass, a deeper heart, seeded hairline cracks (kid-safe glassy, never
+// broken), two still sheen streaks and one slow gloss band sweeping on the
+// paint clock. PAINT ONLY: the line crosses it with no bridge because nothing
+// is there but glass — that is the whole point of a frozen lake.
+function drawLake(d){
+  const t=perf();
+  cx.save(); cx.translate(d.x,d.y);
+  cx.fillStyle=LAKE_RIM;                                             // the ice rim
+  cx.beginPath(); cx.ellipse(0,0,d.rx+6,d.ry+5,0,0,7); cx.fill();
+  cx.fillStyle=LAKE_COL;                                             // the pane
+  cx.beginPath(); cx.ellipse(0,0,d.rx,d.ry,0,0,7); cx.fill();
+  cx.fillStyle=LAKE_DEEP;                                            // the deeper heart
+  cx.globalAlpha=0.75;
+  cx.beginPath(); cx.ellipse(d.rx*0.06,d.ry*0.1,d.rx*0.62,d.ry*0.58,0,0,7); cx.fill();
+  cx.globalAlpha=1;
+  cx.save(); cx.beginPath(); cx.ellipse(0,0,d.rx,d.ry,0,0,7); cx.clip();
+  let s=Math.floor(d.p*1000)||1; const rnd=()=>{ s=(s*9301+49297)%233280; return s/233280; };
+  cx.strokeStyle='#FFFFFF'; cx.globalAlpha=0.5; cx.lineWidth=1.4; cx.lineCap='round';
+  for(let i=0;i<3;i++){                                              // the hairline cracks
+    let px=(rnd()-0.5)*d.rx*1.2, py=(rnd()-0.5)*d.ry*1.2;
+    cx.beginPath(); cx.moveTo(px,py);
+    for(let j2=0;j2<3;j2++){ px+=(rnd()-0.5)*d.rx*0.5; py+=(rnd()-0.5)*d.ry*0.5; cx.lineTo(px,py); }
+    cx.stroke();
+  }
+  cx.globalAlpha=0.35; cx.strokeStyle=ICE_LIGHT; cx.lineWidth=7;     // the still sheen streaks
+  cx.beginPath(); cx.moveTo(-d.rx*0.55,-d.ry*0.3); cx.lineTo(-d.rx*0.1,-d.ry*0.62); cx.stroke();
+  cx.beginPath(); cx.moveTo(d.rx*0.15,d.ry*0.5); cx.lineTo(d.rx*0.55,d.ry*0.2); cx.stroke();
+  const gk=((t*0.05+d.p)%1+1)%1, gx2=(gk*2-1)*d.rx*1.3;              // the slow gloss sweep
+  cx.globalAlpha=0.16; cx.strokeStyle='#FFFFFF'; cx.lineWidth=d.rx*0.16;
+  cx.beginPath(); cx.moveTo(gx2-d.ry*0.5,d.ry); cx.lineTo(gx2+d.ry*0.5,-d.ry); cx.stroke();
+  cx.restore();
+  cx.globalAlpha=1; cx.lineCap='butt'; cx.restore();
+}
+// E42 — frost stars: tiny white sparks twinkling on the glass (the cstar law,
+// moved onto the floor)
+function drawFrostDec(d){
+  const t=perf(), k=0.45+0.55*Math.sin(t*2.1+d.p);
+  cx.globalAlpha=0.5*k; cx.strokeStyle='#FFFFFF'; cx.lineWidth=1.2; cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(d.x-d.r*2,d.y); cx.lineTo(d.x+d.r*2,d.y);
+  cx.moveTo(d.x,d.y-d.r*2); cx.lineTo(d.x,d.y+d.r*2); cx.stroke();
+  cx.globalAlpha=1; cx.lineCap='butt';
 }
 // E41 — the sky fringe: deep sky reaching in from the rug edge, a haze lip —
 // the rug floats IN the sky. The lago grammar, aimed up. PAINT ONLY.
@@ -3147,6 +3301,8 @@ const seaCols=()=>activeLand()==='island'?
   {bank:LAGOON_BANK,blue:LAGOON_BLUE,light:LAGOON_LIGHT,glint:LAGOON_GLINT}:
   activeLand()==='cloud'?   // E41: on the cloud the water is OPEN SKY — rifts between the banks
   {bank:SKY_BANK,blue:SKY_BLUE,light:SKY_LIGHT,glint:SKY_GLINT}:
+  activeLand()==='ice'?     // E42: on the ice the kid's rivers FREEZE OVER — pale glass
+  {bank:ICE_BANK,blue:ICE_BLUE,light:ICE_LIGHT,glint:ICE_GLINT}:
   {bank:RIVER_BANK,blue:RIVER_BLUE,light:RIVER_LIGHT,glint:RIVER_GLINT};
 function drawRivers(){
   let any=false;
@@ -3204,7 +3360,7 @@ function drawRiverGhost(x,y){
 function drawScen(){
   const t=perf();
   for(const [k,s] of scen){
-    if(s.t==='rv'||s.t==='pond'||s.t==='bal'||s.t==='arch'||s.t==='gorge'||s.t==='eag'||s.t==='bfly'||SEA[s.t]) continue;   // water + the gorge paint early; balloons + arches + the eagle + the butterflies fly late; E40 the sea lives in drawSea
+    if(s.t==='rv'||s.t==='pond'||s.t==='bal'||s.t==='arch'||s.t==='iarch'||s.t==='gorge'||s.t==='eag'||s.t==='bfly'||SEA[s.t]) continue;   // water + the gorge paint early; balloons + arches (E42: icicle too) + the eagle + the butterflies fly late; E40 the sea lives in drawSea
     const [x,y]=k.split(',').map(Number);
     drawScenItem(s,GX+x*C,GY+y*C,t);
   }
@@ -3266,6 +3422,70 @@ function drawWireClouds(){
     cx.beginPath(); cx.arc(-d.r*0.45,-d.r*0.3,d.r*0.2,0,7); cx.fill();
     cx.globalAlpha=1; cx.restore();
   }
+}
+/* =====================================================================
+   THE BREATHING SKY (E42) — the aurora: AUR_N translucent ribbons
+   across the rug's top band, each a filled wave between two sine edges
+   with a paler core, drifting sideways and breathing in alpha — pure
+   f(paint clock), zero state (a pinned clock is a pinned sky). Painted
+   late in the flier band (the sky's ceiling), UNDER the weather: snow
+   falls in FRONT of the lights. Ice land, world screens only — the
+   land's sky signature (the wire-cloud gate law).
+   ===================================================================== */
+function drawAurora(){
+  if(!iceGround()) return;
+  const t=perf(), x0=62, x1=WORLD_W-62;
+  cx.lineJoin='round';
+  for(let i=0;i<AUR_N;i++){
+    const y0=AUR_Y[i%AUR_Y.length], th=AUR_TH[i%AUR_TH.length];
+    const dir=i%2?-1:1, ph=i*2.4;
+    const a=(0.55+0.45*Math.sin(t*0.5+i*2.1))*AUR_A;   // the breath
+    const edge=x=>y0+Math.sin(x*0.006+t*AUR_SPEED*TAU*dir+ph)*14
+                    +Math.sin(x*0.0023-t*AUR_SPEED*TAU*dir*0.6+ph*1.7)*7;
+    cx.globalAlpha=a; cx.fillStyle=AUR_COLS[i%AUR_COLS.length];
+    cx.beginPath(); cx.moveTo(x0,edge(x0));
+    for(let x=x0+44;x<=x1;x+=44) cx.lineTo(x,edge(x));
+    for(let x=x1;x>=x0;x-=44) cx.lineTo(x,edge(x)+th);
+    cx.closePath(); cx.fill();
+    cx.globalAlpha=a*0.55; cx.fillStyle='#EAFBF2';      // the paler core
+    cx.beginPath(); cx.moveTo(x0,edge(x0)+th*0.3);
+    for(let x=x0+44;x<=x1;x+=44) cx.lineTo(x,edge(x)+th*0.3);
+    for(let x=x1;x>=x0;x-=44) cx.lineTo(x,edge(x)+th*0.62);
+    cx.closePath(); cx.fill();
+  }
+  cx.globalAlpha=1;
+}
+/* =====================================================================
+   THE BREATH YOU CAN SEE (E42) — in cold lands the loco's breath shows:
+   two tiny white phase-offset wisps off the boiler nose, rising and
+   fading on the paint clock. PURE PAINT, zero state (the wake-bird
+   law): nothing spawns, nothing ticks, a stepped frame is a
+   deterministic frame. Gated BREATH_LANDS=['ice'] — SNOW DAY stays
+   byte-true (the PROOF LAW outranks the lean; adding 'snow' is the
+   one-word Wyatt flip). The tunnel holds its breath (the puffLoco law).
+   ===================================================================== */
+function breathWisps(loco,t,seed){
+  const tp=pieceOf(loco.rd);
+  if(tp&&tp.t==='tun') return;
+  const p=pos(loco.rd);
+  const artAng=p.ang+(loco.face<0?Math.PI:0);
+  const flip=Math.cos(artAng)<0;
+  const lx=34*KART, ly=(flip?14:-14)*KART;               // the boiler NOSE (the stack rides 18 back)
+  const ca=Math.cos(artAng), sa=Math.sin(artAng);
+  const nx=p.x+ca*lx-sa*ly, ny=p.y+sa*lx+ca*ly-LIFT*(p.z||0);
+  cx.fillStyle='#FFFFFF';
+  for(let i=0;i<2;i++){
+    const k=((t*BREATH_RATE+seed+i*0.5)%1+1)%1;
+    cx.globalAlpha=(1-k)*BREATH_A;
+    cx.beginPath(); cx.arc(nx+ca*k*8, ny-3-k*11, 2+k*2.8, 0, 7); cx.fill();
+  }
+  cx.globalAlpha=1;
+}
+function drawBreath(){
+  if(SCREEN==='menu'||!BREATH_LANDS.includes(activeLand())) return;
+  const t=perf();
+  if(PLAY.on){ for(const tr of PLAY.trains){ if(!tr.dying&&tr.cars.length) breathWisps(tr.cars[0],t,tr.id*0.37); } }
+  else if(TRAIN.placed&&TRAIN.cars.length) breathWisps(TRAIN.cars[0],t,0);
 }
 // E41 — THE PUFF THAT PARTS (the cloud IS the creature). Idle: a three-lobe
 // puff breathing slow, a soft VEIL reaching over the edge of the adjacent
@@ -3523,6 +3743,33 @@ function drawSea(){
     cx.restore();
   }
   if(SQ.on) drawSquid(t,P);
+}
+// E42 — THE LAMPLIGHT DOUBLED: any live loco crossing a frozen-lake pane gets
+// a soft warm smear beneath — her lamp reflected in the glass; the cars trail
+// faint white glints. Painted in the ground pass beside the sea (UNDER the
+// track and the cars — the light lives IN the ice), reads train positions,
+// writes nothing back: pure paint, zero state. Ice land, world screens only.
+function lakeAt(x,y){
+  for(const d of landDecor()){
+    if(d.t!=='lake') continue;
+    const ex=(x-d.x)/d.rx, ey=(y-d.y)/d.ry;
+    if(ex*ex+ey*ey<1) return d;
+  }
+  return null;
+}
+function glowSmear(c,i){
+  const p=pos(c.rd), py=p.y-LIFT*(p.z||0);
+  if(!lakeAt(p.x,py)) return;
+  if(i===0){ cx.globalAlpha=0.20; cx.fillStyle='#FFD98A'; cx.beginPath(); cx.ellipse(p.x,py+16,11,17,0,0,7); cx.fill(); }
+  else { cx.globalAlpha=0.08; cx.fillStyle='#FFFFFF'; cx.beginPath(); cx.ellipse(p.x,py+14,9,12,0,0,7); cx.fill(); }
+  cx.globalAlpha=1;
+}
+function drawLakeGlow(){
+  if(!iceGround()) return;
+  let any=false; for(const d of landDecor()) if(d.t==='lake'){ any=true; break; }
+  if(!any) return;
+  if(PLAY.on){ for(const tr of PLAY.trains){ if(tr.dying) continue; for(let i=0;i<tr.cars.length;i++) glowSmear(tr.cars[i],i); } }
+  else if(TRAIN.placed) for(let i=0;i<TRAIN.cars.length;i++) glowSmear(TRAIN.cars[i],i);
 }
 // E40 — THE POD: two glossy backs cruising; the reaction is THE ARC — three
 // dolphins leap in sequence clean across the pool, splashes at entry and exit.
@@ -4013,7 +4260,8 @@ const SCEN_SH={ bush:[27,24], tree:[27,20], ppl:[21,24],
   goat:[26,20],    // E30 — the goat's ledge sits in the standard shadow
   monk:[26,16], parr:[24,11], eleph:[26,24], vtree:[27,17], bleaf:[26,20],   // E31 — the jungle (bfly + wfall carry their own)
   wolf:[21,20],    // E35 — the wolf sits cow-tall
-  palm:[27,18], scast:[26,22] };   // E40 — the beach (shell lies flat; the sea kinds carry water, never shadows)
+  palm:[27,18], scast:[26,22],     // E40 — the beach (shell lies flat; the sea kinds carry water, never shadows)
+  peng:[19,12], iglu:[24,26], cub:[20,16] };   // E42 — the ice (the seal is a flat hole, the arch flies: no shadows)
 function drawScenItem(s,ox,oy,t){
   // real cells land on integer grid coords; palette icons / free-drag ghosts land outside,
   // where fenceMask reads 0 (lone bit of fence) and the herd phase is just fixed.
@@ -4074,6 +4322,11 @@ function drawScenItem(s,ox,oy,t){
   else if(s.t==='shell') drawShell(s);
   else if(s.t==='scast') drawScast(t,ph);
   else if(s.t==='puffc') drawPuffc(s,t,ph,puffDir(gx,gy));   // E41 — the cloud that parts
+  else if(s.t==='peng') drawPeng(s,t,ph,puffDir(gx,gy));     // E42 — the ice: the belly-slider
+  else if(s.t==='seal') drawSeal(s,t,ph);                    // …the hole in the glass
+  else if(s.t==='cub') drawCub(s,t,ph);                      // …the waving cub (silent law)
+  else if(s.t==='iglu') drawIglu();                          // …the warm snow house
+  else if(s.t==='iarch') drawIarchSprite(0,t,ph);            // compact — the rug span rides drawArches
   if((s.lit>0||(s.litH||0)>0.02)&&LIT[s.t]) drawScenLit(s);   // E39: somebody is home
   cx.restore();
 }
@@ -4225,8 +4478,12 @@ function drawScenLit(s){
     cx.save(); cx.beginPath(); cx.rect(x+1,y+1,w-2,h-2); cx.clip();
     const hidden=y+h+r*1.1, upTo=y+h-h*0.62;          // below the sill → 62% up the pane
     const heady=hidden+(upTo-hidden)*up;
+    if(L.head==='hood'){                              // E42: a white fur hood, first — the igloo kid
+      cx.fillStyle='#F4F8FC';
+      cx.beginPath(); cx.arc(hx,heady,r*1.4,0,7); cx.fill();
+    }
     cx.fillStyle=L.head==='chick'? '#F2C531' : '#E8C39A';
-    cx.beginPath(); cx.arc(hx,heady,r,0,7); cx.fill();
+    cx.beginPath(); cx.arc(hx,heady+(L.head==='hood'?r*0.15:0),r,0,7); cx.fill();
     if(L.head==='keeper'){                            // a cap of dark hair for the keeper
       cx.fillStyle='#6B4A2C';
       cx.beginPath(); cx.arc(hx,heady,r,Math.PI*1.12,Math.PI*1.88); cx.fill();
@@ -4577,6 +4834,184 @@ function drawWolf(s,t,ph){
   }
   cx.lineCap='butt';
 }
+// E42 — THE PENGUIN PAIR (a big one and a chick): idle they waddle-rock on the
+// spot; the charm wave is THE BELLY-SLIDE — flop flat and glide out-and-back
+// along the passing line (the puffDir neighbour, aimed PARALLEL), sparkle in
+// the wake, pop back up. Out-and-back = self-resetting: the wave ends and they
+// are standing exactly where they were. dir is null off-track (BUILD far from
+// a line, palette cards): the slide runs flat-x and everything still smiles.
+function drawPeng(s,t,ph,dir){
+  const wv=s.wave>0? (1.3-s.wave)/1.3 : -1;      // -1 idle, else 0..1 through the slide
+  const [px,py]=dir? [-dir[1],dir[0]] : [1,0];   // parallel to the track, not toward it
+  const sgn=s.v? -1:1;
+  const one=(ox,oy,k,pho)=>{                     // k = size (1 the big one, 0.72 the chick)
+    cx.save(); cx.translate(ox,oy); cx.scale(k,k);
+    if(wv<0){                                    // the waddle: a happy rock, heels planted
+      cx.rotate(Math.sin(t*2.2+ph+pho)*0.09);
+      cx.fillStyle='#2E3A48';                    // the back
+      cx.beginPath(); cx.ellipse(0,0,8,11,0,0,7); cx.fill();
+      cx.fillStyle='#F4F8FC';                    // the belly
+      cx.beginPath(); cx.ellipse(0,2.4,5.2,7.6,0,0,7); cx.fill();
+      cx.fillStyle='#2E3A48';                    // flippers, out for balance
+      cx.beginPath(); cx.ellipse(-8.2,1,2.2,5.4,0.35,0,7); cx.fill();
+      cx.beginPath(); cx.ellipse(8.2,1,2.2,5.4,-0.35,0,7); cx.fill();
+      cx.fillStyle='#E8892B';                    // beak + feet
+      cx.beginPath(); cx.moveTo(-1.8,-6.2); cx.lineTo(1.8,-6.2); cx.lineTo(0,-3.4); cx.closePath(); cx.fill();
+      cx.beginPath(); cx.ellipse(-3,11,2.6,1.4,0,0,7); cx.fill();
+      cx.beginPath(); cx.ellipse(3,11,2.6,1.4,0,0,7); cx.fill();
+      cx.fillStyle='#23211E';                    // the eyes
+      cx.beginPath(); cx.arc(-2.6,-8.6,1.1,0,7); cx.fill();
+      cx.beginPath(); cx.arc(2.6,-8.6,1.1,0,7); cx.fill();
+    } else {                                     // THE BELLY-SLIDE
+      const gl=Math.sin(Math.PI*Math.min(1,wv*1.1));            // out-and-back
+      const sx=px*sgn*gl*PENG_SLIDE, sy=py*sgn*gl*PENG_SLIDE;
+      cx.translate(sx,sy+6);
+      if(gl>0.15){                               // the sparkle wake behind the tummy
+        cx.globalAlpha=0.5*gl; cx.strokeStyle='#FFFFFF'; cx.lineWidth=1.6; cx.lineCap='round';
+        cx.beginPath(); cx.moveTo(-px*sgn*10,-py*sgn*10-2); cx.lineTo(-px*sgn*20,-py*sgn*20-2); cx.stroke();
+        cx.globalAlpha=1; cx.lineCap='butt';
+      }
+      cx.rotate(Math.atan2(py*sgn,px*sgn));      // face down the slide
+      cx.fillStyle='#2E3A48';                    // flat on the tummy, head up
+      cx.beginPath(); cx.ellipse(0,0,11,5.4,0,0,7); cx.fill();
+      cx.fillStyle='#F4F8FC';
+      cx.beginPath(); cx.ellipse(-1,1.8,7.4,3,0,0,7); cx.fill();
+      cx.fillStyle='#2E3A48';                    // head high, flippers back like wings
+      cx.beginPath(); cx.arc(9.5,-3.4,4.4,0,7); cx.fill();
+      cx.beginPath(); cx.ellipse(-3,-4.6,4.8,1.8,-0.5,0,7); cx.fill();
+      cx.fillStyle='#E8892B';
+      cx.beginPath(); cx.moveTo(13.4,-4.4); cx.lineTo(13.4,-2.2); cx.lineTo(16.4,-3.3); cx.closePath(); cx.fill();
+      cx.fillStyle='#23211E'; cx.beginPath(); cx.arc(10.6,-4.4,1.1,0,7); cx.fill();
+    }
+    cx.restore();
+  };
+  one(-6,2,1,0); one(8,6,0.72,2.1);              // the pair — the chick a half-beat behind
+}
+// E42 — THE SEAL AT HER HOLE: the hole is glass-dark with an ice rim; idle she
+// peeks on a shy slow cycle; the charm wave brings her up — whiskered face,
+// flippers CLAPPING. The rim's front arc re-strokes OVER her (the squid's
+// pool-band seam trick) so she truly rises from inside the ice.
+function drawSeal(s,t,ph){
+  const wv=s.wave>0? Math.sin(Math.PI*Math.min(1,(1.3-s.wave)/1.3*1.15)) : 0;
+  const pk=(((t*SEAL_PEEK+ph/6.283)%1)+1)%1;
+  const peek=wv>0? 0 : (pk<0.22? Math.sin(Math.PI*pk/0.22)*0.5 : 0);
+  const up=Math.max(wv,peek);                    // 0 hidden · 0.5 the shy peek · 1 the rise
+  cx.fillStyle='#8FB6CE';                        // the worked-ice ring
+  cx.beginPath(); cx.ellipse(0,4,21,14.4,0,0,7); cx.fill();
+  cx.fillStyle=LAKE_RIM;
+  cx.beginPath(); cx.ellipse(0,4,18.6,12.4,0,0,7); cx.fill();
+  cx.fillStyle='#2E4A66';                        // the hole
+  cx.beginPath(); cx.ellipse(0,4,15,9.6,0,0,7); cx.fill();
+  if(up>0.02){
+    const hy=4-up*20;                            // how high she rides
+    cx.fillStyle='#9AACC0';                      // the body (only when she's really up)
+    if(up>0.55){ cx.beginPath(); cx.ellipse(0,hy+10,8.6,9*up,0,0,7); cx.fill(); }
+    cx.beginPath(); cx.arc(0,hy,6.8,0,7); cx.fill();   // the head
+    cx.fillStyle='#C7D3DF';                      // the muzzle
+    cx.beginPath(); cx.ellipse(0,hy+2.2,3.8,2.6,0,0,7); cx.fill();
+    cx.fillStyle='#23211E';                      // the nose + the big kind eyes
+    cx.beginPath(); cx.arc(0,hy+0.8,1.3,0,7); cx.fill();
+    cx.beginPath(); cx.arc(-3,hy-2,1.4,0,7); cx.fill();
+    cx.beginPath(); cx.arc(3,hy-2,1.4,0,7); cx.fill();
+    cx.strokeStyle='#4A5A6A'; cx.lineWidth=0.9; cx.lineCap='round';   // whiskers
+    cx.beginPath(); cx.moveTo(-4,hy+2); cx.lineTo(-9,hy+1); cx.moveTo(-4,hy+3.2); cx.lineTo(-9,hy+3.6);
+    cx.moveTo(4,hy+2); cx.lineTo(9,hy+1); cx.moveTo(4,hy+3.2); cx.lineTo(9,hy+3.6); cx.stroke(); cx.lineCap='butt';
+    if(wv>0.45){                                 // THE CLAP — flippers meet above
+      const cl=Math.abs(Math.sin(t*10))*0.9;
+      cx.fillStyle='#9AACC0';
+      cx.save(); cx.translate(-7.5,hy+7); cx.rotate(-0.9+cl); cx.beginPath(); cx.ellipse(0,-5,2.4,6,0,0,7); cx.fill(); cx.restore();
+      cx.save(); cx.translate(7.5,hy+7); cx.rotate(0.9-cl); cx.beginPath(); cx.ellipse(0,-5,2.4,6,0,0,7); cx.fill(); cx.restore();
+    }
+    cx.strokeStyle=LAKE_RIM; cx.lineWidth=2.6;   // the seam: the rim's front arc, back over her
+    cx.beginPath(); cx.ellipse(0,4,16.8,11,0,0.15,Math.PI-0.15); cx.stroke();
+  }
+}
+// E42 — THE POLAR BEAR CUB: a small white bear sitting on the drift, breathing
+// slow; the charm wave stands her up — one paw waving, mouth-open smile. SILENT
+// by law (the cat/snowman clause): the penguins own this rug's voice.
+function drawCub(s,t,ph){
+  const wv=s.wave>0? Math.sin(Math.PI*Math.min(1,(1.3-s.wave)/1.3*1.1)) : 0;
+  const br=1+0.02*Math.sin(t*1.6+ph);
+  cx.save(); cx.translate(0,-wv*4); cx.scale(1,br);
+  cx.fillStyle='#F2F6F9';                        // the round body
+  cx.beginPath(); cx.ellipse(0,8,13,10,0,0,7); cx.fill();
+  cx.beginPath(); cx.ellipse(-5,16,3.4,2.2,0,0,7); cx.fill();   // the front paws
+  cx.beginPath(); cx.ellipse(5,16,3.4,2.2,0,0,7); cx.fill();
+  cx.beginPath(); cx.arc(0,-5,9,0,7); cx.fill();                // the head
+  cx.beginPath(); cx.arc(-6,-12,3,0,7); cx.fill();              // the ears
+  cx.beginPath(); cx.arc(6,-12,3,0,7); cx.fill();
+  cx.fillStyle='#DDE6EC';
+  cx.beginPath(); cx.arc(-6,-12,1.5,0,7); cx.fill();
+  cx.beginPath(); cx.arc(6,-12,1.5,0,7); cx.fill();
+  cx.fillStyle='#E8EEF3';                        // the muzzle
+  cx.beginPath(); cx.ellipse(0,-2,4.4,3.4,0,0,7); cx.fill();
+  cx.fillStyle='#23211E';                        // nose + eyes
+  cx.beginPath(); cx.arc(0,-3.6,1.6,0,7); cx.fill();
+  cx.beginPath(); cx.arc(-3.6,-7,1.3,0,7); cx.fill();
+  cx.beginPath(); cx.arc(3.6,-7,1.3,0,7); cx.fill();
+  if(wv>0.3){                                    // the wave + the open smile
+    const wg=Math.sin(t*11)*3;
+    cx.strokeStyle='#F2F6F9'; cx.lineWidth=4.6; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(9,2); cx.lineTo(15,-9+wg); cx.stroke(); cx.lineCap='butt';
+    cx.fillStyle='#7E4A3A';
+    cx.beginPath(); cx.arc(0,0.4,1.7,0,Math.PI); cx.fill();
+  }
+  cx.restore();
+}
+// E42 — THE IGLOO: a warm snow house — block seams, a deep doorway, one little
+// window (unlit glass until E39's knock: LIT.iglu owns the gold + the hooded
+// head). A dwelling by law: somebody is ALWAYS home on the ice.
+function drawIglu(){
+  cx.lineJoin='round';
+  cx.fillStyle='#F4F8FC';                        // the dome
+  cx.beginPath(); cx.moveTo(-26,20); cx.arc(0,12,26,Math.PI,0); cx.lineTo(26,20); cx.closePath(); cx.fill();
+  cx.strokeStyle='#C9DCEA'; cx.lineWidth=2; cx.stroke();
+  cx.globalAlpha=0.6; cx.strokeStyle='#C9DCEA'; cx.lineWidth=1.6;   // the block seams
+  cx.beginPath(); cx.moveTo(-24.5,4); cx.quadraticCurveTo(0,-2,24.5,4); cx.stroke();
+  cx.beginPath(); cx.moveTo(-19,-7); cx.quadraticCurveTo(0,-12,19,-7); cx.stroke();
+  cx.beginPath();
+  cx.moveTo(-12,3); cx.lineTo(-12,-8); cx.moveTo(0,-3); cx.lineTo(0,-13.5);
+  cx.moveTo(12,3); cx.lineTo(12,-8); cx.moveTo(-6,18); cx.lineTo(-6,4); cx.moveTo(14,18); cx.lineTo(14,5);
+  cx.stroke(); cx.globalAlpha=1;
+  cx.fillStyle='#DCEAF4';                        // the entrance tunnel
+  cx.beginPath(); cx.moveTo(-11,20); cx.arc(-2,20,9,Math.PI,0); cx.lineTo(7,20); cx.closePath(); cx.fill();
+  cx.strokeStyle='#C9DCEA'; cx.lineWidth=2; cx.stroke();
+  cx.fillStyle='#3A5468';                        // the deep doorway
+  cx.beginPath(); cx.moveTo(-7,20); cx.arc(-2,20,5,Math.PI,0); cx.lineTo(3,20); cx.closePath(); cx.fill();
+  cx.fillStyle='#8A6B4A';                        // the little window — frame…
+  rr(3,-9,12,11,2); cx.fill();
+  cx.fillStyle='#BFD8EA';                        // …and cold glass (E39 warms it)
+  rr(4.2,-7.8,9.6,8.6,1.5); cx.fill();
+  cx.fillStyle='#FFFFFF';                        // the snow cap
+  cx.beginPath(); cx.ellipse(-2,-13.6,7,2.6,0.1,0,7); cx.fill();
+}
+// E42 — THE ICICLE ARCH (the balloon-arch law: blocks nothing, the rug span
+// paints ABOVE the cars in drawArches — she drives under the icicles). Two ice
+// pillars, a glassy band, icicles hanging in a row, sparkle on the clock.
+function drawIarchSprite(rug,t,ph){
+  const k=rug?1:0.72;
+  cx.save(); cx.scale(k,k);
+  cx.lineJoin='round'; cx.lineCap='round';
+  cx.fillStyle='#CFE4F2'; cx.strokeStyle='#A9C8DE'; cx.lineWidth=2;   // the pillars
+  for(const sx of [-1,1]){
+    cx.beginPath(); cx.moveTo(sx*36,24); cx.lineTo(sx*33,-14); cx.lineTo(sx*41,-14); cx.lineTo(sx*44,24); cx.closePath();
+    cx.fill(); cx.stroke();
+  }
+  cx.strokeStyle='#DCEFF9'; cx.lineWidth=10;     // the band
+  cx.beginPath(); cx.moveTo(-37,-14); cx.quadraticCurveTo(0,-40,37,-14); cx.stroke();
+  cx.strokeStyle='#BFE0EF'; cx.lineWidth=5.5;
+  cx.beginPath(); cx.moveTo(-37,-15); cx.quadraticCurveTo(0,-40,37,-15); cx.stroke();
+  cx.fillStyle='#E8F6FC'; cx.strokeStyle='#C9DCEA'; cx.lineWidth=1;   // the icicles
+  for(const [ix,iy,il] of [[-28,-19,9],[-14,-25,14],[0,-28,10],[14,-25,15],[28,-19,8]]){
+    cx.beginPath(); cx.moveTo(ix-2.6,iy); cx.lineTo(ix+2.6,iy); cx.lineTo(ix,iy+il); cx.closePath();
+    cx.fill(); cx.stroke();
+  }
+  const g1=0.4+0.6*Math.max(0,Math.sin(t*2.5+ph)), g2=0.4+0.6*Math.max(0,Math.sin(t*2.5+ph+2.4));
+  cx.fillStyle='#FFFFFF';                        // the glints
+  cx.globalAlpha=0.8*g1; cx.beginPath(); cx.arc(-16,-24,1.6,0,7); cx.fill();
+  cx.globalAlpha=0.8*g2; cx.beginPath(); cx.arc(17,-22,1.6,0,7); cx.fill();
+  cx.globalAlpha=1; cx.lineCap='butt'; cx.restore();
+}
 function drawCat(s,t,ph){
   const react=s.wave>0;
   // the nap: a curled grey loaf. Ears flick on a lazy timer; the charm is one SLOW BLINK.
@@ -4876,13 +5311,13 @@ function drawClock(t){
 function drawArches(){
   const t=perf();
   for(const [k,s] of scen){
-    if(s.t!=='arch') continue;
+    if(s.t!=='arch'&&s.t!=='iarch') continue;   // E42: the icicle arch rides the same over-the-cars pass
     const [x,y]=k.split(',').map(Number);
     const ph=((((x*13+y*29)%23)+23)%23/23)*TAU;
     cx.save(); cx.translate(GX+x*C+C/2,GY+y*C+C/2);
     if(s.pop>0){ const k2=1+0.16*s.pop; cx.scale(k2,k2); }
     if(s.ra) cx.rotate(Math.sin((1-s.ra.k)*18)*0.05*s.ra.k);
-    drawArchSprite(1,t,ph);
+    if(s.t==='iarch') drawIarchSprite(1,t,ph); else drawArchSprite(1,t,ph);
     cx.restore();
   }
 }
@@ -5765,7 +6200,7 @@ function draw(){
   cx.setTransform(DPR*SC,0,0,DPR*SC,DPR*OX,DPR*OY);
   drawRug();
   if(buildGate()) drawNameSign(); else SIGN_RECT=null;   // E15: BUILD only — no sign in campaign or PLAY (E20: camGate opened, so the sign gates on buildGate now)
-  drawRivers(); drawGorges(); drawPonds(); drawSea(); drawGaps();   // E30: the gorge is ground — every deck and bent stands over it; E40: the sea lives in the same water pass
+  drawRivers(); drawGorges(); drawPonds(); drawSea(); drawLakeGlow(); drawGaps();   // E30: the gorge is ground — every deck and bent stands over it; E40: the sea lives in the same water pass; E42: the lamplight doubled in the lake's glass
   // scenery slides in as the midHook: over the ground pass, under the decks and
   // the z-sorted cars — so a cow can graze beneath the high line
   drawTrackAll(grid,hgrid,PLAY.on? playCarItems():trailCarItems(),drawScen);   // E28: trailCarItems = the cars + the rainbow's z-items; PLAY's branch byte-untouched
@@ -5776,8 +6211,10 @@ function draw(){
   drawBflies();     // E31: the butterflies — the lowest of the fliers
   drawWakeBirds();  // E41: little birds banking along behind the tail car
   drawPuffTops();   // E41: the parting cloud curls off her funnel — over the roof
+  drawBreath();     // E42: the breath you can see — tiny wisps off the boiler nose, cold lands only
   drawBalloons();   // E7: balloons fly above the whole rug, shadows drifting along
   drawWireClouds(); // E41: the hung clouds sway above everything — the toy's ceiling
+  drawAurora();     // E42: the breathing sky — ribbons over the top band, under the snow
   drawEagles();     // E30: the eagle circles higher still
   for(const s of smoke){ const k=s.t/s.dur;
     cx.globalAlpha=(1-k)*(s.a||0.4); cx.fillStyle=s.c||'#bbb';   // E38: unstamped = today's exact math
@@ -7063,6 +7500,11 @@ const SND={
   // event's own sound, once per rare surfacing — never the loudest thing).
   eek(){ tone(1175,0.07,'sine',0.065*CHIRP_VOL,1568); tone(1319,0.09,'sine',0.05*CHIRP_VOL,1760,0.09); },
   blub(){ tone(220,0.09,'sine',0.1*CHIRP_VOL,150); tone(180,0.1,'sine',0.07*CHIRP_VOL,130,0.1); },
+  // E42 — the ice voices: the penguin's happy little slide-squeak (up, then a
+  // tumbling down-note — a tummy toboggan in two tones) and the seal's soft
+  // double bark. Both ride the yayCd gate; the cub is SILENT by law.
+  wee(){ tone(988,0.09,'sine',0.06*CHIRP_VOL,1480); tone(1319,0.11,'sine',0.05*CHIRP_VOL,932,0.1); },
+  arf(){ tone(330,0.07,'square',0.05*CHIRP_VOL,262); tone(392,0.08,'square',0.045*CHIRP_VOL,294,0.11); },
   sqhi(){ tone(262,0.22,'sine',0.09,330); tone(196,0.28,'triangle',0.05,262,0.12); noise(0.12,500,0.03,'lowpass',0.02); },
   bloop(){ tone(340,0.12,'sine',0.22,190); },
   // E10 — the rain's distant rumble: low, long, quiet — never the loudest thing
@@ -8046,8 +8488,8 @@ function buildTray(){
 // palette order — Wyatt dial (E4 added RAMP + SPIRAL; E7 adds the TUNNEL + a FRIENDS tab)
 const PIECES=[ ['s','STRAIGHT'], ['c','CURVE'], ['rp','RAMP'], ['x','CROSSING'], ['b','BUMPER'], ['st','STATION'], ['br','BRIDGE'], ['tun','TUNNEL'], ['sw','SPLITTER'], ['sp','SPIRAL'] ];
 const SCEN_TAB=['bush','tree','pine','vtree','bleaf','flw','rock','pond','rv','hay','fire'];   // nature (+ the campfire E9, + the jungle plants E31)
-const TOWN_TAB=[...TOWN_SET,'fence','lamp','wind','whis','sig',...MODEL_IDS.filter(t=>t!=='fire'&&t!=='vtree'&&t!=='bleaf'&&t!=='wolf')];   // built things (the store's — nature/friend-shelved ids excluded)
-const FRIEND_TAB=['ppl',...ANIMAL_SET,'duck','dog','cat','wolf','snow','bal'];      // living things (+ the balloon; E35: the wolf)
+const TOWN_TAB=[...TOWN_SET,'fence','lamp','wind','whis','sig',...MODEL_IDS.filter(t=>t!=='fire'&&t!=='vtree'&&t!=='bleaf'&&t!=='wolf'&&t!=='peng')];   // built things (the store's — nature/friend-shelved ids excluded; E42: the igloo builds, the penguin lives)
+const FRIEND_TAB=['ppl',...ANIMAL_SET,'duck','dog','cat','wolf','peng','snow','bal'];      // living things (+ the balloon; E35: the wolf; E42: the penguin)
 // per-kind flags, all data-driven so E5 can pre-place any of these glued down without new code:
 //  blocks = refuses track (cellBlocksTrack reads this) · react = charms at a passing train ·
 //  knock = wooden tap sound (buildings + fence). Unknown kinds in a save are skipped, never crash.
@@ -8093,6 +8535,15 @@ const SCENDEF={
   // the sky parts in SILENCE, the cat/snowman law). Glued-map-only — never a
   // palette tab, never COLL: THE FIFTY STAY FIFTY.
   puffc:{blocks:1,react:1},
+  // E42 — the ice. The penguin belly-slides (an animal — the herd law, never
+  // blocks; SOLD, friends-shelved) and the igloo is a DWELLING (blocks+knock,
+  // E39's LIT set — somebody is always home; SOLD, town-shelved). The seal IS
+  // her hole (it blocks — nobody lays track over a hole) and the cub waves
+  // SILENTLY (the cat/snowman law); both glued-map-only, never a palette tab,
+  // never COLL: THE FIFTY STAY FIFTY. The icicle arch is the balloon arch's
+  // cousin: blocks nothing, she drives right under.
+  peng:{react:1}, seal:{blocks:1,react:1}, cub:{react:1},
+  iglu:{blocks:1,knock:1}, iarch:{},
 };
 // E39 SOMEBODY IS HOME — tap a dwelling and somebody answers: the windows glow warm
 // gold with the knock, a small head rises into one pane, looks at you, and ducks just
@@ -8109,13 +8560,15 @@ const LIT={                    // pane rects + the peek pane, painter-local coor
   shop: {win:[[-24,8,20,16]],            peek:[-24,8,20,16],head:'keeper',r:4.4},
   hall: {win:[[-24,0,9,10],[15,0,9,10]], peek:[15,0,9,10],  head:'kid',   r:3.4},
   barn: {win:[[-7,-27,14,11]],           peek:[-7,-27,14,11],head:'chick',r:3.6},
+  iglu: {win:[[3,-9,12,11]],             peek:[3,-9,12,11],  head:'hood', r:3.2},   // E42 — a hooded kid in the warm snow house
 };
 const CHIRP={ ppl:'yay', cow:'moo', sheep:'baa', chick:'cluck', duck:'quack', dog:'yip', goat:'baa',
   monk:'chit', parr:'tweet', eleph:'trump', wolf:'howl',
-  dolph:'eek', shark:'blub' };   // E31 — the jungle voices; E35 — the wolf's hello; E40 — the sea's. Same quiet-HUD gate
+  dolph:'eek', shark:'blub',
+  peng:'wee', seal:'arf' };   // E31 — the jungle voices; E35 — the wolf's hello; E40 — the sea's; E42 — the ice's (the cub is silent). Same quiet-HUD gate
 const IZOOM={ cow:1.35, sheep:1.5, chick:2.1, duck:1.9, dog:1.5, cat:1.55, flw:1.2, snow:1.05,
   fount:1.15, stat:1.2, fire:1.25, arch:1.3, flag:1.05, mail2:1.3, bench:1.25, clock:1.05,
-  vtree:1.0, bleaf:1.1, wolf:1.35 };   // E31 — the jungle plants' card zoom; E35 — the wolf
+  vtree:1.0, bleaf:1.1, wolf:1.35, peng:1.5, iglu:1.15 };   // E31 — the jungle plants' card zoom; E35 — the wolf; E42 — the ice pair
 const CARDEF={ tender:'TENDER', box:'BOXCAR', tank:'TANKER', flat:'FLATCAR', cab:'CABOOSE',
                coach:'COACH', mail:'MAIL CAR', circus:'CIRCUS CAR' };   // E7: three new cars join the shed
 // which toy gates each shed part — the tender rides with the RED PUFFER, one toy
@@ -8634,7 +9087,7 @@ function rugTileSize(g,id){
 function rugTileLand(g,id){
   const x=8, y=20, w=88, h=64;
   g.fillStyle='#4A1A12'; g.fillRect(x-4,y-4,w+8,h+8);
-  g.fillStyle= id==='west'? '#8B3E1E' : id==='snow'? '#E9EEF4' : id==='mountain'? '#7C9A55' : id==='jungle'? '#456F36' : id==='island'? '#EBD9A9' : id==='cloud'? CLOUD_FIELD : '#63251C';
+  g.fillStyle= id==='west'? '#8B3E1E' : id==='snow'? '#E9EEF4' : id==='mountain'? '#7C9A55' : id==='jungle'? '#456F36' : id==='island'? '#EBD9A9' : id==='cloud'? CLOUD_FIELD : id==='ice'? ICE_FIELD : '#63251C';
   g.fillRect(x,y,w,h);
   if(id==='rug'){
     g.strokeStyle='#8F4634'; g.lineWidth=2; g.strokeRect(x+5,y+5,w-10,h-10);
@@ -8738,6 +9191,33 @@ function rugTileLand(g,id){
     }
     g.globalAlpha=0.5; g.fillStyle='#F2E3B8';
     g.beginPath(); g.arc(x+55,y+26,3,0,7); g.fill();
+    g.globalAlpha=1;
+  } else if(id==='ice'){
+    // E42 — glacial combing, the frozen lake's glass, a tiny igloo, two frost
+    // stars: the whole cold postcard at tile size
+    g.globalAlpha=0.6; g.strokeStyle=ICE_COMB; g.lineWidth=2;
+    g.beginPath(); for(const yy of [y+14,y+30]){ g.moveTo(x+6,yy); g.quadraticCurveTo(x+w/2,yy-4,x+w-6,yy); } g.stroke();
+    g.globalAlpha=1;
+    g.fillStyle=LAKE_RIM;                                    // the little lake
+    g.beginPath(); g.ellipse(x+30,y+46,24,13,0,0,7); g.fill();
+    g.fillStyle=LAKE_COL;
+    g.beginPath(); g.ellipse(x+30,y+46,20,10,0,0,7); g.fill();
+    g.globalAlpha=0.7; g.fillStyle=LAKE_DEEP;
+    g.beginPath(); g.ellipse(x+32,y+47,12,6,0,0,7); g.fill();
+    g.globalAlpha=0.5; g.strokeStyle='#FFFFFF'; g.lineWidth=1.2;
+    g.beginPath(); g.moveTo(x+22,y+48); g.lineTo(x+32,y+42); g.lineTo(x+40,y+47); g.stroke();
+    g.globalAlpha=1;
+    g.fillStyle='#F4F8FC';                                   // the tiny igloo
+    g.beginPath(); g.moveTo(x+56,y+30); g.arc(x+68,y+30,12,Math.PI,0); g.closePath(); g.fill();
+    g.strokeStyle='#C9DCEA'; g.lineWidth=1.4;
+    g.beginPath(); g.moveTo(x+56,y+30); g.arc(x+68,y+30,12,Math.PI,0); g.stroke();
+    g.beginPath(); g.moveTo(x+57.5,y+24); g.quadraticCurveTo(x+68,y+20,x+78.5,y+24); g.stroke();
+    g.fillStyle='#3A5468';
+    g.beginPath(); g.moveTo(x+64,y+30); g.arc(x+68,y+30,4,Math.PI,0); g.closePath(); g.fill();
+    g.strokeStyle='#FFFFFF'; g.lineWidth=1.2; g.globalAlpha=0.8;   // frost stars
+    for(const [sx2,sy2] of [[x+14,y+12],[x+74,y+10]]){
+      g.beginPath(); g.moveTo(sx2-3,sy2); g.lineTo(sx2+3,sy2); g.moveTo(sx2,sy2-3); g.lineTo(sx2,sy2+3); g.stroke();
+    }
     g.globalAlpha=1;
   } else {
     g.globalAlpha=0.75; g.strokeStyle='#D7E1EC'; g.lineWidth=2;
@@ -8873,7 +9353,7 @@ function buildPalette(){
     RUG_TILES.push({kind,id,el:b});
   };
   for(const [id,name] of [['sm','SMALL'],['lg','BIG'],['xl','HUGE']]) mkRug('size',id,name,g=>rugTileSize(g,id));
-  for(const [id,name] of [['rug','THE RUG'],['west','WESTERN'],['snow','WINTER'],['mountain','MOUNTAIN'],['jungle','JUNGLE'],['island','ISLAND'],['cloud','CLOUD']]) mkRug('land',id,name,g=>rugTileLand(g,id));   // E30 + E31 + E40 + E41
+  for(const [id,name] of [['rug','THE RUG'],['west','WESTERN'],['snow','WINTER'],['mountain','MOUNTAIN'],['jungle','JUNGLE'],['island','ISLAND'],['cloud','CLOUD'],['ice','ICE']]) mkRug('land',id,name,g=>rugTileLand(g,id));   // E30 + E31 + E40 + E41 + E42
   for(const [id,name] of [['clear','CLEAR'],['snowfall','SNOW'],['dust','DUST'],['rain','RAIN']]) mkRug('weather',id,name,g=>rugTileWx(g,id));
   // TIDY UP (E16): the sweep-the-rug button, out of the retired shed's foot.
   // E33: the MORE TOYS… pill RETIRED — the corner chest is BUILD's look-book
@@ -9598,6 +10078,7 @@ const STG_CAP={
   lamp:'A LITTLE NIGHT SUN', whis:'BLOW AS YOU PASS', sig:'RED MEANS WAIT',
   bal:'UP UP AND AWAY', snow:'A COLD ROUND FELLOW',
   tree:'THE CLASSIC TREE',   // E16: the tree sells now (it left the starters for L1)
+  peng:'HE SLIDES ON HIS TUMMY', iglu:'A WARM SNOW HOUSE',   // E42 — the ice pair
 };
 function stRowOf(id){
   const d=defOf(id), snd=sndSlot(id);
