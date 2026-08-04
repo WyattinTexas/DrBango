@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v5.6 -->
+<!-- TRAINSET v5.7 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -719,7 +719,7 @@ const FIT_PAD=0;                                 // px of margin at fit (0 = tod
 // PLAY reads its ACTIVE map's fields (E17); the free-build rug reads the kid's choice.
 function activeLand(){
   if(CAMP.on){ const L=LEVELS[CAMP.level-1]; return (L&&L.land)||'rug'; }
-  if(PLAY.on) return playMap().land||'rug';
+  if(PLAY.on) return PLAY.landOv||playMap().land||'rug';   // E48: the portal may hold the visit in ANOTHER world — session slot, the wx grammar (cleared at entry+exit, never saved)
   return LAND;
 }
 function activeWeather(){
@@ -1120,6 +1120,19 @@ const CYN_BLMC_PER_100=5;           // little blooming-cactus dots — the deser
 const RR_RACE=64;                   // how far the roadrunner sprints out (px, out-and-back beside the line)
 const TMBL_ROLL=54;                 // how far a tumbleweed rolls when she passes (px, out-and-back)
 const COYO_TIP=0.38;                // how far the coyote tips his head (rad) — curious and warm, never a howl
+// ---- Wyatt dials (EXPANSION 48 — one block) ----
+// DRIVE THROUGH AND YOU ARE SOMEWHERE ELSE — THE TUNNEL PORTAL (NEMO #9, the
+// galaxy probe): the island ring's top-run tunnel is a PORTAL. The loco dives
+// in, a steam curtain crosses the screen, and the SAME track — trains
+// mid-stride — is running in the NEXT world: straits of sky, pearl sand,
+// dolphins in cloud. Dive again: home. PAINT ONLY — the world flips, the sim
+// never blinks; the override is SESSION-ONLY (PLAY.landOv, the E35 wx
+// grammar: cleared at entry+exit, never saved — the RUG tile keeps sole
+// ownership of LAND, and LDEC's seeded regen makes the round trip byte-true).
+const PORTAL_WIPE_S=1.15;    // the whole curtain, seconds (ceremony ≤ a breath — the E25/E27 latency law)
+const PORTAL_FLIP_AT=0.5;    // where in the sweep the world flips (0.5 = bank center, full cover)
+const PORTAL_CD=6;           // seconds before the tunnel breathes again (the pick-me window grammar)
+const PORTAL_WISP_A=0.5;     // the mouths' idle steam tell (0 = a plain tunnel)
 // PLAYMAPS — three const tables in the campaign-level shape (E6's one PLAYMAP,
 // now one per mood; same fields, land/weather stay PAINT ONLY — the E10 law).
 // activeLand()/activeWeather() read the ACTIVE map whenever PLAY.on.
@@ -1311,6 +1324,7 @@ const PLAYMAPS=[
   riders:1,                          // the island BOARDS (E30 per-map door — riders look down from every causeway)
   home:['tender','coach'],           // the resident brings seats: lap one owns the pod
   squid:{'6,6':[6,4],'8,1':[8,0],'2,5':[0,5]},   // bridge cell → where she surfaces (plain rv, open water)
+  portal:{cell:'5,1', to:'cloud'},   // E48: the top-run tunnel IS the portal — dive through and the same track runs in the NEXT world (island ↔ cloud, the two prettiest)
   start:[8,6],                       // the resident's home straight (big island shore, east of the strait)
   track:[
     // the harbor quay, eastbound — the first thing every lap does is cross
@@ -1318,8 +1332,10 @@ const PLAYMAPS=[
     ['c',0,2,6],['s',0,3,6],['st',0,4,6],['s',0,5,6],['br',0,6,6],['s',0,7,6],['s',0,8,6],['s',0,9,6],['c',3,10,6],
     // up the big island's shore
     ['s',1,10,5],['s',1,10,4],['s',1,10,3],['s',1,10,2],['c',2,10,1],
-    // the top run, westbound — over the north strait, past palm cove
-    ['s',0,9,1],['br',0,8,1],['s',0,7,1],['s',0,6,1],['s',0,5,1],['s',0,4,1],['s',0,3,1],['s',0,2,1],['c',1,1,1],
+    // the top run, westbound — over the north strait, past palm cove; the
+    // tunnel at (5,1) is THE PORTAL (E48): same ports as the straight it
+    // replaced, so the ring is arc-identical — the door costs nothing
+    ['s',0,9,1],['br',0,8,1],['s',0,7,1],['s',0,6,1],['tun',0,5,1],['s',0,4,1],['s',0,3,1],['s',0,2,1],['c',1,1,1],
     // down the west shore — and the HARBOR STAIR: two steps and a little
     // bridge over the bay, down into the quay
     ['s',1,1,2],['s',1,1,3],['c',0,1,4],['c',2,2,4],['br',1,2,5],
@@ -4043,6 +4059,7 @@ function drawBflies(){
    swim second, and — above them all, once in a while — THE GIANT SQUID.
    ===================================================================== */
 const SQ={on:0,t:0,x:0,y:0,cd:0,force:0};   // the squid EVENT (sim-clocked; reset with every PLAY visit)
+const PORT={on:0,t:0,flip:0,cd:0};          // E48: the portal EVENT (the squid's shape — sim-clocked; reset with every PLAY visit)
 function seaPool(P){
   cx.fillStyle=P.bank; cx.beginPath(); cx.arc(0,0,31,0,7); cx.fill();
   cx.fillStyle=P.blue; cx.beginPath(); cx.arc(0,0,25,0,7); cx.fill();
@@ -5902,6 +5919,45 @@ function drawTunnel(pc,ox,oy){
   }
   cx.restore();
 }
+// E48 — the portal's living details, PLAY-only, the portal cell only (every
+// other tunnel in the galaxy is byte-true by the gate): idle steam breathes
+// from the mouths — the tell that THIS tunnel goes somewhere — and the STEAM
+// CURTAIN crosses the screen when she dives (drawn in draw()'s tail, over the
+// world, under the room's furniture; the world flips beneath full cover).
+function drawPortalWisp(pc,ox,oy){
+  if(PORTAL_WISP_A<=0) return;
+  const t=perf();
+  cx.save(); cx.translate(ox+C/2,oy+C/2); cx.rotate(pc.r*Math.PI/2);
+  cx.fillStyle='#EDE6D8';
+  for(const sx of [-1,1]) for(let i=0;i<2;i++){
+    const ph=(t*0.42+i*0.5+(sx>0?0.27:0))%1;
+    cx.globalAlpha=PORTAL_WISP_A*(1-ph)*(0.35+0.65*Math.min(1,ph*4));
+    cx.beginPath(); cx.arc(sx*52+Math.sin((t+i)*1.7)*2, -8-26*ph, 3.5+3*ph, 0, 7); cx.fill();
+  }
+  cx.globalAlpha=1; cx.restore();
+}
+function drawPortalWipe(){
+  if(!PORT.on) return;
+  const k=Math.min(1,PORT.t/PORTAL_WIPE_S);
+  const e=k<0.5? 2*k*k : 1-Math.pow(-2*k+2,2)/2;   // easeInOutQuad — a curtain, not a snap
+  const BW=W*1.35, x0=W+BW/2, xc=x0+(-BW/2-x0)*e;  // bank center sweeps right → left (the top run dives westbound)
+  const jit=n=>((n*97+31)%23)/23;
+  cx.fillStyle='#F0EAE0';
+  cx.fillRect(xc-BW/2+H*0.14,-4,BW-H*0.28,H+8);    // the bank's body — full cover is geometry, never an alpha
+  for(const s of [-1,1]){                          // billowy leading + trailing edges
+    const ex=xc+s*(BW/2-H*0.14);
+    for(let j=0;j<7;j++){
+      const y=H*(j+0.5)/7+Math.sin(PORT.t*3+j*1.3+s)*5;
+      cx.beginPath(); cx.arc(ex,y,H*0.115*(0.75+0.55*jit(j*2+(s>0?1:0))),0,7); cx.fill();
+    }
+  }
+  cx.globalAlpha=0.55; cx.fillStyle='#FBF8F2';     // steam highlights riding the bank
+  for(let j=0;j<8;j++){
+    const y=H*((j*0.37+0.13)%1), x=xc+(jit(j*3+2)-0.5)*BW*0.6+Math.sin(PORT.t*2.2+j)*6;
+    cx.beginPath(); cx.arc(x,y,H*0.09*(0.7+0.6*jit(j+9)),0,7); cx.fill();
+  }
+  cx.globalAlpha=1;
+}
 // ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers (GVT)
 // E4 pipeline: ground three-pass -> elevated ground shadows -> trestles -> a z-SORTED
 // item list (ramp/spiral deck chunks · the level-1 three-pass batch · every car by its
@@ -6147,6 +6203,12 @@ function drawTrackAll(g,hg,carItems,midHook){
   // E7: tunnel shells repaint ABOVE the cars at their level (cars ride z+0.05, decks z 1)
   for(const row of flat) if(row[2].t==='tun')
     items.push({z:0.5, fn:()=>drawTunnel(row[2],row[0],row[1])});
+  // E48: the portal's mouths breathe — over its own shell, this cell only
+  if(PLAY.on){ const pom=playMap().portal;
+    if(pom) for(const row of flat)
+      if(row[2].t==='tun' && Math.round((row[0]-GX)/C)+','+Math.round((row[1]-GY)/C)===pom.cell)
+        items.push({z:0.52, fn:()=>drawPortalWisp(row[2],row[0],row[1])});
+  }
   for(const row of hflat) if(row[2].t==='tun')
     items.push({z:1.5, fn(){ cx.save(); cx.translate(0,-LIFT); drawTunnel(row[2],row[0],row[1]); cx.restore(); }});
   items.sort((a,b)=>a.z-b.z);
@@ -6880,6 +6942,7 @@ function draw(){
   klGhost();        // E34: the continue-zone whisper — under the live drag ghost
   drawGhosts();
   cx.setTransform(DPR,0,0,DPR,0,0);
+  drawPortalWipe(); // E48: the steam curtain crosses the SCREEN — the world flips beneath it
   for(const p of confetti){ cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot);
     cx.globalAlpha=Math.min(1,(p.dur-p.t)*2); cx.fillStyle=p.col; cx.fillRect(-4,-2.5,8,5); cx.restore(); }
   // E9: minted stars fly from the event to the HUD counter — that flight IS the teaching
@@ -8197,6 +8260,7 @@ const SND={
   pip(){ tone(988,0.05,'sine',0.06*CHIRP_VOL,1175); tone(1175,0.05,'sine',0.055*CHIRP_VOL,1319,0.06);
          tone(1319,0.07,'sine',0.05*CHIRP_VOL,1568,0.12); },
   sqhi(){ tone(262,0.22,'sine',0.09,330); tone(196,0.28,'triangle',0.05,262,0.12); noise(0.12,500,0.03,'lowpass',0.02); },
+  phiss(){ noise(0.55,760,0.05,'lowpass',0,240); tone(392,0.22,'sine',0.028,523,0.06); },   // E48: the portal's soft steam — a breath, not a bell
   bloop(){ tone(340,0.12,'sine',0.22,190); },
   // E10 — the rain's distant rumble: low, long, quiet — never the loudest thing
   rumble(){ noise(1.3,110,0.05,'lowpass'); tone(48,1.5,'sine',0.04,34); },
@@ -8837,7 +8901,7 @@ function winSync(){
    one red train, and the build/campaign saves are never read or
    written by this mode.
    ===================================================================== */
-const PLAY={ on:false, trains:[], crashes:0, respawnT:0, nextId:1, loop:null, mapIdx:0, wx:null };   // wx = E35 sky-pill override, per visit
+const PLAY={ on:false, trains:[], crashes:0, respawnT:0, nextId:1, loop:null, mapIdx:0, wx:null, landOv:null };   // wx = E35 sky-pill override, landOv = E48 portal world override — per visit, never saved
 let PFREE=null;               // the stashed build-rug world while the wind-up rug is out
 // E17: THE CYCLE — how many times the lid has opened. The map for a visit is
 // PLAYMAPS[PLAYI%PLAY_CYCLE], stamped into PLAY.mapIdx at entry, then PLAYI
@@ -9002,9 +9066,29 @@ function squidTick(dt){
   if(SQ.cd>0) SQ.cd-=dt;
   if(SQ.on){ SQ.t+=dt; if(SQ.t>=SQUID_DUR){ SQ.on=0; SQ.cd=SQUID_CD; } }
 }
+// E48 — DRIVE THROUGH AND YOU ARE SOMEWHERE ELSE: the portal transit. Fired by
+// the loco DIVING into the portal cell; the world flips at bank center —
+// PLAY.landOv is the override's ONE write site, and it only ever toggles
+// there ↔ home. Paint only: the sim never blinks, the curtain is over the
+// world, never instead of it. TS.portal() forces one (skips the cooldown).
+function portalFire(force){
+  if(PORT.on||(PORT.cd>0&&!force)) return false;
+  PORT.on=1; PORT.t=0; PORT.flip=0; SND.phiss(); return true;
+}
+function portalTick(dt){
+  if(PORT.cd>0) PORT.cd-=dt;
+  if(!PORT.on) return;
+  PORT.t+=dt;
+  if(!PORT.flip&&PORT.t>=PORTAL_WIPE_S*PORTAL_FLIP_AT){
+    PORT.flip=1;
+    const pom=playMap().portal;
+    PLAY.landOv=PLAY.landOv? null : ((pom&&pom.to)||null);
+  }
+  if(PORT.t>=PORTAL_WIPE_S){ PORT.on=0; PORT.cd=PORTAL_CD; }
+}
 function playUpdate(dt){
   if(!PLAY.on) return;
-  squidTick(dt);
+  squidTick(dt); portalTick(dt);
   for(const tr of PLAY.trains) if(tr.dying){ tr.crashT-=dt;
     for(const c of tr.cars) if(c.squash>0) c.squash=Math.max(0,c.squash-dt*2.5); }
   PLAY.trains=PLAY.trains.filter(tr=>!tr.dying||tr.crashT>0);
@@ -9045,6 +9129,14 @@ function playUpdate(dt){
     if(sqm){
       const lc0=tr.cars[0].rd, sk=lc0.cx+','+lc0.cy;
       if(sk!==tr.sqKey){ tr.sqKey=sk; const sp=sqm[sk]; if(sp) squidRoll(sp); }
+    }
+    // E48 — the portal: the loco DIVING into the mouth (cell-change latch, the
+    // squid's grammar). Maps without the field never ask; mid-wipe or catching
+    // its breath, the tunnel is just a tunnel this pass.
+    const pom=playMap().portal;
+    if(pom){
+      const lc1=tr.cars[0].rd, pk=lc1.cx+','+lc1.cy;
+      if(pk!==tr.poKey){ tr.poKey=pk; if(pk===pom.cell) portalFire(); }
     }
     // E30 — the REACTION LAW rides along (per train, paint only): riders wave
     // BACK at charmed ground people, look down from the trestle (this world's
@@ -9104,7 +9196,9 @@ function playEnter(forceI){
   applyDims('sm');                       // E10: the wind-up rug is the sm rug, always
   PLAY.on=true; PLAY.trains=[]; PLAY.crashes=0; PLAY.respawnT=PLAY_RESPAWN; PLAY.nextId=1;
   PLAY.wx=null;                          // E35: the wind-up rug opens under its map's own sky (stateless law)
+  PLAY.landOv=null;                      // E48: …and as ITSELF — the portal override dies before every visit (session-only law)
   SQ.on=0; SQ.t=0; SQ.cd=0; SQ.force=0;  // E40: the squid keeps no memory between visits (stateless law)
+  PORT.on=0; PORT.t=0; PORT.flip=0; PORT.cd=0;   // E48: the portal keeps none either
   playClackAcc=0;                        // E30: the chain-lift clock starts quiet every visit
   ridersOff();                           // E15: the wind-up rug keeps its glued people only
   grid.clear(); hgrid.clear(); scen.clear();
@@ -9123,8 +9217,9 @@ function playEnter(forceI){
 }
 function playExit(dest){
   if(!PLAY.on){ showScreen(dest); return; }
-  PLAY.on=false; PLAY.trains=[]; PLAY.loop=null; PLAY.wx=null;   // E35: the sky pill override dies with the visit
+  PLAY.on=false; PLAY.trains=[]; PLAY.loop=null; PLAY.wx=null; PLAY.landOv=null;   // E35: the sky pill override dies with the visit (E48: the portal's world with it)
   SQ.on=0; SQ.t=0; SQ.cd=0; SQ.force=0;  // E40: …and so does the squid
+  PORT.on=0; PORT.t=0; PORT.flip=0; PORT.cd=0;   // E48: …and the curtain
   ridersOff();                           // E15: the BUILD rug's platforms restock next tick
   applyDims(SIZE);                       // E10: back to the BUILD rug at its own size
   appWorld(PFREE||{grid:[],scen:[],consist:consist,train:null}); PFREE=null;
@@ -11784,6 +11879,11 @@ window.TS={
     const sp=Object.values(sqm)[i|0]; if(!sp) return false;
     SQ.on=1; SQ.t=0; SQ.x=sp[0]; SQ.y=sp[1]; SQ.force=0; SND.sqhi(); return true; },
   squidState(){ return {on:SQ.on,t:+SQ.t.toFixed(3),x:SQ.x,y:SQ.y,cd:+SQ.cd.toFixed(3),force:SQ.force}; },
+  // E48 — the portal rig: portal() fires one NOW (skips the cooldown; needs
+  // PLAY + a portal map); portalState() = the event + the override, readable.
+  portal(){ if(!PLAY.on||!playMap().portal) return false; return portalFire(true); },
+  portalState(){ return { on:PORT.on, t:+PORT.t.toFixed(3), cd:+PORT.cd.toFixed(3),
+    flip:!!PORT.flip, ov:PLAY.landOv||null, land:activeLand() }; },
   // ---- the wind-up rug rig (E6) ----
   play:{
     enter(){ return playEnter(); },
