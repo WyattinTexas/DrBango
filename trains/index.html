@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v5.4 -->
+<!-- TRAINSET v5.5 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -971,11 +971,19 @@ const WAIT_MAX=3;            // waiters per platform
 const WAIT_REGROW=8;         // seconds per regrown waiter
 const RIDERS_PLAY=false;     // PLAY-mode boarding (ships off — PLAY is the smash mode)
 // C. RIDE ALONG. The chip is DOM beside HOME, NEVER a palette tab.
-// E20 re-aim: the zoom is RELATIVE now — riding along must feel CLOSER than the
-// big default, never further (the old absolute 0.8 read as a zoom-OUT next to
-// baseScale on desktop and a zoom-IN on phones; relative feels the same everywhere).
-const FOLLOW_MUL=1.15;       // ride-along zoom = baseScale()×this (clamped [fit, ZOOM_MAX] like every zoom)
-const FOLLOW_EASE=5;         // camera chase lerp /s
+// E46 THE SHRINK: the ride DIVES now. The dial is CELLS-VISIBLE — how much
+// world the rider sees across the viewport WIDTH — never a scale multiple
+// (E20's FOLLOW_MUL=1.15 is RETIRED: the same multiplier showed ~7.8 cells
+// on a 1280 desk and ~11 on an 812 phone — a multiplier lies across
+// viewports; the cells number is the experience, and it matches everywhere).
+const RIDE_CELLS=4.5;        // THE dial: cells of world across the screen at the dive floor
+const RIDE_SMAX=4.6;         // safety ceiling only (true 4.5 up to 1920px wide) — never the design dial
+const CREST_CELLS=1.35;      // crest widen slot: ×cells while the whoosh holds (1 = off)
+const CREST_HOLD=1.4;        // seconds the widen holds past the whoosh (extend, never re-trigger)
+const LEAN_CELLS=1;          // station lean slot — RESERVED, ships inert (the study's kill list:
+                             // a lean inside the pause is the adult's eye; the seat stays empty)
+const RIDE_LEAD=0;           // screen-px aimed ahead of the engine — named, not built (reversal swing)
+const FOLLOW_EASE=5;         // THE one ease /s — dive, chase, widen, rise all breathe through it
 const FOLLOW_CAMP=false;     // campaign follow (ships false — the followGate law holds)
 // D. THE NAME PLATE. Words only, never a keyboard — the kindergarten law.
 const NAME_WORDS=[
@@ -1651,6 +1659,7 @@ const camGate=()=>SCREEN==='game'||SCREEN==='play';   // E20: every rug pans (ca
 const buildGate=()=>SCREEN==='game'&&!CAMP.on;   // the FREE-BUILD rug (the old camGate) — the name sign lives here only
 const fitScale=()=>Math.min((W-2*FIT_PAD)/WORLD_W,(H-BAR-2*FIT_PAD)/WORLD_H);
 const zoomMax=()=>Math.max(ZOOM_MAX,fitScale());
+const zCap=()=>Math.max(zoomMax(),VIEW.s);       // E46 ratchet: value-identical at s≤max; a hand-abandoned dive can zoom OUT smoothly, never snap
 const baseScale=()=>Math.min(BASE_MUL*fitScale(),zoomMax());   // E20: "about twice" — the big default
 const CAM={off:false};   // E20: a hand (pan/pinch/wheel/follow) carried the camera off the default
 // E20 quiet-HUD amendment: at a zoomed DEFAULT the old rule ("show HOME while
@@ -1660,7 +1669,12 @@ const CAM={off:false};   // E20: a hand (pan/pinch/wheel/follow) carried the cam
 const offBase=()=> VIEW.s>fitScale()+1e-6 && (VIEW.s>baseScale()*1.05 || CAM.off);
 function viewApply(){ SC=VIEW.s; OX=VIEW.ox; OY=VIEW.oy; homeSync(); }
 function clampView(){
-  VIEW.s=Math.max(fitScale(),Math.min(zoomMax(),VIEW.s));
+  // E46: the ceiling opens to RIDE_SMAX — the dive (and a hand-abandoned dive)
+  // lives above ZOOM_MAX; every ORDINARY zoom still self-clamps at its own
+  // write site (zoomAt/pinch via zCap), so at s≤zoomMax this line is
+  // value-identical to the old clamp. Only the rig can reach past the dive,
+  // and it is caught here at the absolute ceiling.
+  VIEW.s=Math.max(fitScale(),Math.min(VIEW.s,Math.max(zoomMax(),RIDE_SMAX)));
   const vw=W, vh=H-BAR, ww=WORLD_W*VIEW.s, wh=WORLD_H*VIEW.s;
   VIEW.ox= ww<=vw? (vw-ww)/2 : Math.max(vw-ww,Math.min(0,VIEW.ox));
   VIEW.oy= wh<=vh? (vh-wh)/2 : Math.max(vh-wh,Math.min(0,VIEW.oy));
@@ -1688,11 +1702,11 @@ function viewBase(){   // the E20 entry view: close to the toys, centered on the
 function viewResize(){
   const f=fitScale();
   if(!camGate() || VIEW.s<=f+1e-9) VIEW.s=f;     // a fitted (or fresh) camera refits; a zoomed one keeps its zoom
-  VIEW.s=Math.min(VIEW.s,zoomMax());
+  VIEW.s=Math.min(VIEW.s,zCap());                // E46: a mid-ride resize keeps the dive (followTick re-aims from the new W)
   clampView(); viewApply();
 }
 function zoomAt(px,py,f){
-  const s0=VIEW.s||fitScale(), s1=Math.max(fitScale(),Math.min(zoomMax(),s0*f));
+  const s0=VIEW.s||fitScale(), s1=Math.max(fitScale(),Math.min(zCap(),s0*f));   // E46: zCap ratchet
   VIEW.ox=px-(px-VIEW.ox)*(s1/s0); VIEW.oy=py-(py-VIEW.oy)*(s1/s0);
   CAM.off=true;                                  // E20: the wheel is a hand — HOME lights up
   VIEW.s=s1; clampView(); viewApply();
@@ -1717,37 +1731,76 @@ function homeSync(){                             // the HOME chip appears only o
   rideSync();
 }
 /* =====================================================================
-   RIDE ALONG (E15) — E10's camera glued to the engine, so a kid can
-   watch their own layout stream past. One floating chip beside HOME
-   (DOM, NEVER a palette tab — the bar must not grow a pixel). ANY
-   HAND WINS INSTANTLY: a pan-press, pinch, wheel, HOME tap or second
-   chip tap exits follow and the camera stays where the kid left it —
-   no snap-back. Screen changes and campaign entry exit too (camGate
-   already locks campaign at fit; FOLLOW_CAMP ships false). Editing
-   while following is allowed — only camera-hand gestures exit. Follow
-   state is never saved; VIEW never was.
+   RIDE ALONG (E15) → THE SHRINK (E46): the chip DIVES now. One eased
+   plunge until RIDE_CELLS of world fill the screen — the child is
+   toy-sized, riding the layout they built. THE CHAIN LAW: the dive,
+   the crest widen, the station lean and the exit rise are ONE chain
+   with ONE ease — followTick holds the ride's ONLY VIEW.s write, and
+   the slots multiply CELLS (the design quantity), never scale. ANY
+   HAND WINS INSTANTLY (pan-press, glued grab, pinch, wheel): hard off,
+   camera stays where the kid left it — no snap-back (E15, kept). THE
+   RISE (E46): the second chip tap — and the train leaving the rails —
+   glide the camera back to EXACTLY the stored pre-ride view; the round
+   trip is the kept promise. A hand cancels a rise where it stands.
+   HOME commands fit; screen changes re-enter through viewBase (both
+   outrank, hard off). Editing while riding never exits. Follow state
+   is never saved; VIEW never was.
    ===================================================================== */
-const FOLLOW={on:false};
+const FOLLOW={on:false};                         // false | 'ride' | 'rise' (truthy strings keep every boolean read)
+const RIDE={prior:null, crestHold:0};            // the chain's memory: the stored view + the crest timer
 const followGate=()=>SCREEN==='game' && (!CAMP.on || FOLLOW_CAMP);
 function rideSync(){                             // visible only with a rug camera + a placed train
   const el=document.getElementById('rideChip'); if(!el) return;
   el.style.display=(followGate() && TRAIN.placed)?'block':'none';
-  if(!FOLLOW.on) el.classList.remove('on');
+  el.classList.toggle('on',FOLLOW.on==='ride');
 }
-function followSet(b){
-  FOLLOW.on=!!b && followGate() && TRAIN.placed;
-  const el=document.getElementById('rideChip');
-  if(el) el.classList.toggle('on',FOLLOW.on);
+function followSet(b){                           // truthy = ride · falsy = HARD off (hands/screens — camera stays)
+  if(b && followGate() && TRAIN.placed){
+    if(!FOLLOW.on) RIDE.prior={s:VIEW.s,ox:VIEW.ox,oy:VIEW.oy,off:CAM.off};   // capture ONLY from off —
+    FOLLOW.on='ride';                            // a mid-rise re-tap keeps the TRUE prior (E46)
+  }else{
+    FOLLOW.on=false; RIDE.prior=null; RIDE.crestHold=0;
+  }
+  rideSync();
   return FOLLOW.on;
 }
-function followTick(dt){                         // presentation only, like camGlide — sim untouched
+function followLetGo(){                          // the deliberate exit — the dive un-dives to the stored view
+  if(FOLLOW.on==='ride' && RIDE.prior && SCREEN==='game'){ FOLLOW.on='rise'; rideSync(); }
+  else followSet(false);
+}
+function rideCellsNow(){                         // the design quantity — the slots multiply CELLS, never scale
+  let c=RIDE_CELLS;                              // THE DIVE (ships)
+  if(RIDE.crestHold>0) c*=CREST_CELLS;           // THE CREST WIDEN — the world opens over the top (ships, dial)
+  if(TRAIN.pauseT>0)   c*=LEAN_CELLS;            // THE STATION LEAN — reserved seat, ships inert (1)
+  return c;
+}
+const rideS=()=>Math.max(fitScale(),Math.min(RIDE_SMAX, W/(rideCellsNow()*C)));   // the ride owns its own sky (past ZOOM_MAX)
+function followTick(dt){                         // THE CHAIN — presentation only, the ride's ONE VIEW.s writer
   if(!FOLLOW.on) return;
-  if(!followGate()||!TRAIN.placed){ followSet(false); return; }
-  if(PINCH||(down&&down.what==='pan')) return;   // a live hand owns the camera (belt + braces)
+  if(FOLLOW.on==='ride'){
+    if(!followGate()){ followSet(false); return; }        // the gate closed — a screen owns the camera now
+    if(!TRAIN.placed) followLetGo();                      // the child lifted the train — rise home
+    else if(PINCH||(down&&down.what==='pan')) return;     // a live hand owns the camera (belt + braces)
+  }
+  if(!FOLLOW.on) return;                                  // letGo with no prior falls to hard off
+  if(RIDE.crestHold>0) RIDE.crestHold=Math.max(0,RIDE.crestHold-dt);
+  const k=1-Math.exp(-FOLLOW_EASE*dt);           // THE ONE EASE — dive, chase, widen, rise all breathe through it
+  if(FOLLOW.on==='rise'){
+    const pr=RIDE.prior;
+    if(!pr || SCREEN!=='game' || PINCH || (down&&down.what==='pan')){ followSet(false); return; }   // a hand cancels the rise where it stands
+    VIEW.s+=(pr.s-VIEW.s)*k;
+    VIEW.ox+=(pr.ox-VIEW.ox)*k; VIEW.oy+=(pr.oy-VIEW.oy)*k;
+    VIEW.vx=VIEW.vy=0;
+    if(Math.abs(VIEW.s-pr.s)<0.002 && Math.abs(VIEW.ox-pr.ox)<0.5 && Math.abs(VIEW.oy-pr.oy)<0.5){
+      VIEW.s=pr.s; VIEW.ox=pr.ox; VIEW.oy=pr.oy; CAM.off=pr.off;   // bit-true — the child's place, kept
+      followSet(false);
+    }
+    clampView(); viewApply();
+    return;
+  }
   const p=pos(TRAIN.cars[0].rd);
-  const k=1-Math.exp(-FOLLOW_EASE*dt);
   CAM.off=true;                                  // E20: riding along leaves the default — HOME shows
-  VIEW.s+=(Math.max(fitScale(),Math.min(zoomMax(),baseScale()*FOLLOW_MUL))-VIEW.s)*k;   // E20: closer than base, never further
+  VIEW.s+=(rideS()-VIEW.s)*k;                    // THE DIVE — cells-visible, never a multiple (E46)
   const tx=W/2-p.x*VIEW.s, ty=(H-BAR)/2-(p.y-LIFT*(p.z||0))*VIEW.s;
   VIEW.ox+=(tx-VIEW.ox)*k; VIEW.oy+=(ty-VIEW.oy)*k;
   VIEW.vx=VIEW.vy=0;
@@ -1826,7 +1879,8 @@ function gravTick(dt){
   // THE CREST: a climb latches, the first descent after it whooshes — ONCE.
   // Flat never latches and never whooshes (the byte-identical audio law).
   if(grade>0.08) GRAV.crest=true;
-  else if(grade<-0.08 && GRAV.crest){ GRAV.crest=false; SND.whoosh(); riderYay(); }
+  else if(grade<-0.08 && GRAV.crest){ GRAV.crest=false; SND.whoosh(); riderYay();
+    if(FOLLOW.on==='ride') RIDE.crestHold=CREST_HOLD; }   // E46: the crest tells the chain — only the chain moves the camera
   return GRAV.mul;
 }
 
@@ -9224,7 +9278,7 @@ function pinchMove(){
   if(pts.length<2) return;
   const d=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)||1;
   const mx=(pts[0].x+pts[1].x)/2, my=(pts[0].y+pts[1].y)/2;
-  VIEW.s=Math.max(fitScale(),Math.min(zoomMax(),PINCH.s0*d/PINCH.d0));
+  VIEW.s=Math.max(fitScale(),Math.min(zCap(),PINCH.s0*d/PINCH.d0));   // E46: zCap ratchet
   VIEW.ox=mx-PINCH.wx*VIEW.s; VIEW.oy=my-PINCH.wy*VIEW.s;
   CAM.off=true;                                  // E20: two fingers are a hand too
   clampView(); viewApply();
@@ -11423,7 +11477,7 @@ function buildMenu(){
 }
 $('mute').addEventListener('click',()=>{ AU.on=!AU.on; if(AU.on){ ac(); SND.click(); } muteSync(); save(); });
 $('homeChip').addEventListener('click',()=>{ ac(); SND.click(); viewFit(); });   // E10: snap back to the whole rug
-$('rideChip').addEventListener('click',()=>{ ac(); SND.click(); followSet(!FOLLOW.on); });   // E15: glue the camera to the engine / let it go
+$('rideChip').addEventListener('click',()=>{ ac(); SND.click(); FOLLOW.on==='ride'? followLetGo() : followSet(true); });   // E46: dive down to the train / rise home to the stored view
 
 // ---- boot ----
 function resize(){
@@ -11623,6 +11677,8 @@ window.TS={
     set(s,ox,oy){ VIEW.s=+s||fitScale(); if(ox!=null) VIEW.ox=+ox; if(oy!=null) VIEW.oy=+oy;
       VIEW.vx=VIEW.vy=0; clampView(); viewApply(); return TS.view.get(); },
     get(){ return { scale:SC, ox:OX, oy:OY, fit:fitScale(), max:zoomMax(), follow:FOLLOW.on,
+      cells:SC>0? W/(SC*C) : 0, rideS:rideS(), crestHold:RIDE.crestHold,     // E46: the measured dive — cells across the screen
+      prior:RIDE.prior? {...RIDE.prior} : null,
       base:baseScale(), off:offBase(), bar:BAR, ui:UIS, aim:baseAim() }; },   // E15: follow rides along · E20: the big-default telemetry
     toRug(px,py){ return [ (px-OX)/SC, (py-OY)/SC ]; },   // THE one inverse, exposed for the rigs
   },
@@ -11641,7 +11697,11 @@ window.TS={
              walking:BOARDERS.some(b=>b.kind==='fb'||b.kind==='fl') };
   },
   friendSeat(v){ FRIEND.aboard=!!v; if(v) FRIEND.at=null; return TS.friend(); },   // shot staging only
-  follow(on){ return followSet(on==null? !FOLLOW.on : !!on); },
+  follow(on){                    // E46: true/toggle = ride · false = let go (the child's rise) · 'off' = hard off (the battery lever)
+    if(on==='off') return followSet(false);
+    if(on==null) on=FOLLOW.on!=='ride';
+    if(on) return followSet(true);
+    followLetGo(); return FOLLOW.on; },
   setName(w1,w2,sfx){ return nameApply(w1,w2,sfx); },   // null clears; returns the sign text or false
   step(dt){ const d=dt||1/60;
     if(SCREEN==='game') update(d);
