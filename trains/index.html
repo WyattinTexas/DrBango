@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v6.6 -->
+<!-- TRAINSET v6.7 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -2945,6 +2945,14 @@ function update(dt){
       const f=clone(c.rd); if(advance(f,30).moved>0) occ.add(key(f.cx,f.cy)+':'+(f.el?1:0));
       const b=clone(c.rd); if(back(b,30).moved>0) occ.add(key(b.cx,b.cy)+':'+(b.el?1:0));
     }
+    // E58: the wind-up trains hold their latches too (a kid-laid splitter in
+    // PLAY — an empty sweep would drop a live latch mid-pass every frame)
+    if(PLAY.on) for(const tr of PLAY.trains){ if(tr.dying) continue;
+      for(const c of tr.cars){
+        occ.add(key(c.rd.cx,c.rd.cy)+':'+(c.rd.el?1:0));
+        const f=clone(c.rd); if(advance(f,30).moved>0) occ.add(key(f.cx,f.cy)+':'+(f.el?1:0));
+        const b=clone(c.rd); if(back(b,30).moved>0) occ.add(key(b.cx,b.cy)+':'+(b.el?1:0));
+      } }
     for(const [k,pc] of grid) if(pc.latch && !occ.has(k+':0')) pc.latch=null;
     for(const [k,pc] of hgrid) if(pc.latch && !occ.has(k+':1')) pc.latch=null;
   }
@@ -7558,6 +7566,22 @@ function drawGhosts(){
       cx.globalAlpha=1;
     }
   }
+  // E58: the lifted wind-up train rides the finger — the 'train' ghost recipe
+  // in the train's OWN livery (playCarItems' one-color law)
+  if(DRAG.kind==='ptrainLift' && DRAG.x!=null){
+    if(hover && pieceTop(hover[0],hover[1])){
+      cx.globalAlpha=0.28; cx.fillStyle='#7CFC66';
+      rr(GX+hover[0]*C+3,GY+hover[1]*C+3,C-6,C-6,10); cx.fill(); cx.globalAlpha=1;
+    }
+    const liv=LIVERY[DRAG.color]||LIVERY.red;
+    const n=1+DRAG.cars.length;
+    for(let i=n-1;i>=0;i--){
+      const t=i===0?'loco':DRAG.cars[i-1];
+      cx.globalAlpha=0.85;
+      drawCar(t, DRAG.x - i*GAP*0.62, DRAG.y + Math.sin(perf()*6+i)*2, 0, 0, wheelPhase, liv);
+      cx.globalAlpha=1;
+    }
+  }
   // E18: the stock attract toy rides the finger — the 'train' ghost recipe, stock consist
   if(DRAG.kind==='atrain' && DRAG.x!=null){
     if(hover && pieceTop(hover[0],hover[1])){
@@ -10436,26 +10460,63 @@ function playYay(tr){            // the downhill whoosh, per train — arms UP +
   if(!aboardN(tr.cars)) return;
   playPose(tr,'up',1.8,3); SND.yay();
 }
-// Walk the glued circuit once and rule it: (cell,elev,path) -> arc coordinate. Every
-// map's circuit is ONE closed path (a figure-8 crosses its own diamond twice on
-// different paths), so every rider and every spawn lives on this single ruler.
+// Walk the circuit and rule it: (cell,elev,path) -> arc coordinate. Every
+// glued map's circuit is ONE closed path (a figure-8 crosses its own diamond
+// twice on different paths), so every rider and every spawn lives on this
+// single ruler. E58 — THE RULER FOLLOWS THE HAND: the walk now seeds from the
+// LIVE grid (stations first) and tolerates open lines — walk backward to the
+// line's true origin (or discover closure), then forward recording segs; the
+// LONGEST walk is the ruler. On a pristine glued map this is byte-identical
+// to the old station-seeded walk. Re-derived after every PLAY track edit so a
+// spawn can never materialize on a removed cell.
 function buildLoopMap(){
   const M=playMap();
-  const st=M.track.find(row=>row[0]==='st')||M.track[0];
-  const rd={cx:st[2],cy:st[3],pi:0,dir:1,s:0,el:0};
-  const segs=[]; let d=0;
-  for(let g=0; g<200; g++){
-    const pc=pieceOf(rd), p=pathsOf(pc)[rd.pi];
-    segs.push({k:key(rd.cx,rd.cy), el:rd.el|0, pi:rd.pi, dir:rd.dir, d0:d, len:p.len});
-    d+=p.len;
-    rd.s=rd.dir>0? p.len:0;
-    if(!enter(rd, p.ports[rd.dir>0?1:0])) break;                      // can't happen on the glued loop
-    if(rd.cx===st[2]&&rd.cy===st[3]&&rd.pi===0&&rd.dir===1) break;    // home again — the circuit closed
+  const sig=r=>r.cx+','+r.cy+':'+(r.el?1:0)+':'+r.pi+':'+r.dir;
+  const seeds=[];
+  for(const [k,pc] of grid){ if(pc.t==='ref') continue; seeds.push([k,pc]); }
+  for(const [k,pc] of hgrid) seeds.push([k,pc]);
+  seeds.sort((a,b)=>((b[1].t==='st')?1:0)-((a[1].t==='st')?1:0));   // stations first (stable — Map order beneath)
+  const cov=new Set(); let best=null;
+  for(const [k,pc] of seeds){
+    const i=k.indexOf(','), x=+k.slice(0,i), y=+k.slice(i+1);
+    const seed={cx:pc.t==='sp'?pc.ax:x, cy:pc.t==='sp'?pc.ay:y, pi:0, dir:1, s:0, el:(pc.elev|0)?1:0};
+    if(cov.has(key(seed.cx,seed.cy)+':'+seed.el+':0')) continue;    // already inside a recorded walk
+    // 1) backward to the origin — or home again (the circuit closed)
+    let rd=clone(seed); rd.dir=-1; let closed=false;
+    for(let g=0; g<420; g++){
+      const c0=pieceOf(rd); if(!c0) break;
+      const p0=pathsOf(c0)[rd.pi]; if(!p0) break;
+      const ex=p0.ports[rd.dir>0?1:0];
+      rd.s=rd.dir>0? p0.len:0;
+      if(ex==null||!enter(rd,ex)) break;                            // parked at the true origin
+      if(rd.cx===seed.cx&&rd.cy===seed.cy&&(rd.el|0)===seed.el&&rd.pi===seed.pi){ closed=true; break; }
+    }
+    const org=closed? clone(seed) : (()=>{ const o=clone(rd); o.dir*=-1;
+      o.s=o.dir>0? 0 : pathsOf(pieceOf(o))[o.pi].len; return o; })();
+    // 2) forward from the origin, recording segs (the old walk, verbatim)
+    const segs=[]; let d=0; const r2=clone(org), osig=sig(org);
+    for(let g=0; g<420; g++){
+      const pc2=pieceOf(r2); if(!pc2) break;
+      const p=pathsOf(pc2)[r2.pi]; if(!p) break;
+      segs.push({k:key(r2.cx,r2.cy), el:r2.el|0, pi:r2.pi, dir:r2.dir, d0:d, len:p.len});
+      d+=p.len;
+      r2.s=r2.dir>0? p.len:0;
+      const ex=p.ports[r2.dir>0?1:0];
+      if(ex==null||!enter(r2,ex)) break;                            // an open end — the ruler stops here
+      if(sig(r2)===osig) break;                                     // home again — the circuit closed
+    }
+    for(const sg of segs) cov.add(sg.k+':'+sg.el+':'+sg.pi);
+    if(!best||d>best.len) best={segs,len:d,closed};
   }
-  const by=new Map(); for(const sg of segs) by.set(sg.k+':'+sg.el+':'+sg.pi,sg);
-  const home=by.get(key(M.start[0],M.start[1])+':0:0');
-  PLAY.loop={ segs, by, len:d, home: home? home.d0+home.len/2 : 0 };
+  if(!best||!best.segs.length){ PLAY.loop=null; return; }
+  const by=new Map(); for(const sg of best.segs) by.set(sg.k+':'+sg.el+':'+sg.pi,sg);
+  const home=by.get(key(M.start[0],M.start[1])+':0:0')
+    ||best.segs.find(sg=>{ const p2=by.get(sg.k+':'+sg.el+':'+sg.pi); if(!p2) return false;
+      const [sx,sy]=sg.k.split(',').map(Number); const spc=sg.el? pieceHi(sx,sy):pieceAt(sx,sy);
+      return spc&&spc.t==='st'; });
+  PLAY.loop={ segs:best.segs, by, len:best.len, home: home? home.d0+home.len/2 : 0, closed:best.closed };
 }
+const playLoopSync=()=>{ if(PLAY.on) buildLoopMap(); };   // E58: every PLAY track edit re-rules the line
 const loopCoord=rd=>{
   const sg=PLAY.loop && PLAY.loop.by.get(key(rd.cx,rd.cy)+':'+(rd.el?1:0)+':'+rd.pi);
   return sg? sg.d0+(sg.dir>0? rd.s : sg.len-rd.s) : null;
@@ -10475,6 +10536,7 @@ function riderAt(d){                  // materialize a rider at loop coordinate 
 // cell any rider occupies RIGHT NOW (the diamond shares one cell between two arcs
 // that are far apart on the ruler, so arc distance alone isn't enough).
 function playSpot(n){
+  if(!PLAY.loop||!PLAY.loop.segs.length) return null;   // E58: no track = no seat (the rug re-asks every ~2s)
   const L=PLAY.loop.len, occ=[], cells=new Set();
   for(const tr of PLAY.trains){ if(tr.dying) continue;
     for(const c of tr.cars){ const lc=loopCoord(c.rd); if(lc!=null) occ.push(lc);
@@ -10522,11 +10584,23 @@ function playAdd(color,speed,cars,atD){
     for(let i=0;i<n;i++) o.push(PLAY_POOL[Math.floor(Math.random()*PLAY_POOL.length)]);
     return o; })();
   const spot=atD!=null? atD : playSpot(1+tail.length);
-  if(spot==null) return {ok:false,why:'full'};
+  if(spot==null||!PLAY.loop||!PLAY.loop.segs.length) return {ok:false,why:'full'};
   const head=riderAt(spot);
+  // E58: the too-short law is placeTrainAt's, spoken here — a kid line may be
+  // one straight now; the probe walks back for the tail, shifts forward once,
+  // or refuses (the glued loops always passed by construction).
+  const need=GAP*tail.length;
+  if(need>0){
+    const pr=clone(head), rb=back(pr,need);
+    if(!rb.ok){
+      const f=advance(head,(need-rb.moved)+2);
+      if(!f.ok) return {ok:false,why:'full'};
+      const pr2=clone(head); if(!back(pr2,need).ok) return {ok:false,why:'full'};
+    }
+  }
   const tr={ id:PLAY.nextId++, color,
     speed: speed!=null? Math.max(0.1,+speed) : PLAY_SPEED_R[0]+Math.random()*(PLAY_SPEED_R[1]-PLAY_SPEED_R[0]),
-    cars:[{type:'loco',rd:head,face:1,squash:0}],
+    cars:[{type:'loco',rd:head,face:1,squash:0}], F:true,   // E58: which end leads — the open-end law's flag
     pauseT:0, stKey:null, cellKey:null, dying:false, crashT:0, wheel:0, smokeT:0.2,
     grav:1, crest:false, pose:null, poseT:0, pri:0 };   // E30: each train carries its own hill-heart (flat maps: mul holds 1.0, pose never arms)
   for(let i=1;i<=tail.length;i++){ const rd=clone(head); back(rd,GAP*i); tr.cars.push({type:tail[i-1],rd,face:1,squash:0}); }
@@ -10603,8 +10677,16 @@ function playUpdate(dt){
     if(tr.poseT>0){ tr.poseT-=dt; if(tr.poseT<=0){ tr.pose=null; tr.pri=0; } }   // E30: poses are paint — they decay even at the platform
     if(tr.pauseT>0){ tr.pauseT-=dt; continue; }       // paused at the platform (and catchable there)
     if(tr.speed>top) top=tr.speed;
-    const step=SPEED*tr.speed*playGravTick(tr,dt)*dt; // E30: the hill modulates each train's OWN step (flat = ×1, float-exact — byte-true)
-    for(const c of tr.cars) advance(c.rd,step);       // a closed glued loop — advance never dead-ends
+    const d=SPEED*tr.speed*playGravTick(tr,dt)*dt;    // E30: the hill modulates each train's OWN step (flat = ×1, float-exact — byte-true)
+    // E58: BUILD's open-end law, per train — probe the lead, clamp the step,
+    // boing + ping-pong at a break or bumper (a kid may open the loop now).
+    // On the glued circuits the probe always passes: stepping stays byte-true.
+    // LIVE latches a kid-laid splitter mid-pass exactly like BUILD's trains.
+    const lead=tr.F? tr.cars[0] : tr.cars[tr.cars.length-1];
+    const probe=clone(lead.rd), pr=advance(probe,d);
+    const step=pr.ok? d : Math.max(0,pr.moved-0.5);
+    if(step>1e-4){ LIVE=true; for(const c of tr.cars) advance(c.rd,step); LIVE=false; }
+    if(!pr.ok) playReverse(tr);
     tr.wheel+=step/8;
     // E9: every train pays its own laps — the ruler is the loop's own arc length
     tr.lapAcc=(tr.lapAcc||0)+step;
@@ -10684,6 +10766,17 @@ function playUpdate(dt){
     }
   }
 }
+// E58 — the exhibit's mount, factored: playEnter's world block verbatim, so
+// THE BROOM can re-set the default room in place (menu-and-back, one tap).
+function playMount(){
+  grid.clear(); hgrid.clear(); scen.clear();
+  const M=playMap();
+  for(const g of M.scen) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
+  // E30: a track row may carry elev as its 5th field — the pass rides trestles.
+  // Rows without it mount at 0 exactly as before; climbers force 0 (the v:4 law).
+  for(const [t,r,x,y,el] of M.track){ const pc=setTrackPiece(t,r,null,(t==='rp'||t==='sp')?0:(el?1:0),x,y); pc.glued=1; }
+  buildLoopMap();
+}
 function playEnter(forceI){
   if(PLAY.on||CAMP.on) return PLAY.on;
   // E17: pick THIS visit's rug, then advance the cycle for next time. The save
@@ -10701,15 +10794,9 @@ function playEnter(forceI){
   PORT.on=0; PORT.t=0; PORT.flip=0; PORT.cd=0;   // E48: the portal keeps none either
   playClackAcc=0;                        // E30: the chain-lift clock starts quiet every visit
   ridersOff();                           // E15: the wind-up rug keeps its glued people only
-  grid.clear(); hgrid.clear(); scen.clear();
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; trailClear();   // E28: PLAY is byte-identical ALWAYS
-  const M=playMap();
-  for(const g of M.scen) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
-  // E30: a track row may carry elev as its 5th field — the pass rides trestles.
-  // Rows without it mount at 0 exactly as before; climbers force 0 (the v:4 law).
-  for(const [t,r,x,y,el] of M.track){ const pc=setTrackPiece(t,r,null,(t==='rp'||t==='sp')?0:(el?1:0),x,y); pc.glued=1; }
-  buildLoopMap();
-  playAdd('red',1,M.home||PLAY_HOME_CARS);   // one red train, already running — the lid opens mid-chug (E30: the pass's resident brings seats)
+  playMount();
+  playAdd('red',1,playMap().home||PLAY_HOME_CARS);   // one red train, already running — the lid opens mid-chug (E30: the pass's resident brings seats)
   $('mark').textContent=PLAY_MARK;
   showScreen('play');
   if(COACH_PAN&&!coachT){ coachT=true; toast(COACH_LINE); }   // E24: the coach speaks once a session
@@ -10731,6 +10818,37 @@ function playLocoHit(wx,wy){             // a toddler finger on any car of any t
     for(const c of tr.cars){ const p=pos(c.rd);
       if(Math.hypot(wx-p.x, wy-(p.y-LIFT*(p.z||0)))<34) return tr; } }
   return null;
+}
+// E58 — the under-train lock, wind-up edition: the E4 (cell,elev) law swept
+// over EVERY live train's cars (trainCells' exact footprint grammar — sp and
+// rp hold both levels). A wind-up train is ALWAYS using its piece: paused at
+// the platform is still using it (no stopped-train concession here — there
+// is no GO button to hand back).
+function playTrainCells(){
+  const s=new Set();
+  for(const tr of PLAY.trains){ if(tr.dying) continue;
+    for(const c of tr.cars){
+      const pc=pieceOf(c.rd);
+      if(pc&&pc.t==='sp'){ for(const [x2,y2] of spiralCells(pc.ax,pc.ay)){ s.add(key(x2,y2)+':0'); s.add(key(x2,y2)+':1'); } }
+      else{ s.add(key(c.rd.cx,c.rd.cy)+':'+(c.rd.el?1:0)); if(pc&&pc.t==='rp') s.add(key(c.rd.cx,c.rd.cy)+':1'); }
+    }
+  }
+  return s;
+}
+function playTrainOn(x,y,pc){
+  if(!PLAY.on||!PLAY.trains.length) return false;
+  const tc=playTrainCells();
+  if(spans2(pc)||pc.t==='sp') return tc.has(key(x,y)+':0')||tc.has(key(x,y)+':1');
+  return tc.has(key(x,y)+':'+(pc.elev?1:0));
+}
+// E58 — the open-end law is BUILD's, per train (reverseTrain verbatim): a
+// broken loop ping-pongs, a bumper boings, the toy never derails. tr.F names
+// which end leads (the E6 uniform-arc law — cars get PUSHED, art never turns).
+function playReverse(tr){
+  const lead=tr.F? tr.cars[0] : tr.cars[tr.cars.length-1];
+  lead.squash=1;
+  for(const c of tr.cars){ c.rd.dir*=-1; c.face*=-1; }
+  tr.F=!tr.F; tr.lapAcc=0; SND.boing();   // E9's law kept: ping-pong bounces don't pay — only true circuits mint
 }
 // play trains as z-items for the E4 paint pipeline; a dying consist tumbles and fades
 function playCarItems(){
@@ -10978,17 +11096,18 @@ function toast(msg){
   el.textContent=msg; el.classList.add('on');
   clearTimeout(toast.tm); toast.tm=setTimeout(()=>el.classList.remove('on'),2000);
 }
-function hintPass(n){ if(BED.ctx) return; if(hintStage===n){ hintStage=n+1; save(); } }   // E18: the menu coaches nobody
+function hintPass(n){ if(BED.ctx||PLAY.on) return; if(hintStage===n){ hintStage=n+1; save(); } }   // E18: the menu coaches nobody — E58: the wind-up rug neither (stateless law)
 function wiggle(el){ el.classList.remove('wig'); void el.offsetWidth; el.classList.add('wig'); }
 
 function swRotate(gx,gy){
   const pc=pieceTop(gx,gy); if(!pc) return;
-  if(pc.glued){ gluedTug(pc,null); return; }
+  if(pc.glued&&!PLAY.on){ gluedTug(pc,null); return; }   // E58: in PLAY glued TRACK turns like any toy
+  if(PLAY.on && playTrainOn(gx,gy,pc)){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); return; }   // E58: the under-train lock, wind-up edition
   if(TRAIN.placed && trainOn(gx,gy,pc)){
     if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); return; }
     trainHome(false);
   }
-  pc.r=(pc.r+1)%4; pc.ra={k:1}; pc.latch=null; SND.click(); save();
+  pc.r=(pc.r+1)%4; pc.ra={k:1}; pc.latch=null; SND.click(); if(PLAY.on) playLoopSync(); else save();
   eagerTry();   // E27: a long-press turn is a track mutation too
 }
 cvs.addEventListener('pointerdown',e=>{
@@ -11116,12 +11235,16 @@ function moveCore(e){
   else if(down.what==='piece'){
     const [gx,gy]=down.cell, pc=pieceTop(gx,gy);
     if(pc){
-      if(pc.glued){ if(grabLand(e)) return; gluedTug(pc,null); down=null; return; }   // E24: the move pans; the menu (no camera) keeps IT'S PART OF THE LAND!
+      // E24: the move pans; the menu (no camera) keeps IT'S PART OF THE LAND!
+      // E58: in PLAY only glued SCENERY is the land — glued TRACK is the toy
+      // and falls through to the tug (tug/rotate/remove, the BUILD hand).
+      if(pc.glued&&!PLAY.on){ if(grabLand(e)) return; gluedTug(pc,null); down=null; return; }
+      if(PLAY.on && playTrainOn(gx,gy,pc)){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); down=null; return; }   // E58: the under-train lock, wind-up edition — a wind-up train is always using its piece
       if(TRAIN.placed && trainOn(gx,gy,pc)){
         if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); down=null; return; }
         trainHome(false); toast('BACK ON THE SHELF');
       }
-      removeTrackPiece(gx,gy,pc); save();
+      removeTrackPiece(gx,gy,pc); if(PLAY.on) playLoopSync(); else save();   // E58: PLAY edits rule the line, never the book
       DRAG={kind:'movePiece',t:pc.t,r:pc.r,sel:pc.sel|0,elev:pc.elev|0,
             from:pc.t==='sp'?[pc.ax,pc.ay]:[gx,gy]};
     }
@@ -11129,8 +11252,8 @@ function moveCore(e){
   else if(down.what==='scen'){
     const [gx,gy]=down.cell, s=scenAt(gx,gy);
     if(s){
-      if(s.glued){ if(grabLand(e)) return; gluedTug(null,s); down=null; return; }     // E24: the move pans; the menu (no camera) keeps IT'S PART OF THE LAND!
-      scen.delete(key(gx,gy)); save();
+      if(s.glued){ if(grabLand(e)) return; gluedTug(null,s); down=null; return; }     // E24: the move pans; the menu (no camera) keeps IT'S PART OF THE LAND! (E58: dressing stays land in PLAY too)
+      scen.delete(key(gx,gy)); if(!PLAY.on) save();
       DRAG={kind:'moveScen',t:s.t,v:s.v|0,from:[gx,gy]};
     }
   }
@@ -11164,6 +11287,13 @@ function moveCore(e){
     DRAG={kind:'atrain',prev:AT.cars};                               // any car of it = the toy law's handle
     AT.cars=[];
   }
+  else if(down.what==='ptrain'){                                     // E58: grab any car = the WHOLE wind-up train
+    const tr=down.tr;                                                // lifts (the E16 loco law, tray edition) —
+    if(tr&&!tr.dying){                                               // same color, same cars, same speed ride the hand
+      PLAY.trains=PLAY.trains.filter(t=>t!==tr);
+      DRAG={kind:'ptrainLift', color:tr.color, speed:tr.speed, cars:tr.cars.slice(1).map(c=>c.type)};
+    }
+  }
   if(DRAG){
     // E55 dismiss law 1 (E25 grammar): a drag born on a CHEST card folds the
     // chest as the toy leaves — the drag rides on to the rug uninterrupted.
@@ -11185,7 +11315,8 @@ function upCore(e){
     } else {
       // E34 KEEP LAYING — a tap on a live continue zone lays the next piece
       // and never arms DTAP; every other empty-cell tap falls through byte-true.
-      if(SCREEN==='game'){ const wz=worldXY(e), cz=cellXY(wz[0],wz[1]);
+      // E58: the chain lays on the wind-up rug too (the one ceremony is gated there).
+      if(SCREEN==='game'||SCREEN==='play'){ const wz=worldXY(e), cz=cellXY(wz[0],wz[1]);
         if(cz&&klTap(cz[0],cz[1])){ down=null; return; } }
       const t2=perf();
       if(DTAP.t&&t2-DTAP.t<0.35&&Math.hypot(e.clientX-DTAP.x,e.clientY-DTAP.y)<30){
@@ -11202,7 +11333,7 @@ function upCore(e){
       if(q&&q.ok){
         layAt(DRAG.t,DRAG.r,DRAG.sel,hover[0],hover[1],q);   // E34: the one hand-lay ceremony — the continue-tap speaks it too
       } else if(hover){
-        if(DRAG.kind==='movePiece'){ setTrackPiece(DRAG.t,DRAG.r,DRAG.sel,DRAG.elev|0,DRAG.from[0],DRAG.from[1]); save(); }
+        if(DRAG.kind==='movePiece'){ setTrackPiece(DRAG.t,DRAG.r,DRAG.sel,DRAG.elev|0,DRAG.from[0],DRAG.from[1]); if(PLAY.on) playLoopSync(); else save(); }
         let msg='THAT SPOT IS TAKEN';
         if(q&&q.why==='ramp') msg='NEEDS A RAMP!';
         else if(q&&q.why==='scenery'){
@@ -11219,21 +11350,21 @@ function upCore(e){
         }
         toast(msg);
       } else {
-        if(DRAG.kind==='movePiece'){ SND.pop(); puff(wx,wy,14); save(); eagerTry(); }   // E27: a removal is a track mutation too
+        if(DRAG.kind==='movePiece'){ SND.pop(); puff(wx,wy,14); if(!PLAY.on) save(); eagerTry(); }   // E27: a removal is a track mutation too (E58: the grab already re-ruled the line)
       }
     }
     else if(DRAG.kind==='newScen'||DRAG.kind==='moveScen'){
       if(hover && canPlaceScen(DRAG.t,hover[0],hover[1])){
         scen.set(key(hover[0],hover[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:1,wave:0});
         SND.tok(); puff(GX+hover[0]*C+C/2,GY+hover[1]*C+C/2,14);
-        if(DRAG.kind==='newScen'){ if(BED.ctx) GHOST.pend='room'; else handMark('room'); }   // E57: a fresh scen drop proves the drag too (rides this save)
-        save();
+        if(DRAG.kind==='newScen'){ if(BED.ctx) GHOST.pend='room'; else if(!PLAY.on) handMark('room'); }   // E57: a fresh scen drop proves the drag too (rides this save; E58: PLAY teaches nothing)
+        if(!PLAY.on) save();
         if(DRAG.kind==='newScen'&&!BED.ctx) handyBump(DRAG.t);   // E55: a fresh placement bubbles onto the face (moves never do — E27)
       } else if(hover){
-        if(DRAG.kind==='moveScen'){ scen.set(key(DRAG.from[0],DRAG.from[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0}); save(); }
+        if(DRAG.kind==='moveScen'){ scen.set(key(DRAG.from[0],DRAG.from[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0}); if(!PLAY.on) save(); }
         toast((DRAG.t==='rv'||DRAG.t==='pond')&&pieceAt(hover[0],hover[1])?'WATER AND TRACK DON\'T MIX — TRY A BRIDGE!':'THAT SPOT IS TAKEN');
       } else {
-        if(DRAG.kind==='moveScen'){ SND.pop(); puff(wx,wy,14); save(); }
+        if(DRAG.kind==='moveScen'){ SND.pop(); puff(wx,wy,14); if(!PLAY.on) save(); }
       }
     }
     else if(DRAG.kind==='train'){
@@ -11298,6 +11429,15 @@ function upCore(e){
       if(d0!=null){ const r=playAdd(DRAG.color,null,null,d0); if(!r.ok) SND.toot(); }
       else { SND.pop(); puff(wx,wy,14); }
     }
+    else if(DRAG.kind==='ptrainLift'){
+      // E58 — the lifted wind-up train goes back down: on the line it lands AT
+      // THE DROP CELL and rolls on (same color, cars, speed); off the line it
+      // goes home in a puff — the NEVER-EMPTY law keeps the rug alive.
+      const d0=playDropD(hover);
+      const r=d0!=null? playAdd(DRAG.color,DRAG.speed,DRAG.cars,d0) : {ok:false};
+      if(r.ok) SND.clank();
+      else { SND.pop(); puff(wx,wy,16); }
+    }
     else if(DRAG.kind==='atrain'){
       // E18 — the stock attract toy goes back down. On track: seated by the
       // placeTrainAt probe law, mid-chug (running is its nature — no GO exists
@@ -11336,16 +11476,17 @@ function upCore(e){
         // the station is the do-it-again button (in a level it re-rolls the
         // gift). Glued stations answer too; a running train keeps today's ladder.
         if(pc.t==='st' && !TRAIN.placed && eagerSummon(gx,gy)){}
-        else if(pc.glued){ gluedTug(pc,null); }   // no rotating the glued land either
+        else if(pc.glued&&!PLAY.on){ gluedTug(pc,null); }   // no rotating the glued land either — E58: in PLAY glued TRACK turns like any toy
         else if(pc.t==='sw'){
           // TAP THE PIECE = THROW THE POINTS (rotation lives on a long-press)
-          if(TRAIN.placed && (pc.latch || trainOn(gx,gy,pc))){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
-          else { pc.sel^=1; SND.click(); save(); eagerTry(); }   // E27: thrown points re-route the line
+          if(PLAY.on? (pc.latch || playTrainOn(gx,gy,pc)) : (TRAIN.placed && (pc.latch || trainOn(gx,gy,pc)))){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
+          else { pc.sel^=1; SND.click(); if(PLAY.on) playLoopSync(); else save(); eagerTry(); }   // E27: thrown points re-route the line
         }
+        else if(PLAY.on && playTrainOn(gx,gy,pc)){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }   // E58: the under-train lock, wind-up edition
         else if(TRAIN.placed && trainOn(gx,gy,pc)){
           if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
           else { trainHome(false); pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); save(); }
-        } else { pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); hintPass(1); save(); eagerTry(); }   // E27: a turn is a track mutation
+        } else { pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); hintPass(1); if(PLAY.on) playLoopSync(); else save(); eagerTry(); }   // E27: a turn is a track mutation
       }
     }
     else if(down.what==='scen'){
@@ -11436,7 +11577,7 @@ function layerOf(t){
          TOWN_TAB.includes(t)?'town': FRIEND_TAB.includes(t)?'friends':null;
 }
 function handyBump(t){
-  if(BED.ctx||SCREEN==='play') return;        // E27: the bedroom and PLAY never bump
+  if(BED.ctx) return;                         // E27: the bedroom never bumps — E58: PLAY does now (one crate, one face; still session-only, zero writes)
   if(!layerOf(t)) return;                     // palette kinds only — cars/engines live in the chest
   HANDY=[t,...HANDY.filter(k=>k!==t)].slice(0,8);   // a shadow deeper than the face, so gates can hide rows
   faceSync();
@@ -11789,6 +11930,16 @@ function buildPalette(){
     ac();
     if(tidyArm){
       clearTimeout(tidyArm); tidyOff();
+      if(PLAY.on){
+        // E58 THE BROOM IS THE RESET: the exhibit re-mounts byte-true —
+        // Wyatt's "goes back to normal" without leaving the room. Fresh
+        // resident, ZERO saves (the stateless law holds even here).
+        PLAY.trains=[]; PLAY.respawnT=PLAY_RESPAWN;
+        playMount();
+        playAdd('red',1,playMap().home||PLAY_HOME_CARS);
+        SND.pop(); toast('ALL TIDY!');
+        return;
+      }
       if(CAMP.on) clearPlayer();             // sweep the kid's line; the glued land stays put
       else { grid.clear(); hgrid.clear(); scen.clear(); trainHome(true); }
       SND.pop(); save(); toast('ALL TIDY!');
@@ -11983,7 +12134,7 @@ function eagerVerdict(pc,x,y){  // both directions from one seed → done? stati
 let KL=null;                    // {pc,x,y} the chain anchor — a HAND-laid piece, BUILD+campaign only
 function klClear(){ KL=null; }
 function klSeed(pc,x,y){        // sp = footprint set-piece, b = end-cap: neither says "onward"
-  KL=(SCREEN==='game'&&!BED.ctx&&pc.t!=='sp'&&pc.t!=='b')? {pc,x,y} : null;
+  KL=((SCREEN==='game'||SCREEN==='play')&&!BED.ctx&&pc.t!=='sp'&&pc.t!=='b')? {pc,x,y} : null;   // E58: the chain follows the hand onto the wind-up rug
 }
 // one writer for the whole hand-lay ceremony — the drag drop and the
 // continue-tap both speak it, so the eager train / hints / coach hear
@@ -11994,11 +12145,13 @@ function layAt(t,r,sel,cx2,cy2,q){
   hintPass(0); if(grid.size>=3) hintPass(1);
   // E57: the kid's own lay IS the lesson's proof — the bit rides this very
   // save (zero extra writes). The bedroom defers through the wrapper line.
+  // E58: the wind-up rug teaches nothing and saves nothing — the lay re-rules
+  // the line instead (spawn seats, drops and laps follow the kid's track).
   if(BED.ctx) GHOST.pend='room';
-  else { handMark('room'); if(CAMP.on) handMark('gap'); }
-  save();
-  if(!BED.ctx) EAGER.last={x:cx2,y:cy2,el:q.elev?1:0};   // E27: the hand's newest piece — the arrival's fallback anchor
-  if(!BED.ctx) handyBump(t);                             // E55: the hand-lay bubbles onto the face (drops + E34 chain taps — rig places never come here)
+  else if(!PLAY.on){ handMark('room'); if(CAMP.on) handMark('gap'); }
+  if(PLAY.on) playLoopSync(); else save();
+  if(!BED.ctx&&!PLAY.on) EAGER.last={x:cx2,y:cy2,el:q.elev?1:0};   // E27: the hand's newest piece — the arrival's fallback anchor
+  if(!BED.ctx) handyBump(t);                             // E55: the hand-lay bubbles onto the face (drops + E34 chain taps — rig places never come here; E58: PLAY bumps too — one crate)
   eagerTry();                                            // E27: mutation + finished + trainless = she comes
   klSeed(pc,cx2,cy2);                                    // E34: the newest piece is the chain's head
   return pc;
@@ -12043,7 +12196,7 @@ function klTap(gx,gy){
 function klGhost(){
   // PAINT-ONLY: a faint next-piece in every armed zone — much quieter
   // than the drag ghost, and hidden while a drag owns the hand.
-  if(!KL_GHOST||!KL||DRAG||SCREEN!=='game') return;
+  if(!KL_GHOST||!KL||DRAG||(SCREEN!=='game'&&SCREEN!=='play')) return;   // E58: the whisper follows the chain onto the wind-up rug
   for(const z of klZones()){
     const mock={t:z.t,r:z.r,sel:z.sel|0,elev:z.elev,latch:null};
     cx.globalAlpha=KL_GHOST_A*0.5; cx.fillStyle='#F7E9C4';
@@ -12155,11 +12308,11 @@ function paletteSync(){
   $('tabTrack').style.display=vis.track?'':'none';
   $('tabScen').style.display=(vis.scen+vis.town)?'':'none';   // E55: LAND & TOWN — one plank over the two old departments
   $('tabFriends').style.display=vis.friends?'':'none';
-  $('tabTrains').style.display=CAMP.on?'none':'';
-  $('shelf').style.display=CAMP.on?'none':'';                  // the TRAINS run follows its plank
-  $('tabRug').style.display=CAMP.on?'none':'';
+  $('tabTrains').style.display=(CAMP.on||PLAY.on)?'none':'';   // E58: PLAY rides the campaign grammar — the tray gives its trains
+  $('shelf').style.display=(CAMP.on||PLAY.on)?'none':'';       // the TRAINS run follows its plank
+  $('tabRug').style.display=(CAMP.on||PLAY.on)?'none':'';      // …and a surprise land keeps its own rug
   const gr=$('grprug');                                        // built by buildPalette — guard the boot order
-  if(gr) gr.style.display=CAMP.on?'none':'';                   // '' = the stylesheet's display:contents
+  if(gr) gr.style.display=(CAMP.on||PLAY.on)?'none':'';        // '' = the stylesheet's display:contents
   faceSync();
 }
 /* =====================================================================
@@ -12339,7 +12492,7 @@ function showScreen(s){
   if(s==='board'){ boardFilter(); boardSync(); }   // E56: one book per visit (BOARD_BOOK gates the trio)
   $('wall').style.display=s==='wall'?'flex':'none';   // E56 THE POSTCARD WALL — the door's inside
   if(s==='wall') wallSync();
-  $('rail').style.display=game?'flex':'none';            // E33→E55: the rail is BUILD/campaign furniture (the face + the chest tile ride it — campaign included, the chest is the palette's door now)
+  $('rail').style.display=(game||play)?'flex':'none';    // E33→E55: the rail is BUILD/campaign furniture — E58: PLAY too (YOUR TRACK: the crate follows the hand onto the wind-up rug)
   $('magic').style.display=((game&&!CAMP.on)||play)?'flex':'none';   // E52: a level owns its sky — E55: the pills are a right chip column on BUILD + PLAY (all three books keep the clear sky)
   document.body.classList.toggle('playshelf',play);      // E36 THE TRAIN SHELF: five trains, always out, no door
   toastSeat();          // E36: the coach line seats above the shelf on the wind-up rug
@@ -13907,6 +14060,11 @@ window.TS={
     add(color,speed,cars){ return playAdd(color,speed,cars); },   // speed/cars pinned only by batteries
     count(){ return PLAY.trains.filter(t=>!t.dying).length; },
     get crashes(){ return PLAY.crashes; },
+    // E58 — the ruler, readable: segs count + arc length + closure + home
+    // (the battery asserts the re-rule after every edit against this door).
+    loop(){ return PLAY.loop? { n:PLAY.loop.segs.length, len:+PLAY.loop.len.toFixed(2),
+      closed:!!PLAY.loop.closed, home:+PLAY.loop.home.toFixed(2),
+      segs:PLAY.loop.segs.map(sg=>[sg.k,sg.el,sg.pi,sg.dir]) } : null; },
     state(){ return { on:PLAY.on, cap:PLAY_CAP, crashes:PLAY.crashes, map:PLAY.mapIdx, playIdx:PLAYI|0,
       loopLen:PLAY.loop? PLAY.loop.len:0, respawnT:PLAY.respawnT,
       trains:PLAY.trains.map(tr=>({ id:tr.id, color:tr.color, speed:tr.speed, dying:!!tr.dying,
