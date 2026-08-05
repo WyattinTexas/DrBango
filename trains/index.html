@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v7.0 -->
+<!-- TRAINSET v7.1 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -48,8 +48,9 @@
      appears only while zoomed off the default (rows sit 48px apart: the chips
      stand 43px tall, so 42px rows kissed by a pixel — measured) ---- */
   #homeChip{ top:58px; right:12px; display:none; }
-  /* ---- the RIDE ALONG chip (E15): stacked under HOME in the cluster (E25) ---- */
-  #rideChip{ top:106px; right:12px; display:none; }
+  /* ---- the RIDE ALONG chip (E15): stacked under the zoom slider in the cluster
+     (E25 seat, E61 nudge — the slider is a hair taller than the chip it replaced) ---- */
+  #rideChip{ top:112px; right:12px; display:none; }
   #rideChip.on{ border-color:#F2C531; color:#F2C531; }
   .pbtn.on{ border-color:#F2C531; color:#F2C531; }   /* E10: the picked SIZE / LAND / WEATHER tile */
   /* ---- the bedroom menu (E3): DOM chrome floats over the painted room ---- */
@@ -526,8 +527,31 @@
      and the chrome breathes back. opacity + pointer-events ONLY, nothing moves.
      The spread needs no fold: dismiss laws 1 and 2 have already shut it before
      any hand is live. ---- */
-  #mark,#menuChip,#backChip,#starChip,#homeChip,#rideChip,#goalChip{ transition:opacity var(--shygame,0.25s) ease; }
-  body.shygame :is(#mark,#mute,#menuChip,#backChip,#starChip,#homeChip,#rideChip,#goalChip){ opacity:0; pointer-events:none; }
+  #mark,#menuChip,#backChip,#starChip,#homeChip,#rideChip,#goalChip,#zslide{ transition:opacity var(--shygame,0.25s) ease; }
+  body.shygame :is(#mark,#mute,#menuChip,#backChip,#starChip,#homeChip,#rideChip,#goalChip,#zslide){ opacity:0; pointer-events:none; }
+  /* ---- E61 THE QUIET RUG: on the wind-up rug a resting hand melts ALL the
+     chrome away — the railroad is the show. opacity + pointer-events only
+     (the shy grammar, a slower breath out and the base fade back in); ANY
+     touch is a poke and it all returns — and the returning touch still
+     lands on the rug, the fade is never a modal. ---- */
+  body.quiet :is(#rail,#spread,#magic,#menuChip,#zslide,#mark,#mute,#starChip){ opacity:0; pointer-events:none; transition:opacity 0.6s ease; }
+  body.quiet :is(#rail,#spread,#magic) *{ pointer-events:none; }
+  /* ---- E61 THE ZOOM SLIDER: WHOLE RUG retired — a little wooden hand-dial in
+     its corner seat (the knob's floor IS the whole rug; its ceiling is the E20
+     zoom max). Custom DOM — a vertical <input type=range> can't wear the wood. */
+  #zslide{ position:absolute; top:58px; right:12px; z-index:6; display:none;
+    align-items:center; gap:calc(var(--ui)*4px);
+    background:linear-gradient(#3a2a18,#241708); border:2px solid #6e5130; border-radius:14px;
+    padding:calc(var(--ui)*5px) calc(var(--ui)*7px);
+    box-shadow:0 4px 12px rgba(0,0,0,0.4); touch-action:none; cursor:pointer; }
+  #zslide b{ font-size:calc(var(--ui)*11px); color:#F2C531; pointer-events:none; line-height:1; font-weight:bold; }
+  #ztrack{ position:relative; width:calc(var(--ui)*72px); height:calc(var(--ui)*14px); pointer-events:none; }
+  #ztrack::before{ content:''; position:absolute; left:0; right:0; top:50%; height:calc(var(--ui)*4px);
+    transform:translateY(-50%); background:#170f08; border:1px solid #513a24; border-radius:4px; }
+  #zknob{ position:absolute; top:50%; left:0; width:calc(var(--ui)*14px); height:calc(var(--ui)*14px);
+    transform:translate(-50%,-50%); background:linear-gradient(#F7D34C,#C89B22); border:2px solid #6e5130;
+    border-radius:50%; box-shadow:0 2px 5px rgba(0,0,0,0.45); }
+  body.conductor #zslide{ opacity:0; pointer-events:none; }
   /* E52 THE CONDUCTOR MOMENT: while the camera shows the goal the chrome holds
      its breath — the same fold as the shy set, plus the rail. cndStart/cndEnd
      are the class's one writer; the chrome returning IS "pieces present". */
@@ -666,6 +690,7 @@
 <div class="chip" id="backChip">🎫 LEVELS</div>
 <div class="chip" id="starChip"><b>SHOP</b><span id="starChipN">★ 0</span></div>
 <div class="chip" id="homeChip">🔎 WHOLE RUG</div>
+<div id="zslide"><b>−</b><div id="ztrack"><div id="zknob"></div></div><b>+</b></div>
 <div class="chip" id="rideChip">🚂 RIDE ALONG</div>
 <!-- E25: the toy box on the rug — screen-space DOM ("that is at least the UI"),
      it never pans with the world. The face canvas keeps a fixed backing store
@@ -1093,6 +1118,8 @@ const TBOX_PX=36;              // box face size ×--ui (~72px closed at the desk
 const TBOX_BREATH_S=4.5;       // seconds between idle lid breaths — a quiet pick-me, never a modal
 const SHY_GAME=true;           // THE SHY FOLD: chrome fades while a drag or a real pan is live
 const SHY_GAME_MS=250;         // the fold's fade, ms (--shygame)
+const QUIET=true;              // E61 THE QUIET RUG: on the wind-up rug a resting hand melts ALL the chrome
+const QUIET_MS=5000;           // ...after this long with no touch (any poke brings it back at once)
 // ---- Wyatt dials (EXPANSION 27 — one block) ----
 // CLOSE AT HAND & THE EAGER TRAIN. Wyatt 8/3, reviewing the spread on his
 // phone: "it shouldn't be this rectangle across the screen… maybe more of a
@@ -1926,9 +1953,10 @@ function camGlide(dt){                           // flick-to-glide — the GVT c
   if(Math.abs(VIEW.vy)<FLICK_STOP) VIEW.vy=0;
   viewApply();
 }
-function homeSync(){                             // the HOME chip appears only off the default (quiet-HUD, E20)
-  const el=document.getElementById('homeChip'); if(!el) return;
-  el.style.display=(camGate() && offBase())?'block':'none';
+function homeSync(){                             // E61: WHOLE RUG retired — the slider's floor is the whole rug
+  const el=document.getElementById('homeChip');
+  if(el) el.style.display='none';
+  zSync();                                       // the knob follows every camera hand (pinch/wheel/double-tap)
   rideSync();
 }
 /* =====================================================================
@@ -11678,7 +11706,7 @@ function faceList(){
   const out=[], seen=new Set();
   for(const t of [...HANDY,...FACE_FLOOR]){
     if(seen.has(t)) continue; seen.add(t);
-    if(!coll.has(t)||!layerOf(t)) continue;   // THE GATE — owned only, both modes
+    if((!coll.has(t)&&!PLAY.on)||!layerOf(t)) continue;   // THE GATE — owned only (E61: PLAY's crate is whole — the sandbox law)
     out.push(t);
     if(out.length>=FACE_N) break;
   }
@@ -12247,6 +12275,22 @@ function shyGameSync(){        // THE SHY FOLD — one truth, read every frame, 
     ( !!DRAG || !!PINCH || !!(down&&down.what==='pan'&&down.on) );
   if(on!==SHYG.on){ SHYG.on=on; document.body.classList.toggle('shygame',on); }
 }
+/* E61 THE QUIET RUG — on the wind-up rug a resting hand melts the chrome.
+   Read every frame like the shy fold; writes only on change. A live hand,
+   a knob mid-drag or an open panel holds the clock; any pointer/wheel is
+   a poke (window capture — it fires before the rug eats the event). */
+const QT={t:0,on:false};
+function quietPoke(){ QT.t=performance.now();
+  if(QT.on){ QT.on=false; document.body.classList.remove('quiet'); } }
+function quietSync(){
+  if(!QUIET||SCREEN!=='play'){ if(QT.on) quietPoke(); return; }
+  if(down||DRAG||PINCH||ZSL.drag
+     ||$('toybox').style.display==='flex'||$('store').style.display==='flex'
+     ||$('bank').style.display==='flex'){ QT.t=performance.now(); return; }
+  if(!QT.on && performance.now()-QT.t>QUIET_MS){ QT.on=true; document.body.classList.add('quiet'); }
+}
+window.addEventListener('pointerdown',quietPoke,true);
+window.addEventListener('wheel',quietPoke,{capture:true,passive:true});
 function buildTbox(){
   document.documentElement.style.setProperty('--shygame',(SHY_GAME_MS/1000)+'s');
   if(TBOX_SIDE==='right'){     // the side is a dial — rail + chest panel flip together (E55: the tile rides the rail)
@@ -12486,7 +12530,8 @@ function paletteSync(){
   // home); a level hides TRAINS + RUG, sections and planks together
   // (the game packs the cars; a level keeps its own land). The face re-asks
   // the same gate through faceSync.
-  const full=false;
+  const full=PLAY.on;   // E61: PLAY is the sandbox — the chest opens WHOLE there (the tray's ignore-unlocks
+                        // law, E6, extended; PLAY is stateless so nothing is granted — THE FIFTY STAY FIFTY)
   const vis={track:0,scen:0,town:0,friends:0};
   for(const b of PAL_BTNS){
     const on=full||coll.has(b.t);
@@ -12685,12 +12730,15 @@ function showScreen(s){
   $('magic').style.display=((game&&!CAMP.on)||play)?'flex':'none';   // E52: a level owns its sky — E55: the pills are a right chip column on BUILD + PLAY (all three books keep the clear sky)
   document.body.classList.toggle('playshelf',play);      // E36 THE TRAIN SHELF: five trains, always out, no door
   toastSeat();          // E36: the coach line seats above the shelf on the wind-up rug
-  $('mark').style.display=(game||play)?'block':'none';
+  $('mark').style.display=game?'block':'none';   // E61: "we're already in play mode" — the chip is BUILD/campaign furniture
   $('menuChip').style.display=((game&&!CAMP.on)||play||s==='room')?'block':'none';   // E49: the big room shows the way home too
   $('backChip').style.display=(game&&CAMP.on)?'block':'none';
   $('goalChip').style.display=(game&&CAMP.on)?'block':'none';   // E52: the goal chip is level furniture — wordless, beside the mark
-  // E9: the ★ chip lives top-right in BUILD and PLAY (the campaign keeps its quiet HUD)
-  $('starChip').style.display=((game&&!CAMP.on)||play)?'block':'none';
+  // E9: the ★ chip lives top-right in BUILD (E61: PLAY sheds the shop door — stars still mint there, only the doorway hides)
+  $('starChip').style.display=(game&&!CAMP.on)?'block':'none';
+  $('mute').style.display=play?'none':'';        // E61: the wind-up rug keeps no sound chip (menu + BUILD keep it)
+  $('zslide').style.display=(game||play)?'flex':'none';   // E61: one camera, one dial — every rug mode
+  quietPoke();                                   // E61: a room change is a poke — the chrome greets you awake
   boxShow(false);       // the chest closes on any screen change (E25 dismiss law 3)
   storeShow(false);     // ...and so does the shop
   bankShow(false);      // ...and the piggy's panel (E13's bank — hers since E53)
@@ -13602,7 +13650,28 @@ function buildMenu(){
   syncSwatches();
 }
 $('mute').addEventListener('click',()=>{ AU.on=!AU.on; if(AU.on){ ac(); SND.click(); } muteSync(); save(); });
-$('homeChip').addEventListener('click',()=>{ ac(); SND.click(); viewFit(); });   // E10: snap back to the whole rug
+$('homeChip').addEventListener('click',()=>{ ac(); SND.click(); viewFit(); });   // E10: snap back to the whole rug (E61: the chip never shows — the slider's floor took its job)
+// ---- E61 THE ZOOM SLIDER — WHOLE RUG retired; the knob's floor IS the whole rug ----
+const ZSL={drag:false};
+function zPct(){ const f=fitScale(), m=zoomMax();
+  return m<=f? 0 : Math.max(0,Math.min(1,(VIEW.s-f)/(m-f))); }
+function zSync(){ if(ZSL.drag) return;
+  const k=document.getElementById('zknob'); if(k) k.style.left=(zPct()*100)+'%'; }
+function zSet(t){ const f=fitScale(), s1=f+Math.max(0,Math.min(1,t))*(zoomMax()-f);
+  const s0=VIEW.s||f; if(Math.abs(s1-s0)<1e-4) return;
+  zoomAt(W/2,(H-BAR)/2,s1/s0);                 // zoom about the screen centre — clamp + CAM.off ride the one pipeline
+  $('zknob').style.left=(zPct()*100)+'%';      // the hand's own write — zSync defers while dragging
+}
+{
+  const sl=$('zslide'), tr=$('ztrack');
+  const at=e=>{ const r=tr.getBoundingClientRect(); return (e.clientX-r.left)/Math.max(1,r.width); };
+  sl.addEventListener('pointerdown',e=>{ ac(); e.preventDefault(); e.stopPropagation();
+    ZSL.drag=true; try{ sl.setPointerCapture(e.pointerId); }catch(_){}
+    zSet(at(e)); });
+  sl.addEventListener('pointermove',e=>{ if(ZSL.drag) zSet(at(e)); });
+  const zEnd=()=>{ if(!ZSL.drag) return; ZSL.drag=false; zSync(); };
+  sl.addEventListener('pointerup',zEnd); sl.addEventListener('pointercancel',zEnd);
+}
 $('rideChip').addEventListener('click',()=>{ ac(); SND.click(); FOLLOW.on==='ride'? followLetGo() : followSet(true); });   // E46: dive down to the train / rise home to the stored view
 
 // ---- boot ----
@@ -13973,6 +14042,7 @@ function frame(t){
   }
   if(DRAG) withBed(dragSync);          // E19: the lift ramp is paint-time — it rises under a still finger
   shyGameSync();                       // E25: the shy fold reads the live hand every frame
+  quietSync();                         // E61: the quiet rug reads the resting hand every frame
   tboxBreath(t);                       // E25: the idle lid sigh — paint only, never a save
   if(SCREEN==='game'||SCREEN==='play') draw(); else if(SCREEN==='room') drawBig(); else drawMenu();
   if($('store').style.display==='flex') aisleFrame();   // E13: the aisle's live cards (visible ones only)
