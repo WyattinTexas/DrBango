@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v6.1 -->
+<!-- TRAINSET v6.2 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -163,6 +163,7 @@
   /* ---- E13 THE TOY AISLE: one horizontal strip, card size IS rarity ---- */
   #staisle{ position:relative; display:flex; align-items:flex-end; gap:calc(var(--ui)*10px);
     overflow-x:auto; overflow-y:hidden; padding:calc(var(--ui)*16px) calc(var(--ui)*10px) calc(var(--ui)*8px);
+    overflow-anchor:none;   /* E53: the fold pad must never make the browser re-aim the shelf */
     scroll-snap-type:x proximity; touch-action:pan-x; cursor:grab;
     border-bottom:calc(var(--ui)*5px) solid #6e5130;   /* the shelf floor the goods sit on */
     scrollbar-width:thin; scrollbar-color:#6e5130 #170f08; }
@@ -216,7 +217,8 @@
   .stcard .pc.buy,#ststage .pc.buy{ background:linear-gradient(#F7D14A,#D9A93B); color:#3A2A18;
     border-color:#8F6B1E; font-weight:bold; pointer-events:auto; cursor:pointer; }
   .stcard .pc.own,#ststage .pc.own{ background:#1e4d1e; border-color:#2f7a2f; color:#CFF7C4; }
-  /* ---- E13 THE BANK — the place you stop BEFORE the shop ---- */
+  /* ---- E13's bank panel — SINCE E53 IT IS THE PIGGY'S (★ MY STARS): the bank
+     died as a doorway; her tap opens the count + ledger. The ids kept the bones. ---- */
   #bank{ position:absolute; inset:0; z-index:12; display:none; align-items:center; justify-content:center;
     padding:10px; background:rgba(10,6,3,0.45); }
   #bkpanel{ position:relative; text-align:center; max-width:min(96vw,calc(var(--ui)*400px));
@@ -234,35 +236,34 @@
   #bkledger{ display:flex; flex-direction:column; gap:calc(var(--ui)*3px); margin:0 auto calc(var(--ui)*8px); max-width:calc(var(--ui)*265px);
     flex:0 1 auto; min-height:0; overflow-y:auto; width:100%;
     scrollbar-width:thin; scrollbar-color:#6e5130 transparent; }   /* E22: the one part of the bank allowed to scroll */
-  #bkpanel h1,#bkrow,#bkshop,#bkback{ flex:0 0 auto; }   /* the pig, the count and the DOOR never squash */
+  #bkpanel h1,#bkrow,.outplk{ flex:0 0 auto; }   /* the pig, the count and the OUT plank never squash */
   .bkrow2{ display:flex; align-items:center; gap:calc(var(--ui)*8px); background:#170f08; border:2px solid #513a24;
     border-radius:12px; padding:calc(var(--ui)*2px) calc(var(--ui)*9px) calc(var(--ui)*2px) calc(var(--ui)*5px); }
   .bkrow2 canvas{ width:calc(var(--ui)*26px); height:calc(var(--ui)*26px); flex:0 0 auto; }
   .bkrow2 b{ font-size:calc(var(--ui)*9px); letter-spacing:2px; color:#F7E9C4; }
   .bkrow2 i{ font-style:normal; font-size:calc(var(--ui)*6px); letter-spacing:1px; color:#8f7a52; }
   .bkrow2 span{ margin-left:auto; font-size:calc(var(--ui)*11px); letter-spacing:1px; color:#F2C531; }
-  /* ---- E22 THE DOOR SAYS SHOP: the gold pill becomes a real storefront —
-     striped awning with a scalloped hem, SHOP in big wooden letters, and the
-     star hint so a kid knows what the door is FOR before ever walking in ---- */
-  #bkshop{ display:block; margin:0 auto; position:relative; overflow:hidden;
-    background:linear-gradient(#7A553A,#5C3F28); border:3px solid #3a2a18; border-radius:14px;
-    font-family:inherit; padding:0 0 calc(var(--ui)*7px); cursor:pointer; min-width:calc(var(--ui)*185px); }
-  #bkshop:active{ transform:translateY(2px); }
-  #bkawn{ display:block; position:relative; height:calc(var(--ui)*17px); margin-bottom:calc(var(--ui)*7px); }
-  #bkawn::before{ content:''; position:absolute; inset:0 0 calc(var(--ui)*6px);
-    background:repeating-linear-gradient(90deg,#C0392B 0 calc(var(--ui)*13px),#F7E9C4 calc(var(--ui)*13px) calc(var(--ui)*26px)); }
-  #bkawn::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:calc(var(--ui)*6.5px);
-    background:
-      radial-gradient(circle at 50% 0,#C0392B 0 calc(var(--ui)*6.3px),transparent calc(var(--ui)*6.6px)) calc(var(--ui)*-6.5px) 0/calc(var(--ui)*26px) 100% repeat-x,
-      radial-gradient(circle at 50% 0,#F7E9C4 0 calc(var(--ui)*6.3px),transparent calc(var(--ui)*6.6px)) calc(var(--ui)*6.5px) 0/calc(var(--ui)*26px) 100% repeat-x; }
-  #bkshop b{ display:block; font-size:calc(var(--ui)*22px); letter-spacing:8px; font-weight:bold;
-    color:#F2C531; text-shadow:0 calc(var(--ui)*2px) 0 rgba(0,0,0,0.4); padding:0 calc(var(--ui)*18px); }
-  #bkshop small{ display:block; margin-top:calc(var(--ui)*3px); font-size:calc(var(--ui)*7.5px);
-    letter-spacing:2px; color:#F7E9C4; }
-  #bkback{ margin-top:4px; background:none; border:none; color:#CBB88C; font-family:inherit;
-    font-size:calc(var(--ui)*9px); letter-spacing:1px; cursor:pointer; padding:5px 8px; }
-  #stback{ margin-top:2px; background:none; border:none; color:#8f7a52; font-family:inherit;
-    font-size:calc(var(--ui)*9px); letter-spacing:1px; cursor:pointer; padding:5px 8px; }
+  /* ---- E53 ⬇ OUT — ONE CLOSE GRAMMAR EVERYWHERE: one wooden plank, bottom-
+     center, closes whatever it stands on. The storefront's wood family, calm
+     and straight. outPlank() mounts it (shop + piggy panel this card; the
+     chest and the door wall in later cards). The odd closes died with it. ---- */
+  .outplk{ display:block; margin:calc(var(--ui)*6px) auto 0; position:relative;
+    background:linear-gradient(#7A553A,#5C3F28); border:3px solid #3a2a18; border-radius:12px;
+    font-family:inherit; cursor:pointer; padding:calc(var(--ui)*7px) calc(var(--ui)*30px);
+    box-shadow:0 4px 10px rgba(0,0,0,0.4); }
+  .outplk b{ font-size:calc(var(--ui)*13px); letter-spacing:6px; font-weight:bold; color:#F2C531;
+    text-shadow:0 2px 0 rgba(0,0,0,0.4); }
+  .outplk:active{ transform:translateY(2px); }
+  /* ---- E53 THE SCROLL CUE: a chevron pill rides the aisle's right fold (the
+     half-cut card beside it is aisleFoldCut's law). JS seats its top on the
+     aisle strip so it works over one shelf and the .two showroom alike. ---- */
+  #stmain{ position:relative; }
+  #stmore{ position:absolute; right:calc(var(--ui)*3px); z-index:3; display:none;
+    width:calc(var(--ui)*26px); height:calc(var(--ui)*40px); align-items:center; justify-content:center;
+    background:linear-gradient(#7A553A,#5C3F28); border:2px solid #3a2a18; border-radius:calc(var(--ui)*9px);
+    color:#F2C531; font-family:inherit; font-size:calc(var(--ui)*17px); font-weight:bold; cursor:pointer;
+    box-shadow:0 4px 10px rgba(0,0,0,0.45); animation:chevBob 1.6s ease-in-out infinite; }
+  @keyframes chevBob{ 0%,100%{ transform:translate(0,-50%); } 50%{ transform:translate(calc(var(--ui)*3px),-50%); } }
   /* ---- E22 THE SHOP FRONT — the ★ chip is a shop button now: a little awning
      and the word, so "how you get to the shop" reads at a glance ---- */
   #starChip{ overflow:hidden; padding-top:calc(var(--ui)*13px); text-align:center; }
@@ -594,9 +595,8 @@
     .bkrow2 canvas{ width:22px; height:22px; }
     .bkrow2 b{ font-size:9px; letter-spacing:1px; } .bkrow2 i{ font-size:6px; }
     .bkrow2 span{ font-size:10px; }
-    #bkshop{ --ui:1.15; border-radius:11px; }
-    #bkback{ font-size:9px; margin-top:1px; }
-    #stback{ font-size:9px; margin-top:0; }
+    .outplk{ --ui:1.15; }
+    #stmore{ --ui:1.2; }
     #nmpanel{ padding:7px 8px 4px; }
     #nmpanel h1{ font-size:12px; letter-spacing:2px; margin-bottom:3px; }
     #nmprev{ font-size:11px; padding:4px 8px; margin-bottom:5px; }
@@ -661,8 +661,8 @@
   <div id="stmain">
   <div id="ststage"><canvas id="stgcv"></canvas><div id="stgside"><div id="stgplate"><b id="stgname"></b><small id="stgcap"></small></div><button id="stgchip" class="pc" type="button"></button></div></div>
   <div id="staisle"></div>
+  <button id="stmore" type="button">»</button>
   </div>
-  <button id="stback" type="button">⬇ CLOSE THE SHOP</button>
 </div></div>
 <div id="namer"><div id="nmpanel">
   <h1>NAME YOUR RAILROAD</h1>
@@ -673,11 +673,9 @@
   <button id="nmback" type="button">⬇ NOT NOW</button>
 </div></div>
 <div id="bank"><div id="bkpanel">
-  <h1>🏦 THE BANK</h1>
+  <h1>★ MY STARS</h1>
   <div id="bkrow"><canvas id="bkpig" width="384" height="312"></canvas><div id="bkcount">★ 0</div></div>
   <div id="bkledger"></div>
-  <button id="bkshop" type="button"><i id="bkawn"></i><b>SHOP</b><small>★ SPEND YOUR STARS</small></button>
-  <button id="bkback" type="button">⬇ CLOSE THE BANK</button>
 </div></div>
 <div id="toybox"><div id="tbpanel">
   <div id="tblid"><h1>🧸 THE TOY BOX</h1><span id="tbcount"></span></div>
@@ -2338,7 +2336,7 @@ function starTarget(){
   const el=$('starChip');
   if(el&&el.style.display!=='none'){ const r=el.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; }
   // E23→E26: on the menu the ★ lives at the little SHOP now — the piggy's pay
-  // flies to the storefront's fascia (the bank waits behind its door). The
+  // flies to the storefront's fascia (E53: the storefront IS the shop). The
   // display gate keeps the old top-right fallback for every hidden-menu screen.
   if($('menu').style.display!=='none') return {x:OX+SC*850, y:OY+SC*726};
   return {x:W-46,y:24};
@@ -8003,8 +8001,10 @@ const ROOM_OBJS=[
     tap(){ SND.tok(); playEnter(); } },
   { id:'toybox',  hit:{x:56, y:340,w:250,h:206}, px:182, py:528, label:()=>BOX_LABEL,
     tap(){ SND.tok(); boxCards(!ROOM.cards); } },
+  // E53 THE STOREFRONT IS THE SHOP — the tap lands in the aisle, one transition
+  // (E13's bank-before-shop repealed; the piggy holds the ledger now)
   { id:'store',   hit:{x:718,y:698,w:264,h:214}, px:850, py:892, label:()=>SHOP_LABEL,
-    tap(){ SND.tok(); bankShow(true); } },
+    tap(){ SND.tok(); storeShow(true); } },
   { id:'tickets', hit:{x:4,  y:6,  w:148,h:196}, px:76,  py:184, label:()=>CAMP_LABEL,
     tap(){ SND.tok(); showScreen('board'); } },
   // E49 THE FRONT DOOR IS A HAND — the 5th row is the hall light menuDoor()
@@ -8782,10 +8782,21 @@ function pigHit(e){
   const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // the menu painting's own inverse
   return Math.abs(mx-PIG.x)<58*PIG_SPOT.s && Math.abs(my-(PIG.y-8*PIG_SPOT.s))<52*PIG_SPOT.s;
 }
+// E53 — the piggy is the wallet, not a door: every tap opens her panel (the
+// old bank's count + ledger) AFTER the hop's beat, so the claim ceremony —
+// hop, coin pop, flight — stays visible before the panel covers the room.
+// The sandcastle wins: any other canvas press clears the pending open, and
+// the timeout re-checks the screen so a rig-driven change is never covered.
+let PIGP_T=null;
+function pigPanelSoon(){
+  if(PIGP_T) clearTimeout(PIGP_T);
+  PIGP_T=setTimeout(()=>{ PIGP_T=null; if(SCREEN==='menu') bankShow(true); }, PIG_PANEL_DELAY*1000);
+}
 function pigTap(){
   ac();
   PIG.hop=1;                            // the hop answers EVERY tap (GVT law)
   if(BED.shy) BED.idleT=0;              // a hand on the piggy is still a hand in the room
+  pigPanelSoon();                       // E53: the wallet opens on every tap — claim day or not
   if(!pigClaimable()){
     // empty today: joy, not a menu — a hop, a puff out the back, one kid word
     SND.pop();
@@ -10676,6 +10687,7 @@ function swRotate(gx,gy){
 }
 cvs.addEventListener('pointerdown',e=>{
   if(SCREEN!=='game'&&SCREEN!=='play'){          // the menu room is furniture + a live floor (E18→E26)
+    if(PIGP_T&&!(SCREEN==='menu'&&pigHit(e))){ clearTimeout(PIGP_T); PIGP_T=null; }   // E53: another press = the sandcastle wins; her pending panel folds
     if(SCREEN==='room'){ bigDown(e); return; }   // E49: the big room — models + the way home, nothing else
     if(SCREEN==='menu'&&!DRAG&&!down&&pigHit(e)){ e.preventDefault(); pigTap(); return; }   // E23: the piggy answers first
     if(SCREEN==='menu'&&!DRAG&&!down){
@@ -11968,7 +11980,7 @@ function showScreen(s){
   boxShow(false);       // the lid closes on any screen change
   boxCards(false);      // ...and the box's two cards fold with it (E26)
   storeShow(false);     // ...and so does the shop
-  bankShow(false);      // ...and the bank (E13)
+  bankShow(false);      // ...and the piggy's panel (E13's bank — hers since E53)
   namerShow(false);     // ...and the name picker (E15)
   winSync();
   shelfSync();
@@ -12085,12 +12097,16 @@ const TIER_MID=13, TIER_BIG=20, TIER_STAR=30;      // ★ price bands → card t
 const CARD_H={sm:190,md:240,bg:300,star:360};      // card px, desktop (E20: ~1.27× — bigger cards, fonts ride --ui); the phone media query rides at 0.55
 const UNOWNED_DIM=1.0;      // 1.0 = full-colour goods on the shelf; 0.4 restores E9's dim look
 const SHOP_CHIP=true;       // the tiny wallet ★ in the shop lid (prices need a wallet to read against)
-const BANK_ROLL=1.2;        // seconds the bank count takes to roll up
-const BACK_TO_BANK=false;   // shop back-button returns to the game (true = back through the bank)
+const BANK_ROLL=1.2;        // seconds the panel count takes to roll up (E53: the piggy's panel now)
 const SHOWCASE_DEFAULT='dream';   // 'dream' = priciest unowned · 'first' = aisle order
 // ---- THE DIALS (E22) — the shop front ----
 const TAB_GLIDE=0.45;       // base seconds of a plaque-tap glide (distance stretches it, capped)
 const SHELF_PLK=4;          // the plank between stacked cards, ×ui px
+// ---- THE DIALS (E53) — one tap to the shop ----
+const PIG_PANEL_DELAY=0.55; // s between the piggy's hop answering the tap and her panel opening (0 = instant)
+const CHEV_ENDS='right';    // the chevron pill rides the RIGHT fold only ('both' = a left twin, unbuilt)
+const CUE_PEEK_PX=24;       // ×ui px a fold-cut toy must show AND hide — "if nothing is cut off, nobody scrolls"
+const CUE_PAD_MAX=60;       // ×ui px cap on the fold-fix padding nudge
 const stTier=p=>p>=TIER_STAR?'star':p>=TIER_BIG?'bg':p>=TIER_MID?'md':'sm';
 const stOwned=id=>id==='pt_red'||coll.has(id);
 // ---- the showcase captions — ≤4 kid words on the name plate, every one a dial ----
@@ -12499,7 +12515,56 @@ function aisleGlide(){
   const ai=$('staisle'), k=Math.min(1,(performance.now()-j.t0)/1000/j.dur);
   ai.scrollLeft=j.from+(j.to-j.from)*(1-Math.pow(1-k,3));
   if(k<1) requestAnimationFrame(aisleGlide);
-  else AJUMP=null;                                    // landed — the aisle owns the light again
+  else { const pg=j.page; AJUMP=null; if(pg) aisleMark(stTabAt()); }   // landed — the aisle owns the light again (a page glide had no destination plaque; light the nearest)
+}
+/* ---- E53 THE SCROLL CUE LAW — "if nothing is cut off, nobody scrolls".
+   Two cues at the aisle's right fold, both viewports: a HALF-CUT toy must
+   peek (aisleFoldCut nudges the aisle's own padding when card math lands a
+   clean edge there) and the #stmore chevron pill rides the fold (hidden at
+   the aisle's true end). CUE_ON is the plate door — cue(false) restores the
+   E22-raw aisle so byte-proofs against live stay honest. ---- */
+let CUE_ON=true, CUE_PEEK=0, CUE_PAD=0;   // rig doors: forced peek px (battery) + the live pad nudge
+function aisleCue(){
+  const ai=$('staisle'), m=$('stmore'); if(!m) return;
+  const more=CUE_ON && $('store').style.display==='flex' &&
+    ai.scrollLeft+ai.clientWidth < ai.scrollWidth-8;
+  m.style.display=more?'flex':'none';
+  if(more) m.style.top=(ai.offsetTop+ai.clientHeight/2)+'px';   // seat on the aisle strip (one shelf or .two)
+}
+function aisleFoldCut(){
+  // ⚠ the snap owns the rest position: any layout write re-snaps scrollLeft
+  // SYNCHRONOUSLY on the next flush (probe-proven — programmatic pins lose).
+  // So the search never predicts from raw offsets: each candidate pad is
+  // APPLIED, the shelf re-pinned, and the cut verified against wherever the
+  // browser actually settled. First candidate that survives the snap wins.
+  const ai=$('staisle'), base=Math.round(10*UIS);   // E13's own padding-left
+  CUE_PAD=0;
+  if(!CUE_ON){ ai.style.paddingLeft=''; return; }
+  const peek=CUE_PEEK||Math.round(CUE_PEEK_PX*UIS), max=Math.round(CUE_PAD_MAX*UIS);
+  const SL0=ai.scrollLeft;                          // where the kid stands — captured BEFORE the pad
+  ai.style.paddingLeft=''; void ai.offsetWidth;     // clear may re-snap; every candidate re-pins to SL0
+  if(ai.scrollWidth<=ai.clientWidth+8) return;      // nothing to scroll — no cue owed
+  const cutNow=()=>{                                // truth AFTER layout + snap settle
+    void ai.offsetWidth;
+    const F=ai.scrollLeft+ai.clientWidth;
+    for(const el of ai.children){
+      if(!(el.classList.contains('stcard')||el.classList.contains('stcol'))) continue;   // a cut SIGN is not a toy
+      if(el.offsetLeft+peek<=F&&el.offsetLeft+el.offsetWidth-peek>=F) return true;
+    }
+    return false;
+  };
+  const tryPad=d=>{
+    ai.style.paddingLeft=d? (base+d)+'px':'';
+    ai.scrollLeft=SL0;                              // re-pin each attempt — no cumulative snap walk
+    if(cutNow()){ CUE_PAD=d; return true; }
+    return false;
+  };
+  if(tryPad(0)) return;
+  for(let s2=4;s2<=max;s2+=4){
+    if(tryPad(s2)) return;
+    if(base-s2>=2&&tryPad(-s2)) return;
+  }
+  ai.style.paddingLeft='';                          // hostile geometry: leave the raw shelf
 }
 /* ---- E22 FILL THE SCREEN: pick 1 or 2 shelves for THIS geometry —
    measured, never guessed. Two shelves only when the SMALLEST card can
@@ -12599,22 +12664,24 @@ function storeSync(){
   ai.scrollLeft=keep;                                   // a rebuild never flings the kid back to the start
   aisleObserve();
   stageSync();
-  aisleMark(stTabAt());                                 // the plaques are a VIEW of the scroll position
+  aisleFoldCut(); aisleCue();                           // E53: half a toy + the chevron at the fold
+  aisleMark(stTabAt());                                 // the plaques are a VIEW of the scroll position (after the fold pad seats)
 }
 function storeShow(b){
   $('store').style.display=b?'flex':'none';
   if(b){
-    bankShow(false);                                    // the shop and the bank are never both open
+    bankShow(false);                                    // the shop and the piggy panel are never both open
     starHudSync(); storeSync();
     stageMount(SHOWCASE_DEFAULT==='dream'? stageDream() : stAisleIds()[0]);
-  }
+  } else AJUMP=null;                                    // E53: closing mid-glide leaves no ghost ride behind
 }
 /* =====================================================================
-   THE BANK (E13) — a PLACE you stop before the shop, never during. The
-   count rolls up (garnish — it lands on the true number), the ledger
+   THE PIGGY'S PANEL (E13's bank, re-homed by E53) — the bank DIED as a
+   doorway; the piggy is the wallet, not a door. Her tap opens this: the
+   count rolls up (garnish — it lands on the true number) and the ledger
    tells a kid how stars happen by READING the MINT dial at render time
-   (a re-tuned dial can never make the bank lie), and the one gold door
-   leads to the store. Past the door, no ceremony: just the wallet chip.
+   (a re-tuned dial can never make the panel lie). The machinery kept its
+   bank-era names (ids are bones, not signage); the ⬇ OUT plank closes it.
    ===================================================================== */
 let BANK_T0=null, BANK_TICK=0;
 function bankShow(b){
@@ -12716,7 +12783,10 @@ function bankIcon(cv,kind){
     cx.lineCap='butt';
   });
 }
-function bankPig(){                  // the molded piggy on the rug, coin halfway in
+function bankPig(){
+  // E53: the panel is HERS — she wears today's coat (the E23 painter this art
+  // was factored into) and the coin tells the truth (only while pay waits).
+  // Tier-0 pink + coin = the old fixed art byte-for-byte (same hex pair).
   const cv=$('bkpig'), g=cv.getContext('2d');
   g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
   g.setTransform(2*ICON_RES,0,0,2*ICON_RES,96*ICON_RES,84*ICON_RES);
@@ -12724,42 +12794,33 @@ function bankPig(){                  // the molded piggy on the rug, coin halfwa
     cx.lineJoin='round'; cx.lineCap='round';
     cx.globalAlpha=0.25; cx.fillStyle='#000';
     cx.beginPath(); cx.ellipse(0,26,34,7,0,0,7); cx.fill(); cx.globalAlpha=1;
-    for(const px of [-20,11]){
-      cx.fillStyle='#E08FB8'; rr(px,16,9,11,3); cx.fill();
-      cx.strokeStyle='#A85C86'; cx.lineWidth=2.5; rr(px,16,9,11,3); cx.stroke();
-    }
-    cx.fillStyle='#E08FB8';
-    cx.beginPath(); cx.ellipse(0,0,30,23,0,0,7); cx.fill();
-    cx.strokeStyle='#A85C86'; cx.lineWidth=2.5;
-    cx.beginPath(); cx.ellipse(0,0,30,23,0,0,7); cx.stroke();
-    cx.fillStyle='#E08FB8';
-    cx.beginPath(); cx.moveTo(14,-22); cx.lineTo(25,-29); cx.lineTo(24,-14); cx.closePath(); cx.fill();
-    cx.strokeStyle='#A85C86'; cx.beginPath(); cx.moveTo(14,-22); cx.lineTo(25,-29); cx.lineTo(24,-14); cx.closePath(); cx.stroke();
-    cx.fillStyle='#E08FB8';
-    cx.beginPath(); cx.ellipse(27,3,7.5,6,0,0,7); cx.fill();
-    cx.strokeStyle='#A85C86'; cx.beginPath(); cx.ellipse(27,3,7.5,6,0,0,7); cx.stroke();
-    cx.fillStyle='#A85C86';
-    cx.beginPath(); cx.arc(25,3,1.6,0,7); cx.fill();
-    cx.beginPath(); cx.arc(30,3,1.6,0,7); cx.fill();
-    cx.fillStyle='#23211E'; cx.beginPath(); cx.arc(13,-7,2.2,0,7); cx.fill();
-    cx.strokeStyle='#A85C86'; cx.lineWidth=2.2;
-    cx.beginPath(); cx.moveTo(-30,2); cx.quadraticCurveTo(-38,-2,-34,-7); cx.quadraticCurveTo(-30,-11,-34,-13); cx.stroke();
-    cx.fillStyle='#7E5A0E'; rr(-8,-26,16,4.5,2); cx.fill();
-    cx.fillStyle='#F2C531';
-    cx.beginPath(); cx.ellipse(0,-30,9,7,0,Math.PI,0); cx.closePath(); cx.fill();
-    cx.strokeStyle='#8F6B1E'; cx.lineWidth=2;
-    cx.beginPath(); cx.ellipse(0,-30,9,7,0,Math.PI,0); cx.stroke();
+    pigArt(pigTier(pigLiveStreak()), pigClaimable());
   });
 }
+// E53 ⬇ OUT — ONE wooden plank, ONE close grammar. A small shared factory so
+// later cards mount the same plank on the chest (0206) and the door wall (0207).
+function outPlank(fn){
+  const b=document.createElement('button'); b.type='button'; b.className='outplk';
+  const t=document.createElement('b'); t.textContent='⬇ OUT'; b.appendChild(t);
+  b.addEventListener('click',()=>{ ac(); SND.click(); fn(); });
+  return b;
+}
 function buildStore(){
-  // E13 FLOW LAW: every path into the shop passes the bank — the ★ chips open the
-  // BANK, the bank's gold door opens the store. The shop's back button returns to
-  // the game exactly as today (BACK_TO_BANK loops it through the bank if Wyatt asks).
-  $('starChip').addEventListener('click',()=>{ ac(); SND.tok(); bankShow(true); });
-  // E26: the menu's SHOP chip died — the painted storefront opens the bank now
-  $('bkshop').addEventListener('click',()=>{ ac(); SND.tok(); storeShow(true); });
-  $('bkback').addEventListener('click',()=>{ ac(); SND.click(); bankShow(false); });
-  $('stback').addEventListener('click',()=>{ ac(); SND.click(); storeShow(false); if(BACK_TO_BANK) bankShow(true); });
+  // E53 FLOW LAW: THE STOREFRONT IS THE SHOP — every shop door lands in the
+  // aisle directly (E13's bank-before-shop repealed; the E22 internals stand).
+  $('starChip').addEventListener('click',()=>{ ac(); SND.tok(); storeShow(true); });
+  // E53 ⬇ OUT — the one close grammar: a wooden plank, bottom-center, on the
+  // shop and on the piggy's panel (later cards mount it on the chest + door).
+  $('stpanel').appendChild(outPlank(()=>storeShow(false)));
+  $('bkpanel').appendChild(outPlank(()=>bankShow(false)));
+  // E53 THE SCROLL CUE — the chevron pill pages the aisle right; the same
+  // AJUMP lane as a plaque tap, so the hand cancels it mid-flight like any glide
+  $('stmore').addEventListener('click',()=>{
+    ac(); SND.click();
+    const ai=$('staisle'), to=Math.min(ai.scrollWidth-ai.clientWidth, ai.scrollLeft+ai.clientWidth*0.7);
+    AJUMP={k:null,page:1,from:ai.scrollLeft,to,t0:performance.now(),dur:Math.min(0.9,TAB_GLIDE+Math.abs(to-ai.scrollLeft)/4000)};
+    requestAnimationFrame(aisleGlide);
+  });
   $('stgchip').addEventListener('click',()=>{
     if(!STAGE_ID) return; ac();
     if(!stOwned(STAGE_ID)) storeBuy(STAGE_ID,$('ststage'));
@@ -12775,7 +12836,7 @@ function buildStore(){
     tb.appendChild(b);
   }
   const ai=$('staisle');
-  ai.addEventListener('scroll',()=>{ if(!AJUMP) aisleMark(stTabAt()); },{passive:true});   // ONE truth: scrollLeft
+  ai.addEventListener('scroll',()=>{ if(!AJUMP) aisleMark(stTabAt()); aisleCue(); },{passive:true});   // ONE truth: scrollLeft (E53: the pill follows the fold)
   // the hand always wins: any hand on the aisle kills a live glide, and the light
   // goes straight back to being a view of where the aisle actually stands
   const handWins=()=>{ if(AJUMP){ AJUMP=null; aisleMark(stTabAt()); } };
@@ -12994,11 +13055,17 @@ window.TS={
   piggy:{
     state(){ return { claimed:PIGGY.claimed, streak:PIGGY.streak|0,
       today:todayStr(), tier:pigTier(pigLiveStreak()), pays:pigTodayPays(),
-      claimable:pigClaimable(), x:PIG.x, y:PIG.y, show:PIG_SHOW }; },
+      claimable:pigClaimable(), x:PIG.x, y:PIG.y, show:PIG_SHOW,
+      panel:$('bank').style.display==='flex' }; },   // E53 — her panel (the old bank's machinery)
     tap(){ pigTap(); return TS.piggy.state(); },
     day(s){ PIG.dayOv=s||null; return todayStr(); },
     set(claimed,streak){ PIGGY={claimed:String(claimed||''),streak:Math.max(0,streak|0)}; return TS.piggy.state(); },
     show(b){ PIG_SHOW=b!==false; return PIG_SHOW; },
+    // E53 — the panel doors + the MINT dial door, re-homed from TS.bank (the
+    // bank rig is gone; the ledger is hers and must follow a re-tuned dial)
+    open(){ bankShow(true); return true; },
+    close(){ bankShow(false); return true; },
+    mint(p){ if(p) Object.assign(MINT,p); return {...MINT}; },
   },
   // E26 — the living-room rig: the object table, the attract clock, the sign
   // box (the 2× proof), the dog, and the pill/hit geometry for pointer rigs.
@@ -13224,13 +13291,7 @@ window.TS={
     add(n){ stars+=n|0; starHudSync(); save(); return stars; },
     set(n){ stars=Math.max(0,n|0); starHudSync(); save(); return stars; },
   },
-  // ---- the bank rig (E13) ----
-  bank:{
-    open(){ bankShow(true); return true; },
-    close(){ bankShow(false); return true; },
-    mint(p){ if(p) Object.assign(MINT,p); return {...MINT}; },   // the mint dial — re-tune it and the ledger must follow
-  },
-  // ---- the store rig (E9; E13 re-aims tab, adds select/paints/chip) ----
+  // ---- the store rig (E9; E13 re-aims tab, adds select/paints/chip; E53 adds cue) ----
   store:{
     open(){ storeShow(true); return true; },
     close(){ storeShow(false); return true; },
@@ -13244,6 +13305,20 @@ window.TS={
         shelves:AISLE2?2:1, rowH:AISLE2 };
     },
     select(id){ return stageMount(id); },              // mount the showcase; returns the mounted id
+    cue(v){                      // E53 — false/true = the plate door (false = E22-raw aisle);
+      if(v===false||v===true){   // {peek:n} = the battery's forcing dial; no arg = telemetry
+        CUE_ON=v; CUE_PEEK=0;    // a boolean always resets any forced peek
+        aisleFoldCut(); aisleCue();
+      } else if(v&&typeof v==='object'){ CUE_PEEK=v.peek|0; aisleFoldCut(); aisleCue(); }
+      const ai=$('staisle'), F=ai.scrollLeft+ai.clientWidth;
+      let cut=null;
+      for(const el of ai.children){
+        if(!(el.classList.contains('stcard')||el.classList.contains('stcol'))) continue;
+        if(el.offsetLeft<F&&el.offsetLeft+el.offsetWidth>F)
+          cut={id:el.dataset.id||'col', vis:Math.round(F-el.offsetLeft), hid:Math.round(el.offsetLeft+el.offsetWidth-F)};
+      }
+      return { on:CUE_ON, pad:CUE_PAD, pill:$('stmore').style.display!=='none', cut };
+    },
     paints(reset){ const o={...AISLE_PAINTS}; if(reset) AISLE_PAINTS={}; return o; },
     chip(b){ if(b!=null){ stChipOn=!!b; $('stStars').style.display=stChipOn?'':'none'; } return stChipOn; },
     list(){
