@@ -2232,7 +2232,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.40</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.41</div>
   <div class="scanlines"></div>
 </div>
 
@@ -3163,6 +3163,7 @@ const TR_DATA={
 "MORE BATTLES":"ほかのバトル",
 "BIG BATTLES — HOP INTO ONE":"おおきなバトル — とびこもう",
 "THE MAP":"マップ",
+"RANDOM":"ランダム",
 "NEW!":"あたらしい!",
 "⚔ BACK TO THE BATTLE":"⚔ たたかいにもどる",
 "♪ SOUND ON":"♪ おと オン",
@@ -4286,6 +4287,7 @@ const TR_DATA={
 "MORE BATTLES":"다른 전투",
 "BIG BATTLES — HOP INTO ONE":"큰 전투 — 뛰어들어",
 "THE MAP":"맵",
+"RANDOM":"랜덤",
 "NEW!":"새것!",
 "⚔ BACK TO THE BATTLE":"⚔ 전투로 돌아가기",
 "♪ SOUND ON":"♪ 소리 켬",
@@ -5409,6 +5411,7 @@ const TR_DATA={
 "MORE BATTLES":"更多战斗",
 "BIG BATTLES — HOP INTO ONE":"大战场 — 跳进去",
 "THE MAP":"地图",
+"RANDOM":"随机",
 "NEW!":"全新!",
 "⚔ BACK TO THE BATTLE":"⚔ 回到战斗",
 "♪ SOUND ON":"♪ 声音 开",
@@ -6532,6 +6535,7 @@ const TR_DATA={
 "MORE BATTLES":"MEHR SCHLACHTEN",
 "BIG BATTLES — HOP INTO ONE":"GROSSE SCHLACHTEN — SPRING REIN",
 "THE MAP":"DIE KARTE",
+"RANDOM":"ZUFALL",
 "NEW!":"NEU!",
 "⚔ BACK TO THE BATTLE":"⚔ ZURÜCK IN DIE SCHLACHT",
 "♪ SOUND ON":"♪ TON AN",
@@ -7656,6 +7660,7 @@ const TR_DATA={
 "MORE BATTLES":"ЕЩЁ БИТВЫ",
 "BIG BATTLES — HOP INTO ONE":"БОЛЬШИЕ БИТВЫ — ЗАПРЫГИВАЙ",
 "THE MAP":"КАРТА",
+"RANDOM":"СЛУЧАЙНО",
 "NEW!":"НОВАЯ!",
 "⚔ BACK TO THE BATTLE":"⚔ ВЕРНУТЬСЯ В БОЙ",
 "♪ SOUND ON":"♪ ЗВУК ВКЛ",
@@ -8779,6 +8784,7 @@ const TR_DATA={
 "MORE BATTLES":"MÁS BATALLAS",
 "BIG BATTLES — HOP INTO ONE":"BATALLAS GRANDES — SALTA A UNA",
 "THE MAP":"EL MAPA",
+"RANDOM":"AL AZAR",
 "NEW!":"¡NUEVO!",
 "⚔ BACK TO THE BATTLE":"⚔ VOLVER A LA BATALLA",
 "♪ SOUND ON":"♪ SONIDO SÍ",
@@ -10555,6 +10561,29 @@ const BF_AI = {
   medium: { every:2.3, hoard:60,  counterWeight:0.25, blunderP:0.32, safeDrop:true,  save:0.1, focus:'weak',   inc:0.82, wildP:0.32, motor:0.06 },
   hard:   { every:0.9, hoard:160, counterWeight:1.0,  blunderP:0.0,  safeDrop:true,  save:0.5, focus:'focus',  inc:1.0,  wildP:0,    motor:0.035 }
 };
+// v2.41 THE ROOKIE TIER (Wyatt 8/4): "we want the computer to lose — play at
+// about half the efficiency. The player should win their first four
+// Battleground games pretty much no matter what." ONE knob, BF_ROOKIE_EFF,
+// scales EASY's teeth: decisions come half as often, the passive income is
+// halved again (income is the lever that actually moves win rates — the 7/24
+// tune's finding; wildP is the other, so three lane reads in four are thrown
+// away), and the motor-pool fund never opens — no rookie eats a tank in game
+// two. It still fights (every placement lands a real man in a legal spot),
+// just badly. The enemy Sarge's forced service pistol lives in
+// startBattlefield beside the kit roll it replaces, not here. The tier
+// SUPERSEDES the stars ramp (bfDifficulty) for those four games and only ever
+// dresses ENEMY seats — a gimped teammate would fight AGAINST the guarantee.
+const BF_ROOKIE_GAMES=4, BF_ROOKIE_EFF=0.5;
+// ⚠ sargeOnce is the lever that actually decides these games (measured): the
+// AI's Sarge is FREE with a 10s respawn and leaks BF_BASEDMG 18 — the biggest
+// infantry whack there is — so a rookie brain that keeps re-fielding him owns
+// an economy-immune battering ram no purse gimp can touch (three Sarge leaks
+// = 54 of a 70hp box; the telemetry read exactly that). One Sarge per rookie
+// game: the kid still meets the regular pistol Sarge Wyatt asked for — once.
+BF_AI.rookie={ every:BF_AI.easy.every/BF_ROOKIE_EFF, hoard:0, counterWeight:0,
+  blunderP:1-(1-BF_AI.easy.blunderP)*BF_ROOKIE_EFF, safeDrop:false, save:0,
+  focus:'center', inc:BF_AI.easy.inc*BF_ROOKIE_EFF,
+  wildP:1-(1-BF_AI.easy.wildP)*BF_ROOKIE_EFF, motor:0, sargeOnce:true };
 // the daily rival's colour ALSO picks how they fight — a free themed opponent
 const BF_PERSONA = {
   red:   { name:'BLITZ',   pref:{ rifleman:2.2, flame:1.8, mgunner:0.7, mortar:0.3, bazooka:0.6, minesweeper:0.4, radioman:0.5, sarge:1.2, commando:0.5, bfjeep:2.0, bftank:0.5 } },
@@ -10997,7 +11026,7 @@ const META_DEFAULT = {
   // now. Two lists like the bench's — a piece you own and left in the
   // footlocker is what the tap-toggle is for (see OUTFIT_ORDER).
   outfit:{ own:[], wear:[] },
-  bfMap:'crossing', bfWins:0, bfLosses:0, bfSeen:0, bfTeam:1, // BATTLEFIELD: last map, record, squad size
+  bfMap:'random', bfWins:0, bfLosses:0, bfSeen:0, bfTeam:1, // BATTLEFIELD: map pick ('random' = the v2.41 default, drawn at match start), record, squad size
   mapSeen:{},        // which debut maps this save has picked at least once — the NEW! tag reads it (v1.58)
   // WORLD RANKINGS: 1v1 and 2v2 are their own ladders, so they keep their own
   // W/L (and the stars they paid). 3v3+ only ever feed bfWins/bfLosses.
@@ -11032,7 +11061,13 @@ let META = META_DEFAULT;
 try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); META.piggy=Object.assign({},META_DEFAULT.piggy,m.piggy||{}); } } catch(e) {}
 // THE CROSSING is the battlefield's flagship map — anyone who never actually
 // fought a match gets nudged onto it; testers with real history keep their pick.
-if((META.bfWins||0)+(META.bfLosses||0)===0) META.bfMap='crossing';
+// v2.41 RANDOM BY DEFAULT (Wyatt 8/4: "please have the default map be
+// random"): every save — veteran explicit picks included — is re-pointed at
+// RANDOM exactly ONCE (the old pick predates the option, so it doesn't
+// outrank the new default; picking a map after this sticks forever). mapRand
+// is the once-flag, a raw field like decorSeen's seed — zero TDZ. This
+// supersedes the old fresh-save re-point at 'crossing'.
+if(!META.mapRand){ META.bfMap='random'; META.mapRand=1; }
 // bfRecord is nested, so Object.assign above can't fill it in for an older
 // profile — normalise both modes here (and never alias META_DEFAULT's copy).
 (function(){ const r=META.bfRecord||{};
@@ -14662,6 +14697,18 @@ function rivCapHex(used, rivHex){
   return bfPickHex(used, rivHex);
 }
 function bfMap(id){ return BF_MAPS.find(m=>m.id===id)||BF_MAPS[0]; }
+// v2.41: 'random' is a legal saved pick now (and the default). It becomes a
+// real carpet only at bfMapResolve time — match start, or the moment a room
+// is born (the host's draw is the truth and rides the existing r.map wire, so
+// 'random' itself never crosses to a guest). Everywhere else it READS as
+// RANDOM (bfMapLabel), never as a fallback map.
+function bfMapResolve(id){ return id==='random'? BF_MAPS[(Math.random()*BF_MAPS.length)|0].id : id; }
+function bfMapLabel(id){ return id==='random'? 'RANDOM' : bfMap(id).name; }
+// v2.41 THE ROOKIE'S FIRST FOUR: lifetime battleground games = the W·L pair
+// endBattlefield has always kept (every resolved battleground, rooms and
+// raids included — a room game COUNTS as played, it is just never rigged).
+function bfGamesPlayed(){ return (META.bfWins|0)+(META.bfLosses|0); }
+function bfRookie(){ return bfGamesPlayed()<BF_ROOKIE_GAMES; }
 // a map generator builds the LEFT half; everything mirrors across MID so both
 // armies always fight the exact same ground (and every existing rock loop works).
 // A feature that already straddles the middle IS its own mirror — stamp it once.
@@ -14852,7 +14899,7 @@ function bfqFound(){
   f.innerHTML='<div class="bfq-stage"><div class="bfq-ringwrap">'
     +'<div class="bfq-countring" id="bfqRing"></div>'
     +'<div class="bfq-core"><div class="bfq-head">BATTLE READY</div>'
-    +'<div class="bfq-sub">'+BFQ.size+' v '+BFQ.size+' · '+escH(bfMap(BFQ.mapId).name)+'</div>'
+    +'<div class="bfq-sub">'+BFQ.size+' v '+BFQ.size+' · '+escH(bfMapLabel(BFQ.mapId))+'</div>'
     +'<div class="bfq-clock" id="bfqClock">10</div></div></div>'
     +'<div class="bfq-actions"><button type="button" class="bfq-go" id="bfqGo">DEPLOY!</button>'
     +'<button type="button" class="bfq-no" id="bfqNo">STAND DOWN</button></div></div>';
@@ -14935,7 +14982,7 @@ function coopFresh(ui,mode){
            outQ:[], cnt:1, pollT:0, busy:false, lastSeen:0, ended:false, wantBattle:false,
            mateHex:null, misses:0, qT0:Date.now(),
            // room only: the table settings, and which chair you took
-           team:META.bfTeam||1, map:META.bfMap, side:'y', slot:0, wantSide:null, wantTeam:0 };
+           team:META.bfTeam||1, map:bfMapResolve(META.bfMap), side:'y', slot:0, wantSide:null, wantTeam:0 };   // v2.41: a party never holds 'random' — the draw is made here
 }
 // one heartbeat for everything: pairing, matchmaking, and the in-battle relay
 function coopTick(){
@@ -16123,21 +16170,47 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
   reset();                                     // invasion-style: wipe FIRST, then build the session
   W=BASE_W;                                    // v1.40: the BF's scale basis is the room rug, never the long front (its own resize below refits)
   S.levelN=0; S.rival=null;
-  const map=bfMap(mapId||META.bfMap);
+  // v2.41 RANDOM MAPS: a 'random' request — the standing default, or the
+  // daily raid's forced draw — resolves to a real carpet HERE, at match
+  // start. Match-setup Math.random is the armory roll's own class (no
+  // deterministic replay path ever reads a battleground back); a private
+  // room never reaches here with 'random' — its draw was made at room birth.
+  const mapReq=mapId||META.bfMap;
+  const map=bfMap(bfMapResolve(mapReq));
   const riv=todaysRival();
   const team=Math.max(1,Math.min(BF_MAX_TEAM, teamSize||META.bfTeam||1));
   const diff=diffOverride||bfDifficulty();
   WORLD_W=bfWidth(team); MID=WORLD_W/2;        // a bigger war gets a bigger carpet
   WORLD_H=H*(map.hMul||1);                     // WESTERN LAND is two carpets TALL (v1.57); every other map keeps H to the pixel
   const seats=(plan && plan.length===team*2)? plan : bfSeatPlan(team,riv);
+  // v2.41 THE ROOKIE'S FIRST FOUR (Wyatt 8/4): the save's first four
+  // battleground games against the computer are wins-in-waiting — every
+  // ENEMY seat fields the plain service-pistol Sarge and thinks on
+  // BF_AI.rookie, superseding the stars ramp. HUMANS ARE NEVER RIGGED: a
+  // private room never engages it (coopLaunching — its games still COUNT as
+  // played, the room AIs just stay stock) and any second human seat in the
+  // plan kills it (belt+braces). An explicit diffOverride (the rig's own
+  // tiers) outranks it. The daily raid is a CPU battleground, so a rookie's
+  // first raids are winnable too — that is the point. Losses count as games
+  // played the same as wins; nothing about the payout changes (a rigged win
+  // pays the full 25★ + XP — that IS the feature).
+  const rookie=!diffOverride && !coopLaunching && bfRookie() && seats.every(st=>!st.human||st.me);
   for(const st of seats){ st.purse=BF_START; st.tagT=0; st.mir=(st.team==='you');
     buildUnitTint(st.hex);
     if(map.ground==='snow'){ buildUnitRim(st.hex); buildUnitRim(GREEN); }   // both armies, on white
     // every commander but you draws his Sarge's weapon out of the crate, once,
     // here — so a seat's Sarge carries the same thing all match, even if he goes
     // down and gets bought again. Seat 0 keeps your Academy loadout untouched.
-    st.kit = st.human? null : bfSargeKit(bfRollWeapon());
-    st.brain = st.human? null : new OpponentBrain(diff, st.persona);
+    // (v2.41: a rookie game hands every ENEMY chair the sidearm instead —
+    // and an opening purse of EFF² (~quarter). Measured, twice: at the full
+    // 210 the enemy's day-one blob mulched a beginner's one-man trickle and
+    // won on leaks; at half (105) the trickle still lost every other game.
+    // At 52 the enemy opens with one man beside the Sarge and the worst
+    // trickle bot in the rig finally wins its first four — "pretty much no
+    // matter what" is a measured bar, not a vibe.)
+    st.kit = st.human? null : ((rookie && st.team==='foe')? bfSargeKit('pistol') : bfSargeKit(bfRollWeapon()));
+    st.brain = st.human? null : new OpponentBrain((rookie && st.team==='foe')? 'rookie' : diff, st.persona);
+    if(rookie && st.team==='foe') st.purse=Math.round(BF_START*BF_ROOKIE_EFF*BF_ROOKIE_EFF);
     if(st.brain) st.brain.cd = 0.7 + st.i*0.13 + Math.random()*0.5;   // 20 brains never fire in lockstep
     // each AI seat anchors to its own slice of the front — ten brains all
     // chasing the same "weakest lane" is a scrum in one lane and a highway
@@ -16158,7 +16231,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
     mySeat:meSeat.i, myTeam,
     base:{ you:{x:130,y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0},
            foe:{x:WORLD_W-130,y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0} },
-    ai:{ diff },
+    ai:{ diff:(rookie?'rookie':diff) }, rookie,   // v2.41: rookie rides the income lever (bfTick reads ai.diff) and the rig's asserts
     rival:riv, hex:{ you:seats[0].hex, foe:seats[team].hex },
     // a tall map opens looking at the crates' own latitude (mid-height); on
     // every hMul-1 map the y clamp is 0..0, so nothing that shipped moves
@@ -16178,7 +16251,11 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
   for(const j of (S.cfg.terrain.jax||[]))
     S.mines.push({ owner:null, side:'jax', seat:null, x:j.x, y:j.y, armT:0, big:false, sl:false, jx:true });
   S.plastic=BF_START;                          // every purse starts level
-  META.bfMap=map.id; META.bfTeam=team;
+  // v2.41: only an explicitly-requested map is remembered — a 'random' draw
+  // (pref or raid) never clobbers the standing pick, so RANDOM stays RANDOM
+  // and an explicit pick survives every raid.
+  if(mapReq!=='random') META.bfMap=map.id;
+  META.bfTeam=team;
   // v1.44: the scroll nudge is a LESSON now — arm it for the first three
   // battles of a save and count the showing here, where VW is about to be
   // refit (the draw still requires VW<WORLD_W each frame, so a resize that
@@ -17721,7 +17798,8 @@ OpponentBrain.prototype.decide=function(view,budget){
   // none at all (v1.25). The brain reads the clock so it never burns a decision
   // on an order applyDeploy is only going to refuse.
   const hasSarge=own.some(u=>u.type==='sarge') || (view.sargeCd||0)>0;
-  const afford=BF_TYPES.filter(t=>BF_COST[t]<=budget && (t!=='sarge'||!hasSarge));
+  // v2.41 sargeOnce (rookie tier): one Sarge per game — see the BF_AI.rookie note
+  const afford=BF_TYPES.filter(t=>BF_COST[t]<=budget && (t!=='sarge'||(!hasSarge && !(this.d.sargeOnce && this.sargeSpent))));
   if(!afford.length) return [];
   const pressure = theirs.some(u=>u.dropT<=0&&u.x>MID-80) || own.length<2;
   // ===== THE MOTOR POOL FUND (7/25) =====
@@ -17775,6 +17853,7 @@ OpponentBrain.prototype.decide=function(view,budget){
     if(v>bs){ bs=v; pick=t; }
   }
   if(Math.random()<this.d.blunderP) pick=afford[(Math.random()*afford.length)|0];
+  if(pick==='sarge' && this.d.sargeOnce) this.sargeSpent=true;   // v2.41: his one walk-on
   const spot=this.pickSpot(pick,theirs,mine,view);
   return spot? [{ kind:'place', type:pick, x:spot.x, y:spot.y }] : [];
 };
@@ -22014,7 +22093,13 @@ function hitCheck(f,u){
     const v=bfBounty(f.type);
     const st=(u && u.seat!=null && S.bf)? S.bf.seats[u.seat] : null;
     if(st && st.me){ S.blobs.push({x:f.x,y:f.y-8,v,t:0}); S.bf.myKills=(S.bf.myKills||0)+1; }
-    else if(st && !st.human) st.purse+=v;   // a friend banks their own kills, on their own screen
+    // v2.41 ROOKIE: the enemy's kill bounties pay EFF² (~quarter) — measured,
+    // this loop is the lever that actually decides the first four. The gimped
+    // drip hardly matters because a beginner's own casualties FUND the enemy
+    // (18 fallen riflemen ≈ 360 tags — triple the drip); at a half tax the
+    // worst trickle bot still lost every other game, so the tax matches the
+    // opening purse's measured EFF² notch.
+    else if(st && !st.human) st.purse += (S.bf && S.bf.rookie && st.team==='foe')? Math.round(v*BF_ROOKIE_EFF*BF_ROOKIE_EFF) : v;
     // a man clatters over; a vehicle goes up (same beat the campaign gives them)
     if(f.def.vehicle){ bfSfx(SFX.boom, f.x, f.y); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
     else bfSfx(SFX.clack, f.x, f.y);
@@ -26210,6 +26295,14 @@ const WT_MAP_GLYPHS = {
     +'<rect x="27" y="11" width="5" height="2.9" rx="0.9" fill="#23211E"/>'
     +'<rect x="31.6" y="11.5" width="1.5" height="2" rx="0.5" fill="#C0392B"/>'
     +'<circle cx="26" cy="9.9" r="0.9" fill="#EFE7D8" opacity="0.8"/>'
+,
+  // v2.41 RANDOM: two tumbling dice on the same carpet — the pool, not a map.
+  // No <text> node (nothing for the l10n hook to sniff at), pips only.
+  random:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/>'
+    +'<g transform="rotate(-9 15.5 15)"><rect x="7" y="7" width="17" height="17" rx="3.5" fill="#F5F0E4" stroke="#8A6B4A" stroke-width="1"/>'
+    +'<g fill="#3B3B44"><circle cx="11.5" cy="11.5" r="1.7"/><circle cx="15.5" cy="15.5" r="1.7"/><circle cx="19.5" cy="19.5" r="1.7"/></g></g>'
+    +'<g transform="rotate(11 32 16)"><rect x="24" y="8" width="16" height="16" rx="3.5" fill="#F5F0E4" stroke="#8A6B4A" stroke-width="1"/>'
+    +'<g fill="#C0483B"><circle cx="28" cy="12" r="1.6"/><circle cx="36" cy="12" r="1.6"/><circle cx="28" cy="20" r="1.6"/><circle cx="36" cy="20" r="1.6"/></g></g>'
 };
 // WESTERN LAND debuts up front ("Boom, new"), CROSSING second (the flagship),
 // the WINTER FIELD third, OPEN CARPET last
@@ -26233,11 +26326,13 @@ function renderWarTable(){
   // not slam shut in the player's face, so its state is read back off the DOM
   const oldLk=document.getElementById('wtLocker');
   const lockerOpen=!!(oldLk && !oldLk.classList.contains('hidden'));
-  const maps=WT_MAP_ORDER.map(id=>{ const m=bfMap(id);
+  // v2.41: RANDOM leads the rail — it is the default, so it gets the first
+  // chip; wtMapIsNew never tags it (it's not in WT_NEW_IDS and never will be)
+  const maps=['random'].concat(WT_MAP_ORDER).map(id=>{
     return '<button type="button" class="wt-map'+(META.bfMap===id?' on':'')+'" onclick="UI.wtMap(\''+id+'\')">'
-      +'<svg viewBox="0 0 46 30">'+WT_MAP_GLYPHS[id]+'</svg><span class="nm">'+escH(m.name)+'</span>'
+      +'<svg viewBox="0 0 46 30">'+WT_MAP_GLYPHS[id]+'</svg><span class="nm">'+escH(bfMapLabel(id))+'</span>'
       +(wtMapIsNew(id)?'<i class="wt-new">NEW!</i>':'')+'</button>'; }).join('');
-  const cur=bfMap(META.bfMap);
+  const curId=(META.bfMap==='random')? 'random' : bfMap(META.bfMap).id, curNm=bfMapLabel(META.bfMap);
   document.getElementById('wartable').innerHTML =
     '<div id="wtBg"></div>'
     +'<div class="wt-top"><div class="wt-wordmark">THE <b>BATTLEFIELD</b></div><div class="wt-spacer"></div>'
@@ -26261,8 +26356,8 @@ function renderWarTable(){
       // chip while a debut map is still unpicked, so the news lands without
       // opening anything.
       +'<button type="button" class="wt-mapchip" onclick="UI.wtMapChip()">'
-      +'<svg viewBox="0 0 46 30">'+WT_MAP_GLYPHS[cur.id]+'</svg>'
-      +'<span class="mc-lab">THE MAP</span><span class="nm">'+escH(cur.name)+'</span>'
+      +'<svg viewBox="0 0 46 30">'+WT_MAP_GLYPHS[curId]+'</svg>'
+      +'<span class="mc-lab">THE MAP</span><span class="nm">'+escH(curNm)+'</span>'
       +(WT_NEW_IDS.some(wtMapIsNew)?'<i class="wt-new">NEW!</i>':'')+'</button>'
       // data-notr on the art-only crate: without it tryWhole offers the whole
       // button (art + label) to the table as one junk key on every open
@@ -28304,7 +28399,11 @@ window.UI = {
   // own army — the same opponent, on the mode the whole game is built around now.
   // `raid` is set AFTER startBattlefield because that function builds S.bf fresh.
   rival(){ if(momDue()) return UI.momFight();   // v1.79 belt-and-braces: while she's due there IS no colored raid
-    audio(); startBattlefield(META.bfMap, null, 1); if(S.bf) S.bf.raid=true; },
+    // v2.41 (Wyatt 8/4): an ATTACKING army picks the ground — the raid's
+    // stage is drawn from the whole pool every time, never simply the map
+    // you have selected. startBattlefield resolves the draw and its
+    // write-back guard keeps your standing pick untouched.
+    audio(); startBattlefield('random', null, 1); if(S.bf) S.bf.raid=true; },
   momFight(){ audio(); startMomRaid(); },   // v1.79: the mom panel's button
   // WAR TABLE: every size button is a launcher — tap = queue that size right now
   wtPlay(n){ audio(); SFX.blip();
@@ -28336,8 +28435,8 @@ window.UI = {
   wtRoom(){ audio(); SFX.blip(); closeWarTable();
     if(COOP && coopRoom() && COOP.code){ roomModal(coopPanelHTML()); return; }    // already at the table
     UI.coopMode('room'); },
-  wtMap(id){ if(!BF_MAPS.some(m=>m.id===id)) return; META.bfMap=id;
-    (META.mapSeen||(META.mapSeen={}))[id]=1;   // picking it once retires the NEW! tag (v1.58)
+  wtMap(id){ if(id!=='random' && !BF_MAPS.some(m=>m.id===id)) return; META.bfMap=id;   // v2.41: RANDOM is a pick too
+    if(id!=='random') (META.mapSeen||(META.mapSeen={}))[id]=1;   // picking it once retires the NEW! tag (v1.58); RANDOM is never news
     SFX.blip(); saveMeta(); renderWarTable(); },
   // v1.58: the front chip lifts (or refolds) the map tray
   wtMapChip(){ audio(); SFX.blip(); const t=document.getElementById('wtMapTray'); if(t) t.classList.toggle('hidden'); },
@@ -28731,7 +28830,12 @@ window.UI = {
     SFX.blip();
     if(COOP) coopLeave();
     COOP=coopFresh('lobby','room');
-    COOP.team=Math.max(1,Math.min(ROOM_MAX,META.bfTeam||1)); COOP.map=META.bfMap;
+    // v2.41: the HOST'S DRAW is made the moment the room is born — a RANDOM
+    // pref becomes one concrete carpet here and rides the existing r.map wire
+    // to every client, so twenty screens fight the same rug with zero wire
+    // change. The cycle button still walks the real maps from wherever the
+    // draw landed.
+    COOP.team=Math.max(1,Math.min(ROOM_MAX,META.bfTeam||1)); COOP.map=bfMapResolve(META.bfMap);
     roomModal(coopPanelHTML());
     coopPost('create',{team:COOP.team, map:COOP.map}).then(r=>{
       if(!COOP||COOP.ui!=='lobby') return;
@@ -28926,7 +29030,7 @@ window.UI = {
     audio(); SFX.blip();
     if(COOP) coopLeave();
     COOP=coopFresh('lobby','room');
-    COOP.team=1; COOP.map=META.bfMap; COOP.duelName=name;
+    COOP.team=1; COOP.map=bfMapResolve(META.bfMap); COOP.duelName=name;   // v2.41: a duel's carpet is drawn at the challenge, same law as the room
     COOP.duelOpp=uid;   // the RATING report names the commander in the other chair
     roomModal(coopPanelHTML());
     coopPost('create',{team:1, map:COOP.map}).then(r=>{
@@ -29112,7 +29216,9 @@ document.getElementById('retryBtn').addEventListener('click', ()=>{
   audio();
   if(S.coop && COOP){ showMenu(); UI.coopOpen(); return; }   // back to the party — go again together
   if(S.bf){ const raid=!!S.bf.raid, m=S.bf.mapId, t=S.bf.team;
-    startBattlefield(m, null, t); if(raid && S.bf) S.bf.raid=true; return; }   // instant rematch, same size, no queue
+    // v2.41: a raid rematch is a fresh attack (the ground is drawn again),
+    // and a RANDOM pref redraws too — an explicit pick still replays itself.
+    startBattlefield((raid||META.bfMap==='random')?'random':m, null, t); if(raid && S.bf) S.bf.raid=true; return; }   // instant rematch, same size, no queue
   startCampaign(S.levelN);
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
@@ -29717,6 +29823,20 @@ window.GVT = {
   coopQuit(){ coopLeave(); },
   // ===== BATTLEFIELD =====
   battlefield(mapId,diff,team){ startBattlefield(mapId, diff, team); return S.bf.mapId+' '+S.bf.team+'v'+S.bf.team+' vs '+S.bf.rival.id+' ('+S.bf.ai.diff+')'; },
+  // v2.41 rookie/random rig: the lifetime counter, the gate, the tier the
+  // brains actually run and what every AI chair drew — probe surface,
+  // product-inert (the sq()/wtChip() precedent).
+  bfInfo(){ const o={ played:bfGamesPlayed(), rookieNext:bfRookie(), mapPref:META.bfMap };
+    if(S.bf) Object.assign(o,{ rookie:!!S.bf.rookie, diff:S.bf.ai.diff, mapId:S.bf.mapId, raid:!!S.bf.raid, room:!!S.bf.room,
+      foeKits:S.bf.seats.filter(st=>st.team==='foe').map(st=>st.kit&&st.kit.w),
+      mateKits:S.bf.seats.filter(st=>st.team==='you'&&!st.me).map(st=>st.kit&&st.kit.w),
+      foeDiffs:S.bf.seats.filter(st=>st.team==='foe').map(st=>st.brain&&st.brain.diff),
+      mateDiffs:S.bf.seats.filter(st=>st.team==='you'&&!st.me).map(st=>st.brain&&st.brain.diff),
+      units:S.units.filter(u=>!u.dead).reduce((k,u)=>{ k[u.side]=(k[u.side]||0)+1; return k; },{}),
+      base:{ you:S.bf.base.you.hp, foe:S.bf.base.foe.hp, dy:S.bf.base.you.dmgTaken, df:S.bf.base.foe.dmgTaken },
+      clock:+S.bf.timeLeft.toFixed(1), plastic:S.plastic,
+      foePurse:S.bf.seats.filter(st=>st.team==='foe').map(st=>Math.round(st.purse)) });
+    return o; },
   // THE EXACT ground factor under a point. Probe this, never time a marching
   // unit: 10% footing pauses and the waypoint wiggle make that measurement
   // noisy enough to lose a whole run to (v1.7 did).
