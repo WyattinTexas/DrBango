@@ -7,7 +7,7 @@
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.10.0';
+const VERSION = 'v0.10.1';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -97,10 +97,18 @@ const BOARD = {
   creamDim: '#c9b391',
 };
 
+// Enemy types are tiered: tougher kinds appear deeper in the run
+// and genuinely differ — HP, damage, and attack cadence per type.
 const MOBS = [
-  { name: 'imp', color: 0xc95b4a },
-  { name: 'slime', color: 0x6aa84f },
-  { name: 'brute', color: 0x8e6bb5 },
+  { name: 'imp', color: 0xc95b4a, minLevel: 5,
+    hpBase: 4, hpPer: 1.7, dmgBase: 2, dmgPer: 0.5, cd: 2,
+    flavor: 'Quick: strikes every 2 throws' },
+  { name: 'slime', color: 0x6aa84f, minLevel: 1,
+    hpBase: 3, hpPer: 1.4, dmgBase: 1, dmgPer: 0.4, cd: 3,
+    flavor: 'Weak and slow' },
+  { name: 'brute', color: 0x8e6bb5, minLevel: 9,
+    hpBase: 7, hpPer: 2.2, dmgBase: 3, dmgPer: 0.6, cd: 4,
+    flavor: 'Heavy hitter, slow windup' },
 ];
 
 const TOOLTIPS = {
@@ -435,17 +443,21 @@ class GameScene extends Phaser.Scene {
       return e;
     };
     if (type === 'boss') {
-      const hp = 20 + n * 5;
+      const hp = 18 + Math.round(n * 4.5);
       this.enemies = [mkEnemy(Phaser.Math.Between(0, MOBS.length - 1),
-        hp, 4 + Math.floor(n * 0.7), n >= 15 ? 2 : 3, true)];
+        hp, 4 + Math.floor(n * 0.6), n >= 15 ? 2 : 3, true)];
     } else {
-      const count = Math.min(1 + Math.floor(n / 5), 3);
+      const count = Math.min(1 + Math.floor((n - 1) / 6), 3);
+      const unlocked = MOBS.map((m, i) => ({ m, i }))
+        .filter(x => n >= x.m.minLevel);
       this.enemies = [];
       for (let i = 0; i < count; i++) {
-        const hp = 4 + n * 3 + Phaser.Math.Between(0, Math.floor(n / 2));
-        const cd = (n >= 12 ? 2 : 3) + (i % 2);
-        this.enemies.push(mkEnemy(Phaser.Math.Between(0, MOBS.length - 1),
-          hp, 1 + Math.ceil(n * 0.6), cd, false));
+        const pick = unlocked[Phaser.Math.Between(0, unlocked.length - 1)];
+        const t = pick.m;
+        const hp = t.hpBase + Math.round(n * t.hpPer) +
+          Phaser.Math.Between(0, Math.floor(n / 3));
+        this.enemies.push(mkEnemy(pick.i,
+          hp, t.dmgBase + Math.floor(n * t.dmgPer), t.cd, false));
       }
     }
     this.layoutEnemies();
@@ -493,6 +505,7 @@ class GameScene extends Phaser.Scene {
       '\nDeals ' + e.dmg + ' damage every ' + e.baseCountdown + ' throws' +
       (e.countdown === 1 ? '\nATTACKS AFTER THIS THROW!' :
         '\nWaiting: attacks in ' + e.countdown + ' throws') +
+      '\n' + MOBS[e.type].flavor +
       '\nSpecial: none (coming later)';
     this.showTooltipText(e.x, e.y + this.stripH * 0.5, msg);
   }
