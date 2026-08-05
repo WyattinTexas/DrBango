@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v6.2 -->
+<!-- TRAINSET v6.3 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -447,46 +447,28 @@
   #shelfTrain{ width:auto; border-color:#F2C531; border-style:dashed; color:#F2C531; }
   #shelfTrain canvas{ width:calc(var(--ui)*110px); height:calc(var(--ui)*52px); }
   #shelfTrain.home{ border-style:solid; border-color:#513a24; color:#CBB88C; cursor:pointer; }
-  /* ---- THE SHY UI (E18): touch the attract rug and the chrome gets out of the
-     way — opacity + pointer-events ONLY, nothing moves or reflows, so the return
-     is seamless. The bedroom tools fade IN with the chrome faded out; they are
-     part of the shy state. Durations are stamped from SHY_FADE_MS at boot. ---- */
-  #menu,#mute{ transition:opacity var(--shyms,0.3s) ease; }
-  body.shy #menu,body.shy #mute{ opacity:0; }
-  body.shy #menu>*,body.shy #mute{ pointer-events:none; }
-  /* visibility:hidden at rest — an opacity-0 layer over the canvas still shifts
-     compositing by ±1px-channel (measured); hidden paints EXACTLY like absent,
-     which keeps the untouched menu byte-identical. The delayed visibility flip
-     lets the opacity fade finish before the tools stop painting. */
-  #bedbar{ position:absolute; left:0; right:0; bottom:0; z-index:6; display:none;
-    align-items:center; justify-content:safe center; gap:calc(var(--ui)*10px);
-    padding:calc(var(--ui)*8px) calc(var(--ui)*10px) calc(var(--ui)*8px + env(safe-area-inset-bottom));
-    overflow-x:auto; visibility:hidden; opacity:0; pointer-events:none;
-    transition:opacity var(--shyms,0.3s) ease, visibility 0s var(--shyms,0.3s); }
-  body.shy #bedbar{ visibility:visible; opacity:1;
-    transition:opacity var(--shyms,0.3s) ease, visibility 0s 0s; }
-  body.shy #bedbar button{ pointer-events:auto; }
-  #bedpal{ display:flex; gap:calc(var(--ui)*8px); }
-  /* E37 DESIGN THE ROOM — the decor shelf (the wood scrolls, the toys lift),
-     the sky pills (the E35 plaque grammar, room edition) and TIDY UP. All live
-     inside #bedbar so the E18 shy visibility law carries them for free. */
-  #bedshelf{ display:flex; align-items:center; gap:calc(var(--ui)*6px);
-    flex:1 1 auto; min-width:calc(var(--ui)*70px); overflow-x:auto; touch-action:pan-x;
-    padding:calc(var(--ui)*4px) calc(var(--ui)*2px); scrollbar-width:none; }
+  /* ---- E54 THE SPILL IS THE TRAY: the E18/E37 mini-palette bar and its shy
+     cycle are DEAD — the pieces lie on the floor as real canvas toys. The two
+     survivors re-home as small docks that never touch the sign regions:
+     the E37 decor shelf = a left-edge vertical dock (the rail's own muscle
+     memory; mounts only when the kid OWNS decor — a fresh boot shows nothing),
+     the E35 sky pills = a 2×2 chip cluster top-right under the mute chip.
+     While a hand is live on the floor both docks fold (body.bedhand — the E25
+     fold recipe: opacity + pointer-events only). ---- */
+  #bedshelf{ position:absolute; left:8px; z-index:6; display:none;
+    flex-direction:column; align-items:center; gap:calc(var(--ui)*4px);
+    overflow-y:auto; touch-action:pan-y; scrollbar-width:none;
+    padding:calc(var(--ui)*3px); }
   #bedshelf::-webkit-scrollbar{ display:none; }
-  /* the room's palette + decor cards wear a bedroom card dial (--bbc) so the
-     strip keeps 3-4 toys in view beside the pills; the train shelf keeps its
-     E16 sizes untouched */
-  #bedpal .pbtn,#bedshelf .pbtn{ width:calc(var(--ui)*46px); }
-  #bedpal .pbtn canvas,#bedshelf .pbtn canvas{ width:calc(var(--ui)*34px); height:calc(var(--ui)*34px); }
-  #bedpal .pbtn small,#bedshelf .pbtn small{ font-size:calc(var(--ui)*7px); }
-  #bedsky{ display:grid; grid-template-columns:auto auto; gap:calc(var(--ui)*3px); flex:0 0 auto; }
+  #bedshelf .pbtn{ width:calc(var(--ui)*46px); flex:0 0 auto; }
+  #bedshelf .pbtn canvas{ width:calc(var(--ui)*34px); height:calc(var(--ui)*34px); }
+  #bedshelf .pbtn small{ font-size:calc(var(--ui)*7px); }
+  #bedsky{ position:absolute; right:10px; top:calc(20px + var(--ui)*34px); z-index:6;
+    display:none; grid-template-columns:auto; gap:calc(var(--ui)*3px); justify-items:stretch; }
   #bedsky .ptab{ font-size:calc(var(--ui)*7.5px); padding:calc(var(--ui)*5px) calc(var(--ui)*4px); }
-  #bedtidy b{ font-size:calc(var(--ui)*20px); pointer-events:none; }
-  #bedtidy.ask{ border-color:#FF7A5C; color:#FF7A5C; }
+  #bedshelf,#bedsky{ transition:opacity 0.25s ease; }
+  body.bedhand :is(#bedshelf,#bedsky){ opacity:0; pointer-events:none; }
   @media (max-width:820px){
-    #bedbar{ gap:3px; }
-    #bedpal{ gap:3px; }
     #bedshelf{ gap:3px; }
     #bedsky .ptab{ font-size:calc(var(--ui)*6.5px); }
   }
@@ -528,9 +510,6 @@
     .pbtn small{ font-size:calc(var(--ui)*7px); }
     /* E27→E33: the rail cards ride the --bc dial (resize() stamps the sm value);
        the bedroom keeps its own exact sm sizes — it borrows the #shelf node */
-    #bedbar #shelf{ gap:calc(var(--ui)*3px); } #bedbar #shelfCars,#bedbar #shelfEng{ gap:calc(var(--ui)*3px); }
-    #bedbar #shelfCars .pbtn,#bedbar #shelfEng .pbtn{ width:calc(var(--ui)*39px); }
-    #bedbar #shelfTrain canvas{ width:calc(var(--ui)*70px); height:calc(var(--ui)*33px); }
     .ptab{ font-size:calc(var(--ui)*6px); padding:calc(var(--ui)*3px) calc(var(--ui)*3px); }
     #tidyBtn b{ font-size:calc(var(--ui)*16px); }
     .mbtn{ font-size:17px; padding:11px 30px; letter-spacing:2px; }
@@ -644,7 +623,10 @@
   <div id="railFoot"></div>
 </div>
 <div id="spread"><div id="spTray"></div></div>
-<div id="bedbar"><span id="bedpal"></span><span id="bedshelf"></span><span id="bedsky"></span></div>
+<!-- E54 THE SPILL IS THE TRAY: the bedroom bar is DEAD. The pieces are canvas
+     toys on the floor now; only the two re-homed docks remain (decor left,
+     sky pills top-right), each clear of every painted sign. -->
+<div id="bedshelf"></div><div id="bedsky"></div>
 <!-- E26 THE LIVING ROOM: the big buttons and the chips are PAINTED FURNITURE now
      (station · toy box · storefront · ticket board, each with a pill label —
      the pigHit pattern). The paint shop keeps its little DOM row; the box's
@@ -746,7 +728,7 @@ const RAIN_RUMBLE=[14,34];                       // seconds between distant rumb
 // move, in every mode. HOME and double-tap-empty-rug still fit the whole rug.
 const BASE_MUL=2;                                // "about twice" — Wyatt's dial
 const ZOOM_MAX=2;                                // camera: was 1× — the hand can go closer still
-// Chrome icon canvases (palette / shelf / tray / bedpal / piggy) keep a FIXED
+// Chrome icon canvases (palette / shelf / tray / piggy) keep a FIXED
 // backing store; at --ui:2 they display at ~their old attr size, so retina
 // needs the attrs doubled to keep v2.8's 2× crispness headroom. Store cards
 // and the world canvas already repaint at rect×DPR and need nothing.
@@ -791,7 +773,7 @@ const CHIRP_VOL=1.0;                                  // moo/baa/cluck loudness 
 const REACT_R=1;                                      // react radius, cells — the train charms animals this close
 const HERD_SPEED=1.0;                                 // herd idle tempo: graze / nibble / peck speed
 // ---- Wyatt dials (EXPANSION 3 — one const each) ----
-const MENU_PROPS=['sign','bed','toybox','blocks','door','lamp','station','store','tickets','board'];  // room props list (E26 adds the three new fixtures; E44 the departure board)
+const MENU_PROPS=['sign','bed','toybox','door','lamp','station','store','tickets','board'];  // room props list (E26 adds the three new fixtures; E44 the departure board; E54 retires 'blocks' — the SPILL owns that floor)
 const ATT_SCALE=0.85;         // attract oval size (scale of the real 4×2 loop)
 const ATT_SPEED=70;           // attract loop speed, px/s — slow; SPEED stays the game's
 const PLAY_LABEL='PLAY';      // E26: the train station's pill (was the big button's copy — re-aimed, never orphaned)
@@ -914,9 +896,22 @@ const SHELF_ORDER=['train','cars','engines'];   // shelf layout, left to right
 // leave it alone and it drifts back. While it's away the rug is a real little
 // building floor — mini palette + the train shelf — and NOTHING is ever saved:
 // the bedroom set is a sandcastle, the tide is a reload (THE EPHEMERAL LAW).
-const UI_SHY_SEC=3.0;          // idle seconds before the chrome returns
-const SHY_FADE_MS=300;         // chrome fade duration, both directions
-const BEDROOM_KINDS=['s','c','st'];  // the mini palette — the E16 tutorial three
+// E54 THE SPILL — five real toys loose on the boards by the TOYS box (the
+// story: they spilled out of it). Permanent, infinite drag sources through
+// the one pipeline; world/attract coords (they paint INSIDE the attract
+// transform, so every piece lies at exactly built size). Fixed jaunty rots —
+// zero randomness, the frozen-clock law. This table is the dial that was
+// BEDROOM_KINDS (the E18 mini palette died with the bar).
+const SPILL=[   // a cascade down the left column: below the box, left of the E44 board, clear of the broom
+  { id:'tree', t:'tree', layer:'scen',  x:-246, y:518, rot:-0.36, wig:0 },
+  { id:'c',    t:'c',    layer:'track', x:-138, y:513, rot: 0.42, wig:0 },
+  { id:'s',    t:'s',    layer:'track', x:-192, y:588, rot:-0.31, wig:0 },
+  { id:'st',   t:'st',   layer:'track', x:-192, y:732, rot: 0.24, wig:0 },
+  { id:'loco', t:'loco', layer:'train', x:-138, y:831, rot:-0.10, wig:0 },
+];
+const SPILL_R=66;              // world px — nearest-spill-wins tap radius
+let SPILL_HINT=false;          // first-boot pulse ring on the straight (no save bit:
+                               // the room key's own absence IS the flag — bedReset derives it)
 // ---- Wyatt dials (EXPANSION 21 — one block) ----
 // THE SURPRISE TRAIN: in campaign the train is a GIFT — the kid brings the
 // engine, the game packs the cars. The shelf paints the stock little train;
@@ -7631,8 +7626,8 @@ function draw(){
    painters. The menu IS the toy.
    ===================================================================== */
 const MRUG={x:350,y:180,w:620,h:470};                       // the crimson rug on the boards
-const ATT={ ox:MRUG.x+MRUG.w/2-192*ATT_SCALE,               // oval bbox centre (192,96) lands on
-            oy:MRUG.y+MRUG.h/2-96*ATT_SCALE };              // ...the rug's centre
+const ATT={ ox:MRUG.x+MRUG.w/2-336*ATT_SCALE,               // E54: the fig-8 bbox centre (336,240 =
+            oy:MRUG.y+MRUG.h/2-240*ATT_SCALE };             // half of 7×5 cells) lands on the rug's centre
 function star5(px,py,k,col){                                // the toybox star, gone travelling
   cx.save(); cx.translate(px,py); cx.scale(k,k); cx.fillStyle=col;
   cx.beginPath(); cx.moveTo(0,-12);
@@ -7714,10 +7709,6 @@ function menuBed(){
   cx.fillStyle='#E8E4D4'; rr(945,196,75,168,13); cx.fill();
   cx.fillStyle='#fff'; rr(958,230,51,100,11); cx.fill();
 }
-function spillPiece(t,r,px,py,rot,s){
-  cx.save(); cx.translate(px,py); cx.rotate(rot); cx.scale(s,s); cx.translate(-C/2,-C/2);
-  drawPieceArt(mkPiece(t,r),0,0); cx.restore();
-}
 function menuToybox(){
   // THE TRACK BOX — the toy chest this game comes out of, track spilling onto
   // the boards. E26: the ONE TRUE BOX now ("the toys should just be under the
@@ -7739,14 +7730,9 @@ function menuToybox(){
   cx.restore();
   star5(80,87,1.05,'#e8d9b0');
   cx.restore();
-  spillPiece('s',0, 268,556,-0.31,0.55);
-  spillPiece('c',0, 300,634, 0.42,0.55);
-}
-function menuBlocks(){
-  const block=(bx,by,c,rot)=>{ cx.save(); cx.translate(bx,by);
-    cx.globalAlpha=0.18; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(0,15,20,5,0,0,7); cx.fill(); cx.globalAlpha=1;
-    cx.rotate(rot*Math.PI/180); cx.fillStyle=c; rr(-16,-12,32,25,4); cx.fill(); cx.restore(); };
-  block(150,724,'#D9A544',14); block(212,752,'#4A6B8A',-19); block(168,788,'#C85A4A',6);
+  // E54: the two DECORATIVE spill pieces died here — the REAL spill (drawSpill,
+  // inside the attract transform at built size) is the toy tray now. Wyatt
+  // already believed these were draggable; now they are.
 }
 function menuSign(){
   // the title on a wooden plank — toy-chest wood, cream ALL-CAPS.
@@ -8319,20 +8305,21 @@ function bigDown(e){
 }
 
 /* =====================================================================
-   THE BEDROOM SET & THE SHY UI (E18) — the menu stops being a menu.
-   Touch the attract rug and the chrome (title, the three big buttons,
-   chips) fades away; leave it alone for UI_SHY_SEC and it fades back.
-   While it's away the rug is a REAL little building floor: a mini
-   palette (s/c/st) + the E16 train shelf, and every press routes into
-   the SAME machinery BUILD's rug reads — swapped onto the attract grid
-   by inBed(), which aliases the world globals for the duration of one
+   THE BEDROOM SET (E18, re-cut by E54 THE SPILL IS THE TRAY) — the menu
+   floor is a REAL little building floor, live at boot: the SPILL's five
+   toys are permanent drag sources, and every press routes into the SAME
+   machinery BUILD's rug reads — swapped onto the attract grid by
+   inBed(), which aliases the world globals for the duration of one
    call. THE EPHEMERAL LAW: save/toast/hintPass are inert inside the
-   wrapper; nothing here ever touches localStorage. The bedroom floor
-   is BR_GW×BR_GH cells with the stock oval at (1,1)-(4,2) — the paint
-   transform shifts one cell so an untouched menu stays PIXEL-IDENTICAL.
+   wrapper (E37: save() reroutes to the ROOM key — the game key gets
+   zero bedroom writes). E54 killed the shy cycle and the bedroom bar
+   with it: the chrome never hides because there is no chrome left to
+   hide — the room IS the UI. BED.shy/a stay as frozen fields (false/1)
+   so the rig's shape survives.
    ===================================================================== */
-const BR_LO=-1, BR_GW=5, BR_GH=3;     // the bedroom floor: cells (-1..4)×(-1..2) — 6×4 on the rug,
-                                      // ringing the stock oval at its ORIGINAL keys (0,0)-(3,1)
+const BR_LO=-1, BR_GW=8, BR_GH=6;     // the bedroom floor minimum: cells (-1..7)×(-1..5),
+                                      // ringing the E54 figure-8 heart at (0,0)-(6,4)
+                                      // (bedBounds still extends to the whole viewport)
 const TFIELDS=['placed','cars','F','running','pauseT','stKey','dist','startSig','goDist','revSinceGo'];
 const bedTrain0=()=>({placed:false,cars:[],F:true,running:false,pauseT:0,stKey:null,dist:0,startSig:null,goDist:0,revSinceGo:false});
 const BED={ on:false, shy:false, a:1, idleT:0, ctx:0, s:null,
@@ -8370,21 +8357,12 @@ function bedRel(){
 function inBed(fn){ bedAcq(); try{ return fn(); } finally{ bedRel(); } }
 const withBed=fn=>SCREEN==='menu'&&BED.on? inBed(fn) : fn();   // shelf handlers serve both rooms
 const bedRun=fn=>()=>{ if(SCREEN==='menu'&&BED.on) inBed(fn); };   // deferred puffs re-enter the room
-// ---- THE SHY UI ----
-function shySync(){ document.body.classList.toggle('shy',BED.shy); }
-function shyTouch(){ BED.idleT=0; if(!BED.shy){ BED.shy=true; shySync(); } }
-function shyTick(dt){
-  if(BED.shy){
-    if(down||DRAG) BED.idleT=0;       // a held finger keeps the room cleared
-    else{
-      BED.idleT+=dt;
-      // LAW: a child is NEVER locked out of the three big buttons for longer
-      // than UI_SHY_SEC + the fade.
-      if(BED.idleT>=UI_SHY_SEC){ BED.shy=false; shySync(); }
-    }
-  }
-  const tgt=BED.shy?0:1, stp=dt*1000/SHY_FADE_MS;   // the canvas sign fades in step with the DOM
-  BED.a=tgt>BED.a? Math.min(tgt,BED.a+stp) : Math.max(tgt,BED.a-stp);
+// ---- E54: the shy cycle is DEAD (shySync/shyTouch/shyTick retired with the
+// bar). One job remains from that era: while a hand is live on the floor the
+// two re-homed docks fold out of the way (the E25 fold recipe — DOM only,
+// zero canvas paint, so every byte proof is blind to it).
+function bedHandSync(){
+  document.body.classList.toggle('bedhand', SCREEN==='menu'&&BED.on&&!!(down||DRAG));
 }
 // ---- the stock attract train: grabbing it picks it up — the toy law, everywhere ----
 function atHitAt(wx,wy){
@@ -8426,7 +8404,6 @@ function bedDown(e){
   // its own taps before the canvas ever sees them, and the piggy answered
   // first back in the pointerdown ladder.
   ac(); e.preventDefault();
-  shyTouch();                          // the chrome gets out of the way
   if(DRAG||down) return;               // one hand at a time
   inBed(()=>{
     const [wx,wy]=worldXY(e);
@@ -8439,8 +8416,33 @@ function bedDown(e){
     const cell=cellXY(wx,wy);
     if(cell&&atCellOn(cell)){ down={x:e.clientX,y:e.clientY,what:'atrain'}; return; }   // track under the toy = the toy
     if(cell&&pieceTop(cell[0],cell[1])){ down={x:e.clientX,y:e.clientY,what:'piece',cell}; return; }
+    // E54 THE SPILL — the five floor toys are drag sources through the one
+    // pipeline. Trains and placed pieces answered above (a toy in the hand
+    // beats a source); room objects + the piggy answered back in the
+    // pointerdown ladder, so no spill toy can steal a furniture tap.
+    const it=spillHitAt(wx,wy);
+    if(it){
+      if(it.t==='loco'){
+        // the engine spot breathes: train out = a ghost minds the spot and a
+        // tap calls her home (E16's BRING IT HOME, floor edition)
+        if(TRAIN.placed) down={x:e.clientX,y:e.clientY,what:'spillHome',spill:it};
+        else down={x:e.clientX,y:e.clientY,what:'handle',spill:it};   // the E16 shelf-train drag verbatim
+      }
+      else down={x:e.clientX,y:e.clientY,what:'spill',t:it.t,layer:it.layer,v:0,spill:it};
+      return;
+    }
     down=null;                         // bare rug — the touch alone cleared the room
   });
+}
+// nearest spill toy within SPILL_R of the (world-space) press — centres sit
+// 90+ px apart, so nearest-wins keeps every toy unambiguous at toddler aim
+function spillHitAt(wx,wy){
+  let best=null, bd=SPILL_R;
+  for(const it of SPILL){
+    const d=Math.hypot(wx-it.x,wy-it.y);
+    if(d<bd){ bd=d; best=it; }
+  }
+  return best;
 }
 // ---- the bedroom rides the menu painting: live on menu+board, discarded by the game ----
 function bedCancel(){                  // put down whatever the hand held — the SAME cancel machinery
@@ -8454,57 +8456,42 @@ function bedCancel(){                  // put down whatever the hand held — th
 function bedScreen(s){
   if(s==='menu'||s==='board'){
     if(!BED.on) bedReset();            // fresh from the game — the tide rebuilt the sandcastle
-    $('bedbar').style.display=s==='menu'? 'flex':'none';
-    if(s!=='menu'){
-      if(BED.shy){ BED.shy=false; shySync(); }
-      bedCancel();
-    }
+    bedToolsShow(s==='menu');          // E54: the two docks serve the menu only (as the bar did)
+    if(s!=='menu'){ bedCancel(); bedHandSync(); }
   } else if(BED.on) bedDrop();
+}
+// E54: the re-homed docks — pills always (the sky is everyone's), the decor
+// dock only when the kid OWNS decor (a fresh boot shows NOTHING — no bar,
+// no dock, just the room and the spill).
+function bedToolsShow(on){
+  $('bedsky').style.display=on?'grid':'none';
+  $('bedshelf').style.display=(on&&$('bedshelf').children.length)?'flex':'none';
 }
 function bedReset(){
   BED.on=true;
-  buildAttract();                      // the stock oval, pristine — THE EPHEMERAL LAW's tide
+  buildAttract();                      // the stock figure-8, pristine — THE EPHEMERAL LAW's tide
   AT.smoke.length=0; AT.wheel=0; AT.smokeT=0;
   BED.scen.clear(); BED.fx=[]; BED.smoke=AT.smoke; BED.boarders=[]; BED.wheel=0;
   BED.grav={mul:1,crest:false}; BED.clack=0;
   BED.train=bedTrain0(); BED.consist=consist.slice(); BED.eng=ENGINE;
-  BED.shy=false; BED.a=1; BED.idleT=0; shySync();
-  $('bedbar').appendChild($('shelf')); // the E16 shelf serves the bedroom while the menu is up
-  $('shelf').style.display='';         // E33: a folded TRAINS plaque must not follow it here
+  for(const it of SPILL) it.wig=0;     // E54: the floor toys sit still on a fresh tide
+  // E54 the first-boot pulse ring: the room key's own absence is the flag —
+  // a returning kid (or any persisted mutation) never sees it. Read-only.
+  try{ SPILL_HINT=!localStorage.getItem(ROOM_KEY); }catch(e){ SPILL_HINT=false; }
   roomApply();                         // E37 THE ROOM REMEMBERS — the saved room dresses the stock
                                        // floor (no save = a no-op = exactly the old tide)
-  inBed(shelfSync);                    // after the apply, so the shelf paints the ROOM's consist
-  bedShelfSync(); bedSkySync();        // E37: the decor shelf + the sky pills wear the room's truth
+  bedShelfSync(); bedSkySync();        // E37: the decor dock + the sky pills wear the room's truth
 }
 function bedDrop(){
   bedCancel();                         // the hand lets go first (BED.on still true for the wrapper)
   BED.on=false;
-  if(BED.shy){ BED.shy=false; shySync(); }
-  BED.a=1; BED.idleT=0;
-  $('bedbar').style.display='none';
-  $('railBody').insertBefore($('shelf'),$('tabRug'));   // the shelf goes home to the rail's TRAINS run (E33)
-  buildPalette.sync(palTab);                            // ...wearing the accordion's current fold
+  bedToolsShow(false);
+  bedHandSync();
 }
-// ---- the mini palette: the E16 tutorial three, kid-scale, no gates ----
-function buildBedPal(){
-  const wrap=$('bedpal');
-  for(const t of BEDROOM_KINDS){
-    const b=document.createElement('button'); b.className='pbtn'; b.type='button';
-    const cv=document.createElement('canvas'); const lb=document.createElement('small');
-    lb.textContent=(PIECES.find(p=>p[0]===t)||[t,t])[1];
-    b.appendChild(cv); b.appendChild(lb); wrap.appendChild(b);
-    cv.width=104*ICON_RES; cv.height=104*ICON_RES;
-    const g=cv.getContext('2d'), s=104*ICON_RES/(C+16);
-    g.setTransform(s,0,0,s,8*s,8*s);
-    withCtx(g,()=>drawPieceArt({t,r:t==='c'?1:0,sel:0,elev:0,latch:null},0,0));
-    b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
-      BED.idleT=0;
-      down={x:e.clientX,y:e.clientY,what:'pal',t,el:b,layer:'track',v:0}; });
-  }
-  // the fade obeys the ONE dial, DOM and canvas alike (--shyms feeds the CSS)
-  document.documentElement.style.setProperty('--shyms',(SHY_FADE_MS/1000)+'s');
-  buildBedShelf(); buildBedSky(); buildBedTidy();   // E37: the room's own tools ride the same bar
-}
+// ---- E54: the mini palette (buildBedPal) and the DOM TIDY button died with
+// the bar — the SPILL is the palette and THE BROOM is the sweep. The two
+// surviving tools build here. ----
+function buildBedTools(){ buildBedShelf(); buildBedSky(); }
 
 /* =====================================================================
    DESIGN THE ROOM — THE ROOM REMEMBERS (E37). Wyatt: "It should also
@@ -8520,7 +8507,9 @@ function buildBedPal(){
    (the room's pet). A fresh profile = a stock room, byte-identical.
    ===================================================================== */
 const ROOM_KEY='TRAINSET_ROOM';       // v:1 — separate from the game save: nothing existing migrates
-const OVAL_KEYS=new Set(['0,0','1,0','2,0','3,0','0,1','1,1','2,1','3,1']);   // the heart — buildAttract's exact keys
+const LOOP_KEYS=new Set(['3,0','4,0','5,0','6,0','3,1','6,1',
+  '0,2','1,2','2,2','3,2','4,2','5,2','6,2','0,3','3,3',
+  '0,4','1,4','2,4','3,4']);   // the heart — buildAttract's exact keys (the E54 figure-8)
 let ROOMWX='clear';                   // the room's own sky (E35 words; persisted in the room save)
 let BEDSKY=[];                        // the room's pill row (bedSkySync marks it)
 function roomSave(){
@@ -8529,8 +8518,9 @@ function roomSave(){
   try{
     const w=serWorld();
     localStorage.setItem(ROOM_KEY, JSON.stringify({ v:1,
-      grid:w.grid.filter(r2=>!OVAL_KEYS.has(r2[0])),   // the heart is never written down
+      grid:w.grid.filter(r2=>!LOOP_KEYS.has(r2[0])),   // the heart is never written down
       scen:w.scen, consist:w.consist, eng:ENGINE, train:w.train, wx:ROOMWX }));
+    SPILL_HINT=false;                  // E54: the room lives — the first-boot ring retires this instant
   }catch(e){}
 }
 function roomApply(){
@@ -8543,7 +8533,9 @@ function roomApply(){
   if(!d||d.v!==1) return;
   inBed(()=>{ try{
     for(const [k2,t,r,sel,elev] of (d.grid||[])){
-      if(elev||!PATHS[t]||OVAL_KEYS.has(k2)||grid.has(k2)) continue;   // ground pieces only; the heart wins
+      if(elev||!PATHS[t]||LOOP_KEYS.has(k2)||grid.has(k2)) continue;   // ground pieces only; the heart wins
+                                       // (E54: an old room's piece under the BIGGER heart skips here and
+                                       // ages out of the save on the next write — the v46 forgiveness)
       const [x,y]=String(k2).split(',').map(Number);
       if(!isFinite(x)||!isFinite(y)) continue;
       setTrackPiece(t,r|0,sel|0,0,x,y);
@@ -8579,7 +8571,7 @@ function buildBedSky(){
                               ['rain','🌧','RAIN'],['dust','🌪','DUST']]){
     const b=document.createElement('button'); b.className='ptab'; b.type='button';
     b.textContent=ico+' '+name;
-    b.addEventListener('click',()=>{ ac(); BED.idleT=0;
+    b.addEventListener('click',()=>{ ac();
       if(ROOMWX===id){ SND.click(); return; }           // already this sky — the pill ceremony verbatim
       ROOMWX=id; WXR.key=null; SND.tok(); bedSkySync(); roomSave(); });
     wrap.appendChild(b); BEDSKY.push({id,el:b});
@@ -8603,32 +8595,98 @@ function bedShelfSync(){
     const g=cv.getContext('2d'), s=104*ICON_RES/(C+16);
     g.setTransform(s,0,0,s,8*s,8*s);
     scenIcon(g,t);
-    b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault(); BED.idleT=0;
+    b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
       down={x:e.clientX,y:e.clientY,what:'pal',t,el:b,layer,
             v:SCENDEF[t]&&SCENDEF[t].react?(pplSeq++%3):0}; });
   }
+  // E54: the dock mounts only when it HOLDS something (a fresh kid owns zero
+  // decor — no bar, no dock, nothing over the floor)
+  if(SCREEN==='menu') bedToolsShow(true);
 }
 function buildBedShelf(){ bedShelfSync(); }
-// ---- TIDY UP (E37) — the E16 two-tap sweep, room edition: the saved room is
-// forgotten, the sky clears, the stock room returns. Kids need an undo for chaos.
-function buildBedTidy(){
-  const b=document.createElement('button'); b.id='bedtidy'; b.className='pbtn'; b.type='button';
-  b.innerHTML='<b>🧹</b><small>TIDY UP</small>';
-  let arm=0;
-  const off=()=>{ arm=0; b.classList.remove('ask'); b.querySelector('small').textContent='TIDY UP'; };
-  b.addEventListener('click',()=>{ ac(); BED.idleT=0;
-    if(arm){
-      clearTimeout(arm); off();
-      try{ localStorage.removeItem(ROOM_KEY); }catch(e){}
-      ROOMWX='clear'; WXR.key=null;
-      bedReset();                                        // the stock room, nothing to apply
-      SND.pop(); toast('ALL TIDY!');                     // outside the wrapper — the one ceremony word shows
-    } else {
-      SND.click(); b.classList.add('ask'); b.querySelector('small').textContent='TAP AGAIN';
-      arm=setTimeout(off,2600);
+// ---- THE BROOM (E54) — TIDY UP re-homed as furniture (the design doc's cut
+// list: "KEEP: TIDY broom (diegetic)"). A little broom leans on the wall
+// below the spill; the E16 two-tap arm survives verbatim: first tap = arm
+// (the broom wiggles + TAP AGAIN), second within the window = the E37 sweep —
+// the saved room is forgotten, the sky clears, the stock room returns. It
+// sweeps BUILT pieces, never the spill sources (they are constants, not
+// placements). Runs OUTSIDE the wrapper (the pigTap precedent — the wrapper
+// IS the line), so the two ceremony words still show.
+const BROOM_SPOT={x:40,y:644};        // painting coords — leaning on the TOYS box's left flank
+const BROOM={arm:0,wig:0};
+function broomHit(e){
+  if(SCREEN!=='menu') return false;
+  const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // the painting's own inverse
+  return mx>=16&&mx<=66&&my>=556&&my<=712;
+}
+function broomTap(){
+  ac();
+  BROOM.wig=1;
+  if(BROOM.arm){
+    clearTimeout(BROOM.arm); BROOM.arm=0;
+    try{ localStorage.removeItem(ROOM_KEY); }catch(e){}
+    ROOMWX='clear'; WXR.key=null;
+    bedReset();                                        // the stock room, nothing to apply
+    SND.pop(); toast('ALL TIDY!');                     // outside the wrapper — the one ceremony word shows
+  } else {
+    SND.click(); toast('TAP AGAIN');
+    BROOM.arm=setTimeout(()=>{ BROOM.arm=0; },2600);
+  }
+}
+function drawBroom(){
+  // molded-plastic broom leaning on the wall — stick, collar, bristles.
+  // Deterministic: the only motion is the armed/tapped wiggle (BROOM.wig,
+  // decayed on the menu clock like every garnish).
+  cx.save(); cx.translate(BROOM_SPOT.x,BROOM_SPOT.y);
+  cx.globalAlpha=0.22; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(6,58,30,7,0,0,7); cx.fill(); cx.globalAlpha=1;
+  cx.rotate(-0.22+(BROOM.wig>0? Math.sin(BROOM.wig*18)*0.06*BROOM.wig : 0));
+  cx.lineCap='round';
+  cx.strokeStyle='#a37c4a'; cx.lineWidth=9;             // the stick (toy-chest wood)
+  cx.beginPath(); cx.moveTo(0,-96); cx.lineTo(0,26); cx.stroke();
+  cx.strokeStyle='#6e5130'; cx.lineWidth=3;
+  cx.beginPath(); cx.arc(0,-96,4.5,0,7); cx.stroke();   // the hang loop
+  cx.fillStyle='#C0392B'; rr(-12,22,24,14,4); cx.fill();   // the collar, livery red
+  cx.strokeStyle='#8a2a20'; cx.lineWidth=2.5; rr(-12,22,24,14,4); cx.stroke();
+  cx.fillStyle='#E8D9A0';                                // the bristle skirt
+  cx.beginPath(); cx.moveTo(-12,34); cx.lineTo(-22,62); cx.lineTo(22,62); cx.lineTo(12,34); cx.closePath(); cx.fill();
+  cx.strokeStyle='#B8A66A'; cx.lineWidth=2;
+  cx.beginPath(); cx.moveTo(-12,34); cx.lineTo(-22,62); cx.lineTo(22,62); cx.lineTo(12,34); cx.closePath(); cx.stroke();
+  cx.beginPath();
+  for(let i=-14;i<=14;i+=7){ cx.moveTo(i*0.75,38); cx.lineTo(i,60); }
+  cx.stroke();
+  cx.restore();
+}
+// ---- THE SPILL's paint (E54) — runs INSIDE drawMenu's attract transform, so
+// the five toys are painted by the REAL piece/car painters at exactly built
+// size: what lies on the boards is what lands on the rug. Deterministic — the
+// only motion is the tap wiggle (menu-clock decay) and the first-boot ring.
+function spillRing(it){
+  // the first-boot invitation: a soft gold ring breathing around the straight
+  // (ROOM.t drives it — frozen-clock deterministic; SPILL_HINT gates it)
+  const k=(ROOM.t%2.2)/2.2;
+  cx.globalAlpha=(1-k)*0.5; cx.strokeStyle='#F2C531'; cx.lineWidth=5;
+  cx.beginPath(); cx.arc(it.x,it.y,40+40*k,0,7); cx.stroke();   // max 80 world — never sweeps the furniture
+  cx.globalAlpha=1;
+}
+function drawSpill(){
+  for(const it of SPILL){
+    const wig=it.wig>0? Math.sin(it.wig*18)*0.08*it.wig : 0;
+    if(it.t==='loco'){
+      // the engine spot breathes: the room's own engine + livery; out on the
+      // rails = a ghost minds the spot (the E16 fd law), tap = come home
+      const placed=BED.ctx? TRAIN.placed : BED.train.placed;
+      cx.save(); cx.translate(it.x,it.y); cx.rotate(it.rot+wig);
+      drawCar(BED.ctx? ENGINE : BED.eng,0,0,0,0,0,livFor(0),0,placed?0.35:undefined);
+      cx.restore();
+      continue;
     }
-  });
-  $('bedbar').appendChild(b);
+    if(SPILL_HINT&&it.id==='s') spillRing(it);
+    cx.save(); cx.translate(it.x,it.y); cx.rotate(it.rot+wig); cx.translate(-C/2,-C/2);
+    if(it.layer==='track') drawPieceArt(mkPiece(it.t,it.t==='c'?1:0),0,0);
+    else drawScenItem({t:it.t,v:0,ra:null,pop:0,wave:0},0,0,1.2);   // the still pose — the icon law
+    cx.restore();
+  }
 }
 // ---- THE ROOM'S WEATHER (E37) — the three shipped recipes, room-span copies.
 // The game's weatherSeed/drawWeather/WXP are UNTOUCHED (their byte proofs must
@@ -8795,7 +8853,6 @@ function pigPanelSoon(){
 function pigTap(){
   ac();
   PIG.hop=1;                            // the hop answers EVERY tap (GVT law)
-  if(BED.shy) BED.idleT=0;              // a hand on the piggy is still a hand in the room
   pigPanelSoon();                       // E53: the wallet opens on every tap — claim day or not
   if(!pigClaimable()){
     // empty today: joy, not a menu — a hop, a puff out the back, one kid word
@@ -8909,21 +8966,47 @@ function bedBounds(){
   // stands in front of the sign; only NEW drops are refused.
   addRect(BOARD_SPOT.x-BOARD_W/2-6, BOARD_SPOT.y-BOARD_H/2-6,
           BOARD_SPOT.x+BOARD_W/2+6, BOARD_SPOT.y+140);
+  // E54: the SPILL toys + THE BROOM are furniture — where a tap grabs a source
+  // (or arms the sweep), a drop must refuse (the piggy law). Painting-space
+  // rects through the same door as everything else.
+  for(const it of SPILL){
+    const px2=ATT.ox+(it.x-GX)*ATT_SCALE, py2=ATT.oy+(it.y-GY)*ATT_SCALE, h2=52*ATT_SCALE;
+    addRect(px2-h2,py2-h2,px2+h2,py2+h2);
+  }
+  addRect(16,556,66,712);   // the broom's lean
+  // ...and the two re-homed DOM docks while they stand (drops can land under
+  // DOM — the ghost must tell the truth there too)
+  for(const el2 of [$('bedshelf'),$('bedsky')]){
+    if(!el2||!el2.offsetParent) continue;
+    const r2=el2.getBoundingClientRect();
+    if(r2.width&&r2.height) addRect((r2.left-OX)/SC,(r2.top-OY)/SC,(r2.right-OX)/SC,(r2.bottom-OY)/SC);
+  }
   BED.blk=blk;
 }
 
-// the attract loop: a REAL 4×2 oval of real pieces, ridden by real riders.
-// E18: the oval keeps its EXACT keys and transform (any re-key shifts float
-// operands and hairline AA — measured); the bedroom floor instead spreads to
-// negative cells around it via the GX0/GY0 lower bound inside the wrapper.
+// E54 THE BIGGER LOOP: the attract track is the PLAYROOM's own figure-8 law
+// ("one closed path through the diamond twice — that is the show") compressed
+// to 7×5 cells so it fills the rug at the UNCHANGED ATT_SCALE — no scale
+// ripple, every piece in the room keeps its exact size. The heart REPLACES the
+// old 4×2 oval wholesale (menu pixels change BY DESIGN); the grid keying,
+// origin and transform grammar never move, so every saved-room cell lands
+// exactly where the kid left it, and the never-re-key float trap stays
+// honored — this is new geometry, not a shifted-and-compensated oval.
 function buildAttract(){
   AT.grid.clear(); AT.hg.clear();
   const put=(x,y,t,r)=>AT.grid.set(key(x,y),mkPiece(t,r));
-  put(0,0,'c',1); put(1,0,'s',0); put(2,0,'s',0); put(3,0,'c',2);
-  put(0,1,'c',0); put(1,1,'s',0); put(2,1,'s',0); put(3,1,'c',3);
+  // top ring (cols 3-6, rows 0-2) — the v56 MATING law corners
+  put(3,0,'c',1); put(4,0,'s',0); put(5,0,'s',0); put(6,0,'c',2);
+  put(3,1,'s',1);                                 put(6,1,'s',1);
+  // the long middle run through THE DIAMOND at (3,2)
+  put(0,2,'c',1); put(1,2,'s',0); put(2,2,'s',0); put(3,2,'x',0);
+  put(4,2,'s',0); put(5,2,'s',0); put(6,2,'c',3);
+  // bottom ring (cols 0-3, rows 2-4)
+  put(0,3,'s',1);                 put(3,3,'s',1);
+  put(0,4,'c',0); put(1,4,'s',0); put(2,4,'s',0); put(3,4,'c',3);
   RGRID=AT.grid; HGRID=AT.hg;
   try{
-    const loco={cx:1,cy:0,pi:0,dir:1,s:48,el:0};
+    const loco={cx:1,cy:2,pi:0,dir:1,s:48,el:0};   // heads east — first thing it does is take the diamond
     AT.cars=[{type:'loco',rd:loco,face:1,squash:0}];
     const tail=['tender','cab'];                       // the loco + 2 cars, both in livery
     for(let i=1;i<=tail.length;i++){
@@ -8933,7 +9016,7 @@ function buildAttract(){
   } finally { RGRID=grid; HGRID=hgrid; }
 }
 function menuUpdate(dt){
-  if(SCREEN==='menu') shyTick(dt);     // E18: the board keeps the oval turning, but only the menu is shy
+  if(SCREEN==='menu') bedHandSync();   // E54: the docks fold while a hand is live (DOM only — proofs are blind to it)
   inBed(()=>{                          // E18: the world globals ARE the bedroom's in here
     const step=ATT_SPEED*dt;
     attRun(AT.cars,step);              // the stock toy — a closed oval never turns around
@@ -8970,6 +9053,9 @@ function menuUpdate(dt){
   // flights her pay rides on (update() ticks these for the game screens;
   // the menu ticks its own). All empty on an untouched menu: zero paint.
   roomTick(dt);   // E26: the alive-room clock — pick-mes, the dog, the box lid (dt only, frozen-clock safe)
+  // E54: the floor toys' tap wiggle + the broom's — garnish, decayed like the hop
+  for(const it of SPILL) if(it.wig>0) it.wig=Math.max(0,it.wig-dt*2.2);
+  if(BROOM.wig>0) BROOM.wig=Math.max(0,BROOM.wig-dt*2.2);
   if(PIG.hop>0) PIG.hop=Math.max(0,PIG.hop-dt*2.6);
   for(const p of PIG.puffs) p.t+=dt;
   for(let i=PIG.puffs.length-1;i>=0;i--) if(PIG.puffs[i].t>=PIG.puffs[i].dur) PIG.puffs.splice(i,1);
@@ -8988,7 +9074,7 @@ function drawMenu(){
   if(MENU_PROPS.includes('bed')) menuBed();
   if(MENU_PROPS.includes('tickets')) menuTickets();   // E26: the wall board, up with the wall things
   if(MENU_PROPS.includes('toybox')) menuToybox();
-  if(MENU_PROPS.includes('blocks')) menuBlocks();
+  drawBroom();                                        // E54: TIDY lives on the wall now — furniture, like the pig
   if(MENU_PROPS.includes('station')) menuStation();   // E26: the floor buildings, south of the rug
   if(MENU_PROPS.includes('board')) menuBoard();       // E44: the departure board, beside the platform
   if(MENU_PROPS.includes('store')) menuStore();
@@ -9001,6 +9087,7 @@ function drawMenu(){
   try{
     if(BED.scen.size) inBed(()=>{ drawRivers(); drawPonds(); });   // E37: water is ground — under the track (a bridge could span it)
     drawTrack(AT.grid);
+    drawSpill();                                                   // E54: the five floor toys — real painters, built size, under the cars
     if(BED.scen.size) inBed(drawScen);                             // E37: the room's toys — over the track, under the cars
     drawCarsOnRails(AT.cars,AT.wheel);
     if(BED.train.placed||(BED.ctx&&TRAIN.placed))                       // E18: the kid's train, beside the stock toy
@@ -9020,13 +9107,7 @@ function drawMenu(){
   menuWeather();   // E37 THE ROOM SKY — over the room, under the labels (clear = zero paint)
   // E26: the pills — furniture labels, painted like the piggy: always on, never shy
   for(const o of ROOM_OBJS) if(!o.nopill) drawPill(o.px,o.py,o.label());   // E49: the door wears no label — the light is the handle
-  if(MENU_PROPS.includes('sign')){
-    // E18 THE SHY UI: the painted title fades with the DOM chrome. An untouched
-    // menu holds a===1 and paints the sign exactly as before — byte-identical.
-    if(BED.a>=1) menuSign();
-    else if(BED.a>0.002){ const k=BED.a*BED.a*(3-2*BED.a);
-      cx.globalAlpha=k; menuSign(); cx.globalAlpha=1; }
-  }
+  if(MENU_PROPS.includes('sign')) menuSign();   // E54: the shy fade is dead — the title just stands (BED.a frozen 1)
   // E23: minted stars fly on the menu too (the piggy's pay) — draw()'s exact
   // recipe in screen space. An empty list paints nothing: byte-proofs hold.
   cx.setTransform(DPR,0,0,DPR,0,0);
@@ -10695,6 +10776,7 @@ cvs.addEventListener('pointerdown',e=>{
       if(o){ e.preventDefault(); ac(); o.tap(); tapSwallow(); return; }
     }
     if(SCREEN==='menu'&&ROOM.cards) boxCards(false);   // a tap on open floor folds the box cards
+    if(SCREEN==='menu'&&!DRAG&&!down&&broomHit(e)){ e.preventDefault(); broomTap(); return; }   // E54: THE BROOM — outside the wrapper, so its two words show
     if(SCREEN==='menu'&&BED.on) bedDown(e);
     return;
   }
@@ -10756,7 +10838,7 @@ cvs.addEventListener('pointerdown',e=>{
 // bedroom wrapper — worldXY maps through the attract transform, the grid is the
 // attract grid, and save/toast/hintPass are inert. Zero duplicated pipeline.
 window.addEventListener('pointermove',e=>{
-  if(SCREEN==='menu'){ if(down||DRAG){ BED.idleT=0; inBed(()=>moveCore(e)); } return; }
+  if(SCREEN==='menu'){ if(down||DRAG) inBed(()=>moveCore(e)); return; }
   moveCore(e);
 },{passive:false});
 // E24 GRAB THE LAND: a move that STARTS on glued becomes a pan — silently
@@ -10806,7 +10888,7 @@ function moveCore(e){
   if(Math.hypot(e.clientX-down.x,e.clientY-down.y)<8) return;
   e.preventDefault();
   if(down.lp){ clearTimeout(down.lp); down.lp=null; }
-  if(down.what==='pal'){ DRAG=down.layer!=='track'? {kind:'newScen',t:down.t,v:down.v|0} : {kind:'newPiece',t:down.t,r:0}; }
+  if(down.what==='pal'||down.what==='spill'){ DRAG=down.layer!=='track'? {kind:'newScen',t:down.t,v:down.v|0} : {kind:'newPiece',t:down.t,r:0}; }   // E54: a floor toy drags exactly like a rail card
   else if(down.what==='piece'){
     const [gx,gy]=down.cell, pc=pieceTop(gx,gy);
     if(pc){
@@ -10865,7 +10947,7 @@ function moveCore(e){
     const [wx,wy]=dragXY(e); DRAG.x=wx; DRAG.y=wy; hover=cellXY(wx,wy); down=null; }
 }
 window.addEventListener('pointerup',e=>{
-  if(SCREEN==='menu'){ if(down||DRAG){ BED.idleT=0; inBed(()=>upCore(e)); } return; }   // E18
+  if(SCREEN==='menu'){ if(down||DRAG) inBed(()=>upCore(e)); return; }   // E18
   upCore(e);
 });
 function upCore(e){
@@ -11051,7 +11133,12 @@ function upCore(e){
       }
     }
     else if(down.what==='pal'){ wiggle(down.el); toast('DRAG IT ONTO THE RUG!'); }   // alive — but only drags spawn (the E16 tray law)
-    else if(down.what==='handle'){ toast('DRAG IT ONTO THE TRACK!'); }
+    else if(down.what==='spill'){ down.spill.wig=1; SND.chirp(); }                  // E54: floor toys wiggle + chirp — only drags spawn
+    else if(down.what==='spillHome'){ SND.pop(); trainHome(false); }                // E54: the empty engine spot calls the toy home (E16's BRING IT HOME)
+    else if(down.what==='handle'){
+      if(down.spill){ down.spill.wig=1; SND.chirp(); }                              // E54: the spill engine is a floor toy too
+      else toast('DRAG IT ONTO THE TRACK!');
+    }
     // E16 — the shelf speaks drag: a bare tap wiggles and points at the verb
     else if(down.what==='shelfCar'){ wiggle(down.el); toast('DRAG IT ONTO YOUR TRAIN!'); }
     else if(down.what==='shelfEng'){ setEngine(down.t); }   // the shed's tap-to-swap, relocated
@@ -11855,7 +11942,7 @@ function buildShelf(){
   repaintShelfIcons();
 }
 function paintShelfTrain(){
-  if(BED.on&&SCREEN==='menu'&&!BED.ctx) return inBed(paintShelfTrain);   // E18: the shelf shows the BEDROOM's train there
+  if(BED.ctx||(BED.on&&SCREEN==='menu')) return;   // E54: the rail shelf never serves the menu now
   if(!shelfTrainCv) return;
   const cv=shelfTrainCv, g=cv.getContext('2d');
   g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
@@ -11916,7 +12003,8 @@ function consistChanged(){
 // E18: while the shelf serves the bedroom, an unwrapped call re-enters through
 // the wrapper so it paints the BEDROOM's train/consist, never BUILD's.
 function shelfSync(){
-  if(BED.on&&SCREEN==='menu'&&!BED.ctx) return inBed(shelfSync);
+  if(BED.ctx) return;                     // E54: no DOM shelf serves the menu — the SPILL is the source
+  if(BED.on&&SCREEN==='menu'){ rideSync(); return; }   // ...but the ride chip still learns the menu hides it
   paintShelfTrain();
   const tb=$('shelfTrain');
   if(tb){
@@ -12944,6 +13032,7 @@ function resize(){
   }
   else {
     SC=Math.min(W/MENU_W,(H-BAR)/MENU_H); OX=(W-MENU_W*SC)/2; OY=(H-BAR-MENU_H*SC)/2;
+    bedShelfSeat();   // E54: the decor dock seats below the wall board, before the cell audit reads its rect
     bedBounds();   // E23: the bedroom floor is every cell the screen can hold — re-derived here
     if(ROOM.cards) boxCardsPlace();   // E26: the box's cards ride the painting through a resize
   }
@@ -12962,6 +13051,18 @@ function resize(){
   if($('store').style.display==='flex') storeSync();   // E22: the shelf count follows the geometry
   homeSync();
 }
+// E54: the decor dock's seat — left edge, below the tickets wall board, capped
+// at the screen floor. Screen-anchored (the E37 bar was too): on sm the whole
+// dock rides the extended boards left of the painting — open floor.
+function bedShelfSeat(){
+  const el=$('bedshelf'); if(!el) return;
+  const top=Math.round(OY+SC*214);
+  let floor=H-10;
+  const pnt=$('paint');                 // never grow down into the paint shop's corner (sm)
+  if(pnt){ const r=pnt.getBoundingClientRect(); if(r.height&&r.left<120) floor=Math.min(floor,r.top-6); }
+  el.style.top=top+'px';
+  el.style.maxHeight=Math.max(60,floor-top)+'px';
+}
 // E36: ONE truth for the coach line's seat — the screen floor everywhere,
 // lifted clear of the TRAIN SHELF on the wind-up rug (card + padding + air).
 // Stamped by resize() and by showScreen() (the shelf exists only in PLAY).
@@ -12971,7 +13072,7 @@ function toastSeat(){
   tt.style.bottom='calc('+(lift*UIS)+'px + env(safe-area-inset-bottom))';
 }
 window.addEventListener('resize',resize);
-load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedPal(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
+load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
 showScreen('menu'); shelfSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
@@ -13049,6 +13150,11 @@ window.TS={
     trains:(AT.cars.length?1:0)+((BED.ctx? TRAIN.placed : BED.train.placed)?1:0),
     // E23 — the whole-floor bounds + the blocked furniture cells, for the battery
     gx0:BED.gx0, gy0:BED.gy0, gw:BED.gw, gh:BED.gh,
+    // E54 — the spill (world coords + painting-space centres), the broom, the ring
+    spill:SPILL.map(it=>({id:it.id,t:it.t,layer:it.layer,x:it.x,y:it.y,wig:+it.wig.toFixed(3),
+      px:ATT.ox+(it.x-GX)*ATT_SCALE, py:ATT.oy+(it.y-GY)*ATT_SCALE})),
+    broom:{x:BROOM_SPOT.x,y:BROOM_SPOT.y,armed:!!BROOM.arm},
+    hint:SPILL_HINT,
     blocked:BED.blk? [...BED.blk] : [] }; },
   // E23 — the piggy rig: state, the battery's calendar, seeding (never saves),
   // and the byte-proof door. tap() walks the REAL pigTap path.
