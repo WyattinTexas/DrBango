@@ -1,20 +1,18 @@
 'use strict';
 
 // ============================================================
-// RUNEFALL — Phase 0.5 "A Real Game"    v0.5.0
-// Rune Dice-style combat: flick dice, equal values bounce into
-// the air and fuse; every merge fires its value as damage at
-// the front enemy. Survive waves. Bombs, potions, cursed
-// stones. The board persists between throws — always.
+// RUNEFALL — Phase 0.7 "The Run"    v0.7.0
+// A 20-level Rune Dice-style run: flick dice from your DICE BAG,
+// merges damage enemies, gold dice pay out, shops between fights
+// sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.6.0';
+const VERSION = 'v0.7.0';
 
-// ---- Tunable knobs (everything feel-related lives here) ----
 const TUNE = {
-  MAX_RESTING_DICE: 28,   // clutter cap — the knob, not a guess
+  MAX_RESTING_DICE: 28,
   SEED_DICE: 12,
-  MAX_VALUE: 6,           // two 6s fuse -> detonation, 12 dmg to ALL
+  MAX_VALUE: 6,
 
   DIE_SIZE_FRAC: 0.092,
   DIE_SIZE_MIN: 34,
@@ -32,8 +30,6 @@ const TUNE = {
   SETTLE_SPEED: 0.35,
   SETTLE_MS: 220,
 
-  // equal dice that TOUCH combine — no speed threshold (Rune Dice
-  // rule). A periodic sweep also catches pairs already in contact.
   TOUCH_SWEEP_MS: 300,
 
   RISE_MS: 180,
@@ -44,7 +40,6 @@ const TUNE = {
   HOP_PER_PX: 0.5,
   HOP_HEIGHT_FRAC: 1.5,
 
-  // live-tunable from the panel
   BOUNCE_RANGE_FRAC: 4.0,
   LAND_SLIDE: 3.0,
 
@@ -55,19 +50,31 @@ const TUNE = {
   SPIN_RATE: 0.05,
   TRAIL_MIN_SPEED: 4,
 
-  // ---- combat ----
   PLAYER_HP: 50,
-  REFRESH_THROWS: 4,      // field refresh cadence, Rune Dice style
-  BOMB_CHANCE: 0.08,      // chance a queue slot is a bomb (wave 2+)
-  POTION_CHANCE: 0.07,    // chance a queue slot is a potion (when hurt)
-  BOMB_DAMAGE: 6,         // to ALL enemies
-  DETONATE_DAMAGE: 12,    // two 6s -> to ALL enemies
+  REFRESH_THROWS: 4,
+  BOMB_DAMAGE: 6,
+  DETONATE_DAMAGE: 12,
   POTION_HEAL: 6,
-  STONE_HITS: 2,          // solid hits to shatter a cursed stone
+  STONE_HITS: 2,
   STONE_HIT_SPEED: 4,
+  SPIKE_DAMAGE: 3,
 };
 
-// ---- Haptic hook (real impl arrives via native bridge, Phase 5) ----
+// The run: 20 levels. fight / shop / boss (miniboss).
+const LEVEL_TRACK = [
+  'fight', 'fight', 'shop', 'fight', 'boss',
+  'fight', 'shop', 'fight', 'fight', 'boss',
+  'shop', 'fight', 'fight', 'shop', 'boss',
+  'fight', 'shop', 'fight', 'fight', 'boss',
+];
+
+const STARTING_BAG = [
+  { kind: 'num', value: 1 }, { kind: 'num', value: 1 },
+  { kind: 'num', value: 1 }, { kind: 'num', value: 1 },
+  { kind: 'num', value: 2 }, { kind: 'num', value: 2 },
+  { kind: 'num', value: 2 }, { kind: 'num', value: 3 },
+];
+
 const feedback = {
   chainStep(n) {
     try {
@@ -76,15 +83,14 @@ const feedback = {
   },
 };
 
-// Rune Dice palette: light warm die bodies, dark plum numbers
 const VALUE_COLORS = {
   1: 0xf2efe4, 2: 0xe4bf7e, 3: 0x8ec873,
   4: 0x6fb3dd, 5: 0xa98ae0, 6: 0xf2b23e,
 };
 const NUMBER_COLOR = '#443355';
+const GOLD = '#f2b23e';
 
 const BOARD = {
-  page: 0x2e2018,
   frame: 0x4a3226,
   frameGrain: 0x3e2a1e,
   frameHi: 0x5e4130,
@@ -106,6 +112,7 @@ const TOOLTIPS = {
   bomb: 'BOMB\nExplodes on impact:\n6 damage to ALL enemies',
   potion: 'POTION\nBreaks on impact\nand heals you +6 HP',
   stone: 'CURSED STONE\nBlocks the board.\nTwo hard hits crush it',
+  spike: 'SPIKE DIE\nHitting it hurts you:\n-3 HP. It then crumbles',
 };
 
 function shade(color, f) {
@@ -119,13 +126,6 @@ function shadeHex(color, f) {
   return (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
 }
 
-function hex(color) {
-  return '#' + color.toString(16).padStart(6, '0');
-}
-
-// ------------------------------------------------------------
-// Tiny particle pool — no engine API risk, hard perf cap.
-// ------------------------------------------------------------
 class ParticlePool {
   constructor(scene, texture, max) {
     this.scene = scene;
@@ -191,11 +191,20 @@ class GameScene extends Phaser.Scene {
     this.fireTime = 0;
     this.trailAccum = 0;
     this.hp = TUNE.PLAYER_HP;
-    this.wave = 0;
+    this.gold = 0;
+    this.level = 0;
     this.throws = 0;
     this.refreshIn = TUNE.REFRESH_THROWS;
     this.gameOver = false;
-    this.waveClearing = false;
+    this.levelClearing = false;
+    this.modalOpen = null;   // 'bag' | 'shop' | 'track' | null
+    this.modalObjects = [];
+
+    // the dice bag: your deck. Draw pile empties, then resets.
+    this.bag = STARTING_BAG.map(e => ({ ...e }));
+    this.drawPile = [];
+    this.reshuffleBag();
+    this.nextQueue = [this.drawFromBag(), this.drawFromBag(), this.drawFromBag()];
 
     this.computeLayout();
     this.makeTextures();
@@ -207,9 +216,6 @@ class GameScene extends Phaser.Scene {
     this.sparks = new ParticlePool(this, 'spark', 120);
     this.trajGfx = this.add.graphics().setDepth(6);
     this.bandGfx = this.add.graphics().setDepth(7);
-
-    this.seedBoard();
-    this.nextWave();
 
     this.matter.world.on('collisionstart', (event) => {
       for (const pair of event.pairs) {
@@ -240,7 +246,8 @@ class GameScene extends Phaser.Scene {
     });
 
     this.input.on('pointerdown', (p) => {
-      if (this.gameOver) { this.restart(); return; }
+      if (this.gameOver) { this.scene.restart(); return; }
+      if (this.modalOpen) return;
       if (!this.ready) return;
       this.aim = { sx: p.x, sy: p.y };
     });
@@ -259,63 +266,605 @@ class GameScene extends Phaser.Scene {
 
     this.scale.on('resize', () => this.handleResize());
     this.setReady(true);
+    this.startLevel(1);
   }
 
-  restart() {
-    this.scene.restart();
+  // ---------- bag ----------
+
+  reshuffleBag() {
+    this.drawPile = this.bag.map(e => ({ ...e }));
+    Phaser.Utils.Array.Shuffle(this.drawPile);
   }
 
-  // ---------- layout (resolution-driven, never hardcoded) ----------
-
-  computeLayout() {
-    const W = this.scale.gameSize.width, H = this.scale.gameSize.height;
-    this.W = W; this.H = H;
-    this.stripH = Phaser.Math.Clamp(H * 0.17, 52, 96); // enemy ledge
-    this.dieSize = Phaser.Math.Clamp(
-      Math.min(W, H - this.stripH) * TUNE.DIE_SIZE_FRAC, TUNE.DIE_SIZE_MIN, TUNE.DIE_SIZE_MAX);
-    this.dieRadius = this.dieSize / 2;
-    this.rail = Math.max(10, Math.round(this.dieSize * 0.42));
-    this.boardTop = this.stripH;               // frame starts here
-    this.fieldTop = this.stripH + this.rail;   // physics ceiling
-    this.launcherPos = { x: W / 2, y: H - this.dieSize * 1.45 };
-    this.maxSpeed = W * TUNE.MAX_SPEED_FRAC;
-    this.maxPull = H * TUNE.MAX_PULL_FRAC;
+  drawFromBag() {
+    if (this.drawPile.length === 0) this.reshuffleBag();
+    return this.drawPile.pop();
   }
 
-  buildWalls() {
-    if (this.walls) for (const w of this.walls) this.matter.world.remove(w);
-    const t = 200, { W, H } = this, r = this.rail;
-    const opts = { isStatic: true, restitution: 1, friction: 0 };
-    this.walls = [
-      this.matter.add.rectangle(W / 2, this.fieldTop - t / 2, W + t * 2, t, opts),
-      this.matter.add.rectangle(W / 2, H - r + t / 2, W + t * 2, t, opts),
-      this.matter.add.rectangle(r - t / 2, H / 2, t, H + t * 2, opts),
-      this.matter.add.rectangle(W - r + t / 2, H / 2, t, H + t * 2, opts),
-    ];
+  bagRemaining() {
+    // dice not yet thrown this cycle = draw pile + what's in the queue
+    const counts = {};
+    for (const e of [...this.drawPile, ...(this.nextQueue || [])]) {
+      const k = e.kind + (e.kind === 'num' ? e.value : '');
+      counts[k] = (counts[k] || 0) + 1;
+    }
+    return counts;
   }
 
-  handleResize() {
-    this.computeLayout();
-    this.buildWalls();
-    this.buildBoard();
-    this.layoutHud();
-    this.layoutLauncher();
-    this.layoutEnemies();
-    for (const d of this.dice) {
-      if (!d.body) continue;
-      const m = this.rail + this.dieRadius;
-      const x = Phaser.Math.Clamp(d.body.position.x, m, this.W - m);
-      const y = Phaser.Math.Clamp(d.body.position.y, this.fieldTop + this.dieRadius, this.H - m);
-      this.MatterLib.Body.setPosition(d.body, { x, y });
+  // ---------- levels ----------
+
+  levelType(n) {
+    return LEVEL_TRACK[n - 1] || 'fight';
+  }
+
+  startLevel(n) {
+    this.level = n;
+    this.levelClearing = false;
+    this.refreshIn = TUNE.REFRESH_THROWS;
+    this.drawRefreshText();
+    this.clearBoard();
+    for (const e of this.enemies) this.destroyEnemyVisual(e);
+    this.enemies = [];
+    const type = this.levelType(n);
+    this.levelText.setText('LEVEL ' + n + '/' + LEVEL_TRACK.length);
+    if (type === 'shop') {
+      this.banner('LEVEL ' + n + ' — SHOP', GOLD);
+      this.time.delayedCall(600, () => this.openShop());
+    } else {
+      this.banner(type === 'boss' ? 'LEVEL ' + n + ' — MINIBOSS' : 'LEVEL ' + n,
+        type === 'boss' ? '#ff8070' : '#ffd54a');
+      this.time.delayedCall(350, () => {
+        this.seedLevelBoard();
+        this.spawnEnemies();
+      });
     }
   }
 
-  // ---------- textures (all programmer art, baked once) ----------
+  levelCfg() {
+    const n = this.level, type = this.levelType(n);
+    const goldMax = Math.min(1 + Math.floor(n / 5) + (type === 'boss' ? 1 : 0), 6);
+    const goldCount = (type === 'boss' ? 4 : 2) + Math.floor(n / 8);
+    return { type, goldMax, goldCount };
+  }
+
+  clearBoard() {
+    for (const d of [...this.dice]) {
+      if (d.dead) continue;
+      d.dead = true;
+      this.detachBody(d);
+      this.tweens.add({
+        targets: [d.img, d.shadow], alpha: 0, scale: d.img.scale * 0.4,
+        duration: 320, ease: 'Quad.easeIn',
+        onComplete: () => {
+          d.img.destroy(); d.shadow.destroy();
+          const idx = this.dice.indexOf(d);
+          if (idx >= 0) this.dice.splice(idx, 1);
+        },
+      });
+    }
+    this.thrownDie = null;
+  }
+
+  seedLevelBoard() {
+    const cfg = this.levelCfg();
+    this.seedBoard(cfg.goldCount, cfg.goldMax);
+    if (cfg.type === 'boss') {
+      this.spawnStones(2);
+      this.spawnSpikes(2 + Math.floor(this.level / 10));
+    } else if (this.level >= 4) {
+      this.spawnStones(1);
+    }
+  }
+
+  spawnEnemies() {
+    const n = this.level, type = this.levelType(n);
+    const mkEnemy = (mobType, hp, dmg, cd, boss) => ({
+      type: mobType, hp, maxHp: hp, dmg,
+      countdown: cd, baseCountdown: cd,
+      alive: true, boss,
+      img: this.add.image(0, 0, 'mob' + mobType).setDepth(30),
+      bar: this.add.graphics().setDepth(31),
+      cdText: this.add.text(0, 0, '', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+        color: '#ffb0a0', fontStyle: 'bold',
+      }).setOrigin(0.5, 0).setDepth(31),
+    });
+    if (type === 'boss') {
+      const hp = 28 + n * 7;
+      this.enemies = [mkEnemy(Phaser.Math.Between(0, MOBS.length - 1),
+        hp, 5 + Math.floor(n * 0.9), 2, true)];
+    } else {
+      const count = Math.min(1 + Math.floor(n / 4), 3);
+      this.enemies = [];
+      for (let i = 0; i < count; i++) {
+        const hp = 5 + n * 4 + Phaser.Math.Between(0, n);
+        const cd = (n >= 8 ? 2 : 3) + (i % 2);
+        this.enemies.push(mkEnemy(Phaser.Math.Between(0, MOBS.length - 1),
+          hp, 2 + Math.ceil(n * 0.8), cd, false));
+      }
+    }
+    this.layoutEnemies();
+  }
+
+  layoutEnemies() {
+    const n = this.enemies.length;
+    if (!n) return;
+    this.enemies.forEach((e, i) => {
+      const size = Phaser.Math.Clamp(this.stripH * (e.boss ? 0.95 : 0.72), 36, 96);
+      const x = this.W * (0.5 + (i - (n - 1) / 2) * 0.2);
+      const y = this.stripH * 0.5;
+      e.x = x; e.y = y;
+      e.img.setPosition(x, y).setDisplaySize(size, size);
+      if (e.boss) e.img.setTint(0xffd0c0);
+      this.drawEnemyBar(e);
+    });
+  }
+
+  drawEnemyBar(e) {
+    const w = Math.max(44, this.stripH * (e.boss ? 1.3 : 0.9)), h = 5;
+    const x = e.x - w / 2, y = this.stripH - 12;
+    e.bar.clear();
+    if (!e.alive) { e.cdText.setText(''); return; }
+    e.bar.fillStyle(0x241408, 0.8);
+    e.bar.fillRoundedRect(x - 1, y - 1, w + 2, h + 2, 2);
+    const frac = Math.max(0, e.hp / e.maxHp);
+    e.bar.fillStyle(frac > 0.5 ? 0x6aa84f : frac > 0.25 ? 0xe6c229 : 0xc9564a, 1);
+    if (frac > 0) e.bar.fillRoundedRect(x, y, w * frac, h, 2);
+    e.cdText.setPosition(e.x, y - 16).setText('⚔ ' + e.countdown);
+  }
+
+  destroyEnemyVisual(e) {
+    e.img.destroy(); e.bar.destroy(); e.cdText.destroy();
+  }
+
+  firstAliveEnemy() {
+    return this.enemies.find(e => e.alive) || null;
+  }
+
+  dealDamage(amount, fromX, fromY, all) {
+    if (this.gameOver) return;
+    const targets = all ? this.enemies.filter(e => e.alive)
+      : (this.firstAliveEnemy() ? [this.firstAliveEnemy()] : []);
+    for (const e of targets) {
+      const bolt = this.add.image(fromX, fromY, 'spark').setDepth(32)
+        .setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd54a)
+        .setScale(1.4);
+      this.tweens.add({
+        targets: bolt, x: e.x, y: e.y, duration: 260, ease: 'Quad.easeIn',
+        onComplete: () => {
+          bolt.destroy();
+          this.hitEnemy(e, amount);
+        },
+      });
+    }
+  }
+
+  hitEnemy(e, amount) {
+    if (!e.alive) {
+      const next = this.firstAliveEnemy();
+      if (next) this.hitEnemy(next, amount);
+      return;
+    }
+    e.hp -= amount;
+    this.sparks.burst(e.x, e.y, 0xffd54a, 8, { speedMin: 1, speedMax: 3.5, life: 320, scale: 0.7 });
+    this.floatText(e.x, e.y - this.stripH * 0.2, '-' + amount, '#ffd54a');
+    e.img.setTintFill(0xffffff);
+    this.time.delayedCall(70, () => {
+      if (e.img.active) { e.img.clearTint(); if (e.boss) e.img.setTint(0xffd0c0); }
+    });
+    this.tweens.add({
+      targets: e.img, y: e.y - 5, duration: 50, yoyo: true,
+      onComplete: () => { if (e.img.active) e.img.setY(e.y); },
+    });
+    if (e.hp <= 0) {
+      e.alive = false;
+      e.hp = 0;
+      this.tweens.add({
+        targets: e.img, alpha: 0, scale: e.img.scaleX * 0.4, angle: 40, duration: 320,
+        onComplete: () => e.img.setVisible(false),
+      });
+      this.sparks.burst(e.x, e.y, shadeHex(MOBS[e.type].color, 0.2), 16,
+        { speedMin: 1.5, speedMax: 5, life: 500, scale: 1 });
+    }
+    this.drawEnemyBar(e);
+    if (!this.enemies.some(en => en.alive) && !this.levelClearing && this.enemies.length) {
+      this.levelClearing = true;
+      if (this.level >= LEVEL_TRACK.length) {
+        this.time.delayedCall(700, () => this.doVictory());
+      } else {
+        this.banner('LEVEL CLEAR!', '#8ec873');
+        this.time.delayedCall(1500, () => this.startLevel(this.level + 1));
+      }
+    }
+  }
+
+  onThrowResolved() {
+    if (this.gameOver || this.levelClearing) return;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      e.countdown--;
+      if (e.countdown <= 0) {
+        e.countdown = e.baseCountdown;
+        this.enemyAttack(e);
+      }
+      this.drawEnemyBar(e);
+    }
+    this.refreshIn--;
+    if (this.refreshIn <= 0) {
+      this.refreshIn = TUNE.REFRESH_THROWS;
+      this.fieldRefresh();
+    }
+    this.drawRefreshText();
+  }
+
+  fieldRefresh() {
+    this.banner('FIELD REFRESH', BOARD.cream);
+    const clearing = this.dice.filter(d =>
+      !d.dead && d.kind === 'num' && (d.state === 'rest' || d.state === 'active'));
+    for (const d of clearing) {
+      d.dead = true;
+      this.detachBody(d);
+      this.tweens.add({
+        targets: [d.img, d.shadow], alpha: 0, scale: d.img.scale * 0.4,
+        duration: 380, ease: 'Quad.easeIn',
+        onComplete: () => {
+          d.img.destroy(); d.shadow.destroy();
+          const idx = this.dice.indexOf(d);
+          if (idx >= 0) this.dice.splice(idx, 1);
+        },
+      });
+    }
+    this.time.delayedCall(450, () => {
+      if (this.gameOver || this.modalOpen === 'shop') return;
+      const cfg = this.levelCfg();
+      this.seedBoard(cfg.goldCount, cfg.goldMax);
+    });
+  }
+
+  drawRefreshText() {
+    if (!this.refreshText) return;
+    this.refreshText
+      .setText('Refresh in ' + this.refreshIn)
+      .setColor(this.refreshIn <= 1 ? '#ffd54a' : BOARD.creamDim);
+  }
+
+  enemyAttack(e) {
+    this.tweens.add({
+      targets: e.img, y: e.y + 10, duration: 90, yoyo: true, ease: 'Quad.easeIn',
+      onComplete: () => { if (e.img.active) e.img.setY(e.y); },
+    });
+    const veil = this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0xaa2222, 0.22)
+      .setDepth(40);
+    this.tweens.add({
+      targets: veil, alpha: 0, duration: 300,
+      onComplete: () => veil.destroy(),
+    });
+    this.cameras.main.shake(120, 0.004);
+    this.hp = Math.max(0, this.hp - e.dmg);
+    this.floatText(this.W * 0.16, this.H - this.rail - 30, '-' + e.dmg, '#ff8070');
+    this.drawHpBar();
+    if (this.hp <= 0) this.doGameOver();
+  }
+
+  heal(amount) {
+    this.hp = Math.min(TUNE.PLAYER_HP, this.hp + amount);
+    this.floatText(this.W * 0.16, this.H - this.rail - 30, '+' + amount, '#8ec873');
+    this.drawHpBar();
+  }
+
+  addGold(amount, x, y) {
+    this.gold += amount;
+    this.floatText(x, y, '+' + amount + 'g', GOLD);
+    this.sparks.burst(x, y, 0xf2b23e, 8, { speedMin: 1, speedMax: 3, life: 400, scale: 0.7 });
+    this.drawGold();
+  }
+
+  doGameOver() {
+    this.gameOver = true;
+    this.closeModal();
+    this.aim = null;
+    this.trajGfx.clear();
+    this.bandGfx.clear();
+    this.previewImg.setVisible(false);
+    this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.78).setDepth(50);
+    this.add.text(this.W / 2, this.H * 0.36, 'DEFEATED', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '52px',
+      fontStyle: 'bold', color: '#ff8070', stroke: '#2a0f08', strokeThickness: 8,
+    }).setOrigin(0.5).setDepth(51);
+    this.add.text(this.W / 2, this.H * 0.52,
+      'Reached level ' + this.level + '/' + LEVEL_TRACK.length +
+      '  ·  Best chain ×' + this.bestChain + '  ·  ' + this.gold + 'g earned', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
+      color: BOARD.cream,
+    }).setOrigin(0.5).setDepth(51);
+    const tap = this.add.text(this.W / 2, this.H * 0.66, 'TAP TO RETRY', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '22px',
+      fontStyle: 'bold', color: '#ffd54a',
+    }).setOrigin(0.5).setDepth(51);
+    this.tweens.add({ targets: tap, alpha: 0.35, duration: 550, yoyo: true, repeat: -1 });
+  }
+
+  doVictory() {
+    this.gameOver = true;
+    this.closeModal();
+    this.previewImg.setVisible(false);
+    this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.78).setDepth(50);
+    this.add.text(this.W / 2, this.H * 0.36, 'VICTORY!', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '52px',
+      fontStyle: 'bold', color: GOLD, stroke: '#2a0f08', strokeThickness: 8,
+    }).setOrigin(0.5).setDepth(51);
+    this.add.text(this.W / 2, this.H * 0.52,
+      'All ' + LEVEL_TRACK.length + ' levels cleared  ·  Best chain ×' + this.bestChain +
+      '  ·  ' + this.gold + 'g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
+      color: BOARD.cream,
+    }).setOrigin(0.5).setDepth(51);
+    const tap = this.add.text(this.W / 2, this.H * 0.66, 'TAP TO PLAY AGAIN', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '22px',
+      fontStyle: 'bold', color: '#ffd54a',
+    }).setOrigin(0.5).setDepth(51);
+    this.tweens.add({ targets: tap, alpha: 0.35, duration: 550, yoyo: true, repeat: -1 });
+  }
+
+  // ---------- modals: bag / shop / track ----------
+
+  modalAdd(obj) {
+    this.modalObjects.push(obj);
+    return obj;
+  }
+
+  closeModal() {
+    for (const o of this.modalObjects) o.destroy();
+    this.modalObjects = [];
+    this.modalOpen = null;
+  }
+
+  modalBase(title, phWant) {
+    for (const o of this.modalObjects) o.destroy();
+    this.modalObjects = [];
+    const dim = this.modalAdd(this.add.rectangle(
+      this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.7).setDepth(70).setInteractive());
+    const pw = Math.min(this.W * 0.82, 640);
+    const ph = phWant ? Math.min(phWant, this.H * 0.94) : Math.min(this.H * 0.78, 400);
+    const px = this.W / 2 - pw / 2, py = this.H / 2 - ph / 2;
+    const panel = this.modalAdd(this.add.graphics().setDepth(71));
+    panel.fillStyle(0x2a1a10, 0.97);
+    panel.fillRoundedRect(px, py, pw, ph, 12);
+    panel.lineStyle(2, 0x6b4a33, 1);
+    panel.strokeRoundedRect(px, py, pw, ph, 12);
+    this.modalAdd(this.add.text(this.W / 2, py + 20, title, {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '20px',
+      fontStyle: 'bold', color: BOARD.cream,
+    }).setOrigin(0.5).setDepth(72));
+    return { dim, px, py, pw, ph };
+  }
+
+  modalCloseButton(px, py, pw, onClose) {
+    const btn = this.modalAdd(this.add.text(px + pw - 14, py + 12, '✕', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '20px',
+      fontStyle: 'bold', color: BOARD.creamDim,
+    }).setOrigin(1, 0).setDepth(73).setInteractive());
+    btn.on('pointerdown', () => onClose());
+  }
+
+  // -- bag modal --
+
+  openBag() {
+    if (this.modalOpen || this.gameOver) return;
+    this.modalOpen = 'bag';
+    const { dim, px, py, pw, ph } = this.modalBase('DICE BAG');
+    dim.on('pointerdown', () => this.closeModal());
+    this.modalCloseButton(px, py, pw, () => this.closeModal());
+    const remaining = this.bagRemaining();
+    const groups = {};
+    for (const e of this.bag) {
+      const k = e.kind + (e.kind === 'num' ? e.value : '');
+      if (!groups[k]) groups[k] = { entry: e, total: 0 };
+      groups[k].total++;
+    }
+    const keys = Object.keys(groups);
+    const cols = Math.min(Math.max(keys.length, 1), 6);
+    const cellW = pw / (cols + 0.5);
+    const s = Math.min(this.dieSize, cellW * 0.55);
+    keys.forEach((k, i) => {
+      const col = i % cols, row = Math.floor(i / cols);
+      const x = px + cellW * (col + 0.75);
+      const y = py + 80 + row * (s + 46);
+      const g = groups[k];
+      const left = remaining[k] || 0;
+      const img = this.modalAdd(this.add.image(x, y,
+        this.textureFor(g.entry.kind, g.entry.value)).setDepth(72)
+        .setDisplaySize(s, s));
+      if (left === 0) img.setAlpha(0.3);
+      this.modalAdd(this.add.text(x, y + s * 0.62 + 4, left + '/' + g.total + ' left', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+        color: left === 0 ? '#7a6a55' : BOARD.cream,
+      }).setOrigin(0.5, 0).setDepth(72));
+    });
+    this.modalAdd(this.add.text(this.W / 2, py + ph - 16,
+      'A random die is drawn each throw. The bag refills once every die has been thrown.', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+      color: BOARD.creamDim,
+    }).setOrigin(0.5, 1).setDepth(72));
+  }
+
+  // -- shop modal --
+
+  shopStock() {
+    const n = this.level;
+    const tier = n <= 5 ? 1 : n <= 12 ? 2 : 3;
+    const pools = {
+      1: [
+        { kind: 'num', value: 2, price: 6 }, { kind: 'num', value: 3, price: 9 },
+        { kind: 'potion', value: 0, price: 8 }, { kind: 'bomb', value: 0, price: 10 },
+        { kind: 'num', value: 1, price: 3 },
+      ],
+      2: [
+        { kind: 'num', value: 3, price: 8 }, { kind: 'num', value: 4, price: 12 },
+        { kind: 'bomb', value: 0, price: 10 }, { kind: 'potion', value: 0, price: 8 },
+        { kind: 'num', value: 5, price: 16 },
+      ],
+      3: [
+        { kind: 'num', value: 4, price: 11 }, { kind: 'num', value: 5, price: 15 },
+        { kind: 'num', value: 6, price: 20 }, { kind: 'bomb', value: 0, price: 9 },
+        { kind: 'potion', value: 0, price: 7 },
+      ],
+    };
+    const pool = Phaser.Utils.Array.Shuffle([...pools[tier]]);
+    return {
+      offers: pool.slice(0, 4),
+      heal: { amount: 10 + tier * 5, price: 6 + tier * 2 },
+    };
+  }
+
+  openShop() {
+    if (this.gameOver) return;
+    this.modalOpen = 'shop';
+    this.renderShop(this.shopStock());
+  }
+
+  renderShop(stock) {
+    // size the panel from its content so rows never collide
+    const pwGuess = Math.min(this.W * 0.82, 640);
+    const sGuess = Math.min(this.dieSize * 1.1, (pwGuess / 4) * 0.5);
+    const offerBottom = 92 + sGuess * 0.65 + 40;
+    const { px, py, pw, ph } = this.modalBase('SHOP — LEVEL ' + this.level,
+      offerBottom + 30 + 62 + 36);
+    this.modalOpen = 'shop';
+    this.modalAdd(this.add.text(px + 16, py + 12, this.gold + 'g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
+      fontStyle: 'bold', color: GOLD,
+    }).setDepth(72));
+    const cellW = pw / 4;
+    const s = Math.min(this.dieSize * 1.1, cellW * 0.5);
+    stock.offers.forEach((o, i) => {
+      const x = px + cellW * (i + 0.5);
+      const y = py + 92;
+      const canAfford = this.gold >= o.price && !o.sold;
+      const img = this.modalAdd(this.add.image(x, y,
+        this.textureFor(o.kind, o.value)).setDepth(72).setDisplaySize(s, s));
+      const label = o.kind === 'num' ? 'Die: ' + o.value :
+        o.kind === 'bomb' ? 'Bomb die' : 'Potion die';
+      this.modalAdd(this.add.text(x, y + s * 0.65 + 4, label, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+        color: BOARD.cream,
+      }).setOrigin(0.5, 0).setDepth(72));
+      this.modalAdd(this.add.text(x, y + s * 0.65 + 22,
+        o.sold ? 'SOLD' : o.price + 'g', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '14px',
+        fontStyle: 'bold', color: o.sold ? '#7a6a55' : canAfford ? GOLD : '#8a6a50',
+      }).setOrigin(0.5, 0).setDepth(72));
+      if (!o.sold) {
+        img.setInteractive();
+        img.on('pointerdown', () => {
+          if (this.gold < o.price || o.sold) return;
+          this.gold -= o.price;
+          o.sold = true;
+          this.bag.push({ kind: o.kind, value: o.value });
+          this.drawPile.splice(Phaser.Math.Between(0, this.drawPile.length), 0,
+            { kind: o.kind, value: o.value });
+          this.drawGold();
+          this.updateBagCount();
+          this.renderShop(stock);
+        });
+      }
+      if (!canAfford && !o.sold) img.setAlpha(0.55);
+    });
+    const hy = py + 92 + s * 0.65 + 40 + 30;
+    const healBtn = this.modalAdd(this.add.text(px + pw * 0.28, hy,
+      '❤ Heal +' + stock.heal.amount + ' HP — ' + stock.heal.price + 'g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontStyle: 'bold',
+      color: this.gold >= stock.heal.price ? '#8ec873' : '#6a7a5a',
+      backgroundColor: '#1c120a', padding: { x: 10, y: 6 },
+    }).setOrigin(0.5).setDepth(72).setInteractive());
+    healBtn.on('pointerdown', () => {
+      if (this.gold < stock.heal.price) return;
+      this.gold -= stock.heal.price;
+      this.heal(stock.heal.amount);
+      this.drawGold();
+      this.renderShop(stock);
+    });
+    this.modalAdd(this.add.text(px + pw * 0.72, hy, 'Special items — coming later', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
+      color: '#7a6a55', fontStyle: 'italic',
+      backgroundColor: '#1c120a', padding: { x: 10, y: 6 },
+    }).setOrigin(0.5).setDepth(72));
+    const leave = this.modalAdd(this.add.text(this.W / 2, hy + 56, '▶ LEAVE SHOP', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '17px',
+      fontStyle: 'bold', color: '#ffd54a',
+      backgroundColor: '#3a2517', padding: { x: 14, y: 7 },
+    }).setOrigin(0.5).setDepth(72).setInteractive());
+    leave.on('pointerdown', () => {
+      this.closeModal();
+      this.startLevel(this.level + 1);
+    });
+  }
+
+  // -- track modal --
+
+  openTrack(autoCloseMs) {
+    if (this.gameOver) return;
+    this.modalOpen = 'track';
+    const { dim, px, py, pw, ph } = this.modalBase('THE RUN');
+    dim.on('pointerdown', () => this.closeModal());
+    this.modalCloseButton(px, py, pw, () => this.closeModal());
+    const total = LEVEL_TRACK.length;
+    const perRow = 10;
+    const rows = Math.ceil(total / perRow);
+    const cellW = pw / (perRow + 1);
+    const rowH = (ph - 110) / rows;
+    const lineG = this.modalAdd(this.add.graphics().setDepth(71));
+    lineG.lineStyle(2, 0x6b4a33, 0.8);
+    for (let i = 0; i < total; i++) {
+      const row = Math.floor(i / perRow);
+      const col = row % 2 === 0 ? i % perRow : perRow - 1 - (i % perRow); // snake
+      const x = px + cellW * (col + 1);
+      const y = py + 70 + row * rowH;
+      if (i > 0) {
+        const pr = Math.floor((i - 1) / perRow);
+        const pc = pr % 2 === 0 ? (i - 1) % perRow : perRow - 1 - ((i - 1) % perRow);
+        lineG.lineBetween(px + cellW * (pc + 1), py + 70 + pr * rowH, x, y);
+      }
+      const lvl = i + 1, type = LEVEL_TRACK[i];
+      const done = lvl < this.level, current = lvl === this.level;
+      const nodeCol = done ? 0x3a2a1c :
+        type === 'shop' ? 0xf2b23e : type === 'boss' ? 0xc9564a : 0xa08a6a;
+      const node = this.modalAdd(this.add.graphics().setDepth(72));
+      node.fillStyle(nodeCol, done ? 0.55 : 1);
+      node.fillCircle(x, y, 13);
+      if (current) {
+        node.lineStyle(3, 0xffd54a, 1);
+        node.strokeCircle(x, y, 17);
+      }
+      const icon = type === 'shop' ? '🛒' : type === 'boss' ? '💀' : '⚔';
+      this.modalAdd(this.add.text(x, y, icon, { fontSize: '13px' })
+        .setOrigin(0.5).setDepth(73).setAlpha(done ? 0.45 : 1));
+      this.modalAdd(this.add.text(x, y + 17, String(lvl), {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '10px',
+        color: current ? '#ffd54a' : BOARD.creamDim,
+      }).setOrigin(0.5, 0).setDepth(73));
+    }
+    this.modalAdd(this.add.text(this.W / 2, py + ph - 14,
+      '⚔ fight   🛒 shop   💀 miniboss', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      color: BOARD.creamDim,
+    }).setOrigin(0.5, 1).setDepth(72));
+    if (autoCloseMs) {
+      this.time.delayedCall(autoCloseMs, () => {
+        if (this.modalOpen === 'track') this.closeModal();
+      });
+    }
+  }
+
+  // ---------- textures ----------
 
   makeTextures() {
     this.makeDieTextures();
+    this.makeGoldDieTextures();
     this.makeSpecialTextures();
     this.makeMobTextures();
+    this.makeBagTexture();
     this.makeSoftTexture('spark', 32, 'rgba(255,255,255,1)', 'rgba(255,255,255,0)');
     this.makeSoftTexture('shadow', 64, 'rgba(20,10,4,0.6)', 'rgba(20,10,4,0)');
     this.makeSoftTexture('flash', 96, 'rgba(255,250,235,0.95)', 'rgba(255,250,235,0)');
@@ -333,7 +882,6 @@ class GameScene extends Phaser.Scene {
     tex.refresh();
   }
 
-  // shared 3/4 cube base; returns {ctx, px, pad, tw} for face content
   drawCubeBase(key, color) {
     const px = Math.round(this.dieSize * 2);
     if (this.textures.exists(key)) this.textures.remove(key);
@@ -371,29 +919,58 @@ class GameScene extends Phaser.Scene {
     return { tex, ctx, px, pad, tw };
   }
 
+  drawDieNumber(ctx, px, pad, tw, v) {
+    const cx = pad + tw / 2, cy = pad + tw / 2;
+    ctx.font = `900 ${Math.round(tw * 0.62)}px -apple-system, "Arial Black", Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = px * 0.045;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.strokeText(String(v), cx, cy + tw * 0.04);
+    ctx.fillStyle = NUMBER_COLOR;
+    ctx.fillText(String(v), cx, cy + tw * 0.04);
+    const depth = px * 0.13;
+    ctx.font = `900 ${Math.round(depth * 0.85)}px -apple-system, Arial, sans-serif`;
+    ctx.fillStyle = 'rgba(255,245,225,0.5)';
+    ctx.fillText(String(v), cx, px - pad - depth * 0.52);
+  }
+
   makeDieTextures() {
     for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('die' + v, VALUE_COLORS[v]);
-      const cx = pad + tw / 2, cy = pad + tw / 2;
-      ctx.font = `900 ${Math.round(tw * 0.62)}px -apple-system, "Arial Black", Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.lineWidth = px * 0.045;
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-      ctx.strokeText(String(v), cx, cy + tw * 0.04);
-      ctx.fillStyle = NUMBER_COLOR;
-      ctx.fillText(String(v), cx, cy + tw * 0.04);
-      const depth = px * 0.13;
-      ctx.font = `900 ${Math.round(depth * 0.85)}px -apple-system, Arial, sans-serif`;
-      ctx.fillStyle = 'rgba(255,245,225,0.5)';
-      ctx.fillText(String(v), cx, px - pad - depth * 0.52);
+      this.drawDieNumber(ctx, px, pad, tw, v);
+      tex.refresh();
+    }
+  }
+
+  // gold dice: same values, but a gold coin sits behind the number
+  makeGoldDieTextures() {
+    for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
+      const { tex, ctx, px, pad, tw } = this.drawCubeBase('gold' + v, VALUE_COLORS[v]);
+      const cx = pad + tw / 2, cy = pad + tw / 2, cr = tw * 0.34;
+      const cg = ctx.createRadialGradient(cx - cr * 0.3, cy - cr * 0.3, cr * 0.15, cx, cy, cr);
+      cg.addColorStop(0, '#ffe08a');
+      cg.addColorStop(0.7, '#f2b23e');
+      cg.addColorStop(1, '#c8862a');
+      ctx.beginPath();
+      ctx.arc(cx, cy + tw * 0.03, cr, 0, Math.PI * 2);
+      ctx.fillStyle = cg;
+      ctx.fill();
+      ctx.lineWidth = px * 0.02;
+      ctx.strokeStyle = '#8a5f1e';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy + tw * 0.03, cr * 0.72, 0, Math.PI * 2);
+      ctx.lineWidth = px * 0.012;
+      ctx.strokeStyle = 'rgba(138,95,30,0.6)';
+      ctx.stroke();
+      this.drawDieNumber(ctx, px, pad, tw, v);
       tex.refresh();
     }
   }
 
   makeSpecialTextures() {
-    // bomb: dark cube, black ball + fuse spark
     {
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('bomb', 0x4a4a52);
       const cx = pad + tw / 2, cy = pad + tw / 2, br = tw * 0.27;
@@ -419,7 +996,6 @@ class GameScene extends Phaser.Scene {
       ctx.fill();
       tex.refresh();
     }
-    // potion: cream cube with a green flask cross
     {
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('potion', 0xdfe8d2);
       const cx = pad + tw / 2, cy = pad + tw / 2, s = tw * 0.5;
@@ -431,19 +1007,12 @@ class GameScene extends Phaser.Scene {
       ctx.beginPath();
       this.roundedRectPath(ctx, cx - s / 2, cy - arm / 2, s, arm, arm * 0.3);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(20,60,25,0.5)';
-      ctx.lineWidth = px * 0.02;
-      ctx.beginPath();
-      this.roundedRectPath(ctx, cx - arm / 2, cy - s / 2, arm, s, arm * 0.3);
-      ctx.stroke();
       tex.refresh();
     }
-    // cursed stone: two damage states
     for (let stage = 0; stage < 2; stage++) {
       const key = stage === 0 ? 'stone' : 'stone1';
       const { tex, ctx, px, pad, tw } = this.drawCubeBase(key, 0x6e6a63);
       const cx = pad + tw / 2, cy = pad + tw / 2;
-      // rune scratch
       ctx.strokeStyle = 'rgba(40,20,60,0.65)';
       ctx.lineWidth = px * 0.035;
       ctx.lineCap = 'round';
@@ -452,7 +1021,7 @@ class GameScene extends Phaser.Scene {
       ctx.lineTo(cx + tw * 0.14, cy - tw * 0.02);
       ctx.lineTo(cx - tw * 0.12, cy + tw * 0.2);
       ctx.stroke();
-      if (stage === 1) { // cracked
+      if (stage === 1) {
         ctx.strokeStyle = 'rgba(25,20,18,0.8)';
         ctx.lineWidth = px * 0.02;
         ctx.beginPath();
@@ -465,6 +1034,74 @@ class GameScene extends Phaser.Scene {
       }
       tex.refresh();
     }
+    // spike die: dark purple with spikes — a miniboss's gift
+    {
+      const { tex, ctx, px, pad, tw } = this.drawCubeBase('spike', 0x5a3a6e);
+      const cx = pad + tw / 2, cy = pad + tw / 2;
+      ctx.fillStyle = '#2e1a3a';
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const bx = cx + Math.cos(a) * tw * 0.18, by = cy + Math.sin(a) * tw * 0.18;
+        const txp = cx + Math.cos(a) * tw * 0.42, typ = cy + Math.sin(a) * tw * 0.42;
+        const pa = a + Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(bx + Math.cos(pa) * tw * 0.07, by + Math.sin(pa) * tw * 0.07);
+        ctx.lineTo(txp, typ);
+        ctx.lineTo(bx - Math.cos(pa) * tw * 0.07, by - Math.sin(pa) * tw * 0.07);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(cx, cy, tw * 0.16, 0, Math.PI * 2);
+      ctx.fillStyle = '#241430';
+      ctx.fill();
+      tex.refresh();
+    }
+  }
+
+  makeBagTexture() {
+    const px = Math.round(this.dieSize * 2);
+    if (this.textures.exists('bag')) this.textures.remove('bag');
+    const tex = this.textures.createCanvas('bag', px, px);
+    const ctx = tex.getContext();
+    const cx = px / 2;
+    ctx.clearRect(0, 0, px, px);
+    const grad = ctx.createLinearGradient(0, px * 0.3, 0, px);
+    grad.addColorStop(0, '#9a6a42');
+    grad.addColorStop(1, '#6e4426');
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = '#3a2210';
+    ctx.lineWidth = px * 0.03;
+    ctx.beginPath();
+    ctx.moveTo(cx - px * 0.12, px * 0.3);
+    ctx.bezierCurveTo(cx - px * 0.45, px * 0.42, cx - px * 0.42, px * 0.92, cx, px * 0.94);
+    ctx.bezierCurveTo(cx + px * 0.42, px * 0.92, cx + px * 0.45, px * 0.42, cx + px * 0.12, px * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#7c5030';
+    ctx.beginPath();
+    ctx.ellipse(cx, px * 0.28, px * 0.16, px * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = '#d9b070';
+    ctx.lineWidth = px * 0.035;
+    ctx.beginPath();
+    ctx.moveTo(cx - px * 0.15, px * 0.3);
+    ctx.quadraticCurveTo(cx, px * 0.38, cx + px * 0.15, px * 0.3);
+    ctx.stroke();
+    ctx.fillStyle = '#f2efe4';
+    ctx.strokeStyle = '#3a2210';
+    ctx.lineWidth = px * 0.02;
+    ctx.beginPath();
+    this.roundedRectPath(ctx, cx - px * 0.1, px * 0.1, px * 0.2, px * 0.2, px * 0.04);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = NUMBER_COLOR;
+    ctx.beginPath();
+    ctx.arc(cx, px * 0.2, px * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+    tex.refresh();
   }
 
   makeMobTextures() {
@@ -484,7 +1121,7 @@ class GameScene extends Phaser.Scene {
       ctx.strokeStyle = 'rgba(20,10,10,0.5)';
       ctx.lineWidth = px * 0.03;
       ctx.beginPath();
-      if (i === 0) { // imp: round + horns
+      if (i === 0) {
         ctx.arc(cx, px * 0.58, px * 0.34, 0, Math.PI * 2);
         ctx.fill(); ctx.stroke();
         ctx.beginPath();
@@ -496,13 +1133,13 @@ class GameScene extends Phaser.Scene {
         ctx.lineTo(cx + px * 0.12, px * 0.28);
         ctx.fillStyle = shade(color, -0.15);
         ctx.fill();
-      } else if (i === 1) { // slime: dome
+      } else if (i === 1) {
         ctx.moveTo(cx - px * 0.38, px * 0.86);
         ctx.quadraticCurveTo(cx - px * 0.42, px * 0.22, cx, px * 0.18);
         ctx.quadraticCurveTo(cx + px * 0.42, px * 0.22, cx + px * 0.38, px * 0.86);
         ctx.closePath();
         ctx.fill(); ctx.stroke();
-      } else { // brute: chunky square + tusks
+      } else {
         this.roundedRectPath(ctx, cx - px * 0.34, px * 0.22, px * 0.68, px * 0.64, px * 0.12);
         ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#f0e6d0';
@@ -515,7 +1152,6 @@ class GameScene extends Phaser.Scene {
         ctx.lineTo(cx + px * 0.12, px * 0.7);
         ctx.fill();
       }
-      // eyes
       const ey = px * (i === 1 ? 0.48 : 0.52);
       for (const s of [-1, 1]) {
         ctx.fillStyle = '#fff8ee';
@@ -527,7 +1163,6 @@ class GameScene extends Phaser.Scene {
         ctx.arc(cx + s * px * 0.13, ey + px * 0.015, px * 0.04, 0, Math.PI * 2);
         ctx.fill();
       }
-      // angry brows
       ctx.strokeStyle = '#241a1a';
       ctx.lineWidth = px * 0.028;
       ctx.lineCap = 'round';
@@ -537,7 +1172,6 @@ class GameScene extends Phaser.Scene {
       ctx.moveTo(cx + px * 0.2, ey - px * 0.13);
       ctx.lineTo(cx + px * 0.06, ey - px * 0.08);
       ctx.stroke();
-      // mouth
       ctx.beginPath();
       ctx.moveTo(cx - px * 0.08, ey + px * 0.16);
       ctx.lineTo(cx + px * 0.08, ey + px * 0.16);
@@ -555,14 +1189,56 @@ class GameScene extends Phaser.Scene {
     ctx.closePath();
   }
 
-  // ---------- the board: enemy ledge + dirt field in a frame ----------
+  // ---------- layout & board ----------
+
+  computeLayout() {
+    const W = this.scale.gameSize.width, H = this.scale.gameSize.height;
+    this.W = W; this.H = H;
+    this.stripH = Phaser.Math.Clamp(H * 0.17, 52, 96);
+    this.dieSize = Phaser.Math.Clamp(
+      Math.min(W, H - this.stripH) * TUNE.DIE_SIZE_FRAC, TUNE.DIE_SIZE_MIN, TUNE.DIE_SIZE_MAX);
+    this.dieRadius = this.dieSize / 2;
+    this.rail = Math.max(10, Math.round(this.dieSize * 0.42));
+    this.boardTop = this.stripH;
+    this.fieldTop = this.stripH + this.rail;
+    this.launcherPos = { x: W / 2, y: H - this.dieSize * 1.45 };
+    this.maxSpeed = W * TUNE.MAX_SPEED_FRAC;
+    this.maxPull = H * TUNE.MAX_PULL_FRAC;
+  }
+
+  buildWalls() {
+    if (this.walls) for (const w of this.walls) this.matter.world.remove(w);
+    const t = 200, { W, H } = this, r = this.rail;
+    const opts = { isStatic: true, restitution: 1, friction: 0 };
+    this.walls = [
+      this.matter.add.rectangle(W / 2, this.fieldTop - t / 2, W + t * 2, t, opts),
+      this.matter.add.rectangle(W / 2, H - r + t / 2, W + t * 2, t, opts),
+      this.matter.add.rectangle(r - t / 2, H / 2, t, H + t * 2, opts),
+      this.matter.add.rectangle(W - r + t / 2, H / 2, t, H + t * 2, opts),
+    ];
+  }
+
+  handleResize() {
+    this.computeLayout();
+    this.buildWalls();
+    this.buildBoard();
+    this.layoutHud();
+    this.layoutLauncher();
+    this.layoutEnemies();
+    for (const d of this.dice) {
+      if (!d.body) continue;
+      const m = this.rail + this.dieRadius;
+      const x = Phaser.Math.Clamp(d.body.position.x, m, this.W - m);
+      const y = Phaser.Math.Clamp(d.body.position.y, this.fieldTop + this.dieRadius, this.H - m);
+      this.MatterLib.Body.setPosition(d.body, { x, y });
+    }
+  }
 
   buildBoard() {
     if (this.boardGfx) this.boardGfx.destroy();
     const g = this.add.graphics().setDepth(0);
     this.boardGfx = g;
     const { W, H } = this, r = this.rail, top = this.boardTop;
-    // enemy ledge: dark forest band with a grass lip
     g.fillStyle(0x1b2418, 1);
     g.fillRect(0, 0, W, top);
     g.fillStyle(0x243019, 1);
@@ -575,14 +1251,12 @@ class GameScene extends Phaser.Scene {
     for (let x = 0; x < W; x += 13) {
       g.fillTriangle(x, top - 6, x + 4, top - 13, x + 8, top - 6);
     }
-    // wooden frame
     g.fillStyle(BOARD.frame, 1);
     g.fillRect(0, top, W, H - top);
     g.lineStyle(2, BOARD.frameGrain, 0.7);
     for (let y = top + 6; y < H; y += 14) {
       g.lineBetween(0, y, W, y);
     }
-    // dirt field
     g.fillStyle(BOARD.dirt, 1);
     g.fillRoundedRect(r, this.fieldTop, W - r * 2, H - this.fieldTop - r, r * 0.6);
     for (let i = 0; i < 70; i++) {
@@ -600,274 +1274,30 @@ class GameScene extends Phaser.Scene {
     }
     g.lineStyle(2, BOARD.frameHi, 0.9);
     g.strokeRoundedRect(r - 2, this.fieldTop - 2, W - (r - 2) * 2, H - this.fieldTop - r + 4, r * 0.6);
-    // launcher pit
     g.fillStyle(0x241408, 0.35);
     g.fillCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.2);
     g.lineStyle(2, BOARD.apron, 0.6);
     g.strokeCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.2);
   }
 
-  // ---------- enemies & waves ----------
-
-  nextWave() {
-    this.wave++;
-    this.waveClearing = false;
-    const w = this.wave;
-    const count = Math.min(1 + Math.floor((w - 1) / 2), 3);
-    for (const e of this.enemies) this.destroyEnemyVisual(e);
-    this.enemies = [];
-    for (let i = 0; i < count; i++) {
-      const type = Phaser.Math.Between(0, MOBS.length - 1);
-      const hp = 6 + w * 3 + Phaser.Math.Between(0, w);
-      const cd = Math.max(2, 3 - Math.floor(w / 5));
-      const e = {
-        type, hp, maxHp: hp,
-        dmg: 3 + Math.floor(w * 1.2),
-        countdown: cd + (i % 2), baseCountdown: cd,
-        alive: true,
-        img: this.add.image(0, 0, 'mob' + type).setDepth(30),
-        bar: this.add.graphics().setDepth(31),
-        cdText: this.add.text(0, 0, '', {
-          fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
-          color: '#ffb0a0', fontStyle: 'bold',
-        }).setOrigin(0.5, 0).setDepth(31),
-      };
-      this.enemies.push(e);
-    }
-    this.layoutEnemies();
-    // stones creep in from wave 2 — bad dice that squat on your board
-    if (w >= 2) this.spawnStones(Math.min(1 + Math.floor(w / 4), 2));
-    this.banner('WAVE ' + w, '#ffd54a');
-  }
-
-  layoutEnemies() {
-    const n = this.enemies.length;
-    if (!n) return;
-    const size = Phaser.Math.Clamp(this.stripH * 0.72, 36, 68);
-    this.enemies.forEach((e, i) => {
-      const x = this.W * (0.5 + (i - (n - 1) / 2) * 0.2);
-      const y = this.stripH * 0.52;
-      e.x = x; e.y = y;
-      e.img.setPosition(x, y).setDisplaySize(size, size);
-      this.drawEnemyBar(e);
-    });
-  }
-
-  drawEnemyBar(e) {
-    const w = Math.max(44, this.stripH * 0.9), h = 5;
-    const x = e.x - w / 2, y = this.stripH - 14;
-    e.bar.clear();
-    if (!e.alive) { e.cdText.setText(''); return; }
-    e.bar.fillStyle(0x241408, 0.8);
-    e.bar.fillRoundedRect(x - 1, y - 1, w + 2, h + 2, 2);
-    const frac = Math.max(0, e.hp / e.maxHp);
-    e.bar.fillStyle(frac > 0.5 ? 0x6aa84f : frac > 0.25 ? 0xe6c229 : 0xc9564a, 1);
-    if (frac > 0) e.bar.fillRoundedRect(x, y, w * frac, h, 2);
-    e.cdText.setPosition(e.x, y - 16)
-      .setText('⚔ ' + e.countdown);
-  }
-
-  destroyEnemyVisual(e) {
-    e.img.destroy(); e.bar.destroy(); e.cdText.destroy();
-  }
-
-  firstAliveEnemy() {
-    return this.enemies.find(e => e.alive) || null;
-  }
-
-  // a merge fires its value at the front enemy, Rune Dice style
-  dealDamage(amount, fromX, fromY, all) {
-    if (this.gameOver) return;
-    const targets = all ? this.enemies.filter(e => e.alive)
-      : (this.firstAliveEnemy() ? [this.firstAliveEnemy()] : []);
-    for (const e of targets) {
-      const bolt = this.add.image(fromX, fromY, 'spark').setDepth(32)
-        .setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd54a)
-        .setScale(1.4);
-      this.tweens.add({
-        targets: bolt, x: e.x, y: e.y, duration: 260, ease: 'Quad.easeIn',
-        onComplete: () => {
-          bolt.destroy();
-          this.hitEnemy(e, amount);
-        },
-      });
-    }
-  }
-
-  hitEnemy(e, amount) {
-    if (!e.alive) {
-      // bolt arrived late — pass to the next in line
-      const next = this.firstAliveEnemy();
-      if (next) this.hitEnemy(next, amount);
-      return;
-    }
-    e.hp -= amount;
-    this.sparks.burst(e.x, e.y, 0xffd54a, 8, { speedMin: 1, speedMax: 3.5, life: 320, scale: 0.7 });
-    this.floatText(e.x, e.y - this.stripH * 0.2, '-' + amount, '#ffd54a');
-    e.img.setTintFill(0xffffff);
-    this.time.delayedCall(70, () => { if (e.img.active) e.img.clearTint(); });
-    this.tweens.add({
-      targets: e.img, y: e.y - 5, duration: 50, yoyo: true,
-      onComplete: () => { if (e.img.active) e.img.setY(e.y); },
-    });
-    if (e.hp <= 0) {
-      e.alive = false;
-      e.hp = 0;
-      this.tweens.add({
-        targets: e.img, alpha: 0, scale: e.img.scaleX * 0.4, angle: 40, duration: 320,
-        onComplete: () => e.img.setVisible(false),
-      });
-      this.sparks.burst(e.x, e.y, shadeHex(MOBS[e.type].color, 0.2), 16,
-        { speedMin: 1.5, speedMax: 5, life: 500, scale: 1 });
-    }
-    this.drawEnemyBar(e);
-    if (!this.enemies.some(en => en.alive) && !this.waveClearing) {
-      this.waveClearing = true;
-      this.banner('WAVE CLEARED!', '#8ec873');
-      this.time.delayedCall(1400, () => this.nextWave());
-    }
-  }
-
-  // called once per resolved throw: enemy countdowns + field refresh
-  onThrowResolved() {
-    if (this.gameOver) return;
-    for (const e of this.enemies) {
-      if (!e.alive) continue;
-      e.countdown--;
-      if (e.countdown <= 0) {
-        e.countdown = e.baseCountdown;
-        this.enemyAttack(e);
-      }
-      this.drawEnemyBar(e);
-    }
-    this.refreshIn--;
-    if (this.refreshIn <= 0) {
-      this.refreshIn = TUNE.REFRESH_THROWS;
-      this.fieldRefresh();
-    }
-    this.drawRefreshText();
-  }
-
-  // Rune Dice's field refresh: the normal dice re-roll so you can
-  // never run dry. Cursed stones stay — only crushing removes them.
-  fieldRefresh() {
-    this.banner('FIELD REFRESH', '#ead9b8');
-    const clearing = this.dice.filter(d =>
-      !d.dead && d.kind === 'num' && (d.state === 'rest' || d.state === 'active'));
-    for (const d of clearing) {
-      d.dead = true;
-      this.detachBody(d);
-      this.tweens.add({
-        targets: [d.img, d.shadow], alpha: 0, scale: d.img.scale * 0.4,
-        duration: 380, ease: 'Quad.easeIn',
-        onComplete: () => {
-          d.img.destroy(); d.shadow.destroy();
-          const idx = this.dice.indexOf(d);
-          if (idx >= 0) this.dice.splice(idx, 1);
-        },
-      });
-    }
-    this.time.delayedCall(450, () => {
-      if (!this.gameOver) this.seedBoard();
-    });
-  }
-
-  drawRefreshText() {
-    if (!this.refreshText) return;
-    this.refreshText
-      .setText('Refresh in ' + this.refreshIn)
-      .setColor(this.refreshIn <= 1 ? '#ffd54a' : BOARD.creamDim);
-  }
-
-  enemyAttack(e) {
-    this.tweens.add({
-      targets: e.img, y: e.y + 10, duration: 90, yoyo: true, ease: 'Quad.easeIn',
-      onComplete: () => { if (e.img.active) e.img.setY(e.y); },
-    });
-    const veil = this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0xaa2222, 0.22)
-      .setDepth(40);
-    this.tweens.add({
-      targets: veil, alpha: 0, duration: 300,
-      onComplete: () => veil.destroy(),
-    });
-    this.cameras.main.shake(120, 0.004);
-    this.hp = Math.max(0, this.hp - e.dmg);
-    this.floatText(this.W * 0.16, this.H - this.rail - 30, '-' + e.dmg, '#ff8070');
-    this.drawHpBar();
-    if (this.hp <= 0) this.doGameOver();
-  }
-
-  heal(amount) {
-    this.hp = Math.min(TUNE.PLAYER_HP, this.hp + amount);
-    this.floatText(this.W * 0.16, this.H - this.rail - 30, '+' + amount, '#8ec873');
-    this.drawHpBar();
-  }
-
-  doGameOver() {
-    this.gameOver = true;
-    this.aim = null;
-    this.trajGfx.clear();
-    this.bandGfx.clear();
-    this.previewImg.setVisible(false);
-    const veil = this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.78)
-      .setDepth(50);
-    this.add.text(this.W / 2, this.H * 0.36, 'DEFEATED', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '52px',
-      fontStyle: 'bold', color: '#ff8070', stroke: '#2a0f08', strokeThickness: 8,
-    }).setOrigin(0.5).setDepth(51);
-    this.add.text(this.W / 2, this.H * 0.52,
-      'Reached wave ' + this.wave + '  ·  Best chain ×' + this.bestChain +
-      '  ·  ' + this.throws + ' throws', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
-      color: BOARD.cream,
-    }).setOrigin(0.5).setDepth(51);
-    const tap = this.add.text(this.W / 2, this.H * 0.66, 'TAP TO RETRY', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '22px',
-      fontStyle: 'bold', color: '#ffd54a',
-    }).setOrigin(0.5).setDepth(51);
-    this.tweens.add({ targets: tap, alpha: 0.35, duration: 550, yoyo: true, repeat: -1 });
-  }
-
-  banner(msg, color) {
-    const t = this.add.text(this.W / 2, this.H * 0.38, msg, {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '40px',
-      fontStyle: 'bold', color, stroke: '#2a1a0e', strokeThickness: 7,
-    }).setOrigin(0.5).setDepth(45).setScale(0.6).setAlpha(0);
-    this.tweens.add({ targets: t, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
-    this.time.delayedCall(1100, () => {
-      this.tweens.add({ targets: t, alpha: 0, duration: 300, onComplete: () => t.destroy() });
-    });
-  }
-
-  floatText(x, y, msg, color) {
-    const t = this.add.text(x, y, msg, {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
-      fontStyle: 'bold', color, stroke: '#241408', strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(35);
-    this.tweens.add({
-      targets: t, y: y - 26, alpha: 0, duration: 750, ease: 'Quad.easeOut',
-      onComplete: () => t.destroy(),
-    });
-  }
-
   // ---------- dice ----------
 
-  textureFor(kind, value) {
-    if (kind === 'num') return 'die' + value;
-    return kind; // 'bomb' | 'potion' | 'stone'
+  textureFor(kind, value, gold) {
+    if (kind === 'num') return (gold ? 'gold' : 'die') + value;
+    return kind;
   }
 
-  makeDie(x, y, value, state, kind) {
+  makeDie(x, y, value, state, kind, gold) {
     kind = kind || 'num';
     const shadow = this.add.image(x, y + this.dieSize * 0.16, 'shadow')
       .setDisplaySize(this.dieSize * 1.15, this.dieSize * 0.55)
       .setAlpha(0.35).setDepth(8);
-    const img = this.add.image(x, y, this.textureFor(kind, value))
+    const img = this.add.image(x, y, this.textureFor(kind, value, gold))
       .setDisplaySize(this.dieSize, this.dieSize).setDepth(10);
     const die = {
-      id: this.nextId++, value, kind, img, shadow, body: null,
+      id: this.nextId++, value, kind, gold: !!gold, img, shadow, body: null,
       baseScale: img.scaleX,
-      state, // 'rest' | 'active' | 'loft' | 'merge'
+      state,
       gx: x, gy: y, h: 0, popScale: 1,
       spinSign: Math.random() < 0.5 ? -1 : 1,
       slowMs: 0, restingSince: 0, dead: false, reserved: false,
@@ -879,7 +1309,7 @@ class GameScene extends Phaser.Scene {
       img.setInteractive();
       const show = () => { if (!die.dead) this.showTooltip(die.gx, die.gy, kind); };
       img.on('pointerover', show);
-      img.on('pointerdown', show); // touch devices: tap the die
+      img.on('pointerdown', show);
       img.on('pointerout', () => this.hideTooltip());
     }
     this.dice.push(die);
@@ -941,62 +1371,6 @@ class GameScene extends Phaser.Scene {
     die.shadow.setAlpha(0.35 * (1 - 0.65 * hn));
   }
 
-  seedBoard() {
-    const placed = [];
-    const minGap = this.dieSize * 1.4, m = this.rail + this.dieSize;
-    const yMin = this.fieldTop + this.dieSize;
-    const yMax = this.fieldTop + (this.H - this.fieldTop) * 0.55;
-    for (let i = 0; i < TUNE.SEED_DICE; i++) {
-      const v = this.weightedValue();
-      for (let tries = 0; tries < 60; tries++) {
-        const x = Phaser.Math.Between(m, this.W - m);
-        const y = Phaser.Math.Between(yMin, yMax);
-        if (placed.every(p => Phaser.Math.Distance.Between(p.x, p.y, x, y) > minGap) &&
-          this.dice.every(d => d.dead ||
-            Phaser.Math.Distance.Between(d.gx, d.gy, x, y) > minGap)) {
-          placed.push({ x, y });
-          const d = this.makeDie(x, y, v, 'rest');
-          d.restingSince = this.time.now;
-          d.img.setScale(0);
-          d.img.rotation = Math.random() * Math.PI;
-          this.tweens.add({
-            targets: d.img, scale: d.baseScale, rotation: 0,
-            duration: 320, delay: i * 45, ease: 'Back.easeOut',
-          });
-          // tiny nudge only — equal seeds that drift into contact
-          // will (correctly) merge, so keep the scatter gentle
-          const a = Math.random() * Math.PI * 2;
-          this.MatterLib.Body.setVelocity(d.body, { x: Math.cos(a) * 0.4, y: Math.sin(a) * 0.4 });
-          break;
-        }
-      }
-    }
-  }
-
-  spawnStones(count) {
-    const m = this.rail + this.dieSize;
-    const yMin = this.fieldTop + this.dieSize;
-    const yMax = this.fieldTop + (this.H - this.fieldTop) * 0.5;
-    const existing = this.dice.filter(d => d.kind === 'stone' && !d.dead).length;
-    for (let i = 0; i < count && existing + i < 3; i++) {
-      for (let tries = 0; tries < 40; tries++) {
-        const x = Phaser.Math.Between(m, this.W - m);
-        const y = Phaser.Math.Between(yMin, yMax);
-        if (this.dice.every(d => !d.body ||
-          Phaser.Math.Distance.Between(d.gx, d.gy, x, y) > this.dieSize * 1.5)) {
-          const d = this.makeDie(x, y, 0, 'rest', 'stone');
-          d.restingSince = this.time.now;
-          d.img.setScale(0);
-          this.tweens.add({
-            targets: d.img, scale: d.baseScale, duration: 300, ease: 'Back.easeOut',
-          });
-          this.sparks.burst(x, y, 0x8a97ad, 8, { speedMin: 0.5, speedMax: 2, life: 300, scale: 0.6 });
-          break;
-        }
-      }
-    }
-  }
-
   weightedValue() {
     const r = Math.random();
     if (r < 0.45) return 1;
@@ -1004,14 +1378,82 @@ class GameScene extends Phaser.Scene {
     return 3;
   }
 
-  rollQueueEntry() {
-    if (this.wave >= 2 && Math.random() < TUNE.BOMB_CHANCE) {
-      return { kind: 'bomb', value: 0 };
+  findSeedSpot(placed, minGap) {
+    const m = this.rail + this.dieSize;
+    const yMin = this.fieldTop + this.dieSize;
+    const yMax = this.fieldTop + (this.H - this.fieldTop) * 0.55;
+    for (let tries = 0; tries < 60; tries++) {
+      const x = Phaser.Math.Between(m, this.W - m);
+      const y = Phaser.Math.Between(yMin, yMax);
+      if (placed.every(p => Phaser.Math.Distance.Between(p.x, p.y, x, y) > minGap) &&
+        this.dice.every(d => d.dead ||
+          Phaser.Math.Distance.Between(d.gx, d.gy, x, y) > minGap)) {
+        placed.push({ x, y });
+        return { x, y };
+      }
     }
-    if (this.hp < TUNE.PLAYER_HP * 0.8 && Math.random() < TUNE.POTION_CHANCE) {
-      return { kind: 'potion', value: 0 };
+    return null;
+  }
+
+  seedBoard(goldCount, goldMax) {
+    const placed = [];
+    const minGap = this.dieSize * 1.4;
+    const rollIn = (d, i) => {
+      d.restingSince = this.time.now;
+      d.img.setScale(0);
+      d.img.rotation = Math.random() * Math.PI;
+      this.tweens.add({
+        targets: d.img, scale: d.baseScale, rotation: 0,
+        duration: 320, delay: i * 45, ease: 'Back.easeOut',
+      });
+      // seeds spawn dead-still: any drift can bring equal dice into
+      // contact, and touching equals merge — boards must not self-play
+    };
+    for (let i = 0; i < TUNE.SEED_DICE; i++) {
+      const spot = this.findSeedSpot(placed, minGap);
+      if (!spot) break;
+      rollIn(this.makeDie(spot.x, spot.y, this.weightedValue(), 'rest'), i);
     }
-    return { kind: 'num', value: this.weightedValue() };
+    // gold dice: the level's treasure
+    for (let i = 0; i < (goldCount || 0); i++) {
+      const spot = this.findSeedSpot(placed, minGap);
+      if (!spot) break;
+      const gm = Math.max(1, goldMax || 1);
+      const v = 1 + Math.floor(Math.random() * gm);
+      rollIn(this.makeDie(spot.x, spot.y, Math.min(v, gm), 'rest', 'num', true),
+        TUNE.SEED_DICE + i);
+    }
+  }
+
+  spawnStones(count) {
+    const placed = [];
+    const existing = this.dice.filter(d => d.kind === 'stone' && !d.dead).length;
+    for (let i = 0; i < count && existing + i < 3; i++) {
+      const spot = this.findSeedSpot(placed, this.dieSize * 1.5);
+      if (!spot) break;
+      const d = this.makeDie(spot.x, spot.y, 0, 'rest', 'stone');
+      d.restingSince = this.time.now;
+      d.img.setScale(0);
+      this.tweens.add({
+        targets: d.img, scale: d.baseScale, duration: 300, ease: 'Back.easeOut',
+      });
+      this.sparks.burst(spot.x, spot.y, 0x8a97ad, 8, { speedMin: 0.5, speedMax: 2, life: 300, scale: 0.6 });
+    }
+  }
+
+  spawnSpikes(count) {
+    const placed = [];
+    for (let i = 0; i < count; i++) {
+      const spot = this.findSeedSpot(placed, this.dieSize * 1.5);
+      if (!spot) break;
+      const d = this.makeDie(spot.x, spot.y, 0, 'rest', 'spike');
+      d.restingSince = this.time.now;
+      d.img.setScale(0);
+      this.tweens.add({
+        targets: d.img, scale: d.baseScale, duration: 300, ease: 'Back.easeOut',
+      });
+      this.sparks.burst(spot.x, spot.y, 0x8a5aa8, 8, { speedMin: 0.5, speedMax: 2, life: 300, scale: 0.6 });
+    }
   }
 
   // ---------- special dice behavior ----------
@@ -1029,6 +1471,9 @@ class GameScene extends Phaser.Scene {
       } else if (x.kind === 'stone' && other.kind === 'num' &&
         impact > TUNE.STONE_HIT_SPEED) {
         this.hitStone(x);
+        handled = true;
+      } else if (x.kind === 'spike' && other.kind === 'num' && impact > 1.2) {
+        this.triggerSpike(x);
         handled = true;
       }
     }
@@ -1050,11 +1495,11 @@ class GameScene extends Phaser.Scene {
     this.sparks.burst(x, y, 0xff8040, 24, { speedMin: 2, speedMax: 7, life: 550, scale: 1.1 });
     this.sparks.burst(x, y, 0x4a4a52, 10, { speedMin: 1, speedMax: 4, life: 450, scale: 0.8 });
     this.knockback(x, y, this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.6, TUNE.KNOCK_SPEED * 1.8);
-    // nearby stones take a hit from the blast
-    for (const d of this.dice) {
-      if (d.kind === 'stone' && !d.dead &&
+    for (const d of [...this.dice]) {
+      if ((d.kind === 'stone' || d.kind === 'spike') && !d.dead &&
         Phaser.Math.Distance.Between(d.gx, d.gy, x, y) < this.dieSize * TUNE.KNOCK_RADIUS_FRAC) {
-        this.hitStone(d);
+        if (d.kind === 'stone') this.hitStone(d);
+        else this.crumbleSpike(d);
       }
     }
     this.cameras.main.shake(180, 0.006);
@@ -1080,17 +1525,35 @@ class GameScene extends Phaser.Scene {
       const x = die.gx, y = die.gy;
       this.destroyDie(die);
       this.sparks.burst(x, y, 0x6e6a63, 16, { speedMin: 1.5, speedMax: 5, life: 500, scale: 1 });
-      this.floatText(x, y - 10, 'CRUSHED', '#c9b391');
+      this.floatText(x, y - 10, 'CRUSHED', BOARD.creamDim);
     } else {
       die.img.setTexture('stone1').setDisplaySize(this.dieSize, this.dieSize);
       this.squash(die);
     }
   }
 
-  // ---------- launcher: slingshot with elastic band ----------
+  triggerSpike(die) {
+    if (die.dead) return;
+    this.hp = Math.max(0, this.hp - TUNE.SPIKE_DAMAGE);
+    this.floatText(die.gx, die.gy - 10, '-' + TUNE.SPIKE_DAMAGE + ' HP', '#ff8070');
+    const veil = this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0xaa22aa, 0.15)
+      .setDepth(40);
+    this.tweens.add({ targets: veil, alpha: 0, duration: 250, onComplete: () => veil.destroy() });
+    this.drawHpBar();
+    this.crumbleSpike(die);
+    if (this.hp <= 0) this.doGameOver();
+  }
+
+  crumbleSpike(die) {
+    if (die.dead) return;
+    const x = die.gx, y = die.gy;
+    this.destroyDie(die);
+    this.sparks.burst(x, y, 0x8a5aa8, 14, { speedMin: 1.5, speedMax: 4.5, life: 450, scale: 0.9 });
+  }
+
+  // ---------- launcher ----------
 
   buildLauncher() {
-    this.nextQueue = [this.rollQueueEntry(), this.rollQueueEntry(), this.rollQueueEntry()];
     this.previewImg = this.add.image(0, 0, 'die1').setDepth(12);
     this.nextLabel = this.add.text(0, 0, 'NEXT', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
@@ -1100,7 +1563,6 @@ class GameScene extends Phaser.Scene {
       this.add.image(0, 0, 'die1').setDepth(11).setAlpha(0.8),
       this.add.image(0, 0, 'die1').setDepth(11).setAlpha(0.55),
     ];
-    // tooltips on the queue too, so specials explain themselves
     const tipFor = (idx, img) => {
       const show = () => {
         const e = this.nextQueue[idx];
@@ -1114,6 +1576,13 @@ class GameScene extends Phaser.Scene {
     tipFor(0, this.previewImg);
     tipFor(1, this.queueImgs[0]);
     tipFor(2, this.queueImgs[1]);
+    // the dice bag button
+    this.bagImg = this.add.image(0, 0, 'bag').setDepth(12).setInteractive();
+    this.bagImg.on('pointerdown', () => this.openBag());
+    this.bagCount = this.add.text(0, 0, '', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      fontStyle: 'bold', color: BOARD.cream,
+    }).setOrigin(0.5, 0).setDepth(12);
     this.layoutLauncher();
   }
 
@@ -1127,6 +1596,16 @@ class GameScene extends Phaser.Scene {
     this.queueImgs[1].setPosition(x + s * 2.95, y + s * 0.12)
       .setTexture(this.textureFor(q[2].kind, q[2].value)).setDisplaySize(s * 0.42, s * 0.42);
     this.nextLabel.setPosition(x + s * 2.5, y - s * 0.55);
+    this.bagImg.setPosition(this.W - this.rail - s * 0.9, this.H - this.rail - s * 0.95)
+      .setDisplaySize(s * 1.3, s * 1.3);
+    this.bagCount.setPosition(this.bagImg.x, this.bagImg.y + s * 0.72);
+    this.updateBagCount();
+  }
+
+  updateBagCount() {
+    if (!this.bagCount) return;
+    const left = this.drawPile.length + this.nextQueue.length;
+    this.bagCount.setText(left + '/' + this.bag.length);
   }
 
   setReady(ready) {
@@ -1170,7 +1649,8 @@ class GameScene extends Phaser.Scene {
     die.spinSign = vel.x >= 0 ? 1 : -1;
     this.thrownDie = die;
     this.nextQueue.shift();
-    this.nextQueue.push(this.rollQueueEntry());
+    this.nextQueue.push(this.drawFromBag());
+    this.updateBagCount();
     this.sparks.burst(x, y, 0xead9b8, 6, { speedMin: 1, speedMax: 3, life: 240, scale: 0.5 });
   }
 
@@ -1241,6 +1721,7 @@ class GameScene extends Phaser.Scene {
       let c = 0xf5e6c8, strong = false;
       if (thrown.kind === 'bomb') { c = 0xff8040; strong = true; }
       else if (thrown.kind === 'potion') { c = 0x3f9d4e; strong = true; }
+      else if (hitDie.kind === 'spike') { c = 0xaa55cc; strong = true; }
       else if (thrown.kind === 'num' && hitDie.kind === 'num' &&
         hitDie.value === thrown.value) { c = 0x8ec873; strong = true; }
       const pulse = 1 + 0.08 * Math.sin(this.time.now / 90);
@@ -1260,12 +1741,10 @@ class GameScene extends Phaser.Scene {
       if (a.value !== b.value) continue;
       if (a.state !== 'rest' && a.state !== 'active') continue;
       if (b.state !== 'rest' && b.state !== 'active') continue;
-      this.fuse(a, b); // touching equals always combine
+      this.fuse(a, b);
     }
   }
 
-  // safety net: equal dice already overlapping (slow drifts, landings)
-  // never re-fire a collision event — sweep and combine them
   touchSweep() {
     const touchDist = this.dieRadius * 0.96 * 2 + 3;
     for (let i = 0; i < this.dice.length; i++) {
@@ -1323,6 +1802,10 @@ class GameScene extends Phaser.Scene {
       console.log('MERGE ' + value + '+' + value + ' -> ' + (value + 1) +
         ' at ' + Math.round(mx) + ',' + Math.round(my) + ' chain->' + (this.chain + 1));
     }
+    // gold dice pay out when merged
+    for (const d of [a, b]) {
+      if (d.gold) this.addGold(d.value, mx, my - riseH - 14);
+    }
     this.destroyDie(a);
     this.destroyDie(b);
 
@@ -1333,7 +1816,6 @@ class GameScene extends Phaser.Scene {
     this.mergeImpact(mx, my, riseH, value);
 
     const newValue = value + 1;
-    // Rune Dice rule: every merge deals its result as damage
     this.dealDamage(newValue > TUNE.MAX_VALUE ? TUNE.DETONATE_DAMAGE : newValue,
       mx, my - riseH, newValue > TUNE.MAX_VALUE);
 
@@ -1477,9 +1959,8 @@ class GameScene extends Phaser.Scene {
     this.sparks.burst(gx, gy + this.dieRadius * 0.4, 0xc9a878, 6,
       { speedMin: 0.5, speedMax: 2, life: 340, scale: 0.7 });
 
-    const R = this.dieSize * TUNE.KNOCK_RADIUS_FRAC;
-    const kick = TUNE.KNOCK_SPEED + this.chain * TUNE.KNOCK_PER_CHAIN;
-    this.knockback(gx, gy, R, kick);
+    this.knockback(gx, gy, this.dieSize * TUNE.KNOCK_RADIUS_FRAC,
+      TUNE.KNOCK_SPEED + this.chain * TUNE.KNOCK_PER_CHAIN);
 
     this.cameras.main.shake(60 + this.chain * 12, 0.0016 + this.chain * 0.0008);
     if (this.chain >= 3) {
@@ -1539,8 +2020,6 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  // ---------- clutter cap (the knob) ----------
-
   enforceClutterCap() {
     const resting = this.dice.filter(d => d.state === 'rest' && !d.dead);
     if (resting.length <= TUNE.MAX_RESTING_DICE) return;
@@ -1566,10 +2045,20 @@ class GameScene extends Phaser.Scene {
   buildHud() {
     const style = { fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px', color: BOARD.creamDim };
     this.fpsText = this.add.text(0, 0, '', { ...style, color: '#7ec96f', fontSize: '12px' }).setDepth(30);
-    this.waveText = this.add.text(0, 0, '', {
+    this.levelText = this.add.text(0, 0, 'LEVEL 1/' + LEVEL_TRACK.length, {
       ...style, fontSize: '16px', color: BOARD.cream, fontStyle: 'bold',
     }).setDepth(30);
+    this.mapBtn = this.add.text(0, 0, '[ MAP ]', {
+      ...style, fontSize: '13px', color: '#ffd54a', fontStyle: 'bold',
+    }).setDepth(30).setInteractive();
+    this.mapBtn.on('pointerdown', () => {
+      if (this.modalOpen === 'track') this.closeModal();
+      else if (!this.modalOpen) this.openTrack();
+    });
     this.bestText = this.add.text(0, 0, 'Best chain: 0', style).setOrigin(1, 0).setDepth(30);
+    this.refreshText = this.add.text(0, 0, '', {
+      ...style, fontSize: '14px', fontStyle: 'bold',
+    }).setOrigin(1, 0).setDepth(30);
     this.versionText = this.add.text(0, 0, VERSION, { ...style, fontSize: '12px' }).setOrigin(1, 1).setDepth(30);
     this.chainText = this.add.text(0, 0, '', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '46px',
@@ -1579,10 +2068,9 @@ class GameScene extends Phaser.Scene {
     this.hpText = this.add.text(0, 0, '', {
       ...style, fontSize: '12px', color: BOARD.cream, fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(31);
-    this.refreshText = this.add.text(0, 0, '', {
-      ...style, fontSize: '14px', fontStyle: 'bold',
-    }).setOrigin(1, 0).setDepth(30);
-    // one reusable tooltip for special dice
+    this.goldText = this.add.text(0, 0, '', {
+      ...style, fontSize: '15px', color: GOLD, fontStyle: 'bold',
+    }).setOrigin(0, 0.5).setDepth(31);
     this.tipBg = this.add.graphics().setDepth(60).setVisible(false);
     this.tipText = this.add.text(0, 0, '', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
@@ -1590,7 +2078,43 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(0.5, 1).setDepth(61).setVisible(false);
     this.layoutHud();
     this.drawHpBar();
+    this.drawGold();
     this.drawRefreshText();
+  }
+
+  layoutHud() {
+    this.fpsText.setPosition(6, 4);
+    const ly = Math.max(20, this.stripH * 0.35);
+    this.levelText.setPosition(6, ly);
+    this.mapBtn.setPosition(this.levelText.x + this.levelText.width + 10, ly + 2);
+    this.refreshText.setPosition(this.W - 8, ly);
+    this.bestText.setPosition(this.W - 8, 4);
+    this.versionText.setPosition(this.W - this.rail - 6, this.H - this.rail - 4);
+    this.chainText.setPosition(this.W / 2, this.H * 0.3);
+    this.drawHpBar();
+    this.drawGold();
+  }
+
+  drawHpBar() {
+    const w = Math.min(this.W * 0.24, 210), h = 12;
+    const x = this.rail + 8, y = this.H - this.rail - 22;
+    const g = this.hpBar;
+    g.clear();
+    g.fillStyle(0x241408, 0.85);
+    g.fillRoundedRect(x - 2, y - 2, w + 4, h + 4, 4);
+    const frac = Math.max(0, this.hp / TUNE.PLAYER_HP);
+    g.fillStyle(frac > 0.5 ? 0x6aa84f : frac > 0.25 ? 0xe6c229 : 0xc9564a, 1);
+    if (frac > 0) g.fillRoundedRect(x, y, w * frac, h, 3);
+    g.lineStyle(1, BOARD.frameHi, 0.8);
+    g.strokeRoundedRect(x - 2, y - 2, w + 4, h + 4, 4);
+    this.hpText.setPosition(x + w + 8, y + h / 2)
+      .setText(this.hp + '/' + TUNE.PLAYER_HP);
+  }
+
+  drawGold() {
+    if (!this.goldText) return;
+    const x = this.rail + 8, y = this.H - this.rail - 44;
+    this.goldText.setPosition(x, y).setText('◉ ' + this.gold + 'g');
   }
 
   showTooltip(x, y, kind) {
@@ -1621,32 +2145,26 @@ class GameScene extends Phaser.Scene {
     this.tipText.setVisible(false);
   }
 
-  layoutHud() {
-    this.fpsText.setPosition(6, 4);
-    // wave label lives in the enemy strip, where dice can't cover it
-    this.waveText.setPosition(6, Math.max(20, this.stripH * 0.35));
-    this.bestText.setPosition(this.W - this.rail - 8, this.fieldTop + 6);
-    this.versionText.setPosition(this.W - this.rail - 6, this.H - this.rail - 4);
-    this.chainText.setPosition(this.W / 2, this.H * 0.3);
-    this.refreshText.setPosition(this.W - 8, Math.max(20, this.stripH * 0.35));
-    this.waveText.setText('WAVE ' + Math.max(1, this.wave));
-    this.drawHpBar();
+  banner(msg, color) {
+    const t = this.add.text(this.W / 2, this.H * 0.38, msg, {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '40px',
+      fontStyle: 'bold', color, stroke: '#2a1a0e', strokeThickness: 7,
+    }).setOrigin(0.5).setDepth(45).setScale(0.6).setAlpha(0);
+    this.tweens.add({ targets: t, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+    this.time.delayedCall(1100, () => {
+      this.tweens.add({ targets: t, alpha: 0, duration: 300, onComplete: () => t.destroy() });
+    });
   }
 
-  drawHpBar() {
-    const w = Math.min(this.W * 0.24, 210), h = 12;
-    const x = this.rail + 8, y = this.H - this.rail - 22;
-    const g = this.hpBar;
-    g.clear();
-    g.fillStyle(0x241408, 0.85);
-    g.fillRoundedRect(x - 2, y - 2, w + 4, h + 4, 4);
-    const frac = Math.max(0, this.hp / TUNE.PLAYER_HP);
-    g.fillStyle(frac > 0.5 ? 0x6aa84f : frac > 0.25 ? 0xe6c229 : 0xc9564a, 1);
-    if (frac > 0) g.fillRoundedRect(x, y, w * frac, h, 3);
-    g.lineStyle(1, BOARD.frameHi, 0.8);
-    g.strokeRoundedRect(x - 2, y - 2, w + 4, h + 4, 4);
-    this.hpText.setPosition(x + w + 8, y + h / 2)
-      .setText(this.hp + '/' + TUNE.PLAYER_HP);
+  floatText(x, y, msg, color) {
+    const t = this.add.text(x, y, msg, {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
+      fontStyle: 'bold', color, stroke: '#241408', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(35);
+    this.tweens.add({
+      targets: t, y: y - 26, alpha: 0, duration: 750, ease: 'Quad.easeOut',
+      onComplete: () => t.destroy(),
+    });
   }
 
   flashChain() {
@@ -1709,7 +2227,6 @@ class GameScene extends Phaser.Scene {
         if (speed < TUNE.SETTLE_SPEED) {
           d.slowMs += delta;
           if (d.slowMs >= TUNE.SETTLE_MS) {
-            // thrown specials that never hit anything pop on settle
             if (d.kind === 'bomb') { this.explodeBomb(d); continue; }
             if (d.kind === 'potion') { this.consumePotion(d); continue; }
             d.state = 'rest';
@@ -1752,7 +2269,6 @@ class GameScene extends Phaser.Scene {
       const fps = Math.round(this.game.loop.actualFps);
       const color = fps >= 55 ? '#7ec96f' : fps >= 45 ? '#e6c229' : '#e74c3c';
       this.fpsText.setColor(color).setText(fps + ' FPS · ' + this.dice.length + ' dice');
-      this.waveText.setText('WAVE ' + Math.max(1, this.wave));
     }
   }
 }
