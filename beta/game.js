@@ -7,7 +7,7 @@
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.9.0';
+const VERSION = 'v0.10.0';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -60,13 +60,9 @@ const TUNE = {
   SPIKE_DAMAGE: 3,
 };
 
-// The run: 20 levels. fight / shop / boss (miniboss).
-const LEVEL_TRACK = [
-  'fight', 'fight', 'shop', 'fight', 'boss',
-  'fight', 'shop', 'fight', 'fight', 'boss',
-  'shop', 'fight', 'fight', 'shop', 'boss',
-  'fight', 'shop', 'fight', 'fight', 'boss',
-];
+// The run: 20 floors of a branching map (fight / shop / boss).
+// Regenerated every run, so no two runs are the same.
+const FLOORS = 20;
 
 const STARTING_BAG = [
   { kind: 'num', value: 1 }, { kind: 'num', value: 1 },
@@ -269,7 +265,8 @@ class GameScene extends Phaser.Scene {
 
     this.scale.on('resize', () => this.handleResize());
     this.setReady(true);
-    this.startLevel(1);
+    this.generateRunMap();
+    this.startLevelAt(0, 0);
   }
 
   // ---------- bag ----------
@@ -294,13 +291,62 @@ class GameScene extends Phaser.Scene {
     return counts;
   }
 
-  // ---------- levels ----------
+  // ---------- levels: a branching run map ----------
 
-  levelType(n) {
-    return LEVEL_TRACK[n - 1] || 'fight';
+  generateRunMap() {
+    this.runMap = [];
+    this.runEdges = [];
+    for (let f = 0; f < FLOORS; f++) {
+      const boss = (f + 1) % 5 === 0; // floors 5, 10, 15, 20
+      const w = boss || f === 0 ? 1 : Phaser.Math.Between(2, 3);
+      const row = [];
+      for (let i = 0; i < w; i++) {
+        const type = boss ? 'boss' :
+          (f === 0 ? 'fight' : (Math.random() < 0.22 ? 'shop' : 'fight'));
+        row.push({ type });
+      }
+      this.runMap.push(row);
+    }
+    // guarantee a shop on the approach to each boss
+    for (const f of [2, 6, 11, 16]) {
+      if (!this.runMap[f].some(n => n.type === 'shop')) {
+        this.runMap[f][Phaser.Math.Between(0, this.runMap[f].length - 1)].type = 'shop';
+      }
+    }
+    // edges: monotone, non-crossing-ish, everything reachable
+    for (let f = 0; f < FLOORS - 1; f++) {
+      const w1 = this.runMap[f].length, w2 = this.runMap[f + 1].length;
+      const rowE = [];
+      for (let i = 0; i < w1; i++) {
+        const base = w1 === 1 ? Math.floor(w2 / 2) :
+          Math.round(i * (w2 - 1) / (w1 - 1));
+        const set = new Set([base]);
+        if (Math.random() < 0.55) {
+          const alt = base + (Math.random() < 0.5 ? -1 : 1);
+          if (alt >= 0 && alt < w2) set.add(alt);
+        }
+        rowE.push([...set].sort((a, b) => a - b));
+      }
+      for (let j = 0; j < w2; j++) {
+        if (!rowE.some(list => list.includes(j))) {
+          let bi = 0, bd = Infinity;
+          for (let i = 0; i < w1; i++) {
+            const d = Math.abs((w1 === 1 ? 0.5 : i / Math.max(w1 - 1, 1)) -
+              (w2 === 1 ? 0.5 : j / (w2 - 1)));
+            if (d < bd) { bd = d; bi = i; }
+          }
+          rowE[bi].push(j);
+          rowE[bi].sort((a, b) => a - b);
+        }
+      }
+      this.runEdges.push(rowE);
+    }
   }
 
-  startLevel(n) {
+  startLevelAt(f, i) {
+    this.mapPos = { f, i };
+    this.currentNode = this.runMap[f][i];
+    const n = f + 1;
     this.level = n;
     this.levelClearing = false;
     this.levelClearPending = false;
@@ -309,8 +355,8 @@ class GameScene extends Phaser.Scene {
     this.clearBoard();
     for (const e of this.enemies) this.destroyEnemyVisual(e);
     this.enemies = [];
-    const type = this.levelType(n);
-    this.levelText.setText('LEVEL ' + n + '/' + LEVEL_TRACK.length);
+    const type = this.currentNode.type;
+    this.levelText.setText('LEVEL ' + n + '/' + FLOORS);
     if (type === 'shop') {
       this.banner('LEVEL ' + n + ' — SHOP', GOLD);
       this.time.delayedCall(600, () => this.openShop());
@@ -324,8 +370,14 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  // level complete: player picks the next node, roguelike style
+  chooseNextPath() {
+    if (this.mapPos.f >= FLOORS - 1) { this.doVictory(); return; }
+    this.openTrack(0, true);
+  }
+
   levelCfg() {
-    const n = this.level, type = this.levelType(n);
+    const n = this.level, type = this.currentNode.type;
     const goldMax = Math.min(1 + Math.floor(n / 5) + (type === 'boss' ? 1 : 0), 6);
     const goldCount = (type === 'boss' ? 5 : 4) + Math.floor(n / 8);
     return { type, goldMax, goldCount };
@@ -363,7 +415,7 @@ class GameScene extends Phaser.Scene {
   }
 
   spawnEnemies() {
-    const n = this.level, type = this.levelType(n);
+    const n = this.level, type = this.currentNode.type;
     const mkEnemy = (mobType, hp, dmg, cd, boss) => {
       const e = {
         type: mobType, hp, maxHp: hp, dmg,
@@ -610,7 +662,7 @@ class GameScene extends Phaser.Scene {
       fontStyle: 'bold', color: '#ff8070', stroke: '#2a0f08', strokeThickness: 8,
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.52,
-      'Reached level ' + this.level + '/' + LEVEL_TRACK.length +
+      'Reached level ' + this.level + '/' + FLOORS +
       '  ·  Best chain ×' + this.bestChain + '  ·  ' + this.gold + 'g earned', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
       color: BOARD.cream,
@@ -632,7 +684,7 @@ class GameScene extends Phaser.Scene {
       fontStyle: 'bold', color: GOLD, stroke: '#2a0f08', strokeThickness: 8,
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.52,
-      'All ' + LEVEL_TRACK.length + ' levels cleared  ·  Best chain ×' + this.bestChain +
+      'All ' + FLOORS + ' levels cleared  ·  Best chain ×' + this.bestChain +
       '  ·  ' + this.gold + 'g', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
       color: BOARD.cream,
@@ -763,31 +815,47 @@ class GameScene extends Phaser.Scene {
     this.renderShop(this.shopStock());
   }
 
+  shopInfoFor(o) {
+    if (o.kind === 'num') {
+      return 'Adds a ' + o.value + ' die to your bag. Merges with other ' +
+        o.value + 's to chain damage.';
+    }
+    return (TOOLTIPS[o.kind] || '').split('\n').slice(1).join(' ');
+  }
+
   renderShop(stock) {
-    // size the panel from its content so rows never collide
     const pwGuess = Math.min(this.W * 0.82, 640);
-    const sGuess = Math.min(this.dieSize * 1.1, (pwGuess / 4) * 0.5);
-    const offerBottom = 92 + sGuess * 0.65 + 40;
+    const s = Math.min(this.dieSize * 1.1, (pwGuess / 4) * 0.5);
+    const offerBottom = 80 + s * 0.65 + 40;
+    const infoY = offerBottom + 14;
+    const rowY = infoY + 46;
+    const leaveY = rowY + 46;
     const { px, py, pw, ph } = this.modalBase('SHOP — LEVEL ' + this.level,
-      offerBottom + 30 + 62 + 36);
+      leaveY + 36);
     this.modalOpen = 'shop';
     this.modalAdd(this.add.text(px + 16, py + 12, this.gold + 'g', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
       fontStyle: 'bold', color: GOLD,
     }).setDepth(72));
     const cellW = pw / 4;
-    const s = Math.min(this.dieSize * 1.1, cellW * 0.5);
+    const labels = {
+      bomb: 'Bomb die ', potion: 'Potion die',
+      wild: 'Wild die', stun: 'Stun die',
+    };
     stock.offers.forEach((o, i) => {
       const x = px + cellW * (i + 0.5);
-      const y = py + 92;
+      const y = py + 80;
       const canAfford = this.gold >= o.price && !o.sold;
+      const selected = stock.selected === i;
+      if (selected && !o.sold) {
+        const ring = this.modalAdd(this.add.graphics().setDepth(72));
+        ring.lineStyle(3, 0xffd54a, 1);
+        ring.strokeRoundedRect(x - s * 0.62, y - s * 0.62, s * 1.24, s * 1.24, 8);
+      }
       const img = this.modalAdd(this.add.image(x, y,
         this.textureFor(o.kind, o.value)).setDepth(72).setDisplaySize(s, s));
-      const labels = {
-        bomb: 'Bomb die ' + o.value, potion: 'Potion die',
-        wild: 'Wild die', stun: 'Stun die',
-      };
-      const label = o.kind === 'num' ? 'Die: ' + o.value : labels[o.kind];
+      const label = o.kind === 'num' ? 'Die: ' + o.value :
+        labels[o.kind] + (o.kind === 'bomb' ? o.value : '');
       this.modalAdd(this.add.text(x, y + s * 0.65 + 4, label, {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
         color: BOARD.cream,
@@ -798,25 +866,53 @@ class GameScene extends Phaser.Scene {
         fontStyle: 'bold', color: o.sold ? '#7a6a55' : canAfford ? GOLD : '#8a6a50',
       }).setOrigin(0.5, 0).setDepth(72));
       if (!o.sold) {
+        // first tap selects and shows details; BUY confirms
         img.setInteractive();
         img.on('pointerdown', () => {
-          if (this.gold < o.price || o.sold) return;
-          this.gold -= o.price;
-          o.sold = true;
-          this.bag.push({ kind: o.kind, value: o.value });
-          this.drawPile.splice(Phaser.Math.Between(0, this.drawPile.length), 0,
-            { kind: o.kind, value: o.value });
-          this.drawGold();
-          this.updateBagCount();
+          stock.selected = i;
           this.renderShop(stock);
         });
       }
       if (!canAfford && !o.sold) img.setAlpha(0.55);
     });
-    const hy = py + 92 + s * 0.65 + 40 + 30;
-    const healBtn = this.modalAdd(this.add.text(px + pw * 0.28, hy,
-      '❤ Heal +' + stock.heal.amount + ' HP — ' + stock.heal.price + 'g', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+    // detail strip for the selected offer
+    const sel = stock.selected != null ? stock.offers[stock.selected] : null;
+    if (sel && !sel.sold) {
+      this.modalAdd(this.add.text(px + 20, py + infoY, this.shopInfoFor(sel), {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+        color: BOARD.cream, wordWrap: { width: pw - 140 },
+      }).setOrigin(0, 0.5).setDepth(72));
+      const afford = this.gold >= sel.price;
+      const buy = this.modalAdd(this.add.text(px + pw - 20, py + infoY,
+        'BUY — ' + sel.price + 'g', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+        fontStyle: 'bold', color: afford ? '#2a1a10' : '#7a6a55',
+        backgroundColor: afford ? '#ffd54a' : '#3a2a1c',
+        padding: { x: 12, y: 6 },
+      }).setOrigin(1, 0.5).setDepth(72).setInteractive());
+      buy.on('pointerdown', () => {
+        if (this.gold < sel.price || sel.sold) return;
+        this.gold -= sel.price;
+        sel.sold = true;
+        stock.selected = null;
+        this.bag.push({ kind: sel.kind, value: sel.value });
+        this.drawPile.splice(Phaser.Math.Between(0, this.drawPile.length), 0,
+          { kind: sel.kind, value: sel.value });
+        this.drawGold();
+        this.updateBagCount();
+        this.renderShop(stock);
+      });
+    } else {
+      this.modalAdd(this.add.text(this.W / 2, py + infoY,
+        'Tap a die to see what it does', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+        color: BOARD.creamDim, fontStyle: 'italic',
+      }).setOrigin(0.5).setDepth(72));
+    }
+    // action row: heal / remove / items-later
+    const healBtn = this.modalAdd(this.add.text(px + pw * 0.2, py + rowY,
+      '❤ Heal +' + stock.heal.amount + ' — ' + stock.heal.price + 'g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '14px',
       fontStyle: 'bold',
       color: this.gold >= stock.heal.price ? '#8ec873' : '#6a7a5a',
       backgroundColor: '#1c120a', padding: { x: 10, y: 6 },
@@ -828,70 +924,165 @@ class GameScene extends Phaser.Scene {
       this.drawGold();
       this.renderShop(stock);
     });
-    this.modalAdd(this.add.text(px + pw * 0.72, hy, 'Special items — coming later', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
-      color: '#7a6a55', fontStyle: 'italic',
+    const canRemove = this.gold >= 5 && this.bag.length > 1;
+    const removeBtn = this.modalAdd(this.add.text(px + pw * 0.5, py + rowY,
+      '✂ Remove a die — 5g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '14px',
+      fontStyle: 'bold', color: canRemove ? '#e6a4a0' : '#6a5a55',
       backgroundColor: '#1c120a', padding: { x: 10, y: 6 },
+    }).setOrigin(0.5).setDepth(72).setInteractive());
+    removeBtn.on('pointerdown', () => {
+      if (!canRemove) return;
+      this.renderShopRemove(stock);
+    });
+    this.modalAdd(this.add.text(px + pw * 0.82, py + rowY, 'Items: coming later', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      color: '#7a6a55', fontStyle: 'italic',
+      backgroundColor: '#1c120a', padding: { x: 8, y: 6 },
     }).setOrigin(0.5).setDepth(72));
-    const leave = this.modalAdd(this.add.text(this.W / 2, hy + 56, '▶ LEAVE SHOP', {
+    const leave = this.modalAdd(this.add.text(this.W / 2, py + leaveY, '▶ LEAVE SHOP', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '17px',
       fontStyle: 'bold', color: '#ffd54a',
       backgroundColor: '#3a2517', padding: { x: 14, y: 7 },
     }).setOrigin(0.5).setDepth(72).setInteractive());
     leave.on('pointerdown', () => {
       this.closeModal();
-      this.startLevel(this.level + 1);
+      this.chooseNextPath();
     });
+  }
+
+  // pick a die to remove from the bag (5g, paid on selection)
+  renderShopRemove(stock) {
+    const { px, py, pw, ph } = this.modalBase('REMOVE A DIE — 5g');
+    this.modalOpen = 'shop';
+    this.modalAdd(this.add.text(px + 16, py + 12, this.gold + 'g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
+      fontStyle: 'bold', color: GOLD,
+    }).setDepth(72));
+    const groups = {};
+    this.bag.forEach((e, idx) => {
+      const k = e.kind + (this.mergeableKind(e.kind) ? e.value : '');
+      if (!groups[k]) groups[k] = { entry: e, total: 0, idx };
+      groups[k].total++;
+    });
+    const keys = Object.keys(groups);
+    const cols = Math.min(Math.max(keys.length, 1), 6);
+    const cellW = pw / (cols + 0.5);
+    const s = Math.min(this.dieSize, cellW * 0.55);
+    keys.forEach((k, i) => {
+      const col = i % cols, row = Math.floor(i / cols);
+      const x = px + cellW * (col + 0.75);
+      const y = py + 84 + row * (s + 50);
+      const g = groups[k];
+      const img = this.modalAdd(this.add.image(x, y,
+        this.textureFor(g.entry.kind, g.entry.value)).setDepth(72)
+        .setDisplaySize(s, s).setInteractive());
+      this.modalAdd(this.add.text(x, y + s * 0.62 + 4, '×' + g.total, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
+        fontStyle: 'bold', color: BOARD.cream,
+      }).setOrigin(0.5, 0).setDepth(72));
+      img.on('pointerdown', () => {
+        if (this.gold < 5 || this.bag.length <= 1) return;
+        this.gold -= 5;
+        // remove one of this type from the bag and the current cycle
+        const match = (e) => e.kind === g.entry.kind &&
+          (!this.mergeableKind(e.kind) || e.value === g.entry.value);
+        const bi = this.bag.findIndex(match);
+        if (bi >= 0) this.bag.splice(bi, 1);
+        const di = this.drawPile.findIndex(match);
+        if (di >= 0) this.drawPile.splice(di, 1);
+        this.drawGold();
+        this.updateBagCount();
+        this.floatText(x, y, 'REMOVED', '#e6a4a0');
+        this.renderShop(stock);
+      });
+    });
+    const back = this.modalAdd(this.add.text(this.W / 2, py + ph - 30, '◀ BACK TO SHOP', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontStyle: 'bold', color: '#ffd54a',
+      backgroundColor: '#3a2517', padding: { x: 12, y: 6 },
+    }).setOrigin(0.5).setDepth(72).setInteractive());
+    back.on('pointerdown', () => this.renderShop(stock));
   }
 
   // -- track modal --
 
-  openTrack(autoCloseMs) {
+  openTrack(autoCloseMs, chooseMode) {
     if (this.gameOver) return;
     this.modalOpen = 'track';
-    const { dim, px, py, pw, ph } = this.modalBase('THE RUN');
-    dim.on('pointerdown', () => this.closeModal());
-    this.modalCloseButton(px, py, pw, () => this.closeModal());
-    const total = LEVEL_TRACK.length;
-    const perRow = 10;
-    const rows = Math.ceil(total / perRow);
-    const cellW = pw / (perRow + 1);
-    const rowH = (ph - 110) / rows;
+    const title = chooseMode ? 'CHOOSE YOUR PATH' : 'THE RUN';
+    const { dim, px, py, pw, ph } = this.modalBase(title);
+    if (!chooseMode) {
+      dim.on('pointerdown', () => this.closeModal());
+      this.modalCloseButton(px, py, pw, () => this.closeModal());
+    }
+    const innerX = px + 18, innerW = pw - 36;
+    const topY = py + 52, botY = py + ph - 46;
+    const colW = innerW / FLOORS;
+    const nodeR = Math.max(7, Math.min(11, colW * 0.38));
+    const posOf = (f, i) => {
+      const w = this.runMap[f].length;
+      return {
+        x: innerX + colW * (f + 0.5),
+        y: w === 1 ? (topY + botY) / 2 :
+          topY + (botY - topY) * (i / (w - 1)),
+      };
+    };
+    // edges first
     const lineG = this.modalAdd(this.add.graphics().setDepth(71));
-    lineG.lineStyle(2, 0x6b4a33, 0.8);
-    for (let i = 0; i < total; i++) {
-      const row = Math.floor(i / perRow);
-      const col = row % 2 === 0 ? i % perRow : perRow - 1 - (i % perRow); // snake
-      const x = px + cellW * (col + 1);
-      const y = py + 70 + row * rowH;
-      if (i > 0) {
-        const pr = Math.floor((i - 1) / perRow);
-        const pc = pr % 2 === 0 ? (i - 1) % perRow : perRow - 1 - ((i - 1) % perRow);
-        lineG.lineBetween(px + cellW * (pc + 1), py + 70 + pr * rowH, x, y);
+    for (let f = 0; f < FLOORS - 1; f++) {
+      for (let i = 0; i < this.runMap[f].length; i++) {
+        for (const j of this.runEdges[f][i]) {
+          const a = posOf(f, i), b = posOf(f + 1, j);
+          const onPath = f < this.mapPos.f ? 0.25 : 0.7;
+          lineG.lineStyle(1.5, 0x6b4a33, onPath);
+          lineG.lineBetween(a.x, a.y, b.x, b.y);
+        }
       }
-      const lvl = i + 1, type = LEVEL_TRACK[i];
-      const done = lvl < this.level, current = lvl === this.level;
-      const nodeCol = done ? 0x3a2a1c :
-        type === 'shop' ? 0xf2b23e : type === 'boss' ? 0xc9564a : 0xa08a6a;
-      const node = this.modalAdd(this.add.graphics().setDepth(72));
-      node.fillStyle(nodeCol, done ? 0.55 : 1);
-      node.fillCircle(x, y, 13);
-      if (current) {
-        node.lineStyle(3, 0xffd54a, 1);
-        node.strokeCircle(x, y, 17);
+    }
+    // choices from the current node
+    const choices = (chooseMode && this.mapPos.f < FLOORS - 1)
+      ? this.runEdges[this.mapPos.f][this.mapPos.i] : [];
+    for (let f = 0; f < FLOORS; f++) {
+      for (let i = 0; i < this.runMap[f].length; i++) {
+        const { x, y } = posOf(f, i);
+        const type = this.runMap[f][i].type;
+        const done = f < this.mapPos.f;
+        const current = f === this.mapPos.f && i === this.mapPos.i;
+        const isChoice = f === this.mapPos.f + 1 && choices.includes(i);
+        const nodeCol = done ? 0x3a2a1c :
+          type === 'shop' ? 0xf2b23e : type === 'boss' ? 0xc9564a : 0xa08a6a;
+        const node = this.modalAdd(this.add.graphics().setDepth(72));
+        node.fillStyle(nodeCol, done ? 0.5 : 1);
+        node.fillCircle(x, y, nodeR);
+        if (current) {
+          node.lineStyle(3, 0xffd54a, 1);
+          node.strokeCircle(x, y, nodeR + 4);
+        }
+        const icon = type === 'shop' ? '🛒' : type === 'boss' ? '💀' : '⚔';
+        this.modalAdd(this.add.text(x, y, icon, { fontSize: Math.round(nodeR) + 'px' })
+          .setOrigin(0.5).setDepth(73).setAlpha(done ? 0.4 : 1));
+        if (isChoice) {
+          const ringG = this.modalAdd(this.add.graphics().setDepth(72));
+          ringG.lineStyle(2.5, 0x8ec873, 1);
+          ringG.strokeCircle(x, y, nodeR + 5);
+          this.tweens.add({
+            targets: ringG, alpha: 0.35, duration: 450, yoyo: true, repeat: -1,
+          });
+          const hit = this.modalAdd(this.add.circle(x, y, nodeR + 12, 0xffffff, 0.001)
+            .setDepth(74).setInteractive());
+          const dest = i;
+          hit.on('pointerdown', () => {
+            this.closeModal();
+            this.startLevelAt(this.mapPos.f + 1, dest);
+          });
+        }
       }
-      const icon = type === 'shop' ? '🛒' : type === 'boss' ? '💀' : '⚔';
-      this.modalAdd(this.add.text(x, y, icon, { fontSize: '13px' })
-        .setOrigin(0.5).setDepth(73).setAlpha(done ? 0.45 : 1));
-      this.modalAdd(this.add.text(x, y + 17, String(lvl), {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '10px',
-        color: current ? '#ffd54a' : BOARD.creamDim,
-      }).setOrigin(0.5, 0).setDepth(73));
     }
     this.modalAdd(this.add.text(this.W / 2, py + ph - 14,
-      '⚔ fight   🛒 shop   💀 miniboss', {
+      chooseMode ? 'Tap a green node to travel' : '⚔ fight   🛒 shop   💀 miniboss', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
-      color: BOARD.creamDim,
+      color: chooseMode ? '#8ec873' : BOARD.creamDim,
     }).setOrigin(0.5, 1).setDepth(72));
     if (autoCloseMs) {
       this.time.delayedCall(autoCloseMs, () => {
@@ -2233,7 +2424,7 @@ class GameScene extends Phaser.Scene {
   buildHud() {
     const style = { fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px', color: BOARD.creamDim };
     this.fpsText = this.add.text(0, 0, '', { ...style, color: '#7ec96f', fontSize: '12px' }).setDepth(30);
-    this.levelText = this.add.text(0, 0, 'LEVEL 1/' + LEVEL_TRACK.length, {
+    this.levelText = this.add.text(0, 0, 'LEVEL 1/' + FLOORS, {
       ...style, fontSize: '16px', color: BOARD.cream, fontStyle: 'bold',
     }).setDepth(30);
     this.mapBtn = this.add.text(0, 0, '[ MAP ]', {
@@ -2449,12 +2640,12 @@ class GameScene extends Phaser.Scene {
     if (this.levelClearPending && !this.gameOver) {
       if (!this.boardBusy()) {
         this.levelClearPending = false;
-        if (this.level >= LEVEL_TRACK.length) {
+        if (this.mapPos.f >= FLOORS - 1) {
           this.time.delayedCall(400, () => this.doVictory());
         } else {
           this.banner('LEVEL CLEAR!', '#8ec873');
-          this.time.delayedCall(1500, () => {
-            if (!this.gameOver) this.startLevel(this.level + 1);
+          this.time.delayedCall(1400, () => {
+            if (!this.gameOver) this.chooseNextPath();
           });
         }
       }
