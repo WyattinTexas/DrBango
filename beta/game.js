@@ -7,7 +7,7 @@
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.7.1';
+const VERSION = 'v0.8.0';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -108,7 +108,7 @@ const MOBS = [
 ];
 
 const TOOLTIPS = {
-  bomb: 'BOMB\nExplodes on impact:\n6 damage to ALL enemies',
+  bomb: 'BOMB DIE\nMerges with its number, then\nblasts nearby dice away and\ndeals its number to ALL enemies',
   potion: 'POTION\nBreaks on impact\nand heals you +6 HP',
   stone: 'CURSED STONE\nBlocks the board.\nTwo hard hits crush it',
   spike: 'SPIKE DIE\nHitting it hurts you:\n-3 HP. It then crumbles',
@@ -196,6 +196,7 @@ class GameScene extends Phaser.Scene {
     this.refreshIn = TUNE.REFRESH_THROWS;
     this.gameOver = false;
     this.levelClearing = false;
+    this.levelClearPending = false;
     this.modalOpen = null;   // 'bag' | 'shop' | 'track' | null
     this.modalObjects = [];
 
@@ -246,7 +247,7 @@ class GameScene extends Phaser.Scene {
 
     this.input.on('pointerdown', (p) => {
       if (this.gameOver) { this.scene.restart(); return; }
-      if (this.modalOpen) return;
+      if (this.modalOpen || this.levelClearPending) return;
       if (!this.ready) return;
       this.aim = { sx: p.x, sy: p.y };
     });
@@ -284,7 +285,7 @@ class GameScene extends Phaser.Scene {
     // dice not yet thrown this cycle = draw pile + what's in the queue
     const counts = {};
     for (const e of [...this.drawPile, ...(this.nextQueue || [])]) {
-      const k = e.kind + (e.kind === 'num' ? e.value : '');
+      const k = e.kind + (this.mergeableKind(e.kind) ? e.value : '');
       counts[k] = (counts[k] || 0) + 1;
     }
     return counts;
@@ -299,6 +300,7 @@ class GameScene extends Phaser.Scene {
   startLevel(n) {
     this.level = n;
     this.levelClearing = false;
+    this.levelClearPending = false;
     this.refreshIn = TUNE.REFRESH_THROWS;
     this.drawRefreshText();
     this.clearBoard();
@@ -489,13 +491,10 @@ class GameScene extends Phaser.Scene {
     }
     this.drawEnemyBar(e);
     if (!this.enemies.some(en => en.alive) && !this.levelClearing && this.enemies.length) {
+      // don't end the level yet — cascades, coins, and specials may
+      // still be resolving. Clear once all dice stop, like a turn.
       this.levelClearing = true;
-      if (this.level >= LEVEL_TRACK.length) {
-        this.time.delayedCall(700, () => this.doVictory());
-      } else {
-        this.banner('LEVEL CLEAR!', '#8ec873');
-        this.time.delayedCall(1500, () => this.startLevel(this.level + 1));
-      }
+      this.levelClearPending = true;
     }
   }
 
@@ -679,7 +678,7 @@ class GameScene extends Phaser.Scene {
     const remaining = this.bagRemaining();
     const groups = {};
     for (const e of this.bag) {
-      const k = e.kind + (e.kind === 'num' ? e.value : '');
+      const k = e.kind + (this.mergeableKind(e.kind) ? e.value : '');
       if (!groups[k]) groups[k] = { entry: e, total: 0 };
       groups[k].total++;
     }
@@ -717,17 +716,17 @@ class GameScene extends Phaser.Scene {
     const pools = {
       1: [
         { kind: 'num', value: 2, price: 5 }, { kind: 'num', value: 3, price: 7 },
-        { kind: 'potion', value: 0, price: 6 }, { kind: 'bomb', value: 0, price: 8 },
+        { kind: 'potion', value: 0, price: 6 }, { kind: 'bomb', value: 2, price: 8 },
         { kind: 'num', value: 1, price: 2 },
       ],
       2: [
         { kind: 'num', value: 3, price: 6 }, { kind: 'num', value: 4, price: 10 },
-        { kind: 'bomb', value: 0, price: 8 }, { kind: 'potion', value: 0, price: 6 },
+        { kind: 'bomb', value: 3, price: 8 }, { kind: 'potion', value: 0, price: 6 },
         { kind: 'num', value: 5, price: 13 },
       ],
       3: [
         { kind: 'num', value: 4, price: 9 }, { kind: 'num', value: 5, price: 12 },
-        { kind: 'num', value: 6, price: 16 }, { kind: 'bomb', value: 0, price: 8 },
+        { kind: 'num', value: 6, price: 16 }, { kind: 'bomb', value: 4, price: 8 },
         { kind: 'potion', value: 0, price: 6 },
       ],
     };
@@ -765,7 +764,7 @@ class GameScene extends Phaser.Scene {
       const img = this.modalAdd(this.add.image(x, y,
         this.textureFor(o.kind, o.value)).setDepth(72).setDisplaySize(s, s));
       const label = o.kind === 'num' ? 'Die: ' + o.value :
-        o.kind === 'bomb' ? 'Bomb die' : 'Potion die';
+        o.kind === 'bomb' ? 'Bomb die ' + o.value : 'Potion die';
       this.modalAdd(this.add.text(x, y + s * 0.65 + 4, label, {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
         color: BOARD.cream,
@@ -992,11 +991,12 @@ class GameScene extends Phaser.Scene {
   }
 
   makeSpecialTextures() {
-    {
-      const { tex, ctx, px, pad, tw } = this.drawCubeBase('bomb', 0x4a4a52);
-      const cx = pad + tw / 2, cy = pad + tw / 2, br = tw * 0.27;
+    // bombs are numbered: dark cube, bomb ball, amber number on top
+    for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
+      const { tex, ctx, px, pad, tw } = this.drawCubeBase('bomb' + v, 0x4a4a52);
+      const cx = pad + tw / 2, cy = pad + tw / 2, br = tw * 0.3;
       ctx.beginPath();
-      ctx.arc(cx, cy + tw * 0.05, br, 0, Math.PI * 2);
+      ctx.arc(cx, cy + tw * 0.04, br, 0, Math.PI * 2);
       const bg = ctx.createRadialGradient(cx - br * 0.3, cy - br * 0.25, br * 0.2, cx, cy, br);
       bg.addColorStop(0, '#3a3a40');
       bg.addColorStop(1, '#17171c');
@@ -1008,13 +1008,23 @@ class GameScene extends Phaser.Scene {
       ctx.strokeStyle = '#7a5a38';
       ctx.lineWidth = px * 0.035;
       ctx.beginPath();
-      ctx.moveTo(cx + br * 0.4, cy - br * 0.6);
-      ctx.quadraticCurveTo(cx + br * 0.9, cy - br * 1.3, cx + br * 0.5, cy - br * 1.6);
+      ctx.moveTo(cx + br * 0.4, cy - br * 0.7);
+      ctx.quadraticCurveTo(cx + br * 0.9, cy - br * 1.3, cx + br * 0.5, cy - br * 1.55);
       ctx.stroke();
       ctx.fillStyle = '#ffb347';
       ctx.beginPath();
-      ctx.arc(cx + br * 0.5, cy - br * 1.6, px * 0.045, 0, Math.PI * 2);
+      ctx.arc(cx + br * 0.5, cy - br * 1.55, px * 0.045, 0, Math.PI * 2);
       ctx.fill();
+      // the number, amber so it reads on the dark face
+      ctx.font = `900 ${Math.round(tw * 0.5)}px -apple-system, "Arial Black", Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = px * 0.04;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(20,10,5,0.85)';
+      ctx.strokeText(String(v), cx, cy + tw * 0.05);
+      ctx.fillStyle = '#ffcf7a';
+      ctx.fillText(String(v), cx, cy + tw * 0.05);
       tex.refresh();
     }
     {
@@ -1305,6 +1315,7 @@ class GameScene extends Phaser.Scene {
 
   textureFor(kind, value, gold) {
     if (kind === 'num') return (gold ? 'gold' : 'die') + value;
+    if (kind === 'bomb') return 'bomb' + value;
     return kind;
   }
 
@@ -1483,17 +1494,14 @@ class GameScene extends Phaser.Scene {
     let handled = false;
     for (const [x, other] of [[a, b], [b, a]]) {
       if (x.dead || other.dead) continue;
-      if (x.kind === 'bomb' && impact > 1.2) {
-        this.explodeBomb(x);
-        handled = true;
-      } else if (x.kind === 'potion' && impact > 0.8) {
+      if (x.kind === 'potion' && impact > 0.8) {
         this.consumePotion(x);
         handled = true;
-      } else if (x.kind === 'stone' && other.kind === 'num' &&
+      } else if (x.kind === 'stone' && this.mergeableKind(other.kind) &&
         impact > TUNE.STONE_HIT_SPEED) {
         this.hitStone(x);
         handled = true;
-      } else if (x.kind === 'spike' && other.kind === 'num' && impact > 1.2) {
+      } else if (x.kind === 'spike' && this.mergeableKind(other.kind) && impact > 1.2) {
         this.triggerSpike(x);
         handled = true;
       }
@@ -1501,30 +1509,36 @@ class GameScene extends Phaser.Scene {
     return handled;
   }
 
-  explodeBomb(die) {
-    if (die.dead) return;
-    const x = die.gx, y = die.gy;
-    if (die === this.thrownDie) this.thrownDie = null;
-    this.destroyDie(die);
+  // fired when a bomb die merges with its number
+  bombBlast(x, y, riseH, value) {
+    const apexY = y - riseH;
+    const flash = this.add.image(x, apexY, 'flash').setDepth(19)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDisplaySize(this.dieSize * 2, this.dieSize * 2);
+    this.tweens.add({
+      targets: flash, alpha: 0, scale: flash.scaleX * 2.6, duration: 300,
+      onComplete: () => flash.destroy(),
+    });
     const ring = this.add.graphics().setDepth(19).setPosition(x, y);
     ring.lineStyle(5, 0xff8040, 1);
     ring.strokeCircle(0, 0, this.dieRadius);
     this.tweens.add({
-      targets: ring, scale: 4.5, alpha: 0, duration: 420,
+      targets: ring, scale: 5, alpha: 0, duration: 450,
       onComplete: () => ring.destroy(),
     });
-    this.sparks.burst(x, y, 0xff8040, 24, { speedMin: 2, speedMax: 7, life: 550, scale: 1.1 });
+    this.sparks.burst(x, apexY, 0xff8040, 24, { speedMin: 2, speedMax: 7, life: 550, scale: 1.1 });
     this.sparks.burst(x, y, 0x4a4a52, 10, { speedMin: 1, speedMax: 4, life: 450, scale: 0.8 });
-    this.knockback(x, y, this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.6, TUNE.KNOCK_SPEED * 1.8);
+    // the point of the bomb: shove everything HARD
+    this.knockback(x, y, this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.9, TUNE.KNOCK_SPEED * 2.4);
     for (const d of [...this.dice]) {
       if ((d.kind === 'stone' || d.kind === 'spike') && !d.dead &&
-        Phaser.Math.Distance.Between(d.gx, d.gy, x, y) < this.dieSize * TUNE.KNOCK_RADIUS_FRAC) {
+        Phaser.Math.Distance.Between(d.gx, d.gy, x, y) < this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.4) {
         if (d.kind === 'stone') this.hitStone(d);
         else this.crumbleSpike(d);
       }
     }
-    this.cameras.main.shake(180, 0.006);
-    this.dealDamage(TUNE.BOMB_DAMAGE, x, y, true);
+    this.cameras.main.shake(200, 0.006);
+    this.dealDamage(value, x, apexY, true);
     feedback.chainStep(4);
   }
 
@@ -1740,11 +1754,12 @@ class GameScene extends Phaser.Scene {
     if (hitDie) {
       const thrown = this.nextQueue[0];
       let c = 0xf5e6c8, strong = false;
-      if (thrown.kind === 'bomb') { c = 0xff8040; strong = true; }
-      else if (thrown.kind === 'potion') { c = 0x3f9d4e; strong = true; }
+      const match = this.mergeableKind(thrown.kind) && this.mergeableKind(hitDie.kind) &&
+        hitDie.value === thrown.value;
+      if (thrown.kind === 'potion') { c = 0x3f9d4e; strong = true; }
       else if (hitDie.kind === 'spike') { c = 0xaa55cc; strong = true; }
-      else if (thrown.kind === 'num' && hitDie.kind === 'num' &&
-        hitDie.value === thrown.value) { c = 0x8ec873; strong = true; }
+      else if (match && (thrown.kind === 'bomb' || hitDie.kind === 'bomb')) { c = 0xff8040; strong = true; }
+      else if (match) { c = 0x8ec873; strong = true; }
       const pulse = 1 + 0.08 * Math.sin(this.time.now / 90);
       g.lineStyle(3, c, strong ? 1 : 0.5);
       g.strokeCircle(hitDie.body.position.x, hitDie.body.position.y,
@@ -1758,7 +1773,7 @@ class GameScene extends Phaser.Scene {
     while (this.fuseQueue.length) {
       const [a, b] = this.fuseQueue.shift();
       if (a.dead || b.dead) continue;
-      if (a.kind !== 'num' || b.kind !== 'num') continue;
+      if (!this.mergeableKind(a.kind) || !this.mergeableKind(b.kind)) continue;
       if (a.value !== b.value) continue;
       if (a.state !== 'rest' && a.state !== 'active') continue;
       if (b.state !== 'rest' && b.state !== 'active') continue;
@@ -1766,15 +1781,19 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  mergeableKind(k) {
+    return k === 'num' || k === 'bomb';
+  }
+
   touchSweep() {
     const touchDist = this.dieRadius * 0.96 * 2 + 3;
     for (let i = 0; i < this.dice.length; i++) {
       const a = this.dice[i];
-      if (a.dead || a.kind !== 'num' || !a.body) continue;
+      if (a.dead || !this.mergeableKind(a.kind) || !a.body) continue;
       if (a.state !== 'rest' && a.state !== 'active') continue;
       for (let j = i + 1; j < this.dice.length; j++) {
         const b = this.dice[j];
-        if (b.dead || b.kind !== 'num' || !b.body || b.value !== a.value) continue;
+        if (b.dead || !this.mergeableKind(b.kind) || !b.body || b.value !== a.value) continue;
         if (b.state !== 'rest' && b.state !== 'active') continue;
         if (Phaser.Math.Distance.Between(a.gx, a.gy, b.gx, b.gy) < touchDist) {
           this.fuseQueue.push([a, b, 0]);
@@ -1834,6 +1853,16 @@ class GameScene extends Phaser.Scene {
     if (this.chain > this.bestChain) this.bestChain = this.chain;
     feedback.chainStep(this.chain);
     this.flashChain();
+
+    // a bomb in the pair: no merged die — a blast that shoves the
+    // board apart (hopefully into new merges) and hits EVERY enemy
+    // for the bomb's number
+    if (a.kind === 'bomb' || b.kind === 'bomb') {
+      this.bombBlast(mx, my, riseH, value);
+      this.loftCount--;
+      return;
+    }
+
     this.mergeImpact(mx, my, riseH, value);
 
     const newValue = value + 1;
@@ -1947,7 +1976,7 @@ class GameScene extends Phaser.Scene {
     let best = null, bestD = Infinity;
     for (const d of this.dice) {
       if (d === exclude || d.dead || d.reserved) continue;
-      if (d.kind !== 'num' || d.value !== value || !d.body) continue;
+      if (!this.mergeableKind(d.kind) || d.value !== value || !d.body) continue;
       if (d.state !== 'rest' && d.state !== 'active') continue;
       const dist = Phaser.Math.Distance.Between(
         exclude.gx, exclude.gy, d.body.position.x, d.body.position.y);
@@ -2255,7 +2284,6 @@ class GameScene extends Phaser.Scene {
         if (speed < TUNE.SETTLE_SPEED) {
           d.slowMs += delta;
           if (d.slowMs >= TUNE.SETTLE_MS) {
-            if (d.kind === 'bomb') { this.explodeBomb(d); continue; }
             if (d.kind === 'potion') { this.consumePotion(d); continue; }
             d.state = 'rest';
             d.restingSince = time;
@@ -2276,6 +2304,22 @@ class GameScene extends Phaser.Scene {
         const d = this.thrownDie;
         this.sparks.burst(d.img.x, d.img.y + this.dieRadius * 0.4, 0xc9a878, 1,
           { speedMin: 0, speedMax: 0.4, life: 320, scale: 0.8, drag: 1 });
+      }
+    }
+
+    if (this.levelClearPending && !this.gameOver) {
+      const busy = this.thrownDie !== null || this.loftCount > 0 ||
+        this.dice.some(d => d.state === 'active' || d.state === 'loft' || d.state === 'merge');
+      if (!busy) {
+        this.levelClearPending = false;
+        if (this.level >= LEVEL_TRACK.length) {
+          this.time.delayedCall(400, () => this.doVictory());
+        } else {
+          this.banner('LEVEL CLEAR!', '#8ec873');
+          this.time.delayedCall(1500, () => {
+            if (!this.gameOver) this.startLevel(this.level + 1);
+          });
+        }
       }
     }
 
