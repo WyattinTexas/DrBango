@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v6.8 -->
+<!-- TRAINSET v6.9 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -2017,6 +2017,70 @@ function cndDwellAt(ox,oy){    // >0 only for THE goal station during the dwell 
   if(!CND.on||CND.ph!==2||!CND.goalK) return 0;
   if(key(Math.round((ox-GX)/C),Math.round((oy-GY)/C))+':0'!==CND.goalK) return 0;
   return Math.min(1,CND.pt/CND_DWELL);
+}
+/* E60 THE CAMPAIGN CALL — WE NEED TRAINS!! The conductor gets a BODY and
+   a LINE: during the dwell a tiny conductor pops up at the goal (station
+   platform; the pond gets him on the bank) and the level's call lands as
+   BIG screen text. A CHARACTER speaking MOTIVATION — E57 retired
+   instruction text and stays retired; HAND_HUSH and the hint machine are
+   untouched. No new sound: the dwell's own SND.pip IS the voice of the
+   moment. Both painters are gated on the moment's phases — zero paint on
+   any other frame — and every frame is a pure function of CND.t/CND.pt
+   (zero Math.random, the E52 law; frozen plates hold at ph 0). The skip
+   that lands the camera kills the body and the line the same frame. */
+const CALL_SAY='WE NEED TRAINS!!';           // the one line, every level of every book
+const CALL_BOOK_ON=false;                    // per-book flavor lines — DEFAULT OFF (dial)
+const CALL_BOOK={pk:'WE NEED PUMPKINS!!',sa:'WE NEED PRESENTS!!'};
+const CALL_PX=46, CALL_Y=0.30;               // huge type · screen seat (× of H-BAR)
+const CALL_POP=0.28, CALL_DUCK=0.30;         // easeOutBack in · sink-away out
+const CALL_DY_ST=52, CALL_DY_LAND=106;       // south of the goal: platform front · the bank
+function callSay(){                          // level row → book flavor (dial) → the line
+  const L=CAMP.on? bookL()[CAMP.level-1] : null;
+  return (L&&L.say) || (CALL_BOOK_ON&&CALL_BOOK[CAMP.book]) || CALL_SAY;
+}
+const callBack=k=>{ const b=k-1; return 1+2.70158*b*b*b+1.70158*b*b; };   // the flag's own overshoot
+function callK(){                            // the caller's scale — pop in the dwell, duck on the way home
+  if(!CND.on||!CAMP.on) return 0;
+  if(CND.ph===2) return callBack(Math.min(1,CND.pt/CALL_POP));
+  if(CND.ph===3){ const k=1-Math.min(1,CND.pt/CALL_DUCK); return k*k; }
+  return 0;
+}
+function drawCaller(){                       // world space, right after the walkers
+  const k=callK(); if(k<=0.01) return;
+  const x=CND.a1.x, y=CND.a1.y+(CND.goalK? CALL_DY_ST:CALL_DY_LAND);
+  cx.save(); cx.translate(x,y+11); cx.scale(k,k); cx.translate(0,-11);   // he grows from his feet
+  cx.lineCap='round'; cx.lineJoin='round';
+  cx.strokeStyle='#28486B'; cx.fillStyle='#28486B'; cx.lineWidth=4.6;
+  // the uniform: body, legs, one arm down — and ONE WAVING ARM (the CHARM law)
+  cx.beginPath(); cx.moveTo(0,-7); cx.lineTo(0,4); cx.stroke();
+  cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(-6,1); cx.stroke();
+  cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(6,-16+Math.sin(CND.t*11)*3); cx.stroke();
+  cx.beginPath(); cx.moveTo(0,4); cx.lineTo(-4,11); cx.moveTo(0,4); cx.lineTo(4,11); cx.stroke();
+  // the E39 head: peach, eyes on YOU — and the conductor's cap on top
+  cx.fillStyle='#E8C39A'; cx.beginPath(); cx.arc(0,-11,4.6,0,7); cx.fill();
+  cx.fillStyle='#28486B';
+  cx.beginPath(); cx.arc(0,-12.2,4.6,Math.PI*1.02,Math.PI*1.98); cx.fill();
+  cx.fillRect(-5.4,-13.1,10.8,1.7);
+  cx.fillStyle='#23211E';
+  cx.beginPath(); cx.arc(-1.6,-10.6,0.8,0,7); cx.fill();
+  cx.beginPath(); cx.arc(1.6,-10.6,0.8,0,7); cx.fill();
+  cx.lineCap='butt'; cx.restore();
+}
+function drawCall(){                         // screen space, under the ceremony cards
+  if(!CND.on||!CAMP.on||(CND.ph!==2&&CND.ph!==3)) return;
+  let a=1, s=1;
+  if(CND.ph===2){ a=Math.min(1,CND.pt/0.12); s=callBack(Math.min(1,CND.pt/CALL_POP)); }
+  else a=1-Math.min(1,CND.pt/(CND_HOME*0.85));
+  if(a<=0) return;
+  const say=callSay(), u=uiCard(150);
+  let f=CALL_PX*u; cx.font='bold '+f+'px "Arial Black",Impact,sans-serif';
+  const w1=cx.measureText(say).width;
+  if(w1>W-40){ f=Math.max(16,Math.floor(f*(W-40)/w1)); cx.font='bold '+f+'px "Arial Black",Impact,sans-serif'; }
+  cx.save(); cx.translate(W/2,(H-BAR)*CALL_Y); cx.scale(s,s); cx.globalAlpha=a;
+  cx.textAlign='center'; cx.textBaseline='middle'; cx.lineJoin='round';
+  cx.strokeStyle='#1e1610'; cx.lineWidth=Math.max(4,f*0.14); cx.strokeText(say,0,0);
+  cx.fillStyle='#F2C531'; cx.fillText(say,0,0);
+  cx.restore(); cx.globalAlpha=1;
 }
 function rrOn(g,x,y,w,h,r){    // rounded rect on a FOREIGN ctx (rr() paths the world's cx)
   g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
@@ -7713,6 +7777,7 @@ function draw(){
   // the z-sorted cars — so a cow can graze beneath the high line
   drawTrackAll(grid,hgrid,PLAY.on? playCarItems():trailCarItems(),drawScen);   // E28: trailCarItems = the cars + the rainbow's z-items; PLAY's branch byte-untouched
   drawBoarders();   // E15: little walkers between platform and train, on the ground
+  drawCaller();     // E60: the campaign caller — gated to the conductor's dwell, zero paint otherwise
   trailSparkPaint();   // E28: stardust floats OVER the cars (PLAY/none = early out, zero paint)
   drawArches();     // E9: balloon arches bow over the line — the train drives under them
   drawRainbow();    // E41: THE arc over the sky river — she drives under it too
@@ -7749,7 +7814,7 @@ function draw(){
     const k=f.t/f.dur, e=k*k*(3-2*k);
     star5(f.x+(f.tx-f.x)*e, f.y+(f.ty-f.y)*e-Math.sin(Math.PI*k)*36, 0.9+0.35*(1-k), '#F2C531'); }
   cx.globalAlpha=1;
-  drawHint(); drawLapCard(); drawCampCards();
+  drawHint(); drawLapCard(); drawCall(); drawCampCards();   // E60: the call rides UNDER the ceremony cards
 }
 
 /* =====================================================================
@@ -14113,7 +14178,8 @@ window.TS={
         replay(){ if(!(SCREEN==='game'&&CAMP.on)) return false; cndStart(); return true; },
         chip(){ return { shown:$('goalChip').style.display!=='none',
           pips:CAMP.stations.length,
-          filled:CAMP.stations.filter(k=>CAMP.visited.has(k)).length }; } },
+          filled:CAMP.stations.filter(k=>CAMP.visited.has(k)).length }; },
+        call(){ return CND.on&&CAMP.on? { say:callSay(), ph:CND.ph, k:+callK().toFixed(3) } : null; } },   // E60: the caller/line probe — read-only
   view:{
     fit(){ viewFit(); return TS.view.get(); },
     base(){ viewBase(); return TS.view.get(); },   // E20: the big default, re-aimed on demand
