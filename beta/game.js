@@ -8,7 +8,7 @@
 // stones. The board persists between throws — always.
 // ============================================================
 
-const VERSION = 'v0.5.1';
+const VERSION = 'v0.6.0';
 
 // ---- Tunable knobs (everything feel-related lives here) ----
 const TUNE = {
@@ -57,6 +57,7 @@ const TUNE = {
 
   // ---- combat ----
   PLAYER_HP: 50,
+  REFRESH_THROWS: 4,      // field refresh cadence, Rune Dice style
   BOMB_CHANCE: 0.08,      // chance a queue slot is a bomb (wave 2+)
   POTION_CHANCE: 0.07,    // chance a queue slot is a potion (when hurt)
   BOMB_DAMAGE: 6,         // to ALL enemies
@@ -100,6 +101,12 @@ const MOBS = [
   { name: 'slime', color: 0x6aa84f },
   { name: 'brute', color: 0x8e6bb5 },
 ];
+
+const TOOLTIPS = {
+  bomb: 'BOMB\nExplodes on impact:\n6 damage to ALL enemies',
+  potion: 'POTION\nBreaks on impact\nand heals you +6 HP',
+  stone: 'CURSED STONE\nBlocks the board.\nTwo hard hits crush it',
+};
 
 function shade(color, f) {
   const r = (color >> 16) & 255, g = (color >> 8) & 255, b = color & 255;
@@ -186,6 +193,7 @@ class GameScene extends Phaser.Scene {
     this.hp = TUNE.PLAYER_HP;
     this.wave = 0;
     this.throws = 0;
+    this.refreshIn = TUNE.REFRESH_THROWS;
     this.gameOver = false;
     this.waveClearing = false;
 
@@ -720,7 +728,7 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  // called once per resolved throw: enemy attack countdowns tick
+  // called once per resolved throw: enemy countdowns + field refresh
   onThrowResolved() {
     if (this.gameOver) return;
     for (const e of this.enemies) {
@@ -732,6 +740,43 @@ class GameScene extends Phaser.Scene {
       }
       this.drawEnemyBar(e);
     }
+    this.refreshIn--;
+    if (this.refreshIn <= 0) {
+      this.refreshIn = TUNE.REFRESH_THROWS;
+      this.fieldRefresh();
+    }
+    this.drawRefreshText();
+  }
+
+  // Rune Dice's field refresh: the normal dice re-roll so you can
+  // never run dry. Cursed stones stay — only crushing removes them.
+  fieldRefresh() {
+    this.banner('FIELD REFRESH', '#ead9b8');
+    const clearing = this.dice.filter(d =>
+      !d.dead && d.kind === 'num' && (d.state === 'rest' || d.state === 'active'));
+    for (const d of clearing) {
+      d.dead = true;
+      this.detachBody(d);
+      this.tweens.add({
+        targets: [d.img, d.shadow], alpha: 0, scale: d.img.scale * 0.4,
+        duration: 380, ease: 'Quad.easeIn',
+        onComplete: () => {
+          d.img.destroy(); d.shadow.destroy();
+          const idx = this.dice.indexOf(d);
+          if (idx >= 0) this.dice.splice(idx, 1);
+        },
+      });
+    }
+    this.time.delayedCall(450, () => {
+      if (!this.gameOver) this.seedBoard();
+    });
+  }
+
+  drawRefreshText() {
+    if (!this.refreshText) return;
+    this.refreshText
+      .setText('Refresh in ' + this.refreshIn)
+      .setColor(this.refreshIn <= 1 ? '#ffd54a' : BOARD.creamDim);
   }
 
   enemyAttack(e) {
@@ -830,6 +875,13 @@ class GameScene extends Phaser.Scene {
       stoneHits: 0,
     };
     if (state !== 'loft') this.attachBody(die, x, y);
+    if (kind !== 'num') {
+      img.setInteractive();
+      const show = () => { if (!die.dead) this.showTooltip(die.gx, die.gy, kind); };
+      img.on('pointerover', show);
+      img.on('pointerdown', show); // touch devices: tap the die
+      img.on('pointerout', () => this.hideTooltip());
+    }
     this.dice.push(die);
     return die;
   }
@@ -899,7 +951,9 @@ class GameScene extends Phaser.Scene {
       for (let tries = 0; tries < 60; tries++) {
         const x = Phaser.Math.Between(m, this.W - m);
         const y = Phaser.Math.Between(yMin, yMax);
-        if (placed.every(p => Phaser.Math.Distance.Between(p.x, p.y, x, y) > minGap)) {
+        if (placed.every(p => Phaser.Math.Distance.Between(p.x, p.y, x, y) > minGap) &&
+          this.dice.every(d => d.dead ||
+            Phaser.Math.Distance.Between(d.gx, d.gy, x, y) > minGap)) {
           placed.push({ x, y });
           const d = this.makeDie(x, y, v, 'rest');
           d.restingSince = this.time.now;
@@ -1046,6 +1100,20 @@ class GameScene extends Phaser.Scene {
       this.add.image(0, 0, 'die1').setDepth(11).setAlpha(0.8),
       this.add.image(0, 0, 'die1').setDepth(11).setAlpha(0.55),
     ];
+    // tooltips on the queue too, so specials explain themselves
+    const tipFor = (idx, img) => {
+      const show = () => {
+        const e = this.nextQueue[idx];
+        if (e && e.kind !== 'num') this.showTooltip(img.x, img.y, e.kind);
+      };
+      img.setInteractive();
+      img.on('pointerover', show);
+      img.on('pointerdown', show);
+      img.on('pointerout', () => this.hideTooltip());
+    };
+    tipFor(0, this.previewImg);
+    tipFor(1, this.queueImgs[0]);
+    tipFor(2, this.queueImgs[1]);
     this.layoutLauncher();
   }
 
@@ -1511,8 +1579,46 @@ class GameScene extends Phaser.Scene {
     this.hpText = this.add.text(0, 0, '', {
       ...style, fontSize: '12px', color: BOARD.cream, fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(31);
+    this.refreshText = this.add.text(0, 0, '', {
+      ...style, fontSize: '14px', fontStyle: 'bold',
+    }).setOrigin(1, 0).setDepth(30);
+    // one reusable tooltip for special dice
+    this.tipBg = this.add.graphics().setDepth(60).setVisible(false);
+    this.tipText = this.add.text(0, 0, '', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
+      color: BOARD.cream, align: 'center', lineSpacing: 3,
+    }).setOrigin(0.5, 1).setDepth(61).setVisible(false);
     this.layoutHud();
     this.drawHpBar();
+    this.drawRefreshText();
+  }
+
+  showTooltip(x, y, kind) {
+    const msg = TOOLTIPS[kind];
+    if (!msg) return;
+    this.tipText.setText(msg);
+    const b = this.tipText.getBounds();
+    const pad = 8;
+    let tx = Phaser.Math.Clamp(x, b.width / 2 + pad + 4, this.W - b.width / 2 - pad - 4);
+    let ty = y - this.dieSize * 0.9;
+    if (ty - b.height - pad * 2 < this.stripH) ty = y + this.dieSize * 0.9 + b.height + pad;
+    this.tipText.setPosition(tx, ty).setVisible(true);
+    const g = this.tipBg;
+    g.clear();
+    g.fillStyle(0x241408, 0.92);
+    g.fillRoundedRect(tx - b.width / 2 - pad, ty - b.height - pad,
+      b.width + pad * 2, b.height + pad * 2, 6);
+    g.lineStyle(1, 0x6b4a33, 1);
+    g.strokeRoundedRect(tx - b.width / 2 - pad, ty - b.height - pad,
+      b.width + pad * 2, b.height + pad * 2, 6);
+    g.setVisible(true);
+    if (this.tipTimer) this.tipTimer.remove();
+    this.tipTimer = this.time.delayedCall(2600, () => this.hideTooltip());
+  }
+
+  hideTooltip() {
+    this.tipBg.setVisible(false);
+    this.tipText.setVisible(false);
   }
 
   layoutHud() {
@@ -1522,6 +1628,7 @@ class GameScene extends Phaser.Scene {
     this.bestText.setPosition(this.W - this.rail - 8, this.fieldTop + 6);
     this.versionText.setPosition(this.W - this.rail - 6, this.H - this.rail - 4);
     this.chainText.setPosition(this.W / 2, this.H * 0.3);
+    this.refreshText.setPosition(this.W - 8, Math.max(20, this.stripH * 0.35));
     this.waveText.setText('WAVE ' + Math.max(1, this.wave));
     this.drawHpBar();
   }
