@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v6.0 -->
+<!-- TRAINSET v6.1 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -36,6 +36,11 @@
     font-size:15px; letter-spacing:1px; color:#F7E9C4; cursor:pointer;
   }
   #mark{ left:12px; cursor:default; color:#F2C531; }
+  /* ---- THE GOAL CHIP (E52): wordless, beside the level mark — a mini station
+     glyph + one stop-pip per required station, filled straight off the win
+     law's own visited set. Tap = replay the conductor pan. Campaign only. ---- */
+  #goalChip{ left:150px; display:none; padding:6px 9px; }
+  #goalChip canvas{ display:block; width:74px; height:29px; }
   #mute{ right:12px; }
   #menuChip{ right:76px; }
   #backChip{ right:76px; display:none; }
@@ -490,8 +495,14 @@
      and the chrome breathes back. opacity + pointer-events ONLY, nothing moves.
      The spread needs no fold: dismiss laws 1 and 2 have already shut it before
      any hand is live. ---- */
-  #tbox,#mark,#menuChip,#backChip,#starChip,#homeChip,#rideChip{ transition:opacity var(--shygame,0.25s) ease; }
-  body.shygame :is(#tbox,#mark,#mute,#menuChip,#backChip,#starChip,#homeChip,#rideChip){ opacity:0; pointer-events:none; }
+  #tbox,#mark,#menuChip,#backChip,#starChip,#homeChip,#rideChip,#goalChip{ transition:opacity var(--shygame,0.25s) ease; }
+  body.shygame :is(#tbox,#mark,#mute,#menuChip,#backChip,#starChip,#homeChip,#rideChip,#goalChip){ opacity:0; pointer-events:none; }
+  /* E52 THE CONDUCTOR MOMENT: while the camera shows the goal the chrome holds
+     its breath — the same fold as the shy set, plus the rail. cndStart/cndEnd
+     are the class's one writer; the chrome returning IS "pieces present". */
+  body.conductor :is(#tbox,#mark,#mute,#menuChip,#backChip,#starChip,#homeChip,#rideChip,#goalChip){ opacity:0; pointer-events:none; }
+  body.conductor #rail{ opacity:0; }
+  body.conductor #rail *{ pointer-events:none; }
   /* ---- toast + rotate (toast bottom rides the LIVE bar height — resize() sets it) ---- */
   #toast{
     position:absolute; left:50%; bottom:132px; transform:translateX(-50%);
@@ -601,6 +612,9 @@
 <body>
 <canvas id="cv"></canvas>
 <div class="chip" id="mark">🚂 TRAIN GALAXY</div>
+<!-- E52 THE GOAL CHIP: the level's goal, wordless — a mini station glyph +
+     stop-pips read straight off the win law's visited set; tap = replay the pan -->
+<div class="chip" id="goalChip"><canvas id="goalCv" width="148" height="58"></canvas></div>
 <div class="chip" id="mute">🔊</div>
 <div class="chip" id="menuChip">🏠 MENU</div>
 <div class="chip" id="backChip">🎫 LEVELS</div>
@@ -1763,7 +1777,7 @@ function clampView(){
   VIEW.ox= ww<=vw? (vw-ww)/2 : Math.max(vw-ww,Math.min(0,VIEW.ox));
   VIEW.oy= wh<=vh? (vh-wh)/2 : Math.max(vh-wh,Math.min(0,VIEW.oy));
 }
-function viewFit(){ followSet(false); CAM.off=false; EAGERC=null; VIEW.s=fitScale(); VIEW.vx=VIEW.vy=0; clampView(); viewApply(); }   // E15: HOME is a camera hand — follow lets go (E27: and the arrival ease)
+function viewFit(){ followSet(false); CAM.off=false; EAGERC=null; cndKill(); VIEW.s=fitScale(); VIEW.vx=VIEW.vy=0; clampView(); viewApply(); }   // E15: HOME is a camera hand — follow lets go (E27: and the arrival ease; E52: and the conductor)
 // E20 — where the big default LOOKS: the placed train if there is one, else the
 // middle of everything on the rug (starter line, glued campaign land, the PLAY
 // map — one scan serves all three), else the rug's own centre.
@@ -1777,13 +1791,14 @@ function baseAim(){
   return n? [sx/n,sy/n] : [WORLD_W/2,WORLD_H/2];
 }
 function viewBase(){   // the E20 entry view: close to the toys, centered on the action
-  followSet(false); CAM.off=false; EAGERC=null;   // E27: the entry camera outranks the arrival ease
+  followSet(false); CAM.off=false; EAGERC=null; cndKill();   // E27: the entry camera outranks the arrival ease (E52: and the conductor)
   VIEW.s=baseScale(); VIEW.vx=VIEW.vy=0;
   const [ax,ay]=baseAim();
   VIEW.ox=W/2-ax*VIEW.s; VIEW.oy=(H-BAR)/2-ay*VIEW.s;
   clampView(); viewApply();
 }
 function viewResize(){
+  if(CND.on) cndEnd(true);                       // E52: frames don't survive a new viewport — a mid-moment resize lands it
   const f=fitScale();
   if(!camGate() || VIEW.s<=f+1e-9) VIEW.s=f;     // a fitted (or fresh) camera refits; a zoomed one keeps its zoom
   VIEW.s=Math.min(VIEW.s,zCap());                // E46: a mid-ride resize keeps the dive (followTick re-aims from the new W)
@@ -1813,6 +1828,126 @@ function homeSync(){                             // the HOME chip appears only o
   const el=document.getElementById('homeChip'); if(!el) return;
   el.style.display=(camGate() && offBase())?'block':'none';
   rideSync();
+}
+/* =====================================================================
+   THE CONDUCTOR MOMENT + THE GOAL CHIP (E52) — a level owns its sky and
+   SHOWS its goal. The title card died: on every campaign entry the camera
+   itself is the introduction — the whole board for one beat, a smooth
+   dive to the goal (the win station; the pond when no stop is asked),
+   two little hops + a flag pop + the E43 three-pip trill, then home to
+   the pieces. CND_T seconds total, ANY touch lands it instantly (the
+   skip eats the touch), zero Math.random — every frame is a pure
+   function of CND.t. While it runs the chrome holds its breath
+   (body.conductor). The goal chip (a mini station + stop-pips read off
+   the win law's OWN visited set) stays behind as the level's one
+   wordless reminder; tapping it replays the pan from wherever the
+   kid's camera stands. ONE WRITER (the E46 law): while CND.on,
+   cndTick is the only VIEW writer; viewFit/viewBase are camera HANDS
+   and kill the moment without landing it (the E15/E27 outranking).
+   ===================================================================== */
+const CND_T=2.5, CND_LOOK=0.35, CND_PAN=0.75, CND_DWELL=0.70,
+      CND_HOME=CND_T-CND_LOOK-CND_PAN-CND_DWELL;   // the last leg inherits the remainder — the total IS the dial
+const CND_HOP=10;              // the dwell's hop height, world px
+const CND={on:false,t:0,ph:0,pt:0,pipped:false,goalK:null,
+           s0:0,a0:null,s1:0,a1:null,home:null,ah:null};
+function cndAim(){             // THE GOAL, deterministic + data-driven: first required
+  const L=bookL()[CAMP.level-1];   // station → first glued 'st' → the mean of the glued land
+  const cc=(x,y)=>({x:GX+x*C+C/2,y:GY+y*C+C/2});
+  if(!L) return {k:null,x:WORLD_W/2,y:WORLD_H/2};
+  if(CAMP.stations.length){
+    const k0=CAMP.stations[0], [x,y]=k0.split(':')[0].split(',').map(Number);
+    return {k:k0,...cc(x,y)};
+  }
+  const st=(L.track||[]).find(r=>r[0]==='st');
+  if(st) return {k:key(st[2],st[3])+':0',...cc(st[2],st[3])};
+  let n=0,sx=0,sy=0;
+  for(const g of (L.glued||[])){ sx+=g[1]; sy+=g[2]; n++; }
+  for(const r of (L.track||[])){ sx+=r[2]; sy+=r[3]; n++; }
+  return n? {k:null,...cc(sx/n,sy/n)} : {k:null,x:WORLD_W/2,y:WORLD_H/2};
+}
+function cndFrame(s,a){        // the aim-true zoom-pan write — the moment's one pen
+  VIEW.s=s; VIEW.ox=W/2-a.x*s; VIEW.oy=(H-BAR)/2-a.y*s;
+  clampView(); viewApply();
+}
+function cndStart(){           // every campaign entry + every goal-chip tap
+  if(!CAMP.on) return;
+  followSet(false); EAGERC=null; VIEW.vx=VIEW.vy=0;
+  const aim=cndAim();
+  CND.on=true; CND.t=0; CND.ph=0; CND.pt=0; CND.pipped=false; CND.goalK=aim.k;
+  CND.home={s:VIEW.s,ox:VIEW.ox,oy:VIEW.oy};   // entry = the E20 frame; replay = the kid's own
+  CND.ah={x:(W/2-VIEW.ox)/VIEW.s, y:((H-BAR)/2-VIEW.oy)/VIEW.s};
+  CND.s0=fitScale(); CND.a0={x:WORLD_W/2,y:WORLD_H/2};
+  CND.s1=baseScale(); CND.a1={x:aim.x,y:aim.y};
+  document.body.classList.add('conductor');
+  cndFrame(CND.s0,CND.a0);                     // frame one IS the whole board
+}
+function cndKill(){            // a camera hand outranks the show — end it where it stands
+  if(!CND.on) return;
+  CND.on=false; document.body.classList.remove('conductor');
+}
+function cndEnd(land){         // the skip and the natural landing share one door
+  if(!CND.on) return;
+  cndKill();
+  if(land){ VIEW.s=CND.home.s; VIEW.ox=CND.home.ox; VIEW.oy=CND.home.oy; clampView(); viewApply(); }
+}
+const cndEase=k=>k*k*(3-2*k);  // the house smoothstep (EAGERC's own)
+function cndTick(dt){
+  if(!CND.on) return;
+  EAGERC=null; VIEW.vx=VIEW.vy=0;              // one writer while the moment runs
+  CND.t+=dt;
+  let t=CND.t;
+  if(t<CND_LOOK){ CND.ph=0; CND.pt=t; cndFrame(CND.s0,CND.a0); return; }
+  t-=CND_LOOK;
+  if(t<CND_PAN){ CND.ph=1; CND.pt=t;
+    const e=cndEase(t/CND_PAN);
+    cndFrame(CND.s0+(CND.s1-CND.s0)*e,
+             {x:CND.a0.x+(CND.a1.x-CND.a0.x)*e, y:CND.a0.y+(CND.a1.y-CND.a0.y)*e});
+    return; }
+  t-=CND_PAN;
+  if(t<CND_DWELL){ CND.ph=2; CND.pt=t;
+    if(!CND.pipped){ CND.pipped=true; SND.pip(); }   // the E43 trill seat verbatim — the moment's ONE sound
+    cndFrame(CND.s1,CND.a1);
+    return; }
+  t-=CND_DWELL;
+  if(t<CND_HOME){ CND.ph=3; CND.pt=t;
+    const e=cndEase(t/CND_HOME);
+    cndFrame(CND.s1+(CND.home.s-CND.s1)*e,
+             {x:CND.a1.x+(CND.ah.x-CND.a1.x)*e, y:CND.a1.y+(CND.ah.y-CND.a1.y)*e});
+    return; }
+  cndEnd(true);                                // the last frame lands BIT-TRUE on home
+}
+function cndDwellAt(ox,oy){    // >0 only for THE goal station during the dwell — the painter's one question
+  if(!CND.on||CND.ph!==2||!CND.goalK) return 0;
+  if(key(Math.round((ox-GX)/C),Math.round((oy-GY)/C))+':0'!==CND.goalK) return 0;
+  return Math.min(1,CND.pt/CND_DWELL);
+}
+function rrOn(g,x,y,w,h,r){    // rounded rect on a FOREIGN ctx (rr() paths the world's cx)
+  g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath();
+}
+function goalSync(){           // repaint the chip off the LIVE win state (visited ⊆ stations)
+  const cv=document.getElementById('goalCv'); if(!cv||!CAMP.on) return;
+  const g=cv.getContext('2d');
+  g.setTransform(2,0,0,2,0,0); g.clearRect(0,0,74,29);
+  // the mini station: platform slab + candy canopy + the green flag — the
+  // molded-plastic palette at chip scale (wordless by law). A level with no
+  // required stop wears the glyph alone, centered (the pond's chip).
+  g.save(); g.translate(CAMP.stations.length?4:20,2);
+  g.fillStyle='#B48A54'; rrOn(g,2,16,26,7,2); g.fill();
+  g.strokeStyle='#8a683e'; g.lineWidth=1.2; rrOn(g,2,16,26,7,2); g.stroke();
+  for(let i=0;i<4;i++){ g.fillStyle=i%2?'#F7E9C4':'#C0392B'; g.fillRect(3+i*6,8,6,5); }
+  g.strokeStyle='#5A5148'; g.lineWidth=1; g.strokeRect(3,8,24,5);
+  g.strokeStyle='#EFE7D8'; g.lineWidth=1.6;
+  g.beginPath(); g.moveTo(1,16); g.lineTo(1,3); g.stroke();
+  g.fillStyle='#4E7F46'; g.beginPath(); g.moveTo(1,3); g.lineTo(8,5.5); g.lineTo(1,8); g.closePath(); g.fill();
+  g.restore();
+  // the stop-pips: one per required station, gold once pause-visited (E5's set)
+  for(let i=0;i<CAMP.stations.length;i++){
+    const x=40+i*11, y=14.5, hit=CAMP.visited.has(CAMP.stations[i]);
+    g.beginPath(); g.arc(x,y,4.2,0,7);
+    if(hit){ g.fillStyle='#F2C531'; g.fill(); g.strokeStyle='#8F6B1E'; g.lineWidth=1.2; g.stroke(); }
+    else { g.fillStyle='rgba(0,0,0,0.35)'; g.fill(); g.strokeStyle='rgba(247,233,196,0.4)'; g.lineWidth=1.2; g.stroke(); }
+  }
 }
 /* =====================================================================
    RIDE ALONG (E15) → THE SHRINK (E46): the chip DIVES now. One eased
@@ -2589,7 +2724,7 @@ function goTrain(){
   TRAIN.startSig=key(lc.cx,lc.cy)+':'+(lc.el?1:0)+':'+lc.pi+':'+lc.dir; TRAIN.goDist=0;
   TRAIN.revSinceGo=false;                  // a campaign win wants a TRUE loop, not a ping-pong
   GRAV.mul=1; GRAV.crest=false; clackAcc=0;   // E15: every run starts flat-hearted
-  if(CAMP.on) CAMP.visited=new Set();      // station visits count "since GO" (E5 win law)
+  if(CAMP.on){ CAMP.visited=new Set(); goalSync(); }   // station visits count "since GO" (E5 win law; E52: the pips honestly unfill)
   shelfSync(); return true;
 }
 
@@ -2686,7 +2821,7 @@ function update(dt){
           if(Math.abs(lc.s-mid)<step+0.6 && TRAIN.stKey!==lk){
             TRAIN.stKey=lk; TRAIN.pauseT=STATION_PAUSE; SND.ding();
             boardAt(TRAIN.cars,lk);                 // E15: riders off, waiters aboard — inside the pause
-            if(CAMP.on) CAMP.visited.add(lk);       // pause-visited, since GO (the E5 win check)
+            if(CAMP.on){ CAMP.visited.add(lk); goalSync(); }   // pause-visited, since GO (the E5 win check; E52: the pip fills NOW)
             // E9: a station stop pays 1★ in BUILD (the campaign pays per first clear
             // instead). Re-armed by the stKey cell-exit law — no parking-on-the-station farm.
             else { const sp=pos(lc); starMint(MINT.station,sp.x,sp.y-LIFT*(sp.z||0)); }
@@ -2746,7 +2881,6 @@ function update(dt){
   for(const f of flights) f.t+=dt;
   flights=flights.filter(f=>f.t<f.dur);
   if(lapCardT>0) lapCardT-=dt;
-  if(goalT>0) goalT-=dt;
   if(winT>0){ winT-=dt; if(winT<0) winT=0;
     if(!winT&&prettyPend){ prettyPend=false; prettyT=PRETTY_T; SND.ding(); } }   // E14: the compliment follows the win card out
   if(prettyT>0){ prettyT-=dt; if(prettyT<0) prettyT=0; }
@@ -6787,7 +6921,13 @@ function drawPieceDecor(pc,ox,oy){
     cx.restore(); cx.restore();
   }
   if(pc.t==='st'){
-    cx.save(); cx.translate(ox+C/2,oy+C/2); cx.rotate(pc.r*Math.PI/2);
+    cx.save(); cx.translate(ox+C/2,oy+C/2);
+    // E52: the conductor's dwell — THE goal station hops twice while the camera
+    // holds it (screen-up, before the rotate, so it reads at any r). cndK is 0
+    // everywhere but that one cell during that one phase: zero paint drift.
+    const cndK=cndDwellAt(ox,oy);
+    if(cndK) cx.translate(0,-CND_HOP*Math.abs(Math.sin(cndK*Math.PI*2)));
+    cx.rotate(pc.r*Math.PI/2);
     // platform on the south side, canopy stripes, one small green stationmaster
     cx.fillStyle='#B48A54'; rr(-42,16,84,26,4); cx.fill();
     cx.strokeStyle='#8a683e'; cx.lineWidth=2.5; rr(-42,16,84,26,4); cx.stroke();
@@ -6808,7 +6948,13 @@ function drawPieceDecor(pc,ox,oy){
     // green flag on a post at the platform's end
     cx.strokeStyle='#EFE7D8'; cx.lineWidth=3;
     cx.beginPath(); cx.moveTo(-34,16); cx.lineTo(-34,-2); cx.stroke();
+    // E52: during the dwell the flag POPS from its post — easeOutBack in the
+    // first quarter second, then it stands. Identity everywhere else.
+    if(cndK){ const fp=Math.min(1,cndK*CND_DWELL/0.25), bp=fp-1,
+                    fs=1+2.70158*bp*bp*bp+1.70158*bp*bp;
+              cx.save(); cx.translate(-34,2); cx.scale(fs,fs); cx.translate(34,-2); }
     cx.fillStyle='#4E7F46'; cx.beginPath(); cx.moveTo(-34,-2); cx.lineTo(-22,2); cx.lineTo(-34,6); cx.closePath(); cx.fill();
+    if(cndK) cx.restore();
     // E15 ALL ABOARD: the platform's ambient waiters — drawn WITH the station,
     // never in scen, never saved, never counted. Icons and ghosts land off-grid,
     // find no platform record, and stay exactly as they always looked.
@@ -9591,7 +9737,7 @@ function refSolve(n,b){
   return {ok:true,rows:S.rows.length,cap:bookCap(b)[n-1]};
 }
 let FREE=null;            // the stashed free-play world while a level is open
-let goalT=0, winT=0;      // the goal card + the LINE COMPLETE! card
+let winT=0;               // the LINE COMPLETE! card (E52: the goal card DIED — the conductor moment shows the goal instead)
 // E14: the compliment card — pend waits for LINE COMPLETE! to fade, prettyT holds the
 // card, prettyN rotates the pool. Session-only, never persisted (no save bump).
 let prettyT=0, prettyPend=false, prettyMsg='', prettyN=0;
@@ -9677,16 +9823,18 @@ function campEnter(n,b){
   // and the rig place with these; every HUMAN drop re-rolls). The kid's BUILD
   // consist sits safe in FREE, restored verbatim on exit — the roll never leaks.
   consist=surpriseRoll();
-  goalT=4.2;
   $('mark').textContent=(b==='pk'? '🎃 LEVEL ': b==='sa'? '🎅 LEVEL ':'🎫 LEVEL ')+n;   // E50: the patch wears its pumpkin · E51: the village wears its Santa
-  showScreen('game'); shelfSync(); save();
+  showScreen('game'); shelfSync();
+  cndStart(); goalSync();   // E52 THE CONDUCTOR MOMENT: the camera shows the goal — the title card died
+  save();
   if(COACH_PAN&&!coachT){ coachT=true; toast(COACH_LINE); }   // E24: the coach speaks once a session
   return true;
 }
 function campExit(dest){
   if(!CAMP.on){ showScreen(dest); return; }
   setWip(CAMP.book,(CAMP_WIP&&!CAMP.won)? serWip() : null);   // cleared on win, kept mid-build (E50: per book)
-  CAMP.on=false; CAMP.level=0; CAMP.won=false; CAMP.wx=null; goalT=0; winT=0; prettyT=0; prettyPend=false;   // E35: the sky pill override dies with the visit
+  cndKill();                                         // E52: leaving mid-moment just ends it — the next entry brings its own
+  CAMP.on=false; CAMP.level=0; CAMP.won=false; CAMP.wx=null; winT=0; prettyT=0; prettyPend=false;   // E35: the sky pill override dies with the visit
   ridersOff();                                       // E15: the level's platforms empty out
   applyDims(SIZE);                                   // E10: the BUILD rug comes back at its own size
   appWorld(FREE||{grid:[],scen:[],consist:consist,train:null}); FREE=null;
@@ -9780,7 +9928,6 @@ function drawCampCards(){
     cx.fillText(sub,W/2,y+80*u);
     cx.globalAlpha=1;
   };
-  if(goalT>0) card(goalT,4.2,'LEVEL '+CAMP.level+' — '+L.name,L.hint,'#F7E9C4');
   if(winT>0) card(winT,3.6,CAMP.level===bookL().length?'GRAND OPENING!':'LINE COMPLETE!',
                   L.name+'  '+CAMP_STAR,'#CFF7C4');
   // E14: the compliment — same gold recipe, the number always read off the dial
@@ -9882,6 +10029,10 @@ function buildBoard(){
   // E26: the CAMPAIGN button died — the wall board's painted stubs are the door now
   $('bback').addEventListener('click',()=>{ ac(); SND.click(); showScreen('menu'); });
   $('backChip').addEventListener('click',()=>{ ac(); SND.click(); campExit('board'); });
+  $('goalChip').addEventListener('click',()=>{   // E52: tap the goal = watch the conductor again
+    if(!(SCREEN==='game'&&CAMP.on)||CND.on) return;
+    ac(); SND.tok(); cndStart();
+  });
   $('nextBtn').addEventListener('click',()=>{
     ac(); SND.tok();
     if(CAMP.level<bookL().length) campEnter(CAMP.level+1,CAMP.book); else campExit('board');   // E50: NEXT stays inside the open book
@@ -10536,6 +10687,7 @@ cvs.addEventListener('pointerdown',e=>{
     return;
   }
   ac(); e.preventDefault();
+  if(CND.on){ cndEnd(true); return; }            // E52 THE SKIP: any touch lands the moment instantly — and the skip EATS the touch
   // E36: the E25 dismiss laws died with the pop-up — the TRAIN SHELF is
   // resident furniture, so a finger on the map has nothing to shut. The
   // tap-swallow law stands: this first press does its whole normal job.
@@ -10905,6 +11057,7 @@ window.addEventListener('pointercancel',e=>{     // E10: the OS took the finger 
 window.addEventListener('wheel',e=>{
   if(!camGate()||e.target!==cvs) return;
   e.preventDefault();
+  if(CND.on){ cndEnd(true); return; }            // E52: the wheel is a hand — it lands the moment and is eaten
   followSet(false);                              // E15: the wheel is a camera hand too
   zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*0.0016));
 },{passive:false});
@@ -11803,11 +11956,13 @@ function showScreen(s){
   $('tbox').style.display=(game&&!CAMP.on)?'block':'none';   // E36: the chest is BUILD's look-book door only; a level's rail carries it all
   $('rail').style.display=(game||play)?'flex':'none';    // E33: the left rail is BUILD/campaign furniture — E35: PLAY gets it too, worn short
   $('rail').classList.toggle('magiconly',play);          // E35: on the wind-up rug the rail hugs the sky pills alone
+  $('magic').style.display=(game&&CAMP.on)?'none':'';    // E52: a level owns its sky — the pills are BUILD/PLAY furniture (all three books)
   document.body.classList.toggle('playshelf',play);      // E36 THE TRAIN SHELF: five trains, always out, no door
   toastSeat();          // E36: the coach line seats above the shelf on the wind-up rug
   $('mark').style.display=(game||play)?'block':'none';
   $('menuChip').style.display=((game&&!CAMP.on)||play||s==='room')?'block':'none';   // E49: the big room shows the way home too
   $('backChip').style.display=(game&&CAMP.on)?'block':'none';
+  $('goalChip').style.display=(game&&CAMP.on)?'block':'none';   // E52: the goal chip is level furniture — wordless, beside the mark
   // E9: the ★ chip lives top-right in BUILD and PLAY (the campaign keeps its quiet HUD)
   $('starChip').style.display=((game&&!CAMP.on)||play)?'block':'none';
   boxShow(false);       // the lid closes on any screen change
@@ -12763,6 +12918,7 @@ function frame(t){
   camGlide(dt);        // E10: the flicked rug glides — presentation only, sim untouched
   followTick(dt);      // E15: ride-along chases the engine — presentation only, same law
   eagerCamTick(dt);    // E27: the arrival's one gentle ease — presentation only, any hand cancels
+  cndTick(dt);         // E52: the conductor moment — presentation only, last pen wins the frame
   if(TS.auto){
     if(SCREEN==='game') update(dt);
     else if(SCREEN==='play'){ update(dt); playUpdate(dt); }             // the shared juice + the wind-up trains
@@ -12923,6 +13079,14 @@ window.TS={
             else { WEATHER=id; save(); } }
           rugSync(); return activeWeather(); },
         state(){ return { active:activeWeather(), build:WEATHER, play:PLAY.wx, camp:CAMP.wx }; } },
+  // ---- the CONDUCTOR rig (E52) — the battery's window on the moment + the chip ----
+  cnd:{ state(){ return { on:CND.on, ph:CND.ph, t:+CND.t.toFixed(3), goalK:CND.goalK,
+          pipped:CND.pipped, home:CND.on? {...CND.home} : null }; },
+        skip(){ if(!CND.on) return false; cndEnd(true); return true; },
+        replay(){ if(!(SCREEN==='game'&&CAMP.on)) return false; cndStart(); return true; },
+        chip(){ return { shown:$('goalChip').style.display!=='none',
+          pips:CAMP.stations.length,
+          filled:CAMP.stations.filter(k=>CAMP.visited.has(k)).length }; } },
   view:{
     fit(){ viewFit(); return TS.view.get(); },
     base(){ viewBase(); return TS.view.get(); },   // E20: the big default, re-aimed on demand
