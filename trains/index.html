@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v6.5 -->
+<!-- TRAINSET v6.6 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -529,6 +529,13 @@
   .toyfly{ position:absolute; left:0; top:0; z-index:15; pointer-events:none;
     filter:drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
   .toyfly canvas{ display:block; width:64px; height:64px; }
+  /* ---- E57 THE GHOST HAND — the one teaching hand (a DOM node so the SAME
+     hand serves the canvas screens AND the DOM shop; above the shop's z12,
+     below the toy flight's 15). rAF-positioned transform, never CSS anim
+     (the compositor-clock trap); pointer-events:none — it can't steal a tap. */
+  #ghand{ position:fixed; left:0; top:0; z-index:14; pointer-events:none;
+    display:none; opacity:0; filter:drop-shadow(0 3px 5px rgba(0,0,0,0.35)); }
+  #ghand canvas{ display:block; }
   #rot{ display:none; position:absolute; inset:0; z-index:20; background:rgba(18,12,6,0.94);
     text-align:center; padding-top:34vh; font-size:19px; letter-spacing:1px; color:#F7E9C4; }
   #rot div{ font-size:52px; margin-bottom:14px; }
@@ -861,6 +868,34 @@ const BIG_DOOR={x:0,y:540,w:340,h:200};   // the way home — the LEFT wall's li
 const DOOR_PINS=3;            // mini postcards pinned on the slab (2..3 legal; worlds = PLAYMAPS[0..pins-1] — seasonal pinning is a named dial)
 const DOOR_LABEL='GO';        // the door's first-ever pill (E49 shipped it wordless — one const back to silence); GO is HINT_WORDS-legal
 const WALL_GS=1.05;           // the wall postcards' glyph scale (E44's own dial, the wall edition)
+// ---- Wyatt dials (EXPANSION 57 — one block) ----
+// THE GHOST HAND. Wyatt 8/4: "If they don't know what to do, show them. Use
+// an indicator. Drag the track on." + the art bar: "The finger we're using,
+// that's not a good finger. Use a much better finger for the dragging."
+// THE LAW: SHOW, NEVER TELL — one hand teaches the whole game with zero
+// words. FOUR lessons, once-ever each (the once-then-silent hint grammar,
+// persisted as the additive `hand` save key — v stays 11): room first-drag ·
+// campaign first gap · shop first fold · door first sight. Demos are the
+// drag VISUALS through the real pipeline at ghost alpha — ZERO writes, no
+// drop commit, no sound; any touch is the kid's turn and kills the show.
+// No lesson in PLAY (the surprise land needs no teacher) and never during
+// the conductor moment.
+const GH_IDLE=4;              // idle seconds inside a context before a lesson fires
+const GH_LOOPS=2;             // demonstrations per firing (drag lessons; the door points once)
+const GH_REST=20;             // seconds of quiet after a firing before it may return
+const GH_HAND=64, GH_HAND_SM=46;   // the hand's painted height, desk / sm (W<=820 — the --bc law)
+const GH_HAND_A=0.85;         // the hand's alpha (the piece ghost keeps the pipeline's 0.8)
+const GH_BOB=1;               // tiny idle bob while demonstrating (0 = perfectly still)
+const GH_TILT=-0.42;          // the point's lean, radians (up-left — the reading direction)
+const GH_DOOR='point';        // door lesson: 'point' at the slab postcard (brief-open named unbuilt)
+const GH_SHOP_MOVES=true;     // the aisle follows the demo swipe 1:1 (false = pantomime only)
+const HAND_KEYS=['room','gap','shop','door'];   // the four seen-bits, in save order
+let HAND={room:0,gap:0,shop:0,door:0};          // set by the KID's own verb, never the demo
+// the hint stages the hand teaches now — drawHint skips their words while the
+// STAGE MACHINE stays byte-true (hintPass still advances + saves as shipped):
+// 0 'DRAG A PIECE…' = the room lesson · 2/3 'FINISH THE TRACK' = the gap
+// lesson. Stages 1 (turn) and 4 (stop) still speak — verbs the hand doesn't do.
+const HAND_HUSH=[0,2,3];
 // THE LIVERY LAW: the chosen colour paints ONLY the red livery parts — loco roof +
 // cowcatcher, tender tub, caboose body. Wheels stay red-spoked, boiler stays dark,
 // gold door stays gold, cargo cars untouched. m = body, d = dark stroke, s = cupola shade.
@@ -1012,7 +1047,8 @@ let PIG_SHOW=true;             // rig door — the byte-proof battery hides the 
 // entry zoom a frame often holds ZERO empty cells, so E10's empty-cell-only
 // pan had nowhere to begin. THE LAW: a move that starts on GLUED becomes a
 // pan; a tap on GLUED keeps the tug (grabLand, in moveCore's glued branches).
-const COACH_PAN=true;          // the once-a-session coach toast, IN by default
+const COACH_PAN=false;         // E57: the toast retired from the kid paths — THE GHOST HAND teaches
+                               // by showing now (machinery + string stay as the dial; true restores it)
 const COACH_LINE='SLIDE THE RUG TO LOOK AROUND';   // kid words only — every word rides the E8 allowlist
 let coachT=false;              // once per SESSION, first campaign or PLAY entry — a let, never saved (like surpT)
 // ---- Wyatt dials (EXPANSION 25 — one block) ----
@@ -2770,6 +2806,7 @@ function goTrain(){
 
 // ---- update ----
 function update(dt){
+  ghTick(dt);   // E57: the ghost hand's clock (game + the shop overlay above it; PLAY = no lesson)
   for(const pc of grid.values()){
     if(pc.ra){ pc.ra.k-=dt*8; if(pc.ra.k<=0) pc.ra=null; }
     if(pc.pop>0) pc.pop=Math.max(0,pc.pop-dt*5);
@@ -7573,6 +7610,8 @@ const uiCard=h0=>Math.max(1,Math.min(UIS,(H-BAR-24)/h0));
 function drawHint(){
   if(PLAY.on) return;               // zero reading on the wind-up rug (E6)
   if(hintStage>=HINTS.length) return;
+  if(HAND_HUSH.includes(hintStage)) return;   // E57: the hand SHOWS these lessons now — the words
+                                              // retire, the stage machine advances byte-true beneath
   const u=Math.max(1,UIS);
   cx.globalAlpha=0.7+0.3*Math.sin(perf()*4);
   cx.font='bold '+(20*u)+'px "Arial Black",Impact,sans-serif'; cx.textAlign='center'; cx.fillStyle='#F7E9C4';
@@ -7655,6 +7694,7 @@ function draw(){
   drawWeather();    // E10: weather drifts over everything — but never over the ghost
   klGhost();        // E34: the continue-zone whisper — under the live drag ghost
   drawGhosts();
+  ghPaintWorld();   // E57: the ghost hand's demo — piece + dashed path, the drag pipeline's own painters
   cx.setTransform(DPR,0,0,DPR,0,0);
   drawPortalWipe(); // E48: the steam curtain crosses the SCREEN — the world flips beneath it
   for(const p of confetti){ cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot);
@@ -8036,7 +8076,7 @@ const ROOM_OBJS=[
   // room's entry retired — rig-only for one release). Footprint enters
   // BED.blk below like every object's (tap-opens ⇒ drop-refuses, piggy law).
   { id:'door', hit:{x:966,y:556,w:329,h:230}, px:1090, py:764, label:()=>DOOR_LABEL,
-    tap(){ SND.tok(); showScreen('wall'); } },
+    tap(){ SND.tok(); handSet('door'); showScreen('wall'); } },   // E57: opening the door IS the lesson learned (once-ever write; rig entries never come here)
 ];
 function objHit(e){
   const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // pigHit's own inverse
@@ -9129,6 +9169,8 @@ function buildAttract(){
   } finally { RGRID=grid; HGRID=hgrid; }
 }
 function menuUpdate(dt){
+  ghTick(dt);                          // E57: the ghost hand's clock — OUTSIDE the wrapper (the pend
+                                       // write lands on the game key, the pigTap precedent)
   if(SCREEN==='menu') bedHandSync();   // E54: the docks fold while a hand is live (DOM only — proofs are blind to it)
   inBed(()=>{                          // E18: the world globals ARE the bedroom's in here
     const step=ATT_SPEED*dt;
@@ -9213,6 +9255,7 @@ function drawMenu(){
         cx.beginPath(); cx.arc(e2.x,e2.y,e2.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; } }
     if(BED.scen.size) inBed(()=>{ drawArches(); drawBalloons(); });     // E37: fliers fly late (the game's layering law)
     if(DRAG&&BED.on) inBed(drawGhosts);                                 // E18: the SAME ghost pipeline, swapped in
+    ghPaintBed();                                                       // E57: the room lesson's demo — same seat, same painters
   } finally { RGRID=grid; HGRID=hgrid; }
   cx.restore();
   drawRoomDog();   // E26: the gag trots in FRONT of the furniture, under the labels
@@ -9549,6 +9592,8 @@ function save(){
       name:NAME? {w1:NAME.w1,w2:NAME.w2,s:NAME.s} : null,   // v:9 — THE NAME PLATE (E15); the ONLY thing E15 persists
       size:SIZE, land:LAND, weather:WEATHER,   // v:8 — BIG COUNTRY (E10); VIEW is NOT saved — every boot opens fitted
       stars:stars, equip:{...equip},   // v:7 — THE STAR BANK + the equipped sound packs (E9)
+      hand:{...HAND},   // E57 THE GHOST HAND — the four seen-bits (ADDITIVE key, v stays 11;
+                        // set only by the KID's own verb, never by a demo)
       e8:1,   // E8 arrived: the ten levels are new land, so any wip saved before this is void (once)
       camp:{ done:[...CAMP.done], all:CAMP.all?1:0,
              wip: (CAMP.on&&CAMP.book==='ten')? (CAMP_WIP&&!CAMP.won? serWip():null) : (CAMP_WIP? CAMP.wip:null) },
@@ -9623,6 +9668,11 @@ function load(){
       if(k2==='trail'){ if(TRAIL_IDS.includes(id)) equip.trail=id; continue; }
       if(id&&PACKS[id]&&sndSlot(id)===k2) equip[k2]=id;
     }
+    // E57 THE GHOST HAND — the additive `hand` key, validated against ITS OWN
+    // four names (the E28/STORE_BY law re-audited: junk can never poison it,
+    // an absent key = a fresh kid, and a set bit SURVIVES reload — both ways).
+    HAND={room:0,gap:0,shop:0,door:0};
+    if(d.hand&&typeof d.hand==='object') for(const k2 of HAND_KEYS) HAND[k2]=d.hand[k2]?1:0;
     // v:11 — THE PIGGY BEDROOM (E23). A v≤10 save meets the piggy FRESH:
     // {claimed:'',streak:0}, zero stars minted retroactively, bank untouched —
     // she starts paying tomorrow's tap, not yesterday's history.
@@ -11176,6 +11226,7 @@ function upCore(e){
       if(hover && canPlaceScen(DRAG.t,hover[0],hover[1])){
         scen.set(key(hover[0],hover[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:1,wave:0});
         SND.tok(); puff(GX+hover[0]*C+C/2,GY+hover[1]*C+C/2,14);
+        if(DRAG.kind==='newScen'){ if(BED.ctx) GHOST.pend='room'; else handMark('room'); }   // E57: a fresh scen drop proves the drag too (rides this save)
         save();
         if(DRAG.kind==='newScen'&&!BED.ctx) handyBump(DRAG.t);   // E55: a fresh placement bubbles onto the face (moves never do — E27)
       } else if(hover){
@@ -11193,6 +11244,7 @@ function upCore(e){
       }
       if(placedOk){
         SND.clank(); hintPass(2); hintPass(3);
+        if(BED.ctx) GHOST.pend='room'; else handMark('room');   // E57: a landed train drop is a mastered drag (the goTrain path saves)
         // E21: the first unboxing of the session gets a word (kid words only — the E8 law)
         if(CAMP.on&&!surpT){ surpT=true; toast(SURPRISE_POOL[Math.floor(Math.random()*SURPRISE_POOL.length)]); }
         if(DRAG.wasRunning) goTrain();
@@ -11940,6 +11992,10 @@ function layAt(t,r,sel,cx2,cy2,q){
   const pc=setTrackPiece(t,r,sel,q.elev,cx2,cy2); pc.pop=1;
   SND.tok(); puff(GX+cx2*C+C/2,GY+cy2*C+C/2,14);
   hintPass(0); if(grid.size>=3) hintPass(1);
+  // E57: the kid's own lay IS the lesson's proof — the bit rides this very
+  // save (zero extra writes). The bedroom defers through the wrapper line.
+  if(BED.ctx) GHOST.pend='room';
+  else { handMark('room'); if(CAMP.on) handMark('gap'); }
   save();
   if(!BED.ctx) EAGER.last={x:cx2,y:cy2,el:q.elev?1:0};   // E27: the hand's newest piece — the arrival's fallback anchor
   if(!BED.ctx) handyBump(t);                             // E55: the hand-lay bubbles onto the face (drops + E34 chain taps — rig places never come here)
@@ -12273,6 +12329,7 @@ function showScreen(s){
   bedScreen(s);                                       // E18: the bedroom set lives on menu+board, dies at the game's door
   followSet(false);                                   // E15: a screen change lets the camera go
   klClear();                                          // E34: chains never survive a room change
+  ghKill();                                           // E57: a room change ends the show (the idle clock re-arms fresh)
   SCREEN=s;
   const game=s==='game', play=s==='play';
   document.body.classList.toggle('rugmode',game||play);   // E26: the sideways prompt is the rug modes' only (the room is portrait-proof)
@@ -13128,6 +13185,7 @@ function buildStore(){
   // AJUMP lane as a plaque tap, so the hand cancels it mid-flight like any glide
   $('stmore').addEventListener('click',()=>{
     ac(); SND.click();
+    handSet('shop');   // E57: paging the aisle IS the lesson learned (the demo never dispatches clicks)
     const ai=$('staisle'), to=Math.min(ai.scrollWidth-ai.clientWidth, ai.scrollLeft+ai.clientWidth*0.7);
     AJUMP={k:null,page:1,from:ai.scrollLeft,to,t0:performance.now(),dur:Math.min(0.9,TAB_GLIDE+Math.abs(to-ai.scrollLeft)/4000)};
     requestAnimationFrame(aisleGlide);
@@ -13143,7 +13201,7 @@ function buildStore(){
   for(const [k2,label] of STORE_TABS){
     const b=document.createElement('button'); b.type='button'; b.className='shtab'; b.dataset.k=k2;
     b.textContent=label;
-    b.addEventListener('click',()=>{ ac(); SND.click(); aisleJump(k2,true); });
+    b.addEventListener('click',()=>{ ac(); SND.click(); handSet('shop'); aisleJump(k2,true); });   // E57: a plaque jump proves the aisle moves
     tb.appendChild(b);
   }
   const ai=$('staisle');
@@ -13151,7 +13209,8 @@ function buildStore(){
   // the hand always wins: any hand on the aisle kills a live glide, and the light
   // goes straight back to being a view of where the aisle actually stands
   const handWins=()=>{ if(AJUMP){ AJUMP=null; aisleMark(stTabAt()); } };
-  ai.addEventListener('wheel',handWins,{passive:true});
+  ai.addEventListener('wheel',()=>{ handWins(); handSet('shop'); },{passive:true});   // E57: a wheel on the aisle = the kid scrolling
+
   ai.addEventListener('pointerdown',e=>{
     handWins();                        // E22: a touch mid-glide cancels the jump
     AISLE_DRAG={down:true,moved:0,x:e.clientX,y:e.clientY,sl:ai.scrollLeft,vx:0,
@@ -13160,6 +13219,7 @@ function buildStore(){
   ai.addEventListener('pointermove',e=>{
     const d2=AISLE_DRAG; if(!d2.down) return;
     d2.moved=Math.max(d2.moved,Math.hypot(e.clientX-d2.x,e.clientY-d2.y));
+    if(d2.moved>8) handSet('shop');   // E57: a real swipe on the shelf (mouse OR touch) = the lesson learned
     if(d2.mouse&&d2.moved>8){          // a mouse drags the shelf by hand; touch pans natively
       if(d2.id!=null){ try{ ai.setPointerCapture(d2.id); }catch(err){} d2.id=null; }
       ai.scrollLeft=d2.sl-(e.clientX-d2.x);
@@ -13251,7 +13311,307 @@ function toastSeat(){
   tt.style.bottom='calc('+(lift*UIS)+'px + env(safe-area-inset-bottom))';
 }
 window.addEventListener('resize',resize);
-load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildWall(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
+/* =====================================================================
+   E57 THE GHOST HAND (FM-TS-60) — SHOW, NEVER TELL. One well-drawn
+   cartoon glove teaches the whole game with zero words: idle ~GH_IDLE
+   seconds inside a context and the hand DOES the real thing — the drag
+   visuals through the real pipeline (drawPieceArt + the green ok tint +
+   a dashed path) at ghost alpha, ZERO state mutation: no drop commit,
+   no save, no sound. Four lessons, once-ever each, persisted as the
+   additive `hand` save key; the KID's own verb sets a bit and that
+   lesson never returns. Loops ×GH_LOOPS then rests GH_REST. Any touch
+   is the kid's turn: the show dies instantly. Never in PLAY, never
+   during the conductor moment, never over a ceremony.
+   THE HAND IS A CHARACTER: one painter, one DOM node (#ghand, z14 — the
+   same hand over canvas screens and the DOM shop), two sizes desk/sm,
+   dark outline so it reads on every land. GLOVE, not skin — species-
+   free, it matches the toy world (a kid-skin variant is the named
+   alternative: swap the two fills).
+   ===================================================================== */
+const GHOST={on:false,les:null,ph:'',t:0,loop:0,idle:0,rest:0,ctx:null,pend:null,
+          sx:0,sy:0,dx:0,dy:0,          // screen-space src/dst (shop + door)
+          wsx:0,wsy:0,wdx:0,wdy:0,      // world-space src/dst (room + gap)
+          wcx:0,wcy:0,                  // the path's bow control — the way arcs into open
+                                        // rug so the dashes never hide along glued track
+          wx:0,wy:0,px:0,py:0,          // the live demo point, world + screen
+          cell:null,kind:null,rot:0,dash:0,a:0,pa:0,press:0,sl0:0,
+          ptr:new Set()};               // live pointers — the mid-touch freeze
+// the phase clocks (seconds) — the drag lessons walk IN→PRESS→DRAG→SETTLE→OUT
+// (×GH_LOOPS with a HOLD between); the door lesson walks IN→POINT→OUT once.
+const GH_PH={in:0.35,press:0.22,drag:1.30,settle:0.45,out:0.30,hold:0.65,point:1.30};
+function handMark(k){                   // the hintPass grammar: guarded, once — the
+  if(HAND[k]) return false;             // caller's own save carries the bit
+  HAND[k]=1; if(GHOST.on&&GHOST.les===k) ghKill();
+  return true;
+}
+function handSet(k){ if(handMark(k)) save(); }   // standalone sites write ONCE, ever
+// ---- the teaching contexts (null = the hand has no lesson here) ----
+function ghOverlayUp(){
+  return $('bank').style.display==='flex'||$('namer').style.display==='flex'||
+         $('toybox').style.display==='flex';
+}
+function ghGapOpen(){
+  const L=bookL()[CAMP.level-1]; if(!L||!L.gaps) return false;
+  return L.gaps.some(g=>!pieceAt(g[0],g[1]));
+}
+function ghCtx(){
+  if($('store').style.display==='flex') return HAND.shop? null:'shop';
+  if(ghOverlayUp()) return null;
+  if(SCREEN==='menu'){
+    if(!HAND.room) return 'room';
+    if(!HAND.door) return 'door';
+    return null;
+  }
+  if(SCREEN==='game'&&CAMP.on){
+    if(HAND.gap||CND.on||CAMP.won||winT>0||toyCard||toyQ.length) return null;
+    return ghGapOpen()? 'gap':null;
+  }
+  return null;   // BUILD, PLAY, wall, board, big room: no lesson lives there
+}
+const ghBusy=()=>GHOST.ptr.size>0||!!down||!!DRAG;
+function ghTouch(){ GHOST.idle=0; if(GHOST.on) ghKill(); }   // any press = the kid's turn
+function ghKill(){
+  if(!GHOST.on&&!ghEl) return;
+  GHOST.on=false; GHOST.ph=''; GHOST.les=null; GHOST.press=0;
+  if(ghEl){ ghEl.style.display='none'; ghEl.style.opacity=0; }
+}
+// ---- the clock (rides update()/menuUpdate() — TS.auto-stepped, frozen-plate blind) ----
+function ghTick(dt){
+  if(GHOST.pend&&!BED.ctx){ const k=GHOST.pend; GHOST.pend=null; handSet(k); }   // the bedroom's deferred
+                                                                        // write — the wrapper law
+  if(GHOST.rest>0) GHOST.rest=Math.max(0,GHOST.rest-dt);
+  const c=ghCtx();
+  if(GHOST.on){
+    if(c!==GHOST.les){ ghKill(); GHOST.ctx=c; GHOST.idle=0; return; }
+    ghRun(dt); return;
+  }
+  if(c!==GHOST.ctx){ GHOST.ctx=c; GHOST.idle=0; return; }   // fresh context = fresh clock
+  if(!c||ghBusy()){ GHOST.idle=0; return; }
+  GHOST.idle+=dt;
+  if(GHOST.idle>=GH_IDLE&&GHOST.rest<=0){ if(!ghStart(c)) GHOST.idle=0; }   // a refused start retries next window
+}
+// ---- coordinate seams (CSS px; the camera stamps SC/OX/OY per screen) ----
+const ghGameS=(wx,wy)=>({x:OX+SC*wx, y:OY+SC*wy});
+const ghBedS =(wx,wy)=>({x:OX+SC*(ATT.ox+ATT_SCALE*(wx-GX)), y:OY+SC*(ATT.oy+ATT_SCALE*(wy-GY))});
+const ghMenuS=(mx,my)=>({x:OX+SC*mx, y:OY+SC*my});
+// ---- the lesson set-up: sources and destinations, all through THE predicate ----
+function ghStart(les){
+  if(les==='room'){
+    // the spill straight → a truly placeable floor cell (never an illegal-looking drop)
+    const sp=SPILL.find(i2=>i2.t==='s'); if(!sp) return false;
+    // the truly-open floor near the spill (the crowded-floor law: broom, box,
+    // board and the button rows block everything at gy>=5 — the predicate is
+    // the picker, these are just the walk order, nearest first)
+    let cell=null;
+    inBed(()=>{ for(const cd of [[1,3],[2,3],[4,3],[4,4],[5,3],[5,4],[6,3],[6,4]]){
+      if(placeQuery('s',0,cd[0],cd[1]).ok){ cell=cd; break; } } });
+    if(!cell) return false;
+    GHOST.wsx=sp.x; GHOST.wsy=sp.y;
+    GHOST.wdx=GX+cell[0]*C+C/2; GHOST.wdy=GY+cell[1]*C+C/2;
+    GHOST.cell=cell; GHOST.kind='s'; GHOST.rot=0;
+  } else if(les==='gap'){
+    const L=bookL()[CAMP.level-1]; if(!L||!L.gaps) return false;
+    const g=L.gaps.find(g2=>!pieceAt(g2[0],g2[1])); if(!g) return false;
+    // the crate's own straight tile is the source — honest art in the hand
+    const ft=FACE_TILES.find(f2=>f2.t==='s'&&f2.el.style.display!=='none'); if(!ft) return false;
+    const r2=ft.el.getBoundingClientRect(); if(!r2.width) return false;
+    GHOST.wsx=(r2.left+r2.width/2-OX)/SC; GHOST.wsy=(r2.top+r2.height/2-OY)/SC;
+    GHOST.wdx=GX+g[0]*C+C/2; GHOST.wdy=GY+g[1]*C+C/2;
+    // the rotation the RUN asks for: E/W neighbours = the lying straight, else standing
+    const ew=pieceAt(g[0]-1,g[1])||pieceAt(g[0]+1,g[1]);
+    GHOST.rot=0;
+    for(const rr2 of [0,1,2,3]){ const P=PATHS['s'][rr2]&&PATHS['s'][rr2][0];
+      if(P&&((ew&&((P.ports[0]===1&&P.ports[1]===3)||(P.ports[0]===3&&P.ports[1]===1)))||
+             (!ew&&((P.ports[0]===0&&P.ports[1]===2)||(P.ports[0]===2&&P.ports[1]===0))))){ GHOST.rot=rr2; break; } }
+    GHOST.cell=[g[0],g[1]]; GHOST.kind='s';
+  } else if(les==='shop'){
+    const ai=$('staisle'); if(!ai) return false;
+    if(ai.scrollLeft>=ai.scrollWidth-ai.clientWidth-20) return false;   // at the end = nothing to reveal
+    const r2=ai.getBoundingClientRect(); if(!r2.width) return false;
+    GHOST.sx=r2.right-r2.width*0.16; GHOST.sy=r2.top+r2.height*0.52;
+    GHOST.dx=r2.left+r2.width*0.30;  GHOST.dy=GHOST.sy;
+    GHOST.cell=null; GHOST.kind=null;
+  } else if(les==='door'){
+    GHOST.cell=null; GHOST.kind=null;   // menu coords resolve per-frame (resize-proof)
+  } else return false;
+  if(les==='room'||les==='gap'){
+    // THE BOW — the way arcs toward open board so the dashes never lie along
+    // glued track (cream on the glued swath disappears — plate-caught)
+    const mx2=(GHOST.wsx+GHOST.wdx)/2, my2=(GHOST.wsy+GHOST.wdy)/2;
+    const ddx=GHOST.wdx-GHOST.wsx, ddy=GHOST.wdy-GHOST.wsy, L2=Math.hypot(ddx,ddy)||1;
+    let nx2=-ddy/L2, ny2=ddx/L2;
+    const bcx=GX+GW*C/2, bcy=GY+GH*C/2;   // the board's middle (the bedroom's rug middle too)
+    if(nx2*(bcx-mx2)+ny2*(bcy-my2)<0){ nx2=-nx2; ny2=-ny2; }
+    const bw=Math.min(85,L2*0.3);
+    GHOST.wcx=mx2+nx2*bw; GHOST.wcy=my2+ny2*bw;
+  }
+  GHOST.on=true; GHOST.les=les; GHOST.ph='in'; GHOST.t=0; GHOST.loop=0;
+  GHOST.dash=0; GHOST.a=0; GHOST.pa=0; GHOST.press=0;
+  if(ghEl){ ghPaintHand(); ghEl.style.display='block'; }
+  return true;
+}
+// ---- the show itself (paint-clock only: zero writes, zero sound, zero random) ----
+const ghEase=k=>k*k*(3-2*k);
+function ghRun(dt){
+  GHOST.t+=dt; GHOST.dash+=dt*30;
+  const door=GHOST.les==='door', shop=GHOST.les==='shop';
+  const seq=door? ['in','point','out'] : ['in','press','drag','settle','out','hold'];
+  let dur=GH_PH[GHOST.ph]||0.3;
+  if(GHOST.t>=dur){
+    GHOST.t=0;
+    const i2=seq.indexOf(GHOST.ph);
+    if(GHOST.ph==='out'){
+      GHOST.loop++;
+      if(door||GHOST.loop>=GH_LOOPS){ ghKill(); GHOST.rest=GH_REST; GHOST.idle=0; return; }
+      GHOST.ph='hold';
+    }
+    else if(GHOST.ph==='hold') GHOST.ph='in';
+    else GHOST.ph=seq[i2+1]||'out';
+    if(GHOST.ph==='press'&&shop){ const ai=$('staisle'); GHOST.sl0=ai? ai.scrollLeft:0; }
+  }
+  const k=Math.min(1,GHOST.t/dur), e2=ghEase(k);
+  // where the finger is, per phase
+  let sx,sy,dx,dy;
+  if(door){ const s2=ghMenuS(1150,706), d2=ghMenuS(1254,592); sx=s2.x; sy=s2.y; dx=d2.x; dy=d2.y; }
+  else if(shop){ sx=GHOST.sx; sy=GHOST.sy; dx=GHOST.dx; dy=GHOST.dy; }
+  else { const f2=GHOST.les==='room'? ghBedS:ghGameS, s2=f2(GHOST.wsx,GHOST.wsy), d2=f2(GHOST.wdx,GHOST.wdy);
+         sx=s2.x; sy=s2.y; dx=d2.x; dy=d2.y; }
+  let x=sx, y=sy, press=0;
+  if(GHOST.ph==='in'){ x=sx+28*(1-e2); y=sy+34*(1-e2); GHOST.a=e2*GH_HAND_A; GHOST.pa=0; }
+  else if(GHOST.ph==='press'){ GHOST.a=GH_HAND_A; press=e2; GHOST.pa=e2; }
+  else if(GHOST.ph==='drag'){ press=1; GHOST.pa=1;
+    if(door||shop){
+      x=sx+(dx-sx)*e2; y=sy+(dy-sy)*e2;
+      if(shop&&GH_SHOP_MOVES){ const ai=$('staisle'); if(ai) ai.scrollLeft=GHOST.sl0+(sx-x); }
+    } else {   // room + gap ride the bowed world path (piece, dashes and hand agree)
+      const u2=1-e2,
+        wqx=u2*u2*GHOST.wsx+2*u2*e2*GHOST.wcx+e2*e2*GHOST.wdx,
+        wqy=u2*u2*GHOST.wsy+2*u2*e2*GHOST.wcy+e2*e2*GHOST.wdy;
+      const f3=GHOST.les==='room'? ghBedS:ghGameS, q3=f3(wqx,wqy);
+      x=q3.x; y=q3.y;
+    }
+  }
+  else if(GHOST.ph==='settle'){ x=dx; y=dy; press=1-e2; GHOST.pa=1-e2; GHOST.a=GH_HAND_A; }
+  else if(GHOST.ph==='out'){ x=dx; y=dy-8*e2; GHOST.a=GH_HAND_A*(1-e2); GHOST.pa=0; }
+  else if(GHOST.ph==='hold'){ GHOST.a=0; GHOST.pa=0; }
+  else if(GHOST.ph==='point'){ const b2=Math.abs(Math.sin(k*Math.PI*2));   // two gentle press-bobs
+    x=dx-6*b2; y=dy+4-6*b2; press=b2; GHOST.a=GH_HAND_A; GHOST.pa=0; }
+  GHOST.press=press;
+  // the world point the canvas demo paints at (room + gap; the door holds no piece)
+  if(!door&&!shop){
+    if(GHOST.les==='room'){ GHOST.wx=GX+((x-OX)/SC-ATT.ox)/ATT_SCALE; GHOST.wy=GY+((y-OY)/SC-ATT.oy)/ATT_SCALE; }
+    else { GHOST.wx=(x-OX)/SC; GHOST.wy=(y-OY)/SC; }
+  }
+  // the hand itself — GH_BOB is the character breathing, tiny
+  const bob=GH_BOB&&(GHOST.ph==='drag'||GHOST.ph==='press'||GHOST.ph==='point')? Math.sin(GHOST.dash/30*3.2)*ghHandPx()*0.03 : 0;
+  if(ghEl){
+    const tip=ghTip();
+    ghEl.style.opacity=GHOST.a.toFixed(3);
+    ghEl.style.transformOrigin=`${tip.x}px ${tip.y}px`;
+    const sq=1-0.05*press;
+    ghEl.style.transform=`translate(${(x-tip.x).toFixed(1)}px,${(y+bob-tip.y).toFixed(1)}px) scale(${(1-0.03*press).toFixed(3)},${sq.toFixed(3)})`;
+  }
+}
+// ---- the canvas half of the demo: dashed path + the pipeline's own ghost ----
+function ghDemoPaint(){
+  cx.save();
+  // the dashed way — a gentle bow, marching toward the destination; a dark
+  // under-stroke carries the cream on pale grounds (the hand's outline law)
+  const pf=GHOST.a/GH_HAND_A||0;
+  cx.setLineDash([11,11]); cx.lineDashOffset=-GHOST.dash; cx.lineCap='round';
+  cx.globalAlpha=0.22*pf; cx.strokeStyle='#26333F'; cx.lineWidth=7;
+  cx.beginPath(); cx.moveTo(GHOST.wsx,GHOST.wsy);
+  cx.quadraticCurveTo(GHOST.wcx,GHOST.wcy,GHOST.wdx,GHOST.wdy); cx.stroke();
+  cx.globalAlpha=0.55*pf; cx.strokeStyle='#F7E9C4'; cx.lineWidth=4;
+  cx.beginPath(); cx.moveTo(GHOST.wsx,GHOST.wsy);
+  cx.quadraticCurveTo(GHOST.wcx,GHOST.wcy,GHOST.wdx,GHOST.wdy); cx.stroke();
+  cx.setLineDash([]); cx.lineCap='butt';
+  // the green ok tint — the drag pipeline's own tell, on the destination cell
+  if(GHOST.cell&&GHOST.pa>0){
+    cx.globalAlpha=0.28*GHOST.pa; cx.fillStyle='#7CFC66';
+    rr(GX+GHOST.cell[0]*C+3,GY+GHOST.cell[1]*C+3,C-6,C-6,10); cx.fill();
+  }
+  // the held piece — drawPieceArt at the ghost's own 0.8, riding the finger
+  if(GHOST.kind&&GHOST.pa>0){
+    const mock={t:GHOST.kind,r:GHOST.rot,sel:0,elev:0,latch:null};
+    cx.globalAlpha=0.8*GHOST.pa;
+    cx.save(); cx.translate(GHOST.wx-C/2,GHOST.wy-C/2); drawPieceArt(mock,0,0); cx.restore();
+  }
+  cx.restore(); cx.globalAlpha=1;
+}
+function ghPaintWorld(){ if(GHOST.on&&GHOST.les==='gap') ghDemoPaint(); }   // draw()'s world pass
+function ghPaintBed(){ if(GHOST.on&&GHOST.les==='room') ghDemoPaint(); }    // drawMenu's attract pass
+// ---- THE HAND — the character's one painter. Tip at the origin, hanging
+// down-right at GH_TILT. Unit height ~118; k scales. Long index finger,
+// rounded tip, three scalloped knuckles up the left edge, a real thumb
+// line, small cuff; dark outline carries it on snow, cloud, ice, crimson.
+function drawHandArt(k){
+  cx.save(); cx.rotate(GH_TILT); cx.scale(k,k);
+  cx.lineJoin='round'; cx.lineCap='round';
+  cx.fillStyle='#F1EEE2'; cx.strokeStyle='#26333F'; cx.lineWidth=6;
+  rr(-15,100,54,19,8); cx.fill(); cx.stroke();                 // the cuff first — the wrist crosses it
+  cx.strokeStyle='rgba(38,51,63,0.35)'; cx.lineWidth=3;
+  cx.beginPath(); cx.moveTo(-11,106); cx.lineTo(35,106); cx.stroke();
+  cx.fillStyle='#FFFDF4'; cx.strokeStyle='#26333F'; cx.lineWidth=7;
+  cx.beginPath();
+  cx.moveTo(-8.5,42);
+  cx.lineTo(-8.5,8);
+  cx.arc(0,8,8.5,Math.PI,0);         // the rounded tip
+  cx.lineTo(8.5,46);                  // the long finger's right edge
+  cx.quadraticCurveTo(13,47,22,50);   // into the palm
+  cx.quadraticCurveTo(45,54,46,70);   // thumb-side out
+  cx.quadraticCurveTo(46,85,33,91);   // …and curling back
+  cx.quadraticCurveTo(29,100,15,101); // the heel
+  cx.lineTo(0,101);
+  cx.quadraticCurveTo(-10,101,-12,94);   // wrist corner
+  cx.quadraticCurveTo(-28,93,-26,81);    // knuckle three bulges…
+  cx.quadraticCurveTo(-25,77,-19,76);    //   …valley
+  cx.quadraticCurveTo(-31,73,-28,62);    // knuckle two
+  cx.quadraticCurveTo(-27,58,-18,58);    //   valley
+  cx.quadraticCurveTo(-30,54,-25,46);    // knuckle one
+  cx.quadraticCurveTo(-21,42,-13,44);    //   over the top
+  cx.quadraticCurveTo(-10,44,-8.5,42);   // the shelf back to the finger
+  cx.closePath(); cx.fill(); cx.stroke();
+  cx.strokeStyle='#26333F'; cx.lineWidth=5;                    // THE THUMB — a real line
+  cx.beginPath(); cx.moveTo(21,53); cx.quadraticCurveTo(37,58,39,71);
+  cx.quadraticCurveTo(40,82,31,88); cx.stroke();
+  cx.strokeStyle='rgba(88,101,128,0.6)'; cx.lineWidth=3.2;     // one quiet fold per knuckle
+  cx.beginPath(); cx.moveTo(-17,52); cx.quadraticCurveTo(-11,51,-7,53); cx.stroke();
+  cx.beginPath(); cx.moveTo(-18,66); cx.quadraticCurveTo(-12,64,-8,66); cx.stroke();
+  cx.beginPath(); cx.moveTo(-16,83); cx.quadraticCurveTo(-10,81,-6,83); cx.stroke();
+  cx.restore();
+}
+// ---- the DOM node: one hand forever, painted once per size ----
+let ghEl=null, ghCv=null, ghSize=0;
+const ghHandPx=()=>W<=820? GH_HAND_SM : GH_HAND;
+function ghTip(){ const k=ghHandPx()/118; return {x:30*k, y:23*k}; }
+function ghPaintHand(){
+  if(!ghCv) return;
+  const px=ghHandPx(); if(px===ghSize) return;
+  ghSize=px; const k=px/118;
+  const w=Math.ceil(128*k), h=Math.ceil(150*k);
+  ghCv.width=w*DPR; ghCv.height=h*DPR;
+  ghCv.style.width=w+'px'; ghCv.style.height=h+'px';
+  const g=ghCv.getContext('2d');
+  g.setTransform(DPR,0,0,DPR,0,0); g.clearRect(0,0,w,h);
+  g.translate(30*k,23*k);
+  withCtx(g,()=>drawHandArt(k));
+}
+function ghBuild(){
+  ghEl=document.createElement('div'); ghEl.id='ghand';
+  ghCv=document.createElement('canvas'); ghEl.appendChild(ghCv);
+  document.body.appendChild(ghEl);
+  ghPaintHand();
+  // any press is the kid's turn; a wheel is a camera hand — both end the show
+  window.addEventListener('pointerdown',e=>{ GHOST.ptr.add(e.pointerId); ghTouch(); },{capture:true,passive:true});
+  window.addEventListener('pointerup',e=>{ GHOST.ptr.delete(e.pointerId); },{capture:true,passive:true});
+  window.addEventListener('pointercancel',e=>{ GHOST.ptr.delete(e.pointerId); },{capture:true,passive:true});
+  window.addEventListener('wheel',ghTouch,{capture:true,passive:true});
+  window.addEventListener('resize',()=>{ ghKill(); ghSize=0; ghPaintHand(); });
+}
+
+
+load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildWall(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract(); ghBuild();
 showScreen('menu'); shelfSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
@@ -13416,6 +13776,32 @@ window.TS={
       books:WALL.books.map(([b])=>({ b, open:wallBookOpen(b), total:bookL(b).length,
         done:[...bookDone(b)].length })),
       cards:WALL.cards.map(([i])=>({ i, land:(PLAYMAPS[i]||{}).land, name:(PLAYMAPS[i]||{}).name })) }; },
+  },
+  // E57 — the ghost hand rig: the bits + the show, readable and forceable.
+  // fire(k) walks the REAL start (context law intact — a wrong room refuses);
+  // set(k) is the kid-success door; clear() re-arms lessons for tests;
+  // idle(v) pre-loads the clock; plate(x,y) shows the hand paint-only for
+  // the art plates (false hides it). Demos stay zero-write either way.
+  hand:{
+    state(){ return { bits:{...HAND}, on:GHOST.on, les:GHOST.les, ph:GHOST.ph,
+      idle:+GHOST.idle.toFixed(2), rest:+GHOST.rest.toFixed(2), pend:GHOST.pend,
+      ctx:ghCtx(), size:ghHandPx() }; },
+    fire(k){ GHOST.rest=0; GHOST.idle=GH_IDLE;
+      const c=ghCtx(); if(!c||(k&&c!==k)) return false;
+      return ghStart(c)? GHOST.les : false; },
+    kill(){ ghKill(); return true; },
+    set(k){ if(HAND_KEYS.includes(k)) handSet(k); return {...HAND}; },
+    clear(k){ if(k){ if(HAND_KEYS.includes(k)) HAND[k]=0; }
+      else HAND={room:0,gap:0,shop:0,door:0};
+      save(); return {...HAND}; },
+    idle(v){ GHOST.ctx=ghCtx(); GHOST.idle=+v||0; return GHOST.idle; },   // the stamp keeps a pre-load alive past the fresh-context reset
+    plate(x,y){ if(x===false){ ghKill(); return true; }
+      if(!ghEl) return false;
+      ghPaintHand(); const tip=ghTip();
+      ghEl.style.display='block'; ghEl.style.opacity=GH_HAND_A;
+      ghEl.style.transformOrigin=`${tip.x}px ${tip.y}px`;
+      ghEl.style.transform=`translate(${(+x-tip.x).toFixed(1)}px,${(+y-tip.y).toFixed(1)}px)`;
+      return true; },
   },
   // E23 — THE predicate, asked from inside the bedroom wrapper (what the ghost
   // tint and the drop see on the menu floor). Battery doors, mutation-free.
