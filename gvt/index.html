@@ -2150,7 +2150,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.35</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.36</div>
   <div class="scanlines"></div>
 </div>
 
@@ -3051,7 +3051,6 @@ const TR_DATA={
 "SARGE'S VEST":"サージのベスト",
 "SARGE'S HELMET":"サージのヘルメット",
 "SARGE'S PLATFORM":"サージのだい",
-"buy a piece and he wears it everywhere he goes · tap it any time to take it off or put it back on":"かうとどこへでもみにつけていくよ · タップでいつでもぬがせたり、またきせたりできる",
 "MORE MAYHEM →":"もっとあばれる →",
 "⚔ PLAY":"⚔ あそぶ",
 "TODAY: %1":"きょう：%1",
@@ -4151,7 +4150,6 @@ const TR_DATA={
 "SARGE'S VEST":"사지의 조끼",
 "SARGE'S HELMET":"사지의 철모",
 "SARGE'S PLATFORM":"사지의 받침대",
-"buy a piece and he wears it everywhere he goes · tap it any time to take it off or put it back on":"사면 어디서나 입고 다녀 · 탭하면 언제든 벗었다 다시 입힐 수 있어",
 "MORE MAYHEM →":"더 신나게 →",
 "⚔ PLAY":"⚔ 플레이",
 "TODAY: %1":"오늘: %1",
@@ -5251,7 +5249,6 @@ const TR_DATA={
 "SARGE'S VEST":"萨吉的马甲",
 "SARGE'S HELMET":"萨吉的钢盔",
 "SARGE'S PLATFORM":"萨吉的底座",
-"buy a piece and he wears it everywhere he goes · tap it any time to take it off or put it back on":"买下来他走到哪都穿着 · 点一下随时脱下或穿上",
 "MORE MAYHEM →":"更多混战 →",
 "⚔ PLAY":"⚔ 开战",
 "TODAY: %1":"今日：%1",
@@ -6351,7 +6348,6 @@ const TR_DATA={
 "SARGE'S VEST":"SARGES WESTE",
 "SARGE'S HELMET":"SARGES HELM",
 "SARGE'S PLATFORM":"SARGES SOCKEL",
-"buy a piece and he wears it everywhere he goes · tap it any time to take it off or put it back on":"Einmal gekauft, trägt er es überall · antippen, um es jederzeit ab- oder wieder anzulegen",
 "MORE MAYHEM →":"MEHR CHAOS →",
 "⚔ PLAY":"⚔ SPIELEN",
 "TODAY: %1":"HEUTE: %1",
@@ -7452,7 +7448,6 @@ const TR_DATA={
 "SARGE'S VEST":"ЖИЛЕТ САРДЖА",
 "SARGE'S HELMET":"КАСКА САРДЖА",
 "SARGE'S PLATFORM":"ПОДСТАВКА САРДЖА",
-"buy a piece and he wears it everywhere he goes · tap it any time to take it off or put it back on":"купи вещь — и он носит её всюду · нажми в любой момент, чтобы снять или надеть обратно",
 "MORE MAYHEM →":"БОЛЬШЕ ЗАВАРУХИ →",
 "⚔ PLAY":"⚔ ИГРАТЬ",
 "TODAY: %1":"СЕГОДНЯ: %1",
@@ -8552,7 +8547,6 @@ const TR_DATA={
 "SARGE'S VEST":"CHALECO DE SARGE",
 "SARGE'S HELMET":"CASCO DE SARGE",
 "SARGE'S PLATFORM":"PEANA DE SARGE",
-"buy a piece and he wears it everywhere he goes · tap it any time to take it off or put it back on":"cómprala y la lleva puesta a todas partes · tócala cuando quieras para quitársela o ponérsela",
 "MORE MAYHEM →":"MÁS CAOS →",
 "⚔ PLAY":"⚔ JUGAR",
 "TODAY: %1":"HOY: %1",
@@ -10521,13 +10515,15 @@ function enhWire(){ const a=ENH_ORDER.filter(enhOn); return a.length? a : null; 
 // Six molded accessories for the man himself, racked in their own department.
 // Buy one and he wears it everywhere he renders; tap it any time to take it
 // off or put it back on (the dye-kit convention — the card is both doors).
-// ⚠ THE QUIET PART: each piece he is WEARING is +1 hp/grit on YOUR Sarge and
-// the player is NEVER told — no card prose, no stat line, no announce, not a
-// word in any language (Wyatt's parenthesis, honoured literally). The count
-// rides sargeStats() as the optional `fit` field (the soul flag's own
-// silence-fence shape), so an ally's number crosses the co-op wire inside the
-// bag that already carries his loadout, and an undressed save's bag — and
-// every wire cmd built from it — stays byte-identical to stock.
+// ⚠ THE QUIET PART (rewritten v2.36, Wyatt 8/4: "Add hidden stats to the
+// equipment. I know we have stats in there already, but let's overwrite
+// them"): the v2.16 flat +1 hp/grit per piece is RETIRED — each piece now
+// carries Wyatt's own trade (the OF_* consts below outfitFit), tuned into the
+// sargeStats() bag at ONE seam (outfitTune), so an ally's numbers cross the
+// co-op wire inside the bag that already carries his loadout and an
+// undressed save's bag — and every wire cmd built from it — stays
+// byte-identical to stock. The player is still NEVER told: no card prose, no
+// stat line, no announce, not a word in any language.
 const OUTFIT_ORDER=['mustache','belt','boots','vest','helmet','platform'];
 // ⚠ Wyatt's brief fixes the SPREAD (35★ → 200★); which piece lands on which
 // rung is my call, one number each — the cheap gag first, the display
@@ -10546,7 +10542,101 @@ function outfitOn(id){ return outfitOwns(id) && (META.outfit.wear||[]).indexOf(i
 // how many pieces are ON HIM right now — the quiet number. Reader-safe by
 // construction: `own` is filtered to real ids at load and `wear` is filtered
 // against `own`, so garbage can only ever under-count.
-function outfitFit(){ return OUTFIT_ORDER.reduce((n,id)=>n+(outfitOn(id)?1:0),0); }
+function outfitFit(){ return OUTFIT_ORDER.reduce((n,id)=>n+(outfitOn(id)?1:0),0); }   // v2.36: the sim no longer reads the count — GVT.outfit()'s rack readout only
+
+// ===== v2.36 THE HIDDEN STATS (Wyatt 8/4 eve, patch 4 of 6, verbatim: "Add
+// hidden stats to the equipment. I know we have stats in there already, but
+// let's overwrite them" + "Each of the lasers is slightly secretive") =====
+// The v2.16 +1hp law is gone from the bag and both its consumers; each piece
+// carries Wyatt's own trade instead, and every laser colour tunes YOUR whole
+// army while the crystal in the hilt tunes SARGE alone, saber in hand. Still
+// not a word on any card in any language — the shop stays cosmetic-looking
+// and a player DISCOVERS the tune. One const per number, all Wyatt's dials.
+const OF_MUS_DMG=0.02,  OF_MUS_RATE=0.02;    // MUSTACHE: +2% damage · −2% attack speed
+const OF_BELT_SPD=0.02, OF_BELT_DEF=0.02;    // BELT: +2% move speed · −2% defense
+const OF_BOOT_SPD=0.02, OF_BOOT_DEF=0.02;    // BOOTS: −2% speed worn · +2% defense
+const OF_VEST_DEF=0.02, OF_VEST_SPD=0.02;    // VEST: +2% defense · −2% speed
+const OF_HELM_DEF=0.02, OF_HELM_RNG=0.01;    // HELMET: +2% defense · −1% attack range
+const OF_PLAT_STARS=0.05, OF_PLAT_XP=0.05;   // PLATFORM: +5% stars from games · −5% XP
+const LZ_RATE=0.01;       // BLUE laser: fires 1% faster
+const LZ_DMG=0.01;        // RED: +1% damage
+const LZ_RNG=0.01;        // TAN: +1% attack range
+const LZ_GOLD_STARS=0.05; // GOLD: +5% stars from winning games
+const LZ_VSARGE=0.02;     // PURPLE: +2% damage to the enemy Sarge
+const LZ_MOVE=0.01;       // GREEN: all troops move 1% faster
+const LZ_CRIT=0.01;       // ORANGE: +1% crit chance (the trigger-men + Sarge — the classes the CRIT feature has always covered; it widens nobody's crit table)
+const LZ_CRITDMG=0.10;    // TEAL: +10% crit damage
+// WHOSE laser tunes this figure? enhU's own ownership law, laser edition: a
+// relayed man reads the token his OWNER sent inside `mo` ('lz:<id>' on the
+// soul's 'sl' seat, so the live server's CMD_KEYS passes it untouched and an
+// old build's ENH filter drops it silently — R6); every battlefield chair
+// that isn't yours, and every AI seat, packs no laser; yours reads your own
+// register. coopMods' presence is the relay marker (always set at both doors).
+function lzOf(u){
+  if(!u) return null;
+  if(u.coopMods) return u.coopLz||null;      // relayed: the ALLY's rack (an older ally sent no token → stock)
+  if(S.bf && !bfHumanU(u)) return null;      // every other chair: factory stock
+  return META.laserOn;
+}
+function lzDmgMul(u){ return lzOf(u)==='red'?  1+LZ_DMG  : 1; }
+function lzRateMul(u){ return lzOf(u)==='blue'? 1+LZ_RATE : 1; }
+function lzRngMul(u){ return lzOf(u)==='tan'?  1+LZ_RNG  : 1; }
+// the stride tune — bfMarch's ONE speed line, both carpets: the green beam
+// hurries the whole army; Sarge's belt/boots/vest (and a green crystal behind
+// a saber) ride the bag the wire already carries, so an ally's Sarge walks
+// HIS pace and every AI Sarge walks the factory's.
+function gearMoveMul(u){
+  let m=(lzOf(u)==='green')? 1+LZ_MOVE : 1;
+  if(u.type==='sarge'){ const sw=unitSargeStats(u); if(sw.spdM) m*=sw.spdM; }
+  return m;
+}
+// the payout tune. Stars land SILENTLY — the extra is banked beside the grant
+// and every spoken line stays byte-what-it-was (hidden means hidden); XP rides
+// xpFor itself, so the spoken number IS the banked number everywhere. Local
+// save reads only, so your platform never fattens an ally's purse; the ladder
+// books (bfRecord.s), the daily-raid calendar purse and HQ's own first-win
+// bonus stay raw — one tune per purse, never across them (the v1.28 law).
+function gearStarMul(){ return (outfitOn('platform')?1+OF_PLAT_STARS:1)*(META.laserOn==='gold'?1+LZ_GOLD_STARS:1); }
+function gearStarX(n){ return Math.max(0, Math.round(n*gearStarMul())-n); }   // the quiet extra, whole stars
+function gearXpMul(){ return outfitOn('platform')? 1-OF_PLAT_XP : 1; }
+// ONE SEAM, EVERY WEAPON: sargeStats() hands each bag through here, so the
+// worn pieces and the hilt crystal tune the SAME numbers the strike sites,
+// the halts, the siege and the co-op wire already read. An undressed,
+// crystal-less save's bag (and every wire cmd built from it) stays
+// byte-identical to stock — no field even appears until an effect exists.
+// `dgM`: the pistol's live damage rides the SARGE unit's default path
+// (u.def.dmg × upMul — bag dmg is its DISPLAY number, v1.16), so the mustache
+// reaches that path through this one optional field.
+// THE CRYSTAL (Wyatt: "same effects as the lasers, except they only apply to
+// SARGE while he is using a SABER"): gated on the blade being the weapon AND
+// a crystal actually chosen (an unchosen hilt is empty — the default draw
+// colour is not a crystal). blue/red/green bake into the numbers right here;
+// purple/orange/teal ride the bag as `cz` for the counter web and the crit
+// gate. No tan or gold crystal exists — SABER_COLORS never had them.
+function outfitTune(b){
+  if(outfitOn('mustache')){
+    if(b.dmg!=null)  b.dmg*=1+OF_MUS_DMG;
+    if(b.rate!=null) b.rate*=1-OF_MUS_RATE;
+    if(b.cd!=null)   b.cd/=1-OF_MUS_RATE;    // the saber's clock is a PERIOD — slower hands, longer rest
+    if(b.w==='pistol') b.dgM=+(1+OF_MUS_DMG).toFixed(4);
+  }
+  if(outfitOn('helmet')){
+    if(b.rng!=null)   b.rng*=1-OF_HELM_RNG;
+    if(b.aggro!=null) b.aggro*=1-OF_HELM_RNG; // the brim over his eyes — the blade hunts a hair shorter
+  }
+  let sM=(outfitOn('belt')?1+OF_BELT_SPD:1)*(outfitOn('boots')?1-OF_BOOT_SPD:1)*(outfitOn('vest')?1-OF_VEST_SPD:1);
+  const dM=(outfitOn('belt')?1-OF_BELT_DEF:1)*(outfitOn('boots')?1+OF_BOOT_DEF:1)*(outfitOn('vest')?1+OF_VEST_DEF:1)*(outfitOn('helmet')?1+OF_HELM_DEF:1);
+  if(b.w==='lightsaber' && META.saberColor){
+    const c=sabName(saberHex());
+    if(c==='red')   b.dmg*=1+LZ_DMG;
+    if(c==='blue')  b.cd/=1+LZ_RATE;
+    if(c==='green') sM*=1+LZ_MOVE;
+    if(c==='purple'||c==='orange'||c==='teal') b.cz=c;
+  }
+  if(sM!==1) b.spdM=+sM.toFixed(4);
+  if(dM!==1) b.defM=+dM.toFixed(4);
+  return b;
+}
 
 // ================= META (the Long War) =================
 const META_DEFAULT = {
@@ -11075,7 +11165,7 @@ const XP_BF_WIN=0.90, XP_BF_TEAM=0.01,   // 1v1 pays 91% of a level, 10v10 the w
 // past the window every payout is byte-what-it-was. Both DIALS for Wyatt.
 const CAMP_PURSE=20, CAMP_PURSE_LVLS=10;
 function xpNeed(){ return 100 + (META.lvl-1)*50; }
-function xpFor(frac){ return Math.max(1, Math.round(xpNeed()*frac)); }   // a fraction of a level -> real XP
+function xpFor(frac){ return Math.max(1, Math.round(xpNeed()*frac*gearXpMul())); }   // a fraction of a level -> real XP (v2.36: the platform's −5% rides HERE, so every spoken number IS the banked number at all six end paths; MOM's three-promotion jackpot is xpToLevels and stays whole by design)
 // the exact XP that lands k promotions from where the bar stands right now —
 // grantXP's own walk run forward (same 100+(L-1)*50 rungs), so the pour can
 // never over- or under-shoot: k rank-ups, k picks, bar at dead zero after.
@@ -12647,35 +12737,34 @@ function sargeStats(){
   // so an unsouled save's bags (and the wire cmds built from them) stay
   // byte-identical to stock — the §5 silence fence, enforced by shape.
   const so=soulIs('w',w)? SOUL_MUL : 1;
-  // SARGE'S OUTFITS (v2.16): the worn-piece count rides the bag as `fit` —
-  // present only when >0 (the soul flag's own silence fence), so an undressed
-  // save's bag, and every co-op wire cmd built from it, stays byte-identical
-  // to stock. gritCap reads it live on the campaign carpet and placeUnit adds
-  // it to the battleground plastic; no screen anywhere prints it (Wyatt:
-  // "don't tell the player").
-  const ft=outfitFit();
+  // SARGE'S OUTFITS + THE CRYSTAL (v2.36): every branch below returns through
+  // outfitTune — ONE seam where the worn pieces and the hilt crystal tune the
+  // bag's own numbers (and hang spdM/defM/dgM/cz only when an effect exists —
+  // the soul flag's silence fence, so an undressed save's bag and every wire
+  // cmd built from it stays byte-identical to stock). The v2.16 fit count is
+  // retired. No screen anywhere prints any of it (Wyatt: hidden stats).
   // the cone is the one stat with a hard ceiling, because it's an ANGLE: the old
   // straight line passes a half-angle of π around rank 50 — a full circle, Sarge
   // shooting the men behind him. 1.2 rad half-angle (a ~137° fan, reached about
   // rank 13) is as wide as a shotgun gets.
   // 7/27 (Wyatt, v1.40): "the shotgun blast cone needs to be increased by 10%"
   // — exactly ×1.10 at every rank (0.62→0.682, 0.05→0.055/rank, ceiling too).
-  if(w==='shotgun')    return { w, r, rng:103, rate:2.0, dmg:(1.1+0.35*u)*so, ...(so>1?{soul:1}:{}), ...(ft>0?{fit:ft}:{}), cone:Math.min(1.32,0.682+0.055*u) };
+  if(w==='shotgun')    return outfitTune({ w, r, rng:103, rate:2.0, dmg:(1.1+0.35*u)*so, ...(so>1?{soul:1}:{}), cone:Math.min(1.32,0.682+0.055*u) });
   // 7/24 (Wyatt): the long rifle cycles 30% faster at base, and every rank oils the bolt another +2%
   // 7/25 (Wyatt): +20% reach on top of that — 340 → 408, the longest gun on the carpet
   // 7/28 (Wyatt, v1.67): rank 10 reaches 15% further again — 408 → 469, for good
-  if(w==='sniper')     return { w, r, rng:(r>=WPN_MILE.sniperLvl? Math.round(SNIPER_RNG*WPN_MILE.sniperRngMul) : SNIPER_RNG), rate:0.22*1.3*(1+0.02*u), dmg:(9+3*u)*so, ...(so>1?{soul:1}:{}), ...(ft>0?{fit:ft}:{}) };
+  if(w==='sniper')     return outfitTune({ w, r, rng:(r>=WPN_MILE.sniperLvl? Math.round(SNIPER_RNG*WPN_MILE.sniperRngMul) : SNIPER_RNG), rate:0.22*1.3*(1+0.02*u), dmg:(9+3*u)*so, ...(so>1?{soul:1}:{}) });
   // 7/28 (Wyatt, v1.67): the dash's range limit is HALVED in general — 88 until
   // rank 20 hands the full 175 back. aggro is both the launch and the chain
   // radius (one field is both), so shrinking it shrinks the whole hunt.
-  if(w==='lightsaber') return { w, r, aggro:(r>=WPN_MILE.sabFullLvl? WPN_MILE.sabFull : WPN_MILE.sabNear), dmg:(7+2.5*u)*so, ...(so>1?{soul:1}:{}), ...(ft>0?{fit:ft}:{}), cd:2.1, block:Math.min(0.75,0.34+0.09*u) };
+  if(w==='lightsaber') return outfitTune({ w, r, aggro:(r>=WPN_MILE.sabFullLvl? WPN_MILE.sabFull : WPN_MILE.sabNear), dmg:(7+2.5*u)*so, ...(so>1?{soul:1}:{}), cd:2.1, block:Math.min(0.75,0.34+0.09*u) });
   // 0092 THE COMMANDER — the slow tank behind a plain steel saber. The bag is
   // SELF-CONTAINED on purpose: blk and aoe ride it so a relayed ally's blocks
   // and blade state come off the WIRE's numbers, never off MY save (the
   // WPN_MILE raw-rank law, applied to the whole identity).
   if(w==='commander'){ const bl=bladeOwned();
-    return { w, r, rng:(bl?CMD.reach2:CMD.reach), rate:CMD.rate,
-             dmg:(CMD.dmg0+CMD.dmgPer*u)*so, ...(so>1?{soul:1}:{}), ...(ft>0?{fit:ft}:{}), blk:CMD.blk, aoe:(bl?CMD.aoeR:0) }; }
+    return outfitTune({ w, r, rng:(bl?CMD.reach2:CMD.reach), rate:CMD.rate,
+             dmg:(CMD.dmg0+CMD.dmgPer*u)*so, ...(so>1?{soul:1}:{}), blk:CMD.blk, aoe:(bl?CMD.aoeR:0) }); }
   // the sidearm: 70% faster than it used to be, +5% a rank on top of that (see
   // PISTOL_RATE). Damage still comes off the SARGE unit's upMul on the default
   // firing path, which is where the pistol lands.
@@ -12685,7 +12774,7 @@ function sargeStats(){
   // 7/29 (Wyatt, v1.73): rank stretches its REACH too — spRng, capped a hair
   // past the rifle line (see THE SIDEARM'S REACH). Same ownership rule: the
   // r:0 kits keep the literal 108, so only a ranked pistol ever grows.
-  return { w:'pistol', r, rng:spRng(r), rate:pistolRate(r)*(r>=WPN_MILE.pistolLvl? WPN_MILE.pistolRateMul:1), dmg:1.5, ...(so>1?{soul:1}:{}), ...(ft>0?{fit:ft}:{}) };
+  return outfitTune({ w:'pistol', r, rng:spRng(r), rate:pistolRate(r)*(r>=WPN_MILE.pistolLvl? WPN_MILE.pistolRateMul:1), dmg:1.5, ...(so>1?{soul:1}:{}) });
 }
 // ===== FORMATION INVASIONS: the Tan come from anywhere, in style =====
 // 0197: T.y is LIVE now, the WORLD_H idiom — reset() snaps it to 300 with
@@ -14642,6 +14731,11 @@ function coopPlaced(u){
   // the token (R6), and the ally's grit/plastic land exact, never re-derived
   // from a rounded um.
   if(u.type==='commando'){ const gb=cmdoGB(u); if(gb) cm.mo=(cm.mo||[]).concat('cg'+gb); }
+  // v2.36 THE LASER TOKEN rides the same 'sl' seat — the whole-army tune is
+  // the OWNER's register, so the id crosses with every placement; the live
+  // server's CMD_KEYS passes mo untouched and an old client's ENH filter
+  // drops the token silently (R6, the soul's own divergence class).
+  if(META.laserOn) cm.mo=(cm.mo||[]).concat('lz:'+META.laserOn);
   // THE DROP crosses as an ORDINARY PLACEMENT (v1.45) with one optional flag on
   // it. ⚠ This is deliberately NOT a new `k`: a new word would fall off an old
   // client's dispatch chain and their screen would simply be missing one of my
@@ -14687,6 +14781,10 @@ function coopApply(cm){
     // copy exists (placeUnit's else branch), so nothing shared moves.
     if(u.def && u.def.vehicle && Array.isArray(cm.mo) && cm.mo.indexOf('ve')>=0)
       u.def.moveSpd=Math.round(u.def.moveSpd*ENG_MUL);
+    // v2.36: the ally's laser — raw read before the ENH filter (the coopSoul
+    // law); absent on an older ally's orders, and lzOf answers factory stock.
+    { const lt=Array.isArray(cm.mo)? cm.mo.find(m=>typeof m==='string'&&m.slice(0,3)==='lz:') : null;
+      u.coopLz=lt? lt.slice(3) : null; }
     // The ally's bench, filtered to parts this build actually knows about. ALWAYS
     // set (empty when they sent none, or are on an older build) — its presence is
     // what marks a figure as "relayed, not mine" for enhU.
@@ -15328,6 +15426,7 @@ function roomPlaced(seat,type,x,y,para){
     if(soulIs('u',type)) cm.mo=(cm.mo||[]).concat('sl');   // 0093: the mo-carried Soul marker (the campaign door's own law — CMD_KEYS has no 'sl')
     if(VEH_ORDER.indexOf(type)>=0) cm.vh=vehHP(type)|0;
     if(VEH_ORDER.indexOf(type)>=0 && vehEng(type)) cm.mo=(cm.mo||[]).concat('ve');   // 0100 THE ENGINE rides INSIDE mo (the 'sl' law); old builds drop it at their ENH filter
+    if(META.laserOn) cm.mo=(cm.mo||[]).concat('lz:'+META.laserOn);   // v2.36: the laser token, same seat, same law — your men fight at YOUR tune
   } else if(type==='sarge'){
     // an AI seat's Sarge drew his weapon out of the crate once, on the referee's
     // client — relay it, or each screen would roll him a different one
@@ -15367,6 +15466,9 @@ function roomApply(cm){
     if(cg){ u.cmdoGB=Math.min(9,+cg[2]||0);
       if(u.hpMax){ u.hpMax+=CMDO_DEF_HP*u.cmdoGB; u.hp=u.hpMax; } }
   }
+  // v2.36: the ally's laser — raw read before the ENH filter (the coopSoul law)
+  { const lt=Array.isArray(cm.mo)? cm.mo.find(m=>typeof m==='string'&&m.slice(0,3)==='lz:') : null;
+    u.coopLz=lt? lt.slice(3) : null; }
   u.coopMods=Array.isArray(cm.mo)? cm.mo.filter(id=>ENH_ORDER.indexOf(id)>=0) : [];
   if(cm.t==='sarge' && cm.sw && typeof cm.sw==='object'){
     u.coopSW=cm.sw;
@@ -15759,6 +15861,12 @@ function endBattlefield(reason, fromRelay){
     // YOUR seat only. 3v3+ feed nothing but the lifetime totals and the medals.
     const wrR=ranked && META.bfRecord[bf.team]; if(wrR){ wrR.w++; wrR.s+=starGain; }
     META.starBank+=starGain; META.starsLifetime+=starGain;
+    // v2.36 THE QUIET WINNINGS (platform +5% stars from games · gold laser
+    // +5% from winning): banked SILENTLY beside the purse — the spoken line
+    // stays byte-what-it-was (hidden means hidden). The ladder book (wrR.s),
+    // the daily-raid calendar purse below and HQ's own first-win bonus stay
+    // raw: one tune per purse, never across them (the v1.28 two-purse law).
+    { const gx=gearStarX(starGain); if(gx){ META.starBank+=gx; META.starsLifetime+=gx; } }
     const promos=xpAward(xpGain,{src:'battleground'});
     const spoils=' · '+t('+'+starGain+'★ WINNINGS · +'+xpGain+' XP')+promoTag(promos)
       +(friendly? ' · '+t('FRIENDLY (no ladder)') : '')+bfEarn;
@@ -15989,6 +16097,17 @@ function counterDmg(tgt,dmg,src){
     else if(a==='lightsaber'||a==='commander') dmg*=JEEP_SABER_RESIST;   // 0092: steel scratches paint too — a slow tank must not chew hulls for free; the bazooka stays the armor answer. (He is NOT in saberArm: the jeep's instant-destroy counters the LUNGING blade; the commander takes an ordinary ram, which his block can eat.)
     else if(a==='mgunner') dmg*=MG_JEEP_BONUS;   // v2.35: the MG shreds the soft-skinned jeep — Wyatt's ×1.7, see the const above
   }
+  // v2.36 THE PURPLE BEAM: +2% into the enemy Sarge HIMSELF — the campaign's
+  // tansarge boss, or any battlefield Sarge across the line (a bullet only
+  // ever finds an enemy, so tgt.type is the whole test there). Laser = your
+  // whole army's rounds; crystal = the saber's own strikes, off the bag the
+  // wire already carries. Rides this same bullet-and-blade funnel as every
+  // row above — splash keeps its own doors (the v2.35 precedent) — and the
+  // tancommander is NOT the Sarge: Wyatt named the man, not the rank.
+  if(tgt.type==='tansarge' || (S.bf && tgt.type==='sarge')){
+    if(lzOf(src)==='purple') dmg*=1+LZ_VSARGE;
+    if(src && src.type==='sarge'){ const psw=unitSargeStats(src); if(psw.cz==='purple') dmg*=1+LZ_VSARGE; }
+  }
   return dmg;
 }
 // at 10v10 forty guns firing across a 3000px carpet would be a wall of bleeps —
@@ -16053,12 +16172,28 @@ const CRIT_SCALE=0.92;
 // same knob (the v1.29 law), so the prose cannot drift from the mechanic
 const CRIT_ONE_IN=Math.round(1/(0.05*CRIT_SCALE));
 function critChance(u){
-  if(u.type==='sarge') return CRIT_SCALE*Math.min(0.75, 0.05 + 0.05*rankUnitsFast(unitSargeStats(u).r||0));
-  if(u.type!=='rifleman' && u.type!=='mgunner') return 0;
-  const r=(S.bf && !bfHumanU(u))? 0 : (META.up[u.type]||0);
-  return CRIT_SCALE*(0.05 + 0.01*rankUnits(r));
+  // v2.36 THE ORANGE BEAM/CRYSTAL: +1 point of crit odds, added after the
+  // scale and capped with everything else. Crit stays the trigger-men's and
+  // Sarge's feature — the classes that have always rolled (the splash
+  // weapons never had a crit site to widen); the ownership is lzOf's and the
+  // bag's, so the answer below is byte-what-it-was for every unlasered seat.
+  let c, sw=null;
+  if(u.type==='sarge'){ sw=unitSargeStats(u); c=CRIT_SCALE*Math.min(0.75, 0.05 + 0.05*rankUnitsFast(sw.r||0)); }
+  else if(u.type!=='rifleman' && u.type!=='mgunner') return 0;
+  else { const r=(S.bf && !bfHumanU(u))? 0 : (META.up[u.type]||0); c=CRIT_SCALE*(0.05 + 0.01*rankUnits(r)); }
+  if(lzOf(u)==='orange') c+=LZ_CRIT;
+  if(sw && sw.cz==='orange') c+=LZ_CRIT;   // cz only ever exists behind a saber (outfitTune's gate)
+  return Math.min(0.75, c);
 }
 function rollCrit(u){ return Math.random() < critChance(u); }
+// v2.36 THE TEAL BEAM/CRYSTAL: crits land 10% harder — one reader beside
+// rollCrit, consumed at every site the bare CRIT_MULT used to sit in.
+function critMult(u){
+  let m=CRIT_MULT;
+  if(lzOf(u)==='teal') m*=1+LZ_CRITDMG;
+  if(u.type==='sarge' && unitSargeStats(u).cz==='teal') m*=1+LZ_CRITDMG;
+  return m;
+}
 function critFx(f){
   S.floats.push({x:f.x,y:f.y-66,txt:'CRIT!',t:0,col:'#FFD24A'});
   S.fx.push({k:'ring',x:f.x,y:f.y-16,r:5,R:30,t:0,dur:0.22,col:'#FFD24A'});
@@ -16182,9 +16317,9 @@ function bfAggro(u){
   // halts at the cone exactly as ever (no statue standing at 210 doing nothing).
   if(u.type==='sarge'){ const sw=unitSargeStats(u);
     if(sgDashReady(u,sw)) return WPN_MILE.sgDetect;
-    return sw.aggro||sw.rng||108; }
+    return (sw.aggro||sw.rng||108)*lzRngMul(u); }   // v2.36: the tan beam moves the halt WITH the trigger (the 0129 law, BF edition)
   if(u.def.rng>=9000) return 260;            // the mortar would "see" the whole world and never advance
-  return u.def.rng || u.def.auraR || 120;    // the radioman halts with the line he is buffing
+  return u.def.rng*lzRngMul(u) || u.def.auraR || 120;    // the radioman halts with the line he is buffing (his rng 0 falls through the tune untouched)
 }
 // the ground underfoot, checked on the march only (diggers-in hold their spot):
 // pond juice slows him to a wade, the race track flank doubles his hustle
@@ -16257,7 +16392,7 @@ function bfMarch(u,dt,goal){
   }
   // DOUBLE TIME (v1.62) rides the stride itself — one factor here covers both
   // carpets, because the campaign march is this same function (v1.30)
-  const dx=gx-u.x, dy=gy-u.y, d=Math.hypot(dx,dy)||1, sp=(u.def.moveSpd||36)*(u.gait||1)*bfGround(u)*emgMoveMul(u);
+  const dx=gx-u.x, dy=gy-u.y, d=Math.hypot(dx,dy)||1, sp=(u.def.moveSpd||36)*(u.gait||1)*bfGround(u)*emgMoveMul(u)*gearMoveMul(u);   // v2.36: the green beam (and Sarge's belt/boots/vest off the bag) ride the stride itself — one factor, both carpets
   const pad=u.squeeze?3:ROCK_PAD_FOE;
   const st=rockSteer(u.x,u.y,gx,gy,pad);          // walk ROUND the blocks, not into them
   let nx=st?st.x:dx/d, ny=st?st.y:dy/d;
@@ -16695,9 +16830,9 @@ function campSiegeRng(u){
   if(u.type==='sarge'){
     const sw=unitSargeStats(u);
     if(sw.w==='lightsaber' || sw.w==='commander') return melee;   // 0092: both swords close to arm's length (his 38 would floor to melee anyway — stated beside the blade for the next reader)
-    return Math.max(melee,(sw.rng||u.def.rng)*radioAura(u).rng);
+    return Math.max(melee,(sw.rng||u.def.rng)*radioAura(u).rng*lzRngMul(u));
   }
-  return Math.max(melee, u.def.rng*radioAura(u).rng*((u.type==='bazooka'&&enhU(u,'longtube'))?ENH_BAZ_RNG:1));
+  return Math.max(melee, u.def.rng*radioAura(u).rng*lzRngMul(u)*((u.type==='bazooka'&&enhU(u,'longtube'))?ENH_BAZ_RNG:1));   // v2.36: the tan beam besieges too — what a man can shoot he can besiege
 }
 // the same "could my gun actually take him" test the weapon loop applies, so a
 // man never halts for a target his trigger would refuse (offscreen, burrowed)
@@ -16758,12 +16893,12 @@ function campUnitStep(u,dt){
       // feet, exactly like the blade above; and with it armed he halts inside
       // the detect window so the weapon loop's launch check gets its frame.
       if(u.sgDash){ if(!u.home) u.home={x:u.x,y:u.y}; u.marching=false; return true; }
-      rng=(sw.rng||u.def.rng)*radioAura(u).rng;
+      rng=(sw.rng||u.def.rng)*radioAura(u).rng*lzRngMul(u);   // v2.36: the halt matches the trigger (the 0129 law) — the tan beam moves both
       if(sgDashReady(u,sw)){ if(!u.home) u.home={x:u.x,y:u.y}; rng=Math.max(rng, WPN_MILE.sgDetect); }
     }
   }
   else if(u.type==='radioman') rng=UDEF.rifleman.rng;   // he halts where the rifle line halts — a step behind the fight, where an aura belongs
-  else rng=u.def.rng*radioAura(u).rng*((u.type==='bazooka'&&enhU(u,'longtube'))?ENH_BAZ_RNG:1);
+  else rng=u.def.rng*radioAura(u).rng*lzRngMul(u)*((u.type==='bazooka'&&enhU(u,'longtube'))?ENH_BAZ_RNG:1);
   if(rng!=null && campFoeInReach(u,rng)){ u.marching=false; return true; }   // a target in reach → halt and FIGHT
   // THE ARMY WAITS FOR THE WAR (v1.32, Wyatt: "have units wait for first
   // wave"): through the dig-in grace a placed man holds the ground he was
@@ -17334,13 +17469,14 @@ function placeUnit(type,x,y,side,seat){
       // his weapon-soul HP misses my BF sim — the saber's own local-seat
       // asymmetry, D8/R5, inherited; campaign grit reads the bag live.)
       if(unitSargeStats(u).soul){ u.hpMax*=SOUL_MUL; u.hp=u.hpMax; }
-      // SARGE'S OUTFITS (v2.16): each worn piece is one more point of plastic,
-      // FLAT and LAST — after every multiplier, because "+1 HP" is Wyatt's
-      // literal. Local seat only, through the same door the ×2 walks: a
-      // relayed ally's bag lands AFTER placement (his own sim carries his fit;
-      // the referee's verdict is the truth — the saber's asymmetry, D8/R5),
-      // and every AI kit carries no fit at all. The player is never told.
-      { const ft=unitSargeStats(u).fit|0; if(ft>0){ u.hpMax+=ft; u.hp=u.hpMax; } }
+      // SARGE'S OUTFITS (v2.36): battleground plastic is hp, so the worn
+      // defense multiplies his pool — the retired v2.16 fit door, re-hung
+      // (vest/boots/helmet plate up, the belt's loose strap down). Local seat
+      // only, through the same door the ×2 walks: a relayed ally's bag lands
+      // AFTER placement (his own sim carries his plates; the referee's
+      // verdict is the truth — the saber's asymmetry, D8/R5), and every AI
+      // kit carries no defM at all. The player is never told.
+      { const dM=+(unitSargeStats(u).defM||1); if(dM!==1){ u.hpMax*=dM; u.hp=u.hpMax; } }
     }
   } else {
     // THE MARCHING CAMPAIGN (v1.30, Wyatt: the campaign fights in the
@@ -17377,12 +17513,11 @@ function gritCap(u){
   // by construction (their coopSW/coopSoul landed at the relay door).
   // 0121: the commando's rank pays DEFENCE — his banked pips land here on the
   // campaign carpet (mine derive live, an ally's rode the wire, AI seats 0)
-  // SARGE'S OUTFITS (v2.16): each worn piece is one quiet pip, FLAT beside the
-  // vet stripe — never through the sword multipliers ("+1" is Wyatt's literal).
-  // Mine derives live off my save; an ally's rides the bag the wire already
-  // carries (the commando-pip law: grit reads the bag live per hit, so both
-  // sims agree with zero new wire fields). No screen ever prints it.
-  return (u.def.grit*(wgrit==='lightsaber'?2:wgrit==='commander'?CMD.grit:1)*veh + (u.vet?1:0) + jump + cmdoGB(u) + (usw? (usw.fit|0) : 0))
+  // SARGE'S OUTFITS (v2.36): the v2.16 quiet pip is RETIRED — campaign grit
+  // is integers, so the worn ±2% defense lives at the tanHit door instead
+  // (a per-round save, not a pip), and this formula is byte-what-it-was
+  // before v2.16 dressed it.
+  return (u.def.grit*(wgrit==='lightsaber'?2:wgrit==='commander'?CMD.grit:1)*veh + (u.vet?1:0) + jump + cmdoGB(u))
     * (soulHpU(u)?SOUL_MUL:1);
 }
 // a lightsaber Sarge deflects some incoming fire — spark and shrug it off
@@ -17480,6 +17615,18 @@ function tanHit(u,fx,fy){
   if(cmdAbsorbs(u)) return;                  // 0092: the commander's counted block — same head, other rig
   if(enhDuck(u)) return;                     // gone over the sandbags
   if(saberBlocks(u)) return;                 // deflected off the blade
+  // v2.36 THE HIDDEN PLATES (vest/boots/helmet — and the belt's loose strap):
+  // campaign armour is integer grit, so a worn ±2% defense is a PER-ROUND
+  // save here — dM 1.06 shrugs 6 rounds in 100 whole; dM below 1 makes the
+  // odd round bite twice. Expected intake is ×(2−dM) exactly, either side.
+  // Sarge only (the pieces are his), read LIVE off the bag so a relayed
+  // ally's plates are his own and every AI seat reads none; no fx, no float,
+  // not a word (the v2.16 silence law). Direct knockdowns (officer potshot,
+  // ram, cannon) keep their own door — a plate stops rounds, not jeeps.
+  if(u.type==='sarge'){ const dM=+(unitSargeStats(u).defM||1);
+    if(dM>1 && Math.random()<dM-1) return;
+    if(dM<1 && Math.random()<1-dM) u.hits++;
+  }
   u.hits++; u.hitT=0;
   S.fx.push({k:'tracer',x1:fx-14,y1:fy-26,x2:u.x,y2:u.y-18,t:0,dur:0.1,col:'#EDD9A8'});
   // ONE ROUND, ONE SAVE (7/25): this round already rolled against the blade and
@@ -17500,8 +17647,10 @@ function tanHit(u,fx,fy){
 // (u.saberCd now ticks in the units-fire loop head, so a marching battlefield
 // Sarge re-arms on the move instead of standing frozen at first contact.)
 function saberNext(u,sw){
-  if(S.bf) return bfNearestEnemy(u,sw.aggro);
-  let best=null,bd=sw.aggro;
+  // v2.36: the tan beam stretches the hunt radius the same 1% it stretches
+  // every gun (the helmet's −1% already lives in sw.aggro itself)
+  if(S.bf) return bfNearestEnemy(u,sw.aggro*lzRngMul(u));
+  let best=null,bd=sw.aggro*lzRngMul(u);
   for(const f of S.foes){ if(f.burrow||f.x>W-6) continue; const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
   return best;
 }
@@ -17526,7 +17675,7 @@ function updateSaber(u,dt,sw){
     const dx=f.x-u.x, dy=f.y-u.y, d=Math.hypot(dx,dy);
     if(d>26){ const sp=680; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }   // a real dash — he's IN quick
     else if(u.saberSwing<=0){
-      const vm=(u.vet?1.5:1), cm=rollCrit(u)?CRIT_MULT:1;
+      const vm=(u.vet?1.5:1)*lzDmgMul(u), cm=rollCrit(u)?critMult(u):1;   // v2.36: the red beam rides vm — every strike and cleave below inherits
       if(cm>1) critFx(f);
       hurt(f,sw.dmg*vm*cm,u);                     // massive strike
       for(const g of TGT(u)){ if(g!==f && !g.burrow && !g.dead && bfCanTarget(u,g) && Math.hypot(g.x-u.x,g.y-u.y)<46){ hurt(g,sw.dmg*0.5*vm*cm,u); } }  // a cleave to whatever else is close (never down into the cut he isn't in — v1.57)
@@ -17536,7 +17685,7 @@ function updateSaber(u,dt,sw){
       bfSfx(SFX.laser, u.x, u.y); if(bfHumanU(u)) S.shake=0.2; u.saberSwing=0.5;
       const nx=saberNext(u,sw);                   // anyone still in reach? keep carving forward
       if(nx){ u.saberTarget=nx; return; }
-      u.saberState='back'; u.saberCd=sw.cd;
+      u.saberState='back'; u.saberCd=sw.cd/lzRateMul(u);   // v2.36: the blue beam re-arms the blade a hair sooner (the crystal's blue lives in sw.cd itself)
     }
     return;
   }
@@ -17564,8 +17713,8 @@ function updateCmd(u,dt,sw){
     if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;
     const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
   if(!best || u.cmdSwT>0) return;
-  u.cmdSwT=1/sw.rate; u.cmdFx=0.22;             // the arm swings for the draw code
-  const vm=(u.vet?1.5:1), cm=rollCrit(u)?CRIT_MULT:1; if(cm>1) critFx(best);
+  u.cmdSwT=1/(sw.rate*lzRateMul(u)); u.cmdFx=0.22;   // the arm swings for the draw code (v2.36: the blue beam winds his clock too)
+  const vm=(u.vet?1.5:1)*lzDmgMul(u), cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(best);   // v2.36: red beam + teal crits, the saber sites' own shape
   if(sw.aoe){                                    // THE BLADE: everything in the circle, full weight
     for(const g of TGT(u)){ if(g.burrow||g.jetT>0||g.dead) continue;
       if(!bfCanTarget(u,g)) continue;
@@ -17622,7 +17771,7 @@ function sgDashNext(u,r){
 }
 function updateSgDash(u,dt,sw){
   if(!u.home) u.home={x:u.x,y:u.y};
-  const fireR=sw.rng*radioAura(u).rng;
+  const fireR=sw.rng*radioAura(u).rng*lzRngMul(u);   // v2.36: the dash lands a hair inside the CONE — the tan beam moves both together
   if(!u.sgDash){
     if(u.sgCd>0) return;
     // someone already inside the cone's reach → there is no gap to close
@@ -20016,7 +20165,7 @@ function endBattle(win){
   // (It used to ask "nobody down longer than ~3s"; with casualties there is no
   // down to time — the words on the win screen never changed.)
   const m1=true, m2=S.lives>=10, m3=(S.lostLevel|0)===0;
-  let stars=(m1?1:0)+(m2?1:0)+(m3?1:0), purse=0;   // purse: the early-campaign winnings (v2.34) — set only on the plain campaign branch
+  let stars=(m1?1:0)+(m2?1:0)+(m3?1:0), purse=0, gearN=0;   // purse: the early-campaign winnings (v2.34) — set only on the plain campaign branch; gearN (v2.36): what the quiet gear tune is allowed to see — plain-branch stars only, never the sortie/MOM calendar purse
   document.getElementById('medalRow').textContent = (m1?'★':'☆')+' '+(m2?'★':'☆')+' '+(m3?'★':'☆');
   let msg = t('Victory') + (m2? ' · '+t('Untouched Toy Box'):'') + (m3? ' · '+t('No soldier left behind'):'');
 
@@ -20067,6 +20216,7 @@ function endBattle(win){
     // and the deep ladder pay byte-what-they-did; sorties and MOM never enter
     // this branch. Banked below with the medals, spoken on the win line.
     if(!prev && S.levelN<=CAMP_PURSE_LVLS) purse=CAMP_PURSE;
+    gearN=stars+purse;   // v2.36: the plain campaign win's own winnings — the quiet tune's whole base
   }
   // SARGE unlocks a new weapon as the campaign advances — announced right here
   let sargeNew=[];
@@ -20130,8 +20280,13 @@ function endBattle(win){
   if(soulOwned() && !META.soulSeen){ META.soulSeen=1; soulNew=true; }
   // a felled boss pays a bounty on top of the level's medals (v1.79: not mom —
   // the allowance headlines her win; her rounds already dropped their tags)
-  if(S.bossKilled && !S.rival && !S.momRaid){ META.starBank+=2; META.starsLifetime+=2; }
+  if(S.bossKilled && !S.rival && !S.momRaid){ META.starBank+=2; META.starsLifetime+=2; gearN+=2; }
   META.starBank+=stars+purse; META.starsLifetime+=stars+purse;   // v2.34: medals + the early-campaign purse (purse is 0 everywhere it always was)
+  // v2.36 THE QUIET WINNINGS — the plain campaign branch only (gearN stays 0
+  // for sorties and MOM: their stars are rivalDayWin's day-capped calendar
+  // purse, a different purse with its own books — the v1.28 law says one
+  // tune each, never across). Silent: no spoken line, no medal row moves.
+  { const gx=gearStarX(gearN); if(gx){ META.starBank+=gx; META.starsLifetime+=gx; } }
   // HOLD THE LINE pays a full level for turning up and 6% more for every
   // commander who stood with you (ten of you = 1.54 levels) — and MOM tops
   // even that (v2.08): xpToLevels(MOM_LEVELS) is THREE whole promotions,
@@ -21007,14 +21162,14 @@ function update(dt){
         // fires on its own cd, which is exactly "begin firing first"
         if(sgDashActive(u,sw)) updateSgDash(u,dt,sw);
         u.cd-=dt; if(u.cd>0) continue;
-        const ra=radioAura(u), rb=ra.rng;
+        const ra=radioAura(u), rb=ra.rng*lzRngMul(u);   // v2.36: the tan beam stretches the reach the aura already stretches
         const list=TGT(u);
         let best=null,bs=1e9;
         for(const f of list){ if(f.burrow||f.jetT>0) continue; if(!bfCanTarget(u,f)) continue; if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;
           const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>sw.rng*rb) continue; const db=PRIO(u,f); if(db<bs){bs=db;best=f;} }
         if(!best) continue;
-        u.cd=1/(sw.rate*ra.rate*emgRateMul(u)); const vm=(u.vet?1.5:1);
-        const cm=rollCrit(u)?CRIT_MULT:1; if(cm>1) critFx(best);   // Sarge crits with whatever he's holding — one roll per trigger pull
+        u.cd=1/(sw.rate*ra.rate*emgRateMul(u)*lzRateMul(u)); const vm=(u.vet?1.5:1)*lzDmgMul(u);   // v2.36: blue beam on the clock, red beam on the round
+        const cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(best);   // Sarge crits with whatever he's holding — one roll per trigger pull
         // v1.50: a foe-side commander faces left, so his muzzle fx anchor left too
         const wdir=(S.bf&&u.side==='foe')?-1:1;
         if(sw.w==='shotgun'){
@@ -21109,11 +21264,11 @@ function update(dt){
     // radioman aura: +25% range when he's got your back — and, with the booster
     // aerial on his back, +25% off every cooldown inside it too. Read ABOVE the
     // minesweeper branch, because a sapper's plant cadence is a cadence as well.
-    const ra=radioAura(u), rngBonus=ra.rng;
+    const ra=radioAura(u), rngBonus=ra.rng*lzRngMul(u);   // v2.36: the tan beam rides beside the aura — every gate below inherits
     // minesweeper: plants mines instead of shooting
     if(def.mine){
       if(S.mines.filter(mn=>mn.owner===u.id).length<3){
-        u.cd=1/(rate*ra.rate*emgRateMul(u));
+        u.cd=1/(rate*ra.rate*emgRateMul(u)*lzRateMul(u));   // v2.36: a sapper's plant cadence is a cadence too — the blue beam winds it
         // he seeds the ground AHEAD of himself — which way that is depends on the side
         const dir=(S.bf && u.side==='foe')? -1 : 1;
         const mx=u.x+dir*(40+Math.random()*70);
@@ -21165,13 +21320,15 @@ function update(dt){
     }
     // RAPID FIRE (v1.62) multiplies the same cadence the aerial does — one more
     // factor on the cooldown, so it stacks with the aura and every mod cleanly
-    u.cd=1/(rate*ra.rate*emgRateMul(u));
+    // (v2.36: and the blue beam is one more factor again, same law)
+    u.cd=1/(rate*ra.rate*emgRateMul(u)*lzRateMul(u));
     // your promotion ranks come onto the battlefield with you; the opposing army
     // fights at stock strength — its difficulty is decisions, not stat padding
     // ⚠ ORDER MATTERS: a RELAYED man carries his owner's rank in coopUM and it has
     // to win, because on the battlefield "not my seat" used to mean "factory
     // stock" — true of an AI chair, and dead wrong for the friend sitting in it.
-    const dmg = def.dmg * (u.vet?1.5:1) * (tube?ENH_BAZ_DMG:1) *
+    const dmg = def.dmg * (u.vet?1.5:1) * (tube?ENH_BAZ_DMG:1) * lzDmgMul(u) *
+      ((ssw&&ssw.dgM)||1) *   // v2.36: the mustache rides the pistol's REAL path here (bag dmg is its display number, v1.16) — and the red beam rides every round, rocket and lob this line feeds
       (u.coopUM!=null? u.coopUM : ((S.bf&&!bfHumanU(u))?1:upMul(u.type))) *
       soulDmgMulU(u);   // 0093 THE SOUL: one reader answers for every figure — souled rig OR souled type off the owner's save/wire; every other seat reads ×1
     if(tube && Math.random()<ENH_BAZ_BACK){ enhBackfire(u); continue; }   // no rocket leaves the tube
@@ -21237,7 +21394,7 @@ function update(dt){
         if(tgt2){ split=true; if(off) tgt=tgt2; } }
       let dmgF = (tgt.type==='crawler'&&u.type==='rifleman')? dmg*0.1 : dmg;   // crawlers shrug off rifle fire
       if(split) dmgF*=ENH_DG_DMG;
-      if(rollCrit(u)){ dmgF*=CRIT_MULT; critFx(tgt); }   // the trigger-men: rifleman / MG / Sarge's pistol
+      if(rollCrit(u)){ dmgF*=critMult(u); critFx(tgt); }   // the trigger-men: rifleman / MG / Sarge's pistol (v2.36: teal rides the multiplier)
       const lz = (META.laserOn && !(S.bf&&!bfHumanU(u)))? ARMIES.find(ar=>ar.id===META.laserOn) : null;   // only YOUR figures pack lasers
       if(lz){ bfSfx(SFX.laser, u.x, u.y); } else { bfSfx(u.type==='mgunner'?SFX.mg:SFX.pew, u.x, u.y); }
       const mox=u.x+(off?16.5:16)*mzl, moy=(u.type==='sarge')? (off? u.y-30.7 : u.y-41) : u.y-26;
@@ -26626,10 +26783,13 @@ function renderShop(){
       // mirror can never lie), six molded accessories racked beside him. The
       // card is the purchase AND the toggle (the dye-jar convention). Not one
       // word in here mentions what a worn piece quietly does — Wyatt's call.
+      // v2.36 (Wyatt: "Let's just remove all that. The player already
+      // knows."): the how-to counsel line is CUT too — the department stands
+      // on its header and the man in the mirror. Six l10n rows went with it.
       +'<section class="sh-dept" id="shOutfit"><h2>SARGE\'S OUTFITS<small>DRESS THE MAN · WEAR IT OR LEAVE IT IN THE FOOTLOCKER</small></h2>'
         +'<div class="sh-oshelf"><div class="sh-oroom"><img src="'+menuSargeURI(dyeHex()||undefined)+'" alt=""><div class="sh-ostand"></div></div>'
         +'<div class="sh-ocards">'+OUTFIT_ORDER.map(shopOutfitHTML).join('')+'</div></div>'
-        +'<div class="sh-counsel">buy a piece and he wears it everywhere he goes · tap it any time to take it off or put it back on</div></section>'
+        +'</section>'
       +'<section class="sh-dept" id="shDecor"><h2>ROOM DECORATIONS<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING · PUT AWAY ANY TIME</small></h2>'
         +'<div class="sh-decrow">'+['elephant','teddy','train','robot','spacerug','ducky','racecar','helmet','warplane'].map(shopDecHTML).join('')+'</div>'
         +'<div class="sh-decbig">'+shopBankHTML()+shopDecHTML('banana')+'</div></section>'
@@ -28452,10 +28612,12 @@ window.GVT = {
     chosen:META.saberColor, chosenName:META.saberColor?sabName(META.saberColor):null,
     hex:saberHex(), owned:(META.sabColOwned||[]).map(sabName), stars:META.starBank,
     weapon:META.sargeWeapon }; },
-  // ===== SARGE'S OUTFITS RIG (v2.16) — the rack in one read. The quiet
-  // number prints nowhere a player can see; this is the harness's own door.
+  // ===== SARGE'S OUTFITS RIG (v2.16 · v2.36) — the rack in one read, plus
+  // the tuned bag and the payout multipliers. Nothing here prints anywhere a
+  // player can see; this is the harness's own door.
   outfit(){ return { stars:META.starBank, own:(META.outfit.own||[]).slice(),
-    wear:(META.outfit.wear||[]).slice(), fit:outfitFit(),
+    wear:(META.outfit.wear||[]).slice(), fit:outfitFit(), bag:sargeStats(),
+    starMul:+gearStarMul().toFixed(4), xpMul:+gearXpMul().toFixed(4),
     prices:OUTFIT_ORDER.map(id=>id+':'+OUTFIT_COST[id]+(outfitOwns(id)?(outfitOn(id)?' WORN':' OWNED'):'')) }; },
   // ===== ROOM DECORATIONS RIG =====
   // GVT.decor() reads the whole department, GVT.decorTap('robot') fires a
