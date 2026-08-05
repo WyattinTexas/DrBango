@@ -2244,7 +2244,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.43</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.44</div>
   <div class="scanlines"></div>
 </div>
 
@@ -9560,6 +9560,9 @@ const BF_MOVE = {
   // v2.35: the MG now pays ×1.7 into this hull (MG_JEEP_BONUS) from 125 reach —
   // one gunner still doesn't solo-stop a full-hp jeep across its dash, but he
   // takes most of the hull with him and TWO stop it well short. The law holds.
+  // v2.44: reach is 150 now — the window widens ~0.2s at pace 221, and the
+  // root never bites here (a gunner IN a jeep's lane is standing his ground
+  // anyway). Re-measured: one full-hp jeep still crosses a lone gunner's fire.
   bfjeep:     { moveSpd:130, hp:24 },
   bftank:     { moveSpd:22,  hp:40 }
 };
@@ -12814,8 +12817,14 @@ const UDEF = {
   // Wyatt 8/4: "Increase range of bazooka and machine gun by 15%" — MG reach
   // 109 → 125, bazooka 150 → 173 (nearest whole px of ×1.15); the LONG TUBE
   // still MULTIPLIES ×1.6 on top, so the tube rides 240 → 276.8 with it.)
+  // v2.44, Wyatt 8/5: "his range should be 20% further" — MG 125 → 150 (×1.2
+  // exact). This is the ONE reach cell the class reads on BOTH carpets:
+  // BF_MOVE has never carried an mgunner rng override (the rifleman's 120 is
+  // that table's own), so campaign, battleground and every AI chair move
+  // together. The price of the reach is THE ROOTED BURST (MG_ROOT, declared
+  // beside MG_JEEP_BONUS): shooting PLANTS him for two whole seconds.
   rifleman:{ rng:198, rate:1.15, dmg:1, air:true,  grit:3, name:'RIFLEMAN' },
-  mgunner: { rng:125, rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },
+  mgunner: { rng:150, rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },
   bazooka: { rng:173, rate:0.32, dmg:4, air:false, grit:3, splash:55, scatter:84, vx2:true, name:'BAZOOKA' },
   mortar:  { rng:9999, minRng:120, rate:0.2, dmg:3, air:false, grit:3, splash:60, scatter:98, name:'MORTAR' },
   sarge:   { rng:108, rate:PISTOL_RATE, dmg:1.5, air:true,  grit:4, name:'SARGE' },
@@ -12852,7 +12861,7 @@ const UDEF = {
 };
 const FDEF = {
   tanrifle:{ hp:2,  spd:40, bounty:5,  leak:1, w:50, rng:198, fireCd:3.2, name:'tan' },  // matches your rifleman's ADVANCED FIRING reach (v1.40) — the ~0.5s aim wind-up is their only tell
-  tanmg:   { hp:3,  spd:34, bounty:8,  leak:1, w:54, rng:112, fireCd:2.6, burst:2 },  // 0117: the 18289 literal moved onto the table — burst:2 IS the shipped 3-round brrrt (one aimed + two chased), verbatim
+  tanmg:   { hp:3,  spd:34, bounty:8,  leak:1, w:54, rng:134, fireCd:2.6, burst:2 },  // 0117: the 18289 literal moved onto the table — burst:2 IS the shipped 3-round brrrt (one aimed + two chased), verbatim. v2.44: rng 112→134 (×1.2 of the class retune — it's the MACHINE GUNNER that reaches further, not the player's copy of him; his green twin still out-reaches him 150 to 134, the v2.35 order kept) — and he pays the same ROOTED BURST law (tanShoot arms f.mgRootT, the walking brrrt now fires from a standstill)
   crawler: { hp:1,  spd:72, bounty:4,  leak:1, w:50, low:true, rng:110, fireCd:4 },
   // 0117: the officer's whole aura moved onto the table too (the one inline
   // 110px/×1.3 scan becomes the caster pass every broadcaster below shares)
@@ -16717,6 +16726,19 @@ const JEEP_SABER_RESIST=0.25;    // a blade scratches paint
 // battleground, a relayed ally's gunner, the AI seats — pays it identically,
 // and a CRIT stacks on top exactly as it does for every round (×2 then ×1.7).
 const MG_JEEP_BONUS=1.7;
+// v2.44 THE ROOTED BURST (Wyatt 8/5: "when he shoots, he has to stop for two
+// whole seconds moving forward. He can't just shoot, move forward, shoot,
+// move forward... his range should be 20% further"): the other half of the
+// MG's 150 reach. EVERY machine-gunner trigger pull — green combat round,
+// siege volley, the tan twin's aimed round and both chased burst rounds —
+// re-arms a two-second clock (u.mgRootT / f.mgRootT), and while it runs his
+// FEET are spoken for: the march gates in bfUnitStep/campUnitStep and the
+// tan movement freeze all read it. Firing is still allowed while planted
+// (the dig-in idiom — a rooted gunner is a turret, not a statue); it is
+// ADVANCING with a hot barrel that died today. Both sides, both carpets,
+// every chair — it's the class, not the seat. Seconds are sim dt at the
+// loop heads (the saberCd law), so speed rungs scale it with everything else.
+const MG_ROOT=2.0;
 function jeepKind(t){ return t==='jeep'||t==='bfjeep'; }
 // is this figure a Sarge with the blade actually in hand?
 function saberArm(x){ return !!x && x.type==='sarge' && !x.dead && unitSargeStats(x).w==='lightsaber'; }
@@ -17194,6 +17216,14 @@ function bfUnitStep(u,dt){
   const b=S.bf.base[enemySide(u)];
   const atBase=bfAtBase(u,b);
   if(!tgt && !atBase){
+    // v2.44 THE ROOTED BURST (Wyatt 8/5: "he has to start shooting and then
+    // wait two seconds, then he can go"): a gunner whose barrel is still hot
+    // holds his ground — return TRUE, the dig-in idiom, so the weapon loop
+    // below keeps his gun up (under a radio aura it may even speak) while his
+    // feet stay planted. The clock cools at the loop head; only two clear
+    // seconds after his last round does the zig below get him back. Both BF
+    // sides read this line — it's the class, not the seat.
+    if(u.mgRootT>0) return true;
     // real people don't march a ruler line (Wyatt 7/24): every man walks his own
     // zig — a fresh sub-goal every second or so, a rare hitch in his step — and
     // only funnels straight onto the box over the last stretch
@@ -17392,6 +17422,7 @@ function campSmash(u,dist){
   // Same table damage, same cadence, same wrecking-crew law — the weapon is
   // the PRESENTATION, not a second balance.
   const arm=(u.type==='sarge')? unitSargeStats(u).w : u.type;
+  if(u.type==='mgunner') u.mgRootT=MG_ROOT;   // v2.44: a siege volley is a trigger pull too — a sieging man never marches mid-pour today (the halt and TB.dead both park him), so this line is the invariant made airtight, not a behavior
   const tx=b.x-10+(Math.random()-0.5)*30, ty=b.y-42+(Math.random()-0.5)*26;
   if(arm==='lightsaber'){
     S.fx.push({k:'ring',x:tx,y:ty,r:5,R:42,t:0,dur:0.24,col:saberHexU(u)});
@@ -17600,6 +17631,13 @@ function campUnitStep(u,dt){
     }
     if(TB.dead){ u.marching=false; return true; }   // the crate is falling — stand and watch it go
   }
+  // v2.44 THE ROOTED BURST, campaign edition — the same two seconds
+  // bfUnitStep holds (every trigger pull re-arms it at the shot). Placed
+  // BELOW the in-reach halt, the dig-in and the siege on purpose: a rooted
+  // gunner still FIGHTS whatever walks in and still pours on the crate —
+  // what he may not do is ADVANCE with a hot barrel. The march machinery
+  // below never hears from him until the clock is clear.
+  if(u.mgRootT>0){ u.marching=false; return true; }
   // v1.48: a war on the rug outranks the stroll — the march aims at the
   // nearest foe whenever one stands (see campNearestFoe above); the crate and
   // the forward line are where he goes when the carpet is quiet.
@@ -18621,6 +18659,7 @@ function tanPick(f){
 function tanShoot(f){
   const best=tanPick(f);
   if(best){ (f.type==='tanmg'?SFX.mg:f.type==='tansniper'?SFX.crack:SFX.tpew)();
+    if(f.type==='tanmg') f.mgRootT=MG_ROOT;   // v2.44 THE ROOTED BURST, tan side — the aimed round AND both chased rounds land here, so the burst re-arms the root round by round; the movement freeze reads it beside aimT
     // v2.28: the duck blocks the TAN line too — he is neutral chaos, not a
     // green ally. Same segment tanHit's tracer draws (their muzzle to the
     // chest), so the round visibly dies on the toy; a blocked round rolls
@@ -21591,7 +21630,13 @@ function update(dt){
     }
     const px=f.x, py=f.y;
     aura*=f.spdMul||1;
-    if(f.aimT>0){ if(dt>0){ f.vx=0; f.vy=0; } }   // stopped to shoot — your window
+    if(f.mgRootT>0) f.mgRootT-=dt;   // v2.44: the tan gunner's root cools on his own loop head (the green law, mirrored)
+    // v2.44: the MG stays stopped TWO SECONDS past his last round (mgRootT
+    // rides beside aimT in this freeze) — the "walks his burst in" brrrt
+    // below fires from a standstill now, and the walk back to his formation
+    // slot waits out the clock (the slot marches on; the spring's own ×1.8
+    // catch-up brings him back — the aimT law, just longer).
+    if(f.aimT>0 || f.mgRootT>0){ if(dt>0){ f.vx=0; f.vy=0; } }   // stopped to shoot — your window
     else {
     // the river funnels everyone to the bridge — except crawlers, who slip under
     const RV=S.cfg.terrain.river;
@@ -21854,6 +21899,7 @@ function update(dt){
     if(u.sprue>0) u.sprue-=dt;
     if(u.saberCd>0) u.saberCd-=dt;   // saber rest ticks even mid-march (BF) — he dashes in without the stand-and-wait
     if(u.sgCd>0) u.sgCd-=dt;         // the gap-close dash re-arms the same way (v1.67) — sim dt, loop head only
+    if(u.mgRootT>0) u.mgRootT-=dt;   // v2.44 THE ROOTED BURST cools here too (the saberCd law) — standing, ducked or down, two sim-seconds from his last round buy his feet back
     if(u.cmdSwT>0) u.cmdSwT-=dt;     // 0092 the commander's swing recovery — the same law (re-arms on the walk between fights)
     if(u.cmdFx>0) u.cmdFx-=dt;       // ...and his arm settles mid-stride (draw timer, sim dt like the forend's)
     if(u.snipeT>0) u.snipeT-=dt;     // the long rifle's recoil rides out on the figure
@@ -22144,6 +22190,7 @@ function update(dt){
       if(rollCrit(u)){ dmgF*=critMult(u); critFx(tgt); }   // the trigger-men: rifleman / MG / Sarge's pistol (v2.36: teal rides the multiplier)
       const lz = (META.laserOn && !(S.bf&&!bfHumanU(u)))? ARMIES.find(ar=>ar.id===META.laserOn) : null;   // only YOUR figures pack lasers
       if(lz){ bfSfx(SFX.laser, u.x, u.y); } else { bfSfx(u.type==='mgunner'?SFX.mg:SFX.pew, u.x, u.y); }
+      if(u.type==='mgunner') u.mgRootT=MG_ROOT;   // v2.44 THE ROOTED BURST: the trigger pull itself plants him — every round re-arms the two seconds (a duck-blocked round too: he FIRED), so a gunner working a target never creeps between bursts
       // v2.39 (Wyatt 8/4: "The laser coming out of the machine gunner is
       // coming out of his head, kind of. It needs to come out of the end of
       // the trigger."): the shared origin (+16,−26) was written for a
