@@ -2244,7 +2244,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.46</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.47</div>
   <div class="scanlines"></div>
 </div>
 
@@ -9412,7 +9412,7 @@ const GREEN='#4A6B35', TAN='#C09E6C', CREAM='#EDEADF', INK='#26281F';
 // 0121 THE COMMANDO: 175 lands between the flame's 150 and the mortar's 200 —
 // exactly where an elite heavy belongs (Wyatt's number, verbatim). His unlock
 // is a campaign milestone (beat L50), never a ★ purchase — see cmdoOwned().
-const COSTS = { rifleman:40, mgunner:100, bazooka:150, mortar:200, sarge:0, minesweeper:120, flame:150, radioman:100, commando:175, spy:60 };   // v2.42: the spy at 60 — a rifleman and a half for the sprint and the cloak
+const COSTS = { rifleman:40, mgunner:100, bazooka:150, mortar:200, sarge:0, minesweeper:120, flame:150, radioman:100, commando:175, spy:75 };   // v2.47 (Wyatt 8/5): the spy at 75 — near two riflemen for the sprint, the cloak and the faster pistol (was 60)
 
 // ================= BATTLEFIELD MODE =================
 // A two-sided lane-pusher on a doubled, mirrored carpet. Both armies live in
@@ -9460,7 +9460,7 @@ const BF_COST   = Object.assign({}, COSTS, { bfjeep:250, bftank:500 });
 // keep the rule, so killing a tank funds a tank of your own eventually
 // (0121: the commando's 88 is 175's half rounded UP — the one non-integer half
 // on the board; every other bounty is exactly half its sticker)
-const BF_BOUNTY = { rifleman:20, minesweeper:60, flame:75, mgunner:50, radioman:50, bazooka:75, mortar:100, sarge:50, commando:88, spy:30, bfjeep:125, bftank:250 };   // v2.42: the spy keeps the exactly-half law (60 → 30)
+const BF_BOUNTY = { rifleman:20, minesweeper:60, flame:75, mgunner:50, radioman:50, bazooka:75, mortar:100, sarge:50, commando:88, spy:38, bfjeep:125, bftank:250 };   // v2.47: the spy keeps the exactly-half law at his new 75 price — 37.5 rounds up to 38, the commando's own 175→88 precedent
 const BF_TICK   = 20;    // dog tags per 10s passive drip
 const BF_START  = 210;   // opening purse — the campaign's exact wallet
 // ===== SARGE'S RESPAWN COOLDOWN (v1.25, Wyatt 7/25: "10 seconds") =====
@@ -9535,6 +9535,11 @@ const BF_MOVE = {
   // cloak IS his armour, and it runs out. rng 70 = his own very short gun
   // (the UDEF cell, restated here because BF reach overrides are this
   // table's job — the rifleman's 120 precedent).
+  // v2.47 (Wyatt 8/5): the sprint is the CLOAK's now — "reduced to a regular
+  // rifleman speed when they come out of stealth". This row is his cloaked
+  // pace; the decloak moment (the cloakT expiry site) writes the rifleman's
+  // own live cell into his per-unit def copy, so the drop quotes the table
+  // on either carpet and can never drift from the trooper it names.
   spy:        { moveSpd:88, hp:2, rng:70 },
   sarge:      { moveSpd:40, hp:6 },
   // ===== THE MOTOR POOL (Wyatt 7/25) — the only two pieces on this carpet that
@@ -12860,13 +12865,14 @@ const UDEF = {
   commando:{ rng:220, rate:0.25, dmg:3, air:false, grit:4, name:'COMMANDO' },
   // v2.42 THE SPY — the discovered man (see the SPY panel by cmdoOwned). rng
   // 70: the shortest gun on either carpet, under the flame's 85 — "a very
-  // short-range pistol" means up close is the only place he wins. rate 3.2:
-  // a hair past Sarge's own tuned sidearm (3.06) — "it fires very fast".
-  // dmg 0.5 at that cadence = 1.6 dps, a rifleman-and-a-half paid entirely
-  // in reach he has to earn. grit 2: the only 2 on the green roster — "a
-  // pretty light unit. Low health." His cloak lives on the figure (cloakT),
-  // never in this row — the campaign dump rig extracts this band verbatim.
-  spy:     { rng:70,  rate:3.2, dmg:0.5, air:false, grit:2, name:'SPY' },
+  // short-range pistol" means up close is the only place he wins. rate 3.84:
+  // v2.47 (Wyatt 8/5: "They should fire 20% faster when they attack") —
+  // 3.2×1.2 exact, now clearly past Sarge's tuned sidearm (3.06); dmg 0.5 at
+  // that cadence = 1.92 dps, still paid entirely in reach he has to earn.
+  // grit 2: the only 2 on the green roster — "a pretty light unit. Low
+  // health." His cloak lives on the figure (cloakT), never in this row — the
+  // campaign dump rig extracts this band verbatim.
+  spy:     { rng:70,  rate:3.84, dmg:0.5, air:false, grit:2, name:'SPY' },
   // ===== BATTLEGROUND-ONLY (Wyatt 7/25). Never in TRAY_ORDER, the shop, the
   // Field Manual or a campaign level — the campaign roster is untouched. The
   // jeep carries no gun at all (rate 0 keeps it out of the weapon code entirely;
@@ -21931,6 +21937,15 @@ function update(dt){
       if(u.cloakT<=0){ u.cloakT=0;
         S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:34,t:0,dur:0.3,col:'rgba(255,255,255,0.7)'});
         bfSfx(SFX.blip, u.x, u.y);
+        // v2.47 (Wyatt 8/5): "They are reduced to a regular rifleman speed
+        // when they come out of stealth." The sprint was the cloak's — the
+        // decloak writes the RIFLEMAN'S OWN live cell into his per-unit def
+        // copy (BF reads the ×BF_PACE-baked column, the campaign reads the
+        // raw CAMP_SPD capture — quoted, never copied, so a pace retune to
+        // the trooper carries the spy's fallback with it). One write at the
+        // one transition site; the manual card already scoped "twice as
+        // fast" to the invisible window, so the prose stops lying for free.
+        if(u.type==='spy') u.def.moveSpd = S.bf? BF_MOVE.rifleman.moveSpd : CAMP_SPD.rifleman;
       }
     }
     // THE DROP (v1.45): the radio man's own clock, ABOVE every skip below it —
@@ -22793,8 +22808,11 @@ function drawRug(){
   if(S.momToys) drawMomToys();
   // wrecking balls last — tallest thing on the carpet (0129: the mode gate is
   // gone — the dressed campaign rugs patrol too, and every undressed rug has
-  // no balls key, so this loop is byte-still there)
-  for(const bl of (S.cfg.terrain.balls||[])) drawWreckBall(bl);
+  // no balls key, so this loop is byte-still there). v2.47 (Wyatt 8/5: "The
+  // ball needs to be a higher layer than the corpses."): on the BATTLEGROUND
+  // the balls lift out of the rug pass and draw after the fallen instead —
+  // the campaign keeps this spot byte-what-it-was (its plow makes no corpses).
+  if(!S.bf) for(const bl of (S.cfg.terrain.balls||[])) drawWreckBall(bl);
   if(snow) drawSnowFall(WD);          // under the figures: drawRug runs first
 }
 // ================= THE WINTER FIELD: the ground itself =================
@@ -23540,6 +23558,14 @@ function draw(){
   cx.globalAlpha=0.85;
   for(const c of S.corpses) drawSprite(c.type,c.x,c.y,c.w,c.rot,0,c.img,c.flip);
   cx.globalAlpha=1;
+
+  // v2.47 (Wyatt 8/5): "The ball needs to be a higher layer than the
+  // corpses." — the battleground's wrecking balls draw HERE now, above the
+  // fallen (a crushed man lies UNDER the ball that got him) and still under
+  // the mines, tags and every living figure, exactly where the rug pass left
+  // them otherwise. The campaign's balls stay in drawRug (no corpses to duck
+  // under — the plow never kills), so its layer order is byte-what-it-was.
+  if(S.bf) for(const bl of (S.cfg.terrain.balls||[])) drawWreckBall(bl);
 
   // mines (armed = red eye) — a jack (v2.15) wears its own toy sprite instead
   for(const mn of S.mines){
