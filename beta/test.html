@@ -9,28 +9,40 @@
 <script src="vendor/phaser.min.js"></script>
 <script src="game.js"></script>
 <script>
+// Scenarios: ?s=cascade (default) — thrown 1 fuses a 1, result leaps to a 2.
+//            ?s=push — thrown 2 shoves a 1 into another 1; pushed dice must merge.
 window.addEventListener('load', () => {
+  window.RUNEFALL_DEBUG = true;
+  const scenario = new URLSearchParams(location.search).get('s') || 'cascade';
   setTimeout(() => {
     try {
       const game = window.__runefall;
       const scene = game.scene.keys.game;
-      console.log('TEST: scene ok, seeded dice=' + scene.dice.length);
-      // clear the seeded board
+      console.log('TEST(' + scenario + '): scene ok, seeded dice=' + scene.dice.length);
       [...scene.dice].forEach(d => scene.destroyDie(d));
-      // two targets: a 1 straight up from the launcher, and a 2 off to the side
-      const d1 = scene.makeDie(scene.launcherPos.x, scene.H * 0.25, 1, 'rest');
-      const d2 = scene.makeDie(scene.W * 0.75, scene.H * 0.3, 2, 'rest');
-      d1.restingSince = 0; d2.restingSince = 0;
-      scene.nextValue = 1;
+      const mk = (x, y, v) => {
+        const d = scene.makeDie(x, y, v, 'rest');
+        d.restingSince = 0;
+        return d;
+      };
+      if (scenario === 'cascade') {
+        mk(scene.launcherPos.x, scene.H * 0.25, 1);
+        mk(scene.W * 0.75, scene.H * 0.3, 2);
+        scene.nextValue = 1;
+      } else { // push
+        mk(scene.launcherPos.x, scene.H * 0.52, 1);
+        mk(scene.launcherPos.x, scene.H * 0.36, 1);
+        scene.nextValue = 2;
+      }
       scene.setReady(true);
-      // fire straight up at the 1
       scene.fire({ x: 0, y: -14 });
-      console.log('TEST: fired');
+      console.log('TEST(' + scenario + '): fired');
       setTimeout(() => {
         const vals = scene.dice.map(d => d.value + ':' + d.state).join(', ');
-        console.log('TEST RESULT chain=' + scene.chain + ' best=' + scene.bestChain +
-          ' dice=[' + vals + '] ready=' + scene.ready);
-      }, 6000);
+        console.log('TEST RESULT ' + scenario + ' chain=' + scene.chain +
+          ' best=' + scene.bestChain + ' dice=[' + vals + '] ready=' + scene.ready +
+          ' loftCount=' + scene.loftCount);
+      }, 6500);
     } catch (e) {
       console.log('TEST ERROR: ' + e.message + '\n' + e.stack);
     }

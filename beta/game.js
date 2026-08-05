@@ -1,13 +1,14 @@
 'use strict';
 
 // ============================================================
-// RUNEFALL — Phase 0 "Feel Prototype"    v0.2.0
-// Billiards-feel dice flicking. Equal values fuse into value+1;
-// the fused die LEAPS to the nearest match and the chain runs.
+// RUNEFALL — Phase 0 "Feel Prototype"    v0.3.0
+// Billiards-feel dice flicking, Rune Dice style. Equal values
+// that collide at speed BOUNCE INTO THE AIR and fuse at the
+// apex into value+1; the fused die leaps at the nearest match.
 // The board persists between throws — that's the design thesis.
 // ============================================================
 
-const VERSION = 'v0.2.0';
+const VERSION = 'v0.3.0';
 
 // ---- Tunable knobs (everything feel-related lives here) ----
 const TUNE = {
@@ -32,19 +33,26 @@ const TUNE = {
   SETTLE_SPEED: 0.35,
   SETTLE_MS: 220,
 
-  // cascade pacing: pop-in, breath, leap, impact
-  BOUNCE_IN_MS: 130,
+  // ANY equal-value contact at this speed merges — pushed dice
+  // chain too, not just the thrown die
+  MERGE_PUSH_SPEED: 1.0,
+
+  // merge choreography: both dice hop up, fuse at the apex,
+  // and the result either leaps onward or bounce-lands
+  RISE_MS: 180,
+  RISE_HEIGHT_FRAC: 1.0,  // × dieSize
+  FALL_MS: 420,           // Bounce.easeOut → visible double bounce
   HOP_PAUSE_MS: 90,
   HOP_BASE_MS: 260,
   HOP_PER_PX: 0.5,
-  HOP_HEIGHT_FRAC: 1.5,   // × dieSize, plus a little per px of distance
+  HOP_HEIGHT_FRAC: 1.5,
 
   // merge impact physics: the explosion shoves nearby dice
-  KNOCK_RADIUS_FRAC: 2.7, // × dieSize
+  KNOCK_RADIUS_FRAC: 2.7,
   KNOCK_SPEED: 3.6,
   KNOCK_PER_CHAIN: 0.45,
 
-  SPIN_RATE: 0.05,        // visual tumble per px/step of speed
+  SPIN_RATE: 0.05,
   TRAIL_MIN_SPEED: 4,
 };
 
@@ -59,19 +67,24 @@ const feedback = {
   },
 };
 
+// Rune Dice palette: light warm die bodies, dark plum numbers
 const VALUE_COLORS = {
-  1: 0x8492a6, 2: 0x2ecc71, 3: 0x3b82f6,
-  4: 0xa855f7, 5: 0xf97316, 6: 0xfbbf24,
+  1: 0xf2efe4, 2: 0xe4bf7e, 3: 0x8ec873,
+  4: 0x6fb3dd, 5: 0xa98ae0, 6: 0xf2b23e,
 };
+const NUMBER_COLOR = '#443355';
 
-// standard pip layouts on a 3x3 grid (-1..1 in x and y)
-const PIPS = {
-  1: [[0, 0]],
-  2: [[-1, -1], [1, 1]],
-  3: [[-1, -1], [0, 0], [1, 1]],
-  4: [[-1, -1], [1, -1], [-1, 1], [1, 1]],
-  5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]],
-  6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]],
+const BOARD = {
+  page: 0x2e2018,       // outside the frame
+  frame: 0x4a3226,      // wood frame
+  frameGrain: 0x3e2a1e,
+  frameHi: 0x5e4130,
+  dirt: 0x7b5136,       // the felt... which is dirt now
+  dirtDark: 0x6f4830,
+  dirtLight: 0x875a3d,
+  apron: 0xa4744e,
+  cream: '#ead9b8',
+  creamDim: '#c9b391',
 };
 
 function weightedNextValue() {
@@ -87,8 +100,9 @@ function shade(color, f) { // f > 0 lighten, f < 0 darken
   return 'rgb(' + ch(r) + ',' + ch(g) + ',' + ch(b) + ')';
 }
 
-function hex(color) {
-  return '#' + color.toString(16).padStart(6, '0');
+function shadeHex(color, f) {
+  const rgb = shade(color, f).match(/\d+/g).map(Number);
+  return (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
 }
 
 // ------------------------------------------------------------
@@ -149,7 +163,7 @@ class GameScene extends Phaser.Scene {
     this.dice = [];
     this.nextId = 1;
     this.fuseQueue = [];
-    this.loftCount = 0;
+    this.loftCount = 0;     // merges/leaps in progress — blocks rearm
     this.thrownDie = null;
     this.chain = 0;
     this.bestChain = 0;
@@ -175,14 +189,13 @@ class GameScene extends Phaser.Scene {
       for (const pair of event.pairs) {
         const a = pair.bodyA.dieRef, b = pair.bodyB.dieRef;
         if (a && b) {
-          this.fuseQueue.push([a, b]);
-          // meaty die-on-die contact: squash pulse + spark
           const va = a.body ? a.body.speed : 0, vb = b.body ? b.body.speed : 0;
           const impact = Math.max(va, vb);
+          this.fuseQueue.push([a, b, impact]);
           if (impact > 3) {
             this.squash(a); this.squash(b);
             const mx = (a.img.x + b.img.x) / 2, my = (a.img.y + b.img.y) / 2;
-            this.sparks.burst(mx, my, 0xffffff, Math.min(6, 2 + impact | 0),
+            this.sparks.burst(mx, my, 0xd9c098, Math.min(6, 2 + impact | 0),
               { speedMin: 0.8, speedMax: 2.5, life: 260, scale: 0.5 });
             a.spinSign = Math.random() < 0.5 ? -1 : 1;
             b.spinSign = -a.spinSign;
@@ -191,6 +204,8 @@ class GameScene extends Phaser.Scene {
           const d = a || b;
           if (d.body && d.body.speed > 4) {
             this.squash(d);
+            this.sparks.burst(d.img.x, d.img.y, 0xd9c098, 3,
+              { speedMin: 0.6, speedMax: 2, life: 220, scale: 0.45 });
             d.spinSign = Math.random() < 0.5 ? -1 : 1;
           }
         }
@@ -210,7 +225,6 @@ class GameScene extends Phaser.Scene {
       this.aim = null;
       this.trajGfx.clear();
       this.bandGfx.clear();
-      this.layoutLauncher();
       if (launch) this.fire(launch);
       else this.previewImg.setPosition(this.launcherPos.x, this.launcherPos.y);
     });
@@ -227,8 +241,8 @@ class GameScene extends Phaser.Scene {
     this.dieSize = Phaser.Math.Clamp(
       Math.min(W, H) * TUNE.DIE_SIZE_FRAC, TUNE.DIE_SIZE_MIN, TUNE.DIE_SIZE_MAX);
     this.dieRadius = this.dieSize / 2;
-    this.rail = Math.max(8, Math.round(this.dieSize * 0.22));
-    this.launcherPos = { x: W / 2, y: H - this.dieSize * 1.35 };
+    this.rail = Math.max(10, Math.round(this.dieSize * 0.42));
+    this.launcherPos = { x: W / 2, y: H - this.dieSize * 1.45 };
     this.maxSpeed = W * TUNE.MAX_SPEED_FRAC;
     this.maxPull = H * TUNE.MAX_PULL_FRAC;
   }
@@ -265,8 +279,8 @@ class GameScene extends Phaser.Scene {
   makeTextures() {
     this.makeDieTextures();
     this.makeSoftTexture('spark', 32, 'rgba(255,255,255,1)', 'rgba(255,255,255,0)');
-    this.makeSoftTexture('shadow', 64, 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0)');
-    this.makeSoftTexture('flash', 96, 'rgba(255,255,255,0.95)', 'rgba(255,255,255,0)');
+    this.makeSoftTexture('shadow', 64, 'rgba(20,10,4,0.6)', 'rgba(20,10,4,0)');
+    this.makeSoftTexture('flash', 96, 'rgba(255,250,235,0.95)', 'rgba(255,250,235,0)');
   }
 
   makeSoftTexture(key, px, inner, outer) {
@@ -281,6 +295,8 @@ class GameScene extends Phaser.Scene {
     tex.refresh();
   }
 
+  // 3/4-view cube dice, Rune Dice style: big top face with a chunky
+  // number, darker front/side strips for depth, rounded silhouette.
   makeDieTextures() {
     const px = Math.round(this.dieSize * 2); // 2x for crispness
     for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
@@ -289,39 +305,53 @@ class GameScene extends Phaser.Scene {
       const tex = this.textures.createCanvas(key, px, px);
       const ctx = tex.getContext();
       const color = VALUE_COLORS[v];
-      const pad = px * 0.045, r = px * 0.24;
+      const pad = px * 0.03, depth = px * 0.13, r = px * 0.2;
       ctx.clearRect(0, 0, px, px);
-      // face with vertical gradient (light catches the top edge)
-      const grad = ctx.createLinearGradient(0, pad, 0, px - pad);
-      grad.addColorStop(0, shade(color, 0.28));
-      grad.addColorStop(0.45, hex(color));
-      grad.addColorStop(1, shade(color, -0.22));
+      // silhouette = the cube's darker sides (bottom + right visible)
       ctx.beginPath();
       this.roundedRectPath(ctx, pad, pad, px - pad * 2, px - pad * 2, r);
-      ctx.fillStyle = grad;
+      const sideGrad = ctx.createLinearGradient(0, 0, px * 0.3, px);
+      sideGrad.addColorStop(0, shade(color, -0.25));
+      sideGrad.addColorStop(1, shade(color, -0.48));
+      ctx.fillStyle = sideGrad;
       ctx.fill();
-      // bevel: dark outer edge, bright inner top highlight
-      ctx.lineWidth = px * 0.045;
-      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = px * 0.028;
+      ctx.strokeStyle = 'rgba(30,15,8,0.55)';
       ctx.stroke();
+      // top face, nudged up-left — the classic 3/4 cube read
+      const tw = px - pad * 2 - depth;
       ctx.beginPath();
-      this.roundedRectPath(ctx, pad + px * 0.05, pad + px * 0.05,
-        px - (pad + px * 0.05) * 2, px - (pad + px * 0.05) * 2, r * 0.75);
-      ctx.lineWidth = px * 0.025;
-      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      this.roundedRectPath(ctx, pad, pad, tw, tw, r * 0.85);
+      const topGrad = ctx.createLinearGradient(0, pad, 0, pad + tw);
+      topGrad.addColorStop(0, shade(color, 0.32));
+      topGrad.addColorStop(1, shade(color, 0.02));
+      ctx.fillStyle = topGrad;
+      ctx.fill();
+      ctx.lineWidth = px * 0.02;
+      ctx.strokeStyle = 'rgba(30,15,8,0.3)';
       ctx.stroke();
-      // pips: flat bright white with a dark rim — reads at phone size
-      const cell = px * 0.22, cx = px / 2, cy = px / 2, pr = px * 0.105;
-      for (const [gx, gy] of PIPS[v]) {
-        const x = cx + gx * cell, y = cy + gy * cell;
-        ctx.beginPath();
-        ctx.arc(x, y, pr, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-        ctx.lineWidth = px * 0.018;
-        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-        ctx.stroke();
-      }
+      // top-left inner highlight
+      ctx.beginPath();
+      this.roundedRectPath(ctx, pad + px * 0.045, pad + px * 0.045,
+        tw - px * 0.09, tw - px * 0.09, r * 0.65);
+      ctx.lineWidth = px * 0.02;
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.stroke();
+      // the number: big, chunky, dark plum like Rune Dice
+      const cx = pad + tw / 2, cy = pad + tw / 2;
+      ctx.font = `900 ${Math.round(tw * 0.62)}px -apple-system, "Arial Black", Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = px * 0.045;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.strokeText(String(v), cx, cy + tw * 0.04);
+      ctx.fillStyle = NUMBER_COLOR;
+      ctx.fillText(String(v), cx, cy + tw * 0.04);
+      // small echo of the number on the front strip
+      ctx.font = `900 ${Math.round(depth * 0.85)}px -apple-system, Arial, sans-serif`;
+      ctx.fillStyle = 'rgba(255,245,225,0.5)';
+      ctx.fillText(String(v), cx, px - pad - depth * 0.52);
       tex.refresh();
     }
   }
@@ -335,36 +365,48 @@ class GameScene extends Phaser.Scene {
     ctx.closePath();
   }
 
-  // ---------- the board: felt, dot grid, rails ----------
+  // ---------- the board: warm dirt field in a wooden frame ----------
 
   buildBoard() {
     if (this.boardGfx) this.boardGfx.destroy();
     const g = this.add.graphics().setDepth(0);
     this.boardGfx = g;
     const { W, H } = this, r = this.rail;
-    // felt
-    g.fillStyle(0x121826, 1);
+    // wooden frame
+    g.fillStyle(BOARD.frame, 1);
     g.fillRect(0, 0, W, H);
-    g.fillStyle(0x0d1220, 1);
-    g.fillRect(r, r, W - r * 2, H - r * 2);
-    // dot grid — subtle, helps you read speed and angles
-    g.fillStyle(0x27324a, 0.35);
-    const step = this.dieSize * 1.4;
-    for (let x = r + step; x < W - r; x += step)
-      for (let y = r + step; y < H - r; y += step)
-        g.fillCircle(x, y, 1.5);
-    // rails: bevelled billiard cushions
-    g.lineStyle(r, 0x2b3550, 1);
-    g.strokeRect(r / 2, r / 2, W - r, H - r);
-    g.lineStyle(2, 0x46567c, 1);
-    g.strokeRect(r, r, W - r * 2, H - r * 2);
-    g.lineStyle(2, 0x151b2c, 1);
-    g.strokeRect(1, 1, W - 2, H - 2);
-    // launcher apron
-    g.fillStyle(0x1a2236, 0.6);
-    g.fillCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.1);
-    g.lineStyle(2, 0x3d4a63, 0.9);
-    g.strokeCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.1);
+    g.lineStyle(2, BOARD.frameGrain, 0.7);
+    for (let y = 6; y < H; y += 14) {
+      g.lineBetween(0, y, W, y);
+    }
+    g.lineStyle(3, BOARD.frameHi, 0.5);
+    g.strokeRect(2, 2, W - 4, H - 4);
+    // dirt field
+    g.fillStyle(BOARD.dirt, 1);
+    g.fillRoundedRect(r, r, W - r * 2, H - r * 2, r * 0.6);
+    // mottled dirt texture
+    for (let i = 0; i < 70; i++) {
+      const bx = r + Math.random() * (W - r * 2);
+      const by = r + Math.random() * (H - r * 2);
+      const br = 8 + Math.random() * 30;
+      g.fillStyle(Math.random() < 0.5 ? BOARD.dirtDark : BOARD.dirtLight,
+        0.10 + Math.random() * 0.12);
+      g.fillEllipse(bx, by, br * 2, br * 1.2);
+    }
+    // inner shadow rim — the field sits below the frame
+    for (let i = 0; i < 4; i++) {
+      g.lineStyle(3, 0x241408, 0.18 - i * 0.035);
+      g.strokeRoundedRect(r + 1 + i * 3, r + 1 + i * 3,
+        W - (r + 1 + i * 3) * 2, H - (r + 1 + i * 3) * 2, r * 0.6);
+    }
+    // frame inner edge highlight
+    g.lineStyle(2, BOARD.frameHi, 0.9);
+    g.strokeRoundedRect(r - 2, r - 2, W - (r - 2) * 2, H - (r - 2) * 2, r * 0.6);
+    // launcher apron: a worn patch of lighter dirt
+    g.fillStyle(BOARD.apron, 0.25);
+    g.fillCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.2);
+    g.lineStyle(2, BOARD.apron, 0.6);
+    g.strokeCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.2);
   }
 
   // ---------- dice ----------
@@ -372,13 +414,14 @@ class GameScene extends Phaser.Scene {
   makeDie(x, y, value, state) {
     const shadow = this.add.image(x, y + this.dieSize * 0.16, 'shadow')
       .setDisplaySize(this.dieSize * 1.15, this.dieSize * 0.55)
-      .setAlpha(0.4).setDepth(8);
+      .setAlpha(0.35).setDepth(8);
     const img = this.add.image(x, y, 'die' + value)
       .setDisplaySize(this.dieSize, this.dieSize).setDepth(10);
     const die = {
       id: this.nextId++, value, img, shadow, body: null,
       baseScale: img.scaleX,
-      state, // 'rest' | 'active' | 'loft'
+      state, // 'rest' | 'active' | 'loft' | 'merge'
+      gx: x, gy: y, h: 0, popScale: 1,
       spinSign: Math.random() < 0.5 ? -1 : 1,
       slowMs: 0, restingSince: 0, dead: false, reserved: false,
     };
@@ -397,13 +440,30 @@ class GameScene extends Phaser.Scene {
     die.body = body;
   }
 
+  detachBody(die) {
+    if (die.body) {
+      this.matter.world.remove(die.body);
+      die.body.dieRef = null;
+      die.body = null;
+    }
+  }
+
   destroyDie(die) {
     die.dead = true;
-    if (die.body) { this.matter.world.remove(die.body); die.body.dieRef = null; die.body = null; }
+    this.detachBody(die);
     die.img.destroy();
     die.shadow.destroy();
     const i = this.dice.indexOf(die);
     if (i >= 0) this.dice.splice(i, 1);
+  }
+
+  // shared renderer for airborne dice: ground pos + height
+  renderAir(die) {
+    const hn = Phaser.Math.Clamp(die.h / (this.dieSize * 1.6), 0, 1);
+    die.img.setPosition(die.gx, die.gy - die.h);
+    die.img.setScale(die.baseScale * (1 + 0.45 * hn) * die.popScale);
+    die.shadow.setPosition(die.gx, die.gy + this.dieSize * 0.16);
+    die.shadow.setAlpha(0.35 * (1 - 0.65 * hn));
   }
 
   seedBoard() {
@@ -418,15 +478,16 @@ class GameScene extends Phaser.Scene {
           placed.push({ x, y });
           const d = this.makeDie(x, y, v, 'rest');
           d.restingSince = this.time.now;
-          // roll-out flourish: dice tumble in with a nudge
           d.img.setScale(0);
           d.img.rotation = Math.random() * Math.PI;
           this.tweens.add({
             targets: d.img, scale: d.baseScale, rotation: 0,
             duration: 320, delay: i * 45, ease: 'Back.easeOut',
           });
+          // nudge stays below MERGE_PUSH_SPEED so the opening
+          // roll-out can't fuse dice before the first throw
           const a = Math.random() * Math.PI * 2;
-          this.MatterLib.Body.setVelocity(d.body, { x: Math.cos(a) * 1.5, y: Math.sin(a) * 1.5 });
+          this.MatterLib.Body.setVelocity(d.body, { x: Math.cos(a) * 0.8, y: Math.sin(a) * 0.8 });
           break;
         }
       }
@@ -440,19 +501,19 @@ class GameScene extends Phaser.Scene {
     this.previewImg = this.add.image(0, 0, 'die' + this.nextQueue[0]).setDepth(12);
     this.nextLabel = this.add.text(0, 0, 'NEXT', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
-      color: '#5b6980', fontStyle: 'bold',
+      color: BOARD.creamDim, fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(11);
     this.queueImgs = [
-      this.add.image(0, 0, 'die1').setDepth(11).setAlpha(0.75),
-      this.add.image(0, 0, 'die1').setDepth(11).setAlpha(0.5),
+      this.add.image(0, 0, 'die1').setDepth(11).setAlpha(0.8),
+      this.add.image(0, 0, 'die1').setDepth(11).setAlpha(0.55),
     ];
     this.layoutLauncher();
   }
 
   layoutLauncher() {
     const { x, y } = this.launcherPos, s = this.dieSize;
-    this.previewImg.setPosition(x, y).setDisplaySize(s, s)
-      .setTexture('die' + this.nextQueue[0]).setDisplaySize(s, s);
+    this.previewImg.setPosition(x, y).setTexture('die' + this.nextQueue[0])
+      .setDisplaySize(s, s);
     this.queueImgs[0].setPosition(x + s * 2.1, y + s * 0.12)
       .setTexture('die' + this.nextQueue[1]).setDisplaySize(s * 0.55, s * 0.55);
     this.queueImgs[1].setPosition(x + s * 2.95, y + s * 0.12)
@@ -498,8 +559,7 @@ class GameScene extends Phaser.Scene {
     this.thrownDie = die;
     this.nextQueue.shift();
     this.nextQueue.push(weightedNextValue());
-    // muzzle flash on the pad
-    this.sparks.burst(x, y, 0xffffff, 6, { speedMin: 1, speedMax: 3, life: 240, scale: 0.5 });
+    this.sparks.burst(x, y, 0xead9b8, 6, { speedMin: 1, speedMax: 3, life: 240, scale: 0.5 });
   }
 
   // ---------- aiming: elastic band + honest trajectory + hit preview ----------
@@ -520,11 +580,11 @@ class GameScene extends Phaser.Scene {
 
     if (!launch) return; // under min pull: no band, no dots — release cancels
 
-    // elastic band from the pad rim to the die
-    const powerColor = Phaser.Display.Color.Interpolate.ColorWithColor(
-      new Phaser.Display.Color(120, 144, 180),
+    // elastic band from the pad rim to the die, cream -> hot with power
+    const pc = Phaser.Display.Color.Interpolate.ColorWithColor(
+      new Phaser.Display.Color(234, 217, 184),
       new Phaser.Display.Color(255, 96, 64), 100, Math.round(launch.frac * 100));
-    const bandTint = Phaser.Display.Color.GetColor(powerColor.r, powerColor.g, powerColor.b);
+    const bandTint = Phaser.Display.Color.GetColor(pc.r, pc.g, pc.b);
     band.lineStyle(3, bandTint, 0.9);
     const perp = Math.atan2(oy, ox) + Math.PI / 2;
     const rr = this.dieRadius * 1.4;
@@ -562,18 +622,18 @@ class GameScene extends Phaser.Scene {
       }
       if (travelled >= nextDot) {
         nextDot = travelled + this.dieSize * 0.55;
-        g.fillStyle(0xffffff, 0.75);
+        g.fillStyle(0xf5e6c8, 0.8);
         g.fillCircle(sx, sy, Math.max(2.5, r * 0.16));
       }
       if (Math.hypot(vx, vy) < 0.5) break;
     }
     // first-impact preview: ring the die you'll hit;
-    // green pulse if it's a fuse, white if it's just a shove
+    // green pulse if it's a fuse, cream if it's just a shove
     if (hitDie) {
       const fusing = hitDie.value === this.nextQueue[0];
-      const c = fusing ? 0x2ecc71 : 0xffffff;
+      const c = fusing ? 0x8ec873 : 0xf5e6c8;
       const pulse = 1 + 0.08 * Math.sin(this.time.now / 90);
-      g.lineStyle(3, c, fusing ? 1 : 0.55);
+      g.lineStyle(3, c, fusing ? 1 : 0.5);
       g.strokeCircle(hitDie.body.position.x, hitDie.body.position.y,
         this.dieRadius * 1.35 * (fusing ? pulse : 1));
     }
@@ -583,22 +643,59 @@ class GameScene extends Phaser.Scene {
 
   processFuseQueue() {
     while (this.fuseQueue.length) {
-      const [a, b] = this.fuseQueue.shift();
+      const [a, b, impact] = this.fuseQueue.shift();
       if (a.dead || b.dead) continue;
       if (a.value !== b.value) continue;
-      if (a.state !== 'active' && b.state !== 'active') continue; // resting dice never auto-fuse
-      this.fuse(a, b);
+      if (a.state === 'merge' || b.state === 'merge') continue;
+      // merge if either die was set moving by the player's throw OR
+      // the contact itself is fast — pushed dice chain too
+      const eligible = a.state === 'active' || b.state === 'active' ||
+        impact >= TUNE.MERGE_PUSH_SPEED;
+      if (eligible) this.fuse(a, b);
     }
   }
 
+  // Both dice bounce INTO THE AIR and fuse at the apex.
   fuse(a, b) {
     const value = a.value;
-    const ax = a.body ? a.body.position.x : a.img.x;
-    const ay = a.body ? a.body.position.y : a.img.y;
-    const bx = b.body ? b.body.position.x : b.img.x;
-    const by = b.body ? b.body.position.y : b.img.y;
-    const mx = (ax + bx) / 2, my = (ay + by) / 2;
-    if (a === this.thrownDie || b === this.thrownDie) this.thrownDie = null;
+    for (const d of [a, b]) {
+      d.reserved = true;
+      if (d === this.thrownDie) this.thrownDie = null;
+      this.detachBody(d);
+      if (d.state !== 'loft') { d.gx = d.img.x; d.gy = d.img.y; }
+      d.state = 'merge';
+      d.sx = d.gx; d.sy = d.gy; d.hStart = d.h;
+      d.startRot = d.img.rotation;
+      d.img.setDepth(20);
+    }
+    this.loftCount++;
+    const mx = (a.gx + b.gx) / 2, my = (a.gy + b.gy) / 2;
+    const riseH = this.dieSize * TUNE.RISE_HEIGHT_FRAC + (a.h + b.h) / 2;
+    const c = { t: 0 };
+    this.tweens.add({
+      targets: c, t: 1, duration: TUNE.RISE_MS, ease: 'Quad.easeOut',
+      onUpdate: () => {
+        for (const d of [a, b]) {
+          if (d.dead) continue;
+          d.gx = d.sx + (mx - d.sx) * c.t;
+          d.gy = d.sy + (my - d.sy) * c.t;
+          d.h = d.hStart + (riseH - d.hStart) * c.t;
+          d.img.rotation = d.startRot * (1 - c.t);
+          this.renderAir(d);
+        }
+      },
+      onComplete: () => {
+        if (a.dead || b.dead) { this.loftCount--; return; }
+        this.completeMerge(a, b, mx, my, riseH, value);
+      },
+    });
+  }
+
+  completeMerge(a, b, mx, my, riseH, value) {
+    if (window.RUNEFALL_DEBUG) {
+      console.log('MERGE ' + value + '+' + value + ' -> ' + (value + 1) +
+        ' at ' + Math.round(mx) + ',' + Math.round(my) + ' chain->' + (this.chain + 1));
+    }
     this.destroyDie(a);
     this.destroyDie(b);
 
@@ -606,41 +703,42 @@ class GameScene extends Phaser.Scene {
     if (this.chain > this.bestChain) this.bestChain = this.chain;
     feedback.chainStep(this.chain);
     this.flashChain();
-    this.mergeImpact(mx, my, value);
+    this.mergeImpact(mx, my, riseH, value);
 
     const newValue = value + 1;
     if (newValue > TUNE.MAX_VALUE) {
-      this.detonate(mx, my);
+      this.detonate(mx, my, riseH);
+      this.loftCount--;
       return;
     }
 
-    // the merged die pops in, takes a breath, then LEAPS at its prey
+    // the merged die is born at the apex
     const die = this.makeDie(mx, my, newValue, 'loft');
-    this.loftCount++;
+    die.gx = mx; die.gy = my; die.h = riseH;
     die.img.setDepth(20);
     die.shadow.setDepth(7);
-    die.img.setScale(0.2);
+    die.popScale = 0.3;
     this.tweens.add({
-      targets: die.img, scale: die.baseScale,
-      duration: TUNE.BOUNCE_IN_MS, ease: 'Back.easeOut',
+      targets: die, popScale: 1, duration: 150, ease: 'Back.easeOut',
+      onUpdate: () => this.renderAir(die),
     });
+    this.renderAir(die);
 
-    this.time.delayedCall(TUNE.BOUNCE_IN_MS + TUNE.HOP_PAUSE_MS, () => {
+    this.time.delayedCall(150 + TUNE.HOP_PAUSE_MS, () => {
       if (die.dead) { this.loftCount--; return; }
       const target = this.findNearestResting(newValue, die);
       if (target) {
         target.reserved = true;
         this.leap(die, target, 0);
       } else {
-        this.loftCount--;
-        this.landLoftedDie(die);
+        this.fallToGround(die);
       }
     });
   }
 
-  // parabolic leap with height, separating shadow, mid-air tumble
+  // parabolic leap from current height onto the target
   leap(die, target, chases) {
-    const sx = die.img.x, sy = die.img.y;
+    const sx = die.gx, sy = die.gy, h0 = die.h;
     const tx = target.body ? target.body.position.x : target.img.x;
     const ty = target.body ? target.body.position.y : target.img.y;
     const dist = Phaser.Math.Distance.Between(sx, sy, tx, ty);
@@ -651,19 +749,17 @@ class GameScene extends Phaser.Scene {
     this.tweens.add({
       targets: c, t: 1, duration: dur, ease: 'Sine.easeInOut',
       onUpdate: () => {
-        const gx = sx + (tx - sx) * c.t, gy = sy + (ty - sy) * c.t;
-        const h = Math.sin(Math.PI * c.t);
-        die.img.setPosition(gx, gy - h * hopH);
-        die.img.setScale(die.baseScale * (1 + 0.45 * h));
-        die.img.rotation = spinDir * Math.PI * 2 * c.t; // one full airborne flip
-        die.shadow.setPosition(gx, gy + this.dieSize * 0.16);
-        die.shadow.setAlpha(0.4 * (1 - 0.65 * h));
-        die.shadow.setScale(die.shadow.scaleX, die.shadow.scaleY); // size steady, alpha carries height
+        die.gx = sx + (tx - sx) * c.t;
+        die.gy = sy + (ty - sy) * c.t;
+        die.h = h0 * (1 - c.t) + hopH * Math.sin(Math.PI * c.t);
+        die.img.rotation = spinDir * Math.PI * 2 * c.t;
+        this.renderAir(die);
       },
       onComplete: () => {
-        if (die.dead) { this.loftCount--; return; }
         die.img.rotation = 0;
-        if (target.dead) { this.loftCount--; this.landLoftedDie(die); return; }
+        die.h = 0;
+        if (die.dead) { this.loftCount--; return; }
+        if (target.dead) { this.fallToGround(die); return; }
         const nx = target.body ? target.body.position.x : target.img.x;
         const ny = target.body ? target.body.position.y : target.img.y;
         const drift = Phaser.Math.Distance.Between(tx, ty, nx, ny);
@@ -672,31 +768,47 @@ class GameScene extends Phaser.Scene {
           return;
         }
         this.loftCount--;
-        this.fuse(die, target);
+        this.fuse(die, target); // both bounce up and fuse in the air
       },
     });
   }
 
-  landLoftedDie(die) {
-    die.state = 'active';
-    // drop back to the felt with a thud
+  // no match: fall from the apex and bounce out on the dirt
+  fallToGround(die) {
+    const h0 = Math.max(die.h, 1);
+    const c = { p: 0 };
     this.tweens.add({
-      targets: die.img, scale: die.baseScale, duration: 140, ease: 'Bounce.easeOut',
+      targets: c, p: 1, duration: TUNE.FALL_MS, ease: 'Bounce.easeOut',
+      onUpdate: () => {
+        die.h = h0 * (1 - c.p);
+        this.renderAir(die);
+      },
+      onComplete: () => {
+        die.h = 0;
+        die.img.setDepth(10);
+        die.shadow.setDepth(8);
+        this.renderAir(die);
+        die.state = 'active';
+        this.attachBody(die, die.gx, die.gy);
+        const a = Math.random() * Math.PI * 2;
+        this.MatterLib.Body.setVelocity(die.body, { x: Math.cos(a) * 1.4, y: Math.sin(a) * 1.4 });
+        this.sparks.burst(die.gx, die.gy + this.dieRadius * 0.5, 0xc9a878, 8,
+          { speedMin: 0.6, speedMax: 2.2, life: 320, scale: 0.6 });
+        this.squash(die);
+        this.loftCount--;
+      },
     });
-    this.attachBody(die, die.img.x, die.img.y);
-    const a = Math.random() * Math.PI * 2;
-    this.MatterLib.Body.setVelocity(die.body, { x: Math.cos(a) * 1.4, y: Math.sin(a) * 1.4 });
-    this.sparks.burst(die.img.x, die.img.y + this.dieRadius * 0.5, 0x8a97ad, 6,
-      { speedMin: 0.6, speedMax: 2, life: 300, scale: 0.6 });
   }
 
+  // nearest fusable die of this value — resting or still rolling
   findNearestResting(value, exclude) {
     let best = null, bestD = Infinity;
     for (const d of this.dice) {
       if (d === exclude || d.dead || d.reserved) continue;
-      if (d.value !== value || d.state !== 'rest' || !d.body) continue;
+      if (d.value !== value || !d.body) continue;
+      if (d.state !== 'rest' && d.state !== 'active') continue;
       const dist = Phaser.Math.Distance.Between(
-        exclude.img.x, exclude.img.y, d.body.position.x, d.body.position.y);
+        exclude.gx, exclude.gy, d.body.position.x, d.body.position.y);
       if (dist < bestD) { bestD = dist; best = d; }
     }
     return best;
@@ -704,32 +816,48 @@ class GameScene extends Phaser.Scene {
 
   // ---------- impact effects: this is where "physics" gets loud ----------
 
-  mergeImpact(x, y, value) {
-    const color = VALUE_COLORS[Math.min(value + 1, TUNE.MAX_VALUE)];
-    // white core flash
-    const flash = this.add.image(x, y, 'flash').setDepth(19)
+  mergeImpact(gx, gy, riseH, value) {
+    const apexY = gy - riseH;
+    const color = shadeHex(VALUE_COLORS[Math.min(value + 1, TUNE.MAX_VALUE)], -0.1);
+    // white core flash at the apex, where the fuse happens
+    const flash = this.add.image(gx, apexY, 'flash').setDepth(19)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDisplaySize(this.dieSize * 1.4, this.dieSize * 1.4);
     this.tweens.add({
       targets: flash, alpha: 0, scale: flash.scaleX * 2.4, duration: 240,
       onComplete: () => flash.destroy(),
     });
-    // shock ring
-    const ring = this.add.graphics().setDepth(19).setPosition(x, y);
-    ring.lineStyle(3.5, 0xffffff, 0.95);
+    const ring = this.add.graphics().setDepth(19).setPosition(gx, apexY);
+    ring.lineStyle(3.5, 0xfff4dc, 0.95);
     ring.strokeCircle(0, 0, this.dieRadius);
     this.tweens.add({
       targets: ring, scale: 2.6 + this.chain * 0.25, alpha: 0, duration: 320,
       onComplete: () => ring.destroy(),
     });
-    // colored debris
-    this.sparks.burst(x, y, color, Math.min(22, 10 + this.chain * 3),
+    this.sparks.burst(gx, apexY, color, Math.min(22, 10 + this.chain * 3),
       { speedMin: 1.5, speedMax: 5.5 + this.chain * 0.5, life: 480, scale: 0.9 });
+    // dust kicked up on the dirt below
+    this.sparks.burst(gx, gy + this.dieRadius * 0.4, 0xc9a878, 6,
+      { speedMin: 0.5, speedMax: 2, life: 340, scale: 0.7 });
 
-    // the merge explosion physically shoves nearby dice — the board
+    // the shockwave physically shoves nearby dice — the board
     // rearranges itself and cascades feel like they have mass
     const R = this.dieSize * TUNE.KNOCK_RADIUS_FRAC;
     const kick = TUNE.KNOCK_SPEED + this.chain * TUNE.KNOCK_PER_CHAIN;
+    this.knockback(gx, gy, R, kick);
+
+    this.cameras.main.shake(60 + this.chain * 12, 0.0016 + this.chain * 0.0008);
+    if (this.chain >= 3) {
+      const cam = this.cameras.main;
+      this.tweens.add({
+        targets: cam, zoom: 1.03 + Math.min(this.chain, 8) * 0.004,
+        duration: 70, yoyo: true, ease: 'Sine.easeOut',
+        onComplete: () => cam.setZoom(1),
+      });
+    }
+  }
+
+  knockback(x, y, R, kick) {
     for (const d of this.dice) {
       if (!d.body || d.dead) continue;
       const dx = d.body.position.x - x, dy = d.body.position.y - y;
@@ -743,44 +871,20 @@ class GameScene extends Phaser.Scene {
       });
       this.squash(d);
     }
-
-    // escalating camera: shake always, zoom-punch once it's a real chain
-    this.cameras.main.shake(60 + this.chain * 12, 0.0016 + this.chain * 0.0008);
-    if (this.chain >= 3) {
-      const cam = this.cameras.main;
-      this.tweens.add({
-        targets: cam, zoom: 1.03 + Math.min(this.chain, 8) * 0.004,
-        duration: 70, yoyo: true, ease: 'Sine.easeOut',
-        onComplete: () => cam.setZoom(1),
-      });
-    }
   }
 
-  detonate(x, y) {
-    // two maxed dice annihilate: the big payoff
-    this.sparks.burst(x, y, 0xfbbf24, 30, { speedMin: 3, speedMax: 8, life: 650, scale: 1.2 });
-    this.sparks.burst(x, y, 0xffffff, 14, { speedMin: 1, speedMax: 4, life: 450, scale: 0.8 });
-    const ring = this.add.graphics().setDepth(19).setPosition(x, y);
-    ring.lineStyle(5, 0xfbbf24, 1);
+  detonate(gx, gy, riseH) {
+    const apexY = gy - riseH;
+    this.sparks.burst(gx, apexY, 0xf2b23e, 30, { speedMin: 3, speedMax: 8, life: 650, scale: 1.2 });
+    this.sparks.burst(gx, apexY, 0xfff4dc, 14, { speedMin: 1, speedMax: 4, life: 450, scale: 0.8 });
+    const ring = this.add.graphics().setDepth(19).setPosition(gx, apexY);
+    ring.lineStyle(5, 0xf2b23e, 1);
     ring.strokeCircle(0, 0, this.dieRadius);
     this.tweens.add({
       targets: ring, scale: 5, alpha: 0, duration: 480,
       onComplete: () => ring.destroy(),
     });
-    const R = this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.8;
-    for (const d of this.dice) {
-      if (!d.body || d.dead) continue;
-      const dx = d.body.position.x - x, dy = d.body.position.y - y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > R || dist < 1) continue;
-      const f = (1 - dist / R) * TUNE.KNOCK_SPEED * 2.2;
-      this.MatterLib.Sleeping.set(d.body, false);
-      this.MatterLib.Body.setVelocity(d.body, {
-        x: d.body.velocity.x + (dx / dist) * f,
-        y: d.body.velocity.y + (dy / dist) * f,
-      });
-      this.squash(d);
-    }
+    this.knockback(gx, gy, this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.8, TUNE.KNOCK_SPEED * 2.2);
     this.cameras.main.shake(220, 0.006);
   }
 
@@ -793,7 +897,9 @@ class GameScene extends Phaser.Scene {
       duration: 55, yoyo: true, ease: 'Sine.easeOut',
       onComplete: () => {
         die.squashing = false;
-        if (!die.dead) die.img.setScale(die.baseScale);
+        if (!die.dead && die.state !== 'loft' && die.state !== 'merge') {
+          die.img.setScale(die.baseScale);
+        }
       },
     });
   }
@@ -808,7 +914,7 @@ class GameScene extends Phaser.Scene {
     for (let i = 0; i < excess; i++) {
       const d = resting[i];
       d.dead = true; // no longer fusable while fading
-      if (d.body) { this.matter.world.remove(d.body); d.body.dieRef = null; d.body = null; }
+      this.detachBody(d);
       this.tweens.add({
         targets: [d.img, d.shadow], alpha: 0, scale: d.img.scale * 0.5, duration: 420,
         onComplete: () => {
@@ -823,27 +929,27 @@ class GameScene extends Phaser.Scene {
   // ---------- HUD ----------
 
   buildHud() {
-    const style = { fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px', color: '#9aa4b2' };
-    this.fpsText = this.add.text(0, 0, '', { ...style, color: '#3fae6a' }).setDepth(30);
+    const style = { fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px', color: BOARD.creamDim };
+    this.fpsText = this.add.text(0, 0, '', { ...style, color: '#7ec96f' }).setDepth(30);
     this.bestText = this.add.text(0, 0, 'Best chain: 0', style).setOrigin(1, 0).setDepth(30);
     this.versionText = this.add.text(0, 0, VERSION, { ...style, fontSize: '12px' }).setOrigin(1, 1).setDepth(30);
     this.chainText = this.add.text(0, 0, '', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '46px',
-      fontStyle: 'bold', color: '#ffffff', stroke: '#000000', strokeThickness: 6,
+      fontStyle: 'bold', color: '#ffffff', stroke: '#3a2517', strokeThickness: 7,
     }).setOrigin(0.5).setAlpha(0).setDepth(30);
     this.layoutHud();
   }
 
   layoutHud() {
-    this.fpsText.setPosition(this.rail + 6, this.rail + 4);
-    this.bestText.setPosition(this.W - this.rail - 6, this.rail + 4);
-    this.versionText.setPosition(this.W - this.rail - 4, this.H - this.rail - 2);
+    this.fpsText.setPosition(this.rail + 8, this.rail + 6);
+    this.bestText.setPosition(this.W - this.rail - 8, this.rail + 6);
+    this.versionText.setPosition(this.W - this.rail - 6, this.H - this.rail - 4);
     this.chainText.setPosition(this.W / 2, this.H * 0.22);
   }
 
   flashChain() {
     const n = this.chain;
-    const color = n >= 7 ? '#ff5252' : n >= 5 ? '#ff9838' : n >= 3 ? '#ffd54a' : '#ffffff';
+    const color = n >= 7 ? '#ff5252' : n >= 5 ? '#ff9838' : n >= 3 ? '#ffd54a' : '#fff4dc';
     this.chainText.setText('CHAIN ×' + n).setColor(color)
       .setAlpha(1).setScale(1.35 + Math.min(n, 8) * 0.05)
       .setRotation((Math.random() - 0.5) * 0.06);
@@ -863,19 +969,21 @@ class GameScene extends Phaser.Scene {
 
     for (const d of this.dice) {
       if (!d.body) continue;
-      d.img.setPosition(d.body.position.x, d.body.position.y);
-      d.shadow.setPosition(d.body.position.x, d.body.position.y + this.dieSize * 0.16);
+      d.gx = d.body.position.x; d.gy = d.body.position.y;
+      d.img.setPosition(d.gx, d.gy);
+      d.shadow.setPosition(d.gx, d.gy + this.dieSize * 0.16);
       const speed = d.body.speed;
 
       // rolling tumble: fast dice visibly spin, slowing dice ease upright
       if (speed > 0.8 && !d.squashing) {
         d.img.rotation += d.spinSign * speed * TUNE.SPIN_RATE * (delta / 16.667);
         d.uprighting = false;
-      } else if (!d.uprighting && Math.abs(d.img.rotation % (Math.PI / 2)) > 0.02) {
+      } else if (!d.uprighting && Math.abs(d.img.rotation % (Math.PI * 2)) > 0.02) {
         d.uprighting = true;
-        const snapped = Math.round(d.img.rotation / (Math.PI / 2)) * (Math.PI / 2);
+        // settle the cube art back to upright — full turns only
+        const snapped = Math.round(d.img.rotation / (Math.PI * 2)) * (Math.PI * 2);
         this.tweens.add({
-          targets: d.img, rotation: snapped, duration: 160, ease: 'Sine.easeOut',
+          targets: d.img, rotation: snapped, duration: 220, ease: 'Sine.easeOut',
           onComplete: () => { if (!d.dead) d.img.rotation = 0; },
         });
       }
@@ -895,15 +1003,15 @@ class GameScene extends Phaser.Scene {
       }
     }
 
-    // speed trail on the thrown die
+    // dust trail on the thrown die
     if (this.thrownDie && this.thrownDie.body &&
       this.thrownDie.body.speed > TUNE.TRAIL_MIN_SPEED) {
       this.trailAccum += delta;
       if (this.trailAccum > 26) {
         this.trailAccum = 0;
         const d = this.thrownDie;
-        this.sparks.burst(d.img.x, d.img.y, VALUE_COLORS[d.value], 1,
-          { speedMin: 0, speedMax: 0.4, life: 300, scale: 0.85, drag: 1 });
+        this.sparks.burst(d.img.x, d.img.y + this.dieRadius * 0.4, 0xc9a878, 1,
+          { speedMin: 0, speedMax: 0.4, life: 320, scale: 0.8, drag: 1 });
       }
     }
 
@@ -911,8 +1019,8 @@ class GameScene extends Phaser.Scene {
     if (!this.ready) {
       const anyActive = this.thrownDie !== null ||
         this.loftCount > 0 ||
-        this.dice.some(d => d.state === 'active' || d.state === 'loft');
-      const timedOut = time - this.fireTime > 5000;
+        this.dice.some(d => d.state === 'active' || d.state === 'loft' || d.state === 'merge');
+      const timedOut = time - this.fireTime > 6000;
       if ((!anyActive || timedOut) && time - this.fireTime > 350) this.setReady(true);
     }
 
@@ -922,7 +1030,7 @@ class GameScene extends Phaser.Scene {
     if (this._fpsAccum > 250) {
       this._fpsAccum = 0;
       const fps = Math.round(this.game.loop.actualFps);
-      const color = fps >= 55 ? '#3fae6a' : fps >= 45 ? '#e6c229' : '#e74c3c';
+      const color = fps >= 55 ? '#7ec96f' : fps >= 45 ? '#e6c229' : '#e74c3c';
       this.fpsText.setColor(color).setText(fps + ' FPS · ' + this.dice.length + ' dice');
     }
   }
@@ -932,7 +1040,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game-container',
-    backgroundColor: '#0e1117',
+    backgroundColor: '#2e2018',
     scale: {
       mode: Phaser.Scale.RESIZE,
       width: window.innerWidth,
