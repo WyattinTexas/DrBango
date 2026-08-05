@@ -2244,7 +2244,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.42</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.43</div>
   <div class="scanlines"></div>
 </div>
 
@@ -10597,29 +10597,58 @@ const BF_AI = {
   medium: { every:2.3, hoard:60,  counterWeight:0.25, blunderP:0.32, safeDrop:true,  save:0.1, focus:'weak',   inc:0.82, wildP:0.32, motor:0.06 },
   hard:   { every:0.9, hoard:160, counterWeight:1.0,  blunderP:0.0,  safeDrop:true,  save:0.5, focus:'focus',  inc:1.0,  wildP:0,    motor:0.035 }
 };
-// v2.41 THE ROOKIE TIER (Wyatt 8/4): "we want the computer to lose — play at
-// about half the efficiency. The player should win their first four
-// Battleground games pretty much no matter what." ONE knob, BF_ROOKIE_EFF,
-// scales EASY's teeth: decisions come half as often, the passive income is
-// halved again (income is the lever that actually moves win rates — the 7/24
-// tune's finding; wildP is the other, so three lane reads in four are thrown
-// away), and the motor-pool fund never opens — no rookie eats a tank in game
-// two. It still fights (every placement lands a real man in a legal spot),
-// just badly. The enemy Sarge's forced service pistol lives in
-// startBattlefield beside the kit roll it replaces, not here. The tier
-// SUPERSEDES the stars ramp (bfDifficulty) for those four games and only ever
-// dresses ENEMY seats — a gimped teammate would fight AGAINST the guarantee.
+// v2.43 THE ROOKIE TIER, REWORKED (Wyatt 8/5: "the answer isn't less units
+// for the enemy. The answer is to have the enemy units be a lot weaker, with
+// a shorter attack range and less health... When there's no enemies on the
+// field and you're just sending your troops through, it's just not a very fun
+// experience!"). v2.41 eased by STARVING the flow — half cadence, quarter
+// purse, one Sarge ever — and the winning rookie marched through an empty
+// rug. The ease lives in the STATS now (BF_ROOKIE_HP/RNG/LEAK below, applied
+// on the per-unit def copy at placeUnit — the shared tables never move):
+// cadence and income are a REAL game's, so the enemy keeps walking on, and
+// every man who does is a lot weaker. He still fights sloppy (BF_ROOKIE_EFF
+// keeps the v2.41 blunder/wild reads — "play at about half the efficiency"),
+// and the motor-pool fund stays shut — no rookie eats a tank in game two.
+// The enemy Sarge cycles on his normal 10s clock again (sargeOnce is DEAD —
+// it was "less units"); his pistol kit + the leak scale keep him honest.
+// The tier SUPERSEDES the stars ramp (bfDifficulty) for those four games and
+// only ever dresses ENEMY seats — a gimped teammate fights AGAINST the
+// guarantee. inc 1.5 (over easy's 0.7) is the weak-unit subsidy, measured:
+// a tag buys half the fighting power, and at 1.0 the sweep read the field
+// THIN (avg ~1.3 enemies alive under a wall) — 1.5 is what keeps a real
+// game's worth of weak men walking on while the director works the throttle.
 const BF_ROOKIE_GAMES=4, BF_ROOKIE_EFF=0.5;
-// ⚠ sargeOnce is the lever that actually decides these games (measured): the
-// AI's Sarge is FREE with a 10s respawn and leaks BF_BASEDMG 18 — the biggest
-// infantry whack there is — so a rookie brain that keeps re-fielding him owns
-// an economy-immune battering ram no purse gimp can touch (three Sarge leaks
-// = 54 of a 70hp box; the telemetry read exactly that). One Sarge per rookie
-// game: the kid still meets the regular pistol Sarge Wyatt asked for — once.
-BF_AI.rookie={ every:BF_AI.easy.every/BF_ROOKIE_EFF, hoard:0, counterWeight:0,
+// THE WEAKER LEVER (Wyatt's own two dials, verbatim: "a shorter attack range
+// and less health" — damage deliberately untouched, he named these two;
+// LEAK is the third, implied by "a lot weaker" and load-bearing: with
+// sargeOnce dead and the flow restored, 0.35 is what the worst-case sweep
+// needed for an ignored lane's leaks to stop deciding the four).
+const BF_ROOKIE_HP=0.5, BF_ROOKIE_RNG=0.6, BF_ROOKIE_LEAK=0.35;
+BF_AI.rookie={ every:BF_AI.easy.every, hoard:0, counterWeight:0,
   blunderP:1-(1-BF_AI.easy.blunderP)*BF_ROOKIE_EFF, safeDrop:false, save:0,
-  focus:'center', inc:BF_AI.easy.inc*BF_ROOKIE_EFF,
-  wildP:1-(1-BF_AI.easy.wildP)*BF_ROOKIE_EFF, motor:0, sargeOnce:true };
+  focus:'center', inc:1.5,
+  wildP:1-(1-BF_AI.easy.wildP)*BF_ROOKIE_EFF, motor:0 };
+// ===== v2.43 THE DIRECTOR (Wyatt 8/5: "the game kind of knowing, 'Hey,
+// we're winning right now. Let's ease off the gas,' or 'Hey, we're losing
+// right now. Let's pick up the gas,' is very important.") =====
+// The speaker is the GAME — the CPU army working its own throttle, a rubber
+// band that always pulls the match toward CLOSE: the computer winning big
+// eases off (the rookie's guarantee survives its own bad day), the computer
+// losing big picks up the gas (a winning player never crosses an empty
+// field — Wyatt's complaint is the losing-CPU case verbatim). gas rides
+// three things, foe seats only: the passive drip, the brains' decision
+// clock, and the lane-read sharpness (wildP). It NEVER touches unit stats,
+// bounties above par, or anything a human seat does.
+//   rookie/vet = gain (gas = 1 + gain×tide); vet governs every later
+//     CPU-only battleground GENTLY — Wyatt calls the knowing "very
+//     important", not rookie-only. Set vet:0 to make game 5+ byte-what-it-was.
+//   min/max    = the rails. min>0 is the never-empty law's economy half —
+//     easing off is SOFTER, never ABSENT.
+//   tau        = seconds to close ~63% of the gap ("continuously", not twitchy).
+//   emptyT     = seconds of enemy-free field before the director forces the
+//     next walk-on (wakes the richest foe brain; stakes it a rifleman if
+//     broke). CPU-only games only — a room/PvP carpet never reaches it.
+const BF_DIR={ rookie:1.0, vet:0.22, min:0.45, max:2.2, tau:1.4, emptyT:1.2 };
 // the daily rival's colour ALSO picks how they fight — a free themed opponent
 const BF_PERSONA = {
   red:   { name:'BLITZ',   pref:{ rifleman:2.2, flame:1.8, mgunner:0.7, mortar:0.3, bazooka:0.6, minesweeper:0.4, radioman:0.5, sarge:1.2, commando:0.5, bfjeep:2.0, bftank:0.5 } },
@@ -16273,34 +16302,45 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
   WORLD_W=bfWidth(team); MID=WORLD_W/2;        // a bigger war gets a bigger carpet
   WORLD_H=H*(map.hMul||1);                     // WESTERN LAND is two carpets TALL (v1.57); every other map keeps H to the pixel
   const seats=(plan && plan.length===team*2)? plan : bfSeatPlan(team,riv);
-  // v2.41 THE ROOKIE'S FIRST FOUR (Wyatt 8/4): the save's first four
-  // battleground games against the computer are wins-in-waiting — every
-  // ENEMY seat fields the plain service-pistol Sarge and thinks on
-  // BF_AI.rookie, superseding the stars ramp. HUMANS ARE NEVER RIGGED: a
-  // private room never engages it (coopLaunching — its games still COUNT as
-  // played, the room AIs just stay stock) and any second human seat in the
-  // plan kills it (belt+braces). An explicit diffOverride (the rig's own
-  // tiers) outranks it. The daily raid is a CPU battleground, so a rookie's
-  // first raids are winnable too — that is the point. Losses count as games
-  // played the same as wins; nothing about the payout changes (a rigged win
-  // pays the full 25★ + XP — that IS the feature).
+  // v2.41 THE ROOKIE'S FIRST FOUR (Wyatt 8/4, reworked 8/5 — v2.43): the
+  // save's first four battleground games against the computer are
+  // wins-in-waiting — every ENEMY seat fields the plain service-pistol Sarge
+  // and thinks on BF_AI.rookie, superseding the stars ramp. The ease is
+  // WEAKNESS now, never absence: the flow of enemy units is a real game's,
+  // and every one of them lands with BF_ROOKIE_HP/RNG on his own def copy
+  // (placeUnit) + the pistol kit's reach scaled here. HUMANS ARE NEVER
+  // RIGGED: a private room never engages it (coopLaunching — its games still
+  // COUNT as played, the room AIs just stay stock) and any second human seat
+  // in the plan kills it (belt+braces). An explicit diffOverride (the rig's
+  // own tiers) outranks it. The daily raid is a CPU battleground, so a
+  // rookie's first raids are winnable too — that is the point. Losses count
+  // as games played the same as wins; nothing about the payout changes (a
+  // rigged win pays the full 25★ + XP — that IS the feature).
   const rookie=!diffOverride && !coopLaunching && bfRookie() && seats.every(st=>!st.human||st.me);
+  // v2.43 THE DIRECTOR's gate, computed once: a carpet whose every other
+  // chair is the computer's (solo quick match, MORE BATTLES vs the CPU at
+  // any size, the daily raid). A room, a duel, any second human = gain 0 and
+  // the whole system is arithmetic identity — gas holds 1 and no multiplier
+  // moves a byte. Teammate AIs on YOUR side are never modulated either (the
+  // gas only ever touches team 'foe' — see bfTick).
+  const dirGain=(!coopLaunching && seats.every(st=>!st.human||st.me))? (rookie? BF_DIR.rookie : BF_DIR.vet) : 0;
   for(const st of seats){ st.purse=BF_START; st.tagT=0; st.mir=(st.team==='you');
     buildUnitTint(st.hex);
     if(map.ground==='snow'){ buildUnitRim(st.hex); buildUnitRim(GREEN); }   // both armies, on white
     // every commander but you draws his Sarge's weapon out of the crate, once,
     // here — so a seat's Sarge carries the same thing all match, even if he goes
     // down and gets bought again. Seat 0 keeps your Academy loadout untouched.
-    // (v2.41: a rookie game hands every ENEMY chair the sidearm instead —
-    // and an opening purse of EFF² (~quarter). Measured, twice: at the full
-    // 210 the enemy's day-one blob mulched a beginner's one-man trickle and
-    // won on leaks; at half (105) the trickle still lost every other game.
-    // At 52 the enemy opens with one man beside the Sarge and the worst
-    // trickle bot in the rig finally wins its first four — "pretty much no
-    // matter what" is a measured bar, not a vibe.)
+    // (v2.41 handed every rookie ENEMY chair the sidearm; v2.43 keeps that —
+    // the pistol is the WEAKEST kit, which is exactly the new lever — and
+    // scales its reach with the rest of the army. The v2.41 EFF² opening
+    // purse (52) was measured under STOCK enemy stats; with the army at half
+    // plastic and 0.6 reach a fuller opening wallet is what keeps the first
+    // thirty seconds peopled, so the purse holds at one EFF (~half) and the
+    // win lives in the stats + the director, not the starvation.)
     st.kit = st.human? null : ((rookie && st.team==='foe')? bfSargeKit('pistol') : bfSargeKit(bfRollWeapon()));
     st.brain = st.human? null : new OpponentBrain((rookie && st.team==='foe')? 'rookie' : diff, st.persona);
-    if(rookie && st.team==='foe') st.purse=Math.round(BF_START*BF_ROOKIE_EFF*BF_ROOKIE_EFF);
+    if(rookie && st.team==='foe'){ st.purse=Math.round(BF_START*BF_ROOKIE_EFF);
+      st.kit.rng=Math.round(st.kit.rng*BF_ROOKIE_RNG); }   // the Sarge's gun lives on the KIT, not the def copy — scaled here, once, per seat
     if(st.brain) st.brain.cd = 0.7 + st.i*0.13 + Math.random()*0.5;   // 20 brains never fire in lockstep
     // each AI seat anchors to its own slice of the front — ten brains all
     // chasing the same "weakest lane" is a scrum in one lane and a highway
@@ -16322,6 +16362,10 @@ function startBattlefield(mapId,diffOverride,teamSize,plan){
     base:{ you:{x:130,y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0},
            foe:{x:WORLD_W-130,y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0} },
     ai:{ diff:(rookie?'rookie':diff) }, rookie,   // v2.41: rookie rides the income lever (bfTick reads ai.diff) and the rig's asserts
+    // v2.43 THE DIRECTOR's ledger: gas is the CPU team's live throttle (1 =
+    // stock), W the tide it read (+1 = the player owns the game), emptyT the
+    // running enemy-free stopwatch, maxEmpty/stakes the rig's telemetry.
+    dirGain, dir:{ gas:1, W:0, emptyT:0, maxEmpty:0, stakes:0 },
     rival:riv, hex:{ you:seats[0].hex, foe:seats[team].hex },
     // a tall map opens looking at the crates' own latitude (mid-height); on
     // every hMul-1 map the y clamp is 0..0, so nothing that shipped moves
@@ -17031,7 +17075,15 @@ function bfAtBase(u,b){ return Math.hypot(u.x-b.x,u.y-b.y)<LEAK_R; }
 // Smooth like the campaign — the ouch + a ring, no fireworks. The KO below is
 // the only leak that gets to be dramatic.
 function bfLeak(u){
-  const bf=S.bf, b=bf.base[enemySide(u)], dmg=BF_BASEDMG[u.type]||6;
+  const bf=S.bf, b=bf.base[enemySide(u)];
+  let dmg=BF_BASEDMG[u.type]||6;
+  // v2.43 ROOKIE: the enemy that DOES reach the box hits it softer — half a
+  // whack (the Sarge's 18 lands 9). With sargeOnce dead he cycles on his
+  // normal clock again, and this is what keeps the free battering ram from
+  // deciding the four (the v2.41 telemetry: three stock Sarge leaks = 54 of
+  // a 70hp box). The occasional leak is the back-and-forth working — the
+  // base takes a visible hit, the rookie still has the game.
+  if(bf.rookie && u.side==='foe') dmg=Math.max(1,Math.round(dmg*BF_ROOKIE_LEAK));
   b.hp=Math.max(0,b.hp-dmg); b.dmgTaken+=dmg; u.dead=true;
   bfSargeDown(u);                         // spending Sarge on their toy box costs the same ten seconds
   SFX.ouch();
@@ -17791,6 +17843,43 @@ function bfTick(dt){
   const otm=bf.ot?2:1;
   const boost={ you:(my<th?1.25:1), foe:(th<my?1.25:1) };
   const inc=(BF_AI[bf.ai.diff]||{}).inc||1;        // the one visible handicap: enemy passive ticks slower on lower tiers
+  // ===== v2.43 THE DIRECTOR: the game reads the tide and works the gas =====
+  // (Wyatt 8/5, the CPU speaking: "Hey, we're winning right now. Let's ease
+  // off the gas... we're losing right now. Let's pick up the gas.") The
+  // literal team 'foe' is the directed one — the same convention the inc
+  // handicap above has always used, and dirGain is only ever set on a carpet
+  // where every human sits on 'you' (the startBattlefield gate), so the two
+  // can never disagree. The tide W reads base health first (the mode's real
+  // verdict metric) with a field-presence term so the band pulls before the
+  // first leak; gas chases 1+gain×W on a ~tau lag, pinned to the rails.
+  // Where dirGain is 0 (rooms, duels, any second human) gas holds 1 and
+  // every application below is arithmetic identity — measured, not assumed.
+  const gasFoe=(()=>{
+    const d=bf.dir; if(!d || !bf.dirGain) return 1;
+    let nYou=0, nFoe=0;
+    for(const u of S.units){ if(u.dead||!u.side) continue; u.side==='foe'? nFoe++ : nYou++; }
+    const bTerm=(bf.base.you.hp/bf.base.you.hpMax)-(bf.base.foe.hp/bf.base.foe.hpMax);
+    const fTerm=Math.max(-1,Math.min(1,(nYou-nFoe)/6));
+    d.W=Math.max(-1,Math.min(1, bTerm*1.1 + fTerm*0.5));
+    const tgt=Math.max(BF_DIR.min,Math.min(BF_DIR.max, 1 + bf.dirGain*d.W));
+    d.gas+=(tgt-d.gas)*Math.min(1, dt/BF_DIR.tau);
+    // THE NEVER-EMPTY-FIELD LAW (Wyatt: "When there's no enemies on the
+    // field and you're just sending your troops through, it's just not a
+    // very fun experience!"): an enemy-free carpet past emptyT wakes the
+    // richest foe brain NOW — staked the cheapest man's fare if it is broke
+    // (CPU purse, CPU-only game, telemetry-counted). Easing off the gas
+    // makes the enemy SOFTER and SLOWER; it never makes him absent. Spawn
+    // ghosts count as presence (a walk-on IS an enemy arriving).
+    if(!nFoe){ d.emptyT+=dt; d.maxEmpty=Math.max(d.maxEmpty,d.emptyT);
+      if(d.emptyT>=BF_DIR.emptyT){
+        let pick=null;
+        for(const s2 of bf.seats) if(s2.team==='foe' && s2.brain && (!pick || s2.purse>pick.purse)) pick=s2;
+        if(pick){ if(pick.purse<BF_COST.rifleman) pick.purse=BF_COST.rifleman;
+          pick.brain.cd=Math.min(pick.brain.cd,0.15); d.stakes++; d.emptyT=0; }
+      }
+    } else d.emptyT=0;
+    return d.gas;
+  })();
   for(const st of bf.seats){
     // SARGE'S TEN SECONDS. Counted here, on the sim's own dt, so it runs at the
     // same rate the rest of the match does and a 2× toggle can't cheat it.
@@ -17802,7 +17891,7 @@ function bfTick(dt){
         SFX.ready(); bf.sargeFlash=0.9;      // the tray card flashes him back in
       }
     }
-    st.tagT += dt*otm*boost[st.team]*(st.team==='foe'? inc : 1);
+    st.tagT += dt*otm*boost[st.team]*(st.team==='foe'? inc*gasFoe : 1);   // v2.43: the director's drip — identity (gas 1) wherever dirGain is 0
     if(st.tagT>=10){ st.tagT-=10;
       if(st.me){ S.plastic+=BF_TICK;
         S.floats.push({x:bf.base[bfMyTeam()].x+46,y:bf.base[bfMyTeam()].y-72,txt:'+'+BF_TICK,t:0,col:'#FFF3C4'}); }
@@ -17814,7 +17903,7 @@ function bfTick(dt){
     // so twenty clients each rolling their own would field twenty DIFFERENT AI
     // armies on what is supposed to be one carpet. The host rolls once and
     // relays the placement like any other order.
-    if(st.brain && (!roomBattle() || coopIsHost()) && st.brain.tick(dt)){
+    if(st.brain && (!roomBattle() || coopIsHost()) && st.brain.tick(st.team==='foe'? dt*gasFoe : dt)){   // v2.43: gas works the decision clock too — a pressing CPU thinks sooner, an easing one dawdles
       const view=buildBFView(dt, st);
       const cmds=st.brain.decide(view, st.purse)||[];
       for(const c of cmds){
@@ -17856,6 +17945,11 @@ function buildBFView(dt, st){
   const mine=bf.base[st.team], theirs=bf.base[st.team==='you'?'foe':'you'];
   return { dt, timeLeft:bf.timeLeft, phase:bf.phase, overtime:bf.ot, sargeCd:(st.sargeCd||0),
     myBaseHP:mine.hp, foeBaseHP:theirs.hp, myPurse:st.purse, mySeat:st.i, laneBias:st.laneBias,
+    // v2.43 THE DIRECTOR's aggression lever, foe seats on a directed carpet
+    // only: 1/gas (railed) multiplies the brain's wildP at pickSpot — gas
+    // 1.5 reads lanes at ~⅔ the blindness, gas 0.45 goes fully wild. 1
+    // everywhere else, so an undirected brain is byte-what-it-was.
+    dirWild:(bf.dirGain && st.team==='foe' && bf.dir)? Math.max(0.5,Math.min(1.3, 1/bf.dir.gas)) : 1,
     cp:(x,y,t)=>canPlace(Math.round(mir? WORLD_W-x : x), Math.round(y), t, st.team),
     units, map:{ width:WORLD_W, rocks:S.cfg.terrain.rocks, rivers:S.cfg.terrain.rivers,
                  ponds:S.cfg.terrain.ponds||[], balls:S.cfg.terrain.balls||[], tracks:S.cfg.terrain.tracks||[],
@@ -17904,12 +17998,14 @@ OpponentBrain.prototype.decide=function(view,budget){
   // none at all (v1.25). The brain reads the clock so it never burns a decision
   // on an order applyDeploy is only going to refuse.
   const hasSarge=own.some(u=>u.type==='sarge') || (view.sargeCd||0)>0;
-  // v2.41 sargeOnce (rookie tier): one Sarge per game — see the BF_AI.rookie note
+  // (v2.41's sargeOnce is DEAD — v2.43, Wyatt: "the answer isn't less units
+  // for the enemy." The rookie's enemy Sarge cycles on his normal 10s clock
+  // like every tier's; the leak scale + his halved plastic keep him honest.)
   // v2.42: the SPY is never the computer's — a CPU seat fielding a man the
   // player literally cannot see would read as cheating, and the secret is
   // the player's to find. One name in one filter; relayed HUMAN spies still
   // land through applyDeploy like any order.
-  const afford=BF_TYPES.filter(t=>t!=='spy' && BF_COST[t]<=budget && (t!=='sarge'||(!hasSarge && !(this.d.sargeOnce && this.sargeSpent))));
+  const afford=BF_TYPES.filter(t=>t!=='spy' && BF_COST[t]<=budget && (t!=='sarge'||!hasSarge));
   if(!afford.length) return [];
   const pressure = theirs.some(u=>u.dropT<=0&&u.x>MID-80) || own.length<2;
   // ===== THE MOTOR POOL FUND (7/25) =====
@@ -17963,7 +18059,6 @@ OpponentBrain.prototype.decide=function(view,budget){
     if(v>bs){ bs=v; pick=t; }
   }
   if(Math.random()<this.d.blunderP) pick=afford[(Math.random()*afford.length)|0];
-  if(pick==='sarge' && this.d.sargeOnce) this.sargeSpent=true;   // v2.41: his one walk-on
   const spot=this.pickSpot(pick,theirs,mine,view);
   return spot? [{ kind:'place', type:pick, x:spot.x, y:spot.y }] : [];
 };
@@ -17999,8 +18094,11 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
   }
   // a wild placement ignores the lane read entirely — the humanizing miss that
   // actually moves win rates (a blundered UNIT still lands in the right lane;
-  // a blundered LANE is what a player can punish)
-  if(this.d.wildP && Math.random()<this.d.wildP) focusY=110+Math.random()*(WORLD_H-220);
+  // a blundered LANE is what a player can punish). v2.43: the DIRECTOR's gas
+  // leans on it through view.dirWild — a pressing CPU (gas>1) reads lanes
+  // sharper, an easing one (gas<1) goes blinder still. Identity (1) wherever
+  // the director is off, so every shipped tier is byte-what-it-was there.
+  if(this.d.wildP && Math.random()<this.d.wildP*((view&&view.dirWild)||1)) focusY=110+Math.random()*(WORLD_H-220);
   // a team seat leans toward its own slice of the front; interception still
   // pulls it off-lane when someone is genuinely breaking through
   if(view && view.laneBias!=null) focusY = focusY*0.55 + view.laneBias*0.45;
@@ -18064,6 +18162,21 @@ function placeUnit(type,x,y,side,seat){
     // (An ally's man collects his at the relay-apply door; machines never —
     // the pool excludes them by name, so this is a no-op for vehicles.)
     if(bfHumanU(u) && soulIs('u',type)){ u.hpMax*=SOUL_MUL; u.hp=u.hpMax; }
+    // v2.43 THE ROOKIE'S WEAKER ENEMY (Wyatt 8/5: "the enemy units be a lot
+    // weaker, with a shorter attack range and less health"). Scaled on the
+    // per-unit def COPY — the jump-tank law, so UDEF/BF_MOVE and every
+    // veteran game stay byte-what-they-were. side 'foe' only (a rookie
+    // carpet's every human sits on 'you' — the gate in startBattlefield):
+    // a gimped TEAMMATE would fight against the guarantee. hp may go
+    // fractional (1.5-plastic rifleman = dies a round sooner); the floor of
+    // 1 keeps every man at least one hit's worth of real. The Sarge's GUN
+    // reach rides his seat's kit (scaled at startBattlefield); this halves
+    // his plastic like everyone's. Damage is deliberately untouched — Wyatt
+    // named range and health, and the trade-fire is the point.
+    if(S.bf.rookie && side==='foe'){
+      if(u.def.rng>0) u.def.rng=Math.round(u.def.rng*BF_ROOKIE_RNG);
+      u.hpMax=Math.max(1,u.hpMax*BF_ROOKIE_HP); u.hp=u.hpMax;
+    }
     // v2.42 THE SPY lands cloaked — the clock starts when the drop ghost
     // touches down (the loop head holds it through dropT). My chair reads my
     // rank; a relayed order re-stamps at its apply door off the um it
@@ -22225,13 +22338,15 @@ function hitCheck(f,u){
     const v=bfBounty(f.type);
     const st=(u && u.seat!=null && S.bf)? S.bf.seats[u.seat] : null;
     if(st && st.me){ S.blobs.push({x:f.x,y:f.y-8,v,t:0}); S.bf.myKills=(S.bf.myKills||0)+1; }
-    // v2.41 ROOKIE: the enemy's kill bounties pay EFF² (~quarter) — measured,
-    // this loop is the lever that actually decides the first four. The gimped
-    // drip hardly matters because a beginner's own casualties FUND the enemy
-    // (18 fallen riflemen ≈ 360 tags — triple the drip); at a half tax the
-    // worst trickle bot still lost every other game, so the tax matches the
-    // opening purse's measured EFF² notch.
-    else if(st && !st.human) st.purse += (S.bf && S.bf.rookie && st.team==='foe')? Math.round(v*BF_ROOKIE_EFF*BF_ROOKIE_EFF) : v;
+    // v2.43 ROOKIE: the enemy's kill bounties ride the DIRECTOR's gas now,
+    // capped at par. Close game → full pay (a beginner's casualties funding
+    // enemy walk-ons IS the back-and-forth — the flow is the feature); the
+    // rookie losing → gas at the floor eases the intake exactly where the
+    // v2.41 telemetry showed casualties snowballing the enemy (18 fallen
+    // riflemen ≈ 360 tags — triple the drip). Never ABOVE par: a pressing
+    // director presses through the drip and the decision clock, never
+    // through richer kills.
+    else if(st && !st.human) st.purse += (S.bf && S.bf.rookie && st.team==='foe')? Math.round(v*Math.min(1,(S.bf.dirGain&&S.bf.dir)?S.bf.dir.gas:1)) : v;
     // a man clatters over; a vehicle goes up (same beat the campaign gives them)
     if(f.def.vehicle){ bfSfx(SFX.boom, f.x, f.y); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
     else bfSfx(SFX.clack, f.x, f.y);
@@ -30134,7 +30249,7 @@ window.GVT = {
   coopWave(){ if(coopGuest()) coopSend({k:'wava'}); else spawnWave(); },
   coopQuit(){ coopLeave(); },
   // ===== BATTLEFIELD =====
-  battlefield(mapId,diff,team){ startBattlefield(mapId, diff, team); return S.bf.mapId+' '+S.bf.team+'v'+S.bf.team+' vs '+S.bf.rival.id+' ('+S.bf.ai.diff+')'; },
+  battlefield(mapId,diff,team,plan){ startBattlefield(mapId, diff, team, plan); return S.bf.mapId+' '+S.bf.team+'v'+S.bf.team+' vs '+S.bf.rival.id+' ('+S.bf.ai.diff+')'; },   // v2.43: the plan rides through — the rig can seat a forged human and prove the gates
   // v2.41 rookie/random rig: the lifetime counter, the gate, the tier the
   // brains actually run and what every AI chair drew — probe surface,
   // product-inert (the sq()/wtChip() precedent).
@@ -30147,7 +30262,14 @@ window.GVT = {
       units:S.units.filter(u=>!u.dead).reduce((k,u)=>{ k[u.side]=(k[u.side]||0)+1; return k; },{}),
       base:{ you:S.bf.base.you.hp, foe:S.bf.base.foe.hp, dy:S.bf.base.you.dmgTaken, df:S.bf.base.foe.dmgTaken },
       clock:+S.bf.timeLeft.toFixed(1), plastic:S.plastic,
-      foePurse:S.bf.seats.filter(st=>st.team==='foe').map(st=>Math.round(st.purse)) });
+      foePurse:S.bf.seats.filter(st=>st.team==='foe').map(st=>Math.round(st.purse)),
+      // v2.43 THE DIRECTOR + THE WEAKER LEVER, as the battery reads them:
+      // the live gas/tide/never-empty ledger, and every standing foe unit's
+      // actual reach + plastic off its own def copy (the Sarge's off his kit)
+      dir:S.bf.dir? { gain:S.bf.dirGain||0, gas:+S.bf.dir.gas.toFixed(3), W:+S.bf.dir.W.toFixed(3),
+        maxEmpty:+S.bf.dir.maxEmpty.toFixed(2), stakes:S.bf.dir.stakes } : null,
+      foeUnits:S.units.filter(u=>!u.dead&&u.side==='foe').map(u=>({ t:u.type,
+        rng:(u.type==='sarge'? (unitSargeStats(u).rng||0) : u.def.rng), hp:+u.hpMax.toFixed(2) })) });
     return o; },
   // THE EXACT ground factor under a point. Probe this, never time a marching
   // unit: 10% footing pauses and the waypoint wiggle make that measurement
