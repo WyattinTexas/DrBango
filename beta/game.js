@@ -8,7 +8,7 @@
 // stones. The board persists between throws — always.
 // ============================================================
 
-const VERSION = 'v0.5.0';
+const VERSION = 'v0.5.1';
 
 // ---- Tunable knobs (everything feel-related lives here) ----
 const TUNE = {
@@ -32,7 +32,9 @@ const TUNE = {
   SETTLE_SPEED: 0.35,
   SETTLE_MS: 220,
 
-  MERGE_PUSH_SPEED: 1.0,
+  // equal dice that TOUCH combine — no speed threshold (Rune Dice
+  // rule). A periodic sweep also catches pairs already in contact.
+  TOUCH_SWEEP_MS: 300,
 
   RISE_MS: 180,
   RISE_HEIGHT_FRAC: 1.0,
@@ -907,8 +909,10 @@ class GameScene extends Phaser.Scene {
             targets: d.img, scale: d.baseScale, rotation: 0,
             duration: 320, delay: i * 45, ease: 'Back.easeOut',
           });
+          // tiny nudge only — equal seeds that drift into contact
+          // will (correctly) merge, so keep the scatter gentle
           const a = Math.random() * Math.PI * 2;
-          this.MatterLib.Body.setVelocity(d.body, { x: Math.cos(a) * 0.8, y: Math.sin(a) * 0.8 });
+          this.MatterLib.Body.setVelocity(d.body, { x: Math.cos(a) * 0.4, y: Math.sin(a) * 0.4 });
           break;
         }
       }
@@ -1182,14 +1186,32 @@ class GameScene extends Phaser.Scene {
 
   processFuseQueue() {
     while (this.fuseQueue.length) {
-      const [a, b, impact] = this.fuseQueue.shift();
+      const [a, b] = this.fuseQueue.shift();
       if (a.dead || b.dead) continue;
       if (a.kind !== 'num' || b.kind !== 'num') continue;
       if (a.value !== b.value) continue;
-      if (a.state === 'merge' || b.state === 'merge') continue;
-      const eligible = a.state === 'active' || b.state === 'active' ||
-        impact >= TUNE.MERGE_PUSH_SPEED;
-      if (eligible) this.fuse(a, b);
+      if (a.state !== 'rest' && a.state !== 'active') continue;
+      if (b.state !== 'rest' && b.state !== 'active') continue;
+      this.fuse(a, b); // touching equals always combine
+    }
+  }
+
+  // safety net: equal dice already overlapping (slow drifts, landings)
+  // never re-fire a collision event — sweep and combine them
+  touchSweep() {
+    const touchDist = this.dieRadius * 0.96 * 2 + 3;
+    for (let i = 0; i < this.dice.length; i++) {
+      const a = this.dice[i];
+      if (a.dead || a.kind !== 'num' || !a.body) continue;
+      if (a.state !== 'rest' && a.state !== 'active') continue;
+      for (let j = i + 1; j < this.dice.length; j++) {
+        const b = this.dice[j];
+        if (b.dead || b.kind !== 'num' || !b.body || b.value !== a.value) continue;
+        if (b.state !== 'rest' && b.state !== 'active') continue;
+        if (Phaser.Math.Distance.Between(a.gx, a.gy, b.gx, b.gy) < touchDist) {
+          this.fuseQueue.push([a, b, 0]);
+        }
+      }
     }
   }
 
@@ -1495,7 +1517,8 @@ class GameScene extends Phaser.Scene {
 
   layoutHud() {
     this.fpsText.setPosition(6, 4);
-    this.waveText.setPosition(this.rail + 8, this.fieldTop + 6);
+    // wave label lives in the enemy strip, where dice can't cover it
+    this.waveText.setPosition(6, Math.max(20, this.stripH * 0.35));
     this.bestText.setPosition(this.W - this.rail - 8, this.fieldTop + 6);
     this.versionText.setPosition(this.W - this.rail - 6, this.H - this.rail - 4);
     this.chainText.setPosition(this.W / 2, this.H * 0.3);
@@ -1536,6 +1559,11 @@ class GameScene extends Phaser.Scene {
   // ---------- main loop ----------
 
   update(time, delta) {
+    this._sweepAccum = (this._sweepAccum || 0) + delta;
+    if (this._sweepAccum >= TUNE.TOUCH_SWEEP_MS) {
+      this._sweepAccum = 0;
+      this.touchSweep();
+    }
     this.processFuseQueue();
     this.sparks.update(delta);
 
