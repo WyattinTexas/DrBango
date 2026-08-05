@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v6.4 -->
+<!-- TRAINSET v6.5 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -106,8 +106,35 @@
   #satickets{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
   .tk.sa{ background:#EAF4FC; border-color:#C0392B; }
   .tk.sa.lock{ background:#241a0e; border-color:#513a24; }
-  #bback{ margin-top:14px; background:none; border:none; color:#8f7a52; font-family:inherit;
-    font-size:12px; letter-spacing:1px; cursor:pointer; padding:6px 8px; }
+  /* ---- E56: ONE BOOK PER VISIT — the wall's book cards open the board showing
+     only that book's trio (the other two hide; the shown pack head sheds its
+     stacked top rule). #bback died: the ⬇ OUT plank is the board's one close,
+     and it climbs back out to the wall. ---- */
+  #bpanel.bk-ten #pkhead,#bpanel.bk-ten #pksub,#bpanel.bk-ten #pktickets,
+  #bpanel.bk-ten #sahead,#bpanel.bk-ten #sasub,#bpanel.bk-ten #satickets{ display:none; }
+  #bpanel.bk-pk h1,#bpanel.bk-pk #bsub,#bpanel.bk-pk #tickets,
+  #bpanel.bk-pk #sahead,#bpanel.bk-pk #sasub,#bpanel.bk-pk #satickets{ display:none; }
+  #bpanel.bk-sa h1,#bpanel.bk-sa #bsub,#bpanel.bk-sa #tickets,
+  #bpanel.bk-sa #pkhead,#bpanel.bk-sa #pksub,#bpanel.bk-sa #pktickets{ display:none; }
+  #bpanel.bk-pk #pkhead,#bpanel.bk-sa #sahead{ border-top:none; margin-top:0; padding-top:0; }
+  /* ---- E56 THE POSTCARD WALL — behind the front door (§4-B, THE PICK): a wood
+     panel in the board screen's own grammar; three book boards up top, one
+     postcard per live world below. Wordless: the places are pictures. ---- */
+  #wall{ position:absolute; inset:0; z-index:6; display:none; align-items:center; justify-content:center; padding:12px; }
+  #wpanel{ background:linear-gradient(#3a2a18,#241a0e); border:3px solid #6e5130; border-radius:20px;
+    padding:16px 20px 8px; text-align:center; max-height:94vh; overflow-y:auto;
+    box-shadow:0 10px 40px rgba(0,0,0,0.55); }
+  #wbooks{ display:flex; gap:14px; justify-content:center; margin-bottom:14px; }
+  .wbk{ background:linear-gradient(#a37c4a,#8f6b3f); border:3px solid #6e5130; border-radius:14px;
+    padding:8px 10px 7px; cursor:pointer; font-family:inherit; }
+  .wbk:active{ transform:translateY(2px); }
+  .wbk .wbe{ display:block; font-size:30px; line-height:1.1; margin-bottom:5px; pointer-events:none; }
+  .wbk canvas{ display:block; width:128px; height:74px; pointer-events:none; }
+  #wcards{ display:grid; grid-template-columns:repeat(5,auto); gap:12px; justify-content:center; }
+  .wpc{ background:none; border:none; padding:0; cursor:pointer; }
+  .wpc:active{ transform:translateY(2px); }
+  .wpc canvas{ display:block; width:104px; height:96px; pointer-events:none;
+    filter:drop-shadow(0 3px 4px rgba(0,0,0,0.35)); }
   #nextBtn{ position:absolute; left:50%; bottom:150px; transform:translateX(-50%); z-index:8; display:none;
     border-color:#F2C531; color:#F2C531; }
   #nextBtn:active{ transform:translateX(-50%) translateY(2px); }
@@ -539,7 +566,15 @@
     .tk{ min-width:54px; padding:6px 2px 5px; }
     .tk b{ font-size:16px; } .tk small{ font-size:6px; }
     .tk .star{ font-size:14px; top:-7px; right:-5px; }
-    #bback{ margin-top:8px; font-size:10px; }
+    /* E56: the wall rides the phone — smaller cards, same grammar (94vh scroll
+       is the seatbelt; the plank stays reachable — the v59 law) */
+    #wpanel{ padding:8px 10px 4px; }
+    #wbooks{ gap:8px; margin-bottom:8px; }
+    .wbk{ padding:5px 6px 4px; border-width:2px; }
+    .wbk .wbe{ font-size:19px; margin-bottom:3px; }
+    .wbk canvas{ width:88px; height:51px; }
+    #wcards{ gap:7px; }
+    .wpc canvas{ width:66px; height:61px; }
     #tbpanel{ padding:5px 4px 2px; }
     #tblid{ margin-bottom:2px; }
     /* E22: the lid plaques + the showroom ride a LOCAL dial on a phone — one
@@ -675,7 +710,14 @@
   <div id="sahead">🎅 SANTA LINES</div>
   <div id="sasub">TAKE THE PRESENTS TO EVERY STOP</div>
   <div id="satickets"></div>
-  <button id="bback" type="button">⬅ BACK TO THE BEDROOM</button>
+</div></div>
+<!-- E56 THE POSTCARD WALL — behind the front door (§4-B enacted, the E26
+     TICKETS flag retired): three book boards (stubs + stars, read-only) over
+     one postcard per live PLAY world in PLAYMAPS order. Cards mount in JS;
+     the ⬇ OUT plank is the 0204 factory (the door-wall mount v6.2 promised). -->
+<div id="wall"><div id="wpanel">
+  <div id="wbooks"></div>
+  <div id="wcards"></div>
 </div></div>
 <button id="nextBtn" class="mbtn" type="button">NEXT LEVEL ▶</button>
 <div id="toast"></div>
@@ -774,7 +816,7 @@ const CHIRP_VOL=1.0;                                  // moo/baa/cluck loudness 
 const REACT_R=1;                                      // react radius, cells — the train charms animals this close
 const HERD_SPEED=1.0;                                 // herd idle tempo: graze / nibble / peck speed
 // ---- Wyatt dials (EXPANSION 3 — one const each) ----
-const MENU_PROPS=['sign','bed','toybox','door','lamp','station','store','tickets','board'];  // room props list (E26 adds the three new fixtures; E44 the departure board; E54 retires 'blocks' — the SPILL owns that floor)
+const MENU_PROPS=['sign','bed','toybox','door','lamp','station','store','board'];  // room props list (E26's fixtures; E44 the departure board; E54 retired 'blocks'; E56 retired 'tickets' — the word left the game, the stubs live on the door's wall)
 const ATT_SCALE=0.85;         // attract oval size (scale of the real 4×2 loop)
 const ATT_SPEED=70;           // attract loop speed, px/s — slow; SPEED stays the game's
 const PLAY_LABEL='PLAY';      // E26: the train station's pill (was the big button's copy — re-aimed, never orphaned)
@@ -812,6 +854,13 @@ const BIG_OX=290, BIG_OY=288;       // where the ring transform seats on the roo
 // models themselves derive from PLAYMAPS: toys arrive in a real house overnight.
 const BIG_CELLS=[[3,0],[7,0],[11,0],[15,0],[19,0],[20,4],[15,4],[10,4],[5,4]];
 const BIG_DOOR={x:0,y:540,w:340,h:200};   // the way home — the LEFT wall's light wedge (the hand's target, painting space)
+/* ---- E56 POSTCARDS ON THE DOOR (§4-B ENACTED — Wyatt 8/4: "we're going to
+   show just postcards… that can work") — the door opens THE POSTCARD WALL;
+   the big room's entry retired (code parked one release, TS.big still walks
+   it); the TICKETS poster + its word retired with it. ---- */
+const DOOR_PINS=3;            // mini postcards pinned on the slab (2..3 legal; worlds = PLAYMAPS[0..pins-1] — seasonal pinning is a named dial)
+const DOOR_LABEL='GO';        // the door's first-ever pill (E49 shipped it wordless — one const back to silence); GO is HINT_WORDS-legal
+const WALL_GS=1.05;           // the wall postcards' glyph scale (E44's own dial, the wall edition)
 // THE LIVERY LAW: the chosen colour paints ONLY the red livery parts — loco roof +
 // cowcatcher, tender tub, caboose body. Wheels stay red-spoked, boiler stays dark,
 // gold door stays gold, cargo cars untouched. m = body, d = dark stroke, s = cupola shade.
@@ -849,7 +898,9 @@ const CAMP_SEQ=true;          // unlock law: true = winning N opens N+1 · false
 const CAMP_WIP=true;          // persist the current level's work-in-progress across reloads
 const CAMP_STAR='⭐';         // the stamp on a finished ticket (star art)
 const CAMP_WIN_WINDOW=90;     // the battery bar: every reference solution must win inside this many sim-seconds
-const CAMP_LABEL='TICKETS';   // E26: the wall board's pill (was the CAMPAIGN button's copy — re-aimed, never orphaned)
+// E56: CAMP_LABEL ('TICKETS') DIED with the wall poster — Wyatt: "a kid's not
+// gonna know that." The word left the game; the door's postcard wall is the
+// campaign's door now (nothing re-aims — the label-const law's delete branch).
 // + the LEVELS table below IS the per-level dial sheet: exact obstacle coords + goal-card copy
 // ---- Wyatt dials (EXPANSION 8 — one const each) ----
 // THE LANGUAGE LAW. Wyatt 8/1: level 2's card said "WEAVE A LOOP THROUGH THE
@@ -7697,6 +7748,23 @@ function menuDoor(){
   cx.fillStyle=g; cx.beginPath();
   cx.moveTo(1221,556); cx.lineTo(966,588); cx.lineTo(966,704); cx.lineTo(1221,726); cx.closePath(); cx.fill();
   cx.fillStyle='#3a2c1c'; rr(1221,560,74,162,8); cx.fill();
+  // E56 THE DOOR GETS ITS HANDLE — DOOR_PINS mini postcards pinned down the
+  // slab (brass tacks, kid tilts): pictures of where the door goes. Worlds =
+  // the first rotation slots, so the slab preview matches the wall's own row.
+  for(let i=0;i<DOOR_PINS;i++){
+    const m=PLAYMAPS[i]; if(!m) break;
+    const pic=BOARD_PIC[m.land]||'tree', sky=BOARD_SKY[m.land]||'#F3E6C0';
+    cx.save(); cx.translate(1254,592+i*52); cx.rotate(i%2?0.06:-0.06);
+    cx.fillStyle='#8f6b3f'; rr(-23,-19,46,38,4); cx.fill();
+    cx.strokeStyle='#6e5130'; cx.lineWidth=2; rr(-23,-19,46,38,4); cx.stroke();
+    cx.fillStyle=sky; rr(-19,-15,38,30,3); cx.fill();
+    cx.save(); cx.beginPath(); rr(-19,-15,38,30,3); cx.clip();
+    cx.translate(0,4); cx.scale(0.42,0.42);
+    drawScenItem({t:pic,v:0,ra:null,pop:0,wave:0},-C/2,-C/2,1.2);
+    cx.restore();
+    cx.fillStyle='#D9A544'; cx.beginPath(); cx.arc(0,-15,2.6,0,7); cx.fill();
+    cx.restore();
+  }
 }
 function menuBed(){
   // E26: the bed keeps its top-right post but steps DOWN below the 2× sign
@@ -7780,8 +7848,8 @@ function roomTick(dt){
       if(!ROOM.dog) ROOM.dog={t:0,k:((w/DOG_EVERY)|0)%2};   // alternate sniff targets, deterministically
       ROOM.fx=null;
     } else if(!ROOM.dog){
-      const seq=['station','toybox','store','tickets','piggy'];
-      ROOM.fx={kind:seq[w%seq.length], t:0, stub:w%LEVELS.length};
+      const seq=['station','toybox','store','piggy'];   // E56: 'tickets' left with the poster (no window ever points at bare wall)
+      ROOM.fx={kind:seq[w%seq.length], t:0};
       if(ROOM.fx.kind==='piggy') PIG.hop=Math.max(PIG.hop,0.55);   // her wiggle IS the E23 hop (paint, no save)
     }
   }
@@ -7931,41 +7999,9 @@ function menuStore(){
   }
   cx.restore();
 }
-function menuTickets(){
-  // TICKETS = the level board ON THE WALL (campaign — kept from the approved §4
-  // table; Wyatt's list skipped it, flagged in the ship report). Ten stubs that
-  // PUNCH as levels clear — the board itself is the progress. One stub flutters
-  // in the attract rotation.
-  cx.save(); cx.translate(76,96);
-  // it hangs from a nail on a string
-  cx.strokeStyle='#6e5130'; cx.lineWidth=2.5;
-  cx.beginPath(); cx.moveTo(-30,-68); cx.lineTo(0,-84); cx.lineTo(30,-68); cx.stroke();
-  cx.fillStyle='#5A5148'; cx.beginPath(); cx.arc(0,-84,3.4,0,7); cx.fill();
-  cx.fillStyle='#8f6b3f'; rr(-66,-68,132,136,8); cx.fill();
-  cx.strokeStyle='#6e5130'; cx.lineWidth=3.5; rr(-66,-68,132,136,8); cx.stroke();
-  cx.fillStyle='#a37c4a'; rr(-58,-60,116,120,6); cx.fill();
-  for(let n=1;n<=LEVELS.length;n++){
-    const i=n-1, sxp=-55+(i%5)*23, syp=i<5? -52 : -2;
-    const done=CAMP.done.has(n);
-    const fl=ROOM.fx&&ROOM.fx.kind==='tickets'&&ROOM.fx.stub===i?
-      Math.sin(ROOM.fx.t*14)*0.16*Math.max(0,1-ROOM.fx.t/1.4) : 0;
-    cx.save(); cx.translate(sxp+9.5,syp); cx.rotate(fl); cx.translate(-9.5,0);
-    cx.fillStyle=done?'#F7E9C4':'#EFE0BC'; rr(0,0,19,44,3); cx.fill();
-    cx.strokeStyle='#B48A54'; cx.lineWidth=1.6; rr(0,0,19,44,3); cx.stroke();
-    if(done){   // the conductor came by: a punched hole + the gold stamp
-      cx.fillStyle='#a37c4a'; cx.beginPath(); cx.arc(9.5,10,4.2,0,7); cx.fill();
-      cx.strokeStyle='#8a683e'; cx.lineWidth=1.4;
-      cx.beginPath(); cx.arc(9.5,10,4.2,0,7); cx.stroke();
-      star5(9.5,29,0.55,'#F2C531');
-    } else {
-      cx.fillStyle='#B48A54'; cx.textAlign='center';
-      cx.font='bold 13px "Arial Black",Impact,sans-serif';
-      cx.fillText(n,9.5,33);
-    }
-    cx.restore();
-  }
-  cx.restore();
-}
+// E56: menuTickets RETIRED — the TICKETS poster left the bedroom wall (§4-B:
+// the door absorbs the campaign; the stub-and-punch recipe lives on in
+// wallBookPaint, one little board per book on the door's postcard wall).
 function drawPill(px,py,label){
   // the GVT .roomtag grammar in the game's own colours: dark toy-chest wood,
   // cream #F7E9C4 kindergarten words — one pill under every object
@@ -7991,16 +8027,16 @@ const ROOM_OBJS=[
   // (E13's bank-before-shop repealed; the piggy holds the ledger now)
   { id:'store',   hit:{x:718,y:698,w:264,h:214}, px:850, py:892, label:()=>SHOP_LABEL,
     tap(){ SND.tok(); storeShow(true); } },
-  { id:'tickets', hit:{x:4,  y:6,  w:148,h:196}, px:76,  py:184, label:()=>CAMP_LABEL,
-    tap(){ SND.tok(); showScreen('board'); } },
-  // E49 THE FRONT DOOR IS A HAND — the 5th row is the hall light menuDoor()
-  // has painted since E3: the wedge ∪ the slab it spills from, NEVER the slab
-  // alone (30×67 sm px — half the smallest thing in the room). No pill, no
-  // hint: the light IS the handle, nothing to read. Its footprint enters
-  // BED.blk below like every object's — 15 far-right floor cells, on purpose
-  // (where a tap opens the room, a drop must refuse — the piggy law).
-  { id:'door', hit:{x:966,y:556,w:329,h:170}, px:1090, py:764, nopill:1, label:()=>'',
-    tap(){ SND.tok(); bigEnter(); } },
+  // E56: the 'tickets' row DIED with the poster (§4-B — the door absorbs the
+  // campaign; its blocked cells free themselves through bedBounds).
+  // E49→E56 THE FRONT DOOR IS A HAND, AND NOW IT HAS A HANDLE — the hit is
+  // still the wedge ∪ the slab menuDoor() has painted since E3, grown 60px of
+  // floor to seat the GO pill (a pill is its object's handle — the GVT law;
+  // station/store seat theirs the same way). Tap → THE POSTCARD WALL (the big
+  // room's entry retired — rig-only for one release). Footprint enters
+  // BED.blk below like every object's (tap-opens ⇒ drop-refuses, piggy law).
+  { id:'door', hit:{x:966,y:556,w:329,h:230}, px:1090, py:764, label:()=>DOOR_LABEL,
+    tap(){ SND.tok(); showScreen('wall'); } },
 ];
 function objHit(e){
   const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // pigHit's own inverse
@@ -8290,6 +8326,118 @@ function bigDown(e){
     }
   }
 }
+// ⚠ E56: the big room's ENTRY is retired (the door opens the wall now — the
+// plan's lean, flagged for Wyatt). Everything above stays functional ONE
+// release: TS.big.enter() still walks the whole tour, and one line in the
+// door row brings it back. If the flag lands the other way, a small room
+// button on the wall is the revert; if it holds, this block lifts out clean.
+
+/* =====================================================================
+   E56 THE POSTCARD WALL (§4-B ENACTED — THE STRUCTURE PICK, LANDED).
+   Behind the front door is not a list and not a second play mode: it is
+   the AIMING WALL. Three book boards up top — the retired TICKETS
+   poster's own stub-and-punch recipe, one little board per book (🎫🎃🎅),
+   reading camp/pk/sa READ-ONLY, stubs numberless (the stars ARE the
+   progress). Below them one postcard per live PLAY world in PLAYMAPS
+   order — E44's frame + sky + glyph, so a future world hangs its card
+   the morning its rug ships. Tap grammar (both shipped, reused):
+   postcard → playEnter(i) forced entry VERBATIM (exact rug, PLAYI
+   untouched, zero saves); book board → that book's level board (today's
+   tickets flow behind one class gate). ⬇ OUT = the 0204 plank factory,
+   the door-wall mount v6.2's report promised. Exactly ONE card flutters
+   per PICKME_S window (the E26 law) — JS transform off ROOM's own clock,
+   never a CSS animation (the v62 compositor trap): frozen-clock safe,
+   one-at-a-time by construction. The wall saves NOTHING, ever.
+   ===================================================================== */
+const WALL={books:[],cards:[],els:[],fli:-1,flr:0};
+let BOARD_BOOK='ten';   // which book the board screen shows (the wall's gift; campExit re-stamps it)
+function wallBookOpen(b){ return campUnlocked(1,b); }   // THE FACE-DOWN LAW's seam: a closed book
+                        // paints its plank back — possibilities visible, never hidden, never a padlock.
+                        // Today every book opens at level 1 by construction; the branch waits.
+function wallBookPaint(cv,b){
+  const g=cv.getContext('2d');
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
+  withCtx(g,()=>{
+    if(!wallBookOpen(b)){   // FACE-DOWN: the plank's back — slats, no stubs, no lock
+      cx.fillStyle='#6e5130'; rr(0,0,256,148,10); cx.fill();
+      cx.strokeStyle='#513a24'; cx.lineWidth=4; rr(2,2,252,144,9); cx.stroke();
+      cx.beginPath(); for(const lx of [86,170]){ cx.moveTo(lx,8); cx.lineTo(lx,140); } cx.stroke();
+      return;
+    }
+    const L=bookL(b), done=bookDone(b);   // READ-ONLY — the wall never writes a book
+    const fill=b==='pk'?'#F7DCA9':b==='sa'?'#EAF4FC':'#F7E9C4';   // each book's own ticket tint (.tk family)
+    const edge=b==='pk'?'#C9772E':b==='sa'?'#C0392B':'#B48A54';
+    const cols=Math.min(5,L.length), rows=Math.ceil(L.length/5), sw=38, sh=60, gx2=8, gy2=10;
+    const x0=(256-(cols*sw+(cols-1)*gx2))/2, y0=(148-(rows*sh+(rows-1)*gy2))/2;
+    for(let n=1;n<=L.length;n++){
+      const i=n-1, sx2=x0+(i%5)*(sw+gx2), sy2=y0+((i/5)|0)*(sh+gy2);
+      cx.fillStyle=fill; rr(sx2,sy2,sw,sh,6); cx.fill();
+      cx.strokeStyle=edge; cx.lineWidth=3; rr(sx2,sy2,sw,sh,6); cx.stroke();
+      if(done.has(n)){   // the conductor came by — the poster's exact grammar, numberless
+        cx.fillStyle='#a37c4a'; cx.beginPath(); cx.arc(sx2+sw/2,sy2+16,8,0,7); cx.fill();
+        cx.strokeStyle='#8a683e'; cx.lineWidth=2.6;
+        cx.beginPath(); cx.arc(sx2+sw/2,sy2+16,8,0,7); cx.stroke();
+        star5(sx2+sw/2,sy2+42,1.05,'#F2C531');
+      }
+    }
+  });
+}
+function wallCardPaint(cv,i){
+  const g=cv.getContext('2d');
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
+  const m=PLAYMAPS[i]||{}, pic=BOARD_PIC[m.land]||'tree', sky=BOARD_SKY[m.land]||'#F3E6C0';
+  withCtx(g,()=>{   // E44's board face, standing alone: frame + the world's sky + its glyph
+    cx.fillStyle='#8f6b3f'; rr(0,0,208,192,14); cx.fill();
+    cx.strokeStyle='#6e5130'; cx.lineWidth=5; rr(2.5,2.5,203,187,12); cx.stroke();
+    cx.fillStyle=sky; rr(12,12,184,168,8); cx.fill();
+    cx.save(); cx.beginPath(); rr(12,12,184,168,8); cx.clip();
+    cx.translate(104,116); cx.scale(2*WALL_GS,2*WALL_GS);
+    drawScenItem({t:pic,v:0,ra:null,pop:0,wave:0},-C/2,-C/2,1.2);
+    cx.restore();
+  });
+}
+function wallSync(){
+  for(const [b,cv] of WALL.books) wallBookPaint(cv,b);
+  for(const [i,cv] of WALL.cards) wallCardPaint(cv,i);
+  for(const el of WALL.els) el.style.transform='';
+  WALL.fli=-1; WALL.flr=0;
+}
+function wallTick(){
+  // the pick-me flutter — ONE card per PICKME_S window across the whole wall,
+  // riding ROOM's own clock (menuUpdate ticks it behind the wall). A frozen
+  // clock freezes the wobble mid-pose: plate-safe, deterministic.
+  if(SCREEN!=='wall'||!WALL.els.length) return;
+  const w=ROOM.win, N=WALL.els.length;
+  const idx=w>=0? ((w%N)+N)%N : -1;
+  const ph=idx>=0? ROOM.t-w*PICKME_S : 0;
+  const fl=(idx>=0&&ph<1.4)? Math.sin(ROOM.t*14)*0.12*(1-ph/1.4) : 0;
+  if(WALL.fli!==idx&&WALL.fli>=0&&WALL.els[WALL.fli]) WALL.els[WALL.fli].style.transform='';
+  if(idx>=0) WALL.els[idx].style.transform=fl? 'rotate('+fl.toFixed(4)+'rad)' : '';
+  WALL.fli=idx; WALL.flr=fl;
+}
+function boardShow(b){ BOARD_BOOK=b; showScreen('board'); }   // one book per visit — the wall's tap grammar
+function boardFilter(){ $('bpanel').className='bk-'+BOARD_BOOK; }
+function buildWall(){
+  const bk=$('wbooks');
+  for(const b of ['ten','pk','sa']){
+    const btn=document.createElement('button'); btn.type='button'; btn.className='wbk'; btn.dataset.b=b;
+    const e2=document.createElement('span'); e2.className='wbe'; e2.textContent=b==='pk'?'🎃':b==='sa'?'🎅':'🎫';
+    const cv=document.createElement('canvas'); cv.width=256; cv.height=148;
+    btn.appendChild(e2); btn.appendChild(cv);
+    btn.addEventListener('click',()=>{ ac(); SND.tok(); boardShow(b); });
+    bk.appendChild(btn); WALL.books.push([b,cv]);
+  }
+  const wc=$('wcards');
+  for(let i=0;i<PLAY_CYCLE;i++){
+    const btn=document.createElement('button'); btn.type='button'; btn.className='wpc'; btn.dataset.i=i;
+    const cv=document.createElement('canvas'); cv.width=208; cv.height=192;
+    btn.appendChild(cv);
+    btn.addEventListener('click',()=>{ ac(); SND.tok(); playEnter(i); });   // the forced entry VERBATIM: exact rug, no cycle bump, no save
+    wc.appendChild(btn); WALL.cards.push([i,cv]);
+  }
+  WALL.els=[...$('wbooks').children,...$('wcards').children];
+  $('wpanel').appendChild(outPlank(()=>showScreen('menu')));   // ⬇ OUT returns to the room (the 0204 factory, verbatim)
+}
 
 /* =====================================================================
    THE BEDROOM SET (E18, re-cut by E54 THE SPILL IS THE TRAY) — the menu
@@ -8441,7 +8589,7 @@ function bedCancel(){                  // put down whatever the hand held — th
   });
 }
 function bedScreen(s){
-  if(s==='menu'||s==='board'){
+  if(s==='menu'||s==='board'||s==='wall'){   // E56: the wall stands over the live bedroom exactly like the board
     if(!BED.on) bedReset();            // fresh from the game — the tide rebuilt the sandcastle
     bedToolsShow(s==='menu');          // E54: the two docks serve the menu only (as the bar did)
     if(s!=='menu'){ bedCancel(); bedHandSync(); }
@@ -9037,7 +9185,6 @@ function drawMenu(){
   menuRug();
   if(MENU_PROPS.includes('door')) menuDoor();
   if(MENU_PROPS.includes('bed')) menuBed();
-  if(MENU_PROPS.includes('tickets')) menuTickets();   // E26: the wall board, up with the wall things
   if(MENU_PROPS.includes('toybox')) menuToybox();
   drawBroom();                                        // E54: TIDY lives on the wall now — furniture, like the pig
   if(MENU_PROPS.includes('station')) menuStation();   // E26: the floor buildings, south of the rug
@@ -9071,7 +9218,7 @@ function drawMenu(){
   drawRoomDog();   // E26: the gag trots in FRONT of the furniture, under the labels
   menuWeather();   // E37 THE ROOM SKY — over the room, under the labels (clear = zero paint)
   // E26: the pills — furniture labels, painted like the piggy: always on, never shy
-  for(const o of ROOM_OBJS) if(!o.nopill) drawPill(o.px,o.py,o.label());   // E49: the door wears no label — the light is the handle
+  for(const o of ROOM_OBJS) if(!o.nopill) drawPill(o.px,o.py,o.label());   // E56: the door wears GO now (E49's no-label lean reversed by the pick — the handle got a word, the smallest one there is)
   if(MENU_PROPS.includes('sign')) menuSign();   // E54: the shy fade is dead — the title just stands (BED.a frozen 1)
   // E23: minted stars fly on the menu too (the piggy's pay) — draw()'s exact
   // recipe in screen space. An empty list paints nothing: byte-proofs hold.
@@ -9890,6 +10037,7 @@ function campEnter(n,b){
 function campExit(dest){
   if(!CAMP.on){ showScreen(dest); return; }
   setWip(CAMP.book,(CAMP_WIP&&!CAMP.won)? serWip() : null);   // cleared on win, kept mid-build (E50: per book)
+  BOARD_BOOK=CAMP.book;   // E56: leaving a level lands you on YOUR book's board (one book per visit)
   cndKill();                                         // E52: leaving mid-moment just ends it — the next entry brings its own
   CAMP.on=false; CAMP.level=0; CAMP.won=false; CAMP.wx=null; winT=0; prettyT=0; prettyPend=false;   // E35: the sky pill override dies with the visit
   ridersOff();                                       // E15: the level's platforms empty out
@@ -10143,8 +10291,10 @@ function buildBoard(){
     });
     sa.appendChild(b);
   }
-  // E26: the CAMPAIGN button died — the wall board's painted stubs are the door now
-  $('bback').addEventListener('click',()=>{ ac(); SND.click(); showScreen('menu'); });
+  // E26→E56: the CAMPAIGN button died, then the TICKETS poster did — the door's
+  // postcard wall is the way in now, and the board's one close is the ⬇ OUT
+  // plank, climbing back out to the wall (#bback retired with its sentence).
+  $('bpanel').appendChild(outPlank(()=>showScreen('wall')));
   $('backChip').addEventListener('click',()=>{ ac(); SND.click(); campExit('board'); });
   $('goalChip').addEventListener('click',()=>{   // E52: tap the goal = watch the conductor again
     if(!(SCREEN==='game'&&CAMP.on)||CND.on) return;
@@ -12129,7 +12279,9 @@ function showScreen(s){
   if(!game){ cancelDrag(); down=null; PINCH=null; PTRS.clear(); }
   $('menu').style.display=s==='menu'?'flex':'none';
   $('board').style.display=s==='board'?'flex':'none';
-  if(s==='board') boardSync();
+  if(s==='board'){ boardFilter(); boardSync(); }   // E56: one book per visit (BOARD_BOOK gates the trio)
+  $('wall').style.display=s==='wall'?'flex':'none';   // E56 THE POSTCARD WALL — the door's inside
+  if(s==='wall') wallSync();
   $('rail').style.display=game?'flex':'none';            // E33→E55: the rail is BUILD/campaign furniture (the face + the chest tile ride it — campaign included, the chest is the palette's door now)
   $('magic').style.display=((game&&!CAMP.on)||play)?'flex':'none';   // E52: a level owns its sky — E55: the pills are a right chip column on BUILD + PLAY (all three books keep the clear sky)
   document.body.classList.toggle('playshelf',play);      // E36 THE TRAIN SHELF: five trains, always out, no door
@@ -13099,7 +13251,7 @@ function toastSeat(){
   tt.style.bottom='calc('+(lift*UIS)+'px + env(safe-area-inset-bottom))';
 }
 window.addEventListener('resize',resize);
-load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
+load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildWall(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract();
 showScreen('menu'); shelfSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
@@ -13109,6 +13261,7 @@ function frame(t){
   eagerCamTick(dt);    // E27: the arrival's one gentle ease — presentation only, any hand cancels
   cndTick(dt);         // E52: the conductor moment — presentation only, last pen wins the frame
   flyTick(dt);         // E55: the new-toy flight — presentation only, frozen clocks hold it still
+  wallTick();          // E56: the wall's one fluttering card — presentation only, rides ROOM's clock
   if(TS.auto){
     if(SCREEN==='game') update(dt);
     else if(SCREEN==='play'){ update(dt); playUpdate(dt); }             // the shared juice + the wind-up trains
@@ -13206,7 +13359,7 @@ window.TS={
   room:{
     objs(){ return ROOM_OBJS.map(o=>({id:o.id, hit:{...o.hit}, pill:{x:o.px,y:o.py,label:o.label()}})); },
     state(){ return { t:+ROOM.t.toFixed(3), win:ROOM.win, lid:+ROOM.lid.toFixed(3),
-      fx:ROOM.fx? {kind:ROOM.fx.kind,t:+ROOM.fx.t.toFixed(3),stub:ROOM.fx.stub} : null,
+      fx:ROOM.fx? {kind:ROOM.fx.kind,t:+ROOM.fx.t.toFixed(3)} : null,   // E56: stub left with the poster
       dog:ROOM.dog? {t:+ROOM.dog.t.toFixed(3),k:ROOM.dog.k} : null,
       gag:ROOM_GAG, every:DOG_EVERY, window:PICKME_S }; },
     sign(){ return { x:MENU_W/2-250*SIGN_K, y:SIGN_TOP, w:500*SIGN_K, h:88*SIGN_K, k:SIGN_K }; },
@@ -13233,6 +13386,8 @@ window.TS={
   // E49 — the big-room rig: the tour's whole state (model rects in painting
   // space, the dwell, the loco), the two doors, and a model tap that walks the
   // REAL playEnter(i) path. Deterministic: the room rides dt only.
+  // ⚠ E56: the kid entry retired (the door opens the wall) — this rig is the
+  // room's ONLY door for one release; it lifts out with the block if the flag holds.
   big:{
     enter(){ bigEnter(); return SCREEN; },
     door(){ if(SCREEN==='room') showScreen('menu'); return SCREEN; },
@@ -13248,6 +13403,19 @@ window.TS={
             land:(PLAYMAPS[i2]||{}).land, name:(PLAYMAPS[i2]||{}).name,
             rect:bigModelRect(i2) })) };
       } finally { RGRID=grid; HGRID=hgrid; } },
+  },
+  // E56 — the postcard wall rig: the doors, the card truth (per-slot land +
+  // book progress, read-only), the flutter index, and taps that walk the REAL
+  // grammars (playEnter forced entry / boardShow's one-book board).
+  wall:{
+    open(){ showScreen('wall'); return SCREEN; },
+    out(){ if(SCREEN==='wall') showScreen('menu'); return SCREEN; },
+    tap(i){ if(SCREEN!=='wall'||i<0||i>=WALL.cards.length) return false; playEnter(i|0); return true; },
+    book(b){ if(SCREEN!=='wall'||!['ten','pk','sa'].includes(b)) return false; boardShow(b); return SCREEN; },
+    state(){ return { on:SCREEN==='wall', n:WALL.cards.length, flutter:WALL.fli, board:BOARD_BOOK,
+      books:WALL.books.map(([b])=>({ b, open:wallBookOpen(b), total:bookL(b).length,
+        done:[...bookDone(b)].length })),
+      cards:WALL.cards.map(([i])=>({ i, land:(PLAYMAPS[i]||{}).land, name:(PLAYMAPS[i]||{}).name })) }; },
   },
   // E23 — THE predicate, asked from inside the bedroom wrapper (what the ghost
   // tint and the drop see on the menu floor). Battery doors, mutation-free.
@@ -13492,7 +13660,7 @@ window.TS={
   // ---- the campaign rig (E5) ----
   camp:{
     winWindow:CAMP_WIN_WINDOW,
-    open(){ showScreen('board'); return SCREEN; },
+    open(){ BOARD_BOOK='ten'; showScreen('board'); return SCREEN; },   // E56: each rig opens ITS book's board
     enter(n){ return campEnter(n); },
     exit(){ campExit('board'); return SCREEN; },
     unlockAll(){ CAMP.all=true; save(); if(SCREEN==='board') boardSync(); return true; },
@@ -13514,7 +13682,7 @@ window.TS={
   },
   // ---- the pack rig (E50 — PUMPKIN LINES, the second book) ----
   pk:{
-    open(){ showScreen('board'); return SCREEN; },
+    open(){ BOARD_BOOK='pk'; showScreen('board'); return SCREEN; },   // E56: each rig opens ITS book's board
     enter(n){ return campEnter(n,'pk'); },
     exit(){ campExit('board'); return SCREEN; },
     solve(n){ return refSolve(n,'pk'); },
@@ -13527,7 +13695,7 @@ window.TS={
   },
   // ---- the pack rig (E51 — SANTA LINES, the third book) ----
   sa:{
-    open(){ showScreen('board'); return SCREEN; },
+    open(){ BOARD_BOOK='sa'; showScreen('board'); return SCREEN; },   // E56: each rig opens ITS book's board
     enter(n){ return campEnter(n,'sa'); },
     exit(){ campExit('board'); return SCREEN; },
     solve(n){ return refSolve(n,'sa'); },
