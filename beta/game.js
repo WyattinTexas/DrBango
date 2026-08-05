@@ -7,7 +7,7 @@
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.7.0';
+const VERSION = 'v0.7.1';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -70,8 +70,7 @@ const LEVEL_TRACK = [
 
 const STARTING_BAG = [
   { kind: 'num', value: 1 }, { kind: 'num', value: 1 },
-  { kind: 'num', value: 1 }, { kind: 'num', value: 1 },
-  { kind: 'num', value: 2 }, { kind: 'num', value: 2 },
+  { kind: 'num', value: 1 }, { kind: 'num', value: 2 },
   { kind: 'num', value: 2 }, { kind: 'num', value: 3 },
 ];
 
@@ -323,7 +322,7 @@ class GameScene extends Phaser.Scene {
   levelCfg() {
     const n = this.level, type = this.levelType(n);
     const goldMax = Math.min(1 + Math.floor(n / 5) + (type === 'boss' ? 1 : 0), 6);
-    const goldCount = (type === 'boss' ? 4 : 2) + Math.floor(n / 8);
+    const goldCount = (type === 'boss' ? 5 : 4) + Math.floor(n / 8);
     return { type, goldMax, goldCount };
   }
 
@@ -358,29 +357,36 @@ class GameScene extends Phaser.Scene {
 
   spawnEnemies() {
     const n = this.level, type = this.levelType(n);
-    const mkEnemy = (mobType, hp, dmg, cd, boss) => ({
-      type: mobType, hp, maxHp: hp, dmg,
-      countdown: cd, baseCountdown: cd,
-      alive: true, boss,
-      img: this.add.image(0, 0, 'mob' + mobType).setDepth(30),
-      bar: this.add.graphics().setDepth(31),
-      cdText: this.add.text(0, 0, '', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
-        color: '#ffb0a0', fontStyle: 'bold',
-      }).setOrigin(0.5, 0).setDepth(31),
-    });
+    const mkEnemy = (mobType, hp, dmg, cd, boss) => {
+      const e = {
+        type: mobType, hp, maxHp: hp, dmg,
+        countdown: cd, baseCountdown: cd,
+        alive: true, boss,
+        img: this.add.image(0, 0, 'mob' + mobType).setDepth(30).setInteractive(),
+        bar: this.add.graphics().setDepth(31),
+        cdText: this.add.text(0, 0, '', {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+          color: '#ffb0a0', fontStyle: 'bold',
+        }).setOrigin(0.5, 0).setDepth(31),
+      };
+      const show = () => { if (e.alive) this.showEnemyTip(e); };
+      e.img.on('pointerover', show);
+      e.img.on('pointerdown', show);
+      e.img.on('pointerout', () => this.hideTooltip());
+      return e;
+    };
     if (type === 'boss') {
-      const hp = 28 + n * 7;
+      const hp = 20 + n * 5;
       this.enemies = [mkEnemy(Phaser.Math.Between(0, MOBS.length - 1),
-        hp, 5 + Math.floor(n * 0.9), 2, true)];
+        hp, 4 + Math.floor(n * 0.7), n >= 15 ? 2 : 3, true)];
     } else {
-      const count = Math.min(1 + Math.floor(n / 4), 3);
+      const count = Math.min(1 + Math.floor(n / 5), 3);
       this.enemies = [];
       for (let i = 0; i < count; i++) {
-        const hp = 5 + n * 4 + Phaser.Math.Between(0, n);
-        const cd = (n >= 8 ? 2 : 3) + (i % 2);
+        const hp = 4 + n * 3 + Phaser.Math.Between(0, Math.floor(n / 2));
+        const cd = (n >= 12 ? 2 : 3) + (i % 2);
         this.enemies.push(mkEnemy(Phaser.Math.Between(0, MOBS.length - 1),
-          hp, 2 + Math.ceil(n * 0.8), cd, false));
+          hp, 1 + Math.ceil(n * 0.6), cd, false));
       }
     }
     this.layoutEnemies();
@@ -410,11 +416,26 @@ class GameScene extends Phaser.Scene {
     const frac = Math.max(0, e.hp / e.maxHp);
     e.bar.fillStyle(frac > 0.5 ? 0x6aa84f : frac > 0.25 ? 0xe6c229 : 0xc9564a, 1);
     if (frac > 0) e.bar.fillRoundedRect(x, y, w * frac, h, 2);
-    e.cdText.setPosition(e.x, y - 16).setText('⚔ ' + e.countdown);
+    if (e.countdown <= 1) {
+      e.cdText.setPosition(e.x, y - 16).setText('⚔ 1').setColor('#ff8070');
+    } else {
+      e.cdText.setPosition(e.x, y - 16).setText('⏳ ' + e.countdown).setColor('#c9b391');
+    }
   }
 
   destroyEnemyVisual(e) {
     e.img.destroy(); e.bar.destroy(); e.cdText.destroy();
+  }
+
+  showEnemyTip(e) {
+    const name = MOBS[e.type].name.toUpperCase();
+    const msg = (e.boss ? 'MINIBOSS — ' : '') + name +
+      '\nHP ' + e.hp + '/' + e.maxHp +
+      '\nDeals ' + e.dmg + ' damage every ' + e.baseCountdown + ' throws' +
+      (e.countdown === 1 ? '\nATTACKS AFTER THIS THROW!' :
+        '\nWaiting: attacks in ' + e.countdown + ' throws') +
+      '\nSpecial: none (coming later)';
+    this.showTooltipText(e.x, e.y + this.stripH * 0.5, msg);
   }
 
   firstAliveEnemy() {
@@ -447,7 +468,7 @@ class GameScene extends Phaser.Scene {
     }
     e.hp -= amount;
     this.sparks.burst(e.x, e.y, 0xffd54a, 8, { speedMin: 1, speedMax: 3.5, life: 320, scale: 0.7 });
-    this.floatText(e.x, e.y - this.stripH * 0.2, '-' + amount, '#ffd54a');
+    this.floatText(e.x, e.y - this.stripH * 0.2, '-' + amount, '#ffd54a', true);
     e.img.setTintFill(0xffffff);
     this.time.delayedCall(70, () => {
       if (e.img.active) { e.img.clearTint(); if (e.boss) e.img.setTint(0xffd0c0); }
@@ -541,7 +562,7 @@ class GameScene extends Phaser.Scene {
     });
     this.cameras.main.shake(120, 0.004);
     this.hp = Math.max(0, this.hp - e.dmg);
-    this.floatText(this.W * 0.16, this.H - this.rail - 30, '-' + e.dmg, '#ff8070');
+    this.floatText(this.W * 0.16, this.H - this.rail - 40, '-' + e.dmg, '#ff8070', true);
     this.drawHpBar();
     if (this.hp <= 0) this.doGameOver();
   }
@@ -695,25 +716,25 @@ class GameScene extends Phaser.Scene {
     const tier = n <= 5 ? 1 : n <= 12 ? 2 : 3;
     const pools = {
       1: [
-        { kind: 'num', value: 2, price: 6 }, { kind: 'num', value: 3, price: 9 },
-        { kind: 'potion', value: 0, price: 8 }, { kind: 'bomb', value: 0, price: 10 },
-        { kind: 'num', value: 1, price: 3 },
+        { kind: 'num', value: 2, price: 5 }, { kind: 'num', value: 3, price: 7 },
+        { kind: 'potion', value: 0, price: 6 }, { kind: 'bomb', value: 0, price: 8 },
+        { kind: 'num', value: 1, price: 2 },
       ],
       2: [
-        { kind: 'num', value: 3, price: 8 }, { kind: 'num', value: 4, price: 12 },
-        { kind: 'bomb', value: 0, price: 10 }, { kind: 'potion', value: 0, price: 8 },
-        { kind: 'num', value: 5, price: 16 },
+        { kind: 'num', value: 3, price: 6 }, { kind: 'num', value: 4, price: 10 },
+        { kind: 'bomb', value: 0, price: 8 }, { kind: 'potion', value: 0, price: 6 },
+        { kind: 'num', value: 5, price: 13 },
       ],
       3: [
-        { kind: 'num', value: 4, price: 11 }, { kind: 'num', value: 5, price: 15 },
-        { kind: 'num', value: 6, price: 20 }, { kind: 'bomb', value: 0, price: 9 },
-        { kind: 'potion', value: 0, price: 7 },
+        { kind: 'num', value: 4, price: 9 }, { kind: 'num', value: 5, price: 12 },
+        { kind: 'num', value: 6, price: 16 }, { kind: 'bomb', value: 0, price: 8 },
+        { kind: 'potion', value: 0, price: 6 },
       ],
     };
     const pool = Phaser.Utils.Array.Shuffle([...pools[tier]]);
     return {
       offers: pool.slice(0, 4),
-      heal: { amount: 10 + tier * 5, price: 6 + tier * 2 },
+      heal: { amount: 10 + tier * 5, price: 5 + tier },
     };
   }
 
@@ -1535,7 +1556,7 @@ class GameScene extends Phaser.Scene {
   triggerSpike(die) {
     if (die.dead) return;
     this.hp = Math.max(0, this.hp - TUNE.SPIKE_DAMAGE);
-    this.floatText(die.gx, die.gy - 10, '-' + TUNE.SPIKE_DAMAGE + ' HP', '#ff8070');
+    this.floatText(die.gx, die.gy - 10, '-' + TUNE.SPIKE_DAMAGE + ' HP', '#ff8070', true);
     const veil = this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0xaa22aa, 0.15)
       .setDepth(40);
     this.tweens.add({ targets: veil, alpha: 0, duration: 250, onComplete: () => veil.destroy() });
@@ -2120,6 +2141,10 @@ class GameScene extends Phaser.Scene {
   showTooltip(x, y, kind) {
     const msg = TOOLTIPS[kind];
     if (!msg) return;
+    this.showTooltipText(x, y, msg);
+  }
+
+  showTooltipText(x, y, msg) {
     this.tipText.setText(msg);
     const b = this.tipText.getBounds();
     const pad = 8;
@@ -2156,13 +2181,16 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  floatText(x, y, msg, color) {
+  floatText(x, y, msg, color, big) {
     const t = this.add.text(x, y, msg, {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
-      fontStyle: 'bold', color, stroke: '#241408', strokeThickness: 4,
+      fontFamily: '-apple-system, Arial, sans-serif',
+      fontSize: (big ? 30 : 18) + 'px',
+      fontStyle: 'bold', color, stroke: '#241408', strokeThickness: big ? 6 : 4,
     }).setOrigin(0.5).setDepth(35);
+    if (big) t.setScale(0.5);
     this.tweens.add({
-      targets: t, y: y - 26, alpha: 0, duration: 750, ease: 'Quad.easeOut',
+      targets: t, y: y - (big ? 44 : 26), alpha: 0, scale: 1,
+      duration: big ? 1400 : 750, ease: 'Quad.easeOut',
       onComplete: () => t.destroy(),
     });
   }
