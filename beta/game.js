@@ -7,7 +7,7 @@
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.8.0';
+const VERSION = 'v0.9.0';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -112,6 +112,9 @@ const TOOLTIPS = {
   potion: 'POTION\nBreaks on impact\nand heals you +6 HP',
   stone: 'CURSED STONE\nBlocks the board.\nTwo hard hits crush it',
   spike: 'SPIKE DIE\nHitting it hurts you:\n-3 HP. It then crumbles',
+  wild: 'WILD DIE\nMerges with ANY number\nand becomes its match',
+  stun: 'STUN DIE\nBreaks on impact and delays\nevery enemy attack by 2 throws',
+  thief: 'THIEF DIE\nTouching it steals 3 gold,\nthen it escapes',
 };
 
 function shade(color, f) {
@@ -352,8 +355,10 @@ class GameScene extends Phaser.Scene {
     if (cfg.type === 'boss') {
       this.spawnStones(2);
       this.spawnSpikes(2 + Math.floor(this.level / 10));
+      if (this.level >= 10) this.spawnHazard('thief', 1);
     } else if (this.level >= 4) {
       this.spawnStones(1);
+      if (this.level >= 8) this.spawnHazard('thief', 1);
     }
   }
 
@@ -496,6 +501,19 @@ class GameScene extends Phaser.Scene {
       this.levelClearing = true;
       this.levelClearPending = true;
     }
+  }
+
+  // the board is busy while anything is airborne, merging, thrown,
+  // or still physically sliding (bomb shoves keep dice moving long
+  // after states settle — refreshes must wait for all of it)
+  boardBusy() {
+    if (this.thrownDie !== null || this.loftCount > 0) return true;
+    for (const d of this.dice) {
+      if (d.dead) continue;
+      if (d.state === 'active' || d.state === 'loft' || d.state === 'merge') return true;
+      if (d.body && d.body.speed > TUNE.SETTLE_SPEED) return true;
+    }
+    return false;
   }
 
   onThrowResolved() {
@@ -717,17 +735,19 @@ class GameScene extends Phaser.Scene {
       1: [
         { kind: 'num', value: 2, price: 5 }, { kind: 'num', value: 3, price: 7 },
         { kind: 'potion', value: 0, price: 6 }, { kind: 'bomb', value: 2, price: 8 },
-        { kind: 'num', value: 1, price: 2 },
+        { kind: 'num', value: 1, price: 2 }, { kind: 'stun', value: 0, price: 6 },
       ],
       2: [
         { kind: 'num', value: 3, price: 6 }, { kind: 'num', value: 4, price: 10 },
         { kind: 'bomb', value: 3, price: 8 }, { kind: 'potion', value: 0, price: 6 },
-        { kind: 'num', value: 5, price: 13 },
+        { kind: 'num', value: 5, price: 13 }, { kind: 'stun', value: 0, price: 6 },
+        { kind: 'wild', value: 0, price: 14 },
       ],
       3: [
         { kind: 'num', value: 4, price: 9 }, { kind: 'num', value: 5, price: 12 },
         { kind: 'num', value: 6, price: 16 }, { kind: 'bomb', value: 4, price: 8 },
-        { kind: 'potion', value: 0, price: 6 },
+        { kind: 'potion', value: 0, price: 6 }, { kind: 'wild', value: 0, price: 12 },
+        { kind: 'stun', value: 0, price: 5 },
       ],
     };
     const pool = Phaser.Utils.Array.Shuffle([...pools[tier]]);
@@ -763,8 +783,11 @@ class GameScene extends Phaser.Scene {
       const canAfford = this.gold >= o.price && !o.sold;
       const img = this.modalAdd(this.add.image(x, y,
         this.textureFor(o.kind, o.value)).setDepth(72).setDisplaySize(s, s));
-      const label = o.kind === 'num' ? 'Die: ' + o.value :
-        o.kind === 'bomb' ? 'Bomb die ' + o.value : 'Potion die';
+      const labels = {
+        bomb: 'Bomb die ' + o.value, potion: 'Potion die',
+        wild: 'Wild die', stun: 'Stun die',
+      };
+      const label = o.kind === 'num' ? 'Die: ' + o.value : labels[o.kind];
       this.modalAdd(this.add.text(x, y + s * 0.65 + 4, label, {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
         color: BOARD.cream,
@@ -883,6 +906,7 @@ class GameScene extends Phaser.Scene {
     this.makeDieTextures();
     this.makeGoldDieTextures();
     this.makeSpecialTextures();
+    this.makeNewSpecialTextures();
     this.makeMobTextures();
     this.makeBagTexture();
     this.makeSoftTexture('spark', 32, 'rgba(255,255,255,1)', 'rgba(255,255,255,0)');
@@ -1086,6 +1110,72 @@ class GameScene extends Phaser.Scene {
       ctx.arc(cx, cy, tw * 0.16, 0, Math.PI * 2);
       ctx.fillStyle = '#241430';
       ctx.fill();
+      tex.refresh();
+    }
+  }
+
+  makeNewSpecialTextures() {
+    // wild: warm cream cube with a plum star
+    {
+      const { tex, ctx, px, pad, tw } = this.drawCubeBase('wild', 0xf5ecd0);
+      const cx = pad + tw / 2, cy = pad + tw / 2, R = tw * 0.3, r = R * 0.45;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const rad = i % 2 === 0 ? R : r;
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = NUMBER_COLOR;
+      ctx.fill();
+      ctx.lineWidth = px * 0.015;
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.stroke();
+      tex.refresh();
+    }
+    // stun: icy blue cube with a spiral
+    {
+      const { tex, ctx, px, pad, tw } = this.drawCubeBase('stun', 0xa8d8e8);
+      const cx = pad + tw / 2, cy = pad + tw / 2;
+      ctx.strokeStyle = '#2a6a8a';
+      ctx.lineWidth = px * 0.035;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let t = 0; t <= 4.2; t += 0.1) {
+        const rad = tw * 0.05 + t * tw * 0.055;
+        const x = cx + Math.cos(t * 1.6) * rad, y = cy + Math.sin(t * 1.6) * rad;
+        if (t === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      tex.refresh();
+    }
+    // thief: maroon cube with a bandit mask
+    {
+      const { tex, ctx, px, pad, tw } = this.drawCubeBase('thief', 0x6e3a3a);
+      const cx = pad + tw / 2, cy = pad + tw / 2;
+      ctx.fillStyle = '#241416';
+      ctx.beginPath();
+      this.roundedRectPath(ctx, pad + tw * 0.12, cy - tw * 0.16, tw * 0.76, tw * 0.3, tw * 0.1);
+      ctx.fill();
+      for (const s of [-1, 1]) {
+        ctx.fillStyle = '#fff4dc';
+        ctx.beginPath();
+        ctx.ellipse(cx + s * tw * 0.17, cy, tw * 0.09, tw * 0.06, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#241416';
+        ctx.beginPath();
+        ctx.arc(cx + s * tw * 0.17, cy, tw * 0.03, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // a little gold coin it swiped
+      ctx.fillStyle = '#f2b23e';
+      ctx.beginPath();
+      ctx.arc(cx + tw * 0.24, cy + tw * 0.27, tw * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#8a5f1e';
+      ctx.lineWidth = px * 0.012;
+      ctx.stroke();
       tex.refresh();
     }
   }
@@ -1474,17 +1564,22 @@ class GameScene extends Phaser.Scene {
   }
 
   spawnSpikes(count) {
+    this.spawnHazard('spike', count);
+  }
+
+  spawnHazard(kind, count) {
+    const tint = kind === 'spike' ? 0x8a5aa8 : 0x6e3a3a;
     const placed = [];
     for (let i = 0; i < count; i++) {
       const spot = this.findSeedSpot(placed, this.dieSize * 1.5);
       if (!spot) break;
-      const d = this.makeDie(spot.x, spot.y, 0, 'rest', 'spike');
+      const d = this.makeDie(spot.x, spot.y, 0, 'rest', kind);
       d.restingSince = this.time.now;
       d.img.setScale(0);
       this.tweens.add({
         targets: d.img, scale: d.baseScale, duration: 300, ease: 'Back.easeOut',
       });
-      this.sparks.burst(spot.x, spot.y, 0x8a5aa8, 8, { speedMin: 0.5, speedMax: 2, life: 300, scale: 0.6 });
+      this.sparks.burst(spot.x, spot.y, tint, 8, { speedMin: 0.5, speedMax: 2, life: 300, scale: 0.6 });
     }
   }
 
@@ -1494,14 +1589,21 @@ class GameScene extends Phaser.Scene {
     let handled = false;
     for (const [x, other] of [[a, b], [b, a]]) {
       if (x.dead || other.dead) continue;
+      const hard = (k) => k === 'num' || k === 'bomb' || k === 'wild';
       if (x.kind === 'potion' && impact > 0.8) {
         this.consumePotion(x);
         handled = true;
-      } else if (x.kind === 'stone' && this.mergeableKind(other.kind) &&
+      } else if (x.kind === 'stun' && impact > 0.8) {
+        this.consumeStun(x);
+        handled = true;
+      } else if (x.kind === 'thief' && hard(other.kind) && impact > 1.0) {
+        this.triggerThief(x);
+        handled = true;
+      } else if (x.kind === 'stone' && hard(other.kind) &&
         impact > TUNE.STONE_HIT_SPEED) {
         this.hitStone(x);
         handled = true;
-      } else if (x.kind === 'spike' && this.mergeableKind(other.kind) && impact > 1.2) {
+      } else if (x.kind === 'spike' && hard(other.kind) && impact > 1.2) {
         this.triggerSpike(x);
         handled = true;
       }
@@ -1549,6 +1651,31 @@ class GameScene extends Phaser.Scene {
     this.destroyDie(die);
     this.sparks.burst(x, y, 0x3f9d4e, 16, { speedMin: 1, speedMax: 4, life: 500, scale: 0.9 });
     this.heal(TUNE.POTION_HEAL);
+  }
+
+  consumeStun(die) {
+    if (die.dead) return;
+    const x = die.gx, y = die.gy;
+    if (die === this.thrownDie) this.thrownDie = null;
+    this.destroyDie(die);
+    this.sparks.burst(x, y, 0x7ec8e8, 18, { speedMin: 1, speedMax: 4, life: 500, scale: 0.9 });
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      e.countdown = Math.min(e.countdown + 2, 9);
+      this.floatText(e.x, e.y - this.stripH * 0.15, '+2 ⏳', '#7ec8e8');
+      this.drawEnemyBar(e);
+    }
+  }
+
+  triggerThief(die) {
+    if (die.dead) return;
+    const x = die.gx, y = die.gy;
+    const stolen = Math.min(this.gold, 3);
+    this.gold -= stolen;
+    this.drawGold();
+    this.floatText(x, y - 10, '-' + stolen + 'g', '#c9564a', true);
+    this.destroyDie(die);
+    this.sparks.burst(x, y, 0x6e3a3a, 12, { speedMin: 1.5, speedMax: 4, life: 400, scale: 0.8 });
   }
 
   hitStone(die) {
@@ -1754,10 +1881,12 @@ class GameScene extends Phaser.Scene {
     if (hitDie) {
       const thrown = this.nextQueue[0];
       let c = 0xf5e6c8, strong = false;
-      const match = this.mergeableKind(thrown.kind) && this.mergeableKind(hitDie.kind) &&
-        hitDie.value === thrown.value;
+      const match = this.canMerge(
+        { kind: thrown.kind, value: thrown.value }, hitDie);
       if (thrown.kind === 'potion') { c = 0x3f9d4e; strong = true; }
+      else if (thrown.kind === 'stun') { c = 0x7ec8e8; strong = true; }
       else if (hitDie.kind === 'spike') { c = 0xaa55cc; strong = true; }
+      else if (hitDie.kind === 'thief') { c = 0xc9564a; strong = true; }
       else if (match && (thrown.kind === 'bomb' || hitDie.kind === 'bomb')) { c = 0xff8040; strong = true; }
       else if (match) { c = 0x8ec873; strong = true; }
       const pulse = 1 + 0.08 * Math.sin(this.time.now / 90);
@@ -1773,8 +1902,7 @@ class GameScene extends Phaser.Scene {
     while (this.fuseQueue.length) {
       const [a, b] = this.fuseQueue.shift();
       if (a.dead || b.dead) continue;
-      if (!this.mergeableKind(a.kind) || !this.mergeableKind(b.kind)) continue;
-      if (a.value !== b.value) continue;
+      if (!this.canMerge(a, b)) continue;
       if (a.state !== 'rest' && a.state !== 'active') continue;
       if (b.state !== 'rest' && b.state !== 'active') continue;
       this.fuse(a, b);
@@ -1785,15 +1913,23 @@ class GameScene extends Phaser.Scene {
     return k === 'num' || k === 'bomb';
   }
 
+  canMerge(a, b) {
+    const m = (k) => k === 'num' || k === 'bomb';
+    if (a.kind === 'wild' && m(b.kind)) return true;
+    if (b.kind === 'wild' && m(a.kind)) return true;
+    return m(a.kind) && m(b.kind) && a.value === b.value;
+  }
+
   touchSweep() {
     const touchDist = this.dieRadius * 0.96 * 2 + 3;
+    const sweepKind = (k) => k === 'num' || k === 'bomb' || k === 'wild';
     for (let i = 0; i < this.dice.length; i++) {
       const a = this.dice[i];
-      if (a.dead || !this.mergeableKind(a.kind) || !a.body) continue;
+      if (a.dead || !sweepKind(a.kind) || !a.body) continue;
       if (a.state !== 'rest' && a.state !== 'active') continue;
       for (let j = i + 1; j < this.dice.length; j++) {
         const b = this.dice[j];
-        if (b.dead || !this.mergeableKind(b.kind) || !b.body || b.value !== a.value) continue;
+        if (b.dead || !b.body || !this.canMerge(a, b)) continue;
         if (b.state !== 'rest' && b.state !== 'active') continue;
         if (Phaser.Math.Distance.Between(a.gx, a.gy, b.gx, b.gy) < touchDist) {
           this.fuseQueue.push([a, b, 0]);
@@ -1803,7 +1939,7 @@ class GameScene extends Phaser.Scene {
   }
 
   fuse(a, b) {
-    const value = a.value;
+    const value = a.kind === 'wild' ? b.value : a.value;
     for (const d of [a, b]) {
       d.reserved = true;
       if (d === this.thrownDie) this.thrownDie = null;
@@ -1976,7 +2112,9 @@ class GameScene extends Phaser.Scene {
     let best = null, bestD = Infinity;
     for (const d of this.dice) {
       if (d === exclude || d.dead || d.reserved) continue;
-      if (!this.mergeableKind(d.kind) || d.value !== value || !d.body) continue;
+      if (!d.body) continue;
+      if (d.kind !== 'wild' &&
+        (!this.mergeableKind(d.kind) || d.value !== value)) continue;
       if (d.state !== 'rest' && d.state !== 'active') continue;
       const dist = Phaser.Math.Distance.Between(
         exclude.gx, exclude.gy, d.body.position.x, d.body.position.y);
@@ -2285,6 +2423,7 @@ class GameScene extends Phaser.Scene {
           d.slowMs += delta;
           if (d.slowMs >= TUNE.SETTLE_MS) {
             if (d.kind === 'potion') { this.consumePotion(d); continue; }
+            if (d.kind === 'stun') { this.consumeStun(d); continue; }
             d.state = 'rest';
             d.restingSince = time;
             d.slowMs = 0;
@@ -2308,9 +2447,7 @@ class GameScene extends Phaser.Scene {
     }
 
     if (this.levelClearPending && !this.gameOver) {
-      const busy = this.thrownDie !== null || this.loftCount > 0 ||
-        this.dice.some(d => d.state === 'active' || d.state === 'loft' || d.state === 'merge');
-      if (!busy) {
+      if (!this.boardBusy()) {
         this.levelClearPending = false;
         if (this.level >= LEVEL_TRACK.length) {
           this.time.delayedCall(400, () => this.doVictory());
@@ -2324,11 +2461,8 @@ class GameScene extends Phaser.Scene {
     }
 
     if (!this.ready && !this.gameOver) {
-      const anyActive = this.thrownDie !== null ||
-        this.loftCount > 0 ||
-        this.dice.some(d => d.state === 'active' || d.state === 'loft' || d.state === 'merge');
-      const timedOut = time - this.fireTime > 6000;
-      if ((!anyActive || timedOut) && time - this.fireTime > 350) {
+      const timedOut = time - this.fireTime > 8000;
+      if ((!this.boardBusy() || timedOut) && time - this.fireTime > 350) {
         this.onThrowResolved();
         this.setReady(true);
       }
