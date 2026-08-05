@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v6.7 -->
+<!-- TRAINSET v6.8 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -449,6 +449,27 @@
   .ftile{ width:calc(var(--ui)*var(--fc,38)*1px) !important; }
   .ftile canvas{ width:calc(var(--ui)*var(--fc,38)*0.86*1px) !important;
     height:calc(var(--ui)*var(--fc,38)*0.86*1px) !important; }
+  /* E59 THE PEDDLER'S PICKS — ✨ a third little column standing BESIDE the
+     face (below would fold the sm rail — measured; the E53 cue law prefers
+     nothing cut at all). One grid item spanning the face's rows: auto-
+     placement keeps the six face tiles in their exact 2×3, the chest keeps
+     its corner. BUILD only; hidden = v6.7's rail to the pixel. */
+  #railBody.haspicks{ grid-template-columns:repeat(2,max-content) max-content; }
+  #picks{ display:none; grid-column:3; grid-row:1/4; flex-direction:column;
+    gap:calc(var(--ui)*3px); align-self:start;
+    border-left:calc(var(--ui)*2px) solid #6e5130; padding-left:calc(var(--ui)*3px); }
+  #railBody.haspicks #picks{ display:flex; }
+  .ptile{ position:relative; }
+  .ptile::after{ content:'✨'; position:absolute; top:calc(var(--ui)*0.5px);
+    right:calc(var(--ui)*1px); font-size:calc(var(--ui)*7px); pointer-events:none;
+    animation:pktw 1.6s ease-in-out infinite; }
+  #picks .ptile:nth-child(2)::after{ animation-delay:0.55s; }
+  #picks .ptile:nth-child(3)::after{ animation-delay:1.1s; }
+  .ptile.pkin{ animation:pkin 0.32s ease-out; }
+  @keyframes pktw{ 0%,100%{ opacity:0.22; transform:scale(1); }
+    50%{ opacity:var(--twa,0.7); transform:scale(1.18); } }
+  @keyframes pkin{ from{ transform:translateX(calc(var(--ui)*10px)); opacity:0; }
+    to{ transform:none; opacity:1; } }
   #railFoot{ flex:0 0 auto; display:flex; gap:calc(var(--ui)*6px);
     padding:calc(var(--ui)*4px) calc(var(--ui)*5px);
     border-top:calc(var(--ui)*2px) solid #6e5130; align-items:center; justify-content:center; }
@@ -11581,6 +11602,7 @@ function handyBump(t){
   if(!layerOf(t)) return;                     // palette kinds only — cars/engines live in the chest
   HANDY=[t,...HANDY.filter(k=>k!==t)].slice(0,8);   // a shadow deeper than the face, so gates can hide rows
   faceSync();
+  pickSync();   // E59: the used suggestion restocks — only a stale slot moves (see the block law)
 }
 function faceList(){
   const out=[], seen=new Set();
@@ -11613,6 +11635,84 @@ function faceSync(){
       g.setTransform(s2,0,0,s2,8*s2,8*s2);
       scenIcon(g,t);
     }
+  }
+}
+/* =====================================================================
+   E59 THE PEDDLER'S PICKS — THE CRATE WHISPERS (MAKE IT MINE 2/3).
+   ✨ three suggestion tiles beside the face, BUILD only: owned toys off
+   the FRIENDS + LAND & TOWN planks the kid forgot — never track, never
+   unowned (THE FIFTY STAY FIFTY: the shop teases, the crate whispers).
+   Excluded: the face's five + kinds standing ≥PICKS_MANY on this rug.
+   Weighted a little random on an OWN 32-bit LCG — zero Math.random, so
+   the shared stream never moves (the E44 boot-race cannot reach the
+   weather seeds through this card). Ephemeral like HANDY: no save key,
+   zero writes. Restock: every BUILD entry + the used slot when its toy
+   lands (pickSync off handyBump — after a bump of kind q the new five
+   ⊆ {q} ∪ old five and only q's rug-count moved, so exactly the used
+   suggestion can go stale; the others hold by proof, not luck).
+   ===================================================================== */
+const PICKS_N=3;                    // the peddler offers three
+const PICKS_MANY=3;                 // this many on the rug = the kid knows this toy today
+const PICKS_W_NR=6, PICKS_W_NP=3, PICKS_W_BASE=1;   // forgotten > new-here > anything owned
+const PICKS_TWINKLE=0.7;            // the ✨ peak opacity (sparkle amplitude)
+const PICKS={ s:((Date.now()>>>0)||1), list:[], tiles:[], cer:new Set() };   // session-only, like HANDY
+function pickRnd(){ PICKS.s=(Math.imul(PICKS.s,1664525)+1013904223)>>>0; return PICKS.s/4294967296; }
+function pickPool(){ return [...new Set([...SCEN_TAB,...TOWN_TAB,...FRIEND_TAB])]; }
+function pickCount(t){ let n=0; for(const s of scen.values()) if(s.t===t&&!s.glued) n++; return n; }
+function pickElig(t,five){ return coll.has(t) && !five.includes(t) && pickCount(t)<PICKS_MANY; }
+function pickW(t){
+  let w=PICKS_W_BASE;
+  if(!HANDY.includes(t)) w+=PICKS_W_NR;   // not recently used (the 8-deep shadow)
+  if(!pickCount(t)) w+=PICKS_W_NP;        // never placed on this rug
+  return w;
+}
+function pickDraw(five,not){
+  const cand=[],ws=[]; let tot=0;
+  for(const t of pickPool()){
+    if(not.includes(t)||!pickElig(t,five)) continue;
+    const w=pickW(t); cand.push(t); ws.push(w); tot+=w;
+  }
+  if(!cand.length) return null;
+  let r=pickRnd()*tot;
+  for(let i=0;i<cand.length;i++){ r-=ws[i]; if(r<0) return cand[i]; }
+  return cand[cand.length-1];
+}
+function pickRoll(){                // every BUILD entry — the peddler restocks the whole column
+  const five=faceList(), out=[];
+  for(let i=0;i<PICKS_N;i++){ const t=pickDraw(five,out); if(!t) break; out.push(t); }
+  PICKS.list=out;
+  pickPaint();
+}
+function pickSync(){                // a toy landed — only a stale suggestion restocks
+  if(!buildGate()) return;
+  const five=faceList(); let changed=false;
+  for(let i=PICKS.list.length-1;i>=0;i--){
+    const t=PICKS.list[i];
+    if(pickElig(t,five)) continue;          // still fresh — hold
+    const nt=pickDraw(five,PICKS.list);
+    if(nt){ PICKS.list[i]=nt; PICKS.cer.add(i); }
+    else PICKS.list.splice(i,1);            // the pool ran dry — the column shortens honestly
+    changed=true;
+  }
+  if(changed) pickPaint();
+}
+function pickPaint(){               // visibility + diff-repaint (the E55 born-hidden law)
+  if(!PICKS.tiles.length) return;
+  const on=buildGate()&&PICKS.list.length>0;
+  $('railBody').classList.toggle('haspicks',on);
+  for(let i=0;i<PICKS.tiles.length;i++){
+    const pt=PICKS.tiles[i], t=on?(PICKS.list[i]||null):null;
+    const cer=PICKS.cer.delete(i)&&!!t;
+    if(pt.t===t&&!cer) continue;
+    pt.t=t;
+    pt.el.style.display=t?'':'none';
+    if(!t) continue;
+    const g=pt.cv.getContext('2d');
+    g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,pt.cv.width,pt.cv.height);
+    const s2=104*ICON_RES/(C+16);
+    g.setTransform(s2,0,0,s2,8*s2,8*s2);
+    scenIcon(g,t);
+    if(cer){ pt.el.classList.remove('pkin'); void pt.el.offsetWidth; pt.el.classList.add('pkin'); }   // the little slide-in
   }
 }
 // ---- the RUG tab's picture tiles (E10): painted straight in 104×104 px ----
@@ -11969,6 +12069,24 @@ function buildPalette(){
             v:SCENDEF[ft.t]&&SCENDEF[ft.t].react?(pplSeq++%3):0}; });
     rb.insertBefore(b,$('tbox'));
   }
+  // E59 THE PEDDLER'S PICKS — ✨ the third little column, one grid item
+  // beside the face (auto-placement keeps the six face tiles in their
+  // exact 2×3). Same descriptor, same pipeline, same voice (hf chirp);
+  // the ✨ is CSS, the words are none.
+  const pw=document.createElement('div'); pw.id='picks';
+  for(let i=0;i<PICKS_N;i++){
+    const b=document.createElement('button'); b.className='pbtn drg ftile ptile'; b.type='button';
+    b.style.display='none';   // born hidden — the E55 empty-slot lesson
+    const cv=document.createElement('canvas'); cv.width=104*ICON_RES; cv.height=104*ICON_RES;
+    b.appendChild(cv);
+    const pt={el:b,cv,t:null}; PICKS.tiles.push(pt);
+    b.addEventListener('pointerdown',e=>{ if(!pt.t) return; ac(); e.preventDefault();
+      down={x:e.clientX,y:e.clientY,what:'pal',t:pt.t,el:b,layer:layerOf(pt.t),hf:1,
+            v:SCENDEF[pt.t]&&SCENDEF[pt.t].react?(pplSeq++%3):0}; });
+    pw.appendChild(b);
+  }
+  rb.appendChild(pw);
+  document.documentElement.style.setProperty('--twa',PICKS_TWINKLE);
   faceSync();
 }
 /* =====================================================================
@@ -12314,6 +12432,7 @@ function paletteSync(){
   const gr=$('grprug');                                        // built by buildPalette — guard the boot order
   if(gr) gr.style.display=(CAMP.on||PLAY.on)?'none':'';        // '' = the stylesheet's display:contents
   faceSync();
+  pickPaint();   // E59: the ✨ column obeys the same door — BUILD only, never a level, never PLAY
 }
 /* =====================================================================
    THE TRAIN SHELF (E16) — the shed's jobs, out in the open. The whole
@@ -12509,6 +12628,7 @@ function showScreen(s){
   winSync();
   shelfSync();
   paletteSync();        // THE GATE follows the mode: BUILD owned-only, campaign full
+  if(game&&!CAMP.on) pickRoll();   // E59: every BUILD entry the peddler restocks — levels and PLAY keep the plain crate
   rugSync();            // E35: the sky pills re-mark on every floor change (active sky wears the gold)
   if(game) eagerTry();  // E27: a finished trainless line greets you already rolling — that IS the toy
   resize();
@@ -14095,6 +14215,18 @@ window.TS={
     list(){ return HANDY.slice(); },           // the raw MRU (deeper than the face)
     face(){ return faceList(); },              // what the crate shows right now
     clear(){ HANDY=[]; faceSync(); return true; },
+  },
+  // ---- E59 THE PEDDLER'S PICKS rig — seed/roll/force for the battery ----
+  picks:{
+    list(){ return PICKS.list.slice(); },
+    seed(k){ PICKS.s=((k>>>0)||1); return PICKS.s; },    // the E44 realign law, private edition
+    roll(){ pickRoll(); return PICKS.list.slice(); },
+    set(a){ PICKS.list=(a||[]).slice(0,PICKS_N); pickPaint(); return PICKS.list.slice(); },   // raw force — set([]) = the plate door (v6.7 rail exactly)
+    elig(t){ return pickElig(t,faceList()); },
+    w(t){ return pickElig(t,faceList())? pickW(t) : 0; },
+    state(){ return { s:PICKS.s, alive:buildGate()&&PICKS.list.length>0, list:PICKS.list.slice(),
+      rects:PICKS.tiles.map(p=>{ const r=p.el.getBoundingClientRect();
+        return {t:p.t,x:r.left,y:r.top,w:r.width,h:r.height,vis:p.el.style.display!=='none'}; }) }; },
   },
   chest:{
     open(b){ boxShow(b!==false); return $('toybox').style.display==='flex'; },
