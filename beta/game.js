@@ -8,7 +8,7 @@
 // The board persists between throws — that's the design thesis.
 // ============================================================
 
-const VERSION = 'v0.3.0';
+const VERSION = 'v0.4.0';
 
 // ---- Tunable knobs (everything feel-related lives here) ----
 const TUNE = {
@@ -46,6 +46,12 @@ const TUNE = {
   HOP_BASE_MS: 260,
   HOP_PER_PX: 0.5,
   HOP_HEIGHT_FRAC: 1.5,
+
+  // the merged die BOUNCES TOWARD its nearest match with real reach
+  // limits — far targets land short and the chain dies there.
+  // These four are live-tunable from the on-screen panel.
+  BOUNCE_RANGE_FRAC: 4.0, // max bounce travel, × dieSize
+  LAND_SLIDE: 3.0,        // leftover slide speed on landing (px/step)
 
   // merge impact physics: the explosion shoves nearby dice
   KNOCK_RADIUS_FRAC: 2.7,
@@ -424,6 +430,7 @@ class GameScene extends Phaser.Scene {
       gx: x, gy: y, h: 0, popScale: 1,
       spinSign: Math.random() < 0.5 ? -1 : 1,
       slowMs: 0, restingSince: 0, dead: false, reserved: false,
+      leftLauncher: true, // fired dice get this cleared until they exit the pad
     };
     if (state !== 'loft') this.attachBody(die, x, y);
     this.dice.push(die);
@@ -455,6 +462,25 @@ class GameScene extends Phaser.Scene {
     die.shadow.destroy();
     const i = this.dice.indexOf(die);
     if (i >= 0) this.dice.splice(i, 1);
+  }
+
+  // a die fell into the shooting pit — swallow it
+  consumeDie(die) {
+    die.dead = true;
+    if (die === this.thrownDie) this.thrownDie = null;
+    this.detachBody(die);
+    this.sparks.burst(die.img.x, die.img.y, 0xc9a878, 8,
+      { speedMin: 0.5, speedMax: 2, life: 300, scale: 0.6 });
+    this.tweens.add({
+      targets: [die.img, die.shadow],
+      x: this.launcherPos.x, y: this.launcherPos.y,
+      scale: 0, alpha: 0, duration: 260, ease: 'Quad.easeIn',
+      onComplete: () => {
+        die.img.destroy(); die.shadow.destroy();
+        const i = this.dice.indexOf(die);
+        if (i >= 0) this.dice.splice(i, 1);
+      },
+    });
   }
 
   // shared renderer for airborne dice: ground pos + height
@@ -554,6 +580,7 @@ class GameScene extends Phaser.Scene {
     this.fireTime = this.time.now;
     const { x, y } = this.launcherPos;
     const die = this.makeDie(x, y, this.nextQueue[0], 'active');
+    die.leftLauncher = false; // it starts on the pad — exempt until it exits
     this.MatterLib.Body.setVelocity(die.body, { x: vel.x, y: vel.y });
     die.spinSign = vel.x >= 0 ? 1 : -1;
     this.thrownDie = die;
@@ -727,31 +754,46 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(150 + TUNE.HOP_PAUSE_MS, () => {
       if (die.dead) { this.loftCount--; return; }
       const target = this.findNearestResting(newValue, die);
-      if (target) {
-        target.reserved = true;
-        this.leap(die, target, 0);
-      } else {
-        this.fallToGround(die);
-      }
+      if (target) this.bounceToward(die, target);
+      else this.fallToGround(die);
     });
   }
 
-  // parabolic leap from current height onto the target
-  leap(die, target, chases) {
+  // The merged die bounces TOWARD its nearest match — but its reach
+  // is physical, not magical. Travel is capped at BOUNCE_RANGE; a far
+  // target means it lands short and the chain ends there. Landing
+  // leaves real slide velocity, so the actual merge (if any) happens
+  // through the normal contact rules.
+  bounceToward(die, target) {
     const sx = die.gx, sy = die.gy, h0 = die.h;
     const tx = target.body ? target.body.position.x : target.img.x;
     const ty = target.body ? target.body.position.y : target.img.y;
     const dist = Phaser.Math.Distance.Between(sx, sy, tx, ty);
-    const dur = TUNE.HOP_BASE_MS + dist * TUNE.HOP_PER_PX;
-    const hopH = this.dieSize * TUNE.HOP_HEIGHT_FRAC + dist * 0.07;
+    if (dist < 1) { this.fallToGround(die); return; }
+    const range = this.dieSize * TUNE.BOUNCE_RANGE_FRAC;
+    const travel = Math.min(dist, range);
+    const dirX = (tx - sx) / dist, dirY = (ty - sy) / dist;
+    const m = this.rail + this.dieRadius;
+    const ex = Phaser.Math.Clamp(sx + dirX * travel, m, this.W - m);
+    const ey = Phaser.Math.Clamp(sy + dirY * travel, m, this.H - m);
+    const dur = TUNE.HOP_BASE_MS + travel * TUNE.HOP_PER_PX;
+    // reach-proportional arc: short hops stay low, full-range ones soar
+    const hopH = this.dieSize * TUNE.HOP_HEIGHT_FRAC * (0.45 + 0.55 * travel / range) + h0 * 0.3;
     const spinDir = this.chain % 2 === 0 ? 1 : -1;
     const c = { t: 0 };
+    const SPLIT = 0.68; // main arc, then a small second skip
     this.tweens.add({
-      targets: c, t: 1, duration: dur, ease: 'Sine.easeInOut',
+      targets: c, t: 1, duration: dur, ease: 'Linear',
       onUpdate: () => {
-        die.gx = sx + (tx - sx) * c.t;
-        die.gy = sy + (ty - sy) * c.t;
-        die.h = h0 * (1 - c.t) + hopH * Math.sin(Math.PI * c.t);
+        die.gx = sx + (ex - sx) * c.t;
+        die.gy = sy + (ey - sy) * c.t;
+        if (c.t < SPLIT) {
+          const u = c.t / SPLIT;
+          die.h = h0 * (1 - u) + hopH * Math.sin(Math.PI * u);
+        } else {
+          const u = (c.t - SPLIT) / (1 - SPLIT);
+          die.h = hopH * 0.22 * Math.sin(Math.PI * u);
+        }
         die.img.rotation = spinDir * Math.PI * 2 * c.t;
         this.renderAir(die);
       },
@@ -759,16 +801,18 @@ class GameScene extends Phaser.Scene {
         die.img.rotation = 0;
         die.h = 0;
         if (die.dead) { this.loftCount--; return; }
-        if (target.dead) { this.fallToGround(die); return; }
-        const nx = target.body ? target.body.position.x : target.img.x;
-        const ny = target.body ? target.body.position.y : target.img.y;
-        const drift = Phaser.Math.Distance.Between(tx, ty, nx, ny);
-        if (drift > this.dieSize * 1.5 && chases < 1) {
-          this.leap(die, target, chases + 1); // it dodged — pounce again
-          return;
-        }
+        die.img.setDepth(10);
+        die.shadow.setDepth(8);
+        this.renderAir(die);
+        die.state = 'active';
+        this.attachBody(die, die.gx, die.gy);
+        this.MatterLib.Body.setVelocity(die.body, {
+          x: dirX * TUNE.LAND_SLIDE, y: dirY * TUNE.LAND_SLIDE,
+        });
+        this.sparks.burst(die.gx, die.gy + this.dieRadius * 0.5, 0xc9a878, 7,
+          { speedMin: 0.6, speedMax: 2.2, life: 320, scale: 0.6 });
+        this.squash(die);
         this.loftCount--;
-        this.fuse(die, target); // both bounce up and fuse in the air
       },
     });
   }
@@ -988,6 +1032,19 @@ class GameScene extends Phaser.Scene {
         });
       }
 
+      // the shooting circle is a pit: dice that wander into it are lost
+      if (d.state === 'rest' || d.state === 'active') {
+        const distL = Phaser.Math.Distance.Between(
+          d.gx, d.gy, this.launcherPos.x, this.launcherPos.y);
+        const apronR = this.dieRadius * 2.2;
+        if (!d.leftLauncher) {
+          if (distL > apronR + this.dieRadius) d.leftLauncher = true;
+        } else if (distL < apronR * 0.85) {
+          this.consumeDie(d);
+          continue;
+        }
+      }
+
       if (d.state === 'active') {
         if (speed < TUNE.SETTLE_SPEED) {
           d.slowMs += delta;
@@ -1036,7 +1093,40 @@ class GameScene extends Phaser.Scene {
   }
 }
 
+// ---- live tuning panel (index.html only; test pages have none) ----
+function bindTunePanel() {
+  const panel = document.getElementById('tune-panel');
+  const toggle = document.getElementById('tune-toggle');
+  if (!panel || !toggle) return;
+  toggle.addEventListener('click', () => {
+    panel.classList.toggle('hidden');
+  });
+  const defs = [
+    ['bounce-range', 'BOUNCE_RANGE_FRAC'],
+    ['bounce-height', 'HOP_HEIGHT_FRAC'],
+    ['land-slide', 'LAND_SLIDE'],
+    ['hop-time', 'HOP_PER_PX'],
+  ];
+  for (const [id, key] of defs) {
+    const input = document.getElementById(id);
+    const label = document.getElementById(id + '-val');
+    if (!input || !label) continue;
+    const saved = localStorage.getItem('runefall.' + key);
+    if (saved !== null && !isNaN(parseFloat(saved))) {
+      TUNE[key] = parseFloat(saved);
+      input.value = saved;
+    }
+    label.textContent = TUNE[key];
+    input.addEventListener('input', () => {
+      TUNE[key] = parseFloat(input.value);
+      label.textContent = input.value;
+      localStorage.setItem('runefall.' + key, input.value);
+    });
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
+  bindTunePanel();
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game-container',
