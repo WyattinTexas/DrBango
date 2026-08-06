@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v7.6 -->
+<!-- TRAINSET v7.7 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -630,6 +630,10 @@
      for the rug modes only, where the wide board really needs the turn. */
   @media (orientation:portrait) and (max-width:560px){ body.rugmode #rot{ display:block; } }
   @media (max-width:820px),(max-height:500px){
+    /* E67: ten crate tiles must stand in a 430px-tall rail — the face dial
+       shrinks on the phone (38→26) and the button padding trims (4 tile rows
+       + the chest, measured: bottoms ≤333 in a 352px body) */
+    .ftile{ --fc:26; padding:2px 3px; }
     /* E20: the sm bar rides the SAME dial at 1.7 — 2.0 can't hold a row inside
        the ≥60%-viewport law on a 375px-tall phone (measured; Wyatt said "about").
        PHONE LAW (v7.0): phone-ness = the SHORT axis — modern iPhones in landscape
@@ -1810,13 +1814,16 @@ const COLL=[
   // starters are track only now: s c st). THE FIFTY STAY FIFTY — same row, new lvl.
   // E65: the tree is a STARTER again (lvl 0 — Wyatt's 8/1 start kit); the face's
   // scenery gateway. Existing saves gain it via baseColl on load.
-  ['tree','TREE','land',0,10], ['bush','BUSH','land',2,10], ['flw','FLOWERS','land',1,10],
-  ['rock','ROCK','land',3,12], ['pond','POND','land',1,10], ['rv','RIVER','land',10,25],
+  // E67: BUSH + FLOWERS + ROCK (and PEOPLE below) join the tree as STARTERS —
+  // Wyatt: decorations belong on the crate face, "going in the box is just not
+  // what players are going to do." Bundles L1-L4 each shrink by one; FIFTY stay fifty.
+  ['tree','TREE','land',0,10], ['bush','BUSH','land',0,10], ['flw','FLOWERS','land',0,10],
+  ['rock','ROCK','land',0,12], ['pond','POND','land',1,10], ['rv','RIVER','land',10,25],
   ['fence','FENCE','land',6,15], ['house','HOUSE','land',6,15], ['shop','SHOP','land',6,15],
   ['hall','TOWN HALL','land',9,20], ['barn','BARN','land',10,25], ['wtr','WATER TOWER','land',9,20],
   ['wind','WINDMILL','land',8,18], ['pine','PINE TREE','land',3,12],
   // EXTRAS (13)
-  ['ppl','PEOPLE','extra',4,12], ['cow','COW','extra',5,15], ['sheep','SHEEP','extra',5,15],
+  ['ppl','PEOPLE','extra',0,12], ['cow','COW','extra',5,15], ['sheep','SHEEP','extra',5,15],
   ['chick','CHICKEN','extra',5,15], ['duck','DUCK','extra',1,10], ['dog','DOG','extra',3,12],
   ['cat','CAT','extra',7,18], ['hay','HAY BALE','extra',5,15], ['lamp','LAMP POST','extra',6,15],
   ['whis','WHISTLE POST','extra',7,18], ['sig','SIGNAL','extra',7,18],
@@ -10005,8 +10012,15 @@ const fillRows=(kind,x0,y0,x1,y1,alt)=>{      // a block of glued scenery; alt c
 const LEVELS=[
   // 1 — THE POND. Wyatt approved this one as it stands: the pond sits mid-rug and
   // the answer is the shape of the water. Kept verbatim; only the card got simpler.
+  // E67 THE GENTLE FIRST STEP — the ring arrives GLUED with exactly TWO
+  // straights missing on the top run (the L2 grammar, one level earlier):
+  // the gaps breathe gold, the ghost hand teaches them, two drags win.
   { name:'THE POND', hint:'GO AROUND THE POND!', toy:'duck', land:'rug',   // E66 TEN LANDS: home floor first
-    glued:[['rv',5,3],['rv',6,3],['rv',5,4],['rv',6,4]], stations:[] },
+    glued:[['rv',5,3],['rv',6,3],['rv',5,4],['rv',6,4]],
+    track:[['c',1,4,2],['c',2,7,2],['c',3,7,5],['c',0,4,5],
+           ['s',1,4,3],['s',1,4,4],['s',1,7,3],['s',1,7,4],
+           ['s',0,5,5],['s',0,6,5]],
+    gaps:[[5,2],[6,2]], stations:[] },
   // 2 — FINISH THE TRACK. The simplest possible second level: an oval already on the
   // rug with three cells missing. The gaps breathe gold; two straights and one curve
   // close it. The station rides along for free so level 6 can ASK for one later.
@@ -10100,7 +10114,7 @@ const swapBr=(rows,cells)=>rows.map(r=>cells.some(c2=>c2[0]===r[2]&&c2[1]===r[3]
 // curves throughout, plus bridges from 4 on (level 3's bundle hands them over).
 // The glued cells of each level are skipped: a reference never re-places the land.
 const SOLVE=[
-  { start:[5,2], rows:ringRows(4,2,7,5) },                                  // 1 round the pond
+  { start:[6,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 1 close the pond's two gaps (E67)
   { start:[6,5], rows:[ ['s',0,5,2],['s',0,6,2],['c',2,8,2] ] },            // 2 close the three gaps
   { start:[5,2], rows:ringRows(4,2,8,5) },                                  // 3 the lane through the woods
   { start:[4,3], rows:swapBr(ringRows(4,2,8,5),[[6,2],[6,5]]) },            // 4 two bridges over the river
@@ -11934,8 +11948,8 @@ const MAGIC_TILES=[];   // E35: the four SKY PILLS (never gated — the sky is e
    (layAt + the newScen drop); moves, rig places, the bedroom and PLAY
    never do. A new toy's flight landing bumps too (E55 §4).
    ===================================================================== */
-const FACE_FLOOR=['s','c','st','tree','x'];   // the starter floor beneath the MRU bubbles
-const FACE_N=5;                               // five pictures and a chest
+const FACE_FLOOR=['s','c','st','tree','bush','flw','rock','ppl','x'];   // the starter floor beneath the MRU bubbles (E67: the four decorations walked out of the box)
+const FACE_N=9;                               // nine pictures and a chest (E67: was five)
 let HANDY=[];                                 // MRU kinds, newest first — session-only
 const FACE_TILES=[];                          // the five crate slots {el,cv,t}
 function layerOf(t){
