@@ -7,7 +7,7 @@
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.16.0';
+const VERSION = 'v0.16.1';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -463,6 +463,9 @@ class GameScene extends Phaser.Scene {
     const auto = window.RUNEFALL_AUTOSTART;
     if (auto) this.startRun(typeof auto === 'string' ? auto : 'warrior');
     else this.showHome();
+    // boot beacon: confirms create() ran to completion on this
+    // device + version (readable by probes and bug reports alike)
+    try { localStorage.setItem('runefall.boot', VERSION); } catch (e) { /* no-op */ }
   }
 
   // ---------- bag ----------
@@ -1240,10 +1243,14 @@ class GameScene extends Phaser.Scene {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
         fontStyle: 'bold', color: realm.hex,
       }).setOrigin(1, 0).setDepth(72));
-      this.modalAdd(this.add.text(x + 60, cy - cardH / 2 + 36, realm.flavor, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
-        color: BOARD.creamDim, wordWrap: { width: cardW - 150 },
-      }).setDepth(72));
+      // short phone cards: skip the flavor line so it can't collide
+      // with the multiplier row
+      if (cardH >= 96) {
+        this.modalAdd(this.add.text(x + 60, cy - cardH / 2 + 36, realm.flavor, {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+          color: BOARD.creamDim, wordWrap: { width: cardW - 150 },
+        }).setDepth(72));
+      }
       this.modalAdd(this.add.text(x + 60, cy + cardH / 2 - 24,
         '♥ enemies ×' + realm.hpMul + '   ⚔ ×' + realm.dmgMul +
         '   gold ×' + realm.goldMul + '   ' + realm.xp + ' xp/fight', {
