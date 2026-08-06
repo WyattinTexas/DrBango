@@ -1,13 +1,13 @@
 'use strict';
 
 // ============================================================
-// RUNEFALL — Phase 0.14 "Class levels"    v0.14.0
+// RUNEFALL — Phase 0.15 "Class relics"    v0.15.0
 // A 20-level Rune Dice-style run: flick dice from your DICE BAG,
 // merges damage enemies, gold dice pay out, shops between fights
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.14.0';
+const VERSION = 'v0.15.0';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -232,6 +232,27 @@ const RELICS = [
     desc: 'Enemy attacks deal 2 less damage (1 minimum)' },
   { id: 'chaincharm', icon: '⛓️', name: 'Chain Charm', tier: 3, price: 20,
     desc: 'Merges at chain ×3 or higher deal +2 damage' },
+  // ---- class relics: only stocked while playing that class ----
+  // one per class is the LV5 signature (starter: true) and joins every
+  // run for free once the class is maxed
+  { id: 'bulwark', icon: '🏰', name: 'Old Bulwark', tier: 1, price: 10,
+    cls: 'warrior', starter: true, desc: 'Start each fight with 3 BLOCK' },
+  { id: 'towerplate', icon: '🧱', name: 'Tower Plate', tier: 2, price: 14,
+    cls: 'warrior', desc: 'Shield dice bank +1 extra BLOCK' },
+  { id: 'spikedplate', icon: '🦔', name: 'Spiked Plate', tier: 3, price: 18,
+    cls: 'warrior', desc: 'Fully blocked hits reflect 3 damage back' },
+  { id: 'firstvolley', icon: '🌬️', name: 'First Volley', tier: 1, price: 10,
+    cls: 'ranger', starter: true, desc: 'Fights open with a free volley: 2 to every enemy' },
+  { id: 'deepquiver', icon: '🎯', name: 'Deep Quiver', tier: 2, price: 14,
+    cls: 'ranger', desc: 'Arrow dice deal +1' },
+  { id: 'eagleeye', icon: '🦅', name: 'Eagle Eye', tier: 3, price: 18,
+    cls: 'ranger', desc: 'A lone enemy takes TRIPLE arrows, not double' },
+  { id: 'emberring', icon: '💍', name: 'Ember Ring', tier: 1, price: 10,
+    cls: 'mage', starter: true, desc: 'Fights open with every enemy burning 1' },
+  { id: 'kindling', icon: '🕯️', name: 'Kindling', tier: 2, price: 14,
+    cls: 'mage', desc: 'Fire dice ignite +1 extra burn' },
+  { id: 'everflame', icon: '♾️', name: 'Everflame', tier: 3, price: 18,
+    cls: 'mage', desc: 'Burn never fades on its own' },
 ];
 
 const RELIC_BY_ID = {};
@@ -631,6 +652,22 @@ class GameScene extends Phaser.Scene {
       }
     }
     this.layoutEnemies();
+    // class openers: LV5 signatures and their shop-bought kin
+    if (this.hasRelic('bulwark')) {
+      this.addBlock(3, this.rail + 60, this.H - this.rail - 70);
+    }
+    if (this.hasRelic('emberring')) {
+      for (const e of this.enemies) {
+        if (e.alive) { e.fire += 1; this.drawEnemyBar(e); }
+      }
+    }
+    if (this.hasRelic('firstvolley')) {
+      this.time.delayedCall(700, () => {
+        if (!this.gameOver && this.enemies.some(e => e.alive)) {
+          this.dealDamage(2, this.launcherPos.x, this.launcherPos.y, true);
+        }
+      });
+    }
   }
 
   layoutEnemies() {
@@ -923,6 +960,15 @@ class GameScene extends Phaser.Scene {
     this.drawHpBar();
     this.drawGold();
     this.drawRelics();
+    // maxed class: its signature relic joins from throw one
+    if (classLevelOf(cls.id) >= CLASS_MAX_LEVEL) {
+      const sig = RELICS.find(r => r.cls === cls.id && r.starter);
+      if (sig) {
+        this.gainRelic(sig.id);
+        this.floatText(this.W / 2, this.H * 0.62,
+          sig.icon + ' ' + sig.name.toUpperCase() + ' JOINS YOU', GOLD, true);
+      }
+    }
     this.generateRunMap();
     this.startLevelAt(0, 0);
   }
@@ -1232,7 +1278,8 @@ class GameScene extends Phaser.Scene {
     };
     const pool = Phaser.Utils.Array.Shuffle([...pools[tier]]);
     // one relic per shop, drawn from the ones this run hasn't claimed
-    const relicPool = RELICS.filter(r => r.tier <= tier && !this.hasRelic(r.id));
+    const relicPool = RELICS.filter(r => r.tier <= tier && !this.hasRelic(r.id) &&
+      (!r.cls || (this.playerClass && r.cls === this.playerClass.id)));
     const relic = relicPool.length
       ? { ...relicPool[Phaser.Math.Between(0, relicPool.length - 1)] } : null;
     // every shop stocks one die of your own class, scaled to the tier
@@ -2505,15 +2552,19 @@ class GameScene extends Phaser.Scene {
     this.sparks.burst(x, apexY, cls.color, 18,
       { speedMin: 1.5, speedMax: 5, life: 520, scale: 0.95 });
     if (kind === 'shield') {
-      this.addBlock(value, x, apexY);
+      this.addBlock(value + (this.hasRelic('towerplate') ? 1 : 0), x, apexY);
     } else if (kind === 'arrow') {
       // a lone target catches the whole volley
       const alive = this.enemies.filter(e => e.alive).length;
-      const dmg = value + this.mergeDamageBonus();
-      if (alive === 1) this.dealDamage(dmg * 2, x, apexY, false);
-      else this.dealDamage(dmg, x, apexY, true);
+      const dmg = value + this.mergeDamageBonus() +
+        (this.hasRelic('deepquiver') ? 1 : 0);
+      if (alive === 1) {
+        this.dealDamage(dmg * (this.hasRelic('eagleeye') ? 3 : 2), x, apexY, false);
+      } else {
+        this.dealDamage(dmg, x, apexY, true);
+      }
     } else if (kind === 'fire') {
-      this.igniteAll(value, x, apexY);
+      this.igniteAll(value + (this.hasRelic('kindling') ? 1 : 0), x, apexY);
     }
   }
 
@@ -2552,7 +2603,7 @@ class GameScene extends Phaser.Scene {
       this.sparks.burst(e.x, e.y, 0xe08a4a, 12,
         { speedMin: 1, speedMax: 3.5, life: 400, scale: 0.8 });
       this.hitEnemy(e, burn);
-      e.fire = Math.max(0, burn - 1);
+      e.fire = this.hasRelic('everflame') ? burn : Math.max(0, burn - 1);
       if (e.alive) this.drawEnemyBar(e);
     }
   }
@@ -2572,6 +2623,10 @@ class GameScene extends Phaser.Scene {
         '-' + through + (label || ''), '#ff8070', true);
     } else {
       this.floatText(this.W * 0.16, this.H - this.rail - 40, 'BLOCKED', '#9fb4c9');
+      // spiked plate: a fully soaked hit bites back
+      if (soaked > 0 && this.hasRelic('spikedplate')) {
+        this.dealDamage(3, this.W * 0.24, this.H - this.rail - 60, false);
+      }
     }
     this.drawHpBar();
     if (this.hp <= 0) this.doGameOver();
