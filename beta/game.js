@@ -7,7 +7,7 @@
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.13.0';
+const VERSION = 'v0.13.1';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -55,6 +55,7 @@ const TUNE = {
   BOMB_DAMAGE: 6,
   DETONATE_DAMAGE: 12,
   POTION_HEAL: 6,
+  SHOP_REFRESH_PRICE: 4,
   STONE_HITS: 2,
   STONE_HIT_SPEED: 4,
   SPIKE_DAMAGE: 3,
@@ -426,9 +427,21 @@ class GameScene extends Phaser.Scene {
       this.runMap.push(row);
     }
     // guarantee a shop on the approach to each boss
-    for (const f of [2, 6, 11, 16]) {
+    const guaranteed = [2, 6, 11, 16];
+    for (const f of guaranteed) {
       if (!this.runMap[f].some(n => n.type === 'shop')) {
         this.runMap[f][Phaser.Math.Between(0, this.runMap[f].length - 1)].type = 'shop';
+      }
+    }
+    // shops never sit on consecutive floors — walking out of one shop
+    // straight into another kills the pacing (guaranteed floors win)
+    for (let f = 0; f < FLOORS - 1; f++) {
+      const aShop = this.runMap[f].some(n => n.type === 'shop');
+      const bShop = this.runMap[f + 1].some(n => n.type === 'shop');
+      if (!aShop || !bShop) continue;
+      const demote = guaranteed.includes(f + 1) ? f : f + 1;
+      for (const n of this.runMap[demote]) {
+        if (n.type === 'shop') n.type = 'fight';
       }
     }
     // edges: monotone, non-crossing-ish, everything reachable
@@ -1172,6 +1185,21 @@ class GameScene extends Phaser.Scene {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
       fontStyle: 'bold', color: GOLD,
     }).setDepth(72));
+    // fresh stock on demand: same tier rules, brand-new roll
+    const canRefresh = this.gold >= TUNE.SHOP_REFRESH_PRICE;
+    const refreshBtn = this.modalAdd(this.add.text(px + pw - 16, py + 12,
+      '⟳ NEW STOCK — ' + TUNE.SHOP_REFRESH_PRICE + 'g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
+      fontStyle: 'bold', color: canRefresh ? '#2a1a10' : '#7a6a55',
+      backgroundColor: canRefresh ? '#e4bf7e' : '#3a2a1c',
+      padding: { x: 10, y: 5 },
+    }).setOrigin(1, 0).setDepth(73).setInteractive());
+    refreshBtn.on('pointerdown', () => {
+      if (this.gold < TUNE.SHOP_REFRESH_PRICE) return;
+      this.gold -= TUNE.SHOP_REFRESH_PRICE;
+      this.drawGold();
+      this.renderShop(this.shopStock());
+    });
     const cellW = pw / 4;
     const labels = {
       bomb: 'Bomb die ', potion: 'Potion die',
