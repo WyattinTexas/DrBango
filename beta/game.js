@@ -1,13 +1,13 @@
 'use strict';
 
 // ============================================================
-// RUNEFALL — Phase 0.12 "Classes"    v0.12.1
+// RUNEFALL — Phase 0.13 "Class dice ride the chain"    v0.13.0
 // A 20-level Rune Dice-style run: flick dice from your DICE BAG,
 // merges damage enemies, gold dice pay out, shops between fights
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.12.2';
+const VERSION = 'v0.13.0';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -70,9 +70,9 @@ const STARTING_BAG = [
   { kind: 'num', value: 2 }, { kind: 'num', value: 3 },
 ];
 
-// Classes: each brings a signature die that merges like a bomb —
-// with its own number, spending both dice and firing an effect
-// instead of leaving a result die behind.
+// Classes: each brings a signature die that merges on its own number,
+// fires its effect, and STILL fuses into the next number up — the
+// effect rides the chain instead of ending it.
 const CLASS_KINDS = ['shield', 'arrow', 'fire'];
 const isClassKind = (k) => CLASS_KINDS.indexOf(k) >= 0;
 
@@ -161,9 +161,9 @@ const TOOLTIPS = {
   wild: 'WILD DIE\nMerges with ANY number\nand becomes its match',
   stun: 'STUN DIE\nBreaks on impact and delays\nevery enemy attack by 2 throws',
   thief: 'THIEF DIE\nTouching it steals 3 gold,\nthen it escapes',
-  shield: 'SHIELD DIE\nMerges with its number, then\nbanks that much BLOCK.\nBlock soaks damage one for one',
-  arrow: 'ARROW DIE\nMerges with its number, then\nhits EVERY enemy for it —\ndouble if only one is left',
-  fire: 'FIRE DIE\nMerges with its number, then\nsets EVERY enemy alight. Burn\nbites each turn, then fades by 1',
+  shield: 'SHIELD DIE\nMerges with its number: banks\nthat much BLOCK (soaks damage\n1:1) and still fuses upward',
+  arrow: 'ARROW DIE\nMerges with its number: hits\nEVERY enemy for it (double if\none left) and still fuses upward',
+  fire: 'FIRE DIE\nMerges with its number: sets\nEVERY enemy burning (burn bites,\nthen fades) and still fuses upward',
 };
 
 // Relics: permanent passives sold from the shop's special-item slot.
@@ -2808,20 +2808,22 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    // class dice spend themselves the same way: the effect IS the result
+    // class dice fire their effect, then the pair STILL fuses upward —
+    // a 2-shield into a 2 banks block AND leaves a 3 to keep the chain
     const classDie = isClassKind(a.kind) ? a : (isClassKind(b.kind) ? b : null);
-    if (classDie) {
-      this.classDieEffect(classDie.kind, value, mx, my, riseH);
-      this.loftCount--;
-      return;
-    }
-
-    this.mergeImpact(mx, my, riseH, value);
+    if (classDie) this.classDieEffect(classDie.kind, value, mx, my, riseH);
+    else this.mergeImpact(mx, my, riseH, value);
 
     const newValue = value + 1;
     const over = newValue > TUNE.MAX_VALUE;
-    this.dealDamage((over ? TUNE.DETONATE_DAMAGE : newValue) + this.mergeDamageBonus(),
-      mx, my - riseH, over);
+    // the class effect replaces the merge's own damage; plain merges
+    // still hit for the fused value
+    if (!classDie) {
+      this.dealDamage((over ? TUNE.DETONATE_DAMAGE : newValue) + this.mergeDamageBonus(),
+        mx, my - riseH, over);
+    } else if (over) {
+      this.dealDamage(TUNE.DETONATE_DAMAGE + this.mergeDamageBonus(), mx, my - riseH, true);
+    }
 
     if (over) {
       this.detonate(mx, my, riseH);
