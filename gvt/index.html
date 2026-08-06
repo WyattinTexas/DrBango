@@ -2247,7 +2247,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.50</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.51</div>
   <div class="scanlines"></div>
 </div>
 
@@ -11327,7 +11327,7 @@ const ENH_FLAME_PACE=1.4,   // he jogs — 68 px/s becomes 95 on the battlefield
 // mod rides along, 68 → 135, and stays an upgrade.
 const MINE_BLAST=90;
 const ENH_MINE_R=1.5,       // blast 90 → 135
-      ENH_MINE_TRIG=1.46,   // trigger 26 → 38: a boot near it is near enough
+      ENH_MINE_TRIG=1.46,   // trigger ×1.46: a boot near it is near enough (v2.51 doubled the sweeper's base at the arming loop — stock 52, with this 76)
       ENH_MINE_VX=2;        // and it is an ANTI-TANK mine now — double against anything with wheels
 const ENH_SHIELD_N=5;       // the plate stops the first FIVE incoming hits dead — any caliber, any source (Wyatt's number, verbatim)
 // v1.68 DUAL GUN BLAZIN' (Wyatt 7/28: "a little bit less damage, but if there
@@ -11377,7 +11377,7 @@ const ENH_INFO={
     down:'No catch — but he now out-walks your own line and arrives on his own. A man with an 85 reach who gets there early gets there alone.' },
   bigbangers:{ unit:'minesweeper', name:'THE BIG BANGERS', sub:'DOUBLE-CHARGE FIRECRACKERS',
     tag:'BIGGER BANG, WIDER TRIGGER, EATS TANKS!',
-    up:'Blast 90 → 135, trigger 26 → 38, and DOUBLE damage to anything with wheels or tracks.',
+    up:'Blast 90 → 135, trigger 52 → 76, and DOUBLE damage to anything with wheels or tracks.',
     down:'A wider blast is a wider blast. In the campaign those mines take out your own men too, and now they can reach further to do it.' },
   riotshield:{ unit:'sarge', name:'THE RIOT SHIELD', sub:'STAMPED PLATE · FIVE RIVETS',
     tag:'THE FIRST FIVE HITS BOUNCE OFF!',
@@ -12761,7 +12761,11 @@ const SET_PIECES={
 // Snow rungs 20/74/100, desert 44/50/88; 58 deliberately stays home (HE
 // STUDIED YOUR PLAYBOOK — the playbook IS your own rug); 14/26 keep the
 // young ladder pure (0098's law). =====
-const CAMP_STAGES={ 20:'snow', 44:'sand', 50:'sand', 74:'snow', 88:'sand', 100:'snow' };
+// v2.51 (Wyatt 8/5: "add in The Winter Background for Levels 11 through 20"):
+// the whole band 11-20 fights on THE WINTER FIELD ground — 20 was already
+// snow, 11-19 join it; the deep rungs keep their v1.96 stages untouched.
+const CAMP_STAGES={ 11:'snow', 12:'snow', 13:'snow', 14:'snow', 15:'snow', 16:'snow', 17:'snow', 18:'snow', 19:'snow',
+                    20:'snow', 44:'sand', 50:'sand', 74:'snow', 88:'sand', 100:'snow' };
 // Pure decor, ZERO hitbox: drawn by drawRug straight off this table — never
 // in terrain.rocks, so steering, placement and ground can never see one.
 // Authored clear of the toy box, the deploy line, every rock's shoulder and
@@ -12874,6 +12878,12 @@ const CAMP_DRESS={
   // west of the 480 deploy line (the L3/L25 house row, bag shoulders ≤ 472).
   7:{ rocks:[{x:404,y:310,r:16,art:'bags',row:'a'},{x:430,y:328,r:16,art:'bags',row:'a'},{x:456,y:346,r:16,art:'bags',row:'a'}],
       jax:[{x:720,y:200},{x:800,y:320},{x:760,y:430},{x:880,y:180},{x:920,y:390},{x:990,y:260}] },
+  // v2.51 (Wyatt 8/5: L11 gets "a few jax mines" beside its new river): four
+  // jacks in the tan approach EAST of the water (river spans x 500-556, all
+  // spots ≥720), every pair ≥141px apart (no one-boot chains), all ≥197px off
+  // the crate — the L7 door verbatim, the v2.15 fairness law (both armies
+  // trip them).
+  11:{ jax:[{x:720,y:200},{x:840,y:300},{x:760,y:440},{x:940,y:200}] },
   25:{ rocks:[{x:608,y:296,r:16,art:'bags',row:'a'},{x:634,y:314,r:16,art:'bags',row:'a'},{x:660,y:332,r:16,art:'bags',row:'a'}],
        balls:[{x:1200,y0:160,y1:430,r:42,spd:54}] },
   30:{ rocks:[{x:900,y:190,r:33,art:'block',ltr:'G',bc:'#6E8F4E'},{x:1010,y:300,r:34,art:'block',ltr:'V',bc:'#4E7FA8'},{x:880,y:420,r:33,art:'block',ltr:'T',bc:'#C0483B'},
@@ -13235,6 +13245,21 @@ function levelCfg(n){
       {f:'column', t:'tanrifle', n:3, e:'right', at:0},
       {f:'boss',   t:mt,         n:1, e:'right', at:2.0, tease:true} ] };
   }
+  // ===== v2.51 THE SEVEN-WAVE LAW (Wyatt 8/5, verbatim: "We don't want any
+  // of the levels to really have more than seven waves unless they're a
+  // really special level. We want the last wave to always feel meaningful.")
+  // — a rung keeps its FIRST SIX waves and its FINALE. The finale slot is
+  // whatever the passes above just put there (the cycle boss, THEIR SARGE's
+  // set piece, or THE BIG PUSH), so the last wave stays the meaningful one by
+  // construction; the premiere/tease openers live at wave 0 and survive
+  // whole. L100 is the one really-special level (the hand-authored toy box is
+  // SACRED — twelve waves and all). Post-build, zero R() consumed — every
+  // seed, every script, every terrain roll stands byte-identical. The per-
+  // level blocks below run AFTER the cut, so "the wave that plays fifth"
+  // (L7's giant, v2.39) keeps meaning exactly that. Old-build co-op allies
+  // sim the long set and clamp harmlessly (the v2.39 L10 precedent).
+  if(n!==100 && cfg.waves.length>7)
+    cfg.waves=cfg.waves.slice(0,6).concat([cfg.waves[cfg.waves.length-1]]);
   // v2.37 (Wyatt 8/4, verbatim: "start off the fight with a red coat and an
   // officer in the back. That's a good vibe."): L3's opener walks on WITH one
   // redcoat and his officer 48px behind the rank — spawnGroup's own rear
@@ -13302,6 +13327,29 @@ function levelCfg(n){
       {f:'boss',t:'giant',n:1,e:'right',at:2.4,hpX:1.5},
       {f:'line',t:'tanflame',n:1,e:'right',at:3.6}] }
   ];
+  // ===== v2.51 (Wyatt 8/5, verbatim: "Level 11 is a little too hard. Please
+  // reduce the wave count to seven waves and add a River with 1 bridge and a
+  // few jax mines" · "Level 12 needs be 5 waves instead of 12. On the 5th
+  // wave add 1 Tank and 1 Big One.") =====
+  // L11: the seven-wave law above already cut it to 7 (convoy premiere
+  // through the BIG PUSH finale). The river is authored in deterministic
+  // literals — the seed rolled none here, so no R() is consumed and every
+  // other rung stands; ONE bridge by the river's own construction (one
+  // bridgeY). The jax ride CAMP_DRESS[11] (the L7 door), east of the water
+  // in the tan approach. The v1.30 campFrontX law makes the EAST BANK the
+  // green stand — by design.
+  if(n===11) cfg.terrain.river={x:500, w:56, bridgeY:300, bw:76};
+  // L12: five waves — the natural first five (the tease's early giant still
+  // opens, AN EARLY GIANT keeps its name honest) and the fifth becomes the
+  // finale: its own roster plus ONE tank and ONE BIG SHOT, wearing the red
+  // card. One n:1 boss group (the sqScaleCfg law); the tank is a bare wedge
+  // (escort 0), authored raw like all armor.
+  if(n===12){ cfg.waves=cfg.waves.slice(0,5);
+    const w5=cfg.waves[4];
+    w5.name=BOSSDEF.giant.wave; w5.boss='giant';
+    w5.groups.push({f:'boss',t:'giant',n:1,e:'right',at:2.0});
+    w5.groups.push({f:'wedge',t:'tank',n:1,e:'right-bottom',at:3.4});
+  }
   return cfg;
 }
 function waveFromKey(key, m, R, lvl){
@@ -13428,7 +13476,7 @@ const UDEF = {
   // together. The price of the reach is THE ROOTED BURST (MG_ROOT, declared
   // beside MG_JEEP_BONUS): shooting PLANTS him for two whole seconds.
   rifleman:{ rng:198, rate:1.15, dmg:1, air:true,  grit:3, name:'RIFLEMAN' },
-  mgunner: { rng:180, rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },   // v2.49 (Wyatt 8/5): +20% again on v2.44's 150 — still inside the rifleman's 198, the v2.35 order kept
+  mgunner: { rng:198, rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },   // v2.49: +20% on v2.44's 150. v2.51 (Wyatt 8/5): +10% again, 180→198 — now level with the rifleman's own reach (tanmg stays 161, the v2.35 order kept; Wyatt's whole sentence was the GREEN gunner). His two matchups live in the damage funnels: MG_RIFLE_RESIST / MG_TANK_RESIST beside MG_JEEP_BONUS
   bazooka: { rng:173, rate:0.32, dmg:4, air:false, grit:3, splash:55, scatter:84, vx2:true, name:'BAZOOKA' },
   mortar:  { rng:9999, minRng:120, rate:0.2, dmg:3, air:false, grit:3, splash:60, scatter:98, name:'MORTAR' },
   sarge:   { rng:108, rate:PISTOL_RATE, dmg:1.5, air:true,  grit:4, name:'SARGE' },
@@ -13512,7 +13560,7 @@ const FDEF = {
   jeep:    { hp:12, spd:88, bounty:25, leak:2, w:78, vehicle:true },
   tank:    { hp:60, spd:20, bounty:100,leak:3, w:96, vehicle:true },
   // ===== BOSSES: rare, huge, and each a different problem to solve =====
-  giant:   { hp:42, spd:26, bounty:70,  leak:5, w:104, rng:396, fireCd:3.5, boss:true },  // v2.49 (Wyatt 8/5: "fire back... one-hit kill... moderately slow... rifleman range"): fireCd 2.3→3.5; his shot fells one man whole (knock() = the v1.32 casualty; shield/plate/saber/jet stay the purchased counters). v2.50 (Wyatt: "he actually needs to shoot further than we thought. Let's double his attack range"): rng 198→396 — double the rifleman's 198, the longest direct gun on the carpet (only the mortar's lob sees further)
+  giant:   { hp:42, spd:23.4, bounty:70,  leak:5, w:104, rng:356, fireCd:3.85, boss:true },  // v2.49: fires back, one shot fells one man whole (knock() = the v1.32 casualty; shield/plate/saber/jet stay the purchased counters). v2.50: rng doubled. v2.51 (Wyatt 8/5: "I was able to beat him, but I'm pretty good... slightly easier — 10% movement slower, 10% less range, 10% slower attack speed"): spd 26→23.4 · rng 396→356 · fireCd 3.5→3.85 — each exactly ×0.9/÷0.9 off the v2.50 build, still the longest direct gun on the carpet
   rollpig: { hp:44, spd:54, bounty:80,  leak:5, w:112, boss:true, splashCd:1.1, splashR:78 }, // fast rush — tumbles in and splashes your line flat
   rex:     { hp:66, spd:33, bounty:110, leak:6, w:122, boss:true, stompCd:2.0, stompR:100 },   // the bruiser — huge HP, AoE stomp
   // v1.38 THEIR SARGE — the Tan's own commander, red saber in hand (the three
@@ -13638,7 +13686,7 @@ const SARGE_WEAPONS = {
   // 7/25 (Wyatt): it is called the SABER everywhere a player can read it. The
   // internal key stays 'lightsaber' — it is threaded through saves, the coop
   // wire and the armory roll, and none of that is player-facing.
-  lightsaber:{ name:'SABER',          unlock:12, desc:'Sarge dashes out, carves through everything in reach, blocks incoming fire, then falls back to his post.' },
+  lightsaber:{ name:'SABER',          unlock:20, desc:'Sarge dashes out, carves through everything in reach, blocks incoming fire, then falls back to his post.' },   // v2.51 (Wyatt 8/5): unlock 12→20 — the winter band's finale earns the blade; every reader (the win-screen grant, the academy card, the crystal-case veil) quotes this cell, and a save that already owns it keeps it (the grant only ever ADDS)
   // 0092 (Wyatt 7/29): the SECRET class. unlock:0 keeps it out of the campaign
   // grant loop below (the pistol's own truth) — ownership is the co-op service
   // record's alone, read through cmdOwned()/wkOwned(). Desc is dead data
@@ -17352,6 +17400,13 @@ const JEEP_SABER_RESIST=0.25;    // a blade scratches paint
 // battleground, a relayed ally's gunner, the AI seats — pays it identically,
 // and a CRIT stacks on top exactly as it does for every round (×2 then ×1.7).
 const MG_JEEP_BONUS=1.7;
+// v2.51 (Wyatt 8/5): the M.GUNNER's two new matchups. Rounds INTO him from a
+// rifleman count 0.8 of a grit pip (campaign, tanHit — deterministic, no roll:
+// 3 pips = 4 rifle rounds) or ×0.8 hp (battlefield, hurt) — "20% less damage
+// from riflemen" exactly, either carpet. His own rounds into a TANK hull pay
+// ×0.3 ("70% less damage to tanks") — tanks only, the jeep keeps its ×1.7
+// shred above and the bazooka/BIG BANGERS stay the armor answer.
+const MG_RIFLE_RESIST=0.8, MG_TANK_RESIST=0.3;
 // v2.44 THE ROOTED BURST (Wyatt 8/5: "when he shoots, he has to stop for two
 // whole seconds moving forward. He can't just shoot, move forward, shoot,
 // move forward... his range should be 20% further"): the other half of the
@@ -17381,6 +17436,12 @@ function counterDmg(tgt,dmg,src){
     else if(a==='lightsaber'||a==='commander') dmg*=JEEP_SABER_RESIST;   // 0092: steel scratches paint too — a slow tank must not chew hulls for free; the bazooka stays the armor answer. (He is NOT in saberArm: the jeep's instant-destroy counters the LUNGING blade; the commander takes an ordinary ram, which his block can eat.)
     else if(a==='mgunner') dmg*=MG_JEEP_BONUS;   // v2.35: the MG shreds the soft-skinned jeep — Wyatt's ×1.7, see the const above
   }
+  // v2.51: the MG's rounds only rattle a TANK's tracks — ×0.3, both carpets
+  // (campaign 'tank', battlefield 'bftank'), same funnel as the jeep rows.
+  if(src && src.type==='mgunner' && (tgt.type==='tank'||tgt.type==='bftank')) dmg*=MG_TANK_RESIST;
+  // v2.51: a battlefield rifleman's round loses a fifth into the dug-in MG
+  // (the campaign twin of this rule lives in tanHit as a fractional pip)
+  if(tgt.type==='mgunner' && src && src.type==='rifleman') dmg*=MG_RIFLE_RESIST;
   // v2.36 THE PURPLE BEAM: +2% into the enemy Sarge HIMSELF — the campaign's
   // tansarge boss, or any battlefield Sarge across the line (a bullet only
   // ever finds an enemy, so tgt.type is the whole test there). Laser = your
@@ -19005,7 +19066,7 @@ function cmdAbsorbs(u){
   S.floats.push({x:u.x,y:u.y-72,txt:'BLOCKED!',t:0,col:'#C9D2D8'});   // raw key — floats translate at draw
   return true;
 }
-function tanHit(u,fx,fy){
+function tanHit(u,fx,fy,src){
   if(u.dead) return;
   if(u.jetT>0) return;                       // airborne (v1.39): no grit ticks mid-arc
   if(sargeAbsorbs(u)) return;                // the plate ate it whole (v1.52) — above every other save
@@ -19024,7 +19085,12 @@ function tanHit(u,fx,fy){
     if(dM>1 && Math.random()<dM-1) return;
     if(dM<1 && Math.random()<1-dM) u.hits++;
   }
-  u.hits++; u.hitT=0;
+  // v2.51 (Wyatt 8/5: the MG "takes 20% less damage from riflemen"): a tan
+  // rifle round into the M.GUNNER counts 0.8 of a pip — DETERMINISTIC (no
+  // roll, so twenty co-op sims agree): 3 grit = 4 rifle rounds, intake ×0.8
+  // exactly. Every other shooter and every other green man pays the whole pip.
+  u.hits += (src && src.type==='tanrifle' && u.type==='mgunner')? MG_RIFLE_RESIST : 1;
+  u.hitT=0;
   S.fx.push({k:'tracer',x1:fx-14,y1:fy-26,x2:u.x,y2:u.y-18,t:0,dur:0.1,col:'#EDD9A8'});
   // ONE ROUND, ONE SAVE (7/25): this round already rolled against the blade and
   // got through — the knockdown it earned must not roll a SECOND time. It did,
@@ -19292,7 +19358,7 @@ function tanShoot(f){
     // NO save (it never arrived — the plate, blade and grit never hear it).
     const dkb=duckBlock(f.x-14,f.y-26,best.x,best.y-18);
     if(dkb){ S.fx.push({k:'tracer',x1:f.x-14,y1:f.y-26,x2:dkb.x,y2:dkb.y,t:0,dur:0.1,col:'#EDD9A8'}); duckBlockFx(dkb); }
-    else tanHit(best,f.x,f.y);
+    else tanHit(best,f.x,f.y,f);   // v2.51: the shooter rides along — the MG's rifle-resist reads it
     return true; }
   return false;
 }
@@ -19315,7 +19381,7 @@ function tanCone(f){
     // v2.28: each pellet is aimed fire (the green cone's own v2.15 law,
     // mirrored) — the pellet at the duck dies on him, the pellet beside sails
     if(da<=f.def.cone){ const dkb=duckBlock(f.x-14,f.y-26,u.x,u.y-18);
-      if(dkb) duckBlockFx(dkb); else tanHit(u,f.x,f.y); }
+      if(dkb) duckBlockFx(dkb); else tanHit(u,f.x,f.y,f); }
   }
   const mzx=f.x-30, mzy=f.y-30;
   S.fx.push({k:'cone',x:mzx,y:mzy,ang,spread:f.def.cone,rng:R,t:0,dur:0.16});
@@ -19336,7 +19402,7 @@ function tanMulti(f){
   SFX.mg();
   hits.forEach(u=>{
     S.fx.push({k:'puff',x:(f.x+u.x)/2,y:(f.y+u.y)/2-14,t:0,dur:0.25,R:14});
-    tanHit(u,f.x,f.y);
+    tanHit(u,f.x,f.y,f);
   });
   return true;
 }
@@ -22923,7 +22989,12 @@ function update(dt){
   for(let i=S.mines.length-1;i>=0;i--){
     const mn=S.mines[i];
     if(mn.armT>0){ mn.armT-=dt; continue; }
-    const trig=mn.big? 26*ENH_MINE_TRIG : 26;
+    // v2.51 (Wyatt 8/5: "Sweeper mines need to activate at 2x their current
+    // range"): the SWEEPER's charges arm at double reach — stock 26→52, BIG
+    // BANGERS 38→76. The jax keep their toy-jack 26: Wyatt named the
+    // sweeper's mines, and a twitchier jack would re-balance every dressed
+    // rug and the BF maps it rides.
+    const trig=(mn.big? 26*ENH_MINE_TRIG : 26)*(mn.jx?1:2);
     // v2.28: a campaign JAX answers to EVERY standing boot — the battlefield
     // got this free from bfEnemies('jax'), but the campaign's armies live in
     // two arrays, so the phantom side reads both here: the foes as ever, plus
@@ -26609,7 +26680,16 @@ function decorReact(id){
 function roomSVG(){
   const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()], momD=momDue();   // v1.79: computed once — every branch below agrees
   const achDone=ACH.filter(a=>META.ach[a.id]).length;
-  const pend=META.pendingPicks>0;
+  // v2.51 (Wyatt 8/5, his screenshot showed the DIM board under a red
+  // 'PROMOTIONS ⚔NEW' pill: "when we have a promotion, we need to show the
+  // chalkboard arrows turn gold one by one. Boom, boom, boom like a
+  // sequence."): the v2.38 gold cascade lit only on pendingPicks — a fresh
+  // WEAPON/GEAR unlock (the ⚔NEW state) left the board dark. The board now
+  // lights for the pill's whole condition trio, so gold arrows and a
+  // promotions callout are never out of step.
+  const pend=META.pendingPicks>0
+    || META.sargeUnlocked.some(w=>META.sargeSeen.indexOf(w)<0)
+    || META.gearUnlocked.some(g=>META.gearSeen.indexOf(g)<0);
   return '<svg viewBox="0 0 960 600" style="position:absolute;inset:0;width:100%;height:100%">'
   // wood floor + planks
   +'<rect width="960" height="600" fill="#C8A170"/>'
@@ -30757,7 +30837,7 @@ window.GVT = {
              flamePace:Math.round((BF_MOVE.flame.moveSpd)*(enhOn('jumptank')?ENH_FLAME_PACE:1)),
              flameGrit:UDEF.flame.grit+(enhOn('jumptank')?ENH_FLAME_GRIT:0),
              flameHP:BF_MOVE.flame.hp+(enhOn('jumptank')?ENH_FLAME_HP:0),
-             mineR:MINE_BLAST*(enhOn('bigbangers')?ENH_MINE_R:1), mineTrig:26*(enhOn('bigbangers')?ENH_MINE_TRIG:1),
+             mineR:MINE_BLAST*(enhOn('bigbangers')?ENH_MINE_R:1), mineTrig:52*(enhOn('bigbangers')?ENH_MINE_TRIG:1),
              mineVx:enhOn('bigbangers')?ENH_MINE_VX:1,
              shieldN:enhOn('riotshield')?ENH_SHIELD_N:0 } };
     ENH_ORDER.forEach(id=>{ o[id]=(enhOwns(id)?(enhOn(id)?'FITTED':'drawer'):'shelf')+' '+ENH_COST[id]+'★'; });
