@@ -1,13 +1,13 @@
 'use strict';
 
 // ============================================================
-// RUNEFALL — Phase 0.13 "Class dice ride the chain"    v0.13.0
+// RUNEFALL — Phase 0.14 "Class levels"    v0.14.0
 // A 20-level Rune Dice-style run: flick dice from your DICE BAG,
 // merges damage enemies, gold dice pay out, shops between fights
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.13.2';
+const VERSION = 'v0.14.0';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -112,6 +112,44 @@ const CLASSES = [
 
 const CLASS_BY_ID = {};
 for (const c of CLASSES) CLASS_BY_ID[c.id] = c;
+
+// ---- class progression: XP banks across runs (localStorage) ----
+// XP comes from fights won; levels gate better starting bags. All the
+// tuning lives in these tables.
+const CLASS_MAX_LEVEL = 5;
+const CLASS_XP_LEVELS = [0, 8, 20, 40, 70]; // total XP to sit at L1..L5
+const XP_PER_FIGHT = 1;   // per fight floor cleared (x2 for minibosses)
+const XP_VICTORY = 8;     // bonus for clearing all 20 floors
+const numDie = (v) => ({ kind: 'num', value: v });
+const classDieOf = (die, v) => ({ kind: die, value: v });
+const CLASS_LEVEL_BAGS = (die) => [
+  [numDie(1), numDie(1), numDie(1), numDie(2), classDieOf(die, 1), classDieOf(die, 2)],
+  [numDie(1), numDie(1), numDie(2), numDie(2), classDieOf(die, 1), classDieOf(die, 2)],
+  [numDie(1), numDie(1), numDie(2), numDie(2), numDie(3), classDieOf(die, 1), classDieOf(die, 2)],
+  [numDie(1), numDie(1), numDie(2), numDie(2), numDie(3), classDieOf(die, 2), classDieOf(die, 2)],
+  [numDie(1), numDie(2), numDie(2), numDie(3), numDie(3),
+    classDieOf(die, 2), classDieOf(die, 2), { kind: 'wild', value: 0 }],
+];
+
+function loadClassXp() {
+  try { return JSON.parse(localStorage.getItem('runefall.classxp')) || {}; }
+  catch (e) { return {}; }
+}
+function saveClassXp(xp) {
+  try { localStorage.setItem('runefall.classxp', JSON.stringify(xp)); } catch (e) { /* no-op */ }
+}
+function classXpOf(id) { return loadClassXp()[id] || 0; }
+function classLevelOf(id) {
+  const xp = classXpOf(id);
+  let lvl = 1;
+  for (let i = 1; i < CLASS_XP_LEVELS.length; i++) {
+    if (xp >= CLASS_XP_LEVELS[i]) lvl = i + 1;
+  }
+  return Math.min(lvl, CLASS_MAX_LEVEL);
+}
+function startingBagFor(cls) {
+  return CLASS_LEVEL_BAGS(cls.die)[classLevelOf(cls.id) - 1].map(e => ({ ...e }));
+}
 
 const feedback = {
   chainStep(n) {
@@ -818,7 +856,12 @@ class GameScene extends Phaser.Scene {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
       color: BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
-    const tap = this.add.text(this.W / 2, this.H * 0.66, 'TAP FOR THE HOME PAGE', {
+    this.add.text(this.W / 2, this.H * 0.61, this.classXpLine(), {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontStyle: 'bold',
+      color: this.playerClass ? this.playerClass.hex : BOARD.cream,
+    }).setOrigin(0.5).setDepth(51);
+    const tap = this.add.text(this.W / 2, this.H * 0.72, 'TAP FOR THE HOME PAGE', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '22px',
       fontStyle: 'bold', color: '#ffd54a',
     }).setOrigin(0.5).setDepth(51);
@@ -826,6 +869,7 @@ class GameScene extends Phaser.Scene {
   }
 
   doVictory() {
+    this.awardClassXp(XP_VICTORY);
     this.gameOver = true;
     this.closeModal();
     this.previewImg.setVisible(false);
@@ -840,7 +884,12 @@ class GameScene extends Phaser.Scene {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
       color: BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
-    const tap = this.add.text(this.W / 2, this.H * 0.66, 'TAP FOR THE HOME PAGE', {
+    this.add.text(this.W / 2, this.H * 0.61, this.classXpLine(), {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontStyle: 'bold',
+      color: this.playerClass ? this.playerClass.hex : BOARD.cream,
+    }).setOrigin(0.5).setDepth(51);
+    const tap = this.add.text(this.W / 2, this.H * 0.72, 'TAP FOR THE HOME PAGE', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '22px',
       fontStyle: 'bold', color: '#ffd54a',
     }).setOrigin(0.5).setDepth(51);
@@ -852,7 +901,16 @@ class GameScene extends Phaser.Scene {
   startRun(classId) {
     const cls = CLASS_BY_ID[classId] || CLASSES[0];
     this.playerClass = cls;
-    this.bag = cls.bag.map(e => ({ ...e }));
+    // a run always opens from a clean slate, whatever came before
+    this.hp = TUNE.PLAYER_HP;
+    this.gold = 0;
+    this.block = 0;
+    this.relics = [];
+    this.chain = 0;
+    this.bestChain = 0;
+    this.throws = 0;
+    this.runXp = 0;
+    this.bag = startingBagFor(cls);
     this.drawPile = [];
     this.reshuffleBag();
     this.nextQueue = [this.drawFromBag(), this.drawFromBag(), this.drawFromBag()];
@@ -861,8 +919,42 @@ class GameScene extends Phaser.Scene {
     this.layoutHud();
     this.layoutLauncher();
     this.updateBagCount();
+    this.bestText.setText('Best chain: 0');
+    this.drawHpBar();
+    this.drawGold();
+    this.drawRelics();
     this.generateRunMap();
     this.startLevelAt(0, 0);
+  }
+
+  // XP banks to the class the moment it's earned, so even a doomed
+  // run levels you up
+  awardClassXp(amount) {
+    if (!this.playerClass || !amount) return;
+    const id = this.playerClass.id;
+    const before = classLevelOf(id);
+    const xp = loadClassXp();
+    xp[id] = (xp[id] || 0) + amount;
+    saveClassXp(xp);
+    this.runXp = (this.runXp || 0) + amount;
+    const after = classLevelOf(id);
+    if (after > before) {
+      this.time.delayedCall(700, () => {
+        if (this.gameOver) return;
+        this.banner(this.playerClass.icon + ' ' + this.playerClass.name +
+          ' — LEVEL ' + after + '!', this.playerClass.hex);
+      });
+    }
+  }
+
+  classXpLine() {
+    if (!this.playerClass) return '';
+    const id = this.playerClass.id;
+    const lvl = classLevelOf(id), xp = classXpOf(id);
+    const next = lvl < CLASS_MAX_LEVEL ? CLASS_XP_LEVELS[lvl] : null;
+    return this.playerClass.icon + ' ' + this.playerClass.name +
+      '  +' + (this.runXp || 0) + ' XP  ·  LEVEL ' + lvl +
+      (next ? '  (' + xp + '/' + next + ' xp)' : '  (MAX)');
   }
 
   // the play chrome has no business on a title screen
@@ -982,15 +1074,29 @@ class GameScene extends Phaser.Scene {
       }).setDepth(72));
       this.modalAdd(this.add.text(x + 58, cy - cardH / 2 + 40, cls.tagline, {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
-        color: BOARD.creamDim, wordWrap: { width: cardW - 76 },
+        color: BOARD.creamDim, wordWrap: { width: cardW - 150 },
       }).setDepth(72));
+      // level badge + progress toward the next one
+      const lvl = classLevelOf(cls.id);
+      const xpNow = classXpOf(cls.id);
+      const next = lvl < CLASS_MAX_LEVEL ? CLASS_XP_LEVELS[lvl] : null;
+      this.modalAdd(this.add.text(x + cardW - 16, cy - cardH / 2 + 12,
+        'LV ' + lvl + (lvl >= CLASS_MAX_LEVEL ? ' ★' : ''), {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '16px',
+        fontStyle: 'bold', color: GOLD,
+      }).setOrigin(1, 0).setDepth(72));
+      this.modalAdd(this.add.text(x + cardW - 16, cy - cardH / 2 + 32,
+        next ? xpNow + '/' + next + ' xp' : 'MAX LEVEL', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '10px',
+        color: '#8a7960',
+      }).setOrigin(1, 0).setDepth(72));
       // the bag it opens with, drawn as the real dice
       const s = Math.min(26, cardW / 13);
       this.modalAdd(this.add.text(x + 18, cy + cardH / 2 - 48, 'STARTS WITH', {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '9px',
         fontStyle: 'bold', color: '#8a7960',
       }).setDepth(72));
-      cls.bag.forEach((e, j) => {
+      startingBagFor(cls).forEach((e, j) => {
         this.modalAdd(this.add.image(x + 22 + s / 2 + j * (s + 6), cy + cardH / 2 - 22,
           this.textureFor(e.kind, e.value)).setDisplaySize(s, s).setDepth(72));
       });
@@ -3383,6 +3489,8 @@ class GameScene extends Phaser.Scene {
           this.time.delayedCall(400, () => this.doVictory());
         } else {
           this.banner('LEVEL CLEAR!', '#8ec873');
+          this.awardClassXp(XP_PER_FIGHT *
+            (this.currentNode.type === 'boss' ? 2 : 1));
           this.time.delayedCall(1400, () => {
             if (!this.gameOver) this.chooseNextPath();
           });
