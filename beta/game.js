@@ -7,7 +7,7 @@
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.12.1';
+const VERSION = 'v0.12.2';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -1399,21 +1399,29 @@ class GameScene extends Phaser.Scene {
     this.trackChooseMode = !!chooseMode;
     this.modalRefresh = () => this.openTrack(0, this.trackChooseMode);
     const title = chooseMode ? 'CHOOSE YOUR PATH' : 'THE RUN';
-    const { dim, px, py, pw, ph } = this.modalBase(title);
+    const { dim, px, py, pw, ph } = this.modalBase(title, this.H * 0.96, this.W * 0.96);
     if (!chooseMode) {
       dim.on('pointerdown', () => this.closeModal());
       this.modalCloseButton(px, py, pw, () => this.closeModal());
     }
-    const innerX = px + 18, innerW = pw - 36;
-    const topY = py + 52, botY = py + ph - 46;
-    const colW = innerW / FLOORS;
-    const nodeR = Math.max(7, Math.min(11, colW * 0.38));
+    // the track snakes: floors 1-10 across the top, 11-20 back along
+    // the bottom — half the columns, so everything doubles in size
+    const innerX = px + 24, innerW = pw - 48;
+    const topY = py + 54, botY = py + ph - 50;
+    const HALF = Math.ceil(FLOORS / 2);
+    const colW = innerW / HALF;
+    const rowH = (botY - topY) / 2;
+    const nodeR = Phaser.Math.Clamp(Math.min(colW * 0.3, (rowH - 30) / 6), 9, 26);
     const posOf = (f, i) => {
+      const row = f < HALF ? 0 : 1;
+      const t = row === 0 ? f : FLOORS - 1 - f; // bottom row runs right to left
       const w = this.runMap[f].length;
+      const bandTop = topY + row * rowH + nodeR + 4;
+      const bandBot = topY + (row + 1) * rowH - nodeR - 22;
       return {
-        x: innerX + colW * (f + 0.5),
-        y: w === 1 ? (topY + botY) / 2 :
-          topY + (botY - topY) * (i / (w - 1)),
+        x: innerX + colW * (t + 0.5),
+        y: w === 1 ? (bandTop + bandBot) / 2 :
+          bandTop + (bandBot - bandTop) * (i / (w - 1)),
       };
     };
     // edges first
@@ -1423,7 +1431,7 @@ class GameScene extends Phaser.Scene {
         for (const j of this.runEdges[f][i]) {
           const a = posOf(f, i), b = posOf(f + 1, j);
           const onPath = f < this.mapPos.f ? 0.25 : 0.7;
-          lineG.lineStyle(1.5, 0x6b4a33, onPath);
+          lineG.lineStyle(3, 0x6b4a33, onPath);
           lineG.lineBetween(a.x, a.y, b.x, b.y);
         }
       }
@@ -1444,20 +1452,28 @@ class GameScene extends Phaser.Scene {
         node.fillStyle(nodeCol, done ? 0.5 : 1);
         node.fillCircle(x, y, nodeR);
         if (current) {
-          node.lineStyle(3, 0xffd54a, 1);
-          node.strokeCircle(x, y, nodeR + 4);
+          node.lineStyle(4, 0xffd54a, 1);
+          node.strokeCircle(x, y, nodeR + 5);
         }
         const icon = type === 'shop' ? '🛒' : type === 'boss' ? '💀' : '⚔';
-        this.modalAdd(this.add.text(x, y, icon, { fontSize: Math.round(nodeR) + 'px' })
+        this.modalAdd(this.add.text(x, y, icon,
+          { fontSize: Math.round(nodeR * 1.15) + 'px' })
           .setOrigin(0.5).setDepth(73).setAlpha(done ? 0.4 : 1));
+        // floor number under every node so the snake reads at a glance
+        this.modalAdd(this.add.text(x, y + nodeR + 3, String(f + 1), {
+          fontFamily: '-apple-system, Arial, sans-serif',
+          fontSize: Math.max(11, Math.round(nodeR * 0.6)) + 'px',
+          fontStyle: current ? 'bold' : 'normal',
+          color: current ? '#ffd54a' : '#8a7960',
+        }).setOrigin(0.5, 0).setDepth(72).setAlpha(done ? 0.5 : 1));
         if (isChoice) {
           const ringG = this.modalAdd(this.add.graphics().setDepth(72));
-          ringG.lineStyle(2.5, 0x8ec873, 1);
-          ringG.strokeCircle(x, y, nodeR + 5);
+          ringG.lineStyle(3.5, 0x8ec873, 1);
+          ringG.strokeCircle(x, y, nodeR + 7);
           this.tweens.add({
             targets: ringG, alpha: 0.35, duration: 450, yoyo: true, repeat: -1,
           });
-          const hit = this.modalAdd(this.add.circle(x, y, nodeR + 12, 0xffffff, 0.001)
+          const hit = this.modalAdd(this.add.circle(x, y, nodeR + 16, 0xffffff, 0.001)
             .setDepth(74).setInteractive());
           const dest = i;
           hit.on('pointerdown', () => {
@@ -1467,9 +1483,10 @@ class GameScene extends Phaser.Scene {
         }
       }
     }
-    this.modalAdd(this.add.text(this.W / 2, py + ph - 14,
+    this.modalAdd(this.add.text(this.W / 2, py + ph - 12,
       chooseMode ? 'Tap a green node to travel' : '⚔ fight   🛒 shop   💀 miniboss', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontStyle: 'bold',
       color: chooseMode ? '#8ec873' : BOARD.creamDim,
     }).setOrigin(0.5, 1).setDepth(72));
     if (autoCloseMs) {
