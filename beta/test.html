@@ -14,6 +14,7 @@
 //   ?s=push    — thrown 2 shoves a 1 into another 1; pushed dice must merge.
 //   ?s=short   — the only 2 is far out of bounce range; chain must stop at 1.
 //   ?s=pit     — a die placed in the shooting circle must be destroyed.
+//   ?s=relic   — whetstone: a 1+1 merge must deal 3 (2 + 1), not 2.
 window.addEventListener('load', () => {
   window.RUNEFALL_DEBUG = true;
   const scenario = new URLSearchParams(location.search).get('s') || 'cascade';
@@ -50,6 +51,11 @@ window.addEventListener('load', () => {
         const wd = scene.makeDie(scene.launcherPos.x, scene.H * 0.3, 0, 'rest', 'wild');
         wd.restingSince = 0;
         scene.nextValue = 3;
+      } else if (scenario === 'relic') {
+        scene.relics = ['whetstone'];
+        scene.drawRelics();
+        mk(scene.launcherPos.x, scene.H * 0.25, 1);
+        scene.nextValue = 1;
       } else if (scenario === 'bomb') {
         const bd = scene.makeDie(scene.launcherPos.x, scene.H * 0.3, 2, 'rest', 'bomb');
         bd.restingSince = 0;
@@ -65,6 +71,7 @@ window.addEventListener('load', () => {
         console.log('TEST RESULT ' + scenario + ' chain=' + scene.chain +
           ' best=' + scene.bestChain + ' dice=[' + vals + '] ready=' + scene.ready +
           ' loftCount=' + scene.loftCount +
+          ' relics=[' + scene.relics.join(',') + ']' +
           ' ehp=' + scene.enemies.map(e => e.hp + '/' + e.maxHp).join(','));
       }, scenario === 'pit' ? 2000 : 6500);
     } catch (e) {

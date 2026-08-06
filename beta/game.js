@@ -7,7 +7,7 @@
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.10.1';
+const VERSION = 'v0.11.0';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -121,6 +121,38 @@ const TOOLTIPS = {
   thief: 'THIEF DIE\nTouching it steals 3 gold,\nthen it escapes',
 };
 
+// Relics: permanent passives sold from the shop's special-item slot.
+// One relic per shop, never a duplicate, gated by the same tiers as dice.
+const RELICS = [
+  { id: 'flask', icon: '🧪', name: "Alchemist's Flask", tier: 1, price: 10,
+    desc: 'Potion dice heal +4 more HP' },
+  { id: 'glove', icon: '🧤', name: "Thief's Glove", tier: 1, price: 10,
+    desc: 'Thieves pay YOU 3 gold instead of stealing' },
+  { id: 'luckycoin', icon: '🪙', name: 'Lucky Coin', tier: 1, price: 12,
+    desc: 'Every gold die pays +1 gold' },
+  { id: 'steeltoe', icon: '🥾', name: 'Steel Toe', tier: 1, price: 12,
+    desc: 'Spikes no longer hurt you' },
+  { id: 'lens', icon: '🔍', name: "Prospector's Lens", tier: 2, price: 14,
+    desc: 'One extra gold die on every board' },
+  { id: 'seal', icon: '📜', name: "Merchant's Seal", tier: 2, price: 14,
+    desc: 'Shop dice cost 2g less, removal costs 3g' },
+  { id: 'hourglass', icon: '⏳', name: 'Cracked Hourglass', tier: 2, price: 15,
+    desc: 'Enemies wait one extra throw before their first attack' },
+  { id: 'whetstone', icon: '🗡️', name: 'Whetstone', tier: 2, price: 16,
+    desc: 'Every merge deals +1 damage' },
+  { id: 'powderhorn', icon: '🧨', name: 'Powder Horn', tier: 3, price: 16,
+    desc: 'Bomb blasts deal +2 damage' },
+  { id: 'emberheart', icon: '🔥', name: 'Ember Heart', tier: 3, price: 18,
+    desc: 'Heal 4 HP at the start of each level' },
+  { id: 'buckler', icon: '🛡️', name: 'Iron Buckler', tier: 3, price: 20,
+    desc: 'Enemy attacks deal 2 less damage (1 minimum)' },
+  { id: 'chaincharm', icon: '⛓️', name: 'Chain Charm', tier: 3, price: 20,
+    desc: 'Merges at chain ×3 or higher deal +2 damage' },
+];
+
+const RELIC_BY_ID = {};
+for (const r of RELICS) RELIC_BY_ID[r.id] = r;
+
 function shade(color, f) {
   const r = (color >> 16) & 255, g = (color >> 8) & 255, b = color & 255;
   const ch = (c) => Math.max(0, Math.min(255, Math.round(f > 0 ? c + (255 - c) * f : c * (1 + f))));
@@ -198,6 +230,8 @@ class GameScene extends Phaser.Scene {
     this.trailAccum = 0;
     this.hp = TUNE.PLAYER_HP;
     this.gold = 0;
+    this.relics = [];        // relic ids, bought from shops, kept for the run
+    this.relicIcons = [];
     this.level = 0;
     this.throws = 0;
     this.refreshIn = TUNE.REFRESH_THROWS;
@@ -299,6 +333,29 @@ class GameScene extends Phaser.Scene {
     return counts;
   }
 
+  // ---------- relics ----------
+
+  hasRelic(id) { return this.relics.indexOf(id) >= 0; }
+
+  gainRelic(id) {
+    if (this.hasRelic(id)) return;
+    this.relics.push(id);
+    this.drawRelics();
+  }
+
+  // extra damage on top of a merge's own value
+  mergeDamageBonus() {
+    return (this.hasRelic('whetstone') ? 1 : 0) +
+      (this.hasRelic('chaincharm') && this.chain >= 3 ? 2 : 0);
+  }
+
+  // what an enemy actually lands after the buckler soaks its hit
+  enemyDamage(e) {
+    return Math.max(1, e.dmg - (this.hasRelic('buckler') ? 2 : 0));
+  }
+
+  removePrice() { return this.hasRelic('seal') ? 3 : 5; }
+
   // ---------- levels: a branching run map ----------
 
   generateRunMap() {
@@ -365,6 +422,9 @@ class GameScene extends Phaser.Scene {
     this.enemies = [];
     const type = this.currentNode.type;
     this.levelText.setText('LEVEL ' + n + '/' + FLOORS);
+    if (this.hasRelic('emberheart') && this.hp < TUNE.PLAYER_HP) {
+      this.time.delayedCall(500, () => { if (!this.gameOver) this.heal(4); });
+    }
     if (type === 'shop') {
       this.banner('LEVEL ' + n + ' — SHOP', GOLD);
       this.time.delayedCall(600, () => this.openShop());
@@ -387,7 +447,8 @@ class GameScene extends Phaser.Scene {
   levelCfg() {
     const n = this.level, type = this.currentNode.type;
     const goldMax = Math.min(1 + Math.floor(n / 5) + (type === 'boss' ? 1 : 0), 6);
-    const goldCount = (type === 'boss' ? 5 : 4) + Math.floor(n / 8);
+    const goldCount = (type === 'boss' ? 5 : 4) + Math.floor(n / 8) +
+      (this.hasRelic('lens') ? 1 : 0);
     return { type, goldMax, goldCount };
   }
 
@@ -427,7 +488,8 @@ class GameScene extends Phaser.Scene {
     const mkEnemy = (mobType, hp, dmg, cd, boss) => {
       const e = {
         type: mobType, hp, maxHp: hp, dmg,
-        countdown: cd, baseCountdown: cd,
+        // the hourglass buys one extra throw before the first swing only
+        countdown: cd + (this.hasRelic('hourglass') ? 1 : 0), baseCountdown: cd,
         alive: true, boss,
         img: this.add.image(0, 0, 'mob' + mobType).setDepth(30).setInteractive(),
         bar: this.add.graphics().setDepth(31),
@@ -502,7 +564,7 @@ class GameScene extends Phaser.Scene {
     const name = MOBS[e.type].name.toUpperCase();
     const msg = (e.boss ? 'MINIBOSS — ' : '') + name +
       '\nHP ' + e.hp + '/' + e.maxHp +
-      '\nDeals ' + e.dmg + ' damage every ' + e.baseCountdown + ' throws' +
+      '\nDeals ' + this.enemyDamage(e) + ' damage every ' + e.baseCountdown + ' throws' +
       (e.countdown === 1 ? '\nATTACKS AFTER THIS THROW!' :
         '\nWaiting: attacks in ' + e.countdown + ' throws') +
       '\n' + MOBS[e.type].flavor +
@@ -643,8 +705,9 @@ class GameScene extends Phaser.Scene {
       onComplete: () => veil.destroy(),
     });
     this.cameras.main.shake(120, 0.004);
-    this.hp = Math.max(0, this.hp - e.dmg);
-    this.floatText(this.W * 0.16, this.H - this.rail - 40, '-' + e.dmg, '#ff8070', true);
+    const dmg = this.enemyDamage(e);
+    this.hp = Math.max(0, this.hp - dmg);
+    this.floatText(this.W * 0.16, this.H - this.rail - 40, '-' + dmg, '#ff8070', true);
     this.drawHpBar();
     if (this.hp <= 0) this.doGameOver();
   }
@@ -676,7 +739,8 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.52,
       'Reached level ' + this.level + '/' + FLOORS +
-      '  ·  Best chain ×' + this.bestChain + '  ·  ' + this.gold + 'g earned', {
+      '  ·  Best chain ×' + this.bestChain + '  ·  ' + this.gold + 'g earned' +
+      '  ·  ' + this.relics.length + ' relics', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
       color: BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
@@ -698,7 +762,7 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.52,
       'All ' + FLOORS + ' levels cleared  ·  Best chain ×' + this.bestChain +
-      '  ·  ' + this.gold + 'g', {
+      '  ·  ' + this.gold + 'g  ·  ' + this.relics.length + ' relics', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
       color: BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
@@ -816,10 +880,20 @@ class GameScene extends Phaser.Scene {
       ],
     };
     const pool = Phaser.Utils.Array.Shuffle([...pools[tier]]);
+    // one relic per shop, drawn from the ones this run hasn't claimed
+    const relicPool = RELICS.filter(r => r.tier <= tier && !this.hasRelic(r.id));
+    const relic = relicPool.length
+      ? { ...relicPool[Phaser.Math.Between(0, relicPool.length - 1)] } : null;
     return {
-      offers: pool.slice(0, 4),
+      offers: pool.slice(0, 4).map(o => ({ ...o })),
+      relic,
       heal: { amount: 10 + tier * 5, price: 5 + tier },
     };
+  }
+
+  // priced on display, so a seal bought here discounts this shop too
+  diePrice(o) {
+    return Math.max(2, o.price - (this.hasRelic('seal') ? 2 : 0));
   }
 
   openShop() {
@@ -841,7 +915,8 @@ class GameScene extends Phaser.Scene {
     const s = Math.min(this.dieSize * 1.1, (pwGuess / 4) * 0.5);
     const offerBottom = 80 + s * 0.65 + 40;
     const infoY = offerBottom + 14;
-    const rowY = infoY + 46;
+    const relicY = infoY + 56;
+    const rowY = relicY + 56;
     const leaveY = rowY + 46;
     const { px, py, pw, ph } = this.modalBase('SHOP — LEVEL ' + this.level,
       leaveY + 36);
@@ -858,7 +933,7 @@ class GameScene extends Phaser.Scene {
     stock.offers.forEach((o, i) => {
       const x = px + cellW * (i + 0.5);
       const y = py + 80;
-      const canAfford = this.gold >= o.price && !o.sold;
+      const canAfford = this.gold >= this.diePrice(o) && !o.sold;
       const selected = stock.selected === i;
       if (selected && !o.sold) {
         const ring = this.modalAdd(this.add.graphics().setDepth(72));
@@ -874,7 +949,7 @@ class GameScene extends Phaser.Scene {
         color: BOARD.cream,
       }).setOrigin(0.5, 0).setDepth(72));
       this.modalAdd(this.add.text(x, y + s * 0.65 + 22,
-        o.sold ? 'SOLD' : o.price + 'g', {
+        o.sold ? 'SOLD' : this.diePrice(o) + 'g', {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '14px',
         fontStyle: 'bold', color: o.sold ? '#7a6a55' : canAfford ? GOLD : '#8a6a50',
       }).setOrigin(0.5, 0).setDepth(72));
@@ -895,17 +970,17 @@ class GameScene extends Phaser.Scene {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
         color: BOARD.cream, wordWrap: { width: pw - 140 },
       }).setOrigin(0, 0.5).setDepth(72));
-      const afford = this.gold >= sel.price;
+      const afford = this.gold >= this.diePrice(sel);
       const buy = this.modalAdd(this.add.text(px + pw - 20, py + infoY,
-        'BUY — ' + sel.price + 'g', {
+        'BUY — ' + this.diePrice(sel) + 'g', {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
         fontStyle: 'bold', color: afford ? '#2a1a10' : '#7a6a55',
         backgroundColor: afford ? '#ffd54a' : '#3a2a1c',
         padding: { x: 12, y: 6 },
       }).setOrigin(1, 0.5).setDepth(72).setInteractive());
       buy.on('pointerdown', () => {
-        if (this.gold < sel.price || sel.sold) return;
-        this.gold -= sel.price;
+        if (this.gold < this.diePrice(sel) || sel.sold) return;
+        this.gold -= this.diePrice(sel);
         sel.sold = true;
         stock.selected = null;
         this.bag.push({ kind: sel.kind, value: sel.value });
@@ -922,8 +997,10 @@ class GameScene extends Phaser.Scene {
         color: BOARD.creamDim, fontStyle: 'italic',
       }).setOrigin(0.5).setDepth(72));
     }
-    // action row: heal / remove / items-later
-    const healBtn = this.modalAdd(this.add.text(px + pw * 0.2, py + rowY,
+    // the special-item slot: one relic, bought once, kept for the run
+    this.renderShopRelic(stock, px, py, pw, relicY);
+    // action row: heal / remove
+    const healBtn = this.modalAdd(this.add.text(px + pw * 0.28, py + rowY,
       '❤ Heal +' + stock.heal.amount + ' — ' + stock.heal.price + 'g', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '14px',
       fontStyle: 'bold',
@@ -937,9 +1014,9 @@ class GameScene extends Phaser.Scene {
       this.drawGold();
       this.renderShop(stock);
     });
-    const canRemove = this.gold >= 5 && this.bag.length > 1;
-    const removeBtn = this.modalAdd(this.add.text(px + pw * 0.5, py + rowY,
-      '✂ Remove a die — 5g', {
+    const canRemove = this.gold >= this.removePrice() && this.bag.length > 1;
+    const removeBtn = this.modalAdd(this.add.text(px + pw * 0.72, py + rowY,
+      '✂ Remove a die — ' + this.removePrice() + 'g', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '14px',
       fontStyle: 'bold', color: canRemove ? '#e6a4a0' : '#6a5a55',
       backgroundColor: '#1c120a', padding: { x: 10, y: 6 },
@@ -948,11 +1025,6 @@ class GameScene extends Phaser.Scene {
       if (!canRemove) return;
       this.renderShopRemove(stock);
     });
-    this.modalAdd(this.add.text(px + pw * 0.82, py + rowY, 'Items: coming later', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
-      color: '#7a6a55', fontStyle: 'italic',
-      backgroundColor: '#1c120a', padding: { x: 8, y: 6 },
-    }).setOrigin(0.5).setDepth(72));
     const leave = this.modalAdd(this.add.text(this.W / 2, py + leaveY, '▶ LEAVE SHOP', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '17px',
       fontStyle: 'bold', color: '#ffd54a',
@@ -964,9 +1036,61 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  // pick a die to remove from the bag (5g, paid on selection)
+  // the shop's special-item slot: a single relic on a shelf of its own
+  renderShopRelic(stock, px, py, pw, relicY) {
+    const cy = py + relicY;
+    const boxH = 50;
+    const font = '-apple-system, Arial, sans-serif';
+    this.modalAdd(this.add.text(px + 18, cy - boxH / 2 - 15, 'SPECIAL ITEM', {
+      fontFamily: font, fontSize: '10px', fontStyle: 'bold', color: '#a8916e',
+    }).setDepth(72));
+    const box = this.modalAdd(this.add.graphics().setDepth(71));
+    box.fillStyle(0x1c120a, 0.92);
+    box.fillRoundedRect(px + 14, cy - boxH / 2, pw - 28, boxH, 8);
+    box.lineStyle(1.5, 0x6b4a33, 0.9);
+    box.strokeRoundedRect(px + 14, cy - boxH / 2, pw - 28, boxH, 8);
+    const rel = stock.relic;
+    if (!rel || rel.sold) {
+      this.modalAdd(this.add.text(px + pw / 2, cy,
+        rel ? rel.name + ' — CLAIMED' : 'Every relic already claimed', {
+        fontFamily: font, fontSize: '12px', fontStyle: 'italic',
+        color: rel ? '#8ec873' : '#7a6a55',
+      }).setOrigin(0.5).setDepth(72));
+      return;
+    }
+    const afford = this.gold >= rel.price;
+    const iconS = Math.min(36, boxH * 0.72);
+    const icon = this.modalAdd(this.add.image(px + 24 + iconS / 2, cy, 'relic_' + rel.id)
+      .setDepth(72).setDisplaySize(iconS, iconS));
+    if (!afford) icon.setAlpha(0.55);
+    const textX = px + 32 + iconS;
+    const buyW = 78;
+    this.modalAdd(this.add.text(textX, cy - 11, rel.name, {
+      fontFamily: font, fontSize: '13px', fontStyle: 'bold', color: GOLD,
+    }).setOrigin(0, 0.5).setDepth(72));
+    this.modalAdd(this.add.text(textX, cy + 8, rel.desc, {
+      fontFamily: font, fontSize: '11px', color: BOARD.cream,
+      wordWrap: { width: pw - (textX - px) - buyW - 34 },
+    }).setOrigin(0, 0.5).setDepth(72));
+    const buy = this.modalAdd(this.add.text(px + pw - 24, cy, rel.price + 'g', {
+      fontFamily: font, fontSize: '14px', fontStyle: 'bold',
+      color: afford ? '#2a1a10' : '#7a6a55',
+      backgroundColor: afford ? '#ffd54a' : '#3a2a1c',
+      padding: { x: 12, y: 6 },
+    }).setOrigin(1, 0.5).setDepth(72).setInteractive());
+    buy.on('pointerdown', () => {
+      if (this.gold < rel.price || rel.sold) return;
+      this.gold -= rel.price;
+      rel.sold = true;
+      this.gainRelic(rel.id);
+      this.drawGold();
+      this.renderShop(stock);
+    });
+  }
+
+  // pick a die to remove from the bag (paid on selection)
   renderShopRemove(stock) {
-    const { px, py, pw, ph } = this.modalBase('REMOVE A DIE — 5g');
+    const { px, py, pw, ph } = this.modalBase('REMOVE A DIE — ' + this.removePrice() + 'g');
     this.modalOpen = 'shop';
     this.modalAdd(this.add.text(px + 16, py + 12, this.gold + 'g', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
@@ -995,8 +1119,8 @@ class GameScene extends Phaser.Scene {
         fontStyle: 'bold', color: BOARD.cream,
       }).setOrigin(0.5, 0).setDepth(72));
       img.on('pointerdown', () => {
-        if (this.gold < 5 || this.bag.length <= 1) return;
-        this.gold -= 5;
+        if (this.gold < this.removePrice() || this.bag.length <= 1) return;
+        this.gold -= this.removePrice();
         // remove one of this type from the bag and the current cycle
         const match = (e) => e.kind === g.entry.kind &&
           (!this.mergeableKind(e.kind) || e.value === g.entry.value);
@@ -1113,6 +1237,7 @@ class GameScene extends Phaser.Scene {
     this.makeNewSpecialTextures();
     this.makeMobTextures();
     this.makeBagTexture();
+    this.makeRelicTextures();
     this.makeSoftTexture('spark', 32, 'rgba(255,255,255,1)', 'rgba(255,255,255,0)');
     this.makeSoftTexture('shadow', 64, 'rgba(20,10,4,0.6)', 'rgba(20,10,4,0)');
     this.makeSoftTexture('flash', 96, 'rgba(255,250,235,0.95)', 'rgba(255,250,235,0)');
@@ -1427,6 +1552,43 @@ class GameScene extends Phaser.Scene {
     ctx.arc(cx, px * 0.2, px * 0.03, 0, Math.PI * 2);
     ctx.fill();
     tex.refresh();
+  }
+
+  // relics are struck as little amber medallions: one coin face per
+  // relic with its glyph stamped in the middle
+  makeRelicTextures() {
+    const px = 72;
+    for (const r of RELICS) {
+      const key = 'relic_' + r.id;
+      if (this.textures.exists(key)) this.textures.remove(key);
+      const tex = this.textures.createCanvas(key, px, px);
+      const ctx = tex.getContext();
+      const c = px / 2;
+      ctx.clearRect(0, 0, px, px);
+      const face = ctx.createRadialGradient(
+        c - px * 0.15, c - px * 0.18, px * 0.06, c, c, px * 0.48);
+      face.addColorStop(0, '#ffe6a8');
+      face.addColorStop(0.65, '#e0a842');
+      face.addColorStop(1, '#a06e24');
+      ctx.beginPath();
+      ctx.arc(c, c, px * 0.45, 0, Math.PI * 2);
+      ctx.fillStyle = face;
+      ctx.fill();
+      ctx.lineWidth = px * 0.05;
+      ctx.strokeStyle = '#54341a';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(c, c, px * 0.37, 0, Math.PI * 2);
+      ctx.lineWidth = px * 0.025;
+      ctx.strokeStyle = 'rgba(255,246,220,0.45)';
+      ctx.stroke();
+      ctx.font = Math.round(px * 0.44) +
+        'px "Apple Color Emoji", "Segoe UI Emoji", -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(r.icon, c, c + px * 0.03);
+      tex.refresh();
+    }
   }
 
   makeMobTextures() {
@@ -1844,7 +2006,7 @@ class GameScene extends Phaser.Scene {
       }
     }
     this.cameras.main.shake(200, 0.006);
-    this.dealDamage(value, x, apexY, true);
+    this.dealDamage(value + (this.hasRelic('powderhorn') ? 2 : 0), x, apexY, true);
     feedback.chainStep(4);
   }
 
@@ -1854,7 +2016,7 @@ class GameScene extends Phaser.Scene {
     if (die === this.thrownDie) this.thrownDie = null;
     this.destroyDie(die);
     this.sparks.burst(x, y, 0x3f9d4e, 16, { speedMin: 1, speedMax: 4, life: 500, scale: 0.9 });
-    this.heal(TUNE.POTION_HEAL);
+    this.heal(TUNE.POTION_HEAL + (this.hasRelic('flask') ? 4 : 0));
   }
 
   consumeStun(die) {
@@ -1874,6 +2036,12 @@ class GameScene extends Phaser.Scene {
   triggerThief(die) {
     if (die.dead) return;
     const x = die.gx, y = die.gy;
+    // the glove turns the shakedown around: the thief pays up and bolts
+    if (this.hasRelic('glove')) {
+      this.destroyDie(die);
+      this.addGold(3, x, y - 10);
+      return;
+    }
     const stolen = Math.min(this.gold, 3);
     this.gold -= stolen;
     this.drawGold();
@@ -1900,6 +2068,11 @@ class GameScene extends Phaser.Scene {
 
   triggerSpike(die) {
     if (die.dead) return;
+    if (this.hasRelic('steeltoe')) {
+      this.floatText(die.gx, die.gy - 10, 'BLOCKED', '#c9b391');
+      this.crumbleSpike(die);
+      return;
+    }
     this.hp = Math.max(0, this.hp - TUNE.SPIKE_DAMAGE);
     this.floatText(die.gx, die.gy - 10, '-' + TUNE.SPIKE_DAMAGE + ' HP', '#ff8070', true);
     const veil = this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0xaa22aa, 0.15)
@@ -2183,8 +2356,9 @@ class GameScene extends Phaser.Scene {
         ' at ' + Math.round(mx) + ',' + Math.round(my) + ' chain->' + (this.chain + 1));
     }
     // gold dice pay out when merged
+    const goldBonus = this.hasRelic('luckycoin') ? 1 : 0;
     for (const d of [a, b]) {
-      if (d.gold) this.addGold(d.value, mx, my - riseH - 14);
+      if (d.gold) this.addGold(d.value + goldBonus, mx, my - riseH - 14);
     }
     this.destroyDie(a);
     this.destroyDie(b);
@@ -2206,10 +2380,11 @@ class GameScene extends Phaser.Scene {
     this.mergeImpact(mx, my, riseH, value);
 
     const newValue = value + 1;
-    this.dealDamage(newValue > TUNE.MAX_VALUE ? TUNE.DETONATE_DAMAGE : newValue,
-      mx, my - riseH, newValue > TUNE.MAX_VALUE);
+    const over = newValue > TUNE.MAX_VALUE;
+    this.dealDamage((over ? TUNE.DETONATE_DAMAGE : newValue) + this.mergeDamageBonus(),
+      mx, my - riseH, over);
 
-    if (newValue > TUNE.MAX_VALUE) {
+    if (over) {
       this.detonate(mx, my, riseH);
       this.loftCount--;
       return;
@@ -2471,6 +2646,7 @@ class GameScene extends Phaser.Scene {
     this.layoutHud();
     this.drawHpBar();
     this.drawGold();
+    this.drawRelics();
     this.drawRefreshText();
   }
 
@@ -2485,6 +2661,7 @@ class GameScene extends Phaser.Scene {
     this.chainText.setPosition(this.W / 2, this.H * 0.3);
     this.drawHpBar();
     this.drawGold();
+    this.drawRelics();
   }
 
   drawHpBar() {
@@ -2507,6 +2684,31 @@ class GameScene extends Phaser.Scene {
     if (!this.goldText) return;
     const x = this.rail + 8, y = this.H - this.rail - 44;
     this.goldText.setPosition(x, y).setText('◉ ' + this.gold + 'g');
+  }
+
+  // owned relics stack above the gold counter, six to a row and
+  // climbing upward so a big collection never reaches the launcher
+  drawRelics() {
+    if (!this.relicIcons) return;
+    for (const o of this.relicIcons) o.destroy();
+    this.relicIcons = [];
+    const size = Math.min(22, this.dieSize * 0.5);
+    const gap = size + 4;
+    const x0 = this.rail + 8 + size / 2;
+    const y0 = this.H - this.rail - 64;
+    this.relics.forEach((id, i) => {
+      const r = RELIC_BY_ID[id];
+      if (!r) return;
+      const x = x0 + (i % 6) * gap, y = y0 - Math.floor(i / 6) * gap;
+      const img = this.add.image(x, y, 'relic_' + id).setDepth(31)
+        .setDisplaySize(size, size).setInteractive();
+      const show = () => this.showTooltipText(x, y + size * 0.5,
+        r.name.toUpperCase() + '\n' + r.desc);
+      img.on('pointerover', show);
+      img.on('pointerdown', show);
+      img.on('pointerout', () => this.hideTooltip());
+      this.relicIcons.push(img);
+    });
   }
 
   showTooltip(x, y, kind) {
