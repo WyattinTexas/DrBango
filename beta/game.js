@@ -1,13 +1,13 @@
 'use strict';
 
 // ============================================================
-// RUNEFALL — Phase 0.12 "Classes"    v0.12.0
+// RUNEFALL — Phase 0.12 "Classes"    v0.12.1
 // A 20-level Rune Dice-style run: flick dice from your DICE BAG,
 // merges damage enemies, gold dice pay out, shops between fights
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.12.0';
+const VERSION = 'v0.12.1';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -335,7 +335,7 @@ class GameScene extends Phaser.Scene {
 
     this.input.on('pointerdown', (p) => {
       if (this.gameOver) { this.scene.restart(); return; }
-      if (this.modalOpen || this.levelClearPending) return;
+      if (this.modalOpen || this.levelClearing || this.levelClearPending) return;
       if (!this.ready) return;
       this.aim = { sx: p.x, sy: p.y };
     });
@@ -348,7 +348,10 @@ class GameScene extends Phaser.Scene {
       this.aim = null;
       this.trajGfx.clear();
       this.bandGfx.clear();
-      if (launch) this.fire(launch);
+      // the level ending or a page opening mid-aim cancels the throw
+      const blocked = this.gameOver || this.modalOpen ||
+        this.levelClearing || this.levelClearPending || !this.ready;
+      if (launch && !blocked) this.fire(launch);
       else this.previewImg.setPosition(this.launcherPos.x, this.launcherPos.y);
     });
 
@@ -863,6 +866,7 @@ class GameScene extends Phaser.Scene {
     for (const o of this.modalObjects) o.destroy();
     this.modalObjects = [];
     this.modalOpen = 'menu';
+    this.cancelAim();
     this.setPlayVisible(false);
     this.modalAdd(this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H,
       0x120a06, 0.92).setDepth(70).setInteractive());
@@ -887,6 +891,7 @@ class GameScene extends Phaser.Scene {
 
   showHome() {
     this.menuBackdrop();
+    this.modalRefresh = () => this.showHome();
     this.modalAdd(this.add.text(this.W / 2, this.H * 0.2, 'RUNEFALL', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '56px',
       fontStyle: 'bold', color: GOLD, stroke: '#2a0f08', strokeThickness: 9,
@@ -922,6 +927,7 @@ class GameScene extends Phaser.Scene {
   showComingSoon(title, body) {
     const { px, py, pw, ph } = this.modalBase(title, 300);
     this.modalOpen = 'menu';
+    this.modalRefresh = () => this.showComingSoon(title, body);
     this.modalAdd(this.add.text(this.W / 2, py + ph * 0.48, body, {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
       color: BOARD.cream, align: 'center', lineSpacing: 4,
@@ -937,6 +943,7 @@ class GameScene extends Phaser.Scene {
 
   showClassSelect() {
     this.menuBackdrop();
+    this.modalRefresh = () => this.showClassSelect();
     this.modalAdd(this.add.text(this.W / 2, this.H * 0.1, 'CHOOSE YOUR CLASS', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '24px',
       fontStyle: 'bold', color: BOARD.cream,
@@ -993,18 +1000,29 @@ class GameScene extends Phaser.Scene {
     return obj;
   }
 
+  // any page opening kills an in-progress aim — nothing fires under a menu
+  cancelAim() {
+    if (!this.aim) return;
+    this.aim = null;
+    if (this.trajGfx) this.trajGfx.clear();
+    if (this.bandGfx) this.bandGfx.clear();
+    if (this.previewImg) this.previewImg.setPosition(this.launcherPos.x, this.launcherPos.y);
+  }
+
   closeModal() {
     for (const o of this.modalObjects) o.destroy();
     this.modalObjects = [];
     this.modalOpen = null;
+    this.modalRefresh = null;
   }
 
-  modalBase(title, phWant) {
+  modalBase(title, phWant, pwWant) {
     for (const o of this.modalObjects) o.destroy();
     this.modalObjects = [];
+    this.cancelAim();
     const dim = this.modalAdd(this.add.rectangle(
       this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.7).setDepth(70).setInteractive());
-    const pw = Math.min(this.W * 0.82, 640);
+    const pw = pwWant ? Math.min(pwWant, this.W * 0.96) : Math.min(this.W * 0.82, 640);
     const ph = phWant ? Math.min(phWant, this.H * 0.94) : Math.min(this.H * 0.78, 400);
     const px = this.W / 2 - pw / 2, py = this.H / 2 - ph / 2;
     const panel = this.modalAdd(this.add.graphics().setDepth(71));
@@ -1032,6 +1050,7 @@ class GameScene extends Phaser.Scene {
   openBag() {
     if (this.modalOpen || this.gameOver) return;
     this.modalOpen = 'bag';
+    this.modalRefresh = () => { this.modalOpen = null; this.openBag(); };
     const { dim, px, py, pw, ph } = this.modalBase('DICE BAG');
     dim.on('pointerdown', () => this.closeModal());
     this.modalCloseButton(px, py, pw, () => this.closeModal());
@@ -1137,6 +1156,8 @@ class GameScene extends Phaser.Scene {
   }
 
   renderShop(stock) {
+    this.currentStock = stock;
+    this.modalRefresh = () => this.renderShop(stock);
     const pwGuess = Math.min(this.W * 0.82, 640);
     const s = Math.min(this.dieSize * 1.1, (pwGuess / 4) * 0.5);
     const offerBottom = 80 + s * 0.65 + 40;
@@ -1317,6 +1338,7 @@ class GameScene extends Phaser.Scene {
 
   // pick a die to remove from the bag (paid on selection)
   renderShopRemove(stock) {
+    this.modalRefresh = () => this.renderShopRemove(stock);
     const { px, py, pw, ph } = this.modalBase('REMOVE A DIE — ' + this.removePrice() + 'g');
     this.modalOpen = 'shop';
     this.modalAdd(this.add.text(px + 16, py + 12, this.gold + 'g', {
@@ -1374,6 +1396,8 @@ class GameScene extends Phaser.Scene {
   openTrack(autoCloseMs, chooseMode) {
     if (this.gameOver) return;
     this.modalOpen = 'track';
+    this.trackChooseMode = !!chooseMode;
+    this.modalRefresh = () => this.openTrack(0, this.trackChooseMode);
     const title = chooseMode ? 'CHOOSE YOUR PATH' : 'THE RUN';
     const { dim, px, py, pw, ph } = this.modalBase(title);
     if (!chooseMode) {
@@ -1984,19 +2008,52 @@ class GameScene extends Phaser.Scene {
   }
 
   handleResize() {
+    const oldW = this.W, oldRail = this.rail;
+    const oldH = this.H, oldFieldTop = this.fieldTop, oldDie = this.dieSize;
     this.computeLayout();
     this.buildWalls();
     this.buildBoard();
     this.layoutHud();
     this.layoutLauncher();
     this.layoutEnemies();
+    // every die keeps its RELATIVE spot on the field. Clamping alone
+    // piled them into the nearest corner, where touching equals merge
+    // and the board played itself.
+    const spanX = Math.max(1, oldW - oldRail * 2);
+    const spanY = Math.max(1, oldH - oldFieldTop - oldRail);
+    const m = this.rail + this.dieRadius;
+    const yLo = this.fieldTop + this.dieRadius;
     for (const d of this.dice) {
-      if (!d.body) continue;
-      const m = this.rail + this.dieRadius;
-      const x = Phaser.Math.Clamp(d.body.position.x, m, this.W - m);
-      const y = Phaser.Math.Clamp(d.body.position.y, this.fieldTop + this.dieRadius, this.H - m);
-      this.MatterLib.Body.setPosition(d.body, { x, y });
+      if (d.dead) continue;
+      const px = d.body ? d.body.position.x : d.gx;
+      const py = d.body ? d.body.position.y : d.gy;
+      const x = Phaser.Math.Clamp(
+        this.rail + ((px - oldRail) / spanX) * (this.W - this.rail * 2), m, this.W - m);
+      const y = Phaser.Math.Clamp(
+        this.fieldTop + ((py - oldFieldTop) / spanY) * (this.H - this.fieldTop - this.rail),
+        yLo, this.H - m);
+      d.gx = x; d.gy = y;
+      if (oldDie !== this.dieSize) {
+        d.img.setDisplaySize(this.dieSize, this.dieSize);
+        d.baseScale = d.img.scaleX;
+        d.shadow.setDisplaySize(this.dieSize * 1.15, this.dieSize * 0.55);
+      }
+      if (d.body) {
+        if (oldDie !== this.dieSize) {
+          this.detachBody(d);
+          this.attachBody(d, x, y);
+        } else {
+          this.MatterLib.Body.setPosition(d.body, { x, y });
+        }
+        this.MatterLib.Body.setVelocity(d.body, { x: 0, y: 0 });
+        d.img.setPosition(x, y);
+        d.shadow.setPosition(x, y + this.dieSize * 0.16);
+      } else {
+        this.renderAir(d);
+      }
     }
+    // an open page re-lays itself out for the new size
+    if (this.modalOpen && this.modalRefresh) this.modalRefresh();
   }
 
   buildBoard() {
@@ -2814,6 +2871,12 @@ class GameScene extends Phaser.Scene {
         die.shadow.setDepth(8);
         this.renderAir(die);
         die.state = 'active';
+        // a resize mid-flight can leave the landing spot outside the
+        // new walls — clamp back into the field before the body attaches
+        die.gx = Phaser.Math.Clamp(die.gx,
+          this.rail + this.dieRadius, this.W - this.rail - this.dieRadius);
+        die.gy = Phaser.Math.Clamp(die.gy,
+          this.fieldTop + this.dieRadius, this.H - this.rail - this.dieRadius);
         this.attachBody(die, die.gx, die.gy);
         this.MatterLib.Body.setVelocity(die.body, {
           x: dirX * TUNE.LAND_SLIDE, y: dirY * TUNE.LAND_SLIDE,
@@ -2841,6 +2904,10 @@ class GameScene extends Phaser.Scene {
         die.shadow.setDepth(8);
         this.renderAir(die);
         die.state = 'active';
+        die.gx = Phaser.Math.Clamp(die.gx,
+          this.rail + this.dieRadius, this.W - this.rail - this.dieRadius);
+        die.gy = Phaser.Math.Clamp(die.gy,
+          this.fieldTop + this.dieRadius, this.H - this.rail - this.dieRadius);
         this.attachBody(die, die.gx, die.gy);
         const a = Math.random() * Math.PI * 2;
         this.MatterLib.Body.setVelocity(die.body, { x: Math.cos(a) * 1.4, y: Math.sin(a) * 1.4 });
