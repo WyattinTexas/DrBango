@@ -1,13 +1,13 @@
 'use strict';
 
 // ============================================================
-// RUNEFALL — Phase 0.15 "Class relics"    v0.15.0
+// RUNEFALL — Phase 0.16 "Realms"    v0.16.0
 // A 20-level Rune Dice-style run: flick dice from your DICE BAG,
 // merges damage enemies, gold dice pay out, shops between fights
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.15.0';
+const VERSION = 'v0.16.0';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -258,6 +258,46 @@ const RELICS = [
 const RELIC_BY_ID = {};
 for (const r of RELICS) RELIC_BY_ID[r.id] = r;
 
+// ---- realms: pick your world and your pain level at run start ----
+// each realm is a biome palette + difficulty knobs, all tunable here
+const REALMS = [
+  {
+    id: 'glade', name: 'VERDANT GLADE', diff: 'EASY', color: 0x8ec873, hex: '#8ec873',
+    flavor: 'Soft meadows, softer monsters. Learn the flick.',
+    hpMul: 1, dmgMul: 1, goldMul: 1, xp: 1,
+    palette: {
+      bg: 0x2e2018, skyA: 0x1b2418, skyB: 0x243019,
+      grassA: 0x4a7c3a, grassB: 0x3c6830,
+      frame: 0x4a3226, frameGrain: 0x3e2a1e, frameHi: 0x5e4130,
+      dirt: 0x7b5136, dirtDark: 0x6f4830, dirtLight: 0x875a3d, apron: 0xa4744e,
+    },
+  },
+  {
+    id: 'tundra', name: 'FROSTBITE TUNDRA', diff: 'MEDIUM', color: 0x7ec8e8, hex: '#7ec8e8',
+    flavor: 'Hardier beasts prowl the ice. Rewards run richer.',
+    hpMul: 1.35, dmgMul: 1.25, goldMul: 1.25, xp: 2,
+    palette: {
+      bg: 0x141e2a, skyA: 0x14202e, skyB: 0x1c2c3e,
+      grassA: 0x7ea8c8, grassB: 0x5c88aa,
+      frame: 0x2c3a4c, frameGrain: 0x24303e, frameHi: 0x3c4e64,
+      dirt: 0x4e6a86, dirtDark: 0x44607a, dirtLight: 0x5a7894, apron: 0x76a0c0,
+    },
+  },
+  {
+    id: 'cinder', name: 'CINDER WASTES', diff: 'HARD', color: 0xff8070, hex: '#ff8070',
+    flavor: 'Everything hits harder here. So do the paydays.',
+    hpMul: 1.75, dmgMul: 1.5, goldMul: 1.5, xp: 3,
+    palette: {
+      bg: 0x221010, skyA: 0x2a1210, skyB: 0x3a1a12,
+      grassA: 0xa04a2a, grassB: 0x7c3820,
+      frame: 0x3e2018, frameGrain: 0x321a12, frameHi: 0x52301e,
+      dirt: 0x5e2e20, dirtDark: 0x52281c, dirtLight: 0x6e3826, apron: 0x8a4a30,
+    },
+  },
+];
+const REALM_BY_ID = {};
+for (const r of REALMS) REALM_BY_ID[r.id] = r;
+
 function shade(color, f) {
   const r = (color >> 16) & 255, g = (color >> 8) & 255, b = color & 255;
   const ch = (c) => Math.max(0, Math.min(255, Math.round(f > 0 ? c + (255 - c) * f : c * (1 + f))));
@@ -339,6 +379,7 @@ class GameScene extends Phaser.Scene {
     this.relicIcons = [];
     this.block = 0;          // warrior block: banked until damage eats it
     this.playerClass = null;
+    this.realm = REALMS[0];
     this.level = 0;
     this.throws = 0;
     this.refreshIn = TUNE.REFRESH_THROWS;
@@ -633,10 +674,12 @@ class GameScene extends Phaser.Scene {
       e.img.on('pointerout', () => this.hideTooltip());
       return e;
     };
+    const rm = this.realm || REALMS[0];
     if (type === 'boss') {
-      const hp = 18 + Math.round(n * 4.5);
+      const hp = Math.round((18 + n * 4.5) * rm.hpMul);
       this.enemies = [mkEnemy(Phaser.Math.Between(0, MOBS.length - 1),
-        hp, 4 + Math.floor(n * 0.6), n >= 15 ? 2 : 3, true)];
+        hp, Math.round((4 + Math.floor(n * 0.6)) * rm.dmgMul),
+        n >= 15 ? 2 : 3, true)];
     } else {
       const count = Math.min(1 + Math.floor((n - 1) / 6), 3);
       const unlocked = MOBS.map((m, i) => ({ m, i }))
@@ -645,10 +688,11 @@ class GameScene extends Phaser.Scene {
       for (let i = 0; i < count; i++) {
         const pick = unlocked[Phaser.Math.Between(0, unlocked.length - 1)];
         const t = pick.m;
-        const hp = t.hpBase + Math.round(n * t.hpPer) +
-          Phaser.Math.Between(0, Math.floor(n / 3));
-        this.enemies.push(mkEnemy(pick.i,
-          hp, t.dmgBase + Math.floor(n * t.dmgPer), t.cd, false));
+        const hp = Math.round((t.hpBase + Math.round(n * t.hpPer) +
+          Phaser.Math.Between(0, Math.floor(n / 3))) * rm.hpMul);
+        this.enemies.push(mkEnemy(pick.i, hp,
+          Math.max(1, Math.round((t.dmgBase + Math.floor(n * t.dmgPer)) * rm.dmgMul)),
+          t.cd, false));
       }
     }
     this.layoutEnemies();
@@ -906,7 +950,7 @@ class GameScene extends Phaser.Scene {
   }
 
   doVictory() {
-    this.awardClassXp(XP_VICTORY);
+    this.awardClassXp(XP_VICTORY * (this.realm ? this.realm.xp : 1));
     this.gameOver = true;
     this.closeModal();
     this.previewImg.setVisible(false);
@@ -935,9 +979,12 @@ class GameScene extends Phaser.Scene {
 
   // ---------- home page / class select ----------
 
-  startRun(classId) {
+  startRun(classId, realmId) {
     const cls = CLASS_BY_ID[classId] || CLASSES[0];
     this.playerClass = cls;
+    this.realm = REALM_BY_ID[realmId] || this.realm || REALMS[0];
+    this.cameras.main.setBackgroundColor(this.realm.palette.bg);
+    this.buildBoard();
     // a run always opens from a clean slate, whatever came before
     this.hp = TUNE.PLAYER_HP;
     this.gold = 0;
@@ -1065,7 +1112,7 @@ class GameScene extends Phaser.Scene {
         'Spend what you carry out of a run on permanent\nunlocks: new dice for the bag, starting relics,\nand the classes beyond the first three.\n\nNot built yet.'));
     this.modalAdd(this.add.text(this.W / 2, y0 + step * 4 + 6,
       FLOORS + ' floors · ' + CLASSES.length + ' classes · ' +
-      RELICS.length + ' relics', {
+      RELICS.length + ' relics · ' + REALMS.length + ' realms', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
       color: '#8a7960',
     }).setOrigin(0.5).setDepth(72));
@@ -1148,7 +1195,7 @@ class GameScene extends Phaser.Scene {
       });
       const hit = this.modalAdd(this.add.rectangle(this.W / 2, cy, cardW, cardH,
         0xffffff, 0.001).setDepth(73).setInteractive());
-      hit.on('pointerdown', () => this.startRun(cls.id));
+      hit.on('pointerdown', () => this.showRealmSelect(cls.id));
     });
     const back = this.modalAdd(this.add.text(this.W / 2, this.H - 34, '◀ BACK', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
@@ -1156,6 +1203,63 @@ class GameScene extends Phaser.Scene {
       backgroundColor: '#3a2517', padding: { x: 12, y: 6 },
     }).setOrigin(0.5).setDepth(74).setInteractive());
     back.on('pointerdown', () => this.showHome());
+  }
+
+  showRealmSelect(classId) {
+    this.menuBackdrop();
+    this.modalRefresh = () => this.showRealmSelect(classId);
+    const cls = CLASS_BY_ID[classId] || CLASSES[0];
+    this.modalAdd(this.add.text(this.W / 2, this.H * 0.1,
+      cls.icon + '  CHOOSE YOUR REALM', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '24px',
+      fontStyle: 'bold', color: BOARD.cream,
+    }).setOrigin(0.5).setDepth(72));
+    const cardW = Math.min(this.W * 0.86, 420);
+    const cardH = Math.min(110, this.H * 0.17);
+    const x = this.W / 2 - cardW / 2;
+    const top = this.H * 0.17;
+    const gap = Math.min(cardH + 16, this.H * 0.23);
+    REALMS.forEach((realm, i) => {
+      const cy = top + gap * i + cardH / 2;
+      const g = this.modalAdd(this.add.graphics().setDepth(71));
+      g.fillStyle(0x2a1a10, 0.98);
+      g.fillRoundedRect(x, cy - cardH / 2, cardW, cardH, 12);
+      g.lineStyle(2, realm.color, 0.95);
+      g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 12);
+      // a little biome swatch instead of an icon
+      const sw = this.modalAdd(this.add.graphics().setDepth(72));
+      sw.fillStyle(realm.palette.dirt, 1);
+      sw.fillRoundedRect(x + 14, cy - cardH / 2 + 14, 34, cardH - 28, 8);
+      sw.fillStyle(realm.palette.grassA, 1);
+      sw.fillRoundedRect(x + 14, cy - cardH / 2 + 14, 34, 8, 4);
+      this.modalAdd(this.add.text(x + 60, cy - cardH / 2 + 12, realm.name, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '19px',
+        fontStyle: 'bold', color: realm.hex,
+      }).setDepth(72));
+      this.modalAdd(this.add.text(x + cardW - 16, cy - cardH / 2 + 14, realm.diff, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+        fontStyle: 'bold', color: realm.hex,
+      }).setOrigin(1, 0).setDepth(72));
+      this.modalAdd(this.add.text(x + 60, cy - cardH / 2 + 36, realm.flavor, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+        color: BOARD.creamDim, wordWrap: { width: cardW - 150 },
+      }).setDepth(72));
+      this.modalAdd(this.add.text(x + 60, cy + cardH / 2 - 24,
+        '♥ enemies ×' + realm.hpMul + '   ⚔ ×' + realm.dmgMul +
+        '   gold ×' + realm.goldMul + '   ' + realm.xp + ' xp/fight', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+        fontStyle: 'bold', color: GOLD,
+      }).setDepth(72));
+      const hit = this.modalAdd(this.add.rectangle(this.W / 2, cy, cardW, cardH,
+        0xffffff, 0.001).setDepth(73).setInteractive());
+      hit.on('pointerdown', () => this.startRun(classId, realm.id));
+    });
+    const back = this.modalAdd(this.add.text(this.W / 2, this.H - 34, '◀ BACK', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontStyle: 'bold', color: '#ffd54a',
+      backgroundColor: '#3a2517', padding: { x: 12, y: 6 },
+    }).setOrigin(0.5).setDepth(74).setInteractive());
+    back.on('pointerdown', () => this.showClassSelect());
   }
 
   // ---------- modals: bag / shop / track ----------
@@ -2259,31 +2363,32 @@ class GameScene extends Phaser.Scene {
     const g = this.add.graphics().setDepth(0);
     this.boardGfx = g;
     const { W, H } = this, r = this.rail, top = this.boardTop;
-    g.fillStyle(0x1b2418, 1);
+    const p = (this.realm || REALMS[0]).palette;
+    g.fillStyle(p.skyA, 1);
     g.fillRect(0, 0, W, top);
-    g.fillStyle(0x243019, 1);
+    g.fillStyle(p.skyB, 1);
     for (let x = 0; x < W; x += 46) {
       g.fillEllipse(x + 20, top * 0.35, 52, top * 0.8);
     }
-    g.fillStyle(0x4a7c3a, 1);
+    g.fillStyle(p.grassA, 1);
     g.fillRect(0, top - 6, W, 6);
-    g.fillStyle(0x3c6830, 1);
+    g.fillStyle(p.grassB, 1);
     for (let x = 0; x < W; x += 13) {
       g.fillTriangle(x, top - 6, x + 4, top - 13, x + 8, top - 6);
     }
-    g.fillStyle(BOARD.frame, 1);
+    g.fillStyle(p.frame, 1);
     g.fillRect(0, top, W, H - top);
-    g.lineStyle(2, BOARD.frameGrain, 0.7);
+    g.lineStyle(2, p.frameGrain, 0.7);
     for (let y = top + 6; y < H; y += 14) {
       g.lineBetween(0, y, W, y);
     }
-    g.fillStyle(BOARD.dirt, 1);
+    g.fillStyle(p.dirt, 1);
     g.fillRoundedRect(r, this.fieldTop, W - r * 2, H - this.fieldTop - r, r * 0.6);
     for (let i = 0; i < 70; i++) {
       const bx = r + Math.random() * (W - r * 2);
       const by = this.fieldTop + Math.random() * (H - this.fieldTop - r);
       const br = 8 + Math.random() * 30;
-      g.fillStyle(Math.random() < 0.5 ? BOARD.dirtDark : BOARD.dirtLight,
+      g.fillStyle(Math.random() < 0.5 ? p.dirtDark : p.dirtLight,
         0.10 + Math.random() * 0.12);
       g.fillEllipse(bx, by, br * 2, br * 1.2);
     }
@@ -2292,11 +2397,11 @@ class GameScene extends Phaser.Scene {
       g.strokeRoundedRect(r + 1 + i * 3, this.fieldTop + 1 + i * 3,
         W - (r + 1 + i * 3) * 2, H - this.fieldTop - r - 1 - i * 6 + 4, r * 0.6);
     }
-    g.lineStyle(2, BOARD.frameHi, 0.9);
+    g.lineStyle(2, p.frameHi, 0.9);
     g.strokeRoundedRect(r - 2, this.fieldTop - 2, W - (r - 2) * 2, H - this.fieldTop - r + 4, r * 0.6);
     g.fillStyle(0x241408, 0.35);
     g.fillCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.2);
-    g.lineStyle(2, BOARD.apron, 0.6);
+    g.lineStyle(2, p.apron, 0.6);
     g.strokeCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.2);
   }
 
@@ -2977,8 +3082,11 @@ class GameScene extends Phaser.Scene {
     }
     // gold dice pay out when merged
     const goldBonus = this.hasRelic('luckycoin') ? 1 : 0;
+    const goldMul = (this.realm || REALMS[0]).goldMul;
     for (const d of [a, b]) {
-      if (d.gold) this.addGold(d.value + goldBonus, mx, my - riseH - 14);
+      if (d.gold) {
+        this.addGold(Math.round((d.value + goldBonus) * goldMul), mx, my - riseH - 14);
+      }
     }
     this.destroyDie(a);
     this.destroyDie(b);
@@ -3305,7 +3413,8 @@ class GameScene extends Phaser.Scene {
       // its own line: the enemy strip owns the middle of the top row
       this.classText.setPosition(6, ly + 18);
       if (this.playerClass) {
-        this.classText.setText(this.playerClass.icon + ' ' + this.playerClass.name)
+        this.classText.setText(this.playerClass.icon + ' ' + this.playerClass.name +
+          (this.realm ? '  ·  ' + this.realm.name : ''))
           .setColor(this.playerClass.hex);
       }
     }
@@ -3544,7 +3653,7 @@ class GameScene extends Phaser.Scene {
           this.time.delayedCall(400, () => this.doVictory());
         } else {
           this.banner('LEVEL CLEAR!', '#8ec873');
-          this.awardClassXp(XP_PER_FIGHT *
+          this.awardClassXp(XP_PER_FIGHT * (this.realm ? this.realm.xp : 1) *
             (this.currentNode.type === 'boss' ? 2 : 1));
           this.time.delayedCall(1400, () => {
             if (!this.gameOver) this.chooseNextPath();
