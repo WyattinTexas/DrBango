@@ -1,13 +1,13 @@
 'use strict';
 
 // ============================================================
-// RUNEFALL — Phase 0.7 "The Run"    v0.7.0
+// RUNEFALL — Phase 0.12 "Classes"    v0.12.0
 // A 20-level Rune Dice-style run: flick dice from your DICE BAG,
 // merges damage enemies, gold dice pay out, shops between fights
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.11.0';
+const VERSION = 'v0.12.0';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -70,6 +70,48 @@ const STARTING_BAG = [
   { kind: 'num', value: 2 }, { kind: 'num', value: 3 },
 ];
 
+// Classes: each brings a signature die that merges like a bomb —
+// with its own number, spending both dice and firing an effect
+// instead of leaving a result die behind.
+const CLASS_KINDS = ['shield', 'arrow', 'fire'];
+const isClassKind = (k) => CLASS_KINDS.indexOf(k) >= 0;
+
+const CLASSES = [
+  {
+    id: 'warrior', name: 'WARRIOR', die: 'shield', icon: '🛡️',
+    color: 0x9fb4c9, hex: '#9fb4c9',
+    tagline: 'Banks block that soaks whatever the floor throws back',
+    bag: [
+      { kind: 'num', value: 1 }, { kind: 'num', value: 1 },
+      { kind: 'num', value: 1 }, { kind: 'num', value: 2 },
+      { kind: 'shield', value: 1 }, { kind: 'shield', value: 2 },
+    ],
+  },
+  {
+    id: 'ranger', name: 'RANGER', die: 'arrow', icon: '🏹',
+    color: 0x7fb069, hex: '#7fb069',
+    tagline: 'Hits the whole line at once, and doubles up on a lone target',
+    bag: [
+      { kind: 'num', value: 1 }, { kind: 'num', value: 1 },
+      { kind: 'num', value: 1 }, { kind: 'num', value: 2 },
+      { kind: 'arrow', value: 1 }, { kind: 'arrow', value: 2 },
+    ],
+  },
+  {
+    id: 'mage', name: 'MAGE', die: 'fire', icon: '🔥',
+    color: 0xe08a4a, hex: '#e08a4a',
+    tagline: 'Sets the floor alight and lets the burn finish the work',
+    bag: [
+      { kind: 'num', value: 1 }, { kind: 'num', value: 1 },
+      { kind: 'num', value: 1 }, { kind: 'num', value: 2 },
+      { kind: 'fire', value: 1 }, { kind: 'fire', value: 2 },
+    ],
+  },
+];
+
+const CLASS_BY_ID = {};
+for (const c of CLASSES) CLASS_BY_ID[c.id] = c;
+
 const feedback = {
   chainStep(n) {
     try {
@@ -119,6 +161,9 @@ const TOOLTIPS = {
   wild: 'WILD DIE\nMerges with ANY number\nand becomes its match',
   stun: 'STUN DIE\nBreaks on impact and delays\nevery enemy attack by 2 throws',
   thief: 'THIEF DIE\nTouching it steals 3 gold,\nthen it escapes',
+  shield: 'SHIELD DIE\nMerges with its number, then\nbanks that much BLOCK.\nBlock soaks damage one for one',
+  arrow: 'ARROW DIE\nMerges with its number, then\nhits EVERY enemy for it —\ndouble if only one is left',
+  fire: 'FIRE DIE\nMerges with its number, then\nsets EVERY enemy alight. Burn\nbites each turn, then fades by 1',
 };
 
 // Relics: permanent passives sold from the shop's special-item slot.
@@ -232,6 +277,8 @@ class GameScene extends Phaser.Scene {
     this.gold = 0;
     this.relics = [];        // relic ids, bought from shops, kept for the run
     this.relicIcons = [];
+    this.block = 0;          // warrior block: banked until damage eats it
+    this.playerClass = null;
     this.level = 0;
     this.throws = 0;
     this.refreshIn = TUNE.REFRESH_THROWS;
@@ -308,7 +355,10 @@ class GameScene extends Phaser.Scene {
     this.scale.on('resize', () => this.handleResize());
     this.setReady(true);
     this.generateRunMap();
-    this.startLevelAt(0, 0);
+    // the test rigs jump straight into a run; players start at the home page
+    const auto = window.RUNEFALL_AUTOSTART;
+    if (auto) this.startRun(typeof auto === 'string' ? auto : 'warrior');
+    else this.showHome();
   }
 
   // ---------- bag ----------
@@ -487,7 +537,7 @@ class GameScene extends Phaser.Scene {
     const n = this.level, type = this.currentNode.type;
     const mkEnemy = (mobType, hp, dmg, cd, boss) => {
       const e = {
-        type: mobType, hp, maxHp: hp, dmg,
+        type: mobType, hp, maxHp: hp, dmg, fire: 0,
         // the hourglass buys one extra throw before the first swing only
         countdown: cd + (this.hasRelic('hourglass') ? 1 : 0), baseCountdown: cd,
         alive: true, boss,
@@ -497,6 +547,10 @@ class GameScene extends Phaser.Scene {
           fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
           color: '#ffb0a0', fontStyle: 'bold',
         }).setOrigin(0.5, 0).setDepth(31),
+        fireText: this.add.text(0, 0, '', {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+          color: '#f2a05a', fontStyle: 'bold',
+        }).setOrigin(0.5, 1).setDepth(31),
       };
       const show = () => { if (e.alive) this.showEnemyTip(e); };
       e.img.on('pointerover', show);
@@ -543,21 +597,26 @@ class GameScene extends Phaser.Scene {
     const w = Math.max(44, this.stripH * (e.boss ? 1.3 : 0.9)), h = 5;
     const x = e.x - w / 2, y = this.stripH - 12;
     e.bar.clear();
-    if (!e.alive) { e.cdText.setText(''); return; }
+    if (!e.alive) { e.cdText.setText(''); e.fireText.setText(''); return; }
+    // burn shares the countdown's line so neither hides behind the mob
+    e.fireText.setOrigin(0, 0).setPosition(e.x + 6, y - 16)
+      .setText(e.fire > 0 ? '🔥 ' + e.fire : '');
     e.bar.fillStyle(0x241408, 0.8);
     e.bar.fillRoundedRect(x - 1, y - 1, w + 2, h + 2, 2);
     const frac = Math.max(0, e.hp / e.maxHp);
     e.bar.fillStyle(frac > 0.5 ? 0x6aa84f : frac > 0.25 ? 0xe6c229 : 0xc9564a, 1);
     if (frac > 0) e.bar.fillRoundedRect(x, y, w * frac, h, 2);
+    const cdX = e.fire > 0 ? e.x - 6 : e.x;
+    e.cdText.setOrigin(e.fire > 0 ? 1 : 0.5, 0).setPosition(cdX, y - 16);
     if (e.countdown <= 1) {
-      e.cdText.setPosition(e.x, y - 16).setText('⚔ 1').setColor('#ff8070');
+      e.cdText.setText('⚔ 1').setColor('#ff8070');
     } else {
-      e.cdText.setPosition(e.x, y - 16).setText('⏳ ' + e.countdown).setColor('#c9b391');
+      e.cdText.setText('⏳ ' + e.countdown).setColor('#c9b391');
     }
   }
 
   destroyEnemyVisual(e) {
-    e.img.destroy(); e.bar.destroy(); e.cdText.destroy();
+    e.img.destroy(); e.bar.destroy(); e.cdText.destroy(); e.fireText.destroy();
   }
 
   showEnemyTip(e) {
@@ -568,6 +627,7 @@ class GameScene extends Phaser.Scene {
       (e.countdown === 1 ? '\nATTACKS AFTER THIS THROW!' :
         '\nWaiting: attacks in ' + e.countdown + ' throws') +
       '\n' + MOBS[e.type].flavor +
+      (e.fire > 0 ? '\nBURNING: ' + e.fire + ' damage next turn' : '') +
       '\nSpecial: none (coming later)';
     this.showTooltipText(e.x, e.y + this.stripH * 0.5, msg);
   }
@@ -645,6 +705,8 @@ class GameScene extends Phaser.Scene {
 
   onThrowResolved() {
     if (this.gameOver || this.levelClearing) return;
+    this.tickFire();   // burn resolves first: it can drop a mob before it swings
+    if (this.gameOver || this.levelClearing) return;
     for (const e of this.enemies) {
       if (!e.alive) continue;
       e.countdown--;
@@ -705,11 +767,7 @@ class GameScene extends Phaser.Scene {
       onComplete: () => veil.destroy(),
     });
     this.cameras.main.shake(120, 0.004);
-    const dmg = this.enemyDamage(e);
-    this.hp = Math.max(0, this.hp - dmg);
-    this.floatText(this.W * 0.16, this.H - this.rail - 40, '-' + dmg, '#ff8070', true);
-    this.drawHpBar();
-    if (this.hp <= 0) this.doGameOver();
+    this.takeDamage(this.enemyDamage(e));
   }
 
   heal(amount) {
@@ -744,7 +802,7 @@ class GameScene extends Phaser.Scene {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
       color: BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
-    const tap = this.add.text(this.W / 2, this.H * 0.66, 'TAP TO RETRY', {
+    const tap = this.add.text(this.W / 2, this.H * 0.66, 'TAP FOR THE HOME PAGE', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '22px',
       fontStyle: 'bold', color: '#ffd54a',
     }).setOrigin(0.5).setDepth(51);
@@ -766,11 +824,166 @@ class GameScene extends Phaser.Scene {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
       color: BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
-    const tap = this.add.text(this.W / 2, this.H * 0.66, 'TAP TO PLAY AGAIN', {
+    const tap = this.add.text(this.W / 2, this.H * 0.66, 'TAP FOR THE HOME PAGE', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '22px',
       fontStyle: 'bold', color: '#ffd54a',
     }).setOrigin(0.5).setDepth(51);
     this.tweens.add({ targets: tap, alpha: 0.35, duration: 550, yoyo: true, repeat: -1 });
+  }
+
+  // ---------- home page / class select ----------
+
+  startRun(classId) {
+    const cls = CLASS_BY_ID[classId] || CLASSES[0];
+    this.playerClass = cls;
+    this.bag = cls.bag.map(e => ({ ...e }));
+    this.drawPile = [];
+    this.reshuffleBag();
+    this.nextQueue = [this.drawFromBag(), this.drawFromBag(), this.drawFromBag()];
+    this.closeModal();
+    this.setPlayVisible(true);
+    this.layoutHud();
+    this.layoutLauncher();
+    this.updateBagCount();
+    this.generateRunMap();
+    this.startLevelAt(0, 0);
+  }
+
+  // the play chrome has no business on a title screen
+  setPlayVisible(v) {
+    const objs = [this.fpsText, this.levelText, this.mapBtn, this.classText,
+      this.bestText, this.refreshText, this.versionText, this.hpBar, this.hpText,
+      this.goldText, this.blockText, this.previewImg, this.nextLabel,
+      this.bagImg, this.bagCount, ...(this.queueImgs || []),
+      ...(this.relicIcons || [])];
+    for (const o of objs) if (o) o.setVisible(v);
+  }
+
+  menuBackdrop() {
+    for (const o of this.modalObjects) o.destroy();
+    this.modalObjects = [];
+    this.modalOpen = 'menu';
+    this.setPlayVisible(false);
+    this.modalAdd(this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H,
+      0x120a06, 0.92).setDepth(70).setInteractive());
+  }
+
+  menuButton(y, label, color, onTap) {
+    const w = Math.min(this.W * 0.64, 300), h = 48;
+    const x = this.W / 2 - w / 2;
+    const g = this.modalAdd(this.add.graphics().setDepth(71));
+    g.fillStyle(0x2a1a10, 0.98);
+    g.fillRoundedRect(x, y - h / 2, w, h, 10);
+    g.lineStyle(2, color, 0.9);
+    g.strokeRoundedRect(x, y - h / 2, w, h, 10);
+    this.modalAdd(this.add.text(this.W / 2, y, label, {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '19px',
+      fontStyle: 'bold', color: BOARD.cream,
+    }).setOrigin(0.5).setDepth(72));
+    const hit = this.modalAdd(this.add.rectangle(this.W / 2, y, w, h, 0xffffff, 0.001)
+      .setDepth(73).setInteractive());
+    hit.on('pointerdown', onTap);
+  }
+
+  showHome() {
+    this.menuBackdrop();
+    this.modalAdd(this.add.text(this.W / 2, this.H * 0.2, 'RUNEFALL', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '56px',
+      fontStyle: 'bold', color: GOLD, stroke: '#2a0f08', strokeThickness: 9,
+    }).setOrigin(0.5).setDepth(72));
+    this.modalAdd(this.add.text(this.W / 2, this.H * 0.2 + 46,
+      'flick the dice · merge the runes · clear the floor', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
+      color: BOARD.creamDim,
+    }).setOrigin(0.5).setDepth(72));
+    const y0 = this.H * 0.42, step = Math.min(62, this.H * 0.075);
+    this.menuButton(y0, '▶ PLAY', 0xffd54a, () => this.showClassSelect());
+    this.menuButton(y0 + step, '⚔️ VERSUS', 0x6b4a33,
+      () => this.showComingSoon('VERSUS',
+        'Head-to-head runs against another player.\n\nSame floors, same dice bag, one board each —\nwhoever banks the deeper clear takes it.\n\nNot built yet.'));
+    this.menuButton(y0 + step * 2, '★ ACHIEVEMENTS', 0x6b4a33,
+      () => this.showComingSoon('ACHIEVEMENTS',
+        'Chain milestones, relics collected, floors reached,\nand a clean run with every class.\n\nNot built yet.'));
+    this.menuButton(y0 + step * 3, '◉ SHOP', 0x6b4a33,
+      () => this.showComingSoon('SHOP',
+        'Spend what you carry out of a run on permanent\nunlocks: new dice for the bag, starting relics,\nand the classes beyond the first three.\n\nNot built yet.'));
+    this.modalAdd(this.add.text(this.W / 2, y0 + step * 4 + 6,
+      FLOORS + ' floors · ' + CLASSES.length + ' classes · ' +
+      RELICS.length + ' relics', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      color: '#8a7960',
+    }).setOrigin(0.5).setDepth(72));
+    this.modalAdd(this.add.text(this.W / 2, this.H - 24, VERSION, {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      color: '#7a6a55',
+    }).setOrigin(0.5).setDepth(72));
+  }
+
+  showComingSoon(title, body) {
+    const { px, py, pw, ph } = this.modalBase(title, 300);
+    this.modalOpen = 'menu';
+    this.modalAdd(this.add.text(this.W / 2, py + ph * 0.48, body, {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
+      color: BOARD.cream, align: 'center', lineSpacing: 4,
+      wordWrap: { width: pw - 48 },
+    }).setOrigin(0.5).setDepth(72));
+    const back = this.modalAdd(this.add.text(this.W / 2, py + ph - 32, '◀ BACK', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '16px',
+      fontStyle: 'bold', color: '#ffd54a',
+      backgroundColor: '#3a2517', padding: { x: 14, y: 7 },
+    }).setOrigin(0.5).setDepth(72).setInteractive());
+    back.on('pointerdown', () => this.showHome());
+  }
+
+  showClassSelect() {
+    this.menuBackdrop();
+    this.modalAdd(this.add.text(this.W / 2, this.H * 0.1, 'CHOOSE YOUR CLASS', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '24px',
+      fontStyle: 'bold', color: BOARD.cream,
+    }).setOrigin(0.5).setDepth(72));
+    const cardW = Math.min(this.W * 0.86, 420);
+    const cardH = Math.min(128, this.H * 0.18);
+    const x = this.W / 2 - cardW / 2;
+    const top = this.H * 0.17;
+    const gap = Math.min(cardH + 16, this.H * 0.24);
+    CLASSES.forEach((cls, i) => {
+      const cy = top + gap * i + cardH / 2;
+      const g = this.modalAdd(this.add.graphics().setDepth(71));
+      g.fillStyle(0x2a1a10, 0.98);
+      g.fillRoundedRect(x, cy - cardH / 2, cardW, cardH, 12);
+      g.lineStyle(2, cls.color, 0.95);
+      g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 12);
+      this.modalAdd(this.add.text(x + 18, cy - cardH / 2 + 14, cls.icon, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '26px',
+      }).setDepth(72));
+      this.modalAdd(this.add.text(x + 58, cy - cardH / 2 + 16, cls.name, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '20px',
+        fontStyle: 'bold', color: cls.hex,
+      }).setDepth(72));
+      this.modalAdd(this.add.text(x + 58, cy - cardH / 2 + 40, cls.tagline, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+        color: BOARD.creamDim, wordWrap: { width: cardW - 76 },
+      }).setDepth(72));
+      // the bag it opens with, drawn as the real dice
+      const s = Math.min(26, cardW / 13);
+      this.modalAdd(this.add.text(x + 18, cy + cardH / 2 - 48, 'STARTS WITH', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '9px',
+        fontStyle: 'bold', color: '#8a7960',
+      }).setDepth(72));
+      cls.bag.forEach((e, j) => {
+        this.modalAdd(this.add.image(x + 22 + s / 2 + j * (s + 6), cy + cardH / 2 - 22,
+          this.textureFor(e.kind, e.value)).setDisplaySize(s, s).setDepth(72));
+      });
+      const hit = this.modalAdd(this.add.rectangle(this.W / 2, cy, cardW, cardH,
+        0xffffff, 0.001).setDepth(73).setInteractive());
+      hit.on('pointerdown', () => this.startRun(cls.id));
+    });
+    const back = this.modalAdd(this.add.text(this.W / 2, this.H - 34, '◀ BACK', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontStyle: 'bold', color: '#ffd54a',
+      backgroundColor: '#3a2517', padding: { x: 12, y: 6 },
+    }).setOrigin(0.5).setDepth(74).setInteractive());
+    back.on('pointerdown', () => this.showHome());
   }
 
   // ---------- modals: bag / shop / track ----------
@@ -884,8 +1097,17 @@ class GameScene extends Phaser.Scene {
     const relicPool = RELICS.filter(r => r.tier <= tier && !this.hasRelic(r.id));
     const relic = relicPool.length
       ? { ...relicPool[Phaser.Math.Between(0, relicPool.length - 1)] } : null;
+    // every shop stocks one die of your own class, scaled to the tier
+    let classOffer = null;
+    if (this.playerClass) {
+      const v = Math.min(TUNE.MAX_VALUE, tier + Phaser.Math.Between(0, 1));
+      classOffer = { kind: this.playerClass.die, value: v, price: 6 + v * 2 };
+    }
+    const offers = pool.slice(0, classOffer ? 3 : 4).map(o => ({ ...o }));
+    if (classOffer) offers.push(classOffer);
+    Phaser.Utils.Array.Shuffle(offers);
     return {
-      offers: pool.slice(0, 4).map(o => ({ ...o })),
+      offers,
       relic,
       heal: { amount: 10 + tier * 5, price: 5 + tier },
     };
@@ -907,7 +1129,11 @@ class GameScene extends Phaser.Scene {
       return 'Adds a ' + o.value + ' die to your bag. Merges with other ' +
         o.value + 's to chain damage.';
     }
-    return (TOOLTIPS[o.kind] || '').split('\n').slice(1).join(' ');
+    const body = (TOOLTIPS[o.kind] || '').split('\n').slice(1).join(' ');
+    if (isClassKind(o.kind)) {
+      return 'Adds a ' + o.kind + ' ' + o.value + ' die to your bag. ' + body;
+    }
+    return body;
   }
 
   renderShop(stock) {
@@ -929,6 +1155,7 @@ class GameScene extends Phaser.Scene {
     const labels = {
       bomb: 'Bomb die ', potion: 'Potion die',
       wild: 'Wild die', stun: 'Stun die',
+      shield: 'Shield die ', arrow: 'Arrow die ', fire: 'Fire die ',
     };
     stock.offers.forEach((o, i) => {
       const x = px + cellW * (i + 0.5);
@@ -943,7 +1170,7 @@ class GameScene extends Phaser.Scene {
       const img = this.modalAdd(this.add.image(x, y,
         this.textureFor(o.kind, o.value)).setDepth(72).setDisplaySize(s, s));
       const label = o.kind === 'num' ? 'Die: ' + o.value :
-        labels[o.kind] + (o.kind === 'bomb' ? o.value : '');
+        labels[o.kind] + (o.kind === 'bomb' || isClassKind(o.kind) ? o.value : '');
       this.modalAdd(this.add.text(x, y + s * 0.65 + 4, label, {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
         color: BOARD.cream,
@@ -1235,6 +1462,7 @@ class GameScene extends Phaser.Scene {
     this.makeGoldDieTextures();
     this.makeSpecialTextures();
     this.makeNewSpecialTextures();
+    this.makeClassDieTextures();
     this.makeMobTextures();
     this.makeBagTexture();
     this.makeRelicTextures();
@@ -1554,6 +1782,56 @@ class GameScene extends Phaser.Scene {
     tex.refresh();
   }
 
+  // class dice carry their class glyph behind a number, like bombs do
+  makeClassDieTextures() {
+    for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
+      for (const cls of CLASSES) {
+        const { tex, ctx, px, pad, tw } = this.drawCubeBase(cls.die + v, cls.color);
+        const cx = pad + tw / 2, cy = pad + tw / 2, r = tw * 0.32;
+        ctx.save();
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = NUMBER_COLOR;
+        if (cls.die === 'shield') {
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - r);
+          ctx.lineTo(cx + r * 0.85, cy - r * 0.6);
+          ctx.lineTo(cx + r * 0.85, cy + r * 0.25);
+          ctx.quadraticCurveTo(cx + r * 0.5, cy + r, cx, cy + r * 1.1);
+          ctx.quadraticCurveTo(cx - r * 0.5, cy + r, cx - r * 0.85, cy + r * 0.25);
+          ctx.lineTo(cx - r * 0.85, cy - r * 0.6);
+          ctx.closePath();
+          ctx.fill();
+        } else if (cls.die === 'arrow') {
+          ctx.lineWidth = tw * 0.11;
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = NUMBER_COLOR;
+          ctx.beginPath();
+          ctx.moveTo(cx - r * 0.85, cy + r * 0.85);
+          ctx.lineTo(cx + r * 0.8, cy - r * 0.8);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(cx + r * 0.85, cy - r * 0.85);
+          ctx.lineTo(cx + r * 0.2, cy - r * 0.75);
+          ctx.lineTo(cx + r * 0.75, cy - r * 0.15);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - r * 1.15);
+          ctx.quadraticCurveTo(cx + r * 0.95, cy - r * 0.1, cx + r * 0.5, cy + r * 0.65);
+          ctx.quadraticCurveTo(cx + r * 0.2, cy + r * 1.1, cx, cy + r * 1.1);
+          ctx.quadraticCurveTo(cx - r * 0.2, cy + r * 1.1, cx - r * 0.5, cy + r * 0.65);
+          ctx.quadraticCurveTo(cx - r * 0.95, cy - r * 0.1, cx, cy - r * 1.15);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+        this.drawDieNumber(ctx, px, pad, tw, v);
+        tex.refresh();
+      }
+    }
+  }
+
   // relics are struck as little amber medallions: one coin face per
   // relic with its glyph stamped in the middle
   makeRelicTextures() {
@@ -1771,7 +2049,7 @@ class GameScene extends Phaser.Scene {
 
   textureFor(kind, value, gold) {
     if (kind === 'num') return (gold ? 'gold' : 'die') + value;
-    if (kind === 'bomb') return 'bomb' + value;
+    if (kind === 'bomb' || isClassKind(kind)) return kind + value;
     return kind;
   }
 
@@ -1955,7 +2233,7 @@ class GameScene extends Phaser.Scene {
     let handled = false;
     for (const [x, other] of [[a, b], [b, a]]) {
       if (x.dead || other.dead) continue;
-      const hard = (k) => k === 'num' || k === 'bomb' || k === 'wild';
+      const hard = (k) => this.mergeableKind(k) || k === 'wild';
       if (x.kind === 'potion' && impact > 0.8) {
         this.consumePotion(x);
         handled = true;
@@ -2008,6 +2286,88 @@ class GameScene extends Phaser.Scene {
     this.cameras.main.shake(200, 0.006);
     this.dealDamage(value + (this.hasRelic('powderhorn') ? 2 : 0), x, apexY, true);
     feedback.chainStep(4);
+  }
+
+  // ---------- class die effects ----------
+
+  classDieEffect(kind, value, x, y, riseH) {
+    const apexY = y - riseH;
+    const cls = CLASSES.find(c => c.die === kind);
+    this.mergeImpact(x, y, riseH, value);
+    this.sparks.burst(x, apexY, cls.color, 18,
+      { speedMin: 1.5, speedMax: 5, life: 520, scale: 0.95 });
+    if (kind === 'shield') {
+      this.addBlock(value, x, apexY);
+    } else if (kind === 'arrow') {
+      // a lone target catches the whole volley
+      const alive = this.enemies.filter(e => e.alive).length;
+      const dmg = value + this.mergeDamageBonus();
+      if (alive === 1) this.dealDamage(dmg * 2, x, apexY, false);
+      else this.dealDamage(dmg, x, apexY, true);
+    } else if (kind === 'fire') {
+      this.igniteAll(value, x, apexY);
+    }
+  }
+
+  addBlock(amount, x, y) {
+    this.block += amount;
+    this.floatText(x, y, '+' + amount + ' BLOCK', '#9fb4c9', true);
+    this.drawHpBar();
+  }
+
+  // the stack lands NOW — if it waited on the bolt tween, whether the
+  // first tick hits this turn or the next would be a coin flip
+  igniteAll(amount, x, y) {
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      e.fire += amount;
+      this.drawEnemyBar(e);
+      const bolt = this.add.image(x, y, 'spark').setDepth(32)
+        .setBlendMode(Phaser.BlendModes.ADD).setTint(0xe08a4a).setScale(1.4);
+      this.tweens.add({
+        targets: bolt, x: e.x, y: e.y, duration: 260, ease: 'Quad.easeIn',
+        onComplete: () => {
+          bolt.destroy();
+          this.sparks.burst(e.x, e.y, 0xe08a4a, 10,
+            { speedMin: 1, speedMax: 3.5, life: 380, scale: 0.7 });
+          this.floatText(e.x, e.y - this.stripH * 0.2, '🔥 +' + amount, '#f2a05a');
+        },
+      });
+    }
+  }
+
+  // burn bites for its whole stack, then fades by one — a 3 deals 3, 2, 1
+  tickFire() {
+    for (const e of this.enemies) {
+      if (!e.alive || !e.fire) continue;
+      const burn = e.fire;
+      this.sparks.burst(e.x, e.y, 0xe08a4a, 12,
+        { speedMin: 1, speedMax: 3.5, life: 400, scale: 0.8 });
+      this.hitEnemy(e, burn);
+      e.fire = Math.max(0, burn - 1);
+      if (e.alive) this.drawEnemyBar(e);
+    }
+  }
+
+  // every point of damage the player takes is soaked by block first
+  takeDamage(amount, label) {
+    const soaked = Math.min(this.block, amount);
+    this.block -= soaked;
+    const through = amount - soaked;
+    this.hp = Math.max(0, this.hp - through);
+    if (soaked > 0) {
+      this.floatText(this.W * 0.32, this.H - this.rail - 62,
+        '🛡 -' + soaked, '#9fb4c9');
+    }
+    if (through > 0) {
+      this.floatText(this.W * 0.16, this.H - this.rail - 40,
+        '-' + through + (label || ''), '#ff8070', true);
+    } else {
+      this.floatText(this.W * 0.16, this.H - this.rail - 40, 'BLOCKED', '#9fb4c9');
+    }
+    this.drawHpBar();
+    if (this.hp <= 0) this.doGameOver();
+    return through;
   }
 
   consumePotion(die) {
@@ -2073,14 +2433,11 @@ class GameScene extends Phaser.Scene {
       this.crumbleSpike(die);
       return;
     }
-    this.hp = Math.max(0, this.hp - TUNE.SPIKE_DAMAGE);
-    this.floatText(die.gx, die.gy - 10, '-' + TUNE.SPIKE_DAMAGE + ' HP', '#ff8070', true);
     const veil = this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0xaa22aa, 0.15)
       .setDepth(40);
     this.tweens.add({ targets: veil, alpha: 0, duration: 250, onComplete: () => veil.destroy() });
-    this.drawHpBar();
+    this.takeDamage(TUNE.SPIKE_DAMAGE, ' HP');
     this.crumbleSpike(die);
-    if (this.hp <= 0) this.doGameOver();
   }
 
   crumbleSpike(die) {
@@ -2287,11 +2644,11 @@ class GameScene extends Phaser.Scene {
   }
 
   mergeableKind(k) {
-    return k === 'num' || k === 'bomb';
+    return k === 'num' || k === 'bomb' || isClassKind(k);
   }
 
   canMerge(a, b) {
-    const m = (k) => k === 'num' || k === 'bomb';
+    const m = (k) => this.mergeableKind(k);
     if (a.kind === 'wild' && m(b.kind)) return true;
     if (b.kind === 'wild' && m(a.kind)) return true;
     return m(a.kind) && m(b.kind) && a.value === b.value;
@@ -2299,7 +2656,7 @@ class GameScene extends Phaser.Scene {
 
   touchSweep() {
     const touchDist = this.dieRadius * 0.96 * 2 + 3;
-    const sweepKind = (k) => k === 'num' || k === 'bomb' || k === 'wild';
+    const sweepKind = (k) => this.mergeableKind(k) || k === 'wild';
     for (let i = 0; i < this.dice.length; i++) {
       const a = this.dice[i];
       if (a.dead || !sweepKind(a.kind) || !a.body) continue;
@@ -2373,6 +2730,14 @@ class GameScene extends Phaser.Scene {
     // for the bomb's number
     if (a.kind === 'bomb' || b.kind === 'bomb') {
       this.bombBlast(mx, my, riseH, value);
+      this.loftCount--;
+      return;
+    }
+
+    // class dice spend themselves the same way: the effect IS the result
+    const classDie = isClassKind(a.kind) ? a : (isClassKind(b.kind) ? b : null);
+    if (classDie) {
+      this.classDieEffect(classDie.kind, value, mx, my, riseH);
       this.loftCount--;
       return;
     }
@@ -2638,6 +3003,12 @@ class GameScene extends Phaser.Scene {
     this.goldText = this.add.text(0, 0, '', {
       ...style, fontSize: '15px', color: GOLD, fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(31);
+    this.blockText = this.add.text(0, 0, '', {
+      ...style, fontSize: '13px', color: '#9fb4c9', fontStyle: 'bold',
+    }).setOrigin(0, 0.5).setDepth(31);
+    this.classText = this.add.text(0, 0, '', {
+      ...style, fontSize: '12px', fontStyle: 'bold',
+    }).setDepth(30);
     this.tipBg = this.add.graphics().setDepth(60).setVisible(false);
     this.tipText = this.add.text(0, 0, '', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
@@ -2655,6 +3026,14 @@ class GameScene extends Phaser.Scene {
     const ly = Math.max(20, this.stripH * 0.35);
     this.levelText.setPosition(6, ly);
     this.mapBtn.setPosition(this.levelText.x + this.levelText.width + 10, ly + 2);
+    if (this.classText) {
+      // its own line: the enemy strip owns the middle of the top row
+      this.classText.setPosition(6, ly + 18);
+      if (this.playerClass) {
+        this.classText.setText(this.playerClass.icon + ' ' + this.playerClass.name)
+          .setColor(this.playerClass.hex);
+      }
+    }
     this.refreshText.setPosition(this.W - 8, ly);
     this.bestText.setPosition(this.W - 8, 4);
     this.versionText.setPosition(this.W - this.rail - 6, this.H - this.rail - 4);
@@ -2678,6 +3057,10 @@ class GameScene extends Phaser.Scene {
     g.strokeRoundedRect(x - 2, y - 2, w + 4, h + 4, 4);
     this.hpText.setPosition(x + w + 8, y + h / 2)
       .setText(this.hp + '/' + TUNE.PLAYER_HP);
+    if (this.blockText) {
+      this.blockText.setPosition(x + w + 8 + this.hpText.width + 10, y + h / 2)
+        .setText(this.block > 0 ? '🛡 ' + this.block : '');
+    }
   }
 
   drawGold() {

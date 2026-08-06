@@ -10,6 +10,12 @@
 <script src="game.js"></script>
 <script>
 // Optional scripted actions so the screenshot shows specific states.
+// ?home=1 holds the home page; otherwise we drop straight into a run.
+// ?class=warrior|ranger|mage picks the bag (default warrior).
+if (!new URLSearchParams(location.search).has('home')) {
+  window.RUNEFALL_AUTOSTART =
+    new URLSearchParams(location.search).get('class') || 'warrior';
+}
 document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(location.search);
   if (params.get('relics')) {
@@ -38,6 +44,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const e = scene.enemies[0];
       if (e) scene.showEnemyTip(e);
     }, 6000);
+  }
+  if (params.get('screen') === 'class') {
+    setTimeout(() => window.__runefall.scene.keys.game.showClassSelect(), 1200);
+  }
+  // paint block and burn on the HUD without playing to them
+  if (params.get('demo')) {
+    setTimeout(() => {
+      const scene = window.__runefall.scene.keys.game;
+      scene.block = 7;
+      scene.drawHpBar();
+      for (const e of scene.enemies) { e.fire = 3; scene.drawEnemyBar(e); }
+    }, 5500);
   }
   if (params.get('modal')) {
     setTimeout(() => {

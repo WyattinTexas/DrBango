@@ -9,12 +9,24 @@
 <script src="vendor/phaser.min.js"></script>
 <script src="game.js"></script>
 <script>
+// Straight into a run — the home page is for players, not the rig.
+// ?class=warrior|ranger|mage picks the bag (default warrior).
+// ?s=menu is the exception: it drives the home page by hand.
+{
+  const p = new URLSearchParams(location.search);
+  if (p.get('s') !== 'menu') {
+    window.RUNEFALL_AUTOSTART = p.get('class') || 'warrior';
+  }
+}
 // Scenarios:
 //   ?s=cascade — thrown 1 fuses a 1; result bounces to an in-range 2 -> 3.
 //   ?s=push    — thrown 2 shoves a 1 into another 1; pushed dice must merge.
 //   ?s=short   — the only 2 is far out of bounce range; chain must stop at 1.
 //   ?s=pit     — a die placed in the shooting circle must be destroyed.
 //   ?s=relic   — whetstone: a 1+1 merge must deal 3 (2 + 1), not 2.
+//   ?s=shield  — shield 2 merged with a 2 must bank 2 block.
+//   ?s=arrow   — arrow 2 into a lone enemy must deal double (4).
+//   ?s=fire    — fire 2 must light every enemy, then burn 2 then 1.
 window.addEventListener('load', () => {
   window.RUNEFALL_DEBUG = true;
   const scenario = new URLSearchParams(location.search).get('s') || 'cascade';
@@ -23,7 +35,7 @@ window.addEventListener('load', () => {
       const game = window.__runefall;
       const scene = game.scene.keys.game;
       console.log('TEST(' + scenario + '): scene ok, seeded dice=' + scene.dice.length);
-      [...scene.dice].forEach(d => scene.destroyDie(d));
+      if (scenario !== 'menu') [...scene.dice].forEach(d => scene.destroyDie(d));
       const mk = (x, y, v) => {
         const d = scene.makeDie(x, y, v, 'rest');
         d.restingSince = 0;
@@ -51,6 +63,35 @@ window.addEventListener('load', () => {
         const wd = scene.makeDie(scene.launcherPos.x, scene.H * 0.3, 0, 'rest', 'wild');
         wd.restingSince = 0;
         scene.nextValue = 3;
+      } else if (scenario === 'menu') {
+        // real taps on the canvas: PLAY, then the MAGE card
+        // headless Chrome never delivers DOM pointer events to Phaser, so
+        // hit-test the point ourselves and fire the top object's handler —
+        // still proves the button is where it looks and does what it says
+        fireVec = null;
+        const click = (x, y, what) => {
+          const p = scene.input.activePointer;
+          p.x = x; p.y = y; p.worldX = x; p.worldY = y;
+          const hits = scene.input.hitTestPointer(p);
+          console.log('TEST(menu): ' + what + ' at ' + Math.round(x) + ',' +
+            Math.round(y) + ' hits=' + hits.length);
+          // hit order isn't guaranteed, and only the button carries a
+          // handler — the backdrop underneath ignores it
+          for (const h of hits) h.emit('pointerdown', p);
+        };
+        click(scene.W / 2, scene.H * 0.42, 'PLAY');
+        setTimeout(() => {
+          const cardH = Math.min(128, scene.H * 0.18);
+          const gap = Math.min(cardH + 16, scene.H * 0.24);
+          click(scene.W / 2, scene.H * 0.17 + gap * 2 + cardH / 2, 'MAGE card');
+        }, 500);
+      } else if (scenario === 'shield' || scenario === 'arrow' || scenario === 'fire') {
+        // each class die merges with a plain die of its own number
+        const kind = scenario === 'shield' ? 'shield' :
+          scenario === 'arrow' ? 'arrow' : 'fire';
+        mk(scene.launcherPos.x, scene.H * 0.25, 2);
+        scene.nextQueue[0] = { kind, value: 2 };
+        scene.layoutLauncher();
       } else if (scenario === 'relic') {
         scene.relics = ['whetstone'];
         scene.drawRelics();
@@ -68,11 +109,17 @@ window.addEventListener('load', () => {
       }
       setTimeout(() => {
         const vals = scene.dice.map(d => d.value + ':' + d.state).join(', ');
-        console.log('TEST RESULT ' + scenario + ' chain=' + scene.chain +
+        console.log('TEST RESULT ' + scenario +
+          ' class=' + (scene.playerClass ? scene.playerClass.id : 'none') +
+          ' modal=' + scene.modalOpen +
+          ' bag=[' + scene.bag.map(e => e.kind + e.value).join(' ') + ']' +
+          ' chain=' + scene.chain +
           ' best=' + scene.bestChain + ' dice=[' + vals + '] ready=' + scene.ready +
           ' loftCount=' + scene.loftCount +
           ' relics=[' + scene.relics.join(',') + ']' +
-          ' ehp=' + scene.enemies.map(e => e.hp + '/' + e.maxHp).join(','));
+          ' block=' + scene.block +
+          ' ehp=' + scene.enemies.map(e => e.hp + '/' + e.maxHp).join(',') +
+          ' fire=' + scene.enemies.map(e => e.fire).join(','));
       }, scenario === 'pit' ? 2000 : 6500);
     } catch (e) {
       console.log('TEST ERROR: ' + e.message + '\n' + e.stack);
