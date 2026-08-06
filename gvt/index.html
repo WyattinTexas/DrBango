@@ -2251,7 +2251,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.56</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.57</div>
   <div class="scanlines"></div>
 </div>
 
@@ -16473,13 +16473,14 @@ function sqTick(dt){
 // green gun already targets him for free) whose own updater eats BOTH
 // armies. YETI_LEVELS is the roster Wyatt curates ("I will instruct when to
 // add him" — 13, then 16 and 20 by his next note); one row per rung.
-const YETI_LEVELS={ 13:15, 16:11, 20:15 };   // level → the second he arrives (v2.54: 15s; v2.55: L16 four seconds earlier)
-// v2.55 (Wyatt 8/6: on L16 "have it primarily target the enemy TAN units
-// because it's a huge wave and it will really shock the player"): on a biased
-// rung the tan side is picked at this probability instead of the strict
-// green/tan alternation; everywhere else the alternation stands.
-const YETI_TAN_BIAS={ 16:0.85 };
-const YETI_STAY=15, YETI_HP=600, YETI_EAT_R=44;
+const YETI_LEVELS={ 13:15, 16:15, 20:15 };   // level → the second he arrives (v2.57: L16 back to 15 — "4 seconds later")
+// v2.57 (Wyatt 8/6, THE DICE ROLL — replaces v2.55's alternation + tan bias):
+// every bound rolls 1-3. A 1 or a 2 is a WILD bound to a random spot (the
+// Ski Free chaos); a 3 is a POUNCE on somebody — 75/25 the enemy's man over
+// yours. He reads as bouncing around the carpet, and every third-ish leap
+// lands square on someone, mostly theirs.
+const YETI_HUNT_P=1/3, YETI_TAN_ODDS=0.75;
+const YETI_STAY=15, YETI_HP=200, YETI_EAT_R=44;   // v2.57: hp 600→200 — killable inside one visit
 function spawnYeti(){
   const f=spawnFoe('yeti', W-70, 110+Math.random()*(WORLD_H-220));
   f.hp=f.hpMax=YETI_HP;              // flat 600 — hpMul keeps its hands off the gag
@@ -16538,19 +16539,18 @@ function updateYeti(f,dt){
   } else {
     f.hopT-=dt;
     if(f.hopT<=0){
-      // v2.54/v2.55: every bound CHASES a real figure. The SIDE alternates
-      // green/tan by default — but on a YETI_TAN_BIAS rung (L16's huge wave)
-      // the tan side is drawn at the biased odds instead, so the shock is
-      // watching him tear through THEIR wave. The victim within the side is
-      // pure luck; an empty side hands its turn across; an empty carpet
-      // falls back to the wild bound.
-      const bias=YETI_TAN_BIAS[S.levelN];
-      f.eatSide = (bias!=null)? (Math.random()<bias? 'tan':'green')
-                              : (f.eatSide==='green'? 'tan' : 'green');
-      const greens=S.units.filter(u=>!u.dead&&!(u.jetT>0)&&!(S.drag&&S.drag.unit===u));
-      const tans=S.foes.filter(g=>g!==f&&!g.boss&&g.type!=='mom'&&!g.burrow&&!g.yetiAte);
-      const pool=(f.eatSide==='green')? (greens.length?greens:tans) : (tans.length?tans:greens);
-      const tgt=pool.length? pool[(Math.random()*pool.length)|0] : null;
+      // v2.57 THE DICE ROLL (Wyatt 8/6): 2-in-3 the bound is WILD — a random
+      // spot, pure Ski Free — and 1-in-3 it is a POUNCE on a real figure,
+      // drawn 75/25 from the enemy's men over yours (the guided leap then
+      // tracks the victim to the landing). An empty side hands the pounce
+      // across; an empty carpet is always a wild bound.
+      let tgt=null;
+      if(Math.random()<YETI_HUNT_P){
+        const greens=S.units.filter(u=>!u.dead&&!(u.jetT>0)&&!(S.drag&&S.drag.unit===u));
+        const tans=S.foes.filter(g=>g!==f&&!g.boss&&g.type!=='mom'&&!g.burrow&&!g.yetiAte);
+        const pool=(Math.random()<YETI_TAN_ODDS)? (tans.length?tans:greens) : (greens.length?greens:tans);
+        tgt=pool.length? pool[(Math.random()*pool.length)|0] : null;
+      }
       f.hunt=tgt||null;
       f.hx0=f.x; f.hy0=f.y;
       if(tgt){ f.hx1=Math.max(90,Math.min(W-70,  tgt.x));
