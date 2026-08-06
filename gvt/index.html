@@ -2251,7 +2251,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.53</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.54</div>
   <div class="scanlines"></div>
 </div>
 
@@ -13399,6 +13399,21 @@ function levelCfg(n){
     w5.groups.push({f:'boss',t:'giant',n:1,e:'right',at:2.0});
     w5.groups.push({f:'wedge',t:'tank',n:1,e:'right-bottom',at:3.4});
   }
+  // v2.54 (Wyatt 8/6: "In wave 4, on level 14, let's add one enemy Mortar."):
+  // one tube, authored RAW on a LINE like the L9 crew (the batterie law —
+  // c() would deal more, a VOLLEY kind would override the 6.5s cadence).
+  if(n===14) cfg.waves[3].groups.push({f:'line',t:'tanmortar',n:1,e:'right',at:2.5});
+  // v2.54 (Wyatt 8/6: "Level 15: Every Wave, Please Add a Giant Piggy. Wave
+  // seven has three giant piggies."): waves 1-6 each gain ONE real rollpig —
+  // n:1 boss groups, the sqScaleCfg law (the W1 tease pig stays light, so
+  // wave one opens with the early tease AND a real one — "every wave" honest
+  // to the letter); the finale already fields one, two more staggered groups
+  // make it THREE (the L10 multi-group door: solo identity holds at 1+1+1).
+  if(n===15){
+    for(let wi=0;wi<6;wi++) cfg.waves[wi].groups.push({f:'boss',t:'rollpig',n:1,e:'right',at:2.0});
+    cfg.waves[6].groups.push({f:'boss',t:'rollpig',n:1,e:'right',at:2.6},
+                             {f:'boss',t:'rollpig',n:1,e:'right',at:4.2});
+  }
   return cfg;
 }
 function waveFromKey(key, m, R, lvl){
@@ -16429,7 +16444,7 @@ function sqTick(dt){
 // green gun already targets him for free) whose own updater eats BOTH
 // armies. YETI_LEVELS is the roster Wyatt curates ("I will instruct when to
 // add him" — 13, then 16 and 20 by his next note); one row per rung.
-const YETI_LEVELS={ 13:30, 16:30, 20:30 };   // level → the second he arrives
+const YETI_LEVELS={ 13:15, 16:15, 20:15 };   // level → the second he arrives (v2.54: Wyatt moved him up to the 15-second mark)
 const YETI_STAY=15, YETI_HP=600, YETI_EAT_R=44;
 function spawnYeti(){
   const f=spawnFoe('yeti', W-70, 110+Math.random()*(WORLD_H-220));
@@ -16441,25 +16456,47 @@ function spawnYeti(){
 }
 function updateYeti(f,dt){
   f.yetiT-=dt;
-  if(f.yetiT<=0){                    // he leaves the scene — one poof, no leak, no verdict
-    const i=S.foes.indexOf(f); if(i>=0) S.foes.splice(i,1);
-    S.fx.push({k:'puff',x:f.x,y:f.y-30,t:0,dur:0.5,R:44});
-    S.fx.push({k:'ring',x:f.x,y:f.y-10,r:8,R:52,t:0,dur:0.4,col:'rgba(232,238,243,0.8)'});
-    return;
-  }
   if(f.hopA){                        // mid-bound — the Ski Free lurch is an arc, not a walk
     f.hopP+=dt/f.hopDur;
     const p=Math.min(1,f.hopP);
     f.x=f.hx0+(f.hx1-f.hx0)*p; f.y=f.hy0+(f.hy1-f.hy0)*p;
-    f.hopZ=Math.sin(p*Math.PI)*46;
-    if(p>=1){ f.hopA=false; f.hopZ=0; f.hopT=0.12+Math.random()*0.3;
-      S.shake=Math.max(S.shake,0.22); bfSfx(SFX.stomp,f.x,f.y); }
+    f.hopZ=Math.sin(p*Math.PI)*(f.leaving?64:46);
+    if(p>=1){
+      // v2.54: the EXIT is a showman's bound clean over the top wall. ⚠ He is
+      // FLAGGED here and swept at the end of update() — updateYeti runs
+      // INSIDE the foes loop, and a mid-iteration splice shifts the array
+      // under the iterator (the never-splice-mid-frame law).
+      if(f.leaving){ f.yetiGone=true; return; }
+      f.hopA=false; f.hopZ=0; f.hopT=0.12+Math.random()*0.3;
+      S.shake=Math.max(S.shake,0.22); bfSfx(SFX.stomp,f.x,f.y);
+    }
+  } else if(f.yetiT<=0){
+    // v2.54 (Wyatt 8/6: "instead of disappearing, please have him jump off
+    // screen"): time's up — one long arc over the top edge, then gone
+    f.leaving=true; f.hx0=f.x; f.hy0=f.y;
+    f.hx1=f.x+(Math.random()-0.5)*260; f.hy1=-170;
+    f.hopDur=0.8; f.hopP=0; f.hopA=true;
+    bfSfx(SFX.rumble,f.x,f.y);
   } else {
     f.hopT-=dt;
-    if(f.hopT<=0){                   // pick the next chaotic spot and leap
+    if(f.hopT<=0){
+      // v2.54 (Wyatt 8/6: "have him alternate between targeting the enemy
+      // and your team. Currently, he randomly bounced around and didn't hit
+      // anybody. We need him to chase certain people and pretty much have it
+      // up to luck who he's going to target."): every bound CHASES a real
+      // figure — the SIDE strictly alternates, the victim within it is pure
+      // luck. An empty side hands its turn across; an empty carpet falls
+      // back to the old wild bound.
+      f.eatSide = f.eatSide==='green'? 'tan' : 'green';
+      const greens=S.units.filter(u=>!u.dead&&!(u.jetT>0)&&!(S.drag&&S.drag.unit===u));
+      const tans=S.foes.filter(g=>g!==f&&!g.boss&&g.type!=='mom'&&!g.burrow);
+      const pool=(f.eatSide==='green')? (greens.length?greens:tans) : (tans.length?tans:greens);
+      const tgt=pool.length? pool[(Math.random()*pool.length)|0] : null;
       f.hx0=f.x; f.hy0=f.y;
-      f.hx1=Math.max(90,Math.min(W-70,  f.x+(Math.random()-0.5)*560));
-      f.hy1=Math.max(96,Math.min(WORLD_H-90, f.y+(Math.random()-0.5)*440));
+      if(tgt){ f.hx1=Math.max(90,Math.min(W-70,  tgt.x+(Math.random()-0.5)*30));
+               f.hy1=Math.max(96,Math.min(WORLD_H-90, tgt.y+(Math.random()-0.5)*24)); }
+      else   { f.hx1=Math.max(90,Math.min(W-70,  f.x+(Math.random()-0.5)*560));
+               f.hy1=Math.max(96,Math.min(WORLD_H-90, f.y+(Math.random()-0.5)*440)); }
       f.hopDur=0.38+Math.random()*0.26; f.hopP=0; f.hopA=true;
     }
   }
@@ -16472,10 +16509,10 @@ function updateYeti(f,dt){
     if(S.drag&&S.drag.unit===u) continue;
     if(Math.hypot(u.x-f.x,u.y-f.y)<YETI_EAT_R){ yetiChomp(f); knock(u,f.x,f.y,true); }
   }
-  for(let i=S.foes.length-1;i>=0;i--){ const g=S.foes[i];
-    if(g===f||g.boss||g.type==='mom') continue;   // the bosses are too big a bite — comedy has limits
+  for(const g of S.foes){
+    if(g===f||g.boss||g.type==='mom'||g.yetiAte) continue;   // the bosses are too big a bite — comedy has limits
     if(Math.hypot(g.x-f.x,g.y-f.y)<YETI_EAT_R){
-      S.foes.splice(i,1); yetiChomp(f);
+      g.yetiAte=true; yetiChomp(f);   // ⚠ flagged, swept after the loop — never splice mid-frame
       S.fx.push({k:'puff',x:g.x,y:g.y-14,t:0,dur:0.35,R:20});
     }
   }
@@ -23284,6 +23321,10 @@ function update(dt){
   // mid-loop would make the for..of skip the next man in the line. Since v1.32
   // BOTH carpets take casualties, so the sweep runs everywhere.
   for(let i=S.units.length-1;i>=0;i--) if(S.units[i].dead) S.units.splice(i,1);
+  // v2.54: the snowman's meals and his own exit ride the SAME law — flagged
+  // in updateYeti (which runs inside the foes loop), swept here. An eaten
+  // tan leaves no corpse, no bounty, no leak — down the hatch whole.
+  for(let i=S.foes.length-1;i>=0;i--) if(S.foes[i].yetiAte||S.foes[i].yetiGone) S.foes.splice(i,1);
 }
 // one radioman rule for every gun on the carpet (BF: your OWN radioman only).
 // ONE scan answers both halves of the aura — v1.22 gave the set a second gift
