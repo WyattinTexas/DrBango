@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v7.5 -->
+<!-- TRAINSET v7.6 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -1971,11 +1971,28 @@ function baseAim(){
   for(const k2 of scen.keys()) add(k2);
   return n? [sx/n,sy/n] : [WORLD_W/2,WORLD_H/2];
 }
-function viewBase(){   // the E20 entry view: close to the toys, centered on the action
+const OPEN_PAD=1.4;   // E66: cells of breathing room around the framed track
+function viewBase(){   // the entry view. E66 THE IDEAL OPENING: frame the WHOLE track
   followSet(false); CAM.off=false; EAGERC=null; cndKill();   // E27: the entry camera outranks the arrival ease (E52: and the conductor)
-  VIEW.s=baseScale(); VIEW.vx=VIEW.vy=0;
-  const [ax,ay]=baseAim();
-  VIEW.ox=W/2-ax*VIEW.s; VIEW.oy=(H-BAR)/2-ay*VIEW.s;
+  VIEW.vx=VIEW.vy=0;
+  // the track's bbox (grid + hgrid — glued campaign lines included); zoom to
+  // hold it all, clamped [fit, baseScale] — never tighter than the E20 default,
+  // never past the whole rug. An empty rug keeps the E20 view verbatim.
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,n=0;
+  const add=k2=>{ const i=k2.indexOf(','), gx=+k2.slice(0,i), gy=+k2.slice(i+1);
+    if(gx<x0)x0=gx; if(gy<y0)y0=gy; if(gx>x1)x1=gx; if(gy>y1)y1=gy; n++; };
+  for(const k2 of grid.keys()) add(k2);
+  for(const k2 of hgrid.keys()) add(k2);
+  if(n){
+    const bx=GX+(x0-OPEN_PAD)*C, by=GY+(y0-OPEN_PAD)*C,
+          bw=(x1-x0+1+2*OPEN_PAD)*C, bh=(y1-y0+1+2*OPEN_PAD)*C;
+    VIEW.s=Math.max(fitScale(),Math.min(baseScale(),Math.min(W/bw,(H-BAR)/bh)));
+    VIEW.ox=W/2-(bx+bw/2)*VIEW.s; VIEW.oy=(H-BAR)/2-(by+bh/2)*VIEW.s;
+  } else {
+    VIEW.s=baseScale();
+    const [ax,ay]=baseAim();
+    VIEW.ox=W/2-ax*VIEW.s; VIEW.oy=(H-BAR)/2-ay*VIEW.s;
+  }
   clampView(); viewApply();
 }
 function viewResize(){
@@ -3161,6 +3178,7 @@ function update(dt){
     if(!winT&&prettyPend){ prettyPend=false; prettyT=PRETTY_T; SND.ding(); } }   // E14: the compliment follows the win card out
   if(prettyT>0){ prettyT-=dt; if(prettyT<0) prettyT=0; }
   if(CAMP.on) toyTick(dt);
+  cwipeTick(dt);   // E66: the clouds carry a finished level to the next one
 }
 // E7 — trackside furniture watches the trains go by, keyed (cell, elev) like everything:
 // a WHISTLE POST toots once when a loco enters its patch and re-arms on exit (the
@@ -6872,9 +6890,8 @@ function drawPortalWisp(pc,ox,oy){
   }
   cx.globalAlpha=1; cx.restore();
 }
-function drawPortalWipe(){
-  if(!PORT.on) return;
-  const k=Math.min(1,PORT.t/PORTAL_WIPE_S);
+function drawSteamCurtain(t){   // E66: the one curtain recipe — PORT (E48) and CWIPE both speak it
+  const k=Math.min(1,t/PORTAL_WIPE_S);
   const e=k<0.5? 2*k*k : 1-Math.pow(-2*k+2,2)/2;   // easeInOutQuad — a curtain, not a snap
   const BW=W*1.35, x0=W+BW/2, xc=x0+(-BW/2-x0)*e;  // bank center sweeps right → left (the top run dives westbound)
   const jit=n=>((n*97+31)%23)/23;
@@ -6883,16 +6900,41 @@ function drawPortalWipe(){
   for(const s of [-1,1]){                          // billowy leading + trailing edges
     const ex=xc+s*(BW/2-H*0.14);
     for(let j=0;j<7;j++){
-      const y=H*(j+0.5)/7+Math.sin(PORT.t*3+j*1.3+s)*5;
+      const y=H*(j+0.5)/7+Math.sin(t*3+j*1.3+s)*5;
       cx.beginPath(); cx.arc(ex,y,H*0.115*(0.75+0.55*jit(j*2+(s>0?1:0))),0,7); cx.fill();
     }
   }
   cx.globalAlpha=0.55; cx.fillStyle='#FBF8F2';     // steam highlights riding the bank
   for(let j=0;j<8;j++){
-    const y=H*((j*0.37+0.13)%1), x=xc+(jit(j*3+2)-0.5)*BW*0.6+Math.sin(PORT.t*2.2+j)*6;
+    const y=H*((j*0.37+0.13)%1), x=xc+(jit(j*3+2)-0.5)*BW*0.6+Math.sin(t*2.2+j)*6;
     cx.beginPath(); cx.arc(x,y,H*0.09*(0.7+0.6*jit(j+9)),0,7); cx.fill();
   }
   cx.globalAlpha=1;
+}
+function drawPortalWipe(){
+  if(PORT.on) drawSteamCurtain(PORT.t);
+  else if(CWIPE.on) drawSteamCurtain(CWIPE.t);   // E66 INTO THE CLOUDS — the campaign's own ride on the curtain
+}
+/* E66 INTO THE CLOUDS — a finished level ends in the beautiful clouds: once the
+   stuff is collected (win card + compliment + every toy card tapped away), the
+   steam curtain sweeps the screen and the NEXT level of the open book mounts
+   beneath full cover — the curtain lifts on a new world (the conductor moment
+   is the reveal). The book's FINALE keeps its button instead: GRAND OPENING
+   deserves lingering, and there is no next. campExit disarms everything. */
+const CWIPE={on:0,t:0,flip:0,armed:0};
+function cwipeTick(dt){
+  if(CWIPE.armed&&!CWIPE.on&&SCREEN==='game'&&CAMP.on&&CAMP.won
+     &&!toyCard&&!toyQ.length&&!winT&&!prettyT&&!prettyPend){
+    CWIPE.armed=0;
+    if(CAMP.level<bookL().length){ CWIPE.on=1; CWIPE.t=0; CWIPE.flip=0; SND.whoosh(); }
+  }
+  if(!CWIPE.on) return;
+  CWIPE.t+=dt;
+  if(!CWIPE.flip&&CWIPE.t>=PORTAL_WIPE_S*PORTAL_FLIP_AT){
+    CWIPE.flip=1;
+    campEnter(CAMP.level+1,CAMP.book);   // the world flips beneath full cover (the E48 law)
+  }
+  if(CWIPE.t>=PORTAL_WIPE_S) CWIPE.on=0;
 }
 // ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers (GVT)
 // E4 pipeline: ground three-pass -> elevated ground shadows -> trestles -> a z-SORTED
@@ -7579,7 +7621,7 @@ function trainCarItems(){
              : (i===0&&friendOn()? 1 : undefined);   // E15: real occupancy on the rug · E45: the
                                                      // engine's window seat — THIS SEAM ONLY (17-site law)
     const sa=saRiding()&&i===TRAIN.cars.length-1&&TRAIN.cars.length>1;   // E51: the caboose seat — THIS SEAM ONLY (the E45 law)
-    items.push({z:p.z+0.05, fn:()=>drawCar(c.type,p.x,p.y,artAng,c.squash||0,wheelPhase*(c.face<0?-1:1),liv,p.z,undefined,rid,ps,sa)});
+    items.push({z:p.z+0.2, fn:()=>drawCar(c.type,p.x,p.y,artAng,c.squash||0,wheelPhase*(c.face<0?-1:1),liv,p.z,undefined,rid,ps,sa)});   // E66: 0.2 beats the 0.125 deck-chunk step — the train rides ITS ramp, never under it
   }
   return items;
 }
@@ -9963,13 +10005,13 @@ const fillRows=(kind,x0,y0,x1,y1,alt)=>{      // a block of glued scenery; alt c
 const LEVELS=[
   // 1 — THE POND. Wyatt approved this one as it stands: the pond sits mid-rug and
   // the answer is the shape of the water. Kept verbatim; only the card got simpler.
-  { name:'THE POND', hint:'GO AROUND THE POND!', toy:'duck',
+  { name:'THE POND', hint:'GO AROUND THE POND!', toy:'duck', land:'rug',   // E66 TEN LANDS: home floor first
     glued:[['rv',5,3],['rv',6,3],['rv',5,4],['rv',6,4]], stations:[] },
   // 2 — FINISH THE TRACK. The simplest possible second level: an oval already on the
   // rug with three cells missing. The gaps breathe gold; two straights and one curve
   // close it. The station rides along for free so level 6 can ASK for one later.
   // E16: the STATION became a starter, so the CABOOSE headlines this bundle instead.
-  { name:'FINISH THE TRACK', hint:'FINISH THE TRACK!', toy:'cab',
+  { name:'FINISH THE TRACK', hint:'FINISH THE TRACK!', toy:'cab', land:'west',
     glued:[['bush',1,1],['flw',10,6],['flw',1,6],['bush',10,1]],
     track:[['c',1,3,2],['s',0,4,2],['s',0,7,2],
            ['s',1,3,3],['s',1,3,4],['s',1,8,3],['s',1,8,4],
@@ -9981,52 +10023,52 @@ const LEVELS=[
   // The forest IS the instruction: it packs every edge solid and leaves one clearing —
   // a two-wide lane running all the way round an island of pines. There is exactly one
   // shape that fits in it, and a five-year-old can see the shape from across the room.
-  { name:'THROUGH THE WOODS', hint:'BUILD THROUGH THE WOODS!', toy:'br',
+  { name:'THROUGH THE WOODS', hint:'BUILD THROUGH THE WOODS!', toy:'br', land:'mountain',
     glued:[...fillRows('tree',0,0,2,7,'pine'), ...fillRows('tree',10,0,11,7,'pine'),
            ...fillRows('pine',3,0,9,0,'tree'), ...fillRows('pine',3,7,9,7,'tree'),
            ...fillRows('pine',5,3,7,4,'tree'), ['dog',4,6,0]],
     stations:[] },
   // 4 — OVER THE RIVER. The river splits the rug top to bottom, so any loop crosses
   // it twice: two bridges, the toy level 3 just handed over.
-  { name:'OVER THE RIVER', hint:'GET OVER THE RIVER!', toy:'tank',
+  { name:'OVER THE RIVER', hint:'GET OVER THE RIVER!', toy:'tank', land:'jungle', weather:'rain',
     glued:[['rv',6,0],['rv',6,1],['rv',6,2],['rv',6,3],['rv',6,4],['rv',6,5],['rv',6,6],['rv',6,7],
            ['ppl',3,6],['duck',8,6,0]],
     stations:[] },
   // 5 — THE FARM. A pen in the middle and a big friendly detour round it. The station
   // stays as scenery ONLY — Wyatt's "make them easier" applied literally: no goal but
   // the loop itself, and the animals are the reward for going the long way.
-  { name:'THE FARM', hint:'GO AROUND THE FARM!', toy:'cow',
+  { name:'THE FARM', hint:'GO AROUND THE FARM!', toy:'cow', land:'island',
     glued:[['fence',4,2],['fence',5,2],['fence',6,2],['fence',4,3],['fence',6,3],['barn',5,3],
            ['cow',9,2,0],['cow',9,4,1],['cow',2,5,2],['sheep',10,3,0],['hay',1,2],['chick',8,6,0]],
     track:[['st',0,9,6]], stations:[] },
   // 6 — MAIN STREET. The first level that ASKS for a station stop, taught four levels
   // earlier by the freebie on level 2. Shops line the middle; ring the whole street.
-  { name:'MAIN STREET', hint:'STOP AT THE STATION!', toy:'house',
+  { name:'MAIN STREET', hint:'STOP AT THE STATION!', toy:'house', land:'snow', weather:'snowfall',
     glued:[['house',3,3],['shop',5,3],['hall',7,3],['house',8,3],['lamp',4,3],['lamp',6,3],
            ['ppl',5,6],['cat',10,6,0]],
     stations:[[5,5]] },
   // 7 — THE CROSSING. One glued crossing sits on the line and the loop has to use it.
   // TRY-THEN-OWN in its purest form: ride the diamond, then it's yours.
-  { name:'THE CROSSING', hint:'USE THE CROSSING!', toy:'x',
+  { name:'THE CROSSING', hint:'USE THE CROSSING!', toy:'x', land:'canyon', weather:'dust',
     glued:[['sig',6,3],['whis',2,6],['cat',10,3,0],['bush',10,6]],
     track:[['x',0,6,1]], cross:[6,1], stations:[] },
   // 8 — THE TUNNEL. A rock-and-pine ridge walls off the top half with exactly one way
   // through it. The land forces the whole rest of the shape — win is just the lap.
-  { name:'THE TUNNEL', hint:'GO THROUGH THE TUNNEL!', toy:'tun',
+  { name:'THE TUNNEL', hint:'GO THROUGH THE TUNNEL!', toy:'tun', land:'ice',
     glued:[['rock',6,0],['rock',6,1],['rock',6,3],['rock',6,4],
            ['pine',5,0],['pine',7,0],['pine',5,4],['pine',7,4],['pine',5,1],['pine',7,1],
            ['wind',2,6],['rock',9,1],['pine',9,0]],
     track:[['tun',0,6,2]], stations:[] },
   // 9 — THE SPLIT. A working siding arrives glued at both ends; the kid closes the big
   // ring around it and the train takes turns down the branch all by itself.
-  { name:'THE SPLIT', hint:'LET THE TRACK SPLIT!', toy:'sw',
+  { name:'THE SPLIT', hint:'LET THE TRACK SPLIT!', toy:'sw', land:'cloud',
     glued:[['hall',1,6],['wtr',10,6],['flw',1,2],['bush',10,2]],
     track:[['sw',0,4,4],['s',0,5,4],['s',0,6,4],['sw',0,7,4],
            ['c',0,4,5],['s',0,5,5],['s',0,6,5],['c',3,7,5]],
     stations:[] },
   // 10 — THE GRAND TOUR. The finale land stands exactly as it shipped: river, pond,
   // farm and houses all at once, two stations far apart, and the double confetti.
-  { name:'THE GRAND TOUR', hint:'VISIT BOTH STATIONS!', toy:'exp',
+  { name:'THE GRAND TOUR', hint:'VISIT BOTH STATIONS!', toy:'exp', land:'rug',   // the tour comes home
     glued:[['rv',3,0],['rv',3,1],['rv',3,2],['rv',3,3],['rv',3,4],['rv',4,4],['rv',5,4],['rv',6,4],['rv',7,4],['rv',8,4],
            ['rv',10,1],['rv',11,1],['rv',10,2],['rv',11,2],
            ['fence',0,5],['fence',1,5],['fence',2,5],['fence',2,6],['fence',2,7],
@@ -10339,6 +10381,7 @@ function campExit(dest){
   setWip(CAMP.book,(CAMP_WIP&&!CAMP.won)? serWip() : null);   // cleared on win, kept mid-build (E50: per book)
   BOARD_BOOK=CAMP.book;   // E56: leaving a level lands you on YOUR book's board (one book per visit)
   cndKill();                                         // E52: leaving mid-moment just ends it — the next entry brings its own
+  CWIPE.armed=0; CWIPE.on=0;                         // E66: walking out mid-ceremony cancels the clouds
   CAMP.on=false; CAMP.level=0; CAMP.won=false; CAMP.wx=null; winT=0; prettyT=0; prettyPend=false;   // E35: the sky pill override dies with the visit
   ridersOff();                                       // E15: the level's platforms empty out
   applyDims(SIZE);                                   // E10: the BUILD rug comes back at its own size
@@ -10367,6 +10410,7 @@ function campPretty(){
 function campWin(){
   const firstClear=!bookDone().has(CAMP.level);   // E9: +10★ rides the FIRST clear only (E50: per book)
   CAMP.won=true; bookDone().add(CAMP.level); setWip(CAMP.book,null);
+  CWIPE.armed=1;   // E66: when the stuff is collected, the clouds come
   winT=3.6; SND.bugle(); SND.whistle();
   voiceAt('win');   // E12: "You did it" — NOT gated on firstClear; the celebration is not the reward
   if(firstClear) starMint(MINT.clear, GX+GW*C/2, GY+GH*C/2);   // on top of the level's toy bundle
@@ -10670,9 +10714,11 @@ function winSync(){
   const b=$('nextBtn');
   // NEXT LEVEL waits for the toys: a kid should not be able to skip past their own
   // prizes, and a button under the card is just something to fat-finger (E8).
-  const show=SCREEN==='game'&&CAMP.on&&CAMP.won&&!toyCard&&!toyQ.length;
+  // E66: non-final levels advance through the clouds now — only the book's
+  // FINALE keeps a button (there is no next level to ride to).
+  const show=SCREEN==='game'&&CAMP.on&&CAMP.won&&!toyCard&&!toyQ.length&&CAMP.level>=bookL().length;
   b.style.display=show?'block':'none';
-  if(show) b.textContent=CAMP.level<bookL().length? 'NEXT LEVEL ▶' : 'BACK TO THE BOARD 🎫';   // E50: per book
+  if(show) b.textContent='BACK TO THE BOARD 🎫';
 }
 
 /* =====================================================================
@@ -11121,7 +11167,7 @@ function playCarItems(){
       const c=tr.cars[i], p=carPose(c), artAng=p.ang+(c.face<0?Math.PI:0);
       // E15→E30: PLAY cars stay decorative unless the map (or the old dial) boards
       const prid=playRiders()&&RIDER_CAP[c.type]!=null? (c.rid|0) : undefined;
-      items.push({z:p.z+0.05, fn: tr.dying?
+      items.push({z:p.z+0.2, fn: tr.dying?   // E66: the ramp law, wind-up edition
         ()=>drawCar(c.type, p.x+c.tum.vx*tt, p.y+c.tum.vy*tt+130*tt*tt, artAng+c.tum.vr*tt, c.squash, tr.wheel, liv, p.z, fd) :
         ()=>drawCar(c.type, p.x, p.y, artAng, c.squash||0, tr.wheel*(c.face<0?-1:1), liv, p.z, undefined, prid, ps)});
     }
