@@ -2251,7 +2251,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.55</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.56</div>
   <div class="scanlines"></div>
 </div>
 
@@ -11377,7 +11377,9 @@ const MINE_BLAST=90;
 // stops). DEFUSE_R = how close a living sweeper gets to a HOSTILE mine before
 // he snips it — 90 beats every trigger (52 stock / 76 big bangers / 26 jax),
 // so the man whose job is mines always wins the race to one.
-const SWEEP_FIELD=6, DEFUSE_R=90;
+const SWEEP_FIELD=2, DEFUSE_R=90;   // v2.56 (Wyatt 8/6): "up to two mines max" — the rolling field shrinks 6→2
+// v2.56: how long the drop circle shows before the charge actually lands
+const MINE_TELL=1.0;
 // v2.52: how long a battlefield corpse lies before melting away (Wyatt:
 // "fade the corpses") — 6s at full ink, 3s of fade, then lifted.
 const CORPSE_HOLD=6, CORPSE_FADE=3;
@@ -19884,6 +19886,29 @@ function cmdoMuzzle(u){
   const dir=paraBand(u).dir;
   return { x:u.x+22*dir, y:u.y-33, dir };
 }
+// v2.56: the commando's SIDESTEP — called only when the wipe found nobody.
+// Nearest man the cannon could REACH (same eligibility as the sweep, minus
+// the angle test); he shuffles toward that man's line at his own walking
+// pace, one 0.25s retry at a time, until rel-angle falls inside the fan and
+// the ordinary trigger takes over. Deterministic (no RNG — co-op sims agree).
+function cmdoShuffle(u,rng){
+  const M=cmdoMuzzle(u);
+  let best=null,bd=1e9;
+  for(const f of TGT(u)){
+    if(f.burrow||f.dead) continue;
+    if(f.jetT>0) continue;
+    if(!bfCanTarget(u,f)) continue;
+    if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;
+    const d=Math.hypot(f.x-M.x,(f.y-18)-M.y);
+    if(d>rng+CMDO.beamW*0.5 || d<1) continue;
+    if(d<bd){ bd=d; best=f; }
+  }
+  if(!best) return;                       // truly nobody reachable — stand easy
+  const want=best.y+15;                   // rel→0 when (f.y-18)===M.y, and M.y=u.y-33
+  const step=Math.max(6,((u.def&&u.def.moveSpd)||40)*0.25);
+  u.y += Math.max(-step, Math.min(step, want-u.y));
+  u.y = Math.max(74, Math.min(WORLD_H-92, u.y));
+}
 function cmdoSweepFire(u,dmg,rng){
   const M=cmdoMuzzle(u), dir=M.dir;
   const coil=enhU(u,'stormcoil');
@@ -23145,17 +23170,27 @@ function update(dt){
       // the drum never stops: one charge every cadence tick, and past
       // SWEEP_FIELD live charges he lifts his own OLDEST — a maintained
       // minefield instead of a stalled one.
-      u.cd=1/(rate*ra.rate*emgRateMul(u)*lzRateMul(u));   // v2.36: a sapper's plant cadence is a cadence too — the blue beam winds it
-      // he seeds the ground AHEAD of himself — which way that is depends on the side
-      const dir=(S.bf && u.side==='foe')? -1 : 1;
-      const mx=u.x+dir*(40+Math.random()*70);
+      // v2.56 (Wyatt 8/6: "a circle indicator when the mine's going to
+      // drop"): the drop is a TWO-BEAT now — first the tell (a marked circle
+      // on the ground for MINE_TELL seconds, drawn in the ring pass), THEN
+      // the charge lands exactly in it. The whole cadence still sums to the
+      // v2.52 drum; a sweeper felled mid-tell plants nothing.
+      if(!u.mineSpot){
+        const dir=(S.bf && u.side==='foe')? -1 : 1;
+        const mx=u.x+dir*(40+Math.random()*70);
+        u.mineSpot={ x:Math.max(24,Math.min((S.bf?WORLD_W:W)-30,mx)),
+                     y:Math.max(70,Math.min(WORLD_H-100,u.y+(Math.random()-0.5)*90)) };
+        u.cd=MINE_TELL;
+        continue;
+      }
+      u.cd=Math.max(0.2, 1/(rate*ra.rate*emgRateMul(u)*lzRateMul(u)) - MINE_TELL);   // v2.36: a sapper's plant cadence is a cadence too — the blue beam winds it
       // THE BIG BANGERS ride on the MINE, not on the man: he may well be dead by
       // the time a boot finds it, and what he had in his pouch when he buried it
       // is what goes off.
       S.mines.push({ owner:u.id, side:u.side||null, seat:(u.seat!=null?u.seat:null),
-        x:Math.max(24,Math.min((S.bf?WORLD_W:W)-30,mx)),
-        y:Math.max(70,Math.min(WORLD_H-100,u.y+(Math.random()-0.5)*90)), armT:0.8,
+        x:u.mineSpot.x, y:u.mineSpot.y, armT:0.8,
         big:enhU(u,'bigbangers'), sl:soulDmgMulU(u)>1 });   // 0093: the Soul rides in the pouch too (D2's logged deviation — his rank never buffs mines, but mines are his whole offense and the card's promise is the law)
+      u.mineSpot=null;
       const ownM=S.mines.filter(mn=>mn.owner===u.id);
       if(ownM.length>SWEEP_FIELD) S.mines.splice(S.mines.indexOf(ownM[0]),1);
       bfSfx(SFX.snap, u.x, u.y);
@@ -23223,7 +23258,16 @@ function update(dt){
     // Zero men in the arc = hold fire on a short retry — a flanker BEHIND him
     // must not drain the 4-second drum on a wipe that hits nobody.
     if(u.type==='commando'){
-      if(!cmdoSweepFire(u,dmg,rng*rngMul)) u.cd=0.25;
+      if(!cmdoSweepFire(u,dmg,rng*rngMul)){
+        u.cd=0.25;
+        // v2.56 (Wyatt 8/6: "when he's trying to hit an enemy but they're
+        // outside of his attack angle radius, he just stands there"): a man
+        // IN RANGE but outside the wipe's angles now makes him SIDESTEP —
+        // he shuffles up or down toward that man's line until the fan can
+        // cover him, one step per retry tick. Lateral only: his x (and the
+        // march that owns it) never moves here.
+        cmdoShuffle(u, rng*rngMul);
+      }
       continue;
     }
     const mzl=(S.bf&&u.side==='foe')?-1:1;         // muzzles point the way the figure faces
@@ -24637,6 +24681,20 @@ function draw(){
     cx.fill();
     cx.strokeStyle=foeR?'rgba(232,160,140,0.6)':'rgba(191,227,154,0.65)';
     cx.lineWidth=2.5; cx.setLineDash([9,7]); cx.stroke(); cx.setLineDash([]);
+  }
+  // v2.56 (Wyatt 8/6: "a circle indicator when the mine's going to drop") —
+  // THE SWEEPER'S TELL: while a drop is queued, a small pulsing dashed circle
+  // marks the exact spot the charge will land, on the same ground layer as
+  // the radio ring above. No spot pending ⇒ zero drawing.
+  for(const sw of S.units){
+    if(sw.dead||!sw.mineSpot) continue;
+    const foeS=S.bf && sw.side==='foe';
+    const pr=13+2.5*Math.sin(S.t*7);
+    cx.beginPath(); cx.arc(sw.mineSpot.x,sw.mineSpot.y,pr,0,7);
+    cx.fillStyle=foeS?'rgba(200,90,74,0.10)':'rgba(255,210,74,0.10)';
+    cx.fill();
+    cx.strokeStyle=foeS?'rgba(232,160,140,0.75)':'rgba(255,210,74,0.8)';
+    cx.lineWidth=2; cx.setLineDash([5,5]); cx.stroke(); cx.setLineDash([]);
   }
 
   // the fallen (under everything alive). v2.52 (Wyatt 8/5: "Please fade the
