@@ -7,7 +7,7 @@
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.13.1';
+const VERSION = 'v0.13.2';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -678,7 +678,7 @@ class GameScene extends Phaser.Scene {
     }
     e.hp -= amount;
     this.sparks.burst(e.x, e.y, 0xffd54a, 8, { speedMin: 1, speedMax: 3.5, life: 320, scale: 0.7 });
-    this.floatText(e.x, e.y - this.stripH * 0.2, '-' + amount, '#ffd54a', true);
+    this.damageNumber(e.x, e.y + this.stripH * 0.18, amount);
     e.img.setTintFill(0xffffff);
     this.time.delayedCall(70, () => {
       if (e.img.active) { e.img.clearTint(); if (e.boss) e.img.setTint(0xffd0c0); }
@@ -3107,8 +3107,8 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(1, 0).setDepth(30);
     this.versionText = this.add.text(0, 0, VERSION, { ...style, fontSize: '12px' }).setOrigin(1, 1).setDepth(30);
     this.chainText = this.add.text(0, 0, '', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '46px',
-      fontStyle: 'bold', color: '#ffffff', stroke: '#3a2517', strokeThickness: 7,
+      fontFamily: '"Arial Black", -apple-system, Arial, sans-serif', fontSize: '54px',
+      fontStyle: 'bold', color: '#ffffff', stroke: '#3a2517', strokeThickness: 9,
     }).setOrigin(0.5).setAlpha(0).setDepth(30);
     this.hpBar = this.add.graphics().setDepth(30);
     this.hpText = this.add.text(0, 0, '', {
@@ -3254,23 +3254,50 @@ class GameScene extends Phaser.Scene {
   floatText(x, y, msg, color, big) {
     const t = this.add.text(x, y, msg, {
       fontFamily: '-apple-system, Arial, sans-serif',
-      fontSize: (big ? 30 : 18) + 'px',
-      fontStyle: 'bold', color, stroke: '#241408', strokeThickness: big ? 6 : 4,
-    }).setOrigin(0.5).setDepth(35);
-    if (big) t.setScale(0.5);
+      fontSize: (big ? 40 : 21) + 'px',
+      fontStyle: 'bold', color, stroke: '#241408', strokeThickness: big ? 8 : 5,
+    }).setOrigin(0.5).setDepth(35).setScale(big ? 0.25 : 0.6);
+    if (big) t.setRotation((Math.random() - 0.5) * 0.16);
     this.tweens.add({
-      targets: t, y: y - (big ? 44 : 26), alpha: 0, scale: 1,
-      duration: big ? 1400 : 750, ease: 'Quad.easeOut',
+      targets: t, scale: big ? 1.18 : 1, duration: 140, ease: 'Back.easeOut',
+      onComplete: () => { if (big) this.tweens.add({ targets: t, scale: 1, duration: 90 }); },
+    });
+    this.tweens.add({
+      targets: t, y: y - (big ? 58 : 30), alpha: 0,
+      duration: big ? 1150 : 720, delay: big ? 240 : 80,
+      ease: 'Quad.easeIn',
       onComplete: () => t.destroy(),
     });
+  }
+
+  // enemy damage numbers: big, punchy, scaling with the hit — this is
+  // the game's paycheck moment, so it gets the full treatment
+  damageNumber(x, y, amount) {
+    const size = Phaser.Math.Clamp(30 + amount * 4, 34, 78);
+    const color = amount >= 10 ? '#ff5252' : amount >= 6 ? '#ff9838' : '#ffd54a';
+    const t = this.add.text(x, y, '-' + amount, {
+      fontFamily: '"Arial Black", -apple-system, Arial, sans-serif',
+      fontSize: size + 'px', fontStyle: 'bold', color,
+      stroke: '#2a0f08', strokeThickness: Math.round(size * 0.18),
+    }).setOrigin(0.5).setDepth(36)
+      .setScale(0.2).setRotation((Math.random() - 0.5) * 0.24);
+    this.tweens.add({
+      targets: t, scale: 1.25, duration: 130, ease: 'Back.easeOut',
+      onComplete: () => this.tweens.add({ targets: t, scale: 1, duration: 100 }),
+    });
+    this.tweens.add({
+      targets: t, y: y + this.stripH * 0.7, alpha: 0, duration: 950, delay: 260,
+      ease: 'Quad.easeIn', onComplete: () => t.destroy(),
+    });
+    if (amount >= 6) this.cameras.main.shake(90, 0.003);
   }
 
   flashChain() {
     const n = this.chain;
     const color = n >= 7 ? '#ff5252' : n >= 5 ? '#ff9838' : n >= 3 ? '#ffd54a' : '#fff4dc';
     this.chainText.setText('CHAIN ×' + n).setColor(color)
-      .setAlpha(1).setScale(1.35 + Math.min(n, 8) * 0.05)
-      .setRotation((Math.random() - 0.5) * 0.06);
+      .setAlpha(1).setScale(1.5 + Math.min(n, 8) * 0.07)
+      .setRotation((Math.random() - 0.5) * 0.08);
     this.tweens.add({ targets: this.chainText, scale: 1, duration: 190, ease: 'Back.easeOut' });
     if (this.chainFade) this.chainFade.remove();
     this.chainFade = this.time.delayedCall(1100, () => {
