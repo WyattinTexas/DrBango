@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.0';
+const VERSION = 'v0.18.1';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -38,8 +38,10 @@ const TUNE = {
   DIE_SIZE_MIN: 34,
   DIE_SIZE_MAX: 72,
 
-  RESTITUTION: 0.7,
-  FRICTION_AIR: 0.014,
+  // marble feel (Rune Dice research): lively billiard bounces, long
+  // glidey slides — the chaos IS the fun
+  RESTITUTION: 0.8,
+  FRICTION_AIR: 0.009,
   FRICTION: 0.01,
 
   MAX_PULL_FRAC: 0.38,
@@ -47,16 +49,16 @@ const TUNE = {
   MAX_SPEED_FRAC: 0.04,
   MIN_SPEED_FRAC: 0.22,
 
-  SETTLE_SPEED: 0.35,
-  SETTLE_MS: 220,
+  SETTLE_SPEED: 0.4,
+  SETTLE_MS: 180,
 
   TOUCH_SWEEP_MS: 300,
 
-  RISE_MS: 180,
+  RISE_MS: 150,
   RISE_HEIGHT_FRAC: 1.0,
-  FALL_MS: 420,
-  HOP_PAUSE_MS: 90,
-  HOP_BASE_MS: 260,
+  FALL_MS: 380,
+  HOP_PAUSE_MS: 55,
+  HOP_BASE_MS: 210,
   HOP_PER_PX: 0.5,
   HOP_HEIGHT_FRAC: 1.5,
 
@@ -64,8 +66,8 @@ const TUNE = {
   LAND_SLIDE: 3.0,
 
   KNOCK_RADIUS_FRAC: 2.7,
-  KNOCK_SPEED: 3.6,
-  KNOCK_PER_CHAIN: 0.45,
+  KNOCK_SPEED: 4.2,
+  KNOCK_PER_CHAIN: 0.5,
 
   SPIN_RATE: 0.05,
   TRAIL_MIN_SPEED: 4,
@@ -2167,6 +2169,21 @@ class GameScene extends Phaser.Scene {
     return REALM_DICE[(this.realm || REALMS[0]).id] || REALM_DICE.glade;
   }
 
+  // the Rune Dice readability recipe: one BIG numeral, color-coded —
+  // "cubes with one number on them" reads through any chain chaos
+  drawDieNumeral(ctx, px, pad, tw, v, colorInt) {
+    const cx = pad + tw / 2, cy = pad + tw / 2;
+    ctx.font = `900 ${Math.round(tw * 0.58)}px "Arial Black", -apple-system, Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = px * 0.05;
+    ctx.strokeStyle = 'rgba(14,8,12,0.72)';
+    ctx.strokeText(String(v), cx, cy + tw * 0.03);
+    ctx.fillStyle = shade(colorInt, 0.25);
+    ctx.fillText(String(v), cx, cy + tw * 0.03);
+  }
+
   // recessed pips, ported from the dice page: shadow ring, pip, highlight
   drawPips(ctx, px, pad, tw, value, pipColor) {
     const pips = PIP_LAYOUTS[Math.min(value, 10)];
@@ -2200,7 +2217,11 @@ class GameScene extends Phaser.Scene {
       const st = rd.values[v];
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('die' + v, st.body,
         { sparkle: rd.sparkle, seed: v });
+      ctx.save();
+      ctx.globalAlpha = 0.24;
       this.drawPips(ctx, px, pad, tw, v, st.pip);
+      ctx.restore();
+      this.drawDieNumeral(ctx, px, pad, tw, v, st.pip);
       tex.refresh();
     }
   }
@@ -2222,7 +2243,11 @@ class GameScene extends Phaser.Scene {
       ctx.lineWidth = px * 0.015;
       ctx.strokeStyle = '#8a5f1e';
       ctx.stroke();
+      ctx.save();
+      ctx.globalAlpha = 0.24;
       this.drawPips(ctx, px, pad, tw, v, 0x54341a);
+      ctx.restore();
+      this.drawDieNumeral(ctx, px, pad, tw, v, 0x54341a);
       tex.refresh();
     }
   }
@@ -2255,7 +2280,11 @@ class GameScene extends Phaser.Scene {
       ctx.arc(cx + br * 0.5, cy - br * 1.55, px * 0.045, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = 0.24;
       this.drawPips(ctx, px, pad, tw, v, 0xffcf7a);
+      ctx.restore();
+      this.drawDieNumeral(ctx, px, pad, tw, v, 0xffcf7a);
       tex.refresh();
     }
     {
@@ -2477,7 +2506,11 @@ class GameScene extends Phaser.Scene {
           ctx.fill();
         }
         ctx.restore();
+        ctx.save();
+        ctx.globalAlpha = 0.24;
         this.drawPips(ctx, px, pad, tw, v, 0xf8f4ff);
+        ctx.restore();
+        this.drawDieNumeral(ctx, px, pad, tw, v, 0xf8f4ff);
         tex.refresh();
       }
     }
