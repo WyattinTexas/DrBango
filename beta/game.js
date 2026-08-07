@@ -18,7 +18,16 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.17.4';
+const VERSION = 'v0.18.0';
+
+// ---- crisp rendering: render at device resolution ----
+// The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
+// scaled down to CSS size, so Retina/phone screens get native pixels
+// instead of a blurry browser upscale. World units are DEVICE px:
+// anything authored in CSS pixels goes through upx()/fpx().
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+const upx = (n) => Math.round(n * DPR);
+const fpx = (n) => Math.round(n * DPR) + 'px';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -390,9 +399,9 @@ class ParticlePool {
       const img = this.free.pop() || this.live.shift()?.img;
       if (!img) return;
       const a = Math.random() * Math.PI * 2;
-      const sp = o.speedMin + Math.random() * (o.speedMax - o.speedMin);
+      const sp = (o.speedMin + Math.random() * (o.speedMax - o.speedMin)) * DPR;
       img.setVisible(true).setPosition(x, y).setTint(tint).setAlpha(1)
-        .setScale(o.scale * (0.6 + Math.random() * 0.8));
+        .setScale(o.scale * (0.6 + Math.random() * 0.8) * DPR);
       this.live.push({
         img, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
         life: o.life * (0.7 + Math.random() * 0.6), age: 0, drag: o.drag,
@@ -479,7 +488,7 @@ class GameScene extends Phaser.Scene {
           const impact = Math.max(va, vb);
           if (this.handleSpecialContact(a, b, impact)) continue;
           this.fuseQueue.push([a, b, impact]);
-          if (impact > 3) {
+          if (impact > 3 * DPR) {
             this.squash(a); this.squash(b);
             const mx = (a.img.x + b.img.x) / 2, my = (a.img.y + b.img.y) / 2;
             this.sparks.burst(mx, my, 0xd9c098, Math.min(6, 2 + impact | 0),
@@ -489,7 +498,7 @@ class GameScene extends Phaser.Scene {
           }
         } else if ((a || b) && (pair.bodyA.isStatic || pair.bodyB.isStatic)) {
           const d = a || b;
-          if (d.body && d.body.speed > 4) {
+          if (d.body && d.body.speed > 4 * DPR) {
             this.squash(d);
             this.sparks.burst(d.img.x, d.img.y, 0xd9c098, 3,
               { speedMin: 0.6, speedMax: 2, life: 220, scale: 0.45 });
@@ -739,11 +748,11 @@ class GameScene extends Phaser.Scene {
         img: this.add.image(0, 0, 'mob' + mobType).setDepth(30).setInteractive(),
         bar: this.add.graphics().setDepth(31),
         cdText: this.add.text(0, 0, '', {
-          fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
           color: '#ffb0a0', fontStyle: 'bold',
         }).setOrigin(0.5, 0).setDepth(31),
         fireText: this.add.text(0, 0, '', {
-          fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
           color: '#f2a05a', fontStyle: 'bold',
         }).setOrigin(0.5, 1).setDepth(31),
       };
@@ -829,20 +838,20 @@ class GameScene extends Phaser.Scene {
   }
 
   drawEnemyBar(e) {
-    const w = Math.max(44, this.stripH * (e.boss ? 1.3 : 0.9)), h = 5;
-    const x = e.x - w / 2, y = this.stripH - 12;
+    const w = Math.max(upx(44), this.stripH * (e.boss ? 1.3 : 0.9)), h = upx(5);
+    const x = e.x - w / 2, y = this.stripH - upx(12);
     e.bar.clear();
     if (!e.alive) { e.cdText.setText(''); e.fireText.setText(''); return; }
     // burn shares the countdown's line so neither hides behind the mob
-    e.fireText.setOrigin(0, 0).setPosition(e.x + 6, y - 16)
+    e.fireText.setOrigin(0, 0).setPosition(e.x + upx(6), y - upx(16))
       .setText(e.fire > 0 ? '🔥 ' + e.fire : '');
     e.bar.fillStyle(0x241408, 0.8);
     e.bar.fillRoundedRect(x - 1, y - 1, w + 2, h + 2, 2);
     const frac = Math.max(0, e.hp / e.maxHp);
     e.bar.fillStyle(frac > 0.5 ? 0x6aa84f : frac > 0.25 ? 0xe6c229 : 0xc9564a, 1);
     if (frac > 0) e.bar.fillRoundedRect(x, y, w * frac, h, 2);
-    const cdX = e.fire > 0 ? e.x - 6 : e.x;
-    e.cdText.setOrigin(e.fire > 0 ? 1 : 0.5, 0).setPosition(cdX, y - 16);
+    const cdX = e.fire > 0 ? e.x - upx(6) : e.x;
+    e.cdText.setOrigin(e.fire > 0 ? 1 : 0.5, 0).setPosition(cdX, y - upx(16));
     if (e.countdown <= 1) {
       e.cdText.setText('⚔ 1').setColor('#ff8070');
     } else {
@@ -909,7 +918,7 @@ class GameScene extends Phaser.Scene {
       if (e.img.active) { e.img.clearTint(); if (e.boss) e.img.setTint(0xffd0c0); }
     });
     this.tweens.add({
-      targets: e.img, y: e.y - 5, duration: 50, yoyo: true,
+      targets: e.img, y: e.y - upx(5), duration: 50, yoyo: true,
       onComplete: () => { if (e.img.active) e.img.setY(e.y); },
     });
     if (e.hp <= 0) {
@@ -954,7 +963,7 @@ class GameScene extends Phaser.Scene {
     for (const d of this.dice) {
       if (d.dead) continue;
       if (d.state === 'active' || d.state === 'loft' || d.state === 'merge') return true;
-      if (d.body && d.body.speed > TUNE.SETTLE_SPEED) return true;
+      if (d.body && d.body.speed > TUNE.SETTLE_SPEED * DPR) return true;
     }
     return false;
   }
@@ -1013,7 +1022,7 @@ class GameScene extends Phaser.Scene {
 
   enemyAttack(e) {
     this.tweens.add({
-      targets: e.img, y: e.y + 10, duration: 90, yoyo: true, ease: 'Quad.easeIn',
+      targets: e.img, y: e.y + upx(10), duration: 90, yoyo: true, ease: 'Quad.easeIn',
       onComplete: () => { if (e.img.active) e.img.setY(e.y); },
     });
     const veil = this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0xaa2222, 0.22)
@@ -1048,23 +1057,23 @@ class GameScene extends Phaser.Scene {
     this.previewImg.setVisible(false);
     this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.78).setDepth(50);
     this.add.text(this.W / 2, this.H * 0.36, 'DEFEATED', {
-      fontFamily: FONT_DISPLAY, fontSize: '54px',
-      fontStyle: 'bold', color: '#ff8070', stroke: '#2a0f08', strokeThickness: 9,
+      fontFamily: FONT_DISPLAY, fontSize: fpx(54),
+      fontStyle: 'bold', color: '#ff8070', stroke: '#2a0f08', strokeThickness: upx(9),
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.52,
       'Reached level ' + this.level + '/' + FLOORS +
       '  ·  Best chain ×' + this.bestChain + '  ·  ' + this.gold + 'g earned' +
       '  ·  ' + this.relics.length + ' relics', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(18),
       color: BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.61, this.classXpLine(), {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
       fontStyle: 'bold',
       color: this.playerClass ? this.playerClass.hex : BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
     const tap = this.add.text(this.W / 2, this.H * 0.72, 'TAP FOR THE HOME PAGE', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '22px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(22),
       fontStyle: 'bold', color: '#ffd54a',
     }).setOrigin(0.5).setDepth(51);
     this.tweens.add({ targets: tap, alpha: 0.35, duration: 550, yoyo: true, repeat: -1 });
@@ -1077,22 +1086,22 @@ class GameScene extends Phaser.Scene {
     this.previewImg.setVisible(false);
     this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.78).setDepth(50);
     this.add.text(this.W / 2, this.H * 0.36, 'VICTORY!', {
-      fontFamily: FONT_DISPLAY, fontSize: '54px',
-      fontStyle: 'bold', color: GOLD, stroke: '#2a0f08', strokeThickness: 9,
+      fontFamily: FONT_DISPLAY, fontSize: fpx(54),
+      fontStyle: 'bold', color: GOLD, stroke: '#2a0f08', strokeThickness: upx(9),
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.52,
       'All ' + FLOORS + ' levels cleared  ·  Best chain ×' + this.bestChain +
       '  ·  ' + this.gold + 'g  ·  ' + this.relics.length + ' relics', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(18),
       color: BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.61, this.classXpLine(), {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
       fontStyle: 'bold',
       color: this.playerClass ? this.playerClass.hex : BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
     const tap = this.add.text(this.W / 2, this.H * 0.72, 'TAP FOR THE HOME PAGE', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '22px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(22),
       fontStyle: 'bold', color: '#ffd54a',
     }).setOrigin(0.5).setDepth(51);
     this.tweens.add({ targets: tap, alpha: 0.35, duration: 550, yoyo: true, repeat: -1 });
@@ -1214,11 +1223,11 @@ class GameScene extends Phaser.Scene {
   }
 
   menuButton(y, label, color, onTap) {
-    const w = Math.min(this.W * 0.64, 300), h = 50;
+    const w = Math.min(this.W * 0.64, upx(300)), h = upx(50);
     const x = this.W / 2 - w / 2;
     const g = this.modalAdd(this.add.graphics().setDepth(71));
     g.fillStyle(0x0e0703, 0.9);
-    g.fillRoundedRect(x, y - h / 2 + 3, w, h, 12);       // under-shadow
+    g.fillRoundedRect(x, y - h / 2 + upx(3), w, h, 12);  // under-shadow
     g.fillGradientStyle(0x3a2517, 0x3a2517, 0x1c1009, 0x1c1009, 1);
     g.fillRoundedRect(x, y - h / 2, w, h, 12);
     g.lineStyle(2, color, 0.95);
@@ -1226,7 +1235,7 @@ class GameScene extends Phaser.Scene {
     g.lineStyle(1, 0xffffff, 0.08);                       // inner bevel
     g.strokeRoundedRect(x + 2, y - h / 2 + 2, w - 4, h - 4, 10);
     const t = this.modalAdd(this.add.text(this.W / 2, y, label, {
-      fontFamily: FONT_DISPLAY, fontSize: '19px',
+      fontFamily: FONT_DISPLAY, fontSize: fpx(19),
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5).setDepth(72));
     const hit = this.modalAdd(this.add.rectangle(this.W / 2, y, w, h, 0xffffff, 0.001)
@@ -1244,13 +1253,13 @@ class GameScene extends Phaser.Scene {
     this.modalRefresh = () => this.showHome();
     // layered title: deep shadow pass under a gold-gradient face
     const ty = this.H * 0.2;
-    this.modalAdd(this.add.text(this.W / 2, ty + 5, 'RUNEFALL', {
-      fontFamily: FONT_DISPLAY, fontSize: '62px', fontStyle: '900',
+    this.modalAdd(this.add.text(this.W / 2, ty + upx(5), 'RUNEFALL', {
+      fontFamily: FONT_DISPLAY, fontSize: fpx(62), fontStyle: '900',
       color: '#160a04',
     }).setOrigin(0.5).setDepth(71).setAlpha(0.9));
     const title = this.modalAdd(this.add.text(this.W / 2, ty, 'RUNEFALL', {
-      fontFamily: FONT_DISPLAY, fontSize: '62px', fontStyle: '900',
-      color: '#e6c869', stroke: '#3a2208', strokeThickness: 8,
+      fontFamily: FONT_DISPLAY, fontSize: fpx(62), fontStyle: '900',
+      color: '#e6c869', stroke: '#3a2208', strokeThickness: upx(8),
     }).setOrigin(0.5).setDepth(72));
     // the dice-page gold: bright crown fading to bronze
     const grad = title.context.createLinearGradient(0, 0, 0, title.height);
@@ -1263,12 +1272,12 @@ class GameScene extends Phaser.Scene {
       targets: title, scale: 1.02, duration: 2400,
       yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
-    this.modalAdd(this.add.text(this.W / 2, ty + 48,
+    this.modalAdd(this.add.text(this.W / 2, ty + upx(48),
       'FLICK THE DICE  ·  MERGE THE RUNES  ·  CLEAR THE FLOOR', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
       fontStyle: 'bold', color: '#a8916e',
     }).setOrigin(0.5).setDepth(72));
-    const y0 = this.H * 0.42, step = Math.min(62, this.H * 0.075);
+    const y0 = this.H * 0.42, step = Math.min(upx(62), this.H * 0.075);
     this.menuButton(y0, '▶ PLAY', 0xffd54a, () => this.showClassSelect());
     this.menuButton(y0 + step, '⚔️ VERSUS', 0x6b4a33,
       () => this.showComingSoon('VERSUS',
@@ -1282,28 +1291,28 @@ class GameScene extends Phaser.Scene {
     this.modalAdd(this.add.text(this.W / 2, y0 + step * 4 + 6,
       FLOORS + ' floors · ' + CLASSES.length + ' classes · ' +
       RELICS.length + ' relics · ' + REALMS.length + ' realms', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
       color: '#8a7960',
     }).setOrigin(0.5).setDepth(72));
     this.modalAdd(this.add.text(this.W / 2, this.H - 24, VERSION, {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
       color: '#7a6a55',
     }).setOrigin(0.5).setDepth(72));
   }
 
   showComingSoon(title, body) {
-    const { px, py, pw, ph } = this.modalBase(title, 300);
+    const { px, py, pw, ph } = this.modalBase(title, upx(300));
     this.modalOpen = 'menu';
     this.modalRefresh = () => this.showComingSoon(title, body);
     this.modalAdd(this.add.text(this.W / 2, py + ph * 0.48, body, {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(13),
       color: BOARD.cream, align: 'center', lineSpacing: 4,
       wordWrap: { width: pw - 48 },
     }).setOrigin(0.5).setDepth(72));
-    const back = this.modalAdd(this.add.text(this.W / 2, py + ph - 32, '◀ BACK', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '16px',
+    const back = this.modalAdd(this.add.text(this.W / 2, py + ph - upx(32), '◀ BACK', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(16),
       fontStyle: 'bold', color: '#ffd54a',
-      backgroundColor: '#3a2517', padding: { x: 14, y: 7 },
+      backgroundColor: '#3a2517', padding: { x: upx(14), y: upx(7) },
     }).setOrigin(0.5).setDepth(72).setInteractive());
     back.on('pointerdown', () => this.showHome());
   }
@@ -1312,19 +1321,19 @@ class GameScene extends Phaser.Scene {
     this.menuBackdrop();
     this.modalRefresh = () => this.showClassSelect();
     this.modalAdd(this.add.text(this.W / 2, this.H * 0.1, 'CHOOSE YOUR CLASS', {
-      fontFamily: FONT_DISPLAY, fontSize: '25px',
+      fontFamily: FONT_DISPLAY, fontSize: fpx(25),
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5).setDepth(72));
-    const cardW = Math.min(this.W * 0.86, 420);
-    const cardH = Math.min(128, this.H * 0.18);
+    const cardW = Math.min(this.W * 0.86, upx(420));
+    const cardH = Math.min(upx(128), this.H * 0.18);
     const x = this.W / 2 - cardW / 2;
     const top = this.H * 0.17;
-    const gap = Math.min(cardH + 16, this.H * 0.24);
+    const gap = Math.min(cardH + upx(16), this.H * 0.24);
     CLASSES.forEach((cls, i) => {
       const cy = top + gap * i + cardH / 2;
       const g = this.modalAdd(this.add.graphics().setDepth(71));
       g.fillStyle(0x0e0703, 0.9);
-      g.fillRoundedRect(x + 3, cy - cardH / 2 + 4, cardW, cardH, 14);  // drop shadow
+      g.fillRoundedRect(x + upx(3), cy - cardH / 2 + upx(4), cardW, cardH, 14);
       g.fillGradientStyle(0x342013, 0x2a1a10, 0x180e08, 0x180e08, 1);
       g.fillRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
       g.lineStyle(5, cls.color, 0.14);                                  // soft glow edge
@@ -1333,52 +1342,53 @@ class GameScene extends Phaser.Scene {
       g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
       // icon medallion
       g.fillStyle(0x120a06, 0.85);
-      g.fillCircle(x + 34, cy - cardH / 2 + 30, 20);
+      g.fillCircle(x + upx(34), cy - cardH / 2 + upx(30), upx(20));
       g.lineStyle(1.5, cls.color, 0.7);
-      g.strokeCircle(x + 34, cy - cardH / 2 + 30, 20);
-      this.modalAdd(this.add.text(x + 34, cy - cardH / 2 + 30, cls.icon, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '23px',
+      g.strokeCircle(x + upx(34), cy - cardH / 2 + upx(30), upx(20));
+      this.modalAdd(this.add.text(x + upx(34), cy - cardH / 2 + upx(30), cls.icon, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(23),
       }).setOrigin(0.5).setDepth(72));
-      this.modalAdd(this.add.text(x + 62, cy - cardH / 2 + 14, cls.name, {
-        fontFamily: FONT_DISPLAY, fontSize: '21px',
+      this.modalAdd(this.add.text(x + upx(62), cy - cardH / 2 + upx(14), cls.name, {
+        fontFamily: FONT_DISPLAY, fontSize: fpx(21),
         fontStyle: 'bold', color: cls.hex,
       }).setDepth(72));
-      this.modalAdd(this.add.text(x + 58, cy - cardH / 2 + 40, cls.tagline, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
-        color: BOARD.creamDim, wordWrap: { width: cardW - 150 },
+      this.modalAdd(this.add.text(x + upx(58), cy - cardH / 2 + upx(40), cls.tagline, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
+        color: BOARD.creamDim, wordWrap: { width: cardW - upx(150) },
       }).setDepth(72));
       // level badge + progress toward the next one
       const lvl = classLevelOf(cls.id);
       const xpNow = classXpOf(cls.id);
       const next = lvl < CLASS_MAX_LEVEL ? CLASS_XP_LEVELS[lvl] : null;
-      this.modalAdd(this.add.text(x + cardW - 16, cy - cardH / 2 + 12,
+      this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + upx(12),
         'LV ' + lvl + (lvl >= CLASS_MAX_LEVEL ? ' ★' : ''), {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '16px',
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(16),
         fontStyle: 'bold', color: GOLD,
       }).setOrigin(1, 0).setDepth(72));
-      this.modalAdd(this.add.text(x + cardW - 16, cy - cardH / 2 + 32,
+      this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + upx(32),
         next ? xpNow + '/' + next + ' xp' : 'MAX LEVEL', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '10px',
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(10),
         color: '#8a7960',
       }).setOrigin(1, 0).setDepth(72));
       // the bag it opens with, drawn as the real dice
-      const s = Math.min(26, cardW / 13);
-      this.modalAdd(this.add.text(x + 18, cy + cardH / 2 - 48, 'STARTS WITH', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '9px',
+      const s = Math.min(upx(26), cardW / 13);
+      this.modalAdd(this.add.text(x + upx(18), cy + cardH / 2 - upx(48), 'STARTS WITH', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(9),
         fontStyle: 'bold', color: '#8a7960',
       }).setDepth(72));
       startingBagFor(cls).forEach((e, j) => {
-        this.modalAdd(this.add.image(x + 22 + s / 2 + j * (s + 6), cy + cardH / 2 - 22,
+        this.modalAdd(this.add.image(x + upx(22) + s / 2 + j * (s + upx(6)),
+          cy + cardH / 2 - upx(22),
           this.textureFor(e.kind, e.value)).setDisplaySize(s, s).setDepth(72));
       });
       const hit = this.modalAdd(this.add.rectangle(this.W / 2, cy, cardW, cardH,
         0xffffff, 0.001).setDepth(73).setInteractive());
       hit.on('pointerdown', () => this.showRealmSelect(cls.id));
     });
-    const back = this.modalAdd(this.add.text(this.W / 2, this.H - 34, '◀ BACK', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+    const back = this.modalAdd(this.add.text(this.W / 2, this.H - upx(34), '◀ BACK', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
       fontStyle: 'bold', color: '#ffd54a',
-      backgroundColor: '#3a2517', padding: { x: 12, y: 6 },
+      backgroundColor: '#3a2517', padding: { x: upx(12), y: upx(6) },
     }).setOrigin(0.5).setDepth(74).setInteractive());
     back.on('pointerdown', () => this.showHome());
   }
@@ -1389,19 +1399,19 @@ class GameScene extends Phaser.Scene {
     const cls = CLASS_BY_ID[classId] || CLASSES[0];
     this.modalAdd(this.add.text(this.W / 2, this.H * 0.1,
       cls.icon + '  CHOOSE YOUR REALM', {
-      fontFamily: FONT_DISPLAY, fontSize: '25px',
+      fontFamily: FONT_DISPLAY, fontSize: fpx(25),
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5).setDepth(72));
-    const cardW = Math.min(this.W * 0.86, 420);
-    const cardH = Math.min(110, this.H * 0.17);
+    const cardW = Math.min(this.W * 0.86, upx(420));
+    const cardH = Math.min(upx(110), this.H * 0.17);
     const x = this.W / 2 - cardW / 2;
     const top = this.H * 0.17;
-    const gap = Math.min(cardH + 16, this.H * 0.23);
+    const gap = Math.min(cardH + upx(16), this.H * 0.23);
     REALMS.forEach((realm, i) => {
       const cy = top + gap * i + cardH / 2;
       const g = this.modalAdd(this.add.graphics().setDepth(71));
       g.fillStyle(0x0e0703, 0.9);
-      g.fillRoundedRect(x + 3, cy - cardH / 2 + 4, cardW, cardH, 14);
+      g.fillRoundedRect(x + upx(3), cy - cardH / 2 + upx(4), cardW, cardH, 14);
       g.fillGradientStyle(0x342013, 0x2a1a10, 0x180e08, 0x180e08, 1);
       g.fillRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
       g.lineStyle(5, realm.color, 0.14);
@@ -1410,7 +1420,8 @@ class GameScene extends Phaser.Scene {
       g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
       // a painted biome vignette in place of an icon
       const sw = this.modalAdd(this.add.graphics().setDepth(72));
-      const sx = x + 12, sy = cy - cardH / 2 + 12, swd = 74, sh = cardH - 24;
+      const sx = x + upx(12), sy = cy - cardH / 2 + upx(12);
+      const swd = upx(74), sh = cardH - upx(24);
       const p = realm.palette;
       sw.fillGradientStyle(p.skyB, p.skyB, p.bg, p.bg, 1);
       sw.fillRoundedRect(sx, sy, swd, sh, 8);
@@ -1440,37 +1451,37 @@ class GameScene extends Phaser.Scene {
       sw.fillStyle(p.dirt, 1);
       sw.fillRoundedRect(sx, sy + sh * 0.76, swd, sh * 0.24, { tl: 0, tr: 0, bl: 8, br: 8 });
       sw.fillStyle(p.grassA, 1);
-      sw.fillRect(sx, sy + sh * 0.76, swd, 3);
-      this.modalAdd(this.add.text(x + 100, cy - cardH / 2 + 12, realm.name, {
-        fontFamily: FONT_DISPLAY, fontSize: '19px',
+      sw.fillRect(sx, sy + sh * 0.76, swd, upx(3));
+      this.modalAdd(this.add.text(x + upx(100), cy - cardH / 2 + upx(12), realm.name, {
+        fontFamily: FONT_DISPLAY, fontSize: fpx(19),
         fontStyle: 'bold', color: realm.hex,
       }).setDepth(72));
-      this.modalAdd(this.add.text(x + cardW - 16, cy - cardH / 2 + 14, realm.diff, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + upx(14), realm.diff, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
         fontStyle: 'bold', color: realm.hex,
       }).setOrigin(1, 0).setDepth(72));
       // short phone cards: skip the flavor line so it can't collide
       // with the multiplier row
-      if (cardH >= 96) {
-        this.modalAdd(this.add.text(x + 100, cy - cardH / 2 + 38, realm.flavor, {
-          fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
-          color: BOARD.creamDim, wordWrap: { width: cardW - 190 },
+      if (cardH >= upx(96)) {
+        this.modalAdd(this.add.text(x + upx(100), cy - cardH / 2 + upx(38), realm.flavor, {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
+          color: BOARD.creamDim, wordWrap: { width: cardW - upx(190) },
         }).setDepth(72));
       }
-      this.modalAdd(this.add.text(x + 100, cy + cardH / 2 - 24,
+      this.modalAdd(this.add.text(x + upx(100), cy + cardH / 2 - upx(24),
         '♥ enemies ×' + realm.hpMul + '   ⚔ ×' + realm.dmgMul +
         '   gold ×' + realm.goldMul + '   ' + realm.xp + ' xp/fight', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
         fontStyle: 'bold', color: GOLD,
       }).setDepth(72));
       const hit = this.modalAdd(this.add.rectangle(this.W / 2, cy, cardW, cardH,
         0xffffff, 0.001).setDepth(73).setInteractive());
       hit.on('pointerdown', () => this.startRun(classId, realm.id));
     });
-    const back = this.modalAdd(this.add.text(this.W / 2, this.H - 34, '◀ BACK', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+    const back = this.modalAdd(this.add.text(this.W / 2, this.H - upx(34), '◀ BACK', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
       fontStyle: 'bold', color: '#ffd54a',
-      backgroundColor: '#3a2517', padding: { x: 12, y: 6 },
+      backgroundColor: '#3a2517', padding: { x: upx(12), y: upx(6) },
     }).setOrigin(0.5).setDepth(74).setInteractive());
     back.on('pointerdown', () => this.showClassSelect());
   }
@@ -1507,24 +1518,24 @@ class GameScene extends Phaser.Scene {
     this.cancelAim();
     const dim = this.modalAdd(this.add.rectangle(
       this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.7).setDepth(70).setInteractive());
-    const pw = pwWant ? Math.min(pwWant, this.W * 0.96) : Math.min(this.W * 0.82, 640);
-    const ph = phWant ? Math.min(phWant, this.H * 0.94) : Math.min(this.H * 0.78, 400);
+    const pw = pwWant ? Math.min(pwWant, this.W * 0.96) : Math.min(this.W * 0.82, upx(640));
+    const ph = phWant ? Math.min(phWant, this.H * 0.94) : Math.min(this.H * 0.78, upx(400));
     const px = this.W / 2 - pw / 2, py = this.H / 2 - ph / 2;
     const panel = this.modalAdd(this.add.graphics().setDepth(71));
     panel.fillStyle(0x2a1a10, 0.97);
     panel.fillRoundedRect(px, py, pw, ph, 12);
     panel.lineStyle(2, 0x6b4a33, 1);
     panel.strokeRoundedRect(px, py, pw, ph, 12);
-    this.modalAdd(this.add.text(this.W / 2, py + 20, title, {
-      fontFamily: FONT_DISPLAY, fontSize: '20px',
+    this.modalAdd(this.add.text(this.W / 2, py + upx(20), title, {
+      fontFamily: FONT_DISPLAY, fontSize: fpx(20),
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5).setDepth(72));
     return { dim, px, py, pw, ph };
   }
 
   modalCloseButton(px, py, pw, onClose) {
-    const btn = this.modalAdd(this.add.text(px + pw - 14, py + 12, '✕', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '20px',
+    const btn = this.modalAdd(this.add.text(px + pw - upx(14), py + upx(12), '✕', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(20),
       fontStyle: 'bold', color: BOARD.creamDim,
     }).setOrigin(1, 0).setDepth(73).setInteractive());
     btn.on('pointerdown', () => onClose());
@@ -1553,7 +1564,7 @@ class GameScene extends Phaser.Scene {
     keys.forEach((k, i) => {
       const col = i % cols, row = Math.floor(i / cols);
       const x = px + cellW * (col + 0.75);
-      const y = py + 80 + row * (s + 46);
+      const y = py + upx(80) + row * (s + upx(46));
       const g = groups[k];
       const left = remaining[k] || 0;
       const img = this.modalAdd(this.add.image(x, y,
@@ -1561,13 +1572,13 @@ class GameScene extends Phaser.Scene {
         .setDisplaySize(s, s));
       if (left === 0) img.setAlpha(0.3);
       this.modalAdd(this.add.text(x, y + s * 0.62 + 4, left + '/' + g.total + ' left', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
         color: left === 0 ? '#7a6a55' : BOARD.cream,
       }).setOrigin(0.5, 0).setDepth(72));
     });
     this.modalAdd(this.add.text(this.W / 2, py + ph - 16,
       'A random die is drawn each throw. The bag refills once every die has been thrown.', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
       color: BOARD.creamDim,
     }).setOrigin(0.5, 1).setDepth(72));
   }
@@ -1644,28 +1655,28 @@ class GameScene extends Phaser.Scene {
   renderShop(stock) {
     this.currentStock = stock;
     this.modalRefresh = () => this.renderShop(stock);
-    const pwGuess = Math.min(this.W * 0.82, 640);
+    const pwGuess = Math.min(this.W * 0.82, upx(640));
     const s = Math.min(this.dieSize * 1.1, (pwGuess / 4) * 0.5);
-    const offerBottom = 80 + s * 0.65 + 40;
-    const infoY = offerBottom + 14;
-    const relicY = infoY + 56;
-    const rowY = relicY + 56;
-    const leaveY = rowY + 46;
+    const offerBottom = upx(80) + s * 0.65 + upx(40);
+    const infoY = offerBottom + upx(14);
+    const relicY = infoY + upx(56);
+    const rowY = relicY + upx(56);
+    const leaveY = rowY + upx(46);
     const { px, py, pw, ph } = this.modalBase('SHOP — LEVEL ' + this.level,
-      leaveY + 36);
+      leaveY + upx(36));
     this.modalOpen = 'shop';
-    this.modalAdd(this.add.text(px + 16, py + 12, this.gold + 'g', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
+    this.modalAdd(this.add.text(px + upx(16), py + upx(12), this.gold + 'g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(18),
       fontStyle: 'bold', color: GOLD,
     }).setDepth(72));
     // fresh stock on demand: same tier rules, brand-new roll
     const canRefresh = this.gold >= TUNE.SHOP_REFRESH_PRICE;
-    const refreshBtn = this.modalAdd(this.add.text(px + pw - 16, py + 12,
+    const refreshBtn = this.modalAdd(this.add.text(px + pw - upx(16), py + upx(12),
       '⟳ NEW STOCK — ' + TUNE.SHOP_REFRESH_PRICE + 'g', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(13),
       fontStyle: 'bold', color: canRefresh ? '#2a1a10' : '#7a6a55',
       backgroundColor: canRefresh ? '#e4bf7e' : '#3a2a1c',
-      padding: { x: 10, y: 5 },
+      padding: { x: upx(10), y: upx(5) },
     }).setOrigin(1, 0).setDepth(73).setInteractive());
     refreshBtn.on('pointerdown', () => {
       if (this.gold < TUNE.SHOP_REFRESH_PRICE) return;
@@ -1681,7 +1692,7 @@ class GameScene extends Phaser.Scene {
     };
     stock.offers.forEach((o, i) => {
       const x = px + cellW * (i + 0.5);
-      const y = py + 80;
+      const y = py + upx(80);
       const canAfford = this.gold >= this.diePrice(o) && !o.sold;
       const selected = stock.selected === i;
       if (selected && !o.sold) {
@@ -1693,13 +1704,13 @@ class GameScene extends Phaser.Scene {
         this.textureFor(o.kind, o.value)).setDepth(72).setDisplaySize(s, s));
       const label = o.kind === 'num' ? 'Die: ' + o.value :
         labels[o.kind] + (o.kind === 'bomb' || isClassKind(o.kind) ? o.value : '');
-      this.modalAdd(this.add.text(x, y + s * 0.65 + 4, label, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      this.modalAdd(this.add.text(x, y + s * 0.65 + upx(4), label, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
         color: BOARD.cream,
       }).setOrigin(0.5, 0).setDepth(72));
-      this.modalAdd(this.add.text(x, y + s * 0.65 + 22,
+      this.modalAdd(this.add.text(x, y + s * 0.65 + upx(22),
         o.sold ? 'SOLD' : this.diePrice(o) + 'g', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '14px',
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(14),
         fontStyle: 'bold', color: o.sold ? '#7a6a55' : canAfford ? GOLD : '#8a6a50',
       }).setOrigin(0.5, 0).setDepth(72));
       if (!o.sold) {
@@ -1715,17 +1726,17 @@ class GameScene extends Phaser.Scene {
     // detail strip for the selected offer
     const sel = stock.selected != null ? stock.offers[stock.selected] : null;
     if (sel && !sel.sold) {
-      this.modalAdd(this.add.text(px + 20, py + infoY, this.shopInfoFor(sel), {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
-        color: BOARD.cream, wordWrap: { width: pw - 140 },
+      this.modalAdd(this.add.text(px + upx(20), py + infoY, this.shopInfoFor(sel), {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
+        color: BOARD.cream, wordWrap: { width: pw - upx(140) },
       }).setOrigin(0, 0.5).setDepth(72));
       const afford = this.gold >= this.diePrice(sel);
-      const buy = this.modalAdd(this.add.text(px + pw - 20, py + infoY,
+      const buy = this.modalAdd(this.add.text(px + pw - upx(20), py + infoY,
         'BUY — ' + this.diePrice(sel) + 'g', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
         fontStyle: 'bold', color: afford ? '#2a1a10' : '#7a6a55',
         backgroundColor: afford ? '#ffd54a' : '#3a2a1c',
-        padding: { x: 12, y: 6 },
+        padding: { x: upx(12), y: upx(6) },
       }).setOrigin(1, 0.5).setDepth(72).setInteractive());
       buy.on('pointerdown', () => {
         if (this.gold < this.diePrice(sel) || sel.sold) return;
@@ -1742,7 +1753,7 @@ class GameScene extends Phaser.Scene {
     } else {
       this.modalAdd(this.add.text(this.W / 2, py + infoY,
         'Tap a die to see what it does', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
         color: BOARD.creamDim, fontStyle: 'italic',
       }).setOrigin(0.5).setDepth(72));
     }
@@ -1751,10 +1762,10 @@ class GameScene extends Phaser.Scene {
     // action row: heal / remove
     const healBtn = this.modalAdd(this.add.text(px + pw * 0.28, py + rowY,
       '❤ Heal +' + stock.heal.amount + ' — ' + stock.heal.price + 'g', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '14px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(14),
       fontStyle: 'bold',
       color: this.gold >= stock.heal.price ? '#8ec873' : '#6a7a5a',
-      backgroundColor: '#1c120a', padding: { x: 10, y: 6 },
+      backgroundColor: '#1c120a', padding: { x: upx(10), y: upx(6) },
     }).setOrigin(0.5).setDepth(72).setInteractive());
     healBtn.on('pointerdown', () => {
       if (this.gold < stock.heal.price) return;
@@ -1766,18 +1777,18 @@ class GameScene extends Phaser.Scene {
     const canRemove = this.gold >= this.removePrice() && this.bag.length > 1;
     const removeBtn = this.modalAdd(this.add.text(px + pw * 0.72, py + rowY,
       '✂ Remove a die — ' + this.removePrice() + 'g', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '14px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(14),
       fontStyle: 'bold', color: canRemove ? '#e6a4a0' : '#6a5a55',
-      backgroundColor: '#1c120a', padding: { x: 10, y: 6 },
+      backgroundColor: '#1c120a', padding: { x: upx(10), y: upx(6) },
     }).setOrigin(0.5).setDepth(72).setInteractive());
     removeBtn.on('pointerdown', () => {
       if (!canRemove) return;
       this.renderShopRemove(stock);
     });
     const leave = this.modalAdd(this.add.text(this.W / 2, py + leaveY, '▶ LEAVE SHOP', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '17px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(17),
       fontStyle: 'bold', color: '#ffd54a',
-      backgroundColor: '#3a2517', padding: { x: 14, y: 7 },
+      backgroundColor: '#3a2517', padding: { x: upx(14), y: upx(7) },
     }).setOrigin(0.5).setDepth(72).setInteractive());
     leave.on('pointerdown', () => {
       this.closeModal();
@@ -1788,44 +1799,44 @@ class GameScene extends Phaser.Scene {
   // the shop's special-item slot: a single relic on a shelf of its own
   renderShopRelic(stock, px, py, pw, relicY) {
     const cy = py + relicY;
-    const boxH = 50;
+    const boxH = upx(50);
     const font = '-apple-system, Arial, sans-serif';
-    this.modalAdd(this.add.text(px + 18, cy - boxH / 2 - 15, 'SPECIAL ITEM', {
-      fontFamily: font, fontSize: '10px', fontStyle: 'bold', color: '#a8916e',
+    this.modalAdd(this.add.text(px + upx(18), cy - boxH / 2 - upx(15), 'SPECIAL ITEM', {
+      fontFamily: font, fontSize: fpx(10), fontStyle: 'bold', color: '#a8916e',
     }).setDepth(72));
     const box = this.modalAdd(this.add.graphics().setDepth(71));
     box.fillStyle(0x1c120a, 0.92);
-    box.fillRoundedRect(px + 14, cy - boxH / 2, pw - 28, boxH, 8);
+    box.fillRoundedRect(px + upx(14), cy - boxH / 2, pw - upx(28), boxH, 8);
     box.lineStyle(1.5, 0x6b4a33, 0.9);
-    box.strokeRoundedRect(px + 14, cy - boxH / 2, pw - 28, boxH, 8);
+    box.strokeRoundedRect(px + upx(14), cy - boxH / 2, pw - upx(28), boxH, 8);
     const rel = stock.relic;
     if (!rel || rel.sold) {
       this.modalAdd(this.add.text(px + pw / 2, cy,
         rel ? rel.name + ' — CLAIMED' : 'Every relic already claimed', {
-        fontFamily: font, fontSize: '12px', fontStyle: 'italic',
+        fontFamily: font, fontSize: fpx(12), fontStyle: 'italic',
         color: rel ? '#8ec873' : '#7a6a55',
       }).setOrigin(0.5).setDepth(72));
       return;
     }
     const afford = this.gold >= rel.price;
-    const iconS = Math.min(36, boxH * 0.72);
-    const icon = this.modalAdd(this.add.image(px + 24 + iconS / 2, cy, 'relic_' + rel.id)
+    const iconS = Math.min(upx(36), boxH * 0.72);
+    const icon = this.modalAdd(this.add.image(px + upx(24) + iconS / 2, cy, 'relic_' + rel.id)
       .setDepth(72).setDisplaySize(iconS, iconS));
     if (!afford) icon.setAlpha(0.55);
-    const textX = px + 32 + iconS;
-    const buyW = 78;
-    this.modalAdd(this.add.text(textX, cy - 11, rel.name, {
-      fontFamily: font, fontSize: '13px', fontStyle: 'bold', color: GOLD,
+    const textX = px + upx(32) + iconS;
+    const buyW = upx(78);
+    this.modalAdd(this.add.text(textX, cy - upx(11), rel.name, {
+      fontFamily: font, fontSize: fpx(13), fontStyle: 'bold', color: GOLD,
     }).setOrigin(0, 0.5).setDepth(72));
-    this.modalAdd(this.add.text(textX, cy + 8, rel.desc, {
-      fontFamily: font, fontSize: '11px', color: BOARD.cream,
-      wordWrap: { width: pw - (textX - px) - buyW - 34 },
+    this.modalAdd(this.add.text(textX, cy + upx(8), rel.desc, {
+      fontFamily: font, fontSize: fpx(11), color: BOARD.cream,
+      wordWrap: { width: pw - (textX - px) - buyW - upx(34) },
     }).setOrigin(0, 0.5).setDepth(72));
-    const buy = this.modalAdd(this.add.text(px + pw - 24, cy, rel.price + 'g', {
-      fontFamily: font, fontSize: '14px', fontStyle: 'bold',
+    const buy = this.modalAdd(this.add.text(px + pw - upx(24), cy, rel.price + 'g', {
+      fontFamily: font, fontSize: fpx(14), fontStyle: 'bold',
       color: afford ? '#2a1a10' : '#7a6a55',
       backgroundColor: afford ? '#ffd54a' : '#3a2a1c',
-      padding: { x: 12, y: 6 },
+      padding: { x: upx(12), y: upx(6) },
     }).setOrigin(1, 0.5).setDepth(72).setInteractive());
     buy.on('pointerdown', () => {
       if (this.gold < rel.price || rel.sold) return;
@@ -1842,8 +1853,8 @@ class GameScene extends Phaser.Scene {
     this.modalRefresh = () => this.renderShopRemove(stock);
     const { px, py, pw, ph } = this.modalBase('REMOVE A DIE — ' + this.removePrice() + 'g');
     this.modalOpen = 'shop';
-    this.modalAdd(this.add.text(px + 16, py + 12, this.gold + 'g', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '18px',
+    this.modalAdd(this.add.text(px + upx(16), py + upx(12), this.gold + 'g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(18),
       fontStyle: 'bold', color: GOLD,
     }).setDepth(72));
     const groups = {};
@@ -1859,13 +1870,13 @@ class GameScene extends Phaser.Scene {
     keys.forEach((k, i) => {
       const col = i % cols, row = Math.floor(i / cols);
       const x = px + cellW * (col + 0.75);
-      const y = py + 84 + row * (s + 50);
+      const y = py + upx(84) + row * (s + upx(50));
       const g = groups[k];
       const img = this.modalAdd(this.add.image(x, y,
         this.textureFor(g.entry.kind, g.entry.value)).setDepth(72)
         .setDisplaySize(s, s).setInteractive());
       this.modalAdd(this.add.text(x, y + s * 0.62 + 4, '×' + g.total, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(13),
         fontStyle: 'bold', color: BOARD.cream,
       }).setOrigin(0.5, 0).setDepth(72));
       img.on('pointerdown', () => {
@@ -1885,9 +1896,9 @@ class GameScene extends Phaser.Scene {
       });
     });
     const back = this.modalAdd(this.add.text(this.W / 2, py + ph - 30, '◀ BACK TO SHOP', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
       fontStyle: 'bold', color: '#ffd54a',
-      backgroundColor: '#3a2517', padding: { x: 12, y: 6 },
+      backgroundColor: '#3a2517', padding: { x: upx(12), y: upx(6) },
     }).setOrigin(0.5).setDepth(72).setInteractive());
     back.on('pointerdown', () => this.renderShop(stock));
   }
@@ -1907,9 +1918,9 @@ class GameScene extends Phaser.Scene {
     }
     // the map table: a parchment inset under the whole track
     const mapG = this.modalAdd(this.add.graphics().setDepth(71));
-    const mx0 = px + 14, my0 = py + 40, mw = pw - 28, mh = ph - 78;
+    const mx0 = px + upx(14), my0 = py + upx(40), mw = pw - upx(28), mh = ph - upx(78);
     mapG.fillStyle(0x120a06, 0.6);
-    mapG.fillRoundedRect(mx0 + 3, my0 + 4, mw, mh, 10);
+    mapG.fillRoundedRect(mx0 + upx(3), my0 + upx(4), mw, mh, 10);
     mapG.fillGradientStyle(0xd9c49a, 0xd2bc90, 0xc4ad7e, 0xbfa878, 1);
     mapG.fillRoundedRect(mx0, my0, mw, mh, 10);
     mapG.fillStyle(this.realm ? this.realm.palette.dirt : 0x7b5136, 0.10);
@@ -1926,18 +1937,19 @@ class GameScene extends Phaser.Scene {
     mapG.strokeRoundedRect(mx0 + 4, my0 + 4, mw - 8, mh - 8, 8);
     // the track snakes: floors 1-10 across the top, 11-20 back along
     // the bottom — half the columns, so everything doubles in size
-    const innerX = px + 24, innerW = pw - 48;
-    const topY = py + 54, botY = py + ph - 50;
+    const innerX = px + upx(24), innerW = pw - upx(48);
+    const topY = py + upx(54), botY = py + ph - upx(50);
     const HALF = Math.ceil(FLOORS / 2);
     const colW = innerW / HALF;
     const rowH = (botY - topY) / 2;
-    const nodeR = Phaser.Math.Clamp(Math.min(colW * 0.3, (rowH - 30) / 6), 9, 26);
+    const nodeR = Phaser.Math.Clamp(
+      Math.min(colW * 0.3, (rowH - upx(30)) / 6), upx(9), upx(26));
     const posOf = (f, i) => {
       const row = f < HALF ? 0 : 1;
       const t = row === 0 ? f : FLOORS - 1 - f; // bottom row runs right to left
       const w = this.runMap[f].length;
-      const bandTop = topY + row * rowH + nodeR + 4;
-      const bandBot = topY + (row + 1) * rowH - nodeR - 22;
+      const bandTop = topY + row * rowH + nodeR + upx(4);
+      const bandBot = topY + (row + 1) * rowH - nodeR - upx(22);
       return {
         x: innerX + colW * (t + 0.5),
         y: w === 1 ? (bandTop + bandBot) / 2 :
@@ -2010,14 +2022,14 @@ class GameScene extends Phaser.Scene {
           }).setOrigin(0.5, 1).setDepth(73));
         } else if (f === 0) {
           this.modalAdd(this.add.text(x, y - nodeR - 5, 'START', {
-            fontFamily: '-apple-system, Arial, sans-serif', fontSize: '10px',
+            fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(10),
             fontStyle: 'bold', color: '#6a5138',
           }).setOrigin(0.5, 1).setDepth(73));
         }
         // floor number under every node so the snake reads at a glance
         this.modalAdd(this.add.text(x, y + nodeR + 3, String(f + 1), {
           fontFamily: '-apple-system, Arial, sans-serif',
-          fontSize: Math.max(11, Math.round(nodeR * 0.6)) + 'px',
+          fontSize: Math.max(upx(11), Math.round(nodeR * 0.6)) + 'px',
           fontStyle: current ? 'bold' : 'normal',
           color: current ? '#a8720a' : '#6a5138',
         }).setOrigin(0.5, 0).setDepth(72).setAlpha(done ? 0.5 : 1));
@@ -2038,9 +2050,9 @@ class GameScene extends Phaser.Scene {
         }
       }
     }
-    this.modalAdd(this.add.text(this.W / 2, py + ph - 12,
+    this.modalAdd(this.add.text(this.W / 2, py + ph - upx(12),
       chooseMode ? 'Tap a green node to travel' : '⚔ fight   🛒 shop   💀 miniboss', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
       fontStyle: 'bold',
       color: chooseMode ? '#8ec873' : BOARD.creamDim,
     }).setOrigin(0.5, 1).setDepth(72));
@@ -2693,11 +2705,12 @@ class GameScene extends Phaser.Scene {
   computeLayout() {
     const W = this.scale.gameSize.width, H = this.scale.gameSize.height;
     this.W = W; this.H = H;
-    this.stripH = Phaser.Math.Clamp(H * 0.17, 52, 96);
+    this.stripH = Phaser.Math.Clamp(H * 0.17, upx(52), upx(96));
     this.dieSize = Phaser.Math.Clamp(
-      Math.min(W, H - this.stripH) * TUNE.DIE_SIZE_FRAC, TUNE.DIE_SIZE_MIN, TUNE.DIE_SIZE_MAX);
+      Math.min(W, H - this.stripH) * TUNE.DIE_SIZE_FRAC,
+      upx(TUNE.DIE_SIZE_MIN), upx(TUNE.DIE_SIZE_MAX));
     this.dieRadius = this.dieSize / 2;
-    this.rail = Math.max(10, Math.round(this.dieSize * 0.42));
+    this.rail = Math.max(upx(10), Math.round(this.dieSize * 0.42));
     this.boardTop = this.stripH;
     this.fieldTop = this.stripH + this.rail;
     this.launcherPos = { x: W / 2, y: H - this.dieSize * 1.45 };
@@ -2864,11 +2877,11 @@ class GameScene extends Phaser.Scene {
     for (let i = 0; i < 16; i++) {
       const img = this.add.image(Math.random() * this.W, Math.random() * this.H, 'spark')
         .setDepth(2).setAlpha(cfg.alpha * (0.5 + Math.random() * 0.5))
-        .setTint(cfg.tint).setScale(cfg.s * (0.6 + Math.random() * 0.8));
+        .setTint(cfg.tint).setScale(cfg.s * (0.6 + Math.random() * 0.8) * DPR);
       if (cfg.add) img.setBlendMode(Phaser.BlendModes.ADD);
       this.ambient.push({
-        img, vy: cfg.vy * (0.7 + Math.random() * 0.6),
-        sway: cfg.sway, phase: Math.random() * Math.PI * 2,
+        img, vy: cfg.vy * (0.7 + Math.random() * 0.6) * DPR,
+        sway: cfg.sway * DPR, phase: Math.random() * Math.PI * 2,
       });
     }
   }
@@ -3062,20 +3075,20 @@ class GameScene extends Phaser.Scene {
     for (const [x, other] of [[a, b], [b, a]]) {
       if (x.dead || other.dead) continue;
       const hard = (k) => this.mergeableKind(k) || k === 'wild';
-      if (x.kind === 'potion' && impact > 0.8) {
+      if (x.kind === 'potion' && impact > 0.8 * DPR) {
         this.consumePotion(x);
         handled = true;
-      } else if (x.kind === 'stun' && impact > 0.8) {
+      } else if (x.kind === 'stun' && impact > 0.8 * DPR) {
         this.consumeStun(x);
         handled = true;
-      } else if (x.kind === 'thief' && hard(other.kind) && impact > 1.0) {
+      } else if (x.kind === 'thief' && hard(other.kind) && impact > 1.0 * DPR) {
         this.triggerThief(x);
         handled = true;
       } else if (x.kind === 'stone' && hard(other.kind) &&
-        impact > TUNE.STONE_HIT_SPEED) {
+        impact > TUNE.STONE_HIT_SPEED * DPR) {
         this.hitStone(x);
         handled = true;
-      } else if (x.kind === 'spike' && hard(other.kind) && impact > 1.2) {
+      } else if (x.kind === 'spike' && hard(other.kind) && impact > 1.2 * DPR) {
         this.triggerSpike(x);
         handled = true;
       }
@@ -3103,7 +3116,8 @@ class GameScene extends Phaser.Scene {
     this.sparks.burst(x, apexY, 0xff8040, 24, { speedMin: 2, speedMax: 7, life: 550, scale: 1.1 });
     this.sparks.burst(x, y, 0x4a4a52, 10, { speedMin: 1, speedMax: 4, life: 450, scale: 0.8 });
     // the point of the bomb: shove everything HARD
-    this.knockback(x, y, this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.9, TUNE.KNOCK_SPEED * 2.4);
+    this.knockback(x, y, this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.9,
+      TUNE.KNOCK_SPEED * 2.4 * DPR);
     for (const d of [...this.dice]) {
       if ((d.kind === 'stone' || d.kind === 'spike') && !d.dead &&
         Phaser.Math.Distance.Between(d.gx, d.gy, x, y) < this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.4) {
@@ -3288,7 +3302,7 @@ class GameScene extends Phaser.Scene {
   buildLauncher() {
     this.previewImg = this.add.image(0, 0, 'die1').setDepth(12);
     this.nextLabel = this.add.text(0, 0, 'NEXT', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
       color: BOARD.creamDim, fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(11);
     this.queueImgs = [
@@ -3312,7 +3326,7 @@ class GameScene extends Phaser.Scene {
     this.bagImg = this.add.image(0, 0, 'bag').setDepth(12).setInteractive();
     this.bagImg.on('pointerdown', () => this.openBag());
     this.bagCount = this.add.text(0, 0, '', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5, 0).setDepth(12);
     this.layoutLauncher();
@@ -3362,7 +3376,7 @@ class GameScene extends Phaser.Scene {
   launchVectorFor(pointer) {
     const dx = this.aim.sx - pointer.x, dy = this.aim.sy - pointer.y;
     const pull = Math.hypot(dx, dy);
-    if (pull < TUNE.MIN_PULL_PX) return null;
+    if (pull < upx(TUNE.MIN_PULL_PX)) return null;
     const frac = Math.min(pull, this.maxPull) / this.maxPull;
     const speed = this.maxSpeed * (TUNE.MIN_SPEED_FRAC + (1 - TUNE.MIN_SPEED_FRAC) * frac);
     return { x: (dx / pull) * speed, y: (dy / pull) * speed, frac };
@@ -3446,7 +3460,7 @@ class GameScene extends Phaser.Scene {
         g.fillStyle(0xf5e6c8, 0.8);
         g.fillCircle(sx, sy, Math.max(2.5, r * 0.16));
       }
-      if (Math.hypot(vx, vy) < 0.5) break;
+      if (Math.hypot(vx, vy) < 0.5 * DPR) break;
     }
     if (hitDie) {
       const thrown = this.nextQueue[0];
@@ -3627,7 +3641,7 @@ class GameScene extends Phaser.Scene {
     const m = this.rail + this.dieRadius;
     const ex = Phaser.Math.Clamp(sx + dirX * travel, m, this.W - m);
     const ey = Phaser.Math.Clamp(sy + dirY * travel, this.fieldTop + this.dieRadius, this.H - m);
-    const dur = TUNE.HOP_BASE_MS + travel * TUNE.HOP_PER_PX;
+    const dur = TUNE.HOP_BASE_MS + (travel / DPR) * TUNE.HOP_PER_PX;
     const hopH = this.dieSize * TUNE.HOP_HEIGHT_FRAC * (0.45 + 0.55 * travel / range) + h0 * 0.3;
     const spinDir = this.chain % 2 === 0 ? 1 : -1;
     const c = { t: 0 };
@@ -3663,7 +3677,7 @@ class GameScene extends Phaser.Scene {
           this.fieldTop + this.dieRadius, this.H - this.rail - this.dieRadius);
         this.attachBody(die, die.gx, die.gy);
         this.MatterLib.Body.setVelocity(die.body, {
-          x: dirX * TUNE.LAND_SLIDE, y: dirY * TUNE.LAND_SLIDE,
+          x: dirX * TUNE.LAND_SLIDE * DPR, y: dirY * TUNE.LAND_SLIDE * DPR,
         });
         this.sparks.burst(die.gx, die.gy + this.dieRadius * 0.5, 0xc9a878, 7,
           { speedMin: 0.6, speedMax: 2.2, life: 320, scale: 0.6 });
@@ -3694,7 +3708,8 @@ class GameScene extends Phaser.Scene {
           this.fieldTop + this.dieRadius, this.H - this.rail - this.dieRadius);
         this.attachBody(die, die.gx, die.gy);
         const a = Math.random() * Math.PI * 2;
-        this.MatterLib.Body.setVelocity(die.body, { x: Math.cos(a) * 1.4, y: Math.sin(a) * 1.4 });
+        this.MatterLib.Body.setVelocity(die.body,
+          { x: Math.cos(a) * 1.4 * DPR, y: Math.sin(a) * 1.4 * DPR });
         this.sparks.burst(die.gx, die.gy + this.dieRadius * 0.5, 0xc9a878, 8,
           { speedMin: 0.6, speedMax: 2.2, life: 320, scale: 0.6 });
         this.squash(die);
@@ -3744,7 +3759,7 @@ class GameScene extends Phaser.Scene {
       { speedMin: 0.5, speedMax: 2, life: 340, scale: 0.7 });
 
     this.knockback(gx, gy, this.dieSize * TUNE.KNOCK_RADIUS_FRAC,
-      TUNE.KNOCK_SPEED + this.chain * TUNE.KNOCK_PER_CHAIN);
+      (TUNE.KNOCK_SPEED + this.chain * TUNE.KNOCK_PER_CHAIN) * DPR);
 
     this.cameras.main.shake(60 + this.chain * 12, 0.0016 + this.chain * 0.0008);
     if (this.chain >= 3) {
@@ -3784,7 +3799,8 @@ class GameScene extends Phaser.Scene {
       targets: ring, scale: 5, alpha: 0, duration: 480,
       onComplete: () => ring.destroy(),
     });
-    this.knockback(gx, gy, this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.8, TUNE.KNOCK_SPEED * 2.2);
+    this.knockback(gx, gy, this.dieSize * TUNE.KNOCK_RADIUS_FRAC * 1.8,
+      TUNE.KNOCK_SPEED * 2.2 * DPR);
     this.cameras.main.shake(220, 0.006);
   }
 
@@ -3827,13 +3843,13 @@ class GameScene extends Phaser.Scene {
   // ---------- HUD ----------
 
   buildHud() {
-    const style = { fontFamily: '-apple-system, Arial, sans-serif', fontSize: '15px', color: BOARD.creamDim };
-    this.fpsText = this.add.text(0, 0, '', { ...style, color: '#7ec96f', fontSize: '12px' }).setDepth(30);
+    const style = { fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15), color: BOARD.creamDim };
+    this.fpsText = this.add.text(0, 0, '', { ...style, color: '#7ec96f', fontSize: fpx(12) }).setDepth(30);
     this.levelText = this.add.text(0, 0, 'LEVEL 1/' + FLOORS, {
-      ...style, fontSize: '16px', color: BOARD.cream, fontStyle: 'bold',
+      ...style, fontSize: fpx(16), color: BOARD.cream, fontStyle: 'bold',
     }).setDepth(30);
     this.mapBtn = this.add.text(0, 0, '[ MAP ]', {
-      ...style, fontSize: '13px', color: '#ffd54a', fontStyle: 'bold',
+      ...style, fontSize: fpx(13), color: '#ffd54a', fontStyle: 'bold',
     }).setDepth(30).setInteractive();
     this.mapBtn.on('pointerdown', () => {
       if (this.modalOpen === 'track') this.closeModal();
@@ -3841,34 +3857,34 @@ class GameScene extends Phaser.Scene {
     });
     this.bestText = this.add.text(0, 0, 'Best chain: 0', style).setOrigin(1, 0).setDepth(30);
     this.refreshText = this.add.text(0, 0, '', {
-      ...style, fontSize: '14px', fontStyle: 'bold',
+      ...style, fontSize: fpx(14), fontStyle: 'bold',
     }).setOrigin(1, 0).setDepth(30);
-    this.versionText = this.add.text(0, 0, VERSION, { ...style, fontSize: '12px' }).setOrigin(1, 1).setDepth(30);
+    this.versionText = this.add.text(0, 0, VERSION, { ...style, fontSize: fpx(12) }).setOrigin(1, 1).setDepth(30);
     this.chainText = this.add.text(0, 0, '', {
-      fontFamily: '"Arial Black", -apple-system, Arial, sans-serif', fontSize: '54px',
-      fontStyle: 'bold', color: '#ffffff', stroke: '#3a2517', strokeThickness: 9,
+      fontFamily: '"Arial Black", -apple-system, Arial, sans-serif', fontSize: fpx(54),
+      fontStyle: 'bold', color: '#ffffff', stroke: '#3a2517', strokeThickness: upx(9),
     }).setOrigin(0.5).setAlpha(0).setDepth(30);
     this.hpBar = this.add.graphics().setDepth(30);
     this.hpText = this.add.text(0, 0, '', {
-      ...style, fontSize: '12px', color: BOARD.cream, fontStyle: 'bold',
+      ...style, fontSize: fpx(12), color: BOARD.cream, fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(31);
     this.goldText = this.add.text(0, 0, '', {
-      ...style, fontSize: '15px', color: GOLD, fontStyle: 'bold',
+      ...style, fontSize: fpx(15), color: GOLD, fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(31);
     this.blockText = this.add.text(0, 0, '', {
-      ...style, fontSize: '13px', color: '#9fb4c9', fontStyle: 'bold',
+      ...style, fontSize: fpx(13), color: '#9fb4c9', fontStyle: 'bold',
     }).setOrigin(0, 0.5).setDepth(31);
     this.classText = this.add.text(0, 0, '', {
-      ...style, fontSize: '12px', fontStyle: 'bold',
+      ...style, fontSize: fpx(12), fontStyle: 'bold',
     }).setDepth(30);
     // every readout gets a dark stroke so it reads on any realm board
     for (const t of [this.levelText, this.bestText, this.refreshText,
       this.goldText, this.blockText, this.hpText, this.classText, this.mapBtn]) {
-      t.setStroke('#160c06', 3);
+      t.setStroke('#160c06', upx(3));
     }
     this.tipBg = this.add.graphics().setDepth(60).setVisible(false);
     this.tipText = this.add.text(0, 0, '', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(13),
       color: BOARD.cream, align: 'center', lineSpacing: 3,
     }).setOrigin(0.5, 1).setDepth(61).setVisible(false);
     this.layoutHud();
@@ -3879,21 +3895,21 @@ class GameScene extends Phaser.Scene {
   }
 
   layoutHud() {
-    this.fpsText.setPosition(6, 4);
-    const ly = Math.max(20, this.stripH * 0.35);
-    this.levelText.setPosition(6, ly);
-    this.mapBtn.setPosition(this.levelText.x + this.levelText.width + 10, ly + 2);
+    this.fpsText.setPosition(upx(6), upx(4));
+    const ly = Math.max(upx(20), this.stripH * 0.35);
+    this.levelText.setPosition(upx(6), ly);
+    this.mapBtn.setPosition(this.levelText.x + this.levelText.width + upx(10), ly + upx(2));
     if (this.classText) {
       // its own line: the enemy strip owns the middle of the top row
-      this.classText.setPosition(6, ly + 18);
+      this.classText.setPosition(upx(6), ly + upx(18));
       if (this.playerClass) {
         this.classText.setText(this.playerClass.icon + ' ' + this.playerClass.name +
           (this.realm ? '  ·  ' + this.realm.name : ''))
           .setColor(this.playerClass.hex);
       }
     }
-    this.refreshText.setPosition(this.W - 8, ly);
-    this.bestText.setPosition(this.W - 8, 4);
+    this.refreshText.setPosition(this.W - upx(8), ly);
+    this.bestText.setPosition(this.W - upx(8), upx(4));
     // quiet dark chips ground the top readouts against the skyline
     if (!this.hudChips) this.hudChips = this.add.graphics().setDepth(28);
     const hc = this.hudChips;
@@ -3904,11 +3920,11 @@ class GameScene extends Phaser.Scene {
       hc.lineStyle(1, 0x6b4a33, 0.45);
       hc.strokeRoundedRect(cx0, cy0, cw, chh, 9);
     };
-    const lw = Math.max(this.levelText.width + this.mapBtn.width + 26,
-      (this.classText ? this.classText.width : 0) + 14);
-    chip(2, ly - 6, lw, 42);
-    chip(this.W - 152, 2, 150, ly + 18);
-    this.versionText.setPosition(this.W - this.rail - 6, this.H - this.rail - 4);
+    const lw = Math.max(this.levelText.width + this.mapBtn.width + upx(26),
+      (this.classText ? this.classText.width : 0) + upx(14));
+    chip(upx(2), ly - upx(6), lw, upx(42));
+    chip(this.W - upx(152), upx(2), upx(150), ly + upx(18));
+    this.versionText.setPosition(this.W - this.rail - upx(6), this.H - this.rail - upx(4));
     this.chainText.setPosition(this.W / 2, this.H * 0.3);
     this.drawHpBar();
     this.drawGold();
@@ -3916,8 +3932,8 @@ class GameScene extends Phaser.Scene {
   }
 
   drawHpBar() {
-    const w = Math.min(this.W * 0.24, 210), h = 12;
-    const x = this.rail + 8, y = this.H - this.rail - 22;
+    const w = Math.min(this.W * 0.24, upx(210)), h = upx(12);
+    const x = this.rail + upx(8), y = this.H - this.rail - upx(22);
     const g = this.hpBar;
     g.clear();
     g.fillStyle(0x241408, 0.85);
@@ -3927,17 +3943,17 @@ class GameScene extends Phaser.Scene {
     if (frac > 0) g.fillRoundedRect(x, y, w * frac, h, 3);
     g.lineStyle(1, BOARD.frameHi, 0.8);
     g.strokeRoundedRect(x - 2, y - 2, w + 4, h + 4, 4);
-    this.hpText.setPosition(x + w + 8, y + h / 2)
+    this.hpText.setPosition(x + w + upx(8), y + h / 2)
       .setText(this.hp + '/' + TUNE.PLAYER_HP);
     if (this.blockText) {
-      this.blockText.setPosition(x + w + 8 + this.hpText.width + 10, y + h / 2)
+      this.blockText.setPosition(x + w + upx(8) + this.hpText.width + upx(10), y + h / 2)
         .setText(this.block > 0 ? '🛡 ' + this.block : '');
     }
   }
 
   drawGold() {
     if (!this.goldText) return;
-    const x = this.rail + 8, y = this.H - this.rail - 44;
+    const x = this.rail + upx(8), y = this.H - this.rail - upx(44);
     this.goldText.setPosition(x, y).setText('◉ ' + this.gold + 'g');
   }
 
@@ -3947,10 +3963,10 @@ class GameScene extends Phaser.Scene {
     if (!this.relicIcons) return;
     for (const o of this.relicIcons) o.destroy();
     this.relicIcons = [];
-    const size = Math.min(22, this.dieSize * 0.5);
-    const gap = size + 4;
-    const x0 = this.rail + 8 + size / 2;
-    const y0 = this.H - this.rail - 64;
+    const size = Math.min(upx(22), this.dieSize * 0.5);
+    const gap = size + upx(4);
+    const x0 = this.rail + upx(8) + size / 2;
+    const y0 = this.H - this.rail - upx(64);
     this.relics.forEach((id, i) => {
       const r = RELIC_BY_ID[id];
       if (!r) return;
@@ -3975,7 +3991,7 @@ class GameScene extends Phaser.Scene {
   showTooltipText(x, y, msg) {
     this.tipText.setText(msg);
     const b = this.tipText.getBounds();
-    const pad = 8;
+    const pad = upx(8);
     let tx = Phaser.Math.Clamp(x, b.width / 2 + pad + 4, this.W - b.width / 2 - pad - 4);
     let ty = y - this.dieSize * 0.9;
     if (ty - b.height - pad * 2 < this.stripH) ty = y + this.dieSize * 0.9 + b.height + pad;
@@ -4000,8 +4016,8 @@ class GameScene extends Phaser.Scene {
 
   banner(msg, color) {
     const t = this.add.text(this.W / 2, this.H * 0.38, msg, {
-      fontFamily: FONT_DISPLAY, fontSize: '42px',
-      fontStyle: 'bold', color, stroke: '#2a1a0e', strokeThickness: 8,
+      fontFamily: FONT_DISPLAY, fontSize: fpx(42),
+      fontStyle: 'bold', color, stroke: '#2a1a0e', strokeThickness: upx(8),
     }).setOrigin(0.5).setDepth(45).setScale(0.6).setAlpha(0);
     this.tweens.add({ targets: t, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
     this.time.delayedCall(1100, () => {
@@ -4012,8 +4028,8 @@ class GameScene extends Phaser.Scene {
   floatText(x, y, msg, color, big) {
     const t = this.add.text(x, y, msg, {
       fontFamily: '-apple-system, Arial, sans-serif',
-      fontSize: (big ? 40 : 21) + 'px',
-      fontStyle: 'bold', color, stroke: '#241408', strokeThickness: big ? 8 : 5,
+      fontSize: fpx(big ? 40 : 21),
+      fontStyle: 'bold', color, stroke: '#241408', strokeThickness: upx(big ? 8 : 5),
     }).setOrigin(0.5).setDepth(35).setScale(big ? 0.25 : 0.6);
     if (big) t.setRotation((Math.random() - 0.5) * 0.16);
     this.tweens.add({
@@ -4021,7 +4037,7 @@ class GameScene extends Phaser.Scene {
       onComplete: () => { if (big) this.tweens.add({ targets: t, scale: 1, duration: 90 }); },
     });
     this.tweens.add({
-      targets: t, y: y - (big ? 58 : 30), alpha: 0,
+      targets: t, y: y - upx(big ? 58 : 30), alpha: 0,
       duration: big ? 1150 : 720, delay: big ? 240 : 80,
       ease: 'Quad.easeIn',
       onComplete: () => t.destroy(),
@@ -4035,8 +4051,8 @@ class GameScene extends Phaser.Scene {
     const color = amount >= 10 ? '#ff5252' : amount >= 6 ? '#ff9838' : '#ffd54a';
     const t = this.add.text(x, y, '-' + amount, {
       fontFamily: '"Arial Black", -apple-system, Arial, sans-serif',
-      fontSize: size + 'px', fontStyle: 'bold', color,
-      stroke: '#2a0f08', strokeThickness: Math.round(size * 0.18),
+      fontSize: fpx(size), fontStyle: 'bold', color,
+      stroke: '#2a0f08', strokeThickness: upx(size * 0.18),
     }).setOrigin(0.5).setDepth(36)
       .setScale(0.2).setRotation((Math.random() - 0.5) * 0.24);
     this.tweens.add({
@@ -4094,7 +4110,7 @@ class GameScene extends Phaser.Scene {
         }
       }
 
-      if (speed > 0.8 && !d.squashing) {
+      if (speed > 0.8 * DPR && !d.squashing) {
         d.img.rotation += d.spinSign * speed * TUNE.SPIN_RATE * (delta / 16.667);
         d.uprighting = false;
       } else if (!d.uprighting && Math.abs(d.img.rotation % (Math.PI * 2)) > 0.02) {
@@ -4107,7 +4123,7 @@ class GameScene extends Phaser.Scene {
       }
 
       if (d.state === 'active') {
-        if (speed < TUNE.SETTLE_SPEED) {
+        if (speed < TUNE.SETTLE_SPEED * DPR) {
           d.slowMs += delta;
           if (d.slowMs >= TUNE.SETTLE_MS) {
             if (d.kind === 'potion') { this.consumePotion(d); continue; }
@@ -4124,7 +4140,7 @@ class GameScene extends Phaser.Scene {
     }
 
     if (this.thrownDie && this.thrownDie.body &&
-      this.thrownDie.body.speed > TUNE.TRAIL_MIN_SPEED) {
+      this.thrownDie.body.speed > TUNE.TRAIL_MIN_SPEED * DPR) {
       this.trailAccum += delta;
       if (this.trailAccum > 26) {
         this.trailAccum = 0;
@@ -4218,9 +4234,10 @@ window.addEventListener('DOMContentLoaded', () => {
     parent: 'game-container',
     backgroundColor: '#2e2018',
     scale: {
-      mode: Phaser.Scale.RESIZE,
-      width: window.innerWidth,
-      height: window.innerHeight,
+      mode: Phaser.Scale.NONE,
+      width: Math.round(window.innerWidth * DPR),
+      height: Math.round(window.innerHeight * DPR),
+      zoom: 1 / DPR,
     },
     physics: {
       default: 'matter',
@@ -4230,6 +4247,11 @@ window.addEventListener('DOMContentLoaded', () => {
       },
     },
     scene: [GameScene],
+  });
+  // Scale.NONE + zoom drives the back-buffer; we own the resizes
+  window.addEventListener('resize', () => {
+    game.scale.resize(Math.round(window.innerWidth * DPR),
+      Math.round(window.innerHeight * DPR));
   });
   window.__runefall = game; // debugging handle
 });
