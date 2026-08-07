@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.10';
+const VERSION = 'v0.18.11';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -2302,11 +2302,19 @@ class GameScene extends Phaser.Scene {
     ctx.lineWidth = px * 0.016;
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.stroke();
-    // the numeral on both side faces, skewed onto each plane
-    const numeral = (fx, fy, slope) => {
+    // face content on both side faces, skewed onto each plane: the numeral
+    // for numbered dice, or a special's stamped face art
+    const onFace = (fx, fy, slope, draw) => {
       ctx.save();
       ctx.translate(fx, fy);
       ctx.transform(0.92, slope, 0, 1, 0, 0);
+      draw();
+      ctx.restore();
+    };
+    const drawContent = o.faceCanvas ? () => {
+      const S = px * 0.56;
+      ctx.drawImage(o.faceCanvas, -S / 2, -S / 2, S, S);
+    } : () => {
       ctx.font = `900 ${Math.round(F * 0.74)}px "Arial Black", -apple-system, Arial, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -2316,83 +2324,24 @@ class GameScene extends Phaser.Scene {
       ctx.strokeText(String(v), 0, 0);
       ctx.fillStyle = shade(pip, 0.25);
       ctx.fillText(String(v), 0, 0);
-      ctx.restore();
     };
-    numeral(cx - W / 2, y0 + H * 1.5 + F / 2, 0.5);
-    numeral(cx + W / 2, y0 + H * 1.5 + F / 2, -0.5);
+    onFace(cx - W / 2, y0 + H * 1.5 + F / 2, 0.5, drawContent);
+    onFace(cx + W / 2, y0 + H * 1.5 + F / 2, -0.5, drawContent);
     tex.refresh();
   }
 
-  // a real mid-roll pose: the cube rotated theta about a horizontal axis,
-  // orthographically projected in the same 2:1 dimetric view as makeIsoDie.
-  // Faces are affine under parallel projection, so the numerals ride their
-  // faces exactly — the value visibly rolls over the edge instead of
-  // swapping. Cycling these frames by speed is the whole tumble illusion.
-  drawTumbleFrame(key, body, pip, v, theta) {
+  // cube mode for the specials: draw the flat face art (icon / pips /
+  // numeral) once on an offscreen canvas, then stamp it sheared onto both
+  // side faces of an iso cube — every special ports without new icon code
+  makeIsoSpecial(key, body, content, opts) {
     const px = Math.round(this.dieSize * 2);
-    if (this.textures.exists(key)) this.textures.remove(key);
-    const tex = this.textures.createCanvas(key, px, px);
-    const ctx = tex.getContext();
-    ctx.clearRect(0, 0, px, px);
-    // s matches makeIsoDie's footprint: rest half-width W=0.46px over the
-    // projected sqrt(2) horizontal extent
-    const cx = px / 2, cy = px / 2, s = px * 0.32;
-    const cr = Math.cos(theta), sr = Math.sin(theta);
-    const c45 = Math.SQRT1_2, c30 = Math.cos(Math.PI / 6), s30 = 0.5;
-    const rot = (p) => {
-      const y1 = p[1] * cr - p[2] * sr, z1 = p[1] * sr + p[2] * cr; // roll
-      const x2 = p[0] * c45 + z1 * c45, z2 = -p[0] * c45 + z1 * c45; // yaw 45
-      return [x2, y1 * c30 - z2 * s30, y1 * s30 + z2 * c30];         // pitch 30
-    };
-    const proj = (p) => [cx + p[0] * s, cy - p[1] * s];
-    const FACES = [
-      { n: [0, 1, 0], u: [1, 0, 0], w: [0, 0, -1] },
-      { n: [0, -1, 0], u: [1, 0, 0], w: [0, 0, 1] },
-      { n: [0, 0, 1], u: [1, 0, 0], w: [0, -1, 0] },
-      { n: [0, 0, -1], u: [-1, 0, 0], w: [0, -1, 0] },
-      { n: [1, 0, 0], u: [0, 0, -1], w: [0, -1, 0] },
-      { n: [-1, 0, 0], u: [0, 0, 1], w: [0, -1, 0] },
-    ];
-    for (const f of FACES) {
-      const n = rot(f.n);
-      if (n[2] <= 0.02) continue; // backface
-      const u = rot(f.u), w = rot(f.w);
-      const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) =>
-        proj([n[0] + a * u[0] + b * w[0], n[1] + a * u[1] + b * w[1], 0]));
-      const bright = Math.max(-0.4, Math.min(0.48,
-        0.058 + 0.418 * n[1] - 0.212 * n[0]));
-      ctx.beginPath();
-      ctx.moveTo(corners[0][0], corners[0][1]);
-      for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
-      ctx.closePath();
-      ctx.fillStyle = shade(body, bright);
-      ctx.fill();
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = px * 0.022;
-      ctx.strokeStyle = 'rgba(18,10,14,0.5)';
-      ctx.stroke();
-      // numeral mapped onto the face plane (parallel projection = affine)
-      const C = proj(n), U = [u[0] * s, -u[1] * s], W = [w[0] * s, -w[1] * s];
-      const m = s;
-      ctx.save();
-      ctx.transform(U[0] / m, U[1] / m, W[0] / m, W[1] / m, C[0], C[1]);
-      ctx.font = `900 ${Math.round(m * 1.15)}px "Arial Black", -apple-system, Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.lineWidth = m * 0.14;
-      ctx.strokeStyle = 'rgba(14,8,12,0.72)';
-      ctx.strokeText(String(v), 0, 0);
-      ctx.fillStyle = shade(pip, 0.25 + bright * 0.5);
-      ctx.fillText(String(v), 0, 0);
-      ctx.restore();
-    }
-    tex.refresh();
-  }
-
-  makeTumbleFrames(base, body, pip, v) {
-    for (let i = 1; i <= 3; i++) {
-      this.drawTumbleFrame(base + '_t' + i, body, pip, v, (Math.PI / 2) * (i / 4));
-    }
+    const off = document.createElement('canvas');
+    off.width = off.height = px;
+    const fctx = off.getContext('2d');
+    const pad = px * 0.04, tw = px - pad * 2;
+    content(fctx, px, pad, tw);
+    this.makeIsoDie(key, body, 0, 0,
+      Object.assign({ faceCanvas: off }, opts || {}));
   }
 
   realmDice() {
@@ -2448,7 +2397,6 @@ class GameScene extends Phaser.Scene {
       if (DICE_CUBE) {
         this.makeIsoDie('die' + v, st.body, st.pip, v,
           { sparkle: rd.sparkle, seed: v });
-        this.makeTumbleFrames('die' + v, st.body, st.pip, v);
         continue;
       }
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('die' + v, st.body,
@@ -2468,7 +2416,6 @@ class GameScene extends Phaser.Scene {
       if (DICE_CUBE) {
         this.makeIsoDie('gold' + v, 0xf2b23e, 0x54341a, v,
           { sparkle: true, seed: 100 + v, coin: true });
-        this.makeTumbleFrames('gold' + v, 0xf2b23e, 0x54341a, v);
         continue;
       }
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('gold' + v, 0xf2b23e,
@@ -2497,164 +2444,213 @@ class GameScene extends Phaser.Scene {
   makeSpecialTextures() {
     // bombs: dark glass, the bomb ball as a watermark, amber pips on top
     for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
+      const content = (ctx, px, pad, tw) => {
+        const cx = pad + tw / 2, cy = pad + tw / 2, br = tw * 0.3;
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy + tw * 0.04, br, 0, Math.PI * 2);
+        const bg = ctx.createRadialGradient(cx - br * 0.3, cy - br * 0.25, br * 0.2, cx, cy, br);
+        bg.addColorStop(0, '#3a3a40');
+        bg.addColorStop(1, '#17171c');
+        ctx.fillStyle = bg;
+        ctx.fill();
+        ctx.strokeStyle = '#111';
+        ctx.lineWidth = px * 0.015;
+        ctx.stroke();
+        ctx.strokeStyle = '#7a5a38';
+        ctx.lineWidth = px * 0.035;
+        ctx.beginPath();
+        ctx.moveTo(cx + br * 0.4, cy - br * 0.7);
+        ctx.quadraticCurveTo(cx + br * 0.9, cy - br * 1.3, cx + br * 0.5, cy - br * 1.55);
+        ctx.stroke();
+        ctx.fillStyle = '#ffb347';
+        ctx.beginPath();
+        ctx.arc(cx + br * 0.5, cy - br * 1.55, px * 0.045, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.save();
+        ctx.globalAlpha = 0.24;
+        this.drawPips(ctx, px, pad, tw, v, 0xffcf7a);
+        ctx.restore();
+        this.drawDieNumeral(ctx, px, pad, tw, v, 0xffcf7a);
+      };
+      if (DICE_CUBE) {
+        this.makeIsoSpecial('bomb' + v, 0x32323c, content);
+        continue;
+      }
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('bomb' + v, 0x32323c);
-      const cx = pad + tw / 2, cy = pad + tw / 2, br = tw * 0.3;
-      ctx.save();
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.arc(cx, cy + tw * 0.04, br, 0, Math.PI * 2);
-      const bg = ctx.createRadialGradient(cx - br * 0.3, cy - br * 0.25, br * 0.2, cx, cy, br);
-      bg.addColorStop(0, '#3a3a40');
-      bg.addColorStop(1, '#17171c');
-      ctx.fillStyle = bg;
-      ctx.fill();
-      ctx.strokeStyle = '#111';
-      ctx.lineWidth = px * 0.015;
-      ctx.stroke();
-      ctx.strokeStyle = '#7a5a38';
-      ctx.lineWidth = px * 0.035;
-      ctx.beginPath();
-      ctx.moveTo(cx + br * 0.4, cy - br * 0.7);
-      ctx.quadraticCurveTo(cx + br * 0.9, cy - br * 1.3, cx + br * 0.5, cy - br * 1.55);
-      ctx.stroke();
-      ctx.fillStyle = '#ffb347';
-      ctx.beginPath();
-      ctx.arc(cx + br * 0.5, cy - br * 1.55, px * 0.045, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-      ctx.save();
-      ctx.globalAlpha = 0.24;
-      this.drawPips(ctx, px, pad, tw, v, 0xffcf7a);
-      ctx.restore();
-      this.drawDieNumeral(ctx, px, pad, tw, v, 0xffcf7a);
+      content(ctx, px, pad, tw);
       tex.refresh();
     }
     {
-      const { tex, ctx, px, pad, tw } = this.drawCubeBase('potion', 0xdfe8d2);
-      const cx = pad + tw / 2, cy = pad + tw / 2, s = tw * 0.5;
-      ctx.fillStyle = '#3f9d4e';
-      const arm = s * 0.34;
-      ctx.beginPath();
-      this.roundedRectPath(ctx, cx - arm / 2, cy - s / 2, arm, s, arm * 0.3);
-      ctx.fill();
-      ctx.beginPath();
-      this.roundedRectPath(ctx, cx - s / 2, cy - arm / 2, s, arm, arm * 0.3);
-      ctx.fill();
-      tex.refresh();
+      const content = (ctx, px, pad, tw) => {
+        const cx = pad + tw / 2, cy = pad + tw / 2, s = tw * 0.5;
+        ctx.fillStyle = '#3f9d4e';
+        const arm = s * 0.34;
+        ctx.beginPath();
+        this.roundedRectPath(ctx, cx - arm / 2, cy - s / 2, arm, s, arm * 0.3);
+        ctx.fill();
+        ctx.beginPath();
+        this.roundedRectPath(ctx, cx - s / 2, cy - arm / 2, s, arm, arm * 0.3);
+        ctx.fill();
+      };
+      if (DICE_CUBE) {
+        this.makeIsoSpecial('potion', 0xdfe8d2, content);
+      } else {
+        const { tex, ctx, px, pad, tw } = this.drawCubeBase('potion', 0xdfe8d2);
+        content(ctx, px, pad, tw);
+        tex.refresh();
+      }
     }
     for (let stage = 0; stage < 2; stage++) {
       const key = stage === 0 ? 'stone' : 'stone1';
-      const { tex, ctx, px, pad, tw } = this.drawCubeBase(key, 0x6e6a63);
-      const cx = pad + tw / 2, cy = pad + tw / 2;
-      ctx.strokeStyle = 'rgba(40,20,60,0.65)';
-      ctx.lineWidth = px * 0.035;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(cx - tw * 0.16, cy - tw * 0.2);
-      ctx.lineTo(cx + tw * 0.14, cy - tw * 0.02);
-      ctx.lineTo(cx - tw * 0.12, cy + tw * 0.2);
-      ctx.stroke();
-      if (stage === 1) {
-        ctx.strokeStyle = 'rgba(25,20,18,0.8)';
-        ctx.lineWidth = px * 0.02;
+      const content = (ctx, px, pad, tw) => {
+        const cx = pad + tw / 2, cy = pad + tw / 2;
+        ctx.strokeStyle = 'rgba(40,20,60,0.65)';
+        ctx.lineWidth = px * 0.035;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(pad + tw * 0.15, pad + tw * 0.1);
-        ctx.lineTo(cx - tw * 0.05, cy);
-        ctx.lineTo(pad + tw * 0.2, pad + tw * 0.85);
-        ctx.moveTo(cx - tw * 0.05, cy);
-        ctx.lineTo(pad + tw * 0.8, cy + tw * 0.3);
+        ctx.moveTo(cx - tw * 0.16, cy - tw * 0.2);
+        ctx.lineTo(cx + tw * 0.14, cy - tw * 0.02);
+        ctx.lineTo(cx - tw * 0.12, cy + tw * 0.2);
         ctx.stroke();
+        if (stage === 1) {
+          ctx.strokeStyle = 'rgba(25,20,18,0.8)';
+          ctx.lineWidth = px * 0.02;
+          ctx.beginPath();
+          ctx.moveTo(pad + tw * 0.15, pad + tw * 0.1);
+          ctx.lineTo(cx - tw * 0.05, cy);
+          ctx.lineTo(pad + tw * 0.2, pad + tw * 0.85);
+          ctx.moveTo(cx - tw * 0.05, cy);
+          ctx.lineTo(pad + tw * 0.8, cy + tw * 0.3);
+          ctx.stroke();
+        }
+      };
+      if (DICE_CUBE) {
+        this.makeIsoSpecial(key, 0x6e6a63, content);
+        continue;
       }
+      const { tex, ctx, px, pad, tw } = this.drawCubeBase(key, 0x6e6a63);
+      content(ctx, px, pad, tw);
       tex.refresh();
     }
     // spike die: dark purple with spikes — a miniboss's gift
     {
-      const { tex, ctx, px, pad, tw } = this.drawCubeBase('spike', 0x5a3a6e);
-      const cx = pad + tw / 2, cy = pad + tw / 2;
-      ctx.fillStyle = '#2e1a3a';
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        const bx = cx + Math.cos(a) * tw * 0.18, by = cy + Math.sin(a) * tw * 0.18;
-        const txp = cx + Math.cos(a) * tw * 0.42, typ = cy + Math.sin(a) * tw * 0.42;
-        const pa = a + Math.PI / 2;
+      const content = (ctx, px, pad, tw) => {
+        const cx = pad + tw / 2, cy = pad + tw / 2;
+        ctx.fillStyle = '#2e1a3a';
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const bx = cx + Math.cos(a) * tw * 0.18, by = cy + Math.sin(a) * tw * 0.18;
+          const txp = cx + Math.cos(a) * tw * 0.42, typ = cy + Math.sin(a) * tw * 0.42;
+          const pa = a + Math.PI / 2;
+          ctx.beginPath();
+          ctx.moveTo(bx + Math.cos(pa) * tw * 0.07, by + Math.sin(pa) * tw * 0.07);
+          ctx.lineTo(txp, typ);
+          ctx.lineTo(bx - Math.cos(pa) * tw * 0.07, by - Math.sin(pa) * tw * 0.07);
+          ctx.closePath();
+          ctx.fill();
+        }
         ctx.beginPath();
-        ctx.moveTo(bx + Math.cos(pa) * tw * 0.07, by + Math.sin(pa) * tw * 0.07);
-        ctx.lineTo(txp, typ);
-        ctx.lineTo(bx - Math.cos(pa) * tw * 0.07, by - Math.sin(pa) * tw * 0.07);
-        ctx.closePath();
+        ctx.arc(cx, cy, tw * 0.16, 0, Math.PI * 2);
+        ctx.fillStyle = '#241430';
         ctx.fill();
+      };
+      if (DICE_CUBE) {
+        this.makeIsoSpecial('spike', 0x5a3a6e, content);
+      } else {
+        const { tex, ctx, px, pad, tw } = this.drawCubeBase('spike', 0x5a3a6e);
+        content(ctx, px, pad, tw);
+        tex.refresh();
       }
-      ctx.beginPath();
-      ctx.arc(cx, cy, tw * 0.16, 0, Math.PI * 2);
-      ctx.fillStyle = '#241430';
-      ctx.fill();
-      tex.refresh();
     }
   }
 
   makeNewSpecialTextures() {
     // wild: warm cream cube with a plum star
     {
-      const { tex, ctx, px, pad, tw } = this.drawCubeBase('wild', 0xf5ecd0);
-      const cx = pad + tw / 2, cy = pad + tw / 2, R = tw * 0.3, r = R * 0.45;
-      ctx.beginPath();
-      for (let i = 0; i < 10; i++) {
-        const rad = i % 2 === 0 ? R : r;
-        const a = -Math.PI / 2 + (i * Math.PI) / 5;
-        const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      const content = (ctx, px, pad, tw) => {
+        const cx = pad + tw / 2, cy = pad + tw / 2, R = tw * 0.3, r = R * 0.45;
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const rad = i % 2 === 0 ? R : r;
+          const a = -Math.PI / 2 + (i * Math.PI) / 5;
+          const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = NUMBER_COLOR;
+        ctx.fill();
+        ctx.lineWidth = px * 0.015;
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.stroke();
+      };
+      if (DICE_CUBE) {
+        this.makeIsoSpecial('wild', 0xf5ecd0, content);
+      } else {
+        const { tex, ctx, px, pad, tw } = this.drawCubeBase('wild', 0xf5ecd0);
+        content(ctx, px, pad, tw);
+        tex.refresh();
       }
-      ctx.closePath();
-      ctx.fillStyle = NUMBER_COLOR;
-      ctx.fill();
-      ctx.lineWidth = px * 0.015;
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-      ctx.stroke();
-      tex.refresh();
     }
     // stun: icy blue cube with a spiral
     {
-      const { tex, ctx, px, pad, tw } = this.drawCubeBase('stun', 0xa8d8e8);
-      const cx = pad + tw / 2, cy = pad + tw / 2;
-      ctx.strokeStyle = '#2a6a8a';
-      ctx.lineWidth = px * 0.035;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      for (let t = 0; t <= 4.2; t += 0.1) {
-        const rad = tw * 0.05 + t * tw * 0.055;
-        const x = cx + Math.cos(t * 1.6) * rad, y = cy + Math.sin(t * 1.6) * rad;
-        if (t === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      const content = (ctx, px, pad, tw) => {
+        const cx = pad + tw / 2, cy = pad + tw / 2;
+        ctx.strokeStyle = '#2a6a8a';
+        ctx.lineWidth = px * 0.035;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (let t = 0; t <= 4.2; t += 0.1) {
+          const rad = tw * 0.05 + t * tw * 0.055;
+          const x = cx + Math.cos(t * 1.6) * rad, y = cy + Math.sin(t * 1.6) * rad;
+          if (t === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      };
+      if (DICE_CUBE) {
+        this.makeIsoSpecial('stun', 0xa8d8e8, content);
+      } else {
+        const { tex, ctx, px, pad, tw } = this.drawCubeBase('stun', 0xa8d8e8);
+        content(ctx, px, pad, tw);
+        tex.refresh();
       }
-      ctx.stroke();
-      tex.refresh();
     }
     // thief: maroon cube with a bandit mask
     {
-      const { tex, ctx, px, pad, tw } = this.drawCubeBase('thief', 0x6e3a3a);
-      const cx = pad + tw / 2, cy = pad + tw / 2;
-      ctx.fillStyle = '#241416';
-      ctx.beginPath();
-      this.roundedRectPath(ctx, pad + tw * 0.12, cy - tw * 0.16, tw * 0.76, tw * 0.3, tw * 0.1);
-      ctx.fill();
-      for (const s of [-1, 1]) {
-        ctx.fillStyle = '#fff4dc';
-        ctx.beginPath();
-        ctx.ellipse(cx + s * tw * 0.17, cy, tw * 0.09, tw * 0.06, 0, 0, Math.PI * 2);
-        ctx.fill();
+      const content = (ctx, px, pad, tw) => {
+        const cx = pad + tw / 2, cy = pad + tw / 2;
         ctx.fillStyle = '#241416';
         ctx.beginPath();
-        ctx.arc(cx + s * tw * 0.17, cy, tw * 0.03, 0, Math.PI * 2);
+        this.roundedRectPath(ctx, pad + tw * 0.12, cy - tw * 0.16, tw * 0.76, tw * 0.3, tw * 0.1);
         ctx.fill();
+        for (const s of [-1, 1]) {
+          ctx.fillStyle = '#fff4dc';
+          ctx.beginPath();
+          ctx.ellipse(cx + s * tw * 0.17, cy, tw * 0.09, tw * 0.06, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#241416';
+          ctx.beginPath();
+          ctx.arc(cx + s * tw * 0.17, cy, tw * 0.03, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // a little gold coin it swiped
+        ctx.fillStyle = '#f2b23e';
+        ctx.beginPath();
+        ctx.arc(cx + tw * 0.24, cy + tw * 0.27, tw * 0.09, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#8a5f1e';
+        ctx.lineWidth = px * 0.012;
+        ctx.stroke();
+      };
+      if (DICE_CUBE) {
+        this.makeIsoSpecial('thief', 0x6e3a3a, content);
+      } else {
+        const { tex, ctx, px, pad, tw } = this.drawCubeBase('thief', 0x6e3a3a);
+        content(ctx, px, pad, tw);
+        tex.refresh();
       }
-      // a little gold coin it swiped
-      ctx.fillStyle = '#f2b23e';
-      ctx.beginPath();
-      ctx.arc(cx + tw * 0.24, cy + tw * 0.27, tw * 0.09, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#8a5f1e';
-      ctx.lineWidth = px * 0.012;
-      ctx.stroke();
-      tex.refresh();
     }
   }
 
@@ -2708,7 +2704,7 @@ class GameScene extends Phaser.Scene {
   makeClassDieTextures() {
     for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
       for (const cls of CLASSES) {
-        const { tex, ctx, px, pad, tw } = this.drawCubeBase(cls.die + v, cls.color);
+        const content = (ctx, px, pad, tw) => {
         const cx = pad + tw / 2, cy = pad + tw / 2, r = tw * 0.32;
         ctx.save();
         ctx.globalAlpha = 0.3;
@@ -2753,6 +2749,13 @@ class GameScene extends Phaser.Scene {
         this.drawPips(ctx, px, pad, tw, v, 0xf8f4ff);
         ctx.restore();
         this.drawDieNumeral(ctx, px, pad, tw, v, 0xf8f4ff);
+        };
+        if (DICE_CUBE) {
+          this.makeIsoSpecial(cls.die + v, cls.color, content);
+          continue;
+        }
+        const { tex, ctx, px, pad, tw } = this.drawCubeBase(cls.die + v, cls.color);
+        content(ctx, px, pad, tw);
         tex.refresh();
       }
     }
@@ -4488,40 +4491,10 @@ class GameScene extends Phaser.Scene {
       }
 
       if (speed > 0.8 * DPR && !d.squashing) {
-        if (DICE_CUBE && d.kind === 'num') {
-          // cycle real mid-roll poses (rest, 22.5°, 45°, 67.5°) at a
-          // speed-scaled rate — the numeral visibly rolls over the edge
-          // and the next face rolls in. 90° of roll loops seamlessly.
-          d.tumblePhase = (d.tumblePhase || 0) +
-            delta * (0.9 + speed / (3 * DPR)) / 420;
-          const idx = Math.floor((d.tumblePhase % 1) * 4);
-          const key = (d.gold ? 'gold' : 'die') + d.value +
-            (idx === 0 ? '' : '_t' + idx);
-          if (d.img.texture.key !== key && this.textures.exists(key)) {
-            d.img.setTexture(key);
-            // the face slaps down flat at the top of each cycle
-            if (idx === 0 && (!d.hopTween || !d.hopTween.isPlaying())) {
-              d.hopTween = this.tweens.add({
-                targets: d.img, scale: d.baseScale * 1.06,
-                duration: 55, yoyo: true, ease: 'Sine.easeOut',
-                onComplete: () => { if (!d.dead && !d.squashing) d.img.setScale(d.baseScale); },
-              });
-            }
-          }
-        } else {
-          d.img.rotation += d.spinSign * speed * TUNE.SPIN_RATE * (delta / 16.667);
-        }
+        d.img.rotation += d.spinSign * speed * TUNE.SPIN_RATE * (delta / 16.667);
         d.uprighting = false;
-      } else if (!d.uprighting &&
-        (Math.abs(d.img.rotation % (Math.PI * 2)) > 0.02 || d.tumblePhase)) {
+      } else if (!d.uprighting && Math.abs(d.img.rotation % (Math.PI * 2)) > 0.02) {
         d.uprighting = true;
-        if (DICE_CUBE && d.kind === 'num') {
-          d.tumblePhase = 0;
-          const base = (d.gold ? 'gold' : 'die') + d.value;
-          if (d.img.texture.key !== base && this.textures.exists(base)) {
-            d.img.setTexture(base);
-          }
-        }
         const snapped = Math.round(d.img.rotation / (Math.PI * 2)) * (Math.PI * 2);
         this.tweens.add({
           targets: d.img, rotation: snapped, duration: 220, ease: 'Sine.easeOut',
