@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.13';
+const VERSION = 'v0.18.14';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -3220,10 +3220,12 @@ class GameScene extends Phaser.Scene {
       this.boardLight = this.add.image(0, 0, 'flash').setDepth(3)
         .setBlendMode(Phaser.BlendModes.ADD);
     }
+    // exact-fit: the old 1.35x/1.5x overscan burned a full extra screen of
+    // fill per frame — invisible pixels a fill-starved phone still pays for
     this.vignette.setPosition(this.W / 2, this.H / 2)
-      .setDisplaySize(this.W * 1.35, this.H * 1.5).setAlpha(0.9);
+      .setDisplaySize(this.W, this.H).setAlpha(0.9);
     this.boardLight.setPosition(this.W / 2, this.H * 0.58)
-      .setDisplaySize(this.W * 1.1, this.H * 1.1)
+      .setDisplaySize(this.W, this.H)
       .setTint(realm.id === 'tundra' ? 0xbfe8ff :
         realm.id === 'cinder' ? 0xffb070 : 0xffe8b0)
       .setAlpha(0.08);
