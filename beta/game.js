@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.19';
+const VERSION = 'v0.18.20';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -864,8 +864,13 @@ class GameScene extends Phaser.Scene {
         relic: pool[Phaser.Math.Between(0, pool.length - 1)] };
     }
     const value = mini ? Phaser.Math.Between(3, 5) : Phaser.Math.Between(1, 3);
-    const kind = this.playerClass && Math.random() < 0.5 ?
-      this.playerClass.die : 'num';
+    const roll = Math.random();
+    if (roll < 0.25) {
+      // special dice join the pool — bombs carry a number, flasks don't
+      const sk = ['bomb', 'stun', 'potion'][Phaser.Math.Between(0, 2)];
+      return { type: 'die', kind: sk, value: sk === 'bomb' ? value : 0 };
+    }
+    const kind = this.playerClass && roll < 0.62 ? this.playerClass.die : 'num';
     return { type: 'die', kind, value };
   }
 
@@ -919,12 +924,13 @@ class GameScene extends Phaser.Scene {
         this.modalAdd(this.add.image(cx, cy - ch * 0.16,
           this.textureFor(rw.kind, rw.value)).setDisplaySize(s, s).setDepth(72));
         const name = rw.kind === 'num' ? 'Die ' + rw.value :
-          rw.kind.charAt(0).toUpperCase() + rw.kind.slice(1) + ' die ' + rw.value;
+          rw.kind.charAt(0).toUpperCase() + rw.kind.slice(1) + ' die' +
+          (rw.value ? ' ' + rw.value : '');
         this.modalAdd(this.add.text(cx, cy + ch * 0.14, name, {
           fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(13),
           fontStyle: 'bold', color: cls ? this.playerClass.hex : BOARD.cream,
         }).setOrigin(0.5, 0).setDepth(72));
-        this.modalAdd(this.add.text(cx, cy + ch * 0.30, 'joins your bag', {
+        this.modalAdd(this.add.text(cx, cy + ch * 0.30, 'holds the field, every level', {
           fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(9),
           color: BOARD.creamDim,
         }).setOrigin(0.5, 0).setDepth(72));
@@ -937,11 +943,8 @@ class GameScene extends Phaser.Scene {
           this.gainRelic(rw.relic.id);
           done(rw.relic.icon + ' ' + rw.relic.name.toUpperCase(), GOLD);
         } else {
-          this.bag.push({ kind: rw.kind, value: rw.value });
-          this.drawPile.splice(Phaser.Math.Between(0, this.drawPile.length), 0,
-            { kind: rw.kind, value: rw.value });
-          this.updateBagCount();
-          done('NEW DIE JOINS THE BAG', '#8ec873');
+          this.fieldDice.push({ kind: rw.kind, value: rw.value });
+          done('A NEW DIE HOLDS THE FIELD', '#8ec873');
         }
       });
     });
@@ -992,6 +995,7 @@ class GameScene extends Phaser.Scene {
   seedLevelBoard() {
     const cfg = this.levelCfg();
     this.seedBoard(cfg.goldCount, cfg.goldMax);
+    this.spawnFieldDice();
     if (cfg.type === 'boss') {
       this.spawnStones(2);
       this.spawnSpikes(2 + Math.floor(this.level / 10));
@@ -1402,6 +1406,7 @@ class GameScene extends Phaser.Scene {
     this.gold = 0;
     this.block = 0;
     this.relics = [];
+    this.fieldDice = []; // reward dice that hold the board every level
     this.chain = 0;
     this.bestChain = 0;
     this.throws = 0;
@@ -2231,8 +2236,8 @@ class GameScene extends Phaser.Scene {
       this.renderShop(stock);
     });
     const canRemove = this.gold >= this.removePrice() && this.bag.length > 1;
-    const removeBtn = this.modalAdd(this.add.text(px + pw * 0.72, py + rowY,
-      '✂ Remove a die — ' + this.removePrice() + 'g', {
+    const removeBtn = this.modalAdd(this.add.text(px + pw * 0.55, py + rowY,
+      '✂ Bag die — ' + this.removePrice() + 'g', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(14),
       fontStyle: 'bold', color: canRemove ? '#e6a4a0' : '#6a5a55',
       backgroundColor: '#1c120a', padding: { x: upx(10), y: upx(6) },
@@ -2240,6 +2245,18 @@ class GameScene extends Phaser.Scene {
     removeBtn.on('pointerdown', () => {
       if (!canRemove) return;
       this.renderShopRemove(stock);
+    });
+    const nField = (this.fieldDice || []).length;
+    const canField = this.gold >= 5 && nField > 0;
+    const fieldBtn = this.modalAdd(this.add.text(px + pw * 0.82, py + rowY,
+      '⬡ Field die — 5g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(14),
+      fontStyle: 'bold', color: canField ? '#a4c9e6' : '#6a5a55',
+      backgroundColor: '#1c120a', padding: { x: upx(10), y: upx(6) },
+    }).setOrigin(0.5).setDepth(72).setInteractive());
+    fieldBtn.on('pointerdown', () => {
+      if (!canField) return;
+      this.renderShopFieldRemove(stock);
     });
     const leave = this.modalAdd(this.add.text(this.W / 2, py + leaveY, '▶ LEAVE SHOP', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(17),
@@ -2305,6 +2322,58 @@ class GameScene extends Phaser.Scene {
   }
 
   // pick a die to remove from the bag (paid on selection)
+  // pick a reward field die to retire — it stops returning to the board
+  renderShopFieldRemove(stock) {
+    this.modalRefresh = () => this.renderShopFieldRemove(stock);
+    const { px, py, pw, ph } = this.modalBase('REMOVE A FIELD DIE — 5g');
+    this.modalOpen = 'shop';
+    this.modalAdd(this.add.text(px + upx(16), py + upx(12), this.gold + 'g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(18),
+      fontStyle: 'bold', color: GOLD,
+    }).setDepth(72));
+    this.modalAdd(this.add.text(this.W / 2, py + upx(44),
+      'These dice return to the board every level. Tap one to retire it.', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
+      color: BOARD.creamDim,
+    }).setOrigin(0.5).setDepth(72));
+    const list = this.fieldDice || [];
+    const cols = Math.min(Math.max(list.length, 1), 6);
+    const cellW = pw / (cols + 0.5);
+    const s = Math.min(this.dieSize, cellW * 0.55);
+    list.forEach((e, i) => {
+      const col = i % cols, row = Math.floor(i / cols);
+      const x = px + cellW * (col + 0.75);
+      const y = py + upx(96) + row * (s + upx(50));
+      const img = this.modalAdd(this.add.image(x, y,
+        this.textureFor(e.kind, e.value)).setDepth(72)
+        .setDisplaySize(s, s).setInteractive());
+      const label = e.kind === 'num' ? 'Die ' + e.value :
+        e.kind.charAt(0).toUpperCase() + e.kind.slice(1) +
+        (this.mergeableKind(e.kind) && e.value ? ' ' + e.value : '');
+      this.modalAdd(this.add.text(x, y + s * 0.62 + 4, label, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
+        color: BOARD.cream,
+      }).setOrigin(0.5, 0).setDepth(72));
+      img.on('pointerdown', () => {
+        if (this.gold < 5) return;
+        const idx = this.fieldDice.indexOf(e);
+        if (idx < 0) return;
+        this.gold -= 5;
+        this.fieldDice.splice(idx, 1);
+        this.drawGold();
+        this.floatText(x, y, 'RETIRED', '#a4c9e6');
+        if (this.fieldDice.length) this.renderShopFieldRemove(stock);
+        else this.renderShop(stock);
+      });
+    });
+    const back = this.modalAdd(this.add.text(this.W / 2, py + ph - 30, '◀ BACK TO SHOP', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
+      fontStyle: 'bold', color: '#ffd54a',
+      backgroundColor: '#3a2517', padding: { x: upx(12), y: upx(6) },
+    }).setOrigin(0.5).setDepth(72).setInteractive());
+    back.on('pointerdown', () => this.renderShop(stock));
+  }
+
   renderShopRemove(stock) {
     this.modalRefresh = () => this.renderShopRemove(stock);
     const { px, py, pw, ph } = this.modalBase('REMOVE A DIE — ' + this.removePrice() + 'g');
@@ -3858,6 +3927,25 @@ class GameScene extends Phaser.Scene {
 
   spawnSpikes(count) {
     this.spawnHazard('spike', count);
+  }
+
+  // reward dice live here, not in the bag — every board reset brings the
+  // whole set back onto the field, even if they merged away last level
+  spawnFieldDice() {
+    if (!this.fieldDice || !this.fieldDice.length) return;
+    const placed = [];
+    for (const e of this.fieldDice) {
+      const spot = this.findSeedSpot(placed, this.dieSize * 1.5);
+      if (!spot) break;
+      const d = this.makeDie(spot.x, spot.y, e.value, 'rest', e.kind);
+      d.restingSince = this.time.now;
+      d.img.setScale(0);
+      this.tweens.add({
+        targets: d.img, scale: d.baseScale, duration: 300, ease: 'Back.easeOut',
+      });
+      this.sparks.burst(spot.x, spot.y, 0x8ec873, 6,
+        { speedMin: 0.5, speedMax: 2, life: 300, scale: 0.55 });
+    }
   }
 
   spawnHazard(kind, count) {
