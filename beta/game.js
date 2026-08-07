@@ -1,13 +1,24 @@
 'use strict';
 
+// crash beacon: record the session's first uncaught error so probes
+// and bug reports can read it; a clean boot clears it (see create())
+window.addEventListener('error', (e) => {
+  try {
+    if (!localStorage.getItem('runefall.bootError')) {
+      localStorage.setItem('runefall.bootError',
+        (e.message || 'unknown') + ' @ ' + (e.filename || '') + ':' + (e.lineno || 0));
+    }
+  } catch (err) { /* no-op */ }
+});
+
 // ============================================================
-// RUNEFALL — Phase 0.16 "Realms"    v0.16.0
+// RUNEFALL — Phase 0.17 "The beauty pass"    v0.17.0
 // A 20-level Rune Dice-style run: flick dice from your DICE BAG,
 // merges damage enemies, gold dice pay out, shops between fights
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.16.1';
+const VERSION = 'v0.17.0';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -159,9 +170,58 @@ const feedback = {
   },
 };
 
-const VALUE_COLORS = {
-  1: 0xf2efe4, 2: 0xe4bf7e, 3: 0x8ec873,
-  4: 0x6fb3dd, 5: 0xa98ae0, 6: 0xf2b23e,
+// ---- dice styling: the drbango.com/dice look, one set per realm ----
+// Every VALUE keeps its own unmistakable body color (you read the board
+// by color); the realm decides the family those colors live in.
+// glade = Rolling Hills greens/earths, tundra = Frost Valley ices
+// (sparkle on), cinder = Volcanic Isles magmas.
+const REALM_DICE = {
+  glade: {
+    sparkle: false,
+    values: [null,
+      { body: 0xe8dcc0, pip: 0x5d4037 },   // 1 bone
+      { body: 0x8d6e63, pip: 0xf5f5dc },   // 2 earth
+      { body: 0x6aa84f, pip: 0xf7f3e0 },   // 3 leaf
+      { body: 0x2e7d32, pip: 0xa5d6a7 },   // 4 forest
+      { body: 0x1f5f5b, pip: 0x9fe8df },   // 5 deep glen
+      { body: 0xf2b23e, pip: 0x5d4037 },   // 6 sungold
+    ],
+  },
+  tundra: {
+    sparkle: true,
+    values: [null,
+      { body: 0xeef4fa, pip: 0x4a8bbf },   // 1 snow
+      { body: 0xa8d8e8, pip: 0x1c3c5e },   // 2 pale ice
+      { body: 0x5d9fcf, pip: 0xffffff },   // 3 frost
+      { body: 0x2c5f8a, pip: 0xd6ecff },   // 4 deep ice
+      { body: 0x6f5fd0, pip: 0xe8e2ff },   // 5 aurora
+      { body: 0x16263e, pip: 0x7fdfff },   // 6 midnight
+    ],
+  },
+  cinder: {
+    sparkle: false,
+    values: [null,
+      { body: 0xd8cfc0, pip: 0x6e3a2a },   // 1 ash bone
+      { body: 0xe08a4a, pip: 0x3a1a10 },   // 2 ember
+      { body: 0xc0392b, pip: 0xffd8a8 },   // 3 magma
+      { body: 0x8b1a1a, pip: 0xff8c00 },   // 4 deep magma
+      { body: 0x5e2a52, pip: 0xffb0e8 },   // 5 smoke violet
+      { body: 0x26202a, pip: 0xff9838 },   // 6 obsidian
+    ],
+  },
+};
+// pip arrangements 1-10, same layouts as the dice page (7+ for later)
+const PIP_LAYOUTS = {
+  1: [[0.5, 0.5]],
+  2: [[0.3, 0.3], [0.7, 0.7]],
+  3: [[0.3, 0.3], [0.5, 0.5], [0.7, 0.7]],
+  4: [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]],
+  5: [[0.3, 0.3], [0.7, 0.3], [0.5, 0.5], [0.3, 0.7], [0.7, 0.7]],
+  6: [[0.3, 0.25], [0.7, 0.25], [0.3, 0.5], [0.7, 0.5], [0.3, 0.75], [0.7, 0.75]],
+  7: [[0.3, 0.25], [0.7, 0.25], [0.3, 0.5], [0.5, 0.5], [0.7, 0.5], [0.3, 0.75], [0.7, 0.75]],
+  8: [[0.3, 0.2], [0.7, 0.2], [0.3, 0.4], [0.7, 0.4], [0.3, 0.6], [0.7, 0.6], [0.3, 0.8], [0.7, 0.8]],
+  9: [[0.3, 0.3], [0.5, 0.3], [0.7, 0.3], [0.3, 0.5], [0.5, 0.5], [0.7, 0.5], [0.3, 0.7], [0.5, 0.7], [0.7, 0.7]],
+  10: [[0.3, 0.2], [0.7, 0.2], [0.3, 0.4], [0.7, 0.4], [0.5, 0.3], [0.5, 0.7], [0.3, 0.6], [0.7, 0.6], [0.3, 0.8], [0.7, 0.8]],
 };
 const NUMBER_COLOR = '#443355';
 const GOLD = '#f2b23e';
@@ -465,7 +525,10 @@ class GameScene extends Phaser.Scene {
     else this.showHome();
     // boot beacon: confirms create() ran to completion on this
     // device + version (readable by probes and bug reports alike)
-    try { localStorage.setItem('runefall.boot', VERSION); } catch (e) { /* no-op */ }
+    try {
+      localStorage.setItem('runefall.boot', VERSION);
+      localStorage.removeItem('runefall.bootError');
+    } catch (e) { /* no-op */ }
   }
 
   // ---------- bag ----------
@@ -987,6 +1050,7 @@ class GameScene extends Phaser.Scene {
     this.playerClass = cls;
     this.realm = REALM_BY_ID[realmId] || this.realm || REALMS[0];
     this.cameras.main.setBackgroundColor(this.realm.palette.bg);
+    this.makeTextures();   // dice restyle to this realm's set
     this.buildBoard();
     // a run always opens from a clean slate, whatever came before
     this.hp = TUNE.PLAYER_HP;
@@ -1805,7 +1869,8 @@ class GameScene extends Phaser.Scene {
   }
 
   makeSoftTexture(key, px, inner, outer) {
-    if (this.textures.exists(key)) this.textures.remove(key);
+    // shared by live particles/shadows — never regenerate under them
+    if (this.textures.exists(key)) return;
     const tex = this.textures.createCanvas(key, px, px);
     const ctx = tex.getContext();
     const g = ctx.createRadialGradient(px / 2, px / 2, px * 0.05, px / 2, px / 2, px / 2);
@@ -1816,73 +1881,125 @@ class GameScene extends Phaser.Scene {
     tex.refresh();
   }
 
-  drawCubeBase(key, color) {
+  // the drbango.com/dice look in 2D: soft rounded glass body, radial
+  // edge shading, a diagonal glass sweep, optional seeded glitter
+  drawCubeBase(key, color, opts) {
+    const o = opts || {};
     const px = Math.round(this.dieSize * 2);
     if (this.textures.exists(key)) this.textures.remove(key);
     const tex = this.textures.createCanvas(key, px, px);
     const ctx = tex.getContext();
-    const pad = px * 0.03, depth = px * 0.13, r = px * 0.2;
+    const pad = px * 0.04, r = px * 0.22;
+    const tw = px - pad * 2;
     ctx.clearRect(0, 0, px, px);
     ctx.beginPath();
-    this.roundedRectPath(ctx, pad, pad, px - pad * 2, px - pad * 2, r);
-    const sideGrad = ctx.createLinearGradient(0, 0, px * 0.3, px);
-    sideGrad.addColorStop(0, shade(color, -0.25));
-    sideGrad.addColorStop(1, shade(color, -0.48));
-    ctx.fillStyle = sideGrad;
+    this.roundedRectPath(ctx, pad, pad, tw, tw, r);
+    const base = ctx.createLinearGradient(0, pad, 0, pad + tw);
+    base.addColorStop(0, shade(color, 0.18));
+    base.addColorStop(0.55, shade(color, 0));
+    base.addColorStop(1, shade(color, -0.14));
+    ctx.fillStyle = base;
     ctx.fill();
-    ctx.lineWidth = px * 0.028;
-    ctx.strokeStyle = 'rgba(30,15,8,0.55)';
-    ctx.stroke();
-    const tw = px - pad * 2 - depth;
+    ctx.save();
+    ctx.clip();
+    // darkened rim, exactly like the page's radial edge shading
+    const rim = ctx.createRadialGradient(
+      px * 0.46, px * 0.42, tw * 0.28, px * 0.5, px * 0.5, tw * 0.72);
+    rim.addColorStop(0, 'rgba(0,0,0,0)');
+    rim.addColorStop(0.72, 'rgba(0,0,0,0.06)');
+    rim.addColorStop(1, 'rgba(0,0,0,0.28)');
+    ctx.fillStyle = rim;
+    ctx.fillRect(0, 0, px, px);
+    // glitter particles (seeded so every die value sparkles its own way)
+    if (o.sparkle) {
+      let seed = ((o.seed || 1) * 7919 + 31) % 2147483647;
+      const srand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      const rb = (color >> 16) & 255, gb = (color >> 8) & 255, bb = color & 255;
+      for (let i = 0; i < 60; i++) {
+        const sx = pad + srand() * tw, sy = pad + srand() * tw;
+        const sz = (0.3 + srand() * 1.4) * (px / 150);
+        const br = 0.10 + srand() * 0.5;
+        ctx.fillStyle = srand() > 0.35 ? 'rgba(255,255,255,' + br + ')' :
+          'rgba(' + Math.min(255, rb + 80) + ',' + Math.min(255, gb + 80) + ',' +
+          Math.min(255, bb + 80) + ',' + (br * 0.5) + ')';
+        ctx.beginPath();
+        ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // diagonal glass sweep
+    const sweep = ctx.createLinearGradient(0, 0, px, px * 0.7);
+    sweep.addColorStop(0, 'rgba(255,255,255,0)');
+    sweep.addColorStop(0.42, 'rgba(255,255,255,0.03)');
+    sweep.addColorStop(0.5, 'rgba(255,255,255,0.12)');
+    sweep.addColorStop(0.58, 'rgba(255,255,255,0.03)');
+    sweep.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sweep;
+    ctx.fillRect(0, 0, px, px);
+    ctx.restore();
+    // rim stroke + inner top highlight
     ctx.beginPath();
-    this.roundedRectPath(ctx, pad, pad, tw, tw, r * 0.85);
-    const topGrad = ctx.createLinearGradient(0, pad, 0, pad + tw);
-    topGrad.addColorStop(0, shade(color, 0.32));
-    topGrad.addColorStop(1, shade(color, 0.02));
-    ctx.fillStyle = topGrad;
-    ctx.fill();
-    ctx.lineWidth = px * 0.02;
-    ctx.strokeStyle = 'rgba(30,15,8,0.3)';
+    this.roundedRectPath(ctx, pad, pad, tw, tw, r);
+    ctx.lineWidth = px * 0.025;
+    ctx.strokeStyle = 'rgba(18,10,14,0.5)';
     ctx.stroke();
     ctx.beginPath();
-    this.roundedRectPath(ctx, pad + px * 0.045, pad + px * 0.045,
-      tw - px * 0.09, tw - px * 0.09, r * 0.65);
-    ctx.lineWidth = px * 0.02;
+    this.roundedRectPath(ctx, pad + px * 0.035, pad + px * 0.035,
+      tw - px * 0.07, tw - px * 0.07, r * 0.75);
+    ctx.lineWidth = px * 0.016;
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.stroke();
     return { tex, ctx, px, pad, tw };
   }
 
-  drawDieNumber(ctx, px, pad, tw, v) {
-    const cx = pad + tw / 2, cy = pad + tw / 2;
-    ctx.font = `900 ${Math.round(tw * 0.62)}px -apple-system, "Arial Black", Arial, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineWidth = px * 0.045;
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.strokeText(String(v), cx, cy + tw * 0.04);
-    ctx.fillStyle = NUMBER_COLOR;
-    ctx.fillText(String(v), cx, cy + tw * 0.04);
-    const depth = px * 0.13;
-    ctx.font = `900 ${Math.round(depth * 0.85)}px -apple-system, Arial, sans-serif`;
-    ctx.fillStyle = 'rgba(255,245,225,0.5)';
-    ctx.fillText(String(v), cx, px - pad - depth * 0.52);
+  realmDice() {
+    return REALM_DICE[(this.realm || REALMS[0]).id] || REALM_DICE.glade;
+  }
+
+  // recessed pips, ported from the dice page: shadow ring, pip, highlight
+  drawPips(ctx, px, pad, tw, value, pipColor) {
+    const pips = PIP_LAYOUTS[Math.min(value, 10)];
+    if (!pips) return;
+    const pipHex = shade(pipColor, 0);
+    const pipR = tw * 0.095 * (value >= 7 ? 0.78 : 1);
+    for (const [u, v] of pips) {
+      const x = pad + u * tw, y = pad + v * tw;
+      ctx.beginPath();
+      ctx.arc(x, y, pipR + px * 0.007, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x, y, pipR, 0, Math.PI * 2);
+      ctx.fillStyle = pipHex;
+      ctx.fill();
+      const pg = ctx.createRadialGradient(x - pipR * 0.3, y - pipR * 0.3, 0, x, y, pipR);
+      pg.addColorStop(0, 'rgba(255,255,255,0.38)');
+      pg.addColorStop(0.5, 'rgba(255,255,255,0.08)');
+      pg.addColorStop(1, 'rgba(0,0,0,0.08)');
+      ctx.beginPath();
+      ctx.arc(x, y, pipR, 0, Math.PI * 2);
+      ctx.fillStyle = pg;
+      ctx.fill();
+    }
   }
 
   makeDieTextures() {
+    const rd = this.realmDice();
     for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
-      const { tex, ctx, px, pad, tw } = this.drawCubeBase('die' + v, VALUE_COLORS[v]);
-      this.drawDieNumber(ctx, px, pad, tw, v);
+      const st = rd.values[v];
+      const { tex, ctx, px, pad, tw } = this.drawCubeBase('die' + v, st.body,
+        { sparkle: rd.sparkle, seed: v });
+      this.drawPips(ctx, px, pad, tw, v, st.pip);
       tex.refresh();
     }
   }
 
-  // gold dice: same values, but a gold coin sits behind the number
+  // gold dice: always treasure-gold glass, coin face behind the pips
   makeGoldDieTextures() {
     for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
-      const { tex, ctx, px, pad, tw } = this.drawCubeBase('gold' + v, VALUE_COLORS[v]);
-      const cx = pad + tw / 2, cy = pad + tw / 2, cr = tw * 0.34;
+      const { tex, ctx, px, pad, tw } = this.drawCubeBase('gold' + v, 0xf2b23e,
+        { sparkle: true, seed: 100 + v });
+      const cx = pad + tw / 2, cy = pad + tw / 2, cr = tw * 0.36;
       const cg = ctx.createRadialGradient(cx - cr * 0.3, cy - cr * 0.3, cr * 0.15, cx, cy, cr);
       cg.addColorStop(0, '#ffe08a');
       cg.addColorStop(0.7, '#f2b23e');
@@ -1891,24 +2008,21 @@ class GameScene extends Phaser.Scene {
       ctx.arc(cx, cy + tw * 0.03, cr, 0, Math.PI * 2);
       ctx.fillStyle = cg;
       ctx.fill();
-      ctx.lineWidth = px * 0.02;
+      ctx.lineWidth = px * 0.015;
       ctx.strokeStyle = '#8a5f1e';
       ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(cx, cy + tw * 0.03, cr * 0.72, 0, Math.PI * 2);
-      ctx.lineWidth = px * 0.012;
-      ctx.strokeStyle = 'rgba(138,95,30,0.6)';
-      ctx.stroke();
-      this.drawDieNumber(ctx, px, pad, tw, v);
+      this.drawPips(ctx, px, pad, tw, v, 0x54341a);
       tex.refresh();
     }
   }
 
   makeSpecialTextures() {
-    // bombs are numbered: dark cube, bomb ball, amber number on top
+    // bombs: dark glass, the bomb ball as a watermark, amber pips on top
     for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
-      const { tex, ctx, px, pad, tw } = this.drawCubeBase('bomb' + v, 0x4a4a52);
+      const { tex, ctx, px, pad, tw } = this.drawCubeBase('bomb' + v, 0x32323c);
       const cx = pad + tw / 2, cy = pad + tw / 2, br = tw * 0.3;
+      ctx.save();
+      ctx.globalAlpha = 0.5;
       ctx.beginPath();
       ctx.arc(cx, cy + tw * 0.04, br, 0, Math.PI * 2);
       const bg = ctx.createRadialGradient(cx - br * 0.3, cy - br * 0.25, br * 0.2, cx, cy, br);
@@ -1929,16 +2043,8 @@ class GameScene extends Phaser.Scene {
       ctx.beginPath();
       ctx.arc(cx + br * 0.5, cy - br * 1.55, px * 0.045, 0, Math.PI * 2);
       ctx.fill();
-      // the number, amber so it reads on the dark face
-      ctx.font = `900 ${Math.round(tw * 0.5)}px -apple-system, "Arial Black", Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.lineWidth = px * 0.04;
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = 'rgba(20,10,5,0.85)';
-      ctx.strokeText(String(v), cx, cy + tw * 0.05);
-      ctx.fillStyle = '#ffcf7a';
-      ctx.fillText(String(v), cx, cy + tw * 0.05);
+      ctx.restore();
+      this.drawPips(ctx, px, pad, tw, v, 0xffcf7a);
       tex.refresh();
     }
     {
@@ -2071,8 +2177,9 @@ class GameScene extends Phaser.Scene {
   }
 
   makeBagTexture() {
+    // realm-independent and displayed persistently — draw once
+    if (this.textures.exists('bag')) return;
     const px = Math.round(this.dieSize * 2);
-    if (this.textures.exists('bag')) this.textures.remove('bag');
     const tex = this.textures.createCanvas('bag', px, px);
     const ctx = tex.getContext();
     const cx = px / 2;
@@ -2122,7 +2229,7 @@ class GameScene extends Phaser.Scene {
         const { tex, ctx, px, pad, tw } = this.drawCubeBase(cls.die + v, cls.color);
         const cx = pad + tw / 2, cy = pad + tw / 2, r = tw * 0.32;
         ctx.save();
-        ctx.globalAlpha = 0.7;
+        ctx.globalAlpha = 0.3;
         ctx.fillStyle = NUMBER_COLOR;
         if (cls.die === 'shield') {
           ctx.beginPath();
@@ -2159,7 +2266,7 @@ class GameScene extends Phaser.Scene {
           ctx.fill();
         }
         ctx.restore();
-        this.drawDieNumber(ctx, px, pad, tw, v);
+        this.drawPips(ctx, px, pad, tw, v, 0xf8f4ff);
         tex.refresh();
       }
     }
@@ -2168,6 +2275,8 @@ class GameScene extends Phaser.Scene {
   // relics are struck as little amber medallions: one coin face per
   // relic with its glyph stamped in the middle
   makeRelicTextures() {
+    // realm-independent and displayed persistently — draw once
+    if (this.textures.exists('relic_' + RELICS[0].id)) return;
     const px = 72;
     for (const r of RELICS) {
       const key = 'relic_' + r.id;
@@ -3261,7 +3370,8 @@ class GameScene extends Phaser.Scene {
 
   mergeImpact(gx, gy, riseH, value) {
     const apexY = gy - riseH;
-    const color = shadeHex(VALUE_COLORS[Math.min(value + 1, TUNE.MAX_VALUE)], -0.1);
+    const st = this.realmDice().values[Math.min(value + 1, TUNE.MAX_VALUE)];
+    const color = shadeHex(st.body, -0.1);
     const flash = this.add.image(gx, apexY, 'flash').setDepth(19)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDisplaySize(this.dieSize * 1.4, this.dieSize * 1.4);
