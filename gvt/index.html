@@ -28322,6 +28322,56 @@ function tvGrant(){
   // ★ up — the piggy's own 1250ms law
   setTimeout(()=>{ if(S.mode==='menu') renderMenu(); }, 1250);
 }
+// ============ v2.60 ADS V1a — THE INTERSTITIAL HALF + THE GATES ============
+// design/ads/ADS-V1.md is the contract; V1a owns showInterstitial /
+// interstitialAvailable and every gate. V1b's rewarded half (the const ADS +
+// theater above, when its hunks are on this tree) OWNS the show; in the
+// placeholder era the interstitial IS that same wordless show — one theater,
+// two seam members, so a real SDK adapter later replaces each independently
+// and no call site ever changes. On a tree without V1b's hunks the seam
+// stands itself up: a no-fill rewarded stub (callable, NEVER pays — the law)
+// and a pass-through interstitial (gameplay always continues — the fail-safe
+// law). THE GATES ride ONLY the player's own tap at a start seam — never a
+// relay (a delayed start desyncs a lobby), never a GVT rig door (batteries
+// stay deterministic), never mid-game, ever. Counters are session-scoped and
+// in-memory on purpose: a reload IS a fresh session, and only door-launched
+// games count — so a mixed session sees FEWER breaks than the schedule,
+// never more. The session's first door game is always free.
+let AD_FREE_GAMES=1;   // door games at session start that are always ad-free (DIAL; let = rig-tunable)
+let AD_CAMP_EVERY=1;   // campaign: a break before every Nth level start — 2 = every other, 0 = off (DIAL)
+let AD_BF_EVERY=1;     // battlegrounds: a break before every Nth match launch — 0 = off (DIAL)
+const ADQ={ games:0, camp:0, bf:0 };   // the session gate counters (door-launched games only)
+(function(){
+  let A; try{ A=ADS; }catch(e){}      // the rewarded half's const, if its hunks are on this tree
+  if(!A) A=window.ADS={ provider:'placeholder',
+    rewardedAvailable(){ return false; },                            // no theater = no fill
+    showRewarded(){ return Promise.resolve({completed:false}); } };  // callable, never pays
+  A.interstitialAvailable=function(){ try{ return !AD; }catch(e){ return true; } };
+  A.showInterstitial=function(){
+    // placeholder era: the same theater as the rewarded show (wordless TV,
+    // static, ring, ✕ from the first frame — the ✕ just ends a placeholder
+    // break early; a gate continues either way, so it is kindness, not a leak)
+    try{ if(typeof adTeardown==='function') return A.showRewarded(); }catch(e){}
+    return Promise.resolve({completed:true});   // theaterless tree: continue as if finished
+  };
+})();
+function adGate(kind, launch){
+  let brk=false;
+  try{
+    try{ if(AD) return; }catch(e){}   // a show is already up — this tap lands on glass
+    const free=ADQ.games<AD_FREE_GAMES;
+    ADQ.games++;
+    const idx= kind==='camp'? ++ADQ.camp : ++ADQ.bf;
+    const every= kind==='camp'? AD_CAMP_EVERY : AD_BF_EVERY;
+    brk= !free && every>0 && (idx%every)===0;
+  }catch(e){ brk=false; }             // the gate may fail — the game may not (fail-safe law)
+  if(brk){
+    // two-arg then: even a misbehaving future adapter that REJECTS (the
+    // contract says never) still hands the game back, exactly once
+    try{ ADS.showInterstitial().then(()=>launch(), ()=>launch()); }
+    catch(e){ launch(); }
+  } else launch();
+}
 // ================= WAR TABLE (the battlefield entry scene) =================
 // Full-screen scene over the menu — the battle photo is the hero. 1v1 is THE
 // default: the big button always says 1v1, it never follows the last-played
@@ -30620,7 +30670,7 @@ function mboxOpen(e){
   SFX.thock(); setTimeout(()=>SFX.coin(), 140);
 }
 window.UI = {
-  play(n){ audio(); startCampaign(n); },
+  play(n){ audio(); adGate('camp', ()=>startCampaign(n)); },
   // THE DAILY RAID (v1.28): a quick 1v1 on the battleground against the rival's
   // own army — the same opponent, on the mode the whole game is built around now.
   // `raid` is set AFTER startBattlefield because that function builds S.bf fresh.
@@ -30634,7 +30684,7 @@ window.UI = {
     // hid with the menu and was still standing there, stale FIGHT copy and
     // all, when the win brought the room back.
     UI.closeModal();
-    audio(); startBattlefield('random', null, 1); if(S.bf) S.bf.raid=true; },
+    audio(); adGate('bf', ()=>{ startBattlefield('random', null, 1); if(S.bf) S.bf.raid=true; }); },
   momFight(){ UI.closeModal(); audio(); startMomRaid(); },   // v1.79: the mom panel's button — v2.45: her door obeys the same launcher law (the 0140 medal door already closed it; this one never did)
   // WAR TABLE: every size button is a launcher — tap = queue that size right now
   wtPlay(n){ audio(); SFX.blip();
@@ -30643,14 +30693,14 @@ window.UI = {
     // would lift the class and hand back a tray nobody asked to reopen
     const lk=document.getElementById('wtLocker'); if(lk) lk.classList.add('hidden');
     const tr=document.getElementById('wtMapTray'); if(tr) tr.classList.add('hidden');
-    bfQueueStart(n); },
+    adGate('bf', ()=>bfQueueStart(n)); },
   // v2.52 THE FEATURED BATTLE — a launcher like wtPlay, but today's fixed map
   // and size ride the queue with the feat flag (the +30★ purse reads it)
   wtFeat(){ audio(); SFX.blip();
     const lk=document.getElementById('wtLocker'); if(lk) lk.classList.add('hidden');
     const tr=document.getElementById('wtMapTray'); if(tr) tr.classList.add('hidden');
     const ft=featBattle();
-    bfQueueStart(ft.size,{mapId:ft.map, feat:true}); },
+    adGate('bf', ()=>bfQueueStart(ft.size,{mapId:ft.map, feat:true})); },
   // the ONE door (v1.43): everything that isn't PLAY/2v2 lives behind it
   wtMore(){ audio(); SFX.blip(); const lk=document.getElementById('wtLocker'); if(lk) lk.classList.remove('hidden'); },
   wtMoreX(){ SFX.clack(); const lk=document.getElementById('wtLocker'); if(lk) lk.classList.add('hidden'); },
@@ -30682,7 +30732,7 @@ window.UI = {
     SFX.clack(); const t=document.getElementById('wtMapTray'); if(t) t.classList.add('hidden'); },
   wtClose(){ SFX.clack(); closeWarTable(); },
   // ---- THE CAMPAIGN scene (v1.42) ----
-  campPlay(n){ audio(); SFX.blip(); startCampaign(n); },   // no n = the next rung
+  campPlay(n){ audio(); SFX.blip(); adGate('camp', ()=>startCampaign(n)); },   // no n = the next rung
   campBuddies(){ audio(); closeCampScene(); UI.coopOpen(); },  // the wtRoom pattern: scene down, muster up
   campClose(){ SFX.clack(); closeCampScene(); },
   // ---- LANGUAGE ----
@@ -30711,7 +30761,7 @@ window.UI = {
   // board's action lives on every ROW now (a challenge needs a name on it).
   wrAct(){ audio(); SFX.blip();
     if(!WR_CTA[WR.tab]) return;
-    bfQueueStart(WR.tab==='bf1'?1:2); },
+    const sz=(WR.tab==='bf1')?1:2; adGate('bf', ()=>bfQueueStart(sz)); },
   // a row IS a challenge — the modal lives over the room, so the scene stands down
   wrRow(uid){ audio(); SFX.blip(); closeWorldRank(); UI.duelPick(uid); },
   wrMuster(){ SFX.blip(); WR.muster=true; renderWorldRank(); },
@@ -31442,7 +31492,7 @@ document.getElementById('title').addEventListener('pointerdown', ()=>{
   audio(); SFX.blip();
   // an invite link outranks the virgin-L1 fast path — get them connected first
   if(META.campaign>0 || coopJoinPend) showMenu();
-  else startCampaign(1);
+  else adGate('camp', ()=>startCampaign(1));   // v2.60: routed through the gate so it COUNTS — necessarily game 1, so always free
 });
 (function fillStrip(){
   // two armies marching past each other, waddling like they own the carpet
@@ -31461,8 +31511,8 @@ document.getElementById('retryBtn').addEventListener('click', ()=>{
   if(S.bf){ const raid=!!S.bf.raid, m=S.bf.mapId, t=S.bf.team;
     // v2.41: a raid rematch is a fresh attack (the ground is drawn again),
     // and a RANDOM pref redraws too — an explicit pick still replays itself.
-    startBattlefield((raid||META.bfMap==='random')?'random':m, null, t); if(raid && S.bf) S.bf.raid=true; return; }   // instant rematch, same size, no queue
-  startCampaign(S.levelN);
+    adGate('bf', ()=>{ startBattlefield((raid||META.bfMap==='random')?'random':m, null, t); if(raid && S.bf) S.bf.raid=true; }); return; }   // instant rematch, same size, no queue
+  adGate('camp', ()=>startCampaign(S.levelN));   // a level RE-start is a level start (v2.60)
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
   audio();
@@ -31499,6 +31549,13 @@ requestAnimationFrame(frame);
 
 // ================= DEBUG API =================
 window.GVT = {
+  // ---- ADS V1a rig (v2.60): gates + dials, deterministic for batteries ----
+  ads(){ return { sess:Object.assign({},ADQ), free:AD_FREE_GAMES, camp:AD_CAMP_EVERY, bf:AD_BF_EVERY,
+    live:(()=>{ try{ return !!AD; }catch(e){ return false; } })(),
+    int:typeof ADS.showInterstitial==='function', rw:typeof ADS.showRewarded==='function' }; },
+  adSess(p){ Object.assign(ADQ,p||{}); return Object.assign({},ADQ); },
+  adCfg(p){ p=p||{}; if(p.free!=null) AD_FREE_GAMES=p.free; if(p.camp!=null) AD_CAMP_EVERY=p.camp;
+    if(p.bf!=null) AD_BF_EVERY=p.bf; return GVT.ads(); },
   // ---- LOCALIZATION RIG ----
   i18n(){ const n={}; for(const k in TR) n[k]=Object.keys(TR[k]).length;
     return { lang:LANG, script:langDef(LANG).script, cfont:CFONT, langs:LANGS.map(l=>l.id), sizes:n }; },
