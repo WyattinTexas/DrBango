@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.17.2';
+const VERSION = 'v0.17.3';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -800,8 +800,29 @@ class GameScene extends Phaser.Scene {
       const x = this.W * (0.5 + (i - (n - 1) / 2) * 0.2);
       const y = this.stripH * 0.5;
       e.x = x; e.y = y;
+      this.tweens.killTweensOf(e.img);
       e.img.setPosition(x, y).setDisplaySize(size, size);
       if (e.boss) e.img.setTint(0xffd0c0);
+      // boss menace: a slow-breathing glow behind the sprite
+      if (e.boss && e.alive) {
+        if (!e.aura) {
+          e.aura = this.add.image(x, y, 'flash').setDepth(29)
+            .setBlendMode(Phaser.BlendModes.ADD).setTint(0xff6a50);
+        }
+        e.aura.setPosition(x, y).setDisplaySize(size * 2.4, size * 2.4).setAlpha(0.16);
+        this.tweens.killTweensOf(e.aura);
+        this.tweens.add({
+          targets: e.aura, alpha: 0.05, duration: 1100,
+          yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        });
+      }
+      // idle breathing
+      if (e.alive) {
+        this.tweens.add({
+          targets: e.img, scaleY: e.img.scaleY * 0.955,
+          duration: 850 + i * 170, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        });
+      }
       this.drawEnemyBar(e);
     });
   }
@@ -829,6 +850,12 @@ class GameScene extends Phaser.Scene {
   }
 
   destroyEnemyVisual(e) {
+    this.tweens.killTweensOf(e.img);
+    if (e.aura) {
+      this.tweens.killTweensOf(e.aura);
+      e.aura.destroy();
+      e.aura = null;
+    }
     e.img.destroy(); e.bar.destroy(); e.cdText.destroy(); e.fireText.destroy();
   }
 
@@ -887,9 +914,24 @@ class GameScene extends Phaser.Scene {
     if (e.hp <= 0) {
       e.alive = false;
       e.hp = 0;
+      this.tweens.killTweensOf(e.img);
+      if (e.aura) {
+        this.tweens.killTweensOf(e.aura);
+        this.tweens.add({
+          targets: e.aura, alpha: 0, duration: 250,
+          onComplete: () => { if (e.aura) { e.aura.destroy(); e.aura = null; } },
+        });
+      }
       this.tweens.add({
         targets: e.img, alpha: 0, scale: e.img.scaleX * 0.4, angle: 40, duration: 320,
         onComplete: () => e.img.setVisible(false),
+      });
+      const poof = this.add.graphics().setDepth(31).setPosition(e.x, e.y);
+      poof.lineStyle(4, shadeHex(MOBS[e.type].color, 0.3), 0.9);
+      poof.strokeCircle(0, 0, 10);
+      this.tweens.add({
+        targets: poof, scale: 3.4, alpha: 0, duration: 420,
+        onComplete: () => poof.destroy(),
       });
       this.sparks.burst(e.x, e.y, shadeHex(MOBS[e.type].color, 0.2), 16,
         { speedMin: 1.5, speedMax: 5, life: 500, scale: 1 });
@@ -2477,69 +2519,162 @@ class GameScene extends Phaser.Scene {
       const cx = px / 2;
       ctx.clearRect(0, 0, px, px);
       const grad = ctx.createLinearGradient(0, 0, 0, px);
-      grad.addColorStop(0, shade(color, 0.25));
-      grad.addColorStop(1, shade(color, -0.25));
+      grad.addColorStop(0, shade(color, 0.3));
+      grad.addColorStop(0.55, shade(color, 0));
+      grad.addColorStop(1, shade(color, -0.3));
       ctx.fillStyle = grad;
-      ctx.strokeStyle = 'rgba(20,10,10,0.5)';
-      ctx.lineWidth = px * 0.03;
-      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(16,8,10,0.65)';
+      ctx.lineWidth = px * 0.035;
+      ctx.lineJoin = 'round';
       if (i === 0) {
-        ctx.arc(cx, px * 0.58, px * 0.34, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
+        // IMP: horned menace — tail whip, fangs, burning eyes
+        ctx.strokeStyle = shade(color, -0.2);
+        ctx.lineWidth = px * 0.045;
         ctx.beginPath();
-        ctx.moveTo(cx - px * 0.26, px * 0.34);
-        ctx.lineTo(cx - px * 0.34, px * 0.08);
-        ctx.lineTo(cx - px * 0.12, px * 0.28);
-        ctx.moveTo(cx + px * 0.26, px * 0.34);
-        ctx.lineTo(cx + px * 0.34, px * 0.08);
-        ctx.lineTo(cx + px * 0.12, px * 0.28);
-        ctx.fillStyle = shade(color, -0.15);
+        ctx.moveTo(cx + px * 0.28, px * 0.72);
+        ctx.quadraticCurveTo(cx + px * 0.48, px * 0.8, cx + px * 0.44, px * 0.6);
+        ctx.stroke();
+        ctx.fillStyle = shade(color, -0.2);
+        ctx.beginPath();
+        ctx.moveTo(cx + px * 0.40, px * 0.62);
+        ctx.lineTo(cx + px * 0.50, px * 0.56);
+        ctx.lineTo(cx + px * 0.47, px * 0.66);
+        ctx.closePath();
         ctx.fill();
+        ctx.fillStyle = '#e8d8b8';
+        ctx.strokeStyle = 'rgba(16,8,10,0.65)';
+        ctx.lineWidth = px * 0.02;
+        for (const s of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(cx + s * px * 0.14, px * 0.32);
+          ctx.quadraticCurveTo(cx + s * px * 0.34, px * 0.22, cx + s * px * 0.30, px * 0.05);
+          ctx.quadraticCurveTo(cx + s * px * 0.24, px * 0.2, cx + s * px * 0.10, px * 0.26);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.fillStyle = grad;
+        ctx.strokeStyle = 'rgba(16,8,10,0.65)';
+        ctx.lineWidth = px * 0.035;
+        ctx.beginPath();
+        ctx.arc(cx, px * 0.56, px * 0.34, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.10)';
+        ctx.beginPath();
+        ctx.ellipse(cx - px * 0.08, px * 0.44, px * 0.16, px * 0.10, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f5ecd8';
+        for (const s of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(cx + s * px * 0.10, px * 0.72);
+          ctx.lineTo(cx + s * px * 0.06, px * 0.80);
+          ctx.lineTo(cx + s * px * 0.03, px * 0.72);
+          ctx.closePath();
+          ctx.fill();
+        }
+        this.mobFace(ctx, px, cx, px * 0.52, 'angry');
       } else if (i === 1) {
-        ctx.moveTo(cx - px * 0.38, px * 0.86);
-        ctx.quadraticCurveTo(cx - px * 0.42, px * 0.22, cx, px * 0.18);
-        ctx.quadraticCurveTo(cx + px * 0.42, px * 0.22, cx + px * 0.38, px * 0.86);
+        // SLIME: glossy blob — wobbly skirt, inner core, big gloss
+        ctx.beginPath();
+        ctx.moveTo(cx - px * 0.38, px * 0.84);
+        ctx.quadraticCurveTo(cx - px * 0.46, px * 0.4, cx - px * 0.16, px * 0.24);
+        ctx.quadraticCurveTo(cx, px * 0.16, cx + px * 0.16, px * 0.24);
+        ctx.quadraticCurveTo(cx + px * 0.46, px * 0.4, cx + px * 0.38, px * 0.84);
+        ctx.quadraticCurveTo(cx + px * 0.28, px * 0.78, cx + px * 0.2, px * 0.85);
+        ctx.quadraticCurveTo(cx + px * 0.08, px * 0.78, cx, px * 0.85);
+        ctx.quadraticCurveTo(cx - px * 0.12, px * 0.78, cx - px * 0.2, px * 0.85);
+        ctx.quadraticCurveTo(cx - px * 0.3, px * 0.79, cx - px * 0.38, px * 0.84);
         ctx.closePath();
         ctx.fill(); ctx.stroke();
+        ctx.fillStyle = shade(color, -0.25);
+        ctx.beginPath();
+        ctx.ellipse(cx, px * 0.62, px * 0.16, px * 0.13, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.30)';
+        ctx.beginPath();
+        ctx.ellipse(cx - px * 0.14, px * 0.34, px * 0.11, px * 0.055, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.14)';
+        ctx.beginPath();
+        ctx.arc(cx + px * 0.18, px * 0.4, px * 0.035, 0, Math.PI * 2);
+        ctx.fill();
+        this.mobFace(ctx, px, cx, px * 0.48, 'cute');
       } else {
-        this.roundedRectPath(ctx, cx - px * 0.34, px * 0.22, px * 0.68, px * 0.64, px * 0.12);
+        // BRUTE: armored slab — brow plate, stub horns, tusks, a scar
+        ctx.beginPath();
+        this.roundedRectPath(ctx, cx - px * 0.36, px * 0.2, px * 0.72, px * 0.66, px * 0.14);
         ctx.fill(); ctx.stroke();
+        ctx.fillStyle = shade(color, -0.28);
+        ctx.beginPath();
+        this.roundedRectPath(ctx, cx - px * 0.36, px * 0.2, px * 0.72, px * 0.18, px * 0.12);
+        ctx.fill();
+        ctx.fillStyle = '#e8d8b8';
+        for (const s of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(cx + s * px * 0.24, px * 0.22);
+          ctx.lineTo(cx + s * px * 0.30, px * 0.08);
+          ctx.lineTo(cx + s * px * 0.14, px * 0.20);
+          ctx.closePath();
+          ctx.fill();
+        }
         ctx.fillStyle = '#f0e6d0';
+        for (const s of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(cx + s * px * 0.2, px * 0.78);
+          ctx.lineTo(cx + s * px * 0.27, px * 0.58);
+          ctx.lineTo(cx + s * px * 0.12, px * 0.72);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.strokeStyle = 'rgba(20,8,10,0.5)';
+        ctx.lineWidth = px * 0.02;
         ctx.beginPath();
-        ctx.moveTo(cx - px * 0.2, px * 0.74);
-        ctx.lineTo(cx - px * 0.26, px * 0.58);
-        ctx.lineTo(cx - px * 0.12, px * 0.7);
-        ctx.moveTo(cx + px * 0.2, px * 0.74);
-        ctx.lineTo(cx + px * 0.26, px * 0.58);
-        ctx.lineTo(cx + px * 0.12, px * 0.7);
-        ctx.fill();
+        ctx.moveTo(cx + px * 0.12, px * 0.30);
+        ctx.lineTo(cx + px * 0.22, px * 0.44);
+        ctx.moveTo(cx + px * 0.20, px * 0.32);
+        ctx.lineTo(cx + px * 0.13, px * 0.42);
+        ctx.stroke();
+        this.mobFace(ctx, px, cx, px * 0.52, 'mean');
       }
-      const ey = px * (i === 1 ? 0.48 : 0.52);
-      for (const s of [-1, 1]) {
-        ctx.fillStyle = '#fff8ee';
-        ctx.beginPath();
-        ctx.arc(cx + s * px * 0.13, ey, px * 0.085, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#241a1a';
-        ctx.beginPath();
-        ctx.arc(cx + s * px * 0.13, ey + px * 0.015, px * 0.04, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.strokeStyle = '#241a1a';
-      ctx.lineWidth = px * 0.028;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(cx - px * 0.2, ey - px * 0.13);
-      ctx.lineTo(cx - px * 0.06, ey - px * 0.08);
-      ctx.moveTo(cx + px * 0.2, ey - px * 0.13);
-      ctx.lineTo(cx + px * 0.06, ey - px * 0.08);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx - px * 0.08, ey + px * 0.16);
-      ctx.lineTo(cx + px * 0.08, ey + px * 0.16);
-      ctx.stroke();
       tex.refresh();
     }
+  }
+
+  // shared face painter: glint eyes, brows and a mouth per mood
+  mobFace(ctx, px, cx, ey, mood) {
+    for (const s of [-1, 1]) {
+      ctx.fillStyle = '#fff8ee';
+      ctx.beginPath();
+      ctx.arc(cx + s * px * 0.13, ey, px * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = mood === 'angry' ? '#5a1010' : '#241a1a';
+      ctx.beginPath();
+      ctx.arc(cx + s * px * 0.12, ey + px * 0.02, px * 0.045, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.arc(cx + s * px * 0.10, ey - px * 0.01, px * 0.015, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = '#241a1a';
+    ctx.lineWidth = px * 0.028;
+    ctx.lineCap = 'round';
+    if (mood !== 'cute') {
+      ctx.beginPath();
+      ctx.moveTo(cx - px * 0.21, ey - px * 0.14);
+      ctx.lineTo(cx - px * 0.06, ey - px * 0.08);
+      ctx.moveTo(cx + px * 0.21, ey - px * 0.14);
+      ctx.lineTo(cx + px * 0.06, ey - px * 0.08);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    if (mood === 'cute') {
+      ctx.arc(cx, ey + px * 0.10, px * 0.06, 0.15 * Math.PI, 0.85 * Math.PI);
+    } else {
+      ctx.moveTo(cx - px * 0.08, ey + px * 0.15);
+      ctx.lineTo(cx + px * 0.08, ey + px * 0.15);
+    }
+    ctx.stroke();
   }
 
   roundedRectPath(ctx, x, y, w, h, r) {
