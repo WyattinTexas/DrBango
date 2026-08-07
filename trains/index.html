@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v7.9 -->
+<!-- TRAINSET v8.0 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -1801,7 +1801,9 @@ const COLL=[
   // and the station should definitely be already placed"). Its price stays a dial.
   ['s','STRAIGHT','track',0,0], ['c','CURVE','track',0,0], ['st','STATION','track',0,10],
   ['br','BRIDGE','track',3,12], ['b','BUMPER','track',4,12], ['x','CROSSING','track',7,18],
-  ['sw','SPLITTER','track',9,20], ['rp','RAMP','track',8,18], ['sp','SPIRAL','track',8,18],
+  // E69: the RAMP arrives at L5 with THE FARM's glued hill (TRY-THEN-OWN —
+  // Wyatt: "the ramps… slowly integrate in… starting at level 4"). Was lvl 8.
+  ['sw','SPLITTER','track',9,20], ['rp','RAMP','track',5,18], ['sp','SPIRAL','track',8,18],
   ['tun','TUNNEL','track',8,18],
   // TRAINS (9) — the RED PUFFER is the loco + its tender, one toy
   ['loco','RED PUFFER','train',0,0], ['box','BOXCAR','train',0,0], ['tank','TANKER','train',4,12],
@@ -6975,10 +6977,13 @@ function cwipeTick(dt){
 function drawCtransTunnel(){  // PAINT ONLY — the tunnel mouth over the glued line (world space)
   if(!CTRANS.on) return;
   const [gx,gy]=CTRANS.cell, k=Math.min(1,CTRANS.t*3.2);
+  const pc0=pieceAt(gx,gy);
+  if(pc0&&pc0.t==='tun') return;         // E69: the level's own tunnel IS the mouth (L8) — never pop a twin over it
+  const el=pieceHi(gx,gy)?1:0;           // E69: a ride on the high line wears its mouth up there (L5's hill)
   const sc=0.55+0.45*k*(2-k);   // quick ease-out pop-in
   cx.save();
-  cx.translate(GX+gx*C+C/2, GY+gy*C+C/2); cx.scale(sc,sc); cx.translate(-C/2,-C/2);
-  drawPieceArt({t:'tun',r:CTRANS.r,sel:0,elev:0,latch:null},0,0);
+  cx.translate(GX+gx*C+C/2, GY+gy*C+C/2-(el?LIFT:0)); cx.scale(sc,sc); cx.translate(-C/2,-C/2);
+  drawPieceArt({t:'tun',r:CTRANS.r,sel:0,elev:el,latch:null},0,0);
   cx.restore();
 }
 // ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers (GVT)
@@ -10088,7 +10093,7 @@ const LEVELS=[
     track:[['c',1,3,2],['s',0,4,2],['s',0,7,2],
            ['s',1,3,3],['s',1,3,4],['s',1,8,3],['s',1,8,4],
            ['c',0,3,5],['c',3,8,5],['st',0,4,5],['s',0,5,5],['s',0,6,5],['s',0,7,5]],
-    gaps:[[5,2],[6,2],[8,2]], stations:[] },
+    gaps:[[5,2],[6,2],[8,2]], ride:[6,5], stations:[] },   // E69: every win rides into the tunnel
   // 3 — THROUGH THE WOODS. Wyatt asked for "a ton of woods, and clearly there's a
   // narrow passage". The forest packs both flanks solid and leaves a two-wide lane
   // all the way round an island of pines — the clearing IS the answer, drawn in trees.
@@ -10104,48 +10109,69 @@ const LEVELS=[
            ...fillRows('pine',3,0,9,0,'tree'), ...fillRows('pine',3,7,9,7,'tree'),
            ...fillRows('pine',5,3,7,4,'tree'), ['dog',4,6,0]],
     track:[['s',0,5,5],['s',0,6,5]],
-    stations:[] },
+    ride:[6,5], stations:[] },
   // 4 — OVER THE RIVER. The river splits the rug top to bottom, so any loop crosses
   // it twice: two bridges, the toy level 3 just handed over.
-  { name:'OVER THE RIVER', hint:'GET OVER THE RIVER!', toy:'tank', land:'jungle', weather:'rain',
+  // E69 (Wyatt: "it says 'Finish the track,' but there's no track… the instructions
+  // are to build across the river"): the board now SAYS the job — four glued bank
+  // straights point at the river from both sides, and the two crossing cells
+  // themselves breathe gold. The bridge ask is drawn on the rug.
+  { name:'OVER THE RIVER', hint:'GET OVER THE RIVER!', say:'CROSS THE RIVER!!',
+    toy:'tank', land:'jungle', weather:'rain',
     glued:[['rv',6,0],['rv',6,1],['rv',6,2],['rv',6,3],['rv',6,4],['rv',6,5],['rv',6,6],['rv',6,7],
            ['ppl',3,6],['duck',8,6,0]],
-    stations:[] },
+    track:[['s',0,5,2],['s',0,7,2],['s',0,5,5],['s',0,7,5]],
+    gaps:[[6,2],[6,5]], ride:[7,5], stations:[] },
   // 5 — THE FARM. A pen in the middle and a big friendly detour round it. The station
   // stays as scenery ONLY — Wyatt's "make them easier" applied literally: no goal but
   // the loop itself, and the animals are the reward for going the long way.
-  { name:'THE FARM', hint:'GO AROUND THE FARM!', toy:'cow', land:'island',
+  // E69 THE HILL (Wyatt: "the ramps and some of the more exciting track pieces
+  // slowly integrate in… starting at level 4"): the ring's top run arrives as a
+  // glued climb — up, whoosh over the farm, down (E15 gravity is already live;
+  // the grammar is the mountain PLAY map's, verbatim). TRY-THEN-OWN: the RAMP
+  // moved into this level's bundle (COLL rp lvl 8→5) and headlines the win.
+  { name:'THE FARM', hint:'GO AROUND THE FARM!', say:'AROUND THE FARM!!',
+    toy:'rp', land:'island',
     glued:[['fence',4,2],['fence',5,2],['fence',6,2],['fence',4,3],['fence',6,3],['barn',5,3],
            ['cow',9,2,0],['cow',9,4,1],['cow',2,5,2],['sheep',10,3,0],['hay',1,2],['chick',8,6,0]],
-    track:[['st',0,9,6]], stations:[] },
+    track:[['st',0,9,6],['rp',0,4,1],['s',0,5,1,1],['rp',2,6,1]], ride:[5,1], stations:[] },
   // 6 — MAIN STREET. The first level that ASKS for a station stop, taught four levels
   // earlier by the freebie on level 2. Shops line the middle; ring the whole street.
-  { name:'MAIN STREET', hint:'STOP AT THE STATION!', toy:'house', land:'snow', weather:'snowfall',
+  { name:'MAIN STREET', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!',
+    toy:'house', land:'snow', weather:'snowfall',
     glued:[['house',3,3],['shop',5,3],['hall',7,3],['house',8,3],['lamp',4,3],['lamp',6,3],
            ['ppl',5,6],['cat',10,6,0]],
-    stations:[[5,5]] },
+    track:[['s',0,4,1],['s',0,5,1]],                       // E69: a head start on the ring (the L3 grammar)
+    ride:[4,1], stations:[[5,5]] },
   // 7 — THE CROSSING. One glued crossing sits on the line and the loop has to use it.
   // TRY-THEN-OWN in its purest form: ride the diamond, then it's yours.
-  { name:'THE CROSSING', hint:'USE THE CROSSING!', toy:'x', land:'canyon', weather:'dust',
+  { name:'THE CROSSING', hint:'USE THE CROSSING!', say:'USE THE CROSSING!!',
+    toy:'x', land:'canyon', weather:'dust',
     glued:[['sig',6,3],['whis',2,6],['cat',10,3,0],['bush',10,6]],
-    track:[['x',0,6,1]], cross:[6,1], stations:[] },
+    track:[['x',0,6,1],['s',0,5,1],['s',0,7,1]],           // E69: straights flank the diamond — its job shows
+    cross:[6,1], ride:[5,1], stations:[] },
   // 8 — THE TUNNEL. A rock-and-pine ridge walls off the top half with exactly one way
   // through it. The land forces the whole rest of the shape — win is just the lap.
-  { name:'THE TUNNEL', hint:'GO THROUGH THE TUNNEL!', toy:'tun', land:'ice',
+  { name:'THE TUNNEL', hint:'GO THROUGH THE TUNNEL!', say:'THROUGH THE TUNNEL!!',
+    toy:'tun', land:'ice',
     glued:[['rock',6,0],['rock',6,1],['rock',6,3],['rock',6,4],
            ['pine',5,0],['pine',7,0],['pine',5,4],['pine',7,4],['pine',5,1],['pine',7,1],
            ['wind',2,6],['rock',9,1],['pine',9,0]],
-    track:[['tun',0,6,2]], stations:[] },
+    track:[['tun',0,6,2],['s',0,5,2],['s',0,7,2]],         // E69: straights flank the tunnel mouth
+    ride:[6,2], stations:[] },                             // E69: the win rides into the LEVEL'S OWN tunnel
   // 9 — THE SPLIT. A working siding arrives glued at both ends; the kid closes the big
   // ring around it and the train takes turns down the branch all by itself.
   { name:'THE SPLIT', hint:'LET THE TRACK SPLIT!', toy:'sw', land:'cloud',
     glued:[['hall',1,6],['wtr',10,6],['flw',1,2],['bush',10,2]],
     track:[['sw',0,4,4],['s',0,5,4],['s',0,6,4],['sw',0,7,4],
-           ['c',0,4,5],['s',0,5,5],['s',0,6,5],['c',3,7,5]],
-    stations:[] },
+           ['c',0,4,5],['s',0,5,5],['s',0,6,5],['c',3,7,5],
+           ['s',0,5,1],['s',0,6,1]],                       // E69: top-run head start — every lap passes here
+    ride:[6,1], stations:[] },
   // 10 — THE GRAND TOUR. The finale land stands exactly as it shipped: river, pond,
   // farm and houses all at once, two stations far apart, and the double confetti.
-  { name:'THE GRAND TOUR', hint:'VISIT BOTH STATIONS!', toy:'exp', land:'rug',   // the tour comes home
+  { name:'THE GRAND TOUR', hint:'VISIT BOTH STATIONS!', say:'VISIT BOTH STATIONS!!',
+    toy:'exp', land:'rug',   // the tour comes home — the finale keeps BACK TO THE BOARD, no ride (the E68 gate)
+    track:[['s',0,5,5],['s',0,6,5]],                       // E69: a head start on the tour's bottom run
     glued:[['rv',3,0],['rv',3,1],['rv',3,2],['rv',3,3],['rv',3,4],['rv',4,4],['rv',5,4],['rv',6,4],['rv',7,4],['rv',8,4],
            ['rv',10,1],['rv',11,1],['rv',10,2],['rv',11,2],
            ['fence',0,5],['fence',1,5],['fence',2,5],['fence',2,6],['fence',2,7],
@@ -10180,15 +10206,15 @@ const SOLVE=[
   { start:[6,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 1 close the pond's two gaps (E67)
   { start:[6,5], rows:[ ['s',0,5,2],['s',0,6,2],['c',2,8,2] ] },            // 2 close the three gaps
   { start:[5,2], rows:ringRows(4,2,8,5,[[5,5],[6,5]]) },                    // 3 the lane through the woods (the two seeded straights are already down)
-  { start:[4,3], rows:swapBr(ringRows(4,2,8,5),[[6,2],[6,5]]) },            // 4 two bridges over the river
-  { start:[4,1], rows:ringRows(3,1,7,4) },                                  // 5 the detour round the pen
-  { start:[3,1], rows:ringRows(2,1,9,5,[[5,5]]) },                          // 6 ring the street, through the stop
-  { start:[4,1], rows:ringRows(3,1,9,5,[[6,1]]) },                          // 7 ring it through the crossing
-  { start:[5,2], rows:ringRows(4,2,8,5,[[6,2]]) },                          // 8 through the tunnel, home below
-  { start:[5,1], rows:ringRows(3,1,8,4,[[4,4],[5,4],[6,4],[7,4]]) },        // 9 close the ring round the siding
-  { start:[7,5], rows:[ ['c',1,3,5],['s',0,4,5],['s',0,5,5],['s',0,6,5],['s',0,7,5],['s',0,8,5],
+  { start:[4,3], rows:swapBr(ringRows(4,2,8,5,[[5,2],[7,2],[5,5],[7,5]]),[[6,2],[6,5]]) },  // 4 two bridges over the river (banks seeded, E69)
+  { start:[3,3], rows:ringRows(3,1,7,4,[[4,1],[5,1],[6,1]]) },              // 5 the detour round the pen (the hill arrives glued, E69)
+  { start:[3,1], rows:ringRows(2,1,9,5,[[5,5],[4,1],[5,1]]) },              // 6 ring the street, through the stop (top seeded, E69)
+  { start:[4,1], rows:ringRows(3,1,9,5,[[6,1],[5,1],[7,1]]) },              // 7 ring it through the crossing (flanks seeded, E69)
+  { start:[4,3], rows:ringRows(4,2,8,5,[[6,2],[5,2],[7,2]]) },              // 8 through the tunnel, home below (flanks seeded, E69)
+  { start:[5,1], rows:ringRows(3,1,8,4,[[4,4],[5,4],[6,4],[7,4],[5,1],[6,1]]) },  // 9 close the ring round the siding (top seeded, E69)
+  { start:[7,5], rows:[ ['c',1,3,5],['s',0,4,5],['s',0,7,5],['s',0,8,5],
       ['c',3,9,5],['c',1,9,4],['c',2,11,4],['s',1,11,5],['c',3,11,6],
-      ['s',0,10,6],['s',0,9,6],['s',0,8,6],['s',0,7,6],['s',0,6,6],['s',0,4,6],['c',0,3,6] ] },  // 10 the grand tour
+      ['s',0,10,6],['s',0,9,6],['s',0,8,6],['s',0,7,6],['s',0,6,6],['s',0,4,6],['c',0,3,6] ] },  // 10 the grand tour ((5,5)+(6,5) seeded, E69)
 ];
 // the campaign's own state object — free play's grid/consist/save is NEVER touched
 const CAMP={ on:false, book:'ten', level:0, won:false, tugT:false, stations:[], visited:new Set(),
@@ -10369,7 +10395,7 @@ function campUnlocked(n,b){ return !CAMP_SEQ || CAMP.all || n===1 || bookDone(b)
 function serWip(){        // the level's work-in-progress — glued rows regenerate from LEVELS, never saved
   const g=[];
   for(const [k,pc] of grid){ if(pc.t==='ref'||pc.glued) continue; g.push([k,pc.t,pc.r,pc.sel|0,pc.elev|0]); }
-  for(const [k,pc] of hgrid) g.push([k,pc.t,pc.r,pc.sel|0,1]);
+  for(const [k,pc] of hgrid){ if(pc.glued) continue; g.push([k,pc.t,pc.r,pc.sel|0,1]); }   // E69: glued high rows regenerate from LEVELS too
   const sc=[]; for(const [k,s] of scen){ if(s.glued) continue; sc.push([k,s.t,s.v|0]); }
   // E21: a wip carries the kid's TRACK work only — the cars are the game's gift,
   // rolled fresh at every drop and never persisted (old wips' consist is ignored).
@@ -10378,7 +10404,8 @@ function serWip(){        // the level's work-in-progress — glued rows regener
 function clearPlayer(){   // sweep everything the PLAYER built; the glued land stays
   for(const [k,pc] of [...grid]){ if(pc.t==='ref'||pc.glued) continue;
     const [x,y]=k.split(',').map(Number); removeTrackPiece(x,y,pc); }
-  for(const [k,pc] of [...hgrid]){ const [x,y]=k.split(',').map(Number); removeTrackPiece(x,y,pc); }
+  for(const [k,pc] of [...hgrid]){ if(pc.glued) continue;   // E69: a level may glue a HILL — its high line is the land
+    const [x,y]=k.split(',').map(Number); removeTrackPiece(x,y,pc); }
   for(const [k,s] of [...scen]) if(!s.glued) scen.delete(k);
   trainHome(true);
 }
@@ -10415,7 +10442,9 @@ function campEnter(n,b){
   for(const g of L.glued) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0,glued:1});
   // TRY-THEN-OWN (E8): the level's own working pieces, glued down. They are part of
   // the land exactly like the scenery — a tug wobbles them and nothing removes them.
-  for(const tr of (L.track||[])){ const pc=setTrackPiece(tr[0],tr[1]|0,null,0,tr[2],tr[3]); pc.glued=1; }
+  // E69: rows carry an optional 5th element = elevation (the PLAY-mount grammar,
+  // :11159 verbatim) so a level can glue a HILL down — ramps/spiral self-elev 0.
+  for(const tr of (L.track||[])){ const pc=setTrackPiece(tr[0],tr[1]|0,null,(tr[0]==='rp'||tr[0]==='sp')?0:(tr[4]?1:0),tr[2],tr[3]); pc.glued=1; }
   CAMP.crossed=false;
   CAMP.stations=[];
   for(const st of L.stations){
@@ -14048,7 +14077,9 @@ function ghOverlayUp(){
 }
 function ghGapOpen(){
   const L=bookL()[CAMP.level-1]; if(!L||!L.gaps) return false;
-  return L.gaps.some(g=>!pieceAt(g[0],g[1]));
+  // E69: only gaps a STRAIGHT can honestly fill — L4's river gaps want a BRIDGE,
+  // and a ghost demoing an illegal drop would teach a lie. Those gaps teach by gold.
+  return L.gaps.some(g=>!pieceAt(g[0],g[1])&&!cellBlocksTrack('s',g[0],g[1]));
 }
 function ghCtx(){
   if($('store').style.display==='flex') return HAND.shop? null:'shop';
@@ -14107,7 +14138,7 @@ function ghStart(les){
     GHOST.cell=cell; GHOST.kind='s'; GHOST.rot=0;
   } else if(les==='gap'){
     const L=bookL()[CAMP.level-1]; if(!L||!L.gaps) return false;
-    const g=L.gaps.find(g2=>!pieceAt(g2[0],g2[1])); if(!g) return false;
+    const g=L.gaps.find(g2=>!pieceAt(g2[0],g2[1])&&!cellBlocksTrack('s',g2[0],g2[1])); if(!g) return false;   // E69: never demo onto a river
     // the crate's own straight tile is the source — honest art in the hand
     const ft=FACE_TILES.find(f2=>f2.t==='s'&&f2.el.style.display!=='none'); if(!ft) return false;
     const r2=ft.el.getBoundingClientRect(); if(!r2.width) return false;
