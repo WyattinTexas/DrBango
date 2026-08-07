@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.2';
+const VERSION = 'v0.18.3';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -28,6 +28,19 @@ const VERSION = 'v0.18.2';
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
 const upx = (n) => Math.round(n * DPR);
 const fpx = (n) => Math.round(n * DPR) + 'px';
+
+// iOS safe areas (notch / home bar), in device px — index.html mirrors
+// the env() values into CSS vars we can actually read
+function safeInsets() {
+  try {
+    const cs = getComputedStyle(document.documentElement);
+    return {
+      l: upx(parseFloat(cs.getPropertyValue('--sal')) || 0),
+      r: upx(parseFloat(cs.getPropertyValue('--sar')) || 0),
+      b: upx(parseFloat(cs.getPropertyValue('--sab')) || 0),
+    };
+  } catch (e) { return { l: 0, r: 0, b: 0 }; }
+}
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -2745,7 +2758,10 @@ class GameScene extends Phaser.Scene {
       Math.min(W, H - this.stripH) * TUNE.DIE_SIZE_FRAC,
       upx(TUNE.DIE_SIZE_MIN), upx(TUNE.DIE_SIZE_MAX));
     this.dieRadius = this.dieSize / 2;
-    this.rail = Math.max(upx(10), Math.round(this.dieSize * 0.42));
+    // the rail absorbs the notch/home-bar so play never hides under them
+    this.safe = safeInsets();
+    this.rail = Math.max(upx(10), Math.round(this.dieSize * 0.42),
+      this.safe.l, this.safe.r, this.safe.b);
     this.boardTop = this.stripH;
     this.fieldTop = this.stripH + this.rail;
     this.launcherPos = { x: W / 2, y: H - this.dieSize * 1.45 };
@@ -3966,21 +3982,23 @@ class GameScene extends Phaser.Scene {
   }
 
   layoutHud() {
-    this.fpsText.setPosition(upx(6), upx(4));
+    const lx = Math.max(upx(6), (this.safe ? this.safe.l : 0) + upx(4));
+    const rx = this.W - Math.max(upx(8), (this.safe ? this.safe.r : 0) + upx(4));
+    this.fpsText.setPosition(lx, upx(4));
     const ly = Math.max(upx(20), this.stripH * 0.35);
-    this.levelText.setPosition(upx(6), ly);
+    this.levelText.setPosition(lx, ly);
     this.mapBtn.setPosition(this.levelText.x + this.levelText.width + upx(10), ly + upx(2));
     if (this.classText) {
       // its own line: the enemy strip owns the middle of the top row
-      this.classText.setPosition(upx(6), ly + upx(18));
+      this.classText.setPosition(lx, ly + upx(18));
       if (this.playerClass) {
         this.classText.setText(this.playerClass.icon + ' ' + this.playerClass.name +
           (this.realm ? '  ·  ' + this.realm.name : ''))
           .setColor(this.playerClass.hex);
       }
     }
-    this.refreshText.setPosition(this.W - upx(8), ly);
-    this.bestText.setPosition(this.W - upx(8), upx(4));
+    this.refreshText.setPosition(rx, ly);
+    this.bestText.setPosition(rx, upx(4));
     // quiet dark chips ground the top readouts against the skyline
     if (!this.hudChips) this.hudChips = this.add.graphics().setDepth(28);
     const hc = this.hudChips;
@@ -3993,8 +4011,8 @@ class GameScene extends Phaser.Scene {
     };
     const lw = Math.max(this.levelText.width + this.mapBtn.width + upx(26),
       (this.classText ? this.classText.width : 0) + upx(14));
-    chip(upx(2), ly - upx(6), lw, upx(42));
-    chip(this.W - upx(152), upx(2), upx(150), ly + upx(18));
+    chip(lx - upx(4), ly - upx(6), lw, upx(42));
+    chip(rx - upx(146), upx(2), upx(150), ly + upx(18));
     this.versionText.setPosition(this.W - this.rail - upx(6), this.H - this.rail - upx(4));
     this.chainText.setPosition(this.W / 2, this.H * 0.3);
     this.drawHpBar();
@@ -4304,6 +4322,7 @@ window.addEventListener('DOMContentLoaded', () => {
     type: Phaser.AUTO,
     parent: 'game-container',
     backgroundColor: '#2e2018',
+    render: { antialias: true, powerPreference: 'high-performance' },
     scale: {
       mode: Phaser.Scale.NONE,
       width: Math.round(window.innerWidth * DPR),
