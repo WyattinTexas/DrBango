@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.11';
+const VERSION = 'v0.18.12';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -28,9 +28,14 @@ const VERSION = 'v0.18.11';
 // on-device perf probes: ?dpr=1 halves the pixel load without touching
 // layout math, ?fx=off drops the vignette / light pool / weather sprites
 const QP = new URLSearchParams(location.search);
-// adaptive quality: a device that can't hold 45fps gets its back-buffer
-// stepped down a notch (2 -> 1.5 -> 1) and the cap remembered
+// adaptive quality: a phone that can't hold 45fps gets its back-buffer
+// stepped down a notch (2 -> 1.5 -> 1) and the cap remembered. Touch
+// devices only — a desktop hiccup (background tab, screenshot flurry)
+// must not permanently degrade a capable machine, so non-touch ignores
+// any stored cap too.
+const TOUCH_DEVICE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const DPR_CAP = (() => {
+  if (!TOUCH_DEVICE) return 2;
   const v = parseFloat(localStorage.getItem('runefall.dprCap'));
   return (v >= 1 && v < 2) ? v : 2;
 })();
@@ -570,6 +575,19 @@ class GameScene extends Phaser.Scene {
     });
 
     this.scale.on('resize', () => this.handleResize());
+    // Tier-2 painted backdrops: a per-realm art strip dropped into
+    // beta/art/backdrop_<realm>.png takes over the sky the moment the file
+    // exists; missing files 404 harmlessly and the painted-in-code skyline
+    // stays. Ship art = drop a PNG, no code change.
+    for (const r of REALMS) {
+      if (!this.textures.exists('bgart_' + r.id)) {
+        this.load.image('bgart_' + r.id, 'art/backdrop_' + r.id + '.png');
+      }
+    }
+    this.load.once('complete', () => {
+      if (this.boardGfx) this.buildBoard();
+    });
+    this.load.start();
     this.setReady(true);
     this.generateRunMap();
     // the test rigs jump straight into a run; players start at the home page
@@ -3161,6 +3179,20 @@ class GameScene extends Phaser.Scene {
       g.destroy();
       this.boardGfx = this.add.image(W / 2, H / 2, 'boardTex').setDepth(0);
     }
+    this.layoutBgArt();
+  }
+
+  // painted realm backdrop, if its art file loaded: scaled to full width
+  // and bottom-anchored to the enemy row's grass line, so the art's lower
+  // band is what shows and the excess hangs above the screen top
+  layoutBgArt() {
+    if (this.bgArt) { this.bgArt.destroy(); this.bgArt = null; }
+    const key = 'bgart_' + (this.realm || REALMS[0]).id;
+    if (!this.textures.exists(key)) return;
+    const src = this.textures.get(key).getSourceImage();
+    if (!src || !src.width) return;
+    this.bgArt = this.add.image(0, this.boardTop, key)
+      .setOrigin(0, 1).setScale(this.W / src.width).setDepth(0.5);
   }
 
   // magical table light: a warm pool over the field, dark corners.
@@ -4588,7 +4620,7 @@ class GameScene extends Phaser.Scene {
       // adaptive quality: 5s of sustained sub-45fps steps the back-buffer
       // down a notch. The reload that applies it only fires outside a run
       // (nothing to lose at a menu); mid-run it waits for the next boot.
-      if (time > 4000 && fps < 45 && !QP.has('dpr') && !this._dprStepped) {
+      if (TOUCH_DEVICE && time > 4000 && fps < 45 && !QP.has('dpr') && !this._dprStepped) {
         this._lowMs = (this._lowMs || 0) + 250;
         if (this._lowMs >= 5000 && DPR > 1) {
           this._dprStepped = true;
