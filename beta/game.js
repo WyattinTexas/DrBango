@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.17.1';
+const VERSION = 'v0.17.2';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -1861,6 +1861,25 @@ class GameScene extends Phaser.Scene {
       dim.on('pointerdown', () => this.closeModal());
       this.modalCloseButton(px, py, pw, () => this.closeModal());
     }
+    // the map table: a parchment inset under the whole track
+    const mapG = this.modalAdd(this.add.graphics().setDepth(71));
+    const mx0 = px + 14, my0 = py + 40, mw = pw - 28, mh = ph - 78;
+    mapG.fillStyle(0x120a06, 0.6);
+    mapG.fillRoundedRect(mx0 + 3, my0 + 4, mw, mh, 10);
+    mapG.fillGradientStyle(0xd9c49a, 0xd2bc90, 0xc4ad7e, 0xbfa878, 1);
+    mapG.fillRoundedRect(mx0, my0, mw, mh, 10);
+    mapG.fillStyle(this.realm ? this.realm.palette.dirt : 0x7b5136, 0.10);
+    mapG.fillRoundedRect(mx0, my0, mw, mh, 10);
+    for (let i = 0; i < 90; i++) {
+      const rx = mx0 + Math.random() * mw, ry = my0 + Math.random() * mh;
+      mapG.fillStyle(Math.random() < 0.5 ? 0x9a835c : 0xe8d8b0,
+        0.08 + Math.random() * 0.10);
+      mapG.fillEllipse(rx, ry, 3 + Math.random() * 10, 2 + Math.random() * 6);
+    }
+    mapG.lineStyle(3, 0x6a4a26, 0.5);
+    mapG.strokeRoundedRect(mx0 + 1.5, my0 + 1.5, mw - 3, mh - 3, 9);
+    mapG.lineStyle(8, 0x3a2410, 0.14);
+    mapG.strokeRoundedRect(mx0 + 4, my0 + 4, mw - 8, mh - 8, 8);
     // the track snakes: floors 1-10 across the top, 11-20 back along
     // the bottom — half the columns, so everything doubles in size
     const innerX = px + 24, innerW = pw - 48;
@@ -1887,9 +1906,21 @@ class GameScene extends Phaser.Scene {
       for (let i = 0; i < this.runMap[f].length; i++) {
         for (const j of this.runEdges[f][i]) {
           const a = posOf(f, i), b = posOf(f + 1, j);
-          const onPath = f < this.mapPos.f ? 0.25 : 0.7;
-          lineG.lineStyle(3, 0x6b4a33, onPath);
-          lineG.lineBetween(a.x, a.y, b.x, b.y);
+          const done = f < this.mapPos.f;
+          const isNext = chooseMode && f === this.mapPos.f && i === this.mapPos.i;
+          if (isNext) {
+            // the roads you can take right now glow
+            lineG.lineStyle(6, 0x5c8a3c, 0.30);
+            lineG.lineBetween(a.x, a.y, b.x, b.y);
+            lineG.lineStyle(2.5, 0x8ec873, 0.95);
+            lineG.lineBetween(a.x, a.y, b.x, b.y);
+          } else {
+            // inked trail: dark under-stroke with a lighter core
+            lineG.lineStyle(4, 0x4a3018, done ? 0.14 : 0.30);
+            lineG.lineBetween(a.x, a.y, b.x, b.y);
+            lineG.lineStyle(1.5, 0x8a6a42, done ? 0.22 : 0.6);
+            lineG.lineBetween(a.x, a.y, b.x, b.y);
+          }
         }
       }
     }
@@ -1905,23 +1936,46 @@ class GameScene extends Phaser.Scene {
         const isChoice = f === this.mapPos.f + 1 && choices.includes(i);
         const nodeCol = done ? 0x3a2a1c :
           type === 'shop' ? 0xf2b23e : type === 'boss' ? 0xc9564a : 0xa08a6a;
+        // medallion: cast shadow, body, top light, dark rim
         const node = this.modalAdd(this.add.graphics().setDepth(72));
-        node.fillStyle(nodeCol, done ? 0.5 : 1);
+        node.fillStyle(0x241408, done ? 0.20 : 0.40);
+        node.fillCircle(x + 2, y + 3, nodeR);
+        node.fillStyle(nodeCol, done ? 0.55 : 1);
         node.fillCircle(x, y, nodeR);
+        node.fillStyle(0xffffff, done ? 0.05 : 0.15);
+        node.fillCircle(x - nodeR * 0.22, y - nodeR * 0.25, nodeR * 0.6);
+        node.lineStyle(2, shadeHex(nodeCol, -0.45), done ? 0.4 : 0.9);
+        node.strokeCircle(x, y, nodeR);
         if (current) {
           node.lineStyle(4, 0xffd54a, 1);
           node.strokeCircle(x, y, nodeR + 5);
+          const glow = this.modalAdd(this.add.image(x, y, 'flash')
+            .setDepth(71).setBlendMode(Phaser.BlendModes.ADD)
+            .setDisplaySize(nodeR * 7, nodeR * 7).setAlpha(0.16).setTint(0xffd54a));
+          this.tweens.add({
+            targets: glow, alpha: 0.05, duration: 900, yoyo: true, repeat: -1,
+          });
         }
         const icon = type === 'shop' ? '🛒' : type === 'boss' ? '💀' : '⚔';
         this.modalAdd(this.add.text(x, y, icon,
           { fontSize: Math.round(nodeR * 1.15) + 'px' })
           .setOrigin(0.5).setDepth(73).setAlpha(done ? 0.4 : 1));
+        if (f === FLOORS - 1) {
+          this.modalAdd(this.add.text(x, y - nodeR - 3, '👑', {
+            fontSize: Math.round(nodeR * 0.9) + 'px',
+          }).setOrigin(0.5, 1).setDepth(73));
+        } else if (f === 0) {
+          this.modalAdd(this.add.text(x, y - nodeR - 5, 'START', {
+            fontFamily: '-apple-system, Arial, sans-serif', fontSize: '10px',
+            fontStyle: 'bold', color: '#6a5138',
+          }).setOrigin(0.5, 1).setDepth(73));
+        }
         // floor number under every node so the snake reads at a glance
         this.modalAdd(this.add.text(x, y + nodeR + 3, String(f + 1), {
           fontFamily: '-apple-system, Arial, sans-serif',
           fontSize: Math.max(11, Math.round(nodeR * 0.6)) + 'px',
           fontStyle: current ? 'bold' : 'normal',
-          color: current ? '#ffd54a' : '#8a7960',
+          color: current ? '#a8720a' : '#6a5138',
         }).setOrigin(0.5, 0).setDepth(72).setAlpha(done ? 0.5 : 1));
         if (isChoice) {
           const ringG = this.modalAdd(this.add.graphics().setDepth(72));
