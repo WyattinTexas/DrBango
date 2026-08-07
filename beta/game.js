@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.14';
+const VERSION = 'v0.18.15';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
