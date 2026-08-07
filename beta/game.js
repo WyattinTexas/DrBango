@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.1';
+const VERSION = 'v0.18.2';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -342,9 +342,9 @@ const REALMS = [
     hpMul: 1, dmgMul: 1, goldMul: 1, xp: 1,
     palette: {
       bg: 0x2e2018, skyA: 0x1b2418, skyB: 0x243019,
-      grassA: 0x4a7c3a, grassB: 0x3c6830,
+      grassA: 0x549042, grassB: 0x447636,
       frame: 0x4a3226, frameGrain: 0x3e2a1e, frameHi: 0x5e4130,
-      dirt: 0x7b5136, dirtDark: 0x6f4830, dirtLight: 0x875a3d, apron: 0xa4744e,
+      dirt: 0x8a5a38, dirtDark: 0x7a4e30, dirtLight: 0x9a6844, apron: 0xb07e52,
     },
   },
   {
@@ -355,7 +355,7 @@ const REALMS = [
       bg: 0x141e2a, skyA: 0x14202e, skyB: 0x1c2c3e,
       grassA: 0x7ea8c8, grassB: 0x5c88aa,
       frame: 0x2c3a4c, frameGrain: 0x24303e, frameHi: 0x3c4e64,
-      dirt: 0x4e6a86, dirtDark: 0x44607a, dirtLight: 0x5a7894, apron: 0x76a0c0,
+      dirt: 0x587a9a, dirtDark: 0x4c6c8a, dirtLight: 0x668aa8, apron: 0x84acc8,
     },
   },
   {
@@ -366,7 +366,7 @@ const REALMS = [
       bg: 0x221010, skyA: 0x2a1210, skyB: 0x3a1a12,
       grassA: 0xa04a2a, grassB: 0x7c3820,
       frame: 0x3e2018, frameGrain: 0x321a12, frameHi: 0x52301e,
-      dirt: 0x5e2e20, dirtDark: 0x52281c, dirtLight: 0x6e3826, apron: 0x8a4a30,
+      dirt: 0x6a3424, dirtDark: 0x5c2c1e, dirtLight: 0x7c4030, apron: 0x9a5436,
     },
   },
 ];
@@ -479,6 +479,7 @@ class GameScene extends Phaser.Scene {
 
     this.sparks = new ParticlePool(this, 'spark', 120);
     this.buildAmbient();
+    this.buildBoardDressing();
     this.trajGfx = this.add.graphics().setDepth(6);
     this.bandGfx = this.add.graphics().setDepth(7);
 
@@ -1119,6 +1120,7 @@ class GameScene extends Phaser.Scene {
     this.makeTextures();   // dice restyle to this realm's set
     this.buildBoard();
     this.buildAmbient();   // and its weather
+    this.buildBoardDressing();
     // a run always opens from a clean slate, whatever came before
     this.hp = TUNE.PLAYER_HP;
     this.gold = 0;
@@ -2769,6 +2771,7 @@ class GameScene extends Phaser.Scene {
     this.computeLayout();
     this.buildWalls();
     this.buildBoard();
+    this.buildBoardDressing();
     this.layoutHud();
     this.layoutLauncher();
     this.layoutEnemies();
@@ -2894,6 +2897,31 @@ class GameScene extends Phaser.Scene {
     g.strokeCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.2);
     g.lineStyle(1.5, p.apron, 0.3);
     g.strokeCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.6);
+    // carved rune rings at mid-field — quiet ancient-magic dressing
+    const ringY = this.fieldTop + (H - this.fieldTop - r) * 0.45;
+    g.lineStyle(2, 0xf5e6c8, 0.05);
+    g.strokeCircle(W / 2, ringY, this.dieSize * 2.6);
+    g.lineStyle(1.5, 0xf5e6c8, 0.04);
+    g.strokeCircle(W / 2, ringY, this.dieSize * 3.1);
+  }
+
+  // magical table light: a warm pool over the field, dark corners.
+  // realm-tinted, sits under the dice so nothing loses readability.
+  buildBoardDressing() {
+    const realm = this.realm || REALMS[0];
+    if (!this.vignette) {
+      this.makeSoftTexture('vignette', 256, 'rgba(0,0,0,0)', 'rgba(10,5,4,0.6)');
+      this.vignette = this.add.image(0, 0, 'vignette').setDepth(3);
+      this.boardLight = this.add.image(0, 0, 'flash').setDepth(3)
+        .setBlendMode(Phaser.BlendModes.ADD);
+    }
+    this.vignette.setPosition(this.W / 2, this.H / 2)
+      .setDisplaySize(this.W * 1.35, this.H * 1.5).setAlpha(0.9);
+    this.boardLight.setPosition(this.W / 2, this.H * 0.58)
+      .setDisplaySize(this.W * 1.1, this.H * 1.1)
+      .setTint(realm.id === 'tundra' ? 0xbfe8ff :
+        realm.id === 'cinder' ? 0xffb070 : 0xffe8b0)
+      .setAlpha(0.08);
   }
 
   // gentle realm weather: leaves drift in the glade, snow falls on the
@@ -3785,6 +3813,16 @@ class GameScene extends Phaser.Scene {
     this.tweens.add({
       targets: ring, scale: 2.6 + this.chain * 0.25, alpha: 0, duration: 320,
       onComplete: () => ring.destroy(),
+    });
+    // ancient-magic beat: a rune diamond spins out of every fuse
+    const rune = this.add.graphics().setDepth(19).setPosition(gx, apexY);
+    rune.lineStyle(2.5, 0xffe8a8, 0.85);
+    rune.strokeRect(-this.dieRadius * 0.8, -this.dieRadius * 0.8,
+      this.dieRadius * 1.6, this.dieRadius * 1.6);
+    rune.setRotation(Math.PI / 4);
+    this.tweens.add({
+      targets: rune, rotation: Math.PI / 4 + 1.6, scale: 2.1, alpha: 0,
+      duration: 380, ease: 'Quad.easeOut', onComplete: () => rune.destroy(),
     });
     this.sparks.burst(gx, apexY, color, Math.min(22, 10 + this.chain * 3),
       { speedMin: 1.5, speedMax: 5.5 + this.chain * 0.5, life: 480, scale: 0.9 });
