@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.8';
+const VERSION = 'v0.18.9';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -4414,10 +4414,32 @@ class GameScene extends Phaser.Scene {
       }
 
       if (speed > 0.8 * DPR && !d.squashing) {
-        d.img.rotation += d.spinSign * speed * TUNE.SPIN_RATE * (delta / 16.667);
+        if (DICE_CUBE && d.kind === 'num') {
+          // a drawn cube can't smooth-spin — it reads as sliding on ice.
+          // Real cubes tumble over their edges in discrete turns: flip the
+          // facing, wobble a few degrees, pop a tiny corner-hop. Step rate
+          // rides the speed so hard throws churn and slow rolls lumber.
+          d.tumbleMs = (d.tumbleMs || 0) + delta * (0.6 + speed / (5 * DPR));
+          if (d.tumbleMs >= 105) {
+            d.tumbleMs = 0;
+            d.img.setFlipX(!d.img.flipX);
+            d.img.rotation = (Math.random() - 0.5) * 0.26;
+            if (!d.hopTween || !d.hopTween.isPlaying()) {
+              d.hopTween = this.tweens.add({
+                targets: d.img, scale: d.baseScale * 1.08,
+                duration: 52, yoyo: true, ease: 'Sine.easeOut',
+                onComplete: () => { if (!d.dead && !d.squashing) d.img.setScale(d.baseScale); },
+              });
+            }
+          }
+        } else {
+          d.img.rotation += d.spinSign * speed * TUNE.SPIN_RATE * (delta / 16.667);
+        }
         d.uprighting = false;
-      } else if (!d.uprighting && Math.abs(d.img.rotation % (Math.PI * 2)) > 0.02) {
+      } else if (!d.uprighting &&
+        (Math.abs(d.img.rotation % (Math.PI * 2)) > 0.02 || d.img.flipX)) {
         d.uprighting = true;
+        if (DICE_CUBE) d.img.setFlipX(false);
         const snapped = Math.round(d.img.rotation / (Math.PI * 2)) * (Math.PI * 2);
         this.tweens.add({
           targets: d.img, rotation: snapped, duration: 220, ease: 'Sine.easeOut',
