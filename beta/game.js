@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.7';
+const VERSION = 'v0.18.8';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -38,6 +38,11 @@ const DPR = QP.has('dpr') ?
   Math.max(1, Math.min(parseFloat(QP.get('dpr')) || 1, 3)) :
   Math.min(window.devicePixelRatio || 1, DPR_CAP);
 const FX_OFF = QP.get('fx') === 'off';
+// Tier-1 Rune Dice look probe: ?dice=cube renders numbered + gold dice as
+// dimetric cubes (bright top, lit left, shaded right, numeral on both side
+// faces) for the Wyatt/Skylar A/B against the glass look. Display size,
+// physics, and realm color tables are identical either way.
+const DICE_CUBE = QP.get('dice') === 'cube';
 // MSAA is ~4x the fill cost on iOS WebGL and invisible at retina density —
 // only pay for it when the back-buffer is low-res enough to show jaggies
 const ANTIALIAS = QP.has('aa') ? QP.get('aa') === 'on' : DPR < 1.5;
@@ -2210,6 +2215,114 @@ class GameScene extends Phaser.Scene {
     return { tex, ctx, px, pad, tw };
   }
 
+  // ?dice=cube — a dimetric cube in the Rune Dice mold: hexagon silhouette,
+  // bright top face, lit left / shaded right, numeral stamped on both side
+  // faces so the value reads from any tumble angle
+  makeIsoDie(key, body, pip, v, opts) {
+    const o = opts || {};
+    const px = Math.round(this.dieSize * 2);
+    if (this.textures.exists(key)) this.textures.remove(key);
+    const tex = this.textures.createCanvas(key, px, px);
+    const ctx = tex.getContext();
+    ctx.clearRect(0, 0, px, px);
+    const cx = px / 2, W = px * 0.46, H = W * 0.5, F = px * 0.52;
+    const y0 = (px - (H * 2 + F)) / 2;
+    const T = [cx, y0], R = [cx + W, y0 + H], L = [cx - W, y0 + H];
+    const C = [cx, y0 + H * 2], BL = [cx - W, y0 + H + F];
+    const BR = [cx + W, y0 + H + F], B = [cx, y0 + H * 2 + F];
+    const face = (pts, fill) => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+    };
+    face([T, R, C, L], shade(body, 0.42));
+    face([L, C, B, BL], shade(body, 0.06));
+    face([C, R, BR, B], shade(body, -0.24));
+    // seeded glitter, clipped to the cube silhouette (realm sparkle carries over)
+    if (o.sparkle) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(T[0], T[1]); ctx.lineTo(R[0], R[1]); ctx.lineTo(BR[0], BR[1]);
+      ctx.lineTo(B[0], B[1]); ctx.lineTo(BL[0], BL[1]); ctx.lineTo(L[0], L[1]);
+      ctx.closePath();
+      ctx.clip();
+      let seed = ((o.seed || 1) * 7919 + 31) % 2147483647;
+      const srand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      const rb = (body >> 16) & 255, gb = (body >> 8) & 255, bb = body & 255;
+      for (let i = 0; i < 44; i++) {
+        const sx = cx - W + srand() * W * 2, sy = y0 + srand() * (H * 2 + F);
+        const br = 0.10 + srand() * 0.45;
+        ctx.fillStyle = srand() > 0.35 ? 'rgba(255,255,255,' + br + ')' :
+          'rgba(' + Math.min(255, rb + 80) + ',' + Math.min(255, gb + 80) + ',' +
+          Math.min(255, bb + 80) + ',' + (br * 0.5) + ')';
+        ctx.beginPath();
+        ctx.arc(sx, sy, (0.3 + srand() * 1.3) * (px / 150), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    // gold's coin lies flat on the top face (squashed to the dimetric plane)
+    if (o.coin) {
+      const cr = W * 0.52;
+      const cg = ctx.createRadialGradient(cx - cr * 0.3, y0 + H - cr * 0.2, cr * 0.15,
+        cx, y0 + H, cr);
+      cg.addColorStop(0, '#ffe08a');
+      cg.addColorStop(0.7, '#f2b23e');
+      cg.addColorStop(1, '#c8862a');
+      ctx.beginPath();
+      ctx.ellipse(cx, y0 + H, cr, cr * 0.5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = cg;
+      ctx.fill();
+      ctx.lineWidth = px * 0.014;
+      ctx.strokeStyle = '#8a5f1e';
+      ctx.stroke();
+    }
+    // edge strokes: dark outer rim, lighter inner seams, top highlight
+    const path = (pts) => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    };
+    path([T, R, BR, B, BL, L]);
+    ctx.closePath();
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = px * 0.03;
+    ctx.strokeStyle = 'rgba(18,10,14,0.55)';
+    ctx.stroke();
+    path([L, C, R]);
+    ctx.lineWidth = px * 0.02;
+    ctx.strokeStyle = 'rgba(18,10,14,0.35)';
+    ctx.stroke();
+    path([C, B]);
+    ctx.stroke();
+    path([T, R]);
+    ctx.lineWidth = px * 0.016;
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.stroke();
+    // the numeral on both side faces, skewed onto each plane
+    const numeral = (fx, fy, slope) => {
+      ctx.save();
+      ctx.translate(fx, fy);
+      ctx.transform(0.92, slope, 0, 1, 0, 0);
+      ctx.font = `900 ${Math.round(F * 0.74)}px "Arial Black", -apple-system, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = px * 0.045;
+      ctx.strokeStyle = 'rgba(14,8,12,0.72)';
+      ctx.strokeText(String(v), 0, 0);
+      ctx.fillStyle = shade(pip, 0.25);
+      ctx.fillText(String(v), 0, 0);
+      ctx.restore();
+    };
+    numeral(cx - W / 2, y0 + H * 1.5 + F / 2, 0.5);
+    numeral(cx + W / 2, y0 + H * 1.5 + F / 2, -0.5);
+    tex.refresh();
+  }
+
   realmDice() {
     return REALM_DICE[(this.realm || REALMS[0]).id] || REALM_DICE.glade;
   }
@@ -2260,6 +2373,11 @@ class GameScene extends Phaser.Scene {
     const rd = this.realmDice();
     for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
       const st = rd.values[v];
+      if (DICE_CUBE) {
+        this.makeIsoDie('die' + v, st.body, st.pip, v,
+          { sparkle: rd.sparkle, seed: v });
+        continue;
+      }
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('die' + v, st.body,
         { sparkle: rd.sparkle, seed: v });
       ctx.save();
@@ -2274,6 +2392,11 @@ class GameScene extends Phaser.Scene {
   // gold dice: always treasure-gold glass, coin face behind the pips
   makeGoldDieTextures() {
     for (let v = 1; v <= TUNE.MAX_VALUE; v++) {
+      if (DICE_CUBE) {
+        this.makeIsoDie('gold' + v, 0xf2b23e, 0x54341a, v,
+          { sparkle: true, seed: 100 + v, coin: true });
+        continue;
+      }
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('gold' + v, 0xf2b23e,
         { sparkle: true, seed: 100 + v });
       const cx = pad + tw / 2, cy = pad + tw / 2, cr = tw * 0.36;
