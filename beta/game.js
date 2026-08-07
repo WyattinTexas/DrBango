@@ -18,14 +18,20 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.5';
+const VERSION = 'v0.18.6';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
 // scaled down to CSS size, so Retina/phone screens get native pixels
 // instead of a blurry browser upscale. World units are DEVICE px:
 // anything authored in CSS pixels goes through upx()/fpx().
-const DPR = Math.min(window.devicePixelRatio || 1, 2);
+// on-device perf probes: ?dpr=1 halves the pixel load without touching
+// layout math, ?fx=off drops the vignette / light pool / weather sprites
+const QP = new URLSearchParams(location.search);
+const DPR = QP.has('dpr') ?
+  Math.max(1, Math.min(parseFloat(QP.get('dpr')) || 1, 3)) :
+  Math.min(window.devicePixelRatio || 1, 2);
+const FX_OFF = QP.get('fx') === 'off';
 const upx = (n) => Math.round(n * DPR);
 const fpx = (n) => Math.round(n * DPR) + 'px';
 
@@ -1243,7 +1249,10 @@ class GameScene extends Phaser.Scene {
   }
 
   menuButton(y, label, color, onTap) {
-    const w = Math.min(this.W * 0.64, upx(300)), h = upx(50);
+    // the row step shrinks to H*0.075 on short phones — the button (and its
+    // label) must shrink with it or the rows stack on each other
+    const w = Math.min(this.W * 0.64, upx(300));
+    const h = Math.min(upx(50), Math.round(this.H * 0.06));
     const x = this.W / 2 - w / 2;
     const g = this.modalAdd(this.add.graphics().setDepth(71));
     g.fillStyle(0x0e0703, 0.9);
@@ -1255,7 +1264,7 @@ class GameScene extends Phaser.Scene {
     g.lineStyle(1, 0xffffff, 0.08);                       // inner bevel
     g.strokeRoundedRect(x + 2, y - h / 2 + 2, w - 4, h - 4, 10);
     const t = this.modalAdd(this.add.text(this.W / 2, y, label, {
-      fontFamily: FONT_DISPLAY, fontSize: fpx(19),
+      fontFamily: FONT_DISPLAY, fontSize: fpx(Math.max(12, Math.round(19 * h / upx(50)))),
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5).setDepth(72));
     const hit = this.modalAdd(this.add.rectangle(this.W / 2, y, w, h, 0xffffff, 0.001)
@@ -2948,6 +2957,7 @@ class GameScene extends Phaser.Scene {
   // magical table light: a warm pool over the field, dark corners.
   // realm-tinted, sits under the dice so nothing loses readability.
   buildBoardDressing() {
+    if (FX_OFF) return;
     const realm = this.realm || REALMS[0];
     if (!this.vignette) {
       this.makeSoftTexture('vignette', 256, 'rgba(0,0,0,0)', 'rgba(10,5,4,0.6)');
@@ -2969,6 +2979,7 @@ class GameScene extends Phaser.Scene {
   buildAmbient() {
     if (this.ambient) for (const a of this.ambient) a.img.destroy();
     this.ambient = [];
+    if (FX_OFF) return;
     const rid = (this.realm || REALMS[0]).id;
     const cfg = rid === 'tundra' ?
       { tint: 0xffffff, alpha: 0.5, vy: 0.35, sway: 0.4, add: false, s: 0.5 } :
@@ -4363,7 +4374,8 @@ class GameScene extends Phaser.Scene {
       // whether WebGL failed over to Canvas and what we're really pushing
       const rdr = this.game.renderer.type === Phaser.WEBGL ? 'GL' : 'CV';
       this.fpsText.setColor(color).setText(fps + ' FPS · ' + this.dice.length +
-        ' dice · ' + rdr + ' ' + this.scale.gameSize.width + '×' + this.scale.gameSize.height);
+        ' dice · ' + rdr + ' ' + this.scale.gameSize.width + '×' + this.scale.gameSize.height +
+        (QP.has('dpr') ? ' · dpr' + DPR : '') + (FX_OFF ? ' · fx-off' : ''));
     }
   }
 }
@@ -4427,6 +4439,10 @@ window.addEventListener('DOMContentLoaded', () => {
   // so a single listener freezes the canvas at the stale size — sync
   // re-checks until the DOM and the back-buffer agree.
   const syncSize = () => {
+    // portrait is covered by the rotate overlay — reshaping the field to a
+    // portrait aspect would crush the dice into each other (touching means
+    // merging), so hold the last landscape geometry until the phone is back
+    if (window.innerHeight > window.innerWidth) return;
     const w = Math.round(window.innerWidth * DPR);
     const h = Math.round(window.innerHeight * DPR);
     const s = game.scale.gameSize;
