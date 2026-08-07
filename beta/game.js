@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.15';
+const VERSION = 'v0.18.16';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -767,6 +767,117 @@ class GameScene extends Phaser.Scene {
   chooseNextPath() {
     if (this.mapPos.f >= FLOORS - 1) { this.doVictory(); return; }
     this.openTrack(0, true);
+  }
+
+  // ---------- post-fight reward chest ----------
+
+  // slots 1-2 roll independently: 40% plain die / 40% class die / 20%
+  // relic — minibosses roll 30% relics and higher die values
+  rollReward(mini) {
+    const pool = RELICS.filter(r => !this.hasRelic(r.id) &&
+      (!r.cls || (this.playerClass && r.cls === this.playerClass.id)));
+    if (Math.random() < (mini ? 0.3 : 0.2) && pool.length) {
+      return { type: 'relic',
+        relic: pool[Phaser.Math.Between(0, pool.length - 1)] };
+    }
+    const value = mini ? Phaser.Math.Between(3, 5) : Phaser.Math.Between(1, 3);
+    const kind = this.playerClass && Math.random() < 0.5 ?
+      this.playerClass.die : 'num';
+    return { type: 'die', kind, value };
+  }
+
+  showRewardChoice(mini) {
+    this.modalOpen = 'reward';
+    // no modalRefresh: re-rolling by rotating the phone would be a cheat
+    const rewards = [this.rollReward(mini), this.rollReward(mini)];
+    const { px, py, pw, ph } = this.modalBase(
+      mini ? '💀 MINIBOSS SPOILS' : 'CHOOSE YOUR REWARD',
+      Math.min(upx(230), this.H * 0.7), Math.min(upx(600), this.W * 0.92));
+    const done = (msg, color) => {
+      this.closeModal();
+      if (msg) this.banner(msg, color || GOLD);
+      this.time.delayedCall(500, () => {
+        if (!this.gameOver) this.chooseNextPath();
+      });
+    };
+    const gap = upx(12);
+    const cw = (pw - upx(32) - gap * 2) / 3;
+    const ch = ph - upx(72);
+    const cy = py + upx(52) + ch / 2;
+    const card = (i, color, fill) => {
+      const cx = px + upx(16) + i * (cw + gap) + cw / 2;
+      const g = this.modalAdd(this.add.graphics().setDepth(71));
+      g.fillStyle(fill, 1);
+      g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 10);
+      g.lineStyle(2, color, 0.9);
+      g.strokeRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 10);
+      return cx;
+    };
+    rewards.forEach((rw, i) => {
+      if (rw.type === 'relic') {
+        const cx = card(i, 0xc9a84c, 0x241810);
+        this.modalAdd(this.add.text(cx, cy - ch * 0.30, rw.relic.icon, {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(26),
+        }).setOrigin(0.5).setDepth(72));
+        this.modalAdd(this.add.text(cx, cy - ch * 0.06, rw.relic.name, {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
+          fontStyle: 'bold', color: GOLD, align: 'center',
+          wordWrap: { width: cw - upx(12) },
+        }).setOrigin(0.5, 0).setDepth(72));
+        this.modalAdd(this.add.text(cx, cy + ch * 0.16, rw.relic.desc, {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(9),
+          color: BOARD.creamDim, align: 'center',
+          wordWrap: { width: cw - upx(12) },
+        }).setOrigin(0.5, 0).setDepth(72));
+      } else {
+        const cls = isClassKind(rw.kind);
+        const cx = card(i, cls ? this.playerClass.color : 0x8a7960, 0x1c120a);
+        const s = Math.min(cw * 0.45, upx(52), ch * 0.42);
+        this.modalAdd(this.add.image(cx, cy - ch * 0.16,
+          this.textureFor(rw.kind, rw.value)).setDisplaySize(s, s).setDepth(72));
+        const name = rw.kind === 'num' ? 'Die ' + rw.value :
+          rw.kind.charAt(0).toUpperCase() + rw.kind.slice(1) + ' die ' + rw.value;
+        this.modalAdd(this.add.text(cx, cy + ch * 0.14, name, {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(13),
+          fontStyle: 'bold', color: cls ? this.playerClass.hex : BOARD.cream,
+        }).setOrigin(0.5, 0).setDepth(72));
+        this.modalAdd(this.add.text(cx, cy + ch * 0.30, 'joins your bag', {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(9),
+          color: BOARD.creamDim,
+        }).setOrigin(0.5, 0).setDepth(72));
+      }
+      const hit = this.modalAdd(this.add.rectangle(
+        px + upx(16) + i * (cw + gap) + cw / 2, cy, cw, ch, 0xffffff, 0.001)
+        .setDepth(73).setInteractive());
+      hit.on('pointerdown', () => {
+        if (rw.type === 'relic') {
+          this.gainRelic(rw.relic.id);
+          done(rw.relic.icon + ' ' + rw.relic.name.toUpperCase(), GOLD);
+        } else {
+          this.bag.push({ kind: rw.kind, value: rw.value });
+          this.drawPile.splice(Phaser.Math.Between(0, this.drawPile.length), 0,
+            { kind: rw.kind, value: rw.value });
+          this.updateBagCount();
+          done('NEW DIE JOINS THE BAG', '#8ec873');
+        }
+      });
+    });
+    // slot 3: always the coin-out
+    const cx = card(2, 0x6b4a33, 0x180e08);
+    this.modalAdd(this.add.text(cx, cy - ch * 0.26, '💰', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(24),
+    }).setOrigin(0.5).setDepth(72));
+    this.modalAdd(this.add.text(cx, cy + ch * 0.02, 'Skip  ·  +10g', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(13),
+      fontStyle: 'bold', color: GOLD,
+    }).setOrigin(0.5, 0).setDepth(72));
+    const skipHit = this.modalAdd(this.add.rectangle(cx, cy, cw, ch,
+      0xffffff, 0.001).setDepth(73).setInteractive());
+    skipHit.on('pointerdown', () => {
+      this.gold += 10;
+      this.drawGold();
+      done('+10 GOLD', GOLD);
+    });
   }
 
   levelCfg() {
@@ -4597,7 +4708,9 @@ class GameScene extends Phaser.Scene {
             }
           });
           this.time.delayedCall(1400, () => {
-            if (!this.gameOver) this.chooseNextPath();
+            if (!this.gameOver) {
+              this.showRewardChoice(this.currentNode.type === 'boss');
+            }
           });
         }
       }
