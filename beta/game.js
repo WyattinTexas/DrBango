@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.17.3';
+const VERSION = 'v0.17.4';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -467,6 +467,7 @@ class GameScene extends Phaser.Scene {
     this.buildLauncher();
 
     this.sparks = new ParticlePool(this, 'spark', 120);
+    this.buildAmbient();
     this.trajGfx = this.add.graphics().setDepth(6);
     this.bandGfx = this.add.graphics().setDepth(7);
 
@@ -1106,6 +1107,7 @@ class GameScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(this.realm.palette.bg);
     this.makeTextures();   // dice restyle to this realm's set
     this.buildBoard();
+    this.buildAmbient();   // and its weather
     // a run always opens from a clean slate, whatever came before
     this.hp = TUNE.PLAYER_HP;
     this.gold = 0;
@@ -1176,7 +1178,7 @@ class GameScene extends Phaser.Scene {
     const objs = [this.fpsText, this.levelText, this.mapBtn, this.classText,
       this.bestText, this.refreshText, this.versionText, this.hpBar, this.hpText,
       this.goldText, this.blockText, this.previewImg, this.nextLabel,
-      this.bagImg, this.bagCount, ...(this.queueImgs || []),
+      this.bagImg, this.bagCount, this.hudChips, ...(this.queueImgs || []),
       ...(this.relicIcons || [])];
     for (const o of objs) if (o) o.setVisible(v);
   }
@@ -2769,12 +2771,47 @@ class GameScene extends Phaser.Scene {
     const g = this.add.graphics().setDepth(0);
     this.boardGfx = g;
     const { W, H } = this, r = this.rail, top = this.boardTop;
-    const p = (this.realm || REALMS[0]).palette;
-    g.fillStyle(p.skyA, 1);
+    const realm = this.realm || REALMS[0];
+    const p = realm.palette, rid = realm.id;
+    g.fillGradientStyle(shadeHex(p.skyA, 0.35), shadeHex(p.skyA, 0.35), p.skyA, p.skyA, 1);
     g.fillRect(0, 0, W, top);
-    g.fillStyle(p.skyB, 1);
-    for (let x = 0; x < W; x += 46) {
-      g.fillEllipse(x + 20, top * 0.35, 52, top * 0.8);
+    // realm skyline behind the enemy row (deterministic scatter)
+    if (rid === 'glade') {
+      g.fillStyle(0xf5e6a3, 0.5);
+      g.fillCircle(W * 0.85, top * 0.30, top * 0.16);
+      g.fillStyle(shadeHex(p.skyB, 0.25), 0.5);
+      for (let x = -20; x < W + 40; x += 90) {
+        g.fillEllipse(x + ((x * 13) % 40), top * (0.2 + ((x * 7) % 20) / 100), 64, 12);
+      }
+      g.fillStyle(shadeHex(p.skyB, -0.25), 1);
+      for (let x = 0; x < W + 30; x += 34) {
+        const h = top * (0.32 + ((x * 31) % 23) / 100);
+        g.fillTriangle(x - 15, top, x, top - h, x + 15, top);
+      }
+    } else if (rid === 'tundra') {
+      g.fillStyle(0xeef4fa, 0.75);
+      g.fillCircle(W * 0.86, top * 0.28, top * 0.14);
+      g.fillStyle(0xffffff, 0.5);
+      for (let x = 10; x < W; x += 56) {
+        g.fillCircle(x + ((x * 17) % 30), top * (0.10 + ((x * 11) % 30) / 100), 1.3);
+      }
+      for (let x = -10; x < W + 60; x += 110) {
+        const h = top * (0.5 + ((x * 13) % 30) / 100);
+        g.fillStyle(shadeHex(p.skyB, -0.15), 1);
+        g.fillTriangle(x - 45, top, x + 10, top - h, x + 65, top);
+        g.fillStyle(0xeef4fa, 0.85);
+        g.fillTriangle(x - 2, top - h * 0.72, x + 10, top - h, x + 22, top - h * 0.72);
+      }
+    } else {
+      g.fillStyle(0xff8c00, 0.12);
+      g.fillCircle(W * 0.5, top * 1.05, top * 0.9);
+      for (let x = -20; x < W + 80; x += 150) {
+        const h = top * (0.55 + ((x * 7) % 25) / 100);
+        g.fillStyle(shadeHex(p.skyB, -0.2), 1);
+        g.fillTriangle(x - 60, top, x + 15, top - h, x + 90, top);
+        g.fillStyle(0xff8c00, 0.85);
+        g.fillCircle(x + 15, top - h + 2, 2.5);
+      }
     }
     g.fillStyle(p.grassA, 1);
     g.fillRect(0, top - 6, W, 6);
@@ -2809,6 +2846,31 @@ class GameScene extends Phaser.Scene {
     g.fillCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.2);
     g.lineStyle(2, p.apron, 0.6);
     g.strokeCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.2);
+    g.lineStyle(1.5, p.apron, 0.3);
+    g.strokeCircle(this.launcherPos.x, this.launcherPos.y, this.dieRadius * 2.6);
+  }
+
+  // gentle realm weather: leaves drift in the glade, snow falls on the
+  // tundra, embers rise off the cinder wastes
+  buildAmbient() {
+    if (this.ambient) for (const a of this.ambient) a.img.destroy();
+    this.ambient = [];
+    const rid = (this.realm || REALMS[0]).id;
+    const cfg = rid === 'tundra' ?
+      { tint: 0xffffff, alpha: 0.5, vy: 0.35, sway: 0.4, add: false, s: 0.5 } :
+      rid === 'cinder' ?
+        { tint: 0xff9838, alpha: 0.55, vy: -0.5, sway: 0.3, add: true, s: 0.45 } :
+        { tint: 0x9fce7a, alpha: 0.4, vy: 0.25, sway: 0.8, add: false, s: 0.4 };
+    for (let i = 0; i < 16; i++) {
+      const img = this.add.image(Math.random() * this.W, Math.random() * this.H, 'spark')
+        .setDepth(2).setAlpha(cfg.alpha * (0.5 + Math.random() * 0.5))
+        .setTint(cfg.tint).setScale(cfg.s * (0.6 + Math.random() * 0.8));
+      if (cfg.add) img.setBlendMode(Phaser.BlendModes.ADD);
+      this.ambient.push({
+        img, vy: cfg.vy * (0.7 + Math.random() * 0.6),
+        sway: cfg.sway, phase: Math.random() * Math.PI * 2,
+      });
+    }
   }
 
   // ---------- dice ----------
@@ -3799,6 +3861,11 @@ class GameScene extends Phaser.Scene {
     this.classText = this.add.text(0, 0, '', {
       ...style, fontSize: '12px', fontStyle: 'bold',
     }).setDepth(30);
+    // every readout gets a dark stroke so it reads on any realm board
+    for (const t of [this.levelText, this.bestText, this.refreshText,
+      this.goldText, this.blockText, this.hpText, this.classText, this.mapBtn]) {
+      t.setStroke('#160c06', 3);
+    }
     this.tipBg = this.add.graphics().setDepth(60).setVisible(false);
     this.tipText = this.add.text(0, 0, '', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
@@ -3827,6 +3894,20 @@ class GameScene extends Phaser.Scene {
     }
     this.refreshText.setPosition(this.W - 8, ly);
     this.bestText.setPosition(this.W - 8, 4);
+    // quiet dark chips ground the top readouts against the skyline
+    if (!this.hudChips) this.hudChips = this.add.graphics().setDepth(28);
+    const hc = this.hudChips;
+    hc.clear();
+    const chip = (cx0, cy0, cw, chh) => {
+      hc.fillStyle(0x120a06, 0.5);
+      hc.fillRoundedRect(cx0, cy0, cw, chh, 9);
+      hc.lineStyle(1, 0x6b4a33, 0.45);
+      hc.strokeRoundedRect(cx0, cy0, cw, chh, 9);
+    };
+    const lw = Math.max(this.levelText.width + this.mapBtn.width + 26,
+      (this.classText ? this.classText.width : 0) + 14);
+    chip(2, ly - 6, lw, 42);
+    chip(this.W - 152, 2, 150, ly + 18);
     this.versionText.setPosition(this.W - this.rail - 6, this.H - this.rail - 4);
     this.chainText.setPosition(this.W / 2, this.H * 0.3);
     this.drawHpBar();
@@ -4074,6 +4155,16 @@ class GameScene extends Phaser.Scene {
       if ((!this.boardBusy() || timedOut) && time - this.fireTime > 350) {
         this.onThrowResolved();
         this.setReady(true);
+      }
+    }
+
+    if (this.ambient) {
+      const tt = time / 1000, dtf = delta / 16.667;
+      for (const a of this.ambient) {
+        a.img.y += a.vy * dtf;
+        a.img.x += Math.sin(tt * 1.3 + a.phase) * a.sway * dtf;
+        if (a.vy > 0 && a.img.y > this.H + 8) { a.img.y = -8; a.img.x = Math.random() * this.W; }
+        else if (a.vy < 0 && a.img.y < -8) { a.img.y = this.H + 8; a.img.x = Math.random() * this.W; }
       }
     }
 
