@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.16';
+const VERSION = 'v0.18.17';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -148,7 +148,7 @@ const STARTING_BAG = [
 // Classes: each brings a signature die that merges on its own number,
 // fires its effect, and STILL fuses into the next number up — the
 // effect rides the chain instead of ending it.
-const CLASS_KINDS = ['shield', 'arrow', 'fire'];
+const CLASS_KINDS = ['shield', 'arrow', 'fire', 'dagger', 'holy'];
 const isClassKind = (k) => CLASS_KINDS.indexOf(k) >= 0;
 
 const CLASSES = [
@@ -182,7 +182,55 @@ const CLASSES = [
       { kind: 'fire', value: 1 }, { kind: 'fire', value: 2 },
     ],
   },
+  // shop classes: price marks them locked until bought with banked gold
+  {
+    id: 'rogue', name: 'ROGUE', die: 'dagger', icon: '🗡️', price: 120,
+    color: 0x9a6ab8, hex: '#9a6ab8',
+    tagline: 'Cuts the first foe and pockets gold with every strike',
+    bag: [
+      { kind: 'num', value: 1 }, { kind: 'num', value: 1 },
+      { kind: 'num', value: 1 }, { kind: 'num', value: 2 },
+      { kind: 'dagger', value: 1 }, { kind: 'dagger', value: 2 },
+    ],
+  },
+  {
+    id: 'cleric', name: 'CLERIC', die: 'holy', icon: '✨', price: 200,
+    color: 0xe6d38a, hex: '#e6d38a',
+    tagline: 'Mends wounds with every merge and smites what remains',
+    bag: [
+      { kind: 'num', value: 1 }, { kind: 'num', value: 1 },
+      { kind: 'num', value: 1 }, { kind: 'num', value: 2 },
+      { kind: 'holy', value: 1 }, { kind: 'holy', value: 2 },
+    ],
+  },
 ];
+
+// ---------- persistent bank + class unlocks ----------
+function loadUnlocks() {
+  try { return JSON.parse(localStorage.getItem('runefall.unlocks')) || []; }
+  catch (e) { return []; }
+}
+function classUnlocked(cls) {
+  return !cls.price || loadUnlocks().indexOf(cls.id) >= 0;
+}
+function unlockClass(id) {
+  const u = loadUnlocks();
+  if (u.indexOf(id) < 0) u.push(id);
+  try { localStorage.setItem('runefall.unlocks', JSON.stringify(u)); } catch (e) { /* no-op */ }
+}
+const BANK = {
+  get() { return parseInt(localStorage.getItem('runefall.bank'), 10) || 0; },
+  add(n) {
+    if (n > 0) {
+      try { localStorage.setItem('runefall.bank', String(this.get() + n)); } catch (e) { /* no-op */ }
+    }
+  },
+  spend(n) {
+    if (this.get() < n) return false;
+    try { localStorage.setItem('runefall.bank', String(this.get() - n)); } catch (e) { return false; }
+    return true;
+  },
+};
 
 const CLASS_BY_ID = {};
 for (const c of CLASSES) CLASS_BY_ID[c.id] = c;
@@ -330,6 +378,8 @@ const TOOLTIPS = {
   shield: 'SHIELD DIE\nMerges with its number: banks\nthat much BLOCK (soaks damage\n1:1) and still fuses upward',
   arrow: 'ARROW DIE\nMerges with its number: hits\nEVERY enemy for it (double if\none left) and still fuses upward',
   fire: 'FIRE DIE\nMerges with its number: sets\nEVERY enemy burning (burn bites,\nthen fades) and still fuses upward',
+  dagger: 'DAGGER DIE\nMerges with its number: cuts the\nfirst enemy for it, steals that\nmuch gold, and still fuses upward',
+  holy: 'HOLY DIE\nMerges with its number: heals\nyou for it, smites the first enemy\nfor half, and still fuses upward',
 };
 
 // Relics: permanent passives sold from the shop's special-item slot.
@@ -364,6 +414,10 @@ const RELICS = [
   // run for free once the class is maxed
   { id: 'bulwark', icon: '🏰', name: 'Old Bulwark', tier: 1, price: 10,
     cls: 'warrior', starter: true, desc: 'Start each fight with 3 BLOCK' },
+  { id: 'cutpurse', icon: '🪤', name: 'Cutpurse Kit', tier: 1, price: 10,
+    cls: 'rogue', starter: true, desc: 'Dagger merges steal +2 more gold' },
+  { id: 'reliquary', icon: '⚱️', name: 'Silver Reliquary', tier: 1, price: 10,
+    cls: 'cleric', starter: true, desc: 'Holy merges heal +2 more HP' },
   { id: 'towerplate', icon: '🧱', name: 'Tower Plate', tier: 2, price: 14,
     cls: 'warrior', desc: 'Shield dice bank +1 extra BLOCK' },
   { id: 'spikedplate', icon: '🦔', name: 'Spiked Plate', tier: 3, price: 18,
@@ -1232,6 +1286,7 @@ class GameScene extends Phaser.Scene {
 
   doGameOver() {
     this.gameOver = true;
+    BANK.add(this.gold); // held gold banks even in defeat
     this.closeModal();
     this.aim = null;
     this.trajGfx.clear();
@@ -1244,8 +1299,8 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.52,
       'Reached level ' + this.level + '/' + FLOORS +
-      '  ·  Best chain ×' + this.bestChain + '  ·  ' + this.gold + 'g earned' +
-      '  ·  ' + this.relics.length + ' relics', {
+      '  ·  Best chain ×' + this.bestChain + '  ·  ' + this.gold + 'g banked' +
+      '  ·  ' + this.relics.length + ' relics  ·  wallet ' + BANK.get() + 'g', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(18),
       color: BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
@@ -1264,6 +1319,7 @@ class GameScene extends Phaser.Scene {
   doVictory() {
     this.awardClassXp(XP_VICTORY * (this.realm ? this.realm.xp : 1));
     this.gameOver = true;
+    BANK.add(this.gold);
     this.closeModal();
     this.previewImg.setVisible(false);
     this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.78).setDepth(50);
@@ -1273,7 +1329,8 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.52,
       'All ' + FLOORS + ' levels cleared  ·  Best chain ×' + this.bestChain +
-      '  ·  ' + this.gold + 'g  ·  ' + this.relics.length + ' relics', {
+      '  ·  ' + this.gold + 'g banked  ·  ' + this.relics.length +
+      ' relics  ·  wallet ' + BANK.get() + 'g', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(18),
       color: BOARD.cream,
     }).setOrigin(0.5).setDepth(51);
@@ -1472,8 +1529,7 @@ class GameScene extends Phaser.Scene {
       () => this.showComingSoon('ACHIEVEMENTS',
         'Chain milestones, relics collected, floors reached,\nand a clean run with every class.\n\nNot built yet.'));
     this.menuButton(y0 + step * 3, '◉ SHOP', 0x6b4a33,
-      () => this.showComingSoon('SHOP',
-        'Spend what you carry out of a run on permanent\nunlocks: new dice for the bag, starting relics,\nand the classes beyond the first three.\n\nNot built yet.'));
+      () => this.showShopHome());
     this.modalAdd(this.add.text(this.W / 2, y0 + step * 4 + 6,
       FLOORS + ' floors · ' + CLASSES.length + ' classes · ' +
       RELICS.length + ' relics · ' + REALMS.length + ' realms', {
@@ -1484,6 +1540,75 @@ class GameScene extends Phaser.Scene {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
       color: '#7a6a55',
     }).setOrigin(0.5).setDepth(72));
+  }
+
+  // the home shop: banked gold from finished runs buys new classes
+  showShopHome() {
+    this.menuBackdrop();
+    this.modalRefresh = () => this.showShopHome();
+    this.modalAdd(this.add.text(this.W / 2, this.H * 0.09, '◉  SHOP', {
+      fontFamily: FONT_DISPLAY, fontSize: fpx(25),
+      fontStyle: 'bold', color: BOARD.cream,
+    }).setOrigin(0.5).setDepth(72));
+    this.modalAdd(this.add.text(this.W / 2, this.H * 0.09 + upx(28),
+      '💰 Wallet: ' + BANK.get() + 'g  ·  the gold you finish runs with banks here', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
+      color: GOLD,
+    }).setOrigin(0.5).setDepth(72));
+    const forSale = CLASSES.filter(c => c.price);
+    const cardW = Math.min(this.W * 0.86, upx(420));
+    const cardH = Math.min(upx(110), this.H * 0.2);
+    const x = this.W / 2 - cardW / 2;
+    const top = this.H * 0.24;
+    const gap = Math.min(cardH + upx(14), this.H * 0.24);
+    forSale.forEach((cls, i) => {
+      const owned = classUnlocked(cls);
+      const afford = BANK.get() >= cls.price;
+      const cy = top + gap * i + cardH / 2;
+      const g = this.modalAdd(this.add.graphics().setDepth(71));
+      g.fillStyle(0x0e0703, 0.9);
+      g.fillRoundedRect(x + upx(3), cy - cardH / 2 + upx(4), cardW, cardH, 14);
+      g.fillGradientStyle(0x342013, 0x2a1a10, 0x180e08, 0x180e08, 1);
+      g.fillRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
+      g.lineStyle(2, owned ? 0x8ec873 : cls.color, owned ? 0.9 : 0.95);
+      g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
+      this.modalAdd(this.add.text(x + upx(30), cy, cls.icon, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(24),
+      }).setOrigin(0.5).setDepth(72)).setAlpha(owned || afford ? 1 : 0.55);
+      this.modalAdd(this.add.text(x + upx(58), cy - cardH / 2 + upx(14), cls.name, {
+        fontFamily: FONT_DISPLAY, fontSize: fpx(19),
+        fontStyle: 'bold', color: cls.hex,
+      }).setDepth(72));
+      this.modalAdd(this.add.text(x + upx(58), cy - cardH / 2 + upx(40), cls.tagline, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
+        color: BOARD.creamDim, wordWrap: { width: cardW - upx(180) },
+      }).setDepth(72));
+      const btn = this.modalAdd(this.add.text(x + cardW - upx(16), cy,
+        owned ? '✓ OWNED' : cls.price + 'g', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
+        fontStyle: 'bold',
+        color: owned ? '#8ec873' : afford ? '#2a1a10' : '#7a6a55',
+        backgroundColor: owned ? '#1c2a14' : afford ? '#ffd54a' : '#3a2a1c',
+        padding: { x: upx(12), y: upx(7) },
+      }).setOrigin(1, 0.5).setDepth(73).setInteractive());
+      btn.on('pointerdown', () => {
+        if (owned || !BANK.spend(cls.price)) return;
+        unlockClass(cls.id);
+        this.showShopHome();
+      });
+    });
+    this.modalAdd(this.add.text(this.W / 2,
+      top + gap * forSale.length + upx(10),
+      'More wares coming: permanent dice and starting relics', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
+      color: '#8a7960', fontStyle: 'italic',
+    }).setOrigin(0.5, 0).setDepth(72));
+    const back = this.modalAdd(this.add.text(this.W / 2, this.H - upx(30), '◀ BACK', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
+      fontStyle: 'bold', color: '#ffd54a',
+      backgroundColor: '#3a2517', padding: { x: upx(12), y: upx(6) },
+    }).setOrigin(0.5).setDepth(74).setInteractive());
+    back.on('pointerdown', () => this.showHome());
   }
 
   showComingSoon(title, body) {
@@ -1510,26 +1635,29 @@ class GameScene extends Phaser.Scene {
       fontFamily: FONT_DISPLAY, fontSize: fpx(25),
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5).setDepth(72));
+    const nCls = CLASSES.length;
     const cardW = Math.min(this.W * 0.86, upx(420));
-    const cardH = Math.min(upx(128), this.H * 0.18);
+    const cardH = Math.min(upx(128), (this.H * 0.71) / nCls - upx(4));
     // short phone cards: every inside offset rides the squeeze factor so
     // the name, badges, and dice row never stack on each other
     const u = cardH / upx(128);
     const cu = (n) => Math.round(upx(n) * u);
     const fu = (n) => fpx(Math.max(8, Math.round(n * Math.max(u, 0.7))));
     const x = this.W / 2 - cardW / 2;
-    const top = this.H * 0.17;
-    const gap = Math.min(cardH + upx(16), this.H * 0.24);
+    const top = this.H * 0.145;
+    const gap = Math.min(cardH + upx(16), (this.H * 0.72) / nCls);
     CLASSES.forEach((cls, i) => {
       const cy = top + gap * i + cardH / 2;
+      const locked = !classUnlocked(cls);
+      const edge = locked ? 0x5a4a3a : cls.color;
       const g = this.modalAdd(this.add.graphics().setDepth(71));
       g.fillStyle(0x0e0703, 0.9);
       g.fillRoundedRect(x + upx(3), cy - cardH / 2 + upx(4), cardW, cardH, 14);
       g.fillGradientStyle(0x342013, 0x2a1a10, 0x180e08, 0x180e08, 1);
       g.fillRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
-      g.lineStyle(5, cls.color, 0.14);                                  // soft glow edge
+      g.lineStyle(5, edge, 0.14);                                       // soft glow edge
       g.strokeRoundedRect(x - 2, cy - cardH / 2 - 2, cardW + 4, cardH + 4, 16);
-      g.lineStyle(2, cls.color, 0.95);
+      g.lineStyle(2, edge, locked ? 0.6 : 0.95);
       g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
       // icon medallion
       g.fillStyle(0x120a06, 0.85);
@@ -1538,10 +1666,10 @@ class GameScene extends Phaser.Scene {
       g.strokeCircle(x + cu(34), cy - cardH / 2 + cu(30), cu(20));
       this.modalAdd(this.add.text(x + cu(34), cy - cardH / 2 + cu(30), cls.icon, {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(23),
-      }).setOrigin(0.5).setDepth(72));
+      }).setOrigin(0.5).setDepth(72)).setAlpha(locked ? 0.45 : 1);
       this.modalAdd(this.add.text(x + cu(62), cy - cardH / 2 + cu(14), cls.name, {
         fontFamily: FONT_DISPLAY, fontSize: fu(21),
-        fontStyle: 'bold', color: cls.hex,
+        fontStyle: 'bold', color: locked ? '#8a7960' : cls.hex,
       }).setDepth(72));
       // short phone cards: skip the tagline so it can't collide with the
       // dice row (same rule the realm cards use)
@@ -1551,20 +1679,33 @@ class GameScene extends Phaser.Scene {
           color: BOARD.creamDim, wordWrap: { width: cardW - upx(150) },
         }).setDepth(72));
       }
-      // level badge + progress toward the next one
-      const lvl = classLevelOf(cls.id);
-      const xpNow = classXpOf(cls.id);
-      const next = lvl < CLASS_MAX_LEVEL ? CLASS_XP_LEVELS[lvl] : null;
-      this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + cu(12),
-        'LV ' + lvl + (lvl >= CLASS_MAX_LEVEL ? ' ★' : ''), {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(16),
-        fontStyle: 'bold', color: GOLD,
-      }).setOrigin(1, 0).setDepth(72));
-      this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + cu(34),
-        next ? xpNow + '/' + next + ' xp' : 'MAX LEVEL', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(10),
-        color: '#8a7960',
-      }).setOrigin(1, 0).setDepth(72));
+      // level badge + progress toward the next one (locked: the price tag)
+      if (locked) {
+        this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + cu(12),
+          '🔒 ' + cls.price + 'g', {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(16),
+          fontStyle: 'bold', color: GOLD,
+        }).setOrigin(1, 0).setDepth(72));
+        this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + cu(34),
+          'tap to visit the shop', {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(10),
+          color: '#8a7960',
+        }).setOrigin(1, 0).setDepth(72));
+      } else {
+        const lvl = classLevelOf(cls.id);
+        const xpNow = classXpOf(cls.id);
+        const next = lvl < CLASS_MAX_LEVEL ? CLASS_XP_LEVELS[lvl] : null;
+        this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + cu(12),
+          'LV ' + lvl + (lvl >= CLASS_MAX_LEVEL ? ' ★' : ''), {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(16),
+          fontStyle: 'bold', color: GOLD,
+        }).setOrigin(1, 0).setDepth(72));
+        this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + cu(34),
+          next ? xpNow + '/' + next + ' xp' : 'MAX LEVEL', {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(10),
+          color: '#8a7960',
+        }).setOrigin(1, 0).setDepth(72));
+      }
       // the bag it opens with, drawn as the real dice
       const s = Math.min(cu(26), cardW / 13);
       this.modalAdd(this.add.text(x + upx(18), cy + cardH / 2 - cu(48), 'STARTS WITH', {
@@ -1574,11 +1715,13 @@ class GameScene extends Phaser.Scene {
       startingBagFor(cls).forEach((e, j) => {
         this.modalAdd(this.add.image(x + upx(22) + s / 2 + j * (s + cu(6)),
           cy + cardH / 2 - cu(22),
-          this.textureFor(e.kind, e.value)).setDisplaySize(s, s).setDepth(72));
+          this.textureFor(e.kind, e.value)).setDisplaySize(s, s).setDepth(72))
+          .setAlpha(locked ? 0.4 : 1);
       });
       const hit = this.modalAdd(this.add.rectangle(this.W / 2, cy, cardW, cardH,
         0xffffff, 0.001).setDepth(73).setInteractive());
-      hit.on('pointerdown', () => this.showRealmSelect(cls.id));
+      hit.on('pointerdown', () =>
+        locked ? this.showShopHome() : this.showRealmSelect(cls.id));
     });
     const back = this.modalAdd(this.add.text(this.W / 2, this.H - upx(34), '◀ BACK', {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
@@ -1884,6 +2027,7 @@ class GameScene extends Phaser.Scene {
       bomb: 'Bomb die ', potion: 'Potion die',
       wild: 'Wild die', stun: 'Stun die',
       shield: 'Shield die ', arrow: 'Arrow die ', fire: 'Fire die ',
+      dagger: 'Dagger die ', holy: 'Holy die ',
     };
     stock.offers.forEach((o, i) => {
       const x = px + cellW * (i + 0.5);
@@ -2876,6 +3020,35 @@ class GameScene extends Phaser.Scene {
           ctx.lineTo(cx + r * 0.75, cy - r * 0.15);
           ctx.closePath();
           ctx.fill();
+        } else if (cls.die === 'dagger') {
+          // blade with crossguard and pommel
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = NUMBER_COLOR;
+          ctx.lineWidth = tw * 0.12;
+          ctx.beginPath();
+          ctx.moveTo(cx - r * 0.7, cy + r * 0.7);
+          ctx.lineTo(cx + r * 0.55, cy - r * 0.55);
+          ctx.stroke();
+          ctx.lineWidth = tw * 0.09;
+          ctx.beginPath();
+          ctx.moveTo(cx + r * 0.15, cy - r * 0.95);
+          ctx.lineTo(cx + r * 0.95, cy - r * 0.15);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(cx - r * 0.85, cy + r * 0.85, tw * 0.07, 0, Math.PI * 2);
+          ctx.fillStyle = NUMBER_COLOR;
+          ctx.fill();
+        } else if (cls.die === 'holy') {
+          // four-point star burst
+          ctx.beginPath();
+          const pts = [[0, -1.15], [0.22, -0.22], [1.15, 0], [0.22, 0.22],
+            [0, 1.15], [-0.22, 0.22], [-1.15, 0], [-0.22, -0.22]];
+          pts.forEach(([ux2, uy2], i) => {
+            const x2 = cx + ux2 * r, y2 = cy + uy2 * r;
+            if (i === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
+          });
+          ctx.closePath();
+          ctx.fill();
         } else {
           ctx.beginPath();
           ctx.moveTo(cx, cy - r * 1.15);
@@ -3632,6 +3805,15 @@ class GameScene extends Phaser.Scene {
       }
     } else if (kind === 'fire') {
       this.igniteAll(value + (this.hasRelic('kindling') ? 1 : 0), x, apexY);
+    } else if (kind === 'dagger') {
+      const steal = value + (this.hasRelic('cutpurse') ? 2 : 0);
+      this.gold += steal;
+      this.drawGold();
+      this.floatText(x, apexY - upx(20), '+' + steal + 'g', GOLD, true);
+      this.dealDamage(value + this.mergeDamageBonus(), x, apexY, false);
+    } else if (kind === 'holy') {
+      this.heal(value + (this.hasRelic('reliquary') ? 2 : 0));
+      this.dealDamage(Math.ceil(value / 2) + this.mergeDamageBonus(), x, apexY, false);
     }
   }
 
