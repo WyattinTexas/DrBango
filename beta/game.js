@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.6';
+const VERSION = 'v0.18.7';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -28,10 +28,19 @@ const VERSION = 'v0.18.6';
 // on-device perf probes: ?dpr=1 halves the pixel load without touching
 // layout math, ?fx=off drops the vignette / light pool / weather sprites
 const QP = new URLSearchParams(location.search);
+// adaptive quality: a device that can't hold 45fps gets its back-buffer
+// stepped down a notch (2 -> 1.5 -> 1) and the cap remembered
+const DPR_CAP = (() => {
+  const v = parseFloat(localStorage.getItem('runefall.dprCap'));
+  return (v >= 1 && v < 2) ? v : 2;
+})();
 const DPR = QP.has('dpr') ?
   Math.max(1, Math.min(parseFloat(QP.get('dpr')) || 1, 3)) :
-  Math.min(window.devicePixelRatio || 1, 2);
+  Math.min(window.devicePixelRatio || 1, DPR_CAP);
 const FX_OFF = QP.get('fx') === 'off';
+// MSAA is ~4x the fill cost on iOS WebGL and invisible at retina density —
+// only pay for it when the back-buffer is low-res enough to show jaggies
+const ANTIALIAS = QP.has('aa') ? QP.get('aa') === 'on' : DPR < 1.5;
 const upx = (n) => Math.round(n * DPR);
 const fpx = (n) => Math.round(n * DPR) + 'px';
 
@@ -4375,7 +4384,20 @@ class GameScene extends Phaser.Scene {
       const rdr = this.game.renderer.type === Phaser.WEBGL ? 'GL' : 'CV';
       this.fpsText.setColor(color).setText(fps + ' FPS · ' + this.dice.length +
         ' dice · ' + rdr + ' ' + this.scale.gameSize.width + '×' + this.scale.gameSize.height +
-        (QP.has('dpr') ? ' · dpr' + DPR : '') + (FX_OFF ? ' · fx-off' : ''));
+        ' · dpr' + DPR + (ANTIALIAS ? '+aa' : '') + (FX_OFF ? ' · fx-off' : ''));
+      // adaptive quality: 5s of sustained sub-45fps steps the back-buffer
+      // down a notch. The reload that applies it only fires outside a run
+      // (nothing to lose at a menu); mid-run it waits for the next boot.
+      if (time > 4000 && fps < 45 && !QP.has('dpr') && !this._dprStepped) {
+        this._lowMs = (this._lowMs || 0) + 250;
+        if (this._lowMs >= 5000 && DPR > 1) {
+          this._dprStepped = true;
+          localStorage.setItem('runefall.dprCap', DPR > 1.5 ? '1.5' : '1');
+          if (!(this.playerClass && !this.gameOver)) location.reload();
+        }
+      } else if (fps >= 45) {
+        this._lowMs = 0;
+      }
     }
   }
 }
@@ -4418,7 +4440,7 @@ window.addEventListener('DOMContentLoaded', () => {
     type: Phaser.AUTO,
     parent: 'game-container',
     backgroundColor: '#2e2018',
-    render: { antialias: true, powerPreference: 'high-performance' },
+    render: { antialias: ANTIALIAS, powerPreference: 'high-performance' },
     scale: {
       mode: Phaser.Scale.NONE,
       width: Math.round(window.innerWidth * DPR),
