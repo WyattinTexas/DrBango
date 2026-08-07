@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.18';
+const VERSION = 'v0.18.19';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -2391,6 +2391,24 @@ class GameScene extends Phaser.Scene {
     mapG.strokeRoundedRect(mx0 + 1.5, my0 + 1.5, mw - 3, mh - 3, 9);
     mapG.lineStyle(8, 0x3a2410, 0.14);
     mapG.strokeRoundedRect(mx0 + 4, my0 + 4, mw - 8, mh - 8, 8);
+    // burnt corners + an ink compass rose, so it reads as a real chart
+    mapG.fillStyle(0x3a2410, 0.09);
+    mapG.fillTriangle(mx0, my0, mx0 + mw * 0.16, my0, mx0, my0 + mh * 0.3);
+    mapG.fillTriangle(mx0 + mw, my0 + mh, mx0 + mw - mw * 0.16, my0 + mh,
+      mx0 + mw, my0 + mh - mh * 0.3);
+    mapG.fillStyle(0x3a2410, 0.06);
+    mapG.fillTriangle(mx0 + mw, my0, mx0 + mw - mw * 0.12, my0, mx0 + mw, my0 + mh * 0.22);
+    mapG.fillTriangle(mx0, my0 + mh, mx0 + mw * 0.12, my0 + mh, mx0, my0 + mh - mh * 0.22);
+    const rcx = mx0 + mw - upx(34), rcy = my0 + mh * 0.5, rr = upx(14);
+    mapG.lineStyle(1.5, 0x6a4a26, 0.4);
+    mapG.strokeCircle(rcx, rcy, rr);
+    mapG.strokeCircle(rcx, rcy, rr * 0.45);
+    mapG.fillStyle(0x6a4a26, 0.45);
+    mapG.fillTriangle(rcx, rcy - rr * 1.35, rcx - rr * 0.22, rcy, rcx + rr * 0.22, rcy);
+    mapG.fillStyle(0x6a4a26, 0.28);
+    mapG.fillTriangle(rcx, rcy + rr * 1.35, rcx - rr * 0.22, rcy, rcx + rr * 0.22, rcy);
+    mapG.fillTriangle(rcx - rr * 1.35, rcy, rcx, rcy - rr * 0.22, rcx, rcy + rr * 0.22);
+    mapG.fillTriangle(rcx + rr * 1.35, rcy, rcx, rcy - rr * 0.22, rcx, rcy + rr * 0.22);
     // the track snakes: floors 1-10 across the top, 11-20 back along
     // the bottom — half the columns, so everything doubles in size
     const innerX = px + upx(24), innerW = pw - upx(48);
@@ -2412,26 +2430,39 @@ class GameScene extends Phaser.Scene {
           bandTop + (bandBot - bandTop) * (i / (w - 1)),
       };
     };
-    // edges first
+    // edges first: gently bowed dotted trails, like footsteps on the chart
     const lineG = this.modalAdd(this.add.graphics().setDepth(71));
+    const trail = (a, b, seed, color, alpha, r) => {
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.max(1, Math.hypot(dx, dy));
+      const bow = (((seed * 37) % 7) - 3) * upx(2.2);
+      const mxp = (a.x + b.x) / 2 - (dy / dist) * bow;
+      const myp = (a.y + b.y) / 2 + (dx / dist) * bow;
+      const steps = Math.max(6, Math.round(dist / upx(9)));
+      lineG.fillStyle(color, alpha);
+      for (let s = 1; s < steps; s++) {
+        const t = s / steps, it = 1 - t;
+        lineG.fillCircle(
+          it * it * a.x + 2 * it * t * mxp + t * t * b.x,
+          it * it * a.y + 2 * it * t * myp + t * t * b.y, r);
+      }
+    };
     for (let f = 0; f < FLOORS - 1; f++) {
       for (let i = 0; i < this.runMap[f].length; i++) {
         for (const j of this.runEdges[f][i]) {
           const a = posOf(f, i), b = posOf(f + 1, j);
           const done = f < this.mapPos.f;
           const isNext = chooseMode && f === this.mapPos.f && i === this.mapPos.i;
+          const seed = f * 31 + i * 7 + j * 13;
           if (isNext) {
             // the roads you can take right now glow
-            lineG.lineStyle(6, 0x5c8a3c, 0.30);
-            lineG.lineBetween(a.x, a.y, b.x, b.y);
-            lineG.lineStyle(2.5, 0x8ec873, 0.95);
-            lineG.lineBetween(a.x, a.y, b.x, b.y);
+            trail(a, b, seed, 0x5c8a3c, 0.35, upx(3.2));
+            trail(a, b, seed, 0x8ec873, 0.95, upx(1.6));
+          } else if (done) {
+            trail(a, b, seed, 0x4a3018, 0.18, upx(1.4));
           } else {
-            // inked trail: dark under-stroke with a lighter core
-            lineG.lineStyle(4, 0x4a3018, done ? 0.14 : 0.30);
-            lineG.lineBetween(a.x, a.y, b.x, b.y);
-            lineG.lineStyle(1.5, 0x8a6a42, done ? 0.22 : 0.6);
-            lineG.lineBetween(a.x, a.y, b.x, b.y);
+            trail(a, b, seed, 0x4a3018, 0.30, upx(2.2));
+            trail(a, b, seed, 0x8a6a42, 0.65, upx(1.2));
           }
         }
       }
@@ -2448,19 +2479,26 @@ class GameScene extends Phaser.Scene {
         const isChoice = f === this.mapPos.f + 1 && choices.includes(i);
         const nodeCol = done ? 0x3a2a1c :
           type === 'shop' ? 0xf2b23e : type === 'boss' ? 0xc9564a : 0xa08a6a;
+        // minibosses loom larger on the chart
+        const nR = type === 'boss' ? nodeR * 1.22 : nodeR;
         // medallion: cast shadow, body, top light, dark rim
         const node = this.modalAdd(this.add.graphics().setDepth(72));
         node.fillStyle(0x241408, done ? 0.20 : 0.40);
-        node.fillCircle(x + 2, y + 3, nodeR);
+        node.fillCircle(x + 2, y + 3, nR);
         node.fillStyle(nodeCol, done ? 0.55 : 1);
-        node.fillCircle(x, y, nodeR);
+        node.fillCircle(x, y, nR);
         node.fillStyle(0xffffff, done ? 0.05 : 0.15);
-        node.fillCircle(x - nodeR * 0.22, y - nodeR * 0.25, nodeR * 0.6);
+        node.fillCircle(x - nR * 0.22, y - nR * 0.25, nR * 0.6);
         node.lineStyle(2, shadeHex(nodeCol, -0.45), done ? 0.4 : 0.9);
-        node.strokeCircle(x, y, nodeR);
+        node.strokeCircle(x, y, nR);
+        if (type === 'boss' && !done) {
+          // double ring marks the skull rooms
+          node.lineStyle(1.5, shadeHex(nodeCol, -0.45), 0.55);
+          node.strokeCircle(x, y, nR + upx(3));
+        }
         if (current) {
           node.lineStyle(4, 0xffd54a, 1);
-          node.strokeCircle(x, y, nodeR + 5);
+          node.strokeCircle(x, y, nR + 5);
           const glow = this.modalAdd(this.add.image(x, y, 'flash')
             .setDepth(71).setBlendMode(Phaser.BlendModes.ADD)
             .setDisplaySize(nodeR * 7, nodeR * 7).setAlpha(0.16).setTint(0xffd54a));
