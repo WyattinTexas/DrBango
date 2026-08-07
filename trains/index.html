@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v8.0 -->
+<!-- TRAINSET v8.1 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -988,13 +988,77 @@ const GH_BOB=1;               // tiny idle bob while demonstrating (0 = perfectl
 const GH_TILT=-0.42;          // the point's lean, radians (up-left — the reading direction)
 const GH_DOOR='point';        // door lesson: 'point' at the slab postcard (brief-open named unbuilt)
 const GH_SHOP_MOVES=true;     // the aisle follows the demo swipe 1:1 (false = pantomime only)
-const HAND_KEYS=['room','gap','shop','door'];   // the four seen-bits, in save order
-let HAND={room:0,gap:0,shop:0,door:0};          // set by the KID's own verb, never the demo
+const HAND_KEYS=['room','gap','shop','door','rot'];   // the five seen-bits, in save order (rot = E70's turn lesson)
+let HAND={room:0,gap:0,shop:0,door:0,rot:0};          // set by the KID's own verb, never the demo
 // the hint stages the hand teaches now — drawHint skips their words while the
 // STAGE MACHINE stays byte-true (hintPass still advances + saves as shipped):
 // 0 'DRAG A PIECE…' = the room lesson · 2/3 'FINISH THE TRACK' = the gap
 // lesson. Stages 1 (turn) and 4 (stop) still speak — verbs the hand doesn't do.
 const HAND_HUSH=[0,2,3];
+// ---- Wyatt dials (EXPANSION 70 — THE FIRST MORNING, one block) ----
+// A fresh install wakes up INSIDE Level 1 with a hand held all the way to the
+// first win — one sheep, one tunnel — and only after that first win does the
+// bedroom exist. firstRun() = the ten book's done-set is EMPTY and the kid has
+// never landed on the menu. Almost everything rides machines that already
+// exist (conductor, ghost hand, eager train, tunnel ride, gold gaps) — these
+// dials only open them up; outside first-run every byte is as it was.
+const FR_IDLE=2;              // first-run gap/rot lessons: idle seconds before the hand fires (vs GH_IDLE)
+const FR_REST=6;              // ...and the rest between firings (vs GH_REST) — the guide loops until the win
+const FR_NUDGE=true;          // THE KIND NUDGE: the game itself taps a wrong-heading gap piece straight
+const FR_NUDGE_S=8;           // ...this many sim-seconds after a completed rot demo, repeating till it joins
+const FR_SNAP=true;           // THE HELPFUL LANDING: a sloppy right-kind drop near an open gap lands ON it
+const FR_SNAP_R=1.5;          // ...within this many cells (rotation kept — the rotate moment survives)
+const FR_SHAPED=true;         // THE GAP IS SHAPED: an open gap accepts only its own track kind (soft boing)
+const FR_DOOR_CONTINUE=false; // ON: the front door's GO enters the next unwon level directly (skips the wall)
+let FR={menuSeen:0};          // the additive `fr` save key (the `hand` grammar verbatim, v stays 11)
+const FRN={t:0,armed:false};  // the nudge's little clock — armed only by a COMPLETED rot demo
+const firstRun=()=>!FR.menuSeen&&CAMP.done.size===0;   // the ten book's done-set only — the boot law reads this
+const frGuideOn=()=>CAMP.on&&CAMP.book==='ten'&&CAMP.level===1&&firstRun();   // the guided morning: L1, first run
+// THE GAP KNOWS ITS HEADING (E70 data law): a level's gaps rows may carry a
+// 3rd element = the reference heading r (drawGaps destructures [gx,gy] and
+// ignores it). For the ten book the SOLVE table knows the KIND at that cell —
+// together they are the finished picture the demos, the nudge and the shaped
+// check all read. Headingless gaps return null and nothing here ever fires.
+function gapRefAt(gx,gy){
+  if(!CAMP.on||CAMP.book!=='ten') return null;
+  const L=LEVELS[CAMP.level-1]; if(!L||!L.gaps) return null;
+  const g=L.gaps.find(g2=>g2[0]===gx&&g2[1]===gy&&g2.length>2); if(!g) return null;
+  const S=SOLVE[CAMP.level-1], row=S&&S.rows.find(rw=>rw[2]===gx&&rw[3]===gy);
+  return {r:g[2]|0, t:row? row[0] : 's'};
+}
+// a straight at r2 IS a straight at r0 — wrongness is the PORTS disagreeing,
+// never the raw r number (the rotate lesson and the nudge both ask here)
+const portSig=(t,r)=>{ const P=PATHS[t]&&PATHS[t][(r|0)%4];
+  return P? P.map(p=>p.ports.slice().sort().join('')).sort().join('|') : ''; };
+// the rotate lesson's context: a PLAYER-placed piece of the right kind sitting
+// on an open-heading gaps cell with a rotation that doesn't join
+function frRotCand(){
+  if(!CAMP.on||CAMP.book!=='ten') return null;
+  const L=LEVELS[CAMP.level-1]; if(!L||!L.gaps) return null;
+  for(const g of L.gaps){
+    if(g.length<3) continue;
+    const pc=pieceAt(g[0],g[1]); if(!pc||pc.glued) continue;
+    const ref=gapRefAt(g[0],g[1]); if(!ref||pc.t!==ref.t) continue;
+    if(portSig(pc.t,pc.r)===portSig(pc.t,ref.r)) continue;
+    return {g,pc,ref};
+  }
+  return null;
+}
+// THE KIND NUDGE — the forced-win floor, first-run L1 only: FR_NUDGE_S
+// sim-seconds after a completed rot demo, a still-wrong piece gets ONE real
+// tap from the game through the shared tap-rotate pipeline (real click, real
+// wobble), repeating each window until it joins. The kid cannot be stuck.
+// (Flagged in the ship report: the game's first real touch of a kid's piece.)
+function frNudgeTick(dt){
+  if(!FR_NUDGE||!FRN.armed||!frGuideOn()||CAMP.won) return;
+  const cand=frRotCand();
+  if(!cand){ FRN.t=0; return; }
+  if(TRAIN.placed&&trainOn(cand.g[0],cand.g[1],cand.pc)) return;   // never turn a piece under the train
+  FRN.t+=dt; if(FRN.t<FR_NUDGE_S) return;
+  FRN.t=0;
+  const pc=cand.pc;
+  pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); hintPass(1); save(); eagerTry();   // the tap branch, verbatim
+}
 // THE LIVERY LAW: the chosen colour paints ONLY the red livery parts — loco roof +
 // cowcatcher, tender tub, caboose body. Wheels stay red-spoked, boiler stays dark,
 // gold door stays gold, cargo cars untouched. m = body, d = dark stroke, s = cupola shade.
@@ -1810,7 +1874,7 @@ const COLL=[
   ['flat','FLATCAR','train',6,15], ['cab','CABOOSE','train',2,10], ['coach','COACH','train',7,18],
   ['mail','MAIL CAR','train',8,18], ['circus','CIRCUS CAR','train',9,20], ['exp','BIG EXPRESS','train',10,25],
   // PAINT (4) — RED is everyone's forever default, never a collectable
-  ['pt_yellow','YELLOW PAINT','paint',1,15], ['pt_blue','BLUE PAINT','paint',2,15],
+  ['pt_yellow','YELLOW PAINT','paint',3,15], ['pt_blue','BLUE PAINT','paint',2,15],
   ['pt_green','GREEN PAINT','paint',4,15], ['pt_purple','PURPLE PAINT','paint',9,15],
   // LAND (14) — E16: the TREE left the starters for L1's award bundle (the palette
   // starters are track only now: s c st). THE FIFTY STAY FIFTY — same row, new lvl.
@@ -1819,14 +1883,18 @@ const COLL=[
   // E67: BUSH + FLOWERS + ROCK (and PEOPLE below) join the tree as STARTERS —
   // Wyatt: decorations belong on the crate face, "going in the box is just not
   // what players are going to do." Bundles L1-L4 each shrink by one; FIFTY stay fifty.
+  // E70 ONE TOY, THEN THE TUNNEL: L1's three cards become ONE — the SHEEP
+  // headlines L1 (a walking cloud), the duck moves to L4's river where a glued
+  // duck already swims (TRY-THEN-OWN), pond→L2, yellow paint→L3. The bundles
+  // ramp 1/3/4/4/4; THE FIFTY STAY FIFTY, prices untouched. lvl column ONLY.
   ['tree','TREE','land',0,10], ['bush','BUSH','land',0,10], ['flw','FLOWERS','land',0,10],
-  ['rock','ROCK','land',0,12], ['pond','POND','land',1,10], ['rv','RIVER','land',10,25],
+  ['rock','ROCK','land',0,12], ['pond','POND','land',2,10], ['rv','RIVER','land',10,25],
   ['fence','FENCE','land',6,15], ['house','HOUSE','land',6,15], ['shop','SHOP','land',6,15],
   ['hall','TOWN HALL','land',9,20], ['barn','BARN','land',10,25], ['wtr','WATER TOWER','land',9,20],
   ['wind','WINDMILL','land',8,18], ['pine','PINE TREE','land',3,12],
   // EXTRAS (13)
-  ['ppl','PEOPLE','extra',0,12], ['cow','COW','extra',5,15], ['sheep','SHEEP','extra',5,15],
-  ['chick','CHICKEN','extra',5,15], ['duck','DUCK','extra',1,10], ['dog','DOG','extra',3,12],
+  ['ppl','PEOPLE','extra',0,12], ['cow','COW','extra',5,15], ['sheep','SHEEP','extra',1,15],
+  ['chick','CHICKEN','extra',5,15], ['duck','DUCK','extra',4,10], ['dog','DOG','extra',3,12],
   ['cat','CAT','extra',7,18], ['hay','HAY BALE','extra',5,15], ['lamp','LAMP POST','extra',6,15],
   ['whis','WHISTLE POST','extra',7,18], ['sig','SIGNAL','extra',7,18],
   ['bal','HOT-AIR BALLOON','extra',10,25], ['snow','SNOWMAN','extra',10,25],
@@ -2756,6 +2824,13 @@ function placeQuery(t,r,x,y){
   for(const [x2,y2] of cells){
     if(x2<GX0||y2<GY0||x2>=GW||y2>=GH) return {ok:false,why:'oob'};   // GX0/GY0 = 0 outside E18's bedroom
     if(cellBlocksTrack(t,x2,y2)) return {ok:false,why:'scenery'};
+    // E70 THE GAP IS SHAPED (first-run L1 only): an open gap cell accepts ONLY
+    // its own track kind — ghost tint and drop refuse together (the E1
+    // one-predicate law). Every other cell stays exactly as free as today.
+    if(FR_SHAPED&&frGuideOn()){
+      const fref=gapRefAt(x2,y2);
+      if(fref&&!pieceAt(x2,y2)&&t!==fref.t) return {ok:false,why:'shaped'};
+    }
   }
   const own=new Set(cells.map(c2=>key(c2[0],c2[1])));
   const climber=(t==='rp'||t==='sp');
@@ -2829,6 +2904,7 @@ function placeHelp(t,r,x,y){
 function canPlaceTrack(t,x,y,r){ return placeQuery(t,r|0,x,y).ok; }
 function canPlaceScen(t,x,y){
   if(BED.ctx&&BED.blk&&BED.blk.has(key(x,y))) return false;   // E23: the piggy + button cells refuse scenery too
+  if(FR_SHAPED&&frGuideOn()&&gapRefAt(x,y)&&!pieceAt(x,y)) return false;   // E70: no toy in the track's own slot (the shaped gap)
   if(scenAt(x,y)) return false;
   const lo=pieceAt(x,y), hi=pieceHi(x,y);
   if(!lo&&!hi) return true;
@@ -3024,6 +3100,7 @@ function goTrain(){
 // ---- update ----
 function update(dt){
   ghTick(dt);   // E57: the ghost hand's clock (game + the shop overlay above it; PLAY = no lesson)
+  frNudgeTick(dt);   // E70 THE KIND NUDGE — first-run L1 only, an instant no-op everywhere else
   for(const pc of grid.values()){
     if(pc.ra){ pc.ra.k-=dt*8; if(pc.ra.k<=0) pc.ra=null; }
     if(pc.pop>0) pc.pop=Math.max(0,pc.pop-dt*5);
@@ -8410,7 +8487,11 @@ const ROOM_OBJS=[
   // room's entry retired — rig-only for one release). Footprint enters
   // BED.blk below like every object's (tap-opens ⇒ drop-refuses, piggy law).
   { id:'door', hit:{x:966,y:556,w:329,h:230}, px:1090, py:764, label:()=>DOOR_LABEL,
-    tap(){ SND.tok(); handSet('door'); showScreen('wall'); } },   // E57: opening the door IS the lesson learned (once-ever write; rig entries never come here)
+    tap(){ SND.tok(); handSet('door');   // E57: opening the door IS the lesson learned (once-ever write; rig entries never come here)
+      // E70 (named dial, OFF): the door's GO one-taps into the next unwon
+      // ten level instead of the postcard wall — a true one-tap continue.
+      if(FR_DOOR_CONTINUE){ for(let n2=1;n2<=LEVELS.length;n2++) if(!CAMP.done.has(n2)){ campEnter(n2); return; } }
+      showScreen('wall'); } },
 ];
 function objHit(e){
   const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // pigHit's own inverse
@@ -9954,8 +10035,9 @@ function save(){
       name:NAME? {w1:NAME.w1,w2:NAME.w2,s:NAME.s} : null,   // v:9 — THE NAME PLATE (E15); the ONLY thing E15 persists
       size:SIZE, land:LAND, weather:WEATHER,   // v:8 — BIG COUNTRY (E10); VIEW is NOT saved — every boot opens fitted
       stars:stars, equip:{...equip},   // v:7 — THE STAR BANK + the equipped sound packs (E9)
-      hand:{...HAND},   // E57 THE GHOST HAND — the four seen-bits (ADDITIVE key, v stays 11;
+      hand:{...HAND},   // E57 THE GHOST HAND — the seen-bits (ADDITIVE key, v stays 11;
                         // set only by the KID's own verb, never by a demo)
+      fr:{menuSeen:FR.menuSeen?1:0},   // E70 THE FIRST MORNING — one bit; set, every boot is a bedroom boot
       e8:1,   // E8 arrived: the ten levels are new land, so any wip saved before this is void (once)
       camp:{ done:[...CAMP.done], all:CAMP.all?1:0,
              wip: (CAMP.on&&CAMP.book==='ten')? (CAMP_WIP&&!CAMP.won? serWip():null) : (CAMP_WIP? CAMP.wip:null) },
@@ -10033,8 +10115,14 @@ function load(){
     // E57 THE GHOST HAND — the additive `hand` key, validated against ITS OWN
     // four names (the E28/STORE_BY law re-audited: junk can never poison it,
     // an absent key = a fresh kid, and a set bit SURVIVES reload — both ways).
-    HAND={room:0,gap:0,shop:0,door:0};
+    HAND={room:0,gap:0,shop:0,door:0,rot:0};
     if(d.hand&&typeof d.hand==='object') for(const k2 of HAND_KEYS) HAND[k2]=d.hand[k2]?1:0;
+    // E70 THE FIRST MORNING — the additive `fr` key (the `hand` grammar
+    // verbatim): absent = a kid who has never seen the bedroom. With the ten
+    // book's done-set empty this routes the boot INTO Level 1; a WKWebView
+    // flush = a true fresh install = the guided morning again, by design.
+    FR={menuSeen:0};
+    if(d.fr&&typeof d.fr==='object') FR.menuSeen=d.fr.menuSeen?1:0;
     // v:11 — THE PIGGY BEDROOM (E23). A v≤10 save meets the piggy FRESH:
     // {claimed:'',streak:0}, zero stars minted retroactively, bank untouched —
     // she starts paying tomorrow's tap, not yesterday's history.
@@ -10075,15 +10163,18 @@ const fillRows=(kind,x0,y0,x1,y1,alt)=>{      // a block of glued scenery; alt c
 const LEVELS=[
   // 1 — THE POND. Wyatt approved this one as it stands: the pond sits mid-rug and
   // the answer is the shape of the water. Kept verbatim; only the card got simpler.
-  // E67 THE GENTLE FIRST STEP — the ring arrives GLUED with exactly TWO
-  // straights missing on the top run (the L2 grammar, one level earlier):
-  // the gaps breathe gold, the ghost hand teaches them, two drags win.
-  { name:'THE POND', hint:'GO AROUND THE POND!', toy:'duck', land:'rug',   // E66 TEN LANDS: home floor first
-    glued:[['rv',5,3],['rv',6,3],['rv',5,4],['rv',6,4]],
+  // E67 THE GENTLE FIRST STEP — the ring arrives GLUED with two cells missing.
+  // E70 THE FIRST MORNING re-cuts them to ONE STRAIGHT PER LESSON: (5,2) top
+  // run r0 = THE DRAG (a crate drop fits exactly as it lands) and (7,3) right
+  // side r1 = THE ROTATE (the r0 drop visibly doesn't join; ONE tap does).
+  // The gaps carry their reference heading (3rd element — the E70 data law);
+  // the sheep grazing at (8,4) is the toy the win hands over (TRY-THEN-OWN).
+  { name:'THE POND', hint:'GO AROUND THE POND!', toy:'sheep', land:'rug',   // E66 TEN LANDS: home floor first · E70: ONE card — the sheep
+    glued:[['rv',5,3],['rv',6,3],['rv',5,4],['rv',6,4],['sheep',8,4,0]],
     track:[['c',1,4,2],['c',2,7,2],['c',3,7,5],['c',0,4,5],
-           ['s',1,4,3],['s',1,4,4],['s',1,7,3],['s',1,7,4],
+           ['s',1,4,3],['s',1,4,4],['s',1,7,4],['s',0,6,2],
            ['s',0,5,5],['s',0,6,5]],
-    gaps:[[5,2],[6,2]], ride:[6,5], stations:[] },   // E68: the win rides into a tunnel here (the experiment level)
+    gaps:[[5,2,0],[7,3,1]], ride:[6,5], stations:[] },   // E68: the win rides into a tunnel here (the experiment level)
   // 2 — FINISH THE TRACK. The simplest possible second level: an oval already on the
   // rug with three cells missing. The gaps breathe gold; two straights and one curve
   // close it. The station rides along for free so level 6 can ASK for one later.
@@ -10093,7 +10184,7 @@ const LEVELS=[
     track:[['c',1,3,2],['s',0,4,2],['s',0,7,2],
            ['s',1,3,3],['s',1,3,4],['s',1,8,3],['s',1,8,4],
            ['c',0,3,5],['c',3,8,5],['st',0,4,5],['s',0,5,5],['s',0,6,5],['s',0,7,5]],
-    gaps:[[5,2],[6,2],[8,2]], ride:[6,5], stations:[] },   // E69: every win rides into the tunnel
+    gaps:[[5,2,0],[6,2,0],[8,2,2]], ride:[6,5], stations:[] },   // E69: every win rides into the tunnel (E70: gaps know their heading — the corner curve's rot lesson)
   // 3 — THROUGH THE WOODS. Wyatt asked for "a ton of woods, and clearly there's a
   // narrow passage". The forest packs both flanks solid and leaves a two-wide lane
   // all the way round an island of pines — the clearing IS the answer, drawn in trees.
@@ -10121,7 +10212,7 @@ const LEVELS=[
     glued:[['rv',6,0],['rv',6,1],['rv',6,2],['rv',6,3],['rv',6,4],['rv',6,5],['rv',6,6],['rv',6,7],
            ['ppl',3,6],['duck',8,6,0]],
     track:[['s',0,5,2],['s',0,7,2],['s',0,5,5],['s',0,7,5]],
-    gaps:[[6,2],[6,5]], ride:[7,5], stations:[] },
+    gaps:[[6,2,0],[6,5,0]], ride:[7,5], stations:[] },   // E70: headings stamped (the demos stay water-filtered — these teach by gold)
   // 5 — THE FARM. A pen in the middle and a big friendly detour round it. The station
   // stays as scenery ONLY — Wyatt's "make them easier" applied literally: no goal but
   // the loop itself, and the animals are the reward for going the long way.
@@ -10203,7 +10294,7 @@ const swapBr=(rows,cells)=>rows.map(r=>cells.some(c2=>c2[0]===r[2]&&c2[1]===r[3]
 // curves throughout, plus bridges from 4 on (level 3's bundle hands them over).
 // The glued cells of each level are skipped: a reference never re-places the land.
 const SOLVE=[
-  { start:[6,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 1 close the pond's two gaps (E67)
+  { start:[6,5], rows:[ ['s',0,5,2],['s',1,7,3] ] },                        // 1 the drag and the rotate (E70 — one straight per lesson)
   { start:[6,5], rows:[ ['s',0,5,2],['s',0,6,2],['c',2,8,2] ] },            // 2 close the three gaps
   { start:[5,2], rows:ringRows(4,2,8,5,[[5,5],[6,5]]) },                    // 3 the lane through the woods (the two seeded straights are already down)
   { start:[4,3], rows:swapBr(ringRows(4,2,8,5,[[5,2],[7,2],[5,5],[7,5]]),[[6,2],[6,5]]) },  // 4 two bridges over the river (banks seeded, E69)
@@ -10436,6 +10527,7 @@ function campEnter(n,b){
   applyDims('sm');                            // E10: every level plays on the sm board, whatever BUILD grew to
   CAMP.on=true; CAMP.book=b; CAMP.level=n; CAMP.won=false; CAMP.tugT=false; CAMP.wx=null;   // E35: every level opens under its own sky
   CAMP.visited=new Set(); winT=0; prettyT=0; prettyPend=false;
+  FRN.armed=false; FRN.t=0;                   // E70: the nudge arms fresh per visit — only a completed rot demo arms it
   ridersOff();                                // E15: fresh platforms for the level's stations
   grid.clear(); hgrid.clear(); scen.clear();
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; trailClear();   // E28: no ghost ribbon on a fresh level
@@ -11569,7 +11661,9 @@ function swRotate(gx,gy){
     if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); return; }
     trainHome(false);
   }
-  pc.r=(pc.r+1)%4; pc.ra={k:1}; pc.latch=null; SND.click(); if(PLAY.on) playLoopSync(); else save();
+  pc.r=(pc.r+1)%4; pc.ra={k:1}; pc.latch=null; SND.click();
+  if(!PLAY.on&&CAMP.on&&gapRefAt(gx,gy)) handMark('rot');   // E70: a long-press turn is the same kid verb
+  if(PLAY.on) playLoopSync(); else save();
   eagerTry();   // E27: a long-press turn is a track mutation too
 }
 cvs.addEventListener('pointerdown',e=>{
@@ -11800,6 +11894,21 @@ function upCore(e){
       DRAG=null; hover=null; return;
     }
     if(DRAG.kind==='newPiece'||DRAG.kind==='movePiece'){
+      // E70 THE HELPFUL LANDING (first-run L1 only): a RIGHT-KIND track drop
+      // released within FR_SNAP_R cells of an open gap lands ON it, rotation
+      // kept — sloppy toddler drops still build the ring and the rotate
+      // moment at the standing gap still happens. Wrong kinds and every
+      // other cell keep today's freedom exactly.
+      if(FR_SNAP&&frGuideOn()){
+        let fbest=null, fbd=FR_SNAP_R;
+        for(const g of (LEVELS[0].gaps||[])){
+          if(pieceAt(g[0],g[1])) continue;
+          const fref=gapRefAt(g[0],g[1]); if(!fref||fref.t!==DRAG.t) continue;
+          const fd=Math.hypot(wx-(GX+g[0]*C+C/2),wy-(GY+g[1]*C+C/2))/C;
+          if(fd<=fbd){ fbd=fd; fbest=g; }
+        }
+        if(fbest) hover=[fbest[0],fbest[1]];
+      }
       // the drop asks THE predicate — through E65's helped door, the same one
       // the ghost tint asked all along (help only ever rescues an unjoined lay)
       let q=null;
@@ -11808,6 +11917,7 @@ function upCore(e){
         layAt(DRAG.t,DRAG.r,DRAG.sel,hover[0],hover[1],q);   // E34: the one hand-lay ceremony — the continue-tap speaks it too
       } else if(hover){
         if(DRAG.kind==='movePiece'){ setTrackPiece(DRAG.t,DRAG.r,DRAG.sel,DRAG.elev|0,DRAG.from[0],DRAG.from[1]); if(PLAY.on) playLoopSync(); else save(); }
+        if(q&&q.why==='shaped'){ SND.boing(); DRAG=null; hover=null; binShow(false); return; }   // E70: the shaped gap refuses WORDLESSLY — the E1 grammar, soft boing only
         let msg='THAT SPOT IS TAKEN';
         if(q&&q.why==='ramp') msg='NEEDS A RAMP!';
         else if(q&&q.why==='scenery'){
@@ -11836,7 +11946,8 @@ function upCore(e){
         if(DRAG.kind==='newScen'&&!BED.ctx) handyBump(DRAG.t);   // E55: a fresh placement bubbles onto the face (moves never do — E27)
       } else if(hover){
         if(DRAG.kind==='moveScen'){ scen.set(key(DRAG.from[0],DRAG.from[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0}); if(!PLAY.on) save(); }
-        toast((DRAG.t==='rv'||DRAG.t==='pond')&&pieceAt(hover[0],hover[1])?'WATER AND TRACK DON\'T MIX — TRY A BRIDGE!':'THAT SPOT IS TAKEN');
+        if(FR_SHAPED&&frGuideOn()&&gapRefAt(hover[0],hover[1])&&!pieceAt(hover[0],hover[1])) SND.boing();   // E70: the shaped gap — wordless soft refuse
+        else toast((DRAG.t==='rv'||DRAG.t==='pond')&&pieceAt(hover[0],hover[1])?'WATER AND TRACK DON\'T MIX — TRY A BRIDGE!':'THAT SPOT IS TAKEN');
       } else {
         if(DRAG.kind==='moveScen'){ SND.pop(); puff(wx,wy,14); if(!PLAY.on) save(); }
       }
@@ -11959,8 +12070,10 @@ function upCore(e){
         else if(PLAY.on && playTrainOn(gx,gy,pc)){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }   // E58: the under-train lock, wind-up edition
         else if(TRAIN.placed && trainOn(gx,gy,pc)){
           if(TRAIN.running){ SND.toot(); toast('THE TRAIN IS USING THAT PIECE!'); }
-          else { trainHome(false); pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); save(); }
-        } else { pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); hintPass(1); if(PLAY.on) playLoopSync(); else save(); eagerTry(); }   // E27: a turn is a track mutation
+          else { trainHome(false); pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); if(CAMP.on&&gapRefAt(gx,gy)) handMark('rot'); save(); }   // E70: the same kid verb
+        } else { pc.r=(pc.r+1)%4; pc.ra={k:1}; SND.click(); hintPass(1);
+          if(!PLAY.on&&CAMP.on&&gapRefAt(gx,gy)) handMark('rot');   // E70: the kid's own turn on a gap piece — lesson learned (rides this save)
+          if(PLAY.on) playLoopSync(); else save(); eagerTry(); }   // E27: a turn is a track mutation
       }
     }
     else if(down.what==='scen'){
@@ -13065,6 +13178,10 @@ function showScreen(s){
   if(game) eagerTry();  // E27: a finished trainless line greets you already rolling — that IS the toy
   resize();
   if(game||play) viewBase();   // E20 THE BIG DEFAULT — every rug entry lands close to the toys, centered on the action
+  // E70: the first bedroom landing, by ANY path (the expected one: the corner
+  // MENU chip from inside L1 — the parent's escape hatch) — one bit, one save,
+  // and every boot after this is a bedroom boot forever.
+  if(s==='menu'&&!FR.menuSeen){ FR.menuSeen=1; save(); }
 }
 function liveryChanged(){ repaintShelfIcons(); syncSwatches(); }
 function syncSwatches(){
@@ -14090,8 +14207,11 @@ function ghCtx(){
     return null;
   }
   if(SCREEN==='game'&&CAMP.on){
-    if(HAND.gap||CND.on||CAMP.won||winT>0||toyCard||toyQ.length) return null;
-    return ghGapOpen()? 'gap':null;
+    if(CND.on||CAMP.won||winT>0||toyCard||toyQ.length) return null;
+    const fr=frGuideOn();   // E70: the first morning ignores the once-ever bits — the guide loops until the win
+    if((!HAND.rot||fr)&&frRotCand()) return 'rot';   // E70: fix the piece already down before teaching the next drop
+    if((!HAND.gap||fr)&&ghGapOpen()) return 'gap';
+    return null;
   }
   return null;   // BUILD, PLAY, wall, board, big room: no lesson lives there
 }
@@ -14115,7 +14235,8 @@ function ghTick(dt){
   if(c!==GHOST.ctx){ GHOST.ctx=c; GHOST.idle=0; return; }   // fresh context = fresh clock
   if(!c||ghBusy()){ GHOST.idle=0; return; }
   GHOST.idle+=dt;
-  if(GHOST.idle>=GH_IDLE&&GHOST.rest<=0){ if(!ghStart(c)) GHOST.idle=0; }   // a refused start retries next window
+  const need=frGuideOn()&&(c==='gap'||c==='rot')? FR_IDLE : GH_IDLE;   // E70: the first morning waits less
+  if(GHOST.idle>=need&&GHOST.rest<=0){ if(!ghStart(c)) GHOST.idle=0; }   // a refused start retries next window
 }
 // ---- coordinate seams (CSS px; the camera stamps SC/OX/OY per screen) ----
 const ghGameS=(wx,wy)=>({x:OX+SC*wx, y:OY+SC*wy});
@@ -14139,18 +14260,34 @@ function ghStart(les){
   } else if(les==='gap'){
     const L=bookL()[CAMP.level-1]; if(!L||!L.gaps) return false;
     const g=L.gaps.find(g2=>!pieceAt(g2[0],g2[1])&&!cellBlocksTrack('s',g2[0],g2[1])); if(!g) return false;   // E69: never demo onto a river
-    // the crate's own straight tile is the source — honest art in the hand
-    const ft=FACE_TILES.find(f2=>f2.t==='s'&&f2.el.style.display!=='none'); if(!ft) return false;
+    // E70 GAP DEMOS AIM TRUE: a gap that KNOWS its heading (3rd element) shows
+    // the FINISHED picture — kind from the reference row, heading from the
+    // data. Headingless gaps keep the neighbour inference below, byte-true.
+    const gref=gapRefAt(g[0],g[1]), kd=gref? gref.t : 's';
+    // the crate's own tile is the source — honest art in the hand
+    const ft=FACE_TILES.find(f2=>f2.t===kd&&f2.el.style.display!=='none'); if(!ft) return false;
     const r2=ft.el.getBoundingClientRect(); if(!r2.width) return false;
     GHOST.wsx=(r2.left+r2.width/2-OX)/SC; GHOST.wsy=(r2.top+r2.height/2-OY)/SC;
     GHOST.wdx=GX+g[0]*C+C/2; GHOST.wdy=GY+g[1]*C+C/2;
-    // the rotation the RUN asks for: E/W neighbours = the lying straight, else standing
-    const ew=pieceAt(g[0]-1,g[1])||pieceAt(g[0]+1,g[1]);
-    GHOST.rot=0;
-    for(const rr2 of [0,1,2,3]){ const P=PATHS['s'][rr2]&&PATHS['s'][rr2][0];
-      if(P&&((ew&&((P.ports[0]===1&&P.ports[1]===3)||(P.ports[0]===3&&P.ports[1]===1)))||
-             (!ew&&((P.ports[0]===0&&P.ports[1]===2)||(P.ports[0]===2&&P.ports[1]===0))))){ GHOST.rot=rr2; break; } }
-    GHOST.cell=[g[0],g[1]]; GHOST.kind='s';
+    if(gref) GHOST.rot=gref.r;
+    else {
+      // the rotation the RUN asks for: E/W neighbours = the lying straight, else standing
+      const ew=pieceAt(g[0]-1,g[1])||pieceAt(g[0]+1,g[1]);
+      GHOST.rot=0;
+      for(const rr2 of [0,1,2,3]){ const P=PATHS['s'][rr2]&&PATHS['s'][rr2][0];
+        if(P&&((ew&&((P.ports[0]===1&&P.ports[1]===3)||(P.ports[0]===3&&P.ports[1]===1)))||
+               (!ew&&((P.ports[0]===0&&P.ports[1]===2)||(P.ports[0]===2&&P.ports[1]===0))))){ GHOST.rot=rr2; break; } }
+    }
+    GHOST.cell=[g[0],g[1]]; GHOST.kind=kd;
+  } else if(les==='rot'){
+    // E70 THE ROTATE LESSON — the glove glides to the kid's own piece and
+    // TAP-pulses; the green ghost flashes the piece at the gap's heading.
+    // Generic: any open-heading gap holding a right-kind wrong-r piece
+    // (L2's corner curve finally has its guide). Zero writes, like every demo.
+    const cand=frRotCand(); if(!cand) return false;
+    GHOST.wdx=GX+cand.g[0]*C+C/2; GHOST.wdy=GY+cand.g[1]*C+C/2;
+    GHOST.wsx=GHOST.wdx+C*0.35; GHOST.wsy=GHOST.wdy+C*0.95;   // in from below, the reading-hand side
+    GHOST.cell=[cand.g[0],cand.g[1]]; GHOST.kind=cand.pc.t; GHOST.rot=cand.ref.r;
   } else if(les==='shop'){
     const ai=$('staisle'); if(!ai) return false;
     if(ai.scrollLeft>=ai.scrollWidth-ai.clientWidth-20) return false;   // at the end = nothing to reveal
@@ -14181,15 +14318,19 @@ function ghStart(les){
 const ghEase=k=>k*k*(3-2*k);
 function ghRun(dt){
   GHOST.t+=dt; GHOST.dash+=dt*30;
-  const door=GHOST.les==='door', shop=GHOST.les==='shop';
-  const seq=door? ['in','point','out'] : ['in','press','drag','settle','out','hold'];
+  const door=GHOST.les==='door', shop=GHOST.les==='shop', rot2=GHOST.les==='rot';
+  const seq=(door||rot2)? ['in','point','out'] : ['in','press','drag','settle','out','hold'];   // E70: the rot lesson points like the door — at the kid's piece
   let dur=GH_PH[GHOST.ph]||0.3;
   if(GHOST.t>=dur){
     GHOST.t=0;
     const i2=seq.indexOf(GHOST.ph);
     if(GHOST.ph==='out'){
       GHOST.loop++;
-      if(door||GHOST.loop>=GH_LOOPS){ ghKill(); GHOST.rest=GH_REST; GHOST.idle=0; return; }
+      if(door||GHOST.loop>=GH_LOOPS){
+        const frles=frGuideOn()&&(rot2||GHOST.les==='gap');   // E70: first-morning lessons rest FR_REST and return
+        if(rot2){ FRN.armed=true; FRN.t=0; }                  // E70: a COMPLETED rot demo arms the kind nudge
+        ghKill(); GHOST.rest=frles? FR_REST : GH_REST; GHOST.idle=0; return;
+      }
       GHOST.ph='hold';
     }
     else if(GHOST.ph==='hold') GHOST.ph='in';
@@ -14222,11 +14363,12 @@ function ghRun(dt){
   else if(GHOST.ph==='out'){ x=dx; y=dy-8*e2; GHOST.a=GH_HAND_A*(1-e2); GHOST.pa=0; }
   else if(GHOST.ph==='hold'){ GHOST.a=0; GHOST.pa=0; }
   else if(GHOST.ph==='point'){ const b2=Math.abs(Math.sin(k*Math.PI*2));   // two gentle press-bobs
-    x=dx-6*b2; y=dy+4-6*b2; press=b2; GHOST.a=GH_HAND_A; GHOST.pa=0; }
+    x=dx-6*b2; y=dy+4-6*b2; press=b2; GHOST.a=GH_HAND_A; GHOST.pa=rot2? b2 : 0; }   // E70: the rot ghost FLASHES with the taps (door keeps 0)
   GHOST.press=press;
   // the world point the canvas demo paints at (room + gap; the door holds no piece)
   if(!door&&!shop){
-    if(GHOST.les==='room'){ GHOST.wx=GX+((x-OX)/SC-ATT.ox)/ATT_SCALE; GHOST.wy=GY+((y-OY)/SC-ATT.oy)/ATT_SCALE; }
+    if(rot2){ GHOST.wx=GHOST.wdx; GHOST.wy=GHOST.wdy; }   // E70: the rot ghost sits ON the cell, at the gap's heading
+    else if(GHOST.les==='room'){ GHOST.wx=GX+((x-OX)/SC-ATT.ox)/ATT_SCALE; GHOST.wy=GY+((y-OY)/SC-ATT.oy)/ATT_SCALE; }
     else { GHOST.wx=(x-OX)/SC; GHOST.wy=(y-OY)/SC; }
   }
   // the hand itself — GH_BOB is the character breathing, tiny
@@ -14245,14 +14387,16 @@ function ghDemoPaint(){
   // the dashed way — a gentle bow, marching toward the destination; a dark
   // under-stroke carries the cream on pale grounds (the hand's outline law)
   const pf=GHOST.a/GH_HAND_A||0;
-  cx.setLineDash([11,11]); cx.lineDashOffset=-GHOST.dash; cx.lineCap='round';
-  cx.globalAlpha=0.22*pf; cx.strokeStyle='#26333F'; cx.lineWidth=7;
-  cx.beginPath(); cx.moveTo(GHOST.wsx,GHOST.wsy);
-  cx.quadraticCurveTo(GHOST.wcx,GHOST.wcy,GHOST.wdx,GHOST.wdy); cx.stroke();
-  cx.globalAlpha=0.55*pf; cx.strokeStyle='#F7E9C4'; cx.lineWidth=4;
-  cx.beginPath(); cx.moveTo(GHOST.wsx,GHOST.wsy);
-  cx.quadraticCurveTo(GHOST.wcx,GHOST.wcy,GHOST.wdx,GHOST.wdy); cx.stroke();
-  cx.setLineDash([]); cx.lineCap='butt';
+  if(GHOST.les!=='rot'){   // E70: the rot lesson travels nowhere — no way to draw
+    cx.setLineDash([11,11]); cx.lineDashOffset=-GHOST.dash; cx.lineCap='round';
+    cx.globalAlpha=0.22*pf; cx.strokeStyle='#26333F'; cx.lineWidth=7;
+    cx.beginPath(); cx.moveTo(GHOST.wsx,GHOST.wsy);
+    cx.quadraticCurveTo(GHOST.wcx,GHOST.wcy,GHOST.wdx,GHOST.wdy); cx.stroke();
+    cx.globalAlpha=0.55*pf; cx.strokeStyle='#F7E9C4'; cx.lineWidth=4;
+    cx.beginPath(); cx.moveTo(GHOST.wsx,GHOST.wsy);
+    cx.quadraticCurveTo(GHOST.wcx,GHOST.wcy,GHOST.wdx,GHOST.wdy); cx.stroke();
+    cx.setLineDash([]); cx.lineCap='butt';
+  }
   // the green ok tint — the drag pipeline's own tell, on the destination cell
   if(GHOST.cell&&GHOST.pa>0){
     cx.globalAlpha=0.28*GHOST.pa; cx.fillStyle='#7CFC66';
@@ -14266,7 +14410,7 @@ function ghDemoPaint(){
   }
   cx.restore(); cx.globalAlpha=1;
 }
-function ghPaintWorld(){ if(GHOST.on&&GHOST.les==='gap') ghDemoPaint(); }   // draw()'s world pass
+function ghPaintWorld(){ if(GHOST.on&&(GHOST.les==='gap'||GHOST.les==='rot')) ghDemoPaint(); }   // draw()'s world pass (E70: the rot lesson lives here too)
 function ghPaintBed(){ if(GHOST.on&&GHOST.les==='room') ghDemoPaint(); }    // drawMenu's attract pass
 // ---- THE HAND — the character's one painter. Tip at the origin, hanging
 // down-right at GH_TILT. Unit height ~118; k scales. Long index finger,
@@ -14339,7 +14483,13 @@ function ghBuild(){
 
 
 load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildWall(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract(); ghBuild();
-showScreen('menu'); shelfSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
+// E70 THE FIRST MORNING — the first door IS Level 1: a fresh kid (the ten
+// book's done-set empty, the menu never seen) wakes up INSIDE the campaign
+// through the REAL door pipeline — campEnter walks its own wip restore, so a
+// kid who quit mid-L1 boots back into L1 exactly where they left it. No menu
+// frame ever paints on a first-run boot. Everyone else: the bedroom, verbatim.
+if(firstRun()&&campEnter(1)){} else showScreen('menu');
+shelfSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
   const dt=Math.min(0.05,(t-last)/1000); last=t;
@@ -14513,7 +14663,7 @@ window.TS={
     kill(){ ghKill(); return true; },
     set(k){ if(HAND_KEYS.includes(k)) handSet(k); return {...HAND}; },
     clear(k){ if(k){ if(HAND_KEYS.includes(k)) HAND[k]=0; }
-      else HAND={room:0,gap:0,shop:0,door:0};
+      else HAND={room:0,gap:0,shop:0,door:0,rot:0};
       save(); return {...HAND}; },
     idle(v){ GHOST.ctx=ghCtx(); GHOST.idle=+v||0; return GHOST.idle; },   // the stamp keeps a pre-load alive past the fresh-context reset
     plate(x,y){ if(x===false){ ghKill(); return true; }
