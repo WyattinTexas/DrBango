@@ -16473,7 +16473,7 @@ function sqTick(dt){
 // green gun already targets him for free) whose own updater eats BOTH
 // armies. YETI_LEVELS is the roster Wyatt curates ("I will instruct when to
 // add him" — 13, then 16 and 20 by his next note); one row per rung.
-const YETI_LEVELS={ 13:15, 16:15, 20:15 };   // level → the second he arrives (v2.57: L16 back to 15 — "4 seconds later")
+const YETI_LEVELS={ 13:20, 16:20, 20:20 };   // level → the second he arrives (v2.58: +5 on every rung — "he still appears too early")
 // v2.57 (Wyatt 8/6, THE DICE ROLL — replaces v2.55's alternation + tan bias):
 // every bound rolls 1-3. A 1 or a 2 is a WILD bound to a random spot (the
 // Ski Free chaos); a 3 is a POUNCE on somebody — 75/25 the enemy's man over
@@ -16481,9 +16481,20 @@ const YETI_LEVELS={ 13:15, 16:15, 20:15 };   // level → the second he arrives 
 // lands square on someone, mostly theirs.
 const YETI_HUNT_P=1/3, YETI_TAN_ODDS=0.75;
 const YETI_STAY=15, YETI_HP=200, YETI_EAT_R=44;   // v2.57: hp 600→200 — killable inside one visit
+// v2.58 (Wyatt 8/6 eve, THE LOCAL MENACE): "he should never jump really
+// across the map… hop around where he is" — so both armies actually stand in
+// gun range of him long enough to put damage on. YETI_HOP_R leashes every
+// wild bound; YETI_HUNT_R is "his area" — the pounce only ever picks a
+// figure already inside it. An empty neighbourhood aims the wild bound
+// TOWARD the nearest figure instead (movement, never a mouth), so he wanders
+// to the fight rather than haunting an empty corner of the rug.
+const YETI_HOP_R=150, YETI_HUNT_R=230;
+// v2.58: the TAN aimed round can pick him too now ("both the enemy and the
+// player… shooting him") — YETI_TAN_DMG per round; a tan kill pays NOBODY.
+const YETI_TAN_DMG=2;
 function spawnYeti(){
   const f=spawnFoe('yeti', W-70, 110+Math.random()*(WORLD_H-220));
-  f.hp=f.hpMax=YETI_HP;              // flat 600 — hpMul keeps its hands off the gag
+  f.hp=f.hpMax=YETI_HP;              // flat YETI_HP — hpMul keeps its hands off the gag
   f.yetiT=YETI_STAY; f.hopA=false; f.hopT=0.01; f.hopZ=0;
   f.roarT=0.5;                       // v2.55: the Yeti.mp3 lands half a second after he enters
   S.ann={txt:t('THE ABOMINABLE SNOWMAN!'), t:2.6, warn:true};
@@ -16499,6 +16510,17 @@ function yetiHuntLive(f){
   // still on a carpet list at all? (kills and trainKill splice foes out whole)
   if(S.units.indexOf(h)<0 && S.foes.indexOf(h)<0) return false;
   return true;
+}
+// v2.58: the nearest live figure of EITHER army — the empty-neighbourhood
+// wild bound drifts toward him. Unbounded scan on purpose: it aims the HOP,
+// never the mouth (the pounce keeps its YETI_HUNT_R gate).
+function yetiNearestFigure(f){
+  let best=null,bd=1e9;
+  for(const u of S.units){ if(u.dead||u.jetT>0||(S.drag&&S.drag.unit===u)) continue;
+    const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<bd){bd=d;best=u;} }
+  for(const g of S.foes){ if(g===f||g.boss||g.type==='mom'||g.burrow||g.yetiAte) continue;
+    const d=Math.hypot(g.x-f.x,g.y-f.y); if(d<bd){bd=d;best=g;} }
+  return best;
 }
 function updateYeti(f,dt){
   f.yetiT-=dt;
@@ -16544,10 +16566,13 @@ function updateYeti(f,dt){
       // drawn 75/25 from the enemy's men over yours (the guided leap then
       // tracks the victim to the landing). An empty side hands the pounce
       // across; an empty carpet is always a wild bound.
+      // v2.58: the pounce pool is pre-filtered to HIS AREA (YETI_HUNT_R) —
+      // nobody near means no pounce this roll, never a cross-map leap.
       let tgt=null;
       if(Math.random()<YETI_HUNT_P){
-        const greens=S.units.filter(u=>!u.dead&&!(u.jetT>0)&&!(S.drag&&S.drag.unit===u));
-        const tans=S.foes.filter(g=>g!==f&&!g.boss&&g.type!=='mom'&&!g.burrow&&!g.yetiAte);
+        const near=o=>Math.hypot(o.x-f.x,o.y-f.y)<=YETI_HUNT_R;
+        const greens=S.units.filter(u=>!u.dead&&!(u.jetT>0)&&!(S.drag&&S.drag.unit===u)&&near(u));
+        const tans=S.foes.filter(g=>g!==f&&!g.boss&&g.type!=='mom'&&!g.burrow&&!g.yetiAte&&near(g));
         const pool=(Math.random()<YETI_TAN_ODDS)? (tans.length?tans:greens) : (greens.length?greens:tans);
         tgt=pool.length? pool[(Math.random()*pool.length)|0] : null;
       }
@@ -16555,8 +16580,18 @@ function updateYeti(f,dt){
       f.hx0=f.x; f.hy0=f.y;
       if(tgt){ f.hx1=Math.max(90,Math.min(W-70,  tgt.x));
                f.hy1=Math.max(96,Math.min(WORLD_H-90, tgt.y)); }
-      else   { f.hx1=Math.max(90,Math.min(W-70,  f.x+(Math.random()-0.5)*560));
-               f.hy1=Math.max(96,Math.min(WORLD_H-90, f.y+(Math.random()-0.5)*440)); }
+      else{
+        // v2.58: the wild bound rides the YETI_HOP_R leash — local Ski Free
+        // chaos. An empty neighbourhood tilts the hop toward the nearest
+        // figure (with a wobble) so he drifts to the fight on his own feet.
+        let a=Math.random()*6.283;
+        const nf=yetiNearestFigure(f);
+        if(nf && Math.hypot(nf.x-f.x,nf.y-f.y)>YETI_HUNT_R)
+          a=Math.atan2(nf.y-f.y,nf.x-f.x)+(Math.random()-0.5)*1.2;
+        const r=YETI_HOP_R*(0.45+Math.random()*0.55);
+        f.hx1=Math.max(90,Math.min(W-70,  f.x+Math.cos(a)*r));
+        f.hy1=Math.max(96,Math.min(WORLD_H-90, f.y+Math.sin(a)*r));
+      }
       f.hopDur=0.38+Math.random()*0.26; f.hopP=0; f.hopA=true;
     }
   }
@@ -19699,8 +19734,42 @@ function tanPick(f){
   }
   return best;
 }
+// v2.58: the nearest live yeti inside this tan trigger's own reach. Only the
+// aimed-round triggers (rifle/MG/sniper — the tanShoot family) engage him;
+// the tubes and the cone keep their green-only scan (a shell on a neutral is
+// wasted iron, and foeSplash would never hurt him anyway).
+function tanYetiPick(f){
+  let best=null,bd=1e9;
+  for(const g of S.foes){
+    if(g.type!=='yeti'||g.leaving||g.yetiGone||g.yetiSlain) continue;
+    const d=Math.hypot(g.x-f.x,g.y-f.y);
+    if(d<=frng(f) && d<bd){bd=d;best=g;}
+  }
+  return best? {g:best,d:bd} : null;
+}
 function tanShoot(f){
   const best=tanPick(f);
+  // v2.58 (Wyatt: "both the enemy and the player… shooting him"): the yeti is
+  // fair game for the tan aimed round — when he stands nearer than the
+  // nearest legal green (or no green stands at all), the round goes to him.
+  // ⚠ he dies here by FLAG (yetiSlain, swept beside yetiAte) — tan triggers
+  // fire INSIDE the foes loop, and hitCheck's campaign branch splices S.foes;
+  // a mid-iteration splice is exactly the v2.54 battery crash. A tan kill
+  // pays nobody: their monster, their bullet, no dog tag either way.
+  const yp=tanYetiPick(f);
+  if(yp && (!best || yp.d<Math.hypot(best.x-f.x,best.y-f.y))){
+    const g=yp.g;
+    (f.type==='tanmg'?SFX.mg:f.type==='tansniper'?SFX.crack:SFX.tpew)();
+    if(f.type==='tanmg') f.mgRootT=MG_ROOT;
+    S.fx.push({k:'tracer',x1:f.x-14,y1:f.y-26,x2:g.x,y2:g.y-40,t:0,dur:0.1,col:'#EDD9A8'});
+    S.fx.push({k:'ring',x:g.x,y:g.y-40,r:4,R:16,t:0,dur:0.16,col:'#FFD9D9'});
+    g.hp-=YETI_TAN_DMG;
+    if(g.hp<=0 && !g.yetiSlain){
+      g.yetiSlain=true; SFX.boom(); S.shake=Math.max(S.shake,0.5);
+      for(let j=0;j<3;j++) S.fx.push({k:'puff',x:g.x+(Math.random()-0.5)*40,y:g.y-30+(Math.random()-0.5)*40,t:0,dur:0.6,R:40});
+    }
+    return true;
+  }
   if(best){ (f.type==='tanmg'?SFX.mg:f.type==='tansniper'?SFX.crack:SFX.tpew)();
     if(f.type==='tanmg') f.mgRootT=MG_ROOT;   // v2.44 THE ROOTED BURST, tan side — the aimed round AND both chased rounds land here, so the burst re-arms the root round by round; the movement freeze reads it beside aimT
     // v2.28: the duck blocks the TAN line too — he is neutral chaos, not a
@@ -22855,7 +22924,7 @@ function update(dt){
         f.shot+=dt;
         const cd=f.def.fireCd*(f.fireMul||1)*(f.fireAura||1);   // 0117: the radio's cadence gift lands here
         const rdy=panic? Math.min(cd,SABER_PANIC_CD) : cd;
-        if(f.shot>=rdy && tanPick(f)){                                         // halt... aim... (tanPick honours a tube's dead zone)
+        if(f.shot>=rdy && (tanPick(f) || (!f.def.splashR&&!f.def.cone&&!f.def.multi&&tanYetiPick(f)))){   // halt... aim... (tanPick honours a tube's dead zone; v2.58: an aimed-round man also halts for the YETI — without this the gate never opens on a green-empty flank and he eats the column unanswered)
           f.aimT = panic? SABER_PANIC_AIM : (f.def.aim||0.55);   // 0117: the sniper's long present-arms is his fairness contract
         }
       }
@@ -23476,7 +23545,7 @@ function update(dt){
   // v2.54: the snowman's meals and his own exit ride the SAME law — flagged
   // in updateYeti (which runs inside the foes loop), swept here. An eaten
   // tan leaves no corpse, no bounty, no leak — down the hatch whole.
-  for(let i=S.foes.length-1;i>=0;i--) if(S.foes[i].yetiAte||S.foes[i].yetiGone) S.foes.splice(i,1);
+  for(let i=S.foes.length-1;i>=0;i--) if(S.foes[i].yetiAte||S.foes[i].yetiGone||S.foes[i].yetiSlain) S.foes.splice(i,1);   // v2.58: yetiSlain = felled by a TAN round (flagged in tanShoot, same law)
 }
 // one radioman rule for every gun on the carpet (BF: your OWN radioman only).
 // ONE scan answers both halves of the aura — v1.22 gave the set a second gift
