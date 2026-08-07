@@ -2311,7 +2311,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.63</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.64</div>
   <div class="scanlines"></div>
 </div>
 
@@ -18424,7 +18424,13 @@ function crewChipHTML(){
       +' onclick="crewPanelOpen()">'
       +tf('⚑ %1 WANTS YOU IN %2!', String(v.frm||'').toUpperCase(), String(v.name||'').toUpperCase())+'</button>';
   }
-  return '';
+  // v2.64: THE STANDING DOOR. The event chips above outrank it, but the squad
+  // must always be one tap from the room — v2.63 shipped the machinery with no
+  // front door (create/join were reachable only through an invite, which only
+  // a squad member could send: a chicken with no egg). Quiet when squadded
+  // (your name on the flag), an invitation when not.
+  return '<button class="mbtn alt" style="padding:0.2rem 0.7rem;font-size:1.1rem;margin-left:10px;opacity:0.92"'
+    +' onclick="crewPanelOpen()">⚑ '+(CREW.crew? '<span data-notr>'+escH(String(CREW.crew.name||'').toUpperCase())+'</span>' : t('YOUR SQUAD'))+'</button>';
 }
 // ---- THE SQUAD DOOR (one modal: mine, or the ways in) ----
 function crewPanelHTML(){
@@ -18817,7 +18823,14 @@ function coopPanelHTML(){
     : '<p style="font-size:1.02rem;opacity:0.8;margin:4px 0 8px">Team up! Beat the level together and <b>both</b> campaigns advance.</p>';
   const back='<p style="text-align:center;margin:10px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.room(\'campaign\');return false">← back to the campaign</a></p>';
   if(c.ui==='idle'){
+    // v2.64: the STANDING squad's own door leads the panel — squadded, it
+    // wears your squad's name; squadless, it sells the whole idea (the key
+    // shipped ×7 with v2.63). The three session doors below are unchanged.
+    const crewStrip = CREW.crew
+      ? '<button class="coopbtn" onclick="crewPanelOpen()"><span class="ico">⚑</span><span><b data-notr>'+escH(String(CREW.crew.name||''))+'</b><small>'+t('YOUR SQUAD')+' · '+(CREW.crew.n|0)+' / '+(CREW.crew.max|0)+'</small></span></button>'
+      : '<button class="coopbtn" onclick="crewPanelOpen()"><span class="ico">⚑</span><span>'+t('CREATE A SQUAD<small>One squad, all your buddies — for good</small>')+'</span></button>';
     h+=rule
+      +crewStrip
       +(c.note? '<p style="color:#D2B489;font-size:0.98rem">'+escH(c.note)+'</p>':'')
       +'<button class="coopbtn" onclick="UI.coopHost()"><span class="ico">🔗</span><span>START A SQUAD<small>Get a code and a link to send everyone</small></span></button>'
       +'<button class="coopbtn" onclick="UI.coopEnterUI()"><span class="ico">🎟️</span><span>ENTER A SQUAD CODE<small>They sent you one? Punch it in</small></span></button>'
