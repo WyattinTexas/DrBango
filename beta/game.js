@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.17';
+const VERSION = 'v0.18.18';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -204,6 +204,33 @@ const CLASSES = [
     ],
   },
 ];
+
+// ---------- achievements ----------
+const ACHIEVEMENTS = [
+  { id: 'chain3', icon: '🔗', name: 'Chain Apprentice', desc: 'Land a ×3 chain' },
+  { id: 'chain5', icon: '⚡', name: 'Chain Adept', desc: 'Land a ×5 chain' },
+  { id: 'chain8', icon: '🌩️', name: 'Cascade Master', desc: 'Land a ×8 chain' },
+  { id: 'miniboss', icon: '💀', name: 'Giantsbane', desc: 'Slay a miniboss' },
+  { id: 'floor10', icon: '⛰️', name: 'Halfway There', desc: 'Reach level 10' },
+  { id: 'win', icon: '👑', name: 'Realm Cleared', desc: 'Win a full 20-floor run' },
+  { id: 'winall', icon: '🌍', name: 'World Walker', desc: 'Win in all three realms' },
+  { id: 'classes3', icon: '🎭', name: 'Many Hats', desc: 'Win with 3 different classes' },
+  { id: 'relic4', icon: '🏺', name: 'Collector', desc: 'Carry 4 relics in one run' },
+  { id: 'rich', icon: '💰', name: 'Deep Pockets', desc: 'Grow the wallet to 300 gold' },
+];
+const ACH_BY_ID = {};
+for (const a of ACHIEVEMENTS) ACH_BY_ID[a.id] = a;
+function achEarned() {
+  try { return JSON.parse(localStorage.getItem('runefall.ach')) || {}; }
+  catch (e) { return {}; }
+}
+function achData() {
+  try { return JSON.parse(localStorage.getItem('runefall.achdata')) || {}; }
+  catch (e) { return {}; }
+}
+function saveAchData(d) {
+  try { localStorage.setItem('runefall.achdata', JSON.stringify(d)); } catch (e) { /* no-op */ }
+}
 
 // ---------- persistent bank + class unlocks ----------
 function loadUnlocks() {
@@ -707,6 +734,7 @@ class GameScene extends Phaser.Scene {
   gainRelic(id) {
     if (this.hasRelic(id)) return;
     this.relics.push(id);
+    if (this.relics.length >= 4) this.earnAch('relic4');
     this.drawRelics();
   }
 
@@ -801,6 +829,7 @@ class GameScene extends Phaser.Scene {
     this.enemies = [];
     const type = this.currentNode.type;
     this.levelText.setText('LEVEL ' + n + '/' + FLOORS);
+    if (n >= 10) this.earnAch('floor10');
     if (this.hasRelic('emberheart') && this.hp < TUNE.PLAYER_HP) {
       this.time.delayedCall(500, () => { if (!this.gameOver) this.heal(4); });
     }
@@ -1287,6 +1316,7 @@ class GameScene extends Phaser.Scene {
   doGameOver() {
     this.gameOver = true;
     BANK.add(this.gold); // held gold banks even in defeat
+    if (BANK.get() >= 300) this.earnAch('rich');
     this.closeModal();
     this.aim = null;
     this.trajGfx.clear();
@@ -1320,6 +1350,16 @@ class GameScene extends Phaser.Scene {
     this.awardClassXp(XP_VICTORY * (this.realm ? this.realm.xp : 1));
     this.gameOver = true;
     BANK.add(this.gold);
+    this.earnAch('win');
+    const d = achData();
+    d.classWins = d.classWins || {};
+    d.realmWins = d.realmWins || {};
+    if (this.playerClass) d.classWins[this.playerClass.id] = true;
+    if (this.realm) d.realmWins[this.realm.id] = true;
+    saveAchData(d);
+    if (Object.keys(d.classWins).length >= 3) this.earnAch('classes3');
+    if (REALMS.every(r => d.realmWins[r.id])) this.earnAch('winall');
+    if (BANK.get() >= 300) this.earnAch('rich');
     this.closeModal();
     this.previewImg.setVisible(false);
     this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.78).setDepth(50);
@@ -1526,8 +1566,7 @@ class GameScene extends Phaser.Scene {
       () => this.showComingSoon('VERSUS',
         'Head-to-head runs against another player.\n\nSame floors, same dice bag, one board each —\nwhoever banks the deeper clear takes it.\n\nNot built yet.'));
     this.menuButton(y0 + step * 2, '★ ACHIEVEMENTS', 0x6b4a33,
-      () => this.showComingSoon('ACHIEVEMENTS',
-        'Chain milestones, relics collected, floors reached,\nand a clean run with every class.\n\nNot built yet.'));
+      () => this.showAchievements());
     this.menuButton(y0 + step * 3, '◉ SHOP', 0x6b4a33,
       () => this.showShopHome());
     this.modalAdd(this.add.text(this.W / 2, y0 + step * 4 + 6,
@@ -1540,6 +1579,84 @@ class GameScene extends Phaser.Scene {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
       color: '#7a6a55',
     }).setOrigin(0.5).setDepth(72));
+  }
+
+  // ---------- achievements ----------
+
+  earnAch(id) {
+    const a = achEarned();
+    if (a[id] || !ACH_BY_ID[id]) return;
+    a[id] = Date.now();
+    try { localStorage.setItem('runefall.ach', JSON.stringify(a)); } catch (e) { return; }
+    const def = ACH_BY_ID[id];
+    this._toastN = (this._toastN || 0) + 1;
+    const slot = this._toastN;
+    const t = this.add.text(this.W / 2, -upx(24),
+      '🏆 ' + def.icon + '  ' + def.name.toUpperCase(), {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(14),
+      fontStyle: 'bold', color: GOLD,
+      backgroundColor: '#241810', padding: { x: upx(12), y: upx(6) },
+    }).setOrigin(0.5).setDepth(60).setAlpha(0.96);
+    this.tweens.add({
+      targets: t, y: upx(26) + (slot - 1) * upx(34),
+      duration: 320, ease: 'Back.easeOut',
+    });
+    this.time.delayedCall(2600, () => {
+      this._toastN--;
+      this.tweens.add({
+        targets: t, alpha: 0, y: t.y - upx(20), duration: 300,
+        onComplete: () => t.destroy(),
+      });
+    });
+  }
+
+  showAchievements() {
+    this.menuBackdrop();
+    this.modalRefresh = () => this.showAchievements();
+    const earned = achEarned();
+    const nEarned = ACHIEVEMENTS.filter(a => earned[a.id]).length;
+    this.modalAdd(this.add.text(this.W / 2, this.H * 0.08, '★  ACHIEVEMENTS', {
+      fontFamily: FONT_DISPLAY, fontSize: fpx(24),
+      fontStyle: 'bold', color: BOARD.cream,
+    }).setOrigin(0.5).setDepth(72));
+    this.modalAdd(this.add.text(this.W / 2, this.H * 0.08 + upx(26),
+      nEarned + ' of ' + ACHIEVEMENTS.length + ' earned', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
+      color: GOLD,
+    }).setOrigin(0.5).setDepth(72));
+    const cols = 2, rows = Math.ceil(ACHIEVEMENTS.length / cols);
+    const cellW = Math.min(this.W * 0.44, upx(310));
+    const top = this.H * 0.2;
+    const cellH = Math.min(upx(58), (this.H * 0.68) / rows);
+    ACHIEVEMENTS.forEach((a, i) => {
+      const col = i % cols, row = Math.floor(i / cols);
+      const cx = this.W / 2 + (col === 0 ? -cellW / 2 - upx(8) : cellW / 2 + upx(8));
+      const cy = top + row * cellH + cellH / 2;
+      const got = !!earned[a.id];
+      const g = this.modalAdd(this.add.graphics().setDepth(71));
+      g.fillStyle(got ? 0x2a2010 : 0x1a120c, 0.9);
+      g.fillRoundedRect(cx - cellW / 2, cy - cellH / 2 + upx(2), cellW, cellH - upx(4), 8);
+      g.lineStyle(1.5, got ? 0xc9a84c : 0x4a3a2c, got ? 0.9 : 0.7);
+      g.strokeRoundedRect(cx - cellW / 2, cy - cellH / 2 + upx(2), cellW, cellH - upx(4), 8);
+      this.modalAdd(this.add.text(cx - cellW / 2 + upx(16), cy, a.icon, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(16),
+      }).setOrigin(0.5).setDepth(72)).setAlpha(got ? 1 : 0.4);
+      this.modalAdd(this.add.text(cx - cellW / 2 + upx(32), cy - cellH * 0.22,
+        a.name + (got ? '  ✓' : ''), {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
+        fontStyle: 'bold', color: got ? GOLD : '#8a7960',
+      }).setOrigin(0, 0.5).setDepth(72));
+      this.modalAdd(this.add.text(cx - cellW / 2 + upx(32), cy + cellH * 0.2, a.desc, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(9),
+        color: got ? BOARD.creamDim : '#6a5a48',
+      }).setOrigin(0, 0.5).setDepth(72));
+    });
+    const back = this.modalAdd(this.add.text(this.W / 2, this.H - upx(24), '◀ BACK', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(15),
+      fontStyle: 'bold', color: '#ffd54a',
+      backgroundColor: '#3a2517', padding: { x: upx(12), y: upx(6) },
+    }).setOrigin(0.5).setDepth(74).setInteractive());
+    back.on('pointerdown', () => this.showHome());
   }
 
   // the home shop: banked gold from finished runs buys new classes
@@ -4238,6 +4355,9 @@ class GameScene extends Phaser.Scene {
 
     this.chain++;
     if (this.chain > this.bestChain) this.bestChain = this.chain;
+    if (this.chain >= 3) this.earnAch('chain3');
+    if (this.chain >= 5) this.earnAch('chain5');
+    if (this.chain >= 8) this.earnAch('chain8');
     feedback.chainStep(this.chain);
     this.flashChain();
 
@@ -4878,6 +4998,7 @@ class GameScene extends Phaser.Scene {
           this.time.delayedCall(400, () => this.doVictory());
         } else {
           this.banner('LEVEL CLEAR!', '#8ec873');
+          if (this.currentNode.type === 'boss') this.earnAch('miniboss');
           const gain = XP_PER_FIGHT * (this.realm ? this.realm.xp : 1) *
             (this.currentNode.type === 'boss' ? 2 : 1);
           this.awardClassXp(gain);
