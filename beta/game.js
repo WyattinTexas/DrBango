@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.3';
+const VERSION = 'v0.18.4';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -3951,6 +3951,10 @@ class GameScene extends Phaser.Scene {
       fontFamily: '"Arial Black", -apple-system, Arial, sans-serif', fontSize: fpx(54),
       fontStyle: 'bold', color: '#ffffff', stroke: '#3a2517', strokeThickness: upx(9),
     }).setOrigin(0.5).setAlpha(0).setDepth(30);
+    this.chainWord = this.add.text(0, 0, '', {
+      fontFamily: FONT_DISPLAY, fontSize: fpx(22),
+      fontStyle: 'bold', color: '#ffd54a', stroke: '#3a2517', strokeThickness: upx(6),
+    }).setOrigin(0.5).setAlpha(0).setDepth(30);
     this.hpBar = this.add.graphics().setDepth(30);
     this.hpText = this.add.text(0, 0, '', {
       ...style, fontSize: fpx(12), color: BOARD.cream, fontStyle: 'bold',
@@ -4015,6 +4019,7 @@ class GameScene extends Phaser.Scene {
     chip(rx - upx(146), upx(2), upx(150), ly + upx(18));
     this.versionText.setPosition(this.W - this.rail - upx(6), this.H - this.rail - upx(4));
     this.chainText.setPosition(this.W / 2, this.H * 0.3);
+    if (this.chainWord) this.chainWord.setPosition(this.W / 2, this.H * 0.3 + upx(44));
     this.drawHpBar();
     this.drawGold();
     this.drawRelics();
@@ -4153,6 +4158,14 @@ class GameScene extends Phaser.Scene {
       ease: 'Quad.easeIn', onComplete: () => t.destroy(),
     });
     if (amount >= 6) this.cameras.main.shake(90, 0.003);
+    // monster hits flash the whole table
+    if (amount >= 12) {
+      const veil = this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H,
+        0xfff4dc, 0.10).setDepth(48);
+      this.tweens.add({
+        targets: veil, alpha: 0, duration: 200, onComplete: () => veil.destroy(),
+      });
+    }
   }
 
   flashChain() {
@@ -4162,11 +4175,44 @@ class GameScene extends Phaser.Scene {
       .setAlpha(1).setScale(1.5 + Math.min(n, 8) * 0.07)
       .setRotation((Math.random() - 0.5) * 0.08);
     this.tweens.add({ targets: this.chainText, scale: 1, duration: 190, ease: 'Back.easeOut' });
+    // streak callouts under the chain counter
+    const word = n >= 9 ? 'LEGENDARY!' : n >= 7 ? 'AMAZING!' : n >= 5 ? 'GREAT!' : '';
+    if (this.chainWord) {
+      this.chainWord.setText(word).setColor(color).setAlpha(word ? 1 : 0);
+      if (word) {
+        this.chainWord.setScale(1.25);
+        this.tweens.add({
+          targets: this.chainWord, scale: 1, duration: 200, ease: 'Back.easeOut',
+        });
+      }
+    }
+    if (n === 4 || n === 7 || n === 10) this.slowMoBeat();
     if (this.chainFade) this.chainFade.remove();
     this.chainFade = this.time.delayedCall(1100, () => {
-      this.tweens.add({ targets: this.chainText, alpha: 0, duration: 350 });
+      this.tweens.add({
+        targets: [this.chainText, this.chainWord], alpha: 0, duration: 350,
+      });
     });
     this.bestText.setText('Best chain: ' + this.bestChain);
+  }
+
+  // a heartbeat of slow-mo at the big chain moments — the whole board
+  // hangs in the air for a breath, then snaps back
+  slowMoBeat() {
+    if (this._slowmo) return;
+    this._slowmo = true;
+    this.matter.world.engine.timing.timeScale = 0.35;
+    this.tweens.timeScale = 0.55;
+    const veil = this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H,
+      0xfff4dc, 0.10).setDepth(48);
+    this.time.delayedCall(170, () => {
+      this.matter.world.engine.timing.timeScale = 1;
+      this.tweens.timeScale = 1;
+      this._slowmo = false;
+      this.tweens.add({
+        targets: veil, alpha: 0, duration: 180, onComplete: () => veil.destroy(),
+      });
+    });
   }
 
   // ---------- main loop ----------
@@ -4246,8 +4292,17 @@ class GameScene extends Phaser.Scene {
           this.time.delayedCall(400, () => this.doVictory());
         } else {
           this.banner('LEVEL CLEAR!', '#8ec873');
-          this.awardClassXp(XP_PER_FIGHT * (this.realm ? this.realm.xp : 1) *
-            (this.currentNode.type === 'boss' ? 2 : 1));
+          const gain = XP_PER_FIGHT * (this.realm ? this.realm.xp : 1) *
+            (this.currentNode.type === 'boss' ? 2 : 1);
+          this.awardClassXp(gain);
+          // the payday beat: what this floor just banked
+          this.time.delayedCall(380, () => {
+            if (!this.gameOver && this.playerClass) {
+              this.floatText(this.W / 2, this.H * 0.54,
+                '+' + gain + ' XP   ·   ' + this.gold + 'g held',
+                this.playerClass.hex, true);
+            }
+          });
           this.time.delayedCall(1400, () => {
             if (!this.gameOver) this.chooseNextPath();
           });
