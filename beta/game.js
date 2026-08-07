@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.20';
+const VERSION = 'v0.18.21';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -1279,6 +1279,7 @@ class GameScene extends Phaser.Scene {
       if (this.gameOver || this.modalOpen === 'shop') return;
       const cfg = this.levelCfg();
       this.seedBoard(cfg.goldCount, cfg.goldMax);
+      this.spawnFieldDice(); // the sweep took the numbered ones with it
     });
   }
 
@@ -1407,6 +1408,7 @@ class GameScene extends Phaser.Scene {
     this.block = 0;
     this.relics = [];
     this.fieldDice = []; // reward dice that hold the board every level
+    this.seedTrim = 0;   // starting board dice bought off at the shop
     this.chain = 0;
     this.bestChain = 0;
     this.throws = 0;
@@ -2246,7 +2248,8 @@ class GameScene extends Phaser.Scene {
       if (!canRemove) return;
       this.renderShopRemove(stock);
     });
-    const nField = (this.fieldDice || []).length;
+    const seedsLeft = Math.max(0, TUNE.SEED_DICE - (this.seedTrim || 0));
+    const nField = (this.fieldDice || []).length + seedsLeft;
     const canField = this.gold >= 5 && nField > 0;
     const fieldBtn = this.modalAdd(this.add.text(px + pw * 0.82, py + rowY,
       '⬡ Field die — 5g', {
@@ -2336,33 +2339,49 @@ class GameScene extends Phaser.Scene {
       fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
       color: BOARD.creamDim,
     }).setOrigin(0.5).setDepth(72));
-    const list = this.fieldDice || [];
+    // the board's own recurring seeds count too — buying one off thins
+    // every future board (and refresh) by one die
+    const seedsLeft = Math.max(0, TUNE.SEED_DICE - (this.seedTrim || 0));
+    const list = (this.fieldDice || []).map(e => ({ entry: e }));
+    if (seedsLeft > 0) list.push({ seed: true });
     const cols = Math.min(Math.max(list.length, 1), 6);
     const cellW = pw / (cols + 0.5);
     const s = Math.min(this.dieSize, cellW * 0.55);
-    list.forEach((e, i) => {
+    list.forEach((it, i) => {
       const col = i % cols, row = Math.floor(i / cols);
       const x = px + cellW * (col + 0.75);
       const y = py + upx(96) + row * (s + upx(50));
+      const e = it.entry;
       const img = this.modalAdd(this.add.image(x, y,
-        this.textureFor(e.kind, e.value)).setDepth(72)
+        it.seed ? 'die2' : this.textureFor(e.kind, e.value)).setDepth(72)
         .setDisplaySize(s, s).setInteractive());
-      const label = e.kind === 'num' ? 'Die ' + e.value :
-        e.kind.charAt(0).toUpperCase() + e.kind.slice(1) +
-        (this.mergeableKind(e.kind) && e.value ? ' ' + e.value : '');
+      if (it.seed) img.setAlpha(0.8);
+      const label = it.seed ? 'Starting die ×' + seedsLeft :
+        e.kind === 'num' ? 'Die ' + e.value :
+          e.kind.charAt(0).toUpperCase() + e.kind.slice(1) +
+          (this.mergeableKind(e.kind) && e.value ? ' ' + e.value : '');
       this.modalAdd(this.add.text(x, y + s * 0.62 + 4, label, {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(12),
         color: BOARD.cream,
       }).setOrigin(0.5, 0).setDepth(72));
       img.on('pointerdown', () => {
         if (this.gold < 5) return;
-        const idx = this.fieldDice.indexOf(e);
-        if (idx < 0) return;
-        this.gold -= 5;
-        this.fieldDice.splice(idx, 1);
-        this.drawGold();
-        this.floatText(x, y, 'RETIRED', '#a4c9e6');
-        if (this.fieldDice.length) this.renderShopFieldRemove(stock);
+        if (it.seed) {
+          this.gold -= 5;
+          this.seedTrim = (this.seedTrim || 0) + 1;
+          this.drawGold();
+          this.floatText(x, y, 'RETIRED', '#a4c9e6');
+        } else {
+          const idx = this.fieldDice.indexOf(e);
+          if (idx < 0) return;
+          this.gold -= 5;
+          this.fieldDice.splice(idx, 1);
+          this.drawGold();
+          this.floatText(x, y, 'RETIRED', '#a4c9e6');
+        }
+        const left = (this.fieldDice || []).length +
+          Math.max(0, TUNE.SEED_DICE - (this.seedTrim || 0));
+        if (left > 0) this.renderShopFieldRemove(stock);
         else this.renderShop(stock);
       });
     });
@@ -3893,7 +3912,9 @@ class GameScene extends Phaser.Scene {
       // seeds spawn dead-still: any drift can bring equal dice into
       // contact, and touching equals merge — boards must not self-play
     };
-    for (let i = 0; i < TUNE.SEED_DICE; i++) {
+    // the shop can permanently thin the recurring seeds (seedTrim)
+    const seedN = Math.max(0, TUNE.SEED_DICE - (this.seedTrim || 0));
+    for (let i = 0; i < seedN; i++) {
       const spot = this.findSeedSpot(placed, minGap);
       if (!spot) break;
       rollIn(this.makeDie(spot.x, spot.y, this.weightedValue(), 'rest'), i);
@@ -3929,15 +3950,18 @@ class GameScene extends Phaser.Scene {
     this.spawnHazard('spike', count);
   }
 
-  // reward dice live here, not in the bag — every board reset brings the
-  // whole set back onto the field, even if they merged away last level
+  // reward dice live here, not in the bag — every board reset AND every
+  // mid-level field refresh brings back any that are missing (merged away
+  // or swept), without duplicating ones still standing
   spawnFieldDice() {
     if (!this.fieldDice || !this.fieldDice.length) return;
     const placed = [];
     for (const e of this.fieldDice) {
+      if (this.dice.some(d => !d.dead && d.fieldRef === e)) continue;
       const spot = this.findSeedSpot(placed, this.dieSize * 1.5);
       if (!spot) break;
       const d = this.makeDie(spot.x, spot.y, e.value, 'rest', e.kind);
+      d.fieldRef = e;
       d.restingSince = this.time.now;
       d.img.setScale(0);
       this.tweens.add({
