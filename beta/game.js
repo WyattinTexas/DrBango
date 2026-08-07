@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.17.0';
+const VERSION = 'v0.17.1';
 
 const TUNE = {
   MAX_RESTING_DICE: 28,
@@ -225,6 +225,10 @@ const PIP_LAYOUTS = {
 };
 const NUMBER_COLOR = '#443355';
 const GOLD = '#f2b23e';
+// display face for titles/banners — same Cinzel as the dice page;
+// falls back to a serif until the webfont arrives (menus re-render
+// on document.fonts.ready)
+const FONT_DISPLAY = '"Cinzel", Georgia, "Times New Roman", serif';
 
 const BOARD = {
   frame: 0x4a3226,
@@ -520,6 +524,14 @@ class GameScene extends Phaser.Scene {
     this.setReady(true);
     this.generateRunMap();
     // the test rigs jump straight into a run; players start at the home page
+    // Cinzel loads async — re-render whatever menu is open once it lands
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        try { if (this.modalOpen && this.modalRefresh) this.modalRefresh(); }
+        catch (e) { /* scene already gone */ }
+      });
+    }
+
     const auto = window.RUNEFALL_AUTOSTART;
     if (auto) this.startRun(typeof auto === 'string' ? auto : 'warrior');
     else this.showHome();
@@ -993,8 +1005,8 @@ class GameScene extends Phaser.Scene {
     this.previewImg.setVisible(false);
     this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.78).setDepth(50);
     this.add.text(this.W / 2, this.H * 0.36, 'DEFEATED', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '52px',
-      fontStyle: 'bold', color: '#ff8070', stroke: '#2a0f08', strokeThickness: 8,
+      fontFamily: FONT_DISPLAY, fontSize: '54px',
+      fontStyle: 'bold', color: '#ff8070', stroke: '#2a0f08', strokeThickness: 9,
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.52,
       'Reached level ' + this.level + '/' + FLOORS +
@@ -1022,8 +1034,8 @@ class GameScene extends Phaser.Scene {
     this.previewImg.setVisible(false);
     this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H, 0x120a06, 0.78).setDepth(50);
     this.add.text(this.W / 2, this.H * 0.36, 'VICTORY!', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '52px',
-      fontStyle: 'bold', color: GOLD, stroke: '#2a0f08', strokeThickness: 8,
+      fontFamily: FONT_DISPLAY, fontSize: '54px',
+      fontStyle: 'bold', color: GOLD, stroke: '#2a0f08', strokeThickness: 9,
     }).setOrigin(0.5).setDepth(51);
     this.add.text(this.W / 2, this.H * 0.52,
       'All ' + FLOORS + ' levels cleared  ·  Best chain ×' + this.bestChain +
@@ -1128,43 +1140,89 @@ class GameScene extends Phaser.Scene {
   }
 
   menuBackdrop() {
-    for (const o of this.modalObjects) o.destroy();
+    for (const o of this.modalObjects) {
+      this.tweens.killTweensOf(o);
+      o.destroy();
+    }
     this.modalObjects = [];
     this.modalOpen = 'menu';
     this.cancelAim();
     this.setPlayVisible(false);
     this.modalAdd(this.add.rectangle(this.W / 2, this.H / 2, this.W, this.H,
-      0x120a06, 0.92).setDepth(70).setInteractive());
+      0x120a06, 0.94).setDepth(70).setInteractive());
+    // a warm hearth glow behind the content
+    this.modalAdd(this.add.image(this.W / 2, this.H * 0.34, 'flash')
+      .setDepth(70).setBlendMode(Phaser.BlendModes.ADD)
+      .setDisplaySize(this.W * 0.95, this.H * 0.85).setAlpha(0.05).setTint(0xf2b23e));
+    // glass dice drifting in the dark
+    const decor = [[0.08, 0.2, 1], [0.92, 0.16, 2], [0.06, 0.82, 3],
+      [0.94, 0.78, 4], [0.16, 0.52, 5], [0.86, 0.5, 6]];
+    decor.forEach(([fx, fy, v], i) => {
+      const s = this.dieSize * (0.7 + (i % 3) * 0.18);
+      const img = this.modalAdd(this.add.image(this.W * fx, this.H * fy, 'die' + v)
+        .setDepth(70).setAlpha(0.22).setDisplaySize(s, s)
+        .setRotation(((i * 1.1) % 1) - 0.5));
+      this.tweens.add({
+        targets: img, y: img.y - 10 - (i % 3) * 6, rotation: img.rotation + 0.14,
+        duration: 2600 + i * 380, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      });
+    });
   }
 
   menuButton(y, label, color, onTap) {
-    const w = Math.min(this.W * 0.64, 300), h = 48;
+    const w = Math.min(this.W * 0.64, 300), h = 50;
     const x = this.W / 2 - w / 2;
     const g = this.modalAdd(this.add.graphics().setDepth(71));
-    g.fillStyle(0x2a1a10, 0.98);
-    g.fillRoundedRect(x, y - h / 2, w, h, 10);
-    g.lineStyle(2, color, 0.9);
-    g.strokeRoundedRect(x, y - h / 2, w, h, 10);
-    this.modalAdd(this.add.text(this.W / 2, y, label, {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '19px',
+    g.fillStyle(0x0e0703, 0.9);
+    g.fillRoundedRect(x, y - h / 2 + 3, w, h, 12);       // under-shadow
+    g.fillGradientStyle(0x3a2517, 0x3a2517, 0x1c1009, 0x1c1009, 1);
+    g.fillRoundedRect(x, y - h / 2, w, h, 12);
+    g.lineStyle(2, color, 0.95);
+    g.strokeRoundedRect(x, y - h / 2, w, h, 12);
+    g.lineStyle(1, 0xffffff, 0.08);                       // inner bevel
+    g.strokeRoundedRect(x + 2, y - h / 2 + 2, w - 4, h - 4, 10);
+    const t = this.modalAdd(this.add.text(this.W / 2, y, label, {
+      fontFamily: FONT_DISPLAY, fontSize: '19px',
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5).setDepth(72));
     const hit = this.modalAdd(this.add.rectangle(this.W / 2, y, w, h, 0xffffff, 0.001)
       .setDepth(73).setInteractive());
-    hit.on('pointerdown', onTap);
+    hit.on('pointerdown', () => {
+      // a tactile press before the action lands
+      this.tweens.add({
+        targets: t, scale: 0.92, duration: 55, yoyo: true, onComplete: onTap,
+      });
+    });
   }
 
   showHome() {
     this.menuBackdrop();
     this.modalRefresh = () => this.showHome();
-    this.modalAdd(this.add.text(this.W / 2, this.H * 0.2, 'RUNEFALL', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '56px',
-      fontStyle: 'bold', color: GOLD, stroke: '#2a0f08', strokeThickness: 9,
+    // layered title: deep shadow pass under a gold-gradient face
+    const ty = this.H * 0.2;
+    this.modalAdd(this.add.text(this.W / 2, ty + 5, 'RUNEFALL', {
+      fontFamily: FONT_DISPLAY, fontSize: '62px', fontStyle: '900',
+      color: '#160a04',
+    }).setOrigin(0.5).setDepth(71).setAlpha(0.9));
+    const title = this.modalAdd(this.add.text(this.W / 2, ty, 'RUNEFALL', {
+      fontFamily: FONT_DISPLAY, fontSize: '62px', fontStyle: '900',
+      color: '#e6c869', stroke: '#3a2208', strokeThickness: 8,
     }).setOrigin(0.5).setDepth(72));
-    this.modalAdd(this.add.text(this.W / 2, this.H * 0.2 + 46,
-      'flick the dice · merge the runes · clear the floor', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '13px',
-      color: BOARD.creamDim,
+    // the dice-page gold: bright crown fading to bronze
+    const grad = title.context.createLinearGradient(0, 0, 0, title.height);
+    grad.addColorStop(0, '#f7ecc0');
+    grad.addColorStop(0.45, '#e6c869');
+    grad.addColorStop(0.55, '#c9a84c');
+    grad.addColorStop(1, '#96702a');
+    title.setFill(grad);
+    this.tweens.add({
+      targets: title, scale: 1.02, duration: 2400,
+      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+    this.modalAdd(this.add.text(this.W / 2, ty + 48,
+      'FLICK THE DICE  ·  MERGE THE RUNES  ·  CLEAR THE FLOOR', {
+      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '12px',
+      fontStyle: 'bold', color: '#a8916e',
     }).setOrigin(0.5).setDepth(72));
     const y0 = this.H * 0.42, step = Math.min(62, this.H * 0.075);
     this.menuButton(y0, '▶ PLAY', 0xffd54a, () => this.showClassSelect());
@@ -1210,7 +1268,7 @@ class GameScene extends Phaser.Scene {
     this.menuBackdrop();
     this.modalRefresh = () => this.showClassSelect();
     this.modalAdd(this.add.text(this.W / 2, this.H * 0.1, 'CHOOSE YOUR CLASS', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '24px',
+      fontFamily: FONT_DISPLAY, fontSize: '25px',
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5).setDepth(72));
     const cardW = Math.min(this.W * 0.86, 420);
@@ -1221,15 +1279,24 @@ class GameScene extends Phaser.Scene {
     CLASSES.forEach((cls, i) => {
       const cy = top + gap * i + cardH / 2;
       const g = this.modalAdd(this.add.graphics().setDepth(71));
-      g.fillStyle(0x2a1a10, 0.98);
-      g.fillRoundedRect(x, cy - cardH / 2, cardW, cardH, 12);
+      g.fillStyle(0x0e0703, 0.9);
+      g.fillRoundedRect(x + 3, cy - cardH / 2 + 4, cardW, cardH, 14);  // drop shadow
+      g.fillGradientStyle(0x342013, 0x2a1a10, 0x180e08, 0x180e08, 1);
+      g.fillRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
+      g.lineStyle(5, cls.color, 0.14);                                  // soft glow edge
+      g.strokeRoundedRect(x - 2, cy - cardH / 2 - 2, cardW + 4, cardH + 4, 16);
       g.lineStyle(2, cls.color, 0.95);
-      g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 12);
-      this.modalAdd(this.add.text(x + 18, cy - cardH / 2 + 14, cls.icon, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '26px',
-      }).setDepth(72));
-      this.modalAdd(this.add.text(x + 58, cy - cardH / 2 + 16, cls.name, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '20px',
+      g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
+      // icon medallion
+      g.fillStyle(0x120a06, 0.85);
+      g.fillCircle(x + 34, cy - cardH / 2 + 30, 20);
+      g.lineStyle(1.5, cls.color, 0.7);
+      g.strokeCircle(x + 34, cy - cardH / 2 + 30, 20);
+      this.modalAdd(this.add.text(x + 34, cy - cardH / 2 + 30, cls.icon, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '23px',
+      }).setOrigin(0.5).setDepth(72));
+      this.modalAdd(this.add.text(x + 62, cy - cardH / 2 + 14, cls.name, {
+        fontFamily: FONT_DISPLAY, fontSize: '21px',
         fontStyle: 'bold', color: cls.hex,
       }).setDepth(72));
       this.modalAdd(this.add.text(x + 58, cy - cardH / 2 + 40, cls.tagline, {
@@ -1278,7 +1345,7 @@ class GameScene extends Phaser.Scene {
     const cls = CLASS_BY_ID[classId] || CLASSES[0];
     this.modalAdd(this.add.text(this.W / 2, this.H * 0.1,
       cls.icon + '  CHOOSE YOUR REALM', {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '24px',
+      fontFamily: FONT_DISPLAY, fontSize: '25px',
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5).setDepth(72));
     const cardW = Math.min(this.W * 0.86, 420);
@@ -1289,18 +1356,49 @@ class GameScene extends Phaser.Scene {
     REALMS.forEach((realm, i) => {
       const cy = top + gap * i + cardH / 2;
       const g = this.modalAdd(this.add.graphics().setDepth(71));
-      g.fillStyle(0x2a1a10, 0.98);
-      g.fillRoundedRect(x, cy - cardH / 2, cardW, cardH, 12);
+      g.fillStyle(0x0e0703, 0.9);
+      g.fillRoundedRect(x + 3, cy - cardH / 2 + 4, cardW, cardH, 14);
+      g.fillGradientStyle(0x342013, 0x2a1a10, 0x180e08, 0x180e08, 1);
+      g.fillRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
+      g.lineStyle(5, realm.color, 0.14);
+      g.strokeRoundedRect(x - 2, cy - cardH / 2 - 2, cardW + 4, cardH + 4, 16);
       g.lineStyle(2, realm.color, 0.95);
-      g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 12);
-      // a little biome swatch instead of an icon
+      g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
+      // a painted biome vignette in place of an icon
       const sw = this.modalAdd(this.add.graphics().setDepth(72));
-      sw.fillStyle(realm.palette.dirt, 1);
-      sw.fillRoundedRect(x + 14, cy - cardH / 2 + 14, 34, cardH - 28, 8);
-      sw.fillStyle(realm.palette.grassA, 1);
-      sw.fillRoundedRect(x + 14, cy - cardH / 2 + 14, 34, 8, 4);
-      this.modalAdd(this.add.text(x + 60, cy - cardH / 2 + 12, realm.name, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: '19px',
+      const sx = x + 12, sy = cy - cardH / 2 + 12, swd = 74, sh = cardH - 24;
+      const p = realm.palette;
+      sw.fillGradientStyle(p.skyB, p.skyB, p.bg, p.bg, 1);
+      sw.fillRoundedRect(sx, sy, swd, sh, 8);
+      sw.fillStyle(shadeHex(p.frame, -0.15), 1);
+      if (realm.id === 'glade') {
+        for (const [tx, th] of [[0.18, 0.5], [0.45, 0.72], [0.7, 0.46], [0.88, 0.6]]) {
+          const bx = sx + swd * tx, hh = sh * th * 0.62;
+          sw.fillTriangle(bx - 7, sy + sh * 0.76, bx, sy + sh * 0.76 - hh,
+            bx + 7, sy + sh * 0.76);
+        }
+      } else if (realm.id === 'tundra') {
+        sw.fillTriangle(sx + 4, sy + sh * 0.76, sx + swd * 0.32, sy + sh * 0.18,
+          sx + swd * 0.58, sy + sh * 0.76);
+        sw.fillTriangle(sx + swd * 0.42, sy + sh * 0.76, sx + swd * 0.7, sy + sh * 0.34,
+          sx + swd - 3, sy + sh * 0.76);
+        sw.fillStyle(0xeef4fa, 0.95);
+        sw.fillTriangle(sx + swd * 0.255, sy + sh * 0.33, sx + swd * 0.32, sy + sh * 0.18,
+          sx + swd * 0.385, sy + sh * 0.33);
+      } else {
+        sw.fillTriangle(sx + 6, sy + sh * 0.76, sx + swd * 0.5, sy + sh * 0.16,
+          sx + swd - 6, sy + sh * 0.76);
+        sw.fillStyle(0xff8c00, 0.95);
+        sw.fillCircle(sx + swd * 0.5, sy + sh * 0.19, 2.5);
+        sw.fillCircle(sx + swd * 0.43, sy + sh * 0.3, 1.5);
+        sw.fillCircle(sx + swd * 0.58, sy + sh * 0.34, 1.5);
+      }
+      sw.fillStyle(p.dirt, 1);
+      sw.fillRoundedRect(sx, sy + sh * 0.76, swd, sh * 0.24, { tl: 0, tr: 0, bl: 8, br: 8 });
+      sw.fillStyle(p.grassA, 1);
+      sw.fillRect(sx, sy + sh * 0.76, swd, 3);
+      this.modalAdd(this.add.text(x + 100, cy - cardH / 2 + 12, realm.name, {
+        fontFamily: FONT_DISPLAY, fontSize: '19px',
         fontStyle: 'bold', color: realm.hex,
       }).setDepth(72));
       this.modalAdd(this.add.text(x + cardW - 16, cy - cardH / 2 + 14, realm.diff, {
@@ -1310,12 +1408,12 @@ class GameScene extends Phaser.Scene {
       // short phone cards: skip the flavor line so it can't collide
       // with the multiplier row
       if (cardH >= 96) {
-        this.modalAdd(this.add.text(x + 60, cy - cardH / 2 + 36, realm.flavor, {
+        this.modalAdd(this.add.text(x + 100, cy - cardH / 2 + 38, realm.flavor, {
           fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
-          color: BOARD.creamDim, wordWrap: { width: cardW - 150 },
+          color: BOARD.creamDim, wordWrap: { width: cardW - 190 },
         }).setDepth(72));
       }
-      this.modalAdd(this.add.text(x + 60, cy + cardH / 2 - 24,
+      this.modalAdd(this.add.text(x + 100, cy + cardH / 2 - 24,
         '♥ enemies ×' + realm.hpMul + '   ⚔ ×' + realm.dmgMul +
         '   gold ×' + realm.goldMul + '   ' + realm.xp + ' xp/fight', {
         fontFamily: '-apple-system, Arial, sans-serif', fontSize: '11px',
@@ -1350,7 +1448,10 @@ class GameScene extends Phaser.Scene {
   }
 
   closeModal() {
-    for (const o of this.modalObjects) o.destroy();
+    for (const o of this.modalObjects) {
+      this.tweens.killTweensOf(o);
+      o.destroy();
+    }
     this.modalObjects = [];
     this.modalOpen = null;
     this.modalRefresh = null;
@@ -1371,7 +1472,7 @@ class GameScene extends Phaser.Scene {
     panel.lineStyle(2, 0x6b4a33, 1);
     panel.strokeRoundedRect(px, py, pw, ph, 12);
     this.modalAdd(this.add.text(this.W / 2, py + 20, title, {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '20px',
+      fontFamily: FONT_DISPLAY, fontSize: '20px',
       fontStyle: 'bold', color: BOARD.cream,
     }).setOrigin(0.5).setDepth(72));
     return { dim, px, py, pw, ph };
@@ -3629,8 +3730,8 @@ class GameScene extends Phaser.Scene {
 
   banner(msg, color) {
     const t = this.add.text(this.W / 2, this.H * 0.38, msg, {
-      fontFamily: '-apple-system, Arial, sans-serif', fontSize: '40px',
-      fontStyle: 'bold', color, stroke: '#2a1a0e', strokeThickness: 7,
+      fontFamily: FONT_DISPLAY, fontSize: '42px',
+      fontStyle: 'bold', color, stroke: '#2a1a0e', strokeThickness: 8,
     }).setOrigin(0.5).setDepth(45).setScale(0.6).setAlpha(0);
     this.tweens.add({ targets: t, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
     this.time.delayedCall(1100, () => {
