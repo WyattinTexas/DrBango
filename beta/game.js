@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.9';
+const VERSION = 'v0.18.10';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -2323,6 +2323,78 @@ class GameScene extends Phaser.Scene {
     tex.refresh();
   }
 
+  // a real mid-roll pose: the cube rotated theta about a horizontal axis,
+  // orthographically projected in the same 2:1 dimetric view as makeIsoDie.
+  // Faces are affine under parallel projection, so the numerals ride their
+  // faces exactly — the value visibly rolls over the edge instead of
+  // swapping. Cycling these frames by speed is the whole tumble illusion.
+  drawTumbleFrame(key, body, pip, v, theta) {
+    const px = Math.round(this.dieSize * 2);
+    if (this.textures.exists(key)) this.textures.remove(key);
+    const tex = this.textures.createCanvas(key, px, px);
+    const ctx = tex.getContext();
+    ctx.clearRect(0, 0, px, px);
+    // s matches makeIsoDie's footprint: rest half-width W=0.46px over the
+    // projected sqrt(2) horizontal extent
+    const cx = px / 2, cy = px / 2, s = px * 0.32;
+    const cr = Math.cos(theta), sr = Math.sin(theta);
+    const c45 = Math.SQRT1_2, c30 = Math.cos(Math.PI / 6), s30 = 0.5;
+    const rot = (p) => {
+      const y1 = p[1] * cr - p[2] * sr, z1 = p[1] * sr + p[2] * cr; // roll
+      const x2 = p[0] * c45 + z1 * c45, z2 = -p[0] * c45 + z1 * c45; // yaw 45
+      return [x2, y1 * c30 - z2 * s30, y1 * s30 + z2 * c30];         // pitch 30
+    };
+    const proj = (p) => [cx + p[0] * s, cy - p[1] * s];
+    const FACES = [
+      { n: [0, 1, 0], u: [1, 0, 0], w: [0, 0, -1] },
+      { n: [0, -1, 0], u: [1, 0, 0], w: [0, 0, 1] },
+      { n: [0, 0, 1], u: [1, 0, 0], w: [0, -1, 0] },
+      { n: [0, 0, -1], u: [-1, 0, 0], w: [0, -1, 0] },
+      { n: [1, 0, 0], u: [0, 0, -1], w: [0, -1, 0] },
+      { n: [-1, 0, 0], u: [0, 0, 1], w: [0, -1, 0] },
+    ];
+    for (const f of FACES) {
+      const n = rot(f.n);
+      if (n[2] <= 0.02) continue; // backface
+      const u = rot(f.u), w = rot(f.w);
+      const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) =>
+        proj([n[0] + a * u[0] + b * w[0], n[1] + a * u[1] + b * w[1], 0]));
+      const bright = Math.max(-0.4, Math.min(0.48,
+        0.058 + 0.418 * n[1] - 0.212 * n[0]));
+      ctx.beginPath();
+      ctx.moveTo(corners[0][0], corners[0][1]);
+      for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
+      ctx.closePath();
+      ctx.fillStyle = shade(body, bright);
+      ctx.fill();
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = px * 0.022;
+      ctx.strokeStyle = 'rgba(18,10,14,0.5)';
+      ctx.stroke();
+      // numeral mapped onto the face plane (parallel projection = affine)
+      const C = proj(n), U = [u[0] * s, -u[1] * s], W = [w[0] * s, -w[1] * s];
+      const m = s;
+      ctx.save();
+      ctx.transform(U[0] / m, U[1] / m, W[0] / m, W[1] / m, C[0], C[1]);
+      ctx.font = `900 ${Math.round(m * 1.15)}px "Arial Black", -apple-system, Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = m * 0.14;
+      ctx.strokeStyle = 'rgba(14,8,12,0.72)';
+      ctx.strokeText(String(v), 0, 0);
+      ctx.fillStyle = shade(pip, 0.25 + bright * 0.5);
+      ctx.fillText(String(v), 0, 0);
+      ctx.restore();
+    }
+    tex.refresh();
+  }
+
+  makeTumbleFrames(base, body, pip, v) {
+    for (let i = 1; i <= 3; i++) {
+      this.drawTumbleFrame(base + '_t' + i, body, pip, v, (Math.PI / 2) * (i / 4));
+    }
+  }
+
   realmDice() {
     return REALM_DICE[(this.realm || REALMS[0]).id] || REALM_DICE.glade;
   }
@@ -2376,6 +2448,7 @@ class GameScene extends Phaser.Scene {
       if (DICE_CUBE) {
         this.makeIsoDie('die' + v, st.body, st.pip, v,
           { sparkle: rd.sparkle, seed: v });
+        this.makeTumbleFrames('die' + v, st.body, st.pip, v);
         continue;
       }
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('die' + v, st.body,
@@ -2395,6 +2468,7 @@ class GameScene extends Phaser.Scene {
       if (DICE_CUBE) {
         this.makeIsoDie('gold' + v, 0xf2b23e, 0x54341a, v,
           { sparkle: true, seed: 100 + v, coin: true });
+        this.makeTumbleFrames('gold' + v, 0xf2b23e, 0x54341a, v);
         continue;
       }
       const { tex, ctx, px, pad, tw } = this.drawCubeBase('gold' + v, 0xf2b23e,
@@ -4415,19 +4489,21 @@ class GameScene extends Phaser.Scene {
 
       if (speed > 0.8 * DPR && !d.squashing) {
         if (DICE_CUBE && d.kind === 'num') {
-          // a drawn cube can't smooth-spin — it reads as sliding on ice.
-          // Real cubes tumble over their edges in discrete turns: flip the
-          // facing, wobble a few degrees, pop a tiny corner-hop. Step rate
-          // rides the speed so hard throws churn and slow rolls lumber.
-          d.tumbleMs = (d.tumbleMs || 0) + delta * (0.6 + speed / (5 * DPR));
-          if (d.tumbleMs >= 105) {
-            d.tumbleMs = 0;
-            d.img.setFlipX(!d.img.flipX);
-            d.img.rotation = (Math.random() - 0.5) * 0.26;
-            if (!d.hopTween || !d.hopTween.isPlaying()) {
+          // cycle real mid-roll poses (rest, 22.5°, 45°, 67.5°) at a
+          // speed-scaled rate — the numeral visibly rolls over the edge
+          // and the next face rolls in. 90° of roll loops seamlessly.
+          d.tumblePhase = (d.tumblePhase || 0) +
+            delta * (0.9 + speed / (3 * DPR)) / 420;
+          const idx = Math.floor((d.tumblePhase % 1) * 4);
+          const key = (d.gold ? 'gold' : 'die') + d.value +
+            (idx === 0 ? '' : '_t' + idx);
+          if (d.img.texture.key !== key && this.textures.exists(key)) {
+            d.img.setTexture(key);
+            // the face slaps down flat at the top of each cycle
+            if (idx === 0 && (!d.hopTween || !d.hopTween.isPlaying())) {
               d.hopTween = this.tweens.add({
-                targets: d.img, scale: d.baseScale * 1.08,
-                duration: 52, yoyo: true, ease: 'Sine.easeOut',
+                targets: d.img, scale: d.baseScale * 1.06,
+                duration: 55, yoyo: true, ease: 'Sine.easeOut',
                 onComplete: () => { if (!d.dead && !d.squashing) d.img.setScale(d.baseScale); },
               });
             }
@@ -4437,9 +4513,15 @@ class GameScene extends Phaser.Scene {
         }
         d.uprighting = false;
       } else if (!d.uprighting &&
-        (Math.abs(d.img.rotation % (Math.PI * 2)) > 0.02 || d.img.flipX)) {
+        (Math.abs(d.img.rotation % (Math.PI * 2)) > 0.02 || d.tumblePhase)) {
         d.uprighting = true;
-        if (DICE_CUBE) d.img.setFlipX(false);
+        if (DICE_CUBE && d.kind === 'num') {
+          d.tumblePhase = 0;
+          const base = (d.gold ? 'gold' : 'die') + d.value;
+          if (d.img.texture.key !== base && this.textures.exists(base)) {
+            d.img.setTexture(base);
+          }
+        }
         const snapped = Math.round(d.img.rotation / (Math.PI * 2)) * (Math.PI * 2);
         this.tweens.add({
           targets: d.img, rotation: snapped, duration: 220, ease: 'Sine.easeOut',
