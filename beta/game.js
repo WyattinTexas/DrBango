@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.4';
+const VERSION = 'v0.18.5';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -500,6 +500,9 @@ class GameScene extends Phaser.Scene {
       for (const pair of event.pairs) {
         const a = pair.bodyA.dieRef, b = pair.bodyB.dieRef;
         if (a && b) {
+          // right after a resize the dice may sit overlapped while Matter
+          // separates them — contact then must not count as a merge
+          if (this.time.now < (this.mergeGraceUntil || 0)) continue;
           const va = a.body ? a.body.speed : 0, vb = b.body ? b.body.speed : 0;
           const impact = Math.max(va, vb);
           if (this.handleSpecialContact(a, b, impact)) continue;
@@ -1343,6 +1346,11 @@ class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(72));
     const cardW = Math.min(this.W * 0.86, upx(420));
     const cardH = Math.min(upx(128), this.H * 0.18);
+    // short phone cards: every inside offset rides the squeeze factor so
+    // the name, badges, and dice row never stack on each other
+    const u = cardH / upx(128);
+    const cu = (n) => Math.round(upx(n) * u);
+    const fu = (n) => fpx(Math.max(8, Math.round(n * Math.max(u, 0.7))));
     const x = this.W / 2 - cardW / 2;
     const top = this.H * 0.17;
     const gap = Math.min(cardH + upx(16), this.H * 0.24);
@@ -1359,43 +1367,47 @@ class GameScene extends Phaser.Scene {
       g.strokeRoundedRect(x, cy - cardH / 2, cardW, cardH, 14);
       // icon medallion
       g.fillStyle(0x120a06, 0.85);
-      g.fillCircle(x + upx(34), cy - cardH / 2 + upx(30), upx(20));
+      g.fillCircle(x + cu(34), cy - cardH / 2 + cu(30), cu(20));
       g.lineStyle(1.5, cls.color, 0.7);
-      g.strokeCircle(x + upx(34), cy - cardH / 2 + upx(30), upx(20));
-      this.modalAdd(this.add.text(x + upx(34), cy - cardH / 2 + upx(30), cls.icon, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(23),
+      g.strokeCircle(x + cu(34), cy - cardH / 2 + cu(30), cu(20));
+      this.modalAdd(this.add.text(x + cu(34), cy - cardH / 2 + cu(30), cls.icon, {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(23),
       }).setOrigin(0.5).setDepth(72));
-      this.modalAdd(this.add.text(x + upx(62), cy - cardH / 2 + upx(14), cls.name, {
-        fontFamily: FONT_DISPLAY, fontSize: fpx(21),
+      this.modalAdd(this.add.text(x + cu(62), cy - cardH / 2 + cu(14), cls.name, {
+        fontFamily: FONT_DISPLAY, fontSize: fu(21),
         fontStyle: 'bold', color: cls.hex,
       }).setDepth(72));
-      this.modalAdd(this.add.text(x + upx(58), cy - cardH / 2 + upx(40), cls.tagline, {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(11),
-        color: BOARD.creamDim, wordWrap: { width: cardW - upx(150) },
-      }).setDepth(72));
+      // short phone cards: skip the tagline so it can't collide with the
+      // dice row (same rule the realm cards use)
+      if (cardH >= upx(96)) {
+        this.modalAdd(this.add.text(x + cu(58), cy - cardH / 2 + cu(40), cls.tagline, {
+          fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(11),
+          color: BOARD.creamDim, wordWrap: { width: cardW - upx(150) },
+        }).setDepth(72));
+      }
       // level badge + progress toward the next one
       const lvl = classLevelOf(cls.id);
       const xpNow = classXpOf(cls.id);
       const next = lvl < CLASS_MAX_LEVEL ? CLASS_XP_LEVELS[lvl] : null;
-      this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + upx(12),
+      this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + cu(12),
         'LV ' + lvl + (lvl >= CLASS_MAX_LEVEL ? ' ★' : ''), {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(16),
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(16),
         fontStyle: 'bold', color: GOLD,
       }).setOrigin(1, 0).setDepth(72));
-      this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + upx(32),
+      this.modalAdd(this.add.text(x + cardW - upx(16), cy - cardH / 2 + cu(34),
         next ? xpNow + '/' + next + ' xp' : 'MAX LEVEL', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(10),
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(10),
         color: '#8a7960',
       }).setOrigin(1, 0).setDepth(72));
       // the bag it opens with, drawn as the real dice
-      const s = Math.min(upx(26), cardW / 13);
-      this.modalAdd(this.add.text(x + upx(18), cy + cardH / 2 - upx(48), 'STARTS WITH', {
-        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fpx(9),
+      const s = Math.min(cu(26), cardW / 13);
+      this.modalAdd(this.add.text(x + upx(18), cy + cardH / 2 - cu(48), 'STARTS WITH', {
+        fontFamily: '-apple-system, Arial, sans-serif', fontSize: fu(9),
         fontStyle: 'bold', color: '#8a7960',
       }).setDepth(72));
       startingBagFor(cls).forEach((e, j) => {
-        this.modalAdd(this.add.image(x + upx(22) + s / 2 + j * (s + upx(6)),
-          cy + cardH / 2 - upx(22),
+        this.modalAdd(this.add.image(x + upx(22) + s / 2 + j * (s + cu(6)),
+          cy + cardH / 2 - cu(22),
           this.textureFor(e.kind, e.value)).setDisplaySize(s, s).setDepth(72));
       });
       const hit = this.modalAdd(this.add.rectangle(this.W / 2, cy, cardW, cardH,
@@ -2827,6 +2839,10 @@ class GameScene extends Phaser.Scene {
         this.renderAir(d);
       }
     }
+    // remapped dice can land touching until physics spreads them back out;
+    // pending fuses from the old geometry are stale either way
+    this.fuseQueue.length = 0;
+    this.mergeGraceUntil = this.time.now + 900;
     // an open page re-lays itself out for the new size
     if (this.modalOpen && this.modalRefresh) this.modalRefresh();
   }
@@ -2919,6 +2935,14 @@ class GameScene extends Phaser.Scene {
     g.strokeCircle(W / 2, ringY, this.dieSize * 2.6);
     g.lineStyle(1.5, 0xf5e6c8, 0.04);
     g.strokeCircle(W / 2, ringY, this.dieSize * 3.1);
+    // Graphics replays its ~500 commands every frame — brutal at DPR2 on
+    // phones. Baking the board into one texture makes it a single quad.
+    if (W <= 4096 && H <= 4096) {
+      if (this.textures.exists('boardTex')) this.textures.remove('boardTex');
+      g.generateTexture('boardTex', Math.round(W), Math.round(H));
+      g.destroy();
+      this.boardGfx = this.add.image(W / 2, H / 2, 'boardTex').setDepth(0);
+    }
   }
 
   // magical table light: a warm pool over the field, dark corners.
@@ -3582,6 +3606,7 @@ class GameScene extends Phaser.Scene {
   }
 
   touchSweep() {
+    if (this.time.now < (this.mergeGraceUntil || 0)) return;
     const touchDist = this.dieRadius * 0.96 * 2 + 3;
     const sweepKind = (k) => this.mergeableKind(k) || k === 'wild';
     for (let i = 0; i < this.dice.length; i++) {
@@ -4334,7 +4359,11 @@ class GameScene extends Phaser.Scene {
       this._fpsAccum = 0;
       const fps = Math.round(this.game.loop.actualFps);
       const color = fps >= 55 ? '#7ec96f' : fps >= 45 ? '#e6c229' : '#e74c3c';
-      this.fpsText.setColor(color).setText(fps + ' FPS · ' + this.dice.length + ' dice');
+      // renderer + buffer size ride along so a phone screenshot tells us
+      // whether WebGL failed over to Canvas and what we're really pushing
+      const rdr = this.game.renderer.type === Phaser.WEBGL ? 'GL' : 'CV';
+      this.fpsText.setColor(color).setText(fps + ' FPS · ' + this.dice.length +
+        ' dice · ' + rdr + ' ' + this.scale.gameSize.width + '×' + this.scale.gameSize.height);
     }
   }
 }
@@ -4393,10 +4422,21 @@ window.addEventListener('DOMContentLoaded', () => {
     },
     scene: [GameScene],
   });
-  // Scale.NONE + zoom drives the back-buffer; we own the resizes
-  window.addEventListener('resize', () => {
-    game.scale.resize(Math.round(window.innerWidth * DPR),
-      Math.round(window.innerHeight * DPR));
+  // Scale.NONE + zoom drives the back-buffer; we own the resizes.
+  // iOS fires 'resize' BEFORE innerWidth/innerHeight update on rotation,
+  // so a single listener freezes the canvas at the stale size — sync
+  // re-checks until the DOM and the back-buffer agree.
+  const syncSize = () => {
+    const w = Math.round(window.innerWidth * DPR);
+    const h = Math.round(window.innerHeight * DPR);
+    const s = game.scale.gameSize;
+    if (w > 0 && h > 0 && (s.width !== w || s.height !== h)) game.scale.resize(w, h);
+  };
+  window.addEventListener('resize', syncSize);
+  window.addEventListener('orientationchange', () => {
+    for (const ms of [60, 180, 360, 700, 1200]) setTimeout(syncSize, ms);
   });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', syncSize);
+  setInterval(syncSize, 500);
   window.__runefall = game; // debugging handle
 });
