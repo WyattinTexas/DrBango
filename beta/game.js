@@ -18,7 +18,7 @@ window.addEventListener('error', (e) => {
 // sell dice for your bag, minibosses guard the deep levels.
 // ============================================================
 
-const VERSION = 'v0.18.12';
+const VERSION = 'v0.18.13';
 
 // ---- crisp rendering: render at device resolution ----
 // The canvas back-buffer runs at min(devicePixelRatio, 2)x and is
@@ -36,6 +36,20 @@ const QP = new URLSearchParams(location.search);
 const TOUCH_DEVICE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const DPR_CAP = (() => {
   if (!TOUCH_DEVICE) return 2;
+  // an explicit ?dpr= visit resets the ladder, and a stored cap expires
+  // after a day — a one-off bad session (Low Power Mode, thermal) must not
+  // blur the game forever
+  if (QP.has('dpr')) {
+    localStorage.removeItem('runefall.dprCap');
+    localStorage.removeItem('runefall.dprCapTs');
+    return 2;
+  }
+  const ts = parseFloat(localStorage.getItem('runefall.dprCapTs'));
+  if (!(ts > 0) || Date.now() - ts > 24 * 3600 * 1000) {
+    localStorage.removeItem('runefall.dprCap');
+    localStorage.removeItem('runefall.dprCapTs');
+    return 2;
+  }
   const v = parseFloat(localStorage.getItem('runefall.dprCap'));
   return (v >= 1 && v < 2) ? v : 2;
 })();
@@ -4625,6 +4639,7 @@ class GameScene extends Phaser.Scene {
         if (this._lowMs >= 5000 && DPR > 1) {
           this._dprStepped = true;
           localStorage.setItem('runefall.dprCap', DPR > 1.5 ? '1.5' : '1');
+          localStorage.setItem('runefall.dprCapTs', String(Date.now()));
           if (!(this.playerClass && !this.gameOver)) location.reload();
         }
       } else if (fps >= 45) {
