@@ -2320,7 +2320,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.68</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.69</div>
   <div class="scanlines"></div>
 </div>
 
@@ -18399,7 +18399,8 @@ function duelChipHTML(){
 // /gvt/crew traffic (invites ride the duel/list poll the menu already makes);
 // and the public queue's theater stays THEATER — the only real thing that can
 // ever happen inside it is a real squadmate taking a real chair.
-let CREW={ crew:null, members:[], invites:[], me:null, busy:false, pollT:0, sig:'' };
+let CREW={ crew:null, members:[], invites:[], me:null, busy:false, pollT:0, sig:'',
+  campGo:null, leadFired:null, autoBf:null };   // v2.69 one-click guards: the go-wish lobby, the lobby already ordered, the room already auto-joined
 const CREW_BF_MIN=2;          // a 1v1 has no second chair on your side
 // ===== v2.66 WEB GOOGLE SIGN-IN (Wyatt 8/7: "on a browser… just do it
 // through Google — that's more natural"). The whole flow is wired and waits
@@ -18461,7 +18462,8 @@ function crewCoopLive(){ return !!(COOP && (COOP.code || (COOP.ui && COOP.ui!=='
 // CREW_TTL ages out on its own
 function crewSt(){
   if(BFQ && BFQ.crewRoom) return { st:'bfFill', info:{ room:BFQ.crewRoom, map:String(BFQ.mapId||''), size:BFQ.size|0 } };
-  if(COOP && coopSquad() && COOP.code) return { st:'campQ', info:{ lobby:COOP.code } };
+  if(COOP && coopSquad() && COOP.code) return { st:'campQ', info:Object.assign({ lobby:COOP.code },
+    CREW.campGo===COOP.code? {go:1} : {}) };   // v2.69: my deploy wish rides my presence
   if(campSceneOpen()) return { st:'campQ', info:{} };
   return { st:'', info:{} };
 }
@@ -18471,7 +18473,10 @@ function crewTick(){
   const fast=(BFQ&&BFQ.crewRoom)||campSceneOpen();
   CREW.pollT=setTimeout(crewTick, fast?2500:5000);
   if(CREW.busy) return;
-  if(S.mode!=='menu') return;                      // never poll from inside a battle
+  if(S.mode!=='menu'){ CREW.campGo=null; CREW.leadFired=null; return; }   // battle entry retires the one-click guards; never poll from inside a battle
+  // a wish or an order outliving its lobby is litter
+  if(CREW.campGo && !(COOP&&coopSquad()&&COOP.code===CREW.campGo)) CREW.campGo=null;
+  if(CREW.leadFired && !(COOP&&coopSquad()&&COOP.code===CREW.leadFired)) CREW.leadFired=null;
   const st=crewSt();
   CREW.busy=true;
   crewPost('poll',{st:st.st, info:st.info}).then(r=>{
@@ -18488,7 +18493,7 @@ function crewTick(){
       if(META.crew){ META.crew=null; saveMeta(); }
     }
     CREW.invites=r.invites||[];
-    crewAutoCamp(); crewBfSwap();
+    crewAutoCamp(); crewBfSwap(); crewAutoBf(); crewLeadGo();
     const sig=JSON.stringify([CREW.crew&&CREW.crew.code, CREW.crew&&CREW.crew.n, CREW.invites.length,
       CREW.members.map(m=>[m.name,m.st,(m.info||{}).room||'',(m.info||{}).lobby||'',m.on?1:0])]);
     if(sig!==CREW.sig){
@@ -18634,13 +18639,14 @@ function crewAutoCamp(){
   if(doors.length){
     doors.sort((a,b)=> a.uid<b.uid? -1:1);
     COOP=coopFresh('enter','squad');
+    COOP.crewCamp=true;   // v2.69: a crew muster — every member gets DEPLOY
     UI.coopJoin(doors[0].info.lobby);
     return;
   }
   // nobody holds a door yet — the smallest uid opens one, everyone else waits
   // for the code to show up on the next poll
   const mine=String(CREW.me||'');
-  if(q.every(m=>String(m.uid)>mine)) UI.coopHost();
+  if(q.every(m=>String(m.uid)>mine)){ UI.coopHost(); if(COOP) COOP.crewCamp=true; }
 }
 // ---- BATTLEGROUND: a real squadmate takes a real chair in the fill window ----
 function crewBfArm(){
@@ -18661,6 +18667,10 @@ function crewBfArm(){
 }
 function crewRoomDrop(){
   if(COOP && coopRoom() && COOP.ui==='idle'){ try{ coopLeave(); }catch(e){} }
+  // v2.69: the fill vanishes from my presence NOW — a squadmate's auto-join
+  // must never chase a window I just canceled (the stale-stamp race lets a
+  // 1v1 queued right after a canceled 2v2 inherit the dead room otherwise)
+  if(CREW.crew){ clearTimeout(CREW.pollT); crewTick(); }
 }
 // the theater absorbs the real joiner: the next open your-side row (or the
 // most recent scripted one) starts wearing their REAL name and colour
@@ -18687,6 +18697,43 @@ function crewJoinBf(code){
   COOP=coopFresh('enter','room');
   COOP.wantSide='y';
   UI.coopJoin(code);
+}
+// ===== v2.69 ONE CLICK FOR THE WHOLE SQUAD (Wyatt 8/7: "if we're both in
+// the battlefield screen and one of us clicks to queue up, that's a click
+// for both of us... we are both watching that ad if it's an ad. Otherwise,
+// both in. That's also how it needs to work for campaign.") The precondition
+// is PRESENCE ON THE SCREEN — the squad only ever acts for a member already
+// standing at that door; everyone else keeps the v2.63 chip. Each entering
+// player runs their OWN ad gate on their OWN screen (Wyatt's amendment to
+// the tap-only law — an auto-entry gates, a relayed mid-battle command still
+// never does). One auto-join per room, one auto-order per muster.
+function wartableOpen(){ const wt=document.getElementById('wartable'); return !!(wt && !wt.classList.contains('hidden')); }
+function crewAutoBf(){
+  if(!CREW.crew || crewCoopLive() || BFQ || S.mode!=='menu' || !wartableOpen()) return;
+  const f=(CREW.members||[]).find(m=>m.uid!==CREW.me && m.st==='bfFill' && m.info
+    && m.info.room && (m.info.size|0)>=CREW_BF_MIN);
+  if(!f) return;
+  if(CREW.autoBf===f.info.room) return;
+  CREW.autoBf=f.info.room;
+  adGate('bf', ()=>crewJoinBf(f.info.room));
+}
+// the non-leader's DEPLOY in a crew-mustered lobby: their own gate, then the
+// wish rides their presence — the leader's client gives the real order
+function crewCampGo(){
+  if(!COOP || !coopSquad() || !COOP.code || COOP.host || CREW.campGo===COOP.code) return;
+  audio(); SFX.horn();
+  const code=COOP.code;
+  adGate('camp', ()=>{ if(COOP && COOP.code===code){ CREW.campGo=code;
+    clearTimeout(CREW.pollT); crewTick(); roomModal(coopPanelHTML()); } });
+}
+function crewLeadGo(){
+  if(!COOP || !coopSquad() || !COOP.code || !COOP.host || !COOP.crewCamp || COOP.wantBattle) return;
+  if(CREW.leadFired===COOP.code) return;
+  const wish=(CREW.members||[]).some(m=>m.uid!==CREW.me && m.st==='campQ' && m.info
+    && m.info.lobby===COOP.code && m.info.go);
+  if(!wish) return;
+  CREW.leadFired=COOP.code;
+  adGate('camp', ()=>UI.coopDeploy());
 }
 // ============ THE PRIVATE BATTLEFIELD ROOM (v1.24) ============
 // Wyatt 7/25: friends should be able to play the battleground TOGETHER, up to
@@ -18990,9 +19037,14 @@ function coopPanelHTML(){
       // door) — the DEPLOY button already names the level, and the level is
       // the LOWEST commander's next one now (the box rules; see the server's
       // lobby_level)
-      +(c.wantBattle? '<div class="coopwait" style="font-size:1.2rem">⚔ DEPLOYING…</div>'
+      +((c.wantBattle || CREW.campGo===c.code)? '<div class="coopwait" style="font-size:1.2rem">⚔ DEPLOYING…</div>'
         : amHost
           ? '<button class="mbtn alt" style="width:100%;font-size:1.3rem" onclick="UI.coopDeploy()">DEPLOY — LEVEL '+c.level+'</button>'
+          // v2.69: in a CREW muster every member holds the trigger — a
+          // non-leader's tap gates them, then wishes the leader's order in.
+          // Stranger lobbies keep the leader-only line untouched.
+          : c.crewCamp
+          ? '<button class="mbtn alt" style="width:100%;font-size:1.3rem" onclick="crewCampGo()">DEPLOY — LEVEL '+c.level+'</button>'
           : '<div class="coopwait">WAITING FOR THE LEADER TO GIVE THE ORDER…</div>')
       +'<p style="text-align:center;margin:10px 0 0"><a href="#" style="color:#8b8f7a" onclick="UI.coopCancel();return false">leave the squad</a></p>';
   } else if(c.ui==='enter'){
