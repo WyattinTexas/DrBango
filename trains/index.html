@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v9.4 -->
+<!-- TRAINSET v9.5 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -172,9 +172,14 @@
      (the panel is 3 cards wide); the ⬇ OUT plank closes it and the E25
      dismiss laws hold (map tap folds it AND still acts, a drag-out folds it
      as the toy leaves, any overlay shuts it). ---- */
+  /* E75 (Wyatt 8/8: "We don't run a toy box, right? We just want the list of
+     all the different things I can drag onto this map"): THE CHEST RETIRES —
+     its whole plank shelf (#tbshelves) moves home into the rail below. The
+     overlay + tile + rig stay parked, the mute precedent. */
   #toybox{ position:absolute; left:calc(var(--ui)*5px); top:60px;
     bottom:calc(var(--ui)*10px + env(safe-area-inset-bottom));
-    z-index:8; display:none; }
+    z-index:8; display:none !important; }
+  #tbox{ display:none !important; }
   #tbpanel{ background:linear-gradient(rgba(58,42,24,0.96),rgba(36,26,14,0.96));
     border:calc(var(--ui)*2px) solid #6e5130; border-radius:calc(var(--ui)*14px);
     padding:calc(var(--ui)*5px) calc(var(--ui)*5px) calc(var(--ui)*3px);
@@ -187,11 +192,19 @@
     border:2px solid #513a24; border-radius:10px; padding:calc(var(--ui)*2px) calc(var(--ui)*5px); }
   /* the one flat shelf: a 3-column grid the planks span — the moved .rgrp
      groups flatten into it (display:contents), so the cards ARE the palette */
-  #tbshelves{ flex:1; min-height:0; display:grid; grid-template-columns:repeat(3,max-content);
+  /* E75: the shelf lives IN THE RAIL now — two columns fit its shoulders,
+     and the fade masks + the ▼ below say "there is more" without a word. */
+  #tbshelves{ flex:1; min-height:0; display:grid; grid-template-columns:repeat(2,max-content);
     gap:calc(var(--ui)*3px); justify-content:center; align-content:start;
     padding:calc(var(--ui)*3px); overflow-y:auto; overflow-x:hidden;
-    touch-action:pan-y; cursor:grab; scrollbar-width:none; }
+    touch-action:pan-y; cursor:grab; scrollbar-width:none;
+    -webkit-mask-image:linear-gradient(transparent 0,#000 calc(var(--ui)*8px),#000 calc(100% - var(--ui)*10px),transparent 100%);
+    mask-image:linear-gradient(transparent 0,#000 calc(var(--ui)*8px),#000 calc(100% - var(--ui)*10px),transparent 100%); }
   #tbshelves::-webkit-scrollbar{ display:none; }
+  #tbshelves .drg{ touch-action:none; }   /* E75: the hand owns a toy's gesture — the intent split decides scroll vs lift */
+  #railMore{ flex:0 0 auto; text-align:center; color:#F2C531; pointer-events:none;
+    font-size:calc(var(--ui)*8px); line-height:1; padding:calc(var(--ui)*1px) 0 calc(var(--ui)*2px);
+    text-shadow:0 1px 2px rgba(0,0,0,0.6); visibility:hidden; }
   #tbshelves .rgrp,#tbshelves #shelf,#tbshelves #shelfCars,#tbshelves #shelfEng{ display:contents; }
   #tbshelves #shelfTrain{ display:none; }   /* E27: the eager train answered this ritual */
   #tbshelves .pbtn{ width:calc(var(--ui)*var(--bc,35)*1px); }
@@ -480,12 +493,11 @@
   body.shygame #magic{ opacity:0; }
   body.shygame #magic *{ pointer-events:none; }
   body.conductor #magic{ opacity:0; }
-  /* THE CRATE — six tiles, two by three; no scroll (a face that scrolls is a
-     folder again). The chest tile sits bottom-right, nearest its old corner. */
-  #railBody{ flex:1; min-height:0; display:grid;
-    grid-template-columns:repeat(2,max-content); gap:calc(var(--ui)*3px);
-    justify-content:center; align-content:start;
-    padding:calc(var(--ui)*4px); overflow:hidden; }
+  /* E75: THE CRATE FACE RETIRED — the railBody is a plain column that hosts
+     the moved #tbshelves (the whole palette, planks and all). Wyatt: "we just
+     want the list… I should be able to just easily scroll my way down." */
+  #railBody{ flex:1; min-height:0; display:flex; flex-direction:column;
+    padding:calc(var(--ui)*2px) 0 0; overflow:hidden; }
   #rail .pbtn{ width:calc(var(--ui)*var(--bc,35)*1px); }
   /* face tiles: icon-only (the E27 slim law — the chest teaches the words) */
   .ftile{ width:calc(var(--ui)*var(--fc,38)*1px) !important; }
@@ -785,6 +797,7 @@
   <div id="railBody">
     <button id="tbox" type="button"><canvas id="tboxCv" width="144" height="144"></canvas></button>
   </div>
+  <div id="railMore">▼</div><!-- E75: the wordless "there is more below" -->
   <div id="railFoot"></div>
 </div>
 <div id="magic"></div>
@@ -8808,7 +8821,7 @@ const ROOM_OBJS=[
     // E55: the box IS the BUILD door, chest open on arrival — one tap where
     // three lived (box → lid → card). MY TOYS died as a destination; the
     // chest it opens is all owned toys, every one draggable.
-    tap(){ SND.tok(); showScreen('game'); boxShow(true); } },
+    tap(){ SND.tok(); showScreen('game'); } },   // E75: the chest retired — the room's box opens plain BUILD (the rail IS the list)
   // E53 THE STOREFRONT IS THE SHOP — the tap lands in the aisle, one transition
   // (E13's bank-before-shop repealed; the piggy holds the ledger now)
   { id:'store',   hit:{x:718,y:698,w:264,h:214}, px:850, py:892, label:()=>SHOP_LABEL,
@@ -11657,7 +11670,11 @@ function flyTarget(id){
   // home corner (the shelf the kid will find it on next visit).
   if(SCREEN==='game'){
     const pal=layerOf(id)&&coll.has(id);
-    const tile=(pal&&FACE_TILES.length&&FACE_TILES[0].el.style.display!=='none')? FACE_TILES[0].el : $('tbox');
+    // E75: the chest corner died — a toy flies to ITS OWN shelf tile when one
+    // shows, else the first visible tile, else the rail itself.
+    const pb=(pal&&(PAL_BTNS.find(p2=>p2.t===id&&p2.el.style.display!=='none')
+                    ||PAL_BTNS.find(p2=>p2.el.style.display!=='none')))||null;
+    const tile=pb? pb.el : $('rail');
     const r=tile.getBoundingClientRect();
     if(r.width) return {x:r.left+r.width/2,y:r.top+r.height/2};
   }
@@ -13182,6 +13199,8 @@ const MAGIC_TILES=[];   // E35: the four SKY PILLS (never gated — the sky is e
 const FACE_FLOOR=['s','c','st','tree','bush','flw','rock','ppl','x'];   // the starter floor beneath the MRU bubbles (E67: the four decorations walked out of the box)
 const FACE_N=9;                               // nine pictures and a chest (E67: was five)
 let HANDY=[];                                 // MRU kinds, newest first — session-only
+const RAIL_FACE=false;                        // E75: the crate face RETIRED — the rail hosts the whole
+                                              // shelf now ("we don't run a toy box"); true revives E55.
 const FACE_TILES=[];                          // the five crate slots {el,cv,t}
 function layerOf(t){
   return PIECES.some(p=>p[0]===t)?'track': SCEN_TAB.includes(t)?'scen':
@@ -13268,6 +13287,7 @@ function pickDraw(five,not){
   return cand[cand.length-1];
 }
 function pickRoll(){                // every BUILD entry — the peddler restocks the whole column
+  if(!RAIL_FACE) return;            // E75: the peddler parked with the face (the shelf shows everything)
   const five=faceList(), out=[];
   for(let i=0;i<PICKS_N;i++){ const t=pickDraw(five,out); if(!t) break; out.push(t); }
   PICKS.list=out;
@@ -13576,7 +13596,11 @@ function buildPalette(){
     g.setTransform(s,0,0,s,8*s,8*s);
     paint(g);
     b.addEventListener('pointerdown',e=>{ ac(); e.preventDefault();
-      down={x:e.clientX,y:e.clientY,what:'pal',t,el:b,layer,
+      // E75 (Wyatt: "if you try to scroll your way down, you just grab
+      // different pieces… not intended"): a touched toy hasn't chosen yet.
+      // The first slop-crossing axis decides — vertical scrolls the rail,
+      // horizontal lifts the toy through the untouched one pipeline.
+      railPend={id:e.pointerId,x:e.clientX,y:e.clientY,t,el:b,layer,
             v:SCENDEF[t]&&SCENDEF[t].react?(pplSeq++%3):0}; });
     PAL_BTNS.push({t,layer,el:b});
   };
@@ -13649,6 +13673,7 @@ function buildPalette(){
   // the SAME down={what:'pal'} descriptor, so the one pipeline (E19 lift,
   // ghost, rotate, gate) is inherited by construction. hf:1 keeps the E27
   // tap voice: wiggle + chirp, never the coach toast.
+  if(!RAIL_FACE){ faceSync(); return; }   // E75: no face, no picks — the shelf itself moved in (buildTbox seats it)
   const rb=$('railBody');
   for(let i=0;i<FACE_N;i++){
     const b=document.createElement('button'); b.className='pbtn drg ftile'; b.type='button';
@@ -13727,6 +13752,52 @@ function buildBarScroll(){          // E27→E33→E55: the E13 recipe re-aimed 
   el.addEventListener('pointerup',barUp);
   el.addEventListener('pointercancel',barUp);
 }
+/* E75 THE INTENT SPLIT (amends E20's "the shelf never grab-scrolls from a
+   toy" — Wyatt: "if you try to scroll your way down, you just grab different
+   pieces… not intended"): a toy touch stakes railPend and WAITS. The first
+   slop-crossing axis decides — vertical = the rail scrolls under the hand
+   (1:1, barFling roll on release), horizontal = the exact old
+   down={what:'pal'} payload and the one pipeline takes over mid-gesture,
+   release inside the slop = wiggle + click, nothing spawns (E16's tray
+   voice). Window-capture so the choice lands before anything else reads
+   the move; one pointerId owns the whole gesture. */
+let railPend=null, railScr=null;
+const RAIL_SLOP=8;
+function railMoreSync(){
+  const el=$('tbshelves'), m=$('railMore'); if(!el||!m) return;
+  m.style.visibility=(el.scrollHeight-el.clientHeight-el.scrollTop>18)?'visible':'hidden';
+}
+window.addEventListener('pointermove',e=>{
+  if(railScr){
+    if(e.pointerId!==railScr.id) return;
+    const el=$('tbshelves');
+    el.scrollTop=railScr.s0-(e.clientY-railScr.y0);
+    const now=performance.now(), dt2=(now-railScr.lt)/1000;
+    if(dt2>0.001) railScr.vy=0.7*railScr.vy+0.3*((railScr.ly-e.clientY)/dt2);
+    railScr.ly=e.clientY; railScr.lt=now;
+    return;
+  }
+  if(!railPend||e.pointerId!==railPend.id) return;
+  const dx=Math.abs(e.clientX-railPend.x), dy=Math.abs(e.clientY-railPend.y);
+  if(dy>=RAIL_SLOP&&dy>dx){
+    railScr={id:railPend.id, y0:e.clientY, s0:$('tbshelves').scrollTop, vy:0, ly:e.clientY, lt:performance.now()};
+    BARSC.moved=9;   // the travelled-tap guard reads true — this gesture is a scroll, never a pick
+    railPend=null;
+  } else if(dx>=RAIL_SLOP){
+    const p=railPend; railPend=null;
+    down={x:p.x,y:p.y,what:'pal',t:p.t,el:p.el,layer:p.layer,v:p.v};   // the hand lifts the toy out
+  }
+},{capture:true});
+window.addEventListener('pointerup',e=>{
+  if(railScr&&e.pointerId===railScr.id){
+    if(Math.abs(railScr.vy)>60) barFling(railScr.vy);
+    railScr=null; railMoreSync();
+  } else if(railPend&&e.pointerId===railPend.id){
+    const p=railPend; railPend=null;
+    SND.click(); p.el.classList.remove('wig'); void p.el.offsetWidth; p.el.classList.add('wig');
+  }
+},{capture:true});
+window.addEventListener('pointercancel',e=>{ railScr=null; railPend=null; },{capture:true});
 /* =====================================================================
    THE CHEST TILE (E25 → E33 → E36 → E55) — the corner chest folded
    INTO the rail as the crate's sixth tile: same #tbox id, same #tboxCv
@@ -13829,8 +13900,14 @@ function buildTbox(){
   }
   $('tbox').addEventListener('click',()=>{
     ac(); SND.tok(); boxShow(true);   // E55: tile six IS the chest — the click never moved, the door did
-  });
+  });                                  // E75: the tile is retired chrome now — the listener idles unreachable
   tboxPaint(0);
+  // E75 THE ONE RAIL: the chest's whole shelf comes home. Node identity
+  // survives the move, so buildBarScroll's listeners, the planks, the
+  // gates and every tile ride along untouched.
+  $('railBody').appendChild($('tbshelves'));
+  $('tbshelves').addEventListener('scroll',railMoreSync);
+  railMoreSync();
 }
 /* =====================================================================
    THE EAGER TRAIN (E27) — a finished line calls its own train.
@@ -14013,6 +14090,7 @@ function paletteSync(){
   if(gr) gr.style.display=(CAMP.on||PLAY.on)?'none':'';        // '' = the stylesheet's display:contents
   faceSync();
   pickPaint();   // E59: the ✨ column obeys the same door — BUILD only, never a level, never PLAY
+  railMoreSync();   // E75: the gate changed what the shelf holds — re-ask "is there more below"
 }
 /* =====================================================================
    THE TRAIN SHELF (E16) — the shed's jobs, out in the open. The whole
@@ -15359,8 +15437,28 @@ function ghOverlayUp(){
   return $('bank').style.display==='flex'||$('namer').style.display==='flex'||
          $('toybox').style.display==='flex';
 }
+function ghNextRow(){
+  // E75 (Wyatt on L13: "we waited 30 seconds, but I still don't see the
+  // hand" — seeded rings carry no gaps rows): the SOLVE table knows the
+  // next move on EVERY level of EVERY book. The first row whose cell is
+  // empty, whose kind the shelf offers, and whose drop is legal RIGHT NOW
+  // is the honest thing to show. Simple kinds only — the reference's own
+  // bridge rows included (a true bridge demo is no lie, the E70 aim-true
+  // law; the L4 GAP path keeps its teach-by-gold filter untouched).
+  if(!CAMP.on) return null;
+  const S=bookSolve(CAMP.book)[CAMP.level-1]; if(!S) return null;
+  for(const row of S.rows){
+    const t=row[0], r=row[1], x=row[2], y=row[3];
+    if(t!=='s'&&t!=='c'&&t!=='br') continue;
+    if(pieceAt(x,y)) continue;
+    if(!placeQuery(t,r,x,y).ok) continue;
+    if(!PAL_BTNS.find(p=>p.t===t&&p.el.style.display!=='none')) continue;
+    return {t,r,x,y};
+  }
+  return null;
+}
 function ghGapOpen(){
-  const L=bookL()[CAMP.level-1]; if(!L||!L.gaps) return false;
+  const L=bookL()[CAMP.level-1]; if(!L||!L.gaps) return !!(L&&ghNextRow());   // E75: gapless levels teach by the reference
   // E69: only gaps a STRAIGHT can honestly fill — L4's river gaps want a BRIDGE,
   // and a ghost demoing an illegal drop would teach a lie. Those gaps teach by gold.
   return L.gaps.some(g=>!pieceAt(g[0],g[1])&&!cellBlocksTrack('s',g[0],g[1]));
@@ -15426,18 +15524,30 @@ function ghStart(les){
     GHOST.wdx=GX+cell[0]*C+C/2; GHOST.wdy=GY+cell[1]*C+C/2;
     GHOST.cell=cell; GHOST.kind='s'; GHOST.rot=0;
   } else if(les==='gap'){
-    const L=bookL()[CAMP.level-1]; if(!L||!L.gaps) return false;
-    const g=L.gaps.find(g2=>!pieceAt(g2[0],g2[1])&&!cellBlocksTrack('s',g2[0],g2[1])); if(!g) return false;   // E69: never demo onto a river
-    // E70 GAP DEMOS AIM TRUE: a gap that KNOWS its heading (3rd element) shows
-    // the FINISHED picture — kind from the reference row, heading from the
-    // data. Headingless gaps keep the neighbour inference below, byte-true.
-    const gref=gapRefAt(g[0],g[1]), kd=gref? gref.t : 's';
-    // the crate's own tile is the source — honest art in the hand
-    const ft=FACE_TILES.find(f2=>f2.t===kd&&f2.el.style.display!=='none'); if(!ft) return false;
+    const L=bookL()[CAMP.level-1]; if(!L) return false;
+    let g,kd,gref=null,nrow=null;
+    if(L.gaps){
+      g=L.gaps.find(g2=>!pieceAt(g2[0],g2[1])&&!cellBlocksTrack('s',g2[0],g2[1])); if(!g) return false;   // E69: never demo onto a river
+      // E70 GAP DEMOS AIM TRUE: a gap that KNOWS its heading (3rd element) shows
+      // the FINISHED picture — kind from the reference row, heading from the
+      // data. Headingless gaps keep the neighbour inference below, byte-true.
+      gref=gapRefAt(g[0],g[1]); kd=gref? gref.t : 's';
+    } else {
+      // E75: a gapless level (Wyatt's L13) teaches by the reference — the
+      // SOLVE table's next open, legal, on-the-shelf move.
+      nrow=ghNextRow(); if(!nrow) return false;
+      g=[nrow.x,nrow.y]; kd=nrow.t;
+    }
+    // E75: the shelf's own tile is the source — honest art in the hand
+    // (was the crate face's; the face retired). Bring it into view first:
+    // the demo also teaches WHERE the piece lives.
+    const ft=PAL_BTNS.find(p2=>p2.t===kd&&p2.el.style.display!=='none'); if(!ft) return false;
+    try{ ft.el.scrollIntoView({block:'nearest'}); railMoreSync(); }catch(err){}
     const r2=ft.el.getBoundingClientRect(); if(!r2.width) return false;
     GHOST.wsx=(r2.left+r2.width/2-OX)/SC; GHOST.wsy=(r2.top+r2.height/2-OY)/SC;
     GHOST.wdx=GX+g[0]*C+C/2; GHOST.wdy=GY+g[1]*C+C/2;
     if(gref) GHOST.rot=gref.r;
+    else if(nrow) GHOST.rot=nrow.r;   // E75: the reference row knows its heading
     else {
       // the rotation the RUN asks for: E/W neighbours = the lying straight, else standing
       const ew=pieceAt(g[0]-1,g[1])||pieceAt(g[0]+1,g[1]);
