@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v9.1 -->
+<!-- TRAINSET v9.2 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -38,8 +38,12 @@
   #mark{ left:12px; cursor:default; color:#F2C531; }
   /* ---- THE GOAL CHIP (E52): wordless, beside the level mark — a mini station
      glyph + one stop-pip per required station, filled straight off the win
-     law's own visited set. Tap = replay the conductor pan. Campaign only. ---- */
-  #goalChip{ left:150px; display:none; padding:6px 9px; }
+     law's own visited set. Tap = replay the conductor pan. Campaign only. ----
+     E72 (Wyatt 8/8): RETIRED — "remove the UI element that has the flag and
+     the red and white bar… it's serving no real purpose." The mute precedent
+     verbatim: node + handler + rig survive for batteries; the kid never sees
+     it (the conductor already plays on every campEnter — E60). ---- */
+  #goalChip{ left:150px; display:none !important; padding:6px 9px; }
   #goalChip canvas{ display:block; width:74px; height:29px; }
   /* E63: MENU takes the corner ("get it off the map"); the sound chip steps inboard
      (MENU is ~110px wide from the edge — 130 clears it on every viewport) */
@@ -596,6 +600,27 @@
   body.conductor :is(#mark,#mute,#menuChip,#backChip,#starChip,#homeChip,#rideChip,#goalChip){ opacity:0; pointer-events:none; }
   body.conductor #rail{ opacity:0; }
   body.conductor #rail *{ pointer-events:none; }
+  /* ---- E72 THE PEEKING CORNER (Wyatt 8/8: "half on the screen… move them
+     over so you can see half of their image… if they click near the top
+     right… the UI comes out to where it is now… click somewhere else or
+     don't click anywhere, it could just go back"). The rugmode corner
+     column RESTS half off the right edge — translateX by half its own
+     width plus its right seat — and sleeps (pointer-events none). The
+     invisible #cornerHot is the summon: one press and body.cornerout
+     slides the column home, live; any press elsewhere or CHROME_OUT_S of
+     quiet peeks it away. transform ONLY — the shy/quiet/conductor folds
+     all speak opacity, so every fade composes without a fight. The hot
+     div hides while a hand is live (shygame) so a corner-side pinch
+     finger is never swallowed, and during the conductor's moment. ---- */
+  body.rugmode:not(.cornerout) :is(#menuChip,#zbtns){ transform:translateX(calc(50% + 8px)); }
+  body.rugmode:not(.cornerout) :is(#homeChip,#rideChip){ transform:translateX(calc(50% + 12px)); }
+  body.rugmode:not(.cornerout) :is(#menuChip,#zbtns,#homeChip,#rideChip){ pointer-events:none; }
+  body.rugmode:not(.cornerout) :is(#menuChip,#zbtns,#homeChip,#rideChip) *{ pointer-events:none; }
+  #menuChip,#zbtns,#homeChip,#rideChip{ transition:opacity var(--shygame,0.25s) ease, transform 0.3s ease; }
+  #cornerHot{ position:absolute; top:0; right:0; width:110px; height:200px; z-index:7;
+    display:none; background:none; }
+  body.rugmode:not(.cornerout) #cornerHot{ display:block; }
+  body.shygame #cornerHot, body.conductor #cornerHot{ display:none; }
   /* ---- toast + rotate (toast bottom rides the LIVE bar height — resize() sets it) ---- */
   #toast{
     position:absolute; left:50%; bottom:132px; transform:translateX(-50%);
@@ -744,6 +769,7 @@
 <div class="chip" id="starChip"><b>SHOP</b><span id="starChipN">★ 0</span></div>
 <div class="chip" id="homeChip">🔎 WHOLE RUG</div>
 <div id="zbtns"><button id="zin" type="button">+</button><button id="zout" type="button">−</button></div>
+<div id="cornerHot"></div><!-- E72: the peeking corner's summon pad — invisible, rugmode-only -->
 <div class="chip" id="wxChip">☀️</div>
 <div class="chip" id="rideChip">🚂 RIDE ALONG</div>
 <!-- E25: the toy box on the rug — screen-space DOM ("that is at least the UI"),
@@ -1012,6 +1038,12 @@ const HAND_HUSH=[0,2,3];
 // dials only open them up; outside first-run every byte is as it was.
 const FR_IDLE=2;              // first-run gap/rot lessons: idle seconds before the hand fires (vs GH_IDLE)
 const FR_REST=6;              // ...and the rest between firings (vs GH_REST) — the guide loops until the win
+const CG_LOOP=true;           // E72 THE PATIENT FINGER (Wyatt: "if the player doesn't take any
+                              // action… use the finger tutorial… put the piece over here"): the
+                              // campaign gap/rot lessons ignore their once-ever bits on EVERY
+                              // level of EVERY book — idle GH_IDLE, demo, rest GH_REST, again,
+                              // until the kid acts. First-run keeps its faster FR pace; any
+                              // press still kills the show; won/ceremony/conductor still gate.
 const FR_NUDGE=true;          // THE KIND NUDGE: the game itself taps a wrong-heading gap piece straight
 const FR_NUDGE_S=8;           // ...this many sim-seconds after a completed rot demo, repeating till it joins
 const FR_SNAP=true;           // THE HELPFUL LANDING: a sloppy right-kind drop near an open gap lands ON it
@@ -1865,7 +1897,11 @@ const BOX_COUNT=(n,total)=>n+' / '+total;   // the lid counter copy
    boot: straights, turns, a simple tree, the train you already have);
    else the campaign level whose win awards it. THE AWARD SCHEDULE IS
    DATA IN THIS TABLE — EXPANSION-8 reads it and must not define its
-   own. (L1-5 award 4 toys, L6-10 award 5 — 45 earnable + 5 starters.)
+   own. E72 THE ONE REWARD LAW (Wyatt 8/8: "each level should only
+   reward one thing, no more, no less… We don't need a ton of things.
+   It just gets old."): every level's bundle is EXACTLY its headline
+   toy. lvl:-1 = SHOP-ONLY — still one of the fifty, still priced and
+   sold (E9 sells every unowned row), just never gifted by a win.
    ===================================================================== */
 const COLL=[
   // E9: the 5th column is the STORE PRICE (★) — "COLL is not edited except to gain a
@@ -1873,18 +1909,19 @@ const COLL=[
   // TRACK (10) — E16: the STATION is a STARTER now (Wyatt: "the turn the straight
   // and the station should definitely be already placed"). Its price stays a dial.
   ['s','STRAIGHT','track',0,0], ['c','CURVE','track',0,0], ['st','STATION','track',0,10],
-  ['br','BRIDGE','track',3,12], ['b','BUMPER','track',4,12], ['x','CROSSING','track',7,18],
+  ['br','BRIDGE','track',3,12], ['b','BUMPER','track',-1,12], ['x','CROSSING','track',7,18],
   // E69: the RAMP arrives at L5 with THE FARM's glued hill (TRY-THEN-OWN —
   // Wyatt: "the ramps… slowly integrate in… starting at level 4"). Was lvl 8.
-  ['sw','SPLITTER','track',9,20], ['rp','RAMP','track',5,18], ['sp','SPIRAL','track',8,18],
+  ['sw','SPLITTER','track',9,20], ['rp','RAMP','track',5,18], ['sp','SPIRAL','track',-1,18],
   ['tun','TUNNEL','track',8,18],
   // TRAINS (9) — the RED PUFFER is the loco + its tender, one toy
   ['loco','RED PUFFER','train',0,0], ['box','BOXCAR','train',0,0], ['tank','TANKER','train',4,12],
-  ['flat','FLATCAR','train',6,15], ['cab','CABOOSE','train',2,10], ['coach','COACH','train',7,18],
-  ['mail','MAIL CAR','train',8,18], ['circus','CIRCUS CAR','train',9,20], ['exp','BIG EXPRESS','train',10,25],
+  ['flat','FLATCAR','train',-1,15], ['cab','CABOOSE','train',2,10], ['coach','COACH','train',-1,18],
+  ['mail','MAIL CAR','train',-1,18], ['circus','CIRCUS CAR','train',-1,20], ['exp','BIG EXPRESS','train',10,25],
   // PAINT (4) — RED is everyone's forever default, never a collectable
-  ['pt_yellow','YELLOW PAINT','paint',3,15], ['pt_blue','BLUE PAINT','paint',2,15],
-  ['pt_green','GREEN PAINT','paint',4,15], ['pt_purple','PURPLE PAINT','paint',9,15],
+  // E72: all four paints are shop goods now (the one-reward law took their slots)
+  ['pt_yellow','YELLOW PAINT','paint',-1,15], ['pt_blue','BLUE PAINT','paint',-1,15],
+  ['pt_green','GREEN PAINT','paint',-1,15], ['pt_purple','PURPLE PAINT','paint',-1,15],
   // LAND (14) — E16: the TREE left the starters for L1's award bundle (the palette
   // starters are track only now: s c st). THE FIFTY STAY FIFTY — same row, new lvl.
   // E65: the tree is a STARTER again (lvl 0 — Wyatt's 8/1 start kit); the face's
@@ -1892,21 +1929,20 @@ const COLL=[
   // E67: BUSH + FLOWERS + ROCK (and PEOPLE below) join the tree as STARTERS —
   // Wyatt: decorations belong on the crate face, "going in the box is just not
   // what players are going to do." Bundles L1-L4 each shrink by one; FIFTY stay fifty.
-  // E70 ONE TOY, THEN THE TUNNEL: L1's three cards become ONE — the SHEEP
-  // headlines L1 (a walking cloud), the duck moves to L4's river where a glued
-  // duck already swims (TRY-THEN-OWN), pond→L2, yellow paint→L3. The bundles
-  // ramp 1/3/4/4/4; THE FIFTY STAY FIFTY, prices untouched. lvl column ONLY.
+  // E70 ONE TOY, THEN THE TUNNEL: L1's three cards became ONE — the sheep.
+  // E72 finishes the thought for every level: ONE headline each, the rest
+  // moved to the shop shelf (lvl -1). THE FIFTY STAY FIFTY, prices untouched.
   ['tree','TREE','land',0,10], ['bush','BUSH','land',0,10], ['flw','FLOWERS','land',0,10],
-  ['rock','ROCK','land',0,12], ['pond','POND','land',2,10], ['rv','RIVER','land',10,25],
-  ['fence','FENCE','land',6,15], ['house','HOUSE','land',6,15], ['shop','SHOP','land',6,15],
-  ['hall','TOWN HALL','land',9,20], ['barn','BARN','land',10,25], ['wtr','WATER TOWER','land',9,20],
-  ['wind','WINDMILL','land',8,18], ['pine','PINE TREE','land',3,12],
+  ['rock','ROCK','land',0,12], ['pond','POND','land',-1,10], ['rv','RIVER','land',-1,25],
+  ['fence','FENCE','land',-1,15], ['house','HOUSE','land',6,15], ['shop','SHOP','land',-1,15],
+  ['hall','TOWN HALL','land',-1,20], ['barn','BARN','land',-1,25], ['wtr','WATER TOWER','land',-1,20],
+  ['wind','WINDMILL','land',-1,18], ['pine','PINE TREE','land',-1,12],
   // EXTRAS (13)
-  ['ppl','PEOPLE','extra',0,12], ['cow','COW','extra',5,15], ['sheep','SHEEP','extra',1,15],
-  ['chick','CHICKEN','extra',5,15], ['duck','DUCK','extra',4,10], ['dog','DOG','extra',3,12],
-  ['cat','CAT','extra',7,18], ['hay','HAY BALE','extra',5,15], ['lamp','LAMP POST','extra',6,15],
-  ['whis','WHISTLE POST','extra',7,18], ['sig','SIGNAL','extra',7,18],
-  ['bal','HOT-AIR BALLOON','extra',10,25], ['snow','SNOWMAN','extra',10,25],
+  ['ppl','PEOPLE','extra',0,12], ['cow','COW','extra',-1,15], ['sheep','SHEEP','extra',1,15],
+  ['chick','CHICKEN','extra',-1,15], ['duck','DUCK','extra',-1,10], ['dog','DOG','extra',-1,12],
+  ['cat','CAT','extra',-1,18], ['hay','HAY BALE','extra',-1,15], ['lamp','LAMP POST','extra',-1,15],
+  ['whis','WHISTLE POST','extra',-1,18], ['sig','SIGNAL','extra',-1,18],
+  ['bal','HOT-AIR BALLOON','extra',-1,25], ['snow','SNOWMAN','extra',-1,25],
 ];
 const COLL_BY={}; for(const [id,name,cat,lvl,price] of COLL) COLL_BY[id]={id,name,cat,lvl,price:price|0};
 const STARTERS=COLL.filter(r=>r[3]===0).map(r=>r[0]);          // s c st loco box (E16) + tree (E65)
@@ -10550,9 +10586,29 @@ const LEVELS=[
   // 7 — THE CROSSING. One glued crossing sits on the line and the loop has to use it.
   // TRY-THEN-OWN in its purest form: ride the diamond, then it's yours.
   // E71b: the diamond's ring arrives glued too — four gaps close the tour.
+  // E72 (Wyatt: "Level 7 really lacked substance. The end track looked quite
+  // abysmal… add more elements"): the bare rug became a full E43 canyon —
+  // a mesa ridge the win-ride tunnels into, the diamond guarded by twin
+  // signals with little crowds watching, the coyote on his butte, the
+  // roadrunner and rolling tumbleweeds ring-adjacent (REACT_R audited), a
+  // STONE ARCH standing over the bottom run (the "end track" — sarch never
+  // blocks, the train rides under it, the canyon PLAY map's own grammar),
+  // and a ranch camp below. No blocker touches a SOLVE cell or the line.
   { name:'THE CROSSING', hint:'USE THE CROSSING!', say:'USE THE CROSSING!!',
     toy:'x', land:'canyon', weather:'dust',
-    glued:[['sig',6,3],['whis',2,6],['cat',10,3,0],['bush',10,6]],
+    glued:[['sig',6,3],['whis',2,6],['cat',10,3,0],['bush',10,6],
+           // the mesa ridge (y0) — the ride cell (5,1) bores straight into it
+           ['bcact',1,0],['rock',2,0],['pine',3,0],['rock',4,0],['rock',5,0],
+           ['sig',6,0],['rock',7,0],['pine',8,0],['rock',9,0],['wtr',10,0],['rock',11,0],
+           // the west rim + the coyote's watch
+           ['pine',0,1],['coyo',2,2,0],['rock',0,4],['bcact',1,4],
+           // inside the diamond — the crossing has an audience
+           ['ppl',5,2],['ppl',7,2],['tmbl',8,2,0],['tmbl',4,4,1],['roadr',8,4,0],
+           // the east rim
+           ['pine',11,1],['bcact',11,3],['rock',10,4],
+           // THE END TRACK — the stone arch over the bottom run + the camp below
+           ['sarch',6,5],['fire',4,6],['ppl',5,6],['hay',6,6],['cow',7,6,1],['bcact',8,6],
+           ['pine',3,7],['rock',5,7],['bcact',7,7],['rock',9,7],['pine',11,7]],
     track:[...ringRows(3,1,9,5,[[5,1],[6,1],[7,1],[4,1],[8,1],[3,3],[9,3]]),
            ['x',0,6,1],['s',0,5,1],['s',0,7,1]],
     gaps:[[4,1,0],[8,1,0],[3,3,1],[9,3,1]],
@@ -10710,7 +10766,7 @@ const LEVELS=[
     track:ringRows(2,1,9,6,[[3,1],[8,1],[2,4],[9,3]]),
     gaps:[[3,1,0],[8,1,0],[2,4,1],[9,3,1]], ride:[5,6], stations:[] },
   { name:'THE ROUNDUP', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'west',
-    toy:'roadr', bundle:['roadr','bcact'],
+    toy:'roadr', bundle:['roadr'],   // E72 one-reward: the bloom cactus moved to the shop shelf
     glued:[['fence',1,3],['fence',2,3],['fence',1,4],['cow',2,4,0],['cow',1,5,1],['cow',10,3,2],
            ['barn',1,2],['hay',10,5],['roadr',2,6,0]],
     track:ringRows(3,1,8,5,[[4,1],[5,1],[6,1],[7,1],[5,5]]),
@@ -10760,7 +10816,7 @@ const LEVELS=[
     track:ringRows(4,2,8,5,[[5,2],[7,2]]),
     gaps:[[5,2,0],[7,2,0]], ride:[6,5], stations:[] },
   { name:'THE POLE PARTY', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'ice', weather:'snowfall',
-    toy:'peng', bundle:['peng','iglu'],
+    toy:'peng', bundle:['peng'],   // E72 one-reward: the igloo moved to the shop shelf
     glued:[['iglu',1,1],['peng',4,3,0],['peng',7,3,1],['cub',10,6,0],['snow',1,6,0],
            ['seal',0,0],['pine',10,1],['pine',0,7]],
     track:ringRows(2,1,9,6,[[3,1],[6,1],[9,3],[5,6]]),
@@ -10815,7 +10871,7 @@ const LEVELS=[
            ['tun',0,6,2],['s',0,5,2],['s',0,7,2]],
     gaps:[[4,3,1],[4,4,1]], ride:[6,2], stations:[] },
   { name:'THE JUNGLE JAMBOREE', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'jungle',
-    toy:'vtree', bundle:['vtree','bleaf'],
+    toy:'vtree', bundle:['vtree'],   // E72 one-reward: the big leaf moved to the shop shelf
     glued:[['eleph',4,3,0],['monk',7,3,1],['monk',1,2,0],['parr',10,2,0],['bfly',3,0],['bfly',8,0],
            ['bfly',10,5],['vtree',0,1],['vtree',10,0],['vtree',0,6],['bleaf',1,5]],
     track:ringRows(2,1,9,6,[[3,1],[6,1],[8,1],[5,6]]),
@@ -10970,7 +11026,7 @@ const LEVELS=[
     track:ringRows(2,1,9,6,[[3,1],[8,1],[2,4]]),
     gaps:[[3,1,0],[8,1,0],[2,4,1]], ride:[5,6], stations:[] },
   { name:'THE GRAND FAIR', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'rug',
-    toy:'arch', bundle:['arch','clock'],
+    toy:'arch', bundle:['arch'],   // E72 one-reward: the town clock moved to the shop shelf
     glued:[['fount',5,3],['clock',7,3],['stat',3,3],['bench',6,4],['lamp',4,4],['lamp',8,4],
            ['arch',4,1],['ppl',10,2,0],['ppl',1,2,1],['ppl',3,7,2],['bal',2,0,0],['bal',9,0,1],['bal',11,3,2]],
     track:ringRows(2,1,9,6,[[6,1],[2,3],[9,4],[5,6]]),
@@ -11280,7 +11336,7 @@ const PK_LEVELS=[
     stations:[[4,2],[7,4]] },
   // 4 — THE PIE KITCHEN. The WOODS grammar in gold: fall-forest flanks, a
   // lantern-lit lane, the kitchen at the top of the loop.
-  { name:'THE PIE KITCHEN', hint:'STOP AT THE KITCHEN!', toy:'lant', bundle:['lant','atree'],
+  { name:'THE PIE KITCHEN', hint:'STOP AT THE KITCHEN!', toy:'lant', bundle:['lant'],   // E72 one-reward
     glued:[...fillRows('atree',0,0,1,7,'pine'), ...fillRows('atree',10,0,11,7,'pine'),
            ['shop',5,1],['lant',4,1],['lant',6,1],
            ['atree',5,3],['atree',6,3],['lant',5,4],['lant',6,4],
@@ -11349,7 +11405,7 @@ const SA_LEVELS=[
     stations:[[4,2],[7,4]] },
   // 4 — THE CANDY LANE. The WOODS grammar in evergreen-and-candy: checkered
   // snowy/green forest flanks, a candy-lit lane, the toy shop at the top.
-  { name:'THE CANDY LANE', hint:'STOP AT THE SHOP!', toy:'cpole', bundle:['cpole','sfir'],
+  { name:'THE CANDY LANE', hint:'STOP AT THE SHOP!', toy:'cpole', bundle:['cpole'],   // E72 one-reward
     land:'ice', weather:'snowfall',
     glued:[...fillRows('sfir',0,0,1,7,'pine'), ...fillRows('sfir',10,0,11,7,'pine'),
            ['shop',5,1],['cpole',4,1],['cpole',6,1],
@@ -13708,6 +13764,21 @@ function shyGameSync(){        // THE SHY FOLD — one truth, read every frame, 
    a knob mid-drag or an open panel holds the clock; any pointer/wheel is
    a poke (window capture — it fires before the rug eats the event). */
 const QT={t:0,on:false};
+/* E72 THE PEEKING CORNER — the rugmode corner column (menu globe, zoom
+   buttons and their zoomed-in lodgers) rests half off the right edge; the
+   invisible #cornerHot summons it home. One state bit + one WALL clock
+   (chrome UX rides the wall, the conductor's own law): any press outside
+   the column or CHROME_OUT_S of quiet peeks it away. The retreat NEVER
+   swallows the outside press — that tap still does its own job. */
+const CHROME_OUT_S=5;            // seconds the column stays out untouched (dial)
+const CORNER={out:false,tm:0};
+function cornerOut(b){
+  b=!!b;
+  if(CORNER.tm){ clearTimeout(CORNER.tm); CORNER.tm=0; }
+  if(b) CORNER.tm=setTimeout(()=>cornerOut(false), CHROME_OUT_S*1000);
+  if(b===CORNER.out) return;
+  CORNER.out=b; document.body.classList.toggle('cornerout',b);
+}
 /* E62: the pocket syncs — one truth each for the sun chip and the train button. */
 function wxSync(){
   const avail=(SCREEN==='game'&&!CAMP.on)||SCREEN==='play';
@@ -14099,6 +14170,7 @@ function showScreen(s){
   bedScreen(s);                                       // E18: the bedroom set lives on menu+board, dies at the game's door
   followSet(false);                                   // E15: a screen change lets the camera go
   ghKill();                                           // E57: a room change ends the show (the idle clock re-arms fresh)
+  cornerOut(false);                                   // E72: every room greets you with the corner peeking
   SCREEN=s;
   const game=s==='game', play=s==='play';
   document.body.classList.toggle('rugmode',game||play);   // E26: the sideways prompt is the rug modes' only (the room is portrait-proof)
@@ -15145,6 +15217,22 @@ function buildMenu(){
 }
 $('mute').addEventListener('click',()=>{ AU.on=!AU.on; if(AU.on){ ac(); SND.click(); } muteSync(); save(); });
 $('homeChip').addEventListener('click',()=>{ ac(); SND.click(); viewFit(); });   // E10: snap back to the whole rug (E61: the chip never shows — the slider's floor took its job)
+// E72 THE PEEKING CORNER: the summon answers at POINTERDOWN (the tap law)
+// and swallows the touch's synthesized click so it never lands on the chip
+// that just slid out from under the finger (the E26 tail — tapSwallow's job).
+$('cornerHot').addEventListener('pointerdown',e=>{
+  e.preventDefault(); e.stopPropagation();
+  ac(); SND.tok(); cornerOut(true); tapSwallow();
+});
+// …and the retreat: window capture, so it reads the press before the rug
+// eats it. A press on the column itself only freshens the out-clock; the
+// outside press retreats the column AND still does its own job.
+window.addEventListener('pointerdown',e=>{
+  if(!CORNER.out) return;
+  const t=e.target;
+  if(t&&t.closest&&t.closest('#menuChip,#zbtns,#homeChip,#rideChip,#cornerHot')){ cornerOut(true); return; }
+  cornerOut(false);
+},true);
 // ---- E61→E64 THE ZOOM BUTTONS — WHOLE RUG retired; the slider retired too.
 // Two tap steps, "a little more obvious for children"; − walks home to the
 // whole rug, + climbs to the E20 max; ends dim (zSync rides homeSync). ----
@@ -15269,7 +15357,7 @@ function ghCtx(){
   }
   if(SCREEN==='game'&&CAMP.on){
     if(CND.on||CAMP.won||winT>0||toyCard||toyQ.length) return null;
-    const fr=frGuideOn();   // E70: the first morning ignores the once-ever bits — the guide loops until the win
+    const fr=frGuideOn()||CG_LOOP;   // E70: the first morning ignores the once-ever bits — E72: every campaign level does (THE PATIENT FINGER)
     if((!HAND.rot||fr)&&frRotCand()) return 'rot';   // E70: fix the piece already down before teaching the next drop
     if((!HAND.gap||fr)&&ghGapOpen()) return 'gap';
     return null;
