@@ -2320,7 +2320,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.69</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.70</div>
   <div class="scanlines"></div>
 </div>
 
@@ -17256,7 +17256,10 @@ function bfQueueStart(size,opts){
   bfqRoster();
   BFQ.clockT=setInterval(()=>{ if(!BFQ) return; const s=((Date.now()-BFQ.t0)/1000)|0;
     const el=document.getElementById('bfqTime'); if(el) el.textContent=(s/60|0)+':'+String(s%60).padStart(2,'0');
-    try{ crewBfSwap(); }catch(e){} },1000);
+    try{ crewBfSwap(); }catch(e){}
+    // v2.70: the arm RETRIES through the window — a veto at the queue's first
+    // instant (a leave still in flight, a stale party) heals a second later
+    if(BFQ && !BFQ.crewRoom){ try{ crewBfArm(); }catch(e){} } },1000);
   // v2.63 SQUADS: a silent room under the theater, so a real squadmate can
   // take a real chair while the scripted names drop in around them
   try{ crewBfArm(); }catch(e){}
@@ -17525,7 +17528,17 @@ function coopOnPoll(r, sentWant){
   // only a reply to a request that ACTUALLY CARRIED the order may cancel it
   if(r.state!=='battle' && sentWant) COOP.wantBattle=false;
   if(r.state==='battle' && !S.coop && !coopLaunching && S.mode==='menu'){
-    if(coopRoom()) roomStartBattle(); else coopStartBattle();
+    // v2.70 (Wyatt: "if one of them has to see an ad, the other one will as
+    // well") — the relayed start of a CREW campaign is the ungated mate's own
+    // ad seam. Whoever already paid a gate for this launch (the clicker, the
+    // goer, the leader) starts straight; the mate who never tapped watches
+    // their break HERE, starts a beat late, and the wave catch-up seats them.
+    if(!coopRoom() && COOP.crewCamp && !CREW.gatedLaunch && !CREW.adPend){
+      CREW.adPend=true;
+      adGate('camp', ()=>{ CREW.adPend=false; CREW.gatedLaunch=1;
+        if(COOP && !S.coop && S.mode==='menu') coopStartBattle(); });
+    }
+    else if(!CREW.adPend){ if(coopRoom()) roomStartBattle(); else coopStartBattle(); }
   }
   else if(!coopMulti() && wasState==='open' && r.state==='paired'){ COOP.ui='paired'; SFX.horn(); coopPanelOpen(); }
   else {
@@ -18400,7 +18413,8 @@ function duelChipHTML(){
 // and the public queue's theater stays THEATER — the only real thing that can
 // ever happen inside it is a real squadmate taking a real chair.
 let CREW={ crew:null, members:[], invites:[], me:null, busy:false, pollT:0, sig:'',
-  campGo:null, leadFired:null, autoBf:null };   // v2.69 one-click guards: the go-wish lobby, the lobby already ordered, the room already auto-joined
+  campGo:null, leadFired:null, autoBf:null,     // v2.69 one-click guards: the go-wish lobby, the lobby already ordered, the room already auto-joined
+  gatedLaunch:0, adPend:false, campLaunch:null, campLaunchT:0 };   // v2.70: paid-my-gate flag · mate's ad in flight · the boom-launch pending lobby + its clock
 const CREW_BF_MIN=2;          // a 1v1 has no second chair on your side
 // ===== v2.66 WEB GOOGLE SIGN-IN (Wyatt 8/7: "on a browser… just do it
 // through Google — that's more natural"). The whole flow is wired and waits
@@ -18473,10 +18487,11 @@ function crewTick(){
   const fast=(BFQ&&BFQ.crewRoom)||campSceneOpen();
   CREW.pollT=setTimeout(crewTick, fast?2500:5000);
   if(CREW.busy) return;
-  if(S.mode!=='menu'){ CREW.campGo=null; CREW.leadFired=null; return; }   // battle entry retires the one-click guards; never poll from inside a battle
+  if(S.mode!=='menu'){ CREW.campGo=null; CREW.leadFired=null; CREW.gatedLaunch=0; CREW.campLaunch=null; return; }   // battle entry retires the one-click guards; never poll from inside a battle
   // a wish or an order outliving its lobby is litter
   if(CREW.campGo && !(COOP&&coopSquad()&&COOP.code===CREW.campGo)) CREW.campGo=null;
   if(CREW.leadFired && !(COOP&&coopSquad()&&COOP.code===CREW.leadFired)) CREW.leadFired=null;
+  if(CREW.campLaunch && !(COOP&&coopSquad()&&COOP.code)) CREW.campLaunch=null;
   const st=crewSt();
   CREW.busy=true;
   crewPost('poll',{st:st.st, info:st.info}).then(r=>{
@@ -18493,7 +18508,7 @@ function crewTick(){
       if(META.crew){ META.crew=null; saveMeta(); }
     }
     CREW.invites=r.invites||[];
-    crewAutoCamp(); crewBfSwap(); crewAutoBf(); crewLeadGo();
+    crewAutoCamp(); crewBfSwap(); crewAutoBf(); crewLeadGo(); crewCampPend();
     const sig=JSON.stringify([CREW.crew&&CREW.crew.code, CREW.crew&&CREW.crew.n, CREW.invites.length,
       CREW.members.map(m=>[m.name,m.st,(m.info||{}).room||'',(m.info||{}).lobby||'',m.on?1:0])]);
     if(sig!==CREW.sig){
@@ -18515,7 +18530,7 @@ function crewInvSync(list){
 function crewChipHTML(){
   const fills=(CREW.members||[]).filter(m=>m.uid!==CREW.me && m.st==='bfFill'
     && m.info && m.info.room && (m.info.size|0)>=CREW_BF_MIN);
-  if(CREW.crew && fills.length && !crewCoopLive() && !BFQ){
+  if(CREW.crew && fills.length && (!crewCoopLive() || crewIdleLobby()) && !BFQ){
     const f=fills[0];
     return '<button class="mbtn alt" style="padding:0.2rem 0.7rem;font-size:1.1rem;margin-left:10px;background:#2E4A22;border-color:#7FA35C"'
       +' onclick="crewJoinBf(\''+escH(f.info.room)+'\')">'
@@ -18650,8 +18665,11 @@ function crewAutoCamp(){
 }
 // ---- BATTLEGROUND: a real squadmate takes a real chair in the fill window ----
 function crewBfArm(){
-  if(!CREW.crew || crewCoopLive() || !BFQ || (BFQ.size|0)<CREW_BF_MIN) return;
+  if(!CREW.crew || !BFQ || (BFQ.size|0)<CREW_BF_MIN || BFQ.crewRoom || BFQ.crewArming) return;
+  crewShedLobby();                       // v2.70: a parked muster never vetoes the queue
+  if(crewCoopLive()) return;
   if(!(CREW.members||[]).some(m=>m.uid!==CREW.me && m.on)) return;   // nobody online — pure theater, as ever
+  BFQ.crewArming=true;                   // v2.70: the clock retries the arm — one create, ever
   const q=BFQ;
   COOP=coopFresh('idle','room');
   COOP.team=q.size; COOP.map=q.mapId;
@@ -18662,8 +18680,8 @@ function crewBfArm(){
       COOP.code=r.code; COOP.host=true; COOP.ui='idle'; COOP.state='open';
       q.crewRoom=r.code; q.crewSeats={};
       coopTick(); crewTick();
-    } else { COOP=null; }
-  }).catch(()=>{ if(COOP===forParty) COOP=null; });
+    } else { COOP=null; q.crewArming=false; }
+  }).catch(()=>{ if(COOP===forParty) COOP=null; if(BFQ===q) q.crewArming=false; });
 }
 function crewRoomDrop(){
   if(COOP && coopRoom() && COOP.ui==='idle'){ try{ coopLeave(); }catch(e){} }
@@ -18693,7 +18711,9 @@ function crewBfSwap(){
 }
 function crewJoinBf(code){
   audio(); SFX.blip();
-  if(crewCoopLive() || BFQ){ bfqPulse(); return; }
+  if(BFQ){ bfqPulse(); return; }
+  crewShedLobby();                       // v2.70: the parked muster steps aside here too
+  if(crewCoopLive()){ bfqPulse(); return; }
   COOP=coopFresh('enter','room');
   COOP.wantSide='y';
   UI.coopJoin(code);
@@ -18708,12 +18728,22 @@ function crewJoinBf(code){
 // the tap-only law — an auto-entry gates, a relayed mid-battle command still
 // never does). One auto-join per room, one auto-order per muster.
 function wartableOpen(){ const wt=document.getElementById('wartable'); return !!(wt && !wt.classList.contains('hidden')); }
+// v2.70 THE PARKED MUSTER NEVER VETOES (the live bug Wyatt hit): after any
+// co-op battle or a campaign auto-muster, the party OUTLIVES the visit — code
+// set, state idle — which crewCoopLive() read as "busy". So a squad that had
+// ever mustered could never arm or auto-join a battlefield room again. A
+// parked squad lobby (no live battle, no pending order) is furniture: shed it
+// and go. A live battle or a pending order still vetoes everything.
+function crewIdleLobby(){ return !!(COOP && coopSquad() && COOP.code && !S.coop && !COOP.wantBattle); }
+function crewShedLobby(){ if(crewIdleLobby()){ try{ coopLeave(); }catch(e){} } }
 function crewAutoBf(){
-  if(!CREW.crew || crewCoopLive() || BFQ || S.mode!=='menu' || !wartableOpen()) return;
+  if(!CREW.crew || BFQ || S.mode!=='menu' || !wartableOpen()) return;
   const f=(CREW.members||[]).find(m=>m.uid!==CREW.me && m.st==='bfFill' && m.info
     && m.info.room && (m.info.size|0)>=CREW_BF_MIN);
   if(!f) return;
   if(CREW.autoBf===f.info.room) return;
+  crewShedLobby();
+  if(crewCoopLive()) return;
   CREW.autoBf=f.info.room;
   adGate('bf', ()=>crewJoinBf(f.info.room));
 }
@@ -18723,7 +18753,7 @@ function crewCampGo(){
   if(!COOP || !coopSquad() || !COOP.code || COOP.host || CREW.campGo===COOP.code) return;
   audio(); SFX.horn();
   const code=COOP.code;
-  adGate('camp', ()=>{ if(COOP && COOP.code===code){ CREW.campGo=code;
+  adGate('camp', ()=>{ if(COOP && COOP.code===code){ CREW.gatedLaunch=1; CREW.campGo=code;
     clearTimeout(CREW.pollT); crewTick(); roomModal(coopPanelHTML()); } });
 }
 function crewLeadGo(){
@@ -18733,7 +18763,67 @@ function crewLeadGo(){
     && m.info.lobby===COOP.code && m.info.go);
   if(!wish) return;
   CREW.leadFired=COOP.code;
-  adGate('camp', ()=>UI.coopDeploy());
+  adGate('camp', ()=>{ CREW.gatedLaunch=1; UI.coopDeploy(); });
+}
+// ===== v2.70 BOOM — THE SCENE'S OWN DEPLOY IS THE SQUAD START (Wyatt 8/7:
+// "they're both in the campaign screen, they're both in the same squad, one
+// of them hits deploy, boom, they're both in the game together" — at the
+// LOWER commander's level, the server's own min rule). campPlay's gate has
+// already been paid when this runs; it returns true when the squad took the
+// launch, false hands the tap back to the plain solo start.
+function crewCampBoom(){
+  // the decision rides FRESH truth, never the last tick's snapshot — a tap
+  // two seconds after a buddy walks onto the scene must still take them both
+  // (the stale read silently downgraded exactly that tap to a solo start)
+  if(!CREW.crew || !campSceneOpen()) return Promise.resolve(false);
+  const st=crewSt();
+  return crewPost('poll',{st:st.st, info:st.info}).then(r=>{
+    if(r && r.ok){ if(r.me) CREW.me=r.me;
+      if(r.crew){ CREW.crew=r.crew; CREW.members=r.members||[]; } }
+    return crewCampBoomNow();
+  }).catch(()=>crewCampBoomNow());
+}
+function crewCampBoomNow(){
+  if(!CREW.crew || !campSceneOpen()) return false;
+  const q=(CREW.members||[]).filter(m=>m.uid!==CREW.me && m.st==='campQ');
+  const mustered=!!(COOP && coopSquad() && COOP.code && (COOP.members||[]).length>1);
+  if(!q.length && !mustered) return false;         // nobody standing here with me → solo
+  CREW.gatedLaunch=1;                              // my gate is paid for this launch
+  if(COOP && coopSquad() && COOP.code){
+    if(COOP.host){
+      if((COOP.members||[]).length>1){ UI.coopDeploy(); }
+      else { COOP.crewCamp=true; CREW.campLaunch=COOP.code; CREW.campLaunchT=Date.now(); roomModal(coopPanelHTML()); }
+    } else {
+      COOP.crewCamp=true; CREW.campGo=COOP.code;
+      clearTimeout(CREW.pollT); crewTick(); roomModal(coopPanelHTML());
+    }
+    return true;
+  }
+  const doors=q.filter(m=>m.info && m.info.lobby);
+  if(doors.length){
+    doors.sort((a,b)=> a.uid<b.uid? -1:1);
+    COOP=coopFresh('enter','squad'); COOP.crewCamp=true;
+    UI.coopJoin(doors[0].info.lobby).then(ok=>{
+      if(ok && COOP && coopSquad() && COOP.code){
+        CREW.campGo=COOP.code; clearTimeout(CREW.pollT); crewTick(); roomModal(coopPanelHTML());
+      }
+    });
+    return true;
+  }
+  // nobody holds a door yet — open one; the squad lands on their next poll
+  // and crewCampPend gives the order the moment they do (or the grace expires
+  // and the clicker marches alone — nobody is ever stranded at the door)
+  UI.coopHost();
+  if(COOP){ COOP.crewCamp=true; CREW.campLaunch=COOP.code||'PENDING'; CREW.campLaunchT=Date.now(); }
+  return true;
+}
+const CREW_BOOM_WAIT=8000;   // ms the boom-launch holds the door for the squad
+function crewCampPend(){
+  if(!CREW.campLaunch) return;
+  if(!COOP || !coopSquad() || !COOP.host || COOP.wantBattle){ if(!COOP||!coopSquad()) CREW.campLaunch=null; return; }
+  if(CREW.campLaunch==='PENDING' && COOP.code){ CREW.campLaunch=COOP.code; }
+  if((COOP.members||[]).length>1){ CREW.campLaunch=null; UI.coopDeploy(); return; }
+  if(Date.now()-(CREW.campLaunchT||0) > CREW_BOOM_WAIT){ CREW.campLaunch=null; UI.coopDeploy(); }
 }
 // ============ THE PRIVATE BATTLEFIELD ROOM (v1.24) ============
 // Wyatt 7/25: friends should be able to play the battleground TOGETHER, up to
@@ -32620,7 +32710,7 @@ window.UI = {
     SFX.clack(); const t=document.getElementById('wtMapTray'); if(t) t.classList.add('hidden'); },
   wtClose(){ SFX.clack(); closeWarTable(); },
   // ---- THE CAMPAIGN scene (v1.42) ----
-  campPlay(n){ audio(); SFX.blip(); adGate('camp', ()=>startCampaign(n)); },   // no n = the next rung
+  campPlay(n){ audio(); SFX.blip(); adGate('camp', ()=>{ crewCampBoom().then(taken=>{ if(!taken) startCampaign(n); }); }); },   // no n = the next rung; v2.70: with a squadmate standing on this scene, the DEPLOY IS the squad start ("boom, both in")
   campBuddies(){ audio(); closeCampScene(); UI.coopOpen(); },  // the wtRoom pattern: scene down, muster up
   campClose(){ SFX.clack(); closeCampScene(); },
   // ---- LANGUAGE ----
