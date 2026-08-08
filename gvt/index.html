@@ -2330,7 +2330,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.78</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.79</div>
   <div class="scanlines"></div>
 </div>
 
@@ -11712,7 +11712,7 @@ const BF_MOVE = {
   // upgrade) and the reflect, not free hull. BF reach 190 keeps him under the
   // tank's 210 — the cannon out-reaches every infantry gun and still loses
   // the artillery duel.
-  commando:   { moveSpd:32, hp:7, rng:190 },
+  commando:   { moveSpd:32, hp:7, rng:152 },   // v2.79 (Wyatt 8/8): beam length −20% (190→152); the wipe hits harder-per-minute instead — rate rides UDEF
   // v2.42 THE SPY — "he moves twice as fast as a regular Trooper": 88 is
   // exactly 2× the rifleman's 44, and BF_PACE rides on top like everyone's
   // (150 on the battleground — under the jeep's 221, over every boot). hp 2:
@@ -15295,7 +15295,7 @@ const UDEF = {
   // rifle duel's 198, under the long tube's 277; rate 0.25 = one sweep per
   // 4s (a drum, not a hose); dmg 3 pays once per man in the arc; grit 4 is
   // Sarge's own elite floor (the rank ladder grows it — cmdoGB).
-  commando:{ rng:220, rate:0.25, dmg:3, air:false, grit:4, name:'COMMANDO' },
+  commando:{ rng:176, rate:0.3, dmg:3, air:false, grit:4, name:'COMMANDO' },
   // v2.42 THE SPY — the discovered man (see the SPY panel by cmdoOwned). rng
   // 70: the shortest gun on either carpet, under the flame's 85 — "a very
   // short-range pistol" means up close is the only place he wins. rate 3.84:
@@ -20788,6 +20788,12 @@ function bfUnitStep(u,dt){
   // drops — the campaign's own artillery law, battlegrounds edition, both
   // armies (the class, never the seat). Placement is the whole decision now.
   if(u.type==='mortar'){ u.marching=false; return true; }
+  // v2.79 (Wyatt 8/8: "he starts moving before his animation is finished, so
+  // he needs to do the full animation, then he's allowed to keep moving
+  // forward"): the wipe PLANTS his feet — while the sweep/recoil runs
+  // (cmdoFireT, set at the trigger for the whole class) he stands and
+  // finishes the shot; the march resumes the frame it rides out.
+  if(u.type==='commando' && u.cmdoFireT>0){ u.marching=false; return true; }
   if(u.def.ram) bfRam(u);                                  // the bumper checks before the wheels turn
   if(u.saberState && u.saberState!=='idle') return true;   // let a charging Sarge finish his run
   if(u.sgDash) return true;                                // v1.67: ...and a gap-closing one too (out or walking back)
@@ -21135,6 +21141,9 @@ function campNearestFoe(u){
 }
 function campUnitStep(u,dt){
   if(u.falling){ unitFallStep(u,dt); u.marching=false; return false; }   // 8/8 v2.76 the long drop
+  // v2.79: the wipe plants his feet on the campaign carpet too — the full
+  // animation finishes before the march resumes (Wyatt's own staging)
+  if(u.type==='commando' && u.cmdoFireT>0){ u.marching=false; return true; }
   // the jump tank reads the OWNER'S bench, and for a relayed man that bench is
   // only known once the placement has landed — so the pace is written on his
   // first step, never at placeUnit time (same number, correct owner).
