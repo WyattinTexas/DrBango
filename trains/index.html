@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v9.0 -->
+<!-- TRAINSET v9.1 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -43,7 +43,10 @@
   #goalChip canvas{ display:block; width:74px; height:29px; }
   /* E63: MENU takes the corner ("get it off the map"); the sound chip steps inboard
      (MENU is ~110px wide from the edge — 130 clears it on every viewport) */
-  #mute{ right:130px; }
+  /* E71b (Wyatt 8/8): the sound chip is RETIRED — "one can just lower their
+     volume on their phone." The node + rig survive for batteries; the kid
+     never sees it. */
+  #mute{ right:130px; display:none !important; }
   /* E71 THE GLOBE — the way home stopped being a word. The corner wears the
      little world (the reference grammar: blue compass ring, gold points,
      green wireframe globe, a door bubble): a painted canvas, no pill. */
@@ -10459,7 +10462,7 @@ function load(){
 // corridor or a finish-the-gap. Only STRAIGHT, CURVE and (from 4 on) BRIDGE are ever
 // REQUIRED; every other piece arrives glued. Reference solutions stay under
 // SOLVE_CAP pieces, and the battery proves each one only places toys owned by then.
-const SOLVE_CAP=[14,14,14,14,14,22,22,22,22,22,
+const SOLVE_CAP=[14,14,14,14,14,14,14,14,14,14,   // E71b: 6-10 re-cut to gap levels — 22s retired with the labor
   // E71 — ninety more: every new reference is a handful of gap fills, bridge
   // drops or a seeded ring; 14 covers all but the crossing fair's full ring.
   ...Array.from({length:90},(_,i)=>(i+11===74)?18:14)];
@@ -10536,41 +10539,56 @@ const LEVELS=[
     track:[['st',0,9,6],['rp',0,4,1],['s',0,5,1,1],['rp',2,6,1]], ride:[5,1], stations:[] },
   // 6 — MAIN STREET. The first level that ASKS for a station stop, taught four levels
   // earlier by the freebie on level 2. Shops line the middle; ring the whole street.
+  // E71b (Wyatt 8/8: "make them easier… three to five pieces max") — the ring
+  // arrives glued with FOUR gold gaps; the street is the level, not the labor.
   { name:'MAIN STREET', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!',
     toy:'house', land:'snow', weather:'snowfall',
     glued:[['house',3,3],['shop',5,3],['hall',7,3],['house',8,3],['lamp',4,3],['lamp',6,3],
            ['ppl',5,6],['cat',10,6,0]],
-    track:[['s',0,4,1],['s',0,5,1]],                       // E69: a head start on the ring (the L3 grammar)
-    ride:[4,1], stations:[[5,5]] },
+    track:ringRows(2,1,9,5,[[5,5],[3,1],[7,1],[2,3],[9,3]]),
+    gaps:[[3,1,0],[7,1,0],[2,3,1],[9,3,1]], ride:[4,1], stations:[[5,5]] },
   // 7 — THE CROSSING. One glued crossing sits on the line and the loop has to use it.
   // TRY-THEN-OWN in its purest form: ride the diamond, then it's yours.
+  // E71b: the diamond's ring arrives glued too — four gaps close the tour.
   { name:'THE CROSSING', hint:'USE THE CROSSING!', say:'USE THE CROSSING!!',
     toy:'x', land:'canyon', weather:'dust',
     glued:[['sig',6,3],['whis',2,6],['cat',10,3,0],['bush',10,6]],
-    track:[['x',0,6,1],['s',0,5,1],['s',0,7,1]],           // E69: straights flank the diamond — its job shows
+    track:[...ringRows(3,1,9,5,[[5,1],[6,1],[7,1],[4,1],[8,1],[3,3],[9,3]]),
+           ['x',0,6,1],['s',0,5,1],['s',0,7,1]],
+    gaps:[[4,1,0],[8,1,0],[3,3,1],[9,3,1]],
     cross:[6,1], ride:[5,1], stations:[] },
   // 8 — THE TUNNEL. A rock-and-pine ridge walls off the top half with exactly one way
   // through it. The land forces the whole rest of the shape — win is just the lap.
+  // E71b: three gaps — the ridge already forced the shape; now the ring shows it.
   { name:'THE TUNNEL', hint:'GO THROUGH THE TUNNEL!', say:'THROUGH THE TUNNEL!!',
     toy:'tun', land:'ice',
     glued:[['rock',6,0],['rock',6,1],['rock',6,3],['rock',6,4],
            ['pine',5,0],['pine',7,0],['pine',5,4],['pine',7,4],['pine',5,1],['pine',7,1],
            ['wind',2,6],['rock',9,1],['pine',9,0]],
-    track:[['tun',0,6,2],['s',0,5,2],['s',0,7,2]],         // E69: straights flank the tunnel mouth
+    track:[...ringRows(4,2,8,5,[[5,2],[6,2],[7,2],[4,3],[4,4],[6,5]]),
+           ['tun',0,6,2],['s',0,5,2],['s',0,7,2]],
+    gaps:[[4,3,1],[4,4,1],[6,5,0]],
     ride:[6,2], stations:[] },                             // E69: the win rides into the LEVEL'S OWN tunnel
   // 9 — THE SPLIT. A working siding arrives glued at both ends; the kid closes the big
   // ring around it and the train takes turns down the branch all by itself.
+  // E71b: the ring round the siding arrives glued — three gaps and she rolls.
   { name:'THE SPLIT', hint:'LET THE TRACK SPLIT!', toy:'sw', land:'cloud',
     glued:[['hall',1,6],['wtr',10,6],['flw',1,2],['bush',10,2]],
-    track:[['sw',0,4,4],['s',0,5,4],['s',0,6,4],['sw',0,7,4],
-           ['c',0,4,5],['s',0,5,5],['s',0,6,5],['c',3,7,5],
-           ['s',0,5,1],['s',0,6,1]],                       // E69: top-run head start — every lap passes here
+    track:[...ringRows(3,1,8,4,[[4,4],[5,4],[6,4],[7,4],[4,1],[7,1],[3,2]]),
+           ['sw',0,4,4],['s',0,5,4],['s',0,6,4],['sw',0,7,4],
+           ['c',0,4,5],['s',0,5,5],['s',0,6,5],['c',3,7,5]],
+    gaps:[[4,1,0],[7,1,0],[3,2,1]],
     ride:[6,1], stations:[] },
   // 10 — THE GRAND TOUR. The finale land stands exactly as it shipped: river, pond,
   // farm and houses all at once, two stations far apart, and the double confetti.
+  // E71b: the whole tour arrives glued with FIVE gold gaps along the way —
+  // the first book's finale is a ride to finish, not a build to survive.
   { name:'THE GRAND TOUR', hint:'VISIT BOTH STATIONS!', say:'VISIT BOTH STATIONS!!',
     toy:'exp', land:'rug', ride:[6,5],   // E71: the tour is a finale no more — it rides the tunnel to the garden like everyone else
-    track:[['s',0,5,5],['s',0,6,5]],                       // E69: a head start on the tour's bottom run
+    track:[['s',0,5,5],['s',0,6,5],
+           ['c',1,3,5],['s',0,7,5],['c',3,9,5],['c',1,9,4],['c',2,11,4],['c',3,11,6],
+           ['s',0,10,6],['s',0,9,6],['s',0,7,6],['s',0,6,6],['c',0,3,6]],
+    gaps:[[4,5,0],[8,5,0],[11,5,1],[8,6,0],[4,6,0]],
     glued:[['rv',3,0],['rv',3,1],['rv',3,2],['rv',3,3],['rv',3,4],['rv',4,4],['rv',5,4],['rv',6,4],['rv',7,4],['rv',8,4],
            ['rv',10,1],['rv',11,1],['rv',10,2],['rv',11,2],
            ['fence',0,5],['fence',1,5],['fence',2,5],['fence',2,6],['fence',2,7],
@@ -11121,13 +11139,11 @@ const SOLVE=[
   { start:[5,2], rows:ringRows(4,2,8,5,[[5,5],[6,5]]) },                    // 3 the lane through the woods (the two seeded straights are already down)
   { start:[4,3], rows:swapBr(ringRows(4,2,8,5,[[5,2],[7,2],[5,5],[7,5]]),[[6,2],[6,5]]) },  // 4 two bridges over the river (banks seeded, E69)
   { start:[3,3], rows:ringRows(3,1,7,4,[[4,1],[5,1],[6,1]]) },              // 5 the detour round the pen (the hill arrives glued, E69)
-  { start:[3,1], rows:ringRows(2,1,9,5,[[5,5],[4,1],[5,1]]) },              // 6 ring the street, through the stop (top seeded, E69)
-  { start:[4,1], rows:ringRows(3,1,9,5,[[6,1],[5,1],[7,1]]) },              // 7 ring it through the crossing (flanks seeded, E69)
-  { start:[4,3], rows:ringRows(4,2,8,5,[[6,2],[5,2],[7,2]]) },              // 8 through the tunnel, home below (flanks seeded, E69)
-  { start:[5,1], rows:ringRows(3,1,8,4,[[4,4],[5,4],[6,4],[7,4],[5,1],[6,1]]) },  // 9 close the ring round the siding (top seeded, E69)
-  { start:[7,5], rows:[ ['c',1,3,5],['s',0,4,5],['s',0,7,5],['s',0,8,5],
-      ['c',3,9,5],['c',1,9,4],['c',2,11,4],['s',1,11,5],['c',3,11,6],
-      ['s',0,10,6],['s',0,9,6],['s',0,8,6],['s',0,7,6],['s',0,6,6],['s',0,4,6],['c',0,3,6] ] },  // 10 the grand tour ((5,5)+(6,5) seeded, E69)
+  { start:[4,1], rows:[ ['s',0,3,1],['s',0,7,1],['s',1,2,3],['s',1,9,3] ] },// 6 four gaps close the street (E71b)
+  { start:[5,1], rows:[ ['s',0,4,1],['s',0,8,1],['s',1,3,3],['s',1,9,3] ] },// 7 four gaps round the diamond (E71b)
+  { start:[5,5], rows:[ ['s',1,4,3],['s',1,4,4],['s',0,6,5] ] },            // 8 three gaps through the ridge (E71b)
+  { start:[5,1], rows:[ ['s',0,4,1],['s',0,7,1],['s',1,3,2] ] },            // 9 three gaps round the siding (E71b)
+  { start:[7,5], rows:[ ['s',0,4,5],['s',0,8,5],['s',1,11,5],['s',0,8,6],['s',0,4,6] ] },  // 10 five gaps along the glued tour (E71b)
   // ---- E71: 11-100. Gap levels' rows are exactly their gold cells; seeded
   // lanes close their ring; the pretzels wrap the board and come home under
   // their own bridge. Straights and curves throughout + bridges where the
@@ -14970,12 +14986,22 @@ function drawGlobeChip(){
     for(let i=0;i<4;i++) point(i*Math.PI/2+Math.PI/4,9);   // the little between-points
     cx.fillStyle='#12203A';                       // the deep-space ring
     cx.beginPath(); cx.arc(cxr,cyr,R,0,7); cx.fill();
-    cx.strokeStyle='#2E4E86'; cx.lineWidth=7;
+    // E71b (Wyatt: "it needs something that makes it have to do with trains")
+    // — THE RING IS A RAILROAD: the game's own WESTERN LAND rail recipe bent
+    // round the world. Blue bed (the reference's ring survives underneath),
+    // wooden sleepers, twin steel rails.
+    cx.strokeStyle='#2E4E86'; cx.lineWidth=9;
     cx.beginPath(); cx.arc(cxr,cyr,R-3.5,0,7); cx.stroke();
-    cx.fillStyle='#F7E9C4';                       // tiny stars — we ARE a galaxy
-    for(const [sx,sy,sr] of [[cxr-26,cyr+18,1.6],[cxr+24,cyr+22,1.2],[cxr-20,cyr-24,1.2]]){
-      cx.beginPath(); cx.arc(sx,sy,sr,0,7); cx.fill();
+    cx.strokeStyle='#6B4A2C'; cx.lineWidth=3;     // the sleepers
+    for(let i=0;i<14;i++){ const an=i*TAU/14+0.22;
+      cx.beginPath();
+      cx.moveTo(cxr+Math.cos(an)*(R-7.6),cyr+Math.sin(an)*(R-7.6));
+      cx.lineTo(cxr+Math.cos(an)*(R+0.4),cyr+Math.sin(an)*(R+0.4));
+      cx.stroke();
     }
+    cx.strokeStyle='#4A423A'; cx.lineWidth=2;     // the twin rails
+    cx.beginPath(); cx.arc(cxr,cyr,R-1.8,0,7); cx.stroke();
+    cx.beginPath(); cx.arc(cxr,cyr,R-5.4,0,7); cx.stroke();
     cx.fillStyle='#4E9E5F';                       // the green world
     cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.fill();
     cx.strokeStyle='#2E6E3E'; cx.lineWidth=2.6;   // the wireframe
@@ -14987,6 +15013,8 @@ function drawGlobeChip(){
     for(const k of [0.45,0.8]){                   // …and parallels
       cx.beginPath(); cx.ellipse(cxr,cyr,26,26*k,0,0,7); cx.stroke();
     }
+    cx.fillStyle='#F7E9C4';                       // one star wink — we ARE a galaxy
+    star5(cxr-13,cyr-15,0.5,'#F7E9C4');
     const bx=cxr+R*0.74, by=cyr-R*0.74;           // THE DOOR BUBBLE — the way out
     cx.fillStyle='#4E9E5F'; cx.strokeStyle='#12203A'; cx.lineWidth=3.5;
     cx.beginPath(); cx.arc(bx,by,16,0,7); cx.fill(); cx.stroke();
@@ -14995,6 +15023,32 @@ function drawGlobeChip(){
     cx.strokeStyle='#F2C531'; cx.lineWidth=4;     // the gold arrow, going home
     cx.beginPath(); cx.moveTo(bx-10,by); cx.lineTo(bx+3,by); cx.stroke();
     cx.beginPath(); cx.moveTo(bx-1,by-4.5); cx.lineTo(bx+4,by); cx.lineTo(bx-1,by+4.5); cx.stroke();
+    // THE LITTLE WORLD TRAIN — the RED PUFFER rides the ring's top-left arc,
+    // wheels toward her planet (the Little Prince grammar), puffing along.
+    const la=-2.35, Rm=R-3.5;
+    cx.save();
+    cx.translate(cxr+Math.cos(la)*Rm,cyr+Math.sin(la)*Rm);
+    cx.rotate(la+Math.PI/2); cx.scale(1.35,1.35);
+    cx.globalAlpha=0.85; cx.fillStyle='#FBFDFF';  // two puffs behind her
+    cx.beginPath(); cx.arc(-14,-9,3,0,7); cx.fill();
+    cx.beginPath(); cx.arc(-17.5,-12.5,2.1,0,7); cx.fill();
+    cx.globalAlpha=1; cx.lineJoin='round';
+    cx.fillStyle='#96281B';                       // cow-catcher
+    cx.beginPath(); cx.moveTo(-11,0.5); cx.lineTo(-14.5,3.2); cx.lineTo(-11,3.2);
+    cx.closePath(); cx.fill();
+    cx.fillStyle='#C0392B'; rr(-11,-6.5,15,7.5,2.5); cx.fill();   // the boiler
+    cx.fillStyle='#96281B'; rr(2.5,-9.5,8,10.5,2); cx.fill();     // the cab
+    cx.fillStyle='#F7E9C4'; rr(4.2,-7.8,4.6,3.6,1); cx.fill();    // her window
+    cx.fillStyle='#3A3A3E'; rr(-9.5,-11,3,5,1); cx.fill();        // the stack
+    cx.fillStyle='#F2C531';                                       // the gold dome
+    cx.beginPath(); cx.arc(-2.5,-7.6,1.9,0,7); cx.fill();
+    cx.fillStyle='#23211E';                                       // the wheels
+    cx.beginPath(); cx.arc(-6,2.8,3.1,0,7); cx.fill();
+    cx.beginPath(); cx.arc(5,2.8,3.1,0,7); cx.fill();
+    cx.fillStyle='#F2C531';                                       // gold hubs
+    cx.beginPath(); cx.arc(-6,2.8,1,0,7); cx.fill();
+    cx.beginPath(); cx.arc(5,2.8,1,0,7); cx.fill();
+    cx.restore();
   });
 }
 function outPlank(fn){
@@ -15506,6 +15560,7 @@ function bootLine(){
   return campEnter(n);
 }
 if(bootLine()){} else showScreen('menu');
+AU.on=true;   // E71b: the sound chip retired — the phone owns volume, and no old save stays stranded muted
 shelfSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
