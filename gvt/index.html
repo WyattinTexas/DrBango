@@ -2330,7 +2330,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.80</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.81</div>
   <div class="scanlines"></div>
 </div>
 
@@ -17759,6 +17759,20 @@ function bfqFound(){
 }
 function bfqDeploy(){
   if(!BFQ) return;
+  // v2.81 THE AD MOVED TO THE DOOR (Wyatt 8/8 PM: "the game should fill up,
+  // and both of them get in, and THEN they're both served the ad"): the queue
+  // fills, the ring lands, and the break plays at DEPLOY — never at the tap.
+  // The theater stays ALIVE under the break (clockT still ticking), so a
+  // squadmate's join keeps absorbing right through it, and STAND DOWN — which
+  // never reaches this door — never pays. The ring past zero retries through
+  // here every 100ms: the glass check and the one-break latch make that safe.
+  try{ if(AD) return; }catch(e){}               // a show is already up — the ring retries
+  if(BFQ.adWait) return;                        // one break per deploy
+  BFQ.adWait=true;
+  adGate('bf', bfqDeployNow);
+}
+function bfqDeployNow(){
+  if(!BFQ) return;
   const q=BFQ; bfQueueTeardown();
   // v2.63 SQUADS: squadmates took chairs during the window — the battle rides
   // the ROOM relay instead (real commanders in their claimed chairs, the
@@ -17777,7 +17791,13 @@ function bfqDeploy(){
   startBattlefield(q.mapId, null, q.size, q.plan, q.riv);
   if(q.feat && S.bf){ S.bf.feat=true; if(keepMap!=null){ META.bfMap=keepMap; saveMeta(); } }
 }
-function bfQueueCancel(){ if(!BFQ) return; const hadRoom=!!BFQ.crewRoom; bfQueueTeardown(); if(hadRoom) crewRoomDrop(); SFX.clack(); }
+function bfQueueCancel(){
+  if(!BFQ) return;
+  // v2.81: standing down from the MIRROR really leaves the engager's room —
+  // the pulled chair's party isn't ui:'idle' (crewRoomDrop's own gate), and a
+  // declined pull must not re-fire (CREW.autoBf keeps the room as "seen").
+  if(BFQ.mirror){ bfQueueTeardown(); try{ coopLeave(); }catch(e){} SFX.clack(); return; }
+  const hadRoom=!!BFQ.crewRoom; bfQueueTeardown(); if(hadRoom) crewRoomDrop(); SFX.clack(); }
 function bfQueueTeardown(){
   if(!BFQ) return;
   BFQ.timers.forEach(t=>clearTimeout(t));
@@ -17785,6 +17805,78 @@ function bfQueueTeardown(){
   BFQ=null;
   ['bfqChip','bfqRoster','bfqFound'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('on'); });
   const wtq=document.getElementById('wartable'); if(wtq) wtq.classList.remove('queueing');
+}
+// ===== v2.81 THE MIRROR THEATER (Wyatt 8/8 PM) =====
+// The pulled squadmate's own view of the fill. Same chip, same roster, same
+// beats as bfQueueStart, three differences: the silent room under it is the
+// ENGAGER's (never arm another — crewRoom is set from birth, so the arm and
+// its retry clock both stand down), the engager is seated by their REAL name
+// and colour from the first beat, and the finish line on this side is the
+// BREAK — the engager holds the DEPLOY trigger; the room relay's own state
+// flip is this chair's entry (the poll seam). Scripted drops run a shade
+// quicker than the engager's 9-15s window (v2.52), so this side is ready
+// when their DEPLOY lands and the two breaks overlap instead of stacking.
+function bfqMirrorStart(size, mapId, room, eng){
+  if(BFQ) return;
+  bfqEnsure();
+  const riv=ARMIES[(Math.random()*ARMIES.length)|0];
+  BFQ={ size, mapId, riv, feat:false, plan:bfSeatPlan(size,riv), in:{0:true}, joined:1,
+        t0:Date.now(), timers:[], clockT:0, ringT:0, state:'searching',
+        crewRoom:room, crewSeats:{}, mirror:true };
+  UI.closeModal(); crewHoldClear();
+  const st=BFQ.plan.find(s=>s.team==='you' && s.i!==0);
+  if(st){ st.name=eng.name; if(eng.hex) st.hex=eng.hex; BFQ.crewSeats.eng=st.i;
+          BFQ.in[st.i]=true; BFQ.joined++; }
+  const sub0=document.getElementById('bfqSub');
+  if(sub0) sub0.innerHTML='<b data-notr>'+escH(eng.name.toUpperCase())+'</b> DROPPED IN — '+BFQ.joined+' OF '+(size*2);
+  document.getElementById('bfqTime').textContent='0:00';
+  document.getElementById('bfqChip').classList.add('on');
+  document.getElementById('bfqRoster').classList.add('on');
+  const wtq=document.getElementById('wartable');
+  if(wtq && !wtq.classList.contains('hidden')) wtq.classList.add('queueing');
+  bfqRoster(); SFX.blip(); bfqPulse();
+  BFQ.clockT=setInterval(()=>{ if(!BFQ) return; const s=((Date.now()-BFQ.t0)/1000)|0;
+    const el=document.getElementById('bfqTime'); if(el) el.textContent=(s/60|0)+':'+String(s%60).padStart(2,'0');
+    try{ crewBfSwap(); }catch(e){} },1000);
+  const others=BFQ.plan.filter(s=>!BFQ.in[s.i]).map(s=>s.i);
+  for(let i=others.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=others[i]; others[i]=others[j]; others[j]=t; }
+  const total=6000+Math.random()*3000;
+  const times=others.map(()=>400+Math.random()*(total-400)).sort((a,b)=>a-b);
+  times.forEach((ms,k)=>{ BFQ.timers.push(setTimeout(()=>{
+    if(!BFQ) return;
+    const sti=BFQ.plan.find(s=>s.i===others[k]);
+    if(sti && !BFQ.in[sti.i]){ BFQ.in[sti.i]=true; BFQ.joined++;
+      const sub=document.getElementById('bfqSub');
+      if(sub) sub.innerHTML='<b data-notr>'+escH(sti.name.toUpperCase())+'</b> DROPPED IN — '+BFQ.joined+' OF '+(size*2);
+      bfqRoster(); SFX.blip(); bfqPulse(); }
+    if(BFQ.joined>=size*2) BFQ.timers.push(setTimeout(bfqMirrorFound,600));
+  },ms)); });
+}
+function bfqMirrorFound(){
+  if(!BFQ || !BFQ.mirror || BFQ.state!=='searching') return;
+  BFQ.state='found';
+  const room=BFQ.crewRoom;
+  // the join never landed (room swept, full, or vetoed) — retreat quietly: no
+  // break for a battle this chair can't reach; the chip just folds.
+  if(!COOP || !coopRoom() || COOP.code!==room){
+    bfQueueTeardown(); if(CREW.autoBf===room) CREW.autoBf=null; return; }
+  // the flip already landed and the entry seam gated there instead — or a
+  // break is already up. Never charge this chair twice.
+  if(CREW.bfPaid===room || S.coop || S.mode!=='menu'){ bfQueueTeardown(); return; }
+  try{ if(AD){ bfQueueTeardown(); return; } }catch(e){}
+  document.getElementById('bfqChip').classList.remove('on');
+  document.getElementById('bfqRoster').classList.remove('on');
+  SFX.horn();
+  crewHold('⚑ SQUAD BATTLE — YOU ARE BEING PULLED IN!','Hold tight — the battle is loading. Do not back out.');
+  CREW.bfAdPend=room;
+  adGate('bf', ()=>{
+    if(CREW.bfAdPend===room) CREW.bfAdPend=null;
+    CREW.bfPaid=room;
+    bfQueueTeardown();
+    // the flip landed mid-break — enter now; otherwise the poll seam enters us
+    if(CREW.bfGo===room){ CREW.bfGo=null;
+      if(COOP && coopRoom() && COOP.code===room && !S.coop && S.mode==='menu') roomStartBattle(); }
+  });
 }
 
 // ================= CO-OP: THE ALLIED CAMPAIGN =================
@@ -17881,7 +17973,11 @@ function coopTick(){
       ? { hy:S.bf.base.you.hp, hf:S.bf.base.foe.hp,
           dy:S.bf.base.you.dmgTaken, df:S.bf.base.foe.dmgTaken,
           tl:Math.round(S.bf.timeLeft*10)/10, ph:S.bf.phase, ot:S.bf.ot?1:0 }
-      : { lives:S.lives, wave:S.wave };
+      // v2.81 THE REFEREE'S CLOCK: the streaming campaign's beacon also says
+      // how long until the next wave — one number, and every screen's
+      // countdown reads the referee's watch instead of its own drifted sim.
+      : (S.sq? { lives:S.lives, wave:S.wave, nl:+Math.max(0,S.sq.nextT-S.sq.t).toFixed(1) }
+             : { lives:S.lives, wave:S.wave });
   }
   // the room's table orders ride the same poll — the host's size/map stepper and
   // anybody's SWITCH SIDES. Request-scoped, so they clear on the reply that
@@ -17967,6 +18063,17 @@ function coopOnPoll(r, sentWant){
   // the referee's word on lives lands straight away
   if(S.coop && COOP && !COOP.host && r.beacon && !COOP.ended && typeof r.beacon.lives==='number')
     S.lives=Math.max(0,Math.min(99,r.beacon.lives|0));
+  // v2.81 THE REFEREE'S CLOCK (Wyatt 8/8 PM: "improve… the time a little"):
+  // a throttled tab lags sim time behind wall time and two screens argue
+  // about when the next wave lands. The host's beacon says how long is left;
+  // adopt only a REAL disagreement — sub-second deltas are poll jitter, and
+  // forever nudging a healthy clock reads as stutter. Guests never PUSH
+  // waves (sqRef), so this only ever moves what the countdown shows.
+  if(S.coop && S.sq && !S.bf && COOP && !COOP.host && r.beacon && !COOP.ended
+     && typeof r.beacon.nl==='number'){
+    const want=S.sq.t+Math.max(0,+r.beacon.nl||0);
+    if(Math.abs(want-S.sq.nextT)>0.9) S.sq.nextT=want;
+  }
   // ...and in a room, the referee's word on both toy boxes and the clock. A
   // guest's own sim keeps SHOWING its drifted numbers between beacons — the men
   // still shoot, the bases still crumble — but every second the truth lands on
@@ -17989,7 +18096,24 @@ function coopOnPoll(r, sentWant){
       adGate('camp', ()=>{ CREW.adPend=false; CREW.gatedLaunch=1;
         if(COOP && !S.coop && S.mode==='menu') coopStartBattle(); });
     }
-    else if(!CREW.adPend){ if(coopRoom()) roomStartBattle(); else coopStartBattle(); }
+    else if(!CREW.adPend){
+      if(coopRoom()){
+        // v2.81: the crew-pulled chair pays its break at the MIRROR THEATER's
+        // own finish (bfqMirrorFound). Flip lands mid-break → remember it and
+        // let the break's callback enter. A pulled chair that somehow never
+        // reached the mirror's finish gates RIGHT HERE — the v2.70 contract
+        // at the battlefield door. Invited rooms (join chips, codes) stay free.
+        if(CREW.bfAdPend && CREW.bfAdPend===COOP.code){ CREW.bfGo=COOP.code; }
+        else if(CREW.autoBf===COOP.code && CREW.bfPaid!==COOP.code){
+          const code=COOP.code;
+          crewHold('⚑ YOUR SQUADMATE HIT DEPLOY!','Hold tight — the battle is loading. Do not back out.');
+          adGate('bf', ()=>{ CREW.bfPaid=code;
+            if(COOP && coopRoom() && COOP.code===code && !S.coop && S.mode==='menu') roomStartBattle(); });
+        }
+        else roomStartBattle();
+      }
+      else coopStartBattle();
+    }
   }
   else if(!coopMulti() && wasState==='open' && r.state==='paired'){ COOP.ui='paired'; SFX.horn(); coopPanelOpen(); }
   else {
@@ -18025,14 +18149,23 @@ function coopOnPoll(r, sentWant){
   }
 }
 // Ten armies on one carpet: every commander keeps their own dye if it is legible
-// next to the ones already taken, else the roster hands them a spare. Same picker
-// the battleground's twenty seats use — so nobody ever fights their own colour.
+// v2.81 TRUE COLOURS (Wyatt 8/8 PM, the 4:52 screenshots: one ally GREEN on
+// his own screen, TAN on his buddy's — "the colors are unacceptable"): a
+// commander's army wears ONE colour on EVERY screen — THEIR dye, or the
+// default green. The old walk seeded the palette with MY dye (per-client, so
+// every screen invented its own answer) and dealt undyed allies from the
+// BATTLEGROUND rack — which contains the tan army itself. No deal, no rack:
+// the roster IS the answer. Allies may share green — friend/foe is green/tan
+// on this carpet, and matching screens beat distinct allies (the room law,
+// v2.73, finally applied to the campaign). Placements also carry the owner's
+// hex on the wire now ('hex' was on CMD_KEYS all along), so this map is only
+// the old-sender fallback and the muster panel's dots — same law, same answer.
 function coopSeatColours(){
   if(!COOP) return;
-  const used=[dyeHex()||GREEN], map={};
+  const map={};
   for(const m of (COOP.members||[])){
-    if(m.seat===COOP.seat) continue;
-    map[String(m.seat)] = bfPickHex(used, m.hex||null);
+    if(m.seat==null || m.seat===COOP.seat) continue;
+    map[String(m.seat)] = (typeof m.hex==='string' && /^#[0-9A-Fa-f]{6}$/.test(m.hex))? m.hex : GREEN;
   }
   COOP.seatHex=map;
   for(const h of Object.values(map)) buildUnitTint(h);
@@ -18044,6 +18177,11 @@ function coopPlaced(u){
   if(!S.coop || !COOP || !u) return u;
   u.cid=COOP.role+(COOP.cnt++);
   const cm={k:'place', id:u.cid, t:u.type, x:u.x|0, y:u.y|0, um:+upMul(u.type).toFixed(2)};
+  // v2.81 TRUE COLOURS: the order carries its owner's own colour — exactly
+  // what this screen paints these men — so every other screen paints the same
+  // thing. 'hex' has been on the server's CMD_KEYS whitelist forever (zero
+  // wire change); an old client simply ignores it and falls back to seatHex.
+  cm.hex=dyeHex()||GREEN;
   // THE JET PACK crosses on placement (v1.39): sargeStats() returns a fresh
   // object per call, so the flag rides THIS copy — never the shared tables and
   // never inside sargeStats itself (bfSargeKit/BF_AI_SARGE stay jet-less). The
@@ -18094,10 +18232,15 @@ function coopApply(cm){
     if(!UDEF[cm.t] || coopUnit(cm.id)) return; // replay-safe
     const x=Math.max(58,Math.min(W-24,cm.x|0)), y=Math.max(70,Math.min(WORLD_H-92,cm.y|0));   // 0197: the live height — a tall lobby's relayed drops keep the whole mat (===H flat)
     const u=placeUnit(cm.t,x,y);
-    // whose man this is decides his colour: one ally has ONE tint, a squad of ten
-    // looks him up by seat. (An unknown seat falls back to honest toy blue.)
+    // whose man this is decides his colour: the ORDER ITSELF says it now
+    // (v2.81 TRUE COLOURS — the owner's hex rides the placement, so this man
+    // is painted exactly what his owner sees, on every screen). An old-build
+    // sender carries no hex: the seat map answers (rebuilt on the roster law),
+    // and an unknown seat still falls back to honest toy blue.
     u.cid=cm.id; u.coopBy=cm.p;
-    u.coopHex = coopSquad()? (COOP.seatHex[cm.p]||'#5B84C4') : COOP.mateHex;
+    const ohex=(typeof cm.hex==='string' && /^#[0-9A-Fa-f]{6}$/.test(cm.hex))? cm.hex : null;
+    if(ohex) buildUnitTint(ohex);
+    u.coopHex = ohex || (coopSquad()? (COOP.seatHex[cm.p]||'#5B84C4') : COOP.mateHex);
     if(cm.um) u.coopUM=Math.max(1,Math.min(1.6,+cm.um||1));
     // v2.42: an ally's SPY re-cloaks off the um his order already carries
     // (um = 1 + SPY_DMG_RANK×ru, so his true rank crosses the wire FREE — no
@@ -18163,7 +18306,12 @@ function coopApply(cm){
   if(cm.k==='wava'){ if(COOP.host && !S.sq && !S.waveActive && S.mode==='play') spawnWave(); return; }
   const u=coopUnit(cm.id); if(!u) return;
   if(cm.k==='mv'){
-    u.x=Math.max(58,Math.min(W-24,cm.x|0)); u.y=Math.max(70,Math.min(WORLD_H-92,cm.y|0)); u.sprue=0.2;   // 0197: the live height (===H flat)
+    const nx=Math.max(58,Math.min(W-24,cm.x|0)), ny=Math.max(70,Math.min(WORLD_H-92,cm.y|0));   // 0197: the live height (===H flat)
+    // v2.81: a SETTLE PULSE correcting a near-agreeing copy lands silently —
+    // the sprue wobble is a real-move flourish, not a metronome. Big moves
+    // (drags, real drift) keep the wobble; under 7px nobody should notice.
+    const big=Math.abs(nx-u.x)>7 || Math.abs(ny-u.y)>7;
+    u.x=nx; u.y=ny; if(big) u.sprue=0.2;
     u.laneY=u.y; u.wp=null; u.wade=null;           // the ally set his lane — he marches on in it
     if(u.type==='sarge'){ u.home={x:u.x,y:u.y}; u.saberState='idle'; sgDashEnd(u); }   // moved post cancels a blade run AND a gap-close (v1.67; v1.73 a cancelled dash arms the hidden five)
     return;
@@ -18223,11 +18371,14 @@ function coopStartBattle(){
     S.ann={txt: p===1? tf(S.levelN===100?'LEVEL %1 — THE LAST TOY BOX':'LEVEL %1 — SMASH THEIR TOY BOX', S.levelN)
                      : tf(S.levelN===100?'LEVEL %1 — THE LAST TOY BOX · %2 COMMANDERS':'LEVEL %1 — SMASH THEIR TOY BOX · %2 COMMANDERS', S.levelN, p), t:3.2, sub:campStageName()};
   } else {
-    // the ally fights in their own colour — or honest toy blue if that clashes
+    // v2.81 TRUE COLOURS: the mate wears THEIR dye or the default green on
+    // every screen — the old clash-swap painted an undyed mate toy blue on MY
+    // screen while his own showed green (the pair's copy of the squad's tan
+    // bug, gentler hue). His placements carry his hex on the wire now anyway;
+    // this is the old-sender fallback, and it must give the same answer.
     let hx=COOP.mate && COOP.mate.hex;
-    const mine=(dyeHex()||'').toLowerCase();
-    if(!hx || hx.toLowerCase()===mine) hx = (mine==='#5b84c4'? '#4AA5A0' : '#5B84C4');
-    COOP.mateHex=hx; buildUnitTint(hx);
+    COOP.mateHex=(typeof hx==='string' && /^#[0-9A-Fa-f]{6}$/.test(hx))? hx : GREEN;
+    buildUnitTint(COOP.mateHex);
     // ⚠ v1.28: THE PAIR MISSION STREAMS TOO. "One campaign, the battlefield one"
     // has to mean every door — and the two-player mission was the last place the
     // old wave-gated campaign was still reachable by a player. Two commanders is
@@ -18412,6 +18563,39 @@ function sqTick(dt){
   }
   // v2.55: the computer buddy shops and fields his purple men on his own clock
   if(sq.bot) botTick(sq);
+  // v2.81 THE SETTLE PULSE (Wyatt 8/8 PM: "improve the positioning a little"
+  // — the 4:52 screenshots' halted pair stood 170px apart on the two screens):
+  // two sims march the same man on their own clocks and he comes to rest a
+  // stride apart per screen. When one of MY men settles somewhere NEW — still
+  // for a whole sweep, a real step from where I last pinned him — I radio his
+  // true spot as the plain 'mv' every shipped build already understands
+  // (v1.9 wire word, zero server change; even an old client's copy snaps to
+  // his owner's truth). One word per rest: a marching man is left alone —
+  // mid-march wobble is the loose-sim law's accepted class, the LANDING is
+  // what two players stare at. Sarge included: a settle re-homes his post to
+  // where his owner's copy actually stands (the mv word's own semantics).
+  if(S.coop && COOP && !COOP.ended && !S.bf){
+    sq.ppT=(sq.ppT||0)+dt;
+    if(sq.ppT>=1.25){ sq.ppT=0;
+      for(const u of S.units){
+        if(u.coopBy || !u.cid || u.dead || u.down || u.para || u.emgV || (u.dropT>0) || u.falling) continue;
+        if(S.drag && S.drag.unit===u) continue;
+        const px=u._ppx, py=u._ppy;                    // where he stood last sweep
+        u._ppx=u.x; u._ppy=u.y;
+        if(px==null) continue;
+        const still=Math.abs(u.x-px)<3 && Math.abs(u.y-py)<3;
+        const moved=(u._psx==null) || Math.abs(u.x-u._psx)>18 || Math.abs(u.y-u._psy)>18;
+        // a NEW rest radios at once; a HELD rest re-pins every 8th sweep
+        // (~10s) — an ally's sim that marched my standing man off his spot
+        // (its own foes gave it no reason to halt there) would otherwise
+        // reopen the drift with nothing left to close it (battery-caught).
+        if(still){ u._pr=(u._pr||0)+1;
+          if(moved || (u._psx!=null && u._pr>=8)){ u._pr=0; u._psx=u.x; u._psy=u.y;
+            coopSend({k:'mv', id:u.cid, x:u.x|0, y:u.y|0}); } }
+        else u._pr=0;
+      }
+    }
+  }
   if(!more) campRegroup();   // v1.46: the set is done — the turtle clock runs (doc LAW G)
 }
 // ===== v2.53 THE ABOMINABLE SNOWMAN (Wyatt 8/5, verbatim: "Add an abominable
@@ -18868,7 +19052,8 @@ function duelChipHTML(){
 // ever happen inside it is a real squadmate taking a real chair.
 let CREW={ crew:null, members:[], invites:[], me:null, busy:false, pollT:0, sig:'',
   campGo:null, leadFired:null, autoBf:null,     // v2.69 one-click guards: the go-wish lobby, the lobby already ordered, the room already auto-joined
-  gatedLaunch:0, adPend:false, campLaunch:null, campLaunchT:0 };   // v2.70: paid-my-gate flag · mate's ad in flight · the boom-launch pending lobby + its clock
+  gatedLaunch:0, adPend:false, campLaunch:null, campLaunchT:0,     // v2.70: paid-my-gate flag · mate's ad in flight · the boom-launch pending lobby + its clock
+  bfPaid:null, bfAdPend:null, bfGo:null };   // v2.81: the pulled chair's BF break — paid room · break in flight · flip-landed-mid-break
 const CREW_BF_MIN=2;          // a 1v1 has no second chair on your side
 // ===== v2.66 WEB GOOGLE SIGN-IN (Wyatt 8/7: "on a browser… just do it
 // through Google — that's more natural"). The whole flow is wired and waits
@@ -18956,10 +19141,10 @@ function crewSt(){
 function crewTick(){
   clearTimeout(CREW.pollT);
   if(!META.crew && !CREW.crew) return;            // squadless: silent, by law
-  const fast=(BFQ&&BFQ.crewRoom)||campSceneOpen();
+  const fast=(BFQ&&BFQ.crewRoom)||campSceneOpen()||wartableOpen();   // v2.81: the war table is a squad door too — the pull must land inside the fill window
   CREW.pollT=setTimeout(crewTick, fast?2500:5000);
   if(CREW.busy) return;
-  if(S.mode!=='menu'){ CREW.campGo=null; CREW.campGoLvl=0; CREW.leadFired=null; CREW.gatedLaunch=0; CREW.campLaunch=null; CREW.campLvl=0; crewHoldClear(); return; }   // battle entry retires the one-click guards (and the hold card); never poll from inside a battle
+  if(S.mode!=='menu'){ CREW.campGo=null; CREW.campGoLvl=0; CREW.leadFired=null; CREW.gatedLaunch=0; CREW.campLaunch=null; CREW.campLvl=0; CREW.bfPaid=null; CREW.bfAdPend=null; CREW.bfGo=null; crewHoldClear(); return; }   // battle entry retires the one-click guards (and the hold card); never poll from inside a battle
   // a wish or an order outliving its lobby is litter
   if(CREW.campGo && !(COOP&&coopSquad()&&COOP.code===CREW.campGo)){ CREW.campGo=null; CREW.campGoLvl=0; }
   if(CREW.leadFired && !(COOP&&coopSquad()&&COOP.code===CREW.leadFired)) CREW.leadFired=null;
@@ -19169,7 +19354,9 @@ function crewRoomDrop(){
 // most recent scripted one) starts wearing their REAL name and colour
 function crewBfSwap(){
   if(!BFQ || !BFQ.crewRoom || !COOP || !coopRoom() || COOP.code!==BFQ.crewRoom) return;
-  const mem=(COOP.members||[]).filter(m=>m.side==='y' && !m.host);
+  // v2.81: on the MIRROR the engager is the host (hand-seated at raise) and I
+  // am seat 0 — absorb only the OTHER squadmates, never my own chair
+  const mem=(COOP.members||[]).filter(m=>m.side==='y' && !m.host && !(BFQ.mirror && m.seat===COOP.seat));
   for(const m of mem){
     const key=String(m.seat!=null? m.seat : m.slot);
     if(BFQ.crewSeats[key]!=null) continue;
@@ -19236,12 +19423,16 @@ function crewAutoBf(){
   crewShedRoom(true);                    // v2.73: the pull outranks the last battle's parked room
   if(crewCoopLive()) return;
   CREW.autoBf=f.info.room;
-  // v2.73 (Wyatt 8/8: "it grabbed us when the game was fully ready... the
-  // buttons should probably be gray and it's like, hey, you're about to be
-  // pulled in"): the hold card + grayed War Table go up FIRST, then the pull
-  const room=f.info.room;
-  crewHold('⚑ SQUAD BATTLE — YOU ARE BEING PULLED IN!','Your squadmate queued up the battlefield. Hold tight.');
-  setTimeout(()=>{ if(CREW.autoBf===room && !BFQ && S.mode==='menu') adGate('bf', ()=>crewJoinBf(room)); }, 1400);
+  // v2.81 (Wyatt 8/8 PM: "on his side of the screen, NOTHING happens until
+  // the game starts filling up… it just turns gray"): the pulled player gets
+  // the SAME filling lobby the engager is watching — join the silent room NOW
+  // (the break moved to the door on this side too: it plays at the mirror's
+  // own finish, bfqMirrorFound, so BOTH breaks land at "match ready") and
+  // raise the roster with the engager already seated by real name and colour.
+  const room=f.info.room, size=Math.max(CREW_BF_MIN,Math.min(BF_MAX_TEAM,f.info.size|0));
+  const eng={ name:String(f.name||'ALLY'), hex:(typeof f.hex==='string'? f.hex:null) };
+  crewJoinBf(room);
+  bfqMirrorStart(size, String(f.info.map||META.bfMap), room, eng);
 }
 // the non-leader's DEPLOY in a crew-mustered lobby: their own gate, then the
 // wish rides their presence — the leader's client gives the real order
@@ -19432,6 +19623,9 @@ function roomSeatPlan(team){
   return seats;
 }
 function roomStartBattle(){
+  // v2.81: a fill/mirror theater still up folds at the door — the pulled
+  // chair's entry can land mid-fill when the engager deploys fast
+  if(BFQ && BFQ.crewRoom && COOP && BFQ.crewRoom===COOP.code) bfQueueTeardown();
   UI.closeModal();
   COOP.ended=false; COOP.wantBattle=false; COOP.cnt=1; COOP.seq=0; COOP.outQ.length=0;
   const team=Math.max(1,Math.min(ROOM_MAX,COOP.team|0));
@@ -33725,14 +33919,14 @@ window.UI = {
     // would lift the class and hand back a tray nobody asked to reopen
     const lk=document.getElementById('wtLocker'); if(lk) lk.classList.add('hidden');
     const tr=document.getElementById('wtMapTray'); if(tr) tr.classList.add('hidden');
-    adGate('bf', ()=>bfQueueStart(n)); },
+    bfQueueStart(n); },   // v2.81: the break moved to the DOOR (bfqDeploy) — fill first, ad at BATTLE READY
   // v2.52 THE FEATURED BATTLE — a launcher like wtPlay, but today's fixed map
   // and size ride the queue with the feat flag (the +30★ purse reads it)
   wtFeat(){ audio(); SFX.blip();
     const lk=document.getElementById('wtLocker'); if(lk) lk.classList.add('hidden');
     const tr=document.getElementById('wtMapTray'); if(tr) tr.classList.add('hidden');
     const ft=featBattle();
-    adGate('bf', ()=>bfQueueStart(ft.size,{mapId:ft.map, feat:true})); },
+    bfQueueStart(ft.size,{mapId:ft.map, feat:true}); },   // v2.81: break at the door, not the tap
   // the ONE door (v1.43): everything that isn't PLAY/2v2 lives behind it
   wtMore(){ audio(); SFX.blip(); const lk=document.getElementById('wtLocker'); if(lk) lk.classList.remove('hidden'); },
   wtMoreX(){ SFX.clack(); const lk=document.getElementById('wtLocker'); if(lk) lk.classList.add('hidden'); },
@@ -33794,7 +33988,7 @@ window.UI = {
   wrAct(){ audio(); SFX.blip();
     if(WR.tab==='squad'){ closeWorldRank(); crewPanelOpen(); return; }   // v2.65: the SQUAD tab's button IS the squad door
     if(!WR_CTA[WR.tab]) return;
-    const sz=(WR.tab==='bf1')?1:2; adGate('bf', ()=>bfQueueStart(sz)); },
+    const sz=(WR.tab==='bf1')?1:2; bfQueueStart(sz); },   // v2.81: break at the door, not the tap
   // a row IS a challenge — the modal lives over the room, so the scene stands down
   wrRow(uid){ audio(); SFX.blip(); closeWorldRank(); UI.duelPick(uid); },
   wrMuster(){ SFX.blip(); WR.muster=true; renderWorldRank(); },
