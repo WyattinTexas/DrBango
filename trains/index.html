@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v9.3 -->
+<!-- TRAINSET v9.4 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -1047,6 +1047,12 @@ const CG_LOOP=true;           // E72 THE PATIENT FINGER (Wyatt: "if the player d
 const CG_IDLE=2;              // E73: campaign lessons fire THIS soon (Wyatt: "show up a little
                               // earlier. I was just on level 9, and I didn't see it"); the
                               // bedroom/shop/door lessons keep GH_IDLE's patience.
+const CG_IDLE_LATE=30;        // E74 (Wyatt: "After level 10, it should increase further, to 30
+                              // seconds. After they reach level 10 they know what to do. We can
+                              // always show them the first move; then get off of them."):
+const cgLate=()=>CAMP.on&&CAMP.book==='ten'&&CAMP.level>10;   // …past the first ten…
+const CGL={shown:false};      // …the hand shows ONE move per visit, then gets off — the latch.
+                              // campEnter re-arms it; a kid-killed demo doesn't count as shown.
 const FR_NUDGE=true;          // THE KIND NUDGE: the game itself taps a wrong-heading gap piece straight
 const FR_NUDGE_S=8;           // ...this many sim-seconds after a completed rot demo, repeating till it joins
 const FR_SNAP=true;           // THE HELPFUL LANDING: a sloppy right-kind drop near an open gap lands ON it
@@ -11526,6 +11532,7 @@ function campEnter(n,b){
   CAMP.on=true; CAMP.book=b; CAMP.level=n; CAMP.won=false; CAMP.tugT=false; CAMP.wx=null;   // E35: every level opens under its own sky
   CAMP.visited=new Set(); winT=0; prettyT=0; prettyPend=false;
   FRN.armed=false; FRN.t=0;                   // E70: the nudge arms fresh per visit — only a completed rot demo arms it
+  CGL.shown=false;                            // E74: a fresh visit earns one fresh first-move show (levels past ten)
   ridersOff();                                // E15: fresh platforms for the level's stations
   grid.clear(); hgrid.clear(); scen.clear();
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; trailClear();   // E28: no ghost ribbon on a fresh level
@@ -15368,6 +15375,7 @@ function ghCtx(){
   }
   if(SCREEN==='game'&&CAMP.on){
     if(CND.on||CAMP.won||winT>0||toyCard||toyQ.length) return null;
+    if(cgLate()&&CGL.shown) return null;   // E74: past ten, ONE show per visit — then get off of them
     const fr=frGuideOn()||CG_LOOP;   // E70: the first morning ignores the once-ever bits — E72: every campaign level does (THE PATIENT FINGER)
     if((!HAND.rot||fr)&&frRotCand()) return 'rot';   // E70: fix the piece already down before teaching the next drop
     if((!HAND.gap||fr)&&ghGapOpen()) return 'gap';
@@ -15395,7 +15403,7 @@ function ghTick(dt){
   if(c!==GHOST.ctx){ GHOST.ctx=c; GHOST.idle=0; return; }   // fresh context = fresh clock
   if(!c||ghBusy()){ GHOST.idle=0; return; }
   GHOST.idle+=dt;
-  const need=(c==='gap'||c==='rot')? (frGuideOn()? FR_IDLE : CG_IDLE) : GH_IDLE;   // E70: the first morning waits less — E73: every campaign lesson comes a little earlier
+  const need=(c==='gap'||c==='rot')? (frGuideOn()? FR_IDLE : (cgLate()? CG_IDLE_LATE : CG_IDLE)) : GH_IDLE;   // E70: first morning waits least — E73: ten waits 2s — E74: past ten waits 30s
   if(GHOST.idle>=need&&GHOST.rest<=0){ if(!ghStart(c)) GHOST.idle=0; }   // a refused start retries next window
 }
 // ---- coordinate seams (CSS px; the camera stamps SC/OX/OY per screen) ----
@@ -15489,6 +15497,7 @@ function ghRun(dt){
       if(door||GHOST.loop>=GH_LOOPS){
         const frles=frGuideOn()&&(rot2||GHOST.les==='gap');   // E70: first-morning lessons rest FR_REST and return
         if(rot2){ FRN.armed=true; FRN.t=0; }                  // E70: a COMPLETED rot demo arms the kind nudge
+        if(cgLate()&&(rot2||GHOST.les==='gap')) CGL.shown=true;   // E74: the first move is SHOWN — get off of them
         ghKill(); GHOST.rest=frles? FR_REST : GH_REST; GHOST.idle=0; return;
       }
       GHOST.ph='hold';
