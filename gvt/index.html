@@ -2330,7 +2330,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.74</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.75</div>
   <div class="scanlines"></div>
 </div>
 
@@ -12796,7 +12796,7 @@ const BF_MAPS = [
   // recipe (0.42× wade) in brown, jax on the v2.15 law, pits and fog on the
   // 8/8 kit. Fog banks are pure f(battle clock) — the trainCars law: every
   // sim and every seat sees the same weather, zero RNG.
-  { id:'backyard', name:'THE BACKYARD', ground:'grass',
+  { id:'backyard', name:'THE BACKYARD', ground:'grass', soccer:true,   // 8/8 v2.75: the once-a-battle soccer ball crossing
     blurb:'Out past the porch light. Weave the stones, skirt the mud and the pits — and when the fog rolls over, nobody can see who is winning.',
     build:()=>({
       rocks:[
@@ -12999,6 +12999,16 @@ const ENH_CMDO_GRAV_DMG=0.8,  // the 20% the cannon gives up while the repulsor 
       GG_PUSH=840,            // 8/8 later, Wyatt: "increase knockback distance of commando beam by 500%" — 140 (≈5 m) × 6 = 840 (≈30 m at soldier scale; the card quotes it)
       GG_T=0.55,              // the slide's clock (decelerating; the distance is GG_PUSH exactly — a longer throw earns a beat more air)
       GG_WALL_DMG=1;          // the bonk when a boulder stops the flight dead
+// ===== 8/8 v2.75 THE SOCCER BALL (Wyatt: "a big soccer ball that rolls
+// through and bounces through the map, but just once per map. It can happen
+// at any moment between the 45-second mark and the 10-second mark,
+// destroying any unit that it hits as it bounces across the map") — THE
+// BACKYARD's once-a-battle guest. One const per claim.
+const SB_AT0=10, SB_AT1=45,   // the launch window, seconds into the battle
+      SB_SPD=340,             // px/s across the carpet
+      SB_R=46,                // the contact circle at a landing
+      SB_HOP=0.5, SB_H=76,    // one bounce: period + apex height (170px a hop)
+      SB_LOWZ=38;             // below this the ball is ON the ground and killing — measured: the footprints tile ~80% of the crossing, the arc's shadow is the survivable sliver
 // v2.52: how long a battlefield corpse lies before melting away (Wyatt:
 // "fade the corpses") — 6s at full ink, 3s of fade, then lifted.
 const CORPSE_HOLD=6, CORPSE_FADE=3;
@@ -17423,16 +17433,81 @@ function fogBanks(){
   }
   return out;
 }
+// v2.75: one bank scan per sim-instant (targeting asks per pair — cache it)
+let FOG_B=null, FOG_T=-1;
+function fogFrame(){
+  const T=S.cfg&&S.cfg.terrain; if(!T||!T.fog) return null;
+  if(FOG_T!==S.t){ FOG_T=S.t; FOG_B=fogBanks(); }
+  return FOG_B;
+}
+// which bank stands over (x,y)? −1 = open air. THE seam bfCanTarget and
+// hasGreenTarget ask — a man is hidden from everyone outside his own bank.
+function fogIdxAt(x,y){
+  const B=fogFrame(); if(!B) return -1;
+  for(let i=0;i<B.length;i++){ const b=B[i], nx=(x-b.x)/b.rx, ny=(y-b.y)/b.ry;
+    if(nx*nx+ny*ny<1) return i; }
+  return -1;
+}
 function drawFog(){
-  const banks=fogBanks(); if(!banks) return;
-  for(const b of banks){
-    const g=cx.createRadialGradient(b.x,b.y,b.rx*0.15,b.x,b.y,b.rx);
-    g.addColorStop(0,'rgba(216,228,204,0.94)');
-    g.addColorStop(0.62,'rgba(216,228,204,0.82)');
-    g.addColorStop(1,'rgba(216,228,204,0)');
+  const banks=fogFrame(); if(!banks) return;
+  for(let i=0;i<banks.length;i++){ const b=banks[i];
+    // v2.75 (Wyatt: "more immersive… really hide the units"): the core sits
+    // near-opaque now, and two soft lobes churn around the heart so the bank
+    // reads as weather, not a sticker — still pure f(clock), zero RNG.
+    const g=cx.createRadialGradient(b.x,b.y,b.rx*0.12,b.x,b.y,b.rx);
+    g.addColorStop(0,'rgba(219,230,208,0.97)');
+    g.addColorStop(0.6,'rgba(219,230,208,0.9)');
+    g.addColorStop(1,'rgba(219,230,208,0)');
     cx.save(); cx.translate(b.x,b.y); cx.scale(1,b.ry/b.rx); cx.translate(-b.x,-b.y);
-    cx.fillStyle=g; cx.beginPath(); cx.arc(b.x,b.y,b.rx,0,7); cx.fill(); cx.restore();
+    cx.fillStyle=g; cx.beginPath(); cx.arc(b.x,b.y,b.rx,0,7); cx.fill();
+    for(let w=0;w<2;w++){
+      const a=S.t*0.07+(w?2.6:0.9)+i*1.4;
+      const wx=b.x+Math.cos(a)*b.rx*0.34, wy=b.y+Math.sin(a)*b.rx*0.22;
+      const g2=cx.createRadialGradient(wx,wy,2,wx,wy,b.rx*0.5);
+      g2.addColorStop(0,'rgba(231,240,222,0.5)'); g2.addColorStop(1,'rgba(231,240,222,0)');
+      cx.fillStyle=g2; cx.beginPath(); cx.arc(wx,wy,b.rx*0.5,0,7); cx.fill();
+    }
+    cx.restore();
   }
+  // v2.75 (Wyatt: "allow players to play their units under the fog"): YOUR
+  // men in the mist stay yours to command — a soft blip marks each of MY
+  // figures inside a bank. Position only, never the pose; the enemy's mist
+  // keeps its secrets (their blips never draw on your screen).
+  for(const u of S.units){
+    if(u.dead||u.dropT>0) continue;
+    if(S.bf && u.side!==bfMyTeam()) continue;
+    if(fogIdxAt(u.x,u.y)<0) continue;
+    cx.globalAlpha=0.6; cx.fillStyle='#DFF3C8';
+    cx.beginPath(); cx.arc(u.x,u.y-13,3,0,7); cx.fill();
+    cx.globalAlpha=0.28; cx.strokeStyle='#DFF3C8'; cx.lineWidth=1.5;
+    cx.beginPath(); cx.arc(u.x,u.y-13,7.5,0,7); cx.stroke();
+    cx.globalAlpha=1;
+  }
+}
+// ===== 8/8 v2.75 THE SOCCER BALL's paint — drawn under the fog (weather
+// over everything) and over the figures (it bounces OVER the war). Shadow
+// holds the ground truth; the ball climbs off it and squashes home.
+function drawSoccer(){
+  const sc=S.bf&&S.bf.soccer; if(!sc||sc.gone||sc.clk<sc.at) return;
+  const k=Math.max(0,Math.min(1,sc.z/SB_H));
+  cx.globalAlpha=0.3-0.16*k; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(sc.x,sc.y,SB_R*(1-0.3*k),SB_R*0.38*(1-0.3*k),0,0,7); cx.fill();
+  cx.globalAlpha=1;
+  const by=sc.y-16-sc.z, r=SB_R*0.95;
+  cx.fillStyle='#F4F1E8'; cx.beginPath(); cx.arc(sc.x,by,r,0,7); cx.fill();
+  cx.save(); cx.translate(sc.x,by); cx.rotate(sc.roll||0);
+  cx.fillStyle='#26262A';
+  const pent=(px,py,pr,rot)=>{ cx.beginPath();
+    for(let p=0;p<5;p++){ const a=rot+p*1.2566;
+      const vx=px+Math.cos(a)*pr, vy=py+Math.sin(a)*pr;
+      p? cx.lineTo(vx,vy) : cx.moveTo(vx,vy); }
+    cx.closePath(); cx.fill(); };
+  pent(0,0,r*0.34,-1.5708);
+  for(let p=0;p<5;p++){ const a=p*1.2566-0.94;
+    pent(Math.cos(a)*r*0.74, Math.sin(a)*r*0.74, r*0.19, a+0.6); }
+  cx.restore();
+  cx.strokeStyle='#B9B4A4'; cx.lineWidth=2.5;
+  cx.beginPath(); cx.arc(sc.x,by,r,0,7); cx.stroke();
 }
 // is the ground underfoot snow? One reader. The invariant since v1.96: a
 // battleground map's ground rides in from bfTerrain, and a campaign stage
@@ -19774,6 +19849,12 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   // private room's twenty sims bury identical jacks (the relPos law's spirit).
   for(const j of (S.cfg.terrain.jax||[]))
     S.mines.push({ owner:null, side:'jax', seat:null, x:j.x, y:j.y, armT:0, big:false, sl:false, jx:true });
+  // 8/8 v2.75 THE SOCCER BALL is rolled at arm time — launch second inside
+  // Wyatt's 10..45 window, direction, lane. Per-sim Math.random is the
+  // mineSpot/yeti-dice precedent (theatrics roll their own dice on each
+  // screen — flagged as ever for the rooms).
+  if(map.soccer) S.bf.soccer={ at:SB_AT0+Math.random()*(SB_AT1-SB_AT0),
+    dir:Math.random()<0.5?1:-1, lane:170+Math.random()*(WORLD_H-340), t:0, clk:0, gone:false };
   S.plastic=BF_START;                          // every purse starts level
   // v2.41: only an explicitly-requested map is remembered — a 'random' draw
   // (pref or raid) never clobbers the standing pick, so RANDOM stays RANDOM
@@ -20004,6 +20085,14 @@ function bfCanTarget(u,o){
   // foeSplash, stomps, tumbles, rams and mines resolve by radius and still
   // find him — Wyatt's "he can be hit by area-of-effect enemy moves".
   if(o && o.cloakT>0) return false;
+  // 8/8 v2.75 THE FOG HIDES (Wyatt: "really hide the units… they can kind of
+  // move up undetected"): a man inside a bank cannot be engaged from OUTSIDE
+  // it — same-bank fights stay legal (you found each other in the mist), and
+  // the lobbers get no exception: nobody sees through weather. Area still
+  // finds him by radius (splash, mines, stomps, the ball — the cloak's own
+  // carve-out above), and campNearestFoe still marches men AT him, so the
+  // answer to a fogged foe is the trench's own doctrine: walk in after him.
+  if(o){ const fi=fogIdxAt(o.x,o.y); if(fi>=0 && fogIdxAt(u.x,u.y)!==fi) return false; }
   if(!S.cfg.terrain.trench) return true;            // identity everywhere the ground carries no cut — every narrow rug, every undressed grand rug, every other BF map (0129: was a mode test; the trench itself is the licence)
   if(!inTrench(o)) return true;                     // target in the open: anyone may engage
   if(TRENCH_EXEMPT[u.type]) return true;            // the lobbers see over the lip
@@ -21270,6 +21359,39 @@ function bfTick(dt){
         if(c.off) continue;
         if(segDist(u.x,u.y,c.fx,c.fy,c.bx,c.by)<TRAIN_KILL_R){ trainKill(u); break; }
       }
+    }
+  }
+  // ===== 8/8 v2.75 THE SOCCER BALL — THE BACKYARD's third wheel: launches
+  // once, somewhere in its window, bounces clear across the carpet and is
+  // gone for the battle. It kills on the LANDINGS only (a ball overhead is a
+  // shadow, not a hit), through the train's own trainKill with the train's
+  // own exemptions — plus the HEAVY TANK, which outweighs a toy ball exactly
+  // as it outweighs the wrecking one. Kills stop the moment the match is
+  // decided; the bounce rolls on behind the ceremony (the wheels law).
+  const sc8=bf.soccer;
+  if(sc8 && !sc8.gone){
+    sc8.clk+=dt;
+    if(sc8.clk>=sc8.at){
+      sc8.t+=dt;
+      const run=sc8.t*SB_SPD;
+      sc8.x = sc8.dir>0? -70+run : WORLD_W+70-run;
+      const ph=(sc8.t%SB_HOP)/SB_HOP;
+      sc8.z = SB_H*4*ph*(1-ph);
+      sc8.y = sc8.lane + Math.sin(sc8.t*0.9)*30;
+      sc8.roll=(sc8.roll||0)+dt*(SB_SPD/SB_R)*sc8.dir;
+      if(ph<0.09){ if(!sc8.thk){ sc8.thk=1; bfSfx(SFX.thock, sc8.x, sc8.y);
+        if(bfVis(sc8.x,sc8.y) && !reducedMotion()) S.shake=Math.max(S.shake,0.08); } }
+      else sc8.thk=0;
+      if(sc8.z<SB_LOWZ && !bf.resolved && !bf.ending){
+        for(const u of S.units){
+          if(u.dead||u.dropT>0||u.jetT>0||u.type==='bftank') continue;
+          if(Math.hypot(u.x-sc8.x,u.y-sc8.y)<SB_R){
+            S.fx.push({k:'puff',x:u.x,y:u.y-6,t:0,dur:0.35,R:14});
+            trainKill(u);
+          }
+        }
+      }
+      if(sc8.dir>0? sc8.x>WORLD_W+70 : sc8.x<-70) sc8.gone=true;
     }
   }
   // toy wrecking balls patrol their beat. v2.15 (Wyatt, verbatim): "The Balls
@@ -22571,6 +22693,9 @@ function hasGreenTarget(f){
     if(u.dead) continue;
     if(u.jetT>0) continue;                  // airborne (v1.39): don't aim at the sky
     if(u.cloakT>0) continue;                // v2.42: a cloaked spy halts no volley line — they can't see him
+    // 8/8 v2.75: a green in the mist halts no volley line either — without
+    // this a tan tube would stand staring at a bank it cannot fire into
+    const fi8=fogIdxAt(u.x,u.y); if(fi8>=0 && fogIdxAt(f.x,f.y)!==fi8) continue;
     if(S.drag&&S.drag.unit===u) continue;
     if(Math.hypot(u.x-f.x,u.y-f.y)<=frng(f)) return true;
   }
@@ -26389,6 +26514,24 @@ function drawRug(){
         cx.beginPath(); cx.moveTo(x+j,y); cx.lineTo(x+j-3,y-7); cx.moveTo(x+j,y); cx.lineTo(x+j+3,y-6); cx.stroke();
       }
     }
+    // 8/8 v2.75 THE LONG GRASS (Wyatt: "add some long grass details"):
+    // sparse tall clusters off the same fixed hash grid, swaying on the
+    // clock — draw-only, zero sim weight, deterministic to the eye (the
+    // ponds' own S.t-animation precedent; never RNG in a draw call).
+    cx.globalAlpha=0.85; cx.strokeStyle='#2A4C1F'; cx.lineWidth=2.4; cx.lineCap='round';
+    for(let y=128;y<HT-84;y+=118){
+      for(let x=96;x<WD-84;x+=150){
+        const j=((x*13+y*7)%37); if(j>14) continue;
+        const bx=x+j*3, by=y+(j%9)*4, sw=Math.sin(S.t*0.8+bx*0.05)*2.8;
+        for(let b=0;b<5;b++){
+          const off=(b-2)*3.2;
+          cx.beginPath(); cx.moveTo(bx+off,by);
+          cx.quadraticCurveTo(bx+off+sw*0.5, by-9, bx+off+sw+(b-2)*1.4, by-16-(b%2)*5);
+          cx.stroke();
+        }
+      }
+    }
+    cx.lineCap='butt';
     cx.globalAlpha=1;
   } else if(roof){
     // 8/8 THE DOLLHOUSE ROOF STANDS ON THE RUG — the toy fiction that keeps
@@ -27564,7 +27707,9 @@ function draw(){
 
   // 8/8 THE JUNGLE FOG rolls over the figures and their fx — that is its whole
   // job ("hides units"). Below the bomber (a plane flies above the weather)
-  // and below every float/HUD word.
+  // and below every float/HUD word. v2.75: the soccer ball bounces over the
+  // men and under the mist, in exactly that order.
+  drawSoccer();
   drawFog();
 
   // 0091 THE AIRPLANE BOMBER's flyover — world space, so the battlefield
