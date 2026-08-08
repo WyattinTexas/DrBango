@@ -2330,7 +2330,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.75</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.76</div>
   <div class="scanlines"></div>
 </div>
 
@@ -13004,6 +13004,16 @@ const ENH_CMDO_GRAV_DMG=0.8,  // the 20% the cannon gives up while the repulsor 
 // at any moment between the 45-second mark and the 10-second mark,
 // destroying any unit that it hits as it bounces across the map") — THE
 // BACKYARD's once-a-battle guest. One const per claim.
+// ===== 8/8 v2.76 THE LONG DROP (Wyatt: "The falling part of the roof needs
+// to not instantly kill the unit… they stop moving… fall just straight down
+// and below the rest of the layer of the map… if a player is falling
+// downwards, they could still use the jetpack and get back up.") A roof fall
+// (THE GAP, the eaves) is a STATE now, not an execution: FALL_DUR seconds of
+// visible plummet — halted, untargetable, unshovable — and a jet pack fired
+// on the way down cancels it and flies him out. The impact is what kills
+// (the same environment kill as ever). Pits stay instant swallows: a 20px
+// hole is not a three-storey drop, and there is no sky in it to fly out of.
+const FALL_DUR=1.8;
 const SB_AT0=10, SB_AT1=45,   // the launch window, seconds into the battle
       SB_SPD=340,             // px/s across the carpet
       SB_R=46,                // the contact circle at a landing
@@ -17509,6 +17519,30 @@ function drawSoccer(){
   cx.strokeStyle='#B9B4A4'; cx.lineWidth=2.5;
   cx.beginPath(); cx.arc(sc.x,by,r,0,7); cx.stroke();
 }
+// ===== 8/8 v2.76 THE LONG DROP's paint — the falling man goes straight
+// DOWN off the roof plane, exactly as Wyatt staged it: "they stop moving…
+// fall just straight down and below the rest of the layer of the map." A
+// gap-faller sinks INTO the hole (clipped to its dark, swallowed by the
+// attic); an eave-faller drops past the gutter toward the rug three storeys
+// below, shrinking and fading as he goes. Position stays logical (x,y) —
+// this is presentation, and the jet rescue launches from where he stepped
+// off. Sorted with the actors at his own y, so the hole's rim reads right.
+function drawFaller(o,img,w,flip){
+  const fl=o.falling; if(!fl) return;
+  const k=Math.min(1,fl.t/fl.dur), e=k*k;
+  const gap=(fl.kind==='gap');
+  const south=o.y>WORLD_H/2;
+  const drop=(gap||south? 240 : 64)*e + 8;
+  const sc=1-0.5*e, al=Math.max(0,1-0.85*e);
+  cx.save();
+  if(gap){
+    const g=(S.cfg.terrain.gaps||[]).find(g8=>Math.abs(o.x-g8.x)<g8.w/2+40);
+    if(g){ cx.beginPath(); cx.rect(g.x-g.w/2-2,g.y0,g.w+4,g.y1-g.y0+8); cx.clip(); }
+  }
+  cx.globalAlpha=al;
+  drawSprite(o.type, o.x, o.y+drop, w*sc, Math.sin(k*8)*0.22, 0, img, flip);
+  cx.globalAlpha=1; cx.restore();
+}
 // is the ground underfoot snow? One reader. The invariant since v1.96: a
 // battleground map's ground rides in from bfTerrain, and a campaign stage
 // comes ONLY from CAMP_STAGES inside levelCfg — nothing else may ever write
@@ -17548,10 +17582,25 @@ function fallFx(x,y,kind){
   bfSfx(SFX.ouch,x,y); bfSfx(SFX.thock,x,y);
 }
 function unitFall(u,vd){
-  if(!u || u.dead || u.jetT>0) return;
+  if(!u || u.dead || u.jetT>0 || u.falling) return;
   fallFx(u.x,u.y,vd.kind);
-  if(S.bf){ trainKill(u); return; }
-  knockKill(u);
+  if(vd.kind==='pit'){ if(S.bf){ trainKill(u); } else knockKill(u); return; }
+  // v2.76: the roof's falls take the LONG DROP — he halts and plummets;
+  // unitFallStep lands the kill at FALL_DUR unless a jet pack saves him.
+  u.falling={t:0,dur:FALL_DUR,kind:vd.kind};
+  u.wp=null; u.mgRootT=0;
+}
+// one tick of the plummet; the impact is the old kill, minus a corpse lying
+// ON a void the man visibly fell through (he is three storeys below it).
+function unitFallStep(u,dt){
+  const fl=u.falling; fl.t+=dt;
+  if(fl.t<fl.dur) return;
+  u.falling=null;
+  if(S.bf){
+    trainKill(u);
+    const c=S.corpses[S.corpses.length-1];
+    if(c && c.x===u.x && c.y===u.y) S.corpses.pop();
+  } else knockKill(u,true);
 }
 // slower ramp (7/24): 25★ wins climb the ladder fast, so hard sits far out —
 // most players live on easy/medium, which are tuned for ~80% player wins
@@ -20085,6 +20134,7 @@ function bfCanTarget(u,o){
   // foeSplash, stomps, tumbles, rams and mines resolve by radius and still
   // find him — Wyatt's "he can be hit by area-of-effect enemy moves".
   if(o && o.cloakT>0) return false;
+  if(o && o.falling) return false;   // 8/8 v2.76: a falling man is below the plane — nobody wastes a round on him
   // 8/8 v2.75 THE FOG HIDES (Wyatt: "really hide the units… they can kind of
   // move up undetected"): a man inside a bank cannot be engaged from OUTSIDE
   // it — same-bank fights stay legal (you found each other in the mist), and
@@ -20300,7 +20350,7 @@ function bfVis(x,y){
 function bfSfx(fn,x,y){ if(bfVis(x,y)) fn(); }
 // every damage site funnels through here so the blade can turn a round aside
 function hurt(f,dmg,src){
-  if(S.bf && f.side && f.jetT>0) return;       // airborne (v1.39): untouchable on the battlefield too
+  if(S.bf && f.side && (f.jetT>0||f.falling)) return;   // airborne (v1.39) — and v2.76's fallers — untouchable on the battlefield too
   if(S.bf && f.side && sargeAbsorbs(f)) return; // THE RIOT SHIELD (v1.52): above the blade — one event, one pip, no double roll
   if(S.bf && f.side && cmdAbsorbs(f)) return;  // 0092 the commander's counted block — same law, other rig (weapon-exclusive with the plate)
   if(S.bf && f.side && saberBlocksU(f)) return;
@@ -20731,6 +20781,7 @@ function bfUnitStep(u,dt){
     }
     return false;
   }
+  if(u.falling){ unitFallStep(u,dt); return false; }       // 8/8 v2.76: a falling man is falling — nothing else this frame
   if(u.shv){ ggShoveStep(u,dt); return false; }            // 8/8 gravity gun: a hurled man is a passenger this frame
   if(u.def.ram) bfRam(u);                                  // the bumper checks before the wheels turn
   if(u.saberState && u.saberState!=='idle') return true;   // let a charging Sarge finish his run
@@ -21078,6 +21129,7 @@ function campNearestFoe(u){
   return best;
 }
 function campUnitStep(u,dt){
+  if(u.falling){ unitFallStep(u,dt); u.marching=false; return false; }   // 8/8 v2.76 the long drop
   // the jump tank reads the OWNER'S bench, and for a relayed man that bench is
   // only known once the placement has landed — so the pace is written on his
   // first step, never at placeUnit time (same number, correct owner).
@@ -22570,7 +22622,7 @@ function cmdoBeamHit(sh,f){
 // crawlers and airborne men are too heavy or not there to move.
 function ggCanShove(f){
   if(!f || f.dead || (f.hp!=null&&f.hp<=0)) return false;
-  if(f.jetT>0 || f.burrow) return false;
+  if(f.jetT>0 || f.burrow || f.falling) return false;   // v2.76: a man already plummeting is past shoving
   if(f.def && (f.def.vehicle || f.def.boss)) return false;
   if(f.boss || f.type==='mom' || f.type==='yeti') return false;
   return true;
@@ -22612,8 +22664,9 @@ function ggShoveStep(o,dt){
     const vd=voidAt(o.x,o.y) || roofFallAt(o.y);
     if(vd){
       o.shv=null;
-      if(S.bf||o.side){ unitFall(o,vd); }                     // a unit falls on the spot
-      else { fallFx(o.x,o.y,vd.kind); o.shvSrc=sv.src; o.fellVoid=vd; }   // a campaign foe is flagged (the v2.54 splice law)
+      if(S.bf||o.side){ unitFall(o,vd); }                     // a unit: pit = instant, roof = the v2.76 long drop
+      else if(vd.kind==='pit'){ fallFx(o.x,o.y,'pit'); o.shvSrc=sv.src; o.fellVoid=vd; }   // a campaign foe in a pit: flagged (the v2.54 splice law)
+      else { fallFx(o.x,o.y,vd.kind); o.shvSrc=sv.src; o.falling={t:0,dur:FALL_DUR,kind:vd.kind}; }   // v2.76: shoved off the roof — the long drop, credit held for the impact
       return;
     }
   }
@@ -22631,7 +22684,7 @@ function ggShoveStep(o,dt){
 // the fling keeps the shipped mineSpot Math.random (per-sim theatrics — the
 // spawn-dice precedent, and the old spot rolled the same dice).
 function sweepTick(u,dt){
-  if(u.dead || u.dropT>0) return;
+  if(u.dead || u.dropT>0 || u.falling) return;   // v2.76: no charges leave a plummeting pouch
   if(S.drag && S.drag.unit===u) return;                 // the figure in your hand plants nothing
   if(u.mineSpot){
     u.swTell=(u.swTell==null? MINE_TELL : u.swTell)-dt;
@@ -22693,6 +22746,7 @@ function hasGreenTarget(f){
     if(u.dead) continue;
     if(u.jetT>0) continue;                  // airborne (v1.39): don't aim at the sky
     if(u.cloakT>0) continue;                // v2.42: a cloaked spy halts no volley line — they can't see him
+    if(u.falling) continue;                 // v2.76: a plummeting green halts nobody either
     // 8/8 v2.75: a green in the mist halts no volley line either — without
     // this a tan tube would stand staring at a bank it cannot fire into
     const fi8=fogIdxAt(u.x,u.y); if(fi8>=0 && fogIdxAt(f.x,f.y)!==fi8) continue;
@@ -22852,6 +22906,10 @@ function jetLaunch(u,tx,ty,relay,airW){
   // airborne. saberCd is left alone: it only ever decrements in the loop head.
   if(u.saberState && u.saberState!=='idle'){ u.saberState='idle'; u.saberTarget=null; }
   u.saberSwing=0;
+  // 8/8 v2.76 THE RESCUE (Wyatt: "if a player is falling downwards, they
+  // could still use the jetpack and get back up") — a jet fired on the way
+  // down cancels the plummet; the flight itself is the climb back out.
+  u.falling=null;
   sgDashEnd(u);   // a launch mid-gap-close ends the dash the same way (v1.67; v1.73 the end arms the hidden five — sgCd still only ever DECREMENTS in the loop head)
   // 0100 THE ENGINE: thrust. Same reach — the flight just takes less of the
   // clock (JET_AIR/ENG_MUL), so the zip is the fastest thing in the game. SIM
@@ -23127,6 +23185,7 @@ function knock(u, srcx, srcy, rolled){
   // One line here covers the officer, the jeep, the tank, all three bosses,
   // THEIR SARGE's strike, splash friendly fire, grit-outs and the backfire.
   if(u.jetT>0) return;
+  if(u.falling) return;   // 8/8 v2.76: a man mid-plummet is below the plane — no round reaches him
   // THE RIOT SHIELD (v1.52) stands here for the same reason the jet guard does:
   // above the blade roll, so an absorbed hit never also rolls a deflect. The
   // grit-out that arrives from tanHit already passed the plate up there (it
@@ -23156,17 +23215,21 @@ function knock(u, srcx, srcy, rolled){
 // take a man without asking the plate/blade/jet guards above (gravity is not
 // a round to deflect). Books, refund, Sarge's clock and the coach live here
 // exactly as they always did.
-function knockKill(u){
+function knockKill(u,quiet){
   if(u.dead) return;
   u.dead=true; SFX.clack();
   const RM=reducedMotion();
-  // a fallen MACHINE rolls onto its back as it melts (the v1.61 rot override —
-  // 3.14 is the pose its battleground corpse wears); a man keeps the tip-over
-  S.fx.push({k:'fallen', type:u.type, img:unitImg(u.type,u), w:unitW(u.type),
-             x:u.x, y:u.y, t:0, dur:RM?0.4:1.1, rot:(u.def&&u.def.vehicle)?3.14:null});
-  S.fx.push({k:'ring', x:u.x, y:u.y-20, r:6, R:26, t:0, dur:0.35, col:'rgba(255,255,255,0.7)'});
-  if(u.def && u.def.vehicle){ bfSfx(SFX.boom, u.x, u.y);
-    S.fx.push({k:'puff',x:u.x,y:u.y-16,t:0,dur:0.5,R:24}); }
+  // v2.76: quiet = a fall's impact — the books below still run whole, but no
+  // tip-over fx replays a man at the surface he visibly fell through.
+  if(!quiet){
+    // a fallen MACHINE rolls onto its back as it melts (the v1.61 rot override —
+    // 3.14 is the pose its battleground corpse wears); a man keeps the tip-over
+    S.fx.push({k:'fallen', type:u.type, img:unitImg(u.type,u), w:unitW(u.type),
+               x:u.x, y:u.y, t:0, dur:RM?0.4:1.1, rot:(u.def&&u.def.vehicle)?3.14:null});
+    S.fx.push({k:'ring', x:u.x, y:u.y-20, r:6, R:26, t:0, dur:0.35, col:'rgba(255,255,255,0.7)'});
+    if(u.def && u.def.vehicle){ bfSfx(SFX.boom, u.x, u.y);
+      S.fx.push({k:'puff',x:u.x,y:u.y-16,t:0,dur:0.5,R:24}); }
+  }
   // ⚠ A PARATROOPER IS OFF THE BOOKS (v1.45) — no dog tags, no casualty. He was
   // never bought, so refunding half of a price nobody paid is a plastic faucet
   // (a radio man would print his own +20 by dying), and he is DROPPED BEHIND
@@ -25430,7 +25493,10 @@ function update(dt){
     // below fires from a standstill now, and the walk back to his formation
     // slot waits out the clock (the slot marches on; the spring's own ×1.8
     // catch-up brings him back — the aimT law, just longer).
-    if(f.shv){ ggShoveStep(f,dt); if(dt>0){ f.vx=0; f.vy=0; } }   // 8/8 gravity gun: the flight owns his feet this frame
+    if(f.falling){ f.falling.t+=dt;   // 8/8 v2.76 the long drop: he plummets, the sweep lands the kill at impact
+      if(f.falling.t>=f.falling.dur){ const fk=f.falling.kind; f.falling=null; f.fellVoid={kind:fk}; }
+      if(dt>0){ f.vx=0; f.vy=0; } }
+    else if(f.shv){ ggShoveStep(f,dt); if(dt>0){ f.vx=0; f.vy=0; } }   // 8/8 gravity gun: the flight owns his feet this frame
     else if(f.aimT>0 || f.mgRootT>0){ if(dt>0){ f.vx=0; f.vy=0; } }   // stopped to shoot — your window
     else {
     // the river funnels everyone to the bridge — except crawlers, who slip under
@@ -25549,9 +25615,12 @@ function update(dt){
     // GAP goes down it — FLAGGED here (we are inside the foes loop), killed
     // by the sweep outside it (the v2.54 splice law). The big ones and the
     // under-rug are exempt; a mid-shove man is the shove step's own check.
-    if(!f.shv && !f.fellVoid && !f.boss && !f.burrow && f.type!=='mom' && f.type!=='yeti'){
+    if(!f.shv && !f.falling && !f.fellVoid && !f.boss && !f.burrow && f.type!=='mom' && f.type!=='yeti'){
       const vd8=voidAt(f.x,f.y);
-      if(vd8){ fallFx(f.x,f.y,vd8.kind); f.fellVoid=vd8; }
+      if(vd8){ fallFx(f.x,f.y,vd8.kind);
+        if(vd8.kind==='pit') f.fellVoid=vd8;
+        else f.falling={t:0,dur:FALL_DUR,kind:vd8.kind};   // v2.76: the tan takes the long drop too — the sweep kills at impact
+      }
     }
     if(dt>0){ f.vx=(f.x-px)/dt; f.vy=(f.y-py)/dt; }
 
@@ -28235,6 +28304,7 @@ function drawSargeOutfit(u){
 function drawUnit(u){
   // airborne (v1.39): the arc replaces the man, both carpets. THE DROP (v1.45)
   // borrows that state and NOT its picture — the canopy is the whole tell.
+  if(u.falling){ drawFaller(u, unitImg(u.type,u), unitW(u.type), S.bf&&u.side==='foe'); return; }   // 8/8 v2.76 the long drop
   if(u.jetT>0){ if(u.para) drawChute(u); else drawJetFlight(u); return; }
   const w=unitW(u.type), im=unitImg(u.type,u);
   if(S.bf){ drawBFUnit(u,w,im); return; }
@@ -28480,6 +28550,7 @@ function drawSargeWeapon(u){
   if(wflip) cx.restore();
 }
 function drawFoe(f){
+  if(f.falling){ drawFaller(f, foeImg(f.type), f.def.w, false); return; }   // 8/8 v2.76 the long drop, tan edition
   if(f.boss){
     if(f.type==='mom'){
       // v1.79: a big soft shadow under the slippers, the giants' slow heavy
