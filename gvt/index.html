@@ -2330,7 +2330,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.77</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.78</div>
   <div class="scanlines"></div>
 </div>
 
@@ -22515,9 +22515,26 @@ function cmdoReflLand(sh){
 // at trigger time with the moment the wipe crosses him, and the shots loop
 // lands the hits as the clock passes them — the frame clamp can delay a hit,
 // never resize or double it, and the queue IS the per-shot visited set.
+// v2.78 (Wyatt 8/8: "sometimes I catch the beam not really coming from the
+// gun"): the muzzle is MEASURED off the sprite's own ink now — tip lands at
+// (124, 56.8) of the 129×150 bake, → (+28, −42) at the drawn 58 width with
+// the v2.39 audit's own cap. The old 22/33 was a guess ~9px under the barrel.
+// ONE seam: the beam draw, the hit math and the sidestep's line all read it.
+const CMDO_MZX=28, CMDO_MZY=42;
 function cmdoMuzzle(u){
   const dir=paraBand(u).dir;
-  return { x:u.x+22*dir, y:u.y-33, dir };
+  return { x:u.x+CMDO_MZX*dir, y:u.y-CMDO_MZY, dir };
+}
+// v2.78 (Wyatt: "There should be a slight movement with the gun when the
+// attack goes off. Otherwise, it looks a little sloppy."): the cannon is
+// baked into the figure, so the FIGURE works the shot — a small kick-dip at
+// the trigger, then the whole piece tracks the wipe upward through sweepT
+// (±4°, mirrored with the facing). Read at the standing sprite calls.
+function cmdoRecoil(u){
+  if(u.type!=='commando' || !(u.cmdoFireT>0)) return 0;
+  const k=1-u.cmdoFireT/CMDO.sweepT;
+  const dir=(S.bf&&u.side==='foe')?-1:1;
+  return dir*(0.055-0.13*k);
 }
 // v2.56: the commando's SIDESTEP — called only when the wipe found nobody.
 // Nearest man the cannon could REACH (same eligibility as the sweep, minus
@@ -22536,11 +22553,14 @@ function cmdoShuffle(u,rng){
     if(d>rng+CMDO.beamW*0.5 || d<1) continue;
     if(d<bd){ bd=d; best=f; }
   }
-  if(!best) return;                       // truly nobody reachable — stand easy
-  const want=best.y+15;                   // rel→0 when (f.y-18)===M.y, and M.y=u.y-33
-  const step=Math.max(6,((u.def&&u.def.moveSpd)||40)*0.25);
-  u.y += Math.max(-step, Math.min(step, want-u.y));
-  u.y = Math.max(74, Math.min(WORLD_H-92, u.y));
+  if(!best){ u.shufTo=null; return; }     // truly nobody reachable — stand easy
+  // v2.78 (Wyatt: "when the commandos move up and down, it's a little
+  // glitchy. They kind of hop"): the shuffle only AIMS now — it sets the
+  // line (u.shufTo) and the loop head GLIDES him there at walking pace,
+  // every frame. The old body moved a whole retry-tick's worth (6-10px) in
+  // one frame, once per 0.25s — which is exactly a hop.
+  const want=best.y+(CMDO_MZY-18);        // rel→0 when the chest (f.y-18) sits on the muzzle line
+  u.shufTo=Math.max(74, Math.min(WORLD_H-92, want));
 }
 function cmdoSweepFire(u,dmg,rng){
   const M=cmdoMuzzle(u), dir=M.dir;
@@ -22563,6 +22583,8 @@ function cmdoSweepFire(u,dmg,rng){
     hits.push({f, at:k*CMDO.sweepT});
   }
   if(!hits.length) return false;                                // nobody in the arc — hold the drum
+  u.cmdoFireT=CMDO.sweepT;                                      // v2.78: the cannon RECOILS through the wipe (drawn at the sprite call)
+  u.shufTo=null;                                                // firing = this line is the right line
   hits.sort((a,b)=>a.at-b.at || a.f.x-b.f.x || a.f.y-b.f.y);    // stable order, never array order
   const seen=new Set(hits.map(h=>h.f));                         // the sweep's ONE visited set — the chain shares it
   bfSfx(SFX.laser, u.x, u.y); bfSfx(SFX.crack, u.x, u.y);
@@ -22592,7 +22614,7 @@ function cmdoBeamHit(sh,f){
   // 8/8 THE GRAVITY GUN: the survivor is hurled along the very ray that hit
   // him — muzzle through chest, "the angle it hits them from". The chain's
   // hops push nobody (the throw is the BEAM's), and the big things are exempt.
-  if(sh.grav) ggShove(f, sh.x, sh.y, u);
+  if(sh.grav) ggShove(f, sh.x, sh.y, u, sh);
   if(!sh.coil) return;
   let from=f, d0=sh.dmg;
   for(let hop=1; hop<=ENH_CMDO_CHAIN_MAX; hop++){
@@ -22632,21 +22654,32 @@ function ggCanShove(f){
   if(f.boss || f.type==='mom' || f.type==='yeti') return false;
   return true;
 }
-function ggShove(f,mx,my,src){
+function ggShove(f,mx,my,src,sh){
   if(!ggCanShove(f)) return;
   const dx=f.x-mx, dy=(f.y-18)-my, d=Math.hypot(dx,dy)||1;
   f.shv={ t:GG_T, dur:GG_T, x:dx/d, y:dy/d, src };
   S.fx.push({k:'ring',x:f.x,y:f.y-16,r:4,R:26,t:0,dur:0.22,col:'#CDE6FF'});
+  // v2.78 (Wyatt: "a 'Whoosh' type of push back"): the gust gets a VOICE —
+  // one whoosh per wipe (the jet pack's own ignition, which IS the house
+  // whoosh), however many men it gathers up.
+  if(sh && !sh.whoosh){ sh.whoosh=1; bfSfx(SFX.jet, f.x, f.y); }
 }
 // one slide step, either army, either carpet. The victim is a passenger
 // while it runs; the caller skips his ordinary frame.
 function ggShoveStep(o,dt){
   const sv=o.shv; if(!sv) return;
+  // v2.78 (Wyatt: "it needs to feel more like a push. We're going for a
+  // 'Whoosh' type of push back"): SMOOTHSTEP displacement — the gust gathers
+  // him up, carries him, sets him down. The old linear decay started at peak
+  // velocity, which read as a yank. Exact by construction: each frame moves
+  // the difference of the curve, so the total is GG_PUSH to the pixel.
+  const ss=k8=>k8*k8*(3-2*k8);
+  const k0=Math.min(1,(sv.dur-sv.t)/sv.dur);
   sv.t-=dt;
-  const k=Math.max(0,sv.t/sv.dur), v=(2*GG_PUSH/sv.dur)*k;   // linear decel — the area under it is GG_PUSH exactly
-  // ⚠ at 840px the peak is ~90px a frame — SUBSTEP the slide (≤10px a hop)
-  // or it tunnels straight through a pit's 20px hole and a boulder's rim.
-  let move=v*dt;
+  const k1=Math.min(1,(sv.dur-Math.max(0,sv.t))/sv.dur);
+  // ⚠ the mid-gust peak is still ~40px a frame — SUBSTEP the slide (≤10px a
+  // hop) or it tunnels straight through a pit's 20px hole and a boulder's rim.
+  let move=GG_PUSH*(ss(k1)-ss(k0));
   while(move>0){
     const st=Math.min(10,move); move-=st;
     const nx=o.x+sv.x*st, ny=o.y+sv.y*st;
@@ -22675,7 +22708,11 @@ function ggShoveStep(o,dt){
       return;
     }
   }
-  if(((S.t*60)|0)%2===0) S.fx.push({k:'puff',x:o.x,y:o.y-3,t:0,dur:0.25,R:8});
+  // v2.78: the gust made visible — thin wind wisps trail him the whole ride
+  if(((S.t*60)|0)%2===0){
+    S.fx.push({k:'wisp',x:o.x-sv.x*16,y:o.y-12-sv.y*16,vx:-sv.x*34,vy:-sv.y*20,up:5,r0:2.4,r1:6.5,t:0,dur:0.3});
+    S.fx.push({k:'puff',x:o.x-sv.x*8,y:o.y-3,t:0,dur:0.22,R:7});
+  }
   if(sv.t<=0) o.shv=null;
 }
 // ===== 8/8 THE SWEEPER'S TIMER (Wyatt, verbatim: "dropping mines on a
@@ -25805,6 +25842,14 @@ function update(dt){
     if(u.pistT>0) u.pistT-=dt;       // the sidearm's buck (v1.50), same idea
     if(u.pist2T>0) u.pist2T-=dt;     // ...and the OFF-hand's buck once he's holding two (v1.67)
     if(u.pumpT>0) u.pumpT-=dt;       // the shotgun forend racking home (v1.50)
+    if(u.cmdoFireT>0) u.cmdoFireT-=dt;   // v2.78: the cannon's recoil rides out on the figure (draw timer, sim dt)
+    // v2.78 THE SMOOTH SIDESTEP: cmdoShuffle only aims (u.shufTo); the feet
+    // move HERE, at walking pace, every frame — no more one-lump hops.
+    if(u.type==='commando' && u.shufTo!=null && !u.dead && !(u.dropT>0) && !u.falling && !u.shv){
+      const spS=((u.def&&u.def.moveSpd)||32)*dt, dyS=u.shufTo-u.y;
+      if(Math.abs(dyS)<=spS){ u.y=u.shufTo; u.shufTo=null; }
+      else u.y+=Math.sign(dyS)*spS;
+    }
     // v2.42 THE SPY's cloak burns at the loop head (the saberCd law — it
     // ticks on the march AND in a fight), held only through the BF drop
     // ghost, so his four seconds start the moment he LANDS. The decloak
@@ -28321,7 +28366,7 @@ function drawUnit(u){
   // battlefield's, below).
   const ck=u.cloakT>0;
   if(ck) cx.globalAlpha=0.42;
-  drawSprite(u.type,u.x,u.y,w,0,Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03),im);
+  drawSprite(u.type,u.x,u.y,w,cmdoRecoil(u),Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03),im);   // v2.78: the recoil, campaign edition
   if(ck) cx.globalAlpha=1;
   if(u.type==='radioman') drawRadioCall(u);
   if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); drawAbsorbPips(u); }
@@ -28374,7 +28419,7 @@ function drawBFUnit(u,w,im){
   // solid bar over a ghost reads as a bug; it returns the frame he appears)
   const ck=u.cloakT>0;
   if(ck) cx.globalAlpha=0.42;
-  drawSprite(u.type,u.x,u.y,w,0, wob, im, flip);
+  drawSprite(u.type,u.x,u.y,w,cmdoRecoil(u), wob, im, flip);   // v2.78: the cannon's recoil rides the whole figure
   if(ck){ cx.globalAlpha=1; return; }
   if(u.type==='radioman') drawRadioCall(u);
   if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); }
