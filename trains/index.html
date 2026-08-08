@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v8.1 -->
+<!-- TRAINSET v9.0 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -44,7 +44,12 @@
   /* E63: MENU takes the corner ("get it off the map"); the sound chip steps inboard
      (MENU is ~110px wide from the edge — 130 clears it on every viewport) */
   #mute{ right:130px; }
-  #menuChip{ right:8px; }
+  /* E71 THE GLOBE — the way home stopped being a word. The corner wears the
+     little world (the reference grammar: blue compass ring, gold points,
+     green wireframe globe, a door bubble): a painted canvas, no pill. */
+  #menuChip{ right:8px; top:6px; background:none; border:none; padding:0; border-radius:50%; }
+  #menuChip canvas{ width:66px; height:66px; display:block; pointer-events:none;
+    filter:drop-shadow(0 3px 4px rgba(0,0,0,0.45)); }
   #backChip{ right:76px; display:none; }
   /* ---- the HOME chip (E10): in the corner cluster since E25, second row —
      appears only while zoomed off the default (rows sit 48px apart: the chips
@@ -731,7 +736,7 @@
      stop-pips read straight off the win law's visited set; tap = replay the pan -->
 <div class="chip" id="goalChip"><canvas id="goalCv" width="148" height="58"></canvas></div>
 <div class="chip" id="mute">🔊</div>
-<div class="chip" id="menuChip">🏠 MENU</div>
+<div class="chip" id="menuChip"><canvas id="menuGlobe" width="132" height="132"></canvas></div>
 <div class="chip" id="backChip">🎫 LEVELS</div>
 <div class="chip" id="starChip"><b>SHOP</b><span id="starChipN">★ 0</span></div>
 <div class="chip" id="homeChip">🔎 WHOLE RUG</div>
@@ -806,7 +811,7 @@
   </div>
 </div></div>
 <div id="board"><div id="bpanel">
-  <h1>TEN LITTLE LINES</h1>
+  <h1>ONE HUNDRED LITTLE LINES</h1>
   <div id="bsub">BUILD A LINE THAT LOOPS</div>
   <div id="tickets"></div>
   <div id="pkhead">🎃 PUMPKIN LINES</div>
@@ -1010,6 +1015,7 @@ const FR_SNAP=true;           // THE HELPFUL LANDING: a sloppy right-kind drop n
 const FR_SNAP_R=1.5;          // ...within this many cells (rotation kept — the rotate moment survives)
 const FR_SHAPED=true;         // THE GAP IS SHAPED: an open gap accepts only its own track kind (soft boing)
 const FR_DOOR_CONTINUE=false; // ON: the front door's GO enters the next unwon level directly (skips the wall)
+const BOOT_LINE=true;         // E71 THE MORNING TRAIN: every boot lands inside the frontier level (off = E70's first-run-only law)
 let FR={menuSeen:0};          // the additive `fr` save key (the `hand` grammar verbatim, v stays 11)
 const FRN={t:0,armed:false};  // the nudge's little clock — armed only by a COMPLETED rot demo
 const firstRun=()=>!FR.menuSeen&&CAMP.done.size===0;   // the ten book's done-set only — the boot law reads this
@@ -1968,6 +1974,12 @@ const STORE=[
   // dial, lean no, per GALAXY.md).
   ['pres','PRESENT','model',10], ['cott','COTTAGE','model',12], ['rein','REINDEER','model',14],
   ['cpole','CANDY POLE','model',10], ['sfir','SNOW TREE','model',12], ['sant','SANTA','model',30],
+  // E71 — the galaxy comes home: THE UNICORN (a FRIEND — she jumps a full
+  // sparkling arc at every pass; level 70's finale hands her over) and THE
+  // RAINBOW (nature — five bands on two cloud feet; level 65's gift). Both
+  // granted by campaign wins AND sold like everything else (the buy-or-win
+  // law). STORE rows by the E9 law: never COLL, never the toy-box "n / 50".
+  ['uni','UNICORN','model',28], ['rbow','RAINBOW','model',20],
 ];
 const STORE_BY={}; for(const [id,name,cat,price] of STORE) STORE_BY[id]={id,name,cat,price:price|0};
 const STORE_FREE=STORE.filter(r=>!r[3]).map(r=>r[0]);   // wh_peep · cr_bonk · bl_ding — everyone's
@@ -1980,7 +1992,7 @@ const TRAIL_IDS=['tr_rain','tr_spark'];   // E28: TRAIN SETS shelf, after the li
 const WHISTLE_IDS=['wh_peep','wh_horn','wh_chime','wh_toot','wh_quack','wh_fart'];
 const CRASH_IDS=['cr_bonk','cr_bang','cr_boing','cr_smash','cr_thud','cr_pfft'];
 const BELL_IDS=['bl_ding','bl_bell','bl_cuckoo','bl_cow'];
-const MODEL_IDS=['fount','stat','fire','arch','flag','mail2','bench','clock','vtree','bleaf','wolf','peng','iglu','roadr','bcact','pum','scrow','crow','atree','lant','king','pres','cott','rein','cpole','sfir','sant'];   // E31: the jungle plants join the bits shelf; E35: the wolf; E42: the penguin + the igloo; E43: the roadrunner + the bloom cactus; E50: the patch's six; E51: the village's six
+const MODEL_IDS=['fount','stat','fire','arch','flag','mail2','bench','clock','vtree','bleaf','wolf','peng','iglu','roadr','bcact','pum','scrow','crow','atree','lant','king','pres','cott','rein','cpole','sfir','sant','uni','rbow'];   // E31: the jungle plants join the bits shelf; E35: the wolf; E42: the penguin + the igloo; E43: the roadrunner + the bloom cactus; E50: the patch's six; E51: the village's six; E71: the unicorn + the rainbow
 const COLL_NO_SALE=[];        // of the fifty, ids Wyatt pulls off the shelf (default: all sell)
 // THE STAR BANK — every mint amount is a dial; all of it generous, none of it a wall
 const MINT={ lap:1, station:1, bonk:1, clear:10, firstLap:5, pretty:1, piggy:PIG_PAYS };   // pretty = E14's scenery bonus · piggy = E23's daily base
@@ -5192,7 +5204,12 @@ const SCEN_SH={ bush:[27,24], tree:[27,20], ppl:[21,24],
   roadr:[20,10], tmbl:[20,14], bcact:[26,18],   // E43 — the canyon (the coyote's butte + the stone arch paint their own)
   pum:[26,17], atree:[27,20], lant:[28,9], scrow:[26,14], crow:[24,10], king:[28,26],   // E50 — the patch
   pres:[24,14], cott:[30,30], rein:[24,18], cpole:[28,8], sfir:[27,20], sant:[28,26],
-  wshop:[32,34], elf:[17,16] };   // E51 — the village (the workshop stands barn-big; the helpers are tiny)
+  wshop:[32,34], elf:[17,16],   // E51 — the village (the workshop stands barn-big; the helpers are tiny)
+  uni:[26,22], rbow:[29,34],    // E71 — her shadow keeps the ground while she jumps; the rainbow's spans her feet
+  lm_us:[30,20], lm_kr:[30,32], lm_cn:[30,22], lm_jp:[30,26], lm_gb:[30,16],
+  lm_no:[30,24], lm_br:[30,26], lm_co:[30,16], lm_es:[30,20], lm_it:[30,16],
+  lm_in:[30,30], lm_de:[30,28], lm_nl:[30,20], lm_fr:[30,26], lm_ar:[30,14],
+  lm_ru:[30,28] };              // …the sixteen wonders stand building-solid
 function drawScenItem(s,ox,oy,t){
   // real cells land on integer grid coords; palette icons / free-drag ghosts land outside,
   // where fenceMask reads 0 (lone bit of fence) and the herd phase is just fixed.
@@ -5277,6 +5294,9 @@ function drawScenItem(s,ox,oy,t){
   else if(s.t==='sant') drawSanta(s,t);
   else if(s.t==='wshop') drawWshop();
   else if(s.t==='elf') drawElf(s,t,ph);
+  else if(s.t==='uni') drawUni(s,t,ph);                      // E71 — she jumps her rainbow
+  else if(s.t==='rbow') drawRbow();
+  else if(s.t.slice(0,3)==='lm_') drawLandmark(s.t);         // …the sixteen wonders (levels 91-100)
   if((s.lit>0||(s.litH||0)>0.02)&&LIT[s.t]) drawScenLit(s);   // E39: somebody is home
   cx.restore();
 }
@@ -6624,6 +6644,273 @@ function saRider(){
   cx.fillStyle='#F4F8FC'; rr(-5,-11.6,10,2.2,1.1); cx.fill();
   cx.beginPath(); cx.arc(6.5,-13,1.5,0,7); cx.fill();
   cx.restore();
+}
+/* =====================================================================
+   E71 — THE GALAXY'S OWN MAGIC. The unicorn, her rainbow, and the
+   sixteen wonders of THE WHOLE WIDE WORLD (levels 91-100). House style
+   throughout: molded plastic, bold silhouettes, ground line y≈30.
+   ===================================================================== */
+function drawUni(s,t,ph){
+  // THE UNICORN — cream pony, golden horn, rainbow mane. Her charm is THE
+  // JUMP: two full arcs (over toward her rainbow and home again) riding the
+  // wave window, sparkles trailing, in SILENCE. Shadow stays on the ground
+  // (SCEN_SH — drawn before this painter), so the leap reads as real air.
+  const J=1.3, w=s.wave>0? Math.min(1,(J-s.wave)/J) : 0;   // 0→1 across the charm
+  const half=w<0.5, u=w? (half? w*2 : (1-w)*2) : 0;        // each half is one hop
+  const hop=w? Math.sin(Math.PI*u) : 0;
+  const jx=u*46;                                           // out 46px, then home
+  const jy=-hop*40;
+  if(w){ // the sparkle trail — deterministic little stars behind her arc
+    for(let i=1;i<=4;i++){ const k2=Math.max(0,u-i*0.12); if(k2<=0) continue;
+      cx.globalAlpha=0.5-(i*0.1);
+      star5(k2*46, -Math.sin(Math.PI*k2)*40-8, 0.55, i%2? '#F2C531':'#E86BA8');
+    }
+    cx.globalAlpha=1;
+  }
+  cx.translate(jx,jy);
+  const bob=w? 0 : Math.sin(t*1.4+ph)*1.4;                 // grazing breath at rest
+  cx.translate(0,8+bob);
+  cx.lineJoin='round'; cx.lineCap='round';
+  cx.strokeStyle='#F6F1E4'; cx.lineWidth=5;                // legs — tucked mid-air
+  const tuck=hop*6;
+  cx.beginPath(); cx.moveTo(-10,6); cx.lineTo(-11,18-tuck); cx.stroke();
+  cx.beginPath(); cx.moveTo(-4,7);  cx.lineTo(-4,19-tuck);  cx.stroke();
+  cx.beginPath(); cx.moveTo(5,7);   cx.lineTo(5,19-tuck);   cx.stroke();
+  cx.beginPath(); cx.moveTo(10,6);  cx.lineTo(12,18-tuck);  cx.stroke();
+  cx.fillStyle='#3A3A3E';                                  // little hooves
+  for(const [hx,hy] of [[-11,18-tuck],[-4,19-tuck],[5,19-tuck],[12,18-tuck]]){
+    cx.beginPath(); cx.ellipse(hx,hy+1.5,2.4,1.7,0,0,7); cx.fill();
+  }
+  cx.fillStyle='#F6F1E4';                                  // the body
+  cx.beginPath(); cx.ellipse(0,3,14.5,9,0,0,7); cx.fill();
+  cx.beginPath(); cx.ellipse(11,-6,6.5,5.4,-0.5,0,7); cx.fill();   // chest→neck
+  cx.beginPath(); cx.ellipse(14,-13,6.2,4.8,-0.2,0,7); cx.fill();  // the head
+  cx.beginPath(); cx.ellipse(18.5,-11.5,3.4,2.6,-0.2,0,7); cx.fill(); // muzzle
+  const MANE=['#E86BA8','#F2C531','#7CA7D8'];              // the rainbow mane
+  cx.lineWidth=3.4;
+  for(let i=0;i<3;i++){ cx.strokeStyle=MANE[i];
+    cx.beginPath(); cx.moveTo(9-i*2.6,-15+i*1.4);
+    cx.quadraticCurveTo(3-i*2.6,-12+i*1.6,1-i*2.6,-3+i*1.2); cx.stroke();
+  }
+  for(let i=0;i<3;i++){ cx.strokeStyle=MANE[i];            // …and the tail
+    const sw2=w? 0 : Math.sin(t*2.2+ph+i)*2;
+    cx.beginPath(); cx.moveTo(-13,-2+i*2);
+    cx.quadraticCurveTo(-20-i*1.5,2+i*2+sw2,-19-i*2,12+i*1.5+sw2); cx.stroke();
+  }
+  cx.fillStyle='#F2C531';                                  // THE HORN — gold
+  cx.beginPath(); cx.moveTo(12.2,-17.5); cx.lineTo(16.2,-17.2); cx.lineTo(15.6,-26.5);
+  cx.closePath(); cx.fill();
+  cx.fillStyle='#23211E';                                  // the kind eye
+  cx.beginPath(); cx.arc(13.5,-13.6,1.1,0,7); cx.fill();
+  cx.fillStyle='#F2B8CC';                                  // a rosy cheek
+  cx.beginPath(); cx.arc(15.5,-11,1.5,0,7); cx.fill();
+}
+function drawRbow(){
+  // THE RAINBOW — five RBOW_COLS bands standing on two little cloud feet.
+  // She blocks her cell (the feet are ON the ground) and stands tall like
+  // the trees — the unicorn's cell sits beside her, and the jump crosses.
+  cx.lineCap='round';
+  for(let i=0;i<5;i++){
+    cx.strokeStyle=RBOW_COLS[i]; cx.lineWidth=5.2;
+    cx.beginPath(); cx.arc(0,24,40-i*5.4,Math.PI+0.16,TAU-0.16); cx.stroke();
+  }
+  const puffAt=(px)=>{ cx.fillStyle='#FBFDFF';
+    cx.beginPath(); cx.arc(px-8,25,7.5,0,7); cx.arc(px,21.5,9,0,7); cx.arc(px+8,25,7.5,0,7);
+    cx.fill();
+    cx.fillStyle='rgba(160,180,205,0.35)';
+    cx.beginPath(); cx.ellipse(px,29.5,14,3.4,0,0,7); cx.fill();
+  };
+  puffAt(-36); puffAt(36);
+}
+// ---- THE SIXTEEN WONDERS (E71) — public monuments as wooden toys, one per
+// country the world levels celebrate. One painter, sixteen small hands; every
+// recipe leans on the town's own grammar (rr, cone, the GVT palette).
+function drawLandmark(t){
+  cx.lineJoin='round'; cx.lineCap='round';
+  if(t==='lm_us'){          // LIBERTY — the copper-green lady and her torch
+    cx.fillStyle='#8a8f98'; rr(-13,20,26,10,2); cx.fill();          // pedestal
+    cx.fillStyle='#6FA98F';                                          // the robe
+    cx.beginPath(); cx.moveTo(-9,20); cx.quadraticCurveTo(-7,-6,0,-8);
+    cx.quadraticCurveTo(7,-6,9,20); cx.closePath(); cx.fill();
+    cx.strokeStyle='#6FA98F'; cx.lineWidth=4;                        // the torch arm
+    cx.beginPath(); cx.moveTo(4,-4); cx.lineTo(11,-20); cx.stroke();
+    cx.fillStyle='#F2C531';                                          // the flame
+    cx.beginPath(); cx.arc(11.5,-23,3.4,0,7); cx.fill();
+    cx.fillStyle='#6FA98F';                                          // head + crown
+    cx.beginPath(); cx.arc(0,-13,4.6,0,7); cx.fill();
+    for(let i=-2;i<=2;i++){ cx.beginPath();
+      cx.moveTo(i*3-1.2,-16); cx.lineTo(i*3+1.2,-16); cx.lineTo(i*3,-22); cx.closePath(); cx.fill(); }
+  } else if(t==='lm_kr'){   // KOREA — the palace gate, granite base + red posts + green tiers
+    cx.fillStyle='#B9B3A6'; rr(-22,10,44,20,2); cx.fill();           // granite
+    cx.fillStyle='#4A423A'; rr(-6,16,12,14,5); cx.fill();            // the arch
+    cx.fillStyle='#B84A3A';                                          // red posts
+    for(const px of [-17,0,17]) cx.fillRect(px-2.4,-4,4.8,14);
+    const tier=(y,w2,h2)=>{ cx.fillStyle='#4E7F6E';
+      cx.beginPath(); cx.moveTo(-w2,y); cx.lineTo(w2,y);
+      cx.lineTo(w2-7,y-h2); cx.lineTo(-w2+7,y-h2); cx.closePath(); cx.fill();
+      cx.strokeStyle='#3E6B5C'; cx.lineWidth=2.5;
+      cx.beginPath(); cx.moveTo(-w2,y); cx.quadraticCurveTo(-w2-4,y-2,-w2-6,y-6); cx.stroke();
+      cx.beginPath(); cx.moveTo(w2,y); cx.quadraticCurveTo(w2+4,y-2,w2+6,y-6); cx.stroke(); };
+    tier(-4,24,8); tier(-14,18,7);                                   // upturned eaves
+  } else if(t==='lm_cn'){   // CHINA — the red pagoda, three roofs and a gold tip
+    cx.fillStyle='#F3E1BE';
+    rr(-9,12,18,18,2); cx.fill(); rr(-7,-6,14,12,2); cx.fill(); rr(-5,-20,10,9,2); cx.fill();
+    const roof=(y,w2)=>{ cx.fillStyle='#C0392B';
+      cx.beginPath(); cx.moveTo(-w2,y); cx.lineTo(w2,y); cx.lineTo(w2-6,y-7); cx.lineTo(-w2+6,y-7);
+      cx.closePath(); cx.fill();
+      cx.strokeStyle='#96281B'; cx.lineWidth=2.4;
+      cx.beginPath(); cx.moveTo(-w2,y); cx.quadraticCurveTo(-w2-3.5,y-1.5,-w2-5,y-5); cx.stroke();
+      cx.beginPath(); cx.moveTo(w2,y); cx.quadraticCurveTo(w2+3.5,y-1.5,w2+5,y-5); cx.stroke(); };
+    roof(12,17); roof(-6,13.5); roof(-20,10);
+    cx.fillStyle='#F2C531'; cx.beginPath(); cx.arc(0,-29.5,2.6,0,7); cx.fill();
+    cx.fillRect(-1.1,-27.5,2.2,4);
+  } else if(t==='lm_jp'){   // JAPAN — the vermillion torii
+    cx.fillStyle='#E04A2F';
+    cx.fillRect(-16,-14,5,44); cx.fillRect(11,-14,5,44);             // the posts
+    rr(-14,-9,28,4.4,2); cx.fill();                                  // the tie beam
+    cx.beginPath(); cx.moveTo(-23,-17); cx.quadraticCurveTo(0,-23,23,-17);   // the crown
+    cx.lineTo(23,-13); cx.quadraticCurveTo(0,-19,-23,-13); cx.closePath(); cx.fill();
+    cx.fillStyle='#3A3A3E'; rr(-23,-19.5,46,3.6,1.8); cx.fill();     // the black cap
+    cx.fillStyle='#B9B3A6';                                          // stone feet
+    rr(-18,26,9,4,1.5); cx.fill(); rr(9,26,9,4,1.5); cx.fill();
+  } else if(t==='lm_gb'){   // GREAT BRITAIN — the great clock tower
+    cx.fillStyle='#C8A96A'; rr(-8,-18,16,48,2); cx.fill();           // the shaft
+    cx.strokeStyle='#A9894E'; cx.lineWidth=2;
+    for(const ly of [-6,4,14]){ cx.beginPath(); cx.moveTo(-8,ly); cx.lineTo(8,ly); cx.stroke(); }
+    cx.fillStyle='#F7E9C4'; cx.beginPath(); cx.arc(0,-24,7.4,0,7); cx.fill();   // the face
+    cx.strokeStyle='#A9894E'; cx.lineWidth=2.6;
+    cx.beginPath(); cx.arc(0,-24,7.4,0,7); cx.stroke();
+    cx.strokeStyle='#23211E'; cx.lineWidth=1.8;                      // the hands
+    cx.beginPath(); cx.moveTo(0,-24); cx.lineTo(0,-29.4); cx.moveTo(0,-24); cx.lineTo(3.8,-22.6); cx.stroke();
+    cx.fillStyle='#4E7F6E';                                          // the green spire
+    cx.beginPath(); cx.moveTo(-9,-31); cx.lineTo(9,-31); cx.lineTo(0,-45); cx.closePath(); cx.fill();
+    cx.fillStyle='#F2C531'; cx.beginPath(); cx.arc(0,-45,2,0,7); cx.fill();
+  } else if(t==='lm_no'){   // NORWAY — the stave church, three steep shingle tiers
+    cx.fillStyle='#5C4326'; rr(-16,14,32,16,2); cx.fill();
+    const stave=(y,w2,h2)=>{ cx.fillStyle='#4A3520';
+      cx.beginPath(); cx.moveTo(-w2,y); cx.lineTo(w2,y); cx.lineTo(0,y-h2); cx.closePath(); cx.fill();
+      cx.strokeStyle='#6B4A2C'; cx.lineWidth=2;
+      cx.beginPath(); cx.moveTo(-w2+3,y-2); cx.lineTo(0,y-h2+2); cx.lineTo(w2-3,y-2); cx.stroke(); };
+    stave(14,20,12); stave(2,14,11); stave(-9,9,10);
+    cx.fillStyle='#F7E9C4'; rr(-3,22,6,8,3); cx.fill();              // the bright door
+    cx.strokeStyle='#C8A96A'; cx.lineWidth=2;                        // the dragon curls
+    cx.beginPath(); cx.moveTo(-20,12); cx.quadraticCurveTo(-24,8,-22,4); cx.stroke();
+    cx.beginPath(); cx.moveTo(20,12); cx.quadraticCurveTo(24,8,22,4); cx.stroke();
+  } else if(t==='lm_br'){   // BRAZIL — the hilltop welcome, arms open wide
+    cx.fillStyle='#7C9A62';                                          // the mountain
+    cx.beginPath(); cx.moveTo(-22,30); cx.quadraticCurveTo(-10,-2,0,-4);
+    cx.quadraticCurveTo(10,-2,22,30); cx.closePath(); cx.fill();
+    cx.fillStyle='#B9B3A6'; rr(-4,-8,8,6,1); cx.fill();              // the plinth
+    cx.fillStyle='#F4F8FC';                                          // the figure
+    cx.fillRect(-2.6,-22,5.2,14);
+    cx.strokeStyle='#F4F8FC'; cx.lineWidth=4;                        // the open arms
+    cx.beginPath(); cx.moveTo(-11,-18); cx.lineTo(11,-18); cx.stroke();
+    cx.beginPath(); cx.arc(0,-25.5,3.4,0,7);
+    cx.fillStyle='#F4F8FC'; cx.fill();
+  } else if(t==='lm_co'){   // COLOMBIA — the golden clock gate of the old town
+    cx.fillStyle='#E0B84E'; rr(-9,-16,18,46,2); cx.fill();           // mustard tower
+    cx.fillStyle='#F7E9C4'; cx.beginPath(); cx.arc(0,-8,5.6,0,7); cx.fill();
+    cx.strokeStyle='#23211E'; cx.lineWidth=1.6;
+    cx.beginPath(); cx.moveTo(0,-8); cx.lineTo(0,-12); cx.moveTo(0,-8); cx.lineTo(3,-7); cx.stroke();
+    cx.fillStyle='#8f4634'; rr(-5,16,10,14,5); cx.fill();            // the gate arch
+    cx.fillStyle='#C0392B';                                          // the dome
+    cx.beginPath(); cx.arc(0,-18,8,Math.PI,0); cx.fill();
+    cx.beginPath(); cx.moveTo(-2,-25); cx.lineTo(2,-25); cx.lineTo(0,-32); cx.closePath(); cx.fill();
+    cx.fillStyle='#F2C531';                                          // bunting in the flag's gold
+    for(const bx of [-7,0,7]){ cx.beginPath(); cx.moveTo(bx-2.4,12); cx.lineTo(bx+2.4,12); cx.lineTo(bx,16); cx.closePath(); cx.fill(); }
+  } else if(t==='lm_es'){   // SPAIN — the white windmill of the wide plain
+    cx.fillStyle='#F4F8FC';                                          // the tower
+    cx.beginPath(); cx.moveTo(-11,30); cx.lineTo(-8,-6); cx.lineTo(8,-6); cx.lineTo(11,30);
+    cx.closePath(); cx.fill();
+    cx.fillStyle='#B84A3A';                                          // terracotta cap
+    cx.beginPath(); cx.arc(0,-6,9,Math.PI,0); cx.fill();
+    cx.strokeStyle='#6B4A2C'; cx.lineWidth=3;                        // four lattice sails
+    for(let i=0;i<4;i++){ const an=i*Math.PI/2+0.5;
+      cx.beginPath(); cx.moveTo(0,-10); cx.lineTo(Math.cos(an)*20,-10+Math.sin(an)*20); cx.stroke(); }
+    cx.fillStyle='#8f4634'; rr(-3.4,20,6.8,10,3); cx.fill();         // the door
+    cx.fillStyle='#F2C531'; rr(-11,28,22,2.6,1.3); cx.fill();        // a gold sill
+  } else if(t==='lm_it'){   // ITALY — the leaning tower, arcade rings
+    cx.save(); cx.rotate(0.1);                                       // the famous lean
+    cx.fillStyle='#F7F3E8'; rr(-8,-24,16,54,7); cx.fill();
+    cx.strokeStyle='#CBB88C'; cx.lineWidth=2.2;
+    for(const ly of [-16,-8,0,8,16]){ cx.beginPath(); cx.moveTo(-8,ly); cx.lineTo(8,ly); cx.stroke(); }
+    for(const ly of [-12,-4,4,12]) for(const lx of [-5,0,5]){
+      cx.beginPath(); cx.arc(lx,ly+1.6,1.6,Math.PI,0); cx.stroke(); }
+    cx.fillStyle='#F7F3E8'; rr(-5.5,-30,11,6,3); cx.fill();          // the bell top
+    cx.restore();
+  } else if(t==='lm_in'){   // INDIA — the white marble dome
+    cx.fillStyle='#F3E1BE'; rr(-20,22,40,8,2); cx.fill();            // the plinth
+    cx.fillStyle='#FBFDFF'; rr(-14,-2,28,24,3); cx.fill();           // the hall
+    cx.fillStyle='#8f6b3f'; rr(-4,8,8,14,4); cx.fill();              // the great arch
+    cx.fillStyle='#FBFDFF';                                          // THE DOME
+    cx.beginPath(); cx.arc(0,-8,11,Math.PI*0.96,Math.PI*0.04);
+    cx.quadraticCurveTo(11,-16,0,-22); cx.quadraticCurveTo(-11,-16,-11,-8.5); cx.fill();
+    cx.fillStyle='#F2C531'; cx.fillRect(-0.9,-27,1.8,5);             // the gold finial
+    for(const mx of [-18,18]){                                       // two little minarets
+      cx.fillStyle='#FBFDFF'; cx.fillRect(mx-1.8,0,3.6,22);
+      cx.beginPath(); cx.arc(mx,-1,3,Math.PI,0); cx.fill(); }
+  } else if(t==='lm_de'){   // GERMANY — the fairy-tale castle on its crag
+    cx.fillStyle='#8a8f98';                                          // the crag
+    cx.beginPath(); cx.moveTo(-20,30); cx.lineTo(-14,14); cx.lineTo(14,14); cx.lineTo(20,30);
+    cx.closePath(); cx.fill();
+    cx.fillStyle='#F4F8FC';                                          // white keep + towers
+    rr(-12,-6,24,20,2); cx.fill(); rr(-16,-14,7,28,2); cx.fill(); rr(9,-14,7,28,2); cx.fill();
+    cx.fillStyle='#5F7FA8';                                          // steep blue caps
+    cone(-12.5,-14,11,12,'#5F7FA8'); cone(12.5,-14,11,12,'#5F7FA8'); cone(0,-6,12,10,'#5F7FA8');
+    cx.fillStyle='#8f6b3f'; rr(-2.6,4,5.2,10,2.5); cx.fill();        // the gate
+    cx.fillStyle='#F2C531'; cx.beginPath(); cx.arc(-12.5,-27.5,1.5,0,7); cx.arc(12.5,-27.5,1.5,0,7); cx.fill();
+  } else if(t==='lm_nl'){   // NETHERLANDS — the brick mill in her tulips
+    cx.fillStyle='#9A5B3C';                                          // the brick body
+    cx.beginPath(); cx.moveTo(-12,26); cx.lineTo(-8,-8); cx.lineTo(8,-8); cx.lineTo(12,26);
+    cx.closePath(); cx.fill();
+    cx.fillStyle='#F4F8FC'; cx.beginPath(); cx.arc(0,-8,9,Math.PI,0); cx.fill();   // white cap
+    cx.strokeStyle='#4A3520'; cx.lineWidth=3.2;                      // the big sails
+    for(let i=0;i<4;i++){ const an=i*Math.PI/2+0.15;
+      cx.beginPath(); cx.moveTo(0,-11); cx.lineTo(Math.cos(an)*22,-11+Math.sin(an)*22); cx.stroke(); }
+    for(let i=0;i<5;i++){                                            // the tulip row
+      const tx=-16+i*8;
+      cx.strokeStyle='#4E7F46'; cx.lineWidth=1.8;
+      cx.beginPath(); cx.moveTo(tx,30); cx.lineTo(tx,24); cx.stroke();
+      cx.fillStyle=['#C0392B','#F2C531','#E86BA8','#F2C531','#C0392B'][i];
+      cx.beginPath(); cx.arc(tx,22.5,2.6,0,7); cx.fill(); }
+  } else if(t==='lm_fr'){   // FRANCE — the iron tower
+    cx.strokeStyle='#6B5A48'; cx.fillStyle='#6B5A48'; cx.lineWidth=3.4;
+    cx.beginPath(); cx.moveTo(-16,30); cx.quadraticCurveTo(-4,-8,0,-38); cx.stroke();   // the legs
+    cx.beginPath(); cx.moveTo(16,30); cx.quadraticCurveTo(4,-8,0,-38); cx.stroke();
+    cx.lineWidth=2.6;                                                // the decks
+    for(const [dy,dw] of [[8,11],[-8,7],[-22,4]]){
+      cx.beginPath(); cx.moveTo(-dw-2,dy); cx.lineTo(dw+2,dy); cx.stroke(); }
+    cx.lineWidth=1.6;                                                // the lattice
+    cx.beginPath();
+    cx.moveTo(-11,8); cx.lineTo(7,-8); cx.moveTo(11,8); cx.lineTo(-7,-8);
+    cx.moveTo(-6.5,-8); cx.lineTo(4,-22); cx.moveTo(6.5,-8); cx.lineTo(-4,-22);
+    cx.stroke();
+    cx.beginPath(); cx.arc(0,-40,2,0,7); cx.fill();                  // the beacon
+  } else if(t==='lm_ar'){   // ARGENTINA — the white needle and the golden sun
+    cx.fillStyle='#EAF4FC'; rr(-14,26,28,4,2); cx.fill();            // the plaza
+    cx.fillStyle='#F4F8FC';                                          // the obelisk
+    cx.beginPath(); cx.moveTo(-6,26); cx.lineTo(-3.4,-24); cx.lineTo(3.4,-24); cx.lineTo(6,26);
+    cx.closePath(); cx.fill();
+    cx.beginPath(); cx.moveTo(-3.4,-24); cx.lineTo(3.4,-24); cx.lineTo(0,-31); cx.closePath(); cx.fill();
+    cx.fillStyle='#F2C531';                                          // the Sun of May
+    cx.beginPath(); cx.arc(13,-30,4,0,7); cx.fill();
+    cx.strokeStyle='#F2C531'; cx.lineWidth=1.6;
+    for(let i=0;i<8;i++){ const an=i*TAU/8;
+      cx.beginPath(); cx.moveTo(13+Math.cos(an)*5.4,-30+Math.sin(an)*5.4);
+      cx.lineTo(13+Math.cos(an)*7.6,-30+Math.sin(an)*7.6); cx.stroke(); }
+    cx.fillStyle='#7CA7D8'; rr(-6,20,12,3,1.5); cx.fill();           // a sky-blue band
+  } else if(t==='lm_ru'){   // RUSSIA — three onion domes over a cream hall
+    cx.fillStyle='#F3E1BE'; rr(-16,4,32,26,2); cx.fill();            // the hall
+    cx.fillStyle='#8f4634'; rr(-3.4,16,6.8,14,3); cx.fill();         // the door
+    const onion=(x,y,r,col)=>{ cx.fillStyle=col;
+      cx.beginPath(); cx.moveTo(x-r,y);
+      cx.quadraticCurveTo(x-r,y-r*1.35,x,y-r*1.7);
+      cx.quadraticCurveTo(x+r,y-r*1.35,x+r,y); cx.closePath(); cx.fill();
+      cx.fillStyle='#F2C531'; cx.fillRect(x-0.8,y-r*1.7-4,1.6,4.5);
+      cx.beginPath(); cx.arc(x,y-r*1.7-4.6,1.3,0,7); cx.fill(); };
+    cx.fillStyle='#F4F8FC'; cx.fillRect(-12,-8,6,12); cx.fillRect(6,-8,6,12); cx.fillRect(-3,-14,6,18);
+    onion(-9,-8,5,'#C0392B'); onion(9,-8,5,'#5F7FA8'); onion(0,-14,6.2,'#F2C531');
+  }
 }
 function drawCat(s,t,ph){
   const react=s.wave>0;
@@ -8823,6 +9110,24 @@ function wallBookPaint(cv,b){
     const L=bookL(b), done=bookDone(b);   // READ-ONLY — the wall never writes a book
     const fill=b==='pk'?'#F7DCA9':b==='sa'?'#EAF4FC':'#F7E9C4';   // each book's own ticket tint (.tk family)
     const edge=b==='pk'?'#C9772E':b==='sa'?'#C0392B':'#B48A54';
+    if(L.length>15){
+      // E71 — ONE HUNDRED LITTLE LINES outgrew the stub grammar: the big book
+      // wears a 10-wide punch-dot grid (gold = the conductor came by) and the
+      // count in gold. The little books keep their stubs byte-true below.
+      let dn=0; for(let n=1;n<=L.length;n++) if(done.has(n)) dn++;
+      const dc=10, dr=Math.ceil(L.length/dc), dg=17, r0x=(256-(dc-1)*dg)/2, r0y=34;
+      for(let n=1;n<=L.length;n++){
+        const i=n-1, px=r0x+(i%dc)*dg, py=r0y+((i/dc)|0)*11;
+        cx.fillStyle=done.has(n)? '#F2C531' : fill;
+        cx.beginPath(); cx.arc(px,py,done.has(n)?4.2:3.2,0,7); cx.fill();
+        if(done.has(n)){ cx.strokeStyle='#a37c4a'; cx.lineWidth=1.6;
+          cx.beginPath(); cx.arc(px,py,4.2,0,7); cx.stroke(); }
+      }
+      cx.fillStyle='#F2C531'; cx.textAlign='center';
+      cx.font='bold 22px "Arial Black",Impact,sans-serif';
+      cx.fillText(dn+' / '+L.length,128,20);
+      return;
+    }
     const cols=Math.min(5,L.length), rows=Math.ceil(L.length/5), sw=38, sh=60, gx2=8, gy2=10;
     const x0=(256-(cols*sw+(cols-1)*gx2))/2, y0=(148-(rows*sh+(rows-1)*gy2))/2;
     for(let n=1;n<=L.length;n++){
@@ -10154,7 +10459,10 @@ function load(){
 // corridor or a finish-the-gap. Only STRAIGHT, CURVE and (from 4 on) BRIDGE are ever
 // REQUIRED; every other piece arrives glued. Reference solutions stay under
 // SOLVE_CAP pieces, and the battery proves each one only places toys owned by then.
-const SOLVE_CAP=[14,14,14,14,14,22,22,22,22,22];
+const SOLVE_CAP=[14,14,14,14,14,22,22,22,22,22,
+  // E71 — ninety more: every new reference is a handful of gap fills, bridge
+  // drops or a seeded ring; 14 covers all but the crossing fair's full ring.
+  ...Array.from({length:90},(_,i)=>(i+11===74)?18:14)];
 const fillRows=(kind,x0,y0,x1,y1,alt)=>{      // a block of glued scenery; alt checkers a second kind in
   const r=[];
   for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++) r.push([(alt&&((x+y)&1))?alt:kind,x,y]);
@@ -10261,13 +10569,527 @@ const LEVELS=[
   // 10 — THE GRAND TOUR. The finale land stands exactly as it shipped: river, pond,
   // farm and houses all at once, two stations far apart, and the double confetti.
   { name:'THE GRAND TOUR', hint:'VISIT BOTH STATIONS!', say:'VISIT BOTH STATIONS!!',
-    toy:'exp', land:'rug',   // the tour comes home — the finale keeps BACK TO THE BOARD, no ride (the E68 gate)
+    toy:'exp', land:'rug', ride:[6,5],   // E71: the tour is a finale no more — it rides the tunnel to the garden like everyone else
     track:[['s',0,5,5],['s',0,6,5]],                       // E69: a head start on the tour's bottom run
     glued:[['rv',3,0],['rv',3,1],['rv',3,2],['rv',3,3],['rv',3,4],['rv',4,4],['rv',5,4],['rv',6,4],['rv',7,4],['rv',8,4],
            ['rv',10,1],['rv',11,1],['rv',10,2],['rv',11,2],
            ['fence',0,5],['fence',1,5],['fence',2,5],['fence',2,6],['fence',2,7],
            ['barn',0,6],['cow',1,6,0],['cow',0,7,1],['cow',1,7,2],
            ['house',6,7],['house',8,2]], stations:[[5,6],[10,4]] },
+  /* ===================================================================
+     E71 — ONE HUNDRED LITTLE LINES (Wyatt 8/8: "add 90 more levels…
+     easy, very hand-holdy… various themes, track patterns, and various
+     fun landscape objects that make it pretty"). Nine decades, one law:
+     the glued board IS the instruction — rings with gold gaps, seeded
+     lanes, a ride cell on a glued straight, land + weather per level,
+     and dressing in the reference maps' toy-box spirit. Gifts are
+     STORE ids through `bundle` (THE FIFTY STAY FIFTY); a level without
+     a gift carries no toy, so its ticket promises nothing.
+     =================================================================== */
+  // ---- 11-20 THE GARDEN VALLEY — Wyatt: "the garden level full of flowers"
+  { name:'THE FLOWER RING', hint:'FINISH THE TRACK!', land:'rug',
+    glued:[['bush',1,1],['bush',10,1],['bush',1,6],['bush',10,6],['flw',2,2],['flw',9,2],
+           ['flw',2,5],['flw',9,5],['flw',3,6],['flw',8,6],['duck',8,3,0]],
+    track:ringRows(4,2,7,5,[[5,2],[6,2]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[6,5], stations:[] },
+  { name:'THE POND GARDEN', hint:'FINISH THE TRACK!', land:'island',
+    glued:[['pond',5,3],['pond',6,4],['flw',4,4],['flw',7,3],['palm',1,1],['palm',10,6],
+           ['duck',2,3,0],['duck',9,4,1],['flw',2,6],['flw',4,6],['flw',7,6],['flw',9,6]],
+    track:ringRows(3,2,8,5,[[4,2],[7,2],[8,3]]),
+    gaps:[[4,2,0],[7,2,0],[8,3,1]], ride:[5,5], stations:[] },
+  { name:'THE BUTTERFLY WAY', hint:'FINISH THE TRACK!', land:'island',
+    glued:[...fillRows('flw',1,1,2,6,'bush'), ...fillRows('flw',9,1,10,6,'bush'),
+           ['bfly',4,3],['bfly',7,4],['bfly',3,0],['tree',5,3],['flw',6,4]],
+    track:[['s',0,5,5],['s',0,6,5]],
+    ride:[6,5], stations:[] },
+  { name:'THE DUCK POND', hint:'FINISH THE TRACK!', land:'rug',
+    glued:[['pond',5,3],['pond',6,3],['duck',5,2,0],['duck',6,4,1],['flw',2,2],['flw',9,2],
+           ['flw',2,5],['flw',9,5],['bush',1,1],['bush',10,1]],
+    track:ringRows(4,1,7,5,[[4,3],[4,4]]),
+    gaps:[[4,3,1],[4,4,1]], ride:[5,5], stations:[] },
+  { name:'THE PICNIC MEADOW', hint:'FINISH THE TRACK!', land:'island',
+    glued:[['bench',5,3],['ppl',6,3,2],['ppl',4,4,1],['fire',7,4],['bush',1,1],['bush',10,1],
+           ['bush',1,6],['bush',10,6],['flw',2,3],['flw',9,4]],
+    track:ringRows(3,2,8,5,[[4,2],[5,2],[6,2],[7,2]]),
+    gaps:[[4,2,0],[5,2,0],[6,2,0],[7,2,0]], ride:[5,5], stations:[] },
+  { name:'THE FOUNTAIN SQUARE', hint:'FINISH THE TRACK!', land:'rug',
+    glued:[['fount',5,3],['flw',4,3],['flw',6,4],['bench',7,3],['lamp',3,4],['lamp',8,4],
+           ['bush',1,1],['bush',10,1],['bush',1,6],['bush',10,6]],
+    track:ringRows(2,2,9,5,[[5,2],[6,2],[9,3]]),
+    gaps:[[5,2,0],[6,2,0],[9,3,1]], ride:[4,5], stations:[] },
+  { name:'THE ORCHARD LOOP', hint:'FINISH THE TRACK!', land:'island',
+    glued:[...fillRows('tree',1,1,2,6,'bush'), ...fillRows('tree',9,1,10,6,'bush'),
+           ['tree',5,3],['tree',7,3],['flw',6,4]],
+    track:[['s',0,5,2],['s',0,6,2]],
+    ride:[5,2], stations:[] },
+  { name:'THE ROSE RING', hint:'FINISH THE TRACK!', land:'rug',
+    glued:[...fillRows('flw',0,0,11,0,'bush'), ...fillRows('flw',0,7,11,7,'bush'),
+           ['pond',5,3],['flw',6,4],['flw',1,3],['flw',10,4],['bal',9,1,0]],
+    track:ringRows(3,2,8,5,[[4,5],[7,5]]),
+    gaps:[[4,5,0],[7,5,0]], ride:[5,2], stations:[] },
+  { name:'THE GARDEN GATE', hint:'FINISH THE TRACK!', land:'island',
+    glued:[['arch',5,1],['flw',1,2],['flw',10,2],['flw',2,6],['flw',9,6],['ppl',2,3,1],
+           ['duck',9,3,0],['bush',1,0],['bush',10,0]],
+    track:ringRows(3,1,8,5,[[4,1],[6,1],[5,5]]),
+    gaps:[[4,1,0],[6,1,0],[5,5,0]], ride:[7,1], stations:[] },
+  // 20 — THE GARDEN PARTY: Wyatt's "garden level full of flowers" taken at
+  // its word — the ring's whole inside is a flower sea round the fountain.
+  { name:'THE GARDEN PARTY', hint:'FINISH THE TRACK!', land:'island',
+    toy:'fount', bundle:['fount'],
+    glued:[...fillRows('flw',0,0,11,0,'bush'), ...fillRows('flw',0,7,11,7,'bush'),
+           ['flw',0,1],['flw',0,6],['flw',11,1],['flw',11,6],
+           ['fount',5,3],['bench',6,4],
+           ['flw',3,2],['flw',4,2],['flw',6,2],['flw',7,2],['flw',8,2],
+           ['flw',3,3],['flw',4,3],['flw',6,3],['flw',7,3],['flw',8,3],
+           ['flw',3,4],['flw',4,4],['flw',5,4],['flw',7,4],['flw',8,4],
+           ['flw',3,5],['flw',4,5],['flw',5,5],['flw',6,5],['flw',7,5],['flw',8,5],
+           ['bal',5,2,0],['bal',1,2,1],['duck',10,5,1],['ppl',10,2,0],['ppl',1,5,1]],
+    track:ringRows(2,1,9,6,[[4,1],[7,1],[2,3],[9,4]]),
+    gaps:[[4,1,0],[7,1,0],[2,3,1],[9,4,1]], ride:[5,6], stations:[] },
+  // ---- 21-30 THE FRONTIER TRAIL — the west and the canyon
+  { name:'THE DESERT OVAL', hint:'FINISH THE TRACK!', land:'west',
+    glued:[['rock',1,1],['rock',10,1],['bcact',2,3],['bcact',9,4],['hay',2,5],
+           ['tmbl',9,2,0],['cow',1,6,0]],
+    track:ringRows(4,2,7,5,[[5,2],[6,2]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[6,5], stations:[] },
+  { name:'THE CACTUS BEND', hint:'FINISH THE TRACK!', land:'canyon', weather:'dust',
+    glued:[['bcact',5,3],['bcact',2,2],['bcact',9,5],['rock',6,4],['rock',1,1],['rock',10,1],
+           ['tmbl',2,6,0],['tmbl',9,1,1]],
+    track:ringRows(3,2,8,5,[[3,3],[3,4]]),
+    gaps:[[3,3,1],[3,4,1]], ride:[5,5], stations:[] },
+  { name:'THE RANCH RING', hint:'FINISH THE TRACK!', land:'west',
+    glued:[['fence',5,3],['fence',7,3],['fence',5,4],['fence',7,4],['cow',6,3,0],
+           ['barn',2,2],['hay',2,3],['hay',9,2],['chick',9,5,0]],
+    track:ringRows(4,2,8,5,[[5,2],[7,2]]),
+    gaps:[[5,2,0],[7,2,0]], ride:[6,5], stations:[] },
+  { name:'THE WATER TOWER STOP', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'west',
+    glued:[['wtr',6,6],['rock',1,1],['rock',10,6],['bcact',2,5],['bcact',9,1],['hay',10,3]],
+    track:ringRows(4,2,8,5,[[5,2],[6,2],[7,2],[6,5]]),
+    gaps:[[5,2,0],[6,2,0],[7,2,0]], ride:[5,5], stations:[[6,5]] },
+  { name:'THE BIG MESA', hint:'FINISH THE TRACK!', land:'canyon', weather:'dust',
+    glued:[['coyo',6,3],['rock',5,3],['rock',5,4],['rock',6,4],['bcact',2,2],['bcact',9,5],
+           ['tmbl',2,6,0],['tmbl',10,3,1],['rock',1,1],['rock',10,1]],
+    track:[['s',0,5,5],['s',0,6,5]],
+    ride:[6,5], stations:[] },
+  { name:'THE TUMBLEWEED RUN', hint:'FINISH THE TRACK!', land:'west',
+    glued:[['tmbl',3,3,0],['tmbl',7,4,1],['tmbl',1,6,2],['rock',1,1],['rock',10,1],
+           ['bcact',1,4],['bcact',10,4],['hay',10,6],['cow',1,2,0]],
+    track:ringRows(2,2,9,5,[[4,2],[6,2],[8,2]]),
+    gaps:[[4,2,0],[6,2,0],[8,2,0]], ride:[5,2], stations:[] },
+  { name:'THE CANYON ARCH', hint:'FINISH THE TRACK!', land:'canyon', weather:'dust',
+    glued:[['sarch',5,1],['coyo',10,2],['bcact',1,2],['bcact',9,6],['tmbl',2,0,0],
+           ['rock',10,5],['rock',1,6]],
+    track:ringRows(3,1,8,5,[[6,1],[7,1],[3,3]]),
+    gaps:[[6,1,0],[7,1,0],[3,3,1]], ride:[4,1], stations:[] },
+  { name:'THE GOLD HILLS', hint:'FINISH THE TRACK!', land:'west',
+    glued:[['rock',8,2],['rock',1,5],['hay',8,5],['cow',9,3,0],['bcact',1,2],['tmbl',1,6,0]],
+    track:[...ringRows(3,1,7,4,[[4,1],[5,1],[6,1],[3,2],[3,3]]),
+           ['rp',0,4,1],['s',0,5,1,1],['rp',2,6,1]],
+    gaps:[[3,2,1],[3,3,1]], ride:[5,1], stations:[] },
+  { name:'THE LONG LASSO', hint:'FINISH THE TRACK!', land:'canyon',
+    glued:[['coyo',5,3],['tmbl',3,3,0],['tmbl',8,4,1],['bcact',1,0],['bcact',10,0],['bcact',0,5],
+           ['rock',11,5],['rock',0,0],['hay',11,0]],
+    track:ringRows(2,1,9,6,[[3,1],[8,1],[2,4],[9,3]]),
+    gaps:[[3,1,0],[8,1,0],[2,4,1],[9,3,1]], ride:[5,6], stations:[] },
+  { name:'THE ROUNDUP', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'west',
+    toy:'roadr', bundle:['roadr','bcact'],
+    glued:[['fence',1,3],['fence',2,3],['fence',1,4],['cow',2,4,0],['cow',1,5,1],['cow',10,3,2],
+           ['barn',1,2],['hay',10,5],['roadr',2,6,0]],
+    track:ringRows(3,1,8,5,[[4,1],[5,1],[6,1],[7,1],[5,5]]),
+    gaps:[[4,1,0],[5,1,0],[6,1,0],[7,1,0]], ride:[6,5], stations:[[5,5]] },
+  // ---- 31-40 THE WINTER WONDER — snow and ice
+  { name:'THE SNOWMAN RING', hint:'FINISH THE TRACK!', land:'snow', weather:'snowfall',
+    glued:[['snow',2,3,0],['snow',9,4,1],['pine',1,1],['pine',10,1],['pine',1,6],['pine',10,6]],
+    track:ringRows(4,2,7,5,[[5,2],[6,2]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[6,5], stations:[] },
+  { name:'THE FROZEN POND', hint:'FINISH THE TRACK!', land:'ice',
+    glued:[['pond',5,3],['pond',6,3],['cub',7,3,0],['seal',2,2],['peng',9,5,0],
+           ['pine',1,1],['pine',10,6]],
+    track:ringRows(3,2,8,5,[[4,2],[7,2]]),
+    gaps:[[4,2,0],[7,2,0]], ride:[5,5], stations:[] },
+  { name:'THE PINE WOODS', hint:'FINISH THE TRACK!', land:'snow', weather:'snowfall',
+    glued:[...fillRows('pine',0,0,2,7,'tree'), ...fillRows('pine',10,0,11,7,'tree'),
+           ...fillRows('pine',5,3,7,4,'tree'), ['snow',3,6,0]],
+    track:[['s',0,5,5],['s',0,6,5]],
+    ride:[6,5], stations:[] },
+  { name:'THE ICE SLIDE', hint:'FINISH THE TRACK!', land:'ice',
+    glued:[['iarch',7,2],['peng',3,3,0],['peng',8,3,1],['cub',1,1,0],['seal',10,6],
+           ['pine',0,0],['pine',11,0]],
+    track:ringRows(2,2,9,5,[[4,2],[5,2],[6,2]]),
+    gaps:[[4,2,0],[5,2,0],[6,2,0]], ride:[8,2], stations:[] },
+  { name:'THE IGLOO VILLAGE', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'ice',
+    glued:[['iglu',2,2],['iglu',9,2],['peng',1,5,0],['pine',1,1],['pine',10,1],['snow',10,5,0]],
+    track:ringRows(4,2,8,5,[[5,2],[6,2],[6,5]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[7,5], stations:[[6,5]] },
+  { name:'THE SNOWY HILL', hint:'FINISH THE TRACK!', land:'snow', weather:'snowfall',
+    glued:[['snow',2,2,0],['snow',9,5,1],['pine',1,1],['pine',10,1],['pine',1,6],['pine',10,6]],
+    track:[...ringRows(4,2,8,5,[[5,2],[6,2],[7,2],[4,3],[4,4]]),
+           ['rp',0,5,2],['s',0,6,2,1],['rp',2,7,2]],
+    gaps:[[4,3,1],[4,4,1]], ride:[6,2], stations:[] },
+  { name:'THE AURORA LOOP', hint:'FINISH THE TRACK!', land:'ice',
+    glued:[['iglu',10,1],['peng',3,3,0],['cub',8,4,0],['seal',0,7],['snow',1,1,0],
+           ['pine',0,0],['pine',11,7]],
+    track:ringRows(2,1,9,6,[[4,1],[7,1],[2,3],[9,4]]),
+    gaps:[[4,1,0],[7,1,0],[2,3,1],[9,4,1]], ride:[5,6], stations:[] },
+  { name:'THE SEAL HOLES', hint:'FINISH THE TRACK!', land:'ice',
+    glued:[['seal',1,1],['seal',10,1],['seal',1,6],['cub',5,3,0],['peng',6,4,1],
+           ['pine',0,0],['pine',11,0]],
+    track:ringRows(3,2,8,5,[[3,3],[8,4]]),
+    gaps:[[3,3,1],[8,4,1]], ride:[5,5], stations:[] },
+  { name:'THE SNOW CASTLE', hint:'FINISH THE TRACK!', land:'snow', weather:'snowfall',
+    glued:[['iglu',5,3],['iglu',6,4],['snow',6,3,0],['snow',7,4,1],['pine',1,1],['pine',10,1],
+           ['pine',1,6],['pine',10,6],['pine',2,3]],
+    track:ringRows(4,2,8,5,[[5,2],[7,2]]),
+    gaps:[[5,2,0],[7,2,0]], ride:[6,5], stations:[] },
+  { name:'THE POLE PARTY', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'ice', weather:'snowfall',
+    toy:'peng', bundle:['peng','iglu'],
+    glued:[['iglu',1,1],['peng',4,3,0],['peng',7,3,1],['cub',10,6,0],['snow',1,6,0],
+           ['seal',0,0],['pine',10,1],['pine',0,7]],
+    track:ringRows(2,1,9,6,[[3,1],[6,1],[9,3],[5,6]]),
+    gaps:[[3,1,0],[6,1,0],[9,3,1]], ride:[7,6], stations:[[5,6]] },
+  // ---- 41-50 THE JUNGLE LAGOON — jungle and island
+  { name:'THE JUNGLE RING', hint:'FINISH THE TRACK!', land:'jungle',
+    glued:[['vtree',2,2],['vtree',9,5],['bleaf',2,5],['bleaf',9,2],['monk',1,1,0],
+           ['parr',10,1,1],['bfly',4,6],['bfly',7,0]],
+    track:ringRows(4,2,7,5,[[5,2],[6,2]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[6,5], stations:[] },
+  { name:'THE MONKEY BRIDGE', hint:'GET OVER THE RIVER!', say:'CROSS THE RIVER!!',
+    land:'jungle', weather:'rain',
+    glued:[['rv',6,0],['rv',6,1],['rv',6,2],['rv',6,3],['rv',6,4],['rv',6,5],['rv',6,6],['rv',6,7],
+           ['wfall',6,0],['monk',4,1,0],['monk',8,6,1],['parr',2,2,0],['vtree',1,5],['vtree',10,2]],
+    track:[['s',0,5,2],['s',0,7,2],['s',0,5,5],['s',0,7,5]],
+    gaps:[[6,2,0],[6,5,0]], ride:[7,5], stations:[] },
+  { name:'THE PARROT PERCH', hint:'FINISH THE TRACK!', land:'island',
+    glued:[['palm',1,1],['palm',10,1],['palm',1,6],['palm',10,6],['parr',5,3,0],['parr',6,4,1],
+           ['shell',2,6],['shell',9,1],['bfly',3,0]],
+    track:ringRows(3,2,8,5,[[4,2],[8,3]]),
+    gaps:[[4,2,0],[8,3,1]], ride:[5,5], stations:[] },
+  { name:'THE LAGOON LINE', hint:'FINISH THE TRACK!', land:'island',
+    glued:[['rv',5,3],['rv',6,3],['rv',5,4],['rv',6,4],['boat',7,3],['palm',3,3],['palm',8,4],
+           ['shell',1,1],['shell',10,6],['flw',1,4],['flw',10,3]],
+    track:ringRows(2,2,9,5,[[5,2],[6,2],[2,4]]),
+    gaps:[[5,2,0],[6,2,0],[2,4,1]], ride:[4,5], stations:[] },
+  { name:'THE WATERFALL WAY', hint:'FINISH THE TRACK!', land:'jungle', weather:'rain',
+    glued:[['wfall',3,0],['wfall',3,1],['wfall',3,2],['rv',3,3],['rv',3,4],['rv',3,5],['rv',3,6],['rv',3,7],
+           ['monk',4,4,0],['eleph',10,6,0],['vtree',4,1],['vtree',10,1],['vtree',1,1],['bleaf',1,5]],
+    track:ringRows(5,2,9,5,[[6,2],[8,2]]),
+    gaps:[[6,2,0],[8,2,0]], ride:[7,5], stations:[] },
+  { name:'THE ELEPHANT WALK', hint:'FINISH THE TRACK!', land:'jungle',
+    glued:[['eleph',5,3,0],['monk',6,3,1],['vtree',1,1],['vtree',10,1],['vtree',2,6],
+           ['bleaf',9,6],['bleaf',1,4],['bfly',2,0],['bfly',9,0]],
+    track:ringRows(3,1,8,5,[[4,1],[5,1],[6,1]]),
+    gaps:[[4,1,0],[5,1,0],[6,1,0]], ride:[7,1], stations:[] },
+  { name:'THE ISLAND HOP', hint:'FINISH THE TRACK!', land:'island',
+    glued:[['rv',3,3],['rv',3,4],['rv',8,3],['rv',8,4],['boat',5,3],['palm',6,4],
+           ['shell',10,6],['shell',1,6],['scast',10,1],['bfly',5,0]],
+    track:ringRows(2,2,9,5,[[4,2],[7,2],[2,3],[9,4]]),
+    gaps:[[4,2,0],[7,2,0],[2,3,1],[9,4,1]], ride:[5,5], stations:[] },
+  { name:'THE SANDCASTLE STOP', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'island',
+    glued:[['scast',6,6],['shell',2,2],['shell',9,2],['shell',2,6],['palm',1,1],['palm',10,1],
+           ['bfly',3,0]],
+    track:ringRows(4,2,8,5,[[5,2],[6,2],[6,5]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[7,5], stations:[[6,5]] },
+  { name:'THE VINE TUNNEL', hint:'GO THROUGH THE TUNNEL!', say:'THROUGH THE TUNNEL!!',
+    land:'jungle', weather:'rain',
+    glued:[...fillRows('vtree',4,0,8,1,'tree'), ['monk',9,1,0],['parr',3,6,1],['bleaf',1,3],
+           ['vtree',10,5]],
+    track:[...ringRows(4,2,8,5,[[5,2],[6,2],[7,2],[4,3],[4,4]]),
+           ['tun',0,6,2],['s',0,5,2],['s',0,7,2]],
+    gaps:[[4,3,1],[4,4,1]], ride:[6,2], stations:[] },
+  { name:'THE JUNGLE JAMBOREE', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'jungle',
+    toy:'vtree', bundle:['vtree','bleaf'],
+    glued:[['eleph',4,3,0],['monk',7,3,1],['monk',1,2,0],['parr',10,2,0],['bfly',3,0],['bfly',8,0],
+           ['bfly',10,5],['vtree',0,1],['vtree',10,0],['vtree',0,6],['bleaf',1,5]],
+    track:ringRows(2,1,9,6,[[3,1],[6,1],[8,1],[5,6]]),
+    gaps:[[3,1,0],[6,1,0],[8,1,0]], ride:[7,6], stations:[[5,6]] },
+  // ---- 51-60 THE MOUNTAIN CLIMB — the high country; the hills roll out
+  { name:'THE FOOTHILL RING', hint:'FINISH THE TRACK!', land:'mountain',
+    glued:[['rock',2,2],['rock',9,5],['pine',1,1],['pine',10,6],['goat',9,2,0],['eag',2,0]],
+    track:ringRows(4,2,7,5,[[5,2],[6,2]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[6,5], stations:[] },
+  { name:'THE GOAT LEDGE', hint:'FINISH THE TRACK!', land:'mountain',
+    glued:[['goat',5,3,0],['goat',2,2,1],['rock',6,4],['rock',1,5],['rock',10,2],
+           ['pine',1,1],['pine',10,6],['eag',9,0]],
+    track:ringRows(3,2,8,5,[[3,3],[8,4]]),
+    gaps:[[3,3,1],[8,4,1]], ride:[5,5], stations:[] },
+  { name:'THE CAMPFIRE STOP', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'mountain',
+    glued:[['fire',6,6],['ppl',5,6,2],['wolf',1,2,0],['pine',1,1],['pine',10,1],['pine',2,5],
+           ['rock',9,1],['rock',10,6]],
+    track:ringRows(4,2,8,5,[[5,2],[6,2],[6,5]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[7,5], stations:[[6,5]] },
+  { name:'THE FIRST CLIMB', hint:'FINISH THE TRACK!', land:'mountain',
+    glued:[['goat',8,2,0],['rock',1,5],['rock',9,4],['pine',1,1],['pine',9,1],['pine',1,6],
+           ['fire',8,5]],
+    track:[...ringRows(3,1,7,4,[[4,1],[5,1],[6,1],[7,2],[7,3]]),
+           ['rp',0,4,1],['s',0,5,1,1],['rp',2,6,1]],
+    gaps:[[7,2,1],[7,3,1]], ride:[5,1], stations:[] },
+  { name:'THE GORGE BRIDGE', hint:'FINISH THE TRACK!', land:'mountain',
+    glued:[['gorge',6,1],['gorge',6,3],['eag',5,0],['goat',10,3,0],['rock',1,1],['rock',10,6],
+           ['pine',0,0],['pine',11,0],['pine',1,6]],
+    track:[...ringRows(3,2,9,5,[[4,2],[5,2],[6,2],[7,2],[8,2],[3,3],[3,4],[9,3]]),
+           ['rp',0,4,2],['s',0,5,2,1],['s',0,6,2,1],['s',0,7,2,1],['rp',2,8,2]],
+    gaps:[[3,3,1],[3,4,1],[9,3,1]], ride:[6,2], stations:[] },
+  { name:'THE WOLF WOODS', hint:'FINISH THE TRACK!', land:'mountain',
+    glued:[...fillRows('pine',0,0,2,7,'tree'), ...fillRows('pine',10,0,11,7,'tree'),
+           ...fillRows('pine',3,0,9,0,'tree'), ...fillRows('pine',3,7,9,7,'tree'),
+           ['wolf',6,3,0],['pine',5,3],['pine',7,3],['pine',5,4],['pine',7,4]],
+    track:[['s',0,5,5],['s',0,6,5]],
+    ride:[6,5], stations:[] },
+  { name:'THE EAGLE PASS', hint:'FINISH THE TRACK!', land:'mountain',
+    glued:[['eag',5,0],['eag',8,0],['goat',9,4,0],['rock',1,2],['rock',10,3],['rock',2,6],
+           ['pine',1,6],['pine',10,6]],
+    track:ringRows(3,1,8,5,[[4,1],[6,1],[3,3]]),
+    gaps:[[4,1,0],[6,1,0],[3,3,1]], ride:[7,1], stations:[] },
+  { name:'THE DOUBLE HILL', hint:'FINISH THE TRACK!', land:'mountain',
+    glued:[['goat',5,3,0],['fire',10,6],['pine',1,1],['pine',10,1],['rock',0,7],['rock',11,0]],
+    track:[...ringRows(2,2,9,5,[[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[2,3],[2,4],[9,3],[9,4]]),
+           ['rp',0,3,2],['s',0,4,2,1],['rp',2,5,2],['rp',0,6,2],['s',0,7,2,1],['rp',2,8,2]],
+    gaps:[[2,3,1],[2,4,1],[9,3,1],[9,4,1]], ride:[4,2], stations:[] },
+  { name:'THE HIGH MEADOW', hint:'FINISH THE TRACK!', land:'mountain',
+    glued:[...fillRows('flw',1,1,2,6,'bush'), ...fillRows('flw',9,1,10,6,'bush'),
+           ['goat',5,3,0],['goat',6,4,1]],
+    track:ringRows(3,2,8,5,[[4,2],[7,2]]),
+    gaps:[[4,2,0],[7,2,0]], ride:[5,5], stations:[] },
+  { name:'THE SUMMIT PARTY', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'mountain',
+    toy:'wolf', bundle:['wolf'],
+    glued:[['goat',3,3,0],['eag',8,0],['fire',8,3],['wolf',10,1,0],['rock',1,5],['rock',10,4],
+           ['pine',0,0],['pine',11,0],['pine',0,7],['pine',11,7]],
+    track:[...ringRows(2,1,9,6,[[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],[2,4],[5,6]]),
+           ['rp',0,4,1],['s',0,5,1,1],['s',0,6,1,1],['rp',2,7,1]],
+    gaps:[[3,1,0],[8,1,0],[2,4,1]], ride:[5,1], stations:[[5,6]] },
+  // ---- 61-70 THE CLOUD KINGDOM — Wyatt: "a unicorn jumping over the rainbow"
+  { name:'THE CLOUD RING', hint:'FINISH THE TRACK!', land:'cloud',
+    glued:[['puffc',3,3,0],['puffc',8,4,1],['bal',2,5,0],['bal',9,1,1]],
+    track:ringRows(4,2,7,5,[[5,2],[6,2]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[6,5], stations:[] },
+  { name:'THE BALLOON CROSSING', hint:'FINISH THE TRACK!', land:'cloud',
+    glued:[['bal',4,0,0],['bal',8,1,1],['bal',1,4,2],['puffc',5,3,0],['puffc',6,4,1]],
+    track:ringRows(3,2,8,5,[[4,2],[6,2],[8,3]]),
+    gaps:[[4,2,0],[6,2,0],[8,3,1]], ride:[5,5], stations:[] },
+  { name:'THE PUFF PARADE', hint:'FINISH THE TRACK!', land:'cloud',
+    glued:[['puffc',4,3,0],['puffc',5,3,1],['puffc',6,3,2],['puffc',7,3,0],
+           ['bal',1,1,0],['bal',10,5,1]],
+    track:ringRows(2,2,9,5,[[3,2],[8,2]]),
+    gaps:[[3,2,0],[8,2,0]], ride:[5,2], stations:[] },
+  { name:'THE SKY GARDEN', hint:'FINISH THE TRACK!', land:'cloud',
+    glued:[...fillRows('flw',1,1,2,6,'bush'), ...fillRows('flw',9,1,10,6,'bush'),
+           ['puffc',5,3,0],['puffc',7,4,1],['bal',0,0,0]],
+    track:ringRows(4,2,8,5,[[5,2],[6,2],[7,2]]),
+    gaps:[[5,2,0],[6,2,0],[7,2,0]], ride:[5,5], stations:[] },
+  // 65 — THE UNICORN. She stands beside her rainbow, one cell of air between
+  // them, and every lap the charm law sends her over it in a sparkling arc.
+  { name:'THE UNICORN', hint:'WATCH THE UNICORN JUMP!', land:'cloud',
+    toy:'rbow', bundle:['rbow'],
+    glued:[['uni',5,3,0],['rbow',6,3],['puffc',2,2,0],['puffc',9,5,1],['bal',10,1,0]],
+    track:ringRows(4,2,8,5,[[5,2],[6,2]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[6,5], stations:[] },
+  { name:'THE RAINBOW ROAD', hint:'FINISH THE TRACK!', land:'cloud',
+    glued:[['rbow',4,3],['rbow',6,3],['rbow',8,3],['puffc',3,4,0],['puffc',7,4,1],['bal',1,1,0]],
+    track:ringRows(2,2,9,5,[[4,2],[7,2]]),
+    gaps:[[4,2,0],[7,2,0]], ride:[6,2], stations:[] },
+  { name:'THE STAR STATION', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'cloud',
+    glued:[['puffc',5,3,0],['puffc',2,2,1],['bal',9,1,0],['bal',1,5,1]],
+    track:ringRows(4,2,8,5,[[5,2],[7,2],[6,5]]),
+    gaps:[[5,2,0],[7,2,0]], ride:[7,5], stations:[[6,5]] },
+  { name:'THE CLOUD HILL', hint:'FINISH THE TRACK!', land:'cloud',
+    glued:[['puffc',9,1,0],['bal',2,1,0],['puffc',2,5,1]],
+    track:[...ringRows(4,2,8,5,[[5,2],[6,2],[7,2],[4,3],[4,4]]),
+           ['rp',0,5,2],['s',0,6,2,1],['rp',2,7,2]],
+    gaps:[[4,3,1],[4,4,1]], ride:[6,2], stations:[] },
+  { name:'THE WIND RIDERS', hint:'FINISH THE TRACK!', land:'cloud',
+    glued:[['bal',2,0,0],['bal',9,0,1],['bal',1,4,2],['bal',10,4,0],
+           ['puffc',5,3,0],['puffc',6,3,1]],
+    track:ringRows(3,1,8,5,[[4,1],[5,1],[7,1]]),
+    gaps:[[4,1,0],[5,1,0],[7,1,0]], ride:[6,1], stations:[] },
+  { name:'THE UNICORN\'S CROWN', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'cloud',
+    toy:'uni', bundle:['uni'],
+    glued:[['uni',3,3,0],['rbow',4,3],['puffc',7,3,0],['puffc',8,3,1],
+           ['bal',1,0,0],['bal',10,0,1]],
+    track:ringRows(2,1,9,6,[[3,1],[7,1],[9,3],[5,6]]),
+    gaps:[[3,1,0],[7,1,0],[9,3,1]], ride:[7,6], stations:[[5,6]] },
+  // ---- 71-80 THE CELEBRATION LINES — the fair from the reference maps
+  { name:'THE PARADE RING', hint:'FINISH THE TRACK!', land:'rug',
+    glued:[['flag',2,2],['flag',9,2],['ppl',2,5,1],['ppl',9,5,0],['bal',5,0,0]],
+    track:ringRows(4,2,7,5,[[5,2],[6,2]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[6,5], stations:[] },
+  { name:'THE BALLOON ARCHES', hint:'FINISH THE TRACK!', land:'island',
+    glued:[['arch',4,2],['arch',7,2],['ppl',2,3,0],['ppl',9,4,1],['flw',2,6],['flw',9,6],
+           ['bal',1,1,0]],
+    track:ringRows(3,2,8,5,[[5,2],[6,2]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[5,5], stations:[] },
+  { name:'THE TOWN CLOCK', hint:'FINISH THE TRACK!', land:'west',
+    glued:[['clock',6,3],['bench',5,3],['bench',7,3],['lamp',5,4],['lamp',7,4],
+           ['mail2',2,2],['flag',9,2],['bush',1,1],['bush',10,6]],
+    track:ringRows(4,2,8,5,[[5,2],[7,2]]),
+    gaps:[[5,2,0],[7,2,0]], ride:[6,5], stations:[] },
+  { name:'THE CROSSING FAIR', hint:'USE THE CROSSING!', say:'USE THE CROSSING!!', land:'rug',
+    glued:[['fount',5,3],['flag',4,3],['flag',8,3],['ppl',2,2,0],['ppl',10,2,1],
+           ['bal',1,0,0],['bal',10,6,1]],
+    track:[['x',0,6,1],['s',0,5,1],['s',0,7,1]],
+    cross:[6,1], ride:[5,1], stations:[] },
+  { name:'THE FOUNTAIN PARK', hint:'FINISH THE TRACK!', land:'island',
+    glued:[['fount',4,3],['fount',7,3],['bench',5,4],['bench',6,4],['flw',3,3],['flw',8,4],
+           ['flw',1,1],['flw',10,1],['ppl',1,4,1],['ppl',10,3,0]],
+    track:ringRows(2,2,9,5,[[4,2],[6,2],[8,2]]),
+    gaps:[[4,2,0],[6,2,0],[8,2,0]], ride:[5,2], stations:[] },
+  { name:'THE STATUE GARDEN', hint:'FINISH THE TRACK!', land:'rug',
+    glued:[['stat',5,3],['stat',6,4],['flw',2,2],['flw',9,2],['flw',2,5],['flw',9,5],
+           ['lamp',1,1],['lamp',10,1]],
+    track:ringRows(3,2,8,5,[[3,3],[3,4]]),
+    gaps:[[3,3,1],[3,4,1]], ride:[5,5], stations:[] },
+  { name:'THE LAMPLIGHT LOOP', hint:'FINISH THE TRACK!', land:'snow', weather:'snowfall',
+    glued:[['lamp',3,1],['lamp',9,1],['lamp',3,6],['lamp',9,6],['bench',2,3],['bench',9,4],
+           ['snow',1,1,0],['ppl',2,4,1],['ppl',10,3,0],['pine',1,6],['pine',10,6]],
+    track:ringRows(4,2,8,5,[[5,2],[6,2]]),
+    gaps:[[5,2,0],[6,2,0]], ride:[7,5], stations:[] },
+  { name:'THE POST OFFICE RUN', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'west',
+    glued:[['mail2',6,6],['flag',2,2],['hay',9,2],['cow',10,4,0],['barn',1,3]],
+    track:ringRows(3,1,8,5,[[4,1],[6,1],[6,5]]),
+    gaps:[[4,1,0],[6,1,0]], ride:[5,5], stations:[[6,5]] },
+  { name:'THE BIG BALLOON DAY', hint:'FINISH THE TRACK!', land:'island',
+    glued:[['bal',3,0,0],['bal',6,0,1],['bal',9,0,2],['bal',1,3,0],['bal',10,4,1],
+           ['arch',5,1],['arch',6,1],['ppl',1,5,0],['ppl',10,2,1],['flw',0,6],['flw',11,6]],
+    track:ringRows(2,1,9,6,[[3,1],[8,1],[2,4]]),
+    gaps:[[3,1,0],[8,1,0],[2,4,1]], ride:[5,6], stations:[] },
+  { name:'THE GRAND FAIR', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'rug',
+    toy:'arch', bundle:['arch','clock'],
+    glued:[['fount',5,3],['clock',7,3],['stat',3,3],['bench',6,4],['lamp',4,4],['lamp',8,4],
+           ['arch',4,1],['ppl',10,2,0],['ppl',1,2,1],['ppl',3,7,2],['bal',2,0,0],['bal',9,0,1],['bal',11,3,2]],
+    track:ringRows(2,1,9,6,[[6,1],[2,3],[9,4],[5,6]]),
+    gaps:[[6,1,0],[2,3,1],[9,4,1]], ride:[7,6], stations:[[5,6]] },
+  // ---- 81-90 UP AND OVER — Wyatt: "a lot higher up ramp and down ramp…
+  // wrap the track around and then go under, since now it's like a bridge"
+  { name:'THE LITTLE HILL', hint:'FINISH THE TRACK!', land:'rug',
+    glued:[['flw',1,2],['flw',8,2],['flw',1,5],['flw',8,5],['bush',1,1],['bush',9,1],
+           ['ppl',8,3,0]],
+    track:[...ringRows(3,1,7,4,[[4,1],[5,1],[6,1],[4,4],[5,4]]),
+           ['rp',0,4,1],['s',0,5,1,1],['rp',2,6,1]],
+    gaps:[[4,4,0],[5,4,0]], ride:[5,1], stations:[] },
+  { name:'THE FOUR BRIDGES', hint:'BUILD THE BRIDGES!', say:'CROSS THE RIVER!!',
+    land:'jungle',
+    glued:[['rv',4,0],['rv',4,1],['rv',4,3],['rv',4,4],['rv',4,6],['rv',4,7],['rv',4,2],['rv',4,5],
+           ['rv',8,0],['rv',8,1],['rv',8,3],['rv',8,4],['rv',8,6],['rv',8,7],['rv',8,2],['rv',8,5],
+           ['duck',3,6,0],['tree',1,1],['tree',10,1],['bush',1,6],['bush',10,6]],
+    track:ringRows(2,2,9,5,[[4,2],[8,2],[4,5],[8,5]]),
+    gaps:[[4,2,0],[8,2,0],[4,5,0],[8,5,0]], ride:[6,2], stations:[] },
+  { name:'THE SIDE TRACK', hint:'FINISH THE TRACK!', land:'canyon',
+    glued:[['bcact',1,6],['bcact',10,6],['rock',1,2],['rock',10,2],['tmbl',2,0,0],['tmbl',9,7,1],
+           ['coyo',10,3]],
+    track:[['sw',0,4,4],['s',0,5,4],['s',0,6,4],['sw',0,7,4],
+           ['c',0,4,5],['s',0,5,5],['s',0,6,5],['c',3,7,5],
+           ['s',0,5,1],['s',0,6,1]],
+    ride:[6,1], stations:[] },
+  { name:'THE LONG BRIDGE', hint:'FINISH THE TRACK!', land:'rug',
+    glued:[['ppl',1,1,0],['ppl',10,1,1],['flw',0,7],['flw',11,7],['tree',0,0],['tree',11,0]],
+    track:[...ringRows(2,2,9,5,[[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[2,3],[2,4],[9,3],[9,4]]),
+           ['rp',0,3,2],['s',0,4,2,1],['s',0,5,2,1],['s',0,6,2,1],['s',0,7,2,1],['rp',2,8,2]],
+    gaps:[[2,3,1],[2,4,1],[9,3,1],[9,4,1]], ride:[5,2], stations:[] },
+  { name:'THE TWIN HILLS', hint:'FINISH THE TRACK!', land:'snow', weather:'snowfall',
+    glued:[['snow',5,3,0],['snow',6,3,1],['pine',1,1],['pine',10,1],['pine',0,7],['pine',11,7]],
+    track:[...ringRows(2,2,9,5,[[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[4,5],[7,5]]),
+           ['rp',0,3,2],['s',0,4,2,1],['rp',2,5,2],['rp',0,6,2],['s',0,7,2,1],['rp',2,8,2]],
+    gaps:[[4,5,0],[7,5,0]], ride:[4,2], stations:[] },
+  { name:'THE CANYON CROSSING', hint:'FINISH THE TRACK!', land:'canyon', weather:'dust',
+    glued:[['gorge',6,1],['gorge',6,3],['coyo',10,2],['tmbl',1,1,0],['tmbl',10,6,1],
+           ['bcact',1,6],['rock',0,0],['rock',11,0]],
+    track:[...ringRows(3,2,9,5,[[4,2],[5,2],[6,2],[7,2],[8,2],[3,3],[3,4],[9,3],[9,4]]),
+           ['rp',0,4,2],['s',0,5,2,1],['s',0,6,2,1],['s',0,7,2,1],['rp',2,8,2]],
+    gaps:[[3,3,1],[3,4,1],[9,3,1],[9,4,1]], ride:[6,2], stations:[] },
+  { name:'THE TALL TRAIL', hint:'FINISH THE TRACK!', land:'mountain',
+    glued:[['goat',3,3,0],['goat',8,4,1],['rock',2,2],['rock',9,5],['rock',2,6],
+           ['pine',2,0],['pine',9,0],['pine',2,7],['eag',5,0],['fire',9,6]],
+    track:ringRows(4,1,7,6,[[4,2],[4,4],[7,3],[7,5]]),
+    gaps:[[4,2,1],[4,4,1],[7,3,1],[7,5,1]], ride:[6,1], stations:[] },
+  // 88 — THE BIG BRIDGE: the pretzel. The glued climb crosses the rug on a
+  // high span, and the one loop wraps the whole board and comes home UNDER
+  // its own bridge — the same cell, two elevations (the E4 law's showpiece).
+  { name:'THE BIG BRIDGE', hint:'GO UNDER THE BRIDGE!', say:'UNDER THE BRIDGE!!', land:'rug',
+    toy:'flag', bundle:['flag'],
+    glued:[['ppl',1,4,0],['ppl',11,0,1],['tree',0,0],['tree',11,7],['flag',9,0],['flw',0,6],['flw',11,6]],
+    track:[['rp',0,4,2],['s',0,5,2,1],['s',0,6,2,1],['s',0,7,2,1],['rp',2,8,2],
+           ['c',0,2,2],['c',2,10,2],['c',3,10,4],['c',0,6,4],['c',2,6,0],['c',1,2,0],
+           ['s',0,3,2],['s',0,9,2]],
+    gaps:[[6,3,1],[6,1,1],[10,3,1],[8,4,0],[4,0,0]], ride:[9,2], stations:[] },
+  // 89 — THE SKY LOOP: the pretzel again, one row down and up in the clouds.
+  { name:'THE SKY LOOP', hint:'GO UNDER THE BRIDGE!', say:'UNDER THE BRIDGE!!', land:'cloud',
+    glued:[['puffc',1,4,0],['puffc',10,1,1],['bal',0,0,0],['bal',11,6,1],['rbow',1,6]],
+    track:[['rp',0,4,3],['s',0,5,3,1],['s',0,6,3,1],['s',0,7,3,1],['rp',2,8,3],
+           ['c',0,2,3],['c',2,10,3],['c',3,10,5],['c',0,6,5],['c',2,6,1],['c',1,2,1],
+           ['s',0,3,3],['s',0,9,3]],
+    gaps:[[6,4,1],[6,2,1],[10,4,1],[8,5,0],[4,1,0]], ride:[9,3], stations:[] },
+  { name:'THE GREAT LOOP', hint:'STOP AT THE STATION!', say:'VISIT THE STATION!!', land:'west',
+    toy:'stat', bundle:['stat'],
+    glued:[['rock',1,2],['rock',10,2],['bcact',0,5],['bcact',11,5],['hay',1,7],['cow',10,7,0],
+           ['flag',0,0],['flag',11,0]],
+    track:[...ringRows(2,1,9,6,[[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],[2,3],[2,4],[9,3],[9,4],[5,6]]),
+           ['rp',0,3,1],['s',0,4,1,1],['s',0,5,1,1],['s',0,6,1,1],['s',0,7,1,1],['rp',2,8,1]],
+    gaps:[[2,3,1],[2,4,1],[9,3,1],[9,4,1]], ride:[5,1], stations:[[5,6]] },
+  // ---- 91-100 THE WHOLE WIDE WORLD — Wyatt's sixteen, two at a time, then
+  // everyone together around the great lagoon (the World Showcase homage).
+  { name:'HELLO JAPAN + KOREA', hint:'SEE THE WORLD!', say:'SEE THE WORLD!!', land:'rug',
+    glued:[['lm_jp',5,3],['lm_kr',6,3],['flw',4,3],['flw',7,3],['tree',2,2],['tree',9,5],
+           ['ppl',2,5,1],['ppl',9,2,0]],
+    track:ringRows(3,2,8,5,[[4,2],[7,2]]),
+    gaps:[[4,2,0],[7,2,0]], ride:[5,5], stations:[] },
+  { name:'HELLO CHINA + INDIA', hint:'SEE THE WORLD!', say:'SEE THE WORLD!!', land:'island',
+    glued:[['lm_cn',5,3],['lm_in',6,4],['tree',2,2],['tree',9,5],['flw',4,4],['flw',7,3],
+           ['eleph',9,2,0],['bfly',2,6]],
+    track:ringRows(3,2,8,5,[[3,3],[8,4]]),
+    gaps:[[3,3,1],[8,4,1]], ride:[5,5], stations:[] },
+  { name:'HELLO BRITAIN + FRANCE', hint:'SEE THE WORLD!', say:'SEE THE WORLD!!', land:'rug',
+    glued:[['lm_gb',5,3],['lm_fr',7,4],['lamp',2,2],['lamp',9,2],['bench',6,3],['flw',2,5],
+           ['flw',9,5],['flw',6,4],['ppl',1,1,0],['ppl',10,1,1]],
+    track:ringRows(4,2,8,5,[[5,2],[7,2]]),
+    gaps:[[5,2,0],[7,2,0]], ride:[6,5], stations:[] },
+  { name:'HELLO SPAIN + ITALY', hint:'SEE THE WORLD!', say:'SEE THE WORLD!!', land:'west',
+    glued:[['lm_es',5,3],['lm_it',6,4],['flw',4,4],['flw',7,3],['flw',2,6],['bal',2,1,0],
+           ['ppl',9,2,0],['ppl',2,3,1]],
+    track:ringRows(3,2,8,5,[[4,2],[6,2]]),
+    gaps:[[4,2,0],[6,2,0]], ride:[5,5], stations:[] },
+  { name:'HELLO GERMANY + HOLLAND', hint:'SEE THE WORLD!', say:'SEE THE WORLD!!', land:'rug',
+    glued:[['lm_de',5,3],['lm_nl',7,4],['cow',2,3,0],['flw',3,6],['flw',8,6],['flw',2,2],
+           ['flw',9,2],['tree',1,1],['tree',10,1]],
+    track:ringRows(4,2,8,5,[[6,2],[4,3]]),
+    gaps:[[6,2,0],[4,3,1]], ride:[6,5], stations:[] },
+  { name:'HELLO NORWAY + RUSSIA', hint:'SEE THE WORLD!', say:'SEE THE WORLD!!',
+    land:'ice', weather:'snowfall',
+    glued:[['lm_no',5,3],['lm_ru',6,4],['pine',2,2],['pine',9,5],['pine',1,1],['snow',2,5,0],
+           ['rein',9,3,0]],
+    track:ringRows(3,2,8,5,[[4,2],[7,2]]),
+    gaps:[[4,2,0],[7,2,0]], ride:[5,5], stations:[] },
+  { name:'HELLO USA + BRAZIL', hint:'SEE THE WORLD!', say:'SEE THE WORLD!!', land:'rug',
+    glued:[['lm_us',5,3],['lm_br',7,4],['flag',3,2],['parr',9,2,0],['ppl',2,3,1],['ppl',9,5,0],
+           ['ppl',1,1,2],['flw',2,6],['flw',9,6]],
+    track:ringRows(4,2,8,5,[[5,2],[6,2],[7,2]]),
+    gaps:[[5,2,0],[6,2,0],[7,2,0]], ride:[5,5], stations:[] },
+  { name:'HELLO COLOMBIA + ARGENTINA', hint:'SEE THE WORLD!', say:'SEE THE WORLD!!', land:'island',
+    glued:[['lm_co',5,3],['lm_ar',6,4],['flw',4,3],['flw',7,4],['flw',2,2],['bfly',9,2],
+           ['bfly',2,6],['ppl',9,5,0]],
+    track:ringRows(3,2,8,5,[[3,3],[3,4]]),
+    gaps:[[3,3,1],[3,4,1]], ride:[5,5], stations:[] },
+  { name:'THE FRIENDSHIP FAIR', hint:'SEE THE WORLD!', say:'ALL ABOARD!!', land:'rug',
+    glued:[['lm_jp',2,2],['lm_fr',9,2],['lm_us',2,5],['lm_ru',9,5],['arch',6,2],
+           ['ppl',3,3,0],['ppl',3,4,1],['ppl',9,3,2],['bal',1,1,0],['bal',10,1,1],['bal',5,0,2],
+           ['flag',2,6],['flag',9,6]],
+    track:ringRows(4,2,8,5,[[5,2],[7,2]]),
+    gaps:[[5,2,0],[7,2,0]], ride:[6,5], stations:[] },
+  // 100 — THE WHOLE WIDE WORLD: the giant lg map. A great lagoon mid-rug and
+  // all sixteen wonders around it; two stations; the finale's double burst.
+  { name:'THE WHOLE WIDE WORLD', hint:'VISIT BOTH STATIONS!', say:'THE WHOLE WORLD!!',
+    land:'island', size:'lg',
+    glued:[['rv',7,5],['rv',8,5],['rv',9,5],['rv',10,5],['rv',6,6],['rv',7,6],['rv',8,6],
+           ['rv',9,6],['rv',10,6],['rv',11,6],['rv',8,7],['rv',9,7],
+           ['lm_us',4,4],['lm_co',4,6],['lm_br',4,8],['lm_ar',6,8],
+           ['lm_es',8,8],['lm_it',10,8],['lm_fr',12,8],['lm_gb',13,7],
+           ['lm_nl',13,5],['lm_de',13,3],['lm_no',11,3],['lm_ru',9,3],
+           ['lm_cn',7,3],['lm_kr',5,3],['lm_jp',6,4],['lm_in',12,4],
+           ['arch',8,2],['boat',11,4],['duck',5,6,0],['palm',5,5],['palm',12,5],
+           ['ppl',5,4,0],['ppl',12,3,1],['ppl',3,7,2],['ppl',14,6,0],
+           ['flw',3,3],['flw',14,3],['flw',3,8],['flw',14,8],['flw',5,7],['flw',12,7],
+           ['bal',1,1,0],['bal',16,10,1],['tree',1,10],['tree',16,1]],
+    track:ringRows(2,2,15,9,[[4,2],[12,2],[2,5],[15,6],[5,9],[13,9],[6,2],[11,9]]),
+    gaps:[[4,2,0],[12,2,0],[2,5,1],[15,6,1],[5,9,0],[13,9,0]],
+    stations:[[6,2],[11,9]] },
 ];
 // THE SOLVABILITY LAW — every level ships a scripted reference solution;
 // TS.camp.solve(n) builds it and the battery proves all ten win. A level whose
@@ -10306,6 +11128,105 @@ const SOLVE=[
   { start:[7,5], rows:[ ['c',1,3,5],['s',0,4,5],['s',0,7,5],['s',0,8,5],
       ['c',3,9,5],['c',1,9,4],['c',2,11,4],['s',1,11,5],['c',3,11,6],
       ['s',0,10,6],['s',0,9,6],['s',0,8,6],['s',0,7,6],['s',0,6,6],['s',0,4,6],['c',0,3,6] ] },  // 10 the grand tour ((5,5)+(6,5) seeded, E69)
+  // ---- E71: 11-100. Gap levels' rows are exactly their gold cells; seeded
+  // lanes close their ring; the pretzels wrap the board and come home under
+  // their own bridge. Straights and curves throughout + bridges where the
+  // river asks — everything owned long before level 11 (the L1-L10 bundles).
+  { start:[6,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 11 the flower ring
+  { start:[6,5], rows:[ ['s',0,4,2],['s',0,7,2],['s',1,8,3] ] },            // 12 the pond garden
+  { start:[5,2], rows:ringRows(4,2,8,5,[[5,5],[6,5]]) },                    // 13 the butterfly way
+  { start:[6,5], rows:[ ['s',1,4,3],['s',1,4,4] ] },                        // 14 the duck pond
+  { start:[6,5], rows:[ ['s',0,4,2],['s',0,5,2],['s',0,6,2],['s',0,7,2] ] },// 15 the picnic meadow
+  { start:[3,5], rows:[ ['s',0,5,2],['s',0,6,2],['s',1,9,3] ] },            // 16 the fountain square
+  { start:[5,2], rows:ringRows(4,2,8,5,[[5,2],[6,2]]) },                    // 17 the orchard loop
+  { start:[6,2], rows:[ ['s',0,4,5],['s',0,7,5] ] },                        // 18 the rose ring
+  { start:[6,5], rows:[ ['s',0,4,1],['s',0,6,1],['s',0,5,5] ] },            // 19 the garden gate
+  { start:[6,6], rows:[ ['s',0,4,1],['s',0,7,1],['s',1,2,3],['s',1,9,4] ] },// 20 the garden party
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 21 the desert oval
+  { start:[6,5], rows:[ ['s',1,3,3],['s',1,3,4] ] },                        // 22 the cactus bend
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,7,2] ] },                        // 23 the ranch ring
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2],['s',0,7,2] ] },            // 24 the water tower stop
+  { start:[5,2], rows:ringRows(4,2,8,5,[[5,5],[6,5]]) },                    // 25 the big mesa
+  { start:[4,5], rows:[ ['s',0,4,2],['s',0,6,2],['s',0,8,2] ] },            // 26 the tumbleweed run
+  { start:[5,5], rows:[ ['s',0,6,1],['s',0,7,1],['s',1,3,3] ] },            // 27 the canyon arch
+  { start:[5,4], rows:[ ['s',1,3,2],['s',1,3,3] ] },                        // 28 the gold hills
+  { start:[4,6], rows:[ ['s',0,3,1],['s',0,8,1],['s',1,2,4],['s',1,9,3] ] },// 29 the long lasso
+  { start:[4,5], rows:[ ['s',0,4,1],['s',0,5,1],['s',0,6,1],['s',0,7,1] ] },// 30 the roundup
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 31 the snowman ring
+  { start:[6,5], rows:[ ['s',0,4,2],['s',0,7,2] ] },                        // 32 the frozen pond
+  { start:[5,2], rows:ringRows(4,2,8,5,[[5,5],[6,5]]) },                    // 33 the pine woods
+  { start:[3,5], rows:[ ['s',0,4,2],['s',0,5,2],['s',0,6,2] ] },            // 34 the ice slide
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 35 the igloo village
+  { start:[5,5], rows:[ ['s',1,4,3],['s',1,4,4] ] },                        // 36 the snowy hill
+  { start:[5,6], rows:[ ['s',0,4,1],['s',0,7,1],['s',1,2,3],['s',1,9,4] ] },// 37 the aurora loop
+  { start:[6,5], rows:[ ['s',1,3,3],['s',1,8,4] ] },                        // 38 the seal holes
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,7,2] ] },                        // 39 the snow castle
+  { start:[4,6], rows:[ ['s',0,3,1],['s',0,6,1],['s',1,9,3] ] },            // 40 the pole party
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 41 the jungle ring
+  { start:[4,3], rows:swapBr(ringRows(4,2,8,5,[[5,2],[7,2],[5,5],[7,5]]),[[6,2],[6,5]]) },  // 42 the monkey bridge
+  { start:[6,5], rows:[ ['s',0,4,2],['s',1,8,3] ] },                        // 43 the parrot perch
+  { start:[7,5], rows:[ ['s',0,5,2],['s',0,6,2],['s',1,2,4] ] },            // 44 the lagoon line
+  { start:[6,5], rows:[ ['s',0,6,2],['s',0,8,2] ] },                        // 45 the waterfall way
+  { start:[4,5], rows:[ ['s',0,4,1],['s',0,5,1],['s',0,6,1] ] },            // 46 the elephant walk
+  { start:[6,5], rows:[ ['s',0,4,2],['s',0,7,2],['s',1,2,3],['s',1,9,4] ] },// 47 the island hop
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 48 the sandcastle stop
+  { start:[5,5], rows:[ ['s',1,4,3],['s',1,4,4] ] },                        // 49 the vine tunnel
+  { start:[4,6], rows:[ ['s',0,3,1],['s',0,6,1],['s',0,8,1] ] },            // 50 the jungle jamboree
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 51 the foothill ring
+  { start:[6,5], rows:[ ['s',1,3,3],['s',1,8,4] ] },                        // 52 the goat ledge
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 53 the campfire stop
+  { start:[5,4], rows:[ ['s',1,7,2],['s',1,7,3] ] },                        // 54 the first climb
+  { start:[5,5], rows:[ ['s',1,3,3],['s',1,3,4],['s',1,9,3] ] },            // 55 the gorge bridge
+  { start:[5,2], rows:ringRows(4,2,8,5,[[5,5],[6,5]]) },                    // 56 the wolf woods
+  { start:[5,5], rows:[ ['s',0,4,1],['s',0,6,1],['s',1,3,3] ] },            // 57 the eagle pass
+  { start:[4,5], rows:[ ['s',1,2,3],['s',1,2,4],['s',1,9,3],['s',1,9,4] ] },// 58 the double hill
+  { start:[5,5], rows:[ ['s',0,4,2],['s',0,7,2] ] },                        // 59 the high meadow
+  { start:[7,6], rows:[ ['s',0,3,1],['s',0,8,1],['s',1,2,4] ] },            // 60 the summit party
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 61 the cloud ring
+  { start:[6,5], rows:[ ['s',0,4,2],['s',0,6,2],['s',1,8,3] ] },            // 62 the balloon crossing
+  { start:[4,5], rows:[ ['s',0,3,2],['s',0,8,2] ] },                        // 63 the puff parade
+  { start:[6,5], rows:[ ['s',0,5,2],['s',0,6,2],['s',0,7,2] ] },            // 64 the sky garden
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 65 THE UNICORN
+  { start:[5,5], rows:[ ['s',0,4,2],['s',0,7,2] ] },                        // 66 the rainbow road
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,7,2] ] },                        // 67 the star station
+  { start:[5,5], rows:[ ['s',1,4,3],['s',1,4,4] ] },                        // 68 the cloud hill
+  { start:[4,5], rows:[ ['s',0,4,1],['s',0,5,1],['s',0,7,1] ] },            // 69 the wind riders
+  { start:[3,6], rows:[ ['s',0,3,1],['s',0,7,1],['s',1,9,3] ] },            // 70 the unicorn's crown
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 71 the parade ring
+  { start:[6,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 72 the balloon arches
+  { start:[6,5], rows:[ ['s',0,5,2],['s',0,7,2] ] },                        // 73 the town clock
+  { start:[5,1], rows:ringRows(3,1,9,5,[[5,1],[6,1],[7,1]]) },              // 74 the crossing fair
+  { start:[3,5], rows:[ ['s',0,4,2],['s',0,6,2],['s',0,8,2] ] },            // 75 the fountain park
+  { start:[5,5], rows:[ ['s',1,3,3],['s',1,3,4] ] },                        // 76 the statue garden
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2] ] },                        // 77 the lamplight loop
+  { start:[7,5], rows:[ ['s',0,4,1],['s',0,6,1] ] },                        // 78 the post office run
+  { start:[6,6], rows:[ ['s',0,3,1],['s',0,8,1],['s',1,2,4] ] },            // 79 the big balloon day
+  { start:[3,6], rows:[ ['s',0,6,1],['s',1,2,3],['s',1,9,4] ] },            // 80 the grand fair
+  { start:[6,4], rows:[ ['s',0,4,4],['s',0,5,4] ] },                        // 81 the little hill
+  { start:[3,5], rows:[ ['br',0,4,2],['br',0,8,2],['br',0,4,5],['br',0,8,5] ] },  // 82 the four bridges
+  { start:[5,1], rows:ringRows(3,1,8,4,[[4,4],[5,4],[6,4],[7,4],[5,1],[6,1]]) },  // 83 the side track
+  { start:[4,5], rows:[ ['s',1,2,3],['s',1,2,4],['s',1,9,3],['s',1,9,4] ] },// 84 the long bridge
+  { start:[5,5], rows:[ ['s',0,4,5],['s',0,7,5] ] },                        // 85 the twin hills
+  { start:[5,5], rows:[ ['s',1,3,3],['s',1,3,4],['s',1,9,3],['s',1,9,4] ] },// 86 the canyon crossing
+  { start:[5,6], rows:[ ['s',1,4,2],['s',1,4,4],['s',1,7,3],['s',1,7,5] ] },// 87 the tall trail
+  { start:[3,2], rows:[ ['s',1,10,3],['s',0,9,4],['s',0,8,4],['s',0,7,4],   // 88 THE BIG BRIDGE —
+      ['s',1,6,3],['s',1,6,2],['s',1,6,1],                                  // wrap the board and come
+      ['s',0,5,0],['s',0,4,0],['s',0,3,0],['s',1,2,1] ] },                  // home UNDER the span
+  { start:[3,3], rows:[ ['s',1,10,4],['s',0,9,5],['s',0,8,5],['s',0,7,5],   // 89 the sky loop —
+      ['s',1,6,4],['s',1,6,3],['s',1,6,2],                                  // the same wrap, one row
+      ['s',0,5,1],['s',0,4,1],['s',0,3,1],['s',1,2,2] ] },                  // down, in the clouds
+  { start:[7,6], rows:[ ['s',1,2,3],['s',1,2,4],['s',1,9,3],['s',1,9,4] ] },// 90 the great loop
+  { start:[5,5], rows:[ ['s',0,4,2],['s',0,7,2] ] },                        // 91 japan + korea
+  { start:[5,5], rows:[ ['s',1,3,3],['s',1,8,4] ] },                        // 92 china + india
+  { start:[6,5], rows:[ ['s',0,5,2],['s',0,7,2] ] },                        // 93 britain + france
+  { start:[5,5], rows:[ ['s',0,4,2],['s',0,6,2] ] },                        // 94 spain + italy
+  { start:[6,5], rows:[ ['s',0,6,2],['s',1,4,3] ] },                        // 95 germany + holland
+  { start:[5,5], rows:[ ['s',0,4,2],['s',0,7,2] ] },                        // 96 norway + russia
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,6,2],['s',0,7,2] ] },            // 97 usa + brazil
+  { start:[5,5], rows:[ ['s',1,3,3],['s',1,3,4] ] },                        // 98 colombia + argentina
+  { start:[5,5], rows:[ ['s',0,5,2],['s',0,7,2] ] },                        // 99 the friendship fair
+  { start:[7,2], rows:[ ['s',0,4,2],['s',0,12,2],['s',1,2,5],['s',1,15,6],  // 100 THE WHOLE WIDE WORLD
+      ['s',0,5,9],['s',0,13,9] ] },
 ];
 // the campaign's own state object — free play's grid/consist/save is NEVER touched
 const CAMP={ on:false, book:'ten', level:0, won:false, tugT:false, stations:[], visited:new Set(),
@@ -10524,7 +11445,9 @@ function campEnter(n,b){
   const L=bookL(b)[n-1]; if(!L||!campUnlocked(n,b)) return false;
   if(CAMP.on){ if(CAMP_WIP&&!CAMP.won) setWip(CAMP.book,serWip()); }   // E50: the OPEN book keeps its wip
   else FREE=serWorld();                       // stash the kid's rug — restored verbatim on exit
-  applyDims('sm');                            // E10: every level plays on the sm board, whatever BUILD grew to
+  // E10: every level plays on the sm board — E71 amends: a level may DECLARE a
+  // size (level 100's giant world plays lg); campExit still restores BUILD's own.
+  applyDims(L.size==='lg'||L.size==='xl'? L.size : 'sm');
   CAMP.on=true; CAMP.book=b; CAMP.level=n; CAMP.won=false; CAMP.tugT=false; CAMP.wx=null;   // E35: every level opens under its own sky
   CAMP.visited=new Set(); winT=0; prettyT=0; prettyPend=false;
   FRN.armed=false; FRN.t=0;                   // E70: the nudge arms fresh per visit — only a completed rot demo arms it
@@ -10626,7 +11549,11 @@ function campWin(){
   // ids it actually added (re-winning adds nothing, so a replay is quiet), the level's
   // headline toy goes first, and the cards queue up behind the LINE COMPLETE! card.
   // E50: a pack's bundles are STORE ids through grantPack — the same one gate (E51: any non-ten book).
-  const won=CAMP.book!=='ten'? grantPack(CAMP.level) : grantBundle(CAMP.level), L=bookL()[CAMP.level-1];
+  // E71: the ten book learns the packs' gift grammar — a level carrying its own
+  // `bundle` row grants STORE ids through THE ONE GATE (levels 11-100's gifts);
+  // L1-L10 keep grantBundle byte-true (COLL lvl rows, THE FIFTY STAY FIFTY).
+  const L=bookL()[CAMP.level-1];
+  const won=(CAMP.book!=='ten'||(L&&L.bundle))? grantPack(CAMP.level) : grantBundle(CAMP.level);
   if(L&&L.toy) won.sort((a,b)=>(b===L.toy)-(a===L.toy));
   toyQ=won; toyCard=null; toyT=0;
   boardSync(); winSync(); save();
@@ -11394,9 +12321,9 @@ function buildTray(){
    ===================================================================== */
 // palette order — Wyatt dial (E4 added RAMP + SPIRAL; E7 adds the TUNNEL + a FRIENDS tab)
 const PIECES=[ ['s','STRAIGHT'], ['c','CURVE'], ['rp','RAMP'], ['x','CROSSING'], ['b','BUMPER'], ['st','STATION'], ['br','BRIDGE'], ['tun','TUNNEL'], ['sw','SPLITTER'], ['sp','SPIRAL'] ];
-const SCEN_TAB=['bush','tree','pine','vtree','bleaf','flw','rock','pond','rv','hay','fire','bcact','pum','atree','sfir'];   // nature (+ the campfire E9, + the jungle plants E31, + the bloom cactus E43, + the pumpkin and the fall tree E50, + the snow tree E51)
-const TOWN_TAB=[...TOWN_SET,'fence','lamp','wind','whis','sig',...MODEL_IDS.filter(t=>t!=='fire'&&t!=='vtree'&&t!=='bleaf'&&t!=='wolf'&&t!=='peng'&&t!=='roadr'&&t!=='bcact'&&t!=='pum'&&t!=='scrow'&&t!=='crow'&&t!=='atree'&&t!=='king'&&t!=='rein'&&t!=='sfir'&&t!=='sant')];   // built things (the store's — nature/friend-shelved ids excluded; E42: the igloo builds, the penguin lives; E43: the roadrunner runs, the cactus grows; E50: the lantern builds, the rest grow or live; E51: the present, cottage + pole build — the herd and Santa live, the tree grows)
-const FRIEND_TAB=['ppl',...ANIMAL_SET,'duck','dog','cat','wolf','peng','roadr','scrow','crow','king','snow','bal','rein','sant'];      // living things (+ the balloon; E35: the wolf; E42: the penguin; E43: the roadrunner; E50: the scarecrow, the crow and the King; E51: the reindeer and Santa)
+const SCEN_TAB=['bush','tree','pine','vtree','bleaf','flw','rock','pond','rv','hay','fire','bcact','pum','atree','sfir','rbow'];   // nature (+ the campfire E9, + the jungle plants E31, + the bloom cactus E43, + the pumpkin and the fall tree E50, + the snow tree E51, + the rainbow E71)
+const TOWN_TAB=[...TOWN_SET,'fence','lamp','wind','whis','sig',...MODEL_IDS.filter(t=>t!=='fire'&&t!=='vtree'&&t!=='bleaf'&&t!=='wolf'&&t!=='peng'&&t!=='roadr'&&t!=='bcact'&&t!=='pum'&&t!=='scrow'&&t!=='crow'&&t!=='atree'&&t!=='king'&&t!=='rein'&&t!=='sfir'&&t!=='sant'&&t!=='uni'&&t!=='rbow')];   // built things (the store's — nature/friend-shelved ids excluded; E42: the igloo builds, the penguin lives; E43: the roadrunner runs, the cactus grows; E50: the lantern builds, the rest grow or live; E51: the present, cottage + pole build — the herd and Santa live, the tree grows)
+const FRIEND_TAB=['ppl',...ANIMAL_SET,'duck','dog','cat','wolf','peng','roadr','scrow','crow','king','snow','bal','rein','sant','uni'];      // living things (+ the balloon; E35: the wolf; E42: the penguin; E43: the roadrunner; E50: the scarecrow, the crow and the King; E51: the reindeer and Santa; E71: the unicorn)
 // per-kind flags, all data-driven so E5 can pre-place any of these glued down without new code:
 //  blocks = refuses track (cellBlocksTrack reads this) · react = charms at a passing train ·
 //  knock = wooden tap sound (buildings + fence). Unknown kinds in a save are skipped, never crash.
@@ -11485,6 +12412,21 @@ const SCENDEF={
   pres:{blocks:1}, sfir:{blocks:1}, cpole:{blocks:1,knock:1},
   cott:{blocks:1,knock:1}, rein:{react:1}, sant:{blocks:1,react:1},
   wshop:{blocks:1,knock:1}, elf:{react:1},
+  // E71 — the galaxy. THE UNICORN is an animal (the herd law — she never
+  // blocks) whose charm is THE JUMP: a full sparkling arc through the one
+  // gate, in SILENCE (the cat/snowman law — wonder reads quiet). THE RAINBOW
+  // is the balloon arch's ground cousin: her cloud feet stand on the cell
+  // (blocks — nobody lays track through a cloud foot) and she asks no sound.
+  // THE SIXTEEN WONDERS are glued-map-only celebration pieces (levels 91-100;
+  // never a palette tab, never COLL: THE FIFTY STAY FIFTY) — public monuments
+  // drawn as wooden toys, solid things every one, and every one knocks.
+  uni:{react:1}, rbow:{blocks:1},
+  lm_us:{blocks:1,knock:1}, lm_kr:{blocks:1,knock:1}, lm_cn:{blocks:1,knock:1},
+  lm_jp:{blocks:1,knock:1}, lm_gb:{blocks:1,knock:1}, lm_no:{blocks:1,knock:1},
+  lm_br:{blocks:1,knock:1}, lm_co:{blocks:1,knock:1}, lm_es:{blocks:1,knock:1},
+  lm_it:{blocks:1,knock:1}, lm_in:{blocks:1,knock:1}, lm_de:{blocks:1,knock:1},
+  lm_nl:{blocks:1,knock:1}, lm_fr:{blocks:1,knock:1}, lm_ar:{blocks:1,knock:1},
+  lm_ru:{blocks:1,knock:1},
 };
 // E39 SOMEBODY IS HOME — tap a dwelling and somebody answers: the windows glow warm
 // gold with the knock, a small head rises into one pane, looks at you, and ducks just
@@ -11517,7 +12459,8 @@ const IZOOM={ cow:1.35, sheep:1.5, chick:2.1, duck:1.9, dog:1.5, cat:1.55, flw:1
   vtree:1.0, bleaf:1.1, wolf:1.35, peng:1.5, iglu:1.15,
   roadr:1.5, bcact:1.05,
   pum:1.3, scrow:1.05, crow:1.8,
-  pres:1.4, rein:1.25 };   // E31 — the jungle plants' card zoom; E35 — the wolf; E42 — the ice pair; E43 — the canyon pair; E50 — the patch (the King + trees stand full-size); E51 — the village (Santa, the cottage, the pole + the tree stand full-size)
+  pres:1.4, rein:1.25,
+  uni:1.2 };   // E31 — the jungle plants' card zoom; E35 — the wolf; E42 — the ice pair; E43 — the canyon pair; E50 — the patch (the King + trees stand full-size); E51 — the village (Santa, the cottage, the pole + the tree stand full-size); E71 — the unicorn (the rainbow stands full-size)
 const CARDEF={ tender:'TENDER', box:'BOXCAR', tank:'TANKER', flat:'FLATCAR', cab:'CABOOSE',
                coach:'COACH', mail:'MAIL CAR', circus:'CIRCUS CAR' };   // E7: three new cars join the shed
 // which toy gates each shed part — the tender rides with the RED PUFFER, one toy
@@ -13146,7 +14089,14 @@ function showScreen(s){
   if(!game){ cancelDrag(); down=null; PINCH=null; PTRS.clear(); }
   $('menu').style.display=s==='menu'?'flex':'none';
   $('board').style.display=s==='board'?'flex':'none';
-  if(s==='board'){ boardFilter(); boardSync(); }   // E56: one book per visit (BOARD_BOOK gates the trio)
+  if(s==='board'){ boardFilter(); boardSync();
+    // E71: a hundred tickets is a long board — opening it brings the FRONTIER
+    // ticket (the first unwon) into view, instantly (no smooth ride for a kid).
+    if(BOARD_BOOK==='ten'){ let n=1; while(n<=LEVELS.length&&CAMP.done.has(n)) n++;
+      const tk=document.querySelector('#tickets .tk[data-n="'+Math.min(n,LEVELS.length)+'"]');
+      if(tk) tk.scrollIntoView({block:'center',behavior:'auto'});
+    } else $('bpanel').scrollTop=0;
+  }   // E56: one book per visit (BOARD_BOOK gates the trio)
   $('wall').style.display=s==='wall'?'flex':'none';   // E56 THE POSTCARD WALL — the door's inside
   if(s==='wall') wallSync();
   $('rail').style.display=(game||play)?'flex':'none';    // E33→E55: the rail is BUILD/campaign furniture — E58: PLAY too (YOUR TRACK: the crate follows the hand onto the wind-up rug)
@@ -13991,6 +14941,62 @@ function bankPig(){
 }
 // E53 ⬇ OUT — ONE wooden plank, ONE close grammar. A small shared factory so
 // later cards mount the same plank on the chest (0206) and the door wall (0207).
+/* =====================================================================
+   E71 THE GLOBE — "look how beautiful we could make a return to menu
+   button instead of just saying menu" (Wyatt 8/8, over the reference's
+   corner compass). An ORIGINAL little world in the reference's GRAMMAR
+   only — blue compass ring, four gold points, green wireframe globe,
+   one door bubble — never its silhouette (the IP law). Wordless, 2×
+   resolution, painted once; every canvas plate holds by construction
+   because the chip is pure DOM.
+   ===================================================================== */
+function drawGlobeChip(){
+  const cv=$('menuGlobe'); if(!cv) return;
+  const g=cv.getContext('2d');
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,132,132);
+  withCtx(g,()=>{
+    const cxr=64, cyr=72, R=38;
+    cx.lineJoin='round'; cx.lineCap='round';
+    const point=(an,len)=>{                       // one gold compass kite
+      const ax=Math.cos(an), ay=Math.sin(an);
+      cx.fillStyle='#F2C531'; cx.strokeStyle='#8a683e'; cx.lineWidth=3;
+      cx.beginPath();
+      cx.moveTo(cxr+ax*(R+len),cyr+ay*(R+len));
+      cx.lineTo(cxr-ay*7+ax*(R-6),cyr+ax*7+ay*(R-6));
+      cx.lineTo(cxr+ay*7+ax*(R-6),cyr-ax*7+ay*(R-6));
+      cx.closePath(); cx.fill(); cx.stroke();
+    };
+    point(-Math.PI/2,22); point(Math.PI/2,20); point(0,20); point(Math.PI,20);
+    for(let i=0;i<4;i++) point(i*Math.PI/2+Math.PI/4,9);   // the little between-points
+    cx.fillStyle='#12203A';                       // the deep-space ring
+    cx.beginPath(); cx.arc(cxr,cyr,R,0,7); cx.fill();
+    cx.strokeStyle='#2E4E86'; cx.lineWidth=7;
+    cx.beginPath(); cx.arc(cxr,cyr,R-3.5,0,7); cx.stroke();
+    cx.fillStyle='#F7E9C4';                       // tiny stars — we ARE a galaxy
+    for(const [sx,sy,sr] of [[cxr-26,cyr+18,1.6],[cxr+24,cyr+22,1.2],[cxr-20,cyr-24,1.2]]){
+      cx.beginPath(); cx.arc(sx,sy,sr,0,7); cx.fill();
+    }
+    cx.fillStyle='#4E9E5F';                       // the green world
+    cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.fill();
+    cx.strokeStyle='#2E6E3E'; cx.lineWidth=2.6;   // the wireframe
+    cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.stroke();
+    cx.beginPath(); cx.moveTo(cxr-26,cyr); cx.lineTo(cxr+26,cyr); cx.stroke();
+    for(const k of [0.45,0.8]){                   // meridians…
+      cx.beginPath(); cx.ellipse(cxr,cyr,26*k,26,0,0,7); cx.stroke();
+    }
+    for(const k of [0.45,0.8]){                   // …and parallels
+      cx.beginPath(); cx.ellipse(cxr,cyr,26,26*k,0,0,7); cx.stroke();
+    }
+    const bx=cxr+R*0.74, by=cyr-R*0.74;           // THE DOOR BUBBLE — the way out
+    cx.fillStyle='#4E9E5F'; cx.strokeStyle='#12203A'; cx.lineWidth=3.5;
+    cx.beginPath(); cx.arc(bx,by,16,0,7); cx.fill(); cx.stroke();
+    cx.fillStyle='#12203A';                       // the doorway
+    rr(bx+1,by-7.5,9,15,4); cx.fill();
+    cx.strokeStyle='#F2C531'; cx.lineWidth=4;     // the gold arrow, going home
+    cx.beginPath(); cx.moveTo(bx-10,by); cx.lineTo(bx+3,by); cx.stroke();
+    cx.beginPath(); cx.moveTo(bx-1,by-4.5); cx.lineTo(bx+4,by); cx.lineTo(bx-1,by+4.5); cx.stroke();
+  });
+}
 function outPlank(fn){
   const b=document.createElement('button'); b.type='button'; b.className='outplk';
   const t=document.createElement('b'); t.textContent='⬇ OUT'; b.appendChild(t);
@@ -14066,6 +15072,7 @@ function buildMenu(){
   // card painters with them) — the box tap IS the BUILD door, chest open.
   // The DOM the menu keeps: the paint shop row.
   $('menuChip').addEventListener('click',()=>{ ac(); SND.click(); showScreen('menu'); });
+  drawGlobeChip();   // E71 THE GLOBE — painted once; the chip's fades and click are untouched
   // THE PAINT SHOP: 5 mini locos painted by the real painter — they ARE the swatches
   const sw=$('swatches');
   for(const name of SWATCHES){
@@ -14483,12 +15490,22 @@ function ghBuild(){
 
 
 load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildWall(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract(); ghBuild();
-// E70 THE FIRST MORNING — the first door IS Level 1: a fresh kid (the ten
-// book's done-set empty, the menu never seen) wakes up INSIDE the campaign
-// through the REAL door pipeline — campEnter walks its own wip restore, so a
-// kid who quit mid-L1 boots back into L1 exactly where they left it. No menu
-// frame ever paints on a first-run boot. Everyone else: the bedroom, verbatim.
-if(firstRun()&&campEnter(1)){} else showScreen('menu');
+// E70 THE FIRST MORNING → E71 THE MORNING TRAIN: EVERY boot lands INSIDE the
+// ten book's frontier level (Wyatt 8/8: "even if it's not a fresh account, we
+// should start them always in the latest campaign level") — the first unwon
+// level, through the REAL door pipeline; campEnter walks its own wip restore,
+// so a mid-level quit reboots exactly where it left off. All hundred done →
+// the finale (the world is the best place to wake up). The corner globe is
+// the escape hatch; no menu frame ever paints on the way in. E70's first
+// morning is the n=1 case of this law — the guided machinery still gates on
+// frGuideOn() and menuSeen still stamps on the first menu landing.
+function bootLine(){
+  if(!BOOT_LINE) return firstRun()&&campEnter(1);   // BOOT_LINE off = the E70 law verbatim
+  let n=1; while(n<=LEVELS.length&&CAMP.done.has(n)) n++;
+  if(n>LEVELS.length) n=LEVELS.length;
+  return campEnter(n);
+}
+if(bootLine()){} else showScreen('menu');
 shelfSync(); muteSync(); syncSwatches(); starHudSync(); rugSync();
 let last=performance.now();
 function frame(t){
