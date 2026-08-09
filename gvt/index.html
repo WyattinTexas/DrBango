@@ -2351,7 +2351,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.82</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.83</div>
   <div class="scanlines"></div>
 </div>
 
@@ -16945,7 +16945,14 @@ function commSay(ev){
 // ---- BRIEFINGS ----
 function commBriefing(kind){
   const pool=COMM_LINES[kind]; if(!pool) return false;
-  if(S.coop && coopHumans()>1) return false;   // 2+ commanders: skipped, NOT marked seen
+  // 2+ commanders: skipped, NOT marked seen. ⚠ v2.83 (battery-caught, and very
+  // likely Wyatt's literal "three-second delay"): the room door sets S.coop
+  // only AFTER startBattlefield returns, so at brief time a squad launch read
+  // as solo — and a first-save chair opened the battle with the WHOLE SIM held
+  // under this card while the other screens fought on. A held sim starts when
+  // its player taps; two players tap seconds apart. The launching party
+  // (coopLaunching) is the truth the old test missed.
+  if((S.coop || (coopLaunching && COOP)) && coopHumans()>1) return false;
   if(META.comms && META.comms[kind]) return false;
   const h=commWin('brief'); if(!h) return false;
   // v2.48: the bf briefing names the army actually fielded (S.bf is live by
@@ -17924,7 +17931,16 @@ function bfqMirrorWatch(){
   const dead = !COOP || !coopRoom() || COOP.code!==BFQ.crewRoom
     || (COOP.members||[]).length<=1
     || (BFQ.foundT && Date.now()-BFQ.foundT>45000);
-  if(dead){ bfQueueTeardown(); crewHoldClear(); }
+  if(dead){
+    // v2.83: the pulled chair retreats WHOLE. Folding only the theater left a
+    // lone party parked in the dead room — and the panel-flip guard then threw
+    // the PRIVATE BATTLE sheet over the war table (the v2.73 phantom's
+    // engager-cancel cousin, battery-caught). If the dead room is still MY
+    // party, leave it too; a party that already moved on is not mine to touch.
+    const room=BFQ.crewRoom;
+    bfQueueTeardown(); crewHoldClear();
+    if(COOP && coopRoom() && COOP.code===room){ try{ coopLeave(); }catch(e){} }
+  }
 }
 
 // ================= CO-OP: THE ALLIED CAMPAIGN =================
@@ -18018,9 +18034,7 @@ function coopTick(){
     // can turn on — both toy boxes, the clock, and which phase we are in. Every
     // other sim adopts them rather than trusting its own drifted copy.
     body.beacon = roomBattle()
-      ? { hy:S.bf.base.you.hp, hf:S.bf.base.foe.hp,
-          dy:S.bf.base.you.dmgTaken, df:S.bf.base.foe.dmgTaken,
-          tl:Math.round(S.bf.timeLeft*10)/10, ph:S.bf.phase, ot:S.bf.ot?1:0 }
+      ? bcnRoom()
       // v2.81 THE REFEREE'S CLOCK: the streaming campaign's beacon also says
       // how long until the next wave — one number, and every screen's
       // countdown reads the referee's watch instead of its own drifted sim.
@@ -19206,7 +19220,15 @@ function crewTick(){
   const fast=(BFQ&&BFQ.crewRoom)||campSceneOpen()||wartableOpen();   // v2.81: the war table is a squad door too — the pull must land inside the fill window
   CREW.pollT=setTimeout(crewTick, fast?2500:5000);
   if(CREW.busy) return;
-  if(S.mode!=='menu'){ CREW.campGo=null; CREW.campGoLvl=0; CREW.leadFired=null; CREW.gatedLaunch=0; CREW.campLaunch=null; CREW.campLvl=0; CREW.bfPaid=null; CREW.bfAdPend=null; CREW.bfGo=null; crewHoldClear(); return; }   // battle entry retires the one-click guards (and the hold card); never poll from inside a battle
+  if(S.mode!=='menu'){ CREW.campGo=null; CREW.campGoLvl=0; CREW.leadFired=null; CREW.gatedLaunch=0; CREW.campLaunch=null; CREW.campLvl=0; CREW.bfPaid=null; CREW.bfAdPend=null; CREW.bfGo=null; crewHoldClear();
+    // v2.83 LAW 1 — LEAVE-TRUTH (Wyatt 8/9: "I don't see when they leave the
+    // Battlefield screen"): the last thing this client TOLD the squad was
+    // "standing at a door" — and with the polls lawfully silent in battle,
+    // that lie would ride the box's 40s TTL on every squadmate's screen. One
+    // farewell settles it: fire-and-forget, reply dropped, still zero
+    // RECURRING polls from inside a battle.
+    if(CREW.lastSt && CREW.crew){ CREW.lastSt=''; crewPost('poll',{st:'',info:{}}).catch(()=>{}); }
+    return; }   // battle entry retires the one-click guards (and the hold card); never poll from inside a battle
   // a wish or an order outliving its lobby is litter
   if(CREW.campGo && !(COOP&&coopSquad()&&COOP.code===CREW.campGo)){ CREW.campGo=null; CREW.campGoLvl=0; }
   if(CREW.leadFired && !(COOP&&coopSquad()&&COOP.code===CREW.leadFired)) CREW.leadFired=null;
@@ -19217,6 +19239,7 @@ function crewTick(){
   crewPost('poll',{st:st.st, info:st.info}).then(r=>{
     CREW.busy=false;
     if(!r||!r.ok) return;
+    CREW.lastSt=st.st;   // v2.83 LAW 1: what the squad last heard — the farewell's due-bill
     if(r.me) CREW.me=r.me;
     if(r.crew){
       CREW.crew=r.crew; CREW.members=r.members||[];
@@ -19751,6 +19774,22 @@ function roomSeatPlan(team){
   }
   return seats;
 }
+// v2.83 LAW 2, the receiving end: dress a computer chair the referee's way.
+// Tint is a draw-time seat lookup, so men already standing recolor for free;
+// the tint (and the snow rim) just need their sprites built. The foe flank's
+// HUD swatch follows when the word names the first right-hand chair.
+function roomSeatWord(cm){
+  const bf=S.bf; if(!bf || S.mode!=='play' || !roomBattle()) return;
+  const i=cm.n|0, st=bf.seats[i];
+  if(!st || st.human || st.me) return;
+  if(typeof cm.t==='string' && cm.t) st.name=cm.t.slice(0,24);
+  if(typeof cm.hex==='string' && /^#[0-9a-fA-F]{6}$/.test(cm.hex) && st.hex!==cm.hex){
+    st.hex=cm.hex; buildUnitTint(st.hex);
+    if(bfMap(bf.mapId).ground==='snow') buildUnitRim(st.hex);
+    if(i===bf.team) bf.hex.foe=st.hex;
+  }
+  if(cm.sw && typeof cm.sw.pn==='string' && cm.sw.pn) st.persona={ id:cm.sw.pn };
+}
 function roomStartBattle(){
   // v2.81: a fill/mirror theater still up folds at the door — the pulled
   // chair's entry can land mid-fill when the engager deploys fast
@@ -19764,6 +19803,17 @@ function roomStartBattle(){
   S.coop=COOP;
   S.speed=1;   // lockstep pin (v1.93): startBattlefield just armed the ×0.9 default — a room runs ×1 on every sim
   S.bf.room=true;
+  // v2.83 LAW 2 — ONE TABLE, THE HOST'S (Wyatt 8/9: "it looks like we versed
+  // different opponents"): the deterministic deal (v2.73) still leaves the
+  // roster IMPLICIT — any race the gate accepts (v2.82's ≤2s stale roster)
+  // deals two tables. The referee now SAYS his: one 'seat' word per computer
+  // chair, first into the log, so they land before any man is placed — and a
+  // late chair replays them from seq 0 with everything else. 'k' crosses
+  // clamp_cmd as an opaque string; an old client falls off roomApply's chain
+  // and keeps today's local deal — no worse, never better-dressed.
+  if(COOP.host) for(const st of S.bf.seats) if(!st.human)
+    coopSend({ k:'seat', n:st.i, t:String(st.name||'').slice(0,24), hex:st.hex,
+               sw:{ pn:String((st.persona&&st.persona.id)||'') } });
   const ppl=Math.max(1,(COOP.members||[]).length);
   S.ann={ txt:tf(ppl===1? 'PRIVATE BATTLE — %1 v %1 · %2 REAL COMMANDER'
                         : 'PRIVATE BATTLE — %1 v %1 · %2 REAL COMMANDERS', team, ppl), t:3.0 };
@@ -19782,6 +19832,89 @@ function roomAdoptBeacon(b){
   if(typeof b.tl==='number') bf.timeLeft=Math.max(0,+b.tl||0);
   if(b.ph==='sudden' && bf.phase!=='sudden'){ bf.phase='sudden'; S.ann={txt:'SUDDEN DEATH — FIRST HIT WINS',t:3,warn:true}; SFX.horn(); }
   if(b.ot && !bf.ot){ bf.ot=true; S.ann={txt:'PUSH! — DOUBLE TAGS',t:2.4,warn:true}; SFX.horn(); }
+  // v2.83 LAW 3 — THE PULL (Wyatt 8/9: "every three seconds, whoever wasn't
+  // the original host pulls from the host data. Even if there's a little
+  // jump, at least they're on the same part."): the beacon's rotating census
+  // lands here. One seat per beat; my own chair is never anybody's to move.
+  if(b.sn && typeof b.sn.s==='number' && Array.isArray(b.sn.u)) roomAdoptSeat(b.sn.s|0, b.sn.u, b.sn.n);
+}
+// v2.83 dials: how far a man may drift before the census jumps him level with
+// the referee's copy, and the beacon's whole-JSON budget. THE 500 LAW: the box
+// stores json.dumps(beacon)[:500] — a truncated beacon is a CORRUPT beacon
+// (json.loads fails server-side at echo and the guest silently loses the
+// clock and both toy boxes with it), so the HOST trims his own census until
+// the whole blob fits. A dropped row just waits for the seat's next turn.
+const SNAP_TOL=48, BCN_MAX=480;
+// THE HOST'S FIELD, one seat per beat. Census rows index into BF_TYPES (a
+// shipped const — append-only by convention, so the two ends can never argue
+// about what a 7 means within a version; an older client ignores 'sn' whole).
+// Men still riding the ~4s spawn ghost are skipped: their own 'place' word is
+// at most one poll behind, and a census row must never beat the man's own
+// order to the far screen (that is what would double him).
+function bcnRoom(){
+  const bf=S.bf;
+  const b={ hy:bf.base.you.hp, hf:bf.base.foe.hp,
+            dy:bf.base.you.dmgTaken, df:bf.base.foe.dmgTaken,
+            tl:Math.round(bf.timeLeft*10)/10, ph:bf.phase, ot:bf.ot?1:0 };
+  bf.snI=((bf.snI|0)+1)%bf.seats.length;
+  const s=bf.snI, all=[];
+  for(const u of S.units){
+    if(u.dead || u.seat!==s || !(u.hp>0) || (u.dropT>0)) continue;
+    const ti=BF_TYPES.indexOf(u.type); if(ti<0) continue;
+    all.push([ti, Math.round(u.x), Math.round(u.y),
+              Math.max(1,Math.min(9,Math.ceil(u.hp/(u.hpMax||1)*9)))]);
+  }
+  // `n` is the seat's TRUE headcount — the guest may only trust an ABSENCE
+  // (his kill-sweep) when the census he holds is COMPLETE (u.length===n).
+  // When the army outgrows the budget, the walk starts at a rolling offset so
+  // successive beats ship different windows — no man is starved forever by a
+  // deterministic tail-trim.
+  bf.snRot=((bf.snRot|0)+13)%Math.max(1,all.length);
+  const rows=all.slice(bf.snRot).concat(all.slice(0,bf.snRot));
+  b.sn={ s, n:all.length, u:rows };
+  while(rows.length && JSON.stringify(b).length>BCN_MAX) rows.pop();
+  if(JSON.stringify(b).length>BCN_MAX) delete b.sn;
+  return b;
+}
+// the guest's half of THE PULL: line this seat's men up against the referee's
+// rows — nearest same-type man claims each row. A claimed man snaps level when
+// he's far off and adopts the referee's hp; a man the referee doesn't have
+// falls quietly (u.dead — the sweep's own no-bounty class, the yeti's law);
+// a man I never got spawns through the relay's own free door (applyDeploy
+// relay=true — no purse, coords clamped), ghost cleared because on the
+// referee's screen he is already old enough to fight.
+function roomAdoptSeat(seat, rows, n){
+  const bf=S.bf; if(!bf || bf.resolved || bf.ending || S.mode!=='play' || !roomBattle()) return;
+  if(!bf.seats[seat] || seat===bfMySeat()) return;
+  // mid-drop men sit this beat out ON BOTH ENDS: the host skips them (their
+  // 'place' word is still in flight) and the guest must too — a fresh relayed
+  // man has no census row yet, and an unmatched man here is a dead man.
+  const mine=S.units.filter(u=>!u.dead && u.seat===seat && !(u.dropT>0));
+  const spawn=[];
+  for(const r of rows){
+    if(!Array.isArray(r) || r.length<4) continue;
+    const type=BF_TYPES[r[0]|0]; if(!type) continue;
+    const x=+r[1]||0, y=+r[2]||0, h=Math.max(1,Math.min(9,r[3]|0));
+    let best=null, bd=Infinity;
+    for(const u of mine){ if(u.snM || u.type!==type) continue;
+      const d=(u.x-x)*(u.x-x)+(u.y-y)*(u.y-y); if(d<bd){ bd=d; best=u; } }
+    if(best){ best.snM=1;
+      if(bd>SNAP_TOL*SNAP_TOL){ best.x=x; best.y=y; }
+      if(best.hpMax) best.hp=Math.max(1,Math.min(best.hpMax,best.hpMax*h/9));
+    } else spawn.push([type,x,y,h]);
+  }
+  // an absence is only evidence on a COMPLETE census — a budget-trimmed beat
+  // lists SOME of the seat's men, and killing the unlisted would massacre a
+  // big army four rows at a time. Matching and spawning stay safe either way
+  // (the match pool is my whole seat, so a partial window never doubles a man).
+  const complete = (typeof n==='number')? rows.length>=n : true;
+  for(const u of mine){ if(u.snM){ delete u.snM; continue; }
+    if(complete){ u.hp=0; u.dead=true; } }
+  for(const [type,x,y,h] of spawn){
+    const u=applyDeploy(seat,type,x,y,true);
+    if(u){ if(u.dropT) u.dropT=0;
+      if(u.hpMax) u.hp=Math.max(1,Math.min(u.hpMax,u.hpMax*h/9)); }
+  }
 }
 // ONE order on the wire, and it is the one the battleground already had: a
 // commander put a man down. It carries the same optional loadout fields the
@@ -19823,6 +19956,10 @@ function roomApply(cm){
   // class as the campaign chain's (an old client misses real damage; the
   // referee's beacon stays the truth).
   if(cm.k==='bmb'){ if(S.bf && S.mode==='play') bmbRelay(cm); return; }
+  // v2.83 the room's SIXTH word — THE SEAT (Law 2). The referee's table,
+  // adopted verbatim; the host never adopts (his deal IS the word), and a
+  // human chair is its owner's business (the roster law) — never restyled.
+  if(cm.k==='seat'){ if(!coopIsHost()) roomSeatWord(cm); return; }
   // v2.73 the room's fifth word — THE JET. Seat-addressed (one live Sarge a
   // chair); the landing is the sender's own resolved spot, applied verbatim
   // (the v1.24 absolute-coords law). An older client falls off the chain and
@@ -31851,7 +31988,7 @@ function crewBubbleRow(kind){
   const list=[me];
   const mem=(CREW.members||[]).filter(m=>m.uid!==CREW.me);
   if(kind==='wt'){
-    for(const m of mem) if(m.st==='wtQ'||m.st==='bfFill') list.push({ name:m.name||'ALLY', hex:m.hex||GREEN });
+    for(const m of mem) if((m.st==='wtQ'||m.st==='bfFill') && m.on) list.push({ name:m.name||'ALLY', hex:m.hex||GREEN });   // v2.83 LAW 1: a stale row is nobody standing anywhere (belt — the box already blanks st past CREW_TTL)
   } else {
     const seen={};
     if(COOP && coopSquad() && COOP.code) for(const m of (COOP.members||[])){
@@ -32029,8 +32166,13 @@ function openWarTable(){
   const lk=document.getElementById('wtLocker'); if(lk) lk.classList.add('hidden');
   wt.classList.toggle('queueing', !!BFQ);
   wt.classList.remove('hidden');
+  // v2.83 LAW 1: the door announces itself NOW — a squadmate's bubble should
+  // rise on their screen within THEIR poll, not after my next lazy 5s beat
+  if(CREW.crew){ clearTimeout(CREW.pollT); crewTick(); }
 }
-function closeWarTable(){ document.getElementById('wartable').classList.add('hidden'); }
+function closeWarTable(){ document.getElementById('wartable').classList.add('hidden');
+  // v2.83 LAW 1: ...and takes its leave the same way (the bubble drops)
+  if(CREW.crew){ clearTimeout(CREW.pollT); crewTick(); } }
 
 // ================= THE CAMPAIGN SCENE (v1.42) =================
 // Wyatt 7/27: the campaign door gets the War Table treatment — a real
