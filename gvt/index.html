@@ -313,6 +313,7 @@
   /* mid-queue the table CLEARS — pill, roster and WITHDRAW are the only live
      things until the ring (kills the old live-but-lying map taps for free) */
   #wartable.queueing .wt-top, #wartable.queueing .wt-mid, #wartable.queueing .wt-foot2,
+  #wartable.queueing .sq-bubs,
   #wartable.queueing #wtLocker, #wartable.queueing #wtMapTray { display:none; }
   /* ---- v1.44 THE HQ SHEET: tap HQ mid-battle = a small pause card, not an
      instant quit. ♪ and speed live here (§6: one strip — purse · clock · HQ). */
@@ -349,8 +350,28 @@
     padding:10px 18px; color:#F4E9C8; font-weight:800; letter-spacing:0.4px;
     text-align:center; box-shadow:0 6px 24px rgba(0,0,0,0.5); max-width:86vw; pointer-events:none; }
   #crewhold small { display:block; opacity:0.85; font-weight:600; margin-top:3px; }
-  .crewheld .wt-play, .crewheld .wt-m2, .crewheld .wt-hold, .crewheld .cs-chip, .crewheld .wt-sizes button
+  .crewheld .wt-play, .crewheld .wt-m2, .crewheld .wt-hold, .crewheld .cs-chip, .crewheld .wt-door, .crewheld .wtl-grid button
     { filter:grayscale(1) brightness(0.55); pointer-events:none; }
+  /* v2.82 BUBBLES LAW (Wyatt 8/8 eve: "they should show up in one of those
+     bubbles… including you"): the squad's chips on the door screens — me +
+     every squadmate reported standing here; the campaign scene pads dashed
+     OPEN SEATs to the ten chairs. vh-clamped (the wt-hold law: nothing may
+     push the foot off a 375px-tall phone). Gold ring = my own chip. */
+  .sq-bubs { display:flex; align-items:center; justify-content:center; flex-wrap:wrap;
+    gap:clamp(4px,0.8vw,9px); padding:clamp(2px,0.6vh,6px) 12px; position:relative; z-index:2; }
+  .sq-lab { font-size:clamp(9px,1.9vh,13px); font-weight:bold; letter-spacing:0.12em;
+    color:#FFD24A; text-transform:uppercase; margin-right:2px; }
+  .sq-bub { display:inline-flex; align-items:center; gap:5px; font-size:clamp(9px,1.9vh,13px);
+    font-weight:bold; letter-spacing:0.04em; text-transform:uppercase; color:#EDEADF;
+    background:rgba(20,26,14,0.55); border:1px solid rgba(127,163,92,0.45); border-radius:999px;
+    padding:clamp(1px,0.5vh,4px) clamp(6px,1vw,10px) clamp(1px,0.5vh,4px) clamp(4px,0.7vw,7px);
+    white-space:nowrap; max-width:34vw; overflow:hidden; text-overflow:ellipsis; }
+  .sq-bub i { width:clamp(9px,1.9vh,13px); height:clamp(9px,1.9vh,13px); border-radius:50%;
+    border:2px solid rgba(255,255,255,0.5); flex-shrink:0; }
+  .sq-bub.me i { box-shadow:0 0 0 2px #FFD24A; }
+  .sq-bub.open { opacity:0.4; }
+  .sq-bub.open i { background:transparent; border-style:dashed; }
+  .wt-door .wt-troph { font-size:clamp(16px,3.4vh,26px); line-height:1; }
   #campscene { position:fixed; inset:0; z-index:20; display:flex; flex-direction:column; background:#141810;
     font-family:var(--uih); font-weight:bold; text-transform:uppercase;
     color:#EDEADF; user-select:none; -webkit-user-select:none; }
@@ -2330,7 +2351,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.81</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.82</div>
   <div class="scanlines"></div>
 </div>
 
@@ -2719,7 +2740,7 @@ function rerenderForLang(){
     const wt=document.getElementById('wartable');
     if(wt && !wt.classList.contains('hidden')) renderWarTable();
     const wr=document.getElementById('worldrank');
-    if(wr && !wr.classList.contains('hidden')) renderWR();
+    if(wr && !wr.classList.contains('hidden')) renderWorldRank();   // v2.82: was a renderWR() ghost — the try/catch ate the ReferenceError and a language switch skipped the open board
     const sh=document.getElementById('toyshop');
     if(sh && !sh.classList.contains('hidden')) renderShop();
     const pk=document.getElementById('picker');
@@ -17680,6 +17701,11 @@ function bfqRoster(){
 function bfQueueStart(size,opts){
   if(BFQ){ bfqPulse(); return; }                       // already queued — the pill nudges you
   if(S.mode!=='menu') return;                          // you queue from HQ, never over a live battle
+  // v2.82 QUEUE-TOGETHER (Law 3): a squadmate's fill already standing? This
+  // tap JOINS their queue instead of opening a second room beside it — one
+  // squad, one door (their size wins; first mover picked it). crewAutoBf's
+  // own guards keep declined rooms declined and invited flows untouched.
+  if(CREW.crew && wartableOpen()){ try{ crewAutoBf(); }catch(e){} if(BFQ) return; }
   size=Math.max(1,Math.min(BF_MAX_TEAM,size||1));
   bfqEnsure();
   // v2.52 (Wyatt 8/5: "you should not be forced to verse the invader of the
@@ -17769,6 +17795,12 @@ function bfqDeploy(){
   try{ if(AD) return; }catch(e){}               // a show is already up — the ring retries
   if(BFQ.adWait) return;                        // one break per deploy
   BFQ.adWait=true;
+  // v2.82 SQUAD AD LAW (Wyatt 8/8 eve: "You will not get an ad when you play.
+  // You will get the ad after the game."): a crew room with 2+ humans deploys
+  // with NO pre-game break — the squad interstitial rides the verdict exit
+  // (squadAdGate). The predicate is bfqDeployNow's own room test, byte-alike;
+  // solo fills keep the v2.81 door gate exactly.
+  if(BFQ.crewRoom && COOP && coopRoom() && COOP.code===BFQ.crewRoom && (COOP.members||[]).length>1){ bfqDeployNow(); return; }
   adGate('bf', bfqDeployNow);
 }
 function bfqDeployNow(){
@@ -17797,7 +17829,12 @@ function bfQueueCancel(){
   // the pulled chair's party isn't ui:'idle' (crewRoomDrop's own gate), and a
   // declined pull must not re-fire (CREW.autoBf keeps the room as "seen").
   if(BFQ.mirror){ bfQueueTeardown(); try{ coopLeave(); }catch(e){} SFX.clack(); return; }
-  const hadRoom=!!BFQ.crewRoom; bfQueueTeardown(); if(hadRoom) crewRoomDrop(); SFX.clack(); }
+  // v2.82 (battery-caught): the CANCELING ENGAGER latches his own room as
+  // "seen" too — a squadmate's mirror keeps advertising it for a beat, and
+  // without the latch his own crewAutoBf pulled him straight back into the
+  // room he just stood down from (a two-mirror zombie nobody could deploy).
+  const hadRoom=BFQ.crewRoom||null; bfQueueTeardown();
+  if(hadRoom){ CREW.autoBf=hadRoom; crewRoomDrop(); } SFX.clack(); }
 function bfQueueTeardown(){
   if(!BFQ) return;
   BFQ.timers.forEach(t=>clearTimeout(t));
@@ -17860,23 +17897,34 @@ function bfqMirrorFound(){
   // break for a battle this chair can't reach; the chip just folds.
   if(!COOP || !coopRoom() || COOP.code!==room){
     bfQueueTeardown(); if(CREW.autoBf===room) CREW.autoBf=null; return; }
-  // the flip already landed and the entry seam gated there instead — or a
-  // break is already up. Never charge this chair twice.
+  // the flip already landed and the entry seam handled it — or this chair is
+  // already in a battle. Never run the finish twice.
   if(CREW.bfPaid===room || S.coop || S.mode!=='menu'){ bfQueueTeardown(); return; }
-  try{ if(AD){ bfQueueTeardown(); return; } }catch(e){}
-  document.getElementById('bfqChip').classList.remove('on');
-  document.getElementById('bfqRoster').classList.remove('on');
+  // v2.82 SQUAD AD LAW: the pulled chair pays NOTHING before a squad game —
+  // the v2.81 break here is gone (the squad interstitial rides the verdict
+  // exit). Marked paid so the entry seam enters this chair free; the theater
+  // STAYS UP (chip, roster, WITHDRAW — the locked-in picture) and entry rides
+  // the room's own state flip, folding the theater at roomStartBattle's door.
+  CREW.bfPaid=room;
+  BFQ.foundT=Date.now();   // v2.82: the corpse watchdog's clock (bfqMirrorWatch)
   SFX.horn();
-  crewHold('⚑ SQUAD BATTLE — YOU ARE BEING PULLED IN!','Hold tight — the battle is loading. Do not back out.');
-  CREW.bfAdPend=room;
-  adGate('bf', ()=>{
-    if(CREW.bfAdPend===room) CREW.bfAdPend=null;
-    CREW.bfPaid=room;
-    bfQueueTeardown();
-    // the flip landed mid-break — enter now; otherwise the poll seam enters us
-    if(CREW.bfGo===room){ CREW.bfGo=null;
-      if(COOP && coopRoom() && COOP.code===room && !S.coop && S.mode==='menu') roomStartBattle(); }
-  });
+  crewHold('⚑ SQUAD BATTLE — YOU ARE BEING PULLED IN!','Hold tight — the battle is loading. Do not back out.', 30000);
+  const sub=document.getElementById('bfqSub'); if(sub) sub.textContent=t('BATTLE READY');
+}
+// v2.82 THE CORPSE WATCH (verify-workflow catch): with the mirror's v2.81
+// break gone, a found mirror waits for the room's flip — and an engager who
+// STANDS DOWN (or dies) during his own ring would strand this chair at
+// BATTLE READY forever, still advertising the dead room to the rest of the
+// squad. The room roster is the truth: the engager is the host, so a found
+// mirror alone in the room folds; a 45s TTL catches a silently-dead engager
+// whose stale row lingers. CREW.autoBf stays latched — the dead room is
+// "seen", never re-pulled.
+function bfqMirrorWatch(){
+  if(!BFQ || !BFQ.mirror || BFQ.state!=='found' || S.coop || S.mode!=='menu') return;
+  const dead = !COOP || !coopRoom() || COOP.code!==BFQ.crewRoom
+    || (COOP.members||[]).length<=1
+    || (BFQ.foundT && Date.now()-BFQ.foundT>45000);
+  if(dead){ bfQueueTeardown(); crewHoldClear(); }
 }
 
 // ================= CO-OP: THE ALLIED CAMPAIGN =================
@@ -18089,12 +18137,18 @@ function coopOnPoll(r, sentWant){
     // goer, the leader) starts straight; the mate who never tapped watches
     // their break HERE, starts a beat late, and the wave catch-up seats them.
     if(!coopRoom() && COOP.crewCamp && !CREW.gatedLaunch && !CREW.adPend){
-      CREW.adPend=true;
-      // v2.73 (Wyatt 8/8): the taken-in player SEES the grab — the hold card
-      // goes up before their break so nobody backs out of a loading battle
-      crewHold('⚑ YOUR SQUADMATE HIT DEPLOY!','Hold tight — the battle is loading. Do not back out.');
-      adGate('camp', ()=>{ CREW.adPend=false; CREW.gatedLaunch=1;
-        if(COOP && !S.coop && S.mode==='menu') coopStartBattle(); });
+      // v2.82 SQUAD AD LAW: a muster of 2+ humans enters FREE — the squad
+      // interstitial rides the verdict exit now. A crew lobby that somehow
+      // flipped with one human keeps the v2.70 gate below, byte-exact.
+      if((COOP.members||[]).length>1){ CREW.gatedLaunch=1; coopStartBattle(); }
+      else{
+        CREW.adPend=true;
+        // v2.73 (Wyatt 8/8): the taken-in player SEES the grab — the hold card
+        // goes up before their break so nobody backs out of a loading battle
+        crewHold('⚑ YOUR SQUADMATE HIT DEPLOY!','Hold tight — the battle is loading. Do not back out.');
+        adGate('camp', ()=>{ CREW.adPend=false; CREW.gatedLaunch=1;
+          if(COOP && !S.coop && S.mode==='menu') coopStartBattle(); });
+      }
     }
     else if(!CREW.adPend){
       if(coopRoom()){
@@ -18105,10 +18159,16 @@ function coopOnPoll(r, sentWant){
         // at the battlefield door. Invited rooms (join chips, codes) stay free.
         if(CREW.bfAdPend && CREW.bfAdPend===COOP.code){ CREW.bfGo=COOP.code; }
         else if(CREW.autoBf===COOP.code && CREW.bfPaid!==COOP.code){
-          const code=COOP.code;
-          crewHold('⚑ YOUR SQUADMATE HIT DEPLOY!','Hold tight — the battle is loading. Do not back out.');
-          adGate('bf', ()=>{ CREW.bfPaid=code;
-            if(COOP && coopRoom() && COOP.code===code && !S.coop && S.mode==='menu') roomStartBattle(); });
+          // v2.82 SQUAD AD LAW: a squad room (2+ humans) enters FREE — the
+          // flip landed before the mirror's finish, so enter right here; the
+          // one-human residue case keeps the v2.70 gate below, byte-exact.
+          if((COOP.members||[]).length>1){ CREW.bfPaid=COOP.code; roomStartBattle(); }
+          else{
+            const code=COOP.code;
+            crewHold('⚑ YOUR SQUADMATE HIT DEPLOY!','Hold tight — the battle is loading. Do not back out.');
+            adGate('bf', ()=>{ CREW.bfPaid=code;
+              if(COOP && coopRoom() && COOP.code===code && !S.coop && S.mode==='menu') roomStartBattle(); });
+          }
         }
         else roomStartBattle();
       }
@@ -19053,7 +19113,8 @@ function duelChipHTML(){
 let CREW={ crew:null, members:[], invites:[], me:null, busy:false, pollT:0, sig:'',
   campGo:null, leadFired:null, autoBf:null,     // v2.69 one-click guards: the go-wish lobby, the lobby already ordered, the room already auto-joined
   gatedLaunch:0, adPend:false, campLaunch:null, campLaunchT:0,     // v2.70: paid-my-gate flag · mate's ad in flight · the boom-launch pending lobby + its clock
-  bfPaid:null, bfAdPend:null, bfGo:null };   // v2.81: the pulled chair's BF break — paid room · break in flight · flip-landed-mid-break
+  bfPaid:null, bfAdPend:null, bfGo:null,     // v2.81: the pulled chair's BF break — paid room · break in flight · flip-landed-mid-break
+  leadGhost:null };   // v2.82: lobby whose NEXT-SEEN wish is suspect (frozen from before the battle) — deliberately NOT in the 19147 sweep, it must survive the verdict
 const CREW_BF_MIN=2;          // a 1v1 has no second chair on your side
 // ===== v2.66 WEB GOOGLE SIGN-IN (Wyatt 8/7: "on a browser… just do it
 // through Google — that's more natural"). The whole flow is wired and waits
@@ -19115,13 +19176,13 @@ function crewCoopLive(){ return !!(COOP && (COOP.code || (COOP.ui && COOP.ui!=='
 // the squad grab coming, on both doors — one card over the scene, one gray
 // class on its buttons. Battle entry, menu teardown and a 15s TTL all clear
 // it, so a stalled flow can never leave a stale promise on screen.
-function crewHold(head, sub){
+function crewHold(head, sub, ttl){
   let el=document.getElementById('crewhold');
   if(!el){ el=document.createElement('div'); el.id='crewhold'; document.body.appendChild(el); }
   el.innerHTML='<span data-notr>'+t(head)+'</span>'+(sub? '<small data-notr>'+t(sub)+'</small>':'');
   for(const id of ['campscene','wartable']){ const n=document.getElementById(id);
     if(n && !n.classList.contains('hidden')) n.classList.add('crewheld'); }
-  clearTimeout(crewHold._t); crewHold._t=setTimeout(crewHoldClear, 15000);
+  clearTimeout(crewHold._t); crewHold._t=setTimeout(crewHoldClear, ttl||15000);   // v2.82: a queue-length hold may outlive the stock 15s
 }
 function crewHoldClear(){
   clearTimeout(crewHold._t);
@@ -19136,6 +19197,7 @@ function crewSt(){
   if(COOP && coopSquad() && COOP.code) return { st:'campQ', info:Object.assign({ lobby:COOP.code },
     CREW.campGo===COOP.code? Object.assign({go:1}, CREW.campGoLvl? {golvl:CREW.campGoLvl|0} : {}) : {}) };   // v2.69: my deploy wish rides my presence (v2.73: with its replay level)
   if(campSceneOpen()) return { st:'campQ', info:{} };
+  if(wartableOpen()) return { st:'wtQ', info:{} };   // v2.82 Law 2: standing on the battlegrounds screen — the box learned 'wtQ' in the same-day patch; an unpatched box just blanks it (online-idle)
   return { st:'', info:{} };
 }
 function crewTick(){
@@ -19148,6 +19210,7 @@ function crewTick(){
   // a wish or an order outliving its lobby is litter
   if(CREW.campGo && !(COOP&&coopSquad()&&COOP.code===CREW.campGo)){ CREW.campGo=null; CREW.campGoLvl=0; }
   if(CREW.leadFired && !(COOP&&coopSquad()&&COOP.code===CREW.leadFired)) CREW.leadFired=null;
+  if(CREW.leadGhost && !(COOP&&coopSquad()&&COOP.code===CREW.leadGhost)) CREW.leadGhost=null;   // v2.82: a ghost mark outliving its lobby is litter
   if(CREW.campLaunch && !(COOP&&coopSquad()&&COOP.code)){ CREW.campLaunch=null; CREW.campLvl=0; }
   const st=crewSt();
   CREW.busy=true;
@@ -19165,13 +19228,28 @@ function crewTick(){
       if(META.crew){ META.crew=null; saveMeta(); }
     }
     CREW.invites=r.invites||[];
-    crewAutoCamp(); crewBfSwap(); crewAutoBf(); crewLeadGo(); crewCampPend();
+    crewAutoCamp(); crewBfSwap(); crewAutoBf(); crewLeadGo(); crewCampPend(); bfqMirrorWatch();
     const sig=JSON.stringify([CREW.crew&&CREW.crew.code, CREW.crew&&CREW.crew.n, CREW.invites.length,
-      CREW.members.map(m=>[m.name,m.st,(m.info||{}).room||'',(m.info||{}).lobby||'',m.on?1:0])]);
+      CREW.members.map(m=>[m.name,m.st,m.hex||'',(m.info||{}).room||'',(m.info||{}).lobby||'',m.on?1:0])]);
     if(sig!==CREW.sig){
       CREW.sig=sig;
       if(S.mode==='menu' && !BFQ) renderMenu();
       if(document.getElementById('crewPanelBody')) roomModal(crewPanelHTML());
+      // v2.82 BUBBLES LAW: the door screens repaint their squad chips on the
+      // same beat (never under a live fill — the theater owns that screen).
+      // The repaint preserves what the player is holding: the map tray's
+      // open state (renderWarTable deliberately renders it shut) and the
+      // replay shelf's scroll (renderCampScene parks it at the newest chips).
+      if(!BFQ && wartableOpen()){
+        const tr=document.getElementById('wtMapTray'), trOpen=!!(tr && !tr.classList.contains('hidden'));
+        renderWarTable();
+        if(trOpen){ const t2=document.getElementById('wtMapTray'); if(t2) t2.classList.remove('hidden'); }
+      }
+      if(campSceneOpen()){
+        const rr=document.querySelector('#campscene .cs-replay'), sl=rr? rr.scrollLeft : null;
+        renderCampScene();
+        if(sl!=null){ const r2=document.querySelector('#campscene .cs-replay'); if(r2) r2.scrollLeft=sl; }
+      }
     }
   }).catch(()=>{ CREW.busy=false; });
 }
@@ -19306,10 +19384,42 @@ function crewInviteWR(uid,name){
 function crewAutoCamp(){
   if(!CREW.crew || S.mode!=='menu' || !campSceneOpen()) return;
   crewShedRoom(false);   // v2.73: lonely BF-room residue steps aside for the muster
-  if(crewCoopLive()) return;
   const q=(CREW.members||[]).filter(m=>m.uid!==CREW.me && m.st==='campQ');
-  if(!q.length) return;
+  if(!q.length){ return; }
   const doors=q.filter(m=>m.info && m.info.lobby);
+  // v2.82 ONE SCREEN: a squadmate's OPEN MUSTER outranks the last battle's
+  // parked room (the bf pull's own v2.73 rank, crewAutoBf's line) — without
+  // this, a chair fresh off a squad battlefield could never follow the squad
+  // into the campaign ("once anyone hits play, everyone is in").
+  if(doors.length) crewShedRoom(true);
+  // v2.82 THE SPLIT-MUSTER HEAL (battery-caught, pre-existing): two doors can
+  // race open — a boom hosting a beat before the other side's lobby stamp
+  // lands, or two near-simultaneous DEPLOY taps — and a door-HOLDER could
+  // never join anybody (crewCoopLive returned forever), stranding the squad
+  // in two separate solo games. Deterministic merge: the door whose holder
+  // has the SMALLEST uid wins (the same sort every joiner already uses, so
+  // guests pile onto the winner and losing doors empty out); an EMPTY idle
+  // holder on the losing side abandons his door and walks into the winner's,
+  // carrying any DEPLOY intent along as the go-wish.
+  if(doors.length && COOP && coopSquad() && COOP.code && COOP.host
+     && COOP.ui==='lobby' && !COOP.wantBattle && !S.coop
+     && (COOP.members||[]).length<=1){
+    doors.sort((a,b)=> a.uid<b.uid? -1:1);
+    if(String(doors[0].uid) < String(CREW.me||'')){
+      const hadTap=!!CREW.campLaunch, lvl=CREW.campLvl||0;
+      CREW.campLaunch=null; CREW.campLaunchT=0;
+      try{ coopLeave(); }catch(e){}
+      COOP=coopFresh('enter','squad'); COOP.crewCamp=true;
+      UI.coopJoin(doors[0].info.lobby).then(ok=>{
+        if(ok && hadTap && COOP && coopSquad() && COOP.code){
+          CREW.campGo=COOP.code; CREW.campGoLvl=lvl;
+          clearTimeout(CREW.pollT); crewTick();
+        }
+      });
+      return;
+    }
+  }
+  if(crewCoopLive()) return;
   if(doors.length){
     doors.sort((a,b)=> a.uid<b.uid? -1:1);
     COOP=coopFresh('enter','squad');
@@ -19416,7 +19526,8 @@ function crewShedRoom(force){
 function crewAutoBf(){
   if(!CREW.crew || BFQ || S.mode!=='menu' || !wartableOpen()) return;
   const f=(CREW.members||[]).find(m=>m.uid!==CREW.me && m.st==='bfFill' && m.info
-    && m.info.room && (m.info.size|0)>=CREW_BF_MIN);
+    && m.info.room && (m.info.size|0)>=CREW_BF_MIN
+    && !(COOP && COOP.code===m.info.room));   // v2.82: my own (parked) room is never a pull — a squadmate's row frozen mid-battle otherwise re-joins the LAST battle's furniture
   if(!f) return;
   if(CREW.autoBf===f.info.room) return;
   crewShedLobby();
@@ -19440,19 +19551,32 @@ function crewCampGo(){
   if(!COOP || !coopSquad() || !COOP.code || COOP.host || CREW.campGo===COOP.code) return;
   audio(); SFX.horn();
   const code=COOP.code;
-  adGate('camp', ()=>{ if(COOP && COOP.code===code){ CREW.gatedLaunch=1; CREW.campGo=code;
-    crewHold('⚑ HOLDING THE DOOR FOR YOUR SQUAD…','They are being pulled in now — the battle starts in a moment.');
-    clearTimeout(CREW.pollT); crewTick(); roomModal(coopPanelHTML()); } });
+  // v2.82 SQUAD AD LAW: a mustered chair is 2+ humans by construction (a host
+  // exists) — the wish fires ad-free; the squad break rides the verdict exit.
+  CREW.gatedLaunch=1; CREW.campGo=code;
+  crewHold('⚑ HOLDING THE DOOR FOR YOUR SQUAD…','They are being pulled in now — the battle starts in a moment.');
+  clearTimeout(CREW.pollT); crewTick(); roomModal(coopPanelHTML());
 }
 function crewLeadGo(){
   if(!COOP || !coopSquad() || !COOP.code || !COOP.host || !COOP.crewCamp || COOP.wantBattle) return;
   if(CREW.leadFired===COOP.code) return;
   const wish=(CREW.members||[]).find(m=>m.uid!==CREW.me && m.st==='campQ' && m.info
     && m.info.lobby===COOP.code && m.info.go);
-  if(!wish) return;
+  if(!wish){ if(CREW.leadGhost===COOP.code) CREW.leadGhost=null; return; }   // one wishless poll = the ghosts are gone; the next wish is a real tap
+  // v2.82 THE GHOST WISH (battery-caught, pre-existing): a wish row frozen
+  // from BEFORE the battle lingers in crewp for up to 40s while leadFired was
+  // rightly cleared at entry — honoring it REDEPLOYED the whole lobby the
+  // moment everyone landed. endBattle marks the lobby's next-seen wish
+  // suspect; only a wish seen after a wishless poll fires the order.
+  if(CREW.leadGhost===COOP.code) return;
+  // v2.82: the wish must still be SEATED — a wisher who left the lobby can
+  // linger in crewp for up to 40s, and firing on his ghost would launch a
+  // one-human battle with no gate anywhere. COOP.members is fresher truth.
+  if((COOP.members||[]).length<2) return;
   CREW.leadFired=COOP.code;
   const wlvl=(wish.info.golvl|0)||0;   // v2.73: the wisher's replay chip names the level
-  adGate('camp', ()=>{ CREW.gatedLaunch=1; UI.coopDeploy(wlvl); });
+  // v2.82 SQUAD AD LAW: the wish IS the second human — the order fires ad-free
+  CREW.gatedLaunch=1; UI.coopDeploy(wlvl);
 }
 // ===== v2.70 BOOM — THE SCENE'S OWN DEPLOY IS THE SQUAD START (Wyatt 8/7:
 // "they're both in the campaign screen, they're both in the same squad, one
@@ -19519,7 +19643,12 @@ function crewCampPend(){
   if(!COOP || !coopSquad() || !COOP.host || COOP.wantBattle){ if(!COOP||!coopSquad()) CREW.campLaunch=null; return; }
   if(CREW.campLaunch==='PENDING' && COOP.code){ CREW.campLaunch=COOP.code; }
   if((COOP.members||[]).length>1){ CREW.campLaunch=null; UI.coopDeploy(CREW.campLvl||0); return; }
-  if(Date.now()-(CREW.campLaunchT||0) > CREW_BOOM_WAIT){ CREW.campLaunch=null; UI.coopDeploy(CREW.campLvl||0); }
+  if(Date.now()-(CREW.campLaunchT||0) > CREW_BOOM_WAIT){ CREW.campLaunch=null;
+    // v2.82 SQUAD AD LAW: the squad never came — this launch degraded to SOLO,
+    // so it pays the solo gate here (the boom path skipped it at the tap)
+    const lv=CREW.campLvl||0;
+    adGate('camp', ()=>{ if(COOP && coopSquad() && COOP.host && !COOP.wantBattle && !S.coop && S.mode==='menu') UI.coopDeploy(lv); });   // the sibling seams' own battle-state guard — a flip landing mid-break must not re-deploy over a live battle
+  }
 }
 // ============ THE PRIVATE BATTLEFIELD ROOM (v1.24) ============
 // Wyatt 7/25: friends should be able to play the battleground TOGETHER, up to
@@ -20177,6 +20306,7 @@ function endBattlefield(reason, fromRelay){
   const copy=BF_END[reason]||BF_END[won?'time':'timeLoss'];
   const margin=t('YOU SMASHED '+my+' — THEY SMASHED '+th);
   S.mode=won?'win':'lose';
+  sqGameTick();   // v2.82 SQUAD AD LAW: a finished 2+-human game counts, win or lose (bf.sqAdT latches it once)
   document.getElementById(won?'win':'lose').classList.remove('hidden');
   // ===== A PRIVATE ROOM PAYS THE SAME, AND RANKS ON A LEASH =====
   // Wyatt, 7/25, verbatim: "THE WINNING TEAM STILL GETS XP AND STARS." So it
@@ -24995,6 +25125,8 @@ function endBattle(win){
     return;
   }
   S.mode = win?'win':'lose';
+  sqGameTick();   // v2.82 SQUAD AD LAW: a finished 2+-human game counts, win or lose (S.sq.sqAdT latches it once)
+  try{ if(S.coop && COOP && coopSquad() && COOP.code) CREW.leadGhost=COOP.code; }catch(e){}   // v2.82 GHOST WISH: this lobby's next-seen wish predates the battle — suspect until one wishless poll
   if(coach) coachDone();   // boot camp lasts one battle — it never follows you to level 2
   // ALLIED MISSION: the host sim is the referee — it files the verdict with HQ,
   // which advances BOTH campaigns on a win and relays the word to the ally.
@@ -31508,7 +31640,8 @@ function tvGrant(){
 let AD_FREE_GAMES=1;   // door games at session start that are always ad-free (DIAL; let = rig-tunable)
 let AD_CAMP_EVERY=1;   // campaign: a break before every Nth level start — 2 = every other, 0 = off (DIAL)
 let AD_BF_EVERY=1;     // battlegrounds: a break before every Nth match launch — 0 = off (DIAL)
-const ADQ={ games:0, camp:0, bf:0 };   // the session gate counters (door-launched games only)
+let AD_SQUAD_EVERY=3;  // v2.82 SQUAD AD LAW: a POST-game break every Nth finished squad game — 0 = off (DIAL)
+const ADQ={ games:0, camp:0, bf:0, squad:0, sqPaid:0 };   // the session gate counters (door-launched games only; squad = finished 2+-human games, sqPaid = the squad count whose break already showed)
 (function(){
   let A; try{ A=ADS; }catch(e){}      // the rewarded half's const, if its hunks are on this tree
   if(!A) A=window.ADS={ provider:'placeholder',
@@ -31536,6 +31669,53 @@ function adGate(kind, launch){
   if(brk){
     // two-arg then: even a misbehaving future adapter that REJECTS (the
     // contract says never) still hands the game back, exactly once
+    try{ ADS.showInterstitial().then(()=>launch(), ()=>launch()); }
+    catch(e){ launch(); }
+  } else launch();
+}
+// ===== v2.82 SQUAD AD LAW (Wyatt 8/8 eve, verbatim: "We can't give everyone
+// the ad. … You will not get an ad when you play. You will get the ad after
+// the game." + "show them an ad every three games after the game") — playing
+// together = ZERO pre-game gates (bfqDeploy, the mirror's finish, the entry
+// seams and the campaign muster gates all stand down for 2+-human launches)
+// and instead ONE interstitial on the verdict exit tap, every
+// AD_SQUAD_EVERY-th finished squad game, on each player's own screen,
+// blocking nobody else's exit. Solo flows keep every v2.81 gate byte-exact.
+// ADS-V1.md §V2 is the contract; audience-every-member is the flagged knob.
+function battleHumans(){
+  // humans in the LIVE battle's party (1 = solo). Rooms = the real commanders
+  // on the roster; campaign squads = the server's own frozen pc (a lobby of
+  // one with the computer buddy stays 1); the legacy pair door is two humans
+  // by construction.
+  if(!S.coop || !COOP) return 1;
+  if(coopRoom()) return Math.max(1,(COOP.members||[]).length);
+  if(coopSquad()) return Math.max(1,(COOP.pc|0)||(COOP.members||[]).length);
+  return 2;
+}
+function sqGameTick(){
+  // a finished squad game ticks the counter — once per battle, at the verdict
+  // raise (the battle object itself carries the latch, so a relay re-entry
+  // can never double-count)
+  try{
+    const tag=S.bf||S.sq;
+    if(S.coop && tag && !tag.sqAdT && battleHumans()>1){ tag.sqAdT=1; ADQ.squad++; }
+  }catch(e){}
+}
+function squadAdGate(launch){
+  // the verdict exit's own gate. Unlike adGate there is no retry ring behind
+  // an exit tap, so a live show HANDS THE TAP THROUGH instead of eating it.
+  let brk=false;
+  try{
+    let live=false; try{ live=!!AD; }catch(e){}
+    // "was this a squad game" = the tick latch the battle itself carries —
+    // never the LIVE roster, which a mate leaving between verdict and tap
+    // would shrink under the due break
+    const sq=!!((S.bf&&S.bf.sqAdT)||(S.sq&&S.sq.sqAdT));
+    brk= !live && S.coop && sq && AD_SQUAD_EVERY>0 && ADQ.squad>0
+       && (ADQ.squad%AD_SQUAD_EVERY)===0 && ADQ.sqPaid!==ADQ.squad;
+    if(brk) ADQ.sqPaid=ADQ.squad;       // one break per due game, however many exits race
+  }catch(e){ brk=false; }               // the gate may fail — the exit may not (fail-safe law)
+  if(brk){
     try{ ADS.showInterstitial().then(()=>launch(), ()=>launch()); }
     catch(e){ launch(); }
   } else launch();
@@ -31655,6 +31835,38 @@ function featBattle(){
   return { map:WT_MAP_ORDER[s%WT_MAP_ORDER.length], size:1+(((s/13)|0)%4) };
 }
 function featDone(){ return !!(META.featDays && META.featDays[todayStr()]); }
+// ===== v2.82 BUBBLES LAW (Wyatt 8/8 eve, verbatim: "If someone who's in your
+// squad enters the Battlegrounds screen… they should show up in one of those
+// bubbles… including you") — the squad's chips on the door screens. The war
+// table shows everyone reported on the battlefield screens (wtQ standing,
+// bfFill queueing) + me; the campaign scene shows the ten chairs: the live
+// muster + fresh campQ squadmates + me, dashed OPEN SEATs to SQ_MAX. Colours:
+// my dye or GREEN; a squadmate's HQ colour (an army WORD from players.color —
+// every one a valid CSS colour) or GREEN — the roster law, allies may share
+// green. Chips are data-notr (names never translate); MY chip wears the gold
+// ring instead of a '— YOU' suffix (zero new l10n rows in the whole wave).
+function crewBubbleRow(kind){
+  if(!CREW.crew) return '';
+  const me={ name:META.name||'YOU', hex:dyeHex()||GREEN, me:true };
+  const list=[me];
+  const mem=(CREW.members||[]).filter(m=>m.uid!==CREW.me);
+  if(kind==='wt'){
+    for(const m of mem) if(m.st==='wtQ'||m.st==='bfFill') list.push({ name:m.name||'ALLY', hex:m.hex||GREEN });
+  } else {
+    const seen={};
+    if(COOP && coopSquad() && COOP.code) for(const m of (COOP.members||[])){
+      if(COOP.seat!=null && m.seat===COOP.seat) continue;   // my own lobby chair — the me-chip already leads
+      const nm=String(m.name||'ALLY'); seen[nm.toUpperCase()]=1;
+      list.push({ name:nm, hex:(typeof m.hex==='string'&&m.hex? m.hex:GREEN) });
+    }
+    for(const m of mem) if(m.st==='campQ' && !seen[String(m.name||'').toUpperCase()])
+      list.push({ name:m.name||'ALLY', hex:m.hex||GREEN });
+  }
+  const rows=list.slice(0,SQ_MAX);
+  let h=rows.map(p=>'<span class="sq-bub'+(p.me?' me':'')+'" data-notr><i style="background:'+escH(String(p.hex))+'"></i>'+escH(String(p.name).slice(0,12))+'</span>').join('');
+  if(kind==='camp') for(let i=rows.length;i<SQ_MAX;i++) h+='<span class="sq-bub open" data-notr><i></i></span>';
+  return '<div class="sq-bubs">'+(kind==='wt'? '<span class="sq-lab" data-notr>⚑ '+TXT('YOUR SQUAD')+'</span>':'')+h+'</div>';
+}
 function renderWarTable(){
   const riv=todaysRival();
   const w=META.bfWins||0, l=META.bfLosses||0;
@@ -31692,6 +31904,7 @@ function renderWarTable(){
     +'<button type="button" class="wt-m2 wt-feat" onclick="UI.wtFeat()">'
       +'<span class="n" data-notr>⭐ '+TXT('FEATURED BATTLE')+' · '+ft.size+'v'+ft.size+'</span>'
       +'<small data-notr>'+escH(bfMapLabel(ft.map))+' · '+(ftDone? TXT('WON TODAY — REPLAY ANYTIME') : tf('FIRST WIN +%1★', FEAT_STARS))+'</small></button></div>'
+    +crewBubbleRow('wt')
     +'<div class="wt-foot2">'
       // v1.58: the map chip — current map up front, tap = the tray. FLAT
       // children (svg shields the button from tryWhole; label and name are
@@ -31704,6 +31917,8 @@ function renderWarTable(){
       +(WT_NEW_IDS.some(wtMapIsNew)?'<i class="wt-new">NEW!</i>':'')+'</button>'
       // data-notr on the art-only crate: without it tryWhole offers the whole
       // button (art + label) to the table as one junk key on every open
+      +'<button type="button" class="wt-door" onclick="UI.wtRank()"><span class="wt-troph" data-notr>🏆</span>'
+      +'<span class="dlab">RANKINGS</span></button>'
       +'<button type="button" class="wt-door" onclick="UI.wtMore()"><span class="wt-crate" data-notr></span>'
       +'<span class="dlab">MORE BATTLES</span></button></div>'
     // the tray renders shut every time — a map pick re-renders the table, and
@@ -31999,6 +32214,7 @@ function renderCampScene(){
       +'</div></div>'
     +'<div class="wt-shelf"><button type="button" class="wt-hold" onclick="UI.campBuddies()">'
       +'<span class="n">'+(mus? tf('🤝 YOUR SQUAD — %1 OF %2 REPORTING', musN, SQ_MAX) : '🤝 BRING YOUR BUDDIES — UP TO 10 OF YOU')+'</span>'
+      +crewBubbleRow('camp')   // v2.82 Law 2: the ten bubbles, including you — dashed OPEN SEATs pad to SQ_MAX
       +'<small>Up to <b>nine friends</b> drop onto this level with you — beat it and <b>their campaigns advance too</b>.</small></button>'
       // data-notr: composed with tf, already translated — without it the DOM
       // walk re-offers the finished line and the audit mints a {0}-shaped miss
@@ -33949,6 +34165,14 @@ window.UI = {
   wtRoom(){ audio(); SFX.blip(); closeWarTable();
     if(COOP && coopRoom() && COOP.code){ roomModal(coopPanelHTML()); return; }    // already at the table
     UI.coopMode('room'); },
+  // v2.82 Law 5 ("The battlefield screen needs to have a link to the
+  // leaderboard"): the board (z20, the LATER sibling) paints OVER the table,
+  // so its own ✕ reveals the table again — zero return plumbing. Squadded =
+  // deep-link the SQUAD tab (and retire its NEW badge, wrTab's own book).
+  wtRank(){ audio(); SFX.blip();
+    if(CREW.crew){ WR.tab='squad';
+      if((META.wrSeen||[]).indexOf('squad')<0){ META.wrSeen.push('squad'); saveMeta(); } }
+    openWorldRank(); },
   wtMap(id){ if(id!=='random' && !BF_MAPS.some(m=>m.id===id)) return; META.bfMap=id;   // v2.41: RANDOM is a pick too
     if(id!=='random') (META.mapSeen||(META.mapSeen={}))[id]=1;   // picking it once retires the NEW! tag (v1.58); RANDOM is never news
     SFX.blip(); saveMeta(); renderWarTable(); },
@@ -33958,7 +34182,7 @@ window.UI = {
     SFX.clack(); const t=document.getElementById('wtMapTray'); if(t) t.classList.add('hidden'); },
   wtClose(){ SFX.clack(); closeWarTable(); },
   // ---- THE CAMPAIGN scene (v1.42) ----
-  campPlay(n){ audio(); SFX.blip(); adGate('camp', ()=>{ crewCampBoom(n).then(taken=>{ if(!taken) startCampaign(n); }); }); },   // no n = the next rung; v2.70: with a squadmate standing on this scene, the DEPLOY IS the squad start ("boom, both in"); v2.73: a replay chip's n rides the squad order too
+  campPlay(n){ audio(); SFX.blip(); crewCampBoom(n).then(taken=>{ if(!taken) adGate('camp', ()=>startCampaign(n)); }); },   // no n = the next rung; v2.70 boom; v2.73 replay chips; v2.82 SQUAD AD LAW: the squad decision comes FIRST — a 2+-human boom launches ad-free (its break rides the verdict exit), only the solo fall-through pays the camp gate
   campBuddies(){ audio(); closeCampScene(); UI.coopOpen(); },  // the wtRoom pattern: scene down, muster up
   campClose(){ SFX.clack(); closeCampScene(); },
   // ---- LANGUAGE ----
@@ -34235,14 +34459,14 @@ window.UI = {
   pick(t){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=RANK_MAX) return;
     META.up[t]=(META.up[t]||0)+1; META.pendingPicks--; checkAch();
     const mb=mboxRoll('u:'+t, META.up[t]); saveMeta();
-    if(META.pendingPicks>0) showPicker(); else showMenu();
+    if(META.pendingPicks>0) showPicker(); else { showMenu(); pgTake(); }   // v2.82: the last pick lands on the squad game's origin screen, never bare HQ
     if(mb) mboxOpen(mb); },
   pickW(wk){ if(META.pendingPicks<=0) return; if(!SARGE_WEAPONS[wk]) return; if(!wkOwned(wk)) return; if((META.sargeUp[wk]||0)>=RANK_MAX) return;   // 0092: the console door can't rank a secret either (the 0070 naive-card trap's cousin)
     META.sargeUp[wk]=(META.sargeUp[wk]||0)+1; META.pendingPicks--;
     const mb=mboxRoll('w:'+wk, META.sargeUp[wk]);
     const mi=mileCross(wk);   // v1.67: the pick that crosses 10 (saber: 20) fires the milestone card — marked BEFORE showMenu so its sweep can't double-fire
     saveMeta();
-    if(META.pendingPicks>0) showPicker(); else showMenu();
+    if(META.pendingPicks>0) showPicker(); else { showMenu(); pgTake(); }   // v2.82: the last pick lands on the squad game's origin screen, never bare HQ
     if(mb) mboxOpen(mb);
     if(mi) mileOpen(mi); },   // z27 — lands OVER the box when one pick pays both
   // the mystery box's one button: fold the card, and repaint the room — a new
@@ -34746,9 +34970,21 @@ document.getElementById('title').addEventListener('pointerdown', ()=>{
   document.getElementById('titleStripG').innerHTML=g;
   document.getElementById('titleStripT').innerHTML=t;
 })();
+// ===== v2.82 ONE SCREEN LAW (Wyatt 8/8 eve, verbatim: "everyone needs to see
+// the same screen when they finish… either back in the battlefield screen or
+// in the campaign… but with all your buddies still") — a squad game's every
+// exit routes to its ORIGIN screen: room battles → the war table, campaign
+// co-op → the campaign scene. The party stays PARKED (no PRIVATE BATTLE sheet
+// thrown in anyone's face — the old UI.coopOpen exit was exactly the reported
+// split); promotion picks chain through (PGO survives the picker detour);
+// hqBtn stays the deliberate abandon; solo exits are byte-identical to v2.81.
+let PGO=null;   // where the picker chain lands after a squad game ('wt'|'camp')
+function pgOrigin(){ return (S.coop && COOP)? (coopRoom()? 'wt':'camp') : null; }
+function pgLand(o){ showMenu(); if(o==='wt') openWarTable(); else if(o==='camp') openCampScene(); }
+function pgTake(){ const o=PGO; PGO=null; if(o==='wt') openWarTable(); else if(o==='camp') openCampScene(); }
 document.getElementById('retryBtn').addEventListener('click', ()=>{
   audio();
-  if(S.coop && COOP){ showMenu(); UI.coopOpen(); return; }   // back to the party — go again together
+  if(S.coop && COOP){ const o=pgOrigin(); squadAdGate(()=>pgLand(o)); return; }   // go again together — FROM the origin screen (v2.82)
   if(S.bf){ const raid=!!S.bf.raid, m=S.bf.mapId, t=S.bf.team;
     // v2.41: a raid rematch is a fresh attack (the ground is drawn again),
     // and a RANDOM pref redraws too — an explicit pick still replays itself.
@@ -34757,12 +34993,13 @@ document.getElementById('retryBtn').addEventListener('click', ()=>{
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
   audio();
-  if(S.coop && COOP){ if(META.pendingPicks>0) showPicker(); else { showMenu(); UI.coopOpen(); } return; }
+  if(S.coop && COOP){ const o=pgOrigin();
+    squadAdGate(()=>{ if(META.pendingPicks>0){ PGO=o; showPicker(); } else pgLand(o); }); return; }
   if(S.bf){ if(META.pendingPicks>0) showPicker(); else showMenu(); return; }   // battlefield XP can promote you
   if(META.pendingPicks>0) showPicker(); else showMenu();
 });
-document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); showMenu(); });
-document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); showMenu(); });
+document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); PGO=null; showMenu(); });
+document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); showMenu(); pgTake(); });
 
 // ================= LOOP =================
 let last=0, ready=false;
@@ -34792,11 +35029,12 @@ requestAnimationFrame(frame);
 window.GVT = {
   // ---- ADS V1a rig (v2.60): gates + dials, deterministic for batteries ----
   ads(){ return { sess:Object.assign({},ADQ), free:AD_FREE_GAMES, camp:AD_CAMP_EVERY, bf:AD_BF_EVERY,
+    squad:AD_SQUAD_EVERY,   // v2.82: the post-game squad cadence dial
     live:(()=>{ try{ return !!AD; }catch(e){ return false; } })(),
     int:typeof ADS.showInterstitial==='function', rw:typeof ADS.showRewarded==='function' }; },
   adSess(p){ Object.assign(ADQ,p||{}); return Object.assign({},ADQ); },
   adCfg(p){ p=p||{}; if(p.free!=null) AD_FREE_GAMES=p.free; if(p.camp!=null) AD_CAMP_EVERY=p.camp;
-    if(p.bf!=null) AD_BF_EVERY=p.bf; return GVT.ads(); },
+    if(p.bf!=null) AD_BF_EVERY=p.bf; if(p.squad!=null) AD_SQUAD_EVERY=p.squad; return GVT.ads(); },
   // ---- LOCALIZATION RIG ----
   i18n(){ const n={}; for(const k in TR) n[k]=Object.keys(TR[k]).length;
     return { lang:LANG, script:langDef(LANG).script, cfont:CFONT, langs:LANGS.map(l=>l.id), sizes:n }; },
