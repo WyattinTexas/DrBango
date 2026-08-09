@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v9.5 -->
+<!-- TRAINSET v9.6 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -8573,12 +8573,25 @@ function menuToybox(){
   // inside the attract transform at built size) is the toy tray now. Wyatt
   // already believed these were draggable; now they are.
 }
+let SIGN_MEDAL=null, SIGN_FIT=0;   // E76: the sign's medallion backing + word fit, built once
+function signMedal(){
+  if(!SIGN_MEDAL){
+    SIGN_MEDAL=document.createElement('canvas'); SIGN_MEDAL.width=264; SIGN_MEDAL.height=264;
+    const g=SIGN_MEDAL.getContext('2d'); g.setTransform(2,0,0,2,0,0);
+    drawGlobeMark(g,{door:false});   // hoisted from the E71 block — the ONE mark
+  }
+  return SIGN_MEDAL;
+}
 function menuSign(){
   // the title on a wooden plank — toy-chest wood, cream ALL-CAPS.
   // E26: the whole sign wears SIGN_K (Wyatt: "definitely be double the size to
   // get your attention more") — one transform about the plank's top-centre, so
-  // the art inside is v3.4's byte-for-byte and the box measures exactly ×K
-  // (500×88 → 1000×176 at K=2; TS.room.sign() hands the box to the battery).
+  // the box measures exactly ×K (500×88 → 1000×176 at K=2; TS.room.sign()
+  // hands the box to the battery — the box is UNCHANGED by E76).
+  // E76 THE SIGN WEARS THE WORLD: the E71 mark (polished) sits as a medallion
+  // between the words — TRAIN ⊕ GALAXY — one identity across chip/icon/sign.
+  // Words auto-fit by measureText so the iOS font fallback can never overflow
+  // the plank; carve-shadow under cream = painted-into-the-wood, not flat.
   const sx=MENU_W/2;
   cx.save(); cx.translate(sx,SIGN_TOP); cx.scale(SIGN_K,SIGN_K); cx.translate(-sx,-40);
   cx.strokeStyle='#6e5130'; cx.lineWidth=10; cx.lineCap='round';
@@ -8587,10 +8600,21 @@ function menuSign(){
   cx.fillStyle='#8f6b3f'; rr(sx-250,40,500,88,10); cx.fill();
   cx.strokeStyle='#6e5130'; cx.lineWidth=4; rr(sx-250,40,500,88,10); cx.stroke();
   cx.fillStyle='#a37c4a'; rr(sx-242,48,484,72,7); cx.fill();
-  cx.fillStyle='#F7E9C4'; cx.textAlign='center';
-  cx.font='bold 40px "Arial Black",Impact,sans-serif';   /* 40px: TRAIN GALAXY measures 338px — clears the stars at ±208 by ~24px a side; 46px (388px) touches them */
-  cx.fillText('TRAIN GALAXY', sx, 100);
-  star5(sx-208,84,0.85,'#e8d9b0'); star5(sx+208,84,0.85,'#e8d9b0');
+  if(!SIGN_FIT){   // one measure: both words wear the smaller fit (star at ±222, word inset 54)
+    cx.font='bold 34px "Arial Black",Impact,sans-serif';
+    const m=Math.max(cx.measureText('TRAIN').width, cx.measureText('GALAXY').width);
+    SIGN_FIT=Math.min(34, 34*152/m);
+  }
+  cx.font='bold '+SIGN_FIT+'px "Arial Black",Impact,sans-serif';
+  const word=(t,x,al)=>{
+    cx.textAlign=al;
+    cx.fillStyle='#5d452a'; cx.fillText(t,x,100.5);   // the carve shadow
+    cx.fillStyle='#F7E9C4'; cx.fillText(t,x,98);
+  };
+  word('TRAIN', sx-54, 'right');
+  word('GALAXY', sx+54, 'left');
+  star5(sx-222,84,0.8,'#e8d9b0'); star5(sx+222,84,0.8,'#e8d9b0');
+  cx.drawImage(signMedal(), sx-47, 39, 94, 94);       // the world between the words
   cx.restore();
 }
 
@@ -15126,91 +15150,172 @@ function bankPig(){
    one door bubble — never its silhouette (the IP law). Wordless, 2×
    resolution, painted once; every canvas plate holds by construction
    because the chip is pure DOM.
+   E76 THE GLOBE POLISH (8/9 design audit) — ONE parameterized painter,
+   drawGlobeMark(g,o), now serves all three homes: this chip (door on),
+   the App Store icon via shell/ios/icon_gen.js (o.space galaxy field,
+   no door), and the menu sign's medallion (no door). The ten tweaks:
+   recentered equal-reach kites (the S tip used to kiss the frame) ·
+   pinwheel two-tone gold (compass-rose grammar) · a gold coin rim ·
+   STEEL rails + 12 tidy sleepers so the ring finally reads RAILROAD at
+   66px · toy continents on the world · limb shade + specular (ball-
+   ness) · lighter etch lines · ✦ sparkles moved off the land into the
+   space gap · the puffer 1.55×, MIRRORED so she CLIMBS the ring at
+   10:40 with smoke trailing down-slope · door bubble r16→13 (an
+   affordance again, not a second planet). Still painted once, still
+   pure DOM, still no rAF.
    ===================================================================== */
+function drawGlobeMark(g,o){
+  o=o||{};
+  const W=o.w||1;
+  withCtx(g,()=>{
+    const cxr=66, cyr=66, R=38;
+    cx.lineJoin='round'; cx.lineCap='round';
+    if(o.space){
+      // the galaxy field (icon only): deep-space radial + fixed stars
+      const S=o.space;
+      const gr=cx.createRadialGradient(S*0.5,S*0.42,S*0.08,S*0.5,S*0.55,S*0.72);
+      gr.addColorStop(0,'#1E3157'); gr.addColorStop(1,'#0C1528');
+      cx.fillStyle=gr; cx.fillRect(0,0,S,S);
+      const stars=[[0.10,0.14,2.6],[0.24,0.06,1.6],[0.87,0.10,2.2],[0.94,0.30,1.5],
+                   [0.06,0.55,1.7],[0.93,0.64,2.5],[0.10,0.86,2.1],[0.30,0.94,1.5],
+                   [0.72,0.95,2.3],[0.90,0.88,1.4],[0.045,0.33,1.3],[0.55,0.045,1.8]];
+      cx.fillStyle='#F7E9C4';
+      for(const st of stars){
+        cx.globalAlpha= st[2]>2 ? 0.9 : 0.55;
+        cx.beginPath(); cx.arc(S*st[0],S*st[1],st[2]*S/280,0,7); cx.fill();
+      }
+      cx.globalAlpha=1;
+      star5(S*0.135,S*0.79,S/620,'#F2C531');       // two gold toybox stars
+      star5(S*0.85,S*0.185,S/900,'#F2C531');
+      const k=(o.fit||0.90)*S/132;                  // seat the mark, centered
+      cx.translate(S/2,S/2); cx.scale(k,k); cx.translate(-cxr,-cyr);
+    }
+    // the compass: pinwheel two-tone kites, equal reach
+    const kite=(an,len,small)=>{
+      const ax=Math.cos(an), ay=Math.sin(an);
+      const tx=cxr+ax*(R+len),   ty=cyr+ay*(R+len);      // tip
+      const mx=cxr+ax*(R-6),     my=cyr+ay*(R-6);        // spine base
+      const lx=cxr-ay*7+ax*(R-6),ly=cyr+ax*7+ay*(R-6);   // base corners
+      const rx=cxr+ay*7+ax*(R-6),ry=cyr-ax*7+ay*(R-6);
+      cx.strokeStyle='#8a683e'; cx.lineWidth=3*W;
+      cx.beginPath(); cx.moveTo(tx,ty); cx.lineTo(lx,ly); cx.lineTo(rx,ry); cx.closePath();
+      cx.stroke();
+      if(small){ cx.fillStyle='#F2C531'; cx.fill(); return; }
+      cx.fillStyle='#F8D64A';                             // lit half (pinwheel)
+      cx.beginPath(); cx.moveTo(tx,ty); cx.lineTo(lx,ly); cx.lineTo(mx,my); cx.closePath(); cx.fill();
+      cx.fillStyle='#D9A31F';                             // shaded half
+      cx.beginPath(); cx.moveTo(tx,ty); cx.lineTo(mx,my); cx.lineTo(rx,ry); cx.closePath(); cx.fill();
+    };
+    for(let i=0;i<4;i++) kite(i*Math.PI/2+Math.PI/4,9,true);   // the little between-points
+    kite(-Math.PI/2,20); kite(Math.PI/2,20); kite(0,20); kite(Math.PI,20);
+    cx.fillStyle='#12203A';                       // the deep-space coin
+    cx.beginPath(); cx.arc(cxr,cyr,R,0,7); cx.fill();
+    cx.strokeStyle='#F2C531'; cx.lineWidth=1.6*W; cx.globalAlpha=0.9;   // gold rim
+    cx.beginPath(); cx.arc(cxr,cyr,R+0.6,0,7); cx.stroke(); cx.globalAlpha=1;
+    // E71b — THE RING IS A RAILROAD: blue bed (the reference's ring
+    // survives underneath), tidy sleepers, twin STEEL rails that finally
+    // read as track at chip size.
+    cx.strokeStyle='#2E4E86'; cx.lineWidth=9*W;
+    cx.beginPath(); cx.arc(cxr,cyr,R-3.5,0,7); cx.stroke();
+    cx.strokeStyle='#6B4A2C'; cx.lineWidth=3.2*W;   // the sleepers
+    for(let i=0;i<12;i++){ const an=i*TAU/12+0.26;
+      cx.beginPath();
+      cx.moveTo(cxr+Math.cos(an)*(R-7.4),cyr+Math.sin(an)*(R-7.4));
+      cx.lineTo(cxr+Math.cos(an)*(R+0.2),cyr+Math.sin(an)*(R+0.2));
+      cx.stroke();
+    }
+    cx.strokeStyle='#C9D1DB'; cx.lineWidth=2.3*W; cx.globalAlpha=0.95;   // the twin rails
+    cx.beginPath(); cx.arc(cxr,cyr,R-1.7,0,7); cx.stroke();
+    cx.beginPath(); cx.arc(cxr,cyr,R-5.5,0,7); cx.stroke();
+    cx.globalAlpha=1;
+    cx.fillStyle='#4E9E5F';                       // the green world
+    cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.fill();
+    cx.save();
+    cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.clip();
+    cx.fillStyle='#357643';                       // toy continents
+    cx.beginPath();                               // the big bean NW→N
+    cx.moveTo(cxr-22,cyr-6);
+    cx.bezierCurveTo(cxr-20,cyr-18,cxr-8,cyr-24,cxr+2,cyr-19);
+    cx.bezierCurveTo(cxr+9,cyr-15,cxr+6,cyr-8,cxr-2,cyr-7);
+    cx.bezierCurveTo(cxr-9,cyr-6,cxr-14,cyr+1,cxr-22,cyr-6);
+    cx.closePath(); cx.fill();
+    cx.beginPath();                               // the small isle SE
+    cx.moveTo(cxr+8,cyr+8);
+    cx.bezierCurveTo(cxr+16,cyr+4,cxr+22,cyr+10,cxr+16,cyr+16);
+    cx.bezierCurveTo(cxr+10,cyr+21,cxr+4,cyr+14,cxr+8,cyr+8);
+    cx.closePath(); cx.fill();
+    cx.strokeStyle='#2E6E3E'; cx.lineWidth=2.2*W; cx.globalAlpha=0.45;   // the light etch
+    cx.beginPath(); cx.moveTo(cxr-26,cyr); cx.lineTo(cxr+26,cyr); cx.stroke();
+    cx.beginPath(); cx.ellipse(cxr,cyr,26*0.55,26,0,0,7); cx.stroke();
+    cx.beginPath(); cx.ellipse(cxr,cyr,26,26*0.55,0,0,7); cx.stroke();
+    cx.globalAlpha=1;
+    cx.strokeStyle='#0E2C1A'; cx.globalAlpha=0.16; cx.lineWidth=7*W;   // limb shade SE
+    cx.beginPath(); cx.arc(cxr,cyr,22.6,-0.15,Math.PI*0.62); cx.stroke();
+    cx.strokeStyle='#FFFFFF'; cx.globalAlpha=0.35; cx.lineWidth=2.4*W;   // specular NW
+    cx.beginPath(); cx.arc(cxr,cyr,21.5,Math.PI*1.10,Math.PI*1.26); cx.stroke();
+    cx.globalAlpha=1;
+    cx.restore();
+    cx.strokeStyle='#2E6E3E'; cx.lineWidth=2.8*W;
+    cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.stroke();
+    // ✦ sparkles in the space gap — we ARE a galaxy (the star left the land)
+    const tw=(px,py,r)=>{
+      cx.fillStyle='#F7E9C4'; cx.beginPath();
+      cx.moveTo(px,py-r); cx.quadraticCurveTo(px+r*0.22,py-r*0.22,px+r,py);
+      cx.quadraticCurveTo(px+r*0.22,py+r*0.22,px,py+r);
+      cx.quadraticCurveTo(px-r*0.22,py+r*0.22,px-r,py);
+      cx.quadraticCurveTo(px-r*0.22,py-r*0.22,px,py-r);
+      cx.closePath(); cx.fill();
+    };
+    tw(cxr+28.6*Math.cos(0.62), cyr+28.6*Math.sin(0.62), 3.4);
+    tw(cxr+28.6*Math.cos(2.72), cyr+28.6*Math.sin(2.72), 2.2);
+    if(o.door){
+      const bx=cxr+R*0.76, by=cyr-R*0.76;         // THE DOOR BUBBLE — the way out
+      cx.fillStyle='#4E9E5F'; cx.strokeStyle='#12203A'; cx.lineWidth=3*W;
+      cx.beginPath(); cx.arc(bx,by,13,0,7); cx.fill(); cx.stroke();
+      cx.fillStyle='#12203A';                     // the doorway
+      rr(bx+0.5,by-6,7,12,3); cx.fill();
+      cx.strokeStyle='#F2C531'; cx.lineWidth=3*W; // the gold arrow, going home
+      cx.beginPath(); cx.moveTo(bx-8.5,by); cx.lineTo(bx+2.5,by); cx.stroke();
+      cx.beginPath(); cx.moveTo(bx-1,by-4); cx.lineTo(bx+3.5,by); cx.lineTo(bx-1,by+4); cx.stroke();
+    }
+    // THE LITTLE WORLD TRAIN — the RED PUFFER, mirrored so she CLIMBS the
+    // ring's left shoulder toward the north star, wheels toward her planet
+    // (the Little Prince grammar), smoke trailing back down the slope.
+    if(o.train!==false){
+      const la=-2.28, Rm=R-3.5, K=1.55;
+      cx.save();
+      cx.translate(cxr+Math.cos(la)*Rm,cyr+Math.sin(la)*Rm);
+      cx.rotate(la+Math.PI/2); cx.scale(-K,K);
+      cx.globalAlpha=0.85; cx.fillStyle='#FBFDFF';  // smoke off the stack
+      cx.beginPath(); cx.arc(-4,-13,2.9,0,7); cx.fill();
+      cx.beginPath(); cx.arc(1,-16.5,2.2,0,7); cx.fill();
+      cx.beginPath(); cx.arc(5.5,-19.5,1.5,0,7); cx.fill();
+      cx.globalAlpha=1; cx.lineJoin='round';
+      cx.fillStyle='#96281B';                       // cow-catcher: a real pilot — flush nose face,
+      cx.beginPath(); cx.moveTo(-11.2,-2.5);        // sloping down-forward to the rail
+      cx.lineTo(-13.8,3.4); cx.lineTo(-11.2,3.4);
+      cx.closePath(); cx.fill();
+      cx.fillStyle='#C0392B'; rr(-11,-6.5,15,7.5,2.5); cx.fill();   // the boiler
+      cx.fillStyle='#96281B'; rr(2.5,-9.5,8,10.5,2); cx.fill();     // the cab
+      cx.fillStyle='#F7E9C4'; rr(4.2,-7.8,4.6,3.6,1); cx.fill();    // her window
+      cx.fillStyle='#3A3A3E'; rr(-9.5,-11,3,5,1); cx.fill();        // the stack
+      cx.fillStyle='#F2C531';                                       // the gold dome
+      cx.beginPath(); cx.arc(-2.5,-7.6,1.9,0,7); cx.fill();
+      cx.fillStyle='#23211E';                                       // the wheels
+      cx.beginPath(); cx.arc(-6,2.8,3.1,0,7); cx.fill();
+      cx.beginPath(); cx.arc(5,2.8,3.1,0,7); cx.fill();
+      cx.fillStyle='#F2C531';                                       // gold hubs
+      cx.beginPath(); cx.arc(-6,2.8,1,0,7); cx.fill();
+      cx.beginPath(); cx.arc(5,2.8,1,0,7); cx.fill();
+      cx.restore();
+    }
+  });
+}
 function drawGlobeChip(){
   const cv=$('menuGlobe'); if(!cv) return;
   const g=cv.getContext('2d');
   g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,132,132);
-  withCtx(g,()=>{
-    const cxr=64, cyr=72, R=38;
-    cx.lineJoin='round'; cx.lineCap='round';
-    const point=(an,len)=>{                       // one gold compass kite
-      const ax=Math.cos(an), ay=Math.sin(an);
-      cx.fillStyle='#F2C531'; cx.strokeStyle='#8a683e'; cx.lineWidth=3;
-      cx.beginPath();
-      cx.moveTo(cxr+ax*(R+len),cyr+ay*(R+len));
-      cx.lineTo(cxr-ay*7+ax*(R-6),cyr+ax*7+ay*(R-6));
-      cx.lineTo(cxr+ay*7+ax*(R-6),cyr-ax*7+ay*(R-6));
-      cx.closePath(); cx.fill(); cx.stroke();
-    };
-    point(-Math.PI/2,22); point(Math.PI/2,20); point(0,20); point(Math.PI,20);
-    for(let i=0;i<4;i++) point(i*Math.PI/2+Math.PI/4,9);   // the little between-points
-    cx.fillStyle='#12203A';                       // the deep-space ring
-    cx.beginPath(); cx.arc(cxr,cyr,R,0,7); cx.fill();
-    // E71b (Wyatt: "it needs something that makes it have to do with trains")
-    // — THE RING IS A RAILROAD: the game's own WESTERN LAND rail recipe bent
-    // round the world. Blue bed (the reference's ring survives underneath),
-    // wooden sleepers, twin steel rails.
-    cx.strokeStyle='#2E4E86'; cx.lineWidth=9;
-    cx.beginPath(); cx.arc(cxr,cyr,R-3.5,0,7); cx.stroke();
-    cx.strokeStyle='#6B4A2C'; cx.lineWidth=3;     // the sleepers
-    for(let i=0;i<14;i++){ const an=i*TAU/14+0.22;
-      cx.beginPath();
-      cx.moveTo(cxr+Math.cos(an)*(R-7.6),cyr+Math.sin(an)*(R-7.6));
-      cx.lineTo(cxr+Math.cos(an)*(R+0.4),cyr+Math.sin(an)*(R+0.4));
-      cx.stroke();
-    }
-    cx.strokeStyle='#4A423A'; cx.lineWidth=2;     // the twin rails
-    cx.beginPath(); cx.arc(cxr,cyr,R-1.8,0,7); cx.stroke();
-    cx.beginPath(); cx.arc(cxr,cyr,R-5.4,0,7); cx.stroke();
-    cx.fillStyle='#4E9E5F';                       // the green world
-    cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.fill();
-    cx.strokeStyle='#2E6E3E'; cx.lineWidth=2.6;   // the wireframe
-    cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.stroke();
-    cx.beginPath(); cx.moveTo(cxr-26,cyr); cx.lineTo(cxr+26,cyr); cx.stroke();
-    for(const k of [0.45,0.8]){                   // meridians…
-      cx.beginPath(); cx.ellipse(cxr,cyr,26*k,26,0,0,7); cx.stroke();
-    }
-    for(const k of [0.45,0.8]){                   // …and parallels
-      cx.beginPath(); cx.ellipse(cxr,cyr,26,26*k,0,0,7); cx.stroke();
-    }
-    cx.fillStyle='#F7E9C4';                       // one star wink — we ARE a galaxy
-    star5(cxr-13,cyr-15,0.5,'#F7E9C4');
-    const bx=cxr+R*0.74, by=cyr-R*0.74;           // THE DOOR BUBBLE — the way out
-    cx.fillStyle='#4E9E5F'; cx.strokeStyle='#12203A'; cx.lineWidth=3.5;
-    cx.beginPath(); cx.arc(bx,by,16,0,7); cx.fill(); cx.stroke();
-    cx.fillStyle='#12203A';                       // the doorway
-    rr(bx+1,by-7.5,9,15,4); cx.fill();
-    cx.strokeStyle='#F2C531'; cx.lineWidth=4;     // the gold arrow, going home
-    cx.beginPath(); cx.moveTo(bx-10,by); cx.lineTo(bx+3,by); cx.stroke();
-    cx.beginPath(); cx.moveTo(bx-1,by-4.5); cx.lineTo(bx+4,by); cx.lineTo(bx-1,by+4.5); cx.stroke();
-    // THE LITTLE WORLD TRAIN — the RED PUFFER rides the ring's top-left arc,
-    // wheels toward her planet (the Little Prince grammar), puffing along.
-    const la=-2.35, Rm=R-3.5;
-    cx.save();
-    cx.translate(cxr+Math.cos(la)*Rm,cyr+Math.sin(la)*Rm);
-    cx.rotate(la+Math.PI/2); cx.scale(1.35,1.35);
-    cx.globalAlpha=0.85; cx.fillStyle='#FBFDFF';  // two puffs behind her
-    cx.beginPath(); cx.arc(-14,-9,3,0,7); cx.fill();
-    cx.beginPath(); cx.arc(-17.5,-12.5,2.1,0,7); cx.fill();
-    cx.globalAlpha=1; cx.lineJoin='round';
-    cx.fillStyle='#96281B';                       // cow-catcher
-    cx.beginPath(); cx.moveTo(-11,0.5); cx.lineTo(-14.5,3.2); cx.lineTo(-11,3.2);
-    cx.closePath(); cx.fill();
-    cx.fillStyle='#C0392B'; rr(-11,-6.5,15,7.5,2.5); cx.fill();   // the boiler
-    cx.fillStyle='#96281B'; rr(2.5,-9.5,8,10.5,2); cx.fill();     // the cab
-    cx.fillStyle='#F7E9C4'; rr(4.2,-7.8,4.6,3.6,1); cx.fill();    // her window
-    cx.fillStyle='#3A3A3E'; rr(-9.5,-11,3,5,1); cx.fill();        // the stack
-    cx.fillStyle='#F2C531';                                       // the gold dome
-    cx.beginPath(); cx.arc(-2.5,-7.6,1.9,0,7); cx.fill();
-    cx.fillStyle='#23211E';                                       // the wheels
-    cx.beginPath(); cx.arc(-6,2.8,3.1,0,7); cx.fill();
-    cx.beginPath(); cx.arc(5,2.8,3.1,0,7); cx.fill();
-    cx.fillStyle='#F2C531';                                       // gold hubs
-    cx.beginPath(); cx.arc(-6,2.8,1,0,7); cx.fill();
-    cx.beginPath(); cx.arc(5,2.8,1,0,7); cx.fill();
-    cx.restore();
-  });
+  drawGlobeMark(g,{door:true});
 }
 function outPlank(fn){
   const b=document.createElement('button'); b.type='button'; b.className='outplk';
