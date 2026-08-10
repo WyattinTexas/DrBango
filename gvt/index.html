@@ -2351,7 +2351,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.83</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.84</div>
   <div class="scanlines"></div>
 </div>
 
@@ -19127,8 +19127,23 @@ function duelChipHTML(){
 let CREW={ crew:null, members:[], invites:[], me:null, busy:false, pollT:0, sig:'',
   campGo:null, leadFired:null, autoBf:null,     // v2.69 one-click guards: the go-wish lobby, the lobby already ordered, the room already auto-joined
   gatedLaunch:0, adPend:false, campLaunch:null, campLaunchT:0,     // v2.70: paid-my-gate flag · mate's ad in flight · the boom-launch pending lobby + its clock
-  bfPaid:null, bfAdPend:null, bfGo:null,     // v2.81: the pulled chair's BF break — paid room · break in flight · flip-landed-mid-break
-  leadGhost:null };   // v2.82: lobby whose NEXT-SEEN wish is suspect (frozen from before the battle) — deliberately NOT in the 19147 sweep, it must survive the verdict
+  bfPaid:null, bfAdPend:null, bfGo:null };   // v2.81: the pulled chair's BF break — paid room · break in flight · flip-landed-mid-battle
+// v2.84: CREW.leadGhost is GONE. v2.82's guard refused a lobby's first-sighted
+// deploy wish after a verdict (a crewp row frozen from before the battle could
+// replay a stale order) and cleared only on a WISHLESS poll — but v2.83's
+// LEAVE-TRUTH farewell blanks every chair's presence row AT BATTLE ENTRY, and
+// the box already blanks st on any row older than CREW_TTL, so the frozen-wish
+// class the guard defended against no longer exists on any battle a farewell
+// build fought. What the guard DID catch was the honest game-2 wish: a guest
+// who lands first and taps DEPLOY while the host is still on the verdict
+// screen (or in the level-up picker) posts a PERSISTENT wish — the host's
+// first post-landing poll sights it, marks it suspect, and since the wisher
+// keeps wishing there is never a wishless poll: the squad's second game
+// DEADLOCKS behind a "HOLDING THE DOOR" card until the host taps DEPLOY
+// himself (Wyatt 8/9 night, the group-up popup). Accepted residue: a
+// farewell-less v2.82-cached wisher whose battle ran UNDER 40s can still
+// replay one stale order — the seated-wisher guard below keeps even that
+// from launching a lobby of one.
 const CREW_BF_MIN=2;          // a 1v1 has no second chair on your side
 // ===== v2.66 WEB GOOGLE SIGN-IN (Wyatt 8/7: "on a browser… just do it
 // through Google — that's more natural"). The whole flow is wired and waits
@@ -19232,7 +19247,6 @@ function crewTick(){
   // a wish or an order outliving its lobby is litter
   if(CREW.campGo && !(COOP&&coopSquad()&&COOP.code===CREW.campGo)){ CREW.campGo=null; CREW.campGoLvl=0; }
   if(CREW.leadFired && !(COOP&&coopSquad()&&COOP.code===CREW.leadFired)) CREW.leadFired=null;
-  if(CREW.leadGhost && !(COOP&&coopSquad()&&COOP.code===CREW.leadGhost)) CREW.leadGhost=null;   // v2.82: a ghost mark outliving its lobby is litter
   if(CREW.campLaunch && !(COOP&&coopSquad()&&COOP.code)){ CREW.campLaunch=null; CREW.campLvl=0; }
   const st=crewSt();
   CREW.busy=true;
@@ -19251,7 +19265,19 @@ function crewTick(){
       if(META.crew){ META.crew=null; saveMeta(); }
     }
     CREW.invites=r.invites||[];
-    crewAutoCamp(); crewBfSwap(); crewAutoBf(); crewLeadGo(); crewCampPend(); bfqMirrorWatch();
+    // v2.84: a LIVE AD SHOW freezes the squad's auto-motion. A show on this
+    // screen means a launch is already committed and about to fire (the solo
+    // fall-through's gate, or a break) — letting the reactors keep rearranging
+    // the party under it is exactly the reported split: the payer's autoCamp
+    // joined a squadmate's just-opened door mid-show, the committed solo start
+    // then ran OVER the fresh seat, and the squadmate stood holding a muster
+    // sheet with a name on it while its owner fought a solo game. It also
+    // keeps crewCampPend's 8s degrade from expiring INTO adGate's glass check
+    // (a launch swallowed silently under someone else's show). The cosmetic
+    // theater absorb (crewBfSwap) still runs — it moves no one.
+    let adUp=false; try{ adUp=!!AD; }catch(e){}
+    if(adUp){ crewBfSwap(); }
+    else { crewAutoCamp(); crewBfSwap(); crewAutoBf(); crewLeadGo(); crewCampPend(); bfqMirrorWatch(); }
     const sig=JSON.stringify([CREW.crew&&CREW.crew.code, CREW.crew&&CREW.crew.n, CREW.invites.length,
       CREW.members.map(m=>[m.name,m.st,m.hex||'',(m.info||{}).room||'',(m.info||{}).lobby||'',m.on?1:0])]);
     if(sig!==CREW.sig){
@@ -19585,13 +19611,13 @@ function crewLeadGo(){
   if(CREW.leadFired===COOP.code) return;
   const wish=(CREW.members||[]).find(m=>m.uid!==CREW.me && m.st==='campQ' && m.info
     && m.info.lobby===COOP.code && m.info.go);
-  if(!wish){ if(CREW.leadGhost===COOP.code) CREW.leadGhost=null; return; }   // one wishless poll = the ghosts are gone; the next wish is a real tap
-  // v2.82 THE GHOST WISH (battery-caught, pre-existing): a wish row frozen
-  // from BEFORE the battle lingers in crewp for up to 40s while leadFired was
-  // rightly cleared at entry — honoring it REDEPLOYED the whole lobby the
-  // moment everyone landed. endBattle marks the lobby's next-seen wish
-  // suspect; only a wish seen after a wishless poll fires the order.
-  if(CREW.leadGhost===COOP.code) return;
+  if(!wish) return;
+  // v2.84: the v2.82 leadGhost refusal that stood here is gone — the v2.83
+  // farewell (and the box's own CREW_TTL blanking) killed the frozen-wish
+  // class at the source, and the refusal had become a real game-2 deadlock:
+  // an honest wish tapped while this host still dwelt on the verdict screen
+  // was sighted-first, marked suspect, and stayed suspect forever because a
+  // real wisher never goes wishless. See the CREW literal's note.
   // v2.82: the wish must still be SEATED — a wisher who left the lobby can
   // linger in crewp for up to 40s, and firing on his ghost would launch a
   // one-human battle with no gate anywhere. COOP.members is fresher truth.
@@ -20444,6 +20470,7 @@ function endBattlefield(reason, fromRelay){
   const margin=t('YOU SMASHED '+my+' — THEY SMASHED '+th);
   S.mode=won?'win':'lose';
   sqGameTick();   // v2.82 SQUAD AD LAW: a finished 2+-human game counts, win or lose (bf.sqAdT latches it once)
+  PGV=pgOrigin();   // v2.84 POST-GAME LANDING LAW: the room family's verdict banks its origin too (see endBattle's line)
   document.getElementById(won?'win':'lose').classList.remove('hidden');
   // ===== A PRIVATE ROOM PAYS THE SAME, AND RANKS ON A LEASH =====
   // Wyatt, 7/25, verbatim: "THE WINNING TEAM STILL GETS XP AND STARS." So it
@@ -25263,7 +25290,7 @@ function endBattle(win){
   }
   S.mode = win?'win':'lose';
   sqGameTick();   // v2.82 SQUAD AD LAW: a finished 2+-human game counts, win or lose (S.sq.sqAdT latches it once)
-  try{ if(S.coop && COOP && coopSquad() && COOP.code) CREW.leadGhost=COOP.code; }catch(e){}   // v2.82 GHOST WISH: this lobby's next-seen wish predates the battle — suspect until one wishless poll
+  PGV=pgOrigin();   // v2.84 POST-GAME LANDING LAW: the verdict itself remembers where this game was launched from — a party that dies on the verdict screen (iPad suspended past the box's 45s prune → 'no party' → dissolve) must not rob the exit taps of their squad landing
   if(coach) coachDone();   // boot camp lasts one battle — it never follows you to level 2
   // ALLIED MISSION: the host sim is the referee — it files the verdict with HQ,
   // which advances BOTH campaigns on a win and relays the word to the ally.
@@ -31846,9 +31873,12 @@ function squadAdGate(launch){
     let live=false; try{ live=!!AD; }catch(e){}
     // "was this a squad game" = the tick latch the battle itself carries —
     // never the LIVE roster, which a mate leaving between verdict and tap
-    // would shrink under the due break
+    // would shrink under the due break. v2.84: the S.coop read is gone for
+    // the same reason one step further — a party that DIED on the verdict
+    // screen (the iPad-suspend prune) nulls S.coop, and the finished squad
+    // game it latched must still pay its due break on the way out.
     const sq=!!((S.bf&&S.bf.sqAdT)||(S.sq&&S.sq.sqAdT));
-    brk= !live && S.coop && sq && AD_SQUAD_EVERY>0 && ADQ.squad>0
+    brk= !live && sq && AD_SQUAD_EVERY>0 && ADQ.squad>0
        && (ADQ.squad%AD_SQUAD_EVERY)===0 && ADQ.sqPaid!==ADQ.squad;
     if(brk) ADQ.sqPaid=ADQ.squad;       // one break per due game, however many exits race
   }catch(e){ brk=false; }               // the gate may fail — the exit may not (fail-safe law)
@@ -35120,13 +35150,23 @@ document.getElementById('title').addEventListener('pointerdown', ()=>{
 // thrown in anyone's face — the old UI.coopOpen exit was exactly the reported
 // split); promotion picks chain through (PGO survives the picker detour);
 // hqBtn stays the deliberate abandon; solo exits are byte-identical to v2.81.
+// v2.84: the ORIGIN outlives the PARTY. pgOrigin() read the live party at the
+// exit tap — but a party can die ON the verdict screen (an iPad suspended past
+// the box's 45s prune comes back to 'no party' → coopDissolve nulls S.coop and
+// COOP mid-dwell), and that tap then fell through to the SOLO exits: HQ
+// landing, no squad break, the landing law broken for a game that was fought
+// together. The verdict raise now banks pgOrigin() in PGV; the exit taps read
+// the live party first and the stamp second, and every verdict raise
+// overwrites the stamp, so it can never leak across battles.
 let PGO=null;   // where the picker chain lands after a squad game ('wt'|'camp')
+let PGV=null;   // v2.84: the verdict's own origin stamp (endBattle/endBattlefield write it at the raise)
 function pgOrigin(){ return (S.coop && COOP)? (coopRoom()? 'wt':'camp') : null; }
+function pgTakeV(){ const o=pgOrigin()||PGV; PGV=null; return o; }   // consume-once: live party's word first, the verdict stamp as fallback
 function pgLand(o){ showMenu(); if(o==='wt') openWarTable(); else if(o==='camp') openCampScene(); }
 function pgTake(){ const o=PGO; PGO=null; if(o==='wt') openWarTable(); else if(o==='camp') openCampScene(); }
 document.getElementById('retryBtn').addEventListener('click', ()=>{
   audio();
-  if(S.coop && COOP){ const o=pgOrigin(); squadAdGate(()=>pgLand(o)); return; }   // go again together — FROM the origin screen (v2.82)
+  { const o=pgTakeV(); if(o){ squadAdGate(()=>pgLand(o)); return; } }   // go again together — FROM the origin screen (v2.82; v2.84: the stamp survives a party that died on this screen)
   if(S.bf){ const raid=!!S.bf.raid, m=S.bf.mapId, t=S.bf.team;
     // v2.41: a raid rematch is a fresh attack (the ground is drawn again),
     // and a RANDOM pref redraws too — an explicit pick still replays itself.
@@ -35135,12 +35175,12 @@ document.getElementById('retryBtn').addEventListener('click', ()=>{
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
   audio();
-  if(S.coop && COOP){ const o=pgOrigin();
-    squadAdGate(()=>{ if(META.pendingPicks>0){ PGO=o; showPicker(); } else pgLand(o); }); return; }
+  { const o=pgTakeV(); if(o){
+    squadAdGate(()=>{ if(META.pendingPicks>0){ PGO=o; showPicker(); } else pgLand(o); }); return; } }
   if(S.bf){ if(META.pendingPicks>0) showPicker(); else showMenu(); return; }   // battlefield XP can promote you
   if(META.pendingPicks>0) showPicker(); else showMenu();
 });
-document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); PGO=null; showMenu(); });
+document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); PGO=null; PGV=null; showMenu(); });
 document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); showMenu(); pgTake(); });
 
 // ================= LOOP =================
