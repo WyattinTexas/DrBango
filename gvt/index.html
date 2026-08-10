@@ -2385,7 +2385,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.94</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.95</div>
   <div class="scanlines"></div>
 </div>
 
@@ -13999,10 +13999,16 @@ function escH(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;'
 // ONE fetch feeds all three WORLD RANKINGS tabs: the stars ladder plus both
 // battleground ladders. Rows land in WR.data; the challenge flow reads the
 // merged roster out of window.__gvtBoard.
-function wrLoad(){
+function wrLoad(force){
+  // v2.95 (load-audit F5): the board a kid closed ten seconds ago is still the
+  // board — one 54KB fetch a minute is plenty. A fresh rating passes force.
+  if(!force && WR.data && Date.now()-(WR.t||0)<60000){
+    if(wrIsOpen()) renderWorldRank();
+    return Promise.resolve(WR.data);
+  }
   return netFetch(NET+'/board?device='+META.deviceId).then(r=>r.json()).then(d=>{
     if(!d||!d.ok) throw new Error('board');
-    WR.err=false;
+    WR.err=false; WR.t=Date.now();
     WR.data={ board:d.board||[], bf1:d.bf1||[], bf2:d.bf2||[], rat:d.rat||[], squads:d.squads||[] };   // v2.65: the SQUAD tab rides the same fetch
     // your own rating rides the board fetch — HQ always appends your row
     const meR=WR.data.rat.find(r=>r.you);
@@ -18392,7 +18398,7 @@ function coopFresh(ui,mode){
   return { mode:mode||'squad', code:null, role:null, host:false, seat:0, mate:null, members:[],
            pc:1, seatHex:{}, level:0, state:'idle', ui:ui||'idle', seq:0,
            outQ:[], cnt:1, pollT:0, busy:false, lastSeen:0, ended:false, wantBattle:false,
-           mateHex:null, misses:0, qT0:Date.now(),
+           mateHex:null, misses:0, mrev:null, qT0:Date.now(),
            // room only: the table settings, and which chair you took
            team:META.bfTeam||1, map:bfMapResolve(META.bfMap), side:'y', slot:0, wantSide:null, wantTeam:0 };   // v2.41: a party never holds 'random' — the draw is made here
 }
@@ -18401,7 +18407,13 @@ function coopTick(){
   if(!COOP) return;
   clearTimeout(COOP.pollT);
   if(!COOP.code && COOP.ui!=='queue') return;  // idle/enter panels have nothing to say
-  COOP.pollT=setTimeout(coopTick, S.coop? 1000 : 2000);
+  // v2.95 BREATHING ROOM (load-audit F4): ±250ms of jitter so a classroom of
+  // clients can never phase-lock on the same second, and misses stretches the
+  // stride — HQ's own 'slow down' (429) and dead wifi both land here, and the
+  // first clean reply snaps it back to cadence. Cap ×4: a lobby chair is only
+  // held 45s, so even five straight misses keep the seat warm.
+  COOP.pollT=setTimeout(coopTick,
+    (S.coop? 1000 : 2000)*Math.min(4, 1+(COOP.misses||0)*0.5) + Math.random()*250);
   if(COOP.busy) return;
   // ⚠ v1.37: A REPLY MAY ONLY TOUCH THE PARTY THAT SENT ITS REQUEST. A poll
   // already in flight when you leave one party and join another lands on the
@@ -18427,6 +18439,9 @@ function coopTick(){
   if(!COOP.code) return;
   COOP.busy=true;
   const body={ code:COOP.code, seq:COOP.seq };
+  // v2.95: tell HQ which roster revision we hold — a battle poll that matches
+  // is spared the members blob (~97% of relay egress was that near-static list)
+  if(coopMulti() && COOP.mrev!=null) body.mrev=COOP.mrev;
   const sending=COOP.outQ.slice(0,40);
   if(sending.length) body.cmds=sending;
   if(S.coop && COOP.host && !COOP.ended){
@@ -18492,6 +18507,9 @@ function coopOnPoll(r, sentWant){
     // BEFORE replaying anything, or a re-seated client applies its own orders twice.
     if(typeof r.seat==='number'){ COOP.seat=r.seat; COOP.role=String(r.seat); }
     COOP.host=!!r.host;                        // the chair can change hands mid-match
+    // v2.95: adopt HQ's roster revision; when members is absent (our mrev
+    // matched, battle only) the guard below simply keeps the roster we hold.
+    if(typeof r.mrev==='number') COOP.mrev=r.mrev;
     if(Array.isArray(r.members)){
       const wasN=(COOP.members||[]).length; COOP.members=r.members;
       if(coopRoom()) roomSeatColours(); else coopSeatColours();
@@ -19494,6 +19512,9 @@ function duelTick(){
   duelStop();
   if(S.mode!=='menu') return;               // never poll from inside a battle
   DUEL.pollT=setTimeout(duelTick, DUEL_POLL);
+  // v2.95 (load-audit F4): a hidden tab keeps the clock but skips the wire —
+  // an idle HQ in a background tab was a write txn on the box every 12s.
+  if(document.hidden) return;
   if(DUEL.busy) return;
   DUEL.busy=true;
   duelPost('list').then(r=>{
@@ -19509,6 +19530,13 @@ function duelTick(){
     }
   }).catch(()=>{ DUEL.busy=false; });
 }
+// v2.95: the moment the tab comes back, the menu pollers report in — the
+// hidden-tab skip above must never read as a dead inbox or a vanished squad.
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden || S.mode!=='menu') return;
+  duelTick();
+  if(META.crew||CREW.crew){ clearTimeout(CREW.pollT); crewTick(); }
+});
 // the chip: one gold button in the room's own header, so it cannot collide with
 // the furniture and a kid cannot miss it
 function duelChipHTML(){
@@ -19653,6 +19681,9 @@ function crewTick(){
   if(!META.crew && !CREW.crew) return;            // squadless: silent, by law
   const fast=(BFQ&&BFQ.crewRoom)||campSceneOpen()||wartableOpen();   // v2.81: the war table is a squad door too — the pull must land inside the fill window
   CREW.pollT=setTimeout(crewTick, fast?2500:5000);
+  // v2.95 (load-audit F4): hidden tab = not really at HQ. The clock keeps
+  // ticking, the wire goes quiet, and presence lapsing to idle is the TRUTH.
+  if(document.hidden) return;
   if(CREW.busy) return;
   if(S.mode!=='menu'){ CREW.campGo=null; CREW.campGoLvl=0; CREW.leadFired=null; CREW.gatedLaunch=0; CREW.campLaunch=null; CREW.campLvl=0; CREW.bfPaid=null; CREW.bfAdPend=null; CREW.bfGo=null;
     CREW.vsRoom=null; CREW.vsAim=null; CREW.vsT=0; CREW.autoVs=null; CREW.autoVsT=0;   // v2.87: battle entry retires the call-out both ways (litter law) — the farewell below kills the stale fill row on every squadmate's screen
@@ -21105,7 +21136,7 @@ function endBattlefield(reason, fromRelay){
     netFetch(NET+'/rated',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({device:META.deviceId, won:won, opp:opp})})
       .then(r=>r.json()).then(dd=>{
-        if(dd&&dd.ok&&typeof dd.rating==='number'){ WR.mine=dd.rating; if(wrIsOpen()) wrLoad(); }
+        if(dd&&dd.ok&&typeof dd.rating==='number'){ WR.mine=dd.rating; if(wrIsOpen()) wrLoad(true); }   // v2.95: a fresh rating busts the board's 60s cache
       }).catch(()=>{});
   }
   checkAch(); saveMeta(); netSync();
