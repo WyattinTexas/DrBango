@@ -2385,7 +2385,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.93</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.94</div>
   <div class="scanlines"></div>
 </div>
 
@@ -17944,6 +17944,44 @@ function sandField(){ return !!(S.cfg && S.cfg.terrain && S.cfg.terrain.ground==
 // ...the back lawn, and the dollhouse roof (8/8) — same one-reader law.
 function grassField(){ return !!(S.cfg && S.cfg.terrain && S.cfg.terrain.ground==='grass'); }
 function roofField(){ return !!(S.cfg && S.cfg.terrain && S.cfg.terrain.ground==='roof'); }
+// v2.94 THE LAWN COMPROMISE IS CONDITIONAL (Wyatt 8/10: "If any of the players
+// are playing as green… keep it this new paler green color. If the green
+// character is not in the level… display its original color. We like that
+// color more."). v2.89 bought the pale field FOR the green figure (1.03:1 on
+// the deep lawn); the deep lawn he likes better comes back whenever nobody
+// fielding an army here would drown on it. "Green" is decided by MEASURE, not
+// by name — what it really means is "invisible on #3E6B2E": figure green
+// 1.03, THE GREEN ARMY dye 1.25 and the #1E6E62 filler 1.03 all hide; black
+// 1.41, blue 1.66, teal 2.15, tan 2.49 all read (the v1.47 crimson rug ships
+// the black army at 1.3 — the accepted floor sits just under the bar). WCAG
+// ratio vs the DEEP base, cached per hex; under LAWN_PALE_CR ⇒ pale stands.
+// Who is "in the level": battleground = every SEAT's plastic (either team —
+// a rival green army hides exactly as yours does); campaign = my dye + the
+// co-op roster (pair mate errs GREEN until his hello lands, the placement
+// painter's own fallback family; squad seatHex rows — a missing row paints
+// toy blue at placement, so it counts as blue here too; bot crews are purple
+// by law). Draw-state only — the sim never reads it.
+const LAWN_DEEP={ base:'#3E6B2E', stripe:'#477836', tuft:'#2F5423', tall:'#2A4C1F' };
+const LAWN_PALE={ base:'#B4D2A6', stripe:'#A2C68F', tuft:'#7FA663', tall:'#77A05B' };
+const LAWN_PALE_CR=1.35, LAWN_CRC={};
+function lawnCR(hex){
+  if(LAWN_CRC[hex]!=null) return LAWN_CRC[hex];
+  const lum=h=>{ const c=[1,3,5].map(i=>parseInt(h.substr(i,2),16)/255)
+    .map(v=>v<=0.03928? v/12.92 : Math.pow((v+0.055)/1.055,2.4));
+    return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; };
+  const a=lum(LAWN_DEEP.base), b=lum(hex), hi=Math.max(a,b), lo=Math.min(a,b);
+  return LAWN_CRC[hex]=(hi+0.05)/(lo+0.05);
+}
+function lawnHides(hex){ return typeof hex==='string' && /^#[0-9a-fA-F]{6}$/.test(hex) && lawnCR(hex)<LAWN_PALE_CR; }
+function lawnPale(){
+  if(S.bf) return (S.bf.seats||[]).some(st=>lawnHides((st&&st.hex)||GREEN));
+  if(lawnHides(dyeHex()||GREEN)) return true;
+  if(S.coop && COOP){
+    if(coopSquad()){ const m=COOP.seatHex||{}; for(const k in m){ if(lawnHides(m[k])) return true; } }
+    else if(lawnHides(COOP.mateHex||GREEN)) return true;
+  }
+  return false;
+}
 // ===== 8/8 THE VOIDS — ground that simply is not there. pits[] are small
 // lethal holes: STEERED around like rocks (rockSteer scans them) but never
 // shouldered — a man who ENTERS one falls in. gaps[] are missing roof
@@ -27707,6 +27745,11 @@ function drawRug(){
   cx.strokeStyle='#4A1A12'; cx.lineWidth=56; cx.strokeRect(0,0,WD,HT);
   cx.strokeStyle='#8F4634'; cx.lineWidth=7; cx.strokeRect(42,42,WD-84,HT-84);
   const snow=snowField(), sand=sandField(), grass=grassField(), roof=roofField();
+  // v2.94: the lawn recipe is chosen per frame — pale while any fielded army
+  // would hide on the deep green, the original deep lawn otherwise (the law
+  // and both recipes live at lawnPale/LAWN_DEEP). Stable in practice: dyes
+  // and seat deals are fixed once a battle starts.
+  const gLawn = grass? (lawnPale()? LAWN_PALE : LAWN_DEEP) : null;
   if(snow){
     // THE SNOW LIES ON THE RUG — the carpet frame is deliberately kept, which is
     // what makes this a toy-box blizzard rather than a different game. The field
@@ -27740,14 +27783,16 @@ function drawRug(){
     // lifts the field ABOVE every green figure: army green reads 3.69:1,
     // tan 1.52:1 (the western ≥1.5 bar). Dark silhouettes on pale turf now
     // — the field spends its budget on separation, not atmosphere.
-    // (Old recipe for revert: base #3E6B2E · stripe #477836 · tuft #2F5423
-    // · long grass #2A4C1F.)
-    cx.fillStyle='#B4D2A6'; cx.fillRect(56,56,WD-112,HT-112);
-    cx.globalAlpha=0.55; cx.fillStyle='#A2C68F';
+    // v2.94: BOTH recipes ship — gLawn picked the deep original back
+    // whenever no fielded army hides on it (Wyatt likes that color more);
+    // alphas and rhythm are shared, so the deep render is byte-identical
+    // to the pre-v2.89 lawn.
+    cx.fillStyle=gLawn.base; cx.fillRect(56,56,WD-112,HT-112);
+    cx.globalAlpha=0.55; cx.fillStyle=gLawn.stripe;
     for(let x=56;x<WD-56;x+=96) cx.fillRect(x,56,48,HT-112);   // the mowing stripes
     // blade tufts — fixed grid + deterministic jitter (the v1.7 draw law:
     // RNG inside a draw call flickers)
-    cx.globalAlpha=0.5; cx.strokeStyle='#7FA663'; cx.lineWidth=2;
+    cx.globalAlpha=0.5; cx.strokeStyle=gLawn.tuft; cx.lineWidth=2;
     for(let y=100;y<HT-70;y+=54){
       for(let x=76;x<WD-70;x+=64){
         const j=((x*7+y*13)%23)-11;
@@ -27758,7 +27803,7 @@ function drawRug(){
     // sparse tall clusters off the same fixed hash grid, swaying on the
     // clock — draw-only, zero sim weight, deterministic to the eye (the
     // ponds' own S.t-animation precedent; never RNG in a draw call).
-    cx.globalAlpha=0.85; cx.strokeStyle='#77A05B'; cx.lineWidth=2.4; cx.lineCap='round';
+    cx.globalAlpha=0.85; cx.strokeStyle=gLawn.tall; cx.lineWidth=2.4; cx.lineCap='round';
     for(let y=128;y<HT-84;y+=118){
       for(let x=96;x<WD-84;x+=150){
         const j=((x*13+y*7)%37); if(j>14) continue;
@@ -27815,9 +27860,11 @@ function drawRug(){
     // v2.89: on the PALE lawn the cream dash washed out too (5.2:1 → 1.4:1
     // when the field lightened) — the halfway line is the soccer pitch's own
     // white marking, so grass gets it in full white at full-strength alpha.
+    // v2.94: the white marking rides ONLY the pale lawn — the deep original
+    // takes the cream dash back (5.2:1 there, the pre-v2.89 render exactly).
     cx.globalAlpha=snow?0.13:0.16; cx.fillStyle=snow?'#5A6E86':'#EDEADF';
     cx.fillRect(MID-MID_BUFFER,56,MID_BUFFER*2,HT-112);
-    cx.globalAlpha=snow?0.85:grass?0.9:0.55; cx.strokeStyle=snow?'#5A6E86':grass?'#FFFFFF':'#EDEADF'; cx.lineWidth=4; cx.setLineDash([16,14]);
+    cx.globalAlpha=snow?0.85:(gLawn===LAWN_PALE)?0.9:0.55; cx.strokeStyle=snow?'#5A6E86':(gLawn===LAWN_PALE)?'#FFFFFF':'#EDEADF'; cx.lineWidth=4; cx.setLineDash([16,14]);
     cx.beginPath(); cx.moveTo(MID,56); cx.lineTo(MID,HT-56); cx.stroke();
     cx.setLineDash([]); cx.globalAlpha=1;
   } else {
@@ -32650,7 +32697,11 @@ const WT_MAP_GLYPHS = {
   // 8/8 v2.74 THE BACKYARD in miniature: the lawn in mower stripes, two mud
   // pits, a garden stone, one dark pitfall — and the fog bank rolling over
   // the top, because the fog IS the map's story. v2.89: the mini wears the
-  // pale lawn so the picker matches the field it sells.
+  // pale lawn so the picker matches the field it sells. v2.94: the FIELD is
+  // conditional now (deep original when no green army is fielded — lawnPale)
+  // but the mini stays pale: the match's armies aren't dealt at picker time,
+  // and the default-green kid — the common case — sees a true preview.
+  // (Dial: make it a function of dyeHex() if Wyatt wants the mini to follow.)
   backyard:'<rect x="1" y="1" width="44" height="28" rx="4" fill="#A0522D"/>'
     +'<rect x="3" y="3" width="40" height="24" rx="3" fill="#B4D2A6"/>'
     +'<g fill="#A2C68F"><rect x="8" y="3" width="5" height="24"/><rect x="18" y="3" width="5" height="24"/><rect x="28" y="3" width="5" height="24"/><rect x="37" y="3" width="5" height="24"/></g>'
