@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v9.6 -->
+<!-- TRAINSET v9.7 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -15167,6 +15167,17 @@ function bankPig(){
 function drawGlobeMark(g,o){
   o=o||{};
   const W=o.w||1;
+  // E76b PLANET CONCEPTS (Wyatt 8/9: "more like Neptune… try an Earth concept
+  // too… some blues would look really well"): o.planet picks the ball —
+  // 'green' (default, byte-identical to E76) · 'earth' (toy ocean + the green
+  // continents) · 'neptune' (bands + the dark spot + methane wisps). Ring,
+  // compass, train, sparkles identical across planets — only the world turns.
+  const PLANETS={
+    green:  { base:'#4E9E5F', line:'#2E6E3E', shade:'#0E2C1A' },
+    earth:  { base:'#3579C8', line:'#2A5E9E', shade:'#0A1F42' },
+    neptune:{ base:'#4180CE', line:'#24518F', shade:'#0A1F42' },
+  };
+  const pl=PLANETS[o.planet||'green']||PLANETS.green;
   withCtx(g,()=>{
     const cxr=66, cyr=66, R=38;
     cx.lineJoin='round'; cx.lineCap='round';
@@ -15228,34 +15239,69 @@ function drawGlobeMark(g,o){
     cx.beginPath(); cx.arc(cxr,cyr,R-1.7,0,7); cx.stroke();
     cx.beginPath(); cx.arc(cxr,cyr,R-5.5,0,7); cx.stroke();
     cx.globalAlpha=1;
-    cx.fillStyle='#4E9E5F';                       // the green world
+    cx.fillStyle=pl.base;                         // the little world
     cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.fill();
     cx.save();
     cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.clip();
-    cx.fillStyle='#357643';                       // toy continents
-    cx.beginPath();                               // the big bean NW→N
-    cx.moveTo(cxr-22,cyr-6);
-    cx.bezierCurveTo(cxr-20,cyr-18,cxr-8,cyr-24,cxr+2,cyr-19);
-    cx.bezierCurveTo(cxr+9,cyr-15,cxr+6,cyr-8,cxr-2,cyr-7);
-    cx.bezierCurveTo(cxr-9,cyr-6,cxr-14,cyr+1,cxr-22,cyr-6);
-    cx.closePath(); cx.fill();
-    cx.beginPath();                               // the small isle SE
-    cx.moveTo(cxr+8,cyr+8);
-    cx.bezierCurveTo(cxr+16,cyr+4,cxr+22,cyr+10,cxr+16,cyr+16);
-    cx.bezierCurveTo(cxr+10,cyr+21,cxr+4,cyr+14,cxr+8,cyr+8);
-    cx.closePath(); cx.fill();
-    cx.strokeStyle='#2E6E3E'; cx.lineWidth=2.2*W; cx.globalAlpha=0.45;   // the light etch
+    if((o.planet||'green')==='green'){
+      cx.fillStyle='#357643';                     // toy continents
+      cx.beginPath();                             // the big bean NW→N
+      cx.moveTo(cxr-22,cyr-6);
+      cx.bezierCurveTo(cxr-20,cyr-18,cxr-8,cyr-24,cxr+2,cyr-19);
+      cx.bezierCurveTo(cxr+9,cyr-15,cxr+6,cyr-8,cxr-2,cyr-7);
+      cx.bezierCurveTo(cxr-9,cyr-6,cxr-14,cyr+1,cxr-22,cyr-6);
+      cx.closePath(); cx.fill();
+      cx.beginPath();                             // the small isle SE
+      cx.moveTo(cxr+8,cyr+8);
+      cx.bezierCurveTo(cxr+16,cyr+4,cxr+22,cyr+10,cxr+16,cyr+16);
+      cx.bezierCurveTo(cxr+10,cyr+21,cxr+4,cyr+14,cxr+8,cyr+8);
+      cx.closePath(); cx.fill();
+    }else if(o.planet==='earth'){
+      cx.fillStyle='#4E9E5F';                     // the greens stay — as continents
+      cx.beginPath();                             // the big bean NW→N
+      cx.moveTo(cxr-22,cyr-6);
+      cx.bezierCurveTo(cxr-20,cyr-18,cxr-8,cyr-24,cxr+2,cyr-19);
+      cx.bezierCurveTo(cxr+9,cyr-15,cxr+6,cyr-8,cxr-2,cyr-7);
+      cx.bezierCurveTo(cxr-9,cyr-6,cxr-14,cyr+1,cxr-22,cyr-6);
+      cx.closePath(); cx.fill();
+      cx.beginPath();                             // the small isle SE
+      cx.moveTo(cxr+8,cyr+8);
+      cx.bezierCurveTo(cxr+16,cyr+4,cxr+22,cyr+10,cxr+16,cyr+16);
+      cx.bezierCurveTo(cxr+10,cyr+21,cxr+4,cyr+14,cxr+8,cyr+8);
+      cx.closePath(); cx.fill();
+      cx.beginPath();                             // third isle SW — the ocean needs company
+      cx.moveTo(cxr-16,cyr+9);
+      cx.bezierCurveTo(cxr-9,cyr+7,cxr-6,cyr+13,cxr-11,cyr+17);
+      cx.bezierCurveTo(cxr-16,cyr+20,cxr-20,cyr+13,cxr-16,cyr+9);
+      cx.closePath(); cx.fill();
+    }else{                                        // neptune — bands, the dark spot, wisps
+      cx.strokeStyle='#2E62B0'; cx.globalAlpha=0.75; cx.lineWidth=5.5*W;
+      cx.beginPath(); cx.moveTo(cxr-27,cyr-9); cx.quadraticCurveTo(cxr,cyr-13,cxr+27,cyr-9); cx.stroke();
+      cx.strokeStyle='#2A57A0'; cx.globalAlpha=0.6; cx.lineWidth=7*W;
+      cx.beginPath(); cx.moveTo(cxr-27,cyr+7); cx.quadraticCurveTo(cxr,cyr+3,cxr+27,cyr+7); cx.stroke();
+      cx.strokeStyle='#2E62B0'; cx.globalAlpha=0.55; cx.lineWidth=4*W;
+      cx.beginPath(); cx.moveTo(cxr-27,cyr+17); cx.quadraticCurveTo(cxr,cyr+14,cxr+27,cyr+17); cx.stroke();
+      cx.globalAlpha=1;
+      cx.fillStyle='#1D4488';                     // the great dark spot
+      cx.save(); cx.translate(cxr+8,cyr-3); cx.rotate(-0.18);
+      cx.beginPath(); cx.ellipse(0,0,6.2,3.9,0,0,7); cx.fill(); cx.restore();
+      cx.strokeStyle='#DCEBFA'; cx.globalAlpha=0.55; cx.lineWidth=2*W;   // methane wisps
+      cx.beginPath(); cx.moveTo(cxr-16,cyr-16); cx.quadraticCurveTo(cxr-9,cyr-18,cxr-3,cyr-16.5); cx.stroke();
+      cx.beginPath(); cx.moveTo(cxr-2,cyr+11); cx.quadraticCurveTo(cxr+5,cyr+9.5,cxr+11,cyr+11); cx.stroke();
+      cx.globalAlpha=1;
+    }
+    cx.strokeStyle=pl.line; cx.lineWidth=2.2*W; cx.globalAlpha=0.45;   // the light etch
     cx.beginPath(); cx.moveTo(cxr-26,cyr); cx.lineTo(cxr+26,cyr); cx.stroke();
     cx.beginPath(); cx.ellipse(cxr,cyr,26*0.55,26,0,0,7); cx.stroke();
     cx.beginPath(); cx.ellipse(cxr,cyr,26,26*0.55,0,0,7); cx.stroke();
     cx.globalAlpha=1;
-    cx.strokeStyle='#0E2C1A'; cx.globalAlpha=0.16; cx.lineWidth=7*W;   // limb shade SE
+    cx.strokeStyle=pl.shade; cx.globalAlpha=0.16; cx.lineWidth=7*W;   // limb shade SE
     cx.beginPath(); cx.arc(cxr,cyr,22.6,-0.15,Math.PI*0.62); cx.stroke();
     cx.strokeStyle='#FFFFFF'; cx.globalAlpha=0.35; cx.lineWidth=2.4*W;   // specular NW
     cx.beginPath(); cx.arc(cxr,cyr,21.5,Math.PI*1.10,Math.PI*1.26); cx.stroke();
     cx.globalAlpha=1;
     cx.restore();
-    cx.strokeStyle='#2E6E3E'; cx.lineWidth=2.8*W;
+    cx.strokeStyle=pl.line; cx.lineWidth=2.8*W;
     cx.beginPath(); cx.arc(cxr,cyr,26,0,7); cx.stroke();
     // ✦ sparkles in the space gap — we ARE a galaxy (the star left the land)
     const tw=(px,py,r)=>{
