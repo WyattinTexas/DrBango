@@ -13092,6 +13092,20 @@ const MINE_TELL=1.0;
 let SWEEP_EVERY=6,        // a charge every 6 seconds, on his own clock (was 12)
     SWEEP_FIRST=2;        // ...and the FIRST lands this soon after placement — a man who dies young still leaves one behind
 const SWEEP_FLING=84;     // ≈3 m at soldier scale (28px/m): the charge lands anywhere inside this ring of his boots
+// ===== 8/10 THE HIDDEN STRIPES (Wyatt, card 0242 — design/balance-0810/01) =====
+// Five SECRET milestone perks on the unit rank ladders. HIDDEN by law (the
+// SPY_VS2 precedent): combat math only — no card, tooltip or shop line ever
+// names one; discovery is the reward. Gates read RAW rank (the WPN_MILE law)
+// through perkRank() — one reader, the upMul/cg ownership shape: my save, a
+// relayed ally's 'mr' token, every other battlefield chair factory stock.
+const MILE_BAZ_R=10,   MILE_BAZ_P=0.2,  MILE_BAZ_RMUL=3;   // THE BIG ONE: 1-in-5 rockets, blast 55 -> 165 (dmg untouched; tube backfire law untouched)
+const MILE_SWEEP_R=15, MILE_SWEEP_P=1/3, MILE_SWEEP_N=3;   // CLUSTER CHARGES: 1 drop in 3 lands THREE mines; the field cap counts DROPS (groups) now
+const MILE_RADIO_R=25, PARA_RAPID_T=3,  PARA_RAPID_MUL=3;  // HOT DROP: the paratrooper lands firing — rate x3 for 3s, armed at the jet's landing beat
+const MILE_FLAME_R=40, COMB_R=84,       COMB_MAX=8;        // COMBUSTION: a flame kill licks every enemy inside 3m (84px); kills chain — popcorn, depth-capped
+const MILE_SPY_R=10,   MILE_SPY_CLOAK=1;                   // LONG BREATH: +1s cloak at rank 10 (gate is tapered-units >= 10 — lossless across the um wire)
+// which classes carry a wire-crossing stripe ('mr'+rawRank on the mo seat —
+// spy derives from um exactly; the commando's pips already ride 'cg')
+const PERK_MARKS={ bazooka:MILE_BAZ_R, minesweeper:MILE_SWEEP_R, radioman:MILE_RADIO_R, flame:MILE_FLAME_R };
 // ===== 8/8 THE GRAVITY GUN (commando mod) — Wyatt verbatim: "reduces the
 // damage done by the Commando by 20%, but now Commando's beam knocks enemies
 // back based on the angle that it hits them from, at a force that should
@@ -14241,6 +14255,7 @@ const CMDO_LVL=50;        // the wall: campaign level 50 BEATEN, never reached �
 const CMDO_DMG_RANK=0.02; // Wyatt verbatim "increases the damage slightly by 2% each time" (everyone else's slope is 0.1); rank 100 = ×1.494, inside the wire's own [1,1.6] um clamp
 const CMDO_DEF_EVERY=5;   // "increases his defense, generally speaking": one grit pip per 5 FULL-VALUE ranks — through the v1.17 taper, so rank 5→+1, 10→+2, 22→+3, 65→+4, 100→+4 (never a straight line, never unkillable)
 const CMDO_DEF_HP=2;      // ...and each pip is +2 plastic on the battleground — the jumptank's own 1-grit:2-hp dual mapping (grit 4→8, hp 7→15 at rank 100)
+const CMDO_DEF_CAP=5;     // 0242: the 5th pip is the RANK-100 CAPSTONE — floor(u/5) tops at 4 because u(100)=24.72 misses 25 by 0.28; the summit grants it flat
 // (his rng/rate/dmg/grit live RAW on the UDEF row — the campaign dump rig and
 // the server's apply loop extract that band verbatim, so the row must stand
 // alone; this panel holds what only the sweep and the ladder read.)
@@ -14279,7 +14294,7 @@ function spyOwned(){ return !!META.spy; }
 // my spy's cloak reads my rank; a relayed ally's derives from the um his
 // order already carries (um = 1 + SPY_DMG_RANK×ru, so ru crosses the wire
 // free — see coopApply); every AI chair never fields him at all.
-function spyCloakRk(ru){ return SPY_CLOAK + SPY_CLOAK_RANK*ru; }
+function spyCloakRk(ru){ return SPY_CLOAK + SPY_CLOAK_RANK*ru + (ru>=MILE_SPY_R? MILE_SPY_CLOAK:0); }   // 0242 LONG BREATH — ru>=10 is raw rank 10 exactly, and um 1.10 crosses the wire lossless
 // ONE ownership reader for every roster surface (tray, picker, soul pool,
 // academy, the two completion medals): shop recruits live in META.unlocked;
 // the commando DERIVES from the campaign record — the 0091/0092 law, so he is
@@ -14304,7 +14319,18 @@ function cmdoGB(u){
   if(u.cmdoGB!=null) return u.cmdoGB;            // the wire's number, stamped at the apply door
   if(u.coopMods) return 0;                       // relayed with no marker: an older build's ally fights factory defence
   if(S.bf && !bfHumanU(u)) return 0;
-  return Math.floor(rankUnits(META.up.commando||0)/CMDO_DEF_EVERY);
+  const r=META.up.commando||0;
+  return r>=RANK_MAX? CMDO_DEF_CAP : Math.floor(rankUnits(r)/CMDO_DEF_EVERY);   // 0242: rank 100 = the capstone pip (grit 9, hull 17); the wire's cg clamp (<=9) already admits it
+}
+// 0242 THE STRIPE READER — raw milestone rank by ownership (the cmdoGB shape):
+// mine live off the save; a relayed ally's off the wire's 'mr' token; a
+// marker-less relay (older build) and every non-human battlefield chair = 0.
+function perkRank(u){
+  if(!u) return 0;
+  if(u.coopMR!=null) return u.coopMR;
+  if(u.coopMods) return 0;
+  if(S.bf && !bfHumanU(u)) return 0;
+  return META.up[u.type]||0;
 }
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function dayBack(n){ const d=new Date(Date.now()-n*864e5); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -18438,6 +18464,9 @@ function coopPlaced(u){
   // the token (R6), and the ally's grit/plastic land exact, never re-derived
   // from a rounded um.
   if(u.type==='commando'){ const gb=cmdoGB(u); if(gb) cm.mo=(cm.mo||[]).concat('cg'+gb); }
+  // 0242: a HIDDEN STRIPE crosses as 'mr'+rawRank on the same seat (the cg
+  // idiom) — raw rank, never um: two wire decimals round rank 40 down to 39.8.
+  { const pr=META.up[u.type]||0; if(PERK_MARKS[u.type] && pr>=PERK_MARKS[u.type]) cm.mo=(cm.mo||[]).concat('mr'+pr); }
   // v2.36 THE LASER TOKEN rides the same 'sl' seat — the whole-army tune is
   // the OWNER's register, so the id crosses with every placement; the live
   // server's CMD_KEYS passes mo untouched and an old client's ENH filter
@@ -18492,6 +18521,9 @@ function coopApply(cm){
       const cg=cm.mo.find(m=>/^cg\d$/.test(String(m)));
       if(cg) u.cmdoGB=Math.min(9,+cg[2]||0);
     }
+    // 0242: the ally's hidden-stripe rank — raw read before the ENH filter
+    { const mr=Array.isArray(cm.mo)? cm.mo.find(m=>/^mr\d{1,3}$/.test(String(m))) : null;
+      if(mr) u.coopMR=Math.min(RANK_MAX,+String(mr).slice(2)||0); }
     // 0100 THE ENGINE — the ally's emg loaner arrives at the pace THEY paid
     // for. Raw read before the ENH filter (the coopSoul law); the campaign def
     // copy exists (placeUnit's else branch), so nothing shared moves.
@@ -20253,6 +20285,7 @@ function roomPlaced(seat,type,x,y,para){
     if(soulIs('u',type)) cm.mo=(cm.mo||[]).concat('sl');   // 0093: the mo-carried Soul marker (the campaign door's own law — CMD_KEYS has no 'sl')
     if(VEH_ORDER.indexOf(type)>=0) cm.vh=vehHP(type)|0;
     if(VEH_ORDER.indexOf(type)>=0 && vehEng(type)) cm.mo=(cm.mo||[]).concat('ve');   // 0100 THE ENGINE rides INSIDE mo (the 'sl' law); old builds drop it at their ENH filter
+    { const pr=META.up[type]||0; if(PERK_MARKS[type] && pr>=PERK_MARKS[type]) cm.mo=(cm.mo||[]).concat('mr'+pr); }   // 0242: the stripe token — the cg idiom, an old client's ENH filter drops it
     if(META.laserOn) cm.mo=(cm.mo||[]).concat('lz:'+META.laserOn);   // v2.36: the laser token, same seat, same law — your men fight at YOUR tune
   } else if(type==='sarge'){
     // an AI seat's Sarge drew his weapon out of the crate once, on the referee's
@@ -20312,6 +20345,9 @@ function roomApply(cm){
     if(cg){ u.cmdoGB=Math.min(9,+cg[2]||0);
       if(u.hpMax){ u.hpMax+=CMDO_DEF_HP*u.cmdoGB; u.hp=u.hpMax; } }
   }
+  // 0242: the ally's hidden-stripe rank — raw read before the ENH filter
+  { const mr=Array.isArray(cm.mo)? cm.mo.find(m=>/^mr\d{1,3}$/.test(String(m))) : null;
+    if(mr) u.coopMR=Math.min(RANK_MAX,+String(mr).slice(2)||0); }
   // v2.36: the ally's laser — raw read before the ENH filter (the coopSoul law)
   { const lt=Array.isArray(cm.mo)? cm.mo.find(m=>typeof m==='string'&&m.slice(0,3)==='lz:') : null;
     u.coopLz=lt? lt.slice(3) : null; }
@@ -21028,6 +21064,7 @@ function saberBlocksU(u){
 // that flag themselves). The BAZOOKA keeps its ×2 and stays the armor answer;
 // the BIG BANGERS keep theirs — nothing else moves by a hair.
 const JEEP_SNIPER_RESIST=0.15;   // "very resistant to sniper fire"
+const TANK_SNIPER_RESIST=0.15;   // 8/10 (Wyatt, card 0242): "almost impossible to hit someone while they're in the jeep or in the tank" — BOTH hulls clank the long rifle now; the bazooka stays the armor answer
 const JEEP_MORTAR_RESIST=0.30;   // shells mostly bounce off the hull
 const JEEP_SABER_RESIST=0.25;    // a blade scratches paint
 // v2.35 (Wyatt 8/4, verbatim: "The machine gun unit needs to get a bonus
@@ -21090,6 +21127,13 @@ function counterDmg(tgt,dmg,src){
   }
   // v2.51: the MG's rounds only rattle a TANK's tracks — ×0.3, both carpets
   // (campaign 'tank', battlefield 'bftank'), same funnel as the jeep rows.
+  // 0242: the crew is INSIDE the machine — a sniper round NICKS a tank hull
+  // exactly like the jeep's (same CLANK tell, same 0.15 band, own dial).
+  if(src && (tgt.type==='tank'||tgt.type==='bftank') && srcArm(src)==='sniper'){
+    dmg*=TANK_SNIPER_RESIST;
+    S.fx.push({k:'ring',x:tgt.x+10,y:tgt.y-26,r:3,R:16,t:0,dur:0.18,col:'#D8D8D8'});
+    S.floats.push({x:tgt.x,y:tgt.y-64,txt:'CLANK!',t:0,col:'#D8D8D8'});
+  }
   if(src && src.type==='mgunner' && (tgt.type==='tank'||tgt.type==='bftank')) dmg*=MG_TANK_RESIST;
   // v2.51: a battlefield rifleman's round loses a fifth into the dug-in MG
   // (the campaign twin of this rule lives in tanHit as a fractional pip)
@@ -23539,12 +23583,37 @@ function sweepTick(u,dt){
   if(u.mineSpot){
     u.swTell=(u.swTell==null? MINE_TELL : u.swTell)-dt;
     if(u.swTell>0) return;
-    S.mines.push({ owner:u.id, side:u.side||null, seat:(u.seat!=null?u.seat:null),
-      x:u.mineSpot.x, y:u.mineSpot.y, armT:0.8,
-      big:enhU(u,'bigbangers'), sl:soulDmgMulU(u)>1 });  // 0093: the Soul rides in the pouch too
+    // 0242 CLUSTER CHARGES: at rank 15 one drop in three lands THREE mines in
+    // a tight ring round the told spot (each walked off rocks/voids toward the
+    // spot, the throw's own guard). A cluster is ONE drop: every mine carries
+    // a grp id and the rolling field cap counts GROUPS, so the perk can never
+    // lift its own siblings — SWEEP_FIELD drops = up to 6 mines at best.
+    S.mineGrp=(S.mineGrp||0)+1;
+    const clu=(perkRank(u)>=MILE_SWEEP_R && Math.random()<MILE_SWEEP_P)? MILE_SWEEP_N : 1;
+    for(let ci=0;ci<clu;ci++){
+      let cxm=u.mineSpot.x, cym=u.mineSpot.y;
+      if(ci>0){
+        const ca=Math.random()*6.283, cr=12+Math.random()*22;
+        cxm=Math.max(24,Math.min((S.bf?WORLD_W:W)-30,cxm+Math.cos(ca)*cr));
+        cym=Math.max(70,Math.min(WORLD_H-100,cym+Math.sin(ca)*cr));
+        for(let g8=0; g8<6; g8++){
+          let bad=false;
+          for(const rk of S.cfg.terrain.rocks){ if(Math.hypot(rk.x-cxm,rk.y-cym)<rk.r+6){ bad=true; break; } }
+          if(!bad && voidAt(cxm,cym)) bad=true;
+          if(!bad) break;
+          cxm=u.mineSpot.x+(cxm-u.mineSpot.x)*0.55; cym=u.mineSpot.y+(cym-u.mineSpot.y)*0.55;
+        }
+      }
+      S.mines.push({ owner:u.id, side:u.side||null, seat:(u.seat!=null?u.seat:null),
+        x:cxm, y:cym, armT:0.8, grp:S.mineGrp,
+        big:enhU(u,'bigbangers'), sl:soulDmgMulU(u)>1 });  // 0093: the Soul rides in the pouch too
+    }
     u.mineSpot=null; u.swTell=null;
-    const ownM=S.mines.filter(mn=>mn.owner===u.id);
-    if(ownM.length>SWEEP_FIELD) S.mines.splice(S.mines.indexOf(ownM[0]),1);
+    // the rolling cap, in GROUPS (a pre-0242 single is its own group)
+    { const gs=[], seen={};
+      for(const mn of S.mines) if(mn.owner===u.id){ const g=mn.grp||('m'+S.mines.indexOf(mn)); if(!seen[g]){ seen[g]=1; gs.push(g); } }
+      while(gs.length>SWEEP_FIELD){ const g0=gs.shift();
+        for(let mi=S.mines.length-1;mi>=0;mi--){ const mn=S.mines[mi]; if(mn.owner===u.id && (mn.grp||('m'+mi))===g0) S.mines.splice(mi,1); } } }
     bfSfx(SFX.snap, u.x, u.y);
     return;
   }
@@ -23820,6 +23889,11 @@ function jetStep(u,dt){
   S.fx.push({k:'ring',x:u.x,y:u.y-4,r:6,R:30,t:0,dur:0.3,col:'rgba(255,255,255,0.85)'});
   S.fx.push({k:'puff',x:u.x,y:u.y-8,t:0,dur:0.3,R:18});
   bfSfx(SFX.thock, u.x, u.y);
+  // 0242 HOT DROP: a stamped paratrooper lands FIRING — rate x3 for 3s from
+  // this exact beat (never earlier: an airborne man can't shoot, so arming at
+  // the chute would burn the window on the way down).
+  if(u.rapArm){ u.rapArm=0; u.rapT=PARA_RAPID_T;
+    S.fx.push({k:'ring',x:u.x,y:u.y-16,r:5,R:26,t:0,dur:0.3,col:'#FFD24A'}); }
   // only YOUR Sarge gets to rock the room (the 10382 law)
   if(bfHumanU(u) && !u.coopBy && !reducedMotion()) S.shake=Math.max(S.shake,0.15);
 }
@@ -23936,6 +24010,7 @@ function radioCall(u){
   const p=S.bf? placeUnit('rifleman',to.x,to.y,u.side,u.seat)
               : placeUnit('rifleman',to.x,to.y);
   if(!p) return null;
+  if(perkRank(u)>=MILE_RADIO_R) p.rapArm=1;   // 0242 HOT DROP — armed at the landing beat, so the canopy never burns the window
   paraChute(p,to.x,to.y);
   if(S.bf) roomPlaced(p.seat,'rifleman',to.x,to.y,true);   // no-op outside a private room
   else     coopPlaced(p);                                  // no-op outside co-op
@@ -26664,6 +26739,7 @@ function update(dt){
     // ticks on the march AND in a fight), held only through the BF drop
     // ghost, so his four seconds start the moment he LANDS. The decloak
     // moment tells the room: one ring, one blip — the enemy's first sight.
+    if(u.rapT>0) u.rapT-=dt;   // 0242 HOT DROP — the landing burst burns at the loop head, the cloak's own law
     if(u.cloakT>0 && !(S.bf && u.dropT>0)){
       u.cloakT-=dt;
       if(u.cloakT<=0){ u.cloakT=0;
@@ -26868,7 +26944,7 @@ function update(dt){
     // RAPID FIRE (v1.62) multiplies the same cadence the aerial does — one more
     // factor on the cooldown, so it stacks with the aura and every mod cleanly
     // (v2.36: and the blue beam is one more factor again, same law)
-    u.cd=1/(rate*ra.rate*emgRateMul(u)*lzRateMul(u));
+    u.cd=1/(rate*ra.rate*emgRateMul(u)*lzRateMul(u)*(u.rapT>0?PARA_RAPID_MUL:1));   // 0242 HOT DROP — one more factor on the same cooldown, the aura's own stacking law
     // your promotion ranks come onto the battlefield with you; the opposing army
     // fights at stock strength — its difficulty is decisions, not stat padding
     // ⚠ ORDER MATTERS: a RELAYED man carries his owner's rank in coopUM and it has
@@ -26930,7 +27006,13 @@ function update(dt){
       // dumb-fire: he shoots where they WERE, roughly. It's a big rocket.
       const a=Math.random()*6.283, r=Math.random()*def.scatter;
       const tx=Math.max(20,Math.min(WX-20,best.x+Math.cos(a)*r)), ty=Math.max(20,Math.min((S.bf?H:WORLD_H)-20,best.y+Math.sin(a)*r));
-      S.shots.push({k:'rocket',x:u.x+14*mzl,y:u.y-30,tx,ty,spd:280,dmg,splash:def.splash,vx2:true,src:u});
+      // 0242 THE BIG ONE: at rank 10 one rocket in five leaves the tube FAT —
+      // blast radius x3, damage untouched, and it rode the same backfire roll
+      // as every rocket (that gate sits above this line). The campaign's
+      // friendly-fire knock rides the bigger blast too — the mortar's own law.
+      const big1=perkRank(u)>=MILE_BAZ_R && Math.random()<MILE_BAZ_P;
+      if(big1) S.fx.push({k:'flash',x:u.x+14*mzl,y:u.y-30,ang:Math.atan2(ty-(u.y-30),tx-(u.x+14*mzl)),R:26,lw:4,t:0,dur:0.16});
+      S.shots.push({k:'rocket',x:u.x+14*mzl,y:u.y-30,tx,ty,spd:280,dmg,splash:def.splash*(big1?MILE_BAZ_RMUL:1),big:big1?1:0,vx2:true,src:u});
     } else if(u.type==='mortar'){
       bfSfx(SFX.rocket, u.x, u.y);
       // aims at where they are + scatter — he can lead them or whiff entirely
@@ -27020,7 +27102,7 @@ function update(dt){
     const sh=S.shots[i];
     if(sh.k==='rocket'){
       const dx=sh.tx-sh.x, dy=(sh.ty-14)-sh.y, d=Math.hypot(dx,dy);
-      if(d<10){ S.shots.splice(i,1); if(sh.refl) cmdoReflLand(sh); else if(sh.foe) foeSplash(sh.tx,sh.ty,sh.splash,sh.src); else splash(sh.tx,sh.ty,sh.splash,sh.dmg,true,sh.src); }
+      if(d<10){ S.shots.splice(i,1); if(sh.refl) cmdoReflLand(sh); else if(sh.foe) foeSplash(sh.tx,sh.ty,sh.splash,sh.src); else splash(sh.tx,sh.ty,sh.splash,sh.dmg,true,sh.src,false,false,sh.big); }
       else { sh.x+=dx/d*sh.spd*dt; sh.y+=dy/d*sh.spd*dt;
         // v2.15 THE CROSSING's duck swallows a rocket WHOLE — "Bazooka" is
         // Wyatt's own list, and the tank's shell rides the same pipeline (a
@@ -27179,6 +27261,38 @@ function noteKill(u,f){
   // that shells both count, and a man standing next to one never does.
   if(u.def && u.def.vehicle) META.stats.vehKills++;
 }
+// 0242 COMBUSTION — at flame rank 40 a kill by flame damage licks every enemy
+// inside COMB_R of the fallen with one flame tick (the OWNER's own damage);
+// a lick that kills spreads again — popcorn — visited-set guarded, depth
+// backstopped (the storm coil's own ceiling shape). The lick rides hurt(), so
+// blocks, plates and ducks still answer (a kid-readable save). Snapshot lists,
+// backwards guards: hitCheck splices S.foes and this runs inside it.
+function combustDmg(src){
+  return UDEF.flame.dmg*(src.vet?1.5:1)*lzDmgMul(src)
+    *(src.coopUM!=null? src.coopUM : ((S.bf&&!bfHumanU(src))?1:upMul('flame')))
+    *soulDmgMulU(src);
+}
+function combustCheck(f,src){
+  if(!src) return;
+  let root=null;
+  if(src.combStub) root=src;
+  else if(src.type==='flame' && perkRank(src)>=MILE_FLAME_R)
+    root={ combStub:1, type:'flame', side:src.side, seat:src.seat, n:0, seen:new Set(), dmb:combustDmg(src) };
+  if(!root || root.n>=COMB_MAX) return;
+  root.n++;
+  const list=S.bf? S.units.slice() : S.foes.slice();
+  for(let i=list.length-1;i>=0;i--){
+    const o=list[i];
+    if(o===f || o.dead || o.hp<=0) continue;
+    if(S.bf && (o.dropT>0 || o.side===root.side)) continue;
+    if(root.seen.has(o)) continue;
+    if(Math.hypot(o.x-f.x,o.y-f.y)>COMB_R) continue;
+    root.seen.add(o);
+    S.combN=(S.combN||0)+1;   // sim-side counter, rig-readable — never drawn
+    S.fx.push({k:'puff',x:o.x,y:o.y-14,t:0,dur:0.3,R:16});
+    hurt(o, root.dmb, root);
+  }
+}
 function hitCheck(f,u){
   // BATTLEFIELD combatant (campaign foes never carry a `side`): flag him dead,
   // lay him where he fell in his own army's colour, and pay whoever got him.
@@ -27207,6 +27321,7 @@ function hitCheck(f,u){
     // a man clatters over; a vehicle goes up (same beat the campaign gives them)
     if(f.def.vehicle){ bfSfx(SFX.boom, f.x, f.y); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
     else bfSfx(SFX.clack, f.x, f.y);
+    combustCheck(f,u);   // 0242 COMBUSTION — the popcorn spreads from where he fell
     return;
   }
   if(f.hp<=0){
@@ -27243,6 +27358,7 @@ function hitCheck(f,u){
       }
       else if(f.def.vehicle){ SFX.boom(); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
       else SFX.clack();
+      combustCheck(f,u);   // 0242 COMBUSTION — campaign twin of the hook above
     }
   }
 }
@@ -27251,7 +27367,7 @@ function hitCheck(f,u){
 // v1.14-measured balance). `mach` is v1.22's ANTI-TANK charge: it doubles
 // against a vehicle on EITHER carpet, and only the big-banger mine passes it,
 // so nothing that shipped before moves by a hair.
-function splash(x,y,R,dmg,vx2,src,mach,refl){
+function splash(x,y,R,dmg,vx2,src,mach,refl,bigSelf){
   // 0121: a charged commando on the RECEIVING side catches a shell whole —
   // rockets, mortar bombs and tank rounds, the three Wyatt named; mines
   // (mach) never, and a reflected shell (refl) never again. Stands ABOVE
@@ -27318,7 +27434,10 @@ function splash(x,y,R,dmg,vx2,src,mach,refl){
     if(u.dead) continue;
     if(u.jetT>0) continue;   // your own shell bursts under his flight path (v1.39) — no FRIENDLY FIRE mid-arc
     if(S.drag&&S.drag.unit===u) continue;
-    if(Math.hypot(u.x-x,u.y-y)<=R*0.9){
+    // 0242: the BIG ONE never makes its OWN firer worse off than a stock
+    // rocket — his self-risk ring stays the 55-blast's (a hidden perk must
+    // not hide a self-nerf); every OTHER friendly respects the full blast.
+    if(Math.hypot(u.x-x,u.y-y)<=((bigSelf&&u===src)? R/MILE_BAZ_RMUL : R)*0.9){
       // v2.28: a JAX is nobody's shell — the knock still lands (one boom
       // hurts BOTH armies, the neutrality law) but the FRIENDLY FIRE ledger
       // stays clean: the stamp is an accusation, and the phantom side fired.
@@ -28579,7 +28698,7 @@ function draw(){
 
   // shots
   for(const sh of S.shots){
-    if(sh.k==='rocket'){ cx.fillStyle='#333'; cx.beginPath(); cx.arc(sh.x,sh.y,4,0,7); cx.fill(); }
+    if(sh.k==='rocket'){ cx.fillStyle='#333'; cx.beginPath(); cx.arc(sh.x,sh.y,sh.big?7:4,0,7); cx.fill(); }   // 0242: the BIG ONE reads fat in the air
     else if(sh.k==='beam'){
       // 0121 the lightning cannon's wipe — drawn off the SAME angle math the
       // sim queues hits with, so the light crosses a man exactly when he pays.
