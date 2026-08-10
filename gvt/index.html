@@ -2385,7 +2385,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.96</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.97</div>
   <div class="scanlines"></div>
 </div>
 
@@ -18520,7 +18520,18 @@ function coopOnPoll(r, sentWant){
     // ⚠ role is the wire IDENTITY and the cmds filter below reads it — set it
     // BEFORE replaying anything, or a re-seated client applies its own orders twice.
     if(typeof r.seat==='number'){ COOP.seat=r.seat; COOP.role=String(r.seat); }
+    const wasHost=COOP.host;                    // v2.96 (squads audit F7): the chair before this poll
     COOP.host=!!r.host;                        // the chair can change hands mid-match
+    // v2.96 (squads audit F7): a guest PROMOTED to host (the old host dropped in
+    // a level's final seconds; lobby_prune hands the chair over) in a CAMPAIGN
+    // whose crate ALREADY fell must re-judge the win it inherited. campCrateFall's
+    // victory callback is guest-gated and one-shot, so it skipped while I was a
+    // guest; nobody else speaks now, and coopGuest() has just flipped false under
+    // the lives-loss writer — so an already-WON level could otherwise record as a
+    // LOSS. tanBase.dead is the crate-is-down signal (set the instant it falls,
+    // before the 900ms ceremony) and is campaign-only (a room battle has none).
+    if(!wasHost && COOP.host && S.coop && S.mode==='play' && !S.bf
+       && S.tanBase && S.tanBase.dead && !S.cleared){ S.cleared=true; endBattle(true); }
     // v2.95: adopt HQ's roster revision; when members is absent (our mrev
     // matched, battle only) the guard below simply keeps the roster we hold.
     if(typeof r.mrev==='number') COOP.mrev=r.mrev;
@@ -19684,7 +19695,14 @@ function crewSt(){
   if(CREW.vsRoom && COOP && coopRoom() && COOP.code===CREW.vsRoom && wartableOpen())
     return { st:'bfFill', info:{ room:CREW.vsRoom, map:String(COOP.map||''), size:1, vs:String(CREW.vsAim||'') } };
   if(BFQ && BFQ.crewRoom) return { st:'bfFill', info:{ room:BFQ.crewRoom, map:String(BFQ.mapId||''), size:BFQ.size|0 } };
-  if(COOP && coopSquad() && COOP.code) return { st:'campQ', info:Object.assign({ lobby:COOP.code },
+  // v2.96 (squads audit F1): the parked squad lobby must NOT claim campQ while
+  // I'm standing at the war table. coopTick keeps an idle lobby fresh every 2s
+  // after any campaign muster, so without this gate a battleground fill reports
+  // campQ forever — the v2.82 bubbles (which filter wtQ‖bfFill) and the v2.87 VS
+  // pill (which needs wtQ) both go dark for the whole session. The war-table
+  // branch below now catches me; the campaign scene (wartableOpen()==false)
+  // still reports campQ with its deploy wish exactly as before.
+  if(COOP && coopSquad() && COOP.code && !wartableOpen()) return { st:'campQ', info:Object.assign({ lobby:COOP.code },
     CREW.campGo===COOP.code? Object.assign({go:1}, CREW.campGoLvl? {golvl:CREW.campGoLvl|0} : {}) : {}) };   // v2.69: my deploy wish rides my presence (v2.73: with its replay level)
   if(campSceneOpen()) return { st:'campQ', info:{} };
   if(wartableOpen()) return { st:'wtQ', info:{} };   // v2.82 Law 2: standing on the battlegrounds screen — the box learned 'wtQ' in the same-day patch; an unpatched box just blanks it (online-idle)
@@ -20221,7 +20239,14 @@ function crewCampBoom(n){
   // the decision rides FRESH truth, never the last tick's snapshot — a tap
   // two seconds after a buddy walks onto the scene must still take them both
   // (the stale read silently downgraded exactly that tap to a solo start)
-  if(!CREW.crew || !campSceneOpen()) return Promise.resolve(false);
+  if(!campSceneOpen()) return Promise.resolve(false);
+  // v2.96 (squads audit N-20179): a CODE-SQUAD (coopSquad with a code but NO
+  // persistent crew — the front-door START/ENTER A SQUAD pair) musters through
+  // COOP, not the crew roster. It used to bail here on !CREW.crew and silently
+  // start a SOLO campaign, abandoning the mate the moment a replay chip or the
+  // scene DEPLOY was tapped. Admit it: there is no crew roster to refresh (COOP's
+  // own tick keeps its members fresh), so route straight to the launch decision.
+  if(!CREW.crew) return Promise.resolve((COOP && coopSquad() && COOP.code) ? crewCampBoomNow(n) : false);
   const st=crewSt();
   return crewPost('poll',{st:st.st, info:st.info}).then(r=>{
     if(r && r.ok){ if(r.me) CREW.me=r.me;
@@ -20230,7 +20255,10 @@ function crewCampBoom(n){
   }).catch(()=>crewCampBoomNow(n));
 }
 function crewCampBoomNow(n){
-  if(!CREW.crew || !campSceneOpen()) return false;
+  // v2.96 (squads audit N-20179): admit a code-squad muster (coopSquad + code)
+  // alongside a persistent crew — the existing coopSquad() launch path below
+  // then runs for it instead of falling through to a solo start.
+  if((!CREW.crew && !(COOP && coopSquad() && COOP.code)) || !campSceneOpen()) return false;
   crewShedRoom(true);                    // v2.73: the DEPLOY tap outranks any parked room
   if(crewCoopLive() && !coopSquad()) return false;   // a room mid-battle/order: the tap stays a plain solo start
   const q=(CREW.members||[]).filter(m=>m.uid!==CREW.me && m.st==='campQ');
