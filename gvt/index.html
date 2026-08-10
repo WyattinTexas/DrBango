@@ -2351,7 +2351,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.84</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.85</div>
   <div class="scanlines"></div>
 </div>
 
@@ -28517,13 +28517,26 @@ function fingerTap(x,y){
   const c=(coach.t%0.95)/0.95, press=c<0.3? 1-c/0.3 : 0;
   drawFinger(x,y+4*Math.sin(c*6.28),press);
 }
+// v2.85 (Wyatt 8/9, the iPad night: "the finger tutorial was not on top of
+// the unit buttons — just to the left"): 236,540 WAS the rifleman card's
+// centre — on the 960 rug the coach was written for. v1.40's long front
+// (W=CAMP_W) slid the tray 140px right and the constant kept lifting bare
+// floor on every virgin device since (once per device, so nobody's veteran
+// save ever replayed it). The anchor is the tray's OWN rect now: drawHUD
+// rebuilds trayRects every frame before drawCoach runs in the same pass, so
+// the finger rides the live card through resize, orientation and whatever
+// roster the save owns — never a constant again.
+function coachCardXY(t){
+  const i=TRAY().findIndex(s=>s.t===t), r=i>=0? trayRects[i] : null;
+  return r? { x:r[0]+r[2]/2, y:r[1]+r[3]/2 } : { x:236, y:540 };
+}
 function drawCoach(){
   if(!coach||S.mode!=='play') return;
   // ⚠ the finger stays INSIDE the deploy half (v1.31 drew it at x=620, which
   // canPlace refuses since the crate shipped — a coach must never demonstrate
   // an illegal drop)
-  if(coach.step===1){ coachPill('DRAG A RIFLEMAN ONTO THE CARPET'); fingerDrag(236,540,400,280); }
-  else if(coach.step===2){ coachPill('ADD A SECOND SOLDIER — TWO GUNS BEAT ONE'); fingerDrag(236,540,400,390); }
+  if(coach.step===1){ coachPill('DRAG A RIFLEMAN ONTO THE CARPET'); const c=coachCardXY('rifleman'); fingerDrag(c.x,c.y,400,280); }
+  else if(coach.step===2){ coachPill('ADD A SECOND SOLDIER — TWO GUNS BEAT ONE'); const c=coachCardXY('rifleman'); fingerDrag(c.x,c.y,400,390); }
   else if(coach.step===3){ coachPill('DIG IN — THE TAN ARE ALREADY ON THE WAY'); }
   else if(coach.step===4){
     // no finger — there is nothing to tap. The man tipped over; the pill says why.
@@ -31132,6 +31145,11 @@ const ROOM_SPOTS=[
 // under the 46px header band; the load path's whitelist purge guarantees no
 // core-button key can reach that object from any era's save.
 const RDRAG_T=10;
+// v2.85 (Wyatt 8/9, the iPad night): the TOUCH slop. 10 screen px is mouse
+// precision — a kid's finger rolls 2-3× that just pressing down, so on touch
+// every tap classified as a drag and the tap branch was unreachable (the
+// racecar's "not clickable"). A pen is a mouse: it doesn't wobble.
+const RDRAG_TT=26;
 // the victory men's grab rects (base ink, pre-delta), keyed to their vt slot
 // — the plain x/y/w/h their <image> tags declare in roomVictory. v2.17: vt0,
 // the bed sleeper, is REMOVED (Wyatt 8/3: "One of the army men is upside
@@ -31194,6 +31212,24 @@ function rdragPick(p){
   }
   return null;
 }
+// v2.85: the TAP-ONLY react family — the fixed toys (banana, helmet,
+// warplane, the space-rug planet), the wandering robot and the block tower
+// never drag, but their taps died the same iOS death the draggable six did
+// (touch-action:none + a rolled finger = no click synthesized, ever).
+// Claimed off the browser's OWN hit test (e.target), never geometry, so an
+// overlapped door keeps winning exactly the taps it already won; the claim
+// does nothing at all unless the release comes back sub-slop. The comets
+// stay OUT on purpose: a comet tap is a flight-gated secret whose handler
+// reads its own event, not a toy react to synthesize.
+function rdragTapPick(e){
+  const t=e.target; if(!t || !t.closest) return null;
+  if(t.closest('#decRobot'))  return { k:'robot',  tapOnly:true };
+  if(t.closest('#tblocks'))   return { k:'blocks', tapOnly:true };
+  const dv=t.closest('[id^="dspot-"]');
+  if(dv){ const k=dv.id.slice(6);
+    if(DECOR_REACT[k] && RDRAG_DECOR.indexOf(k)<0) return { k:k, tapOnly:true }; }
+  return null;
+}
 // paint one object at [dx,dy]: SVG wrapper + (for a toy) its tap anchor, all
 // re-queried by id (the repaint self-heal law above). v2.18: the rspot/rtag
 // branch is GONE with the doors' draggability — k can only name a troop or a
@@ -31207,9 +31243,38 @@ function rdragApply(k, dx, dy){
   if(dp){ const dv=document.getElementById('dspot-'+k);
     if(dv){ dv.style.left=(dp.x+dx)+'px'; dv.style.top=(dp.y+dy)+'px'; } }
 }
-function rdragEnd(){
-  const d=RDRAG; RDRAG=null;
-  if(!d || !d.moved) return;
+function rdragEnd(e){
+  const d=RDRAG; if(!d) return;
+  // v2.85: the claim ends only with its OWN pointer — a resting second
+  // finger's lift must neither drop a live drag nor mint a phantom tap
+  if(e && e.pointerId!==undefined && d.pid!==undefined && e.pointerId!==d.pid) return;
+  RDRAG=null;
+  if(!d.moved){
+    // ===== v2.85 THE SYNTHESIZED TAP (Wyatt 8/9, the iPad night: "the race
+    // car was not clickable… you could never get the animation to happen").
+    // touch-action:none means iOS never PROMISES a click after a finger that
+    // rolled, and a kid's press rolls past the old 10px slop nearly every
+    // time — the gesture became a hair-width drag whose release eater then
+    // swallowed the one click iOS did send: blip on the drop, animation
+    // never. The tap is the controller's own now: a sub-slop pointerup IS
+    // the tap for every reacting toy, mouse/pen/touch alike, and the eater
+    // here is a TARGETED one-shot — it swallows only the browser's own late
+    // click on the same toy (no double react) while an honest next tap on
+    // anything else sails through. Troops deliberately DON'T synthesize: a
+    // sub-slop tap on a man falls through to the door he stands on, exactly
+    // as shipped (Sarge lives inside the campaign hotspot). A pointercancel
+    // is never a tap.
+    if(e && e.type==='pointerup' && (d.k==='blocks' || DECOR_REACT[d.k])){
+      const tgt = d.k==='blocks'? document.getElementById('tblocks')
+                : d.k==='robot'?  document.getElementById('decRobot')
+                : document.getElementById('dspot-'+d.k);
+      const eat=ev=>{ if(tgt && (ev.target===tgt || tgt.contains(ev.target))){ ev.stopPropagation(); ev.preventDefault(); } };
+      document.addEventListener('click', eat, {capture:true, once:true});
+      setTimeout(()=>document.removeEventListener('click', eat, {capture:true}), 350);
+      if(d.k==='blocks') UI.blocksTap(); else UI.decorTap(d.k);
+    }
+    return;
+  }
   // the release must not land as a tap — one timed capture-phase swallow (a
   // drag that ends off its element fires no click at all, so the eater
   // EXPIRES rather than lying in wait for the next honest tap)
@@ -31225,13 +31290,19 @@ document.addEventListener('pointerdown', e=>{
   if(RDRAG || !e.isPrimary || S.mode!=='menu') return;
   const st=document.getElementById('roomStage'); if(!st || !st.contains(e.target)) return;
   const p=rdragPt(e); if(!p) return;
-  const hit=rdragPick(p); if(!hit) return;
-  RDRAG={ k:hit.k, base:hit.base, x0:e.clientX, y0:e.clientY, d0:rpXY(hit.k), moved:false };
+  const hit=rdragPick(p) || rdragTapPick(e);
+  if(!hit) return;
+  RDRAG={ k:hit.k, base:hit.base, tapOnly:!!hit.tapOnly, pid:e.pointerId,
+          sl:(e.pointerType==='touch'? RDRAG_TT : RDRAG_T),
+          x0:e.clientX, y0:e.clientY, d0:rpXY(hit.k), moved:false };
 });
 document.addEventListener('pointermove', e=>{
   if(!RDRAG || !e.isPrimary) return;
   const mx=e.clientX-RDRAG.x0, my=e.clientY-RDRAG.y0;
-  if(!RDRAG.moved && mx*mx+my*my < RDRAG_T*RDRAG_T) return;
+  if(!RDRAG.moved && mx*mx+my*my < RDRAG.sl*RDRAG.sl) return;
+  // a fixed toy has no drag to become — past the slop the claim just lets
+  // go (nothing lifted, nothing eaten; the gesture is whatever it always was)
+  if(RDRAG.tapOnly){ RDRAG=null; return; }
   RDRAG.moved=true;
   e.preventDefault();
   const p=rdragPt(e); if(!p) return;
