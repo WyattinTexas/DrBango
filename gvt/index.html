@@ -2383,7 +2383,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.87</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v2.88</div>
   <div class="scanlines"></div>
 </div>
 
@@ -11701,9 +11701,21 @@ let WORLD_H=600;
 const BASE_HP=70, DROP_T=2, MID_BUFFER=120, BF_MAX_TEAM=10;
 function bfWidth(team){ return 1920+(team-1)*128; }
 function bfClockFor(team){ return Math.min(150, 90+(team-1)*8); }
+// v2.88 2V2 BASE −30% (Wyatt 8/9, card 0239): "when you do a 2v2, the health of
+// both bases should be reduced by about 30" — winning PRETTY WELL should end a
+// 2v2 by razing before its 98s clock; only a genuinely even match should see
+// the final seconds. His "2v2" is EVERY battlefield sim at team size 2 — the
+// squad queue-together room the kids play (two humans one side), a friend room
+// booked at 2, the walk-up door's own 2v2 pick — because they are all the one
+// startBattlefield(team=2) sim reading this very function. Team 1 (walk-up
+// 1v1, the daily raid, the ⚔ VS duel room) and sizes 3-10 keep their numbers
+// to the byte, and the campaign crate reads CAMP_BASE_HP, nowhere near this.
+// Both bases wear the same bhp, so the cut is symmetric by construction:
+// 118 → 82. A let + GVT.bf2v2Mul(m) so Wyatt can tune without a deploy.
+let BASE_HP_2V2_MUL=0.7;
 // per-purse leak pressure scales with the enemy team, so the box toughens with
 // it — sub-linear, so a genuinely cracked lane still knocks one out
-function bfBaseHP(team){ return Math.round(BASE_HP*Math.pow(team,0.75)); }
+function bfBaseHP(team){ return Math.round(BASE_HP*Math.pow(team,0.75)*(team===2?BASE_HP_2V2_MUL:1)); }
 // 20 seats at 10v10 need 20 readable colours: the ten ARMIES plus these spares,
 // each hand-picked to clear hexNear() against the rest of the palette
 const BF_EXTRA_HEX=['#E890C8','#9CC24E','#6FC7E8','#223E7A','#96703F','#C24AC2','#F0E858','#7A2E2E','#1E6E62','#8EE8B0','#B0A0E0'];
@@ -36234,6 +36246,11 @@ window.GVT = {
   bfEnd(r){ endBattlefield(r||'time'); },
   bfCash(n){ S.plastic=n; if(S.bf) S.bf.seats.forEach(st=>{ if(!st.human) st.purse=n; }); },
   bfClock(t){ if(S.bf) S.bf.timeLeft=t; },
+  // v2.88 (card 0239): the 2v2 base-HP dial. Call bare to read; session-local,
+  // so a console tune never writes into a kid's save. Answers the number the
+  // next 2v2 will actually deal, so a tune reads back as hp on the spot.
+  bf2v2Mul(m){ if(typeof m==='number'&&isFinite(m)&&m>0&&m<=2) BASE_HP_2V2_MUL=m;
+    return { mul:BASE_HP_2V2_MUL, hp2v2:bfBaseHP(2) }; },
   bfCam(x,y){ if(S.bf){ S.bf.cam.x=clampCam(x); S.bf.cam.vx=0;
     if(y!=null){ S.bf.cam.y=clampCamY(y); S.bf.cam.vy=0; } } return S.bf&&S.bf.cam.x; },
   // ---- WESTERN LAND RIG (v1.57) ----
