@@ -14328,7 +14328,8 @@ function cmdoOwned(){ return META.campaign>=CMDO_LVL; }
 // Every number below is a proposal logged for Wyatt, one line each.
 const SPY_CLOAK=4;         // Wyatt verbatim: "invisible for the first 4 seconds"
 const SPY_CLOAK_RANK=0.03; // "upgrades his invisibility time, but only very slightly" — +0.03s per full-value rank through the v1.17 taper (rank 10 = 4.3s, rank 100 ≈ 4.74s)
-const SPY_DMG_RANK=0.01;   // "and his damage by about 1% with each level up" (everyone else's slope is 0.1; the commando precedent at 0.02)
+const SPY_DMG_RANK=0.02;   // 8/10 late (Wyatt, card 0243: "the spy needs to gain damage... slowly"): 1% -> the commando's own elite slope — rank 100 lands x1.494; the CLASSINFO number-hole and BOTH co-op um derivations quote this const, so the card and the wire move with it
+const SPY_CRIT_RANK=0.005; // 0243: "...and crit slowly" — HALF the trigger-men's slope; rank 100 = 11.4% after CRIT_SCALE, comfortably under the 20% law
 function spyOwned(){ return !!META.spy; }
 // my spy's cloak reads my rank; a relayed ally's derives from the um his
 // order already carries (um = 1 + SPY_DMG_RANK×ru, so ru crosses the wire
@@ -21513,6 +21514,13 @@ function hurt(f,dmg,src){
 // Sarge's rank-100 68.8%→63.3%, the trigger-men's rank-100 29.7%→27.3%.
 const CRIT_MULT=2;
 const CRIT_SCALE=0.92;
+// 8/10 late THE 20% LAW (Wyatt, card 0243, verbatim: "at level 100, I don't
+// want anyone critting more than 20%. That's not a sarge. Only the sarge has
+// that privilege.") — every non-Sarge roll is ceilinged at critChance's return,
+// AFTER the orange gear point, so nothing stacks past it. The trigger-men's
+// shipped slope rides untouched to rank ~57 (where 0.92·1%·u crosses 20) and
+// holds 20.0% to the summit — ranks 0-57 byte-identical, the v1.17 law held.
+const CRIT_UNIT_MAX=0.20;
 // the field manual quotes the base odds as "one shot in N" — N comes off the
 // same knob (the v1.29 law), so the prose cannot drift from the mechanic
 const CRIT_ONE_IN=Math.round(1/(0.05*CRIT_SCALE));
@@ -21528,11 +21536,13 @@ function critChance(u){
   // (the BF AI's stock seats included), and every rank buys back what it
   // always did. The orange beam's +1 point below is gear, not base — kept.
   if(u.type==='sarge'){ sw=unitSargeStats(u); c=CRIT_SCALE*Math.min(0.75, 0.05*rankUnitsFast(sw.r||0)); }
-  else if(u.type!=='rifleman' && u.type!=='mgunner') return 0;
-  else { const r=(S.bf && !bfHumanU(u))? 0 : (META.up[u.type]||0); c=CRIT_SCALE*(0.01*rankUnits(r)); }
+  else if(u.type!=='rifleman' && u.type!=='mgunner' && u.type!=='spy') return 0;   // 0243: the spy joins the crit club — the silenced round learns the seam
+  else { const r=(S.bf && !bfHumanU(u))? 0 : (META.up[u.type]||0); c=CRIT_SCALE*((u.type==='spy'?SPY_CRIT_RANK:0.01)*rankUnits(r)); }   // 0243: spy at half slope
   if(lzOf(u)==='orange') c+=LZ_CRIT;
   if(sw && sw.cz==='orange') c+=LZ_CRIT;   // cz only ever exists behind a saber (outfitTune's gate)
-  return Math.min(0.75, c);
+  // 0243 THE 20% LAW: Sarge alone keeps the 75 ceiling — everyone else's
+  // ladder AND gear together stop at CRIT_UNIT_MAX, exactly as ordered.
+  return Math.min(u.type==='sarge'?0.75:CRIT_UNIT_MAX, c);
 }
 function rollCrit(u){ return Math.random() < critChance(u); }
 // v2.36 THE TEAL BEAM/CRYSTAL: crits land 10% harder — one reader beside
