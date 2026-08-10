@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v10.0 -->
+<!-- TRAINSET v10.1 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -629,6 +629,18 @@
   body.conductor :is(#mark,#mute,#menuChip,#backChip,#starChip,#homeChip,#rideChip,#goalChip){ opacity:0; pointer-events:none; }
   body.conductor #rail{ opacity:0; }
   body.conductor #rail *{ pointer-events:none; }
+  /* ---- E80 THE VICTORY LAP: the level is WON and the train is going around —
+     the WHOLE stage clears. The conductor's fold plus the pocket chips and the
+     toast: every piece of chrome fades and goes deaf until the clouds mount
+     the next level or the level is left. The celebration is canvas (cards,
+     stars, confetti, clouds) and rides on untouched; the finale's one BACK TO
+     THE BOARD button is the only DOM survivor — a book's end still needs its
+     door (and #rot stays exempt: a device gate outranks any show). winShySync
+     is the class's one writer. ---- */
+  body.winstage :is(#mark,#mute,#menuChip,#backChip,#starChip,#homeChip,#rideChip,#goalChip,#zbtns,#wxChip,#trainChip,#toast){ opacity:0; pointer-events:none; }
+  body.winstage :is(#rail,#magic,#spread){ opacity:0; }
+  body.winstage :is(#rail,#magic,#spread) *{ pointer-events:none; }
+  body.winstage #cornerHot{ display:none !important; }   /* the E72 peek rule's :not(.cornerout) outguns one class — the stage law outranks it */
   /* ---- E72 THE PEEKING CORNER (Wyatt 8/8: "half on the screen… move them
      over so you can see half of their image… if they click near the top
      right… the UI comes out to where it is now… click somewhere else or
@@ -1336,6 +1348,7 @@ const TBOX_PX=36;              // box face size ×--ui (~72px closed at the desk
 const TBOX_BREATH_S=4.5;       // seconds between idle lid breaths — a quiet pick-me, never a modal
 const SHY_GAME=true;           // THE SHY FOLD: chrome fades while a drag or a real pan is live
 const SHY_GAME_MS=250;         // the fold's fade, ms (--shygame)
+const WIN_SHY=true;            // E80 THE VICTORY LAP: a won level clears the whole stage — chrome returns with the next level
 const QUIET=true;              // E61 THE QUIET RUG: on the wind-up rug a resting hand melts ALL the chrome
 const QUIET_MS=5000;           // ...after this long with no touch (any poke brings it back at once)
 /* E62 POCKET BUTTONS — "you hit a button, boom it pops up, then it goes away."
@@ -11697,6 +11710,8 @@ function campWin(){
   const firstClear=!bookDone().has(CAMP.level);   // E9: +10★ rides the FIRST clear only (E50: per book)
   CAMP.won=true; bookDone().add(CAMP.level); setWip(CAMP.book,null);
   CWIPE.armed=1;   // E66: when the stuff is collected, the clouds come
+  bankShow(false); storeShow(false); boxShow(false);   // E80: a panel standing over the moment folds with the chrome
+
   winT=3.6; SND.bugle(); SND.whistle();
   voiceAt('win');   // E12: "You did it" — NOT gated on firstClear; the celebration is not the reward
   if(firstClear) starMint(MINT.clear, GX+GW*C/2, GY+GH*C/2);   // on top of the level's toy bundle
@@ -13981,6 +13996,15 @@ function shyGameSync(){        // THE SHY FOLD — one truth, read every frame, 
     ( !!DRAG || !!PINCH || !!(down&&down.what==='pan'&&down.on) );
   if(on!==SHYG.on){ SHYG.on=on; document.body.classList.toggle('shygame',on); }
 }
+/* E80 THE VICTORY LAP — the level is won and the train is going around: the
+   whole stage clears (the shy grammar: one truth, read every frame, writes
+   only on change). No clock and no new state of its own — campEnter (the
+   clouds' flip included) and campExit end the fold by ending the won state. */
+const WINS={on:false};
+function winShySync(){
+  const on=WIN_SHY && SCREEN==='game' && CAMP.on && CAMP.won;
+  if(on!==WINS.on){ WINS.on=on; document.body.classList.toggle('winstage',on); }
+}
 /* E61 THE QUIET RUG — on the wind-up rug a resting hand melts the chrome.
    Read every frame like the shy fold; writes only on change. A live hand,
    a knob mid-drag or an open panel holds the clock; any pointer/wheel is
@@ -16151,6 +16175,7 @@ function frame(t){
   }
   if(DRAG) withBed(dragSync);          // E19: the lift ramp is paint-time — it rises under a still finger
   shyGameSync();                       // E25: the shy fold reads the live hand every frame
+  winShySync();                        // E80: the victory lap reads the won state every frame
   quietSync();                         // E61: the quiet rug reads the resting hand every frame
   tboxBreath(t);                       // E25: the idle lid sigh — paint only, never a save
   if(SCREEN==='game'||SCREEN==='play') draw(); else if(SCREEN==='room') drawBig(); else drawMenu();
