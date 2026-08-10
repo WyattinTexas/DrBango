@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v9.8 -->
+<!-- TRAINSET v9.9 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -206,7 +206,11 @@
     font-size:calc(var(--ui)*8px); line-height:1; padding:calc(var(--ui)*1px) 0 calc(var(--ui)*2px);
     text-shadow:0 1px 2px rgba(0,0,0,0.6); visibility:hidden; }
   #tbshelves .rgrp,#tbshelves #shelf,#tbshelves #shelfCars,#tbshelves #shelfEng{ display:contents; }
-  #tbshelves #shelfTrain{ display:none; }   /* E27: the eager train answered this ritual */
+  /* E78: the tap source returns — E27 hid the train here (the eager train answered
+     the drag ritual); TAP-TO-PLACE gives the tile a job again: one wide card
+     spanning the rail's two columns, the whole consist on its face. */
+  #tbshelves #shelfTrain{ grid-column:1/-1; justify-self:stretch; width:auto; }
+  #tbshelves #shelfTrain canvas{ width:calc(var(--ui)*var(--bc,35)*2.02px); height:calc(var(--ui)*var(--bc,35)*0.95px); }
   #tbshelves .pbtn{ width:calc(var(--ui)*var(--bc,35)*1px); }
   #tbshelves .pbtn canvas{ width:calc(var(--ui)*var(--bc,35)*0.7*1px); height:calc(var(--ui)*var(--bc,35)*0.7*1px); }
   #tbshelves .pbtn small{ font-size:calc(var(--ui)*var(--bc,35)*0.17*1px); }
@@ -1383,6 +1387,7 @@ const PLAY_RESPAWN=2;                // the NEVER-EMPTY law: seconds till a fres
 const TRAY_ORDER=['red','yellow','blue','green','purple'];  // tray colour order (E7's toy-box unlocks are IGNORED here — play shows all five, always)
 const CRASH_TUMBLE=0.8;              // seconds of squash-and-tumble before a crashed train is gone
 const PLAY_CLEAR=70;                 // px of loop arc a spawn must keep clear of every train (the spawn law's floor)
+const SNAP_R=1.5;                    // E78 THE GENEROUS SNAP — cells: a train dropped this near the track IS on the track (err generous)
 const PLAY_HOME_CARS=['tender','box'];        // the resident red train: loco + tender + boxcar, speed ×1
 const PLAY_POOL=['box','tank','flat','cab'];  // tray spawns tow 1-2 random cars from this pool
 // ---- Wyatt dials (EXPANSION 17 — one block) ----
@@ -12022,8 +12027,10 @@ function playYay(tr){            // the downhill whoosh, per train — arms UP +
 // LONGEST walk is the ruler. On a pristine glued map this is byte-identical
 // to the old station-seeded walk. Re-derived after every PLAY track edit so a
 // spawn can never materialize on a removed cell.
-function buildLoopMap(){
-  const M=playMap();
+// E78: the walk factored out as lineWalk(start) — buildLoopMap keeps its name
+// and its one writer's job (PLAY.loop), and TAP-TO-PLACE asks the SAME ruler
+// about the BUILD/campaign board (start=null: a station seg anchors home).
+function lineWalk(start){
   const sig=r=>r.cx+','+r.cy+':'+(r.el?1:0)+':'+r.pi+':'+r.dir;
   const seeds=[];
   for(const [k,pc] of grid){ if(pc.t==='ref') continue; seeds.push([k,pc]); }
@@ -12061,53 +12068,65 @@ function buildLoopMap(){
     for(const sg of segs) cov.add(sg.k+':'+sg.el+':'+sg.pi);
     if(!best||d>best.len) best={segs,len:d,closed};
   }
-  if(!best||!best.segs.length){ PLAY.loop=null; return; }
+  if(!best||!best.segs.length) return null;
   const by=new Map(); for(const sg of best.segs) by.set(sg.k+':'+sg.el+':'+sg.pi,sg);
-  const home=by.get(key(M.start[0],M.start[1])+':0:0')
+  const home=(start? by.get(key(start[0],start[1])+':0:0') : null)
     ||best.segs.find(sg=>{ const p2=by.get(sg.k+':'+sg.el+':'+sg.pi); if(!p2) return false;
       const [sx,sy]=sg.k.split(',').map(Number); const spc=sg.el? pieceHi(sx,sy):pieceAt(sx,sy);
       return spc&&spc.t==='st'; });
-  PLAY.loop={ segs:best.segs, by, len:best.len, home: home? home.d0+home.len/2 : 0, closed:best.closed };
+  return { segs:best.segs, by, len:best.len, home: home? home.d0+home.len/2 : 0, closed:best.closed };
 }
+function buildLoopMap(){ PLAY.loop=lineWalk(playMap().start); }
 const playLoopSync=()=>{ if(PLAY.on) buildLoopMap(); };   // E58: every PLAY track edit re-rules the line
-const loopCoord=rd=>{
-  const sg=PLAY.loop && PLAY.loop.by.get(key(rd.cx,rd.cy)+':'+(rd.el?1:0)+':'+rd.pi);
+const loopCoord=(rd,lp=PLAY.loop)=>{           // E78: any ruling can ask now — default stays the wind-up rug's
+  const sg=lp && lp.by.get(key(rd.cx,rd.cy)+':'+(rd.el?1:0)+':'+rd.pi);
   return sg? sg.d0+(sg.dir>0? rd.s : sg.len-rd.s) : null;
 };
-function riderAt(d){                  // materialize a rider at loop coordinate d
-  const L=PLAY.loop.len; d=((d%L)+L)%L;
-  for(const sg of PLAY.loop.segs){
+function riderAt(d,lp=PLAY.loop){     // materialize a rider at loop coordinate d
+  const L=lp.len; d=((d%L)+L)%L;
+  for(const sg of lp.segs){
     if(d<sg.d0||d>sg.d0+sg.len) continue;
     const off=d-sg.d0, [x,y]=sg.k.split(',').map(Number);
     return {cx:x,cy:y,pi:sg.pi,dir:sg.dir,s:sg.dir>0? off : sg.len-off,el:sg.el};
   }
-  const sg=PLAY.loop.segs[PLAY.loop.segs.length-1], [x,y]=sg.k.split(',').map(Number);
+  const sg=lp.segs[lp.segs.length-1], [x,y]=sg.k.split(',').map(Number);
   return {cx:x,cy:y,pi:sg.pi,dir:sg.dir,s:sg.dir>0?sg.len:0,el:sg.el};
 }
 // THE SPAWN LAW: the new train lands on the free stretch FARTHEST from every train —
 // maximize the minimum arc distance over every car it will drop — and never into a
 // cell any rider occupies RIGHT NOW (the diamond shares one cell between two arcs
 // that are far apart on the ruler, so arc distance alone isn't enough).
-function playSpot(n){
-  if(!PLAY.loop||!PLAY.loop.segs.length) return null;   // E58: no track = no seat (the rug re-asks every ~2s)
-  const L=PLAY.loop.len, occ=[], cells=new Set();
-  for(const tr of PLAY.trains){ if(tr.dying) continue;
-    for(const c of tr.cars){ const lc=loopCoord(c.rd); if(lc!=null) occ.push(lc);
+// E78 — THE SAFE STRETCH PICKER: that law, one brain, shared by TAP-TO-PLACE and
+// THE GENEROUS SNAP alike. lp = a lineWalk ruling · trs = the running trains to
+// keep clear of · n = cars to seat · nearD:
+//   null  → the free stretch FARTHEST from everyone (the tap: "pick an area
+//           where it won't collide right away"),
+//   coord → the nearest FREE stretch to that coord (the snap's landing — never
+//           INTO a running train; that crash would be ours, not the kid's).
+// Both modes refuse (null) when no stretch keeps PLAY_CLEAR of every train.
+function stretchPick(lp,trs,n,nearD){
+  if(!lp||!lp.segs.length) return null;       // E58: no track = no seat (the rug re-asks every ~2s)
+  const L=lp.len, occ=[], cells=new Set();
+  for(const tr of trs){ if(tr.dying) continue;
+    for(const c of tr.cars){ const lc=loopCoord(c.rd,lp); if(lc!=null) occ.push(lc);
       cells.add(key(c.rd.cx,c.rd.cy)+':'+(c.rd.el?1:0)); } }
-  if(!occ.length) return PLAY.loop.home;      // an empty rug: the resident's home straight
+  if(!occ.length) return nearD!=null? nearD : lp.home;   // an empty line: the drop's own stretch, or the home straight
   let best=-1, bestD=null;
   const STEPS=Math.max(96,Math.round(L/12));
   for(let i=0;i<STEPS;i++){
     const d0=L*i/STEPS; let mn=Infinity, ok=true;
     for(let ci=0;ci<n;ci++){
-      const dc=((d0-ci*GAP)%L+L)%L, r=riderAt(dc);
+      const dc=((d0-ci*GAP)%L+L)%L, r=riderAt(dc,lp);
       if(cells.has(key(r.cx,r.cy)+':'+(r.el?1:0))){ ok=false; break; }
       for(const o of occ){ const ad=Math.abs(dc-o), dd=Math.min(ad,L-ad); if(dd<mn) mn=dd; }
     }
-    if(ok&&mn>best){ best=mn; bestD=d0; }
+    if(!ok||mn<PLAY_CLEAR) continue;
+    const sc=nearD!=null? L-Math.min(Math.abs(d0-nearD),L-Math.abs(d0-nearD)) : mn;   // near: closest wins · far: clearest wins
+    if(sc>best){ best=sc; bestD=d0; }
   }
-  return best>=PLAY_CLEAR? bestD : null;
+  return bestD;
 }
+function playSpot(n){ return stretchPick(PLAY.loop,PLAY.trains,n,null); }   // the spawn law, unchanged through the one picker
 // E16 — the loop coordinate under a rug cell (mid-piece), or null off the line.
 // E32 — the finger follows BUILD's law (the E4 audit): pieceTop resolves the
 // drop to the VISIBLE deck, so an over/under cell lands the train on the
@@ -12124,6 +12143,33 @@ function playDropD(cell){
   const el=(pc.elev|0)?1:0;
   for(const sg of PLAY.loop.segs) if(sg.k===k2&&sg.el===el) return sg.d0+sg.len/2;
   return null;
+}
+// E78 — THE GENEROUS SNAP, the wind-up finder: the nearest RULED cell within
+// SNAP_R cells of the drop point (world units; a high deck is measured where
+// the child sees it — the E32 finger law's spirit). Returns that stretch's
+// coord for the picker to keep clear of every running train, or null when the
+// drop is honestly far (the remove/return law keeps its whole meaning).
+function playSnapD(wx,wy){
+  if(!PLAY.loop) return null;
+  let bd=SNAP_R*C, bestD=null;
+  for(const sg of PLAY.loop.segs){
+    const i=sg.k.indexOf(','), x=+sg.k.slice(0,i), y=+sg.k.slice(i+1);
+    const d=Math.hypot(wx-(GX+x*C+C/2), wy-(GY+y*C+C/2-(sg.el?LIFT:0)));
+    if(d<bd){ bd=d; bestD=sg.d0+sg.len/2; }
+  }
+  return bestD;
+}
+// ...and the BUILD/campaign finder: the nearest track CELL within SNAP_R of
+// the drop (grid + high grid; spiral stubs count — placeTrainAt derefs them).
+function snapCell(wx,wy){
+  let bd=SNAP_R*C, best=null;
+  const look=(k,el)=>{
+    const i=k.indexOf(','), x=+k.slice(0,i), y=+k.slice(i+1);
+    const d=Math.hypot(wx-(GX+x*C+C/2), wy-(GY+y*C+C/2-(el?LIFT:0)));
+    if(d<bd){ bd=d; best=[x,y]; } };
+  for(const k of grid.keys()) look(k,0);
+  for(const k of hgrid.keys()) look(k,1);
+  return best;
 }
 // THE HAND PLACES THE TRAIN (E16, was: the tap is the whole gesture): a tray train
 // dragged onto the line lands AT THE DROP CELL (atD) and runs. The old farthest-
@@ -13020,9 +13066,14 @@ function upCore(e){
     }
     else if(DRAG.kind==='train'){
       let placedOk=false;
-      if(hover && pieceTop(hover[0],hover[1])){
+      // E78 THE GENEROUS SNAP — near the track IS the track: a miss within
+      // SNAP_R cells re-aims at the nearest track cell (one train boards this
+      // board, so the drop point's own stretch is free by construction); a
+      // direct hit keeps today's exact landing.
+      const tcell=(hover && pieceTop(hover[0],hover[1]))? hover : snapCell(wx,wy);
+      if(tcell){
         if(CAMP.on) consist=surpriseRoll();   // E21 THE SURPRISE — the game packs the cars, fresh every drop
-        placedOk=placeTrainAt(hover[0],hover[1]);
+        placedOk=placeTrainAt(tcell[0],tcell[1]);
       }
       if(placedOk){
         SND.clank(); hintPass(2); hintPass(3);
@@ -13037,7 +13088,7 @@ function upCore(e){
         // revSinceGo, visited) lives in there. The whistle sells the toy.
         else if(AUTO_GO==='all'||(AUTO_GO==='camp'&&CAMP.on)){ goTrain(); SND.whistle(); hintPass(4); }
       } else {
-        const onTrack=hover && pieceTop(hover[0],hover[1]);
+        const onTrack=!!tcell;   // E78: a near-track too-short drop hands her back too — only an honestly FAR drop removes
         if(onTrack) toast('TOO SHORT FOR THIS TRAIN!');
         if(DRAG.prev){
           if(onTrack||BED.ctx){   // a REFUSED drop hands her back (and the bedroom keeps its restore law)
@@ -13076,7 +13127,13 @@ function upCore(e){
     else if(DRAG.kind==='ptrain'){
       // E16 PLAY DRAGS TOO — the tray train lands AT THE DROP CELL and runs.
       // Off the rails: a soft poof, nothing places, no toast spam.
-      const d0=playDropD(hover);
+      // E78 THE GENEROUS SNAP: a near miss (SNAP_R) lands on the line at the
+      // nearest FREE stretch — never INTO a running train (n=4 = the tray
+      // roll's ceiling; a hair over-careful never spawns a crash). A direct
+      // hit keeps today's landing — that collision is the kid's own.
+      let d0=playDropD(hover);
+      if(d0==null){ const nd=playSnapD(wx,wy);
+        if(nd!=null) d0=stretchPick(PLAY.loop,PLAY.trains,4,nd); }
       if(d0!=null){ const r=playAdd(DRAG.color,null,null,d0); if(!r.ok) SND.toot(); }
       else { SND.pop(); puff(wx,wy,14); }
     }
@@ -13084,7 +13141,10 @@ function upCore(e){
       // E58 — the lifted wind-up train goes back down: on the line it lands AT
       // THE DROP CELL and rolls on (same color, cars, speed); off the line it
       // goes home in a puff — the NEVER-EMPTY law keeps the rug alive.
-      const d0=playDropD(hover);
+      // E78: the same generous snap, exact car count in hand.
+      let d0=playDropD(hover);
+      if(d0==null){ const nd=playSnapD(wx,wy);
+        if(nd!=null) d0=stretchPick(PLAY.loop,PLAY.trains,1+DRAG.cars.length,nd); }
       const r=d0!=null? playAdd(DRAG.color,DRAG.speed,DRAG.cars,d0) : {ok:false};
       if(r.ok) SND.clank();
       else { SND.pop(); puff(wx,wy,16); }
@@ -13159,14 +13219,26 @@ function upCore(e){
       else toast('DRAG IT ONTO THE RUG!'); }       // alive — but only drags spawn (the E16 tray law)
     else if(down.what==='spill'){ down.spill.wig=1; SND.chirp(); }                  // E54: floor toys wiggle + chirp — only drags spawn
     else if(down.what==='spillHome'){ SND.pop(); trainHome(false); }                // E54: the empty engine spot calls the toy home (E16's BRING IT HOME)
+    // E78: the shelf's bring-home moved into the pointer pipeline (the old click
+    // handler's exact body) — a tap-place's synthesized click can never land on
+    // the home state it just created and undo it (the E73 release law).
+    else if(down.what==='shelfHome'){ trainHome(false); toast('BACK ON THE SHELF'); save(); }
     else if(down.what==='handle'){
       if(down.spill){ down.spill.wig=1; SND.chirp(); }                              // E54: the spill engine is a floor toy too
-      else toast('DRAG IT ONTO THE TRACK!');
+      // E78 TAP-TO-PLACE (Wyatt: "If the kid just taps one of the trains, just
+      // throw it on the track") — the tap seats her on the line and she GOES;
+      // no line / too short → today's answer, word for word.
+      else if(!tapPlaceTrain()) toast('DRAG IT ONTO THE TRACK!');
     }
     // E16 — the shelf speaks drag: a bare tap wiggles and points at the verb
     else if(down.what==='shelfCar'){ wiggle(down.el); toast('DRAG IT ONTO YOUR TRAIN!'); }
     else if(down.what==='shelfEng'){ setEngine(down.t); }   // the shed's tap-to-swap, relocated
-    else if(down.what==='tray'){ wiggle(down.el); SND.chirp(); }   // alive — but nothing spawns
+    else if(down.what==='tray'){
+      // E78 TAP-TO-PLACE — the tap IS the spawn again (E16's tap-spawn law
+      // revived): the picker seats her on the farthest free stretch, rolling.
+      const r=playAdd(down.color);
+      if(!r.ok){ wiggle(down.el); SND.chirp(); }   // no line / crowded / full rug: the old voice answers
+    }
   }
   down=null;
 }
@@ -14062,6 +14134,31 @@ function eagerSummon(gx,gy){
   if(!eagerVerdict(pc,gx,gy)) return false;
   return eagerArrive(gx,gy,(pc.elev|0)?1:0);
 }
+// E78 — TAP-TO-PLACE (Wyatt 8/9 night: "If the kid just taps one of the
+// trains, just throw it on the track. Just pick an area where it won't
+// collide right away"): a bare tap on the shelf train seats her on the
+// LONGEST line the board holds — the campaign's glued line rules itself the
+// same way — at the stretch the safe picker names, and she GOES (the E16
+// drop-pipeline tail, hint passes included; a tap is not a drag, so the
+// once-ever drag lesson stays unlearned). No line / too short → false, and
+// the caller keeps today's refusal, word for word.
+function tapPlaceTrain(){
+  if(BED.ctx||SCREEN!=='game'||TRAIN.placed) return false;
+  const lp=lineWalk(null);
+  if(!lp) return false;
+  if(CAMP.on) consist=surpriseRoll();     // E21's gift law — a tap unboxes like a drop
+  const d=stretchPick(lp,[],1+consist.length,null);
+  if(d==null) return false;
+  const r=riderAt(d,lp);
+  if(!placeTrainAt(r.cx,r.cy,r.el?1:0)) return false;   // the too-short law still rules
+  SND.clank(); hintPass(2); hintPass(3);
+  for(const c of TRAIN.cars){ const p=pos(c.rd); c.squash=1; puff(p.x,p.y-8-LIFT*(p.z||0),14); }   // a breath of steam — the tap may seat her far away
+  if(CAMP.on&&!surpT){ surpT=true; toast(SURPRISE_POOL[Math.floor(Math.random()*SURPRISE_POOL.length)]); }
+  if(AUTO_GO==='all'||(AUTO_GO==='camp'&&CAMP.on)){ goTrain(); SND.whistle(); hintPass(4); }
+  eagerPan();                             // seated off-screen → the E27 ease finds her
+  shelfSync(); save();
+  return true;
+}
 function eagerPan(){
   // one gentle ease when she arrives off-screen (the E20 center-on-action
   // grammar, eased over EAGER_PAN) — any hand cancels it, entry cameras outrank it
@@ -14107,8 +14204,8 @@ function paletteSync(){
   $('tabTrack').style.display=vis.track?'':'none';
   $('tabScen').style.display=(vis.scen+vis.town)?'':'none';   // E55: LAND & TOWN — one plank over the two old departments
   $('tabFriends').style.display=vis.friends?'':'none';
-  $('tabTrains').style.display=(CAMP.on||PLAY.on)?'none':'';   // E58: PLAY rides the campaign grammar — the tray gives its trains
-  $('shelf').style.display=(CAMP.on||PLAY.on)?'none':'';       // the TRAINS run follows its plank
+  $('tabTrains').style.display=PLAY.on?'none':'';   // E78: the TRAINS plank returns to levels — the gift train is a tap away (the tray gives PLAY its trains)
+  $('shelf').style.display=PLAY.on?'none':'';       // the run follows; a level still hides car management (shelfSync's CAMP law)
   $('tabRug').style.display=(CAMP.on||PLAY.on)?'none':'';      // …and a surprise land keeps its own rug
   const gr=$('grprug');                                        // built by buildPalette — guard the boot order
   if(gr) gr.style.display=(CAMP.on||PLAY.on)?'none':'';        // '' = the stylesheet's display:contents
@@ -14139,13 +14236,11 @@ function buildShelf(){
     ac(); e.preventDefault();
     if(SCREEN==='menu') BED.idleT=0;         // E18: shelf touches hold the chrome away
     withBed(()=>{                            // E18: on the menu, TRAIN is the bedroom's
-      if(TRAIN.placed) return;               // it acts as the bring-home button then
-      down={x:e.clientX,y:e.clientY,what:'handle'};
-    });
-  });
-  tb.addEventListener('click',()=>{
-    withBed(()=>{                            // E18: menu = bedroom train home (toast+save inert there)
-      if(TRAIN.placed){ trainHome(false); toast('BACK ON THE SHELF'); save(); }
+      // E78: both meanings ride the POINTER pipeline now — the tap decides at
+      // release (place vs bring home), so a synthesized click can never see a
+      // state the same gesture just changed (the E73 release law). The old
+      // click listener died with this.
+      down={x:e.clientX,y:e.clientY,what:TRAIN.placed?'shelfHome':'handle'};
     });
   });
   parts.train=tb;
