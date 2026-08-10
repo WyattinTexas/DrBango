@@ -9,7 +9,7 @@
    ?daily=1 — date-seeded board (same run for everyone today)
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.1.0';
+const BUILD = 'STARSPELL v0.1.1';
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
 const QS = new URLSearchParams(location.search);
 const DEMO = QS.get('demo') === '1';
