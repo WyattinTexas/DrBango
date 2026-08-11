@@ -124,4 +124,7 @@ const SS_ACH = [
   { id: 'daily-devout', icon: '☀', name: 'DAILY DEVOUT', desc: 'Complete a Daily hunt.' },
   { id: 'dragonfall', icon: '🐉', name: 'DRAGONFALL', desc: 'Fell DRACO, the Star Eater.' },
   { id: 'first-flame', icon: '🔥', name: 'THE FIRST FLAME', desc: 'Fell PHOENIX and finish the story.' },
+  { id: 'rival-star', icon: '⚔', name: 'RIVAL STAR', desc: 'Win a versus battle.' },
+  { id: 'sky-marshal', icon: '♜', name: 'SKY MARSHAL', desc: 'Win a battleground of 3+ mages.' },
+  { id: 'war-weaver', icon: '✷', name: 'WAR WEAVER', desc: 'Cast 25 words in versus, lifetime.' },
 ];

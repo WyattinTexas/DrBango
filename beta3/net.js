@@ -134,7 +134,24 @@ const SSNET = (() => {
       await dbTxn('weekly/' + weekKey() + '/' + me, rec);
     } catch (e) { }
   }
+  // housekeeping: old day/week boards would pile up forever — sweep them
+  // as we pass by (keep today+yesterday, this week+last week). Once/session.
+  let sweptBoards = false;
+  async function pruneBoards() {
+    if (sweptBoards) return;
+    sweptBoards = true;
+    try {
+      const keepDays = [dayKey(), dayKey(new Date(Date.now() - 86400000))].map(String);
+      const keepWeeks = [weekKey(), weekKey(new Date(Date.now() - 7 * 86400000))];
+      const days = (await dbGet('daily').catch(() => null)) || {};
+      for (const k of Object.keys(days)) if (!keepDays.includes(k)) dbSet('daily/' + k, null).catch(() => { });
+      const weeks = (await dbGet('weekly').catch(() => null)) || {};
+      for (const k of Object.keys(weeks)) if (!keepWeeks.includes(k)) dbSet('weekly/' + k, null).catch(() => { });
+    } catch (e) { }
+  }
+
   async function getBoard(kind) {
+    pruneBoards();
     const path = kind === 'weekly' ? 'weekly/' + weekKey() : 'daily/' + dayKey();
     const all = (await dbGet(path).catch(() => null)) || {};
     const rows = Object.entries(all)

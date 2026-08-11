@@ -169,7 +169,10 @@ class VsBattle extends Phaser.Scene {
     this.onCastCb = (snap) => { this.onCast(snap.key, snap.val()); };
     if (this.castsRef) this.castsRef.on('child_added', this.onCastCb);
 
+    this.onAchCb = (def) => ssAchToast(this, def);
+    this.game.events.on('ss-ach', this.onAchCb);
     this.events.once('shutdown', () => {
+      this.game.events.off('ss-ach', this.onAchCb);
       if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
       if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
       if (this.meRef && this.room && this.room.status !== 'done') this.meRef.update({ gone: true }).catch(() => { });
@@ -265,6 +268,7 @@ class VsBattle extends Phaser.Scene {
       this.checkEnd();
     }
     if (room.status === 'done' && this.state !== 'done') this.endBattle();
+    else if (room.status === 'done' && room.rematch && !this.rematchBusy) this.showRematchCall();
   }
 
   updateLobby() {
@@ -486,7 +490,8 @@ class VsBattle extends Phaser.Scene {
     this.state = 'anim';
     SFX.cast(this.sel.length);
     if (letters >= 6) { SFX.bigWord(); this.cameras.main.flash(220, 240, 210, 120, false); }
-    SS.prof.words++; SS.save();
+    SS.prof.words++; SS.prof.vsWords++; SS.save();
+    if (SS.prof.vsWords >= 25) SS.award('war-weaver', this.game);
 
     // fly tiles toward the target's panel
     const pan = this.oppPanels[target.id];
@@ -610,8 +615,12 @@ class VsBattle extends Phaser.Scene {
     const l = this.L;
     const won = this.room.winnerUid === vsUid();
     const winner = this.room.players[this.room.winnerUid];
-    if (won) { SFX.victory(); SS.prof.wins++; } else SFX.defeat();
+    if (won) { SFX.victory(); SS.prof.wins++; SS.prof.vsWins++; } else SFX.defeat();
     SS.prof.runs++; SS.save(); SS.sync();
+    if (won) {
+      SS.award('rival-star', this.game);
+      if (this.room.mode === 'bg' && Object.keys(this.room.players || {}).length >= 3) SS.award('sky-marshal', this.game);
+    }
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.85).setInteractive().setDepth(150);
     const items = [veil];
     items.push(ssTxt(this, l.x(0), l.y(280), won ? 'THE SKY BOWS TO YOU' : 'THE DUEL IS LOST', l.u(24), won ? '#ffe9a8' : '#e66a6a').setOrigin(0.5).setDepth(151)
@@ -619,13 +628,54 @@ class VsBattle extends Phaser.Scene {
     items.push(ssTxt(this, l.x(0), l.y(330), winner ? winner.name + ' stands alone beneath the stars' : 'the night ends quietly', l.u(13), '#d8d2bd', 'italic').setOrigin(0.5).setDepth(151));
     const me = this.me() || {};
     items.push(ssTxt(this, l.x(0), l.y(380), 'damage dealt  ' + (me.dealt | 0) + '   ·   words  ' + (me.casts | 0), l.u(13), '#8a94c4').setOrigin(0.5).setDepth(151));
-    const homeB = this.add.image(l.x(0), l.y(470), 'btn').setDisplaySize(l.u(220), l.u(56)).setInteractive({ useHandCursor: true }).setDepth(151);
-    const homeT = ssTxt(this, l.x(0), l.y(470), 'RETURN', l.u(16), '#4a3305').setOrigin(0.5).setDepth(151);
-    items.push(homeB, homeT);
-    homeB.on('pointerdown', () => { SFX.ui(); this.scene.start(VSDEMO ? 'vsmenu' : 'vsmenu'); });
+    this.rematchB = this.add.image(l.x(0), l.y(455), 'btn').setDisplaySize(l.u(240), l.u(56)).setInteractive({ useHandCursor: true }).setDepth(151);
+    this.rematchT = ssTxt(this, l.x(0), l.y(455), '⚔ REMATCH', l.u(16), '#4a3305').setOrigin(0.5).setDepth(151);
+    this.rematchB.on('pointerdown', () => { SFX.ui(); this.doRematch(); });
+    const homeB = this.add.image(l.x(0), l.y(525), 'btndark').setDisplaySize(l.u(220), l.u(52)).setInteractive({ useHandCursor: true }).setDepth(151);
+    const homeT = ssTxt(this, l.x(0), l.y(525), 'RETURN', l.u(15), '#9fb0e8').setOrigin(0.5).setDepth(151);
+    items.push(this.rematchB, this.rematchT, homeB, homeT);
+    homeB.on('pointerdown', () => { SFX.ui(); this.scene.start('vsmenu'); });
     this.overlayC.add(items);
+    if (this.room.rematch) this.showRematchCall();
     if (VSDEMO) {
-      localStorage.setItem('beta3.vsresult', JSON.stringify({ won, mode: this.room.mode, dealt: me.dealt | 0, casts: me.casts | 0, t: Date.now() }));
+      localStorage.setItem('beta3.vsresult', JSON.stringify({ won, mode: this.room.mode, dealt: me.dealt | 0, casts: me.casts | 0, rematch: !!window.__VSDEMO_REMATCHED, t: Date.now() }));
+      if (!window.__VSDEMO_REMATCHED) {
+        window.__VSDEMO_REMATCHED = true;
+        this.time.delayedCall(2000 + Math.random() * 2000, () => { if (this.scene.isActive()) this.doRematch(); });
+      }
+    }
+  }
+
+  /* ---------- rematch: first presser seals a fresh room on the old one ---------- */
+  showRematchCall() {
+    if (!this.rematchT || this.rematchPulse) return;
+    this.rematchT.setText('⚔ ANSWER THE REMATCH');
+    this.rematchPulse = this.tweens.add({ targets: [this.rematchB, this.rematchT], alpha: 0.55, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+  async doRematch() {
+    if (this.rematchBusy || this.state !== 'done' || !this.room) return;
+    this.rematchBusy = true;
+    this.rematchT && this.rematchT.setText('SEALING…');
+    try {
+      let dest = this.room.rematch;
+      if (!dest) {
+        const code = vsCode();
+        await SSNET.dbSet('mp/rooms/' + code, {
+          mode: this.room.mode, status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
+          seed: Math.floor(Math.random() * 1e9),
+          players: { [vsUid()]: { name: vsName(), hp: VS_HP, seat: 0, casts: 0, dealt: 0, gone: false, joinedAt: Date.now() } },
+        });
+        // one rematch room per battle — a transaction settles simultaneous pressers
+        const r = await SSNET.dbTxn('mp/rooms/' + this.code + '/rematch', (cur) => (cur == null ? code : undefined));
+        dest = (r && r.value) || code;
+        if (dest !== code) SSNET.dbSet('mp/rooms/' + code, null).catch(() => { });
+      }
+      const mine = await vsJoinRoom(dest); // idempotent — true if we are already seated
+      if (!mine) { this.rematchBusy = false; this.rematchT && this.rematchT.setText('THE SEAL IS COLD'); return; }
+      this.scene.start('vsbattle', { code: dest });
+    } catch (e) {
+      this.rematchBusy = false;
+      this.rematchT && this.rematchT.setText('⚔ REMATCH');
     }
   }
 

@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.2.0';
+const BUILD = 'STARSPELL v0.2.1';
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
 const QS = new URLSearchParams(location.search);
 const DEMO = QS.get('demo') === '1';
@@ -47,6 +47,7 @@ const SS = {
     const p = this.prof;
     p.runs = p.runs | 0; p.wins = p.wins | 0; p.words = p.words | 0; p.beasts = p.beasts | 0;
     p.longest = p.longest || ''; p.bigHit = p.bigHit | 0; p.bestQuick = p.bestQuick | 0;
+    p.vsWords = p.vsWords | 0; p.vsWins = p.vsWins | 0;
     p.daily = p.daily || {}; p.ach = p.ach || {};
     return p;
   },
@@ -55,6 +56,7 @@ const SS = {
     SSNET.syncProfile({
       runs: this.prof.runs, wins: this.prof.wins, words: this.prof.words, beasts: this.prof.beasts,
       longest: this.prof.longest, bigHit: this.prof.bigHit, bestQuick: this.prof.bestQuick,
+      vsWins: this.prof.vsWins,
       achCount: Object.keys(this.prof.ach).length,
     });
   },
@@ -970,6 +972,7 @@ class Profile extends Phaser.Scene {
       ['runs begun', p.runs], ['runs won', p.wins], ['beasts felled', p.beasts],
       ['words woven', p.words], ['finest word', p.longest ? p.longest.toUpperCase() : '—'],
       ['mightiest hit', p.bigHit || '—'], ['best quick play', p.bestQuick || '—'],
+      ['versus victories', p.vsWins || '—'],
     ];
     rows.forEach(([k, v], i) => {
       const y = l.y(170 + i * 30);
