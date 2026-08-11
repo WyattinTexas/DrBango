@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BACKLOT · environment generator</title>
+<style>
+/* ═══════════ BACKLOT — workshop instrument. dark charcoal frame · deep-green
+   faceplate · brass/cream chrome · chunky rounded controls ═══════════ */
+:root{
+  --frame:#171511; --frame2:#211e18; --frame3:#2b2720;
+  --face:#1d3529; --face2:#16281f; --face3:#254434; --groove:#122019;
+  --brass:#c9a35c; --brass2:#e2c383; --brass-dim:#8a7345;
+  --cream:#f0e6d1; --cream-dim:#b9ae95; --cream-faint:#7d7562;
+  --ok:#7dc98f; --warn:#d98a5f;
+  --r:12px; --r-sm:8px;
+  --font:ui-rounded,"SF Pro Rounded","Nunito","Varela Round",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--frame);color:var(--cream);font-family:var(--font);
+  font-size:13px;overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font-family:var(--font);cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:var(--font)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--face2)}
+::-webkit-scrollbar-thumb{background:var(--frame3);border-radius:6px;border:2px solid var(--face2)}
+::-webkit-scrollbar-thumb:hover{background:var(--brass-dim)}
+
+#app{display:grid;height:100vh;
+  grid-template-columns:340px 1fr;
+  grid-template-rows:58px 1fr 148px 26px;
+  gap:8px;padding:8px;background:var(--frame)}
+
+/* ── header ─────────────────────────────────────────────────────────── */
+#hdr{grid-column:1/3;display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:linear-gradient(180deg,var(--frame3),var(--frame2));
+  border-radius:var(--r);border:1px solid #3a352b;flex-wrap:nowrap;min-width:0}
+#wordmark{display:flex;align-items:baseline;gap:9px;white-space:nowrap}
+#wordmark b{font-size:21px;letter-spacing:3.5px;color:var(--brass);font-weight:800}
+#wordmark small{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:var(--cream-faint)}
+.hsep{width:1px;height:28px;background:#3a352b;flex:none}
+.hlabel{font-size:9px;letter-spacing:1.8px;color:var(--cream-faint);text-transform:uppercase;
+  margin-right:2px;white-space:nowrap}
+.hgroup{display:flex;align-items:center;gap:5px;flex:none}
+.knurl{width:30px;height:30px;border-radius:9px;background:var(--frame2);
+  border:1.5px solid var(--brass-dim);color:var(--brass2);font-size:13px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;transition:all .12s}
+.knurl:hover{background:var(--brass-dim);color:var(--frame);border-color:var(--brass)}
+.knurl:active{transform:translateY(1px)}
+#seedInput{width:96px;height:30px;background:var(--groove);color:var(--brass2);
+  border:1.5px solid #3a352b;border-radius:9px;text-align:center;font-size:14px;
+  font-weight:700;letter-spacing:1px;outline:none;-moz-appearance:textfield}
+#seedInput:focus{border-color:var(--brass)}
+#btnRand{height:34px;padding:0 18px;border-radius:11px;font-weight:800;font-size:13px;
+  letter-spacing:1.2px;background:linear-gradient(180deg,var(--brass2),var(--brass));
+  color:#241c0c;box-shadow:0 2px 0 #6b5730,inset 0 1px 0 #f5e3b8;transition:all .12s;white-space:nowrap}
+#btnRand:hover{filter:brightness(1.07)}
+#btnRand:active{transform:translateY(2px);box-shadow:0 0 0 #6b5730}
+#btnRand .kbd{opacity:.55;font-size:10px;margin-left:5px}
+.seg{display:flex;background:var(--groove);border-radius:11px;padding:3px;
+  border:1px solid #3a352b}
+.seg button{padding:5px 13px;border-radius:8px;font-size:11px;font-weight:800;
+  letter-spacing:1.2px;color:var(--cream-dim);transition:all .12s;white-space:nowrap}
+.seg button.on{background:var(--face3);color:var(--brass2);box-shadow:inset 0 0 0 1px var(--brass-dim)}
+.seg button:not(.on):hover{color:var(--cream)}
+.xbtn{height:30px;padding:0 12px;border-radius:9px;font-size:11px;font-weight:800;
+  letter-spacing:.8px;background:var(--frame2);border:1.5px solid #46402f;color:var(--cream-dim);
+  transition:all .12s;white-space:nowrap}
+.xbtn:hover{border-color:var(--brass-dim);color:var(--brass2)}
+.xbtn:active{transform:translateY(1px)}
+#skyTog{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--cream-faint);
+  letter-spacing:.6px;cursor:pointer;user-select:none;white-space:nowrap}
+#hdrSpacer{flex:1}
+
+/* ── faceplate panel ────────────────────────────────────────────────── */
+#panel{grid-column:1;grid-row:2;overflow-y:auto;overflow-x:hidden;
+  background:linear-gradient(180deg,var(--face),var(--face2));
+  border-radius:var(--r);border:1px solid #35543f;padding:14px 12px 20px;
+  display:flex;flex-direction:column;gap:16px}
+.sectlabel{font-size:10px;font-weight:800;letter-spacing:2.4px;color:var(--brass);
+  text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.sectlabel::after{content:'';flex:1;height:1px;background:#35543f}
+
+/* pack cards */
+#packCards{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.packcard{background:var(--face2);border:1.5px solid #2c4736;border-radius:var(--r);
+  padding:10px 12px;cursor:pointer;transition:all .13s;position:relative}
+.packcard:hover{border-color:var(--brass-dim);transform:translateY(-1px)}
+.packcard.sel{border-color:var(--brass);background:var(--face3);
+  box-shadow:0 0 0 1px var(--brass),0 4px 14px rgba(0,0,0,.3)}
+.packcard .pname{font-size:13px;font-weight:800;letter-spacing:1.4px;color:var(--cream)}
+.packcard.sel .pname{color:var(--brass2)}
+.packcard .pblurb{font-size:10.5px;line-height:1.45;color:var(--cream-dim);margin:4px 0 7px}
+.swatches{display:flex;gap:3px;height:12px}
+.swatches i{flex:1;border-radius:3px;border:1px solid rgba(0,0,0,.35)}
+#presetRow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.preset{padding:5px 11px;border-radius:20px;background:var(--groove);font-size:10.5px;
+  font-weight:700;letter-spacing:.5px;color:var(--cream-dim);border:1px solid #2c4736;
+  transition:all .12s}
+.preset:hover{color:var(--brass2);border-color:var(--brass-dim)}
+
+/* control groups */
+#lockOps{display:flex;gap:6px;margin-top:8px}
+#lockOps .xbtn{flex:1;background:var(--face2);border-color:#2c4736;height:27px;font-size:10px}
+.cgroup{border:1px solid #2c4736;border-radius:var(--r);overflow:hidden;margin-top:8px;
+  background:var(--face2)}
+.ghead{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;
+  background:linear-gradient(180deg,var(--face3),var(--face2));user-select:none}
+.ghead:hover{filter:brightness(1.1)}
+.ghead .chev{font-size:9px;color:var(--brass);transition:transform .15s;width:10px}
+.cgroup.closed .chev{transform:rotate(-90deg)}
+.ghead .gname{flex:1;font-size:10.5px;font-weight:800;letter-spacing:2px;color:var(--cream)}
+.lockbtn{width:24px;height:24px;border-radius:7px;font-size:12px;line-height:1;
+  display:flex;align-items:center;justify-content:center;transition:all .12s;
+  filter:grayscale(1);opacity:.32}
+.lockbtn:hover{opacity:.75;background:rgba(0,0,0,.25)}
+.lockbtn.on{filter:none;opacity:1;background:rgba(201,163,92,.18);
+  box-shadow:inset 0 0 0 1px var(--brass-dim)}
+.lockbtn.half{filter:none;opacity:.6}
+.gbody{padding:4px 10px 10px}
+.cgroup.closed .gbody{display:none}
+.ctl{display:grid;grid-template-columns:104px 1fr 24px;align-items:center;gap:7px;
+  padding:5px 0}
+.ctl .clabel{font-size:10.5px;color:var(--cream-dim);letter-spacing:.4px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ctl.locked .clabel{color:var(--brass2)}
+.cwrap{display:flex;align-items:center;gap:7px;min-width:0}
+input[type=range]{flex:1;min-width:0;-webkit-appearance:none;height:22px;background:none}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;
+  background:var(--groove);border:1px solid #0d1a13}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--cream);border:2.5px solid var(--brass);
+  margin-top:-6px;transition:transform .1s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.18)}
+input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--groove)}
+input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;
+  background:var(--cream);border:2.5px solid var(--brass)}
+.cval{width:44px;height:22px;background:var(--groove);border:1px solid #2c4736;
+  border-radius:6px;color:var(--brass2);font-size:10.5px;font-weight:700;text-align:center;
+  outline:none;-moz-appearance:textfield}
+.cval:focus{border-color:var(--brass)}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{display:none}
+#seedInput::-webkit-outer-spin-button,#seedInput::-webkit-inner-spin-button{display:revert}
+/* cyc control */
+.cyc{display:flex;align-items:center;gap:4px;flex:1;min-width:0}
+.cyc .arr{width:20px;height:22px;border-radius:6px;background:var(--groove);
+  color:var(--brass);font-size:9px;border:1px solid #2c4736;flex:none}
+.cyc .arr:hover{background:var(--face3);border-color:var(--brass-dim)}
+.cyc .cycv{flex:1;text-align:center;height:22px;line-height:20px;background:var(--groove);
+  border:1px solid #2c4736;border-radius:6px;color:var(--cream);font-size:10.5px;
+  font-weight:700;letter-spacing:.5px;overflow:hidden;white-space:nowrap}
+/* toggle */
+.tog{width:42px;height:22px;border-radius:11px;background:var(--groove);
+  border:1px solid #2c4736;position:relative;transition:all .15s;flex:none}
+.tog::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;
+  border-radius:50%;background:var(--cream-faint);transition:all .15s}
+.tog.on{background:var(--face3);border-color:var(--brass-dim)}
+.tog.on::after{left:22px;background:var(--brass2)}
+
+/* ── viewport ───────────────────────────────────────────────────────── */
+#viewport{grid-column:2;grid-row:2;position:relative;border-radius:var(--r);
+  overflow:hidden;background:#0d0c0a;border:1px solid #3a352b;min-width:0;min-height:0}
+#viewport canvas{display:block}
+#hud{position:absolute;top:12px;left:12px;display:flex;gap:7px;pointer-events:none;
+  flex-wrap:wrap;max-width:70%;z-index:10}
+#palStrip,#kartHelp{z-index:10}
+.chip{padding:5px 12px;border-radius:20px;background:rgba(16,14,10,.72);
+  backdrop-filter:blur(4px);font-size:10.5px;font-weight:800;letter-spacing:1.2px;
+  color:var(--cream);border:1px solid rgba(201,163,92,.35)}
+.chip b{color:var(--brass2)}
+#palStrip{position:absolute;bottom:12px;left:12px;display:flex;gap:4px;pointer-events:none}
+#palStrip i{width:22px;height:22px;border-radius:6px;border:1.5px solid rgba(16,14,10,.8);
+  box-shadow:0 1px 4px rgba(0,0,0,.4)}
+#kartHelp{position:absolute;bottom:12px;right:12px;display:none}
+body.kart #kartHelp{display:block}
+#errOverlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(13,12,10,.9);z-index:40;text-align:center;padding:40px;line-height:1.7;
+  color:var(--warn);font-weight:700}
+
+/* ── bank ───────────────────────────────────────────────────────────── */
+#bank{grid-column:1/3;grid-row:3;display:flex;gap:10px;align-items:stretch;
+  background:linear-gradient(180deg,var(--frame3),var(--frame2));
+  border-radius:var(--r);border:1px solid #3a352b;padding:10px 12px;min-width:0}
+#bankLeft{display:flex;flex-direction:column;gap:6px;justify-content:center;flex:none}
+#btnSave{height:52px;padding:0 16px;border-radius:11px;font-weight:800;font-size:12px;
+  letter-spacing:1.2px;background:var(--face3);color:var(--brass2);
+  border:1.5px solid var(--brass-dim);transition:all .12s;white-space:nowrap}
+#btnSave:hover{background:var(--face);border-color:var(--brass)}
+#btnSave:active{transform:translateY(1px)}
+#bankOps{display:flex;gap:5px}
+#bankOps .xbtn{flex:1;height:24px;font-size:9.5px;padding:0 8px}
+#bankStrip{flex:1;display:flex;gap:9px;overflow-x:auto;overflow-y:hidden;
+  align-items:center;min-width:0;padding:2px}
+#bankEmpty{color:var(--cream-faint);font-size:11px;letter-spacing:.6px;padding-left:8px}
+.bcard{flex:none;display:flex;gap:8px;background:var(--frame2);border:1.5px solid #46402f;
+  border-radius:11px;padding:6px;transition:all .13s;cursor:grab;position:relative}
+.bcard:hover{border-color:var(--brass-dim);transform:translateY(-2px)}
+.bcard.cur{border-color:var(--brass);box-shadow:0 0 0 1px var(--brass)}
+.bcard.dragover{border-color:var(--ok)}
+.bcard img{width:96px;height:96px;border-radius:7px;background:#000;display:block}
+.bmeta{display:flex;flex-direction:column;gap:3px;width:104px;padding:2px 2px 2px 0}
+.bname{font-size:10.5px;font-weight:800;color:var(--cream);line-height:1.25;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  cursor:text;border-radius:4px;padding:1px 3px}
+.bname:hover{background:rgba(201,163,92,.12)}
+.bname input{width:100%;background:var(--groove);border:1px solid var(--brass);
+  border-radius:4px;color:var(--cream);font-size:10.5px;font-weight:700;padding:1px 3px;outline:none}
+.bsub{font-size:9px;color:var(--cream-faint);letter-spacing:.5px;padding-left:3px}
+.brow{display:flex;gap:4px;margin-top:auto}
+.brow button{height:21px;border-radius:6px;font-size:9px;font-weight:800;letter-spacing:.6px;
+  background:var(--frame3);border:1px solid #46402f;color:var(--cream-dim);padding:0 8px;
+  transition:all .1s}
+.brow button:hover{color:var(--brass2);border-color:var(--brass-dim)}
+.brow .bdel:hover{color:var(--warn);border-color:var(--warn)}
+
+/* ── footer ─────────────────────────────────────────────────────────── */
+#foot{grid-column:1/3;grid-row:4;display:flex;align-items:center;justify-content:space-between;
+  padding:0 10px;font-size:9.5px;letter-spacing:1px;color:var(--cream-faint)}
+#foot b{color:var(--brass-dim);letter-spacing:2px}
+
+/* ── toast ──────────────────────────────────────────────────────────── */
+#toast{position:fixed;bottom:170px;right:22px;background:var(--face3);color:var(--cream);
+  border:1.5px solid var(--brass);border-radius:11px;padding:10px 16px;font-size:12px;
+  font-weight:700;letter-spacing:.4px;opacity:0;transform:translateY(8px);
+  transition:all .25s;pointer-events:none;z-index:60;max-width:340px}
+#toast.show{opacity:1;transform:none}
+
+/* ── shot mode: hide all chrome ─────────────────────────────────────── */
+body.shot #app{grid-template-columns:0 1fr;grid-template-rows:0 1fr 0 0;gap:0;padding:0}
+body.shot #hdr,body.shot #panel,body.shot #bank,body.shot #foot,
+body.shot #hud,body.shot #palStrip,body.shot #kartHelp,body.shot #toast{display:none}
+body.shot #viewport{border-radius:0;border:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hdr">
+    <div id="wordmark"><b>BACKLOT</b><small>environment generator</small></div>
+    <div class="hsep"></div>
+    <div class="hgroup"><span class="hlabel">seed</span>
+      <button class="knurl" id="seedPrev" title="previous seed">◂</button>
+      <input id="seedInput" type="number" min="0" step="1" value="7">
+      <button class="knurl" id="seedNext" title="next seed">▸</button>
+    </div>
+    <button id="btnRand">⟳ RANDOMIZE<span class="kbd">R</span></button>
+    <div class="hsep"></div>
+    <div class="hgroup"><span class="hlabel">cam</span>
+      <div class="seg" id="camSeg">
+        <button data-cam="orbit" class="on" title="orbit camera (1)">⦿ ORBIT</button>
+        <button data-cam="kart" title="kart camera, eye 1.1 m (2)">▲ KART</button>
+      </div>
+    </div>
+    <div id="hdrSpacer"></div>
+    <div class="hgroup"><span class="hlabel">export</span>
+      <button class="xbtn" id="btnGLB">⬇ GLB</button>
+      <label id="skyTog"><span class="tog" id="skyTogSw"></span>sky in GLB</label>
+      <button class="xbtn" id="btnRecipe">⬇ RECIPE</button>
+      <button class="xbtn" id="btnPNG">⬇ PNG 2×</button>
+    </div>
+  </header>
+
+  <aside id="panel">
+    <section>
+      <div class="sectlabel">style pack</div>
+      <div id="packCards"></div>
+      <div id="presetRow"></div>
+    </section>
+    <section>
+      <div class="sectlabel">dials</div>
+      <div id="lockOps">
+        <button class="xbtn" id="btnLockAll">🔒 lock all</button>
+        <button class="xbtn" id="btnUnlockAll">🔓 unlock all</button>
+      </div>
+      <div id="groups"></div>
+    </section>
+  </aside>
+
+  <main id="viewport">
+    <div id="hud">
+      <span class="chip" id="chipCam">⦿ ORBIT</span>
+      <span class="chip" id="chipFps">— fps</span>
+      <span class="chip" id="chipTris">△ —</span>
+      <span class="chip" id="chipWorld">—</span>
+    </div>
+    <div id="palStrip"></div>
+    <span class="chip" id="kartHelp">W A S D drive · drag to look · 1 back to orbit</span>
+    <div id="errOverlay"></div>
+  </main>
+
+  <section id="bank">
+    <div id="bankLeft">
+      <button id="btnSave">✦ BANK THIS WORLD</button>
+      <div id="bankOps">
+        <button class="xbtn" id="btnBankExport">⬇ export</button>
+        <button class="xbtn" id="btnBankImport">⬆ import</button>
+      </div>
+    </div>
+    <div id="bankStrip"><span id="bankEmpty">bank is empty — dial in a world and ✦ BANK it</span></div>
+  </section>
+
+  <footer id="foot">
+    <span>deterministic · same pack + params + seed ⇒ the same world, every time</span>
+    <span>made with <b>CELSTUDIO · BACKLOT</b></span>
+  </footer>
+</div>
+<div id="toast"></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/OrbitControls.js"></script>
+<script src="vendor/GLTFExporter.js"></script>
+<script src="lib/env-law.js"></script>
+<script src="lib/packs/candy-basin.js"></script>
+<script src="lib/packs/inkwash-canyon.js"></script>
+<script src="lib/packs/mesa-golden.js"></script>
+<script src="lib/packs/neon-circuit.js"></script>
+<script src="lib/packs/palm-lagoon.js"></script>
+<script src="lib/packs/sundown-poster.js"></script>
+<script>
+(function(){
+'use strict';
+/* ═════════════ BACKLOT app — built against the §2 EnvGen interface only ═════════════ */
+var NS='backlot-v1-';
+var $=function(id){return document.getElementById(id)};
+
+/* ── query / modes ── */
+var q={};location.search.replace(/^\?/,'').split('&').forEach(function(kv){
+  if(!kv)return;var p=kv.split('=');q[decodeURIComponent(p[0])]=decodeURIComponent(p[1]||'')});
+var SHOT=q.shot==='1', UISHOT=q.uishot==='1', SHOTISH=SHOT||UISHOT;
+if(SHOT)document.body.classList.add('shot');
+
+/* ── engine sanity ── */
+function fatal(msg){var o=$('errOverlay');o.style.display='flex';o.textContent=msg}
+var __errs=[],__renders=0;
+window.addEventListener('error',function(e){
+  __errs.push((e.message||'?')+' @'+(e.filename||'').split('/').pop()+':'+e.lineno)});
+if(!window.THREE){fatal('vendor/three.min.js failed to load — BACKLOT cannot start.');return}
+if(!window.EnvGen){fatal('No engine: lib/env-law.js did not provide window.EnvGen.');return}
+var GEN=window.EnvGen, PACKS=window.BACKLOT_PACKS||{};
+var packKeys=Object.keys(PACKS);
+if(!packKeys.length){fatal('window.BACKLOT_PACKS is empty — no style packs registered.');return}
+
+/* ── persistence (namespaced, versioned; silent in shot modes) ── */
+function lsGet(k,fb){try{var v=localStorage.getItem(NS+k);return v?JSON.parse(v):fb}catch(e){return fb}}
+function lsSet(k,v){if(SHOTISH)return;try{localStorage.setItem(NS+k,JSON.stringify(v))}catch(e){}}
+
+/* ── state ── */
+var defPack=PACKS['mesa-golden']?'mesa-golden':packKeys[0];
+var saved=SHOTISH?null:lsGet('state',null);
+var state={pack:defPack,seed:7,params:null};
+if(saved&&saved.pack&&PACKS[saved.pack]){state.pack=saved.pack;state.seed=(saved.seed>>>0)||7;
+  state.params=saved.params||null}
+if(q.pack&&PACKS[q.pack])state.pack=q.pack;
+if(q.seed!==undefined)state.seed=(parseInt(q.seed,10)>>>0)||0;
+var locks=SHOTISH?{}:(lsGet('locks',{})||{});
+var ui=lsGet('ui',{collapsed:{},includeSky:false,cam:'orbit'});
+ui.collapsed=ui.collapsed||{};if(typeof ui.includeSky!=='boolean')ui.includeSky=false;
+var bank=SHOTISH?[]:(lsGet('bank',[])||[]);
+var nextId=lsGet('nextid',1);
+
+function freshParams(pack){var p=GEN.defaults(pack);
+  // carry locked dial values across the pack switch where the key still exists
+  Object.keys(locks).forEach(function(k){
+    if(locks[k]&&state.params&&(k in p)&&(k in state.params))p[k]=state.params[k]});
+  return p}
+function normalizeParams(p,pack){var d=GEN.defaults(pack);
+  if(!p||typeof p!=='object')return d;
+  var out={};for(var k in d)out[k]=(k in p)?p[k]:d[k];out.pack=pack;return out}
+state.params=normalizeParams(state.params,state.pack);
+/* shot-rig dial overrides — ?<controlKey>=value for any §2 CONTROLS key (proof shots
+   sweep dials through the same state.params → build path the panel dials use) */
+if(SHOTISH)(GEN.CONTROLS||[]).forEach(function(c){
+  if(q[c.k]===undefined)return;var v=q[c.k];
+  if(c.t==='tog')v=(v==='1'||v==='true');
+  else if(c.t==='rng')v=parseFloat(v);
+  else if(c.t==='cyc'&&typeof c.o[0]==='number')v=parseFloat(v);
+  state.params[c.k]=v});
+
+/* deterministic seed scramble for RANDOMIZE — no Math.random anywhere */
+function nextRandomSeed(s){s=(s^0x9E3779B9)>>>0;s=Math.imul(s,0x85EBCA6B)>>>0;
+  s^=s>>>13;s=Math.imul(s,0xC2B2AE35)>>>0;s^=s>>>16;return s>>>0}
+function deepCopy(o){return JSON.parse(JSON.stringify(o))}
+function clamp(v,a,b){return v<a?a:v>b?b:v}
+
+/* ── three.js scaffold ── */
+var vp=$('viewport');
+/* shot modes pin antialias OFF: headless SwiftShader grants the MSAA request
+   nondeterministically run-to-run, which breaks byte-identical proof shots */
+var renderer=new THREE.WebGLRenderer({antialias:!SHOTISH,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+vp.appendChild(renderer.domElement);
+var scene=new THREE.Scene();
+scene.background=new THREE.Color('#0d0c0a');
+var orbCam=new THREE.PerspectiveCamera(50,1,0.1,1600);
+orbCam.position.set(215,155,245);
+var kartCam=new THREE.PerspectiveCamera(62,1,0.05,1600);
+kartCam.rotation.order='YXZ';
+var controls=new THREE.OrbitControls(orbCam,renderer.domElement);
+controls.target.set(0,10,0);controls.enableDamping=true;controls.dampingFactor=0.08;
+controls.maxPolarAngle=Math.PI*0.495;controls.maxDistance=650;controls.minDistance=10;
+var camMode='orbit';
+function sizeViewport(){var w=vp.clientWidth||8,h=vp.clientHeight||8;
+  renderer.setSize(w,h,false);
+  renderer.domElement.style.width='100%';renderer.domElement.style.height='100%';
+  orbCam.aspect=w/h;orbCam.updateProjectionMatrix();
+  kartCam.aspect=w/h;kartCam.updateProjectionMatrix()}
+window.addEventListener('resize',sizeViewport);
+window.addEventListener('load',sizeViewport);
+/* ?diag=1 — dump render truth into the DOM so headless shots can prove it */
+function shotDiag(){
+  try{
+    var gl=renderer.getContext(),cv=renderer.domElement;
+    var cx=Math.floor(cv.width/2),cyy=Math.floor(cv.height/2);
+    function rp(){var p=new Uint8Array(4);gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+      gl.readPixels(cx,cyy,1,1,gl.RGBA,gl.UNSIGNED_BYTE,p);return p[0]+','+p[1]+','+p[2]}
+    render();
+    var post=rp();
+    var inf=renderer.info.render,skyTxt='none';
+    if(built&&built.sky){
+      var bs=new THREE.Box3().setFromObject(built.sky).getBoundingSphere(new THREE.Sphere());
+      var mat=null;built.sky.traverse(function(o){if(!mat&&o.material)mat=o.material});
+      skyTxt='r'+Math.round(bs.radius)+'@'+Math.round(bs.center.y)+
+        (mat?(' side'+mat.side+' vis'+(built.sky.visible?1:0)+' type '+mat.type):'')}
+    var d=document.createElement('div');d.className='chip';
+    d.style.cssText='position:absolute;top:44px;right:12px;z-index:50;max-width:560px';
+    d.textContent='DIAG post '+post+' · calls '+inf.calls+' tri '+inf.triangles+
+      ' · far '+activeCam().far+' · sky '+skyTxt+
+      ' · errs['+__errs.slice(0,3).join('|').slice(0,100)+']';
+    vp.appendChild(d);
+  }catch(e){var d2=document.createElement('div');d2.className='chip';
+    d2.style.cssText='position:absolute;top:44px;right:12px;z-index:50';
+    d2.textContent='DIAG ERR '+e.message;vp.appendChild(d2)}
+}
+
+/* ── build / rebuild ── */
+var built=null;
+function disposeBuilt(b){[b.group,b.sky].forEach(function(root){
+  if(!root)return;
+  root.traverse(function(o){
+    if(o.geometry)o.geometry.dispose();
+    if(o.material){var ms=Array.isArray(o.material)?o.material:[o.material];
+      ms.forEach(function(m){if(m.map)m.map.dispose();m.dispose()})}})})}
+function rebuild(){
+  try{
+    if(built){scene.remove(built.group);scene.remove(built.sky);disposeBuilt(built)}
+    built=GEN.build(deepCopy(state.params),state.seed>>>0);
+    scene.add(built.group);
+    if(built.sky)scene.add(built.sky);
+    scene.fog=built.fog?new THREE.Fog(built.fog.color,built.fog.near,built.fog.far):null;
+    fitCameras();updateHUD();persistState();
+  }catch(e){fatal('build failed: '+e.message);if(window.console)console.error(e)}
+}
+/* packs own their sky size — fit the far plane to whatever dome the pack built */
+function fitCameras(){
+  var far=1600;
+  if(built&&built.sky){
+    try{var bs=new THREE.Box3().setFromObject(built.sky).getBoundingSphere(new THREE.Sphere());
+      if(isFinite(bs.radius)&&bs.radius>0)far=Math.max(far,bs.center.length()+bs.radius*1.2)}catch(e){}
+  }
+  orbCam.far=far;kartCam.far=far;
+  orbCam.updateProjectionMatrix();kartCam.updateProjectionMatrix()}
+var buildTimer=null,buildPending=false;
+function scheduleBuild(){clearTimeout(buildTimer);buildPending=true;
+  buildTimer=setTimeout(function(){buildPending=false;rebuild()},60)}
+/* exports/bank read `built` — flush any debounced rebuild first so a click inside
+   the 60 ms window can never pair NEW params with a STALE world/thumbnail */
+function flushBuild(){if(buildPending){clearTimeout(buildTimer);buildPending=false;rebuild()}}
+function persistState(){lsSet('state',{pack:state.pack,seed:state.seed,params:state.params})}
+
+/* ── HUD ── */
+function updateHUD(){
+  if(!built)return;
+  var m=built.meta||{};
+  $('chipTris').innerHTML='△ <b>'+((m.tris||0)/1000).toFixed(1)+'k</b>';
+  $('chipWorld').innerHTML='<b>'+(m.label||state.pack)+'</b> · s'+state.seed;
+  var ps=$('palStrip');ps.innerHTML='';
+  (m.palette||[]).slice(0,9).forEach(function(hex){
+    var i=document.createElement('i');i.style.background=hex;i.title=hex;ps.appendChild(i)});
+}
+var fpsFrames=0,fpsLast=0;
+function fpsTick(t){fpsFrames++;
+  if(t-fpsLast>600){$('chipFps').innerHTML='<b>'+Math.round(fpsFrames*1000/(t-fpsLast))+'</b> fps';
+    fpsFrames=0;fpsLast=t}}
+
+/* ── kart camera ── */
+var kart={x:0,y:1.1,z:0,yaw:0,pitch:-0.02,vel:0};
+var keys={};
+var DOWN=new THREE.Vector3(0,-1,0),rayO=new THREE.Vector3();
+var raycaster=new THREE.Raycaster();
+function groundY(x,z){
+  if(!built)return null;
+  /* engine extension (engine report): Built.heightAt(x,z) is the authoritative
+     kart ground-follow — analytic, prop-proof, no per-frame raycast cost */
+  if(typeof built.heightAt==='function')return built.heightAt(x,z);
+  rayO.set(x,420,z);raycaster.set(rayO,DOWN);
+  var hits=raycaster.intersectObject(built.group,true);
+  if(!hits.length)return null;
+  for(var i=0;i<hits.length;i++){var o=hits[i].object;
+    if(o.userData.ground||o.name==='terrain')return hits[i].point.y}
+  return hits[hits.length-1].point.y;   // deepest hit ≈ terrain under props
+}
+function resetKart(headingDeg){
+  /* judge framing (doc §8): shot mode tilts ~7° up so the sky owns ~55% of the frame —
+     same framing the engine harness judges with */
+  kart.x=0;kart.z=0;kart.vel=0;kart.pitch=SHOTISH?0.12:-0.02;
+  kart.yaw=-THREE.MathUtils.degToRad(headingDeg||0);
+  var gy=groundY(0,0);kart.y=(gy===null?0:gy)+1.1;
+  kartCam.position.set(kart.x,kart.y,kart.z);
+  kartCam.rotation.set(kart.pitch,kart.yaw,0)}
+function kartTick(dt){
+  var turn=1.75;
+  if(keys.a||keys.arrowleft)kart.yaw+=turn*dt;
+  if(keys.d||keys.arrowright)kart.yaw-=turn*dt;
+  var tgt=0;
+  if(keys.w||keys.arrowup)tgt=20;else if(keys.s||keys.arrowdown)tgt=-8;
+  kart.vel+=(tgt-kart.vel)*Math.min(1,dt*4);
+  if(!tgt&&Math.abs(kart.vel)<0.03)kart.vel=0;
+  if(kart.vel){
+    kart.x=clamp(kart.x-Math.sin(kart.yaw)*kart.vel*dt,-292,292);
+    kart.z=clamp(kart.z-Math.cos(kart.yaw)*kart.vel*dt,-292,292)}
+  var gy=groundY(kart.x,kart.z);
+  if(gy!==null)kart.y+=((gy+1.1)-kart.y)*Math.min(1,dt*10);
+  kartCam.position.set(kart.x,kart.y,kart.z);
+  kartCam.rotation.set(kart.pitch,kart.yaw,0)}
+/* mouse-drag look */
+var dragging=false,lastPX=0,lastPY=0;
+renderer.domElement.addEventListener('pointerdown',function(e){
+  if(camMode!=='kart')return;dragging=true;lastPX=e.clientX;lastPY=e.clientY;
+  renderer.domElement.setPointerCapture(e.pointerId)});
+renderer.domElement.addEventListener('pointermove',function(e){
+  if(!dragging||camMode!=='kart')return;
+  kart.yaw-=(e.clientX-lastPX)*0.0042;
+  kart.pitch=clamp(kart.pitch-(e.clientY-lastPY)*0.0032,-0.62,0.62);
+  lastPX=e.clientX;lastPY=e.clientY});
+window.addEventListener('pointerup',function(){dragging=false});
+
+function setCam(mode,headingDeg){
+  camMode=mode;
+  document.body.classList.toggle('kart',mode==='kart');
+  controls.enabled=(mode==='orbit');
+  if(mode==='kart')resetKart(headingDeg!==undefined?headingDeg:45);
+  $('chipCam').innerHTML=mode==='kart'?'▲ <b>KART</b> · eye 1.1 m':'⦿ <b>ORBIT</b>';
+  var seg=$('camSeg').children;
+  for(var i=0;i<seg.length;i++)seg[i].classList.toggle('on',seg[i].dataset.cam===mode);
+  ui.cam=mode;lsSet('ui',ui)}
+
+/* ── seed / randomize ── */
+var seedInput=$('seedInput');
+function setSeed(s,noBuild){state.seed=s>>>0;seedInput.value=state.seed;if(!noBuild)rebuild()}
+seedInput.addEventListener('change',function(){setSeed(parseInt(seedInput.value,10)||0)});
+seedInput.addEventListener('input',function(){
+  var v=parseInt(seedInput.value,10);if(!isNaN(v)){state.seed=v>>>0;scheduleBuild()}});
+$('seedPrev').addEventListener('click',function(){setSeed((state.seed-1)>>>0)});
+$('seedNext').addEventListener('click',function(){setSeed((state.seed+1)>>>0)});
+function randomize(){
+  var s=nextRandomSeed(state.seed);
+  state.params=GEN.roll(deepCopy(state.params),locks,s);
+  state.params.pack=state.pack;
+  setSeed(s,true);renderControls();rebuild();
+}
+$('btnRand').addEventListener('click',randomize);
+
+/* ── pack picker ── */
+function collectHexes(o,out){
+  if(typeof o==='string'){if(/^#[0-9a-fA-F]{3,8}$/.test(o)&&out.indexOf(o)<0)out.push(o)}
+  else if(Array.isArray(o))o.forEach(function(v){collectHexes(v,out)});
+  else if(o&&typeof o==='object')Object.keys(o).forEach(function(k){collectHexes(o[k],out)});
+  return out}
+function packSwatches(key){
+  try{var pk=PACKS[key];
+    if(typeof pk.palette==='function'){
+      var pal=pk.palette(GEN.defaults(key),(function(a){return function(){
+        a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);
+        t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}})(1));
+      var hx=collectHexes(pal,[]);if(hx.length)return hx.slice(0,7)}
+  }catch(e){}
+  return['#5a5a52','#7a7568','#9a917c','#bcb098']}
+function renderPacks(){
+  var host=$('packCards');host.innerHTML='';
+  packKeys.forEach(function(key){
+    var pk=PACKS[key];
+    var card=document.createElement('div');
+    card.className='packcard'+(key===state.pack?' sel':'');
+    var sw=packSwatches(key).map(function(h){return'<i style="background:'+h+'"></i>'}).join('');
+    card.innerHTML='<div class="pname">'+(pk.label||key)+'</div>'+
+      '<div class="pblurb">'+(pk.blurb||'')+'</div><div class="swatches">'+sw+'</div>';
+    card.addEventListener('click',function(){
+      if(state.pack===key)return;
+      state.pack=key;state.params=freshParams(key);state.params.pack=key;
+      renderPacks();renderPresets();renderControls();rebuild()});
+    host.appendChild(card)});
+}
+function renderPresets(){
+  var host=$('presetRow');host.innerHTML='';
+  (GEN.PRESETS||[]).filter(function(p){return p.pack===state.pack}).forEach(function(p){
+    var b=document.createElement('button');b.className='preset';b.textContent='◈ '+p.name;
+    b.title='apply preset';
+    b.addEventListener('click',function(){
+      state.params=normalizeParams(deepCopy(p.params),state.pack);
+      renderControls();rebuild();toast('preset · '+p.name)});
+    host.appendChild(b)});
+}
+
+/* ── control panel (auto-built from CONTROLS/GROUPS) ── */
+function fmt(v,step){var d=(step&&step<1)?((''+step).split('.')[1]||'').length:0;
+  return Number(v).toFixed(d)}
+function setLock(k,on){locks[k]=!!on;lsSet('locks',locks);renderControls()}
+function renderControls(){
+  var host=$('groups');host.innerHTML='';
+  (GEN.GROUPS||[]).forEach(function(gname){
+    var ctls=(GEN.CONTROLS||[]).filter(function(c){return c.g===gname});
+    if(!ctls.length)return;
+    var sec=document.createElement('div');
+    sec.className='cgroup'+(ui.collapsed[gname]?' closed':'');
+    var head=document.createElement('div');head.className='ghead';
+    var lockedN=ctls.filter(function(c){return locks[c.k]}).length;
+    head.innerHTML='<span class="chev">▼</span><span class="gname">'+gname+'</span>';
+    var gl=document.createElement('button');
+    gl.className='lockbtn'+(lockedN===ctls.length?' on':lockedN?' half':'');
+    gl.textContent='🔒';gl.title=lockedN===ctls.length?'unlock group':'lock whole group';
+    gl.addEventListener('click',function(e){e.stopPropagation();
+      var lockAll=lockedN!==ctls.length;
+      ctls.forEach(function(c){locks[c.k]=lockAll});lsSet('locks',locks);renderControls()});
+    head.appendChild(gl);
+    head.addEventListener('click',function(){
+      ui.collapsed[gname]=!ui.collapsed[gname];lsSet('ui',ui);
+      sec.classList.toggle('closed',!!ui.collapsed[gname])});
+    sec.appendChild(head);
+    var body=document.createElement('div');body.className='gbody';
+    ctls.forEach(function(c){body.appendChild(buildCtlRow(c))});
+    sec.appendChild(body);host.appendChild(sec)});
+}
+function buildCtlRow(c){
+  var row=document.createElement('div');row.className='ctl'+(locks[c.k]?' locked':'');
+  var lab=document.createElement('div');lab.className='clabel';lab.textContent=c.l||c.k;
+  lab.title=c.k;row.appendChild(lab);
+  var wrap=document.createElement('div');wrap.className='cwrap';
+  if(c.t==='rng'){
+    var sl=document.createElement('input');sl.type='range';
+    sl.min=c.min;sl.max=c.max;sl.step=c.step||1;sl.value=state.params[c.k];
+    var num=document.createElement('input');num.type='number';num.className='cval';
+    num.min=c.min;num.max=c.max;num.step=c.step||1;num.value=fmt(state.params[c.k],c.step);
+    sl.addEventListener('input',function(){
+      state.params[c.k]=parseFloat(sl.value);num.value=fmt(sl.value,c.step);scheduleBuild()});
+    num.addEventListener('change',function(){
+      var v=clamp(parseFloat(num.value)||c.min,c.min,c.max);
+      state.params[c.k]=v;num.value=fmt(v,c.step);sl.value=v;scheduleBuild()});
+    wrap.appendChild(sl);wrap.appendChild(num);
+  }else if(c.t==='cyc'){
+    var cy=document.createElement('div');cy.className='cyc';
+    var back=document.createElement('button');back.className='arr';back.textContent='◂';
+    var val=document.createElement('div');val.className='cycv';val.textContent=state.params[c.k];
+    var fwd=document.createElement('button');fwd.className='arr';fwd.textContent='▸';
+    function step(d){var i=c.o.indexOf(state.params[c.k]);if(i<0)i=0;
+      i=(i+d+c.o.length)%c.o.length;state.params[c.k]=c.o[i];val.textContent=c.o[i];scheduleBuild()}
+    back.addEventListener('click',function(){step(-1)});
+    fwd.addEventListener('click',function(){step(1)});
+    val.addEventListener('click',function(){step(1)});
+    cy.appendChild(back);cy.appendChild(val);cy.appendChild(fwd);wrap.appendChild(cy);
+  }else{ /* tog */
+    var tg=document.createElement('button');
+    tg.className='tog'+(state.params[c.k]?' on':'');tg.title=c.l;
+    tg.addEventListener('click',function(){
+      state.params[c.k]=!state.params[c.k];tg.classList.toggle('on',!!state.params[c.k]);
+      scheduleBuild()});
+    wrap.appendChild(tg)}
+  row.appendChild(wrap);
+  var lk=document.createElement('button');
+  lk.className='lockbtn'+(locks[c.k]?' on':'');lk.textContent='🔒';
+  lk.title=locks[c.k]?'unlock — dial re-rolls on RANDOMIZE':'lock — dial survives RANDOMIZE';
+  lk.addEventListener('click',function(){setLock(c.k,!locks[c.k])});
+  row.appendChild(lk);
+  return row}
+$('btnLockAll').addEventListener('click',function(){
+  (GEN.CONTROLS||[]).forEach(function(c){locks[c.k]=true});lsSet('locks',locks);renderControls()});
+$('btnUnlockAll').addEventListener('click',function(){
+  locks={};lsSet('locks',locks);renderControls()});
+
+/* ── render helpers, thumbnails, downloads ── */
+function activeCam(){return camMode==='kart'?kartCam:orbCam}
+/* shot modes: mirror each rendered frame into a 2D canvas — headless compositors
+   capture 2D canvases reliably where a WebGL surface can race to black */
+var mirror=null;
+if(SHOTISH){
+  mirror=document.createElement('canvas');
+  mirror.style.cssText='position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none';
+  vp.appendChild(mirror);
+}
+function render(){
+  renderer.render(scene,activeCam());__renders++;
+  if(mirror){
+    var src=renderer.domElement;
+    if(mirror.width!==src.width||mirror.height!==src.height){
+      mirror.width=src.width;mirror.height=src.height}
+    mirror.getContext('2d').drawImage(src,0,0);
+  }
+}
+function makeThumb(){
+  render();
+  var src=renderer.domElement,s=Math.min(src.width,src.height);
+  var c=document.createElement('canvas');c.width=128;c.height=128;
+  c.getContext('2d').drawImage(src,(src.width-s)/2,(src.height-s)/2,s,s,0,0,128,128);
+  return c.toDataURL('image/png')}
+function downloadBlob(name,blob){var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},2000)}
+function downloadURL(name,url){var a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){a.remove()},2000)}
+function toast(msg){var t=$('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove('show')},2400)}
+function worldName(){return'backlot-'+state.pack+'-s'+state.seed}
+
+/* ── exports ── */
+$('skyTogSw').classList.toggle('on',ui.includeSky);
+$('skyTog').addEventListener('click',function(e){e.preventDefault();
+  ui.includeSky=!ui.includeSky;$('skyTogSw').classList.toggle('on',ui.includeSky);
+  lsSet('ui',ui)});
+$('btnGLB').addEventListener('click',function(){
+  flushBuild();if(!built)return;
+  var input=(ui.includeSky&&built.sky)?[built.group,built.sky]:[built.group];
+  try{
+    new THREE.GLTFExporter().parse(input,function(res){
+      downloadBlob(worldName()+'.glb',new Blob([res],{type:'model/gltf-binary'}));
+      toast('GLB exported · '+((built.meta&&built.meta.tris||0)/1000).toFixed(1)+'k tris'+
+        (ui.includeSky?' · sky included':' · sky excluded'));
+    },function(err){toast('GLB export failed: '+(err&&err.message||err))},{binary:true});
+  }catch(e){toast('GLB export failed: '+e.message)}});
+function makeRecipe(){
+  return {app:'backlot',version:1,pack:state.pack,seed:state.seed,
+    params:deepCopy(state.params),fog:built&&built.fog||null,bounds:built&&built.bounds||null,
+    meta:built&&built.meta?{label:built.meta.label,tris:built.meta.tris,palette:built.meta.palette}:null,
+    notes:'EnvGen.build(params, seed) regenerates this world exactly. '+
+      'Fog does not survive GLB — re-apply from this recipe. Sky is excluded from GLB by default.'}}
+$('btnRecipe').addEventListener('click',function(){
+  flushBuild();if(!built)return;
+  downloadBlob(worldName()+'.recipe.json',
+    new Blob([JSON.stringify(makeRecipe(),null,2)],{type:'application/json'}));
+  toast('recipe JSON exported')});
+$('btnPNG').addEventListener('click',function(){
+  flushBuild();
+  var w=vp.clientWidth,h=vp.clientHeight,pr=renderer.getPixelRatio();
+  renderer.setPixelRatio(2);renderer.setSize(w,h,false);render();
+  var url=renderer.domElement.toDataURL('image/png');
+  renderer.setPixelRatio(pr);renderer.setSize(w,h,false);render();
+  downloadURL(worldName()+'@2x.png',url);
+  toast('PNG 2× exported · '+(w*2)+'×'+(h*2))});
+
+/* ── BANK ── */
+function persistBank(){lsSet('bank',bank);lsSet('nextid',nextId)}
+function bankCurrent(quiet){
+  flushBuild();if(!built)return;
+  var item={id:nextId++,name:(built.meta&&built.meta.label||state.pack)+' · s'+state.seed,
+    pack:state.pack,seed:state.seed,params:deepCopy(state.params),thumb:makeThumb()};
+  bank.push(item);persistBank();renderBank();
+  if(!quiet)toast('banked · '+item.name)}
+$('btnSave').addEventListener('click',function(){bankCurrent(false)});
+function loadBank(item){
+  if(!PACKS[item.pack]){toast('pack "'+item.pack+'" not loaded');return}
+  state.pack=item.pack;state.seed=(item.seed>>>0)||0;
+  state.params=normalizeParams(deepCopy(item.params),item.pack);
+  seedInput.value=state.seed;
+  renderPacks();renderPresets();renderControls();rebuild();renderBank();
+  toast('loaded · '+item.name)}
+var dragId=null;
+function renderBank(){
+  var strip=$('bankStrip');strip.innerHTML='';
+  if(!bank.length){var e=document.createElement('span');e.id='bankEmpty';
+    e.textContent='bank is empty — dial in a world and ✦ BANK it';strip.appendChild(e);return}
+  bank.forEach(function(item){
+    var card=document.createElement('div');card.className='bcard';card.draggable=true;
+    if(item.pack===state.pack&&item.seed===state.seed)card.classList.add('cur');
+    var img=document.createElement('img');img.src=item.thumb||'';img.alt=item.name;
+    img.addEventListener('dblclick',function(){loadBank(item)});
+    var meta=document.createElement('div');meta.className='bmeta';
+    var nm=document.createElement('div');nm.className='bname';nm.textContent=item.name;
+    nm.title='click to rename';
+    nm.addEventListener('click',function(){beginRename(item,nm)});
+    var sub=document.createElement('div');sub.className='bsub';
+    sub.textContent=item.pack+' · s'+item.seed;
+    var row=document.createElement('div');row.className='brow';
+    var bl=document.createElement('button');bl.textContent='LOAD';
+    bl.addEventListener('click',function(){loadBank(item)});
+    var bd=document.createElement('button');bd.className='bdel';bd.textContent='✕';
+    bd.title='delete';
+    bd.addEventListener('click',function(){
+      bank=bank.filter(function(b){return b.id!==item.id});persistBank();renderBank()});
+    row.appendChild(bl);row.appendChild(bd);
+    meta.appendChild(nm);meta.appendChild(sub);meta.appendChild(row);
+    card.appendChild(img);card.appendChild(meta);
+    card.addEventListener('dragstart',function(){dragId=item.id});
+    card.addEventListener('dragover',function(e){e.preventDefault();card.classList.add('dragover')});
+    card.addEventListener('dragleave',function(){card.classList.remove('dragover')});
+    card.addEventListener('drop',function(e){e.preventDefault();card.classList.remove('dragover');
+      if(dragId===null||dragId===item.id)return;
+      var from=bank.findIndex(function(b){return b.id===dragId});
+      var to=bank.findIndex(function(b){return b.id===item.id});
+      if(from<0||to<0)return;
+      var moved=bank.splice(from,1)[0];bank.splice(to,0,moved);
+      persistBank();renderBank()});
+    strip.appendChild(card)});
+}
+function beginRename(item,nameEl){
+  var inp=document.createElement('input');inp.value=item.name;
+  nameEl.textContent='';nameEl.appendChild(inp);inp.focus();inp.select();
+  function commit(){item.name=inp.value.trim()||item.name;persistBank();renderBank()}
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter')commit();
+    if(e.key==='Escape')renderBank();
+    e.stopPropagation()});
+  inp.addEventListener('blur',commit)}
+$('btnBankExport').addEventListener('click',function(){
+  downloadBlob('backlot-bank.json',
+    new Blob([JSON.stringify({app:'backlot-bank',version:1,items:bank},null,1)],
+      {type:'application/json'}));
+  toast('bank exported · '+bank.length+' worlds')});
+$('btnBankImport').addEventListener('click',function(){$('importFile').click()});
+$('importFile').addEventListener('change',function(){
+  var f=this.files[0];this.value='';if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){try{
+    var data=JSON.parse(rd.result);
+    var items=Array.isArray(data)?data:(data.items||[]);
+    var added=0;
+    items.forEach(function(it){
+      if(!it||!it.pack||it.params===undefined||it.seed===undefined)return;
+      bank.push({id:nextId++,name:''+(it.name||it.pack+' · s'+it.seed),
+        pack:''+it.pack,seed:it.seed>>>0,params:it.params,thumb:it.thumb||''});added++});
+    persistBank();renderBank();
+    toast(added?('imported '+added+' world'+(added>1?'s':'')):'no valid worlds in that file');
+  }catch(e){toast('import failed: '+e.message)}};
+  rd.readAsText(f)});
+
+/* ── keyboard ── */
+var DRIVE=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
+window.addEventListener('keydown',function(e){
+  if(e.target&&/^(input|textarea|select)$/i.test(e.target.tagName))return;
+  var k=e.key.toLowerCase();
+  if(k==='r'){randomize();e.preventDefault()}
+  else if(k==='1')setCam('orbit');
+  else if(k==='2')setCam('kart');
+  else if(DRIVE.indexOf(k)>=0){keys[k]=true;if(camMode==='kart')e.preventDefault()}});
+window.addEventListener('keyup',function(e){
+  var k=e.key.toLowerCase();if(DRIVE.indexOf(k)>=0)keys[k]=false});
+window.addEventListener('blur',function(){keys={}});
+$('camSeg').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(b)setCam(b.dataset.cam)});
+
+/* ── boot ── */
+sizeViewport();
+renderPacks();renderPresets();renderControls();renderBank();
+rebuild();
+
+/* shot-mode camera fixing */
+var heading=parseFloat(q.heading)||0;
+if(SHOTISH){
+  var shotCam=(q.cam==='kart')?'kart':'orbit';
+  setCam(shotCam,heading);
+  if(shotCam==='orbit'){
+    var hr=THREE.MathUtils.degToRad(heading),R=265;
+    orbCam.position.set(Math.sin(hr)*R,160,Math.cos(hr)*R);
+    controls.target.set(0,10,0);controls.enabled=false;controls.update();
+    orbCam.lookAt(0,10,0)}
+}else{
+  setCam(ui.cam==='kart'?'kart':'orbit');
+}
+/* ?demobank=N — exercise the real bank pipeline for proof shots */
+if(q.demobank){
+  var n=Math.min(6,parseInt(q.demobank,10)||3),baseSeed=state.seed;
+  sizeViewport();
+  for(var i=0;i<n;i++){state.seed=(baseSeed+i)>>>0;rebuild();bankCurrent(true)}
+  state.seed=baseSeed;seedInput.value=baseSeed;rebuild();renderBank();
+  /* &demoload=1 — pull the first banked world back through the REAL loadBank path */
+  if(q.demoload==='1'&&bank.length)loadBank(bank[0]);
+}
+
+/* ── main loop — rAF stays ALIVE; shot modes warm 3 then every 10th tick ── */
+var frameCount=0,lastT=0;
+function loop(t){
+  requestAnimationFrame(loop);
+  var dt=Math.min(0.05,(t-lastT)/1000)||0.016;lastT=t;
+  frameCount++;
+  if(frameCount===1)sizeViewport();   // layout can settle after boot in headless
+  if(camMode==='kart')kartTick(dt);
+  else if(controls.enabled)controls.update();
+  if(SHOTISH){
+    if(frameCount<=3||frameCount%10===0)render();
+    if(frameCount===3||frameCount%30===0)   /* title doubles as headless error probe */
+      document.title=__errs.length?
+        ('SHOT-ERR-'+__errs.length+'-'+__errs[0]).slice(0,150):'SHOT-READY';
+    if(frameCount===6&&q.diag==='1')shotDiag();
+    if(frameCount===3&&q.recipedump==='1'){   /* dev: expose the exact recipe JSON */
+      var rp=document.createElement('pre');rp.id='recipeDump';rp.style.display='none';
+      rp.textContent=JSON.stringify(makeRecipe());document.body.appendChild(rp)}
+  }else render();
+  fpsTick(t)}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
