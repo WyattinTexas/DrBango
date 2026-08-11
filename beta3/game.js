@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.3.3';
+const BUILD = 'STARSPELL v0.3.4';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -78,10 +78,19 @@ SS.load();
 /* ============================================================
    Shared drawing helpers (textures + constellation rendering)
    ============================================================ */
+// Texture crispness factor: box art (buttons, tiles, panels) is authored in a
+// small design-space canvas; on retina the upscale smeared every edge. Draw
+// those canvases at R x and let setDisplaySize map them 1:1-ish to device px.
+function ssTexRes(scene) {
+  return Math.min(Math.max(Math.min(scene.scale.width / 420, scene.scale.height / 800), 1), 3);
+}
 function ssMakeTextures(scene) {
-  const mk = (key, w, h, fn) => {
+  const R = ssTexRes(scene);
+  const mk = (key, w, h, fn, r) => {
     if (scene.textures.exists(key)) return;
-    const t = scene.textures.createCanvas(key, w, h);
+    r = r || 1;
+    const t = scene.textures.createCanvas(key, Math.round(w * r), Math.round(h * r));
+    t.context.scale(r, r);
     fn(t.context, w, h); t.refresh();
   };
   mk('dot', 16, 16, (c, w, h) => {
@@ -109,7 +118,7 @@ function ssMakeTextures(scene) {
     const g3 = c.createLinearGradient(0, 92, 0, 120);
     g3.addColorStop(0, 'rgba(0,0,0,0)'); g3.addColorStop(1, 'rgba(60,40,10,0.22)');
     c.fillStyle = g3; c.fill();
-  });
+  }, R);
   tileTex('tile0', '#f7f1e2', '#dfd3b8', '#b8a67f');
   tileTex('tile1', '#ffe9a8', '#e8b84b', '#a97c1c');
   tileTex('tile2', '#e6f6ff', '#a8d9f2', '#5f9fc4');
@@ -122,7 +131,7 @@ function ssMakeTextures(scene) {
     c.lineWidth = 3; c.strokeStyle = '#a98d51'; c.stroke();
     c.lineWidth = 1.5; c.strokeStyle = '#ffffffaa';
     c.beginPath(); c.roundRect(8, 8, 240, 240, 18); c.stroke();
-  });
+  }, R);
   mk('btn', 256, 96, (c) => {
     c.beginPath(); c.roundRect(4, 4, 248, 88, 46);
     const g = c.createLinearGradient(0, 4, 0, 92);
@@ -133,12 +142,12 @@ function ssMakeTextures(scene) {
     const g2 = c.createLinearGradient(0, 10, 0, 44);
     g2.addColorStop(0, 'rgba(255,255,255,0.65)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
     c.fillStyle = g2; c.fill();
-  });
+  }, R);
   mk('btndark', 256, 96, (c) => {
     c.beginPath(); c.roundRect(4, 4, 248, 88, 46);
     c.fillStyle = '#161d38'; c.fill();
     c.lineWidth = 2.5; c.strokeStyle = '#4a5a8c'; c.stroke();
-  });
+  }, R);
 }
 
 function ssStarfield(scene, count) {
@@ -189,9 +198,11 @@ function ssAscentP(ms) {
 }
 
 function ssSkyTextures(scene) {
-  const mk = (key, w, h, fn) => {
+  const mk = (key, w, h, fn, r) => {
     if (scene.textures.exists(key)) return;
-    const t = scene.textures.createCanvas(key, w, h);
+    r = r || 1;
+    const t = scene.textures.createCanvas(key, Math.round(w * r), Math.round(h * r));
+    t.context.scale(r, r);
     fn(t.context, w, h); t.refresh();
   };
   mk('skygrad', 64, 1024, (c, w, h) => {
@@ -227,7 +238,7 @@ function ssSkyTextures(scene) {
     c.globalCompositeOperation = 'source-over';
     c.fillStyle = 'rgba(247,232,200,0.06)';
     c.beginPath(); c.arc(0, 0, 54, 0, Math.PI * 2); c.fill();
-  });
+  }, 2);
   mk('cloudwisp', 256, 80, (c, w, h) => {
     const blob = (cx, cy, rx, ry, col, a) => {
       c.save(); c.translate(cx, cy); c.scale(rx / 40, ry / 40);
@@ -250,7 +261,7 @@ function ssSkyTextures(scene) {
     const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, 7);
     g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)');
     c.fillStyle = g; c.fillRect(w / 2 - 7, h / 2 - 7, 14, 14);
-  });
+  }, 2);
   mk('grasstrip', 512, 32, (c, w, h) => {   // 512x32: POT both ways — WebGL1 iPhones can't REPEAT an NPOT texture
     c.fillStyle = '#050310';
     c.beginPath(); c.moveTo(0, h);
@@ -262,7 +273,7 @@ function ssSkyTextures(scene) {
       c.beginPath(); c.moveTo(x, h); c.quadraticCurveTo(x + 3, h - 14, x, top + 5); c.stroke();
       c.fillStyle = '#050310'; c.beginPath(); c.arc(x, top + 4, 3.2, 0, Math.PI * 2); c.fill();
     }
-  });
+  }, 2);   // 1024x64 — still power-of-two both ways for WebGL1 REPEAT
 }
 
 const SS_STAR_COLORS = [0xcfd8ff, 0xcfd8ff, 0xcfd8ff, 0xffe9c9, 0xffd1dc, 0xc9fff2];
@@ -306,15 +317,16 @@ function ssSkyWorld(scene) {
 
   // hero stars — the ones a player would wish on, in the meadow's dusk sky
   for (let i = 0; i < 6; i++) {
+    const hsz = l.u(14 + Math.random() * 10);
     const hs = scene.add.image(l.x(-190 + Math.random() * 380), l.y(50 + Math.random() * 320), 'spark4')
-      .setScale(l.u(0.22 + Math.random() * 0.16)).setAlpha(0.6).setBlendMode('ADD').setScrollFactor(1, 0.85);
+      .setDisplaySize(hsz, hsz).setAlpha(0.6).setBlendMode('ADD').setScrollFactor(1, 0.85);
     scene.tweens.add({ targets: hs, angle: 360, duration: 42000 + Math.random() * 40000, repeat: -1 });
     scene.tweens.add({ targets: hs, alpha: 0.45, duration: 2200 + Math.random() * 1800, yoyo: true, repeat: -1, delay: Math.random() * 2000 });
   }
 
   // moon — low on the horizon's left shoulder, clear of the buttons,
   // slides down and out during the first half of the rise
-  const moon = scene.add.image(l.x(-140), l.y(425), 'moon').setScale(l.u(0.72)).setAngle(24).setScrollFactor(1, 0.85);
+  const moon = scene.add.image(l.x(-140), l.y(425), 'moon').setDisplaySize(l.u(104), l.u(104)).setAngle(24).setScrollFactor(1, 0.85);
   const halo = scene.add.image(moon.x, moon.y, 'glowbig').setScale(l.u(0.95)).setTint(0xf7e8c8).setAlpha(0.14).setBlendMode('ADD').setScrollFactor(1, 0.85);
   scene.tweens.add({ targets: halo, alpha: 0.1, duration: 4200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
@@ -331,7 +343,7 @@ function ssSkyWorld(scene) {
   const grassY = Math.max(l.y(772), l.H - l.u(30));
   for (const [off, ph] of [[0, 0], [l.u(5), 1300]]) {
     const gr = scene.add.tileSprite(l.W / 2, grassY + off, l.W, l.u(32), 'grasstrip').setOrigin(0.5, 0);
-    gr.setTileScale(l.s); gr.tilePositionX = off * 20;
+    gr.setTileScale(l.s / 2); gr.tilePositionX = off * 20;   // texture is drawn at 2x
     scene.tweens.add({ targets: gr, x: gr.x + l.u(1.5), duration: 2600, yoyo: true, repeat: -1, delay: ph, ease: 'Sine.easeInOut' });
   }
   const flies = [];
@@ -399,9 +411,11 @@ function ssAssembleBeast(scene, cont, beast, unitScale, onDone) {
 }
 
 function ssTxt(scene, x, y, str, size, color, style) {
+  // shadow stays tight — a soft wide black blur turned small text to smear on
+  // gold buttons at retina; a crisp 1px-ish drop keeps contrast without mush
   return scene.add.text(x, y, str, {
     fontFamily: SERIF, fontSize: size + 'px', color: color || '#f0e8d2', fontStyle: style || 'bold',
-  }).setShadow(0, size * 0.07, '#000000', size * 0.25);
+  }).setShadow(0, Math.max(1, size * 0.05), 'rgba(0,0,0,0.45)', size * 0.09);
 }
 
 // Layout: 420 x 800 design space, scaled + centered
