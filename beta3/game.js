@@ -8,8 +8,11 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.3.1';
-const DPR = Math.min(window.devicePixelRatio || 1, 2);
+const BUILD = 'STARSPELL v0.3.2';
+// Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
+// went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
+const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
 const QS = new URLSearchParams(location.search);
 const DEMO = QS.get('demo') === '1';
 
@@ -428,7 +431,7 @@ let PENDING_ASCENT = null;   // survives a mid-ascent resize-restart: finish to 
 class Home extends Phaser.Scene {
   constructor() { super('home'); }
   create() {
-    if (PENDING_ASCENT) { const d = PENDING_ASCENT; PENDING_ASCENT = null; this.scene.start('battle', d); return; }
+    if (PENDING_ASCENT) { DIAG('restart mid-ascent → straight to battle'); const d = PENDING_ASCENT; PENDING_ASCENT = null; this.scene.start('battle', d); return; }
     const l = ssLayout(this);
     ssMakeTextures(this);
     this.sky = ssSkyWorld(this);
@@ -499,6 +502,7 @@ class Home extends Phaser.Scene {
 
     localStorage.setItem('beta3.boot', BUILD);
     console.log(BUILD);
+    DIAG(BUILD + ' · ' + (this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas') + ' ' + this.game.scale.width + 'x' + this.game.scale.height + ' dprCap ' + DPR);
     if (QS.get('vsdemo') === '1') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
     else if (DEMO || QS.get('daily') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? 'quick' : 'daily'));
   }
@@ -517,6 +521,7 @@ class Home extends Phaser.Scene {
   beginAscent(data) {
     this.ascending = true;
     PENDING_ASCENT = data;
+    DIAG('ascent begin (' + data.mode + ')');
     try {
       const l = ssLayout(this);
       SFX.crickets(false); SFX.riser();
@@ -525,6 +530,7 @@ class Home extends Phaser.Scene {
       if (this.bloomBtn) this.tweens.add({ targets: this.bloomBtn, scale: { from: this.bloomBtn.scaleX, to: this.bloomBtn.scaleX * 1.08 }, duration: 130, yoyo: true });
       this.tweens.add({ targets: this.uiItems, alpha: 0, duration: 300 });
       if (ssReduceMotion()) {
+        DIAG('ascent: reduce-motion is ON → veil crossfade instead of the rise');
         const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setAlpha(0).setDepth(600);
         this.tweens.add({ targets: veil, alpha: 1, duration: 200, onComplete: () => this.arrive() });
         return;
@@ -534,10 +540,11 @@ class Home extends Phaser.Scene {
       this.input.on('pointerdown', this.skipFn = () => { if (this.ascending && !this.skipAt) this.skipAt = ASC.TOTAL_MS - 220; });
       if (DEMO) this.skipAt = ASC.TOTAL_MS - 220;   // the solver has no time for wonder
     } catch (e) {
-      this.fallbackToBattle();                       // the rise must never strand the player
+      this.fallbackToBattle(e);                      // the rise must never strand the player
     }
   }
-  fallbackToBattle() {
+  fallbackToBattle(e) {
+    DIAG('ascent FALLBACK: ' + (e && e.message || '?'));
     const data = PENDING_ASCENT || { mode: 'quick', resume: null };
     PENDING_ASCENT = null;
     this.arrived = true;
@@ -560,6 +567,7 @@ class Home extends Phaser.Scene {
   arrive() {
     if (this.arrived) return;
     this.arrived = true;
+    DIAG('ascent arrive' + (this.skipAt ? ' (skipped)' : ''));
     if (this.skipFn) this.input.off('pointerdown', this.skipFn);
     SFX.arriveChime();                              // the hush, then the forge voice
     const data = PENDING_ASCENT; PENDING_ASCENT = null;
@@ -1368,7 +1376,7 @@ const game = new Phaser.Game({
   height: Math.round(window.innerHeight * DPR),
   backgroundColor: '#0a0d1c',
   scale: { mode: Phaser.Scale.NONE },
-  render: { antialias: true, powerPreference: 'high-performance' },
+  render: { antialias: DPR < 2, powerPreference: 'high-performance' },
   scene: [Home, Battle, Profile, Board],
 });
 function fitCanvas() {
@@ -1388,6 +1396,7 @@ window.addEventListener('resize', () => {
   // — that must NOT restart scenes or it cuts the ascent and resets battles.
   // Only a real reshape (rotation / window drag) relays out.
   const major = Math.abs(window.innerWidth - lastRW) > 4 || Math.abs(window.innerHeight - lastRH) > 200;
+  if (window.SSDIAG) window.SSDIAG('resize ' + window.innerWidth + 'x' + window.innerHeight + (major ? ' MAJOR → scene restart' : ' minor (ignored)'));
   lastRW = window.innerWidth; lastRH = window.innerHeight;
   if (!major) return;
   clearTimeout(resizeTo);
