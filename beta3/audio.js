@@ -23,6 +23,7 @@ class SynthAudio {
       this.pad = new AmbientPad(this);
       this.pad.start();
       if (this.meadowOn) this._cricketBoot();
+      if (this.dawnOn) this._birdBoot();
     } catch (e) { /* garnish only */ }
   }
   setMuted(m) { this.muted = m; localStorage.setItem('beta3.mute', m ? '1' : '0'); if (this.ok) this.master.gain.value = m ? 0 : 0.5; }
@@ -74,6 +75,30 @@ class SynthAudio {
       next();
     };
     voice(4150); setTimeout(() => voice(4420), 700);
+  }
+  /* dawn birds — sparse descending chirps, the meadow at sunrise */
+  birds(on) {
+    this.dawnOn = on;
+    if (!this.ok) return;
+    this._birdBoot();
+    this.birdGain.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, on ? 0.6 : 0.25);
+  }
+  _birdBoot() {
+    if (this.birdGain) return;
+    this.birdGain = this.ctx.createGain();
+    this.birdGain.gain.value = this.dawnOn ? 1 : 0;
+    this.birdGain.connect(this.master);
+    const voice = (lo) => {
+      const next = () => {
+        if (this.dawnOn) {
+          const f0 = lo + Math.random() * 900, n = 2 + Math.floor(Math.random() * 3);
+          for (let i = 0; i < n; i++) this.tone(f0 * (1 - 0.11 * i), 0.07, 'sine', 0.012, i * 0.1, f0 * (1 - 0.11 * i) * 0.85, this.birdGain);
+        }
+        setTimeout(next, 1100 + Math.random() * 2800);
+      };
+      next();
+    };
+    voice(2100); setTimeout(() => voice(2600), 1600);
   }
   riser() { this.sweep(300, 2600, 2.3, 0.10); this.sweep(190, 520, 2.3, 0.05, true); }
   arriveChime() { this.tone(880, 0.35, 'sine', 0.08, 0.12); this.tone(1318.5, 0.5, 'sine', 0.07, 0.22); }

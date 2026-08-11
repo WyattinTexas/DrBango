@@ -150,9 +150,14 @@ class VsBattle extends Phaser.Scene {
   create() {
     const l = this.L = ssLayout(this);
     ssMakeTextures(this);
-    ssStarfield(this, 100);
+    // both duelists share the seal code, so hashing it seeds an IDENTICAL sky —
+    // you wait on the same meadow and rise together into the same stars
+    let seedH = 0;
+    for (const ch of this.code) seedH = (seedH * 31 + ch.charCodeAt(0)) | 0;
+    this.sky = ssSkyWorld(this, { zenithAtZero: true, seed: (seedH ^ 0x5f37c11) || 1 });
+    this.sky.setP(0, 0);       // the lobby waits on the meadow
     this.room = null;
-    this.state = 'wait';       // wait | pick | anim | sigil | done
+    this.state = 'wait';       // wait | rise | pick | anim | sigil | done
     this.board = []; this.sel = []; this.lineTiles = [];
     this.mySigils = [];
     this.seenCasts = {};
@@ -224,9 +229,12 @@ class VsBattle extends Phaser.Scene {
     }).setDepth(60);
     this.overlayC = this.add.container(0, 0).setDepth(100);
 
-    // lobby veil
-    this.lobbyC = this.add.container(0, 0).setDepth(90);
-    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.75);
+    // lobby veil — camera-fixed: the battle HUD lives at the zenith, but the
+    // lobby floats over the meadow where the camera waits
+    this.lobbyC = this.add.container(0, 0).setDepth(90).setScrollFactor(0);
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.55);
+    const leave = ssTxt(this, l.x(-195), l.y(24), '‹ LEAVE', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    leave.on('pointerdown', () => { SFX.ui(); this.scene.start('vsmenu'); });
     this.lobbyTitle = txt(l.x(0), l.y(240), 'THE SUMMONS IS SEALED', 20, '#f3e5b4').setOrigin(0.5)
       .setShadow(0, 0, '#c9a94f', l.u(12), true, true);
     this.lobbyCode = txt(l.x(0), l.y(300), this.code, 44, '#ffe9a8').setOrigin(0.5)
@@ -236,7 +244,7 @@ class VsBattle extends Phaser.Scene {
     this.beginB = this.add.image(l.x(0), l.y(540), 'btn').setDisplaySize(l.u(220), l.u(56)).setInteractive({ useHandCursor: true }).setVisible(false);
     this.beginT = txt(l.x(0), l.y(540), 'BEGIN THE BATTLE', 15, '#4a3305').setOrigin(0.5).setVisible(false);
     this.beginB.on('pointerdown', () => this.hostStart());
-    this.lobbyC.add([veil, this.lobbyTitle, this.lobbyCode, this.lobbySub, this.lobbyRoster, this.beginB, this.beginT]);
+    this.lobbyC.add([veil, this.lobbyTitle, this.lobbyCode, this.lobbySub, this.lobbyRoster, this.beginB, this.beginT, leave]);
   }
 
   /* ---------- room snapshots drive everything ---------- */
@@ -297,13 +305,45 @@ class VsBattle extends Phaser.Scene {
   }
 
   beginBattle() {
-    SFX.victory();
-    const l = this.L;
     this.tweens.add({ targets: this.lobbyC, alpha: 0, duration: 400, onComplete: () => this.lobbyC.setVisible(false) });
     setSeed(this.room.seed || 1);
     this.board = []; this.sel = [];
-    this.fillBoard(true);
     this.buildOpponentPanels();
+    this.state = 'rise';
+    // rise together: both clients see status flip to active within moments of
+    // each other and climb the same seeded sky. On a stale rejoin (resize
+    // restart mid-battle) skip straight to the zenith.
+    const fresh = Date.now() - (this.room.startedAt || 0) < 8000;
+    if (!fresh || ssReduceMotion()) { this.arriveBattle(true); return; }
+    SFX.riser();
+    this.riseStart = this.time.now;
+    this.riseSkipAt = null; this.riseLastP = 0; this.riseLastT = this.time.now;
+    this.time.delayedCall(400, () => {   // arm skip past any launching tap
+      if (this.state !== 'rise') return;
+      this.riseSkipFn = () => { if (this.state === 'rise' && !this.riseSkipAt) this.riseSkipAt = ASC.TOTAL_MS - 220; };
+      this.input.on('pointerdown', this.riseSkipFn);
+    });
+  }
+  update(time) {
+    if (this.state !== 'rise' || !this.riseStart) return;
+    try {
+      let ms = time - this.riseStart;
+      if (this.riseSkipAt && ms < this.riseSkipAt) { this.riseStart = time - this.riseSkipAt; ms = this.riseSkipAt; }
+      if (ms >= ASC.TOTAL_MS) { this.arriveBattle(); return; }
+      const p = ssAscentP(ms);
+      const vel = Math.max(0, (p - this.riseLastP) / Math.max(1, time - this.riseLastT));
+      this.sky.setP(p, vel);
+      this.riseLastP = p; this.riseLastT = time;
+    } catch (e) { this.arriveBattle(true); }
+  }
+  arriveBattle(instant) {
+    if (this.state !== 'rise') return;
+    if (this.riseSkipFn) { this.input.off('pointerdown', this.riseSkipFn); this.riseSkipFn = null; }
+    this.sky.setP(1, 0);
+    if (!instant) SFX.arriveChime();
+    SFX.victory();
+    const l = this.L;
+    this.fillBoard(true);
     this.state = 'pick';
     this.updatePanels();
     const go = ssTxt(this, l.x(0), l.y(400), 'WEAVE!', l.u(30), '#2fe0d0').setOrigin(0.5).setDepth(80).setScale(0.5);
@@ -612,6 +652,7 @@ class VsBattle extends Phaser.Scene {
 
   endBattle() {
     this.state = 'done';
+    if (this.sky) this.sky.setP(1, 0);   // if the duel dies mid-rise, land at the zenith where the overlay lives
     const l = this.L;
     const won = this.room.winnerUid === vsUid();
     const winner = this.room.players[this.room.winnerUid];
