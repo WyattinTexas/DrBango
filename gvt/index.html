@@ -1919,6 +1919,30 @@
      nothing, so the kill list never needs to know it exists. */
   .nemcry { display:inline-block; font-size:clamp(1.15rem,4.4vw,1.9rem); color:#FF4D4D; text-transform:none;
     letter-spacing:0.02em; margin-top:0.25rem; text-shadow:0 0 14px rgba(255,45,45,0.5); }
+  /* v3.24 ENDCARD FIT (card 04) — the verdict card must FIT the screen. The
+     headline, cry, flag row and button all carry a vh term now so a 375px-tall
+     phone caps them (the arcade logo's own min(vw,vh) idiom); the battlefield
+     verdict body renders as rows (.vr) + reward chips (.vc) via vfill()
+     instead of one giant ' · ' paragraph, with a tighter scale (.vlong) once
+     the stack runs 8+ parts. Campaign verdicts still write plain text into
+     these same elements — the caps improve them, nothing else touches them.
+     The overlay pair is also the no-clip BACKSTOP: margin-auto centering +
+     overflow-y:auto means anything ever taller than the screen scrolls INSIDE
+     the card (the contract's last resort) — clipping is structurally gone. */
+  #win, #lose { overflow-y:auto; touch-action:pan-y; justify-content:flex-start; }
+  #win > :first-child, #lose > :first-child { margin-top:auto; }
+  #win > :last-child, #lose > :last-child { margin-bottom:auto; }
+  #win h1, #lose h1 { font-size:clamp(1.5rem, min(9vw, 11vh), 4.5rem); line-height:1.05; margin-bottom:clamp(0.15rem, 1.2vh, 0.5rem); }
+  #win .nemcry, #lose .nemcry { font-size:clamp(1rem, min(4.4vw, 5vh), 1.9rem); }
+  #win .medals { font-size:clamp(1.05rem, min(2.4rem, 5.2vh), 2.4rem); margin:clamp(0.1rem, 0.8vh, 0.6rem) 0 0; }
+  #win p, #lose p { font-size:clamp(0.9rem, min(1.1rem, 4.5vh), 1.1rem); max-width:min(92vw, 46em); line-height:1.35; }
+  #win .btn, #lose .btn { margin-top:clamp(0.35rem, 1.6vh, 1.4rem); }
+  .vr { display:block; margin:0.14em 0; }
+  .vc { display:inline-block; font-size:0.88em; line-height:1.25; padding:0.1em 0.7em; margin:0.12em 0.12em;
+    border-radius:999px; background:rgba(255,255,255,0.07); border:1px solid rgba(237,234,223,0.26);
+    max-width:96%; box-sizing:border-box; vertical-align:middle; }
+  .vlong .vr { font-size:0.9em; }
+  .vlong .vc { font-size:0.74em; }
   .roomtag.alarm { background:#A63B2A; box-shadow:0 0 15px rgba(166,59,42,0.8); animation:blink 1.25s linear infinite; }
   .roomtag.alarm:hover { background:#C34A36; }
   /* piggy bank: tapping it should pay you back in joy, not a menu */
@@ -2664,7 +2688,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.23</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.24</div>
   <div class="scanlines"></div>
 </div>
 
@@ -15267,6 +15291,7 @@ function rivalDayWin(id){
   if(META.rivalDays[day]) return { stars:1, msg:t('Rival already beaten today — +1★ for the drill.'), first:false };
   META.rivalDays[day]=id; META.stats.rivalWins++;
   let msg=t('DAILY RIVAL DOWN · BONUS +5★');
+  const parts=[msg];   // v3.24 ENDCARD FIT: the same clauses UN-GLUED — the battlefield verdict chips read these; msg stays byte-identical for the campaign's own end line
   // THE PIGGY BANK LIVES ANOTHER DAY. A missed day has already dropped the
   // streak (pigCheck), so this either extends the run or starts one at 1.
   pigCheck();
@@ -15277,14 +15302,17 @@ function rivalDayWin(id){
   // now — the countdown used to fire only while the piggy was still unpainted,
   // and the whole point of the streak is wanting tomorrow's defense. Numbers
   // ride %N so no translation ever carries a digit; colors ride their own rows.
-  if(after>before) msg+=' · '+tf('🐷 DAY %1 — THE PIGGY BANK TURNED %2! IT PAYS +%3★ EVERY DAY NOW', META.piggy.streak, t(PIG_COLORS[after].name), pigPayout());
-  else msg+=' · '+tf('🐷 PIGGY SAFE — DAY %1', META.piggy.streak);
+  { const c=(after>before)? tf('🐷 DAY %1 — THE PIGGY BANK TURNED %2! IT PAYS +%3★ EVERY DAY NOW', META.piggy.streak, t(PIG_COLORS[after].name), pigPayout())
+                          : tf('🐷 PIGGY SAFE — DAY %1', META.piggy.streak);
+    msg+=' · '+c; parts.push(c); }
   if(after<9){ const need=pigNeed();
-    msg+=' · '+tf(need===1?'%1 MORE DAY → %2 (+%3★ A DAY)':'%1 MORE DAYS → %2 (+%3★ A DAY)', need, t(PIG_COLORS[after+1].name), pigNextPays()); }
+    const c=tf(need===1?'%1 MORE DAY → %2 (+%3★ A DAY)':'%1 MORE DAYS → %2 (+%3★ A DAY)', need, t(PIG_COLORS[after+1].name), pigNextPays());
+    msg+=' · '+c; parts.push(c); }
   // the stake is the engagement hook — a bank never exempts the paint (Wyatt:
   // "Even if you upgrade your piggy bank, you still have to defend")
-  msg+=' · '+t(after===9? 'MISS A DAY AND IT ALL POPS BACK TO PINK':'MISS A DAY AND IT POPS BACK TO PINK');
-  return { stars:5, msg, first:true };
+  { const c=t(after===9? 'MISS A DAY AND IT ALL POPS BACK TO PINK':'MISS A DAY AND IT POPS BACK TO PINK');
+    msg+=' · '+c; parts.push(c); }
+  return { stars:5, msg, parts, first:true };
 }
 // the one-line piggy report used by the rival panel — where the daily raid lives.
 // v1.87: composed through the table CLAUSE BY CLAUSE (tf + the colors' own
@@ -15374,6 +15402,23 @@ const NEM_COUNTER={ blue:'orange', orange:'blue', red:'green', green:'red',
 const NEM_QUIPS=['Got chu','ooo','Nice try','almost'];                            // he beat YOU
 const NEM_CRIES=['NOOOO!','HOW CAN THIS BE?',"I'LL BE BACK!","I'M TELLING MOM!"]; // YOU beat him
 function nemSay(list){ return '<br><span class="nemcry">"'+TXT(list[(Math.random()*list.length)|0])+'"</span>'; }
+// v3.24 ENDCARD FIT (card 04, Wyatt: "After the battle the UI popup didn't fit
+// on the screen"): the battlefield verdict body renders as compact rows and
+// reward chips — one <span> per clause — instead of one giant ' · ' paragraph.
+// parts = [kind, html]: kind 'r' is a full-width row (.vr), 'c' a pill chip
+// (.vc). Everything arrives PRE-translated (t()/tf() at composition, the v1.29
+// law) and HTML-safe: fixed table strings only — the one free-text string on
+// these screens, the rival's NAME, lives in the title and stays escH'd there.
+// ⚠ the __enHTML bust is v1.79's law one layer down: with real children in the
+// <p>, the localize pass's tryWhole() would cache the FIRST verdict's markup
+// and clobber every LATER verdict back to it in non-EN — exactly the card-02
+// title bug. Campaign verdicts still write plain textContent into this same
+// element and never meet this function (a leftover .vlong is inert on text).
+function vfill(el, parts){
+  el.__enHTML=undefined;
+  el.classList.toggle('vlong', parts.length>=8);   // the tighter type scale on long stacks
+  el.innerHTML=parts.map(p=>'<span class="'+(p[0]==='r'?'vr':'vc')+'">'+p[1]+'</span>').join('');
+}
 function nemEff(){ const n=META.nemesis||{}; return Math.max(NEMESIS_FLOOR, 1-NEMESIS_STEP*(n.l|0)); }
 // his colors are decided AT SERVE TIME off whatever you wear TODAY (contract
 // §2) — a fresh object every serve, never a shared ARMIES row (nothing here
@@ -22888,11 +22933,11 @@ function endBattlefield(reason, fromRelay){
   // EARNED DECORATIONS (v1.71): the racecar's 50th knockover usually lands on
   // this very tally, so its crossing announces on this end screen — win OR
   // lose, same as the tally above. ⚠ the win text is REWRITTEN when
-  // /challenge answers (the v1.13 lesson), so the line rides the `spoils`
-  // string both writes append — never a one-shot textContent of its own.
-  let bfEarn='';
+  // /challenge answers (the v1.13 lesson): both writes render the SAME vParts
+  // list through vfill() — the answer only swaps flavorRow's text (v3.24).
+  const bfEarnA=[];   // v3.24: chips now (vfill) — the ' · ' glue died with the giant paragraph
   for(const dk of DECOR_EARN_ORDER)
-    if(DECOR_EARN[dk].due() && !decOwns(dk)){ META.decor.own.push(dk); bfEarn+=' · '+TXT(DECOR_LINE[dk]); }
+    if(DECOR_EARN[dk].due() && !decOwns(dk)){ META.decor.own.push(dk); bfEarnA.push(TXT(DECOR_LINE[dk])); }
   const my=bf.base[bfFoeTeam()].dmgTaken, th=bf.base[bfMyTeam()].dmgTaken;
   const copy=BF_END[reason]||BF_END[won?'time':'timeLoss'];
   const margin=t('YOU SMASHED '+my+' — THEY SMASHED '+th);
@@ -22938,15 +22983,23 @@ function endBattlefield(reason, fromRelay){
     // raw: one tune per purse, never across them (the v1.28 two-purse law).
     { const gx=gearStarX(starGain); if(gx){ META.starBank+=gx; META.starsLifetime+=gx; } }
     const promos=xpAward(xpGain,{src:'battleground'});
-    const spoils=' · '+t('+'+starGain+'★ WINNINGS · +'+xpGain+' XP')+promoTag(promos)
-      +(friendly? ' · '+t('FRIENDLY (no ladder)') : '')+bfEarn;
+    // v3.24 ENDCARD FIT (card 04): the verdict body is a typed parts LIST now —
+    // ['r',…] full-width rows, ['c',…] reward chips — rendered by vfill().
+    // Every clause is the byte-same string it always was, in the same order;
+    // only the ' · ' glue died. flavorRow is swapped BY REFERENCE when
+    // /challenge answers (the v1.13 rewrite law, minus the string surgery).
+    const flavorRow=['r', t(copy[1])];
+    const vParts=[['r', margin], flavorRow, ['c', t('+'+starGain+'★ WINNINGS · +'+xpGain+' XP')]];
+    if(promos>0) vParts.push(['c', tf('PROMOTED TO LEVEL %1!', META.lvl)]);   // promoTag's own key — the campaign keeps promoTag itself
+    if(friendly) vParts.push(['c', t('FRIENDLY (no ladder)')]);
+    for(const dl of bfEarnA) vParts.push(['c', dl]);
     // THE DAILY RAID's own purse, on top of the battleground's — first win of the
     // day only, and it is what keeps the piggy bank's streak alive.
-    let raidMsg='';
     if(bf.raid && !priv){
       const rd=rivalDayWin(bf.rival.id);
       META.starBank+=rd.stars; META.starsLifetime+=rd.stars;
-      raidMsg=' · '+rd.msg+(rd.first?'':' '+t('(+1★)'));
+      if(rd.first){ for(const c of rd.parts) vParts.push(['c', c]); }   // the daily purse + the piggy report, one chip each
+      else vParts.push(['c', rd.msg+' '+t('(+1★)')]);
     }
     // ===== v3.12 NEMESIS BESTED — the full purse, EVERY defeat (contract §8:
     // only the medal is once). rivalDayWin above already counted the day, the
@@ -22966,14 +23019,14 @@ function endBattlefield(reason, fromRelay){
       N.w=(N.w|0)+1; if(NEMESIS_RESET_ON_WIN) N.l=0;
       while((N.st|0)<NEMESIS_DAYS.length && NEMESIS_DAYS[N.st|0]<=(META.piggy.streak|0)) N.st=(N.st|0)+1;
       META.starBank+=NEMESIS_STARS; META.starsLifetime+=NEMESIS_STARS;
-      raidMsg+=' · '+tf('🏆 NEMESIS BESTED — +%1★!', NEMESIS_STARS);
+      vParts.push(['c', tf('🏆 NEMESIS BESTED — +%1★!', NEMESIS_STARS)]);
       const pool=mboxPool();
       if(pool.length){ const e=pool[(Math.random()*pool.length)|0]; e.g();
-        raidMsg+=' · '+tf('🎁 HE LEFT A GIFT — %1!', e.notr? e.name : TXT(e.name)); }
+        vParts.push(['c', tf('🎁 HE LEFT A GIFT — %1!', escH(e.notr? e.name : TXT(e.name)))]); }   // escH: the line renders as HTML now
       else { META.starBank+=NEMESIS_STARS; META.starsLifetime+=NEMESIS_STARS;
-        raidMsg+=' · '+tf('🎁 He would have left a gift — but you own EVERYTHING. +%1★ instead!', NEMESIS_STARS); }
-      if(!META.ach.hm13) raidMsg+=' · '+TXT('🎖 NEW MEDAL — BESTED RIVAL hangs in your case!');   // checkAch at the foot banks it this same tick (the hm11 law)
-      if((N.st|0)<NEMESIS_DAYS.length) raidMsg+=' · '+tf('NEMESIS RETURNS AT DAY %1', NEMESIS_DAYS[N.st|0]);
+        vParts.push(['c', tf('🎁 He would have left a gift — but you own EVERYTHING. +%1★ instead!', NEMESIS_STARS)]); }
+      if(!META.ach.hm13) vParts.push(['c', TXT('🎖 NEW MEDAL — BESTED RIVAL hangs in your case!')]);   // checkAch at the foot banks it this same tick (the hm11 law)
+      if((N.st|0)<NEMESIS_DAYS.length) vParts.push(['c', tf('NEMESIS RETURNS AT DAY %1', NEMESIS_DAYS[N.st|0])]);
     }
     // v2.52 THE FEATURED BATTLE: the first win of the day pays its +30★ on
     // top of the ordinary spoils; every later run is a plain battle (the
@@ -22981,7 +23034,7 @@ function endBattlefield(reason, fromRelay){
     if(bf.feat && !priv && !featDone()){
       META.featDays=META.featDays||{}; META.featDays[todayStr()]=1;
       META.starBank+=FEAT_STARS; META.starsLifetime+=FEAT_STARS;
-      raidMsg+=' · '+tf('⭐ FEATURED BATTLE — BONUS +%1★', FEAT_STARS);
+      vParts.push(['c', tf('⭐ FEATURED BATTLE — BONUS +%1★', FEAT_STARS)]);
     }
     const wt=document.getElementById('winTitle'); wt.style.color='#7FA35C';
     // v3.22 THE VOICE: NEMESIS DEFEATED stands — and he CRIES, one of his four,
@@ -22992,7 +23045,7 @@ function endBattlefield(reason, fromRelay){
     wt.__enHTML=undefined;
     wt.innerHTML = (bf.raid? (escH(bf.rival.name.toUpperCase())+'<br>'+t('DEFEATED')) : t(copy[0])) + (bf.nem? nemSay(NEM_CRIES) : '');
     document.getElementById('medalRow').textContent='⚑ ⚑ ⚑';
-    document.getElementById('medalText').textContent=margin+' · '+t(copy[1])+spoils+raidMsg;
+    vfill(document.getElementById('medalText'), vParts);
     // report the win to HQ the same way an invasion does — /challenge pays the
     // first-of-the-day bonus. NEVER route rewards through /sync (it clamps).
     // ⚠ Not from a private room: that bonus is for beating the DAILY RIVAL, and
@@ -23002,7 +23055,8 @@ function endBattlefield(reason, fromRelay){
       .then(r=>r.json()).then(d=>{
         const el=document.getElementById('medalText');
         if(el&&d&&d.bonus>0){ META.starBank+=d.bonus; META.starsLifetime+=d.bonus; saveMeta();
-          el.textContent=margin+' · '+tf('FIRST BATTLEFIELD WIN TODAY — BONUS +%1★ (%2 left today)', d.bonus, d.capLeft)+spoils+raidMsg; }
+          flavorRow[1]=tf('FIRST BATTLEFIELD WIN TODAY — BONUS +%1★ (%2 left today)', d.bonus, d.capLeft);
+          vfill(el, vParts); }   // the same list, re-rendered — flavorRow swapped by reference
       }).catch(()=>{});
   } else {
     META.bfLosses++;
@@ -23012,7 +23066,7 @@ function endBattlefield(reason, fromRelay){
     // mechanic the player can feel, not a silent mercy.
     let nemLoss='';
     if(bf.nem){ META.nemesis.l=(META.nemesis.l|0)+1;
-      nemLoss=' · '+tf('NEMESIS GLOATS. Next time he fights at %1% strength.', Math.round(nemEff()*100)); }
+      nemLoss=tf('NEMESIS GLOATS. Next time he fights at %1% strength.', Math.round(nemEff()*100)); }   // v3.24: its own row — no glue
     // a beating is still a lesson — every defeat pays a tenth of a level
     const xpGain=xpFor(XP_LOSS), promos=xpAward(xpGain,{src:'battleground'});
     // v3.22 THE VOICE: he beat you — he SAYS so, one of his four, drawn fresh
@@ -23021,7 +23075,11 @@ function endBattlefield(reason, fromRelay){
     // bust = the win side's own note.
     const lt=document.getElementById('loseTitle'); lt.__enHTML=undefined;
     lt.innerHTML=t(copy[0])+(bf.nem? nemSay(NEM_QUIPS) : '');
-    document.getElementById('loseText').textContent=margin+' · '+t(copy[1])+' · '+t('+'+xpGain+' XP')+promoTag(promos)+bfEarn+nemLoss;
+    const lParts=[['r', margin], ['r', t(copy[1])], ['c', t('+'+xpGain+' XP')]];
+    if(promos>0) lParts.push(['c', tf('PROMOTED TO LEVEL %1!', META.lvl)]);
+    for(const dl of bfEarnA) lParts.push(['c', dl]);
+    if(nemLoss) lParts.push(['r', nemLoss]);
+    vfill(document.getElementById('loseText'), lParts);
     SFX.ouch();
   }
   // ===== THE RATING (v1.36): every battleground verdict is one rung =====
