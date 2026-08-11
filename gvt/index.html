@@ -2305,6 +2305,10 @@
     93% { transform:translateY(-3px) rotate(360deg); } 100% { transform:translateY(0) rotate(360deg); } }
   .socb { transform-box:fill-box; transform-origin:50% 100%; }
   .socr { transform-box:fill-box; transform-origin:50% 50%; }
+  /* v3.16: the flight pins the shadow to the floor while the ball climbs off
+     it — scaled/faded by JS inline style, never animated, so the RM kill
+     list has nothing to park (no flight ever starts under reduced motion) */
+  .socsh { transform-box:fill-box; transform-origin:50% 50%; }
   .dec-soc.react .socb { animation:socboing 1.15s cubic-bezier(.3,.65,.4,1); }
   .dec-soc.react .socr { animation:socroll 1.15s cubic-bezier(.3,.65,.4,1); }
   @keyframes socboing { 0% { transform:none; } 14% { transform:translateY(-19px); }
@@ -2603,7 +2607,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.15</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.16</div>
   <div class="scanlines"></div>
 </div>
 
@@ -12979,6 +12983,17 @@ function roomCur(){ const c=META.rooms && META.rooms.cur; return (c && c!=='bedr
 // and everything comes back exactly where it lived.
 const ROOF_GONE=new Set();
 function roofGone(k){ return ROOF_GONE.has(k); }
+// v3.16 THE BALL'S CASUALTIES (Wyatt 8/11, card 0257 — "If it hits any of
+// your army men, they should be defeated until the next time you open the
+// app"): army men the pushed soccer ball bowls through go down for the
+// SESSION — the rooftop-fall law verbatim, deliberately NEVER persisted: a
+// relaunch IS the medic. A SIBLING of ROOF_GONE, not a member — a toy off
+// the roof VANISHES behind the eaves, a defeated man stays ON the rug,
+// knocked flat where he stood. Map value = his flat rotation (the sign is
+// the direction the ball was travelling). Touches neither META.roomPos nor
+// ownership, so the saved arrangement rides through the defeat untouched.
+const BALL_DOWN=new Map();
+function ballDown(k){ return BALL_DOWN.has(k); }
 // what the room's render asks about a toy now: on the floor AND still on the roof
 function decorHome(id){ return decorOn(id) && !ROOF_GONE.has(id); }
 function bankTier(){ return Math.max(0, Math.min(BANK_TIERS.length, (META.bankTier)|0)); }
@@ -18121,6 +18136,10 @@ const SFX = {
   bounce: ()=>{ tone(310,120,0.11,'sine',0.085);
                 setTimeout(()=>tone(268,110,0.09,'sine',0.06),300);
                 setTimeout(()=>tone(232,100,0.075,'sine',0.042),520); },
+  // v3.16: ONE rubbery contact — the flight's per-landing beat (the level
+  // ball's thock in the room's own soft voice; the kick-off reuses it, and
+  // the old three-hop bounce above stays the RM/mom-day tap react's voice)
+  socland:()=>{ tone(295,110,0.09,'sine',0.07); noise(0.03,0.012,900); },
   // the roof's long drop (v3.06): a little falling whistle sliding down two
   // octaves, then the tiniest far-away landing — more cartoon than crash
   fall:   ()=>{ tone(1250,240,0.62,'sine',0.05);
@@ -32792,12 +32811,30 @@ function roomVictory(){
   // dropped. His slot number retired with him so vt1-vt4's saved deltas stay
   // their own men's; a clean bed is part of the won-back room now.
   // v3.06: a man off the roof is off the floor till relaunch (ROOF_GONE)
-  const vt=(n,inner)=>roofGone('vt'+n)? '' : '<g id="ro-vt'+n+'"'+rpT('vt'+n)+'>'+inner+'</g>';
+  // v3.16: a man the soccer ball bowled through lies knocked FLAT for the
+  // session — his own sprite on the rivdown idiom (the room's only
+  // prone-figure precedent), rotated the way the ball was travelling. The
+  // flat wrapper SHEDS its id (the roof ghost's own law): a downed man must
+  // never answer a getElementById — or a grab, or a second defeat — meant
+  // for a standing one. His saved drag delta still places him: he lies
+  // exactly where he stood, and the save is never written.
+  const vt=(n,k,x,y,w,dl,uri)=>{
+    if(roofGone('vt'+n)) return '';
+    const dn=BALL_DOWN.get('vt'+n);
+    if(dn!==undefined){ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
+      // the angle is per MAN, not per law: 82° fells the standing men the
+      // rivdown way, but the mgunner's sprite is ALREADY prone (v1.22) and
+      // 82° would STAND HIM UP — the v2.17 trap verbatim ("a prone-sprite
+      // mgunner spun 80° read as a man stood on his head"); he tips 28°.
+      const rot=dn*(k==='mgunner'? 28 : 82);
+      return '<g data-gid="ro-vt'+n+'"'+rpT('vt'+n)+'><image class="rivdown" href="'+(uri||sprURI(k,hex))+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/></g>'; }
+    return '<g id="ro-vt'+n+'"'+rpT('vt'+n)+'>'+fig(k,x,y,w,dl,uri)+'</g>';
+  };
   return '<g>'
-    +vt(1, fig('sarge',236,198,58,-0.5, menuSargeURI(hex)))  // Sarge up on the toy box, surveying his room
-    +vt(2, fig('rifleman',196,146,54,-0.9))      // keeping the piggy bank company
-    +vt(3, fig('mgunner',534,300,52,-0.2))       // and a couple just enjoying the rug
-    +vt(4, fig('rifleman',470,392,54,-1.3))
+    +vt(1,'sarge',236,198,58,-0.5, menuSargeURI(hex))  // Sarge up on the toy box, surveying his room
+    +vt(2,'rifleman',196,146,54,-0.9)      // keeping the piggy bank company
+    +vt(3,'mgunner',534,300,52,-0.2)       // and a couple just enjoying the rug
+    +vt(4,'rifleman',470,392,54,-1.3)
     +'</g>';
 }
 // ================= MOM DAYS (v1.79) =================
@@ -33667,23 +33704,28 @@ function footballSVG(){
   // group (the ducky's own v2.18 shape) — CSS only ever animates .ftbw inside
   return '<g id="ro-football"'+rpT('football')+'><g class="dec dec-ftb" id="decFtb" transform="translate(272,486)">'+footballArt()+'</g></g>';
 }
-// the soccer ball: a stylized classic — the ring pentagons sit WHOLE inside
-// the leather (no clipPath: this string inlines into the room, the shop card,
-// the mystery box and Mom's bake at once, and duplicate url(#clip) ids
-// resolving across inline copies is exactly the quiet cross-reference the
-// one-drawing law exists to avoid).
+// the soccer ball, v3.16 (Wyatt 8/11, card 0257 — "The soccer ball needs to
+// look more like the soccer ball"): THE level ball's own recipe — drawSoccer's
+// big clear centre pentagon + five ring pentagons, leather #F4F1E8, pents
+// #26262A, rim #B9B4A4 — baked to paths at this ball's r=16.5 (the exact
+// pent(0,0,r*0.34) / five at r*0.74 geometry, same angles). One ball, two
+// homes. The pentagons still sit WHOLE inside the leather and there is still
+// no clipPath (this string inlines into the room, the shop card, the mystery
+// box and Mom's bake at once, and duplicate url(#) ids resolving across
+// inline copies is exactly the quiet cross-reference the one-drawing law
+// exists to avoid). The shadow wears .socsh so the flight can pin it to the
+// ground truth while the ball climbs off it — the level ball's own shadow law.
 function soccerArt(){
-  return '<ellipse cx="0" cy="20.5" rx="17" ry="4.4" fill="#000" opacity="0.25"/>'
+  return '<ellipse class="socsh" cx="0" cy="20.5" rx="17" ry="4.4" fill="#000" opacity="0.25"/>'
     +'<g class="socb"><g class="socr">'
-      +'<circle cx="0" cy="0" r="16.5" fill="#F5F1E6"/>'
-      +'<path d="M-11 10.5 a16.5 16.5 0 0 0 22 0" stroke="#D8D0BE" stroke-width="3.2" fill="none" opacity="0.7"/>'
-      +'<path d="M0 -6.7 L 5.9 -2.4 L 3.6 4.5 L -3.6 4.5 L -5.9 -2.4 Z" fill="#2A2620"/>'
-      +'<path d="M1.2 -14.8 L 3.9 -11.1 L 1.2 -7.4 L -3.2 -8.8 L -3.2 -13.4 Z" fill="#2A2620"/>'
-      +'<path d="M14 -3.8 L 11.3 -0.1 L 6.9 -1.5 L 6.9 -6.1 L 11.3 -7.5 Z" fill="#2A2620"/>'
-      +'<path d="M7.4 11.8 L 3 10.4 L 3 5.8 L 7.4 4.4 L 10.1 8.1 Z" fill="#2A2620"/>'
-      +'<path d="M-9.4 10.4 L -9.4 5.8 L -5 4.4 L -2.3 8.1 L -5 11.8 Z" fill="#2A2620"/>'
-      +'<path d="M-13.3 -6.1 L -8.9 -7.5 L -6.2 -3.8 L -8.9 -0.1 L -13.3 -1.5 Z" fill="#2A2620"/>'
-      +'<path d="M-9.5 -9.5 q4 -5 10 -4.6" stroke="#FFFFFF" stroke-width="2.6" fill="none" stroke-linecap="round" opacity="0.85"/>'
+      +'<circle cx="0" cy="0" r="16.5" fill="#F4F1E8"/>'
+      +'<path d="M0 -5.61 L 5.34 -1.73 L 3.30 4.54 L -3.30 4.54 L -5.34 -1.73 Z" fill="#26262A"/>'
+      +'<path d="M10.16 -10.91 L 9.11 -7.37 L 5.42 -7.28 L 4.20 -10.75 L 7.12 -12.99 Z" fill="#26262A"/>'
+      +'<path d="M13.51 6.29 L 9.83 6.38 L 8.60 2.91 L 11.52 0.67 L 14.56 2.76 Z" fill="#26262A"/>'
+      +'<path d="M-1.81 14.79 L -3.04 11.32 L -0.11 9.08 L 2.93 11.16 L 1.88 14.70 Z" fill="#26262A"/>'
+      +'<path d="M-14.63 2.85 L -11.70 0.61 L -8.67 2.70 L -9.71 6.23 L -13.40 6.33 Z" fill="#26262A"/>'
+      +'<path d="M-7.24 -13.03 L -4.20 -10.94 L -5.25 -7.41 L -8.93 -7.31 L -10.16 -10.79 Z" fill="#26262A"/>'
+      +'<circle cx="0" cy="0" r="16.5" fill="none" stroke="#B9B4A4" stroke-width="1.6"/>'
     +'</g></g>';
 }
 const SOC_VB='-22 -22 44 47';
@@ -33793,12 +33835,140 @@ const DECOR_REACT={
 };
 function decorReact(id){
   const d=DECOR_REACT[id]; if(!d) return;
+  // v3.16 (Wyatt 8/11, card 0257): the soccer ball's tap is a real KICK now
+  // — the full level-style bounce across the room (socKick). Its solo latch
+  // is the racecar's own: a tap mid-flight does nothing at all. Reduced
+  // motion and Mom's staging day fall through to the old boing react
+  // instead (which the RM kill list already parks at identity — v3.04 law).
+  if(id==='soccer'){ if(SOC_FLY) return; if(socCanFly()){ socKick(); return; } }
   if(d.solo){ const g=document.getElementById(d.el);
     if(g && g.classList.contains('react')) return; }
   if(SFX[d.sfx]) SFX[d.sfx]();
   const el=document.getElementById(d.el); if(!el) return;
   el.classList.remove('react'); void el.getBoundingClientRect(); el.classList.add('react');
   setTimeout(()=>{ try{ el.classList.remove('react'); }catch(e){} }, d.ms);
+}
+// ===== v3.16 THE REAL BOUNCE (Wyatt 8/11, card 0257 — verbatim: "When you
+// push it in the room, it should bounce like it does in the level. It's kind
+// of like the race car, but it'll bounce off screen and come back. If it
+// hits any of your army men, they should be defeated until the next time
+// you open the app.") =====
+// A push — the tap, or a drag released at real pace — sends the room ball
+// across the floor on the LEVEL's own hop law (z = H·4·ph·(1-ph) through a
+// period; rolling at v/r; killing only while LOW, SB_LOWZ verbatim), dying
+// the way a real ball dies: every landing keeps SOC_REST of its apex, the
+// period follows sqrt(H) down (gravity's own clock), and when the hops are
+// spent it rolls to a stop. The walls it bounces off stand SOC_OUT past
+// every board edge — OFF SCREEN: the racecar's exit-and-return, bounced —
+// and while it's out there its pace may not die (SOC_HOME), so the ball
+// ALWAYS comes back. The rest is a drag's rest: clamped, written to
+// META.roomPos.soccer, saved (on the rooftop the settle obeys the roof's
+// own fall law first). JS rAF on its own clamped clock, not CSS: the lap's
+// steps(1,end) wrap trap can't exist here, and a trajectory with live
+// collisions can't be keyframed.
+const SOC_OUT=130,       // the off-screen porch: bounce walls this far past every board edge
+      SOC_WALL=0.82,     // wall restitution
+      SOC_DECEL=230,     // rolling friction, px/s²
+      SOC_REST=0.74,     // each landing keeps this much apex
+      SOC_MINPER=0.16,   // shortest hop period, s
+      SOC_LOWH=7,        // below this apex the ball just rolls
+      SOC_STOP=40,       // settle pace, px/s
+      SOC_HOME=150,      // pace floor while off the board — the comeback clause
+      SOC_KICK=860,      // the tap's kick, px/s
+      SOC_HREF=700,      // the pace that earns the level's full SB_H apex
+      SOC_FLINGMIN=380,  // release pace that reads as a push, px/s
+      SOC_FLINGMAX=1150, // release pace cap
+      SOC_HIT=10;        // reach around a man's rect, px
+let SOC_FLY=null;
+function socCanFly(){
+  return !SOC_FLY && !reducedMotion() && !momDue() && S.mode==='menu' && decorHome('soccer');
+}
+function socKick(){   // the tap: a real kick somewhere new — every tap its own story
+  const a=Math.random()*6.2832, d=rpXY('soccer');
+  socLaunch(d[0], d[1], Math.cos(a)*SOC_KICK, Math.sin(a)*SOC_KICK);
+}
+function socLaunch(x0,y0,vx,vy){
+  if(SOC_FLY) return;
+  SOC_FLY={ x:x0, y:y0, vx:vx, vy:vy, ph:0, per:SB_HOP, z:0, roll:0,
+            hopH:SB_H*Math.min(1, Math.hypot(vx,vy)/SOC_HREF), prev:performance.now() };
+  const el=document.getElementById('decSoc');
+  if(el) el.classList.remove('react');   // the flight owns the ball now — no CSS react underneath it
+  SFX.socland();
+  requestAnimationFrame(socFlyStep);
+}
+function socFlyStep(now){
+  const f=SOC_FLY; if(!f) return;
+  // the room left us (a battle opened, the toy went in the box): the flight
+  // simply ends and the ball goes home to its saved spot — the racecar's rule
+  if(S.mode!=='menu' || !decorHome('soccer')){ SOC_FLY=null;
+    if(S.mode==='menu') renderMenu(); return; }
+  const dt=Math.min(0.05, Math.max(0,(now-f.prev)/1000)); f.prev=now;
+  f.x+=f.vx*dt; f.y+=f.vy*dt;
+  // the porch walls (ball centre = the authored 324,488 + delta)
+  let cx=324+f.x, cy=488+f.y;
+  if(cx<-SOC_OUT){ f.x+=2*(-SOC_OUT-cx); f.vx=Math.abs(f.vx)*SOC_WALL; }
+  else if(cx>960+SOC_OUT){ f.x-=2*(cx-(960+SOC_OUT)); f.vx=-Math.abs(f.vx)*SOC_WALL; }
+  if(cy<-SOC_OUT){ f.y+=2*(-SOC_OUT-cy); f.vy=Math.abs(f.vy)*SOC_WALL; }
+  else if(cy>600+SOC_OUT){ f.y-=2*(cy-(600+SOC_OUT)); f.vy=-Math.abs(f.vy)*SOC_WALL; }
+  cx=324+f.x; cy=488+f.y;
+  const off = cx<-17 || cx>977 || cy<-17 || cy>617;
+  let sp=Math.hypot(f.vx,f.vy);
+  const ns=off? Math.max(Math.max(0,sp-SOC_DECEL*dt), SOC_HOME) : Math.max(0,sp-SOC_DECEL*dt);
+  if(sp>0.001){ f.vx*=ns/sp; f.vy*=ns/sp; }
+  sp=ns;
+  // the hop clock — the level ball's own law (see the battleground tick)
+  if(f.hopH>SOC_LOWH){
+    f.ph+=dt/f.per;
+    if(f.ph>=1){ f.ph%=1; f.hopH*=SOC_REST;
+      if(f.hopH<=SOC_LOWH){ f.hopH=0; f.ph=0; }
+      else { f.per=Math.max(SOC_MINPER, SB_HOP*Math.sqrt(f.hopH/SB_H)); SFX.socland(); } }
+    f.z=f.hopH*4*f.ph*(1-f.ph);
+  } else f.z=0;
+  f.roll+=dt*(sp/16.5)*57.2958*(f.vx>=0?1:-1);
+  // casualties — only while LOW (the level's own kill law), only YOUR army
+  // men, and only the ones actually standing on stage this very frame (a
+  // rival-day or mom-day room fields no vt men; a man already down or off
+  // the roof isn't there to hit)
+  let hit=false;
+  if(f.z<SB_LOWZ) for(const tb of VTROOPS){
+    if(BALL_DOWN.has(tb.k) || roofGone(tb.k)) continue;
+    if(!document.getElementById('ro-'+tb.k)) continue;
+    const d=rpXY(tb.k);
+    if(cx>=tb.x+d[0]-SOC_HIT && cx<=tb.x+tb.w+d[0]+SOC_HIT && cy>=tb.y+d[1]-SOC_HIT && cy<=tb.y+tb.h+d[1]+SOC_HIT){
+      BALL_DOWN.set(tb.k, f.vx>=0? 1 : -1);   // the sign: he goes down the way the ball was going (render owns the angle)
+      hit=true;
+    }
+  }
+  if(hit){ SFX.thump(); renderMenu(); }   // the rebuild law — everything below re-queries
+  // paint: ground delta on the wrapper, hop on .socb, roll on .socr, the
+  // shadow pinned to the floor and thinning with height (the level's own
+  // shadow law); the LIVE group rides to the scene's end while airborne —
+  // SVG z is document order and the level ball crosses OVER the war — and
+  // settle's renderMenu re-seats the canonical order.
+  const g=document.getElementById('ro-soccer');
+  if(g){
+    g.setAttribute('transform','translate('+f.x.toFixed(1)+','+f.y.toFixed(1)+')');
+    if(g.parentNode && g.parentNode.lastElementChild!==g) g.parentNode.appendChild(g);
+    const gb=g.querySelector('.socb'), gr=g.querySelector('.socr'), gs=g.querySelector('.socsh');
+    const zk=Math.max(0,Math.min(1,f.z/SB_H));
+    if(gb) gb.style.transform='translateY('+(-f.z).toFixed(1)+'px)';
+    if(gr) gr.style.transform='rotate('+(f.roll%360).toFixed(1)+'deg)';
+    if(gs){ gs.style.transform='scale('+(1-0.3*zk).toFixed(3)+')'; gs.style.opacity=(0.25*(1-0.55*zk)).toFixed(3); }
+  }
+  if(sp<=SOC_STOP && !off && f.z<6){ socSettle(); return; }
+  requestAnimationFrame(socFlyStep);
+}
+function socSettle(){
+  const f=SOC_FLY; SOC_FLY=null; if(!f) return;
+  const b=DECOR_SPOTS.soccer, d=rdragClamp(b, f.x, f.y);
+  // the rooftop keeps its own law: a ball that dies in the gap or flush on
+  // an eave is a toy off the roof — session-gone, and the save deliberately
+  // unwritten so relaunch restores the spot it was pushed from (v3.06)
+  if(roomCur()==='rooftop'){ const z=roofFallZone(b, d[0], d[1]);
+    if(z){ roofFall('soccer', b, d[0], d[1], z); return; } }
+  if(d[0]||d[1]) META.roomPos.soccer=[d[0],d[1]]; else delete META.roomPos.soccer;
+  saveMeta(); SFX.blip();
+  renderMenu();
 }
 function roomSVG(){
   const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()], momD=momDue();   // v1.79: computed once — every branch below agrees
@@ -34252,13 +34422,14 @@ function rdragPick(p){
   // off the roof (the porthole clone dupes ids but this is existence-only)
   if(document.querySelector('[id^="ro-vt"]'))
     for(let i=VTROOPS.length-1;i>=0;i--){ const tb=VTROOPS[i], d=rpXY(tb.k);
-      if(roofGone(tb.k)) continue;
+      if(roofGone(tb.k) || BALL_DOWN.has(tb.k)) continue;   // v3.16: a man the ball put down is not draggable while down
       if(p.x>=tb.x+d[0] && p.x<=tb.x+tb.w+d[0] && p.y>=tb.y+d[1] && p.y<=tb.y+tb.h+d[1])
         return { k:tb.k, base:tb }; }
   // the named toys — after the troops (a man on the rug outranks the toy
   // under him); reverse paint order between themselves (RDRAG_DECOR's law)
   for(const k of RDRAG_DECOR){
     if(!decorHome(k)) continue;   // v3.06: a fallen toy can't be grabbed again
+    if(k==='soccer' && SOC_FLY) continue;   // v3.16: mid-flight the ball isn't at its parked spot to grab
     const b=DECOR_SPOTS[k], d=rpXY(k);
     if(p.x>=b.x+d[0] && p.x<=b.x+b.w+d[0] && p.y>=b.y+d[1] && p.y<=b.y+b.h+d[1])
       return { k:k, base:b };
@@ -34373,6 +34544,17 @@ function rdragEnd(e){
   document.addEventListener('click', eat, {capture:true, once:true});
   setTimeout(()=>document.removeEventListener('click', eat, {capture:true}), 350);
   if(d.dx!==undefined){
+    // v3.16 (Wyatt 8/11, card 0257): a soccer ball LET GO at real pace is
+    // his PUSH — the flight takes over from exactly where the ball shows
+    // (ghost = placement, the deploy drag's own contract) and the SETTLE
+    // writes the save. A stale hand (>90ms since the last move) is a park,
+    // not a push; so is any release under reduced motion or on Mom's
+    // staging day (socCanFly answers all of it).
+    if(d.k==='soccer' && d.vx!==undefined && socCanFly() && performance.now()-d.mt<=90){
+      const fsp=Math.hypot(d.vx,d.vy);
+      if(fsp>=SOC_FLINGMIN){ const fc=Math.min(fsp,SOC_FLINGMAX)/fsp;
+        socLaunch(d.dx, d.dy, d.vx*fc, d.vy*fc); return; }
+    }
     // v3.06: on the rooftop a drop in the gap or against either eave FALLS —
     // and the saved arrangement is deliberately NOT written, so the relaunch
     // that brings the toy back brings it back where it lived before the drop
@@ -34409,6 +34591,15 @@ document.addEventListener('pointermove', e=>{
   const d=rdragClamp(RDRAG.base, RDRAG.d0[0]+mx/p.s, RDRAG.d0[1]+my/p.s-DRAG_OFF);
   RDRAG.dx=d[0]; RDRAG.dy=d[1];
   rdragApply(RDRAG.k, d[0], d[1]);
+  // v3.16: remember the hand's pace in room-space (smoothed) — the release
+  // reads it to tell Wyatt's PUSH from a park (soccer only, in rdragEnd)
+  const nw=performance.now();
+  if(RDRAG.mt!==undefined && nw>RDRAG.mt){
+    const mdt=(nw-RDRAG.mt)/1000, ivx=(p.x-RDRAG.mx)/mdt, ivy=(p.y-RDRAG.my)/mdt;
+    RDRAG.vx = RDRAG.vx===undefined? ivx : RDRAG.vx*0.55+ivx*0.45;
+    RDRAG.vy = RDRAG.vy===undefined? ivy : RDRAG.vy*0.55+ivy*0.45;
+  }
+  RDRAG.mx=p.x; RDRAG.my=p.y; RDRAG.mt=nw;
 }, {passive:false});
 document.addEventListener('pointerup', rdragEnd);
 document.addEventListener('pointercancel', rdragEnd);
@@ -39027,6 +39218,13 @@ window.GVT = {
       react:!!(el&&el.classList.contains('react')),
       ms:DECOR_REACT.racecar.ms, vb:RACER_VB, spot:DECOR_SPOTS.racecar,
       tx: zip? (getComputedStyle(zip).transform||'none') : null }; },
+  // v3.16: the soccer flight — a live read + a deterministic kick, so a
+  // battery can push the ball on a chosen line instead of the tap's dice
+  soc(){ return { fly:!!SOC_FLY,
+    f:SOC_FLY? { x:SOC_FLY.x, y:SOC_FLY.y, z:SOC_FLY.z, hopH:SOC_FLY.hopH,
+                 sp:Math.hypot(SOC_FLY.vx,SOC_FLY.vy) } : null,
+    down:Array.from(BALL_DOWN.keys()), pos:rpXY('soccer').slice() }; },
+  socKick(vx,vy){ const d=rpXY('soccer'); socLaunch(d[0],d[1],vx,vy); return !!SOC_FLY; },
   // v1.80: the whole milestone table + each slot's own ledger, in one read
   coopMiles(){ return COOP_MILES.map(m=>({ lvl:m.lvl, kind:m.kind,
     id:m.id||m.ref||m.link||null, beat:coopBeat(m.lvl),
