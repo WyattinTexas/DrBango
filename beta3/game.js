@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.3.2';
+const BUILD = 'STARSPELL v0.3.3';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -537,7 +537,13 @@ class Home extends Phaser.Scene {
       }
       this.ascentStart = this.time.now;
       this.skipAt = null; this.lastP = 0; this.lastT = this.time.now;
-      this.input.on('pointerdown', this.skipFn = () => { if (this.ascending && !this.skipAt) this.skipAt = ASC.TOTAL_MS - 220; });
+      // arm the tap-to-skip only after the launching tap has fully cleared —
+      // Phaser delivers the button's own pointerdown to scene listeners added
+      // during dispatch, so arming immediately made every real tap self-skip
+      this.time.delayedCall(400, () => {
+        if (!this.ascending || this.arrived) return;
+        this.input.on('pointerdown', this.skipFn = () => { if (this.ascending && !this.skipAt) this.skipAt = ASC.TOTAL_MS - 220; });
+      });
       if (DEMO) this.skipAt = ASC.TOTAL_MS - 220;   // the solver has no time for wonder
     } catch (e) {
       this.fallbackToBattle(e);                      // the rise must never strand the player
