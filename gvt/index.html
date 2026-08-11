@@ -2603,7 +2603,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.13</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.14</div>
   <div class="scanlines"></div>
 </div>
 
@@ -15884,14 +15884,22 @@ const VOLLEY_CYCLE={ redcoat:{period:3.2, haltAt:2.3, present:0.55},
 // cadence IS the tuning dial, the FDEF law). Officer potshot, tank cannon
 // and boss swing clocks deliberately do NOT ride the rate axis (armor and
 // monsters grow via hp — one-line dial each if Wyatt wants them in).
-// Windows clamp at 65: CARD 12 EXTENDS the *To fields to 100 as it retunes
-// 66-100 — until then the deep half keeps today's flat numbers (it was
-// flat before this card too). QUIET MERCY stacks under the hp axis
+// 8/11 LEVEL PASS 66-100 (design/campaign/LEVEL-PASS-66-100.md is the
+// contract; card 0255): the windows run to 100 now. BOSSES keep the exact
+// card-11 slope and land at ×2.00 on the nose at L100 (rex/gpig 586 — the
+// deep half's growth axis, the only one with headroom); the RATE line
+// continues unbroken through the 65/66 seam to a NEW floor 0.85, landing
+// at L74 (the old 0.90 floor never fired inside its own window — minimum
+// reached was 0.904 — so lowering it is a pure extension, retro-free on
+// 50-65); the HP contribution PEGS at its L65 value via hpPeak — 4.94
+// flat from 65 through 100, because the measured knife-edge tops ~5 and
+// this card refuses to climb it (raise hpPeak only after a fresh walk
+// battery). QUIET MERCY stacks under the hp axis
 // automatically (it multiplies S.cfg.hpMul after levelCfg builds);
 // yeti/mom hp is written flat elsewhere — the law keeps its hands off both.
-const CAMP_STRENGTH={ hpFrom:50, hpSlope:0.015, hpTo:65,
-                      bossFrom:51, bossSlope:0.02, bossTo:65,
-                      rateFrom:50, rateSlope:0.006, rateFloor:0.90, rateTo:65 };
+const CAMP_STRENGTH={ hpFrom:50, hpSlope:0.015, hpTo:100, hpPeak:65,
+                      bossFrom:51, bossSlope:0.02, bossTo:100,
+                      rateFrom:50, rateSlope:0.006, rateFloor:0.85, rateTo:100 };
 function levelCfg(n){
   // v1.46 THE 80% CURVE (doc LAW D): the count knee (+0.12/lvl through L30,
   // +0.06 after — L100 fields 8.7x, not 12.9x), the hp ceiling (x6 — a plastic
@@ -15920,7 +15928,7 @@ function levelCfg(n){
   // every rung past hp ~5 went red at any rank — and a plastic rifleman
   // should never need more than ~3 max-rank rounds anyway. One const.
   const cfg = { n, hpMul: Math.min(4.7, 1+0.08*Math.max(0,n-2))
-      + (n>=CAMP_STRENGTH.hpFrom && n<=CAMP_STRENGTH.hpTo ? CAMP_STRENGTH.hpSlope*(n-(CAMP_STRENGTH.hpFrom-1)) : 0),   // 8/11 LEVEL PASS 31-65: the second slope (see CAMP_STRENGTH above)
+      + (n>=CAMP_STRENGTH.hpFrom && n<=CAMP_STRENGTH.hpTo ? CAMP_STRENGTH.hpSlope*(Math.min(n,CAMP_STRENGTH.hpPeak)-(CAMP_STRENGTH.hpFrom-1)) : 0),   // 8/11 LEVEL PASS 31-65 + 66-100: the second slope, PEGGED at hpPeak (4.94 flat 65→100 — the measured knife-edge law)
     cntMul: Math.min(cnt0*(spike?1.08:breather?0.92:1), CNT_PLATEAU),   // 0098: the plateau's own law, applied to the product (breathers only ever sit below it)
     // bosses climb toward FULL hp growth as the ladder deepens (0.5 -> 1.0
     // across L30-L50): half-growth was tuned for a shallow ladder, and it is
@@ -16457,6 +16465,83 @@ function levelCfg(n){
         {f:'boss',t:'gpig',n:1,e:'right',at:0},
         {f:'boss',t:'gpig',n:1,e:'right',at:6},
         {f:'redcoat',t:'tanrifle',n:16,e:'right',at:10,officer:true}] }
+  ];
+  // ===== 8/11 LEVEL PASS 66-100 (design/campaign/LEVEL-PASS-66-100.md is
+  // the contract; card 0255). Same house rules as the 17-30 and 31-65
+  // sections above: literal integers only, never c(); fresh objects every
+  // build; zero R() consumed; tease waves carry the flag at BOTH levels;
+  // mid-wave pigs are f:'boss' n:1 groups on unflagged waves. Audit F1
+  // again, deeper: the rotation deals MGs once (97), radio once (76),
+  // snipers twice, shotgun/pistol2 elites NEVER, gpig NEVER — the authored
+  // rungs below field the locker the band owns but never shows.
+  // --- L68 THE IRON COLUMN premiere pin — the ironwall premiered at 66
+  // bodies at WAVE ONE (zero economy; the L52 breach anatomy exactly, the
+  // measured ~50-body wall's worst deep offender). 15-escort convoy + 24
+  // creep = 42 keeps the reveal wave-1-alone and civilized. The premiere
+  // flag and both clocks stand. ---
+  if(n===68){ const g=cfg.waves[0].groups; g[0].escort=15; g[1].n=24; }
+  // --- THE 3-TANK BIG PUSH pin — the ≥80 third-wedge door dealt 81-body
+  // finales (74 on breather counts at 82/94): 16 past the kept 65-norm.
+  // First wedge escort →19, crawler pack →13 lands 65 (61 breather) — the
+  // shape stays the band's heavy finale AT the norm's ceiling; the third
+  // tank and all four clocks stand. L100's own push is SACRED (doc LAW F)
+  // and stands byte-still. ---
+  if(n===80||n===82||n===83||n===86||n===92||n===94||n===98){
+    const g=cfg.waves[cfg.waves.length-1].groups; g[0].escort=19; g[1].n=13; }
+  // --- L70 THE ARMORY — the first deep milestone was the band's emptiest
+  // rung (grand + dress + NOTHING; audit F4 recurring). Compress anatomy
+  // (the L20/L35 law: reads far heavier than it weighs): the whole tan gun
+  // locker fires on one rung — the first MG platoon since 47, the snipers'
+  // third-ever rung, mortars lobbing from behind their own east trench
+  // (the shipped dress IS the firebase; minRng 150 stays the rush
+  // counter), radio pageantry — and the giant walks the guns out himself.
+  // Zero new strings. ---
+  if(n===70) cfg.waves=[
+    { name:'THE GUN LINE',       groups:[{f:'line',t:'tanrifle',n:16,e:'right',at:0},{f:'line',t:'tanmg',n:6,e:'right',at:2}] },
+    { name:'THE MARKSMEN',       groups:[{f:'creep',t:'tanrifle',n:16,e:'right',at:0},{f:'line',t:'tansniper',n:3,e:'right-top',at:2.6}] },
+    { name:'THE MORTAR BATTERY', groups:[{f:'creep',t:'tanrifle',n:18,e:'right',at:0},{f:'line',t:'tanmortar',n:4,e:'right',at:3}] },
+    { name:'THE REDCOATS',       groups:[{f:'redcoat',t:'tanrifle',n:28,e:'right',at:0,officer:true,radio:true}] },
+    { name:'THE ROCKET TEAM',    groups:[{f:'column',t:'tanrifle',n:18,e:'right',at:0},{f:'line',t:'tanbazooka',n:5,e:'right',at:2}] },
+    { name:'THE SNEAK ATTACK',   groups:[{f:'guerrilla',t:'crawler',n:18,e:'right',at:0},{f:'solo',t:'jeep',n:1,e:'right',at:4}] },
+    { name:BOSSDEF.giant.wave, boss:'giant', groups:[{f:'boss',t:'giant',n:1,e:'right',at:0},{f:'line',t:'tanmg',n:6,e:'right',at:3},{f:'line',t:'tanmortar',n:3,e:'right',at:4.5}] }
+  ];
+  // --- L85 THE RUNAWAY PAIR — showcase-breather (the L55 anatomy): the
+  // shotgun broom and the double-pistol ace return from the young band
+  // (F1), the flame stalks behind the MGs, a rider pig tumbles the middle
+  // — and the finale is the game's first rollpig PAIR (two n:1 groups,
+  // NEVER n:2 — the sqScaleCfg law), tumbling past their own wrecking
+  // ball. Zero new strings. ---
+  if(n===85) cfg.waves=[
+    { name:'THE COLUMN',        groups:[{f:'column',t:'tanrifle',n:13,e:'right',at:0}] },
+    { name:'THE THIN TAN LINE', groups:[{f:'line',t:'tanrifle',n:20,e:'right',at:0,elite:'tanshotgun'}] },
+    { name:'THE SNEAK ATTACK',  groups:[{f:'guerrilla',t:'crawler',n:14,e:'right',at:0},{f:'boss',t:'rollpig',n:1,e:'right',at:5}] },
+    { name:'THE CRESCENT',      groups:[{f:'crescent',t:'tanrifle',n:22,e:'right',at:0,elite:'tanpistol2'}] },
+    { name:'THE GUN LINE',      groups:[{f:'line',t:'tanrifle',n:16,e:'right',at:0},{f:'line',t:'tanmg',n:5,e:'right',at:2,elite:'tanflame'}] },
+    { name:'THE JEEP PARADE',   groups:[{f:'solo',t:'jeep',n:1,e:'right-top',at:0},{f:'column',t:'tanrifle',n:12,e:'right',at:1.5},{f:'solo',t:'jeep',n:1,e:'right-bottom',at:4}] },
+    { name:BOSSDEF.rollpig.wave, boss:'rollpig', groups:[{f:'boss',t:'rollpig',n:1,e:'right',at:0},{f:'boss',t:'rollpig',n:1,e:'right',at:2.6},{f:'redcoat',t:'tanrifle',n:10,e:'right',at:5,officer:true}] }
+  ];
+  // --- L95 THE MONSTER PARADE — the L30 milestone's own name and card,
+  // reprised as the pre-summit in the band's only TWO-BALL arena: all four
+  // monsters in single file past the balls (bosses are ball-exempt; the
+  // redcoat guard is not — the arena's joke, twice), GIANT PIGGY's only
+  // deep-half rung (the pig arc: 25 debut · 55 return · 65 twins · 95 the
+  // parade), honest-teased at wave 1 (0.30×). The key shipped with v2.92's
+  // L30 — zero new strings. ---
+  if(n===95) cfg.waves=[
+    { name:'THE BIG ONE MARCHES EARLY!', tease:true, groups:[
+        {f:'column',t:'tanrifle',n:3,e:'right',at:0},
+        {f:'boss',t:'gpig',n:1,e:'right',at:2,tease:true}] },
+    { name:'THE PINCER',        groups:[{f:'column',t:'tanrifle',n:14,e:'right-top',at:0},{f:'column',t:'tanrifle',n:14,e:'right-bottom',at:3}] },
+    { name:'THE REDCOATS',      groups:[{f:'redcoat',t:'tanrifle',n:28,e:'right',at:0,officer:true,radio:true}] },
+    { name:'THE GUN LINE',      groups:[{f:'line',t:'tanrifle',n:16,e:'right',at:0},{f:'line',t:'tanmg',n:6,e:'right',at:2}] },
+    { name:'THE SNEAK ATTACK',  groups:[{f:'guerrilla',t:'crawler',n:18,e:'right',at:0},{f:'solo',t:'jeep',n:1,e:'right',at:4}] },
+    { name:'THE CRESCENT',      groups:[{f:'crescent',t:'tanrifle',n:26,e:'right',at:0}] },
+    { name:'THE MONSTER PARADE', piece:true, boss:'gpig', groups:[
+        {f:'boss',t:'gpig',n:1,e:'right',at:0},
+        {f:'boss',t:'giant',n:1,e:'right',at:7},
+        {f:'boss',t:'rollpig',n:1,e:'right',at:14},
+        {f:'boss',t:'rex',n:1,e:'right',at:21},
+        {f:'redcoat',t:'tanrifle',n:12,e:'right',at:24,officer:true}] }
   ];
   return cfg;
 }
