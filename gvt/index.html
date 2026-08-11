@@ -20670,17 +20670,31 @@ function roomSeatPlan(team){
   for(let i=0;i<team*2;i++){ const m=byS[i]; if(m && m.hex && used.indexOf(m.hex)<0) used.push(m.hex); }
   const uname=()=>{ let n=roomCallsign(rng), guard=0; while(names[n] && guard++<25) n=roomCallsign(rng); names[n]=1; return n; };
   const seats=[];
+  const worn=[mine];   // v3.02: every colour actually dealt ON THIS SCREEN, my plastic first
   for(let i=0;i<team*2;i++){
     const tm=(i<team)?'you':'foe', m=byS[i];
     if(m){
       const me=(m.seat===COOP.seat);
-      const hex = me? mine : (m.hex || COOP.seatHex[String(i)] || roomSeatFallbackHex(i, used));
+      let hex = me? mine : (m.hex || COOP.seatHex[String(i)] || roomSeatFallbackHex(i, used));
+      // v3.02 THE TWO GREEN ARMIES (Wyatt 8/10: a matched 1v1 dealt
+      // green-vs-green on one screen — his own undyed default and the other
+      // commander's green dye landed together, and nobody could tell the
+      // armies apart). Another commander's dye is still worn verbatim —
+      // UNLESS it lands on (or near) a colour this screen already fielded,
+      // my own plastic first among them; then that chair re-dresses from the
+      // same seeded walk. View-local by construction (the mine=own-dye law
+      // above already is — each screen guards its OWN contrast), and the
+      // referee's seat words never touch a human chair (roomSeatWord bails
+      // on st.human), so nothing re-dresses it back.
+      if(!me && worn.some(w=>w===hex||hexNear(w,hex))) hex=roomSeatFallbackHex(i, used.concat(worn));
+      if(!me) worn.push(hex);
       names[m.name||'']=1;
       seats.push({ i, name:(m.name||'COMMANDER'), team:tm, hex, human:true, me, brain:null,
                    purse:BF_START, tagT:0, persona:null });
     } else {
       const cap=(i===team && !byS[team]);      // the daily rival captains an unclaimed right flank
       const hex=cap? rivCapHex(used, riv.hex) : bfPickHex(used);   // v2.37 TRUE COLOURS held — and the walk is deterministic now, so every client deals him alike
+      worn.push(hex);   // v3.02: the computer's coats count toward this screen's contrast too
       seats.push({ i, name:uname(), team:tm, hex, human:false, me:false, brain:null,
                    purse:BF_START, tagT:0, persona:{ id: cap? riv.id : roomPersonaFor(hex, rng) } });
     }
@@ -29431,7 +29445,8 @@ function draw(){
   if(S.vflag && S.vflag.fw) drawFireworks();
 
   // dragged unit on top
-  if(S.drag){ drawSprite(S.drag.type,S.drag.x,S.drag.y,unitW(S.drag.type),0,0,unitImg(S.drag.type,S.bf?bfMe():null));
+  if(S.drag){ drawSprite(S.drag.type,S.drag.x,S.drag.y,unitW(S.drag.type),0,0,unitImg(S.drag.type,S.bf?bfMe():null),
+      S.bf && bfMyTeam()==='foe');   // v3.02 (Wyatt 8/10): the tan-side commander's held figure faces his own war — the drag preview forgot the flip drawBFUnit always had
     cx.globalAlpha=0.25; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(S.drag.x+26,S.drag.y+30,60,24,0.4,0,7); cx.fill(); cx.globalAlpha=1; }
 
   cx.restore();
