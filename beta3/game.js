@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.3.4';
+const BUILD = 'STARSPELL v0.3.5';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -337,8 +337,10 @@ function ssSkyWorld(scene) {
   }
 
   // the meadow: hills, ground, swaying grass, fireflies
+  // (near hill raised + widened so the bright horizon band can't peek
+  //  through the saddle between the two silhouettes)
   scene.add.ellipse(l.x(-108), l.y(545), l.u(432), l.u(250), 0x141026);
-  scene.add.ellipse(l.x(184), l.y(607), l.u(534), l.u(325), 0x0c0918);
+  scene.add.ellipse(l.x(150), l.y(588), l.u(620), l.u(340), 0x0c0918);
   scene.add.rectangle(l.W / 2, l.y(553), l.W, Math.max(1, l.H - l.y(553)) + 120 * l.s, 0x0a0714).setOrigin(0.5, 0);
   const grassY = Math.max(l.y(772), l.H - l.u(30));
   for (const [off, ph] of [[0, 0], [l.u(5), 1300]]) {

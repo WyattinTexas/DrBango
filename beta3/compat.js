@@ -38,7 +38,16 @@ function ssPaint(msg, bg) {
     d.textContent += msg + '\n';
   } catch (_) { }
 }
+var SS_DIAG_ON = /[?&]diag=1/.test(location.search);
 window.addEventListener('error', function (e) {
+  // "Script error." with no filename = a masked cross-origin error we cannot
+  // read or act on — in Firefox iOS these come from the browser's own
+  // injected scripts. Don't alarm players; surface only in ?diag=1.
+  var masked = !e.filename && (!e.message || e.message === 'Script error.');
+  if (masked) {
+    if (SS_DIAG_ON && window.SSDIAG) window.SSDIAG('masked cross-origin error (browser/CDN internals) — ignored');
+    return;
+  }
   ssPaint((e.message || String(e.type)) + '  @ ' + String(e.filename || '').split('/').pop() + ':' + e.lineno + '  (tap to dismiss)');
 });
 window.addEventListener('unhandledrejection', function (e) {
