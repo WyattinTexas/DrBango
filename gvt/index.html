@@ -2664,7 +2664,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.22</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.23</div>
   <div class="scanlines"></div>
 </div>
 
@@ -15435,6 +15435,26 @@ function startNemesisRaid(){
   st.purse=Math.round(BF_START*eff);   // the pity works both faucets: opening purse here, income drip in bfTick (the rookie-purse idiom)
   S.ann={ txt:'NEMESIS ATTACKS THE ROOM!', t:3.0, warn:true };   // raw key — the ann drawer TXTs it
 }
+// v3.23 (card 03): the WORDLESS tell — Wyatt: "doesn't need to say
+// telekinesis. The action should speak for itself." The word came off the
+// cast (the only cast-time name float in the game died below); what warns you
+// now is the POWER ITSELF gathering on his crystal: a glint column over his
+// head, a double ring running INWARD in his saber's red, and a two-note
+// RISING menace sting (SFX.tkwarn). Reduced motion keeps one ring + the
+// sting — the warning is information, not garnish (v3.21's own RM law). The
+// player's own casts keep the quieter in-branch GATHER: subtle for yours,
+// loud for his (the contract's recommendation). The l10n 'TELEKINESIS' rows
+// STAY — the bench card still speaks the name; only cast-time text died.
+function tkTellFx(x,y){
+  const RM=reducedMotion();
+  S.fx.push({k:'ring',x:x,y:y-18,r:74,R:10,t:0,dur:0.34,col:NEMESIS_SABER});
+  if(!RM){
+    S.fx.push({k:'ring',x:x,y:y-18,r:46,R:6,t:0,dur:0.26,col:'rgba(255,255,255,0.85)'});
+    S.fx.push({k:'flash',x:x,y:y-66,ang:1.57,R:22,lw:3.5,t:0,dur:0.3});
+    S.fx.push({k:'flash',x:x,y:y-66,ang:0.79,R:12,lw:2.5,t:0,dur:0.2});
+  }
+  bfSfx(SFX.tkwarn, x, y);
+}
 // his Sarge's own clock, ticked from bfTick: runs only while the man stands
 // (fielded, landed, alive), so the FIRST press lands ~NEMESIS_TK_T0 after he
 // walks on and the player is looking at him. A refused press (mid-jet,
@@ -15449,7 +15469,7 @@ function nemTkTick(dt){
   if(bf.nem.tkCd>0) return;
   if(tkFire(sg,'red',true)){
     bf.nem.tkCd=NEMESIS_TK_CD;
-    S.floats.push({x:sg.x, y:sg.y-84, txt:TXT('TELEKINESIS')+'!', t:0, col:'#FF6B5A'});   // the tell, in the mod's own name (7 rows already in the tables)
+    tkTellFx(sg.x, sg.y);   // v3.23: the tell went WORDLESS — crystal flare + warning sting (the name float died; the action speaks for itself)
   } else bf.nem.tkCd=0.5;
 }
 // the rival panel's one-line teaser once he's been met and beaten — the next
@@ -18188,6 +18208,14 @@ const SFX = {
   // v3.21 the wreck itself — a splintery knock, then the debris settling
   smash: ()=>{ noise(0.2,0.2,950); tone(150,62,0.2,'triangle',0.12);
                setTimeout(()=>noise(0.12,0.08,520),90); },
+  // v3.23 TELEKINESIS CINEMA (card 03) — the red lunge's own voice and the
+  // nemesis's WORDLESS warning. House synth, house levels (laser 0.045 ·
+  // crack 0.13 · boom 0.14-0.22 are the neighbors).
+  tkgather:()=>{ tone(240,980,0.2,'sawtooth',0.05); noise(0.12,0.03,2400); },   // THE GATHER: a fast rising pull — the power breathing in
+  tkslam: ()=>{ noise(0.16,0.3,760); tone(110,42,0.3,'sine',0.16);
+               tone(1500,190,0.1,'square',0.06); },                             // THE SLAM: dust, a chest thump, one bright edge of blade
+  tkwarn: ()=>{ tone(66,104,0.5,'sawtooth',0.11); noise(0.3,0.05,300);
+               setTimeout(()=>tone(88,140,0.55,'sawtooth',0.12),260); },        // THE WARNING: two RISING menace notes — the opposite arc of nemarr's fall
   // ===== ROOM DECORATIONS (v1.21): one silly noise each, mouth-made like the rest =====
   trumpet:()=>{ tone(210,560,0.34,'sawtooth',0.075); noise(0.16,0.03,900);
                 setTimeout(()=>tone(540,300,0.2,'square',0.04),160); },
@@ -18659,7 +18687,7 @@ function reset(){
   S.ctrain=null; S.ctrainClk=0; S.ctrainWhis=false;   // 0196: the crossing line re-arms with every battle — a replay runs the same timetable from second 0
   S.gk=1; S.cCam={x:0,y:0,vx:0,vy:0}; S.camHold=0; S.camOwn=false;   // v1.98: the grand-rug factor + the campaign camera re-arm with every battle — v2.09: and the pan claim re-arms with them (a NEW battle's escort walks again until its own first pan)
   S.momRaid=false; S.momToys=null;   // v1.79/0140: a stale mom flag (or her scattered props) would leak into the next battle
-  S.training=false; S.train=null;   // 0248: the range dies with every battle door (the mom-flag idiom)
+  S.training=false; S.train=null; S.tkDemo=false;   // 0248: the range dies with every battle door (the mom-flag idiom) — v3.23: the review range with it
   S.sargeCd=0; S.sargeFlash=0; S.tagT=0; S.lostLevel=0;   // casualties + Sarge's clock + the faucet (v1.32)
   S.annWait=null;                                         // v1.41: a deferred boss card dies with the battle it was staged for
   COMM.cd=0; COMM.leakCd=0; COMM.last={};                 // ...and the comm cooldowns re-arm fresh each battle
@@ -18997,6 +19025,74 @@ function trainTick(dt){
       S.train.acc=0;
       const el=document.getElementById('tbDmgN'); if(el) el.textContent=String(Math.round(S.train.dmg));
     }
+  }
+}
+// ===== v3.23 THE CRYSTAL RANGE (card 03, Wyatt 8/11 afternoon: "we should
+// review each one of them and have them in a little demo so we can see and
+// adjust and tweak each of their telekinesis abilities") — a REVIEW harness
+// riding the Training Range's own chassis (startTraining: bare floor, no
+// waves, no verdict door, no XP, no wallet — nothing in here reaches
+// saveMeta) + tkFire's AI door (relay=true skips ownership and cooldown —
+// card 10's own contract). GATED: only ?tkdemo=1 ever calls tkDemoStart;
+// without the param every line here is dead code and the boot is behavior-
+// identical (battery-asserted). Phone-first: Wyatt opens <mirror>/?tkdemo=1
+// and taps crystals. NO META writes — his save is never touched. Demo chrome
+// is deliberately EN-only dev tooling (no l10n rows — documented call).
+const TKDEMO_SX=350, TKDEMO_SY=300;   // Sarge's chalk mark on the range floor
+// per-crystal target poses, each built to show that power's own read:
+// blue = a ring to shove · red = a knot at lunge range (84px, the 46-circle
+// catches the knot) · teal = a spread to dash-chain · the rest = an east
+// line. Dummies are the range's own (hp 999999, no gun, spd 0).
+function tkDemoPose(col){
+  const p=[];
+  if(col==='blue'){ for(let i=0;i<6;i++){ const a=i*1.047+0.52;
+    p.push([TKDEMO_SX+Math.cos(a)*88, TKDEMO_SY+Math.sin(a)*46]); } }
+  else if(col==='red'){ p.push([TKDEMO_SX+84,TKDEMO_SY],[TKDEMO_SX+112,TKDEMO_SY-26],[TKDEMO_SX+116,TKDEMO_SY+24]); }
+  else if(col==='teal'){ p.push([TKDEMO_SX+130,TKDEMO_SY-40],[TKDEMO_SX+250,TKDEMO_SY+10],[TKDEMO_SX+390,TKDEMO_SY-20],[TKDEMO_SX+180,TKDEMO_SY+60]); }
+  else p.push([TKDEMO_SX+150,TKDEMO_SY-30],[TKDEMO_SX+180,TKDEMO_SY+20],[TKDEMO_SX+240,TKDEMO_SY-5]);
+  return p;
+}
+function tkDemoStage(col){
+  S.units.length=0; S.shots.length=0; S.mines.length=0; S.drag=null; S.sel=null;
+  S.foes.length=0;
+  for(const q of tkDemoPose(col)) spawnFoe('dummy', q[0], q[1]);
+  for(const f of S.foes){ f.tkAcc=0; f.tkAccT=0; }
+  placeUnit('sarge', TKDEMO_SX, TKDEMO_SY);
+  return S.units.find(q=>q.type==='sarge');
+}
+function tkDemoStart(){
+  startTraining();                      // the whole chassis: reset, bare floor, empty waves, the dummy law
+  S.tkDemo=true; S.train=null;          // the range's one-dummy ledger yields — the demo runs its own (multi-dummy)
+  S.ann={txt:'CRYSTAL REVIEW RANGE', t:2.2};
+  tkDemoStage('red');
+  tkDemoBar();
+}
+function tkDemoBar(){
+  const el=document.getElementById('trainbar'); if(!el) return;
+  el.classList.remove('hidden');
+  let h='<button class="tbx" onclick="UI.trainExit()">← EXIT</button>';
+  SABER_COLORS.forEach(c=>{
+    h+='<button class="tbu'+(S.tkDemoCol===c.id?' on':'')+'" onclick="UI.tkDemoGo(\''+c.id+'\')" '
+      +'style="border-color:'+c.hex+'"><span style="display:block;width:22px;height:22px;border-radius:50%;'
+      +'background:'+c.hex+';margin:2px auto"></span><b>'+c.id.toUpperCase()+'</b></button>';
+  });
+  h+='<button class="tbu" onclick="UI.tkDemoTell()"><span style="display:block;width:22px;height:22px;'
+    +'border-radius:50%;background:#1a1410;border:2px solid #FF4D4D;margin:2px auto"></span><b>HIS TELL</b></button>';
+  el.innerHTML=h;
+}
+// the range's ledger law, multi-dummy: bank every frame's delta, refill the
+// pool, float the number over the dummy it landed on — and keep the one
+// Sarge upright between casts (the v1.16 prop idiom).
+function tkDemoTick(dt){
+  const sg=S.units.find(q=>q.type==='sarge');
+  if(sg){ sg.down=false; sg.downT=0; sg.hits=0; }
+  for(const f of S.foes){
+    if(f.type!=='dummy') continue;
+    const hit=f.hpMax-f.hp;
+    if(hit>0){ f.tkAcc=(f.tkAcc||0)+hit; f.hp=f.hpMax; }
+    f.tkAccT=(f.tkAccT||0)+dt;
+    if(f.tkAccT>=0.45){ f.tkAccT=0;
+      if(f.tkAcc>0){ S.floats.push({x:f.x, y:f.y-76, txt:'-'+trainFmt(f.tkAcc), t:0, col:'#FFD24A'}); f.tkAcc=0; } }
   }
 }
 function hideAllOverlays(){ xpTeardown();   // a ceremony must never survive into the next screen
@@ -25783,6 +25879,21 @@ function tkLgStep(u,dt){
   lg.t+=dt;
   const k=Math.min(1,lg.t/lg.dur), s=k*k*(3-2*k);
   u.x=lg.fx+(lg.tx-lg.fx)*s; u.y=lg.fy+(lg.ty-lg.fy)*s;
+  // v3.23 CINEMA BEAT 2 — THE STREAK (red only; teal keeps its own look): an
+  // after-image of the figure every ~70ms of slide + a hex streak segment
+  // under the ride. Cadence keys off lg.t, positions off the smoothstep —
+  // NO dice consumed (the flame-lick law: a same-seed trace stays byte-
+  // identical, proven in the battery on both blobs).
+  if(lg.kind==='red' && !reducedMotion()){
+    const gn=Math.floor(lg.t/0.07);
+    if(gn>(lg.gN||0)){ lg.gN=gn;
+      S.fx.push({k:'tkgho', type:u.type, img:unitImg(u.type,u), w:unitW(u.type),
+        flip:(S.bf&&u.side==='foe'), x:u.x, y:u.y, a:0.4, t:0, dur:0.24});
+      S.fx.push({k:'tracer', x1:(lg.px!=null?lg.px:lg.fx), y1:(lg.py!=null?lg.py:lg.fy)-26,
+        x2:u.x, y2:u.y-26, col:u.tkHex||'#FF4D4D', w:3.5, a:0.6, t:0, dur:0.2});
+    }
+    lg.px=u.x; lg.py=u.y;
+  }
   if(k<1) return;
   u.tkLg=null;
   u.home={x:u.x,y:u.y}; u.laneY=u.y; u.wp=null; u.wade=null;
@@ -25790,9 +25901,26 @@ function tkLgStep(u,dt){
     // THE OVERHEAD SWING: one heavy arc where the lunge lands — full weight to
     // everyone the blade can reach, no half-cleave (Wyatt gave ONE number)
     const hex=u.tkHex||tkHexOf('red');
+    // v3.23 CINEMA BEATS 3+4 — THE SLAM and THE CRATER: a double shock ring,
+    // the blade flash, a dust pool and dice-free debris (velocities hashed
+    // off the landing point — the flame-lick law), a heavy landing voice, and
+    // the sniper's own punch (S.hitStop — never in co-op: two sims, one
+    // clock; RM exempt) for YOUR cast and for the NEMESIS's landing alike:
+    // his lunge AT you is the "uh-oh" Wyatt asked to feel. hitStop scales
+    // the NEXT frame's dt, and the hurt loop below runs THIS frame — the
+    // exactly-10-inside-46 contract and its clock are byte-untouched.
+    const lrm=reducedMotion(), lmine=bfHumanU(u)&&!u.coopBy, lnem=!!(S.bf&&S.bf.nem&&u.side==='foe'&&u.seat===S.bf.team);
     S.fx.push({k:'ring',x:u.x,y:u.y-16,r:8,R:TK_RED_R+12,t:0,dur:0.3,col:hex});
-    S.fx.push({k:'flash',x:u.x,y:u.y-30,ang:1.57,R:20,lw:3,t:0,dur:0.14});
-    bfSfx(SFX.laser, u.x, u.y); if(bfHumanU(u) && !u.coopBy) S.shake=Math.max(S.shake,0.18);
+    S.fx.push({k:'ring',x:u.x,y:u.y-16,r:4,R:TK_RED_R-6,t:0,dur:0.22,col:'rgba(255,255,255,0.9)'});
+    S.fx.push({k:'flash',x:u.x,y:u.y-30,ang:1.57,R:lrm?20:26,lw:lrm?3:3.5,t:0,dur:0.14});
+    S.fx.push({k:'puff',x:u.x,y:u.y-6,t:0,dur:0.32,R:TK_RED_R});
+    if(!lrm){ for(let dj=0;dj<5;dj++){ const da=(u.x*0.83+u.y*1.7+dj*1.2566)%6.283;
+      S.fx.push({k:'wisp',x:u.x+Math.cos(da)*10,y:u.y-8+Math.sin(da)*6,
+        vx:Math.cos(da)*(46+((dj*29)%17)), vy:Math.sin(da)*22-14, up:20+(dj%3)*6,
+        r0:2.2+(dj%2), r1:6+(dj%3)*1.5, t:0, dur:0.4}); } }
+    bfSfx(SFX.tkslam, u.x, u.y);
+    if((lmine||lnem) && !lrm){ S.shake=Math.max(S.shake,0.34);
+      if(!S.coop) S.hitStop=Math.max(S.hitStop,0.09); }
     for(const f of TGT(u)){
       if(f.dead || f.burrow || f.jetT>0) continue;
       if(!bfCanTarget(u,f)) continue;
@@ -25871,7 +25999,18 @@ function tkFire(u,col,relay,ax,ay){
       tx=u.x+dx*TK_RED_DASH; ty=u.y+dy*TK_RED_DASH;
     }
     tkLgStart(u,tx,ty,'red');
-    if(u.tkLg) aim={x:u.tkLg.tx,y:u.tkLg.ty};
+    if(u.tkLg){ aim={x:u.tkLg.tx,y:u.tkLg.ty};
+      // v3.23 CINEMA BEAT 1 — THE GATHER: the power breathes IN before the
+      // leap. A ring that runs INWARD (r>R runs the house ring backwards), a
+      // hard glint over the crystal, a rising pull of sound — all layered on
+      // the press frame: the dash still starts THIS frame, so time-to-damage
+      // is byte-what-it-was (TK_RED_T, the nemesis clock reads it too).
+      const grm=reducedMotion();
+      S.fx.push({k:'ring',x:u.x,y:u.y-16,r:64,R:8,t:0,dur:0.22,col:hex});
+      if(!grm){ S.fx.push({k:'ring',x:u.x,y:u.y-16,r:40,R:4,t:0,dur:0.16,col:'rgba(255,255,255,0.85)'});
+        S.fx.push({k:'flash',x:u.x,y:u.y-58,ang:0.79,R:14,lw:2.5,t:0,dur:0.18}); }
+      bfSfx(SFX.tkgather, u.x, u.y);
+    }
   } else if(col==='green'){
     // VANISH: the spy's own cloak state on the Sarge — bfCanTarget already
     // blinds every aimed trigger in the game, every fire loop holds HIS fire,
@@ -28686,6 +28825,8 @@ function update(dt){
   if(S.mode==='play') bmbTick(dt);
   // 0248: the training ledger reads the frame's damage and refills the dummy
   if(S.training && S.mode==='play') trainTick(dt);
+  // v3.23: the review range's own multi-dummy ledger (param-gated boot; dead code without it)
+  if(S.tkDemo && S.mode==='play') tkDemoTick(dt);
   if(S.emgFlash>0) S.emgFlash-=dt;
   // SARGE COMMS cooldowns drain on sim dt like every other clock (v1.41)
   if(COMM.cd>0) COMM.cd=Math.max(0,COMM.cd-dt);
@@ -31218,6 +31359,13 @@ function draw(){
       // to roll onto its back the way its corpse used to pose.
       cx.globalAlpha=1-k*k;
       drawSprite(e.type, e.x, e.y+3*k, e.w, (e.rot!=null?e.rot:-1.36)*Math.min(1,k*2.6), 0, e.img);
+      cx.globalAlpha=1; }
+    else if(e.k==='tkgho'){ // v3.23 RED CINEMA — the dash after-image: the figure
+      // himself, frozen where the lunge has already been, dying out fast.
+      // Drawn through drawSprite with the unit's own resolved tint (unitImg at
+      // push time, the 'fallen' idiom) so any army color rides free.
+      cx.globalAlpha=(1-k)*(e.a||0.45);
+      drawSprite(e.type, e.x, e.y, e.w, 0, 0, e.img, e.flip);
       cx.globalAlpha=1; }
     else if(e.k==='cone'){ // the shotgun blast — a quick fan of buckshot
       cx.globalAlpha=(1-k)*0.5; cx.fillStyle='#FFE39A';
@@ -35160,7 +35308,7 @@ function showMenu(){
   S.bf=null; S.pan=null; S.speed=1; S.slowmo=1; S.vflag=null; W=BASE_W; resize();   // ...nor a battlefield, nor the long front, nor a mid-rise flag: the room is 960 wide again
   S.coop=null;                      // the battle flag only — the party (COOP) rides on
   S.sq=null;                        // ...and the streaming ticker stops at the door
-  S.training=false; S.train=null;   // 0248: the range never survives the door back to the room
+  S.training=false; S.train=null; S.tkDemo=false;   // 0248: the range never survives the door back to the room — v3.23: nor the review range
   hideAllOverlays();
   document.getElementById('menu').classList.remove('hidden');
   // v1.80: a returning save's milestone medals (a record built on another
@@ -38427,6 +38575,13 @@ window.UI = {
   // over it: the equipSarge re-open idiom, verbatim.
   trainExit(){ if(!S.training) return; SFX.blip(); S.drag=null; hqClose();
     showMenu(); roomModal(panelHTML('promo')); },
+  // v3.23 THE CRYSTAL RANGE doors (card 03): stage that crystal's own pose,
+  // fire through the AI door (ownership and cooldown are the demo's to skip),
+  // repaint the strip. audio() on the tap — the boot path had no gesture.
+  tkDemoGo(col){ if(!S.tkDemo||S.mode!=='play') return; audio(); S.tkDemoCol=col;
+    const sg=tkDemoStage(col); if(sg) tkFire(sg, col, true); tkDemoBar(); },
+  tkDemoTell(){ if(!S.tkDemo||S.mode!=='play') return; audio(); S.tkDemoCol=null;
+    tkDemoStage('tell'); const d=S.foes[0]; if(d) tkTellFx(d.x, d.y); tkDemoBar(); },
   // WAR TABLE: every size button is a launcher — tap = queue that size right now
   wtPlay(n){ audio(); SFX.blip();
     // v3.09 (card 07): only the party leader starts — the buttons wear the
@@ -39402,7 +39557,12 @@ function frame(ts){
   }
   draw();
 }
-buildSprites(()=>{ ready=true; });
+buildSprites(()=>{ ready=true;
+  // v3.23 (card 03): the review range answers only to its own key — without
+  // ?tkdemo=1 this line is a dead regex test and the boot is behavior-
+  // identical (battery-asserted; prod flow byte-untouched).
+  try{ if(/[?&]tkdemo=1/.test(location.search)) tkDemoStart(); }catch(e){}
+});
 try{ if(META.dyeOn) buildUnitTint(dyeHex()); }catch(e){}
 requestAnimationFrame(frame);
 
