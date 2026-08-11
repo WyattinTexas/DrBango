@@ -22,10 +22,11 @@ class SynthAudio {
       this.ok = true;
       this.pad = new AmbientPad(this);
       this.pad.start();
+      if (this.meadowOn) this._cricketBoot();
     } catch (e) { /* garnish only */ }
   }
   setMuted(m) { this.muted = m; localStorage.setItem('beta3.mute', m ? '1' : '0'); if (this.ok) this.master.gain.value = m ? 0 : 0.5; }
-  tone(freq, dur, type, gain, when, glideTo) {
+  tone(freq, dur, type, gain, when, glideTo, dest) {
     if (!this.ok) return;
     const t = (when || 0) + this.ctx.currentTime;
     const o = this.ctx.createOscillator(), g = this.ctx.createGain();
@@ -34,8 +35,49 @@ class SynthAudio {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(gain || 0.12, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(this.master); o.start(t); o.stop(t + dur + 0.03);
+    o.connect(g).connect(dest || this.master); o.start(t); o.stop(t + dur + 0.03);
   }
+  // noise sweep with a swelling envelope (the ascent riser / descent wind)
+  sweep(f0, f1, dur, gain, lowwind) {
+    if (!this.ok) return;
+    const t = this.ctx.currentTime;
+    const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true;
+    const f = this.ctx.createBiquadFilter(); f.type = lowwind ? 'lowpass' : 'bandpass'; f.Q.value = lowwind ? 0.7 : 1.4;
+    f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + dur * 0.55);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f).connect(g).connect(this.master); s.start(t); s.stop(t + dur + 0.1);
+  }
+  /* meadow crickets — two staggered voices, gated by meadowOn so they only
+     sing while the home scene is at rest on the grass */
+  crickets(on) {
+    this.meadowOn = on;
+    if (!this.ok) return;
+    this._cricketBoot();
+    this.cricketGain.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, on ? 0.5 : 0.25);
+  }
+  _cricketBoot() {
+    if (this.cricketGain) return;
+    this.cricketGain = this.ctx.createGain();
+    this.cricketGain.gain.value = this.meadowOn ? 1 : 0;
+    this.cricketGain.connect(this.master);
+    const voice = (base) => {
+      const next = () => {
+        if (this.meadowOn) {
+          const n = 4 + Math.floor(Math.random() * 3);
+          for (let i = 0; i < n; i++) this.tone(base + Math.random() * 220, 0.028, 'sine', 0.014, i * 0.052, 0, this.cricketGain);
+        }
+        setTimeout(next, 340 + Math.random() * 620);
+      };
+      next();
+    };
+    voice(4150); setTimeout(() => voice(4420), 700);
+  }
+  riser() { this.sweep(300, 2600, 2.3, 0.10); this.sweep(190, 520, 2.3, 0.05, true); }
+  arriveChime() { this.tone(880, 0.35, 'sine', 0.08, 0.12); this.tone(1318.5, 0.5, 'sine', 0.07, 0.22); }
+  descendSweep() { this.sweep(1900, 320, 1.1, 0.07); }
   noise(dur, freq, q, gain, sweepTo) {
     if (!this.ok) return;
     const t = this.ctx.currentTime;

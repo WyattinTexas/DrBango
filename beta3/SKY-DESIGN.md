@@ -1,5 +1,5 @@
 # STARSPELL — THE ASCENT
-### Sky & transition design · v1 · 2026-08-10 · status: DESIGN (nothing built)
+### Sky & transition design · v1 · 2026-08-10 · status: P1+P2 SHIPPED in v0.3.0 (8/11) + P3 descend/defeat-fade; still open: dawn variant, versus rise-together, title-dissolve
 
 **The pitch.** The menu is no longer *in* the sky — it's a twilight meadow you stand in,
 looking up. The beasts wheel overhead, tiny and far. When you join a game, you **rise**:

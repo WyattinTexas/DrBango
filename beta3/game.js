@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.2.1';
+const BUILD = 'STARSPELL v0.3.0';
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
 const QS = new URLSearchParams(location.search);
 const DEMO = QS.get('demo') === '1';
@@ -151,7 +151,7 @@ function ssShootingStars(scene) {
   const fire = () => {
     if (!scene.scene.isActive()) return;
     const W = scene.scale.width, H = scene.scale.height;
-    const x = Math.random() * W * 0.8, y = Math.random() * H * 0.35;
+    const x = Math.random() * W * 0.8, y = scene.cameras.main.scrollY + Math.random() * H * 0.35;
     const s = scene.add.image(x, y, 'dot').setScale(1.1).setTint(0xfff2c9).setBlendMode('ADD').setDepth(1);
     const trail = [];
     for (let i = 0; i < 7; i++) trail.push(scene.add.image(x, y, 'dot').setScale(0.7 - i * 0.08).setAlpha(0.5 - i * 0.06).setTint(0xcfe0ff).setBlendMode('ADD').setDepth(1));
@@ -163,6 +163,199 @@ function ssShootingStars(scene) {
     });
   };
   scene.time.addEvent({ delay: 4200 + Math.random() * 4000, loop: true, callback: fire });
+}
+
+/* ============================================================
+   THE ASCENT — one vertical world, meadow at the bottom, the
+   battle sky at the zenith. Camera rises 2 frames (design
+   worldY 0..2400; home frame = 1600..2400; zenith = 0..800,
+   drawn at l.y(d) - 1600s so the battle handoff is invisible).
+   Spec: SKY-DESIGN.md · demo: ascent.html (curve ported 1:1).
+   ============================================================ */
+const ASC = { DIP_MS: 260, TOTAL_MS: 2600, DESCEND_MS: 1150 };
+const ssReduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// dip → rise → settle with overshoot; p: 0 = meadow, 1 = zenith
+function ssAscentP(ms) {
+  const easeOutSine = (t) => Math.sin(t * Math.PI / 2);
+  const quint = (t) => (t < 0.5 ? 16 * t ** 5 : 1 - Math.pow(-2 * t + 2, 5) / 2);
+  if (ms <= ASC.DIP_MS) return -0.011 * easeOutSine(ms / ASC.DIP_MS);
+  const u = Math.min(1, (ms - ASC.DIP_MS) / (ASC.TOTAL_MS - ASC.DIP_MS));
+  const q = quint(u);
+  const bump = u > 0.82 ? 0.009 * Math.sin(Math.min(1, (u - 0.82) / 0.18) * Math.PI) : 0;
+  return -0.011 * (1 - Math.min(1, u * 3)) + q + bump;
+}
+
+function ssSkyTextures(scene) {
+  const mk = (key, w, h, fn) => {
+    if (scene.textures.exists(key)) return;
+    const t = scene.textures.createCanvas(key, w, h);
+    fn(t.context, w, h); t.refresh();
+  };
+  mk('skygrad', 64, 1024, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h);
+    [[0, '#0a0d1c'], [0.09, '#0a0d1c'], [0.27, '#10142e'], [0.43, '#1c2350'], [0.575, '#3a3068'],
+     [0.685, '#6b4585'], [0.76, '#a05a8c'], [0.805, '#c96a8e'], [0.83, '#f0997a'], [0.846, '#ffc98a'],
+     [0.852, '#ffe4b0'], [0.86, '#0c0918'], [1, '#070510']].forEach(([p, col]) => g.addColorStop(p, col));
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    // banding law: ±1.5 RGB scanline dither — grain is what makes it look expensive
+    const im = c.getImageData(0, 0, w, h), d = im.data;
+    for (let y = 0; y < h; y++) {
+      const row = (Math.random() - 0.5) * 3;
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4, px = row + (Math.random() - 0.5) * 1.5;
+        d[i] += px; d[i + 1] += px; d[i + 2] += px;
+      }
+    }
+    c.putImageData(im, 0, 0);
+  });
+  mk('grain', 128, 128, (c, w, h) => {
+    const im = c.createImageData(w, h), d = im.data;
+    for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+    c.putImageData(im, 0, 0);
+  });
+  mk('moon', 144, 144, (c, w, h) => {
+    c.translate(w / 2, h / 2);
+    c.fillStyle = 'rgba(247,232,200,0.07)';                       // earthshine disk
+    c.beginPath(); c.arc(0, 0, 54, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#f7e8c8';
+    c.beginPath(); c.arc(0, 0, 54, 0, Math.PI * 2); c.fill();
+    c.globalCompositeOperation = 'destination-out';                // bite = the crescent
+    c.beginPath(); c.arc(31, -24, 53, 0, Math.PI * 2); c.fill();
+    c.globalCompositeOperation = 'source-over';
+    c.fillStyle = 'rgba(247,232,200,0.06)';
+    c.beginPath(); c.arc(0, 0, 54, 0, Math.PI * 2); c.fill();
+  });
+  mk('cloudwisp', 256, 80, (c, w, h) => {
+    const blob = (cx, cy, rx, ry, col, a) => {
+      c.save(); c.translate(cx, cy); c.scale(rx / 40, ry / 40);
+      const g = c.createRadialGradient(0, 0, 0, 0, 0, 40);
+      g.addColorStop(0, col.replace('A', String(a))); g.addColorStop(1, col.replace('A', '0'));
+      c.fillStyle = g; c.beginPath(); c.arc(0, 0, 40, 0, Math.PI * 2); c.fill(); c.restore();
+    };
+    blob(128, 46, 120, 26, 'rgba(20,16,40,A)', 0.9);               // dark body
+    blob(88, 50, 70, 18, 'rgba(20,16,40,A)', 0.7);
+    blob(120, 30, 90, 12, 'rgba(255,228,176,A)', 0.16);            // moonlit top edge
+  });
+  mk('spark4', 64, 64, (c, w, h) => {                              // hero-star diffraction cross
+    const arm = (ang) => {
+      c.save(); c.translate(w / 2, h / 2); c.rotate(ang);
+      const g = c.createLinearGradient(-30, 0, 30, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.95)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = g; c.fillRect(-30, -1.2, 60, 2.4); c.restore();
+    };
+    arm(0); arm(Math.PI / 2);
+    const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, 7);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g; c.fillRect(w / 2 - 7, h / 2 - 7, 14, 14);
+  });
+  mk('grasstrip', 512, 40, (c, w, h) => {
+    c.fillStyle = '#050310';
+    c.beginPath(); c.moveTo(0, h);
+    for (let x = 0; x <= w; x += 9) c.lineTo(x + Math.random() * 5, 10 + Math.random() * 24);
+    c.lineTo(w, h); c.closePath(); c.fill();
+    for (let i = 0; i < 4; i++) {                                  // wildflower silhouettes
+      const x = 30 + Math.random() * (w - 60), top = 2 + Math.random() * 6;
+      c.strokeStyle = '#050310'; c.lineWidth = 1.6;
+      c.beginPath(); c.moveTo(x, h); c.quadraticCurveTo(x + 3, h - 14, x, top + 5); c.stroke();
+      c.fillStyle = '#050310'; c.beginPath(); c.arc(x, top + 4, 3.2, 0, Math.PI * 2); c.fill();
+    }
+  });
+}
+
+const SS_STAR_COLORS = [0xcfd8ff, 0xcfd8ff, 0xcfd8ff, 0xffe9c9, 0xffd1dc, 0xc9fff2];
+function ssSkyWorld(scene) {
+  const l = ssLayout(scene);
+  ssSkyTextures(scene);
+  const T = 1600 * l.s;                                            // camera travel, px
+  const wy = (d) => l.y(d - 1600);                                 // worldY (0..2400) → scene y
+
+  // master gradient: spans the whole column, zenith top pinned to the game bg
+  scene.add.image(l.W / 2, wy(0), 'skygrad').setOrigin(0.5, 0).setDisplaySize(l.W, 2400 * l.s);
+  scene.add.rectangle(l.W / 2, l.y(800), l.W, Math.max(1, l.H - l.y(800)) + 120 * l.s, 0x070510).setOrigin(0.5, 0);
+
+  // aurora — lives at the zenith; one faint teal tease bleeds into the meadow sky
+  for (const [tint, dx, dy, a] of [[0x2fe0d0, -120, 160, 0.055], [0x8a5ae0, 130, 120, 0.055], [0xd7b45c, 0, 640, 0.055], [0x2fe0d0, 40, 1660, 0.03]]) {
+    const g = scene.add.image(l.x(dx), wy(dy), 'glowbig').setScale(l.u(2.6)).setTint(tint).setAlpha(a).setBlendMode('ADD');
+    scene.tweens.add({ targets: g, x: g.x + l.u(30), y: g.y - l.u(20), scale: l.u(3.1), duration: 7000 + Math.random() * 4000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  // star tiers — density ramps toward the zenith end of each parallax span
+  const tier = (f, n, s0, s1, twinkle) => {
+    const out = [], top = -T * f, span = T * f + l.H;
+    for (let i = 0; i < n; i++) {
+      const y = top + Math.pow(Math.random(), 1.8) * span;
+      const sc = (s0 + Math.random() * (s1 - s0)) * l.s;
+      const baseA = 0.25 + Math.random() * 0.55;
+      const st = scene.add.image(Math.random() * l.W, y, 'dot')
+        .setScale(sc).setAlpha(baseA).setTint(SS_STAR_COLORS[Math.floor(Math.random() * SS_STAR_COLORS.length)])
+        .setScrollFactor(1, f);
+      st.baseS = sc; st.baseA = baseA;
+      if (twinkle && Math.random() < 0.5)
+        scene.tweens.add({ targets: st, alpha: baseA * 0.35, duration: 1600 + Math.random() * 2600, yoyo: true, repeat: -1, delay: Math.random() * 2500 });
+      out.push(st);
+    }
+    return out;
+  };
+  tier(0.55, 110, 0.28, 0.5, true);
+  const tierM = tier(0.70, 75, 0.42, 0.68, true);
+  const tierN = tier(0.85, 48, 0.66, 0.95, false);
+  tierN.forEach((st) => st.setBlendMode('ADD'));
+
+  // hero stars — the ones a player would wish on, in the meadow's dusk sky
+  for (let i = 0; i < 6; i++) {
+    const hs = scene.add.image(l.x(-190 + Math.random() * 380), l.y(50 + Math.random() * 320), 'spark4')
+      .setScale(l.u(0.28 + Math.random() * 0.2)).setAlpha(0.75).setBlendMode('ADD').setScrollFactor(1, 0.85);
+    scene.tweens.add({ targets: hs, angle: 360, duration: 42000 + Math.random() * 40000, repeat: -1 });
+    scene.tweens.add({ targets: hs, alpha: 0.45, duration: 2200 + Math.random() * 1800, yoyo: true, repeat: -1, delay: Math.random() * 2000 });
+  }
+
+  // moon — low over the meadow, slides down and out during the first half of the rise
+  const moon = scene.add.image(l.x(-90), l.y(432), 'moon').setScale(l.u(0.9)).setAngle(24).setScrollFactor(1, 0.85);
+  const halo = scene.add.image(moon.x, moon.y, 'glowbig').setScale(l.u(1.1)).setTint(0xf7e8c8).setAlpha(0.16).setBlendMode('ADD').setScrollFactor(1, 0.85);
+  scene.tweens.add({ targets: halo, alpha: 0.1, duration: 4200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+  // clouds — parked in the climb band, crossed mid-flight
+  for (const [cx, cy, cw, chh] of [[-51, -650, 242, 43], [108, -475, 280, 50], [-121, -313, 229, 38]]) {
+    const c = scene.add.image(l.x(cx), l.y(cy), 'cloudwisp').setDisplaySize(l.u(cw), l.u(chh)).setAlpha(0.55);
+    scene.tweens.add({ targets: c, x: c.x + l.u(20), duration: 6000 + Math.random() * 4000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  // the meadow: hills, ground, swaying grass, fireflies
+  scene.add.ellipse(l.x(-108), l.y(545), l.u(432), l.u(250), 0x141026);
+  scene.add.ellipse(l.x(184), l.y(607), l.u(534), l.u(325), 0x0c0918);
+  scene.add.rectangle(l.W / 2, l.y(553), l.W, Math.max(1, l.H - l.y(553)) + 120 * l.s, 0x0a0714).setOrigin(0.5, 0);
+  const grassY = Math.max(l.y(770), l.H - l.u(34));
+  for (const [off, ph] of [[0, 0], [l.u(6), 1300]]) {
+    const gr = scene.add.tileSprite(l.W / 2, grassY + off, l.W, l.u(40), 'grasstrip').setOrigin(0.5, 0);
+    gr.setTileScale(l.s); gr.tilePositionX = off * 20;
+    scene.tweens.add({ targets: gr, x: gr.x + l.u(1.5), duration: 2600, yoyo: true, repeat: -1, delay: ph, ease: 'Sine.easeInOut' });
+  }
+  const flies = [];
+  for (let i = 0; i < 12; i++) {
+    const f = scene.add.image(l.x(-180 + Math.random() * 360), l.y(600 + Math.random() * 165), 'dot')
+      .setScale(l.u(0.22 + Math.random() * 0.14)).setTint(0xffdf8f).setBlendMode('ADD').setAlpha(0);
+    scene.tweens.add({ targets: f, alpha: 0.85, duration: 1700 + Math.random() * 1700, yoyo: true, repeat: -1, delay: Math.random() * 3000 });
+    scene.tweens.add({ targets: f, x: f.x + l.u(-14 + Math.random() * 28), y: f.y - l.u(6 + Math.random() * 10), duration: 2600 + Math.random() * 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    flies.push(f);
+  }
+
+  // film grain over everything — fixed to the camera
+  scene.add.tileSprite(l.W / 2, l.H / 2, l.W, l.H, 'grain').setScrollFactor(0).setAlpha(0.04).setDepth(500);
+
+  // camera driver: p 0 = meadow · 1 = zenith; vel drives the star-stretch
+  const setP = (p, vel) => {
+    scene.cameras.main.scrollY = -p * T;
+    const kN = Math.min(2.2, 1 + (vel || 0) * 560), kM = Math.min(1.6, 1 + (vel || 0) * 280);
+    for (const st of tierN) { st.setScale(st.baseS, st.baseS * kN); if (kN > 1.01) st.setAlpha(Math.min(1, st.baseA + (kN - 1) * 0.17)); }
+    for (const st of tierM) st.setScale(st.baseS, st.baseS * kM);
+  };
+  const scatterFlies = () => {
+    for (const f of flies) {
+      scene.tweens.killTweensOf(f);
+      scene.tweens.add({ targets: f, y: f.y - l.u(90 + Math.random() * 80), alpha: 0, duration: 700 + Math.random() * 500, ease: 'Sine.easeOut' });
+    }
+  };
+  return { setP, scatterFlies, T };
 }
 
 // Assemble a constellation inside a container: stars fly in, lines fade up.
@@ -227,24 +420,23 @@ function ssAchToast(scene, def) {
 }
 
 /* ============================================================
-   HOME
+   HOME — a twilight meadow at the bottom of the world column.
+   Entering a battle rises through the dusk to the zenith.
    ============================================================ */
+let PENDING_ASCENT = null;   // survives a mid-ascent resize-restart: finish to battle
 class Home extends Phaser.Scene {
   constructor() { super('home'); }
   create() {
+    if (PENDING_ASCENT) { const d = PENDING_ASCENT; PENDING_ASCENT = null; this.scene.start('battle', d); return; }
     const l = ssLayout(this);
     ssMakeTextures(this);
-    ssStarfield(this, 150);
+    this.sky = ssSkyWorld(this);
     ssShootingStars(this);
+    this.uiItems = [];
+    this.ascending = false; this.descending = false; this.arrived = false;
+    const ui = (o) => { this.uiItems.push(o); return o; };
 
-    // aurora
-    const AUR = [[0x2fe0d0, -120, 160], [0x8a5ae0, 130, 120], [0xd7b45c, 0, 640]];
-    for (const [tint, dx, dy] of AUR) {
-      const a = this.add.image(l.x(dx), l.y(dy), 'glowbig').setScale(l.u(2.6)).setTint(tint).setAlpha(0.055).setBlendMode('ADD');
-      this.tweens.add({ targets: a, x: a.x + l.u(30), y: a.y - l.u(20), scale: l.u(3.1), duration: 7000 + Math.random() * 4000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    }
-
-    // beast showcase behind/above title
+    // beast showcase — tonight's hunt, rising in the dusk sky
     this.showC = this.add.container(l.x(0), l.y(150));
     const ids = Object.keys(SS_BEASTS);
     let showIdx = Math.floor(Math.random() * ids.length);
@@ -256,11 +448,11 @@ class Home extends Phaser.Scene {
     cycle();
     this.time.addEvent({ delay: 9000, loop: true, callback: () => { this.tweens.add({ targets: this.showC, alpha: 0, duration: 500, onComplete: () => { this.showC.setAlpha(1); cycle(); } }); } });
 
-    // title
-    const title = ssTxt(this, l.x(0), l.y(300), 'STARSPELL', l.u(46), '#f3e5b4').setOrigin(0.5)
-      .setShadow(0, 0, '#c9a94f', l.u(18), true, true);
+    // title — just above the horizon glow, which acts as its halo
+    const title = ui(ssTxt(this, l.x(0), l.y(300), 'STARSPELL', l.u(46), '#f3e5b4').setOrigin(0.5)
+      .setShadow(0, 0, '#c9a94f', l.u(18), true, true));
     this.tweens.add({ targets: title, scale: 1.02, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    ssTxt(this, l.x(0), l.y(338), 'weave words · fell the star-beasts', l.u(12), '#8a94c4', 'italic').setOrigin(0.5);
+    ui(ssTxt(this, l.x(0), l.y(338), 'weave words · fell the star-beasts', l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
 
     // buttons
     const ck = this.campaignCheckpoint();
@@ -273,24 +465,36 @@ class Home extends Phaser.Scene {
       { y: 692, label: 'PROFILE', sub: null, fn: () => { SFX.ui(); this.scene.start('profile'); }, dark: true },
     ];
     for (const r of rows) {
-      const b = this.add.image(l.x(0), l.y(r.y), r.dark ? 'btndark' : 'btn').setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true });
-      const t = ssTxt(this, l.x(0), l.y(r.y - (r.sub ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : '#4a3305').setOrigin(0.5);
-      if (r.sub) ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : '#7a6535', 'italic').setOrigin(0.5);
-      b.on('pointerdown', () => { SFX.ensure(); r.fn(); });
+      const b = ui(this.add.image(l.x(0), l.y(r.y), r.dark ? 'btndark' : 'btn').setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true }));
+      ui(ssTxt(this, l.x(0), l.y(r.y - (r.sub ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : '#4a3305').setOrigin(0.5));
+      if (r.sub) ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : '#7a6535', 'italic').setOrigin(0.5));
+      b.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
       b.on('pointerover', () => b.setScale(b.scaleX * 1.03, b.scaleY * 1.03));
       b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)));
     }
     // versus
-    const vs = ssTxt(this, l.x(0), l.y(742), '⚔  VERSUS — duel beneath the stars  ⚔', l.u(13), '#9fb0e8').setOrigin(0.5).setInteractive({ useHandCursor: true });
-    vs.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.scene.start('vsmenu'); });
+    const vs = ui(ssTxt(this, l.x(0), l.y(742), '⚔  VERSUS — duel beneath the stars  ⚔', l.u(13), '#9fb0e8').setOrigin(0.5).setInteractive({ useHandCursor: true }));
+    vs.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); SFX.ui(); this.scene.start('vsmenu'); });
     this.tweens.add({ targets: vs, alpha: 0.65, duration: 1400, yoyo: true, repeat: -1 });
 
-    ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5);
-    this.muteB = ssTxt(this, l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7);
+    ui(ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5));
+    this.muteB = ui(ssTxt(this, l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
     this.muteB.on('pointerdown', () => { SFX.ensure(); SFX.setMuted(!SFX.muted); this.muteB.setText(SFX.muted ? '🔇' : '🔊'); });
 
     this.input.once('pointerdown', () => SFX.ensure());
     this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
+
+    // crickets sing while we stand in the grass
+    SFX.crickets(true);
+    this.events.once('shutdown', () => SFX.crickets(false));
+
+    // arriving from a battle: descend home · from defeat: wake up on the grass
+    const entry = (this.scene.settings.data || {}).from;
+    if (entry === 'battle') this.descendHome(l);
+    else if (entry === 'defeat') {
+      const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(600);
+      this.tweens.add({ targets: veil, alpha: 0, duration: 350, onComplete: () => veil.destroy() });
+    }
 
     localStorage.setItem('beta3.boot', BUILD);
     console.log(BUILD);
@@ -300,10 +504,65 @@ class Home extends Phaser.Scene {
   campaignCheckpoint() {
     try { return JSON.parse(localStorage.getItem('beta3.campaign')); } catch (e) { return null; }
   }
+  busy() { return this.ascending || this.descending; }
   startMode(mode) {
+    if (this.busy()) return;
     SFX.ui();
     const resume = mode === 'campaign' ? this.campaignCheckpoint() : null;
-    this.scene.start('battle', { mode, resume });
+    this.beginAscent({ mode, resume, ascended: true });
+  }
+
+  /* ---------- the rise (SKY-DESIGN §5) ---------- */
+  beginAscent(data) {
+    this.ascending = true;
+    PENDING_ASCENT = data;
+    const l = ssLayout(this);
+    SFX.crickets(false); SFX.riser();
+    this.sky.scatterFlies();
+    for (const o of this.uiItems) this.tweens.killTweensOf(o);
+    if (this.bloomBtn) this.tweens.add({ targets: this.bloomBtn, scale: { from: this.bloomBtn.scaleX, to: this.bloomBtn.scaleX * 1.08 }, duration: 130, yoyo: true });
+    this.tweens.add({ targets: this.uiItems, alpha: 0, duration: 300 });
+    if (ssReduceMotion()) {
+      const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setAlpha(0).setDepth(600);
+      this.tweens.add({ targets: veil, alpha: 1, duration: 200, onComplete: () => this.arrive() });
+      return;
+    }
+    this.ascentStart = this.time.now;
+    this.skipAt = null; this.lastP = 0; this.lastT = this.time.now;
+    this.input.on('pointerdown', this.skipFn = () => { if (this.ascending && !this.skipAt) this.skipAt = ASC.TOTAL_MS - 220; });
+    if (DEMO) this.skipAt = ASC.TOTAL_MS - 220;   // the solver has no time for wonder
+  }
+  update(time) {
+    if (!this.ascending || this.arrived || !this.ascentStart) return;
+    let ms = time - this.ascentStart;
+    if (this.skipAt && ms < this.skipAt) { this.ascentStart = time - this.skipAt; ms = this.skipAt; }
+    if (ms >= ASC.TOTAL_MS) { this.arrive(); return; }
+    const p = ssAscentP(ms);
+    const vel = Math.max(0, (p - this.lastP) / Math.max(1, time - this.lastT));
+    this.sky.setP(p, vel);
+    this.lastP = p; this.lastT = time;
+  }
+  arrive() {
+    if (this.arrived) return;
+    this.arrived = true;
+    if (this.skipFn) this.input.off('pointerdown', this.skipFn);
+    this.sky.setP(1, 0);
+    SFX.arriveChime();                              // the hush, then the forge voice
+    const data = PENDING_ASCENT; PENDING_ASCENT = null;
+    localStorage.setItem('beta3.ascent', JSON.stringify({ v: BUILD, skipped: !!this.skipAt, t: Date.now() }));
+    this.scene.transition({ target: 'battle', duration: 450, data, moveAbove: true });
+  }
+
+  /* ---------- the way back down ---------- */
+  descendHome(l) {
+    this.descending = true;
+    this.sky.setP(1, 0);
+    SFX.descendSweep();
+    this.tweens.addCounter({
+      from: 1, to: 0, duration: ASC.DESCEND_MS, ease: 'Cubic.easeInOut',
+      onUpdate: (tw) => this.sky.setP(tw.getValue(), 0),
+      onComplete: () => { this.descending = false; this.sky.setP(0, 0); SFX.crickets(true); },
+    });
   }
 }
 
@@ -312,11 +571,15 @@ class Home extends Phaser.Scene {
    ============================================================ */
 class Battle extends Phaser.Scene {
   constructor() { super('battle'); }
-  init(data) { this.mode = data.mode || 'quick'; this.resume = data.resume || null; }
+  init(data) { this.mode = data.mode || 'quick'; this.resume = data.resume || null; this.ascended = !!data.ascended; }
 
   create() {
     const l = this.L = ssLayout(this);
     ssMakeTextures(this);
+    if (this.ascended) {   // arriving from the rise: fade in over the zenith — bg matches, no pop
+      this.cameras.main.setAlpha(0);
+      this.tweens.add({ targets: this.cameras.main, alpha: 1, duration: 420, ease: 'Sine.easeOut' });
+    }
     ssStarfield(this, 110);
     ssShootingStars(this);
     for (const [tint, dx, dy] of [[0x2fe0d0, -140, 140], [0x8a5ae0, 140, 620]]) {
@@ -401,7 +664,7 @@ class Battle extends Phaser.Scene {
     this.hintB.on('pointerdown', () => this.useHint());
 
     this.homeB = txt(l.x(-195), l.y(24), '‹', 22, '#5a6390').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-    this.homeB.on('pointerdown', () => { SFX.ui(); this.scene.start('home'); });
+    this.homeB.on('pointerdown', () => { SFX.ui(); this.scene.start('home', { from: 'battle' }); });
     this.muteB = txt(l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', 14).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7);
     this.muteB.on('pointerdown', () => { SFX.ensure(); SFX.setMuted(!SFX.muted); this.muteB.setText(SFX.muted ? '🔇' : '🔊'); });
     txt(l.x(195), l.y(784), BUILD, 9, '#39406b').setOrigin(1, 0.5);
@@ -876,7 +1139,7 @@ class Battle extends Phaser.Scene {
     const homeT = ssTxt(this, l.x(0), l.y(by + 78), 'HOME', l.u(14), '#9fb0e8').setOrigin(0.5);
     items.push(again, againT, homeB, homeT);
     again.on('pointerdown', () => { SFX.ui(); this.scene.restart({ mode: this.mode, resume: null }); });
-    homeB.on('pointerdown', () => { SFX.ui(); this.scene.start('home'); });
+    homeB.on('pointerdown', () => { SFX.ui(); this.scene.start('home', { from: won ? 'battle' : 'defeat' }); });
     this.overlayC.add(items);
 
     if (DEMO) {
