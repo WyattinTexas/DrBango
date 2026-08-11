@@ -104,6 +104,8 @@ const PACK={
     const G=function(hex){return tone(g(hex))};
     const ground={
       floor:  G('#4E4B33'),                       /* calm dusk meadow — the kart canvas */
+      mottle: shade(G('#4E4B33'),-0.04,-2,-0.01), /* NEAR LAW: dry-meadow patches */
+      verge:  shade(G('#4E4B33'),-0.045,3,0.02),  /* the drawn rim band */
       b0:     G('#232E1E'),                       /* deep pine shadow */
       b1:     G('#2C3A26'),
       b2:     G('#3C4B2F'),
@@ -135,6 +137,8 @@ const PACK={
              bark:G('#2A2118'),
              snag:mix(G('#6E6553'),horizon,0.10),
              boulder:G('#494A3E'),
+             tuft:shade(G('#4E4B33'),0.05,4,0.03),      /* dry-grass blades */
+             tuftHi:shade(G('#4E4B33'),0.10,6,0.05),
              tower:tone('#2A2433'),towerDark:tone('#201B29')},  /* dusk-cool silhouette */
       accent:accent,
       water:tone('#3A3153'),                       /* the tarn mirrors the dusk, not the accent */
@@ -167,6 +171,8 @@ const PACK={
       basin:{r:params.basinR,blend:50,roll:0.8,rollScale:1/46,
         floor:params.water?Math.max(0.35,params.waterLevel+1.5):0.35},
       basinC:g.floor,
+      basinMottle:{scale:1/40,hexB:g.mottle,thresh:0.56},   /* NEAR LAW (doc2 §4) */
+      verge:{w:8,c:g.verge},
       bands:[
         {upTo:BAND_FR[0]*R,c:g.b0,cliff:g.cliffLo},
         {upTo:BAND_FR[1]*R,c:g.b1,cliff:g.cliffLo},
@@ -190,6 +196,24 @@ const PACK={
       prof.shore={level:params.waterLevel,c:pal.shore};
     }
     return prof;
+  },
+
+  /* ── farfield(params, rnd, pal) — FAR LAW (doc2 §2/§8): three receding ridge shells
+     on the rowNear→rowFar ladder, REAL parallax; the nearest wears the conifer TEETH.
+     Far rows get TALLER (the sundown-poster recession — far ridge stands tallest);
+     the dome keeps only its farthest painted row (see paintSky). */
+  farfield:function(params,rnd,pal){
+    const L=[mix(pal.sky.rowNear,pal.sky.rowFar,0.40),
+             mix(pal.sky.rowNear,pal.sky.rowFar,0.62),
+             mix(pal.sky.rowNear,pal.sky.rowFar,0.80)];
+    return {floor:-30,rings:[
+      {r:430, crest:40, hex:L[0],style:'rolling',teeth:9,toothW:12,
+       opts:{features:5,wMin:0.07,wMax:0.15}},
+      {r:740, crest:95, hex:L[1],style:'rolling',
+       opts:{features:5,wMin:0.06,wMax:0.13}},
+      {r:1180,crest:200,hex:L[2],style:'rolling',
+       opts:{features:6,wMin:0.05,wMax:0.11}}
+    ]};
   },
 
   /* ── paintSky — ONE enormous smooth vertical gradient + huge low sun with a soft halo +
@@ -223,8 +247,12 @@ const PACK={
     }
     /* receding ridge layers, far→near: farther = taller + lighter (closer to the sky
        hue), nearer = shorter + darker with a conifer-tooth fringe. Painted AFTER the
-       sun so far peaks sit in front of its lower limb — the sundown-poster move. */
-    const rows=[
+       sun so far peaks sit in front of its lower limb — the sundown-poster move.
+       DOME DEMOTION (doc2 §2): with FAR LAYERS on, the 3D shells own the near/mid
+       rows — the dome keeps ONLY the farthest painted row (the beyond-parallax one). */
+    const rows=(params.farRings==null||params.farRings>0)?[
+      {rise:0.085,t:0.85,teeth:0}
+    ]:[
       {rise:0.085,t:0.85,teeth:0},
       {rise:0.065,t:0.62,teeth:0},
       {rise:0.048,t:0.38,teeth:h*0.006},
@@ -277,6 +305,36 @@ const PACK={
     const boxGeo=new T.BoxGeometry(1,1,1);
     const roofGeo=new T.ConeGeometry(1,1,4,1);
     const rockGeo=new T.IcosahedronGeometry(1,0);
+    const bladeGeo=new T.ConeGeometry(1,1,3,1,true);
+
+    /* NEAR LAW (doc2 §4): dry-grass tuft — 5–7 blades leaning out from a base */
+    function tuft(s){
+      const grp=new T.Group();
+      const n=2+(rnd()<0.5?3:4);
+      for(let i=0;i<n;i++){
+        const bh=rng(rnd,0.22,0.44)*s;
+        const bg=new T.Group();
+        bg.rotation.y=(i/n)*6.28318+rng(rnd,-0.4,0.4);
+        const b=new T.Mesh(bladeGeo,kit.mat(rnd()<0.3?pal.props.tuftHi:pal.props.tuft));
+        b.scale.set(bh*0.10,bh,bh*0.10);
+        b.position.set(rng(rnd,0,0.10)*s,bh/2,0);
+        bg.rotation.z=rng(rnd,0.10,0.38);
+        bg.add(b);grp.add(bg);
+      }
+      return grp;
+    }
+    /* verge vignette — boulder anchor + tufts, left-heavy (house law) */
+    function vignette(s){
+      const grp=new T.Group();
+      const br=s*rng(rnd,0.5,0.85);
+      const b=new T.Mesh(rockGeo,kit.mat(pal.props.boulder));
+      b.scale.set(br*1.2,br*0.7,br);b.position.y=br*0.32;
+      b.rotation.y=rng(rnd,0,6.28);grp.add(b);
+      const t1=tuft(s);t1.position.set(-s*0.6,0,s*0.15);grp.add(t1);
+      const t2=tuft(s*0.8);t2.position.set(-s*0.15,0,-s*0.5);grp.add(t2);
+      const t3=tuft(s*0.7);t3.position.set(s*0.5,0,s*0.3);grp.add(t3);
+      return grp;
+    }
 
     /* stacked-cone fir. farHue set = pure one-hue silhouette (trunk included) */
     function fir(s,farHue){
@@ -419,6 +477,17 @@ const PACK={
       },
       sink:0.35
     });
+    /* NEAR LAW tables (doc2 §4) — NEAR DETAIL dial, outer annulus, drivable */
+    tables.push({near:true,count:5,odd:true,insideBasinOK:true,rad:2.5,
+      ring:[basinR-10,basinR+16],scaleRng:[1.0,1.6],
+      make:function(T2,r2,s){return vignette(s)},sink:0.15});
+    /* blades START AT THE EYE (doc2 §4) — foreground strokes, drivable */
+    tables.push({near:true,count:120,insideBasinOK:true,rad:0.9,
+      ring:[basinR*0.14,basinR-6],scaleRng:[0.8,1.5],
+      make:function(T2,r2,s){return tuft(s)},sink:0.05});
+    tables.push({near:true,count:36,rad:1.0,
+      ring:[basinR+4,basinR+100],scaleRng:[0.9,1.7],
+      make:function(T2,r2,s){return tuft(s)},sink:0.05});
     return tables;
   },
 

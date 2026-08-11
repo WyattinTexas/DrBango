@@ -52,6 +52,8 @@ function ink(hex){return shade(hex,-0.38,8,0.12)}
 function gouache(hex){const c=h2r(hex),k=rgb2hsl(c[0],c[1],c[2]);
   const o=hsl2rgb(k[0],clamp(k[1],0.20,0.62),clamp(k[2],0.22,0.72));
   return r2h(o[0],o[1],o[2])}
+/* rgba(hex, a) — canvas paint helper (halos/glows want alpha, hexes don't carry it) */
+function rgba(hex,a){const c=h2r(hex);return'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'}
 
 /* ───────────────────────────── 2 · THE PALETTE (world-law §3, copied as data) ───────────
    BG box S∈[.20,.62] L∈[.22,.72]. Derivatives via shade/mix only — never hand-pick. */
@@ -172,9 +174,16 @@ function flatKit(){
      rim:{r0,r1,lo},                           // radial gain: drama beyond the rim
      basin:{r,blend,roll,rollScale,floor},     // THE BASIN LAW (§3)
      basinC,                                   // calm floor hex inside the basin
+     basinMottle:{scale,hexB,thresh}?,         // NEAR LAW (doc2 §4): seeded 2-tone hard
+                                               //   patches on the basin floor — texture
+                                               //   without stealing sprite readability
+     verge:{w,c}?,                             // NEAR LAW: drawn colour band on the last
+                                               //   w metres inside the rim
      bands:[{upTo(m), c, cliff}...], cliffNy,  // posterized height bands + cliff hex
      shore:{level,c}?,                         // depth band when water is on
-     aerial:{sky,start,end,max},               // WL mix() toward sky hue by distance
+     aerial:{sky,start,end,max,steps?},        // WL mix() toward sky hue by distance;
+                                               //   steps = LADDER LAW quantize (doc2 §1):
+                                               //   hard distance rungs, not smooth mush
    } */
 function heightfield(prof, seed){
   const T=global.THREE;
@@ -225,6 +234,11 @@ function heightfield(prof, seed){
   const cliffDy=prof.cliffDy;
   const aer=prof.aerial, aerRGB=aer?h2r(aer.sky):null;
   const basinRGB=prof.basinC?h2r(prof.basinC):null;
+  /* NEAR LAW (doc2 §4) — mottle patches + verge band, face colours only, zero new tris */
+  const mot=prof.basinMottle,motRGB=(mot&&mot.hexB)?h2r(mot.hexB):null,
+        motN=motRGB?valueNoise2D((seed^0xB0771E)>>>0):null,
+        motSc=mot?(mot.scale||1/38):0,motTh=mot?(mot.thresh==null?0.55:mot.thresh):0;
+  const vrg=prof.verge,vrgRGB=(vrg&&vrg.c)?h2r(vrg.c):null,vrgW=vrg?(vrg.w||9):0;
   const shoreRGB=prof.shore?h2r(prof.shore.c):null;
   const cell=size/segs;
   /* cache the grid heights once (segs+1)² */
@@ -240,7 +254,11 @@ function heightfield(prof, seed){
     const mx=(ax+bx+cx)/3,my=(ay+by+cy)/3,mz=(az+bz+cz)/3;
     const d=Math.hypot(mx,mz);
     let rgb;
-    if(basinRGB&&d<basin.r-4)rgb=basinRGB;
+    if(basinRGB&&d<basin.r-4){
+      rgb=basinRGB;
+      if(motRGB&&motN(mx*motSc+13.7,mz*motSc+7.9)>motTh)rgb=motRGB;
+      if(vrgRGB&&d>basin.r-4-vrgW)rgb=vrgRGB;
+    }
     else{
       let band=bands[bands.length-1];
       for(let k=0;k<bands.length;k++)if(my<=bands[k].upTo){band=bands[k];break}
@@ -251,7 +269,9 @@ function heightfield(prof, seed){
     }
     /* §4 shore band applies EVERYWHERE below the water line — basin faces included */
     if(shoreRGB&&my<prof.shore.level+0.5)rgb=shoreRGB;
-    if(aerRGB){const t=aer.max*smoothstep(aer.start,aer.end,d);
+    if(aerRGB){let t=aer.max*smoothstep(aer.start,aer.end,d);
+      /* LADDER LAW (doc2 §1): optional quantize — hard distance rungs */
+      if(aer.steps)t=Math.round(t*aer.steps)/aer.steps;
       rgb=[rgb[0]+(aerRGB[0]-rgb[0])*t,rgb[1]+(aerRGB[1]-rgb[1])*t,rgb[2]+(aerRGB[2]-rgb[2])*t]}
     const r=rgb[0]/255,g=rgb[1]/255,b=rgb[2]/255;
     pos[p]=ax;pos[p+1]=ay;pos[p+2]=az;pos[p+3]=bx;pos[p+4]=by;pos[p+5]=bz;
@@ -280,8 +300,10 @@ function heightfield(prof, seed){
 /* ───────────────────────────── 6 · SCATTER LAW (doc §6) ─────────────────────────────
    tables: [{make(T,rnd,s,i)->Object3D, count, ring:[r0,r1], scaleRng:[s0,s1], rad,
              landmark?, insideBasinOK?, rimRing?, odd?, arc?(radians — left-heavy cluster),
-             punct? (scaled by punctuation dial instead of density), yAt?(heightAt,x,z,s),
-             sink?, margin?}]
+             punct? (scaled by punctuation dial instead of density),
+             near? (NEAR LAW doc2 §4 — scaled by the NEAR DETAIL dial instead of density;
+               drivable-cosmetic detail ≤~0.5 m, outer basin annulus only),
+             yAt?(heightAt,x,z,s), sink?, margin?}]
    Exactly ONE landmark per world; density dial multiplies counts; never inside the basin
    unless flagged; odd counts where the table asks (house punctuation law). */
 function scatterAll(group, tables, ctx){
@@ -297,7 +319,8 @@ function scatterAll(group, tables, ctx){
       /* fixed tables ignore the density/punct multipliers — the one-wrong-colour
          accent (doc §7) must survive density 0 and stay singular at density 2 */
     }else{
-      count=Math.round(count*(t.punct?ctx.punct:ctx.density));
+      count=Math.round(count*(t.punct?ctx.punct:
+        t.near?(ctx.nearDetail==null?1:ctx.nearDetail):ctx.density));
       if(t.odd&&count>0&&count%2===0)count+=1;
     }
     let a0=null;
@@ -363,6 +386,11 @@ function skyDome(paint,opts){
   const T=global.THREE,w=2048,h=1024;
   const cv=document.createElement('canvas');cv.width=w;cv.height=h;
   paint(cv.getContext('2d'),w,h);
+  /* force the 2d raster queue to COMPLETE before the texture snapshots the canvas —
+     headless GPU-canvas rasterizes asynchronously, and without a readback the last
+     ops (e.g. a full-canvas putImageData) can miss the upload: the same URL then
+     renders one of TWO skies (the depth-wave determinism hunt, 8/11). 1px is enough. */
+  cv.getContext('2d').getImageData(0,0,1,1);
   const tex=new T.CanvasTexture(cv);
   tex.minFilter=T.LinearFilter;tex.magFilter=T.LinearFilter;tex.generateMipmaps=false;
   const geo=new T.SphereGeometry((opts&&opts.radius)||2600,48,30);
@@ -442,8 +470,210 @@ const sky={
     }
     ctx.lineTo(w,y0);ctx.lineTo(w,y0+rise*2+40);ctx.lineTo(0,y0+rise*2+40);
     ctx.closePath();ctx.fill();
+  },
+  /* ── doc2 §5 — night-register jewellery (any pack may use) ── */
+  /* smooth multi-stop vertical gradient with per-scanline ±dither RGB noise.
+     stops=[[t,hex]...] over [top..hor]. SKY-DESIGN banding law: smooth dark gradients
+     band hard on OLED — the dither is what makes it look expensive. */
+  gradient:function(ctx,w,h,o){
+    const stops=o.stops,top=Math.floor(o.top||0),hor=Math.ceil(o.hor);
+    const di=o.dither==null?1.5:o.dither;
+    /* poleFade: taper the dither toward the dome pole — per-scanline offsets read
+       as concentric rings where the equirect compresses at the zenith */
+    const pf=o.poleFade||0;
+    const jr=mulberry32(((o.seed)||9)^0x6AD1);
+    for(let y=top;y<hor;y++){
+      const t=clamp((y-top)/((hor-top)||1),0,1);
+      let a=stops[0],b=stops[stops.length-1];
+      for(let i=0;i<stops.length-1;i++)
+        if(t>=stops[i][0]&&t<=stops[i+1][0]){a=stops[i];b=stops[i+1];break}
+      const f=(t-a[0])/((b[0]-a[0])||1e-9);
+      const A=h2r(a[1]),B=h2r(b[1]);
+      const dd=di*(pf>0&&y<pf?y/pf:1);
+      ctx.fillStyle=r2h(A[0]+(B[0]-A[0])*f+(jr()*2-1)*dd,
+                        A[1]+(B[1]-A[1])*f+(jr()*2-1)*dd,
+                        A[2]+(B[2]-A[2])*f+(jr()*2-1)*dd);
+      ctx.fillRect(0,y,w,1);
+    }
+  },
+  /* seeded per-pixel luminance noise over the whole canvas — kills banding.
+     CPU pixels on purpose (getImageData → putImageData): a pattern-from-canvas +
+     'overlay' composite raced the headless GPU-canvas flush — the sky texture
+     sometimes uploaded WITHOUT the grain pass (two-attractor determinism failure).
+     The synchronous read also forces a full flush before CanvasTexture snapshots. */
+  grain:function(ctx,w,h,o){
+    const a=(o&&o.alpha)!=null?o.alpha:0.03;
+    const amp=a*70;                            /* alpha 0.05 ⇒ ±3.5 RGB — film-subtle */
+    const jr=mulberry32((((o&&o.seed)||3))^0x96A1);
+    const img=ctx.getImageData(0,0,w,h),d=img.data;
+    for(let i=0;i<d.length;i+=4){
+      const n=(jr()*2-1)*amp;
+      d[i]+=n;d[i+1]+=n;d[i+2]+=n;             /* Uint8ClampedArray clamps */
+    }
+    ctx.putImageData(img,0,0);
+  },
+  /* tiered starfield with a density ramp toward y0 (zenith side): the thickening sky.
+     colors=[{c,w}] weighted; heroN four-ray wish-stars (twinkle + tiny core). */
+  starfield:function(ctx,o){
+    const jr=mulberry32(((o.seed)||77)^0x57A2);
+    const cols=o.colors||[{c:'#cfd8ff',w:0.62},{c:'#ffe9c9',w:0.24},
+      {c:'#ffd1dc',w:0.07},{c:'#c9fff2',w:0.07}];
+    const ramp=o.ramp==null?1.6:o.ramp;
+    function pickC(){let v=jr(),acc=0;
+      for(let i=0;i<cols.length;i++){acc+=cols[i].w;if(v<=acc)return cols[i].c}
+      return cols[0].c}
+    for(let i=0;i<(o.n||0);i++){
+      const u=Math.pow(jr(),ramp);            /* 0 = zenith side — denser up there */
+      const y=o.y0+(o.y1-o.y0)*u,x=jr()*o.w;
+      const r=rng(jr,0.7,2.4)*(1-u*0.45);
+      ctx.globalAlpha=rng(jr,0.35,1)*(1-u*0.35);
+      ctx.fillStyle=pickC();
+      ctx.beginPath();ctx.arc(x,y,r,0,6.28318);ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    for(let i=0;i<(o.heroN||0);i++){
+      const x=jr()*o.w,y=o.y0+(o.y1-o.y0)*(0.25+0.6*jr());
+      const r=rng(jr,4.5,7.5),c=pickC();
+      ctx.globalAlpha=0.92;
+      sky.twinkle(ctx,{x:x,y:y,r:r,color:c});
+      ctx.globalAlpha=0.35;ctx.fillStyle=c;
+      ctx.beginPath();ctx.arc(x,y,r*0.22,0,6.28318);ctx.fill();
+      ctx.globalAlpha=1;
+    }
+  },
+  /* fat tilted crescent + faint earthshine + soft halo (haloA dials its strength).
+     bg = the sky behind it — the bite is CLIPPED to the disc so it never erases
+     the halo. */
+  moon:function(ctx,o){
+    const tilt=(o.tilt==null?24:o.tilt)*Math.PI/180;
+    const es=o.earthshine?mix(o.bg,o.color,o.earthshine):o.bg;
+    if(o.halo){
+      const hA=o.haloA==null?0.30:o.haloA;
+      const hg=ctx.createRadialGradient(o.x,o.y,o.r*0.7,o.x,o.y,o.r*3.1);
+      hg.addColorStop(0,rgba(o.color,hA));
+      hg.addColorStop(0.5,rgba(o.color,hA*0.33));
+      hg.addColorStop(1,rgba(o.color,0));
+      ctx.fillStyle=hg;ctx.beginPath();ctx.arc(o.x,o.y,o.r*3.1,0,6.28318);ctx.fill();
+    }
+    ctx.fillStyle=o.color;
+    ctx.beginPath();ctx.arc(o.x,o.y,o.r,0,6.28318);ctx.fill();
+    ctx.save();
+    ctx.beginPath();ctx.arc(o.x,o.y,o.r,0,6.28318);ctx.clip();
+    ctx.fillStyle=es;
+    ctx.beginPath();
+    ctx.arc(o.x-Math.cos(tilt)*o.r*0.46,o.y-Math.sin(tilt)*o.r*0.46,o.r*0.88,0,6.28318);
+    ctx.fill();
+    ctx.restore();
   }
 };
+
+/* ───────────────────────── 7B · FAR LAW (doc2 §1–§3) ─────────────────────────
+   depthLadder — monotonic quantized value rungs toward the sky; ridgeline — the
+   AUTHORED silhouette grammar (few, large, deliberate features; MAX composition;
+   seam-safe on the circle); farShells — real-parallax silhouette rings. */
+/* depthLadder(nearHex, skyHex, n, gamma) — n rungs stepping toward the sky.
+   gamma <1 bunches the far rungs near the sky hue (default 0.8). */
+function depthLadder(nearHex,skyHex,n,gamma){
+  const g=gamma==null?0.8:gamma,out=[];
+  for(let i=0;i<n;i++)out.push(mix(nearHex,skyHex,Math.pow((i+1)/(n+1),g)));
+  return out;
+}
+/* ridgeline(style, seed, opts) -> f(t∈[0,1) wraps, returns 0..1 crest height).
+   styles: 'rolling' (raised-cosine arcs) | 'peaks' (skewed linear summits) |
+   'mesa' (trapezoid slabs) | 'dunes' (skewed sine crests).
+   opts:{features, wMin,wMax, hMin,hMax, base, swell} — all optional.
+   Noise octaves are for TERRAIN; silhouettes are AUTHORED (doc2 §3). */
+function ridgeline(style,seed,opts){
+  opts=opts||{};
+  const r=mulberry32(seed>>>0);
+  const n=opts.features!=null?opts.features:(style==='mesa'?rint(r,3,5):rint(r,4,7));
+  const wMin=opts.wMin==null?0.05:opts.wMin,wMax=opts.wMax==null?0.13:opts.wMax;
+  const hMin=opts.hMin==null?0.42:opts.hMin,hMax=opts.hMax==null?1.0:opts.hMax;
+  const feats=[];
+  for(let i=0;i<n;i++){
+    feats.push({c:(i+0.5)/n+rng(r,-0.28,0.28)/n,
+      w:rng(r,wMin,wMax),h:rng(r,hMin,hMax),
+      sk:rng(r,-0.35,0.35),ft:rng(r,0.34,0.62)});
+  }
+  const base=opts.base==null?rng(r,0.05,0.10):opts.base;
+  const swellA=opts.swell==null?rng(r,0.05,0.12):opts.swell;
+  const swellP=r()*6.28318,swellK=rint(r,1,2);
+  function shape(x,f){
+    const ax=Math.abs(x);
+    if(ax>=1)return 0;
+    if(style==='mesa')return ax<f.ft?1:(1-ax)/(1-f.ft);
+    if(style==='peaks'){const xx=x-f.sk*(1-ax);return Math.max(0,1-Math.abs(xx))}
+    if(style==='dunes')return Math.sin(3.14159*Math.pow((x+1)/2,1+f.sk*0.8));
+    return 0.5+0.5*Math.cos(3.14159*x);           /* rolling */
+  }
+  return function(t){
+    t=((t%1)+1)%1;
+    let hgt=0;
+    for(let i=0;i<feats.length;i++){
+      const f=feats[i];
+      let dt=t-f.c;if(dt>0.5)dt-=1;else if(dt<-0.5)dt+=1;
+      const s=shape(dt/f.w,f)*f.h;
+      if(s>hgt)hgt=s;                             /* MAX: stacked-paper overlaps */
+    }
+    const sw=swellA*(0.5+0.5*Math.sin(swellK*6.28318*t+swellP));
+    return clamp(base+sw+hgt*(1-base-swellA),0,1);
+  };
+}
+/* farShells(spec, seed) -> THREE.Group 'backlot-far' — doc2 §2.
+   spec:{floor?, rings:[{r, crest, base?, hex, style?, opts?, teeth?, toothW?, segs?}]}.
+   Each ring: ONE flat unlit colour (fog:false — ring hexes ARE the aerial ladder,
+   scene fog must never re-wash them), top edge from ridgeline(), bottom skirt to
+   `floor` so the tile edge never shows void. Real geometry ⇒ real parallax. */
+function farShells(spec,seed){
+  const T=global.THREE,grp=new T.Group();grp.name='backlot-far';
+  const floor=spec.floor==null?-30:spec.floor;
+  const rings=spec.rings||[];
+  for(let i=0;i<rings.length;i++){
+    const rg=rings[i];
+    const segs=rg.segs||(rg.teeth?512:384);
+    const prof=ridgeline(rg.style||'rolling',(seed^Math.imul(i+1,0x9E37))>>>0,rg.opts);
+    /* conifer-tooth fringe: per-tooth heights pre-drawn (seeded), triangle wave */
+    const toothH=rg.teeth||0,toothW=rg.toothW||11;
+    let nTeeth=0,tHs=null;
+    if(toothH){
+      const tr=mulberry32((seed^Math.imul(i+1,0x51F7))>>>0);
+      nTeeth=Math.max(8,Math.round(6.28318*rg.r/toothW));
+      tHs=new Float32Array(nTeeth);
+      for(let k=0;k<nTeeth;k++)tHs[k]=toothH*rng(tr,0.55,1.3);
+    }
+    const base=rg.base||0;
+    function topAt(t){
+      let y=base+rg.crest*prof(t);
+      if(toothH){
+        const u=t*nTeeth,k=Math.floor(u)%nTeeth,fr2=u-Math.floor(u);
+        y+=tHs[k]*(1-Math.abs(2*fr2-1));
+      }
+      return y;
+    }
+    const pos=new Float32Array(segs*2*9);
+    let p=0;
+    for(let s=0;s<segs;s++){
+      const t0=s/segs,t1=(s+1)/segs;
+      const a0=t0*6.28318530718,a1=t1*6.28318530718;
+      const x0=Math.sin(a0)*rg.r,z0=Math.cos(a0)*rg.r,
+            x1=Math.sin(a1)*rg.r,z1=Math.cos(a1)*rg.r;
+      const y0=topAt(t0),y1=topAt(t1);
+      pos[p++]=x0;pos[p++]=floor;pos[p++]=z0;
+      pos[p++]=x1;pos[p++]=floor;pos[p++]=z1;
+      pos[p++]=x0;pos[p++]=y0;  pos[p++]=z0;
+      pos[p++]=x1;pos[p++]=floor;pos[p++]=z1;
+      pos[p++]=x1;pos[p++]=y1;  pos[p++]=z1;
+      pos[p++]=x0;pos[p++]=y0;  pos[p++]=z0;
+    }
+    const geo=new T.BufferGeometry();
+    geo.setAttribute('position',new T.BufferAttribute(pos,3));
+    const mat=new T.MeshBasicMaterial({color:new T.Color(rg.hex),fog:false,
+      side:T.DoubleSide});
+    const m=new T.Mesh(geo,mat);m.name='far-ring-'+i;
+    grp.add(m);
+  }
+  return grp;
+}
 
 /* ───────────────────────────── 8 · SHAPE HELPERS ───────────────────────────── */
 /* kidney loop (world-law §7 kidney, rnd-driven) — pond/pad decals. Returns [{x,y}]. */
@@ -477,12 +707,13 @@ function countTris(root){
 const EL={
   mulberry32:mulberry32,pick:pick,rng:rng,rint:rint,clamp:clamp,hashInt:hashInt,
   smoothstep:smoothstep,
-  h2r:h2r,r2h:r2h,shade:shade,mix:mix,ink:ink,gouache:gouache,
+  h2r:h2r,r2h:r2h,shade:shade,mix:mix,ink:ink,gouache:gouache,rgba:rgba,
   PAL:PAL,CEL:CEL,
   valueNoise2D:valueNoise2D,fbm:fbm,
   toonKit:toonKit,hullOf:hullOf,put:put,flatKit:flatKit,
   heightfield:heightfield,scatterAll:scatterAll,
   skyDome:skyDome,sky:sky,
+  depthLadder:depthLadder,ridgeline:ridgeline,farShells:farShells,
   kidneyLoop:kidneyLoop,shapeFromLoop:shapeFromLoop,countTris:countTris
 };
 global.EL=EL;
@@ -494,6 +725,7 @@ const CONTROLS=[
   {k:'detail',      l:'TERRAIN DETAIL',  g:'WORLD',  t:'rng',min:64, max:128,step:32,  d:128},
   {k:'water',       l:'WATER',           g:'WORLD',  t:'tog',                          d:false},
   {k:'waterLevel',  l:'WATER LEVEL',     g:'WORLD',  t:'rng',min:0.5,max:6,  step:0.5, d:1.5},
+  {k:'farRings',    l:'FAR LAYERS',      g:'WORLD',  t:'cyc',o:[0,2,3],                d:3},
   {k:'relief',      l:'RELIEF',          g:'TERRAIN',t:'rng',min:12, max:80, step:2,   d:55},
   {k:'terrace',     l:'TERRACE STRENGTH',g:'TERRAIN',t:'rng',min:0,  max:1,  step:0.05,d:0.85},
   {k:'terraceSteps',l:'TERRACE STEPS',   g:'TERRAIN',t:'rng',min:3,  max:9,  step:1,   d:6},
@@ -505,6 +737,7 @@ const CONTROLS=[
   {k:'punct',       l:'PUNCTUATION',     g:'PROPS',  t:'rng',min:0,  max:2,  step:0.1, d:1},
   {k:'landmark',    l:'LANDMARK',        g:'PROPS',  t:'cyc',o:[0,1,2],                d:0},
   {k:'propScale',   l:'PROP SCALE',      g:'PROPS',  t:'rng',min:0.7,max:1.4,step:0.05,d:1},
+  {k:'nearDetail',  l:'NEAR DETAIL',     g:'PROPS',  t:'rng',min:0,  max:2,  step:0.1, d:1},
   {k:'hueShift',    l:'PALETTE SHIFT',   g:'COLOR',  t:'rng',min:-40,max:40, step:2,   d:0},
   {k:'accent',      l:'WRONG COLOUR',    g:'COLOR',  t:'cyc',o:[0,1,2],                d:0},
   {k:'fog',         l:'FOG',             g:'MOOD',   t:'tog',                          d:false},
@@ -561,7 +794,8 @@ const EnvGen={
           rTer=mulberry32((S^0x7E44A1)>>>0),
           rSky=mulberry32((S^0x051C07)>>>0),
           rProp=mulberry32((S^0x94077E)>>>0),
-          rScat=mulberry32((S^0x5CA77E)>>>0);
+          rScat=mulberry32((S^0x5CA77E)>>>0),
+          rFar=mulberry32((S^0xFA57E1)>>>0);
     const pal=pack.palette(params,rPal);
     const prof=pack.terrain(params,rTer,pal);
     const hf=heightfield(prof,S);
@@ -592,16 +826,29 @@ const EnvGen={
     }
     const tables=pack.props(EL,rProp,params,pal);
     scatterAll(group,tables,{rnd:rScat,basinR:params.basinR,heightAt:hf.heightAt,
-      density:params.density,punct:params.punct,propScale:params.propScale});
+      density:params.density,punct:params.punct,propScale:params.propScale,
+      nearDetail:params.nearDetail});
     const skyObj=skyDome(function(ctx,w,h){pack.paintSky(ctx,w,h,pal,params,rSky)});
+    /* FAR LAW (doc2 §2): real-parallax silhouette shells from the pack hook — data in,
+       geometry out. No hook or FAR LAYERS 0 ⇒ null (legacy dome-only, byte-identical). */
+    let far=null,farTris=0;
+    if(pack.farfield&&(params.farRings==null||params.farRings>0)){
+      const spec=pack.farfield(params,rFar,pal)||{};
+      const nR=params.farRings==null?3:params.farRings;
+      const rings=(spec.rings||[]).slice(0,nR);
+      if(rings.length){
+        far=farShells({floor:spec.floor,rings:rings},S);
+        farTris=countTris(far);
+      }
+    }
     const fog=(pack.treatment!=='flat'&&params.fog&&pal.fogHex)?
       {color:pal.fogHex,near:120+280*(1-params.fogAmt),far:900-380*params.fogAmt}:null;
     return {
-      group:group,sky:skyObj,fog:fog,
+      group:group,sky:skyObj,far:far,fog:fog,
       bounds:{radius:params.basinR},
       heightAt:hf.heightAt,   /* engine extension: kart-cam kinematic ground follow */
       meta:{pack:pack.name,label:pack.label,palette:pal.swatches||[],
-            tris:countTris(group),moving:[]}
+            tris:countTris(group),farTris:farTris,moving:[]}
     };
   }
 };

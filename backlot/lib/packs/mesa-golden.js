@@ -45,6 +45,8 @@ const PACK={
        pale caps. Every hex from the WL tables or one shade() step off them. */
     const ground={
       floor:  G(shade(PAL.stone,-0.02,2,-0.12)),       /* calm greyed gold — kart canvas */
+      mottle: G(shade(PAL.stone,-0.065,4,-0.13)),      /* NEAR LAW: sand-drift patches */
+      verge:  G(shade(PAL.dirtM,0.03,2,-0.04)),        /* the drawn rim band */
       b0:     G(PAL.dirtM),
       b1:     G(PAL.dirtF),
       b2:     G(shade(PAL.thatch,0.05,0,0.02)),        /* the butter */
@@ -91,6 +93,8 @@ const PACK={
       basin:{r:params.basinR,blend:52,roll:0.9,rollScale:1/47,
         floor:params.water?Math.max(0.35,params.waterLevel+1.2):0.35},
       basinC:g.floor,
+      basinMottle:{scale:1/42,hexB:g.mottle,thresh:0.56},   /* NEAR LAW (doc2 §4) */
+      verge:{w:8,c:g.verge},
       bands:[
         {upTo:BAND_FR[0]*R,c:g.b0,cliff:g.cliffLo},
         {upTo:BAND_FR[1]*R,c:g.b1,cliff:g.cliffLo},
@@ -105,15 +109,38 @@ const PACK={
     return prof;
   },
 
+  /* ── farfield(params, rnd, pal) — FAR LAW (doc2 §2/§8): MESA-style shells (flat-top
+     slabs, the §3 grammar in this register) replace BOTH painted silhouette rows.
+     Real parallax kills the bowl feel; rungs step up the ladder toward the horizon. */
+  farfield:function(params,rnd,pal){
+    const horC=pal.sky.horizon,g=pal.ground;
+    /* MESA SCALE: relief-55 rim terrain subtends ~10° at the tile edge — shells must
+       OUT-RANK it (Monument Valley buttes are 300 m). COLOUR LESSON (r4): mixing the
+       narrow gold family toward the horizon converges — the rings read as extra sky
+       bands. Rungs are now VALUE-STEPPED off the haze (deep rust → burnt orange →
+       amber → haze), and bases sit LOW so real sky gaps open between slabs — mesa
+       silhouettes, not bands. Sun law intact: tallest top ≈ 16° < the 17° sun floor. */
+    const hz=shade(pal.sky.horizon,-0.06,3,-0.03);
+    const L=[shade(hz,-0.23,-11,0.12),shade(hz,-0.13,-7,0.08),shade(hz,-0.05,-3,0.04)];
+    return {floor:-30,rings:[
+      {r:420, crest:90, hex:L[0],style:'mesa',
+       opts:{features:5,wMin:0.05,wMax:0.10,base:0.03,swell:0.03}},
+      {r:700, crest:190,hex:L[1],style:'mesa',
+       opts:{features:5,wMin:0.055,wMax:0.11,base:0.03,swell:0.03}},
+      {r:1100,crest:310,hex:L[2],style:'mesa',
+       opts:{features:4,wMin:0.06,wMax:0.13,base:0.02,swell:0.03}}
+    ]};
+  },
+
   /* ── paintSky(ctx,w,h,pal,params,rnd) — 4 hard dusk bands + scallops + sun disc +
         sparse punctuation + far mesa silhouette rows (doc §8). Sky owns ~55% of the
         kart frame; horizon = canvas y = h/2. ─────────────────────────────────────────── */
   paintSky:function(ctx,w,h,pal,params,rnd){
     const tod=params.timeOfDay||'dusk';
     /* stage compressed to the KART-VISIBLE strip: horizon = 0.5h (v .5 on the dome),
-       stage top = 0.30h ≈ elevation 36° — all 4 bands land inside the judge frame.
-       Sizes below are ANGULAR (fractions of h ⇒ degrees/180), not stage fractions. */
-    const hor=h*0.5,top=h*0.30;
+       stage top = 0.26h ≈ elevation 43° — all 4 bands land inside the judge frame,
+       and the zenith cap's arc (the bowl feel) rides above the frame top (doc2 §0). */
+    const hor=h*0.5,top=h*0.26;
     const seed=Math.floor(rnd()*1e9)^((params.skyVar|0)*7919);
     const stops=EL.sky.bands(ctx,w,h,pal.sky.cols,{seed:seed,top:top,hor:hor});
     const horC=pal.sky.horizon;
@@ -133,11 +160,15 @@ const PACK={
       EL.sky.sunDisc(ctx,{x:sx,y:sy,r:sr,color:pal.sky.sun,rings:tod==='dusk'?2:0,
         ringColor:shade(pal.sky.sun,-0.06,6,0)});
     }
-    /* far mesa silhouette rows — the layered horizon at every heading */
-    EL.sky.silhouetteRow(ctx,w,h,{y:hor,rise:h*0.050,seed:seed^0x1234,
-      color:mix(pal.ground.b3,horC,0.66)});
-    EL.sky.silhouetteRow(ctx,w,h,{y:hor,rise:h*0.082,seed:seed^0x8765,
-      color:mix(pal.ground.b2,horC,0.42)});
+    /* far mesa silhouette rows — the layered horizon at every heading.
+       DOME DEMOTION (doc2 §2): with FAR LAYERS on, the 3D shells own the far field —
+       the dome paints NO rows (they were the bowl feel). Legacy path kept for dial 0. */
+    if(!(params.farRings==null||params.farRings>0)){
+      EL.sky.silhouetteRow(ctx,w,h,{y:hor,rise:h*0.050,seed:seed^0x1234,
+        color:mix(pal.ground.b3,horC,0.66)});
+      EL.sky.silhouetteRow(ctx,w,h,{y:hor,rise:h*0.082,seed:seed^0x8765,
+        color:mix(pal.ground.b2,horC,0.42)});
+    }
     /* sparse punctuation — odd counts, scaled by the dial; dial 0 ⇒ NONE (matches
        the mast semantics in env-law scatter) */
     const np=pv<=0?0:clamp(Math.round(2*pv)|1,1,5);
@@ -282,6 +313,47 @@ const PACK={
       },
       sink:0.25
     });
+
+    /* NEAR LAW tables (doc2 §4) — NEAR DETAIL dial, outer annulus, drivable:
+       pebble triads + dry brush tuftlets in the house golds */
+    const bladeGeo=new T.ConeGeometry(1,1,3,1,true);
+    function brushTuft(s){
+      const grp=new T.Group();
+      const n=5+(rnd()<0.5?0:2);
+      for(let i=0;i<n;i++){
+        const bh=rng(rnd,0.18,0.38)*s;
+        const bg=new T.Group();
+        bg.rotation.y=(i/n)*6.28318+rng(rnd,-0.4,0.4);
+        const b=new T.Mesh(bladeGeo,kit.mat(rnd()<0.35?pal.props.scrub:pal.props.rock));
+        b.scale.set(bh*0.11,bh,bh*0.11);
+        b.position.set(rng(rnd,0,0.10)*s,bh/2,0);
+        bg.rotation.z=rng(rnd,0.12,0.42);
+        bg.add(b);grp.add(bg);
+      }
+      return grp;
+    }
+    function pebbleTriad(s){
+      const grp=new T.Group();
+      for(let i=0;i<3;i++){
+        const pr=s*rng(rnd,0.12,0.28);
+        const p=new T.Mesh(rockGeo,kit.mat(pal.props.rock));
+        p.scale.set(pr*1.2,pr*0.65,pr);
+        p.position.set(rng(rnd,-0.4,0.4)*s,pr*0.32,rng(rnd,-0.4,0.4)*s);
+        p.rotation.y=rng(rnd,0,6.28);
+        grp.add(p);
+      }
+      return grp;
+    }
+    /* blades START AT THE EYE (doc2 §4) — foreground strokes, drivable */
+    tables.push({near:true,count:110,insideBasinOK:true,rad:0.9,
+      ring:[basinR*0.14,basinR-6],scaleRng:[0.8,1.5],
+      make:function(T2,r2,s){return brushTuft(s)},sink:0.05});
+    tables.push({near:true,count:30,rad:1.0,
+      ring:[basinR+4,basinR+100],scaleRng:[0.9,1.7],
+      make:function(T2,r2,s){return brushTuft(s)},sink:0.05});
+    tables.push({near:true,count:16,insideBasinOK:true,rad:1.2,
+      ring:[basinR*0.22,basinR-8],scaleRng:[0.9,1.6],
+      make:function(T2,r2,s){return pebbleTriad(s)},sink:0.10});
 
     /* THE TEAL POND — the one wrong colour, in/near the basin. Kidney decal, banded.
        fixed: exactly ONE at every density (doc §7 one-wrong-colour law).

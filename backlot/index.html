@@ -69,7 +69,7 @@ input{font-family:var(--font)}
   transition:all .12s;white-space:nowrap}
 .xbtn:hover{border-color:var(--brass-dim);color:var(--brass2)}
 .xbtn:active{transform:translateY(1px)}
-#skyTog{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--cream-faint);
+#skyTog,#farTog{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--cream-faint);
   letter-spacing:.6px;cursor:pointer;user-select:none;white-space:nowrap}
 #hdrSpacer{flex:1}
 
@@ -255,6 +255,7 @@ body.shot #viewport{border-radius:0;border:none}
     <div class="hgroup"><span class="hlabel">export</span>
       <button class="xbtn" id="btnGLB">⬇ GLB</button>
       <label id="skyTog"><span class="tog" id="skyTogSw"></span>sky in GLB</label>
+      <label id="farTog"><span class="tog" id="farTogSw"></span>far in GLB</label>
       <button class="xbtn" id="btnRecipe">⬇ RECIPE</button>
       <button class="xbtn" id="btnPNG">⬇ PNG 2×</button>
     </div>
@@ -313,6 +314,7 @@ body.shot #viewport{border-radius:0;border:none}
 <script src="lib/env-law.js"></script>
 <script src="lib/packs/candy-basin.js"></script>
 <script src="lib/packs/inkwash-canyon.js"></script>
+<script src="lib/packs/meadow-nocturne.js"></script>
 <script src="lib/packs/mesa-golden.js"></script>
 <script src="lib/packs/neon-circuit.js"></script>
 <script src="lib/packs/palm-lagoon.js"></script>
@@ -354,8 +356,9 @@ if(saved&&saved.pack&&PACKS[saved.pack]){state.pack=saved.pack;state.seed=(saved
 if(q.pack&&PACKS[q.pack])state.pack=q.pack;
 if(q.seed!==undefined)state.seed=(parseInt(q.seed,10)>>>0)||0;
 var locks=SHOTISH?{}:(lsGet('locks',{})||{});
-var ui=lsGet('ui',{collapsed:{},includeSky:false,cam:'orbit'});
+var ui=lsGet('ui',{collapsed:{},includeSky:false,includeFar:false,cam:'orbit'});
 ui.collapsed=ui.collapsed||{};if(typeof ui.includeSky!=='boolean')ui.includeSky=false;
+if(typeof ui.includeFar!=='boolean')ui.includeFar=false;
 var bank=SHOTISH?[]:(lsGet('bank',[])||[]);
 var nextId=lsGet('nextid',1);
 
@@ -424,8 +427,14 @@ function shotDiag(){
         (mat?(' side'+mat.side+' vis'+(built.sky.visible?1:0)+' type '+mat.type):'')}
     var d=document.createElement('div');d.className='chip';
     d.style.cssText='position:absolute;top:44px;right:12px;z-index:50;max-width:560px';
+    var farTxt='none';
+    if(built&&built.far){
+      var fb=new THREE.Box3().setFromObject(built.far);
+      farTxt=(built.meta.farTris||0)+'t y'+Math.round(fb.min.y)+'..'+Math.round(fb.max.y)+
+        ' r'+Math.round(Math.max(Math.abs(fb.min.x),Math.abs(fb.max.x)));
+    }
     d.textContent='DIAG post '+post+' · calls '+inf.calls+' tri '+inf.triangles+
-      ' · far '+activeCam().far+' · sky '+skyTxt+
+      ' · far '+activeCam().far+' · sky '+skyTxt+' · shells '+farTxt+
       ' · errs['+__errs.slice(0,3).join('|').slice(0,100)+']';
     vp.appendChild(d);
   }catch(e){var d2=document.createElement('div');d2.className='chip';
@@ -435,7 +444,7 @@ function shotDiag(){
 
 /* ── build / rebuild ── */
 var built=null;
-function disposeBuilt(b){[b.group,b.sky].forEach(function(root){
+function disposeBuilt(b){[b.group,b.sky,b.far].forEach(function(root){
   if(!root)return;
   root.traverse(function(o){
     if(o.geometry)o.geometry.dispose();
@@ -443,10 +452,12 @@ function disposeBuilt(b){[b.group,b.sky].forEach(function(root){
       ms.forEach(function(m){if(m.map)m.map.dispose();m.dispose()})}})})}
 function rebuild(){
   try{
-    if(built){scene.remove(built.group);scene.remove(built.sky);disposeBuilt(built)}
+    if(built){scene.remove(built.group);scene.remove(built.sky);
+      if(built.far)scene.remove(built.far);disposeBuilt(built)}
     built=GEN.build(deepCopy(state.params),state.seed>>>0);
     scene.add(built.group);
     if(built.sky)scene.add(built.sky);
+    if(built.far)scene.add(built.far);
     scene.fog=built.fog?new THREE.Fog(built.fog.color,built.fog.near,built.fog.far):null;
     fitCameras();updateHUD();persistState();
   }catch(e){fatal('build failed: '+e.message);if(window.console)console.error(e)}
@@ -502,10 +513,13 @@ function groundY(x,z){
 }
 function resetKart(headingDeg){
   /* judge framing (doc §8): shot mode tilts ~7° up so the sky owns ~55% of the frame —
-     same framing the engine harness judges with */
-  kart.x=0;kart.z=0;kart.vel=0;kart.pitch=SHOTISH?0.12:-0.02;
+     same framing the engine harness judges with. Shot rig may place the kart
+     (?kx=&kz=) — near-field judging + the doc2 §9 parallax proof need off-centre eyes. */
+  kart.x=SHOTISH?(parseFloat(q.kx)||0):0;
+  kart.z=SHOTISH?(parseFloat(q.kz)||0):0;
+  kart.vel=0;kart.pitch=SHOTISH?0.12:-0.02;
   kart.yaw=-THREE.MathUtils.degToRad(headingDeg||0);
-  var gy=groundY(0,0);kart.y=(gy===null?0:gy)+1.1;
+  var gy=groundY(kart.x,kart.z);kart.y=(gy===null?0:gy)+1.1;
   kartCam.position.set(kart.x,kart.y,kart.z);
   kartCam.rotation.set(kart.pitch,kart.yaw,0)}
 function kartTick(dt){
@@ -717,9 +731,15 @@ $('skyTogSw').classList.toggle('on',ui.includeSky);
 $('skyTog').addEventListener('click',function(e){e.preventDefault();
   ui.includeSky=!ui.includeSky;$('skyTogSw').classList.toggle('on',ui.includeSky);
   lsSet('ui',ui)});
+$('farTogSw').classList.toggle('on',ui.includeFar);
+$('farTog').addEventListener('click',function(e){e.preventDefault();
+  ui.includeFar=!ui.includeFar;$('farTogSw').classList.toggle('on',ui.includeFar);
+  lsSet('ui',ui)});
 $('btnGLB').addEventListener('click',function(){
   flushBuild();if(!built)return;
-  var input=(ui.includeSky&&built.sky)?[built.group,built.sky]:[built.group];
+  var input=[built.group];
+  if(ui.includeSky&&built.sky)input.push(built.sky);
+  if(ui.includeFar&&built.far)input.push(built.far);
   try{
     new THREE.GLTFExporter().parse(input,function(res){
       downloadBlob(worldName()+'.glb',new Blob([res],{type:'model/gltf-binary'}));
@@ -730,9 +750,11 @@ $('btnGLB').addEventListener('click',function(){
 function makeRecipe(){
   return {app:'backlot',version:1,pack:state.pack,seed:state.seed,
     params:deepCopy(state.params),fog:built&&built.fog||null,bounds:built&&built.bounds||null,
-    meta:built&&built.meta?{label:built.meta.label,tris:built.meta.tris,palette:built.meta.palette}:null,
-    notes:'EnvGen.build(params, seed) regenerates this world exactly. '+
-      'Fog does not survive GLB — re-apply from this recipe. Sky is excluded from GLB by default.'}}
+    meta:built&&built.meta?{label:built.meta.label,tris:built.meta.tris,
+      farTris:built.meta.farTris||0,palette:built.meta.palette}:null,
+    notes:'EnvGen.build(params, seed) regenerates this world exactly — including the far '+
+      'silhouette shells (Built.far). Fog does not survive GLB — re-apply from this recipe. '+
+      'Sky and far shells are excluded from GLB by default (toggles in the header).'}}
 $('btnRecipe').addEventListener('click',function(){
   flushBuild();if(!built)return;
   downloadBlob(worldName()+'.recipe.json',
