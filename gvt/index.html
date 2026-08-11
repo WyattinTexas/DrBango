@@ -2428,7 +2428,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.01</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.05</div>
   <div class="scanlines"></div>
 </div>
 
@@ -15819,7 +15819,15 @@ const UDEF = {
   // rifle duel's 198, under the long tube's 277; rate 0.25 = one sweep per
   // 4s (a drum, not a hose); dmg 3 pays once per man in the arc; grit 4 is
   // Sarge's own elite floor (the rank ladder grows it — cmdoGB).
-  commando:{ rng:176, rate:0.3, dmg:3, air:false, grit:4, name:'COMMANDO' },
+  // v3.05 (Wyatt 8/10 night, card 0246, verbatim: "Please reduce commando
+  // damage in general by two."): dmg 3→1 — this cell is the ONE commando
+  // damage number BOTH carpets read (the fire loop's def.dmg feeds the wipe),
+  // so the whole order is one edit; coil/grav/vet/rank multipliers all ride
+  // it. At the v2.90 cadence (0.5s wipe + 0.2s repose) that is ~257→~86
+  // dmg/min per man in the arc. ⚠ the prose above predates v2.79/v2.90
+  // (live cells: rng 176, rate 0.3 — and rate no longer paces him at all,
+  // the re-attack law does).
+  commando:{ rng:176, rate:0.3, dmg:1, air:false, grit:4, name:'COMMANDO' },
   // v2.42 THE SPY — the discovered man (see the SPY panel by cmdoOwned). rng
   // 70: the shortest gun on either carpet, under the flame's 85 — "a very
   // short-range pistol" means up close is the only place he wins. rate 3.84:
@@ -16094,6 +16102,19 @@ const WPN_MILE={ pistolLvl:10, pistolRateMul:1.6, pistolFullLvl:20, pistolFullMu
                  sgLvl:10, sgDetect:210, sgCd:5, sgSpd:680, sgRet:390,
                  sniperLvl:10, sniperRngMul:1.15,
                  sabNear:88, sabFull:175, sabFullLvl:20 };
+// v3.05 (Wyatt 8/10 night, card 0246, verbatim: "make sure that the player
+// wielding a saber, if it's level 20, now blocks 50% of all incoming
+// attacks."): the deflect is a RANK-20 MILESTONE now — below sabFullLvl the
+// blade parries NOTHING; at 20+ every incoming roll is this coin flip. The
+// old ramp (min(0.75, 0.34+0.09u) — quietly 75% from saber rank ~5, the cap
+// the v1.19 note measured) retires with it: 50-at-20 read as probability IS
+// a cut against that hidden 75%, and that is the order as written — the
+// blade's answer becomes a mastery you can NAME instead of a curve nobody
+// could see. One number, one read (the sargeWStats bag → saberBlocks' single
+// roll — the one-round-one-save law stands untouched). THE PLAYER's blade
+// only: the AI kit's stock 0.34 (bfSargeKit) and THEIR SARGE's FDEF 0.5 are
+// their own bags, deliberately unmoved.
+const SABER_L20_BLOCK=0.5;
 // which rank a weapon's milestone card fires at (the saber's is the @20 restore)
 function mileLvl(wk){ return wk==='lightsaber'? WPN_MILE.sabFullLvl
   : wk==='shotgun'? WPN_MILE.sgLvl : wk==='sniper'? WPN_MILE.sniperLvl : WPN_MILE.pistolLvl; }
@@ -16276,7 +16297,7 @@ function sargeStats(){
   // 7/28 (Wyatt, v1.67): the dash's range limit is HALVED in general — 88 until
   // rank 20 hands the full 175 back. aggro is both the launch and the chain
   // radius (one field is both), so shrinking it shrinks the whole hunt.
-  if(w==='lightsaber') return outfitTune({ w, r, aggro:(r>=WPN_MILE.sabFullLvl? WPN_MILE.sabFull : WPN_MILE.sabNear), dmg:(7+2.5*u)*so, ...(so>1?{soul:1}:{}), cd:2.1, block:Math.min(0.75,0.34+0.09*u) });
+  if(w==='lightsaber') return outfitTune({ w, r, aggro:(r>=WPN_MILE.sabFullLvl? WPN_MILE.sabFull : WPN_MILE.sabNear), dmg:(7+2.5*u)*so, ...(so>1?{soul:1}:{}), cd:2.1, block:(r>=WPN_MILE.sabFullLvl? SABER_L20_BLOCK : 0) });
   // 0092 THE COMMANDER — the slow tank behind a plain steel saber. The bag is
   // SELF-CONTAINED on purpose: blk and aoe ride it so a relayed ally's blocks
   // and blade state come off the WIRE's numbers, never off MY save (the
@@ -22880,19 +22901,38 @@ function campCamTick(dt){
 // ===== 0129 THE WRECKING BALL, campaign edition — bfTick's own patrol math
 // VERBATIM (move, turn at the posts, roll, plow aside at r+16 on dt*10),
 // ticked beside campCamTick under the same briefing hold, on sim dt, zero
-// RNG. Push, never a kill: on the campaign carpet the ball is a moving rock,
-// not a train — knockdown stays the officer/jeep/tank/boss family's job.
-// GREENS: the BF exemptions verbatim (the dead and spawn ghosts escape) plus
-// the man in your hand (the tanPick drag guard — physics must not fight the
-// finger). FOES: the same plow — but never a boss (the big ones outweigh it;
-// mom is boss:true so her scripted round trip can't be shoved), never a
-// burrowed crawler (he is UNDER the rug), and the clamp is their own band
-// (FOE_TOP/FOE_BOT), so the shove can't put a walker off the carpet. A foe
-// marching his whole column through a beat gets swept along — that IS the
-// feature ("time your push", the OPEN CARPET's own blurb).
+// RNG. v3.05 (Wyatt 8/10 night, card 0246, verbatim: "The rolling balls in
+// the campaign are not destroying units. They should be destroying units.")
+// — the plow-only doctrine is RETIRED: 0129 shipped "push, never a kill" on
+// purpose and only the battleground got Wyatt's v2.15 kill law ("auto
+// destroy any non Tank unit on collision"); that split is overruled now and
+// the campaign carpet crushes too, through its own doors (trainKill is a
+// BF-only shape — hitCheck's first branch keys on side, which campaign men
+// never carry):
+// GREENS die through knockKill, so the books run whole (casualty, refund,
+// Sarge's clock, the coach) — behind the ball's own exemptions: the dead and
+// spawn ghosts, the man in your hand (physics must not fight the finger),
+// the airborne (jetT), a faller (below the plane, v2.76), and the HEAVY TANK
+// loaner (bftank — it outweighs the toy here exactly as it does on the
+// battleground). No guard rolls on the way down: the v2.15 law is AUTO
+// destroy, the fall door, not knock()'s — a blade parries rounds, not
+// boulders (the GRAND RING's knock() path is the MEAN TRAIN's own dial, not
+// this one). Everyone exempt still gets the plow, so nothing overlaps a ball.
+// FOES: never a boss (mom's scripted round trip must not die), never a
+// burrowed crawler (UNDER the rug), never the TAN TANK ("any non Tank unit"
+// — Wyatt's own words drew that line; the jeep dies here exactly as the
+// bfjeep does) — the rest are COLLECTED in the sweep and fall after it (the
+// mid-frame law: hitCheck splices S.foes, and a live for..of must never
+// watch its own array shrink), through the GRAND RING's phantom-side door:
+// a crushed tan mints NO tag and credits nobody's tally (the jax neutrality
+// law — a patrol beat must never be a plastic faucet).
+// Kills stand down behind the flag (S.vflag, the ring's own gate); the plow
+// never does. Zero RNG start to finish, so co-op's twin sims crush the same
+// men on the same frame.
 function campBallTick(dt){
   const balls=S.cfg.terrain.balls;
   if(!balls || !balls.length) return;   // every undressed rug: one truthy test, zero work — the seeded sims stand byte-equal
+  const kills=S.vflag? null : [];   // v3.05: the ring's own gate — kills stand down behind the flag, the plow never does
   for(const bl of balls){
     bl.y+=bl.dir*bl.spd*dt;
     if(bl.y>=bl.y1){ bl.y=bl.y1; bl.dir=-1; } else if(bl.y<=bl.y0){ bl.y=bl.y0; bl.dir=1; }
@@ -22902,6 +22942,12 @@ function campBallTick(dt){
       if(S.drag&&S.drag.unit===u) continue;
       const ax=u.x-bl.x, ay=u.y-bl.y, dd=Math.hypot(ax,ay), min=bl.r+16;
       if(dd>0.1&&dd<min){
+        if(kills && u.type!=='bftank' && !(u.jetT>0) && !u.falling){
+          S.fx.push({k:'ring',x:u.x,y:u.y-10,r:6,R:40,t:0,dur:0.35,col:'rgba(255,255,255,0.85)'});
+          S.fx.push({k:'puff',x:u.x,y:u.y-8,t:0,dur:0.4,R:22});
+          bfSfx(SFX.thock,u.x,u.y);
+          knockKill(u); continue;
+        }
         u.x+=ax/dd*(min-dd)*Math.min(1,dt*10); u.y+=ay/dd*(min-dd)*Math.min(1,dt*10);
         u.y=Math.max(74,Math.min(WORLD_H-96,u.y));
         if(u.home){ u.home.x=u.x; u.home.y=u.y; }
@@ -22911,10 +22957,21 @@ function campBallTick(dt){
       if(f.boss||f.burrow) continue;
       const ax=f.x-bl.x, ay=f.y-bl.y, dd=Math.hypot(ax,ay), min=bl.r+16;
       if(dd>0.1&&dd<min){
+        if(kills && f.type!=='tank'){ kills.push(f); continue; }
         f.x+=ax/dd*(min-dd)*Math.min(1,dt*10); f.y+=ay/dd*(min-dd)*Math.min(1,dt*10);
         if(f.y<FOE_TOP) f.y=FOE_TOP; else if(f.y>FOE_BOT) f.y=FOE_BOT;
       }
     }
+  }
+  // the collected fall AFTER the sweep — hitCheck splices S.foes, and a
+  // live for..of must never watch its own array shrink (the mid-frame law)
+  if(kills) for(const f of kills){
+    if(f.hp<=0) continue;
+    f.hp=0;
+    S.fx.push({k:'ring',x:f.x,y:f.y-10,r:6,R:40,t:0,dur:0.35,col:'rgba(255,255,255,0.85)'});
+    S.fx.push({k:'puff',x:f.x,y:f.y-8,t:0,dur:0.4,R:22});
+    bfSfx(SFX.thock,f.x,f.y);
+    hitCheck(f,{side:'jax'});
   }
 }
 function bfTick(dt){
@@ -22996,8 +23053,8 @@ function bfTick(dt){
   // the train's own exemptions (ghosts, the airborne, the fallen). Only the
   // HEAVY TANK outweighs it — the tank, the airborne, and everyone once the
   // match is decided, still get the old plow-aside so nothing overlaps a
-  // rolling ball. (The campaign's dressed rugs keep the pure plow — that is
-  // campBallTick, a knockdown world where nobody dies.)
+  // rolling ball. (v3.05: the campaign's dressed rugs crush now too —
+  // campBallTick carries this same law through the campaign's own doors.)
   for(const bl of (S.cfg.terrain.balls||[])){
     bl.y+=bl.dir*bl.spd*dt;
     if(bl.y>=bl.y1){ bl.y=bl.y1; bl.dir=-1; } else if(bl.y<=bl.y0){ bl.y=bl.y0; bl.dir=1; }
