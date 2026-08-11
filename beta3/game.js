@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.3.0';
+const BUILD = 'STARSPELL v0.3.1';
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
 const QS = new URLSearchParams(location.search);
 const DEMO = QS.get('demo') === '1';
@@ -248,10 +248,10 @@ function ssSkyTextures(scene) {
     g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)');
     c.fillStyle = g; c.fillRect(w / 2 - 7, h / 2 - 7, 14, 14);
   });
-  mk('grasstrip', 512, 40, (c, w, h) => {
+  mk('grasstrip', 512, 32, (c, w, h) => {   // 512x32: POT both ways — WebGL1 iPhones can't REPEAT an NPOT texture
     c.fillStyle = '#050310';
     c.beginPath(); c.moveTo(0, h);
-    for (let x = 0; x <= w; x += 9) c.lineTo(x + Math.random() * 5, 10 + Math.random() * 24);
+    for (let x = 0; x <= w; x += 9) c.lineTo(x + Math.random() * 5, 8 + Math.random() * 19);
     c.lineTo(w, h); c.closePath(); c.fill();
     for (let i = 0; i < 4; i++) {                                  // wildflower silhouettes
       const x = 30 + Math.random() * (w - 60), top = 2 + Math.random() * 6;
@@ -304,14 +304,15 @@ function ssSkyWorld(scene) {
   // hero stars — the ones a player would wish on, in the meadow's dusk sky
   for (let i = 0; i < 6; i++) {
     const hs = scene.add.image(l.x(-190 + Math.random() * 380), l.y(50 + Math.random() * 320), 'spark4')
-      .setScale(l.u(0.28 + Math.random() * 0.2)).setAlpha(0.75).setBlendMode('ADD').setScrollFactor(1, 0.85);
+      .setScale(l.u(0.22 + Math.random() * 0.16)).setAlpha(0.6).setBlendMode('ADD').setScrollFactor(1, 0.85);
     scene.tweens.add({ targets: hs, angle: 360, duration: 42000 + Math.random() * 40000, repeat: -1 });
     scene.tweens.add({ targets: hs, alpha: 0.45, duration: 2200 + Math.random() * 1800, yoyo: true, repeat: -1, delay: Math.random() * 2000 });
   }
 
-  // moon — low over the meadow, slides down and out during the first half of the rise
-  const moon = scene.add.image(l.x(-90), l.y(432), 'moon').setScale(l.u(0.9)).setAngle(24).setScrollFactor(1, 0.85);
-  const halo = scene.add.image(moon.x, moon.y, 'glowbig').setScale(l.u(1.1)).setTint(0xf7e8c8).setAlpha(0.16).setBlendMode('ADD').setScrollFactor(1, 0.85);
+  // moon — low on the horizon's left shoulder, clear of the buttons,
+  // slides down and out during the first half of the rise
+  const moon = scene.add.image(l.x(-140), l.y(425), 'moon').setScale(l.u(0.72)).setAngle(24).setScrollFactor(1, 0.85);
+  const halo = scene.add.image(moon.x, moon.y, 'glowbig').setScale(l.u(0.95)).setTint(0xf7e8c8).setAlpha(0.14).setBlendMode('ADD').setScrollFactor(1, 0.85);
   scene.tweens.add({ targets: halo, alpha: 0.1, duration: 4200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
   // clouds — parked in the climb band, crossed mid-flight
@@ -324,9 +325,9 @@ function ssSkyWorld(scene) {
   scene.add.ellipse(l.x(-108), l.y(545), l.u(432), l.u(250), 0x141026);
   scene.add.ellipse(l.x(184), l.y(607), l.u(534), l.u(325), 0x0c0918);
   scene.add.rectangle(l.W / 2, l.y(553), l.W, Math.max(1, l.H - l.y(553)) + 120 * l.s, 0x0a0714).setOrigin(0.5, 0);
-  const grassY = Math.max(l.y(770), l.H - l.u(34));
-  for (const [off, ph] of [[0, 0], [l.u(6), 1300]]) {
-    const gr = scene.add.tileSprite(l.W / 2, grassY + off, l.W, l.u(40), 'grasstrip').setOrigin(0.5, 0);
+  const grassY = Math.max(l.y(772), l.H - l.u(30));
+  for (const [off, ph] of [[0, 0], [l.u(5), 1300]]) {
+    const gr = scene.add.tileSprite(l.W / 2, grassY + off, l.W, l.u(32), 'grasstrip').setOrigin(0.5, 0);
     gr.setTileScale(l.s); gr.tilePositionX = off * 20;
     scene.tweens.add({ targets: gr, x: gr.x + l.u(1.5), duration: 2600, yoyo: true, repeat: -1, delay: ph, ease: 'Sine.easeInOut' });
   }
@@ -452,7 +453,7 @@ class Home extends Phaser.Scene {
     const title = ui(ssTxt(this, l.x(0), l.y(300), 'STARSPELL', l.u(46), '#f3e5b4').setOrigin(0.5)
       .setShadow(0, 0, '#c9a94f', l.u(18), true, true));
     this.tweens.add({ targets: title, scale: 1.02, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    ui(ssTxt(this, l.x(0), l.y(338), 'weave words · fell the star-beasts', l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
+    ui(ssTxt(this, l.x(0), l.y(354), 'weave words · fell the star-beasts', l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
 
     // buttons
     const ck = this.campaignCheckpoint();
@@ -516,41 +517,59 @@ class Home extends Phaser.Scene {
   beginAscent(data) {
     this.ascending = true;
     PENDING_ASCENT = data;
-    const l = ssLayout(this);
-    SFX.crickets(false); SFX.riser();
-    this.sky.scatterFlies();
-    for (const o of this.uiItems) this.tweens.killTweensOf(o);
-    if (this.bloomBtn) this.tweens.add({ targets: this.bloomBtn, scale: { from: this.bloomBtn.scaleX, to: this.bloomBtn.scaleX * 1.08 }, duration: 130, yoyo: true });
-    this.tweens.add({ targets: this.uiItems, alpha: 0, duration: 300 });
-    if (ssReduceMotion()) {
-      const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setAlpha(0).setDepth(600);
-      this.tweens.add({ targets: veil, alpha: 1, duration: 200, onComplete: () => this.arrive() });
-      return;
+    try {
+      const l = ssLayout(this);
+      SFX.crickets(false); SFX.riser();
+      this.sky.scatterFlies();
+      for (const o of this.uiItems) this.tweens.killTweensOf(o);
+      if (this.bloomBtn) this.tweens.add({ targets: this.bloomBtn, scale: { from: this.bloomBtn.scaleX, to: this.bloomBtn.scaleX * 1.08 }, duration: 130, yoyo: true });
+      this.tweens.add({ targets: this.uiItems, alpha: 0, duration: 300 });
+      if (ssReduceMotion()) {
+        const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setAlpha(0).setDepth(600);
+        this.tweens.add({ targets: veil, alpha: 1, duration: 200, onComplete: () => this.arrive() });
+        return;
+      }
+      this.ascentStart = this.time.now;
+      this.skipAt = null; this.lastP = 0; this.lastT = this.time.now;
+      this.input.on('pointerdown', this.skipFn = () => { if (this.ascending && !this.skipAt) this.skipAt = ASC.TOTAL_MS - 220; });
+      if (DEMO) this.skipAt = ASC.TOTAL_MS - 220;   // the solver has no time for wonder
+    } catch (e) {
+      this.fallbackToBattle();                       // the rise must never strand the player
     }
-    this.ascentStart = this.time.now;
-    this.skipAt = null; this.lastP = 0; this.lastT = this.time.now;
-    this.input.on('pointerdown', this.skipFn = () => { if (this.ascending && !this.skipAt) this.skipAt = ASC.TOTAL_MS - 220; });
-    if (DEMO) this.skipAt = ASC.TOTAL_MS - 220;   // the solver has no time for wonder
+  }
+  fallbackToBattle() {
+    const data = PENDING_ASCENT || { mode: 'quick', resume: null };
+    PENDING_ASCENT = null;
+    this.arrived = true;
+    this.scene.start('battle', data);
   }
   update(time) {
     if (!this.ascending || this.arrived || !this.ascentStart) return;
-    let ms = time - this.ascentStart;
-    if (this.skipAt && ms < this.skipAt) { this.ascentStart = time - this.skipAt; ms = this.skipAt; }
-    if (ms >= ASC.TOTAL_MS) { this.arrive(); return; }
-    const p = ssAscentP(ms);
-    const vel = Math.max(0, (p - this.lastP) / Math.max(1, time - this.lastT));
-    this.sky.setP(p, vel);
-    this.lastP = p; this.lastT = time;
+    try {
+      let ms = time - this.ascentStart;
+      if (this.skipAt && ms < this.skipAt) { this.ascentStart = time - this.skipAt; ms = this.skipAt; }
+      if (ms >= ASC.TOTAL_MS) { this.arrive(); return; }
+      const p = ssAscentP(ms);
+      const vel = Math.max(0, (p - this.lastP) / Math.max(1, time - this.lastT));
+      this.sky.setP(p, vel);
+      this.lastP = p; this.lastT = time;
+    } catch (e) {
+      this.fallbackToBattle();
+    }
   }
   arrive() {
     if (this.arrived) return;
     this.arrived = true;
     if (this.skipFn) this.input.off('pointerdown', this.skipFn);
-    this.sky.setP(1, 0);
     SFX.arriveChime();                              // the hush, then the forge voice
     const data = PENDING_ASCENT; PENDING_ASCENT = null;
-    localStorage.setItem('beta3.ascent', JSON.stringify({ v: BUILD, skipped: !!this.skipAt, t: Date.now() }));
-    this.scene.transition({ target: 'battle', duration: 450, data, moveAbove: true });
+    try {
+      this.sky.setP(1, 0);
+      localStorage.setItem('beta3.ascent', JSON.stringify({ v: BUILD, skipped: !!this.skipAt, t: Date.now() }));
+      this.scene.transition({ target: 'battle', duration: 450, data, moveAbove: true });
+    } catch (e) {
+      this.scene.start('battle', data);
+    }
   }
 
   /* ---------- the way back down ---------- */
@@ -1361,9 +1380,16 @@ function fitCanvas() {
 game.events.once('ready', fitCanvas);
 SSNET.connect().then(() => { });
 let resizeTo = null;
+let lastRW = window.innerWidth, lastRH = window.innerHeight;
 window.addEventListener('resize', () => {
   game.scale.resize(Math.round(window.innerWidth * DPR), Math.round(window.innerHeight * DPR));
   fitCanvas();
+  // iOS Safari fires resize when the URL bar collapses (height-only, ~50-115px)
+  // — that must NOT restart scenes or it cuts the ascent and resets battles.
+  // Only a real reshape (rotation / window drag) relays out.
+  const major = Math.abs(window.innerWidth - lastRW) > 4 || Math.abs(window.innerHeight - lastRH) > 200;
+  lastRW = window.innerWidth; lastRH = window.innerHeight;
+  if (!major) return;
   clearTimeout(resizeTo);
   resizeTo = setTimeout(() => {
     for (const k of ['home', 'battle', 'profile', 'board']) {
