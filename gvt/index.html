@@ -1054,6 +1054,13 @@
   .sh-bucket small { display:block; font-family:var(--hand); font-weight:normal;
     font-size:clamp(6px,1.4vh,11px); color:#9ab0c0; }
   .sh-bucket.off { opacity:0.4; }
+  /* v3.03: the paint counter's mirror — the outfits stage cut to shelf size
+     so Sarge stands IN the top row, right of the black jar (Wyatt: "next to
+     the black, have Sarge there, just like he's displayed in outfits, and so
+     each time you change your color, you can directly see Sarge turn into
+     that color"). Same .sh-oroom recipe (stage light + stand); this only
+     re-sizes it: jar-and-a-half wide, bottom-aligned on the same plank. */
+  .sh-proom { flex:0 0 auto; width:clamp(56px,24vh,124px); padding:5% 2% 3%; }
   .sh-poster { position:absolute; left:clamp(8px,1.4vw,18px); top:clamp(34px,7vh,60px);
     width:clamp(110px,13vw,170px); padding:8px 10px 6px; transform:rotate(-3.5deg); background:var(--card);
     border-radius:3px; box-shadow:0 4px 9px rgba(0,0,0,0.5); text-align:center; }
@@ -1342,7 +1349,19 @@
   .sh-pknote.ok { color:#9BD167; }
   .sh-pkstar.busy { opacity:0.55; }
   .sh-pkstar.deny .sh-pkprice { animation:shno3 0.42s; }
-  .sh-regbtn { cursor:pointer; font:inherit; }
+  .sh-regbtn { cursor:pointer; font:inherit; position:relative; }
+  /* v3.03 (Wyatt 8/10: the piggy already walks you to the stars aisle —
+     "increase the hit box slightly so it will take players there a little
+     easier"): an invisible tap extender — the art never scales, the box
+     does. --pigpad is the dial (~1.4× the button's height once both lips
+     land; ⚠ the ::after anchors to the PADDING box, so the till's 2px
+     border eats 2px of every lip — the clamp is sized WITH that tax).
+     It leans UP/RIGHT/DOWN into the corner's free space; the LEFT lip
+     stays 4px so the last plaque keeps its tap lane at 640×320. Rides
+     .sh-regbtn only — the IAP-less dead .sh-reg div stays a dead div. */
+  .sh-regbtn::after { content:''; position:absolute; --pigpad:clamp(9px,2.4vh,13px);
+    top:calc(-1*var(--pigpad)); right:calc(-1*var(--pigpad));
+    bottom:calc(-1*var(--pigpad)); left:-4px; }
   .sh-regplus { font-style:normal; font-weight:bold; color:#9BD167; margin-left:2px;
     font-size:clamp(11px,2.7vh,19px); line-height:1; }
   @media (prefers-reduced-motion:reduce) {
@@ -31955,16 +31974,20 @@ function roomSVG(){
   // textLength pins the lettering inside the board on EVERY platform
   // (Android ships no Arial Narrow — glyphs squish to the measured lane;
   // 70 inside the 80 board seats es's EXCEDENTES DE SARGE at the same
-  // px-per-glyph the old 76/plaque did). Art ink spans world 395..505 ×
-  // 110..182 — 47px shy of the ducky's x552 band, every pixel inside the
-  // crate's own 378..528 × 80..200 hotspot. No pill: the crate IS the
-  // door (hotspot + tap unchanged; corridor survey lives in git history
-  // with the retired lane).
+  // px-per-glyph the old 76/plaque did). v3.03 (Wyatt 8/10: "Sarge's
+  // Surplus 20% bigger in the main menu"): the inner g wears scale(1.2),
+  // its translate rebased 390,86 → 378,66.8 so the crate grows IN PLACE —
+  // centre x450 and the 182 ground line hold (shadow bottom 190 → 191.6).
+  // Art ink spans world 384..516 × 95.6..191.6 now — 36px shy of the
+  // ducky's x552 band, every pixel inside the crate's own grown
+  // 372..532 × 76..200 hotspot (the ROOM_SPOTS row moved with the art).
+  // No pill: the crate IS the door (tap unchanged; corridor survey lives
+  // in git history with the retired lane).
   // v2.86 THE SHOP INTRO: while the introduction is live (comms.shop===1) the
   // crate wears .beckon — baked into every paint, so crew repaints and buys
   // can't shake it off; openShop retires it for good.
   +'<g id="ro-shop"'+(shopBeckonOn()?' class="beckon"':'')+rpT('shop')+'>'
-  +'<g transform="translate(390,86)">'
+  +'<g transform="translate(378,66.8) scale(1.2)">'
   +'<ellipse cx="60" cy="96" rx="54" ry="8" fill="#000" opacity="0.25"/>'
   +'<rect x="10" y="36" width="100" height="58" rx="4" fill="#B48A54" stroke="#8a683e" stroke-width="3"/>'
   +'<rect x="17" y="42" width="7" height="49" fill="#8a683e" opacity="0.35"/>'
@@ -32111,8 +32134,13 @@ const ROOM_SPOTS=[
   // renders a pill only when a row HAS a label — the sign on the crate
   // carries the branding alone now). The SHOP key and its six translations
   // stay in the tables; v2.13's doorstep-corridor survey (lx494/ly244, the
-  // 244 cap) lives in git history if a pill ever comes back.
-  { id:'shop',     x:378, y:80,  w:150, h:120, mv:'shop' },
+  // 244 cap) lives in git history if a pill ever comes back. v3.03: the
+  // crate wears scale(1.2) (Wyatt: 20% bigger) — the row grows with the art
+  // (372..532 × 76..200 over ink 384..516 × 95.6..191.6), still shy of the
+  // ducky anchor's x552 west edge; the south edge stays 200 exactly, so the
+  // campaign row's shared border resolves the way it always has (the shop
+  // div renders LATER, so it wins the edge — unchanged since v2.09).
+  { id:'shop',     x:372, y:76,  w:160, h:124, mv:'shop' },
   // v2.17 ONE RIVAL DOOR (Wyatt 8/3): the doorway corner row is GONE — the
   // squad wanders the TOWER now (towerSquad, inside #ro-rival), so the tap,
   // the art AND the pill are one draggable possession. This is also the fix
@@ -33799,8 +33827,15 @@ function closeWorldRank(){
 // browse, and the dark back-of-store run (lasers → crystals → fireworks →
 // stars) holds exactly as it was. Walk order = THIS list + the renderShop
 // sections IN LOCKSTEP (the packs-gate note below); ids and goods untouched.
-const SHOP_TABS = [ {id:'figs', lab:'FIGURES'}, {id:'motor', lab:'MOTORS'},
-                    {id:'paint', lab:'PAINT'}, {id:'outfit', lab:'OUTFITS'},
+// v3.03 (Wyatt 8/10: "Move Paint to be the first slot in Sarge's surplus."):
+// PAINT leads the walk now — the colour counter is the storefront window —
+// and the front door follows the first slot (SHOP's tab default + openShop
+// land on 'paint'; a store whose first shelf sits one swipe LEFT of where
+// you walk in has no first shelf). Everything else keeps v2.86's relative
+// order: recruits · motors · outfits · decor · mods · the dark run · stars.
+const SHOP_TABS = [ {id:'paint', lab:'PAINT'},
+                    {id:'figs', lab:'FIGURES'}, {id:'motor', lab:'MOTORS'},
+                    {id:'outfit', lab:'OUTFITS'},
                     {id:'decor', lab:'DECOR'},
                     {id:'mods', lab:'MODS'},
                     {id:'lasers', lab:'LASERS'}, {id:'saber', lab:'CRYSTALS'},
@@ -33811,7 +33846,7 @@ const SHOP_TABS = [ {id:'figs', lab:'FIGURES'}, {id:'motor', lab:'MOTORS'},
                     // and section gate on the SAME predicate, so the aisle
                     // arithmetic in shopScroll/shopJump never skews.
                     ...(IAP.avail()? [{id:'packs', lab:'STARS'}] : []) ];
-let SHOP = { tab:'figs', jumpT:0 };
+let SHOP = { tab:'paint', jumpT:0 };   // v3.03: the front door is the paint counter
 function shopIsOpen(){ const el=document.getElementById('toyshop'); return !!el && !el.classList.contains('hidden'); }
 // a ray gun in the game's own molded-plastic idiom: thick round-capped strokes
 function rayURI(hex){
@@ -34055,12 +34090,25 @@ function shopBmbHTML(){
       +'<span class="sh-cline">'+BMB_COST+' DOG TAGS A SORTIE · EARNED IN THE FIELD · NEVER SOLD</span>'
     +'</button></div>';
 }
+// v3.03 THE DYE ESCALATOR (Wyatt 8/10: "Each time you buy a paint dye, it
+// gets 40 more expensive, so the first few are cheap, but to have the full
+// freedom of all of them, it'll cost more and more."): the next jar's price
+// = base + escalator × jars already in the ledger. META.dyes IS the ledger
+// (factory green is the null state, never a purchase, so it never counts;
+// a milestone-prize jar DOES count — ownership is ownership, and the ladder
+// reads how much of the rainbow you hold, not how you got it). Every sealed
+// sticker, the dept header, the rail, the guard and the till read THIS
+// function, so the deny threshold can never drift from the price shown
+// (the lensBuy law), and renderShop's full rebuild after every buy is what
+// makes the climb live on the shelf. Dials, one each:
+const DYE_BASE=40, PAINT_ESCALATOR=40;   // the first jar · the climb per jar owned
+function dyePrice(){ return DYE_BASE + PAINT_ESCALATOR*META.dyes.length; }
 function shopJarHTML(a){
   const own=META.dyes.indexOf(a.id)>=0, on=META.dyeOn===a.id;
   const st = on? 'wearing' : own? 'owned' : 'sealed';
   return '<button type="button" class="sh-jar'+(on?' wearing':'')+'" id="shjr-'+a.id+'" style="--jarhex:'+a.hex+'" onclick="UI.dye(\''+a.id+'\')">'
     +jarSVG(a.hex,st)
-    +(st==='sealed'? '<span class="sh-tag">40★</span>'
+    +(st==='sealed'? '<span class="sh-tag">'+dyePrice()+'★</span>'
       : st==='owned'? '<span class="sh-tag own">YOURS</span>'
       : '<span class="sh-tag wear">WEARING IT</span><img class="sh-wearer" src="'+sprURI('rifleman',a.hex)+'" alt="">')
     +'<span class="sh-jn">'+a.id+'</span></button>';
@@ -34427,19 +34475,29 @@ function renderShop(){
         : '<div class="sh-reg">'+SH_PIG+'<b id="shStars">'+META.starBank+'★</b></div>')
     +'</div>'
     +'<div class="sh-aisle" id="shAisle">'
+      // v3.03 (Wyatt 8/10): PAINT & DYE walks FIRST — this section leads the
+      // aisle in lockstep with SHOP_TABS above. The header, the sealed jar
+      // stickers and the rail all quote dyePrice() LIVE now (the escalator);
+      // the {0}★ l10n holes keep every language true at any number, and the
+      // rail's stale 20★ (pre-v2.53) retires with the literal. Beside the
+      // black jar: Sarge on the outfits aisle's own stage (.sh-oroom, the
+      // one menuSargeURI reader) — every UI.dye re-render repaints the img
+      // src, so tap a colour and the man turns that colour. Stateless, no
+      // listeners (the innerHTML-wipe law).
+      +'<section class="sh-dept" id="shPaint"><h2>PAINT &amp; DYE<small>REPAINT THE WHOLE ARMY — '+dyePrice()+'★ THE JAR</small></h2>'
+        +'<div class="sh-poster"><b>COLOR YOUR ARMY!</b><div>'
+        +['#5B84C4','#C05A4A','#D9A544'].map(h=>'<img src="'+sprURI('rifleman',h)+'" alt="">').join('')+'</div></div>'
+        +'<div class="sh-shelf" style="margin-top:auto"><div class="sh-jars">'+ARMIES.slice(0,5).map(shopJarHTML).join('')
+        +'<div class="sh-oroom sh-proom"><img src="'+menuSargeURI(dyeHex()||undefined)+'" alt=""><div class="sh-ostand"></div></div></div>'
+        +'<div class="sh-plank"></div><div class="sh-pricerail">DYE KITS — '+dyePrice()+'★ · BUY IT, WEAR IT, WASH IT OFF ANY TIME</div></div>'
+        +'<div class="sh-shelf sh-shelf2"><div class="sh-jars">'+jars2+'</div>'
+        +'<div class="sh-plank"></div><div class="sh-pricerail">FACTORY GREEN IS ALWAYS FREE</div></div></section>'
       +'<section class="sh-dept" id="shWall"><h2>NEW RECRUITS<small>CARDED FIGURES — EACH SOLD SEPARATELY</small></h2>'
         +'<div class="sh-packrow">'+SHOP_ITEMS.map(shopPackHTML).join('')+shopEmgHTML()+'</div>'
         +'<div class="sh-rail"></div></section>'
       +'<section class="sh-dept" id="shMotor"><h2>THE MOTOR POOL<small>BOXED VEHICLES · FLIGHT GEAR · UPGRADES SOLD SEPARATELY</small></h2>'
         +'<div class="sh-bays">'+VEH_ORDER.map(shopRigHTML).join('')+shopJetHTML()+(bmbOwned()? shopBmbHTML():'')+'</div>'
         +'<div class="sh-rail"></div></section>'
-      +'<section class="sh-dept" id="shPaint"><h2>PAINT &amp; DYE<small>REPAINT THE WHOLE ARMY — 40★ THE JAR</small></h2>'
-        +'<div class="sh-poster"><b>COLOR YOUR ARMY!</b><div>'
-        +['#5B84C4','#C05A4A','#D9A544'].map(h=>'<img src="'+sprURI('rifleman',h)+'" alt="">').join('')+'</div></div>'
-        +'<div class="sh-shelf" style="margin-top:auto"><div class="sh-jars">'+ARMIES.slice(0,5).map(shopJarHTML).join('')+'</div>'
-        +'<div class="sh-plank"></div><div class="sh-pricerail">DYE KITS — 20★ · BUY IT, WEAR IT, WASH IT OFF ANY TIME</div></div>'
-        +'<div class="sh-shelf sh-shelf2"><div class="sh-jars">'+jars2+'</div>'
-        +'<div class="sh-plank"></div><div class="sh-pricerail">FACTORY GREEN IS ALWAYS FREE</div></div></section>'
       // SARGE'S OUTFITS (v2.16): the fitting corner — the man himself on his
       // little stage (the same one reader every room surface uses, so the
       // mirror can never lie), six molded accessories racked beside him. The
@@ -34718,7 +34776,7 @@ function openShop(){
     const g=document.getElementById('ro-shop'); if(g) g.classList.remove('beckon');
     if(COMM.say && !COMM.brief) commClear();
   }
-  SHOP.tab='figs';                                   // you always come in the front door
+  SHOP.tab='paint';                                  // you always come in the front door — the PAINT counter now (v3.03)
   IAP_STATE.note={};                                 // stale DELIVERED!/permission notes die at the door
   // asking for products doubles as the READY signal — native answers with
   // prices AND re-pushes any transaction still waiting for its ack (0097 §4.2)
@@ -36240,8 +36298,13 @@ window.UI = {
     if(id===null){ if(!META.dyeOn){ SFX.clack(); return; }    // the wash bucket, free, any time
       META.dyeOn=null; SFX.blip(); saveMeta(); renderMenu(); shopRefresh(); return; }
     if(META.dyes.indexOf(id)>=0){ META.dyeOn = META.dyeOn===id? null : id; SFX.blip(); }
-    else if(META.starBank>=40){ META.starBank-=40; META.dyes.push(id); META.dyeOn=id; SFX.coin(); }   // v2.53 (Wyatt 8/5): every paint +20★ — 20→40 the jar
-    else { shopDeny('shjr-'+id); return; }
+    // v2.53 (Wyatt 8/5): 20→40 the jar. v3.03 (Wyatt 8/10): the ESCALATOR —
+    // price it ONCE, before the ledger grows, and the guard, the till and the
+    // deny all read that same number: nobody is denied a jar he can afford,
+    // nobody pays a price the shelf never showed.
+    else { const p=dyePrice();
+      if(META.starBank<p){ shopDeny('shjr-'+id); return; }
+      META.starBank-=p; META.dyes.push(id); META.dyeOn=id; SFX.coin(); }
     if(META.dyeOn) buildUnitTint(dyeHex());
     saveMeta(); renderMenu(); shopRefresh();
   },
