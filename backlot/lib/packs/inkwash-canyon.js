@@ -350,8 +350,7 @@ const PACK={
           g2.add(sp);g2.add(EL.hullOf(T,sp,Dl,kit.hullMat));
         }
         return g2;
-      },
-      sink:1.2
+      }
     });
 
     /* canyon fins — tall thin blades, some wearing a blush cap plate. The mid-ground
