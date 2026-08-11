@@ -2607,7 +2607,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.16</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.17</div>
   <div class="scanlines"></div>
 </div>
 
@@ -32785,8 +32785,11 @@ function roomRuckus(riv){
 }
 // the bed's own squatters (rival-active): one sprawled on the pillow, one
 // stood on the blanket. Split out of roomRuckus in v2.17 so they render
-// INSIDE #ro-bed — the bed is draggable furniture now, and whoever is ON the
-// furniture drags with it (the piggy's bank-and-pig one-wrapper law).
+// INSIDE #ro-bed and share the bed's whole fate (the piggy's bank-and-pig
+// one-wrapper law — v2.18 made the bed plain fixed furniture again).
+// v3.17: the bed is BEDROOM-ONLY, so the pair squat only where the bed is —
+// in the outside rooms the occupation is roomRuckus's five men alone (their
+// bit is YOUR bed; a bedless yard gives them nothing to squat on).
 function bedRuckus(riv){
   const fig=(k,x,y,w,d)=>'<image class="rivfig" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
   const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
@@ -34019,15 +34022,22 @@ function roomSVG(){
   // siblings is moot. Armed/asleep is recomposed per repaint — the piggy's own
   // refresh law, no live class flipping.
   +tvSVG()
-  // bed top-right — draggable furniture since v2.17: the frame and whoever is
-  // ON it share one wrapper, so the ruckus pair sleep wherever the bed goes
-  // (the piggy's bank-and-pig one-wrapper law). Base y34 sits above the 48px
-  // header floor by architecture — rdragClamp's band only binds objects that
-  // start BELOW it, so home is always reachable again.
-  +'<g id="ro-bed"'+rpT('bed')+'>'
-  +'<rect x="700" y="34" width="230" height="140" rx="10" fill="#8FA98F"/><rect x="700" y="34" width="56" height="140" rx="10" fill="#E8E4D4"/><rect x="710" y="62" width="38" height="84" rx="8" fill="#fff"/>'
-  +((momD||rivDone)? '' : bedRuckus(riv))
-  +'</g>'
+  // bed top-right — BEDROOM-ONLY since v3.17 (Wyatt 8/11: "in the outside
+  // backgrounds, the bed should be removed"): backyard/winter/rooftop are all
+  // outdoors, so the whole group — frame, sheets, pillow AND whoever is ON it
+  // (the piggy's bank-and-pig one-wrapper law) — renders only at home. The
+  // gate IS the restore: roomSVG rebuilds per repaint, so switching back
+  // re-seats the bed with nothing to undo. On a rival day outside, the
+  // occupation still speaks through roomRuckus's five men — the bed pair's
+  // whole bit is squatting YOUR bed, so no bed, no bed squatters (the v3.17
+  // ruling; see bedRuckus). Base y34 sits above the 48px header floor by
+  // architecture — rdragClamp's band only binds objects that start BELOW it.
+  +(roomCur()==='bedroom'
+    ? '<g id="ro-bed"'+rpT('bed')+'>'
+      +'<rect x="700" y="34" width="230" height="140" rx="10" fill="#8FA98F"/><rect x="700" y="34" width="56" height="140" rx="10" fill="#E8E4D4"/><rect x="710" y="62" width="38" height="84" rx="8" fill="#fff"/>'
+      +((momD||rivDone)? '' : bedRuckus(riv))
+      +'</g>'
+    : '')
   // v2.23 THE CORNER IS THE MEDAL CASE'S NOW (Wyatt 8/3: "Remove whatever is
   // on the bottom right of the main menu. It looks like an opening door.
   // Let's just remove it so we can move the medals over to the right and
@@ -34407,8 +34417,11 @@ function rdragPt(e){
 function rdragClamp(base, dx, dy){
   dx=Math.max(-base.x, Math.min(960-base.w-base.x, dx));
   // the 48px header band must never FORCE an object below its own home — the
-  // bed lives at y34 by architecture (v2.17), so the band binds only objects
-  // that start under it; everything else keeps the exact old bound
+  // band binds only objects that START under it (the v2.17 rule; its example
+  // was the bed at y34 — bedroom-only furniture since v3.17, and out of the
+  // drag families since v2.18 anyway). Today every draggable's home sits
+  // below the band, so this is dormant architecture for whatever parks up
+  // there next; everything else keeps the exact old bound
   dy=Math.max(Math.min(48-base.y,0), Math.min(600-base.h-base.y, dy));
   return [Math.round(dx), Math.round(dy)];
 }
@@ -34629,7 +34642,12 @@ const GLASS_MAG=2.1;    // how hard the porthole magnifies (DIAL)
 const GLASS_W=110;      // the glass in hand, world px wide (DIAL)
 const GLASS_CX=GLASS_W*0.5, GLASS_CY=GLASS_W*(52/120), GLASS_PR=Math.round(GLASS_W*(37/120));
 // the bed's authored rect — fixed architecture since v2.18 (its roomPos key
-// is purged at load), so the discovery door can never be dragged away
+// is purged at load), so the discovery door can never be dragged away.
+// v3.17: the bed DRAWS only in the bedroom now, but this door stays open in
+// EVERY room on purpose — a hunt that a room switch could strand would read
+// as a broken lens to a kid sweeping the yard, and "UNDER THE BED!" is the
+// spy's unlock story, not a claim about the room on screen (the ruling,
+// flagged in the v3.17 notes).
 const SPY_BED={ x:700, y:34, w:230, h:140 };
 function glassDue(){ return lensOwned() && !spyOwned(); }
 function glassWorldPt(e){
