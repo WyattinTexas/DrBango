@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.7.0';
+const BUILD = 'STARSPELL v0.7.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -737,6 +737,9 @@ class Home extends Phaser.Scene {
     ui(ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5));
     this.muteB = ui(ssTxt(this, l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
     this.muteB.on('pointerdown', () => { SFX.ensure(); SFX.setMuted(!SFX.muted); this.muteB.setText(SFX.muted ? '🔇' : '🔊'); });
+    // language switcher — opposite the mute toggle; opens the sheet of native names
+    this.langB = ui(ssTxt(this, l.x(195), l.y(784), '🌐', l.u(14)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
+    this.langB.on('pointerdown', () => this.langSheet());
 
     this.input.once('pointerdown', () => SFX.ensure());
     this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
@@ -759,6 +762,36 @@ class Home extends Phaser.Scene {
     DIAG(BUILD + ' · ' + (this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas') + ' ' + this.game.scale.width + 'x' + this.game.scale.height + ' dprCap ' + DPR);
     if (QS.get('vsdemo') === '1') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
     else if (DEMO || QS.get('daily') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? 'quick' : 'daily'));
+  }
+  // the language sheet — a parchment list of native names. Picking one rewrites
+  // ?lang= and reloads: strings.js saves the choice, and every string plus the
+  // baked wordmark texture re-render in the new language. Rewriting the URL
+  // (rather than only saving) matters because a ?lang= already in the address
+  // would out-rank the saved preference on the next load.
+  langSheet() {
+    if (this.busy() || this.langC) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.langC = this.add.container(0, 0).setDepth(700);
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.55).setInteractive();
+    veil.on('pointerdown', () => { c.destroy(); this.langC = null; });
+    const keys = Object.keys(SS_STR);
+    const rowH = 30, ph = keys.length * rowH + 34;
+    c.add(veil);
+    c.add(this.add.image(l.x(0), l.y(400), 'panel').setDisplaySize(l.u(232), l.u(ph)));
+    keys.forEach((k, i) => {
+      const y = 400 - ph / 2 + 32 + i * rowH;
+      const cur = k === SS_LANG;
+      const t = ssTxt(this, l.x(0), l.y(y), (cur ? '✦  ' : '') + (SS_LANGS[k] || k) + (cur ? '  ✦' : ''),
+        l.u(15), cur ? '#8a6210' : '#4a3305').setOrigin(0.5).setInteractive({ useHandCursor: true });
+      t.on('pointerdown', () => {
+        SFX.ui();
+        const u = new URL(location.href);
+        u.searchParams.set('lang', k);
+        location.replace(u.toString());
+      });
+      c.add(t);
+    });
   }
   campaignCheckpoint() {
     try { return JSON.parse(localStorage.getItem('beta3.campaign')); } catch (e) { return null; }

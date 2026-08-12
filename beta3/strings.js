@@ -111,6 +111,12 @@ const SS_STR = {
   },
 };
 
+// native names, for the language sheet — never translated
+const SS_LANGS = {
+  en: 'English', es: 'Español', fr: 'Français', pt: 'Português', de: 'Deutsch',
+  ja: '日本語', ko: '한국어', zh: '中文', hi: 'हिन्दी', ar: 'العربية',
+};
+
 const SS_LANG = (() => {
   const qs = new URLSearchParams(location.search);
   const q = (qs.get('lang') || '').toLowerCase();
