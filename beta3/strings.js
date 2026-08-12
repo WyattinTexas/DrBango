@@ -60,7 +60,7 @@ const SS_STR = {
     versus: '⚔  VERSUS — Duell unter Sternen  ⚔',
   },
   ja: {
-    title: 'スタースペル',
+    title: 'STARSPELL',
     tagline: '言葉を紡ぎ、星獣を討て',
     campaign: 'キャンペーン', campaignSub: '三幕・長き一夜',
     cont: 'つづきから', fightN: '戦い %1 / 5',
@@ -70,7 +70,7 @@ const SS_STR = {
     versus: '⚔  VS — 星空の下の決闘  ⚔',
   },
   ko: {
-    title: '스타스펠',
+    title: 'STARSPELL',
     tagline: '단어를 엮어 별짐승을 쓰러뜨려라',
     campaign: '캠페인', campaignSub: '3막 · 기나긴 하룻밤',
     cont: '이어하기', fightN: '전투 %1 / 5',
@@ -80,7 +80,7 @@ const SS_STR = {
     versus: '⚔  VS — 별빛 아래 결투  ⚔',
   },
   zh: {
-    title: '星语咒',
+    title: 'STARSPELL',
     tagline: '编织词语 · 击落星兽',
     campaign: '战役', campaignSub: '三幕 · 一整夜',
     cont: '继续', fightN: '第 %1 战，共 5 战',
@@ -90,7 +90,7 @@ const SS_STR = {
     versus: '⚔  对战 — 星空下的决斗  ⚔',
   },
   hi: {
-    title: 'स्टारस्पेल',
+    title: 'STARSPELL',
     tagline: 'शब्द बुनो · तारा-दानवों को हराओ',
     campaign: 'अभियान', campaignSub: 'तीन अंक · एक लंबी रात',
     cont: 'जारी रखें', fightN: 'लड़ाई %1 / 5',
@@ -100,7 +100,7 @@ const SS_STR = {
     versus: '⚔  वर्सस — तारों तले द्वंद्व  ⚔',
   },
   ar: {
-    title: 'تعويذة النجوم',
+    title: 'STARSPELL',
     tagline: 'انسج الكلمات · واصرع وحوش النجوم',
     campaign: 'الحملة', campaignSub: 'ثلاثة فصول · ليلة واحدة طويلة',
     cont: 'متابعة', fightN: 'المعركة %1 من 5',
