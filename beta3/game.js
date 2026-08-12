@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.7.2';
+const BUILD = 'STARSPELL v0.8.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -596,53 +596,185 @@ function ssTxt(scene, x, y, str, size, color, style) {
 }
 
 // The title wordmark — live text drawn once into a canvas texture in the palette
-// of the painted set: warm halo, letterpress drop, navy rim, button-gold gradient
-// fill, tile-style top sheen. It stays a *string* (SS_T('title'), any language),
-// and the whole run is drawn in one fillText: per-letter effects would break
-// Arabic shaping and RTL ordering. Returns { key, w, h } in design units.
+// of the painted set. Latin titles get the hand-set treatment (gentle arch,
+// bookend letters a touch larger, tight tracking, per-letter tilt along the
+// curve); any non-Latin title falls back to a single run, because per-letter
+// transforms would break Arabic shaping and RTL ordering. Layers, in paint
+// order: warm halo · letterpress drop · outer gold hairline · navy rim ·
+// per-letter gold gradient · inner bevel · dust speckle · top sheen.
+// Returns { key, w, h, anchors } in design units; anchors are letter-tip
+// points (relative to the texture centre) where the home scene sets sparkles.
 function ssTitleTex(scene) {
   const R = Math.max(2, ssTexRes(scene));
   const key = 'title@' + SS_LANG;
   const text = SS_T('title'), px = 46 * R;
-  const font = '900 ' + px + 'px ' + SERIF;
+  const font = (s) => '900 ' + Math.round(s) + 'px ' + SERIF;
   if (scene.textures.exists(key)) {
-    const f = scene.textures.get(key).getSourceImage();
-    return { key, w: f.width / R, h: f.height / R };
+    const tex = scene.textures.get(key), f = tex.getSourceImage();
+    return { key, w: f.width / R, h: f.height / R, anchors: tex.ssAnchors || [] };
   }
+  const latin = !/[^ -ɏ\s]/.test(text);
   const meas = document.createElement('canvas').getContext('2d');
-  meas.font = font;
-  const m = meas.measureText(text);
-  const asc = Math.ceil(m.actualBoundingBoxAscent || px * 0.8);
-  const desc = Math.ceil(m.actualBoundingBoxDescent || px * 0.25);
-  const padX = Math.ceil(px * 0.40), padY = Math.ceil(px * 0.34);
-  const W = Math.ceil(m.width) + padX * 2, H = asc + desc + padY * 2;
+  const A = latin ? px * 0.16 : 0;             // arch height
+  let letters = null, tw = 0, asc = 0, desc = 0;
+  if (latin) {
+    letters = [];
+    const n = text.length;
+    let x = 0;
+    for (let i = 0; i < n; i++) {
+      const lt = n > 1 ? (i / (n - 1)) * 2 - 1 : 0;      // -1 .. 1 across the word
+      const sc = 1 + 0.09 * lt * lt;                     // bookends slightly larger
+      meas.font = font(px * sc);
+      const m = meas.measureText(text[i]);
+      letters.push({ ch: text[i], x, lw: m.width, sc, lt });
+      x += m.width - px * 0.015;                         // tight tracking
+      asc = Math.max(asc, Math.ceil(m.actualBoundingBoxAscent || px * 0.8));
+      desc = Math.max(desc, Math.ceil(m.actualBoundingBoxDescent || px * 0.05));
+    }
+    tw = x + px * 0.015;
+  } else {
+    meas.font = font(px);
+    const m = meas.measureText(text);
+    tw = m.width;
+    asc = Math.ceil(m.actualBoundingBoxAscent || px * 0.8);
+    desc = Math.ceil(m.actualBoundingBoxDescent || px * 0.25);
+  }
+  const padX = Math.ceil(px * 0.42), padY = Math.ceil(px * 0.40);
+  const W = Math.ceil(tw) + padX * 2, H = Math.ceil(asc + desc + A) + padY * 2;
   const t = scene.textures.createCanvas(key, W, H);
-  const c = t.context, bx = W / 2, by = padY + asc;
-  c.font = font; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
-  if (SS_LANG === 'ar') c.direction = 'rtl';
-  // warm halo — replaces the old text-object glow shadow
+  const c = t.context, by = padY + A + asc;    // baseline of an unarched letter
+  c.textBaseline = 'alphabetic';
+  // each(fn) walks the word with the arch transform applied; every layer below
+  // paints through it, so the layers stay registered. fn draws at (0,0) on the
+  // letter's baseline centre and gets that letter's scale for local gradients.
+  const each = (fn) => {
+    if (!latin) {
+      c.save(); c.translate(W / 2, by);
+      c.font = font(px); c.textAlign = 'center';
+      if (SS_LANG === 'ar') c.direction = 'rtl';
+      fn(text, 1);
+      c.restore(); return;
+    }
+    for (const L of letters) {
+      c.save();
+      c.translate(padX + L.x + L.lw / 2, by - A * (1 - L.lt * L.lt));
+      c.rotate(Math.atan((2 * A * L.lt) / (tw / 2)) * 0.8);   // tilt along the curve
+      c.font = font(px * L.sc); c.textAlign = 'center';
+      fn(L.ch, L.sc);
+      c.restore();
+    }
+  };
+  // warm halo
   c.shadowColor = 'rgba(201,169,79,0.5)'; c.shadowBlur = px * 0.28;
   c.fillStyle = '#c9a94f';
-  c.fillText(text, bx, by); c.fillText(text, bx, by);
+  each((ch) => { c.fillText(ch, 0, 0); c.fillText(ch, 0, 0); });
   c.shadowColor = 'transparent'; c.shadowBlur = 0;
-  // letterpress drop, then the navy rim the buttons taught us
+  // letterpress drop
   c.fillStyle = 'rgba(16,12,34,0.85)';
-  c.fillText(text, bx, by + px * 0.05);
-  c.lineJoin = 'round'; c.lineWidth = px * 0.055; c.strokeStyle = '#241c40';
-  c.strokeText(text, bx, by);
-  // gold gradient fill, sampled from the button-rim family
-  const g = c.createLinearGradient(0, by - asc, 0, by + desc);
-  g.addColorStop(0, '#fff7dc'); g.addColorStop(0.35, '#ffe08d');
-  g.addColorStop(0.62, '#d7b45c'); g.addColorStop(1, '#9c7a28');
-  c.fillStyle = g;
-  c.fillText(text, bx, by);
-  // top sheen, clipped to what's already drawn (rim included, like the tiles)
+  each((ch) => c.fillText(ch, 0, px * 0.05));
+  // outer gold hairline, then the navy rim the buttons taught us
+  c.lineJoin = 'round';
+  c.strokeStyle = '#e6c87e'; c.lineWidth = px * 0.085;
+  each((ch) => c.strokeText(ch, 0, 0));
+  c.strokeStyle = '#241c40'; c.lineWidth = px * 0.055;
+  each((ch) => c.strokeText(ch, 0, 0));
+  // gold gradient fill, per letter so the tone is uniform along the arch
+  each((ch, sc) => {
+    const g = c.createLinearGradient(0, -asc * sc, 0, desc + px * 0.04);
+    g.addColorStop(0, '#fff7dc'); g.addColorStop(0.35, '#ffe08d');
+    g.addColorStop(0.62, '#d7b45c'); g.addColorStop(1, '#9c7a28');
+    c.fillStyle = g;
+    c.fillText(ch, 0, 0);
+  });
+  // inner bevel — clipped strokes: light under the top edges, shade above the bottom
   c.globalCompositeOperation = 'source-atop';
-  const sh = c.createLinearGradient(0, by - asc, 0, by - asc + (asc + desc) * 0.42);
+  c.strokeStyle = 'rgba(255,252,240,0.28)'; c.lineWidth = px * 0.03;
+  each((ch) => c.strokeText(ch, 0, px * 0.014));
+  c.strokeStyle = 'rgba(60,32,4,0.30)';
+  each((ch) => c.strokeText(ch, 0, -px * 0.014));
+  // dust speckle, like the button faces wear
+  if (latin) {
+    for (const L of letters) {
+      const cx = padX + L.x + L.lw / 2, cy = by - A * (1 - L.lt * L.lt);
+      for (let i = 0; i < 9; i++) {
+        const dark = i % 3 === 0;
+        c.fillStyle = dark ? 'rgba(50,30,6,0.22)' : 'rgba(255,246,220,0.20)';
+        c.beginPath();
+        c.arc(cx + (Math.random() - 0.5) * L.lw * 0.8, cy - Math.random() * asc * L.sc * 0.9 + Math.random() * desc,
+          px * (0.008 + Math.random() * 0.014), 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  }
+  // top sheen across the whole mark
+  const sh = c.createLinearGradient(0, by - A - asc, 0, by - A - asc + (asc + desc + A) * 0.42);
   sh.addColorStop(0, 'rgba(255,255,255,0.34)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
   c.fillStyle = sh;
   c.fillRect(0, 0, W, H);
   c.globalCompositeOperation = 'source-over';
+  t.refresh();
+  // sparkle anchors: letter-tip points, so the sky feels like it owns the mark
+  let anchors = [];
+  if (latin && letters.length > 2) {
+    const n = letters.length;
+    const pick = [[1, 0.8, -1], [Math.round(n * 0.55), 0.5, -1], [n - 1, 0.9, 0.35]];
+    anchors = pick.map(([i, fx, fy]) => {
+      const L = letters[Math.min(i, n - 1)];
+      const cy = by - A * (1 - L.lt * L.lt);
+      return { x: (padX + L.x + L.lw * fx - W / 2) / R, y: (cy + (fy < 0 ? fy * asc * L.sc : fy * desc + px * 0.04) - H / 2) / R };
+    });
+  }
+  t.ssAnchors = anchors;
+  return { key, w: W / R, h: H / R, anchors };
+}
+
+// The divider under the title. With the painted art on it is a strip of the
+// actual button braid — the title and the buttons literally share material —
+// with a ✦ set in the middle; the procedural build gets a plain gold hairline
+// so the layout doesn't jump between modes. Both ends fade out.
+function ssBraidTex(scene) {
+  const key = 'titlebraid';
+  const R = Math.max(2, ssTexRes(scene));
+  if (scene.textures.exists(key)) {
+    const f = scene.textures.get(key).getSourceImage();
+    return { key, w: f.width / R, h: f.height / R };
+  }
+  const W = Math.round(250 * R), H = Math.round(16 * R);
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context, mid = W / 2, gap = 13 * R;
+  if (ART && SSART.ready) {
+    const img = SSART.img.btn;
+    const bh = 7 * R, byy = (H - bh) / 2;
+    // the button's top braid run, between the corners
+    c.drawImage(img, 130, 10, img.width - 260, 30, 0, byy, mid - gap / 2, bh);
+    c.save(); c.translate(W, 0); c.scale(-1, 1);       // mirrored right half
+    c.drawImage(img, 130, 10, img.width - 260, 30, 0, byy, mid - gap / 2, bh);
+    c.restore();
+  } else {
+    const line = (x0, x1) => {
+      const g = c.createLinearGradient(x0, 0, x1, 0);
+      g.addColorStop(0, 'rgba(215,180,92,0)'); g.addColorStop(1, 'rgba(215,180,92,0.9)');
+      c.fillStyle = g; c.fillRect(Math.min(x0, x1), H / 2 - R * 0.6, Math.abs(x1 - x0), R * 1.2);
+    };
+    line(0, mid - gap / 2); line(W, mid + gap / 2);
+  }
+  // fade the outer ends
+  for (const [x0, x1] of [[0, 26 * R], [W, W - 26 * R]]) {
+    const g = c.createLinearGradient(x0, 0, x1, 0);
+    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.globalCompositeOperation = 'destination-out';
+    c.fillStyle = g; c.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0), H);
+    c.globalCompositeOperation = 'source-over';
+  }
+  // the ✦, in the same gold-on-navy dress as the letters
+  c.font = '900 ' + Math.round(11 * R) + 'px serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.lineJoin = 'round'; c.lineWidth = 2.2 * R; c.strokeStyle = '#241c40';
+  c.strokeText('✦', mid, H / 2 + R * 0.5);
+  const g = c.createLinearGradient(0, H / 2 - 6 * R, 0, H / 2 + 6 * R);
+  g.addColorStop(0, '#fff7dc'); g.addColorStop(0.6, '#ffe08d'); g.addColorStop(1, '#c9a057');
+  c.fillStyle = g;
+  c.fillText('✦', mid, H / 2 + R * 0.5);
   t.refresh();
   return { key, w: W / R, h: H / R };
 }
@@ -703,13 +835,20 @@ class Home extends Phaser.Scene {
     const title = this.titleT = ui(this.add.image(l.x(0), l.y(300), tk.key)
       .setDisplaySize(l.u(tk.w * tScale), l.u(tk.h * tScale)));
     this.tweens.add({ targets: title, scaleX: title.scaleX * 1.02, scaleY: title.scaleY * 1.02, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    for (const [fx, fy, fs] of [[-0.36, -0.30, 15], [0.30, -0.38, 11], [0.42, 0.24, 13]]) {
-      const sp = ui(this.add.image(l.x(fx * tk.w * tScale), l.y(300 + fy * tk.h * tScale), 'spark4')
+    // sparkles sit on letter-tip anchors from the renderer; fractional fallback
+    // covers a non-Latin title, which reports no anchors
+    const spots = tk.anchors.length
+      ? tk.anchors.map((a, i) => [a.x * tScale, a.y * tScale, [15, 11, 13][i % 3]])
+      : [[-0.36 * tk.w * tScale, -0.30 * tk.h * tScale, 15], [0.30 * tk.w * tScale, -0.38 * tk.h * tScale, 11], [0.42 * tk.w * tScale, 0.24 * tk.h * tScale, 13]];
+    for (const [fx, fy, fs] of spots) {
+      const sp = ui(this.add.image(l.x(fx), l.y(300 + fy), 'spark4')
         .setDisplaySize(l.u(fs), l.u(fs)).setAlpha(0.75).setBlendMode('ADD'));
       this.tweens.add({ targets: sp, angle: 360, duration: 36000 + Math.random() * 20000, repeat: -1 });
       this.tweens.add({ targets: sp, alpha: 0.3, duration: 1600 + Math.random() * 1400, yoyo: true, repeat: -1, delay: Math.random() * 1500 });
     }
-    ui(ssTxt(this, l.x(0), l.y(354), SS_T('tagline'), l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
+    const bk = ssBraidTex(this);
+    ui(this.add.image(l.x(0), l.y(300 + tk.h * tScale * 0.5 + 6), bk.key).setDisplaySize(l.u(bk.w), l.u(bk.h)).setAlpha(0.9));
+    ui(ssTxt(this, l.x(0), l.y(358), SS_T('tagline'), l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
 
     // buttons
     const ck = this.campaignCheckpoint();
