@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.6.1';
+const BUILD = 'STARSPELL v0.7.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -595,6 +595,58 @@ function ssTxt(scene, x, y, str, size, color, style) {
   }).setShadow(0, Math.max(1, size * 0.05), 'rgba(0,0,0,0.45)', size * 0.09);
 }
 
+// The title wordmark — live text drawn once into a canvas texture in the palette
+// of the painted set: warm halo, letterpress drop, navy rim, button-gold gradient
+// fill, tile-style top sheen. It stays a *string* (SS_T('title'), any language),
+// and the whole run is drawn in one fillText: per-letter effects would break
+// Arabic shaping and RTL ordering. Returns { key, w, h } in design units.
+function ssTitleTex(scene) {
+  const R = Math.max(2, ssTexRes(scene));
+  const key = 'title@' + SS_LANG;
+  const text = SS_T('title'), px = 46 * R;
+  const font = '900 ' + px + 'px ' + SERIF;
+  if (scene.textures.exists(key)) {
+    const f = scene.textures.get(key).getSourceImage();
+    return { key, w: f.width / R, h: f.height / R };
+  }
+  const meas = document.createElement('canvas').getContext('2d');
+  meas.font = font;
+  const m = meas.measureText(text);
+  const asc = Math.ceil(m.actualBoundingBoxAscent || px * 0.8);
+  const desc = Math.ceil(m.actualBoundingBoxDescent || px * 0.25);
+  const padX = Math.ceil(px * 0.40), padY = Math.ceil(px * 0.34);
+  const W = Math.ceil(m.width) + padX * 2, H = asc + desc + padY * 2;
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context, bx = W / 2, by = padY + asc;
+  c.font = font; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  if (SS_LANG === 'ar') c.direction = 'rtl';
+  // warm halo — replaces the old text-object glow shadow
+  c.shadowColor = 'rgba(201,169,79,0.5)'; c.shadowBlur = px * 0.28;
+  c.fillStyle = '#c9a94f';
+  c.fillText(text, bx, by); c.fillText(text, bx, by);
+  c.shadowColor = 'transparent'; c.shadowBlur = 0;
+  // letterpress drop, then the navy rim the buttons taught us
+  c.fillStyle = 'rgba(16,12,34,0.85)';
+  c.fillText(text, bx, by + px * 0.05);
+  c.lineJoin = 'round'; c.lineWidth = px * 0.055; c.strokeStyle = '#241c40';
+  c.strokeText(text, bx, by);
+  // gold gradient fill, sampled from the button-rim family
+  const g = c.createLinearGradient(0, by - asc, 0, by + desc);
+  g.addColorStop(0, '#fff7dc'); g.addColorStop(0.35, '#ffe08d');
+  g.addColorStop(0.62, '#d7b45c'); g.addColorStop(1, '#9c7a28');
+  c.fillStyle = g;
+  c.fillText(text, bx, by);
+  // top sheen, clipped to what's already drawn (rim included, like the tiles)
+  c.globalCompositeOperation = 'source-atop';
+  const sh = c.createLinearGradient(0, by - asc, 0, by - asc + (asc + desc) * 0.42);
+  sh.addColorStop(0, 'rgba(255,255,255,0.34)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = sh;
+  c.fillRect(0, 0, W, H);
+  c.globalCompositeOperation = 'source-over';
+  t.refresh();
+  return { key, w: W / R, h: H / R };
+}
+
 // Layout: 420 x 800 design space, scaled + centered
 function ssLayout(scene) {
   const W = scene.scale.width, H = scene.scale.height;
@@ -644,21 +696,30 @@ class Home extends Phaser.Scene {
     cycle();
     this.time.addEvent({ delay: 9000, loop: true, callback: () => { this.tweens.add({ targets: this.showC, alpha: 0, duration: 500, onComplete: () => { this.showC.setAlpha(1); cycle(); } }); } });
 
-    // title — just above the horizon glow, which acts as its halo
-    const title = this.titleT = ui(ssTxt(this, l.x(0), l.y(300), 'STARSPELL', l.u(46), '#f3e5b4').setOrigin(0.5)
-      .setShadow(0, 0, '#c9a94f', l.u(18), true, true));
-    this.tweens.add({ targets: title, scale: 1.02, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    ui(ssTxt(this, l.x(0), l.y(354), 'weave words · fell the star-beasts', l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
+    // title — the painted wordmark, just above the horizon glow. Sparkles are
+    // separate sprites so they can twinkle without redrawing the texture.
+    const tk = ssTitleTex(this);
+    const tScale = Math.min(1, 384 / tk.w);           // long localized titles fit the frame
+    const title = this.titleT = ui(this.add.image(l.x(0), l.y(300), tk.key)
+      .setDisplaySize(l.u(tk.w * tScale), l.u(tk.h * tScale)));
+    this.tweens.add({ targets: title, scaleX: title.scaleX * 1.02, scaleY: title.scaleY * 1.02, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    for (const [fx, fy, fs] of [[-0.36, -0.30, 15], [0.30, -0.38, 11], [0.42, 0.24, 13]]) {
+      const sp = ui(this.add.image(l.x(fx * tk.w * tScale), l.y(300 + fy * tk.h * tScale), 'spark4')
+        .setDisplaySize(l.u(fs), l.u(fs)).setAlpha(0.75).setBlendMode('ADD'));
+      this.tweens.add({ targets: sp, angle: 360, duration: 36000 + Math.random() * 20000, repeat: -1 });
+      this.tweens.add({ targets: sp, alpha: 0.3, duration: 1600 + Math.random() * 1400, yoyo: true, repeat: -1, delay: Math.random() * 1500 });
+    }
+    ui(ssTxt(this, l.x(0), l.y(354), SS_T('tagline'), l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
 
     // buttons
     const ck = this.campaignCheckpoint();
     const today = SS.prof.daily[String(SSNET.dayKey())];
     const rows = [
-      { y: 420, label: ck ? 'CONTINUE  ·  ' + SS_ACTS[ck.actIdx].name.split('·')[0].trim() : 'CAMPAIGN', sub: ck ? 'fight ' + (ck.fightIdx % 5 + 1) + ' of 5' : 'three acts · one long night', fn: () => this.startMode('campaign') },
-      { y: 488, label: 'QUICK PLAY', sub: 'five beasts, then the Star Eater', fn: () => this.startMode('quick') },
-      { y: 556, label: 'DAILY HUNT', sub: today ? 'today: ' + today + ' — again for glory' : 'one sky, shared by all', fn: () => this.startMode('daily') },
-      { y: 624, label: 'LEADERBOARD', sub: null, fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
-      { y: 692, label: 'PROFILE', sub: null, fn: () => { SFX.ui(); this.scene.start('profile'); }, dark: true },
+      { y: 420, label: ck ? SS_T('cont') + '  ·  ' + SS_ACTS[ck.actIdx].name.split('·')[0].trim() : SS_T('campaign'), sub: ck ? SS_T('fightN', ck.fightIdx % 5 + 1) : SS_T('campaignSub'), fn: () => this.startMode('campaign') },
+      { y: 488, label: SS_T('quick'), sub: SS_T('quickSub'), fn: () => this.startMode('quick') },
+      { y: 556, label: SS_T('daily'), sub: today ? SS_T('dailyAgain', today) : SS_T('dailySub'), fn: () => this.startMode('daily') },
+      { y: 624, label: SS_T('board'), sub: null, fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
+      { y: 692, label: SS_T('profile'), sub: null, fn: () => { SFX.ui(); this.scene.start('profile'); }, dark: true },
     ];
     for (const r of rows) {
       const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.sub ? 58 : 46)).setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true }));
@@ -669,7 +730,7 @@ class Home extends Phaser.Scene {
       b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)));
     }
     // versus
-    const vs = ui(ssTxt(this, l.x(0), l.y(742), '⚔  VERSUS — duel beneath the stars  ⚔', l.u(13), '#9fb0e8').setOrigin(0.5).setInteractive({ useHandCursor: true }));
+    const vs = ui(ssTxt(this, l.x(0), l.y(742), SS_T('versus'), l.u(13), '#9fb0e8').setOrigin(0.5).setInteractive({ useHandCursor: true }));
     vs.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); SFX.ui(); this.scene.start('vsmenu'); });
     this.tweens.add({ targets: vs, alpha: 0.65, duration: 1400, yoyo: true, repeat: -1 });
 
