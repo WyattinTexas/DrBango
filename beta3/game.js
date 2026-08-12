@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.8.0';
+const BUILD = 'STARSPELL v0.9.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -142,15 +142,18 @@ function ssMakeTextures(scene) {
   // composited on top untinted — a straight setTint would colour the rim too, and tint is a
   // silent no-op under the Canvas renderer (the game boots Phaser.AUTO). Adding a bonus
   // colour stays one line, same as the procedural path below.
+  // The 6px inset matches the procedural tile's roundRect(6,6,116,116): board and word-line
+  // gaps were tuned against that ~5% breathing room, and a full-bleed painted tile ate it —
+  // the board rows and the staged word visibly overlapped.
   const tileArt = (key, color) => mk(key, 128, 128, (c, w, h) => {
     const f = SSART.img.tile_face, o = SSART.img.tile_over;
-    c.drawImage(f, 0, 0, w, h);
+    c.drawImage(f, 6, 6, w - 12, h - 12);
     c.globalCompositeOperation = 'multiply';
     c.fillStyle = color; c.fillRect(0, 0, w, h);
     c.globalCompositeOperation = 'destination-in';   // multiply floods the box; restore alpha
-    c.drawImage(f, 0, 0, w, h);
+    c.drawImage(f, 6, 6, w - 12, h - 12);
     c.globalCompositeOperation = 'source-over';
-    c.drawImage(o, 0, 0, w, h);
+    c.drawImage(o, 6, 6, w - 12, h - 12);
   }, R);
   if (ARTON) {
     tileArt('tile0', '#e2deec');   // plain
@@ -162,6 +165,33 @@ function ssMakeTextures(scene) {
     tileTex('tile2', '#e6f6ff', '#a8d9f2', '#5f9fc4');
   }
   mk('veil', 8, 8, (c, w, h) => { c.fillStyle = '#060812'; c.fillRect(0, 0, w, h); });
+  // battle chrome, in the wordmark's dress: a ribbon behind the strikes line and
+  // framed troughs + gradient fills for the health bars (progress = setCrop)
+  mk('ribbon', 256, 40, (c, w, h) => {
+    c.beginPath(); c.roundRect(2, 2, w - 4, h - 4, (h - 4) / 2);
+    c.fillStyle = 'rgba(16,12,34,0.62)'; c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = 'rgba(215,180,92,0.40)'; c.stroke();
+  }, R);
+  mk('bartrough', 256, 24, (c, w, h) => {
+    c.beginPath(); c.roundRect(1, 1, w - 2, h - 2, (h - 2) / 2);
+    c.fillStyle = '#10142a'; c.fill();
+    const g = c.createLinearGradient(0, 1, 0, h * 0.5);            // inner top shadow
+    g.addColorStop(0, 'rgba(0,0,0,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g; c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = 'rgba(215,180,92,0.5)'; c.stroke();
+  }, R);
+  const barFill = (key, top, bottom) => mk(key, 256, 16, (c, w, h) => {
+    c.beginPath(); c.roundRect(0, 0, w, h, h / 2);
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, top); g.addColorStop(1, bottom);
+    c.fillStyle = g; c.fill();
+    c.beginPath(); c.roundRect(3, 1.5, w - 6, h * 0.4, h * 0.2);   // top sheen
+    const g2 = c.createLinearGradient(0, 0, 0, h * 0.45);
+    g2.addColorStop(0, 'rgba(255,255,255,0.45)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g2; c.fill();
+  }, R);
+  barFill('barfill-gold', '#ffe08d', '#b9924a');
+  barFill('barfill-rose', '#f2969b', '#b34d55');
   mk('panel', 256, 256, (c) => {
     c.beginPath(); c.roundRect(4, 4, 248, 248, 22);
     const g = c.createLinearGradient(0, 0, 0, 256);
@@ -779,6 +809,45 @@ function ssBraidTex(scene) {
   return { key, w: W / R, h: H / R };
 }
 
+// Small gold-lettered texture in the wordmark's dress — single run, no arch:
+// beast nameplates, flying damage numbers. Cached by text+size; battle removes
+// its number textures on shutdown so a long session doesn't hoard canvases.
+function ssGoldTex(scene, text, sizeU) {
+  const R = Math.max(2, ssTexRes(scene));
+  const key = 'gold@' + sizeU + '@' + text;
+  if (scene.textures.exists(key)) {
+    const f = scene.textures.get(key).getSourceImage();
+    return { key, w: f.width / R, h: f.height / R };
+  }
+  const px = sizeU * R;
+  const meas = document.createElement('canvas').getContext('2d');
+  meas.font = '900 ' + Math.round(px) + 'px ' + SERIF;
+  const m = meas.measureText(text);
+  const asc = Math.ceil(m.actualBoundingBoxAscent || px * 0.8), desc = Math.ceil(m.actualBoundingBoxDescent || px * 0.25);
+  const padX = Math.ceil(px * 0.30), padY = Math.ceil(px * 0.26);
+  const W = Math.ceil(m.width) + padX * 2, H = asc + desc + padY * 2;
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context, bx = W / 2, by = padY + asc;
+  c.font = meas.font; c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.lineJoin = 'round';
+  c.shadowColor = 'rgba(201,169,79,0.45)'; c.shadowBlur = px * 0.22;
+  c.fillStyle = '#c9a94f'; c.fillText(text, bx, by);
+  c.shadowColor = 'transparent'; c.shadowBlur = 0;
+  c.fillStyle = 'rgba(16,12,34,0.85)'; c.fillText(text, bx, by + px * 0.05);
+  c.strokeStyle = '#e6c87e'; c.lineWidth = px * 0.085; c.strokeText(text, bx, by);
+  c.strokeStyle = '#241c40'; c.lineWidth = px * 0.055; c.strokeText(text, bx, by);
+  const g = c.createLinearGradient(0, by - asc, 0, by + desc + px * 0.04);
+  g.addColorStop(0, '#fff7dc'); g.addColorStop(0.35, '#ffe08d');
+  g.addColorStop(0.62, '#d7b45c'); g.addColorStop(1, '#9c7a28');
+  c.fillStyle = g; c.fillText(text, bx, by);
+  c.globalCompositeOperation = 'source-atop';
+  const sh = c.createLinearGradient(0, by - asc, 0, by - asc + (asc + desc) * 0.42);
+  sh.addColorStop(0, 'rgba(255,255,255,0.34)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = sh; c.fillRect(0, 0, W, H);
+  c.globalCompositeOperation = 'source-over';
+  t.refresh();
+  return { key, w: W / R, h: H / R };
+}
+
 // Layout: 420 x 800 design space, scaled + centered
 function ssLayout(scene) {
   const W = scene.scale.width, H = scene.scale.height;
@@ -1119,15 +1188,17 @@ class Battle extends Phaser.Scene {
     this.scoreT = txt(l.x(190), l.y(24), '0', 15).setOrigin(1, 0.5);
 
     txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);
-    this.hpBarBg = this.add.rectangle(l.x(-150), l.y(68), l.u(250), l.u(9), 0x1a2038).setOrigin(0, 0.5);
-    this.hpBar = this.add.rectangle(l.x(-150), l.y(68), l.u(250), l.u(9), 0xd7b45c).setOrigin(0, 0.5);
+    // framed troughs + gradient fills; progress is a setCrop in updateBars
+    this.add.image(l.x(-152), l.y(68), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(254), l.u(15));
+    this.hpBar = this.add.image(l.x(-150), l.y(68), 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(250), l.u(9));
     this.hpT = txt(l.x(190), l.y(68), '', 12).setOrigin(1, 0.5);
 
     this.beastC = this.add.container(l.x(0), l.y(170));
-    this.beastName = txt(l.x(0), l.y(280), '', 17, '#ffffff').setOrigin(0.5);
-    this.beastTitle = txt(l.x(0), l.y(300), '', 11, '#8a94c4').setOrigin(0.5);
-    this.ehpBarBg = this.add.rectangle(l.x(-110), l.y(322), l.u(220), l.u(8), 0x1a2038).setOrigin(0, 0.5);
-    this.ehpBar = this.add.rectangle(l.x(-110), l.y(322), l.u(220), l.u(8), 0xe66a6a).setOrigin(0, 0.5);
+    this.beastNameI = null;   // gold nameplate image, built per beast in setBeastName
+    this.beastTitle = txt(l.x(0), l.y(301), '', 10, '#8a94c4').setOrigin(0.5).setLetterSpacing(l.u(2));
+    this.add.image(l.x(-112), l.y(322), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(224), l.u(13));
+    this.ehpBar = this.add.image(l.x(-110), l.y(322), 'barfill-rose').setOrigin(0, 0.5).setDisplaySize(l.u(220), l.u(8));
+    this.strikeRib = this.add.image(l.x(0), l.y(342), 'ribbon').setAlpha(0);
     this.strikeT = txt(l.x(0), l.y(342), '', 12, '#e6a2a2').setOrigin(0.5);
 
     this.lineC = this.add.container(l.x(0), l.y(372));
@@ -1144,10 +1215,12 @@ class Battle extends Phaser.Scene {
     this.castT = txt(l.x(70), l.y(754), 'CAST', 20, BTN_INK()).setOrigin(0.5)
       .setShadow(0, l.u(1), ART && SSART.ready ? '#2a1c05' : '#ffe9b0', l.u(1));
     this.castB.on('pointerdown', () => this.tryCast());
-    this.scryB = this.add.rectangle(l.x(-150), l.y(754), l.u(100), l.u(50), 0x151b33).setStrokeStyle(l.u(1.5), 0x4a5a8c).setInteractive({ useHandCursor: true });
+    // scry + hint wear the painted dark button (aspect-correct via ssBtn), same
+    // as the home screen's LEADERBOARD/PROFILE — no more bare dev rectangles
+    this.scryB = this.add.image(l.x(-150), l.y(754), ssBtn(this, true, 100, 50)).setDisplaySize(l.u(100), l.u(50)).setInteractive({ useHandCursor: true });
     txt(l.x(-150), l.y(754), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
     this.scryB.on('pointerdown', () => this.scry());
-    this.hintB = this.add.rectangle(l.x(-62), l.y(754), l.u(50), l.u(50), 0x151b33).setStrokeStyle(l.u(1.5), 0x8c7a4a).setInteractive({ useHandCursor: true }).setVisible(false);
+    this.hintB = this.add.image(l.x(-62), l.y(754), ssBtn(this, true, 50, 50)).setDisplaySize(l.u(50), l.u(50)).setInteractive({ useHandCursor: true }).setVisible(false);
     this.hintT = txt(l.x(-62), l.y(754), '◉', 18, '#d7b45c').setOrigin(0.5).setVisible(false);
     this.hintB.on('pointerdown', () => this.useHint());
 
@@ -1155,7 +1228,14 @@ class Battle extends Phaser.Scene {
     this.homeB.on('pointerdown', () => { SFX.ui(); this.scene.start('home', { from: 'battle' }); });
     this.muteB = txt(l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', 14).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7);
     this.muteB.on('pointerdown', () => { SFX.ensure(); SFX.setMuted(!SFX.muted); this.muteB.setText(SFX.muted ? '🔇' : '🔊'); });
-    txt(l.x(195), l.y(784), BUILD, 9, '#39406b').setOrigin(1, 0.5);
+    // version stamp lives beside the mute icon — right-aligned it collided with
+    // the widened painted CAST button
+    txt(l.x(-172), l.y(784), BUILD, 9, '#39406b').setOrigin(0, 0.5);
+    // flying damage numbers mint one texture per distinct value; drop them when
+    // the battle ends so a long session doesn't hoard canvases
+    this.events.once('shutdown', () => {
+      for (const k of this.textures.getTextureKeys()) if (k.indexOf('gold@') === 0) this.textures.remove(k);
+    });
 
     this.fxC = this.add.container(0, 0).setDepth(50);
     this.starBurst = this.add.particles(0, 0, 'dot', {
@@ -1316,10 +1396,10 @@ class Battle extends Phaser.Scene {
       p.setTint(gi < this.run.fightIdx ? 0xd7b45c : gi === this.run.fightIdx ? 0xffffff : 0x4a5480)
         .setScale(gi === this.run.fightIdx ? 0.9 : 0.6);
     });
-    this.beastName.setText(''); this.beastTitle.setText('');
+    this.setBeastName(''); this.beastTitle.setText('');
     const asm = ssAssembleBeast(this, this.beastC, this.beast, l.u(1.15), () => {
-      this.beastName.setText(this.beast.name);
-      this.beastTitle.setText(this.beast.title + (this.beast.boss ? ' · BOSS' : ''));
+      this.setBeastName(this.beast.name);
+      this.beastTitle.setText((this.beast.title + (this.beast.boss ? ' · BOSS' : '')).toUpperCase());
     });
     this.beastLines = asm.lines; this.beastStars = asm.stars;
     this.breathTween = this.tweens.add({ targets: this.beastC, scaleX: 1.04, scaleY: 0.97, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -1339,13 +1419,25 @@ class Battle extends Phaser.Scene {
   }
   updateBars() {
     const l = this.L;
-    this.hpBar.width = l.u(250) * clamp(this.run.hp / this.run.hpMax, 0, 1);
+    const crop = (bar, f) => bar.setCrop(0, 0, bar.frame.width * clamp(f, 0, 1), bar.frame.height);
+    crop(this.hpBar, this.run.hp / this.run.hpMax);
     this.hpT.setText(this.run.hp + ' / ' + this.run.hpMax);
-    this.ehpBar.width = l.u(220) * clamp(this.beast.hpNow / this.beast.hp, 0, 1);
+    crop(this.ehpBar, this.beast.hpNow / this.beast.hp);
     this.strikeT.setText(this.beast.hpNow > 0 ? '✦ strikes in ' + this.beast.count + (this.beast.count === 1 ? ' cast ✦' : ' casts ✦') : '');
-    this.scoreT.setText(String(this.runScore()));
+    this.strikeRib.setAlpha(this.strikeT.text ? 0.9 : 0);
+    if (this.strikeT.text) this.strikeRib.setDisplaySize(this.strikeT.width + l.u(26), l.u(19));
+    // while a damage number is in flight the tally animation owns the counter
+    if (!this.scoreAnim) this.scoreT.setText(String(this.runScore()));
   }
   runScore() { return this.run.totalDmg + this.run.longest.length * 15 + this.run.fightIdx * 50; }
+  setBeastName(name) {
+    if (this.beastNameI) { this.beastNameI.destroy(); this.beastNameI = null; }
+    if (!name) return;
+    const gk = ssGoldTex(this, name, 19);
+    const sc = Math.min(1, 340 / gk.w);   // umbral prefixes get long
+    this.beastNameI = this.add.image(this.L.x(0), this.L.y(280), gk.key)
+      .setDisplaySize(this.L.u(gk.w * sc), this.L.u(gk.h * sc));
+  }
 
   // ---------- casting ----------
   tryCast() {
@@ -1418,9 +1510,45 @@ class Battle extends Phaser.Scene {
   beastHit(dmg) {
     const l = this.L;
     this.beast.hpNow -= dmg;
+    // the tally beat: a big gold number pops at the beast, arcs up to the score
+    // trailing stars, and the score counts up when it lands. The counter is read
+    // from the label (not runScore) so back-to-back casts chain smoothly.
+    const from = parseInt(this.scoreT.text, 10) || 0;
     this.run.totalDmg += dmg;
-    const dt = ssTxt(this, this.beastC.x, this.beastC.y - l.u(40), String(dmg), l.u(34), '#ffe9a8').setOrigin(0.5).setDepth(70);
-    this.tweens.add({ targets: dt, y: dt.y - l.u(46), alpha: 0, scale: 1.25, duration: 800, ease: 'Cubic.easeOut', onComplete: () => dt.destroy() });
+    const to = this.runScore();
+    this.scoreAnim = (this.scoreAnim || 0) + 1;
+    const gk = ssGoldTex(this, '+' + dmg, 30);
+    const nI = this.add.image(this.beastC.x, this.beastC.y - l.u(34), gk.key)
+      .setDisplaySize(l.u(gk.w), l.u(gk.h)).setDepth(70);
+    const sx = nI.scaleX, sy = nI.scaleY;
+    nI.setScale(sx * 0.3, sy * 0.3).setAlpha(0);
+    this.tweens.add({ targets: nI, scaleX: sx * 1.15, scaleY: sy * 1.15, alpha: 1, duration: 180, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: nI, scaleX: sx, scaleY: sy, delay: 180, duration: 120 });
+    const start = { x: nI.x, y: nI.y }, dst = { x: this.scoreT.x - l.u(16), y: this.scoreT.y };
+    const ctrl = { x: (start.x + dst.x) / 2 + l.u(46), y: Math.min(start.y, dst.y) - l.u(64) };
+    const pt = { t: 0 };
+    this.tweens.add({
+      targets: pt, t: 1, delay: 500, duration: 520, ease: 'Cubic.easeIn',
+      onUpdate: () => {
+        const u = pt.t, v = 1 - u;
+        nI.x = v * v * start.x + 2 * v * u * ctrl.x + u * u * dst.x;
+        nI.y = v * v * start.y + 2 * v * u * ctrl.y + u * u * dst.y;
+        const k = 1 - u * 0.65;
+        nI.setScale(sx * k, sy * k);
+        if (Math.random() < 0.35) this.starBurst.emitParticleAt(nI.x, nI.y, 1);
+      },
+      onComplete: () => {
+        nI.destroy();
+        this.starBurst.emitParticleAt(dst.x, dst.y, 3);
+        this.tweens.add({ targets: this.scoreT, scale: 1.3, duration: 110, yoyo: true });
+        const cnt = { v: from };
+        this.tweens.add({
+          targets: cnt, v: to, duration: Math.min(700, 90 + (to - from) * 6), ease: 'Cubic.easeOut',
+          onUpdate: () => this.scoreT.setText(String(Math.round(cnt.v))),
+          onComplete: () => { this.scoreAnim--; if (!this.scoreAnim) this.updateBars(); },
+        });
+      },
+    });
     this.tweens.add({ targets: this.beastC, x: l.x(0) + l.u(10), duration: 60, yoyo: true, repeat: 1, onComplete: () => this.beastC.setX(l.x(0)) });
     if (this.beastLines) { this.beastLines.setAlpha(1); this.tweens.add({ targets: this.beastLines, alpha: 0.35, duration: 300 }); }
     this.updateBars();
@@ -1441,7 +1569,7 @@ class Battle extends Phaser.Scene {
     this.goldRain.start();
     this.time.delayedCall(1300, () => this.goldRain.stop());
     if (this.beastLines) this.tweens.add({ targets: this.beastLines, alpha: 0, duration: 350 });
-    this.strikeT.setText('');
+    this.strikeT.setText(''); this.strikeRib.setAlpha(0);
     SS.prof.beasts++;
     SS.award('first-blood', this.game);
     if (this.fights[this.run.fightIdx].id === 'draco') SS.award('dragonfall', this.game);
