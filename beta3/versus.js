@@ -48,8 +48,8 @@ class VsMenu extends Phaser.Scene {
     ];
     for (const r of rows) {
       const b = this.add.image(l.x(0), l.y(r.y), 'btn').setDisplaySize(l.u(320), l.u(66)).setInteractive({ useHandCursor: true });
-      ssTxt(this, l.x(0), l.y(r.y - 10), r.label, l.u(17), '#4a3305').setOrigin(0.5);
-      ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(9.5), '#7a6535', 'italic').setOrigin(0.5);
+      ssTxt(this, l.x(0), l.y(r.y - 10), r.label, l.u(17), BTN_INK()).setOrigin(0.5);
+      ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
       b.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.match(r.mode); });
     }
     ssTxt(this, l.x(0), l.y(460), '— or answer a summons —', l.u(12), '#5a6390').setOrigin(0.5);
@@ -216,7 +216,7 @@ class VsBattle extends Phaser.Scene {
     });
 
     this.castB = this.add.image(l.x(70), l.y(766), 'btn').setDisplaySize(l.u(180), l.u(52)).setInteractive({ useHandCursor: true });
-    this.castT = txt(l.x(70), l.y(766), 'CAST', 19, '#4a3305').setOrigin(0.5);
+    this.castT = txt(l.x(70), l.y(766), 'CAST', 19, BTN_INK()).setOrigin(0.5);
     this.castB.on('pointerdown', () => this.tryCast());
     this.scryB = this.add.rectangle(l.x(-140), l.y(766), l.u(110), l.u(48), 0x151b33).setStrokeStyle(l.u(1.5), 0x4a5a8c).setInteractive({ useHandCursor: true });
     this.scryT = txt(l.x(-140), l.y(766), 'SCRY ↻', 13, '#9fb0e8').setOrigin(0.5);
@@ -242,7 +242,7 @@ class VsBattle extends Phaser.Scene {
     this.lobbySub = txt(l.x(0), l.y(348), 'share this seal — your rival enters it under VERSUS', 11, '#8a94c4', 'italic').setOrigin(0.5);
     this.lobbyRoster = txt(l.x(0), l.y(430), '', 14, '#d8d2bd').setOrigin(0.5).setAlign('center');
     this.beginB = this.add.image(l.x(0), l.y(540), 'btn').setDisplaySize(l.u(220), l.u(56)).setInteractive({ useHandCursor: true }).setVisible(false);
-    this.beginT = txt(l.x(0), l.y(540), 'BEGIN THE BATTLE', 15, '#4a3305').setOrigin(0.5).setVisible(false);
+    this.beginT = txt(l.x(0), l.y(540), 'BEGIN THE BATTLE', 15, BTN_INK()).setOrigin(0.5).setVisible(false);
     this.beginB.on('pointerdown', () => this.hostStart());
     this.lobbyC.add([veil, this.lobbyTitle, this.lobbyCode, this.lobbySub, this.lobbyRoster, this.beginB, this.beginT, leave]);
   }
@@ -670,7 +670,7 @@ class VsBattle extends Phaser.Scene {
     const me = this.me() || {};
     items.push(ssTxt(this, l.x(0), l.y(380), 'damage dealt  ' + (me.dealt | 0) + '   ·   words  ' + (me.casts | 0), l.u(13), '#8a94c4').setOrigin(0.5).setDepth(151));
     this.rematchB = this.add.image(l.x(0), l.y(455), 'btn').setDisplaySize(l.u(240), l.u(56)).setInteractive({ useHandCursor: true }).setDepth(151);
-    this.rematchT = ssTxt(this, l.x(0), l.y(455), '⚔ REMATCH', l.u(16), '#4a3305').setOrigin(0.5).setDepth(151);
+    this.rematchT = ssTxt(this, l.x(0), l.y(455), '⚔ REMATCH', l.u(16), BTN_INK()).setOrigin(0.5).setDepth(151);
     this.rematchB.on('pointerdown', () => { SFX.ui(); this.doRematch(); });
     const homeB = this.add.image(l.x(0), l.y(525), 'btndark').setDisplaySize(l.u(220), l.u(52)).setInteractive({ useHandCursor: true }).setDepth(151);
     const homeT = ssTxt(this, l.x(0), l.y(525), 'RETURN', l.u(15), '#9fb0e8').setOrigin(0.5).setDepth(151);
@@ -742,5 +742,5 @@ class VsBattle extends Phaser.Scene {
 VsBattle.prototype.buildTrie = Battle.prototype.buildTrie;
 VsBattle.prototype.bestWord = Battle.prototype.bestWord;
 
-game.scene.add('vsmenu', VsMenu);
-game.scene.add('vsbattle', VsBattle);
+ssAddScene('vsmenu', VsMenu);
+ssAddScene('vsbattle', VsBattle);

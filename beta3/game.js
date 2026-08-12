@@ -8,13 +8,30 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.4.0';
+const BUILD = 'STARSPELL v0.5.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
 const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
 const QS = new URLSearchParams(location.search);
 const DEMO = QS.get('demo') === '1';
+
+/* ---- ?art=1 — painted box art (buttons + letter tiles) -------------------
+   Everything else in this game is drawn to canvas at boot; these four files
+   are the only downloaded images. They swap in at texture-build time under
+   the SAME texture keys, so nothing downstream changes. If any file fails or
+   is slow, ART stays off and the procedural art draws exactly as before. */
+const ART = QS.get('art') === '1';
+const SSART = { ready: false, img: {} };
+function ssLoadArt() {
+  const names = ['btn', 'btndark', 'tile_face', 'tile_over'];
+  return Promise.all(names.map((n) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => { SSART.img[n] = im; res(true); };
+    im.onerror = () => { DIAG('art MISSING ' + n); res(false); };
+    im.src = 'art/' + n + '.png?v=' + encodeURIComponent(BUILD);
+  }))).then((r) => { SSART.ready = r.every(Boolean); DIAG('art ' + (SSART.ready ? 'loaded' : 'FAILED — procedural')); });
+}
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -86,6 +103,7 @@ function ssTexRes(scene) {
 }
 function ssMakeTextures(scene) {
   const R = ssTexRes(scene);
+  const ARTON = ART && SSART.ready;
   const mk = (key, w, h, fn, r) => {
     if (scene.textures.exists(key)) return;
     r = r || 1;
@@ -119,9 +137,29 @@ function ssMakeTextures(scene) {
     g3.addColorStop(0, 'rgba(0,0,0,0)'); g3.addColorStop(1, 'rgba(60,40,10,0.22)');
     c.fillStyle = g3; c.fill();
   }, R);
-  tileTex('tile0', '#f7f1e2', '#dfd3b8', '#b8a67f');
-  tileTex('tile1', '#ffe9a8', '#e8b84b', '#a97c1c');
-  tileTex('tile2', '#e6f6ff', '#a8d9f2', '#5f9fc4');
+  // Painted tiles: one neutral glass face multiplied by the tier colour, with the gold rim
+  // composited on top untinted — a straight setTint would colour the rim too, and tint is a
+  // silent no-op under the Canvas renderer (the game boots Phaser.AUTO). Adding a bonus
+  // colour stays one line, same as the procedural path below.
+  const tileArt = (key, color) => mk(key, 128, 128, (c, w, h) => {
+    const f = SSART.img.tile_face, o = SSART.img.tile_over;
+    c.drawImage(f, 0, 0, w, h);
+    c.globalCompositeOperation = 'multiply';
+    c.fillStyle = color; c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'destination-in';   // multiply floods the box; restore alpha
+    c.drawImage(f, 0, 0, w, h);
+    c.globalCompositeOperation = 'source-over';
+    c.drawImage(o, 0, 0, w, h);
+  }, R);
+  if (ARTON) {
+    tileArt('tile0', '#e2deec');   // plain
+    tileArt('tile1', '#ffcd6e');   // +6 value
+    tileArt('tile2', '#96d7ff');   // 1.5x word
+  } else {
+    tileTex('tile0', '#f7f1e2', '#dfd3b8', '#b8a67f');
+    tileTex('tile1', '#ffe9a8', '#e8b84b', '#a97c1c');
+    tileTex('tile2', '#e6f6ff', '#a8d9f2', '#5f9fc4');
+  }
   mk('veil', 8, 8, (c, w, h) => { c.fillStyle = '#060812'; c.fillRect(0, 0, w, h); });
   mk('panel', 256, 256, (c) => {
     c.beginPath(); c.roundRect(4, 4, 248, 248, 22);
@@ -132,23 +170,36 @@ function ssMakeTextures(scene) {
     c.lineWidth = 1.5; c.strokeStyle = '#ffffffaa';
     c.beginPath(); c.roundRect(8, 8, 240, 240, 18); c.stroke();
   }, R);
-  mk('btn', 256, 96, (c) => {
-    c.beginPath(); c.roundRect(4, 4, 248, 88, 46);
-    const g = c.createLinearGradient(0, 4, 0, 92);
-    g.addColorStop(0, '#ffdf8f'); g.addColorStop(0.5, '#f0b93e'); g.addColorStop(1, '#c98f1d');
-    c.fillStyle = g; c.fill();
-    c.lineWidth = 3; c.strokeStyle = '#8a6210'; c.stroke();
-    c.beginPath(); c.roundRect(14, 10, 228, 34, 20);
-    const g2 = c.createLinearGradient(0, 10, 0, 44);
-    g2.addColorStop(0, 'rgba(255,255,255,0.65)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
-    c.fillStyle = g2; c.fill();
-  }, R);
-  mk('btndark', 256, 96, (c) => {
-    c.beginPath(); c.roundRect(4, 4, 248, 88, 46);
-    c.fillStyle = '#161d38'; c.fill();
-    c.lineWidth = 2.5; c.strokeStyle = '#4a5a8c'; c.stroke();
-  }, R);
+  // Painted buttons are authored 627x344, so the slot is 256x140 rather than the procedural
+  // 256x96 — that keeps the frame's vertical detail instead of pre-squashing it. Safe because
+  // every consumer sizes with setDisplaySize, which works off the frame.
+  if (ARTON) {
+    mk('btn', 256, 140, (c, w, h) => { c.drawImage(SSART.img.btn, 0, 0, w, h); }, R);
+    mk('btndark', 256, 140, (c, w, h) => { c.drawImage(SSART.img.btndark, 0, 0, w, h); }, R);
+  } else {
+    mk('btn', 256, 96, (c) => {
+      c.beginPath(); c.roundRect(4, 4, 248, 88, 46);
+      const g = c.createLinearGradient(0, 4, 0, 92);
+      g.addColorStop(0, '#ffdf8f'); g.addColorStop(0.5, '#f0b93e'); g.addColorStop(1, '#c98f1d');
+      c.fillStyle = g; c.fill();
+      c.lineWidth = 3; c.strokeStyle = '#8a6210'; c.stroke();
+      c.beginPath(); c.roundRect(14, 10, 228, 34, 20);
+      const g2 = c.createLinearGradient(0, 10, 0, 44);
+      g2.addColorStop(0, 'rgba(255,255,255,0.65)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = g2; c.fill();
+    }, R);
+    mk('btndark', 256, 96, (c) => {
+      c.beginPath(); c.roundRect(4, 4, 248, 88, 46);
+      c.fillStyle = '#161d38'; c.fill();
+      c.lineWidth = 2.5; c.strokeStyle = '#4a5a8c'; c.stroke();
+    }, R);
+  }
 }
+
+// Label colour for text sitting on a 'btn'. The procedural button is light gold, the painted
+// one is dark navy — every gold-button label has to flip with it.
+const BTN_INK = () => (ART && SSART.ready ? '#f4e6bd' : '#4a3305');
+const BTN_INK2 = () => (ART && SSART.ready ? '#c9b48a' : '#7a6535');
 
 function ssStarfield(scene, count) {
   const W = scene.scale.width, H = scene.scale.height;
@@ -463,8 +514,8 @@ function ssAchToast(scene, def) {
   const l = ssLayout(scene);
   const c = scene.add.container(l.x(0), l.y(-40)).setDepth(400);
   const bg = scene.add.image(0, 0, 'btn').setDisplaySize(l.u(300), l.u(58));
-  const t1 = ssTxt(scene, 0, -l.u(10), '✦ ' + def.name + ' ✦', l.u(15), '#4a3305').setOrigin(0.5);
-  const t2 = ssTxt(scene, 0, l.u(12), def.desc, l.u(10), '#6a5a35', 'italic').setOrigin(0.5);
+  const t1 = ssTxt(scene, 0, -l.u(10), '✦ ' + def.name + ' ✦', l.u(15), BTN_INK()).setOrigin(0.5);
+  const t2 = ssTxt(scene, 0, l.u(12), def.desc, l.u(10), BTN_INK2(), 'italic').setOrigin(0.5);
   c.add([bg, t1, t2]);
   scene.tweens.add({ targets: c, y: l.y(52), duration: 450, ease: 'Back.easeOut' });
   scene.tweens.add({ targets: c, alpha: 0, delay: 2600, duration: 400, onComplete: () => c.destroy() });
@@ -518,8 +569,8 @@ class Home extends Phaser.Scene {
     ];
     for (const r of rows) {
       const b = ui(this.add.image(l.x(0), l.y(r.y), r.dark ? 'btndark' : 'btn').setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true }));
-      ui(ssTxt(this, l.x(0), l.y(r.y - (r.sub ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : '#4a3305').setOrigin(0.5));
-      if (r.sub) ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : '#7a6535', 'italic').setOrigin(0.5));
+      ui(ssTxt(this, l.x(0), l.y(r.y - (r.sub ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
+      if (r.sub) ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5));
       b.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
       b.on('pointerover', () => b.setScale(b.scaleX * 1.03, b.scaleY * 1.03));
       b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)));
@@ -576,7 +627,18 @@ class Home extends Phaser.Scene {
       SFX.crickets(false); SFX.birds(false); SFX.riser();
       this.sky.scatterFlies();
       for (const o of this.uiItems) this.tweens.killTweensOf(o);
-      if (this.bloomBtn) this.tweens.add({ targets: this.bloomBtn, scale: { from: this.bloomBtn.scaleX, to: this.bloomBtn.scaleX * 1.08 }, duration: 130, yoyo: true });
+      // BUGFIX: this tweened `scale`, whose setter writes BOTH axes — a setDisplaySize'd
+      // button (scaleX ~1.17, scaleY ~0.60) had its height snapped to the scaleX value, so
+      // the pressed button doubled in height for 130ms and never came back. Drive the axes
+      // separately. (Same trap as the Runefall note: never tween `scale` on these.)
+      if (this.bloomBtn) {
+        const b = this.bloomBtn;
+        this.tweens.add({
+          targets: b, duration: 130, yoyo: true,
+          scaleX: { from: b.scaleX, to: b.scaleX * 1.08 },
+          scaleY: { from: b.scaleY, to: b.scaleY * 1.08 },
+        });
+      }
       this.tweens.add({ targets: this.uiItems, alpha: 0, duration: 300 });
       this.dissolveTitle();
       if (ssReduceMotion()) {
@@ -753,7 +815,8 @@ class Battle extends Phaser.Scene {
     });
 
     this.castB = this.add.image(l.x(70), l.y(754), 'btn').setDisplaySize(l.u(180), l.u(56)).setInteractive({ useHandCursor: true });
-    this.castT = txt(l.x(70), l.y(754), 'CAST', 20, '#4a3305').setOrigin(0.5).setShadow(0, l.u(1), '#ffe9b0', l.u(1));
+    this.castT = txt(l.x(70), l.y(754), 'CAST', 20, BTN_INK()).setOrigin(0.5)
+      .setShadow(0, l.u(1), ART && SSART.ready ? '#2a1c05' : '#ffe9b0', l.u(1));
     this.castB.on('pointerdown', () => this.tryCast());
     this.scryB = this.add.rectangle(l.x(-150), l.y(754), l.u(100), l.u(50), 0x151b33).setStrokeStyle(l.u(1.5), 0x4a5a8c).setInteractive({ useHandCursor: true });
     txt(l.x(-150), l.y(754), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
@@ -1233,7 +1296,7 @@ class Battle extends Phaser.Scene {
       by += 66;
     }
     const again = this.add.image(l.x(0), l.y(by + 10), 'btn').setDisplaySize(l.u(220), l.u(58)).setInteractive({ useHandCursor: true });
-    const againT = ssTxt(this, l.x(0), l.y(by + 10), won || this.mode !== 'campaign' ? 'NEW RUN' : 'TRY AGAIN', l.u(18), '#4a3305').setOrigin(0.5);
+    const againT = ssTxt(this, l.x(0), l.y(by + 10), won || this.mode !== 'campaign' ? 'NEW RUN' : 'TRY AGAIN', l.u(18), BTN_INK()).setOrigin(0.5);
     const homeB = this.add.image(l.x(0), l.y(by + 78), 'btndark').setDisplaySize(l.u(220), l.u(50)).setInteractive({ useHandCursor: true });
     const homeT = ssTxt(this, l.x(0), l.y(by + 78), 'HOME', l.u(14), '#9fb0e8').setOrigin(0.5);
     items.push(again, againT, homeB, homeT);
@@ -1443,22 +1506,44 @@ class Board extends Phaser.Scene {
 /* ============================================================
    Boot
    ============================================================ */
-const game = new Phaser.Game({
-  type: Phaser.AUTO,
-  width: Math.round(window.innerWidth * DPR),
-  height: Math.round(window.innerHeight * DPR),
-  backgroundColor: '#0a0d1c',
-  scale: { mode: Phaser.Scale.NONE },
-  render: { antialias: DPR < 2, powerPreference: 'high-performance' },
-  scene: [Home, Battle, Profile, Board],
-});
+let game = null;
+// versus.js registers its scenes at load time, which now happens before the game exists on
+// the ?art=1 path. Queue them until boot.
+const SS_LATE_SCENES = [];
+function ssAddScene(key, cls) {
+  if (game) game.scene.add(key, cls); else SS_LATE_SCENES.push([key, cls]);
+}
+function ssBoot() {
+  game = new Phaser.Game({
+    type: Phaser.AUTO,
+    width: Math.round(window.innerWidth * DPR),
+    height: Math.round(window.innerHeight * DPR),
+    backgroundColor: '#0a0d1c',
+    scale: { mode: Phaser.Scale.NONE },
+    render: { antialias: DPR < 2, powerPreference: 'high-performance' },
+    scene: [Home, Battle, Profile, Board],
+  });
+  window.game = game;
+  while (SS_LATE_SCENES.length) { const [k, c] = SS_LATE_SCENES.shift(); game.scene.add(k, c); }
+  game.events.once('ready', fitCanvas);
+}
 function fitCanvas() {
-  const c = game.canvas;
+  const c = game && game.canvas;
   if (!c) return;
   c.style.width = window.innerWidth + 'px';
   c.style.height = window.innerHeight + 'px';
 }
-game.events.once('ready', fitCanvas);
+// Textures are built inside the first scene's create(), so the art has to be decoded before
+// Phaser starts. Capped at 2.5s — a slow or dead image never blocks the game, it just falls
+// back to the procedural art. Without ?art=1 this is a straight synchronous boot as before.
+if (ART) {
+  let booted = false;
+  const go = () => { if (!booted) { booted = true; ssBoot(); } };
+  setTimeout(() => { if (!booted) DIAG('art TIMEOUT — procedural'); go(); }, 2500);
+  ssLoadArt().then(go);
+} else {
+  ssBoot();
+}
 SSNET.connect().then(() => { });
 let resizeTo = null;
 let lastRW = window.innerWidth, lastRH = window.innerHeight;
