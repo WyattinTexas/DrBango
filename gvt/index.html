@@ -2727,7 +2727,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.28</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.29</div>
   <div class="scanlines"></div>
 </div>
 
@@ -17089,8 +17089,8 @@ const FDEF = {
   // spawn (600, the difficulty curve keeps its hands off the gag). spd 0 —
   // updateYeti owns his feet entirely (the mom idiom).
   yeti:    { hp:600, spd:0, bounty:75, leak:0, w:110, rng:0, fireCd:0 },  // v2.49: fires back, one shot fells one man whole (knock() = the v1.32 casualty; shield/plate/saber/jet stay the purchased counters). v2.50: rng doubled. v2.51 (Wyatt 8/5: "I was able to beat him, but I'm pretty good... slightly easier — 10% movement slower, 10% less range, 10% slower attack speed"): spd 26→23.4 · rng 396→356 · fireCd 3.5→3.85 — each exactly ×0.9/÷0.9 off the v2.50 build, still the longest direct gun on the carpet
-  rollpig: { hp:44, spd:40.5, bounty:130,  leak:5, w:112, boss:true, splashCd:1.1, splashR:78 }, // fast rush — tumbles in and splashes your line flat. v2.71 (Wyatt 8/7): spd ×0.75 ('slow the piggies in all levels by 25%') + 50 more dog tags on the kill
-  gpig:    { hp:66, spd:54.7, bounty:200,  leak:5, w:224, boss:true, splashCd:1.1, splashR:108 }, // 8/8 GIANT PIGGY (Wyatt): ×1.35 the pig's pace, DOUBLE his size, +50% hp, 200 dog tags; splash ring scaled with the body (my call, one cell)
+  rollpig: { hp:29, spd:40.5, bounty:130,  leak:5, w:112, boss:true, splashCd:1.1, splashR:78 }, // fast rush — tumbles in and splashes your line flat. v2.71 (Wyatt 8/7): spd ×0.75 ('slow the piggies in all levels by 25%') + 50 more dog tags on the kill. v3.29 (Wyatt 8/11 eve): hp 44→29 — 'The smaller piggy banks nerf by 15 HP'; the base cell is the one door every spawn reads (his own spd-cut law), so the nerf rides every level through spawnFoe's boss hpm
+  gpig:    { hp:16, spd:54.7, bounty:200,  leak:5, w:224, boss:true, splashCd:1.1, splashR:108 }, // 8/8 GIANT PIGGY (Wyatt): ×1.35 the pig's pace, DOUBLE his size, +50% hp, 200 dog tags; splash ring scaled with the body (my call, one cell). v3.29 (Wyatt 8/11 eve): hp 66→16 — 'The giant piggy banks need to be nerfed by 50'; ⚠ the giant now carries LESS base hp than the runaway (16 vs 29) — a glass cannon at every level, his ruling taken literally; one cell to redial
   rex:     { hp:66, spd:33, bounty:110, leak:6, w:122, boss:true, stompCd:2.0, stompR:100 },   // the bruiser — huge HP, AoE stomp
   // v1.38 THEIR SARGE — the Tan's own commander, red saber in hand (the three
   // SET_PIECES levels). The saber bag is his whole tuning panel: aggro = when
@@ -35299,11 +35299,18 @@ function roofFallZone(base, dx, dy){
 // — the ghost svg is ours alone (fresh element, no SVG transform attribute),
 // so the CSS fall animation composes cleanly (the v1.21 layer law honoured
 // by construction). Reduced motion: no ghost — it's simply gone.
-function roofFall(k, base, dx, dy, zone){
-  const g=document.getElementById('ro-'+k);
+function roofFall(k, base, dx, dy, zone, artOv){
+  // v3.29: the source may be a DOWNED man (his flat wrapper SHEDS its id —
+  // data-gid is the only name he answers to) or the wandering robot (no ro-
+  // wrapper at all — nemSmash's own DECOR_REACT fallback, borrowed). The
+  // robot's caller passes artOv outright besides: a cloned .robwalk would
+  // restart its 19s keyframes and paint the ghost back at his HOME, not
+  // where he actually fell.
+  const g=document.getElementById('ro-'+k) || document.querySelector('[data-gid="ro-'+k+'"]')
+        || (DECOR_REACT[k]? document.getElementById(DECOR_REACT[k].el) : null);
   // the clone sheds its ids — a ghost must never answer a getElementById
   // meant for the (now absent) real toy while it plays
-  const art=g? g.outerHTML.replace(/ id="/g,' data-gid="') : '';
+  const art=artOv!==undefined? artOv : (g? g.outerHTML.replace(/ id="/g,' data-gid="') : '');
   ROOF_GONE.add(k);
   SFX.fall();
   renderMenu();
@@ -35318,6 +35325,62 @@ function roofFall(k, base, dx, dy, zone){
     setTimeout(()=>{ try{ gh.remove(); }catch(e){} }, 900);
   }
 }
+// ===== v3.29 THE ROOF HOLDS NOBODY (Wyatt 8/11 eve, verbatim: "On the roof
+// background for the main menu, if anything overlaps the gap in the floor,
+// it should fall, including the robot. If any of your troops are over that
+// gap, immediately they should fall upon loading in so they're not
+// appearing like they're flying.") =====
+// The v3.06 rule fired only on a DROP — a man or toy whose SAVED delta
+// parks him over the gap (arranged in another room, or parked on the roof
+// before v3.06 shipped the rule) simply hovered there, flying. Now every
+// repaint sweeps both drag families through the exact roofFallZone the
+// drop uses (one geometry — the ROOF_GAP law), so the load-in itself drops
+// them. A downed man (BALL_DOWN) lies over the void too, so he falls with
+// the rest. The sweep re-enters renderMenu through roofFall BY DESIGN:
+// ROOF_GONE is written before the repaint, so the inner pass skips the
+// already-fallen and the recursion bottoms out one frame per casualty.
+let ROOF_SWEEPING=false;
+function roofSweep(){
+  if(ROOF_SWEEPING || S.mode!=='menu' || roomCur()!=='rooftop') return;
+  ROOF_SWEEPING=true;
+  // troops first (they paint above the toys) — only men actually on THIS
+  // room state's floor (a ruckus/mom day fields no vt wrapper at all)
+  for(const tb of VTROOPS){
+    if(roofGone(tb.k)) continue;
+    if(!document.getElementById('ro-'+tb.k) && !document.querySelector('[data-gid="ro-'+tb.k+'"]')) continue;
+    const d=rpXY(tb.k), z=roofFallZone(tb, d[0], d[1]);
+    if(z) roofFall(tb.k, tb, d[0], d[1], z);
+  }
+  for(const k of RDRAG_DECOR){
+    if(!decorHome(k)) continue;
+    if(k==='soccer' && SOC_FLY) continue;   // mid-flight the ball isn't at its spot — its own landing already tests the zone (v3.16)
+    const b=DECOR_SPOTS[k], d=rpXY(k), z=roofFallZone(b, d[0], d[1]);
+    if(z) roofFall(k, b, d[0], d[1], z);
+  }
+  ROOF_SWEEPING=false;
+}
+// THE ROBOT (his own clause in Wyatt's ruling): no anchor, no saved delta —
+// he WANDERS on CSS keyframes, and his home translate(440,250) plus half
+// his waypoints sit inside ROOF_GAP by construction. So his test is LIVE:
+// sample the .robwalk transform a few times a second, and the moment his
+// origin crosses into the gap he goes down it — which on this roof is near
+// load-in, every session (the hole is on his beat; relaunch is the medic,
+// the v3.06 session law verbatim). Reduced motion parks him at home —
+// inside the gap — and the same tick takes him there too.
+function robRoofCheck(){
+  if(S.mode!=='menu' || roomCur()!=='rooftop' || !decorHome('robot')) return;
+  const el=document.getElementById('decRobot'); if(!el) return;
+  const wk=el.querySelector('.robwalk'); if(!wk) return;
+  let tx=0, ty=0;
+  const tr=getComputedStyle(wk).transform;
+  if(tr && tr.indexOf('matrix(')===0){ const p=tr.slice(7,-1).split(',');
+    tx=parseFloat(p[4])||0; ty=parseFloat(p[5])||0; }
+  const cx=440+tx, cy=250+ty, g=ROOF_GAP;
+  if(cx>=g.x && cx<=g.x+g.w && cy>=g.y && cy<=g.y+g.h)
+    roofFall('robot', {x:cx-26, y:cy-44, w:52, h:82}, 0, 0, 'gap',
+      '<g transform="translate('+cx.toFixed(1)+','+cy.toFixed(1)+')">'+roboArt()+'</g>');
+}
+setInterval(robRoofCheck, 300);
 function rdragEnd(e){
   const d=RDRAG; if(!d) return;
   // v2.85: the claim ends only with its OWN pointer — a resting second
@@ -35697,6 +35760,7 @@ function renderMenu(){
   // label now, so no #rtag-shop ever renders.)
   for(const el of document.querySelectorAll('#roomStage .roomtag'))
     if(el.offsetWidth > (el.id==='rtag-piggy'? 220 : el.id==='rtag-ach'? 196 : 360)) el.style.fontSize='14px';
+  roofSweep();   // v3.29: the roof holds nobody — the paint that would show a man flying drops him instead
   sizeRoom();
 }
 // tap the piggy and it hops. No menu, no modal — the hop IS the reward.
