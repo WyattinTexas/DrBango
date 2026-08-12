@@ -4,11 +4,14 @@ Two scripts, both dev-only — nothing here ships to the browser.
 
 ## make-art-assets.py
 
-Re-cuts `beta3/art/*.png` from the original Midjourney renders in `~/Downloads`.
-Run it when you want to re-tune the painted art rather than hand-edit the PNGs.
+Re-cuts `beta3/art/*.png` from the original Midjourney renders — button/tile
+sources in `~/Downloads`, the meadow in `~/starspell-art-sources` (override with
+`MEADOW_SRC`). Run it when you want to re-tune the painted art rather than
+hand-edit the PNGs. `ONLY=meadow` (or `button`/`tiles`) re-cuts one asset.
 
 ```
 CALM=0.55 python3 tools/make-art-assets.py
+ONLY=meadow NIGHT=0.55 python3 tools/make-art-assets.py
 ```
 
 `CALM` (0–1, default 0.55) is a vertical-only blur on the tile face. It exists because
@@ -32,9 +35,27 @@ What the script handles that a manual crop would not:
   1.08 on the launch bloom and drop to alpha 0.45 when disabled; a baked shadow grows,
   shifts and goes translucent with them.
 
+What the meadow cut handles (`art/meadow.png`, v0.6.0):
+
+- **The painting's sky never ships.** A per-column ridge detector keys everything above
+  the mountain line to alpha 0, so the painted landscape sits against the game's own
+  procedural dusk gradient — no palette clash, and the ascent/battle handoff is untouched.
+- **Ridge detection needs a 20 px sustained dark run** (`lum < 148`): the pink band has
+  ~10 px dark cloud streaks that an 8 px run latched onto (rectangular chunks of sky kept
+  opaque), and the pale far ridge at lum ~142 vanishes if the threshold is 130. The curve
+  is then median-filtered and gaussian-rounded — raw per-column disagreement renders as
+  column-aligned banding, and the median alone leaves staircase plateaus on peaks.
+- **`NIGHT` (0–1, default 0.55)** ramps a darken/desaturate/cool-shift grade from the
+  ridge (keeps the dusk glow) to the bottom (night): the render's foreground is
+  daylight-bright green, but the buttons live down there as "lanterns in dark grass".
+- The matching game-side change: with the plate on, `skygrad` drops its baked razor
+  horizon line and dark-ground plunge (an `artHz` variant in `ssSkyTextures`) — the
+  plate's ridge sits lower than the old procedural hills in places, and the baked edge
+  showed through/above the painted forest as a straight grey band.
+
 If the art ever goes default-on (not just `?art=1`), convert the output to WebP — the
-button goes 427 KB → ~55 KB with no quality loss. Palette-quantised PNG is smaller too but
-adds visible dither to the dark face.
+button goes 427 KB → ~55 KB with no quality loss (the meadow 639 KB → similar savings).
+Palette-quantised PNG is smaller too but adds visible dither to the dark face.
 
 ## click-test.js
 

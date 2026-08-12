@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.5.1';
+const BUILD = 'STARSPELL v0.6.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -16,15 +16,16 @@ const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
 const QS = new URLSearchParams(location.search);
 const DEMO = QS.get('demo') === '1';
 
-/* ---- ?art=1 — painted box art (buttons + letter tiles) -------------------
-   Everything else in this game is drawn to canvas at boot; these four files
-   are the only downloaded images. They swap in at texture-build time under
-   the SAME texture keys, so nothing downstream changes. If any file fails or
-   is slow, ART stays off and the procedural art draws exactly as before. */
+/* ---- ?art=1 — painted art (buttons + letter tiles + meadow plate) --------
+   Everything else in this game is drawn to canvas at boot; these five files
+   are the only downloaded images. Buttons/tiles swap in at texture-build time
+   under the SAME texture keys, so nothing downstream changes; the meadow is a
+   landscape plate ssSkyWorld lays over the procedural ground. If any file
+   fails or is slow, ART stays off and the procedural art draws as before. */
 const ART = QS.get('art') === '1';
 const SSART = { ready: false, img: {} };
 function ssLoadArt() {
-  const names = ['btn', 'btndark', 'tile_face', 'tile_over'];
+  const names = ['btn', 'btndark', 'tile_face', 'tile_over', 'meadow'];
   return Promise.all(names.map((n) => new Promise((res) => {
     const im = new Image();
     im.onload = () => { SSART.img[n] = im; res(true); };
@@ -271,7 +272,16 @@ function ssSkyTextures(scene, dawn) {
     }
     c.putImageData(im, 0, 0);
   });
-  gradTex('skygrad', [
+  // With the painted meadow plate on, the gradient must not bake its own razor
+  // horizon (bright line + plunge to dark ground): the plate's ridge sits lower
+  // than the old procedural hills in places, and the baked edge shows above the
+  // painted forest as a straight grey band. The plate brings the ground; the
+  // gradient's tail becomes a dusk haze settling behind the painted mountains.
+  const artHz = ART && SSART.ready;
+  gradTex('skygrad', artHz ? [
+    [0, '#0a0d1c'], [0.09, '#0a0d1c'], [0.27, '#10142e'], [0.43, '#1c2350'], [0.575, '#3a3068'],
+    [0.685, '#6b4585'], [0.76, '#a05a8c'], [0.805, '#c96a8e'], [0.83, '#f0997a'], [0.846, '#ffc98a'],
+    [0.852, '#ffd095'], [0.88, '#b06080'], [0.93, '#4a3560'], [1, '#241a38']] : [
     [0, '#0a0d1c'], [0.09, '#0a0d1c'], [0.27, '#10142e'], [0.43, '#1c2350'], [0.575, '#3a3068'],
     [0.685, '#6b4585'], [0.76, '#a05a8c'], [0.805, '#c96a8e'], [0.83, '#f0997a'], [0.846, '#ffc98a'],
     [0.852, '#ffe4b0'], [0.86, '#0c0918'], [1, '#070510']]);
@@ -419,14 +429,32 @@ function ssSkyWorld(scene, opts) {
   // the meadow: hills, ground, swaying grass, fireflies
   // (near hill raised + widened so the bright horizon band can't peek
   //  through the saddle between the two silhouettes)
-  scene.add.ellipse(l.x(-108), my(545), l.u(432), l.u(250), opts.dawn ? 0x1a1430 : 0x141026);
-  scene.add.ellipse(l.x(150), my(588), l.u(620), l.u(340), opts.dawn ? 0x120d22 : 0x0c0918);
-  scene.add.rectangle(l.W / 2, my(553), l.W, Math.max(1, l.H - l.y(553)) + 120 * l.s, opts.dawn ? 0x0f0a1c : 0x0a0714).setOrigin(0.5, 0);
-  const grassY = Math.max(l.y(772), l.H - l.u(30)) + B * l.s;
-  for (const [off, ph] of [[0, 0], [l.u(5), 1300]]) {
-    const gr = scene.add.tileSprite(l.W / 2, grassY + off, l.W, l.u(32), 'grasstrip').setOrigin(0.5, 0);
-    gr.setTileScale(l.s / 2); gr.tilePositionX = off * 20;   // texture is drawn at 2x
-    scene.tweens.add({ targets: gr, x: gr.x + l.u(1.5), duration: 2600, yoyo: true, repeat: -1, delay: ph, ease: 'Sine.easeInOut' });
+  // painted meadow plate (?art=1, dusk only — the cut is graded for dusk): the MJ
+  // landscape with its own sky keyed out at the ridge, so the painted mountains
+  // stand against the procedural horizon glow. The procedural silhouettes and
+  // grass strip stand down — anything drawn under the ridge's feathered alpha
+  // shows through it as a phantom hump. Height is pinned (ridge ~horizon, foot
+  // just past the screen bottom so the anticipation dip can't peek under it);
+  // width follows the screen, so very wide frames stretch the painting rather
+  // than run out of it.
+  const artMeadow = ART && SSART.ready && !opts.dawn;
+  if (artMeadow) {
+    if (!scene.textures.exists('meadowart')) scene.textures.addImage('meadowart', SSART.img.meadow);
+    const src = scene.textures.get('meadowart').getSourceImage();
+    const bot = Math.max(my(800), l.H + B * l.s) + l.u(30);
+    const h = bot - my(398);
+    scene.add.image(l.W / 2, bot, 'meadowart').setOrigin(0.5, 1)
+      .setDisplaySize(Math.max(l.W, h * src.width / src.height), h);
+  } else {
+    scene.add.ellipse(l.x(-108), my(545), l.u(432), l.u(250), opts.dawn ? 0x1a1430 : 0x141026);
+    scene.add.ellipse(l.x(150), my(588), l.u(620), l.u(340), opts.dawn ? 0x120d22 : 0x0c0918);
+    scene.add.rectangle(l.W / 2, my(553), l.W, Math.max(1, l.H - l.y(553)) + 120 * l.s, opts.dawn ? 0x0f0a1c : 0x0a0714).setOrigin(0.5, 0);
+    const grassY = Math.max(l.y(772), l.H - l.u(30)) + B * l.s;
+    for (const [off, ph] of [[0, 0], [l.u(5), 1300]]) {
+      const gr = scene.add.tileSprite(l.W / 2, grassY + off, l.W, l.u(32), 'grasstrip').setOrigin(0.5, 0);
+      gr.setTileScale(l.s / 2); gr.tilePositionX = off * 20;   // texture is drawn at 2x
+      scene.tweens.add({ targets: gr, x: gr.x + l.u(1.5), duration: 2600, yoyo: true, repeat: -1, delay: ph, ease: 'Sine.easeInOut' });
+    }
   }
   const flies = [];
   if (!opts.dawn) {

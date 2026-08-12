@@ -9,6 +9,7 @@ os.makedirs(OUT, exist_ok=True)
 
 BTN_SRC  = DL + "/u9877896886_fantasy_word-game_UI_button_wide_rounded_rectangl_fb0dbbe1-24ae-4f62-93f5-efe0d93b1a30_1.png"
 TILE_SRC = DL + "/u9877896886_set_of_fantasy_game_UI_buttons_in_matching_style__b9c62610-6f9a-4f68-81d7-7b95546b9494_0.png"
+MEADOW_SRC = os.environ.get("MEADOW_SRC", "/Users/admin/starspell-art-sources/mj-meadow.png")
 
 # palette the existing UI actually uses, for grading targets
 GOLD_UI = np.array([0xd7, 0xb4, 0x5c], float)   # #d7b45c, the shipped gold
@@ -110,7 +111,71 @@ def build_tiles(CALM=0.75):
     print("tile_face.png / tile_over.png  300x300  radius %d  (sparkle removed)" % RAD)
 
 
-build_button()
-build_tiles(CALM=float(__import__("os").environ.get("CALM","0.75")))
+# ---------------------------------------------------------------- MEADOW
+def build_meadow(NIGHT=0.55, FEATHER=14):
+    """Cut the landscape out of the meadow render, keying the painting's own sky
+    away at the ridge. The plate then sits against the PROCEDURAL horizon glow in
+    game — the painted teal sky never ships, so there is no palette clash and the
+    ascent gradient/battle handoff stay untouched."""
+    im = Image.open(MEADOW_SRC).convert("RGB")
+    a = np.asarray(im).astype(float)
+    H, W = a.shape[:2]
+    lum = 0.2126 * a[:, :, 0] + 0.7152 * a[:, :, 1] + 0.0722 * a[:, :, 2]
+
+    # per-column ridge: first sustained dark run scanning down from mid-sky.
+    # The sky right above the ridge is the bright pink band (lum ~170+); the
+    # mountains are dusk violet (lum ~90). The pink band carries darker cloud
+    # streaks ~10 px thick — an 8 px run latched onto them and left rectangular
+    # chunks of pink sky opaque above the true ridge, so demand 20 px, which
+    # only an actual mountain sustains. Median-smooth the curve after: any
+    # residual per-column disagreement renders as column-aligned banding.
+    # THRESH must sit between the pale far-ridge lavender (lum ~142) and the pink
+    # sky right above it (lum ~156) — at 130 the far mountains read as "sky" and
+    # get feathered away, leaving a bald haze gap on the right.
+    SCAN_TOP, THRESH, RUN = int(H * 0.40), 148, 20
+    dark = (lum[SCAN_TOP:] < THRESH)
+    runsum = np.cumsum(dark, axis=0)
+    hit = (runsum[RUN:] - runsum[:-RUN]) == RUN          # RUN consecutive darks
+    ridge = SCAN_TOP + np.argmax(hit, axis=0)            # first True per column
+    ridge[~hit.any(axis=0)] = H - 1                      # (never happens; safety)
+    pad = np.pad(ridge, 7, mode="edge")
+    ridge = np.median(np.lib.stride_tricks.sliding_window_view(pad, 15), axis=1)
+    k = np.exp(-0.5 * (np.arange(-8, 9) / 4.0) ** 2); k /= k.sum()   # round the median's plateaus
+    ridge = np.convolve(np.pad(ridge, 8, mode="edge"), k, "valid").astype(int)
+
+    top = max(0, int(ridge.min()) - 3 * FEATHER)         # headroom for the feather
+    crop = a[top:]
+    ch = crop.shape[0]
+
+    # alpha: smoothstep 0→1 across [ridge-FEATHER, ridge+FEATHER] per column,
+    # then a light blur so the key line never reads as a paper cutout
+    yy = np.arange(top, H)[:, None].astype(float)
+    t = np.clip((yy - (ridge[None, :] - FEATHER)) / (2 * FEATHER), 0, 1)
+    alpha = t * t * (3 - 2 * t)
+    alpha = np.asarray(Image.fromarray((alpha * 255).astype(np.uint8))
+                       .filter(ImageFilter.GaussianBlur(1.2))).astype(float) / 255.0
+
+    # NIGHT GRADE — the render's foreground is daylight-bright green, but the
+    # buttons live down there and the design wants "lanterns in dark grass".
+    # Ramp from the ridge (keep the dusk glow) to the bottom (night):
+    #   · darken toward 1-NIGHT
+    #   · desaturate a third of the way to luminance (night kills chroma)
+    #   · cool-shift so the green reads as moonlit blue-green, matching the
+    #     game's #0c0918 ground family rather than a daytime lawn
+    ty = (np.arange(ch, dtype=float)[:, None] / (ch * 0.9)).clip(0, 1) ** 0.8
+    g = crop.copy()
+    clum = (0.2126 * g[:, :, 0] + 0.7152 * g[:, :, 1] + 0.0722 * g[:, :, 2])[:, :, None]
+    g = g + (clum - g) * (0.33 * ty[:, :, None])                       # desaturate
+    gains = np.dstack([1 - 0.16 * ty, 1 - 0.10 * ty, 1 + 0.06 * ty])   # cool shift
+    g = g * gains * (1 - NIGHT * ty[:, :, None])                       # darken
+    out = np.dstack([np.clip(g, 0, 255), alpha * 255]).astype(np.uint8)
+    Image.fromarray(out, "RGBA").save(OUT + "/meadow.png")
+    print("meadow.png  %dx%d  ridge y %d..%d (src), NIGHT %.2f" % (W, ch, ridge.min(), ridge.max(), NIGHT))
+
+
+ONLY = os.environ.get("ONLY")   # ONLY=meadow re-cuts one asset; sources live in different places
+if ONLY in (None, "button"): build_button()
+if ONLY in (None, "tiles"):  build_tiles(CALM=float(os.environ.get("CALM", "0.75")))
+if ONLY in (None, "meadow"): build_meadow(NIGHT=float(os.environ.get("NIGHT", "0.55")))
 for f in sorted(os.listdir(OUT)):
     print("   %-16s %6.1f KB" % (f, os.path.getsize(OUT + "/" + f) / 1024))
