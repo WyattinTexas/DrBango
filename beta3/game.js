@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.5.0';
+const BUILD = 'STARSPELL v0.5.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -1532,6 +1532,12 @@ function fitCanvas() {
   if (!c) return;
   c.style.width = window.innerWidth + 'px';
   c.style.height = window.innerHeight + 'px';
+  // We own the canvas CSS size (Scale.NONE), and Phaser caches the canvas bounding rect to
+  // map pointer coords into game space. It must be told after we change that rect or
+  // displayScale stays 1 while the canvas is really 1/DPR of the back-buffer — every tap
+  // then lands at a third of where it should and nothing is clickable. Latent until the
+  // ?art=1 deferred boot ran ssBoot() after document-complete and flipped the order.
+  if (game.scale) game.scale.refresh();
 }
 // Textures are built inside the first scene's create(), so the art has to be decoded before
 // Phaser starts. Capped at 2.5s — a slow or dead image never blocks the game, it just falls
@@ -1548,6 +1554,7 @@ SSNET.connect().then(() => { });
 let resizeTo = null;
 let lastRW = window.innerWidth, lastRH = window.innerHeight;
 window.addEventListener('resize', () => {
+  if (!game) return;   // ?art=1 boots after the art decodes; a resize before that is a no-op
   game.scale.resize(Math.round(window.innerWidth * DPR), Math.round(window.innerHeight * DPR));
   fitCanvas();
   // iOS Safari fires resize when the URL bar collapses (height-only, ~50-115px)
