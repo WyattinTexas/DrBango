@@ -2727,7 +2727,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.30</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.31</div>
   <div class="scanlines"></div>
 </div>
 
@@ -35908,7 +35908,7 @@ function renderMenu(){
   // saved [dx,dy] and deterministic ids (#rspot-/#rtag-<mv>), so every
   // innerHTML rebuild — every buy, every payout — repaints the room exactly
   // the way its owner arranged it, and a mid-gesture rebuild self-heals by id.
-  const spots=ROOM_SPOTS.map(sp=>{
+  const spots=ROOM_SPOTS.filter(sp=>!(sp.id==='tv'&&STEAM_SHELL)).map(sp=>{   // v3.31: the TV's invisible tap door leaves with its art — no dead target on the Steam floor
     const d=sp.mv? rpXY(sp.mv) : [0,0];
     // v2.45: a label may now answer EMPTY for a state with nothing to say
     // (the beaten rival) — computed once, and an empty answer renders no tag,
@@ -36069,6 +36069,21 @@ function piggyHop(){
 // the exact API both cards converge on: a future SDK adapter replaces the
 // placeholder BEHIND these three members and every caller keeps working. The
 // seam never touches stars — granting is the caller's job, on completed only.
+// ===== v3.31 THE STEAM STAND-DOWN (jumpr 0271; V3.17 of design/mp-guardrails-
+// 0811/03-MAX-DUAL-TRACK-0811.md) — Valve's ad rules ban ad-supported business
+// models AND any reward for watching an ad, and the Steam store copy already
+// promises no ads, so inside the Steam shell the WHOLE module stands down: no
+// TV in the room (art AND spot row — an asleep set would be a dead tap
+// target), no break at any gate, and the seam resolves instantly as finished
+// if anything ever calls it (the never-reject law). Detection is the UA token
+// ONLY — shell/steam/main.js appends " GVTShell-Steam/1.0" — and NEVER
+// window.webkit / the Android globals (those are the mobile billing bridges;
+// an Electron window has neither, and both prove nothing about Steam). Read
+// ONCE at boot; rig-readable as GVT.ads().steam. The ADQ counters keep
+// ticking exactly as everywhere else (a mixed squad's other seats must see
+// identical cadence arithmetic) — only the SHOWS stand down, which is also
+// why the AD_* dials stay untouched. =====
+const STEAM_SHELL=(()=>{ try{ return /GVTShell-Steam/.test(navigator.userAgent); }catch(e){ return false; } })();
 const AD_SECS=5;      // the placeholder show's length (DIAL)
 const TV_STARS=30;    // what the set pays, once a day (DIAL)
 let AD=null;          // the live show {t, iv, resolve} — session-only, never persisted
@@ -36093,6 +36108,7 @@ const ADS={
   provider:'placeholder',
   rewardedAvailable(){ return !AD; },   // the placeholder always has fill — false only mid-show
   showRewarded(){
+    if(STEAM_SHELL) return Promise.resolve({completed:true});   // v3.31: no theater on Steam, ever — resolve as finished so any caller's launch continues (showInterstitial rides this same door)
     if(AD) return Promise.resolve({completed:false});   // re-entry is a no-pay no-op, never a second show
     return new Promise(res=>{
       AD={ t:AD_SECS, iv:0, resolve:res };
@@ -36170,6 +36186,7 @@ function tvArt(on,o){
   return s;
 }
 function tvSVG(){
+  if(STEAM_SHELL) return '';   // v3.31: no set on Steam at all — not even asleep (its ROOM_SPOTS row stands down with it; the pocket is bare floor, nothing reflows)
   const on=tvArmed();
   return '<g id="tvSet" transform="translate(352,424)">'
     +tvArt(on,{clip:'tvclip'})
@@ -36260,7 +36277,7 @@ function adGate(kind, launch){
     ADQ.games++;
     const idx= kind==='camp'? ++ADQ.camp : ++ADQ.bf;
     const every= kind==='camp'? AD_CAMP_EVERY : AD_BF_EVERY;
-    brk= !free && every>0 && (idx%every)===0;
+    brk= !STEAM_SHELL && !free && every>0 && (idx%every)===0;   // v3.31: Steam never breaks — the counters above still tick (mixed-shell law)
   }catch(e){ brk=false; }             // the gate may fail — the game may not (fail-safe law)
   if(brk){
     // two-arg then: even a misbehaving future adapter that REJECTS (the
@@ -36310,7 +36327,7 @@ function squadAdGate(launch){
     // screen (the iPad-suspend prune) nulls S.coop, and the finished squad
     // game it latched must still pay its due break on the way out.
     const sq=!!((S.bf&&S.bf.sqAdT)||(S.sq&&S.sq.sqAdT));
-    brk= !live && sq && AD_SQUAD_EVERY>0 && ADQ.squad>0
+    brk= !STEAM_SHELL && !live && sq && AD_SQUAD_EVERY>0 && ADQ.squad>0
        && (ADQ.squad%AD_SQUAD_EVERY)===0 && ADQ.sqPaid!==ADQ.squad;
     if(brk) ADQ.sqPaid=ADQ.squad;       // one break per due game, however many exits race
   }catch(e){ brk=false; }               // the gate may fail — the exit may not (fail-safe law)
@@ -40184,7 +40201,7 @@ requestAnimationFrame(frame);
 // ================= DEBUG API =================
 window.GVT = {
   // ---- ADS V1a rig (v2.60): gates + dials, deterministic for batteries ----
-  ads(){ return { sess:Object.assign({},ADQ), free:AD_FREE_GAMES, camp:AD_CAMP_EVERY, bf:AD_BF_EVERY,
+  ads(){ return { steam:STEAM_SHELL, sess:Object.assign({},ADQ), free:AD_FREE_GAMES, camp:AD_CAMP_EVERY, bf:AD_BF_EVERY,
     squad:AD_SQUAD_EVERY,   // v2.82: the post-game squad cadence dial
     live:(()=>{ try{ return !!AD; }catch(e){ return false; } })(),
     int:typeof ADS.showInterstitial==='function', rw:typeof ADS.showRewarded==='function' }; },
