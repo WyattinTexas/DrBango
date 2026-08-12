@@ -34,6 +34,11 @@ What the script handles that a manual crop would not:
 - **The button's drop shadow is cropped off** on purpose. Buttons scale 1.03 on hover and
   1.08 on the launch bloom and drop to alpha 0.45 when disabled; a baked shadow grows,
   shifts and goes translucent with them.
+- **Game-side (v0.6.1):** consumers display buttons at ~3.2:1–6.5:1 while the painting is
+  1.8:1, so `ssBtn()` in game.js bakes an aspect-correct 9-slice per display size —
+  corners at true proportions, braid runs mirror-tiled (alternate tiles flipped so the
+  pattern joins at the cuts), only the plain face stretched. Slice maths are in integer
+  device pixels: fractional boundaries antialias into bright hairline seams.
 
 What the meadow cut handles (`art/meadow.png`, v0.6.0):
 

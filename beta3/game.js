@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.6.0';
+const BUILD = 'STARSPELL v0.6.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -172,8 +172,9 @@ function ssMakeTextures(scene) {
     c.beginPath(); c.roundRect(8, 8, 240, 240, 18); c.stroke();
   }, R);
   // Painted buttons are authored 627x344, so the slot is 256x140 rather than the procedural
-  // 256x96 — that keeps the frame's vertical detail instead of pre-squashing it. Safe because
-  // every consumer sizes with setDisplaySize, which works off the frame.
+  // 256x96 — that keeps the frame's vertical detail instead of pre-squashing it. Actual
+  // button consumers go through ssBtn(), which bakes an aspect-correct 9-slice per display
+  // size; this base texture remains for anything that grabs 'btn' directly.
   if (ARTON) {
     mk('btn', 256, 140, (c, w, h) => { c.drawImage(SSART.img.btn, 0, 0, w, h); }, R);
     mk('btndark', 256, 140, (c, w, h) => { c.drawImage(SSART.img.btndark, 0, 0, w, h); }, R);
@@ -201,6 +202,70 @@ function ssMakeTextures(scene) {
 // one is dark navy — every gold-button label has to flip with it.
 const BTN_INK = () => (ART && SSART.ready ? '#f4e6bd' : '#4a3305');
 const BTN_INK2 = () => (ART && SSART.ready ? '#c9b48a' : '#7a6535');
+
+// Button texture for a given display size. The painted source is 627x344 but consumers
+// display buttons anywhere from ~3.2:1 to ~6.5:1, and a flat stretch smears the braided
+// frame corners ~3x wide. So under ?art=1 each aspect gets its own baked 9-slice
+// ('btn@300x58', created on demand): corners keep the painting's proportions, the braid
+// runs are mirror-tiled (alternate tiles flipped so the pattern joins seamlessly at the
+// cuts) rather than stretched, and only the plain face stretches. Baking beats Phaser's
+// NineSlice object here because that object is WebGL-only and the game boots Phaser.AUTO.
+// The procedural path keeps the shared 'btn'/'btndark' — its plain rounded rect never
+// minded the stretch.
+function ssBtn(scene, dark, w, h) {
+  const base = dark ? 'btndark' : 'btn';
+  if (!(ART && SSART.ready)) return base;
+  const key = base + '@' + w + 'x' + h;
+  if (scene.textures.exists(key)) return key;
+  const img = SSART.img[base], sw = img.width, sh = img.height;
+  const R = ssTexRes(scene);
+  // All dest maths in integer DEVICE pixels: at R=3 the slice boundaries land on
+  // fractions otherwise (corner height 18.5u = 55.5px), and the antialiased edges
+  // of adjacent draws let the background peek through as bright hairline seams.
+  const W = Math.round(w * R), H = Math.round(h * R);
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context;
+  const cs = 110;                                     // source corner block, > the 96px rim radius
+  const s = H / sh;                                   // uniform frame scale follows height
+  const CW = Math.min(Math.round(cs * s), Math.floor(W * 0.33));  // corner dest (capped: never collide)
+  const CH = Math.round(cs * s);
+  const mx = sw - 2 * cs, my = sh - 2 * cs;           // source middle spans
+  // corners — the only pieces drawn at the painting's own aspect
+  c.drawImage(img, 0, 0, cs, cs, 0, 0, CW, CH);
+  c.drawImage(img, sw - cs, 0, cs, cs, W - CW, 0, CW, CH);
+  c.drawImage(img, 0, sh - cs, cs, cs, 0, H - CH, CW, CH);
+  c.drawImage(img, sw - cs, sh - cs, cs, cs, W - CW, H - CH, CW, CH);
+  // horizontal braid runs — mirror-tiled at the corner scale (alternate tiles are
+  // flipped so the pattern joins seamlessly at the cuts), never stretched
+  const tileX = (sy, dy) => {
+    const tw = Math.max(1, Math.round(mx * s));
+    for (let x = CW, i = 0; x < W - CW; x += tw, i++) {
+      const dw = Math.min(tw, W - CW - x), sW = (dw / tw) * mx;
+      c.save();
+      if (i % 2) { c.translate(x + dw, 0); c.scale(-1, 1); c.drawImage(img, cs + mx - sW, sy, sW, cs, 0, dy, dw, CH); }
+      else c.drawImage(img, cs, sy, sW, cs, x, dy, dw, CH);
+      c.restore();
+    }
+  };
+  tileX(0, 0); tileX(sh - cs, H - CH);
+  // vertical braid runs — same treatment
+  const tileY = (sx, dx) => {
+    const th = Math.max(1, Math.round(my * s));
+    for (let y = CH, i = 0; y < H - CH; y += th, i++) {
+      const dh = Math.min(th, H - CH - y), sH = (dh / th) * my;
+      c.save();
+      if (i % 2) { c.translate(0, y + dh); c.scale(1, -1); c.drawImage(img, sx, cs + my - sH, cs, sH, dx, 0, CW, dh); }
+      else c.drawImage(img, sx, cs, cs, sH, dx, y, CW, dh);
+      c.restore();
+    }
+  };
+  tileY(0, 0); tileY(sw - cs, W - CW);
+  // the face — plain navy with a soft vignette; a stretch keeps the vignette whole
+  // where tiling would repeat its speckle clusters
+  c.drawImage(img, cs, cs, mx, my, CW, CH, W - 2 * CW, H - 2 * CH);
+  t.refresh();
+  return key;
+}
 
 function ssStarfield(scene, count) {
   const W = scene.scale.width, H = scene.scale.height;
@@ -541,7 +606,7 @@ function ssLayout(scene) {
 function ssAchToast(scene, def) {
   const l = ssLayout(scene);
   const c = scene.add.container(l.x(0), l.y(-40)).setDepth(400);
-  const bg = scene.add.image(0, 0, 'btn').setDisplaySize(l.u(300), l.u(58));
+  const bg = scene.add.image(0, 0, ssBtn(scene, false, 300, 58)).setDisplaySize(l.u(300), l.u(58));
   const t1 = ssTxt(scene, 0, -l.u(10), '✦ ' + def.name + ' ✦', l.u(15), BTN_INK()).setOrigin(0.5);
   const t2 = ssTxt(scene, 0, l.u(12), def.desc, l.u(10), BTN_INK2(), 'italic').setOrigin(0.5);
   c.add([bg, t1, t2]);
@@ -596,7 +661,7 @@ class Home extends Phaser.Scene {
       { y: 692, label: 'PROFILE', sub: null, fn: () => { SFX.ui(); this.scene.start('profile'); }, dark: true },
     ];
     for (const r of rows) {
-      const b = ui(this.add.image(l.x(0), l.y(r.y), r.dark ? 'btndark' : 'btn').setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true }));
+      const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.sub ? 58 : 46)).setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true }));
       ui(ssTxt(this, l.x(0), l.y(r.y - (r.sub ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
       if (r.sub) ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5));
       b.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
@@ -842,7 +907,7 @@ class Battle extends Phaser.Scene {
       y: l.y(556) + (Math.floor(i / 4) - 1.5) * (this.tileSize + this.tileGap),
     });
 
-    this.castB = this.add.image(l.x(70), l.y(754), 'btn').setDisplaySize(l.u(180), l.u(56)).setInteractive({ useHandCursor: true });
+    this.castB = this.add.image(l.x(70), l.y(754), ssBtn(this, false, 180, 56)).setDisplaySize(l.u(180), l.u(56)).setInteractive({ useHandCursor: true });
     this.castT = txt(l.x(70), l.y(754), 'CAST', 20, BTN_INK()).setOrigin(0.5)
       .setShadow(0, l.u(1), ART && SSART.ready ? '#2a1c05' : '#ffe9b0', l.u(1));
     this.castB.on('pointerdown', () => this.tryCast());
@@ -1306,7 +1371,7 @@ class Battle extends Phaser.Scene {
 
     let by = 470;
     if (this.mode === 'daily') {
-      const share = this.add.image(l.x(0), l.y(by), 'btndark').setDisplaySize(l.u(220), l.u(52)).setInteractive({ useHandCursor: true });
+      const share = this.add.image(l.x(0), l.y(by), ssBtn(this, true, 220, 52)).setDisplaySize(l.u(220), l.u(52)).setInteractive({ useHandCursor: true });
       const shareT = ssTxt(this, l.x(0), l.y(by), '✶ SHARE TODAY\'S HUNT', l.u(14), '#9fb0e8').setOrigin(0.5);
       items.push(share, shareT);
       share.on('pointerdown', () => {
@@ -1323,9 +1388,9 @@ class Battle extends Phaser.Scene {
       });
       by += 66;
     }
-    const again = this.add.image(l.x(0), l.y(by + 10), 'btn').setDisplaySize(l.u(220), l.u(58)).setInteractive({ useHandCursor: true });
+    const again = this.add.image(l.x(0), l.y(by + 10), ssBtn(this, false, 220, 58)).setDisplaySize(l.u(220), l.u(58)).setInteractive({ useHandCursor: true });
     const againT = ssTxt(this, l.x(0), l.y(by + 10), won || this.mode !== 'campaign' ? 'NEW RUN' : 'TRY AGAIN', l.u(18), BTN_INK()).setOrigin(0.5);
-    const homeB = this.add.image(l.x(0), l.y(by + 78), 'btndark').setDisplaySize(l.u(220), l.u(50)).setInteractive({ useHandCursor: true });
+    const homeB = this.add.image(l.x(0), l.y(by + 78), ssBtn(this, true, 220, 50)).setDisplaySize(l.u(220), l.u(50)).setInteractive({ useHandCursor: true });
     const homeT = ssTxt(this, l.x(0), l.y(by + 78), 'HOME', l.u(14), '#9fb0e8').setOrigin(0.5);
     items.push(again, againT, homeB, homeT);
     again.on('pointerdown', () => { SFX.ui(); this.scene.restart({ mode: this.mode, resume: null }); });
