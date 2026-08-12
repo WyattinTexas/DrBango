@@ -2746,7 +2746,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.35</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.36</div>
   <div class="scanlines"></div>
 </div>
 
@@ -17921,18 +17921,28 @@ const FDEF = {
   rollpig: { hp:29, spd:40.5, bounty:130,  leak:5, w:112, boss:true, splashCd:1.1, splashR:78 }, // fast rush — tumbles in and splashes your line flat. v2.71 (Wyatt 8/7): spd ×0.75 ('slow the piggies in all levels by 25%') + 50 more dog tags on the kill. v3.29 (Wyatt 8/11 eve): hp 44→29 — 'The smaller piggy banks nerf by 15 HP'; the base cell is the one door every spawn reads (his own spd-cut law), so the nerf rides every level through spawnFoe's boss hpm
   gpig:    { hp:16, spd:54.7, bounty:200,  leak:5, w:224, boss:true, splashCd:1.1, splashR:108 }, // 8/8 GIANT PIGGY (Wyatt): ×1.35 the pig's pace, DOUBLE his size, +50% hp, 200 dog tags; splash ring scaled with the body (my call, one cell). v3.29 (Wyatt 8/11 eve): hp 66→16 — 'The giant piggy banks need to be nerfed by 50'; ⚠ the giant now carries LESS base hp than the runaway (16 vs 29) — a glass cannon at every level, his ruling taken literally; one cell to redial
   rex:     { hp:66, spd:33, bounty:110, leak:6, w:122, boss:true, stompCd:2.0, stompR:100 },   // the bruiser — huge HP, AoE stomp
-  // ===== v3.33 TP-02 THE YETI PARK CAST — small/big yetis THROW SNOWBALLS on
-  // the tan hitscan (rng/fireCd = the throw; the knock is the same v1.32
-  // casualty every tan round deals), the tiny blue piggies just RUSH (no rng
-  // — the officer law: they never shoot; their whole threat is the leak),
-  // the snowman lobs from further back. The three mini-bosses and KING YETI
-  // ride the giant's one-big-shot branch (YETI_SHOOTERS at parkCfg) — a
-  // hurled BIG snowball that fells the nearest man whole. All fixed-colour
-  // (no currentColor), so no tint/rim bucket needs a row.
-  syeti:   { hp:3,  spd:46, bounty:6,  leak:1, w:46,  rng:120, fireCd:3.4 },
-  byeti:   { hp:8,  spd:33, bounty:16, leak:2, w:66,  rng:150, fireCd:3.0, elite:true },
+  // ===== v3.33 TP-02 THE YETI PARK CAST — reworked 0274a v3.36 (Wyatt's
+  // 8/12 playtest): the SNOWMAN is the ranged one now, "a further ranged
+  // rifleman" — rng 240 out-throws the 198 rifle duel and the tansniper 205
+  // (under Abominable 356 / tanmortar 404), so he opens FIRST as the line
+  // closes; his lobbed ball CHIPS instead of felling (chip:4 — the 4th
+  // unturned hit puts a man down; the seam lives in tanHit). The small/big
+  // yetis STOPPED THROWING — snowballs belong to snowmen — and POUNCE
+  // instead (the pounce bag on a non-boss row IS updateFoePounce's whole
+  // licence, the 0117 capability law: one airborne attack hop onto a man
+  // inside aggro, ONE unrolled knock at contact, chain to the next —
+  // tansarge's saber core re-molded); rng-less they ride the officer-law
+  // march for free. The tiny blue piggies just RUSH (no rng — their whole
+  // threat is the leak). The three mini-bosses and KING YETI still ride the
+  // giant's one-big-shot branch (YETI_SHOOTERS at parkCfg) — a hurled BIG
+  // snowball that fells the nearest man whole. All fixed-colour (no
+  // currentColor), so no tint/rim bucket needs a row. ⚠ the campaign
+  // ABOMINABLE is FDEF.yeti above — his 356 gun, his bounds and his no-leak
+  // carve-out are his own row's and stay byte-untouched.
+  syeti:   { hp:3,  spd:46, bounty:6,  leak:1, w:46,  pounce:{aggro:150, leap:460, swing:0.9} },
+  byeti:   { hp:8,  spd:33, bounty:16, leak:2, w:66,  elite:true, pounce:{aggro:150, leap:380, swing:1.2} },
   bluepig: { hp:4,  spd:56, bounty:10, leak:1, w:44 },
-  snowfig: { hp:5,  spd:30, bounty:12, leak:1, w:52,  rng:170, fireCd:3.6 },
+  snowfig: { hp:5,  spd:30, bounty:12, leak:1, w:52,  rng:240, fireCd:3.6, chip:4 },
   yetiboss1:{ hp:60, spd:26, bounty:80, leak:4, w:92,  rng:170, fireCd:3.2, boss:true },
   yetiboss2:{ hp:90, spd:24, bounty:100,leak:4, w:104, rng:180, fireCd:3.0, boss:true },
   yetiboss3:{ hp:70, spd:28, bounty:90, leak:4, w:96,  rng:175, fireCd:2.9, boss:true },
@@ -26398,6 +26408,29 @@ function tanHit(u,fx,fy,src){
     if(dM>1 && Math.random()<dM-1) return;
     if(dM<1 && Math.random()<1-dM) u.hits++;
   }
+  // ===== 0274a THE CHIP LAW (Wyatt 8/12: snowballs "don't deal too much
+  // damage. It should take them like four shots to kill an average
+  // rifleman") — a landed snowball no longer spends a grit pip: it CHIPS
+  // its OWN ledger. Every turn-out above already had its say (jet, TK
+  // wall, plate, commander, duck, blade, the worn ±armor roll — a TURNED
+  // ball counts NOTHING); an unturned hit bumps u.snowN with a white
+  // flinch, and the chip-th (src.def.chip) hit calls knock rolled=true —
+  // the v1.19 double-roll law: this ball already rolled past the blade up
+  // there. The grit ledger and its 4s recovery clock never hear a snowball
+  // (no pip, no hitT reset — chips never heal; four shots is literal).
+  // MEN ONLY: a green machine keeps the whole grit path below (armour
+  // doesn't flinch). The dino spitter keeps his felling pips — no chip
+  // cell on his row — until Wyatt says port (§15's scope line).
+  if(src && src.def && src.def.chip && !(u.def&&u.def.vehicle)){
+    u.snowN=(u.snowN||0)+1;
+    if(u.snowN>=src.def.chip){ knock(u,fx,fy,true); }
+    else {
+      S.fx.push({k:'ring',x:u.x,y:u.y-22,r:4,R:20,t:0,dur:0.22,col:'rgba(255,255,255,0.9)'});
+      S.fx.push({k:'puff',x:u.x,y:u.y-26,t:0,dur:0.3,R:13});
+      bfSfx(SFX.thock, u.x, u.y);
+    }
+    return;
+  }
   // v2.51 (Wyatt 8/5: the MG "takes 20% less damage from riflemen"): a tan
   // rifle round into the M.GUNNER counts 0.8 of a pip — DETERMINISTIC (no
   // roll, so twenty co-op sims agree): 3 grit = 4 rifle rounds, intake ×0.8
@@ -26641,6 +26674,58 @@ function updateFoeSaber(f,dt){
   if(d>4){ f.x+=dx/d*sb.ret*dt; f.y+=dy/d*sb.ret*dt; }
   else { f.saberState='idle'; f.saberTarget=null; }
 }
+// ===== 0274a THE MUNCHKIN POUNCE (Wyatt 8/12: "they hop right to you and
+// hit for pretty high damage before hopping on to the next target") —
+// updateFoeSaber's out/chain core re-molded for the park's small yetis.
+// idle→out on a man inside pounce.aggro (foeSaberNext's own filter — dead/
+// dragged/cloaked/jetting men respected); the close is ONE airborne attack
+// hop at pounce.leap px/s — f.hopZ lifts the BODY only (the v2.53 channel),
+// so he stays TARGETABLE mid-leap: rifles get their say, no immunity
+// frames; contact ≤26 lands ONE UNROLLED knock (the v1.32 casualty IS
+// "pretty high damage"; the funnel's outs — jet/plate/shield/blade — keep
+// their say, one roll per strike); swing recovery; then the CHAIN to the
+// next man inside aggro (foeSaberNext verbatim). Chain dry → straight back
+// to 'idle' and the march resumes — NO back-state, no home/ret: yetis are
+// marchers, not station-keepers (tansarge keeps his own return trip). His
+// feet are held meanwhile by the pounce-steal branch + stall twin in the
+// march chain. His death mid-leap: hitCheck splices him, no dangling state
+// — the tansarge law verbatim.
+function updateFoePounce(f,dt){
+  const pb=f.def.pounce; if(!pb) return;
+  if(!f.pounceState) f.pounceState='idle';
+  if(f.pounceState==='idle'){
+    if(f.burrow) return;   // a guerrilla under the rug pounces on nobody
+    const best=foeSaberNext(f,pb.aggro);
+    if(best){ f.pounceState='out'; f.pounceTarget=best; f.pounceD0=Math.max(1,Math.hypot(best.x-f.x,best.y-f.y)); }
+    return;
+  }
+  // 'out' — the attack hop (the only other state; chain-dry lands on 'idle')
+  const u=f.pounceTarget;
+  const gone = !u || u.dead || S.units.indexOf(u)<0 || (S.drag&&S.drag.unit===u);
+  if(gone){
+    const nx=foeSaberNext(f,pb.aggro);   // denied his man — hop onto the next instead
+    if(nx){ f.pounceTarget=nx; f.pounceD0=Math.max(1,Math.hypot(nx.x-f.x,nx.y-f.y)); return; }
+    f.pounceState='idle'; f.pounceTarget=null; f.hopZ=0; return;
+  }
+  f.pounceSwing=(f.pounceSwing||0)-dt;
+  const dx=u.x-f.x, dy=u.y-f.y, d=Math.hypot(dx,dy);
+  if(d>26){
+    f.x+=dx/d*pb.leap*dt; f.y+=dy/d*pb.leap*dt;
+    const p=Math.max(0,Math.min(1,1-d/f.pounceD0));
+    f.hopZ=f.def.w*0.5*4*p*(1-p);   // the hop's own arc — presentation only (drawFoe's v2.53 body lift; targeting reads the ground)
+  } else {
+    f.hopZ=0;
+    if(f.pounceSwing<=0){
+      knock(u, f.x, f.y);   // UNROLLED — one roll per strike, inside the funnel (the v1.19 law)
+      S.fx.push({k:'ring',x:f.x,y:f.y-14,r:6,R:44,t:0,dur:0.26,col:'#EAF4FF'});
+      bfSfx(SFX.thock, f.x, f.y);
+      f.pounceSwing=pb.swing;
+      const nx=foeSaberNext(f,pb.aggro);   // anyone else in reach? hop right onto him
+      if(nx){ f.pounceTarget=nx; f.pounceD0=Math.max(1,Math.hypot(nx.x-f.x,nx.y-f.y)); return; }
+      f.pounceState='idle'; f.pounceTarget=null;   // chain dry — the march resumes
+    }
+  }
+}
 // 0117: the radioman's reach gift rides here — every tan reach reader already
 // funnels through this one door, so the aura costs one factor and no caller
 function frng(f){ return f.def.rng*(f.rngAura||1); }
@@ -26697,15 +26782,22 @@ function tanShoot(f){
     }
     return true;
   }
-  if(best){ (f.type==='tanmg'?SFX.mg:f.type==='tansniper'?SFX.crack:SFX.tpew)();
+  if(best){ (f.def.chip?SFX.blip:f.type==='tanmg'?SFX.mg:f.type==='tansniper'?SFX.crack:SFX.tpew)();   // 0274a: a snowball leaves on a soft boop, not a rifle pew
     if(f.type==='tanmg') f.mgRootT=MG_ROOT;   // v2.44 THE ROOTED BURST, tan side — the aimed round AND both chased rounds land here, so the burst re-arms the root round by round; the movement freeze reads it beside aimT
     // v2.28: the duck blocks the TAN line too — he is neutral chaos, not a
     // green ally. Same segment tanHit's tracer draws (their muzzle to the
     // chest), so the round visibly dies on the toy; a blocked round rolls
     // NO save (it never arrived — the plate, blade and grit never hear it).
+    // 0274a: a CHIP thrower's round flies as a lobbed white ball instead of
+    // the straight tracer (k:'snowb' — tanmortar's arc precedent at small
+    // scale), whether it lands or dies on the duck. Post-hoc presentation
+    // like every tracer in the game — the hit itself stays hitscan.
     const dkb=duckBlock(f.x-14,f.y-26,best.x,best.y-18);
-    if(dkb){ S.fx.push({k:'tracer',x1:f.x-14,y1:f.y-26,x2:dkb.x,y2:dkb.y,t:0,dur:0.1,col:'#EDD9A8'}); duckBlockFx(dkb); }
-    else tanHit(best,f.x,f.y,f);   // v2.51: the shooter rides along — the MG's rifle-resist reads it
+    if(dkb){ if(f.def.chip) S.fx.push({k:'snowb',x1:f.x-14,y1:f.y-26,x2:dkb.x,y2:dkb.y,t:0,dur:0.16});
+      else S.fx.push({k:'tracer',x1:f.x-14,y1:f.y-26,x2:dkb.x,y2:dkb.y,t:0,dur:0.1,col:'#EDD9A8'});
+      duckBlockFx(dkb); }
+    else { if(f.def.chip) S.fx.push({k:'snowb',x1:f.x-14,y1:f.y-26,x2:best.x,y2:best.y-20,t:0,dur:0.22});
+      tanHit(best,f.x,f.y,f); }   // v2.51: the shooter rides along — the MG's rifle-resist reads it (0274a: and the chip seam)
     return true; }
   return false;
 }
@@ -30396,6 +30488,13 @@ function update(dt){
       // dead zone. hasGreenTarget asks reach only (no dead-zone filter), so
       // a man UNDER the tube still pins him here: a 2-hp statue that cannot
       // shoot — the mortar's authored weakness, by construction.
+    } else if(f.pounceState && f.pounceState!=='idle'){
+      // 0274a: a munchkin mid-pounce — the attack hop owns his feet
+      // (updateFoePounce, wired beside the per-type tests below), and it
+      // outranks the formation slot: a pouncing yeti leaves his rank and
+      // rejoins the march when the chain dries (the slot's own ×1.8
+      // catch-up spring walks him back). The saber-steal idiom, one shelf
+      // up so a FORM member can pounce at all.
     } else if(f.form){
       const fo=f.form, o=f.off;
       // v1.60: the slot's world target folds onto the rug band — a wheeling
@@ -30459,6 +30558,12 @@ function update(dt){
       // v1.38: a dash away from the crate is not "no ground gained" — without
       // this reset the stall watch reads his lunge as a stall and flips him
       // into a cosmetic squeeze at 2.5s (the v1.15 idiom, foe-side)
+      f.best=null; f.stall=0;
+    }
+    else if(f.pounceState && f.pounceState!=='idle'){
+      // 0274a: a leap away from the crate is not "no ground gained" either —
+      // the saber twin's own law for the munchkins (formless-pouncer cover;
+      // a form member already rides the f.form reset above)
       f.best=null; f.stall=0;
     }
     else if(f.type==='mom'){
@@ -30593,6 +30698,12 @@ function update(dt){
               if(Math.hypot(g.x-u.x,g.y-u.y)<TANK_AOE) knock(g,u.x,u.y); } } }
       }
     }
+    // 0274a THE MUNCHKIN POUNCE — the park's small yetis leap the way their
+    // finale captain dashes (updateFoeSaber's little sibling). The pounce
+    // bag on a non-boss row IS the licence — the 0117 capability law, so a
+    // new pouncer can never sit unfielded — and the on-carpet gate mirrors
+    // the boss section's: nobody pounces off the walk-on lane.
+    if(f.def.pounce && !f.boss && f.x<W-10) updateFoePounce(f,dt);
     // ===== BOSS attacks (only once they're on the carpet) =====
     if(f.boss && f.x<W-10){
       f.shot+=dt;
@@ -32731,6 +32842,11 @@ function draw(){
   for(const e of S.fx){
     const k=e.t/e.dur;
     if(e.k==='tracer'){ cx.globalAlpha=(1-k)*(e.a||1); cx.strokeStyle=e.col||'#FFF3C4'; cx.lineWidth=e.w||2.5; cx.beginPath(); cx.moveTo(e.x1,e.y1); cx.lineTo(e.x2,e.y2); cx.stroke(); cx.globalAlpha=1; }
+    else if(e.k==='snowb'){ // 0274a: the lobbed snowball — white ball, slate rim (reads on snow AND carpet), tanmortar's arc at small scale
+      const ah=18+0.05*Math.hypot(e.x2-e.x1,e.y2-e.y1);
+      const px=e.x1+(e.x2-e.x1)*k, py=e.y1+(e.y2-e.y1)*k-ah*4*k*(1-k);
+      cx.fillStyle='#FFFFFF'; cx.strokeStyle='rgba(46,62,84,0.8)'; cx.lineWidth=1.5;
+      cx.beginPath(); cx.arc(px,py,3.6,0,7); cx.fill(); cx.stroke(); }
     else if(e.k==='flash'){ // muzzle / impact star: long spikes along the shot, short ones across it
       cx.globalAlpha=1-k; const R=e.R*(0.55+0.75*k);
       cx.fillStyle='#FFF6D0'; cx.beginPath(); cx.arc(e.x,e.y,R*0.4,0,7); cx.fill();
@@ -33787,6 +33903,25 @@ function drawFoe(f){
   // lie flat and read fine)
   if(snowField()){ cx.fillStyle='rgba(74,90,120,0.30)';
     cx.beginPath(); cx.ellipse(f.x,f.y-1,f.def.vehicle? f.def.w*0.34 : 15,f.def.vehicle? 7 : 5,0,0,7); cx.fill(); }
+  if(f.def.pounce){
+    // 0274a THE MUNCHKIN HOP (Wyatt: "all the yetis hop around like a bunch
+    // of little munchkins") — PRESENTATION ONLY: the bob rides f.x (the
+    // ground truth) scaled by live speed, so a halted yeti stands flat
+    // instead of hanging mid-air, and sim x/y never move here (the spd
+    // cells are byte-untouched — assert Δx/Δt against them, not this).
+    // The landing squash breathes at each hop's foot; the pounce leap
+    // arrives via f.hopZ, the v2.53 body-lift channel (shadow and contact
+    // circle stay on the ground). syeti = quick munchkin hops, byeti =
+    // heavy bounds — hopH/λ are the two presentation dials.
+    const hopH=f.type==='syeti'?7:10, lam=f.type==='syeti'?26:40;
+    const mv=Math.min(1,Math.hypot(f.vx||0,f.vy||0)/18);
+    const ph=Math.abs(Math.sin(Math.PI*f.x/lam+(f.id%7)*0.9));
+    const bob=(f.pounceState==='out')?0:hopH*ph*mv;
+    const sq=(f.pounceState==='out'||ph>0.3)?0:(1-ph/0.3)*0.14*mv;
+    cx.save(); cx.translate(f.x,f.y); cx.scale(1+sq*0.8,1-sq);
+    drawSprite(f.type,0,-(f.hopZ||0)-bob,f.def.w,0,wob,foeImg(f.type));
+    cx.restore();
+  } else
   drawSprite(f.type,f.x,f.y-(f.hopZ||0),f.def.w,0,wob,foeImg(f.type));   // v2.53: the yeti's bound lifts the BODY only — his shadow stays on the ground where the contact circle lives
   // 0117 THE SNIPER'S TELL — the fairness contract for the 205 reach: a long
   // aim (def.aim >= 1) draws its line for the whole wind-up, pointed at the
