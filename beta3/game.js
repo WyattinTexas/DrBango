@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.11.2';
+const BUILD = 'STARSPELL v0.12.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -235,6 +235,16 @@ function ssMakeTextures(scene) {
 // one is dark navy — every gold-button label has to flip with it.
 const BTN_INK = () => (ART && SSART.ready ? '#f4e6bd' : '#4a3305');
 const BTN_INK2 = () => (ART && SSART.ready ? '#c9b48a' : '#7a6535');
+
+// Time until the next daily, worded by the current language. Minutes round UP
+// so the label never sits on "0m" — it reads 1m, then the sky turns over.
+// Each language owns cdHM/cdH/cdM: ja wants no space, de wants 'Std', fr spaces 'min'.
+function ssCountdown(ms) {
+  const mins = Math.max(1, Math.ceil(ms / 60000));
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (!h) return SS_T('cdM', m);
+  return m ? SS_T('cdHM', h, m) : SS_T('cdH', h);   // "1h", not "1h 0m"
+}
 
 // Button texture for a given display size. The painted source is 627x344 but consumers
 // display buttons anywhere from ~3.2:1 to ~6.5:1, and a flat stretch smears the braided
@@ -924,18 +934,20 @@ class Home extends Phaser.Scene {
 
     // buttons
     const ck = this.campaignCheckpoint();
-    const today = SS.prof.daily[String(SSNET.dayKey())];
     const rows = [
       { y: 420, label: ck ? SS_T('cont') + '  ·  ' + SS_ACTS[ck.actIdx].name.split('·')[0].trim() : SS_T('campaign'), sub: ck ? SS_T('fightN', ck.fightIdx % 5 + 1) : SS_T('campaignSub'), fn: () => this.startMode('campaign') },
       { y: 488, label: SS_T('quick'), sub: SS_T('quickSub'), fn: () => this.startMode('quick') },
-      { y: 556, label: SS_T('daily'), sub: today ? SS_T('dailyAgain', today) : SS_T('dailySub'), fn: () => this.startMode('daily') },
+      { y: 556, label: SS_T('daily'), sub: this.dailySub(), key: 'daily', fn: () => this.startMode('daily') },
       { y: 624, label: SS_T('board'), sub: null, fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
       { y: 692, label: SS_T('profile'), sub: null, fn: () => { SFX.ui(); this.scene.start('profile'); }, dark: true },
     ];
     for (const r of rows) {
       const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.sub ? 58 : 46)).setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true }));
       ui(ssTxt(this, l.x(0), l.y(r.y - (r.sub ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
-      if (r.sub) ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5));
+      if (r.sub) {
+        const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5));
+        if (r.key === 'daily') this.dailySubT = sub;
+      }
       b.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
       b.on('pointerover', () => b.setScale(b.scaleX * 1.03, b.scaleY * 1.03));
       b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)));
@@ -951,6 +963,12 @@ class Home extends Phaser.Scene {
     // language switcher — opposite the mute toggle; opens the sheet of native names
     this.langB = ui(ssTxt(this, l.x(195), l.y(784), '🌐', l.u(14)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
     this.langB.on('pointerdown', () => this.langSheet());
+
+    // the daily's countdown has to keep moving while the home screen sits open.
+    // Ticking also carries the label across midnight UTC on its own: dayKey()
+    // moves, today's score stops matching, and the sub falls back to the
+    // "unplayed" wording for the new sky without a reload.
+    this.time.addEvent({ delay: 15000, loop: true, callback: () => this.refreshDailySub() });
 
     this.input.once('pointerdown', () => SFX.ensure());
     this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
@@ -973,6 +991,16 @@ class Home extends Phaser.Scene {
     DIAG(BUILD + ' · ' + (this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas') + ' ' + this.game.scale.width + 'x' + this.game.scale.height + ' dprCap ' + DPR);
     if (QS.get('vsdemo') === '1') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
     else if (DEMO || QS.get('daily') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? 'quick' : 'daily'));
+  }
+  // Subtitle under DAILY HUNT. Unplayed, it invites and shows how long the sky
+  // stays up; played, it shows today's score and when the next one lands.
+  dailySub() {
+    const cd = ssCountdown(SSNET.msToNextDay());
+    const done = SS.prof.daily[String(SSNET.dayKey())];
+    return done ? SS_T('dailyDone', done, cd) : SS_T('dailyOpen', cd);
+  }
+  refreshDailySub() {
+    if (this.dailySubT && this.dailySubT.active) this.dailySubT.setText(this.dailySub());
   }
   // the language sheet — a parchment list of native names. Picking one rewrites
   // ?lang= and reloads: strings.js saves the choice, and every string plus the

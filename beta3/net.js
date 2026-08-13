@@ -123,7 +123,9 @@ const SSNET = (() => {
   // playing, and sweeps their live board out from under them.
   // Rollover is 00:00 UTC — 7pm CDT, 1am BST, 9am JST.
   function dayKey(d) {
-    d = d || new Date();
+    // via Date.now() so the whole clock surface (dayKey, msToNextDay) reads
+    // one source — identical in production, and freezable as a pair in tests
+    d = d || new Date(Date.now());
     return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
   }
   // dayKey as an ISO date, so anything user-facing (share text, countdowns)
