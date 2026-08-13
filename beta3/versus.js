@@ -462,7 +462,7 @@ class VsBattle extends Phaser.Scene {
     this.layoutLine();
   }
   currentWord() { return this.sel.map((i) => this.board[i].ch).join(''); }
-  validWord() { const w = this.currentWord(); return this.sel.length >= 3 && WORDSET.has(w); }
+  validWord() { const w = this.currentWord(); return this.sel.length >= 2 && WORDSET.has(w); }
   layoutLine() {
     const l = this.L;
     for (const t of this.lineTiles) t.destroy();

@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.10.0';
+const BUILD = 'STARSPELL v0.11.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -58,7 +58,7 @@ for (const [ch, n] of Object.entries({ e: 12, a: 9, i: 9, o: 8, n: 6, r: 6, t: 6
   for (let i = 0; i < n; i++) BAG.push(ch);
 }
 const VOWELS = 'aeiou';
-const LEN_MULT = [0, 0, 0, 1, 1.15, 1.35, 1.6, 1.9, 2.3];
+const LEN_MULT = [0, 0, 0.6, 1, 1.15, 1.35, 1.6, 1.9, 2.3];
 const SERIF = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
 
 /* ============================================================
@@ -1325,7 +1325,7 @@ class Battle extends Phaser.Scene {
     const n = this.sel.length;
     this.lineHint.setAlpha(n ? 0 : 0.9);
     const word = this.currentWord();
-    const valid = n >= 3 && WORDSET.has(word);
+    const valid = n >= 2 && WORDSET.has(word);
     const sz = l.u(44), gap = l.u(6);
     const w = n * sz + (n - 1) * gap;
     this.sel.forEach((bi, k) => {
@@ -1447,7 +1447,7 @@ class Battle extends Phaser.Scene {
     if (this.state !== 'pick') return;
     const word = this.currentWord();
     const l = this.L;
-    if (this.sel.length < 3 || !WORDSET.has(word)) {
+    if (this.sel.length < 2 || !WORDSET.has(word)) {
       SFX.invalid();
       this.cameras.main.shake(120, 0.004);
       this.tweens.add({ targets: this.lineC, x: this.lineC.x + l.u(8), duration: 50, yoyo: true, repeat: 3, onComplete: () => this.lineC.setX(l.x(0)) });
@@ -1787,7 +1787,7 @@ class Battle extends Phaser.Scene {
     const used = new Array(tiles.length).fill(false);
     const pick = [];
     const dive = (node) => {
-      if (node.$ && pick.length >= 3) {
+      if (node.$ && pick.length >= 2) {
         const dmg = this.wordDamage(pick.map((k) => tiles[k].s));
         if (dmg > bestScore) { bestScore = dmg; best = pick.map((k) => tiles[k].i); }
       }
