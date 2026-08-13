@@ -2980,7 +2980,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.47</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.48</div>
   <div class="scanlines"></div>
 </div>
 
@@ -16675,10 +16675,14 @@ window.GVTN = {
   appleSignIn(){ try{ webkit.messageHandlers.gvtSign.postMessage({cmd:'apple_signin'}); }catch(e){} },
   _appleResult(r){
     if(!r||!r.ok){ S.floats.push({x:W/2,y:150,txt:'SIGN-IN CANCELED',t:0,col:'#D96A55'}); return; }
+    // 0286: the shell's identityToken rides to HQ, which verifies Apple's own
+    // signature now — a bare sub no longer opens the account door. An old
+    // shell build relays no token, so HQ refuses and the float below answers;
+    // nothing else about that install changes (identity rides the device id).
     netFetch(NET+'/link',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({device:META.deviceId,provider:'apple',sub:r.sub,name:r.name||META.name})})
+      body:JSON.stringify({device:META.deviceId,provider:'apple',sub:r.sub,idToken:r.idToken||'',name:r.name||META.name})})
       .then(x=>x.json()).then(d=>{
-        if(!d.ok) return;
+        if(!d.ok){ S.floats.push({x:W/2,y:150,txt:'SIGN-IN CANCELED',t:0,col:'#D96A55'}); return; }
         META.account='apple';
         if(d.name) META.name=d.name;
         META.starsLifetime=Math.max(META.starsLifetime,d.stars||0);
