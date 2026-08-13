@@ -3012,7 +3012,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.54</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.55</div>
   <div class="scanlines"></div>
 </div>
 
@@ -22262,18 +22262,41 @@ function bfQueueStart(size,opts){
 // proven seams — bfqDeployNow's members>1 branch on the host, the room's own
 // state flip plus bfqMirrorWatch's corpse watch on the guest. Nobody pays a
 // second break: the door tap already paid (CREW.bfPaid marks the guest free).
+// ═══ 0291 CADENCE UNDER SERVER COMMAND (FM-GVT-GUARD-01 §9 + audit M5) ═══
+// Every poll-family answer may carry `nx` = the commanded next-beat ms
+// (class default × the box's pressure multiplier; battle relays stretch only
+// at P2+). The five network timers honor it as a RATIO of the server's class
+// default, clamped [×1, ×NX_CAP_MUL]: the floor is the shipped beat (a
+// corrupt value can never speed the fleet up), the cap is ×4 (a corrupt
+// value can never park a class). At P0 the ratio is 1 and every beat is
+// byte-what-it-was; a stretched beat breathes ±20% (the v2.95 anti-phase-
+// lock idiom, floored at the class default) so a commanded fleet never
+// marches in step. Old client + new server: the key is ignored; new client +
+// old server: no key, ratio 1 — Law 7 both ways.
+// COMPOSITION (audit M5): hidden/idle beats are already the stretched form —
+// pressure never multiplies them (0292's worker beats consume nx themselves);
+// the server clamps every commanded nx to ≤½ the stale/TTL window its poll
+// keeps alive, so the brake can never evict the seats it protects. The three
+// party-gone strings stay sacred: a stretch is a longer wait, never a miss.
+let GVT_CV='3.55';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
+function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
+  return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
+function nxBeat(def,nx,srvDef){ const m=nxMul(nx,srvDef); if(m<=1) return def;
+  return Math.max(def, Math.round(def*m*(0.8+0.4*Math.random()))); }   // ±20%, floored at the shipped beat
 function bfSeekPost(body){
   return netFetch(NET+'/bf/seek',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(Object.assign({device:META.deviceId},body||{}))}).then(r=>r.json());
+    body:JSON.stringify(Object.assign({device:META.deviceId, cv:GVT_CV},body||{}))}).then(r=>r.json());
 }
 function bfSeekTick(){
   const q=BFQ, s=q&&q.seek; if(!s || s.busy) return;
   if(s.st==='pool'){
     if(Date.now()>s.until){ bfSeekBail(); return; }
-    if(Date.now()-(s.last||0)<2000) return;
+    if(Date.now()-(s.last||0)<(s.nxMs||2000)) return;   // 0291: the commanded stride
     s.last=Date.now(); s.busy=true;
     bfSeekPost({}).then(r=>{ s.busy=false;
       if(!BFQ || BFQ!==q || BFQ.seek!==s || s.st!=='pool') return;
+      if(r&&r.nx){ s.nx=r.nx|0; s.nxMs=nxBeat(2000, s.nx, 2000); }   // 0291
       if(r&&r.ok&&r.room) bfSeekGuest(r);
       else if(r&&r.ok&&r.host) bfSeekHost(r);
       // wait (or a miss) just keeps the window running
@@ -22594,7 +22617,7 @@ function coopFam(){ return coopRoom()? '/room/' : coopSquad()? '/lobby/' : '/coo
 function coopPost(ep,body,fam){
   fam = fam || coopFam();
   return netFetch(NET+fam+ep,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(Object.assign({device:META.deviceId, me:coopMe()},body||{}))}).then(r=>r.json());
+    body:JSON.stringify(Object.assign({device:META.deviceId, me:coopMe(), cv:GVT_CV},body||{}))}).then(r=>r.json());
 }
 function coopFresh(ui,mode){
   // ⚠ v1.37: 'squad' is the default family now — the campaign's one friends
@@ -22604,6 +22627,7 @@ function coopFresh(ui,mode){
            pc:1, seatHex:{}, level:0, state:'idle', ui:ui||'idle', seq:0,
            outQ:[], cnt:1, pollT:0, busy:false, lastSeen:0, ended:false, wantBattle:false,
            mateHex:null, misses:0, mrev:null, qT0:Date.now(),
+           nx:0, nxD:2000,   // 0291: last commanded beat + the server-class default it was scaled from
            // room only: the table settings, and which chair you took
            team:META.bfTeam||1, map:bfMapResolve(META.bfMap), side:'y', slot:0, wantSide:null, wantTeam:0 };   // v2.41: a party never holds 'random' — the draw is made here
 }
@@ -22618,7 +22642,7 @@ function coopTick(){
   // first clean reply snaps it back to cadence. Cap ×4: a lobby chair is only
   // held 45s, so even five straight misses keep the seat warm.
   COOP.pollT=setTimeout(coopTick,
-    (S.coop? 1000 : 2000)*Math.min(4, 1+(COOP.misses||0)*0.5) + Math.random()*250);
+    nxBeat(S.coop? 1000 : 2000, COOP.nx, COOP.nxD||2000)*Math.min(4, 1+(COOP.misses||0)*0.5) + Math.random()*250);   // 0291: commanded base — misses/jitter unchanged
   if(COOP.busy) return;
   // ⚠ v1.37: A REPLY MAY ONLY TOUCH THE PARTY THAT SENT ITS REQUEST. A poll
   // already in flight when you leave one party and join another lands on the
@@ -22690,6 +22714,7 @@ function coopTick(){
     if(COOP!==forParty) return; COOP.busy=false;
     if(!r||!r.ok){ coopMiss(r); return; }
     COOP.misses=0;
+    if(r.nx){ COOP.nx=r.nx|0; COOP.nxD=(r.state==='battle')?1000:2000; }   // 0291
     COOP.outQ.splice(0, sending.length);       // delivered — safe to drop
     if(sentSide && COOP.wantSide===sentSide) COOP.wantSide=null;
     if(sentTeam && COOP.wantTeam===sentTeam) COOP.wantTeam=0;
@@ -23838,10 +23863,10 @@ function sqCatchUp(n){
 // state to engineer around — it is turned straight back into an offer to
 // challenge them back, which is the thing the kid wanted anyway.
 const DUEL_POLL=12000;                      // HQ only, and only while you're in it
-let DUEL={ inbox:[], sent:[], pollT:0, busy:false, sig:'' };
+let DUEL={ inbox:[], sent:[], pollT:0, busy:false, sig:'', nx:0 };   // 0291: nx = last commanded beat
 function duelPost(ep,body){
   return netFetch(NET+'/duel/'+ep,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(Object.assign({device:META.deviceId},body||{}))}).then(r=>r.json());
+    body:JSON.stringify(Object.assign({device:META.deviceId, cv:GVT_CV},body||{}))}).then(r=>r.json());
 }
 function duelSig(){ return DUEL.inbox.map(x=>x.frm+':'+x.code).join('|'); }
 function duelStop(){ clearTimeout(DUEL.pollT); DUEL.pollT=0; }
@@ -23851,7 +23876,7 @@ function duelStop(){ clearTimeout(DUEL.pollT); DUEL.pollT=0; }
 function duelTick(){
   duelStop();
   if(S.mode!=='menu') return;               // never poll from inside a battle
-  DUEL.pollT=setTimeout(duelTick, DUEL_POLL);
+  DUEL.pollT=setTimeout(duelTick, nxBeat(DUEL_POLL, DUEL.nx, DUEL_POLL));   // 0291
   // v2.95 (load-audit F4): a hidden tab keeps the clock but skips the wire —
   // an idle HQ in a background tab was a write txn on the box every 12s.
   if(document.hidden) return;
@@ -23861,6 +23886,7 @@ function duelTick(){
     DUEL.busy=false;
     if(!r||!r.ok) return;
     DUEL.inbox=r.inbox||[]; DUEL.sent=r.sent||[];
+    if(r.nx) DUEL.nx=r.nx|0;   // 0291
     crewInvSync(r.crewInv);   // v2.63: squad invites ride the poll the menu already makes
     const sig=duelSig();
     if(sig!==DUEL.sig){
@@ -23899,7 +23925,7 @@ function duelChipHTML(){
 // /gvt/crew traffic (invites ride the duel/list poll the menu already makes);
 // and the public queue's theater stays THEATER — the only real thing that can
 // ever happen inside it is a real squadmate taking a real chair.
-let CREW={ crew:null, members:[], invites:[], wt:[], pinv:[], me:null, busy:false, pollT:0, sig:'',   // wt = v3.09 the battlefield-menu rail (strangers standing at this door) · pinv = v3.20 party invites (card 06)
+let CREW={ crew:null, members:[], invites:[], wt:[], pinv:[], me:null, busy:false, pollT:0, nx:0, sig:'',   // wt = v3.09 the battlefield-menu rail (strangers standing at this door) · pinv = v3.20 party invites (card 06)
   campGo:null, leadFired:null, autoBf:null,     // v2.69 one-click guards: the go-wish lobby, the lobby already ordered, the room already auto-joined
   gatedLaunch:0, adPend:false, campLaunch:null, campLaunchT:0,     // v2.70: paid-my-gate flag · mate's ad in flight · the boom-launch pending lobby + its clock
   bfPaid:null, bfAdPend:null, bfGo:null,     // v2.81: the pulled chair's BF break — paid room · break in flight · flip-landed-mid-battle
@@ -23985,7 +24011,7 @@ function gsiCred(resp){
 }
 function crewPost(ep,body){
   return netFetch(NET+'/crew/'+ep,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(Object.assign({device:META.deviceId},body||{}))}).then(r=>r.json());
+    body:JSON.stringify(Object.assign({device:META.deviceId, cv:GVT_CV},body||{}))}).then(r=>r.json());
 }
 function campSceneOpen(){ const cs=document.getElementById('campscene'); return !!(cs && !cs.classList.contains('hidden')); }
 // a cancelled party leaves an IDLE SHELL behind (coopCancel resets, never
@@ -24049,7 +24075,7 @@ function crewSt(){
 function crewTickLone(){
   const owe=!!CREW.lastSt;
   if(!wartableOpen() && !campSceneOpen() && !parkSceneOpen() && !raidSceneOpen() && !owe) return;   // nothing to say, nothing owed — the door kick restarts us (v3.39: all three campaign-family doors speak)
-  CREW.pollT=setTimeout(crewTick, 2500);
+  CREW.pollT=setTimeout(crewTick, nxBeat(2500, CREW.nx, 2500));   // 0291
   if(document.hidden) return;
   if(CREW.busy) return;
   if(S.mode!=='menu'){ if(owe){ CREW.lastSt=''; crewPost('poll',{st:'',info:{}}).catch(()=>{}); } return; }
@@ -24060,6 +24086,7 @@ function crewTickLone(){
     CREW.busy=false;
     if(!r||!r.ok) return;
     CREW.lastSt=st;
+    if(r.nx) CREW.nx=r.nx|0;   // 0291
     if(r.me) CREW.me=r.me;
     if(r.crew && r.crew.code){
       // squadded while I stood here (an accepted invite, a link merge) —
@@ -24094,7 +24121,7 @@ function crewTick(){
   clearTimeout(CREW.pollT);
   if(!META.crew && !CREW.crew){ crewTickLone(); return; }   // v3.09: the battlefield menu is the ONE screen a squadless player speaks on (the rail) — silent everywhere else, by law
   const fast=(BFQ&&BFQ.crewRoom)||campSceneOpen()||wartableOpen();   // v2.81: the war table is a squad door too — the pull must land inside the fill window
-  CREW.pollT=setTimeout(crewTick, fast?2500:5000);
+  CREW.pollT=setTimeout(crewTick, nxBeat(fast?2500:5000, CREW.nx, 2500));   // 0291: both branches, one ratio
   // v2.95 (load-audit F4): hidden tab = not really at HQ. The clock keeps
   // ticking, the wire goes quiet, and presence lapsing to idle is the TRUTH.
   if(document.hidden) return;
@@ -24120,6 +24147,7 @@ function crewTick(){
     CREW.busy=false;
     if(!r||!r.ok) return;
     CREW.lastSt=st.st;   // v2.83 LAW 1: what the squad last heard — the farewell's due-bill
+    if(r.nx) CREW.nx=r.nx|0;   // 0291
     if(r.me) CREW.me=r.me;
     if(r.crew){
       CREW.crew=r.crew; CREW.members=r.members||[];
@@ -46620,6 +46648,15 @@ window.GVT = {
   adSess(p){ Object.assign(ADQ,p||{}); return Object.assign({},ADQ); },
   adCfg(p){ p=p||{}; if(p.free!=null) AD_FREE_GAMES=p.free; if(p.camp!=null) AD_CAMP_EVERY=p.camp;
     if(p.bf!=null) AD_BF_EVERY=p.bf; if(p.squad!=null) AD_SQUAD_EVERY=p.squad; return GVT.ads(); },
+  // ---- 0291 CADENCE rig: commanded beats, dials and cv — read-only (beats
+  // re-roll their ±20% breath per call; assert on bands, never equality) ----
+  nx(){ return { cv:GVT_CV, capMul:NX_CAP_MUL,
+    crew:CREW.nx|0, coop:COOP? (COOP.nx|0):0, coopD:COOP? (COOP.nxD|0):0,
+    duel:DUEL.nx|0, seek:(BFQ&&BFQ.seek)? (BFQ.seek.nx|0):0,
+    beat:{ crewFast:nxBeat(2500,CREW.nx,2500), crewSlow:nxBeat(5000,CREW.nx,2500),
+           coop:COOP? nxBeat(S.coop?1000:2000, COOP.nx, COOP.nxD||2000):0,
+           duel:nxBeat(DUEL_POLL,DUEL.nx,DUEL_POLL),
+           seek:(BFQ&&BFQ.seek&&BFQ.seek.nxMs)||2000 } }; },
   // ---- LOCALIZATION RIG ----
   i18n(){ const n={}; for(const k in TR) n[k]=Object.keys(TR[k]).length;
     return { lang:LANG, script:langDef(LANG).script, cfont:CFONT, langs:LANGS.map(l=>l.id), sizes:n }; },
