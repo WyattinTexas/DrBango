@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.11.0';
+const BUILD = 'STARSPELL v0.11.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -1255,7 +1255,7 @@ class Battle extends Phaser.Scene {
   }
   modeTitle() {
     if (this.mode === 'campaign') return SS_ACTS[this.fights[this.run.fightIdx].actIdx].name;
-    if (this.mode === 'daily') return '☀ DAILY HUNT · ' + SSNET.dayKey();
+    if (this.mode === 'daily') return '☀ DAILY HUNT · ' + SSNET.dayKeyISO();
     return 'QUICK PLAY';
   }
 
@@ -1739,8 +1739,7 @@ class Battle extends Phaser.Scene {
       const shareT = ssTxt(this, l.x(0), l.y(by), '✶ SHARE TODAY\'S HUNT', l.u(14), '#9fb0e8').setOrigin(0.5);
       items.push(share, shareT);
       share.on('pointerdown', () => {
-        const d = new Date();
-        const txt = 'STARSPELL Daily ' + d.toISOString().slice(0, 10) + '\n' +
+        const txt = 'STARSPELL Daily ' + SSNET.dayKeyISO() + '\n' +
           '✶ ' + score + ' pts · ' + this.run.fightIdx + '/' + this.fights.length + ' beasts\n' +
           '❦ finest word: ' + (this.run.longest || '—').toUpperCase() + '\n' +
           'https://drbango.com/beta3/?daily=1';

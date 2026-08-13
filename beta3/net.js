@@ -61,7 +61,14 @@ const SSNET = (() => {
     return [n, parts[parts.length - 1]];
   }
   function localGet(path) { const [n, k] = lwalk(ltree(), path, false); return n ? (n[k] == null ? null : n[k]) : null; }
-  function localSet(path, v) { const t = ltree(); const [n, k] = lwalk(t, path, true); n[k] = v; lsave(t); }
+  // set(null) is the delete idiom everywhere in this codebase (pruneBoards,
+  // versus room cleanup), and RTDB removes the node outright — so drop the key
+  // rather than leaving a null behind, or Object.keys() readers still see it.
+  function localSet(path, v) {
+    const t = ltree(); const [n, k] = lwalk(t, path, true);
+    if (v === null) delete n[k]; else n[k] = v;
+    lsave(t);
+  }
 
   // ---- adapter ----
   async function dbGet(path) {
@@ -108,9 +115,28 @@ const SSNET = (() => {
   }
 
   // ---- keys ----
+  // Both keys are UTC. The daily seeds the board (setSeed(dayKey) in Battle),
+  // so a local-time key would hand Tokyo a given day's sky ~16h before Los
+  // Angeles — "one sky, shared by all" only holds if the whole planet turns
+  // over at once. It also keeps pruneBoards honest: with local keys a client
+  // in UTC+14 reads "today" as a date that clients in UTC-11 are still
+  // playing, and sweeps their live board out from under them.
+  // Rollover is 00:00 UTC — 7pm CDT, 1am BST, 9am JST.
   function dayKey(d) {
     d = d || new Date();
-    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+    return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+  }
+  // dayKey as an ISO date, so anything user-facing (share text, countdowns)
+  // can never drift from the key that actually chose the puzzle
+  function dayKeyISO(k) {
+    k = k || dayKey();
+    const s = String(k);
+    return s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6, 8);
+  }
+  // ms until the next daily drops
+  function msToNextDay(now) {
+    const t = (now == null ? Date.now() : now);
+    return 86400000 - (((t % 86400000) + 86400000) % 86400000);
   }
   function weekKey(d) {
     d = d || new Date();
@@ -135,13 +161,15 @@ const SSNET = (() => {
     } catch (e) { }
   }
   // housekeeping: old day/week boards would pile up forever — sweep them
-  // as we pass by (keep today+yesterday, this week+last week). Once/session.
+  // as we pass by (this week+last week). Once/session.
+  // Days keep a 3-deep window rather than 2: any client can delete any board,
+  // so a device with a day-fast clock would otherwise wipe the live one.
   let sweptBoards = false;
   async function pruneBoards() {
     if (sweptBoards) return;
     sweptBoards = true;
     try {
-      const keepDays = [dayKey(), dayKey(new Date(Date.now() - 86400000))].map(String);
+      const keepDays = [0, 1, 2].map((n) => String(dayKey(new Date(Date.now() - n * 86400000))));
       const keepWeeks = [weekKey(), weekKey(new Date(Date.now() - 7 * 86400000))];
       const days = (await dbGet('daily').catch(() => null)) || {};
       for (const k of Object.keys(days)) if (!keepDays.includes(k)) dbSet('daily/' + k, null).catch(() => { });
@@ -171,5 +199,5 @@ const SSNET = (() => {
   // raw ref for live listeners (multiplayer); null when offline/local
   function ref(path) { return mode === 'firebase' && fdb ? fdb.ref(NS + '/' + path) : null; }
 
-  return { connect, uid, myName, setName, submitScore, getBoard, syncProfile, dayKey, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, get mode() { return mode; } };
+  return { connect, uid, myName, setName, submitScore, getBoard, syncProfile, dayKey, dayKeyISO, msToNextDay, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, get mode() { return mode; } };
 })();
