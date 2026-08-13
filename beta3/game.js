@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.12.0';
+const BUILD = 'STARSPELL v0.13.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -939,8 +939,11 @@ class Home extends Phaser.Scene {
       { y: 488, label: SS_T('quick'), sub: SS_T('quickSub'), fn: () => this.startMode('quick') },
       { y: 556, label: SS_T('daily'), sub: this.dailySub(), key: 'daily', fn: () => this.startMode('daily') },
       { y: 624, label: SS_T('board'), sub: null, fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
-      { y: 692, label: SS_T('profile'), sub: null, fn: () => { SFX.ui(); this.scene.start('profile'); }, dark: true },
+      // PROFILE moved to the chip up in the corner, which frees this row for
+      // VERSUS — it is a play mode, so it gets a real button like the rest.
+      { y: 692, label: SS_T('versus'), sub: SS_T('versusSub'), key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
     ];
+    this.rowBtns = {};
     for (const r of rows) {
       const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.sub ? 58 : 46)).setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true }));
       ui(ssTxt(this, l.x(0), l.y(r.y - (r.sub ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
@@ -948,14 +951,23 @@ class Home extends Phaser.Scene {
         const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5));
         if (r.key === 'daily') this.dailySubT = sub;
       }
+      if (r.key) this.rowBtns[r.key] = b;
       b.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
       b.on('pointerover', () => b.setScale(b.scaleX * 1.03, b.scaleY * 1.03));
       b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)));
     }
-    // versus
-    const vs = ui(ssTxt(this, l.x(0), l.y(742), SS_T('versus'), l.u(13), '#9fb0e8').setOrigin(0.5).setInteractive({ useHandCursor: true }));
-    vs.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); SFX.ui(); this.scene.start('vsmenu'); });
-    this.tweens.add({ targets: vs, alpha: 0.65, duration: 1400, yoyo: true, repeat: -1 });
+    // Profile chip — the stargazer's name, up in the corner on the same line as
+    // every other scene's back link. Long or non-Latin names are trimmed to the
+    // chip rather than sized to it, so the pill keeps one baked texture.
+    const CW = 152, CH = 30;
+    const chip = this.profileChip = ui(this.add.image(l.x(195), l.y(26), ssBtn(this, true, CW, CH))
+      .setDisplaySize(l.u(CW), l.u(CH)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }));
+    const chipT = ui(ssTxt(this, l.x(195 - CW / 2), l.y(26), '✦ ' + SSNET.myName(), l.u(11), '#9fb0e8').setOrigin(0.5));
+    let nm = SSNET.myName();
+    while (chipT.width > l.u(CW - 18) && nm.length > 2) { nm = nm.slice(0, -1); chipT.setText('✦ ' + nm + '…'); }
+    chip.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); SFX.ui(); this.scene.start('profile'); });
+    chip.on('pointerover', () => chip.setScale(chip.scaleX * 1.04, chip.scaleY * 1.04));
+    chip.on('pointerout', () => chip.setDisplaySize(l.u(CW), l.u(CH)));
 
     ui(ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5));
     this.muteB = ui(ssTxt(this, l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));

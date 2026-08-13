@@ -19,7 +19,7 @@ const SS_STR = {
     daily: 'DAILY HUNT', dailyOpen: 'one sky, shared by all · %1 left',
     dailyDone: 'today: %1 · next sky in %2', cdHM: '%1h %2m', cdH: '%1h', cdM: '%1m',
     board: 'LEADERBOARD', profile: 'PROFILE',
-    versus: '⚔  VERSUS — duel beneath the stars  ⚔',
+    versus: '⚔ VERSUS ⚔', versusSub: 'duel beneath the stars',
   },
   es: {
     rotate: 'gira el teléfono en vertical para jugar',
@@ -31,7 +31,7 @@ const SS_STR = {
     daily: 'CAZA DIARIA', dailyOpen: 'un mismo cielo para todos · quedan %1',
     dailyDone: 'hoy: %1 · nuevo cielo en %2', cdHM: '%1 h %2 min', cdH: '%1 h', cdM: '%1 min',
     board: 'CLASIFICACIÓN', profile: 'PERFIL',
-    versus: '⚔  VERSUS — duelo bajo las estrellas  ⚔',
+    versus: '⚔ VERSUS ⚔', versusSub: 'duelo bajo las estrellas',
   },
   fr: {
     rotate: 'tourne ton téléphone à la verticale pour jouer',
@@ -43,7 +43,7 @@ const SS_STR = {
     daily: 'CHASSE DU JOUR', dailyOpen: 'un même ciel, partagé par tous · %1 restant',
     dailyDone: 'aujourd’hui : %1 · prochain ciel dans %2', cdHM: '%1 h %2 min', cdH: '%1 h', cdM: '%1 min',
     board: 'CLASSEMENT', profile: 'PROFIL',
-    versus: '⚔  VERSUS — duel sous les étoiles  ⚔',
+    versus: '⚔ VERSUS ⚔', versusSub: 'duel sous les étoiles',
   },
   pt: {
     rotate: 'gire o celular na vertical para jogar',
@@ -55,7 +55,7 @@ const SS_STR = {
     daily: 'CAÇADA DIÁRIA', dailyOpen: 'um só céu, de todos · faltam %1',
     dailyDone: 'hoje: %1 · novo céu em %2', cdHM: '%1 h %2 min', cdH: '%1 h', cdM: '%1 min',
     board: 'PLACAR', profile: 'PERFIL',
-    versus: '⚔  VERSUS — duelo sob as estrelas  ⚔',
+    versus: '⚔ VERSUS ⚔', versusSub: 'duelo sob as estrelas',
   },
   de: {
     rotate: 'dreh dein Handy ins Hochformat, um zu spielen',
@@ -67,7 +67,7 @@ const SS_STR = {
     daily: 'TAGESJAGD', dailyOpen: 'ein Himmel, geteilt mit allen · noch %1',
     dailyDone: 'heute: %1 · neuer Himmel in %2', cdHM: '%1 Std %2 Min', cdH: '%1 Std', cdM: '%1 Min',
     board: 'BESTENLISTE', profile: 'PROFIL',
-    versus: '⚔  VERSUS — Duell unter Sternen  ⚔',
+    versus: '⚔ VERSUS ⚔', versusSub: 'Duell unter Sternen',
   },
   ja: {
     rotate: 'タテ画面にして遊んでね',
@@ -79,7 +79,7 @@ const SS_STR = {
     daily: 'デイリーハント', dailyOpen: 'ひとつの空を、みんなで · 残り%1',
     dailyDone: '今日: %1 · 次の空まで%2', cdHM: '%1時間%2分', cdH: '%1時間', cdM: '%1分',
     board: 'ランキング', profile: 'プロフィール',
-    versus: '⚔  VS — 星空の下の決闘  ⚔',
+    versus: '⚔ VS ⚔', versusSub: '星空の下の決闘',
   },
   ko: {
     rotate: '세로 화면으로 돌려서 플레이하세요',
@@ -91,7 +91,7 @@ const SS_STR = {
     daily: '오늘의 사냥', dailyOpen: '모두가 함께 보는 하나의 하늘 · %1 남음',
     dailyDone: '오늘: %1 · 다음 하늘까지 %2', cdHM: '%1시간 %2분', cdH: '%1시간', cdM: '%1분',
     board: '리더보드', profile: '프로필',
-    versus: '⚔  VS — 별빛 아래 결투  ⚔',
+    versus: '⚔ VS ⚔', versusSub: '별빛 아래 결투',
   },
   zh: {
     rotate: '请竖屏游玩',
@@ -103,7 +103,7 @@ const SS_STR = {
     daily: '每日狩猎', dailyOpen: '同一片星空，人人共享 · 剩余%1',
     dailyDone: '今日: %1 · 距下一片星空%2', cdHM: '%1小时%2分', cdH: '%1小时', cdM: '%1分',
     board: '排行榜', profile: '个人资料',
-    versus: '⚔  对战 — 星空下的决斗  ⚔',
+    versus: '⚔ 对战 ⚔', versusSub: '星空下的决斗',
   },
   hi: {
     rotate: 'खेलने के लिए फ़ोन को सीधा करें',
@@ -115,7 +115,7 @@ const SS_STR = {
     daily: 'दैनिक शिकार', dailyOpen: 'एक आकाश, सबका साझा · %1 शेष',
     dailyDone: 'आज: %1 · अगला आकाश %2 में', cdHM: '%1 घं %2 मि', cdH: '%1 घं', cdM: '%1 मि',
     board: 'लीडरबोर्ड', profile: 'प्रोफ़ाइल',
-    versus: '⚔  वर्सस — तारों तले द्वंद्व  ⚔',
+    versus: '⚔ वर्सस ⚔', versusSub: 'तारों तले द्वंद्व',
   },
   ar: {
     rotate: 'أدر هاتفك عموديًا للعب',
@@ -127,7 +127,7 @@ const SS_STR = {
     daily: 'صيد اليوم', dailyOpen: 'سماء واحدة يتشاركها الجميع · يتبقى %1',
     dailyDone: 'اليوم: %1 · السماء التالية بعد %2', cdHM: '%1 س %2 د', cdH: '%1 س', cdM: '%1 د',
     board: 'لوحة الصدارة', profile: 'الملف الشخصي',
-    versus: '⚔  مبارزة تحت النجوم  ⚔',
+    versus: '⚔ مبارزة ⚔', versusSub: 'تحت النجوم',
   },
 };
 
