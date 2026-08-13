@@ -173,9 +173,31 @@ def build_meadow(NIGHT=0.55, FEATHER=14):
     print("meadow.png  %dx%d  ridge y %d..%d (src), NIGHT %.2f" % (W, ch, ridge.min(), ridge.max(), NIGHT))
 
 
+# ---------------------------------------------------------------- WEBP
+def build_webp():
+    """The game loads .webp (art default-on since v0.10.0 — PNGs were 1.6 MB on
+    cellular). UI pieces go lossless (sharp rims dither under lossy); the meadow
+    painting is smooth gradients, where lossy q90 is visually clean at ~1/5th
+    the bytes. PNGs stay committed as the recut baseline — the button/tile
+    sources in ~/Downloads may be long gone."""
+    for f in sorted(os.listdir(OUT)):
+        if not f.endswith(".png"):
+            continue
+        im = Image.open(OUT + "/" + f)
+        dst = OUT + "/" + f[:-4] + ".webp"
+        if f.startswith("tile"):
+            im.save(dst, lossless=True, method=6)      # tiles are small and get tier-tinted: keep exact
+        elif f == "meadow.png":
+            im.save(dst, quality=90, method=6)
+        else:
+            im.save(dst, quality=92, method=6)         # buttons: painterly dust defeats lossless; q92 reads identical
+        print("   %-16s -> %-18s %6.1f KB" % (f, os.path.basename(dst), os.path.getsize(dst) / 1024))
+
+
 ONLY = os.environ.get("ONLY")   # ONLY=meadow re-cuts one asset; sources live in different places
 if ONLY in (None, "button"): build_button()
 if ONLY in (None, "tiles"):  build_tiles(CALM=float(os.environ.get("CALM", "0.75")))
 if ONLY in (None, "meadow"): build_meadow(NIGHT=float(os.environ.get("NIGHT", "0.55")))
+if ONLY in (None, "webp"):   build_webp()
 for f in sorted(os.listdir(OUT)):
     print("   %-16s %6.1f KB" % (f, os.path.getsize(OUT + "/" + f) / 1024))

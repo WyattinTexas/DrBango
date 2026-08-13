@@ -10,6 +10,7 @@
    ============================================================ */
 const SS_STR = {
   en: {
+    rotate: 'turn your phone upright to play',
     title: 'STARSPELL',
     tagline: 'weave words · fell the star-beasts',
     campaign: 'CAMPAIGN', campaignSub: 'three acts · one long night',
@@ -20,6 +21,7 @@ const SS_STR = {
     versus: '⚔  VERSUS — duel beneath the stars  ⚔',
   },
   es: {
+    rotate: 'gira el teléfono en vertical para jugar',
     title: 'STARSPELL',
     tagline: 'teje palabras · derriba a las bestias estelares',
     campaign: 'CAMPAÑA', campaignSub: 'tres actos · una larga noche',
@@ -30,6 +32,7 @@ const SS_STR = {
     versus: '⚔  VERSUS — duelo bajo las estrellas  ⚔',
   },
   fr: {
+    rotate: 'tourne ton téléphone à la verticale pour jouer',
     title: 'STARSPELL',
     tagline: 'tisse des mots · terrasse les bêtes stellaires',
     campaign: 'CAMPAGNE', campaignSub: 'trois actes · une longue nuit',
@@ -40,6 +43,7 @@ const SS_STR = {
     versus: '⚔  VERSUS — duel sous les étoiles  ⚔',
   },
   pt: {
+    rotate: 'gire o celular na vertical para jogar',
     title: 'STARSPELL',
     tagline: 'teça palavras · derrube as feras estelares',
     campaign: 'CAMPANHA', campaignSub: 'três atos · uma longa noite',
@@ -50,6 +54,7 @@ const SS_STR = {
     versus: '⚔  VERSUS — duelo sob as estrelas  ⚔',
   },
   de: {
+    rotate: 'dreh dein Handy ins Hochformat, um zu spielen',
     title: 'STARSPELL',
     tagline: 'webe Worte · fälle die Sternenbestien',
     campaign: 'KAMPAGNE', campaignSub: 'drei Akte · eine lange Nacht',
@@ -60,6 +65,7 @@ const SS_STR = {
     versus: '⚔  VERSUS — Duell unter Sternen  ⚔',
   },
   ja: {
+    rotate: 'タテ画面にして遊んでね',
     title: 'STARSPELL',
     tagline: '言葉を紡ぎ、星獣を討て',
     campaign: 'キャンペーン', campaignSub: '三幕・長き一夜',
@@ -70,6 +76,7 @@ const SS_STR = {
     versus: '⚔  VS — 星空の下の決闘  ⚔',
   },
   ko: {
+    rotate: '세로 화면으로 돌려서 플레이하세요',
     title: 'STARSPELL',
     tagline: '단어를 엮어 별짐승을 쓰러뜨려라',
     campaign: '캠페인', campaignSub: '3막 · 기나긴 하룻밤',
@@ -80,6 +87,7 @@ const SS_STR = {
     versus: '⚔  VS — 별빛 아래 결투  ⚔',
   },
   zh: {
+    rotate: '请竖屏游玩',
     title: 'STARSPELL',
     tagline: '编织词语 · 击落星兽',
     campaign: '战役', campaignSub: '三幕 · 一整夜',
@@ -90,6 +98,7 @@ const SS_STR = {
     versus: '⚔  对战 — 星空下的决斗  ⚔',
   },
   hi: {
+    rotate: 'खेलने के लिए फ़ोन को सीधा करें',
     title: 'STARSPELL',
     tagline: 'शब्द बुनो · तारा-दानवों को हराओ',
     campaign: 'अभियान', campaignSub: 'तीन अंक · एक लंबी रात',
@@ -100,6 +109,7 @@ const SS_STR = {
     versus: '⚔  वर्सस — तारों तले द्वंद्व  ⚔',
   },
   ar: {
+    rotate: 'أدر هاتفك عموديًا للعب',
     title: 'STARSPELL',
     tagline: 'انسج الكلمات · واصرع وحوش النجوم',
     campaign: 'الحملة', campaignSub: 'ثلاثة فصول · ليلة واحدة طويلة',

@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.9.0';
+const BUILD = 'STARSPELL v0.10.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -16,13 +16,16 @@ const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
 const QS = new URLSearchParams(location.search);
 const DEMO = QS.get('demo') === '1';
 
-/* ---- ?art=1 — painted art (buttons + letter tiles + meadow plate) --------
+/* ---- painted art (buttons + letter tiles + meadow plate), DEFAULT ON -----
    Everything else in this game is drawn to canvas at boot; these five files
-   are the only downloaded images. Buttons/tiles swap in at texture-build time
-   under the SAME texture keys, so nothing downstream changes; the meadow is a
-   landscape plate ssSkyWorld lays over the procedural ground. If any file
-   fails or is slow, ART stays off and the procedural art draws as before. */
-const ART = QS.get('art') === '1';
+   are the only downloaded images (webp, ~230 KB total — the PNGs were 1.5 MB,
+   which is why default-on waited for the conversion). Buttons/tiles swap in
+   at texture-build time under the SAME texture keys, so nothing downstream
+   changes; the meadow is a landscape plate ssSkyWorld lays over the
+   procedural ground. If any file fails, is slow, or the browser predates
+   webp, ART stays off and the procedural art draws as before — and ?art=0
+   forces that fallback for debugging. */
+const ART = QS.get('art') !== '0';
 const SSART = { ready: false, img: {} };
 function ssLoadArt() {
   const names = ['btn', 'btndark', 'tile_face', 'tile_over', 'meadow'];
@@ -30,7 +33,7 @@ function ssLoadArt() {
     const im = new Image();
     im.onload = () => { SSART.img[n] = im; res(true); };
     im.onerror = () => { DIAG('art MISSING ' + n); res(false); };
-    im.src = 'art/' + n + '.png?v=' + encodeURIComponent(BUILD);
+    im.src = 'art/' + n + '.webp?v=' + encodeURIComponent(BUILD);
   }))).then((r) => { SSART.ready = r.every(Boolean); DIAG('art ' + (SSART.ready ? 'loaded' : 'FAILED — procedural')); });
 }
 
