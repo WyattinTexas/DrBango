@@ -160,21 +160,25 @@ const SSNET = (() => {
       await dbTxn('weekly/' + weekKey() + '/' + me, rec);
     } catch (e) { }
   }
-  // housekeeping: old day/week boards would pile up forever — sweep them
-  // as we pass by (this week+last week). Once/session.
-  // Days keep a 3-deep window rather than 2: any client can delete any board,
-  // so a device with a day-fast clock would otherwise wipe the live one.
+  // housekeeping: old day/week boards would pile up forever — sweep them as we
+  // pass by. Once/session.
+  // Sweep STRICTLY OLDER than the cutoff, never "anything not in the keep
+  // list". Any client can delete any board, and both directions of clock
+  // error have to be survivable: a day-fast device would wipe the live board
+  // (hence a 3-deep window, not 1), and a day-slow device would wipe the one
+  // that is about to become live. A future-dated key belongs to a day that
+  // hasn't arrived yet — leave it alone and it becomes today's board on time.
   let sweptBoards = false;
   async function pruneBoards() {
     if (sweptBoards) return;
     sweptBoards = true;
     try {
-      const keepDays = [0, 1, 2].map((n) => String(dayKey(new Date(Date.now() - n * 86400000))));
-      const keepWeeks = [weekKey(), weekKey(new Date(Date.now() - 7 * 86400000))];
+      const dayCut = dayKey(new Date(Date.now() - 2 * 86400000));       // numeric YYYYMMDD
+      const weekCut = weekKey(new Date(Date.now() - 7 * 86400000));     // 'YYYY-Www' sorts lexically
       const days = (await dbGet('daily').catch(() => null)) || {};
-      for (const k of Object.keys(days)) if (!keepDays.includes(k)) dbSet('daily/' + k, null).catch(() => { });
+      for (const k of Object.keys(days)) if (Number(k) < dayCut) dbSet('daily/' + k, null).catch(() => { });
       const weeks = (await dbGet('weekly').catch(() => null)) || {};
-      for (const k of Object.keys(weeks)) if (!keepWeeks.includes(k)) dbSet('weekly/' + k, null).catch(() => { });
+      for (const k of Object.keys(weeks)) if (k < weekCut) dbSet('weekly/' + k, null).catch(() => { });
     } catch (e) { }
   }
 
