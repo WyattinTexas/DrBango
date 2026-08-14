@@ -8,13 +8,64 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.13.1';
+const BUILD = 'STARSPELL v0.14.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
 const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
 const QS = new URLSearchParams(location.search);
 const DEMO = QS.get('demo') === '1';
+
+/* ---- frame-time probe (part of ?diag=1) --------------------------------
+   The rise and the descent are the game's signature moves and must stay
+   silky, so they self-report: start() at motion begin, stop() at motion end,
+   and every RAF-to-RAF delta in between is recorded raw (loop.rawDelta, not
+   Phaser's smoothed delta — smoothing is exactly what hides a hitch). The
+   first recorded delta is split out as `entry`: it covers the game step that
+   ran the previous scene's shutdown + this scene's create, which is where
+   texture bakes and uploads land. Summaries go to the diag box and pile up
+   on window.__ssperf so a headless run can read them programmatically.
+   Costs one array push per frame while a flight is live, nothing otherwise. */
+const PERF = {
+  rec: null,
+  // limit: auto-stop after that many frames — for flights with no natural end
+  // marker in this scene (the arrival handoff runs in the next scene's create)
+  start(label, scene, limit) {
+    if (!this.hooked) {
+      this.hooked = true;
+      const loop = scene.game.loop;
+      scene.game.events.on('prestep', () => {
+        if (!this.rec) return;
+        this.rec.f.push(loop.rawDelta);
+        if (this.rec.limit && this.rec.f.length >= this.rec.limit) this.stop();
+      });
+    }
+    this.rec = { label, f: [], limit };
+  },
+  stop() {
+    const r = this.rec;
+    this.rec = null;
+    if (!r || r.f.length < 3) return;
+    // start() runs inside a game step (create or input handler), after that
+    // step's prestep fired — so f[0] is the first delta measured AFTER the
+    // heavy entry work, i.e. it spans it. That's the shutdown+create frame.
+    const entry = r.f[0];
+    const flight = r.f.slice(1);
+    const n = flight.length, total = flight.reduce((a, b) => a + b, 0);
+    const sorted = flight.slice().sort((a, b) => b - a);
+    const sum = {
+      label: r.label, entryMs: Math.round(entry), frames: n,
+      avgMs: +(total / n).toFixed(1),
+      worst: sorted.slice(0, 4).map((v) => Math.round(v)),
+      over25: flight.filter((v) => v > 25).length,
+      over40: flight.filter((v) => v > 40).length,
+    };
+    (window.__ssperf = window.__ssperf || []).push(sum);
+    DIAG('perf ' + sum.label + ': entry ' + sum.entryMs + 'ms · ' + n + 'f avg ' + sum.avgMs +
+      ' · worst ' + sum.worst.join('/') + ' · >25ms ' + sum.over25 + ' · >40ms ' + sum.over40);
+  },
+};
+window.SSPERF = PERF;   // the headless perf harness reads/starts probes through this
 
 /* ---- painted art (buttons + letter tiles + meadow plate), DEFAULT ON -----
    Everything else in this game is drawn to canvas at boot; these five files
@@ -501,12 +552,18 @@ function ssSkyWorld(scene, opts) {
         .setScale(sc).setAlpha(baseA).setTint(SS_STAR_COLORS[Math.floor(rnd() * SS_STAR_COLORS.length)])
         .setScrollFactor(1, f);
       st.baseS = sc; st.baseA = baseA;
-      if (twinkle && rnd() < 0.5)
-        scene.tweens.add({ targets: st, alpha: baseA * 0.35, duration: 1600 + rnd() * 2600, yoyo: true, repeat: -1, delay: rnd() * 2500 });
+      if (twinkle && rnd() < 0.5) twinkles.push(st);
       out.push(st);
     }
     return out;
   };
+  // ~90 twinkle tweens were a real slice of a create that sometimes opens a
+  // descent — starting them a beat later is invisible and off the entry frame
+  const twinkles = [];
+  scene.time.delayedCall(400, () => {
+    for (const st of twinkles)
+      scene.tweens.add({ targets: st, alpha: st.baseA * 0.35, duration: 1600 + rnd() * 2600, yoyo: true, repeat: -1, delay: rnd() * 2500 });
+  });
   tier(0.55, 110, 0.28, 0.5, true);
   const tierM = tier(0.70, 75, 0.42, 0.68, true);
   const tierN = tier(0.85, 48, 0.66, 0.95, false);
@@ -565,18 +622,25 @@ function ssSkyWorld(scene, opts) {
     }
   }
   const flies = [];
+  const flyTweens = (f) => {
+    scene.tweens.add({ targets: f, alpha: 0.85, duration: 1700 + rnd() * 1700, yoyo: true, repeat: -1, delay: rnd() * 3000 });
+    scene.tweens.add({ targets: f, x: f.baseX + l.u(-14 + rnd() * 28), y: f.baseY - l.u(6 + rnd() * 10), duration: 2600 + rnd() * 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  };
   if (!opts.dawn) {
     for (let i = 0; i < 12; i++) {
       const f = scene.add.image(l.x(-180 + rnd() * 360), my(600 + rnd() * 165), 'dot')
         .setScale(l.u(0.22 + rnd() * 0.14)).setTint(0xffdf8f).setBlendMode('ADD').setAlpha(0);
-      scene.tweens.add({ targets: f, alpha: 0.85, duration: 1700 + rnd() * 1700, yoyo: true, repeat: -1, delay: rnd() * 3000 });
-      scene.tweens.add({ targets: f, x: f.x + l.u(-14 + rnd() * 28), y: f.y - l.u(6 + rnd() * 10), duration: 2600 + rnd() * 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      f.baseX = f.x; f.baseY = f.y;
+      flyTweens(f);
       flies.push(f);
     }
   }
 
-  // film grain over everything — fixed to the camera
-  scene.add.tileSprite(l.W / 2, l.H / 2, l.W, l.H, 'grain').setScrollFactor(0).setAlpha(0.04).setDepth(500);
+  // film grain over everything — fixed to the camera. The rise/descent hides
+  // it: at alpha 0.04 it is invisible over a fast-scrolling sky, and it is a
+  // full back-buffer of blended fill per frame at DPR 3 — exactly the frames
+  // that must not drop.
+  const grain = scene.add.tileSprite(l.W / 2, l.H / 2, l.W, l.H, 'grain').setScrollFactor(0).setAlpha(0.04).setDepth(500);
 
   // camera driver: p 0 = meadow · 1 = zenith; vel drives the star-stretch
   const setP = (p, vel) => {
@@ -591,7 +655,15 @@ function ssSkyWorld(scene, opts) {
       scene.tweens.add({ targets: f, y: f.y - l.u(90 + Math.random() * 80), alpha: 0, duration: 700 + Math.random() * 500, ease: 'Sine.easeOut' });
     }
   };
-  return { setP, scatterFlies, T };
+  // the wake path (descending home without a re-create) puts them back
+  const restoreFlies = () => {
+    for (const f of flies) {
+      scene.tweens.killTweensOf(f);
+      f.setPosition(f.baseX, f.baseY).setAlpha(0);
+      flyTweens(f);
+    }
+  };
+  return { setP, scatterFlies, restoreFlies, grain, T };
 }
 
 // Assemble a constellation inside a container: stars fly in, lines fade up.
@@ -628,6 +700,69 @@ function ssAssembleBeast(scene, cont, beast, unitScale, onDone) {
     if (onDone) onDone();
   });
   return { lines: g, stars, eyes };
+}
+
+/* ---- tile glyph cache ----------------------------------------------------
+   Board tiles used to carry two live Text objects each — 32 fresh canvas
+   rasters + GPU uploads landing in the single frame that builds a board,
+   the biggest slice of the arrival hitch at the top of the rise (and a
+   smaller one on every mid-battle refill and word-line tap). Letters and
+   values bake once per (glyph, ink) into small canvas textures — idle-
+   prewarmed from the meadow — and tiles just point images at them.
+   Box is 64x48 design units with the letter at font 36 (Qu at 30); consumers
+   scale the box, so the word-line's font-20 look is the same texture at
+   20/36 scale. */
+const SS_TILE_INK = ['#3a3020', '#5a3c05', '#1d4a66'];    // letter ink per tier
+const SS_TILE_VINK = ['#8d7f60', '#7a5510', '#2a6a8e'];   // value ink per tier
+const SS_LINE_GREEN = '#1d6a35';                          // word-line "valid" ink
+function ssGlyph(scene, ch, color) {
+  const key = 'gl-' + ch + '-' + color;
+  if (!scene.textures.exists(key)) {
+    const R = ssTexRes(scene), fs = ch === 'qu' ? 30 : 36;
+    const t = scene.textures.createCanvas(key, Math.round(64 * R), Math.round(48 * R));
+    const c = t.context;
+    c.scale(R, R);
+    c.font = 'bold ' + fs + 'px ' + SERIF;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = color;
+    // caps sit a touch above the em middle in serifs — nudge to optical centre
+    c.fillText(ch === 'qu' ? 'Qu' : ch.toUpperCase(), 32, 24 + fs * 0.06);
+    t.refresh();
+  }
+  return key;
+}
+function ssGlyphVal(scene, v, color) {
+  const key = 'gv-' + v + '-' + color;
+  if (!scene.textures.exists(key)) {
+    const R = ssTexRes(scene);
+    const t = scene.textures.createCanvas(key, Math.round(26 * R), Math.round(16 * R));
+    const c = t.context;
+    c.scale(R, R);
+    c.font = 'bold 12px ' + SERIF;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = color;
+    c.fillText(String(v), 13, 8.7);
+    t.refresh();
+  }
+  return key;
+}
+function ssPrewarmGlyphs(scene) {
+  const jobs = [];
+  for (const base of 'abcdefghijklmnopqrstuvwxyz') {
+    const ch = base === 'q' ? 'qu' : base;
+    for (let tier = 0; tier < 3; tier++) {
+      const v = (VALS[base] || 1) + (ch === 'qu' ? 1 : 0) + (tier === 1 ? 6 : 0);
+      jobs.push(() => { ssGlyph(scene, ch, SS_TILE_INK[tier]); ssGlyphVal(scene, v, SS_TILE_VINK[tier]); });
+    }
+    jobs.push(() => ssGlyph(scene, ch, SS_LINE_GREEN));
+  }
+  // a few per tick — baking all ~130 in one frame would itself hitch the idle
+  const ev = scene.time.addEvent({
+    delay: 40, loop: true, callback: () => {
+      for (let i = 0; i < 6 && jobs.length; i++) jobs.shift()();
+      if (!jobs.length) ev.remove();
+    },
+  });
 }
 
 function ssTxt(scene, x, y, str, size, color, style) {
@@ -921,14 +1056,71 @@ class Home extends Phaser.Scene {
   constructor() { super('home'); }
   create() {
     if (PENDING_ASCENT) { DIAG('restart mid-ascent → straight to battle'); const d = PENDING_ASCENT; PENDING_ASCENT = null; this.scene.start('battle', d); return; }
+    const tCr = performance.now();
     const l = ssLayout(this);
     ssMakeTextures(this);
     this.isDawn = !!((this.scene.settings.data || {}).dawn) || QS.get('dawn') === '1';
     this.sky = ssSkyWorld(this, { dawn: this.isDawn });
     ssShootingStars(this);
+    const tSky = performance.now();
     this.uiItems = [];
     this.ascending = false; this.descending = false; this.arrived = false;
-    const ui = (o) => { this.uiItems.push(o); return o; };
+
+    // Everything at the meadow (showcase, title, buttons, chip, footer) is a
+    // full frame's work on a slow phone, and a descent-by-create (the dawn
+    // return, or any fallback) starts with the camera at the ZENITH — none of
+    // it is visible yet. Building it one frame later halves the entry hitch of
+    // those descents; on a plain boot it builds inline as before.
+    const entry = (this.scene.settings.data || {}).from;
+    if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
+    else this.buildMeadowUi(l);
+    // the daily's countdown has to keep moving while the home screen sits open.
+    // Ticking also carries the label across midnight UTC on its own: dayKey()
+    // moves, today's score stops matching, and the sub falls back to the
+    // "unplayed" wording for the new sky without a reload.
+    this.time.addEvent({ delay: 15000, loop: true, callback: () => this.refreshDailySub() });
+
+    this.input.once('pointerdown', () => SFX.ensure());
+    this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
+
+    // crickets sing while we stand in the grass — at dawn, the birds do
+    SFX.crickets(!this.isDawn);
+    SFX.birds(this.isDawn);
+    this.events.once('shutdown', () => { SFX.crickets(false); SFX.birds(false); });
+
+    // the ascent puts this scene to SLEEP, not to rest — returning from battle
+    // wakes it and glides down, skipping the 200-370ms create() freeze that
+    // used to open every descent (see arrive())
+    this.createdW = this.scale.width; this.createdH = this.scale.height;
+    this.events.on('wake', (sys, data) => this.onWake(data || {}));
+    // pre-bake the dawn gradient while the meadow idles: the campaign-win
+    // descent re-creates the scene with the other sky, and baking + uploading
+    // skygrad-dawn inside that create was a measurable slice of its entry hitch
+    if (!this.isDawn) this.time.delayedCall(600, () => { if (this.scene.isActive()) ssSkyTextures(this, true); });
+    // …and the tile glyphs, so the board build at the top of the rise is
+    // sprite reuse instead of 32 live text rasters (see ssGlyph)
+    this.time.delayedCall(700, () => { if (this.scene.isActive()) ssPrewarmGlyphs(this); });
+
+    // arriving from a battle: descend home · from defeat: wake up on the grass
+    if (entry === 'battle') this.descendHome();
+    else if (entry === 'defeat') {
+      const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(600);
+      this.tweens.add({ targets: veil, alpha: 0, duration: 350, onComplete: () => veil.destroy() });
+    }
+
+    DIAG('home create sky ' + Math.round(tSky - tCr) + 'ms' + (entry ? ' · ui deferred (' + entry + ')' : ''));
+    localStorage.setItem('beta3.boot', BUILD);
+    console.log(BUILD);
+    DIAG(BUILD + ' · ' + (this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas') + ' ' + this.game.scale.width + 'x' + this.game.scale.height + ' dprCap ' + DPR);
+    if (QS.get('vsdemo') === '1') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
+    else if (DEMO || QS.get('daily') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? 'quick' : 'daily'));
+  }
+  buildMeadowUi(l) {
+    // baseAlpha: the ascent fades all ui to 0 — the wake path (return from
+    // battle without a re-create) restores each item to the alpha it was born
+    // with, which is not 1 for sparkles, braid, mute/lang buttons
+    const ui = (o) => { o.baseAlpha = o.alpha; this.uiItems.push(o); return o; };
+    const tUi = performance.now();
 
     // beast showcase — tonight's hunt, rising in the dusk sky
     this.showC = this.add.container(l.x(0), l.y(150));
@@ -948,26 +1140,44 @@ class Home extends Phaser.Scene {
     const tScale = Math.min(1, 384 / tk.w);           // long localized titles fit the frame
     const title = this.titleT = ui(this.add.image(l.x(0), l.y(300), tk.key)
       .setDisplaySize(l.u(tk.w * tScale), l.u(tk.h * tScale)));
-    this.tweens.add({ targets: title, scaleX: title.scaleX * 1.02, scaleY: title.scaleY * 1.02, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.titleBase = { sx: title.scaleX, sy: title.scaleY };
     // sparkles sit on letter-tip anchors from the renderer; fractional fallback
     // covers a non-Latin title, which reports no anchors
     const spots = tk.anchors.length
       ? tk.anchors.map((a, i) => [a.x * tScale, a.y * tScale, [15, 11, 13][i % 3]])
       : [[-0.36 * tk.w * tScale, -0.30 * tk.h * tScale, 15], [0.30 * tk.w * tScale, -0.38 * tk.h * tScale, 11], [0.42 * tk.w * tScale, 0.24 * tk.h * tScale, 13]];
+    this.sparkles = [];
     for (const [fx, fy, fs] of spots) {
-      const sp = ui(this.add.image(l.x(fx), l.y(300 + fy), 'spark4')
-        .setDisplaySize(l.u(fs), l.u(fs)).setAlpha(0.75).setBlendMode('ADD'));
-      this.tweens.add({ targets: sp, angle: 360, duration: 36000 + Math.random() * 20000, repeat: -1 });
-      this.tweens.add({ targets: sp, alpha: 0.3, duration: 1600 + Math.random() * 1400, yoyo: true, repeat: -1, delay: Math.random() * 1500 });
+      this.sparkles.push(ui(this.add.image(l.x(fx), l.y(300 + fy), 'spark4')
+        .setDisplaySize(l.u(fs), l.u(fs)).setAlpha(0.75).setBlendMode('ADD')));
     }
+    // the breath and sparkle idle tweens are re-armed on wake (beginAscent
+    // kills them so its fade-to-0 doesn't fight the alpha yoyos)
+    this.idleTweens = () => {
+      title.setScale(this.titleBase.sx, this.titleBase.sy);
+      this.tweens.add({ targets: title, scaleX: this.titleBase.sx * 1.02, scaleY: this.titleBase.sy * 1.02, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      for (const sp of this.sparkles) {
+        this.tweens.add({ targets: sp, angle: 360, duration: 36000 + Math.random() * 20000, repeat: -1 });
+        this.tweens.add({ targets: sp, alpha: 0.3, duration: 1600 + Math.random() * 1400, yoyo: true, repeat: -1, delay: Math.random() * 1500 });
+      }
+    };
+    this.idleTweens();
     const bk = ssBraidTex(this);
     ui(this.add.image(l.x(0), l.y(300 + tk.h * tScale * 0.5 + 6), bk.key).setDisplaySize(l.u(bk.w), l.u(bk.h)).setAlpha(0.9));
     ui(ssTxt(this, l.x(0), l.y(358), SS_T('tagline'), l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
 
     // buttons
-    const ck = this.campaignCheckpoint();
+    const campRow = () => {
+      const ck = this.campaignCheckpoint();
+      return {
+        label: ck ? SS_T('cont') + '  ·  ' + SS_ACTS[ck.actIdx].name.split('·')[0].trim() : SS_T('campaign'),
+        sub: ck ? SS_T('fightN', ck.fightIdx % 5 + 1) : SS_T('campaignSub'),
+      };
+    };
+    this.campRow = campRow;
+    const cr = campRow();
     const rows = [
-      { y: 420, label: ck ? SS_T('cont') + '  ·  ' + SS_ACTS[ck.actIdx].name.split('·')[0].trim() : SS_T('campaign'), sub: ck ? SS_T('fightN', ck.fightIdx % 5 + 1) : SS_T('campaignSub'), fn: () => this.startMode('campaign') },
+      { y: 420, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.startMode('campaign') },
       { y: 488, label: SS_T('quick'), sub: SS_T('quickSub'), fn: () => this.startMode('quick') },
       { y: 556, label: SS_T('daily'), sub: this.dailySub(), key: 'daily', fn: () => this.startMode('daily') },
       { y: 624, label: SS_T('board'), sub: null, fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
@@ -978,10 +1188,12 @@ class Home extends Phaser.Scene {
     this.rowBtns = {};
     for (const r of rows) {
       const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.sub ? 58 : 46)).setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true }));
-      ui(ssTxt(this, l.x(0), l.y(r.y - (r.sub ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
+      const lab = ui(ssTxt(this, l.x(0), l.y(r.y - (r.sub ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
+      if (r.key === 'campaign') this.campLabelT = lab;
       if (r.sub) {
         const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5));
         if (r.key === 'daily') this.dailySubT = sub;
+        if (r.key === 'campaign') this.campSubT = sub;
       }
       if (r.key) this.rowBtns[r.key] = b;
       b.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
@@ -1007,34 +1219,7 @@ class Home extends Phaser.Scene {
     // language switcher — opposite the mute toggle; opens the sheet of native names
     this.langB = ui(ssTxt(this, l.x(195), l.y(784), '🌐', l.u(14)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
     this.langB.on('pointerdown', () => this.langSheet());
-
-    // the daily's countdown has to keep moving while the home screen sits open.
-    // Ticking also carries the label across midnight UTC on its own: dayKey()
-    // moves, today's score stops matching, and the sub falls back to the
-    // "unplayed" wording for the new sky without a reload.
-    this.time.addEvent({ delay: 15000, loop: true, callback: () => this.refreshDailySub() });
-
-    this.input.once('pointerdown', () => SFX.ensure());
-    this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
-
-    // crickets sing while we stand in the grass — at dawn, the birds do
-    SFX.crickets(!this.isDawn);
-    SFX.birds(this.isDawn);
-    this.events.once('shutdown', () => { SFX.crickets(false); SFX.birds(false); });
-
-    // arriving from a battle: descend home · from defeat: wake up on the grass
-    const entry = (this.scene.settings.data || {}).from;
-    if (entry === 'battle') this.descendHome(l);
-    else if (entry === 'defeat') {
-      const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(600);
-      this.tweens.add({ targets: veil, alpha: 0, duration: 350, onComplete: () => veil.destroy() });
-    }
-
-    localStorage.setItem('beta3.boot', BUILD);
-    console.log(BUILD);
-    DIAG(BUILD + ' · ' + (this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas') + ' ' + this.game.scale.width + 'x' + this.game.scale.height + ' dprCap ' + DPR);
-    if (QS.get('vsdemo') === '1') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
-    else if (DEMO || QS.get('daily') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? 'quick' : 'daily'));
+    DIAG('meadow ui built ' + Math.round(performance.now() - tUi) + 'ms');
   }
   // Subtitle under DAILY HUNT. Unplayed, it invites and shows how long the sky
   // stays up; played, it shows today's score and when the next one lands.
@@ -1113,10 +1298,14 @@ class Home extends Phaser.Scene {
       this.dissolveTitle();
       if (ssReduceMotion()) {
         DIAG('ascent: reduce-motion is ON → veil crossfade instead of the rise');
-        const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setAlpha(0).setDepth(600);
+        // kept on this.ascVeil: if the scene sleeps and later wakes, the wake
+        // path lands under this veil instead of gliding (respects the setting)
+        const veil = this.ascVeil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setAlpha(0).setDepth(600);
         this.tweens.add({ targets: veil, alpha: 1, duration: 200, onComplete: () => this.arrive() });
         return;
       }
+      this.sky.grain.setVisible(false);   // full-screen blended fill — not during the flight
+      PERF.start('ascent', this);
       this.ascentStart = this.time.now;
       this.skipAt = null; this.lastP = 0; this.lastT = this.time.now;
       // arm the tap-to-skip only after the launching tap has fully cleared —
@@ -1171,6 +1360,7 @@ class Home extends Phaser.Scene {
   arrive() {
     if (this.arrived) return;
     this.arrived = true;
+    PERF.stop();
     DIAG('ascent arrive' + (this.skipAt ? ' (skipped)' : ''));
     if (this.skipFn) this.input.off('pointerdown', this.skipFn);
     SFX.arriveChime();                              // the hush, then the forge voice
@@ -1178,22 +1368,68 @@ class Home extends Phaser.Scene {
     try {
       this.sky.setP(1, 0);
       localStorage.setItem('beta3.ascent', JSON.stringify({ v: BUILD, skipped: !!this.skipAt, t: Date.now() }));
-      this.scene.transition({ target: 'battle', duration: 450, data, moveAbove: true });
+      // sleep (don't stop): the meadow keeps its 300+ objects alive so the trip
+      // home is a wake + camera glide instead of a full re-create — the create
+      // ran 200-370ms on a throttled phone profile, a visible freeze exactly at
+      // the "leave battle" moment. Dawn returns still restart the scene (other
+      // sky); rotation is caught on wake by the layout check there.
+      this.scene.transition({ target: 'battle', duration: 450, data, moveAbove: true, sleep: true });
+      // the handoff frame runs Battle.create — probe it (auto-stops)
+      PERF.start('arrive', this, 30);
     } catch (e) {
       this.scene.start('battle', data);
     }
   }
 
   /* ---------- the way back down ---------- */
-  descendHome(l) {
+  descendHome() {
     this.descending = true;
+    PERF.start('descend' + (this.isDawn ? '-dawn' : ''), this);
+    this.sky.grain.setVisible(false);
     this.sky.setP(1, 0);
     SFX.descendSweep();
     this.tweens.addCounter({
       from: 1, to: 0, duration: ASC.DESCEND_MS, ease: 'Cubic.easeInOut',
       onUpdate: (tw) => this.sky.setP(tw.getValue(), 0),
-      onComplete: () => { this.descending = false; this.sky.setP(0, 0); if (this.isDawn) SFX.birds(true); else SFX.crickets(true); },
+      onComplete: () => { this.descending = false; PERF.stop(); this.sky.grain.setVisible(true); this.sky.setP(0, 0); if (this.isDawn) SFX.birds(true); else SFX.crickets(true); },
     });
+  }
+  /* the woken meadow: everything still exists, so returning is bookkeeping —
+     restore what the ascent faded/killed, refresh what battle changed, glide */
+  onWake(data) {
+    // rotated while asleep: the viewport loop only restarts ACTIVE scenes, so
+    // a stale layout lands here — rebuild rather than glide a broken frame
+    if (this.scale.width !== this.createdW || this.scale.height !== this.createdH) { this.scene.restart(data); return; }
+    // the dawn meadow is a once-per-campaign-win moment: if the sleeping scene
+    // and the return disagree about it, rebuild with the sky the return wants
+    // (matches the old create-path behavior — dusk again on the next descent)
+    if (this.isDawn !== !!data.dawn) { this.scene.restart(data); return; }
+    this.ascending = false; this.arrived = false; this.ascentStart = null;
+    // the outgoing transition disabled this scene's input for the crossfade;
+    // a stopped scene would re-enable it in create, a slept one must here
+    this.input.enabled = true;
+    for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(o.baseAlpha); }
+    this.idleTweens();
+    this.sky.restoreFlies();
+    const cr = this.campRow();   // battle moved the campaign checkpoint
+    if (this.campLabelT.active) this.campLabelT.setText(cr.label);
+    if (this.campSubT.active) this.campSubT.setText(cr.sub);
+    this.refreshDailySub();
+    const l = ssLayout(this);
+    if (this.ascVeil) {          // reduce-motion rise → reduce-motion return
+      this.sky.setP(0, 0);
+      this.sky.grain.setVisible(true);
+      const veil = this.ascVeil; this.ascVeil = null;
+      this.tweens.add({ targets: veil, alpha: 0, duration: 350, onComplete: () => veil.destroy() });
+      SFX.crickets(true);
+    } else if (data.from === 'battle') this.descendHome();
+    else {                       // defeat: wake up on the grass under a lifting veil
+      this.sky.setP(0, 0);
+      this.sky.grain.setVisible(true);
+      const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(600);
+      this.tweens.add({ targets: veil, alpha: 0, duration: 350, onComplete: () => veil.destroy() });
+      SFX.crickets(true);
+    }
   }
 }
 
@@ -1205,6 +1441,7 @@ class Battle extends Phaser.Scene {
   init(data) { this.mode = data.mode || 'quick'; this.resume = data.resume || null; this.ascended = !!data.ascended; }
 
   create() {
+    const tCr = performance.now();
     const l = this.L = ssLayout(this);
     ssMakeTextures(this);
     if (this.ascended) {   // arriving from the rise: fade in over the zenith — bg matches, no pop
@@ -1213,6 +1450,7 @@ class Battle extends Phaser.Scene {
     }
     ssStarfield(this, 110);
     ssShootingStars(this);
+    const tSky = performance.now();
     for (const [tint, dx, dy] of [[0x2fe0d0, -140, 140], [0x8a5ae0, 140, 620]]) {
       const a = this.add.image(l.x(dx), l.y(dy), 'glowbig').setScale(l.u(2.2)).setTint(tint).setAlpha(0.04).setBlendMode('ADD');
       this.tweens.add({ targets: a, x: a.x + l.u(24), scale: l.u(2.6), duration: 8000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -1241,8 +1479,13 @@ class Battle extends Phaser.Scene {
     this.board = []; this.sel = []; this.lineTiles = [];
     SS.prof.runs++; SS.save();
 
+    const tState = performance.now();
     this.buildUi();
+    const tUi = performance.now();
     this.startFight();
+    const tEnd = performance.now();
+    DIAG('battle create ' + Math.round(tEnd - tCr) + 'ms (sky ' + Math.round(tSky - tCr) +
+      ' · state ' + Math.round(tState - tSky) + ' · ui ' + Math.round(tUi - tState) + ' · fight ' + Math.round(tEnd - tUi) + ')');
 
     if (DEMO) this.demoTimer = this.time.addEvent({ delay: 1400, loop: true, callback: () => this.demoStep() });
     this.input.on('pointerdown', () => SFX.ensure());
@@ -1250,6 +1493,16 @@ class Battle extends Phaser.Scene {
     this.events.once('shutdown', () => this.game.events.off('ss-ach', this.onAch, this));
   }
   onAch(def) { ssAchToast(this, def); }
+
+  // Wake the sleeping meadow instead of re-creating it — the descent must
+  // start on the very next frame. The dawn return (campaign win) needs the
+  // other sky so it takes the full re-create, and so does a home that a
+  // mid-ascent resize restart already stopped.
+  goHome(data) {
+    const h = this.scene.get('home');
+    if (!data.dawn && h && h.sys.isSleeping()) { this.scene.wake('home', data); this.scene.stop(); }
+    else this.scene.start('home', data);
+  }
 
   // ---------- ui ----------
   buildUi() {
@@ -1300,7 +1553,7 @@ class Battle extends Phaser.Scene {
     this.hintB.on('pointerdown', () => this.useHint());
 
     this.homeB = txt(l.x(-195), l.y(24), '‹', 22, '#5a6390').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-    this.homeB.on('pointerdown', () => { SFX.ui(); this.scene.start('home', { from: 'battle' }); });
+    this.homeB.on('pointerdown', () => { SFX.ui(); this.goHome({ from: 'battle' }); });
     this.muteB = txt(l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', 14).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7);
     this.muteB.on('pointerdown', () => { SFX.ensure(); SFX.setMuted(!SFX.muted); this.muteB.setText(SFX.muted ? '🔇' : '🔊'); });
     // version stamp lives beside the mute icon — right-aligned it collided with
@@ -1348,14 +1601,10 @@ class Battle extends Phaser.Scene {
     const l = this.L, p = this.slotPos(i);
     const c = this.add.container(p.x, p.y - (initial ? l.u(500) + i * l.u(14) : l.u(420)));
     const img = this.add.image(0, 0, 'tile' + tier).setDisplaySize(this.tileSize, this.tileSize);
-    const letter = this.add.text(0, -l.u(2), ch === 'qu' ? 'Qu' : ch.toUpperCase(), {
-      fontFamily: SERIF, fontSize: l.u(ch === 'qu' ? 30 : 36) + 'px', fontStyle: 'bold',
-      color: tier === 2 ? '#1d4a66' : tier === 1 ? '#5a3c05' : '#3a3020',
-    }).setOrigin(0.5);
-    const val = this.add.text(l.u(25), l.u(21), String(this.tileVal(ch, tier)), {
-      fontFamily: SERIF, fontSize: l.u(12) + 'px', fontStyle: 'bold',
-      color: tier === 2 ? '#2a6a8e' : tier === 1 ? '#7a5510' : '#8d7f60',
-    }).setOrigin(0.5);
+    const letter = this.add.image(0, -l.u(2), ssGlyph(this, ch, SS_TILE_INK[tier]))
+      .setDisplaySize(l.u(64), l.u(48));
+    const val = this.add.image(l.u(25), l.u(21), ssGlyphVal(this, this.tileVal(ch, tier), SS_TILE_VINK[tier]))
+      .setDisplaySize(l.u(26), l.u(16));
     c.add([img, letter, val]);
     if (tier > 0) {
       const glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(tier === 2 ? 0.35 : 0.25)
@@ -1404,10 +1653,10 @@ class Battle extends Phaser.Scene {
       const s = this.board[bi];
       const mc = this.add.container(-w / 2 + sz / 2 + k * (sz + gap), 0);
       const img = this.add.image(0, 0, 'tile' + s.tier).setDisplaySize(sz, sz);
-      const letter = this.add.text(0, 0, s.ch === 'qu' ? 'Qu' : s.ch.toUpperCase(), {
-        fontFamily: SERIF, fontSize: l.u(s.ch === 'qu' ? 16 : 20) + 'px', fontStyle: 'bold',
-        color: valid ? '#1d6a35' : '#3a3020',
-      }).setOrigin(0.5);
+      // same glyph texture as the board, at the line's font-16/20 proportions
+      const gsc = s.ch === 'qu' ? 16 / 30 : 20 / 36;
+      const letter = this.add.image(0, 0, ssGlyph(this, s.ch, valid ? SS_LINE_GREEN : SS_TILE_INK[0]))
+        .setDisplaySize(l.u(64 * gsc), l.u(48 * gsc));
       mc.add([img, letter]);
       mc.setSize(sz, sz).setInteractive({ useHandCursor: true });
       mc.on('pointerdown', () => this.unselectFrom(k));
@@ -1830,7 +2079,7 @@ class Battle extends Phaser.Scene {
     items.push(again, againT, homeB, homeT);
     again.on('pointerdown', () => { SFX.ui(); this.scene.restart({ mode: this.mode, resume: null }); });
     // the Act III payoff: win the campaign and you descend into sunrise
-    homeB.on('pointerdown', () => { SFX.ui(); this.scene.start('home', { from: won ? 'battle' : 'defeat', dawn: won && this.mode === 'campaign' }); });
+    homeB.on('pointerdown', () => { SFX.ui(); this.goHome({ from: won ? 'battle' : 'defeat', dawn: won && this.mode === 'campaign' }); });
     this.overlayC.add(items);
 
     if (DEMO) {
