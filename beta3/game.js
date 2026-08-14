@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.15.0';
+const BUILD = 'STARSPELL v0.16.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -1660,8 +1660,15 @@ class Battle extends Phaser.Scene {
     this.beastC = this.add.container(l.x(0), l.y(170));
     this.beastNameI = null;   // gold nameplate image, built per beast in setBeastName
     this.beastTitle = txt(l.x(0), l.y(301), '', 10, '#8a94c4').setOrigin(0.5).setLetterSpacing(l.u(2));
-    this.add.image(l.x(-112), l.y(322), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(224), l.u(13));
+    // trough + fill + numbers live in one container so a heavy hit can shake
+    // the whole bar as a unit
+    this.ehpC = this.add.container(0, 0);
+    const eTrough = this.add.image(l.x(-112), l.y(322), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(224), l.u(13));
     this.ehpBar = this.add.image(l.x(-110), l.y(322), 'barfill-rose').setOrigin(0, 0.5).setDisplaySize(l.u(220), l.u(8));
+    // numeric HP on the bar itself — players plan lethal ("15 left, build 15+")
+    this.ehpT = txt(l.x(0), l.y(321), '', 11, '#ffe9e0')
+      .setOrigin(0.5).setShadow(0, l.u(1), 'rgba(16,4,12,0.95)', l.u(2.5));
+    this.ehpC.add([eTrough, this.ehpBar, this.ehpT]);
     this.strikeRib = this.add.image(l.x(0), l.y(342), 'ribbon').setAlpha(0);
     this.strikeT = txt(l.x(0), l.y(342), '', 12, '#e6a2a2').setOrigin(0.5);
 
@@ -1844,11 +1851,16 @@ class Battle extends Phaser.Scene {
     this.beast = this.beastFor(f);
     if (this.hasSigil('hush')) this.beast.timer += 1;
     this.beast.hpNow = this.beast.hp;
+    // what the bar/numbers SHOW — trails hpNow, catching up when a flying
+    // damage number lands on the bar
+    this.ehpShown = { v: this.beast.hp };
+    this.dying = false;
     this.beast.count = this.beast.timer;
     this.run.firstUsed = false;
     this.struckThisBattle = false;
     this.shieldUsed = false;
     this.hintUsed = false;
+    this.clearHintFx();
     this.headT.setText(this.modeTitle());
     const pipBase = this.mode === 'campaign' ? Math.floor(this.run.fightIdx / 5) * 5 : 0;
     this.pips.forEach((p, i) => {
@@ -1882,12 +1894,19 @@ class Battle extends Phaser.Scene {
     const crop = (bar, f) => bar.setCrop(0, 0, bar.frame.width * clamp(f, 0, 1), bar.frame.height);
     crop(this.hpBar, this.run.hp / this.run.hpMax);
     this.hpT.setText(this.run.hp + ' / ' + this.run.hpMax);
-    crop(this.ehpBar, this.beast.hpNow / this.beast.hp);
+    this.drawEhp();
     this.strikeT.setText(this.beast.hpNow > 0 ? '✦ strikes in ' + this.beast.count + (this.beast.count === 1 ? ' cast ✦' : ' casts ✦') : '');
     this.strikeRib.setAlpha(this.strikeT.text ? 0.9 : 0);
     if (this.strikeT.text) this.strikeRib.setDisplaySize(this.strikeT.width + l.u(26), l.u(19));
     // while a damage number is in flight the tally animation owns the counter
     if (!this.scoreAnim) this.scoreT.setText(String(this.runScore()));
+  }
+  // enemy bar + numbers render the SHOWN hp (which trails hpNow during a
+  // damage flight); numbers count down as the drain tween runs
+  drawEhp() {
+    const shown = Math.max(0, Math.round(this.ehpShown.v));
+    this.ehpBar.setCrop(0, 0, this.ehpBar.frame.width * clamp(shown / this.beast.hp, 0, 1), this.ehpBar.frame.height);
+    this.ehpT.setText(shown + ' / ' + this.beast.hp);
   }
   runScore() { return this.run.totalDmg + this.run.longest.length * 15 + this.run.fightIdx * 50; }
   setBeastName(name) {
@@ -1911,6 +1930,7 @@ class Battle extends Phaser.Scene {
       return;
     }
     this.state = 'anim';
+    this.clearHintFx(true);
     const tiles = this.sel.map((i) => this.board[i]);
     const dmg = this.wordDamage(tiles);
     const letters = tiles.reduce((a, s) => a + s.ch.length, 0);
@@ -1970,30 +1990,83 @@ class Battle extends Phaser.Scene {
   beastHit(dmg) {
     const l = this.L;
     this.beast.hpNow -= dmg;
-    // the tally beat: a big gold number pops at the beast, arcs up to the score
-    // trailing stars, and the score counts up when it lands. The counter is read
-    // from the label (not runScore) so back-to-back casts chain smoothly.
     const from = parseInt(this.scoreT.text, 10) || 0;
     this.run.totalDmg += dmg;
     const to = this.runScore();
     this.scoreAnim = (this.scoreAnim || 0) + 1;
-    const gk = ssGoldTex(this, '+' + dmg, 30);
-    const nI = this.add.image(this.beastC.x, this.beastC.y - l.u(34), gk.key)
+    // beast recoil + hull flash read instantly; the bar waits for the number
+    this.tweens.add({ targets: this.beastC, x: l.x(0) + l.u(10), duration: 60, yoyo: true, repeat: 1, onComplete: () => this.beastC.setX(l.x(0)) });
+    if (this.beastLines) { this.beastLines.setAlpha(1); this.tweens.add({ targets: this.beastLines, alpha: 0.35, duration: 300 }); }
+    this.updateBars();
+
+    // the hit beat: the damage pops big at center screen, slams up into the
+    // enemy HP bar, and only when it lands does the bar drain + count down.
+    // Then the same value arcs on from the bar to the score tally.
+    const big = dmg >= 25;
+    const gk = ssGoldTex(this, String(dmg), 34);
+    const nI = this.add.image(l.x(0), l.y(468), gk.key)
       .setDisplaySize(l.u(gk.w), l.u(gk.h)).setDepth(70);
     const sx = nI.scaleX, sy = nI.scaleY;
-    nI.setScale(sx * 0.3, sy * 0.3).setAlpha(0);
-    this.tweens.add({ targets: nI, scaleX: sx * 1.15, scaleY: sy * 1.15, alpha: 1, duration: 180, ease: 'Back.easeOut' });
-    this.tweens.add({ targets: nI, scaleX: sx, scaleY: sy, delay: 180, duration: 120 });
-    const start = { x: nI.x, y: nI.y }, dst = { x: this.scoreT.x - l.u(16), y: this.scoreT.y };
-    const ctrl = { x: (start.x + dst.x) / 2 + l.u(46), y: Math.min(start.y, dst.y) - l.u(64) };
+    nI.setScale(sx * 0.2, sy * 0.2).setAlpha(0);
+    const pop = big ? 1.45 : 1.18;
+    this.tweens.add({ targets: nI, scaleX: sx * pop, scaleY: sy * pop, alpha: 1, duration: 190, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: nI, scaleX: sx, scaleY: sy, delay: 190, duration: 130 });
+    const start = { x: nI.x, y: nI.y }, dst = { x: l.x(0), y: l.y(322) };
     const pt = { t: 0 };
     this.tweens.add({
-      targets: pt, t: 1, delay: 500, duration: 520, ease: 'Cubic.easeIn',
+      targets: pt, t: 1, delay: 430, duration: 340, ease: 'Cubic.easeIn',
+      onUpdate: () => {
+        nI.x = start.x + (dst.x - start.x) * pt.t;
+        nI.y = start.y + (dst.y - start.y) * pt.t;
+        const k = 1 - pt.t * 0.55;
+        nI.setScale(sx * k, sy * k);
+        if (Math.random() < 0.3) this.starBurst.emitParticleAt(nI.x, nI.y, 1);
+      },
+      onComplete: () => {
+        nI.destroy();
+        this.starBurst.emitParticleAt(dst.x, dst.y, big ? 6 : 3);
+        // small bar shake — only when the hit is worth bragging about
+        if (big) {
+          this.tweens.killTweensOf(this.ehpC);
+          this.ehpC.setX(0);
+          this.tweens.add({ targets: this.ehpC, x: l.u(3), duration: 40, yoyo: true, repeat: 3, onComplete: () => this.ehpC.setX(0) });
+        }
+        // drain now — the number has landed. Landing always retargets the
+        // latest hpNow so chained casts stay truthful.
+        this.tweens.killTweensOf(this.ehpShown);
+        this.tweens.add({
+          targets: this.ehpShown, v: Math.max(0, this.beast.hpNow), duration: 300, ease: 'Cubic.easeOut',
+          onUpdate: () => this.drawEhp(),
+          onComplete: () => {
+            this.drawEhp();
+            if (this.beast.hpNow <= 0 && !this.dying) { this.dying = true; this.beastDeath(); }
+          },
+        });
+        this.flyScore(dst, dmg, from, to);
+      },
+    });
+  }
+
+  // the tally beat (v0.9.0), re-anchored: a smaller +N lifts off the enemy bar
+  // where the damage landed, arcs up to the score trailing stars, and the score
+  // counts up when it lands. The counter is read from the label (not runScore)
+  // so back-to-back casts chain smoothly.
+  flyScore(startPt, dmg, from, to) {
+    const l = this.L;
+    const gk = ssGoldTex(this, '+' + dmg, 22);
+    const nI = this.add.image(startPt.x, startPt.y, gk.key)
+      .setDisplaySize(l.u(gk.w), l.u(gk.h)).setDepth(70);
+    const sx = nI.scaleX, sy = nI.scaleY;
+    const dst = { x: this.scoreT.x - l.u(16), y: this.scoreT.y };
+    const ctrl = { x: (startPt.x + dst.x) / 2 + l.u(40), y: Math.min(startPt.y, dst.y) - l.u(52) };
+    const pt = { t: 0 };
+    this.tweens.add({
+      targets: pt, t: 1, duration: 430, ease: 'Cubic.easeIn',
       onUpdate: () => {
         const u = pt.t, v = 1 - u;
-        nI.x = v * v * start.x + 2 * v * u * ctrl.x + u * u * dst.x;
-        nI.y = v * v * start.y + 2 * v * u * ctrl.y + u * u * dst.y;
-        const k = 1 - u * 0.65;
+        nI.x = v * v * startPt.x + 2 * v * u * ctrl.x + u * u * dst.x;
+        nI.y = v * v * startPt.y + 2 * v * u * ctrl.y + u * u * dst.y;
+        const k = 1 - u * 0.45;
         nI.setScale(sx * k, sy * k);
         if (Math.random() < 0.35) this.starBurst.emitParticleAt(nI.x, nI.y, 1);
       },
@@ -2009,10 +2082,6 @@ class Battle extends Phaser.Scene {
         });
       },
     });
-    this.tweens.add({ targets: this.beastC, x: l.x(0) + l.u(10), duration: 60, yoyo: true, repeat: 1, onComplete: () => this.beastC.setX(l.x(0)) });
-    if (this.beastLines) { this.beastLines.setAlpha(1); this.tweens.add({ targets: this.beastLines, alpha: 0.35, duration: 300 }); }
-    this.updateBars();
-    if (this.beast.hpNow <= 0) this.beastDeath();
   }
 
   beastDeath() {
@@ -2099,6 +2168,7 @@ class Battle extends Phaser.Scene {
     SFX.ensure(); SFX.noise(0.4, 600, 1, 0.12, 1800);
     this.state = 'anim';
     this.run.scried = true;
+    this.clearHintFx();
     this.unselectFrom(0);
     for (let i = 0; i < 16; i++) { if (this.board[i]) { this.board[i].c.destroy(); this.board[i] = null; } }
     this.fillBoard(false);
@@ -2106,18 +2176,65 @@ class Battle extends Phaser.Scene {
     this.tickEnemy(() => { this.state = 'pick'; });
   }
 
+  // The hint teaches the ORDER, not just the letters: tiles light one at a
+  // time in word order, a gold thread grows from tile to tile as it goes, the
+  // finished path holds a couple of seconds, then fades. A simultaneous
+  // highlight told you WHICH letters but never WHAT word.
   useHint() {
     if (this.state !== 'pick' || !this.hasSigil('tome') || this.hintUsed) return;
+    const best = this.bestWord();
+    if (!best) return;
     this.hintUsed = true;
     this.hintB.setAlpha(0.3); this.hintT.setAlpha(0.3);
     SFX.forge();
-    const best = this.bestWord();
-    if (!best) return;
-    for (const bi of best) {
-      const c = this.board[bi].c;
-      const g = this.add.image(c.x, c.y, 'dot').setScale(this.tileSize / 10).setTint(0xffd77a).setAlpha(0).setBlendMode('ADD').setDepth(40);
-      this.tweens.add({ targets: g, alpha: 0.55, duration: 250, yoyo: true, repeat: 3, onComplete: () => g.destroy() });
-    }
+    const l = this.L;
+    this.clearHintFx();
+    const fx = this.hintFx = this.add.container(0, 0).setDepth(45);
+    const line = this.add.graphics().setBlendMode('ADD');
+    fx.add(line);
+    // slot positions, not live containers — tiles may pop/shift under the fx
+    const pts = best.map((bi) => ({ x: this.board[bi].c.x, y: this.board[bi].c.y, bi }));
+    const segs = [];
+    const drawAll = (a, b, t) => {
+      line.clear();
+      line.lineStyle(l.u(4), 0xffd77a, 0.7);
+      for (const [p1, p2] of segs) { line.beginPath(); line.moveTo(p1.x, p1.y); line.lineTo(p2.x, p2.y); line.strokePath(); }
+      if (a && t > 0) {
+        line.beginPath(); line.moveTo(a.x, a.y);
+        line.lineTo(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t); line.strokePath();
+      }
+    };
+    const step = (k) => {
+      if (this.hintFx !== fx) return;   // cancelled mid-reveal
+      const p = pts[k];
+      SFX.chime(k);   // same rising scale the taps will make — ear learns it too
+      // soft halo, not a floodlight — the letter has to stay readable so the
+      // player can read the word off the board as the path grows
+      const g = this.add.image(p.x, p.y, 'dot').setScale(this.tileSize / 14)
+        .setTint(0xffc95c).setAlpha(0).setBlendMode('ADD');
+      fx.add(g);
+      this.tweens.add({ targets: g, alpha: 0.55, duration: 160, ease: 'Sine.easeOut', yoyo: true, hold: 60, repeat: 0, onComplete: () => g.setAlpha(0.3) });
+      const bc = this.board[p.bi] && this.board[p.bi].c;
+      if (bc) this.tweens.add({ targets: bc, scale: 1.1, duration: 130, yoyo: true });
+      if (k > 0) {
+        const a = pts[k - 1], seg = { t: 0 };
+        this.tweens.add({
+          targets: seg, t: 1, duration: 220, ease: 'Sine.easeOut',
+          onUpdate: () => { if (this.hintFx === fx) drawAll(a, p, seg.t); },
+          onComplete: () => { if (this.hintFx === fx) { segs.push([a, p]); drawAll(null, null, 0); } },
+        });
+      }
+      if (k + 1 < pts.length) this.time.delayedCall(340, () => step(k + 1));
+      else this.time.delayedCall(2200, () => { if (this.hintFx === fx) this.clearHintFx(true); });
+    };
+    step(0);
+  }
+  clearHintFx(fade) {
+    if (!this.hintFx) return;
+    const fx = this.hintFx;
+    this.hintFx = null;
+    if (fade) this.tweens.add({ targets: fx, alpha: 0, duration: 450, onComplete: () => fx.destroy() });
+    else fx.destroy();
   }
 
   // ---------- sigil pick ----------
