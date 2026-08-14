@@ -3072,10 +3072,33 @@
     background:radial-gradient(closest-side, rgba(255,230,150,0.95), rgba(255,210,90,0.35) 62%, rgba(255,210,90,0) 100%); }
   #shakeStage.shk-camon .cam-glow { animation:camGlow 1818ms ease-in-out infinite; }
   @keyframes camGlow { 0%,100% { opacity:0.5; } 50% { opacity:0.95; } }
+  /* ===== SH-03 THE KINGS (§6) ===== KING REX BOBS: on stage from the CUT in
+     full shows (a king watches the whole show — the :not(.shk-lite) door below;
+     short/RM keep the standard lite reveal), head-bobbing behind the line ON
+     the beat; at the DROP the conductor swaps his art to the ATTEMPTED
+     TINY-ARM CLAP for exactly one beat (the salute recipe — two little hands
+     straining and NOT meeting is the whole joke). His img rides .shk-i, so he
+     pops at the drop, JUMPS with the cast and freezes mid-air. */
+  #shakeStage:not(.shk-lite) .cam-rex { opacity:1; }
+  #shakeStage.shk-drop .cam-rex .shk-w, #shakeStage.shk-shake .cam-rex .shk-w,
+  #shakeStage.shk-sig .cam-rex .shk-w { animation:camRexBob 909ms ease-in-out infinite; }
+  @keyframes camRexBob { 0%,100% { transform:rotate(0deg); } 34% { transform:rotate(5deg) translateY(2px); }
+    68% { transform:rotate(-2deg); } }
+  /* KING YETI'S SHIVER-SHAKE: the caped king surfaces behind the line at the
+     Signature — announced by his REAL roar (the YETIB voice, an SFX accent
+     layered over the theme) — and shivers head to toe on the half-beat. The
+     confetti palette rides K.snow in shakeConf. */
+  #shakeStage.shk-camon .cam-yeti { animation:camYIn 455ms cubic-bezier(0.3,1.25,0.4,1) both; }
+  @keyframes camYIn { 0% { transform:translateY(26px) scale(var(--sc,1)); opacity:0; }
+    100% { transform:translateY(0) scale(var(--sc,1)); opacity:1; } }
+  #shakeStage.shk-camon .cam-yeti .shk-w { animation:camShiver 227ms ease-in-out infinite; }
+  @keyframes camShiver { 0%,100% { transform:rotate(-2.5deg) translateX(-1px); }
+    50% { transform:rotate(2.5deg) translateX(1px); } }
   /* the short show (D5 cameo-lite) and the RM tableau take the cameo STATIC */
   #shakeStage.shk-lite .cam-nem, #shakeStage.shk-lite .cam-nem .shk-w,
   #shakeStage.shk-lite .cam-momR, #shakeStage.shk-lite .cam-mus,
-  #shakeStage.shk-lite .cam-glow { animation:none; }
+  #shakeStage.shk-lite .cam-glow, #shakeStage.shk-lite .cam-rex .shk-w,
+  #shakeStage.shk-lite .cam-yeti, #shakeStage.shk-lite .cam-yeti .shk-w { animation:none; }
   /* THE FINALE VOLLEY (owned fireworks only): streaks rise and bloom in the
      stage sky, free-running THROUGH the freeze — deliberately absent from the
      .shk-frz pause list so the sky stays alive behind the frozen jump */
@@ -3094,7 +3117,8 @@
      specificity the later rule would win — measured in r2). The .shk-fw volley
      is deliberately NOT here: the sky stays alive behind the frozen jump. */
   #shakeStage.shk-frz.shk-camon .cam-momR,
-  #shakeStage.shk-frz.shk-camon .cam-glow { animation-play-state:paused; }
+  #shakeStage.shk-frz.shk-camon .cam-glow,
+  #shakeStage.shk-frz.shk-camon .cam-yeti .shk-w { animation-play-state:paused; }
   /* ⚠ ID-SCOPED AND LAST (v1.21): reduced motion stills the whole stage — the JS
      runs its own SHORTER still-tableau variant, this is the belt to that brace */
   @media (prefers-reduced-motion: reduce){
@@ -21402,8 +21426,15 @@ const PANTHEON=[
   { id:'camp100', due:()=>META.campaign>=100 },
   { id:'nemesis', due:()=>{ const n=META.nemesis||{}; return (n.w|0)>0 && (n.st|0)>=NEMESIS_DAYS.length; } },   // the retirement — co-fires with hm14, one moment
   { id:'mom',     due:()=>!!(META.mom&&META.mom.done) },
-  { id:'kingrex', due:()=>false },   // SH-03 wires the park/raid first-clear flags
-  { id:'kingyeti',due:()=>false }    // SH-03
+  // SH-03 THE KINGS: state = the TP wave's own first-kill ledgers. A King dies
+  // in exactly two rooms — his park's L20 finale (the key + the rung-20 pd bit
+  // bank on EVERY seat, D16; the yeti's bank at the AMBUSH INTERRUPT via
+  // nemParkBank, so his show fires at the NEXT win foot — usually the FROZEN
+  // CLAIM verdict itself) and his raid (META.bone/META.ice first-clear tiers,
+  // HOST-only writes, D20 — a keyless raid guest's save never crosses, so the
+  // celebration never invents a state that save doesn't hold).
+  { id:'kingrex', due:()=>!!(META.bronzeKey || (META.parks&&META.parks.dino&&((META.parks.dino.pd>>19)&1)) || (META.bone&&(META.bone.e||META.bone.m||META.bone.h))) },
+  { id:'kingyeti',due:()=>!!(META.silverKey || (META.parks&&META.parks.yeti&&((META.parks.yeti.pd>>19)&1)) || (META.ice&&(META.ice.e||META.ice.m||META.ice.h))) }
 ];
 // the two win feet call this AFTER every grant+saveMeta. State-based means a
 // missed moment (loss-crossing, two-due) fires on the next win by itself.
@@ -21414,7 +21445,9 @@ function pantheonCheck(){
     for(const p of PANTHEON){ if(!META.pantheon[p.id] && p.due()){ id=p.id; break; } }
     if(id){ META.pantheon[id]=1; saveMeta(); shakeShow(id,{}); return; }
     // D5 repeats: an already-seen great fight fought AGAIN gets the short show
-    const rep=S.momRaid? 'mom' : (S.bf&&S.bf.nem)? 'nemesis' : null;
+    const rep=S.momRaid? 'mom' : (S.bf&&S.bf.nem)? 'nemesis'
+      : (S.raid&&S.raid.cfg===S.cfg)? (S.raid.k==='bone'? 'kingrex' : 'kingyeti')   // SH-03: every raid win fells its King (every tier fields him) — a re-kill on a seen save; the identity stamp keeps a STALE bag silent (reset() never clears these two)
+      : (S.park&&S.park.cfg===S.cfg&&(S.park.n|0)>=PARK_LEVELS)? (S.park.id==='dino'? 'kingrex' : 'kingyeti') : null;   // a replayed L20 finale (the PARTY yeti-20 keeps its verdict whole — D12; the solo yeti-20 exits by the ambush and speaks through the CLAIM's own bf row above)
     if(rep && META.pantheon[rep]) shakeShow(rep,{short:true});
   }catch(e){}   // theater must never break a verdict
 }
@@ -21437,12 +21470,14 @@ function shakeShow(id,o){
   SHAKE={ id:id, short:!!o.short, rm:RM, t0:performance.now(), spb:spb, ph:ph, beats:beats,
           total:RM? SHAKE_RM_T : (beats-1)*spb+SHAKE_HOLD,
           held:held, rev:rev, src:null, g:null, raf:0, cur:null, frz:false, mdead:false,
-          gold:(id==='lv100'), shLen:shLen, nemSal:false };
+          gold:(id==='lv100'), shLen:shLen, nemSal:false,
+          snow:(id==='kingyeti'), rexSal:false, roared:false,   // SH-03: the snow palette + the clap/roar latches
+          cap:!!o.cap, capN:0, capStop:null };   // SH-03 CAPTURE: the ad factory's frame-counted clock (rig-only door — GVT.dance({capture:1}))
   shakeBuild(root, RM);
   root.className=RM? 'shk-rm shk-camon shk-lite' : (o.short? 'shk-lite' : '');   // SH-02: the RM tableau includes the cameo STATIC; short shows take the lite treatment
   root.classList.remove('hidden');
   if(!RM) shakeDecode(()=>shakeMusicTry());   // the RM tableau ships silent — calm is calm
-  window.addEventListener('pointerdown', shakeSkip, true);   // capture-phase: one tap ends theater; pe:none root never blocks the tap underneath
+  if(!o.cap) window.addEventListener('pointerdown', shakeSkip, true);   // capture-phase: one tap ends theater; pe:none root never blocks the tap underneath (SH-03: capture mode records — a stray tap must never eat a take)
   SHAKE.raf=requestAnimationFrame(shakeFrame);
 }
 // dancers = the winning side's standing units at verdict time, capped and padded
@@ -21532,6 +21567,20 @@ function shakeBoxURI(){
     +'<g transform="rotate(-9 14 60)">'+SHAKE_BOX_LID+'</g>';
   return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 140">'+body+'</svg>');
 }
+// SH-03 KING REX's two frames (§6): the kingrex art itself (the rex mold in
+// his sharp shades) and THE ATTEMPTED CLAP — the mold's one tiny arm re-posed
+// reaching forward with its hidden twin drawn in behind (the mold's own darker
+// green), two little hands straining toward each other and NOT meeting.
+// Split/join on the arm's exact strings (the kingyeti re-pose recipe); the
+// conductor swaps src on the beat — the salute's machinery, beat for beat.
+const SHAKE_REX_ARM='<path d="M62 96 Q54 98 52 106" stroke="#4E8C4A" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="52" cy="107" r="3" fill="#4E8C4A"/>';
+function shakeRexURI(clap){
+  let a=SPRITES_SRC.kingrex;
+  if(clap) a=a.replace(SHAKE_REX_ARM,
+     '<path d="M66 101 Q57 99 53 103" stroke="#3D6E3B" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="52" cy="104" r="2.6" fill="#3D6E3B"/>'
+    +'<path d="M62 96 Q52 91 46 95" stroke="#4E8C4A" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="45" cy="96" r="3" fill="#4E8C4A"/>');
+  return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140">'+a+'</svg>');
+}
 // the cameo cast (§6) — built with the stage, revealed by .shk-camon (the
 // Signature on full shows, the finale on short ones — D5 cameo-lite), STATIC
 // under .shk-lite and in the RM tableau. Movers reuse .shk-w/.shk-i so the sig
@@ -21569,6 +21618,20 @@ function shakeCamHTML(id, RM, short){
     }
     return s;
   }
+  if(id==='kingrex'){
+    // KING REX BOBS (§6): the dino park's own king looms behind the line the
+    // WHOLE full show (visible from the cut — the CSS :not(.shk-lite) door),
+    // head-bobbing on the beat; the clap swap is the conductor's.
+    return '<div class="shk-d shk-cam cam-rex" style="left:78%;bottom:19%;--sc:2.3;--i:10;--dir:1">'
+      +'<div class="shk-w"><img class="shk-i cam-rexi" src="'+shakeRexURI(false)+'" style="--fx:1" alt=""></div></div>';
+  }
+  if(id==='kingyeti'){
+    // THE SHIVER-SHAKE (§6): the mountain's caped king surfaces center-back at
+    // the Signature and shivers on the half-beat; his img rides .shk-i so he
+    // jumps with the cast and freezes mid-air.
+    return '<div class="shk-d shk-cam cam-yeti" style="left:50%;bottom:19%;--sc:2.3;--i:11;--dir:-1">'
+      +'<div class="shk-w"><img class="shk-i" src="'+sprURI('kingyeti')+'" style="--fx:1" alt=""></div></div>';
+  }
   return '';
 }
 // THE FINALE VOLLEY (§7 compose): if the player OWNS victory fireworks and has
@@ -21597,7 +21660,8 @@ function shakeConf(nn, mode){
   const holder=document.getElementById('shkConf'); if(!holder) return;
   const W=window.innerWidth||812, H=window.innerHeight||375;
   const cols=K.gold? ['#FFD24A','#FFE9A0','#F5C542','#FFF3C4','#E8C25A','#FFD98C']
-                   : ['#FFD24A','#BFE39A','#E86A5E','#7FB4E8','#FFF3C4','#E8A0E0'];   // SH-02: an lv100 show throws GOLD
+             : K.snow? ['#FFFFFF','#E8F4FF','#CFE9FF','#B8DDF7','#9FD4F5','#F4FBFF']
+                   : ['#FFD24A','#BFE39A','#E86A5E','#7FB4E8','#FFF3C4','#E8A0E0'];   // SH-02: an lv100 show throws GOLD · SH-03: the King Yeti's show SNOWS
   let s='';
   for(let i=0;i<nn;i++){
     const L=(i%2)===0; let x0,y0,x1,y1;
@@ -21612,7 +21676,11 @@ function shakeConf(nn, mode){
 function shakeFrame(){
   const K=SHAKE; if(!K) return;
   const root=document.getElementById('shakeStage'); if(!root){ SHAKE=null; return; }
-  const t=(performance.now()-K.t0)/1000;
+  // SH-03 CAPTURE: under the rig's capture preset the conductor's clock is
+  // FRAME-COUNTED — every class swap lands on the same frame index every run,
+  // and the slaving loop at the frame's foot pins each CSS animation to this
+  // same clock, so two recordings are identical frame for frame.
+  const t=K.cap? K.capN/60 : (performance.now()-K.t0)/1000;
   if(!K.rm){
     const b=t/K.spb;
     let acc=0, cur=null;
@@ -21622,9 +21690,11 @@ function shakeFrame(){
       K.cur=cur;
       root.classList.remove('shk-cut','shk-drop','shk-shake','shk-sig','shk-fin');
       root.classList.add('shk-'+cur);
-      if(cur==='drop'){ shakeConf(Math.floor(CONFETTI_N*0.55),'cannon'); try{ SFX.fwpop(); }catch(e){} }   // accent 1 of 2, existing palette
+      if(cur==='drop'){ shakeConf(Math.floor(CONFETTI_N*0.55),'cannon'); try{ SFX.fwpop(); }catch(e){}   // accent 1 of 2, existing palette
+        if(K.id==='kingrex' && !K.short){ const ri=root.querySelector('.cam-rexi'); if(ri) ri.src=shakeRexURI(true); } }   // SH-03: THE ATTEMPTED CLAP — the tiny arms reach on the drop (the salute recipe: art swap on the beat)
       if(cur==='shake') root.classList.add('shk-march');
-      if(cur==='sig' && !K.short) root.classList.add('shk-camon');   // SH-02: the cameo owns the stage (persistent — the phase swap never removes it)
+      if(cur==='sig' && !K.short){ root.classList.add('shk-camon');   // SH-02: the cameo owns the stage (persistent — the phase swap never removes it)
+        if(K.id==='kingyeti' && !K.roared){ K.roared=true; try{ SFX.yeti(); }catch(e){} } }   // SH-03: the King's REAL roar is the sting — an SFX accent over the theme (§8.4: soundOn-gated like every accent, silent under mute, never a second track)
       if(cur==='fin'){ if(K.short) root.classList.add('shk-camon');   // D5 cameo-lite: the token appears in the finale freeze
         shakeFw(root);   // owned VICTORY FIREWORKS volley the stage sky (§7 compose — never the world launcher)
         shakeConf(CONFETTI_N-Math.floor(CONFETTI_N*0.55),'burst'); try{ SFX.thump(); }catch(e){} }   // accent 2 of 2
@@ -21637,12 +21707,25 @@ function shakeFrame(){
                 so.classList.toggle('shk-tw', sw>=4&&sw<6);
                 so.classList.toggle('shk-worm', sw>=8&&sw<16); }
               else so.classList.remove('shk-tw','shk-worm'); }
+      if(K.id==='kingrex' && !K.rexSal && b>=3){
+        K.rexSal=true;   // SH-03: the clap holds for exactly one beat — the arms drop back on beat 3 (the drop is beats 2..4)
+        const ri=root.querySelector('.cam-rexi'); if(ri) ri.src=shakeRexURI(false);
+      }
       if(K.id==='nemesis' && K.cur==='sig' && !K.nemSal && (sb-K.shLen)>=4.4){
         K.nemSal=true;   // THE SALUTE: the blade snaps UP on the beat — the conductor swaps back to the raised art
         const ni=root.querySelector('.cam-nemi'); if(ni) ni.src=shakeNemURI(false);
       }
     }
     if(!K.frz && b>=K.beats-1){ K.frz=true; root.classList.add('shk-frz'); }   // freeze mid-air, hold — the screenshot frame
+  }
+  if(K.cap){   // SH-03 CAPTURE: slave every CSS clock to the frame-counted conductor.
+    try{        // On first sight an animation is stamped to its birth frame AND its
+      const as=root.getAnimations({subtree:true});   // playbackRate zeroed — transform/opacity animations run on the
+      for(const a of as){ if(a.playState==='paused') continue;   // COMPOSITOR thread, which self-advances between main-thread commits
+        if(a.__ct==null){ a.__ct=t; a.playbackRate=0; }          // (measured: ±1 frame of drift on a held still). Rate 0 stops that
+        a.currentTime=Math.max(0,(t-a.__ct)*1000); }             // clock dead; the seek below is the ONLY clock. Freeze pauses stay theirs.
+    }catch(e){}
+    if(!(K.capStop!=null && K.capN>=K.capStop)) K.capN++;   // GVT.danceHold(n) parks the clock AT a frame; null releases it
   }
   if(t>=K.total) return shakeEnd();
   K.raf=requestAnimationFrame(shakeFrame);
@@ -23179,7 +23262,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.70';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.71';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -43423,6 +43506,7 @@ function startParkBattle(park, n){
   S.park={ id:park, n:n, mine:true,
     hex:(park==='yeti' && n>=PARK_LEVELS? (((ARMIES.find(a=>a.id==='red')||{}).hex)||'#C05A4A') : null) };   // v3.35: the red ambush tint is the YETI finale's alone — the dino park has no Nemesis (D18), its cast stays factory
   S.cfg=parkCfg(park, n);
+  S.park.cfg=S.cfg;   // SH-03: the raid bag's identity-stamp law (v3.39) mirrored — a stale park bag on a battle→battle jump goes inert for its readers
   S.plastic=PARK_TAGS;
   if(S.park.hex) buildFoeTint(S.park.hex);
   hideAllOverlays();
@@ -48746,10 +48830,12 @@ window.GVT = {
   // (const 132-BPM clock, index-derived stagger and positions, zero RNG), so
   // battery runs and ad-factory captures repeat frame for frame.
   dance(id,o){ o=o||{}; if(SHAKE) shakeTeardown();
-    shakeShow(id||'lv100',{short:!!o.short}); return GVT.shake(); },
+    shakeShow(id||'lv100',{short:!!o.short, cap:!!(o.capture||o.cap)}); return GVT.shake(); },   // SH-03: {capture:1} = the ad factory's deterministic preset (frame clock + tap-proof)
+  danceHold(n){ if(SHAKE&&SHAKE.cap) SHAKE.capStop=(n==null? null : Math.max(0,n|0));   // SH-03: park the pinned clock AT a frame (screenshot-stable step-through); null releases
+    return GVT.shake(); },
   shake(){ const K=SHAKE, root=document.getElementById('shakeStage');
     return { live:!!K, id:K? K.id:null, short:!!(K&&K.short), rm:!!(K&&K.rm),
-      t:K? +(((performance.now()-K.t0)/1000).toFixed(2)):0, total:K? +K.total.toFixed(2):0,
+      t:K? +((K.cap? K.capN/60 : (performance.now()-K.t0)/1000).toFixed(2)):0, total:K? +K.total.toFixed(2):0,
       phase:K? (K.rm? 'rm' : (K.cur||'cut')):null, frz:!!(K&&K.frz),
       up:!!(root&&!root.classList.contains('hidden')),
       dancers:root? root.querySelectorAll('.shk-d').length:0,
@@ -48759,6 +48845,8 @@ window.GVT = {
       fwb:root? root.querySelectorAll('.shk-fwb').length:0,
       gold:!!(K&&K.gold), camon:!!(root&&root.classList.contains('shk-camon')),
       lite:!!(root&&root.classList.contains('shk-lite')), nemSal:!!(K&&K.nemSal),
+      snow:!!(K&&K.snow), rexSal:!!(K&&K.rexSal), roared:!!(K&&K.roared),
+      cap:!!(K&&K.cap), capN:K? (K.capN|0):0, capStop:(K&&K.capStop!=null)? K.capStop : null,
       musicLive:!!(K&&K.src), gain:(K&&K.g)? +K.g.gain.value.toFixed(3):null,
       held:!!(K&&K.held), buf:!!SHAKEB.buf, themeDead:THEME.dead, themeSrc:!!THEME.src,
       winHidden:document.getElementById('win').classList.contains('hidden'),
