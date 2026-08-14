@@ -3,12 +3,12 @@
    STARSPELL — word-roguelite (Corkscrew Games)
    v0.2: Home / Campaign (3 acts) / Quick Play / Daily Hunt with
    share + leaderboards (daily & weekly) / Profile with stats and
-   achievements / 10 constellation beasts / 16 sigils / ambient
+   achievements / 10 constellation beasts / 24 tiered sigils / ambient
    music and a heavy coat of star-magic. Versus: next moon.
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.17.0';
+const BUILD = 'STARSPELL v0.18.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -809,7 +809,7 @@ function ssTitleTex(scene) {
     const tex = scene.textures.get(key), f = tex.getSourceImage();
     return { key, w: f.width / R, h: f.height / R, anchors: tex.ssAnchors || [] };
   }
-  const latin = !/[^ -ɏ\s]/.test(text);
+  const latin = !/[^\u0000-ɏ\s]/.test(text);
   const meas = document.createElement('canvas').getContext('2d');
   const A = latin ? px * 0.16 : 0;             // arch height
   let letters = null, tw = 0, asc = 0, desc = 0;
@@ -1012,6 +1012,114 @@ function ssGoldTex(scene, text, sizeU) {
   c.globalCompositeOperation = 'source-over';
   t.refresh();
   return { key, w: W / R, h: H / R };
+}
+
+/* ---- sigil rarity dress ------------------------------------------------
+   Three tiers, unmistakable at a glance: basic wears the house gold, rare a
+   cool gem-blue frame with an icy glow, legendary a gold radiance with rays
+   baked around its medallion (the scene adds particles and an arrival flash
+   on top). Card chrome is baked per tier+size like ssBtn's slices. */
+const SS_RARITY = [
+  { glow: 0xd7b45c, ink: '#e6d9ac', shadow: '#c9b676', label: null, labelColor: '' },
+  { glow: 0x6fa8ff, ink: '#d4e4ff', shadow: '#6fa8ff', label: 'rarityRare', labelColor: '#9fc8ff' },
+  { glow: 0xffd77a, ink: '#ffe9a8', shadow: '#ffc94d', label: 'rarityLegendary', labelColor: '#ffdf8f' },
+];
+
+// Baked card chrome: midnight glass, tier frame + hairline, corner ornaments,
+// and a medallion socket on the left for the glyph. Returns { key, mx, mr } —
+// medallion centre/radius in design units (recomputed on cache hits).
+function ssSigilCardTex(scene, tier, w, h) {
+  const mr = Math.min(h * 0.30, 40), mx = Math.max(mr + 14, h * 0.42);
+  const key = 'sigcard' + tier + '@' + w + 'x' + h;
+  if (scene.textures.exists(key)) return { key, mx, mr };
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(w * R), Math.round(h * R));
+  const c = t.context;
+  c.scale(R, R);
+  const frame = ['#c9a84c', '#7fb4ff', '#ffd77a'][tier];
+  const faint = ['rgba(215,180,92,', 'rgba(127,180,255,', 'rgba(255,215,122,'][tier];
+  const rad = Math.min(16, h * 0.2);
+  const rr = (inset, r) => { c.beginPath(); c.roundRect(inset, inset, w - inset * 2, h - inset * 2, r); };
+  // midnight glass — cooler for rare, a warmer dusk-violet for legendary
+  rr(2.5, rad);
+  const g = c.createLinearGradient(0, 0, 0, h);
+  if (tier === 1) { g.addColorStop(0, '#152247'); g.addColorStop(0.55, '#0e1530'); g.addColorStop(1, '#0a0f24'); }
+  else if (tier === 2) { g.addColorStop(0, '#2a2142'); g.addColorStop(0.55, '#171129'); g.addColorStop(1, '#100c1e'); }
+  else { g.addColorStop(0, '#171d3c'); g.addColorStop(0.55, '#10142c'); g.addColorStop(1, '#0b0f21'); }
+  c.fillStyle = g; c.fill();
+  const g2 = c.createLinearGradient(0, 2.5, 0, h * 0.4);        // starlight sheen
+  g2.addColorStop(0, tier === 2 ? 'rgba(255,224,141,0.13)' : 'rgba(159,176,232,0.11)');
+  g2.addColorStop(1, 'rgba(159,176,232,0)');
+  rr(2.5, rad); c.fillStyle = g2; c.fill();
+  c.lineWidth = 2; c.strokeStyle = frame; rr(2.5, rad); c.stroke();
+  c.lineWidth = 0.8; c.strokeStyle = faint + '0.5)'; rr(6.5, rad * 0.72); c.stroke();
+  // corner ornaments: a small diamond with two trailing ticks, mirrored 4x
+  const orn = (x, y, sx, sy) => {
+    c.save(); c.translate(x, y); c.scale(sx, sy);
+    c.fillStyle = frame;
+    c.beginPath(); c.moveTo(11, 15); c.lineTo(15, 11); c.lineTo(19, 15); c.lineTo(15, 19); c.closePath(); c.fill();
+    c.strokeStyle = faint + '0.7)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(15, 19); c.lineTo(15, 26); c.moveTo(19, 15); c.lineTo(26, 15); c.stroke();
+    c.restore();
+  };
+  orn(0, 0, 1, 1); orn(w, 0, -1, 1); orn(0, h, 1, -1); orn(w, h, -1, -1);
+  // the medallion socket
+  const my = h / 2;
+  if (tier === 2) {                                              // legendary rays
+    c.strokeStyle = 'rgba(255,215,122,0.20)'; c.lineWidth = 1.2;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + 0.26;
+      c.beginPath(); c.moveTo(mx + Math.cos(a) * (mr + 3), my + Math.sin(a) * (mr + 3));
+      c.lineTo(mx + Math.cos(a) * (mr + 12), my + Math.sin(a) * (mr + 12)); c.stroke();
+    }
+  }
+  const rg = c.createRadialGradient(mx, my, 2, mx, my, mr);
+  rg.addColorStop(0, faint + '0.30)'); rg.addColorStop(0.75, faint + '0.10)'); rg.addColorStop(1, faint + '0)');
+  c.beginPath(); c.arc(mx, my, mr, 0, Math.PI * 2); c.fillStyle = rg; c.fill();
+  c.lineWidth = 1.6; c.strokeStyle = frame; c.beginPath(); c.arc(mx, my, mr, 0, Math.PI * 2); c.stroke();
+  c.lineWidth = 0.8; c.strokeStyle = faint + '0.5)'; c.beginPath(); c.arc(mx, my, mr - 3.5, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = frame;                                           // compass points on the ring
+  for (const [dx, dy] of [[0, -mr], [0, mr], [-mr, 0], [mr, 0]]) {
+    c.beginPath(); c.arc(mx + dx, my + dy, 1.6, 0, Math.PI * 2); c.fill();
+  }
+  t.refresh();
+  return { key, mx, mr };
+}
+
+// One ornate pick card: baked chrome, glyph in the medallion, gold-letterpress
+// nameplate, rarity ribbon, italic desc. Interactive container, w x h design
+// units; heights under 100 lay out as the compact (versus) one-liner.
+function ssSigilCard(scene, l, sg, w, h) {
+  const tier = sg.rarity | 0;
+  const RC = SS_RARITY[tier];
+  const loc = SS_SIG(sg);
+  const tex = ssSigilCardTex(scene, tier, w, h);
+  const c = scene.add.container(0, 0);
+  c.add(scene.add.image(0, 0, tex.key).setDisplaySize(l.u(w), l.u(h)));
+  const gx = -w / 2 + tex.mx;
+  c.add(ssTxt(scene, l.u(gx), 0, sg.icon, l.u(tex.mr * 0.98), RC.ink).setOrigin(0.5)
+    .setShadow(0, 0, RC.shadow, l.u(5), true, true));
+  const lx = gx + tex.mr + 14, maxW = w / 2 - lx - 12;
+  const compact = h < 100;
+  const gk = ssGoldTex(scene, loc.name, compact ? 12 : 15);
+  const nsc = Math.min(1, maxW / gk.w);
+  const nameY = compact ? -h / 2 + 16 : (RC.label ? -h / 2 + 42 : -h / 2 + 52);
+  c.add(scene.add.image(l.u(lx), l.u(nameY), gk.key).setOrigin(0, 0.5)
+    .setDisplaySize(l.u(gk.w * nsc), l.u(gk.h * nsc)));
+  if (RC.label) {
+    const lab = compact
+      ? ssTxt(scene, l.u(w / 2 - 24), l.u(-h / 2 + 19), SS_T(RC.label), l.u(9), RC.labelColor).setOrigin(1, 0.5)
+      : ssTxt(scene, l.u(lx), l.u(nameY + 19), '✦ ' + SS_T(RC.label) + ' ✦', l.u(10), RC.labelColor).setOrigin(0, 0.5);
+    c.add(lab.setLetterSpacing(l.u(2)).setShadow(0, 0, RC.shadow, l.u(6), true, true));
+  }
+  const descY = compact ? 0 : (RC.label ? nameY + 30 : nameY + 15);
+  c.add(scene.add.text(l.u(lx), l.u(descY), loc.desc, {
+    fontFamily: SERIF, fontSize: l.u(compact ? 10 : 12.5) + 'px', color: '#c3c6da', fontStyle: 'italic',
+    wordWrap: { width: l.u(maxW + 4) }, lineSpacing: l.u(2),
+  }).setOrigin(0, 0));
+  c.setSize(l.u(w), l.u(h)).setInteractive({ useHandCursor: true });
+  c.setData('sigilCard', true);
+  return c;
 }
 
 // Layout: 420 x 800 design space, scaled + centered
@@ -1625,7 +1733,8 @@ class Battle extends Phaser.Scene {
       sigils: this.resume.sigils || [], words: this.resume.words | 0, longest: this.resume.longest || '',
       totalDmg: this.resume.totalDmg | 0, scried: !!this.resume.scried, featherUsed: !!this.resume.featherUsed,
       letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0, playMs: this.resume.playMs | 0,
-    } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0 };
+      overkill: this.resume.overkill | 0,
+    } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0, overkill: 0 };
     this.run.startAt = Date.now();
     this.run.firstUsed = false;
     this.state = 'boot';
@@ -1845,7 +1954,11 @@ class Battle extends Phaser.Scene {
     let dmg = base * (LEN_MULT[Math.min(letters, 8)] || 2.3) * starMult;
     if (this.hasSigil('quill')) dmg += 4;
     if (this.hasSigil('longbow') && letters >= 6) dmg += 12;
+    if (this.hasSigil('roots')) dmg += 2 * this.run.sigils.length;
+    if (this.hasSigil('verse')) dmg += this.run.words;
     if (this.hasSigil('blood')) dmg *= 1.25;
+    if (this.hasSigil('nova') && letters >= 7) dmg *= 2;
+    if (this.hasSigil('storm') && this.run.words % 3 === 2) dmg *= 2;   // every 3rd cast
     if (this.hasSigil('first') && !this.run.firstUsed) dmg *= 2;
     return Math.round(dmg);
   }
@@ -1868,9 +1981,17 @@ class Battle extends Phaser.Scene {
     this.beast = this.beastFor(f);
     if (this.hasSigil('hush')) this.beast.timer += 1;
     this.beast.hpNow = this.beast.hp;
+    if ((this.run.overkill | 0) > 0) {                 // ECHO OF RUIN carries the surplus
+      const carve = Math.min(this.run.overkill | 0, this.beast.hp - 1);
+      this.beast.hpNow -= carve;
+      this.run.overkill = 0;
+      const et = ssTxt(this, l.x(0), l.y(238), '☍ −' + carve, l.u(18), '#d9b0ff').setOrigin(0.5).setDepth(70)
+        .setShadow(0, 0, '#a86be0', l.u(8), true, true);
+      this.tweens.add({ targets: et, alpha: 0, y: l.y(214), delay: 1100, duration: 500, onComplete: () => et.destroy() });
+    }
     // what the bar/numbers SHOW — trails hpNow, catching up when a flying
     // damage number lands on the bar
-    this.ehpShown = { v: this.beast.hp };
+    this.ehpShown = { v: this.beast.hpNow };
     this.dying = false;
     this.beast.count = this.beast.timer;
     this.run.firstUsed = false;
@@ -1951,6 +2072,7 @@ class Battle extends Phaser.Scene {
     const tiles = this.sel.map((i) => this.board[i]);
     const dmg = this.wordDamage(tiles);
     const letters = tiles.reduce((a, s) => a + s.ch.length, 0);
+    const stormProc = this.hasSigil('storm') && this.run.words % 3 === 2;   // before words++
     this.run.words++; this.run.firstUsed = true;
     this.run.letters += letters;
     if (dmg > this.run.bigHit) this.run.bigHit = dmg;
@@ -1972,6 +2094,11 @@ class Battle extends Phaser.Scene {
       const bt = ssTxt(this, l.x(0), l.y(430), word6, l.u(24), '#ffe9a8').setOrigin(0.5).setDepth(70).setScale(0.5);
       this.tweens.add({ targets: bt, scale: 1, duration: 200, ease: 'Back.easeOut' });
       this.tweens.add({ targets: bt, alpha: 0, y: l.y(410), delay: 800, duration: 400, onComplete: () => bt.destroy() });
+    }
+    if (stormProc) {                                   // STORMBINDER doubles this one
+      const st = ssTxt(this, l.x(0), l.y(498), '↯ ×2', l.u(18), '#bfe0ff').setOrigin(0.5).setDepth(70)
+        .setShadow(0, 0, '#6fa8ff', l.u(9), true, true);
+      this.tweens.add({ targets: st, alpha: 0, y: l.y(474), delay: 650, duration: 400, onComplete: () => st.destroy() });
     }
 
     const tx = this.beastC.x - this.lineC.x, ty = this.beastC.y - this.lineC.y;
@@ -2124,8 +2251,9 @@ class Battle extends Phaser.Scene {
     if (this.fights[this.run.fightIdx].id === 'phoenix') SS.award('first-flame', this.game);
     if (!this.struckThisBattle) SS.award('untouched', this.game);
     SS.save();
+    if (this.hasSigil('echo')) this.run.overkill = Math.max(0, -this.beast.hpNow);
     this.run.fightIdx++;
-    this.heal(6);
+    this.heal(this.hasSigil('meteor') ? this.run.hpMax : 6);
     if (this.mode === 'campaign') this.saveCheckpoint();
     this.time.delayedCall(1150, () => {
       if (this.run.fightIdx >= this.fights.length) this.endRun(true);
@@ -2140,6 +2268,7 @@ class Battle extends Phaser.Scene {
       sigils: this.run.sigils, words: this.run.words, longest: this.run.longest,
       totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
       letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
+      overkill: this.run.overkill | 0,
     }));
   }
   runElapsed() { return (this.run.playMs | 0) + Math.max(0, Date.now() - this.run.startAt); }
@@ -2167,8 +2296,11 @@ class Battle extends Phaser.Scene {
     this.cameras.main.flash(220, 120, 20, 30);
     this.time.delayedCall(220, () => {
       this.struckThisBattle = true;
-      this.run.hp -= this.beast.atk;
-      const dt = ssTxt(this, l.x(-160), l.y(68), '-' + this.beast.atk, l.u(22), '#ff8a8a').setOrigin(0.5).setDepth(70);
+      let atk = this.beast.atk;
+      if (this.hasSigil('eclipse')) atk = Math.ceil(atk / 2);
+      if (this.hasSigil('ward')) atk = Math.max(1, atk - 3);
+      this.run.hp -= atk;
+      const dt = ssTxt(this, l.x(-160), l.y(68), '-' + atk, l.u(22), '#ff8a8a').setOrigin(0.5).setDepth(70);
       this.tweens.add({ targets: dt, y: dt.y + l.u(30), alpha: 0, duration: 800, onComplete: () => dt.destroy() });
       if (this.run.hp <= 0 && this.hasSigil('feather') && !this.run.featherUsed) {
         this.run.featherUsed = true;
@@ -2259,37 +2391,91 @@ class Battle extends Phaser.Scene {
   }
 
   // ---------- sigil pick ----------
+  // Rarity gating. Campaign: rares surface from late Act I and climb with the
+  // ascent, legendaries from mid Act II — power arrives with the difficulty.
+  // Quick/daily: any tier can appear anywhere, but at LOW odds, so an early
+  // lucky legendary stays a story, not a strategy (the legendary effects are
+  // also tuned to scale — none of them flat-nukes an early beast).
+  sigilChances() {
+    if (this.mode === 'campaign') {
+      const p = this.run.fightIdx / Math.max(1, this.fights.length - 1);
+      return {
+        rare: this.run.fightIdx >= 3 ? 0.12 + 0.28 * p : 0,
+        leg: this.run.fightIdx >= 7 ? 0.04 + 0.14 * Math.max(0, p - 0.5) / 0.5 : 0,
+      };
+    }
+    return { rare: 0.10, leg: 0.03 };
+  }
+  rollSigilOpts() {
+    const { rare, leg } = this.sigilChances();
+    const pools = [0, 1, 2].map((r) => SS_SIGILS.filter((s) => (s.rarity | 0) === r && !this.run.sigils.includes(s.id)));
+    const opts = [];
+    for (let k = 0; k < 3; k++) {
+      const roll = rng();
+      let tier = roll < leg ? 2 : roll < leg + rare ? 1 : 0;
+      while (tier > 0 && !pools[tier].length) tier--;          // pool dry → fall a tier
+      const pool = pools[tier].length ? pools[tier] : pools.find((p) => p.length);
+      if (!pool || !pool.length) break;
+      opts.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
+    }
+    return opts;
+  }
   showSigilPick() {
     const l = this.L;
     this.state = 'sigil';
-    const avail = SS_SIGILS.filter((s) => !this.run.sigils.includes(s.id));
-    const opts = [];
-    while (opts.length < 3 && avail.length) opts.push(avail.splice(Math.floor(rng() * avail.length), 1)[0]);
+    const opts = this.rollSigilOpts();
+    if (!opts.length) { this.startFight(); return; }           // every sigil owned — ride on
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
-    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.82).setInteractive();
-    const head = ssTxt(this, l.x(0), l.y(150), '— CHOOSE A SIGIL —', l.u(18), '#c9b676').setOrigin(0.5)
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.86, duration: 300 });
+    const head = ssTxt(this, l.x(0), l.y(128), SS_T('sigilHead'), l.u(18), '#c9b676').setOrigin(0.5)
       .setShadow(0, 0, '#c9b676', l.u(10), true, true);
     const items = [veil, head];
+    // pick-screen sparkles ride above the cards (added to overlayC last)
+    const sparks = this.add.particles(0, 0, 'dot', {
+      speed: { min: 40, max: 240 }, lifespan: { min: 300, max: 900 }, scale: { start: 0.8, end: 0 },
+      tint: [0xffd77a, 0xfff2c9], blendMode: 'ADD', emitting: false,
+    });
     opts.forEach((sg, k) => {
-      const cy = l.y(280 + k * 150);
-      const card = this.add.image(l.x(0), cy, 'panel').setDisplaySize(l.u(330), l.u(124)).setInteractive({ useHandCursor: true });
-      const nm = ssTxt(this, l.x(0), cy - l.u(26), sg.icon + '  ' + sg.name, l.u(17), '#6a4e11').setOrigin(0.5);
-      const ds = this.add.text(l.x(0), cy + l.u(8), sg.desc, {
-        fontFamily: SERIF, fontSize: l.u(13) + 'px', color: '#4a4030', fontStyle: 'italic',
-        wordWrap: { width: l.u(290) },
-      }).setOrigin(0.5);
-      items.push(card, nm, ds);
-      card.setAlpha(0); nm.setAlpha(0); ds.setAlpha(0);
-      this.tweens.add({ targets: [card, nm, ds], alpha: 1, delay: 150 + k * 130, duration: 300 });
+      const cy = l.y(268 + k * 168);
+      const tier = sg.rarity | 0;
+      const glow = this.add.image(l.x(0), cy, 'glowbig').setDisplaySize(l.u(470), l.u(240))
+        .setTint(SS_RARITY[tier].glow).setAlpha(0).setBlendMode('ADD');
+      const card = ssSigilCard(this, l, sg, 336, 146).setPosition(l.x(0), cy + l.u(26)).setAlpha(0);
+      items.push(glow, card);
+      const delay = 160 + k * 150;
+      this.tweens.add({ targets: card, alpha: 1, y: cy, delay, duration: 320, ease: 'Cubic.easeOut' });
+      if (tier > 0) {
+        // arrival glow settles into a slow breathing pulse
+        this.tweens.add({
+          targets: glow, alpha: tier === 2 ? 0.22 : 0.12, delay, duration: 400,
+          onComplete: () => this.tweens.add({ targets: glow, alpha: tier === 2 ? 0.10 : 0.05, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }),
+        });
+        this.time.delayedCall(delay + 280, () => {
+          if (this.state !== 'sigil') return;
+          if (tier === 2) {                                    // the legendary announces itself
+            SFX.forge();
+            this.cameras.main.flash(300, 255, 214, 120, false);
+            sparks.emitParticleAt(l.x(0), cy, 22);
+          } else sparks.emitParticleAt(l.x(0), cy, 8);
+        });
+      }
+      card.on('pointerover', () => { if (this.state === 'sigil') this.tweens.add({ targets: card, scale: 1.03, duration: 120 }); });
+      card.on('pointerout', () => this.tweens.add({ targets: card, scale: 1, duration: 120 }));
       card.on('pointerdown', () => {
+        if (this.state !== 'sigil') return;
+        this.state = 'anim';
         SFX.sigil();
         this.run.sigils.push(sg.id);
         if (sg.id === 'aegis') { this.run.hpMax += 20; this.run.hp = this.run.hpMax; }
         if (this.mode === 'campaign') this.saveCheckpoint();
-        for (const it of items) it.destroy();
-        this.startFight();
+        sparks.emitParticleAt(card.x, card.y, tier === 2 ? 26 : 12);
+        this.tweens.add({ targets: card, scale: 1.05, duration: 130, yoyo: true });
+        for (const it of items) if (it !== card && it !== sparks) this.tweens.add({ targets: it, alpha: 0, duration: 200 });
+        this.time.delayedCall(260, () => { sparks.destroy(); for (const it of items) it.destroy(); this.startFight(); });
       });
     });
+    items.push(sparks);
     this.overlayC.add(items);
   }
 
@@ -2479,7 +2665,7 @@ class Battle extends Phaser.Scene {
       if (!this.sigilShownAt) this.sigilShownAt = this.time.now;
       if (this.time.now - this.sigilShownAt > 2200) {
         this.sigilShownAt = 0;
-        const cards = this.overlayC.list.filter((o) => o.texture && o.texture.key === 'panel');
+        const cards = this.overlayC.list.filter((o) => o.getData && o.getData('sigilCard'));
         if (cards.length) cards[Math.floor(Math.random() * cards.length)].emit('pointerdown');
       }
       return;

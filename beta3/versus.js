@@ -640,19 +640,33 @@ class VsBattle extends Phaser.Scene {
   showSigilPick() {
     const l = this.L;
     this.state = 'sigil';
-    const avail = SS_SIGILS.filter((s) => !this.mySigils.includes(s.id) && !['aegis', 'hush', 'shield', 'feather', 'salve', 'comet', 'tome', 'first'].includes(s.id));
+    // Only sigils this engine actually implements (see wordDamage/tryCast) —
+    // the solo-only ones (battle timers, heals, revives) would be dead picks.
+    // The old exclusion list leaked leech and gilded, which did nothing here.
+    const VS_OK = ['quill', 'choir', 'runes', 'forge', 'longbow', 'blood'];
+    const avail = SS_SIGILS.filter((s) => !this.mySigils.includes(s.id) && VS_OK.includes(s.id));
     const opts = [];
     while (opts.length < 3 && avail.length) opts.push(avail.splice(Math.floor(Math.random() * avail.length), 1)[0]);
     if (!opts.length) { this.state = 'pick'; return; }
-    const head = ssTxt(this, l.x(0), l.y(430), '— A SIGIL OFFERS ITSELF —', l.u(14), '#c9b676').setOrigin(0.5).setDepth(120);
-    const items = [head];
+    // dim the board — the cards were floating straight over lit tiles and the
+    // header drowned; the veil also swallows stray taps
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive().setDepth(118);
+    this.tweens.add({ targets: veil, alpha: 0.72, duration: 250 });
+    const head = ssTxt(this, l.x(0), l.y(428), SS_T('vsSigilHead'), l.u(14), '#c9b676').setOrigin(0.5).setDepth(120)
+      .setShadow(0, 0, '#c9b676', l.u(8), true, true);
+    const items = [veil, head];
     opts.forEach((sg, k) => {
-      const cy = l.y(490 + k * 78);
-      const card = this.add.image(l.x(0), cy, 'panel').setDisplaySize(l.u(320), l.u(66)).setInteractive({ useHandCursor: true }).setDepth(120);
-      const nm = ssTxt(this, l.x(0), cy - l.u(14), sg.name, l.u(14), '#6a4e11').setOrigin(0.5).setDepth(121);
-      const ds = ssTxt(this, l.x(0), cy + l.u(10), sg.desc, l.u(10), '#4a4030', 'italic').setOrigin(0.5).setDepth(121);
-      items.push(card, nm, ds);
+      const tier = sg.rarity | 0;
+      const cy = l.y(486 + k * 94);
+      if (tier > 0) {
+        items.push(this.add.image(l.x(0), cy, 'glowbig').setDisplaySize(l.u(430), l.u(150))
+          .setTint(SS_RARITY[tier].glow).setAlpha(tier === 2 ? 0.16 : 0.09).setBlendMode('ADD').setDepth(119));
+      }
+      const card = ssSigilCard(this, l, sg, 330, 84).setPosition(l.x(0), cy).setDepth(120).setAlpha(0);
+      this.tweens.add({ targets: card, alpha: 1, delay: 100 + k * 110, duration: 260 });
+      items.push(card);
       card.on('pointerdown', () => {
+        if (this.state !== 'sigil') return;
         SFX.sigil();
         this.mySigils.push(sg.id);
         if (this.meRef) this.meRef.update({ sigils: this.mySigils }).catch(() => { });
@@ -748,7 +762,7 @@ class VsBattle extends Phaser.Scene {
   /* ---------- demo: the solver duels itself ---------- */
   demoStep() {
     if (this.state === 'sigil') {
-      const cards = this.overlayC.list.filter((o) => o.texture && o.texture.key === 'panel');
+      const cards = this.overlayC.list.filter((o) => o.getData && o.getData('sigilCard'));
       if (cards.length) cards[Math.floor(Math.random() * cards.length)].emit('pointerdown');
       return;
     }

@@ -90,23 +90,37 @@ const SS_UMBRAL = { tint: 0x8080a8, eye: 0xff3860, prefix: 'UMBRAL ' };
 const SS_QUICK_POOL = ['vulpes', 'lepus', 'serpens', 'cancer', 'corvus', 'ursa', 'aranea'];
 const SS_QUICK_BOSS = 'draco';
 
+// rarity: 0 = basic, 1 = rare, 2 = legendary. Rares and legendaries surface
+// deeper into the campaign (and at low odds anywhere in quick/daily) — the
+// gating curve lives in Battle.sigilChances().
 const SS_SIGILS = [
-  { id: 'quill', icon: '❦', name: 'EMBER QUILL', desc: 'Every word deals +4 damage.' },
-  { id: 'choir', icon: '♫', name: 'VOWEL CHOIR', desc: 'Vowels are worth +2 each.' },
-  { id: 'runes', icon: '✣', name: 'RIVER RUNES', desc: 'S, R, E and T are worth +2 each.' },
-  { id: 'salve', icon: '☾', name: 'MOON SALVE', desc: 'Words of 5+ letters heal you 4.' },
-  { id: 'forge', icon: '❂', name: 'STAR FORGE', desc: 'Forged tiles come one tier higher.' },
-  { id: 'aegis', icon: '✺', name: 'AEGIS OF DAWN', desc: '+20 max health, healed now.' },
-  { id: 'first', icon: '✧', name: 'FIRST LIGHT', desc: 'Your first word each battle deals double.' },
-  { id: 'hush', icon: '⧗', name: 'HUSHED HOURGLASS', desc: 'Beasts strike one cast later.' },
-  { id: 'comet', icon: '☄', name: 'COMET TRAIL', desc: 'SCRY no longer hastens the strike.' },
-  { id: 'shield', icon: '◈', name: 'SILVER SHIELD', desc: 'Block the first strike of every battle.' },
-  { id: 'leech', icon: '❉', name: 'DEW DRINKER', desc: 'Every word heals you 1.' },
-  { id: 'longbow', icon: '➳', name: 'STARRY LONGBOW', desc: 'Words of 6+ letters deal +12.' },
-  { id: 'gilded', icon: '✹', name: 'GILDED DAWN', desc: 'Every battle begins with a gilded tile.' },
-  { id: 'blood', icon: '✠', name: 'BLOOD INK', desc: 'Your words +25%. Beast strikes +25%.' },
-  { id: 'tome', icon: '◉', name: 'WHISPERING TOME', desc: 'The eye ◉ reveals a strong word, once per battle.' },
-  { id: 'feather', icon: '❋', name: 'PHOENIX FEATHER', desc: 'Once per run, survive death at 1 health.' },
+  // ---- basic ----
+  { id: 'quill', icon: '❦', rarity: 0, name: 'EMBER QUILL', desc: 'Every word deals +4 damage.' },
+  { id: 'choir', icon: '♫', rarity: 0, name: 'VOWEL CHOIR', desc: 'Vowels are worth +2 each.' },
+  { id: 'runes', icon: '✣', rarity: 0, name: 'RIVER RUNES', desc: 'S, R, E and T are worth +2 each.' },
+  { id: 'salve', icon: '☾', rarity: 0, name: 'MOON SALVE', desc: 'Words of 5+ letters heal you 4.' },
+  { id: 'aegis', icon: '✺', rarity: 0, name: 'AEGIS OF DAWN', desc: '+20 max health, healed now.' },
+  { id: 'first', icon: '✧', rarity: 0, name: 'FIRST LIGHT', desc: 'Your first word each battle deals double.' },
+  { id: 'hush', icon: '⧗', rarity: 0, name: 'HUSHED HOURGLASS', desc: 'Beasts strike one cast later.' },
+  { id: 'comet', icon: '☄', rarity: 0, name: 'COMET TRAIL', desc: 'SCRY no longer hastens the strike.' },
+  { id: 'shield', icon: '◈', rarity: 0, name: 'SILVER SHIELD', desc: 'Block the first strike of every battle.' },
+  { id: 'leech', icon: '❉', rarity: 0, name: 'DEW DRINKER', desc: 'Every word heals you 1.' },
+  { id: 'longbow', icon: '➳', rarity: 0, name: 'STARRY LONGBOW', desc: 'Words of 6+ letters deal +12.' },
+  { id: 'gilded', icon: '✹', rarity: 0, name: 'GILDED DAWN', desc: 'Every battle begins with a gilded tile.' },
+  // ---- rare ----
+  { id: 'forge', icon: '❂', rarity: 1, name: 'STAR FORGE', desc: 'Forged tiles come one tier higher.' },
+  { id: 'blood', icon: '✠', rarity: 1, name: 'BLOOD INK', desc: 'Your words +25%. Beast strikes +25%.' },
+  { id: 'tome', icon: '◉', rarity: 1, name: 'WHISPERING TOME', desc: 'The eye ◉ reveals a strong word, once per battle.' },
+  { id: 'storm', icon: '↯', rarity: 1, name: 'STORMBINDER', desc: 'Every third word you cast strikes twice.' },
+  { id: 'roots', icon: '❧', rarity: 1, name: 'LEYLINE ROOTS', desc: 'Words deal +2 for every sigil you hold.' },
+  { id: 'ward', icon: '✥', rarity: 1, name: 'MOONWARD', desc: 'Beast strikes deal 3 less, never below 1.' },
+  { id: 'echo', icon: '☍', rarity: 1, name: 'ECHO OF RUIN', desc: 'Overkill damage wounds the next beast.' },
+  // ---- legendary ----
+  { id: 'feather', icon: '❋', rarity: 2, name: 'PHOENIX FEATHER', desc: 'Once per run, survive death at 1 health.' },
+  { id: 'eclipse', icon: '◐', rarity: 2, name: 'THE ECLIPSE', desc: 'Beast strikes deal only half.' },
+  { id: 'nova', icon: '✸', rarity: 2, name: 'CROWN OF NOVAE', desc: 'Words of 7+ letters deal double.' },
+  { id: 'verse', icon: '∞', rarity: 2, name: 'THE UNENDING VERSE', desc: 'Words deal +1 for every word woven this run.' },
+  { id: 'meteor', icon: '✽', rarity: 2, name: 'HEART OF THE METEOR', desc: 'Felling a beast restores you to full health.' },
 ];
 
 // Achievements — checked against the event bag the battle scene maintains.
