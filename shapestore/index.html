@@ -40,6 +40,7 @@ input[type=range]{accent-color:var(--gold);}
 .stamp:hover{border-color:var(--gold);}
 .stamp img{width:100%; height:52px; object-fit:contain; pointer-events:none;}
 .stamp div{font-size:9px; font-weight:bold; color:#4A4432; letter-spacing:.5px;}
+.delst{position:absolute; top:2px; right:4px; font-size:10px; color:#8A2F26; font-weight:bold; cursor:pointer; background:#fff9; border-radius:4px; padding:0 3px;}
 /* stage */
 #stagewrap{flex:1; display:flex; flex-direction:column; min-width:0;}
 #stagebar{display:flex; gap:8px; align-items:center; padding:6px 10px; background:#181E10; font-size:12px; flex-wrap:wrap;}
@@ -101,15 +102,26 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
 </div>
 <div id="main">
   <div id="left" class="panel">
-    <h3>STARTER TOYS</h3>
-    <div class="stamps" id="moldGrid"></div>
-    <h3>BUILD-A-BEAST</h3>
+    <h3>SHAPES</h3>
     <div class="stamps" id="partGrid"></div>
+    <h3>MY SHAPES</h3>
+    <div id="myHint" style="font-size:10px;color:#8A8A72;margin-bottom:4px">Select anything and press ⭐ KEEP — it lands here to use again.</div>
+    <div class="stamps" id="myGrid"></div>
+    <h3>FINISHED CHARACTERS</h3>
+    <div class="stamps" id="moldGrid"></div>
     <h3>SCENERY</h3>
     <div class="stamps" id="envGrid"></div>
   </div>
   <div id="stagewrap">
     <div id="stagebar">
+      <button id="tMove" class="gold" onclick="setTool('move')">👆 MOVE</button>
+      <button id="tDraw" onclick="setTool('draw')">✏️ DRAW</button>
+      <span id="penSizes" style="display:none">
+        <button onclick="setPen(3.5,this)" title="thin">•</button>
+        <button class="gold" onclick="setPen(7,this)" title="fat" style="font-size:16px">●</button>
+        <button onclick="setPen(13,this)" title="MEGA fat" style="font-size:20px">●</button>
+      </span>
+      <span style="color:#4A5740">|</span>
       <button id="bCreature" class="gold" onclick="setBoard('creature')">TOY CARD</button>
       <button id="bWide" onclick="setBoard('wide')">PARK SCENE</button>
       <select id="skySel" onchange="setSky(this.value)" style="display:none">
@@ -168,9 +180,11 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
 <div class="modal" id="helpModal"><div class="mbox">
   <h2>❓ HOW THE SHOP WORKS</h2>
   <div class="helplist">
-    <b>Start from a real GVT toy:</b> tap any STARTER TOY — it's the actual mold from the game. Drag it, resize with the corner handle, spin with the top handle.<br>
+    <b>Just draw:</b> press ✏️ DRAW and scribble — a big fat pencil in whatever paint chip you tapped last. Three dot sizes. 👆 MOVE goes back to grabbing things.<br>
+    <b>Start from a real GVT toy:</b> tap any FINISHED CHARACTER — it's the actual mold from the game. Drag it, resize with the corner handle, spin with the top handle.<br>
     <b>Coloring:</b> select a toy and its colors appear as swatches on the right. Tap a swatch, then tap any paint chip at the bottom (or the 🎨 wheel) — every piece wearing that color changes at once, just like the game recolors its toys.<br>
-    <b>Build your own:</b> BUILD-A-BEAST parts are bodies, spikes, limbs, eyes… they paint with whatever chip you tapped last.<br>
+    <b>Build your own:</b> SHAPES are bodies, spikes, limbs, stars, eyes… they paint with whatever chip you tapped last.<br>
+    <b>Keep your own shapes:</b> select anything you made (or drew) and press ⭐ KEEP — it joins MY SHAPES on the left so you can stamp it out again anytime, like your own decoration shelf.<br>
     <b>Pick one piece:</b> double-tap a toy to grab a single piece — move it, recolor it, or delete it (take the crown off, move the head…).<br>
     <b>Scenes:</b> switch to PARK SCENE for a wide 1280×640 park hero board with skies, volcanoes, pines and bone gates.<br>
     <b>Saving:</b> 💾 SAVE keeps it in the GALLERY on this device. EXPORT → JSON makes a file you can text to each other and IMPORT on the other computer.<br>
@@ -222,7 +236,7 @@ M.rex='<ellipse cx="72" cy="130" rx="54" ry="8" fill="#000" opacity="0.28"/>'
  +'<path d="M33 65 Q41 61 49 66" stroke="#3D6E3B" stroke-width="3.5" fill="none" stroke-linecap="round"/>'
  +'<circle cx="40" cy="73" r="6" fill="#fff"/><circle cx="37" cy="74" r="3" fill="#1a1208"/><circle cx="19" cy="75" r="2" fill="#2a3a24"/>';
 M.kingrex=M.rex
- +'<g stroke-linejoin="round">'
+ +'<g stroke-linejoin="round" transform="translate(5.6,27.6) scale(0.8)">'
  +'<path d="M21 56 Q30 51 45 51 L58 43 L53 62 Q47 68 35 68 Q25 66 21 56 z" fill="#15110c" stroke="#060505" stroke-width="2"/>'
  +'<path d="M21 56 L12 53" stroke="#15110c" stroke-width="3.5" stroke-linecap="round"/>'
  +'<path d="M29 59 L42 54" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity="0.75"/></g>';
@@ -450,6 +464,17 @@ const PARTS=[
  {n:'LIMB', tag:'path', a:{d:'M-12 -14 L10 12', fill:'none', 'stroke-width':'11', 'stroke-linecap':'round'}, strokeAsMain:true},
  {n:'LEG', tag:'rect', a:{x:'-6',y:'-13',width:'12',height:'26',rx:'5'}},
  {n:'TAIL', tag:'path', a:{d:'M-24 10 Q0 14 24 -12', fill:'none', 'stroke-width':'9', 'stroke-linecap':'round'}, strokeAsMain:true},
+ {n:'OVAL', tag:'ellipse', a:{rx:'22', ry:'14'}},
+ {n:'DOME', tag:'path', a:{d:'M-20 12 A20 20 0 0 1 20 12 z'}},
+ {n:'TRIANGLE', tag:'path', a:{d:'M-18 14 L0 -18 L18 14 z'}},
+ {n:'STAR', tag:'path', a:{d:'M0 -20 L5.9 -6.2 L20 -6.2 L8.9 2.4 L12.4 16 L0 8 L-12.4 16 L-8.9 2.4 L-20 -6.2 L-5.9 -6.2 z'}},
+ {n:'CROWN', tag:'path', a:{d:'M-16 12 L-16 -4 L-8 4 L0 -12 L8 4 L16 -4 L16 12 z', fill:'#D9A544'}, fixed:true},
+ {n:'RING', tag:'circle', a:{r:'15', fill:'none', 'stroke-width':'8'}, strokeAsMain:true},
+ {n:'MOON', tag:'path', a:{d:'M6 -18 A18 18 0 1 0 6 18 A14 14 0 1 1 6 -18 z'}},
+ {n:'HEART', tag:'path', a:{d:'M0 16 C-18 2 -16 -14 -6 -14 C-1 -14 0 -9 0 -7 C0 -9 1 -14 6 -14 C16 -14 18 2 0 16 z'}},
+ {n:'DIAMOND', tag:'path', a:{d:'M0 -18 L14 0 L0 18 L-14 0 z'}},
+ {n:'WING', tag:'path', a:{d:'M-18 14 Q-6 -18 22 -16 Q8 -6 2 14 z'}},
+ {n:'FANG', tag:'path', a:{d:'M-8 -12 L8 -12 L0 14 z', fill:'#F5EFD8'}, fixed:true},
  {n:'EYE', eye:true},
  {n:'CHEEK', tag:'circle', a:{r:'5', fill:'#E8A87C', opacity:'0.85'}, fixed:true},
  {n:'TEETH', tag:'path', a:{d:'M-16 6 l4 -8 4 8 z M-6 6 l4 -8 4 8 z M4 6 l4 -8 4 8 z', fill:'#F5EFD8'}, fixed:true},
@@ -537,7 +562,7 @@ function renderShape(s){
 function skyDefs(){
   const b=B();
   if(DOC.board==='creature')
-    return '<rect width="140" height="140" fill="#F6F1E2"/><path d="M0 118 L140 118" stroke="#D8CDB0" stroke-width="1" stroke-dasharray="4 5"/>';
+    return '<rect width="140" height="140" fill="#F6F1E2"/>';
   const w=b.w,h=b.h, g=(id,st)=>'<linearGradient id="'+id+'" x1="0" y1="0" x2="0" y2="1">'+st+'</linearGradient>';
   const sk=DOC.sky;
   let defs='',sky='',ground='';
@@ -691,6 +716,75 @@ function shapeMatrix(s){
 }
 function applyM(m,p){ return {x:m.a*p.x+m.c*p.y+m.e, y:m.b*p.x+m.d*p.y+m.f}; }
 
+/* ---- pencil tool ---- */
+let TOOL='move', PEN=7, drawPts=null, drawEl=null;
+function setTool(t){
+  TOOL=t;
+  $('tMove').className=t==='move'?'gold':'';
+  $('tDraw').className=t==='draw'?'gold':'';
+  $('penSizes').style.display=t==='draw'?'':'none';
+  svg.style.cursor=t==='draw'?'crosshair':'';
+  if(t==='draw'){ selT=selC=null; render(); }
+}
+function setPen(w,btn){
+  PEN=w;
+  document.querySelectorAll('#penSizes button').forEach(b=>b.classList.remove('gold'));
+  if(btn) btn.classList.add('gold');
+}
+function penW(){ return PEN*(DOC.board==='wide'?4:1); }
+function strokePath(pts){
+  if(pts.length<2) return 'M'+r2(pts[0].x)+' '+r2(pts[0].y)+' l0.01 0';
+  let d='M'+r2(pts[0].x)+' '+r2(pts[0].y);
+  for(let i=1;i<pts.length-1;i++){
+    const mx=(pts[i].x+pts[i+1].x)/2, my=(pts[i].y+pts[i+1].y)/2;
+    d+=' Q'+r2(pts[i].x)+' '+r2(pts[i].y)+' '+r2(mx)+' '+r2(my);
+  }
+  const l=pts[pts.length-1];
+  return d+' L'+r2(l.x)+' '+r2(l.y);
+}
+
+/* ---- MY SHAPES (saved stamps) ---- */
+function loadStamps(){ try{ return JSON.parse(localStorage.getItem('ss.stamps')||'[]'); }catch(e){ return []; } }
+function saveStamps(g){ try{ localStorage.setItem('ss.stamps',JSON.stringify(g)); }catch(e){ alert('Storage is full — delete a few saved shapes.'); } }
+function keepAsShape(){
+  const s=getSel(); if(!s) return;
+  const node=svg.querySelector('[data-top="'+s.id+'"]'); if(!node) return;
+  let bb; try{ bb=node.getBBox(); }catch(e){ return; }
+  const name=prompt('Name your shape:', s.label&&s.label!=='PENCIL'? s.label : 'MY SHAPE');
+  if(!name) return;
+  const copy=JSON.parse(JSON.stringify(s)); copy.label=name.toUpperCase().slice(0,18);
+  const inner=copy.t==='group'? copy.kids.map(rawStr).join('') : rawStr(copy);
+  const g=loadStamps();
+  g.unshift({id:uid(), name:copy.label, shape:copy,
+    cx:r2(bb.x+bb.width/2), cy:r2(bb.y+bb.height/2),
+    vb:[r2(bb.x-4),r2(bb.y-4),r2(bb.width+8),r2(bb.height+8)].join(' '),
+    svg:inner});
+  saveStamps(g); renderMyGrid();
+}
+function insertStamp(id){
+  const st=loadStamps().find(x=>x.id===id); if(!st) return;
+  pushUndo();
+  const s=JSON.parse(JSON.stringify(st.shape));
+  const reid=o=>{ o.id=uid(); if(o.kids) o.kids.forEach(reid); };
+  reid(s);
+  const m=shapeMatrix(s);
+  const c=centerOf();
+  s.x=c.x-(m.a*st.cx+m.c*st.cy); s.y=c.y-(m.b*st.cx+m.d*st.cy);
+  DOC.shapes.push(s); selT=s.id; selC=null; render();
+}
+function delStamp(id){
+  if(!confirm('Remove this shape from your shelf?')) return;
+  saveStamps(loadStamps().filter(x=>x.id!==id)); renderMyGrid();
+}
+function renderMyGrid(){
+  const g=loadStamps(), el=$('myGrid');
+  $('myHint').style.display=g.length?'none':'';
+  el.innerHTML=g.map(st=>'<div class="stamp" style="position:relative" onclick="insertStamp(\''+st.id+'\')">'
+    +'<span class="delst" onclick="event.stopPropagation();delStamp(\''+st.id+'\')">✕</span>'
+    +'<img src="data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="'+NS+'" viewBox="'+st.vb+'">'+st.svg+'</svg>')+'" alt="">'
+    +'<div>'+esc(st.name)+'</div></div>').join('');
+}
+
 /* ---- pointer interaction ---- */
 let drag=null;
 function toBoard(e){
@@ -698,8 +792,18 @@ function toBoard(e){
   return {x:(e.clientX-r.left)/r.width*b.w, y:(e.clientY-r.top)/r.height*b.h};
 }
 svg.addEventListener('pointerdown',e=>{
-  const h=e.target.getAttribute&&e.target.getAttribute('data-h');
   const p=toBoard(e);
+  if(TOOL==='draw'){
+    drawPts=[p];
+    drawEl=elNS('path');
+    drawEl.setAttribute('fill','none'); drawEl.setAttribute('stroke',lastColor);
+    drawEl.setAttribute('stroke-width',penW());
+    drawEl.setAttribute('stroke-linecap','round'); drawEl.setAttribute('stroke-linejoin','round');
+    drawEl.setAttribute('d',strokePath(drawPts));
+    svg.appendChild(drawEl);
+    svg.setPointerCapture(e.pointerId); e.preventDefault(); return;
+  }
+  const h=e.target.getAttribute&&e.target.getAttribute('data-h');
   if(h && selT){
     const s=getSel();
     const node=svg.querySelector('[data-top="'+s.id+'"]');
@@ -737,6 +841,12 @@ svg.addEventListener('dblclick',e=>{
   render();
 });
 svg.addEventListener('pointermove',e=>{
+  if(drawPts){
+    const p=toBoard(e), l=drawPts[drawPts.length-1];
+    const min=DOC.board==='wide'?3:1;
+    if(Math.hypot(p.x-l.x,p.y-l.y)>=min){ drawPts.push(p); drawEl.setAttribute('d',strokePath(drawPts)); }
+    return;
+  }
   if(!drag) return;
   const p=toBoard(e);
   if(!drag.pushed){ pushUndo(); drag.pushed=true; }
@@ -762,7 +872,16 @@ svg.addEventListener('pointermove',e=>{
   }
   renderLive();
 });
-svg.addEventListener('pointerup',()=>{ if(drag){ drag=null; render(); } });
+svg.addEventListener('pointerup',()=>{
+  if(drawPts){
+    pushUndo();
+    DOC.shapes.push({id:uid(), t:'raw', tag:'path',
+      attrs:{d:strokePath(drawPts), fill:'none', stroke:lastColor, 'stroke-width':String(penW()), 'stroke-linecap':'round', 'stroke-linejoin':'round'},
+      wrapT:'', label:'PENCIL', x:0, y:0, scale:1, rot:0, flip:false});
+    drawPts=null; drawEl=null; render(); return;
+  }
+  if(drag){ drag=null; render(); }
+});
 function renderLive(){
   /* light update: just transforms + overlay */
   const s=getSel(); if(!s) return;
@@ -845,6 +964,7 @@ function renderProps(){
     h+='<div class="row"><label>See-thru</label><input type="range" min="0.1" max="1" step="0.05" value="'+(o.attrs.opacity!=null?o.attrs.opacity:1)+'" style="width:90px" oninput="setOp(this.value)"></div>';
   }
   h+='<div class="row" style="margin-top:10px">'
+    +'<button class="gold" onclick="keepAsShape()">⭐ KEEP</button>'
     +'<button onclick="flipSel()">↔ FLIP</button>'
     +'<button onclick="dupSel()">⧉ COPY</button>'
     +'<button onclick="orderSel(1)">TO FRONT</button>'
@@ -1035,7 +1155,7 @@ function closeModals(){ document.querySelectorAll('.modal').forEach(m=>m.classLi
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) closeModals(); }));
 
 /* ---- boot ---- */
-buildPalette(); buildStamps();
+buildPalette(); buildStamps(); renderMyGrid();
 (function(){
   try{
     const cur=localStorage.getItem('ss.cur');
