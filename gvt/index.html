@@ -3110,7 +3110,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.63</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.64</div>
   <div class="scanlines"></div>
 </div>
 
@@ -22399,7 +22399,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.63';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.64';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -30517,7 +30517,15 @@ function canPlace(x,y,type,side){
   if(x<215&&y>T.y-100&&y<T.y+80) return false; // toy box zone (0197: rides the crate's own latitude — 200..380 on every flat rug, byte-still)
   // v1.31: with an enemy crate to take, drops land on YOUR HALF (the
   // battleground's own law) — a drop beside their box is a siege you didn't march for
-  if(S.tanBase && x>campDeployX()) return false;
+  // 0305 BF-00 (shipped defect #3): the raids and the crateless park finale
+  // rung compute the SAME line (campDeployX()=743 on the grand mat — Wyatt
+  // called it from play: "a little shallower than the western deploy line",
+  // 840) but never consulted it: a raid mints no crate, so legal drops
+  // reached x 1875 and a turret could be claimed by dropping INTO the ring.
+  // The raid clause reads its identity stamp so a stale rig bag can never
+  // gate a later battle; parks 1-19 carry a crate anyway, so the S.park
+  // clause only ever bites the finale rung (x 1200 → 480).
+  if((S.tanBase || (S.raid && S.raid.cfg===S.cfg) || S.park) && x>campDeployX()) return false;
   const RV=S.cfg.terrain.river;
   if(RV && x>RV.x-14 && x<RV.x+RV.w+14) return false;        // no standing in the river (or hogging the bridge)
   // 0196: the crossing line is off-limits — march across, never camp on (the
@@ -30856,6 +30864,20 @@ function spawnGroup(g){
       if(fo2 && g.cap!=null) fo2.capI=g.cap|0; }   // v3.39: the capture-squad stamp — the march fork reads it
     return;
   }
+  // 0305 BF-00 (shipped defect #1): `pincer` was authored as a GROUP kind on
+  // 13 waves — both raids' P3, both park L20 finales, both park factories —
+  // but spawnGroup only ever knew it as a WAVE key, so the group built an
+  // empty list (form.speed=Infinity) and spawned NOTHING, silently. The
+  // formation now reads exactly as the wave key always has (waveFromKey's own
+  // pincer row, and the crescent comment's stated contrast): TWO separate
+  // columns off the flank lanes. Attachments (officer/radio/elite) ride the
+  // top jaw only, so an authored flag still fields exactly one body.
+  if(g.f==='pincer'){
+    const h=Math.ceil(g.n/2);
+    spawnGroup(Object.assign({},g,{f:'column',n:h,e:'right-top'}));
+    if(g.n>h) spawnGroup(Object.assign({},g,{f:'column',n:g.n-h,e:'right-bottom',officer:0,radio:0,elite:0}));
+    return;
+  }
   const ep=edgePt(g.e);
   const list=[];
   if(g.f==='column'){ for(let i=0;i<g.n;i++) list.push({t:g.t, fx:-i*36, fy:0}); }
@@ -30912,6 +30934,15 @@ function spawnGroup(g){
     for(let i=0;i<g.n;i++){ const col=i%9, row=Math.floor(i/9)%8;
       list.push({t:g.t, fx:-40*row, fy:(col-4)*44}); }
   }
+  // 0305 BF-00 (shipped defect #1, twin): `push` was authored on 26 closing
+  // waves ("EVERYONE OUT OF THE POOL / SANDBOX") and spawned nothing the same
+  // way. A push is the closers' rush — two staggered ranks abreast, a mob
+  // with its shoulders down. And ANY kind this chain still does not know now
+  // falls back to a plain column: bodies always arrive, never a phantom form.
+  else if(g.f==='push'){
+    for(let i=0;i<g.n;i++) list.push({t:g.t, fx:-(i%2)*34, fy:(i-(g.n-1)/2)*38});
+  }
+  else { for(let i=0;i<g.n;i++) list.push({t:g.t, fx:-i*36, fy:0}); }
   // 0117: the radioman rides beside the officer at the rear (antenna next to
   // the flag), an ELITE strides out at the FRONT of his men — both are the
   // officer push's own idiom, one body per flag. rear/front read the list
@@ -33532,6 +33563,11 @@ function update(dt){
     // guard is the belt to that brace.
     if(f.type!=='mom' && f.type!=='yeti' && Math.hypot(T.x-f.x, T.y-f.y)<LEAK_R){   // v2.53: a bound past the box is not a breach — the snowman neither leaks nor splices
       S.foes.splice(i,1); S.lives-=f.def.leak; SFX.ouch();
+      // 0305 BF-00 (shipped defect #2): the P3 king walking INTO the toy box
+      // is an ESCAPE, never a kill — the latch the raid's verdict door now
+      // reads (mom's guard two lines up names this exact class; the kings
+      // were unguarded).
+      if(S.raid && S.raid.p3King && f.type===raidBossT()) S.raid.kingLeak=true;
       commSay('leak');   // Sarge barks about the breach (v1.41; throttled inside)
       if(f.boss){ S.shake=0.7; S.floats.push({x:T.x,y:T.y-70,txt:'THE BOSS BROKE THROUGH!',t:0,col:'#D96A55'}); }
       S.fx.push({k:'ring',x:T.x-10,y:T.y-10,r:10,R:60,t:0,dur:0.5,col:'rgba(166,59,42,0.8)'});
@@ -34248,6 +34284,11 @@ function hitCheck(f,u){
         // flips S.bossKilled: BOSS DEFEATED and the +2★ bounty still mean
         // "you felled the real one")
         SFX.boom(); S.shake=0.85; if(!f.tease) S.bossKilled=true;
+        // 0305 BF-00 (defect #2): a raid win must mean the king FELL — death
+        // latches HERE, the one campaign death door (hurt/splash/void/ram/
+        // turret all funnel through), and raidTick's verdict reads the latch
+        // instead of inferring from absence.
+        if(S.raid && S.raid.p3King && !f.tease && f.type===raidBossT()) S.raid.kingDown=true;
         for(let j=0;j<4;j++) S.fx.push({k:'puff',x:f.x+(Math.random()-0.5)*46,y:f.y-24+(Math.random()-0.5)*46,t:0,dur:0.6,R:44});
         S.floats.push({x:f.x,y:f.y-72,txt:'BOSS DOWN!',t:0,col:'#FFF3C4'});
         // 0278a THE DEATH-SPLIT (Wyatt: "he turns into five snowmen with
@@ -35556,7 +35597,7 @@ function draw(){
   if(S.drag){
     // v1.31: with an enemy crate on the carpet your half is the deploy zone —
     // shade the ground you must TAKE, so a refused drop explains itself
-    if(!S.bf && S.tanBase){
+    if(!S.bf && (S.tanBase || (S.raid && S.raid.cfg===S.cfg) || S.park)){   // 0305 BF-00: the newly-wired deploy line SHOWS itself in raids + the park finale too
       const dpx=campDeployX();   // v1.98: the line rides the grand stretch
       cx.fillStyle='rgba(166,59,42,0.07)'; cx.fillRect(dpx,64,W-dpx-4,WORLD_H-64-88);   // 0197: the shade covers the live height (===H flat)
       cx.strokeStyle='rgba(255,243,196,0.4)'; cx.lineWidth=2; cx.setLineDash([10,10]);
@@ -42461,7 +42502,7 @@ const RAID_TAGS=240;                           // opening dog tags — three pha
 const RAID_KING_FCX={ e:1, m:0.8, h:0.65 };    // the per-tier boss mechanic: his one-big-snowball clock tightens (M/H)
 // the two outposts — authored on the 1920×1200 mat, both flanks of the
 // midfield so holding one is a FORWARD position, never a spawn camp
-const RAID_POSTS=[ {x:1010,y:330}, {x:1360,y:880} ];   // both PAST the deploy line (campDeployX=960 on the grand mat) — a hold must be MARCHED to, never dropped on
+const RAID_POSTS=[ {x:1010,y:330}, {x:1360,y:880} ];   // both PAST the deploy line (campDeployX()=743 on the grand mat — INERT until 0305 BF-00 wired the canPlace gate) — a hold must be MARCHED to, never dropped on
 const RAID_CAP_R=110;                          // the capture ring (sug ~110px)
 const RAID_CAP_T=3;                            // uncontested seconds to flip
 const RAID_TUR_RNG=230;                        // the mini turret's reach
@@ -42750,7 +42791,7 @@ function startRaidBattle(tier,rk){
   tier=RAID_TIERS.indexOf(tier)>=0? tier : 'e';
   rk=(rk==='bone')?'bone':'ice';   // 0278e: the door names the raid on the battle bag too — every shipped caller (no rk) is the ice door, byte-what-it-was
   S.levelN=0; S.rival=null; S.park=null;   // a raid outranks any stale park bag (the rig battle→battle law, made harmless here)
-  S.raid={ t:tier, k:rk, mine:true, won:false, p3:false, p3King:false,
+  S.raid={ t:tier, k:rk, mine:true, won:false, p3:false, p3King:false, kingDown:false, kingLeak:false,   // 0305 BF-00: the kill-vs-leak latches — the verdict door's own truth
     posts:RAID_POSTS.map(p=>({x:p.x, y:p.y, o:0, pr:0, prs:0, tur:0})),
     crushT:RAID_CRUSH_CD[tier] };
   S.cfg=raidCfg(tier,rk);
@@ -42819,14 +42860,25 @@ function raidTick(dt){
     if(rd.p3King && !rd.won
        && !S.foes.some(f=>f.type===bt && !f.dead)
        && !S.queue.some(g2=>g2.t===bt)){
-      rd.won=true;
-      // boss death ENDS it (§7) — the leftover swarm melts with their king
-      if(!coopGuest() && !S.cleared){
-        S.cleared=true;
-        for(const f of S.foes) S.fx.push({k:'smoke',x:f.x,y:f.y-14,t:0,dur:0.5});
-        S.foes.length=0; S.forms.length=0; S.queue.length=0; S.waveActive=false;
-        S.bossKilled=true;
-        startVictoryFlag(120, 1, null, dyeHex()||GREEN, ()=>{ if(S.mode==='play') endBattle(true); });
+      // 0305 BF-00 (shipped defect #2): the door used to read ABSENCE — and a
+      // leaked king is absent (spliced without dying), so walking to the toy
+      // box handed you rd.won, the tier ledger and CROWN OF BONES / CROWN OF
+      // ICE. The verdict now reads the LATCHES: kingDown (hitCheck's boss-
+      // death beat) is the only win; kingLeak is an ESCAPE — the tan colours
+      // rise instead and the raid is LOST where it stands.
+      if(rd.kingDown){
+        rd.won=true;
+        // boss death ENDS it (§7) — the leftover swarm melts with their king
+        if(!coopGuest() && !S.cleared){
+          S.cleared=true;
+          for(const f of S.foes) S.fx.push({k:'smoke',x:f.x,y:f.y-14,t:0,dur:0.5});
+          S.foes.length=0; S.forms.length=0; S.queue.length=0; S.waveActive=false;
+          S.bossKilled=true;
+          startVictoryFlag(120, 1, null, dyeHex()||GREEN, ()=>{ if(S.mode==='play') endBattle(true); });
+        }
+      } else if(rd.kingLeak && !coopGuest() && !S.cleared){
+        S.cleared=true;   // the latch blocks the generic full-clear door from stealing a win mid-ceremony
+        startVictoryFlag(120, 1, null, campFoeHex(), ()=>{ if(S.mode==='play') endBattle(false); }, true);
       }
     }
   }
@@ -47933,7 +47985,7 @@ window.GVT = {
     return { key:META.silverKey?1:0, rite:META.iceRite?1:0, cur:RAID_CUR, bkey:META.bronzeKey?1:0, boneRite:META.boneRite?1:0, boneRiteOpen:boneRiteIsOpen()?1:0, bone:Object.assign({},META.bone), ice:Object.assign({},META.ice), day:Object.assign({},META.raidDay),
       sel:RAID_SEL, open:RAID_TIERS.map(k2=>k2+':'+(raidTierOpen(k2)?1:0)).join(' '), scene:raidSceneOpen(), riteOpen:iceRiteIsOpen(),
       hero:document.querySelector('#raidBg svg.rhero')?1:0, lair:document.getElementById('raidscene').classList.contains('lair')?1:0,
-      live:S.raid? { t:S.raid.t, mine:S.raid.mine?1:0, p3:S.raid.p3?1:0, won:S.raid.won?1:0, dead:S.raid.void?1:0, crushT:Math.round(S.raid.crushT*10)/10,
+      live:S.raid? { t:S.raid.t, k:S.raid.k, mine:S.raid.mine?1:0, p3:S.raid.p3?1:0, p3King:S.raid.p3King?1:0, kingDown:S.raid.kingDown?1:0, kingLeak:S.raid.kingLeak?1:0, won:S.raid.won?1:0, dead:S.raid.void?1:0, crushT:Math.round(S.raid.crushT*10)/10,
         posts:S.raid.posts.map(P=>({o:P.o, pr:Math.round(P.pr*100)/100, x:P.x, y:P.y})),
         king:(f2=>f2?{hp:Math.round(f2.hp*10)/10, max:f2.hpMax}:null)(S.foes.find(f2=>f2.type===raidBossT()&&!f2.dead)),
         wave:S.wave, waves:S.cfg.waves.length, p2n:S.cfg.p2n } : null }; },
