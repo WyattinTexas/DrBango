@@ -3110,7 +3110,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.64</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.65</div>
   <div class="scanlines"></div>
 </div>
 
@@ -22399,7 +22399,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.64';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.65';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -23531,7 +23531,7 @@ function coopStartBattle(){
   coopLaunching=false;
   W=CAMP_W; resize();   // v1.40: every co-op door is a crate door — the same long front as solo, on every sim
   if(!pp) campGrandArm();   // v1.98: the grand rugs ride the SAME levelN on every sim — mirrored by construction, zero wire change (v3.33: a park rug is never grand — levelN 0 and the snow cfg are its whole dressing)
-  else if(pp.id==='ice'||pp.id==='bone') raidArm();   // v3.39: the raid IS grand — the tall mat on every sim (deterministic, zero wire change; 0278e: the lair rides the same span)
+  else if(pp.id==='ice'||pp.id==='bone') raidArm(RAID_HMUL[pp.id]);   // v3.39: the raid IS grand — the tall mat on every sim (deterministic, zero wire change; 0278e: the lair rides the same span; 0305 BF-0S: per-raid height)
   S.coop=COOP;
   S.speed=1;   // lockstep pin (v1.93): every sim in the lobby — old builds included — runs ×1
   if(pp && (pp.id==='ice'||pp.id==='bone')){
@@ -24205,7 +24205,15 @@ function sqPushWave(n,remote){
     // THAT?!"), and the red card + sting land a beat later to credit the boss
     // by name. Pure presentation — the spawn breaths (1.6/3.2/3.4) are
     // authored sim data and are untouched.
-    if(commSay(n===S.cfg.waves.length? 'bossFinal':'boss')) S.annWait={ ann:{txt:t(w.name), t:3.2, warn:true}, in:COMM_BOSS_LEAD, sting:true };   // v2.48: the finale speaks its own line
+    // 0305 BF-0S: an authored LATE king — a boss whose group at: sits deep in
+    // his own wave (the eruption interlude) stings on his WALK-ON, not at the
+    // push: the wave's own name card lands now, and w.annTxt rides S.annWait
+    // for w.annIn seconds (the shipped v2.48 slot; no wave authors both a
+    // comm-lead defer and an annIn, so the slot never double-books).
+    if(w.annIn!=null){ S.ann={txt:t(w.name), t:3.2, warn:true}; SFX.sting();
+      S.annWait={ ann:{txt:t(w.annTxt||w.name), t:3.2, warn:true}, in:+w.annIn, sting:true };
+      commSay(n===S.cfg.waves.length? 'bossFinal':'boss'); }
+    else if(commSay(n===S.cfg.waves.length? 'bossFinal':'boss')) S.annWait={ ann:{txt:t(w.name), t:3.2, warn:true}, in:COMM_BOSS_LEAD, sting:true };   // v2.48: the finale speaks its own line
     else { S.ann={txt:t(w.name), t:3.2, warn:true}; SFX.sting(); }
   }
   else if(w.premiere) S.ann={txt:t(w.name), t:2.6};
@@ -28881,7 +28889,7 @@ function kySummon(f,t,n){
 // knocks in a ±KING_SW_FAN fan. Rotation red → pigs → wind → court on the
 // royal clock. Every clock self-seeds (the raw-spawn NaN law).
 function kingKitTick(f,dt){
-  if(f.kyAbT==null){ f.kyAbT=3.2; f.kyAbN=0; f.kySwCd=2.6; f.kySwing=0; }
+  if(f.kyAbT==null){ f.kyAbT=3.2*(f.kyx||1); f.kyAbN=0; f.kySwCd=2.6*(f.swx||1); f.kySwing=0; }   // 0305 BF-0S: the H-tier dials — kyx scales the wheel, swx the melee
   if(f.kyTk){
     const u=f.kyTk.u;
     if(!u || u.dead || S.units.indexOf(u)<0){ f.kyTk=null; }
@@ -28919,7 +28927,7 @@ function kingKitTick(f,dt){
   if(f.kySwCd<=0 && !f.kyTk && f.kySwing<=0){
     const m=kyNearMan(f,KING_SW_TRIG);
     if(m){
-      f.kySwing=0.3; f.kySwCd=KING_SW_CD;
+      f.kySwing=0.3; f.kySwCd=KING_SW_CD*(f.swx||1);   // 0305 BF-0S: D8 — "attacks faster" includes the melee
       const ang=Math.atan2(m.y-f.y,m.x-f.x);
       S.fx.push({k:'arc',x:f.x,y:f.y-26,R:52,a0:ang-1.15,a1:ang+1.15,t:0,dur:0.34});
       bfSfx(SFX.swish, f.x, f.y);
@@ -28936,7 +28944,7 @@ function kingKitTick(f,dt){
   }
   f.kyAbT-=dt;
   if(f.kyAbT<=0){
-    f.kyAbT=KING_ROT; const ab=f.kyAbN; f.kyAbN=(f.kyAbN+1)%4;
+    f.kyAbT=KING_ROT*(f.kyx||1); const ab=f.kyAbN; f.kyAbN=(f.kyAbN+1)%4;   // 0305 BF-0S: an INDEPENDENT scalar — never touch KING_ROT itself (it also clocks the summons)
     if(ab===0){
       const m=kyNearMan(f,KING_TK_SEEK);
       if(m){ f.kyTk={u:m,t:KING_TK_HOLD}; m.kyHeldT=0.25; tkTellFx(f.x,f.y);
@@ -28959,15 +28967,25 @@ function kingKitTick(f,dt){
 // grow line is inert at r===rMax), wears the rock skin, and respects pits
 // (the fall-in gag rides the boulder's own flag; the giant's snowfields
 // carry no pits and his flag rides 0 — his bytes behave as shipped).
+const SB_FAN=0.20;   // 0305 BF-0S: radians between adjacent volley boulders (5-wide = 0.80 rad ≈ 46°, just inside the king's own breath cone)
 function gsnowTick(f,dt){
   const sb=f.def.snowboulder||f.def.boulder;
   if(f.gsWind>0){
     f.gsWind-=dt;
     if(f.gsWind<=0){
       f.gsWind=0; f.shot=0;
-      (S.gboul||(S.gboul=[])).push({ x:f.x-36, y:f.y-10, dx:f.gsDir.x, dy:f.gsDir.y,
-        run:sb.range, spd:sb.spd, r:(f.def.boulder? sb.r : 13), rMax:sb.r, rot:0, hit:{},
-        rock:(f.def.boulder?1:0), pits:(f.def.boulder?1:0) });
+      // 0305 BF-0S: the VOLLEY — f.sbn boulders in one release, FANNED off
+      // f.gsDir (each boulder owns its hit:{} registry, so co-linear boulders
+      // knock the same man N times; SB_FAN=0.20 rad puts adjacent boulders
+      // ~60px apart after 300px of roll). No sbn stamped (the giant, the
+      // stego) ⇒ nb=1 ⇒ aa===a0 to two float ops — the shipped throw.
+      const nb=Math.max(1,f.sbn||1), a0=Math.atan2(f.gsDir.y,f.gsDir.x);
+      for(let bi=0;bi<nb;bi++){
+        const aa=a0+(bi-(nb-1)/2)*SB_FAN;
+        (S.gboul||(S.gboul=[])).push({ x:f.x-36, y:f.y-10, dx:Math.cos(aa), dy:Math.sin(aa),
+          run:sb.range, spd:sb.spd, r:(f.def.boulder? sb.r : 13), rMax:sb.r, rot:0, hit:{},
+          rock:(f.def.boulder?1:0), pits:(f.def.boulder?1:0) });
+      }
       S.fx.push({k:'ring',x:f.x-30,y:f.y-16,r:5,R:26,t:0,dur:0.24,col:(f.def.boulder?'#B8A888':'#FFFFFF')});
       bfSfx(SFX.thock, f.x, f.y);
     }
@@ -29235,7 +29253,7 @@ function drawKingSnow(){
 }
 // 0117: the radioman's reach gift rides here — every tan reach reader already
 // funnels through this one door, so the aura costs one factor and no caller
-function frng(f){ return f.def.rng*(f.rngAura||1); }
+function frng(f){ return f.def.rng*(f.rngAura||1)*(f.rngX||1); }   // 0305 BF-0S: rngX is the SPAWN-stamped reach (rngAura belongs to the aura pass, reset every frame)
 // 0117: the aimed pick, shared by every tan trigger — nearest legal green,
 // honouring a tube's minRng dead zone. Pure (no state), so the sniper's
 // draw-side tell can ask it the same question the trigger will.
@@ -30838,6 +30856,21 @@ function spawnGroup(g){
     for(let i=0;i<n;i++){
       const f=spawnFoe(g.t, W+70, n===1? lane : lof+140+(320/(n-1))*i, null, false);
       if(f && g.fcx) f.fcx=+g.fcx||1;   // v3.39: the raid king's tier clock — the YETI_SHOOTERS branch reads it
+      // 0305 BF-0S: the boss-stamp cells the three-boss wave authors — each
+      // inert until authored, each read deterministically per-foe:
+      //   spdx → f.spdMul (reader ships: the aura pass multiplies it in)
+      //   rngx → f.rngX   (frng's third factor — NEVER f.rngAura, which the
+      //                    aura pass RESETS every frame; a spawn stamp there
+      //                    would silently vanish on frame 1)
+      //   kyx  → the king's TK wheel clock  ·  swx → his melee re-arm
+      //   sbn  → boulders per volley (gsnowTick's fan)
+      //   ret  → the retreat floor (hitCheck clamps; raidKingStands opens)
+      if(f && g.spdx) f.spdMul=+g.spdx||1;
+      if(f && g.rngx) f.rngX=+g.rngx||1;
+      if(f && g.kyx)  f.kyx=+g.kyx||1;
+      if(f && g.swx)  f.swx=+g.swx||1;
+      if(f && g.sbn)  f.sbn=Math.max(1,g.sbn|0);
+      if(f && g.ret!=null) f.retFloor=+g.ret;
       // v1.81 THE VANGUARD: the tease is the same monster in the same lane
       // with the same walk-on — just lighter (a real fight at wave-1 economy,
       // never a wall). Attacks stay full-strength; the flag rides to
@@ -30846,6 +30879,10 @@ function spawnGroup(g){
       // v2.48: an authored per-group hp dial (L10's giants ride it at 1.5) —
       // applied after the boss curve, exactly the tease's own idiom.
       if(g.hpX) f.hp=f.hpMax=Math.max(1,Math.round(f.hpMax*g.hpX));
+      // 0305 BF-0S: the ADDITIVE hp cell — Wyatt's briefs price in "+25 hp",
+      // and the source should read his number, not a ×1.087719 (post-curve,
+      // exactly the hpX seat's own idiom).
+      if(g.hpAdd) f.hp=f.hpMax=Math.max(1,f.hpMax+(g.hpAdd|0));
       // v2.29 MOM AT THE DOOR: HER TEMPER — the authored phase (1 CALM SWEEP ·
       // 2 BUSY DAY · 3 FURIOUS) rides the group and keys the same MOM_SPD/
       // MOM_STOMP_CD/MOM_KICK_CD/MOM_TOYS_N arrays her raid rounds key.
@@ -32461,6 +32498,14 @@ function endBattle(win){
       }
     }
   } else if(S.raid){
+    // 0305 BF-0S: the boss-fight telemetry fold (P7 seam A) — additive META
+    // (old builds ignore it); GVT.bossStats() is the read-back door (seam B).
+    { const bs=META.stats.boss||(META.stats.boss={});
+      const kk=S.raid.k+'_'+S.raid.t, e=bs[kk]||(bs[kk]={w:0,l:0});
+      e[win?'w':'l']=(e[win?'w':'l']|0)+1;
+      if(S.raid.p3T!=null) e.p3t=S.raid.p3T;
+      if(S.raid.p3kT!=null) e.kt=S.raid.p3kT;
+      if(S.raid.hold) e.hold=Math.round(S.raid.hold); }
     // v3.39 TP-04 THE RAID VERDICT (D19/D20/§9): medal stars are suppressed
     // (the replay-farm trap, the park's own law) — the raid pays the REPEAT
     // PURSE on every win, per-player per-day capped ≤25★ across BOTH raids
@@ -34255,6 +34300,12 @@ function hitCheck(f,u){
     combustCheck(f,u);   // 0242 COMBUSTION — the popcorn spreads from where he fell
     return;
   }
+  // 0305 BF-0S: the retreat floor — a king authored ret:<f> can be beaten
+  // TO the floor but never through it (the "defeated → he runs off" grammar:
+  // the frame the floor clamps him, raidKingStands' strict > opens the gate).
+  // hitCheck is the ONE campaign death door — hurt/splash/void-sweep/ram/
+  // turret all funnel through — so this single guard covers every damage path.
+  if(f.retFloor!=null && f.hp<=f.hpMax*f.retFloor){ f.hp=f.hpMax*f.retFloor; return; }
   if(f.hp<=0){
     const idx=S.foes.indexOf(f);
     if(idx>=0){
@@ -42503,6 +42554,12 @@ const RAID_KING_FCX={ e:1, m:0.8, h:0.65 };    // the per-tier boss mechanic: hi
 // the two outposts — authored on the 1920×1200 mat, both flanks of the
 // midfield so holding one is a FORWARD position, never a spawn camp
 const RAID_POSTS=[ {x:1010,y:330}, {x:1360,y:880} ];   // both PAST the deploy line (campDeployX()=743 on the grand mat — INERT until 0305 BF-00 wired the canPlace gate) — a hold must be MARCHED to, never dropped on
+// 0305 BF-0S: the per-raid tables. Both raids read their OWN row (the shipped
+// single tables above/below stay as the no-key fallbacks). Today every row
+// equals the shipped value — the re-author cards re-seat them, never this one.
+const RAID_HMUL={ ice:2, bone:2 };                       // WORLD_H = H*hm per raid
+const RAID_POSTS_K={ ice:[ {x:1010,y:330}, {x:1360,y:880} ], bone:[ {x:1010,y:330}, {x:1360,y:880} ] };
+const RAID_RETREAT_K={ ice:0.4, bone:0.4 };              // the king bolts below this fraction (raidKingStands)
 const RAID_CAP_R=110;                          // the capture ring (sug ~110px)
 const RAID_CAP_T=3;                            // uncontested seconds to flip
 const RAID_TUR_RNG=230;                        // the mini turret's reach
@@ -42778,7 +42835,7 @@ function raidBossT(){ return (S.raid && S.raid.k==='bone')? 'kingrex' : 'kingyet
 function raidKingStands(){
   if(!S.raid) return false;
   const bt=raidBossT();
-  for(const f of S.foes) if(f.type===bt && !f.dead && f.hp>f.hpMax*RAID_RETREAT_F) return true;
+  for(const f of S.foes) if(f.type===bt && !f.dead && f.hp>f.hpMax*(RAID_RETREAT_K[S.raid.k]!=null? RAID_RETREAT_K[S.raid.k] : RAID_RETREAT_F)) return true;   // 0305 BF-0S: the raid's own retreat pivot
   return false;
 }
 // THE BATTLE CORE — shared by the solo door and the party launch (the
@@ -42792,7 +42849,7 @@ function startRaidBattle(tier,rk){
   rk=(rk==='bone')?'bone':'ice';   // 0278e: the door names the raid on the battle bag too — every shipped caller (no rk) is the ice door, byte-what-it-was
   S.levelN=0; S.rival=null; S.park=null;   // a raid outranks any stale park bag (the rig battle→battle law, made harmless here)
   S.raid={ t:tier, k:rk, mine:true, won:false, p3:false, p3King:false, kingDown:false, kingLeak:false,   // 0305 BF-00: the kill-vs-leak latches — the verdict door's own truth
-    posts:RAID_POSTS.map(p=>({x:p.x, y:p.y, o:0, pr:0, prs:0, tur:0})),
+    posts:(RAID_POSTS_K[rk]||RAID_POSTS).map(p=>({x:p.x, y:p.y, o:0, pr:0, prs:0, tur:0})),   // 0305 BF-0S: the raid's own post table
     crushT:RAID_CRUSH_CD[tier] };
   S.cfg=raidCfg(tier,rk);
   S.raid.cfg=S.cfg;   // the identity stamp — raidTick serves THIS battle only (a stale S.raid on a rigged next battle goes inert instead of running turrets on a park)
@@ -42804,15 +42861,19 @@ function startRaidBattle(tier,rk){
 // cfg is authored DIRECTLY in the 1920×1200 span, so unlike the campaign's
 // seeded 600-band terrain nothing here is re-scaled or slid — the 0129 law:
 // the editor owns span coherence).
-function raidArm(){
-  WORLD_H=H*2; T.y=WORLD_H/2; FOE_BOT=WORLD_H-12; S.cCam.y=(WORLD_H-H)/2;
+function raidArm(hm){
+  // 0305 BF-0S: the per-raid mat height — startBattlefield's own fractional
+  // shape (WORLD_H = H*(map.hMul||1)). Both raids pass RAID_HMUL[rk] (2 and 2
+  // today — byte-identical geometry; the bone lair's 1.2 arrives with its
+  // re-author). No argument = the shipped tall mat, so old callers hold.
+  WORLD_H=Math.round(H*(hm||2)); T.y=WORLD_H/2; FOE_BOT=WORLD_H-12; S.cCam.y=(WORLD_H-H)/2;
   S.gk=CAMP_GRAND_W/CAMP_W;
   W=CAMP_GRAND_W; resize();
 }
 // the SOLO door (the party door is coopStartBattle's ice fork)
 function startRaid(tier){
   startRaidBattle(tier, RAID_CUR);   // 0278e: the solo door reads the scene it was pressed in (crewRaidBoom asserts the scene is open; the party path relays the id instead)
-  raidArm();
+  raidArm(RAID_HMUL[S.raid.k]);   // 0305 BF-0S: per-raid height
   sqScaleCfg(S.cfg, 1);
   S.sq={ p:1, t:0, nextT:SQ_GRACE };
   spdInit();
@@ -42855,8 +42916,9 @@ function raidTick(dt){
   const bt=raidBossT();   // 0278e: kingyeti or kingrex — the door's own king
   // phase bookkeeping + the win door: the P3 king walked on, then fell
   if(S.wave>=S.cfg.waves.length){
+    if(rd.p3T==null) rd.p3T=Math.round(S.t);   // 0305 BF-0S: time-to-phase (folds into META.stats.boss at the verdict)
     rd.p3=true;
-    if(!rd.p3King && S.foes.some(f=>f.type===bt && !f.dead)) rd.p3King=true;
+    if(!rd.p3King && S.foes.some(f=>f.type===bt && !f.dead)){ rd.p3King=true; rd.p3kT=Math.round(S.t); }
     if(rd.p3King && !rd.won
        && !S.foes.some(f=>f.type===bt && !f.dead)
        && !S.queue.some(g2=>g2.t===bt)){
@@ -42885,6 +42947,7 @@ function raidTick(dt){
   // turrets serve WHOEVER holds the point — every sim, its own combat
   for(const P of rd.posts){
     if(!P.o) continue;
+    if(P.o===1) rd.hold=(rd.hold||0)+dt;   // 0305 BF-0S: green hold seconds (telemetry)
     P.tur=(P.tur||0)-dt;
     if(P.tur>0) continue;
     if(P.o===1){
@@ -47989,6 +48052,7 @@ window.GVT = {
         posts:S.raid.posts.map(P=>({o:P.o, pr:Math.round(P.pr*100)/100, x:P.x, y:P.y})),
         king:(f2=>f2?{hp:Math.round(f2.hp*10)/10, max:f2.hpMax}:null)(S.foes.find(f2=>f2.type===raidBossT()&&!f2.dead)),
         wave:S.wave, waves:S.cfg.waves.length, p2n:S.cfg.p2n } : null }; },
+  bossStats(){ return (META.stats&&META.stats.boss)||{}; },   // 0305 BF-0S: P7 seam B — the battery's read-back door
   lobby(){ return { park:PARK_CUR, open:parkSceneOpen()?1:0, hero:PARK_HERO[PARK_CUR==='dino'?'dino':'yetiURI']?1:0,
     flyer:document.getElementById('parkFlyer')?1:0, choir:document.querySelectorAll('#pkChoir .hopper').length,
     notes:document.querySelectorAll('#pkChoir .note').length, roller:document.getElementById('pkRoller')?1:0,
