@@ -61,8 +61,8 @@ input[type=range]{accent-color:var(--gold);}
 /* stage */
 #stagewrap{flex:1; display:flex; flex-direction:column; min-width:0;}
 #stagebar{display:flex; gap:8px; align-items:center; padding:6px 10px; background:#181E10; font-size:12px; flex-wrap:wrap;}
-#stage{flex:1; overflow:auto; display:grid; place-items:center; background:#151A0E;}
-#board{background:var(--paper); box-shadow:0 8px 40px #000A; border-radius:6px; touch-action:none; display:block;}
+#stage{flex:1; overflow:auto; display:flex; background:#151A0E;}
+#board{background:var(--paper); box-shadow:0 8px 40px #000A; border-radius:6px; touch-action:none; display:block; margin:auto; overflow:visible; flex:none;}
 /* layers */
 #layers{display:flex; flex-direction:column; gap:3px;}
 .lrow{display:flex; align-items:center; gap:5px; background:#1E2416; padding:4px 6px; border-radius:6px; font-size:12px; cursor:pointer; border:1px solid transparent;}
@@ -184,6 +184,7 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
       <span style="color:#8A8A72">ZOOM</span>
       <input id="zoomR" type="range" min="0.4" max="3" step="0.05" value="1" oninput="setZoom(+this.value)">
       <button onclick="zoomFit()">FIT</button>
+      <button class="danger" onclick="clearAll()" title="clear the whole board">🧹 START FRESH</button>
     </div>
     <div id="stage"><svg id="board" xmlns="http://www.w3.org/2000/svg"></svg></div>
   </div>
@@ -591,7 +592,7 @@ const PALETTE=[
 
 /* ============================================================ */
 const BOARDS={ creature:{w:140,h:140}, wide:{w:1280,h:640} };
-let DOC={v:1, board:'creature', sky:'sunrise', shapes:[]};
+let DOC={v:2, board:'creature', sky:'sunrise', shapes:[]};
 let selT=null, selC=null, lastColor='#4E8C4A', paintTarget=null;
 let undoStack=[], redoStack=[], fitZ=3, userZ=1;
 const $=id=>document.getElementById(id);
@@ -648,7 +649,7 @@ function renderShape(s){
   g.setAttribute('transform',userT(s));
   if(s.hide){ g.setAttribute('display','none'); }
   if(s.t==='group') for(const k of s.kids) g.appendChild(renderRaw(k));
-  else g.appendChild(renderRaw(s));
+  else g.appendChild(renderRaw({...s, x:0, y:0})); /* top-level raws position via userT only */
   return g;
 }
 function skyDefs(){
@@ -732,7 +733,21 @@ function undo(){ if(!undoStack.length) return; redoStack.push(JSON.stringify(DOC
 function redo(){ if(!redoStack.length) return; undoStack.push(JSON.stringify(DOC)); DOC=JSON.parse(redoStack.pop()); selT=selC=null; syncBoardUI(); render(); }
 
 /* ---- insertion ---- */
-function centerOf(){ const b=B(); return {x:b.w/2, y:DOC.board==='wide'? b.h*0.62 : b.h/2}; }
+function centerOf(){
+  const b=B();
+  let x=b.w/2, y=DOC.board==='wide'? b.h*0.62 : b.h/2;
+  /* aim for the middle of what's actually on screen (zoomed/scrolled views) */
+  const st=$('stage'), r=svg.getBoundingClientRect(), sr=st.getBoundingClientRect();
+  const l=Math.max(r.left,sr.left), t=Math.max(r.top,sr.top);
+  const rt=Math.min(r.right,sr.right), bt=Math.min(r.bottom,sr.bottom);
+  if(r.width>0 && rt>l && bt>t){
+    x=((l+rt)/2-r.left)/r.width*b.w;
+    y=((t+bt)/2-r.top)/r.height*b.h;
+    /* whole park visible → keep the ground-level bias */
+    if(DOC.board==='wide' && r.width<=sr.width+1 && r.height<=sr.height+1) y=b.h*0.62;
+  }
+  return {x:r2(Math.max(16,Math.min(b.w-16,x))), y:r2(Math.max(16,Math.min(b.h-16,y)))};
+}
 function insertArt(str,label,vb){
   pushUndo();
   const g=parseMold(str, label, vb);
@@ -838,6 +853,24 @@ function shapeMatrix(s){
 }
 function applyM(m,p){ return {x:m.a*p.x+m.c*p.y+m.e, y:m.b*p.x+m.d*p.y+m.f}; }
 
+/* v1 docs rendered top-level raws with x/y applied twice (userT + inner wrap);
+   fold the extra offset into x/y once so old saves stay exactly where they looked. */
+function migrateDoc(d){
+  if(!d || (d.v||1)>=2) return d;
+  for(const s of (d.shapes||[])) if(s.t!=='group'&&(s.x||s.y)){
+    const p=applyM(shapeMatrix(s),{x:s.x||0,y:s.y||0});
+    s.x=r2(p.x); s.y=r2(p.y);
+  }
+  d.v=2; return d;
+}
+
+/* clear board */
+function clearAll(){
+  if(!DOC.shapes.length) return;
+  if(!confirm('Clear the whole board and start fresh?\n(↩ UNDO can bring it back)')) return;
+  pushUndo(); DOC.shapes=[]; selT=selC=null; render();
+}
+
 /* ---- pencil tool ---- */
 let TOOL='move', PEN=7, drawPts=null, drawEl=null;
 function setTool(t){
@@ -867,7 +900,19 @@ function strokePath(pts){
 }
 
 /* ---- MY SHAPES (saved stamps) ---- */
-function loadStamps(){ try{ return JSON.parse(localStorage.getItem('ss.stamps')||'[]'); }catch(e){ return []; } }
+function loadStamps(){
+  let g; try{ g=JSON.parse(localStorage.getItem('ss.stamps')||'[]'); }catch(e){ g=[]; }
+  try{
+    if(localStorage.getItem('ss.stampsV')!=='2'){
+      /* v1 raw stamps measured cx/cy with the doubled x/y offset baked in */
+      for(const st of g){ const s=st&&st.shape;
+        if(s&&s.t!=='group'&&(s.x||s.y)){ st.cx=r2(st.cx-(s.x||0)); st.cy=r2(st.cy-(s.y||0)); s.x=0; s.y=0; } }
+      if(g.length) localStorage.setItem('ss.stamps',JSON.stringify(g));
+      localStorage.setItem('ss.stampsV','2');
+    }
+  }catch(e){}
+  return g;
+}
 function saveStamps(g){ try{ localStorage.setItem('ss.stamps',JSON.stringify(g)); }catch(e){ alert('Storage is full — delete a few saved shapes.'); } }
 function keepAsShape(){
   const s=getSel(); if(!s) return;
@@ -876,7 +921,7 @@ function keepAsShape(){
   const name=prompt('Name your shape:', s.label&&s.label!=='PENCIL'? s.label : 'MY SHAPE');
   if(!name) return;
   const copy=JSON.parse(JSON.stringify(s)); copy.label=name.toUpperCase().slice(0,18);
-  const inner=copy.t==='group'? copy.kids.map(rawStr).join('') : rawStr(copy);
+  const inner=copy.t==='group'? copy.kids.map(rawStr).join('') : rawStr({...copy,x:0,y:0});
   const g=loadStamps();
   g.unshift({id:uid(), name:copy.label, shape:copy,
     cx:r2(bb.x+bb.width/2), cy:r2(bb.y+bb.height/2),
@@ -1210,7 +1255,7 @@ function rawStr(s){
   return '<g transform="translate('+r2(s.x||0)+' '+r2(s.y||0)+')">'+inner+'</g>';
 }
 function shapeStr(s){
-  const inner=s.t==='group'? s.kids.map(rawStr).join('') : rawStr(s);
+  const inner=s.t==='group'? s.kids.map(rawStr).join('') : rawStr({...s,x:0,y:0});
   return '<g transform="'+userT(s)+'">'+inner+'</g>';
 }
 function docSVG(withBG){
@@ -1248,7 +1293,7 @@ function importJSONFile(){
     rd.onload=()=>{ try{
       const data=JSON.parse(rd.result);
       if(!data.doc||!Array.isArray(data.doc.shapes)) throw 0;
-      pushUndo(); DOC=data.doc; $('docname').value=data.name||'IMPORTED';
+      pushUndo(); DOC=migrateDoc(data.doc); $('docname').value=data.name||'IMPORTED';
       selT=selC=null; closeModals(); syncBoardUI(); zoomFit();
     }catch(e){ alert('That file is not a Shape Store work.'); } };
     rd.readAsText(f);
@@ -1283,7 +1328,7 @@ function openGallery(){
     d.innerHTML='<img src="data:image/svg+xml;charset=utf-8,'+encodeURIComponent(it.svg)+'"><div class="nm">'+esc(it.name)+'</div>';
     const btns=document.createElement('div'); btns.className='btns';
     const mk=(t,fn,cls)=>{ const b=document.createElement('button'); b.textContent=t; if(cls)b.className=cls; b.onclick=fn; btns.appendChild(b); };
-    mk('OPEN',()=>{ pushUndo(); DOC=JSON.parse(JSON.stringify(it.doc)); $('docname').value=it.name; selT=selC=null; closeModals(); syncBoardUI(); zoomFit(); },'gold');
+    mk('OPEN',()=>{ pushUndo(); DOC=migrateDoc(JSON.parse(JSON.stringify(it.doc))); $('docname').value=it.name; selT=selC=null; closeModals(); syncBoardUI(); zoomFit(); },'gold');
     mk('FILE',()=>{ dl(it.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'.json','data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify({app:'shapestore',v:1,name:it.name,doc:it.doc}))); });
     mk('🗑',()=>{ if(confirm('Delete "'+it.name+'" from the gallery?')){ saveGal(loadGal().filter(x=>x.id!==it.id)); openGallery(); } },'danger');
     d.appendChild(btns); el.appendChild(d);
@@ -1375,7 +1420,7 @@ buildPalette(); buildStamps(); renderMyGrid();
 (function(){
   try{
     const cur=localStorage.getItem('ss.cur');
-    if(cur){ const d=JSON.parse(cur); if(d&&Array.isArray(d.shapes)&&d.shapes.length){ DOC=d; } }
+    if(cur){ const d=JSON.parse(cur); if(d&&Array.isArray(d.shapes)&&d.shapes.length){ DOC=migrateDoc(d); } }
   }catch(e){}
   if(!DOC.shapes.length){ /* greet with the Tin Rex ready to recolor */
     const g=parseMold(M.rex,'TIN REX','0 0 140 140'); g.scale=0.94; DOC.shapes.push(g);
