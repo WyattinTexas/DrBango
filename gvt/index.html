@@ -3095,7 +3095,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.61</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.62</div>
   <div class="scanlines"></div>
 </div>
 
@@ -16004,7 +16004,8 @@ const TK_RED_DASH=3*TK_M,          // "moves the Sarge forward 3m"
       TK_RED_R=46,                 // the overhead arc's reach — the blade's own cleave circle
       TK_RED_T=0.32,               // the lunge's clock (smoothstep slide)
       TK_RED_SEEK=220;             // how far he looks for a man to lunge at (nobody there = he swings at the air ahead)
-const TK_GREEN_T=4;                // "invisible for 4 seconds" — the spy's own cloakT state on the Sarge
+const TK_GREEN_T=4,                // "invisible for 4 seconds" — the spy's own cloakT state on the Sarge
+      TK_GREEN_SPD=1.6;            // 0308 (Wyatt 8/13): the vanish moves 60% faster — the spy speed column ×1.6 while cloaked, both carpets (the decloak restore reads tkVSpd0, the PRE-cloak snapshot, so it never sees this)
 const TK_ORANGE_R=120,             // "everyone around the Sarge — like a radio man" — the aura's 120
       TK_ORANGE_T=3,               // "for 3 seconds"
       TK_ORANGE_LS=1;              // "100% lifesteal" — heal = damage dealt × this
@@ -16016,7 +16017,8 @@ const TK_TEAL_T=8,                 // "powers up the Sarge for 8 seconds"
       TK_TEAL_AOE=MINE_BLAST*0.25, // "about 25% of the radius that a mine has" = 22.5
       TK_TEAL_DMG=1,               // "deals 1 damage"
       TK_TEAL_SLOW=1.4,            // victims' attack INTERVAL ×1.4 — "slows ... attack speed by 40%"
-      TK_TEAL_SLOWT=2;             // "...for 2 seconds"
+      TK_TEAL_SLOWT=2,             // "...for 2 seconds"
+      TK_TEAL_REFL_P=0.6;          // 0308 (Wyatt 8/13): while OVERDRIVE is powered, each incoming hit is caught and thrown back 60% of the time — a per-hit roll on the blue wall's own funnels
 // ===== 8/8 v2.75 THE SOCCER BALL (Wyatt: "a big soccer ball that rolls
 // through and bounces through the map, but just once per map. It can happen
 // at any moment between the 45-second mark and the 10-second mark,
@@ -22368,7 +22370,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.61';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.62';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -26586,7 +26588,7 @@ function hurt(f,dmg,src){
   // v3.11 BLUE: the 0.4s wall — the round is negated AND goes back up the
   // lane at its own full weight (TK_REFL: one bounce ever, the buddyshield
   // ping-pong law). Sits below the traversal guards, above the blade.
-  if(S.bf && f.side && f.tkDeflT>0 && !TK_REFL){
+  if(S.bf && f.side && !TK_REFL && (f.tkDeflT>0 || tkTealRefl(f))){   // 0308: the teal OVERDRIVE rolls the wall's own save at 60% — same negate, same full-weight throw
     tkDeflPop(f);
     if(src && !src.dead){ TK_REFL=true; hurt(src,dmg,f); TK_REFL=false; }
     return;
@@ -28403,7 +28405,7 @@ function tanHit(u,fx,fy,src){
   // v3.11 BLUE: the wall stands ABOVE the plate (a caught round must not also
   // spend a pip) — and the round goes back: a campaign small-arm carries no
   // number against green grit, so the return is TK_BLUE_REFL_C in tan hp.
-  if(u.tkDeflT>0){ tkDeflPop(u);
+  if(u.tkDeflT>0 || tkTealRefl(u)){ tkDeflPop(u);   // 0308: + the teal 60% per-hit save
     if(src && !src.dead && src.hp!=null) hurt(src,TK_BLUE_REFL_C,u);
     return; }
   if(sargeAbsorbs(u)) return;                // the plate ate it whole (v1.52) — above every other save
@@ -29381,7 +29383,7 @@ function foeSplash(x,y,R,src){
       // v3.11 BLUE: the wall catches a SHELL whole — thrown back at the tube
       // with the green twin's own damage (this funnel's reflect currency, the
       // cmdoCatch line above). knock()'s own wall check would only negate.
-      if(u.tkDeflT>0){ tkDeflPop(u);
+      if(u.tkDeflT>0 || tkTealRefl(u)){ tkDeflPop(u);   // 0308: + the teal 60% per-hit save — a caught shell flies back whole
         if(src && !src.dead) hurt(src, src.type==='tanbazooka'?UDEF.bazooka.dmg:UDEF.mortar.dmg, u);
         continue; }
       knock(u,x,y);
@@ -29718,6 +29720,14 @@ function tkDeflPop(u){
   bfSfx(SFX.snap, u.x, u.y);
 }
 let TK_REFL=false;   // one bounce, ever — a reflected round must never re-reflect (the buddyshield ping-pong law)
+// 0308 TEAL REFLECT (Wyatt 8/13): while OVERDRIVE is powered each incoming
+// hit rolls its OWN 60% save — caught and thrown back at whoever sent it,
+// riding the blue wall's exact funnels (hurt / tanHit / the shell splash /
+// knock) at each funnel's exact reflect currency. Per-hit Math.random is the
+// saber-block grammar (each sim rolls its own saves — the knock() funnel's
+// co-op law); the TK_REFL ping-pong guard rules this bounce exactly as it
+// rules the wall's. tkOverT only ever lands on a Sarge (tkFire's teal seat).
+function tkTealRefl(u){ return u.tkOverT>0 && Math.random()<TK_TEAL_REFL_P; }
 // the nearest engageable enemy inside r — the lunge's and the dash's one scan
 function tkNearFoe(u,r){
   let best=null,bd=r;
@@ -29884,7 +29894,7 @@ function tkFire(u,col,relay,ax,ay){
     // and the fast feet are the spy's own speed column (restored at decloak)
     u.cloakT=TK_GREEN_T;
     if(u.tkVSpd0==null) u.tkVSpd0=u.def.moveSpd;
-    u.def.moveSpd = S.bf? BF_MOVE.spy.moveSpd : CAMP_SPD.spy;
+    u.def.moveSpd = (S.bf? BF_MOVE.spy.moveSpd : CAMP_SPD.spy)*TK_GREEN_SPD;   // 0308 (Wyatt 8/13): +60% on the cloak sprint
     S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:34,t:0,dur:0.3,col:hex});
     bfSfx(SFX.blip, u.x, u.y);
   } else if(col==='orange'){
@@ -30517,7 +30527,7 @@ function knock(u, srcx, srcy, rolled){
   // v3.11 BLUE: the wall turns the one-hit knockers too — a potshot, a ram, a
   // shell's rim. No return address rides a knock (coords, not a shooter), so
   // this door only negates; the funnels that know the shooter reflect.
-  if(u.tkDeflT>0){ tkDeflPop(u); return; }
+  if(u.tkDeflT>0 || tkTealRefl(u)){ tkDeflPop(u); return; }   // 0308: + the teal 60% save — negate-only, the wall's own no-return-address door
   // THE RIOT SHIELD (v1.52) stands here for the same reason the jet guard does:
   // above the blade roll, so an absorbed hit never also rolls a deflect. The
   // grit-out that arrives from tanHit already passed the plate up there (it
@@ -41731,7 +41741,7 @@ const LEVEL_NAMES=[
 const PARK_LEVELS=20;      // Wyatt 8/12 — "we don't want them too long"
 const PARK_PURSE=10;       // per-rung first-clear winnings (dial; ~8-15 per the doc)
 const PARK_TAGS=210;       // opening dog tags — the campaign's own purse
-const PARK_BASE_HP=n=>Math.round(200*(1+0.03*(Math.max(1,n)-1)));   // L1 200 … L19 ~308 — brisk crates
+const PARK_BASE_HP=n=>Math.round(200*(1+0.03*(Math.max(1,n)-1)))+70;   // L1 270 … L19 ~378 — brisk crates +70 (0308 Wyatt 8/13: the ENEMY BASE in park levels ONLY; CAMP_BASE_HP untouched; both call sites — solo and the squad-scaled crate — ride this one function)
 const YETI_SHOOTERS={ yetiboss1:1, yetiboss2:1, yetiboss3:1, kingyeti:1,
   dinoboss1:1, dinoboss2:1, dinoboss3:1 };   // the giant's one-big-shot branch serves these SEVEN (v3.35: the dino bosses hurl the same one big shot — a spit glob in the fiction; 0278b D9: KING REX left the const — FIRE BREATH + SPRINT are his own arm now, kingRexTick)
 // the twenty rung names — the King-Moogle comic register (each an i18n row;
@@ -47087,6 +47097,14 @@ document.getElementById('retryBtn').addEventListener('click', ()=>{
     // v2.41: a raid rematch is a fresh attack (the ground is drawn again),
     // and a RANDOM pref redraws too — an explicit pick still replays itself.
     adGate('bf', ()=>{ startBattlefield((raid||META.bfMap==='random')?'random':m, null, t); if(raid && S.bf) S.bf.raid=true; }); return; }   // instant rematch, same size, no queue
+  // 0308 (Wyatt 8/13): a PARK loss retries ITS OWN rung. S.park still wears
+  // the run on the verdict screen (only showMenu takes it off), so the
+  // campaign door below would quietly re-route the kid to the regular war —
+  // and leak S.park into it (startCampaign never clears the field; a win
+  // there would bank a park rung). startPark rebuilds the same ladder step
+  // whole; a loss moved neither pk.lv nor META.campaign, so the retry can
+  // neither skip nor advance anything.
+  if(S.park){ const pid=S.park.id, pn=S.park.n; adGate('camp', ()=>startPark(pid,pn)); return; }   // a park RE-start is a level start too (the v2.60 law UI.parkPlay already pays)
   adGate('camp', ()=>startCampaign(S.levelN));   // a level RE-start is a level start (v2.60)
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
