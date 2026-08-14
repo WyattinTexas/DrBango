@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.14.0';
+const BUILD = 'STARSPELL v0.15.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -370,22 +370,25 @@ function ssStarfield(scene, count) {
   }
 }
 
+// one shooting star, fired now — the ambient loop below uses it, and the
+// boot intro calls it directly (its 4-8s cadence would miss a 3s intro)
+function ssShootingStar(scene) {
+  if (!scene.scene.isActive()) return;
+  const W = scene.scale.width, H = scene.scale.height;
+  const x = Math.random() * W * 0.8, y = scene.cameras.main.scrollY + Math.random() * H * 0.35;
+  const s = scene.add.image(x, y, 'dot').setScale(1.1).setTint(0xfff2c9).setBlendMode('ADD').setDepth(1);
+  const trail = [];
+  for (let i = 0; i < 7; i++) trail.push(scene.add.image(x, y, 'dot').setScale(0.7 - i * 0.08).setAlpha(0.5 - i * 0.06).setTint(0xcfe0ff).setBlendMode('ADD').setDepth(1));
+  const dx = 200 + Math.random() * 240, dy = 90 + Math.random() * 120;
+  scene.tweens.add({
+    targets: s, x: x + dx, y: y + dy, alpha: 0, duration: 800, ease: 'Cubic.easeOut',
+    onUpdate: () => { for (let i = trail.length - 1; i > 0; i--) { trail[i].x = trail[i - 1].x; trail[i].y = trail[i - 1].y; } trail[0].x = s.x; trail[0].y = s.y; },
+    onComplete: () => { s.destroy(); trail.forEach((t) => t.destroy()); },
+  });
+}
+
 function ssShootingStars(scene) {
-  const fire = () => {
-    if (!scene.scene.isActive()) return;
-    const W = scene.scale.width, H = scene.scale.height;
-    const x = Math.random() * W * 0.8, y = scene.cameras.main.scrollY + Math.random() * H * 0.35;
-    const s = scene.add.image(x, y, 'dot').setScale(1.1).setTint(0xfff2c9).setBlendMode('ADD').setDepth(1);
-    const trail = [];
-    for (let i = 0; i < 7; i++) trail.push(scene.add.image(x, y, 'dot').setScale(0.7 - i * 0.08).setAlpha(0.5 - i * 0.06).setTint(0xcfe0ff).setBlendMode('ADD').setDepth(1));
-    const dx = 200 + Math.random() * 240, dy = 90 + Math.random() * 120;
-    scene.tweens.add({
-      targets: s, x: x + dx, y: y + dy, alpha: 0, duration: 800, ease: 'Cubic.easeOut',
-      onUpdate: () => { for (let i = trail.length - 1; i > 0; i--) { trail[i].x = trail[i - 1].x; trail[i].y = trail[i - 1].y; } trail[0].x = s.x; trail[0].y = s.y; },
-      onComplete: () => { s.destroy(); trail.forEach((t) => t.destroy()); },
-    });
-  };
-  scene.time.addEvent({ delay: 4200 + Math.random() * 4000, loop: true, callback: fire });
+  scene.time.addEvent({ delay: 4200 + Math.random() * 4000, loop: true, callback: () => ssShootingStar(scene) });
 }
 
 /* ============================================================
@@ -1050,8 +1053,19 @@ function ssDomInput(scene, inp, commit, commitOnShutdown) {
 /* ============================================================
    HOME — a twilight meadow at the bottom of the world column.
    Entering a battle rises through the dusk to the zenith.
+   A cold boot opens at the zenith and settles down (playIntro).
    ============================================================ */
 let PENDING_ASCENT = null;   // survives a mid-ascent resize-restart: finish to battle
+let INTRO_SEEN = false;      // once per page load — a rotation restart must not replay it
+// The language sheet reloads the page to re-render every baked string; sitting
+// through the intro again for each language tried would be miserable, so that
+// reload sets a one-shot flag this consumes.
+function ssIntroBypassed() {
+  try {
+    if (sessionStorage.getItem('beta3.skipIntro')) { sessionStorage.removeItem('beta3.skipIntro'); return true; }
+  } catch (e) { }
+  return false;
+}
 class Home extends Phaser.Scene {
   constructor() { super('home'); }
   create() {
@@ -1064,7 +1078,7 @@ class Home extends Phaser.Scene {
     ssShootingStars(this);
     const tSky = performance.now();
     this.uiItems = [];
-    this.ascending = false; this.descending = false; this.arrived = false;
+    this.ascending = false; this.descending = false; this.arrived = false; this.introPlaying = false;
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
     // full frame's work on a slow phone, and a descent-by-create (the dawn
@@ -1072,7 +1086,12 @@ class Home extends Phaser.Scene {
     // it is visible yet. Building it one frame later halves the entry hitch of
     // those descents; on a plain boot it builds inline as before.
     const entry = (this.scene.settings.data || {}).from;
+    // the cinematic opening plays on a cold boot only: restarts (rotation),
+    // battle/defeat returns, demo/daily/vsdemo runs and the lang-switch reload
+    // all land straight on the interactive meadow
+    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && QS.get('daily') !== '1' && !ssIntroBypassed();
     if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
+    else if (intro) this.playIntro(l);
     else this.buildMeadowUi(l);
     // the daily's countdown has to keep moving while the home screen sits open.
     // Ticking also carries the label across midnight UTC on its own: dayKey()
@@ -1083,9 +1102,9 @@ class Home extends Phaser.Scene {
     this.input.once('pointerdown', () => SFX.ensure());
     this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
 
-    // crickets sing while we stand in the grass — at dawn, the birds do
-    SFX.crickets(!this.isDawn);
-    SFX.birds(this.isDawn);
+    // crickets sing while we stand in the grass — at dawn, the birds do.
+    // During the intro we're still up at the zenith; they start on landing.
+    if (!this.introPlaying) { SFX.crickets(!this.isDawn); SFX.birds(this.isDawn); }
     this.events.once('shutdown', () => { SFX.crickets(false); SFX.birds(false); });
 
     // the ascent puts this scene to SLEEP, not to rest — returning from battle
@@ -1221,6 +1240,121 @@ class Home extends Phaser.Scene {
     this.langB.on('pointerdown', () => this.langSheet());
     DIAG('meadow ui built ' + Math.round(performance.now() - tUi) + 'ms');
   }
+
+  /* ---------- the opening: born at the zenith (cold boot only) ----------
+     The first thing a player ever sees is the top of the sky — deep twilight,
+     the aurora, the dense star field, shooting stars — then the wordmark
+     condenses out of stardust and the whole column settles down into the
+     meadow: the intro IS the home scene arriving, not a page before it.
+     Always tappable-through — one tap settles straight onto the grass (the
+     listener is armed a beat late via delayedCall: the v0.3.3 lesson, a
+     listener added during a dispatch sees the tap that created it).
+     prefers-reduced-motion swaps the flight for a veil fade on the grass.
+     No new assets: every texture here already exists for the ascent. */
+  playIntro(l) {
+    INTRO_SEEN = true;
+    this.buildMeadowUi(l);
+    if (ssReduceMotion()) {
+      // gentle: open on the grass under a lifting veil. introPlaying never
+      // sticks on this path, so create() starts the crickets as usual.
+      DIAG('intro: reduce-motion → veil fade');
+      const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(650);
+      this.tweens.add({ targets: veil, alpha: 0, duration: 700, onComplete: () => veil.destroy() });
+      window.__ssintro = 'reduced';
+      return;
+    }
+    try {
+      this.introPlaying = true;
+      window.__ssintro = 'playing';   // headless verification reads this
+      DIAG('intro begin');
+      // the meadow ui waits at alpha 0 for the camera to come down
+      for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(0); }
+      this.sky.grain.setVisible(false);          // never during a flight
+      // a shade below the true zenith: the violet dusk band peeks in at the
+      // bottom edge — deeper twilight than the battle sky's flat navy, and a
+      // hint that there is a world below to settle into
+      this.introP = 0.92;
+      this.sky.setP(this.introP, 0);
+      // wordmark + halo, fixed to the camera at the zenith; they fade on the
+      // way down and hand off to the real title waiting in the meadow
+      const tk = ssTitleTex(this);
+      const tScale = Math.min(1, 384 / tk.w);
+      const t = this.add.image(l.W / 2, l.H * 0.4, tk.key)
+        .setDisplaySize(l.u(tk.w * tScale), l.u(tk.h * tScale)).setScrollFactor(0).setDepth(610).setAlpha(0);
+      const bs = { sx: t.scaleX, sy: t.scaleY };
+      t.setScale(bs.sx * 1.12, bs.sy * 1.12);
+      const glow = this.add.image(t.x, t.y, 'glowbig').setScale(l.u(2.1)).setTint(0xf3e5b4)
+        .setBlendMode('ADD').setScrollFactor(0).setDepth(605).setAlpha(0);
+      const em = this.add.particles(0, 0, 'dot', {
+        speed: { min: 6, max: 46 }, lifespan: { min: 500, max: 1100 }, gravityY: -14,
+        scale: { start: 0.5, end: 0 }, alpha: { start: 0.85, end: 0 },
+        blendMode: 'ADD', tint: [0xf3e5b4, 0xffe9c9, 0xcfd8ff], emitting: false,
+      }).setScrollFactor(0).setDepth(612);
+      // fade up from black — the page was black a moment ago; meet it there
+      const bootVeil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(650);
+      this.tweens.add({ targets: bootVeil, alpha: 0, duration: 450, onComplete: () => bootVeil.destroy() });
+
+      const timers = [];
+      const at = (ms, fn) => timers.push(this.time.delayedCall(ms, fn));
+      const finish = (skipped) => {
+        if (!this.introPlaying) return;
+        this.introPlaying = false;
+        for (const tm of timers) tm.remove(false);
+        if (this.introSkipFn) { this.input.off('pointerdown', this.introSkipFn); this.introSkipFn = null; }
+        this.tweens.killTweensOf([t, glow]);
+        t.destroy(); glow.destroy(); em.destroy();
+        this.sky.setP(0, 0);
+        this.sky.grain.setVisible(true);
+        for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(o.baseAlpha); }
+        this.idleTweens();
+        SFX.crickets(!this.isDawn); SFX.birds(this.isDawn);
+        window.__ssintro = skipped ? 'skipped' : 'done';
+        DIAG('intro ' + (skipped ? 'SKIPPED' : 'done'));
+      };
+      // the pan down into the meadow — the sky settling IS the scene change.
+      // Re-entrant on purpose: a skip mid-glide re-calls it with a short ms to
+      // accelerate from wherever introP currently is.
+      const settle = (ms, skipped) => {
+        if (this.introGlide) { this.introGlide.stop(); this.introGlide = null; }
+        this.tweens.killTweensOf([t, glow]);
+        this.tweens.add({ targets: [t, glow], alpha: 0, duration: Math.min(500, ms * 0.55), delay: ms * 0.2 });
+        for (const o of this.uiItems) { this.tweens.killTweensOf(o); this.tweens.add({ targets: o, alpha: o.baseAlpha, duration: 450, delay: Math.max(0, ms - 420) }); }
+        this.introGlide = this.tweens.addCounter({
+          from: this.introP, to: 0, duration: ms, ease: 'Cubic.easeInOut',
+          onUpdate: (tw) => { this.introP = tw.getValue(); this.sky.setP(this.introP, 0); },
+          onComplete: () => finish(skipped),
+        });
+      };
+      // the show: a beat of pure sky, stars streak, the word arrives, then down
+      at(350, () => ssShootingStar(this));
+      at(500, () => {
+        if (!this.introPlaying) return;
+        this.tweens.add({ targets: glow, alpha: 0.32, duration: 600, yoyo: true, hold: 250 });
+        this.tweens.add({ targets: t, alpha: 1, duration: 900, ease: 'Sine.easeOut' });
+        this.tweens.add({ targets: t, scaleX: bs.sx, scaleY: bs.sy, duration: 1200, ease: 'Cubic.easeOut' });
+        const b = t.getBounds();
+        for (let k = 0; k < 42; k++) em.emitParticleAt(b.x + Math.random() * b.width, b.y + b.height * 0.2 + Math.random() * b.height * 0.6);
+      });
+      at(1300, () => ssShootingStar(this));
+      at(1800, () => settle(1250, false));
+      at(300, () => {
+        if (!this.introPlaying) return;
+        this.input.on('pointerdown', this.introSkipFn = () => {
+          if (!this.introPlaying) return;
+          for (const tm of timers) tm.remove(false);
+          settle(Math.max(240, 340 * this.introP), true);
+        });
+      });
+    } catch (e) {
+      // the opening must never strand the player above their own meadow
+      DIAG('intro FALLBACK: ' + (e && e.message || '?'));
+      this.introPlaying = false;
+      this.sky.setP(0, 0);
+      this.sky.grain.setVisible(true);
+      for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(o.baseAlpha); }
+      this.idleTweens();
+    }
+  }
   // Subtitle under DAILY HUNT. Unplayed, it invites and shows how long the sky
   // stays up; played, it shows today's score and when the next one lands.
   dailySub() {
@@ -1254,6 +1388,8 @@ class Home extends Phaser.Scene {
         l.u(15), cur ? '#8a6210' : '#4a3305').setOrigin(0.5).setInteractive({ useHandCursor: true });
       t.on('pointerdown', () => {
         SFX.ui();
+        // this reload is navigation, not a fresh visit — don't replay the intro
+        try { sessionStorage.setItem('beta3.skipIntro', '1'); } catch (e) { }
         const u = new URL(location.href);
         u.searchParams.set('lang', k);
         location.replace(u.toString());
@@ -1264,7 +1400,7 @@ class Home extends Phaser.Scene {
   campaignCheckpoint() {
     try { return JSON.parse(localStorage.getItem('beta3.campaign')); } catch (e) { return null; }
   }
-  busy() { return this.ascending || this.descending; }
+  busy() { return this.ascending || this.descending || this.introPlaying; }
   startMode(mode) {
     if (this.busy()) return;
     SFX.ui();

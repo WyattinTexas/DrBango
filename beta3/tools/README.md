@@ -90,5 +90,12 @@ Two things it will not work without:
 Healthy output has `displayScale` equal to the device pixel ratio — if it reads `1.000` at
 DPR 3, pointer coordinates are unscaled and nothing on screen is hittable.
 
+If the page crawls (~5fps rAF, a renderer process pinned at 500%+ CPU), the swiftshader
+GL path has gone pathological — seen with Chrome 150 (2026-08): the same scene that ran
+60fps two days earlier rendered at 3-5fps, which silently stretches every scene-clock
+timer ~25x and makes "the game is frozen" a false diagnosis. Swap the three GL flags for
+`--disable-gpu`: Phaser falls back to its Canvas renderer, real clicks and
+`--force-device-scale-factor=3` still work, and the loop runs at 60fps again.
+
 Serve the folder over HTTP rather than opening `file://`: the painted art is drawn into
 canvas textures, and a `file://` image taints the canvas so the WebGL upload throws.
