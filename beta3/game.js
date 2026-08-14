@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.16.0';
+const BUILD = 'STARSPELL v0.17.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -122,6 +122,7 @@ const SS = {
     const p = this.prof;
     p.runs = p.runs | 0; p.wins = p.wins | 0; p.words = p.words | 0; p.beasts = p.beasts | 0;
     p.longest = p.longest || ''; p.bigHit = p.bigHit | 0; p.bestQuick = p.bestQuick | 0;
+    p.bestCampaign = p.bestCampaign | 0;
     p.vsWords = p.vsWords | 0; p.vsWins = p.vsWins | 0;
     p.daily = p.daily || {}; p.ach = p.ach || {};
     return p;
@@ -246,6 +247,20 @@ function ssMakeTextures(scene) {
   }, R);
   barFill('barfill-gold', '#ffe08d', '#b9924a');
   barFill('barfill-rose', '#f2969b', '#b34d55');
+  // End-of-run window: midnight glass in a double gold frame. Drawn at the
+  // display aspect (~372x580) so the corners stay true when stretched.
+  mk('endpanel', 186, 290, (c, w, h) => {
+    c.beginPath(); c.roundRect(2.5, 2.5, w - 5, h - 5, 13);
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#161d3e'); g.addColorStop(0.5, '#0f142c'); g.addColorStop(1, '#0b0f21');
+    c.fillStyle = g; c.fill();
+    c.lineWidth = 1.8; c.strokeStyle = '#c9a84c'; c.stroke();
+    c.beginPath(); c.roundRect(6, 6, w - 12, h - 12, 10);
+    c.lineWidth = 0.7; c.strokeStyle = 'rgba(215,180,92,0.45)'; c.stroke();
+    const g2 = c.createLinearGradient(0, 2.5, 0, 46);      // faint starlight sheen
+    g2.addColorStop(0, 'rgba(159,176,232,0.11)'); g2.addColorStop(1, 'rgba(159,176,232,0)');
+    c.beginPath(); c.roundRect(2.5, 2.5, w - 5, h - 5, 13); c.fillStyle = g2; c.fill();
+  }, R);
   mk('panel', 256, 256, (c) => {
     c.beginPath(); c.roundRect(4, 4, 248, 248, 22);
     const g = c.createLinearGradient(0, 0, 0, 256);
@@ -1609,7 +1624,9 @@ class Battle extends Phaser.Scene {
       fightIdx: this.resume.fightIdx, hpMax: this.resume.hpMax, hp: this.resume.hp,
       sigils: this.resume.sigils || [], words: this.resume.words | 0, longest: this.resume.longest || '',
       totalDmg: this.resume.totalDmg | 0, scried: !!this.resume.scried, featherUsed: !!this.resume.featherUsed,
-    } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false };
+      letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0, playMs: this.resume.playMs | 0,
+    } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0 };
+    this.run.startAt = Date.now();
     this.run.firstUsed = false;
     this.state = 'boot';
     this.board = []; this.sel = []; this.lineTiles = [];
@@ -1935,6 +1952,8 @@ class Battle extends Phaser.Scene {
     const dmg = this.wordDamage(tiles);
     const letters = tiles.reduce((a, s) => a + s.ch.length, 0);
     this.run.words++; this.run.firstUsed = true;
+    this.run.letters += letters;
+    if (dmg > this.run.bigHit) this.run.bigHit = dmg;
     SS.prof.words++;
     if (letters > this.run.longest.length) this.run.longest = word;
     if (word.length > SS.prof.longest.length) SS.prof.longest = word;
@@ -2120,8 +2139,10 @@ class Battle extends Phaser.Scene {
       fightIdx: this.run.fightIdx, actIdx: f.actIdx, hp: this.run.hp, hpMax: this.run.hpMax,
       sigils: this.run.sigils, words: this.run.words, longest: this.run.longest,
       totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
+      letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
     }));
   }
+  runElapsed() { return (this.run.playMs | 0) + Math.max(0, Date.now() - this.run.startAt); }
 
   heal(n) { this.run.hp = clamp(this.run.hp + n, 0, this.run.hpMax); this.updateBars(); }
 
@@ -2252,7 +2273,7 @@ class Battle extends Phaser.Scene {
     opts.forEach((sg, k) => {
       const cy = l.y(280 + k * 150);
       const card = this.add.image(l.x(0), cy, 'panel').setDisplaySize(l.u(330), l.u(124)).setInteractive({ useHandCursor: true });
-      const nm = ssTxt(this, l.x(0), cy - l.u(26), sg.name, l.u(17), '#6a4e11').setOrigin(0.5);
+      const nm = ssTxt(this, l.x(0), cy - l.u(26), sg.icon + '  ' + sg.name, l.u(17), '#6a4e11').setOrigin(0.5);
       const ds = this.add.text(l.x(0), cy + l.u(8), sg.desc, {
         fontFamily: SERIF, fontSize: l.u(13) + 'px', color: '#4a4030', fontStyle: 'italic',
         wordWrap: { width: l.u(290) },
@@ -2277,17 +2298,26 @@ class Battle extends Phaser.Scene {
     const l = this.L;
     this.state = 'end';
     const score = this.runScore();
+    const elapsed = this.runElapsed();
     if (!won) SFX.defeat();
+    // best-run reference, captured before the books are updated below
+    const dk = String(SSNET.dayKey());
+    let prevBest = -1;                                     // -1 = no best line for this mode/result
+    if (won && this.mode === 'quick') prevBest = SS.prof.bestQuick;
+    if (won && this.mode === 'campaign') prevBest = SS.prof.bestCampaign;
+    if (this.mode === 'daily') prevBest = SS.prof.daily[dk] | 0;
     if (won && this.mode === 'quick') {
       SS.award('star-caller', this.game);
       if (!this.run.scried) SS.award('no-scry', this.game);
       if (score > SS.prof.bestQuick) SS.prof.bestQuick = score;
     }
-    if (won && this.mode === 'campaign') SS.award('sky-sweeper', this.game);
+    if (won && this.mode === 'campaign') {
+      SS.award('sky-sweeper', this.game);
+      if (score > SS.prof.bestCampaign) SS.prof.bestCampaign = score;
+    }
     if (this.mode === 'campaign') localStorage.removeItem('beta3.campaign');
     if (this.mode === 'daily') {
       SS.award('daily-devout', this.game);
-      const dk = String(SSNET.dayKey());
       if (!SS.prof.daily[dk] || score > SS.prof.daily[dk]) SS.prof.daily[dk] = score;
     }
     if (won) SS.prof.wins++;
@@ -2295,22 +2325,71 @@ class Battle extends Phaser.Scene {
     if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest);
 
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
-    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.82).setInteractive();
-    const items = [veil];
-    items.push(ssTxt(this, l.x(0), l.y(190), won ? 'THE SKY IS QUIET' : 'THE STARS CLAIM YOU', l.u(26), won ? '#ffe9a8' : '#e66a6a').setOrigin(0.5)
-      .setShadow(0, 0, won ? '#c9b676' : '#802020', l.u(12), true, true));
-    const lines = [
-      'score  ' + score,
-      'beasts felled  ' + this.run.fightIdx + ' / ' + this.fights.length,
-      'words woven  ' + this.run.words,
-      'finest word  ' + (this.run.longest ? this.run.longest.toUpperCase() : '—'),
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: won ? 0.7 : 0.8, duration: won ? 300 : 550 });
+    const items = [];
+
+    // the window: an opaque midnight/gold panel, sized to its contents
+    const ph = this.mode === 'daily' ? 610 : 566;
+    const top = 410 - ph / 2;
+    const py = (d) => l.y(top + d);
+    items.push(this.add.image(l.x(0), py(ph / 2), 'endpanel').setDisplaySize(l.u(372), l.u(ph)));
+
+    const title = ssTxt(this, l.x(0), py(42), SS_T(won ? 'endWin' : 'endLose'), l.u(24), won ? '#ffe9a8' : '#e66a6a').setOrigin(0.5)
+      .setShadow(0, 0, won ? '#c9b676' : '#802020', l.u(12), true, true);
+    items.push(title);
+    items.push(ssTxt(this, l.x(0), py(70), SS_T(won ? 'endWinSub' : 'endLoseSub'), l.u(12), won ? '#c9b676' : '#8f8090', 'italic').setOrigin(0.5));
+    const rule = (d) => items.push(this.add.rectangle(l.x(0), py(d), l.u(316), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
+    rule(92);
+
+    // the score, in gold letterpress, with the best-run reference under it
+    items.push(ssTxt(this, l.x(0), py(112), SS_T('stScore'), l.u(11), '#8f8873').setOrigin(0.5));
+    const gk = ssGoldTex(this, String(score), 30);
+    items.push(this.add.image(l.x(0), py(140), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
+    if (prevBest >= 0 && score > prevBest && prevBest > 0) {
+      const nb = ssTxt(this, l.x(0), py(170), SS_T('newBest'), l.u(14), '#ffe9a8').setOrigin(0.5)
+        .setShadow(0, 0, '#c9b676', l.u(10), true, true);
+      items.push(nb);
+      this.tweens.add({ targets: nb, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 1000 });
+    } else if (prevBest > 0) {
+      items.push(ssTxt(this, l.x(0), py(170), SS_T('stBest', prevBest), l.u(12), '#8f8873').setOrigin(0.5));
+    }
+
+    // the finest word gets the nameplate treatment
+    items.push(ssTxt(this, l.x(0), py(196), SS_T('stFinest'), l.u(11), '#8f8873').setOrigin(0.5));
+    if (this.run.longest) {
+      const wk = ssGoldTex(this, this.run.longest.toUpperCase(), 20);
+      const sc = Math.min(1, 300 / wk.w);
+      items.push(this.add.image(l.x(0), py(222), wk.key).setDisplaySize(l.u(wk.w * sc), l.u(wk.h * sc)));
+    } else {
+      items.push(ssTxt(this, l.x(0), py(222), '—', l.u(18), '#d8d2bd').setOrigin(0.5));
+    }
+    rule(246);
+
+    // the ledger: label left, value right
+    const mins = Math.floor(elapsed / 60000), secs = Math.floor(elapsed / 1000) % 60;
+    const rows = [
+      [SS_T('stBeasts'), this.run.fightIdx + ' / ' + this.fights.length],
+      [SS_T('stWords'), String(this.run.words)],
+      [SS_T('stLetters'), String(this.run.letters)],
+      [SS_T('stBigHit'), this.run.bigHit ? String(this.run.bigHit) : '—'],
+      [SS_T('stTime'), mins + ':' + String(secs).padStart(2, '0')],
     ];
-    lines.forEach((s, k) => items.push(ssTxt(this, l.x(0), l.y(270 + k * 34), s, l.u(16), '#d8d2bd').setOrigin(0.5)));
+    rows.forEach(([k, v], i) => {
+      items.push(ssTxt(this, l.x(-150), py(266 + i * 26), k, l.u(13), '#a89f85').setOrigin(0, 0.5));
+      items.push(ssTxt(this, l.x(150), py(266 + i * 26), v, l.u(13.5), '#e8e0c8').setOrigin(1, 0.5));
+    });
+
+    // sigils held, as their icons
+    items.push(ssTxt(this, l.x(-150), py(400), SS_T('stSigils'), l.u(13), '#a89f85').setOrigin(0, 0.5));
+    const glyphs = this.run.sigils.map((id) => (SS_SIGILS.find((s) => s.id === id) || {}).icon || '✦');
+    items.push(ssTxt(this, l.x(150), py(400), glyphs.length ? glyphs.join(' ') : '—', l.u(glyphs.length > 10 ? 12 : 14), '#d7b45c').setOrigin(1, 0.5)
+      .setShadow(0, 0, '#c9b676', l.u(6), true, true));
 
     let by = 470;
     if (this.mode === 'daily') {
-      const share = this.add.image(l.x(0), l.y(by), ssBtn(this, true, 220, 52)).setDisplaySize(l.u(220), l.u(52)).setInteractive({ useHandCursor: true });
-      const shareT = ssTxt(this, l.x(0), l.y(by), '✶ SHARE TODAY\'S HUNT', l.u(14), '#9fb0e8').setOrigin(0.5);
+      const share = this.add.image(l.x(0), py(452), ssBtn(this, true, 240, 44)).setDisplaySize(l.u(240), l.u(44)).setInteractive({ useHandCursor: true });
+      const shareT = ssTxt(this, l.x(0), py(452), SS_T('shareBtn'), l.u(13), '#9fb0e8').setOrigin(0.5);
       items.push(share, shareT);
       share.on('pointerdown', () => {
         const txt = 'STARSPELL Daily ' + SSNET.dayKeyISO() + '\n' +
@@ -2320,23 +2399,36 @@ class Battle extends Phaser.Scene {
         try {
           if (navigator.clipboard) navigator.clipboard.writeText(txt);
           else { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
-          shareT.setText('✶ COPIED — GO BOAST');
-        } catch (e) { shareT.setText('✶ COPY FAILED'); }
+          shareT.setText(SS_T('shareCopied'));
+        } catch (e) { shareT.setText(SS_T('shareFail')); }
       });
-      by += 66;
+      by = 506;
     }
-    const again = this.add.image(l.x(0), l.y(by + 10), ssBtn(this, false, 220, 58)).setDisplaySize(l.u(220), l.u(58)).setInteractive({ useHandCursor: true });
-    const againT = ssTxt(this, l.x(0), l.y(by + 10), won || this.mode !== 'campaign' ? 'NEW RUN' : 'TRY AGAIN', l.u(18), BTN_INK()).setOrigin(0.5);
-    const homeB = this.add.image(l.x(0), l.y(by + 78), ssBtn(this, true, 220, 50)).setDisplaySize(l.u(220), l.u(50)).setInteractive({ useHandCursor: true });
-    const homeT = ssTxt(this, l.x(0), l.y(by + 78), 'HOME', l.u(14), '#9fb0e8').setOrigin(0.5);
+    const again = this.add.image(l.x(0), py(by), ssBtn(this, false, 240, 56)).setDisplaySize(l.u(240), l.u(56)).setInteractive({ useHandCursor: true });
+    const againT = ssTxt(this, l.x(0), py(by), SS_T(won || this.mode !== 'campaign' ? 'newRun' : 'tryAgain'), l.u(17), BTN_INK()).setOrigin(0.5);
+    const homeB = this.add.image(l.x(0), py(by + 58), ssBtn(this, true, 240, 46)).setDisplaySize(l.u(240), l.u(46)).setInteractive({ useHandCursor: true });
+    const homeT = ssTxt(this, l.x(0), py(by + 58), SS_T('home'), l.u(14), '#9fb0e8').setOrigin(0.5);
     items.push(again, againT, homeB, homeT);
     again.on('pointerdown', () => { SFX.ui(); this.scene.restart({ mode: this.mode, resume: null }); });
     // the Act III payoff: win the campaign and you descend into sunrise
     homeB.on('pointerdown', () => { SFX.ui(); this.goHome({ from: won ? 'battle' : 'defeat', dawn: won && this.mode === 'campaign' }); });
-    this.overlayC.add(items);
+    this.overlayC.add([veil, ...items]);
+
+    // entrance: the window settles up into place; a defeat sinks in more slowly
+    items.forEach((it) => { it.y += l.u(16); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(16), alpha: 1, duration: won ? 380 : 600, ease: won ? 'Back.easeOut' : 'Sine.easeOut', delay: won ? 120 : 250 });
+    if (won) this.time.delayedCall(300, () => {           // gold motes crown a victory
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * Math.PI * 2, r = l.u(30 + rng() * 40);
+        const m = this.add.image(title.x, title.y - l.u(16), 'dot').setScale(0.5 + rng() * 0.5)
+          .setTint(0xffe9a8).setBlendMode('ADD').setDepth(101);
+        this.overlayC.add(m);
+        this.tweens.add({ targets: m, x: title.x + Math.cos(a) * r * 2.4, y: title.y - l.u(16) + Math.sin(a) * r, alpha: 0, scale: 0.1, duration: 900 + rng() * 500, ease: 'Cubic.easeOut', onComplete: () => m.destroy() });
+      }
+    });
 
     if (DEMO) {
-      localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, words: this.run.words, longest: this.run.longest }));
+      localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, words: this.run.words, longest: this.run.longest, letters: this.run.letters, bigHit: this.run.bigHit, elapsed }));
       this.time.delayedCall(2500, () => again.emit('pointerdown'));
     }
   }
