@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.13.0';
+const BUILD = 'STARSPELL v0.13.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -878,6 +878,38 @@ function ssAchToast(scene, def) {
   c.add([bg, t1, t2]);
   scene.tweens.add({ targets: c, y: l.y(52), duration: 450, ease: 'Back.easeOut' });
   scene.tweens.add({ targets: c, alpha: 0, delay: 2600, duration: 400, onComplete: () => c.destroy() });
+}
+
+/* Every DOM element the game floats above the canvas (rename input, seal-code
+   input) goes through here. Phaser preventDefaults canvas touches, so tapping
+   '‹ HOME' never blurs a focused input — left to its own devices the element
+   outlives its scene and sits on top of whatever screen comes next. This ties
+   its life to the scene: Enter/blur commit, Escape cancels, and scene shutdown
+   (back link, scene.start, resize-restart) always removes it — committing only
+   if commitOnShutdown says the commit is safe to run against a dead scene.
+   One shared id doubles as a belt-and-suspenders sweep: a second overlay
+   replaces the first instead of stacking. */
+function ssDomInput(scene, inp, commit, commitOnShutdown) {
+  // removing a FOCUSED input fires its blur synchronously, whose close()
+  // detaches it mid-remove — Chrome then throws NotFoundError on the outer
+  // call. Harmless (the element is gone either way), so swallow it.
+  const prev = document.getElementById('ss-overlay-input');
+  if (prev) { try { prev.remove(); } catch (e) { } }
+  inp.id = 'ss-overlay-input';
+  let open = true;
+  const close = (save) => {
+    if (!open) return;
+    open = false;
+    scene.events.off('shutdown', onShut);
+    try { inp.remove(); } catch (e) { }
+    if (save) commit(inp.value);
+  };
+  const onShut = () => close(!!commitOnShutdown);
+  scene.events.once('shutdown', onShut);
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') close(true); if (e.key === 'Escape') close(false); });
+  inp.addEventListener('blur', () => close(true));
+  document.body.appendChild(inp);
+  inp.focus();
 }
 
 /* ============================================================
@@ -1922,16 +1954,13 @@ class Profile extends Phaser.Scene {
     inp.value = SSNET.myName();
     inp.style.cssText = 'position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:9999;font:700 ' +
       Math.round(l.u(20)) + 'px Georgia,serif;text-align:center;background:#141a33;color:#f3e5b4;border:2px solid #c9a94f;border-radius:10px;padding:8px 14px;outline:none;width:70%;max-width:320px;';
-    document.body.appendChild(inp);
-    inp.focus(); inp.select();
-    const commit = () => {
-      const n = SSNET.setName(inp.value);
-      this.nameT.setText(n);
-      inp.remove();
+    // commitOnShutdown: backing out mid-rename still keeps what was typed
+    ssDomInput(this, inp, (v) => {
+      const n = SSNET.setName(v);
+      if (this.nameT.active) this.nameT.setText(n);
       SS.sync();
-    };
-    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') inp.remove(); });
-    inp.addEventListener('blur', commit);
+    }, true);
+    inp.select();
   }
 }
 
@@ -2047,24 +2076,56 @@ if (ART) {
   ssBoot();
 }
 SSNET.connect().then(() => { });
-let resizeTo = null;
-let lastRW = window.innerWidth, lastRH = window.innerHeight;
-window.addEventListener('resize', () => {
-  if (!game) return;   // ?art=1 boots after the art decodes; a resize before that is a no-op
-  game.scale.resize(Math.round(window.innerWidth * DPR), Math.round(window.innerHeight * DPR));
+/* ---------- viewport: resize + rotation ----------
+   iOS Safari can fire resize while innerWidth/Height still report the OLD
+   orientation, and doesn't always fire again once they settle — trusting the
+   event's numbers once left the canvas laid out landscape in a portrait
+   window, bottom half cut off. So any viewport signal starts a short settle
+   loop: re-fit now, keep re-checking until the numbers hold still, and only
+   relayout against the dims the scenes were actually built for.
+   The game is portrait-only on phones: while the CSS rotate-veil covers a
+   landscape coarse-pointer screen, the loop just sleeps the game and waits —
+   no landscape relayout, nothing to mangle — then lays out once, upright,
+   when the device turns back.
+   iOS also fires resize when the URL bar collapses (height-only, ~50-115px)
+   — that must NOT restart scenes or it cuts the ascent and resets battles;
+   only a real reshape (rotation / window drag) relays out. */
+let vpW = window.innerWidth, vpH = window.innerHeight;   // the dims the scenes are laid out for
+let vpTimer = null, vpPolls = 0;
+function ssVeiled() {
+  try { return window.matchMedia('(orientation: landscape) and (pointer: coarse)').matches; } catch (e) { return false; }
+}
+function ssVpSettle() {
+  vpTimer = null;
+  // not made yet (?art=1 defers boot until the art decodes) or mid-boot
+  // (scale.resize before the renderer exists throws) — come back shortly
+  if (!game || !game.isBooted) { vpTimer = setTimeout(ssVpSettle, 300); return; }
+  if (ssVeiled()) {
+    if (game.loop.running) game.loop.sleep();
+    vpPolls = Math.max(vpPolls, 2);      // relayout checks still owed once we're upright
+    vpTimer = setTimeout(ssVpSettle, 350);
+    return;
+  }
+  if (!game.loop.running) game.loop.wake();
+  const w = window.innerWidth, h = window.innerHeight;
+  game.scale.resize(Math.round(w * DPR), Math.round(h * DPR));
   fitCanvas();
-  // iOS Safari fires resize when the URL bar collapses (height-only, ~50-115px)
-  // — that must NOT restart scenes or it cuts the ascent and resets battles.
-  // Only a real reshape (rotation / window drag) relays out.
-  const major = Math.abs(window.innerWidth - lastRW) > 4 || Math.abs(window.innerHeight - lastRH) > 200;
-  if (window.SSDIAG) window.SSDIAG('resize ' + window.innerWidth + 'x' + window.innerHeight + (major ? ' MAJOR → scene restart' : ' minor (ignored)'));
-  lastRW = window.innerWidth; lastRH = window.innerHeight;
-  if (!major) return;
-  clearTimeout(resizeTo);
-  resizeTo = setTimeout(() => {
-    for (const k of ['home', 'battle', 'profile', 'board']) {
-      const sc = game.scene.getScene(k);
-      if (sc && sc.scene.isActive()) sc.scene.restart();
-    }
-  }, 250);
-});
+  const major = Math.abs(w - vpW) > 4 || Math.abs(h - vpH) > 200;
+  DIAG('vp ' + w + 'x' + h + (major ? ' MAJOR → scene restart' : ' minor'));
+  if (major) {
+    vpW = w; vpH = h;
+    // every active scene, versus included — restart() with no args keeps the
+    // original scene data, so a vsbattle rejoins its room by seal code
+    for (const sc of game.scene.getScenes(true)) sc.scene.restart();
+  }
+  if (vpPolls-- > 0) vpTimer = setTimeout(ssVpSettle, 300);
+}
+function ssVpKick() {
+  vpPolls = 4;                           // ~1.3s of re-checks outlasts iOS's stale reports
+  clearTimeout(vpTimer);
+  vpTimer = setTimeout(ssVpSettle, 60);
+}
+window.addEventListener('resize', ssVpKick);
+window.addEventListener('orientationchange', ssVpKick);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', ssVpKick);
+ssVpKick();   // opened in landscape? park under the veil from the very start

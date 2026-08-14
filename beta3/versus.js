@@ -66,18 +66,15 @@ class VsMenu extends Phaser.Scene {
     inp.type = 'text'; inp.maxLength = 4; inp.placeholder = 'SEAL';
     inp.style.cssText = 'position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:9999;font:700 ' +
       Math.round(l.u(26)) + 'px Georgia,serif;text-align:center;letter-spacing:0.3em;text-transform:uppercase;background:#141a33;color:#f3e5b4;border:2px solid #c9a94f;border-radius:10px;padding:10px;outline:none;width:52%;max-width:220px;';
-    document.body.appendChild(inp);
-    inp.focus();
-    const go = async () => {
-      const code = inp.value.trim().toUpperCase();
-      inp.remove();
-      if (code.length !== 4) return;
+    // no commitOnShutdown: leaving the menu mid-type must not join a room
+    ssDomInput(this, inp, async (v) => {
+      const code = v.trim().toUpperCase();
+      if (code.length !== 4 || !this.sys.isActive()) return;
       const ok = await vsJoinRoom(code);
+      if (!this.sys.isActive()) return;   // the scene moved on while we were joining
       if (ok) this.scene.start('vsbattle', { code });
       else { this.noteT.setText('that seal answers to no one'); this.time.delayedCall(2000, () => this.noteT.setText('')); }
-    };
-    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); if (e.key === 'Escape') inp.remove(); });
-    inp.addEventListener('blur', go);
+    });
   }
   async match(mode) {
     this.noteT && this.noteT.setText('consulting the stars…');
@@ -100,9 +97,11 @@ async function vsQuickMatch(mode) {
   try {
     const rooms = (await SSNET.dbGet('mp/rooms').catch(() => null)) || {};
     const now = Date.now();
-    // housekeeping: clear stale rooms as we pass by
+    // housekeeping: clear stale rooms as we pass by. No createdAt = a skeleton
+    // (an armed onDisconnect writing players/<uid>/gone into a deleted room
+    // re-creates it as junk) — sweep those too, they'd otherwise live forever.
     for (const [id, r] of Object.entries(rooms)) {
-      if (r && r.createdAt && now - r.createdAt > 40 * 60000) SSNET.dbSet('mp/rooms/' + id, null).catch(() => { });
+      if (r && (!r.createdAt || now - r.createdAt > 40 * 60000)) SSNET.dbSet('mp/rooms/' + id, null).catch(() => { });
     }
     for (const [id, r] of Object.entries(rooms)) {
       if (!r || r.status !== 'waiting' || r.mode !== mode) continue;
@@ -180,7 +179,9 @@ class VsBattle extends Phaser.Scene {
       this.game.events.off('ss-ach', this.onAchCb);
       if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
       if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
-      if (this.meRef && this.room && this.room.status !== 'done') this.meRef.update({ gone: true }).catch(() => { });
+      // this.left: leaveRoom already deleted the seat — update() on the dead
+      // path would write players/<uid>/{gone:true} back, resurrecting a ghost
+      if (!this.left && this.meRef && this.room && this.room.status !== 'done') this.meRef.update({ gone: true }).catch(() => { });
     });
 
     if (VSDEMO) this.time.addEvent({ delay: 1500, loop: true, callback: () => this.demoStep() });
@@ -229,12 +230,17 @@ class VsBattle extends Phaser.Scene {
     }).setDepth(60);
     this.overlayC = this.add.container(0, 0).setDepth(100);
 
-    // lobby veil — camera-fixed: the battle HUD lives at the zenith, but the
-    // lobby floats over the meadow where the camera waits
-    this.lobbyC = this.add.container(0, 0).setDepth(90).setScrollFactor(0);
+    // lobby veil — the battle HUD lives at the zenith, but the camera waits
+    // down at the meadow, so the lobby is parked AT the camera's resting
+    // scroll. It was scrollFactor(0) once: that renders in the right corner
+    // but hit-tests in world space (a Container's scrollFactor affects
+    // rendering only, never input), so every lobby tap — LEAVE included —
+    // landed a full sky-height away from the text that drew it.
+    const cam = this.cameras.main;
+    this.lobbyC = this.add.container(cam.scrollX, cam.scrollY).setDepth(90);
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.55);
     const leave = ssTxt(this, l.x(-195), l.y(24), '‹ LEAVE', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-    leave.on('pointerdown', () => { SFX.ui(); this.scene.start('vsmenu'); });
+    leave.on('pointerdown', () => this.leaveRoom());
     this.lobbyTitle = txt(l.x(0), l.y(240), 'THE SUMMONS IS SEALED', 20, '#f3e5b4').setOrigin(0.5)
       .setShadow(0, 0, '#c9a94f', l.u(12), true, true);
     this.lobbyCode = txt(l.x(0), l.y(300), this.code, 44, '#ffe9a8').setOrigin(0.5)
@@ -302,6 +308,25 @@ class VsBattle extends Phaser.Scene {
     if (!this.room || this.room.status !== 'waiting' || this.room.hostUid !== vsUid()) return;
     const seats = Object.entries(this.room.players).map(([id, p]) => ({ id, seat: p.seat })).sort((a, b) => a.seat - b.seat);
     this.roomRef.update({ status: 'active', startedAt: Date.now(), turnUid: seats[0].id, turnCount: 0 }).catch(() => { });
+  }
+
+  /* ---------- leave: surrender the seat, not just the screen ---------- */
+  leaveRoom() {
+    SFX.ui();
+    this.left = true;
+    try { if (this.meRef) this.meRef.child('gone').onDisconnect().cancel(); } catch (e) { }
+    SSNET.dbTxn('mp/rooms/' + this.code, (cur) => {
+      if (!cur || !cur.players || !cur.players[vsUid()]) return cur;
+      if (cur.status !== 'waiting') { cur.players[vsUid()].gone = true; return cur; }   // battle began mid-tap — bow out like a disconnect
+      const players = { ...cur.players };
+      delete players[vsUid()];
+      const rest = Object.entries(players).sort((a, b) => a[1].seat - b[1].seat);
+      if (!rest.length) return null;   // last one out seals the room behind them
+      const next = { ...cur, players };
+      if (cur.hostUid === vsUid()) next.hostUid = rest[0][0];   // pass the host key on, or auto-start never fires for those still waiting
+      return next;
+    }).catch(() => { });
+    this.scene.start('vsmenu');
   }
 
   beginBattle() {
