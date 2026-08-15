@@ -12,6 +12,7 @@
   --paper:#F2EBD8; --ink:#2A2620; --gold:#D9A544; --goldD:#8a6a24;
   --green:#4E8C4A; --greenD:#2f5730; --bg:#1D241A; --panel:#28301F;
   --cream:#EDE4CC; --red:#C0473A;
+  --lw:196px; --rw:230px; --peek:14px;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;height:100%;}
@@ -27,7 +28,7 @@ button.danger{background:#6E3028;}
 input[type=text],select{background:#161B10; color:var(--cream); border:1px solid #4A5740; border-radius:6px; padding:5px 8px; font-size:13px;}
 input[type=range]{accent-color:var(--gold);}
 /* ---- top bar ---- */
-#top{display:flex; align-items:center; gap:10px; padding:8px 14px; background:linear-gradient(#2E381F,#222B16); border-bottom:3px solid var(--gold); flex-wrap:wrap;}
+#top{display:flex; align-items:center; gap:10px; padding:8px 14px; background:linear-gradient(#2E381F,#222B16); border-bottom:1px solid #4A5740; flex-wrap:wrap;}
 #top .wm{font-size:26px; color:var(--gold); text-shadow:2px 2px 0 #14180C; white-space:nowrap;}
 #top .wm small{color:var(--cream); font-size:12px; letter-spacing:2px; display:block; margin-top:-4px; font-family:"Trebuchet MS",sans-serif;}
 #docname{width:150px; font-weight:bold; text-transform:uppercase;}
@@ -35,8 +36,52 @@ input[type=range]{accent-color:var(--gold);}
 /* ---- main ---- */
 #main{flex:1; display:flex; min-height:0;}
 .panel{background:var(--panel); overflow-y:auto; padding:10px; scrollbar-width:thin;}
-#left{width:196px; border-right:2px solid #14180C;}
-#right{width:230px; border-left:2px solid #14180C; display:flex; flex-direction:column; gap:10px;}
+#left{flex:1; min-width:0;}
+#right{flex:1; min-width:0; display:flex; flex-direction:column; gap:10px;}
+/* ---- THE PEEKING DRAWERS (round 7, Wyatt: "canvas 80% of the screen…
+   everything else slightly off the screen, click it and it comes down like a
+   drawer, like Train Galaxy") — the E72 peeking-corner recipe grown to four
+   edges. Every shelf is position:fixed over the stage and RESTS just off its
+   edge: transform-only (translate to −100% + the 14px gold lip), pointer-events
+   asleep, a labelled gold handle riding the lip. The invisible .hot edge strip
+   (or the handle itself) summons it home; any press elsewhere tucks it away AND
+   still does its own job; DRAWER_OUT_S of quiet tucks it too. One drawer out at
+   a time. Widths carry env(safe-area-inset-*) so the DYNAMIC ISLAND never
+   covers shelf content — the drawer grows by the inset and pads it off. ---- */
+.dock{position:fixed; z-index:30; transition:transform 0.3s ease;}
+body.outT #dockT, body.outL #dockL, body.outR #dockR, body.outB #dockB{z-index:32;}
+#dockT{top:0; left:0; right:0; background:linear-gradient(#2E381F,#222B16); border-bottom:3px solid var(--gold);
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) 0 env(safe-area-inset-left,0px);}
+body:not(.outT) #dockT{transform:translateY(calc(var(--peek) - 100%));}
+#dockL{left:0; top:0; bottom:0; display:flex; width:calc(var(--lw) + env(safe-area-inset-left,0px));
+  padding-left:env(safe-area-inset-left,0px); background:var(--panel); border-right:3px solid var(--gold);}
+body:not(.outL) #dockL{transform:translateX(calc(var(--peek) - 100%));}
+#dockR{right:0; top:0; bottom:0; display:flex; width:calc(var(--rw) + env(safe-area-inset-right,0px));
+  padding-right:env(safe-area-inset-right,0px); background:var(--panel); border-left:3px solid var(--gold);}
+body:not(.outR) #dockR{transform:translateX(calc(100% - var(--peek)));}
+#dockB{bottom:0; left:0; right:0; background:#181E10; border-top:3px solid var(--gold);
+  padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);}
+body:not(.outB) #dockB{transform:translateY(calc(100% - var(--peek)));}
+/* asleep while tucked — but the handle always answers (the one deliberate !important) */
+body:not(.outT) #dockT, body:not(.outL) #dockL, body:not(.outR) #dockR, body:not(.outB) #dockB,
+body:not(.outT) #dockT *, body:not(.outL) #dockL *, body:not(.outR) #dockR *, body:not(.outB) #dockB *{pointer-events:none;}
+.dock>.knob{pointer-events:auto !important;}
+.knob{position:absolute; background:var(--gold); color:#2A2010; font-family:Impact,"Arial Black",sans-serif;
+  font-size:13px; letter-spacing:1px; padding:5px 12px; white-space:nowrap; cursor:pointer;
+  box-shadow:0 2px 8px #0008; touch-action:none;}
+#dockT>.knob{top:100%; left:50%; transform:translateX(-50%); border-radius:0 0 10px 10px;}
+#dockB>.knob{bottom:100%; left:50%; transform:translateX(-50%); border-radius:10px 10px 0 0;}
+/* side handles sit at 68% height — BELOW the dynamic island pill (centered on the edge) */
+#dockL>.knob{left:100%; top:68%; writing-mode:vertical-rl; padding:12px 5px; border-radius:0 10px 10px 0;}
+#dockR>.knob{right:100%; top:68%; writing-mode:vertical-rl; padding:12px 5px; border-radius:10px 0 0 10px;}
+#dockT .ar::before{content:'▾';} body.outT #dockT .ar::before{content:'▴';}
+#dockB .ar::before{content:'▴';} body.outB #dockB .ar::before{content:'▾';}
+.hot{position:fixed; z-index:31; background:none; touch-action:none;}
+#hotT{top:0; left:0; right:0; height:calc(18px + env(safe-area-inset-top,0px));}
+#hotB{bottom:0; left:0; right:0; height:calc(18px + env(safe-area-inset-bottom,0px));}
+#hotL{left:0; top:0; bottom:0; width:18px;}
+#hotR{right:0; top:0; bottom:0; width:18px;}
+body.outT #hotT, body.outL #hotL, body.outR #hotR, body.outB #hotB{display:none;}
 .panel h3{margin:8px 0 6px; font-size:14px; color:var(--gold); border-bottom:1px solid #4A5740; padding-bottom:3px;}
 /* stamps grid */
 .stamps{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
@@ -79,7 +124,7 @@ input[type=range]{accent-color:var(--gold);}
 #gcolors .sw{width:28px; height:28px; border-radius:7px; border:2px solid #14180C; cursor:pointer;}
 #gcolors .sw.tgt{border-color:#fff; box-shadow:0 0 0 2px var(--gold);}
 /* palette */
-#palette{display:flex; gap:10px; padding:8px 12px; background:#181E10; border-top:2px solid #14180C; overflow-x:auto; align-items:flex-end;}
+#palette{display:flex; gap:10px; padding:8px 12px; background:#181E10; overflow-x:auto; align-items:flex-end;}
 .fam{display:flex; flex-direction:column; gap:3px; align-items:center;}
 .fam .cols{display:flex; gap:3px;}
 .fam small{font-size:8px; letter-spacing:1px; color:#8A8A72; white-space:nowrap;}
@@ -101,7 +146,7 @@ textarea{width:100%; height:140px; background:#161B10; color:#B8E0A0; border:1px
 .helplist b{color:var(--gold);}
 kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5px; font-size:11px;}
 @media (max-width:860px){
-  #left{width:150px;} #right{width:190px;}
+  :root{--lw:150px; --rw:190px;}
   #top .wm{font-size:20px;}
 }
 /* ---- iPad / touch ---- */
@@ -125,6 +170,7 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
 </style>
 </head>
 <body>
+<div id="dockT" class="dock">
 <div id="top">
   <div class="wm">THE SHAPE STORE<small>GVT CREATURE WORKSHOP</small></div>
   <input id="docname" type="text" value="MY CREATURE" maxlength="24">
@@ -138,15 +184,45 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
   <button id="fsBtn" onclick="toggleFS()" title="fullscreen">⛶ FULL</button>
   <button onclick="openHelp()">❓ HELP</button>
 </div>
+<div id="stagebar">
+  <button id="tMove" class="gold" onclick="setTool('move')">👆 MOVE</button>
+  <button id="tDraw" onclick="setTool('draw')">✏️ DRAW</button>
+  <span id="penSizes" style="display:none; align-items:center; gap:4px;">
+    <button onclick="setPen(2,this)" title="skinny">·</button>
+    <button onclick="setPen(3.5,this)" title="thin">•</button>
+    <button class="gold" onclick="setPen(7,this)" title="fat" style="font-size:16px">●</button>
+    <button onclick="setPen(13,this)" title="MEGA fat" style="font-size:20px">●</button>
+    <input id="penR" type="range" min="0.5" max="26" step="0.5" value="7" style="width:90px" oninput="setPen(+this.value,null)">
+    <span id="penV" style="color:#8A8A72;font-size:11px;min-width:26px">7</span>
+  </span>
+  <span style="color:#4A5740">|</span>
+  <button id="bCreature" class="gold" onclick="setBoard('creature')">TOY CARD</button>
+  <button id="bWide" onclick="setBoard('wide')">PARK SCENE</button>
+  <select id="skySel" onchange="setSky(this.value)" style="display:none">
+    <option value="sunrise">Jungle Sunrise</option>
+    <option value="dusk">Volcano Dusk</option>
+    <option value="aurora">Aurora Night</option>
+    <option value="snowday">Snowfield Day</option>
+    <option value="paper">Plain Paper</option>
+  </select>
+  <span class="spacer"></span>
+  <span style="color:#8A8A72">ZOOM</span>
+  <input id="zoomR" type="range" min="0.4" max="3" step="0.05" value="1" oninput="setZoom(+this.value)">
+  <button onclick="zoomFit()">FIT</button>
+  <button class="danger" onclick="clearAll()" title="clear the whole board">🧹 START FRESH</button>
+</div>
+<div class="knob"><span class="ar"></span> 🧰 TOOLS <span class="ar"></span></div>
+</div>
 <div id="rotOvl">
   <div class="rotcard">
     <div class="rotph">📱</div>
-    <div style="font-size:20px" class="wm">TURN YOUR IPAD SIDEWAYS</div>
+    <div style="font-size:20px" class="wm">TURN IT SIDEWAYS</div>
     <div style="font-size:13px; color:#B8B49E; margin:8px 0 14px">The workshop is much roomier in landscape.</div>
     <button onclick="dismissRot()">use it tall anyway</button>
   </div>
 </div>
 <div id="main">
+  <div id="dockL" class="dock"><div class="knob">🦖 SHAPES</div>
   <div id="left" class="panel">
     <h3>SHAPES</h3>
     <div class="stamps" id="partGrid"></div>
@@ -158,36 +234,11 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
     <h3>SCENERY</h3>
     <div class="stamps" id="envGrid"></div>
   </div>
+  </div>
   <div id="stagewrap">
-    <div id="stagebar">
-      <button id="tMove" class="gold" onclick="setTool('move')">👆 MOVE</button>
-      <button id="tDraw" onclick="setTool('draw')">✏️ DRAW</button>
-      <span id="penSizes" style="display:none; align-items:center; gap:4px;">
-        <button onclick="setPen(2,this)" title="skinny">·</button>
-        <button onclick="setPen(3.5,this)" title="thin">•</button>
-        <button class="gold" onclick="setPen(7,this)" title="fat" style="font-size:16px">●</button>
-        <button onclick="setPen(13,this)" title="MEGA fat" style="font-size:20px">●</button>
-        <input id="penR" type="range" min="0.5" max="26" step="0.5" value="7" style="width:90px" oninput="setPen(+this.value,null)">
-        <span id="penV" style="color:#8A8A72;font-size:11px;min-width:26px">7</span>
-      </span>
-      <span style="color:#4A5740">|</span>
-      <button id="bCreature" class="gold" onclick="setBoard('creature')">TOY CARD</button>
-      <button id="bWide" onclick="setBoard('wide')">PARK SCENE</button>
-      <select id="skySel" onchange="setSky(this.value)" style="display:none">
-        <option value="sunrise">Jungle Sunrise</option>
-        <option value="dusk">Volcano Dusk</option>
-        <option value="aurora">Aurora Night</option>
-        <option value="snowday">Snowfield Day</option>
-        <option value="paper">Plain Paper</option>
-      </select>
-      <span class="spacer"></span>
-      <span style="color:#8A8A72">ZOOM</span>
-      <input id="zoomR" type="range" min="0.4" max="3" step="0.05" value="1" oninput="setZoom(+this.value)">
-      <button onclick="zoomFit()">FIT</button>
-      <button class="danger" onclick="clearAll()" title="clear the whole board">🧹 START FRESH</button>
-    </div>
     <div id="stage"><svg id="board" xmlns="http://www.w3.org/2000/svg"></svg></div>
   </div>
+  <div id="dockR" class="dock"><div class="knob">🧩 PIECES</div>
   <div id="right" class="panel">
     <div>
       <h3>SELECTED</h3>
@@ -202,8 +253,12 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
       <div id="layers"></div>
     </div>
   </div>
+  </div>
 </div>
+<div id="dockB" class="dock"><div class="knob"><span class="ar"></span> 🎨 PAINTS <span class="ar"></span></div>
 <div id="palette"></div>
+</div>
+<div id="hotT" class="hot"></div><div id="hotL" class="hot"></div><div id="hotR" class="hot"></div><div id="hotB" class="hot"></div>
 
 <div class="modal" id="galModal"><div class="mbox">
   <h2>🖼 THE GALLERY</h2>
@@ -244,6 +299,7 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
 <div class="modal" id="helpModal"><div class="mbox">
   <h2>❓ HOW THE SHOP WORKS</h2>
   <div class="helplist">
+    <b>The drawers:</b> the whole screen is your paper. The shelves live in four drawers just off the edges — tap a gold handle (🧰 TOOLS · 🦖 SHAPES · 🧩 PIECES · 🎨 PAINTS) and the drawer slides in. Tap the paper and it tucks itself away.<br>
     <b>Just draw:</b> press ✏️ DRAW and scribble — a big fat pencil in whatever paint chip you tapped last. Three dot sizes. 👆 MOVE goes back to grabbing things.<br>
     <b>Start from a real GVT toy:</b> tap any FINISHED CHARACTER — it's the actual mold from the game. Drag it, resize with the corner handle, spin with the top handle.<br>
     <b>Coloring:</b> select a toy and its colors appear as swatches on the right. Tap a swatch, then tap any paint chip at the bottom (or the 🎨 wheel) — every piece wearing that color changes at once, just like the game recolors its toys.<br>
@@ -1242,7 +1298,10 @@ function setSky(v){ pushUndo(); DOC.sky=v; render(); }
 function setZoom(z){ userZ=z; render(); }
 function zoomFit(){
   const st=$('stage'), b=B();
-  fitZ=Math.max(0.2, Math.min((st.clientWidth-30)/b.w,(st.clientHeight-30)/b.h));
+  /* round 7: the stage is the whole screen now — FITPAD keeps the paper off the
+     drawer lips + handles (14px lip + ~26px handle each side, ~32px margin) */
+  const FITPAD=64;
+  fitZ=Math.max(0.2, Math.min((st.clientWidth-FITPAD)/b.w,(st.clientHeight-FITPAD)/b.h));
   userZ=1; $('zoomR').value=1; render();
 }
 window.addEventListener('resize',()=>zoomFit());
@@ -1414,6 +1473,54 @@ rotCheck();
 function openHelp(){ $('helpModal').classList.add('on'); }
 function closeModals(){ document.querySelectorAll('.modal').forEach(m=>m.classList.remove('on')); }
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) closeModals(); }));
+
+/* ---- THE PEEKING DRAWERS (round 7) — the Train Galaxy E72 'peeking corner'
+   recipe grown to four edges. The handle or the invisible edge strip SUMMONS a
+   drawer at pointerdown (and swallows the tap's synthesized click so it never
+   lands on a control that just slid under the finger — TG's tapSwallow law).
+   Any press outside the open drawer tucks it away AND still does its own job;
+   a press inside only freshens the quiet clock. One drawer out at a time. */
+const DRAWER_OUT_S=8;             // seconds a drawer stays out untouched (dial)
+const DK={cur:null,tm:0};
+let swT=0;
+function swallowTap(){ swT=performance.now(); }
+window.addEventListener('click',e=>{
+  if(swT&&performance.now()-swT<450){ swT=0; e.preventDefault(); e.stopPropagation(); }
+},true);
+function dockEl(k){ return k?$('dock'+k):null; }
+function dockOut(k){
+  if(DK.tm){ clearTimeout(DK.tm); DK.tm=0; }
+  if(k) DK.tm=setTimeout(()=>{
+    // the quiet clock — but never mid-typing: a focused field freshens instead
+    const d=dockEl(k), a=document.activeElement;
+    if(d&&a&&d.contains(a)&&/INPUT|SELECT|TEXTAREA/.test(a.tagName)) dockOut(k); else dockOut(null);
+  }, DRAWER_OUT_S*1000);
+  if(k===DK.cur) return;
+  if(!k){ const d=dockEl(DK.cur), a=document.activeElement; if(d&&a&&d.contains(a)) a.blur(); }
+  ['T','L','R','B'].forEach(x=>document.body.classList.toggle('out'+x, x===k));
+  DK.cur=k;
+}
+['T','L','R','B'].forEach(k=>{
+  const go=e=>{
+    e.preventDefault(); e.stopPropagation();
+    const was=DK.cur; dockOut(k);
+    if(was!==k){   // only a real summon swallows — a handle-tap on an open drawer is free
+      swallowTap();
+      // a slow tap outlives the first swallow — re-arm it once at the release (TG E73)
+      window.addEventListener('pointerup',()=>swallowTap(),{capture:true,once:true});
+    }
+  };
+  $('hot'+k).addEventListener('pointerdown',go);
+  dockEl(k).querySelector('.knob').addEventListener('pointerdown',go);
+});
+// the retreat: window capture reads the press first. Inside the open drawer =
+// freshen; anywhere else = tuck away — and that press still does its own job.
+window.addEventListener('pointerdown',e=>{
+  if(!DK.cur) return;
+  const t=e.target, d=dockEl(DK.cur);
+  if(t&&d&&d.contains(t)){ dockOut(DK.cur); return; }
+  dockOut(null);
+},true);
 
 /* ---- boot ---- */
 buildPalette(); buildStamps(); renderMyGrid();
