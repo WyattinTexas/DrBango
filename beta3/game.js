@@ -8,12 +8,36 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.31.1';
+const BUILD = 'STARSPELL v0.32.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
-const DPR = Math.min(window.devicePixelRatio || 1, 3);
-const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
 const QS = new URLSearchParams(location.search);
+/* ---- adaptive back-buffer (the Runefall ladder) ------------------------
+   Full-DPR is the crispness the game fought for, so it stays the default —
+   but a phone that provably can't hold it gets its back-buffer stepped down
+   a notch (3 -> 2 -> 1.5 -> 1) and the cap remembered for a day. Touch
+   devices only: a desktop hiccup (background tab, screenshot flurry) must
+   not degrade a capable machine. An explicit ?dpr= visit resets the ladder
+   and pins the value for that session. The detector lives in ssPerfWatch. */
+const TOUCH_DEVICE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+const DPR_CAP = (() => {
+  if (!TOUCH_DEVICE) return 3;
+  if (QS.has('dpr')) {
+    localStorage.removeItem('beta3.dprCap'); localStorage.removeItem('beta3.dprCapTs');
+    return 3;
+  }
+  const ts = parseFloat(localStorage.getItem('beta3.dprCapTs'));
+  if (!(ts > 0) || Date.now() - ts > 24 * 3600 * 1000) {
+    localStorage.removeItem('beta3.dprCap'); localStorage.removeItem('beta3.dprCapTs');
+    return 3;
+  }
+  const v = parseFloat(localStorage.getItem('beta3.dprCap'));
+  return (v >= 1 && v < 3) ? v : 3;
+})();
+const DPR = QS.has('dpr')
+  ? Math.max(1, Math.min(parseFloat(QS.get('dpr')) || 1, 3))
+  : Math.min(window.devicePixelRatio || 1, DPR_CAP);
+const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
 const DEMO = QS.get('demo') === '1';
 
 /* ---- frame-time probe (part of ?diag=1) --------------------------------
@@ -66,6 +90,53 @@ const PERF = {
   },
 };
 window.SSPERF = PERF;   // the headless perf harness reads/starts probes through this
+
+/* ---- fps overlay + the ladder's detector -------------------------------
+   A tiny DOM readout in the top-left (Wyatt's debugging ask): fps, worst
+   frame of the last half-second, renderer (GL/CV — a phone screenshot
+   instantly tells us if WebGL failed over to Canvas), back-buffer size and
+   dpr. DOM, not a Phaser object: zero render cost, survives scene changes.
+   On by default while perf is under investigation; ?fps=0 hides it.
+   The same 500ms pulse runs the ladder: 5s of sustained sub-45fps on a
+   touch device stores a lower dpr cap, applied by a reload the next time
+   the home meadow is idle — never mid-battle, mid-flight, or in versus. */
+function ssPerfWatch(gm) {
+  let el = null;
+  if (QS.get('fps') !== '0') {
+    el = document.createElement('div');
+    el.style.cssText = 'position:fixed;left:4px;top:calc(env(safe-area-inset-top,0px) + 4px);' +
+      'z-index:40;pointer-events:none;font:600 10px/1.5 ui-monospace,Menlo,monospace;' +
+      'color:#7ec96f;background:rgba(6,8,20,.55);padding:2px 7px;border-radius:7px;letter-spacing:.3px';
+    document.body.appendChild(el);
+  }
+  let worst = 0;
+  gm.events.on('prestep', () => { const d = gm.loop.rawDelta; if (d > worst) worst = d; });
+  let lowMs = 0, wantStep = false;
+  setInterval(() => {
+    const fps = Math.round(gm.loop.actualFps);
+    if (el) {
+      el.style.color = fps >= 50 ? '#7ec96f' : fps >= 30 ? '#e6c229' : '#e74c3c';
+      el.textContent = fps + ' FPS · ' + Math.round(worst) + 'ms · ' +
+        (gm.renderer.type === Phaser.WEBGL ? 'GL ' : 'CV ') +
+        gm.scale.width + '×' + gm.scale.height + ' · dpr' + (Math.round(DPR * 10) / 10);
+    }
+    worst = 0;
+    if (!TOUCH_DEVICE || QS.has('dpr')) return;
+    if (!wantStep && performance.now() > 6000 && fps < 45 && DPR > 1) {
+      lowMs += 500;
+      if (lowMs >= 5000) {
+        wantStep = true;
+        localStorage.setItem('beta3.dprCap', String(DPR > 2 ? 2 : DPR > 1.5 ? 1.5 : 1));
+        localStorage.setItem('beta3.dprCapTs', String(Date.now()));
+        DIAG('perf ladder: sustained ' + fps + 'fps -> dpr cap ' + localStorage.getItem('beta3.dprCap'));
+      }
+    } else if (fps >= 45) lowMs = 0;
+    if (wantStep) {
+      const h = gm.scene.getScene('home');
+      if (h && h.scene.isActive() && !h.ascending && !h.descending && !h.introPlaying) location.reload();
+    }
+  }, 500);
+}
 
 /* ---- painted art (buttons + letter tiles + meadow plate), DEFAULT ON -----
    Everything else in this game is drawn to canvas at boot; these five files
@@ -3580,6 +3651,7 @@ class Battle extends Phaser.Scene {
     // numeric HP on the bar itself — players plan lethal ("15 left, build 15+")
     this.ehpT = txt(l.x(0), l.y(321), '', 11, '#ffe9e0')
       .setOrigin(0.5).setShadow(0, l.u(1), 'rgba(16,4,12,0.95)', l.u(2.5));
+    this._ehpStr = null;   // scene restarts reuse this instance — never let a stale cache mute the fresh text
     this.ehpC.add([eTrough, this.ehpBar, this.ehpT]);
     this.strikeRib = this.add.image(l.x(0), l.y(342), 'ribbon').setAlpha(0);
     this.strikeT = txt(l.x(0), l.y(342), '', 12, '#e6a2a2').setOrigin(0.5);
@@ -4151,7 +4223,17 @@ class Battle extends Phaser.Scene {
   drawEhp() {
     const shown = Math.max(0, Math.round(this.ehpShown.v));
     this.ehpBar.setCrop(0, 0, this.ehpBar.frame.width * clamp(shown / this.beast.hp, 0, 1), this.ehpBar.frame.height);
-    this.ehpT.setText(shown + ' / ' + this.beast.hp);
+    // setText re-rasterizes and re-uploads the text texture — at dpr3 a
+    // per-frame repaint during the 300ms drain eats the frame budget. The
+    // bar crop stays per-frame (cheap, carries the smoothness); the numeral
+    // repaints at ~20Hz and always lands exact on the drain's endpoints.
+    const s = shown + ' / ' + this.beast.hp;
+    if (s === this._ehpStr) return;
+    const now = performance.now();
+    const atRest = shown === Math.max(0, this.beast.hpNow) || shown === 0;
+    if (!atRest && now - (this._ehpTextAt || 0) < 45) return;
+    this._ehpStr = s; this._ehpTextAt = now;
+    this.ehpT.setText(s);
   }
   runScore() { return this.run.totalDmg + this.run.longest.length * 15 + this.run.fightIdx * 50; }
   setBeastName(name) {
@@ -4331,11 +4413,20 @@ class Battle extends Phaser.Scene {
         nI.destroy();
         this.starBurst.emitParticleAt(dst.x, dst.y, 3);
         this.tweens.add({ targets: this.scoreT, scale: 1.3, duration: 110, yoyo: true });
-        const cnt = { v: from };
+        const cnt = { v: from, at: 0 };
         this.tweens.add({
           targets: cnt, v: to, duration: Math.min(700, 90 + (to - from) * 6), ease: 'Cubic.easeOut',
-          onUpdate: () => this.scoreT.setText(String(Math.round(cnt.v))),
-          onComplete: () => { this.scoreAnim--; if (!this.scoreAnim) this.updateBars(); },
+          // same texture-repaint economy as drawEhp: count at ~20Hz, land exact
+          onUpdate: () => {
+            const now = performance.now();
+            if (now - cnt.at < 45) return;
+            cnt.at = now;
+            this.scoreT.setText(String(Math.round(cnt.v)));
+          },
+          onComplete: () => {
+            this.scoreT.setText(String(Math.round(to)));
+            this.scoreAnim--; if (!this.scoreAnim) this.updateBars();
+          },
         });
       },
     });
@@ -5246,6 +5337,7 @@ function ssBoot() {
   window.game = game;
   while (SS_LATE_SCENES.length) { const [k, c] = SS_LATE_SCENES.shift(); game.scene.add(k, c); }
   game.events.once('ready', fitCanvas);
+  game.events.once('ready', () => ssPerfWatch(game));
 }
 function fitCanvas() {
   const c = game && game.canvas;
