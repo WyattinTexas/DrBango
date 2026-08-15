@@ -14,6 +14,8 @@ h1,h2,.wm,.bub{font-family:Impact,"Arial Black",sans-serif; letter-spacing:1px; 
 header{padding:14px 16px 6px; text-align:center;}
 header .wm{font-size:26px; color:var(--gold); text-shadow:1px 1px 0 #14180C;}
 header small{display:block; color:#8A8A72; font-size:11px; letter-spacing:2px; font-family:"Trebuchet MS";}
+#toShop{position:fixed; top:8px; left:10px; z-index:11; background:#3A4530; color:var(--cream); border:2px solid var(--gold);
+  border-radius:9px; padding:6px 10px; font-size:11px; font-weight:bold; cursor:pointer; font-family:inherit;}
 /* the shopkeeper asks */
 #asks{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding:10px 12px;}
 .bub{background:var(--paper); color:#4A4432; border:3px solid #B8A888; border-radius:14px; padding:8px 14px;
@@ -35,22 +37,28 @@ body.scrolled #heroCard .nm{font-size:10px;}
 /* the sheet */
 #sheet{max-width:760px; margin:0 auto; padding:0 12px;}
 .sec{margin:16px 0;}
-.sec h2{font-size:15px; color:var(--gold); border-bottom:1px solid #4A5740; padding-bottom:4px; margin:0 0 8px;}
+.sec h2{font-size:15px; color:var(--gold); border-bottom:1px solid #4A5740; padding-bottom:4px; margin:0 0 8px;
+  display:flex; align-items:center; gap:8px;}
 .sec h2 small{color:#8A8A72; font-size:10px; letter-spacing:1px; font-family:"Trebuchet MS"; font-weight:normal;}
+.sec h2 .ed{margin-left:auto; background:var(--gold); color:#2A2010; border:none; border-radius:7px; padding:4px 9px;
+  font-size:10px; font-weight:bold; cursor:pointer; font-family:"Trebuchet MS"; letter-spacing:0;}
 .chips{display:flex; gap:8px; flex-wrap:wrap;}
-.chip{background:var(--paper); border:3px solid transparent; border-radius:10px; padding:4px; cursor:pointer; text-align:center; width:86px;}
+.chip{background:var(--paper); border:3px solid transparent; border-radius:10px; padding:4px; cursor:pointer; text-align:center; width:86px; position:relative;}
 .chip svg{display:block; width:76px; height:56px; margin:0 auto;}
 .chip div{font-size:9px; font-weight:bold; color:#4A4432; letter-spacing:.5px; margin-top:2px; text-transform:uppercase;}
 .chip.on{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold);}
 .chip:active{transform:scale(0.96);}
+.chip .del{position:absolute; top:1px; right:4px; font-size:11px; color:#8A2F26; font-weight:bold; background:#fff9; border-radius:4px; padding:0 4px;}
+.chip .dye{width:44px; height:44px; border-radius:50%; margin:6px auto; border:3px solid #0006;}
 footer{text-align:center; color:#57574A; font-size:10px; letter-spacing:1px; padding:26px 0 10px;}
 @media (pointer:coarse){ .chip{width:96px;} .chip svg{width:86px; height:62px;} }
 </style>
 </head>
 <body>
+<button id="toShop" onclick="location.href='index.html'">🦖 THE SHOP</button>
 <header>
   <div class="wm">THE PARTS COUNTER</div>
-  <small>THE SHAPE STORE · PICK A PART, THE TOY WEARS IT</small>
+  <small>THE SHAPE STORE · PICK A PART, THE TOY WEARS IT · 🛠 EDIT A PART AND MAKE IT YOURS</small>
 </header>
 <div id="asks"></div>
 <div id="hero">
@@ -61,14 +69,13 @@ footer{text-align:center; color:#57574A; font-size:10px; letter-spacing:1px; pad
   </div>
 </div>
 <div id="sheet"></div>
-<footer>EVERY PART IS A REAL GVT MOLD PIECE — TAP CHIPS, BUILD A TOY</footer>
+<footer>REAL GVT MOLDS BEHIND THE GLASS — TAP CHIPS · 🛠 EDIT SENDS A PART TO THE SHOP TO REDRAW</footer>
 <script>
 'use strict';
 const NS='http://www.w3.org/2000/svg';
 const $=id=>document.getElementById(id);
 
-/* ================= SHARED FACE KITS =================
-   Authored around (0,0); INK / PUP swap per character; eyes sit at ±14. */
+/* ================= SHARED FACE KITS (glyph frame: (0,0) center, eyes at ±14) ================= */
 const EYES=[
  {n:'buttons', s:'<ellipse cx="-14" cy="0" rx="5" ry="6" fill="PUP"/><ellipse cx="14" cy="0" rx="5" ry="6" fill="PUP"/>'},
  {n:'sparkle', s:'<circle cx="-14" cy="0" r="6.6" fill="#fff" stroke="INK" stroke-width="1.6"/><circle cx="-15.5" cy="0.8" r="3.2" fill="#1a1208"/><circle cx="-13" cy="-1.8" r="1.2" fill="#fff"/><circle cx="14" cy="0" r="6.6" fill="#fff" stroke="INK" stroke-width="1.6"/><circle cx="12.5" cy="0.8" r="3.2" fill="#1a1208"/><circle cx="15" cy="-1.8" r="1.2" fill="#fff"/>'},
@@ -97,63 +104,125 @@ const MOUTHS=[
  {n:'tongue', s:'<path d="M-12 -1 Q0 6 12 -1" stroke="PUP" stroke-width="3.6" fill="none" stroke-linecap="round"/><path d="M-1 3 Q-1 12 4 12 Q9 12 8 4.5 Q4 6.5 -1 3 z" fill="#E8863A" stroke="#B05E20" stroke-width="1.6" stroke-linejoin="round"/>'},
 ];
 function kit(base, ink, pup, dkm){ return base.map(v=>({n:v.n, s:v.s.split('INK').join(ink).split('PUP').join(pup).split('DKM').join(dkm)})); }
+function rewrap(list, t){ return list.map(v=>({n:v.n, s:'<g transform="'+t+'">'+v.s+'</g>'})); }
+
+/* ================= THE GVT ARMY MOLD — lifted verbatim from the game ================= */
+const AHEAD='<circle cx="0" cy="0" r="8" fill="currentColor"/><path d="M -11 0 a 11 11 0 0 1 22 0 z" fill="currentColor"/><rect x="-12.5" y="-2.5" width="25" height="4.5" rx="2.2" fill="currentColor"/>';
+const ABASE='<ellipse cx="60" cy="129" rx="33" ry="7.5" fill="#000" opacity="0.28"/><ellipse cx="60" cy="126" rx="33" ry="7.5" fill="currentColor"/>';
+const ALEGS='<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M40 122 L54 96" stroke-width="11"/><path d="M76 118 L58 96" stroke-width="11"/><path d="M56 96 L58 68" stroke-width="16"/></g>';
+const OF_MUS='<g stroke="#3a2c1c" stroke-width="3" stroke-linecap="round" fill="none"><path d="M -0.6 4.4 Q -3.2 3.0 -6.4 5.0"/><path d="M 0.6 4.4 Q 3.2 3.0 6.4 5.0"/></g>';
+const OF_HELM='<path d="M -11.2 0.2 a 11.2 11.2 0 0 1 22.4 0 z" fill="#5d6a72"/><path d="M -6.8 -6.9 a 8.5 8.5 0 0 1 7.6 -3" stroke="#8f9aa4" stroke-width="1.7" stroke-linecap="round" fill="none"/><path d="M 0 -8.2 L 0.78 -6.55 L 2.6 -6.3 L 1.28 -5.05 L 1.6 -3.25 L 0 -4.1 L -1.6 -3.25 L -1.28 -5.05 L -2.6 -6.3 L -0.78 -6.55 Z" fill="#D9A544" stroke="#8a6a24" stroke-width="0.5"/><rect x="-13.2" y="-1.4" width="26.4" height="4.6" rx="2.2" fill="#4a545c"/><path d="M -12.2 3.4 L 12.2 3.4" stroke="#39424a" stroke-width="1.2"/>';
+const OF_HAT='<path d="M -7.4 0.6 Q -7.9 -8.2 -3.4 -9.1 Q 0 -9.8 3.4 -9.1 Q 7.9 -8.2 7.4 0.6 Z" fill="#8a6136"/><path d="M -0.5 -9.2 L -0.5 -1.2" stroke="#6d4c28" stroke-width="1.8" stroke-linecap="round" fill="none"/><path d="M -14.6 1.7 Q -13.6 -2.4 -10.6 0.3 L 10.6 0.3 Q 13.6 -2.4 14.6 1.7 Q 7.6 4.1 0 4.1 Q -7.6 4.1 -14.6 1.7 Z" fill="#75522c"/><path d="M -13.5 1.3 Q -7 3.3 0 3.3 Q 7 3.3 13.5 1.3" stroke="#5c3f21" stroke-width="0.9" fill="none"/><path d="M -7.2 -0.6 L 7.2 -0.6" stroke="#4a3a22" stroke-width="2.4"/><rect x="-1.7" y="-1.9" width="3.4" height="2.6" rx="0.6" fill="#C7913B" stroke="#8a6a24" stroke-width="0.5"/>';
+const OF_SNOWHAT='<path d="M -10.6 0.6 Q -11 -7.6 -5 -9.6 Q 0 -11.2 5 -9.6 Q 11 -7.6 10.6 0.6 Z" fill="#7FA8C8"/><path d="M -7.4 -8.2 Q -3.6 -10.6 2.2 -9.9" stroke="#A9CBE2" stroke-width="1.6" stroke-linecap="round" fill="none"/><path d="M -6.8 -6.4 L -5.4 -1.4 M -3.2 -7.6 L -2.2 -1.6 M 0.6 -8 L 0.8 -1.6 M 4.2 -7.4 L 4.8 -1.6" stroke="#5E86A6" stroke-width="1" stroke-linecap="round" fill="none"/><circle cx="0" cy="-10.4" r="3" fill="#F2F6FA" stroke="#A9CBE2" stroke-width="1"/><rect x="-11.6" y="-1.6" width="23.2" height="4.8" rx="2.4" fill="#EAF3FA" stroke="#A9CBE2" stroke-width="0.9"/>';
+const OF_SAFHAT='<ellipse cx="0" cy="-1" rx="13.4" ry="4.6" fill="#C8B078" stroke="#8A7448" stroke-width="1.2"/><path d="M -7 -2.2 Q -7 -9.4 0 -9.8 Q 7 -9.4 7 -2.2 Z" fill="#D4BC86" stroke="#8A7448" stroke-width="1.1"/><rect x="-7.2" y="-4.6" width="14.4" height="2.8" rx="1.2" fill="#6E5A34"/><path d="M -4 -7.6 Q 0 -9 4 -7.6" stroke="#E0D0A0" stroke-width="1.2" stroke-linecap="round" fill="none"/>';
+const OF_CROWN='<path d="M -9.4 0.6 L -9.4 -6.8 L -4.7 -3.2 L 0 -9.2 L 4.7 -3.2 L 9.4 -6.8 L 9.4 0.6 Z" fill="#E8C24A" stroke="#B8922E" stroke-width="1.3"/><circle cx="-4.7" cy="-1" r="1.05" fill="#C0392B"/><circle cx="0" cy="-1.4" r="1.05" fill="#2E86C1"/><circle cx="4.7" cy="-1" r="1.05" fill="#27AE60"/><circle cx="0" cy="-10.6" r="1.5" fill="#E8C24A" stroke="#B8922E" stroke-width="0.9"/>';
+const OF_VEST='<path d="M 58 71 L 56.4 92" stroke="#6b4f2e" stroke-width="18" stroke-linecap="round" fill="none"/><path d="M 58 71.5 L 56.4 91.5" stroke="#7d5c37" stroke-width="13" stroke-linecap="round" fill="none"/><path d="M 51.5 74 L 63.5 73.2" stroke="#4a3a22" stroke-width="3.2" stroke-linecap="round" fill="none"/><rect x="49.6" y="80" width="6.4" height="7" rx="1.4" fill="#4a3a22" stroke="#33261a" stroke-width="0.8"/><rect x="58.4" y="79.4" width="6.4" height="7" rx="1.4" fill="#4a3a22" stroke="#33261a" stroke-width="0.8"/><path d="M 57.4 71.5 L 56.8 91.5" stroke="#33261a" stroke-width="1.1" fill="none"/>';
+const OF_EXPVEST='<path d="M 58 71 L 56.4 92" stroke="#B89A5C" stroke-width="18" stroke-linecap="round" fill="none"/><path d="M 58 71.5 L 56.4 91.5" stroke="#C8B078" stroke-width="13" stroke-linecap="round" fill="none"/><rect x="50.6" y="76.4" width="5.4" height="4.8" rx="1" fill="#A8894C" stroke="#8A7448" stroke-width="0.8"/><rect x="59" y="76" width="5.4" height="4.8" rx="1" fill="#A8894C" stroke="#8A7448" stroke-width="0.8"/><rect x="50.4" y="83.6" width="5.6" height="5.2" rx="1" fill="#A8894C" stroke="#8A7448" stroke-width="0.8"/><rect x="59" y="83.2" width="5.6" height="5.2" rx="1" fill="#A8894C" stroke="#8A7448" stroke-width="0.8"/><path d="M 51.6 72.6 L 63.4 71.9" stroke="#E0D0A0" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M 57.4 71.5 L 56.8 91.5" stroke="#6E5A34" stroke-width="1.1" fill="none"/>';
+const OF_SNOWJKT='<path d="M 58 71 L 56.4 92" stroke="#7FA8C8" stroke-width="18" stroke-linecap="round" fill="none"/><path d="M 58 71.5 L 56.4 91.5" stroke="#A9CBE2" stroke-width="13" stroke-linecap="round" fill="none"/><path d="M 50.5 77 L 64.5 76 M 50.2 82.6 L 64.2 81.8 M 50.5 88.2 L 64 87.6" stroke="#7FA8C8" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M 51.6 72.6 L 63.4 71.9" stroke="#EAF3FA" stroke-width="3.4" stroke-linecap="round" fill="none"/><path d="M 57.4 71.5 L 56.8 91.5" stroke="#4E7396" stroke-width="1.1" fill="none"/><rect x="54.6" y="90" width="4.4" height="3" rx="1" fill="#4E7396"/>';
+const OF_SCOUT='<path d="M 58 71.5 L 56.6 90.5" stroke="#4f6238" stroke-width="16" stroke-linecap="round" fill="none"/><path d="M 58 72 L 56.7 90" stroke="#5d7244" stroke-width="11" stroke-linecap="round" fill="none"/><path d="M 51.4 74.6 L 62.8 86.2" stroke="#3a4a2a" stroke-width="2.7" stroke-linecap="round" fill="none"/><path d="M 63.2 74.2 L 50.8 85.8" stroke="#3a4a2a" stroke-width="2.7" stroke-linecap="round" fill="none"/><circle cx="57.2" cy="80.2" r="2.7" fill="#C7913B" stroke="#6d5423" stroke-width="0.9"/><circle cx="57.2" cy="80.2" r="1.1" fill="#8a6a24"/><rect x="52.4" y="87.2" width="8.8" height="4.4" rx="1.3" fill="#3a4a2a" stroke="#2b371f" stroke-width="0.8"/><path d="M 54 89.4 L 59.6 89.4" stroke="#5d7244" stroke-width="0.9"/>';
+const OF_PLAT='<ellipse cx="60" cy="130.6" rx="39" ry="7.6" fill="#000" opacity="0.25"/><ellipse cx="60" cy="129.2" rx="38.5" ry="8" fill="#8a6a24"/><ellipse cx="60" cy="126.2" rx="38.5" ry="8" fill="#C7913B"/><ellipse cx="60" cy="125.4" rx="30.5" ry="5.8" fill="#D9A544"/><path d="M 31 124.5 a 30 6 0 0 1 22 -4.6" stroke="#F2D98C" stroke-width="1.6" stroke-linecap="round" fill="none"/>';
+const OF_BOOT=(L)=>{ const bx=(L[0]+(L[2]-L[0])*0.38).toFixed(1), by=(L[1]+(L[3]-L[1])*0.38).toFixed(1);
+  return '<path d="M '+L[0]+' '+L[1]+' L '+bx+' '+by+'" stroke="#26261f" stroke-width="12.5" stroke-linecap="round" fill="none"/>'
+    +'<path d="M '+(L[0]-2)+' '+(L[1]+3.4)+' L '+(L[0]+3)+' '+(L[1]+3.6)+'" stroke="#171310" stroke-width="4" stroke-linecap="round" fill="none"/>'
+    +'<path d="M '+(bx-2)+' '+(by-0.5)+' L '+(+bx+2)+' '+(by-1.5)+'" stroke="#5a4a34" stroke-width="1.2" stroke-linecap="round" fill="none"/>'; };
+const OF_EXPBOOT=(L)=>{ const bx=(L[0]+(L[2]-L[0])*0.38).toFixed(1), by=(L[1]+(L[3]-L[1])*0.38).toFixed(1);
+  return '<path d="M '+L[0]+' '+L[1]+' L '+bx+' '+by+'" stroke="#8A6238" stroke-width="12.5" stroke-linecap="round" fill="none"/>'
+    +'<path d="M '+(L[0]-2)+' '+(L[1]+3.4)+' L '+(L[0]+3)+' '+(L[1]+3.6)+'" stroke="#5E4126" stroke-width="4" stroke-linecap="round" fill="none"/>'
+    +'<path d="M '+(bx-2.4)+' '+(by-0.4)+' L '+(+bx+2.4)+' '+(by-1.4)+'" stroke="#C89858" stroke-width="2.2" stroke-linecap="round" fill="none"/>'
+    +'<path d="M '+(bx-2)+' '+(+by+1.4)+' L '+(+bx+2)+' '+(+by+0.6)+'" stroke="#A8794A" stroke-width="1.2" stroke-linecap="round" fill="none"/>'; };
+const OF_SNOWBOOT=(L)=>{ const ax=L[0], ay=L[1];
+  const bx=+(ax+(L[2]-ax)*0.38).toFixed(1), by=+(ay+(L[3]-ay)*0.38).toFixed(1);
+  const mx=+((ax+bx)/2).toFixed(1), my=+((ay+by)/2).toFixed(1);
+  return '<path d="M '+(ax-4.6)+' '+(ay+5)+' L '+(ax+4)+' '+(ay+5.2)+' Q '+(ax+6.8)+' '+(ay+5.2)+' '+(ax+6.2)+' '+(ay+2.8)+'" stroke="#4E7396" stroke-width="3.4" stroke-linecap="round" fill="none"/>'
+    +'<path d="M '+(ax-2.6)+' '+(ay+1.8)+' L '+(ax+4)+' '+(ay+2.2)+'" stroke="#EAF3FA" stroke-width="7.5" stroke-linecap="round" fill="none"/>'
+    +'<path d="M '+ax+' '+ay+' L '+bx+' '+by+'" stroke="#EAF3FA" stroke-width="12.5" stroke-linecap="round" fill="none"/>'
+    +'<path d="M '+(mx-5.4)+' '+(my+0.7)+' L '+(mx+5.4)+' '+(my-0.7)+'" stroke="#7FA8C8" stroke-width="2.8" stroke-linecap="round" fill="none"/>'
+    +'<circle cx="'+(bx-4.3)+'" cy="'+(by+0.6)+'" r="3.2" fill="#FFFFFF" stroke="#C9D2DC" stroke-width="1"/>'
+    +'<circle cx="'+(bx+4.3)+'" cy="'+(by+0.4)+'" r="3.2" fill="#FFFFFF" stroke="#C9D2DC" stroke-width="1"/>'
+    +'<circle cx="'+bx+'" cy="'+(by-1)+'" r="3.8" fill="#FFFFFF" stroke="#C9D2DC" stroke-width="1"/>'; };
+const LEGA=[[40,122,54,96],[76,118,58,96]];
+const OF_BOOTS_A=OF_BOOT(LEGA[0])+OF_BOOT(LEGA[1]);
+const OF_EXPBOOT_A=OF_EXPBOOT(LEGA[0])+OF_EXPBOOT(LEGA[1]);
+const OF_SNOWBOOT_A=OF_SNOWBOOT(LEGA[0])+OF_SNOWBOOT(LEGA[1]);
+const ARM_WAVE='<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M60 72 L76 48" stroke-width="8"/><path d="M58 76 L81 72" stroke-width="8"/></g>';
+const ARM_PISTOL=ARM_WAVE
+ +'<g fill="none" stroke-linecap="round"><path d="M76.5 41 L73.5 50" stroke="#3a2c1c" stroke-width="6"/><path d="M79.5 40.5 Q80.5 46.5 74.8 45" stroke="#3a2c1c" stroke-width="2"/><path d="M80 40 L88.5 40" stroke="#3a2c1c" stroke-width="3.5"/><path d="M71 36 L90 36" stroke="#26261f" stroke-width="6.5"/><path d="M69.5 33.5 L67 31" stroke="#26261f" stroke-width="2.5"/><path d="M74 33.6 L87 33.6" stroke="#5a4a34" stroke-width="1.5"/></g><rect x="88" y="31.4" width="2.2" height="2.4" rx="0.9" fill="#26261f"/><circle cx="92.2" cy="36" r="1.5" fill="#000" opacity="0.35"/>';
+const ARM_SABER='<ellipse cx="94" cy="28" rx="16" ry="30" fill="#3FA0C8" opacity="0.12" transform="rotate(33 94 28)"/>'
+ +'<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M57 78 L38 70" stroke-width="8"/><path d="M60 72 L78 52" stroke-width="8"/></g>'
+ +'<path d="M74.5 57 L79 50.5" stroke="#2c2c2c" stroke-width="6.5" stroke-linecap="butt" fill="none"/><path d="M79 50.5 L81 47.6" stroke="#d8d8d8" stroke-width="7" stroke-linecap="butt" fill="none"/>'
+ +'<g fill="none" stroke-linecap="round"><path d="M81 47.6 L107 8.5" stroke="#3FA0C8" stroke-width="13" opacity="0.32"/><path d="M81 47.6 L107 8.5" stroke="#3FA0C8" stroke-width="7"/><path d="M81 47.6 L107 8.5" stroke="#fff" stroke-width="3"/></g><circle cx="107" cy="8.5" r="3.2" fill="#fff"/>';
+const ARM_STEEL='<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M57 78 L38 70" stroke-width="8"/><path d="M60 72 L78 52" stroke-width="8"/></g>'
+ +'<path d="M74.5 57 L79 50.5" stroke="#3a2c1c" stroke-width="6.5" stroke-linecap="butt" fill="none"/><circle cx="73.6" cy="58.4" r="2" fill="#26261f"/><path d="M75.6 46.4 L84.4 52" stroke="#26261f" stroke-width="3.5" stroke-linecap="round" fill="none"/>'
+ +'<g fill="none" stroke-linecap="round"><path d="M80.6 48 L104 13" stroke="#8f979f" stroke-width="6.5"/><path d="M82.2 46 L102.6 15.5" stroke="#d8d8d8" stroke-width="1.8"/></g>';
+const ARM_LOOKOUT='<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M58 76 L44 82" stroke-width="8"/><path d="M60 72 L78 60" stroke-width="8"/><path d="M78 60 L73 47" stroke-width="7"/><path d="M73 47 L65 45.5" stroke-width="6.5"/></g>';
+const ARM_SPYGLASS='<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M58 76 L44 82" stroke-width="8"/><path d="M60 72 L72 60" stroke-width="8"/></g>'
+ +'<path d="M70 58 L82 47" stroke="#26261f" stroke-width="6" stroke-linecap="round" fill="none"/><path d="M81 48 L89 41" stroke="#3a2c1c" stroke-width="7.5" stroke-linecap="round" fill="none"/><circle cx="90" cy="40" r="2" fill="#8fd0e8"/>'
+ +'<path d="M74 55 L78 51" stroke="#C7913B" stroke-width="1.6" stroke-linecap="round" fill="none"/>';
+const ARM_MAP='<g stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M58 76 L72 70" stroke-width="8"/><path d="M60 72 L70 62" stroke-width="8"/></g>'
+ +'<g transform="rotate(-9 78 64)"><rect x="66" y="56" width="24" height="16" rx="2" fill="#F5EFD8" stroke="#B8A888" stroke-width="1.6"/><path d="M74 56 V72 M82 56 V72" stroke="#B8A888" stroke-width="1"/><path d="M70 62 Q76 66 82 60 Q86 58 87 64" stroke="#C0473A" stroke-width="1.4" fill="none" stroke-dasharray="2 1.6"/><circle cx="86" cy="64.5" r="1.3" fill="#C0473A"/></g>';
+const GIRL_HAIR='<path d="M-8.4 0.4 Q-8.8 -8.6 0 -8.8 Q8.8 -8.6 8.4 0.4 Q8.8 2 7 1.6 Q4.6 -3.6 0 -3.6 Q-4.6 -3.6 -7 1.6 Q-8.8 2 -8.4 0.4 z" fill="#6E4522"/>'
+ +'<path d="M-7.4 -2.6 Q-15 -4.6 -16 3 Q-16.6 9.4 -11.4 11.6 Q-13.8 5.4 -9.6 1.6 z" fill="#6E4522"/>'
+ +'<path d="M-12.4 10.4 q0.8 2.6 3 3.2" stroke="#4E2F14" stroke-width="1.4" stroke-linecap="round" fill="none"/>'
+ +'<circle cx="-8.9" cy="0.9" r="1.6" fill="#C7913B"/>';
 
 /* ================= THE CHARACTERS ================= */
-/* Each layer: string (always drawn) or {slot} (current variant drawn).
-   Slots: {id, label, note, wrap, chipVB, chipWrap?, v:[{n,s}]} — wrap positions
-   the part on the toy; chips render the raw part in chipVB. */
 const CHARS=[];
 
-/* ---- THE BLUE DRAGON — new mold, trike blues, house laws ---- */
+/* ---- DRAGON — Wyatt's own build (bluedragon-shapestore.json), sliced verbatim ---- */
 (function(){
- const B='#4A8CA0', L='#6FB0C0', D='#2E5A68', BEL='#9CC8D6', CR='#F5EFD8', CRD='#B8A888';
- const faceE=kit(EYES,D,'#1a1208','#5A2330'), faceB=kit(BROWS,D,'#1a1208','#5A2330'), faceM=kit(MOUTHS,D,'#22333B','#5A2330');
+ const INK='#155A74', faceE=kit(EYES,INK,'#1a1208','#5A2330'), faceB=kit(BROWS,INK,'#1a1208','#5A2330'), faceM=kit(MOUTHS,INK,'#17414F','#5A2330');
+ const HORN_CURVE='<path d="M7.71 5.19 L7.71 3.83 L7.75 2.55 L7.83 1.34 L7.94 0.2 L8.07 -0.87 L8.24 -1.88 L8.44 -2.82 L8.67 -3.71 L8.93 -4.54 L9.22 -5.32 L9.55 -6.06 L9.91 -6.76 L10.32 -7.43 L10.78 -8.06 L11.3 -8.67 L11.88 -9.24 A4.2 4.2 0 0 0 8.12 -16.76 L6.75 -16.26 L5.41 -15.66 L4.1 -14.94 L2.84 -14.11 L1.63 -13.18 L0.47 -12.15 L-0.63 -11.02 L-1.67 -9.79 L-2.65 -8.48 L-3.56 -7.09 L-4.4 -5.62 L-5.19 -4.07 L-5.91 -2.46 L-6.57 -0.77 L-7.17 0.99 L-7.71 2.81 A7.8 7.8 0 0 0 7.71 5.19 z" fill="#FFD24A"/>';
  CHARS.push({
-  key:'dragon', name:'THE BLUE DRAGON', ask:'HOW ABOUT THE BLUE DRAGON?', vb:'-6 -8 152 152',
+  key:'dragon', name:'DRAGON', ask:'HOW ABOUT DRAGON?', vb:'-6 -12 152 154',
   layers:[
-   '<ellipse cx="70" cy="132" rx="46" ry="8" fill="#000" opacity="0.25"/>',
-   {slot:'tail'}, {slot:'wings'}, {slot:'feet'},
-   '<path d="M70 24 C98 24 110 46 108 76 C106 104 94 116 70 116 C46 116 34 104 32 76 C30 46 42 24 70 24 z" fill="'+B+'" stroke="'+D+'" stroke-width="5" stroke-linejoin="round"/>',
-   {slot:'belly'}, {slot:'arms'},
-   '<circle cx="48" cy="58" r="4.2" fill="#E8A87C" opacity="0.85"/><circle cx="92" cy="58" r="4.2" fill="#E8A87C" opacity="0.85"/>',
-   {slot:'eyes'}, {slot:'brows'}, {slot:'mouth'}, {slot:'horns'},
+   '<g transform="translate(70 131.5) scale(1.4 1.4)"><ellipse rx="30" ry="5.5" fill="#000" opacity="0.28"/></g>',
+   {slot:'tail'}, {slot:'ears'},
+   '<g transform="translate(70 94) scale(1.45 1.45)"><circle r="20" fill="#3FA0C8"/></g>',
+   {slot:'belly'}, {slot:'feet'}, {slot:'arms'},
+   '<g transform="translate(70 49) scale(1.5 1.5)"><circle r="20" fill="#3FA0C8"/></g>',
+   {slot:'horns'},
+   '<g transform="translate(70 66.5)"><ellipse rx="15" ry="9.5" fill="#6FB0C0" opacity="0.45"/></g><g transform="translate(64.5 68) rotate(-15)"><ellipse rx="2.2" ry="3.8" fill="#FFD24A" opacity="0.7"/></g><g transform="translate(75.5 68) rotate(15)"><ellipse rx="2.2" ry="3.8" fill="#FFD24A" opacity="0.7"/></g>',
+   {slot:'eyes'}, {slot:'brows'}, {slot:'mouth'},
   ],
   slots:[
-   {id:'horns', label:'HORNS', chipVB:'34 -6 72 44', v:[
-     {n:'little nubs', s:'<path d="M52 28 Q47 16 54 10 Q58 19 61 26 z M88 28 Q93 16 86 10 Q82 19 79 26 z" fill="'+CR+'" stroke="'+CRD+'" stroke-width="2.5" stroke-linejoin="round"/>'},
-     {n:'tall curls', s:'<path d="M53 27 Q42 14 46 0 Q56 8 61 24 z M87 27 Q98 14 94 0 Q84 8 79 24 z" fill="'+CR+'" stroke="'+CRD+'" stroke-width="2.5" stroke-linejoin="round"/>'},
-     {n:'crest row', s:'<path d="M50 28 l6 -12 6 11 z M62 25 l8 -15 8 15 z M78 26 l6 -11 6 12 z" fill="'+D+'" stroke="'+D+'" stroke-width="2" stroke-linejoin="round"/>'},
-     {n:'gold crown', s:'<g stroke-linejoin="round"><path d="M56 26 L58 8 L66 17 L70 4 L74 17 L82 8 L84 26 z" fill="#D9A544" stroke="#8a6a24" stroke-width="3"/><rect x="55" y="23" width="30" height="6" rx="3" fill="#C7913B" stroke="#8a6a24" stroke-width="2"/></g>'},
+   {id:'horns', label:'HORNS', chipVB:'40 -12 60 42', v:[
+     {n:'his horns', s:'<g transform="translate(70 15.5) scale(0.42 0.42)"><path d="M-11 12 L0 -16 L11 12 z" fill="#FFD24A"/></g><g transform="translate(56 16.5) scale(-1 1)">'+HORN_CURVE+'</g><g transform="translate(84 16.5)">'+HORN_CURVE+'</g>'},
+     {n:'crest row', s:'<path d="M52 22 l6 -13 6 12 z M63 18 l7 -16 7 16 z M76 21 l6 -12 6 13 z" fill="#FFD24A" stroke="#C7913B" stroke-width="1.6" stroke-linejoin="round"/>'},
+     {n:'gold crown', s:'<g stroke-linejoin="round"><path d="M56 22 L58 4 L66 13 L70 0 L74 13 L82 4 L84 22 z" fill="#FFD24A" stroke="#C7913B" stroke-width="3"/><rect x="55" y="19" width="30" height="6" rx="3" fill="#E8B93B" stroke="#C7913B" stroke-width="2"/></g>'},
+     {n:'one spike', s:'<g transform="translate(70 13) scale(0.62 0.62)"><path d="M-11 12 L0 -16 L11 12 z" fill="#FFD24A"/></g>'},
      {n:'bare head', s:''},
    ]},
-   {id:'brows', label:'EYEBROWS', wrap:'translate(70,38)', chipVB:'-26 -13 52 22', v:faceB},
-   {id:'eyes', label:'EYES', wrap:'translate(70,50)', chipVB:'-26 -12 52 24', d:1, v:faceE},
-   {id:'mouth', label:'MOUTH', wrap:'translate(70,68)', chipVB:'-20 -10 40 28', v:faceM},
-   {id:'belly', label:'BODY', note:'belly panels', chipVB:'40 60 60 56', v:[
-     {n:'smooth', s:'<path d="M70 72 C86 72 92 82 91 94 C90 108 82 113 70 113 C58 113 50 108 49 94 C48 82 54 72 70 72 z" fill="'+BEL+'"/>'},
-     {n:'scale rows', s:'<path d="M70 72 C86 72 92 82 91 94 C90 108 82 113 70 113 C58 113 50 108 49 94 C48 82 54 72 70 72 z" fill="'+BEL+'"/><path d="M54 84 q8 6 16 0 q8 6 16 0 M56 96 q7 6 14 0 q7 6 14 0" stroke="'+L+'" stroke-width="3" fill="none" stroke-linecap="round"/>'},
-     {n:'star patch', s:'<path d="M70 72 C86 72 92 82 91 94 C90 108 82 113 70 113 C58 113 50 108 49 94 C48 82 54 72 70 72 z" fill="'+BEL+'"/><path d="M70 82 l3.4 7 7.6 1 -5.5 5.4 1.3 7.6 -6.8 -3.6 -6.8 3.6 1.3 -7.6 -5.5 -5.4 7.6 -1 z" fill="'+CR+'" stroke="'+CRD+'" stroke-width="1.6" stroke-linejoin="round"/>'},
-     {n:'racing stripe', s:'<path d="M70 72 C86 72 92 82 91 94 C90 108 82 113 70 113 C58 113 50 108 49 94 C48 82 54 72 70 72 z" fill="'+BEL+'"/><path d="M62 73 C60 88 60 100 62 112 M78 73 C80 88 80 100 78 112" stroke="'+L+'" stroke-width="4" fill="none" stroke-linecap="round"/>'},
+   {id:'ears', label:'EARS', note:'the wing ears', chipVB:'8 24 124 44', v:[
+     {n:'his ears', s:'<g transform="translate(45 43.5) rotate(-6) scale(-1.1 1.1)"><path d="M0 -11 Q12 -17 23 -12 Q29 -9 26 -3 L16.5 -2.5 Q25 1 23.5 7.5 Q21 13 12.5 11.5 Q3 9.5 0 4.5 z" fill="#3FA0C8"/></g><g transform="translate(95 43.5) rotate(6) scale(1.1 1.1)"><path d="M0 -11 Q12 -17 23 -12 Q29 -9 26 -3 L16.5 -2.5 Q25 1 23.5 7.5 Q21 13 12.5 11.5 Q3 9.5 0 4.5 z" fill="#3FA0C8"/></g>'},
+     {n:'perky', s:'<g transform="translate(47 38) rotate(-30)"><ellipse rx="10" ry="6" fill="#3FA0C8"/><ellipse cx="2" rx="5.5" ry="3.2" fill="#FFD24A" opacity="0.8"/></g><g transform="translate(93 38) rotate(30)"><ellipse rx="10" ry="6" fill="#3FA0C8"/><ellipse cx="-2" rx="5.5" ry="3.2" fill="#FFD24A" opacity="0.8"/></g>'},
+     {n:'no ears', s:''},
    ]},
-   {id:'wings', label:'WINGS', note:'the sleeves of a dragon', chipVB:'-6 22 152 56', v:[
-     {n:'perky', s:'<path d="M40 52 Q16 24 4 40 Q-4 54 12 62 Q24 68 40 66 z" fill="'+D+'" stroke="'+D+'" stroke-width="3" stroke-linejoin="round"/><path d="M34 56 Q18 40 8 44 M34 62 Q20 54 12 56" stroke="'+L+'" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M100 52 Q124 24 136 40 Q144 54 128 62 Q116 68 100 66 z" fill="'+D+'" stroke="'+D+'" stroke-width="3" stroke-linejoin="round"/><path d="M106 56 Q122 40 132 44 M106 62 Q120 54 128 56" stroke="'+L+'" stroke-width="2.6" fill="none" stroke-linecap="round"/>'},
-     {n:'folded', s:'<path d="M38 66 Q20 62 16 74 Q26 80 38 78 z" fill="'+D+'" stroke="'+D+'" stroke-width="3" stroke-linejoin="round"/><path d="M102 66 Q120 62 124 74 Q114 80 102 78 z" fill="'+D+'" stroke="'+D+'" stroke-width="3" stroke-linejoin="round"/>'},
-     {n:'baby nubs', s:'<path d="M36 68 q-10 -8 -8 4 q4 6 10 2 z" fill="'+D+'"/><path d="M104 68 q10 -8 8 4 q-4 6 -10 2 z" fill="'+D+'"/>'},
+   {id:'brows', label:'EYEBROWS', wrap:'translate(70,31)', chipVB:'-26 -13 52 22', v:[{n:'plain',s:''}].concat(faceB)},
+   {id:'eyes', label:'EYES', chipVB:'44 28 52 34', cropC:'44 28 52 34', v:[
+     {n:'his eyes', s:'<g transform="translate(59 43.5) rotate(-5)"><ellipse rx="10" ry="12" fill="#FFD24A"/></g><g transform="translate(81 43.5) rotate(5)"><ellipse rx="10" ry="12" fill="#FFD24A"/></g><g transform="translate(62 47.8) scale(-1.05 1.05)"><circle r="7" fill="#fff"/><circle cx="-1.5" cy="0.5" r="3.4" fill="#1a1208"/><circle cx="0.5" cy="-2" r="1.2" fill="#fff"/></g><g transform="translate(78 47.8) scale(1.05 1.05)"><circle r="7" fill="#fff"/><circle cx="-1.5" cy="0.5" r="3.4" fill="#1a1208"/><circle cx="0.5" cy="-2" r="1.2" fill="#fff"/></g>'},
+   ].concat(rewrap(kit(EYES,INK,'#1a1208','#5A2330'),'translate(70,45)'))},
+   {id:'mouth', label:'MOUTH', wrap:'translate(70,81)', chipVB:'-20 -10 40 28', v:[{n:'plain',s:''}].concat(faceM)},
+   {id:'belly', label:'BELLY', chipVB:'44 66 52 56', v:[
+     {n:'his belly', s:'<g transform="translate(70 96) scale(1.05 1.05)"><path d="M0 -26 Q18 -20 18 6 Q18 24 0 26 Q-18 24 -18 6 Q-18 -20 0 -26 z" fill="#FFD24A"/></g>'},
+     {n:'scale rows', s:'<g transform="translate(70 96) scale(1.05 1.05)"><path d="M0 -26 Q18 -20 18 6 Q18 24 0 26 Q-18 24 -18 6 Q-18 -20 0 -26 z" fill="#FFD24A"/><path d="M-13 -10 q6.5 5 13 0 q6.5 5 13 0 M-14 4 q7 5 14 0 q7 5 14 0 M-12 17 q6 5 12 0 q6 5 12 0" stroke="#E8B93B" stroke-width="2.4" fill="none" stroke-linecap="round"/></g>'},
+     {n:'star patch', s:'<g transform="translate(70 96) scale(1.05 1.05)"><path d="M0 -26 Q18 -20 18 6 Q18 24 0 26 Q-18 24 -18 6 Q-18 -20 0 -26 z" fill="#FFD24A"/><path d="M0 -12 l3.6 7.4 8 1.1 -5.8 5.7 1.4 8 -7.2 -3.8 -7.2 3.8 1.4 -8 -5.8 -5.7 8 -1.1 z" fill="#3FA0C8" opacity="0.85"/></g>'},
+     {n:'racing stripe', s:'<g transform="translate(70 96) scale(1.05 1.05)"><path d="M0 -26 Q18 -20 18 6 Q18 24 0 26 Q-18 24 -18 6 Q-18 -20 0 -26 z" fill="#FFD24A"/><path d="M-6 -25 Q-8 0 -6 25 M6 -25 Q8 0 6 25" stroke="#FFE28A" stroke-width="4" fill="none" stroke-linecap="round"/></g>'},
    ]},
-   {id:'arms', label:'HANDS', note:'stubby arms + claws', chipVB:'8 62 124 46', v:[
-     {n:'cheer', s:'<path d="M38 80 Q26 74 22 64" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M22 64 L15 58 M22 64 L18 55 M22 64 L26 54" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/><path d="M102 80 Q114 74 118 64" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M118 64 L125 58 M118 64 L122 55 M118 64 L114 54" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/>'},
-     {n:'resting', s:'<path d="M38 80 Q28 88 26 98" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M26 98 L19 103 M26 98 L23 106 M26 98 L31 105" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/><path d="M102 80 Q112 88 114 98" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M114 98 L121 103 M114 98 L117 106 M114 98 L109 105" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/>'},
-     {n:'big wave', s:'<path d="M38 78 Q28 68 26 56" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M26 56 L19 51 M26 56 L23 47 M26 56 L31 47" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/><path d="M102 80 Q112 88 114 98" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M114 98 L121 103 M114 98 L117 106 M114 98 L109 105" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/>'},
+   {id:'arms', label:'HANDS', note:'the paddle arms', chipVB:'14 56 112 48', v:[
+     {n:'resting', s:'<g transform="translate(37.5 90) rotate(52)"><ellipse rx="13" ry="7.5" fill="#3FA0C8"/></g><g transform="translate(102.5 90) rotate(-52)"><ellipse rx="13" ry="7.5" fill="#3FA0C8"/></g>'},
+     {n:'cheer', s:'<g transform="translate(36 73) rotate(-50)"><ellipse rx="13" ry="7.5" fill="#3FA0C8"/></g><g transform="translate(104 73) rotate(50)"><ellipse rx="13" ry="7.5" fill="#3FA0C8"/></g>'},
+     {n:'big wave', s:'<g transform="translate(36 73) rotate(-50)"><ellipse rx="13" ry="7.5" fill="#3FA0C8"/></g><g transform="translate(102.5 90) rotate(-52)"><ellipse rx="13" ry="7.5" fill="#3FA0C8"/></g>'},
+     {n:'hug ready', s:'<g transform="translate(35 82) rotate(90)"><ellipse rx="13" ry="7.5" fill="#3FA0C8"/></g><g transform="translate(105 82) rotate(90)"><ellipse rx="13" ry="7.5" fill="#3FA0C8"/></g>'},
    ]},
-   {id:'feet', label:'FEET', chipVB:'36 106 68 30', v:[
-     {n:'stompers', s:'<rect x="46" y="112" width="15" height="17" rx="6" fill="'+D+'"/><rect x="79" y="112" width="15" height="17" rx="6" fill="'+D+'"/><path d="M48 129 l4 -3 M54 129 l4 -3 M81 129 l4 -3 M87 129 l4 -3" stroke="'+CR+'" stroke-width="2.6" stroke-linecap="round"/>'},
-     {n:'boots', s:'<path d="M47 112 v9 q0 7 8 7 h6 q4 0 3 -5 q-1 -4 -6 -5 v-6 z" fill="#6E4522" stroke="#4E2F14" stroke-width="2.4" stroke-linejoin="round"/><path d="M93 112 v9 q0 7 -8 7 h-6 q-4 0 -3 -5 q1 -4 6 -5 v-6 z" fill="#6E4522" stroke="#4E2F14" stroke-width="2.4" stroke-linejoin="round"/>'},
-     {n:'tip toes', s:'<ellipse cx="53" cy="122" rx="8" ry="10" fill="'+D+'"/><ellipse cx="87" cy="122" rx="8" ry="10" fill="'+D+'"/><circle cx="50" cy="115" r="2.4" fill="'+CR+'"/><circle cx="90" cy="115" r="2.4" fill="'+CR+'"/>'},
+   {id:'feet', label:'FEET', chipVB:'18 100 104 40', v:[
+     {n:'his feet', s:'<g transform="translate(44.5 119.5) rotate(14)"><ellipse rx="20.5" ry="13.5" fill="#3FA0C8"/><ellipse rx="13.5" ry="8.5" fill="#6FB0C0" opacity="0.6"/></g><g transform="translate(95.5 119.5) rotate(-14)"><ellipse rx="20.5" ry="13.5" fill="#3FA0C8"/><ellipse rx="13.5" ry="8.5" fill="#6FB0C0" opacity="0.6"/></g><g transform="translate(28.5 127) rotate(198) scale(0.3)"><path d="M-20 12 A20 20 0 0 1 20 12 z" fill="#F5EFD8"/></g><g transform="translate(38.5 130.5) rotate(183) scale(0.3)"><path d="M-20 12 A20 20 0 0 1 20 12 z" fill="#F5EFD8"/></g><g transform="translate(50 131.8) rotate(165) scale(0.3)"><path d="M-20 12 A20 20 0 0 1 20 12 z" fill="#F5EFD8"/></g><g transform="translate(111.5 127) rotate(162) scale(0.3)"><path d="M-20 12 A20 20 0 0 1 20 12 z" fill="#F5EFD8"/></g><g transform="translate(101.5 130.5) rotate(177) scale(0.3)"><path d="M-20 12 A20 20 0 0 1 20 12 z" fill="#F5EFD8"/></g><g transform="translate(90 131.8) rotate(195) scale(0.3)"><path d="M-20 12 A20 20 0 0 1 20 12 z" fill="#F5EFD8"/></g>'},
+     {n:'boots', s:'<g transform="translate(44.5 119.5) rotate(14)"><ellipse rx="20.5" ry="13.5" fill="#8A6238"/><ellipse cy="-6" rx="14" ry="5" fill="#A8794A"/></g><g transform="translate(95.5 119.5) rotate(-14)"><ellipse rx="20.5" ry="13.5" fill="#8A6238"/><ellipse cy="-6" rx="14" ry="5" fill="#A8794A"/></g>'},
+     {n:'tip toes', s:'<g transform="translate(50 122)"><ellipse rx="12" ry="9" fill="#3FA0C8"/><ellipse rx="7" ry="5" fill="#6FB0C0" opacity="0.6"/></g><g transform="translate(90 122)"><ellipse rx="12" ry="9" fill="#3FA0C8"/><ellipse rx="7" ry="5" fill="#6FB0C0" opacity="0.6"/></g>'},
    ]},
-   {id:'tail', label:'TAIL', chipVB:'-6 76 60 52', v:[
-     {n:'spade curl', s:'<path d="M36 104 Q14 116 8 100 Q4 88 16 88" stroke="'+B+'" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M17 94 l-6 -9 11 -1 z" fill="'+D+'" stroke="'+D+'" stroke-width="2" stroke-linejoin="round"/>'},
-     {n:'flame tip', s:'<path d="M36 104 Q14 116 8 100 Q4 88 16 88" stroke="'+B+'" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M16 94 q-8 -4 -4 -12 q2 5 6 5 q-1 -6 4 -9 q0 10 4 12 q-4 8 -10 4 z" fill="#D9A544" stroke="#C7913B" stroke-width="1.6" stroke-linejoin="round"/>'},
-     {n:'stubby', s:'<path d="M36 106 q-12 6 -16 -2 q6 -8 18 -6 z" fill="'+B+'" stroke="'+D+'" stroke-width="3" stroke-linejoin="round"/>'},
+   {id:'tail', label:'TAIL', chipVB:'-6 74 64 56', v:[
+     {n:'no tail', s:''},
+     {n:'spade curl', s:'<path d="M38 106 Q16 118 10 102 Q6 90 18 90" stroke="#3FA0C8" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M19 96 l-7 -10 12 -1 z" fill="#FFD24A" stroke="#C7913B" stroke-width="1.6" stroke-linejoin="round"/>'},
+     {n:'flame tip', s:'<path d="M38 106 Q16 118 10 102 Q6 90 18 90" stroke="#3FA0C8" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M18 96 q-8 -4 -4 -12 q2 5 6 5 q-1 -6 4 -9 q0 10 4 12 q-4 8 -10 4 z" fill="#FFD24A" stroke="#C7913B" stroke-width="1.6" stroke-linejoin="round"/>'},
    ]},
   ],
  });
@@ -194,14 +263,14 @@ const CHARS=[];
      {n:'no cape', s:''},
    ]},
    {id:'arms', label:'SLEEVES + HANDS', chipVB:'-8 18 136 72', v:[
-     {n:'round fists', s:'<path d="M30 56 Q16 64 12 78" stroke="'+BODY+'" stroke-width="13"/><path d="M30 56 Q16 64 12 78" stroke="'+INK+'" stroke-width="3" fill="none" opacity="0.35"/><circle cx="11.5" cy="80" r="6.5" fill="'+BODY+'" stroke="'+INK+'" stroke-width="3.5"/><path d="M90 56 L112 32 M86 50 L104 24" stroke="'+BODY+'" stroke-width="13"/><circle cx="106" cy="27" r="7.5" fill="'+BODY+'" stroke="'+INK+'" stroke-width="3.5"/>'},
-     {n:'wild claws', s:'<path d="M30 56 L8 30 M34 50 L16 22" stroke="'+BODY+'" stroke-width="13"/><path d="M30 56 L8 30 M34 50 L16 22" stroke="'+INK+'" stroke-width="3" fill="none" opacity="0.35"/><path d="M8 30 L2 22 M8 30 L0 32 M16 22 L10 14 M16 22 L8 24" stroke="'+INK+'" stroke-width="4"/><path d="M90 56 L112 32 M86 50 L104 24" stroke="'+BODY+'" stroke-width="13"/><path d="M112 32 L118 24 M112 32 L120 34 M104 24 L110 16 M104 24 L112 26" stroke="'+INK+'" stroke-width="4"/>'},
-     {n:'both down', s:'<path d="M30 58 Q16 66 12 80 M90 58 Q104 66 108 80" stroke="'+BODY+'" stroke-width="13"/><circle cx="11.5" cy="82" r="6.5" fill="'+BODY+'" stroke="'+INK+'" stroke-width="3.5"/><circle cx="108.5" cy="82" r="6.5" fill="'+BODY+'" stroke="'+INK+'" stroke-width="3.5"/>'},
+     {n:'round fists', s:'<path d="M30 56 Q16 64 12 78" stroke="#E8EEF3" stroke-width="13"/><path d="M30 56 Q16 64 12 78" stroke="'+INK+'" stroke-width="3" fill="none" opacity="0.35"/><circle cx="11.5" cy="80" r="6.5" fill="#E8EEF3" stroke="'+INK+'" stroke-width="3.5"/><path d="M90 56 L112 32 M86 50 L104 24" stroke="#E8EEF3" stroke-width="13"/><circle cx="106" cy="27" r="7.5" fill="#E8EEF3" stroke="'+INK+'" stroke-width="3.5"/>'},
+     {n:'wild claws', s:'<path d="M30 56 L8 30 M34 50 L16 22" stroke="#E8EEF3" stroke-width="13"/><path d="M30 56 L8 30 M34 50 L16 22" stroke="'+INK+'" stroke-width="3" fill="none" opacity="0.35"/><path d="M8 30 L2 22 M8 30 L0 32 M16 22 L10 14 M16 22 L8 24" stroke="'+INK+'" stroke-width="4"/><path d="M90 56 L112 32 M86 50 L104 24" stroke="#E8EEF3" stroke-width="13"/><path d="M112 32 L118 24 M112 32 L120 34 M104 24 L110 16 M104 24 L112 26" stroke="'+INK+'" stroke-width="4"/>'},
+     {n:'both down', s:'<path d="M30 58 Q16 66 12 80 M90 58 Q104 66 108 80" stroke="#E8EEF3" stroke-width="13"/><circle cx="11.5" cy="82" r="6.5" fill="#E8EEF3" stroke="'+INK+'" stroke-width="3.5"/><circle cx="108.5" cy="82" r="6.5" fill="#E8EEF3" stroke="'+INK+'" stroke-width="3.5"/>'},
    ]},
    {id:'feet', label:'FEET', chipVB:'30 92 60 42', v:[
-     {n:'snow feet', s:'<path d="M38 128 L42 96 L58 100 L56 128 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 128 L78 96 L62 100 L64 128 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/>'},
-     {n:'royal boots', s:'<path d="M38 128 L42 96 L58 100 L56 128 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 128 L78 96 L62 100 L64 128 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/><path d="M37 128 l20 0 0 -9 -20 -1 z M83 128 l-20 0 0 -9 20 -1 z" fill="#C0473A" stroke="#8A2F26" stroke-width="2.6" stroke-linejoin="round"/>'},
-     {n:'snowshoes', s:'<path d="M38 124 L42 96 L58 100 L56 124 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 124 L78 96 L62 100 L64 124 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/><ellipse cx="47" cy="127" rx="15" ry="5" fill="#6E4522" stroke="#4E2F14" stroke-width="2"/><ellipse cx="73" cy="127" rx="15" ry="5" fill="#6E4522" stroke="#4E2F14" stroke-width="2"/>'},
+     {n:'snow feet', s:'<path d="M38 128 L42 96 L58 100 L56 128 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 128 L78 96 L62 100 L64 128 z" fill="#C9D5DD" stroke="'+INK+'" stroke-width="4"/>'},
+     {n:'royal boots', s:'<path d="M38 128 L42 96 L58 100 L56 128 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 128 L78 96 L62 100 L64 128 z" fill="#C9D5DD" stroke="'+INK+'" stroke-width="4"/><path d="M37 128 l20 0 0 -9 -20 -1 z M83 128 l-20 0 0 -9 20 -1 z" fill="#C0473A" stroke="#8A2F26" stroke-width="2.6" stroke-linejoin="round"/>'},
+     {n:'snowshoes', s:'<path d="M38 124 L42 96 L58 100 L56 124 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 124 L78 96 L62 100 L64 124 z" fill="#C9D5DD" stroke="'+INK+'" stroke-width="4"/><ellipse cx="47" cy="127" rx="15" ry="5" fill="#6E4522" stroke="#4E2F14" stroke-width="2"/><ellipse cx="73" cy="127" rx="15" ry="5" fill="#6E4522" stroke="#4E2F14" stroke-width="2"/>'},
    ]},
    {id:'saber', label:'THE SABER', chipVB:'88 -24 74 68', v:[
      {n:'frost saber', s:'<g stroke-linecap="round"><circle cx="95.5" cy="37" r="3.4" fill="#D9A544" stroke="#8a6a24" stroke-width="1.6"/><path d="M98 35 L110 24" stroke="#3A434C" stroke-width="7"/><path d="M100.4 29.5 L103.6 33.4 M104.6 25.7 L107.8 29.6" stroke="#D9A544" stroke-width="2.6"/><path d="M108.6 17.6 L115.4 25" stroke="#B8C4D0" stroke-width="4.6"/><path d="M114 19 L152 -16" stroke="#C9D5DD" stroke-width="10" opacity="0.4"/><path d="M114 19 L152 -16" stroke="#EAF0F5" stroke-width="5"/><path d="M114 19 L152 -16" stroke="#FFFFFF" stroke-width="2.2"/><path d="M148 -18.5 L154 -12.5 M154.5 -18 L147.5 -13" stroke="#FFFFFF" stroke-width="2" opacity="0.9"/></g>'},
@@ -212,49 +281,117 @@ const CHARS=[];
  });
 })();
 
-/* ---- THE SARGE — Sgt. Cold off the real shelf ---- */
+/* ---- THE SARGE — the green army man you play as, mold + wardrobe verbatim from GVT ---- */
 (function(){
- const INK='#54606C', BODY='#E8EEF3', SH='#C9D5DD';
- const faceE=kit(EYES,INK,'#2B3138','#5A2330'), faceB=kit(BROWS,INK,'#2B3138','#5A2330'), faceM=kit(MOUTHS,INK,'#2B3138','#5A2330');
- faceM[1]={n:'big grin', s:'<path d="M0 -6 C14 -6 18 2 16 10 C12 18 -12 18 -16 10 C-18 2 -14 -6 0 -6 z" fill="#5A2330" stroke="'+INK+'" stroke-width="4"/><path d="M-12 -2 L-8 4 L-4 -2 L0 4 L4 -2 L8 4 L12 -2" stroke="#FFFFFF" stroke-width="4" fill="none"/>'};
+ const faceE=rewrap(kit(EYES,'#3a2c1c','#26261f','#5A2330'),'translate(0,3.6) scale(0.36)');
+ const faceM=rewrap(kit(MOUTHS,'#3a2c1c','#26261f','#5A2330'),'translate(0,6.2) scale(0.3)');
  CHARS.push({
-  key:'sarge', name:'THE SARGE', ask:'THE SARGE HIMSELF?', vb:'-12 -14 164 158',
+  key:'sarge', name:'THE SARGE', ask:'THE SARGE HIMSELF?', vb:'-2 -10 126 150',
   layers:[
-   '<g stroke-linecap="round" stroke-linejoin="round">',
-   '<ellipse cx="60" cy="130" rx="42" ry="7" fill="#000" opacity="0.22"/>',
+   '<g style="color:PLASTIC">',
+   {slot:'stand'},
+   ALEGS,
    {slot:'feet'},
-   '<path d="M60 22 C88 22 100 44 98 68 C96 94 84 104 60 104 C36 104 24 94 22 68 C20 44 32 22 60 22 z" fill="'+BODY+'" stroke="'+INK+'" stroke-width="5"/>',
-   '<path d="M40 92 C48 100 72 100 80 92 C76 104 44 104 40 92 z" fill="'+SH+'"/>',
-   '<rect x="24" y="27" width="15" height="8" rx="3" fill="#C0473A" stroke="'+INK+'" stroke-width="2.5"/><rect x="81" y="27" width="15" height="8" rx="3" fill="#C0473A" stroke="'+INK+'" stroke-width="2.5"/>',
-   {slot:'arms'}, {slot:'rank'},
-   {slot:'eyes'}, {slot:'brows'}, {slot:'mouth'}, {slot:'hat'},
+   {slot:'chest'}, {slot:'gear'},
+   '<g transform="translate(57,50)">'+AHEAD+'</g>',
+   {slot:'hat'}, {slot:'eyes'}, {slot:'mouth'},
    '</g>',
   ],
   slots:[
-   {id:'hat', label:'HEAD GEAR', chipVB:'30 -14 60 42', v:[
-     {n:'steel kettle', s:'<g stroke-linejoin="round"><path d="M33 28 Q33 5 60 5 Q87 5 87 28 Q74 23 60 23 Q46 23 33 28 z" fill="#3A434C" stroke="#22282E" stroke-width="3"/><rect x="52" y="7" width="16" height="5" rx="2.5" fill="#22282E" opacity="0.5"/></g>'},
-     {n:'campaign hat', s:'<g stroke-linejoin="round"><ellipse cx="60" cy="20" rx="30" ry="7" fill="#6E4522" stroke="#4E2F14" stroke-width="2.6"/><path d="M44 19 Q46 2 60 2 Q74 2 76 19 Q60 24 44 19 z" fill="#8a6a24" stroke="#4E2F14" stroke-width="2.6"/><path d="M46 16 H74" stroke="#D9A544" stroke-width="3"/></g>'},
-     {n:'wool beanie', s:'<g stroke-linejoin="round"><path d="M36 24 Q36 4 60 4 Q84 4 84 24 z" fill="#C0473A" stroke="#8A2F26" stroke-width="3"/><path d="M36 24 Q60 18 84 24 l0 6 Q60 24 36 30 z" fill="#8A2F26"/><circle cx="60" cy="2" r="4.5" fill="#F5EFD8" stroke="#B8A888" stroke-width="2"/></g>'},
-     {n:'bare head', s:''},
+   {id:'plastic', label:'PLASTIC', note:'what he is molded in', v:[
+     {n:'army green', c:'#7FA35C'}, {n:'tan', c:'#C2A76B'}, {n:'snow white', c:'#E8EEF3'}, {n:'toy red', c:'#C0473A'}, {n:'pool blue', c:'#3FA0C8'},
    ]},
-   {id:'brows', label:'EYEBROWS', wrap:'translate(60,37)', chipVB:'-26 -13 52 22', v:faceB},
-   {id:'eyes', label:'EYES', wrap:'translate(60,46)', chipVB:'-26 -12 52 24', v:faceE},
-   {id:'mouth', label:'MOUTH', wrap:'translate(60,68)', chipVB:'-22 -12 44 32', v:faceM},
-   {id:'rank', label:'RANK', note:'stripes on the chest', chipVB:'40 70 40 32', v:[
-     {n:'one chevron', s:'<path d="M48 80 L60 92 L72 80" stroke="#C0473A" stroke-width="7" fill="none"/><path d="M48 80 L60 92 L72 80" stroke="#7A2A22" stroke-width="2.5" fill="none" opacity="0.55"/>'},
-     {n:'double stack', s:'<path d="M48 76 L60 88 L72 76 M48 86 L60 98 L72 86" stroke="#C0473A" stroke-width="6" fill="none"/><path d="M48 76 L60 88 L72 76 M48 86 L60 98 L72 86" stroke="#7A2A22" stroke-width="2" fill="none" opacity="0.55"/>'},
-     {n:'gold star', s:'<path d="M60 76 l3.6 7.4 8.2 1.2 -6 5.8 1.4 8.2 -7.2 -3.9 -7.2 3.9 1.4 -8.2 -6 -5.8 8.2 -1.2 z" fill="#D9A544" stroke="#8a6a24" stroke-width="2" stroke-linejoin="round"/>'},
-     {n:'plain coat', s:''},
+   {id:'hat', label:'HEAD GEAR', wrap:'translate(57,50)', chipVB:'-16 -13 32 22', v:[
+     {n:'steel pot', s:OF_HELM},
+     {n:'cowboy', s:OF_HAT},
+     {n:'safari brim', s:OF_SAFHAT},
+     {n:'snow cap', s:OF_SNOWHAT},
+     {n:'the crown', s:OF_CROWN},
+     {n:'molded', s:''},
    ]},
-   {id:'arms', label:'SLEEVES + HANDS', chipVB:'-8 18 136 72', v:[
-     {n:'at ease', s:'<path d="M30 58 L8 68 M34 52 L12 48" stroke="'+BODY+'" stroke-width="13"/><path d="M30 58 L8 68 M34 52 L12 48" stroke="'+INK+'" stroke-width="3" fill="none" opacity="0.35"/><path d="M8 68 L2 62 M8 68 L2 74 M12 48 L5 42 M12 48 L4 54" stroke="'+INK+'" stroke-width="4"/><path d="M90 56 L112 32 M86 50 L104 24" stroke="'+BODY+'" stroke-width="13"/><path d="M112 32 L118 24 M112 32 L120 34 M104 24 L110 16 M104 24 L112 26" stroke="'+INK+'" stroke-width="4"/>'},
-     {n:'the salute', s:'<path d="M30 58 L8 68" stroke="'+BODY+'" stroke-width="13"/><path d="M8 68 L2 62 M8 68 L2 74" stroke="'+INK+'" stroke-width="4"/><path d="M90 52 Q100 44 92 34" stroke="'+BODY+'" stroke-width="13"/><path d="M92 34 L84 30 M92 34 L94 26 M92 34 L99 29" stroke="'+INK+'" stroke-width="4"/>'},
-     {n:'drill claws', s:'<path d="M30 56 L8 30 M34 50 L16 22" stroke="'+BODY+'" stroke-width="13"/><path d="M8 30 L2 22 M8 30 L0 32 M16 22 L10 14 M16 22 L8 24" stroke="'+INK+'" stroke-width="4"/><path d="M90 56 L112 32 M86 50 L104 24" stroke="'+BODY+'" stroke-width="13"/><path d="M112 32 L118 24 M112 32 L120 34 M104 24 L110 16 M104 24 L112 26" stroke="'+INK+'" stroke-width="4"/>'},
+   {id:'eyes', label:'EYES', wrap:'translate(57,50)', chipVB:'-9 -1 18 12', v:[{n:'molded',s:''}].concat(faceE)},
+   {id:'mouth', label:'MOUTH', wrap:'translate(57,50)', chipVB:'-9 1 18 11', v:[
+     {n:'molded', s:''},
+     {n:'mustache', s:OF_MUS},
+   ].concat(faceM)},
+   {id:'gear', label:'SLEEVES + GEAR', note:'arms come with the hardware', chipVB:'16 0 108 100', v:[
+     {n:'the wave', s:ARM_WAVE},
+     {n:'sidearm', s:ARM_PISTOL},
+     {n:'blue saber', s:ARM_SABER},
+     {n:'steel saber', s:ARM_STEEL},
    ]},
-   {id:'feet', label:'FEET', chipVB:'30 92 60 42', v:[
-     {n:'snow feet', s:'<path d="M38 128 L42 96 L58 100 L56 128 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 128 L78 96 L62 100 L64 128 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/>'},
-     {n:'drill boots', s:'<path d="M38 128 L42 96 L58 100 L56 128 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 128 L78 96 L62 100 L64 128 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/><path d="M37 128 l20 0 0 -9 -20 -1 z M83 128 l-20 0 0 -9 20 -1 z" fill="#3A434C" stroke="#22282E" stroke-width="2.6" stroke-linejoin="round"/>'},
-     {n:'skis', s:'<path d="M38 124 L42 96 L58 100 L56 124 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 124 L78 96 L62 100 L64 124 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/><path d="M28 127 H64 q4 0 5 -4 M56 127 H92 q4 0 5 -4" stroke="#C0473A" stroke-width="4" fill="none" stroke-linecap="round"/>'},
+   {id:'chest', label:'BODY', note:'the chest rack', chipVB:'42 62 32 36', v:[
+     {n:'molded', s:''},
+     {n:'flak vest', s:OF_VEST},
+     {n:'explorer vest', s:OF_EXPVEST},
+     {n:'snow jacket', s:OF_SNOWJKT},
+     {n:'scout plate', s:OF_SCOUT},
+   ]},
+   {id:'feet', label:'FEET', chipVB:'26 88 68 46', v:[
+     {n:'molded', s:''},
+     {n:'black boots', s:OF_BOOTS_A},
+     {n:'trail boots', s:OF_EXPBOOT_A},
+     {n:'snow boots', s:OF_SNOWBOOT_A},
+   ]},
+   {id:'stand', label:'THE STAND', chipVB:'20 104 80 34', v:[
+     {n:'classic base', s:ABASE},
+     {n:'parade platform', s:ABASE+OF_PLAT},
+   ]},
+  ],
+ });
+})();
+
+/* ---- EXPLORER — the dino park's own Indiana Jones girl, same mold language ---- */
+(function(){
+ const faceE=rewrap(kit(EYES,'#3a2c1c','#26261f','#5A2330'),'translate(0,3.6) scale(0.36)');
+ const faceM=rewrap(kit(MOUTHS,'#3a2c1c','#26261f','#5A2330'),'translate(0,6.2) scale(0.3)');
+ CHARS.push({
+  key:'explorer', name:'EXPLORER', ask:'HOW ABOUT EXPLORER?', vb:'-2 -10 126 150',
+  layers:[
+   '<g style="color:PLASTIC">',
+   {slot:'stand'},
+   ALEGS,
+   {slot:'feet'},
+   {slot:'chest'}, {slot:'gear'},
+   '<g transform="translate(57,50)"><circle r="8" fill="currentColor"/>'+GIRL_HAIR+'</g>',
+   {slot:'hat'}, {slot:'eyes'}, {slot:'mouth'},
+   '</g>',
+  ],
+  slots:[
+   {id:'plastic', label:'PLASTIC', note:'what she is molded in', v:[
+     {n:'army green', c:'#7FA35C'}, {n:'khaki', c:'#C2A76B'}, {n:'snow white', c:'#E8EEF3'}, {n:'toy red', c:'#C0473A'}, {n:'pool blue', c:'#3FA0C8'},
+   ]},
+   {id:'hat', label:'HEAD GEAR', wrap:'translate(57,49)', chipVB:'-16 -13 32 22', d:0, v:[
+     {n:'safari brim', s:OF_SAFHAT},
+     {n:'cowboy', s:OF_HAT},
+     {n:'steel pot', s:OF_HELM},
+     {n:'snow cap', s:OF_SNOWHAT},
+     {n:'the crown', s:OF_CROWN},
+     {n:'just hair', s:''},
+   ]},
+   {id:'eyes', label:'EYES', wrap:'translate(57,50)', chipVB:'-9 -1 18 12', d:2, v:[{n:'molded',s:''}].concat(faceE)},
+   {id:'mouth', label:'MOUTH', wrap:'translate(57,50)', chipVB:'-9 1 18 11', d:1, v:[{n:'molded',s:''}].concat(faceM)},
+   {id:'gear', label:'SLEEVES + GEAR', note:'tools of the trail', chipVB:'16 24 108 76', v:[
+     {n:'spyglass', s:ARM_SPYGLASS},
+     {n:'lookout', s:ARM_LOOKOUT},
+     {n:'the map', s:ARM_MAP},
+     {n:'the wave', s:ARM_WAVE},
+   ]},
+   {id:'chest', label:'BODY', note:'the chest rack', chipVB:'42 62 32 36', d:0, v:[
+     {n:'explorer vest', s:OF_EXPVEST},
+     {n:'molded', s:''},
+     {n:'flak vest', s:OF_VEST},
+     {n:'snow jacket', s:OF_SNOWJKT},
+   ]},
+   {id:'feet', label:'FEET', chipVB:'26 88 68 46', d:1, v:[
+     {n:'molded', s:''},
+     {n:'trail boots', s:OF_EXPBOOT_A},
+     {n:'black boots', s:OF_BOOTS_A},
+     {n:'snow boots', s:OF_SNOWBOOT_A},
+   ]},
+   {id:'stand', label:'THE STAND', chipVB:'20 104 80 34', v:[
+     {n:'classic base', s:ABASE},
+     {n:'parade platform', s:ABASE+OF_PLAT},
    ]},
   ],
  });
@@ -262,13 +399,20 @@ const CHARS=[];
 
 /* ================= THE COUNTER ================= */
 let CUR=0;
-const PICKS={};   // key -> {slotId: index}
+const PICKS={};
 function C(){ return CHARS[CUR]; }
+function customs(){ try{ return JSON.parse(localStorage.getItem('ss.counterCustom')||'{}'); }catch(e){ return {}; } }
+function saveCustoms(c){ try{ localStorage.setItem('ss.counterCustom',JSON.stringify(c)); }catch(e){ alert('Storage is full.'); } }
+function vlist(slot){ const cu=customs(); const mine=(cu[C().key]||{})[slot.id]||[]; return slot.v.concat(mine.map(m=>({n:m.n, s:m.s, raw:true, custom:true}))); }
 function picks(){ const c=C(); if(!PICKS[c.key]){ PICKS[c.key]={}; c.slots.forEach(s=>PICKS[c.key][s.id]=s.d||0); } return PICKS[c.key]; }
-function slotSVG(slot){ const p=picks(); const v=slot.v[p[slot.id]]||slot.v[0]; return slot.wrap? '<g transform="'+slot.wrap+'">'+v.s+'</g>' : v.s; }
+function curVar(slot){ const l=vlist(slot); return l[Math.min(picks()[slot.id]||0, l.length-1)]; }
+function slotSVG(slot){ const v=curVar(slot); if(v.c) return ''; return (slot.wrap && !v.raw)? '<g transform="'+slot.wrap+'">'+v.s+'</g>' : v.s; }
+function dyeOf(){ const c=C(); const p=c.slots.find(s=>s.id==='plastic'); return p? curVar(p).c : null; }
 function heroStr(){
   const c=C();
-  return c.layers.map(l=> typeof l==='string'? l : slotSVG(c.slots.find(s=>s.id===l.slot))).join('');
+  let s=c.layers.map(l=> typeof l==='string'? l : slotSVG(c.slots.find(x=>x.id===l.slot))).join('');
+  const dye=dyeOf(); if(dye) s=s.split('PLASTIC').join(dye);
+  return s;
 }
 function renderHero(){
   const c=C();
@@ -277,30 +421,50 @@ function renderHero(){
   $('heroName').textContent = c.name;
 }
 function chipSVG(slot, v){
+  if(v.c) return '<div class="dye" style="background:'+v.c+'"></div>';
+  const vb = v.raw? (slot.cropC||C().vb) : slot.chipVB;
   let inner=v.s;
-  if(!inner){ const b=slot.chipVB.split(' ').map(Number);
+  if(inner && /currentColor|PLASTIC/.test(inner)){ const dye=dyeOf()||'#7FA35C'; inner='<g style="color:'+dye+'">'+inner.split('PLASTIC').join(dye)+'</g>'; }
+  if(!inner){ const b=vb.split(' ').map(Number);
     inner='<text x="'+(b[0]+b[2]/2)+'" y="'+(b[1]+b[3]/2+3)+'" text-anchor="middle" font-size="'+Math.round(b[3]/3)+'" fill="#B8A888" font-family="Trebuchet MS">·</text>'; }
-  return '<svg xmlns="'+NS+'" viewBox="'+slot.chipVB+'">'+inner+'</svg>';
+  return '<svg xmlns="'+NS+'" viewBox="'+vb+'">'+inner+'</svg>';
 }
 function renderSheet(){
   const c=C(), p=picks();
-  $('sheet').innerHTML = c.slots.map(slot=>
-    '<div class="sec"><h2>'+slot.label+(slot.note? ' <small>· '+slot.note+'</small>':'')+'</h2><div class="chips">'
-    + slot.v.map((v,i)=>'<div class="chip'+(p[slot.id]===i?' on':'')+'" onclick="pick(\''+slot.id+'\','+i+')">'+chipSVG(slot,v)+'<div>'+v.n+'</div></div>').join('')
-    +'</div></div>').join('');
+  $('sheet').innerHTML = c.slots.map((slot,si)=>{
+    const l=vlist(slot);
+    return '<div class="sec"><h2>'+slot.label+(slot.note? ' <small>· '+slot.note+'</small>':'')
+    +(slot.id!=='plastic'? '<button class="ed" onclick="editPart(\''+slot.id+'\')">🛠 EDIT THIS PART</button>':'')
+    +'</h2><div class="chips">'
+    + l.map((v,i)=>'<div class="chip'+(Math.min(p[slot.id]||0,l.length-1)===i?' on':'')+'" onclick="pick(\''+slot.id+'\','+i+')">'
+      +(v.custom? '<span class="del" onclick="event.stopPropagation();delCustom(\''+slot.id+'\','+(i-slot.v.length)+')">✕</span>':'')
+      +chipSVG(slot,v)+'<div>'+v.n+'</div></div>').join('')
+    +'</div></div>';
+  }).join('');
 }
 function pick(slotId, i){
   picks()[slotId]=i;
   renderHero();
-  const c=C();
-  document.querySelectorAll('.sec').forEach((sec,si)=>{
-    if(c.slots[si].id!==slotId) return;
-    sec.querySelectorAll('.chip').forEach((ch,ci)=>ch.classList.toggle('on', ci===i));
-  });
+  if(slotId==='plastic') renderSheet();   // dye tints the outfit chips too
+  else {
+    const c=C();
+    document.querySelectorAll('.sec').forEach((sec,si)=>{
+      if(c.slots[si].id!==slotId) return;
+      sec.querySelectorAll('.chip').forEach((ch,ci)=>ch.classList.toggle('on', ci===i));
+    });
+  }
+}
+function delCustom(slotId, mi){
+  if(!confirm('Take this part off your shelf?')) return;
+  const cu=customs(); const arr=(cu[C().key]||{})[slotId]||[];
+  arr.splice(mi,1); saveCustoms(cu);
+  const slot=C().slots.find(s=>s.id===slotId);
+  picks()[slotId]=Math.min(picks()[slotId]||0, vlist(slot).length-1);
+  renderHero(); renderSheet();
 }
 function mixUp(){
   const c=C(), p=picks();
-  c.slots.forEach(s=>{ p[s.id]=Math.floor(Math.random()*s.v.length); });
+  c.slots.forEach(s=>{ p[s.id]=Math.floor(Math.random()*vlist(s).length); });
   renderHero(); renderSheet();
 }
 function setChar(i){
@@ -309,7 +473,29 @@ function setChar(i){
   renderHero(); renderSheet();
   scrollTo({top:0, behavior:'smooth'});
 }
-$('asks').innerHTML = CHARS.map((c,i)=>'<div class="bub'+(i===0?' on':'')+'" onclick="setChar('+i+')">'+c.ask+'</div>').join('');
+/* ---- 🛠 the edit loop: this part rides to the shop, comes back a chip ---- */
+function editPart(slotId){
+  const c=C(), slot=c.slots.find(s=>s.id===slotId);
+  let svg=slotSVG(slot);
+  const dye=dyeOf(); if(dye) svg=svg.split('PLASTIC').join(dye).split('currentColor').join(dye);
+  try{
+    localStorage.setItem('ss.edit', JSON.stringify({char:c.key, slot:slotId, label:c.name+' '+slot.label, svg, vb:c.vb}));
+    location.href='index.html?edit=1';
+  }catch(e){ alert('Storage is full.'); }
+}
+(function(){  /* a part came home from the shop */
+  let out=null; try{ out=JSON.parse(localStorage.getItem('ss.editOut')||'null'); }catch(e){}
+  if(!out) return;
+  localStorage.removeItem('ss.editOut');
+  const ci=CHARS.findIndex(x=>x.key===out.char); if(ci<0||!out.svg) return;
+  const cu=customs(); cu[out.char]=cu[out.char]||{}; cu[out.char][out.slot]=cu[out.char][out.slot]||[];
+  cu[out.char][out.slot].push({n:'MY OWN'+(cu[out.char][out.slot].length? ' '+(cu[out.char][out.slot].length+1):''), s:out.svg});
+  saveCustoms(cu);
+  CUR=ci;
+  const slot=CHARS[ci].slots.find(s=>s.id===out.slot);
+  picks()[out.slot]=vlist(slot).length-1;
+})();
+$('asks').innerHTML = CHARS.map((c,i)=>'<div class="bub'+(i===CUR?' on':'')+'" onclick="setChar('+i+')">'+c.ask+'</div>').join('');
 addEventListener('scroll',()=>document.body.classList.toggle('scrolled', scrollY>130), {passive:true});
 renderHero(); renderSheet();
 </script>

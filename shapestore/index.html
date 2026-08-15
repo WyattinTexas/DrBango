@@ -283,6 +283,7 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
     <button onclick="redo()" title="Redo (Ctrl+Y)">↪ REDO</button>
     <button id="fsBtn" onclick="toggleFS()" title="fullscreen">⛶ FULL</button>
     <button onclick="openHelp()">❓ HELP</button>
+    <button style="grid-column:1/-1; background:#3A4530; border:2px solid var(--gold)" onclick="location.href='sheet.html'">🧩 THE PARTS COUNTER — character maker</button>
   </div>
 </div>
 <div id="zbtns">
@@ -1736,13 +1737,49 @@ window.addEventListener('pointerdown',e=>{
 buildPalette(); buildStamps(); renderMyGrid(); buildPicker();
 tameSlider($('penR'));   // r9: the pen slider gets the same pointer driving
 $('mchipImg').src=moldThumb(M.rex,'0 0 140 140');   // the corner coin wears the game's own face
+/* ---- THE PARTS COUNTER hand-off (r10, sheet.html ↔ the shop) ----
+   ?edit=1 + ss.edit: ONE character part becomes the whole doc for redrawing;
+   the toy-in-progress is PARKED first and restored on SEND BACK — or on the
+   next normal boot if the edit was abandoned. The counter never eats a toy. */
+let EDITJOB=null;
 (function(){
   try{
-    const cur=localStorage.getItem('ss.cur');
-    if(cur){ const d=JSON.parse(cur); if(d&&Array.isArray(d.shapes)&&d.shapes.length){ DOC=migrateDoc(d); } }
+    if(/[?&]edit=1/.test(location.search)) EDITJOB=JSON.parse(localStorage.getItem('ss.edit')||'null');
+    if(!EDITJOB){
+      if(localStorage.getItem('ss.edit')!=null){ const p=localStorage.getItem('ss.parked'); if(p!=null) localStorage.setItem('ss.cur',p); }
+      localStorage.removeItem('ss.parked'); localStorage.removeItem('ss.edit');
+    }
+  }catch(e){ EDITJOB=null; }
+})();
+function sendBackToCounter(){
+  clearTimeout(render._t);
+  const svg=DOC.shapes.map(shapeStr).join('');
+  try{
+    localStorage.setItem('ss.editOut', JSON.stringify({char:EDITJOB.char, slot:EDITJOB.slot, svg}));
+    const p=localStorage.getItem('ss.parked');
+    if(p) localStorage.setItem('ss.cur',p); else localStorage.removeItem('ss.cur');
+    localStorage.removeItem('ss.parked'); localStorage.removeItem('ss.edit');
   }catch(e){}
-  if(!DOC.shapes.length){ /* greet with the Tin Rex ready to recolor */
-    const g=parseMold(M.rex,'TIN REX','0 0 140 140'); g.scale=0.94; DOC.shapes.push(g);
+  location.href='sheet.html';
+}
+(function(){
+  if(EDITJOB){
+    try{ localStorage.setItem('ss.parked', localStorage.getItem('ss.cur')||''); }catch(e){}
+    const g=parseMold(EDITJOB.svg||'', EDITJOB.label||'PART', EDITJOB.vb||'0 0 140 140');
+    if(g.kids.length){ DOC.shapes.push(g); selT=g.id; }
+    const b=document.createElement('button'); b.id='backCounter'; b.className='gold';
+    b.textContent='⬅ SEND IT BACK TO THE COUNTER';
+    b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:38px;z-index:25;box-shadow:0 3px 12px #000A;';
+    b.onclick=sendBackToCounter;
+    document.body.appendChild(b);
+  } else {
+    try{
+      const cur=localStorage.getItem('ss.cur');
+      if(cur){ const d=JSON.parse(cur); if(d&&Array.isArray(d.shapes)&&d.shapes.length){ DOC=migrateDoc(d); } }
+    }catch(e){}
+    if(!DOC.shapes.length){ /* greet with the Tin Rex ready to recolor */
+      const g=parseMold(M.rex,'TIN REX','0 0 140 140'); g.scale=0.94; DOC.shapes.push(g);
+    }
   }
   syncBoardUI();
   requestAnimationFrame(()=>zoomFit());
