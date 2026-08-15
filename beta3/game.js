@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.30.0';
+const BUILD = 'STARSPELL v0.31.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -273,10 +273,12 @@ function ssMakeTextures(scene) {
     tileArt('tile0', '#e2deec');   // plain
     tileArt('tile1', '#ffcd6e');   // +6 value
     tileArt('tile2', '#96d7ff');   // 1.5x word
+    tileArt('tileblk', '#494263'); // blackout curse — the void face
   } else {
     tileTex('tile0', '#f7f1e2', '#dfd3b8', '#b8a67f');
     tileTex('tile1', '#ffe9a8', '#e8b84b', '#a97c1c');
     tileTex('tile2', '#e6f6ff', '#a8d9f2', '#5f9fc4');
+    tileTex('tileblk', '#453f63', '#28233f', '#6b5fa8');
   }
   mk('veil', 8, 8, (c, w, h) => { c.fillStyle = '#060812'; c.fillRect(0, 0, w, h); });
   // battle chrome, in the wordmark's dress: a ribbon behind the strikes line and
@@ -1590,6 +1592,10 @@ const SS_TILE_INK = ['#3a3020', '#5a3c05', '#1d4a66'];    // letter ink per tier
 // value ink per tier — deliberately near the letter ink's darkness: the old
 // pale inks made the worth unreadable at arm's length (Wyatt's call)
 const SS_TILE_VINK = ['#655636', '#5f420a', '#215a7c'];
+// the blackout curse: inked letters read in pale ash on the void face —
+// still legible, clearly cursed, and the flat 0 says what they're worth
+const SS_BLK_INK = '#b9b0d8';
+const SS_BLK_VINK = '#9a90c4';
 const SS_LINE_GREEN = '#1d6a35';                          // word-line "valid" ink
 function ssGlyph(scene, ch, color) {
   const key = 'gl-' + ch + '-' + color;
@@ -3726,7 +3732,7 @@ class Battle extends Phaser.Scene {
     c.setSize(this.tileSize, this.tileSize).setInteractive({ useHandCursor: true });
     c.on('pointerdown', () => this.tapTile(i));
     this.boardC.add(c);
-    this.board[i] = { ch, tier, c, img, letter, val, glow };
+    this.board[i] = { ch, tier, blk: false, c, img, letter, val, glow };
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
@@ -3783,6 +3789,118 @@ class Battle extends Phaser.Scene {
     if (drained) SFX.fizzle();
   }
 
+  /* THE BLACKOUT (Wyatt): void-fictioned bosses ink letters as they charge.
+     An inked tile stays readable and stays usable in words — it is simply
+     worth NOTHING when the points are added up (base value, tier bonus and
+     letter bonuses all void; the rest of the word scores normally and the
+     word-level multipliers still apply to the others). It rides the existing
+     boss telegraph: the volley flies at "strikes in 1 cast", the same beat
+     the eyes charge and the sky rumbles, so the word woven under the gun is
+     the word that must route around the dark. The curse holds until the tile
+     leaves the board — spend it for nothing, scry the board away, or purify
+     it (VIRGO cleanses) — because those valves already exist, "until used"
+     plays better than a timed lift. Targets are the highest-value clean
+     tiles (the boss eats your best letters, freshly forged specials first —
+     a blacked special loses its shimmer outright: blackout wins). Never more
+     than 6 dark at once, and an inked letter still spells, so a board is
+     never uncastable. */
+  blackoutAttack(done) {
+    const l = this.L;
+    const dark = this.board.filter((s) => s && s.blk).length;
+    const n = Math.min(this.beast.fx.ink || 2, Math.max(0, 6 - dark));
+    const targets = this.board.map((s, i) => ({ s, i })).filter((x) => x.s && !x.s.blk && x.s.c.active)
+      .sort((a, b) => this.tileVal(b.s.ch, b.s.tier) - this.tileVal(a.s.ch, a.s.tier) || a.i - b.i)
+      .slice(0, n);
+    if (!targets.length) { done(); return; }
+    let fin = false;
+    const finish = () => { if (!fin) { fin = true; done(); } };
+    this.time.delayedCall(2200, finish);            // watchdog — the turn must always return
+    window.__ssink = { n: targets.length, tiles: targets.map((t) => t.i), fight: this.run.fightIdx, t: Date.now() };
+    SFX.curse();
+    // the windup: the boss shudders with gathered dark — strike-tremble language
+    const c = this.beastC;
+    this.tweens.add({ targets: c, x: l.x(0) - l.u(6), duration: 90, yoyo: true, repeat: 3, ease: 'Sine.easeInOut', onComplete: () => c.setX(l.x(0)) });
+    ssEdgeFlash(this, 0x6b5fa8, 0.3, 700);
+    // the telegraph line borrows the word-line hint's spot — dip the hint so
+    // the two never overprint, and hand its alpha back when the line passes
+    this.tweens.killTweensOf(this.lineHint);
+    this.tweens.add({ targets: this.lineHint, alpha: 0, duration: 150 });
+    const tt = ssTxt(this, l.x(0), l.y(384), SS_T('inkTele'), l.u(13), '#b9b0d8', 'italic')
+      .setOrigin(0.5).setDepth(70).setAlpha(0).setShadow(0, 0, '#0a0d1c', l.u(8), true, true);
+    this.tweens.add({ targets: tt, alpha: 0.95, duration: 220 });
+    this.tweens.add({
+      targets: tt, alpha: 0, y: tt.y - l.u(14), delay: 1350, duration: 450,
+      onComplete: () => { tt.destroy(); if (this.lineHint.active) this.lineHint.setAlpha(this.sel.length ? 0 : 0.9); },
+    });
+    // ink bolts: dark motes streak from the beast's gaze onto the chosen letters
+    const eye = (this.beast.eyes && this.beast.eyes[0]) || [0, 0];
+    const from = { x: c.x + eye[0] * l.u(1.32), y: c.y + eye[1] * l.u(1.32) };
+    const dotK = ssFxTex(this, 'dot', 0x8a76e8);
+    let landed = 0;
+    targets.forEach((tg, k) => {
+      this.time.delayedCall(380 + k * 150, () => {
+        const s = this.board[tg.i];
+        const settle = () => { if (++landed === targets.length) this.time.delayedCall(240, finish); };
+        if (!s || !s.c.active || s.blk) { settle(); return; }
+        SFX.noise(0.14, 700, 1.6, 0.05, 220);
+        const to = { x: s.c.x, y: s.c.y };
+        const ctrl = { x: (from.x + to.x) / 2 + (k % 2 ? -1 : 1) * l.u(70), y: (from.y + to.y) / 2 };
+        const dots = [];
+        for (let j = 0; j < 6; j++) dots.push(this.add.image(from.x, from.y, dotK).setBlendMode('ADD').setDepth(58).setScale(1.05 - j * 0.12).setAlpha(0));
+        const pr = { t: 0 };
+        this.tweens.add({
+          targets: pr, t: 1, duration: 290, ease: 'Cubic.easeIn',
+          onUpdate: () => dots.forEach((d, j) => {
+            const t2 = clamp(pr.t * 1.3 - j * 0.055, 0, 1);
+            const p = ssQBez(from, ctrl, to, t2);
+            d.x = p.x; d.y = p.y; d.alpha = t2 > 0 ? 0.9 - j * 0.13 : 0;
+          }),
+          onComplete: () => {
+            dots.forEach((d) => this.tweens.add({ targets: d, alpha: 0, duration: 150, onComplete: () => d.destroy() }));
+            this.blackTile(tg.i);
+            settle();
+          },
+        });
+      });
+    });
+  }
+  blackTile(i) {
+    const s = this.board[i];
+    if (!s || !s.c.active || s.blk) return;
+    const l = this.L;
+    s.blk = true;
+    // blackout wins: a gilded or forged letter is simply dark now
+    s.tier = 0;
+    if (s.glow) {
+      const gg = s.glow;
+      s.glow = null;
+      this.tweens.killTweensOf(gg);
+      this.tweens.add({ targets: gg, alpha: 0, duration: 260, onComplete: () => { if (gg.active) gg.destroy(); } });
+    }
+    // the ink pools: the void face crossfades in under a pale letter and a flat 0
+    const inked = this.add.image(0, 0, 'tileblk').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
+    s.c.addAt(inked, s.c.list.indexOf(s.img) + 1);
+    const old = s.img;
+    s.img = inked;
+    this.tweens.add({ targets: inked, alpha: 1, duration: 300, onComplete: () => { if (old.active) old.destroy(); } });
+    this.time.delayedCall(150, () => {
+      if (!s.c.active) return;
+      s.letter.setTexture(ssGlyph(this, s.ch, SS_BLK_INK)).setDisplaySize(l.u(64), l.u(48));
+      s.val.setTexture(ssGlyphVal(this, 0, SS_BLK_VINK)).setDisplaySize(l.u(30), l.u(20));
+    });
+    const ring = this.add.image(s.c.x, s.c.y, ssFxTex(this, 'ring', 0x8a76e8)).setBlendMode('ADD').setAlpha(0.7).setScale(0.2).setDepth(59);
+    this.tweens.add({ targets: ring, scale: l.u(0.85), alpha: 0, duration: 380, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+    this.tweens.add({ targets: s.c, angle: -3, duration: 60, yoyo: true, repeat: 2, onComplete: () => s.c.setAngle(0) });
+    this.cameras.main.shake(60, 0.0022);
+    // teach it once per run — after that the flat 0 speaks
+    if (!this.run.inkShown) {
+      this.run.inkShown = true;
+      const ft = ssTxt(this, s.c.x, s.c.y - l.u(52), SS_T('inkHint'), l.u(12), '#b9b0d8', 'italic')
+        .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#0a0d1c', l.u(8), true, true);
+      this.tweens.add({ targets: ft, alpha: 0, y: ft.y - l.u(20), delay: 1500, duration: 500, onComplete: () => ft.destroy() });
+    }
+  }
+
   // ---------- selection ----------
   tapTile(i) {
     if (this.state !== 'pick') return;
@@ -3817,10 +3935,12 @@ class Battle extends Phaser.Scene {
     this.sel.forEach((bi, k) => {
       const s = this.board[bi];
       const mc = this.add.container(-w / 2 + sz / 2 + k * (sz + gap), 0);
-      const img = this.add.image(0, 0, 'tile' + s.tier).setDisplaySize(sz, sz);
-      // same glyph texture as the board, at the line's font-16/20 proportions
+      const img = this.add.image(0, 0, s.blk ? 'tileblk' : 'tile' + s.tier).setDisplaySize(sz, sz);
+      // same glyph texture as the board, at the line's font-16/20 proportions;
+      // an inked letter keeps its ash ink in the staged word — it spells, but
+      // the player should see it carrying no weight
       const gsc = s.ch.length > 1 ? 16 / 30 : 20 / 36;
-      const letter = this.add.image(0, 0, ssGlyph(this, s.ch, valid ? SS_LINE_GREEN : SS_TILE_INK[0]))
+      const letter = this.add.image(0, 0, ssGlyph(this, s.ch, s.blk ? SS_BLK_INK : valid ? SS_LINE_GREEN : SS_TILE_INK[0]))
         .setDisplaySize(l.u(64 * gsc), l.u(48 * gsc));
       mc.add([img, letter]);
       mc.setSize(sz, sz).setInteractive({ useHandCursor: true });
@@ -3889,16 +4009,18 @@ class Battle extends Phaser.Scene {
   // ---------- damage ----------
   hasSigil(id) { return this.run.sigils.includes(id); }
   wordDamage(tiles) {
-    let base = 0, starMult = 1, vowelsN = 0, letters = 0;
+    let base = 0, starMult = 1, vowelsN = 0, vowelsPaid = 0, letters = 0;
     for (const s of tiles) {
-      base += this.tileVal(s.ch, s.tier);
-      if (s.tier === 2) starMult = 1.5;
       letters += s.ch.length;
       const c0 = s.ch[0];
-      if (VOWELS.includes(c0)) vowelsN++;
+      if (VOWELS.includes(c0)) vowelsN++;      // structural — LIBRA's balance sees even inked vowels
+      if (s.blk) continue;                     // blackout: the letter spells, but pays NOTHING
+      base += this.tileVal(s.ch, s.tier);
+      if (s.tier === 2) starMult = 1.5;
+      if (VOWELS.includes(c0)) vowelsPaid++;
       if (this.hasSigil('runes') && 'sret'.includes(c0)) base += 2;
     }
-    if (this.hasSigil('choir')) base += vowelsN * 2;
+    if (this.hasSigil('choir')) base += vowelsPaid * 2;
     let dmg = base * (LEN_MULT[Math.min(letters, 8)] || 2.3) * starMult;
     if (this.hasSigil('quill')) dmg += 4;
     if (this.hasSigil('longbow') && letters >= 6) dmg += 12;
@@ -4286,7 +4408,15 @@ class Battle extends Phaser.Scene {
     }
     this.beast.count--;
     this.updateBars();
-    if (this.beast.count > 0) { done(); return; }
+    if (this.beast.count > 0) {
+      // void bosses ink letters at the very beat the telegraph charges —
+      // "strikes in 1 cast" and the board goes dark under the gun
+      if (this.beast.count === 1 && this.beast.fx && this.beast.fx.curse === 'blackout' && this.beast.hpNow > 0) {
+        this.blackoutAttack(done);
+        return;
+      }
+      done(); return;
+    }
     this.beast.count = this.beast.timer;
     if (this.hasSigil('shield') && !this.shieldUsed) {
       this.shieldUsed = true;
@@ -4789,7 +4919,7 @@ class Battle extends Phaser.Scene {
       const seen = new Set();
       for (let k = 0; k < tiles.length; k++) {
         if (used[k]) continue;
-        const key = tiles[k].s.ch + ':' + tiles[k].s.tier;
+        const key = tiles[k].s.ch + ':' + tiles[k].s.tier + (tiles[k].s.blk ? ':b' : '');
         if (seen.has(key)) continue;
         seen.add(key);
         let n = node, ok = true;

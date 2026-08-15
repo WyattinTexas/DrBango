@@ -122,6 +122,9 @@ class SynthAudio {
   // the forge's mirror: a quiet descending shimmer — an unspent bonus tile
   // drains back to plain (must never overpower the cast/impact it rides under)
   fizzle() { this.tone(1046.5, 0.22, 'sine', 0.045); this.tone(784, 0.28, 'sine', 0.04, 0.08); this.tone(587.3, 0.4, 'sine', 0.035, 0.17); }
+  // the blackout curse — a low void swell with a falling minor sigh; it rides
+  // under the boss telegraph's rumble, so it stays a whisper, never a stab
+  curse() { this.noise(0.7, 140, 1, 0.1, 55); this.tone(233.1, 0.5, 'sine', 0.05, 0.05, 155.6); this.tone(311.1, 0.6, 'triangle', 0.035, 0.15, 207.7); }
   hurt() { this.noise(0.35, 200, 0.8, 0.26, 70); this.tone(90, 0.4, 'sawtooth', 0.12, 0, 50); }
   blocked() { this.tone(660, 0.15, 'triangle', 0.14); this.noise(0.12, 1200, 2, 0.1); }
   sigil() { [659.3, 784, 987.8].forEach((f, i) => this.tone(f, 0.4, 'sine', 0.09, i * 0.08)); }

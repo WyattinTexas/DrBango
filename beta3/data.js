@@ -15,6 +15,10 @@
      atk  — pounce · slam · lash · snap · swoop · breath · nova · charge · volley
    Optional tuning fields: hops (pounce), strands (lash), amp
    (flex/charge), bolts (volley).
+   Boss curse (bosses only, where void/ink fits the fiction):
+     curse: 'blackout' (+ ink: tiles per volley, default 2) — the
+     boss inks the highest-value letters as its strike charges;
+     inked tiles stay usable but score 0 (Battle.blackoutAttack).
    ============================================================ */
 
 // Stats by tier + lvl (lvl ≈ the act the beast is at home in). The original
@@ -160,7 +164,7 @@ const SS_BEASTS = {
     stars: [[0, -50], [28, -40], [40, -12], [28, 16], [0, 26], [-28, 16], [-40, -12], [-28, -40], [-38, -58], [38, -58], [0, 4], [-8, 14], [8, 14], [-52, 0], [-72, 22], [-58, 40], [52, 0], [72, 22], [58, 40], [-14, 52], [14, 52]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0], [7, 8], [1, 9], [10, 11], [10, 12], [6, 13], [13, 14], [14, 15], [2, 16], [16, 17], [17, 18], [4, 19], [4, 20]],
     eyes: [[-14, -18], [14, -18]],
-    fx: { idle: 'headturn', atk: 'swoop' },
+    fx: { idle: 'headturn', atk: 'swoop', curse: 'blackout' },   // the void drinks the light
   },
   leo: {
     name: 'LEO', title: 'THE SOVEREIGN LION', tier: 'boss', lvl: 1, tint: 0xffd23e, eye: 0xffb066,
@@ -188,7 +192,7 @@ const SS_BEASTS = {
     stars: [[-92, 42], [-72, 28], [-52, 36], [-32, 22], [-12, 28], [8, 14], [2, -8], [-16, -36], [6, -54], [20, -32], [42, -46], [30, 2], [46, -12], [58, -30], [50, -48], [70, -44], [78, -18], [62, -6], [24, 30], [18, 48], [44, 26], [48, 44]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [6, 9], [9, 10], [5, 11], [11, 12], [12, 13], [13, 14], [13, 15], [13, 16], [16, 17], [11, 18], [18, 19], [11, 20], [20, 21]],
     eyes: [[56, -26]],
-    fx: { idle: 'flex', atk: 'breath' },
+    fx: { idle: 'flex', atk: 'breath', curse: 'blackout', ink: 3 },   // the Star Eater eats more
   },
   phoenix: {
     name: 'PHOENIX', title: 'THE FIRST FLAME', tier: 'boss', lvl: 3, hp: 170, atk: 22, timer: 4, tint: 0xffa94d, eye: 0xfff0a8,

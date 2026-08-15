@@ -14,7 +14,10 @@ explicit `hp`/`atk`/`timer` override it), a palette (`tint`/`eye`), and an
 `fx` block picking an idle + attack archetype from `game.js`
 (idle: prowl · bob · coil · pinch · headturn · lumber · ripple · flex;
 atk: pounce · slam · lash · snap · swoop · breath · nova · charge · volley;
-tuning: hops, strands, amp, bolts). Then add the id to the act pools /
+tuning: hops, strands, amp, bolts; boss curse: `curse: 'blackout'` + `ink: N`
+— void-fictioned bosses ink the highest-value letters at the "strikes in 1
+cast" telegraph; inked tiles stay usable but score 0 until they leave the
+board). Then add the id to the act pools /
 `SS_QUICK_POOL` and give the title translations in `strings.js` (`beast` map,
 9 languages; English lives in data.js).
 
@@ -40,11 +43,11 @@ tuning: hops, strands, amp, bolts). Then add the id to the act pools /
 | cassiopeia | Cassiopeia (queen) | mini 3 | HUMAN — the W is her crown |
 | cetus | Cetus (sea monster) | mini 4 | head ring + body loop |
 | orion | Orion (hunter) | mini 4 | HUMAN — belt, club, shield |
-| strix | (invented owl) | boss 1 | not a real constellation |
+| strix | (invented owl) | boss 1 | not a real constellation · BLACKOUT curse (inks 2) |
 | leo | Leo (lion) | boss 1 | the Sickle + Denebola |
 | taurus | Taurus (bull) | boss 1 | Hyades V, Aldebaran eye, floating Pleiades cluster |
 | scorpius | Scorpius (scorpion) | boss 2 | Antares eye + stinger hook |
-| draco | Draco (dragon) | boss 2 | |
+| draco | Draco (dragon) | boss 2 | BLACKOUT curse (inks 3) — the Star Eater eats your letters too |
 | phoenix | Phoenix | boss 3 | Act III finale |
 | centaurus | Centaurus | boss 4 | END-GAME — Act IV, chimera pair |
 | sagittarius | Sagittarius (archer) | boss 4 | END-GAME — campaign finale, volley signature |
