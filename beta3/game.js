@@ -8,35 +8,21 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.32.0';
+const BUILD = 'STARSPELL v0.32.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
-/* ---- adaptive back-buffer (the Runefall ladder) ------------------------
-   Full-DPR is the crispness the game fought for, so it stays the default —
-   but a phone that provably can't hold it gets its back-buffer stepped down
-   a notch (3 -> 2 -> 1.5 -> 1) and the cap remembered for a day. Touch
-   devices only: a desktop hiccup (background tab, screenshot flurry) must
-   not degrade a capable machine. An explicit ?dpr= visit resets the ladder
-   and pins the value for that session. The detector lives in ssPerfWatch. */
-const TOUCH_DEVICE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-const DPR_CAP = (() => {
-  if (!TOUCH_DEVICE) return 3;
-  if (QS.has('dpr')) {
-    localStorage.removeItem('beta3.dprCap'); localStorage.removeItem('beta3.dprCapTs');
-    return 3;
-  }
-  const ts = parseFloat(localStorage.getItem('beta3.dprCapTs'));
-  if (!(ts > 0) || Date.now() - ts > 24 * 3600 * 1000) {
-    localStorage.removeItem('beta3.dprCap'); localStorage.removeItem('beta3.dprCapTs');
-    return 3;
-  }
-  const v = parseFloat(localStorage.getItem('beta3.dprCap'));
-  return (v >= 1 && v < 3) ? v : 3;
-})();
+/* ---- back-buffer resolution --------------------------------------------
+   Full-DPR always: the v0.32.0 adaptive ladder is DEAD. On-device evidence
+   (Wyatt's overlay screenshots) showed dpr1 running 28-49fps — a 9x pixel
+   cut bought nothing, so the game is CPU-bound, not fill-rate-bound, and
+   the ladder just reload-thrashed the phone down to mush for zero fps.
+   ?dpr= stays as a manual probe. The removeItems purge caps the ladder
+   stored on phones that ran v0.32.0. */
+localStorage.removeItem('beta3.dprCap'); localStorage.removeItem('beta3.dprCapTs');
 const DPR = QS.has('dpr')
   ? Math.max(1, Math.min(parseFloat(QS.get('dpr')) || 1, 3))
-  : Math.min(window.devicePixelRatio || 1, DPR_CAP);
+  : Math.min(window.devicePixelRatio || 1, 3);
 const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
 const DEMO = QS.get('demo') === '1';
 
@@ -96,10 +82,7 @@ window.SSPERF = PERF;   // the headless perf harness reads/starts probes through
    frame of the last half-second, renderer (GL/CV — a phone screenshot
    instantly tells us if WebGL failed over to Canvas), back-buffer size and
    dpr. DOM, not a Phaser object: zero render cost, survives scene changes.
-   On by default while perf is under investigation; ?fps=0 hides it.
-   The same 500ms pulse runs the ladder: 5s of sustained sub-45fps on a
-   touch device stores a lower dpr cap, applied by a reload the next time
-   the home meadow is idle — never mid-battle, mid-flight, or in versus. */
+   On by default while perf is under investigation; ?fps=0 hides it. */
 function ssPerfWatch(gm) {
   let el = null;
   if (QS.get('fps') !== '0') {
@@ -111,7 +94,6 @@ function ssPerfWatch(gm) {
   }
   let worst = 0;
   gm.events.on('prestep', () => { const d = gm.loop.rawDelta; if (d > worst) worst = d; });
-  let lowMs = 0, wantStep = false;
   setInterval(() => {
     const fps = Math.round(gm.loop.actualFps);
     if (el) {
@@ -121,20 +103,6 @@ function ssPerfWatch(gm) {
         gm.scale.width + '×' + gm.scale.height + ' · dpr' + (Math.round(DPR * 10) / 10);
     }
     worst = 0;
-    if (!TOUCH_DEVICE || QS.has('dpr')) return;
-    if (!wantStep && performance.now() > 6000 && fps < 45 && DPR > 1) {
-      lowMs += 500;
-      if (lowMs >= 5000) {
-        wantStep = true;
-        localStorage.setItem('beta3.dprCap', String(DPR > 2 ? 2 : DPR > 1.5 ? 1.5 : 1));
-        localStorage.setItem('beta3.dprCapTs', String(Date.now()));
-        DIAG('perf ladder: sustained ' + fps + 'fps -> dpr cap ' + localStorage.getItem('beta3.dprCap'));
-      }
-    } else if (fps >= 45) lowMs = 0;
-    if (wantStep) {
-      const h = gm.scene.getScene('home');
-      if (h && h.scene.isActive() && !h.ascending && !h.descending && !h.introPlaying) location.reload();
-    }
   }, 500);
 }
 
