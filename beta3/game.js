@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.21.0';
+const BUILD = 'STARSPELL v0.22.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -731,7 +731,8 @@ function ssSkyWorld(scene, opts) {
 // Assemble a constellation inside a container: stars fly in, lines fade up.
 function ssAssembleBeast(scene, cont, beast, unitScale, onDone) {
   cont.removeAll(true);
-  const sc = unitScale * (beast.boss ? 1.15 : 1);
+  // scale must match ssBeastFx's, which owns star homes once it arms
+  const sc = unitScale * (beast.boss ? 1.15 : beast.tier === 'mini' ? 1.06 : 1);
   const g = scene.add.graphics().setAlpha(0);
   g.lineStyle(unitScale * 1.25, 0xffffff, 0.35);
   for (const [a, b] of beast.edges) g.lineBetween(beast.stars[a][0] * sc, beast.stars[a][1] * sc, beast.stars[b][0] * sc, beast.stars[b][1] * sc);
@@ -1089,6 +1090,84 @@ const SS_ATK_FX = {
       },
     });
   },
+  // rear back, then gallop low across the board — hoofbeat bob, a stardust
+  // wake, and a trampling ground-ring (unicorn, bull; amp = the centaur's cut)
+  charge(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont, amp = fx.def.amp || 1;
+    SFX.noise(0.5, 220, 1, 0.07, 260);
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const tgt = { x: l.x(0), y: l.y(452) };
+    scene.tweens.add({
+      targets: c, y: fx.homeY - l.u(30), scaleX: 1.06, scaleY: 1.06, duration: 300, ease: 'Sine.easeOut',
+      onComplete: () => {
+        SFX.noise(0.7, 160, 1.1, 0.08, 90);
+        const p0 = { x: c.x, y: c.y };
+        const c1 = { x: fx.homeX + side * l.u(150), y: (fx.homeY + tgt.y) / 2 + l.u(20) };
+        const pr = { t: 0 };
+        scene.tweens.add({
+          targets: pr, t: 1, duration: 420, ease: 'Quad.easeIn',
+          onUpdate: () => {
+            const p = ssQBez(p0, c1, tgt, pr.t);
+            c.x = p.x;
+            c.y = p.y - Math.abs(Math.sin(pr.t * Math.PI * 3)) * l.u(10);   // gallop bob
+            if (Math.random() < 0.7) scene.starBurst.emitParticleAt(c.x - side * l.u(26), c.y + l.u(24), 1);
+          },
+          onComplete: () => {
+            impact(amp > 1 ? 1.3 : 1.15);
+            const ring = scene.add.image(c.x, c.y + l.u(30), ssFxTex(scene, 'ring', fx.beast.tint))
+              .setBlendMode('ADD').setAlpha(0.85).setScale(0.3).setDepth(58);
+            scene.tweens.add({ targets: ring, scale: l.u(2.4), alpha: 0, duration: 460, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+            scene.starBurst.emitParticleAt(c.x, c.y + l.u(26), 12);
+            scene.cameras.main.shake(120, 0.004);
+            const c2 = { x: fx.homeX - side * l.u(170), y: (fx.homeY + tgt.y) / 2 };
+            const back = { t: 0 };
+            scene.tweens.add({
+              targets: back, t: 1, duration: 540, ease: 'Sine.easeOut',
+              onUpdate: () => { const p = ssQBez(tgt, c2, { x: fx.homeX, y: fx.homeY }, back.t); c.x = p.x; c.y = p.y; },
+              onComplete: finish,
+            });
+          },
+        });
+      },
+    });
+  },
+  // draw and hold... then a fan of light-arrows streaks onto the board, each
+  // with its own thud (the archer's signature; the peacock's feather-darts)
+  volley(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont, bolts = Math.max(3, fx.def.bolts | 0);
+    SFX.noise(0.35, 1200, 1.6, 0.05, 3000);
+    const headE = fx.beast.eyes[0];
+    scene.tweens.add({ targets: c, y: fx.homeY - l.u(14), scaleX: 0.965, duration: 340, ease: 'Sine.easeOut' });
+    const dotK = ssFxTex(scene, 'dot', fx.beast.eye);
+    const tgt = { x: l.x(0), y: l.y(470) };
+    let flown = 0;
+    for (let k = 0; k < bolts; k++) {
+      scene.time.delayedCall(430 + k * 120, () => {
+        if (fx.dead) return;
+        SFX.noise(0.12, 1800, 2.2, 0.03, 4200);
+        const f = { x: c.x + headE[0] * fx.sc, y: c.y + headE[1] * fx.sc };
+        const to = { x: tgt.x + (k - (bolts - 1) / 2) * l.u(52), y: tgt.y + Math.abs(k - (bolts - 1) / 2) * l.u(14) };
+        const darts = [];
+        for (let j = 0; j < 4; j++) darts.push(scene.add.image(f.x, f.y, dotK).setBlendMode('ADD').setDepth(58).setScale(1 - j * 0.18).setAlpha(0));
+        const pr = { t: 0 };
+        scene.tweens.add({
+          targets: pr, t: 1, duration: 170, ease: 'Linear',
+          onUpdate: () => darts.forEach((d, j) => {
+            const tt = clamp(pr.t - j * 0.07, 0, 1);
+            d.x = f.x + (to.x - f.x) * tt; d.y = f.y + (to.y - f.y) * tt;
+            d.alpha = tt > 0 ? 1 - j * 0.2 : 0;
+          }),
+          onComplete: () => {
+            darts.forEach((d) => scene.tweens.add({ targets: d, alpha: 0, duration: 120, onComplete: () => d.destroy() }));
+            scene.starBurst.emitParticleAt(to.x, to.y, 4);
+            scene.cameras.main.shake(60, 0.0024);
+            if (++flown === 1) impact(fx.beast.boss ? 1.3 : 1.05);
+            if (flown === bolts) scene.tweens.add({ targets: c, y: fx.homeY, scaleX: 1, duration: 380, ease: 'Sine.easeOut', onComplete: finish });
+          },
+        });
+      });
+    }
+  },
   // the phoenix rises, whitens, and detonates in rings of dawn-fire
   nova(scene, fx, impact, finish) {
     const l = scene.L, c = fx.cont;
@@ -1119,7 +1198,7 @@ const SS_ATK_FX = {
 // presence only — no threat, no attacks, dimmer aura, no boss fanfare.
 function ssBeastFx(scene, cont, beast, unitScale, asm, opts) {
   opts = opts || {};
-  const sc = unitScale * (beast.boss ? 1.15 : 1);
+  const sc = unitScale * (beast.boss ? 1.15 : beast.tier === 'mini' ? 1.06 : 1);
   const def = beast.fx || {};
   const stars = asm.stars, eyes = asm.eyes, g = asm.lines;
   const xs = beast.stars.map((p) => p[0]), ys = beast.stars.map((p) => p[1]);
@@ -1150,7 +1229,7 @@ function ssBeastFx(scene, cont, beast, unitScale, asm, opts) {
   const anchors = [{ x: fx.cx, y: fx.cy, s: 1.25 }];
   const stepN = Math.max(2, Math.floor(beast.stars.length / (beast.boss ? 4 : 5)));
   for (let i = 0; i < beast.stars.length; i += stepN) anchors.push({ x: xs[i], y: ys[i], s: 0.62 });
-  const baseA = (opts.lite ? 0.07 : beast.boss ? 0.13 : 0.1);
+  const baseA = (opts.lite ? 0.07 : beast.boss ? 0.13 : beast.tier === 'mini' ? 0.115 : 0.1);
   const aura = anchors.map((a, i) => {
     const im = scene.add.image(a.x * sc, a.y * sc, glowKey).setBlendMode('ADD').setAlpha(0);
     im.hx = a.x * sc; im.hy = a.y * sc;
@@ -1766,13 +1845,58 @@ function ssLayout(scene) {
    whole alternate campaigns later just work). Returns { c, zone } — zone is
    the tappable current node (null when the campaign is complete); the
    container carries it as data 'mapZone' for the demo driver. */
+/* Campaign roster — the drawn sky. Each campaign rolls its acts' open slots
+   from the tier pools in SS_ACTS (fixed ids stay fixed) and the draw is
+   pinned in localStorage, so the chart, the battles, and a resumed
+   checkpoint all march the same road. It lives and dies with the
+   checkpoint (ssClearCampaign wipes both). */
+function ssRollRoster(seed) {
+  const r = ssMulberry(seed);
+  const used = new Set();
+  const roster = [];
+  for (const act of SS_ACTS) {
+    const local = new Set();
+    for (const sl of act.slots) {
+      let id = sl;
+      if (sl === 'b' || sl === 'm' || sl === 'B') {
+        const pool = sl === 'b' ? act.basics : sl === 'm' ? act.minis : act.bosses;
+        // prefer beasts this campaign has not drawn yet, then at least
+        // beasts this act has not drawn yet
+        let cand = pool.filter((p) => !local.has(p) && !used.has(p));
+        if (!cand.length) cand = pool.filter((p) => !local.has(p));
+        if (!cand.length) cand = pool;
+        id = cand[Math.floor(r() * cand.length)];
+      }
+      local.add(id); used.add(id);
+      roster.push(id);
+    }
+  }
+  return roster;
+}
+function ssCampaignLen() { return SS_ACTS.reduce((a, act) => a + act.slots.length, 0); }
+function ssCampaignRoster() {
+  try {
+    const r = JSON.parse(localStorage.getItem('beta3.camproster'));
+    if (Array.isArray(r) && r.length === ssCampaignLen() && r.every((id) => SS_BEASTS[id])) return r;
+  } catch (e) { }
+  const roster = ssRollRoster(Math.floor(Math.random() * 1e9));
+  try { localStorage.setItem('beta3.camproster', JSON.stringify(roster)); } catch (e) { }
+  return roster;
+}
+function ssClearCampaign() {
+  localStorage.removeItem('beta3.campaign');
+  localStorage.removeItem('beta3.camproster');
+}
+
 function ssStarChart(scene, opts) {
   const l = ssLayout(scene);
   const acts = opts.acts || SS_ACTS;
+  const roster = opts.roster || ssCampaignRoster();
   const fightIdx = opts.fightIdx | 0;
   const c = scene.add.container(0, 0);
   const fights = [];   // flattened in the exact order Battle marches them
-  acts.forEach((act, ai) => act.fights.forEach((id, fi) => fights.push({ id, actIdx: ai, fi, len: act.fights.length, umbral: act.umbral, boss: fi === act.fights.length - 1 })));
+  let ri = 0;
+  acts.forEach((act, ai) => act.slots.forEach((sl, fi) => fights.push({ id: roster[ri++], actIdx: ai, fi, len: act.slots.length, umbral: act.umbral, boss: fi === act.slots.length - 1 })));
   const N = fights.length;
 
   // the window + header
@@ -1782,15 +1906,18 @@ function ssStarChart(scene, opts) {
   c.add(scene.add.image(l.x(0), l.y(106), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
   const complete = fightIdx >= N;
   const cur = complete ? null : fights[fightIdx];
-  c.add(ssTxt(scene, l.x(0), l.y(132), complete ? SS_T('endWinSub') : acts[cur.actIdx].name + '  ·  ' + SS_T('fightN', cur.fi + 1),
+  c.add(ssTxt(scene, l.x(0), l.y(132), complete ? SS_T('endWinSub') : SS_ACT_N(acts[cur.actIdx]) + '  ·  ' + SS_T('fightN', cur.fi + 1),
     l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
 
   // node positions: a serpentine sweep per act, mirrored on alternate acts so
-  // the path braids left-right-left as it climbs; act bosses stand centered
+  // the path braids left-right-left as it climbs; act bosses stand centered.
+  // Step adapts to the fight count so a four-act road still fits the window.
   const pos = [];
   const wob = [0, 22, -16, 10];                       // organic jitter on the sweep
   let y = 632;
-  const step = 29, actGap = 25;
+  const step = Math.min(29, (632 - 172) / Math.max(1, (N - 1) + (acts.length - 1) * 0.86));
+  const actGap = Math.round(step * 0.86);
+  const cramp = clamp(step / 29, 0.72, 1);           // nodes shrink with the tighter road
   for (let i = 0; i < N; i++) {
     const f = fights[i];
     if (i > 0 && f.actIdx !== fights[i - 1].actIdx) {
@@ -1811,9 +1938,9 @@ function ssStarChart(scene, opts) {
     const first = fights.findIndex((f) => f.actIdx === ai);
     const gy = (pos[first].y + pos[first - 1].y) / 2;
     const gx = -Math.sign(pos[first].x || 1) * 62;
-    c.add(ssTxt(scene, l.x(gx), l.y(gy), act.name, l.u(8.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
+    c.add(ssTxt(scene, l.x(gx), l.y(gy), SS_ACT_N(act), l.u(8.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
   });
-  c.add(ssTxt(scene, l.x(0), l.y(656), acts[0].name, l.u(8.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
+  c.add(ssTxt(scene, l.x(0), l.y(656), SS_ACT_N(acts[0]), l.u(8.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
 
   // the path: dotted starlight between nodes — gold where you have walked
   const pathG = scene.add.graphics();
@@ -1841,7 +1968,7 @@ function ssStarChart(scene, opts) {
     const name = (um ? SS_UMBRAL.prefix : '') + b.name;
     const state = i < fightIdx ? 'won' : i === fightIdx ? 'now' : 'far';
     const last = i === N - 1;
-    const sc = (b.boss ? 0.20 : 0.145) * (last ? 1.3 : 1);
+    const sc = (b.boss ? 0.20 : b.tier === 'mini' ? 0.165 : 0.145) * (last ? 1.3 : 1) * cramp;
     const k = l.u(sc);
     const tint = state === 'won' ? 0xd7b45c : state === 'now' ? 0xffe9a8 : (um ? SS_UMBRAL.tint : b.tint);
     const aLine = state === 'won' ? 0.4 : state === 'now' ? 0.85 : 0.2;
@@ -2038,7 +2165,7 @@ class Home extends Phaser.Scene {
     console.log(BUILD);
     DIAG(BUILD + ' · ' + (this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas') + ' ' + this.game.scale.width + 'x' + this.game.scale.height + ' dprCap ' + DPR);
     if (QS.get('vsdemo') === '1') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
-    else if (DEMO || QS.get('daily') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? 'quick' : 'daily'));
+    else if (DEMO || QS.get('daily') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : 'quick') : 'daily'));
   }
   buildMeadowUi(l) {
     // baseAlpha: the ascent fades all ui to 0 — the wake path (return from
@@ -2104,7 +2231,7 @@ class Home extends Phaser.Scene {
     const campRow = () => {
       const ck = this.campaignCheckpoint();
       return {
-        label: ck ? SS_T('cont') + '  ·  ' + SS_ACTS[ck.actIdx].name.split('·')[0].trim() : SS_T('campaign'),
+        label: ck ? SS_T('cont') + '  ·  ' + SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim() : SS_T('campaign'),
         sub: ck ? SS_T('fightN', ck.fightIdx % 5 + 1) : SS_T('campaignSub'),
       };
     };
@@ -2510,7 +2637,7 @@ class Home extends Phaser.Scene {
     const tk = ssGoldTex(this, SS_T('abandonTitle'), 17);
     const tsc = Math.min(1, 280 / tk.w);
     items.push(this.add.image(l.x(0), l.y(304), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
-    items.push(ssTxt(this, l.x(0), l.y(362), SS_T('abandonBody', SS_ACTS[ck.actIdx].name.split('·')[0].trim(), ck.fightIdx % 5 + 1),
+    items.push(ssTxt(this, l.x(0), l.y(362), SS_T('abandonBody', SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim(), ck.fightIdx % 5 + 1),
       l.u(12), '#c9c3ae', 'italic').setOrigin(0.5).setWordWrapWidth(l.u(280)).setAlign('center'));
     // KEEP CLIMBING wears the gold — walking away from a checkpoint should
     // never be the brightest thing on screen
@@ -2522,7 +2649,7 @@ class Home extends Phaser.Scene {
     keepB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
     abB.on('pointerdown', () => {
       SFX.ui();
-      localStorage.removeItem('beta3.campaign');
+      ssClearCampaign();
       const cr = this.campRow();
       if (this.campLabelT && this.campLabelT.active) this.campLabelT.setText(cr.label);
       if (this.campSubT && this.campSubT.active) this.campSubT.setText(cr.sub);
@@ -2734,7 +2861,7 @@ class Battle extends Phaser.Scene {
     else setSeed(Math.floor(Math.random() * 1e9));
     this.fights = [];
     if (this.mode === 'campaign') {
-      SS_ACTS.forEach((act, ai) => act.fights.forEach((id, fi) => this.fights.push({ id, actIdx: ai, mult: act.mult, atkAdd: act.atkAdd, umbral: act.umbral, actStart: fi === 0 })));
+      this.fights = SS_CAMPAIGN_FIGHTS(ssCampaignRoster());
     } else {
       const pool = [...SS_QUICK_POOL];
       for (let i = 0; i < 4; i++) this.fights.push({ id: pool.splice(Math.floor(rng() * pool.length), 1)[0], actIdx: 0, mult: 1 + i * 0.12, atkAdd: Math.floor(i / 2), umbral: false });
@@ -2862,7 +2989,7 @@ class Battle extends Phaser.Scene {
     this.overlayC = this.add.container(0, 0).setDepth(100);
   }
   modeTitle() {
-    if (this.mode === 'campaign') return SS_ACTS[this.fights[this.run.fightIdx].actIdx].name;
+    if (this.mode === 'campaign') return SS_ACT_N(SS_ACTS[this.fights[this.run.fightIdx].actIdx]);
     if (this.mode === 'daily') return '☀ DAILY HUNT · ' + SSNET.dayKeyISO();
     return 'QUICK PLAY';
   }
@@ -3025,7 +3152,8 @@ class Battle extends Phaser.Scene {
     this.beastC.setPosition(l.x(0), l.y(170)).setScale(1).setRotation(0);
     const asm = ssAssembleBeast(this, this.beastC, this.beast, l.u(1.15), () => {
       this.setBeastName(this.beast.name);
-      this.beastTitle.setText((this.beast.title + (this.beast.boss ? ' · BOSS' : '')).toUpperCase());
+      const tag = this.beast.boss ? ' · ' + SS_T('tBoss') : this.beast.tier === 'mini' ? ' · ' + SS_T('tElite') : '';
+      this.beastTitle.setText((SS_BEAST_T(this.beast) + tag).toUpperCase());
     });
     this.beastLines = asm.lines; this.beastStars = asm.stars;
     // presence + attack fx (aura, idle, shimmer, telegraph, signature strikes);
@@ -3285,7 +3413,7 @@ class Battle extends Phaser.Scene {
     });
   }
   saveCheckpoint() {
-    if (this.run.fightIdx >= this.fights.length) { localStorage.removeItem('beta3.campaign'); return; }
+    if (this.run.fightIdx >= this.fights.length) { ssClearCampaign(); return; }
     const f = this.fights[this.run.fightIdx];
     localStorage.setItem('beta3.campaign', JSON.stringify({
       fightIdx: this.run.fightIdx, actIdx: f.actIdx, hp: this.run.hp, hpMax: this.run.hpMax,
@@ -3564,7 +3692,7 @@ class Battle extends Phaser.Scene {
       SS.award('sky-sweeper', this.game);
       if (score > SS.prof.bestCampaign) SS.prof.bestCampaign = score;
     }
-    if (this.mode === 'campaign') localStorage.removeItem('beta3.campaign');
+    if (this.mode === 'campaign') ssClearCampaign();
     if (this.mode === 'daily') {
       SS.award('daily-devout', this.game);
       if (!SS.prof.daily[dk] || score > SS.prof.daily[dk]) SS.prof.daily[dk] = score;

@@ -2,109 +2,277 @@
 /* ============================================================
    STARSPELL data — beasts, acts, sigils, achievements.
    Constellations are hand-authored star points in a 200x160 box
-   centered on origin; edges are index pairs; eyes glow + pulse.
+   centered on origin (y down); edges are index pairs; eyes glow
+   + pulse. New shapes are placed from the real star charts so
+   each figure resembles its namesake asterism (see BESTIARY.md
+   for the roster plan and what remains unauthored).
 
+   Authoring a beast is data-only:
+     tier: 'basic' | 'mini' | 'boss'  + lvl 1-4 → stats come from
+     SS_TIER_CURVE; explicit hp/atk/timer override the curve.
    fx: presence + attack, all archetype-driven (ssBeastFx in game.js).
-   New beasts pick from the shared archetypes rather than getting
-   hand-soldered effects:
      idle — prowl · bob · coil · pinch · headturn · lumber · ripple · flex
-     atk  — pounce · slam · lash · snap · swoop · breath · nova
-   Optional tuning fields: hops (pounce), strands (lash), amp (flex).
+     atk  — pounce · slam · lash · snap · swoop · breath · nova · charge · volley
+   Optional tuning fields: hops (pounce), strands (lash), amp
+   (flex/charge), bolts (volley).
    ============================================================ */
 
+// Stats by tier + lvl (lvl ≈ the act the beast is at home in). The original
+// ten keep their hand-tuned explicit stats; new beasts ride the curve.
+const SS_TIER_CURVE = {
+  basic: (l) => ({ hp: 22 + 8 * l, atk: 7 + l, timer: l >= 3 ? 3 : 4 }),
+  mini: (l) => ({ hp: 40 + 15 * l, atk: 10 + Math.round(l * 1.5), timer: 3 }),
+  boss: (l) => ({ hp: 60 + 30 * l, atk: 13 + 2 * l, timer: l >= 3 ? 4 : 3 }),
+};
+
 const SS_BEASTS = {
+  // ---- basics ----
   vulpes: {
-    name: 'VULPES', title: 'THE EMBER FOX', hp: 30, atk: 8, timer: 4, tint: 0xffb066, eye: 0xffd23e,
+    name: 'VULPES', title: 'THE EMBER FOX', tier: 'basic', lvl: 1, hp: 30, atk: 8, timer: 4, tint: 0xffb066, eye: 0xffd23e,
     stars: [[-78, 18], [-58, 2], [-38, 10], [-20, -2], [2, -10], [20, -14], [38, -24], [34, -44], [56, -40], [54, -22], [64, -14], [46, -6], [26, 16], [30, 34], [-8, 16], [-6, 34]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 6], [5, 12], [12, 13], [3, 14], [14, 15]],
     eyes: [[46, -22]],
     fx: { idle: 'prowl', atk: 'pounce' },
   },
   lepus: {
-    name: 'LEPUS', title: 'THE MOONLIT HARE', hp: 38, atk: 9, timer: 4, tint: 0xbfe8c9, eye: 0xa8ffc4,
+    name: 'LEPUS', title: 'THE MOONLIT HARE', tier: 'basic', lvl: 2, hp: 38, atk: 9, timer: 4, tint: 0xbfe8c9, eye: 0xa8ffc4,
     stars: [[-10, -64], [14, -60], [-2, -38], [8, -30], [26, -26], [0, -4], [8, 18], [-28, -18], [-52, -6], [-58, 16], [-36, 34], [-66, -14]],
     edges: [[0, 2], [1, 2], [2, 3], [3, 4], [3, 5], [5, 6], [5, 7], [7, 8], [8, 9], [9, 10], [8, 11]],
     eyes: [[12, -32]],
     fx: { idle: 'bob', atk: 'pounce', hops: 2 },
   },
   serpens: {
-    name: 'SERPENS', title: 'THE TIDE SERPENT', hp: 48, atk: 10, timer: 3, tint: 0x6fe0d0, eye: 0x9ffcee,
+    name: 'SERPENS', title: 'THE TIDE SERPENT', tier: 'basic', lvl: 3, hp: 48, atk: 10, timer: 3, tint: 0x6fe0d0, eye: 0x9ffcee,
     stars: [[-84, 32], [-62, 14], [-40, 28], [-18, 10], [4, 24], [26, 6], [46, 18], [60, 0], [68, -20], [58, -40], [42, -34], [74, -34]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [9, 11]],
     eyes: [[52, -38], [64, -38]],
     fx: { idle: 'coil', atk: 'lash' },
   },
+  delphinus: {
+    name: 'DELPHINUS', title: 'THE STARLIT DOLPHIN', tier: 'basic', lvl: 1, tint: 0x9fd8e8, eye: 0xcfffff,
+    stars: [[44, -52], [16, -34], [32, -8], [58, -26], [80, -44], [-4, 12], [-34, 30], [-64, 38], [-84, 20], [-80, 58]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 0], [3, 4], [2, 5], [5, 6], [6, 7], [7, 8], [7, 9]],
+    eyes: [[48, -40]],
+    fx: { idle: 'coil', atk: 'pounce' },
+  },
+  columba: {
+    name: 'COLUMBA', title: 'THE HERALD DOVE', tier: 'basic', lvl: 1, tint: 0xe8ddc8, eye: 0xfff2c9,
+    stars: [[-10, -46], [-26, -52], [-2, -28], [6, -8], [12, 10], [-34, -24], [-60, -34], [-84, -46], [30, -18], [56, -24], [82, -34], [4, 32], [-10, 46], [18, 48]],
+    edges: [[0, 1], [0, 2], [2, 3], [3, 4], [2, 5], [5, 6], [6, 7], [2, 8], [8, 9], [9, 10], [4, 11], [11, 12], [11, 13]],
+    eyes: [[-14, -48]],
+    fx: { idle: 'bob', atk: 'swoop' },
+  },
+  lacerta: {
+    name: 'LACERTA', title: 'THE ZIGZAG LIZARD', tier: 'basic', lvl: 2, tint: 0xa8e86b, eye: 0xd4ff5e,
+    stars: [[8, -68], [-8, -58], [6, -46], [-10, -34], [8, -22], [-8, -10], [6, 2], [-8, 14], [4, 28], [-6, 44], [6, 58], [-2, 72], [-28, -26], [26, -14], [-24, 36], [26, 36]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [3, 12], [4, 13], [8, 14], [8, 15]],
+    eyes: [[2, -58]],
+    fx: { idle: 'coil', atk: 'lash' },
+  },
+  cygnus: {
+    name: 'CYGNUS', title: 'THE CROSSWIND SWAN', tier: 'basic', lvl: 3, tint: 0xdfe8ff, eye: 0x9fb4ff,
+    stars: [[4, -58], [0, -30], [0, -4], [-2, 24], [-4, 48], [30, 2], [58, 10], [84, 24], [-30, -10], [-58, -6], [-84, 6]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4], [2, 5], [5, 6], [6, 7], [2, 8], [8, 9], [9, 10]],
+    eyes: [[-8, 50]],
+    fx: { idle: 'flex', atk: 'swoop' },
+  },
+  pavo: {
+    name: 'PAVO', title: 'THE VEILED PEACOCK', tier: 'basic', lvl: 3, tint: 0x6be0c4, eye: 0x7affd4,
+    stars: [[0, 10], [4, 28], [-4, -8], [0, -26], [6, -38], [-64, -6], [-52, -34], [-28, -54], [4, -62], [36, -50], [58, -26], [68, 2], [-8, 46], [12, 46]],
+    edges: [[1, 0], [0, 2], [2, 3], [3, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10], [0, 11], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [1, 12], [1, 13]],
+    eyes: [[-4, -28]],
+    fx: { idle: 'ripple', atk: 'volley', bolts: 4 },
+  },
+  // ---- minibosses ----
   cancer: {
-    name: 'CANCER', title: 'THE GLOOM CRAB', hp: 62, atk: 12, timer: 3, tint: 0xc79af5, eye: 0xff7ad9,
+    name: 'CANCER', title: 'THE GLOOM CRAB', tier: 'mini', lvl: 1, hp: 62, atk: 12, timer: 3, tint: 0xc79af5, eye: 0xff7ad9,
     stars: [[-20, 0], [0, -12], [20, 0], [14, 16], [-14, 16], [-38, -8], [-60, -20], [-76, -8], [-88, -20], [-72, -34], [38, -8], [60, -20], [76, -8], [88, -20], [72, -34], [-26, 26], [-34, 44], [0, 28], [0, 46], [26, 26], [34, 44], [-8, -24], [8, -24]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0], [0, 5], [5, 6], [6, 7], [7, 8], [7, 9], [2, 10], [10, 11], [11, 12], [12, 13], [12, 14], [4, 15], [15, 16], [3, 17], [17, 18], [3, 19], [19, 20], [1, 21], [1, 22]],
     eyes: [[-8, -28], [8, -28]],
     fx: { idle: 'pinch', atk: 'snap' },
   },
   corvus: {
-    name: 'CORVUS', title: 'THE HOLLOW RAVEN', hp: 58, atk: 12, timer: 3, tint: 0x9a86e8, eye: 0xf2f2ff,
+    name: 'CORVUS', title: 'THE HOLLOW RAVEN', tier: 'mini', lvl: 1, hp: 58, atk: 12, timer: 3, tint: 0x9a86e8, eye: 0xf2f2ff,
     stars: [[48, -30], [66, -22], [30, -24], [8, -10], [-28, 4], [-46, 14], [-42, -4], [2, -40], [-18, -56], [-40, -62], [8, 14], [-8, 30], [-28, 40]],
     edges: [[0, 1], [0, 2], [2, 3], [3, 4], [4, 5], [4, 6], [2, 7], [7, 8], [8, 9], [3, 10], [10, 11], [11, 12]],
     eyes: [[50, -34]],
     fx: { idle: 'headturn', atk: 'swoop' },
   },
   ursa: {
-    name: 'URSA', title: 'THE WINTER BEAR', hp: 76, atk: 14, timer: 3, tint: 0xd6a86b, eye: 0xffd23e,
+    name: 'URSA', title: 'THE WINTER BEAR', tier: 'mini', lvl: 2, hp: 76, atk: 14, timer: 3, tint: 0xd6a86b, eye: 0xffd23e,
     stars: [[58, -6], [44, -20], [38, -32], [16, -30], [-8, -38], [-38, -28], [-56, -10], [-48, 14], [-42, 34], [-8, 8], [22, 12], [26, 34], [48, 6]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [6, 9], [9, 10], [10, 11], [0, 12], [12, 9]],
     eyes: [[46, -16]],
     fx: { idle: 'lumber', atk: 'slam' },
   },
   aranea: {
-    name: 'ARANEA', title: 'THE SILK WIDOW', hp: 70, atk: 13, timer: 3, tint: 0xba6be0, eye: 0xff4d6b,
+    name: 'ARANEA', title: 'THE SILK WIDOW', tier: 'mini', lvl: 2, hp: 70, atk: 13, timer: 3, tint: 0xba6be0, eye: 0xff4d6b,
     stars: [[10, -14], [-14, 6], [26, -30], [44, -44], [32, -12], [56, -16], [30, 6], [52, 18], [18, 18], [28, 38], [-30, -24], [-46, -40], [-36, -4], [-58, -6], [-32, 14], [-48, 28], [-22, 26], [-28, 46], [18, -26], [6, -28]],
     edges: [[0, 1], [0, 2], [2, 3], [0, 4], [4, 5], [0, 6], [6, 7], [1, 8], [8, 9], [1, 10], [10, 11], [1, 12], [12, 13], [1, 14], [14, 15], [1, 16], [16, 17], [0, 18], [0, 19]],
     eyes: [[8, -18], [14, -16]],
     fx: { idle: 'ripple', atk: 'lash', strands: 3 },
   },
+  aquila: {
+    name: 'AQUILA', title: 'THE THUNDER EAGLE', tier: 'mini', lvl: 2, tint: 0xd8c06b, eye: 0xfff0a8,
+    stars: [[0, -52], [-12, -58], [10, -46], [0, -28], [-4, -4], [-30, -18], [-58, -8], [-82, 8], [28, -14], [54, -2], [78, 16], [2, 20], [-8, 40], [12, 42], [2, 58]],
+    edges: [[1, 0], [0, 2], [0, 3], [3, 4], [3, 5], [5, 6], [6, 7], [3, 8], [8, 9], [9, 10], [4, 11], [11, 12], [11, 13], [12, 14], [13, 14]],
+    eyes: [[0, -54]],
+    fx: { idle: 'flex', atk: 'swoop' },
+  },
+  lupus: {
+    name: 'LUPUS', title: 'THE STAR-STARVED WOLF', tier: 'mini', lvl: 3, tint: 0xb0bdd4, eye: 0xff5e4d,
+    stars: [[-62, -52], [-48, -40], [-58, -30], [-36, -48], [-30, -22], [-10, -12], [14, -16], [38, -10], [56, -24], [70, -40], [-22, 6], [-26, 28], [-20, 50], [30, 8], [38, 30], [30, 52], [4, 10]],
+    edges: [[0, 1], [1, 2], [1, 3], [1, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [5, 10], [10, 11], [11, 12], [7, 13], [13, 14], [14, 15], [10, 16], [16, 13]],
+    eyes: [[-44, -44]],
+    fx: { idle: 'prowl', atk: 'pounce' },
+  },
+  monoceros: {
+    name: 'MONOCEROS', title: 'THE GLASS UNICORN', tier: 'mini', lvl: 3, tint: 0xd8d2f0, eye: 0xbfe8ff,
+    stars: [[-70, -58], [-56, -42], [-46, -30], [-58, -18], [-34, -24], [-16, -30], [8, -26], [32, -28], [50, -18], [66, -2], [60, 18], [-28, -6], [-34, 16], [-30, 44], [0, -2], [26, -4], [34, 20], [28, 46]],
+    edges: [[0, 1], [1, 2], [2, 3], [2, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [4, 11], [11, 12], [12, 13], [11, 14], [14, 15], [15, 16], [16, 17], [7, 15]],
+    eyes: [[-48, -34]],
+    fx: { idle: 'prowl', atk: 'charge' },
+  },
+  cassiopeia: {
+    name: 'CASSIOPEIA', title: 'THE VAIN QUEEN', tier: 'mini', lvl: 3, tint: 0xe0aed0, eye: 0xffd23e,
+    stars: [[-74, -26], [-38, -48], [-2, -24], [34, -52], [66, -30], [-2, -4], [-14, 10], [12, 8], [-16, 34], [16, 32], [-10, 54], [12, 52], [-30, 6], [34, 4]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4], [2, 5], [5, 6], [5, 7], [6, 8], [7, 9], [8, 10], [9, 11], [8, 9], [12, 8], [13, 9]],
+    eyes: [[-6, -6], [2, -6]],
+    fx: { idle: 'headturn', atk: 'lash' },
+  },
+  cetus: {
+    name: 'CETUS', title: 'THE DROWNED LEVIATHAN', tier: 'mini', lvl: 4, tint: 0x6b9fe0, eye: 0x9ffcee,
+    stars: [[52, -44], [76, -32], [82, -8], [66, 10], [46, -2], [42, -26], [58, 22], [28, 14], [4, 26], [-22, 30], [-46, 20], [-62, 2], [-80, 16], [-90, 0], [-88, 36]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [3, 6], [4, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12], [12, 13], [12, 14]],
+    eyes: [[60, -30]],
+    fx: { idle: 'coil', atk: 'breath' },
+  },
+  orion: {
+    name: 'ORION', title: 'THE STARBOUND HUNTER', tier: 'mini', lvl: 4, tint: 0x9fc4ff, eye: 0xffb066,
+    stars: [[0, -56], [-28, -34], [28, -38], [-10, 2], [0, 6], [10, 10], [-24, 48], [28, 44], [4, 20], [6, 30], [-42, -52], [-48, -68], [-34, -74], [54, -28], [62, -10], [60, 8]],
+    edges: [[0, 1], [0, 2], [1, 2], [1, 3], [2, 5], [3, 4], [4, 5], [3, 6], [5, 7], [4, 8], [8, 9], [1, 10], [10, 11], [11, 12], [2, 13], [13, 14], [14, 15]],
+    eyes: [[0, -58]],
+    fx: { idle: 'headturn', atk: 'slam' },
+  },
+  // ---- bosses ----
   strix: {
-    name: 'STRIX', title: 'THE VOID OWL', hp: 85, atk: 14, timer: 3, tint: 0x9fb4ff, eye: 0xffe08a, boss: true,
+    name: 'STRIX', title: 'THE VOID OWL', tier: 'boss', lvl: 1, hp: 85, atk: 14, timer: 3, tint: 0x9fb4ff, eye: 0xffe08a,
     stars: [[0, -50], [28, -40], [40, -12], [28, 16], [0, 26], [-28, 16], [-40, -12], [-28, -40], [-38, -58], [38, -58], [0, 4], [-8, 14], [8, 14], [-52, 0], [-72, 22], [-58, 40], [52, 0], [72, 22], [58, 40], [-14, 52], [14, 52]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0], [7, 8], [1, 9], [10, 11], [10, 12], [6, 13], [13, 14], [14, 15], [2, 16], [16, 17], [17, 18], [4, 19], [4, 20]],
     eyes: [[-14, -18], [14, -18]],
     fx: { idle: 'headturn', atk: 'swoop' },
   },
+  leo: {
+    name: 'LEO', title: 'THE SOVEREIGN LION', tier: 'boss', lvl: 1, tint: 0xffd23e, eye: 0xffb066,
+    stars: [[-24, 30], [-32, 10], [-22, -12], [-34, -30], [-52, -36], [-64, -22], [-70, -6], [8, -14], [40, -22], [70, -10], [44, 8], [-28, 54], [42, 34], [50, 56], [8, 52], [82, -24]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [0, 2], [2, 7], [7, 8], [8, 9], [9, 15], [8, 10], [10, 0], [0, 11], [10, 12], [12, 13], [7, 14]],
+    eyes: [[-58, -24]],
+    fx: { idle: 'prowl', atk: 'pounce' },
+  },
+  taurus: {
+    name: 'TAURUS', title: 'THE STORM-EYED BULL', tier: 'boss', lvl: 1, tint: 0xc4915e, eye: 0xff7a45,
+    stars: [[-16, 18], [-28, 2], [-38, -14], [-2, 2], [8, -12], [-58, -34], [-74, -52], [26, -34], [40, -56], [30, 4], [58, -2], [80, 10], [66, 30], [70, 52], [4, 36], [0, 58], [28, 34], [30, 56], [48, -24], [54, -28], [58, -22], [52, -18], [58, -30]],
+    edges: [[2, 1], [1, 0], [0, 3], [3, 4], [2, 5], [5, 6], [4, 7], [7, 8], [3, 9], [9, 10], [10, 11], [11, 12], [12, 13], [0, 14], [14, 15], [9, 16], [16, 17]],
+    eyes: [[-38, -14]],
+    fx: { idle: 'lumber', atk: 'charge' },
+  },
+  scorpius: {
+    name: 'SCORPIUS', title: 'THE CRIMSON STING', tier: 'boss', lvl: 2, tint: 0xe87a6b, eye: 0xff3860,
+    stars: [[-84, -38], [-66, -52], [-72, -18], [-52, -30], [-36, -22], [-20, -12], [-8, 4], [-2, 20], [4, 36], [14, 50], [30, 58], [48, 56], [62, 46], [70, 30], [64, 14], [50, 6]],
+    edges: [[0, 3], [1, 3], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12], [12, 13], [13, 14], [14, 15]],
+    eyes: [[-20, -12], [50, 6]],
+    fx: { idle: 'pinch', atk: 'lash' },
+  },
   draco: {
-    name: 'DRACO', title: 'THE STAR EATER', hp: 130, atk: 18, timer: 4, tint: 0xffc46b, eye: 0xff5e4d, boss: true,
+    name: 'DRACO', title: 'THE STAR EATER', tier: 'boss', lvl: 2, hp: 130, atk: 18, timer: 4, tint: 0xffc46b, eye: 0xff5e4d,
     stars: [[-92, 42], [-72, 28], [-52, 36], [-32, 22], [-12, 28], [8, 14], [2, -8], [-16, -36], [6, -54], [20, -32], [42, -46], [30, 2], [46, -12], [58, -30], [50, -48], [70, -44], [78, -18], [62, -6], [24, 30], [18, 48], [44, 26], [48, 44]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [6, 9], [9, 10], [5, 11], [11, 12], [12, 13], [13, 14], [13, 15], [13, 16], [16, 17], [11, 18], [18, 19], [11, 20], [20, 21]],
     eyes: [[56, -26]],
     fx: { idle: 'flex', atk: 'breath' },
   },
   phoenix: {
-    name: 'PHOENIX', title: 'THE FIRST FLAME', hp: 170, atk: 22, timer: 4, tint: 0xffa94d, eye: 0xfff0a8, boss: true,
+    name: 'PHOENIX', title: 'THE FIRST FLAME', tier: 'boss', lvl: 3, hp: 170, atk: 22, timer: 4, tint: 0xffa94d, eye: 0xfff0a8,
     stars: [[0, -58], [14, -62], [-8, -72], [0, -40], [0, -14], [22, -28], [46, -42], [70, -26], [-22, -28], [-46, -42], [-70, -26], [8, 26], [20, 48], [0, 30], [0, 56], [-8, 26], [-20, 48]],
     edges: [[0, 1], [0, 2], [0, 3], [3, 4], [3, 5], [5, 6], [6, 7], [3, 8], [8, 9], [9, 10], [4, 11], [11, 12], [4, 13], [13, 14], [4, 15], [15, 16]],
     eyes: [[5, -56]],
     fx: { idle: 'flex', atk: 'nova', amp: 1.35 },
   },
+  centaurus: {
+    name: 'CENTAURUS', title: 'THE FIRSTBORN CENTAUR', tier: 'boss', lvl: 4, tint: 0xc9a26b, eye: 0xffe08a,
+    stars: [[-40, -62], [-54, -48], [-26, -50], [-8, -56], [12, -64], [30, -72], [-42, -30], [-24, -16], [2, -12], [28, -16], [50, -10], [68, -20], [80, -6], [-34, 4], [-40, 28], [-36, 52], [-14, 4], [-12, 30], [-16, 54], [44, 8], [54, 30], [46, 54], [8, 8]],
+    edges: [[0, 1], [0, 2], [1, 6], [2, 6], [2, 3], [3, 4], [4, 5], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12], [7, 13], [13, 14], [14, 15], [7, 16], [16, 17], [17, 18], [10, 19], [19, 20], [20, 21], [16, 22], [22, 19]],
+    eyes: [[-40, -64]],
+    fx: { idle: 'lumber', atk: 'charge', amp: 1.2 },
+  },
+  sagittarius: {
+    name: 'SAGITTARIUS', title: 'THE ZENITH ARCHER', tier: 'boss', lvl: 4, hp: 200, atk: 24, timer: 4, tint: 0xff9e58, eye: 0xfff0a8,
+    stars: [[10, -58], [-4, -44], [26, -46], [0, -22], [20, -26], [30, -8], [16, 4], [-4, 0], [-10, -12], [-24, -18], [-44, -58], [-56, -38], [-48, -16], [-30, -38], [-70, -44], [44, -14], [66, -8], [80, -18], [90, -4], [2, 18], [-2, 40], [4, 60], [62, 12], [70, 34], [62, 58]],
+    edges: [[0, 1], [0, 2], [1, 3], [2, 4], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 3], [8, 9], [1, 11], [10, 11], [11, 12], [13, 14], [2, 13], [5, 15], [15, 16], [16, 17], [17, 18], [6, 19], [19, 20], [20, 21], [16, 22], [22, 23], [23, 24]],
+    eyes: [[6, -60]],
+    fx: { idle: 'flex', amp: 0.7, atk: 'volley', bolts: 5 },
+  },
 };
 
-// Campaign: three acts. Umbral variants reuse a constellation with new colors
-// and scaled stats — mult applies to hp, add to atk.
+// Resolve tiers → stats + the boss flag every consumer already reads.
+for (const _id in SS_BEASTS) {
+  const _b = SS_BEASTS[_id];
+  _b.id = _id;
+  _b.boss = _b.tier === 'boss';
+  const _c = SS_TIER_CURVE[_b.tier](_b.lvl || 1);
+  if (_b.hp == null) _b.hp = _c.hp;
+  if (_b.atk == null) _b.atk = _c.atk;
+  if (_b.timer == null) _b.timer = _c.timer;
+}
+
+/* Campaign: four acts of five fights. Acts draw from tier pools — a slot is
+   'b' (basics pool), 'm' (minis pool), 'B' (bosses pool), or a fixed beast id.
+   The draw is rolled once per campaign (game.js ssCampaignRoster) and pinned
+   in localStorage so chart, battles and checkpoint resume agree; the fixed
+   anchors keep the story beats — STRIX, DRACO, PHOENIX, and Act IV's climb of
+   ORION → CENTAURUS → SAGITTARIUS, the end-game pair.
+   Umbral variants reuse a constellation with new colors and scaled stats —
+   mult applies to hp, add to atk. Act names live in strings.js (nameKey). */
 const SS_ACTS = [
   {
-    name: 'ACT I · THE MEADOW SKY', mult: 1, atkAdd: 0, umbral: false,
-    fights: ['vulpes', 'lepus', 'serpens', 'cancer', 'strix'],
+    nameKey: 'act1', mult: 1, atkAdd: 0, umbral: false,
+    slots: ['b', 'b', 'b', 'm', 'strix'],
+    basics: ['vulpes', 'lepus', 'delphinus', 'columba', 'lacerta', 'serpens'],
+    minis: ['cancer', 'corvus', 'aquila'],
   },
   {
-    name: 'ACT II · THE DEEP NIGHT', mult: 1.35, atkAdd: 2, umbral: false,
-    fights: ['corvus', 'aranea', 'ursa', 'serpens', 'draco'],
+    nameKey: 'act2', mult: 1.35, atkAdd: 2, umbral: false,
+    slots: ['b', 'm', 'm', 'B', 'draco'],
+    basics: ['serpens', 'cygnus', 'pavo', 'lacerta'],
+    minis: ['corvus', 'aranea', 'ursa', 'aquila', 'lupus', 'monoceros'],
+    bosses: ['leo', 'taurus'],
   },
   {
-    name: 'ACT III · THE CROWN OF DAWN', mult: 1.8, atkAdd: 5, umbral: true,
-    fights: ['cancer', 'strix', 'ursa', 'draco', 'phoenix'],
+    nameKey: 'act3', mult: 1.8, atkAdd: 5, umbral: true,
+    slots: ['m', 'm', 'B', 'B', 'phoenix'],
+    minis: ['ursa', 'aranea', 'lupus', 'monoceros', 'cetus', 'cassiopeia'],
+    bosses: ['strix', 'draco', 'leo', 'taurus', 'scorpius'],
+  },
+  {
+    nameKey: 'act4', mult: 1.8, atkAdd: 6, umbral: false,
+    slots: ['m', 'B', 'orion', 'centaurus', 'sagittarius'],
+    minis: ['cetus', 'cassiopeia', 'lupus', 'monoceros'],
+    bosses: ['leo', 'taurus', 'scorpius', 'draco'],
   },
 ];
 const SS_UMBRAL = { tint: 0x8080a8, eye: 0xff3860, prefix: 'UMBRAL ' };
 
+// Flatten a rolled roster into the fight list Battle marches.
+function SS_CAMPAIGN_FIGHTS(roster) {
+  const fights = [];
+  let k = 0;
+  SS_ACTS.forEach((act, ai) => act.slots.forEach((sl, fi) => {
+    fights.push({ id: roster[k++], actIdx: ai, mult: act.mult, atkAdd: act.atkAdd, umbral: act.umbral, actStart: fi === 0 });
+  }));
+  return fights;
+}
+
 // Quick Play / Daily: four random lesser beasts then Draco.
-const SS_QUICK_POOL = ['vulpes', 'lepus', 'serpens', 'cancer', 'corvus', 'ursa', 'aranea'];
+const SS_QUICK_POOL = ['vulpes', 'lepus', 'serpens', 'cancer', 'corvus', 'ursa', 'aranea', 'delphinus', 'columba', 'lacerta', 'cygnus', 'pavo', 'aquila'];
 const SS_QUICK_BOSS = 'draco';
 
 // rarity: 0 = basic, 1 = rare, 2 = legendary. Rares and legendaries surface
@@ -154,7 +322,7 @@ const SS_ACH = [
   { id: 'century', icon: 'C', name: 'CENTURION', desc: 'Cast 100 words, lifetime.' },
   { id: 'daily-devout', icon: '☀', name: 'DAILY DEVOUT', desc: 'Complete a Daily hunt.' },
   { id: 'dragonfall', icon: '🐉', name: 'DRAGONFALL', desc: 'Fell DRACO, the Star Eater.' },
-  { id: 'first-flame', icon: '🔥', name: 'THE FIRST FLAME', desc: 'Fell PHOENIX and finish the story.' },
+  { id: 'first-flame', icon: '🔥', name: 'THE FIRST FLAME', desc: 'Fell PHOENIX, the First Flame.' },
   { id: 'rival-star', icon: '⚔', name: 'RIVAL STAR', desc: 'Win a versus battle.' },
   { id: 'sky-marshal', icon: '♜', name: 'SKY MARSHAL', desc: 'Win a battleground of 3+ mages.' },
   { id: 'war-weaver', icon: '✷', name: 'WAR WEAVER', desc: 'Cast 25 words in versus, lifetime.' },
