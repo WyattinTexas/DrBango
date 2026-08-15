@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.23.0';
+const BUILD = 'STARSPELL v0.24.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -126,6 +126,10 @@ const SS = {
     p.vsWords = p.vsWords | 0; p.vsWins = p.vsWins | 0;
     p.daily = p.daily || {}; p.ach = p.ach || {};
     p.signs = p.signs || {};   // per-zodiac campaign records: id → {best, clears, runs}
+    // star rating: every profile that predates it starts at the baseline
+    p.rating = Number.isFinite(p.rating) ? Math.round(p.rating) : 1000;
+    p.rhide = !!p.rhide;                                   // veil my rating from others
+    p.rday = (p.rday && typeof p.rday === 'object') ? p.rday : { d: 0, g: 0 };   // PvE daily-cap ledger
     return p;
   },
   save() { try { localStorage.setItem('beta3.profile', JSON.stringify(this.prof)); } catch (e) { } },
@@ -135,6 +139,7 @@ const SS = {
       longest: this.prof.longest, bigHit: this.prof.bigHit, bestQuick: this.prof.bestQuick,
       vsWins: this.prof.vsWins,
       achCount: Object.keys(this.prof.ach).length,
+      rating: this.prof.rating, rhide: this.prof.rhide ? 1 : 0,
     });
   },
   has(id) { return !!this.prof.ach[id]; },
@@ -148,6 +153,52 @@ const SS = {
   },
 };
 SS.load();
+
+/* ---- the star rating: one number for how well you weave ------------------
+   Baseline 1000, hard floor 600 — a new player can never be beaten into the
+   ground. Versus moves it Elo-style: expected-score math at K=32, so felling
+   a higher-rated rival pays big, farming a lower one pays little, and losses
+   mirror. Solo play only ever RAISES it — wins and mighty words pay a pinch
+   that diminishes to nothing as the rating climbs toward PVE_SOFT and is
+   capped per UTC day, so grinding beasts can seed a rating but never inflate
+   one past what versus play supports. Mutates SS.prof only; every call site
+   already rides an SS.save()/SS.sync() moments later. */
+const SS_RATING = {
+  BASE: 1000, FLOOR: 600, K: 32, PVE_DAY_CAP: 30, PVE_SOFT: 1250,
+  expected(mine, opp) { return 1 / (1 + Math.pow(10, (opp - mine) / 400)); },
+  // versus: standard Elo against the rival (or the field's average). score is
+  // 1 for a win, 0 for a loss. Returns the applied delta (floor-aware).
+  duel(opp, score) {
+    return this.apply(Math.round(this.K * (score - this.expected(SS.prof.rating, opp))));
+  },
+  // solo: never negative, diminishing above BASE, capped per day
+  pve(base) {
+    const p = SS.prof, today = SSNET.dayKey();
+    if (!p.rday || p.rday.d !== today) p.rday = { d: today, g: 0 };
+    const scale = clamp((this.PVE_SOFT - p.rating) / (this.PVE_SOFT - this.BASE), 0, 1);
+    const d = Math.min(Math.ceil(base * scale), Math.max(0, this.PVE_DAY_CAP - p.rday.g));
+    if (d <= 0) return 0;
+    p.rday.g += d;
+    return this.apply(d);
+  },
+  apply(d) {
+    const p = SS.prof, before = p.rating;
+    p.rating = Math.max(this.FLOOR, Math.round(p.rating + d));
+    return p.rating - before;
+  },
+};
+// the star-classes: named tiers at thresholds so the number has flavor.
+// min is inclusive; baseline 1000 wakes as a RISING STAR.
+const SS_RATING_TIERS = [
+  { min: 0, key: 'rt0', glyph: '✧', color: '#8a94c4', tint: 0x8a94c4 },
+  { min: 850, key: 'rt1', glyph: '✦', color: '#e8a87f', tint: 0xe8a87f },
+  { min: 1000, key: 'rt2', glyph: '✦', color: '#cfd8ff', tint: 0xcfd8ff },
+  { min: 1150, key: 'rt3', glyph: '✦', color: '#ffd77a', tint: 0xffd77a },
+  { min: 1300, key: 'rt4', glyph: '★', color: '#ffe9a8', tint: 0xffe9a8 },
+  { min: 1450, key: 'rt5', glyph: '★', color: '#9fe8ff', tint: 0x9fe8ff },
+  { min: 1600, key: 'rt6', glyph: '✸', color: '#fff6d8', tint: 0xfff6d8 },
+];
+function ssRatingTier(r) { let t = SS_RATING_TIERS[0]; for (const x of SS_RATING_TIERS) if (r >= x.min) t = x; return t; }
 
 /* ============================================================
    Shared drawing helpers (textures + constellation rendering)
@@ -2080,6 +2131,76 @@ function ssAchToast(scene, def) {
   scene.tweens.add({ targets: c, alpha: 0, delay: 2600, duration: 400, onComplete: () => c.destroy() });
 }
 
+/* ---- the rating card: tap any stargazer's name, see their standing -------
+   One small window of sky: the name, the star-class glyph burning in its
+   tier's color over a breathing glow, the number in gold letterpress. Pass
+   {own:true} for yourself, {rating,rhide,name} when the numbers are already
+   in hand (versus room records), or {uid,name} to fetch the synced profile.
+   A player who veiled their rating shows as "veiled in starlight" to
+   everyone but themselves. Works in any scene that ran ssMakeTextures. */
+function ssRatingCard(scene, o) {
+  if (scene.__rcC && scene.__rcC.scene) return;   // one card at a time; a destroyed ref self-heals
+  scene.__rcC = null;
+  SFX.ui();
+  const l = ssLayout(scene);
+  const c = scene.__rcC = scene.add.container(0, 0).setDepth(950);
+  const close = () => { if (scene.__rcC !== c) return; scene.__rcC = null; c.destroy(); };
+  const veil = scene.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+  scene.tweens.add({ targets: veil, alpha: 0.6, duration: 180 });
+  veil.on('pointerdown', () => { SFX.ui(); close(); });
+  c.add(veil);
+  const PH = 250, py = (d) => l.y(400 - PH / 2 + d);
+  const items = [];
+  // the window swallows its own taps so a press inside never hits the veil
+  items.push(scene.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(300), l.u(PH)).setInteractive());
+  const own = !!o.own || (!!o.uid && o.uid === SSNET.uid());
+  const nm = ssTxt(scene, l.x(0), py(38), o.name || (own ? SSNET.myName() : '…'), l.u(16), '#f0e8d2').setOrigin(0.5);
+  while (nm.width > l.u(252) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+  items.push(nm);
+  items.push(scene.add.rectangle(l.x(0), py(60), l.u(240), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
+  const body = scene.add.container(0, 0);
+  items.push(body);
+  const fill = (rating, hidden) => {
+    if (scene.__rcC !== c || !body.scene) return;
+    if (hidden && !own) {
+      body.add(ssTxt(scene, l.x(0), py(118), '☾', l.u(30), '#5a6390').setOrigin(0.5).setAlpha(0.9));
+      body.add(ssTxt(scene, l.x(0), py(160), SS_T('rHiddenCard'), l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
+      return;
+    }
+    const tier = ssRatingTier(rating);
+    const g = scene.add.image(l.x(0), py(114), 'glowbig').setDisplaySize(l.u(160), l.u(160))
+      .setTint(tier.tint).setAlpha(0.13).setBlendMode('ADD');
+    body.add(g);
+    scene.tweens.add({ targets: g, alpha: 0.05, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    body.add(ssTxt(scene, l.x(0), py(96), tier.glyph, l.u(26), tier.color).setOrigin(0.5)
+      .setShadow(0, 0, tier.color, l.u(12), true, true));
+    const gk = ssGoldTex(scene, String(rating), 26);
+    body.add(scene.add.image(l.x(0), py(140), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
+    body.add(ssTxt(scene, l.x(0), py(176), '— ' + SS_T(tier.key) + ' —', l.u(12), tier.color).setOrigin(0.5)
+      .setShadow(0, 0, tier.color, l.u(6), true, true));
+    if (own && SS.prof.rhide) {
+      body.add(ssTxt(scene, l.x(0), py(204), '☾ ' + SS_T('rYourVeil'), l.u(9), '#5a6390', 'italic').setOrigin(0.5));
+    }
+  };
+  if (own) fill(SS.prof.rating, SS.prof.rhide);
+  else if (o.rating != null || !o.uid) fill(Number.isFinite(o.rating) ? o.rating : SS_RATING.BASE, !!o.rhide);
+  else {
+    const loadT = ssTxt(scene, l.x(0), py(130), SS_T('lbLoading'), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5);
+    body.add(loadT);
+    SSNET.dbGet('players/' + o.uid).catch(() => null).then((p) => {
+      if (scene.__rcC !== c || !loadT.scene) return;
+      loadT.destroy();
+      if (p && p.name && !o.name && nm.active) nm.setText(p.name);
+      fill(p && Number.isFinite(p.rating) ? p.rating : SS_RATING.BASE, !!(p && p.rhide));
+    });
+  }
+  c.add(items);
+  // entrance: the little window settles up into place like every other sheet
+  items.forEach((it) => { if (it !== body) it.y += l.u(12); it.alpha = 0; });
+  scene.tweens.add({ targets: items, alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+  scene.tweens.add({ targets: items.filter((it) => it !== body), y: '-=' + l.u(12), duration: 240, ease: 'Back.easeOut' });
+}
+
 /* Every DOM element the game floats above the canvas (rename input, seal-code
    input) goes through here. Phaser preventDefaults canvas touches, so tapping
    '‹ HOME' never blurs a focused input — left to its own devices the element
@@ -2308,6 +2429,27 @@ class Home extends Phaser.Scene {
     chip.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); SFX.ui(); this.scene.start('profile'); });
     chip.on('pointerover', () => chip.setScale(chip.scaleX * 1.04, chip.scaleY * 1.04));
     chip.on('pointerout', () => chip.setDisplaySize(l.u(CW), l.u(CH)));
+
+    // Star rating — the standing beside the stargazer's name: a small pill
+    // under the chip wearing the tier's glyph and color, the star-class named
+    // beneath it. Tap → your own rating card (always visible to yourself,
+    // veiled or not). Refreshed on wake — a battle can move the number.
+    const RW = 108, RH = 22;
+    const rpill = this.ratingPill = ui(this.add.image(l.x(195), l.y(52), ssBtn(this, true, RW, RH))
+      .setDisplaySize(l.u(RW), l.u(RH)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }));
+    this.ratingT = ui(ssTxt(this, l.x(195 - RW / 2), l.y(52), '', l.u(11), '#cfd8ff').setOrigin(0.5));
+    this.ratingTierT = ui(ssTxt(this, l.x(195), l.y(68), '', l.u(8.5), '#cfd8ff', 'italic').setOrigin(1, 0.5).setAlpha(0.85));
+    this.refreshRatingPill = () => {
+      if (!this.ratingT || !this.ratingT.active) return;
+      const tier = ssRatingTier(SS.prof.rating);
+      this.ratingT.setText(tier.glyph + ' ' + SS.prof.rating).setColor(tier.color)
+        .setShadow(0, 0, tier.color, l.u(5), true, true);
+      this.ratingTierT.setText(SS_T(tier.key)).setColor(tier.color);
+    };
+    this.refreshRatingPill();
+    rpill.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); ssRatingCard(this, { own: true }); });
+    rpill.on('pointerover', () => rpill.setScale(rpill.scaleX * 1.04, rpill.scaleY * 1.04));
+    rpill.on('pointerout', () => rpill.setDisplaySize(l.u(RW), l.u(RH)));
 
     // Daily hunt herald — a small red chip in the top-left corner, counting
     // tonight's sky down second by second. Alive while the hunt is unplayed
@@ -2573,8 +2715,10 @@ class Home extends Phaser.Scene {
         } else {
           rows.push(ssTxt(this, l.x(-146), y, '#' + (i + 1), l.u(11), '#8a94c4').setOrigin(0.5));
         }
-        const nm = ssTxt(this, l.x(-124), y, r.name, l.u(12.5), me ? '#ffe9a8' : '#e8e0c8').setOrigin(0, 0.5);
+        const nm = ssTxt(this, l.x(-124), y, r.name, l.u(12.5), me ? '#ffe9a8' : '#e8e0c8').setOrigin(0, 0.5)
+          .setInteractive({ useHandCursor: true });
         while (nm.width > l.u(190) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+        nm.on('pointerdown', () => ssRatingCard(this, { uid: r.id, name: r.name }));
         rows.push(nm);
         rows.push(ssTxt(this, l.x(146), y, String(r.score), l.u(13), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));
       });
@@ -2957,6 +3101,7 @@ class Home extends Phaser.Scene {
     if (this.campLabelT.active) this.campLabelT.setText(cr.label);
     if (this.campSubT.active) this.campSubT.setText(cr.sub);
     this.updateDailyChip();
+    if (this.refreshRatingPill) this.refreshRatingPill();   // the battle may have moved the number
     const l = ssLayout(this);
     if (this.ascVeil) {          // reduce-motion rise → reduce-motion return
       this.sky.setP(0, 0);
@@ -4008,6 +4153,13 @@ class Battle extends Phaser.Scene {
       SS.award('daily-devout', this.game);
       if (!SS.prof.daily[dk] || score > SS.prof.daily[dk]) SS.prof.daily[dk] = score;
     }
+    // the rating stirs: a win pays by mode, a mighty word pays a pinch — all
+    // through the PvE gate (daily cap + diminishing), so solo play can seed a
+    // rating but never inflate one past what versus supports
+    let rDelta = 0;
+    if (won) rDelta += SS_RATING.pve(this.mode === 'campaign' ? 10 : 5);
+    if (this.run.bigHit >= 60) rDelta += SS_RATING.pve(3);
+    else if (this.run.bigHit >= 40) rDelta += SS_RATING.pve(1);
     if (won) SS.prof.wins++;
     SS.save(); SS.sync();
     if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest);
@@ -4074,6 +4226,13 @@ class Battle extends Phaser.Scene {
     items.push(ssTxt(this, l.x(150), py(400), glyphs.length ? glyphs.join(' ') : '—', l.u(glyphs.length > 10 ? 12 : 14), '#d7b45c').setOrigin(1, 0.5)
       .setShadow(0, 0, '#c9b676', l.u(6), true, true));
 
+    // the rating readout — when the number moved, show it move
+    if (rDelta) {
+      const rTier = ssRatingTier(SS.prof.rating);
+      items.push(ssTxt(this, l.x(0), py(this.mode === 'daily' ? 421 : 428), '✦ +' + rDelta + '  ·  ' + SS.prof.rating + ' ' + SS_T(rTier.key), l.u(11), '#ffd77a').setOrigin(0.5)
+        .setShadow(0, 0, '#c9b676', l.u(6), true, true));
+    }
+
     let by = 470;
     if (this.mode === 'daily') {
       const share = this.add.image(l.x(0), py(452), ssBtn(this, true, 240, 44)).setDisplaySize(l.u(240), l.u(44)).setInteractive({ useHandCursor: true });
@@ -4122,7 +4281,7 @@ class Battle extends Phaser.Scene {
     });
 
     if (DEMO) {
-      localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, words: this.run.words, longest: this.run.longest, letters: this.run.letters, bigHit: this.run.bigHit, elapsed }));
+      localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, words: this.run.words, longest: this.run.longest, letters: this.run.letters, bigHit: this.run.bigHit, elapsed, rating: SS.prof.rating, rd: rDelta }));
       this.time.delayedCall(2500, () => again.emit('pointerdown'));
     }
   }
@@ -4216,6 +4375,17 @@ class Profile extends Phaser.Scene {
     this.nameT.on('pointerdown', () => this.editName(l));
 
     const p = SS.prof;
+
+    // the star rating, right under the name — tap it for your own card; the
+    // line below veils/unveils it from other stargazers (you always see yours)
+    const rTier = ssRatingTier(p.rating);
+    const ratingT = ssTxt(this, l.x(0), l.y(139), rTier.glyph + ' ' + p.rating + ' · ' + SS_T(rTier.key), l.u(12.5), rTier.color).setOrigin(0.5)
+      .setShadow(0, 0, rTier.color, l.u(6), true, true).setInteractive({ useHandCursor: true });
+    ratingT.on('pointerdown', () => ssRatingCard(this, { own: true }));
+    const veilT = ssTxt(this, l.x(0), l.y(156), '', l.u(8.5), '#5a6390', 'italic').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const dressVeil = () => veilT.setText(SS_T('rVeilRow') + ':  ' + (SS.prof.rhide ? '☾ ' + SS_T('rVeiled') : '✦ ' + SS_T('rShown')));
+    dressVeil();
+    veilT.on('pointerdown', () => { SFX.ui(); SS.prof.rhide = !SS.prof.rhide; SS.save(); SS.sync(); dressVeil(); });
     const rows = [
       ['runs begun', p.runs], ['runs won', p.wins], ['beasts felled', p.beasts],
       ['words woven', p.words], ['finest word', p.longest ? p.longest.toUpperCase() : '—'],
@@ -4377,7 +4547,10 @@ class Board extends Phaser.Scene {
       grp.push(ssTxt(this, l.x(P.dx), l.y(P.my), String(i + 1), l.u(P.r * 0.95), SS_MEDAL_INK[i]).setOrigin(0.5, 0.55));
       if (me) grp.push(ssTxt(this, l.x(P.dx), l.y(P.my - P.r - 14), '✦ ' + SS_T('lbYou') + ' ✦', l.u(10), '#ffe9a8').setOrigin(0.5)
         .setShadow(0, 0, '#c9b676', l.u(6), true, true));
-      grp.push(trim(ssTxt(this, l.x(P.dx), l.y(P.my + P.r + 15), r.name, l.u(i === 0 ? 13.5 : 12), me ? '#ffe9a8' : '#e8e0c8').setOrigin(0.5), 124));
+      const pnm = trim(ssTxt(this, l.x(P.dx), l.y(P.my + P.r + 15), r.name, l.u(i === 0 ? 13.5 : 12), me ? '#ffe9a8' : '#e8e0c8').setOrigin(0.5), 124)
+        .setInteractive({ useHandCursor: true });
+      pnm.on('pointerdown', () => ssRatingCard(this, { uid: r.id, name: r.name }));
+      grp.push(pnm);
       const gk = ssGoldTex(this, String(r.score), P.big);
       grp.push(this.add.image(l.x(P.dx), l.y(P.my + P.r + 37), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
       if (r.word) grp.push(trim(ssTxt(this, l.x(P.dx), l.y(P.my + P.r + 56), r.word, l.u(9), '#8a94c4', 'italic').setOrigin(0.5), 124));
@@ -4403,7 +4576,10 @@ class Board extends Phaser.Scene {
       grp.push(this.add.image(l.x(0), y, 'ribbon').setDisplaySize(l.u(384), l.u(34)));
       if (me) grp.push(this.add.rectangle(l.x(0), y, l.u(376), l.u(28), 0xd7b45c, 0.13));
       grp.push(ssTxt(this, l.x(-172), y, '#' + (k + 4), l.u(11), me ? '#ffd77a' : '#8a94c4').setOrigin(0, 0.5));
-      grp.push(trim(ssTxt(this, l.x(-140), y, r.name, l.u(13), me ? '#ffe9a8' : '#f0e8d2').setOrigin(0, 0.5), 176));
+      const rnm = trim(ssTxt(this, l.x(-140), y, r.name, l.u(13), me ? '#ffe9a8' : '#f0e8d2').setOrigin(0, 0.5), 176)
+        .setInteractive({ useHandCursor: true });
+      rnm.on('pointerdown', () => ssRatingCard(this, { uid: r.id, name: r.name }));
+      grp.push(rnm);
       if (r.word) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#5a6390', 'italic').setOrigin(0, 0.5));
       grp.push(ssTxt(this, l.x(172), y, String(r.score), l.u(13.5), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));
       ent.push(...grp);
@@ -4418,7 +4594,10 @@ class Board extends Phaser.Scene {
         grp.push(this.add.image(l.x(0), y, 'ribbon').setDisplaySize(l.u(384), l.u(34)));
         grp.push(this.add.rectangle(l.x(0), y, l.u(376), l.u(28), 0xd7b45c, 0.13));
         grp.push(ssTxt(this, l.x(-172), y, '#' + (b.me + 1), l.u(11), '#ffd77a').setOrigin(0, 0.5));
-        grp.push(trim(ssTxt(this, l.x(-130), y, r.name, l.u(13), '#ffe9a8').setOrigin(0, 0.5), 166));
+        const ynm = trim(ssTxt(this, l.x(-130), y, r.name, l.u(13), '#ffe9a8').setOrigin(0, 0.5), 166)
+          .setInteractive({ useHandCursor: true });
+        ynm.on('pointerdown', () => ssRatingCard(this, { own: true }));
+        grp.push(ynm);
         if (r.word) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#8a94c4', 'italic').setOrigin(0, 0.5));
         grp.push(ssTxt(this, l.x(172), y, String(r.score), l.u(13.5), '#ffe9a8').setOrigin(1, 0.5));
       }

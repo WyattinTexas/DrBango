@@ -22,6 +22,14 @@ const VSDEMO = QS.get('vsdemo') === '1';
 const MPUID = QS.get('mpuid');
 const vsUid = () => (MPUID ? 'test_' + MPUID : SSNET.uid());
 const vsName = () => (MPUID ? 'Wisp ' + MPUID.toUpperCase() : SSNET.myName());
+// every seat carries its rating into the room: the Elo exchange at the end
+// reads the rival's number from here, and rhide keeps a veiled rating out of
+// the opponent's VIEW (the math still needs the true value — client-
+// authoritative, same caveat as every score in this game)
+const vsSeat = (seat) => ({
+  name: vsName(), hp: VS_HP, seat, casts: 0, dealt: 0, gone: false, joinedAt: Date.now(),
+  rating: SS.prof.rating, rhide: SS.prof.rhide ? 1 : 0,
+});
 
 /* ============================================================
    Menu — pick a mode, quick-match or join by seal code
@@ -116,7 +124,7 @@ async function vsQuickMatch(mode) {
     await SSNET.dbSet('mp/rooms/' + code, {
       mode, status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
       seed: Math.floor(Math.random() * 1e9),
-      players: { [vsUid()]: { name: vsName(), hp: VS_HP, seat: 0, casts: 0, dealt: 0, gone: false, joinedAt: Date.now() } },
+      players: { [vsUid()]: vsSeat(0) },
     });
     return code;
   } catch (e) { return null; }
@@ -132,7 +140,7 @@ async function vsJoinRoom(code) {
       const seats = Object.values(players).map((p) => p.seat);
       let seat = 0;
       while (seats.includes(seat)) seat++;
-      players[vsUid()] = { name: vsName(), hp: VS_HP, seat, casts: 0, dealt: 0, gone: false, joinedAt: Date.now() };
+      players[vsUid()] = vsSeat(seat);
       return { ...cur, players };
     });
     return !!(r.value && r.value.players && r.value.players[vsUid()]);
@@ -195,7 +203,20 @@ class VsBattle extends Phaser.Scene {
     this.headT = txt(l.x(0), l.y(24), 'SEAL ' + this.code, 14, '#c9b676').setOrigin(0.5);
     this.clockT = txt(l.x(190), l.y(24), '', 15, '#ffe9a8').setOrigin(1, 0.5);
     const back = txt(l.x(-195), l.y(24), '‹', 22, '#5a6390').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-    back.on('pointerdown', () => { SFX.ui(); this.scene.start('vsmenu'); });
+    back.on('pointerdown', () => {
+      SFX.ui();
+      // deserting a live battle settles as a loss — fleeing can't dodge the
+      // Elo exchange (endBattle never runs for a seat that walked out)
+      if (this.room && this.room.status === 'active' && this.state !== 'done') {
+        const foes = Object.entries(this.room.players || {}).filter(([id]) => id !== vsUid()).map(([, p]) => p);
+        if (foes.length) {
+          const oppAvg = foes.reduce((a, p) => a + (Number.isFinite(p.rating) ? p.rating : SS_RATING.BASE), 0) / foes.length;
+          SS_RATING.duel(oppAvg, 0);
+          SS.save(); SS.sync();
+        }
+      }
+      this.scene.start('vsmenu');
+    });
 
     this.oppC = this.add.container(0, 0);          // opponents row
     this.turnT = txt(l.x(0), l.y(320), '', 14, '#ffe9a8').setOrigin(0.5);
@@ -389,7 +410,13 @@ class VsBattle extends Phaser.Scene {
       const c = this.add.container(l.x(cx), l.y(cy));
       const av = this.add.container(n === 1 ? -l.u(120) : -l.u(60), 0);
       ssAssembleBeast(this, av, SS_BEASTS[VS_EMBLEMS[p.seat % VS_EMBLEMS.length]], l.u(n === 1 ? 0.35 : 0.2));
-      const nm = ssTxt(this, l.u(n === 1 ? -40 : -30), -l.u(22), p.name, l.u(n === 1 ? 15 : 12), '#f0e8d2').setOrigin(0, 0.5);
+      // the rival's star-class glyph rides beside the name (veiled ratings show
+      // no glyph); tapping the name opens their rating card from the room record
+      const hidden = !!p.rhide;
+      const pr = Number.isFinite(p.rating) ? p.rating : SS_RATING.BASE;
+      const nm = ssTxt(this, l.u(n === 1 ? -40 : -30), -l.u(22), (hidden ? '' : ssRatingTier(pr).glyph + ' ') + p.name, l.u(n === 1 ? 15 : 12), '#f0e8d2').setOrigin(0, 0.5)
+        .setInteractive({ useHandCursor: true });
+      nm.on('pointerdown', () => ssRatingCard(this, { name: p.name, rating: pr, rhide: hidden }));
       const barBg = this.add.rectangle(l.u(n === 1 ? -40 : -30), 0, l.u(n === 1 ? 200 : 110), l.u(8), 0x1a2038).setOrigin(0, 0.5);
       const bar = this.add.rectangle(l.u(n === 1 ? -40 : -30), 0, l.u(n === 1 ? 200 : 110), l.u(8), 0xe66a6a).setOrigin(0, 0.5);
       const sub = ssTxt(this, l.u(n === 1 ? -40 : -30), l.u(20), '', l.u(10), '#8a94c4', 'italic').setOrigin(0, 0.5);
@@ -696,6 +723,17 @@ class VsBattle extends Phaser.Scene {
     const won = this.room.winnerUid === vsUid();
     const winner = this.room.players[this.room.winnerUid];
     if (won) { SFX.victory(); SS.prof.wins++; SS.prof.vsWins++; } else SFX.defeat();
+    // the rating exchange — Elo against the field's average, each client
+    // settling its own ledger from the same room record (so a duel's two
+    // deltas mirror). No winner (everyone faded) = no exchange.
+    let rd = 0;
+    if (this.room.winnerUid) {
+      const foes = Object.entries(this.room.players || {}).filter(([id]) => id !== vsUid()).map(([, p]) => p);
+      if (foes.length) {
+        const oppAvg = foes.reduce((a, p) => a + (Number.isFinite(p.rating) ? p.rating : SS_RATING.BASE), 0) / foes.length;
+        rd = SS_RATING.duel(oppAvg, won ? 1 : 0);
+      }
+    }
     SS.prof.runs++; SS.save(); SS.sync();
     if (won) {
       SS.award('rival-star', this.game);
@@ -708,6 +746,11 @@ class VsBattle extends Phaser.Scene {
     items.push(ssTxt(this, l.x(0), l.y(330), winner ? winner.name + ' stands alone beneath the stars' : 'the night ends quietly', l.u(13), '#d8d2bd', 'italic').setOrigin(0.5).setDepth(151));
     const me = this.me() || {};
     items.push(ssTxt(this, l.x(0), l.y(380), 'damage dealt  ' + (me.dealt | 0) + '   ·   words  ' + (me.casts | 0), l.u(13), '#8a94c4').setOrigin(0.5).setDepth(151));
+    if (rd !== 0) {
+      const rTier = ssRatingTier(SS.prof.rating);
+      items.push(ssTxt(this, l.x(0), l.y(408), '✦ ' + (rd > 0 ? '+' : '') + rd + '  ·  ' + SS.prof.rating + ' ' + SS_T(rTier.key), l.u(12), rd > 0 ? '#ffd77a' : '#c98080').setOrigin(0.5).setDepth(151)
+        .setShadow(0, 0, rd > 0 ? '#c9b676' : '#802020', l.u(6), true, true));
+    }
     this.rematchB = this.add.image(l.x(0), l.y(455), ssBtn(this, false, 240, 56)).setDisplaySize(l.u(240), l.u(56)).setInteractive({ useHandCursor: true }).setDepth(151);
     this.rematchT = ssTxt(this, l.x(0), l.y(455), '⚔ REMATCH', l.u(16), BTN_INK()).setOrigin(0.5).setDepth(151);
     this.rematchB.on('pointerdown', () => { SFX.ui(); this.doRematch(); });
@@ -718,7 +761,7 @@ class VsBattle extends Phaser.Scene {
     this.overlayC.add(items);
     if (this.room.rematch) this.showRematchCall();
     if (VSDEMO) {
-      localStorage.setItem('beta3.vsresult', JSON.stringify({ won, mode: this.room.mode, dealt: me.dealt | 0, casts: me.casts | 0, rematch: !!window.__VSDEMO_REMATCHED, t: Date.now() }));
+      localStorage.setItem('beta3.vsresult', JSON.stringify({ won, mode: this.room.mode, dealt: me.dealt | 0, casts: me.casts | 0, rematch: !!window.__VSDEMO_REMATCHED, rating: SS.prof.rating, rd, t: Date.now() }));
       if (!window.__VSDEMO_REMATCHED) {
         window.__VSDEMO_REMATCHED = true;
         this.time.delayedCall(2000 + Math.random() * 2000, () => { if (this.scene.isActive()) this.doRematch(); });
@@ -743,7 +786,7 @@ class VsBattle extends Phaser.Scene {
         await SSNET.dbSet('mp/rooms/' + code, {
           mode: this.room.mode, status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
           seed: Math.floor(Math.random() * 1e9),
-          players: { [vsUid()]: { name: vsName(), hp: VS_HP, seat: 0, casts: 0, dealt: 0, gone: false, joinedAt: Date.now() } },
+          players: { [vsUid()]: vsSeat(0) },
         });
         // one rematch room per battle — a transaction settles simultaneous pressers
         const r = await SSNET.dbTxn('mp/rooms/' + this.code + '/rematch', (cur) => (cur == null ? code : undefined));
