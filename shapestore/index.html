@@ -26,7 +26,7 @@ button.gold{background:var(--gold); color:#2A2010; font-weight:bold;}
 button.gold:hover{background:#E8B856;}
 button.danger{background:#6E3028;}
 input[type=text],select{background:#161B10; color:var(--cream); border:1px solid #4A5740; border-radius:6px; padding:5px 8px; font-size:13px;}
-input[type=range]{accent-color:var(--gold);}
+input[type=range]{accent-color:var(--gold); touch-action:none;} /* r9: touch-action none or the panel's scroll steals slider drags on iOS */
 /* ---- round 8: the big top bar died. #dockT = ONE slim tool row; the save/
    gallery/export/lessons/help crowd moved into #dockM, the top-right corner
    panel whose handle is the GAME'S ICON half on-screen (the TG menu globe). */
@@ -151,6 +151,14 @@ body.outT #hotT, body.outL #hotL, body.outR #hotR, body.outB #hotB{display:none;
 .fam small{font-size:8px; letter-spacing:1px; color:#8A8A72; white-space:nowrap;}
 .pc{width:22px; height:22px; border-radius:6px; cursor:pointer; border:2px solid #0008;}
 .pc:hover{transform:scale(1.15);}
+/* r9: the paint mixer — replaces the native color input (WKWebView never opens one) */
+.pickbox{max-width:432px; padding:14px 18px;}
+.pickbox h2{font-size:17px;}
+#pkGrid,#pkRecent{display:grid; grid-template-columns:repeat(12,1fr); gap:4px;}
+.pk{aspect-ratio:1/1; border-radius:6px; border:2px solid #0006; cursor:pointer; min-width:0;}
+.pk.on{border-color:#fff; box-shadow:0 0 0 2px var(--gold);}
+#pkRecent{display:none; margin-bottom:4px;}
+#pkRecent.has{display:grid;}
 /* modals */
 .modal{position:fixed; inset:0; background:#000A; display:none; place-items:center; z-index:50; padding:16px;}
 .modal.on{display:grid;}
@@ -307,6 +315,18 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
     <button class="gold" onclick="copyCode()">COPY CODE</button>
     <button onclick="closeModals()">CLOSE</button>
   </div>
+</div></div>
+
+<div class="modal" id="pickModal"><div class="mbox pickbox">
+  <h2 style="margin:0 0 8px">🎨 PAINT ANYTHING</h2>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+    <span id="pkCur" class="cwell" style="width:38px;height:38px;flex:none"></span>
+    <span style="font-size:12px;color:#B8B49E">Tap paints — it tries them on right away.</span>
+    <span class="spacer"></span>
+    <button class="gold" onclick="closeModals()">DONE</button>
+  </div>
+  <div id="pkRecent"></div>
+  <div id="pkGrid"></div>
 </div></div>
 
 <div class="modal" id="tutModal"><div class="mbox">
@@ -774,6 +794,9 @@ function drawOverlay(){
   const s=getSel(); if(!s) return;
   const node=svg.querySelector('[data-top="'+s.id+'"]'); if(!node) return;
   let bb; try{ bb=node.getBBox(); }catch(e){ return; }
+  /* r9: WebKit gives hidden/empty nodes a 0×0 bbox instead of throwing — never
+     draw a tiny ghost box around art that isn't painting (Wyatt's iPhone bug) */
+  if(s.hide || (bb.width<0.01 && bb.height<0.01)) return;
   const o=elNS('g'); o.id='ovl'; o.setAttribute('transform',userT(s)); o.setAttribute('pointer-events','none');
   const px=1/(fitZ*userZ*(s.scale||1));
   const rect=elNS('rect');
@@ -806,6 +829,11 @@ function drawOverlay(){
 }
 function getSel(){ return DOC.shapes.find(s=>s.id===selT)||null; }
 function getSelChild(){ const s=getSel(); if(!s||s.t!=='group'||!selC) return null; return s.kids.find(k=>k.id===selC)||null; }
+/* r9: selection changes redraw ONLY the overlay + side panels. A full render()
+   mid-pointerdown rebuilds the svg and destroys the finger's own target — iOS
+   WebKit then cancels the touch, its pointerup is never delivered, and the
+   pinch ledger jams a stale finger that eats every later tap. */
+function renderSel(){ drawOverlay(); renderLayers(); renderProps(); }
 
 /* ---- undo ---- */
 function pushUndo(){ undoStack.push(JSON.stringify(DOC)); if(undoStack.length>60) undoStack.shift(); redoStack.length=0; }
@@ -1041,6 +1069,8 @@ function toBoard(e){
 }
 svg.addEventListener('pointerdown',e=>{
   const p=toBoard(e);
+  /* r9: sweep a half-stroke whose finger was lost (its pointerup never came) */
+  if(e.isPrimary&&drawPts){ if(drawEl) drawEl.remove(); drawPts=null; drawEl=null; }
   if(TOOL==='draw'){
     drawPts=[p];
     drawEl=elNS('path');
@@ -1081,10 +1111,10 @@ svg.addEventListener('pointerdown',e=>{
       else selC=null;
     }
     drag={kind:'move', s, child, start:p, sx:child?child.x:s.x, sy:child?child.y:s.y, pushed:false};
-    try{svg.setPointerCapture(e.pointerId);}catch(_){} render(); e.preventDefault();
+    try{svg.setPointerCapture(e.pointerId);}catch(_){} renderSel(); e.preventDefault();   // r9: NEVER rebuild the svg under a live finger
   } else {
     if(selT) lastDesel={id:selT, c:selC, t:performance.now()};   // round 8: a pinch right after may claim it back
-    selT=null; selC=null; lastTap={t:0,x:0,y:0,id:null}; render();
+    selT=null; selC=null; lastTap={t:0,x:0,y:0,id:null}; renderSel();
   }
 });
 let lastTap={t:0,x:0,y:0,id:null};
@@ -1097,7 +1127,7 @@ svg.addEventListener('dblclick',e=>{
     const ke=e.target.closest('g[data-kid]');
     selC=ke? ke.getAttribute('data-kid') : null;
   }
-  render();
+  renderSel();
 });
 svg.addEventListener('pointermove',e=>{
   if(drawPts){
@@ -1155,13 +1185,18 @@ let PINCH=null, lastDesel=null;
 function pinchDist(){ const a=[...PTRS.values()]; return Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1; }
 function pinchMid(){ const a=[...PTRS.values()]; return {clientX:(a[0].x+a[1].x)/2, clientY:(a[0].y+a[1].y)/2}; }
 svg.addEventListener('pointerdown',e=>{
+  /* r9: a fresh FIRST finger proves nothing else is truly down. iOS loses
+     pointerups (app switch, system sheets, notification pulls) and a stale
+     ledger entry makes every later tap read as "finger two" — the board goes
+     dead until reload. A primary pointerdown wipes the slate. */
+  if(e.isPrimary){ PTRS.clear(); PINCH=null; drag=null; }
   PTRS.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(PTRS.size!==2) return;
   e.preventDefault(); e.stopPropagation();          // the single-finger machine never sees finger two
   if(drawPts){ if(drawEl) drawEl.remove(); drawPts=null; drawEl=null; }
   drag=null;
   let s=getSel();
-  if(!s&&lastDesel&&performance.now()-lastDesel.t<350){ selT=lastDesel.id; selC=lastDesel.c; s=getSel()||null; if(s) render(); }
+  if(!s&&lastDesel&&performance.now()-lastDesel.t<350){ selT=lastDesel.id; selC=lastDesel.c; s=getSel()||null; if(s) renderSel(); }   // r9: no svg rebuild under live fingers
   if(s){
     const node=svg.querySelector('[data-top="'+s.id+'"]');
     let bb; try{ bb=node.getBBox(); }catch(_){ PINCH=null; return; }
@@ -1193,12 +1228,17 @@ svg.addEventListener('pointermove',e=>{
 },true);
 window.addEventListener('pointerup',e=>{
   PTRS.delete(e.pointerId);
-  if(PINCH&&PTRS.size<2){ const was=PINCH; PINCH=null; if(was.mode==='obj') render(); }
+  if(PINCH&&PTRS.size<2){ const was=PINCH; PINCH=null; if(was.mode==='obj') renderSel(); }   // r9: the other finger may still be down — no rebuild
 },true);
 window.addEventListener('pointercancel',e=>{
   PTRS.delete(e.pointerId);
-  if(PINCH&&PTRS.size<2){ const was=PINCH; PINCH=null; if(was.mode==='obj') render(); }
+  if(PINCH&&PTRS.size<2){ const was=PINCH; PINCH=null; if(was.mode==='obj') renderSel(); }
 },true);
+/* r9: leaving the app mid-touch (home swipe, app switch, TestFlight sheet)
+   loses the pointerup — wipe the gesture state so the board never jams */
+function clearGesture(){ PTRS.clear(); PINCH=null; drag=null; if(drawEl) drawEl.remove(); drawPts=null; drawEl=null; }
+window.addEventListener('blur',clearGesture);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearGesture(); });
 function renderLive(){
   /* light update: just transforms + overlay */
   const s=getSel(); if(!s) return;
@@ -1286,8 +1326,8 @@ function renderProps(){
       +'<button onclick="setAttrColor(\'fill\',\'none\')" style="font-size:10px">none</button></div>';
     h+='<div class="row"><label>Line</label><span class="cwell" id="strokeWell" style="background:'+(stroke==='none'?'transparent':esc(stroke))+'"></span>'
       +'<button onclick="setAttrColor(\'stroke\',\'none\')" style="font-size:10px">none</button>'
-      +'<input type="range" min="0" max="16" step="0.5" value="'+(parseFloat(o.attrs['stroke-width'])||0)+'" style="width:70px" oninput="setSW(this.value)"></div>';
-    h+='<div class="row"><label>See-thru</label><input type="range" min="0.1" max="1" step="0.05" value="'+(o.attrs.opacity!=null?o.attrs.opacity:1)+'" style="width:90px" oninput="setOp(this.value)"></div>';
+      +'<input id="swR" type="range" min="0" max="16" step="0.5" value="'+(parseFloat(o.attrs['stroke-width'])||0)+'" style="width:70px" oninput="setSW(this.value)" onchange="slDone()"></div>';
+    h+='<div class="row"><label>See-thru</label><input id="opR" type="range" min="0.1" max="1" step="0.05" value="'+(o.attrs.opacity!=null?o.attrs.opacity:1)+'" style="width:90px" oninput="setOp(this.value)" onchange="slDone()"></div>';
   }
   h+='<div class="row" style="margin-top:10px">'
     +'<button class="gold" onclick="keepAsShape()">⭐ KEEP</button>'
@@ -1301,6 +1341,7 @@ function renderProps(){
   if(gw) gw.querySelectorAll('.sw').forEach(sw=>{ sw.onclick=()=>{ paintTarget=sw.getAttribute('data-c'); renderProps(); }; });
   const fw=el.querySelector('#fillWell'); if(fw) fw.onclick=()=>pickColor(c=>setAttrColor('fill',c), (ch||s).attrs.fill);
   const sw2=el.querySelector('#strokeWell'); if(sw2) sw2.onclick=()=>pickColor(c=>setAttrColor('stroke',c), (ch||s).attrs.stroke);
+  el.querySelectorAll('input[type=range]').forEach(tameSlider);   // r9: pointer-driven, iOS-proof
 }
 function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
 function setAttrColor(key,val){
@@ -1309,14 +1350,85 @@ function setAttrColor(key,val){
   pushUndo(); o.attrs[key]=val; if(val!=='none') lastColor=val;
   render();
 }
-function setSW(v){ const o=getSelChild()||(getSel()&&getSel().t==='raw'?getSel():null); if(!o) return; o.attrs['stroke-width']=v; if(!o.attrs.stroke||o.attrs.stroke==='none') o.attrs.stroke=lastColor; render(); }
-function setOp(v){ const o=getSelChild()||(getSel()&&getSel().t==='raw'?getSel():null); if(!o) return; o.attrs.opacity=v; render(); }
-/* hidden color wheel */
-const cpick=document.createElement('input'); cpick.type='color'; cpick.style.position='fixed'; cpick.style.left='-100px'; document.body.appendChild(cpick);
+/* r9: sliders must NEVER rebuild the panel mid-drag — the drag dies with the
+   node on iOS (one notch, then dead). Patch the DOC *and* the live SVG
+   attribute; the release (change) does one honest render(). */
+let slUndo=false;
+function liveAttr(key,val,alsoStroke){
+  const s=getSel(); const o=getSelChild()||(s&&s.t==='raw'?s:null); if(!o) return;
+  if(!slUndo){ pushUndo(); slUndo=true; }
+  o.attrs[key]=String(val);
+  if(alsoStroke&&(!o.attrs.stroke||o.attrs.stroke==='none')) o.attrs.stroke=lastColor;
+  const top=svg.querySelector('[data-top="'+s.id+'"]');
+  const kid=top&&top.querySelector('[data-kid="'+o.id+'"]');
+  const node=kid&&(kid.querySelector(o.tag)||kid.firstElementChild);
+  if(node){ node.setAttribute(key,o.attrs[key]); if(alsoStroke) node.setAttribute('stroke',o.attrs.stroke); }
+  clearTimeout(render._t); render._t=setTimeout(()=>{try{localStorage.setItem('ss.cur',JSON.stringify(DOC));}catch(e){}},400);
+}
+function setSW(v){ liveAttr('stroke-width',v,true); }
+function setOp(v){ liveAttr('opacity',v); }
+function slDone(){ if(!slUndo) return; slUndo=false; render(); }
+/* r9: iOS-proof slider driving — the pointer does the work (tap lands the
+   thumb, drags glide, capture holds the finger even off the strip), so panel
+   scroll and finicky native thumbs can't eat the gesture. */
+function tameSlider(el){
+  el.addEventListener('pointerdown',ps=>{
+    ps.preventDefault(); ps.stopPropagation();
+    try{ el.setPointerCapture(ps.pointerId); }catch(_){}
+    try{ el.focus({preventScroll:true}); }catch(_){}
+    const min=+el.min||0, max=+el.max===0?0:(+el.max||100), st=+el.step||1;
+    const dec=(String(st).split('.')[1]||'').length;
+    const drive=ev=>{
+      const r=el.getBoundingClientRect();
+      let v=min+(max-min)*Math.min(1,Math.max(0,(ev.clientX-r.left-8)/Math.max(1,r.width-16)));
+      v=+(Math.round(v/st)*st).toFixed(dec);
+      if(String(v)!==el.value){ el.value=v; el.dispatchEvent(new Event('input',{bubbles:false})); }
+    };
+    drive(ps);
+    const mv=e2=>{ if(e2.pointerId===ps.pointerId) drive(e2); };
+    const up=e2=>{ if(e2.pointerId!==ps.pointerId) return;
+      el.removeEventListener('pointermove',mv); el.removeEventListener('pointerup',up); el.removeEventListener('pointercancel',up);
+      el.dispatchEvent(new Event('change',{bubbles:false})); };
+    el.addEventListener('pointermove',mv); el.addEventListener('pointerup',up); el.addEventListener('pointercancel',up);
+  });
+}
+/* r9: THE PAINT MIXER — the native <input type=color> never opens inside the
+   iOS shell (WKWebView has no color panel; desktop was fine, the app wasn't).
+   Tap-only mixer: grays + 12 hues × 5 shades + your recent paints; every tap
+   paints live through the same callback the old wheel used. */
+let pkCB=null;
+function hslHex(h,s,l){
+  s/=100; l/=100;
+  const a=s*Math.min(l,1-l);
+  const f=n=>{ const k=(n+h/30)%12; const c=l-a*Math.max(-1,Math.min(k-3,Math.min(9-k,1))); return Math.round(255*c).toString(16).padStart(2,'0'); };
+  return '#'+f(0)+f(8)+f(4);
+}
+function pkChip(c){ return '<div class="pk" data-c="'+c+'" style="background:'+c+'"></div>'; }
+function buildPicker(){
+  let h='';
+  for(let i=0;i<12;i++){ const v=Math.round(255-i*255/11).toString(16).padStart(2,'0'); h+=pkChip('#'+v+v+v); }
+  for(const l of [84,68,54,40,27]) for(let i=0;i<12;i++) h+=pkChip(hslHex(i*30,82,l));
+  $('pkGrid').innerHTML=h;
+  $('pickModal').addEventListener('click',e=>{
+    const el=e.target.closest('.pk'); if(!el||!pkCB) return;
+    const c=el.getAttribute('data-c');
+    $('pickModal').querySelectorAll('.pk.on').forEach(x=>x.classList.remove('on'));
+    el.classList.add('on');
+    $('pkCur').style.background=c;
+    try{ let r=JSON.parse(localStorage.getItem('ss.recent')||'[]'); r=[c,...r.filter(x=>x!==c)].slice(0,12); localStorage.setItem('ss.recent',JSON.stringify(r)); }catch(_){}
+    pkCB(c);
+    if(DK.cur) dockOut(DK.cur);   // keep the PIECES drawer awake while mixing
+  });
+}
 function pickColor(cb,cur){
-  if(cur&&/^#([0-9a-f]{6})$/i.test(cur)) cpick.value=cur;
-  cpick.oninput=()=>cb(cpick.value);
-  cpick.click();
+  pkCB=cb;
+  $('pkCur').style.background=(cur&&cur!=='none')?cur:'#F6F1E2';
+  $('pickModal').querySelectorAll('.pk.on').forEach(x=>x.classList.remove('on'));
+  if(cur){ const m=$('pickModal').querySelector('.pk[data-c="'+String(cur).toLowerCase()+'"]'); if(m) m.classList.add('on'); }
+  let r=[]; try{ r=JSON.parse(localStorage.getItem('ss.recent')||'[]'); }catch(_){}
+  $('pkRecent').innerHTML=r.map(pkChip).join('');
+  $('pkRecent').classList.toggle('has',r.length>0);
+  $('pickModal').classList.add('on');
 }
 /* apply a chosen paint chip */
 function paintWith(color){
@@ -1614,13 +1726,15 @@ function dockOut(k){
 // freshen; anywhere else = tuck away — and that press still does its own job.
 window.addEventListener('pointerdown',e=>{
   if(!DK.cur) return;
+  if(document.querySelector('.modal.on')) return;   // r9: pressing inside a modal never re-files the drawers
   const t=e.target, d=dockEl(DK.cur);
   if(t&&d&&d.contains(t)){ dockOut(DK.cur); return; }
   dockOut(null);
 },true);
 
 /* ---- boot ---- */
-buildPalette(); buildStamps(); renderMyGrid();
+buildPalette(); buildStamps(); renderMyGrid(); buildPicker();
+tameSlider($('penR'));   // r9: the pen slider gets the same pointer driving
 $('mchipImg').src=moldThumb(M.rex,'0 0 140 140');   // the corner coin wears the game's own face
 (function(){
   try{
