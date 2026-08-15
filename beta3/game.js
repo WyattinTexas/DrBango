@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.31.0';
+const BUILD = 'STARSPELL v0.31.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -4748,7 +4748,9 @@ class Battle extends Phaser.Scene {
     else if (this.run.bigHit >= 40) rDelta += SS_RATING.pve(1);
     if (won) SS.prof.wins++;
     SS.save(); SS.sync();
-    if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest, PACK.lang);
+    // mode rides along: only daily runs may land on the daily board (the
+    // weekly takes any run; campaign still only when the whole climb is won)
+    if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest, PACK.lang, this.mode);
 
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();

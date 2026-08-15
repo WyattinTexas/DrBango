@@ -174,14 +174,20 @@ const SSNET = (() => {
   function dailyPath(lang) {
     return 'daily/' + dayKey() + (lang && lang !== 'en' ? '-' + lang : '');
   }
-  async function submitScore(score, finestWord, lang) {
+  // mode is the run's mode ('quick'|'daily'|'campaign'). The DAILY board is
+  // the daily hunt's own ledger — only daily-mode runs may touch it (quick
+  // and campaign runs used to bleed in here and bury the real hunters). The
+  // weekly board stays all-modes on purpose: it ranks the week's best single
+  // runs wherever they were earned. Both are max-only transactions — a new
+  // score only ever replaces a lower one, never adds.
+  async function submitScore(score, finestWord, lang, mode) {
     const rec = (cur) => {
       if (cur && cur.score >= score) return cur;
-      return { name: myName(), score, word: (finestWord || '').toUpperCase(), at: Date.now() };
+      return { name: myName(), score, word: (finestWord || '').toUpperCase(), at: Date.now(), m: mode || 'quick' };
     };
     const me = uid();
     try {
-      await dbTxn(dailyPath(lang) + '/' + me, rec);
+      if (mode === 'daily') await dbTxn(dailyPath(lang) + '/' + me, rec);
       await dbTxn('weekly/' + weekKey() + '/' + me, rec);
     } catch (e) { }
   }
@@ -210,9 +216,17 @@ const SSNET = (() => {
 
   async function getBoard(kind, lang) {
     pruneBoards();
-    const path = kind === 'weekly' ? 'weekly/' + weekKey() : dailyPath(lang);
+    const daily = kind !== 'weekly';
+    const path = daily ? dailyPath(lang) : 'weekly/' + weekKey();
     const all = (await dbGet(path).catch(() => null)) || {};
     const rows = Object.entries(all)
+      // The daily board shows ONLY rows stamped m:'daily'. Belt to the write
+      // gate's suspenders: clients running cached pre-v0.31.1 code still
+      // submit quick/campaign runs here for a while after deploy, and their
+      // unstamped rows must stay invisible. (Today's board was hand-migrated
+      // at deploy; older unstamped boards are never read — dailyPath is
+      // always today's.)
+      .filter(([, r]) => !daily || (r && r.m === 'daily'))
       .map(([id, r]) => ({ id, name: r.name || '???', score: r.score | 0, word: r.word || '', at: r.at }))
       .sort((a, b) => b.score - a.score);
     const meIdx = rows.findIndex((r) => r.id === uid());
