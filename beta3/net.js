@@ -167,14 +167,21 @@ const SSNET = (() => {
   }
 
   // ---- leaderboards ----
-  async function submitScore(score, finestWord) {
+  // The daily board is per gameplay language — different bags deal different
+  // skies, so scores only compete within one tongue ('20260815' stays the
+  // English board, '20260815-es' is the Spanish one). The weekly board stays
+  // global: it ranks whole runs, not a shared board.
+  function dailyPath(lang) {
+    return 'daily/' + dayKey() + (lang && lang !== 'en' ? '-' + lang : '');
+  }
+  async function submitScore(score, finestWord, lang) {
     const rec = (cur) => {
       if (cur && cur.score >= score) return cur;
       return { name: myName(), score, word: (finestWord || '').toUpperCase(), at: Date.now() };
     };
     const me = uid();
     try {
-      await dbTxn('daily/' + dayKey() + '/' + me, rec);
+      await dbTxn(dailyPath(lang) + '/' + me, rec);
       await dbTxn('weekly/' + weekKey() + '/' + me, rec);
     } catch (e) { }
   }
@@ -194,15 +201,16 @@ const SSNET = (() => {
       const dayCut = dayKey(new Date(Date.now() - 2 * 86400000));       // numeric YYYYMMDD
       const weekCut = weekKey(new Date(Date.now() - 7 * 86400000));     // 'YYYY-Www' sorts lexically
       const days = (await dbGet('daily').catch(() => null)) || {};
-      for (const k of Object.keys(days)) if (Number(k) < dayCut) dbSet('daily/' + k, null).catch(() => { });
+      // keys may carry a language suffix ('20260815-es') — compare on the date
+      for (const k of Object.keys(days)) if (Number(String(k).slice(0, 8)) < dayCut) dbSet('daily/' + k, null).catch(() => { });
       const weeks = (await dbGet('weekly').catch(() => null)) || {};
       for (const k of Object.keys(weeks)) if (k < weekCut) dbSet('weekly/' + k, null).catch(() => { });
     } catch (e) { }
   }
 
-  async function getBoard(kind) {
+  async function getBoard(kind, lang) {
     pruneBoards();
-    const path = kind === 'weekly' ? 'weekly/' + weekKey() : 'daily/' + dayKey();
+    const path = kind === 'weekly' ? 'weekly/' + weekKey() : dailyPath(lang);
     const all = (await dbGet(path).catch(() => null)) || {};
     const rows = Object.entries(all)
       .map(([id, r]) => ({ id, name: r.name || '???', score: r.score | 0, word: r.word || '', at: r.at }))

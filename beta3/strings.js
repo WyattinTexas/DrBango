@@ -72,6 +72,7 @@ const SS_STR = {
     smJoining: 'answering the summons…', smCold: 'that seal has gone cold — the duel is over or full', frAdded: '✦ %1 is now your friend',
     frLinkTitle: 'a friend joins your sky', vsFriendsOn: '✦ %1 of your friends online', endAddFriend: '✦ ADD %1 AS A FRIEND',
     endFriends: '✦ FRIENDS ✦',
+    vsLang: '⚔ this duel is woven in %1',
     // sigil names/descs come from data.js in English; other languages carry a `sig` map
     // zodiac titles/descs come from data.js in English; other languages carry a `zod` map
   },
@@ -149,6 +150,7 @@ const SS_STR = {
     smJoining: 'respondiendo a la llamada…', smCold: 'ese sello se ha enfriado — el duelo terminó o está lleno', frAdded: '✦ %1 ya es tu amigo',
     frLinkTitle: 'un amigo se une a tu cielo', vsFriendsOn: '✦ %1 de tus amigos en línea', endAddFriend: '✦ AÑADIR A %1 COMO AMIGO',
     endFriends: '✦ AMIGOS ✦',
+    vsLang: '⚔ este duelo se teje en %1',
     zod: {
       aries: ['EL CARNERO', 'Cada combate abre con una embestida: la bestia recibe 8.'],
       taurus: ['EL TORO', 'El toro resiste: +15 de salud máxima al empezar el ascenso.'],
@@ -264,6 +266,7 @@ const SS_STR = {
     smJoining: 'réponse à l\'appel…', smCold: 'ce sceau s\'est refroidi — le duel est fini ou complet', frAdded: '✦ %1 est désormais votre ami',
     frLinkTitle: 'un ami rejoint votre ciel', vsFriendsOn: '✦ %1 de vos amis en ligne', endAddFriend: '✦ AJOUTER %1 COMME AMI',
     endFriends: '✦ AMIS ✦',
+    vsLang: '⚔ ce duel se tisse en %1',
     zod: {
       aries: ['LE BÉLIER', 'Chaque combat s\'ouvre sur une charge : la bête subit 8.'],
       taurus: ['LE TAUREAU', 'Le taureau endure : +15 de santé maximale au départ de l\'ascension.'],
@@ -379,6 +382,7 @@ const SS_STR = {
     smJoining: 'respondendo ao chamado…', smCold: 'esse selo esfriou — o duelo acabou ou está cheio', frAdded: '✦ %1 agora é teu amigo',
     frLinkTitle: 'um amigo junta-se ao teu céu', vsFriendsOn: '✦ %1 dos teus amigos online', endAddFriend: '✦ ADICIONAR %1 COMO AMIGO',
     endFriends: '✦ AMIGOS ✦',
+    vsLang: '⚔ este duelo se tece em %1',
     zod: {
       aries: ['O CARNEIRO', 'Cada combate abre com uma investida: a fera sofre 8.'],
       taurus: ['O TOURO', 'O touro resiste: +15 de vida máxima no início da subida.'],
@@ -494,6 +498,7 @@ const SS_STR = {
     smJoining: 'dem Ruf wird gefolgt…', smCold: 'dieses Siegel ist erkaltet — das Duell ist vorbei oder voll', frAdded: '✦ %1 ist jetzt dein Freund',
     frLinkTitle: 'ein Freund betritt deinen Himmel', vsFriendsOn: '✦ %1 deiner Freunde online', endAddFriend: '✦ %1 ALS FREUND HINZUFÜGEN',
     endFriends: '✦ FREUNDE ✦',
+    vsLang: '⚔ dieses Duell wird auf %1 gewoben',
     zod: {
       aries: ['DER WIDDER', 'Jeder Kampf beginnt mit einem Rammstoß: das Biest erleidet 8.'],
       taurus: ['DER STIER', 'Der Stier hält stand: +15 maximale Gesundheit zu Beginn des Aufstiegs.'],
@@ -609,6 +614,7 @@ const SS_STR = {
     smJoining: '召喚に応えています…', smCold: 'その封印は冷めました — 決闘は終了か満員です', frAdded: '✦ %1 がフレンドになりました',
     frLinkTitle: 'フレンドがあなたの空へ', vsFriendsOn: '✦ フレンド %1 人がオンライン', endAddFriend: '✦ %1 をフレンドに追加',
     endFriends: '✦ フレンド ✦',
+    vsLang: '⚔ この決闘は%1で織られる',
     zod: {
       aries: ['牡羊', '各戦闘の開幕に突進：獣に8ダメージ。'],
       taurus: ['牡牛', '牡牛は耐える：登り開始時に最大体力+15。'],
@@ -724,6 +730,7 @@ const SS_STR = {
     smJoining: '소환에 응답하는 중…', smCold: '그 인장은 식었어요 — 결투가 끝났거나 가득 찼어요', frAdded: '✦ %1이(가) 친구가 되었어요',
     frLinkTitle: '친구가 당신의 하늘에 합류', vsFriendsOn: '✦ 친구 %1명 온라인', endAddFriend: '✦ %1 친구 추가',
     endFriends: '✦ 친구 ✦',
+    vsLang: '⚔ 이 결투는 %1(으)로 짜입니다',
     zod: {
       aries: ['양자리', '전투 시작마다 들이받기: 짐승이 8 피해를 입는다.'],
       taurus: ['황소자리', '황소의 인내: 등반 시작 시 최대 체력 +15.'],
@@ -839,6 +846,7 @@ const SS_STR = {
     smJoining: '正在应召…', smCold: '这枚印记已冷却 — 决斗已结束或已满员', frAdded: '✦ %1 已成为你的好友',
     frLinkTitle: '一位好友加入你的星空', vsFriendsOn: '✦ %1 位好友在线', endAddFriend: '✦ 添加 %1 为好友',
     endFriends: '✦ 好友 ✦',
+    vsLang: '⚔ 这场对决以%1编织',
     zod: {
       aries: ['白羊', '每场战斗开场猛撞：星兽受到8点伤害。'],
       taurus: ['金牛', '金牛坚忍：攀登开始时生命上限+15。'],
@@ -954,6 +962,7 @@ const SS_STR = {
     smJoining: 'आह्वान का उत्तर दे रहे हैं…', smCold: 'वह मुहर ठंडी पड़ गई — द्वंद्व खत्म है या भरा हुआ है', frAdded: '✦ %1 अब आपके मित्र हैं',
     frLinkTitle: 'एक मित्र आपके आकाश में आया', vsFriendsOn: '✦ आपके %1 मित्र ऑनलाइन', endAddFriend: '✦ %1 को मित्र बनाएँ',
     endFriends: '✦ मित्र ✦',
+    vsLang: '⚔ यह द्वंद्व %1 में बुना गया है',
     zod: {
       aries: ['मेष', 'हर लड़ाई की शुरुआत टक्कर से: दानव को 8 क्षति।'],
       taurus: ['वृषभ', 'वृषभ डटा रहता है: चढ़ाई की शुरुआत में अधिकतम जीवन +15।'],
@@ -1069,6 +1078,7 @@ const SS_STR = {
     smJoining: 'نلبّي النداء…', smCold: 'برد هذا الختم — انتهت المبارزة أو اكتملت', frAdded: '✦ %1 صار صديقك',
     frLinkTitle: 'صديق ينضم إلى سمائك', vsFriendsOn: '✦ %1 من أصدقائك متصلون', endAddFriend: '✦ أضف %1 صديقًا',
     endFriends: '✦ الأصدقاء ✦',
+    vsLang: '⚔ هذه المبارزة تُنسج بلغة %1',
     zod: {
       aries: ['الحمل', 'تفتتح كل معركة بنطحة: يتلقى الوحش 8.'],
       taurus: ['الثور', 'الثور يصمد: +15 للصحة القصوى عند بدء الصعود.'],

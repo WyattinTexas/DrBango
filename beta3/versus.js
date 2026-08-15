@@ -450,6 +450,7 @@ async function vsSealRoom(code, mode, opts) {
     await SSNET.dbSet('mp/rooms/' + code, {
       mode, status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
       seed: Math.floor(Math.random() * 1e9),
+      lang: ssGameLang(),   // the creator's tongue rules the duel — both bags and dictionaries follow it
       private: !!(opts && opts.private), invited: (opts && opts.invited) || null,
       players: { [vsUid()]: vsSeat(0) },
     });
@@ -664,6 +665,9 @@ class VsBattle extends Phaser.Scene {
     const first = !this.room;
     const prevStatus = this.room && this.room.status;
     this.room = room;
+    // start pulling the room's dictionary the moment its tongue is known, so
+    // the beginBattle gate almost never actually has to wait
+    if (first && room.lang && room.lang !== 'en') SS_DICT.load(room.lang);
     if (room.status === 'waiting') { this.updateLobby(); this.maybeAutoStart(); return; }
     if (room.status === 'active' && (first || prevStatus === 'waiting')) this.beginBattle();
     if (room.status === 'active') {
@@ -678,7 +682,10 @@ class VsBattle extends Phaser.Scene {
     const n = Object.keys(this.room.players || {}).length;
     const names = Object.values(this.room.players || {}).sort((a, b) => a.seat - b.seat)
       .map((p, i) => (i + 1) + '.  ' + p.name + (p.name === vsName() ? '   (you)' : ''));
-    this.lobbyRoster.setText(names.join('\n') + '\n\n' + n + ' / ' + VS_MAX[this.room.mode] + ' mages answered');
+    // a duel sealed in another tongue says so before you rise into it
+    const langLine = (this.room.lang && this.room.lang !== ssGameLang() && SS_PACKS[this.room.lang])
+      ? '\n' + SS_T('vsLang', SS_LANGS[this.room.lang] || this.room.lang) : '';
+    this.lobbyRoster.setText(names.join('\n') + '\n\n' + n + ' / ' + VS_MAX[this.room.mode] + ' mages answered' + langLine);
     const host = this.room.hostUid === vsUid();
     const canBegin = this.room.mode === 'bg' && host && n >= VS_MIN.bg;
     this.beginB.setVisible(canBegin); this.beginT.setVisible(canBegin);
@@ -719,6 +726,21 @@ class VsBattle extends Phaser.Scene {
   }
 
   beginBattle() {
+    // the room's tongue rules the duel: both clients must hold its dictionary
+    // BEFORE the shared-seed deal, or their identical boards diverge. The
+    // dictionary was prefetched at the first room snapshot, so this gate is
+    // usually already open; if the fetch truly fails (10s of retries), fall
+    // back to English rather than soft-lock the lobby.
+    const rl = (this.room.lang && SS_PACKS[this.room.lang]) ? this.room.lang : 'en';
+    if (!SS_DICT.ready(rl) && (this.dictTries | 0) < 40) {
+      this.dictTries = (this.dictTries | 0) + 1;
+      SS_DICT.load(rl);
+      this.time.delayedCall(250, () => {
+        if (this.state === 'wait' && this.room && this.room.status === 'active') this.beginBattle();
+      });
+      return;
+    }
+    ssUsePack(SS_DICT.ready(rl) ? rl : 'en');
     this.tweens.add({ targets: this.lobbyC, alpha: 0, duration: 400, onComplete: () => this.lobbyC.setVisible(false) });
     // everyone I cross swords with becomes a recent rival (one-tap add later)
     for (const p of this.others()) SSNET.FR.noteRival(p.id, p.name);
@@ -766,6 +788,13 @@ class VsBattle extends Phaser.Scene {
     const go = ssTxt(this, l.x(0), l.y(400), 'WEAVE!', l.u(30), '#2fe0d0').setOrigin(0.5).setDepth(80).setScale(0.5);
     this.tweens.add({ targets: go, scale: 1, duration: 200, ease: 'Back.easeOut' });
     this.tweens.add({ targets: go, alpha: 0, delay: 900, duration: 300, onComplete: () => go.destroy() });
+    // arriving into a duel woven in another tongue — say so over the board,
+    // for joiners who rose past the lobby too fast to read it there
+    if (this.room.lang && this.room.lang !== ssGameLang() && SS_PACKS[this.room.lang]) {
+      const lt = ssTxt(this, l.x(0), l.y(438), SS_T('vsLang', SS_LANGS[this.room.lang] || this.room.lang),
+        l.u(12), '#ffe9a8', 'italic').setOrigin(0.5).setDepth(80);
+      this.tweens.add({ targets: lt, alpha: 0, delay: 2600, duration: 400, onComplete: () => lt.destroy() });
+    }
   }
 
   buildOpponentPanels() {
@@ -841,7 +870,7 @@ class VsBattle extends Phaser.Scene {
       if (this.board[i]) continue;
       let ch = rpick(BAG);
       if (this.boardVowels() < 5 && !VOWELS.includes(ch)) ch = rpick(['a', 'e', 'i', 'o', 'u']);
-      if (ch === 'q') ch = 'qu';
+      ch = PACK.digraph[ch] || ch;
       const tier = this.pendingTier || 0;
       this.pendingTier = 0;
       this.spawnTile(i, ch, tier, initial);
@@ -852,7 +881,7 @@ class VsBattle extends Phaser.Scene {
     const c = this.add.container(p.x, p.y - l.u(initial ? 460 : 420));
     const img = this.add.image(0, 0, 'tile' + tier).setDisplaySize(this.tileSize, this.tileSize);
     const letter = this.add.text(0, -l.u(2), ch === 'qu' ? 'Qu' : ch.toUpperCase(), {
-      fontFamily: SERIF, fontSize: l.u(ch === 'qu' ? 30 : 36) + 'px', fontStyle: 'bold',
+      fontFamily: SERIF, fontSize: l.u(ch.length > 1 ? 30 : 36) + 'px', fontStyle: 'bold',
       color: tier === 2 ? '#1d4a66' : tier === 1 ? '#5a3c05' : '#3a3020',
     }).setOrigin(0.5);
     const val = this.add.text(l.u(25), l.u(21), String(this.tileVal(ch, tier)), {
@@ -865,7 +894,7 @@ class VsBattle extends Phaser.Scene {
     this.board[i] = { ch, tier, c };
     this.tweens.add({ targets: c, y: p.y, duration: 450, ease: 'Bounce.easeOut', delay: initial ? i * 40 : Math.random() * 90 });
   }
-  tileVal(ch, tier) { return (VALS[ch[0]] || 1) + (ch === 'qu' ? 1 : 0) + (tier === 1 ? 6 : 0); }
+  tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
   tapTile(i) {
     if (this.state !== 'pick' || !this.isMyTurn()) return;
     SFX.ensure();
@@ -900,7 +929,7 @@ class VsBattle extends Phaser.Scene {
       const mc = this.add.container(-w / 2 + sz / 2 + k * (sz + gap), 0);
       mc.add(this.add.image(0, 0, 'tile' + s.tier).setDisplaySize(sz, sz));
       mc.add(this.add.text(0, 0, s.ch === 'qu' ? 'Qu' : s.ch.toUpperCase(), {
-        fontFamily: SERIF, fontSize: l.u(20) + 'px', fontStyle: 'bold', color: valid ? '#1d6a35' : '#3a3020',
+        fontFamily: SERIF, fontSize: l.u(s.ch.length > 1 ? 16 : 20) + 'px', fontStyle: 'bold', color: valid ? '#1d6a35' : '#3a3020',
       }).setOrigin(0.5));
       mc.setSize(sz, sz).setInteractive({ useHandCursor: true });
       mc.on('pointerdown', () => this.unselectFrom(k));
@@ -1194,6 +1223,7 @@ class VsBattle extends Phaser.Scene {
         await SSNET.dbSet('mp/rooms/' + code, {
           mode: this.room.mode, status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
           seed: Math.floor(Math.random() * 1e9),
+          lang: this.room.lang || 'en',   // a rematch keeps the tongue the duel began in
           players: { [vsUid()]: vsSeat(0) },
         });
         // one rematch room per battle — a transaction settles simultaneous pressers

@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.26.0';
+const BUILD = 'STARSPELL v0.27.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -102,13 +102,20 @@ function rng() {
 }
 const rpick = (arr) => arr[Math.floor(rng() * arr.length)];
 
-const WORDSET = new Set(STARSPELL_WORDS.split(' '));
-const VALS = { a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, q: 9, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10 };
-const BAG = [];
-for (const [ch, n] of Object.entries({ e: 12, a: 9, i: 9, o: 8, n: 6, r: 6, t: 6, l: 4, s: 4, u: 4, d: 4, g: 3, b: 2, c: 2, m: 2, p: 2, f: 2, h: 2, v: 2, w: 2, y: 2, k: 1, j: 1, x: 1, q: 1, z: 1 })) {
-  for (let i = 0; i < n; i++) BAG.push(ch);
+/* The active gameplay pack (bag, point values, vowels, dictionary) — see
+   packs.js. Solo battles use the player's own language; a versus battle uses
+   the ROOM's language so both duelists deal from one bag against one
+   dictionary. ssUsePack flips all four globals together and falls back to
+   English as a unit if a pack's dictionary isn't resident (solo can't hit
+   that — SS_DICT.boot loads it synchronously — only a failed versus fetch). */
+let PACK, WORDSET, VALS, BAG, VOWELS;
+function ssUsePack(lang) {
+  const ok = SS_PACKS[lang] && SS_DICT.ready(lang);
+  PACK = ok ? SS_PACKS[lang] : SS_PACKS.en;
+  WORDSET = SS_DICT.set(PACK.lang);
+  VALS = PACK.vals; BAG = ssBagArr(PACK); VOWELS = PACK.vowels;
 }
-const VOWELS = 'aeiou';
+ssUsePack(ssGameLang());
 const LEN_MULT = [0, 0, 0.6, 1, 1.15, 1.35, 1.6, 1.9, 2.3];
 const SERIF = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
 
@@ -1585,7 +1592,11 @@ const SS_LINE_GREEN = '#1d6a35';                          // word-line "valid" i
 function ssGlyph(scene, ch, color) {
   const key = 'gl-' + ch + '-' + color;
   if (!scene.textures.exists(key)) {
-    const R = ssTexRes(scene), fs = ch === 'qu' ? 30 : 36;
+    // multi-letter tiles (Qu, and CH/LL/RR in Spanish) drop to 30 to fit the
+    // box; accented caps (Ñ Ä Ö Ü Ç) drop to 32 with no downward nudge so the
+    // tilde/umlaut keeps headroom instead of clipping at the canvas top
+    const R = ssTexRes(scene), acc = ch.length === 1 && /[ñäöüç]/.test(ch);
+    const fs = ch.length > 1 ? 30 : acc ? 32 : 36;
     const t = scene.textures.createCanvas(key, Math.round(64 * R), Math.round(48 * R));
     const c = t.context;
     c.scale(R, R);
@@ -1593,7 +1604,7 @@ function ssGlyph(scene, ch, color) {
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillStyle = color;
     // caps sit a touch above the em middle in serifs — nudge to optical centre
-    c.fillText(ch === 'qu' ? 'Qu' : ch.toUpperCase(), 32, 24 + fs * 0.06);
+    c.fillText(ch === 'qu' ? 'Qu' : ch.toUpperCase(), 32, 24 + fs * (acc ? 0.02 : 0.06));
     t.refresh();
   }
   return key;
@@ -1615,10 +1626,10 @@ function ssGlyphVal(scene, v, color) {
 }
 function ssPrewarmGlyphs(scene) {
   const jobs = [];
-  for (const base of 'abcdefghijklmnopqrstuvwxyz') {
-    const ch = base === 'q' ? 'qu' : base;
+  for (const base of Object.keys(PACK.bag)) {
+    const ch = PACK.digraph[base] || base;
     for (let tier = 0; tier < 3; tier++) {
-      const v = (VALS[base] || 1) + (ch === 'qu' ? 1 : 0) + (tier === 1 ? 6 : 0);
+      const v = (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0);
       jobs.push(() => { ssGlyph(scene, ch, SS_TILE_INK[tier]); ssGlyphVal(scene, v, SS_TILE_VINK[tier]); });
     }
     jobs.push(() => ssGlyph(scene, ch, SS_LINE_GREEN));
@@ -2879,7 +2890,7 @@ class Home extends Phaser.Scene {
     items.push(ssTxt(this, l.x(0), py(198), '— ' + SS_T('dpTop') + ' —', l.u(12), '#c9b676').setOrigin(0.5));
     const loadT = ssTxt(this, l.x(0), py(300), SS_T('lbLoading'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5);
     items.push(loadT);
-    SSNET.getBoard('daily').then((b) => {
+    SSNET.getBoard('daily', ssGameLang()).then((b) => {
       if (this.dailyC !== c || !this.scene.isActive()) return;
       loadT.destroy();
       const meId = SSNET.uid();
@@ -3313,6 +3324,9 @@ class Battle extends Phaser.Scene {
     const tCr = performance.now();
     const l = this.L = ssLayout(this);
     ssMakeTextures(this);
+    // solo always fights in the player's own tongue (a versus battle may have
+    // left the globals on the room's pack — flip them back)
+    ssUsePack(ssGameLang());
     if (this.ascended) {   // arriving from the rise: fade in over the zenith — bg matches, no pop
       this.cameras.main.setAlpha(0);
       this.tweens.add({ targets: this.cameras.main, alpha: 1, duration: 420, ease: 'Sine.easeOut' });
@@ -3326,7 +3340,9 @@ class Battle extends Phaser.Scene {
     }
 
     // ---- build the fight list ----
-    if (this.mode === 'daily') setSeed(SSNET.dayKey());
+    // daily: same-language hunters share one seeded sky; the pack salt keeps
+    // a language switch from replaying today's English board with new letters
+    if (this.mode === 'daily') setSeed(SSNET.dayKey() ^ ssPackSeed(PACK.lang));
     else setSeed(Math.floor(Math.random() * 1e9));
     this.fights = [];
     if (this.mode === 'campaign') {
@@ -3486,7 +3502,7 @@ class Battle extends Phaser.Scene {
       if (this.board[i]) continue;
       let ch = rpick(BAG);
       if (this.boardVowels() < 5 && !VOWELS.includes(ch)) ch = rpick(['a', 'e', 'i', 'o', 'u']);
-      if (ch === 'q') ch = 'qu';
+      ch = PACK.digraph[ch] || ch;
       let tier = this.pendingTier || 0;
       this.pendingTier = 0;
       this.spawnTile(i, ch, tier, initial);
@@ -3512,7 +3528,7 @@ class Battle extends Phaser.Scene {
     this.board[i] = { ch, tier, c };
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
   }
-  tileVal(ch, tier) { return (VALS[ch[0]] || 1) + (ch === 'qu' ? 1 : 0) + (tier === 1 ? 6 : 0); }
+  tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
 
   // ---------- selection ----------
   tapTile(i) {
@@ -3550,7 +3566,7 @@ class Battle extends Phaser.Scene {
       const mc = this.add.container(-w / 2 + sz / 2 + k * (sz + gap), 0);
       const img = this.add.image(0, 0, 'tile' + s.tier).setDisplaySize(sz, sz);
       // same glyph texture as the board, at the line's font-16/20 proportions
-      const gsc = s.ch === 'qu' ? 16 / 30 : 20 / 36;
+      const gsc = s.ch.length > 1 ? 16 / 30 : 20 / 36;
       const letter = this.add.image(0, 0, ssGlyph(this, s.ch, valid ? SS_LINE_GREEN : SS_TILE_INK[0]))
         .setDisplaySize(l.u(64 * gsc), l.u(48 * gsc));
       mc.add([img, letter]);
@@ -3622,7 +3638,7 @@ class Battle extends Phaser.Scene {
     SFX.forge();
     s.c.destroy(); this.board[i] = null;
     let ch = rpick(BAG);
-    if (ch === 'q') ch = 'qu';
+    ch = PACK.digraph[ch] || ch;
     this.spawnTile(i, ch, s.tier, false);
   }
 
@@ -4344,7 +4360,7 @@ class Battle extends Phaser.Scene {
     else if (this.run.bigHit >= 40) rDelta += SS_RATING.pve(1);
     if (won) SS.prof.wins++;
     SS.save(); SS.sync();
-    if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest);
+    if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest, PACK.lang);
 
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
@@ -4482,15 +4498,20 @@ class Battle extends Phaser.Scene {
 
   // ---------- solver (hint + demo) ----------
   buildTrie() {
-    if (Battle.trie) return;
-    const root = {};
-    for (const w of WORDSET) {
-      if (w.length > 8) continue;
-      let n = root;
-      for (const ch of w) n = n[ch] || (n[ch] = {});
-      n.$ = true;
+    // one trie per language, cached for the session — a versus battle in
+    // another tongue must not hint from the solo language's words
+    Battle.tries = Battle.tries || {};
+    if (!Battle.tries[PACK.lang]) {
+      const root = {};
+      for (const w of WORDSET) {
+        if (w.length > 8) continue;
+        let n = root;
+        for (const ch of w) n = n[ch] || (n[ch] = {});
+        n.$ = true;
+      }
+      Battle.tries[PACK.lang] = root;
     }
-    Battle.trie = root;
+    this.trie = Battle.tries[PACK.lang];
   }
   bestWord() {
     this.buildTrie();
@@ -4518,7 +4539,7 @@ class Battle extends Phaser.Scene {
         used[k] = false; pick.pop();
       }
     };
-    dive(Battle.trie);
+    dive(this.trie);
     return best;
   }
   demoStep() {
@@ -4713,7 +4734,7 @@ class Board extends Phaser.Scene {
     this.rowsC.removeAll(true);
     this.loadingT.setVisible(true);
     const tab = this.tab;
-    const b = await SSNET.getBoard(tab);
+    const b = await SSNET.getBoard(tab, ssGameLang());
     if (this.tab !== tab || !this.scene.isActive()) return;
     this.loadingT.setVisible(false);
     if (!b.rows.length) {

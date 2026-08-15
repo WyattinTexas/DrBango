@@ -1,6 +1,17 @@
 # beta3 dev tools
 
-Two scripts, both dev-only — nothing here ships to the browser.
+Three scripts, all dev-only — nothing here ships to the browser.
+
+## make-word-packs.py
+
+Rebuilds the per-language gameplay dictionaries `beta3/words-{es,fr,pt,de}.js`
+(fed to `SS_DICT` — see packs.js for the whole language-pack system). Raw
+source lists are cached in `~/starspell-art-sources/wordlist-sources/` (kept
+out of the repo); the script's docstring carries sources, licenses and the
+Scrabble-style normalization rules. The one subtle part: the German book
+corpus contains English fragments, so German is sieved by en-vs-de relative
+frequency — the measured gap (intruders ≥ 52×, true homographs ≤ 18×) is cut
+at 25×. If you regenerate and "night" validates in German, that sieve broke.
 
 ## make-art-assets.py
 
