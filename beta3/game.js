@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.19.0';
+const BUILD = 'STARSPELL v0.20.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -261,6 +261,19 @@ function ssMakeTextures(scene) {
     g2.addColorStop(0, 'rgba(159,176,232,0.11)'); g2.addColorStop(1, 'rgba(159,176,232,0)');
     c.beginPath(); c.roundRect(2.5, 2.5, w - 5, h - 5, 13); c.fillStyle = g2; c.fill();
   }, R);
+  // the daily herald's chip — a small crimson pill with an ember rim, up in
+  // the home screen's corner where notifications live
+  mk('chipred', 128, 32, (c, w, h) => {
+    c.beginPath(); c.roundRect(1.5, 1.5, w - 3, h - 3, (h - 3) / 2);
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#a32433'); g.addColorStop(0.55, '#7c1626'); g.addColorStop(1, '#570e1b');
+    c.fillStyle = g; c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = 'rgba(255,138,110,0.6)'; c.stroke();
+    c.beginPath(); c.roundRect(6, 3.5, w - 12, h * 0.4, h * 0.22);
+    const g2 = c.createLinearGradient(0, 3, 0, h * 0.5);
+    g2.addColorStop(0, 'rgba(255,255,255,0.28)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g2; c.fill();
+  }, R);
   mk('panel', 256, 256, (c) => {
     c.beginPath(); c.roundRect(4, 4, 248, 248, 22);
     const g = c.createLinearGradient(0, 0, 0, 256);
@@ -322,6 +335,14 @@ function ssCountdownLive(ms) {
   if (h) return m ? SS_T('cdHM', h, m) : SS_T('cdH', h);
   if (m) return SS_T('cdMS', m, sec);
   return SS_T('cdS', sec);
+}
+
+// The daily chip's clock: bare digits, H:MM:SS — reads in every language and
+// visibly moves every second, which is the whole point of a live herald.
+function ssClock(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const p = (n) => String(n).padStart(2, '0');
+  return Math.floor(s / 3600) + ':' + p(Math.floor(s / 60) % 60) + ':' + p(s % 60);
 }
 
 // The player's own daily-completion streak, from the local score log. A streak
@@ -1197,6 +1218,159 @@ function ssLayout(scene) {
   return { W, H, s, x: (d) => W / 2 + d * s, y: (d) => H / 2 + (d - 400) * s, u: (d) => d * s };
 }
 
+/* ---- the campaign star chart --------------------------------------------
+   The whole long night on one window of sky: every fight of every act is a
+   constellation node on a winding path that climbs from the meadow's edge
+   (bottom) to the crown of dawn (top). Felled beasts burn gold, the next one
+   breathes under a glow and waits for a tap, the ones ahead hang dim in their
+   own colors, and the final boss stands haloed at the summit as the visible
+   destination. Data-driven: pass any acts array (SS_ACTS today; more acts or
+   whole alternate campaigns later just work). Returns { c, zone } — zone is
+   the tappable current node (null when the campaign is complete); the
+   container carries it as data 'mapZone' for the demo driver. */
+function ssStarChart(scene, opts) {
+  const l = ssLayout(scene);
+  const acts = opts.acts || SS_ACTS;
+  const fightIdx = opts.fightIdx | 0;
+  const c = scene.add.container(0, 0);
+  const fights = [];   // flattened in the exact order Battle marches them
+  acts.forEach((act, ai) => act.fights.forEach((id, fi) => fights.push({ id, actIdx: ai, fi, len: act.fights.length, umbral: act.umbral, boss: fi === act.fights.length - 1 })));
+  const N = fights.length;
+
+  // the window + header
+  c.add(scene.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(384), l.u(664)).setInteractive());
+  const hk = ssGoldTex(scene, SS_T('mapTitle'), 20);
+  const hsc = Math.min(1, 300 / hk.w);
+  c.add(scene.add.image(l.x(0), l.y(106), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
+  const complete = fightIdx >= N;
+  const cur = complete ? null : fights[fightIdx];
+  c.add(ssTxt(scene, l.x(0), l.y(132), complete ? SS_T('endWinSub') : acts[cur.actIdx].name + '  ·  ' + SS_T('fightN', cur.fi + 1),
+    l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
+
+  // node positions: a serpentine sweep per act, mirrored on alternate acts so
+  // the path braids left-right-left as it climbs; act bosses stand centered
+  const pos = [];
+  const wob = [0, 22, -16, 10];                       // organic jitter on the sweep
+  let y = 632;
+  const step = 29, actGap = 25;
+  for (let i = 0; i < N; i++) {
+    const f = fights[i];
+    if (i > 0 && f.actIdx !== fights[i - 1].actIdx) {
+      y -= actGap;                                    // breathing room for the act label
+    }
+    const dir = f.actIdx % 2 === 0 ? 1 : -1;
+    let x = 0;
+    if (!f.boss) {
+      const t = f.len > 2 ? f.fi / (f.len - 2) : 0;
+      x = (-118 + t * 218 + wob[f.fi % 4]) * dir;
+    }
+    pos.push({ x, y });
+    y -= step;
+  }
+  // act labels sit in the gaps, offset off the path's diagonal
+  acts.forEach((act, ai) => {
+    if (ai === 0) return;
+    const first = fights.findIndex((f) => f.actIdx === ai);
+    const gy = (pos[first].y + pos[first - 1].y) / 2;
+    const gx = -Math.sign(pos[first].x || 1) * 62;
+    c.add(ssTxt(scene, l.x(gx), l.y(gy), act.name, l.u(8.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
+  });
+  c.add(ssTxt(scene, l.x(0), l.y(656), acts[0].name, l.u(8.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
+
+  // the path: dotted starlight between nodes — gold where you have walked
+  const pathG = scene.add.graphics();
+  for (let i = 0; i < N - 1; i++) {
+    const a = pos[i], b = pos[i + 1];
+    const walked = i < fightIdx;
+    pathG.fillStyle(walked ? 0xd7b45c : 0x4a5480, walked ? 0.5 : 0.28);
+    const dist = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = Math.max(3, Math.round(dist / 9));
+    for (let k = 2; k <= n - 2; k++) {
+      const t = k / n;
+      pathG.fillCircle(l.x(a.x + (b.x - a.x) * t), l.y(a.y + (b.y - a.y) * t), l.u(1.2));
+    }
+  }
+  c.add(pathG);
+
+  // the nodes: little constellations in the beasts' own stars
+  const staticG = scene.add.graphics();
+  c.add(staticG);
+  let zone = null;
+  for (let i = 0; i < N; i++) {
+    const f = fights[i], p = pos[i];
+    const b = SS_BEASTS[f.id];
+    const um = f.umbral && f.id !== 'phoenix';       // beastFor's umbral rule
+    const name = (um ? SS_UMBRAL.prefix : '') + b.name;
+    const state = i < fightIdx ? 'won' : i === fightIdx ? 'now' : 'far';
+    const last = i === N - 1;
+    const sc = (b.boss ? 0.20 : 0.145) * (last ? 1.3 : 1);
+    const k = l.u(sc);
+    const tint = state === 'won' ? 0xd7b45c : state === 'now' ? 0xffe9a8 : (um ? SS_UMBRAL.tint : b.tint);
+    const aLine = state === 'won' ? 0.4 : state === 'now' ? 0.85 : 0.2;
+    const aStar = state === 'won' ? 0.85 : state === 'now' ? 1 : 0.5;
+
+    // the summit halo: the destination is visible from the very first step
+    if (last) {
+      c.add(scene.add.image(l.x(p.x), l.y(p.y), 'glowbig').setDisplaySize(l.u(120), l.u(96))
+        .setTint(state === 'won' ? 0xffd77a : 0xffc46b).setAlpha(0.13).setBlendMode('ADD'));
+    }
+    const drawInto = (g, gx, gy) => {
+      g.lineStyle(l.u(0.9), tint, aLine);
+      for (const [e1, e2] of b.edges) {
+        g.lineBetween(gx + b.stars[e1][0] * k, gy + b.stars[e1][1] * k, gx + b.stars[e2][0] * k, gy + b.stars[e2][1] * k);
+      }
+      g.fillStyle(tint, aStar);
+      for (let s = 0; s < b.stars.length; s++) {
+        g.fillCircle(gx + b.stars[s][0] * k, gy + b.stars[s][1] * k, l.u(s % 3 === 0 ? 1.5 : 1.0));
+      }
+    };
+    if (state === 'now') {
+      // the breathing node: its own container so it can pulse and be tapped
+      const nc = scene.add.container(l.x(p.x), l.y(p.y));
+      nc.add(scene.add.image(0, 0, 'glowbig').setDisplaySize(l.u(96), l.u(78)).setTint(0xffd77a).setAlpha(0.17).setBlendMode('ADD'));
+      const ng = scene.add.graphics();
+      drawInto(ng, 0, 0);
+      for (const e of b.eyes) {
+        const eye = scene.add.image(e[0] * k, e[1] * k, 'dot').setScale(0.32).setTint(b.eye).setBlendMode('ADD');
+        scene.tweens.add({ targets: eye, alpha: 0.4, duration: 700, yoyo: true, repeat: -1 });
+        nc.add(eye);
+      }
+      nc.add(ng);
+      scene.tweens.add({ targets: nc, scaleX: 1.09, scaleY: 1.09, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      c.add(nc);
+      // the waiting ring, swelling like a held breath
+      const ring = scene.add.graphics({ x: l.x(p.x), y: l.y(p.y) });
+      ring.lineStyle(l.u(1.4), 0xffd77a, 0.55);
+      ring.strokeCircle(0, 0, l.u(b.boss ? 27 : 23));
+      scene.tweens.add({ targets: ring, scaleX: 1.16, scaleY: 1.16, alpha: 0.15, duration: 1100, repeat: -1, ease: 'Sine.easeOut' });
+      c.add(ring);
+      zone = scene.add.zone(l.x(p.x), l.y(p.y), l.u(88), l.u(66)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      let entered = false;
+      zone.on('pointerdown', () => { if (entered) return; entered = true; SFX.ensure(); SFX.ui(); opts.onEnter(); });
+      c.add(zone);
+    } else {
+      drawInto(staticG, l.x(p.x), l.y(p.y));
+    }
+
+    // the name beside each node, hugging the path's inside edge
+    const off = b.boss ? 32 : 27;
+    const nx = p.x > 8 ? p.x - off : p.x + off;
+    const t = ssTxt(scene, l.x(nx), l.y(p.y), name,
+      l.u(state === 'now' ? 9.5 : 8.5),
+      state === 'won' ? '#8f7f4e' : state === 'now' ? '#ffe9a8' : '#5a6390')
+      .setOrigin(p.x > 8 ? 1 : 0, 0.5);
+    if (state === 'now') t.setShadow(0, 0, '#c9b676', l.u(6), true, true);
+    c.add(t);
+    if (last) {
+      c.add(ssTxt(scene, l.x(nx), l.y(p.y + 12), SS_T('mapDest'), l.u(7.5), '#c98f4d', 'italic')
+        .setOrigin(p.x > 8 ? 1 : 0, 0.5));
+    }
+  }
+  if (!complete) c.add(ssTxt(scene, l.x(0), l.y(680), SS_T('mapHint'), l.u(10), '#c9b676', 'italic').setOrigin(0.5).setAlpha(0.9));
+  c.setData('mapZone', zone);
+  return { c, zone };
+}
+
 // achievement toast, usable from any scene
 function ssAchToast(scene, def) {
   const l = ssLayout(scene);
@@ -1272,7 +1446,7 @@ class Home extends Phaser.Scene {
     this.ascending = false; this.descending = false; this.arrived = false; this.introPlaying = false;
     // scene instances persist across restarts — a rotation mid-sheet would
     // otherwise leave these truthy forever and the sheets could never reopen
-    this.langC = null; this.dailyC = null;
+    this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null;
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
     // full frame's work on a slow phone, and a descent-by-create (the dawn
@@ -1287,11 +1461,11 @@ class Home extends Phaser.Scene {
     if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
     else if (intro) this.playIntro(l);
     else this.buildMeadowUi(l);
-    // the daily's countdown has to keep moving while the home screen sits open.
-    // Ticking also carries the label across midnight UTC on its own: dayKey()
-    // moves, today's score stops matching, and the sub falls back to the
-    // "unplayed" wording for the new sky without a reload.
-    this.time.addEvent({ delay: 15000, loop: true, callback: () => this.refreshDailySub() });
+    // the daily chip's clock ticks every second while the meadow sits open.
+    // Ticking also carries it across midnight UTC on its own: dayKey() moves,
+    // today's score stops matching, and the chip lights back up for the new
+    // sky without a reload.
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.updateDailyChip() });
 
     this.input.once('pointerdown', () => SFX.ensure());
     this.events.on('ss-achproxy', (def) => ssAchToast(this, def));
@@ -1373,6 +1547,12 @@ class Home extends Phaser.Scene {
         this.tweens.add({ targets: sp, angle: 360, duration: 36000 + Math.random() * 20000, repeat: -1 });
         this.tweens.add({ targets: sp, alpha: 0.3, duration: 1600 + Math.random() * 1400, yoyo: true, repeat: -1, delay: Math.random() * 1500 });
       }
+      // the daily herald's ember breath (guarded: the first idleTweens call
+      // runs before the chip is built; the wake path re-arms it here)
+      if (this.dailyGlow) {
+        this.dailyGlow.setAlpha(0.13);
+        this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      }
     };
     this.idleTweens();
     const bk = ssBraidTex(this);
@@ -1390,11 +1570,13 @@ class Home extends Phaser.Scene {
     this.campRow = campRow;
     const cr = campRow();
     const rows = [
-      { y: 420, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.startMode('campaign') },
-      { y: 488, label: SS_T('quick'), sub: SS_T('quickSub'), fn: () => this.startMode('quick') },
-      // DAILY opens the pre-screen (today's board, countdown, PLAY) rather than
-      // dropping straight into the game; the ?daily=1 deep link stays direct.
-      { y: 556, label: SS_T('daily'), sub: this.dailySub(), key: 'daily', fn: () => this.dailySheet() },
+      // CAMPAIGN / CONTINUE opens the star chart — the campaign always enters
+      // through the map, at the checkpoint when one is standing
+      { y: 420, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.mapSheet() },
+      // NEW CAMPAIGN took the daily's old row (the daily is a chip now):
+      // abandon the checkpoint (confirmed) and start the long night over
+      { y: 488, label: SS_T('newCamp'), sub: SS_T('newCampSub'), key: 'newcamp', dark: true, fn: () => this.newCampaign() },
+      { y: 556, label: SS_T('quick'), sub: SS_T('quickSub'), fn: () => this.startMode('quick') },
       { y: 624, label: SS_T('board'), sub: null, fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
       // PROFILE moved to the chip up in the corner, which frees this row for
       // VERSUS — it is a play mode, so it gets a real button like the rest.
@@ -1407,7 +1589,6 @@ class Home extends Phaser.Scene {
       if (r.key === 'campaign') this.campLabelT = lab;
       if (r.sub) {
         const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5));
-        if (r.key === 'daily') this.dailySubT = sub;
         if (r.key === 'campaign') this.campSubT = sub;
       }
       if (r.key) this.rowBtns[r.key] = b;
@@ -1427,6 +1608,23 @@ class Home extends Phaser.Scene {
     chip.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); SFX.ui(); this.scene.start('profile'); });
     chip.on('pointerover', () => chip.setScale(chip.scaleX * 1.04, chip.scaleY * 1.04));
     chip.on('pointerout', () => chip.setDisplaySize(l.u(CW), l.u(CH)));
+
+    // Daily hunt herald — a small red chip in the top-left corner, counting
+    // tonight's sky down second by second. Alive while the hunt is unplayed
+    // (ember glow breathing behind it), quiet with a ✓ once you've hunted.
+    // Tapping it opens the daily pre-screen, same door as the old button.
+    const DW = 108, DH = 26;
+    this.dailyGlow = ui(this.add.image(l.x(-195 + DW / 2), l.y(26), 'glowbig')
+      .setDisplaySize(l.u(DW * 1.8), l.u(62)).setTint(0xff5e4d).setAlpha(0.13).setBlendMode('ADD'));
+    const dchip = this.dailyChipB = ui(this.add.image(l.x(-195), l.y(26), 'chipred')
+      .setDisplaySize(l.u(DW), l.u(DH)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }));
+    this.dailyChipT = ui(ssTxt(this, l.x(-195 + DW / 2), l.y(26), '', l.u(10.5), '#ffe2c9').setOrigin(0.5)
+      .setShadow(0, l.u(1), 'rgba(40,4,10,0.8)', l.u(1.5)));
+    dchip.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.dailySheet(); });
+    dchip.on('pointerover', () => dchip.setScale(dchip.scaleX * 1.05, dchip.scaleY * 1.05));
+    dchip.on('pointerout', () => dchip.setDisplaySize(l.u(DW), l.u(DH)));
+    this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.updateDailyChip();
 
     ui(ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5));
     this.muteB = ui(ssTxt(this, l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
@@ -1553,13 +1751,13 @@ class Home extends Phaser.Scene {
   }
   // Subtitle under DAILY HUNT. Unplayed, it invites and shows how long the sky
   // stays up; played, it shows today's score and when the next one lands.
-  dailySub() {
-    const cd = ssCountdown(SSNET.msToNextDay());
-    const done = SS.prof.daily[String(SSNET.dayKey())];
-    return done ? SS_T('dailyDone', done, cd) : SS_T('dailyOpen', cd);
-  }
-  refreshDailySub() {
-    if (this.dailySubT && this.dailySubT.active) this.dailySubT.setText(this.dailySub());
+  // the herald's second-by-second clock; also flips the chip between its
+  // alive (unplayed — ember glow) and quiet (✓ hunted) dress
+  updateDailyChip() {
+    if (!this.dailyChipT || !this.dailyChipT.active) return;
+    const played = !!SS.prof.daily[String(SSNET.dayKey())];
+    this.dailyChipT.setText((played ? '✓ ' : '☀ ') + ssClock(SSNET.msToNextDay()));
+    if (this.dailyGlow && this.dailyGlow.active) this.dailyGlow.setVisible(!played);
   }
   // the language sheet — a parchment list of native names. Picking one rewrites
   // ?lang= and reloads: strings.js saves the choice, and every string plus the
@@ -1567,7 +1765,7 @@ class Home extends Phaser.Scene {
   // (rather than only saving) matters because a ?lang= already in the address
   // would out-rank the saved preference on the next load.
   langSheet() {
-    if (this.busy() || this.langC) return;
+    if (this.busy() || this.langC || this.dailyC || this.mapC || this.confirmC) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.langC = this.add.container(0, 0).setDepth(700);
@@ -1603,7 +1801,7 @@ class Home extends Phaser.Scene {
      list IS the completion list, and RTDB prunes past days, so the streak
      shown here is the player's own, kept in the local profile log.) */
   dailySheet() {
-    if (this.busy() || this.dailyC || this.langC) return;
+    if (this.busy() || this.dailyC || this.langC || this.mapC || this.confirmC) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.dailyC = this.add.container(0, 0).setDepth(700);
@@ -1700,7 +1898,7 @@ class Home extends Phaser.Scene {
       if (this.busy()) return;
       SFX.ui();
       closeSheet();
-      this.bloomBtn = this.rowBtns && this.rowBtns.daily;   // the meadow button blooms as we lift off
+      this.bloomBtn = this.dailyChipB;   // the corner chip blooms as we lift off
       this.startMode('daily');
     });
 
@@ -1708,6 +1906,91 @@ class Home extends Phaser.Scene {
     // entrance: the notice board settles up into place like the end-run window
     items.forEach((it) => { it.y += l.u(14); it.alpha = 0; });
     this.tweens.add({ targets: items, y: '-=' + l.u(14), alpha: 1, duration: 300, ease: 'Back.easeOut' });
+  }
+
+  /* ---------- the campaign map sheet ----------
+     The campaign's only door: CAMPAIGN/CONTINUE opens the star chart over the
+     meadow — the whole climb laid out, the checkpoint breathing — and tapping
+     the glowing constellation closes the sheet and rides the full ascent into
+     that fight. Fresh campaigns enter the same way, at the first node. */
+  mapSheet() {
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.mapC = this.add.container(0, 0).setDepth(700);
+    const closeSheet = () => {
+      if (this.mapC !== c) return;
+      this.mapC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.72, duration: 220 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+    const ck = this.campaignCheckpoint();
+    const chart = ssStarChart(this, {
+      fightIdx: ck ? ck.fightIdx : 0,
+      onEnter: () => {
+        closeSheet();
+        this.bloomBtn = this.rowBtns && this.rowBtns.campaign;
+        this.startMode('campaign');
+      },
+    });
+    const xB = ssTxt(this, l.x(170), l.y(96), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    chart.c.add(xB);
+    c.add(chart.c);
+    // entrance: the chart settles up into place like the other sheets
+    chart.c.y = l.u(14); chart.c.alpha = 0;
+    this.tweens.add({ targets: chart.c, y: 0, alpha: 1, duration: 300, ease: 'Back.easeOut' });
+  }
+
+  /* NEW CAMPAIGN — abandon the standing checkpoint (confirmed first: a
+     checkpoint is hours of climb) and open the chart at the first node.
+     With no checkpoint there is nothing to abandon: it is simply the door. */
+  newCampaign() {
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC) return;
+    const ck = this.campaignCheckpoint();
+    if (!ck) { this.mapSheet(); return; }
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.confirmC = this.add.container(0, 0).setDepth(720);
+    const closeSheet = () => {
+      if (this.confirmC !== c) return;
+      this.confirmC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+    const items = [];
+    items.push(this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(336), l.u(272)).setInteractive());
+    const tk = ssGoldTex(this, SS_T('abandonTitle'), 17);
+    const tsc = Math.min(1, 280 / tk.w);
+    items.push(this.add.image(l.x(0), l.y(304), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    items.push(ssTxt(this, l.x(0), l.y(362), SS_T('abandonBody', SS_ACTS[ck.actIdx].name.split('·')[0].trim(), ck.fightIdx % 5 + 1),
+      l.u(12), '#c9c3ae', 'italic').setOrigin(0.5).setWordWrapWidth(l.u(280)).setAlign('center'));
+    // KEEP CLIMBING wears the gold — walking away from a checkpoint should
+    // never be the brightest thing on screen
+    const keepB = this.add.image(l.x(0), l.y(438), ssBtn(this, false, 250, 50)).setDisplaySize(l.u(250), l.u(50)).setInteractive({ useHandCursor: true });
+    const keepT = ssTxt(this, l.x(0), l.y(438), SS_T('abandonNo'), l.u(15), BTN_INK()).setOrigin(0.5);
+    const abB = this.add.image(l.x(0), l.y(492), ssBtn(this, true, 250, 40)).setDisplaySize(l.u(250), l.u(40)).setInteractive({ useHandCursor: true });
+    const abT = ssTxt(this, l.x(0), l.y(492), SS_T('abandonYes'), l.u(13), '#e6a2a2').setOrigin(0.5);
+    items.push(keepB, keepT, abB, abT);
+    keepB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    abB.on('pointerdown', () => {
+      SFX.ui();
+      localStorage.removeItem('beta3.campaign');
+      const cr = this.campRow();
+      if (this.campLabelT && this.campLabelT.active) this.campLabelT.setText(cr.label);
+      if (this.campSubT && this.campSubT.active) this.campSubT.setText(cr.sub);
+      closeSheet();
+      this.mapSheet();   // the fresh climb, from the first constellation
+    });
+    c.add(items);
+    items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 260, ease: 'Back.easeOut' });
   }
 
   campaignCheckpoint() {
@@ -1863,7 +2146,7 @@ class Home extends Phaser.Scene {
     const cr = this.campRow();   // battle moved the campaign checkpoint
     if (this.campLabelT.active) this.campLabelT.setText(cr.label);
     if (this.campSubT.active) this.campSubT.setText(cr.sub);
-    this.refreshDailySub();
+    this.updateDailyChip();
     const l = ssLayout(this);
     if (this.ascVeil) {          // reduce-motion rise → reduce-motion return
       this.sky.setP(0, 0);
@@ -2614,7 +2897,7 @@ class Battle extends Phaser.Scene {
     const l = this.L;
     this.state = 'sigil';
     const opts = this.rollSigilOpts();
-    if (!opts.length) { this.startFight(); return; }           // every sigil owned — ride on
+    if (!opts.length) { this.afterSigil(); return; }           // every sigil owned — ride on
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
     this.tweens.add({ targets: veil, alpha: 0.86, duration: 300 });
@@ -2662,11 +2945,40 @@ class Battle extends Phaser.Scene {
         sparks.emitParticleAt(card.x, card.y, tier === 2 ? 26 : 12);
         this.tweens.add({ targets: card, scale: 1.05, duration: 130, yoyo: true });
         for (const it of items) if (it !== card && it !== sparks) this.tweens.add({ targets: it, alpha: 0, duration: 200 });
-        this.time.delayedCall(260, () => { sparks.destroy(); for (const it of items) it.destroy(); this.startFight(); });
+        this.time.delayedCall(260, () => { sparks.destroy(); for (const it of items) it.destroy(); this.afterSigil(); });
       });
     });
     items.push(sparks);
     this.overlayC.add(items);
+  }
+
+  // ---------- the map between fights ----------
+  // Campaign only: after the sigil settles, the star chart rises — where the
+  // night stands, what has been felled, what waits above — and the player
+  // taps the breathing constellation to march on. Quick/daily keep their
+  // straight fight → sigil → fight rhythm.
+  afterSigil() {
+    if (this.mode === 'campaign') this.showMap();
+    else this.startFight();
+  }
+  showMap() {
+    const l = this.L;
+    this.state = 'map';
+    this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.86, duration: 300 });
+    const chart = ssStarChart(this, {
+      fightIdx: this.run.fightIdx,
+      onEnter: () => {
+        if (this.state !== 'map') return;
+        this.state = 'anim';
+        this.tweens.add({ targets: [veil, chart.c], alpha: 0, duration: 220 });
+        this.time.delayedCall(240, () => { veil.destroy(); chart.c.destroy(); this.startFight(); });
+      },
+    });
+    this.overlayC.add([veil, chart.c]);
+    chart.c.y = l.u(16); chart.c.alpha = 0;
+    this.tweens.add({ targets: chart.c, y: 0, alpha: 1, duration: 320, ease: 'Back.easeOut' });
   }
 
   // ---------- run end ----------
@@ -2851,6 +3163,12 @@ class Battle extends Phaser.Scene {
     return best;
   }
   demoStep() {
+    if (this.state === 'map') {
+      const ch = this.overlayC.list.find((o) => o.getData && o.getData('mapZone'));
+      const z = ch && ch.getData('mapZone');
+      if (z && z.active) z.emit('pointerdown');
+      return;
+    }
     if (this.state === 'sigil') {
       if (!this.sigilShownAt) this.sigilShownAt = this.time.now;
       if (this.time.now - this.sigilShownAt > 2200) {
