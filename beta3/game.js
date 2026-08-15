@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.24.0';
+const BUILD = 'STARSPELL v0.25.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -2275,7 +2275,8 @@ class Home extends Phaser.Scene {
     // the cinematic opening plays on a cold boot only: restarts (rotation),
     // battle/defeat returns, demo/daily/vsdemo runs and the lang-switch reload
     // all land straight on the interactive meadow
-    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && QS.get('daily') !== '1' && !ssIntroBypassed();
+    const deep = typeof vsDeepPending === 'function' && vsDeepPending();   // ?join= / ?friend= (versus.js)
+    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && QS.get('daily') !== '1' && !deep && !ssIntroBypassed();
     if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
     else if (intro) this.playIntro(l);
     else this.buildMeadowUi(l);
@@ -2317,7 +2318,11 @@ class Home extends Phaser.Scene {
     localStorage.setItem('beta3.boot', BUILD);
     console.log(BUILD);
     DIAG(BUILD + ' · ' + (this.game.renderer.type === Phaser.WEBGL ? 'webgl' : 'canvas') + ' ' + this.game.scale.width + 'x' + this.game.scale.height + ' dprCap ' + DPR);
-    if (QS.get('vsdemo') === '1') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
+    // the summons overlay rides above every screen for the whole visit — a
+    // friend's challenge banner and the friends-layer toasts live there
+    if (this.scene.get('summons') && !this.scene.isActive('summons')) { this.scene.launch('summons'); this.scene.bringToTop('summons'); }
+    if (deep) this.time.delayedCall(300, () => vsDeepRun(this));
+    else if (QS.get('vsdemo') === '1' || QS.get('frdemo') === 'host' || QS.get('frdemo') === 'invite') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
     else if (DEMO || QS.get('daily') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : 'quick') : 'daily'));
   }
   buildMeadowUi(l) {
@@ -2403,6 +2408,7 @@ class Home extends Phaser.Scene {
       // VERSUS — it is a play mode, so it gets a real button like the rest.
       { y: 692, label: SS_T('versus'), sub: SS_T('versusSub'), key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
     ];
+    this.rowSubs = {};
     this.rowBtns = {};
     for (const r of rows) {
       const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.sub ? 58 : 46)).setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true }));
@@ -2411,6 +2417,7 @@ class Home extends Phaser.Scene {
       if (r.sub) {
         const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5));
         if (r.key === 'campaign') this.campSubT = sub;
+        if (r.key) this.rowSubs[r.key] = sub;
       }
       if (r.key) this.rowBtns[r.key] = b;
       b.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
@@ -2468,6 +2475,16 @@ class Home extends Phaser.Scene {
     this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.updateDailyChip();
 
+    // the VERSUS door knows who's waiting behind it: with friends online the
+    // sub-line turns gold and counts them (live from the presence layer)
+    if (this.frOff) this.frOff();
+    this.frOff = SSNET.FR.on((FR) => {
+      const t = this.rowSubs.versus;
+      if (!t || !t.active) return;
+      const n = FR.onlineCount();
+      t.setText(n > 0 ? SS_T('vsFriendsOn', n) : SS_T('versusSub')).setColor(n > 0 ? '#ffe9a8' : BTN_INK2());
+    });
+    this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
     ui(ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5));
     this.muteB = ui(ssTxt(this, l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
     this.muteB.on('pointerdown', () => { SFX.ensure(); SFX.setMuted(!SFX.muted); this.muteB.setText(SFX.muted ? '🔇' : '🔊'); });
@@ -4662,7 +4679,9 @@ if (ART) {
 } else {
   ssBoot();
 }
-SSNET.connect().then(() => { });
+// a profile row for everyone who ever opened the game — friend links and
+// rating cards look names up there, and a first-time inviter has played nothing
+SSNET.connect().then((m) => { if (m === 'firebase') SS.sync(); });
 /* ---------- viewport: resize + rotation ----------
    iOS Safari can fire resize while innerWidth/Height still report the OLD
    orientation, and doesn't always fire again once they settle — trusting the

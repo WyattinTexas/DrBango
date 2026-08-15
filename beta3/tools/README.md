@@ -99,3 +99,27 @@ timer ~25x and makes "the game is frozen" a false diagnosis. Swap the three GL f
 
 Serve the folder over HTTP rather than opening `file://`: the painted art is drawn into
 canvas textures, and a `file://` image taints the canvas so the WebGL upload throws.
+
+## Harness gotchas learned on the friends/invites work (v0.25.0)
+
+- **Never let headless Chrome reach `navigator.share`.** Headless Chrome on macOS still
+  has it (127.0.0.1 is a secure context), and calling it inside a user-activation window
+  opens the NATIVE macOS share sheet — the whole browser process blocks (every CDP eval
+  and even `/json/list` hang) and a panel pops on Skylar's desktop. Strip it with
+  `Page.addScriptToEvaluateOnNewDocument` (`navigator.share = undefined`, and
+  `navigator.clipboard = undefined` so the game falls through to `execCommand('copy')`).
+  It only bites after a REAL synthesized click (transient activation lasts ~5s), which is
+  why an auto-run `?frdemo=invite` boot never showed it.
+- Objects inside a Container are not in `scene.children.list` — search `container.list`
+  (`overlayC`, `lobbyC`, `frC`, `bannerC`).
+- Click at `getBounds().centerX/Y`, not at `(x, y)`: a left-anchored text's origin sits
+  exactly on its hit-area edge and the rounded pointer lands one pixel outside it.
+- Subtract `cameras.main.scrollX/Y` from world coords before `Input.dispatchMouseEvent`
+  — the versus lobby lives at the meadow (`zenithAtZero` sky, camera scrolled ~4200px).
+- `Runtime.evaluate` with `returnByValue` on a Phaser game object comes back `undefined`,
+  not truthy — always wrap finders in `!!(...)`.
+- Friends recipes: `?frdemo=host&mpuid=a` (befriend test_b, wait online, CHALLENGE),
+  `?frdemo=guest&mpuid=b` (auto-ACCEPT the summons), `?frdemo=invite&mpuid=a` (INVITE A
+  FRIEND → private lobby), `?frdemo=join&mpuid=x` (solver on, nothing automatic — the
+  real-click harness drives it). Beacons: `beta3.summons`, `beta3.deeplink`,
+  `beta3.vsresult`. Clean up `friends|recent|invites|presence|players/test_*` after.

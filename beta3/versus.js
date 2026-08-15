@@ -10,7 +10,16 @@
 
    Every 3rd cast of your own → sigil pick-3.
    Boards start identical (shared seed) then diverge.
+
+   Connections (v0.25): the front door is FRIENDS — a mutual list in
+   RTDB (SSNET.FR), presence dots, one-tap CHALLENGE that seals a
+   private room and rings a summons banner on the friend's screen
+   (VsSummons overlay scene, any screen), and native INVITE links
+   (?join=CODE&from=UID via navigator.share / clipboard) that
+   auto-join on boot. The 4-letter seal stays as the fallback.
    Testing: ?vsdemo=1&vsmode=turns|timed|bg&mpuid=a — solver plays.
+   ?frdemo=host|guest|invite|join&mpuid=x — friends recipes (see
+   frDemo / VsSummons.create).
    ============================================================ */
 
 const VS_MAX = { turns: 2, timed: 2, bg: 4 };
@@ -18,10 +27,17 @@ const VS_MIN = { turns: 2, timed: 2, bg: 2 };
 const VS_TIME_MS = 180000;
 const VS_HP = 60;
 const VS_EMBLEMS = ['vulpes', 'strix', 'serpens', 'draco'];
-const VSDEMO = QS.get('vsdemo') === '1';
-const MPUID = QS.get('mpuid');
-const vsUid = () => (MPUID ? 'test_' + MPUID : SSNET.uid());
-const vsName = () => (MPUID ? 'Wisp ' + MPUID.toUpperCase() : SSNET.myName());
+const FRDEMO = QS.get('frdemo');                              // friends-flow test recipes
+const VSDEMO = QS.get('vsdemo') === '1' || !!FRDEMO;          // the solver plays the duel
+const VSAUTO = QS.get('vsdemo') === '1';                      // …and auto quick-matches from the menu
+if (FRDEMO) window.__VSDEMO_REMATCHED = true;                 // friends recipes end after one duel
+// identity comes from SSNET (which honors ?mpuid= for same-machine tests) —
+// friends, presence, invites and seats all key by the same uid
+const vsUid = () => SSNET.uid();
+const vsName = () => SSNET.myName();
+const VS_MODES = ['turns', 'timed', 'bg'];
+const VS_MODE_KEY = { turns: 'vsModeTurns', timed: 'vsModeTimed', bg: 'vsModeBg' };
+const VS_MODE_SUB = { turns: 'vsTurnsSub', timed: 'vsTimedSub', bg: 'vsBgSub' };
 // every seat carries its rating into the room: the Elo exchange at the end
 // reads the rival's number from here, and rhide keeps a veiled rating out of
 // the opponent's VIEW (the math still needs the true value — client-
@@ -32,7 +48,8 @@ const vsSeat = (seat) => ({
 });
 
 /* ============================================================
-   Menu — pick a mode, quick-match or join by seal code
+   Menu — friends first: who's online, one-tap CHALLENGE, native
+   INVITE links; then quick match, then the seal code as fallback
    ============================================================ */
 class VsMenu extends Phaser.Scene {
   constructor() { super('vsmenu'); }
@@ -42,31 +59,188 @@ class VsMenu extends Phaser.Scene {
     ssStarfield(this, 90);
     const back = ssTxt(this, l.x(-195), l.y(24), '‹ HOME', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     back.on('pointerdown', () => { SFX.ui(); this.scene.start('home'); });
-    ssTxt(this, l.x(0), l.y(70), '⚔ VERSUS ⚔', l.u(24), '#f3e5b4').setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(14), true, true);
-    ssTxt(this, l.x(0), l.y(102), 'as ' + vsName(), l.u(12), '#8a94c4', 'italic').setOrigin(0.5);
+    ssTxt(this, l.x(0), l.y(62), '⚔ VERSUS ⚔', l.u(22), '#f3e5b4').setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(14), true, true);
+    ssTxt(this, l.x(0), l.y(90), SS_T('vsAs', vsName()), l.u(11), '#8a94c4', 'italic').setOrigin(0.5);
+    this.busyC = false;
 
     if (SSNET.mode === 'local') {
-      ssTxt(this, l.x(0), l.y(300), 'the wider sky is unreachable —\nduels need a connection', l.u(14), '#8c5a5a', 'italic').setOrigin(0.5).setAlign('center');
+      ssTxt(this, l.x(0), l.y(300), SS_T('vsNoSky'), l.u(14), '#8c5a5a', 'italic').setOrigin(0.5).setAlign('center');
       return;
     }
-    const rows = [
-      { y: 190, label: 'DUEL · TURNS', sub: 'trade words blow for blow — no clock, no mercy', mode: 'turns' },
-      { y: 278, label: 'DUEL · TIMED', sub: 'three minutes, both weaving at once', mode: 'timed' },
-      { y: 366, label: 'BATTLEGROUND', sub: 'two to four mages · every hit finds the leader', mode: 'bg' },
-    ];
-    for (const r of rows) {
-      const b = this.add.image(l.x(0), l.y(r.y), ssBtn(this, false, 320, 66)).setDisplaySize(l.u(320), l.u(66)).setInteractive({ useHandCursor: true });
-      ssTxt(this, l.x(0), l.y(r.y - 10), r.label, l.u(17), BTN_INK()).setOrigin(0.5);
-      ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
-      b.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.match(r.mode); });
-    }
-    ssTxt(this, l.x(0), l.y(460), '— or answer a summons —', l.u(12), '#5a6390').setOrigin(0.5);
-    const joinB = this.add.image(l.x(0), l.y(505), ssBtn(this, true, 260, 52)).setDisplaySize(l.u(260), l.u(52)).setInteractive({ useHandCursor: true });
-    ssTxt(this, l.x(0), l.y(505), 'ENTER A SEAL CODE', l.u(14), '#9fb0e8').setOrigin(0.5);
-    joinB.on('pointerdown', () => this.codePrompt(l));
-    this.noteT = ssTxt(this, l.x(0), l.y(560), '', l.u(11), '#c9b676', 'italic').setOrigin(0.5);
+    this.mode = VS_MODES.includes(localStorage.getItem('beta3.vsmode')) ? localStorage.getItem('beta3.vsmode') : 'turns';
+    if (QS.get('vsmode') && VS_MODES.includes(QS.get('vsmode'))) this.mode = QS.get('vsmode');
 
-    if (VSDEMO) this.time.delayedCall(600, () => this.match(QS.get('vsmode') || 'turns'));
+    this.buildFriends(l);
+
+    // the mode picker — three pills, the chosen one wears the gold button;
+    // CHALLENGE, INVITE and FIND all seal a room of this mode
+    this.pills = {};
+    VS_MODES.forEach((m, i) => {
+      const x = l.x(-124 + i * 124);
+      const b = this.add.image(x, l.y(440), ssBtn(this, true, 116, 32)).setDisplaySize(l.u(116), l.u(32)).setInteractive({ useHandCursor: true });
+      const t = ssTxt(this, x, l.y(440), SS_T(VS_MODE_KEY[m]), l.u(10.5), '#9fb0e8').setOrigin(0.5);
+      b.on('pointerdown', () => { SFX.ui(); this.setMode(m); });
+      this.pills[m] = { b, t };
+    });
+    this.modeSubT = ssTxt(this, l.x(0), l.y(466), '', l.u(9.5), '#8a94c4', 'italic').setOrigin(0.5);
+    this.setMode(this.mode, true);
+
+    // INVITE A FRIEND — the modern door: seals a private room and opens the
+    // share sheet with a link that joins it. Wired on pointerUP: iOS grants
+    // navigator.share/clipboard only inside a user activation, and Phaser's
+    // pointerdown comes from touchstart, which is not one — touchend is.
+    const invB = this.add.image(l.x(0), l.y(512), ssBtn(this, false, 320, 60)).setDisplaySize(l.u(320), l.u(60)).setInteractive({ useHandCursor: true });
+    ssTxt(this, l.x(0), l.y(502), SS_T('vsInvite'), l.u(17), BTN_INK()).setOrigin(0.5);
+    ssTxt(this, l.x(0), l.y(524), SS_T('vsInviteSub'), l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
+    vsOnTap(invB, () => { SFX.ensure(); SFX.ui(); this.inviteFriend(); });
+    // FIND A RIVAL — quick match, as before
+    const findB = this.add.image(l.x(0), l.y(580), ssBtn(this, false, 320, 60)).setDisplaySize(l.u(320), l.u(60)).setInteractive({ useHandCursor: true });
+    ssTxt(this, l.x(0), l.y(570), SS_T('vsFind'), l.u(17), BTN_INK()).setOrigin(0.5);
+    ssTxt(this, l.x(0), l.y(592), SS_T('vsFindSub'), l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
+    findB.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.match(this.mode); });
+    // the seal code — still the cross-device fallback that needs no friend setup
+    ssTxt(this, l.x(0), l.y(632), SS_T('vsOrSeal'), l.u(11), '#5a6390').setOrigin(0.5);
+    const joinB = this.add.image(l.x(0), l.y(664), ssBtn(this, true, 250, 44)).setDisplaySize(l.u(250), l.u(44)).setInteractive({ useHandCursor: true });
+    ssTxt(this, l.x(0), l.y(664), SS_T('vsSeal'), l.u(13), '#9fb0e8').setOrigin(0.5);
+    joinB.on('pointerdown', () => this.codePrompt(l));
+    this.noteT = ssTxt(this, l.x(0), l.y(708), '', l.u(11), '#c9b676', 'italic').setOrigin(0.5).setAlign('center').setWordWrapWidth(l.u(340));
+
+    this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
+    if (VSAUTO) this.time.delayedCall(600, () => this.match(this.mode));
+    if (FRDEMO === 'host' || FRDEMO === 'invite') this.time.delayedCall(800, () => this.frDemo());
+  }
+  note(s, ms) {
+    if (!this.noteT || !this.noteT.active) return;
+    this.noteT.setText(s || '');
+    if (this.noteTimer) { this.noteTimer.remove(false); this.noteTimer = null; }
+    if (s && ms) this.noteTimer = this.time.delayedCall(ms, () => { if (this.noteT.active) this.noteT.setText(''); });
+  }
+  setMode(m, silent) {
+    this.mode = m;
+    try { localStorage.setItem('beta3.vsmode', m); } catch (e) { }
+    const l = ssLayout(this);
+    for (const k of VS_MODES) {
+      const sel = k === m;
+      this.pills[k].b.setTexture(ssBtn(this, !sel, 116, 32)).setDisplaySize(l.u(116), l.u(32));
+      this.pills[k].t.setColor(sel ? BTN_INK() : '#9fb0e8');
+    }
+    this.modeSubT.setText(SS_T(VS_MODE_SUB[m]));
+    if (!silent) this.refreshFriends();
+  }
+
+  /* ---------- the friends panel ----------
+     Live from SSNET.FR: friends online first (dot lit, CHALLENGE ready),
+     then the rest with when they were last seen; below the roll, recent
+     rivals as one-tap "+ ADD" links and the friend-link share. */
+  buildFriends(l) {
+    const PH = 296, top = 118;
+    this.frTop = top;
+    this.add.image(l.x(0), l.y(top + PH / 2), 'endpanel').setDisplaySize(l.u(372), l.u(PH));
+    ssTxt(this, l.x(0), l.y(top + 22), SS_T('vsFriends'), l.u(12), '#c9b676').setOrigin(0.5);
+    this.frC = this.add.container(0, 0);
+    this.frOff = SSNET.FR.on(() => this.refreshFriends());
+    // "seen 2h ago" and online dots age while the menu sits open
+    this.time.addEvent({ delay: 15000, loop: true, callback: () => this.refreshFriends() });
+  }
+  refreshFriends() {
+    if (!this.frC || !this.frC.scene) return;   // (not isActive: the first paint happens inside create)
+    const l = ssLayout(this), top = this.frTop, FR = SSNET.FR;
+    this.frC.removeAll(true);
+    const items = [];
+    const friends = FR.list();
+    const ROWS = 5, rowY = (i) => l.y(top + 54 + i * 38);
+    if (!friends.length) {
+      items.push(ssTxt(this, l.x(0), l.y(top + 120), SS_T('vsNoFriends'), l.u(11), '#5a6390', 'italic').setOrigin(0.5).setAlign('center').setWordWrapWidth(l.u(320)));
+    }
+    const shown = friends.length > ROWS ? friends.slice(0, ROWS - 1) : friends;
+    shown.forEach((f, i) => {
+      const y = rowY(i);
+      const dot = this.add.circle(l.x(-160), y, l.u(4.5), f.online ? 0x7fe0a0 : 0x39406b);
+      if (f.online) {
+        dot.setStrokeStyle(l.u(1), 0xbfffd8, 0.6);
+        this.tweens.add({ targets: dot, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      }
+      items.push(dot);
+      const nm = ssTxt(this, l.x(-146), y - l.u(7), f.name, l.u(13), f.online ? '#f0e8d2' : '#a9a99a').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+      while (nm.width > l.u(150) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+      nm.on('pointerdown', () => ssRatingCard(this, { uid: f.id, name: f.name }));
+      items.push(nm);
+      const p = FR.presence[f.id];
+      const status = f.online ? (f.busy ? SS_T('vsInDuel') : SS_T('vsOnline'))
+        : (p && p.at ? SS_T('vsSeen', vsAgo(Date.now() - p.at)) : SS_T('vsOffline'));
+      items.push(ssTxt(this, l.x(-146), y + l.u(9), status, l.u(9), f.online ? (f.busy ? '#e8a87f' : '#7fe0a0') : '#5a6390', 'italic').setOrigin(0, 0.5));
+      if (f.online && !f.busy) {
+        const cb = this.add.image(l.x(96), y, ssBtn(this, false, 104, 30)).setDisplaySize(l.u(104), l.u(30)).setInteractive({ useHandCursor: true });
+        const ct = ssTxt(this, l.x(96), y, SS_T('vsChallenge'), l.u(10.5), BTN_INK()).setOrigin(0.5);
+        cb.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.challenge(f); });
+        cb.on('pointerover', () => cb.setScale(cb.scaleX * 1.03, cb.scaleY * 1.03));
+        cb.on('pointerout', () => cb.setDisplaySize(l.u(104), l.u(30)));
+        items.push(cb, ct);
+      }
+      const rm = ssTxt(this, l.x(176), y, '✕', l.u(11), '#39406b').setOrigin(0.5).setInteractive({ useHandCursor: true });
+      rm.on('pointerdown', () => { SFX.ui(); FR.remove(f.id); });
+      items.push(rm);
+    });
+    if (friends.length > ROWS) {
+      items.push(ssTxt(this, l.x(0), rowY(ROWS - 1), SS_T('vsMore', friends.length - shown.length), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5));
+    }
+    // recent rivals → one-tap adds
+    const rivals = FR.rivals(3);
+    if (rivals.length) {
+      let x = -168;
+      const lab = ssTxt(this, l.x(x), l.y(top + 254), SS_T('vsRecent') + ':', l.u(9.5), '#5a6390', 'italic').setOrigin(0, 0.5);
+      items.push(lab);
+      x += lab.width / l.u(1) + 10;
+      for (const r of rivals) {
+        const t = ssTxt(this, l.x(x), l.y(top + 254), SS_T('vsAdd') + ' ' + r.name, l.u(10), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+        while (t.width > l.u(120) && t.text.length > 6) t.setText(t.text.slice(0, -2) + '…');
+        t.on('pointerdown', () => { SFX.ui(); t.setColor('#5a6390'); FR.add(r.id, r.name).then(() => vsNotify(SS_T('frAdded', r.name))); });
+        items.push(t);
+        x += t.width / l.u(1) + 14;
+        if (x > 150) break;
+      }
+    }
+    // your friend link — the way to add someone without a duel first
+    const fl = ssTxt(this, l.x(0), l.y(top + 278), SS_T('vsFriendLink'), l.u(10), '#c9b676').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    vsOnTap(fl, () => {
+      SFX.ui();
+      vsShare(SS_T('vsFriendText', vsName()), vsFriendUrl()).then((r) => {
+        if (r === 'copied') this.note(SS_T('vsCopied'), 2500);
+        else if (r === 'failed') this.note(SS_T('vsCopyFail'), 2500);
+      });
+    });
+    items.push(fl);
+    this.frC.add(items);
+  }
+
+  /* ---------- the three doors ---------- */
+  async challenge(f) {
+    if (this.busyC) return;
+    this.busyC = true;
+    this.note(SS_T('vsConsult'));
+    try {
+      const conn = await SSNET.connect();
+      if (conn !== 'firebase') { this.note(SS_T('vsNoSky'), 3000); this.busyC = false; return; }
+      const code = vsCode();
+      const ok = await vsSealRoom(code, this.mode, { private: true, invited: f.id });
+      if (!ok || !this.sys.isActive()) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
+      await SSNET.FR.challenge(f.id, code, this.mode);
+      if (!this.sys.isActive()) return;
+      this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name } });
+    } catch (e) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; }
+  }
+  inviteFriend() {
+    if (this.busyC || SSNET.mode !== 'firebase') { if (SSNET.mode !== 'firebase') this.note(SS_T('vsNoSky'), 3000); return; }
+    this.busyC = true;
+    // the code is minted locally, so the link exists BEFORE the room write
+    // lands — the share sheet opens inside the tap's activation window
+    const code = vsCode();
+    const sharing = vsShare(SS_T('vsShareText', vsName()), vsInviteUrl(code));
+    vsSealRoom(code, this.mode, { private: true }).then((ok) => {
+      if (!this.sys.isActive()) return;
+      if (!ok) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
+      this.scene.start('vsbattle', { code, sharing });
+    });
   }
   codePrompt(l) {
     SFX.ui();
@@ -81,17 +255,159 @@ class VsMenu extends Phaser.Scene {
       const ok = await vsJoinRoom(code);
       if (!this.sys.isActive()) return;   // the scene moved on while we were joining
       if (ok) this.scene.start('vsbattle', { code });
-      else { this.noteT.setText('that seal answers to no one'); this.time.delayedCall(2000, () => this.noteT.setText('')); }
+      else this.note(SS_T('vsColdSeal'), 2000);
     });
   }
   async match(mode) {
-    this.noteT && this.noteT.setText('consulting the stars…');
+    if (this.busyC) return;
+    this.busyC = true;
+    this.note(SS_T('vsConsult'));
     const conn = await SSNET.connect();
-    if (conn !== 'firebase') { this.noteT.setText('the wider sky is unreachable'); return; }
+    if (conn !== 'firebase') { this.note(SS_T('vsNoSky')); this.busyC = false; return; }
     const code = await vsQuickMatch(mode);
+    if (!this.sys.isActive()) return;
     if (code) this.scene.start('vsbattle', { code });
-    else { this.noteT.setText('the stars refused — try again'); }
+    else { this.note(SS_T('vsRefused'), 3000); this.busyC = false; }
   }
+  /* ---------- test recipes (?frdemo=) ----------
+     host:   befriend test_b, wait for them online, CHALLENGE (their tab runs
+             ?frdemo=guest and auto-accepts the summons)
+     invite: INVITE A FRIEND → private lobby; a third tab boots with
+             ?join=<code>&from=test_a to prove the deep link */
+  async frDemo() {
+    await SSNET.connect();
+    if (!this.sys.isActive()) return;
+    if (FRDEMO === 'invite') { this.inviteFriend(); return; }
+    const other = QS.get('frwith') || 'b';
+    await SSNET.FR.add('test_' + other, 'Wisp ' + other.toUpperCase());
+    let tries = 0;
+    const tick = () => {
+      if (!this.sys.isActive()) return;
+      if (SSNET.FR.isOnline('test_' + other) && !SSNET.FR.isBusy('test_' + other)) { this.challenge({ id: 'test_' + other, name: 'Wisp ' + other.toUpperCase() }); return; }
+      if (++tries < 90) this.time.delayedCall(1000, tick);
+    };
+    tick();
+  }
+}
+
+// "seen 3d ago" / "seen 2h 10m ago" / "seen 4m ago"
+function vsAgo(ms) {
+  const d = Math.floor(ms / 86400000);
+  return d >= 1 ? SS_T('cdD', d) : ssCountdown(Math.max(60000, ms));
+}
+
+/* ---------- links + native share ----------
+   Share buttons fire on pointerUP (iOS grants navigator.share / clipboard
+   only inside a user activation, and Phaser's pointerdown comes from
+   touchstart, which is not one — touchend is). But an up alone is a trap:
+   a tap on RETURN in the previous scene queues the switch on its down, and
+   its release then lands on whatever button now sits under the finger in
+   the NEW scene — the INVITE door, as it happens. So arm on down, fire on
+   the matching up, disarm on out. */
+function vsOnTap(obj, fn) {
+  let armed = false;
+  obj.on('pointerdown', () => { armed = true; });
+  obj.on('pointerout', () => { armed = false; });
+  obj.on('pointerup', () => { if (!armed) return; armed = false; fn(); });
+}
+function vsLinkBase() {
+  const u = new URL(location.href);
+  u.search = ''; u.hash = '';
+  return u;
+}
+function vsInviteUrl(code) {
+  const u = vsLinkBase();
+  u.searchParams.set('join', code); u.searchParams.set('from', vsUid());
+  return u.toString();
+}
+function vsFriendUrl() {
+  const u = vsLinkBase();
+  u.searchParams.set('friend', vsUid());
+  return u.toString();
+}
+// share sheet where there is one (iOS/Android/desktop Chrome+Safari), the
+// clipboard where there isn't, the old execCommand path as a last resort.
+// Resolves 'shared' | 'aborted' | 'copied' | 'failed'. A native shell later
+// (WKWebView, the FAVOR precedent) inherits this unchanged — true contacts /
+// Game Center friends would be that shell's job.
+async function vsShare(text, url) {
+  if (navigator.share) {
+    try { await navigator.share({ title: 'STARSPELL', text, url }); return 'shared'; }
+    catch (e) { if (e && e.name === 'AbortError') return 'aborted'; }
+  }
+  const full = text + ' ' + url;
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(full); return 'copied'; } } catch (e) { }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = full; ta.style.cssText = 'position:fixed;left:-1000px;top:0;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    if (ok) return 'copied';
+  } catch (e) { }
+  return 'failed';
+}
+// a toast on whatever screen is up (the summons overlay scene draws it)
+function vsNotify(text) {
+  const s = window.game && game.scene.getScene('summons');
+  if (s && s.sys.isActive() && s.toast) s.toast(text);
+}
+
+/* ---------- deep links: ?join=CODE&from=UID · ?friend=UID ----------
+   Consumed once per page load by Home.create (after compat/intro decisions,
+   before the meadow is interactive): befriend the sender, join the room,
+   drop into its lobby. The URL is scrubbed so a reload or the language
+   switch never answers the same summons twice. */
+const VS_DEEP = (() => {
+  const j = QS.get('join'), f = QS.get('friend'), from = QS.get('from');
+  if (!j && !f) return null;
+  return { join: j ? j.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4) : null, friend: f || from || null, consumed: false };
+})();
+function vsDeepPending() { return !!(VS_DEEP && !VS_DEEP.consumed); }
+async function vsDeepRun(scene) {
+  if (!vsDeepPending()) return;
+  VS_DEEP.consumed = true;
+  INTRO_SEEN = true;   // the meadow, when we get there, is a return — not a cold open
+  try {
+    const u = new URL(location.href);
+    ['join', 'from', 'friend'].forEach((k) => u.searchParams.delete(k));
+    history.replaceState(null, '', u.toString());
+  } catch (e) { }
+  const l = ssLayout(scene);
+  const veil = scene.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setAlpha(0.7).setDepth(650).setInteractive();
+  const t = ssTxt(scene, l.W / 2, l.H * 0.42, VS_DEEP.join ? SS_T('smJoining') : SS_T('lbLoading'), l.u(15), '#ffe9a8', 'italic').setOrigin(0.5).setScrollFactor(0).setDepth(651)
+    .setShadow(0, 0, '#c9b676', l.u(10), true, true);
+  const t2 = VS_DEEP.join ? ssTxt(scene, l.W / 2, l.H * 0.42 + l.u(34), VS_DEEP.join, l.u(30), '#ffe9a8').setOrigin(0.5).setScrollFactor(0).setDepth(651) : null;
+  const done = () => { veil.destroy(); t.destroy(); if (t2) t2.destroy(); };
+  let friendName = null, joined = false;
+  try {
+    const conn = await SSNET.connect();
+    if (conn === 'firebase') {
+      if (VS_DEEP.friend && VS_DEEP.friend !== vsUid()) {
+        // who sent this? the synced profile, else their presence row, else the
+        // seat they hold in the room the link points at (a brand-new stargazer
+        // may never have synced a profile before sharing their first invite)
+        const p = await SSNET.dbGet('players/' + VS_DEEP.friend).catch(() => null);
+        const already = await SSNET.dbGet('friends/' + vsUid() + '/' + VS_DEEP.friend).catch(() => null);
+        friendName = (p && p.name) || null;
+        if (!friendName) { const pr = await SSNET.dbGet('presence/' + VS_DEEP.friend).catch(() => null); friendName = (pr && pr.name) || null; }
+        if (!friendName && VS_DEEP.join) { const seat = await SSNET.dbGet('mp/rooms/' + VS_DEEP.join + '/players/' + VS_DEEP.friend).catch(() => null); friendName = (seat && seat.name) || null; }
+        if (friendName && !already) await SSNET.FR.add(VS_DEEP.friend, friendName);
+        else friendName = null;   // already friends, or no such stargazer — nothing to announce
+      }
+      if (VS_DEEP.join) joined = await vsJoinRoom(VS_DEEP.join);
+    }
+  } catch (e) { }
+  localStorage.setItem('beta3.deeplink', JSON.stringify({ join: VS_DEEP.join, joined, friend: VS_DEEP.friend, friendName, t: Date.now() }));
+  if (!scene.sys.isActive()) return;
+  if (joined) {
+    scene.scene.start('vsbattle', { code: VS_DEEP.join });
+    if (friendName) scene.time.delayedCall(700, () => vsNotify(SS_T('frAdded', friendName)));
+    return;
+  }
+  done();
+  if (VS_DEEP.join) vsNotify(SS_T('smCold'));
+  if (friendName) scene.time.delayedCall(VS_DEEP.join ? 2600 : 200, () => vsNotify(SS_T('frAdded', friendName)));
 }
 
 /* ---------- room helpers ---------- */
@@ -113,6 +429,7 @@ async function vsQuickMatch(mode) {
     }
     for (const [id, r] of Object.entries(rooms)) {
       if (!r || r.status !== 'waiting' || r.mode !== mode) continue;
+      if (r.private) continue;   // sealed for a friend or an invite link — not open sky
       if (now - (r.createdAt || 0) > 5 * 60000) continue;
       const n = Object.keys(r.players || {}).length;
       if (n >= VS_MAX[mode]) continue;
@@ -121,13 +438,23 @@ async function vsQuickMatch(mode) {
     }
     // open a new room
     const code = vsCode();
+    if (!(await vsSealRoom(code, mode, {}))) return null;
+    return code;
+  } catch (e) { return null; }
+}
+// seal a fresh room under a known code (minted by vsCode() beforehand, so an
+// invite link can exist before the write lands). private rooms are skipped
+// by quick match; invited names the friend a CHALLENGE was rung for.
+async function vsSealRoom(code, mode, opts) {
+  try {
     await SSNET.dbSet('mp/rooms/' + code, {
       mode, status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
       seed: Math.floor(Math.random() * 1e9),
+      private: !!(opts && opts.private), invited: (opts && opts.invited) || null,
       players: { [vsUid()]: vsSeat(0) },
     });
-    return code;
-  } catch (e) { return null; }
+    return true;
+  } catch (e) { return false; }
 }
 async function vsJoinRoom(code) {
   try {
@@ -152,7 +479,11 @@ async function vsJoinRoom(code) {
    ============================================================ */
 class VsBattle extends Phaser.Scene {
   constructor() { super('vsbattle'); }
-  init(d) { this.code = d.code; }
+  init(d) {
+    this.code = d.code;
+    this.challenged = d.challenged || null;   // {id,name} when this room was sealed by a CHALLENGE
+    this.sharing = d.sharing || null;         // the INVITE share promise, for lobby feedback
+  }
 
   create() {
     const l = this.L = ssLayout(this);
@@ -173,6 +504,21 @@ class VsBattle extends Phaser.Scene {
 
     this.roomRef = SSNET.ref('mp/rooms/' + this.code);
     if (!this.roomRef) { this.scene.start('vsmenu'); return; }
+    SSNET.FR.setBusy(true);   // friends see "in a duel" and can't ring me mid-fight
+    // a CHALLENGE lobby watches its own bell: if the friend removes it without
+    // taking a seat, they declined
+    if (this.challenged) {
+      this.invRef = SSNET.ref('invites/' + this.challenged.id + '/' + vsUid());
+      this.onInvCb = (snap) => {
+        if (snap.val() != null) return;
+        this.time.delayedCall(1500, () => {
+          if (!this.sys.isActive() || !this.room || this.room.status !== 'waiting') return;
+          if ((this.room.players || {})[this.challenged.id]) return;
+          if (this.lobbySub && this.lobbySub.active) this.lobbySub.setText(SS_T('vsDeclined', this.challenged.name)).setColor('#e8a87f');
+        });
+      };
+      if (this.invRef) this.invRef.on('value', this.onInvCb);
+    }
     this.onRoomCb = (snap) => this.onRoom(snap.val());
     this.roomRef.on('value', this.onRoomCb);
     this.meRef = SSNET.ref('mp/rooms/' + this.code + '/players/' + vsUid());
@@ -187,6 +533,10 @@ class VsBattle extends Phaser.Scene {
       this.game.events.off('ss-ach', this.onAchCb);
       if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
       if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
+      if (this.invRef) this.invRef.off('value', this.onInvCb);
+      SSNET.FR.setBusy(false);
+      // walking out of a challenge lobby takes the bell back
+      if (this.challenged && (!this.room || this.room.status === 'waiting')) SSNET.FR.cancelChallenge(this.challenged.id);
       // this.left: leaveRoom already deleted the seat — update() on the dead
       // path would write players/<uid>/{gone:true} back, resurrecting a ghost
       if (!this.left && this.meRef && this.room && this.room.status !== 'done') this.meRef.update({ gone: true }).catch(() => { });
@@ -262,16 +612,34 @@ class VsBattle extends Phaser.Scene {
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.55);
     const leave = ssTxt(this, l.x(-195), l.y(24), '‹ LEAVE', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     leave.on('pointerdown', () => this.leaveRoom());
-    this.lobbyTitle = txt(l.x(0), l.y(240), 'THE SUMMONS IS SEALED', 20, '#f3e5b4').setOrigin(0.5)
+    const ch = this.challenged;
+    this.lobbyTitle = txt(l.x(0), l.y(206), ch ? SS_T('vsSent', ch.name) : SS_T('lobbyTitle'), ch ? 17 : 20, '#f3e5b4').setOrigin(0.5)
       .setShadow(0, 0, '#c9a94f', l.u(12), true, true);
-    this.lobbyCode = txt(l.x(0), l.y(300), this.code, 44, '#ffe9a8').setOrigin(0.5)
+    while (this.lobbyTitle.width > l.u(360) && this.lobbyTitle.text.length > 8) this.lobbyTitle.setText(this.lobbyTitle.text.slice(0, -2) + '…');
+    this.lobbyCode = txt(l.x(0), l.y(262), this.code, 44, '#ffe9a8').setOrigin(0.5)
       .setShadow(0, 0, '#c9a94f', l.u(18), true, true);
-    this.lobbySub = txt(l.x(0), l.y(348), 'share this seal — your rival enters it under VERSUS', 11, '#8a94c4', 'italic').setOrigin(0.5);
-    this.lobbyRoster = txt(l.x(0), l.y(430), '', 14, '#d8d2bd').setOrigin(0.5).setAlign('center');
-    this.beginB = this.add.image(l.x(0), l.y(540), ssBtn(this, false, 220, 56)).setDisplaySize(l.u(220), l.u(56)).setInteractive({ useHandCursor: true }).setVisible(false);
-    this.beginT = txt(l.x(0), l.y(540), 'BEGIN THE BATTLE', 15, BTN_INK()).setOrigin(0.5).setVisible(false);
+    this.lobbySub = txt(l.x(0), l.y(308), ch ? SS_T('vsWaitAnswer', ch.name) : SS_T('lobbySub'), 11, '#8a94c4', 'italic').setOrigin(0.5)
+      .setAlign('center').setWordWrapWidth(l.u(340));
+    // native invite from the lobby too — same link, same pointerUP rule
+    this.shareB = this.add.image(l.x(0), l.y(360), ssBtn(this, false, 250, 46)).setDisplaySize(l.u(250), l.u(46)).setInteractive({ useHandCursor: true });
+    this.shareT = txt(l.x(0), l.y(360), SS_T('vsShareInvite'), 13, BTN_INK()).setOrigin(0.5);
+    vsOnTap(this.shareB, () => {
+      SFX.ui();
+      vsShare(SS_T('vsShareText', vsName()), vsInviteUrl(this.code)).then((r) => this.shareNote(r));
+    });
+    if (this.sharing) this.sharing.then((r) => this.shareNote(r)).catch(() => { });
+    this.lobbyRoster = txt(l.x(0), l.y(440), '', 14, '#d8d2bd').setOrigin(0.5).setAlign('center');
+    this.beginB = this.add.image(l.x(0), l.y(548), ssBtn(this, false, 220, 56)).setDisplaySize(l.u(220), l.u(56)).setInteractive({ useHandCursor: true }).setVisible(false);
+    this.beginT = txt(l.x(0), l.y(548), 'BEGIN THE BATTLE', 15, BTN_INK()).setOrigin(0.5).setVisible(false);
     this.beginB.on('pointerdown', () => this.hostStart());
-    this.lobbyC.add([veil, this.lobbyTitle, this.lobbyCode, this.lobbySub, this.lobbyRoster, this.beginB, this.beginT, leave]);
+    this.lobbyC.add([veil, this.lobbyTitle, this.lobbyCode, this.lobbySub, this.shareB, this.shareT, this.lobbyRoster, this.beginB, this.beginT, leave]);
+  }
+  shareNote(r) {
+    if (!this.shareT || !this.shareT.active) return;
+    if (r === 'copied') this.shareT.setText(SS_T('vsCopied'));
+    else if (r === 'failed') this.shareT.setText(SS_T('vsCopyFail'));
+    else return;
+    this.time.delayedCall(2600, () => { if (this.shareT.active) this.shareT.setText(SS_T('vsShareInvite')); });
   }
 
   /* ---------- room snapshots drive everything ---------- */
@@ -352,6 +720,9 @@ class VsBattle extends Phaser.Scene {
 
   beginBattle() {
     this.tweens.add({ targets: this.lobbyC, alpha: 0, duration: 400, onComplete: () => this.lobbyC.setVisible(false) });
+    // everyone I cross swords with becomes a recent rival (one-tap add later)
+    for (const p of this.others()) SSNET.FR.noteRival(p.id, p.name);
+    if (this.challenged) SSNET.FR.cancelChallenge(this.challenged.id);   // the bell is answered
     setSeed(this.room.seed || 1);
     this.board = []; this.sel = [];
     this.buildOpponentPanels();
@@ -758,6 +1129,18 @@ class VsBattle extends Phaser.Scene {
     const homeT = ssTxt(this, l.x(0), l.y(525), 'RETURN', l.u(15), '#9fb0e8').setOrigin(0.5).setDepth(151);
     items.push(this.rematchB, this.rematchT, homeB, homeT);
     homeB.on('pointerdown', () => { SFX.ui(); this.scene.start('vsmenu'); });
+    // the rival you just fought is the friend you're most likely to want
+    const foesL = this.others();
+    if (foesL.length === 1 && !SSNET.FR.friends[foesL[0].id] && SSNET.mode === 'firebase') {
+      const f = foesL[0];
+      const addT = ssTxt(this, l.x(0), l.y(578), SS_T('endAddFriend', f.name), l.u(11.5), '#c9b676').setOrigin(0.5).setDepth(151).setInteractive({ useHandCursor: true });
+      while (addT.width > l.u(360) && addT.text.length > 8) addT.setText(addT.text.slice(0, -2) + '…');
+      addT.on('pointerdown', () => {
+        SFX.ui(); addT.disableInteractive().setColor('#7fe0a0').setText(SS_T('endFriends'));
+        SSNET.FR.add(f.id, f.name).then(() => vsNotify(SS_T('frAdded', f.name)));
+      });
+      items.push(addT);
+    }
     this.overlayC.add(items);
     if (this.room.rematch) this.showRematchCall();
     if (VSDEMO) {
@@ -824,5 +1207,117 @@ class VsBattle extends Phaser.Scene {
 VsBattle.prototype.buildTrie = Battle.prototype.buildTrie;
 VsBattle.prototype.bestWord = Battle.prototype.bestWord;
 
+/* ============================================================
+   THE SUMMONS — a transparent overlay scene that runs above every
+   other screen (Home launches it once, brings it to top). It draws
+   two things: the pulsing challenge banner when a friend rings the
+   bell (ACCEPT drops straight into their room, whatever you were
+   doing — the campaign checkpoint is safe, a quick run is not) and
+   small toasts for the friends layer ("X is now your friend").
+   Nothing here is interactive except the banner itself, so taps
+   elsewhere fall through to the scene beneath.
+   ============================================================ */
+class VsSummons extends Phaser.Scene {
+  constructor() { super('summons'); }
+  create() {
+    ssMakeTextures(this);
+    this.bannerC = null; this.shown = null; this.accepting = false;
+    this.toastY = 0;
+    this.frOff = SSNET.FR.on(() => this.refresh());
+    // banners age out and "suppressed" flips as scenes come and go
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.refresh() });
+    this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
+    if (FRDEMO === 'guest') this.time.addEvent({ delay: 1500, loop: true, callback: () => { const inv = SSNET.FR.pending()[0]; if (inv && !this.accepting) this.accept(inv); } });
+  }
+  // no bell while a versus scene is up: a fresh challenge waits in RTDB (5 min)
+  // and rings the moment you're back on a menu
+  suppressed() {
+    const vb = this.scene.get('vsbattle');
+    return !!(vb && vb.sys.isActive());
+  }
+  refresh() {
+    if (!this.sys.isActive()) return;
+    const list = SSNET.FR.pending();
+    const inv = list[0];
+    if (!inv || this.suppressed()) { if (this.bannerC && !this.accepting) this.hide(); return; }
+    if (this.shown && this.shown.from === inv.from && this.shown.code === inv.code) {
+      if (this.moreT && this.moreT.active) this.moreT.setText(list.length > 1 ? SS_T('smMore', list.length - 1) : '');
+      return;
+    }
+    if (this.accepting) return;
+    this.show(inv, list.length - 1);
+  }
+  show(inv, more) {
+    if (this.bannerC) { this.bannerC.destroy(); this.bannerC = null; }
+    this.shown = inv;
+    const l = ssLayout(this);
+    const c = this.bannerC = this.add.container(l.x(0), l.y(120)).setDepth(900);
+    const W = 356, H = 66;
+    const glow = this.add.image(0, 0, 'glowbig').setDisplaySize(l.u(W * 1.5), l.u(H * 2.6)).setTint(0xffd77a).setAlpha(0.16).setBlendMode('ADD');
+    this.tweens.add({ targets: glow, alpha: 0.05, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const bg = this.add.image(0, 0, ssBtn(this, true, W, H)).setDisplaySize(l.u(W), l.u(H)).setInteractive();
+    const name = inv.name || SSNET.FR.nameOf(inv.from);
+    const t1 = ssTxt(this, -l.u(W / 2 - 16), -l.u(13), SS_T('smTitle', name), l.u(13), '#ffe9a8').setOrigin(0, 0.5)
+      .setShadow(0, 0, '#c9b676', l.u(6), true, true);
+    while (t1.width > l.u(220) && t1.text.length > 6) t1.setText(t1.text.slice(0, -2) + '…');
+    const t2 = ssTxt(this, -l.u(W / 2 - 16), l.u(11), SS_T(VS_MODE_KEY[inv.mode] || 'vsModeTurns') + '  ·  ' + inv.code, l.u(10), '#9fb0e8', 'italic').setOrigin(0, 0.5);
+    const ab = this.add.image(l.u(W / 2 - 78), 0, ssBtn(this, false, 96, 32)).setDisplaySize(l.u(96), l.u(32)).setInteractive({ useHandCursor: true });
+    const at = ssTxt(this, l.u(W / 2 - 78), 0, SS_T('smAccept'), l.u(11), BTN_INK()).setOrigin(0.5);
+    this.tweens.add({ targets: [ab, at], alpha: 0.7, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    ab.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.accept(inv); });
+    const xb = ssTxt(this, l.u(W / 2 - 16), 0, '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xb.on('pointerdown', () => { SFX.ui(); SSNET.FR.decline(inv.from); this.hide(); });
+    this.moreT = ssTxt(this, 0, l.u(H / 2 + 12), more > 0 ? SS_T('smMore', more) : '', l.u(9), '#8a94c4', 'italic').setOrigin(0.5);
+    this.acceptT = at;
+    c.add([glow, bg, t1, t2, ab, at, xb, this.moreT]);
+    c.y = l.y(120) - l.u(90); c.alpha = 0;
+    this.tweens.add({ targets: c, y: l.y(120), alpha: 1, duration: 420, ease: 'Back.easeOut' });
+    SFX.forge();
+    localStorage.setItem('beta3.summons', JSON.stringify({ from: inv.from, code: inv.code, mode: inv.mode, t: Date.now() }));
+  }
+  hide() {
+    const c = this.bannerC;
+    this.bannerC = null; this.shown = null; this.moreT = null; this.acceptT = null;
+    if (!c) return;
+    this.tweens.add({ targets: c, alpha: 0, y: c.y - ssLayout(this).u(30), duration: 220, onComplete: () => c.destroy() });
+  }
+  async accept(inv) {
+    if (this.accepting) return;
+    this.accepting = true;
+    if (this.acceptT && this.acceptT.active) this.acceptT.setText('…');
+    let ok = false;
+    try { ok = await vsJoinRoom(inv.code); } catch (e) { ok = false; }
+    SSNET.FR.decline(inv.from);   // the bell is answered either way
+    if (!this.sys.isActive()) { this.accepting = false; return; }
+    if (!ok) { this.accepting = false; this.hide(); this.toast(SS_T('smCold')); return; }
+    // whatever was running steps aside: a battle mid-swing, the meadow, a
+    // sleeping Home under a battle, a half-typed seal code…
+    PENDING_ASCENT = null;
+    for (const s of this.game.scene.getScenes(false)) {
+      if (s === this) continue;
+      if (s.sys.isActive() || s.sys.isSleeping() || s.sys.isPaused()) s.scene.stop();
+    }
+    this.hide();
+    this.accepting = false;
+    this.scene.launch('vsbattle', { code: inv.code });
+    this.scene.bringToTop();
+  }
+  toast(text) {
+    if (!this.sys.isActive()) return;
+    const l = ssLayout(this);
+    const c = this.add.container(l.x(0), l.y(-40)).setDepth(910);
+    const t = ssTxt(this, 0, 0, text, l.u(12), '#ffe9a8').setOrigin(0.5).setShadow(0, 0, '#c9b676', l.u(6), true, true);
+    while (t.width > l.u(330) && t.text.length > 6) t.setText(t.text.slice(0, -2) + '…');
+    const bw = Math.ceil((t.width / l.u(1) + 36) / 20) * 20;   // coarse steps: one baked pill per width bucket
+    const bg = this.add.image(0, 0, ssBtn(this, true, bw, 34)).setDisplaySize(l.u(bw), l.u(34));
+    c.add([bg, t]);
+    const y = this.bannerC ? 186 : 120;   // clear of the home chips (and the banner, when one is up)
+    this.tweens.add({ targets: c, y: l.y(y), duration: 380, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: c, alpha: 0, delay: 2600, duration: 400, onComplete: () => c.destroy() });
+    SFX.ach();
+  }
+}
+
 ssAddScene('vsmenu', VsMenu);
 ssAddScene('vsbattle', VsBattle);
+ssAddScene('summons', VsSummons);

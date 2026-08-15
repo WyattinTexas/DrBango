@@ -21,7 +21,14 @@ const SSNET = (() => {
   let fdb = null;
 
   // ---- identity (device uid + generated name, FAVOR-style) ----
+  // ?mpuid=x is the same-machine test identity ('test_x' + a Wisp name), used
+  // by the two-headless-Chrome versus recipes. It lives HERE, not just in
+  // versus.js, so friends/presence/invites/leaderboards all agree on who
+  // this tab is — a friend record keyed by one uid and a seat keyed by
+  // another would never find each other.
+  const MPUID = (() => { try { return new URLSearchParams(location.search).get('mpuid'); } catch (e) { return null; } })();
   function uid() {
+    if (MPUID) return 'test_' + MPUID;
     let u = localStorage.getItem('starspellUid');
     if (!u) {
       u = 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -32,6 +39,7 @@ const SSNET = (() => {
   const NAME_A = ['Astral', 'Gilded', 'Quiet', 'Umbral', 'Silver', 'Dawn', 'Comet', 'Rune', 'Velvet', 'Winter', 'Ember', 'Moonlit'];
   const NAME_B = ['Quill', 'Fox', 'Owl', 'Weaver', 'Scribe', 'Hare', 'Raven', 'Mage', 'Widow', 'Serpent', 'Bear', 'Lantern'];
   function myName() {
+    if (MPUID) return 'Wisp ' + MPUID.toUpperCase();
     let n = localStorage.getItem('starspellName');
     if (!n) {
       n = NAME_A[Math.floor(Math.random() * NAME_A.length)] + ' ' + NAME_B[Math.floor(Math.random() * NAME_B.length)];
@@ -111,6 +119,7 @@ const SSNET = (() => {
     } catch (e) {
       mode = 'local';
     }
+    if (mode === 'firebase') { try { FR.start(); } catch (e) { } }
     return mode;
   }
 
@@ -212,5 +221,112 @@ const SSNET = (() => {
   // raw ref for live listeners (multiplayer); null when offline/local
   function ref(path) { return mode === 'firebase' && fdb ? fdb.ref(NS + '/' + path) : null; }
 
-  return { connect, uid, myName, setName, submitScore, getBoard, syncProfile, dayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, get mode() { return mode; } };
+  /* ---- friends · presence · summons · recent rivals ------------------------
+     The social layer under versus, all client-authoritative like the rest:
+       friends/{uid}/{fuid}  = {name, at}      mutual — adding writes both sides
+       presence/{uid}        = {name, at, busy} onDisconnect-removed + heartbeat
+       invites/{toUid}/{from}= {name, code, mode, at}   a challenge = a private
+                               room already sealed by the challenger; accepting
+                               is just joining it by code
+       recent/{uid}/{fuid}   = {name, at}      the last few rivals, for one-tap adds
+     One live snapshot of all four is kept here and every UI that cares
+     subscribes with FR.on(cb) — the versus menu, the summons banner, the
+     home button's "friends online" line. Nothing here touches Phaser. */
+  const FR = {
+    friends: {}, presence: {}, invites: {}, recent: {},
+    busy: false, started: false, _cbs: new Set(), _hb: null,
+    ONLINE_MS: 150000,   // a heartbeat every 45s; silent 2.5min = gone
+    INVITE_MS: 5 * 60000,
+    on(cb) { this._cbs.add(cb); try { cb(this); } catch (e) { } return () => this._cbs.delete(cb); },
+    _emit() { for (const cb of this._cbs) { try { cb(this); } catch (e) { try { console.warn('FR listener threw', e); } catch (e2) { } } } },
+    start() {
+      if (this.started || mode !== 'firebase') return;
+      this.started = true;
+      const me = uid();
+      ref('friends/' + me).on('value', (s) => { this.friends = s.val() || {}; this._emit(); });
+      ref('recent/' + me).on('value', (s) => { this.recent = s.val() || {}; this._emit(); });
+      ref('invites/' + me).on('value', (s) => { this.invites = s.val() || {}; this._emit(); });
+      ref('presence').on('value', (s) => { this.presence = s.val() || {}; this._emit(); });
+      // presence, the FAVOR/BoO way: re-armed on every (re)connection because
+      // the server drops the node the moment the socket goes — a phone coming
+      // back from the lock screen has to announce itself again
+      fdb.ref('.info/connected').on('value', (s) => { if (s.val()) this._announce(true); });
+      this._hb = setInterval(() => this._announce(false), 45000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) this._announce(false); });
+      // housekeeping: presence rows whose owner has been silent for an hour
+      // are corpses (onDisconnect can be lost); sweep them once as we pass
+      setTimeout(() => {
+        const cut = Date.now() - 3600000;
+        for (const [k, p] of Object.entries(this.presence)) if (!p || !(p.at > cut)) dbSet('presence/' + k, null).catch(() => { });
+        for (const [k, inv] of Object.entries(this.invites)) if (!inv || !(inv.at > Date.now() - this.INVITE_MS)) dbSet('invites/' + me + '/' + k, null).catch(() => { });
+      }, 8000);
+    },
+    _announce(arm) {
+      const r = ref('presence/' + uid());
+      if (!r) return;
+      if (arm) r.onDisconnect().remove();
+      r.update({ name: myName(), at: Date.now(), busy: !!this.busy }).catch(() => { });
+    },
+    setBusy(b) { this.busy = !!b; if (this.started) this._announce(false); },
+    isOnline(fuid) { const p = this.presence[fuid]; return !!(p && p.at > Date.now() - this.ONLINE_MS); },
+    isBusy(fuid) { const p = this.presence[fuid]; return !!(p && p.busy); },
+    // display name: presence carries the freshest one, the friend record a snapshot
+    nameOf(fuid) { const p = this.presence[fuid], f = this.friends[fuid], r = this.recent[fuid]; return (p && p.name) || (f && f.name) || (r && r.name) || '???'; },
+    list() {   // friends, online first, then most recently added
+      return Object.entries(this.friends).map(([id, f]) => ({ id, name: this.nameOf(id), at: (f && f.at) | 0, online: this.isOnline(id), busy: this.isBusy(id) }))
+        .sort((a, b) => (b.online - a.online) || (b.at - a.at));
+    },
+    onlineCount() { return Object.keys(this.friends).filter((id) => this.isOnline(id)).length; },
+    rivals(n) {   // recent rivals who aren't friends yet, newest first
+      return Object.entries(this.recent).filter(([id]) => !this.friends[id] && id !== uid())
+        .map(([id, r]) => ({ id, name: this.nameOf(id), at: (r && r.at) | 0 })).sort((a, b) => b.at - a.at).slice(0, n || 6);
+    },
+    pending() {   // live challenges to me, newest first
+      const cut = Date.now() - this.INVITE_MS;
+      return Object.entries(this.invites).filter(([, i]) => i && i.code && i.at > cut)
+        .map(([from, i]) => ({ from, ...i })).sort((a, b) => b.at - a.at);
+    },
+    async add(fuid, name) {
+      if (!fuid || fuid === uid()) return false;
+      const me = uid(), at = Date.now();
+      if (!name) { try { const p = await dbGet('players/' + fuid); name = (p && p.name) || this.nameOf(fuid); } catch (e) { name = this.nameOf(fuid); } }
+      try {
+        await dbUpdate('friends/' + me + '/' + fuid, { name: name || '???', at });
+        await dbUpdate('friends/' + fuid + '/' + me, { name: myName(), at });
+        this.friends[fuid] = { name, at }; this._emit();
+        return true;
+      } catch (e) { return false; }
+    },
+    async remove(fuid) {
+      try { await dbSet('friends/' + uid() + '/' + fuid, null); await dbSet('friends/' + fuid + '/' + uid(), null); } catch (e) { }
+    },
+    // remember who I crossed swords with (my own node only) — capped so it
+    // never grows past a handful
+    async noteRival(fuid, name) {
+      if (!fuid || fuid === uid()) return;
+      try {
+        const cur = Object.assign({}, this.recent, { [fuid]: { name: name || '???', at: Date.now() } });
+        const keep = Object.entries(cur).sort((a, b) => (b[1].at | 0) - (a[1].at | 0)).slice(0, 8);
+        await dbSet('recent/' + uid(), Object.fromEntries(keep));
+      } catch (e) { }
+    },
+    // a challenge: the private room is already sealed; this just rings the bell
+    async challenge(fuid, code, mode) {
+      const r = ref('invites/' + fuid + '/' + uid());
+      if (!r) return false;
+      try {
+        r.onDisconnect().remove();   // a challenger who vanishes takes the bell with them
+        await r.set({ name: myName(), code, mode, at: Date.now() });
+        return true;
+      } catch (e) { return false; }
+    },
+    async cancelChallenge(fuid) {
+      const r = ref('invites/' + fuid + '/' + uid());
+      if (!r) return;
+      try { r.onDisconnect().cancel(); await r.remove(); } catch (e) { }
+    },
+    async decline(fromUid) { try { await dbSet('invites/' + uid() + '/' + fromUid, null); } catch (e) { } },
+  };
+
+  return { connect, uid, myName, setName, submitScore, getBoard, syncProfile, dayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
 })();
