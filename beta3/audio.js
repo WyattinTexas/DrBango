@@ -119,6 +119,9 @@ class SynthAudio {
   impact() { this.noise(0.16, 300, 1, 0.2); this.tone(180, 0.18, 'sine', 0.18, 0, 70); }
   bigWord() { [784, 987.8, 1174.7, 1568].forEach((f, i) => this.tone(f, 0.5, 'sine', 0.08, i * 0.06)); this.noise(0.6, 2000, 2, 0.06, 5000); }
   forge() { this.tone(880, 0.3, 'sine', 0.1); this.tone(1318.5, 0.45, 'sine', 0.09, 0.09); }
+  // the forge's mirror: a quiet descending shimmer — an unspent bonus tile
+  // drains back to plain (must never overpower the cast/impact it rides under)
+  fizzle() { this.tone(1046.5, 0.22, 'sine', 0.045); this.tone(784, 0.28, 'sine', 0.04, 0.08); this.tone(587.3, 0.4, 'sine', 0.035, 0.17); }
   hurt() { this.noise(0.35, 200, 0.8, 0.26, 70); this.tone(90, 0.4, 'sawtooth', 0.12, 0, 50); }
   blocked() { this.tone(660, 0.15, 'triangle', 0.14); this.noise(0.12, 1200, 2, 0.1); }
   sigil() { [659.3, 784, 987.8].forEach((f, i) => this.tone(f, 0.4, 'sine', 0.09, i * 0.08)); }

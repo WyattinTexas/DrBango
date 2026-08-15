@@ -890,17 +890,52 @@ class VsBattle extends Phaser.Scene {
       fontFamily: SERIF, fontSize: l.u(ch.length > 1 ? 30 : 36) + 'px', fontStyle: 'bold',
       color: tier === 2 ? '#1d4a66' : tier === 1 ? '#5a3c05' : '#3a3020',
     }).setOrigin(0.5);
-    const val = this.add.text(l.u(25), l.u(21), String(this.tileVal(ch, tier)), {
-      fontFamily: SERIF, fontSize: l.u(12) + 'px', fontStyle: 'bold', color: tier === 1 ? '#7a5510' : '#8d7f60',
+    // value at 15px in near-letter-dark ink — it has to read at arm's length
+    // (and tier 2 finally gets its own blue ink, matching the solo board)
+    const val = this.add.text(l.u(24), l.u(21), String(this.tileVal(ch, tier)), {
+      fontFamily: SERIF, fontSize: l.u(15) + 'px', fontStyle: 'bold',
+      color: tier === 2 ? '#215a7c' : tier === 1 ? '#5f420a' : '#655636',
     }).setOrigin(0.5);
     c.add([img, letter, val]);
     c.setSize(this.tileSize, this.tileSize).setInteractive({ useHandCursor: true });
     c.on('pointerdown', () => this.tapTile(i));
     this.boardC.add(c);
-    this.board[i] = { ch, tier, c };
+    this.board[i] = { ch, tier, c, img, letter, val };
     this.tweens.add({ targets: c, y: p.y, duration: 450, ease: 'Bounce.easeOut', delay: initial ? i * 40 : Math.random() * 90 });
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
+  // USE IT OR LOSE IT, versus edition: same law as the solo board — a bonus
+  // tile not woven into your very next cast drains to plain. Both clients run
+  // the rule on their own boards, so the duel stays fair.
+  expireSpecials() {
+    const l = this.L;
+    let drained = false;
+    for (const s of this.board) {
+      if (!s || !s.tier || !s.c.active) continue;
+      drained = true;
+      const tint = s.tier === 2 ? 0x9fd8ff : 0xffd77a;
+      s.tier = 0;
+      const plain = this.add.image(0, 0, 'tile0').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
+      s.c.addAt(plain, s.c.list.indexOf(s.img) + 1);
+      const old = s.img;
+      s.img = plain;
+      this.tweens.add({ targets: plain, alpha: 1, duration: 480, delay: 120, onComplete: () => { if (old.active) old.destroy(); } });
+      // pure cosmetics use Math.random, never rng() — the seeded stream deals
+      // the tiles and must not be nudged by an animation
+      for (let k = 0; k < 3; k++) {
+        const mote = this.add.image(s.c.x + (Math.random() - 0.5) * l.u(34), s.c.y + (Math.random() - 0.5) * l.u(20), 'dot')
+          .setScale(0.5 + Math.random() * 0.4).setTint(tint).setAlpha(0.5).setBlendMode('ADD').setDepth(60);
+        this.boardC.add(mote);
+        this.tweens.add({ targets: mote, y: mote.y + l.u(16 + Math.random() * 10), alpha: 0, delay: k * 90, duration: 520, ease: 'Sine.easeIn', onComplete: () => mote.destroy() });
+      }
+      this.time.delayedCall(280, () => {
+        if (!s.c.active) return;
+        s.letter.setColor('#3a3020');
+        s.val.setText(String(this.tileVal(s.ch, 0))).setColor('#655636');
+      });
+    }
+    if (drained) SFX.fizzle();
+  }
   tapTile(i) {
     if (this.state !== 'pick' || !this.isMyTurn()) return;
     SFX.ensure();
@@ -1023,6 +1058,7 @@ class VsBattle extends Phaser.Scene {
         await this.roomRef.update({ turnUid: next, turnCount: (this.room.turnCount | 0) + 1 });
       }
       for (const i of used) { if (this.board[i]) { this.board[i].c.destroy(); this.board[i] = null; } }
+      this.expireSpecials();               // unspent bonuses fade before the new reward drops
       if (letters >= 7) this.pendingTier = 2;
       else if (letters >= 5) this.pendingTier = 1;
       if (this.pendingTier && this.hasSigil('forge')) this.pendingTier = 2;

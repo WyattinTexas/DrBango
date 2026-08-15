@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.29.0';
+const BUILD = 'STARSPELL v0.30.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -1587,7 +1587,9 @@ function ssBeastFx(scene, cont, beast, unitScale, asm, opts) {
    scale the box, so the word-line's font-20 look is the same texture at
    20/36 scale. */
 const SS_TILE_INK = ['#3a3020', '#5a3c05', '#1d4a66'];    // letter ink per tier
-const SS_TILE_VINK = ['#8d7f60', '#7a5510', '#2a6a8e'];   // value ink per tier
+// value ink per tier — deliberately near the letter ink's darkness: the old
+// pale inks made the worth unreadable at arm's length (Wyatt's call)
+const SS_TILE_VINK = ['#655636', '#5f420a', '#215a7c'];
 const SS_LINE_GREEN = '#1d6a35';                          // word-line "valid" ink
 function ssGlyph(scene, ch, color) {
   const key = 'gl-' + ch + '-' + color;
@@ -1613,13 +1615,15 @@ function ssGlyphVal(scene, v, color) {
   const key = 'gv-' + v + '-' + color;
   if (!scene.textures.exists(key)) {
     const R = ssTexRes(scene);
-    const t = scene.textures.createCanvas(key, Math.round(26 * R), Math.round(16 * R));
+    const t = scene.textures.createCanvas(key, Math.round(30 * R), Math.round(20 * R));
     const c = t.context;
     c.scale(R, R);
-    c.font = 'bold 12px ' + SERIF;
+    // 15px, up from 12 — the point value has to read at arm's length on a
+    // phone without shouldering the main letter aside
+    c.font = 'bold 15px ' + SERIF;
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillStyle = color;
-    c.fillText(String(v), 13, 8.7);
+    c.fillText(String(v), 15, 10.7);
     t.refresh();
   }
   return key;
@@ -3710,21 +3714,74 @@ class Battle extends Phaser.Scene {
     const img = this.add.image(0, 0, 'tile' + tier).setDisplaySize(this.tileSize, this.tileSize);
     const letter = this.add.image(0, -l.u(2), ssGlyph(this, ch, SS_TILE_INK[tier]))
       .setDisplaySize(l.u(64), l.u(48));
-    const val = this.add.image(l.u(25), l.u(21), ssGlyphVal(this, this.tileVal(ch, tier), SS_TILE_VINK[tier]))
-      .setDisplaySize(l.u(26), l.u(16));
+    const val = this.add.image(l.u(24), l.u(21), ssGlyphVal(this, this.tileVal(ch, tier), SS_TILE_VINK[tier]))
+      .setDisplaySize(l.u(30), l.u(20));
     c.add([img, letter, val]);
+    let glow = null;
     if (tier > 0) {
-      const glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(tier === 2 ? 0.35 : 0.25)
+      glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(tier === 2 ? 0.35 : 0.25)
         .setTint(tier === 2 ? 0x9fd8ff : 0xffd77a).setBlendMode('ADD');
       c.addAt(glow, 0);
     }
     c.setSize(this.tileSize, this.tileSize).setInteractive({ useHandCursor: true });
     c.on('pointerdown', () => this.tapTile(i));
     this.boardC.add(c);
-    this.board[i] = { ch, tier, c };
+    this.board[i] = { ch, tier, c, img, letter, val, glow };
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
+
+  // USE IT OR LOSE IT (Wyatt): a bonus tile must ride the very next cast or
+  // its power drains away — the letter stays, the shimmer goes. Swept after a
+  // cast's impact and BEFORE the refill drops the newly earned tile, so every
+  // reward is live for exactly one cast. The beast's strike is not a cast and
+  // never wastes a tile; only the player's own word can.
+  expireSpecials() {
+    const l = this.L;
+    let drained = false;
+    for (const s of this.board) {
+      if (!s || !s.tier || !s.c.active) continue;
+      drained = true;
+      const wasTier = s.tier, tint = wasTier === 2 ? 0x9fd8ff : 0xffd77a;
+      s.tier = 0;
+      // the goodbye: the glow swells once and drains, gold dust sinks out of
+      // the letter, and the plain face crossfades in under cooling inks
+      if (s.glow) {
+        this.tweens.killTweensOf(s.glow);
+        this.tweens.add({
+          targets: s.glow, alpha: 0.55, scaleX: s.glow.scaleX * 1.3, scaleY: s.glow.scaleY * 1.3,
+          duration: 150, ease: 'Sine.easeOut',
+          onComplete: () => this.tweens.add({ targets: s.glow, alpha: 0, duration: 420, onComplete: () => { if (s.glow.active) s.glow.destroy(); } }),
+        });
+      }
+      const plain = this.add.image(0, 0, 'tile0').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
+      s.c.addAt(plain, s.c.list.indexOf(s.img) + 1);
+      const old = s.img;
+      s.img = plain;
+      this.tweens.add({ targets: plain, alpha: 1, duration: 480, delay: 120, onComplete: () => { if (old.active) old.destroy(); } });
+      // pure cosmetics use Math.random, never rng() — the seeded stream deals
+      // the tiles and must not be nudged by an animation
+      for (let k = 0; k < 3; k++) {
+        const mote = this.add.image(s.c.x + (Math.random() - 0.5) * l.u(34), s.c.y + (Math.random() - 0.5) * l.u(20), 'dot')
+          .setScale(0.5 + Math.random() * 0.4).setTint(tint).setAlpha(0.5).setBlendMode('ADD').setDepth(60);
+        this.boardC.add(mote);
+        this.tweens.add({ targets: mote, y: mote.y + l.u(16 + Math.random() * 10), alpha: 0, delay: k * 90, duration: 520, ease: 'Sine.easeIn', onComplete: () => mote.destroy() });
+      }
+      this.time.delayedCall(280, () => {
+        if (!s.c.active) return;
+        s.letter.setTexture(ssGlyph(this, s.ch, SS_TILE_INK[0])).setDisplaySize(l.u(64), l.u(48));
+        s.val.setTexture(ssGlyphVal(this, this.tileVal(s.ch, 0), SS_TILE_VINK[0])).setDisplaySize(l.u(30), l.u(20));
+      });
+      // teach it once per run — after that the drain speaks for itself
+      if (!this.run.fadeShown) {
+        this.run.fadeShown = true;
+        const ft = ssTxt(this, s.c.x, s.c.y - l.u(52), SS_T('tileFade'), l.u(12), '#c9b676', 'italic')
+          .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#0a0d1c', l.u(8), true, true);
+        this.tweens.add({ targets: ft, alpha: 0, y: ft.y - l.u(20), delay: 1400, duration: 500, onComplete: () => ft.destroy() });
+      }
+    }
+    if (drained) SFX.fizzle();
+  }
 
   // ---------- selection ----------
   tapTile(i) {
@@ -4056,7 +4113,8 @@ class Battle extends Phaser.Scene {
       this.layoutLine();
       this.beastHit(dmg);
       this.time.delayedCall(200, () => {
-        if (this.beast.hpNow <= 0) return;
+        if (this.beast.hpNow <= 0) return;   // board rebuilds next fight — nothing to drain
+        this.expireSpecials();               // unspent bonuses fade BEFORE the new reward drops
         this.fillBoard(false);
         this.tickEnemy(() => { this.state = 'pick'; });
       });
