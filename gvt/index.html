@@ -3421,7 +3421,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.79</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.80</div>
   <div class="scanlines"></div>
 </div>
 
@@ -15093,7 +15093,7 @@ const BF_EXTRA_HEX=['#E890C8','#9CC24E','#6FC7E8','#223E7A','#96703F','#C24AC2',
 // every class since v2.34, applyDeploy's membership check lets a friend's
 // relayed spy land, and the ONE consumer that must never deal him is the AI
 // brain's afford list — its filter names him, the secret stays found-only.)
-const BF_TYPES=['rifleman','mgunner','bazooka','mortar','minesweeper','flame','radioman','commando','spy','bfjeep','bftank','jeep2','sarge'];   // 0278e: the V2 JEEP trays only when EARNED (bfTray's vehKind gate) — the AI director funds 'bfjeep'/'bftank' by name and can never field it
+const BF_TYPES=['rifleman','mgunner','bazooka','mortar','minesweeper','flame','radioman','commando','spy','bfjeep','bftank','jeep2','sarge'];   // 0278e; 0316 [WYATT]: the V2 REPLACES the scout — bfTray seats it IN THE JEEP'S SLOT and drops this trailing entry (⚠ the ARRAY itself is wire order — bcnRoom/roomAdoptSeat serialize indexOf — and is never reordered); the AI director funds 'bfjeep'/'bftank' by name and the afford filter now names jeep2 out (the spy grammar)
 // SAME DOG TAGS AS THE CAMPAIGN (Wyatt 7/24: "use the same ones so players
 // aren't confused") — BF_COST *is* the campaign price list, Sarge free like
 // always. The passive drip and the kill bounties are scaled into campaign
@@ -15208,7 +15208,7 @@ const BF_MOVE = {
   // root never bites here (a gunner IN a jeep's lane is standing his ground
   // anyway). Re-measured: one full-hp jeep still crosses a lone gunner's fire.
   bfjeep:     { moveSpd:130, hp:24 },
-  jeep2:      { moveSpd:130, hp:24 },   // 0278e: the V2 rides the jeep's own column — the +30% is a CLOSING bonus in bfMarch, the +40% hp lives at vehHP (both shown in the notes' math)
+  jeep2:      { moveSpd:130, hp:24 },   // 0278e→0316: the V2 rides the jeep's own column — THE CHARGE BURST (J2_CHARGE ramp) lives in bfMarch, the +40% hp at vehHP (both shown in the notes' math)
   bftank:     { moveSpd:22,  hp:40 }
 };
 // THE MARCHING CAMPAIGN (v1.30) reads this table RAW: BF_PACE exists because the
@@ -15277,8 +15277,9 @@ const VEH_INFO={
            line:'250 DOG TAGS IN THE MATCH · NO GUN · ALL NERVE' },
   bftank:{ name:'THE HEAVY TANK', band:'#4B5A2E', tag:'REAL ROLLING CANNON! Out-shoots the whole line.',
            line:'500 DOG TAGS IN THE MATCH · 210 REACH · SLOW AS SUNDAY' },
-  // 0278e: §17 grammar — this row renders ONLY once owned (shopV2HTML); the
-  // line reuses the pole's own provenance key, the tag stays digit-free (the
+  // 0278e→0316: this row is the FACE the jeep crate wears once the V2 is
+  // owned (shopRigHTML's vehFaceK — the separate bay is retired); the line
+  // reuses the pole's own provenance key, the tag stays digit-free (the
   // tokeniser law — a digit in composed prose demands a {0}-shaped key)
   jeep2:{ name:'THE V2 JEEP', band:'#8A6B2E', tag:"THE KING'S OWN MACHINE! Faster on the charge, harder to crack.",
            line:"KING REX'S PRIZE · NEVER SOLD" }
@@ -15295,14 +15296,31 @@ function vehOwns(t){ return (META.vehOwned||[]).indexOf(t)>=0; }
 // motor-pool KIND without ever joining VEH_ORDER — the vehGift migration
 // seeds that list free to any save with battleground history, and the
 // veh2/plate medals iterate it; an EARNED machine must join neither.
-// [WYATT stats] +40% max HP · +30% acceleration when approaching enemies.
+// [WYATT stats 0278e→0316] +40% max HP · THE CHARGE BURST ("MASSIVELY
+// ACCELERATES when closing in on enemies — a charge burst almost like the
+// Triceratops", Wyatt 8/14 — the 0278e flat ×1.3 is RETIRED).
 // Both derive from the jeep's own garage (the vehHP/vehEng delegates), so
 // the plate rail and the engine on the jeep crate feed the V2 too — one
-// chassis family, upgraded. J2_SIGHT is the executor dial for "approaching":
+// chassis family, upgraded. J2_SIGHT is the executor dial for "closing in":
 // 260px (the dilo-aggro family) — a live enemy inside it AND this frame's
-// step closing on it (the dot test in bfMarch) = the charge.
-const J2_HP_MUL=1.4, J2_CLOSE=1.3, J2_SIGHT=260;
+// step closing on it (the dot test in bfMarch) ARMS the burst; u.j2c winds
+// 0→1 over J2_RAMP seconds and the march multiplies 1→J2_CHARGE with it,
+// dying the frame the trigger drops. 221 base → 486 at full song — the
+// trike's own dash is 470 (measured, not vibes); the engine's ×1.45 still
+// stacks on the def copy. Both dials are one-const Wyatt levers.
+const J2_HP_MUL=1.4, J2_CHARGE=2.2, J2_RAMP=0.5, J2_SIGHT=260;
 function vehKind(t){ return VEH_ORDER.indexOf(t)>=0 || t==='jeep2'; }
+// 0316 THE REPLACEMENT LAW [WYATT]: "Once acquired, it simply TAKES THE
+// SCOUT JEEP'S SLOT." vehHas answers "is this garage OPEN" — the jeep's
+// garage opens with EITHER key (the 450★ Surplus buy or the lair's earned
+// V2; a V2-first save never needs the scout), and every jeep-slot surface
+// (tray, crate, rail doors, veh2 medal, mystery box, emergency loaner)
+// resolves through it. vehFaceK answers WHOSE FACE the jeep slot wears:
+// the V2's the moment it is owned, the scout's until then. The garage KEYS
+// never move — plates/engine stay under 'bfjeep' in the save, which IS the
+// carry-over: same rail, same tier, zero migration.
+function vehHas(t){ return vehOwns(t) || (t==='bfjeep' && vehOwns('jeep2')); }
+function vehFaceK(t){ return (t==='bfjeep' && vehOwns('jeep2'))? 'jeep2' : t; }
 // 0100 THE ENGINE readers. vehEng's array guard is the v1.88 normalise-at-the-
 // reader law (a hand-rolled string save must never corrupt a buy), and jetEng
 // counts ONLY the exact 1 the buy writes — garbage under-grants, never over
@@ -15326,7 +15344,8 @@ function vehNextCost(t){ const r=vehTier(t); return r>=VEH_TIERS? 0 : VEH_TIER_C
 // there is nothing to migrate: an account that bought its extras keeps every
 // card, and the OTHER seats still read BF_TYPES raw (their muster — and their
 // motor pool — is none of your business).
-function bfTray(){ const L=BF_TYPES.filter(t=> vehKind(t)? vehOwns(t) : (t==='sarge' || unitOwned(t)));   // 0278e: vehKind — the V2 jeep gates on the Surplus ledger like its brothers
+function bfTray(){ const L=BF_TYPES.filter(t=> t==='jeep2'? false : t==='bfjeep'? vehHas(t) : vehKind(t)? vehOwns(t) : (t==='sarge' || unitOwned(t)))
+    .map(t=> (t==='bfjeep' && vehOwns('jeep2'))? 'jeep2' : t);   // 0316 [WYATT]: the V2 TAKES THE SCOUT'S SLOT — one jeep card at the jeep's own position (before the tank), never the 0278e thirteenth card at the end; vehHas seats a V2-first save with no 450★ buy
   return (S.bf && S.cfg.terrain.cq)? L.filter(t=>!CQBAN[t]) : L; }   // 0303 THE STARSHIP: the ship trays no banned machine
 
 // ===== VICTORY FIREWORKS (v1.65, Wyatt 7/28) =====
@@ -15425,7 +15444,7 @@ function emgActivate(n, veh){
   S.emgUsed=true; S.emgFlash=0.9;
   if(n==null) n=Math.floor(Math.random()*EMG_FX);
   n=Math.max(0,Math.min(EMG_FX-1,n|0));
-  if(n===4 && !veh) veh=(Math.random()<0.5? 'bfjeep':'bftank');
+  if(n===4 && !veh) veh=(Math.random()<0.5? (vehOwns('jeep2')?'jeep2':'bfjeep') :'bftank');   // 0316: the loaner is YOUR shelf's jeep (the v1.62 law) — the V2 once it holds the slot; the vehicle rides an ordinary relayed placement and an old build's announce maps any non-tank to A FREE JEEP! already
   const tag=S.bf? 's'+bfMySeat() : 'me';
   emgRun(n, veh, tag, S.bf? bfMyTeam() : null, true);
   // the wire word carries the ROLL, not the dice. `n` and `t` are already on
@@ -19971,7 +19990,7 @@ const UDEF = {
   // it hurts people by driving into them, see bfRam). Pace + plastic live in
   // BF_MOVE with the rest of the battleground table.
   bfjeep:  { rng:0,   rate:0,   dmg:0, air:false, grit:3, name:'JEEP', vehicle:true, ram:4, ramR:46 },
-  jeep2:   { rng:0,   rate:0,   dmg:0, air:false, grit:3, name:'V2 JEEP', vehicle:true, ram:4, ramR:46 },   // 0278e THE V2 JEEP — the lair's Hard prize: the jeep's own row (the +40% hp / +30% closing land at vehHP / bfMarch, never in the shared def)
+  jeep2:   { rng:0,   rate:0,   dmg:0, air:false, grit:3, name:'V2 JEEP', vehicle:true, ram:4, ramR:46 },   // 0278e THE V2 JEEP — the lair's Hard prize: the jeep's own row (the +40% hp / the 0316 charge burst land at vehHP / bfMarch, never in the shared def)
   bftank:  { rng:210, rate:0.5, dmg:6, air:false, grit:3, name:'TANK', vehicle:true, splash:48, scatter:26 }
 };
 const FDEF = {
@@ -23894,7 +23913,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.79';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.80';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -28625,18 +28644,27 @@ function bfMarch(u,dt,goal){
     const nl=Math.hypot(nx,ny)||1; nx/=nl; ny/=nl;
   }
   u.slide={x:nx,y:ny};                            // always current, only read on ice
-  // 0278e THE V2 JEEP [WYATT]: +30% acceleration when APPROACHING enemies.
-  // "Approaching" (the executor reading, flagged in the notes): a live
-  // enemy inside J2_SIGHT of him AND this frame's actual step direction
-  // CLOSING on it (the dot test) — target-in-sight + closing, measured on
-  // the movement itself so a jeep steering AROUND a rock mid-charge keeps
-  // the bonus only while the step still closes. Deterministic (no RNG) and
-  // per-sim like all combat; enemies are the other teams' men on the
-  // battleground and S.foes on the campaign carpet. Vs the jeep's BF_MOVE
-  // column: 130 ×1.7 baked = 221 → 287 on the charge; the engine's ×1.45
-  // stacks exactly as it does for the jeep (the def copy carries it).
+  // 0316 THE CHARGE BURST [WYATT]: "MASSIVELY ACCELERATES when closing in
+  // on enemies — a charge burst almost like the Triceratops." The 0278e
+  // flat ×1.3 is RETIRED; the TRIGGER is kept verbatim (deterministic, no
+  // RNG): a live enemy inside J2_SIGHT AND this frame's post-steer step
+  // CLOSING on it (the dot test), so a jeep steering AROUND a rock keeps
+  // the charge only while the step still closes; enemies are the other
+  // teams' men on the battleground and S.foes on the campaign carpet. NEW:
+  // the burst RAMPS — u.j2c winds 0→1 over J2_RAMP while the trigger holds
+  // (dt-driven, the u.stall grammar: lockstep across sims, and GVT.step's
+  // 1/60 makes 0.5s exactly 30 frames) and resets the frame it doesn't, so
+  // the read is the trike's own rhythm: a beat of wind-up, then the
+  // scream-in at ×J2_CHARGE. 221 → 486 at full song (trike dash 470); the
+  // engine's ×1.45 stacks on the def copy exactly as it does for the
+  // scout. The rooster tail thickens with the burst — draw-only dust
+  // through S.fx (bfRam's own puff grammar: RNG in fx, never in the step).
+  // ⚠ 0278l who-hits-first is UPDATE ORDER: untouched — bfRam still runs
+  // before the wheels turn; the charge moves arrival time, never strike
+  // order.
   let v2m=1;
   if(u.type==='jeep2'){
+    let j2close=false;
     const es=S.bf? S.units : S.foes;
     for(const o2 of es){
       if(o2===u || o2.dead) continue;
@@ -28644,8 +28672,12 @@ function bfMarch(u,dt,goal){
       else if(o2.burrow) continue;
       const ex=o2.x-u.x, ey=o2.y-u.y;
       if(Math.hypot(ex,ey)>J2_SIGHT) continue;
-      if(nx*ex+ny*ey>0){ v2m=J2_CLOSE; break; }
+      if(nx*ex+ny*ey>0){ j2close=true; break; }
     }
+    u.j2c = j2close? Math.min(1,(u.j2c||0)+dt/J2_RAMP) : 0;
+    v2m = 1+(J2_CHARGE-1)*u.j2c;
+    if(u.j2c>0.4 && Math.random()<dt*26)
+      S.fx.push({k:'puff',x:u.x-(S.bf? (u.side==='you'?30:-30) : 30),y:u.y-2,t:0,dur:0.26,R:9});
   }
   u.x+=nx*sp*v2m*dt; u.y+=ny*sp*v2m*dt;
   // v3.61 (0307 WALK-FLIP): the stride's INTENT velocity stamps the walk
@@ -29760,7 +29792,7 @@ OpponentBrain.prototype.decide=function(view,budget){
   // player literally cannot see would read as cheating, and the secret is
   // the player's to find. One name in one filter; relayed HUMAN spies still
   // land through applyDeploy like any order.
-  const afford=BF_TYPES.filter(t=>t!=='spy' && BF_COST[t]<=budget && (t!=='sarge'||!hasSarge));
+  const afford=BF_TYPES.filter(t=>t!=='spy' && t!=='jeep2' && BF_COST[t]<=budget && (t!=='sarge'||!hasSarge));   // 0316: THE KING'S OWN MACHINE never fields in enemy colors — the generic pick could reach it on a windfall (pref defaulted to 1); one name in one filter, the spy's own grammar
   if(!afford.length) return [];
   const pressure = theirs.some(u=>u.dropT<=0&&u.x>MID-80) || own.length<2;
   // ===== THE MOTOR POOL FUND (7/25) =====
@@ -32592,7 +32624,7 @@ function unitImg(k,u){
 // (bfMe() replaced the old const BF_ME here in v1.24 — your chair moves now)
 // how big a figure is drawn on the carpet — one answer, so the man, his ghost
 // and his corpse are always the same size (the vehicles dwarf the infantry)
-function unitW(t){ return t==='bftank'? 92 : t==='bfjeep'? 76 : t==='mortar'? 58 : t==='commando'? 58 : 54; }
+function unitW(t){ return t==='bftank'? 92 : (t==='bfjeep'||t==='jeep2')? 76 : t==='mortar'? 58 : t==='commando'? 58 : 54; }   // 0316: the V2 draws at the jeep family's width — the slot's machine, not a 54px infantryman (a 0278e miss)
 // the veteran stripe has to contrast with whatever colour that army is wearing
 function vetStripe(){ const h=dyeHex(); return (h&&h.toUpperCase()==='#E8E8E8')?'#4A4A4A':'#fff'; }
 function spawnGroup(g){
@@ -33929,7 +33961,7 @@ const COOP_MILES=[
 // over. vehKills is scored by the KILLER's own vehicle flag (see noteKill).
 ACH.push(...achSet('veh',[
   ['veh1','MOTOR POOL',   'Own your first vehicle',                            1, vehOwnCount],
-  ['veh2','BOTH SETS OF KEYS','Own the jeep AND the tank',                     2, ()=>VEH_ORDER.filter(vehOwns).length],   // 0278e: count the SHOP pair only — the earned V2 jeep must not stand in for the tank (the claim names both machines; veh1 above keeps the raw count — owning the V2 IS owning a vehicle)
+  ['veh2','BOTH SETS OF KEYS','Own the jeep AND the tank',                     2, ()=>VEH_ORDER.filter(vehHas).length],   // 0278e→0316: under the replacement law the V2 IS the jeep, so vehHas opens the JEEP half for a V2-first save (its crate reads owned — the wall must agree); the V2 still never stands in for the TANK half, 0278e's actual concern (veh1 keeps the raw count)
   ['veh3','FIRST PLATE',  'Bolt one armour plate onto a vehicle',              1, vehPlateBest],
   ['veh4','UP-ARMOURED',  'Get a vehicle to three plates',                     3, vehPlateBest],
   ['veh5','FULL PLATE',   'Get a vehicle to full armour',           VEH_TIERS,    vehPlateBest],
@@ -46928,7 +46960,7 @@ function shopPackHTML(s){
 // in line — the rail reads as one thing to a kid, and the caption always names
 // the exact price and the exact plastic it adds.
 function shopRigHTML(t){
-  const inf=VEH_INFO[t], own=vehOwns(t), r=vehTier(t), dye=dyeHex()||undefined;
+  const fk=vehFaceK(t), inf=VEH_INFO[fk], own=vehHas(t), r=vehTier(t), dye=dyeHex()||undefined;   // 0316: once the V2 is earned the jeep crate WEARS IT — one crate, the scout's slot, the V2's face (name/art/tag/line/stats), and a V2-first save reads OWNED with no 450★ buy; the rail below keeps the jeep's own garage keys — that IS the carry-over
   const maxed=r>=VEH_TIERS, eng=vehEng(t);
   // v1.94 ONE RAIL (Wyatt 7/31: "too many numbers… the simplicity of before we
   // added the boosters"): the engine is the gold slot CAPPING the rail — its
@@ -46945,41 +46977,27 @@ function shopRigHTML(t){
     +'onclick="UI.vehEng(\''+t+'\')" aria-label="the engine">'+(eng?'✓':'')+'</button>'
     +(eng? '' : '<i class="sh-engp">'+ENG_COST[t]+'★</i>');
   const cap = !own? 'UNLOCK IT FIRST'
-    : !maxed? 'NEXT PLATE '+vehNextCost(t)+'★ · +'+(vehHP(t,r+1)-vehHP(t,r))+' PLASTIC'
+    : !maxed? 'NEXT PLATE '+vehNextCost(t)+'★ · +'+(vehHP(fk,r+1)-vehHP(fk,r))+' PLASTIC'
     : !eng? 'THE ENGINE '+ENG_COST[t]+'★ · +'+(espd-spd)+' SPEED'
     : 'FULLY PLATED · ENGINE ✓';
   return '<div class="sh-bay">'
     +'<button type="button" class="sh-crate'+(own?' own':'')+'" id="shvh-'+t+'" onclick="UI.vehBuy(\''+t+'\')">'
       +'<span class="sh-cband" style="background:'+inf.band+'"><i>GREEN ARMY · MOTOR POOL</i><b>'+inf.name+'</b></span>'
-      +'<span class="sh-cwin"><img src="'+vehURI(t)+'" alt=""></span>'
+      +'<span class="sh-cwin"><img src="'+vehURI(fk)+'" alt=""></span>'
       +'<span class="sh-ctag">'+inf.tag+'</span>'
-      +(own? '<span class="sh-cstamp">IN THE POOL ✓</span><img class="sh-cout" src="'+vehURI(t,dye)+'" alt="">'
+      +(own? '<span class="sh-cstamp">IN THE POOL ✓</span><img class="sh-cout" src="'+vehURI(fk,dye)+'" alt="">'
            : '<span class="sh-cprice">'+VEH_UNLOCK[t]+'★</span>')
       +'<span class="sh-cline">'+inf.line+'</span></button>'
     +'<div class="sh-rig'+(own?'':' lock')+'" id="shvr-'+t+'">'
-      +'<span class="sh-rnum">PLASTIC <b>'+vehHP(t, own? r : 0)+'</b>'
-        +(own&&!maxed? ' <i>&#8594; '+vehHP(t,r+1)+'</i>' : '')+'</span>'
+      +'<span class="sh-rnum">PLASTIC <b>'+vehHP(fk, own? r : 0)+'</b>'
+        +(own&&!maxed? ' <i>&#8594; '+vehHP(fk,r+1)+'</i>' : '')+'</span>'
       +'<span class="sh-prow">'+plates+'</span>'
       +'<span class="sh-pcap">'+cap+'</span>'
     +'</div></div>';
 }
-// 0278e THE V2 JEEP's bay — §17 grammar from BIRTH: the bay EXISTS only
-// once earned (no locked tease, no lock line, no silhouette — the raid
-// keeps its secret), then reads OWNED forever: no price, no rail (its
-// plates are the jeep's own — the vehHP/vehEng delegates), the stat story
-// on the tag and the pole's own provenance line under it. The crate tap is
-// inert by construction (UI.vehBuy gates on VEH_ORDER).
-function shopV2HTML(){
-  const inf=VEH_INFO.jeep2, dye=dyeHex()||undefined;
-  return '<div class="sh-bay">'
-    +'<button type="button" class="sh-crate own" id="shvh-jeep2" onclick="UI.vehBuy(\'jeep2\')">'
-      +'<span class="sh-cband" style="background:'+inf.band+'"><i>GREEN ARMY · MOTOR POOL</i><b>'+inf.name+'</b></span>'
-      +'<span class="sh-cwin"><img src="'+vehURI('jeep2')+'" alt=""></span>'
-      +'<span class="sh-ctag">'+inf.tag+'</span>'
-      +'<span class="sh-cstamp">IN THE POOL ✓</span><img class="sh-cout" src="'+vehURI('jeep2',dye)+'" alt="">'
-      +'<span class="sh-cline">'+inf.line+'</span></button>'
-    +'</div>';
-}
+// 0316: shopV2HTML RETIRED — the 0278e separate owned-only bay was the V2
+// "trying to fit in and be its own thing" (Wyatt 8/14). The V2 wears the
+// ONE jeep crate now (shopRigHTML's vehFaceK), rail and all.
 // THE JET PACK's bay (v1.70): the campaign prize racked beside the two crates —
 // narrower box (gear, not a machine), NO price sticker ever (never sold; the
 // campaign is the only door), with the BOOSTER RAIL under it. Locked until the
@@ -47584,7 +47602,7 @@ function renderShop(){
         +'<div class="sh-packrow">'+SHOP_ITEMS.map(shopPackHTML).join('')+shopEmgHTML()+'</div>'
         +'<div class="sh-rail"></div></section>'
       +'<section class="sh-dept" id="shMotor"><h2>THE MOTOR POOL<small>BOXED VEHICLES · FLIGHT GEAR · UPGRADES SOLD SEPARATELY</small></h2>'
-        +'<div class="sh-bays">'+VEH_ORDER.map(shopRigHTML).join('')+(vehOwns('jeep2')? shopV2HTML():'')+shopJetHTML()+(bmbOwned()? shopBmbHTML():'')+'</div>'
+        +'<div class="sh-bays">'+VEH_ORDER.map(shopRigHTML).join('')+shopJetHTML()+(bmbOwned()? shopBmbHTML():'')+'</div>'
         +'<div class="sh-rail"></div></section>'
       // SARGE'S OUTFITS (v2.16): the fitting corner — the man himself on his
       // little stage (the same one reader every room surface uses, so the
@@ -48448,14 +48466,14 @@ function mboxPool(){
       art:'<img src="'+sprURI('rifleman',a.hex)+'" alt="">',
       g(){ META.dyes.push(a.id); }});
   for(const t of VEH_ORDER){
-    if(!vehOwns(t))
+    if(!vehHas(t))   // 0316: a V2-first save's box must never gift the scout it replaced
       pool.push({k:'veh', id:t, name:VEH_INFO[t].name, line:MB_LINES.veh,
         art:'<img src="'+vehURI(t)+'" alt="">',
         g(){ META.vehOwned.push(t); }});
-    else { const r=vehTier(t);
+    else { const r=vehTier(t), fk=vehFaceK(t);   // 0316: the plate card wears the face the crate wears
       if(r<VEH_TIERS)
-        pool.push({k:'vehup', id:t, name:tf('AN ARMOUR PLATE — %1', TXT(VEH_INFO[t].name)), notr:1,
-          line:MB_LINES.vehup, art:'<img src="'+vehURI(t)+'" alt="">',
+        pool.push({k:'vehup', id:t, name:tf('AN ARMOUR PLATE — %1', TXT(VEH_INFO[fk].name)), notr:1,
+          line:MB_LINES.vehup, art:'<img src="'+vehURI(fk)+'" alt="">',
           g(){ META.vehUp[t]=r+1; }}); } }
   // THE BOOSTER RAIL (v1.70): in the box only while the store itself would
   // sell one (pack earned, rail not full) — the v1.68 gated-part law: a box
@@ -49191,7 +49209,7 @@ window.UI = {
   // ===== THE MOTOR POOL: the unlock, then the plates =====
   // Unlocking is what puts the card in the battleground tray at all — the 250/500
   // dog tags in the match are unchanged and still due every time you field one.
-  vehBuy(t){ if(VEH_ORDER.indexOf(t)<0 || vehOwns(t)) return;
+  vehBuy(t){ if(VEH_ORDER.indexOf(t)<0 || vehHas(t)) return;   // 0316: a V2-holder's crate reads OWNED — it must never sell him the scout under the V2's face
     if(META.starBank<VEH_UNLOCK[t]){ shopDeny('shvh-'+t); return; }
     if(!shopAsk('vehBuy',[t],VEH_UNLOCK[t],VEH_INFO[t].name)) return;   // 0320
     META.starBank-=VEH_UNLOCK[t]; META.vehOwned.push(t); saveMeta(); renderMenu();
@@ -49203,11 +49221,11 @@ window.UI = {
     cr.classList.add('buying');                    // let the unboxing play out first
     setTimeout(()=>shopRefresh(), 1000); },
   // any unbought plate buys the NEXT one in line — the rail is one control
-  vehUp(t){ if(!vehOwns(t)){ shopDeny('shvh-'+t); return; }
+  vehUp(t){ if(!vehHas(t)){ shopDeny('shvh-'+t); return; }   // 0316: the earned V2 opens the jeep rail — same plates, same keys
     const r=vehTier(t); if(r>=VEH_TIERS) return;
     const cost=VEH_TIER_COST[t][r];
     if(META.starBank<cost){ shopDeny('shvr-'+t); return; }
-    if(!shopAsk('vehUp',[t],cost,'THE NEXT ARMOR PLATE<small>'+VEH_INFO[t].name+'</small>')) return;   // 0320
+    if(!shopAsk('vehUp',[t],cost,'THE NEXT ARMOR PLATE<small>'+VEH_INFO[vehFaceK(t)].name+'</small>')) return;   // 0320; 0316: the confirm names the face the crate wears
     META.starBank-=cost; META.vehUp[t]=r+1; saveMeta(); renderMenu();
     SFX.thock(); setTimeout(()=>SFX.coin(), 120);
     shopRefresh(); },
@@ -49227,10 +49245,10 @@ window.UI = {
   // unowned machine answers on the CRATE, a poor tap shakes the RAIL (the
   // jetUp idiom — the slot itself has no deny face), a fitted slot rests.
   vehEng(t){ if(VEH_ORDER.indexOf(t)<0) return;
-    if(!vehOwns(t)){ shopDeny('shvh-'+t); return; }
+    if(!vehHas(t)){ shopDeny('shvh-'+t); return; }   // 0316: the earned V2 opens the engine slot too — one garage
     if(vehEng(t)) return;
     if(META.starBank<ENG_COST[t]){ shopDeny('shvr-'+t); return; }
-    if(!shopAsk('vehEng',[t],ENG_COST[t],'THE ENGINE<small>'+VEH_INFO[t].name+'</small>')) return;   // 0320
+    if(!shopAsk('vehEng',[t],ENG_COST[t],'THE ENGINE<small>'+VEH_INFO[vehFaceK(t)].name+'</small>')) return;   // 0320; 0316: the face the crate wears
     META.starBank-=ENG_COST[t];
     META.vehEng=(Array.isArray(META.vehEng)?META.vehEng:[]).concat(t);
     saveMeta(); renderMenu();
@@ -50412,7 +50430,7 @@ window.GVT = {
              unlock:VEH_UNLOCK[t], next:vehNextCost(t), track:VEH_HP[t].slice(), costs:VEH_TIER_COST[t].slice(),
              eng:{ owned:vehEng(t), cost:ENG_COST[t], mul:ENG_MUL },
              spd:{ base:BF_MOVE[t].moveSpd, eng:Math.round(BF_MOVE[t].moveSpd*ENG_MUL) } }; });
-    o.jeep2={ owned:vehOwns('jeep2'), hp:vehHP('jeep2'), stock:BF_MOVE.jeep2.hp, close:J2_CLOSE, sight:J2_SIGHT, eng:vehEng('jeep2'), spd:{ base:BF_MOVE.jeep2.moveSpd, eng:Math.round(BF_MOVE.jeep2.moveSpd*ENG_MUL) } };   // 0278e
+    o.jeep2={ owned:vehOwns('jeep2'), hp:vehHP('jeep2'), stock:BF_MOVE.jeep2.hp, charge:J2_CHARGE, ramp:J2_RAMP, sight:J2_SIGHT, eng:vehEng('jeep2'), has:vehHas('bfjeep'), face:vehFaceK('bfjeep'), spd:{ base:BF_MOVE.jeep2.moveSpd, eng:Math.round(BF_MOVE.jeep2.moveSpd*ENG_MUL) } };   // 0278e→0316: the charge dials + the replacement answers
     return o; },
   // straight to a state, no shopping: give(t) unlocks, tier(t,n) sets the plates
   vehGive(t){ if(VEH_ORDER.indexOf(t)<0) return null;
