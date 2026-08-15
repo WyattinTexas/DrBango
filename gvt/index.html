@@ -18071,7 +18071,7 @@ const META_DEFAULT = {
   bone:{ e:0, m:0, h:0 }
 };
 let META = META_DEFAULT;
-try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); META.piggy=Object.assign({},META_DEFAULT.piggy,m.piggy||{}); if(!META.iceR2){ META.iceR2=1; META.ice={}; } } } catch(e) {}   // 0305 BF-02 (D14): the castle is a NEW fight — a pre-BF-02 ice ledger would open HARD on a fight the player never saw, so it resets ONCE (iceR2 latches; banked medals live in META.ach and never move; granted items stay owned)
+try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); META.piggy=Object.assign({},META_DEFAULT.piggy,m.piggy||{}); if(!META.iceR2){ META.iceR2=1; if(m.nemPark===undefined) META.ice={}; } } } catch(e) {}   // 0305 BF-02 (D14): the castle is a NEW fight — a pre-BF-02 ice ledger would open HARD on a fight the player never saw, so it resets ONCE (iceR2 latches; banked medals live in META.ach and never move; granted items stay owned). 0344 (Wyatt 8/15): the reset keys on the save's VINTAGE now — nemPark shipped in the same 0305 wave, so only true pre-BF-02 storage lacks it; before this, a fresh save that beat the castle in its FIRST session lost its honest ice ledger on boot 2 and 21-50 relocked at relaunch
 // THE CROSSING is the battlefield's flagship map — anyone who never actually
 // fought a match gets nudged onto it; testers with real history keep their pick.
 // v2.41 RANDOM BY DEFAULT (Wyatt 8/4: "please have the default map be
@@ -19391,6 +19391,19 @@ function nemEff(){ const n=META.nemesis||{}; return Math.max(NEMESIS_FLOOR, 1-NE
 function nemesisRival(){
   const c=ARMIES.find(a=>a.id===(NEM_COUNTER[META.dyeOn]||'red'))||ARMIES[1];
   return { id:'nemesis', name:'NEMESIS', hex:c.hex, blurb:'', mod:{} };
+}
+// 0344 (Wyatt 8/15, "it must be Nemesis who says it"): the comms window's
+// speaker card for HIS line — the saber-Sarge mold UNDRESSED (never
+// sargeWepURI: that door wears YOUR outfit pieces, and no enemy may borrow
+// your wardrobe — its own v2.16 law), body in his serve-time counter hex
+// (the exact hex the ambush dresses him in), blade his own red, cropped by
+// the window's standing head-and-shoulders box (the blade glow at y28 rides
+// inside it — the red saber reads in frame beside his face).
+function nemSpeaker(){
+  const riv=nemesisRival();
+  const art=(SARGE_ART.lightsaber||SPRITES_SRC.sarge).split('currentColor').join(riv.hex).split('BLADEHEX').join(NEMESIS_SABER);
+  return { name:'NEMESIS', hex:NEMESIS_SABER,
+    img:'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+COMM_PORT_VB+'">'+art+'</svg>') };
 }
 // THE MIRROR: your roster's rank numbers, shuffled across your own unit
 // types — his lineup. Multiset-equal to your snapshot BY CONSTRUCTION
@@ -23392,7 +23405,7 @@ function commChirp(){ tone(520,880,0.06,'square',0.05); setTimeout(()=>tone(760,
 // string in here is resolved through TXT() ONCE by hand, and the typewriter
 // then writes .nodeValue — a partial substring must never re-enter the
 // translating setters (it could match another key mid-type and audit-spam).
-function commWin(mode){
+function commWin(mode, spk){   // 0344: spk = optional speaker card {name,img,hex} — the nemPark briefing seats NEMESIS; every other window is Sarge's exactly as shipped
   const el=document.getElementById('comms'); if(!el) return null;
   clearTimeout(COMM.timer); COMM.timer=0;
   el.innerHTML='';
@@ -23404,11 +23417,12 @@ function commWin(mode){
   // the game's own Sarge, in YOUR army colour — dressed through the outfit
   // door (v2.16: 'sarge' has no SARGE_ART row, so the weaponless base figure
   // falls through untouched and only the worn pieces ride the crop)
-  img.src=sargeWepURI('sarge', dyeHex()||undefined, undefined, COMM_PORT_VB);
+  img.src=(spk&&spk.img)? spk.img : sargeWepURI('sarge', dyeHex()||undefined, undefined, COMM_PORT_VB);
   port.appendChild(img);
   if(!reducedMotion()){ const sc=document.createElement('div'); sc.className='cm-scan'; port.appendChild(sc); }
   const nm=document.createElement('div'); nm.className='cm-name';
-  nm.appendChild(document.createTextNode(TXT('SARGE')));
+  if(spk&&spk.hex) nm.style.color=spk.hex;
+  nm.appendChild(document.createTextNode(TXT((spk&&spk.name)||'SARGE')));
   const left=document.createElement('div'); left.className='cm-left';
   left.appendChild(port); left.appendChild(nm);
   const txt=document.createElement('div'); txt.className='cm-txt';
@@ -23490,7 +23504,7 @@ function commBriefing(kind, always){
   // (coopLaunching) is the truth the old test missed.
   if((S.coop || (coopLaunching && COOP)) && coopHumans()>1) return false;
   if(!always && META.comms && META.comms[kind]) return false;   // 0305 BF-03: an ALWAYS briefing replays every visit (the ambush speaks on every rung-20 clear, not once per save)
-  const h=commWin('brief'); if(!h) return false;
+  const h=commWin('brief', kind==='nemPark'? nemSpeaker() : null); if(!h) return false;   // 0344 (Wyatt 8/15): "it must be Nemesis who says it" — HIS window for HIS line; every other briefing keeps Sarge's
   // v2.48: the bf briefing names the army actually fielded (S.bf is live by
   // the time startBattlefield briefs) — %1 lands AFTER translation, the tf law
   const foe=(kind==='bf')? t((S.bf&&S.bf.rival&&S.bf.rival.name)||'THE BLACK ARMY') : null;
@@ -24890,7 +24904,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.93';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.94';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -29206,7 +29220,14 @@ function endBattlefield(reason, fromRelay){
     // v3.12: defeating NEMESIS pays THREE whole promotions, measured from the
     // live bar (xpToLevels — MOM's own jackpot arithmetic, flat on purpose, no
     // stacking: the number IS the ceremony). Every other win pays what it did.
-    const starGain=25, xpGain=(bf.nem? xpToLevels(NEMESIS_LEVELS) : xpFor(Math.min(1, XP_BF_WIN+XP_BF_TEAM*(bf.team||1))));
+    // 0344 (Wyatt 8/15): the PARK ambush's three-level jackpot is FIRST-CLEAR
+    // ONLY — rung 20 replays re-enter the ambush every time (0317's always-
+    // variant), so the ungated jackpot was a level farm. momFirst's own law
+    // (v2.21): a replay pays the regular battleground win rate instead.
+    // META.nemPark is still 0 right here on the first clear (the D17 latch
+    // writes below) — the read is the gate; per-seat in rooms, D17's own note.
+    // The DAILY Nemesis keeps his every-defeat jackpot (NEMESIS_DAYS-gated).
+    const starGain=25, xpGain=((bf.nem && !(bf.nem.park && META.nemPark))? xpToLevels(NEMESIS_LEVELS) : xpFor(Math.min(1, XP_BF_WIN+XP_BF_TEAM*(bf.team||1))));
     // 1v1 and 2v2 have their own ladders, so they keep their own books — for
     // YOUR seat only. 3v3+ feed nothing but the lifetime totals and the medals.
     const wrR=ranked && META.bfRecord[bf.team]; if(wrR){ wrR.w++; wrR.s+=starGain; }
