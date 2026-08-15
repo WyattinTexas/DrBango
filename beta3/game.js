@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.25.0';
+const BUILD = 'STARSPELL v0.25.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -2518,6 +2518,7 @@ class Home extends Phaser.Scene {
     }
     try {
       this.introPlaying = true;
+      this.introFx = [];              // landing flourishes; finish() sweeps them
       window.__ssintro = 'playing';   // headless verification reads this
       DIAG('intro begin');
       // the meadow ui waits at alpha 0 for the camera to come down
@@ -2555,6 +2556,8 @@ class Home extends Phaser.Scene {
         for (const tm of timers) tm.remove(false);
         if (this.introSkipFn) { this.input.off('pointerdown', this.introSkipFn); this.introSkipFn = null; }
         this.tweens.killTweensOf([t, glow]);
+        for (const fx of this.introFx) if (fx && fx.active) { this.tweens.killTweensOf(fx); fx.destroy(); }
+        this.introFx = [];
         t.destroy(); glow.destroy(); em.destroy();
         this.sky.setP(0, 0);
         this.sky.grain.setVisible(true);
@@ -2571,25 +2574,51 @@ class Home extends Phaser.Scene {
         if (this.introGlide) { this.introGlide.stop(); this.introGlide = null; }
         this.tweens.killTweensOf([t, glow]);
         this.tweens.add({ targets: [t, glow], alpha: 0, duration: Math.min(500, ms * 0.55), delay: ms * 0.2 });
-        for (const o of this.uiItems) { this.tweens.killTweensOf(o); this.tweens.add({ targets: o, alpha: o.baseAlpha, duration: 450, delay: Math.max(0, ms - 420) }); }
+        // the meadow's own wordmark (and its sparkles) wake ahead of the rest:
+        // the zenith word dissolves while this one comes up, so the title reads
+        // as riding the descent down rather than cutting from one to the other
+        const early = new Set([this.titleT, ...(this.sparkles || [])]);
+        for (const o of this.uiItems) { this.tweens.killTweensOf(o); this.tweens.add({ targets: o, alpha: o.baseAlpha, duration: 450, delay: Math.max(0, ms - (early.has(o) ? 690 : 420)) }); }
         this.introGlide = this.tweens.addCounter({
           from: this.introP, to: 0, duration: ms, ease: 'Cubic.easeInOut',
           onUpdate: (tw) => { this.introP = tw.getValue(); this.sky.setP(this.introP, 0); },
           onComplete: () => finish(skipped),
         });
       };
-      // the show: a beat of pure sky, stars streak, the word arrives, then down
-      at(350, () => ssShootingStar(this));
-      at(500, () => {
+      // the show, beats overlapping like weather: a star streaks while the boot
+      // veil is still lifting, the word condenses and LANDS (scale settles with
+      // a Back overshoot into a swell of light and kicked stardust), a second
+      // star crosses the landing itself, and the descent begins on the
+      // landing's afterglow — no beat waits for the last one to end
+      at(200, () => ssShootingStar(this));
+      at(320, () => {
         if (!this.introPlaying) return;
-        this.tweens.add({ targets: glow, alpha: 0.32, duration: 600, yoyo: true, hold: 250 });
-        this.tweens.add({ targets: t, alpha: 1, duration: 900, ease: 'Sine.easeOut' });
-        this.tweens.add({ targets: t, scaleX: bs.sx, scaleY: bs.sy, duration: 1200, ease: 'Cubic.easeOut' });
+        this.tweens.add({ targets: glow, alpha: 0.32, duration: 550, yoyo: true, hold: 200 });
+        this.tweens.add({ targets: t, alpha: 1, duration: 750, ease: 'Sine.easeOut' });
+        this.tweens.add({
+          targets: t, scaleX: bs.sx, scaleY: bs.sy, duration: 950, ease: 'Back.easeOut',
+          onComplete: () => {
+            // the landing: the halo swells, a ring of light blooms outward,
+            // stardust kicks up from the word's baseline
+            if (!this.introPlaying) return;
+            this.tweens.killTweensOf(glow);
+            this.tweens.add({
+              targets: glow, alpha: 0.5, duration: 150, yoyo: true,
+              onComplete: () => { if (this.introPlaying) this.tweens.add({ targets: glow, alpha: 0.18, duration: 450 }); },
+            });
+            const ring = this.add.image(t.x, t.y, 'glowbig').setScale(l.u(0.9)).setTint(0xffe9c9)
+              .setBlendMode('ADD').setScrollFactor(0).setDepth(604).setAlpha(0.3);
+            this.introFx.push(ring);
+            this.tweens.add({ targets: ring, scale: l.u(3.1), alpha: 0, duration: 420, ease: 'Sine.easeOut', onComplete: () => { if (ring.active) ring.destroy(); } });
+            const rb = t.getBounds();
+            for (let k = 0; k < 18; k++) em.emitParticleAt(rb.x + Math.random() * rb.width, rb.y + rb.height * (0.72 + Math.random() * 0.3));
+          },
+        });
         const b = t.getBounds();
         for (let k = 0; k < 42; k++) em.emitParticleAt(b.x + Math.random() * b.width, b.y + b.height * 0.2 + Math.random() * b.height * 0.6);
       });
-      at(1300, () => ssShootingStar(this));
-      at(1800, () => settle(1250, false));
+      at(1000, () => ssShootingStar(this));
+      at(1350, () => settle(1000, false));
       at(300, () => {
         if (!this.introPlaying) return;
         this.input.on('pointerdown', this.introSkipFn = () => {
