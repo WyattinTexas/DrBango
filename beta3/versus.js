@@ -594,6 +594,12 @@ class VsBattle extends Phaser.Scene {
     this.scryB = this.add.rectangle(l.x(-140), l.y(766), l.u(110), l.u(48), 0x151b33).setStrokeStyle(l.u(1.5), 0x4a5a8c).setInteractive({ useHandCursor: true });
     this.scryT = txt(l.x(-140), l.y(766), 'SCRY ↻', 13, '#9fb0e8').setOrigin(0.5);
     this.scryB.on('pointerdown', () => this.scry());
+    // held sigils fold into a chip between SCRY and CAST — tap = the inspector
+    // window (a duel can't pause, but the box still reads and shields the board)
+    this.sigChipB = this.add.rectangle(l.x(-52), l.y(766), l.u(58), l.u(48), 0x151b33)
+      .setStrokeStyle(l.u(1.5), 0x8c7a4a).setInteractive({ useHandCursor: true }).setVisible(false);
+    this.sigChipT = txt(l.x(-52), l.y(766), '', 14, '#ffd77a').setOrigin(0.5).setVisible(false);
+    this.sigChipB.on('pointerdown', () => this.openInspect());
 
     this.fxC = this.add.container(0, 0).setDepth(50);
     this.starBurst = this.add.particles(0, 0, 'dot', {
@@ -1099,10 +1105,26 @@ class VsBattle extends Phaser.Scene {
         if (this.meRef) this.meRef.update({ sigils: this.mySigils }).catch(() => { });
         for (const it of items) it.destroy();
         this.state = 'pick';
+        this.refreshSigChip();
         this.updatePanels();
       });
     });
     this.overlayC.add(items);
+  }
+
+  // ---------- the sigil inspector ----------
+  refreshSigChip() {
+    const n = this.mySigils.length;
+    this.sigChipB.setVisible(n > 0);
+    this.sigChipT.setVisible(n > 0).setText(n ? '✦ ' + n : '');
+  }
+  openInspect() {
+    if (this.inspectP || this.state !== 'pick' || !this.mySigils.length) return;
+    SFX.ensure();
+    this.inspectP = ssSigilPanel(this, {
+      sigils: this.mySigils,
+      onClose: () => { this.inspectP = null; },
+    });
   }
 
   checkEnd(timeUp) {
@@ -1118,6 +1140,7 @@ class VsBattle extends Phaser.Scene {
 
   endBattle() {
     this.state = 'done';
+    if (this.inspectP) this.inspectP.close();   // the end screen owes the reader nothing
     if (this.sky) this.sky.setP(1, 0);   // if the duel dies mid-rise, land at the zenith where the overlay lives
     const l = this.L;
     const won = this.room.winnerUid === vsUid();

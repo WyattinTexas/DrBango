@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.27.0';
+const BUILD = 'STARSPELL v0.28.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -2027,6 +2027,140 @@ function ssSigilCard(scene, l, sg, w, h) {
   return c;
 }
 
+/* ---- the sigil inspector -------------------------------------------------
+   Powers must be readable in a proper box, never text floating over the game.
+   One panel serves solo and versus: a midnight/gold window (the end screens'
+   language) listing the birth sign and every held sigil — icon in its
+   medallion, gold nameplate, rarity ribbon, full effect text. The veil
+   beneath is interactive, so every tap on the board under the window dies at
+   the veil; tapping it (or ✕) minimizes the panel back to the compact dock.
+   Drag-scrolls when a long run has collected more than one window holds.
+   Returns { c, close } — callers stash it and may force-close on battle end. */
+function ssSigilPanel(scene, opts) {
+  const l = ssLayout(scene);
+  const c = scene.add.container(0, 0).setDepth(95);
+  const veil = scene.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+  scene.tweens.add({ targets: veil, alpha: 0.72, duration: 200 });
+  c.add(veil);
+  const close = () => {
+    if (c.getData('closed') || !c.active) return;
+    c.setData('closed', true);
+    scene.tweens.add({ targets: c, alpha: 0, duration: 150, onComplete: () => { if (c.active) c.destroy(); } });
+    if (opts.onClose) opts.onClose();
+  };
+  veil.on('pointerdown', () => { SFX.ui(); close(); });
+
+  const rows = [];
+  if (opts.sign) rows.push({ sign: opts.sign });
+  for (const id of opts.sigils || []) {
+    const sg = SS_SIGILS.find((s) => s.id === id);
+    if (sg) rows.push({ sg });
+  }
+  const RW = 340, RH = 84, GAP = 8, HEAD = 56, FOOT = 30;
+  const contentH = rows.length * RH + Math.max(0, rows.length - 1) * GAP;
+  const viewH = Math.min(contentH, 552);
+  const winH = HEAD + viewH + FOOT;
+  const top = 400 - winH / 2;
+
+  // the window rides in its own container so it can rise in as one piece
+  const wc = scene.add.container(0, 0);
+  const win = scene.add.image(l.x(0), l.y(top + winH / 2), 'endpanel')
+    .setDisplaySize(l.u(372), l.u(winH)).setInteractive();
+  wc.add(win);
+  const tk = ssGoldTex(scene, SS_T('inspTitle'), 16);
+  const tsc = Math.min(1, 250 / tk.w);
+  wc.add(scene.add.image(l.x(-6), l.y(top + 30), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+  const xT = ssTxt(scene, l.x(164), l.y(top + 29), '✕', l.u(17), '#8a94c4').setOrigin(0.5);
+  const xZ = scene.add.zone(l.x(164), l.y(top + 29), l.u(46), l.u(46)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+  xZ.on('pointerdown', () => { SFX.ui(); close(); });
+  wc.add([xT, xZ]);
+  wc.add(ssTxt(scene, l.x(0), l.y(top + winH - 15), SS_T('inspSub'), l.u(9.5), '#5a6390', 'italic').setOrigin(0.5));
+
+  // rows live in a masked container; dragging the window scrolls them
+  const rc = scene.add.container(0, 0);
+  rows.forEach((r, k) => {
+    const yk = top + HEAD + k * (RH + GAP) + RH / 2;
+    const tier = r.sg ? (r.sg.rarity | 0) : 0;
+    const RC = SS_RARITY[tier];
+    const tex = ssSigilCardTex(scene, tier, RW, RH);
+    rc.add(scene.add.image(l.x(0), l.y(yk), tex.key).setDisplaySize(l.u(RW), l.u(RH)));
+    const gx = -RW / 2 + tex.mx;
+    let name, desc, ribbon, ribbonColor;
+    if (r.sg) {
+      rc.add(ssTxt(scene, l.x(gx), l.y(yk), r.sg.icon, l.u(tex.mr * 0.95), RC.ink).setOrigin(0.5)
+        .setShadow(0, 0, RC.shadow, l.u(5), true, true));
+      const loc = SS_SIG(r.sg);
+      name = loc.name; desc = loc.desc;
+      ribbon = RC.label ? SS_T(RC.label) : ''; ribbonColor = RC.labelColor;
+    } else {
+      const g = ssZodiacGlyph(scene, r.sign, l.u(0.145), l.x(gx), l.y(yk));
+      rc.add(g);
+      const loc = SS_ZOD(r.sign);
+      name = r.sign.name + ' · ' + loc.title; desc = loc.desc;
+      ribbon = SS_T('inspSign'); ribbonColor = '#ffdf8f';
+    }
+    const lx = gx + tex.mr + 14, maxW = RW / 2 - lx - 12;
+    const gk = ssGoldTex(scene, name, 13);
+    const nsc = Math.min(1, (maxW - (ribbon ? 66 : 0)) / gk.w);
+    rc.add(scene.add.image(l.x(lx), l.y(yk - RH / 2 + 19), gk.key).setOrigin(0, 0.5)
+      .setDisplaySize(l.u(gk.w * nsc), l.u(gk.h * nsc)));
+    if (ribbon) rc.add(ssTxt(scene, l.x(RW / 2 - 30), l.y(yk - RH / 2 + 19), ribbon, l.u(8.5), ribbonColor)
+      .setOrigin(1, 0.5).setLetterSpacing(l.u(1.5)).setShadow(0, 0, RC.shadow, l.u(6), true, true));
+    rc.add(scene.add.text(l.x(lx), l.y(yk - RH / 2 + 31), desc, {
+      fontFamily: SERIF, fontSize: l.u(12) + 'px', color: '#c9ccde', fontStyle: 'italic',
+      wordWrap: { width: l.u(maxW + 6) }, lineSpacing: l.u(1.5),
+    }).setOrigin(0, 0));
+  });
+  wc.add(rc);
+
+  const maxOff = Math.max(0, l.u(contentH - viewH));
+  if (maxOff > 0) {
+    const mg = scene.make.graphics();
+    mg.fillRect(l.x(-186), l.y(top + HEAD), l.u(372), l.u(viewH));
+    rc.setMask(mg.createGeometryMask());
+    // a slim gold thumb tracks where you are in the list
+    const trackH = l.u(viewH), thumbH = trackH * (l.u(viewH) / l.u(contentH));
+    const thumb = scene.add.rectangle(l.x(172), l.y(top + HEAD) + thumbH / 2, l.u(3), thumbH, 0xd7b45c, 0.45).setOrigin(0.5);
+    wc.add(thumb);
+    let drag = null, off = 0;
+    win.on('pointerdown', (p) => { drag = { y: p.y, off }; });
+    const mv = (p) => {
+      if (!drag) return;
+      if (!p.isDown) { drag = null; return; }
+      off = clamp(drag.off + (drag.y - p.y), 0, maxOff);
+      rc.y = -off;
+      thumb.y = l.y(top + HEAD) + thumbH / 2 + (off / maxOff) * (trackH - thumbH);
+    };
+    const up = () => { drag = null; };
+    scene.input.on('pointermove', mv);
+    scene.input.on('pointerup', up);
+    c.once('destroy', () => { scene.input.off('pointermove', mv); scene.input.off('pointerup', up); mg.destroy(); });
+  }
+
+  c.add(wc);
+  wc.y = l.u(14); wc.alpha = 0;
+  scene.tweens.add({ targets: wc, y: 0, alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+  SFX.ui();
+  return { c, close };
+}
+
+// The dock's vertical glass pill, baked per height like the card chrome.
+function ssDockTex(scene, hU) {
+  const key = 'sigdock@' + Math.round(hU);
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), w = 34;
+  const t = scene.textures.createCanvas(key, Math.round(w * R), Math.round(hU * R));
+  const c = t.context;
+  c.scale(R, R);
+  c.beginPath(); c.roundRect(1.5, 1.5, w - 3, hU - 3, (w - 3) / 2);
+  const g = c.createLinearGradient(0, 0, 0, hU);
+  g.addColorStop(0, 'rgba(22,29,62,0.92)'); g.addColorStop(1, 'rgba(11,15,33,0.92)');
+  c.fillStyle = g; c.fill();
+  c.lineWidth = 1.2; c.strokeStyle = 'rgba(201,168,76,0.55)'; c.stroke();
+  t.refresh();
+  return key;
+}
+
 // Layout: 420 x 800 design space, scaled + centered
 function ssLayout(scene) {
   const W = scene.scale.width, H = scene.scale.height;
@@ -3488,6 +3622,68 @@ class Battle extends Phaser.Scene {
       tint: [0xffd77a, 0xfff2c9, 0xd7b45c], blendMode: 'ADD', emitting: false,
     }).setDepth(55);
     this.overlayC = this.add.container(0, 0).setDepth(100);
+
+    // ---- the sigil dock ----
+    // Held sigils keep watch on the right edge, below the birth sign — the
+    // beast's authoring box never reaches past x ±115, so the column is clear.
+    // Tapping it opens the inspector window; the run resumes untouched when
+    // the window closes (strikes are cast-counted, so reading costs nothing).
+    this.dockC = this.add.container(0, 0).setDepth(40);
+    this.refreshDock();
+  }
+
+  // Rebuilds the compact dock from run.sigils; newIdx blooms the arrival.
+  // Six icons show, then the tail folds into a +N — the window lists them all.
+  refreshDock(newIdx) {
+    const l = this.L;
+    this.dockC.removeAll(true);
+    const ids = this.run.sigils;
+    if (!ids.length) return;
+    const X = 187, TOP = 100, STEP = 30;
+    const slots = ids.length <= 6 ? ids.length : 6;
+    const shown = ids.length <= 6 ? ids : ids.slice(0, 5);
+    const pillH = slots * STEP + 6;
+    this.dockC.add(this.add.image(l.x(X), l.y(TOP + pillH / 2), ssDockTex(this, pillH))
+      .setDisplaySize(l.u(34), l.u(pillH)));
+    shown.forEach((id, k) => {
+      const sg = SS_SIGILS.find((s) => s.id === id);
+      if (!sg) return;
+      const RC = SS_RARITY[sg.rarity | 0];
+      const t = ssTxt(this, l.x(X), l.y(TOP + 18 + k * STEP), sg.icon, l.u(15), RC.ink).setOrigin(0.5)
+        .setShadow(0, 0, RC.shadow, l.u(4), true, true);
+      this.dockC.add(t);
+      if (newIdx === k) {         // the newest sigil lands with a small bloom
+        const b = this.add.image(t.x, t.y, 'glowbig').setDisplaySize(l.u(70), l.u(54))
+          .setTint(RC.glow).setAlpha(0.5).setBlendMode('ADD');
+        this.dockC.add(b);
+        this.tweens.add({ targets: b, alpha: 0, duration: 900, ease: 'Sine.easeOut', onComplete: () => b.destroy() });
+        t.setScale(1.7);
+        this.tweens.add({ targets: t, scale: 1, duration: 380, ease: 'Back.easeOut' });
+      }
+    });
+    if (ids.length > 6) this.dockC.add(ssTxt(this, l.x(X), l.y(TOP + 18 + 5 * STEP), '+' + (ids.length - 5), l.u(12), '#c9b676').setOrigin(0.5));
+    const zone = this.add.zone(l.x(X), l.y(TOP + pillH / 2), l.u(46), Math.max(l.u(pillH + 18), l.u(48)))
+      .setOrigin(0.5).setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', () => this.openInspect());
+    this.dockC.add(zone);
+  }
+
+  // The inspector: freeze the fight (every action gates on state 'pick' and
+  // strikes are cast-counted, so nothing can punish the reader), then raise
+  // the window. Closing hands the turn straight back.
+  openInspect() {
+    if (this.state !== 'pick' || this.inspectP) return;
+    if (!this.run.sigils.length && !this.signZ) return;
+    this.state = 'inspect';
+    this.dockC.setVisible(false);          // the compact form yields to the window
+    this.inspectP = ssSigilPanel(this, {
+      sigils: this.run.sigils, sign: this.signZ,
+      onClose: () => {
+        this.inspectP = null;
+        this.dockC.setVisible(true);
+        if (this.state === 'inspect') this.state = 'pick';
+      },
+    });
   }
   modeTitle() {
     if (this.mode === 'campaign') return SS_ACT_N(SS_ACTS[this.fights[this.run.fightIdx].actIdx]);
@@ -3590,19 +3786,10 @@ class Battle extends Phaser.Scene {
       this.setPurifyArmed(!this.purifyArmed);
       return;
     }
-    SFX.ensure(); SFX.ui();
-    this.showSignToast();
-  }
-  showSignToast() {
-    const l = this.L;
-    if (this.signToastC) { this.signToastC.destroy(); this.signToastC = null; }
-    const t = SS_ZOD(this.signZ);
-    const c = this.signToastC = this.add.container(0, 0).setDepth(70);
-    c.add(ssTxt(this, l.x(0), l.y(452), this.signZ.name + ' · ' + t.title, l.u(13), '#ffe9a8').setOrigin(0.5)
-      .setShadow(0, 0, '#c9b676', l.u(8), true, true));
-    c.add(ssTxt(this, l.x(0), l.y(476), t.desc, l.u(10.5), '#c9c3ae', 'italic').setOrigin(0.5)
-      .setWordWrapWidth(l.u(340)).setAlign('center'));
-    this.tweens.add({ targets: c, alpha: 0, delay: 2400, duration: 400, onComplete: () => { if (this.signToastC === c) this.signToastC = null; c.destroy(); } });
+    SFX.ensure();
+    // the sign's power reads in the inspector window — never as text over the
+    // board (it was an unreadable toast once; Wyatt called it)
+    this.openInspect();
   }
   // VIRGO's ember: charged = a soft breath behind the emblem, armed = bright
   updateSignGlow() {
@@ -4275,7 +4462,11 @@ class Battle extends Phaser.Scene {
         sparks.emitParticleAt(card.x, card.y, tier === 2 ? 26 : 12);
         this.tweens.add({ targets: card, scale: 1.05, duration: 130, yoyo: true });
         for (const it of items) if (it !== card && it !== sparks) this.tweens.add({ targets: it, alpha: 0, duration: 200 });
-        this.time.delayedCall(260, () => { sparks.destroy(); for (const it of items) it.destroy(); this.afterSigil(); });
+        this.time.delayedCall(260, () => {
+          sparks.destroy(); for (const it of items) it.destroy();
+          this.refreshDock(this.run.sigils.length - 1);   // the dock receives it with a bloom
+          this.afterSigil();
+        });
       });
     });
     items.push(sparks);
@@ -4315,6 +4506,7 @@ class Battle extends Phaser.Scene {
   endRun(won) {
     const l = this.L;
     this.state = 'end';
+    if (this.inspectP) this.inspectP.close();   // no window may outlive the run
     const score = this.runScore();
     const elapsed = this.runElapsed();
     if (!won) SFX.defeat();
