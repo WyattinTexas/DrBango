@@ -3357,7 +3357,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.76</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.77</div>
   <div class="scanlines"></div>
 </div>
 
@@ -16901,6 +16901,11 @@ function lzOf(u){
   if(S.bf && !bfHumanU(u)) return null;      // every other chair: factory stock
   return META.laserOn;
 }
+// 0313b TRUE COLOURS: whose laser PAINTS this figure's rounds — lzOf's own
+// ownership answer with one carve-out: the computer buddy keeps borrowing YOUR
+// register (his men have glowed your colour since v2.36 — the offline render
+// stays byte-what-it-was). coopMods' presence is the relay marker, as in lzOf.
+function lzVisOf(u){ return (u&&u.coopMods&&u.coopBy!=='bot')? (u.coopLz||null) : META.laserOn; }
 function lzDmgMul(u){ const c=lzOf(u); return c==='red'? 1+LZ_DMG : c==='silver'? 1+LZ_SILVER_D : 1; }
 function lzRateMul(u){ const c=lzOf(u); return c==='blue'? 1+LZ_RATE : c==='silver'? 1+LZ_SILVER_RT : 1; }
 function lzRngMul(u){ return lzOf(u)==='tan'?  1+LZ_RNG  : 1; }
@@ -23737,7 +23742,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.76';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.77';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -24702,7 +24707,13 @@ function coopPlaced(u){
   // object per call, so the flag rides THIS copy — never the shared tables and
   // never inside sargeStats itself (bfSargeKit/BF_AI_SARGE stay jet-less). The
   // 'sw' field is already on the server's CMD_KEYS whitelist, contents and all.
-  if(u.type==='sarge'){ cm.sw=sargeStats(); if(jetOwned()) cm.sw.jet=1; }
+  if(u.type==='sarge'){ cm.sw=sargeStats(); if(jetOwned()) cm.sw.jet=1;
+    // 0313b TRUE COLOURS: the blade crystal rides the kit — saberHexU on every
+    // build already reads sw.saber first (the AI kits' own field, :bfSargeKit),
+    // so the ally's screen paints THIS colour instead of its own fallback.
+    // Always sent, free blue included: the owner's default is still the
+    // owner's colour, never the viewer's.
+    cm.sw.saber=saberHex(); }
   // THE MOD BENCH rides along (v1.22) — one more OPTIONAL field, so an older
   // client simply ignores it and that ally's men fight factory stock, exactly
   // as they did yesterday. Nothing already on the wire changed shape.
@@ -27080,7 +27091,7 @@ function roomPlaced(seat,type,x,y,para){
   if(seat===bfMySeat()){
     // your men fight at YOUR rank, with YOUR bench and YOUR hull points
     cm.um=+upMul(type).toFixed(2);
-    if(type==='sarge') cm.sw=sargeStats();
+    if(type==='sarge'){ cm.sw=sargeStats(); cm.sw.saber=saberHex(); }   // 0313b: the blade crystal rides for friends too (the campaign door's law; AI kits already carry theirs)
     const mo=enhWire(); if(mo) cm.mo=mo;
     if(soulIs('u',type)) cm.mo=(cm.mo||[]).concat('sl');   // 0093: the mo-carried Soul marker (the campaign door's own law — CMD_KEYS has no 'sl')
     if(vehKind(type)) cm.vh=vehHP(type)|0;
@@ -28009,7 +28020,8 @@ function unitJet(u){
 }
 // whose blade is this? a drawn one glows its own colour; yours glows the one
 // you picked in the Academy
-function saberHexU(u){ const sw=u&&unitSargeStats(u); return (sw&&sw.saber)||saberHex(); }
+function saberHexU(u){ const sw=u&&unitSargeStats(u), h=sw&&sw.saber;   // 0313b: the wire hex answers only when it IS one (the v2.81 ohex idiom) — a forged string never reaches strokeStyle/shadowColor
+  return (typeof h==='string' && /^#[0-9A-Fa-f]{6}$/.test(h))? h : saberHex(); }
 function saberBlocksU(u){
   if(u.type!=='sarge') return false;
   return saberBlocks(u);                       // a drawn blade deflects exactly like yours does
@@ -35668,7 +35680,8 @@ function update(dt){
       let dmgF = (tgt.type==='crawler'&&u.type==='rifleman')? dmg*0.1 : dmg;   // crawlers shrug off rifle fire
       if(split) dmgF*=ENH_DG_DMG;
       if(rollCrit(u)){ dmgF*=critMult(u); critFx(tgt); }   // the trigger-men: rifleman / MG / Sarge's pistol (v2.36: teal rides the multiplier)
-      const lz = (META.laserOn && !(S.bf&&!bfHumanU(u)))? (META.laserOn==='silver'? LZ_SILVER_ROW : ARMIES.find(ar=>ar.id===META.laserOn)) : null;   // only YOUR figures pack lasers (v3.39: the silver id resolves off its own row — ARMIES never knew it)
+      const lzc = lzVisOf(u);   // 0313b TRUE COLOURS: the beam asks the mechanics' own ownership question — an ally's men fire in the ALLY's colour (u.coopLz off his orders), yours in yours, the buddy borrows yours
+      const lz = (lzc && !(S.bf&&!bfHumanU(u)))? (lzc==='silver'? LZ_SILVER_ROW : ARMIES.find(ar=>ar.id===lzc)) : null;   // only HUMAN figures pack lasers (v3.39: the silver id resolves off its own row — ARMIES never knew it)
       if(lz){ bfSfx(SFX.laser, u.x, u.y); } else { bfSfx(u.type==='mgunner'?SFX.mg:SFX.pew, u.x, u.y); }
       if(u.type==='mgunner') u.mgRootT=MG_ROOT;   // v2.44 THE ROOTED BURST: the trigger pull itself plants him — every round re-arms the two seconds (a duck-blocked round too: he FIRED), so a gunner working a target never creeps between bursts
       // v2.39 (Wyatt 8/4: "The laser coming out of the machine gunner is
