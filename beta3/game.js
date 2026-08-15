@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.32.1';
+const BUILD = 'STARSPELL v0.33.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -25,6 +25,136 @@ const DPR = QS.has('dpr')
   : Math.min(window.devicePixelRatio || 1, 3);
 const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
 const DEMO = QS.get('demo') === '1';
+
+/* ---- raster probe + renderer choice ------------------------------------
+   The iOS 9fps hunt (v0.33.0) ended here: on the afflicted iPhone the JS was
+   idle and the fill was modest, yet frames cost ~26ms + ~11ms per Mpx — the
+   signature of WebGL running on a SOFTWARE rasterizer (~90Mpx/s; a real
+   phone GPU does thousands). Some WKWebView/Safari states hand Phaser a GL
+   context that silently rasterizes on the CPU, while the same device's
+   Canvas2D is GPU-backed and fast. So: measure both fill rates once at boot
+   (cached 7 days), and only when GL is provably catastrophic AND canvas is
+   provably faster, boot Phaser.CANVAS instead of AUTO. Resolution and look
+   are untouched — this is choosing the fast rasterizer, not a quality
+   ladder. ?rend=cv / ?rend=gl force either path; ?glprobe=1 re-measures. */
+function ssRasterProbe() {
+  if (QS.get('glprobe') !== '1') {
+    try {
+      const c = JSON.parse(localStorage.getItem('beta3.raster') || 'null');
+      if (c && c.v === 2 && Date.now() - c.t < 7 * 864e5) return c;
+    } catch (e) { }
+  }
+  const S = 384, out = { v: 2, t: Date.now(), gl: 0, cv: 0, gpu: '' };
+  try {   // GL: blended fullscreen triangles through a minimal pipeline
+    const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+    const gl = cv.getContext('webgl', { antialias: false, depth: false, stencil: false });
+    if (gl) {
+      try {
+        const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+        out.gpu = String(gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : gl.RENDERER)).slice(0, 48);
+      } catch (e) { }
+      // textured + blended, like the game's real pixels: a flat-color probe
+      // reads ~10x too fast on software rasterizers (measured vs the live
+      // scene under SwiftShader) and would let a slow device slip past.
+      const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+      const pr = gl.createProgram();
+      gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}'));
+      gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, 'precision mediump float;varying vec2 v;uniform sampler2D u;void main(){gl_FragColor=texture2D(u,v)*vec4(1.,.9,.8,.5);}'));
+      gl.linkProgram(pr); gl.useProgram(pr);
+      const tc = document.createElement('canvas'); tc.width = tc.height = 256;
+      const tcx = tc.getContext('2d');
+      tcx.fillStyle = '#546'; tcx.fillRect(0, 0, 256, 256);
+      tcx.fillStyle = '#a98'; for (let i = 0; i < 8; i++) tcx.fillRect(i * 32, 0, 16, 256);
+      const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tc);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(pr, 'p');
+      gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.viewport(0, 0, S, S);
+      const px = new Uint8Array(4);
+      const pass = (n) => { for (let i = 0; i < n; i++) gl.drawArrays(gl.TRIANGLES, 0, 3); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
+      pass(8);   // warm: shader compile + first-alloc stay out of the clock
+      const t0 = performance.now(); pass(30);
+      out.gl = Math.round(30 * S * S / Math.max(0.4, performance.now() - t0) / 1000);
+      const lc = gl.getExtension('WEBGL_lose_context'); if (lc) lc.loseContext();
+    }
+  } catch (e) { }
+  try {   // Canvas2D: alpha-blended full-canvas blits, same yardstick
+    const a = document.createElement('canvas'), b2 = document.createElement('canvas');
+    a.width = a.height = b2.width = b2.height = S;
+    const ca = a.getContext('2d'), cb = b2.getContext('2d');
+    cb.fillStyle = '#334455'; cb.fillRect(0, 0, S, S);
+    ca.globalAlpha = 0.6;
+    for (let i = 0; i < 6; i++) ca.drawImage(b2, 0, 0);
+    ca.getImageData(0, 0, 1, 1);
+    const t0 = performance.now();
+    for (let i = 0; i < 40; i++) ca.drawImage(b2, 0, 0);
+    ca.getImageData(0, 0, 1, 1);
+    out.cv = Math.round(40 * S * S / Math.max(0.4, performance.now() - t0) / 1000);
+  } catch (e) { }
+  try { localStorage.setItem('beta3.raster', JSON.stringify(out)); } catch (e) { }
+  return out;
+}
+const SS_REND = (() => {
+  const q = QS.get('rend');
+  if (q === 'cv' || q === 'canvas') return { mode: 'cv', why: 'forced' };
+  if (q === 'gl' || q === 'webgl') return { mode: 'gl', why: 'forced' };
+  const p = ssRasterProbe();
+  // GL under 600Mpx/s (textured) is no GPU at all: software paths bench well
+  // under that, the weakest real GPU reads thousands. When GL is that broken,
+  // the canvas renderer wins even against an all-software Canvas2D (measured
+  // 3.3x under SwiftShader; GPU-backed Canvas2D wins far bigger) — the cv
+  // number is diagnostic, not a gate. gl===0 means no WebGL at all: leave
+  // AUTO to make its own canvas fallback.
+  if (p.gl > 0 && p.gl < 600) return { mode: 'cv', why: 'auto', p };
+  return { mode: 'auto', why: 'auto', p };
+})();
+window.__ssraster = SS_REND;
+
+/* Canvas renderer: setTint is a silent no-op (long-standing project rule) —
+   under the canvas fallback every tinted image would draw white. Rather than
+   bake 38 call sites by hand, patch Image.setTint once: serve a cached
+   tint-multiplied copy of the texture (the ssFxTex trick, generalized).
+   Same pixel dimensions, so setDisplaySize/setScale consumers are untouched. */
+function ssCanvasTintShim() {
+  if (!game || !game.renderer || game.renderer.type !== Phaser.CANVAS) return;
+  const IP = Phaser.GameObjects.Image.prototype;
+  if (IP.__ssTintShim) return;
+  IP.__ssTintShim = true;
+  const orig = IP.setTint;
+  IP.setTint = function (t) {
+    orig.call(this, t);
+    if (typeof t !== 'number' || t === 0xffffff || arguments.length > 1 || !this.scene) return this;
+    try {
+      const base = this.__ssBaseTex || this.texture.key;
+      const tk = base + '#' + t.toString(16);
+      const T = this.scene.textures;
+      if (!T.exists(tk)) {
+        const src = T.get(base).getSourceImage();
+        if (!src || !src.width) return this;
+        const ct = T.createCanvas(tk, src.width, src.height);
+        const c = ct.context;
+        c.drawImage(src, 0, 0);
+        c.globalCompositeOperation = 'multiply';
+        c.fillStyle = '#' + t.toString(16).padStart(6, '0');
+        c.fillRect(0, 0, src.width, src.height);
+        c.globalCompositeOperation = 'destination-in';
+        c.drawImage(src, 0, 0);
+        ct.refresh();
+      }
+      const dw = this.displayWidth, dh = this.displayHeight;
+      this.__ssBaseTex = base;
+      this.setTexture(tk);
+      this.setDisplaySize(dw, dh);
+    } catch (e) { }
+    return this;
+  };
+}
 
 /* ---- frame-time probe (part of ?diag=1) --------------------------------
    The rise and the descent are the game's signature moves and must stay
@@ -89,18 +219,37 @@ function ssPerfWatch(gm) {
     el = document.createElement('div');
     el.style.cssText = 'position:fixed;left:4px;top:calc(env(safe-area-inset-top,0px) + 4px);' +
       'z-index:40;pointer-events:none;font:600 10px/1.5 ui-monospace,Menlo,monospace;' +
-      'color:#7ec96f;background:rgba(6,8,20,.55);padding:2px 7px;border-radius:7px;letter-spacing:.3px';
+      'color:#7ec96f;background:rgba(6,8,20,.55);padding:2px 7px;border-radius:7px;letter-spacing:.3px;' +
+      'white-space:pre-line';
     document.body.appendChild(el);
   }
   let worst = 0;
   gm.events.on('prestep', () => { const d = gm.loop.rawDelta; if (d > worst) worst = d; });
+  // ?prof=1: update-vs-render main-thread split, read on-device from a screenshot
+  const PROF = QS.get('prof') === '1';
+  let pT = 0, updSum = 0, rendSum = 0, pN = 0;
+  if (PROF) {
+    gm.events.on('prestep', () => { pT = performance.now(); });
+    gm.events.on('poststep', () => { updSum += performance.now() - pT; });
+    gm.events.on('prerender', () => { pT = performance.now(); });
+    gm.events.on('postrender', () => { rendSum += performance.now() - pT; pN++; });
+  }
+  // 2nd line: what the raster probe learned + which renderer we chose and why.
+  // On the afflicted phone one screenshot now names the pathology outright.
+  const P = window.__ssraster || {};
+  const probeLine = (P.p ? 'gl ' + P.p.gl + ' · cv ' + P.p.cv + ' Mpx/s · ' : '') +
+    (P.mode === 'cv' ? 'CV(' + P.why + ')' : P.mode === 'gl' ? 'GL(forced)' : 'auto') +
+    (P.p && P.p.gpu ? ' · ' + P.p.gpu.slice(0, 34) : '');
   setInterval(() => {
     const fps = Math.round(gm.loop.actualFps);
     if (el) {
       el.style.color = fps >= 50 ? '#7ec96f' : fps >= 30 ? '#e6c229' : '#e74c3c';
-      el.textContent = fps + ' FPS · ' + Math.round(worst) + 'ms · ' +
+      let txt = fps + ' FPS · ' + Math.round(worst) + 'ms · ' +
         (gm.renderer.type === Phaser.WEBGL ? 'GL ' : 'CV ') +
         gm.scale.width + '×' + gm.scale.height + ' · dpr' + (Math.round(DPR * 10) / 10);
+      if (PROF && pN > 0) { txt += '\nupd ' + (updSum / pN).toFixed(1) + ' · draw ' + (rendSum / pN).toFixed(1) + 'ms'; updSum = rendSum = 0; pN = 0; }
+      txt += '\n' + probeLine;
+      el.textContent = txt;
     }
     worst = 0;
   }, 500);
@@ -5294,15 +5443,26 @@ function ssAddScene(key, cls) {
 }
 function ssBoot() {
   game = new Phaser.Game({
-    type: Phaser.AUTO,
+    // CANVAS only when the raster probe proved this device's GL is a software
+    // rasterizer and its Canvas2D is faster (see SS_REND) — same resolution,
+    // same art, just the rasterizer that actually has a GPU behind it.
+    type: SS_REND.mode === 'cv' ? Phaser.CANVAS : SS_REND.mode === 'gl' ? Phaser.WEBGL : Phaser.AUTO,
     width: Math.round(window.innerWidth * DPR),
     height: Math.round(window.innerHeight * DPR),
     backgroundColor: '#0a0d1c',
     scale: { mode: Phaser.Scale.NONE },
-    render: { antialias: DPR < 2, powerPreference: 'high-performance' },
+    // canvas mode keeps smoothing on: no MSAA to pay for, and NEAREST-scaled
+    // painted art goes crunchy. The DPR<2 rule is the GL/MSAA-at-retina one.
+    render: { antialias: SS_REND.mode === 'cv' ? true : DPR < 2, powerPreference: 'high-performance' },
     scene: [Home, Battle, Profile, Board],
   });
   window.game = game;
+  DIAG('rend ' + SS_REND.mode + '/' + SS_REND.why + (SS_REND.p ? ' gl ' + SS_REND.p.gl + ' cv ' + SS_REND.p.cv + ' Mpx/s' : ''));
+  // renderer may not exist until Phaser's own boot — install the shim both
+  // ways (it no-ops unless the renderer really is Canvas; AUTO can land there
+  // too, e.g. headless without GPU)
+  ssCanvasTintShim();
+  game.events.once('ready', ssCanvasTintShim);
   while (SS_LATE_SCENES.length) { const [k, c] = SS_LATE_SCENES.shift(); game.scene.add(k, c); }
   game.events.once('ready', fitCanvas);
   game.events.once('ready', () => ssPerfWatch(game));

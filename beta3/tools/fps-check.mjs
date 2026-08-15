@@ -1,4 +1,5 @@
-// v0.32.0 verification: fps overlay + adaptive DPR ladder + counter throttles.
+// v0.33.0 verification: fps overlay v2, full-DPR law, raster probe + renderer
+// choice (auto-CANVAS on software-GL devices), canvas tint shim, counter throttles.
 // Drives a real headless Chrome over CDP (port 9333). Run from beta3/:
 //   node tools/fps-check.mjs
 const BASE = 'http://localhost:8899/index.html';
@@ -63,26 +64,54 @@ async function main() {
   const hidden = await c.ev(`![...document.querySelectorAll('div')].some(d => /FPS ·/.test(d.textContent||''))`);
   ok('?fps=0 hides the overlay', hidden === true);
 
-  // ---- ladder: stored cap applies on boot, ?dpr= resets it ----
+  // ---- v0.32.1 law: the ladder is dead — stored caps purge, full-DPR always ----
   await c.ev(`localStorage.setItem('beta3.dprCap','1.5');localStorage.setItem('beta3.dprCapTs',String(Date.now()));'set'`);
-  await c.nav(BASE + '?diag=1', 8000);
-  let lad = JSON.parse(await c.ev(`JSON.stringify({w: game.scale.width, iw: innerWidth, dpr: window.devicePixelRatio,
-    touch: 'ontouchstart' in window || navigator.maxTouchPoints > 0})`));
-  // headless chrome has no touch → cap must be IGNORED (desktop guard). That IS the check.
-  ok('non-touch ignores a stored cap (desktop guard)', lad.w === Math.round(lad.iw * Math.min(lad.dpr, 3)),
-    'w=' + lad.w + ' expected=' + Math.round(lad.iw * Math.min(lad.dpr, 3)));
-  // simulate touch, re-boot: now the cap must bite
   await c.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await c.nav(BASE + '?diag=1', 8000);
-  lad = JSON.parse(await c.ev(`JSON.stringify({w: game.scale.width, iw: innerWidth})`));
-  ok('touch device honors stored 1.5 cap', lad.w === Math.round(lad.iw * 1.5), 'w=' + lad.w + ' iw=' + lad.iw);
-  // ?dpr=1 pins and clears
-  await c.nav(BASE + '?diag=1&dpr=1', 8000);
-  lad = JSON.parse(await c.ev(`JSON.stringify({w: game.scale.width, iw: innerWidth,
+  let lad = JSON.parse(await c.ev(`JSON.stringify({w: game.scale.width, iw: innerWidth, dpr: window.devicePixelRatio,
     cap: localStorage.getItem('beta3.dprCap')})`));
+  ok('touch boot ignores + purges a stored v0.32.0 cap (full-DPR law)',
+    lad.w === Math.round(lad.iw * Math.min(lad.dpr, 3)) && lad.cap === null,
+    'w=' + lad.w + ' cap=' + lad.cap);
+  // ?dpr=1 still pins (manual probe)
+  await c.nav(BASE + '?diag=1&dpr=1', 8000);
+  lad = JSON.parse(await c.ev(`JSON.stringify({w: game.scale.width, iw: innerWidth})`));
   ok('?dpr=1 pins buffer to 1x', lad.w === Math.round(lad.iw * 1), 'w=' + lad.w);
-  ok('?dpr= clears the stored cap', lad.cap === null);
   await c.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+
+  // ---- v0.33.0: raster probe + renderer choice ----
+  const ras = JSON.parse(await c.ev(`JSON.stringify(window.__ssraster)`));
+  ok('raster probe beacon present with numeric rates', ras && ras.p && ras.p.gl >= 0 && ras.p.cv >= 0,
+    JSON.stringify(ras && ras.p));
+  ok('probe verdict cached', await c.ev(`!!localStorage.getItem('beta3.raster')`) === true);
+  // ?rend=cv forces the canvas renderer and the tint shim bakes tinted copies
+  await c.nav(BASE + '?rend=cv', 9000);
+  const cvb = JSON.parse(await c.ev(`JSON.stringify({
+    cv: game.renderer.type === Phaser.CANVAS,
+    shim: !!Phaser.GameObjects.Image.prototype.__ssTintShim,
+    baked: Object.keys(game.textures.list).filter(k => /^(dot|glowbig)#[0-9a-f]+$/.test(k)).length })`));
+  ok('?rend=cv boots the CANVAS renderer', cvb.cv);
+  ok('canvas tint shim installed and baking (stars/aurora keep their colors)', cvb.shim && cvb.baked >= 3,
+    cvb.baked + ' baked tints');
+  // ?rend=gl forces WebGL
+  await c.nav(BASE + '?rend=gl', 9000);
+  ok('?rend=gl boots the WEBGL renderer', await c.ev(`game.renderer.type === Phaser.WEBGL`) === true);
+  // same-day daily board must deal identical letters on both renderers
+  const dailyLetters = async (rend) => {
+    await c.nav(BASE + '?rend=' + rend + '&daily=1&mpuid=fpscheck', 12000);
+    return await c.ev(`(async () => {
+      for (let i = 0; i < 40; i++) {
+        const b = game.scene.getScene('battle');
+        if (game.scene.isActive('battle') && b && b.board && b.board.length === 16 && b.board.every(s => s && s.ch))
+          return b.board.map(s => s.ch).join('');
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      return 'TIMEOUT';
+    })()`);
+  };
+  const dGL = await dailyLetters('gl'), dCV = await dailyLetters('cv');
+  ok('daily board letters identical across renderers (seed untouched)', dGL === dCV && dGL !== 'TIMEOUT',
+    dGL + ' vs ' + dCV);
 
   // ---- counters: drain lands exact, throttle really skips repaints ----
   await c.nav(BASE + '?diag=1', 9000);
@@ -115,17 +144,20 @@ async function main() {
     ok('hp repaints throttled (~20Hz: 2-9 paints for 300ms, was ~18)', bt.paints >= 2 && bt.paints <= 9, bt.paints + ' paints');
   }
 
-  // ---- score counter exactness ----
+  // ---- score counter exactness: the count-up ends truth-synced (updateBars
+  // rewrites scoreT with runScore() the moment the last pending anim lands —
+  // that final overwrite IS the "always land exact" law) ----
   const sc = await c.ev(`(async ()=>{
     const b = window.game.scene.getScene('battle');
     if (!b || !b.scoreT) return JSON.stringify({ err: 'no battle' });
     b.scoreAnim = (b.scoreAnim || 0) + 1;
     b.flyScore({ x: 100, y: 300 }, 37, 0, 137);
-    await new Promise(r => setTimeout(r, 2200));
-    return JSON.stringify({ text: b.scoreT.text });
+    await new Promise(r => setTimeout(r, 3000));
+    return JSON.stringify({ text: b.scoreT.text, truth: String(b.runScore()), pending: b.scoreAnim });
   })()`);
   const scr = JSON.parse(sc);
-  ok('score counter lands exactly (137)', scr.text === '137', scr.text);
+  ok('score counter truth-syncs exactly after the count', !scr.err && scr.pending === 0 && scr.text === scr.truth,
+    JSON.stringify(scr));
 
   // ---- ascent perf probe still records (PERF untouched) ----
   const perf = await c.ev(`(window.__ssperf||[]).length`);
