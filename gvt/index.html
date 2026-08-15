@@ -3487,7 +3487,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.85</div>
+  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.86</div>
   <div class="scanlines"></div>
 </div>
 
@@ -16590,6 +16590,12 @@ const BF_MAPS = [
   // the ship itself is the hazard.
   { id:'starship', name:'THE STARSHIP', ground:'deck', hMul:1.5,
     blurb:'The spaceship playset lands on the space rug. Ring corridors, rooms with jobs — and the power room runs the blast door.',
+    // 0326 [WYATT]: "you don't need that many troops to get through and beat
+    // the level" — the ship fights on SHORT SUPPLY: both toy boxes open at 25
+    // in a 1v1 and 40 in a 2v2 (the map's own numbers; sizes he didn't name
+    // keep the bfBaseHP formula). Data here, one seam in startBattlefield —
+    // every other map has no key and keeps its numbers to the byte.
+    supply:{1:25, 2:40},
     build:()=>({ rocks:[], rivers:[],
       ice:[ {x:MID,y:748,rx:86,ry:30} ],   // the coolant spill — the engine room's own slide (v1.27 damping verbatim)
       cq:cqShipBuild() }) }
@@ -23491,6 +23497,7 @@ function cqShipBuild(){
     gN:{x:M-604,y:190}, gDn:{x:M-604,y:340}, gA:{x:M-604,y:396}, gM:{x:M-604,y:500}, gS:{x:M-604,y:620},
     rng:{x:M-360,y:190}, crnT:{x:M-240,y:206},
     powW:{x:M-110,y:176}, powE:{x:M+110,y:176}, rngE:{x:M+360,y:190},
+    crnT2:{x:M+240,y:206}, crnN2:{x:M+240,y:300},
     hn:{x:M-360,y:340}, supW:{x:M-118,y:350}, supE:{x:M+118,y:350}, hn2:{x:M+360,y:340},
     crnN:{x:M-240,y:300}, crnM:{x:M-240,y:430}, hmJ:{x:M-240,y:500},
     hm:{x:M-380,y:500}, dw:{x:M-60,y:500}, de:{x:M+60,y:500}, hm2:{x:M+380,y:500}, hmJ2:{x:M+240,y:500},
@@ -23504,12 +23511,18 @@ function cqShipBuild(){
   };
   const E={
     exN:[['gA',100]], exS:[['gM',100]],
-    gA:[['gN',25],['gDn',35],['gM',40]],
+    gA:[['gN',40],['gDn',30],['gM',30]],   // 0326 [WYATT] "characters rarely go into the top room": the north fork carries real weight now (was 25/35/40; totals hold 100 — the hash arithmetic never moves)
     gDn:[['hn',100]],
     gM:[['hm',60],['gS',40]],
     gN:[['rng',100]], gS:[['hs',100]],
-    rng:[['powW',70],['crnT',30]], crnT:[['crnN',100]],
-    powW:[['powE',100]], powE:[['rngE',100]], rngE:[['gN2',60],['hn2',40]],
+    rng:[['powW',80],['crnT',20]], crnT:[['crnN',100]],   // 0326: same law, the room's own door (was 70/30)
+    powW:[['powE',100]], powE:[['rngE',100]],
+    // 0326 STUCK-SPOT: the old rngE->hn2 edge crossed a wall band with NO
+    // floor (x M+360, y 230..300) — every top-room man who rolled its 40%
+    // wedged at the rng~ south edge forever. The exit keeps the same 60/40
+    // split but walks the mirrored ring channel (crn~), the vertical the
+    // west side always used.
+    rngE:[['gN2',60],['crnT2',40]], crnT2:[['crnN2',100]], crnN2:[['hn2',100]],
     hn:[['supW',60],['crnN',40]],
     supW:[['supE',100]], supE:[['hn2',100]],
     crnN:[['crnM',100]], crnM:[['hmJ',100]],
@@ -23544,6 +23557,7 @@ function cqShipBuild(){
   for(let q8=0;q8<7;q8++){ rlights.push({x:120+q8*((WW-240)/6), y:64, ph:q8*0.6});
                            rlights.push({x:120+q8*((WW-240)/6), y:WORLD_H-56, ph:q8*0.6+0.3}); }
   return { ban:CQBAN, zones:Z, vis:VIS, visd:VISD, nod:nod, E:E,
+    mouth:{x0:252, n:396, s:504},   // 0326: the crate room's own edge inset + its two door-mouth centres (an 356..436 / as 464..544) — the mouth funnel below reads these
     sup:{x0:M-170,x1:M+170,y0:280,y1:420}, pow:{x0:M-150,x1:M+150,y0:96,y1:252},
     vent:{x:M,y:720}, stars:{L1:L1,L2:L2,L3:L3}, meteors:meteors, greeb:greeb, rlights:rlights };
 }
@@ -23564,6 +23578,15 @@ function cqNodePos(u,id){ const n=S.cfg.terrain.cq.nod[id];
   return u.side==='you'? {x:n.x,y:n.y} : {x:WORLD_W-n.x,y:n.y}; }
 function cqPickEdge(u,fromId){ const edges=S.cfg.terrain.cq.E[fromId]||[];
   if(!edges.length) return null;
+  // 0326 TOP-ROOM INTENT [WYATT]: a man DROPPED on the north run (placeUnit
+  // stamps u.cqPow at y<=260 — the ring's top band, the threshold, the power
+  // room's own latitude) was aimed at the top room by the finger that placed
+  // him — his forks take it. crnT is the ring's turn-off just shy of the
+  // door: a man who STARTS there (dropped beside it) walks to powW instead —
+  // a node target needs no authored edge, and the run to it is all floor.
+  // Both teams read the same law; the stamp derives from the relayed drop
+  // point, so every sim agrees.
+  if(u.cqPow){ if(fromId==='gA') return 'gN'; if(fromId==='rng'||fromId==='crnT') return 'powW'; }
   if(edges.length===1) return edges[0][0];
   let tot=0; for(const e of edges) tot+=e[1];
   // the fork is HIS: a hash of his own unit id x the node name — deterministic
@@ -23930,6 +23953,25 @@ function voidAt(x,y){
 // a roof on his own) — only a FORCED displacement (the gravity gun's shove)
 // ever crosses, and this is the line it crosses.
 function roofFallAt(y){ return roofField() && (y<74 || y>WORLD_H-96) ? {kind:'eave'} : null; }   // the march clamp IS the brink — only a shove ever tests past it
+// 0326 THE ROOF LAW [WYATT]: "they need to know that top area they're mostly
+// gonna just walk off the roof" — COMPUTER-owned walkers route AROUND a gap:
+// down the near rim, under the hole, back on course (the bridge-funnel
+// goal-rewrite in gap costume). Pure geometry, zero RNG, zero state, so every
+// sim computes the same detour. Player-placed men keep their right to walk
+// off the roof — the trap is theirs to respect (and the gravity gun's stage).
+// Gaps are authored at the TOP of both roof carpets, so the safe lane is the
+// south rim; jets overfly (u.jetT exempts every void), and the exempt classes
+// (bosses, swoopers, the burrowed) never consulted a lane anyway.
+const GAP_KEEP=26;
+function aiGapGoal(x,y,gx,gy){
+  for(const g of (S.cfg.terrain.gaps||[])){
+    const L=g.x-g.w/2-GAP_KEEP, R=g.x+g.w/2+GAP_KEEP, safe=g.y1+GAP_KEEP;
+    if(Math.min(x,gx)>=R || Math.max(x,gx)<=L) continue;   // the walk never spans the hole
+    if(y<safe) return { x: x<g.x? L : R, y:safe };         // north of the safe lane: round the near rim first
+    if(gy<safe) return { x:gx, y:safe };                   // already safe: never re-aim INTO the band
+  }
+  return null;
+}
 // the long drop, both carpets: the show, then the kill. Battleground units
 // take the trainKill law verbatim; campaign greens ride knock()'s own kill
 // tail (knockKill — lives, refund, Sarge's clock and the coach stay one law,
@@ -24148,7 +24190,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.85';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.86';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -27927,7 +27969,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
     const idx=(st.i%team);
     st.laneBias = team>1 ? 110 + (idx+0.5)*((WORLD_H-220)/team) : null;   // 1v1 keeps the tuned solo brain untouched; a tall map spreads the whole front
   }
-  const bhp=bfBaseHP(team);
+  const bhp=(map.supply && map.supply[team]) || bfBaseHP(team);   // 0326: a map may fight on its own supply (THE STARSHIP 25/40); sizes without a cell keep the formula
   // WHICH ONE IS MINE. In every solo battleground that is seat 0 on the left, and
   // the plan says so. In a private room the plan comes off the room's roster and
   // your chair may well be one of the ten on the RIGHT — so the camera opens
@@ -28876,7 +28918,28 @@ function bfMarch(u,dt,goal){
       const g8=cqGoal(u);
       if(g8){ if(g8.hold && Math.hypot(g8.x-u.x,g8.y-u.y)<10){ u.marching=false; return; }
         gx=g8.x; gy=g8.y; } }
+    else if(cb){
+      // 0326 THE MOUTH FUNNEL (stuck-spot fix): the crate sits at WORLD_H/2 —
+      // dead centre of the wall strip BETWEEN the crate room's two door
+      // mouths — so a man funneled straight at it converged down the ring
+      // corridor's edge until his goal direction was pure-horizontal into the
+      // strip's face and the axis-clamp wall slide had nothing left to slide
+      // (measured: three riflemen pinned at (1671,450) for 80s). West of the
+      // room's own edge the last stretch aims at the NEAR MOUTH's centre
+      // instead (the bridge-funnel goal-rewrite, third verse); inside the
+      // room the crate is one open rectangle and the true goal takes over.
+      const mo=S.cfg.terrain.cq.mouth;
+      const out8=(u.side==='you')? u.x<WORLD_W-mo.x0 : u.x>mo.x0;
+      if(out8){ gx=cb.x; gy=(u.y<WORLD_H/2)? mo.n : mo.s; }
+    }
     cqPx=u.x; cqPy=u.y;
+  }
+  // 0326 THE ROOF LAW: a computer seat's walker detours the gap — the human
+  // chairs' men are deliberately exempt (the card: player placement is the
+  // player's own risk). Campaign greens never enter (S.bf gate).
+  if(S.bf && u.side && u.seat!=null && !(u.jetT>0) && S.cfg.terrain.gaps){
+    const st8=S.bf.seats[u.seat];
+    if(st8 && !st8.human){ const d8=aiGapGoal(u.x,u.y,gx,gy); if(d8){ gx=d8.x; gy=d8.y; } }
   }
   // DOUBLE TIME (v1.62) rides the stride itself — one factor here covers both
   // carpets, because the campaign march is this same function (v1.30)
@@ -30201,7 +30264,13 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
   for(let i=0;i<24;i++){          // 24 tries, not 16 — the strewn maps eat candidates
     const x=Math.round(lo+Math.random()*(hi-lo));
     const spread=(this.d.focus==='focus'?110:(this.d.focus==='weak'?190:300));
-    const y=Math.round(Math.max(92,Math.min(WORLD_H-108, focusY+(Math.random()-0.5)*spread)));
+    let y=Math.round(Math.max(92,Math.min(WORLD_H-108, focusY+(Math.random()-0.5)*spread)));
+    // 0326 THE ROOF LAW, placement edition: a brain never ORDERS a man into
+    // the death band over the gap — the candidate lane folds below the rim
+    // (the march detour still backstops whatever slips through; view.cp
+    // referees the folded spot like any other).
+    for(const g6 of (S.cfg.terrain.gaps||[])){
+      if(y<g6.y1+GAP_KEEP+8) y=Math.round(Math.min(WORLD_H-108, g6.y1+GAP_KEEP+8+(g6.y1+GAP_KEEP+8-y)*0.25)); }
     if(!view.cp(x,y,type)) continue;         // the view knows which half is legal (and un-mirrors)
     const fwd=(x-lo)/(hi-lo);
     let s=(back? fwd : 1-fwd)*1.5;
@@ -30224,6 +30293,7 @@ function placeUnit(type,x,y,side,seat){
     const b=S.bf.base[side==='you'?'foe':'you'];
     u.side=side;
     u.seat=(seat!=null)? seat : (side==='you'? 0 : S.bf.team);
+    if(S.cfg && S.cfg.terrain && S.cfg.terrain.cq && y<=260) u.cqPow=1;   // 0326: dropped on the north run = aimed at the top room (cqPickEdge honors it)
     u.def=Object.assign({}, UDEF[type], BF_MOVE[type]||{});   // per-unit copy — never mutate the shared UDEF
     u.hpMax=u.def.hp||3; u.hp=u.hpMax;
     // v3.12 NEMESIS: the captain's man walks on carrying one of YOUR mirrored
@@ -35520,10 +35590,18 @@ function update(dt){
       // anchor could otherwise rotate an on-camera man's slot off the bottom
       // edge and he'd vanish mid-march (measured: 13.8s gone on an L21 line)
       const sx=fo.x+fo.dir.x*o.fx-fo.dir.y*o.fy, sy=foeBandY(fo.y+fo.dir.y*o.fx+fo.dir.x*o.fy);
-      const dd=Math.hypot(sx-f.x, sy-f.y);
+      // 0326 THE ROOF LAW, formation edition: the slot spring is a walk like
+      // any other — its STEP routes through the same detour (rim first, then
+      // under the hole, shadowing a slot that is crossing from the safe lane
+      // below; west of the hole the spring climbs home). A folded TARGET
+      // alone was measured insufficient — a wide wing's diagonal clipped the
+      // rim (35 vee/crescent men down the L39 hole in one soak).
+      let tx=sx, ty=sy;
+      if(S.cfg.terrain.gaps){ const d6=aiGapGoal(f.x,f.y,sx,sy); if(d6){ tx=d6.x; ty=d6.y; } }
+      const dd=Math.hypot(tx-f.x, ty-f.y);
       if(dd>2){
         const sp=(fo.halted&&dd<24)?0 : f.def.spd*aura*(dd>70?1.8:1.15);
-        f.x+=(sx-f.x)/dd*Math.min(sp*amv,dd); f.y+=(sy-f.y)/dd*Math.min(sp*amv,dd);   // 0278a: a formation snowman springs to his slot in hops too (amv===dt for everyone else)
+        f.x+=(tx-f.x)/dd*Math.min(sp*amv,dd); f.y+=(ty-f.y)/dd*Math.min(sp*amv,dd);   // 0278a: a formation snowman springs to his slot in hops too (amv===dt for everyone else)
       }
     } else if(f.gu){
       // crawlers: dash on the surface, then BURROW under the rug — a moving
@@ -35539,9 +35617,15 @@ function update(dt){
         const d=Math.hypot(gT.x-f.x,gT.y-f.y);
         if(d>1){ const sp=f.def.spd*aura*0.7, st=rockSteer(f.x,f.y,gT.x,gT.y,f.squeeze?3:ROCK_PAD_FOE);
           f.x+=(st?st.x:(gT.x-f.x)/d)*sp*dt; f.y+=(st?st.y:(gT.y-f.y)/d)*sp*dt; }
-        if(f.gt<=0){ f.burrow=false; f.dash=true; f.gt=0.8+Math.random()*0.4;
+        if(f.gt<=0){
+          // 0326 THE ROOF LAW, crawler edition: never SURFACE in (or beside)
+          // the hole — hold the burrow a beat and pop up past it; the dash
+          // never AIMS into the band either (aiGapGoal clamps the target).
+          if(S.cfg.terrain.gaps && aiGapGoal(f.x,f.y,f.x,f.y)){ f.gt=0.35; }
+          else { f.burrow=false; f.dash=true; f.gt=0.8+Math.random()*0.4;
           f.tgt={ x:f.x+(gT.x-f.x)*0.3+(Math.random()-0.5)*90, y:f.y+(gT.y-f.y)*0.3+(Math.random()-0.5)*90 };
-          S.fx.push({k:'ring',x:f.x,y:f.y,r:4,R:22,t:0,dur:0.3,col:'rgba(154,90,74,0.9)'}); }
+          if(S.cfg.terrain.gaps){ const t6=aiGapGoal(f.x,f.y,f.tgt.x,f.tgt.y); if(t6) f.tgt=t6; }
+          S.fx.push({k:'ring',x:f.x,y:f.y,r:4,R:22,t:0,dur:0.3,col:'rgba(154,90,74,0.9)'}); } }
       } else if(f.dash && f.tgt){
         const dd=Math.hypot(f.tgt.x-f.x, f.tgt.y-f.y);
         if(dd<8||f.gt<=0){ f.dash=false; f.burrow=true; f.gt=1.2+Math.random()*0.5; }
@@ -35549,6 +35633,7 @@ function update(dt){
       } else if(f.gt<=0){
         f.dash=true; f.gt=0.7+Math.random()*0.5;
         f.tgt={ x:f.x+(gT.x-f.x)*0.35+(Math.random()-0.5)*100, y:f.y+(gT.y-f.y)*0.35+(Math.random()-0.5)*100 };   // 0318: the dash header rides the same order
+        if(S.cfg.terrain.gaps){ const t6=aiGapGoal(f.x,f.y,f.tgt.x,f.tgt.y); if(t6) f.tgt=t6; }   // 0326: the roof law's clamp
       }
     } else if(f.saberState && f.saberState!=='idle'){
       // v1.38: THEIR SARGE mid-dash — the blade owns his feet (updateFoeSaber,
@@ -35563,9 +35648,17 @@ function update(dt){
       // v2.53: the snowman's bounds own his feet the same way (mom's slot)
       updateYeti(f,dt);
     } else {
-      const d=Math.hypot(goal.x-f.x, goal.y-f.y);
-      if(d>1){ const sp=f.def.spd*aura, st=rockSteer(f.x,f.y,goal.x,goal.y,f.squeeze?3:ROCK_PAD_FOE);
-        f.x+=(st?st.x:(goal.x-f.x)/d)*sp*amv; f.y+=(st?st.y:(goal.y-f.y)/d)*sp*amv; }   // 0278a: amv — the air-step gate (=== dt for every non-gait foe)
+      // 0326 THE ROOF LAW: the tan walker rounds the gap like everyone the
+      // computer owns (aiGapGoal — covers the bridge goal too, so a river
+      // crossing can never clip the hole). Bosses/swoopers are exempt: the
+      // voids never eat them, and a dodge they don't need reads as fear.
+      let g6=goal;
+      if(S.cfg.terrain.gaps && !f.boss && !f.def.swoop){
+        const d6=aiGapGoal(f.x,f.y,g6.x,g6.y); if(d6) g6=d6;
+      }
+      const d=Math.hypot(g6.x-f.x, g6.y-f.y);
+      if(d>1){ const sp=f.def.spd*aura, st=rockSteer(f.x,f.y,g6.x,g6.y,f.squeeze?3:ROCK_PAD_FOE);
+        f.x+=(st?st.x:(g6.x-f.x)/d)*sp*amv; f.y+=(st?st.y:(g6.y-f.y)/d)*sp*amv; }   // 0278a: amv — the air-step gate (=== dt for every non-gait foe)
     }
     // NOBODY STANDS STILL FOREVER. Steering gets a man round any rock we can
     // see; this is the backstop for the ones we can't — a pile-up, a pinch
