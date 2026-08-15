@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.28.0';
+const BUILD = 'STARSPELL v0.29.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -4321,8 +4321,11 @@ class Battle extends Phaser.Scene {
 
   // The hint teaches the ORDER, not just the letters: tiles light one at a
   // time in word order, a gold thread grows from tile to tile as it goes, the
-  // finished path holds a couple of seconds, then fades. A simultaneous
-  // highlight told you WHICH letters but never WHAT word.
+  // finished path holds long enough to read and start tracing, then fades.
+  // A simultaneous highlight told you WHICH letters but never WHAT word.
+  // Pacing is deliberately unhurried (Wyatt: the old beat was "way too fast")
+  // — and holding is free: only a successful cast clears the fx, so the
+  // player can trace the lit path while it stands.
   useHint() {
     if (this.state !== 'pick' || !this.hasSigil('tome') || this.hintUsed) return;
     const best = this.bestWord();
@@ -4356,19 +4359,19 @@ class Battle extends Phaser.Scene {
       const g = this.add.image(p.x, p.y, 'dot').setScale(this.tileSize / 14)
         .setTint(0xffc95c).setAlpha(0).setBlendMode('ADD');
       fx.add(g);
-      this.tweens.add({ targets: g, alpha: 0.55, duration: 160, ease: 'Sine.easeOut', yoyo: true, hold: 60, repeat: 0, onComplete: () => g.setAlpha(0.3) });
+      this.tweens.add({ targets: g, alpha: 0.55, duration: 260, ease: 'Sine.easeOut', yoyo: true, hold: 120, repeat: 0, onComplete: () => g.setAlpha(0.35) });
       const bc = this.board[p.bi] && this.board[p.bi].c;
-      if (bc) this.tweens.add({ targets: bc, scale: 1.1, duration: 130, yoyo: true });
+      if (bc) this.tweens.add({ targets: bc, scale: 1.1, duration: 200, yoyo: true });
       if (k > 0) {
         const a = pts[k - 1], seg = { t: 0 };
         this.tweens.add({
-          targets: seg, t: 1, duration: 220, ease: 'Sine.easeOut',
+          targets: seg, t: 1, duration: 440, ease: 'Sine.easeOut',
           onUpdate: () => { if (this.hintFx === fx) drawAll(a, p, seg.t); },
           onComplete: () => { if (this.hintFx === fx) { segs.push([a, p]); drawAll(null, null, 0); } },
         });
       }
-      if (k + 1 < pts.length) this.time.delayedCall(340, () => step(k + 1));
-      else this.time.delayedCall(2200, () => { if (this.hintFx === fx) this.clearHintFx(true); });
+      if (k + 1 < pts.length) this.time.delayedCall(650, () => step(k + 1));
+      else this.time.delayedCall(5000, () => { if (this.hintFx === fx) this.clearHintFx(900); });
     };
     step(0);
   }
@@ -4376,7 +4379,7 @@ class Battle extends Phaser.Scene {
     if (!this.hintFx) return;
     const fx = this.hintFx;
     this.hintFx = null;
-    if (fade) this.tweens.add({ targets: fx, alpha: 0, duration: 450, onComplete: () => fx.destroy() });
+    if (fade) this.tweens.add({ targets: fx, alpha: 0, duration: fade === true ? 450 : fade, onComplete: () => fx.destroy() });
     else fx.destroy();
   }
 
@@ -4507,7 +4510,12 @@ class Battle extends Phaser.Scene {
     const l = this.L;
     this.state = 'end';
     if (this.inspectP) this.inspectP.close();   // no window may outlive the run
-    const score = this.runScore();
+    // THE TOME'S PRICE — holding the Whispering Tome taxes the final score by
+    // 25%. Applied here, before the books: bests, sign records, the daily
+    // ledger, the beacon and the submitted leaderboard score all pay it.
+    const rawScore = this.runScore();
+    const tomeTax = this.hasSigil('tome');
+    const score = tomeTax ? Math.round(rawScore * 0.75) : rawScore;
     const elapsed = this.runElapsed();
     if (!won) SFX.defeat();
     // best-run reference, captured before the books are updated below
@@ -4582,13 +4590,16 @@ class Battle extends Phaser.Scene {
     items.push(ssTxt(this, l.x(0), py(112), SS_T('stScore'), l.u(11), '#8f8873').setOrigin(0.5));
     const gk = ssGoldTex(this, String(score), 30);
     items.push(this.add.image(l.x(0), py(140), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
+    // the bargain stated where it bit — the score shown already paid it
+    if (tomeTax) items.push(ssTxt(this, l.x(0), py(163), SS_T('endTomeTax'), l.u(9.5), '#cf8fa0', 'italic').setOrigin(0.5));
+    const bestY = tomeTax ? 178 : 170;
     if (prevBest >= 0 && score > prevBest && prevBest > 0) {
-      const nb = ssTxt(this, l.x(0), py(170), SS_T('newBest'), l.u(14), '#ffe9a8').setOrigin(0.5)
+      const nb = ssTxt(this, l.x(0), py(bestY), SS_T('newBest'), l.u(14), '#ffe9a8').setOrigin(0.5)
         .setShadow(0, 0, '#c9b676', l.u(10), true, true);
       items.push(nb);
       this.tweens.add({ targets: nb, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 1000 });
     } else if (prevBest > 0) {
-      items.push(ssTxt(this, l.x(0), py(170), SS_T('stBest', prevBest), l.u(12), '#8f8873').setOrigin(0.5));
+      items.push(ssTxt(this, l.x(0), py(bestY), SS_T('stBest', prevBest), l.u(12), '#8f8873').setOrigin(0.5));
     }
 
     // the finest word gets the nameplate treatment

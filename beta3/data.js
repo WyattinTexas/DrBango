@@ -374,7 +374,7 @@ const SS_SIGILS = [
   // ---- rare ----
   { id: 'forge', icon: '❂', rarity: 1, name: 'STAR FORGE', desc: 'Forged tiles come one tier higher.' },
   { id: 'blood', icon: '✠', rarity: 1, name: 'BLOOD INK', desc: 'Your words +25%. Beast strikes +25%.' },
-  { id: 'tome', icon: '◉', rarity: 1, name: 'WHISPERING TOME', desc: 'The eye ◉ reveals a strong word, once per battle.' },
+  { id: 'tome', icon: '◉', rarity: 1, name: 'WHISPERING TOME', desc: 'The eye ◉ reveals a strong word, once per battle. Tome’s price: −25% final score.' },
   { id: 'storm', icon: '↯', rarity: 1, name: 'STORMBINDER', desc: 'Every third word you cast strikes twice.' },
   { id: 'roots', icon: '❧', rarity: 1, name: 'LEYLINE ROOTS', desc: 'Words deal +2 for every sigil you hold.' },
   { id: 'ward', icon: '✥', rarity: 1, name: 'MOONWARD', desc: 'Beast strikes deal 3 less, never below 1.' },
