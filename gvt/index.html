@@ -24533,7 +24533,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.89';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.90';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -25186,6 +25186,7 @@ function coopTick(wk){   // 0292: wk = the worker's hidden beat — chain untouc
   // v2.95: tell HQ which roster revision we hold — a battle poll that matches
   // is spared the members blob (~97% of relay egress was that near-static list)
   if(coopMulti() && COOP.mrev!=null) body.mrev=COOP.mrev;
+  cenBeat();   // 0330: the owner's pin + the referee's foe census board this very poll
   const sending=COOP.outQ.slice(0,40);
   if(sending.length) body.cmds=sending;
   if(S.coop && COOP.host && !COOP.ended){
@@ -25598,6 +25599,49 @@ function coopApply(cm){
     else { (S.pendFd||(S.pendFd=[])).push({t:t8, id:n8, n:cm.n|0, a:0}); if(S.pendFd.length>240) S.pendFd.shift(); }
     return;
   }
+  // 0330 THE OWNER'S PIN arrives — an ally's word on where his OWN men
+  // truly stand. Twins more than CEN_TOL off rubber-band level with the mv
+  // word's own semantics (lane, sarge re-home, sprue wobble). Position-only:
+  // 'ud' owns deaths, 'place' owns spawns — an unknown cid is a placement
+  // still in flight, skipped without a word.
+  if(cm.k==='cen'){
+    if(S.bf || String(cm.p||'')===String(COOP.role) || !Array.isArray(cm.mo)) return;
+    for(const r9 of cm.mo){ const p9=String(r9).split(':'); if(p9.length<3) continue;
+      const u9=S.units.find(v9=>v9.cid===p9[0] && v9.coopBy && v9.coopBy!=='bot');
+      if(!u9 || u9.dead || u9.para || u9.emgV || (u9.dropT>0) || u9.falling) continue;   // a down twin slides level too — he stands up where his owner truly is
+      const nx=Math.max(58,Math.min(W-24,parseInt(p9[1],36)|0)), ny=Math.max(70,Math.min(WORLD_H-92,parseInt(p9[2],36)|0));
+      if(Math.abs(nx-u9.x)<=CEN_TOL && Math.abs(ny-u9.y)<=CEN_TOL) continue;
+      const big9=Math.abs(nx-u9.x)>7 || Math.abs(ny-u9.y)>7;
+      u9.x=nx; u9.y=ny; if(big9) u9.sprue=0.2;
+      u9.laneY=u9.y; u9.wp=null; u9.wade=null;
+      if(u9.type==='sarge'){ u9.home={x:nx,y:ny}; u9.saberState='idle'; sgDashEnd(u9); }
+    }
+    return;
+  }
+  // 0330 THE REFEREE'S FOE CENSUS — the tan army's true spots off the
+  // referee's sim. A twin far off the word rubber-bands level; a FORMED foe
+  // shifts his whole formation ONCE per word (rigid translate — ranks never
+  // fight their slots). Position-only: 'fd' owns deaths, the stream owns
+  // spawns — an unspawned muster number is simply not here yet.
+  if(cm.k==='fcn'){
+    if(S.bf || COOP.host || String(cm.p||'')===String(COOP.role) || !Array.isArray(cm.mo)) return;
+    FCN_KEYS||(FCN_KEYS=Object.keys(FDEF));
+    S.cenQ=(S.cenQ|0)+1;
+    for(const r9 of cm.mo){ const p9=String(r9).split(','); if(p9.length<4) continue;
+      const t9=FCN_KEYS[parseInt(p9[0],36)|0]; if(!t9) continue;
+      const f9=S.foes.find(g9=>g9.type===t9 && (g9.foN|0)===(parseInt(p9[1],36)|0));
+      if(!f9 || f9.dead || f9.pendDie) continue;
+      const nx=Math.max(-400,Math.min(W+400,parseInt(p9[2],36)|0)), ny=Math.max(40,Math.min(WORLD_H-40,parseInt(p9[3],36)|0));
+      const dx=nx-f9.x, dy=ny-f9.y;
+      if(Math.abs(dx)<=FCN_TOL && Math.abs(dy)<=FCN_TOL) continue;
+      if(f9.form && f9.off && S.forms.indexOf(f9.form)>=0){
+        if(f9.form._cenQ===S.cenQ) continue;
+        f9.form._cenQ=S.cenQ; f9.form.x+=dx; f9.form.y+=dy;
+        for(const m9 of f9.form.members){ if(m9 && !m9.dead && !m9.pendDie){ m9.x+=dx; m9.y+=dy; } }
+      } else { f9.x=nx; f9.y=ny; }
+    }
+    return;
+  }
   if(cm.k==='place'){
     if(!UDEF[cm.t] || coopUnit(cm.id)) return; // replay-safe
     const x=Math.max(58,Math.min(W-24,cm.x|0)), y=Math.max(70,Math.min(WORLD_H-92,cm.y|0));   // 0197: the live height — a tall lobby's relayed drops keep the whole mat (===H flat)
@@ -25761,9 +25805,9 @@ function evTick(dt){
       // field (they name waves that are gone, and expire): the 0322 rejoin
       // lane's safety. A word nothing answers expires at 12s (leaked here).
       let m=S.foes.find(f8=>f8.type===e.t && (f8.foN|0)===e.id);
-      if(!m && e.a>1.5){ const c8=S.foes.filter(f8=>f8.type===e.t && (f8.wv|0)===(e.n|0) && f8.pendDie);
+      if(!m && e.a>1.5){ const c8=S.foes.filter(f8=>f8.type===e.t && Math.abs((f8.wv|0)-(e.n|0))<=1 && f8.pendDie);   // 0330: wave ±1 — the spawn-moment stamp skew
         if(c8.length){ c8.sort((a8,b8)=>(a8.foN|0)-(b8.foN|0)); m=c8[0]; } }
-      if(!m && e.a>3){ const c8=S.foes.filter(f8=>f8.type===e.t && (f8.wv|0)===(e.n|0));
+      if(!m && e.a>3){ const c8=S.foes.filter(f8=>f8.type===e.t && Math.abs((f8.wv|0)-(e.n|0))<=1);   // 0330: wave ±1, same skew law
         if(c8.length){ c8.sort((a8,b8)=>(a8.foN|0)-(b8.foN|0)); m=c8[0]; } }
       if(m){ evKillByWord(m); pl.splice(i,1); continue; }
       if(e.a>12) pl.splice(i,1);
@@ -28008,6 +28052,91 @@ function roomAdoptBeacon(b){
 // clock and both toy boxes with it), so the HOST trims his own census until
 // the whole blob fits. A dropped row just waits for the seat's next turn.
 const SNAP_TOL=48, BCN_MAX=480;
+// ===== 0330 THE OWNER'S PIN & THE REFEREE'S FOE CENSUS (design/mp-sync-0330/
+// 00-DESIGN.md). Positions were the last per-sim liberty two screens took
+// wholesale: deaths crossed (0313a 'fd'/'ud'), the room census pulled guests
+// level (v2.83 'sn') — but a campaign ally's standing men wobbled off their
+// pins under fire (the settle pulse's still-gate never fires mid-combat, p95
+// 82px on the 0330 rig), the tan army marched two different wars (p95 551px),
+// and the room HOST never adopted a guest's own chair at all. One beat, two
+// words, all riding the shipped poll and clamp_cmd's existing shape law
+// ('mo' = ≤16 strings ≤16 chars): every commander pins his OWN men ('cen' —
+// the ud grammar, position edition; in a room it is a full chair census down
+// the shipped roomAdoptSeat walk, the sender's seat being HQ's own stamp),
+// and the campaign referee deals a rotating FOE census ('fcn' — the sn
+// grammar, muster-number edition; a formed foe shifts his whole formation so
+// ranks never fight their slots). Old clients drop both words at their
+// dispatch tails and keep yesterday's game byte-exact; rubber-banding the
+// laggard level is the card's own approved mechanism.
+const CEN_TOL=14, FCN_TOL=48, CEN_ROWS=16, CEN_LOGWIN=1200;
+let FCN_KEYS=null;
+function cenBeat(){
+  if(!S.coop || !COOP || COOP.ended || S.mode!=='play' || coopHumans()<2) return;
+  // marathon brake: past this many log rows the replay window (LCMD_CAP 1600,
+  // pair-family CMD_CAP 400) is the scarcer resource — pin every third beat
+  S.cenB=(S.cenB|0)+1;
+  if(COOP.seq>((coopSquad()||coopRoom())? CEN_LOGWIN : 300) && (S.cenB%3)) return;
+  if(roomBattle()){
+    const bf=S.bf, sMe=bfMySeat(); if(!bf || bf.resolved || !bf.seats[sMe]) return;
+    const all=[];
+    for(const u of S.units){
+      if(u.dead || u.seat!==sMe || !(u.hp>0) || (u.dropT>0)) continue;
+      const ti=BF_TYPES.indexOf(u.type); if(ti<0) continue;
+      all.push(ti.toString(36)+','+Math.round(u.x).toString(36)+','+Math.round(u.y).toString(36)+','+
+               Math.max(1,Math.min(9,Math.ceil(u.hp/(u.hpMax||1)*9))).toString(36));
+    }
+    if(!all.length) return;
+    // over the word's budget the walk starts at a rolling offset (the sn
+    // idiom); n carries the true headcount, so a windowed beat never kills.
+    // Stride = the window (the overlap-starvation law, r21)
+    S.cenR=((S.cenR|0)+CEN_ROWS)%all.length;
+    coopSend({k:'cen', n:all.length, mo:all.slice(S.cenR).concat(all.slice(0,S.cenR)).slice(0,CEN_ROWS)});
+    return;
+  }
+  // campaign/park/raid: my own men, cid rows, EVERY beat — the twin's sim
+  // acts on its own between words (it marches, it chases ITS fights), so any
+  // quiet window is a runaway window (the r9/r10 rigs both caught one). One
+  // word per beat costs the log the same one row whether it carries 3 rows
+  // or 16 — the movers-only idea saved bytes, not the capped resource.
+  const el=[];
+  for(const u of S.units){
+    if(u.coopBy || !u.cid || u.dead || u.para || u.emgV || (u.dropT>0) || u.falling) continue;   // down men still pin — a casualty's twin must lie where HE lies
+    if(S.drag && S.drag.unit===u) continue;
+    if(u.type==='sarge' && u.saberState && u.saberState!=='idle') continue;   // mid-dash theatrics stay his own until he lands
+    el.push(u);
+  }
+  if(el.length){
+    // an army past the word's 16 rows walks a rotating window — the stride
+    // IS the window, or overlap starves the tail (the r21 rig measured a
+    // 7-beat sweep on an 83-foe flood under a +13 stride)
+    S.cenUR=((S.cenUR|0)+CEN_ROWS)%el.length;
+    const w9=el.slice(S.cenUR).concat(el.slice(0,S.cenUR)).slice(0,CEN_ROWS), rows=[];
+    for(const u of w9) rows.push(String(u.cid)+':'+Math.round(u.x).toString(36)+':'+Math.round(u.y).toString(36));
+    coopSend({k:'cen', mo:rows});
+  }
+  // the referee deals the foe census — the WHOLE standing army through a
+  // rotating two-word window (32 rows a beat; a 40-foe wave sweeps in 2).
+  // An engaged foe STALLS at the fight line for its whole combat life — a
+  // movers-only walk would go quiet on it exactly when the two sims' lines
+  // stand furthest apart (the r10 rig measured p95 481px that way).
+  if(COOP.host){
+    FCN_KEYS||(FCN_KEYS=Object.keys(FDEF));
+    const act=[];
+    for(const f of S.foes){
+      if(f.dead || f.pendDie) continue;
+      if(FCN_KEYS.indexOf(f.type)<0) continue;
+      act.push(f);
+    }
+    if(!act.length) return;
+    S.fcnR=((S.fcnR|0)+CEN_ROWS*2)%act.length;   // stride = the two-word window (the overlap-starvation law above)
+    const win=act.slice(S.fcnR).concat(act.slice(0,S.fcnR)).slice(0,CEN_ROWS*2), mo=[];
+    for(const f of win)
+      mo.push(FCN_KEYS.indexOf(f.type).toString(36)+','+(f.foN|0).toString(36)+','+
+              Math.round(f.x).toString(36)+','+Math.round(f.y).toString(36));
+    coopSend({k:'fcn', mo:mo.slice(0,CEN_ROWS)});
+    if(mo.length>CEN_ROWS) coopSend({k:'fcn', mo:mo.slice(CEN_ROWS)});
+  }
+}
 // THE HOST'S FIELD, one seat per beat. Census rows index into BF_TYPES (a
 // shipped const — append-only by convention, so the two ends can never argue
 // about what a 7 means within a version; an older client ignores 'sn' whole).
@@ -28147,6 +28276,24 @@ function roomApply(cm){
     }
     return;
   }
+  // 0330 THE OWNER'S PIN, battleground edition — every commander radios his
+  // own chair's census each battle beat, and every OTHER screen (the HOST
+  // finally included) lines that seat up through the SHIPPED census walk.
+  // The seat is HQ's own sender stamp — no chair can speak for another; my
+  // own chair stays my own business (v2.83's law, both directions).
+  if(cm.k==='cen'){
+    if(S.bf && S.mode==='play' && Array.isArray(cm.mo)){
+      const s9=parseInt(cm.p,10);
+      if(s9>=0 && S.bf.seats[s9] && s9!==bfMySeat()){
+        const rows9=[]; for(const r9 of cm.mo){ const p9=String(r9).split(',');
+          if(p9.length>=4) rows9.push([parseInt(p9[0],36)|0, parseInt(p9[1],36)|0, parseInt(p9[2],36)|0,
+                                       Math.max(1,Math.min(9,parseInt(p9[3],36)|0))]); }
+        roomAdoptSeat(s9, rows9, cm.n|0);
+      }
+    }
+    return;
+  }
+  if(cm.k==='fcn') return;   // 0330: campaign word — nothing to say in a room
   if(cm.k!=='place' || !S.bf || S.mode!=='play') return;
   const seat=(typeof cm.n==='number')? (cm.n|0) : parseInt(cm.p,10);
   if(!(seat>=0) || !S.bf.seats[seat]) return;
