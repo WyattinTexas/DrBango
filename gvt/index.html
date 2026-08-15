@@ -2919,7 +2919,40 @@
     80% { transform:translate(30px,250px) rotate(-10deg); }
     91% { transform:translate(-26px,62px) rotate(-3deg); }
     100% { transform:translate(0,0) rotate(0); } }
-  @media (prefers-reduced-motion:reduce){ .dec-gkey.react .gkw, .dec-yeti.react .ytw, .dec-bait.react .btw, .dec-dino.react .dtw, .dec-hook.react .hkw, .dec-yeti .ymk, .dec-yeti .ymw1, .dec-yeti .ymw2, .dec-yeti .ymw3, #roomStage.roofquake, #ro-glass .lenswrap, #pkRod .rodg.rcast, #pkRod .rodg.rtug, #pkRod .rodg.rsnap, .dec-puff.react .pfw, .dec-ship .shb, .dec-ship.react .shw { animation:none; } }
+  @media (prefers-reduced-motion:reduce){ .dec-gkey.react .gkw, .dec-yeti.react .ytw, .dec-bait.react .btw, .dec-dino.react .dtw, .dec-hook.react .hkw, .dec-yeti .ymk, .dec-yeti .ymw1, .dec-yeti .ymw2, .dec-yeti .ymw3, #roomStage.roofquake, #ro-glass .lenswrap, #pkRod .rodg.rcast, #pkRod .rodg.rtug, #pkRod .rodg.rsnap, .dec-puff.react .pfw, .dec-ship .shb, .dec-ship.react .shw, .dec-ship.travel .shw, #cloudwipe .cwb { animation:none; } }
+  /* ===== 0330a THE ROOM RAIL — one tiny square per unlocked room, in the
+     header beside the squad chip; nothing renders under two rooms. Swatches
+     are two-tone (sky over ground) so a kid reads them at a glance; the
+     room you are IN wears the home card's own gold. ===== */
+  .rmsq { display:inline-flex; gap:6px; margin-left:10px; align-items:center; flex:none; }
+  .rmsqb { width:26px; height:26px; border:3px solid rgba(0,0,0,0.35); border-radius:7px; padding:0; cursor:pointer; background-clip:padding-box; box-shadow:0 1px 2px rgba(0,0,0,0.4); }
+  .rmsqb.cur { border-color:#FFD24A; box-shadow:0 0 9px rgba(255,210,74,0.55); }
+  .rq-bedroom { background-image:linear-gradient(#8FA8C8 0 40%, #B98A5A 40% 100%); }
+  .rq-backyard { background-image:linear-gradient(#A8D8F0 0 40%, #4E8F3A 40% 100%); }
+  .rq-winter { background-image:linear-gradient(#BFE0F5 0 40%, #F2F7FB 40% 100%); }
+  .rq-rooftop { background-image:linear-gradient(#574A78 0 40%, #8A4A3A 40% 100%); }
+  .rq-western { background-image:linear-gradient(#E8A050 0 40%, #8B3E1E 40% 100%); }
+  /* ===== 0330a THE PIRATE FERRY — travel rides the SAME .shw wrapper the
+     0315 lap animates (never the art inside, so 0335's sail redesign drops
+     in with zero ferry edits): a little dip back, then an accelerating exit
+     off the top-right with a fade tail so no monitor ever sees a parked
+     ship (the stage never clips — v0315's own overflow law). ===== */
+  .dec-ship.travel .shw { animation:shiptrav 1.5s cubic-bezier(.55,.05,.85,.4) forwards; }
+  @keyframes shiptrav { 0% { transform:translate(0,0) rotate(0); opacity:1; }
+    16% { transform:translate(-15px,7px) rotate(-4deg); }
+    34% { transform:translate(30px,-18px) rotate(6deg); opacity:1; }
+    78% { opacity:1; }
+    100% { transform:translate(980px,-210px) rotate(9deg) scale(0.82); opacity:0; } }
+  /* the cloud wipe: a 400vw bank whose solid middle spans two screens, so
+     the covered state HOLDS between the in and out phases (each 'forwards')
+     while the room repaints beneath; z:26 over everything, and the glass is
+     down from the FIRST beat — no door opens mid-ferry */
+  #cloudwipe { position:fixed; inset:0; z-index:26; overflow:hidden; pointer-events:auto; }
+  #cloudwipe .cwb { position:absolute; top:0; bottom:0; left:0; width:400vw; transform:translateX(100vw); }
+  #cloudwipe.in .cwb { animation:cwIn 0.9s cubic-bezier(.3,.6,.4,1) forwards; }
+  #cloudwipe.out .cwb { animation:cwOut 0.9s cubic-bezier(.6,0,.7,.4) forwards; }
+  @keyframes cwIn { from { transform:translateX(100vw); } to { transform:translateX(-150vw); } }
+  @keyframes cwOut { from { transform:translateX(-150vw); } to { transform:translateX(-400vw); } }
   .dec-teddy.react .tedw { animation:tedhug 1.1s cubic-bezier(.25,.85,.4,1); }
   @keyframes tedhug { 0% { transform:scale(1,1) rotate(0); }
     16% { transform:scale(1.15,0.85) rotate(-2.2deg); } 38% { transform:scale(0.93,1.08) rotate(2.4deg); }
@@ -16239,9 +16272,20 @@ const BANK_TIERS=[
 ];
 function decOwns(id){ const d=META.decor; return !!(d && d.own && d.own.indexOf(id)>=0); }
 // owned AND not put away (v1.71) — the only question the room's render ever
-// asks. The off-list is absence-means-on, so every save that predates the
-// switch walks in with its whole floor exactly as it left it.
-function decorOn(id){ const d=META.decor; return decOwns(id) && !(d.off && d.off.indexOf(id)>=0); }
+// asks. 0330a THE ROOM-LINKED FLOOR: for room FURNITURE the question is
+// per-room now — placed on THIS room's floor (META.rdec[roomCur()]). The
+// park gear (pole/bait) renders at the DINO PARK, not in any room, so it
+// keeps the old global off-list (absence-means-on) untouched.
+const DECOR_GLOBAL=['pole','bait'];
+function rdecList(r){ const m=META.rdec; const l=m && m[r]; return Array.isArray(l)? l : []; }
+function decorOn(id){ const d=META.decor; if(!decOwns(id)) return false;
+  if(DECOR_GLOBAL.indexOf(id)>=0) return !(d.off && d.off.indexOf(id)>=0);
+  return rdecList(roomCur()).indexOf(id)>=0; }
+// placed on ANY room's floor — placedCount/momDue's read, so the per-room
+// deal preserves the trigger's meaning exactly (union at deal == old on-set)
+function decorPlacedAny(id){ const d=META.decor; if(!decOwns(id)) return false;
+  if(DECOR_GLOBAL.indexOf(id)>=0) return !(d.off && d.off.indexOf(id)>=0);
+  const m=META.rdec||{}; for(const r in m){ if(m[r].indexOf(id)>=0) return true; } return false; }
 // ===== v3.06 THE ROOMS AISLE (Wyatt 8/10 night, card 0247, verbatim: "Add a
 // rooms tab to the [Sarge's] surplus. Have it after fireworks and before
 // stars… two per row, so they're nice and big. The top-left one, of course,
@@ -16271,6 +16315,9 @@ function roomOwns(id){
   return id==='bedroom' || !!(META.rooms && Array.isArray(META.rooms.own) && META.rooms.own.indexOf(id)>=0); }
 // junk-proof by construction: an unowned or alien cur answers bedroom
 function roomCur(){ const c=META.rooms && META.rooms.cur; return (c && c!=='bedroom' && roomOwns(c) && ROOM_ORDER.indexOf(c)>=0)? c : 'bedroom'; }
+// 0330a: every room you hold, shelf order — the rail, the ferry's cycle and
+// the ship's per-room deal all walk this one list
+function ownedRooms(){ return ROOM_ORDER.filter(roomOwns); }
 // THE ROOFTOP'S SESSION LEDGER: what has fallen off the roof stays fallen
 // until the app is closed and reopened — Wyatt's own rule ("You don't get it
 // until you close the app and open the app"), so this set is deliberately
@@ -17823,6 +17870,52 @@ if(!META.mapRand){ META.bfMap='random'; META.mapRand=1; }
     // own array; roomCur() re-guards through roomOwns at read time, so a
     // junk cur without the map still answers bedroom.
     META.rooms={ own:own, cur:(src.cur==='bedroom'||src.cur==='western'||own.indexOf(src.cur)>=0)? src.cur : 'bedroom' }; })();
+  // ===== 0330a THE ROOM-LINKED FLOOR: per-room placement (rdec) + per-room
+  // arrangement (roomPosR), both fresh-built with whitelists (the roomPos
+  // purge idiom, per room), plus the ONE-TIME deal of the single-floor era
+  // into the room the player is actually standing in (rdecV latches — the
+  // iceR2/mapRand idiom). META.decor.off and META.roomPos STAY: the park
+  // gear still reads off, and an old client on this device still reads
+  // both untouched. Lists are INLINED (the TDZ house law): rooms =
+  // ROOM_ORDER's five; furniture = DECOR_ORDER+DECOR_EARN_ORDER minus the
+  // park gear pole/bait; pos keys = the v2.18 movers. Keep in step by hand.
+  (function(){
+    const okr=['bedroom','backyard','winter','rooftop','western'],
+      okd=['elephant','teddy','train','robot','spacerug','banana','unicorn','football','soccer','ducky','racecar','helmet','warplane','goldkey','silverkey','bronzekey','yeti','dino','hook','puffer','ship'],
+      okp=['vt1','vt2','vt3','vt4','racecar','ducky','teddy','elephant','train','unicorn','football','soccer','yeti','dino'];
+    const sd=META.rdec||{}, rd={}, sp=META.roomPosR||{}, rp={};
+    for(const r of okr){
+      if(Array.isArray(sd[r])){ const l=sd[r].filter(id=>okd.indexOf(id)>=0); if(l.length) rd[r]=l; }
+      const m=sp[r]; if(m && typeof m==='object'){ const o={};
+        for(const k in m){ const v=m[k];
+          if(okp.indexOf(k)>=0 && Array.isArray(v) && v.length===2 && isFinite(v[0]) && isFinite(v[1])) o[k]=[v[0]|0, v[1]|0]; }
+        if(Object.keys(o).length) rp[r]=o; }
+    }
+    META.rdec=rd; META.roomPosR=rp;
+    META.rdecSeen=Array.isArray(META.rdecSeen)? META.rdecSeen.filter(id=>okd.indexOf(id)>=0) : [];
+    META.rdecShip=(function(sh){ const o={}; if(sh && typeof sh==='object'){ for(const r of okr){ if(sh[r]) o[r]=1; } } return o; })(META.rdecShip);
+    if(!META.rdecV){ META.rdecV=1;
+      // the deal: today's floor (own minus off, furniture only) lands in
+      // the CURRENT room with its exact arrangement; every owned id is
+      // marked dealt so the standing sweep only ever places FUTURE grants.
+      // Nothing is lost: out stays out in the room you see, put-away stays
+      // placeable everywhere, positions ride over byte-exact.
+      const cur=((META.rooms.cur==='western' && META.wmap) || META.rooms.own.indexOf(META.rooms.cur)>=0)? META.rooms.cur : 'bedroom';
+      const down=(META.decor&&META.decor.own)||[], doff=(META.decor&&META.decor.off)||[];
+      const fl=down.filter(id=>okd.indexOf(id)>=0 && doff.indexOf(id)<0);
+      if(fl.length) META.rdec[cur]=fl;
+      META.rdecSeen=down.filter(id=>okd.indexOf(id)>=0);
+      const po={}, psrc=META.roomPos||{};
+      for(const k in psrc){ const v=psrc[k];
+        if(okp.indexOf(k)>=0 && Array.isArray(v) && v.length===2 && isFinite(v[0]) && isFinite(v[1])) po[k]=[v[0]|0, v[1]|0]; }
+      if(Object.keys(po).length) META.roomPosR[cur]=po;
+      if(down.indexOf('ship')>=0 && doff.indexOf('ship')>=0){
+        // a STOWED ship stays stowed — pre-latch every room you hold so the
+        // vehicle deal in rdecSweep never overrides the put-away
+        for(const r of okr){ if(r==='bedroom' || (r==='western'&&META.wmap) || META.rooms.own.indexOf(r)>=0) META.rdecShip[r]=1; }
+      }
+    }
+  })();
   // v3.33 TP-02: the parks ledger is NESTED — fresh-build (the decor/enh alias
   // law) with clamps: lv 0..cap, INLINED PER PARK (PARK_LEVELS/parkLevels are
   // TDZ down here, the v1.26 law — 0327 THE DEEP LADDER: yeti 50, dino 20;
@@ -19248,7 +19341,7 @@ function momAllow(){ return (META.mom && META.mom.done) ? MOM_ALLOW : 0; }
 // The v1.79 day-gate (momSetCheck + the since/day-compare) died here —
 // deleted, not gated (the v1.28 law); META.mom.since is vestigial.
 const MOM_TRIGGER_N=7;   // Wyatt's number: this many toys ON THE FLOOR brings Mom
-function placedCount(){ return DECOR_ORDER.concat(DECOR_EARN_ORDER).filter(decorOn).length; }
+function placedCount(){ return DECOR_ORDER.concat(DECOR_EARN_ORDER).filter(decorPlacedAny).length; }   // 0330a: ANY room's floor — Mom's trigger keeps its meaning across the per-room deal
 function momDue(){ return !META.mom.done && placedCount()>=MOM_TRIGGER_N; }
 // THE MERCY (v3.28, Wyatt 8/11 eve, verbatim: "Mom shouldn't be auto-engaging
 // you if you're playing, though. It's more so like she replaces the invading
@@ -24533,7 +24626,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.90';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.91';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -42853,6 +42946,7 @@ function decorReact(id){
   // instead (which the RM kill list already parks at identity — v3.04 law).
   if(id==='soccer'){ if(SOC_FLY) return; socGoalPurse(); if(socCanFly()){ socKick(); return; } }   // v3.32: the purse rides the tap (a mid-flight tap is not a kick and pays nothing)
   if(id==='puffer') puffPurse();   // 0315: pays before the solo latch can swallow the tap — by the second tap the flag is long since banked
+  if(id==='ship' && shipTravelDue()){ shipTravel(); return; }   // 0330a THE PIRATE FERRY: with 2+ rooms the tap is travel — the one-room save keeps the 0315 lap byte-exact
   if(d.solo){ const g=document.getElementById(d.el);
     if(g && g.classList.contains('react')) return; }
   if(SFX[d.sfx]) SFX[d.sfx]();
@@ -42978,7 +43072,7 @@ function socSettle(){
   // unwritten so relaunch restores the spot it was pushed from (v3.06)
   if(roomCur()==='rooftop'){ const z=roofFallZone(b, d[0], d[1]);
     if(z){ roofFall('soccer', b, d[0], d[1], z); return; } }
-  if(d[0]||d[1]) META.roomPos.soccer=[d[0],d[1]]; else delete META.roomPos.soccer;
+  if(d[0]||d[1]) rpMap().soccer=[d[0],d[1]]; else delete rpMap().soccer;   // 0330a: THIS room's arrangement
   saveMeta(); SFX.blip();
   renderMenu();
 }
@@ -43717,7 +43811,11 @@ const VTROOPS=[
 // its squatters sleep at the authored 700,34 for good.
 const RDRAG_DECOR=['dino','yeti','racecar','soccer','football','ducky','unicorn','teddy','elephant','train'];   // 0315: the plushies lead — they paint LAST in decorSVG (dino after yeti), and reverse paint order is this list's law   // v2.61: the unicorn is plush family — reverse paint order law holds (she paints after the bear). v3.04: the balls slot between car and duck — decorSVG paints duck → football → soccer → racecar, and this list is that z reversed
 let RDRAG=null;
-function rpXY(k){ const v=META.roomPos && META.roomPos[k]; return (v && v.length===2)? v : [0,0]; }
+// 0330a: the arrangement is PER ROOM now — reads and writes go through the
+// current room's own map (created on write). META.roomPos is the pre-0330a
+// legacy orphan: dealt once at load, never read again here.
+function rpMap(){ const r=roomCur(); const m=META.roomPosR||(META.roomPosR={}); return m[r]||(m[r]={}); }
+function rpXY(k){ const m=META.roomPosR && META.roomPosR[roomCur()]; const v=m && m[k]; return (v && v.length===2)? v : [0,0]; }
 function rpT(k){ const v=rpXY(k); return (v[0]||v[1])? ' transform="translate('+v[0]+','+v[1]+')"' : ''; }
 // a pointer event in ROOM coordinates — the stage is transform:scaled, so its
 // on-screen rect IS the scale; re-read every event, and a mid-gesture resize
@@ -43979,7 +44077,7 @@ function rdragEnd(e){
     // that brings the toy back brings it back where it lived before the drop
     const z=roomCur()==='rooftop'? roofFallZone(d.base, d.dx, d.dy) : '';
     if(z){ roofFall(d.k, d.base, d.dx, d.dy, z); return; }
-    if(d.dx||d.dy) META.roomPos[d.k]=[d.dx, d.dy]; else delete META.roomPos[d.k];
+    if(d.dx||d.dy) rpMap()[d.k]=[d.dx, d.dy]; else delete rpMap()[d.k];   // 0330a: THIS room's arrangement
     saveMeta(); SFX.blip();
   }
 }
@@ -44361,6 +44459,100 @@ function bkeySweep(){
   if(S.mode==='menu') renderMenu();
   bkeyOpen(); return true;
 }
+// ===== 0330a THE ROOM RAIL & THE ROOM-LINKED FLOOR & THE PIRATE FERRY
+// (Wyatt 8/15, front-slotted). The standing deal: any owned furniture id
+// the per-room world hasn't seen yet was granted since the last paint — it
+// introduces itself on THIS floor, so every grant site in the game stays
+// byte-untouched (placement is lazy, at the next renderMenu). The ship is
+// TRANSPORT, not furniture: it follows its owner into every room ONCE
+// (per-room latch — a stowed ship stays stowed; the latch never re-deals).
+function rdecSweep(){
+  if(!META.rdecV) return;
+  let ch=false; const cur=roomCur();
+  for(const id of ((META.decor&&META.decor.own)||[])){
+    if(DECOR_GLOBAL.indexOf(id)>=0) continue;
+    if(DECOR_ORDER.indexOf(id)<0 && DECOR_EARN_ORDER.indexOf(id)<0) continue;
+    if(META.rdecSeen.indexOf(id)>=0) continue;
+    META.rdecSeen.push(id);
+    const l=META.rdec[cur]||(META.rdec[cur]=[]);
+    if(l.indexOf(id)<0) l.push(id);
+    ch=true;
+  }
+  if(decOwns('ship')){
+    for(const r of ownedRooms()){
+      if(META.rdecShip[r]) continue; META.rdecShip[r]=1;
+      const l=META.rdec[r]||(META.rdec[r]=[]);
+      if(l.indexOf('ship')<0) l.push('ship');
+      ch=true;
+    }
+  }
+  if(ch) saveMeta();
+}
+// one move, both doors (the rail and the ferry): the roomBuy owned-move
+// beat verbatim, minus the shop refresh it doesn't need
+function roomSwitch(id, quiet){
+  if(!roomOwns(id) || roomCur()===id) return false;
+  META.rooms.cur=id; saveMeta();
+  if(S.mode==='menu') renderMenu();
+  if(!quiet){ SFX.blip(); setTimeout(()=>SFX.thock(), 140); }
+  return true;
+}
+// THE ROOM RAIL: one tiny square per unlocked room, only once there are
+// two — labels reuse ROOM_INFO's own names (localized x7 since v1.57, zero
+// new strings); the room you are IN wears the gold
+function roomSqHTML(){
+  const own=ownedRooms(); if(own.length<2) return '';
+  const cur=roomCur();
+  return '<span class="rmsq" id="rmsq">'+own.map(r=>
+    '<button type="button" class="rmsqb rq-'+r+(r===cur?' cur':'')+'" title="'+escH(t(ROOM_INFO[r].name))
+    +'" aria-label="'+escH(t(ROOM_INFO[r].name))+'" onclick="UI.roomHop(\''+r+'\')"></button>').join('')+'</span>';
+}
+// ===== THE PIRATE FERRY — the ship's tap is TRAVEL once you hold 2+
+// rooms. The whole show rides the #decShip WRAPPER (.travel on the .shw
+// transform) and its own overlay node — never the art inside, so 0335's
+// sail redesign drops in with zero ferry edits. All state page-lifetime.
+let SHIPTRV=0;
+function shipTravelDue(){
+  if(SHIPTRV || S.mode!=='menu') return false;
+  if(ownedRooms().length<2 || !decorHome('ship')) return false;
+  const g=document.getElementById('decShip');
+  return !!g && !g.classList.contains('react');   // a lap must FINISH (v1.78)
+}
+function shipNextRoom(){
+  const own=ownedRooms(); const i=own.indexOf(roomCur());
+  return own[(i+1) % own.length];
+}
+function cloudWipeSVG(){
+  // the 400vw bank, preserveAspectRatio none: scalloped leading and
+  // trailing thirds around a solid two-screen middle, two tones for depth
+  let lob='', shd='';
+  const L=[[96,8,34],[88,26,40],[97,45,36],[86,64,42],[95,84,38],[89,100,34]];
+  for(const p of L){ shd+='<ellipse cx="'+(p[0]+3)+'" cy="'+(p[1]+3)+'" rx="'+(p[2]*0.34)+'" ry="'+(p[2]*0.30)+'" fill="#DDE6EE" opacity="0.6"/>'
+      +'<ellipse cx="'+(403-p[0])+'" cy="'+(105-p[1])+'" rx="'+(p[2]*0.34)+'" ry="'+(p[2]*0.30)+'" fill="#DDE6EE" opacity="0.6"/>';
+    lob+='<ellipse cx="'+p[0]+'" cy="'+p[1]+'" rx="'+(p[2]*0.36)+'" ry="'+(p[2]*0.32)+'" fill="#F2EEDF"/>'
+      +'<ellipse cx="'+(400-p[0])+'" cy="'+(108-p[1])+'" rx="'+(p[2]*0.36)+'" ry="'+(p[2]*0.32)+'" fill="#F2EEDF"/>'; }
+  return '<svg viewBox="0 0 400 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">'
+    +'<rect x="88" y="0" width="224" height="100" fill="#F2EEDF"/>'+shd+lob+'</svg>';
+}
+function shipTravel(){
+  SHIPTRV=1;
+  const go=()=>{ roomSwitch(shipNextRoom(), true); SFX.thock(); };
+  // shorter, not just quieter (v1.25's law) — and the latch HOLDS a beat:
+  // a decor tap reaches decorReact TWICE by design (the dspot's onclick +
+  // the RDRAG tap path), and a synchronous reset would let the twin call
+  // ferry straight back (measured: bedroom->backyard->bedroom in one tap)
+  if(reducedMotion()){ SFX.prop(); go(); setTimeout(()=>{ SHIPTRV=0; }, 600); return; }
+  SFX.prop();
+  const g=document.getElementById('decShip'); if(g) g.classList.add('travel');
+  const w=document.createElement('div'); w.id='cloudwipe';
+  w.innerHTML='<div class="cwb">'+cloudWipeSVG()+'</div>';
+  document.body.appendChild(w);   // bank parked off-right, but the glass is
+                                  // DOWN from beat one — no door mid-ferry
+  setTimeout(()=>{ w.classList.add('in'); SFX.twink(); }, 1150);
+  setTimeout(go, 2050);                          // under full cover
+  setTimeout(()=>w.classList.add('out'), 2300);
+  setTimeout(()=>{ try{ w.remove(); }catch(e){} SHIPTRV=0; }, 3260);
+}
 let lastMarch=0;
 function showMenu(){
   S.mode='menu';
@@ -44435,6 +44627,7 @@ function sizeRoom(){
 window.addEventListener('resize', sizeRoom);
 function renderMenu(){
   pigCheck();   // settle the piggy BEFORE labels read it — a missed day drops it here
+  rdecSweep();  // 0330a: deal any newly-granted toy onto THIS floor (and the ship into new rooms) before the paint reads the lists
   // v2.42: a repaint wipes the flying glass with the rest of the innerHTML —
   // drop its hand-state with it, or a stale pointer id grabs at a dead node
   // (the renderShop/LENS lesson, verbatim)
@@ -44462,7 +44655,7 @@ function renderMenu(){
       +'<b>COMMANDER · LV '+META.lvl+'</b>'
       +'<div class="xpbar" style="flex:1;max-width:220px;margin:0 12px"><div style="width:'+Math.min(100,Math.round(100*META.xp/xpNeed()))+'%"></div></div>'
       +(META.pendingPicks>0?'<button class="mbtn alt" style="padding:0.2rem 2.6rem 0.2rem 0.7rem;font-size:1.1rem;position:relative" onclick="UI.promote()">PROMOTION!<span class="pkn" data-notr>×'+META.pendingPicks+'</span></button>':'')
-      +duelChipHTML()+crewChipHTML()
+      +duelChipHTML()+crewChipHTML()+roomSqHTML()
       +'<span style="margin-left:auto">'+t(tierName(META.starsLifetime))+' · ★ '+META.starBank+'</span>'
       +'<button class="mbtn alt langchip" title="MUSIC" onclick="UI.themeChip()">'+(META.themeOn?'🔊':'🔇')+'</button>'
       +'<button class="mbtn alt langchip" title="LANGUAGE" onclick="UI.langPanel()">🌐</button></div>'
@@ -50937,6 +51130,14 @@ window.UI = {
   // moves in on the spot (renderMenu repaints under the shop, so the new
   // floor is down the moment you walk out of the store). Tapping the room
   // you already live in just nods (the dye-jar re-wear law: never a charge).
+  // 0330a THE ROOM RAIL: a square is a one-tap move (the owned-room half of
+  // roomBuy without the aisle) — dead while the ferry holds the glass down
+  roomHop(id){
+    if(SHIPTRV) return;
+    audio();
+    if(roomCur()===id){ SFX.blip(); return; }   // your own square just nods
+    roomSwitch(id);
+  },
   roomBuy(id){
     if(!ROOM_INFO[id]) return;
     if(id==='western' && !roomOwns(id)) return;   // 0313: never sold — the pond fish's map is the only key (aisle-hidden pre-find; this guard is for stray calls)
@@ -50968,11 +51169,22 @@ window.UI = {
     // it again never charges a second time). Away = a soft thock into the toy
     // box; back = a blip, then the toy introduces itself again on the floor.
     if(decOwns(id)){
-      const off=META.decor.off||(META.decor.off=[]);
-      const i=off.indexOf(id);
-      if(i>=0){ off.splice(i,1); SFX.blip();
-        const d=DECOR_REACT[id]; if(d && SFX[d.sfx]) setTimeout(()=>SFX[d.sfx](), 260); }
-      else { off.push(id); SFX.thock(); }
+      // 0330a: for furniture the card is THIS ROOM's switch now — the same
+      // stamp strings were already per-room truthful ("IN YOUR ROOM").
+      // The park gear (pole/bait) keeps the global off-list it always had.
+      if(DECOR_GLOBAL.indexOf(id)>=0){
+        const off=META.decor.off||(META.decor.off=[]);
+        const i=off.indexOf(id);
+        if(i>=0){ off.splice(i,1); SFX.blip();
+          const d=DECOR_REACT[id]; if(d && SFX[d.sfx]) setTimeout(()=>SFX[d.sfx](), 260); }
+        else { off.push(id); SFX.thock(); }
+      } else {
+        const l=META.rdec[roomCur()]||(META.rdec[roomCur()]=[]);
+        const i=l.indexOf(id);
+        if(i>=0){ l.splice(i,1); SFX.thock(); }
+        else { l.push(id); SFX.blip();
+          const d=DECOR_REACT[id]; if(d && SFX[d.sfx]) setTimeout(()=>SFX[d.sfx](), 260); }
+      }
       saveMeta(); renderMenu(); shopRefresh(); return;
     }
     // an earned prize is never sold — a locked tap explains itself on the card
@@ -51813,6 +52025,7 @@ window.GVT = {
   camOwn(v){ if(v!==undefined) S.camOwn=!!v; return !!S.camOwn; },   // v2.09: the pan claim — read or set it from the rig
   roomPos(){ return JSON.parse(JSON.stringify(META.roomPos||{})); },   // v2.12: the room arrangement, for the battery's eyes
   roomsState(){ return { cur:roomCur(), own:(META.rooms&&META.rooms.own||[]).slice(), gone:Array.from(ROOF_GONE) }; },   // v3.06: the rooms aisle, for the battery's eyes
+  rdecState(){ return JSON.parse(JSON.stringify({ cur:roomCur(), rooms:ownedRooms(), rdec:META.rdec, pos:META.roomPosR, seen:META.rdecSeen, ship:META.rdecShip, v:META.rdecV||0, trv:SHIPTRV })); },   // 0330a: the room-linked floor, for the battery's eyes
   meta(){ return JSON.parse(JSON.stringify(META)); },
   // v2.59 THE REWARDED TV rig — state read, the day-stamp seeder (rollover
   // legs), and the placeholder's two exits. finish/abort drive the SAME
