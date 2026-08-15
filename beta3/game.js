@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.20.0';
+const BUILD = 'STARSPELL v0.21.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -738,15 +738,21 @@ function ssAssembleBeast(scene, cont, beast, unitScale, onDone) {
   cont.add(g);
   const stars = [];
   beast.stars.forEach((p, i) => {
-    const big = i % 3 === 0;
+    // star magnitudes: five brightness classes so the figure reads like a real
+    // constellation — a few blazing anchors, a scatter of faint companions.
+    // Faint stars twinkle in alpha as well as size; anchors burn steadier.
+    const mag = [1.18, 0.62, 0.88, 0.5, 0.98][i % 5];
     const ang = Math.random() * Math.PI * 2, d = 260 * unitScale + Math.random() * 200;
     const st = scene.add.image(p[0] * sc + Math.cos(ang) * d, p[1] * sc + Math.sin(ang) * d, 'dot')
       .setScale(0.1).setAlpha(0).setTint(beast.tint).setBlendMode('ADD');
     cont.add(st); stars.push(st);
     scene.tweens.add({
-      targets: st, x: p[0] * sc, y: p[1] * sc, alpha: 1, scale: big ? 1.1 : 0.7,
+      targets: st, x: p[0] * sc, y: p[1] * sc, alpha: 1, scale: mag,
       delay: i * 40, duration: 620, ease: 'Cubic.easeOut',
-      onComplete: () => scene.tweens.add({ targets: st, scale: (big ? 1.1 : 0.7) * 0.75, duration: 900 + (i * 137) % 900, yoyo: true, repeat: -1 }),
+      onComplete: () => scene.tweens.add({
+        targets: st, scale: mag * (mag < 0.8 ? 0.6 : 0.78), alpha: mag < 0.8 ? 0.55 : 0.85,
+        duration: 700 + (i * 137) % 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      }),
     });
   });
   const eyes = [];
@@ -762,6 +768,538 @@ function ssAssembleBeast(scene, cont, beast, unitScale, onDone) {
     if (onDone) onDone();
   });
   return { lines: g, stars, eyes };
+}
+
+/* ============================================================
+   Beast presence & attack fx — ssBeastFx
+   Gives every constellation a body (nebula aura, breathing,
+   shimmering edges, traveling glints), a creature-specific idle,
+   a telegraph that charges as the strike counter fills, and a
+   signature attack. Everything is archetype-driven off the fx
+   block in SS_BEASTS (data.js) so new beasts are data-only.
+   ============================================================ */
+
+// Baked colour textures: setTint is a silent no-op under the Canvas renderer,
+// so every coloured fx sprite gets a small baked texture, cached per (kind,
+// colour). A handful of tiny canvases per beast palette, kept for the session.
+function ssFxTex(scene, kind, tint) {
+  const key = 'fx' + kind + '-' + tint.toString(16);
+  if (scene.textures.exists(key)) return key;
+  const rgb = ((tint >> 16) & 255) + ',' + ((tint >> 8) & 255) + ',' + (tint & 255);
+  const S = { dot: 32, glow: 160, ring: 192, vig: 256 }[kind];
+  const t = scene.textures.createCanvas(key, S, S), c = t.context, h = S / 2;
+  let g;
+  if (kind === 'dot') {
+    g = c.createRadialGradient(h, h, 0, h, h, h);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.3, 'rgba(' + rgb + ',0.9)');
+    g.addColorStop(1, 'rgba(' + rgb + ',0)');
+  } else if (kind === 'glow') {
+    g = c.createRadialGradient(h, h, 0, h, h, h);
+    g.addColorStop(0, 'rgba(' + rgb + ',0.6)');
+    g.addColorStop(0.55, 'rgba(' + rgb + ',0.18)');
+    g.addColorStop(1, 'rgba(' + rgb + ',0)');
+  } else if (kind === 'ring') {
+    g = c.createRadialGradient(h, h, 0, h, h, h);
+    g.addColorStop(0.55, 'rgba(' + rgb + ',0)');
+    g.addColorStop(0.72, 'rgba(' + rgb + ',0.85)');
+    g.addColorStop(0.88, 'rgba(' + rgb + ',0)');
+  } else {   // vig — edge vignette: transparent centre, colour pooling at the frame
+    g = c.createRadialGradient(h, h, 0, h, h, h * 1.42);
+    g.addColorStop(0.55, 'rgba(' + rgb + ',0)');
+    g.addColorStop(1, 'rgba(' + rgb + ',0.85)');
+  }
+  c.fillStyle = g; c.fillRect(0, 0, S, S);
+  t.refresh();
+  return key;
+}
+
+// Screen-edge impact wash — the player-side "you were hit" feedback. One
+// full-screen vignette image per colour, reused across flashes.
+function ssEdgeFlash(scene, tint, peak, dur) {
+  const key = ssFxTex(scene, 'vig', tint);
+  scene._edgeVigs = scene._edgeVigs || {};
+  let v = scene._edgeVigs[key];
+  if (!v || !v.scene) {
+    v = scene._edgeVigs[key] = scene.add.image(scene.scale.width / 2, scene.scale.height / 2, key)
+      .setDisplaySize(scene.scale.width, scene.scale.height).setAlpha(0).setDepth(95);
+  }
+  scene.tweens.killTweensOf(v);
+  v.setAlpha(peak);
+  scene.tweens.add({ targets: v, alpha: 0, duration: dur || 460, ease: 'Sine.easeOut' });
+}
+
+const ssQBez = (a, c, b, t) => ({
+  x: (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * c.x + t * t * b.x,
+  y: (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * c.y + t * t * b.y,
+});
+
+/* ---- idle archetypes -------------------------------------------------------
+   Each writes a star's offset into o (screen px via fx.k). hx/hy are the
+   star's home in beast design units, i its index — geometry-driven regioning
+   (head = top, wings = far |x|, claws = far |x| on the crab) so any beast
+   built in the same 200x160 box can borrow any idle. */
+const SS_IDLE_FX = {
+  // the fox slinks — the figure slides in a lazy S, nose leading
+  prowl(fx, T, i, hx, hy, o) {
+    o.x += (Math.sin(T * 0.8 - hx * 0.012) * 3.4 + Math.sin(T * 0.47 + 1.3) * 2.2) * fx.k;
+    o.y += Math.sin(T * 1.6 + hx * 0.02) * 1.5 * fx.k;
+  },
+  // the hare sits alert, then springs a quick double-bounce; ears flick mid-hop
+  bob(fx, T, i, hx, hy, o) {
+    o.y += Math.sin(T * 1.15) * 1.8 * fx.k;
+    const hop = T % 4.6;
+    if (hop < 0.42) {
+      const p = Math.sin((hop / 0.42) * Math.PI);
+      o.y -= p * 9 * fx.k;
+      if (hy < fx.topY) o.x += Math.sin(T * 26) * p * 1.6 * fx.k;
+    }
+  },
+  // the serpent coils — a wave travels down the star chain
+  coil(fx, T, i, hx, hy, o) {
+    o.y += Math.sin(T * 2.1 - i * 0.75) * 3.6 * fx.k;
+    o.x += Math.cos(T * 1.05 - i * 0.75) * 1.8 * fx.k;
+  },
+  // the crab works its claws and skitters its legs
+  pinch(fx, T, i, hx, hy, o) {
+    if (Math.abs(hx) > 55) {
+      const sq = 0.5 + 0.5 * Math.sin(T * 1.5 + (hx > 0 ? 0 : 1.1));
+      o.x -= Math.sign(hx) * sq * 4.5 * fx.k;
+      o.y -= sq * 1.5 * fx.k;
+    } else if (hy > 20) o.x += Math.sin(T * 3.1 + hx * 0.2) * 1.1 * fx.k;
+    else o.y += Math.sin(T * 1.5) * 0.8 * fx.k;
+  },
+  // the owl's head turns — quick swivel, long unblinking hold
+  headturn(fx, T, i, hx, hy, o) {
+    if (hy < -18) {
+      const step = T / 2.4, a = Math.floor(step), f = step - a;
+      const r = (n) => Math.sin(n * 127.1 + 311.7) * 0.9;
+      const e = f < 0.22 ? (1 - Math.cos((f / 0.22) * Math.PI)) / 2 : 1;
+      o.x += (r(a - 1) + (r(a) - r(a - 1)) * e) * 7 * fx.k;
+    } else o.y += Math.sin(T * 1.2) * 1.2 * fx.k;
+  },
+  // the bear shifts its weight paw to paw
+  lumber(fx, T, i, hx, hy, o) {
+    o.x += Math.sin(T * 0.65) * 2.6 * fx.k;
+    o.y += Math.sin(T * 1.3 + (hx > 0 ? 0 : Math.PI)) * 1.6 * fx.k;
+  },
+  // the widow's legs ripple — motion grows toward the tips
+  ripple(fx, T, i, hx, hy, o) {
+    const d = Math.min(1, Math.hypot(hx - fx.cx, hy - fx.cy) / 55);
+    o.x += Math.sin(T * 2.6 + i * 2.1) * 2.1 * d * fx.k;
+    o.y += Math.cos(T * 3.2 + i * 1.3) * 2.1 * d * fx.k;
+  },
+  // wings flex — the far spans rise and sweep together (dragon, phoenix)
+  flex(fx, T, i, hx, hy, o) {
+    const amp = fx.def.amp || 1;
+    const w = Math.max(0, Math.abs(hx) - 34) / 46;
+    if (w > 0) {
+      o.y -= Math.sin(T * 1.25) * 7.5 * w * amp * fx.k;
+      o.x -= Math.sin(T * 1.25 + 0.5) * 2.2 * w * Math.sign(hx) * fx.k;
+    } else o.y += Math.sin(T * 1.25 + 1.2) * 1.4 * fx.k;
+  },
+};
+
+/* ---- attack archetypes -----------------------------------------------------
+   Each animates the beast + projectiles, calls impact(mult) exactly once at
+   the blow's landing (Battle applies damage + player-side feedback there,
+   scaled by mult), and finish() once the beast is home again. */
+const SS_ATK_FX = {
+  // crouch and spring at the board (hops: 2 = the hare's stutter-bounce)
+  pounce(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont, hops = fx.def.hops | 0;
+    SFX.noise(0.25, 500, 1, 0.05, 1200);
+    const drop = l.u(150);
+    const leap = (toY, dur, last, cb) => scene.tweens.add({
+      targets: c, y: toY, duration: dur, ease: last ? 'Cubic.easeIn' : 'Quad.easeOut',
+      onUpdate: () => { if (Math.random() < 0.5) scene.starBurst.emitParticleAt(c.x + (Math.random() - 0.5) * l.u(50), c.y - l.u(10), 1); },
+      onComplete: cb,
+    });
+    scene.tweens.add({
+      targets: c, scaleX: 1.07, scaleY: 0.88, y: fx.homeY + l.u(10), duration: 210, ease: 'Sine.easeOut',
+      onComplete: () => {
+        const strike = () => leap(fx.homeY + drop, 140, true, () => {
+          impact(1);
+          scene.starBurst.emitParticleAt(c.x, c.y + l.u(30), 10);
+          scene.tweens.add({ targets: c, y: fx.homeY, scaleX: 1, scaleY: 1, duration: 430, ease: 'Sine.easeOut', onComplete: finish });
+        });
+        if (hops >= 2) leap(fx.homeY + drop * 0.4, 110, false, () => leap(fx.homeY + drop * 0.22, 90, false, strike));
+        else strike();
+      },
+    });
+  },
+  // rear tall, then bring the whole weight down — shockwave on landing
+  slam(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont;
+    SFX.noise(0.45, 200, 1, 0.06, 80);
+    scene.tweens.add({
+      targets: c, y: fx.homeY - l.u(46), scaleX: 1.05, scaleY: 1.14, duration: 340, ease: 'Sine.easeOut',
+      onComplete: () => scene.tweens.add({
+        targets: c, y: fx.homeY + l.u(150), scaleY: 0.94, duration: 130, ease: 'Quad.easeIn',
+        onComplete: () => {
+          impact(1.2);
+          const ring = scene.add.image(c.x, c.y + l.u(40), ssFxTex(scene, 'ring', fx.beast.tint))
+            .setBlendMode('ADD').setAlpha(0.8).setScale(0.3).setDepth(58);
+          scene.tweens.add({ targets: ring, scale: l.u(2.7), alpha: 0, duration: 480, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+          scene.starBurst.emitParticleAt(c.x, c.y + l.u(40), 14);
+          scene.tweens.add({ targets: c, y: fx.homeY, scaleX: 1, scaleY: 1, duration: 520, ease: 'Sine.easeOut', onComplete: finish });
+        },
+      }),
+    });
+  },
+  // whip a line of stars at the board (strands: the widow throws three silks)
+  lash(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont, strands = Math.max(1, fx.def.strands | 0);
+    SFX.noise(0.3, 900, 1.4, 0.06, 2600);
+    scene.tweens.add({ targets: c, x: fx.homeX - l.u(14), duration: 90, yoyo: true, repeat: 2, ease: 'Sine.easeInOut', onComplete: () => c.setX(fx.homeX) });
+    const headE = fx.beast.eyes[0];
+    const from = { x: c.x + headE[0] * fx.sc, y: c.y + headE[1] * fx.sc };
+    const tgt = { x: l.x(0), y: l.y(470) };
+    const dotK = ssFxTex(scene, 'dot', fx.beast.tint);
+    let landed = 0;
+    for (let s = 0; s < strands; s++) {
+      const to = { x: tgt.x + (s - (strands - 1) / 2) * l.u(64), y: tgt.y + Math.abs(s - (strands - 1) / 2) * l.u(18) };
+      const ctrl = { x: (from.x + to.x) / 2 + (s % 2 ? -1 : 1) * l.u(90), y: (from.y + to.y) / 2 };
+      const dots = [];
+      for (let k = 0; k < 7; k++) dots.push(scene.add.image(from.x, from.y, dotK).setBlendMode('ADD').setDepth(58).setAlpha(0).setScale(1 - k * 0.09));
+      const pr = { t: 0 };
+      scene.tweens.add({
+        targets: pr, t: 1, delay: 160 + s * 90, duration: 300, ease: 'Cubic.easeIn',
+        onUpdate: () => dots.forEach((d, k) => {
+          const tt = clamp(pr.t * 1.35 - k * 0.055, 0, 1);
+          const p = ssQBez(from, ctrl, to, tt);
+          d.x = p.x; d.y = p.y; d.alpha = tt > 0 ? 1 - k * 0.11 : 0;
+        }),
+        onComplete: () => {
+          scene.starBurst.emitParticleAt(to.x, to.y, 6);
+          dots.forEach((d) => scene.tweens.add({ targets: d, alpha: 0, duration: 160, onComplete: () => d.destroy() }));
+          if (++landed === 1) impact(1);
+          if (landed === strands) finish();
+        },
+      });
+    }
+  },
+  // both claws sweep in from the sides and meet in a scissor of light
+  snap(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont;
+    SFX.noise(0.22, 700, 1.6, 0.06, 1600);
+    scene.tweens.add({ targets: c, scaleX: 1.12, duration: 160, yoyo: true, ease: 'Sine.easeOut' });
+    const tgt = { x: l.x(0), y: l.y(460) };
+    const dotK = ssFxTex(scene, 'dot', fx.beast.tint);
+    let met = 0;
+    [-1, 1].forEach((side) => {
+      const from = { x: c.x + side * l.u(110), y: c.y + l.u(30) };
+      const ctrl = { x: tgt.x + side * l.u(150), y: (from.y + tgt.y) / 2 + l.u(30) };
+      const dots = [];
+      for (let k = 0; k < 5; k++) dots.push(scene.add.image(from.x, from.y, dotK).setBlendMode('ADD').setDepth(58).setAlpha(0).setScale(1.1 - k * 0.14));
+      const pr = { t: 0 };
+      scene.tweens.add({
+        targets: pr, t: 1, delay: 220, duration: 280, ease: 'Cubic.easeIn',
+        onUpdate: () => dots.forEach((d, k) => {
+          const tt = clamp(pr.t * 1.3 - k * 0.06, 0, 1);
+          const p = ssQBez(from, ctrl, tgt, tt);
+          d.x = p.x; d.y = p.y; d.alpha = tt > 0 ? 1 - k * 0.14 : 0;
+        }),
+        onComplete: () => {
+          dots.forEach((d) => scene.tweens.add({ targets: d, alpha: 0, duration: 140, onComplete: () => d.destroy() }));
+          if (++met === 2) {
+            impact(1);
+            const bg = scene.add.graphics().setDepth(58).setBlendMode('ADD');
+            bg.lineStyle(l.u(3.5), fx.beast.eye, 0.9);
+            bg.lineBetween(tgt.x - l.u(60), tgt.y - l.u(40), tgt.x + l.u(60), tgt.y + l.u(40));
+            bg.lineBetween(tgt.x - l.u(60), tgt.y + l.u(40), tgt.x + l.u(60), tgt.y - l.u(40));
+            scene.starBurst.emitParticleAt(tgt.x, tgt.y, 10);
+            scene.tweens.add({ targets: bg, alpha: 0, duration: 260, onComplete: () => bg.destroy() });
+            finish();
+          }
+        },
+      });
+    });
+  },
+  // the whole constellation dives across the board in a wing-trailed arc
+  swoop(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont, boss = !!fx.beast.boss;
+    SFX.noise(0.5, 400, 1, 0.07, 900);
+    const tgt = { x: l.x(0), y: l.y(440) };
+    const side = Math.random() < 0.5 ? -1 : 1;
+    scene.tweens.add({
+      targets: c, y: fx.homeY - l.u(26), duration: 240, ease: 'Sine.easeOut',
+      onComplete: () => {
+        const p0 = { x: c.x, y: c.y };
+        const c1 = { x: fx.homeX + side * l.u(170), y: (fx.homeY + tgt.y) / 2 };
+        const pr = { t: 0 };
+        scene.tweens.add({
+          targets: pr, t: 1, duration: 380, ease: 'Quad.easeIn',
+          onUpdate: () => {
+            const p = ssQBez(p0, c1, tgt, pr.t);
+            c.x = p.x; c.y = p.y;
+            if (Math.random() < 0.6) scene.starBurst.emitParticleAt(c.x - side * l.u(30), c.y - l.u(16), 1);
+          },
+          onComplete: () => {
+            impact(boss ? 1.25 : 1);
+            scene.starBurst.emitParticleAt(c.x, c.y + l.u(20), boss ? 14 : 8);
+            const c2 = { x: fx.homeX - side * l.u(170), y: (fx.homeY + tgt.y) / 2 + l.u(30) };
+            const back = { t: 0 };
+            scene.tweens.add({
+              targets: back, t: 1, duration: 520, ease: 'Sine.easeOut',
+              onUpdate: () => { const p = ssQBez(tgt, c2, { x: fx.homeX, y: fx.homeY }, back.t); c.x = p.x; c.y = p.y; },
+              onComplete: finish,
+            });
+          },
+        });
+      },
+    });
+  },
+  // the dragon rears and pours a comet stream onto the board
+  breath(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont;
+    SFX.noise(0.5, 300, 1, 0.07, 1500);
+    const headE = fx.beast.eyes[0];
+    scene.tweens.add({
+      targets: c, y: fx.homeY - l.u(22), rotation: -0.05, scaleX: 1.05, scaleY: 1.05, duration: 320, ease: 'Sine.easeOut',
+      onComplete: () => {
+        SFX.noise(1.0, 600, 0.9, 0.09, 150);
+        const tgt = { x: l.x(0), y: l.y(480) };
+        const dotK = ssFxTex(scene, 'dot', fx.beast.eye);
+        const dot2K = ssFxTex(scene, 'dot', fx.beast.tint);
+        const N = 16;
+        for (let k = 0; k < N; k++) {
+          scene.time.delayedCall(k * 42, () => {
+            if (fx.dead) return;
+            const f = { x: c.x + headE[0] * fx.sc, y: c.y + headE[1] * fx.sc };
+            const to = { x: tgt.x + (Math.random() - 0.5) * l.u(120), y: tgt.y + (Math.random() - 0.5) * l.u(60) };
+            const ctrl = { x: (f.x + to.x) / 2 + l.u(40), y: f.y - l.u(30) };
+            const d = scene.add.image(f.x, f.y, k % 3 ? dotK : dot2K).setBlendMode('ADD').setDepth(58).setScale(0.8 + Math.random() * 0.7);
+            const pr = { t: 0 };
+            scene.tweens.add({
+              targets: pr, t: 1, duration: 230, ease: 'Quad.easeIn',
+              onUpdate: () => { const p = ssQBez(f, ctrl, to, pr.t); d.x = p.x; d.y = p.y; },
+              onComplete: () => {
+                scene.starBurst.emitParticleAt(d.x, d.y, 2);
+                d.destroy();
+                if (k === 9) impact(1.35);
+                else if (k % 4 === 0) scene.cameras.main.shake(50, 0.002);
+              },
+            });
+          });
+        }
+        scene.time.delayedCall(N * 42 + 300, () => scene.tweens.add({
+          targets: c, y: fx.homeY, rotation: 0, scaleX: 1, scaleY: 1, duration: 420, ease: 'Sine.easeOut', onComplete: finish,
+        }));
+      },
+    });
+  },
+  // the phoenix rises, whitens, and detonates in rings of dawn-fire
+  nova(scene, fx, impact, finish) {
+    const l = scene.L, c = fx.cont;
+    SFX.noise(0.9, 250, 1, 0.07, 2400);
+    scene.tweens.add({
+      targets: c, y: fx.homeY - l.u(46), scaleX: 1.1, scaleY: 1.1, duration: 430, ease: 'Sine.easeOut',
+      onComplete: () => {
+        const ringK = ssFxTex(scene, 'ring', fx.beast.eye);
+        const dotK = ssFxTex(scene, 'dot', fx.beast.tint);
+        scene.cameras.main.flash(360, 255, 200, 120, false);
+        for (let w = 0; w < 2; w++) {
+          const ring = scene.add.image(c.x, c.y, ringK).setBlendMode('ADD').setAlpha(0.85 - w * 0.25).setScale(0.3).setDepth(58);
+          scene.tweens.add({ targets: ring, scale: l.u(3.6 + w * 0.8), alpha: 0, delay: w * 130, duration: 620, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+        }
+        for (let k = 0; k < 22; k++) {
+          const a = (k / 22) * Math.PI * 2;
+          const d = scene.add.image(c.x, c.y, dotK).setBlendMode('ADD').setDepth(58).setScale(0.7 + Math.random() * 0.6);
+          scene.tweens.add({ targets: d, x: c.x + Math.cos(a) * l.u(240), y: c.y + Math.sin(a) * l.u(240), alpha: 0, duration: 560 + Math.random() * 200, ease: 'Cubic.easeOut', onComplete: () => d.destroy() });
+        }
+        scene.time.delayedCall(210, () => impact(1.5));
+        scene.tweens.add({ targets: c, y: fx.homeY, scaleX: 1, scaleY: 1, delay: 420, duration: 480, ease: 'Sine.easeOut', onComplete: finish });
+      },
+    });
+  },
+};
+
+// The factory. asm = ssAssembleBeast's return. opts.lite (home showcase):
+// presence only — no threat, no attacks, dimmer aura, no boss fanfare.
+function ssBeastFx(scene, cont, beast, unitScale, asm, opts) {
+  opts = opts || {};
+  const sc = unitScale * (beast.boss ? 1.15 : 1);
+  const def = beast.fx || {};
+  const stars = asm.stars, eyes = asm.eyes, g = asm.lines;
+  const xs = beast.stars.map((p) => p[0]), ys = beast.stars.map((p) => p[1]);
+  const homes = beast.stars.map((p) => ({ x: p[0] * sc, y: p[1] * sc }));
+  const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+  const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+  const fx = {
+    scene, cont, beast, sc, def, k: sc, ready: false, dead: false, attacking: false,
+    threat: 0, bright: 0, charged: false, armT: Infinity,
+    cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, topY: minY + (maxY - minY) * 0.3,
+    homeX: cont.x, homeY: cont.y,
+  };
+  const idles = String(def.idle || '').split('+').map((n) => SS_IDLE_FX[n]).filter(Boolean);
+  const lw = unitScale * 1.25;
+
+  // eyes ride the idle field of their nearest star
+  const eyeMeta = beast.eyes.map((e) => {
+    let bi = 0, bd = 1e9;
+    beast.stars.forEach((p, i) => {
+      const dx = p[0] - e[0], dy = p[1] - e[1], d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; bi = i; }
+    });
+    return { hx: e[0], hy: e[1], i: bi, x0: e[0] * sc, y0: e[1] * sc };
+  });
+
+  // ---- the nebula body: soft glow blobs behind the lines, breathing slowly
+  const glowKey = ssFxTex(scene, 'glow', beast.tint);
+  const anchors = [{ x: fx.cx, y: fx.cy, s: 1.25 }];
+  const stepN = Math.max(2, Math.floor(beast.stars.length / (beast.boss ? 4 : 5)));
+  for (let i = 0; i < beast.stars.length; i += stepN) anchors.push({ x: xs[i], y: ys[i], s: 0.62 });
+  const baseA = (opts.lite ? 0.07 : beast.boss ? 0.13 : 0.1);
+  const aura = anchors.map((a, i) => {
+    const im = scene.add.image(a.x * sc, a.y * sc, glowKey).setBlendMode('ADD').setAlpha(0);
+    im.hx = a.x * sc; im.hy = a.y * sc;
+    im.baseS = 0.69 * a.s * sc * (beast.boss ? 1.3 : 1);
+    im.baseA = baseA * (i === 0 ? 1.4 : 1);
+    im.w = 0.55 + (i * 0.37) % 0.6; im.ph = i * 1.93;
+    cont.addAt(im, 0);
+    return im;
+  });
+  // bosses wear a slow-turning halo ring — the tier marker
+  let halo = null;
+  if (beast.boss && !opts.lite) {
+    halo = scene.add.image(fx.cx * sc, fx.cy * sc, ssFxTex(scene, 'ring', beast.tint)).setBlendMode('ADD').setAlpha(0);
+    halo.baseS = 1.5 * sc;
+    cont.addAt(halo, 0);
+  }
+
+  // ---- traveling glints: starlight running along the edges
+  const glints = [];
+  const spawnGlint = () => {
+    if (fx.dead || !fx.ready || glints.length >= (beast.boss ? 3 : 2)) return;
+    const e = beast.edges[Math.floor(Math.random() * beast.edges.length)];
+    const gi = scene.add.image(stars[e[0]].x, stars[e[0]].y, 'dot').setBlendMode('ADD').setScale(0.45).setAlpha(0);
+    cont.add(gi); glints.push(gi);
+    const pr = { t: 0 };
+    scene.tweens.add({
+      targets: pr, t: 1, duration: 420 + Math.random() * 260, ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        const a = stars[e[0]], b = stars[e[1]];
+        gi.x = a.x + (b.x - a.x) * pr.t; gi.y = a.y + (b.y - a.y) * pr.t;
+        gi.alpha = Math.sin(pr.t * Math.PI) * 0.9;
+      },
+      onComplete: () => { glints.splice(glints.indexOf(gi), 1); gi.destroy(); },
+    });
+  };
+  const glintTimer = scene.time.addEvent({
+    delay: 640, loop: true,
+    callback: () => { if (Math.random() < 0.35 + fx.threat * 0.5 + (beast.boss ? 0.2 : 0)) spawnGlint(); },
+  });
+
+  // ---- arm once the assembly finishes (fly-in tweens own the stars until then)
+  const armTimer = scene.time.delayedCall(beast.stars.length * 40 + 760, () => {
+    fx.ready = true; fx.armT = scene.time.now;
+    scene.tweens.killTweensOf(g); g.setAlpha(1);   // fx owns line alpha per-edge now
+    if (beast.boss && !opts.lite) {                // the boss announces its tier
+      scene.cameras.main.flash(300, 60, 50, 90);
+      SFX.noise(0.8, 120, 1, 0.08, 50);
+      const rk = scene.add.image(cont.x, cont.y, ssFxTex(scene, 'ring', beast.tint))
+        .setBlendMode('ADD').setDepth(55).setAlpha(0.7).setScale(0.4 * sc);
+      scene.tweens.add({ targets: rk, scale: 2.6 * sc, alpha: 0, duration: 700, ease: 'Cubic.easeOut', onComplete: () => rk.destroy() });
+    }
+  });
+
+  // ---- per-frame: idle field, live line redraw (shimmer), aura breath
+  const upd = (time, delta) => {
+    if (fx.dead) return;
+    const T = time / 1000;
+    fx.bright *= Math.exp(-(delta || 16) / 150);
+    const gain = clamp((time - fx.armT) / 900, 0, 1);
+    const heat = 1 + fx.threat * 1.1 + fx.bright * 1.6;
+    for (let i = 0; i < aura.length; i++) {
+      const b = aura[i];
+      b.alpha = Math.min(0.5, gain * b.baseA * (0.7 + 0.3 * Math.sin(T * b.w + b.ph)) * heat);
+      b.setScale(b.baseS * (1 + 0.08 * Math.sin(T * b.w * 1.3 + b.ph)));
+      b.x = b.hx + Math.sin(T * 0.4 + b.ph) * 3 * sc;
+      b.y = b.hy + Math.cos(T * 0.31 + b.ph) * 2 * sc;
+    }
+    if (halo) {
+      halo.alpha = Math.min(0.6, gain * (0.16 + fx.threat * 0.2 + fx.bright * 0.3) * (0.8 + 0.2 * Math.sin(T * 0.9)));
+      halo.rotation = T * 0.12;
+      halo.setScale(halo.baseS * (1 + 0.06 * Math.sin(T * 0.7)));
+    }
+    if (!fx.ready) return;
+    // idle: creature-specific offsets over the authored homes
+    for (let i = 0; i < stars.length; i++) {
+      const o = { x: 0, y: 0 };
+      for (let f = 0; f < idles.length; f++) idles[f](fx, T, i, xs[i], ys[i], o);
+      stars[i].x = homes[i].x + o.x * gain;
+      stars[i].y = homes[i].y + o.y * gain;
+    }
+    for (let i = 0; i < eyeMeta.length; i++) {
+      const em = eyeMeta[i], eye = eyes[i];
+      if (!eye) continue;
+      const o = { x: 0, y: 0 };
+      for (let f = 0; f < idles.length; f++) idles[f](fx, T, em.i, em.hx, em.hy, o);
+      eye.x = em.x0 + o.x * gain; eye.y = em.y0 + o.y * gain;
+      if (fx.charged) eye.setScale(0.9 + Math.max(0, Math.sin(T * 7)) * 0.5);
+    }
+    // edges redrawn from live star positions — starlight shimmer, per edge
+    g.clear();
+    for (let ei = 0; ei < beast.edges.length; ei++) {
+      const e = beast.edges[ei], a = stars[e[0]], b = stars[e[1]];
+      const al = 0.3 + Math.sin(T * 1.35 + ei * 1.71) * 0.13 + fx.threat * 0.18 + fx.bright * 0.6;
+      g.lineStyle(lw, 0xffffff, clamp(al, 0.12, 1));
+      g.lineBetween(a.x, a.y, b.x, b.y);
+    }
+    // the body breathes (container scale) unless an attack owns the transform
+    if (!fx.attacking) {
+      const s = 0.5 + 0.5 * Math.sin(T * 1.96);
+      cont.setScale(1 + s * 0.035, 1 - s * 0.028);
+    }
+  };
+  scene.events.on('update', upd);
+
+  // ---- api ----
+  fx.setThreat = (v) => {
+    fx.threat = clamp(v || 0, 0, 1);
+    const ch = fx.threat >= 0.999;
+    if (ch && !fx.charged) {
+      fx.charged = true;
+      fx.bright = Math.max(fx.bright, 0.5);
+      SFX.noise(0.6, 160, 1.1, 0.05, 60);   // low rumble — the sky tenses
+    } else if (!ch && fx.charged) {
+      fx.charged = false;
+      eyes.forEach((e) => e.setScale(0.9));
+    }
+  };
+  fx.hitFlash = () => { fx.bright = 1; };
+  fx.attack = (onImpact) => {
+    const name = SS_ATK_FX[def.atk] ? def.atk : 'pounce';
+    window.__SSFX = window.__SSFX || { atk: {} };
+    window.__SSFX.atk[name] = (window.__SSFX.atk[name] | 0) + 1;
+    fx.attacking = true;
+    let hit = false;
+    const impact = (mult) => { if (!hit) { hit = true; onImpact(mult || 1); } };
+    // watchdog: a strike must always land — a stalled archetype ends the run's turn
+    scene.time.delayedCall(2600, () => impact(1));
+    SS_ATK_FX[name](scene, fx, impact, () => {
+      fx.attacking = false;
+      if (!fx.dead) { cont.setPosition(fx.homeX, fx.homeY); cont.setRotation(0); }
+    });
+  };
+  fx.die = () => {
+    if (fx.dead) return;
+    fx.dead = true;
+    glintTimer.remove();
+    const parts = halo ? aura.concat([halo]) : aura;
+    parts.forEach((b) => scene.tweens.add({
+      targets: b, x: fx.cx * sc, y: fx.cy * sc, alpha: 0, scale: b.baseS * 0.2, duration: 550, ease: 'Cubic.easeIn',
+    }));
+  };
+  fx.destroy = () => {
+    fx.dead = true;
+    scene.events.off('update', upd);
+    glintTimer.remove();
+    if (armTimer) armTimer.remove(false);
+  };
+  scene.events.once('shutdown', fx.destroy);
+  return fx;
 }
 
 /* ---- tile glyph cache ----------------------------------------------------
@@ -1515,7 +2053,10 @@ class Home extends Phaser.Scene {
     let showIdx = Math.floor(Math.random() * ids.length);
     const cycle = () => {
       if (!this.scene.isActive()) return;
-      ssAssembleBeast(this, this.showC, SS_BEASTS[ids[showIdx % ids.length]], l.u(0.8));
+      if (this.showFx) { this.showFx.destroy(); this.showFx = null; }
+      const b = SS_BEASTS[ids[showIdx % ids.length]];
+      const asm = ssAssembleBeast(this, this.showC, b, l.u(0.8));
+      this.showFx = ssBeastFx(this, this.showC, b, l.u(0.8), asm, { lite: true });
       showIdx++;
     };
     cycle();
@@ -2480,12 +3021,16 @@ class Battle extends Phaser.Scene {
         .setScale(gi === this.run.fightIdx ? 0.9 : 0.6);
     });
     this.setBeastName(''); this.beastTitle.setText('');
+    if (this.beastFx) this.beastFx.destroy();
+    this.beastC.setPosition(l.x(0), l.y(170)).setScale(1).setRotation(0);
     const asm = ssAssembleBeast(this, this.beastC, this.beast, l.u(1.15), () => {
       this.setBeastName(this.beast.name);
       this.beastTitle.setText((this.beast.title + (this.beast.boss ? ' · BOSS' : '')).toUpperCase());
     });
     this.beastLines = asm.lines; this.beastStars = asm.stars;
-    this.breathTween = this.tweens.add({ targets: this.beastC, scaleX: 1.04, scaleY: 0.97, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // presence + attack fx (aura, idle, shimmer, telegraph, signature strikes);
+    // it also owns the body's breathing, so no more breathTween here
+    this.beastFx = ssBeastFx(this, this.beastC, this.beast, l.u(1.15), asm);
 
     this.sel = [];
     for (const s of this.board) if (s) s.c.destroy();
@@ -2507,8 +3052,12 @@ class Battle extends Phaser.Scene {
     this.hpT.setText(this.run.hp + ' / ' + this.run.hpMax);
     this.drawEhp();
     this.strikeT.setText(this.beast.hpNow > 0 ? '✦ strikes in ' + this.beast.count + (this.beast.count === 1 ? ' cast ✦' : ' casts ✦') : '');
+    this.strikeT.setColor(this.beast.count === 1 && this.beast.hpNow > 0 ? '#ff8a70' : '#e6a2a2');
     this.strikeRib.setAlpha(this.strikeT.text ? 0.9 : 0);
     if (this.strikeT.text) this.strikeRib.setDisplaySize(this.strikeT.width + l.u(26), l.u(19));
+    // telegraph: the constellation charges as the strike counter fills
+    if (this.beastFx) this.beastFx.setThreat(this.beast.hpNow > 0
+      ? (this.beast.timer - this.beast.count) / Math.max(1, this.beast.timer - 1) : 0);
     // while a damage number is in flight the tally animation owns the counter
     if (!this.scoreAnim) this.scoreT.setText(String(this.runScore()));
   }
@@ -2615,7 +3164,8 @@ class Battle extends Phaser.Scene {
     this.scoreAnim = (this.scoreAnim || 0) + 1;
     // beast recoil + hull flash read instantly; the bar waits for the number
     this.tweens.add({ targets: this.beastC, x: l.x(0) + l.u(10), duration: 60, yoyo: true, repeat: 1, onComplete: () => this.beastC.setX(l.x(0)) });
-    if (this.beastLines) { this.beastLines.setAlpha(1); this.tweens.add({ targets: this.beastLines, alpha: 0.35, duration: 300 }); }
+    if (this.beastFx && this.beastFx.ready) this.beastFx.hitFlash();
+    else if (this.beastLines) { this.beastLines.setAlpha(1); this.tweens.add({ targets: this.beastLines, alpha: 0.35, duration: 300 }); }
     this.updateBars();
 
     // the hit beat: the damage pops big at center screen, slams up into the
@@ -2707,7 +3257,8 @@ class Battle extends Phaser.Scene {
     this.state = 'anim';
     SFX.victory();
     const l = this.L;
-    if (this.breathTween) this.breathTween.stop();
+    if (this.beastFx) this.beastFx.die();   // stops idle/shimmer, implodes the aura
+    this.beastC.setScale(1);
     for (const st of this.beastStars) {
       this.tweens.killTweensOf(st);
       const ang = Math.atan2(st.y, st.x) + (rng() - 0.5);
@@ -2763,11 +3314,16 @@ class Battle extends Phaser.Scene {
       done();
       return;
     }
-    SFX.hurt();
-    this.tweens.add({ targets: this.beastC, y: l.y(170) + l.u(60), duration: 160, yoyo: true, ease: 'Cubic.easeIn', onComplete: () => this.beastC.setY(l.y(170)) });
-    this.cameras.main.shake(260, 0.012);
-    this.cameras.main.flash(220, 120, 20, 30);
-    this.time.delayedCall(220, () => {
+    // the blow itself: the beast's signature attack (archetype from data.js)
+    // telegraphs, strikes, and calls land() at the moment of contact — where
+    // the player-side feedback (shake, red flash, screen-edge wash) fires
+    const land = (mult) => {
+      mult = mult || 1;
+      const boss = !!this.beast.boss;
+      SFX.hurt();
+      this.cameras.main.shake(Math.round(260 * (boss ? 1.35 : 1)), 0.012 * (boss ? 1.3 : 1) * mult);
+      this.cameras.main.flash(220, 120, 20, 30);
+      ssEdgeFlash(this, this.beast.eye, Math.min(0.85, 0.42 * mult * (boss ? 1.25 : 1)));
       this.struckThisBattle = true;
       let atk = this.beast.atk;
       if (this.hasSigil('eclipse')) atk = Math.ceil(atk / 2);
@@ -2786,7 +3342,12 @@ class Battle extends Phaser.Scene {
       this.updateBars();
       if (this.run.hp <= 0) this.endRun(false);
       else done();
-    });
+    };
+    if (this.beastFx && this.beastFx.ready) this.beastFx.attack(land);
+    else {   // struck before the constellation finished assembling — plain lunge
+      this.tweens.add({ targets: this.beastC, y: l.y(170) + l.u(60), duration: 160, yoyo: true, ease: 'Cubic.easeIn', onComplete: () => this.beastC.setY(l.y(170)) });
+      this.time.delayedCall(220, () => land(1));
+    }
   }
 
   scry() {
