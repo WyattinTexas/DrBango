@@ -39,9 +39,9 @@ class SynthAudio {
     o.connect(g).connect(dest || this.master); o.start(t); o.stop(t + dur + 0.03);
   }
   // noise sweep with a swelling envelope (the ascent riser / descent wind)
-  sweep(f0, f1, dur, gain, lowwind) {
+  sweep(f0, f1, dur, gain, lowwind, when) {
     if (!this.ok) return;
-    const t = this.ctx.currentTime;
+    const t = this.ctx.currentTime + (when || 0);
     const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true;
     const f = this.ctx.createBiquadFilter(); f.type = lowwind ? 'lowpass' : 'bandpass'; f.Q.value = lowwind ? 0.7 : 1.4;
     f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
@@ -123,6 +123,28 @@ class SynthAudio {
   blocked() { this.tone(660, 0.15, 'triangle', 0.14); this.noise(0.12, 1200, 2, 0.1); }
   sigil() { [659.3, 784, 987.8].forEach((f, i) => this.tone(f, 0.4, 'sine', 0.09, i * 0.08)); }
   victory() { [523.3, 659.3, 784, 1046.5].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.1, i * 0.11)); }
+  /* the win fanfare — a swelling sting sized to the feat: 1 = a hunt won,
+     2 = a rival bested, 3 = the whole campaign conquered. Built from swells
+     and bells over the victory chord's key — celebration, never a stab. */
+  fanfare(tier) {
+    if (!this.ok) return;
+    this.sweep(420, 2400, 0.9, 0.09);                                    // the swell in
+    [523.3, 659.3, 784, 1046.5].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.1, i * 0.085));
+    const at = 0.4;                                                      // the crown chord lands as the run peaks
+    [523.3, 659.3, 784, 1046.5].forEach((f) => { this.tone(f, 1.5, 'sine', 0.065, at); this.tone(f / 2, 1.7, 'triangle', 0.035, at); });
+    this.tone(130.8, 1.6, 'sine', 0.13, at, 65);                         // the deep drum under it
+    this.noise(0.9, 4200, 2, 0.05, 8200);                                // stardust hiss
+    if (tier >= 2) {                                                     // the rival tier: a bold counter-line answers
+      [659.3, 784, 987.8, 1174.7].forEach((f, i) => this.tone(f, 0.7, 'sawtooth', 0.024, at + 0.18 + i * 0.11));
+      this.tone(98, 1.0, 'sine', 0.1, at + 0.55, 62);
+    }
+    if (tier >= 3) {                                                     // the campaign tier: bells cascade, the key lifts to D
+      [1046.5, 1318.5, 1568, 2093, 1568, 2093].forEach((f, i) => this.tone(f, 0.55, 'sine', 0.05, 1.05 + i * 0.13));
+      this.sweep(360, 3000, 1.8, 0.07, false, 1.0);
+      [587.3, 739.99, 880, 1174.7].forEach((f) => { this.tone(f, 2.4, 'sine', 0.055, 1.85); this.tone(f * 2, 1.4, 'sine', 0.022, 1.85); });
+      this.tone(73.4, 2.6, 'sine', 0.12, 1.85, 58);
+    }
+  }
   defeat() { [392, 330, 262, 196].forEach((f, i) => this.tone(f, 0.6, 'sine', 0.1, i * 0.16)); }
   ach() { [1046.5, 1318.5, 1568, 2093].forEach((f, i) => this.tone(f, 0.35, 'sine', 0.07, i * 0.07)); }
   ui() { this.tone(740, 0.08, 'sine', 0.05); }

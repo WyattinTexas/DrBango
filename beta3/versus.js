@@ -1093,7 +1093,16 @@ class VsBattle extends Phaser.Scene {
     const l = this.L;
     const won = this.room.winnerUid === vsUid();
     const winner = this.room.players[this.room.winnerUid];
-    if (won) { SFX.victory(); SS.prof.wins++; SS.prof.vsWins++; } else SFX.defeat();
+    if (won) { SS.prof.wins++; SS.prof.vsWins++; } else SFX.defeat();
+    // THE FANFARE — you beat a *person*: the head-to-head gets its own beat
+    // (comets crossing, the rival named) before the stats settle in. The
+    // fanfare carries the victory sting, so no SFX.victory() here.
+    let fanWait = 0;
+    if (won) {
+      const rivals = this.others();
+      const sub = rivals.length === 1 ? SS_T('fanVsSub', rivals[0].name) : SS_T('fanVsSubMany');
+      fanWait = ssWinFanfare(this, 2, { text: SS_T('fanVs'), sub, cy: 300 });
+    }
     // the rating exchange — Elo against the field's average, each client
     // settling its own ledger from the same room record (so a duel's two
     // deltas mirror). No winner (everyone faded) = no exchange.
@@ -1142,6 +1151,22 @@ class VsBattle extends Phaser.Scene {
       items.push(addT);
     }
     this.overlayC.add(items);
+    // a win's window waits out the fanfare, then settles up into place; the
+    // veil dims quickly (the celebration reads better on a hushed field) and
+    // deepens as the window arrives. Buttons stay locked until it lands.
+    if (fanWait) {
+      veil.setAlpha(0);
+      this.tweens.chain({ targets: veil, tweens: [
+        { alpha: 0.5, duration: 260 },
+        { alpha: 0.85, duration: 450, delay: Math.max(0, fanWait - 710) },
+      ] });
+      const rest = items.filter((o) => o !== veil);
+      rest.forEach((it) => { it.alpha = 0; it.y += l.u(14); });
+      this.tweens.add({ targets: rest, alpha: 1, y: '-=' + l.u(14), duration: 400, ease: 'Back.easeOut', delay: fanWait });
+      const lock = rest.filter((o) => o.input);
+      lock.forEach((o) => { o.input.enabled = false; });
+      this.time.delayedCall(fanWait, () => lock.forEach((o) => { if (o.active && o.input) o.input.enabled = true; }));
+    }
     if (this.room.rematch) this.showRematchCall();
     if (VSDEMO) {
       localStorage.setItem('beta3.vsresult', JSON.stringify({ won, mode: this.room.mode, dealt: me.dealt | 0, casts: me.casts | 0, rematch: !!window.__VSDEMO_REMATCHED, rating: SS.prof.rating, rd, t: Date.now() }));

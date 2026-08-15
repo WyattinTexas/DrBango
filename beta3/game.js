@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.25.1';
+const BUILD = 'STARSPELL v0.26.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -880,6 +880,142 @@ function ssEdgeFlash(scene, tint, peak, dur) {
   scene.tweens.killTweensOf(v);
   v.setAlpha(peak);
   scene.tweens.add({ targets: v, alpha: 0, duration: dur || 460, ease: 'Sine.easeOut' });
+}
+
+/* ============================================================
+   THE WIN FANFARE — the celebration beat that lands BEFORE the
+   end window arrives. One helper, three sizes of triumph:
+     tier 1 · a quick or daily hunt won
+     tier 2 · a rival bested in versus
+     tier 3 · the whole campaign conquered
+   Spectacle is motion and light — a banner landing with weight,
+   blooms, expanding rings, stardust, one slow camera swell —
+   never strobing. Reduced-motion keeps only the banner's gentle
+   fade. Returns the ms the caller should wait before settling
+   the stats window into place.
+   ============================================================ */
+function ssWinFanfare(scene, tier, opts) {
+  opts = opts || {};
+  const l = scene.L || ssLayout(scene);
+  const cx = l.x(0), cy = l.y(opts.cy != null ? opts.cy : 330);
+  const D = opts.depth || 250;
+  const reduced = ssReduceMotion();
+  try { SFX.fanfare(tier); } catch (e) { }
+  window.__ssfan = { tier, text: opts.text || '', reduced, t: Date.now() };   // verification beacon
+  const hold = tier >= 3 ? 1500 : tier === 2 ? 1000 : 800;
+  const wait = hold + 420;
+  const kill = [];                        // the banner party, swept together at the exit
+
+  // the banner — the word of triumph, condensing with real weight
+  const gt = ssGoldTex(scene, opts.text || SS_T('fanWin'), tier >= 3 ? 34 : 29);
+  const bsc = Math.min(1, 344 / gt.w);
+  const bw = gt.w * bsc, bh = gt.h * bsc;
+  const glow = scene.add.image(cx, cy, 'glowbig').setDisplaySize(l.u(bw * 2.2), l.u(bh * 3.4))
+    .setTint(0xffd77a).setAlpha(0).setBlendMode('ADD').setDepth(D);
+  const banner = scene.add.image(cx, cy, gt.key).setDisplaySize(l.u(bw * 0.55), l.u(bh * 0.55)).setAlpha(0).setDepth(D + 2);
+  kill.push(glow, banner);
+  if (opts.sub) {
+    const sub = ssTxt(scene, cx, cy + l.u(bh / 2 + 20), opts.sub, l.u(13), '#ffe9a8', 'italic').setOrigin(0.5).setAlpha(0).setDepth(D + 2)
+      .setShadow(0, 0, '#c9b676', l.u(7), true, true);
+    kill.push(sub);
+    scene.tweens.add({ targets: sub, alpha: 1, duration: 320, delay: reduced ? 250 : 300, ease: 'Sine.easeOut' });
+  }
+
+  if (reduced) {
+    // stillness for sensitive eyes: the words simply glow in and pass
+    scene.tweens.add({ targets: banner, displayWidth: l.u(bw), displayHeight: l.u(bh), alpha: 1, duration: 450, ease: 'Sine.easeOut' });
+    scene.tweens.add({ targets: glow, alpha: 0.3, duration: 500, ease: 'Sine.easeOut' });
+    scene.time.delayedCall(hold + 60, () => {
+      scene.tweens.add({ targets: kill, alpha: 0, duration: 420, ease: 'Sine.easeIn', onComplete: () => kill.forEach((o) => o.destroy()) });
+    });
+    return wait;
+  }
+
+  // banner entrance — Back-eased into full size, glow swelling behind it
+  scene.tweens.add({ targets: banner, displayWidth: l.u(bw), displayHeight: l.u(bh), alpha: 1, duration: 340, ease: 'Back.easeOut' });
+  scene.tweens.add({ targets: glow, alpha: 0.55, duration: 380, ease: 'Sine.easeOut' });
+  scene.tweens.add({ targets: glow, alpha: 0.25, duration: 600, delay: 400, ease: 'Sine.easeInOut' });
+
+  // one slow golden wash pooling at the frame — a swell, not a flash
+  const vig = scene.add.image(l.W / 2, l.H / 2, ssFxTex(scene, 'vig', 0xffd77a))
+    .setDisplaySize(l.W, l.H).setAlpha(0).setDepth(D - 3);
+  scene.tweens.add({ targets: vig, alpha: tier >= 3 ? 0.4 : 0.26, duration: 480, ease: 'Sine.easeOut', yoyo: true, hold: 260, onComplete: () => vig.destroy() });
+
+  // rings of light expanding from the word — one per tier
+  for (let i = 0; i < tier; i++) {
+    const ring = scene.add.image(cx, cy, ssFxTex(scene, 'ring', 0xffe9a8)).setDisplaySize(l.u(56), l.u(56)).setAlpha(0).setDepth(D + 1);
+    scene.time.delayedCall(120 + i * 210, () => {
+      if (!ring.scene) return;
+      ring.setAlpha(0.85);
+      const rw = l.u(400 + i * 90);
+      scene.tweens.add({ targets: ring, displayWidth: rw, displayHeight: rw, alpha: 0, duration: 950, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+    });
+  }
+
+  // stardust kicked out radially from the landing
+  const motes = tier >= 3 ? 30 : tier === 2 ? 22 : 16;
+  for (let i = 0; i < motes; i++) {
+    const a = (i / motes) * Math.PI * 2 + rng() * 0.4, r = l.u(60 + rng() * 130) * (tier >= 3 ? 1.5 : 1);
+    const m = scene.add.image(cx, cy, 'dot').setScale(0.5 + rng() * 0.7)
+      .setTint(i % 3 ? 0xffe9a8 : 0xfff6d8).setBlendMode('ADD').setDepth(D + 1);
+    scene.tweens.add({
+      targets: m, x: cx + Math.cos(a) * r * 1.6, y: cy + Math.sin(a) * r, alpha: 0, scale: 0.1,
+      duration: 800 + rng() * 600, ease: 'Cubic.easeOut', onComplete: () => m.destroy(),
+    });
+  }
+
+  // the rival tier: two comets cross the banner — the duel written in the sky
+  if (tier === 2) for (let i = 0; i < 2; i++) {
+    const dir = i ? 1 : -1, y0 = cy + l.u(i ? 130 : -150);
+    const comet = scene.add.image(cx - dir * l.u(250), y0, 'dot').setScale(1.3).setTint(0xfff2c9).setBlendMode('ADD').setAlpha(0).setDepth(D + 1);
+    scene.time.delayedCall(260 + i * 300, () => {
+      if (!comet.scene) return;
+      comet.setAlpha(1);
+      scene.tweens.add({
+        targets: comet, x: cx + dir * l.u(250), y: y0 - dir * l.u(30), duration: 620, ease: 'Sine.easeIn',
+        onUpdate: () => {
+          if (Math.random() < 0.55) {
+            const tr = scene.add.image(comet.x, comet.y, 'dot').setScale(0.5).setTint(0xffe9a8).setBlendMode('ADD').setDepth(D);
+            scene.tweens.add({ targets: tr, alpha: 0, scale: 0.05, duration: 420, onComplete: () => tr.destroy() });
+          }
+        },
+        onComplete: () => { comet.destroy(); },
+      });
+    });
+  }
+
+  // the campaign tier: firework blooms across the sky and a rain of gold
+  if (tier >= 3) {
+    for (let b = 0; b < 5; b++) {
+      scene.time.delayedCall(340 + b * 250, () => {
+        const bx = cx + (rng() - 0.5) * l.u(300), by = cy + (rng() - 0.5) * l.u(340);
+        const pop = scene.add.image(bx, by, 'glowbig').setDisplaySize(l.u(70), l.u(70)).setTint(0xfff2c9).setBlendMode('ADD').setAlpha(0.8).setDepth(D);
+        scene.tweens.add({ targets: pop, alpha: 0, displayWidth: l.u(160), displayHeight: l.u(160), duration: 540, ease: 'Cubic.easeOut', onComplete: () => pop.destroy() });
+        for (let i = 0; i < 9; i++) {
+          const a = (i / 9) * Math.PI * 2 + rng() * 0.5, r = l.u(34 + rng() * 40);
+          const d = scene.add.image(bx, by, 'dot').setScale(0.45 + rng() * 0.4).setTint(0xffe9a8).setBlendMode('ADD').setDepth(D + 1);
+          scene.tweens.add({ targets: d, x: bx + Math.cos(a) * r, y: by + Math.sin(a) * r, alpha: 0, scale: 0.05, duration: 600 + rng() * 300, ease: 'Cubic.easeOut', onComplete: () => d.destroy() });
+        }
+        try { SFX.chime(3 + (b % 4)); } catch (e) { }
+      });
+    }
+    const rain = scene.add.particles(0, 0, 'dot', {
+      x: { min: 0, max: scene.scale.width }, y: -20,
+      speedY: { min: 140, max: 300 }, speedX: { min: -30, max: 30 },
+      lifespan: 2000, scale: { start: 0.75, end: 0.1 }, quantity: 3,
+      tint: [0xffd77a, 0xfff2c9, 0xd7b45c], blendMode: 'ADD',
+    }).setDepth(D - 1);
+    scene.time.delayedCall(1700, () => { rain.stop(); scene.time.delayedCall(2100, () => rain.destroy()); });
+  }
+
+  // one slow breath of the whole sky (returns to rest well before the window)
+  scene.tweens.add({ targets: scene.cameras.main, zoom: tier >= 3 ? 1.045 : 1.025, duration: tier >= 3 ? 600 : 400, yoyo: true, ease: 'Sine.easeInOut' });
+
+  // the banner gives way — lifts into the night as the window rises beneath it
+  scene.time.delayedCall(hold, () => {
+    scene.tweens.add({ targets: kill, y: '-=' + l.u(46), alpha: 0, duration: 480, ease: 'Sine.easeIn', onComplete: () => kill.forEach((o) => o.destroy()) });
+  });
+  return wait;
 }
 
 const ssQBez = (a, c, b, t) => ({
@@ -4213,6 +4349,12 @@ class Battle extends Phaser.Scene {
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
     this.tweens.add({ targets: veil, alpha: won ? 0.7 : 0.8, duration: won ? 300 : 550 });
+    // THE FANFARE — a triumph beat lands before the window; the window waits
+    // it out. A campaign win (the whole long night) reads biggest. Losses
+    // keep their quiet veil.
+    let fanWait = 0;
+    if (won) fanWait = ssWinFanfare(this, this.mode === 'campaign' ? 3 : 1,
+      { text: SS_T(this.mode === 'campaign' ? 'fanCamp' : 'fanWin') });
     const items = [];
 
     // the window: an opaque midnight/gold panel, sized to its contents
@@ -4313,10 +4455,16 @@ class Battle extends Phaser.Scene {
     homeB.on('pointerdown', () => { SFX.ui(); this.goHome({ from: won ? 'battle' : 'defeat', dawn: won && this.mode === 'campaign' }); });
     this.overlayC.add([veil, ...items]);
 
+    // while the fanfare plays, the window's (invisible) buttons can't eat taps
+    if (fanWait) {
+      const lock = items.filter((o) => o.input);
+      lock.forEach((o) => { o.input.enabled = false; });
+      this.time.delayedCall(fanWait, () => lock.forEach((o) => { if (o.active && o.input) o.input.enabled = true; }));
+    }
     // entrance: the window settles up into place; a defeat sinks in more slowly
     items.forEach((it) => { it.y += l.u(16); it.alpha = 0; });
-    this.tweens.add({ targets: items, y: '-=' + l.u(16), alpha: 1, duration: won ? 380 : 600, ease: won ? 'Back.easeOut' : 'Sine.easeOut', delay: won ? 120 : 250 });
-    if (won) this.time.delayedCall(300, () => {           // gold motes crown a victory
+    this.tweens.add({ targets: items, y: '-=' + l.u(16), alpha: 1, duration: won ? 380 : 600, ease: won ? 'Back.easeOut' : 'Sine.easeOut', delay: won ? fanWait : 250 });
+    if (won) this.time.delayedCall(fanWait + 180, () => {  // gold motes crown a victory
       for (let i = 0; i < 14; i++) {
         const a = (i / 14) * Math.PI * 2, r = l.u(30 + rng() * 40);
         const m = this.add.image(title.x, title.y - l.u(16), 'dot').setScale(0.5 + rng() * 0.5)
