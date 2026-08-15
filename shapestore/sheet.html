@@ -32,10 +32,14 @@ header .wm{font-size:22px; color:var(--gold); text-shadow:1px 1px 0 #14180C; fle
 #heroCard svg{display:block; width:184px; height:184px; margin:0 auto; transition:width 0.25s ease, height 0.25s ease; touch-action:manipulation;}
 #heroCard .nm{font-size:12px; font-weight:bold; color:#4A4432; letter-spacing:1px;}
 #heroCard .hint{font-size:10px; color:#8A8A72; letter-spacing:.5px;}
-/* the picked part: a gold glow on the toy + a name tag that teaches the second tap */
+/* the picked part: a gold glow on the toy + a big EDIT button that ALWAYS works —
+   the second tap on a skinny part can miss; this button never does */
 #heroSvg .selpart{filter:drop-shadow(0 0 2.5px #D9A544) drop-shadow(0 0 5px rgba(217,165,68,0.8));}
-#picked{display:none; font-size:11px; color:#8a6a24; font-weight:bold; letter-spacing:.5px; background:#D9A54426; border-radius:8px; padding:2px 8px; margin-top:2px;}
+#picked{display:none; background:var(--gold); color:#2A2010; border:none; border-radius:9px;
+  padding:6px 14px; margin-top:3px; font-size:13px; font-weight:bold; letter-spacing:.5px;
+  cursor:pointer; font-family:inherit; box-shadow:0 2px 8px #0006;}
 #picked.on{display:inline-block;}
+body.scrolled #picked{padding:4px 10px; font-size:11px;}
 #mix,#drawOn{background:var(--gold); color:#2A2010; border:none; border-radius:9px; margin-top:4px;
   padding:6px 12px; font-weight:bold; font-size:12px; cursor:pointer; font-family:inherit;}
 /* scrolled: the toy steps back so the shelves get the room */
@@ -55,6 +59,12 @@ body.scrolled #mix, body.scrolled #drawOn{padding:3px 9px; font-size:10px;}
   #wrap{flex-direction:row;}
   #side{width:268px; min-width:268px; overflow-y:auto; -webkit-overflow-scrolling:touch; border-right:2px solid #4A5740;
     padding-bottom:10px; padding-left:env(safe-area-inset-left,0px);}
+  /* the rail overflows a phone's landscape height — the EDIT button was living
+     BELOW THE FOLD (untappable, invisible: Wyatt's "still can't edit the pieces").
+     Picked ⇒ it floats fixed at the rail's bottom edge, always on screen, and
+     never scrolls the toy out from under the second tap. */
+  #picked.on{position:fixed; left:calc(8px + env(safe-area-inset-left,0px)); bottom:8px; width:252px;
+    z-index:20; box-shadow:0 3px 12px #000A;}
   header .wm{font-size:16px;}
   #side>small{display:none;}
   .bub{font-size:10px; padding:4px 8px; border-width:2px;}
@@ -73,6 +83,7 @@ body.scrolled #mix, body.scrolled #drawOn{padding:3px 9px; font-size:10px;}
 .chip.on{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold);}
 .chip:active{transform:scale(0.96);}
 .chip .del{position:absolute; top:1px; right:4px; font-size:12px; color:#8A2F26; font-weight:bold; background:#fff9; border-radius:4px; padding:0 4px;}
+.chip .rst{position:absolute; top:1px; left:4px; font-size:12px; color:#8A2F26; font-weight:bold; background:#fff9; border-radius:4px; padding:0 4px;}
 .chip .dye{width:52px; height:52px; border-radius:50%; margin:7px auto; border:3px solid #0006;}
 footer{text-align:center; color:#57574A; font-size:10px; letter-spacing:1px; padding:26px 0 10px;}
 @media (pointer:coarse){ .chip{width:112px;} .chip svg{width:100px; height:72px;} }
@@ -86,14 +97,14 @@ footer{text-align:center; color:#57574A; font-size:10px; letter-spacing:1px; pad
   <div class="wm">CHARACTER MAKER</div>
   <span style="width:78px"></span>
 </header>
-<small>PICK A PART, THE TOY WEARS IT · TAP A PART, THEN AGAIN TO EDIT IT</small>
+<small>PICK A PART, THE TOY WEARS IT · TAP A PART, THEN ✏️ EDIT IT YOURSELF</small>
 <div id="asks"></div>
 <div id="hero">
   <div id="heroCard">
     <svg id="heroSvg" xmlns="http://www.w3.org/2000/svg"></svg>
     <div class="nm" id="heroName"></div>
-    <div class="hint">👆 tap a part to pick it · tap it again to edit it</div>
-    <div id="picked"></div>
+    <div class="hint">👆 tap a part to pick it · then hit ✏️ EDIT</div>
+    <button id="picked" onclick="if(selSlot)editPart(selSlot)"></button>
     <div style="display:flex; gap:6px; justify-content:center">
       <button id="mix" onclick="mixUp()">🎲 MIX ONE UP</button>
       <button id="drawOn" style="background:#4E8C4A; color:#F2EBD8" onclick="drawOnToy()">🖌 DRAW ON ME</button>
@@ -104,7 +115,7 @@ footer{text-align:center; color:#57574A; font-size:10px; letter-spacing:1px; pad
 </div>
 <div id="scrollwrap">
 <div id="sheet"></div>
-<footer>REAL GVT MOLDS BEHIND THE GLASS — TAP CHIPS · DOUBLE-TAP THE TOY OR 🛠 EDIT TO MAKE A PART YOURS</footer>
+<footer>REAL GVT MOLDS BEHIND THE GLASS — TAP CHIPS · TAP A PART ON THE TOY, THEN ✏️ EDIT TO MAKE IT YOURS · ✕ ON A CHIP PUTS THE ORIGINAL BACK</footer>
 </div>
 </div>
 <script>
@@ -443,7 +454,23 @@ const PICKS={};
 function C(){ return CHARS[CUR]; }
 function customs(){ try{ return JSON.parse(localStorage.getItem('ss.counterCustom')||'{}'); }catch(e){ return {}; } }
 function saveCustoms(c){ try{ localStorage.setItem('ss.counterCustom',JSON.stringify(c)); }catch(e){ alert('Storage is full.'); } }
-function vlist(slot){ const cu=customs(); const mine=(cu[C().key]||{})[slot.id]||[]; return slot.v.concat(mine.map(m=>({n:m.n, s:m.s, raw:true, custom:true}))); }
+/* overrides: editing a part REPLACES its design in place — the toy comes back
+   wearing what you drew, saved for good. The ✕ on the chip's top-left corner
+   restores the original. Keyed {char:{slot:{variantIndex: svg}}}. */
+function overs(){ try{ return JSON.parse(localStorage.getItem('ss.counterOver')||'{}'); }catch(e){ return {}; } }
+function saveOvers(o){ try{ localStorage.setItem('ss.counterOver',JSON.stringify(o)); }catch(e){ alert('Storage is full.'); } }
+function vlist(slot){
+  const ov=(overs()[C().key]||{})[slot.id]||{};
+  const stock=slot.v.map((v,i)=> (ov[i]!=null && !v.c)? {n:v.n, s:ov[i], raw:true, over:true, oi:i} : v);
+  const cu=customs(); const mine=(cu[C().key]||{})[slot.id]||[];
+  return stock.concat(mine.map(m=>({n:m.n, s:m.s, raw:true, custom:true})));
+}
+function resetOver(slotId, vi){
+  if(!confirm('Put the original back?')) return;
+  const ov=overs(); const m=(ov[C().key]||{})[slotId];
+  if(m){ delete m[vi]; saveOvers(ov); }
+  renderHero(); renderSheet();
+}
 function picks(){ const c=C(); if(!PICKS[c.key]){ PICKS[c.key]={}; c.slots.forEach(s=>PICKS[c.key][s.id]=s.d||0); } return PICKS[c.key]; }
 function curVar(slot){ const l=vlist(slot); return l[Math.min(picks()[slot.id]||0, l.length-1)]; }
 function slotSVG(slot){ const v=curVar(slot); if(v.c) return ''; return (slot.wrap && !v.raw)? '<g transform="'+slot.wrap+'">'+v.s+'</g>' : v.s; }
@@ -478,6 +505,7 @@ function renderSheet(){
     +'</h2><div class="chips">'
     + l.map((v,i)=>'<div class="chip'+(Math.min(p[slot.id]||0,l.length-1)===i?' on':'')+'" onclick="pick(\''+slot.id+'\','+i+')">'
       +(v.custom? '<span class="del" onclick="event.stopPropagation();delCustom(\''+slot.id+'\','+(i-slot.v.length)+')">✕</span>':'')
+      +(v.over? '<span class="rst" title="restore the original" onclick="event.stopPropagation();resetOver(\''+slot.id+'\','+v.oi+')">✕</span>':'')
       +chipSVG(slot,v)+'<div>'+v.n+'</div></div>').join('')
     +'</div></div>';
   }).join('');
@@ -540,22 +568,35 @@ function editPart(slotId){
   const c=C(), slot=c.slots.find(s=>s.id===slotId);
   let svg=slotSVG(slot);
   const dye=dyeOf(); if(dye) svg=svg.split('PLASTIC').join(dye).split('currentColor').join(dye);
+  const vi=Math.min(picks()[slotId]||0, vlist(slot).length-1);   // WHICH design is being redrawn
   try{
-    localStorage.setItem('ss.edit', JSON.stringify({char:c.key, slot:slotId, label:c.name+' '+slot.label, svg, vb:c.vb}));
+    localStorage.setItem('ss.edit', JSON.stringify({char:c.key, slot:slotId, vi, label:c.name+' '+slot.label, svg, vb:c.vb}));
     location.href='index.html?edit=1';
   }catch(e){ alert('Storage is full.'); }
 }
-(function(){  /* a part came home from the shop */
+(function(){  /* a part came home from the shop — it BECOMES the part (saved),
+                 and the chip's top-left ✕ can always restore the original */
   let out=null; try{ out=JSON.parse(localStorage.getItem('ss.editOut')||'null'); }catch(e){}
   if(!out) return;
   localStorage.removeItem('ss.editOut');
   const ci=CHARS.findIndex(x=>x.key===out.char); if(ci<0||!out.svg) return;
-  const cu=customs(); cu[out.char]=cu[out.char]||{}; cu[out.char][out.slot]=cu[out.char][out.slot]||[];
-  cu[out.char][out.slot].push({n:'MY OWN'+(cu[out.char][out.slot].length? ' '+(cu[out.char][out.slot].length+1):''), s:out.svg});
-  saveCustoms(cu);
   CUR=ci;
-  const slot=CHARS[ci].slots.find(s=>s.id===out.slot);
-  picks()[out.slot]=vlist(slot).length-1;
+  const slot=CHARS[ci].slots.find(s=>s.id===out.slot); if(!slot) return;
+  const pushMyOwn=()=>{   // pre-vi edits (or a vanished custom) land as a MY OWN chip
+    const cu=customs(); cu[out.char]=cu[out.char]||{}; cu[out.char][out.slot]=cu[out.char][out.slot]||[];
+    cu[out.char][out.slot].push({n:'MY OWN'+(cu[out.char][out.slot].length? ' '+(cu[out.char][out.slot].length+1):''), s:out.svg});
+    saveCustoms(cu);
+    picks()[out.slot]=vlist(slot).length-1;
+  };
+  if(typeof out.vi==='number' && out.vi<slot.v.length){
+    const ov=overs(); ov[out.char]=ov[out.char]||{}; ov[out.char][out.slot]=ov[out.char][out.slot]||{};
+    ov[out.char][out.slot][out.vi]=out.svg; saveOvers(ov);
+    picks()[out.slot]=out.vi;
+  } else if(typeof out.vi==='number'){
+    const cu=customs(); const m=((cu[out.char]||{})[out.slot]||[])[out.vi-slot.v.length];
+    if(m){ m.s=out.svg; saveCustoms(cu); picks()[out.slot]=out.vi; }
+    else pushMyOwn();
+  } else pushMyOwn();
 })();
 $('asks').innerHTML = CHARS.map((c,i)=>'<div class="bub'+(i===CUR?' on':'')+'" onclick="setChar('+i+')">'+c.ask+'</div>').join('');
 /* the toy steps back on scroll — but NEVER while a part is picked: the second
@@ -576,7 +617,7 @@ function selectPart(slot){
   const tag=$('picked');
   if(slot){
     const s=C().slots.find(x=>x.id===slot);
-    tag.innerHTML='✏️ '+s.label+' — tap it again to edit';
+    tag.innerHTML='✏️ EDIT '+s.label;
     tag.classList.add('on');
     jumpTo(slot);
   } else tag.classList.remove('on');
