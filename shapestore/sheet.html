@@ -558,7 +558,10 @@ function editPart(slotId){
   picks()[out.slot]=vlist(slot).length-1;
 })();
 $('asks').innerHTML = CHARS.map((c,i)=>'<div class="bub'+(i===CUR?' on':'')+'" onclick="setChar('+i+')">'+c.ask+'</div>').join('');
-$('scrollwrap').addEventListener('scroll',()=>document.body.classList.toggle('scrolled', $('scrollwrap').scrollTop>60), {passive:true});
+/* the toy steps back on scroll — but NEVER while a part is picked: the second
+   tap must land where the first one did, so the toy holds perfectly steady */
+function heroSteady(){ document.body.classList.toggle('scrolled', $('scrollwrap').scrollTop>60 && !selSlot); }
+$('scrollwrap').addEventListener('scroll',heroSteady,{passive:true});
 /* tap a part ON THE TOY = pick it (gold glow, name tag, its chips scroll up);
    tap the SAME part again = enter it in the shop. No timers, no double-tap —
    the phone's zoom gesture never gets a say. */
@@ -569,7 +572,7 @@ function applySelGlow(){
 }
 function selectPart(slot){
   selSlot=slot;
-  applySelGlow();
+  applySelGlow(); heroSteady();
   const tag=$('picked');
   if(slot){
     const s=C().slots.find(x=>x.id===slot);
