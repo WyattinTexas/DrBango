@@ -81,3 +81,14 @@ Demon Star — eye gimmick), Virgo (Spica).
 Ideas parked: Gemini as a two-constellation simultaneous fight; Ophiuchus
 wielding serpens; Perseus' Algol as a blinking demon eye; Pegasus as a
 rideable ally, not an enemy.
+
+## The zodiac (v0.23.0)
+
+The twelve birth signs are campaign starting characters (SS_ZODIAC in
+data.js, picker before a fresh campaign). Five draw the stars of an
+existing beast (cancer, leo, taurus, scorpius, sagittarius). The other
+seven — ARIES, GEMINI, VIRGO, LIBRA, CAPRICORN, AQUARIUS, PISCES — got
+their own hand-placed asterisms from the real charts, which means those
+constellations are now AUTHORED and one fx/tier block away from joining
+the bestiary as beasts (Gemini's double-fight idea above still stands).
+Felling the beast that wears your own sign = the STAR-CROSSED achievement.

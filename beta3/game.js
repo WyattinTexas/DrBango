@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.22.0';
+const BUILD = 'STARSPELL v0.23.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -125,6 +125,7 @@ const SS = {
     p.bestCampaign = p.bestCampaign | 0;
     p.vsWords = p.vsWords | 0; p.vsWins = p.vsWins | 0;
     p.daily = p.daily || {}; p.ach = p.ach || {};
+    p.signs = p.signs || {};   // per-zodiac campaign records: id → {best, clears, runs}
     return p;
   },
   save() { try { localStorage.setItem('beta3.profile', JSON.stringify(this.prof)); } catch (e) { } },
@@ -1886,6 +1887,37 @@ function ssCampaignRoster() {
 function ssClearCampaign() {
   localStorage.removeItem('beta3.campaign');
   localStorage.removeItem('beta3.camproster');
+  localStorage.removeItem('beta3.campsign');
+}
+
+/* ---- the zodiac ----------------------------------------------------------
+   The campaign's birth sign is chosen on the picker sheet and pinned in
+   localStorage alongside the roster — it lives and dies with the campaign
+   (ssClearCampaign wipes all three). 'none' = the player chose the classic,
+   unsigned climb; an ABSENT key means the picker has not been answered yet. */
+function ssCampSign() {
+  const v = localStorage.getItem('beta3.campsign');
+  return SS_ZODIAC_BY[v] ? v : null;
+}
+function ssCampSignChosen() { return localStorage.getItem('beta3.campsign') != null; }
+
+// A sign's constellation, drawn small — picker cells, the battle emblem, the
+// profile strip. Signs that share a beast draw the beast's own stars; k maps
+// star units (±100 box) to css px.
+function ssZodiacGlyph(scene, z, k, x, y, tint, alpha) {
+  const src = z.stars ? z : SS_BEASTS[z.beast];
+  const col = tint != null ? tint : SS_ELEMENTS[z.el];
+  const a = alpha == null ? 1 : alpha;
+  const g = scene.add.graphics({ x, y });
+  g.lineStyle(Math.max(1, k * 6.5), col, 0.5 * a);
+  for (const [e1, e2] of src.edges) {
+    g.lineBetween(src.stars[e1][0] * k, src.stars[e1][1] * k, src.stars[e2][0] * k, src.stars[e2][1] * k);
+  }
+  g.fillStyle(col, Math.min(1, 0.95 * a));
+  for (let i = 0; i < src.stars.length; i++) {
+    g.fillCircle(src.stars[i][0] * k, src.stars[i][1] * k, Math.max(0.8, k * (i % 3 === 0 ? 10 : 7)));
+  }
+  return g;
 }
 
 function ssStarChart(scene, opts) {
@@ -2111,7 +2143,7 @@ class Home extends Phaser.Scene {
     this.ascending = false; this.descending = false; this.arrived = false; this.introPlaying = false;
     // scene instances persist across restarts — a rotation mid-sheet would
     // otherwise leave these truthy forever and the sheets could never reopen
-    this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null;
+    this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null;
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
     // full frame's work on a slow phone, and a descent-by-create (the dawn
@@ -2240,7 +2272,7 @@ class Home extends Phaser.Scene {
     const rows = [
       // CAMPAIGN / CONTINUE opens the star chart — the campaign always enters
       // through the map, at the checkpoint when one is standing
-      { y: 420, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.mapSheet() },
+      { y: 420, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.campaignDoor() },
       // NEW CAMPAIGN took the daily's old row (the daily is a chip now):
       // abandon the checkpoint (confirmed) and start the long night over
       { y: 488, label: SS_T('newCamp'), sub: SS_T('newCampSub'), key: 'newcamp', dark: true, fn: () => this.newCampaign() },
@@ -2433,7 +2465,7 @@ class Home extends Phaser.Scene {
   // (rather than only saving) matters because a ?lang= already in the address
   // would out-rank the saved preference on the next load.
   langSheet() {
-    if (this.busy() || this.langC || this.dailyC || this.mapC || this.confirmC) return;
+    if (this.busy() || this.langC || this.dailyC || this.mapC || this.confirmC || this.signC) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.langC = this.add.container(0, 0).setDepth(700);
@@ -2469,7 +2501,7 @@ class Home extends Phaser.Scene {
      list IS the completion list, and RTDB prunes past days, so the streak
      shown here is the player's own, kept in the local profile log.) */
   dailySheet() {
-    if (this.busy() || this.dailyC || this.langC || this.mapC || this.confirmC) return;
+    if (this.busy() || this.dailyC || this.langC || this.mapC || this.confirmC || this.signC) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.dailyC = this.add.container(0, 0).setDepth(700);
@@ -2582,7 +2614,7 @@ class Home extends Phaser.Scene {
      the glowing constellation closes the sheet and rides the full ascent into
      that fight. Fresh campaigns enter the same way, at the first node. */
   mapSheet() {
-    if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC) return;
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC || this.signC) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.mapC = this.add.container(0, 0).setDepth(700);
@@ -2617,9 +2649,11 @@ class Home extends Phaser.Scene {
      checkpoint is hours of climb) and open the chart at the first node.
      With no checkpoint there is nothing to abandon: it is simply the door. */
   newCampaign() {
-    if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC) return;
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC || this.signC) return;
     const ck = this.campaignCheckpoint();
-    if (!ck) { this.mapSheet(); return; }
+    // no checkpoint → nothing to abandon: wipe any half-made choice (a rolled
+    // roster, a pinned sign never entered) and offer the stars afresh
+    if (!ck) { ssClearCampaign(); this.signSheet(); return; }
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.confirmC = this.add.container(0, 0).setDepth(720);
@@ -2654,11 +2688,119 @@ class Home extends Phaser.Scene {
       if (this.campLabelT && this.campLabelT.active) this.campLabelT.setText(cr.label);
       if (this.campSubT && this.campSubT.active) this.campSubT.setText(cr.sub);
       closeSheet();
-      this.mapSheet();   // the fresh climb, from the first constellation
+      this.signSheet();   // the fresh climb opens under fresh stars
     });
     c.add(items);
     items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
     this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 260, ease: 'Back.easeOut' });
+  }
+
+  /* The campaign's front door. A standing checkpoint (or an already-answered
+     picker — sign chosen, map opened, fight not yet entered) goes straight to
+     the chart; a truly fresh campaign asks the stars first. */
+  campaignDoor() {
+    if (this.campaignCheckpoint() || ssCampSignChosen()) this.mapSheet();
+    else this.signSheet();
+  }
+
+  /* ---------- the zodiac picker ----------
+     Before a fresh campaign: the twelve birth signs on one window of sky,
+     each a small constellation in its element's color, with the player's
+     per-sign records under the names. Tap a sign to read its power, BEGIN to
+     walk under it, or take the unsigned classic climb. The choice is pinned
+     for the whole campaign (beta3.campsign) and cleared with it. */
+  signSheet() {
+    if (this.busy() || this.signC || this.mapC || this.dailyC || this.langC || this.confirmC) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.signC = this.add.container(0, 0).setDepth(700);
+    const closeSheet = () => {
+      if (this.signC !== c) return;
+      this.signC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.72, duration: 220 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+
+    const items = [];
+    const win = this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(384), l.u(664)).setInteractive();
+    items.push(win);
+    const xB = ssTxt(this, l.x(170), l.y(96), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    items.push(xB);
+    const hk = ssGoldTex(this, SS_T('zpTitle'), 20);
+    const hsc = Math.min(1, 300 / hk.w);
+    items.push(this.add.image(l.x(0), l.y(106), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
+    items.push(ssTxt(this, l.x(0), l.y(132), SS_T('zpSub'), l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
+
+    // the wheel: 3 x 4 constellations, records under the names
+    let chosen = null;
+    const selG = this.add.graphics();       // the ring around the chosen sign
+    const selGlow = this.add.image(0, 0, 'glowbig').setDisplaySize(l.u(150), l.u(112)).setBlendMode('ADD').setAlpha(0);
+    items.push(selGlow, selG);
+    const powerT = ssTxt(this, l.x(0), l.y(548), '', l.u(12), '#ffe9a8').setOrigin(0.5)
+      .setShadow(0, 0, '#c9b676', l.u(7), true, true);
+    const descT = ssTxt(this, l.x(0), l.y(578), '', l.u(10.5), '#c9c3ae', 'italic').setOrigin(0.5)
+      .setWordWrapWidth(l.u(324)).setAlign('center');
+    items.push(powerT, descT);
+    const beginB = this.add.image(l.x(0), l.y(636), ssBtn(this, false, 260, 50)).setDisplaySize(l.u(260), l.u(50))
+      .setInteractive({ useHandCursor: true }).setAlpha(0.45);
+    const beginT = ssTxt(this, l.x(0), l.y(636), SS_T('zpBegin'), l.u(15), BTN_INK()).setOrigin(0.5).setAlpha(0.55);
+    items.push(beginB, beginT);
+    const skipT = ssTxt(this, l.x(0), l.y(682), SS_T('zpSkip'), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+    items.push(skipT);
+
+    const enter = (id) => {
+      // pin the choice and open the chart — the map is the campaign's own door
+      try { localStorage.setItem('beta3.campsign', id); } catch (e) { }
+      closeSheet();
+      this.mapSheet();
+    };
+    const cells = [];
+    SS_ZODIAC.forEach((z, i) => {
+      const cx = (-124 + (i % 3) * 124), cy = 200 + Math.floor(i / 3) * 82;
+      const g = ssZodiacGlyph(this, z, l.u(0.16), l.x(cx), l.y(cy - 10));
+      const nameT = ssTxt(this, l.x(cx), l.y(cy + 18), z.name, l.u(9.5), '#8a94c4').setOrigin(0.5);
+      items.push(g, nameT);
+      const sr = SS.prof.signs[z.id];
+      if (sr && sr.clears > 0) {
+        items.push(ssTxt(this, l.x(cx), l.y(cy + 30), '★' + sr.clears + ' · ' + sr.best, l.u(8), '#d7b45c').setOrigin(0.5));
+      }
+      const zone = this.add.zone(l.x(cx), l.y(cy - 2), l.u(116), l.u(76)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      items.push(zone);
+      cells.push({ z, cx, cy, nameT });
+      zone.on('pointerdown', () => {
+        SFX.ui();
+        chosen = z.id;
+        for (const cell of cells) cell.nameT.setColor(cell.z.id === chosen ? '#ffe9a8' : '#8a94c4');
+        const col = SS_ELEMENTS[z.el];
+        selG.clear();
+        selG.lineStyle(l.u(1.3), col, 0.75);
+        selG.strokeRoundedRect(l.x(cx) - l.u(56), l.y(cy - 2) - l.u(36), l.u(112), l.u(72), l.u(10));
+        selGlow.setPosition(l.x(cx), l.y(cy - 2)).setTint(col).setAlpha(0.13);
+        const t = SS_ZOD(z);
+        powerT.setText(z.name + ' · ' + t.title);
+        descT.setText(t.desc);
+        beginB.setAlpha(1); beginT.setAlpha(1);
+      });
+    });
+    beginB.on('pointerover', () => { if (chosen) beginB.setScale(beginB.scaleX * 1.03, beginB.scaleY * 1.03); });
+    beginB.on('pointerout', () => beginB.setDisplaySize(l.u(260), l.u(50)));
+    beginB.on('pointerdown', () => { if (!chosen) return; SFX.ui(); enter(chosen); });
+    skipT.on('pointerdown', () => { SFX.ui(); enter('none'); });
+
+    c.add(items);
+    // entrance: the sky of signs settles up into place like the other sheets.
+    // Zones are pure hit areas (no alpha component) — they stay where they are.
+    for (const it of items) {
+      if (it === selG || it === selGlow || it.type === 'Zone') continue;
+      const baseA = it.alpha;
+      it.y += l.u(14); it.alpha = 0;
+      this.tweens.add({ targets: it, y: it.y - l.u(14), alpha: baseA, duration: 300, ease: 'Back.easeOut' });
+    }
   }
 
   campaignCheckpoint() {
@@ -2878,6 +3020,11 @@ class Battle extends Phaser.Scene {
     } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0, overkill: 0 };
     this.run.startAt = Date.now();
     this.run.firstUsed = false;
+    // the birth sign — campaign only, pinned for the whole climb. TAURUS's
+    // endurance lands once at the run's start and rides the checkpoint's hpMax.
+    this.sign = this.mode === 'campaign' ? ssCampSign() : null;
+    this.signZ = this.sign ? SS_ZODIAC_BY[this.sign] : null;
+    if (this.sign === 'taurus' && !this.resume) { this.run.hpMax += 15; this.run.hp = this.run.hpMax; }
     this.state = 'boot';
     this.board = []; this.sel = []; this.lineTiles = [];
     SS.prof.runs++; SS.save();
@@ -2917,6 +3064,17 @@ class Battle extends Phaser.Scene {
     const nP = this.mode === 'campaign' ? 5 : this.fights.length;
     for (let i = 0; i < nP; i++) this.pips.push(this.add.image(l.x(-40 + i * 20), l.y(46), 'dot').setScale(0.6).setTint(0x4a5480));
     this.scoreT = txt(l.x(190), l.y(24), '0', 15).setOrigin(1, 0.5);
+
+    // the birth sign keeps watch beside the score. Tapping it speaks the
+    // power — except VIRGO, whose tap IS the power (arm purify, tap a tile).
+    if (this.signZ) {
+      this.signGlow = this.add.image(l.x(172), l.y(48), 'glowbig').setDisplaySize(l.u(64), l.u(50))
+        .setTint(SS_ELEMENTS[this.signZ.el]).setAlpha(0).setBlendMode('ADD');
+      this.signG = ssZodiacGlyph(this, this.signZ, l.u(0.14), l.x(172), l.y(48));
+      const zn = this.add.zone(l.x(172), l.y(48), l.u(52), l.u(42)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      zn.on('pointerdown', () => this.signTap());
+      this.updateSignGlow();
+    }
 
     txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);
     // framed troughs + gradient fills; progress is a setCrop in updateBars
@@ -3033,6 +3191,7 @@ class Battle extends Phaser.Scene {
   tapTile(i) {
     if (this.state !== 'pick') return;
     SFX.ensure();
+    if (this.purifyArmed) { this.purifyTile(i); return; }
     const k = this.sel.indexOf(i);
     if (k >= 0) { this.unselectFrom(k); return; }
     if (this.sel.length >= 8) return;
@@ -3079,6 +3238,67 @@ class Battle extends Phaser.Scene {
     this.castT.setText(valid ? 'CAST ' + this.previewDamage() : 'CAST');
   }
 
+  // ---------- the birth sign ----------
+  signTap() {
+    if (!this.signZ) return;
+    if (this.sign === 'virgo') {
+      if (this.state !== 'pick' || this.purifyUsed) return;
+      SFX.ensure(); SFX.ui();
+      this.setPurifyArmed(!this.purifyArmed);
+      return;
+    }
+    SFX.ensure(); SFX.ui();
+    this.showSignToast();
+  }
+  showSignToast() {
+    const l = this.L;
+    if (this.signToastC) { this.signToastC.destroy(); this.signToastC = null; }
+    const t = SS_ZOD(this.signZ);
+    const c = this.signToastC = this.add.container(0, 0).setDepth(70);
+    c.add(ssTxt(this, l.x(0), l.y(452), this.signZ.name + ' · ' + t.title, l.u(13), '#ffe9a8').setOrigin(0.5)
+      .setShadow(0, 0, '#c9b676', l.u(8), true, true));
+    c.add(ssTxt(this, l.x(0), l.y(476), t.desc, l.u(10.5), '#c9c3ae', 'italic').setOrigin(0.5)
+      .setWordWrapWidth(l.u(340)).setAlign('center'));
+    this.tweens.add({ targets: c, alpha: 0, delay: 2400, duration: 400, onComplete: () => { if (this.signToastC === c) this.signToastC = null; c.destroy(); } });
+  }
+  // VIRGO's ember: charged = a soft breath behind the emblem, armed = bright
+  updateSignGlow() {
+    if (!this.signGlow) return;
+    this.tweens.killTweensOf(this.signGlow);
+    if (this.sign !== 'virgo') { this.signGlow.setAlpha(0); return; }
+    if (this.purifyArmed) {
+      this.signGlow.setAlpha(0.32);
+      this.tweens.add({ targets: this.signGlow, alpha: 0.14, duration: 500, yoyo: true, repeat: -1 });
+    } else if (!this.purifyUsed) {
+      this.signGlow.setAlpha(0.10);
+      this.tweens.add({ targets: this.signGlow, alpha: 0.04, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    } else this.signGlow.setAlpha(0);
+  }
+  setPurifyArmed(on) {
+    this.purifyArmed = on;
+    if (this.purifyHintT) { this.purifyHintT.destroy(); this.purifyHintT = null; }
+    if (on) {
+      this.purifyHintT = ssTxt(this, this.L.x(0), this.L.y(452), SS_T('zpPurify'), this.L.u(12), '#cfe8b0', 'italic')
+        .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#3a5a2a', this.L.u(8), true, true);
+    }
+    this.updateSignGlow();
+  }
+  purifyTile(i) {
+    const s = this.board[i];
+    if (!s) return;
+    this.purifyUsed = true;
+    this.setPurifyArmed(false);
+    const k = this.sel.indexOf(i);
+    if (k >= 0) this.unselectFrom(k);
+    const p = this.slotPos(i);
+    this.starBurst.emitParticleAt(p.x, p.y, 8);
+    SFX.forge();
+    s.c.destroy(); this.board[i] = null;
+    let ch = rpick(BAG);
+    if (ch === 'q') ch = 'qu';
+    this.spawnTile(i, ch, s.tier, false);
+  }
+
   // ---------- damage ----------
   hasSigil(id) { return this.run.sigils.includes(id); }
   wordDamage(tiles) {
@@ -3097,6 +3317,16 @@ class Battle extends Phaser.Scene {
     if (this.hasSigil('longbow') && letters >= 6) dmg += 12;
     if (this.hasSigil('roots')) dmg += 2 * this.run.sigils.length;
     if (this.hasSigil('verse')) dmg += this.run.words;
+    // birth-sign angles (campaign only; this.sign is null elsewhere)
+    if (this.sign === 'gemini') {
+      const twice = {};
+      for (const s of tiles) twice[s.ch] = (twice[s.ch] | 0) + 1;
+      for (const ch in twice) if (twice[ch] >= 2) { dmg += 10; break; }
+    }
+    if (this.sign === 'leo' && letters >= 6) dmg += 8;
+    if (this.sign === 'libra' && tiles.length && vowelsN * 2 === tiles.length) dmg += 10;
+    if (this.sign === 'capricorn') dmg += this.run.fightIdx;
+    if (this.sign === 'pisces' && this.beast && this.beast.count === 1 && this.beast.hpNow > 0) dmg *= 1.3;
     if (this.hasSigil('blood')) dmg *= 1.25;
     if (this.hasSigil('nova') && letters >= 7) dmg *= 2;
     if (this.hasSigil('storm') && this.run.words % 3 === 2) dmg *= 2;   // every 3rd cast
@@ -3129,6 +3359,24 @@ class Battle extends Phaser.Scene {
       const et = ssTxt(this, l.x(0), l.y(238), '☍ −' + carve, l.u(18), '#d9b0ff').setOrigin(0.5).setDepth(70)
         .setShadow(0, 0, '#a86be0', l.u(8), true, true);
       this.tweens.add({ targets: et, alpha: 0, y: l.y(214), delay: 1100, duration: 500, onComplete: () => et.destroy() });
+    }
+    // the birth sign wakes with the battle
+    this.venom = 0;
+    this.shellUsed = false;
+    this.watersUsed = false;
+    this.purifyUsed = false;
+    if (this.purifyArmed) this.setPurifyArmed(false);
+    else this.updateSignGlow && this.updateSignGlow();
+    if (this.sign === 'aries') {                       // the opening ram
+      const ram = Math.min(8, this.beast.hpNow - 1);
+      if (ram > 0) {
+        this.beast.hpNow -= ram;
+        this.run.totalDmg += ram;
+        const rt = ssTxt(this, l.x(0), l.y(214), '−' + ram, l.u(18), '#ffb066').setOrigin(0.5).setDepth(70)
+          .setShadow(0, 0, '#e05e2a', l.u(9), true, true);
+        this.tweens.add({ targets: rt, alpha: 0, y: l.y(190), delay: 1000, duration: 500, onComplete: () => rt.destroy() });
+        this.cameras.main.shake(120, 0.004);
+      }
     }
     // what the bar/numbers SHOW — trails hpNow, catching up when a flying
     // damage number lands on the bar
@@ -3219,6 +3467,7 @@ class Battle extends Phaser.Scene {
     }
     this.state = 'anim';
     this.clearHintFx(true);
+    if (this.purifyArmed) this.setPurifyArmed(false);
     const tiles = this.sel.map((i) => this.board[i]);
     const dmg = this.wordDamage(tiles);
     const letters = tiles.reduce((a, s) => a + s.ch.length, 0);
@@ -3266,6 +3515,7 @@ class Battle extends Phaser.Scene {
       this.cameras.main.shake(140, 0.006);
       if (this.hasSigil('salve') && letters >= 5) this.heal(4);
       if (this.hasSigil('leech')) this.heal(1);
+      if (this.sign === 'scorpio') this.venom = (this.venom | 0) + 1;   // the sting settles in
       const used = [...this.sel];
       this.sel = [];
       this.lineTiles = [];
@@ -3401,6 +3651,7 @@ class Battle extends Phaser.Scene {
     SS.award('first-blood', this.game);
     if (this.fights[this.run.fightIdx].id === 'draco') SS.award('dragonfall', this.game);
     if (this.fights[this.run.fightIdx].id === 'phoenix') SS.award('first-flame', this.game);
+    if (this.signZ && this.signZ.beast === this.fights[this.run.fightIdx].id) SS.award('star-crossed', this.game);
     if (!this.struckThisBattle) SS.award('untouched', this.game);
     SS.save();
     if (this.hasSigil('echo')) this.run.overkill = Math.max(0, -this.beast.hpNow);
@@ -3428,10 +3679,26 @@ class Battle extends Phaser.Scene {
   heal(n) { this.run.hp = clamp(this.run.hp + n, 0, this.run.hpMax); this.updateBars(); }
 
   tickEnemy(done) {
+    const l = this.L;
+    // SCORPIO's venom seeps first — over a long fight it can fell the beast
+    // before the strike ever lands
+    if (this.sign === 'scorpio' && (this.venom | 0) > 0 && this.beast.hpNow > 0) {
+      const vd = Math.min(6, this.venom | 0);
+      this.beast.hpNow -= vd;
+      this.run.totalDmg += vd;
+      const vt = ssTxt(this, l.x(64), l.y(214), '−' + vd, l.u(15), '#9fe87a').setOrigin(0.5).setDepth(70)
+        .setShadow(0, 0, '#3a8a2a', l.u(8), true, true);
+      this.tweens.add({ targets: vt, alpha: 0, y: l.y(190), delay: 500, duration: 450, onComplete: () => vt.destroy() });
+      this.tweens.killTweensOf(this.ehpShown);
+      this.tweens.add({ targets: this.ehpShown, v: Math.max(0, this.beast.hpNow), duration: 240, onUpdate: () => this.drawEhp() });
+      if (this.beast.hpNow <= 0) {
+        if (!this.dying) { this.dying = true; this.updateBars(); this.beastDeath(); }
+        return;
+      }
+    }
     this.beast.count--;
     this.updateBars();
     if (this.beast.count > 0) { done(); return; }
-    const l = this.L;
     this.beast.count = this.beast.timer;
     if (this.hasSigil('shield') && !this.shieldUsed) {
       this.shieldUsed = true;
@@ -3455,6 +3722,13 @@ class Battle extends Phaser.Scene {
       this.struckThisBattle = true;
       let atk = this.beast.atk;
       if (this.hasSigil('eclipse')) atk = Math.ceil(atk / 2);
+      if (this.sign === 'cancer' && !this.shellUsed) {   // the shell takes the first blow
+        this.shellUsed = true;
+        atk = Math.ceil(atk / 2);
+        SFX.blocked();
+        const st = ssTxt(this, l.x(0), l.y(240), '◈ ' + SS_T('zShell') + ' ◈', l.u(16), '#9fd8ff').setOrigin(0.5).setDepth(70);
+        this.tweens.add({ targets: st, alpha: 0, y: l.y(220), delay: 700, duration: 400, onComplete: () => st.destroy() });
+      }
       if (this.hasSigil('ward')) atk = Math.max(1, atk - 3);
       this.run.hp -= atk;
       const dt = ssTxt(this, l.x(-160), l.y(68), '-' + atk, l.u(22), '#ff8a8a').setOrigin(0.5).setDepth(70);
@@ -3466,6 +3740,18 @@ class Battle extends Phaser.Scene {
         SFX.bigWord();
         const ft = ssTxt(this, l.x(0), l.y(400), '🔥 THE FEATHER BURNS 🔥', l.u(20), '#ffa94d').setOrigin(0.5).setDepth(70);
         this.tweens.add({ targets: ft, alpha: 0, delay: 1200, duration: 500, onComplete: () => ft.destroy() });
+      }
+      // AQUARIUS: the first stumble below half health pours the waters
+      if (this.sign === 'aquarius' && !this.watersUsed && this.run.hp > 0 && this.run.hp < this.run.hpMax / 2) {
+        this.watersUsed = true;
+        this.time.delayedCall(430, () => {
+          if (this.state === 'end' || !this.scene.isActive()) return;
+          this.heal(8);
+          SFX.forge();
+          const wt = ssTxt(this, l.x(-150), l.y(94), '≈ +8 ≈', l.u(16), '#7ae0d8').setOrigin(0.5).setDepth(70)
+            .setShadow(0, 0, '#2a8a8a', l.u(8), true, true);
+          this.tweens.add({ targets: wt, alpha: 0, y: l.y(74), delay: 700, duration: 450, onComplete: () => wt.destroy() });
+        });
       }
       this.updateBars();
       if (this.run.hp <= 0) this.endRun(false);
@@ -3484,9 +3770,21 @@ class Battle extends Phaser.Scene {
     this.state = 'anim';
     this.run.scried = true;
     this.clearHintFx();
+    if (this.purifyArmed) this.setPurifyArmed(false);
     this.unselectFrom(0);
     for (let i = 0; i < 16; i++) { if (this.board[i]) { this.board[i].c.destroy(); this.board[i] = null; } }
     this.fillBoard(false);
+    // SAGITTARIUS: the scry is also a loosed arrow
+    if (this.sign === 'sagittarius' && this.beast.hpNow > 0) {
+      const l = this.L;
+      const ar = ssTxt(this, l.x(0), l.y(470), '➳', l.u(24), '#ffd77a').setOrigin(0.5).setDepth(70).setRotation(-Math.PI / 2);
+      this.tweens.add({
+        targets: ar, y: this.beastC.y, duration: 240, ease: 'Cubic.easeIn',
+        onComplete: () => { this.starBurst.emitParticleAt(ar.x, ar.y, 6); ar.destroy(); },
+      });
+      this.beastHit(6);
+      if (this.beast.hpNow <= 0) return;   // the arrow felled it — the death sequence takes over
+    }
     if (this.hasSigil('comet')) { this.time.delayedCall(300, () => { this.state = 'pick'; }); return; }
     this.tickEnemy(() => { this.state = 'pick'; });
   }
@@ -3692,6 +3990,19 @@ class Battle extends Phaser.Scene {
       SS.award('sky-sweeper', this.game);
       if (score > SS.prof.bestCampaign) SS.prof.bestCampaign = score;
     }
+    // the sign's own ledger — best is a winning-run score, like bestCampaign
+    if (this.mode === 'campaign' && this.sign) {
+      const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0 });
+      sr.runs++;
+      if (won) {
+        sr.clears++;
+        if (score > sr.best) sr.best = score;
+        SS.award('sign-born', this.game);
+        const cleared = Object.keys(SS.prof.signs).filter((k) => SS.prof.signs[k].clears > 0).length;
+        if (cleared >= 3) SS.award('wheel-walker', this.game);
+        if (cleared >= 12) SS.award('grand-zodiac', this.game);
+      }
+    }
     if (this.mode === 'campaign') ssClearCampaign();
     if (this.mode === 'daily') {
       SS.award('daily-devout', this.game);
@@ -3786,7 +4097,13 @@ class Battle extends Phaser.Scene {
     const homeB = this.add.image(l.x(0), py(by + 58), ssBtn(this, true, 240, 46)).setDisplaySize(l.u(240), l.u(46)).setInteractive({ useHandCursor: true });
     const homeT = ssTxt(this, l.x(0), py(by + 58), SS_T('home'), l.u(14), '#9fb0e8').setOrigin(0.5);
     items.push(again, againT, homeB, homeT);
-    again.on('pointerdown', () => { SFX.ui(); this.scene.restart({ mode: this.mode, resume: null }); });
+    again.on('pointerdown', () => {
+      SFX.ui();
+      // a campaign retry keeps the sign you climbed under; only the meadow's
+      // NEW CAMPAIGN asks the stars again
+      if (this.mode === 'campaign' && this.sign) { try { localStorage.setItem('beta3.campsign', this.sign); } catch (e) { } }
+      this.scene.restart({ mode: this.mode, resume: null });
+    });
     // the Act III payoff: win the campaign and you descend into sunrise
     homeB.on('pointerdown', () => { SFX.ui(); this.goHome({ from: won ? 'battle' : 'defeat', dawn: won && this.mode === 'campaign' }); });
     this.overlayC.add([veil, ...items]);
@@ -3911,14 +4228,24 @@ class Profile extends Phaser.Scene {
       ssTxt(this, l.x(150), y, String(v), l.u(13), '#f0e8d2').setOrigin(1, 0.5);
     });
 
-    ssTxt(this, l.x(0), l.y(408), '— ACHIEVEMENTS  ' + Object.keys(p.ach).length + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
+    // the zodiac strip: every campaign sign, burning gold once cleared under.
+    // Cleared glyphs wear their element color's glow; the rest hang dim.
+    SS_ZODIAC.forEach((z, i) => {
+      const x = l.x(-165 + i * 30), y = l.y(400);
+      const sr = p.signs[z.id];
+      const cleared = !!(sr && sr.clears > 0);
+      ssZodiacGlyph(this, z, l.u(0.085), x, y, cleared ? 0xffd77a : 0x39406b, cleared ? 1 : 0.8);
+    });
+
+    ssTxt(this, l.x(0), l.y(424), '— ACHIEVEMENTS  ' + Object.keys(p.ach).length + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
+    // the grid is 20 deep now — tighter rows so the whole ledger still fits
     SS_ACH.forEach((a, i) => {
       const col = i % 2, row = Math.floor(i / 2);
-      const x = l.x(col === 0 ? -100 : 100), y = l.y(448 + row * 44);
+      const x = l.x(col === 0 ? -100 : 100), y = l.y(450 + row * 34);
       const got = !!p.ach[a.id];
-      ssTxt(this, x - l.u(88), y, a.icon, l.u(15), got ? '#ffd77a' : '#39406b').setOrigin(0.5);
-      ssTxt(this, x - l.u(68), y - l.u(8), a.name, l.u(11), got ? '#f0e8d2' : '#4a5480').setOrigin(0, 0.5);
-      ssTxt(this, x - l.u(68), y + l.u(9), a.desc, l.u(8), got ? '#8a94c4' : '#39406b', 'italic').setOrigin(0, 0.5);
+      ssTxt(this, x - l.u(88), y, a.icon, l.u(14), got ? '#ffd77a' : '#39406b').setOrigin(0.5);
+      ssTxt(this, x - l.u(68), y - l.u(7.5), a.name, l.u(10.5), got ? '#f0e8d2' : '#4a5480').setOrigin(0, 0.5);
+      ssTxt(this, x - l.u(68), y + l.u(8.5), a.desc, l.u(8), got ? '#8a94c4' : '#39406b', 'italic').setOrigin(0, 0.5);
     });
 
     ssTxt(this, l.x(0), l.y(784), 'seal: ' + SSNET.uid().slice(0, 12) + ' · ' + (SSNET.mode === 'local' ? 'offline' : 'synced'), l.u(9), '#39406b').setOrigin(0.5);

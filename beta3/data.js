@@ -275,6 +275,85 @@ function SS_CAMPAIGN_FIGHTS(roster) {
 const SS_QUICK_POOL = ['vulpes', 'lepus', 'serpens', 'cancer', 'corvus', 'ursa', 'aranea', 'delphinus', 'columba', 'lacerta', 'cygnus', 'pavo', 'aquila'];
 const SS_QUICK_BOSS = 'draco';
 
+/* ============================================================
+   THE ZODIAC — twelve birth signs, pickable before a campaign.
+   Each is a starting character with one modest power that bends
+   HOW the climb is played, never a straight power-up. Five signs
+   share a constellation with a bestiary beast (beast:) and draw
+   its stars; the other seven carry their own hand-placed
+   asterisms from the real charts, same 200x160 box as beasts.
+   English title/desc are canonical here; other languages carry a
+   `zod` map in strings.js (SS_ZOD). Latin sign NAMES never
+   translate, like beast names. Element tints color the glyphs.
+   ============================================================ */
+const SS_ELEMENTS = { fire: 0xffa94d, earth: 0xa8d883, air: 0x9fc4ff, water: 0x6fe0d0 };
+const SS_ZODIAC = [
+  {
+    id: 'aries', name: 'ARIES', title: 'THE RAM', el: 'fire',
+    desc: 'Each battle opens with a headlong ram: the beast takes 8.',
+    stars: [[-60, -20], [-24, -32], [10, -30], [40, -6], [48, 18]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4]],
+  },
+  {
+    id: 'taurus', name: 'TAURUS', title: 'THE BULL', el: 'earth', beast: 'taurus',
+    desc: 'The bull endures: +15 max health at the climb\'s start.',
+  },
+  {
+    id: 'gemini', name: 'GEMINI', title: 'THE TWINS', el: 'air',
+    desc: 'Twinned letters: words that use the same letter twice deal +10.',
+    stars: [[-28, -58], [30, -52], [-34, -30], [-42, -2], [-48, 26], [-36, 52], [-64, 34], [24, -26], [34, 2], [28, 28], [44, 52], [60, 30]],
+    edges: [[0, 2], [2, 3], [3, 4], [4, 5], [4, 6], [1, 7], [7, 8], [8, 9], [9, 10], [9, 11], [2, 7], [3, 8]],
+  },
+  {
+    id: 'cancer', name: 'CANCER', title: 'THE CRAB', el: 'water', beast: 'cancer',
+    desc: 'The shell holds: the first strike of every battle deals half.',
+  },
+  {
+    id: 'leo', name: 'LEO', title: 'THE LION', el: 'fire', beast: 'leo',
+    desc: 'The roar: words of 6+ letters deal +8.',
+  },
+  {
+    id: 'virgo', name: 'VIRGO', title: 'THE MAIDEN', el: 'earth',
+    desc: 'Once per battle, tap your sign, then a tile, to purify it into a new letter.',
+    stars: [[-72, 44], [-38, 20], [-10, 4], [18, -8], [2, -34], [-18, -56], [46, -24], [74, -40], [40, 18], [66, 36]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [3, 6], [6, 7], [3, 8], [8, 9]],
+  },
+  {
+    id: 'libra', name: 'LIBRA', title: 'THE SCALES', el: 'air',
+    desc: 'The scales: words with vowels and consonants in balance deal +10.',
+    stars: [[0, -52], [-52, -16], [44, -24], [-58, 28], [-44, 52], [38, 24], [54, 50]],
+    edges: [[0, 1], [0, 2], [1, 2], [1, 3], [3, 4], [2, 5], [5, 6]],
+  },
+  {
+    id: 'scorpio', name: 'SCORPIO', title: 'THE SCORPION', el: 'water', beast: 'scorpius',
+    desc: 'Venom builds with every word — the beast suffers it after each cast.',
+  },
+  {
+    id: 'sagittarius', name: 'SAGITTARIUS', title: 'THE ARCHER', el: 'fire', beast: 'sagittarius',
+    desc: 'The nocked arrow: SCRY also strikes the beast for 6.',
+  },
+  {
+    id: 'capricorn', name: 'CAPRICORN', title: 'THE SEA-GOAT', el: 'earth',
+    desc: 'The climb: words deal +1 for every beast felled this run.',
+    stars: [[-72, -30], [-62, -10], [-34, 10], [-2, 26], [30, 26], [56, 8], [70, -24], [40, -20], [-16, -24]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 0]],
+  },
+  {
+    id: 'aquarius', name: 'AQUARIUS', title: 'THE WATER-BEARER', el: 'air',
+    desc: 'Once per battle, falling below half health pours the waters: heal 8.',
+    stars: [[28, -46], [12, -58], [44, -56], [24, -26], [-8, -22], [-42, -30], [-66, -6], [42, -4], [26, 14], [42, 32], [22, 52], [50, 56]],
+    edges: [[1, 0], [2, 0], [0, 3], [3, 4], [4, 5], [5, 6], [3, 7], [7, 8], [8, 9], [9, 10], [10, 11]],
+  },
+  {
+    id: 'pisces', name: 'PISCES', title: 'THE TWIN FISH', el: 'water',
+    desc: 'The deep current: words woven at one cast from the strike deal +30%.',
+    stars: [[52, 44], [18, 34], [-14, 26], [-44, 22], [-66, 14], [-84, 20], [-86, 36], [-68, 42], [-52, 34], [46, 16], [40, -12], [34, -40], [24, -58], [44, -60]],
+    edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 3], [0, 9], [9, 10], [10, 11], [11, 12], [12, 13], [13, 11]],
+  },
+];
+const SS_ZODIAC_BY = {};
+for (const _z of SS_ZODIAC) SS_ZODIAC_BY[_z.id] = _z;
+
 // rarity: 0 = basic, 1 = rare, 2 = legendary. Rares and legendaries surface
 // deeper into the campaign (and at low odds anywhere in quick/daily) — the
 // gating curve lives in Battle.sigilChances().
@@ -326,4 +405,8 @@ const SS_ACH = [
   { id: 'rival-star', icon: '⚔', name: 'RIVAL STAR', desc: 'Win a versus battle.' },
   { id: 'sky-marshal', icon: '♜', name: 'SKY MARSHAL', desc: 'Win a battleground of 3+ mages.' },
   { id: 'war-weaver', icon: '✷', name: 'WAR WEAVER', desc: 'Cast 25 words in versus, lifetime.' },
+  { id: 'sign-born', icon: '✵', name: 'SIGN-BORN', desc: 'Complete the Campaign under a zodiac sign.' },
+  { id: 'wheel-walker', icon: '❁', name: 'WHEEL WALKER', desc: 'Clear campaigns under 3 different signs.' },
+  { id: 'grand-zodiac', icon: '✪', name: 'THE GRAND ZODIAC', desc: 'Clear a campaign under all 12 signs.' },
+  { id: 'star-crossed', icon: '☌', name: 'STAR-CROSSED', desc: 'Fell the beast that wears your own sign.' },
 ];
