@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>THE PARTS COUNTER — Shape Store character sheets</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐲</text></svg>">
+<style>
+:root{ --paper:#F2EBD8; --ink:#2A2620; --gold:#D9A544; --bg:#1D241A; --panel:#28301F; --cream:#EDE4CC; }
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+body{margin:0; background:var(--bg); color:var(--cream); font-family:"Trebuchet MS",Verdana,sans-serif;
+  -webkit-user-select:none; user-select:none; padding-bottom:60px;}
+h1,h2,.wm,.bub{font-family:Impact,"Arial Black",sans-serif; letter-spacing:1px; font-weight:normal;}
+header{padding:14px 16px 6px; text-align:center;}
+header .wm{font-size:26px; color:var(--gold); text-shadow:1px 1px 0 #14180C;}
+header small{display:block; color:#8A8A72; font-size:11px; letter-spacing:2px; font-family:"Trebuchet MS";}
+/* the shopkeeper asks */
+#asks{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding:10px 12px;}
+.bub{background:var(--paper); color:#4A4432; border:3px solid #B8A888; border-radius:14px; padding:8px 14px;
+  font-size:14px; cursor:pointer; position:relative;}
+.bub.on{border-color:var(--gold); color:var(--ink); box-shadow:0 0 0 2px var(--gold);}
+/* the example stays with you */
+#hero{position:sticky; top:0; z-index:10; background:linear-gradient(var(--bg) 82%, transparent);
+  display:flex; justify-content:center; padding:6px 0 14px;}
+#heroCard{background:var(--paper); border:3px solid var(--gold); border-radius:14px; padding:6px 10px; text-align:center;
+  box-shadow:0 8px 30px #000A;}
+#heroCard svg{display:block; width:190px; height:190px; transition:width 0.25s ease, height 0.25s ease;}
+#heroCard .nm{font-size:12px; font-weight:bold; color:#4A4432; letter-spacing:1px;}
+#mix{display:block; margin:6px auto 0; background:var(--gold); color:#2A2010; border:none; border-radius:9px;
+  padding:7px 14px; font-weight:bold; font-size:13px; cursor:pointer; font-family:inherit;}
+/* scrolled: the toy steps back so the shelves stay visible */
+body.scrolled #heroCard svg{width:118px; height:118px;}
+body.scrolled #mix{padding:4px 10px; font-size:11px;}
+body.scrolled #heroCard .nm{font-size:10px;}
+/* the sheet */
+#sheet{max-width:760px; margin:0 auto; padding:0 12px;}
+.sec{margin:16px 0;}
+.sec h2{font-size:15px; color:var(--gold); border-bottom:1px solid #4A5740; padding-bottom:4px; margin:0 0 8px;}
+.sec h2 small{color:#8A8A72; font-size:10px; letter-spacing:1px; font-family:"Trebuchet MS"; font-weight:normal;}
+.chips{display:flex; gap:8px; flex-wrap:wrap;}
+.chip{background:var(--paper); border:3px solid transparent; border-radius:10px; padding:4px; cursor:pointer; text-align:center; width:86px;}
+.chip svg{display:block; width:76px; height:56px; margin:0 auto;}
+.chip div{font-size:9px; font-weight:bold; color:#4A4432; letter-spacing:.5px; margin-top:2px; text-transform:uppercase;}
+.chip.on{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold);}
+.chip:active{transform:scale(0.96);}
+footer{text-align:center; color:#57574A; font-size:10px; letter-spacing:1px; padding:26px 0 10px;}
+@media (pointer:coarse){ .chip{width:96px;} .chip svg{width:86px; height:62px;} }
+</style>
+</head>
+<body>
+<header>
+  <div class="wm">THE PARTS COUNTER</div>
+  <small>THE SHAPE STORE · PICK A PART, THE TOY WEARS IT</small>
+</header>
+<div id="asks"></div>
+<div id="hero">
+  <div id="heroCard">
+    <svg id="heroSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="nm" id="heroName"></div>
+    <button id="mix" onclick="mixUp()">🎲 MIX ONE UP</button>
+  </div>
+</div>
+<div id="sheet"></div>
+<footer>EVERY PART IS A REAL GVT MOLD PIECE — TAP CHIPS, BUILD A TOY</footer>
+<script>
+'use strict';
+const NS='http://www.w3.org/2000/svg';
+const $=id=>document.getElementById(id);
+
+/* ================= SHARED FACE KITS =================
+   Authored around (0,0); INK / PUP swap per character; eyes sit at ±14. */
+const EYES=[
+ {n:'buttons', s:'<ellipse cx="-14" cy="0" rx="5" ry="6" fill="PUP"/><ellipse cx="14" cy="0" rx="5" ry="6" fill="PUP"/>'},
+ {n:'sparkle', s:'<circle cx="-14" cy="0" r="6.6" fill="#fff" stroke="INK" stroke-width="1.6"/><circle cx="-15.5" cy="0.8" r="3.2" fill="#1a1208"/><circle cx="-13" cy="-1.8" r="1.2" fill="#fff"/><circle cx="14" cy="0" r="6.6" fill="#fff" stroke="INK" stroke-width="1.6"/><circle cx="12.5" cy="0.8" r="3.2" fill="#1a1208"/><circle cx="15" cy="-1.8" r="1.2" fill="#fff"/>'},
+ {n:'happy', s:'<path d="M-20 2 Q-14 -6 -8 2 M8 2 Q14 -6 20 2" stroke="PUP" stroke-width="4" fill="none" stroke-linecap="round"/>'},
+ {n:'dizzy', s:'<path d="M-18 -4 L-10 4 M-10 -4 L-18 4 M10 -4 L18 4 M18 -4 L10 4" stroke="PUP" stroke-width="3.6" stroke-linecap="round"/>'},
+ {n:'stars', s:'<path d="M-14 -6 V6 M-20 0 H-8 M14 -6 V6 M8 0 H20" stroke="PUP" stroke-width="3.4" stroke-linecap="round"/>'},
+ {n:'sleepy', s:'<path d="M-19 -2 Q-14 3 -9 -2 M9 -2 Q14 3 19 -2" stroke="PUP" stroke-width="3.6" fill="none" stroke-linecap="round"/><path d="M-13 4 l3 2 M11 4 l3 2" stroke="PUP" stroke-width="2" stroke-linecap="round"/>'},
+ {n:'swirl', s:'<path d="M-10 0 A4.6 4.6 0 1 1 -14 -4.6 A2.6 2.6 0 1 0 -11.5 -1" stroke="PUP" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M18 0 A4.6 4.6 0 1 1 14 -4.6 A2.6 2.6 0 1 0 16.5 -1" stroke="PUP" stroke-width="2.6" fill="none" stroke-linecap="round"/>'},
+];
+const BROWS=[
+ {n:'fierce', s:'<path d="M-22 -4 L-8 2 M22 -4 L8 2" stroke="INK" stroke-width="4" stroke-linecap="round"/>'},
+ {n:'calm', s:'<path d="M-21 0 Q-14 -4 -7 -1 M7 -1 Q14 -4 21 0" stroke="INK" stroke-width="3.6" fill="none" stroke-linecap="round"/>'},
+ {n:'raised', s:'<path d="M-20 2 Q-14 -7 -8 -1 M8 -1 Q14 -7 20 2" stroke="INK" stroke-width="3.6" fill="none" stroke-linecap="round"/>'},
+ {n:'flat', s:'<path d="M-20 0 H-8 M8 0 H20" stroke="INK" stroke-width="4" stroke-linecap="round"/>'},
+ {n:'worried', s:'<path d="M-20 2 L-8 -3 M20 2 L8 -3" stroke="INK" stroke-width="4" stroke-linecap="round"/>'},
+ {n:'one up', s:'<path d="M-20 -3 Q-13 -8 -7 -4 M8 1 H20" stroke="INK" stroke-width="3.8" fill="none" stroke-linecap="round"/>'},
+];
+const MOUTHS=[
+ {n:'smirk', s:'<path d="M-12 0 Q0 7 12 -2 L12 -2 Q14 -3 15 -6" stroke="PUP" stroke-width="3.6" fill="none" stroke-linecap="round"/>'},
+ {n:'big grin', s:'<path d="M0 -3 C11 -3 14 3 12.5 8 C9.5 14 -9.5 14 -12.5 8 C-14 3 -11 -3 0 -3 z" fill="DKM" stroke="INK" stroke-width="3"/><path d="M-9 0 L-6 5 L-3 0 L0 5 L3 0 L6 5 L9 0" stroke="#fff" stroke-width="3.4" fill="none"/>'},
+ {n:'laugh', s:'<path d="M-11 -2 Q0 0 11 -2 Q10 11 0 11 Q-10 11 -11 -2 z" fill="#7A2A22" stroke="INK" stroke-width="2.6" stroke-linejoin="round"/><path d="M-6 7.5 Q0 12 6 7.5 Q0 15 -6 7.5 z" fill="#E8863A"/>'},
+ {n:'hmm', s:'<path d="M-9 2 H9" stroke="PUP" stroke-width="3.6" stroke-linecap="round"/>'},
+ {n:'wavy', s:'<path d="M-12 2 Q-8 -2 -4 2 Q0 6 4 2 Q8 -2 12 2" stroke="PUP" stroke-width="3.4" fill="none" stroke-linecap="round"/>'},
+ {n:'ooo', s:'<ellipse cx="0" cy="2" rx="4.6" ry="5.6" fill="DKM" stroke="INK" stroke-width="2.6"/>'},
+ {n:'fang', s:'<path d="M-12 0 Q0 8 12 0" stroke="PUP" stroke-width="3.6" fill="none" stroke-linecap="round"/><path d="M6 2.6 l2.6 6 l3 -5.2" fill="#F5EFD8" stroke="#B8A888" stroke-width="1.4" stroke-linejoin="round"/>'},
+ {n:'tongue', s:'<path d="M-12 -1 Q0 6 12 -1" stroke="PUP" stroke-width="3.6" fill="none" stroke-linecap="round"/><path d="M-1 3 Q-1 12 4 12 Q9 12 8 4.5 Q4 6.5 -1 3 z" fill="#E8863A" stroke="#B05E20" stroke-width="1.6" stroke-linejoin="round"/>'},
+];
+function kit(base, ink, pup, dkm){ return base.map(v=>({n:v.n, s:v.s.split('INK').join(ink).split('PUP').join(pup).split('DKM').join(dkm)})); }
+
+/* ================= THE CHARACTERS ================= */
+/* Each layer: string (always drawn) or {slot} (current variant drawn).
+   Slots: {id, label, note, wrap, chipVB, chipWrap?, v:[{n,s}]} — wrap positions
+   the part on the toy; chips render the raw part in chipVB. */
+const CHARS=[];
+
+/* ---- THE BLUE DRAGON — new mold, trike blues, house laws ---- */
+(function(){
+ const B='#4A8CA0', L='#6FB0C0', D='#2E5A68', BEL='#9CC8D6', CR='#F5EFD8', CRD='#B8A888';
+ const faceE=kit(EYES,D,'#1a1208','#5A2330'), faceB=kit(BROWS,D,'#1a1208','#5A2330'), faceM=kit(MOUTHS,D,'#22333B','#5A2330');
+ CHARS.push({
+  key:'dragon', name:'THE BLUE DRAGON', ask:'HOW ABOUT THE BLUE DRAGON?', vb:'-6 -8 152 152',
+  layers:[
+   '<ellipse cx="70" cy="132" rx="46" ry="8" fill="#000" opacity="0.25"/>',
+   {slot:'tail'}, {slot:'wings'}, {slot:'feet'},
+   '<path d="M70 24 C98 24 110 46 108 76 C106 104 94 116 70 116 C46 116 34 104 32 76 C30 46 42 24 70 24 z" fill="'+B+'" stroke="'+D+'" stroke-width="5" stroke-linejoin="round"/>',
+   {slot:'belly'}, {slot:'arms'},
+   '<circle cx="48" cy="58" r="4.2" fill="#E8A87C" opacity="0.85"/><circle cx="92" cy="58" r="4.2" fill="#E8A87C" opacity="0.85"/>',
+   {slot:'eyes'}, {slot:'brows'}, {slot:'mouth'}, {slot:'horns'},
+  ],
+  slots:[
+   {id:'horns', label:'HORNS', chipVB:'34 -6 72 44', v:[
+     {n:'little nubs', s:'<path d="M52 28 Q47 16 54 10 Q58 19 61 26 z M88 28 Q93 16 86 10 Q82 19 79 26 z" fill="'+CR+'" stroke="'+CRD+'" stroke-width="2.5" stroke-linejoin="round"/>'},
+     {n:'tall curls', s:'<path d="M53 27 Q42 14 46 0 Q56 8 61 24 z M87 27 Q98 14 94 0 Q84 8 79 24 z" fill="'+CR+'" stroke="'+CRD+'" stroke-width="2.5" stroke-linejoin="round"/>'},
+     {n:'crest row', s:'<path d="M50 28 l6 -12 6 11 z M62 25 l8 -15 8 15 z M78 26 l6 -11 6 12 z" fill="'+D+'" stroke="'+D+'" stroke-width="2" stroke-linejoin="round"/>'},
+     {n:'gold crown', s:'<g stroke-linejoin="round"><path d="M56 26 L58 8 L66 17 L70 4 L74 17 L82 8 L84 26 z" fill="#D9A544" stroke="#8a6a24" stroke-width="3"/><rect x="55" y="23" width="30" height="6" rx="3" fill="#C7913B" stroke="#8a6a24" stroke-width="2"/></g>'},
+     {n:'bare head', s:''},
+   ]},
+   {id:'brows', label:'EYEBROWS', wrap:'translate(70,38)', chipVB:'-26 -13 52 22', v:faceB},
+   {id:'eyes', label:'EYES', wrap:'translate(70,50)', chipVB:'-26 -12 52 24', d:1, v:faceE},
+   {id:'mouth', label:'MOUTH', wrap:'translate(70,68)', chipVB:'-20 -10 40 28', v:faceM},
+   {id:'belly', label:'BODY', note:'belly panels', chipVB:'40 60 60 56', v:[
+     {n:'smooth', s:'<path d="M70 72 C86 72 92 82 91 94 C90 108 82 113 70 113 C58 113 50 108 49 94 C48 82 54 72 70 72 z" fill="'+BEL+'"/>'},
+     {n:'scale rows', s:'<path d="M70 72 C86 72 92 82 91 94 C90 108 82 113 70 113 C58 113 50 108 49 94 C48 82 54 72 70 72 z" fill="'+BEL+'"/><path d="M54 84 q8 6 16 0 q8 6 16 0 M56 96 q7 6 14 0 q7 6 14 0" stroke="'+L+'" stroke-width="3" fill="none" stroke-linecap="round"/>'},
+     {n:'star patch', s:'<path d="M70 72 C86 72 92 82 91 94 C90 108 82 113 70 113 C58 113 50 108 49 94 C48 82 54 72 70 72 z" fill="'+BEL+'"/><path d="M70 82 l3.4 7 7.6 1 -5.5 5.4 1.3 7.6 -6.8 -3.6 -6.8 3.6 1.3 -7.6 -5.5 -5.4 7.6 -1 z" fill="'+CR+'" stroke="'+CRD+'" stroke-width="1.6" stroke-linejoin="round"/>'},
+     {n:'racing stripe', s:'<path d="M70 72 C86 72 92 82 91 94 C90 108 82 113 70 113 C58 113 50 108 49 94 C48 82 54 72 70 72 z" fill="'+BEL+'"/><path d="M62 73 C60 88 60 100 62 112 M78 73 C80 88 80 100 78 112" stroke="'+L+'" stroke-width="4" fill="none" stroke-linecap="round"/>'},
+   ]},
+   {id:'wings', label:'WINGS', note:'the sleeves of a dragon', chipVB:'-6 22 152 56', v:[
+     {n:'perky', s:'<path d="M40 52 Q16 24 4 40 Q-4 54 12 62 Q24 68 40 66 z" fill="'+D+'" stroke="'+D+'" stroke-width="3" stroke-linejoin="round"/><path d="M34 56 Q18 40 8 44 M34 62 Q20 54 12 56" stroke="'+L+'" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M100 52 Q124 24 136 40 Q144 54 128 62 Q116 68 100 66 z" fill="'+D+'" stroke="'+D+'" stroke-width="3" stroke-linejoin="round"/><path d="M106 56 Q122 40 132 44 M106 62 Q120 54 128 56" stroke="'+L+'" stroke-width="2.6" fill="none" stroke-linecap="round"/>'},
+     {n:'folded', s:'<path d="M38 66 Q20 62 16 74 Q26 80 38 78 z" fill="'+D+'" stroke="'+D+'" stroke-width="3" stroke-linejoin="round"/><path d="M102 66 Q120 62 124 74 Q114 80 102 78 z" fill="'+D+'" stroke="'+D+'" stroke-width="3" stroke-linejoin="round"/>'},
+     {n:'baby nubs', s:'<path d="M36 68 q-10 -8 -8 4 q4 6 10 2 z" fill="'+D+'"/><path d="M104 68 q10 -8 8 4 q-4 6 -10 2 z" fill="'+D+'"/>'},
+   ]},
+   {id:'arms', label:'HANDS', note:'stubby arms + claws', chipVB:'8 62 124 46', v:[
+     {n:'cheer', s:'<path d="M38 80 Q26 74 22 64" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M22 64 L15 58 M22 64 L18 55 M22 64 L26 54" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/><path d="M102 80 Q114 74 118 64" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M118 64 L125 58 M118 64 L122 55 M118 64 L114 54" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/>'},
+     {n:'resting', s:'<path d="M38 80 Q28 88 26 98" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M26 98 L19 103 M26 98 L23 106 M26 98 L31 105" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/><path d="M102 80 Q112 88 114 98" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M114 98 L121 103 M114 98 L117 106 M114 98 L109 105" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/>'},
+     {n:'big wave', s:'<path d="M38 78 Q28 68 26 56" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M26 56 L19 51 M26 56 L23 47 M26 56 L31 47" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/><path d="M102 80 Q112 88 114 98" stroke="'+B+'" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M114 98 L121 103 M114 98 L117 106 M114 98 L109 105" stroke="'+CR+'" stroke-width="3.6" stroke-linecap="round"/>'},
+   ]},
+   {id:'feet', label:'FEET', chipVB:'36 106 68 30', v:[
+     {n:'stompers', s:'<rect x="46" y="112" width="15" height="17" rx="6" fill="'+D+'"/><rect x="79" y="112" width="15" height="17" rx="6" fill="'+D+'"/><path d="M48 129 l4 -3 M54 129 l4 -3 M81 129 l4 -3 M87 129 l4 -3" stroke="'+CR+'" stroke-width="2.6" stroke-linecap="round"/>'},
+     {n:'boots', s:'<path d="M47 112 v9 q0 7 8 7 h6 q4 0 3 -5 q-1 -4 -6 -5 v-6 z" fill="#6E4522" stroke="#4E2F14" stroke-width="2.4" stroke-linejoin="round"/><path d="M93 112 v9 q0 7 -8 7 h-6 q-4 0 -3 -5 q1 -4 6 -5 v-6 z" fill="#6E4522" stroke="#4E2F14" stroke-width="2.4" stroke-linejoin="round"/>'},
+     {n:'tip toes', s:'<ellipse cx="53" cy="122" rx="8" ry="10" fill="'+D+'"/><ellipse cx="87" cy="122" rx="8" ry="10" fill="'+D+'"/><circle cx="50" cy="115" r="2.4" fill="'+CR+'"/><circle cx="90" cy="115" r="2.4" fill="'+CR+'"/>'},
+   ]},
+   {id:'tail', label:'TAIL', chipVB:'-6 76 60 52', v:[
+     {n:'spade curl', s:'<path d="M36 104 Q14 116 8 100 Q4 88 16 88" stroke="'+B+'" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M17 94 l-6 -9 11 -1 z" fill="'+D+'" stroke="'+D+'" stroke-width="2" stroke-linejoin="round"/>'},
+     {n:'flame tip', s:'<path d="M36 104 Q14 116 8 100 Q4 88 16 88" stroke="'+B+'" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M16 94 q-8 -4 -4 -12 q2 5 6 5 q-1 -6 4 -9 q0 10 4 12 q-4 8 -10 4 z" fill="#D9A544" stroke="#C7913B" stroke-width="1.6" stroke-linejoin="round"/>'},
+     {n:'stubby', s:'<path d="M36 106 q-12 6 -16 -2 q6 -8 18 -6 z" fill="'+B+'" stroke="'+D+'" stroke-width="3" stroke-linejoin="round"/>'},
+   ]},
+  ],
+ });
+})();
+
+/* ---- KING YETI — the real mold, sliced into the counter ---- */
+(function(){
+ const INK='#54606C', BODY='#E8EEF3', SH='#C9D5DD';
+ const faceE=kit(EYES,INK,'#2B3138','#5A2330'), faceB=kit(BROWS,INK,'#2B3138','#5A2330'), faceM=kit(MOUTHS,INK,'#2B3138','#5A2330');
+ faceM[1]={n:'big grin', s:'<path d="M0 -6 C14 -6 18 2 16 10 C12 18 -12 18 -16 10 C-18 2 -14 -6 0 -6 z" fill="#5A2330" stroke="'+INK+'" stroke-width="4"/><path d="M-12 -2 L-8 4 L-4 -2 L0 4 L4 -2 L8 4 L12 -2" stroke="#FFFFFF" stroke-width="4" fill="none"/>'};
+ CHARS.push({
+  key:'kingyeti', name:'KING YETI', ask:'HOW ABOUT KING YETI?', vb:'-40 -28 200 172',
+  layers:[
+   '<g stroke-linecap="round" stroke-linejoin="round">',
+   '<ellipse cx="60" cy="130" rx="44" ry="7" fill="#000" opacity="0.22"/>',
+   {slot:'cape'}, {slot:'feet'},
+   '<path d="M60 22 C88 22 100 44 98 68 C96 94 84 104 60 104 C36 104 24 94 22 68 C20 44 32 22 60 22 z" fill="'+BODY+'" stroke="'+INK+'" stroke-width="5"/>',
+   '<path d="M40 92 C48 100 72 100 80 92 C76 104 44 104 40 92 z" fill="'+SH+'"/>',
+   {slot:'arms'},
+   {slot:'eyes'}, {slot:'brows'}, {slot:'mouth'},
+   {slot:'crown'}, {slot:'saber'},
+   '</g>',
+  ],
+  slots:[
+   {id:'crown', label:'CROWN', chipVB:'38 -8 44 36', v:[
+     {n:'the crown', s:'<g stroke-linejoin="round"><path d="M44 20 L48 4 L56 14 L60 0 L64 14 L72 4 L76 20 z" fill="#D9A544" stroke="#8a6a24" stroke-width="3"/><rect x="44" y="17" width="32" height="7" rx="3" fill="#C7913B" stroke="#8a6a24" stroke-width="2"/><circle cx="52" cy="9" r="2.2" fill="#C0473A"/><circle cx="60" cy="5" r="2.2" fill="#3FA0C8"/><circle cx="68" cy="9" r="2.2" fill="#3FA05E"/></g>'},
+     {n:'ice crown', s:'<g stroke-linejoin="round"><path d="M45 21 L48 2 L54 15 L60 -4 L66 15 L72 2 L75 21 z" fill="#BFE0EE" stroke="#54606C" stroke-width="3" opacity="0.92"/><rect x="45" y="18" width="30" height="6" rx="3" fill="#8FB2C8" stroke="#54606C" stroke-width="2"/></g>'},
+     {n:'tiny hat', s:'<g stroke-linejoin="round"><path d="M50 18 Q60 -2 70 18 z" fill="#C0473A" stroke="#8A2F26" stroke-width="3"/><circle cx="60" cy="0" r="4" fill="#F5EFD8" stroke="#B8A888" stroke-width="2"/></g>'},
+     {n:'bare head', s:''},
+   ]},
+   {id:'brows', label:'EYEBROWS', wrap:'translate(60,37)', chipVB:'-26 -13 52 22', v:faceB},
+   {id:'eyes', label:'EYES', wrap:'translate(60,46)', chipVB:'-26 -12 52 24', v:faceE},
+   {id:'mouth', label:'MOUTH', wrap:'translate(60,68)', chipVB:'-22 -12 44 32', v:faceM},
+   {id:'cape', label:'CAPE', note:'the body wardrobe', chipVB:'12 24 100 100', v:[
+     {n:'war red', s:'<g stroke-linejoin="round"><path d="M34 34 Q28 70 20 112 Q52 100 66 116 Q84 98 104 118 Q112 74 96 34 Q66 22 34 34 z" fill="#C0473A" stroke="#8A2F26" stroke-width="4"/><path d="M40 44 Q36 76 30 104 M60 40 Q60 78 62 108 M84 42 Q90 76 96 106" stroke="#8A2F26" stroke-width="3" fill="none" opacity="0.55"/><path d="M34 34 Q66 24 96 34" stroke="#D9A544" stroke-width="5" fill="none"/><circle cx="34" cy="33" r="4.5" fill="#D9A544" stroke="#8a6a24" stroke-width="2"/><circle cx="96" cy="33" r="4.5" fill="#D9A544" stroke="#8a6a24" stroke-width="2"/></g>'},
+     {n:'royal blue', s:'<g stroke-linejoin="round"><path d="M34 34 Q28 70 20 112 Q52 100 66 116 Q84 98 104 118 Q112 74 96 34 Q66 22 34 34 z" fill="#3E5FA8" stroke="#26407A" stroke-width="4"/><path d="M40 44 Q36 76 30 104 M60 40 Q60 78 62 108 M84 42 Q90 76 96 106" stroke="#26407A" stroke-width="3" fill="none" opacity="0.55"/><path d="M34 34 Q66 24 96 34" stroke="#D9A544" stroke-width="5" fill="none"/><circle cx="34" cy="33" r="4.5" fill="#D9A544" stroke="#8a6a24" stroke-width="2"/><circle cx="96" cy="33" r="4.5" fill="#D9A544" stroke="#8a6a24" stroke-width="2"/></g>'},
+     {n:'snow cloak', s:'<g stroke-linejoin="round"><path d="M34 34 Q28 70 20 112 Q52 100 66 116 Q84 98 104 118 Q112 74 96 34 Q66 22 34 34 z" fill="#E8EEF3" stroke="#54606C" stroke-width="4"/><path d="M28 96 q6 5 12 0 q6 5 12 0 M74 100 q6 5 12 0 q6 5 12 0" stroke="#8FB2C8" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M34 34 Q66 24 96 34" stroke="#D9A544" stroke-width="5" fill="none"/></g>'},
+     {n:'no cape', s:''},
+   ]},
+   {id:'arms', label:'SLEEVES + HANDS', chipVB:'-8 18 136 72', v:[
+     {n:'round fists', s:'<path d="M30 56 Q16 64 12 78" stroke="'+BODY+'" stroke-width="13"/><path d="M30 56 Q16 64 12 78" stroke="'+INK+'" stroke-width="3" fill="none" opacity="0.35"/><circle cx="11.5" cy="80" r="6.5" fill="'+BODY+'" stroke="'+INK+'" stroke-width="3.5"/><path d="M90 56 L112 32 M86 50 L104 24" stroke="'+BODY+'" stroke-width="13"/><circle cx="106" cy="27" r="7.5" fill="'+BODY+'" stroke="'+INK+'" stroke-width="3.5"/>'},
+     {n:'wild claws', s:'<path d="M30 56 L8 30 M34 50 L16 22" stroke="'+BODY+'" stroke-width="13"/><path d="M30 56 L8 30 M34 50 L16 22" stroke="'+INK+'" stroke-width="3" fill="none" opacity="0.35"/><path d="M8 30 L2 22 M8 30 L0 32 M16 22 L10 14 M16 22 L8 24" stroke="'+INK+'" stroke-width="4"/><path d="M90 56 L112 32 M86 50 L104 24" stroke="'+BODY+'" stroke-width="13"/><path d="M112 32 L118 24 M112 32 L120 34 M104 24 L110 16 M104 24 L112 26" stroke="'+INK+'" stroke-width="4"/>'},
+     {n:'both down', s:'<path d="M30 58 Q16 66 12 80 M90 58 Q104 66 108 80" stroke="'+BODY+'" stroke-width="13"/><circle cx="11.5" cy="82" r="6.5" fill="'+BODY+'" stroke="'+INK+'" stroke-width="3.5"/><circle cx="108.5" cy="82" r="6.5" fill="'+BODY+'" stroke="'+INK+'" stroke-width="3.5"/>'},
+   ]},
+   {id:'feet', label:'FEET', chipVB:'30 92 60 42', v:[
+     {n:'snow feet', s:'<path d="M38 128 L42 96 L58 100 L56 128 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 128 L78 96 L62 100 L64 128 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/>'},
+     {n:'royal boots', s:'<path d="M38 128 L42 96 L58 100 L56 128 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 128 L78 96 L62 100 L64 128 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/><path d="M37 128 l20 0 0 -9 -20 -1 z M83 128 l-20 0 0 -9 20 -1 z" fill="#C0473A" stroke="#8A2F26" stroke-width="2.6" stroke-linejoin="round"/>'},
+     {n:'snowshoes', s:'<path d="M38 124 L42 96 L58 100 L56 124 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 124 L78 96 L62 100 L64 124 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/><ellipse cx="47" cy="127" rx="15" ry="5" fill="#6E4522" stroke="#4E2F14" stroke-width="2"/><ellipse cx="73" cy="127" rx="15" ry="5" fill="#6E4522" stroke="#4E2F14" stroke-width="2"/>'},
+   ]},
+   {id:'saber', label:'THE SABER', chipVB:'88 -24 74 68', v:[
+     {n:'frost saber', s:'<g stroke-linecap="round"><circle cx="95.5" cy="37" r="3.4" fill="#D9A544" stroke="#8a6a24" stroke-width="1.6"/><path d="M98 35 L110 24" stroke="#3A434C" stroke-width="7"/><path d="M100.4 29.5 L103.6 33.4 M104.6 25.7 L107.8 29.6" stroke="#D9A544" stroke-width="2.6"/><path d="M108.6 17.6 L115.4 25" stroke="#B8C4D0" stroke-width="4.6"/><path d="M114 19 L152 -16" stroke="#C9D5DD" stroke-width="10" opacity="0.4"/><path d="M114 19 L152 -16" stroke="#EAF0F5" stroke-width="5"/><path d="M114 19 L152 -16" stroke="#FFFFFF" stroke-width="2.2"/><path d="M148 -18.5 L154 -12.5 M154.5 -18 L147.5 -13" stroke="#FFFFFF" stroke-width="2" opacity="0.9"/></g>'},
+     {n:'gold saber', s:'<g stroke-linecap="round"><circle cx="95.5" cy="37" r="3.4" fill="#D9A544" stroke="#8a6a24" stroke-width="1.6"/><path d="M98 35 L110 24" stroke="#3A434C" stroke-width="7"/><path d="M108.6 17.6 L115.4 25" stroke="#C7913B" stroke-width="4.6"/><path d="M114 19 L152 -16" stroke="#D9A544" stroke-width="9" opacity="0.5"/><path d="M114 19 L152 -16" stroke="#FFD24A" stroke-width="5"/><path d="M114 19 L152 -16" stroke="#FFF3C0" stroke-width="2.2"/></g>'},
+     {n:'no saber', s:''},
+   ]},
+  ],
+ });
+})();
+
+/* ---- THE SARGE — Sgt. Cold off the real shelf ---- */
+(function(){
+ const INK='#54606C', BODY='#E8EEF3', SH='#C9D5DD';
+ const faceE=kit(EYES,INK,'#2B3138','#5A2330'), faceB=kit(BROWS,INK,'#2B3138','#5A2330'), faceM=kit(MOUTHS,INK,'#2B3138','#5A2330');
+ faceM[1]={n:'big grin', s:'<path d="M0 -6 C14 -6 18 2 16 10 C12 18 -12 18 -16 10 C-18 2 -14 -6 0 -6 z" fill="#5A2330" stroke="'+INK+'" stroke-width="4"/><path d="M-12 -2 L-8 4 L-4 -2 L0 4 L4 -2 L8 4 L12 -2" stroke="#FFFFFF" stroke-width="4" fill="none"/>'};
+ CHARS.push({
+  key:'sarge', name:'THE SARGE', ask:'THE SARGE HIMSELF?', vb:'-12 -14 164 158',
+  layers:[
+   '<g stroke-linecap="round" stroke-linejoin="round">',
+   '<ellipse cx="60" cy="130" rx="42" ry="7" fill="#000" opacity="0.22"/>',
+   {slot:'feet'},
+   '<path d="M60 22 C88 22 100 44 98 68 C96 94 84 104 60 104 C36 104 24 94 22 68 C20 44 32 22 60 22 z" fill="'+BODY+'" stroke="'+INK+'" stroke-width="5"/>',
+   '<path d="M40 92 C48 100 72 100 80 92 C76 104 44 104 40 92 z" fill="'+SH+'"/>',
+   '<rect x="24" y="27" width="15" height="8" rx="3" fill="#C0473A" stroke="'+INK+'" stroke-width="2.5"/><rect x="81" y="27" width="15" height="8" rx="3" fill="#C0473A" stroke="'+INK+'" stroke-width="2.5"/>',
+   {slot:'arms'}, {slot:'rank'},
+   {slot:'eyes'}, {slot:'brows'}, {slot:'mouth'}, {slot:'hat'},
+   '</g>',
+  ],
+  slots:[
+   {id:'hat', label:'HEAD GEAR', chipVB:'30 -14 60 42', v:[
+     {n:'steel kettle', s:'<g stroke-linejoin="round"><path d="M33 28 Q33 5 60 5 Q87 5 87 28 Q74 23 60 23 Q46 23 33 28 z" fill="#3A434C" stroke="#22282E" stroke-width="3"/><rect x="52" y="7" width="16" height="5" rx="2.5" fill="#22282E" opacity="0.5"/></g>'},
+     {n:'campaign hat', s:'<g stroke-linejoin="round"><ellipse cx="60" cy="20" rx="30" ry="7" fill="#6E4522" stroke="#4E2F14" stroke-width="2.6"/><path d="M44 19 Q46 2 60 2 Q74 2 76 19 Q60 24 44 19 z" fill="#8a6a24" stroke="#4E2F14" stroke-width="2.6"/><path d="M46 16 H74" stroke="#D9A544" stroke-width="3"/></g>'},
+     {n:'wool beanie', s:'<g stroke-linejoin="round"><path d="M36 24 Q36 4 60 4 Q84 4 84 24 z" fill="#C0473A" stroke="#8A2F26" stroke-width="3"/><path d="M36 24 Q60 18 84 24 l0 6 Q60 24 36 30 z" fill="#8A2F26"/><circle cx="60" cy="2" r="4.5" fill="#F5EFD8" stroke="#B8A888" stroke-width="2"/></g>'},
+     {n:'bare head', s:''},
+   ]},
+   {id:'brows', label:'EYEBROWS', wrap:'translate(60,37)', chipVB:'-26 -13 52 22', v:faceB},
+   {id:'eyes', label:'EYES', wrap:'translate(60,46)', chipVB:'-26 -12 52 24', v:faceE},
+   {id:'mouth', label:'MOUTH', wrap:'translate(60,68)', chipVB:'-22 -12 44 32', v:faceM},
+   {id:'rank', label:'RANK', note:'stripes on the chest', chipVB:'40 70 40 32', v:[
+     {n:'one chevron', s:'<path d="M48 80 L60 92 L72 80" stroke="#C0473A" stroke-width="7" fill="none"/><path d="M48 80 L60 92 L72 80" stroke="#7A2A22" stroke-width="2.5" fill="none" opacity="0.55"/>'},
+     {n:'double stack', s:'<path d="M48 76 L60 88 L72 76 M48 86 L60 98 L72 86" stroke="#C0473A" stroke-width="6" fill="none"/><path d="M48 76 L60 88 L72 76 M48 86 L60 98 L72 86" stroke="#7A2A22" stroke-width="2" fill="none" opacity="0.55"/>'},
+     {n:'gold star', s:'<path d="M60 76 l3.6 7.4 8.2 1.2 -6 5.8 1.4 8.2 -7.2 -3.9 -7.2 3.9 1.4 -8.2 -6 -5.8 8.2 -1.2 z" fill="#D9A544" stroke="#8a6a24" stroke-width="2" stroke-linejoin="round"/>'},
+     {n:'plain coat', s:''},
+   ]},
+   {id:'arms', label:'SLEEVES + HANDS', chipVB:'-8 18 136 72', v:[
+     {n:'at ease', s:'<path d="M30 58 L8 68 M34 52 L12 48" stroke="'+BODY+'" stroke-width="13"/><path d="M30 58 L8 68 M34 52 L12 48" stroke="'+INK+'" stroke-width="3" fill="none" opacity="0.35"/><path d="M8 68 L2 62 M8 68 L2 74 M12 48 L5 42 M12 48 L4 54" stroke="'+INK+'" stroke-width="4"/><path d="M90 56 L112 32 M86 50 L104 24" stroke="'+BODY+'" stroke-width="13"/><path d="M112 32 L118 24 M112 32 L120 34 M104 24 L110 16 M104 24 L112 26" stroke="'+INK+'" stroke-width="4"/>'},
+     {n:'the salute', s:'<path d="M30 58 L8 68" stroke="'+BODY+'" stroke-width="13"/><path d="M8 68 L2 62 M8 68 L2 74" stroke="'+INK+'" stroke-width="4"/><path d="M90 52 Q100 44 92 34" stroke="'+BODY+'" stroke-width="13"/><path d="M92 34 L84 30 M92 34 L94 26 M92 34 L99 29" stroke="'+INK+'" stroke-width="4"/>'},
+     {n:'drill claws', s:'<path d="M30 56 L8 30 M34 50 L16 22" stroke="'+BODY+'" stroke-width="13"/><path d="M8 30 L2 22 M8 30 L0 32 M16 22 L10 14 M16 22 L8 24" stroke="'+INK+'" stroke-width="4"/><path d="M90 56 L112 32 M86 50 L104 24" stroke="'+BODY+'" stroke-width="13"/><path d="M112 32 L118 24 M112 32 L120 34 M104 24 L110 16 M104 24 L112 26" stroke="'+INK+'" stroke-width="4"/>'},
+   ]},
+   {id:'feet', label:'FEET', chipVB:'30 92 60 42', v:[
+     {n:'snow feet', s:'<path d="M38 128 L42 96 L58 100 L56 128 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 128 L78 96 L62 100 L64 128 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/>'},
+     {n:'drill boots', s:'<path d="M38 128 L42 96 L58 100 L56 128 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 128 L78 96 L62 100 L64 128 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/><path d="M37 128 l20 0 0 -9 -20 -1 z M83 128 l-20 0 0 -9 20 -1 z" fill="#3A434C" stroke="#22282E" stroke-width="2.6" stroke-linejoin="round"/>'},
+     {n:'skis', s:'<path d="M38 124 L42 96 L58 100 L56 124 z" fill="#D7E0E6" stroke="'+INK+'" stroke-width="4"/><path d="M82 124 L78 96 L62 100 L64 124 z" fill="'+SH+'" stroke="'+INK+'" stroke-width="4"/><path d="M28 127 H64 q4 0 5 -4 M56 127 H92 q4 0 5 -4" stroke="#C0473A" stroke-width="4" fill="none" stroke-linecap="round"/>'},
+   ]},
+  ],
+ });
+})();
+
+/* ================= THE COUNTER ================= */
+let CUR=0;
+const PICKS={};   // key -> {slotId: index}
+function C(){ return CHARS[CUR]; }
+function picks(){ const c=C(); if(!PICKS[c.key]){ PICKS[c.key]={}; c.slots.forEach(s=>PICKS[c.key][s.id]=s.d||0); } return PICKS[c.key]; }
+function slotSVG(slot){ const p=picks(); const v=slot.v[p[slot.id]]||slot.v[0]; return slot.wrap? '<g transform="'+slot.wrap+'">'+v.s+'</g>' : v.s; }
+function heroStr(){
+  const c=C();
+  return c.layers.map(l=> typeof l==='string'? l : slotSVG(c.slots.find(s=>s.id===l.slot))).join('');
+}
+function renderHero(){
+  const c=C();
+  $('heroSvg').setAttribute('viewBox', c.vb);
+  $('heroSvg').innerHTML = heroStr();
+  $('heroName').textContent = c.name;
+}
+function chipSVG(slot, v){
+  let inner=v.s;
+  if(!inner){ const b=slot.chipVB.split(' ').map(Number);
+    inner='<text x="'+(b[0]+b[2]/2)+'" y="'+(b[1]+b[3]/2+3)+'" text-anchor="middle" font-size="'+Math.round(b[3]/3)+'" fill="#B8A888" font-family="Trebuchet MS">·</text>'; }
+  return '<svg xmlns="'+NS+'" viewBox="'+slot.chipVB+'">'+inner+'</svg>';
+}
+function renderSheet(){
+  const c=C(), p=picks();
+  $('sheet').innerHTML = c.slots.map(slot=>
+    '<div class="sec"><h2>'+slot.label+(slot.note? ' <small>· '+slot.note+'</small>':'')+'</h2><div class="chips">'
+    + slot.v.map((v,i)=>'<div class="chip'+(p[slot.id]===i?' on':'')+'" onclick="pick(\''+slot.id+'\','+i+')">'+chipSVG(slot,v)+'<div>'+v.n+'</div></div>').join('')
+    +'</div></div>').join('');
+}
+function pick(slotId, i){
+  picks()[slotId]=i;
+  renderHero();
+  const c=C();
+  document.querySelectorAll('.sec').forEach((sec,si)=>{
+    if(c.slots[si].id!==slotId) return;
+    sec.querySelectorAll('.chip').forEach((ch,ci)=>ch.classList.toggle('on', ci===i));
+  });
+}
+function mixUp(){
+  const c=C(), p=picks();
+  c.slots.forEach(s=>{ p[s.id]=Math.floor(Math.random()*s.v.length); });
+  renderHero(); renderSheet();
+}
+function setChar(i){
+  CUR=i;
+  document.querySelectorAll('.bub').forEach((b,bi)=>b.classList.toggle('on', bi===i));
+  renderHero(); renderSheet();
+  scrollTo({top:0, behavior:'smooth'});
+}
+$('asks').innerHTML = CHARS.map((c,i)=>'<div class="bub'+(i===0?' on':'')+'" onclick="setChar('+i+')">'+c.ask+'</div>').join('');
+addEventListener('scroll',()=>document.body.classList.toggle('scrolled', scrollY>130), {passive:true});
+renderHero(); renderSheet();
+</script>
+</body>
+</html>
