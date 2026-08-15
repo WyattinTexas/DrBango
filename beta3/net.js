@@ -140,6 +140,13 @@ const SSNET = (() => {
     const t = (now == null ? Date.now() : now);
     return 86400000 - (((t % 86400000) + 86400000) % 86400000);
   }
+  // ms until the weekly board turns over. weekKey is ISO (weeks start Monday),
+  // so the flip is Monday 00:00 UTC — same clock surface as msToNextDay.
+  function msToNextWeek(now) {
+    const t = (now == null ? Date.now() : now);
+    const dow = new Date(t).getUTCDay() || 7;   // 1 Mon .. 7 Sun
+    return (7 - dow) * 86400000 + msToNextDay(t);
+  }
   function weekKey(d) {
     d = d || new Date();
     const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -205,5 +212,5 @@ const SSNET = (() => {
   // raw ref for live listeners (multiplayer); null when offline/local
   function ref(path) { return mode === 'firebase' && fdb ? fdb.ref(NS + '/' + path) : null; }
 
-  return { connect, uid, myName, setName, submitScore, getBoard, syncProfile, dayKey, dayKeyISO, msToNextDay, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, get mode() { return mode; } };
+  return { connect, uid, myName, setName, submitScore, getBoard, syncProfile, dayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, get mode() { return mode; } };
 })();

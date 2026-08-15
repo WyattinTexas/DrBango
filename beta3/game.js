@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.18.0';
+const BUILD = 'STARSPELL v0.19.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
@@ -310,6 +310,29 @@ function ssCountdown(ms) {
   const h = Math.floor(mins / 60), m = mins % 60;
   if (!h) return SS_T('cdM', m);
   return m ? SS_T('cdHM', h, m) : SS_T('cdH', h);   // "1h", not "1h 0m"
+}
+
+// The live countdown for the leaderboard / daily pre-screen — same wording at
+// hour scale, but under an hour it ticks in seconds so the deadline visibly
+// moves, and above a day it speaks in days (the weekly board needs them).
+function ssCountdownLive(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400), h = Math.floor(s / 3600) % 24, m = Math.floor(s / 60) % 60, sec = s % 60;
+  if (d) return h ? SS_T('cdDH', d, h) : SS_T('cdD', d);
+  if (h) return m ? SS_T('cdHM', h, m) : SS_T('cdH', h);
+  if (m) return SS_T('cdMS', m, sec);
+  return SS_T('cdS', sec);
+}
+
+// The player's own daily-completion streak, from the local score log. A streak
+// broken only by TODAY still counts — today's sky is still up, go keep it.
+// (RTDB can't answer this: daily boards prune to today+yesterday.)
+function ssDailyStreak() {
+  const log = (SS.prof && SS.prof.daily) || {};
+  let t = Date.now(), n = 0;
+  if (!log[String(SSNET.dayKey(new Date(t)))]) t -= 86400000;
+  while (log[String(SSNET.dayKey(new Date(t)))]) { n++; t -= 86400000; }
+  return n;
 }
 
 // Button texture for a given display size. The painted source is 627x344 but consumers
@@ -1014,6 +1037,51 @@ function ssGoldTex(scene, text, sizeU) {
   return { key, w: W / R, h: H / R };
 }
 
+/* ---- leaderboard medals -------------------------------------------------
+   Gold / silver / bronze medallions for the podium — a metallic disc in the
+   sigil-medallion's language (rim, inner hairline, compass points), with rays
+   baked around the gold. The rank numeral is drawn over it by the scene in
+   the matching ink. Consumed via setDisplaySize (R-scaled texture rule). */
+const SS_MEDAL_INK = ['#3a2a08', '#2c3350', '#3a2408'];
+function ssMedalTex(scene, tier) {
+  const key = 'lbmedal' + tier;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), S = 96;
+  const t = scene.textures.createCanvas(key, Math.round(S * R), Math.round(S * R));
+  const c = t.context;
+  c.scale(R, R);
+  const cx = S / 2, cy = S / 2, r = S / 2 - 10;
+  const M = [
+    { hi: '#fff3c9', mid: '#ffd77a', lo: '#9c7a28', rim: '#e6c87e', faint: 'rgba(255,215,122,' },
+    { hi: '#f4f7ff', mid: '#c9d4e8', lo: '#6a7590', rim: '#dfe6f4', faint: 'rgba(201,212,232,' },
+    { hi: '#ffd9b0', mid: '#d29a5f', lo: '#7a4d20', rim: '#e8b57f', faint: 'rgba(232,181,127,' },
+  ][tier];
+  if (tier === 0) {                                  // the champion's rays
+    c.strokeStyle = M.faint + '0.35)'; c.lineWidth = 1.4;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + 0.26;
+      c.beginPath(); c.moveTo(cx + Math.cos(a) * (r + 2), cy + Math.sin(a) * (r + 2));
+      c.lineTo(cx + Math.cos(a) * (r + 9), cy + Math.sin(a) * (r + 9)); c.stroke();
+    }
+  }
+  const g = c.createLinearGradient(0, cy - r, 0, cy + r);
+  g.addColorStop(0, M.hi); g.addColorStop(0.5, M.mid); g.addColorStop(1, M.lo);
+  c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fillStyle = g; c.fill();
+  c.lineWidth = 3; c.strokeStyle = M.rim; c.stroke();
+  c.lineWidth = 1.2; c.strokeStyle = 'rgba(16,12,34,0.4)';
+  c.beginPath(); c.arc(cx, cy, r - 5.5, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = M.rim;                               // compass points on the ring
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    c.beginPath(); c.arc(cx + Math.cos(a) * (r - 5.5), cy + Math.sin(a) * (r - 5.5), 1.5, 0, Math.PI * 2); c.fill();
+  }
+  const sh = c.createLinearGradient(0, cy - r, 0, cy);   // top sheen
+  sh.addColorStop(0, 'rgba(255,255,255,0.4)'); sh.addColorStop(1, 'rgba(255,255,255,0)');
+  c.beginPath(); c.arc(cx, cy, r - 2, 0, Math.PI * 2); c.fillStyle = sh; c.fill();
+  t.refresh();
+  return key;
+}
+
 /* ---- sigil rarity dress ------------------------------------------------
    Three tiers, unmistakable at a glance: basic wears the house gold, rare a
    cool gem-blue frame with an icy glow, legendary a gold radiance with rays
@@ -1202,6 +1270,9 @@ class Home extends Phaser.Scene {
     const tSky = performance.now();
     this.uiItems = [];
     this.ascending = false; this.descending = false; this.arrived = false; this.introPlaying = false;
+    // scene instances persist across restarts — a rotation mid-sheet would
+    // otherwise leave these truthy forever and the sheets could never reopen
+    this.langC = null; this.dailyC = null;
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
     // full frame's work on a slow phone, and a descent-by-create (the dawn
@@ -1321,7 +1392,9 @@ class Home extends Phaser.Scene {
     const rows = [
       { y: 420, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.startMode('campaign') },
       { y: 488, label: SS_T('quick'), sub: SS_T('quickSub'), fn: () => this.startMode('quick') },
-      { y: 556, label: SS_T('daily'), sub: this.dailySub(), key: 'daily', fn: () => this.startMode('daily') },
+      // DAILY opens the pre-screen (today's board, countdown, PLAY) rather than
+      // dropping straight into the game; the ?daily=1 deep link stays direct.
+      { y: 556, label: SS_T('daily'), sub: this.dailySub(), key: 'daily', fn: () => this.dailySheet() },
       { y: 624, label: SS_T('board'), sub: null, fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
       // PROFILE moved to the chip up in the corner, which frees this row for
       // VERSUS — it is a play mode, so it gets a real button like the rest.
@@ -1520,6 +1593,123 @@ class Home extends Phaser.Scene {
       c.add(t);
     });
   }
+  /* ---------- the daily pre-screen ----------
+     Tapping DAILY opens tonight's notice board instead of dropping straight
+     into the game: today's top hunters (live from RTDB), the reset countdown
+     ticking in seconds, whether you've already hunted, your completion streak,
+     and one big PLAY that rides the full ascent. This is also the home of the
+     daily-challenge leaderboard — everyone on it completed today's sky. (A
+     separate "completed the daily" board would list the same names: the score
+     list IS the completion list, and RTDB prunes past days, so the streak
+     shown here is the player's own, kept in the local profile log.) */
+  dailySheet() {
+    if (this.busy() || this.dailyC || this.langC) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.dailyC = this.add.container(0, 0).setDepth(700);
+    let tick = null;
+    const closeSheet = () => {
+      if (this.dailyC !== c) return;
+      this.dailyC = null;
+      if (tick) { tick.remove(false); tick = null; }
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.72, duration: 220 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+
+    const PH = 560, top = 400 - PH / 2;
+    const py = (d) => l.y(top + d);
+    const items = [];
+    // the window swallows its own taps so a press inside never falls through to the veil
+    const win = this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(372), l.u(PH)).setInteractive();
+    items.push(win);
+    const xB = ssTxt(this, l.x(164), py(28), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    items.push(xB);
+
+    // header: the hunt's name in gold, tonight's date, the shared-sky line
+    const hk = ssGoldTex(this, '☀ ' + SS_T('daily'), 21);
+    const hsc = Math.min(1, 300 / hk.w);
+    items.push(this.add.image(l.x(0), py(46), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
+    items.push(ssTxt(this, l.x(0), py(76), SSNET.dayKeyISO() + ' · ' + SS_T('dpOneSky'), l.u(11), '#8a94c4', 'italic').setOrigin(0.5));
+    const cdT = ssTxt(this, l.x(0), py(98), '', l.u(12), '#c9b676').setOrigin(0.5);
+    const tickCd = () => { if (cdT.active) cdT.setText('☾ ' + SS_T('lbNewSky', ssCountdownLive(SSNET.msToNextDay()))); };
+    tickCd();
+    tick = this.time.addEvent({ delay: 1000, loop: true, callback: tickCd });
+    items.push(cdT);
+    const rule = (d) => items.push(this.add.rectangle(l.x(0), py(d), l.u(316), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
+    rule(116);
+
+    // your standing under today's sky
+    const played = SS.prof.daily[String(SSNET.dayKey())] | 0;
+    items.push(ssTxt(this, l.x(0), py(140), played ? SS_T('dpPlayed', played) : SS_T('dpAwait'),
+      l.u(13.5), played ? '#f0e8d2' : '#ffe9a8').setOrigin(0.5)
+      .setShadow(0, 0, played ? 'rgba(0,0,0,0.45)' : '#c9b676', l.u(played ? 2 : 8), true, true));
+    const streak = ssDailyStreak();
+    if (streak >= 2) {
+      items.push(ssTxt(this, l.x(0), py(161), '✶ ' + SS_T('dpStreak', streak) + ' ✶', l.u(10.5), '#d7b45c').setOrigin(0.5));
+    }
+    rule(178);
+
+    // today's board — live from RTDB while the sheet stands open
+    items.push(ssTxt(this, l.x(0), py(198), '— ' + SS_T('dpTop') + ' —', l.u(12), '#c9b676').setOrigin(0.5));
+    const loadT = ssTxt(this, l.x(0), py(300), SS_T('lbLoading'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5);
+    items.push(loadT);
+    SSNET.getBoard('daily').then((b) => {
+      if (this.dailyC !== c || !this.scene.isActive()) return;
+      loadT.destroy();
+      const meId = SSNET.uid();
+      const rows = [];
+      if (!b.rows.length) {
+        rows.push(ssTxt(this, l.x(0), py(300), SS_T('lbEmpty'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5));
+      }
+      b.rows.slice(0, 6).forEach((r, i) => {
+        const y = py(226 + i * 34);
+        const me = r.id === meId;
+        if (me) rows.push(this.add.rectangle(l.x(0), y, l.u(324), l.u(28), 0xd7b45c, 0.13));
+        if (i < 3) {
+          rows.push(this.add.image(l.x(-146), y, ssMedalTex(this, i)).setDisplaySize(l.u(24), l.u(24)));
+          rows.push(ssTxt(this, l.x(-146), y, String(i + 1), l.u(12), SS_MEDAL_INK[i]).setOrigin(0.5, 0.52));
+        } else {
+          rows.push(ssTxt(this, l.x(-146), y, '#' + (i + 1), l.u(11), '#8a94c4').setOrigin(0.5));
+        }
+        const nm = ssTxt(this, l.x(-124), y, r.name, l.u(12.5), me ? '#ffe9a8' : '#e8e0c8').setOrigin(0, 0.5);
+        while (nm.width > l.u(190) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+        rows.push(nm);
+        rows.push(ssTxt(this, l.x(146), y, String(r.score), l.u(13), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));
+      });
+      if (b.me >= 0) {
+        const mine = b.me >= 6 && b.rows[b.me]
+          ? '#' + (b.me + 1) + ' · ' + b.rows[b.me].name + ' · ' + b.rows[b.me].score + '   ·   '
+          : '';
+        rows.push(ssTxt(this, l.x(0), py(438), mine + SS_T('lbYouRank', b.me + 1, b.total), l.u(11), '#ffd77a').setOrigin(0.5));
+      }
+      rows.forEach((o, i) => { o.alpha = 0; this.tweens.add({ targets: o, alpha: 1, duration: 260, delay: i * 24 }); });
+      c.add(rows);
+    }).catch(() => { });
+
+    // the big door: PLAY — closes the sheet and rides the ascent
+    const pb = this.add.image(l.x(0), py(492), ssBtn(this, false, 260, 58)).setDisplaySize(l.u(260), l.u(58)).setInteractive({ useHandCursor: true });
+    const pbT = ssTxt(this, l.x(0), py(492), played ? SS_T('dpAgain') : SS_T('dpPlay'), l.u(17), BTN_INK()).setOrigin(0.5);
+    items.push(pb, pbT);
+    pb.on('pointerover', () => pb.setScale(pb.scaleX * 1.03, pb.scaleY * 1.03));
+    pb.on('pointerout', () => pb.setDisplaySize(l.u(260), l.u(58)));
+    pb.on('pointerdown', () => {
+      if (this.busy()) return;
+      SFX.ui();
+      closeSheet();
+      this.bloomBtn = this.rowBtns && this.rowBtns.daily;   // the meadow button blooms as we lift off
+      this.startMode('daily');
+    });
+
+    c.add(items);
+    // entrance: the notice board settles up into place like the end-run window
+    items.forEach((it) => { it.y += l.u(14); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(14), alpha: 1, duration: 300, ease: 'Back.easeOut' });
+  }
+
   campaignCheckpoint() {
     try { return JSON.parse(localStorage.getItem('beta3.campaign')); } catch (e) { return null; }
   }
@@ -2745,42 +2935,83 @@ class Profile extends Phaser.Scene {
 }
 
 /* ============================================================
-   LEADERBOARD
+   LEADERBOARD — the night's finest, held like a ceremony:
+   a medallion podium for the top three, glass pills for the
+   roll below, your own row in gold wherever you stand, and
+   the reset clock ticking over both boards.
    ============================================================ */
 class Board extends Phaser.Scene {
   constructor() { super('board'); }
   create() {
     const l = ssLayout(this);
     ssMakeTextures(this);
-    ssStarfield(this, 90);
-    const back = ssTxt(this, l.x(-195), l.y(24), '‹ HOME', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-    back.on('pointerdown', () => { SFX.ui(); this.scene.start('home'); });
-    ssTxt(this, l.x(0), l.y(60), '— THE NIGHT\'S FINEST —', l.u(15), '#c9b676').setOrigin(0.5)
-      .setShadow(0, 0, '#c9b676', l.u(8), true, true);
+    ssStarfield(this, 110);
+    // a faint gold dawn crowns the summit of the list
+    this.add.image(l.x(0), l.y(160), 'glowbig').setScale(l.u(2.6)).setTint(0xd7b45c).setAlpha(0.05).setBlendMode('ADD');
 
+    const back = ssTxt(this, l.x(-195), l.y(24), '‹ ' + SS_T('home'), l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    back.on('pointerdown', () => { SFX.ui(); this.scene.start('home'); });
+
+    // the title in the wordmark's gold letterpress, flanked by flourishes
+    const tk = ssGoldTex(this, SS_T('lbTitle'), 19);
+    const tsc = Math.min(1, 320 / tk.w);
+    this.add.image(l.x(0), l.y(58), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc));
+    for (const s of [-1, 1]) {
+      ssTxt(this, l.x(s * (tk.w * tsc / 2 + 20)), l.y(58), '✦', l.u(12), '#c9b676').setOrigin(0.5)
+        .setShadow(0, 0, '#c9b676', l.u(6), true, true);
+    }
+
+    // tabs: two pills — the active board wears the gold
     this.tab = 'daily';
-    this.tabD = ssTxt(this, l.x(-60), l.y(100), 'DAILY', l.u(15), '#f0e8d2').setOrigin(0.5).setInteractive({ useHandCursor: true });
-    this.tabW = ssTxt(this, l.x(60), l.y(100), 'WEEKLY', l.u(15), '#5a6390').setOrigin(0.5).setInteractive({ useHandCursor: true });
-    this.tabD.on('pointerdown', () => this.setTab('daily'));
-    this.tabW.on('pointerdown', () => this.setTab('weekly'));
+    this.tabBtns = {};
+    const mkTab = (key, dx, label) => {
+      const bg = this.add.image(l.x(dx), l.y(104), ssBtn(this, true, 150, 38)).setDisplaySize(l.u(150), l.u(38)).setInteractive({ useHandCursor: true });
+      const lab = ssTxt(this, l.x(dx), l.y(104), label, l.u(14), '#5a6390').setOrigin(0.5);
+      bg.on('pointerdown', () => this.setTab(key));
+      this.tabBtns[key] = { bg, lab };
+    };
+    mkTab('daily', -80, SS_T('lbDaily'));
+    mkTab('weekly', 80, SS_T('lbWeekly'));
+    this.dressTabs(l);
+
+    // the reset clock, ticking every second. Both flips are UTC (daily 00:00,
+    // weekly Monday 00:00) so the countdown is the same for the whole planet,
+    // worded in the player's own units.
+    this.cdT = ssTxt(this, l.x(0), l.y(138), '', l.u(11.5), '#c9b676').setOrigin(0.5);
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.tickCd() });
+    this.tickCd();
 
     if (SSNET.mode === 'local') {
-      ssTxt(this, l.x(0), l.y(130), '· local standings — the wider sky is unreachable ·', l.u(10), '#8c5a5a', 'italic').setOrigin(0.5);
+      ssTxt(this, l.x(0), l.y(772), '· ' + SS_T('lbLocal') + ' ·', l.u(9.5), '#8c5a5a', 'italic').setOrigin(0.5);
     }
     this.rowsC = this.add.container(0, 0);
-    this.loadingT = ssTxt(this, l.x(0), l.y(300), 'consulting the stars…', l.u(13), '#5a6390', 'italic').setOrigin(0.5);
+    this.loadingT = ssTxt(this, l.x(0), l.y(340), SS_T('lbLoading'), l.u(13), '#5a6390', 'italic').setOrigin(0.5);
     this.refresh();
+  }
+  dressTabs(l) {
+    for (const [key, t] of Object.entries(this.tabBtns)) {
+      const on = key === this.tab;
+      t.bg.setTexture(ssBtn(this, !on, 150, 38)).setDisplaySize(l.u(150), l.u(38));
+      t.lab.setColor(on ? BTN_INK() : '#5a6390');
+    }
+  }
+  tickCd() {
+    if (!this.cdT || !this.cdT.active) return;
+    const daily = this.tab === 'daily';
+    const ms = daily ? SSNET.msToNextDay() : SSNET.msToNextWeek();
+    this.cdT.setText((daily ? '☾ ' : '✦ ') + SS_T(daily ? 'lbNewSky' : 'lbWeekEnds', ssCountdownLive(ms)));
   }
   setTab(t) {
     if (this.tab === t) return;
     SFX.ui();
     this.tab = t;
-    this.tabD.setColor(t === 'daily' ? '#f0e8d2' : '#5a6390');
-    this.tabW.setColor(t === 'weekly' ? '#f0e8d2' : '#5a6390');
+    this.dressTabs(ssLayout(this));
+    this.tickCd();
     this.refresh();
   }
   async refresh() {
     const l = ssLayout(this);
+    if (this.rowsC.list.length) this.tweens.killTweensOf(this.rowsC.list);
     this.rowsC.removeAll(true);
     this.loadingT.setVisible(true);
     const tab = this.tab;
@@ -2788,23 +3019,86 @@ class Board extends Phaser.Scene {
     if (this.tab !== tab || !this.scene.isActive()) return;
     this.loadingT.setVisible(false);
     if (!b.rows.length) {
-      this.rowsC.add(ssTxt(this, l.x(0), l.y(300), 'no hunts recorded yet — be the first', l.u(13), '#5a6390', 'italic').setOrigin(0.5));
+      this.rowsC.add(ssTxt(this, l.x(0), l.y(340), SS_T('lbEmpty'), l.u(13), '#5a6390', 'italic').setOrigin(0.5));
       return;
     }
     const meId = SSNET.uid();
-    b.rows.slice(0, 16).forEach((r, i) => {
-      const y = l.y(160 + i * 38);
-      const me = r.id === meId;
-      if (me) this.rowsC.add(this.add.rectangle(l.x(0), y, l.u(380), l.u(32), 0xd7b45c, 0.12));
-      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.';
-      this.rowsC.add(ssTxt(this, l.x(-180), y, String(medal), l.u(13), me ? '#ffd77a' : '#8a94c4').setOrigin(0, 0.5));
-      this.rowsC.add(ssTxt(this, l.x(-138), y, r.name, l.u(13), me ? '#ffe9a8' : '#f0e8d2').setOrigin(0, 0.5));
-      if (r.word) this.rowsC.add(ssTxt(this, l.x(60), y, r.word, l.u(10), '#5a6390', 'italic').setOrigin(0, 0.5));
-      this.rowsC.add(ssTxt(this, l.x(180), y, String(r.score), l.u(13), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));
+    const ent = [];                       // entrance-animated, in cascade order
+    const trim = (t2, w) => { while (t2.width > l.u(w) && t2.text.length > 2) t2.setText(t2.text.slice(0, -2) + '…'); return t2; };
+
+    // ---- the podium: three medallions afloat in the dusk, champion highest ----
+    const POD = [
+      { dx: 0, my: 216, r: 38, big: 18, glow: 0xffd77a, ga: 0.2 },
+      { dx: -132, my: 240, r: 29, big: 14, glow: 0xcfd8ff, ga: 0.11 },
+      { dx: 132, my: 248, r: 26, big: 13, glow: 0xe8b57f, ga: 0.1 },
+    ];
+    b.rows.slice(0, 3).forEach((r, i) => {
+      const P = POD[i], me = r.id === meId;
+      const glow = this.add.image(l.x(P.dx), l.y(P.my), 'glowbig').setDisplaySize(l.u(P.r * 5.2), l.u(P.r * 5.2))
+        .setTint(P.glow).setAlpha(P.ga).setBlendMode('ADD');
+      this.rowsC.add(glow);
+      if (i === 0) this.tweens.add({ targets: glow, alpha: P.ga * 0.45, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      const grp = [];
+      grp.push(this.add.image(l.x(P.dx), l.y(P.my), ssMedalTex(this, i)).setDisplaySize(l.u(P.r * 2), l.u(P.r * 2)));
+      grp.push(ssTxt(this, l.x(P.dx), l.y(P.my), String(i + 1), l.u(P.r * 0.95), SS_MEDAL_INK[i]).setOrigin(0.5, 0.55));
+      if (me) grp.push(ssTxt(this, l.x(P.dx), l.y(P.my - P.r - 14), '✦ ' + SS_T('lbYou') + ' ✦', l.u(10), '#ffe9a8').setOrigin(0.5)
+        .setShadow(0, 0, '#c9b676', l.u(6), true, true));
+      grp.push(trim(ssTxt(this, l.x(P.dx), l.y(P.my + P.r + 15), r.name, l.u(i === 0 ? 13.5 : 12), me ? '#ffe9a8' : '#e8e0c8').setOrigin(0.5), 124));
+      const gk = ssGoldTex(this, String(r.score), P.big);
+      grp.push(this.add.image(l.x(P.dx), l.y(P.my + P.r + 37), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
+      if (r.word) grp.push(trim(ssTxt(this, l.x(P.dx), l.y(P.my + P.r + 56), r.word, l.u(9), '#8a94c4', 'italic').setOrigin(0.5), 124));
+      ent.push(...grp);
+      this.rowsC.add(grp);
     });
-    if (b.me >= 16) {
-      this.rowsC.add(ssTxt(this, l.x(0), l.y(160 + 16 * 38 + 8), 'you: #' + (b.me + 1) + ' of ' + b.total, l.u(12), '#ffd77a').setOrigin(0.5));
+    // gold motes crown the champion as the podium settles
+    this.time.delayedCall(280, () => {
+      if (this.tab !== tab || !this.scene.isActive()) return;
+      const em = this.add.particles(0, 0, 'dot', {
+        speed: { min: 20, max: 90 }, lifespan: { min: 400, max: 1000 }, scale: { start: 0.6, end: 0 },
+        alpha: { start: 0.9, end: 0 }, tint: [0xffd77a, 0xfff2c9], blendMode: 'ADD', emitting: false,
+      });
+      this.rowsC.add(em);
+      em.emitParticleAt(l.x(0), l.y(216), 16);
+      this.time.delayedCall(1200, () => em.destroy());
+    });
+
+    // ---- the roll: ranks 4-10 on glass pills ----
+    b.rows.slice(3, 10).forEach((r, k) => {
+      const y = l.y(392 + k * 40), me = r.id === meId;
+      const grp = [];
+      grp.push(this.add.image(l.x(0), y, 'ribbon').setDisplaySize(l.u(384), l.u(34)));
+      if (me) grp.push(this.add.rectangle(l.x(0), y, l.u(376), l.u(28), 0xd7b45c, 0.13));
+      grp.push(ssTxt(this, l.x(-172), y, '#' + (k + 4), l.u(11), me ? '#ffd77a' : '#8a94c4').setOrigin(0, 0.5));
+      grp.push(trim(ssTxt(this, l.x(-140), y, r.name, l.u(13), me ? '#ffe9a8' : '#f0e8d2').setOrigin(0, 0.5), 176));
+      if (r.word) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#5a6390', 'italic').setOrigin(0, 0.5));
+      grp.push(ssTxt(this, l.x(172), y, String(r.score), l.u(13.5), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));
+      ent.push(...grp);
+      this.rowsC.add(grp);
+    });
+
+    // ---- you, wherever you stand ----
+    if (b.me >= 0) {
+      const grp = [];
+      if (b.me >= 10 && b.rows[b.me]) {
+        const y = l.y(688), r = b.rows[b.me];
+        grp.push(this.add.image(l.x(0), y, 'ribbon').setDisplaySize(l.u(384), l.u(34)));
+        grp.push(this.add.rectangle(l.x(0), y, l.u(376), l.u(28), 0xd7b45c, 0.13));
+        grp.push(ssTxt(this, l.x(-172), y, '#' + (b.me + 1), l.u(11), '#ffd77a').setOrigin(0, 0.5));
+        grp.push(trim(ssTxt(this, l.x(-130), y, r.name, l.u(13), '#ffe9a8').setOrigin(0, 0.5), 166));
+        if (r.word) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#8a94c4', 'italic').setOrigin(0, 0.5));
+        grp.push(ssTxt(this, l.x(172), y, String(r.score), l.u(13.5), '#ffe9a8').setOrigin(1, 0.5));
+      }
+      grp.push(ssTxt(this, l.x(0), l.y(b.me >= 10 ? 718 : 700), SS_T('lbYouRank', b.me + 1, b.total), l.u(11.5), '#c9b676').setOrigin(0.5));
+      ent.push(...grp);
+      this.rowsC.add(grp);
     }
+
+    // entrance: the podium pops first, the roll follows in a soft cascade
+    ent.forEach((o, i) => {
+      const ty = o.y;
+      o.y = ty + l.u(10); o.alpha = 0;
+      this.tweens.add({ targets: o, y: ty, alpha: 1, duration: 300, delay: Math.min(620, i * 22), ease: 'Cubic.easeOut' });
+    });
   }
 }
 
