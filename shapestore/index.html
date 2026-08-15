@@ -283,7 +283,7 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
     <button onclick="redo()" title="Redo (Ctrl+Y)">↪ REDO</button>
     <button id="fsBtn" onclick="toggleFS()" title="fullscreen">⛶ FULL</button>
     <button onclick="openHelp()">❓ HELP</button>
-    <button style="grid-column:1/-1; background:#3A4530; border:2px solid var(--gold)" onclick="location.href='sheet.html'">🧩 THE PARTS COUNTER — character maker</button>
+    <button style="grid-column:1/-1; background:#3A4530; border:2px solid var(--gold)" onclick="location.href='sheet.html'">🧩 CHARACTER MAKER</button>
   </div>
 </div>
 <div id="zbtns">
@@ -1741,7 +1741,7 @@ $('mchipImg').src=moldThumb(M.rex,'0 0 140 140');   // the corner coin wears the
    ?edit=1 + ss.edit: ONE character part becomes the whole doc for redrawing;
    the toy-in-progress is PARKED first and restored on SEND BACK — or on the
    next normal boot if the edit was abandoned. The counter never eats a toy. */
-let EDITJOB=null;
+let EDITJOB=null, PLACE=null;
 (function(){
   try{
     if(/[?&]edit=1/.test(location.search)) EDITJOB=JSON.parse(localStorage.getItem('ss.edit')||'null');
@@ -1749,7 +1749,11 @@ let EDITJOB=null;
       if(localStorage.getItem('ss.edit')!=null){ const p=localStorage.getItem('ss.parked'); if(p!=null) localStorage.setItem('ss.cur',p); }
       localStorage.removeItem('ss.parked'); localStorage.removeItem('ss.edit');
     }
-  }catch(e){ EDITJOB=null; }
+    /* 🖌 DRAW ON ME: the maker sends the whole dressed toy — it JOINS the
+       drawing as one grouped shape (double-tap / TAKE APART opens it up) */
+    if(/[?&]place=1/.test(location.search)) PLACE=JSON.parse(localStorage.getItem('ss.place')||'null');
+    localStorage.removeItem('ss.place');
+  }catch(e){ EDITJOB=null; PLACE=null; }
 })();
 function sendBackToCounter(){
   clearTimeout(render._t);
@@ -1768,7 +1772,7 @@ function sendBackToCounter(){
     const g=parseMold(EDITJOB.svg||'', EDITJOB.label||'PART', EDITJOB.vb||'0 0 140 140');
     if(g.kids.length){ DOC.shapes.push(g); selT=g.id; }
     const b=document.createElement('button'); b.id='backCounter'; b.className='gold';
-    b.textContent='⬅ SEND IT BACK TO THE COUNTER';
+    b.textContent='⬅ BACK TO THE CHARACTER MAKER — wear it';
     b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:38px;z-index:25;box-shadow:0 3px 12px #000A;';
     b.onclick=sendBackToCounter;
     document.body.appendChild(b);
@@ -1782,7 +1786,9 @@ function sendBackToCounter(){
     }
   }
   syncBoardUI();
-  requestAnimationFrame(()=>zoomFit());
+  requestAnimationFrame(()=>{ zoomFit();
+    if(!EDITJOB && PLACE && PLACE.svg){ insertArt(PLACE.svg, PLACE.label||'TOY', PLACE.vb||'0 0 140 140'); PLACE=null; }
+  });
 })();
 </script>
 </body>
