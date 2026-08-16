@@ -17704,27 +17704,36 @@ const TK_SILVER_R=4*TK_M,      // 112px — "4m around him"
       TK_SILVER_T=3,           // "for 3 seconds"
       SILVER_AURA_HP=3;        // "+3 additional hp"
 function tkSilvRng(u){ return (u && u.tkSilvT>0)? TK_SILVER_RNG : 0; }
+// 0347 (Wyatt 8/15): the ACTIVE surge casts 2m wider — its OWN const, because
+// TK_SILVER_R also rules the PASSIVE +3HP aura and the lens line that quotes
+// it live ("+3 HP to soldiers within 4 m"); the passive stays 4m by design.
+const TK_SILVER_R2=6*TK_M;     // 168px — the surge's cast circle ("4m" + the buff pass's "+2m")
 const TK_BLUE_R=120,               // who the force push catches: the radio circle's own "nearby"
       TK_BLUE_PUSH=8*TK_M,         // "8m" — 224px of gravity-gun slide away from his boots
       TK_BLUE_DMG=1,               // "does 1 damage" — the too-heavy feel the slap, not the slide
       TK_BLUE_DEFL=0.4,            // "deflects any attacks for 0.4 seconds"
       TK_BLUE_REFL_C=3;            // a campaign small-arm thrown back, in tan hp (their rounds carry no number against green grit — median infantry falls to its own round; the battleground reflects the EXACT damage instead)
-const TK_RED_DASH=3*TK_M,          // "moves the Sarge forward 3m"
+const TK_BLUE_R2=6*TK_M;           // 0347 (Wyatt 8/15): the POP's giant circle — the shove moved to the wall's last tick and grew ("a giant half-circle arc"); TK_BLUE_R stays the cast ring's own size
+const TK_RED_DASH=9*TK_M,          // 0347 (Wyatt 8/15): "triple the current distance" — 3m→9m; with a man found the travel clamps ONTO him (d−16, the teal dash's landing), because the shipped fixed hop would overshoot point-blank at 3× and the 46-circle would miss
       TK_RED_DMG=10,               // "10 damage to whoever the saber hits"
       TK_RED_R=46,                 // the overhead arc's reach — the blade's own cleave circle
       TK_RED_T=0.32,               // the lunge's clock (smoothstep slide)
-      TK_RED_SEEK=220;             // how far he looks for a man to lunge at (nobody there = he swings at the air ahead)
+      TK_RED_SEEK=660;             // 0347: the eye triples with the legs — how far he looks for a man to lunge at (nobody there = he swings at the air ahead)
 const TK_GREEN_T=4,                // "invisible for 4 seconds" — the spy's own cloakT state on the Sarge
       TK_GREEN_SPD=1.6;            // 0308 (Wyatt 8/13): the vanish moves 60% faster — the spy speed column ×1.6 while cloaked, both carpets (the decloak restore reads tkVSpd0, the PRE-cloak snapshot, so it never sees this)
-const TK_ORANGE_R=120,             // "everyone around the Sarge — like a radio man" — the aura's 120
+const TK_GREEN_AS=1.4,             // 0347 (Wyatt 8/15): "+40% attack speed" out of stealth — tkSlowMul divides every cadence clock by this while the frenzy runs
+      TK_GREEN_AST=5;              // "...for 5 seconds" (u.tkFrenzT, burnt at the clock head)
+const TK_ORANGE_R=120+2*TK_M,      // 0347 (Wyatt 8/15): the rally circle grew "+2m" — the radio man's 120 plus 56 = 176
       TK_ORANGE_T=3,               // "for 3 seconds"
       TK_ORANGE_LS=1;              // "100% lifesteal" — heal = damage dealt × this
 const TK_PURPLE_HASTE=1.3,         // "30% faster movement speed"
-      TK_PURPLE_HASTE_T=1.75;      // "...for 1.75 seconds"
+      TK_PURPLE_HASTE_T=1.75,      // "...for 1.75 seconds"
+      TK_PURPLE_R=3*TK_M,          // 0347 (Wyatt 8/15): "roughly 3m around the landing point..."
+      TK_PURPLE_DMG=12;            // "...takes MASSIVE damage" — a step past the red overhead's 10: fells every infantryman, bites the armor
 const TK_TEAL_T=8,                 // "powers up the Sarge for 8 seconds"
       TK_TEAL_EVERY=1.3,           // a dash on this beat while powered (≈6 dashes a charge)
       TK_TEAL_SEEK=200,            // how far a dash will hunt
-      TK_TEAL_AOE=MINE_BLAST*0.25, // "about 25% of the radius that a mine has" = 22.5
+      TK_TEAL_AOE=MINE_BLAST*0.25+2*TK_M, // 0347 (Wyatt 8/15): the pop reaches "+2m" — the quarter-mine 22.5 plus 56 = 78.5 (catch and rings read this one const)
       TK_TEAL_DMG=1,               // "deals 1 damage"
       TK_TEAL_SLOW=1.4,            // victims' attack INTERVAL ×1.4 — "slows ... attack speed by 40%"
       TK_TEAL_SLOWT=2,             // "...for 2 seconds"
@@ -24370,14 +24379,14 @@ function trainTick(dt){
 // is deliberately EN-only dev tooling (no l10n rows — documented call).
 const TKDEMO_SX=350, TKDEMO_SY=300;   // Sarge's chalk mark on the range floor
 // per-crystal target poses, each built to show that power's own read:
-// blue = a ring to shove · red = a knot at lunge range (84px, the 46-circle
+// blue = a ring to shove · red = a knot at lunge range (252px since 0347, the 46-circle
 // catches the knot) · teal = a spread to dash-chain · the rest = an east
 // line. Dummies are the range's own (hp 999999, no gun, spd 0).
 function tkDemoPose(col){
   const p=[];
   if(col==='blue'){ for(let i=0;i<6;i++){ const a=i*1.047+0.52;
     p.push([TKDEMO_SX+Math.cos(a)*88, TKDEMO_SY+Math.sin(a)*46]); } }
-  else if(col==='red'){ p.push([TKDEMO_SX+84,TKDEMO_SY],[TKDEMO_SX+112,TKDEMO_SY-26],[TKDEMO_SX+116,TKDEMO_SY+24]); }
+  else if(col==='red'){ p.push([TKDEMO_SX+250,TKDEMO_SY],[TKDEMO_SX+262,TKDEMO_SY-26],[TKDEMO_SX+264,TKDEMO_SY+24]); }   // 0347: the knot moved to the 9m band (the lunge lands ON the near man, d−16)
   else if(col==='teal'){ p.push([TKDEMO_SX+130,TKDEMO_SY-40],[TKDEMO_SX+250,TKDEMO_SY+10],[TKDEMO_SX+390,TKDEMO_SY-20],[TKDEMO_SX+180,TKDEMO_SY+60]); }
   else p.push([TKDEMO_SX+150,TKDEMO_SY-30],[TKDEMO_SX+180,TKDEMO_SY+20],[TKDEMO_SX+240,TKDEMO_SY-5]);
   return p;
@@ -25272,7 +25281,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='3.98';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='3.99';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -30073,14 +30082,22 @@ function bfSfx(fn,x,y){ if(bfVis(x,y)) fn(); }
 const FLAME_SNOW_X=2;
 function hurt(f,dmg,src){
   if(S.bf && f.side && (f.jetT>0||f.falling)) return;   // airborne (v1.39) — and v2.76's fallers — untouchable on the battlefield too
+  // v3.11 BLUE → 0347 (Wyatt 8/15): the 0.4s wall is INVULNERABILITY now —
+  // it stands ABOVE the plate and every other save (tanHit's own seat: one
+  // event, one save, resolved wall-first), so no pip is spent and nothing
+  // lands while it holds: the round is negated AND goes back up the lane at
+  // its own full weight (TK_REFL: one bounce ever, the buddyshield
+  // ping-pong law).
+  if(S.bf && f.side && !TK_REFL && f.tkDeflT>0){
+    tkDeflPop(f);
+    if(src && !src.dead){ TK_REFL=true; hurt(src,dmg,f); TK_REFL=false; }
+    return;
+  }
   if(S.bf && f.side && sargeAbsorbs(f)) return; // THE RIOT SHIELD (v1.52): above the blade — one event, one pip, no double roll
   if(S.bf && f.side && cmdAbsorbs(f)) return;  // 0092 the commander's counted block — same law, other rig (weapon-exclusive with the plate)
   if(S.bf && f.side && saberBlocksU(f)) return;
   if(S.bf && f.side && enhDuck(f)) return;     // he dropped into the hole and it went over him
-  // v3.11 BLUE: the 0.4s wall — the round is negated AND goes back up the
-  // lane at its own full weight (TK_REFL: one bounce ever, the buddyshield
-  // ping-pong law). Sits below the traversal guards, above the blade.
-  if(S.bf && f.side && !TK_REFL && (f.tkDeflT>0 || tkTealRefl(f))){   // 0308: the teal OVERDRIVE rolls the wall's own save at 60% — same negate, same full-weight throw
+  if(S.bf && f.side && !TK_REFL && tkTealRefl(f)){   // 0308: the teal OVERDRIVE rolls the wall's own save at 60% below the saves (its shipped seat) — same negate, same full-weight throw
     tkDeflPop(f);
     if(src && !src.dead){ TK_REFL=true; hurt(src,dmg,f); TK_REFL=false; }
     return;
@@ -31057,7 +31074,7 @@ function campUnitStep(u,dt){
     if(sw.w==='lightsaber'){
       if(!u.home) u.home={x:u.x,y:u.y};       // his post starts under his feet; bfMarch carries it forward
       if(u.saberState && u.saberState!=='idle') return true;   // mid-dash: the blade owns his feet
-      if(saberNext(u,sw)){ u.marching=false; return true; }    // work inside his aggro — stand and let the blade take it
+      if(!(u.tkGhost&&u.cloakT>0) && saberNext(u,sw)){ u.marching=false; return true; }    // work inside his aggro — stand and let the blade take it (0347: the GHOST WALK excepted — an invisible blade stands for nobody, he walks on)
     } else if(sw.w==='commander'){
       rng=sw.rng;   // 0092: halt at the sword's own reach — no aura on a blade (D6), no dash clauses EVER (the class law); the ordinary march below walks him
     } else {
@@ -31081,8 +31098,9 @@ function campUnitStep(u,dt){
   // given — the march begins when wave one is actually walking on. The
   // in-reach halt above still outranks this, so anything already close gets
   // fought, never stared at; and a standing man still lays mines and keeps
-  // his gun up, so the grace stays a DIG-IN, not a freeze.
-  if(S.sq && S.wave===0){ u.marching=false; return true; }
+  // his gun up, so the grace stays a DIG-IN, not a freeze. (0347: the GHOST
+  // WALK strides through the grace — the press itself was the marching order.)
+  if(S.sq && S.wave===0 && !(u.tkGhost&&u.cloakT>0)){ u.marching=false; return true; }
   const TB=S.tanBase;
   if(TB){
     // THE SIEGE (v1.31 → v1.40): a man ATTACKS the crate from his own weapon's
@@ -31136,14 +31154,14 @@ function campUnitStep(u,dt){
   // the battleground's own line instead — at the crate, flattening whatever
   // it clips on the way — which is exactly what its card promises.
   const RP=raidHalfPost(u);   // 0318: the turret order outranks the stroll (and the war's chase) — the in-reach halt above already had its say
-  const NF=(RP || (u.def.vehicle && !u.def.rng) || u.def.mine)? null : campNearestFoe(u);   // 8/8: the sweeper ignores the war on the way to the crate
-  if(!RP && !TB && !NF && u.x>=campFrontX()-6){ u.marching=false; return true; }   // no crate, no war: stand the forward line
-  if(u.pauseT>0){ u.pauseT-=dt; u.marching=false; return false; }   // picking his footing
+  const NF=(RP || (u.def.vehicle && !u.def.rng) || u.def.mine || (u.tkGhost&&u.cloakT>0))? null : campNearestFoe(u);   // 8/8: the sweeper ignores the war on the way to the crate — 0347: the GHOST WALK too ("ignoring units entirely", Wyatt verbatim)
+  if(!RP && !TB && !NF && u.x>=campFrontX()-6 && !(u.tkGhost&&u.cloakT>0)){ u.marching=false; return true; }   // no crate, no war: stand the forward line (0347: the ghost keeps walking east)
+  if(u.pauseT>0 && !(u.tkGhost&&u.cloakT>0)){ u.pauseT-=dt; u.marching=false; return false; }   // picking his footing (0347: a ghost never stops to pick — "without stopping")
   // his own lane, his own zig — the battleground's walk, pointed at the foe
   // (or, with nobody to fight, at the crate / the forward line)
   let goal;
   const lane=(RP? RP.y : NF? NF.y : (u.laneY!=null?u.laneY:u.y));   // v1.48: the zig drifts to the FOE's lane while one stands (0318: or to his turret's)
-  const gx=RP? RP.x : NF? NF.x : (TB? TB.x : campFrontX()), gy=RP? RP.y : NF? NF.y : (TB? TB.y : lane);
+  const gx=RP? RP.x : NF? NF.x : (TB? TB.x : ((u.tkGhost&&u.cloakT>0)? W-30 : campFrontX())), gy=RP? RP.y : NF? NF.y : (TB? TB.y : lane);   // 0347: no crate = the ghost strides for the east edge, straight through everybody
   if(gx-u.x<200){ u.wp=null; goal={x:gx, y:gy}; }
   else {
     u.wpT=(u.wpT||0)-dt;
@@ -32130,7 +32148,7 @@ function updateSaber(u,dt,sw){
       S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:50,t:0,dur:0.26,col:saberHexU(u)});
       // twenty commanders can now draw a blade — an offscreen strike must not
       // shove the camera around, and only YOUR Sarge gets to rock the room
-      bfSfx(SFX.laser, u.x, u.y); if(bfHumanU(u)) S.shake=0.2; u.saberSwing=0.5;
+      bfSfx(SFX.laser, u.x, u.y); if(bfHumanU(u)) S.shake=0.2; u.saberSwing=0.5*(u.tkFrenzT>0? 1/TK_GREEN_AS : 1);   // 0347 GREEN: the frenzy quickens the chain too (frenzy factor ONLY — this line never read the teal slow and still doesn't)
       const nx=saberNext(u,sw);                   // anyone still in reach? keep carving forward
       if(nx){ u.saberTarget=nx; u.saberFirstT=(nx===f? null : nx); return; }   // 0278l: a NEW man owes him the first strike; the man he JUST struck got his — the exchange is open (no immunity duel)
       u.saberState='back'; u.saberFirstT=null; u.saberCd=sw.cd*tkSlowMul(u)/lzRateMul(u);   // v2.36: the blue beam re-arms the blade a hair sooner (the crystal's blue lives in sw.cd itself) · v3.11: TEAL's concussion stretches it
@@ -33373,7 +33391,11 @@ function ggShoveStep(o,dt){
 function tkOwned(){ return enhOn('telekinesis'); }   // the button exists while the part is FITTED — a mod in the drawer is a stock Sarge (the bench's own law)
 function tkHexOf(col){ const c=SABER_COLORS.find(x=>x.id===col); return c? c.hex : '#4DA6FF'; }
 function tkMyCol(){ const c=SABER_COLORS.find(x=>x.hex===META.saberColor); return c? c.id : 'blue'; }
-function tkSlowMul(o){ return o && o.tkSlowT>0 ? TK_TEAL_SLOW : 1; }   // TEAL's victim clock: attack INTERVAL ×1.4 while the concussion rings
+// TEAL's victim clock (attack INTERVAL ×1.4 while the concussion rings) —
+// and, 0347, GREEN's decloak FRENZY divides the same interval by 1.4 for 5s:
+// every cadence clock in the game already consumes this one read, so the
+// frenzy rides his blade re-arm and every gun cd write for free.
+function tkSlowMul(o){ let m=(o && o.tkSlowT>0)? TK_TEAL_SLOW : 1; if(o && o.tkFrenzT>0) m/=TK_GREEN_AS; return m; }
 // 0278a SNOW-SLOW: the stack's own interval stretch — 1/max(0.10, 1−slowF),
 // the −90% HARD CAP made arithmetic (Wyatt round 3: never fully stopped).
 // slowF only ever accrues at tanHit's campaign seam (snowfig balls), so the
@@ -33396,6 +33418,31 @@ function tkDeflPop(u){
   bfSfx(SFX.snap, u.x, u.y);
 }
 let TK_REFL=false;   // one bounce, ever — a reflected round must never re-reflect (the buddyshield ping-pong law)
+// 0347 BLUE, resolved (Wyatt 8/15): the wall is a full invulnerability
+// window and the SHOVE waits for it — set at the cast (u.tkBluePop),
+// consumed at the one clock site the frame tkDeflT crosses zero. Everyone
+// around him (6m — giant now) takes the same 1 damage and the same 8m
+// gg-rail slide the cast used to deal; the picture is two half-circle
+// curtains born at 12:00 and swept to 6:00 down each side (the tkarc fx).
+// A relayed cast replays the whole beat on its own sim (two-sims law).
+function tkBluePopGo(u){
+  const hex=u.tkHex||tkHexOf('blue');
+  if(!reducedMotion()){
+    S.fx.push({k:'tkarc',x:u.x,y:u.y,R:TK_BLUE_R2,t:0,dur:0.38,col:hex});
+    S.fx.push({k:'ring',x:u.x,y:u.y-14,r:8,R:TK_BLUE_R2,t:0,dur:0.32,col:hex});
+    S.fx.push({k:'ring',x:u.x,y:u.y-14,r:4,R:TK_BLUE_R2*0.55,t:0,dur:0.24,col:'rgba(255,255,255,0.85)'});
+  } else S.fx.push({k:'ring',x:u.x,y:u.y-14,r:6,R:TK_BLUE_R2,t:0,dur:0.3,col:hex});
+  bfSfx(SFX.jet, u.x, u.y);
+  if(bfHumanU(u) && !u.coopBy && !reducedMotion()) S.shake=Math.max(S.shake,0.26);
+  const sh={};   // one whoosh a pop (the gg law)
+  for(const f of TGT(u)){
+    if(f.dead || f.burrow || f.jetT>0) continue;
+    if(!bfCanTarget(u,f)) continue;
+    if(Math.hypot(f.x-u.x,f.y-u.y)>TK_BLUE_R2) continue;
+    hurt(f,TK_BLUE_DMG,u);
+    if(!f.dead && !(f.hp!=null&&f.hp<=0)) ggShove(f,u.x,u.y-18,u,sh,TK_BLUE_PUSH);
+  }
+}
 // 0308 TEAL REFLECT (Wyatt 8/13): while OVERDRIVE is powered each incoming
 // hit rolls its OWN 60% save — caught and thrown back at whoever sent it,
 // riding the blue wall's exact funnels (hurt / tanHit / the shell splash /
@@ -33438,12 +33485,12 @@ function tkLgStep(u,dt){
   // NO dice consumed (the flame-lick law: a same-seed trace stays byte-
   // identical, proven in the battery on both blobs).
   if(lg.kind==='red' && !reducedMotion()){
-    const gn=Math.floor(lg.t/0.07);
+    const gn=Math.floor(lg.t/0.055);   // 0347: a denser trail — the same 0.32s clock covers 3× the ground now
     if(gn>(lg.gN||0)){ lg.gN=gn;
       S.fx.push({k:'tkgho', type:u.type, img:unitImg(u.type,u), w:unitW(u.type),
         flip:(S.bf&&u.side==='foe'), x:u.x, y:u.y, a:0.4, t:0, dur:0.24});
       S.fx.push({k:'tracer', x1:(lg.px!=null?lg.px:lg.fx), y1:(lg.py!=null?lg.py:lg.fy)-26,
-        x2:u.x, y2:u.y-26, col:u.tkHex||'#FF4D4D', w:3.5, a:0.6, t:0, dur:0.2});
+        x2:u.x, y2:u.y-26, col:u.tkHex||'#FF4D4D', w:4.5, a:0.7, t:0, dur:0.2});
     }
     lg.px=u.x; lg.py=u.y;
   }
@@ -33463,17 +33510,17 @@ function tkLgStep(u,dt){
     // the NEXT frame's dt, and the hurt loop below runs THIS frame — the
     // exactly-10-inside-46 contract and its clock are byte-untouched.
     const lrm=reducedMotion(), lmine=bfHumanU(u)&&!u.coopBy, lnem=!!(S.bf&&S.bf.nem&&u.side==='foe'&&u.seat===S.bf.team);
-    S.fx.push({k:'ring',x:u.x,y:u.y-16,r:8,R:TK_RED_R+12,t:0,dur:0.3,col:hex});
+    S.fx.push({k:'ring',x:u.x,y:u.y-16,r:8,R:TK_RED_R+20,t:0,dur:0.32,col:hex});   // 0347: a heavier slam for the 9m lunge (rings, debris, punch — the 10 damage is byte-kept)
     S.fx.push({k:'ring',x:u.x,y:u.y-16,r:4,R:TK_RED_R-6,t:0,dur:0.22,col:'rgba(255,255,255,0.9)'});
-    S.fx.push({k:'flash',x:u.x,y:u.y-30,ang:1.57,R:lrm?20:26,lw:lrm?3:3.5,t:0,dur:0.14});
+    S.fx.push({k:'flash',x:u.x,y:u.y-30,ang:1.57,R:lrm?20:30,lw:lrm?3:4,t:0,dur:0.14});
     S.fx.push({k:'puff',x:u.x,y:u.y-6,t:0,dur:0.32,R:TK_RED_R});
-    if(!lrm){ for(let dj=0;dj<5;dj++){ const da=(u.x*0.83+u.y*1.7+dj*1.2566)%6.283;
+    if(!lrm){ for(let dj=0;dj<8;dj++){ const da=(u.x*0.83+u.y*1.7+dj*0.7854)%6.283;
       S.fx.push({k:'wisp',x:u.x+Math.cos(da)*10,y:u.y-8+Math.sin(da)*6,
         vx:Math.cos(da)*(46+((dj*29)%17)), vy:Math.sin(da)*22-14, up:20+(dj%3)*6,
         r0:2.2+(dj%2), r1:6+(dj%3)*1.5, t:0, dur:0.4}); } }
     bfSfx(SFX.tkslam, u.x, u.y);
-    if((lmine||lnem) && !lrm){ S.shake=Math.max(S.shake,0.34);
-      if(!S.coop) S.hitStop=Math.max(S.hitStop,0.09); }
+    if((lmine||lnem) && !lrm){ S.shake=Math.max(S.shake,0.42);
+      if(!S.coop) S.hitStop=Math.max(S.hitStop,0.12); }
     for(const f of TGT(u)){
       if(f.dead || f.burrow || f.jetT>0) continue;
       if(!bfCanTarget(u,f)) continue;
@@ -33485,8 +33532,20 @@ function tkLgStep(u,dt){
 // swings 40% slower for two seconds (tkSlowMul at every cadence clock)
 function tkBoom(u){
   const hex=u.tkHex||tkHexOf('teal');
-  S.fx.push({k:'ring',x:u.x,y:u.y-8,r:4,R:TK_TEAL_AOE+12,t:0,dur:0.26,col:hex});
+  // 0347 (Wyatt 8/15): a pop you can't miss — double ring + white core +
+  // impact flash + dice-free hashed sparks (the flame-lick law) + a small
+  // shake for the caster's own hand; and the AOE const itself grew +2m.
+  S.fx.push({k:'ring',x:u.x,y:u.y-8,r:4,R:TK_TEAL_AOE+12,t:0,dur:0.3,col:hex});
+  S.fx.push({k:'ring',x:u.x,y:u.y-8,r:3,R:TK_TEAL_AOE*0.6,t:0,dur:0.24,col:'rgba(255,255,255,0.9)'});
   S.fx.push({k:'puff',x:u.x,y:u.y-8,t:0,dur:0.3,R:TK_TEAL_AOE});
+  if(!reducedMotion()){
+    S.fx.push({k:'flash',x:u.x,y:u.y-14,ang:1.57,R:22,lw:3,t:0,dur:0.12});
+    for(let dj=0;dj<4;dj++){ const da=(u.x*1.13+u.y*0.77+dj*1.5708)%6.283;
+      S.fx.push({k:'wisp',x:u.x+Math.cos(da)*8,y:u.y-8+Math.sin(da)*5,
+        vx:Math.cos(da)*(40+((dj*23)%13)), vy:Math.sin(da)*18-12, up:16+(dj%2)*6,
+        r0:2+(dj%2), r1:5+(dj%2), t:0, dur:0.35}); }
+    if(bfHumanU(u) && !u.coopBy) S.shake=Math.max(S.shake,0.18);
+  }
   bfSfx(SFX.thock, u.x, u.y);
   for(const f of TGT(u)){
     if(f.dead || f.burrow || f.jetT>0) continue;
@@ -33527,29 +33586,26 @@ function tkFire(u,col,relay,ax,ay){
   const hex=tkHexOf(col); u.tkHex=hex;
   let aim=null;
   if(col==='blue'){
-    // FORCE PUSH: 0.4s of wall on HIM + everyone nearby slapped for 1 and
-    // slid 8m down the gravity gun's own rails (heavies feel the slap only)
-    u.tkDeflT=TK_BLUE_DEFL;
+    // FORCE WALL → FORCE POP (0347, Wyatt 8/15): the click buys 0.4s of
+    // INVULNERABILITY — the wall stands above every save at all four intake
+    // funnels now, so he cannot die and every attack is thrown back while
+    // it holds. The shove left the cast: it fires at the wall's LAST tick
+    // (tkBluePopGo at the clock head), giant. The cast is the shield going
+    // up — rings and a snap; the whoosh moved to the pop with the shove.
+    u.tkDeflT=TK_BLUE_DEFL; u.tkBluePop=1;
     S.fx.push({k:'ring',x:u.x,y:u.y-14,r:6,R:TK_BLUE_R,t:0,dur:0.3,col:hex});
     S.fx.push({k:'ring',x:u.x,y:u.y-14,r:4,R:TK_BLUE_R*0.55,t:0,dur:0.22,col:'rgba(255,255,255,0.8)'});
-    bfSfx(SFX.jet, u.x, u.y);
-    const sh={};   // one whoosh a press (the gg law)
-    for(const f of TGT(u)){
-      if(f.dead || f.burrow || f.jetT>0) continue;
-      if(!bfCanTarget(u,f)) continue;
-      if(Math.hypot(f.x-u.x,f.y-u.y)>TK_BLUE_R) continue;
-      hurt(f,TK_BLUE_DMG,u);
-      if(!f.dead && !(f.hp!=null&&f.hp<=0)) ggShove(f,u.x,u.y-18,u,sh,TK_BLUE_PUSH);
-    }
+    bfSfx(SFX.snap, u.x, u.y);
   } else if(col==='red'){
     let tx,ty;
     if(relay && ax!=null){ tx=+ax; ty=+ay; }
     else {
       const f=tkNearFoe(u,TK_RED_SEEK);
-      let dx,dy;
-      if(f){ const d=Math.hypot(f.x-u.x,f.y-u.y)||1; dx=(f.x-u.x)/d; dy=(f.y-u.y)/d; }
+      let dx,dy,dd=TK_RED_DASH;
+      if(f){ const d=Math.hypot(f.x-u.x,f.y-u.y)||1; dx=(f.x-u.x)/d; dy=(f.y-u.y)/d;
+        dd=Math.min(TK_RED_DASH, Math.max(24, d-16)); }   // 0347: the 9m lunge lands ON the man (the teal dash's own d−16), never PAST him — a fixed hop overshot point-blank at 3× and the 46-circle missed
       else { dx=S.bf? (Math.sign(S.bf.base[enemySide(u)].x-u.x)||1) : (S.tanBase? (Math.sign(S.tanBase.x-u.x)||1) : 1); dy=0; }
-      tx=u.x+dx*TK_RED_DASH; ty=u.y+dy*TK_RED_DASH;
+      tx=u.x+dx*dd; ty=u.y+dy*dd;
     }
     tkLgStart(u,tx,ty,'red');
     if(u.tkLg){ aim={x:u.tkLg.tx,y:u.tkLg.ty};
@@ -33565,23 +33621,34 @@ function tkFire(u,col,relay,ax,ay){
       bfSfx(SFX.tkgather, u.x, u.y);
     }
   } else if(col==='green'){
-    // VANISH: the spy's own cloak state on the Sarge — bfCanTarget already
-    // blinds every aimed trigger in the game, every fire loop holds HIS fire,
-    // and the fast feet are the spy's own speed column (restored at decloak)
-    u.cloakT=TK_GREEN_T;
+    // VANISH → 0347 GHOST WALK (Wyatt 8/15): he never stands the cloak out.
+    // The blade state drops on the spot (the red/purple grammar) and
+    // u.tkGhost tells campUnitStep to ignore the war wholesale — no saber
+    // stand, no foe chase, no footing pause: he walks PAST everybody to the
+    // crate (or the east edge) until the cloak burns off. The BF brain
+    // already marches a cloaked man. Feet stay the spy's own ×1.6, and
+    // bfCanTarget still blinds every trigger while every fire loop holds his.
+    u.cloakT=TK_GREEN_T; u.tkGhost=1; u.wp=null;
+    if(u.saberState && u.saberState!=='idle'){ u.saberState='idle'; u.saberTarget=null; }
+    u.saberSwing=0; sgDashEnd(u);
     if(u.tkVSpd0==null) u.tkVSpd0=u.def.moveSpd;
     u.def.moveSpd = (S.bf? BF_MOVE.spy.moveSpd : CAMP_SPD.spy)*TK_GREEN_SPD;   // 0308 (Wyatt 8/13): +60% on the cloak sprint
     S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:34,t:0,dur:0.3,col:hex});
     bfSfx(SFX.blip, u.x, u.y);
   } else if(col==='orange'){
-    // RALLY: a radio-circle snapshot — every friendly inside 120 (himself
-    // included) leeches 100% of the damage he deals for the next 3 seconds
+    // RALLY: a radio-circle snapshot — every friendly inside the circle
+    // (himself included) leeches 100% of the damage he deals for the next 3
+    // seconds. 0347 (Wyatt 8/15): the circle grew +2m, and every troop
+    // caught rings a little orange the moment the buff starts — "they're
+    // powered up" must READ (information, so it fires under reduced motion).
     S.fx.push({k:'ring',x:u.x,y:u.y-8,r:8,R:TK_ORANGE_R,t:0,dur:0.4,col:hex});
     bfSfx(SFX.ready, u.x, u.y);
     for(const o of S.units){
       if(o.dead || o.dropT>0) continue;
       if(S.bf && o.side!==u.side) continue;
-      if(Math.hypot(o.x-u.x,o.y-u.y)<=TK_ORANGE_R) o.tkRallyT=TK_ORANGE_T;
+      if(Math.hypot(o.x-u.x,o.y-u.y)<=TK_ORANGE_R){ o.tkRallyT=TK_ORANGE_T;
+        S.fx.push({k:'ring',x:o.x,y:o.y-12,r:3,R:16,t:0,dur:0.35,col:hex});
+        S.fx.push({k:'ring',x:o.x,y:o.y-12,r:2,R:9,t:0,dur:0.28,col:'rgba(255,255,255,0.8)'}); }
     }
   } else if(col==='purple'){
     // LEAP: the jet arc with no pack and no flame — resolve like the quick
@@ -33599,16 +33666,22 @@ function tkFire(u,col,relay,ax,ay){
     S.fx.push({k:'ring',x:u.x,y:u.y-6,r:4,R:26,t:0,dur:0.3,col:hex});
     aim={x:to.x,y:to.y};
   } else if(col==='silver'){
-    // v3.39 THE SILVER SURGE: a radio-circle snapshot at 4m — every friendly
+    // v3.39 THE SILVER SURGE: a radio-circle snapshot — every friendly
     // inside (himself included) fights +3m long for 3 seconds (the rally's
-    // own one-scan shape; the reach gates read tkSilvRng, applied last)
-    S.fx.push({k:'ring',x:u.x,y:u.y-10,r:8,R:TK_SILVER_R,t:0,dur:0.4,col:hex});
-    S.fx.push({k:'ring',x:u.x,y:u.y-10,r:4,R:TK_SILVER_R*0.55,t:0,dur:0.28,col:'rgba(255,255,255,0.85)'});
+    // own one-scan shape; the reach gates read tkSilvRng, applied last).
+    // 0347 (Wyatt 8/15): the cast circle grew +2m on TK_SILVER_R2, its OWN
+    // const — TK_SILVER_R still rules the passive +3HP aura and the lens
+    // line that quotes it — and every troop caught rings a little silver
+    // the moment the buff starts (information: reduced motion keeps it).
+    S.fx.push({k:'ring',x:u.x,y:u.y-10,r:8,R:TK_SILVER_R2,t:0,dur:0.4,col:hex});
+    S.fx.push({k:'ring',x:u.x,y:u.y-10,r:4,R:TK_SILVER_R2*0.55,t:0,dur:0.28,col:'rgba(255,255,255,0.85)'});
     bfSfx(SFX.ready, u.x, u.y);
     for(const o of S.units){
       if(o.dead || o.dropT>0) continue;
       if(S.bf && o.side!==u.side) continue;
-      if(Math.hypot(o.x-u.x,o.y-u.y)<=TK_SILVER_R) o.tkSilvT=TK_SILVER_T;
+      if(Math.hypot(o.x-u.x,o.y-u.y)<=TK_SILVER_R2){ o.tkSilvT=TK_SILVER_T;
+        S.fx.push({k:'ring',x:o.x,y:o.y-12,r:3,R:16,t:0,dur:0.35,col:hex});
+        S.fx.push({k:'ring',x:o.x,y:o.y-12,r:2,R:9,t:0,dur:0.28,col:'rgba(255,255,255,0.8)'}); }
     }
   } else {
     // TEAL OVERDRIVE: 8 seconds powered, a dash on the beat, each landing a
@@ -33979,11 +34052,31 @@ function jetStep(u,dt){
   if(u.rapArm){ u.rapArm=0; u.rapT=PARA_RAPID_T;
     S.fx.push({k:'ring',x:u.x,y:u.y-16,r:5,R:26,t:0,dur:0.3,col:'#FFD24A'}); }
   // v3.11 PURPLE: the landing writes the haste clock — 30% faster feet for
-  // 1.75s, def-copy write with its own stash (the jump tank's idiom)
+  // 1.75s, def-copy write with its own stash (the jump tank's idiom).
+  // 0347 (Wyatt 8/15): the landing is the WEAPON now — everyone within 3m
+  // of the touchdown takes MASSIVE damage (12: a step past the red
+  // overhead's 10), dealt through hurt() so every carpet pays its own
+  // currency, with the red slam's picture and punch. A relayed leap lands
+  // verbatim (v1.24), so each sim deals the same circle at the same spot.
   if(u.tkJump){ u.tkJump=0;
     if(u.tkHSpd0==null) u.tkHSpd0=u.def.moveSpd;
     u.def.moveSpd=u.tkHSpd0*TK_PURPLE_HASTE; u.tkHasteT=TK_PURPLE_HASTE_T;
-    S.fx.push({k:'ring',x:u.x,y:u.y-6,r:5,R:34,t:0,dur:0.3,col:tkHexOf('purple')}); }
+    const phex=tkHexOf('purple'), prm=reducedMotion(), pmine=bfHumanU(u)&&!u.coopBy;
+    S.fx.push({k:'ring',x:u.x,y:u.y-8,r:8,R:TK_PURPLE_R+16,t:0,dur:0.32,col:phex});
+    S.fx.push({k:'ring',x:u.x,y:u.y-8,r:4,R:TK_PURPLE_R*0.6,t:0,dur:0.24,col:'rgba(255,255,255,0.9)'});
+    S.fx.push({k:'puff',x:u.x,y:u.y-6,t:0,dur:0.32,R:TK_PURPLE_R});
+    if(!prm){ S.fx.push({k:'flash',x:u.x,y:u.y-26,ang:1.57,R:26,lw:3.5,t:0,dur:0.14});
+      for(let dj=0;dj<6;dj++){ const da=(u.x*0.91+u.y*1.31+dj*1.0472)%6.283;
+        S.fx.push({k:'wisp',x:u.x+Math.cos(da)*10,y:u.y-8+Math.sin(da)*6,
+          vx:Math.cos(da)*(44+((dj*31)%15)), vy:Math.sin(da)*20-14, up:18+(dj%3)*6,
+          r0:2.2+(dj%2), r1:6+(dj%2)*1.5, t:0, dur:0.38}); }
+      if(pmine){ S.shake=Math.max(S.shake,0.34); if(!S.coop) S.hitStop=Math.max(S.hitStop,0.09); } }
+    bfSfx(SFX.tkslam, u.x, u.y);
+    for(const f of TGT(u)){
+      if(f.dead || f.burrow || f.jetT>0) continue;
+      if(!bfCanTarget(u,f)) continue;
+      if(Math.hypot(f.x-u.x,f.y-u.y)<=TK_PURPLE_R+((f.def&&f.def.w)||50)*0.3) hurt(f,TK_PURPLE_DMG,u);
+    } }
   // only YOUR Sarge gets to rock the room (the 10382 law)
   if(bfHumanU(u) && !u.coopBy && !reducedMotion()) S.shake=Math.max(S.shake,0.15);
 }
@@ -37500,7 +37593,12 @@ function update(dt){
       else if(!inA && u.tkSAurT){ u.tkSAurT=0;
         if(u.hpMax!=null){ u.hpMax-=SILVER_AURA_HP; u.hp=Math.max(0.5,Math.min(u.hp,u.hpMax)); } } }
     if(u.tkSlowT>0){ u.tkSlowT-=dt; if(u.tkSlowT<0) u.tkSlowT=0; }
-    if(u.tkDeflT>0){ u.tkDeflT-=dt; if(u.tkDeflT<0) u.tkDeflT=0; }
+    if(u.tkDeflT>0){ u.tkDeflT-=dt;
+      if(u.tkDeflT<=0){ u.tkDeflT=0;
+        // 0347 BLUE: the wall's last tick throws the room — the shove
+        // waited out the invulnerability window (set at cast, consumed once)
+        if(u.tkBluePop){ u.tkBluePop=0; if(!u.dead) tkBluePopGo(u); } } }
+    if(u.tkFrenzT>0){ u.tkFrenzT-=dt; if(u.tkFrenzT<0) u.tkFrenzT=0; }   // 0347 GREEN: the decloak frenzy cools on the same head
     if(u.tkHasteT>0){ u.tkHasteT-=dt;
       if(u.tkHasteT<=0){ u.tkHasteT=0; if(u.tkHSpd0!=null){ u.def.moveSpd=u.tkHSpd0; u.tkHSpd0=null; } } }
     if(u.type==='sarge' && u.tkOverT>0) tkOverTick(u,dt);
@@ -37510,8 +37608,14 @@ function update(dt){
         S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:34,t:0,dur:0.3,col:'rgba(255,255,255,0.7)'});
         bfSfx(SFX.blip, u.x, u.y);
         // v3.11 GREEN vanish hands the spy feet back at the same one
-        // transition site the spy's own fallback uses
-        if(u.tkVSpd0!=null){ u.def.moveSpd=u.tkVSpd0; u.tkVSpd0=null; }
+        // transition site the spy's own fallback uses — and 0347 arms the
+        // FRENZY there: out of stealth = +40% attack speed for 5 seconds
+        // (tkSlowMul carries it to every cadence clock), a green ring says
+        // so, and the ghost-walk flag drops with the cloak.
+        if(u.tkVSpd0!=null){ u.def.moveSpd=u.tkVSpd0; u.tkVSpd0=null;
+          u.tkGhost=0; u.tkFrenzT=TK_GREEN_AST;
+          S.fx.push({k:'ring',x:u.x,y:u.y-16,r:5,R:40,t:0,dur:0.32,col:tkHexOf('green')});
+          bfSfx(SFX.ready, u.x, u.y); }
         // v2.47 (Wyatt 8/5): "They are reduced to a regular rifleman speed
         // when they come out of stealth." The sprint was the cloak's — the
         // decloak writes the RIFLEMAN'S OWN live cell into his per-unit def
@@ -39910,6 +40014,25 @@ function draw(){
       cx.lineCap='butt'; cx.fillStyle='#FFF6D0'; cx.beginPath(); cx.arc(p,q,3.2,0,7); cx.fill(); }
     else if(e.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle=fxSnow('#e8e0cc'); cx.beginPath(); cx.arc(e.x,e.y,e.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; }
     else if(e.k==='ring'){ cx.globalAlpha=1-k; cx.strokeStyle=fxSnow(e.col); cx.lineWidth=3; cx.beginPath(); cx.arc(e.x,e.y,e.r+(e.R-e.r)*k,0,7); cx.stroke(); cx.globalAlpha=1; }
+    else if(e.k==='tkarc'){ // 0347 BLUE pop: two half-circle curtains born at
+      // 12:00 and swept to 6:00 down each side — the giant arc IS the
+      // shove's picture (mirror via scale(-1,1): one sweep drawn twice)
+      const lead=-1.5708+3.1416*Math.min(1,k*1.12);
+      cx.lineCap='round';
+      for(const m of [1,-1]){
+        cx.save(); cx.translate(e.x,e.y-10); cx.scale(m,1);
+        for(let s=0;s<3;s++){
+          const a1=lead-s*0.34, a0=a1-0.36;
+          if(a1<=-1.5708) continue;
+          cx.strokeStyle=s? e.col : '#FFFFFF';
+          cx.lineWidth=5.5-s*1.5;
+          cx.globalAlpha=(1-k)*(1-s*0.26)*0.95;
+          cx.beginPath(); cx.arc(0,0,e.R*(0.86+0.2*k),Math.max(-1.5708,a0),Math.min(1.5708,a1)); cx.stroke();
+        }
+        cx.restore();
+      }
+      cx.lineCap='butt'; cx.globalAlpha=1;
+    }
     else if(e.k==='smoke'){ cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb'; cx.beginPath(); cx.arc(e.x,e.y,3+5*k,0,7); cx.fill(); cx.globalAlpha=1; }
     else if(e.k==='wisp'){ // gun smoke off a muzzle: drifts with the shot, curls upward, thins out
       cx.globalAlpha=(1-k)*0.42; cx.fillStyle='#b8b6ae';
@@ -40674,9 +40797,19 @@ function drawTkLeap(u){
 // reduced motion (a steady ring), juice only when motion is welcome.
 function drawTkFx(u){
   if(u.tkOverT>0){
-    cx.save(); cx.globalAlpha=reducedMotion()? 0.5 : (0.42+0.22*Math.sin(S.t*6));
-    cx.strokeStyle=u.tkHex||tkHexOf('teal'); cx.lineWidth=2.5;
-    cx.beginPath(); cx.ellipse(u.x,u.y,20,7,0,0,7); cx.stroke(); cx.restore();
+    // 0347 (Wyatt 8/15): the OVERDRIVE tell got loud ("much more
+    // noticeable") — a bigger, brighter ground ring and three orbiting
+    // motes keyed off S.t (dice-free); reduced motion keeps a steady ring.
+    cx.save(); cx.globalAlpha=reducedMotion()? 0.6 : (0.55+0.25*Math.sin(S.t*6));
+    cx.strokeStyle=u.tkHex||tkHexOf('teal'); cx.lineWidth=3.5;
+    cx.beginPath(); cx.ellipse(u.x,u.y,28,10,0,0,7); cx.stroke();
+    if(!reducedMotion()){
+      cx.fillStyle=u.tkHex||tkHexOf('teal');
+      for(let i=0;i<3;i++){ const a=S.t*4+i*2.094;
+        cx.globalAlpha=0.55+0.3*Math.sin(S.t*8+i);
+        cx.beginPath(); cx.arc(u.x+Math.cos(a)*24,u.y-26+Math.sin(a)*9,2.4,0,7); cx.fill(); }
+    }
+    cx.restore();
   }
   if(u.tkDeflT>0){
     cx.save(); cx.globalAlpha=0.85; cx.strokeStyle=u.tkHex||'#4DA6FF'; cx.lineWidth=3; cx.lineCap='round';
@@ -40688,6 +40821,18 @@ function drawTkFx(u){
     cx.save(); cx.globalAlpha=reducedMotion()? 0.45 : (0.3+0.2*Math.sin(S.t*7+(u.phase||0)));
     cx.strokeStyle='#FF9A3D'; cx.lineWidth=2;
     cx.beginPath(); cx.ellipse(u.x,u.y,16,5.5,0,0,7); cx.stroke(); cx.restore();
+  }
+  // 0347: the SILVER window shows on the man exactly like the rally does
+  // (a buff must READ), and the GREEN frenzy wears its own quick ring.
+  if(u.tkSilvT>0){
+    cx.save(); cx.globalAlpha=reducedMotion()? 0.45 : (0.3+0.2*Math.sin(S.t*7+(u.phase||0)));
+    cx.strokeStyle='#C8CDD6'; cx.lineWidth=2;
+    cx.beginPath(); cx.ellipse(u.x,u.y,18,6,0,0,7); cx.stroke(); cx.restore();
+  }
+  if(u.tkFrenzT>0){
+    cx.save(); cx.globalAlpha=reducedMotion()? 0.5 : (0.35+0.25*Math.sin(S.t*9));
+    cx.strokeStyle='#5BE870'; cx.lineWidth=2.2;
+    cx.beginPath(); cx.ellipse(u.x,u.y,17,6,0,0,7); cx.stroke(); cx.restore();
   }
 }
 function drawUnit(u){
@@ -53833,14 +53978,15 @@ window.GVT = {
   tk(){ const u=jetSarge()||S.units.find(q=>q.type==='sarge'&&!q.coopBy&&!q.dead)||null;
     return { owned:enhOwns('telekinesis'), on:tkOwned(), cd:S.tkCd||0, col:tkMyCol(), hex:tkHexOf(tkMyCol()),
       cds:Object.assign({},TK_CD), m:TK_M,
-      dials:{ blueR:TK_BLUE_R, bluePush:TK_BLUE_PUSH, blueDmg:TK_BLUE_DMG, blueDefl:TK_BLUE_DEFL, blueReflC:TK_BLUE_REFL_C,
-        redDash:TK_RED_DASH, redDmg:TK_RED_DMG, redR:TK_RED_R, redSeek:TK_RED_SEEK, greenT:TK_GREEN_T,
-        orangeR:TK_ORANGE_R, orangeT:TK_ORANGE_T, orangeLS:TK_ORANGE_LS,
-        purpleHaste:TK_PURPLE_HASTE, purpleHasteT:TK_PURPLE_HASTE_T,
+      dials:{ blueR:TK_BLUE_R, blueR2:TK_BLUE_R2, bluePush:TK_BLUE_PUSH, blueDmg:TK_BLUE_DMG, blueDefl:TK_BLUE_DEFL, blueReflC:TK_BLUE_REFL_C,
+        redDash:TK_RED_DASH, redDmg:TK_RED_DMG, redR:TK_RED_R, redSeek:TK_RED_SEEK, greenT:TK_GREEN_T, greenAS:TK_GREEN_AS, greenAST:TK_GREEN_AST,
+        orangeR:TK_ORANGE_R, orangeT:TK_ORANGE_T, orangeLS:TK_ORANGE_LS, silverR:TK_SILVER_R, silverR2:TK_SILVER_R2,
+        purpleHaste:TK_PURPLE_HASTE, purpleHasteT:TK_PURPLE_HASTE_T, purpleR:TK_PURPLE_R, purpleDmg:TK_PURPLE_DMG,
         tealT:TK_TEAL_T, tealEvery:TK_TEAL_EVERY, tealSeek:TK_TEAL_SEEK, tealAoe:TK_TEAL_AOE, tealSlow:TK_TEAL_SLOW, tealSlowT:TK_TEAL_SLOWT },
       btn:btnRects.tk? btnRects.tk.slice() : null,
       u:u? { x:u.x, y:u.y, cloakT:u.cloakT||0, overT:u.tkOverT||0, deflT:u.tkDeflT||0,
              hasteT:u.tkHasteT||0, rallyT:u.tkRallyT||0, lg:!!u.tkLg, jetT:u.jetT||0,
+             frenzT:u.tkFrenzT||0, ghost:!!u.tkGhost, bluePop:!!u.tkBluePop, silvT:u.tkSilvT||0,
              tkJump:!!u.tkJump, spd:(u.def&&u.def.moveSpd)||0, hits:u.hits||0, hp:(u.hp==null?null:u.hp) } : null }; },
   tkGo(col){ const u=jetSarge(); if(!u) return false; return tkFire(u, col||tkMyCol(), false); },
   tkCd(v){ S.tkCd=Math.max(0,+v||0); return S.tkCd; },
