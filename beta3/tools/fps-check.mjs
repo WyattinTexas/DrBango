@@ -1,5 +1,7 @@
-// v0.33.0 verification: fps overlay v2, full-DPR law, raster probe + renderer
-// choice (auto-CANVAS on software-GL devices), canvas tint shim, counter throttles.
+// v0.34.0 verification: fps overlay v2, full-DPR law, raster probe + renderer
+// choice (auto-CANVAS on software-GL devices), canvas tint shim, counter
+// throttles, and the ?lab=1 on-device perf bisection lab (boots, runs all 20
+// stages, writes its RTDB report, leaves normal boot untouched).
 // Drives a real headless Chrome over CDP (port 9333). Run from beta3/:
 //   node tools/fps-check.mjs
 const BASE = 'http://localhost:8899/index.html';
@@ -162,6 +164,53 @@ async function main() {
   // ---- ascent perf probe still records (PERF untouched) ----
   const perf = await c.ev(`(window.__ssperf||[]).length`);
   ok('PERF probe machinery intact', typeof perf === 'number');
+
+  // ---- v0.34.0: the perf lab ----
+  ok('normal boot carries no lab UI', await c.ev(`!document.getElementById('sslab')`) === true);
+  // ?lab=1 opens the lab door and does NOT boot the game
+  await c.nav(BASE + '?lab=1&labfast=1&mpuid=lab', 6000);
+  const lab0 = JSON.parse(await c.ev(`JSON.stringify({ui: !!document.getElementById('sslab'),
+    btn: !!document.getElementById('sslab-go'), game: !!window.game,
+    canvases: document.querySelectorAll('canvas').length})`));
+  ok('?lab=1 shows the lab door, no game booted', lab0.ui && lab0.btn && !lab0.game && lab0.canvases === 0,
+    JSON.stringify(lab0));
+  // a REAL synthesized tap on TAP TO BEGIN (screenshots never click)
+  const br = JSON.parse(await c.ev(`JSON.stringify(document.getElementById('sslab-go').getBoundingClientRect())`));
+  const bx = br.x + br.width / 2, by = br.y + br.height / 2;
+  await c.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: bx, y: by });
+  await c.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: bx, y: by, button: 'left', clickCount: 1 });
+  await c.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: bx, y: by, button: 'left', clickCount: 1 });
+  let labDone = false;
+  for (let i = 0; i < 90 && !labDone; i++) { await sleep(2000); labDone = await c.ev(`!!window.__sslabDone`) === true; }
+  ok('lab runs to completion (labfast)', labDone);
+  const lb = JSON.parse(await c.ev(`JSON.stringify(window.__sslab)`) || 'null');
+  ok('lab ran all 20 stages', lb && lb.stages && lb.stages.length === 20 && lb.total === 20,
+    lb && lb.stages && lb.stages.length + ' stages');
+  ok('every stage carries a measurement or an explicit error',
+    lb && lb.stages.every(s => s.err || (typeof s.fps === 'number' && s.frames > 0)),
+    lb && JSON.stringify(lb.stages.filter(s => !s.err && !(s.frames > 0)).map(s => s.id)));
+  ok('once-per-run probes present (maxTex + granted ctx attrs, or explicit no-gl)',
+    lb && ((lb.maxTex > 0 && !!lb.ctx) || /no-gl/.test(lb.ctxStr || '')), lb && ('maxTex=' + lb.maxTex + ' ctx=' + lb.ctxStr));
+  ok('texture scan ran on the full home scene', lb && lb.tex && Array.isArray(lb.tex.top) && lb.tex.top.length > 0,
+    lb && lb.tex && JSON.stringify(lb.tex.top[0]));
+  ok('no baked texture exceeds the device ceiling (defensive clamp holds)',
+    lb && lb.tex && lb.tex.over.length === 0, lb && lb.tex && JSON.stringify(lb.tex.over));
+  ok('winner recorded for the content stages', lb && typeof lb.winner === 'string' && lb.winner.length > 0,
+    lb && lb.winner);
+  ok('results table painted on screen', await c.ev(`document.querySelectorAll('#sslab table tr').length`) === 20);
+  // the report landed in RTDB under perflab/<deviceId>/<runKey>
+  const rtUrl = 'https://testroom-75200-default-rtdb.firebaseio.com/starspell/perflab/' + lb.id + '/' + lb.runKey + '.json';
+  let rt = null;
+  try { rt = await (await fetch(rtUrl)).json(); } catch (e) { }
+  ok('lab report landed in RTDB (' + lb.id + ')', rt && rt.done === true && rt.stages && rt.stages.length === 20);
+  // sweep the test row
+  try {
+    await fetch('https://testroom-75200-default-rtdb.firebaseio.com/starspell/perflab/' + lb.id + '.json', { method: 'DELETE' });
+  } catch (e) { }
+  // and a normal boot afterwards is untouched
+  await c.nav(BASE + '?fps=0', 9000);
+  ok('normal boot unaffected after lab (game boots, no lab UI)',
+    await c.ev(`!!window.game && !document.getElementById('sslab')`) === true);
 
   console.log('\\n' + pass + ' passed, ' + fail + ' failed');
   if (c.errs.length) { console.log('EXCEPTIONS:'); c.errs.slice(0, 5).forEach(e => console.log('  ' + e.split('\\n')[0])); }

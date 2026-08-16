@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.33.0';
+const BUILD = 'STARSPELL v0.34.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -25,6 +25,10 @@ const DPR = QS.has('dpr')
   : Math.min(window.devicePixelRatio || 1, 3);
 const DIAG = (m) => { if (window.SSDIAG) window.SSDIAG(m); };
 const DEMO = QS.get('demo') === '1';
+// ?lab=1 — the on-device perf bisection lab (lab.js, loaded by index.html only
+// under the flag). The lab boots and destroys its own staged Phaser games, so
+// the normal boot and the viewport machinery below stand down entirely.
+const LAB = QS.get('lab') === '1';
 
 /* ---- raster probe + renderer choice ------------------------------------
    The iOS 9fps hunt (v0.33.0) ended here: on the afflicted iPhone the JS was
@@ -404,14 +408,31 @@ function ssRatingTier(r) { let t = SS_RATING_TIERS[0]; for (const x of SS_RATING
 function ssTexRes(scene) {
   return Math.min(Math.max(Math.min(scene.scale.width / 420, scene.scale.height / 800), 1), 3);
 }
+// The device's texture ceiling (WebGL MAX_TEXTURE_SIZE), cached once. An
+// upload past it silently white-boxes on WebGL1 — the two mk() factories
+// clamp against it defensively. Nothing today comes near (largest bake
+// ~1.3k px vs a 4096 floor on any real GPU), so the clamp is pure armor:
+// when it never fires, output is byte-identical.
+let SS_MAXTEX = 0;
+function ssMaxTex(scene) {
+  if (!SS_MAXTEX) {
+    try {
+      const gl = scene.game.renderer.gl;
+      SS_MAXTEX = (gl && gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 8192;
+    } catch (e) { SS_MAXTEX = 8192; }
+    SS_MAXTEX = Math.max(2048, SS_MAXTEX | 0);
+  }
+  return SS_MAXTEX;
+}
 function ssMakeTextures(scene) {
   const R = ssTexRes(scene);
   const ARTON = ART && SSART.ready;
   const mk = (key, w, h, fn, r) => {
     if (scene.textures.exists(key)) return;
     r = r || 1;
-    const t = scene.textures.createCanvas(key, Math.round(w * r), Math.round(h * r));
-    t.context.scale(r, r);
+    const cap = Math.min(1, ssMaxTex(scene) / Math.max(w * r, h * r));
+    const t = scene.textures.createCanvas(key, Math.round(w * r * cap), Math.round(h * r * cap));
+    t.context.scale(r * cap, r * cap);
     fn(t.context, w, h); t.refresh();
   };
   mk('dot', 16, 16, (c, w, h) => {
@@ -723,8 +744,10 @@ function ssSkyTextures(scene, dawn) {
   const mk = (key, w, h, fn, r) => {
     if (scene.textures.exists(key)) return;
     r = r || 1;
-    const t = scene.textures.createCanvas(key, Math.round(w * r), Math.round(h * r));
-    t.context.scale(r, r);
+    // same defensive ceiling clamp as ssMakeTextures (see ssMaxTex)
+    const cap = Math.min(1, ssMaxTex(scene) / Math.max(w * r, h * r));
+    const t = scene.textures.createCanvas(key, Math.round(w * r * cap), Math.round(h * r * cap));
+    t.context.scale(r * cap, r * cap);
     fn(t.context, w, h); t.refresh();
   };
   const gradTex = (key, stops) => mk(key, 64, 1024, (c, w, h) => {
@@ -5482,7 +5505,12 @@ function fitCanvas() {
 // Textures are built inside the first scene's create(), so the art has to be decoded before
 // Phaser starts. Capped at 2.5s — a slow or dead image never blocks the game, it just falls
 // back to the procedural art. Without ?art=1 this is a straight synchronous boot as before.
-if (ART) {
+if (LAB) {
+  /* ?lab=1: lab.js owns boot — it builds and destroys its own Phaser games
+     stage by stage, and the fixed-size stages must not be restarted under
+     the meter, so the viewport machinery below stands down too. SSNET still
+     connects: the lab reports home through it. */
+} else if (ART) {
   let booted = false;
   const go = () => { if (!booted) { booted = true; ssBoot(); } };
   setTimeout(() => { if (!booted) DIAG('art TIMEOUT — procedural'); go(); }, 2500);
@@ -5542,7 +5570,9 @@ function ssVpKick() {
   clearTimeout(vpTimer);
   vpTimer = setTimeout(ssVpSettle, 60);
 }
-window.addEventListener('resize', ssVpKick);
-window.addEventListener('orientationchange', ssVpKick);
-if (window.visualViewport) window.visualViewport.addEventListener('resize', ssVpKick);
-ssVpKick();   // opened in landscape? park under the veil from the very start
+if (!LAB) {
+  window.addEventListener('resize', ssVpKick);
+  window.addEventListener('orientationchange', ssVpKick);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', ssVpKick);
+  ssVpKick();   // opened in landscape? park under the veil from the very start
+}
