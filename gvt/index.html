@@ -859,6 +859,8 @@
   #castleHot.go .key { animation:pkkeyrise 1.1s ease-out; }
   /* 0340: the hideout door + the lasso horse (the castle grammar) */
   #hideHot { position:absolute; z-index:3; background:transparent; border:none; cursor:pointer; }
+  #wstarHot { position:absolute; z-index:3; background:transparent; border:none; padding:0; cursor:pointer; }   /* 0359: the pediment star's tap box (the hideHot grammar) */
+  #dmtrHot { position:absolute; z-index:3; background:transparent; border:none; padding:0; cursor:default; }   /* 0359: the meteor corridor — no pointer tell over empty sky; the streak itself invites the chase */
   #hideHot::after { content:''; position:absolute; left:50%; bottom:8%; width:34%; height:40%;
     transform:translate(-50%,0); border-radius:10px; box-shadow:0 0 26px 8px rgba(255,217,160,0.18); }
   #hideHot.deny { animation:shno3 0.42s; }
@@ -19387,6 +19389,12 @@ const META_DEFAULT = {
   // older saves to 0 free, and garbage can only ever under-grant); nemBank =
   // THE BANK HEIST's one victory, ever (the nemPark latch's western twin).
   wcacti:0, nemBank:0,
+  // 0359 HIDDEN PURSES: wstar = the saloon's pediment star (20★ on its
+  // first-ever tap in the OUTLAW TOWN scene); dmeteor = the dino sky's
+  // shooting meteor caught mid-flight (100★ once). The comet law both:
+  // Object.assign migrates older saves to 0 free; truthy blocks the grant
+  // forever, so garbage can only ever under-grant. BANK ONLY.
+  wstar:0, dmeteor:0,
   // v3.33 TP-02 THE YETI PARK — flat find/announce/key flags (the comet law:
   // Object.assign migrates older saves to 0 free; truthy blocks re-grants) +
   // the parks ledger: lv = highest rung beaten (the ladder — HOST-only in a
@@ -26729,7 +26737,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.16';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.17';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -45317,6 +45325,8 @@ const COMET_STARS=100;
 // D12 extends one-time to the yard's first kick)
 const SNOWMAN_STARS=50, SOC_GOAL_STARS=100;
 const WCACTUS_STARS=20;   // 0346: each western saguaro's first-ever tap (per-cactus bit in META.wcacti)
+const WSTAR_STARS=20, DMETEOR_STARS=100;   // 0359: the saloon pediment star + the dino meteor catch — once-ever hidden purses (bank only)
+const DMETEOR_R=110;      // 0359: the catch radius (scene px) around the meteor's interpolated head — generous for a kid's finger on a ~0.9s streak
 // ===== v3.06 THE ROOMS' GROUND (one painter, four floors) =====
 // The bedroom branch is the old wood BYTE-FOR-BYTE; the other three re-dress
 // the same 960×600 board with their battle carpets' own menu-clean recipes
@@ -53171,6 +53181,11 @@ function paintParkScene(dpk){
     const hideOpen=!!(META.parks&&META.parks.western&&META.parks.western.lv>=20);
     bg.innerHTML='<svg class="phero" viewBox="0 0 1600 650" preserveAspectRatio="xMidYMid slice">'+parkHeroSVG('western')+'</svg>'
       +'<button type="button" id="hideHot" onclick="UI.hideTap()">'+(hideOpen? '<span class="key" data-notr>🔓</span>' : '')+'</button>'
+      // 0359: THE PEDIMENT STAR — the saloon's gold star is a hidden 20★
+      // purse (once ever, UI.wstarTap). DOM furniture over the painted scene
+      // (the hideHot grammar) — the memoized hero stays state-free and
+      // byte-still; the claimed star just keeps twinkling.
+      +'<button type="button" id="wstarHot" onclick="UI.wstarTap(event)"></button>'
       +(!META.whorse? '<div id="pkHorse" onclick="UI.lassoTap()"><svg viewBox="0 0 140 140" style="display:block;width:100%;overflow:visible"><g class="bob2">'+whorseArt()+'</g></svg>'
         +((META.lasso&&!META.whorse)? '<span class="rope" data-notr>🪢</span>' : '')+'</div>' : '');
     parkSceneLayout();
@@ -53182,6 +53197,15 @@ function paintParkScene(dpk){
       +parkHeroSVG('dino')+'<g transform="translate(-111.35,-44.13) scale(1.15)">'+volcKeyGroup(!META.boneRite)+'</g></svg>'   // 0278k Wyatt 8/13 "back to the middle": the ring lands (1187,298) — the grown cone's own axis (crater cx 1129 through the 0278h wrap = 1187); wrapper OUTSIDE #volcKey so the .deny shake (a CSS transform) can't replace an attribute transform
       +'<div id="parkFlyer"><svg viewBox="0 0 140 140" style="width:100%;overflow:visible;filter:drop-shadow(0 14px 10px rgba(10,16,6,0.35))"><g class="bob">'+SPRITES_SRC.ptero+'</g></svg></div>'
       +'<button type="button" id="volcHot" onclick="UI.volcTap()"></button>'
+      // 0359: THE METEOR CORRIDOR — a fixed transparent z:3 button over the
+      // shooting meteor's whole flight band (svg-side pads are unreachable:
+      // the full-width wt-mid chrome swallows scene taps at desktop aspects
+      // and the later-painted sun/canopy swallow them at phone aspects —
+      // only volcHot-grammar DOM furniture wins). Whether a tap actually
+      // CAUGHT the meteor is decided in UI.dmeteorTap from the pkmeteor
+      // animation's own clock (head position ± DMETEOR_R) — nothing here
+      // reads state, and empty-sky taps stay as dead as they are today.
+      +'<button type="button" id="dmtrHot" onclick="UI.dmeteorTap(event)"></button>'
       // 0313: the pond gear — pail + rod seats and the pond's tap rect
       // (ownership-gated; parkSceneLayout seats them right below)
       +wlGearHTML();
@@ -53220,6 +53244,8 @@ function parkSceneLayout(){
   P('pkRod',1108,462,84,102);   // 0315 (IMG_6728): the rod LEANS AT THE BANK — over the pond's west lip, tip toward the water. pkBait + pondHot seats BYTE-STILL (the 0314 honesty law); the rod div's 42px overlap of pondHot's west edge is z-theater over a 216-wide tap rect, and the pail keeps all but its top-right sliver
   P('castleHot',170,110,262,261);   // 0278h: the castle crossed to the upper-left (the swap)
   P('hideHot',1110,262,250,240);    // 0340: the hideout's own door — the painted building's box (1120,268 230×228 padded a hair)
+  P('wstarHot',250,212,64,64);      // 0359: the saloon's pediment star (282,244) — a fat kid-finger box over the gold star; clear of hideHot (1110) and pkHorse (700)
+  P('dmtrHot',540,56,600,184);      // 0359: the meteor corridor — contains every head position of the 0%..7% flight (1060,26)->(614,178) plus the catch radius; below wt-top, above volcHot's 245 band
   P('pkHorse',700,452,120,120);     // 0340->0353: the lasso horse keeps THE HITCHING RAIL (round 4) — at the trough, clear of the campfire, the poster post and the barrel
   Q('#pkChoir .hopper.h1',742,646,52); Q('#pkChoir .hopper.h2',806,634,44);
   Q('#pkChoir .note.n1',760,552,24); Q('#pkChoir .note.n2',792,536,19); Q('#pkChoir .note.n3',826,554,22);
@@ -56813,6 +56839,61 @@ window.UI = {
       setTimeout(()=>{ if(S.mode==='menu') renderMenu(); }, 1200);
     }
   },
+  // 0359 HIDDEN PURSES (Wyatt 8/16: "Award the player 20 stars if he clicks
+  // the star in the outlaw town scene… 100 stars if he clicks the meteor in
+  // the dino town scene. These are both one-time events."). The wcactusTap
+  // grammar verbatim: flag FIRST, credit SECOND, BANK ONLY (never lifetime),
+  // one saveMeta, twink + '+N★' float, renderMenu-if-menu; a claimed purse
+  // answers a plain blip, zero stars. The floats ride #parkBg — the park
+  // stage is positioned (inset:0) and owns the hotspot seats' coordinates.
+  wstarTap(ev){ audio();
+    if(ev&&ev.stopPropagation) ev.stopPropagation();
+    if(META.wstar){ SFX.blip(); return; }
+    META.wstar=1; META.starBank+=WSTAR_STARS;
+    saveMeta();
+    SFX.twink();
+    const st=document.getElementById('parkBg');
+    if(st){
+      const hb=document.getElementById('wstarHot');
+      const f=document.createElement('div');
+      f.className='starfloat big'; f.textContent='+'+WSTAR_STARS+'★';
+      f.style.left=(hb&&hb.style.left)||'260px'; f.style.top=(hb&&hb.style.top)||'200px';
+      st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120);
+      setTimeout(()=>{ if(S.mode==='menu') renderMenu(); }, 1200);
+    }
+  },
+  // The dino sky's shooting meteor (a ~0.9s streak every 13s) — the 0099
+  // comet catch's cousin. The corridor button is fixed; whether THIS tap
+  // caught the meteor is decided here, at tap time, from the pkmeteor
+  // animation's own clock: computed-opacity gate first (parked between
+  // flights at opacity 0 — and under prefers-reduced-motion it never flies
+  // at all, so the purse is unfindable there BY DESIGN, the comet's own
+  // ruling), then the tap must land within DMETEOR_R of the interpolated
+  // head (keyframes: 0% at 1060,26 -> 7% of 13s at 614,178, linear). A miss
+  // over empty sky stays silent; a claimed catch blips; the meteor keeps
+  // flying either way.
+  dmeteorTap(ev){ audio();
+    const el=document.querySelector('#parkBg .mtr'); if(!el) return;
+    if(parseFloat(getComputedStyle(el).opacity||'0')<0.2) return;
+    const an=(el.getAnimations? el.getAnimations().find(a=>a.animationName==='pkmeteor') : null);
+    const bg=document.getElementById('parkBg'); if(!an||!bg) return;
+    const r=bg.getBoundingClientRect(); if(!r.width||!r.height) return;
+    const s2=Math.max(r.width/1600,r.height/650), ox=(1600-r.width/s2)/2, oy=(650-r.height/s2)/2;
+    const ft=Math.min((Number(an.currentTime)%13000)/910,1);   // fraction of the 0..7% flight window
+    const hx=1060-446*ft, hy=26+152*ft;
+    const tx=(ev.clientX-r.left)/s2+ox, ty=(ev.clientY-r.top)/s2+oy;
+    if(Math.hypot(tx-hx,ty-hy)>DMETEOR_R) return;
+    if(ev.stopPropagation) ev.stopPropagation();
+    if(META.dmeteor){ SFX.blip(); return; }
+    META.dmeteor=1; META.starBank+=DMETEOR_STARS;
+    saveMeta();
+    SFX.twink();
+    const f=document.createElement('div');
+    f.className='starfloat big'; f.textContent='+'+DMETEOR_STARS+'★';
+    f.style.left=Math.round(ev.clientX-r.left)+'px'; f.style.top=Math.round(ev.clientY-r.top)+'px';
+    bg.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120);
+    setTimeout(()=>{ if(S.mode==='menu') renderMenu(); }, 1200);
+  },
   // 0346: the heist card's FIGHT — fold the card, gate the ad, ride into the
   // hidden western arena (the bf retry button's own adGate word).
   bankFight(){ audio();
@@ -57751,7 +57832,7 @@ window.GVT = {
   // v3.32 TP-01 rig: the whole secrets pass in one read
   secrets(){ return { snowman:!!META.snowmanTap, burp:!!META.roofBurp, fed:ROOF_FED,
     burpN:ROOF_BURP_N, soc:!!META.socGoal, goldKey:!!META.goldKey, keySeen:!!META.goldKeySeen,
-    keyOwned:decOwns('goldkey'), stars:META.starBank, life:META.starsLifetime,
+    keyOwned:decOwns('goldkey'), wstar:!!META.wstar, dmeteor:!!META.dmeteor, stars:META.starBank, life:META.starsLifetime,
     finds:Object.keys(ROOM_FINDS), rect:ROOM_FINDS[roomCur()]? ROOM_FINDS[roomCur()].rect() : null }; },
   // v1.75: THE FOLD — which departments can scroll DOWN and where each sits.
   // scrolls means the shelf runs past the viewport at this size; a department
