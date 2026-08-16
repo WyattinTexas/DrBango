@@ -205,6 +205,14 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
   #stage{-webkit-overflow-scrolling:touch;}
   .panel{scrollbar-width:none;}
 }
+/* 🧽 the eraser's rubber puck rides the finger (pointer-events:none — it can
+   never eat its own scrub); z40 above drawers so it's always visible */
+.erpuck{position:fixed; width:34px; height:34px; margin:-17px 0 0 -17px; border-radius:50%;
+  background:#FFC9CFB8; border:2.5px solid #C0473A; pointer-events:none; z-index:40;}
+/* the edit-visit starter kit: the three things a kid wants to do to a part —
+   erase it, recolor it, add shapes (fixed like #backCounter, z25 under drawers) */
+#kitbar{position:fixed; left:50%; transform:translateX(-50%); bottom:86px; z-index:25; display:flex; gap:8px;}
+#kitbar .kitb{font-size:14px; padding:10px 14px; border-radius:12px; box-shadow:0 3px 12px #000A;}
 </style>
 </head>
 <body>
@@ -212,6 +220,7 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
 <div id="stagebar">
   <button id="tMove" class="gold" onclick="setTool('move')">👆 MOVE</button>
   <button id="tDraw" onclick="setTool('draw')">✏️ DRAW</button>
+  <button id="tErase" onclick="setTool('erase')">🧽 ERASE</button>
   <span id="penSizes" style="display:none; align-items:center; gap:4px;">
     <button onclick="setPen(2,this)" title="skinny">·</button>
     <button onclick="setPen(3.5,this)" title="thin">•</button>
@@ -360,6 +369,7 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
     <b>The drawers:</b> the whole screen is your paper. The shelves live in drawers just off the edges — tap a gold handle (🧰 TOOLS · 🦖 SHAPES · 🧩 PIECES · 🎨 PAINTS) and the drawer slides in. Tap the paper and it tucks itself away. The <b>Tin Rex coin</b> in the top-right corner holds SAVE, GALLERY, EXPORT, LESSONS, UNDO and HELP.<br>
     <b>Zoom:</b> pinch the paper with two fingers to zoom in and out, or tap the round <b>＋ / －</b> buttons. Pinch while a toy is SELECTED and you resize the toy instead.<br>
     <b>Just draw:</b> press ✏️ DRAW and scribble — a big fat pencil in whatever paint chip you tapped last. Three dot sizes. 👆 MOVE goes back to grabbing things.<br>
+    <b>Erase:</b> press 🧽 ERASE and rub — every piece under your finger disappears. One whole scrub is a single ↩ UNDO, so nothing is ever truly gone.<br>
     <b>Start from a real GVT toy:</b> tap any FINISHED CHARACTER — it's the actual mold from the game. Drag it, resize with the corner handle, spin with the top handle.<br>
     <b>Coloring:</b> select a toy and its colors appear as swatches on the right. Tap a swatch, then tap any paint chip at the bottom (or the 🎨 wheel) — every piece wearing that color changes at once, just like the game recolors its toys.<br>
     <b>Build your own:</b> SHAPES are bodies, spikes, limbs, stars, eyes… they paint with whatever chip you tapped last.<br>
@@ -1008,15 +1018,64 @@ function clearAll(){
 }
 
 /* ---- pencil tool ---- */
-let TOOL='move', PEN=7, drawPts=null, drawEl=null;
+let TOOL='move', PEN=7, drawPts=null, drawEl=null, PAINTC=null;
 function setTool(t){
   TOOL=t;
   $('tMove').className=t==='move'?'gold':'';
   $('tDraw').className=t==='draw'?'gold':'';
+  $('tErase').className=t==='erase'?'gold':'';
   $('penSizes').style.display=t==='draw'?'':'none';
-  svg.style.cursor=t==='draw'?'crosshair':'';
-  if(t==='draw'){ selT=selC=null; render(); }
+  svg.style.cursor=t==='draw'?'crosshair':(t==='erase'||t==='paint'?'cell':'');
+  const ke=$('kitErase'), kp=$('kitPaint');
+  if(ke) ke.className='kitb'+(t==='erase'?' gold':'');
+  if(kp) kp.className='kitb'+(t==='paint'?' gold':'');
+  if(t!=='move'){ selT=selC=null; render(); }
 }
+/* ---- 🧽 THE ERASER (Wyatt: "we need the eraser to be pretty easy to use") ----
+   Rub anywhere: pieces vanish under the finger. While the finger is down the
+   nodes are only HIDDEN (the r9 law — never rebuild the svg under a live
+   finger); the release does ONE pushUndo + splice + render, so a whole scrub
+   is a single ↩ UNDO. */
+let ERZ=null;
+function scrubAt(e){
+  if(!ERZ) return;
+  for(const o of [[0,0],[9,0],[-9,0],[0,9],[0,-9]]){
+    const el=document.elementFromPoint(e.clientX+o[0], e.clientY+o[1]);
+    if(!el||el===svg||!svg.contains(el)) continue;
+    const tp=el.closest&&el.closest('g[data-top]'); if(!tp) continue;
+    const tid=tp.getAttribute('data-top');
+    const s=DOC.shapes.find(x=>x.id===tid); if(!s) continue;
+    if(s.t==='group'){
+      const kd=el.closest('g[data-kid]'); if(!kd) continue;
+      const kid=kd.getAttribute('data-kid');
+      if(ERZ.kids.has(kid)) continue;
+      ERZ.kids.add(kid); ERZ.nodes.push(kd); kd.setAttribute('display','none');
+    } else if(!ERZ.tops.has(tid)){
+      ERZ.tops.add(tid); ERZ.nodes.push(tp); tp.setAttribute('display','none');
+    }
+  }
+  ERZ.cur.style.left=e.clientX+'px'; ERZ.cur.style.top=e.clientY+'px';
+}
+function eraseAbort(){ if(!ERZ) return; ERZ.nodes.forEach(n=>n.removeAttribute('display')); ERZ.cur.remove(); ERZ=null; }
+function eraseCommit(){
+  if(!ERZ) return;
+  const tops=ERZ.tops, kids=ERZ.kids; ERZ.cur.remove(); ERZ=null;
+  if(!tops.size&&!kids.size) return;
+  pushUndo();
+  for(const s of DOC.shapes) if(s.t==='group') s.kids=s.kids.filter(k=>!kids.has(k.id));
+  DOC.shapes=DOC.shapes.filter(s=>!tops.has(s.id)&&!(s.t==='group'&&!s.kids.length));
+  if(selT&&!DOC.shapes.find(s=>s.id===selT)){ selT=null; selC=null; }
+  render();
+}
+/* 🎨 PAINT mode (the edit kit's RECOLOR): pick a paint in the mixer, then every
+   piece you tap wears it — DOC + live attr patched directly, no rebuild under
+   the finger; the release does one honest render. */
+function startPaint(){
+  PAINTC=PAINTC||lastColor;
+  pickColor(c=>{ PAINTC=c; lastColor=c; }, PAINTC);
+  setTool('paint');
+}
+function kitErase(){ setTool(TOOL==='erase'?'move':'erase'); }
 function setPen(w,btn){
   PEN=w;
   document.querySelectorAll('#penSizes button').forEach(b=>b.classList.remove('gold'));
@@ -1109,6 +1168,30 @@ svg.addEventListener('pointerdown',e=>{
     svg.appendChild(drawEl);
     try{svg.setPointerCapture(e.pointerId);}catch(_){} e.preventDefault(); return;
   }
+  if(TOOL==='erase'){
+    try{svg.setPointerCapture(e.pointerId);}catch(_){}
+    ERZ={tops:new Set(), kids:new Set(), nodes:[], cur:document.createElement('div')};
+    ERZ.cur.className='erpuck'; document.body.appendChild(ERZ.cur);
+    scrubAt(e); e.preventDefault(); return;
+  }
+  if(TOOL==='paint'){
+    const tp=e.target.closest&&e.target.closest('g[data-top]');
+    if(tp&&PAINTC){
+      const s=DOC.shapes.find(x=>x.id===tp.getAttribute('data-top'));
+      let o=null;
+      if(s&&s.t==='group'){ const kd=e.target.closest('g[data-kid]'); if(kd) o=s.kids.find(k=>k.id===kd.getAttribute('data-kid')); }
+      else o=s;
+      if(o){
+        pushUndo();
+        const key=(!o.attrs.fill||o.attrs.fill==='none')?'stroke':'fill';
+        o.attrs[key]=PAINTC;
+        e.target.setAttribute(key,PAINTC);   // the tapped primitive itself — no rebuild under the finger
+        drag={kind:'painted'};               // the release does the one honest render
+        try{svg.setPointerCapture(e.pointerId);}catch(_){}
+      }
+    }
+    e.preventDefault(); return;
+  }
   const h=e.target.getAttribute&&e.target.getAttribute('data-h');
   /* the ✕ deletes on POINTERUP — never rebuild the svg under a live finger (r9 law) */
   if(h==='del' && selT){ drag={kind:'del'}; try{svg.setPointerCapture(e.pointerId);}catch(_){} e.preventDefault(); return; }
@@ -1166,8 +1249,9 @@ svg.addEventListener('pointermove',e=>{
     if(Math.hypot(p.x-l.x,p.y-l.y)>=min){ drawPts.push(p); drawEl.setAttribute('d',strokePath(drawPts)); }
     return;
   }
+  if(ERZ){ scrubAt(e); return; }
   if(!drag) return;
-  if(drag.kind==='del') return;   // the ✕ never drags — and never pushes an undo
+  if(drag.kind==='del'||drag.kind==='painted') return;   // the ✕ and a paint tap never drag — and never push a second undo
   const p=toBoard(e);
   if(!drag.pushed){ pushUndo(); drag.pushed=true; }
   const s=drag.s;
@@ -1193,6 +1277,7 @@ svg.addEventListener('pointermove',e=>{
   renderLive();
 });
 svg.addEventListener('pointerup',()=>{
+  if(ERZ){ eraseCommit(); return; }
   if(drawPts){
     pushUndo();
     DOC.shapes.push({id:uid(), t:'raw', tag:'path',
@@ -1220,11 +1305,12 @@ svg.addEventListener('pointerdown',e=>{
      pointerups (app switch, system sheets, notification pulls) and a stale
      ledger entry makes every later tap read as "finger two" — the board goes
      dead until reload. A primary pointerdown wipes the slate. */
-  if(e.isPrimary){ PTRS.clear(); PINCH=null; drag=null; }
+  if(e.isPrimary){ PTRS.clear(); PINCH=null; drag=null; eraseAbort(); }   // a stale scrub un-hides, uncommitted
   PTRS.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(PTRS.size!==2) return;
   e.preventDefault(); e.stopPropagation();          // the single-finger machine never sees finger two
   if(drawPts){ if(drawEl) drawEl.remove(); drawPts=null; drawEl=null; }
+  eraseAbort();
   drag=null;
   let s=getSel();
   if(!s&&lastDesel&&performance.now()-lastDesel.t<350){ selT=lastDesel.id; selC=lastDesel.c; s=getSel()||null; if(s) renderSel(); }   // r9: no svg rebuild under live fingers
@@ -1267,7 +1353,7 @@ window.addEventListener('pointercancel',e=>{
 },true);
 /* r9: leaving the app mid-touch (home swipe, app switch, TestFlight sheet)
    loses the pointerup — wipe the gesture state so the board never jams */
-function clearGesture(){ PTRS.clear(); PINCH=null; drag=null; if(drawEl) drawEl.remove(); drawPts=null; drawEl=null; }
+function clearGesture(){ PTRS.clear(); PINCH=null; drag=null; if(drawEl) drawEl.remove(); drawPts=null; drawEl=null; eraseAbort(); }
 window.addEventListener('blur',clearGesture);
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) clearGesture(); });
 function renderLive(){
@@ -1826,6 +1912,13 @@ function sendBackToCounter(){
     b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:38px;z-index:25;box-shadow:0 3px 12px #000A;';
     b.onclick=sendBackToCounter;
     document.body.appendChild(b);
+    /* the starter kit — "what do they want to do? erase it, recolor it, add
+       maybe some more shapes. We have to help them get there." (Wyatt 8/15) */
+    const kit=document.createElement('div'); kit.id='kitbar';
+    kit.innerHTML='<button id="kitErase" class="kitb" onclick="kitErase()">🧽 ERASE IT</button>'
+      +'<button id="kitPaint" class="kitb" onclick="startPaint()">🎨 PAINT IT</button>'
+      +'<button class="kitb" onclick="dockOut(\'L\')">🦖 ADD SHAPES</button>';
+    document.body.appendChild(kit);
   } else {
     try{
       const cur=localStorage.getItem('ss.cur');
