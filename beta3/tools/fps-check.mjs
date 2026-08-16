@@ -1,7 +1,9 @@
-// v0.34.0 verification: fps overlay v2, full-DPR law, raster probe + renderer
-// choice (auto-CANVAS on software-GL devices), canvas tint shim, counter
-// throttles, and the ?lab=1 on-device perf bisection lab (boots, runs all 20
-// stages, writes its RTDB report, leaves normal boot untouched).
+// v0.35.0 verification: fps overlay v2, full-DPR law, WORKLOAD probe + renderer
+// verdict (~300-sprite/tilesprite/text/emitter run on BOTH real renderers at
+// boot — the fill-rate probe is dead; perf-lab run fxios-…/1786853475034 proved
+// object-count collapse that fill rate can't see), canvas tint shim, counter
+// throttles, grain diet (static baked image, no TileSprite), canvas-parity
+// snapshots for home + battle, and the ?lab=1 on-device perf bisection lab.
 // Drives a real headless Chrome over CDP (port 9333). Run from beta3/:
 //   node tools/fps-check.mjs
 const BASE = 'http://localhost:8899/index.html';
@@ -41,7 +43,8 @@ async function main() {
   const c = await cdp();
 
   // ---- boot: overlay present, live, reporting the real buffer ----
-  await c.nav(BASE + '?diag=1', 9000);
+  // (a fresh profile runs the workload probe before boot — allow for it)
+  await c.nav(BASE + '?diag=1', 15000);
   let st = await c.ev(`(()=>{
     const el = [...document.querySelectorAll('div')].find(d => /FPS ·/.test(d.textContent||''));
     const g = window.game;
@@ -81,27 +84,81 @@ async function main() {
   ok('?dpr=1 pins buffer to 1x', lad.w === Math.round(lad.iw * 1), 'w=' + lad.w);
   await c.send('Emulation.setTouchEmulationEnabled', { enabled: false });
 
-  // ---- v0.33.0: raster probe + renderer choice ----
+  // ---- v0.35.0: workload probe + renderer verdict ----
+  // force a fresh probe run: both renderers measured, verdict cached, budget held
+  await c.ev(`localStorage.removeItem('beta3.raster');'cleared'`);
+  await c.nav(BASE + '?glprobe=1&fps=0', 16000);
   const ras = JSON.parse(await c.ev(`JSON.stringify(window.__ssraster)`));
-  ok('raster probe beacon present with numeric rates', ras && ras.p && ras.p.gl >= 0 && ras.p.cv >= 0,
-    JSON.stringify(ras && ras.p));
-  ok('probe verdict cached', await c.ev(`!!localStorage.getItem('beta3.raster')`) === true);
+  ok('workload probe measured both renderers (ms/frame medians)',
+    ras && ras.why === 'workload' && ras.p && ras.p.glMs > 0 && ras.p.cvMs > 0,
+    JSON.stringify(ras && ras.p && { glMs: ras.p.glMs, cvMs: ras.p.cvMs, mode: ras.mode }));
+  ok('probe boot cost under budget (caps hold even on software GL)',
+    await c.ev(`window.__ssprobeMs > 0 && window.__ssprobeMs < 6500`) === true,
+    (await c.ev(`window.__ssprobeMs`)) + 'ms');
+  const cache = JSON.parse(await c.ev(`localStorage.getItem('beta3.raster')`) || 'null');
+  ok('verdict cached as v3 workload record', cache && cache.v === 3 && cache.why === 'workload'
+    && typeof cache.mode === 'string', JSON.stringify(cache && { v: cache.v, mode: cache.mode }));
+  // cached verdict is USED on the next boot (no re-probe)
+  await c.nav(BASE + '?fps=0', 10000);
+  ok('next boot rides the cached verdict (no re-probe)',
+    await c.ev(`window.__ssprobeMs === undefined && window.__ssraster.why === 'workload'`) === true);
   // ?rend=cv forces the canvas renderer and the tint shim bakes tinted copies
   await c.nav(BASE + '?rend=cv', 9000);
   const cvb = JSON.parse(await c.ev(`JSON.stringify({
     cv: game.renderer.type === Phaser.CANVAS,
+    why: window.__ssraster.why, probed: window.__ssprobeMs !== undefined,
     shim: !!Phaser.GameObjects.Image.prototype.__ssTintShim,
     baked: Object.keys(game.textures.list).filter(k => /^(dot|glowbig)#[0-9a-f]+$/.test(k)).length })`));
-  ok('?rend=cv boots the CANVAS renderer', cvb.cv);
+  ok('?rend=cv forces CANVAS, skips the probe, wins over the cache', cvb.cv && cvb.why === 'forced' && !cvb.probed);
   ok('canvas tint shim installed and baking (stars/aurora keep their colors)', cvb.shim && cvb.baked >= 3,
     cvb.baked + ' baked tints');
   // ?rend=gl forces WebGL
   await c.nav(BASE + '?rend=gl', 9000);
-  ok('?rend=gl boots the WEBGL renderer', await c.ev(`game.renderer.type === Phaser.WEBGL`) === true);
-  // same-day daily board must deal identical letters on both renderers
-  const dailyLetters = async (rend) => {
+  ok('?rend=gl forces the WEBGL renderer over the cache',
+    await c.ev(`game.renderer.type === Phaser.WEBGL && window.__ssraster.why === 'forced'`) === true);
+  // grain diet: the film grain is a single baked half-res Image, not a TileSprite
+  const gr = JSON.parse(await c.ev(`(()=>{ const h = game.scene.getScene('home');
+    const g = h && h.sky && h.sky.grain;
+    return JSON.stringify({ type: g && g.type, key: g && g.texture.key,
+      halfres: game.textures.exists('grainbake') &&
+        Math.abs(game.textures.get('grainbake').getSourceImage().width - game.scale.width / 2) <= 1 }); })()`));
+  ok('film grain is a baked static Image at half res (TileSprite diet)',
+    gr.type === 'Image' && gr.key === 'grainbake' && gr.halfres, JSON.stringify(gr));
+  // a 24x48 grid of averaged colors from a real renderer snapshot — coarse
+  // enough to forgive twinkle phase, sharp enough to catch a scene that lost
+  // its buttons/tiles (canvas-parity law)
+  const gridSnap = () => c.ev(`(async () => {
+    const img = await new Promise(res => game.renderer.snapshot(res));
+    const cv = document.createElement('canvas'); cv.width = 24; cv.height = 48;
+    const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, 24, 48);
+    return Array.from(cx.getImageData(0, 0, 24, 48).data);
+  })()`);
+  const gridDiff = (a, b, fromRow) => {
+    let sum = 0, n = 0;
+    for (let r = fromRow; r < 48; r++) for (let x = 0; x < 24; x++) {
+      const i = (r * 24 + x) * 4;
+      sum += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
+      n += 3;
+    }
+    return +(sum / n).toFixed(2);
+  };
+  // home parity: meadow under GL vs CV (lower 2/3 — the showcase beast up top
+  // is random per boot; buttons/title/meadow below are deterministic). The
+  // intro is bypassed (software-GL runs it at 6fps and never settles in time).
+  const homeGrid = async (rend) => {
+    await c.ev(`sessionStorage.setItem('beta3.skipIntro','1');'armed'`);
+    await c.nav(BASE + '?rend=' + rend + '&fps=0', 12000);
+    await c.ev(`(async()=>{ for (let i=0;i<24;i++){ if (window.game && game.scene.isActive('home') && game.scene.getScene('home').titleT) return; await new Promise(r=>setTimeout(r,500)); } })()`);
+    await sleep(2000);
+    return gridSnap();
+  };
+  const hGL = await homeGrid('gl'), hCV = await homeGrid('cv');
+  const hd = gridDiff(hGL, hCV, 16);
+  ok('canvas-parity: home meadow matches WebGL (grid diff < 10)', hd < 10, hd + ' avg channel diff');
+  // battle parity + seed law: same-day daily board on both renderers
+  const dailyBoard = async (rend) => {
     await c.nav(BASE + '?rend=' + rend + '&daily=1&mpuid=fpscheck', 12000);
-    return await c.ev(`(async () => {
+    const letters = await c.ev(`(async () => {
       for (let i = 0; i < 40; i++) {
         const b = game.scene.getScene('battle');
         if (game.scene.isActive('battle') && b && b.board && b.board.length === 16 && b.board.every(s => s && s.ch))
@@ -110,10 +167,16 @@ async function main() {
       }
       return 'TIMEOUT';
     })()`);
+    await sleep(2500);
+    return { letters, grid: await gridSnap() };
   };
-  const dGL = await dailyLetters('gl'), dCV = await dailyLetters('cv');
-  ok('daily board letters identical across renderers (seed untouched)', dGL === dCV && dGL !== 'TIMEOUT',
-    dGL + ' vs ' + dCV);
+  const dGL = await dailyBoard('gl'), dCV = await dailyBoard('cv');
+  ok('daily board letters identical across renderers (seed untouched)',
+    dGL.letters === dCV.letters && dGL.letters !== 'TIMEOUT', dGL.letters + ' vs ' + dCV.letters);
+  // measured 8.1 healthy (random bg stars + software-GL gradient dither);
+  // a canvas scene that lost its tiles/buttons reads 30+
+  const bd = gridDiff(dGL.grid, dCV.grid, 16);
+  ok('canvas-parity: battle board matches WebGL (grid diff < 14)', bd < 14, bd + ' avg channel diff');
 
   // ---- counters: drain lands exact, throttle really skips repaints ----
   await c.nav(BASE + '?diag=1', 9000);

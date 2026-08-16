@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.34.0';
+const BUILD = 'STARSPELL v0.35.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -30,95 +30,164 @@ const DEMO = QS.get('demo') === '1';
 // the normal boot and the viewport machinery below stand down entirely.
 const LAB = QS.get('lab') === '1';
 
-/* ---- raster probe + renderer choice ------------------------------------
-   The iOS 9fps hunt (v0.33.0) ended here: on the afflicted iPhone the JS was
-   idle and the fill was modest, yet frames cost ~26ms + ~11ms per Mpx — the
-   signature of WebGL running on a SOFTWARE rasterizer (~90Mpx/s; a real
-   phone GPU does thousands). Some WKWebView/Safari states hand Phaser a GL
-   context that silently rasterizes on the CPU, while the same device's
-   Canvas2D is GPU-backed and fast. So: measure both fill rates once at boot
-   (cached 7 days), and only when GL is provably catastrophic AND canvas is
-   provably faster, boot Phaser.CANVAS instead of AUTO. Resolution and look
-   are untouched — this is choosing the fast rasterizer, not a quality
-   ladder. ?rend=cv / ?rend=gl force either path; ?glprobe=1 re-measures. */
-function ssRasterProbe() {
+/* ---- workload probe + renderer verdict ---------------------------------
+   The v0.33.0 fill-rate probe asked "how fast can this device fill pixels?"
+   and the afflicted iPhone answered honestly: very (gl 2212 Mpx/s — the GPU
+   is real). Yet the perf lab (v0.34.0, run fxios-…/1786853475034) showed the
+   full home scene at 6fps/154ms on WebGL and 59fps on Canvas ON THAT SAME
+   PHONE: its iOS WebKit WebGL path collapses with OBJECT COUNT (per-draw /
+   GPU-process overhead piling up per content layer), which a fill-rate
+   number can never see. So the probe now runs the workload the game actually
+   is: ~300 small tinted alpha-blended sprites, a tilesprite, a per-frame
+   text, a modest emitter — a handful of real Phaser frames on BOTH real
+   renderers at full DPR, near-invisible during boot. Better median frame
+   time wins ON THIS DEVICE. No per-browser/UA rules (Safari's Canvas2D may
+   genuinely lose; next year's WebKit may flip again) — measure, decide,
+   cache 7 days. ?rend=cv / ?rend=gl force either path; ?glprobe=1
+   re-measures. Crispness untouched: same resolution either way. */
+const SS_REND = { mode: 'auto', why: 'auto', p: null };
+window.__ssraster = SS_REND;
+function ssProbeScene() {
+  return class extends Phaser.Scene {
+    constructor() { super('probe'); }
+    create() {
+      const W = this.scale.width, H = this.scale.height, u = W / 428;
+      let t = this.textures.createCanvas('pdot', 16, 16);
+      const g = t.context.createRadialGradient(8, 8, 0, 8, 8, 8);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,0.5)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      t.context.fillStyle = g; t.context.fillRect(0, 0, 16, 16); t.refresh();
+      t = this.textures.createCanvas('pnoise', 64, 64);   // POT — WebGL1 REPEAT
+      const im = t.context.createImageData(64, 64), d = im.data;
+      for (let i = 0; i < d.length; i += 4) { const v = (Math.random() * 255) | 0; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+      t.context.putImageData(im, 0, 0); t.refresh();
+      // ~300 small tinted alpha sprites, a third ADD-blended, a third alpha-
+      // tweened — the meadow's composition (stars/aurora/fireflies) in miniature
+      for (let i = 0; i < 300; i++) {
+        const s = this.add.image(Math.random() * W, Math.random() * H, 'pdot')
+          .setScale((0.3 + Math.random() * 0.7) * u).setAlpha(0.08 + Math.random() * 0.3)
+          .setTint(SS_STAR_COLORS[i % SS_STAR_COLORS.length]);
+        if (i % 3 === 0) s.setBlendMode('ADD');
+        if (i % 3 === 1) this.tweens.add({ targets: s, alpha: 0.04, duration: 700 + (i % 7) * 150, yoyo: true, repeat: -1 });
+      }
+      // one full-screen tilesprite — the game's TileSprite class of work
+      this.add.tileSprite(W / 2, H / 2, W, H, 'pnoise').setAlpha(0.05);
+      // one text rewritten every frame — score count-ups, countdowns
+      const tx = this.add.text(W / 2, H * 0.8, '0', {
+        fontFamily: 'Georgia, serif', fontSize: Math.max(12, Math.round(18 * u)) + 'px', color: '#1c2350',
+      }).setOrigin(0.5).setAlpha(0.3);
+      let n = 0;
+      this.events.on('update', () => tx.setText(String(n = (n + 7) % 99999)));
+      // one modest steady emitter — the burst machinery, priced at steady state
+      this.add.particles(0, 0, 'pdot', {
+        x: { min: 0, max: W }, y: -10, quantity: 1, frequency: 90, lifespan: 2400,
+        speedY: { min: 40 * u, max: 90 * u }, scale: { start: 0.5 * u, end: 0 },
+        alpha: { start: 0.2, end: 0 }, blendMode: 'ADD', tint: 0x2a3355,
+      });
+      this.game.__pready = true;
+    }
+  };
+}
+// boots one throwaway Phaser game on `type`, samples real frame deltas, and
+// resolves {ms: median, gpu} — ms -1 when the renderer failed to boot/sample
+function ssProbeRun(type) {
+  return new Promise((resolve) => {
+    const out = { ms: -1, gpu: '' };
+    const f = [];                                    // sampled frame deltas
+    let g = null, fin = false;
+    const finish = () => {
+      if (fin) return; fin = true;
+      // whatever frames we got by now ARE the answer — a 150ms/frame
+      // renderer that only managed 4 samples before the cap still reports
+      if (out.ms < 0 && f.length >= 3) { f.sort((a, b) => a - b); out.ms = +f[f.length >> 1].toFixed(1); }
+      let gl = null;
+      try { gl = g && g.renderer && g.renderer.gl; } catch (e) { }
+      const gone = () => {
+        try { const ext = gl && gl.getExtension('WEBGL_lose_context'); if (ext) ext.loseContext(); } catch (e) { }
+        try { if (g && g.canvas && g.canvas.parentNode) g.canvas.parentNode.removeChild(g.canvas); } catch (e) { }
+        resolve(out);
+      };
+      if (!g) return gone();
+      let done = false; const once = () => { if (!done) { done = true; gone(); } };
+      try { g.events.once('destroy', once); g.destroy(true); } catch (e) { once(); }
+      setTimeout(once, 500);
+    };
+    setTimeout(finish, 3000);                        // absolute per-renderer failsafe
+    try {
+      g = new Phaser.Game({
+        type, banner: false,
+        width: Math.round(window.innerWidth * DPR), height: Math.round(window.innerHeight * DPR),
+        backgroundColor: '#0a0d1c',
+        scale: { mode: Phaser.Scale.NONE },
+        render: { antialias: type === Phaser.CANVAS ? true : DPR < 2, powerPreference: 'high-performance' },
+        scene: [ssProbeScene()],
+      });
+    } catch (e) { finish(); return; }
+    const arm = () => {
+      if (fin) return;
+      if (!g.isBooted || !g.__pready) { setTimeout(arm, 30); return; }
+      try {   // near-invisible: real draws, real compositing, faint on screen
+        g.canvas.style.cssText += ';position:fixed;left:0;top:0;opacity:0.05;pointer-events:none;' +
+          'width:' + window.innerWidth + 'px;height:' + window.innerHeight + 'px';
+      } catch (e) { }
+      try {
+        const gl = g.renderer && g.renderer.gl;
+        if (gl) {
+          const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+          out.gpu = String(gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : gl.RENDERER)).slice(0, 48);
+        }
+      } catch (e) { }
+      // the measurement cap starts HERE, not at boot — a slow renderer's 1s
+      // boot must not eat the sampling window (the failsafe above still rules)
+      setTimeout(finish, 1600);
+      let warm = 2;
+      const t0 = performance.now();
+      const onStep = () => {
+        if (warm-- > 0) return;                       // compiles/uploads stay out of the clock
+        const d = g.loop.rawDelta;
+        if (d > 0 && d < 2000) f.push(d);
+        // a handful of frames or ~900ms of sampling, whichever first — a
+        // 50ms/frame renderer still yields 12+ frames for a stable median
+        if (f.length >= 20 || performance.now() - t0 > 900) {
+          try { g.events.off('prestep', onStep); } catch (e) { }
+          finish();
+        }
+      };
+      g.events.on('prestep', onStep);
+    };
+    arm();
+  });
+}
+// resolves SS_REND in place (cached / forced: immediately; else ~1-1.5s probe)
+function ssRenderVerdict() {
+  const q = QS.get('rend');
+  if (q === 'cv' || q === 'canvas') { SS_REND.mode = 'cv'; SS_REND.why = 'forced'; return Promise.resolve(SS_REND); }
+  if (q === 'gl' || q === 'webgl') { SS_REND.mode = 'gl'; SS_REND.why = 'forced'; return Promise.resolve(SS_REND); }
   if (QS.get('glprobe') !== '1') {
     try {
       const c = JSON.parse(localStorage.getItem('beta3.raster') || 'null');
-      if (c && c.v === 2 && Date.now() - c.t < 7 * 864e5) return c;
+      if (c && c.v === 3 && Date.now() - c.t < 7 * 864e5) {
+        SS_REND.mode = c.mode; SS_REND.why = c.why; SS_REND.p = c;
+        return Promise.resolve(SS_REND);
+      }
     } catch (e) { }
   }
-  const S = 384, out = { v: 2, t: Date.now(), gl: 0, cv: 0, gpu: '' };
-  try {   // GL: blended fullscreen triangles through a minimal pipeline
-    const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
-    const gl = cv.getContext('webgl', { antialias: false, depth: false, stencil: false });
-    if (gl) {
-      try {
-        const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-        out.gpu = String(gl.getParameter(dbg ? dbg.UNMASKED_RENDERER_WEBGL : gl.RENDERER)).slice(0, 48);
-      } catch (e) { }
-      // textured + blended, like the game's real pixels: a flat-color probe
-      // reads ~10x too fast on software rasterizers (measured vs the live
-      // scene under SwiftShader) and would let a slow device slip past.
-      const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; };
-      const pr = gl.createProgram();
-      gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}'));
-      gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, 'precision mediump float;varying vec2 v;uniform sampler2D u;void main(){gl_FragColor=texture2D(u,v)*vec4(1.,.9,.8,.5);}'));
-      gl.linkProgram(pr); gl.useProgram(pr);
-      const tc = document.createElement('canvas'); tc.width = tc.height = 256;
-      const tcx = tc.getContext('2d');
-      tcx.fillStyle = '#546'; tcx.fillRect(0, 0, 256, 256);
-      tcx.fillStyle = '#a98'; for (let i = 0; i < 8; i++) tcx.fillRect(i * 32, 0, 16, 256);
-      const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tc);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-      const loc = gl.getAttribLocation(pr, 'p');
-      gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      gl.viewport(0, 0, S, S);
-      const px = new Uint8Array(4);
-      const pass = (n) => { for (let i = 0; i < n; i++) gl.drawArrays(gl.TRIANGLES, 0, 3); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
-      pass(8);   // warm: shader compile + first-alloc stay out of the clock
-      const t0 = performance.now(); pass(30);
-      out.gl = Math.round(30 * S * S / Math.max(0.4, performance.now() - t0) / 1000);
-      const lc = gl.getExtension('WEBGL_lose_context'); if (lc) lc.loseContext();
-    }
-  } catch (e) { }
-  try {   // Canvas2D: alpha-blended full-canvas blits, same yardstick
-    const a = document.createElement('canvas'), b2 = document.createElement('canvas');
-    a.width = a.height = b2.width = b2.height = S;
-    const ca = a.getContext('2d'), cb = b2.getContext('2d');
-    cb.fillStyle = '#334455'; cb.fillRect(0, 0, S, S);
-    ca.globalAlpha = 0.6;
-    for (let i = 0; i < 6; i++) ca.drawImage(b2, 0, 0);
-    ca.getImageData(0, 0, 1, 1);
-    const t0 = performance.now();
-    for (let i = 0; i < 40; i++) ca.drawImage(b2, 0, 0);
-    ca.getImageData(0, 0, 1, 1);
-    out.cv = Math.round(40 * S * S / Math.max(0.4, performance.now() - t0) / 1000);
-  } catch (e) { }
-  try { localStorage.setItem('beta3.raster', JSON.stringify(out)); } catch (e) { }
-  return out;
+  const t0 = performance.now();
+  return ssProbeRun(Phaser.WEBGL).then((gl) => ssProbeRun(Phaser.CANVAS).then((cv) => {
+    const out = {
+      v: 3, t: Date.now(), glMs: gl.ms, cvMs: cv.ms, gpu: gl.gpu || '',
+      probeMs: Math.round(performance.now() - t0), why: 'workload', mode: 'auto',
+    };
+    // canvas must beat WebGL by >10% frame time to unseat it: status-quo bias
+    // keeps healthy devices off the shim path and stops coin-flip flip-flops.
+    // Either renderer missing → AUTO (Phaser makes its own fallback).
+    if (gl.ms > 0 && cv.ms > 0 && cv.ms < gl.ms * 0.9) out.mode = 'cv';
+    try { localStorage.setItem('beta3.raster', JSON.stringify(out)); } catch (e) { }
+    SS_REND.mode = out.mode; SS_REND.why = out.why; SS_REND.p = out;
+    window.__ssprobeMs = out.probeMs;
+    DIAG('workload probe gl ' + gl.ms + ' · cv ' + cv.ms + ' ms/f → ' + out.mode + ' (' + out.probeMs + 'ms)');
+    return SS_REND;
+  }));
 }
-const SS_REND = (() => {
-  const q = QS.get('rend');
-  if (q === 'cv' || q === 'canvas') return { mode: 'cv', why: 'forced' };
-  if (q === 'gl' || q === 'webgl') return { mode: 'gl', why: 'forced' };
-  const p = ssRasterProbe();
-  // GL under 600Mpx/s (textured) is no GPU at all: software paths bench well
-  // under that, the weakest real GPU reads thousands. When GL is that broken,
-  // the canvas renderer wins even against an all-software Canvas2D (measured
-  // 3.3x under SwiftShader; GPU-backed Canvas2D wins far bigger) — the cv
-  // number is diagnostic, not a gate. gl===0 means no WebGL at all: leave
-  // AUTO to make its own canvas fallback.
-  if (p.gl > 0 && p.gl < 600) return { mode: 'cv', why: 'auto', p };
-  return { mode: 'auto', why: 'auto', p };
-})();
-window.__ssraster = SS_REND;
 
 /* Canvas renderer: setTint is a silent no-op (long-standing project rule) —
    under the canvas fallback every tinted image would draw white. Rather than
@@ -238,12 +307,19 @@ function ssPerfWatch(gm) {
     gm.events.on('prerender', () => { pT = performance.now(); });
     gm.events.on('postrender', () => { rendSum += performance.now() - pT; pN++; });
   }
-  // 2nd line: what the raster probe learned + which renderer we chose and why.
-  // On the afflicted phone one screenshot now names the pathology outright.
-  const P = window.__ssraster || {};
-  const probeLine = (P.p ? 'gl ' + P.p.gl + ' · cv ' + P.p.cv + ' Mpx/s · ' : '') +
-    (P.mode === 'cv' ? 'CV(' + P.why + ')' : P.mode === 'gl' ? 'GL(forced)' : 'auto') +
-    (P.p && P.p.gpu ? ' · ' + P.p.gpu.slice(0, 34) : '');
+  // 2nd line: what the workload probe measured + which renderer won and by
+  // what ms. On the afflicted phone one screenshot names the verdict outright.
+  const P = window.__ssraster || {}, pp = P.p || {};
+  const r1 = (v) => (v > 0 ? Math.round(v * 10) / 10 : '—');
+  let verdict = 'auto';
+  if (P.why === 'forced') verdict = (P.mode === 'cv' ? 'CV' : 'GL') + ' (forced)';
+  else if (P.why === 'workload') {
+    verdict = P.mode === 'cv'
+      ? 'CV (workload' + (pp.glMs > 0 && pp.cvMs > 0 ? ' −' + Math.round((pp.glMs - pp.cvMs) * 10) / 10 + 'ms' : '') + ')'
+      : 'GL (workload)';
+  }
+  const probeLine = (pp.glMs != null ? 'gl ' + r1(pp.glMs) + ' · cv ' + r1(pp.cvMs) + ' ms/f · ' : '') +
+    verdict + (pp.gpu ? ' · ' + pp.gpu.slice(0, 30) : '');
   setInterval(() => {
     const fps = Math.round(gm.loop.actualFps);
     if (el) {
@@ -838,6 +914,28 @@ function ssSkyTextures(scene, dawn) {
   }, 2);   // 1024x64 — still power-of-two both ways for WebGL1 REPEAT
 }
 
+/* Film grain, dieted (perf-lab task 24): the full-screen grain TileSprite
+   cost 16fps on the afflicted iPhone — a live TileSprite keeps a full
+   back-buffer-sized internal pattern canvas and runs the tile pipeline every
+   frame for what is a completely STATIC effect at alpha 0.04. Now the tiled
+   noise is baked ONCE at half back-buffer res and drawn as a single
+   stretched Image: one plain quad per frame on both renderers, and the 2x
+   coarsening is imperceptible at 4% opacity (side-by-side verified).
+   Rebaked only when a reshape (rotation) changes the target size. */
+function ssGrainOverlay(scene, W, H) {
+  const gw = Math.max(64, Math.round(W / 2)), gh = Math.max(64, Math.round(H / 2));
+  const key = 'grainbake';
+  const ex = scene.textures.exists(key) ? scene.textures.get(key).getSourceImage() : null;
+  if (ex && (ex.width !== gw || ex.height !== gh)) scene.textures.remove(key);
+  if (!scene.textures.exists(key)) {
+    const t = scene.textures.createCanvas(key, gw, gh);
+    const src = scene.textures.get('grain').getSourceImage();
+    for (let y = 0; y < gh; y += 128) for (let x = 0; x < gw; x += 128) t.context.drawImage(src, x, y);
+    t.refresh();
+  }
+  return scene.add.image(W / 2, H / 2, key).setDisplaySize(W, H).setScrollFactor(0).setAlpha(0.04).setDepth(500);
+}
+
 const SS_STAR_COLORS = [0xcfd8ff, 0xcfd8ff, 0xcfd8ff, 0xffe9c9, 0xffd1dc, 0xc9fff2];
 // Small standalone mulberry32 — seeded skies (versus: shared seed = same sky)
 function ssMulberry(seed) {
@@ -973,8 +1071,8 @@ function ssSkyWorld(scene, opts) {
   // film grain over everything — fixed to the camera. The rise/descent hides
   // it: at alpha 0.04 it is invisible over a fast-scrolling sky, and it is a
   // full back-buffer of blended fill per frame at DPR 3 — exactly the frames
-  // that must not drop.
-  const grain = scene.add.tileSprite(l.W / 2, l.H / 2, l.W, l.H, 'grain').setScrollFactor(0).setAlpha(0.04).setDepth(500);
+  // that must not drop. Baked static image, not a TileSprite (see ssGrainOverlay).
+  const grain = ssGrainOverlay(scene, l.W, l.H);
 
   // camera driver: p 0 = meadow · 1 = zenith; vel drives the star-stretch
   const setP = (p, vel) => {
@@ -5480,7 +5578,7 @@ function ssBoot() {
     scene: [Home, Battle, Profile, Board],
   });
   window.game = game;
-  DIAG('rend ' + SS_REND.mode + '/' + SS_REND.why + (SS_REND.p ? ' gl ' + SS_REND.p.gl + ' cv ' + SS_REND.p.cv + ' Mpx/s' : ''));
+  DIAG('rend ' + SS_REND.mode + '/' + SS_REND.why + (SS_REND.p ? ' gl ' + SS_REND.p.glMs + ' cv ' + SS_REND.p.cvMs + ' ms/f' : ''));
   // renderer may not exist until Phaser's own boot — install the shim both
   // ways (it no-ops unless the renderer really is Canvas; AUTO can land there
   // too, e.g. headless without GPU)
@@ -5510,13 +5608,17 @@ if (LAB) {
      stage by stage, and the fixed-size stages must not be restarted under
      the meter, so the viewport machinery below stands down too. SSNET still
      connects: the lab reports home through it. */
-} else if (ART) {
-  let booted = false;
-  const go = () => { if (!booted) { booted = true; ssBoot(); } };
-  setTimeout(() => { if (!booted) DIAG('art TIMEOUT — procedural'); go(); }, 2500);
-  ssLoadArt().then(go);
 } else {
-  ssBoot();
+  // renderer verdict first (cached or forced: resolves instantly; first boot:
+  // ~1-1.5s of workload probing, hard-capped), then the art gate as before
+  ssRenderVerdict().then(() => {
+    if (ART) {
+      let booted = false;
+      const go = () => { if (!booted) { booted = true; ssBoot(); } };
+      setTimeout(() => { if (!booted) DIAG('art TIMEOUT — procedural'); go(); }, 2500);
+      ssLoadArt().then(go);
+    } else ssBoot();
+  });
 }
 // a profile row for everyone who ever opened the game — friend links and
 // rating cards look names up there, and a first-time inviter has played nothing

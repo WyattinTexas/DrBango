@@ -41,12 +41,12 @@
 
   const runKey = String(Date.now());
   const payload = {
-    v: 1, build: BUILD, ua: UA.slice(0, 160), browser: BROWSER,
+    v: 2, build: BUILD, ua: UA.slice(0, 160), browser: BROWSER,
     id: BROWSER + '-' + SSNET.uid(), runKey, fast: FAST,
     dpr: DPR, deviceDpr: window.devicePixelRatio || 1,
     vw: LW, vh: LH, screen: (screen.width || 0) + 'x' + (screen.height || 0),
     raster: {
-      gl: SS_REND.p ? SS_REND.p.gl : -1, cv: SS_REND.p ? SS_REND.p.cv : -1,
+      glMs: SS_REND.p ? SS_REND.p.glMs : -1, cvMs: SS_REND.p ? SS_REND.p.cvMs : -1,
       gpu: (SS_REND.p && SS_REND.p.gpu) || '', mode: SS_REND.mode, why: SS_REND.why,
     },
     stages: [], errors: [], startedAt: 0, updatedAt: 0, completed: 0, total: 0,
@@ -115,7 +115,7 @@
       '<div style="text-align:center;margin:6px 0;font-weight:bold;color:' + (p.uploaded ? '#7ec96f' : '#e74c3c') + '">' +
       (p.uploaded ? '✓ UPLOADED — results are already home' : '✗ OFFLINE — please screenshot this table') + '</div>' +
       '<div style="text-align:center;color:#8a94c4;font-size:11px;margin-bottom:10px">' +
-      BROWSER + ' · dpr' + DPR + ' · gl ' + p.raster.gl + ' · cv ' + p.raster.cv + ' Mpx/s · ' + esc(p.raster.gpu || '') +
+      BROWSER + ' · dpr' + DPR + ' · gl ' + p.raster.glMs + ' · cv ' + p.raster.cvMs + ' ms/f · ' + esc(p.raster.gpu || '') +
       '<br>maxTex ' + (p.maxTex || '?') + ' · ctx ' + esc(p.ctxStr || '?') + ' · winner: ' + esc(p.winner || 'base') +
       (p.tex && p.tex.over && p.tex.over.length ? '<br><b style="color:#e74c3c">OVERSIZED TEXTURES: ' + esc(JSON.stringify(p.tex.over)) + '</b>' : '') +
       '</div>' +
@@ -250,7 +250,9 @@
       }
     }],
     ['grain', (sc, l) => {
-      sc.add.tileSprite(l.W / 2, l.H / 2, l.W, l.H, 'grain').setScrollFactor(0).setAlpha(0.04).setDepth(500);
+      // the dieted grain the game now ships (task 24): baked half-res static
+      // image, not a live TileSprite — the lab prices what players get
+      ssGrainOverlay(sc, l.W, l.H);
     }],
     ['twinkle', (sc) => {
       for (const st of sc.__tw)
@@ -497,6 +499,15 @@
     status('warming up…');
     try { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').catch(() => { }); } catch (e) { }
     try { await SSNET.connect(); } catch (e) { }
+    // fresh workload-probe verdict so the base stage boots the config a real
+    // visit would get, and the payload carries today's numbers
+    try {
+      await ssRenderVerdict();
+      payload.raster = {
+        glMs: SS_REND.p ? SS_REND.p.glMs : -1, cvMs: SS_REND.p ? SS_REND.p.cvMs : -1,
+        gpu: (SS_REND.p && SS_REND.p.gpu) || '', mode: SS_REND.mode, why: SS_REND.why,
+      };
+    } catch (e) { }
     try { await ssLoadArt(); } catch (e) { }
     INTRO_SEEN = true;   // home stages land straight on the interactive meadow
     payload.startedAt = Date.now();
