@@ -1789,7 +1789,26 @@ function sendBackToCounter(){
   clearTimeout(render._t);
   const svg=DOC.shapes.map(shapeStr).join('');
   try{
-    localStorage.setItem('ss.editOut', JSON.stringify({char:EDITJOB.char, slot:EDITJOB.slot, vi:EDITJOB.vi, svg}));
+    if(EDITJOB.gal!=null){
+      /* a piece of a SAVED DRAWING: the edit replaces that piece INSIDE the
+         gallery doc itself (as one grouped shape), thumbnail regenerated —
+         the maker only displays; the doc surgery lives here with parseMold */
+      const g=loadGal(), it=g.find(x=>x.id===EDITJOB.gal);
+      if(it && it.doc){
+        migrateDoc(it.doc);   // the maker serialized from a migrated copy — align before splicing
+        const shp=it.doc.shapes||(it.doc.shapes=[]);
+        const idx=EDITJOB.idx|0, wide=it.doc.board==='wide';
+        const rep=parseMold(svg, EDITJOB.plabel||'PIECE', wide?'0 0 1280 640':'0 0 140 140');
+        if(rep.kids.length){ if(idx>=0&&idx<shp.length) shp.splice(idx,1,rep); else shp.push(rep); }
+        else if(idx>=0&&idx<shp.length) shp.splice(idx,1);   // fully erased = the piece comes off
+        const keep=DOC; DOC=it.doc; it.svg=docSVG(wide); DOC=keep;   // docSVG/skyDefs read the DOC global
+        it.ts=Date.now();
+        saveGal(g);
+        localStorage.setItem('ss.galBack', EDITJOB.gal);
+      }
+    } else {
+      localStorage.setItem('ss.editOut', JSON.stringify({char:EDITJOB.char, slot:EDITJOB.slot, vi:EDITJOB.vi, svg}));
+    }
     const p=localStorage.getItem('ss.parked');
     if(p) localStorage.setItem('ss.cur',p); else localStorage.removeItem('ss.cur');
     localStorage.removeItem('ss.parked'); localStorage.removeItem('ss.edit');
@@ -1799,10 +1818,11 @@ function sendBackToCounter(){
 (function(){
   if(EDITJOB){
     try{ localStorage.setItem('ss.parked', localStorage.getItem('ss.cur')||''); }catch(e){}
+    if(EDITJOB.board && BOARDS[EDITJOB.board]) DOC.board=EDITJOB.board;   // a wide drawing's piece gets the wide paper
     const g=parseMold(EDITJOB.svg||'', EDITJOB.label||'PART', EDITJOB.vb||'0 0 140 140');
     if(g.kids.length){ DOC.shapes.push(g); selT=g.id; }
     const b=document.createElement('button'); b.id='backCounter'; b.className='gold';
-    b.textContent='⬅ BACK TO THE CHARACTER MAKER — wear it';
+    b.textContent=EDITJOB.gal!=null? '⬅ PUT IT BACK IN MY DRAWING' : '⬅ BACK TO THE CHARACTER MAKER — wear it';
     b.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:38px;z-index:25;box-shadow:0 3px 12px #000A;';
     b.onclick=sendBackToCounter;
     document.body.appendChild(b);
