@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.36.0';
+const BUILD = 'STARSPELL v0.36.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -319,10 +319,14 @@ window.SSPERF = PERF;   // the headless perf harness reads/starts probes through
    frame of the last half-second, renderer (GL/CV — a phone screenshot
    instantly tells us if WebGL failed over to Canvas), back-buffer size and
    dpr. DOM, not a Phaser object: zero render cost, survives scene changes.
-   On by default while perf is under investigation; ?fps=0 hides it. */
+   OPT-IN as of v0.36.1: ?fps=1 shows it. It was default-ON through the iPhone
+   perf saga (v0.32-v0.36) and earned its place — the v0.36.0 verdict bug was
+   diagnosed entirely from one screenshot of line 2 — but that investigation is
+   closed, and it sat on top of the QUICK PLAY header for every player. The
+   measurement machinery below always runs; only the readout is gated. */
 function ssPerfWatch(gm) {
   let el = null;
-  if (QS.get('fps') !== '0') {
+  if (QS.get('fps') === '1') {
     el = document.createElement('div');
     el.style.cssText = 'position:fixed;left:4px;top:calc(env(safe-area-inset-top,0px) + 4px);' +
       'z-index:40;pointer-events:none;font:600 10px/1.5 ui-monospace,Menlo,monospace;' +

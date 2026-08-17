@@ -1,4 +1,4 @@
-// v0.36.0 verification: fps overlay v2, full-DPR law, WORKLOAD probe + renderer
+// v0.36.1 verification: fps overlay (OPT-IN via ?fps=1), full-DPR law, WORKLOAD probe + renderer
 // verdict (~300-sprite/tilesprite/text/emitter run on BOTH real renderers at
 // boot — the fill-rate probe is dead; perf-lab run fxios-…/1786853475034 proved
 // object-count collapse that fill rate can't see), canvas tint shim, counter
@@ -38,13 +38,16 @@ async function cdp() {
 }
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+// a verdict that came from an actual probe run, however each renderer ended
+const PROBED = (w) => ['workload', 'gl-unmeasurable', 'cv-unmeasurable'].includes(w);
+const PROBED_JS = `((w) => ['workload','gl-unmeasurable','cv-unmeasurable'].includes(w))`;
 
 async function main() {
   const c = await cdp();
 
-  // ---- boot: overlay present, live, reporting the real buffer ----
+  // ---- boot: overlay opt-in, live, reporting the real buffer ----
   // (a fresh profile runs the workload probe before boot — allow for it)
-  await c.nav(BASE + '?diag=1', 15000);
+  await c.nav(BASE + '?diag=1&fps=1', 15000);
   let st = await c.ev(`(()=>{
     const el = [...document.querySelectorAll('div')].find(d => /FPS ·/.test(d.textContent||''));
     const g = window.game;
@@ -56,7 +59,7 @@ async function main() {
     });
   })()`);
   st = JSON.parse(st);
-  ok('overlay exists on default boot', st.overlay, st.text);
+  ok('?fps=1 shows the overlay', st.overlay, st.text);
   ok('overlay names renderer', st.text && (st.text.includes('GL') || st.text.includes('CV')), st.renderer);
   ok('overlay carries buffer size', st.text && st.text.includes(st.w + '×' + st.h));
   const t1 = await c.ev(`[...document.querySelectorAll('div')].find(d=>/FPS ·/.test(d.textContent)).textContent`);
@@ -64,10 +67,15 @@ async function main() {
   const t2 = await c.ev(`[...document.querySelectorAll('div')].find(d=>/FPS ·/.test(d.textContent)).textContent`);
   ok('overlay is live (reports a numeric fps)', /^\d+ FPS/.test(t2), t2);
 
-  // ---- ?fps=0 hides it ----
+  // ---- v0.36.1: the overlay is OPT-IN — a plain boot shows players nothing ----
+  // (it was default-ON through the perf saga and sat on the QUICK PLAY header)
+  const noFlag = `![...document.querySelectorAll('div')].some(d => /FPS ·/.test(d.textContent||''))`;
+  await c.nav(BASE, 9000);
+  ok('DEFAULT boot has no overlay (players get a clean screen)', await c.ev(noFlag) === true);
   await c.nav(BASE + '?fps=0', 8000);
-  const hidden = await c.ev(`![...document.querySelectorAll('div')].some(d => /FPS ·/.test(d.textContent||''))`);
-  ok('?fps=0 hides the overlay', hidden === true);
+  ok('?fps=0 still hides it (old habit keeps working)', await c.ev(noFlag) === true);
+  ok('perf machinery runs even with the readout off (measurement is not gated)',
+    await c.ev(`!!window.game && game.loop.actualFps > 0`) === true);
 
   // ---- v0.32.1 law: the ladder is dead — stored caps purge, full-DPR always ----
   await c.ev(`localStorage.setItem('beta3.dprCap','1.5');localStorage.setItem('beta3.dprCapTs',String(Date.now()));'set'`);
@@ -89,17 +97,32 @@ async function main() {
   await c.ev(`localStorage.removeItem('beta3.raster');'cleared'`);
   await c.nav(BASE + '?glprobe=1&fps=0', 16000);
   const ras = JSON.parse(await c.ev(`JSON.stringify(window.__ssraster)`));
-  ok('workload probe measured both renderers (ms/frame medians)',
-    ras && ras.why === 'workload' && ras.p && ras.p.glMs > 0 && ras.p.cvMs > 0,
-    JSON.stringify(ras && ras.p && { glMs: ras.p.glMs, cvMs: ras.p.cvMs, mode: ras.mode }));
-  ok('probe boot cost under budget (caps hold even on software GL)',
-    await c.ev(`window.__ssprobeMs > 0 && window.__ssprobeMs < 6500`) === true,
+  // ⚠ do NOT assert both renderers measured. On a software-GL box (and on the
+  // afflicted iPhone) the GL probe legitimately fails to sample — that IS the
+  // signal, and demanding two numbers is what made v0.35.0 blind to it. Assert
+  // instead that the probe ran, both sides reported HOW they ended, and at
+  // least one produced a usable number.
+  ok('workload probe ran and both renderers reported an outcome',
+    ras && PROBED(ras.why) && ras.p && ras.p.glHow && ras.p.cvHow &&
+    (ras.p.glMs > 0 || ras.p.cvMs > 0),
+    JSON.stringify(ras && ras.p && { glMs: ras.p.glMs, glHow: ras.p.glHow, cvMs: ras.p.cvMs, cvHow: ras.p.cvHow, mode: ras.mode }));
+  // Budget is generous on purpose: a renderer that blocks the main thread hard
+  // enough can outrun its own setTimeout failsafe (a timer cannot preempt
+  // synchronous driver work), and SwiftShader here does exactly that — 10s runs
+  // observed under load. The caps bound the common case, not the pathological one.
+  ok('probe boot cost bounded (caps hold even on software GL)',
+    await c.ev(`window.__ssprobeMs > 0 && window.__ssprobeMs < 12000`) === true,
     (await c.ev(`window.__ssprobeMs`)) + 'ms');
   const cache = JSON.parse(await c.ev(`localStorage.getItem('beta3.raster')`) || 'null');
-  ok('verdict cached as v4 workload record', cache && cache.v === 4 && cache.why === 'workload'
-    && typeof cache.mode === 'string', JSON.stringify(cache && { v: cache.v, mode: cache.mode }));
+  ok('verdict cached as a v4 probe record', cache && cache.v === 4 && PROBED(cache.why)
+    && typeof cache.mode === 'string', JSON.stringify(cache && { v: cache.v, mode: cache.mode, why: cache.why }));
+  // every probe names its outcome, and a measured one carries >=3 frames — the
+  // pairing that lets one screenshot say WHICH way a renderer failed
+  const HOWS = ['ok', 'nosample', 'nocreate', 'noboot', 'throw'];
   ok('probe records frame count + how per renderer (a failure names itself)',
-    cache && cache.glN >= 3 && cache.cvN >= 3 && cache.glHow === 'ok' && cache.cvHow === 'ok',
+    cache && HOWS.includes(cache.glHow) && HOWS.includes(cache.cvHow) &&
+    (cache.glHow === 'ok' ? cache.glN >= 3 && cache.glMs > 0 : cache.glMs === -1) &&
+    (cache.cvHow === 'ok' ? cache.cvN >= 3 && cache.cvMs > 0 : cache.cvMs === -1),
     JSON.stringify(cache && { glN: cache.glN, glHow: cache.glHow, cvN: cache.cvN, cvHow: cache.cvHow }));
   // ⚠ v0.35.0's bug, now a standing law: an UNMEASURABLE GL probe must fall to
   // Canvas, never to AUTO (which hands the game back to the failing renderer).
@@ -117,7 +140,7 @@ async function main() {
   // cached verdict is USED on the next boot (no re-probe)
   await c.nav(BASE + '?fps=0', 10000);
   ok('next boot rides the cached verdict (no re-probe)',
-    await c.ev(`window.__ssprobeMs === undefined && window.__ssraster.why === 'workload'`) === true);
+    await c.ev(`window.__ssprobeMs === undefined && ${PROBED_JS}(window.__ssraster.why)`) === true);
   // a stale v3 record (the bad-verdict generation) must be discarded, not ridden
   await c.ev(`(() => { const r = JSON.parse(localStorage.getItem('beta3.raster'));
     r.v = 3; r.mode = 'auto'; localStorage.setItem('beta3.raster', JSON.stringify(r)); return 'aged' })()`);
@@ -321,7 +344,7 @@ async function main() {
       localStorage.removeItem('beta3.raster');
     })()`,
   });
-  await c.nav(BASE + '?glprobe=1', 13000);
+  await c.nav(BASE + '?glprobe=1&fps=1', 13000);
   const ph = JSON.parse(await c.ev(`JSON.stringify({
     rend: game.renderer.type === Phaser.CANVAS ? 'CANVAS' : 'WEBGL',
     mode: window.__ssraster.mode, why: window.__ssraster.why,
@@ -340,7 +363,7 @@ async function main() {
   await c.ev(`localStorage.removeItem('beta3.raster');'swept'`);
   await c.nav(BASE + '?fps=0', 12000);
   ok('WebGL restored afterwards: a healthy device is untouched by all this',
-    await c.ev(`!!window.game && window.__ssraster.why === 'workload'`) === true);
+    await c.ev(`!!window.game && ${PROBED_JS}(window.__ssraster.why)`) === true);
 
   console.log('\\n' + pass + ' passed, ' + fail + ' failed');
   if (c.errs.length) { console.log('EXCEPTIONS:'); c.errs.slice(0, 5).forEach(e => console.log('  ' + e.split('\\n')[0])); }
