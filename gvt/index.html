@@ -2903,6 +2903,31 @@
   @keyframes trrod { 0%{transform:translate(2px,0)} 25%{transform:translate(0,2px)}
     50%{transform:translate(-2px,0)} 75%{transform:translate(0,-2px)} 100%{transform:translate(2px,0)} }
   .dec-train.react .trpuff { animation-duration:0.5s; }
+  /* ===== 0376 THE GOOD DOG (v4.34) — Train Galaxy's dog on tour. The WALK
+     is JS (an inline transform + a short transition on #dogWalk — never a
+     CSS animation, the v1.21 attr-kill law); wag/bob/sniff/pat ride their
+     own groups pinned transform-box:view-box + origin 0 0 (the .trcar pin:
+     ancestor translates put local (0,0) AT the pivot — the western-feel
+     feet-nesting immunity — and no fill-box bbox ever breathes under the
+     origin). Periods are TG drawRoomDog's own: bob |sin(t·9)| → .35s ·
+     sniff sin(t·10) → .315s halves · wag sin(t·4.2) → .75s halves ·
+     pat 0.7s. Pixel amounts are TG's art units × the 2.0 seat. */
+  #dogWalk { transition:transform 0.14s linear; }
+  #dogFade { transition:opacity 0.45s linear; }
+  .dgPin { transform-box:view-box; transform-origin:0 0; }
+  .dogtrotB { animation:dogbob 0.35s linear infinite; }
+  .dogsniffB { animation:dogsniff 0.315s ease-in-out infinite alternate; }
+  .dogwagG { animation:dogwag 0.75s ease-in-out infinite alternate; }
+  .dogpatA { animation:dogpat 0.7s ease-out; }
+  @keyframes dogbob { 0%{transform:translateY(0)} 50%{transform:translateY(-6px)} 100%{transform:translateY(0)} }
+  @keyframes dogsniff { from{transform:rotate(9.2deg) translate(-4px,3px)} to{transform:rotate(9.2deg) translate(-4px,9px)} }
+  @keyframes dogwag { from{transform:rotate(-10deg)} to{transform:rotate(10deg)} }
+  @keyframes dogpat { 0%{transform:translateY(0) rotate(0deg)} 22%{transform:translateY(-18px) rotate(3deg)}
+    44%{transform:translateY(0) rotate(-2deg)} 64%{transform:translateY(-9px) rotate(2deg)}
+    82%{transform:translateY(0) rotate(-1deg)} 100%{transform:translateY(0) rotate(0deg)} }
+  @media (prefers-reduced-motion: reduce){
+    #ro-gooddog .dogtrotB, #ro-gooddog .dogsniffB, #ro-gooddog .dogwagG,
+    #ro-gooddog .dogpatA { animation:none; } }
   /* ROBO-SARGE 3000 — bounded by construction: no wander keyframe is more than
      150px out from where he's parked, so he can never leave the rug. */
   .dec-whorse.react { animation:whtrot 1s ease-in-out; }
@@ -20031,6 +20056,11 @@ const META_DEFAULT = {
   // abort or failure never burns the day. Flat string: Object.assign migrates
   // every era's save for free (the v1.22 nested-object law doesn't apply).
   tvDay:'',
+  // 0376 THE GOOD DOG: the visiting dog's ledger — `day`+`paid` roll at the
+  // first pat of a day (+5★ once per room per day), `done` = the day a tour
+  // COMPLETED (stamped at the dino-gate finale, the tvDay burn law) so an
+  // app closed mid-tour re-arms on reload with the paid rooms staying muted.
+  dog:{ day:'', paid:[], done:'' },
   // SARGE'S ARSENAL: weapons unlocked by campaign progress, equipped in the
   // Training Academy, each upgraded through the promotion picker once unlocked.
   sargeWeapon:'pistol', sargeUnlocked:[], sargeUp:{}, sargeSeen:[], saberColor:null,
@@ -20464,6 +20494,10 @@ META.stripeSeen=Array.isArray(META.stripeSeen)? META.stripeSeen.slice() : [];
   META.mom={ since: typeof m.since==='string'? m.since : '', done: m.done?1:0 }; })();
 (function(){ const n=META.nemesis||{};   // v3.12 NEMESIS ledger — nested-object rebuild (the v1.22 law): never hand a save the DEFAULT object
   META.nemesis={ w:n.w|0, l:n.l|0, st:n.st|0 }; })();
+(function(){ const g9=META.dog||{};   // 0376 THE GOOD DOG — nested fresh-build (the v1.22 law) + junk clamps: an alien room in `paid` is dropped, the roomCur idiom
+  META.dog={ day: typeof g9.day==='string'? g9.day : '',
+    paid:(Array.isArray(g9.paid)? g9.paid : []).filter(r=>ROOM_ORDER.indexOf(r)>=0),
+    done: typeof g9.done==='string'? g9.done : '' }; })();
 // THE MOD BENCH (v1.22) — nothing to grandfather (no save has ever owned a part),
 // but `enh` is NESTED, so the Object.assign above hands an older profile the
 // DEFAULT object itself and every purchase would write straight into
@@ -25942,6 +25976,9 @@ const SFX = {
     setTimeout(()=>tone(f*1.5,f*1.9,0.05,'sine',0.035),45); },
   // the empty piggy's little raspberry — quiet, low, and very funny to a kid
   toot:  ()=>{ tone(150,62,0.24,'sawtooth',0.05); setTimeout(()=>noise(0.1,0.03,340),30); },
+  // 0376 THE GOOD DOG: the soft yip — Train Galaxy's own two squares
+  // (900→1400 then 760→1150 a beat later); a sound, never a word
+  yip:   ()=>{ tone(900,1400,0.06,'square',0.055); setTimeout(()=>tone(760,1150,0.08,'square',0.045),80); },
   // v2.59 THE REWARDED TV: the set clicking on — one dial-clunk and a breath
   // of static, mouth-made like the rest (the coin already owns the payout)
   tvon:  ()=>{ tone(320,90,0.06,'square',0.09); setTimeout(()=>noise(0.16,0.035,5200),40); },
@@ -27812,7 +27849,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.33';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.34';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -47435,6 +47472,7 @@ function ycharsSVG(momD, vic){
     ent.push({ fy:ycharFeet(k), s: k==='elephant'? elephSVG() : k==='robot'? roboSVG()
       : k==='yeti'? yetiToySVG() : k==='dino'? dinoToySVG() : k==='pdino'? petDinoSVG() : k==='whorse'? whorseSVG() : k==='bluedragon'? bdragSVG() : bossToySVG(k) });
   }
+  if(dogVisible()) ent.push({ fy:dogFeetY(), s:dogNodeSVG() });   // 0376: THE GOOD DOG joins the belt mid-stroll (state lives in DOGT — a repaint re-seats him, never restarts him)
   ent.sort((a,b)=>a.fy-b.fy);
   ROBW_T0=performance.now();   // the wander (re)starts with this paint — robZTick's phase clock
   return '<g id="ychars">'+ent.map(e=>e.s).join('')+'</g>';
@@ -49721,6 +49759,242 @@ function robZTick(){
   belt.insertBefore(el, ref);
 }
 setInterval(robZTick, 250);
+// ===== 0376 THE GOOD DOG (v4.34) — Train Galaxy's dog tours the rooms =====
+// Wyatt 8/17 verbatim: "Take the dog from Train Galaxy. We're gonna have him
+// travel between the different maps slowly, and if you ever click on him,
+// you get 5 stars… once per room… every day… then maybe he goes into dino
+// town and disappears." The tour is page-lifetime JS (DOGT) — only the
+// ledger persists (META.dog {day,paid,done}). His clock runs ONLY while the
+// menu is on screen and the tab visible, so a battle never eats his visit.
+// ZERO randomness — the same save walks the same tour (the battery just
+// freezes/steps the clock through GVT.dogFreeze/dogStep). The art is TG
+// drawDog re-authored as SVG: same palette, same silhouette, same beats.
+const DOG_STARS=5;                 // ⚑ the pat's purse — once per room per day
+const DOG_SPEED=42;                // ⚑ stroll pace px/s (a stroll, not TG's 5.8s gag)
+const DOG_SNIFF_S=7;               // ⚑ seconds planted at each sniff stop
+const DOG_GAP_S=40;                // ⚑ the invisible walk between rooms
+const DOG_BOOT_S=6;                // ⚑ the beat after boot before he enters your room
+const DOG_FADE_S=1.1;              // the dino-gate fade
+const DOG_LANE_Y=583;              // feet lane — surveyed clear of every floor's doors at the stops
+const DOG_SNIFF_X=[295,720];       // ⚑ sniff stops — the ONLY two lanes-clear pockets (survey: the full hit box clears every door + the BATTLEFIELD/MEDALS pills on all five floors; 720 seats his centre clear of the western street's wcw3 cactus, nose right at it)
+const DOG_GATE=[668,438];          // the backyard bone gate seat (ROOM_SPOTS dinopark centre, feet at its base)
+let DOGT=null, DOG_LAST=0;         // the tour + the tick's wall-clock stamp
+const DOGRIG={ frozen:0 };         // battery rig — dt pinned to 0, stepped by GVT.dogStep
+const DOGD={ el:null, x:null, y:null, pose:null, f:0, op:-1, seg:-1, zc:0 };   // DOM write cache
+function dogArm(){
+  const today=todayStr();
+  if(META.dog && META.dog.done===today){ DOGT={ phase:'done', day:today, t:0 }; return; }
+  const own=ownedRooms(), cur=roomCur();
+  const rest=own.filter(r=>r!=='backyard');
+  let order=[];
+  if(rest.length){
+    const i=Math.max(0, rest.indexOf(cur==='backyard'? rest[0] : cur));
+    order=rest.slice(i).concat(rest.slice(0,i));
+  }
+  if(own.indexOf('backyard')>=0){
+    if(cur==='backyard') order=['backyard'].concat(order);   // he still comes to YOU first; the finale re-enters for the gate (paid stays muted)
+    order.push('backyard');                                  // the BACKYARD is LAST — Wyatt's exit
+  }
+  DOGT={ phase:'wait', t:0, leg:0, day:today, f:1,
+         legs:order.map((r,i)=>({ room:r, dir:(i%2)? -1:1 })) };
+}
+function dogLegPlan(li){
+  const l=DOGT.legs[li], y=DOG_LANE_Y, dir=l.dir;
+  const xin=dir>0? -70:1030, xout=dir>0? 1030:-70;
+  const stops=dir>0? DOG_SNIFF_X.slice() : DOG_SNIFF_X.slice().reverse();
+  const segs=[]; let t=0, px=xin;
+  for(const sx of stops){
+    const w=Math.abs(sx-px)/DOG_SPEED;
+    segs.push({ k:'walk', x0:px, x1:sx, y0:y, y1:y, t0:t, t1:t+w }); t+=w; px=sx;
+    segs.push({ k:'sniff', x0:sx, x1:sx, y0:y, y1:y, t0:t, t1:t+DOG_SNIFF_S }); t+=DOG_SNIFF_S;
+  }
+  if(l.room==='backyard' && META.parkDino && li===DOGT.legs.length-1){
+    // the FINAL leg: trot to the bone gate and gone through it — Wyatt's exit
+    const w1=Math.abs(DOG_GATE[0]-px)/DOG_SPEED;
+    segs.push({ k:'walk', x0:px, x1:DOG_GATE[0], y0:y, y1:y, t0:t, t1:t+w1 }); t+=w1;
+    const w2=Math.abs(y-DOG_GATE[1])/DOG_SPEED;
+    segs.push({ k:'gate', x0:DOG_GATE[0], x1:DOG_GATE[0], y0:y, y1:DOG_GATE[1], t0:t, t1:t+w2 }); t+=w2;
+    segs.push({ k:'fade', x0:DOG_GATE[0], x1:DOG_GATE[0], y0:DOG_GATE[1], y1:DOG_GATE[1], t0:t, t1:t+DOG_FADE_S }); t+=DOG_FADE_S;
+  } else {
+    const w=Math.abs(xout-px)/DOG_SPEED;
+    segs.push({ k:'walk', x0:px, x1:xout, y0:y, y1:y, t0:t, t1:t+w }); t+=w;
+  }
+  return { segs, dur:t };
+}
+function dogLegStart(){ DOGT.phase='in'; DOGT.t=0; DOGT.plan=dogLegPlan(DOGT.leg); DOGD.seg=-1; }
+function dogLegEnd(){
+  if(DOGT.leg>=DOGT.legs.length-1){
+    META.dog.done=DOGT.day; saveMeta();   // the day burns HERE — the tour completed (tvDay's law)
+    DOGT={ phase:'done', day:DOGT.day, t:0 };
+  } else { DOGT.leg++; DOGT.phase='gap'; DOGT.t=0; }
+}
+function dogSegAt(){
+  const pl=DOGT.plan;
+  for(let i=0;i<pl.segs.length;i++) if(DOGT.t<pl.segs[i].t1) return { s:pl.segs[i], i:i };
+  return { s:pl.segs[pl.segs.length-1], i:pl.segs.length-1 };
+}
+function dogPos(){
+  const q=dogSegAt(), s=q.s;
+  const k=s.t1>s.t0? Math.min(1, Math.max(0,(DOGT.t-s.t0)/(s.t1-s.t0))) : 1;
+  return { x:s.x0+(s.x1-s.x0)*k, y:s.y0+(s.y1-s.y0)*k, k:k, s:s, i:q.i };
+}
+function dogVisible(){ return !!(DOGT && DOGT.phase==='in' && DOGT.legs[DOGT.leg].room===roomCur()); }
+function dogTappable(){ if(!dogVisible()) return false; const s=dogSegAt().s; return s.k!=='gate' && s.k!=='fade'; }
+function dogFeetY(){ return dogVisible()? dogPos().y : DOG_LANE_Y; }
+function dogAdvance(dt){
+  const today=todayStr();
+  if(!DOGT || DOGT.day!==today) dogArm();   // boot + the midnight flip (a fresh day re-arms the tour)
+  if(DOGT.phase==='done') return;
+  DOGT.t+=dt;
+  if(DOGT.phase==='wait'){ if(DOGT.t>=DOG_BOOT_S) dogLegStart(); }
+  else if(DOGT.phase==='gap'){ if(DOGT.t>=DOG_GAP_S) dogLegStart(); }
+  else if(DOGT.phase==='in'){ if(DOGT.t>=DOGT.plan.dur) dogLegEnd(); }
+}
+function dogTick(){
+  const now=performance.now();
+  let dt=DOG_LAST? Math.min(0.25,(now-DOG_LAST)/1000) : 0;
+  DOG_LAST=now;
+  if(S.mode!=='menu' || document.hidden){ DOG_LAST=0; return; }   // the clock parks — a battle never eats his visit
+  if(DOGRIG.frozen) dt=0;
+  dogAdvance(dt);
+  dogPaint();
+}
+setInterval(dogTick, 100);
+// TG drawDog's geometry verbatim (canvas → SVG): a seated dog facing LEFT,
+// the head its own group at (-8,-6), the red collar in the body frame over
+// the seam, the tail a nested-translate pivot so the wag turns at its base.
+function dogArtSVG(){
+  return '<g stroke-linecap="round">'
+    +'<g transform="translate(13,2)"><g class="dogwagG dgPin"><path d="M0 0 Q5 -2 7 -6" stroke="#8a6544" stroke-width="3.4" fill="none"/></g></g>'
+    +'<ellipse cx="8" cy="7" rx="8.5" ry="7.5" fill="#8a6544"/>'
+    +'<ellipse cx="-4" cy="4" rx="7" ry="7" fill="#8a6544"/>'
+    +'<path d="M-7 8 L-7 16 M-1 9 L-1 16" stroke="#8a6544" stroke-width="4" fill="none"/>'
+    +'<path d="M12 13 L15 16" stroke="#7A553A" stroke-width="3.6" fill="none"/>'
+    +'<ellipse cx="-5" cy="3" rx="3.4" ry="4.6" fill="#EFE0BC" transform="rotate(11.5 -5 3)"/>'
+    +'<g transform="translate(-8,-6)">'
+      +'<circle r="6.4" fill="#8a6544"/>'
+      +'<rect x="-11" y="-1" width="7" height="5.4" rx="2.6" fill="#7A553A"/>'
+      +'<circle cx="-10.4" cy="1.6" r="1.7" fill="#23211E"/>'
+      +'<path d="M3 -6 Q8 -4 6.5 2 Q5 4 2.6 1 Z" fill="#5b3a22"/>'
+      +'<circle cx="-2.6" cy="-1.6" r="1.3" fill="#23211E"/>'
+    +'</g>'
+    +'<path d="M-2.39 -2.16 A6.8 6.8 0 0 1 -12 -0.51" stroke="#C0392B" stroke-width="2.4" fill="none"/>'
+    +'</g>';
+}
+function dogFlipNow(q){
+  if(q.s.k==='walk' && q.s.x1!==q.s.x0) DOGT.f=(q.s.x1>q.s.x0)? 1 : -1;
+  return DOGT.f||1;
+}
+function dogPoseNow(q){ return q.s.k==='sniff'? 'dogsniffB' : (q.s.k==='fade'? '' : 'dogtrotB'); }
+function dogNodeSVG(){
+  const q=dogPos(), f=dogFlipNow(q);
+  const op=q.s.k==='fade'? Math.max(0,1-q.k) : 1;
+  const pose=dogPoseNow(q);
+  return '<g id="ro-gooddog">'
+    +'<g id="dogWalk" style="transform:translate('+q.x.toFixed(1)+'px,'+(q.y-38).toFixed(1)+'px)">'
+    +'<g id="dogFade" style="opacity:'+op.toFixed(3)+'">'
+    +'<ellipse cx="0" cy="38" rx="17" ry="4.6" fill="#000" opacity="0.2"/>'
+    +'<g id="dogPat" class="dgPin">'
+    +'<g id="dogFlip"'+(f>0? ' transform="scale(-1,1)"':'')+'>'
+    +'<g id="dogPose" class="dgPin'+(pose? ' '+pose:'')+'">'
+    +'<g transform="translate(0,6) scale(2)">'+dogArtSVG()+'</g>'
+    +'</g></g></g></g></g></g>';
+}
+function dogZSeat(fresh){
+  const belt=document.getElementById('ychars'); if(!belt) return;
+  const el=document.getElementById('ro-gooddog'); if(!el || el.parentNode!==belt) return;
+  const fy=dogFeetY();
+  let ref=null;
+  for(const c of belt.children){
+    if(c===el) continue;
+    let b=null, key=null;
+    if(c.id==='decRobot'){ b=NEM_XSPOT.robot; key='robot'; }   // the wanderer's own home box (his live delta never reaches the lane)
+    else { const id=(c.id||c.getAttribute('data-gid')||'').replace(/^ro-/,'');
+      b=VTROOPS.find(t9=>t9.k===id)||DECOR_SPOTS[id]; key=id; }
+    if(!b) continue;
+    if(b.y+b.h+rpXY(key)[1]>fy){ ref=c; break; }
+  }
+  if(!fresh && (ref===el.nextElementSibling || (ref===null && belt.lastElementChild===el))) return;
+  belt.insertBefore(el, ref);
+  const dl=-DOGT.t;   // reinsertion restarts CSS animations — resume phase (robZTick's negative-delay law)
+  for(const sel of ['#dogPose','.dogwagG']){ const n=el.querySelector(sel); if(n) n.style.animationDelay=dl+'s'; }
+}
+function dogPaint(){
+  const belt=document.getElementById('ychars');
+  let el=document.getElementById('ro-gooddog');
+  if(!dogVisible()){ if(el){ try{ el.remove(); }catch(e){} } DOGD.el=null; return; }
+  if(!belt) return;
+  if(!el || el.parentNode!==belt){
+    if(el){ try{ el.remove(); }catch(e){} }
+    belt.insertAdjacentHTML('beforeend', dogNodeSVG());
+    el=document.getElementById('ro-gooddog');
+    DOGD.seg=dogPos().i;   // a mid-seg arrival premieres no sound
+    dogZSeat(true);
+  }
+  if(DOGD.el!==el){ DOGD.el=el; DOGD.x=null; DOGD.y=null; DOGD.pose=null; DOGD.f=0; DOGD.op=-1; }   // a renderMenu repaint minted a fresh node — re-learn it
+  const q=dogPos();
+  const x=+q.x.toFixed(1), y=+(q.y-38).toFixed(1);
+  const wk=document.getElementById('dogWalk');
+  if(wk && (DOGD.x!==x || DOGD.y!==y)){
+    // a real tick moves ≤ ~10px and the 0.14s transition smooths it; a WARP
+    // (the rig's dogStep, a midnight re-arm) must SNAP, or the glide drags
+    // him across the room and a frozen screenshot catches him mid-flight
+    const jump=DOGD.x!==null && (Math.abs(DOGD.x-x)>60 || Math.abs(DOGD.y-y)>60);
+    if(jump) wk.style.transition='none';
+    wk.style.transform='translate('+x+'px,'+y+'px)';
+    if(jump){ void wk.getBoundingClientRect(); wk.style.transition=''; }
+    DOGD.x=x; DOGD.y=y;
+  }
+  const f=dogFlipNow(q), fl=document.getElementById('dogFlip');
+  if(fl && DOGD.f!==f){ if(f>0) fl.setAttribute('transform','scale(-1,1)'); else fl.removeAttribute('transform'); DOGD.f=f; }
+  const pose=dogPoseNow(q), po=document.getElementById('dogPose');
+  if(po && DOGD.pose!==pose){ po.setAttribute('class','dgPin'+(pose? ' '+pose:'')); DOGD.pose=pose; }
+  const op=q.s.k==='fade'? +Math.max(0,1-q.k).toFixed(3) : 1, fd=document.getElementById('dogFade');
+  if(fd && DOGD.op!==op){ fd.style.opacity=op; DOGD.op=op; }
+  if(DOGD.seg!==q.i){   // seg premieres — one soft yip at each sniff, one last happy yip into the gate
+    if(q.s.k==='sniff' || q.s.k==='fade') SFX.yip();
+    DOGD.seg=q.i;
+  }
+  if((DOGD.zc=(DOGD.zc+1))%3===0) dogZSeat(false);
+}
+function dogPick(p,e){
+  if(!dogTappable()) return false;
+  const t9=e && e.target;
+  if(t9 && t9.closest){ const dv=t9.closest('div[onclick]');
+    if(dv && !/^dspot-/.test(dv.id||'')) return false; }   // doors, pills and the Nemesis keep the taps they already won (the v2.10 later-wins law); furniture anchors lose (TG's piggy→dog→furniture order)
+  const q=dogPos();
+  return Math.abs(p.x-q.x)<48 && p.y>q.y-104 && p.y<q.y+10;
+}
+function dogEat(q){
+  // the browser's own late click lands where the finger was — over the dog,
+  // maybe over a dspot underneath. Eat exactly that one (geometric, 350ms);
+  // an honest next tap anywhere else sails through (the v2.85 eater law).
+  const eat=ev=>{ const p=rdragPt(ev);
+    if(p && Math.abs(p.x-q.x)<48 && p.y>q.y-104 && p.y<q.y+10){ ev.stopPropagation(); ev.preventDefault(); } };
+  document.addEventListener('click', eat, {capture:true, once:true});
+  setTimeout(()=>document.removeEventListener('click', eat, {capture:true}), 350);
+}
+function dogTap(){
+  if(!dogTappable()) return;
+  const q=dogPos();
+  dogEat(q);
+  SFX.yip(); setTimeout(()=>{ if(dogVisible()) SFX.yip(); },150);   // the happy double-yip (TG's own beat)
+  const g9=document.getElementById('dogPat');
+  if(g9){ g9.classList.remove('dogpatA'); void g9.getBoundingClientRect(); g9.classList.add('dogpatA'); }
+  const room=roomCur();
+  if(META.dog.day!==todayStr()){ META.dog.day=todayStr(); META.dog.paid=[]; }   // the ledger rolls FIRST — yesterday's paid rooms never mute today's pat
+  if(META.dog.paid.indexOf(room)>=0) return;   // a second pat TODAY = the hop and the yips, ZERO stars
+  META.dog.paid.push(room);                                          // flag FIRST (the wcactus one-time-purse law)…
+  META.starBank+=DOG_STARS; META.starsLifetime+=DOG_STARS; saveMeta();   // …credit SECOND — THE ONE STARS PIPELINE verbatim
+  SFX.coin();
+  const st=document.getElementById('roomStage');
+  if(st){ const f=document.createElement('div');
+    f.className='starfloat big'; f.textContent='+'+DOG_STARS+'★';
+    f.style.left=(q.x-34)+'px'; f.style.top=(q.y-128)+'px';
+    st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120); }
+  setTimeout(()=>{ if(S.mode==='menu') renderMenu(); }, 1250);   // the header ★ catches up (the piggy's own deferral)
+}
+
 function rdragEnd(e){
   const d=RDRAG; if(!d) return;
   // v2.85: the claim ends only with its OWN pointer — a resting second
@@ -49742,6 +50016,7 @@ function rdragEnd(e){
     // sub-slop tap on a man falls through to the door he stands on, exactly
     // as shipped (Sarge lives inside the campaign hotspot). A pointercancel
     // is never a tap.
+    if(e && e.type==='pointerup' && d.k==='gooddog'){ dogTap(); return; }   // 0376: the pat (sub-slop release IS the tap; the late click is eaten geometrically inside; a pointercancel is never a pat)
     if(e && e.type==='pointerup' && (d.k==='blocks' || DECOR_REACT[d.k])){
       const tgt = d.k==='blocks'? document.getElementById('tblocks')
                 : d.k==='robot'?  document.getElementById('decRobot')
@@ -49786,6 +50061,11 @@ document.addEventListener('pointerdown', e=>{
   if(RDRAG || !e.isPrimary || S.mode!=='menu') return;
   const st=document.getElementById('roomStage'); if(!st || !st.contains(e.target)) return;
   const p=rdragPt(e); if(!p) return;
+  if(dogPick(p,e)){   // 0376: THE GOOD DOG answers before the furniture (TG's tap-order law; dogPick itself declines doors/pills/the Nemesis)
+    RDRAG={ k:'gooddog', tapOnly:true, pid:e.pointerId,
+            sl:(e.pointerType==='touch'? RDRAG_TT : RDRAG_T),
+            x0:e.clientX, y0:e.clientY, d0:[0,0], moved:false };
+    return; }
   const hit=rdragPick(p) || rdragTapPick(e);
   if(!hit) return;
   RDRAG={ k:hit.k, base:hit.base, tapOnly:!!hit.tapOnly, pid:e.pointerId,
@@ -60096,6 +60376,20 @@ requestAnimationFrame(frame);
 
 // ================= DEBUG API =================
 window.GVT = {
+  // ---- 0376 THE GOOD DOG rig: deterministic tour clock for batteries ----
+  dog(){ const q=(DOGT&&DOGT.phase==='in')? dogPos():null;
+    return { phase:DOGT? DOGT.phase:'unarmed', leg:DOGT? DOGT.leg:0,
+      legs:(DOGT&&DOGT.legs||[]).map(l=>l.room), t:(DOGT&&DOGT.t!=null)? +DOGT.t.toFixed(3):0,
+      room:(DOGT&&DOGT.legs&&DOGT.legs[DOGT.leg])? DOGT.legs[DOGT.leg].room:null,
+      dur:(DOGT&&DOGT.plan)? +DOGT.plan.dur.toFixed(3):0,
+      pos:q? { x:Math.round(q.x), y:Math.round(q.y), k:q.s.k, i:q.i }:null,
+      visible:dogVisible(), tappable:dogTappable(),
+      day:META.dog&&META.dog.day, paid:(META.dog&&META.dog.paid||[]).slice(), done:META.dog&&META.dog.done }; },
+  dogFreeze(on){ DOGRIG.frozen=on?1:0; DOG_LAST=0; return DOGRIG.frozen; },
+  dogStep(s){ if(!DOGT) dogArm(); let r=Math.max(0,+s||0);
+    while(r>0){ const d=Math.min(0.1,r); dogAdvance(d); r-=d; }
+    if(S.mode==='menu') dogPaint(); return GVT.dog(); },
+  dogRearm(){ DOGT=null; dogAdvance(0); if(S.mode==='menu') dogPaint(); return GVT.dog(); },
   // ---- ADS V1a rig (v2.60): gates + dials, deterministic for batteries ----
   ads(){ return { steam:STEAM_SHELL, sess:Object.assign({},ADQ), free:AD_FREE_GAMES, camp:AD_CAMP_EVERY, bf:AD_BF_EVERY,
     squad:AD_SQUAD_EVERY,   // v2.82: the post-game squad cadence dial
