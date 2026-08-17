@@ -27940,7 +27940,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.40';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.41';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -51437,8 +51437,8 @@ function tvTap(){
     return;
   }
   if(adFree()){ tvGrant(); return; }   // 0333a: a paid-quiet set pays WITHOUT the show — zero ads of any kind, and the daily +30★ is never taken from the paying player (the day still burns in tvGrant, exactly once). ⚑ Wyatt's dial: one predicate to show spots anyway, or to sleep the set.
-  if(ADS.provider!=='placeholder'){ adAskShow(); return; }   // FM-GVT-MAX-01 §V3.11: a REAL rewarded is asked about in words first — the one-tap disclosure; the wordless show stays placeholder-only
-  ADS.showRewarded().then(r=>{ if(r && r.completed) tvGrant(); });
+  if(ADS.provider!=='placeholder'){ adAskShow(); return; }   // FM-GVT-MAX-01 §V3.11: a REAL rewarded is asked about in words first — the one-tap disclosure
+  tvGrant();   // 0383: the fake five-second show is RETIRED — where no real ad can run (web, the child track), the set simply pays its daily stars; never a pretend ad
 }
 function tvGrant(){
   if(tvClaimedToday()) return;    // double-resolve guard — one grant per day, period
@@ -51481,7 +51481,7 @@ function tvGrant(){
 let AD_FREE_GAMES=1;   // door games at session start that are always ad-free (DIAL; let = rig-tunable)
 let AD_CAMP_EVERY=1;   // campaign: a break before every Nth level start — 2 = every other, 0 = off (DIAL)
 let AD_BF_EVERY=1;     // battlegrounds: a break before every Nth match launch — 0 = off (DIAL)
-let AD_SQUAD_EVERY=3;  // v2.82 SQUAD AD LAW: a POST-game break every Nth finished squad game — 0 = off (DIAL)
+let AD_SQUAD_EVERY=1;  // v2.82 squad law, retuned 0383 (Wyatt: an ad after 'each game that you essentially play') — every finished squad game's exit; 0 = off (DIAL)
 let AD_SOLO_POST=1;    // v3.60 (0297 §V3.8): the adapter-era placement flip — 0 = today's placeholder door law; 1 moves SOLO breaks post-game. A COMPLIANCE PRECONDITION for real ads (Wyatt sign-off, ADS-V1.md §V3 gate 5), never auto-flipped; NO reader in the placeholder era BY DESIGN — the adapter card flips a staged switch, not a new build (DIAL)   // ⛔ GATE 5 SIGNED — Wyatt 8/17 verbatim: "for C, let's turn it on. We want to show solo players an ad after playing" — the reader shipped in v4.35; the dial flips ON here (0379). Real-provider only by construction: soloDue requires ADS.provider!=='placeholder', so web/child/Steam stay break-free
 const ADQ={ games:0, camp:0, bf:0, squad:0, sqPaid:0 };   // the session gate counters (door-launched games only; squad = finished 2+-human games, sqPaid = the squad count whose break already showed)
 (function(){
@@ -51505,8 +51505,8 @@ const ADQ={ games:0, camp:0, bf:0, squad:0, sqPaid:0 };   // the session gate co
 // handler, so this whole module is DORMANT everywhere until the vc4/1004/1.0.3
 // binaries roll: web, Steam and the live store builds behave byte-identically.
 const ADS_BRIDGE=(()=>{ try{ return !!(window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.gvtAds); }catch(e){ return false; } })();
-let AD_MIN_GAP_MIN=3;   // §V3.10: minutes between REAL interstitials (DIAL)
-let AD_SESS_CAP=6;      // §V3.10: real interstitials per session, hard ceiling (DIAL)
+let AD_MIN_GAP_MIN=1;   // §V3.10 retuned 0383: a whole game is its own natural gap — this floor only guards pathological quick-quit loops (DIAL)
+let AD_SESS_CAP=20;     // §V3.10 retuned 0383: the ceiling backs off to a sanity rail — every-game cadence must survive a long session (DIAL)
 let AD_WD_MS=25000;     // 0380: the never-DISPLAYED belt — how long a sent show may go dark before the page takes the game back; stands down the moment the ad is on screen (DIAL, rig-tunable)
 const MAXA={ ok:false, initSent:false, int:false, rew:false, pend:{}, seq:1, last:null, lastShow:0, sess:0, repPend:0, tvPrev:null, log:[] };
 function maxPost(m){ try{ webkit.messageHandlers.gvtAds.postMessage(m); MAXA.log.push(m.cmd+(m.kind?(':'+m.kind):'')); if(MAXA.log.length>24) MAXA.log.shift(); }catch(e){} }
@@ -51641,23 +51641,20 @@ function adAskShow(){
 // be asked for (§V3.6 — gate-pass strictly precedes the first SDK byte).
 try{ if(adTeen()) maxInit(); }catch(e){}
 function adGate(kind, launch){
-  let brk=false;
+  // 0383 — THE PLACEHOLDER RETIRES (Wyatt 8/17 verbatim: "the five-second
+  // placeholder TV shouldn't really exist anymore. It should actually be ads
+  // and those spots, and if ads aren't allowed in certain spots on certain
+  // platforms, that's fine, we won't put them there"). A door tap NEVER breaks
+  // again, on ANY platform: a real ad may not ride a pre-game seam (§V3.8's
+  // store law), and the fake five-second show is retired outright — where a
+  // real ad can't run, NOTHING runs. The counters still tick: the verdict
+  // gate's solo arithmetic reads ADQ.games, and a mixed session's cadence
+  // stays measurable. The theater machinery below survives for the rigs.
   try{
-    try{ if(AD) return; }catch(e){}   // a show is already up — this tap lands on glass
-    const free=ADQ.games<AD_FREE_GAMES;
     ADQ.games++;
-    const idx= kind==='camp'? ++ADQ.camp : ++ADQ.bf;
-    const every= kind==='camp'? AD_CAMP_EVERY : AD_BF_EVERY;
-    brk= !STEAM_SHELL && ADS.provider==='placeholder' && !adFree() && !free && every>0 && (idx%every)===0;   // v3.31: Steam never breaks — the counters above still tick (mixed-shell law). 0333a: a paid no-ads package suppresses the break the same way (a term ADDED, no guard loosened; expiry just stops suppressing — the quiet resume). FM-GVT-MAX-01 §V3.8: when a real adapter owns the seam the pre-game door break stands down WHOLESALE (Play bans real pre-level interstitials) — the counters still tick, the door law survives only for the placeholder era
-  }catch(e){ brk=false; }             // the gate may fail — the game may not (fail-safe law)
-  if(brk){
-    // two-arg then: even a misbehaving future adapter that REJECTS (the
-    // contract says never) still hands the game back, exactly once.
-    // 0333a: the first break EVER hands its exit to the one-time no-ads
-    // offer instead (naMaybeOffer launches straight through every time after)
-    try{ ADS.showInterstitial().then(()=>naMaybeOffer(launch), ()=>naMaybeOffer(launch)); }
-    catch(e){ launch(); }
-  } else launch();
+    if(kind==='camp') ++ADQ.camp; else ++ADQ.bf;
+  }catch(e){}
+  launch();
 }
 // ===== v2.82 SQUAD AD LAW (Wyatt 8/8 eve, verbatim: "We can't give everyone
 // the ad. … You will not get an ad when you play. You will get the ad after
@@ -51706,7 +51703,7 @@ function squadAdGate(launch){
     // seam. Ships 0; flips only on Wyatt's gate-5 sign-off (a dial, not a build).
     const soloDue= !sq && AD_SOLO_POST===1 && ADS.provider!=='placeholder' && ADQ.games>AD_FREE_GAMES;
     brk= !STEAM_SHELL && !adFree() && !live && (due||soloDue)   // 0333a: the paid package suppresses the post-game break too
-       && (ADS.provider==='placeholder' || maxIntOk());   // §V3.10: a REAL break also obeys the gap/cap/payer law; the placeholder keeps the old arithmetic verbatim. A due squad break that the gap swallows simply skips — fewer ads than the schedule, never more
+       && ADS.provider!=='placeholder' && maxIntOk();   // 0383: REAL ads only — the placeholder break is retired everywhere (web/child/Steam see ZERO interstitials, ever); §V3.10's gap/cap/payer law governs every real one, and a due break the gap swallows simply skips — fewer ads than the schedule, never more
     if(brk && due) ADQ.sqPaid=ADQ.squad;       // one break per due game, however many exits race
   }catch(e){ brk=false; }               // the gate may fail — the exit may not (fail-safe law)
   if(brk){
