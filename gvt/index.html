@@ -2793,6 +2793,14 @@
   .starfloat.run.tick { animation:pigtick 0.34s ease-out; }
   @keyframes pigtick { 0% { transform:scale(1);} 30% { transform:scale(1.3);} 100% { transform:scale(1);} }
   @media (prefers-reduced-motion: reduce){ .starfloat.run.tick { animation:none; } }
+  /* 0378 THE BANK PAYS ITS KEEPER — the door coin is the daily tell: bright
+     and pulsing while today's +5 is unclaimed, the shipped dim penny once
+     paid. Own reduced-motion opt-out (the shared kill-list line untouched);
+     the circle carries no SVG transform attribute of its own, so the CSS
+     transform replaces nothing (the v1.21 attr-kill law honored). */
+  .bankcoin { animation:bankpulse 1.6s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+  @keyframes bankpulse { 0%,100% { opacity:0.72; transform:scale(1); } 50% { opacity:1; transform:scale(1.3); } }
+  @media (prefers-reduced-motion: reduce){ .bankcoin { animation:none; } }
   /* ===== v2.59 THE REWARDED TV (ADS V1b — design/ads/ADS-V1.md) =====
      The set's snow jitters on steps(1) so it SNAPS between frames (real static,
      no tween smear); the badge bobs; the sleeping screen answers a tap with one
@@ -20218,8 +20226,12 @@ const META_DEFAULT = {
   // 0346 WESTERN LAND: wcacti = the four saguaros' first-tap claim BITMASK
   // (bit i = cactus i paid; the comet law per bit — Object.assign migrates
   // older saves to 0 free, and garbage can only ever under-grant); nemBank =
-  // THE BANK HEIST's one victory, ever (the nemPark latch's western twin).
-  wcacti:0, nemBank:0,
+  // THE BANK HEIST's one victory, ever (the nemPark latch's western twin);
+  // bankDay = 0378 THE KEEPER'S DAILY PURSE — the day the post-heist bank
+  // last paid its +5 (the tvDay idiom: Object.assign migrates older saves
+  // to '' free, and a junk value !== todayStr() just pays today — the
+  // ledger can only ever under-grant).
+  wcacti:0, nemBank:0, bankDay:'',
   // 0359 HIDDEN PURSES: wstar = the saloon's pediment star (20★ on its
   // first-ever tap in the OUTLAW TOWN scene); dmeteor = the dino sky's
   // shooting meteor caught mid-flight (100★ once). The comet law both:
@@ -21711,6 +21723,7 @@ const NEMESIS_RESET_ON_WIN=true;       // DECODED CHOICE (contract §5): a defea
 const NEMESIS_LEVELS=3;                // +3 commander levels per defeat (MOM_LEVELS's own xpToLevels shape)
 const NEMESIS_STARS=100;               // "a hundred stars for defeating him each time"
 const NEMBANK_STARS=200;               // 0346: THE BANK HEIST's once-ever purse (META.nemBank latches; the nemPark comet law)
+const BANK_STARS=5;                    // ⚑ 0378: the keeper's daily purse — the post-heist bank tap pays this once a day, every day (META.bankDay burns the day)
 const NEMESIS_TK_CD=9;                 // his Sarge presses telekinesis on this clock (red's own 8s + a breath)
 const NEMESIS_TK_T0=6;                 // …first press ~6s after his Sarge stands
 const NEMESIS_SABER='#FF4D4D';         // THE RED SABER — SPRITES_SRC.tansarge's own hex
@@ -27927,7 +27940,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.35';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.36';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -50558,7 +50571,12 @@ function bankArtSVG(){
     +'<rect x="-13" y="72" width="12" height="48" rx="2" fill="#3A2417"/>'
     +'<rect x="1" y="72" width="12" height="48" rx="2" fill="#3A2417"/>';
   if(done){
-    door+='<circle cx="8" cy="97" r="2.2" fill="#C7913B"/>';
+    // 0378: the coin is the daily tell — bright and pulsing while today's
+    // +5 is unclaimed, the shipped dim penny once paid (zero words; the
+    // pigClaimable-style hint). bankPay's deferred renderMenu dims it.
+    door+= (META.bankDay!==todayStr())
+      ? '<circle class="bankcoin" cx="8" cy="97" r="3.4" fill="#FFD24A" stroke="#B98A2E" stroke-width="1.1"/>'
+      : '<circle cx="8" cy="97" r="2.2" fill="#C7913B"/>';
   } else if(key){
     door='<rect x="-17" y="68" width="34" height="56" rx="3" fill="#140904"/>'
       +'<path d="M-12 124 L7 68 L-12 68 Z" fill="#FFD24A" opacity="0.32"/>'
@@ -50593,6 +50611,38 @@ function bankArtSVG(){
     +'<rect x="-62" y="124" width="124" height="7" rx="2.5" fill="#8a5a30" stroke="#6E3018" stroke-width="2"/>'
     +'</g>';
 }
+// 0378 THE BANK PAYS ITS KEEPER (Wyatt 8/17: "After you save the bank, if
+// you click on the bank, you get 5 stars each day."). The first post-heist
+// tap of the day pays BANK_STARS and deals NO card — the money is the
+// ceremony (the piggy/tv grammar); the same-day second tap falls through
+// to the shipped SAFE card and pays zero. Ledger FIRST, show second (the
+// flag-first purse law); META.bankDay is a flat day string (the tvDay
+// idiom), so there is no roll step to forget — yesterday's value never
+// mutes today by construction. The bank never drags (not in the roomPos
+// whitelist), so the show sits at absolute stage coords off the roof.
+function bankPay(){
+  if(META.bankDay===todayStr()) return;   // double-resolve guard — one grant per day, period (the tvGrant law)
+  META.bankDay=todayStr();                // the day burns HERE and only here (the tvDay idiom)
+  META.starBank+=BANK_STARS; META.starsLifetime+=BANK_STARS; saveMeta();   // the one stars pipeline, verbatim
+  const st=document.getElementById('roomStage');
+  if(st){
+    const f=document.createElement('div');
+    f.className='starfloat big'; f.textContent='+'+BANK_STARS+'★';
+    f.style.left='638px'; f.style.top='240px';
+    st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120);
+    for(let i=0;i<Math.min(BANK_STARS,6);i++){
+      const s=document.createElement('div');
+      s.className='starfloat'; s.textContent='★';
+      s.style.left=(631+Math.random()*82)+'px'; s.style.top=(352+Math.random()*16)+'px';
+      s.style.animationDelay=(0.08+i*0.09)+'s';
+      st.appendChild(s); setTimeout(()=>{ try{ s.remove(); }catch(e){} }, 1150+i*90);
+    }
+  }
+  SFX.coin();
+  // the deferred repaint dims the door coin and catches the header ★ up —
+  // the piggy's own 1250ms law
+  setTimeout(()=>{ if(S.mode==='menu') renderMenu(); }, 1250);
+}
 // the bank's door: one of three cards on the milePop shell (keyOpen's own
 // grammar — raw EN in the innerHTML, the localize hook translates the DOM;
 // composed numbers ride tf at the verdict, never here).
@@ -50610,6 +50660,9 @@ function bankOpen(){
     p.classList.remove('hidden'); SFX.blip(); return;
   }
   if(META.nemBank){
+    // 0378: the keeper's daily purse — the first tap of the day pays and
+    // deals no card; a second tap the same day reads the SAFE card below.
+    if(META.bankDay!==todayStr()){ bankPay(); return; }
     // the post-heist state: the town keeps the bank, the bank keeps the star
     p.innerHTML='<div class="mb-card">'
       +'<span class="mb-band">THE BANK IS SAFE</span>'
@@ -61421,7 +61474,7 @@ window.GVT = {
     bait:decOwns('bait')?1:0, pole:decOwns('pole')?1:0, puffer:decOwns('puffer')?1:0, puffStar:META.puffStar?1:0, bone:Object.assign({},META.bone),
     degg:META.degg?1:0, deggH:META.deggH?1:0, tap:META.deggTap|0, kind:META.deggKind||'', pdino:decOwns('pdino')?1:0 }; },
   // 0346: the bank's window, for the battery's eyes only.
-  bank(){ return { key:(META.goldKey||decOwns('goldkey'))?1:0, cacti:META.wcacti|0, done:META.nemBank?1:0,
+  bank(){ return { key:(META.goldKey||decOwns('goldkey'))?1:0, cacti:META.wcacti|0, done:META.nemBank?1:0, day:META.bankDay||'',
     spot:document.getElementById('rspot-bank')?1:0, pop:!document.getElementById('milePop').classList.contains('hidden'),
     map:S.bf?S.bf.mapId:null, diff:(S.bf&&S.bf.ai)?S.bf.ai.diff:null,
     nem:(S.bf&&S.bf.nem)?{ bank:S.bf.nem.bank?1:0, park:S.bf.nem.park?1:0, n:S.bf.nem.lineup.length }:null,
