@@ -26883,7 +26883,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.19';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.20';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -28574,7 +28574,8 @@ const YETI_TAN_DMG=2;
 function spawnYeti(){
   const f=spawnFoe('yeti', W-70, 110+Math.random()*(WORLD_H-220));
   f.hp=f.hpMax=YETI_HP;              // flat YETI_HP — hpMul keeps its hands off the gag
-  f.yetiT=YETI_STAY-3-Math.random()*1.5; f.hopA=false;   // v2.71 (Wyatt 8/7): 3-4.5s shaved per visit — 10.5-12s, the playable's 11s made a little random f.hopT=0.01; f.hopZ=0;
+  f.yetiT=YETI_STAY-3-Math.random()*1.5; f.hopA=false;   // v2.71 (Wyatt 8/7): 3-4.5s shaved per visit — 10.5-12s, the playable's 11s made a little random.
+  f.hopT=0.01; f.hopZ=0;             // 0362 THE FROZEN SNOWMAN (Wyatt 8/16, TOP PRIORITY): these two inits had sat INSIDE the v2.71 comment above since 8/7 — f.hopT undefined → the idle branch's `f.hopT-=dt` is NaN → `NaN<=0` never fires → he never took his first bound and stood at his spawn spot (x=W-70, "the bottom-right corner doing nothing") until yetiT bounded him off the top. Back as code: his first bound lands one frame after the roar.
   f.roarT=0.5;                       // v2.55: the Yeti.mp3 lands half a second after he enters
   S.ann={txt:t('THE ABOMINABLE SNOWMAN!'), t:2.6, warn:true};
   S.shake=0.6;
@@ -28638,6 +28639,7 @@ function updateYeti(f,dt){
     f.hopDur=0.8; f.hopP=0; f.hopA=true;
     bfSfx(SFX.rumble,f.x,f.y);
   } else {
+    if(!(f.hopT>=0)) f.hopT=0.01;   // 0362: NaN-proof — a missing clock (the v2.71 comment swallow) seeds the first bound instead of freezing him (the raw-'yeti' NaN-clock law, on the yeti himself at last)
     f.hopT-=dt;
     if(f.hopT<=0){
       // v2.57 THE DICE ROLL (Wyatt 8/6): 2-in-3 the bound is WILD — a random
