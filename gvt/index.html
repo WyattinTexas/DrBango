@@ -27940,7 +27940,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.39';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.40';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -35975,19 +35975,29 @@ const CHEESE_R=60;   // the cheese slice's knock circle (foeSplash R)
 // shipped exemption). o = { own, x,y (the FEET — the sweep's origin, the
 // shipped hitbox), mzx,mzy (the muzzle the fx fly from), aim, R, green
 // (which army the storm bites), deal(victim) (the two damage funnels
-// differ; the storm is one) }. SFX.wshot speaks once a wave (never per
-// bullet), both pistols flash, the ground kicks a touch. Reduced motion:
-// 4 tracers a wave — same waves, same damage.
+// differ; the storm is one), mz [right,left] (the TWO muzzle seats, each
+// owner's own irons), hand (0 right / 1 left — THIS volley's gun), kick(hand)
+// (optional — the owner's own buck) }. SFX.wshot speaks once a wave (never
+// per bullet), the ground kicks a touch. Reduced motion: 4 tracers a wave —
+// same waves, same damage.
+// 0382 THE HANDS (Wyatt 8/17: "he fires with the right, then the left, then
+// the right, then left… like boom, boom, boom, boom. Not both, just at the
+// same time. It's a very quick alternation."): ONE gun a volley — the whole
+// fan of brass, the ONE flash, the report and the buck all leave THAT hand's
+// muzzle; volley n is hand n&1, RIGHT first. The second flash is GONE. The
+// gap between volleys is BRG_GAP (0.33 → 0.2: the 0.1s flash is fully dark
+// before the next boom — discrete, never a hose, never two irons alight).
 function brgWave(o){
   const N=reducedMotion()? 4 : BRG_ROUNDS;
+  const hz=o.mz[o.hand&1];   // this volley's iron
   for(let i=0;i<N;i++){
     const a=o.aim-CROAK_FAN_HALF+((i+0.5)/N)*CROAK_FAN_HALF*2;
     const L0=o.R*(0.82+((i*29)%13)/13*0.18);
-    S.fx.push({k:'slugtr',x1:o.mzx,y1:o.mzy,x2:o.mzx+Math.cos(a)*L0,y2:o.mzy+Math.sin(a)*L0,t:0,dur:0.14});
+    S.fx.push({k:'slugtr',x1:hz.x,y1:hz.y,x2:hz.x+Math.cos(a)*L0,y2:hz.y+Math.sin(a)*L0,t:0,dur:0.14});
   }
-  S.fx.push({k:'flash',x:o.mzx,y:o.mzy,ang:o.aim,R:reducedMotion()?8:12,lw:2.6,t:0,dur:0.1});
-  S.fx.push({k:'flash',x:o.mzx+Math.sin(o.aim)*10,y:o.mzy-Math.cos(o.aim)*10,ang:o.aim,R:reducedMotion()?7:10,lw:2.2,t:0,dur:0.1});
-  bfSfx(SFX.wshot, o.mzx, o.mzy);
+  S.fx.push({k:'flash',x:hz.x,y:hz.y,ang:o.aim,R:reducedMotion()?8:12,lw:2.6,t:0,dur:0.1});
+  if(o.kick) o.kick(o.hand&1);
+  bfSfx(SFX.wshot, hz.x, hz.y);
   S.shake=Math.max(S.shake,0.18);
   const list=o.green? (S.bf? S.units.slice() : S.foes.slice()) : S.units.slice();
   for(const v of list){
@@ -36003,6 +36013,35 @@ function brgWave(o){
     if(da<=CROAK_FAN_HALF) o.deal(v);
   }
 }
+// ===== 0382 the kings' TWO IRONS + the RANGE DOOR (Wyatt 8/17) =====
+// croakMz: the two barrel tips measured off SPRITES_SRC.kingcroak — the west
+// iron's barrel rect x18..33 and the east iron's x109..124, both y57..62.5 in
+// the 140 box, tips (18,59.75)/(124,59.75) — carried through drawSprite's own
+// frame (a w×w box at (−w/2, −0.92w) off the feet). Index 0 = the RIGHT hand
+// = the WEST gun (the puppet faces you: his right is your left — and west is
+// where the greens stand), 1 = the LEFT = the east gun. Both kings ride it at
+// f.def.w (120 / the little king's 72); the playable king at the unit lane's
+// 128 — one measure, every scale.
+function croakMz(x,y,w){ const s=w/140, my=y-w*0.92+59.75*s; return [{x:x-52*s,y:my},{x:x+54*s,y:my}]; }
+// croakScan: THE KING FIRES ONLY IN RANGE (Wyatt: "King Croak should only use
+// it when there's someone in range. If there's no one in range, he should not
+// use that.") — the plant door's question: live greens inside HIS reach (the
+// storm's own filters — dead, airborne and the finger's man never count), the
+// in-range CENTROID as the aim (nearest = the flagged alternate). Returns
+// {n,ang} or null. ONE seam: the duel card that follows adds the toy box HERE
+// and nowhere else — the door and the aim already read this answer.
+function croakScan(f,R){
+  let sx=0,sy=0,n=0;
+  for(const u of S.units){ if(u.dead||u.jetT>0) continue; if(S.drag&&S.drag.unit===u) continue;
+    if(Math.hypot(u.x-f.x,u.y-f.y)>R) continue; sx+=u.x; sy+=u.y; n++; }
+  return n? { n, ang:Math.atan2(sy/n-f.y, sx/n-f.x) } : null;
+}
+// croakRc: the recoil rock a volley leaves on a king — his mold has no kick
+// param, so the tell is the flash at THAT barrel plus this: a 0.12s / 0.06rad
+// rock read at draw off the S.t stamp the kick writes (the wkT/wkBack
+// grammar — presentation only, nothing in the sim reads it). The west iron
+// rocks him clockwise (that gun lifts), the east iron the other way.
+function croakRc(f){ if(!(f.def&&f.def.croak) || f.rcAt==null) return 0; const k=1-(S.t-f.rcAt)/0.12; return k>0? (f.rcH? -0.06 : 0.06)*k : 0; }
 // ===== 0340/0370/0374 KING CROAK'S BRAIN — the main-street duel, and
 // since 0374 he HUNTS (Wyatt: "King croak needs to mostly hunt players and
 // move forward"): between channels he presses WEST at the nearest green —
@@ -36013,8 +36052,13 @@ function brgWave(o){
 // behind the crates, else shrug and press on — cover play is the
 // minority). Still his: the sporadic STRONG round (2 pips through tanHit,
 // +10% at M/H via dmgX), the 0.55s PLANT (the crouch is the tell — no cone
-// since 0373), THE BARRAGE (brgWave above): 8 waves of brass, the shipped
-// 3-pip budget spread 3/8 a wave through tanHit's own fractional seam. The
+// since 0373; since 0382 ONLY with a green inside his reach — croakScan, the
+// clock held at zero and re-asked every tick on a dry field), THE BARRAGE
+// (brgWave above): 8 volleys of brass, RIGHT-LEFT-RIGHT-LEFT off his two
+// irons (0382), the shipped 3-pip budget spread 3/8 a volley through tanHit's
+// own fractional seam, then CROAK_FAN_CD (10s, every tier — 0382) on a WALL
+// clock that ticks through the cover dash and the duck (the after-cover
+// clamp retired with it). The
 // west floor CROAK_HUNT_MINX keeps him off the toy box (a king inside it =
 // kingLeak = the raid LOST — never giftable). He never marches for the
 // box: the mover fork's croak arm cedes his feet to this machine. The whole
@@ -36036,8 +36080,9 @@ function updateFoeCroak(f,dt){
     if(RVc){ const e0=f.x>RVc.x+RVc.w/2, e1=tx>RVc.x+RVc.w/2;
       if(e0!==e1) D.via=[{x:e0?RVc.x+RVc.w+26:RVc.x-26,y:RVc.bridgeY},{x:e0?RVc.x-26:RVc.x+RVc.w+26,y:RVc.bridgeY}]; }
     D.wx=tx; D.wy=ty; };
+  D.fanCd=Math.max(0,D.fanCd-dt);   // 0382: the barrage clock is a WALL clock — it ticks in every state (the cover dash and the duck included; it was roam-only) and holds at ZERO: "10-second cooldown" means ten seconds (Wyatt); the finisher below re-arms it
   if(D.st==='roam'){
-    D.shotCd-=dt; D.fanCd-=dt;
+    D.shotCd-=dt;
     // 0374 THE HUNT: vias first; on arrival he ROLLS — hunt legs press at
     // the nearest green and stop at the CROAK_PRESS_R ring (no greens ⇒ the
     // deploy band); hold legs wander where he STANDS (pressed ground is
@@ -36071,11 +36116,15 @@ function updateFoeCroak(f,dt){
         f.pipN=CROAK_SHOT_PIPS; tanHit(m,f.x,f.y,f); f.pipN=0;
       } else D.shotCd=0.8;
     }
-    if(D.fanCd<=0){ D.st='plant'; D.t=0.55;
-      let sx=0,sy=0,n0=0;
-      for(const u of S.units){ if(u.dead||u.jetT>0) continue; sx+=u.x; sy+=u.y; n0++; }
-      D.aimAt=n0? Math.atan2(sy/n0-f.y, sx/n0-f.x) : Math.PI;
-    }
+    // 0382 THE KING FIRES ONLY IN RANGE (Wyatt): the plant door asks
+    // croakScan — a green inside HIS fan, or NO plant: the clock sits at
+    // zero and the question is asked again next tick (a 0.25s re-check is
+    // the flagged alternate) while he keeps hunting, roaming and
+    // strong-shooting; the aim is the IN-RANGE centroid. The cover-debt
+    // reaction below stays reachable under a held clock (it was the
+    // else-arm of a door that used to open the instant the clock ran out).
+    const sc0=(D.fanCd<=0)? croakScan(f,fanR) : null;
+    if(sc0){ D.st='plant'; D.t=0.55; D.aimAt=sc0.ang; }
     else if((D.dmgRef-f.hp)>=f.hpMax*CROAK_COVER_DEBT){ D.dmgRef=f.hp;
       // 0374: cover play is the MINORITY now — on the debt he ROLLS: the
       // shrug (the debt re-arms, the press continues) beats ducking 2:1; a
@@ -36094,8 +36143,9 @@ function updateFoeCroak(f,dt){
     return;
   }
   if(D.st==='fan'){ D.wt-=dt;   // 0370 THE BARRAGE — the rooted channel (brgWave above); 0373: the ground wedge + cone fx retired (Wyatt) — brass, muzzles and shake carry the show
-    if(D.wt<=0 && D.wn<BRG_WAVES){ D.wt+=BRG_GAP; D.wn++;
-      brgWave({ own:f, x:f.x, y:f.y, mzx:f.x-14, mzy:f.y-30, aim:D.aimAt, R:fanR, green:false,
+    if(D.wt<=0 && D.wn<BRG_WAVES){ D.wt+=BRG_GAP; const hd=D.wn&1; D.wn++;   // 0382: volley n fires hand n&1 — RIGHT, LEFT, RIGHT, LEFT off his two irons (croakMz), never both
+      brgWave({ own:f, x:f.x, y:f.y, mz:croakMz(f.x,f.y,f.def.w), hand:hd, aim:D.aimAt, R:fanR, green:false,
+        kick:(h)=>{ f.rcAt=S.t; f.rcH=h; },   // the mold has no kick param: the flash at THAT barrel + the croakRc recoil rock are the tell
         deal:(u)=>{ f.pipN=CROAK_FAN_PIPS/BRG_WAVES; tanHit(u,f.x,f.y,f); f.pipN=0; } });   // 3/8 pip a wave — 8 waves stood = the shipped 3 EXACT (×dmgX), deterministic; every save rolls per wave (flagged split)
     }
     if(D.wn>=BRG_WAVES){
@@ -36118,7 +36168,7 @@ function updateFoeCroak(f,dt){
     return;
   }
   if(D.st==='cover'){ D.t-=dt;
-    if(D.t<=0){ D.st='roam'; f.burrow=false; D.fanCd=Math.min(D.fanCd, 2.2);
+    if(D.t<=0){ D.st='roam'; f.burrow=false;   // 0382: the after-cover Math.min(D.fanCd,2.2) clamp RETIRED — the 10s wall clock ticked through the duck and owes nothing (one cell to restore)
       D.spd=CROAK_ROAM_SPD;
       goVia(rx0+Math.random()*(rx1-rx0)*0.7, ry0+Math.random()*(ry1-ry0)); }   // 0374: the stand-up leg is a hold; the next arrival rolls the hunt again
     return;
@@ -37294,9 +37344,10 @@ function gsBank(u){
 // rpOn: the mod FITTED and the PISTOL racked. rpActivate: aims at the crowd
 // (the king's own average, valid enemies inside his e-tier reach), roots the
 // man (u.rpT — the kyHeldT shelf parks his feet AND his own gun) and plays
-// Croak's exact machine through rpStep: 0.55s plant tell -> the 2.64s
-// BRG_WAVES channel (brgWave — brass OutLaw Slugs, both muzzles, per-wave
-// sweep). Each wave lands the pistol's levelled base ÷ BRG_WAVES
+// Croak's exact machine through rpStep: 0.55s plant tell -> the BRG_WAVES
+// channel (brgWave — brass OutLaw Slugs, RIGHT-LEFT-RIGHT-LEFT off his two
+// irons' own seats and bucks since 0382, per-wave sweep; 1.6s at BRG_GAP
+// 0.2). Each wave lands the pistol's levelled base ÷ BRG_WAVES
 // (UDEF.sarge.dmg x upMul — no vet/laser/outfit extras; an enemy who stands
 // the whole storm takes exactly the 0361 number, flagged) through hurt(),
 // so deflects and resists hold. The shelf is HELD until the last wave flies
@@ -37322,13 +37373,15 @@ function rpScan(u,R0){
 }
 function rpActivate(){
   // 0373 FIRE AT WILL (Wyatt: "activate it anytime while the pistol sarge is
-  // alive"): the 14s re-arm gate and the empty-street refusal are BOTH
-  // RETIRED — the only clock left is the channel itself (u.rpT holds till the
-  // last wave flies; one barrage at a time). No crowd inside RP_R? He fires
-  // anyway: the nearest live enemy anywhere sets the aim, and a truly empty
-  // field takes his own facing (east; a right-hand battleground chair faces
-  // west). rpOn + a fielded live pistol Sarge stay the door.
-  if(!rpOn()) return false;
+  // alive"): the empty-street refusal is RETIRED — no crowd inside RP_R? He
+  // fires anyway: the nearest live enemy anywhere sets the aim, and a truly
+  // empty field takes his own facing (east; a right-hand battleground chair
+  // faces west). 0382 (Wyatt: "It should have a 10-second cooldown"): the
+  // re-arm gate is BACK at RP_CD 10 — S.rpCd refuses the tap till it drains
+  // (the button draws the sweep + the count); the channel guard (u.rpT holds
+  // till the last wave flies; one barrage at a time) stands beside it. rpOn
+  // + a fielded live pistol Sarge stay the door.
+  if(!rpOn() || (S.rpCd||0)>0) return false;
   const u=jetSarge(); if(!u || u.rpT>0 || u.jetT>0) return false;
   if(unitSargeStats(u).w!=='pistol') return false;
   const aim=rpScan(u); let ang;
@@ -37349,15 +37402,23 @@ function rpActivate(){
 }
 function rpStep(u,dt){
   u.rpT-=dt;
-  const R=(u.rpKC&&u.rpR)||RP_R, mzx=u.x+14, mzy=u.y-30;   // 0372: the playable king's channel sweeps HIS OWN reach (rpR, stamped at the fire-loop door; the muzzle is the boss's −14/−30 mirrored to the unit lane); 0373: the Sarge's renegade path sweeps RP_R — his own doubled radius
+  const R=(u.rpKC&&u.rpR)||RP_R;   // 0372: the playable king's channel sweeps HIS OWN reach (rpR, stamped at the fire-loop door); 0373: the Sarge's renegade path sweeps RP_R — his own doubled radius
+  // 0382 THE HANDS: Sarge's volleys leave his two irons' OWN seats — the
+  // plain-fire path's flash seats (the raised iron +17.5/−41.5, the hip iron
+  // +18/−31, on the mzl facing law) — and buck the gun that fired (pistT /
+  // pist2T, the v1.67 pair); the playable king rides his mold's two tips at
+  // the unit lane's 128 (croakMz — the boss's own measure), no kick param.
+  const mzl=(S.bf&&u.side==='foe')?-1:1;
+  const mz=u.rpKC? croakMz(u.x,u.y,unitW(u.type)) : [{x:u.x+17.5*mzl,y:u.y-41.5},{x:u.x+18*mzl,y:u.y-31}];
   if(u.rpSt===0){
     if(u.rpT<=RP_BURST){ u.rpSt=1; u.rpWt=BRG_GAP; u.rpWn=0; }   // 0373: the flashing cone tell RETIRED (Wyatt: "it should not show the cone") — the plant stance is the tell
     return;
   }
   if(u.rpT<=0 && u.rpWn<BRG_WAVES) u.rpT=0.016;   // the shelf holds till the last wave flies (the root law) — jitter never eats the finisher
   u.rpWt-=dt;
-  if(u.rpWt<=0 && u.rpWn<BRG_WAVES){ u.rpWt+=BRG_GAP; u.rpWn++;
-    brgWave({ own:u, x:u.x, y:u.y, mzx:mzx, mzy:mzy, aim:u.rpAim, R:R, green:true,
+  if(u.rpWt<=0 && u.rpWn<BRG_WAVES){ u.rpWt+=BRG_GAP; const hd=u.rpWn&1; u.rpWn++;   // 0382: volley n fires hand n&1 — RIGHT, LEFT, RIGHT, LEFT, never both
+    brgWave({ own:u, x:u.x, y:u.y, mz:mz, hand:hd, aim:u.rpAim, R:R, green:true,
+      kick:u.rpKC? null : (h)=>{ if(h) u.pist2T=PISTOL_KICK; else u.pistT=PISTOL_KICK; },
       deal:(f)=>{ hurt(f, u.rpDmg/BRG_WAVES, u); } });   // 0361's law kept: the levelled base, now split evenly — stand the whole storm and it sums to exactly the old number (flagged)
   }
   if(u.rpWn>=BRG_WAVES){
@@ -45127,7 +45188,12 @@ function drawSargeWeapon(u){
     // above, so a foe-side pair swings round with the figure (the v1.50
     // mirror law, both facings). Rank reads the WIRE bag: a relayed ally's
     // ten ranks bring the pair to your screen, the AI's r:0 never does.
-    if((usw.r|0)>=WPN_MILE.pistolLvl){
+    // 0382: and through a RENEGADE channel (u.rpT — never relayed, so only
+    // the man who tapped) the hip iron shows at ANY rank — the barrage fires
+    // right, left, right, left, so the left hand needs its gun; the plant IS
+    // "he draws both pistols" (flagged: the pair could stay rank-10-only and
+    // a below-rank Sarge fire every volley from the raised iron instead).
+    if((usw.r|0)>=WPN_MILE.pistolLvl || u.rpT>0){
       const k2=(u.pist2T>0? u.pist2T/PISTOL_KICK : 0);
       cx.save();
       if(k2>0){ cx.translate(u.x+9.3,u.y-26.2); cx.rotate(-0.22*k2); cx.translate(-(u.x+9.3),-(u.y-26.2)); }
@@ -45311,7 +45377,7 @@ function drawFoe(f){
       // already draw their own shadows, these three never had one)
       if(lightField()){ cx.fillStyle='rgba(74,90,120,0.30)';
         cx.beginPath(); cx.ellipse(f.x,f.y-1,f.def.w*0.30,8,0,0,7); cx.fill(); }
-      drawSprite(f.type,f.x,f.y,f.def.w,0,Math.sin(S.t*3.4+f.wob)*0.028,foeImg(f.type),wbk);
+      drawSprite(f.type,f.x,f.y,f.def.w,0,Math.sin(S.t*3.4+f.wob)*0.028+croakRc(f),foeImg(f.type),wbk);   // 0382: + the king's volley recoil rock (zero for every other giant)
     }
     return;   // boss HP is on the big top bar, not a little sprite bar
   }
@@ -45439,7 +45505,7 @@ function drawFoe(f){
     if(f.aimT>0 && !f.def.pellet){ cx.globalAlpha=0.5+0.4*Math.sin(S.t*18); cx.fillStyle='#FFD24A';
       cx.beginPath(); cx.arc(f.x-25,f.y-26,6+2.5*Math.sin(S.t*14),0,7); cx.fill(); cx.globalAlpha=1; }
   } else
-  drawSprite(f.type,f.x,f.y-(f.hopZ||0),f.def.w,0,wob,foeImg(f.type),wbk);   // v2.53: the yeti's bound lifts the BODY only — his shadow stays on the ground where the contact circle lives (v3.61: + the walk-flip seat)
+  drawSprite(f.type,f.x,f.y-(f.hopZ||0),f.def.w,0,wob+croakRc(f),foeImg(f.type),wbk);   // v2.53: the yeti's bound lifts the BODY only — his shadow stays on the ground where the contact circle lives (v3.61: + the walk-flip seat; 0382: + the little king's volley recoil rock, zero for everyone else)
   // 0117 THE SNIPER'S TELL — the fairness contract for the 205 reach: a long
   // aim (def.aim >= 1) draws its line for the whole wind-up, pointed at the
   // same man tanPick will hand the trigger, so you can SEE it and move him.
@@ -45986,9 +46052,11 @@ function drawGsBtn(){
   if(win>0){ cx.textAlign='center'; cx.font=cf('bold 26px'); cx.fillStyle='#FFD24A'; cx.fillText(Math.ceil(win), x+bw/2, y+bh/2+9); }
   else if(cd>0){ cx.textAlign='center'; cx.font=cf('bold 26px'); cx.fillStyle='#FFD24A'; cx.fillText(Math.ceil(cd), x+bw/2, y+bh/2+9); }
 }
-// ===== 0361/0373 THE RENEGADE'S GREEN BUTTON — FIRE AT WILL: lit whenever a
-// pistol Sarge stands (0373 retired the cooldown AND the crowd test), DIM only
-// mid-channel or with no live pistol Sarge. The glyph: the renegade iron
+// ===== 0361/0373/0382 THE RENEGADE'S GREEN BUTTON — lit whenever a pistol
+// Sarge stands with the re-arm drained (0373 retired the crowd test; 0382
+// brought the cooldown BACK at RP_CD 10 — the sibling sweep + count, divide-
+// safe), DIM mid-channel, mid-cooldown or with no live pistol Sarge. The
+// glyph: the renegade iron
 // itself — 0381 THE ICON: enhPartSVG's mark transcribed to canvas ops,
 // values lifted a notch for the dark panel (rect/stack/alpha laws untouched).
 function drawRpBtn(){
@@ -45997,14 +46065,21 @@ function drawRpBtn(){
   const bw=64, bh=56, x=VW-88;
   const y = H-232 - 64*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (snpOn()?1:0) + (gsOn()?1:0));
   btnRects.rp=[x,y,bw,bh];
-  const js=jetSarge();
-  const ready=js && !(js.rpT>0) && unitSargeStats(js).w==='pistol';   // 0373 FIRE AT WILL — the cd and crowd gates retired with RP_CD
+  const js=jetSarge(), cd=S.rpCd||0;
+  const ready=js && !(cd>0) && !(js.rpT>0) && unitSargeStats(js).w==='pistol';   // 0373 FIRE AT WILL — the crowd gate stays retired; 0382: the re-arm gate is back (Wyatt's 10s), read here exactly as rpActivate reads it
   cx.fillStyle = ready? 'rgba(38,40,31,0.92)' : 'rgba(38,40,31,0.6)';
   rr(x,y,bw,bh,12); cx.fill();
-  cx.save(); cx.globalAlpha = 0.8;
+  cx.save(); cx.globalAlpha = cd>0? 0.25 : 0.8;
   cx.strokeStyle='#8FBF63'; cx.lineWidth=2; rr(x+1.5,y+1.5,bw-3,bh-3,10); cx.stroke(); cx.restore();
+  if(cd>0){   // 0382: the re-arm sweep — the sibling (outlaw/guardian) grammar, divide-safe by construction
+    const k=RP_CD>0? Math.max(0,Math.min(1,1-cd/RP_CD)) : 1, fh=Math.max(1,bh*k);
+    cx.save(); rr(x,y,bw,bh,12); cx.clip();
+    cx.fillStyle='rgba(143,191,99,0.35)'; cx.fillRect(x,y+bh-fh,bw,fh);
+    cx.fillStyle='#BFE39A'; cx.fillRect(x,y+bh-fh,bw,3);
+    cx.restore();
+  }
   const gx=x+bw/2, gy=y+bh/2;
-  cx.globalAlpha = ready?1:0.35;
+  cx.globalAlpha = cd>0? 0.16 : (ready?1:0.35);
   cx.lineCap='round';
   cx.fillStyle='#454a3e';   // muzzle bell + under-mouth + sights + hammer
   rr(gx-24.8,gy-8.4,5.5,10.9,1.5); cx.fill();
@@ -46040,6 +46115,11 @@ function drawRpBtn(){
   cx.fillStyle='#9be89b';
   rr(gx+8.8,gy-0.2,3.8,1.5,0.7); cx.fill();
   cx.lineCap='butt'; cx.globalAlpha=1;
+  if(cd>0){   // 0382: the count — seconds till the iron re-arms (raw digits, l10n-exempt; the sibling grammar)
+    cx.textAlign='center';
+    cx.font=cf('bold 26px'); cx.fillStyle='#FFD24A';
+    cx.fillText(Math.ceil(cd), x+bw/2, y+bh/2+9);
+  }
 }
 function drawBmbBtn(){
   btnRects.bmb=null;
@@ -46163,9 +46243,9 @@ cv.addEventListener('pointerdown', e=>{
     if(!gsActivate()) SFX.clack();
     S.sel=null; return;
   }
-  // 0361/0373 THE RENEGADE: one tap plants the king's fan — FIRE AT WILL.
-  // Only mid-burst or the wrong iron clacks now (the cooldown and the
-  // empty-street refusals retired with RP_CD).
+  // 0361/0373/0382 THE RENEGADE: one tap plants the king's fan — FIRE AT
+  // WILL, on a 10s re-arm. Mid-burst, mid-cooldown or the wrong iron clacks
+  // (the empty-street refusal stays retired).
   if(inRect(p.x,p.y,btnRects.rp)){
     if(!rpActivate()) SFX.clack();
     S.sel=null; return;
@@ -53711,7 +53791,7 @@ const RAID_KING_FCX={ e:1, m:0.8, h:0.65, g:1.25 };    // the per-tier boss mech
 // +20%/+50% hp and +10% dmg are the hpX/dmgX stamps, never the raid curve).
 const CROAK_HPX ={ e:1, m:1.2, h:1.5, g:2.25 };   // Wyatt verbatim: M +20% health · H +50% — 0372 MEGA: Hard ×1.5 EXACT (the 0341/0357 not-stacked law; king 360, little king 72)
 const CROAK_DMGX={ e:1, m:1.1, h:1.1, g:1.2 };   // Wyatt verbatim: M/H +10% damage — 0372 MEGA: one more notch (a 3-grit stander drops a wave sooner; dial)
-const CROAK_FAN_CD={ e:7, m:7, h:4.5, g:3.5 };   // the twin-pistol cone clock — H "shorter cooldown" (the demo's own 7/4.5); 0372 MEGA: faster still (dial)
+const CROAK_FAN_CD={ e:10, m:10, h:10, g:10 };   // 0382 (Wyatt 8/17: "It should have a 10-second cooldown. And the same goes for King Croak"): TEN, every tier — a WALL clock since 0382 (ticks through cover); the earlier ladder e7/m7/h4.5/g3.5 (H "shorter cooldown", 0372 MEGA faster still) is one cell each to restore (flagged)
 const CROAK_FAN_R ={ e:210, m:210, h:294, g:420 };   // the cone's reach — H "+40% bigger radius" (210×1.4); 0372 MEGA: ×2 (the 0357 rngx-doubling shape; the little king rides ×0.6=252 free; dial)
 const CROAK_FAN_HALF=0.62;                     // the cone's half-angle (the demo's own wedge)
 const CROAK_FAN_PIPS=3;                        // 0370: the CHANNEL'S whole budget — 3/8 pip a wave through tanHit's fractional seam; a man who stands all 8 waves takes the shipped 3 whole (a caught 3-grit man still drops), a man who leaves after 3 loses ~1
@@ -53729,7 +53809,7 @@ const CROAK_HUNT_MINX=300;                     // the hard west floor — the to
 const CROAK_SHRUG=0.33;                        // the 14% cover debt ROLLS now: 1/3 duck behind the crates, 2/3 shrug and press on
 const CROAK_SABER_RESIST=0.10;                 // 0370 (Wyatt: "The boss should have a good saber resistance, maybe taking 90% less damage from the saber") — both croaks, counterDmg's own funnel
 const CROAK_JANE_T=30;                         // 0370 (Wyatt: "she just automatically comes to help you on normal mode when you're 30 seconds into the fight") — the battle clock; 0374: arms on EVERY tier but Easy (M/H/MEGA — Wyatt: "Jane never came out during the fight"; the solo no-hookshot swallow fixed at BOTH doors)
-const BRG_WAVES=8, BRG_GAP=0.33;               // 0370 THE BARRAGE — Bullet Time: 8 waves 0.33s apart = a 2.64s rooted channel after the 0.55s plant tell (dials)
+const BRG_WAVES=8, BRG_GAP=0.2;                // 0370 THE BARRAGE — Bullet Time: 8 volleys after the 0.55s plant tell; 0382 VERY QUICK (Wyatt: "boom, boom, boom, boom… a very quick alternation"): 0.33 → 0.2 apart = a 1.6s rooted channel, right-left-right-left (0.16-0.22 is the band; the waves stay 8 so every storm's damage sums byte-same — dials)
 const BRG_ROUNDS=10;                           // brass OutLaw Slugs per wave across the cone (reduced motion draws 4 — same waves, same damage)
 const CROAK_LIL_FANR=0.6;                      // 0370 LITTLE KING CROAK — "his cone is smaller": the radius dial (flagged radius-vs-angle)
 // ===== 0374 THE STAMPEDE (Wyatt: "There needs to be a stampede of horses
@@ -53746,8 +53826,8 @@ const SNIPE_CD=14;                             // 0340 OUTLAW SNIPER: the red bu
 const SNIPE_BOSS_DMG=10;                       // ...a BOSS takes a heavy hit, never the eliminate (flagged for Wyatt)
 const GS_WIN=5;                                // 0361 GUARDIAN SHOTGUN: the forge window (Wyatt's 5 seconds)
 const GS_CD=SNIPE_CD;                          // ...on the outlaw button's own re-arm economy (flagged)
-const RP_PLANT=0.55, RP_BURST=BRG_WAVES*BRG_GAP;   // 0361/0370 RENEGADE PISTOL: KING CROAK'S OWN clocks — the wedge tell + the 2.64s barrage channel (the fan's 1.05 retired with the single resolution)
-const RP_CD=0;                                 // 0373 FIRE AT WILL (Wyatt: "activate it anytime while the pistol sarge is alive") — the sniper's 14s re-arm RETIRED; the 3.19s channel itself is the only clock (dial)
+const RP_PLANT=0.55, RP_BURST=BRG_WAVES*BRG_GAP;   // 0361/0370 RENEGADE PISTOL: KING CROAK'S OWN clocks — the wedge tell + the barrage channel (2.64s at 0370's gap, 1.6s since 0382; the fan's 1.05 retired with the single resolution)
+const RP_CD=10;                                // 0382 (Wyatt 8/17: "It should have a 10-second cooldown") — the re-arm is BACK at ten (0373's fire-at-will 0 retired the sniper's 14; the crowd refusal stays retired — the tap always fires when the clock is drained); dial
 const RP_R=CROAK_FAN_R.e*2;                    // 0373 DOUBLE THE SIZE (Wyatt): the renegade's OWN radius = 420 — never the boss's shared CROAK_FAN_R cells (MEGA math builds off .e); half-angle untouched (radius reading, flagged)
 const KC_BACK_PX=64, KC_BACK_SPD=96, KC_BACK_MIN=150;   // 0372 PLAYABLE KING CROAK's hit-and-run: the back-off distance/pace after his channel + the west floor (east of the toy box at x120, inside the deploy band; dials)
 // the two outposts — authored on the 1920×1200 mat, both flanks of the
