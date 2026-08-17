@@ -23106,10 +23106,10 @@ const FDEF = {
   // knockdown currency — Sarge's grit and saves apply through knock()).
   wbandit: { hp:2,  spd:40, bounty:5,  leak:1, w:50, rng:225, fireCd:1.4, wild:0.4 },   // 0355 (Wyatt 8/16: "The bandits need to be firing… extra range… out-range a players' machine guns… 40% less accuracy… fairly quick attack speed"): rng 198→225 (over the MG's campaign 192, past the rifle duel's 198, under the snowfig's 280), fireCd 3.2→1.4 (the pistol class), wild 0.4 = THE WILD-AIM LAW (tanShoot rolls the miss — the round lands beside the man and kicks sand)
   wsniper: { hp:2,  spd:26, bounty:35, leak:1, w:54, rng:404, fireCd:5.2, aim:1.4, elite:true },
-  wrider:  { hp:6,  spd:80, bounty:30, leak:2, w:76, rng:170, elite:true, wild:0.6, ride:{cd:1.15, ramR:52, brN:4, brGap:0.14, lull:0.9, lullVar:1.3} },   // 0355 (Wyatt: "firing sporadically… just firing pew pew pew pew. He needs to scare the player a little bit"): 4-round sprays brGap apart, then a SPORADIC lull (lull + rand×lullVar) — wild 0.6 holds his hits/s ≈ the old single-shot clock (scary, never deadlier; every cell is a dial)
+  wrider:  { hp:6,  spd:96, bounty:30, leak:2, w:76, rng:170, elite:true, wild:0.8, ride:{cd:1.15, ramR:52, brN:7, brGap:0.11, lull:0.35, lullVar:0.6} },   // 0355 SPORADIC spray law (brN rounds brGap apart, then lull + rand×lullVar; a miss spends the pull, lands beside the man and kicks sand) · 0367 (Wyatt: "20% faster… firing like crazy. They can miss all over the place, but they need to feel impactful"): spd 80→96 EXACT; the spray goes to 7 rounds on a short leash — ~5.3 rounds/s vs the old ~2.0, the crazy is REAL — and wild 0.8 prices the storm back to ~+20% hits/s over the 0355 clock ON THE REAL 60Hz GRID (grid-measured 5.02 vs 2.07 rounds/s; impactful, never double-deadly — 0.7 would DOUBLE it; every cell a dial; the ram at ramR stands)
   wmouse:  { hp:3,  spd:44, bounty:12, leak:1, w:36, rng:90,  fireCd:1.4, burst:3, aim:0.25, sneak:{t:5, spd:210, gx:330, gap:70, hold:170, mineAt:1, mineR:100} },
-  wteddy:  { hp:8,  spd:26, bounty:32, leak:2, w:60, rng:100, fireCd:3.2, aim:0.6, multi:3, cone:0.95, pellet:true, elite:true },
-  wsnake:  { hp:10, spd:22, bounty:40, leak:2, w:96, elite:true, bur:{digCd:2.2, digSpd:200, rattle:0.5, lungeR:50, seekR:110, away:1.1} },
+  wteddy:  { hp:12, spd:26, bounty:32, leak:2, w:60, rng:100, fireCd:3.2, aim:0.6, multi:3, cone:0.95, pellet:true, elite:true },   // 0367 (Wyatt: "not really impactful at all. Let's give him 50% more health"): hp 8→12 EXACT — the shotgun bear stands half again longer; every rung inherits through spawnFoe's one hpMul seat
+  wsnake:  { hp:10, spd:22, bounty:40, leak:2, w:192, elite:true, bur:{digCd:2.2, digSpd:200, rattle:0.5, lungeR:100, seekR:220, away:1.1} },   // 0367 (Wyatt: "double the scale of it and double its hitbox… burrowing and popping up and scaring players"): w 96→192 doubles the DRAWN cell (drawSprite is feet-anchored — the belly stays on the ground) AND every def.w×0.3 body circle (splash/mines/TK/kami) through the one funnel; the aimed rifles were always center-picked hitscan — his doubled REACH is the bite: lungeR 50→100, seekR 110→220 (a doubled snake FINDS and BITES like one); mound/burst/shake/rattle ride drawFoe + updateFoeSnake
   // 0340 KING CROAK — the hideout's own boss (rk='croak' raids only; never a
   // park rung, never BF). NO fireCd BY DESIGN (the wrider licence law:
   // updateFoeCroak fires his strong shot and the twin-pistol fan on his OWN
@@ -25404,6 +25404,7 @@ const SFX = {
   boom:  ()=>{ noise(0.35,0.22,700); tone(120,40,0.3,'sine',0.14); },
   thock: ()=>tone(180,120,0.07,'sine',0.2),
   clack: ()=>{ noise(0.09,0.2,3000); tone(300,150,0.06,'triangle',0.1); },
+  rattle:()=>{ for(let i9=0;i9<9;i9++) setTimeout(()=>noise(0.03,0.1,4600),i9*34); tone(110,95,0.3,'sawtooth',0.022); },   // 0367: the rattlesnake's dry warning — nine quick ticks under a thin buzz, 306ms (fits the 0.5s rattle window even at HARD's burx 1.2; one new tone, the 0340 wshot precedent)
   snap:  ()=>tone(1400,900,0.05,'square',0.07),
   blip:  ()=>tone(600,1200,0.09,'sine',0.08),
   laser: ()=>{ tone(1900,240,0.12,'sawtooth',0.045); tone(2400,300,0.09,'square',0.02); },
@@ -27205,7 +27206,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.24';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.25';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -35376,8 +35377,10 @@ function updateFoeSnake(f,dt){
     f.x+=dx/Math.max(1,d)*sp*dt; f.y+=dy/Math.max(1,d)*sp*dt+Math.sin(S.t*9+f.wob)*34*dt;
     if(Math.random()<dt*9) S.fx.push({k:'puff',x:f.x,y:f.y+4,t:0,dur:0.3,R:9});
     if(d<14){ f.snakeState='rise'; f.snkT=bg.rattle/bx1; f.burrow=false;
+      S.fx.push({k:'puff',x:f.x,y:f.y,t:0,dur:0.45,R:32});   // 0367 (Wyatt: "popping up and scaring players"): the pop-up BURSTS sand — the doubled body's own cloud
       S.fx.push({k:'ring',x:f.x,y:f.y-8,r:6,R:30,t:0,dur:0.3,col:'rgba(217,201,160,0.95)'});
-      bfSfx(SFX.clack, f.x, f.y); }
+      S.shake=Math.max(S.shake,0.4);   // 0367: the ground jumps when he surfaces
+      bfSfx(SFX.rattle, f.x, f.y); }   // 0367: the warning IS a rattle — nine dry ticks through the scatter window, not a single clack
     return;
   }
   if(f.snakeState==='rise'){
@@ -35386,11 +35389,11 @@ function updateFoeSnake(f,dt){
       let m=null,md=bg.seekR;
       for(const u of S.units){ if(u.dead||u.jetT>0||u.cloakT>0) continue; if(S.drag&&S.drag.unit===u) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<md){md=d;m=u;} }
       if(m){ S.fx.push({k:'ring',x:m.x,y:m.y-6,r:8,R:bg.lungeR,t:0,dur:0.3,col:'rgba(192,71,58,0.9)'});
-        bfSfx(SFX.thock, f.x, f.y); S.shake=Math.max(S.shake,0.25);
+        bfSfx(SFX.thock, f.x, f.y); S.shake=Math.max(S.shake,0.4);   // 0367: the bite kicks as hard as the surface (0.25→0.4)
         for(const g8 of S.units){ if(g8.dead||g8.jetT>0) continue; if(S.drag&&S.drag.unit===g8) continue;
           if(Math.hypot(g8.x-m.x,g8.y-m.y)<bg.lungeR) knock(g8,f.x,f.y); } }
       f.snakeState='away'; f.snkT=bg.away/bx1; f.burrow=true;
-      S.fx.push({k:'puff',x:f.x,y:f.y,t:0,dur:0.4,R:16});
+      S.fx.push({k:'puff',x:f.x,y:f.y,t:0,dur:0.4,R:32});   // 0367: the dive-under grows with the doubled body (16→32)
     }
     return;
   }
@@ -44402,7 +44405,7 @@ function drawFoe(f){
       return;
     }
     // under the rug: just a moving bump and a guilty ripple
-    const bw8=f.type==='wsnake'?1.6:1;   // 0339: the giant rattlesnake races a bigger mound
+    const bw8=f.type==='wsnake'?3.2:1;   // 0339: the giant rattlesnake races a bigger mound (0367: doubled with the body — w 96→192, bump rx ≈61 ≈ the doubled sprite's own shadow)
     cx.fillStyle='rgba(0,0,0,0.18)'; cx.beginPath(); cx.ellipse(f.x,f.y+4,22*bw8,8*bw8,0,0,7); cx.fill();
     cx.fillStyle='#9a5a4a'; cx.beginPath(); cx.ellipse(f.x,f.y-2,19*bw8,10*bw8,0,0,7); cx.fill();
     cx.strokeStyle='rgba(255,255,255,0.25)'; cx.lineWidth=2;
