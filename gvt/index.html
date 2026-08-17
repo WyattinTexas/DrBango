@@ -27940,7 +27940,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.37';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.38';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -51399,6 +51399,7 @@ const ADQ={ games:0, camp:0, bf:0, squad:0, sqPaid:0 };   // the session gate co
 const ADS_BRIDGE=(()=>{ try{ return !!(window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.gvtAds); }catch(e){ return false; } })();
 let AD_MIN_GAP_MIN=3;   // §V3.10: minutes between REAL interstitials (DIAL)
 let AD_SESS_CAP=6;      // §V3.10: real interstitials per session, hard ceiling (DIAL)
+let AD_WD_MS=25000;     // 0380: the never-DISPLAYED belt — how long a sent show may go dark before the page takes the game back; stands down the moment the ad is on screen (DIAL, rig-tunable)
 const MAXA={ ok:false, initSent:false, int:false, rew:false, pend:{}, seq:1, last:null, lastShow:0, sess:0, repPend:0, tvPrev:null, log:[] };
 function maxPost(m){ try{ webkit.messageHandlers.gvtAds.postMessage(m); MAXA.log.push(m.cmd+(m.kind?(':'+m.kind):'')); if(MAXA.log.length>24) MAXA.log.shift(); }catch(e){} }
 // ---- the neutral age gate (§V3.3/§V3.4; Wyatt gate 1 defaults) ----
@@ -51474,8 +51475,13 @@ function maxShow(kind){
   }
   return new Promise(res=>{
     const id=MAXA.seq++;
-    const wd=setTimeout(()=>{ if(MAXA.pend[id]){ delete MAXA.pend[id]; res({completed:intish}); } }, 25000);   // a shell that never answers still hands the game back exactly once (the two-arg-then law's native belt)
-    MAXA.pend[id]={res:res, wd:wd};
+    // 0380 (the 8/17 emulator e2e's catch): this belt guards exactly ONE
+    // failure — a show that never REACHES the screen. A rewarded video
+    // legitimately outruns any fixed clock, and the 25s belt resolved UNDER a
+    // playing ad; so _adsCreative (the on-screen proof) stands it down and
+    // onAdHidden owns the result from the first displayed frame.
+    const wd=setTimeout(()=>{ if(MAXA.pend[id]){ delete MAXA.pend[id]; res({completed:intish}); } }, AD_WD_MS);
+    MAXA.pend[id]={res:res, wd:wd, kind:kind};
     if(intish){ MAXA.lastShow=Date.now(); MAXA.sess++; }   // §V3.10 bookkeeping at the SEND — a failed show still spent its slot, so a broken fill can never machine-gun the player
     maxPost({cmd:'show', kind:kind, id:id});
   });
@@ -51487,7 +51493,14 @@ function maxOnResult(d){
   p.res({completed:!!d.completed});
   if(MAXA.repPend && S.mode==='menu') adRepShow();
 }
-function maxOnCreative(d){ if(d&&(d.network||d.creativeId)) MAXA.last={ n:String(d.network||'').slice(0,40), c:String(d.creativeId||'').slice(0,64), u:String(d.adUnit||'').slice(0,20) }; }
+function maxOnCreative(d){
+  if(!d) return;
+  if(d.network||d.creativeId) MAXA.last={ n:String(d.network||'').slice(0,40), c:String(d.creativeId||'').slice(0,64), u:String(d.adUnit||'').slice(0,20) };
+  // 0380: the ad is ON SCREEN — the never-displayed belt stands down for this
+  // kind's pending show; the result now belongs to onAdHidden alone. (If the
+  // process dies mid-ad the page dies with it — nothing to guard page-side.)
+  try{ for(const k in MAXA.pend){ const p=MAXA.pend[k]; if(p && p.kind===d.kind && p.wd){ clearTimeout(p.wd); p.wd=0; } } }catch(e){}
+}
 // §V3.10 for REAL interstitials only: the gap, the session cap, the payer
 // exemption. The placeholder keeps its own arithmetic verbatim.
 function maxIntOk(){ try{ return !META.paidEver && MAXA.sess<AD_SESS_CAP && (!MAXA.lastShow || (Date.now()-MAXA.lastShow)>=AD_MIN_GAP_MIN*60000); }catch(e){ return false; } }
@@ -60664,7 +60677,7 @@ window.GVT = {
     if(S.mode==='menu') dogPaint(); return GVT.dog(); },
   dogRearm(){ DOGT=null; dogAdvance(0); if(S.mode==='menu') dogPaint(); return GVT.dog(); },
   // ---- ADS V1a rig (v2.60): gates + dials, deterministic for batteries ----
-  ads(){ return { steam:STEAM_SHELL, bridge:ADS_BRIDGE, provider:ADS.provider, track:(META.adTrack||null), mi:MAXA.int, mr:MAXA.rew, msess:MAXA.sess, mgap:AD_MIN_GAP_MIN, mcap:AD_SESS_CAP, mlog:MAXA.log.slice(), sess:Object.assign({},ADQ), free:AD_FREE_GAMES, camp:AD_CAMP_EVERY, bf:AD_BF_EVERY,
+  ads(){ return { steam:STEAM_SHELL, bridge:ADS_BRIDGE, provider:ADS.provider, track:(META.adTrack||null), mi:MAXA.int, mr:MAXA.rew, msess:MAXA.sess, mgap:AD_MIN_GAP_MIN, mcap:AD_SESS_CAP, mwd:AD_WD_MS, mlog:MAXA.log.slice(), sess:Object.assign({},ADQ), free:AD_FREE_GAMES, camp:AD_CAMP_EVERY, bf:AD_BF_EVERY,
     squad:AD_SQUAD_EVERY,   // v2.82: the post-game squad cadence dial
     solo:AD_SOLO_POST,      // v3.60 (0297): the parked adapter-era placement dial (§V3.8)
     live:(()=>{ try{ return !!AD; }catch(e){ return false; } })(),
@@ -60674,6 +60687,7 @@ window.GVT = {
     if(p.bf!=null) AD_BF_EVERY=p.bf; if(p.squad!=null) AD_SQUAD_EVERY=p.squad;
     if(p.solo!=null) AD_SOLO_POST=p.solo;   // v3.60 (0297): the §V3.8 dial
     if(p.gap!=null) AD_MIN_GAP_MIN=p.gap; if(p.cap!=null) AD_SESS_CAP=p.cap;   // FM-GVT-MAX-01: the §V3.10 dials
+    if(p.wd!=null) AD_WD_MS=p.wd;   // 0380: the never-displayed belt (rig legs shrink it)
     return GVT.ads(); },
   age(m,d,y){ return ageGateAnswer(m,d,y); },   // FM-GVT-MAX-01 rig: answer the gate (null = rejected input); GVT.ads().track reads it back
   // ---- 0333a NO ADS rig: read-only entitlement state ----
