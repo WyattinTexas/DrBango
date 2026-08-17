@@ -48,6 +48,10 @@
     raster: {
       glMs: SS_REND.p ? SS_REND.p.glMs : -1, cvMs: SS_REND.p ? SS_REND.p.cvMs : -1,
       gpu: (SS_REND.p && SS_REND.p.gpu) || '', mode: SS_REND.mode, why: SS_REND.why,
+      // frames sampled + how each probe ended: an unmeasurable renderer is a
+      // finding, and the RTDB row must carry WHICH way it failed
+      glN: SS_REND.p ? SS_REND.p.glN : -1, cvN: SS_REND.p ? SS_REND.p.cvN : -1,
+      glHow: (SS_REND.p && SS_REND.p.glHow) || '', cvHow: (SS_REND.p && SS_REND.p.cvHow) || '',
     },
     stages: [], errors: [], startedAt: 0, updatedAt: 0, completed: 0, total: 0,
     done: false, uploaded: false,
@@ -506,6 +510,8 @@
       payload.raster = {
         glMs: SS_REND.p ? SS_REND.p.glMs : -1, cvMs: SS_REND.p ? SS_REND.p.cvMs : -1,
         gpu: (SS_REND.p && SS_REND.p.gpu) || '', mode: SS_REND.mode, why: SS_REND.why,
+        glN: SS_REND.p ? SS_REND.p.glN : -1, cvN: SS_REND.p ? SS_REND.p.cvN : -1,
+        glHow: (SS_REND.p && SS_REND.p.glHow) || '', cvHow: (SS_REND.p && SS_REND.p.cvHow) || '',
       };
     } catch (e) { }
     try { await ssLoadArt(); } catch (e) { }

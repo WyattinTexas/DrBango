@@ -1,4 +1,4 @@
-// v0.35.0 verification: fps overlay v2, full-DPR law, WORKLOAD probe + renderer
+// v0.36.0 verification: fps overlay v2, full-DPR law, WORKLOAD probe + renderer
 // verdict (~300-sprite/tilesprite/text/emitter run on BOTH real renderers at
 // boot — the fill-rate probe is dead; perf-lab run fxios-…/1786853475034 proved
 // object-count collapse that fill rate can't see), canvas tint shim, counter
@@ -96,12 +96,34 @@ async function main() {
     await c.ev(`window.__ssprobeMs > 0 && window.__ssprobeMs < 6500`) === true,
     (await c.ev(`window.__ssprobeMs`)) + 'ms');
   const cache = JSON.parse(await c.ev(`localStorage.getItem('beta3.raster')`) || 'null');
-  ok('verdict cached as v3 workload record', cache && cache.v === 3 && cache.why === 'workload'
+  ok('verdict cached as v4 workload record', cache && cache.v === 4 && cache.why === 'workload'
     && typeof cache.mode === 'string', JSON.stringify(cache && { v: cache.v, mode: cache.mode }));
+  ok('probe records frame count + how per renderer (a failure names itself)',
+    cache && cache.glN >= 3 && cache.cvN >= 3 && cache.glHow === 'ok' && cache.cvHow === 'ok',
+    JSON.stringify(cache && { glN: cache.glN, glHow: cache.glHow, cvN: cache.cvN, cvHow: cache.cvHow }));
+  // ⚠ v0.35.0's bug, now a standing law: an UNMEASURABLE GL probe must fall to
+  // Canvas, never to AUTO (which hands the game back to the failing renderer).
+  // Wyatt's phone read `gl — · cv 17 ms/f · GL (workload)` at 8fps because of it.
+  const vd = (gl, cv) => c.ev(`(() => { const o = ssVerdictFrom(${gl}, ${cv}); return o.mode + '/' + o.why })()`);
+  ok('gl unmeasurable + cv measured → CV (the 8fps regression)',
+    await vd(`{ms:-1,n:0,how:'nosample'}`, `{ms:17,n:12,how:'ok'}`) === 'cv/gl-unmeasurable');
+  ok('cv unmeasurable + gl measured → GL',
+    await vd(`{ms:9,n:20,how:'ok'}`, `{ms:-1,n:1,how:'noboot'}`) === 'gl/cv-unmeasurable');
+  ok('both unmeasurable → AUTO (Phaser picks its own fallback)',
+    await vd(`{ms:-1,n:0,how:'noboot'}`, `{ms:-1,n:0,how:'noboot'}`) === 'auto/workload');
+  ok('both measured keeps the >10% status-quo rule (no flip-flop)',
+    await vd(`{ms:10,n:20,how:'ok'}`, `{ms:9.5,n:20,how:'ok'}`) === 'auto/workload' &&
+    await vd(`{ms:10,n:20,how:'ok'}`, `{ms:8,n:20,how:'ok'}`) === 'cv/workload');
   // cached verdict is USED on the next boot (no re-probe)
   await c.nav(BASE + '?fps=0', 10000);
   ok('next boot rides the cached verdict (no re-probe)',
     await c.ev(`window.__ssprobeMs === undefined && window.__ssraster.why === 'workload'`) === true);
+  // a stale v3 record (the bad-verdict generation) must be discarded, not ridden
+  await c.ev(`(() => { const r = JSON.parse(localStorage.getItem('beta3.raster'));
+    r.v = 3; r.mode = 'auto'; localStorage.setItem('beta3.raster', JSON.stringify(r)); return 'aged' })()`);
+  await c.nav(BASE + '?fps=0', 16000);
+  ok('stale v3 cache is discarded and re-probed (phones in the wild get the fix)',
+    await c.ev(`window.__ssprobeMs > 0 && JSON.parse(localStorage.getItem('beta3.raster')).v === 4`) === true);
   // ?rend=cv forces the canvas renderer and the tint shim bakes tinted copies
   await c.nav(BASE + '?rend=cv', 9000);
   const cvb = JSON.parse(await c.ev(`JSON.stringify({
@@ -274,6 +296,51 @@ async function main() {
   await c.nav(BASE + '?fps=0', 9000);
   ok('normal boot unaffected after lab (game boots, no lab UI)',
     await c.ev(`!!window.game && !document.getElementById('sslab')`) === true);
+
+  // ---- v0.36.0: THE PHONE REPRO (end to end) ----
+  // v0.35.0's verdict only compared two MEASURED numbers, so when Wyatt's
+  // iPhone failed to sample WebGL at all it fell through to AUTO and booted
+  // the very renderer that had just failed — `gl — · cv 17 ms/f · GL
+  // (workload)` at 8 FPS. Deny WebGL here and assert the whole boot chain, not
+  // just the decision function, lands on Canvas. (ssProbeRun can't be stubbed:
+  // it's a function declaration and game.js calls ssRenderVerdict()
+  // synchronously on load. Phaser arrives by assignment, so an accessor
+  // installed before any script runs catches it.)
+  const deny = await c.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: `(() => { let P = null;
+      Object.defineProperty(window, 'Phaser', { configurable: true,
+        get() { return P; },
+        set(v) { P = v;
+          if (v && v.Game && !v.__glDenied) { const Real = v.Game;
+            v.Game = function (cfg) {
+              if (cfg && cfg.type === v.WEBGL) throw new Error('simulated: no WebGL context');
+              return new Real(cfg);
+            };
+            v.Game.prototype = Real.prototype; v.__glDenied = true; } },
+      });
+      localStorage.removeItem('beta3.raster');
+    })()`,
+  });
+  await c.nav(BASE + '?glprobe=1', 13000);
+  const ph = JSON.parse(await c.ev(`JSON.stringify({
+    rend: game.renderer.type === Phaser.CANVAS ? 'CANVAS' : 'WEBGL',
+    mode: window.__ssraster.mode, why: window.__ssraster.why,
+    glMs: window.__ssraster.p.glMs, glHow: window.__ssraster.p.glHow, cvMs: window.__ssraster.p.cvMs,
+    overlay: ([...document.querySelectorAll('div')].map(d => d.textContent).find(t => /FPS/.test(t)) || '').slice(0, 160),
+    shim: !!Phaser.GameObjects.Image.prototype.__ssTintShim,
+    scene: game.scene.getScenes(true).map(s => s.scene.key).join(','),
+  })`));
+  ok('unmeasurable GL + measured CV → the GAME BOOTS CANVAS (the 8 FPS regression)',
+    ph.rend === 'CANVAS' && ph.mode === 'cv' && ph.why === 'gl-unmeasurable',
+    ph.rend + ' ' + ph.mode + '/' + ph.why + ' gl=' + ph.glMs + '/' + ph.glHow);
+  ok('the canvas tint shim comes along on that path', ph.shim && /home|intro/i.test(ph.scene), ph.scene);
+  ok('overlay names the failure, not a bare em dash', /—\(0f\)/.test(ph.overlay) && /CV \(gl \w+\)/.test(ph.overlay),
+    ph.overlay.replace(/\n/g, ' | '));
+  await c.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: deny.identifier });
+  await c.ev(`localStorage.removeItem('beta3.raster');'swept'`);
+  await c.nav(BASE + '?fps=0', 12000);
+  ok('WebGL restored afterwards: a healthy device is untouched by all this',
+    await c.ev(`!!window.game && window.__ssraster.why === 'workload'`) === true);
 
   console.log('\\n' + pass + ' passed, ' + fail + ' failed');
   if (c.errs.length) { console.log('EXCEPTIONS:'); c.errs.slice(0, 5).forEach(e => console.log('  ' + e.split('\\n')[0])); }

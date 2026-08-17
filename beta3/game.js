@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.35.0';
+const BUILD = 'STARSPELL v0.36.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -88,17 +88,28 @@ function ssProbeScene() {
   };
 }
 // boots one throwaway Phaser game on `type`, samples real frame deltas, and
-// resolves {ms: median, gpu} — ms -1 when the renderer failed to boot/sample
+// resolves {ms: median, n: frames, how, gpu} — ms -1 when the renderer failed
+// to boot/sample, and `how` says WHICH so the verdict (and the overlay) can
+// tell "this renderer is broken" from "this renderer was never tried"
 function ssProbeRun(type) {
   return new Promise((resolve) => {
-    const out = { ms: -1, gpu: '' };
+    const out = { ms: -1, n: 0, how: 'noboot', gpu: '' };
     const f = [];                                    // sampled frame deltas
-    let g = null, fin = false;
+    let g = null, fin = false, armed = false, sawBoot = false;
     const finish = () => {
       if (fin) return; fin = true;
       // whatever frames we got by now ARE the answer — a 150ms/frame
       // renderer that only managed 4 samples before the cap still reports
+      out.n = f.length;
       if (out.ms < 0 && f.length >= 3) { f.sort((a, b) => a - b); out.ms = +f[f.length >> 1].toFixed(1); }
+      // a renderer that cannot boot, or boots but cannot paint three frames
+      // inside the failsafe, has told us something decisive — not nothing
+      // 'nosample' = it painted, just not 3 frames · 'nocreate' = the renderer
+      // came up but building the workload outlasted the failsafe · 'noboot' =
+      // no context at all. All three are verdicts against the renderer.
+      if (out.how !== 'throw') {
+        out.how = out.ms > 0 ? 'ok' : armed ? 'nosample' : sawBoot ? 'nocreate' : 'noboot';
+      }
       let gl = null;
       try { gl = g && g.renderer && g.renderer.gl; } catch (e) { }
       const gone = () => {
@@ -121,10 +132,12 @@ function ssProbeRun(type) {
         render: { antialias: type === Phaser.CANVAS ? true : DPR < 2, powerPreference: 'high-performance' },
         scene: [ssProbeScene()],
       });
-    } catch (e) { finish(); return; }
+    } catch (e) { out.how = 'throw'; finish(); return; }
     const arm = () => {
       if (fin) return;
+      if (g.isBooted) sawBoot = true;
       if (!g.isBooted || !g.__pready) { setTimeout(arm, 30); return; }
+      armed = true;
       try {   // near-invisible: real draws, real compositing, faint on screen
         g.canvas.style.cssText += ';position:fixed;left:0;top:0;opacity:0.05;pointer-events:none;' +
           'width:' + window.innerWidth + 'px;height:' + window.innerHeight + 'px';
@@ -157,6 +170,29 @@ function ssProbeRun(type) {
     arm();
   });
 }
+// the decision itself, pure and testable from two probe results — kept out of
+// the async boot chain so the harness can assert every branch without booting
+function ssVerdictFrom(gl, cv) {
+  const out = {
+    v: 4, t: Date.now(), glMs: gl.ms, cvMs: cv.ms, gpu: gl.gpu || '',
+    glN: gl.n, cvN: cv.n, glHow: gl.how, cvHow: cv.how,
+    why: 'workload', mode: 'auto',
+  };
+  // canvas must beat WebGL by >10% frame time to unseat it: status-quo bias
+  // keeps healthy devices off the shim path and stops coin-flip flip-flops.
+  if (gl.ms > 0 && cv.ms > 0 && cv.ms < gl.ms * 0.9) out.mode = 'cv';
+  // ⚠ v0.35.0 shipped this branch as "either renderer missing → AUTO", and
+  // Wyatt's phone read `gl — · cv 17 ms/f · GL (workload)` at 8fps: its GL
+  // probe never painted three frames inside the 3s failsafe, so `gl.ms > 0`
+  // was false, the comparison never ran, and AUTO handed the game straight
+  // back to the WebGL path the probe had just failed on. A renderer too
+  // broken to sample is the STRONGEST evidence against it, not a null
+  // result — so a measured renderer always beats an unmeasurable one.
+  else if (gl.ms <= 0 && cv.ms > 0) { out.mode = 'cv'; out.why = 'gl-unmeasurable'; }
+  else if (cv.ms <= 0 && gl.ms > 0) { out.mode = 'gl'; out.why = 'cv-unmeasurable'; }
+  // both unmeasurable → AUTO, and Phaser makes its own fallback as before
+  return out;
+}
 // resolves SS_REND in place (cached / forced: immediately; else ~1-1.5s probe)
 function ssRenderVerdict() {
   const q = QS.get('rend');
@@ -165,7 +201,10 @@ function ssRenderVerdict() {
   if (QS.get('glprobe') !== '1') {
     try {
       const c = JSON.parse(localStorage.getItem('beta3.raster') || 'null');
-      if (c && c.v === 3 && Date.now() - c.t < 7 * 864e5) {
+      // v bump = every device re-probes on next load. REQUIRED this time: the
+      // v3 records already cached on real phones hold the bad AUTO verdict for
+      // up to 7 days, so shipping the fix without the bump fixes nobody.
+      if (c && c.v === 4 && Date.now() - c.t < 7 * 864e5) {
         SS_REND.mode = c.mode; SS_REND.why = c.why; SS_REND.p = c;
         return Promise.resolve(SS_REND);
       }
@@ -173,18 +212,13 @@ function ssRenderVerdict() {
   }
   const t0 = performance.now();
   return ssProbeRun(Phaser.WEBGL).then((gl) => ssProbeRun(Phaser.CANVAS).then((cv) => {
-    const out = {
-      v: 3, t: Date.now(), glMs: gl.ms, cvMs: cv.ms, gpu: gl.gpu || '',
-      probeMs: Math.round(performance.now() - t0), why: 'workload', mode: 'auto',
-    };
-    // canvas must beat WebGL by >10% frame time to unseat it: status-quo bias
-    // keeps healthy devices off the shim path and stops coin-flip flip-flops.
-    // Either renderer missing → AUTO (Phaser makes its own fallback).
-    if (gl.ms > 0 && cv.ms > 0 && cv.ms < gl.ms * 0.9) out.mode = 'cv';
+    const out = ssVerdictFrom(gl, cv);
+    out.probeMs = Math.round(performance.now() - t0);
     try { localStorage.setItem('beta3.raster', JSON.stringify(out)); } catch (e) { }
     SS_REND.mode = out.mode; SS_REND.why = out.why; SS_REND.p = out;
     window.__ssprobeMs = out.probeMs;
-    DIAG('workload probe gl ' + gl.ms + ' · cv ' + cv.ms + ' ms/f → ' + out.mode + ' (' + out.probeMs + 'ms)');
+    DIAG('workload probe gl ' + gl.ms + '/' + gl.how + ' · cv ' + cv.ms + '/' + cv.how +
+      ' ms/f → ' + out.mode + '/' + out.why + ' (' + out.probeMs + 'ms)');
     return SS_REND;
   }));
 }
@@ -313,12 +347,17 @@ function ssPerfWatch(gm) {
   const r1 = (v) => (v > 0 ? Math.round(v * 10) / 10 : '—');
   let verdict = 'auto';
   if (P.why === 'forced') verdict = (P.mode === 'cv' ? 'CV' : 'GL') + ' (forced)';
+  else if (P.why === 'gl-unmeasurable') verdict = 'CV (gl ' + (pp.glHow || 'failed') + ')';
+  else if (P.why === 'cv-unmeasurable') verdict = 'GL (cv ' + (pp.cvHow || 'failed') + ')';
   else if (P.why === 'workload') {
     verdict = P.mode === 'cv'
       ? 'CV (workload' + (pp.glMs > 0 && pp.cvMs > 0 ? ' −' + Math.round((pp.glMs - pp.cvMs) * 10) / 10 + 'ms' : '') + ')'
       : 'GL (workload)';
   }
-  const probeLine = (pp.glMs != null ? 'gl ' + r1(pp.glMs) + ' · cv ' + r1(pp.cvMs) + ' ms/f · ' : '') +
+  // a failed probe prints its frame count, not a bare em dash — one screenshot
+  // then distinguishes "never booted" from "booted but painted nothing"
+  const pr = (ms, n) => (ms > 0 ? r1(ms) : '—(' + (n || 0) + 'f)');
+  const probeLine = (pp.glMs != null ? 'gl ' + pr(pp.glMs, pp.glN) + ' · cv ' + pr(pp.cvMs, pp.cvN) + ' ms/f · ' : '') +
     verdict + (pp.gpu ? ' · ' + pp.gpu.slice(0, 30) : '');
   setInterval(() => {
     const fps = Math.round(gm.loop.actualFps);
