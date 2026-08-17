@@ -19101,23 +19101,31 @@ const BF_MAPS = [
   // The space-rug era finally gets its ship: a big molded playset (lid off —
   // walls stop every flat shot, the sky stays open) set down on the v1.21
   // space rug. Every fight is indoors: two RING corridors and rooms with
-  // jobs on WORLD_H 900 (hMul 1.5), one long hall gated by the clocked
-  // BLAST DOOR the POWER ROOM can force open, a SUPPLY BAY that pays the
-  // sole holder, an ENGINE ROOM with a telegraphed vent and a coolant
-  // slide, per-side POD ROOM flank pockets. The room complex holds its
-  // authored size; the two approach halls stretch with the team size (the
-  // race-track law) — 60px at 1v1, 636 at 10v10. Zero jax, zero balls:
-  // the ship itself is the hazard.
-  { id:'starship', name:'THE STARSHIP', ground:'deck', hMul:1.5,
+  // jobs, one long hall gated by the clocked BLAST DOOR the POWER ROOM can
+  // force open, a SUPPLY BAY that pays the sole holder, an ENGINE ROOM with
+  // a telegraphed vent and a coolant slide, per-side POD ROOM flank pockets.
+  // The room complex holds its authored size; the two approach halls
+  // stretch with the team size (the race-track law) — 60px at 1v1, 636 at
+  // 10v10. Zero jax, zero balls: the ship itself is the hazard.
+  // 0375 [WYATT 8/17: "Starship battlefield 2x size"]: the ship is TWICE
+  // the ship now — every room, corridor and door at 2x (CQ_K in
+  // cqShipBuild; hMul 3.0 = 1.5·K → WORLD_H 1800; wAdd 1800 = 900·2·(K−1)
+  // widens WORLD_W by the doubled complex so the approaches keep the
+  // race-track stretch on top; baseX 308 = the doubled crate room's own
+  // centre — the toy box sits where it always sat, in the middle of its
+  // hangar). The three cells move together — the rig asserts the arithmetic.
+  { id:'starship', name:'THE STARSHIP', ground:'deck', hMul:3.0, wAdd:1800, baseX:308,
     blurb:'The spaceship playset lands on the space rug. Ring corridors, rooms with jobs — and the power room runs the blast door.',
     // 0326 [WYATT]: "you don't need that many troops to get through and beat
     // the level" — the ship fights on SHORT SUPPLY: both toy boxes open at 25
     // in a 1v1 and 40 in a 2v2 (the map's own numbers; sizes he didn't name
     // keep the bfBaseHP formula). Data here, one seam in startBattlefield —
     // every other map has no key and keeps its numbers to the byte.
+    // 0375: the numbers STAND at 2x (flagged — the pace measure rides the
+    // commit; every retune is Wyatt's word, never a silent rebalance).
     supply:{1:25, 2:40},
     build:()=>({ rocks:[], rivers:[],
-      ice:[ {x:MID,y:748,rx:86,ry:30} ],   // the coolant spill — the engine room's own slide (v1.27 damping verbatim)
+      ice:[ {x:MID,y:748*CQ_K,rx:86*CQ_K,ry:30*CQ_K} ],   // the coolant spill — the engine room's own slide (v1.27 damping verbatim); 0375: scaled with the room it lies in
       cq:cqShipBuild() }) }
 ];
 // AI difficulty. Economy is IDENTICAL to yours at every tier — the difficulty is
@@ -26936,6 +26944,13 @@ function rivCapHex(used, rivHex){
 // clause below is a no-op there.
 // hMul 1.5 — WORLD_H 900, camY pans 0..300 (the western clamp's own formula;
 // the bone raid already ships a non-integer hMul through its own door).
+// 0375 [WYATT]: the ship is authored at 1x and BUILT at CQ_K (2) — hMul 3.0,
+// WORLD_H 1800, camY pans 0..1200, WORLD_W +1800 (the row's wAdd); every
+// consumer of an authored coordinate reads the bag's k. And the SUPPLY BAY
+// is a first-class objective for both teams: south doors through the long
+// hall's blind wall, hunger-weighted forks (cqPickEdge), the centre POST
+// (cqBayPost / CQ_SUP_DWELL), a placement weight for the brains
+// (pickSpot / CQ_SUP_PLACE).
 // SSSS RULED (Wyatt 8/12, do not re-litigate): mortar, tank and jeep are NOT
 // ACCESSIBLE on this map — CQBAN at EVERY door (tray, canPlace, applyDeploy
 // incl. relay, the brains' motor fund zeroed per seat). jeep2 is a jeep
@@ -26945,6 +26960,10 @@ const CQ_DOOR_SHUT=22, CQ_DOOR_OPEN=14, CQ_DOOR_LEAD=3, CQ_DOOR_ANIM=0.7;   // t
 const CQ_DRIP=2;                    // SUPPLY BAY pays tags/s per seat, sole-holder team, IN-MATCH purse only — never a star (the economy law)
 const CQ_VENT={ period:11, warn:3, r:54, dmg:2 };   // ENGINE VENT: 3s amber telegraph, then a burst that pays NOBODY (the train law)
 const CQ_PAD=14, CQ_NODE_R=36;
+const CQ_K=2;                       // 0375 THE SHIP AT 2x [WYATT: "Starship battlefield 2x size"] — the build scale (rooms, corridors, doors, nodes, art); the row's hMul (1.5·K) and wAdd (900·2·(K−1)) are its literal twins
+const CQ_SUP_DWELL=8;               // 0375 seconds a man POSTS at the bay's centre before his fork carries him out (flagged)
+const CQ_SUP_POST=30, CQ_SUP_R=80;  // 0375 the post grid's pitch (a man's shoulder) and the centre node's arrival reach (a corner post sits 42 out)
+const CQ_SUP_PLACE=0.9;             // 0375 the brains' placement weight for a drop INSIDE the bay while it is not solely ours (a decision weight — the AI-difficulty law)
 function cqOn(){ return !!(S.bf && S.cfg && S.cfg.terrain && S.cfg.terrain.cq); }
 function cqDoorCycle(){ return S.t % (CQ_DOOR_SHUT+CQ_DOOR_OPEN); }
 function cqClockOpen(){ return cqDoorCycle()>=CQ_DOOR_SHUT; }
@@ -26961,32 +26980,50 @@ function cqDoorFrac(){ if(S.bf&&S.bf.cqPower) return 1; const c=cqDoorCycle();
 // (the winter chain law); pow/sup/eng/door sit ON MID = their own mirror.
 // The v2.1 dressing seeds ride the same bag — seeded ONCE here by a fixed
 // LCG (the snowFlakes law: never RNG inside a draw call).
-function cqShipBuild(){
-  const M=MID, WW=WORLD_W, Z=[];
+function cqShipBuild(k){
+  // 0375 THE SHIP AT 2x [WYATT: "Starship battlefield 2x size"]: K = CQ_K
+  // (2) scales EVERY authored coordinate — rooms, corridors, thresholds,
+  // nodes, the mouth funnel, the room rects, the vent seat — so the ship
+  // keeps its exact SHAPE at twice the size (the row's hMul 3.0 = 1.5·K
+  // doubles WORLD_H to 1800; its wAdd 1800 = 900·2·(K−1) hands WORLD_W the
+  // extra hull so the approaches keep their race-track stretch on top: 60px
+  // at 1v1 → 636 at 10v10, exactly as before). The rig may pass k=1 to
+  // rebuild the shipped 1x ship (the parity leg). The dressing seeds spend
+  // K²× the stars/greebles (the doubled void keeps its density) and the
+  // meteors fly K× as far — one LCG, spent whole right here, in this order.
+  const K=k||CQ_K, M=MID, WW=WORLD_W, Z=[];
   function z(id,x0,x1,y0,y1){ Z.push({id:id,x0:x0,x1:x1,y0:y0,y1:y1}); }
   function zm(id,x0,x1,y0,y1){ z(id,x0,x1,y0,y1); z(id+'~',WW-x1,WW-x0,y0,y1); }
-  zm('br',56,252,356,544);          // the crate room — its two E doors ARE the approach mouths
-  zm('an',252,M-648,356,436);       // the approaches stretch with the carpet (the race-track law)
-  zm('as',252,M-648,464,544);
-  zm('gal',M-648,M-560,150,750);    // the west ring vertical
-  zm('rng',M-560,M-166,150,230);    // the north ring run
-  z('pow',M-150,M+150,96,252);      // THE POWER ROOM (own mirror)
-  zm('thP',M-166,M-150,150,230);    // its threshold — the only strip that sees both ways
-  zm('hn',M-560,M-186,300,380);
-  z('sup',M-170,M+170,280,420);     // THE SUPPLY BAY (own mirror)
-  zm('thS',M-186,M-170,300,380);
-  zm('crn',M-280,M-200,230,460);    // ring vertical: rng/hn down to HALL-M
-  zm('hm',M-560,M-16,460,540);      // the long hall — the ship's one straight signature
-  z('door',M-16,M+16,460,540);      // THE BLAST DOOR band (own mirror)
-  zm('crs',M-280,M-200,540,680);    // ring vertical: HALL-M down to HALL-S
-  zm('hs',M-560,M-200,580,660);
-  zm('pod',M-470,M-320,610,770);    // POD ROOM — the per-side flank pocket (pods are art, no gimmick)
-  zm('crx',M-320,M-150,660,740);    // CROSS-X: the ONLY way into the engine (the end-around IS the way in)
-  z('eng',M-150,M+150,640,800);     // THE ENGINE ROOM (own mirror)
+  zm('br',56*K,252*K,356*K,544*K);          // the crate room — its two E doors ARE the approach mouths
+  zm('an',252*K,M-648*K,356*K,436*K);       // the approaches stretch with the carpet (the race-track law)
+  zm('as',252*K,M-648*K,464*K,544*K);
+  zm('gal',M-648*K,M-560*K,150*K,750*K);    // the west ring vertical
+  zm('rng',M-560*K,M-166*K,150*K,230*K);    // the north ring run
+  z('pow',M-150*K,M+150*K,96*K,252*K);      // THE POWER ROOM (own mirror)
+  zm('thP',M-166*K,M-150*K,150*K,230*K);    // its threshold — the only strip that sees both ways
+  zm('hn',M-560*K,M-186*K,300*K,380*K);
+  z('sup',M-170*K,M+170*K,280*K,420*K);     // THE SUPPLY BAY (own mirror)
+  zm('thS',M-186*K,M-170*K,300*K,380*K);
+  // 0375 THE BAY'S SOUTH DOORS [WYATT: troops "seem to walk by the room"] —
+  // the long hall ran the whole length of the bay's BLIND south wall, forty
+  // pixels from a room nobody could enter from it. Two thresholds cut
+  // through that wall (mirrored — one per side of the door), the bay's own
+  // 80-wide doorway grammar turned on its side; the sight table below pairs
+  // them (hall ↔ strip ↔ bay — the THRESHOLD LAW, third door), and the
+  // wander graph gets hmS/supS nodes to walk them.
+  zm('thSs',M-140*K,M-60*K,420*K,460*K);
+  zm('crn',M-280*K,M-200*K,230*K,460*K);    // ring vertical: rng/hn down to HALL-M
+  zm('hm',M-560*K,M-16*K,460*K,540*K);      // the long hall — the ship's one straight signature
+  z('door',M-16*K,M+16*K,460*K,540*K);      // THE BLAST DOOR band (own mirror)
+  zm('crs',M-280*K,M-200*K,540*K,680*K);    // ring vertical: HALL-M down to HALL-S
+  zm('hs',M-560*K,M-200*K,580*K,660*K);
+  zm('pod',M-470*K,M-320*K,610*K,770*K);    // POD ROOM — the per-side flank pocket (pods are art, no gimmick)
+  zm('crx',M-320*K,M-150*K,660*K,740*K);    // CROSS-X: the ONLY way into the engine (the end-around IS the way in)
+  z('eng',M-150*K,M+150*K,640*K,800*K);     // THE ENGINE ROOM (own mirror)
   // niches on the long hall (same-zone pockets — movement texture only)
-  z('hm',M-500,M-444,416,460); z('hm',M-380,M-324,416,460);
-  z('hm~',M+444,M+500,416,460); z('hm~',M+324,M+380,416,460);
-  z('hm',M-130,M-74,540,576);  z('hm~',M+74,M+130,540,576);
+  z('hm',M-500*K,M-444*K,416*K,460*K); z('hm',M-380*K,M-324*K,416*K,460*K);
+  z('hm~',M+444*K,M+500*K,416*K,460*K); z('hm~',M+324*K,M+380*K,416*K,460*K);
+  z('hm',M-130*K,M-74*K,540*K,576*K);  z('hm~',M+74*K,M+130*K,540*K,576*K);
   // THE SIGHT TABLE: adjacent-through-opening pairs, mirrored; the door pairs
   // (visd) open only with the door. A zone sees itself by identity.
   const VIS={}, VISD={};
@@ -26997,19 +27034,26 @@ function cqShipBuild(){
     ['gal','rng'],['gal','hn'],['gal','hm'],['gal','hs'],
     ['rng','thP'],['thP','pow'],
     ['hn','thS'],['thS','sup'],
+    ['hm','thSs'],['thSs','sup'],   // 0375: the south door sees the hall and the bay — never both from either
     ['rng','crn'],['hn','crn'],['crn','hm'],['hm','crs'],['crs','hs'],
     ['hs','pod'],['pod','crx'],['crs','crx'],['crx','eng']
   ].forEach(function(p){ pp(VIS,p[0],p[1]); pp(VIS,mir(p[0]),mir(p[1])); });
   [['hm','door'],['door','hm~'],['hm','hm~']].forEach(function(p){ pp(VISD,p[0],p[1]); });
   // THE WANDER GRAPH: directed weighted you-side edges; the foe mirror-walks
   // the same ids (cqNodePos flips x). Fork picked per man by his unit-id hash.
-  const nod={
+  // 0375: every seat is authored at 1x and scaled ×K here (the same law as
+  // the zones), so a node sits in its corridor at any K.
+  const N1={
     exN:{x:282,y:396}, exS:{x:282,y:504},
     gN:{x:M-604,y:190}, gDn:{x:M-604,y:340}, gA:{x:M-604,y:396}, gM:{x:M-604,y:500}, gS:{x:M-604,y:620},
     rng:{x:M-360,y:190}, crnT:{x:M-240,y:206},
     powW:{x:M-110,y:176}, powE:{x:M+110,y:176}, rngE:{x:M+360,y:190},
     crnT2:{x:M+240,y:206}, crnN2:{x:M+240,y:300},
-    hn:{x:M-360,y:340}, supW:{x:M-118,y:350}, supE:{x:M+118,y:350}, hn2:{x:M+360,y:340},
+    hn:{x:M-360,y:340}, supW:{x:M-118,y:350}, supC:{x:M,y:350}, supE:{x:M+118,y:350}, hn2:{x:M+360,y:340},
+    // 0375 the bay's south road: hmS in the hall under the door, supS on the
+    // strip, supC = the bay's centre where every man POSTS (cqBayPost); the
+    // ~2 seats are the mirrored door on the far side of the blast door
+    hmS:{x:M-100,y:500}, supS:{x:M-100,y:440}, supS2:{x:M+100,y:440}, hmS2:{x:M+100,y:500},
     crnN:{x:M-240,y:300}, crnM:{x:M-240,y:430}, hmJ:{x:M-240,y:500},
     hm:{x:M-380,y:500}, dw:{x:M-60,y:500}, de:{x:M+60,y:500}, hm2:{x:M+380,y:500}, hmJ2:{x:M+240,y:500},
     crsM:{x:M-240,y:570}, crsS:{x:M-240,y:640}, crxN:{x:M-240,y:700},
@@ -27020,11 +27064,22 @@ function cqShipBuild(){
     gN2:{x:M+604,y:190}, gDn2:{x:M+604,y:340}, gA2:{x:M+604,y:396}, gM2:{x:M+604,y:500}, gS2:{x:M+604,y:620},
     exN2:{x:WW-282,y:396}, exS2:{x:WW-282,y:504}
   };
+  const nod={};
+  for(const nid in N1){ const q=N1[nid];
+    // scale about MID in x (M-relative seats stay M-relative), about 0 in y;
+    // the two absolute-authored columns (exN/exS at 282, their mirrors at
+    // WW-282) scale from their own edge of the world
+    const ax = (nid==='exN'||nid==='exS')? q.x*K : (nid==='exN2'||nid==='exS2')? WW-(WW-q.x)*K : M+(q.x-M)*K;
+    nod[nid]={x:ax, y:q.y*K}; }
+  // 0375 THE BAY WANTS MEN — an edge's third cell is its HUNGER weight: added
+  // to the fork while the SUPPLY BAY is not solely ours (cqPickEdge reads
+  // bf.cqHolder), so a bay we don't hold pulls men down its roads and a bay
+  // we do hold lets them push on. The 0326 top-room weights stand.
   const E={
     exN:[['gA',100]], exS:[['gM',100]],
-    gA:[['gN',40],['gDn',30],['gM',30]],   // 0326 [WYATT] "characters rarely go into the top room": the north fork carries real weight now (was 25/35/40; totals hold 100 — the hash arithmetic never moves)
+    gA:[['gN',40],['gDn',30,20],['gM',30]],   // 0326 [WYATT] "characters rarely go into the top room": the north fork carries real weight now (was 25/35/40); 0375: the bay road (gDn→hn→the west door) hungers +20
     gDn:[['hn',100]],
-    gM:[['hm',60],['gS',40]],
+    gM:[['hm',60,20],['gS',40]],   // 0375: the long hall = the south-door road, hungers +20
     gN:[['rng',100]], gS:[['hs',100]],
     rng:[['powW',80],['crnT',20]], crnT:[['crnN',100]],   // 0326: same law, the room's own door (was 70/30)
     powW:[['powE',100]], powE:[['rngE',100]],
@@ -27034,11 +27089,14 @@ function cqShipBuild(){
     // split but walks the mirrored ring channel (crn~), the vertical the
     // west side always used.
     rngE:[['gN2',60],['crnT2',40]], crnT2:[['crnN2',100]], crnN2:[['hn2',100]],
-    hn:[['supW',60],['crnN',40]],
-    supW:[['supE',100]], supE:[['hn2',100]],
+    hn:[['supW',75,25],['crnN',25]],   // 0375: the west door takes 75 (was 60), 100 when the bay hungers
+    supW:[['supC',100]],               // 0375: through the door to the CENTRE — the post, then on
+    supC:[['supE',55],['supS2',45]],   // 0375: out the east door, or the far south door into their hall
+    supE:[['hn2',100]], supS2:[['hmS2',100]], hmS2:[['hm2',100]],
     crnN:[['crnM',100]], crnM:[['hmJ',100]],
-    hmJ:[['dw',65],['crsM',35]],
-    hm:[['dw',75],['hmJ',25]],
+    hmJ:[['dw',40],['crsM',30],['hmS',30,30]],   // 0375: the corner men take the south door 30 (60 hungry); was dw 65 / crsM 35
+    hm:[['dw',45],['hmJ',20],['hmS',35,30]],     // 0375: the hall men take the south door 35 (65 hungry); was dw 75 / hmJ 25
+    hmS:[['supS',100]], supS:[['supC',100]],
     dw:[['de',100]], de:[['hm2',55],['hmJ2',45]],
     crsM:[['crsS',100]], crsS:[['crxN',100]], crxN:[['engW',100]],
     hs:[['pod',45],['crsS',55]],
@@ -27054,23 +27112,24 @@ function cqShipBuild(){
   };
   // v2.1 SHIP DRESSING seeds — one fixed LCG, spent whole right here
   let s8=20260812; const rnd=function(){ s8=(s8*9301+49297)%233280; return s8/233280; };
-  const L1=[],L2=[],L3=[];
-  for(let i8=0;i8<90;i8++) L1.push({x:rnd()*WW, y:rnd()*WORLD_H, r:0.7+rnd()*0.8, a:0.18+rnd()*0.25});
-  for(let j8=0;j8<48;j8++) L2.push({x:rnd()*WW, y:rnd()*WORLD_H, r:1.0+rnd()*0.9, a:0.3+rnd()*0.3});
-  for(let k8=0;k8<24;k8++) L3.push({x:rnd()*WW, y:rnd()*WORLD_H, l:8+rnd()*8, a:0.4+rnd()*0.35});
-  const meteors=[ {per:9.5, ph:2.1, x0:0.15*WW, y0:-30, dx:520, dy:340},
-                  {per:13.7, ph:7.0, x0:0.72*WW, y0:-40, dx:-460, dy:380},
-                  {per:17.3, ph:12.4, x0:0.45*WW, y0:-30, dx:610, dy:300} ];
+  const L1=[],L2=[],L3=[], KK=K*K;
+  for(let i8=0;i8<90*KK;i8++) L1.push({x:rnd()*WW, y:rnd()*WORLD_H, r:0.7+rnd()*0.8, a:0.18+rnd()*0.25});
+  for(let j8=0;j8<48*KK;j8++) L2.push({x:rnd()*WW, y:rnd()*WORLD_H, r:1.0+rnd()*0.9, a:0.3+rnd()*0.3});
+  for(let k8=0;k8<24*KK;k8++) L3.push({x:rnd()*WW, y:rnd()*WORLD_H, l:8+rnd()*8, a:0.4+rnd()*0.35});
+  const meteors=[ {per:9.5, ph:2.1, x0:0.15*WW, y0:-30, dx:520*K, dy:340*K},
+                  {per:13.7, ph:7.0, x0:0.72*WW, y0:-40, dx:-460*K, dy:380*K},
+                  {per:17.3, ph:12.4, x0:0.45*WW, y0:-30, dx:610*K, dy:300*K} ];
   const greeb=[];
-  for(let g8=0;g8<34;g8++) greeb.push({ x:60+rnd()*(WW-140), y:80+rnd()*(WORLD_H-180),
+  for(let g8=0;g8<34*KK;g8++) greeb.push({ x:60+rnd()*(WW-140), y:80+rnd()*(WORLD_H-180),
     w:16+rnd()*70, h:rnd()<0.55? 2+rnd()*3 : 10+rnd()*16, a:0.10+rnd()*0.12, v:rnd()<0.25 });
   const rlights=[];
   for(let q8=0;q8<7;q8++){ rlights.push({x:120+q8*((WW-240)/6), y:64, ph:q8*0.6});
                            rlights.push({x:120+q8*((WW-240)/6), y:WORLD_H-56, ph:q8*0.6+0.3}); }
-  return { ban:CQBAN, zones:Z, vis:VIS, visd:VISD, nod:nod, E:E,
-    mouth:{x0:252, n:396, s:504},   // 0326: the crate room's own edge inset + its two door-mouth centres (an 356..436 / as 464..544) — the mouth funnel below reads these
-    sup:{x0:M-170,x1:M+170,y0:280,y1:420}, pow:{x0:M-150,x1:M+150,y0:96,y1:252},
-    vent:{x:M,y:720}, stars:{L1:L1,L2:L2,L3:L3}, meteors:meteors, greeb:greeb, rlights:rlights };
+  return { ban:CQBAN, zones:Z, vis:VIS, visd:VISD, nod:nod, E:E, k:K,
+    fun:300*K,   // 0375: the base-funnel handoff radius (bfMarch) rides the scale — the crate room's own reach, 300 at 1x
+    mouth:{x0:252*K, n:396*K, s:504*K},   // 0326: the crate room's own edge inset + its two door-mouth centres (an 356..436 / as 464..544) — the mouth funnel below reads these
+    sup:{x0:M-170*K,x1:M+170*K,y0:280*K,y1:420*K}, pow:{x0:M-150*K,x1:M+150*K,y0:96*K,y1:252*K},
+    vent:{x:M,y:720*K}, stars:{L1:L1,L2:L2,L3:L3}, meteors:meteors, greeb:greeb, rlights:rlights };
 }
 function cqZoneSet(x,y){ const cq=S.cfg.terrain.cq, out=[];
   for(const r of cq.zones){ if(x>=r.x0&&x<=r.x1&&y>=r.y0&&y<=r.y1 && out.indexOf(r.id)<0) out.push(r.id); }
@@ -27099,32 +27158,74 @@ function cqPickEdge(u,fromId){ const edges=S.cfg.terrain.cq.E[fromId]||[];
   // point, so every sim agrees.
   if(u.cqPow){ if(fromId==='gA') return 'gN'; if(fromId==='rng'||fromId==='crnT') return 'powW'; }
   if(edges.length===1) return edges[0][0];
-  let tot=0; for(const e of edges) tot+=e[1];
+  // 0375 THE BAY WANTS MEN: while the SUPPLY BAY is not solely OURS (empty,
+  // contested, or theirs) every edge's hunger cell (e[2]) joins its weight —
+  // the roads into the bay pull harder until we hold it, then relax so the
+  // holders' comrades push on. Both teams read the same scan (bf.cqHolder,
+  // the 1s presence census); the fork stays the man's own hash.
+  const hungry = !!(S.bf && S.bf.cqHolder!==u.side);
+  const wt = e => e[1] + (hungry? (e[2]||0) : 0);
+  let tot=0; for(const e of edges) tot+=wt(e);
   // the fork is HIS: a hash of his own unit id x the node name — deterministic
   // (a room's twenty sims agree), varied (ten men take six ways)
   const h=(((u.id*2654435761)>>>0) ^ ((fromId.charCodeAt(0)*2246822519 + fromId.length*97)>>>0))>>>0;
   let r=h%tot;
-  for(const e of edges){ r-=e[1]; if(r<0) return e[0]; }
+  for(const e of edges){ r-=wt(e); if(r<0) return e[0]; }
   return edges[0][0]; }
 function cqAtDoorNode(u){ return (u.cqN==='dw'&&u.side==='you')||(u.cqN==='de'&&u.side==='foe'); }
 // THE HOLD SLOT: a door-bound man owns a hashed grid slot on his side of the
 // shut door — within 10px his feet PLANT (the dig-in idiom, the jitter kill).
+// 0375: the grid hangs off the door band's own frame (16·K half-width, the
+// 500·K centre line) so it seats against the door at any ship scale; the
+// 30/17 pitch is a MAN's shoulder, never scaled. ⚠ the shipped multiplier
+// 40503 is divisible by 3, so h%3 was ALWAYS 0 — every door-bound man took
+// column 0 and the 3×4 grid was one column of four (measured, ids 1..300);
+// 40507 deals all twelve slots evenly (flagged — a latent 0303 quirk).
 function cqHoldSlot(u){
-  if(!u._hs){ const h=((u.id*40503)>>>0), col=h%3, row=(h>>3)%4;
-    u._hs={ x:(u.side==='you'? MID-44-col*30 : MID+44+col*30), y:474+row*17 }; }
+  if(!u._hs){ const h=((u.id*40507)>>>0), col=h%3, row=(h>>3)%4, K=S.cfg.terrain.cq.k||1;
+    u._hs={ x:(u.side==='you'? MID-(16*K+28)-col*30 : MID+(16*K+28)+col*30), y:500*K-26+row*17 }; }
   return { x:u._hs.x, y:u._hs.y, hold:true }; }
+// 0375 THE BAY POST: a man who reaches the bay's centre node owns a hashed
+// slot of the 3×3 post grid around it (the hold-slot idiom, room edition —
+// CQ_SUP_POST pitch, a man's shoulder) and PLANTS there for CQ_SUP_DWELL
+// seconds on the battle clock before his fork carries him out a far door.
+// While he stands he IS presence: the sole-holder drip pays his seat, the
+// door strips see him from the hall (the THRESHOLD LAW cuts both ways), and
+// an enemy walking in meets a garrison, not a corridor. Mirrored for the
+// foe by construction — the offsets ride the mirrored node.
+function cqBayPost(u){
+  const c=cqNodePos(u,'supC');
+  if(!u._bp){ const h=((u.id*2654435761)>>>0), col=h%3, row=(h>>4)%3;   // the fork hash's own multiplier — nine slots dealt evenly (measured, ids 1..300)
+    u._bp={ dx:(col-1)*CQ_SUP_POST, dy:(row-1)*CQ_SUP_POST }; }
+  return { x:c.x+u._bp.dx, y:c.y+u._bp.dy, hold:true }; }
+// 0375 THE CLEAR LINE: a straight walk from (x0,y0) to (x1,y1) that never
+// leaves the authored floor (sampled every 10px, the door band counted open
+// — the same union bfMarch's slide reads). The wander graph's first pick
+// asks it: a man dropped in the POWER ROOM found the bay's new centre node
+// NEAREST through the wall between the rooms (measured — 40s pinned at
+// (M,504), the pure-vertical wall face the slide can never escape); a node
+// he can walk straight to is a node in his own room.
+function cqLineFloor(x0,y0,x1,y1){ const d=Math.hypot(x1-x0,y1-y0), n=Math.max(1,Math.ceil(d/10));
+  for(let i=1;i<=n;i++){ const t2=i/n; if(!cqFloor(x0+(x1-x0)*t2, y0+(y1-y0)*t2, true)) return false; }
+  return true; }
 function cqGoal(u){
   const cq=S.cfg.terrain.cq;
-  if(!u.cqN){ let best=null,bd=1e9;
+  if(!u.cqN){ let best=null,bd=1e9, near=null,nd=1e9;
     for(const id in cq.nod){ const p0=cqNodePos(u,id);
       const behind = u.side==='you'? p0.x<u.x-70 : p0.x>u.x+70;
       if(behind) continue;
       const d=Math.hypot(p0.x-u.x,p0.y-u.y);
-      if(d<bd){ bd=d; best=id; } }
-    u.cqN=best||'dw'; }
+      if(d<nd){ nd=d; near=id; }
+      if(d<bd && cqLineFloor(u.x,u.y,p0.x,p0.y)){ bd=d; best=id; } }   // 0375: the nearest node he can walk STRAIGHT to; a man off the floor (a jet, a shove) keeps the plain nearest and walks home free
+    u.cqN=best||near||'dw'; }
   let p=cqNodePos(u,u.cqN);
-  if(Math.hypot(p.x-u.x,p.y-u.y)<CQ_NODE_R){
+  const arr=(u.cqN==='supC')? CQ_SUP_R : CQ_NODE_R;   // 0375: the bay's centre "arrives" at post-grid reach (a corner post sits past CQ_NODE_R)
+  if(Math.hypot(p.x-u.x,p.y-u.y)<arr){
     if(cqAtDoorNode(u) && !cqDoorOpen()) return cqHoldSlot(u);
+    // 0375: at the bay's centre his clock starts (once — the DAG never
+    // brings him back); he posts until it runs, then his fork carries him out
+    if(u.cqN==='supC'){ if(u.cqSupT==null) u.cqSupT=S.t;
+      if(S.t-u.cqSupT<CQ_SUP_DWELL) return cqBayPost(u); }
     const nx=cqPickEdge(u,u.cqN);
     if(nx){ u.cqN=nx; p=cqNodePos(u,u.cqN); } }
   if(!cqDoorOpen() && cqAtDoorNode(u)) return cqHoldSlot(u);
@@ -27147,11 +27248,12 @@ function cqShipTick(dt){
     if(!open){
       // THE DOOR NEVER CRUSHES (L4): the shut beat NUDGES the band clear —
       // no kill, no knockdown, just the nearer side of the frame
+      const K=cq.k||1;   // 0375: the band is the door's own frame at any scale (16·K half-width + 4, 460·K..540·K + 4)
       for(const u of S.units){ if(u.dead) continue;
-        if(u.x>M-20 && u.x<M+20 && u.y>456 && u.y<544) u.x = u.x<M? M-40 : M+40; }
+        if(u.x>M-(16*K+4) && u.x<M+(16*K+4) && u.y>460*K-4 && u.y<540*K+4) u.x = u.x<M? M-(16*K+24) : M+(16*K+24); }
     }
     S.ann={ txt:t(open? 'THE BLAST DOOR IS OPEN!' : 'THE BLAST DOOR IS SHUT!'), t:2.2, warn:!open };
-    bfSfx(open? SFX.ready : SFX.thock, M, 500);
+    bfSfx(open? SFX.ready : SFX.thock, M, 500*(cq.k||1));
     bf.cqLastOpen=open;
   }
   // THE ENGINE VENT: a burst on every period boundary (cycle-counted — no
@@ -27187,7 +27289,7 @@ function cqShipTick(dt){
         if(st.me) S.plastic+=CQ_DRIP;
         else if(!st.human) st.purse+=CQ_DRIP; }   // a human ally's purse lives on THEIR sim (the BF_TICK law)
       bf.cqDrips=(bf.cqDrips||0)+1;
-      if(bf.cqDrips%5===1) S.floats.push({ x:M, y:300, txt:'+'+CQ_DRIP, t:0,
+      if(bf.cqDrips%5===1) S.floats.push({ x:M, y:300*(cq.k||1), txt:'+'+CQ_DRIP, t:0,   // 0375: the float pops at the bay's own top edge at any scale
         col:hold==='you'? '#8FD6A8' : '#E8A080' });
     }
   }
@@ -27710,7 +27812,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.32';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.33';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -32104,7 +32206,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   const riv=rivX||todaysRival();
   const team=Math.max(1,Math.min(BF_MAX_TEAM, teamSize||META.bfTeam||1));
   const diff=diffOverride||bfDifficulty();
-  WORLD_W=bfWidth(team); MID=WORLD_W/2;        // a bigger war gets a bigger carpet
+  WORLD_W=bfWidth(team)+(map.wAdd||0); MID=WORLD_W/2;        // a bigger war gets a bigger carpet; 0375: a map may add hull of its own (THE STARSHIP's doubled complex, 1800) — every other row has no cell and keeps its span to the pixel
   WORLD_H=H*(map.hMul||1);                     // WESTERN LAND is two carpets TALL (v1.57); every other map keeps H to the pixel
   const seats=(plan && plan.length===team*2)? plan : bfSeatPlan(team,riv);
   // v2.41 THE ROOKIE'S FIRST FOUR (Wyatt 8/4, reworked 8/5 — v2.43): the
@@ -32164,8 +32266,8 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   S.bf = { resolved:false, ending:false, mapId:map.id, mapName:map.name, phase:'live',
     team, timeLeft:bfClockFor(team), ot:false, seats, myKills:0,
     mySeat:meSeat.i, myTeam,
-    base:{ you:{x:130,y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0},
-           foe:{x:WORLD_W-130,y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0} },
+    base:{ you:{x:(map.baseX||130),y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0},   // 0375: a map may seat its toy boxes (THE STARSHIP's doubled hangar centres them at 308); every other row keeps 130 to the pixel
+           foe:{x:WORLD_W-(map.baseX||130),y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0} },
     ai:{ diff:(rookie?'rookie':diff) }, rookie,   // v2.41: rookie rides the income lever (bfTick reads ai.diff) and the rig's asserts
     // v2.43 THE DIRECTOR's ledger: gas is the CPU team's live throttle (1 =
     // stock), W the tide it read (+1 = the player owns the game), emptyT the
@@ -33197,7 +33299,7 @@ function bfMarch(u,dt,goal){
   let cqPx=null, cqPy=null;
   if(S.bf && S.cfg.terrain.cq && u.side){
     const cb=S.bf.base[enemySide(u)];
-    if(cb && Math.abs(cb.x-u.x)>=300){
+    if(cb && Math.abs(cb.x-u.x)>=(S.cfg.terrain.cq.fun||300)){   // 0375: the handoff radius rides the ship's scale (300·K — the bag's fun; a stale bag reads 300)
       const g8=cqGoal(u);
       if(g8){ if(g8.hold && Math.hypot(g8.x-u.x,g8.y-u.y)<10){ u.marching=false; return; }
         gx=g8.x; gy=g8.y; } }
@@ -33362,12 +33464,13 @@ function bfLeak(u){
     setTimeout(()=>{ S.slowmo=1;
       // ⚠ the ceremony anchors on the DRAWN crate (120 / WORLD_W-120), not the
       // base object's x (130) — drawBase and the pennant-suppression equality
-      // both live on the drawn coordinate
+      // both live on the drawn coordinate. 0375: both read b.x∓10 now (the
+      // ship seats its boxes at baseX; every other map lands on 120 exactly)
       // v1.56: EVERY KO flies the winner's colours now, your team's or not —
       // the fallen side's pennant comes down, the razing side's standard runs
       // up in its own hex, and the sting knows whose ceremony you're watching
       if(S.mode==='play' && S.bf===bf && !bf.resolved)
-        startVictoryFlag(es==='you'?120:WORLD_W-120, es==='you'?1:-1,
+        startVictoryFlag(bf.base[es].x-(es==='you'?10:-10), es==='you'?1:-1,
           (es==='you'?(bf.hex.you||GREEN):bf.hex.foe), bf.hex[u.side]||GREEN,
           verdict, u.side!==bfMyTeam());
       else verdict();
@@ -34597,6 +34700,16 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
   // pulls it off-lane when someone is genuinely breaking through
   if(view && view.laneBias!=null) focusY = focusY*0.55 + view.laneBias*0.45;
   const back=(type==='mortar'||type==='bazooka'||type==='mgunner');
+  // 0375 THE BAY WANTS MEN (the ship only): while the SUPPLY BAY is not
+  // solely OURS, a candidate that lands INSIDE the bay (its legal slice on
+  // our half — a real slice only on the 2x ship) scores +CQ_SUP_PLACE: the
+  // drop that walks straight into the room. The bay straddles MID (its own
+  // mirror), so the rect reads true in this brain's mirrored frame; the
+  // interception read, safeDrop's ghost law and every tier's blunder/wild
+  // roll stand on top — this is a decision weight, never a resource (the
+  // AI-difficulty law).
+  const cqS=(S.bf && S.cfg && S.cfg.terrain && S.cfg.terrain.cq)? S.cfg.terrain.cq.sup : null;
+  const bayHungry = !!(cqS && view && S.bf.seats[view.mySeat] && S.bf.cqHolder!==S.bf.seats[view.mySeat].team);
   let best=null, bs=-1e9;
   for(let i=0;i<24;i++){          // 24 tries, not 16 — the strewn maps eat candidates
     const x=Math.round(lo+Math.random()*(hi-lo));
@@ -34616,6 +34729,7 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
       s += near<150 ? -3.5 : 0.6;                 // the 5s ghost has to land somewhere it survives
     }
     s += 1-Math.min(1,Math.abs(y-focusY)/260);
+    if(bayHungry && x>=cqS.x0&&x<=cqS.x1&&y>=cqS.y0&&y<=cqS.y1) s+=CQ_SUP_PLACE;   // 0375: into the bay
     s += Math.random()*0.4;
     if(s>bs){ bs=s; best={x,y}; }
   }
@@ -34630,7 +34744,7 @@ function placeUnit(type,x,y,side,seat){
     const b=S.bf.base[side==='you'?'foe':'you'];
     u.side=side;
     u.seat=(seat!=null)? seat : (side==='you'? 0 : S.bf.team);
-    if(S.cfg && S.cfg.terrain && S.cfg.terrain.cq && y<=260) u.cqPow=1;   // 0326: dropped on the north run = aimed at the top room (cqPickEdge honors it)
+    if(S.cfg && S.cfg.terrain && S.cfg.terrain.cq && y<=260*(S.cfg.terrain.cq.k||1)) u.cqPow=1;   // 0326: dropped on the north run = aimed at the top room (cqPickEdge honors it); 0375: the latitude rides the ship's scale
     u.def=Object.assign({}, UDEF[type], BF_MOVE[type]||{});   // per-unit copy — never mutate the shared UDEF
     u.hpMax=u.def.hp||3; u.hp=u.hpMax;
     // v3.12 NEMESIS: the captain's man walks on carrying one of YOUR mirrored
@@ -42246,6 +42360,14 @@ function cqCrate(x,y,w,h,tone){   // a supply crate that reads as a BOX — lid,
 }
 function drawDeckShip(WD,HT){
   const cq=S.cfg.terrain.cq, M=MID, rm=reducedMotion(), t=rm?0:S.t;
+  // 0375 THE SHIP AT 2x: the room ART below is authored at 1x and drawn
+  // inside a context scaled ×K about (M,0) — the ship's 2x is a SCALE, not
+  // a redraw (line widths and the numeral grow with it, the way a bigger
+  // playset's moulding would). Two things stay 1x on purpose: the VENT
+  // (its burst radius CQ_VENT.r is a hazard dial — the grate and the amber
+  // telegraph are drawn TRUE to it, a Wyatt dial untouched) and the running
+  // lights (dots on the hull's edge). The stern block scales about (M,HT).
+  const K=cq.k||1;
   cx.fillStyle='#10151F'; cx.fillRect(0,0,WD,HT);
   let i,st8,yy;
   cx.fillStyle='#8FA2C8';
@@ -42279,12 +42401,14 @@ function drawDeckShip(WD,HT){
   cx.fillStyle='#2A323E';
   cx.beginPath(); cx.moveTo(WD*0.24,58); cx.lineTo(WD*0.28,18); cx.lineTo(WD*0.33,58); cx.closePath(); cx.fill();
   cx.beginPath(); cx.moveTo(WD*0.67,58); cx.lineTo(WD*0.72,18); cx.lineTo(WD*0.76,58); cx.closePath(); cx.fill();
+  cx.save(); cx.translate(M,HT); cx.scale(K,K); cx.translate(-M,-HT);   // 0375: the stern rides the scale about its own corner
   cx.fillRect(M-150,HT-58,300,26);
   for(i=-1;i<=1;i++){ const ex=M+i*74, fl=rm? 20 : 18+9*Math.sin(t*11+i*2.1)+5*Math.sin(t*23+i);
     const gd=cx.createLinearGradient(ex,HT-36,ex,HT-36+30+fl);
     gd.addColorStop(0,'rgba(140,205,255,0.85)'); gd.addColorStop(0.5,'rgba(90,150,255,0.35)'); gd.addColorStop(1,'rgba(90,150,255,0)');
     cx.fillStyle=gd;
     cx.beginPath(); cx.moveTo(ex-13,HT-36); cx.lineTo(ex+13,HT-36); cx.lineTo(ex,HT-36+30+fl); cx.closePath(); cx.fill(); }
+  cx.restore();
   for(i=0;i<cq.greeb.length;i++){ const gb=cq.greeb[i];
     cx.globalAlpha=gb.a; cx.fillStyle=gb.v? '#1B222C' : '#39434F';
     cx.fillRect(gb.x,gb.y,gb.w,gb.h); }
@@ -42298,15 +42422,16 @@ function drawDeckShip(WD,HT){
   // the decks: a dark wall-pad ring under every floor, then the pale plastic
   // decking — threshold strips a shade darker (come to the door to fight)
   cx.fillStyle='#39434F';
-  for(const r of cq.zones) cx.fillRect(r.x0-10,r.y0-10,(r.x1-r.x0)+20,(r.y1-r.y0)+20);
+  for(const r of cq.zones) cx.fillRect(r.x0-10*K,r.y0-10*K,(r.x1-r.x0)+20*K,(r.y1-r.y0)+20*K);   // 0375: the wall pad is moulding — it scales
   for(const q of cq.zones){ if(q.id==='door') continue;
     cx.fillStyle = q.id.indexOf('th')===0? '#BFC7D0' : '#CBD1D8';
     cx.fillRect(q.x0,q.y0,q.x1-q.x0,q.y1-q.y0); }
   cx.strokeStyle='rgba(80,92,108,0.14)'; cx.lineWidth=2;
   for(const w8 of cq.zones){
-    if((w8.x1-w8.x0)<170 || w8.id==='pow'||w8.id==='sup'||w8.id==='eng') continue;
-    for(let sx=Math.ceil(w8.x0/96)*96; sx<w8.x1; sx+=96){
+    if((w8.x1-w8.x0)<170*K || w8.id==='pow'||w8.id==='sup'||w8.id==='eng') continue;   // 0375: the seam pitch scales with the deck
+    for(let sx=Math.ceil(w8.x0/(96*K))*(96*K); sx<w8.x1; sx+=96*K){
       cx.beginPath(); cx.moveTo(sx,w8.y0+3); cx.lineTo(sx,w8.y1-3); cx.stroke(); } }
+  cx.save(); cx.translate(M,0); cx.scale(K,K); cx.translate(-M,0);   // 0375: the room art at 1x, scaled ×K about (M,0)
   // THE POWER ROOM: the core and its halo in the holder's own colour
   const pcol = (S.bf&&S.bf.cqPower)? (S.bf.hex[S.bf.cqPower]||'#4FC3D9') : '#7B8794';
   cx.fillStyle='#39434F'; cx.fillRect(M-14,128,28,54);
@@ -42326,6 +42451,7 @@ function drawDeckShip(WD,HT){
   cx.beginPath(); cx.arc(M-70,806,26,3.1416,0,true); cx.fill();
   cx.beginPath(); cx.arc(M,806,30,3.1416,0,true); cx.fill();
   cx.beginPath(); cx.arc(M+70,806,26,3.1416,0,true); cx.fill();
+  cx.restore();   // 0375: the VENT below draws at 1x — true to its burst radius
   cx.fillStyle='#525E6C'; cx.fillRect(M-20,cq.vent.y-14,40,28);
   cx.strokeStyle='#39434F'; cx.lineWidth=2;
   for(let g2=0;g2<4;g2++){ cx.beginPath(); cx.moveTo(M-16,cq.vent.y-8+g2*6); cx.lineTo(M+16,cq.vent.y-8+g2*6); cx.stroke(); }
@@ -42334,11 +42460,12 @@ function drawDeckShip(WD,HT){
     cx.fillStyle='#FFB03A'; cx.beginPath(); cx.arc(cq.vent.x,cq.vent.y,CQ_VENT.r,0,7); cx.fill(); cx.globalAlpha=1; }
   if(S.bf&&S.bf.cqVentFx>0){ cx.globalAlpha=Math.max(0,S.bf.cqVentFx*2.4); cx.fillStyle='#FFE9C8';
     cx.beginPath(); cx.arc(cq.vent.x,cq.vent.y,CQ_VENT.r,0,7); cx.fill(); cx.globalAlpha=1; }
+  cx.save(); cx.translate(M,0); cx.scale(K,K); cx.translate(-M,0);   // 0375: pods + the door at 1x, scaled ×K
   // THE POD ROOMS: three round pod hatches on each pocket's outer wall
   cx.strokeStyle='#8894A2'; cx.lineWidth=2.5;
   for(let pd=0;pd<3;pd++){
     cx.beginPath(); cx.arc(M-452,652+pd*44,11,0,7); cx.stroke();
-    cx.beginPath(); cx.arc(WD-(M-452),652+pd*44,11,0,7); cx.stroke(); }
+    cx.beginPath(); cx.arc(M+452,652+pd*44,11,0,7); cx.stroke(); }   // 0375: M+452 (=WD-(M-452) — written M-relative so the scale about M mirrors it true)
   // THE BLAST DOOR: two sliding hazard-striped halves over a glow seam,
   // chevrons, frame pillars, the indicator column, a bare countdown numeral
   // (digits only — nothing here for a translator). Slide is pure f(clock).
@@ -42368,6 +42495,7 @@ function drawDeckShip(WD,HT){
   const c8=cqDoorCycle(), rem=(S.bf&&S.bf.cqPower)? 0 : Math.ceil(open? (CQ_DOOR_SHUT+CQ_DOOR_OPEN-c8) : (CQ_DOOR_SHUT-c8));
   if(rem>0){ cx.font=cf('bold 12px'); cx.fillStyle=lamp; cx.textAlign='center';
     cx.fillText(''+rem, M, 438); cx.textAlign='left'; }
+  cx.restore();
 }
 function drawRug(){
   if(S.momRaid){ drawRoomFloor(); drawMomToys(); return; }   // v1.79: the mom fight is fought on the floorboards, not a rug — 0140: her props sit on the boards (ground layer, under every figure)
@@ -43338,7 +43466,7 @@ function drawBase(side){
   const bf=S.bf, b=bf.base[side], im=IMG.toybox;
   // by rides the base's own latitude (b.y+52 === the old 352 on every hMul-1
   // map) so the crate stands at mid-height on the tall map (v1.57)
-  const bx=(side==='you'?120:WORLD_W-120), by=b.y+52, w=150, dir=(side==='you'?1:-1);
+  const dir=(side==='you'?1:-1), bx=b.x-10*dir, by=b.y+52, w=150;   // 0375: the drawn crate hangs off the base's own x (b.x−10 toward the wall = the shipped 120 / WORLD_W−120 on every map but the ship, whose baseX centres it in the doubled hangar)
   const k=Math.max(0,b.hp/b.hpMax);
   if(im){
     const h=w*(im.height/im.width);
@@ -60861,7 +60989,10 @@ window.GVT = {
       zones:cq.zones.map(r=>({id:r.id,x0:r.x0,x1:r.x1,y0:r.y0,y1:r.y1})),
       at:(x,y)=>cqZoneSet(x,y), vis:(a,b)=>cqVisPair(a,b), floor:(x,y)=>cqFloor(x,y,true),
       vent:{x:cq.vent.x,y:cq.vent.y,period:CQ_VENT.period,r:CQ_VENT.r,dmg:CQ_VENT.dmg,warn:CQ_VENT.warn},
-      ban:Object.keys(CQBAN), nodes:Object.keys(cq.nod).length }; },
+      ban:Object.keys(CQBAN), nodes:Object.keys(cq.nod).length,
+      k:cq.k||1, fun:cq.fun||300, sup:cq.sup, mouth:cq.mouth,   // 0375: the scale, the handoff, the bay rect, the mouth funnel — for the battery's eyes
+      dwell:CQ_SUP_DWELL, post:CQ_SUP_POST, supR:CQ_SUP_R, place:CQ_SUP_PLACE, K:CQ_K,
+      posted:S.units.filter(u=>!u.dead&&u.cqN==='supC'&&u.cqSupT!=null&&S.t-u.cqSupT<CQ_SUP_DWELL).length }; },
   bfSpawn(s,type,x,y){ if(!S.bf) return null;
     const seat = typeof s==='number'? s : (s==='foe'? S.bf.team : 0);
     const st=S.bf.seats[seat]; if(!st) return null;
