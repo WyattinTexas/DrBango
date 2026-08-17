@@ -4666,6 +4666,7 @@ ar:{
 "IT'S MINE!":"إنه لي!",
 "JACKS AND GIANTS":"جاك والعمالقة",
 "JEEP":"الجيب",
+"V2 JEEP":"جيب V2",
 "JUNGLE AMBUSH":"كمين الأدغال",
 "JUNGLE DRUMS":"طبول الأدغال",
 "JUST A DENT!":"مجرد خدش!",
@@ -7151,6 +7152,7 @@ ar:{
 "INVITE SENT!":"しょうたいをおくった！",
 "IRON COLUMN":"てつのれっしゃ",
 "JEEP":"ジープ",
+"V2 JEEP":"V2ジープ",
 "JUNGLE AMBUSH":"ジャングルのまちぶせ",
 "KING OF THE CARPET":"カーペットのおうさま",
 "KITTED OUT":"そうびばんたん",
@@ -8980,6 +8982,7 @@ ar:{
 "INVITE SENT!":"초대를 보냈어!",
 "IRON COLUMN":"강철 종대",
 "JEEP":"지프",
+"V2 JEEP":"V2 지프",
 "JUNGLE AMBUSH":"정글 매복",
 "KING OF THE CARPET":"카펫의 왕",
 "KITTED OUT":"완전 무장",
@@ -10809,6 +10812,7 @@ ar:{
 "INVITE SENT!":"邀请已发出！",
 "IRON COLUMN":"钢铁纵队",
 "JEEP":"吉普",
+"V2 JEEP":"V2吉普",
 "JUNGLE AMBUSH":"丛林伏击",
 "KING OF THE CARPET":"地毯之王",
 "KITTED OUT":"装备齐全",
@@ -12638,6 +12642,7 @@ ar:{
 "INVITE SENT!":"EINLADUNG VERSCHICKT!",
 "IRON COLUMN":"EISENKOLONNE",
 "JEEP":"JEEP",
+"V2 JEEP":"V2-JEEP",
 "JUNGLE AMBUSH":"DSCHUNGEL-HINTERHALT",
 "KING OF THE CARPET":"KÖNIG DES TEPPICHS",
 "KITTED OUT":"VOLL AUSGESTATTET",
@@ -14467,6 +14472,7 @@ ar:{
 "INVITE SENT!":"ПРИГЛАШЕНИЕ ОТПРАВЛЕНО!",
 "IRON COLUMN":"ЖЕЛЕЗНАЯ КОЛОННА",
 "JEEP":"ДЖИП",
+"V2 JEEP":"ДЖИП V2",
 "JUNGLE AMBUSH":"ЗАСАДА В ДЖУНГЛЯХ",
 "KING OF THE CARPET":"КОРОЛЬ КОВРА",
 "KITTED OUT":"ПОЛНОСТЬЮ ЭКИПИРОВАН",
@@ -16296,6 +16302,7 @@ ar:{
 "INVITE SENT!":"¡INVITACIÓN ENVIADA!",
 "IRON COLUMN":"COLUMNA DE HIERRO",
 "JEEP":"JEEP",
+"V2 JEEP":"JEEP V2",
 "JUNGLE AMBUSH":"EMBOSCADA EN LA SELVA",
 "KING OF THE CARPET":"REY DE LA ALFOMBRA",
 "KITTED OUT":"EQUIPADO A TOPE",
@@ -17060,7 +17067,7 @@ const GREEN='#4A6B35', TAN='#C09E6C', CREAM='#EDEADF', INK='#26281F';
 // 0121 THE COMMANDO: 175 lands between the flame's 150 and the mortar's 200 —
 // exactly where an elite heavy belongs (Wyatt's number, verbatim). His unlock
 // is a campaign milestone (beat L50), never a ★ purchase — see cmdoOwned().
-const COSTS = { rifleman:40, mgunner:100, bazooka:130, mortar:200, sarge:0, minesweeper:80, flame:140, radioman:100, commando:175, spy:75, kingyeti:325, kingrex:325 };   // 0341: the king @325 (MEGA's prize) · 0357: KING REX at the SAME seat (Wyatt: 'costs the same amount as the Yeti King')   // v2.47: spy 75. v2.52 (Wyatt 8/5): sweeper 120→80 · bazooka 150→130 · flame 150→140 — bounties ride the exactly-half law below
+const COSTS = { rifleman:40, mgunner:100, bazooka:130, mortar:200, sarge:0, minesweeper:80, flame:140, radioman:100, commando:175, spy:75, kingyeti:325, kingrex:325, bfjeep:250, bftank:500, jeep2:250 };   // 0364 THE MOTOR POOL FIELDS IN THE CAMPAIGN (Wyatt 8/16): the machines keep their battleground stickers — the SAME DOG TAGS law (these are BF_COST's own numbers, so its Object.assign overrides below go identity and the battleground stays byte-what-it-was in value)   // 0341: the king @325 (MEGA's prize) · 0357: KING REX at the SAME seat (Wyatt: 'costs the same amount as the Yeti King')   // v2.47: spy 75. v2.52 (Wyatt 8/5): sweeper 120→80 · bazooka 150→130 · flame 150→140 — bounties ride the exactly-half law below
 
 // ================= BATTLEFIELD MODE =================
 // A two-sided lane-pusher on a doubled, mirrored carpet. Both armies live in
@@ -26960,7 +26967,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.21';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.22';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -32923,7 +32930,15 @@ function campSmash(u,dist){
     S.fx.push({k:'ring',x:tx,y:ty,r:5,R:42,t:0,dur:0.24,col:saberHexU(u)});
     bfSfx(SFX.laser, u.x, u.y);
   } else if((dist||0)>LEAK_R+10){
-    if(arm==='sniper'){ bfSfx(SFX.crack, u.x, u.y);
+    if(arm==='bftank'){ bfSfx(SFX.boom, u.x, u.y);
+      // 0364: the cannon SHELLS the boards — the weapon loop's own bftank
+      // voice (muzzle smoke + flash + a shell puff on the crate), never the
+      // rifle pew. The campaign green always faces right (+42,-44 muzzle).
+      const mzx=u.x+42, mzy=u.y-44;
+      S.fx.push({k:'puff',x:mzx,y:mzy,t:0,dur:0.4,R:14});
+      S.fx.push({k:'flash',x:mzx,y:mzy,ang:Math.atan2(ty-mzy,tx-mzx),R:20,lw:3.2,t:0,dur:0.13});
+      S.fx.push({k:'puff',x:tx,y:ty,t:0,dur:0.35,R:20}); }
+    else if(arm==='sniper'){ bfSfx(SFX.crack, u.x, u.y);
       S.fx.push({k:'tracer',x1:u.x+48,y1:u.y-37,x2:tx,y2:ty,t:0,dur:0.2,col:'#FFF3C4',w:3}); }
     else if(arm==='bazooka'){ bfSfx(SFX.rocket, u.x, u.y);
       S.fx.push({k:'puff',x:tx,y:ty,t:0,dur:0.35,R:18}); }
@@ -32974,6 +32989,35 @@ function campCrateFall(word){
       if(S.mode==='play' && !S.cleared && !coopGuest()){ S.cleared=true; endBattle(true); }
     });
   },900);
+}
+// ===== 0364 THE JEEP IS A KAMIKAZE (Wyatt 8/16, verbatim: "It charges in,
+// and on collision with the enemy toy box it self-destructs: the Jeep is
+// destroyed by the impact, but it deals damage to the toy box on the way
+// out. One hit, one Jeep. Make sure the damage actually applies before/as
+// the Jeep is removed, so it can't die without landing its hit.") =====
+// 40 IS THE BF RATIO, NOT A GUESS: the battleground leak table prices a jeep
+// breakthrough at 12 of a 70 box (~17%), and 17% of the campaign's own L1
+// crate (CAMP_BASE_HP 240) is ~41 -> 40. Flat like every number the crate
+// reads (the BF_BASEDMG law): the growing crate dilutes the dent at depth
+// exactly as it dilutes every man's whack (L1 16.7% ... L100 5.6%). Raw
+// const — no vet/rank/soul riders (the RAID_KAMI_DMG shape: machines take
+// no stripe and hold no rank). One Wyatt lever per hull.
+const CAMP_KAMI_DMG={ bfjeep:40, jeep2:40 };
+function campKamikaze(u){
+  const b=S.tanBase; if(!b||b.dead||u.kamiDone) return;
+  u.kamiDone=1;   // the ally-copy guard (raidKamikaze's own line): on MY sim his machine survives knockKill — the 0313a owner's word — one boom, never a metronome
+  // THE ORDER IS THE LAW: the blow lands FIRST, the death after, in the SAME
+  // tick — a mid-frame splice can never drop a paid-for hit.
+  const dmg=CAMP_KAMI_DMG[u.type]||CAMP_KAMI_DMG.bfjeep;
+  b.hp=Math.max(0,b.hp-dmg); b.hitT=0.25;
+  sqSiegeHaste(dmg);   // a battered crate hurries the next wave out — the alarm hears one big whack
+  bfSfx(SFX.boom, u.x, u.y); S.shake=Math.max(S.shake,0.5);
+  S.fx.push({k:'puff',x:b.x-14,y:b.y-34,t:0,dur:0.5,R:30});
+  S.fx.push({k:'ring',x:b.x-6,y:b.y-34,r:8,R:56,t:0,dur:0.4,col:'rgba(255,214,138,0.85)'});
+  S.floats.push({x:b.x,y:b.y-96,txt:'\u2212'+dmg,t:0,col:'#BFE39A'});
+  u.kamiSpent=1;   // a DELIVERY, not a casualty — knockKill still melts half the sticker back, but the no-losses star is never taxed (the paratrooper's own "expected to die there" law)
+  knockKill(u,false);   // the shipped vehicle death — tip-over, boom corpse; an ally's copy survives on the owner's word and kamiDone parks it
+  if(b.hp<=0) campCrateFall();
 }
 // ===== CAMPAIGN CASUALTIES (v1.32, Wyatt 7/26) =====
 // "Characters cannot be taped to get back up, but you do get a half dog-tag
@@ -33153,6 +33197,17 @@ function campUnitStep(u,dt){
   if(S.sq && S.wave===0 && !(u.tkGhost&&u.cloakT>0)){ u.marching=false; return true; }
   const TB=S.tanBase;
   if(TB){
+    // 0364 THE JEEP'S DOOR: the jeep family (def.ram — the gunless hulls; the
+    // tank has a cannon and holds its 210 stand-off through the siege law
+    // below, never closing, never spending itself) detonates ON CONTACT with
+    // the crate — exactly the ring the old melee siege would have parked it
+    // at — damage first, dead the same tick. A spent copy stands down
+    // (kamiDone: an ally's machine survives knockKill on MY sim — the
+    // owner's word — and must never join the census or boom twice).
+    if(u.def.vehicle && u.def.ram){
+      if(u.kamiDone){ u.marching=false; return false; }
+      if(!TB.dead && Math.hypot(TB.x-u.x,TB.y-u.y)<=LEAK_R+8){ campKamikaze(u); u.marching=false; return false; }
+    }
     // THE SIEGE (v1.31 → v1.40): a man ATTACKS the crate from his own weapon's
     // reach now — the rifle line pours volleys from way out, the blade and the
     // toolless walk right up — on his own cadence, staggered so ten men never
@@ -36889,7 +36944,7 @@ function knockKill(u,quiet){
   // paratrooper is: it was free, so half of a price nobody paid is a faucet,
   // and losing a gift must not tax the no-losses star.
   if(!u.coopBy && !u.para && !u.emgV){
-    S.lostLevel++;                           // the level's third star asks about YOUR men only
+    if(!u.kamiSpent) S.lostLevel++;          // the level's third star asks about YOUR men only — and a DELIVERED kamikaze is the plan working, not a loss (0364: the paratrooper's own star law; the half-refund below still melts back)
     if(u.type==='sarge'){
       S.sargeCd=BF_SARGE_DOWN;
       S.floats.push({x:u.x, y:u.y-70, txt:tf('SARGE DOWN — %1s', BF_SARGE_DOWN), t:0, col:'#FFD24A'});
@@ -44157,7 +44212,24 @@ function drawFoe(f){
 
 // ================= HUD =================
 // (TRAY_ORDER now sits up with VEH_ORDER — the medal case needs it at build time.)
-function TRAY(){ return ownedUnits().filter(t9=>((t9!=='kingyeti'&&t9!=='kingrex')||!S.coop)).map(t=>({t})); }   // 0121: derives the commando off the record · 0341/0357: BOTH kings are SOLO-ONLY (no relay word — an old ally's sim would crash on an unknown type; flagged)
+function TRAY(){ const L=ownedUnits().filter(t9=>((t9!=='kingyeti'&&t9!=='kingrex')||!S.coop));   // 0121: derives the commando off the record · 0341/0357: BOTH kings are SOLO-ONLY (no relay word — an old ally's sim would crash on an unknown type; flagged)
+  // 0364 THE MOTOR POOL FIELDS IN EVERY CAMPAIGN (Wyatt 8/16): the owned
+  // machines join the BATTLE TRAY exactly where bfTray seats them — after the
+  // men, in front of the free Sarge — through the spy's own splice lane.
+  // NEVER TRAY_ORDER (hm9 ALL PRESENT and the QUARTERS score size off that
+  // list) and NEVER ownedUnits(): that reader feeds the academy (machines
+  // hold no rank card), the promotion picker, the soul pool (a 'u:bfjeep'
+  // soul would null saves at the validator), nemesisLineup (the Nemesis
+  // mirrors MEN) and the training range. The jeep slot wears the V2's face
+  // once owned (the 0316 replacement law, vehFaceK/vehHas). Co-op KEEPS the
+  // machines (unlike the kings' filter above): the campaign relay's own
+  // membership check is UDEF — every live build knows these types and has
+  // simulated relayed loaner machines since v1.62; an old-build ally's sim
+  // merely sieges where this build kamikazes, and the referee's beacon (cr)
+  // owns the crate hp — the accepted divergence class.
+  if(vehHas('bfjeep')) L.splice(L.length-(L.indexOf('sarge')>=0?1:0), 0, vehFaceK('bfjeep'));
+  if(vehOwns('bftank')) L.splice(L.length-(L.indexOf('sarge')>=0?1:0), 0, 'bftank');
+  return L.map(t=>({t})); }
 function kingSpent(t){ return (t==='kingyeti'||t==='kingrex') && !!(S.kingSpent && S.kingSpent[t]); }   // 0357 (Wyatt 8/16 verbatim: "you may only play them once per battle... grayed out, and the number of their cost should go away"): the royal latch — reset() deals every fresh battle fresh crowns
 const trayRects=[], btnRects={};
 function bfClock(){
@@ -44382,7 +44454,7 @@ function drawHUD(){
 
   // veteran popup
   btnRects.vet=null;
-  if(S.sel && !S.sel.vet && S.sel.type!=='sarge' && S.mode==='play'){
+  if(S.sel && !S.sel.vet && S.sel.type!=='sarge' && !(S.sel.def&&S.sel.def.vehicle) && S.mode==='play'){   // 0364: machines take PLATES at the Surplus, never the stripe — no veteran door on a hull
     const cost=Math.round(COSTS[S.sel.type]*VET_COST_MUL), ok=S.plastic>=cost;   // v2.98: ×1.5 (commando 263, spy 113 — the round is for those two)
     // v2.04: the selected man lives in WORLD space but this popup draws on the
     // SCREEN (drawHUD runs after the camera restore) — map him through the
@@ -44955,7 +45027,9 @@ cv.addEventListener('pointerup', e=>{
     if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; d.unit.laneY=dy; d.unit.wp=null; d.unit.wade=null;   // he marches on in the lane you set him
       if(d.unit.type==='sarge'){ d.unit.home={x:p.x,y:dy}; d.unit.saberState='idle'; sgDashEnd(d.unit); } SFX.thock();
       if(S.coop && d.unit.cid) coopSend({k:'mv', id:d.unit.cid, x:p.x|0, y:dy|0}); }
-    else { S.plastic-=COSTS[d.type]; const nu=placeUnit(d.type,p.x,dy); coopPlaced(nu); if(d.type==='kingyeti'||d.type==='kingrex') (S.kingSpent||(S.kingSpent={}))[d.type]=1; }   // 0357: the royal deploy spends the crown — once per battle (both kings)
+    else { S.plastic-=COSTS[d.type]; const nu=placeUnit(d.type,p.x,dy);
+      if(nu && nu.def.vehicle && vehEng(d.type)) nu.def.moveSpd=Math.round(nu.def.moveSpd*ENG_MUL);   // 0364: MY machine rolls out at the pace I paid for — emgVehicle's own campaign line (the per-unit def copy; a relayed copy reads the 've' marker coopPlaced sends, an ALLY's engine is his own sim's business)
+      coopPlaced(nu); if(d.type==='kingyeti'||d.type==='kingrex') (S.kingSpent||(S.kingSpent={}))[d.type]=1; }   // 0357: the royal deploy spends the crown — once per battle (both kings)
   } else if(d.unit){ SFX.clack(); } // he returns to his old spot
 });
 window.addEventListener('pointercancel', ()=>{ S.drag=null; S.pan=null; S.jetAim=null; });
@@ -51713,6 +51787,7 @@ function raidKamikaze(u,B){
     if(f2.dead || f2.burrow || f2.falling) continue;
     if(Math.hypot(f2.x-u.x,f2.y-u.y)<=RAID_KAMI_AOE+f2.def.w*0.3){ f2.hp -= dmg; hitCheck(f2, u); }
   }
+  u.kamiSpent=1;   // 0364: a DELIVERED kamikaze is the plan working — a PURCHASED machine (tray-bought, on the books) keeps its half-refund but never taxes the no-losses star; inert for the emgV loaner, whose books were always skipped
   knockKill(u,false);   // the shipped vehicle death — tip-over, boom corpse
 }
 function raidSceneOpen(){ const rs=document.getElementById('raidscene'); return !!(rs && !rs.classList.contains('hidden')); }
