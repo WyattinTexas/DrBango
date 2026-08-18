@@ -29075,7 +29075,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.60';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.61';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -32107,9 +32107,23 @@ function ptyPickSet(str){
   SFX.blip(); ptyRender();
 }
 // ---- THE DOOR BUTTON (badge = live count; elsewhere = AT <PLACE> →) ----
+// 0403 THE PARTY DOOR TELLS THE TRUTH (Wyatt 8/18: "this is from the
+// perspective of a player who never invited anybody ... it's just
+// confusing"): the walk face speaks ONLY for a party of TWO OR MORE parked
+// elsewhere. The invite card mints a lobby of one on open (0394 D1) — that
+// lobby is nobody's party yet, so a solo player meets INVITE at every door;
+// the sheet's own away face (member-facing) and the GO/CATCH cards (non-
+// host) are untouched. ONE predicate, all three helpers. A vanished buddy
+// holds their chair DARK_HOLD_C (n stays 2) — the breadcrumb persists, and
+// that is the chair-held truth.
+function ptyDoorAway(here){
+  const L=ptyLobby(); if(!L) return false;
+  const plc=ptyPlace();
+  return !!(plc && plc!==here && (COOP.members||[]).length>1);
+}
 function ptyDoorLabel(here){
   const L=ptyLobby(), plc=L? ptyPlace() : null;
-  if(L && plc && plc!==here) return escH(tf('AT %1', ptyPlaceName(plc)))+' →';
+  if(ptyDoorAway(here)) return escH(tf('AT %1', ptyPlaceName(plc)))+' →';
   const n=L? (COOP.members||[]).length : 0;
   if(n>1){
     // the GREEN face: PARTY · n + the seat-hex face dots
@@ -32126,13 +32140,13 @@ function ptyDoorLabel(here){
     +'<span class="dsub">'+escH(t('YOUR CODE · TAP TO INVITE A FRIEND'))+'</span>';
 }
 function ptyDoorFace(here){
-  const L=ptyLobby(), plc=L? ptyPlace() : null;
-  if(L && plc && plc!==here) return '';                // the AT <PLACE> → walk face
+  const L=ptyLobby();
+  if(ptyDoorAway(here)) return '';                     // the AT <PLACE> → walk face (a party of 2+, 0403)
   return (L? (COOP.members||[]).length:0)>1? ' grn' : ' inv';
 }
 function ptyDoorGlyph(here){
-  const L=ptyLobby(), plc=L? ptyPlace() : null;
-  if(L && plc && plc!==here) return '🤝';
+  const L=ptyLobby();
+  if(ptyDoorAway(here)) return '🤝';                   // 0403: same predicate as the face
   return (L? (COOP.members||[]).length:0)>1? '🤝' : '📤';
 }
 function ptyToggle(){
@@ -62529,9 +62543,21 @@ window.UI = {
   // 0387 THE PARTY: one door, every scene — the glass sheet's toggle
   party(){ audio(); SFX.blip();
     // 0394 (I1/I2): the door's two faces — a party of one opens the INVITE
-    // CARD (the front door); 2+ (or a party parked elsewhere) opens the sheet
+    // CARD (the front door); 2+ opens the sheet (parked elsewhere = its
+    // away face). 0403 THE PARTY DOOR TELLS THE TRUTH: a party of ONE is
+    // ALWAYS the invite card — the door read INVITE, so the tap matches the
+    // face — and a solo HOST standing at a new place brings his lonely
+    // lobby along (the LOCATION LAW's own move, minus the sheet: ptyMint's
+    // short-circuit never re-stamps plc, so without this a friend joining
+    // by code would be walked to the stale place while the host sits here).
     const L=ptyLobby(), plc=L? ptyPlace() : null, here=ptyPlaceNow();
-    if((L? (COOP.members||[]).length:0)<2 && !(L && plc && here && plc!==here)) ptyInviteCard();
+    if((L? (COOP.members||[]).length:0)<2){
+      if(L && COOP.host && here && plc!==here){
+        COOP.wantPlc=here; COOP.plc=here; COOP.pub=0; COOP.pick=''; PTY_LFG=null; PTY.place=here;
+        clearTimeout(COOP.pollT); coopTick(); ptyRender();
+      }
+      ptyInviteCard();
+    }
     else ptyToggle(); },
   // ---- THE CAMPAIGN scene (v1.42) ----
   campPlay(n){ audio(); SFX.blip();
@@ -64695,6 +64721,15 @@ window.GVT = {
     botN:(COOP&&COOP.botN)|0,
     sheet:!!document.querySelector('.ptySheet:not(.hidden)'),
     doorBtn:!!document.querySelector('.wt-ptydoor'),
+    // 0403 — the OPEN scene's door face (five scenes carry five class-shell
+    // doors; a bare query answers a hidden copy) + the shared predicate
+    door:(()=>{ for(const id of ['wartable','campscene','parkscene','raidscene']){
+      const sc=document.getElementById(id); if(!sc || sc.classList.contains('hidden')) continue;
+      const d=sc.querySelector('.wt-ptydoor'); if(!d) return null;
+      return { scene:id, face:/\binv\b/.test(d.className)? 'inv' : /\bgrn\b/.test(d.className)? 'grn' : 'away',
+        txt:String(d.textContent||'').slice(0,80), glyph:String((d.querySelector('.wt-troph')||{}).textContent||'') }; }
+      return null; })(),
+    away:ptyDoorAway(ptyPlaceNow()),
     // 0394 REV 5 — read-only (the v2.60 law)
     pcode:META.pcode||null, dks:((COOP&&COOP.members)||[]).map(m=>m.dk|0),
     say:(PTY.sayLog||[]).slice(-12), ban:!!(PTY.ban&&Date.now()-PTY.ban.t0<10000),
