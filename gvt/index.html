@@ -1964,7 +1964,7 @@
   .sh-lensstand.out .sh-lwin { opacity:0.16; filter:saturate(0.2); }
   @keyframes lensSway { 0%,100% { transform:rotate(-2.2deg); } 50% { transform:rotate(2.4deg); } }
   #shLensFly { position:absolute; left:0; top:0; z-index:8; cursor:grab; touch-action:none;
-    will-change:transform; transform-origin:50% 31%; filter:drop-shadow(0 10px 9px rgba(0,0,0,0.4)); }
+    will-change:transform; transform-origin:50% 93.75%; filter:drop-shadow(0 10px 9px rgba(0,0,0,0.4)); }   /* 0402: the wobble swings about the HELD point — the handle tip (157.5/168 = LENS_AF's CSS twin) */
   #shLensFly.held { cursor:grabbing; }
   #shLensFly > svg { display:block; width:100%; height:auto; }
   .sh-lztag { position:absolute; left:50%; top:57%; transform:translateX(-50%); min-width:120px; max-width:200px;
@@ -29075,7 +29075,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.59';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.60';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -53302,6 +53302,13 @@ const GLASS={ held:false, pid:null, x:0, y:0, tx:0, ty:0, raf:0 };
 const GLASS_MAG=2.1;    // how hard the porthole magnifies (DIAL)
 const GLASS_W=110;      // the glass in hand, world px wide (DIAL)
 const GLASS_CX=GLASS_W*0.5, GLASS_CY=GLASS_W*(52/120), GLASS_PR=Math.round(GLASS_W*(37/120));
+// 0402 THE LENS HELD BY THE HANDLE (Wyatt 8/18: "when they're holding it, the
+// magnifying glass should use the image point of the very bottom of the
+// magnifying glass"): the HELD anchor moves to the handle tip — art
+// (60,157.5) of 120×168 — while GLASS_CY stays the porthole's seat and the
+// glass's EYE: the zoom re-aim and the find check both read the CENTER,
+// GLASS_AY-GLASS_CY (≈96.7 world px) above the finger.
+const GLASS_AY=GLASS_W*(157.5/120);
 // the bed's authored rect — fixed architecture since v2.18 (its roomPos key
 // is purged at load), so the discovery door can never be dragged away.
 // v3.32 TP-01 (supersedes v3.17's every-room bed door): each room owns its
@@ -53374,9 +53381,11 @@ function glassSpawnFly(wx,wy){
 }
 function glassPlace(){
   const f=document.getElementById('roomGlassFly'); if(!f) return;
-  f.style.transform='translate('+(GLASS.x-GLASS_CX)+'px,'+(GLASS.y-GLASS_CY)+'px)';
+  f.style.transform='translate('+(GLASS.x-GLASS_CX)+'px,'+(GLASS.y-GLASS_AY)+'px)';   // 0402: the finger holds the handle tip
   const z=f.querySelector('.rg-zoom');
-  if(z){ z.style.left=(GLASS_PR-GLASS.x*GLASS_MAG)+'px'; z.style.top=(GLASS_PR-GLASS.y*GLASS_MAG)+'px'; }
+  // 0402: the porthole still magnifies what sits under the GLASS CIRCLE —
+  // the eye rides GLASS_AY-GLASS_CY above the held tip now
+  if(z){ z.style.left=(GLASS_PR-GLASS.x*GLASS_MAG)+'px'; z.style.top=(GLASS_PR-(GLASS.y-(GLASS_AY-GLASS_CY))*GLASS_MAG)+'px'; }
   glassBedCheck();
 }
 function glassGrabEv(e){
@@ -53385,8 +53394,10 @@ function glassGrabEv(e){
   let f=document.getElementById('roomGlassFly');
   if(!f){
     // first pickup: it lifts off the floor where it was lying, then chases
-    // the finger — the shop stand's own lift
-    f=glassSpawnFly(64,254);
+    // the finger — the shop stand's own lift (0402: the anchor is the tip
+    // now, so the same floor seat reads 254+(GLASS_AY-GLASS_CY) — the art
+    // starts byte-where it always started)
+    f=glassSpawnFly(64, 254+GLASS_AY-GLASS_CY);
     if(!f) return;
     SFX.blip();
   }
@@ -53423,7 +53434,8 @@ function glassBedCheck(){   // v3.32: the FIND check — the current room's regi
   if(!glassDue()) return;
   const F=ROOM_FINDS[roomCur()]; if(!F) return;
   const B=F.rect();
-  if(GLASS.x>=B.x && GLASS.x<=B.x+B.w && GLASS.y>=B.y && GLASS.y<=B.y+B.h) F.take();
+  const cy=GLASS.y-(GLASS_AY-GLASS_CY);   // 0402: the find fires under the glass EYE, never under the finger
+  if(GLASS.x>=B.x && GLASS.x<=B.x+B.w && cy>=B.y && cy<=B.y+B.h) F.take();
 }
 // THE DISCOVERY. Grant and announce-ledger write BEFORE a pixel of ceremony
 // (v1.25's synchronous law + v2.34's announce edition: a reload mid-fanfare
@@ -61142,9 +61154,12 @@ function shopCardClose(){
 // scroller; a re-render or a fresh shop visit puts the lens back on its
 // stand. reducedMotion(): the glass snaps to the finger, nothing sways.
 const LENS={ held:false, pid:null, x:0, y:0, tx:0, ty:0, rot:0, raf:0, over:null };
+const LENS_AF=157.5/168, LENS_CF=52/168;   // 0402: held-anchor (the handle tip) & glass-center fractions of the fly's height — CSS twin: #shLensFly transform-origin 50% 93.75%
 // the toy itself: real glass, toy brass, a proper wooden grip — molded in the
 // store's own thick round-capped strokes. Glass center = (60,52) of 120×168,
-// which is where the fly anchors and where the scan reads.
+// which is where the scan reads. 0402 (Wyatt 8/18: the glass "should use the
+// image point of the very bottom"): the fly ANCHORS at the handle tip
+// (60,157.5) now — LENS_AF — while the scan keeps reading the CENTER.
 // port=true is the ROOM fly's dress (v2.42): the glass circle goes near-clear
 // so the live porthole underneath shows THROUGH it — same brass, same grip,
 // just a whisper of sheen instead of the shop's solid glazing.
@@ -61200,7 +61215,7 @@ function lensPlace(){
   const f=document.getElementById('shLensFly'); if(!f) return;
   const w=lensFlyW(), h=w*1.4;
   f.style.width=w+'px';
-  f.style.transform='translate('+(LENS.x-w/2)+'px,'+(LENS.y-h*0.31)+'px) rotate('+LENS.rot.toFixed(2)+'deg)';
+  f.style.transform='translate('+(LENS.x-w/2)+'px,'+(LENS.y-h*LENS_AF)+'px) rotate('+LENS.rot.toFixed(2)+'deg)';
 }
 function lensSpawnFly(cx,cy){
   const shop=document.getElementById('toyshop');
@@ -61226,9 +61241,11 @@ function lensGrabEv(e){
   let f=document.getElementById('shLensFly');
   if(!f){
     // first pickup: the lens lifts off from wherever its stand actually sits
+    // (0402: the lift seat rides LENS_AF too — anchor and lift must agree
+    // or the first grab teleports the art ~0.63h up)
     const st=document.getElementById('shLensStand');
     const r=st? st.getBoundingClientRect() : null;
-    f=lensSpawnFly(r? r.left+r.width/2 : e.clientX, r? r.top+r.height*0.31 : e.clientY);
+    f=lensSpawnFly(r? r.left+r.width/2 : e.clientX, r? r.top+r.height*LENS_AF : e.clientY);
   }
   LENS.held=true; LENS.pid=e.pointerId;
   LENS.tx=e.clientX; LENS.ty=e.clientY;
@@ -61270,7 +61287,9 @@ function lensScan(){
   const f=document.getElementById('shLensFly'); if(!f) return;
   let hit=null;
   try{
-    const els=document.elementsFromPoint(LENS.x, LENS.y);
+    // 0402: the scan reads under the GLASS CIRCLE — (LENS_AF-LENS_CF)·h
+    // above the held handle tip — never under the finger
+    const els=document.elementsFromPoint(LENS.x, LENS.y-(LENS_AF-LENS_CF)*lensFlyW()*1.4);
     for(const n of els){
       if(n===f || f.contains(n)) continue;
       const c=n.closest? n.closest('[data-lens]') : null;
@@ -64132,7 +64151,8 @@ window.GVT = {
   // door (the outfit rig's law: nothing here prints anywhere a player sees).
   lens(){ return { cost:LENS_COST, owned:lensOwned(), stars:META.starBank, free:LENS_FREE_LVL, due:lensDue(), lensFree:!!META.lensFree, ann:!!META.lensAnn,   // 0363: the free-at-15 doors, for the battery's eyes
     out:!!document.getElementById('shLensFly'), held:LENS.held, over:LENS.over,
-    at:[Math.round(LENS.x),Math.round(LENS.y)],
+    at:[Math.round(LENS.x),Math.round(LENS.y)],   // the HELD anchor — the handle tip since 0402
+    glassAt:[Math.round(LENS.x),Math.round(LENS.y-(LENS_AF-LENS_CF)*lensFlyW()*1.4)],   // 0402: the glass EYE the scan reads
     lz:LASER_COLORS.map(a=>a.id+' = '+lensLine('lz',a.id)),
     cz:SABER_COLORS.map(c=>c.id+' = '+lensLine('cz',c.id)),
     of:OUTFIT_ORDER.map(id=>id+' = '+lensLines2(id).join(' · ')) }; },
@@ -64174,7 +64194,9 @@ window.GVT = {
   glass(){ return { lens:lensOwned(), spy:spyOwned(), due:glassDue(),
     room:roomCur(), find:roomHasLiveFind(roomCur()), found:foundHere(roomCur()),
     fly:!!document.getElementById('roomGlassFly'), held:GLASS.held,
-    at:[Math.round(GLASS.x),Math.round(GLASS.y)], seen:!!META.spySeen }; },
+    at:[Math.round(GLASS.x),Math.round(GLASS.y)],   // the HELD anchor — the handle tip since 0402
+    glassAt:[Math.round(GLASS.x),Math.round(GLASS.y-(GLASS_AY-GLASS_CY))],   // 0402: the glass EYE the porthole and the finds read
+    seen:!!META.spySeen }; },
   // v3.32 TP-01 rig: the whole secrets pass in one read
   secrets(){ return { snowman:!!META.snowmanTap, burp:!!META.roofBurp, fed:ROOF_FED,
     burpN:ROOF_BURP_N, soc:!!META.socGoal, goldKey:!!META.goldKey, keySeen:!!META.goldKeySeen,
