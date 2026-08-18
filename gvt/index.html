@@ -29072,7 +29072,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.56';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.57';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -54469,8 +54469,9 @@ let AD_FREE_GAMES=1;   // door games at session start that are always ad-free (D
 let AD_CAMP_EVERY=1;   // campaign: a break before every Nth level start — 2 = every other, 0 = off (DIAL)
 let AD_BF_EVERY=1;     // battlegrounds: a break before every Nth match launch — 0 = off (DIAL)
 let AD_SQUAD_EVERY=1;  // v2.82 squad law, retuned 0383 (Wyatt: an ad after 'each game that you essentially play') — every finished squad game's exit; 0 = off (DIAL)
+let AD_SOLO_EVERY=3;   // 0399 THE SOLO VERDICT BREAK (Wyatt 8/18: "we need to be serving interstitials to players who are playing campaign levels alone or if they're just grinding battlefields" + "Not every game, but every 2 or 3 games") — a SOLO verdict exit breaks on every Nth door-launched game of the session (ADQ.games % N === 0 → games 3, 6, 9…); 0 = off. ⚑ SOLO_EVERY: "2 or 3" — 3 shipped, 2 is one digit (DIAL)
 let AD_SOLO_POST=1;    // v3.60 (0297 §V3.8): the adapter-era placement flip — 0 = today's placeholder door law; 1 moves SOLO breaks post-game. A COMPLIANCE PRECONDITION for real ads (Wyatt sign-off, ADS-V1.md §V3 gate 5), never auto-flipped; NO reader in the placeholder era BY DESIGN — the adapter card flips a staged switch, not a new build (DIAL)   // ⛔ GATE 5 SIGNED — Wyatt 8/17 verbatim: "for C, let's turn it on. We want to show solo players an ad after playing" — the reader shipped in v4.35; the dial flips ON here (0379). Real-provider only by construction: soloDue requires ADS.provider!=='placeholder', so web/child/Steam stay break-free
-const ADQ={ games:0, camp:0, bf:0, squad:0, sqPaid:0 };   // the session gate counters (door-launched games only; squad = finished 2+-human games, sqPaid = the squad count whose break already showed)
+const ADQ={ games:0, camp:0, bf:0, squad:0, sqPaid:0, soloPaid:0 };   // the session gate counters (door-launched games only; squad = finished 2+-human games, sqPaid = the squad count whose break already showed; 0399: soloPaid = the games count whose SOLO verdict break already showed — the sqPaid idiom, one break per due verdict however many exits race)
 (function(){
   let A; try{ A=ADS; }catch(e){}      // the rewarded half's const, if its hunks are on this tree
   if(!A) A=window.ADS={ provider:'placeholder',
@@ -54688,10 +54689,18 @@ function squadAdGate(launch){
     // FM-GVT-MAX-01 §V3.8: AD_SOLO_POST's reader lands — dial 1 + a live
     // adapter moves SOLO breaks HERE, the verdict exit, the only legal real
     // seam. Ships 0; flips only on Wyatt's gate-5 sign-off (a dial, not a build).
-    const soloDue= !sq && AD_SOLO_POST===1 && ADS.provider!=='placeholder' && ADQ.games>AD_FREE_GAMES;
+    // 0399 THE SOLO VERDICT BREAK: the solo cadence — every AD_SOLO_EVERY-th
+    // door-launched game's exit (games 3, 6, 9… as shipped), the first game
+    // free (AD_FREE_GAMES), one break per due verdict (the soloPaid latch =
+    // the sqPaid idiom). The three verdict exits below route SOLO games here
+    // now (v4.56 only entered this gate from a PARTY origin — the reader was
+    // dead code for every player who plays alone; the fix is at the taps).
+    const soloDue= !sq && AD_SOLO_POST===1 && ADS.provider!=='placeholder' && ADQ.games>AD_FREE_GAMES
+       && AD_SOLO_EVERY>0 && (ADQ.games%AD_SOLO_EVERY)===0 && ADQ.soloPaid!==ADQ.games;
     brk= !STEAM_SHELL && !adFree() && !live && (due||soloDue)   // 0333a: the paid package suppresses the post-game break too
        && ADS.provider!=='placeholder' && maxIntOk();   // 0383: REAL ads only — the placeholder break is retired everywhere (web/child/Steam see ZERO interstitials, ever); §V3.10's gap/cap/payer law governs every real one, and a due break the gap swallows simply skips — fewer ads than the schedule, never more
     if(brk && due) ADQ.sqPaid=ADQ.squad;       // one break per due game, however many exits race
+    if(brk && soloDue) ADQ.soloPaid=ADQ.games; // 0399: the solo latch — same law
   }catch(e){ brk=false; }               // the gate may fail — the exit may not (fail-safe law)
   if(brk){
     try{ ADS.showInterstitial().then(()=>naMaybeOffer(launch), ()=>naMaybeOffer(launch)); }   // 0333a: the first break ever pitches once; the held exit blocks nobody else's (the squad gate's own property)
@@ -63792,6 +63801,11 @@ function pgTake(){ const o=PGO; PGO=null; if(o==='wt') openWarTable(); else if(o
 document.getElementById('retryBtn').addEventListener('click', ()=>{
   audio();
   { const o=pgTakeV(); if(o){ squadAdGate(()=>pgLand(o)); return; } }   // go again together — FROM the origin screen (v2.82; v2.84: the stamp survives a party that died on this screen)
+  // 0399 THE SOLO VERDICT BREAK: the solo retry is a verdict exit too — it
+  // pays the same gate (soloDue's cadence; the party branch above is
+  // byte-still). The landing below is the v4.56 body verbatim, run after the
+  // break (or straight through when none is due — the gate never eats a tap).
+  squadAdGate(()=>{
   if(S.bf){ const raid=!!S.bf.raid, m=S.bf.mapId, t=S.bf.team;
     // v2.41: a raid rematch is a fresh attack (the ground is drawn again),
     // and a RANDOM pref redraws too — an explicit pick still replays itself.
@@ -63805,14 +63819,19 @@ document.getElementById('retryBtn').addEventListener('click', ()=>{
   // neither skip nor advance anything.
   if(S.park){ const pid=S.park.id, pn=S.park.n; adGate('camp', ()=>startPark(pid,pn)); return; }   // a park RE-start is a level start too (the v2.60 law UI.parkPlay already pays)
   adGate('camp', ()=>startCampaign(S.levelN));   // a level RE-start is a level start (v2.60)
+  });
 });
 document.getElementById('againBtn').addEventListener('click', ()=>{
   audio();
   { const o=pgTakeV(); if(o){
     squadAdGate(()=>{ if(META.pendingPicks>0){ PGO=o; showPicker(); } else pgLand(o); }); return; } }
+  // 0399 THE SOLO VERDICT BREAK: the solo Continue pays the same gate (the
+  // party branch above is byte-still); the v4.56 landing runs after the break.
+  squadAdGate(()=>{
   { const p=pgTakePk(); if(p){ if(META.pendingPicks>0){ PGPK=p; showPicker(); } else { showMenu(); openParkScene(p); } return; } }   // 0341: a park verdict lands on ITS park screen (win and loss alike), never the main menu
   if(S.bf){ if(META.pendingPicks>0) showPicker(); else showMenu(); return; }   // battlefield XP can promote you
   if(META.pendingPicks>0) showPicker(); else showMenu();
+  });
 });
 document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); PGO=null; PGV=null; PGPV=null; PGPK=null; showMenu(); });   // 0341: HQ stays the explicit menu door — it clears the park stamp too (flagged)
 document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); showMenu(); pgTake(); });
@@ -63874,12 +63893,14 @@ window.GVT = {
   ads(){ return { steam:STEAM_SHELL, bridge:ADS_BRIDGE, provider:ADS.provider, track:(META.adTrack||null), mi:MAXA.int, mr:MAXA.rew, msess:MAXA.sess, mgap:AD_MIN_GAP_MIN, mcap:AD_SESS_CAP, mwd:AD_WD_MS, mlog:MAXA.log.slice(), sess:Object.assign({},ADQ), free:AD_FREE_GAMES, camp:AD_CAMP_EVERY, bf:AD_BF_EVERY,
     squad:AD_SQUAD_EVERY,   // v2.82: the post-game squad cadence dial
     solo:AD_SOLO_POST,      // v3.60 (0297): the parked adapter-era placement dial (§V3.8)
+    soloEvery:AD_SOLO_EVERY,   // 0399: the solo verdict cadence dial
     live:(()=>{ try{ return !!AD; }catch(e){ return false; } })(),
     int:typeof ADS.showInterstitial==='function', rw:typeof ADS.showRewarded==='function' }; },
   adSess(p){ Object.assign(ADQ,p||{}); return Object.assign({},ADQ); },
   adCfg(p){ p=p||{}; if(p.free!=null) AD_FREE_GAMES=p.free; if(p.camp!=null) AD_CAMP_EVERY=p.camp;
     if(p.bf!=null) AD_BF_EVERY=p.bf; if(p.squad!=null) AD_SQUAD_EVERY=p.squad;
     if(p.solo!=null) AD_SOLO_POST=p.solo;   // v3.60 (0297): the §V3.8 dial
+    if(p.soloEvery!=null) AD_SOLO_EVERY=p.soloEvery;   // 0399: the solo verdict cadence dial
     if(p.gap!=null) AD_MIN_GAP_MIN=p.gap; if(p.cap!=null) AD_SESS_CAP=p.cap;   // FM-GVT-MAX-01: the §V3.10 dials
     if(p.wd!=null) AD_WD_MS=p.wd;   // 0380: the never-displayed belt (rig legs shrink it)
     return GVT.ads(); },
