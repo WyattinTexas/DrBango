@@ -68,7 +68,8 @@
     --hand:'Comic Sans MS','Marker Felt','Segoe Print','Helvetica Neue',Arial,cursive;
   }
   html, body { margin:0; padding:0; background:#1a1512; height:100%; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; font-family:var(--ui); }
-  #wrap { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+  #wrap { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    padding-bottom:var(--chin,0px); box-sizing:border-box; }   /* 0395 THE CHIN: the canvas centres in the box above the chin (identity at 0) */
   canvas { display:block; }
   .overlay { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:rgba(20,16,12,0.88); color:#EDEADF; z-index:10; }
   .overlay h1 { font-size: clamp(2.4rem, 9vw, 4.5rem); margin:0 0 0.5rem; letter-spacing:0.04em; text-transform:uppercase; }
@@ -4197,10 +4198,40 @@
   text-align:center; max-width:54px; overflow:hidden; }
 #trainbar .tbu.on { border-color:#FFD24A; background:rgba(255,210,74,0.14); }
 
+
+  /* ===== 0395 THE CHIN — RESPECT THE HOME BAR (FM-GVT-EDGE-01 §6-A, Wyatt GO 8/17 late).
+     iOS decides Home/app-switch by where a finger LANDS: the bottom ~21 pt in landscape
+     (env(safe-area-inset-bottom); iPhone 17 20, iPhone Air 29, home-bar iPad 20) is the
+     system's. --chin (chinApply(): inset+EDGE_PAD where env()>0, else 0) is a FLOOR under
+     every touch surface — the canvas fits above it (resize()), every fixed scene root pads
+     by it, and the chin itself is the body's own dark ground (#1a1512 — ⚑ dial vs #000
+     beside an OLED bezel): no drawing, no handler, nothing of ours starts a touch in the
+     band. Where env() is 0 every rule below is identity — desktop/Android-immersive/SE/
+     Steam render byte-identical. This block sits LAST in the sheet on purpose. ===== */
+  #wartable, #campscene, #parkscene, #raidscene, #toyshop, #worldrank, #win, #lose,
+  #menu, #hqsheet { padding-bottom:var(--chin,0px); box-sizing:border-box; }
+  /* roots that already carry bottom padding KEEP it — the chin stacks on top (a bare
+     var would REPLACE their padding and move pixels at chin 0 — the byte-still law) */
+  #picker { padding-bottom:calc(28px + var(--chin,0px)); }
+  .rmback { padding-bottom:calc(10px + var(--chin,0px)); }
+  #mboxPop, #milePop { padding-bottom:calc(10px + var(--chin,0px)); }
+  .mb-card { max-height:calc(94vh - var(--chin,0px)); }
+  /* the hero/decor photos stop AT the chin — position:absolute inset:0 tracks the root's
+     PADDING box, so root padding alone would let them paint into the band (⚑ alt flagged:
+     let the photos run under it). parkSceneLayout/lairBoneLayout read the bg's own rect,
+     so every hotspot follows this line automatically. */
+  #parkBg, #raidBg, #wtBg, #campBg, #wrBg { bottom:var(--chin,0px); }
+  .ptySheet { bottom:var(--chin,0px); }        /* the GO bar rides up (REV 5 skin keeps its own padding) */
+  #trainbar { bottom:calc(10px + var(--chin,0px)); }   /* the training range's whole picker lived on the edge */
+  #adRep { bottom:max(14px, var(--chin,0px)); }   /* was max(14px, env()) — chin ⊇ env+pad, identity at 0 */
 </style>
 </head>
 <body>
 <div id="wrap"><canvas id="cv"></canvas></div>
+<!-- 0395 THE CHIN: the env() probe, chinPx()'s one source of truth. visibility:hidden +
+     pointer-events:none, never display:none — env() must LAY OUT to resolve, and the
+     v1.71 elementFromPoint seat probes must never hit it. -->
+<div id="chinProbe" style="position:fixed;left:0;bottom:0;width:0;height:env(safe-area-inset-bottom,0px);visibility:hidden;pointer-events:none"></div>
 
 <div class="overlay arcade" id="title">
   <div class="logo-stack">
@@ -28906,7 +28937,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.52';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.53';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -44817,8 +44848,36 @@ let scale=1;
 // VW is how much world the screen can actually show — on a landscape phone the
 // extra width becomes pannable field instead of pillarbox.
 let VW=W;
+// ===== 0395 THE CHIN — RESPECT THE HOME BAR (FM-GVT-EDGE-01 §6-A, Wyatt GO 8/17
+// late: "let's go with the chin"). iOS's Home / quick-switch gestures fire on
+// where the finger LANDS — the bottom ~21 pt in landscape belongs to the system
+// — so the page stops laying ANY touch target there: the canvas fits the screen
+// MINUS the chin, every fixed scene root pads by var(--chin) (the stylesheet's
+// closing block), and the chin is inert dark ground. The 0341 DECOR_SPOTS note
+// root-caused this exact band for the room's kings; this finishes the thought
+// for the whole page. The sim never hears of it: H stays 600, the trays keep
+// y0=H-th-18, nothing persists in saves. Where env() is 0 the chin is 0 and
+// every byte of layout is what it was.
+const EDGE_PAD=6;   // ⚑ dial: 6 pt puts an iPhone-15 card bottom ~38 pt above the edge (Wyatt's own "10%" line, clear even of a 34-pt zone); 0 = exactly the inset (~32 pt, ~1.6% bigger figures); 12 = more margin
+const CHIN={px:0, ov:null};   // ov = rig override (GVT.chin) — env() is 0 in headless
+function chinPx(){ return CHIN.px; }
+function chinMeasure(){
+  if(CHIN.ov!=null) return CHIN.ov;
+  const pr=document.getElementById('chinProbe');
+  const inset=pr? pr.getBoundingClientRect().height : 0;   // the rect, never display:none+getComputedStyle — env() must lay out to resolve
+  return inset>0? Math.round(inset)+EDGE_PAD : 0;
+}
+function chinApply(){
+  const c=chinMeasure();
+  if(c===CHIN.px) return;   // idempotent — the no-change path dispatches nothing (no resize loop)
+  CHIN.px=c;
+  document.documentElement.style.setProperty('--chin', c+'px');
+  window.dispatchEvent(new Event('resize'));   // re-runs the whole layout chain — resize → sizeRoom → lairBone → park, their own registration order
+}
+window.addEventListener('resize', chinApply);   // registered BEFORE resize's own listener: a rotation re-measures first, the chain reads the fresh value
+if(window.ResizeObserver) new ResizeObserver(chinApply).observe(document.getElementById('chinProbe'));   // WKWebView re-resolves env() on safeAreaInsetsDidChange WITHOUT a window resize — the observer catches a late/changed inset
 function resize(){
-  const ww=window.innerWidth, wh=window.innerHeight;
+  const ww=window.innerWidth, wh=window.innerHeight-chinPx();   // 0395 THE CHIN: nothing else in the formula moves — a phone's BF VW widens as ww/scale (MORE field sideways), the campaign keeps VW=W=1240 and its pillars widen (the 3-side frame)
   // v1.98: the scale basis caps at the LONG FRONT — a grand W widens the
   // WORLD, never shrinks the figures. Identity everywhere that shipped: the
   // room/BF basis is 960 and the campaign's 1240, both under the cap — and a
@@ -44834,7 +44893,7 @@ function resize(){
   if(S.bf){ S.bf.cam.x=clampCam(S.bf.cam.x); S.bf.cam.y=clampCamY(S.bf.cam.y||0); }
   else if(S.cCam){ S.cCam.x=clampCam(S.cCam.x); S.cCam.y=clampCamY(S.cCam.y||0); }
 }
-window.addEventListener('resize',resize); resize();
+window.addEventListener('resize',resize); chinApply(); resize();   // 0395: the chin is measured before the first layout
 
 function drawSprite(k,x,y,w,rot,wob,imgOverride,flip){
   const im=imgOverride||IMG[k]; if(!im) return;
@@ -48763,6 +48822,12 @@ cv.addEventListener('pointerdown', e=>{
         S.sel=null; return;
       }
     }
+    // 0395 THE CHIN (⚑ inert-strip dial ON): with a live chin the 18-unit strip
+    // UNDER the tray (y>H-18) starts no pan — nobody pans from it today (iOS
+    // owned it), and after the chin it sits 27–38 pt up: inside the zone's
+    // honest upper bound if the real recogniser runs taller than the inset.
+    // Byte-still where the chin is 0.
+    if(CHIN.px>0 && p.y>H-18){ S.sel=null; return; }
     S.pan={ sx:e.clientX, sy:e.clientY, cam0:S.bf.cam.x, cam0y:S.bf.cam.y||0,
             lx:e.clientX, ly:e.clientY, lt:S.t, vx:0, vy:0, moved:false };
     S.bf.cam.vx=0; S.bf.cam.vy=0; S.sel=null; return;
@@ -48804,6 +48869,7 @@ cv.addEventListener('pointerdown', e=>{
   // gesture, same shape, through the campaign camera. Narrow rugs never
   // reach this (W===VW), so a tap stays exactly the deselect it always was.
   if(W>VW && S.cCam){
+    if(CHIN.px>0 && p.y>H-18){ S.sel=null; return; }   // 0395 THE CHIN: the same inert strip on a grand rug's pan
     S.pan={ sx:e.clientX, sy:e.clientY, cam0:S.cCam.x, cam0y:S.cCam.y||0,
             lx:e.clientX, ly:e.clientY, lt:S.t, vx:0, vy:0, moved:false };
     S.cCam.vx=0; S.cCam.vy=0;
@@ -53638,7 +53704,7 @@ function showMenu(){
 }
 function sizeRoom(){
   const st=document.getElementById('roomStage'); if(!st) return;
-  const s=Math.min(window.innerWidth/960, window.innerHeight/600);
+  const s=Math.min(window.innerWidth/960, (window.innerHeight-chinPx())/600);   // 0395 THE CHIN: the shared chinPx(), never a resize()-local — #menu's own padding recentres the stage in what's left (the train/racecar drags land clear of the band)
   st.style.transform='scale('+s+')';
 }
 window.addEventListener('resize', sizeRoom);
@@ -63314,6 +63380,9 @@ requestAnimationFrame(frame);
 
 // ================= DEBUG API =================
 window.GVT = {
+  // ---- 0395 THE CHIN rig: force the chin (env() is 0 in headless); null clears
+  // the override. Never persisted, never in saves. ----
+  chin(px){ CHIN.ov=(px==null? null : Math.max(0,+px||0)); chinApply(); return CHIN.px; },
   // ---- 0376 THE GOOD DOG rig: deterministic tour clock for batteries ----
   dog(){ const q=(DOGT&&DOGT.phase==='in')? dogPos():null;
     return { phase:DOGT? DOGT.phase:'unarmed', leg:DOGT? DOGT.leg:0,
