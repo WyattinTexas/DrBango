@@ -28581,7 +28581,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.48';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.49';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -37572,13 +37572,31 @@ const CHEESE_R=60;   // the cheese slice's knock circle (foeSplash R)
 // muzzle; volley n is hand n&1, RIGHT first. The second flash is GONE. The
 // gap between volleys is BRG_GAP (0.33 → 0.2: the 0.1s flash is fully dark
 // before the next boom — discrete, never a hose, never two irons alight).
+// 0391 THE BARRAGE FEEL 3 (Wyatt 8/17 PM: "make sure that the proper laser is
+// showing when using the activatable cone attack… It should be rapid lasers
+// projectiles firing, so increase the speed by 200% & have the bullets be
+// individual but shooting anywhere inside of the cone."): the volley's N
+// rounds are INDIVIDUAL now — each at a RANDOM angle inside the wedge with a
+// random reach (presentation dice only — the deal below still sweeps the
+// wedge, so damage never hears them), leaving the iron ONE AT A TIME (round i
+// is born t=−i·BRG_STAG; draw() sits on any fx till its clock crosses zero)
+// and crossing in a third of the old slug's clock (BRG_DUR = 0.14/3 — +200%).
+// THE PAINT LAW: the caller resolves the owner's own round colour exactly
+// like plain fire (lzVisOf + the row lookup) and passes o.lz (row|null) +
+// o.lzc (id) — a colour row flies 'bolt' dashes in lz.hex, 'slug' flies the
+// brass slugtr (the kings' trophy — their caller passes the slug row), stock
+// flies the pale bolt. The report stays the volley's own boom (flagged).
 function brgWave(o){
-  const N=reducedMotion()? 4 : BRG_ROUNDS;
+  const RM=reducedMotion();
+  const N=RM? 4 : BRG_ROUNDS;
   const hz=o.mz[o.hand&1];   // this volley's iron
+  const stg=RM? 0 : BRG_STAG;   // reduced motion keeps its 4, un-staggered
   for(let i=0;i<N;i++){
-    const a=o.aim-CROAK_FAN_HALF+((i+0.5)/N)*CROAK_FAN_HALF*2;
-    const L0=o.R*(0.82+((i*29)%13)/13*0.18);
-    S.fx.push({k:'slugtr',x1:hz.x,y1:hz.y,x2:hz.x+Math.cos(a)*L0,y2:hz.y+Math.sin(a)*L0,t:0,dur:0.14});
+    const a=o.aim+(Math.random()*2-1)*CROAK_FAN_HALF;   // 0391: ANYWHERE inside the cone — per-sim presentation dice (the deal below never reads them)
+    const L0=o.R*(0.82+Math.random()*0.18);             // random reach — dice, not the old (i*29)%13 comb
+    const x2=hz.x+Math.cos(a)*L0, y2=hz.y+Math.sin(a)*L0;
+    if(o.lz && o.lzc==='slug') S.fx.push({k:'slugtr',x1:hz.x,y1:hz.y,x2:x2,y2:y2,t:-i*stg,dur:BRG_DUR});
+    else S.fx.push({k:'bolt',x1:hz.x,y1:hz.y,x2:x2,y2:y2,t:-i*stg,dur:BRG_DUR,col:o.lz? o.lz.hex : '#FFF3C4'});
   }
   S.fx.push({k:'flash',x:hz.x,y:hz.y,ang:o.aim,R:reducedMotion()?8:12,lw:2.6,t:0,dur:0.1});
   if(o.kick) o.kick(o.hand&1);
@@ -37743,7 +37761,7 @@ function updateFoeCroak(f,dt){
   }
   if(D.st==='fan'){ D.wt-=dt;   // 0370 THE BARRAGE — the rooted channel (brgWave above); 0373: the ground wedge + cone fx retired (Wyatt) — brass, muzzles and shake carry the show
     if(D.wt<=0 && D.wn<BRG_WAVES){ D.wt+=BRG_GAP; const hd=D.wn&1; D.wn++;   // 0382: volley n fires hand n&1 — RIGHT, LEFT, RIGHT, LEFT off his two irons (croakMz), never both
-      brgWave({ own:f, x:f.x, y:f.y, mz:croakMz(f.x,f.y,f.def.w), hand:hd, aim:D.aimAt, R:fanR, green:false,
+      brgWave({ own:f, x:f.x, y:f.y, mz:croakMz(f.x,f.y,f.def.w), hand:hd, aim:D.aimAt, R:fanR, green:false, lz:LZ_SLUG_ROW, lzc:'slug',   // 0391: brass stays the kings' trophy paint (0340) — their storm flies the slug rounds on the new individual clock
         kick:(h)=>{ f.rcAt=S.t; f.rcH=h; },   // the mold has no kick param: the flash at THAT barrel + the croakRc recoil rock are the tell
         deal:(u)=>{ f.pipN=CROAK_FAN_PIPS/BRG_WAVES; tanHit(u,f.x,f.y,f); f.pipN=0; } });   // 3/8 pip a wave — 8 waves stood = the shipped 3 EXACT (×dmgX), deterministic; every save rolls per wave (flagged split)
     }
@@ -39045,7 +39063,9 @@ function rpStep(u,dt){
   if(u.rpT<=0 && u.rpWn<BRG_WAVES) u.rpT=0.016;   // the shelf holds till the last wave flies (the root law) — jitter never eats the finisher
   u.rpWt-=dt;
   if(u.rpWt<=0 && u.rpWn<BRG_WAVES){ u.rpWt+=BRG_GAP; const hd=u.rpWn&1; u.rpWn++;   // 0382: volley n fires hand n&1 — RIGHT, LEFT, RIGHT, LEFT, never both
-    brgWave({ own:u, x:u.x, y:u.y, mz:mz, hand:hd, aim:u.rpAim, R:R, green:true,
+    const lzc=lzVisOf(u);   // 0391 THE PROPER LASER (Wyatt): the storm's rounds wear what his plain rounds wear — the fire loop's own paint law verbatim; the playable king rides it too (his storm in YOUR racked colour — flagged)
+    const lz=(lzc && !(S.bf&&!bfHumanU(u)))? (lzc==='silver'? LZ_SILVER_ROW : lzc==='slug'? LZ_SLUG_ROW : ARMIES.find(ar=>ar.id===lzc)) : null;
+    brgWave({ own:u, x:u.x, y:u.y, mz:mz, hand:hd, aim:u.rpAim, R:R, green:true, lz:lz, lzc:lzc,
       kick:u.rpKC? null : (h)=>{ if(h) u.pist2T=PISTOL_KICK; else u.pistT=PISTOL_KICK; },
       deal:(f)=>{ hurt(f, u.rpDmg/BRG_WAVES, u); } });   // 0361's law kept: the levelled base, now split evenly — stand the whole storm and it sums to exactly the old number (flagged)
   }
@@ -45739,6 +45759,7 @@ function draw(){
 
   // fx
   for(const e of S.fx){
+    if(e.t<0) continue;   // 0391: a staggered barrage round waits its turn — born t=−i·BRG_STAG (brgWave), it draws nothing till the tick walks its clock past zero (no other fx is ever born below zero)
     const k=e.t/e.dur;
     if(e.k==='tracer'){ cx.globalAlpha=(1-k)*(e.a||1); cx.strokeStyle=e.col||'#FFF3C4'; cx.lineWidth=e.w||2.5; cx.beginPath(); cx.moveTo(e.x1,e.y1); cx.lineTo(e.x2,e.y2); cx.stroke(); cx.globalAlpha=1; }
     if(e.k==='rope'){   // 0340: Jane's hook-shot line — taut from the eave, gone as she lands
@@ -45753,6 +45774,18 @@ function draw(){
       cx.globalAlpha=Math.min(1,(1-k)*1.6); cx.translate(bx,by); cx.rotate(an);
       cx.fillStyle='#C9A227'; cx.beginPath(); cx.moveTo(4.6,0); cx.lineTo(1.2,-2.1); cx.lineTo(-4.2,-2.1); cx.lineTo(-4.2,2.1); cx.lineTo(1.2,2.1); cx.closePath(); cx.fill();
       cx.fillStyle='#8a6a1e'; cx.fillRect(-4.2,-2.1,1.6,4.2);
+      cx.restore(); cx.globalAlpha=1; }
+    else if(e.k==='bolt'){   // 0391: the barrage's LASER BOLT — a short bright dash racing muzzle→reach in BRG_DUR, the owner's own colour round a white core, a faint tail behind (the laser answer to the slug above)
+      const bx=e.x1+(e.x2-e.x1)*k, by=e.y1+(e.y2-e.y1)*k;
+      const L=Math.hypot(e.x2-e.x1,e.y2-e.y1)||1, dl=Math.min(BOLT_LEN,L*k);
+      const ux=(e.x2-e.x1)/L, uy=(e.y2-e.y1)/L, tx=bx-ux*dl, ty=by-uy*dl;
+      cx.save(); cx.lineCap='round';
+      cx.globalAlpha=0.22*(1-k); cx.strokeStyle=e.col; cx.lineWidth=2;
+      cx.beginPath(); cx.moveTo(e.x1,e.y1); cx.lineTo(tx,ty); cx.stroke();
+      cx.globalAlpha=Math.min(1,(1-k)*1.6); cx.lineWidth=4.5;
+      cx.beginPath(); cx.moveTo(tx,ty); cx.lineTo(bx,by); cx.stroke();
+      cx.strokeStyle='#ffffff'; cx.lineWidth=1.4;
+      cx.beginPath(); cx.moveTo(bx-ux*dl*0.55,by-uy*dl*0.55); cx.lineTo(bx,by); cx.stroke();
       cx.restore(); cx.globalAlpha=1; }
     else if(e.k==='snowb'){ // 0274a: the lobbed snowball — white ball, slate rim (reads on snow AND carpet), tanmortar's arc at small scale (0278b: col/rim = the thrower's own glob cells — the spitter's GREEN SPIT rides the same lob)
       const ah=18+0.05*Math.hypot(e.x2-e.x1,e.y2-e.y1);
@@ -55394,7 +55427,10 @@ const CROAK_SHRUG=0.33;                        // the 14% cover debt ROLLS now: 
 const CROAK_SABER_RESIST=0.10;                 // 0370 (Wyatt: "The boss should have a good saber resistance, maybe taking 90% less damage from the saber") — both croaks, counterDmg's own funnel
 const CROAK_JANE_T=20;                         // 0384 (Wyatt 8/17: "Jane's supposed to come in 20 seconds into the fight" — his latest word; 0370's 30 superseded, flagged): the battle clock, M/H/MEGA only (E never) — HER ONLY DOOR now: the HARD first-leak early door is RETIRED (0374's swallow fixes + the once-per-battle girl latch stand)
 const BRG_WAVES=8, BRG_GAP=0.2;                // 0370 THE BARRAGE — Bullet Time: 8 volleys after the 0.55s plant tell; 0382 VERY QUICK (Wyatt: "boom, boom, boom, boom… a very quick alternation"): 0.33 → 0.2 apart = a 1.6s rooted channel, right-left-right-left (0.16-0.22 is the band; the waves stay 8 so every storm's damage sums byte-same — dials)
-const BRG_ROUNDS=10;                           // brass OutLaw Slugs per wave across the cone (reduced motion draws 4 — same waves, same damage)
+const BRG_ROUNDS=10;                           // rounds per volley across the cone — brass slugs or laser bolts, the 0391 paint law (reduced motion draws 4 — same waves, same damage)
+const BRG_DUR=0.047;                           // 0391 +200% SPEED (Wyatt): each barrage round crosses its reach in ONE THIRD of the old slug's 0.14 — ×3 exact (0.04-0.06 the band; 0.07 if he meant ×2 — dial)
+const BRG_STAG=0.016;                          // 0391 RAPID INDIVIDUAL FIRE: round i leaves the iron i×this after the volley's first — 10 rounds span ~0.144s of the 0.2 gap (~62 rounds/s mid-storm); reduced motion un-staggered (dial)
+const BOLT_LEN=32;                             // 0391 the laser bolt's dash length, px (28-40 the band — dial); the white core rides inside it
 const CROAK_LIL_FANR=0.6;                      // 0370 LITTLE KING CROAK — "his cone is smaller": the radius dial (flagged radius-vs-angle)
 // ===== 0374 THE STAMPEDE (Wyatt: "There needs to be a stampede of horses
 // ever 25 seconds") — the duel's own recurring set-piece, every tier incl.
