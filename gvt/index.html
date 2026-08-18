@@ -19506,6 +19506,14 @@ const BF_MAPS = [
   // cell >=90px from every bowl rim (nobody is born in lava — the lair's
   // own nest law; the two centre bowls moved 180/420 -> 212/388 to keep
   // it), the centre lane at y300 left open on purpose: straight through.
+  // 0405 ONE CLUTCH, ONE SPECIES (Wyatt 8/18): the deal is ONE match-level
+  // roll now — every cell of BOTH nests hatches the SAME dinosaur (the seed
+  // breathes per battle: solo bf.eggN dice, room = the referee's relayed
+  // 'eggN' stamp), and a bdino roll brings KING REX HIMSELF at KING_FULL
+  // (190, his campaign row) as a 21st escort egg at the top nest's mouth —
+  // poppable like any egg, and the magma never eats HIM here. THE MOLTEN
+  // CLAIM row below keeps the 0386 varied clutch + 40hp king byte-for-byte
+  // (its own boss balance; ⚑ the inherit-alt is Wyatt's word away).
   { id:'lava', name:'THE LAVA FIELD', ground:'lair',
     blurb:"King Rex's playset boiled over. Magma bowls dot the carpet and the nests at the top and the bottom are ticking — at half time every egg hatches into a surprise dinosaur, maybe even King Rex himself. Hatchlings bite either team, both teams can shoot them, and they never leave on their own.",
     build:()=>({ rocks:[
@@ -22698,7 +22706,9 @@ const NEMKIT_SWOOP=1;     // the pterodactyl pass, once per figure per pass
 const NEMKIT_BOUL=2;      // the stegosaurus rock, once per figure per roll
 const NEMKIT_BREATH=1;    // fire breath, per jet hit (dilo multi 4 · the king multi 6)
 const HATCH_HP=3;         // a hatchling's plastic in bf currency (a rifleman's own grit: three rifle rounds, or one bazooka round)
-const HATCH_KING_HP=40;   // KING REX the hatchling — a siege both armies notice (~10 bazooka rounds), never a wall
+const HATCH_KING_HP=40;   // KING REX the hatchling — a siege both armies notice (~10 bazooka rounds), never a wall (0405: THE MOLTEN CLAIM's king only now — the pool lava king hatches at KING_FULL below)
+const KING_FULL=190;      // 0405 (Wyatt 8/18: "King Rex needs to have his full health and all of his abilities") — the campaign king's OWN plastic, = FDEF.kingrex.hp; a literal seat because FDEF sits 2k lines below (the v1.26 TDZ law — the battery asserts the twins agree)
+const KING_DUE=NEMEGG_STAG*9+NEMEGG_TELL;   // 0405 the escort egg's own crack beat (5.7s): the clutch's last beat + the whole 3s tell — the king's egg is the LAST in the nest and both armies get a REAL window to shell him (the 0386 attackable-nests law; ⚑ unpoppable alt = hatch him at 0, one field)
 // THE NEST (0386): ten plain cream eggs in two staggered rows. ONE list is
 // the whole truth — the map row authors its egg CELLS off the dx<0 half
 // (the jax mirror doubles them to 20 exactly) and the props painter's
@@ -22707,10 +22717,21 @@ const HATCH_KING_HP=40;   // KING REX the hatchling — a siege both armies noti
 const NEST10_EGGS=[[-80,-10],[-48,-10],[-16,-10],[16,-10],[48,-10],[80,-10],[-56,9],[-24,9],[24,9],[56,9]];
 // the kind hash — dice-free and SHARED: every sim in a room hashes the same
 // room code; a solo battle hashes the rival's id (or the map's own name
-// when there is none — flagged: that clutch repeats until a shared
-// per-battle seed exists, which is one wire word away and NOT built).
-function nemEggSeed(){ const bf=S.bf;
-  return ((S.coop&&COOP&&COOP.code)? String(COOP.code) : (bf.rival&&bf.rival.id? String(bf.rival.id) : 'lava'))+':'+bf.team; }
+// when there is none). 0405 THE SEED BREATHES: the 0386 flag ("a per-battle
+// shared seed is one wire word away") is BUILT for the pool lava map — solo
+// folds bf.eggN (this sim's own arm-time dice, no twin to desync); a room
+// folds COOP.eggN, the REFEREE'S battle stamp relayed as the 'eggN' word at
+// roomStartBattle (first into the log beside the v2.83 seat words, replayed
+// from seq 0 by any late chair; rides clamp_cmd's existing 'n' bound — zero
+// server). A v4.62 host mints no word: every v4.63 chair folds the same 0
+// and the room stays agreed (deal-stable, the old repeat — a mixed window
+// diverges wholesale on this card anyway, the 0358 pool-ship class). THE
+// MOLTEN CLAIM never folds a nonce: the showdown keeps its shipped
+// deal-stable clutch (its own balance).
+function nemEggSeed(){ const bf=S.bf, rm9=!!(S.coop&&COOP&&COOP.code);
+  let s9=(rm9? String(COOP.code) : (bf.rival&&bf.rival.id? String(bf.rival.id) : 'lava'))+':'+bf.team;
+  if(bf.mapId==='lava') s9+=':'+((((rm9? COOP.eggN : bf.eggN))||0)>>>0);
+  return s9; }
 function nemEggHash(i){ let s9=2166136261>>>0; const t9=nemEggSeed()+':'+i;
   for(let j9=0;j9<t9.length;j9++){ s9=(s9^t9.charCodeAt(j9))>>>0; s9=Math.imul(s9,16777619)>>>0; }
   return s9>>>0; }
@@ -22720,21 +22741,42 @@ function nemEggTick(dt){
   // verdict ceremony (a decided match hatches nothing over its card)
   if(bf.eggAt==null && !bf.resolved && !bf.ending && bf.timeLeft<=bfClockFor(bf.team)/2){
     bf.eggAt=0; bf.hatch=bf.hatch||[];
-    // THE DEAL (0386): every cell's kind rolls HERE, in array order (top
-    // 0..9 then bottom 10..19 — the authored order IS the total order), and
-    // binds to the CELL: a popped king egg means no king this battle, never
-    // a re-deal onto a survivor. The FIRST cell to roll 'kingrex' takes the
-    // crown; every later king roll falls back onto the six off the same
-    // hash (the %6 slot — still dice-free). A rig may pre-seed e.kind; a
-    // pre-seeded crown counts (the deterministic door stays deterministic).
-    const P7=EGG_POOL.concat('kingrex');   // built at arm time — EGG_POOL's const sits far below this line (the v1.26 TDZ law)
-    let crowned9=false;
-    for(let i9=0;i9<bf.eggs.length;i9++){ const e9=bf.eggs[i9];
-      if(e9.kind){ if(e9.kind==='kingrex') crowned9=true; continue; }
-      const r9=nemEggHash(i9);
-      let kd9=P7[r9%P7.length];
-      if(kd9==='kingrex'){ if(crowned9) kd9=EGG_POOL[r9%EGG_POOL.length]; else crowned9=true; }
-      e9.kind=kd9;
+    // THE DEAL. 0405 ONE CLUTCH, ONE SPECIES (Wyatt 8/18 verbatim: "The
+    // spawned dinosaurs, when you're playing the lava battlegrounds map,
+    // should all be the same dinosaur, so you pick a random dinosaur, and
+    // then they all come out as that, except King Rex. If the random
+    // dinosaur is the big bruiser dinosaur, that one comes with King Rex"):
+    // on the pool lava map ONE match-level roll — the same shared-seed hash
+    // at sentinel index -1, over EGG_POOL's SIX ('kingrex' left the pool) —
+    // deals EVERY cell of BOTH nests. crowned9's per-cell crown law RETIRES
+    // on this lane: the ≤1-king law is STRUCTURAL now (only the bruiser's
+    // single escort cell below carries the crown; a rig pre-seeding king
+    // cells mints its own, exactly as the old door allowed). The roll still
+    // binds to the CELLS at the deal (a popped egg never hatches); a rig's
+    // pre-seeded e.kind is honored cell-by-cell as ever, and the ESCORT
+    // follows the ROLL, never the pre-seeds. THE BRUISER'S KING: bdino
+    // deals a 21st egg — kind 'kingrex', the top nest's mouth-centre
+    // (MID,101: the row-2 gap, 91px off the bowl rim — nobody is born in
+    // lava), carrying its OWN KING_DUE crack beat so defenders CAN shell
+    // him (popped = no king; the 0386 attackable-nests law).
+    // THE MOLTEN CLAIM (id 'nemlair') keeps the shipped varied clutch
+    // byte-for-byte in the else-lane — the showdown balances its own boss
+    // fight (varied species, HATCH_KING_HP king, the magma eats him).
+    if(bf.mapId==='lava'){
+      const sp9=EGG_POOL[nemEggHash(-1)%EGG_POOL.length];
+      bf.clutch=sp9;   // the dealt species — the rig's own read
+      for(const e9 of bf.eggs){ if(!e9.kind) e9.kind=sp9; }
+      if(sp9==='bdino') bf.eggs.push({x:MID,y:101,st:0,kind:'kingrex',due:KING_DUE});
+    } else {
+      const P7=EGG_POOL.concat('kingrex');   // built at arm time — EGG_POOL's const sits far below this line (the v1.26 TDZ law)
+      let crowned9=false;
+      for(let i9=0;i9<bf.eggs.length;i9++){ const e9=bf.eggs[i9];
+        if(e9.kind){ if(e9.kind==='kingrex') crowned9=true; continue; }
+        const r9=nemEggHash(i9);
+        let kd9=P7[r9%P7.length];
+        if(kd9==='kingrex'){ if(crowned9) kd9=EGG_POOL[r9%EGG_POOL.length]; else crowned9=true; }
+        e9.kind=kd9;
+      }
     }
     S.ann={ txt:'THE EGGS ARE HATCHING!', t:2.6, warn:true }; SFX.roar();
   }
@@ -22742,7 +22784,7 @@ function nemEggTick(dt){
     bf.eggAt+=dt;
     for(let i=0;i<bf.eggs.length;i++){ const e=bf.eggs[i];
       if(e.st) continue;
-      const due=(i%10)*NEMEGG_STAG;   // 0386: both nests crack in parallel — top i and bottom i on the same beat
+      const due=(e.due!=null? e.due : (i%10)*NEMEGG_STAG);   // 0386: both nests crack in parallel — top i and bottom i on the same beat (0405: the escort egg carries its OWN beat, KING_DUE — the last crack in the nest)
       if(bf.eggAt>=due){
         e.st=1;
         S.fx.push({k:'puff',x:e.x,y:e.y-10,t:0,dur:0.4,R:16});
@@ -22758,7 +22800,7 @@ function nemEggTick(dt){
         // dropT:0 is LOAD-BEARING: bfEnemies gates on o.dropT<=0, and an
         // UNDEFINED dropT fails that compare — without the field no TGT
         // list, mine trigger or paraSpot would ever answer him (r1's find).
-        const kg=e.kind==='kingrex', hp9=kg?HATCH_KING_HP:HATCH_HP;
+        const kg=e.kind==='kingrex', hp9=kg?(bf.mapId==='lava'?KING_FULL:HATCH_KING_HP):HATCH_HP;   // 0405: the pool lava king arrives at FULL STRENGTH (190 = his campaign row; the amber bar scales itself); THE MOLTEN CLAIM's king keeps his shipped 40
         const kd9=FDEF[e.kind]||{};
         const hb={ id:idc++, type:e.kind, k:e.kind, side:'nem', seat:null,
           def:{ name:'HATCHLING', grit:hp9, rng:0, rate:0, dmg:0, hatch:true },
@@ -22823,8 +22865,12 @@ function nemEggTick(dt){
         bfSfx(SFX.thock,best.x,best.y);
       }
     } else h.cd-=dt;   // the bite clock re-arms while the trick plays
-    // the magma — even a king; NEVER the ptero (a flyer's shadow crosses)
-    if(h.k!=='ptero'){
+    // the magma — NEVER the ptero (a flyer's shadow crosses); 0405: on the
+    // pool lava map NEVER the KING either (Wyatt: "he shouldn't just
+    // disappear after a while. He should ravage the players" — the campaign
+    // lair's own law, 'the king cannot fall in his own lava', reaches his
+    // field twin); THE MOLTEN CLAIM's 40hp king still drowns (its balance)
+    if(h.k!=='ptero' && !(h.k==='kingrex' && bf.mapId==='lava')){
       const vd=voidAt(h.x,h.y);
       if(vd){ fallFx(h.x,h.y,vd.kind); h.dead=true; bf.hatch.splice(i,1); continue; }   // straight into the magma (the lair's own lava law, pool edition)
     }
@@ -29082,7 +29128,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.62';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.63';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -34049,6 +34095,16 @@ function roomStartBattle(){
   // late chair replays them from seq 0 with everything else. 'k' crosses
   // clamp_cmd as an opaque string; an old client falls off roomApply's chain
   // and keeps today's local deal — no worse, never better-dressed.
+  // 0405 THE BATTLE STAMP — the room's per-battle egg nonce: the referee
+  // mints ONE word a battle and SAYS it first into the log beside his seat
+  // words (replayed from seq 0 by any late chair, so a rejoiner deals the
+  // same clutch). Rides the relay's existing 'n' bound (clamp_cmd |n|<=1e9
+  // — zero server, zero schema); an old client falls off roomApply's chain
+  // and keeps its varied deal (the mixed window's accepted class). Every
+  // chair resets to 0 first, so a v4.62 host's silence still leaves all
+  // v4.63 chairs agreed on the same fold.
+  COOP.eggN=0;
+  if(COOP.host){ COOP.eggN=(Math.random()*1e9)|0; coopSend({ k:'eggN', n:COOP.eggN }); }
   if(COOP.host) for(const st of S.bf.seats) if(!st.human)
     coopSend({ k:'seat', n:st.i, t:String(st.name||'').slice(0,24), hex:st.hex,
                sw:{ pn:String((st.persona&&st.persona.id)||'') } });
@@ -34358,6 +34414,10 @@ function roomApply(cm){
   // adopted verbatim; the host never adopts (his deal IS the word), and a
   // human chair is its owner's business (the roster law) — never restyled.
   if(cm.k==='seat'){ if(!coopIsHost()) roomSeatWord(cm); return; }
+  // 0405 the room's next word — THE BATTLE STAMP (the egg nonce). The
+  // referee's mint, adopted verbatim; the host never adopts (his mint IS
+  // the word). An older client falls off the chain and keeps its own deal.
+  if(cm.k==='eggN'){ if(!coopIsHost() && COOP && typeof cm.n==='number') COOP.eggN=cm.n>>>0; return; }
   // v2.73 the room's fifth word — THE JET. Seat-addressed (one live Sarge a
   // chair); the landing is the sender's own resolved spot, applied verbatim
   // (the v1.24 absolute-coords law). An older client falls off the chain and
@@ -34815,7 +34875,13 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   // and cracks it into a NEUTRAL COMBATANT in S.units (side 'nem', seat
   // null = wire-free by construction) that BOTH armies can shoot dead —
   // per-sim like the balls, the drift law; no self-expiry (amendment #2).
-  if(S.cfg.terrain.eggs && S.cfg.terrain.eggs.length){ S.bf.eggs=S.cfg.terrain.eggs.map(e=>({x:e.x,y:e.y,st:0})); S.bf.hatch=[]; }
+  if(S.cfg.terrain.eggs && S.cfg.terrain.eggs.length){ S.bf.eggs=S.cfg.terrain.eggs.map(e=>({x:e.x,y:e.y,st:0})); S.bf.hatch=[];
+    // 0405 THE SEED BREATHES (solo half): a per-battle nonce off MY OWN
+    // arm-time dice — the soccer ball's per-sim precedent below; NEVER read
+    // in a room (nemEggSeed folds the referee's COOP.eggN there instead),
+    // and never folded at all off the pool lava map (THE MOLTEN CLAIM's
+    // deal stays byte-what-it-was).
+    S.bf.eggN=(Math.random()*1e9)|0; }
   // 8/8 v2.75 THE SOCCER BALL is rolled at arm time — launch second inside
   // Wyatt's 10..45 window, direction, lane. Per-sim Math.random is the
   // mineSpot/yeti-dice precedent (theatrics roll their own dice on each
@@ -45856,24 +45922,41 @@ function drawRug(){
       cx.fillStyle='#6b2a12'; cx.strokeStyle='#3a1808'; cx.lineWidth=3;
       cx.beginPath(); cx.ellipse(pr.x,pr.y+10,96,20,0,0,7); cx.fill(); cx.stroke();
       const egs=S.bf&&S.bf.eggs;
-      for(const p9 of NEST10_EGGS){
-        const ex=pr.x+p9[0], ey=pr.y+p9[1];
-        let st9=0;
-        if(egs) for(const e9 of egs){ if(Math.abs(e9.x-ex)<1 && Math.abs(e9.y-ey)<1){ st9=e9.st||0; break; } }
+      // 0405: the per-egg recipe hoisted WHOLE (whole / halves / scorch —
+      // byte-the-same strokes, continue became return) so the escort pass
+      // below paints with the exact same hand.
+      const egg9=(ex,ey,st9)=>{
         if(st9===2){   // shelled by a blast — a scorch where the egg sat
           cx.fillStyle='rgba(30,12,6,0.55)'; cx.beginPath(); cx.ellipse(ex,ey+4,10,5,0,0,7); cx.fill();
-          continue;
+          return;
         }
         if(st9===1){   // hatched — the shell halves, tipped apart
           cx.fillStyle='#F2EBD8'; cx.strokeStyle='#B8A888'; cx.lineWidth=2;
           cx.beginPath(); cx.moveTo(ex-9,ey+3); cx.quadraticCurveTo(ex-8,ey-8,ex-1,ey-4); cx.lineTo(ex-2,ey+4); cx.closePath(); cx.fill(); cx.stroke();
           cx.beginPath(); cx.moveTo(ex+3,ey+4); cx.quadraticCurveTo(ex+9,ey-6,ex+11,ey+2); cx.lineTo(ex+5,ey+5); cx.closePath(); cx.fill(); cx.stroke();
-          continue;
+          return;
         }
         cx.fillStyle='#F2EBD8'; cx.strokeStyle='#B8A888'; cx.lineWidth=2.5;
         cx.beginPath(); cx.ellipse(ex,ey,11,14,0,0,7); cx.fill(); cx.stroke();
         cx.strokeStyle='#B8A888'; cx.lineWidth=2;
         cx.beginPath(); cx.moveTo(ex-4,ey-5); cx.lineTo(ex,ey-2); cx.stroke();
+      };
+      for(const p9 of NEST10_EGGS){
+        const ex=pr.x+p9[0], ey=pr.y+p9[1];
+        let st9=0;
+        if(egs) for(const e9 of egs){ if(Math.abs(e9.x-ex)<1 && Math.abs(e9.y-ey)<1){ st9=e9.st||0; break; } }
+        egg9(ex,ey,st9);
+      }
+      // 0405 THE ESCORT EGG (the bruiser's king): a dealt cell OUTSIDE the
+      // authored ten paints the SAME recipe, live off its own st — same
+      // cream, same halves, same scorch ("poppable like any egg"). Bound to
+      // THIS nest by the ring's own reach (|dy|<=24, |dx|<=100), so the
+      // bottom ring never double-paints the top nest's escort.
+      if(egs) for(const e9 of egs){
+        if(Math.abs(e9.y-pr.y)>24 || Math.abs(e9.x-pr.x)>100) continue;
+        let own9=false;
+        for(const p9 of NEST10_EGGS){ if(Math.abs((pr.x+p9[0])-e9.x)<1 && Math.abs((pr.y+p9[1])-e9.y)<1){ own9=true; break; } }
+        if(!own9) egg9(e9.x,e9.y,e9.st||0);
       }
     }
   }
