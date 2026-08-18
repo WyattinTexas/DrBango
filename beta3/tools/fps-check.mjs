@@ -320,6 +320,38 @@ async function main() {
   ok('normal boot unaffected after lab (game boots, no lab UI)',
     await c.ev(`!!window.game && !document.getElementById('sslab')`) === true);
 
+  // ---- v0.36.2: SAFE-AREA LAW (the TestFlight prerequisite) ----
+  // In a browser the chrome hides the notch. In a full-screen WKWebView shell
+  // the canvas owns every pixel, and the 420x800 design box was landing its top
+  // row under the hardware: -7px on iPhone 14/15 Pro, and on a no-notch SE the
+  // daily chip + profile chip sat squarely beneath the status bar, both tappable.
+  // The box now centres in the SAFE band. ?inset=T,B forces values (headless
+  // env() always reports 0, so without it this is untestable).
+  const box = async (qs) => JSON.parse(await c.ev(`(() => {
+    const l = ssLayout(game.scene.getScenes(true)[0]);
+    const D = game.scale.width / innerWidth;
+    return JSON.stringify({ top: l.y(0) / D, bot: l.y(800) / D, s: l.s,
+      vh: innerHeight, inset: SS_INSET });
+  })()`.replace(/\s+/g, ' ')));
+  await c.nav(BASE + '?fps=0&inset=59,34', 12000);
+  const inset = await box();
+  ok('insets are read and applied to the design box',
+    inset.inset.top === 59 && inset.inset.bottom === 34, JSON.stringify(inset.inset));
+  ok('content box clears the notch AND the home indicator',
+    inset.top >= 59 && inset.bot <= inset.vh - 34,
+    `box ${inset.top.toFixed(1)}..${inset.bot.toFixed(1)} in viewport ${inset.vh}`);
+  // and with no insets the arithmetic must be EXACTLY the old centred formula —
+  // this is what keeps the fix from quietly moving every desktop layout
+  await c.nav(BASE + '?fps=0', 12000);
+  const plain = await box();
+  const legacy = await c.ev(`(() => { const H = game.scale.height, W = game.scale.width,
+    D = W / innerWidth, s = Math.min(W / 420, H / 800);
+    return JSON.stringify({ top: (H / 2 - 400 * s) / D, bot: (H / 2 + 400 * s) / D }); })()`);
+  const lg = JSON.parse(legacy);
+  ok('zero insets reproduce the original layout exactly (no silent reflow)',
+    plain.inset.top === 0 && Math.abs(plain.top - lg.top) < 0.01 && Math.abs(plain.bot - lg.bot) < 0.01,
+    `now ${plain.top.toFixed(2)}..${plain.bot.toFixed(2)} vs was ${lg.top.toFixed(2)}..${lg.bot.toFixed(2)}`);
+
   // ---- v0.36.0: THE PHONE REPRO (end to end) ----
   // v0.35.0's verdict only compared two MEASURED numbers, so when Wyatt's
   // iPhone failed to sample WebGL at all it fell through to AUTO and booted

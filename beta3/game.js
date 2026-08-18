@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.36.1';
+const BUILD = 'STARSPELL v0.36.2';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2524,10 +2524,50 @@ function ssDockTex(scene, hU) {
 }
 
 // Layout: 420 x 800 design space, scaled + centered
+/* ---- safe-area insets ---------------------------------------------------
+   In a browser the chrome absorbs the notch and the home indicator, so the
+   layout never had to know they exist. In a full-screen WKWebView shell it
+   does: index.html already sets viewport-fit=cover + apple-mobile-web-app-
+   capable, so the canvas owns EVERY pixel. Measured at 393x852 (iPhone 14/15
+   Pro) the 420x800 design box landed 7px under the Dynamic Island, and on a
+   no-notch SE — where the box is height-bound and fills the screen exactly —
+   the daily chip and the profile chip sat squarely beneath the status bar,
+   both of them tappable. Read once at boot from CSS env(); `?inset=T,B` forces
+   values so the harness can prove this without a device (headless reports 0).
+   Values are CSS px; the design box works in buffer px, hence the DPR. */
+const SS_INSET = { top: 0, bottom: 0 };
+function ssReadInsets() {
+  const q = QS.get('inset');
+  if (q) {
+    const p = String(q).split(',').map(parseFloat);
+    if (isFinite(p[0])) SS_INSET.top = Math.max(0, p[0]);
+    if (isFinite(p[1])) SS_INSET.bottom = Math.max(0, p[1]);
+    return SS_INSET;
+  }
+  try {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;' +
+      'padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+    document.body.appendChild(d);
+    const cs = getComputedStyle(d);
+    SS_INSET.top = parseFloat(cs.paddingTop) || 0;
+    SS_INSET.bottom = parseFloat(cs.paddingBottom) || 0;
+    d.remove();
+  } catch (e) { }
+  return SS_INSET;
+}
+/* The design box is 420x800 and used to centre in the raw viewport. It now
+   centres in the SAFE band instead, so nothing authored at the top or bottom
+   of the box can land under the hardware. With zero insets — every desktop
+   browser, and every phone with browser chrome — the arithmetic is identical
+   to before, which is why this does not move a single existing layout. */
 function ssLayout(scene) {
   const W = scene.scale.width, H = scene.scale.height;
-  const s = Math.min(W / 420, H / 800);
-  return { W, H, s, x: (d) => W / 2 + d * s, y: (d) => H / 2 + (d - 400) * s, u: (d) => d * s };
+  const it = SS_INSET.top * DPR, ib = SS_INSET.bottom * DPR;
+  const availH = Math.max(1, H - it - ib);
+  const s = Math.min(W / 420, availH / 800);
+  const cy = it + availH / 2;
+  return { W, H, s, x: (d) => W / 2 + d * s, y: (d) => cy + (d - 400) * s, u: (d) => d * s };
 }
 
 /* ---- the campaign star chart --------------------------------------------
@@ -5634,6 +5674,7 @@ function ssBoot() {
 function fitCanvas() {
   const c = game && game.canvas;
   if (!c) return;
+  ssReadInsets();          // rotation moves the notch: re-measure before laying out
   c.style.width = window.innerWidth + 'px';
   c.style.height = window.innerHeight + 'px';
   // We own the canvas CSS size (Scale.NONE), and Phaser caches the canvas bounding rect to
@@ -5654,6 +5695,7 @@ if (LAB) {
 } else {
   // renderer verdict first (cached or forced: resolves instantly; first boot:
   // ~1-1.5s of workload probing, hard-capped), then the art gate as before
+  ssReadInsets();
   ssRenderVerdict().then(() => {
     if (ART) {
       let booted = false;
