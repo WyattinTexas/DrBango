@@ -19430,14 +19430,15 @@ const BF_MAPS = [
   // hangar). The three cells move together — the rig asserts the arithmetic.
   { id:'starship', name:'THE STARSHIP', ground:'deck', hMul:3.0, wAdd:1800, baseX:308,
     blurb:'The spaceship playset lands on the space rug. Ring corridors, rooms with jobs — and the power room runs the blast door.',
-    // 0326 [WYATT]: "you don't need that many troops to get through and beat
-    // the level" — the ship fights on SHORT SUPPLY: both toy boxes open at 25
-    // in a 1v1 and 40 in a 2v2 (the map's own numbers; sizes he didn't name
-    // keep the bfBaseHP formula). Data here, one seam in startBattlefield —
-    // every other map has no key and keeps its numbers to the byte.
-    // 0375: the numbers STAND at 2x (flagged — the pace measure rides the
-    // commit; every retune is Wyatt's word, never a silent rebalance).
-    supply:{1:25, 2:40},
+    // 0326 fought the ship on SHORT SUPPLY (supply:{1:25,2:40} — "you don't
+    // need that many troops to get through and beat the level"). 0388
+    // [WYATT]: "Restore the amount of health that you're supposed to have
+    // for the starship level back to normal. Players are able to abuse it in
+    // its current state." — a 25 box died to ONE leaked tank (BF_BASEDMG 26)
+    // or a Sarge and a rifleman between them; a rush ended the match in
+    // seconds. The override is RETIRED: the ship's toy boxes read
+    // bfBaseHP(team) like every other map (70 in a 1v1, 82 in a 2v2). The
+    // startBattlefield seam stands empty for a future map.
     build:()=>({ rocks:[], rivers:[],
       ice:[ {x:MID,y:748*CQ_K,rx:86*CQ_K,ry:30*CQ_K} ],   // the coolant spill — the engine room's own slide (v1.27 damping verbatim); 0375: scaled with the room it lies in
       cq:cqShipBuild() }) }
@@ -27361,6 +27362,13 @@ function rivCapHex(used, rivHex){
 // hall's blind wall, hunger-weighted forks (cqPickEdge), the centre POST
 // (cqBayPost / CQ_SUP_DWELL), a placement weight for the brains
 // (pickSpot / CQ_SUP_PLACE).
+// 0388 [WYATT]: the toy boxes get their NORMAL HEALTH back (the 0326 25/40
+// short-supply override RETIRED — "Players are able to abuse it in its
+// current state") · a man PLACED IN A BAY FRONTAGE goes IN (u.cqSup — the
+// cqPow grammar, bay edition: cqSupFront below, placeUnit stamps, cqGoal
+// seats the door node, cqPickEdge honors the forks) · passing men LEAN IN:
+// the hungry forks at hn/hm/hmJ send ~85% down the bay roads (the E table's
+// hunger cells).
 // SSSS RULED (Wyatt 8/12, do not re-litigate): mortar, tank and jeep are NOT
 // ACCESSIBLE on this map — CQBAN at EVERY door (tray, canPlace, applyDeploy
 // incl. relay, the brains' motor fund zeroed per seat). jeep2 is a jeep
@@ -27374,6 +27382,28 @@ const CQ_K=2;                       // 0375 THE SHIP AT 2x [WYATT: "Starship bat
 const CQ_SUP_DWELL=8;               // 0375 seconds a man POSTS at the bay's centre before his fork carries him out (flagged)
 const CQ_SUP_POST=30, CQ_SUP_R=80;  // 0375 the post grid's pitch (a man's shoulder) and the centre node's arrival reach (a corner post sits 42 out)
 const CQ_SUP_PLACE=0.9;             // 0375 the brains' placement weight for a drop INSIDE the bay while it is not solely ours (a decision weight — the AI-difficulty law)
+// 0388 THE FRONT-DOOR INTENT [WYATT: "If the characters are in front of the
+// supply room, they should probably go into the supply room, especially if
+// they're placed right in front of the supply room. They should go in this
+// part."] — the bay's two FRONTAGES, authored at 1x like every zone (x is
+// MID-relative, scaled ×K about MID; y ×K; the foe reads his mirror by
+// construction): the WEST FRONT is the hn→supW road (the corridor's door
+// end + the thS strip), the SOUTH FRONT is the hall under the south door
+// strip. A man DROPPED in one was aimed at the bay by the finger that
+// placed him — placeUnit stamps u.cqSup off the RELAYED drop point (every
+// sim agrees), cqGoal seats his FIRST PICK on his own side's door node
+// (supW / hmS — a straight floor walk from anywhere in its front, the
+// battery proves the line) and cqPickEdge honors him at the hn/hm/hmJ
+// forks — 100%, no roll, both teams (a decision, never a resource). From
+// the bay's post his clock and fork carry him out exactly like today: the
+// stamp only steers him IN, the DAG stands. The interior needs no stamp — a
+// man dropped inside the bay picks a bay node straight and posts already.
+const CQ_SUP_FRONT_W={x0:-360,x1:-170,y0:300,y1:400};   // the west road: x M-360..M-170, y 300..400 (hn's band + the crn sliver + thS)
+const CQ_SUP_FRONT_S={x0:-160,x1:-40,y0:455,y1:545};    // the hall under the south door strip (thSs above, the niche pockets below)
+function cqSupFront(x,y,side){ const cq=S.cfg.terrain.cq, K=cq.k||1;
+  const mx = side==='you'? x : WORLD_W-x;   // his own side's doors — the foe's fronts are the mirrors
+  const inR=r=> mx>=MID+r.x0*K && mx<=MID+r.x1*K && y>=r.y0*K && y<=r.y1*K;
+  return inR(CQ_SUP_FRONT_W)? 'w' : inR(CQ_SUP_FRONT_S)? 's' : null; }
 function cqOn(){ return !!(S.bf && S.cfg && S.cfg.terrain && S.cfg.terrain.cq); }
 function cqDoorCycle(){ return S.t % (CQ_DOOR_SHUT+CQ_DOOR_OPEN); }
 function cqClockOpen(){ return cqDoorCycle()>=CQ_DOOR_SHUT; }
@@ -27499,13 +27529,13 @@ function cqShipBuild(k){
     // split but walks the mirrored ring channel (crn~), the vertical the
     // west side always used.
     rngE:[['gN2',60],['crnT2',40]], crnT2:[['crnN2',100]], crnN2:[['hn2',100]],
-    hn:[['supW',75,25],['crnN',25]],   // 0375: the west door takes 75 (was 60), 100 when the bay hungers
+    hn:[['supW',75,65],['crnN',25]],   // 0375: the west door takes 75 (was 60); 0388 [WYATT]: passing men LEAN IN — ~85% of a hungry fork (was +25 = 80%)
     supW:[['supC',100]],               // 0375: through the door to the CENTRE — the post, then on
     supC:[['supE',55],['supS2',45]],   // 0375: out the east door, or the far south door into their hall
     supE:[['hn2',100]], supS2:[['hmS2',100]], hmS2:[['hm2',100]],
     crnN:[['crnM',100]], crnM:[['hmJ',100]],
-    hmJ:[['dw',40],['crsM',30],['hmS',30,30]],   // 0375: the corner men take the south door 30 (60 hungry); was dw 65 / crsM 35
-    hm:[['dw',45],['hmJ',20],['hmS',35,30]],     // 0375: the hall men take the south door 35 (65 hungry); was dw 75 / hmJ 25
+    hmJ:[['dw',40],['crsM',30],['hmS',30,370]],   // 0375: the corner men take the south door 30; 0388: ~85% of a hungry fork (was +30 = 46%)
+    hm:[['dw',45],['hmJ',20],['hmS',35,335]],     // 0375: the hall men take the south door 35; 0388: ~85% of a hungry fork (was +30 = 50%)
     hmS:[['supS',100]], supS:[['supC',100]],
     dw:[['de',100]], de:[['hm2',55],['hmJ2',45]],
     crsM:[['crsS',100]], crsS:[['crxN',100]], crxN:[['engW',100]],
@@ -27567,6 +27597,9 @@ function cqPickEdge(u,fromId){ const edges=S.cfg.terrain.cq.E[fromId]||[];
   // Both teams read the same law; the stamp derives from the relayed drop
   // point, so every sim agrees.
   if(u.cqPow){ if(fromId==='gA') return 'gN'; if(fromId==='rng'||fromId==='crnT') return 'powW'; }
+  // 0388 FRONT-DOOR INTENT: a man stamped in a bay frontage takes the bay
+  // road at its forks — 100%, no roll (the cqPow grammar, bay edition).
+  if(u.cqSup){ if(fromId==='hn') return 'supW'; if(fromId==='hm'||fromId==='hmJ') return 'hmS'; }
   if(edges.length===1) return edges[0][0];
   // 0375 THE BAY WANTS MEN: while the SUPPLY BAY is not solely OURS (empty,
   // contested, or theirs) every edge's hunger cell (e[2]) joins its weight —
@@ -27620,6 +27653,7 @@ function cqLineFloor(x0,y0,x1,y1){ const d=Math.hypot(x1-x0,y1-y0), n=Math.max(1
   return true; }
 function cqGoal(u){
   const cq=S.cfg.terrain.cq;
+  if(!u.cqN && u.cqSup) u.cqN = u.cqSup==='w'? 'supW' : 'hmS';   // 0388 FRONT-DOOR INTENT: his first pick IS his side's door node — a straight floor walk from anywhere in his front (the nearest-node law below would read a door past the rect's lip as "behind" him)
   if(!u.cqN){ let best=null,bd=1e9, near=null,nd=1e9;
     for(const id in cq.nod){ const p0=cqNodePos(u,id);
       const behind = u.side==='you'? p0.x<u.x-70 : p0.x>u.x+70;
@@ -28226,7 +28260,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.45';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.46';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -33585,7 +33619,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
     const idx=(st.i%team);
     st.laneBias = team>1 ? 110 + (idx+0.5)*((WORLD_H-220)/team) : null;   // 1v1 keeps the tuned solo brain untouched; a tall map spreads the whole front
   }
-  const bhp=(map.supply && map.supply[team]) || bfBaseHP(team);   // 0326: a map may fight on its own supply (THE STARSHIP 25/40); sizes without a cell keep the formula
+  const bhp=(map.supply && map.supply[team]) || bfBaseHP(team);   // 0326: a map may fight on its own supply; 0388 retired THE STARSHIP's 25/40 cell (the last rider — abused) — no row carries one today, the seam stands for a future map
   // WHICH ONE IS MINE. In every solo battleground that is seat 0 on the left, and
   // the plan says so. In a private room the plan comes off the room's roster and
   // your chair may well be one of the ten on the RIGHT — so the camera opens
@@ -36087,6 +36121,7 @@ function placeUnit(type,x,y,side,seat){
     u.side=side;
     u.seat=(seat!=null)? seat : (side==='you'? 0 : S.bf.team);
     if(S.cfg && S.cfg.terrain && S.cfg.terrain.cq && y<=260*(S.cfg.terrain.cq.k||1)) u.cqPow=1;   // 0326: dropped on the north run = aimed at the top room (cqPickEdge honors it); 0375: the latitude rides the ship's scale
+    if(S.cfg && S.cfg.terrain && S.cfg.terrain.cq){ const f9=cqSupFront(x,y,side); if(f9) u.cqSup=f9; }   // 0388: dropped in a bay FRONTAGE = aimed at the bay (cqGoal seats his door node, cqPickEdge walks him through — the cqPow grammar, bay edition)
     u.def=Object.assign({}, UDEF[type], BF_MOVE[type]||{});   // per-unit copy — never mutate the shared UDEF
     u.hpMax=u.def.hp||3; u.hp=u.hpMax;
     // v3.12 NEMESIS: the captain's man walks on carrying one of YOUR mirrored
@@ -62925,6 +62960,7 @@ window.GVT = {
       ban:Object.keys(CQBAN), nodes:Object.keys(cq.nod).length,
       k:cq.k||1, fun:cq.fun||300, sup:cq.sup, mouth:cq.mouth,   // 0375: the scale, the handoff, the bay rect, the mouth funnel — for the battery's eyes
       dwell:CQ_SUP_DWELL, post:CQ_SUP_POST, supR:CQ_SUP_R, place:CQ_SUP_PLACE, K:CQ_K,
+      fronts:{w:CQ_SUP_FRONT_W, s:CQ_SUP_FRONT_S}, front:(x,y,side)=>cqSupFront(x,y,side), stamped:S.units.filter(u=>!u.dead&&u.cqSup).length,   // 0388 the frontage rects + the stamp, for the battery's eyes
       posted:S.units.filter(u=>!u.dead&&u.cqN==='supC'&&u.cqSupT!=null&&S.t-u.cqSupT<CQ_SUP_DWELL).length }; },
   bfSpawn(s,type,x,y){ if(!S.bf) return null;
     const seat = typeof s==='number'? s : (s==='foe'? S.bf.team : 0);
