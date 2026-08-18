@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.36.2';
+const BUILD = 'STARSPELL v0.37.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -324,16 +324,68 @@ window.SSPERF = PERF;   // the headless perf harness reads/starts probes through
    diagnosed entirely from one screenshot of line 2 — but that investigation is
    closed, and it sat on top of the QUICK PLAY header for every player. The
    measurement machinery below always runs; only the readout is gated. */
-function ssPerfWatch(gm) {
-  let el = null;
-  if (QS.get('fps') === '1') {
-    el = document.createElement('div');
-    el.style.cssText = 'position:fixed;left:4px;top:calc(env(safe-area-inset-top,0px) + 4px);' +
+/* The overlay has no URL to be summoned from inside the iOS shell — it loads a
+   fixed address with no query string — so it is also reachable by tapping the
+   version footer five times, and the choice sticks in `beta3.fps` so it
+   survives an app relaunch. ⚠ TEMPORARY: this gesture exists to check the
+   renderer verdict and frame time on the TestFlight build, where the browser's
+   URL bar isn't available. Remove it (and this comment) once the shell is
+   confirmed good — see ssArmFpsTap. */
+let SS_FPS_EL = null;
+function ssFpsShow(on, persist) {
+  if (on && !SS_FPS_EL) {
+    SS_FPS_EL = document.createElement('div');
+    SS_FPS_EL.style.cssText = 'position:fixed;left:4px;top:calc(env(safe-area-inset-top,0px) + 4px);' +
       'z-index:40;pointer-events:none;font:600 10px/1.5 ui-monospace,Menlo,monospace;' +
       'color:#7ec96f;background:rgba(6,8,20,.55);padding:2px 7px;border-radius:7px;letter-spacing:.3px;' +
       'white-space:pre-line';
-    document.body.appendChild(el);
+    document.body.appendChild(SS_FPS_EL);
+  } else if (!on && SS_FPS_EL) {
+    SS_FPS_EL.remove();
+    SS_FPS_EL = null;
   }
+  // Only the gesture is sticky. `?fps=1` must stay transient — persisting it
+  // meant one debug load turned the readout on for good, which the suite caught
+  // as "DEFAULT boot has no overlay" failing on the very next navigation.
+  if (persist) { try { localStorage.setItem('beta3.fps', on ? '1' : '0'); } catch (e) { } }
+  return !!SS_FPS_EL;
+}
+function ssFpsOn() {
+  if (QS.get('fps') === '1') return true;
+  if (QS.get('fps') === '0') return false;
+  try { return localStorage.getItem('beta3.fps') === '1'; } catch (e) { return false; }
+}
+/* Five taps on the version footer inside 3s toggles the readout. Deliberately
+   dull: no visible affordance, nothing a player finds by accident, and the
+   footer is the one element that is never part of play. */
+function ssArmFpsTap(t) {
+  if (!t || !t.setInteractive) return;
+  t.setInteractive();
+  try {                          // a 9px line is a mean target — widen the hit box
+    const ha = t.input.hitArea;
+    ha.x -= 26; ha.y -= 18; ha.width += 52; ha.height += 36;
+  } catch (e) { }
+  let n = 0, last = 0;
+  t.on('pointerdown', () => {
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    n = (now - last > 3000) ? 1 : n + 1;
+    last = now;
+    if (n < 5) return;
+    n = 0;
+    const on = ssFpsShow(!SS_FPS_EL, true);
+    try { SFX.ensure(); SFX.ui(); } catch (e) { }
+    // say so, so a stray five-tap is never a mystery
+    const sc = t.scene;
+    if (sc && sc.add) {
+      const l = ssLayout(sc);
+      const say = ssTxt(sc, l.x(0), l.y(768), on ? 'fps readout on' : 'fps readout off', l.u(10), '#8fa0ff')
+        .setOrigin(0.5).setDepth(700).setScrollFactor(0);
+      sc.tweens.add({ targets: say, alpha: 0, duration: 900, delay: 700, onComplete: () => say.destroy() });
+    }
+  });
+}
+function ssPerfWatch(gm) {
+  if (ssFpsOn()) ssFpsShow(true);
   let worst = 0;
   gm.events.on('prestep', () => { const d = gm.loop.rawDelta; if (d > worst) worst = d; });
   // ?prof=1: update-vs-render main-thread split, read on-device from a screenshot
@@ -365,6 +417,7 @@ function ssPerfWatch(gm) {
     verdict + (pp.gpu ? ' · ' + pp.gpu.slice(0, 30) : '');
   setInterval(() => {
     const fps = Math.round(gm.loop.actualFps);
+    const el = SS_FPS_EL;
     if (el) {
       el.style.color = fps >= 50 ? '#7ec96f' : fps >= 30 ? '#e6c229' : '#e74c3c';
       let txt = fps + ' FPS · ' + Math.round(worst) + 'ms · ' +
@@ -3168,7 +3221,9 @@ class Home extends Phaser.Scene {
       t.setText(n > 0 ? SS_T('vsFriendsOn', n) : SS_T('versusSub')).setColor(n > 0 ? '#ffe9a8' : BTN_INK2());
     });
     this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
-    ui(ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5));
+    const verT = ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5);
+    ui(verT);
+    ssArmFpsTap(verT);          // ⚠ TEMPORARY — see ssArmFpsTap, remove after the shell checks out
     this.muteB = ui(ssTxt(this, l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
     this.muteB.on('pointerdown', () => { SFX.ensure(); SFX.setMuted(!SFX.muted); this.muteB.setText(SFX.muted ? '🔇' : '🔊'); });
     // language switcher — opposite the mute toggle; opens the sheet of native names
