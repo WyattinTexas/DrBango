@@ -20050,7 +20050,14 @@ const FS_LIFE=5;       // ⚑ seconds a patch burns
 const FS_DPS=3;        // ⚑ damage a second, hurt()'s own currency (the sniper's 9-a-round scale)
 const FS_TICK=0.5;     // the burn drum — FS_DPS*FS_TICK (1.5) a beat, dice-free
 const FS_RUNG=10;      // ⚑ the dino-ladder rung that awards the part (DPARK_BEATS[10] = dinoboss2, GENERAL GOBBLES)
-const FS_FF=0;         // ⚑ FRIENDLY FIRE: 0 = your own men walk the fire unburned (the 7/24 no-FF law; the mortar splash stays Wyatt's one deliberate exception); 1 = his literal "anyone" — every side burns
+const FS_FF=1;         // ⚑ FRIENDLY FIRE — 1 since 0404 (Wyatt 8/18 verbatim: "the fire created by
+                       // fire in general… should hurt all players. It doesn't belong to a certain
+                       // player when you create fire"): GROUND fire burns EVERY side — this const
+                       // is the law for every ground patch (0391's ladies inherit it); breath
+                       // licks and flamethrowers stay owner-scoped, lava was always side-blind. A
+                       // friendly beat carries NO owner (null src in fsTick's own-side lane), so
+                       // the ledger never pays for your own men. 0 = the retired 7/24 no-FF law
+                       // (the mortar splash was its one deliberate exception). Back-flip = this char.
 const ENH_INFO={
   // v3.11 TELEKINESIS (Wyatt 8/10 night, card 0252): Sarge's marquee part and
   // the dearest thing on the bench BY DECREE. v3.15 (Wyatt 8/11, card 0256):
@@ -29075,7 +29082,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.61';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.62';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -39921,20 +39928,28 @@ function fsTick(dt){
       if(p.tk>p.life+1e-9) break;
       const tg=S.bf? bfEnemies(p.side) : S.foes;
       for(const e of tg){
-        if(e.dead||e.jetT>0||e.falling||e.burrow) continue;
+        if(e.dead||e.jetT>0||e.falling||e.burrow||(S.drag&&S.drag.unit===e)) continue;   // 0404: the drag grace on the enemy lane too — dormant until enemy-owned ground fire exists (0391 mints it); the man YOU drag out of THEIR patch must not burn either
         if(Math.hypot(e.x-p.x,e.y-p.y)>p.r) continue;
         if(!p.hit.has(e)){ p.hit.add(e); S.floats.push({x:e.x,y:e.y-52,txt:'🔥',t:0,col:'#FF9A3D'}); }   // one 🔥 per man per patch — the burn itself repeats every beat
         hurt(e, FS_DPS*FS_TICK, p.src);
       }
-      // ⚑ FS_FF — Wyatt's word was "anyone": flip the const and every side
-      // burns. Own men route through their own funnels (BF hp = hurt();
-      // campaign grit = tanHit — breathBurn's law); the dragged man keeps
-      // the standing "drag your men out" grace either way.
+      // 0404 FS_FF LIVE — Wyatt 8/18: "the fire created by fire in general…
+      // should hurt all players. It doesn't belong to a certain player" —
+      // GROUND fire burns EVERY side. Own men route through their own
+      // funnels (BF hp = hurt(); campaign grit = tanHit — breathBurn's law)
+      // with a NULL src: a friendly beat has no owner, so the ledger never
+      // pays (no kills++/noteKill/tag bounty — hitCheck's own `u &&` doors),
+      // no rally leech, and a TK wall negates the beat but throws it back
+      // at nobody (hurt's own `src &&` guard). PARITY with the enemy lane:
+      // burrowed and dropping men are out of the flame, one 🔥 float per
+      // man per patch, and the dragged man keeps the standing "drag your
+      // men out" grace.
       if(FS_FF){
         for(const e of (S.bf? S.units.filter(o=>o.side===p.side) : S.units)){
-          if(e.dead||e.jetT>0||e.falling||(S.drag&&S.drag.unit===e)) continue;
+          if(e.dead||e.jetT>0||e.dropT>0||e.falling||e.burrow||(S.drag&&S.drag.unit===e)) continue;
           if(Math.hypot(e.x-p.x,e.y-p.y)>p.r) continue;
-          if(S.bf) hurt(e, FS_DPS*FS_TICK, p.src); else tanHit(e, p.x, p.y, null);
+          if(!p.hit.has(e)){ p.hit.add(e); S.floats.push({x:e.x,y:e.y-52,txt:'🔥',t:0,col:'#FF9A3D'}); }
+          if(S.bf) hurt(e, FS_DPS*FS_TICK, null); else tanHit(e, p.x, p.y, null);
         }
       }
     }
