@@ -22206,13 +22206,33 @@ function nemParaTick(dt){
 // strict+array-order), drift-tolerated exactly like the wrecking balls (the
 // host referees a room — the standing law). Bites still ride hurt(u,·,null),
 // the no-blame funnel, so every worn save on the BITTEN man gets its say.
+// 0389 (Wyatt 8/17 late: "the random dinosaurs that spawn need to have the
+// properties of those dinosaurs… If one spawns as a King Rex, you should
+// have all of King Rex's abilities and his speed… the triceratops has the
+// charge, etc."): A HATCHLING IS THE DINOSAUR ON HIS EGG'S ROLL — same
+// feet, same trick, same reach. The birth hands him his SPECIES BAG
+// (u.kit = FDEF[kind], READ never copied) and one machine per capability
+// key fields his trick on the third side (sprint/stomp/ram/swoop/boulder/
+// breath — the campaign bestiary's semantics in bf currency; the machines
+// live under nemEggTick). His walk paces his OWN row's spd now; his width
+// IS the row's. hp stays the flat bf seats (he said abilities and speed).
 const NEMEGG_STAG=0.3;    // crack stagger, seconds per egg index WITHIN a nest (i%10 — top i and bottom i pop on the same beat; ten eggs over 2.7s)
 const NEMEGG_TELL=3;      // hairline-crack puffs this long before the pop (updateFoeEgg's own last-3s tell)
-const NEMEGG_SPD=46;      // hatchling walk — the king marches at this too (his campaign row says 22; a slower king is Wyatt's dial)
-const NEMEGG_R=26;        // bite reach, the six; the king's mouth clears his own hide — +(w-40)/2, see the bite below
+const NEMEGG_SPD=46;      // FALLBACK walk for a kind with no FDEF row (0389: every kind walks its OWN row's spd — the king marches at his campaign 22, Wyatt's ruling; no shipped kind falls back)
+const NEMEGG_R=26;        // bite reach, the six; a wide mouth clears its own hide — +(w-40)/2, see the bite below
 const NEMEGG_BITE=1;      // hp per bite through hurt() (a tan rifle round's own weight)
 const NEMEGG_CD=0.8;      // bite clock
-const NEMEGG_W=40;        // hatchling draw width, THE SIX (the shipped baby size); the king draws at FDEF.kingrex.w — "the size of King Rex"
+const NEMEGG_W=40;        // FALLBACK draw width (0389: every kind draws at its OWN row's w — 46/66/74/56/88/70/148; no shipped kind falls back)
+// 0389 THE HATCHLING KITS — damage seats in bf currency (⚑ Wyatt dials, one
+// line each; never a floated number on a park foe — rings and thocks only).
+// hp stays HATCH_HP/HATCH_KING_HP flat (⚑ a per-kind table {sdino 2, ptero
+// 2, dilo 4, trike 5, stego 6, bdino 7, kingrex 40} is one dial away).
+const NEMKIT_SWING=1;     // sprint swing (sdino · the king) — the dash's own bite
+const NEMKIT_STOMP=1;     // the bruiser's slam, everyone inside stompR
+const NEMKIT_RAM=2;       // the triceratops charge, once per figure per charge
+const NEMKIT_SWOOP=1;     // the pterodactyl pass, once per figure per pass
+const NEMKIT_BOUL=2;      // the stegosaurus rock, once per figure per roll
+const NEMKIT_BREATH=1;    // fire breath, per jet hit (dilo multi 4 · the king multi 6)
 const HATCH_HP=3;         // a hatchling's plastic in bf currency (a rifleman's own grit: three rifle rounds, or one bazooka round)
 const HATCH_KING_HP=40;   // KING REX the hatchling — a siege both armies notice (~10 bazooka rounds), never a wall
 // THE NEST (0386): ten plain cream eggs in two staggered rows. ONE list is
@@ -22267,14 +22287,18 @@ function nemEggTick(dt){
         // THE BIRTH (0386): a NEUTRAL COMBATANT into S.units — side 'nem'
         // (both armies' scans answer him), seat null (no census, no wire),
         // a def stub every reader can hold (hatch:true is the death door's
-        // tag), hp by kind, the king at KING REX'S OWN width off his row.
+        // tag), hp by kind. 0389: EVERY kind at ITS OWN row width now
+        // (46/66/74/56/88/70/148), with the SPECIES BAG riding as u.kit —
+        // a REF, read never copied (a blind def spread would import
+        // boss/elite/leak/bounty keys the bf readers already interpret).
         // dropT:0 is LOAD-BEARING: bfEnemies gates on o.dropT<=0, and an
         // UNDEFINED dropT fails that compare — without the field no TGT
         // list, mine trigger or paraSpot would ever answer him (r1's find).
         const kg=e.kind==='kingrex', hp9=kg?HATCH_KING_HP:HATCH_HP;
+        const kd9=FDEF[e.kind]||{};
         const hb={ id:idc++, type:e.kind, k:e.kind, side:'nem', seat:null,
           def:{ name:'HATCHLING', grit:hp9, rng:0, rate:0, dmg:0, hatch:true },
-          hp:hp9, hpMax:hp9, w:kg?FDEF.kingrex.w:NEMEGG_W, dropT:0,
+          kit:kd9, hp:hp9, hpMax:hp9, w:kd9.w||NEMEGG_W, dropT:0,
           x:e.x, y:e.y, cd:NEMEGG_CD, wob:i };
         S.units.push(hb); bf.hatch.push(hb);
         // the king's entrance earns the boss fight's own tell — the roar
@@ -22291,34 +22315,324 @@ function nemEggTick(dt){
   // dead through the hitCheck hatch branch; a magma bowl eats him below) or
   // the battle ends. The walk freezes with the verdict — the men get their
   // card over a still field (the bite gate always held there anyway).
+  // 0389: THE KIT OWNS THE TICK — one machine per capability key off u.kit
+  // (sprint/stomp/ram/swoop/boulder/breath, below); a machine that owns the
+  // feet this tick (brace, charge, rest, wind, inhale, dive, dash) returns
+  // true and the walk+bite stands down. The walk itself paces the ROW
+  // (kit.spd — sdino 70 · bdino 31 · trike 30 · ptero 78 · stego 18 ·
+  // dilo 29 · the king at his campaign 22, Wyatt's ruling). The magma law
+  // sits BELOW the dispatch so a dash or a dive tests the bowls too — and
+  // a FLYER never drowns (the campaign's pits-never-eat-a-flyer law: his
+  // shadow just crosses the hole).
   for(let i=bf.hatch.length-1;i>=0;i--){ const h=bf.hatch[i];
     if(h.dead){ bf.hatch.splice(i,1); continue; }   // shot dead — the units sweep already lifted the body
     if(bf.resolved||bf.ending) continue;
-    // nearest standing figure, EITHER army — strict compare + array order,
-    // so every sim that agrees on the armies agrees on the chase; a
-    // hatchling never chases (or bites) another hatchling.
-    let best=null, bd=1e9;
+    const kt=h.kit||FDEF[h.k]||{};
+    let busy=false;
+    if(kt.ram)            busy=nemRamTick(h,kt,dt)||busy;
+    if(kt.stompCd)        busy=nemStompTick(h,kt,dt)||busy;
+    if(kt.swoop)          busy=nemSwoopTick(h,kt,dt)||busy;
+    if(kt.boulder)        busy=nemBoulTick(h,kt,dt)||busy;
+    if(kt.multi&&kt.cone) busy=nemBreathTick(h,kt,dt)||busy;
+    if(kt.sprint&&!busy)  busy=nemSprintTick(h,kt,dt)||busy;   // no sprint mid-inhale — the king's doors gate each other (his campaign law)
+    if(!busy){
+      // nearest standing figure, EITHER army — strict compare + array order,
+      // so every sim that agrees on the armies agrees on the chase; a
+      // hatchling never chases (or bites) another hatchling.
+      let best=null, bd=1e9;
+      for(const u of S.units){
+        if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+        const d=Math.hypot(u.x-h.x,u.y-h.y);
+        if(d<bd){ bd=d; best=u; }
+      }
+      const rch=NEMEGG_R+((h.w||NEMEGG_W)-NEMEGG_W)/2;   // a wide mouth clears its own hide (26+54=80 at the king's 148)
+      if(best && bd>rch*0.7){
+        const vx=(best.x-h.x)/bd, vy=(best.y-h.y)/bd, sp9=kt.spd||NEMEGG_SPD;
+        h.x+=vx*sp9*dt; h.y+=vy*sp9*dt; h.fx=vx>0;
+        h.y=Math.max(74,Math.min(WORLD_H-96,h.y));
+      }
+      h.cd-=dt;
+      if(best && bd<=rch && h.cd<=0){
+        h.cd=NEMEGG_CD;
+        hurt(best, NEMEGG_BITE, null);   // the no-blame funnel — every save gets its say
+        S.fx.push({k:'ring',x:best.x,y:best.y-16,r:3,R:16,t:0,dur:0.2,col:'#8FBF5A'});
+        bfSfx(SFX.thock,best.x,best.y);
+      }
+    } else h.cd-=dt;   // the bite clock re-arms while the trick plays
+    // the magma — even a king; NEVER the ptero (a flyer's shadow crosses)
+    if(h.k!=='ptero'){
+      const vd=voidAt(h.x,h.y);
+      if(vd){ fallFx(h.x,h.y,vd.kind); h.dead=true; bf.hatch.splice(i,1); continue; }   // straight into the magma (the lair's own lava law, pool edition)
+    }
+  }
+}
+// ===== 0389 THE HATCHLING KIT MACHINES — the campaign bestiary's SEMANTICS
+// (0278b FM-GVT-DINO-01) ported to the battlefield's third side: every
+// machine keys off the species bag (u.kit — the 0117 law), targets the
+// nearest standing figure of EITHER army (never a hatchling — the shipped
+// chase rule), lands every hit through hurt(u,·,null) in bf currency
+// (rings + thocks, never a floated number — the park-foe law), and rolls
+// ZERO dice (unit clocks + S.t edges only — the sync posture is the
+// bites': per-sim, drift-tolerated, host referees). The lane machines
+// themselves (updateFoePounce/Trike/Swoop/Stomp, gsnowTick, tanMulti) stay
+// campaign-side byte-untouched — they are lane-shaped (west march,
+// greens-only funnel); these are their field twins. =====
+// the shared pick: nearest standing figure of EITHER army within R
+// (strict compare + array order — dice-free, the shipped chase rule)
+function nemNearFig(x,y,R){
+  let b=null, bd=(R==null?1e9:R);
+  for(const u of S.units){
+    if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+    const d=Math.hypot(u.x-x,u.y-y);
+    if(d<bd){ bd=d; b=u; }
+  }
+  return b;
+}
+// THE SPRINT (sdino · the king): inside sprint.aggro → a ground dash at
+// sprint.dash straight at the mark (heel dust on an S.t edge) → the SWING
+// = the bite at sprint.swing cadence, NEMKIT_SWING through the funnel. The
+// king honours his own cap/cd (chains ≤2 then rests the door) and the D2
+// turn law; the dash ignores no bowl — the magma sweep reads his feet.
+function nemSprintTick(h,kt,dt){
+  const pb=kt.sprint;
+  if(h.nkSpr===1){
+    const u=h.nkTgt, gone=!u||u.dead||S.units.indexOf(u)<0;
+    if(gone){
+      const nx=nemNearFig(h.x,h.y,pb.aggro);
+      if(nx){ h.nkTgt=nx; return true; }
+      h.nkSpr=0; h.nkTgt=null; if(pb.cd) h.nkSprCd=pb.cd; if(h.k==='kingrex') h.nkTurn=0;
+      return false;
+    }
+    h.nkSw=(h.nkSw||0)-dt;
+    const dx=u.x-h.x, dy=u.y-h.y, d=Math.hypot(dx,dy)||1;
+    const rch=NEMEGG_R+((h.w||NEMEGG_W)-NEMEGG_W)/2;
+    if(d>rch){
+      h.x+=dx/d*pb.dash*dt; h.y=Math.max(74,Math.min(WORLD_H-96,h.y+dy/d*pb.dash*dt)); h.fx=dx>0;
+      if(((S.t*14)|0)!==(((S.t-dt)*14)|0)) S.fx.push({k:'puff',x:h.x-(h.fx?12:-12),y:h.y+3,t:0,dur:0.22,R:6});   // heel dust — clock-edge, dice-free
+    } else if(h.nkSw<=0){
+      hurt(u, NEMKIT_SWING, null);
+      S.fx.push({k:'ring',x:h.x,y:h.y-14,r:6,R:44,t:0,dur:0.26,col:'#EAF4FF'});
+      bfSfx(SFX.thock,h.x,h.y);
+      h.nkSw=pb.swing; h.nkN=(h.nkN||0)+1;
+      if(pb.cap && h.nkN>=pb.cap){ h.nkSpr=0; h.nkTgt=null; if(pb.cd) h.nkSprCd=pb.cd; if(h.k==='kingrex') h.nkTurn=0; return false; }
+      const nx=nemNearFig(h.x,h.y,pb.aggro);
+      if(nx){ h.nkTgt=nx; return true; }
+      h.nkSpr=0; h.nkTgt=null; if(pb.cd) h.nkSprCd=pb.cd; if(h.k==='kingrex') h.nkTurn=0;
+      return false;
+    }
+    return true;
+  }
+  if(pb.cd){ h.nkSprCd=(h.nkSprCd||0)-dt; if(h.nkSprCd>0) return false; }
+  if(h.k==='kingrex' && h.nkTurn===0) return false;   // D2: after a charge, the BREATH takes its turn (his campaign dance)
+  const m=nemNearFig(h.x,h.y,pb.aggro);
+  if(m){ h.nkSpr=1; h.nkTgt=m; h.nkN=0; h.nkSw=0; return true; }
+  return false;
+}
+// THE RAM (trike): BRACE ram.brace with forepaw dust (the tell — heading
+// LOCKED) → a STRAIGHT-LINE charge at ram.dash, never homing: one
+// NEMKIT_RAM per figure per charge (per-charge registry), overshooting
+// ram.over past the mark → REST ram.rest planted (the counter window BOTH
+// armies get). THE BONK LAW: a mesa or a bowl EDGE ends the charge in
+// comedy (+0.6s rest, head-shake) — each step tested BEFORE taken, so the
+// charge itself can never carry him INTO the magma.
+function nemRamTick(h,kt,dt){
+  const rb=kt.ram;
+  if(!h.nkSt) h.nkSt='idle';
+  if(h.nkSt==='idle'){
+    const m=nemNearFig(h.x,h.y,rb.aggro);
+    if(m){
+      const dx=m.x-h.x, dy=m.y-h.y, d=Math.hypot(dx,dy)||1;
+      h.nkSt='brace'; h.nkT=rb.brace; h.nkDir={x:dx/d,y:dy/d}; h.nkRun=d+rb.over; h.nkHit={}; h.fx=dx>0;
+      S.fx.push({k:'puff',x:h.x+(h.fx?18:-18),y:h.y+4,t:0,dur:0.3,R:9});
+      bfSfx(SFX.thock,h.x,h.y);
+    }
+    return false;
+  }
+  if(h.nkSt==='brace'){
+    h.nkT-=dt;
+    if(((S.t*18)|0)!==(((S.t-dt)*18)|0)) S.fx.push({k:'puff',x:h.x+(h.fx?16:-16),y:h.y+5,t:0,dur:0.25,R:7});   // forepaw dust — clock-edge, dice-free
+    if(h.nkT<=0) h.nkSt='charge';
+    return true;
+  }
+  if(h.nkSt==='charge'){
+    const step=rb.dash*dt, nx=h.x+h.nkDir.x*step, ny=h.y+h.nkDir.y*step;
+    let bonk=false;
+    if(S.cfg && S.cfg.terrain && S.cfg.terrain.rocks) for(const rk of S.cfg.terrain.rocks){
+      if(Math.hypot(nx-rk.x,ny-rk.y)<rk.r+16){ bonk=true; break; } }
+    if(!bonk && voidAt(nx,ny)) bonk=true;   // the bowl EDGE — he stops short, never falls in (the campaign's comedy law)
+    if(bonk){
+      h.nkSt='rest'; h.nkT=rb.rest+0.6; h.nkBonkT=0.5;
+      S.fx.push({k:'ring',x:h.x,y:h.y-20,r:6,R:30,t:0,dur:0.3,col:'#F5EFD8'});
+      S.fx.push({k:'puff',x:h.x,y:h.y-26,t:0,dur:0.35,R:12});
+      bfSfx(SFX.thock,h.x,h.y);
+      return true;
+    }
+    h.x=nx; h.y=ny; h.nkRun-=step;
+    if(((S.t*22)|0)!==(((S.t-dt)*22)|0)) S.fx.push({k:'puff',x:h.x-(h.fx?20:-20),y:h.y+6,t:0,dur:0.28,R:8});   // charge dust — clock-edge, dice-free
+    for(const u of S.units){
+      if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+      if(h.nkHit[u.id]) continue;
+      if(Math.hypot(u.x-h.x,u.y-h.y)<rb.lane+12){
+        h.nkHit[u.id]=1;
+        hurt(u, NEMKIT_RAM, null);
+        S.fx.push({k:'ring',x:u.x,y:u.y-16,r:4,R:22,t:0,dur:0.22,col:'#F5EFD8'});
+        bfSfx(SFX.thock,u.x,u.y);
+      }
+    }
+    if(h.nkRun<=0 || h.x<40 || h.x>WORLD_W-40 || h.y<74 || h.y>WORLD_H-96){
+      h.nkSt='rest'; h.nkT=rb.rest;
+      h.x=Math.max(40,Math.min(WORLD_W-40,h.x)); h.y=Math.max(74,Math.min(WORLD_H-96,h.y));
+    }
+    return true;
+  }
+  h.nkT-=dt; if(h.nkBonkT>0) h.nkBonkT-=dt;
+  if(h.nkT<=0){ h.nkSt='idle'; h.nkBonkT=0; }
+  return true;   // rest — planted (the counter window)
+}
+// THE STOMP (bdino): every stompCd with a figure inside stompR → REAR UP
+// stompWind (planted — the dodge is dragging your men out; a slam into
+// vacated grass hits nobody) → the SLAM: everyone of either army inside
+// stompR takes NEMKIT_STOMP through the funnel; ring + gated shake.
+function nemStompTick(h,kt,dt){
+  if(h.nkAW>0){
+    h.nkAW-=dt;
+    if(h.nkAW<=0){
+      h.nkAW=0; h.nkShot=0;
+      bfSfx(SFX.stomp,h.x,h.y);
+      if(bfVis(h.x,h.y)&&!reducedMotion()) S.shake=Math.max(S.shake,0.4);
+      S.fx.push({k:'ring',x:h.x,y:h.y+6,r:10,R:kt.stompR,t:0,dur:0.4,col:'rgba(255,210,74,0.75)'});
+      S.fx.push({k:'puff',x:h.x-10,y:h.y-6,t:0,dur:0.4,R:16});
+      for(const u of S.units){
+        if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+        if(Math.hypot(u.x-h.x,u.y-h.y)<kt.stompR) hurt(u, NEMKIT_STOMP, null);
+      }
+    }
+    return true;
+  }
+  h.nkShot=(h.nkShot||0)+dt;
+  if(h.nkShot>=kt.stompCd){
+    const m=nemNearFig(h.x,h.y,kt.stompR);
+    if(m){ h.nkAW=kt.stompWind; S.fx.push({k:'puff',x:h.x+8,y:h.y+4,t:0,dur:0.3,R:10}); }
+    else h.nkShot=kt.stompCd*0.7;   // nobody to squash — the statue retry
+  }
+  return h.nkAW>0;
+}
+// THE SWOOP (ptero): FLIGHT IS DRAW-ONLY — ground x/y is the truth, he is
+// ALWAYS shootable, and a bowl never eats him (the flyer laws ported
+// whole). Gliding, the walk owns his feet (spd 78 — the fastest); inside
+// swoop.aggro he locks a strafing line THROUGH the nearest figure, dives
+// at swoop.dive (u.sAlt sinks the DRAWN body to the deck), hits each
+// figure within swoop.lane ONCE per pass (NEMKIT_SWOOP), climbs out
+// swoop.climb before the next pass.
+function nemSwoopTick(h,kt,dt){
+  const wb=kt.swoop;
+  if(h.sAlt==null) h.sAlt=1;
+  h.nkCd=(h.nkCd||0)-dt;
+  if(h.nkSt!=='dive'){
+    h.sAlt=Math.min(1,h.sAlt+dt*1.6);
+    if(h.nkCd<=0){
+      const m=nemNearFig(h.x,h.y,wb.aggro);
+      if(m){
+        const dx=m.x-h.x, dy=m.y-h.y, d=Math.hypot(dx,dy)||1;
+        h.nkSt='dive'; h.nkDir={x:dx/d,y:dy/d}; h.nkRun=d+110; h.nkHit={}; h.fx=dx>0;
+        bfSfx(SFX.swish,h.x,h.y);
+      }
+    }
+    return false;   // gliding — the walk owns the feet
+  }
+  h.sAlt=Math.max(0,h.sAlt-dt*3.2);
+  const step=wb.dive*dt;
+  h.x+=h.nkDir.x*step; h.y+=h.nkDir.y*step; h.nkRun-=step; h.fx=h.nkDir.x>0;
+  for(const u of S.units){
+    if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+    if(h.nkHit[u.id]) continue;
+    if(Math.hypot(u.x-h.x,u.y-h.y)<wb.lane+10){
+      h.nkHit[u.id]=1;
+      hurt(u, NEMKIT_SWOOP, null);
+      S.fx.push({k:'ring',x:u.x,y:u.y-16,r:4,R:20,t:0,dur:0.22,col:'#EAF4FF'});
+      bfSfx(SFX.thock,u.x,u.y);
+    }
+  }
+  if(h.nkRun<=0 || h.x<30 || h.x>WORLD_W-30 || h.y<74 || h.y>WORLD_H-96){
+    h.nkSt='glide'; h.nkCd=wb.climb;
+    h.x=Math.max(30,Math.min(WORLD_W-30,h.x)); h.y=Math.max(74,Math.min(WORLD_H-96,h.y));
+  }
+  return true;
+}
+// THE ROCK (stego): every fireCd, the nearest figure inside rng and BEYOND
+// minRng (the dead-zone tube law — under it he is a walker, never a
+// statue) → wind boulder.wind (the ball riding up the tail, drawUnit) →
+// ONE full-size rock into S.gboul with nem:1 (gboulTick's third-side
+// teachings: bf currency, field bounds, no commando catch, hatchlings
+// never hit, toy boxes never answer). pits:1 = the bowls eat a rolling
+// rock (the campaign's fall-in gag); a mesa crumbles it.
+function nemBoulTick(h,kt,dt){
+  const sb=kt.boulder;
+  if(h.nkGW>0){
+    h.nkGW-=dt;
+    if(h.nkGW<=0){
+      h.nkGW=0; h.nkShot=0;
+      const a0=Math.atan2(h.nkDir.y,h.nkDir.x);
+      (S.gboul||(S.gboul=[])).push({ x:h.x+(h.fx?36:-36), y:h.y-10, dx:Math.cos(a0), dy:Math.sin(a0),
+        run:sb.range, spd:sb.spd, r:sb.r, rMax:sb.r, rot:0, hit:{}, rock:1, pits:1, nem:1, rng0:sb.range });
+      S.fx.push({k:'ring',x:h.x+(h.fx?30:-30),y:h.y-16,r:5,R:26,t:0,dur:0.24,col:'#B8A888'});
+      bfSfx(SFX.thock,h.x,h.y);
+    }
+    return true;
+  }
+  h.nkShot=(h.nkShot||0)+dt;
+  if(h.nkShot>=kt.fireCd){
+    let m=null, bd=kt.rng;
     for(const u of S.units){
       if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
       const d=Math.hypot(u.x-h.x,u.y-h.y);
-      if(d<bd){ bd=d; best=u; }
+      if(d<bd && d>=kt.minRng){ bd=d; m=u; }
     }
-    const rch=NEMEGG_R+((h.w||NEMEGG_W)-NEMEGG_W)/2;   // the king's mouth clears his own hide (26+54=80 at his 148)
-    if(best && bd>rch*0.7){
-      const vx=(best.x-h.x)/bd, vy=(best.y-h.y)/bd;
-      h.x+=vx*NEMEGG_SPD*dt; h.y+=vy*NEMEGG_SPD*dt; h.fx=vx>0;
-      h.y=Math.max(74,Math.min(WORLD_H-96,h.y));
-      const vd=voidAt(h.x,h.y);
-      if(vd){ fallFx(h.x,h.y,vd.kind); h.dead=true; bf.hatch.splice(i,1); continue; }   // straight into the magma — even a king (the lair's own lava law, pool edition)
-    }
-    h.cd-=dt;
-    if(best && bd<=rch && h.cd<=0){
-      h.cd=NEMEGG_CD;
-      hurt(best, NEMEGG_BITE, null);   // the no-blame funnel — every save gets its say
-      S.fx.push({k:'ring',x:best.x,y:best.y-16,r:3,R:16,t:0,dur:0.2,col:'#8FBF5A'});
-      bfSfx(SFX.thock,best.x,best.y);
-    }
+    if(m){ const dx=m.x-h.x, dy=m.y-h.y, d=Math.hypot(dx,dy)||1;
+      h.nkDir={x:dx/d,y:dy/d}; h.fx=dx>0; h.nkGW=sb.wind; }
+    else h.nkShot=kt.fireCd*0.7;   // everyone under the arm — walk on
   }
+  return h.nkGW>0;
+}
+// THE BREATH (dilo multi 4 cone .5 · the king multi 6 cone .6): fireCd →
+// the INHALE kt.aim (planted — the gold mouth glow is the fairness tell,
+// drawUnit) → the jets: every figure of either army inside rng and the
+// cone, nearest-first up to multi, NEMKIT_BREATH each through the funnel;
+// ONE layered 'breath' fx is the picture (the 0357 field precedent). The
+// king keeps his D2 turn dance: a fired breath hands the CHARGE its turn.
+function nemBreathTick(h,kt,dt){
+  const kg=h.k==='kingrex';
+  if(h.nkAW>0){
+    h.nkAW-=dt;
+    if(h.nkAW<=0){ h.nkAW=0; h.nkShot=0; nemBreathFire(h,kt); if(kg) h.nkTurn=1; }
+    return true;
+  }
+  h.nkShot=(h.nkShot||0)+dt;
+  if(h.nkShot>=kt.fireCd && h.nkSpr!==1 && (!kg || h.nkTurn!==1)){
+    const m=nemNearFig(h.x,h.y,kt.rng);
+    if(m){ h.nkAW=kt.aim; h.fx=m.x>h.x; }
+    else h.nkShot=kt.fireCd*0.7;
+  }
+  return h.nkAW>0;
+}
+function nemBreathFire(h,kt){
+  const m=nemNearFig(h.x,h.y,kt.rng); if(!m) return;
+  const ang=Math.atan2(m.y-h.y,m.x-h.x);
+  let hits=[];
+  for(const u of S.units){
+    if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+    if(Math.hypot(u.x-h.x,u.y-h.y)>kt.rng) continue;
+    let da=Math.abs(Math.atan2(u.y-h.y,u.x-h.x)-ang); if(da>Math.PI) da=Math.PI*2-da;
+    if(da>=kt.cone/2+0.12) continue;
+    hits.push(u);
+  }
+  if(hits.length>kt.multi){ hits.sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y)); hits=hits.slice(0,kt.multi); }
+  if(!hits.length) return;
+  const kg=h.k==='kingrex', mo=kg?{x:46,y:-56,sc:1.5}:{x:25,y:-24,sc:1};
+  h.fx=Math.cos(ang)>0;
+  bfSfx(SFX.jet,h.x,h.y);
+  S.fx.push({k:'breath',x:h.x+(h.fx?mo.x:-mo.x),y:h.y+mo.y,ang:ang,rng:kt.rng,sc:mo.sc,t:0,dur:kg?0.7:0.65});
+  for(const u of hits) hurt(u, NEMKIT_BREATH, null);
 }
 // v3.23 (card 03): the WORDLESS tell — Wyatt: "doesn't need to say
 // telekinesis. The action should speak for itself." The word came off the
@@ -28260,7 +28574,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.46';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.47';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -37035,7 +37349,12 @@ function gboulTick(dt){
     B.r=Math.min(B.rMax, B.r+step*0.02);
     if(B.pits){ const bv=voidAt(B.x,B.y);
       if(bv){ fallFx(B.x,B.y,bv.kind); bl.splice(i,1); continue; } }
-    let stop = B.run<=0 || B.x<14 || B.x>W+120 || B.y<FOE_TOP-40 || B.y>FOE_BOT+40;
+    // 0389: a hatchling's rock (B.nem) crumbles at the FIELD's own edge —
+    // W/FOE_TOP/FOE_BOT are the campaign lane's — and the verdict crumbles
+    // it outright (the men get their card over a still field).
+    let stop = B.run<=0 || (B.nem
+      ? (B.x<14 || B.x>WORLD_W-14 || B.y<40 || B.y>WORLD_H-20 || (S.bf&&(S.bf.resolved||S.bf.ending)))
+      : (B.x<14 || B.x>W+120 || B.y<FOE_TOP-40 || B.y>FOE_BOT+40));
     if(!stop && S.cfg && S.cfg.terrain) for(const rk of S.cfg.terrain.rocks){
       if(Math.hypot(B.x-rk.x,B.y-rk.y)<rk.r+6){ stop=true; break; } }
     // 0318 THE CAUGHT BALL (Wyatt 8/14: the commando's reflect "should also
@@ -37046,7 +37365,7 @@ function gboulTick(dt){
     // One charge, the shipped catch language. The return works the OTHER
     // army below on cmdoReflLand's own grammar — direct hp + hitCheck, the
     // reflect currency (UDEF.mortar.dmg): ordnance bypasses blocks (v1.38).
-    if(!stop && !B.refl){
+    if(!stop && !B.refl && !B.nem){   // 0389: no commando catch on a hatchling's rock — the reflect's re-aim and its return currency both speak S.foes, a lane the third side never walks (⚑ Wyatt's dial)
       const C=cmdoIntercept(B.x,B.y,B.r+11,0);
       if(C){ B.refl=1; B.rby=C; B.hit={};
         if(B.src && !B.src.dead && S.foes.indexOf(B.src)>=0){ const dd=Math.hypot(B.src.x-B.x,B.src.y-B.y)||1; B.dx=(B.src.x-B.x)/dd; B.dy=(B.src.y-B.y)/dd; }
@@ -37063,6 +37382,16 @@ function gboulTick(dt){
           f2.hp -= UDEF.mortar.dmg;   // the reflect currency — foeSplash's own return law
           hitCheck(f2, B.rby); }
       }
+    } else if(B.nem) for(const u of S.units){
+      // 0389: the third side's rock — bf currency through the funnel, one
+      // hit per figure per roll; hatchlings never hit (his own kind), TOY
+      // BOXES never answer (units only, by construction — RULED: no).
+      if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+      if(B.hit[u.id]) continue;
+      if(Math.hypot(u.x-B.x,u.y-B.y)<B.r+11){ B.hit[u.id]=1;
+        hurt(u, NEMKIT_BOUL, null);
+        S.fx.push({k:'ring',x:u.x,y:u.y-16,r:4,R:22,t:0,dur:0.22,col:'#B8A888'});
+        bfSfx(SFX.thock,u.x,u.y); }
     } else for(const u of S.units){
       if(u.dead || u.jetT>0 || u.dropT>0 || u.falling) continue;
       if(S.drag && S.drag.unit===u) continue;
@@ -42669,7 +42998,7 @@ function update(dt){
   medicPass(dt);   // 0365 THE MEDIC PASS — its own walk down S.units BESIDE the loop, never inside a step: a marching man heals like a halted one, and the 4s quiet clock below keeps its own recovery on top
   for(const u of S.units){
     if(u.dead) continue;             // a casualty is out of the fight the frame he falls (swept below)
-    if(u.side==='nem') continue;     // 0386: a hatchling is nemEggTick's — no clocks, no auras, no march, no gun (his fight is his bite)
+    if(u.side==='nem') continue;     // 0386: a hatchling is nemEggTick's — no clocks, no auras, no march, no gun (0389: his fight is his own kit — the bite and his species' trick)
     if(u.sprue>0) u.sprue-=dt;
     if(u.saberCd>0) u.saberCd-=dt;   // saber rest ticks even mid-march (BF) — he dashes in without the stand-and-wait
     if(u.sgCd>0) u.sgCd-=dt;         // the gap-close dash re-arms the same way (v1.67) — sim dt, loop head only
@@ -46340,10 +46669,39 @@ function drawUnit(u){
   // 0386: a hatchling — the shipped molds/wob/flip at his own width (the
   // king at KING REX'S OWN 148), plus the units' hp-bar grammar in a
   // neutral amber (he is nobody's man; a kid must SEE the king's bar drop).
+  // 0389: the POSE rides the species bag — the campaign bestiary's own draw
+  // grammar, third-side edition: the ptero's draw-only altitude (his shadow
+  // sits on the truth — targeting reads the ground), the trike's brace/
+  // charge/bonk lean, the stego's wind-up rock, the breathers' inhale glow,
+  // the bruiser's rear-up. The amber bar seats scale to the row width (the
+  // king byte-what-he-was: 44×4 @y−140). Rings are information (RM keeps
+  // them); the poses are pure ink.
   if(u.side==='nem'){
-    drawSprite(u.k,u.x,u.y,u.w||NEMEGG_W,0,Math.sin(S.t*9+(u.wob||0))*0.08,null,!!u.fx);
+    const kt9=u.kit||{}, wob9=Math.sin(S.t*9+(u.wob||0))*0.08, w9=u.w||NEMEGG_W;
+    if(kt9.swoop){
+      cx.fillStyle='rgba(0,0,0,0.25)';
+      cx.beginPath(); cx.ellipse(u.x,u.y+4,w9*0.32,5,0,0,7); cx.fill();
+      const lf9=34*(u.sAlt==null?1:u.sAlt)+8, dv9=(u.nkSt==='dive');
+      drawSprite(u.k,u.x,u.y-lf9,w9,0,(dv9?0.12:0)+Math.sin(S.t*6+(u.wob||0))*0.04,null,dv9? !!(u.nkDir&&u.nkDir.x>0) : !!u.fx);
+    } else if(kt9.ram){
+      const rot9= u.nkSt==='brace'? 0.14 : u.nkSt==='charge'? -0.08
+        : (u.nkBonkT>0? Math.sin(S.t*26)*0.12*Math.min(1,u.nkBonkT*2) : wob9);
+      drawSprite(u.k,u.x,u.y,w9,0,rot9,null,!!u.fx);
+    } else if(kt9.boulder){
+      drawSprite(u.k,u.x,u.y,w9,0,(u.nkGW>0? -0.1 : Math.sin(S.t*3.4+(u.wob||0))*0.028),null,!!u.fx);
+      if(u.nkGW>0){ cx.fillStyle='#9a8b74'; cx.strokeStyle='#5c5344'; cx.lineWidth=2.5;
+        cx.beginPath(); cx.arc(u.x+(u.fx?-30:30),u.y-52,13,0,7); cx.fill(); cx.stroke(); }
+    } else {
+      const rot9= (kt9.stompCd&&u.nkAW>0)? -0.14 : (kt9.cone&&u.nkAW>0)? 0.1 : wob9;
+      drawSprite(u.k,u.x,u.y,w9,0,rot9,null,!!u.fx);
+      if(kt9.cone&&u.nkAW>0){ const kg8=u.k==='kingrex';
+        cx.globalAlpha=0.5+0.4*Math.sin(S.t*18); cx.fillStyle='#FFD24A';
+        cx.beginPath(); cx.arc(u.x+(u.fx?1:-1)*(kg8?46:25),u.y-(kg8?56:26),(kg8?8:6)+2.5*Math.sin(S.t*14),0,7); cx.fill(); cx.globalAlpha=1; }
+    }
     if(u.hp<u.hpMax){
-      const k9=Math.max(0,u.hp/u.hpMax), kg9=u.k==='kingrex', bw9=kg9?44:30, bo9=kg9?140:56;
+      const k9=Math.max(0,u.hp/u.hpMax), kg9=u.k==='kingrex',
+        bw9=kg9?44:Math.round(Math.max(26,Math.min(40,w9*0.55))),
+        bo9=kg9?140:Math.round(44+w9*0.3);
       cx.fillStyle='rgba(0,0,0,0.45)'; cx.fillRect(u.x-bw9/2,u.y-bo9,bw9,4);
       cx.fillStyle=k9>0.4?'#C8842F':'#8a2f26'; cx.fillRect(u.x-bw9/2,u.y-bo9,bw9*k9,4);
     }
