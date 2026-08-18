@@ -27536,7 +27536,7 @@ function reset(){
   S.plastic=170; S.lives=10; S.wave=0; S.waveActive=false; S.queue=[]; S.waveT=0;
   WORLD_H=H;      // only a tall map raises it (startBattlefield right after this wipe — or, 0197, a tall crate door via campGrandArm)
   T.y=300; FOE_BOT=H-12;   // 0197: the toy box and the foe floor snap home with the height — the tall crate door moves both to the waist
-  S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[]; S.gboul=[];   // 0278a: the giant's boulders die with the battle
+  S.units=[]; S.foes=[]; S.forms=[]; S.shots=[]; S.fx=[]; S.blobs=[]; S.floats=[]; S.corpses=[]; S.mines=[]; S.gboul=[]; S.breaths=[];   // 0278a: the giant's boulders die with the battle (0396: the standing fire tongues too)
   S.sel=null; S.drag=null; S.shake=0; S.placedAny=false; S.hintT=0; S.cleared=false; S.ann=null; S.interT=0;
   S.kingSpent={};   // 0357: the kings' once-per-battle latch — a fresh battle deals fresh crowns (the crossing's own once-per-battle law, royal edition)
   S.ffLevel=0; S.bossKilled=false; S.bf=null; S.pan=null; S.speed=1; S.slowmo=1; S.spdI=0; S.hitStop=0; S.tanBase=null; S.vflag=null;
@@ -28937,7 +28937,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.53';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.54';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -38705,7 +38705,8 @@ function kingRexTick(f,dt){
     return;
   }
   if(f.shot>=f.def.fireCd*(f.fcx||1)*tkSlowMul(f) && (!f.pounceState || f.pounceState==='idle') && (f.rexTurn!==1 || f.megaK)){   // 0305 BF-01 (D2 strict): a fired breath hands the CHARGE its turn — 0357 MEGA: the king waives the wait (his ~4s clock IS the cadence; no-inhale-mid-sprint stands)
-    if(tanPick(f)) f.aW=f.def.aim;
+    const bm9=tanPick(f);
+    if(bm9){ f.aW=f.def.aim; f.brFc=(bm9.x>f.x)?1:-1; }   // 0396 R4: the king turns for his man before the inhale too
     else f.shot=f.def.fireCd*0.7;
   }
 }
@@ -38851,6 +38852,61 @@ function tanCone(f){
   S.fx.push({k:'flash',x:mzx,y:mzy,ang,R:reducedMotion()?10:15,lw:reducedMotion()?2:3,t:0,dur:0.12});
   return true;
 }
+// ===== 0396 THE LAVA DINOSAUR'S FIRE — THE JET IS ITS PICTURE (Wyatt 8/17:
+// "Make sure the lava dinosaur is the one spitting the fire. Make sure that
+// their damage is working. In the campaign, we felt like their hitbox wasn't
+// being respected."). ONE geometry answers the inhale glow, the 'breath' fx
+// and the burn: the JAW is the root (the mold's own muzzle, MIRRORED when
+// the breath goes +x — he faces the man he burns, nemBreathTick's own
+// grammar), the half-spread is the DRAWN 0.26·coneX, the reach is the drawn
+// frng. The tongue LIVES its whole fx dur as a standing fire region in
+// S.breaths — deterministic (positions + sim clocks only, zero dice — the
+// mvSm law holds), ONE pip per man per breath (the set), airborne (jetT) and
+// the dragged man untouchable (the standing "drag your men out" grace,
+// unchanged). EVERY man in the picture burns — no multi trim inside the
+// tongue (Wyatt's hitbox law; multi keeps its other jobs: the teddy's
+// pellets, tanflame's lick, the branch pick). =====
+const BR_BODY=12;    // ⚑ FIRE_BODY: a figure's half-shoulder — his BODY standing in the flame burns, not just his feet-point (the wedge dilates by this)
+const BR_PLANT=1;    // ⚑ the breather stands planted while his own jet stands (a moonwalking breather fails the eyeball law); 0 walks him mid-jet
+function breathMo(f){ const kg=f.type==='kingrex'; return {x:(kg?46:25)*(f.brFc===1?1:-1), y:kg?-56:-24, sc:kg?1.5:1}; }
+function breathGeo(f){ const mo=breathMo(f); return {x:f.x+mo.x, y:f.y+mo.y, sc:mo.sc, sp:0.26*(f.coneX||1), rng:frng(f)}; }
+// is this man's figure in the drawn tongue? — exact point-to-wedge distance
+// vs BR_BODY (the tip's 1.12 quadratic bulge and the ±6% length flicker are
+// presentation, the flame-lick law; the flat rng splits them honestly)
+function breathHitsU(b,u){
+  const dx=u.x-b.x, dy=u.y-b.y, d=Math.hypot(dx,dy);
+  if(d<=BR_BODY) return true;
+  let da=Math.abs(Math.atan2(dy,dx)-b.ang); if(da>Math.PI) da=Math.PI*2-da;
+  if(da<=b.sp) return d<=b.rng+BR_BODY;
+  const be=da-b.sp;
+  if(be>=Math.PI/2) return false;
+  const along=d*Math.cos(be);
+  if(along<=b.rng) return d*Math.sin(be)<=BR_BODY;
+  return Math.hypot(along-b.rng,d*Math.sin(be))<=BR_BODY;
+}
+function breathBurn(b){
+  for(const u of S.units){
+    if(u.dead||u.jetT>0) continue;               // airborne: the v1.39 grace stands
+    if(S.drag&&S.drag.unit===u) continue;        // the dragged man: "drag your men out" stands (a DROPPED man burns)
+    if(b.hit.has(u)) continue;                   // one pip per man per breath
+    if(b.src&&!bfCanTarget(b.src,u)) continue;   // 0129 the trench sight law, unchanged
+    if(!breathHitsU(b,u)) continue;
+    b.hit.add(u);
+    tanHit(u,b.fx0,b.fy0,b.src);                 // one grit pip on the standard save path (⚑ FIRE_PIPS: a pipN row seat is the one-line dial, NOT moved)
+  }
+}
+function breathFire(f,aimM){
+  f.brFc=(aimM.x>f.x)?1:-1;                      // R4 authoritative at the fire: the jaw + the figure mirror together
+  const g=breathGeo(f), dur=f.boss?0.7:0.65;
+  const ang=Math.atan2(aimM.y-g.y,aimM.x-g.x);   // the centerline runs JAW→man — picture, glow and burn share it
+  SFX.jet();
+  S.fx.push({k:'breath',x:g.x,y:g.y,ang:ang,rng:g.rng,sc:g.sc,sp:g.sp,t:0,dur:dur});
+  const b={x:g.x,y:g.y,ang:ang,sp:g.sp,rng:g.rng,t:0,dur:dur,src:f,fx0:f.x,fy0:f.y,hit:new Set()};
+  (S.breaths||(S.breaths=[])).push(b);
+  if(BR_PLANT) f.brT=dur;                        // the stance holds while his own jet stands (drawFoe + the planted read)
+  breathBurn(b);                                 // the fire frame: everyone in the picture burns NOW
+  return true;
+}
 // the flame: the green flame's own shape — first N in reach, a puff between
 // shooter and victim, one hit each (green's extra.slice idiom, mirrored).
 // 0278b: a CONE-carrying multi (dilo · kingrex — the fire-breathers) AIMS
@@ -38860,7 +38916,9 @@ function tanCone(f){
 // this same proven hitscan. tanflame carries no cone — byte-what-he-was.
 function tanMulti(f){
   const cone=f.def.cone*(f.coneX||1), mlt=(f.def.multi||0)*(f.multiX||1); let ang=0;   // 0357 MEGA REX: conex/multix spawn stamps (×1 unstamped — every shipped breather reads byte-what-it-was)
-  if(cone){ const aimM=tanPick(f); if(!aimM) return false; ang=Math.atan2(aimM.y-f.y,aimM.x-f.x); }
+  if(cone){ const aimM=tanPick(f); if(!aimM) return false;
+    if(!f.def.pellet) return breathFire(f,aimM);   // 0396: the fire-breathers (dilo · the king) leave the one-frame feet-hitscan — the jet is its picture now; the teddy's pellet cone and tanflame's lick below stay byte-what-they-were
+    ang=Math.atan2(aimM.y-f.y,aimM.x-f.x); }
   let hits=[];
   for(const u of S.units){
     if(u.dead||u.jetT>0) continue;
@@ -38873,20 +38931,13 @@ function tanMulti(f){
   if(cone && hits.length>mlt){ hits.sort((a,b)=>Math.hypot(a.x-f.x,a.y-f.y)-Math.hypot(b.x-f.x,b.y-f.y)); hits=hits.slice(0,mlt); }   // 0357: the trim reads the stamped cap
   if(!hits.length) return false;
   if(cone){
-    if(f.def.pellet){
-      // 0339 THE TEDDY'S SHOTGUN — a cone-carrying multi that is PELLETS,
-      // never breath: the ≤multi trim above already picked the nearest 3;
-      // the picture is tanCone's own (cone sweep + muzzle flash + thock),
-      // the mechanic stays this same proven hitscan.
-      SFX.thock(); SFX.tpew();
-      S.fx.push({k:'cone',x:f.x-14,y:f.y-26,ang,spread:f.def.cone,rng:frng(f),t:0,dur:0.16});
-      S.fx.push({k:'flash',x:f.x-14,y:f.y-26,ang,R:reducedMotion()?10:15,lw:reducedMotion()?2:3,t:0,dur:0.12});
-      for(const u of hits) tanHit(u,f.x,f.y,f);
-      return true;
-    }
-    SFX.jet();
-    const mo=f.type==='kingrex'? {x:-46,y:-56,sc:1.5} : {x:-25,y:-24,sc:1};
-    S.fx.push({k:'breath',x:f.x+mo.x,y:f.y+mo.y,ang:ang,rng:frng(f),sc:mo.sc,sp:0.26*(f.coneX||1),t:0,dur:f.boss?0.7:0.65});   // 0357: the jet's spread widens with the stamped arc (the length already rides frng)
+    // 0339 THE TEDDY'S SHOTGUN — a cone-carrying multi that is PELLETS,
+    // never breath (the breathers rerouted above — 0396): the ≤multi trim
+    // above already picked the nearest 3; the picture is tanCone's own
+    // (cone sweep + muzzle flash + thock), the proven hitscan stands.
+    SFX.thock(); SFX.tpew();
+    S.fx.push({k:'cone',x:f.x-14,y:f.y-26,ang,spread:f.def.cone,rng:frng(f),t:0,dur:0.16});
+    S.fx.push({k:'flash',x:f.x-14,y:f.y-26,ang,R:reducedMotion()?10:15,lw:reducedMotion()?2:3,t:0,dur:0.12});
     for(const u of hits) tanHit(u,f.x,f.y,f);
     return true;
   }
@@ -43217,6 +43268,13 @@ function update(dt){
     if(S.park.jcSay>0){ S.park.jcSay-=dt; if(S.park.jcSay<=0){ S.park.jcSay=0; COMM.cd=0; if(!commSay('janecameo')) S.park.jcSay=1.2; } }
   }
   if(S.tanBase && S.tanBase.hitT>0) S.tanBase.hitT-=dt;   // the crate's hit flash cools here, on sim time
+  // 0396 R2: the standing fire tongues live their whole fx dur — a man who
+  // steps (or is dropped) into a tongue mid-life burns his one pip too; the
+  // region outlives its breather (the flame already left his mouth).
+  if(S.breaths && S.breaths.length){
+    for(const b9 of S.breaths){ b9.t+=dt; breathBurn(b9); }
+    S.breaths=S.breaths.filter(b9=>b9.t<b9.dur);
+  }
 
   // formations: anchors wheel toward the Toy Box
   for(let i=S.forms.length-1;i>=0;i--){
@@ -43289,6 +43347,7 @@ function update(dt){
     const px=f.x, py=f.y;
     aura*=f.spdMul||1;
     if(f.mgRootT>0) f.mgRootT-=dt;   // v2.44: the tan gunner's root cools on his own loop head (the green law, mirrored)
+    if(f.brT>0){ f.brT-=dt; if(f.brT<0) f.brT=0; }   // 0396: the breather's stance-hold cools with his standing jet
     if(f.tkSlowT>0){ f.tkSlowT-=dt; if(f.tkSlowT<0) f.tkSlowT=0; }   // v3.11 TEAL: the concussion's slow cools on the same head
     // v2.44: the MG stays stopped TWO SECONDS past his last round (mgRootT
     // rides beside aimT in this freeze) — the "walks his burst in" brrrt
@@ -43299,7 +43358,7 @@ function update(dt){
       if(f.falling.t>=f.falling.dur){ const fk=f.falling.kind; f.falling=null; f.fellVoid={kind:fk}; }
       if(dt>0){ f.vx=0; f.vy=0; } }
     else if(f.shv){ ggShoveStep(f,dt); if(dt>0){ f.vx=0; f.vy=0; } }   // 8/8 gravity gun: the flight owns his feet this frame
-    else if(f.aimT>0 || f.mgRootT>0 || f.aW>0){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; }   // stopped to shoot — your window (0278a: a halted air-stepper stands planted, never frozen mid-hop; 0278b: f.aW = the bruiser's rear-up + the king's inhale, the same planted read)
+    else if(f.aimT>0 || f.mgRootT>0 || f.aW>0 || f.brT>0){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; }   // stopped to shoot — your window (0278a: a halted air-stepper stands planted, never frozen mid-hop; 0278b: f.aW = the bruiser's rear-up + the king's inhale, the same planted read; 0396: f.brT = a breather stands through his own standing jet — ⚑ BR_PLANT)
     else {
     // 0278a THE AIR-STEP GATE: airMv() integrates this frame's airborne
     // overlap for the gait types (snowfig · gsnowman · the king's footwork)
@@ -43565,6 +43624,7 @@ function update(dt){
         const rdy=panic? Math.min(cd,SABER_PANIC_CD) : cd;
         if(f.shot>=rdy && (tanPick(f) || (!f.def.splashR&&!f.def.cone&&!f.def.multi&&tanYetiPick(f)))){   // halt... aim... (tanPick honours a tube's dead zone; v2.58: an aimed-round man also halts for the YETI — without this the gate never opens on a green-empty flank and he eats the column unanswered)
           f.aimT = panic? SABER_PANIC_AIM : (f.def.aim||0.55);   // 0117: the sniper's long present-arms is his fairness contract
+          if(f.def.multi&&f.def.cone&&!f.def.pellet){ const bm9=tanPick(f); f.brFc=(bm9&&bm9.x>f.x)?1:-1; }   // 0396 R4: the breather turns to face his man BEFORE he inhales (re-stamped at the fire from the real aim man)
         }
       }
     }
@@ -47863,9 +47923,10 @@ function drawFoe(f){
       // tell (gold glow swelling at the mouth — the wordless fairness
       // window), else the heavy royal sway. Grass park — no snow floor.
       const kro=(f.pounceState==='out')? -0.14 : (f.aW>0? 0.08 : Math.sin(S.t*3.4+f.wob)*0.028);
-      drawSprite(f.type,f.x,f.y,f.def.w,0,kro,foeImg(f.type),wbk);
-      if(f.aW>0){ cx.globalAlpha=0.5+0.4*Math.sin(S.t*18); cx.fillStyle='#FFD24A';
-        cx.beginPath(); cx.arc(f.x-46,f.y-56,8+3*Math.sin(S.t*14),0,7); cx.fill(); cx.globalAlpha=1; }
+      const kfl9=(f.pounceState!=='out'&&(f.aW>0||f.brT>0))? f.brFc===1 : wbk;   // 0396 R4: inhale + his standing jet face his man (+x mirrors); the sprint keeps its own read
+      drawSprite(f.type,f.x,f.y,f.def.w,0,kro,foeImg(f.type),kfl9);
+      if(f.aW>0){ const g9=breathGeo(f); cx.globalAlpha=0.5+0.4*Math.sin(S.t*18); cx.fillStyle='#FFD24A';
+        cx.beginPath(); cx.arc(g9.x,g9.y,8+3*Math.sin(S.t*14),0,7); cx.fill(); cx.globalAlpha=1; }
       return;
     }
     if(f.type==='rollpig'||f.type==='gpig'){   // 8/8: the giant rolls in his little brother's paint, double the box
@@ -48002,10 +48063,14 @@ function drawFoe(f){
   } else if(f.def.multi && f.def.cone){
     // 0278b THE DILOPHOSAURUS — the aim halt IS the inhale (aimT, the
     // generic fairness tell): lean in, gold glow swelling at the mouth;
-    // the jet itself is the 'breath' fx tanMulti pushes.
-    drawSprite(f.type,f.x,f.y,f.def.w,0,(f.aimT>0? 0.1 : wob),foeImg(f.type),wbk);
-    if(f.aimT>0 && !f.def.pellet){ cx.globalAlpha=0.5+0.4*Math.sin(S.t*18); cx.fillStyle='#FFD24A';
-      cx.beginPath(); cx.arc(f.x-25,f.y-26,6+2.5*Math.sin(S.t*14),0,7); cx.fill(); cx.globalAlpha=1; }
+    // the jet itself is the 'breath' fx tanMulti pushes (0396: glow, fx and
+    // burn all root at breathGeo's jaw; the figure mirrors toward his man
+    // through the inhale + his standing jet; the teddy's pellet aim keeps
+    // the pure walk-flip read).
+    const bfl9=(!f.def.pellet&&(f.aimT>0||f.brT>0))? f.brFc===1 : wbk;
+    drawSprite(f.type,f.x,f.y,f.def.w,0,(f.aimT>0? 0.1 : wob),foeImg(f.type),bfl9);
+    if(f.aimT>0 && !f.def.pellet){ const g9=breathGeo(f); cx.globalAlpha=0.5+0.4*Math.sin(S.t*18); cx.fillStyle='#FFD24A';
+      cx.beginPath(); cx.arc(g9.x,g9.y,6+2.5*Math.sin(S.t*14),0,7); cx.fill(); cx.globalAlpha=1; }
   } else
   drawSprite(f.type,f.x,f.y-(f.hopZ||0),f.def.w,0,wob+croakRc(f),foeImg(f.type),wbk);   // v2.53: the yeti's bound lifts the BODY only — his shadow stays on the ground where the contact circle lives (v3.61: + the walk-flip seat; 0382: + the little king's volley recoil rock, zero for everyone else)
   // 0117 THE SNIPER'S TELL — the fairness contract for the 205 reach: a long
