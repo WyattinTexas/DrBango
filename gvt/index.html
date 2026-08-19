@@ -3296,14 +3296,34 @@
   .dogwagG { animation:dogwag 0.75s ease-in-out infinite alternate; }
   .dogpatA { animation:dogpat 0.7s ease-out; }
   @keyframes dogbob { 0%{transform:translateY(0)} 50%{transform:translateY(-6px)} 100%{transform:translateY(0)} }
-  @keyframes dogsniff { from{transform:rotate(9.2deg) translate(-4px,3px)} to{transform:rotate(9.2deg) translate(-4px,9px)} }
+  @keyframes dogsniff { from{transform:rotate(3deg) translate(-2px,1px)} to{transform:rotate(3deg) translate(-2px,3px)} }
   @keyframes dogwag { from{transform:rotate(-10deg)} to{transform:rotate(10deg)} }
   @keyframes dogpat { 0%{transform:translateY(0) rotate(0deg)} 22%{transform:translateY(-18px) rotate(3deg)}
     44%{transform:translateY(0) rotate(-2deg)} 64%{transform:translateY(-9px) rotate(2deg)}
     82%{transform:translateY(0) rotate(-1deg)} 100%{transform:translateY(0) rotate(0deg)} }
+  /* 0412 THE GOOD BOY: two leg phases (a = near-front + far-hind, b = the other
+     diagonal pair) swing only in the trot; the head nods a hair in the trot and
+     drops to the grass in the SNIFF; the ear flops with the step and flies up on
+     the pat; the tongue is hidden until the pat. */
+  .dogtrotB .dgLegA { animation:dogstep 0.35s ease-in-out infinite alternate; }
+  .dogtrotB .dgLegB { animation:dogstep 0.35s ease-in-out infinite alternate-reverse; }
+  @keyframes dogstep { from{transform:rotate(-24deg)} to{transform:rotate(24deg)} }
+  .dogtrotB .dogHeadG { animation:doghnod 0.35s ease-in-out infinite alternate; }
+  @keyframes doghnod { from{transform:rotate(-2deg)} to{transform:rotate(3deg)} }
+  .dogsniffB .dogHeadG { animation:doghsniff 0.63s ease-in-out infinite alternate; }
+  @keyframes doghsniff { from{transform:rotate(-26deg) translate(1px,2px)} to{transform:rotate(-34deg) translate(1px,3px)} }
+  .dogtrotB .dogEarG { animation:dogearflop 0.35s ease-in-out infinite alternate; }
+  @keyframes dogearflop { from{transform:rotate(-8deg)} to{transform:rotate(10deg)} }
+  .dogpatA .dogEarG { animation:dogearup 0.7s ease-out; }
+  @keyframes dogearup { 0%{transform:rotate(0)} 22%{transform:rotate(-70deg)} 50%{transform:rotate(-20deg)} 70%{transform:rotate(-45deg)} 100%{transform:rotate(0)} }
+  .dogTng { opacity:0; }
+  .dogpatA .dogTng { animation:dogtng 0.7s ease-out; }
+  @keyframes dogtng { 0%{opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{opacity:0} }
   @media (prefers-reduced-motion: reduce){
     #ro-gooddog .dogtrotB, #ro-gooddog .dogsniffB, #ro-gooddog .dogwagG,
-    #ro-gooddog .dogpatA { animation:none; } }
+    #ro-gooddog .dogpatA { animation:none; }
+    #ro-gooddog .dgLegA, #ro-gooddog .dgLegB, #ro-gooddog .dogHeadG,
+    #ro-gooddog .dogEarG, #ro-gooddog .dogTng { animation:none; } }
   /* ROBO-SARGE 3000 — bounded by construction: no wander keyframe is more than
      150px out from where he's parked, so he can never leave the rug. */
   .dec-whorse.react { animation:whtrot 1s ease-in-out; }
@@ -4255,6 +4275,7 @@
        list covers only the room framings) */
     #milePop .duckbob, #milePop .rcjig { animation:none; }
     #milePop .dogwagG, #milePop .dogtrotB { animation:none; }   /* 0385: the bone card's dog sits still too */
+    #milePop .dgLegA, #milePop .dgLegB, #milePop .dogHeadG, #milePop .dogEarG, #milePop .dogTng { animation:none; }   /* 0412: and so do the redrawn dog's limbs */
   }
   /* v2.62 ARABIC READING ORDER — text-level only, never layout. Each element's
      inline text lays out by its own first strong character, so a line like
@@ -29430,7 +29451,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.69';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.70';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -53479,25 +53500,43 @@ function dogTick(){
   dogPaint();
 }
 setInterval(dogTick, 100);
-// TG drawDog's geometry verbatim (canvas → SVG): a seated dog facing LEFT,
-// the head its own group at (-8,-6), the red collar in the body frame over
-// the seam, the tail a nested-translate pivot so the wag turns at its base.
-function dogArtSVG(){
+// 0412 THE GOOD BOY (design/dog-companion-0818 candidate A — Wyatt: "a
+// wonderful little companion that people love to see and look at, and he
+// looks professional"): a standing, trotting puppy in TG's palette to the
+// hex; the seated stub is retired for four legs with a real walk cycle.
+// Every pose pivot rides the .dgPin nested-translate law (the ancestor
+// translate puts local (0,0) AT the pivot): .dgLegA/.dgLegB ×2 at the hips
+// (diagonal trot pairs), .dogHeadG at the neck, .dogEarG at the ear root,
+// .dogTng the pat tongue; the tail keeps .dogwagG. REV 2 forward-compat:
+// dogArtSVG(coat) takes {coat,shade,cream,ear,ink,collar,tag} — default
+// DOG_COAT_CLASSIC (the TG hexes); the bare call is byte-identical to it.
+const DOG_COAT_CLASSIC={ coat:'#8a6544', shade:'#7A553A', cream:'#EFE0BC', ear:'#5b3a22', ink:'#23211E', collar:'#C0392B', tag:'#E8C878' };
+function dogArtSVG(c9){
+  const K=c9||DOG_COAT_CLASSIC;
+  const leg=(x,y,len,col,w,cls,sock)=>'<g transform="translate('+x+','+y+')"><g class="dgPin '+cls+'">'
+    +'<path d="M0 0 L0 '+len+'" stroke="'+col+'" stroke-width="'+w+'" fill="none" stroke-linecap="round"/>'
+    +(sock? '<circle cx="0" cy="'+len+'" r="'+(w*0.55)+'" fill="'+K.cream+'"/>' : '')
+    +'</g></g>';
   return '<g stroke-linecap="round">'
-    +'<g transform="translate(13,2)"><g class="dogwagG dgPin"><path d="M0 0 Q5 -2 7 -6" stroke="#8a6544" stroke-width="3.4" fill="none"/></g></g>'
-    +'<ellipse cx="8" cy="7" rx="8.5" ry="7.5" fill="#8a6544"/>'
-    +'<ellipse cx="-4" cy="4" rx="7" ry="7" fill="#8a6544"/>'
-    +'<path d="M-7 8 L-7 16 M-1 9 L-1 16" stroke="#8a6544" stroke-width="4" fill="none"/>'
-    +'<path d="M12 13 L15 16" stroke="#7A553A" stroke-width="3.6" fill="none"/>'
-    +'<ellipse cx="-5" cy="3" rx="3.4" ry="4.6" fill="#EFE0BC" transform="rotate(11.5 -5 3)"/>'
-    +'<g transform="translate(-8,-6)">'
-      +'<circle r="6.4" fill="#8a6544"/>'
-      +'<rect x="-11" y="-1" width="7" height="5.4" rx="2.6" fill="#7A553A"/>'
-      +'<circle cx="-10.4" cy="1.6" r="1.7" fill="#23211E"/>'
-      +'<path d="M3 -6 Q8 -4 6.5 2 Q5 4 2.6 1 Z" fill="#5b3a22"/>'
-      +'<circle cx="-2.6" cy="-1.6" r="1.3" fill="#23211E"/>'
-    +'</g>'
-    +'<path d="M-2.39 -2.16 A6.8 6.8 0 0 1 -12 -0.51" stroke="#C0392B" stroke-width="2.4" fill="none"/>'
+    +'<g transform="translate(11.5,-1)"><g class="dogwagG dgPin"><path d="M0 0 Q4.2 -1 4.6 -6 Q4.8 -8.6 2.6 -8.6" stroke="'+K.coat+'" stroke-width="3.2" fill="none"/><circle cx="2.6" cy="-8.6" r="1.7" fill="'+K.cream+'"/></g></g>'
+    +leg(-2.5,7,8.5,K.shade,3.4,'dgLegB',true)
+    +leg(9.5,7,8.5,K.shade,3.4,'dgLegA',true)
+    +'<path d="M-11.9 2.4 C-11.9 -2.6 -8.6 -4.6 -4.2 -4.6 L5.4 -4.2 C10 -4 12.6 -1.2 12.6 3 C12.6 7.4 9.8 9.6 5.8 9.6 L-4.6 9.8 C-9.6 9.8 -11.9 7.2 -11.9 2.4 Z" fill="'+K.coat+'"/>'
+    +leg(-6.5,7,8.5,K.coat,3.6,'dgLegA',true)
+    +leg(6,7,8.5,K.coat,3.6,'dgLegB',true)
+    +'<ellipse cx="-8.4" cy="5.2" rx="3.1" ry="3.9" fill="'+K.cream+'" transform="rotate(14 -8.4 5.2)"/>'
+    +'<path d="M-14 -0.6 Q-9.2 3.6 -3.6 -0.2" stroke="'+K.collar+'" stroke-width="2.6" fill="none"/>'
+    +'<circle cx="-9.4" cy="3.6" r="1.5" fill="'+K.tag+'"/>'
+    +'<g transform="translate(-9,-2)"><g class="dogHeadG dgPin">'
+      +'<circle cx="-3" cy="-4.5" r="7.2" fill="'+K.coat+'"/>'
+      +'<rect x="-12.6" y="-5" width="8.6" height="6.2" rx="3" fill="'+K.cream+'"/>'
+      +'<circle cx="-11.6" cy="-2.9" r="1.95" fill="'+K.ink+'"/>'
+      +'<path d="M-9.4 0.2 q1.4 1.5 2.9 0.1" stroke="'+K.ink+'" stroke-width="0.9" fill="none"/>'
+      +'<path class="dogTng" d="M-9.6 0.5 Q-8.4 4.4 -6.9 0.7 Z" fill="#E0656B"/>'
+      +'<circle cx="-4.6" cy="-6.6" r="1.75" fill="'+K.ink+'"/>'
+      +'<circle cx="-5.2" cy="-7.2" r="0.62" fill="#FFFFFF"/>'
+      +'<g transform="translate(1.2,-10.2)"><g class="dogEarG dgPin"><path d="M0 0 Q6.2 -0.4 5.2 7 Q4.6 11.2 1.4 10.7 Q-1.4 10.2 0 0 Z" fill="'+K.ear+'"/></g></g>'
+    +'</g></g>'
     +'</g>';
 }
 function dogFlipNow(q){
@@ -53536,7 +53575,7 @@ function dogZSeat(fresh){
   if(!fresh && (ref===el.nextElementSibling || (ref===null && belt.lastElementChild===el))) return;
   belt.insertBefore(el, ref);
   const dl=-DOGT.t;   // reinsertion restarts CSS animations — resume phase (robZTick's negative-delay law)
-  for(const sel of ['#dogPose','.dogwagG']){ const n=el.querySelector(sel); if(n) n.style.animationDelay=dl+'s'; }
+  for(const sel of ['#dogPose','.dogwagG','.dgLegA','.dgLegB','.dogHeadG','.dogEarG']) for(const n of el.querySelectorAll(sel)) n.style.animationDelay=dl+'s';
 }
 function dogPaint(){
   const belt=document.getElementById('ychars');
@@ -63309,7 +63348,7 @@ window.UI = {
     if(p){ p.innerHTML='<div class="mb-card">'
       +'<span class="mb-band">KING REX\'S LAIR</span>'
       +'<h2 class="mb-h">DOG UNLOCKED!</h2>'
-      +'<span class="mb-win">'+MB_RAYS+'<svg viewBox="0 0 120 120"><g transform="translate(59,54) scale(2.8)"><g class="dgPin dogtrotB">'+dogArtSVG()+'</g></g></svg></span>'
+      +'<span class="mb-win">'+MB_RAYS+'<svg viewBox="0 0 120 120"><g transform="translate(62,54) scale(2.6)"><g class="dgPin dogtrotB">'+dogArtSVG()+'</g></g></svg></span>'
       +'<span class="mb-line">He wanders around!</span>'
       +'<button type="button" class="mb-take" onclick="UI.mileTake()">HE\'S MINE!</button>'
       +'</div>';
