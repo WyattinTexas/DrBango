@@ -23813,9 +23813,30 @@ const VOLLEY_CYCLE={ redcoat:{period:3.2, haltAt:2.3, present:0.55},
 // battery). QUIET MERCY stacks under the hp axis
 // automatically (it multiplies S.cfg.hpMul after levelCfg builds);
 // yeti/mom hp is written flat elsewhere — the law keeps its hands off both.
+// 0408 THE LONG MARCH 60-100 (Wyatt 8/18: "I think I'm at 80 now, and the
+// last 20 have been almost a blur of ease… a real journey to get to level
+// 100"): the fresh walk battery the 8/11 card demanded RAN (before/after
+// tables in design/campaign/LEVEL-PASS-66-100.md §0408 + the ship memory),
+// so the flat axes climb again — each dial ONE seat, measured against the
+// three walls: (1) hp gains a SECOND, SOFTER slope past the L65 peg
+// (hpSlope2 0.01 to hpPeak2 88 → 5.17 flat 88-100, UNDER the ~5.25
+// knife-edge where a 2hp rifle would round to 11 — rifles hold 10hp the
+// whole march; the climb bites through bosses, armor and the 4hp+ bodies:
+// officers 21 from L84, MGs 16 from L88, tanks 296→310); (2) bosses gain a
+// second slope too (bossFrom2 66, bossSlope2 0.006 → ×2.21 at L100, rex
+// 586→674 — the monsters stay the deep half's growth axis); (3) the
+// trigger floor drops 0.85→0.78 (the −0.006 line keeps sliding 75→85, the
+// floor lands at L86 — rifle cadence 2.72s→2.50s deep; officer/tank/boss
+// clocks stay off-axis, the standing law). 50-65 provably untouched
+// (every new window opens past 65); the deep SPIKE rungs ride CAMP_EDITS
+// (the count plateau ate their ×1.08 — see the overlay table); the parks
+// are PINNED to the pre-0408 curve (PARK_CS at parkCampAxes — the mirror
+// no longer retunes with this law).
 const CAMP_STRENGTH={ hpFrom:50, hpSlope:0.015, hpTo:100, hpPeak:65,
+                      hpSlope2:0.01, hpPeak2:88,
                       bossFrom:51, bossSlope:0.02, bossTo:100,
-                      rateFrom:50, rateSlope:0.006, rateFloor:0.85, rateTo:100 };
+                      bossFrom2:66, bossSlope2:0.006,
+                      rateFrom:50, rateSlope:0.006, rateFloor:0.78, rateTo:100 };
 function levelCfg(n){
   // v1.46 THE 80% CURVE (doc LAW D): the count knee (+0.12/lvl through L30,
   // +0.06 after — L100 fields 8.7x, not 12.9x), the hp ceiling (x6 — a plastic
@@ -23844,13 +23865,15 @@ function levelCfg(n){
   // every rung past hp ~5 went red at any rank — and a plastic rifleman
   // should never need more than ~3 max-rank rounds anyway. One const.
   const cfg = { n, hpMul: Math.min(4.7, 1+0.08*Math.max(0,n-2))
-      + (n>=CAMP_STRENGTH.hpFrom && n<=CAMP_STRENGTH.hpTo ? CAMP_STRENGTH.hpSlope*(Math.min(n,CAMP_STRENGTH.hpPeak)-(CAMP_STRENGTH.hpFrom-1)) : 0),   // 8/11 LEVEL PASS 31-65 + 66-100: the second slope, PEGGED at hpPeak (4.94 flat 65→100 — the measured knife-edge law)
+      + (n>=CAMP_STRENGTH.hpFrom && n<=CAMP_STRENGTH.hpTo ? CAMP_STRENGTH.hpSlope*(Math.min(n,CAMP_STRENGTH.hpPeak)-(CAMP_STRENGTH.hpFrom-1)) : 0)   // 8/11 LEVEL PASS 31-65 + 66-100: the second slope, PEGGED at hpPeak (4.94 at 65 — the measured knife-edge law)
+      + (n>CAMP_STRENGTH.hpPeak && n<=CAMP_STRENGTH.hpTo ? CAMP_STRENGTH.hpSlope2*(Math.min(n,CAMP_STRENGTH.hpPeak2)-CAMP_STRENGTH.hpPeak) : 0),   // 0408 THE LONG MARCH: the third, SOFTER slope — 4.94→5.17 across 66-88, flat to 100 (walk-battery gated; a 2hp rifle still rounds to 10, the knife-edge held under 5.25)
     cntMul: Math.min(cnt0*(spike?1.08:breather?0.92:1), CNT_PLATEAU),   // 0098: the plateau's own law, applied to the product (breathers only ever sit below it)
     // bosses climb toward FULL hp growth as the ladder deepens (0.5 -> 1.0
     // across L30-L50): half-growth was tuned for a shallow ladder, and it is
     // exactly why a L75 giant weighed 7% of a parade (doc LAW A2).
     bossF: Math.min(1, 0.5+Math.max(0,n-30)*0.025)
-      + (n>=CAMP_STRENGTH.bossFrom && n<=CAMP_STRENGTH.bossTo ? CAMP_STRENGTH.bossSlope*(n-(CAMP_STRENGTH.bossFrom-1)) : 0),   // 8/11: bosses keep growing past the old 1.0 ceiling (L50 HIGH NOON stays exactly 1.0 — the window opens at 51)
+      + (n>=CAMP_STRENGTH.bossFrom && n<=CAMP_STRENGTH.bossTo ? CAMP_STRENGTH.bossSlope*(n-(CAMP_STRENGTH.bossFrom-1)) : 0)   // 8/11: bosses keep growing past the old 1.0 ceiling (L50 HIGH NOON stays exactly 1.0 — the window opens at 51)
+      + (n>=CAMP_STRENGTH.bossFrom2 && n<=CAMP_STRENGTH.bossTo ? CAMP_STRENGTH.bossSlope2*(n-(CAMP_STRENGTH.bossFrom2-1)) : 0),   // 0408 THE LONG MARCH: the second boss slope — ×1.33 at 66 → ×2.21 at 100 (rex 586→674 at the summit; 51-65 byte-value-still, the window opens at 66)
     // 8/11 LEVEL PASS 31-65: the RATE axis — tan fireCd × this, landing at
     // spawnFoe's fireMul seat (1.0 outside the window; battlefield/rival/
     // mom/nemesis cfgs never carry the field and read identity via ||1).
@@ -24964,7 +24987,25 @@ const BOSSDEF = {
 // ⚠ THIS MUST LIVE IN THE SHIPPED FILE. Co-op relays only the level NUMBER — both sims
 // rebuild the army from levelCfg, so an override in localStorage, a ?param or a fetch
 // desyncs every co-op lobby. "Resubmit to update the game" means COMMIT.
-const CAMP_EDITS = {};
+// 0408 THE LONG MARCH: the table ARMS for the first time — E.levels only,
+// four rows, the numbers pass's band-shaping seat. THE WHY: once counts hit
+// the L33 plateau (from L36) the boss rungs' ×1.08 count spike stopped
+// buying bodies (the 0098 cap binds the product), so the deep SPIKE rungs
+// went flat with everything else. The spike identity moves to the axis with
+// headroom: the deep carousel pressure rungs (72/78/84/96 — the pair +
+// R2B-tank rungs) wear bossF at the formula's own value ×1.04, a strict
+// ladder 1.54→2.19 that stays UNDER the L100 summit's 2.21. ⚠ L90 wears NO
+// row BY MEASUREMENT: the band's heaviest organic rung (69-body finale +
+// pair + tank) walked at ×1.04 put the sensible-player proxy at 0-for-2 —
+// its own composition IS the spike, and the formula's 1.95 (+8.3% over the
+// shipped 1.80) already firms it; one row here re-adds the wall-rung read
+// if Wyatt wants it. Breathers, authored rungs (65/70/85/95) and SACRED
+// L100 carry NO row — they ride the law alone. hpMul/cntMul rows
+// deliberately unused: counts are BAKED at build time (a post-build cntMul
+// override moves no bodies) and the hp ceiling is the knife-edge's, not
+// this table's. Overrides are ABSOLUTE values (the grammar replaces).
+const CAMP_EDITS = { v:1, levels:{
+  72:{ bossF:1.54 }, 78:{ bossF:1.70 }, 84:{ bossF:1.87 }, 96:{ bossF:2.19 } } };
 if(CAMP_EDITS && CAMP_EDITS.v){
   const E = CAMP_EDITS;
   if(E.fdef)     for(const k in E.fdef)     FDEF[k]    = Object.assign({}, FDEF[k]||{}, E.fdef[k]);
@@ -29270,7 +29311,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.65';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.66';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -30788,12 +30829,15 @@ const SQ_GAP=15;         // and another every fifteen after that, cleared or not
 // knife-edge) are byte-untouched. One knob, Wyatt's to overrule.
 const CAMP_LATE_PACE=0.9;
 function sqGapFor(n){
-  // v1.46: DEPTH BREATHES — from L55 the cadence cap widens 12 → 20 (27s →
-  // 35s between waves). The proven lever (v1.32's own L15 fix was cadence):
+  // v1.46: DEPTH BREATHES — from L55 the cadence cap widens past 12 (0408
+  // THE LONG MARCH: 20 → 16, base 35s → 31s — the widest never-retuned
+  // lever finally retuned, walked against the overlap wall: no triple-
+  // stacks at the sensible proxy, both rigs, ×2 runs; the wall's original
+  // measure stands below). The proven lever (v1.32's own L15 fix was cadence):
   // with counts and hp both plateaued, the walk battery still died L60+ to
   // OVERLAP — waves arriving before the last one resolved. A veteran's rung
   // is a chain of full battles now, not a standing mass. One const each.
-  const base=SQ_GAP + Math.min((n|0)>=55?20:12, Math.max(0,(n|0)-8)*1.5);
+  const base=SQ_GAP + Math.min((n|0)>=55?16:12, Math.max(0,(n|0)-8)*1.5);   // 0408: 20→16
   const late=((n|0)>=21)? CAMP_LATE_PACE : 1;
   // tempo bands (doc LAW C): sprint rungs run a fast drum, siege rungs
   // breathe deeper — the wc half of the law lives in levelCfg.
@@ -55694,8 +55738,21 @@ const PARK_TEMPER={ cnt:0.40, hp:0.72 };
 const YETI_DEEP={ hp:0.008, cnt:0.0075, rate:0.0009, rateFloor:0.81 };
 const WEST_DEEP={ hp:0.008, cnt:0.0075, rate:0.0009, rateFloor:0.81 };   // 0372 (the town stays the HARDEST ladder per rung — 0355's own ruling): the walk past pn30 CONTINUES the eased-yeti slope cell-for-cell (seam-continuous at r20/21; r50 = 4.1694/2.8478/0.8126, just over yeti r50 on every axis; the floor never binds ≤50, reached ≈r52.7). Wyatt's one dial if the deep band should bite.
 const DINO_DEEP={ hp:0.005, cnt:0.005, rate:0.0012, rateFloor:0.79 };   // 0357 (Wyatt 8/16, verbatim: "fairly difficult, but not as difficult as levels 21 through 50 in the Yeti campaign"): the dino walk sits UNDER the eased yeti walk on every cell (hp .005<.008 · cnt .005<.0075 · the trigger finger eases faster and deeper: .0012>.0009, floor .79 never reached at d≤30) ⇒ every rung 21-50 lands below the same yeti rung on hp+cnt+rate; monotone from r20 (r50 = 3.9868/2.6860/0.8140 vs yeti 4.0768/2.7610/0.8230); rungs 1-20 float-identical (the walk starts at d=1)   // 0354 (Wyatt 8/16, verbatim: "Balance level 21 through level 50. It needs to be slightly easier and remain cenematic"): the walk relaxes — hp .012→.008 · cnt .010→.0075 · the tan trigger finger eases FASTER and DEEPER (rate .00067→.0009, floor .83→.81, now actually reached); rungs 1-20 float-identical (the walk starts at d=1), every overlay set-piece byte-still — the spectacle is authored composition, only the walked numbers moved (0327's own prescription).   // 0327 THE DEEP WALK (rungs 21-50): +hp/+cnt/−rate per rung past 20 — the FELT ramp is authored composition, not bodies (the campaign's own deep-band lesson)
+// 0408 THE LONG MARCH: the campaign's deep axes climb again (hpSlope2 /
+// bossFrom2 / rateFloor 0.78 + the CAMP_EDITS spike rows) — but the park
+// ladders were WALKED and shipped on the pre-0408 curve, so the mirror PINS
+// to it verbatim: PARK_CS is the 8/11 CAMP_STRENGTH frozen cell-for-cell,
+// and every yeti/dino/western rung reads byte-the-value it read before this
+// card (battery-asserted at rungs 1/10/25/50, both parks). The "a future
+// campaign retune moves both parks with it" coupling in the block above
+// ENDS HERE by design — re-couple = point CS back at CAMP_STRENGTH; retune
+// the parks = edit PARK_CS deliberately. The CAMP_EDITS levels table never
+// reaches here either (parkCfg* build their own cfgs off these axes).
+const PARK_CS={ hpFrom:50, hpSlope:0.015, hpTo:100, hpPeak:65,
+                bossFrom:51, bossSlope:0.02, bossTo:100,
+                rateFrom:50, rateSlope:0.006, rateFloor:0.85, rateTo:100 };
 function parkCampAxes(L){
-  const n=L, CS=CAMP_STRENGTH;
+  const n=L, CS=PARK_CS;
   const cnt0 = n<=30 ? 1+0.12*Math.max(0,n-1) : Math.min(4.84, 4.48+0.06*(n-30));
   const hpC = Math.min(4.7, 1+0.08*Math.max(0,n-2))
       + (n>=CS.hpFrom && n<=CS.hpTo ? CS.hpSlope*(Math.min(n,CS.hpPeak)-(CS.hpFrom-1)) : 0);
