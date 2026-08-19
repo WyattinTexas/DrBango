@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.37.2';
+const BUILD = 'STARSPELL v0.38.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2042,6 +2042,44 @@ function ssTxt(scene, x, y, str, size, color, style) {
   }).setShadow(0, Math.max(1, size * 0.05), 'rgba(0,0,0,0.45)', size * 0.09);
 }
 
+/* ---- blank-text self-healing ---------------------------------------------
+   TestFlight, 8/19: a rare sigil card reached Wyatt's screen with its rarity
+   ribbon painted and its effect text BLANK — the one Text object on the card
+   that drew nothing, unreproducible in headless Chrome AND real WebKit (both
+   renderers, notch insets and all). Every Phaser Text bakes its string into a
+   private canvas ONCE and blits that canvas each frame, so a single failed or
+   purged bake (iOS reclaims canvas backing stores under pressure and in the
+   background) is INVISIBLE to the game and permanent on screen. This sweeps a
+   scene's live Texts, samples each canvas's alpha, and re-bakes any that hold
+   a non-empty string but zero ink. Runs after the surfaces where a silent
+   blank costs the player information (sigil cards, inspector, end screen) and
+   whenever the app returns to the foreground. DIAG counts every save. */
+function ssHealBlankTexts(scene, tag) {
+  let healed = 0;
+  const walk = (list) => list.forEach((o) => {
+    if (o.list) walk(o.list);
+    if (o.type !== 'Text' || !o.canvas || !o.visible || !(o.text || '').trim()) return;
+    try {
+      const cw = o.canvas.width, ch = o.canvas.height;
+      if (!cw || !ch) { o.updateText(); healed++; return; }
+      const ctx = o.context || o.canvas.getContext('2d');
+      const d = ctx.getImageData(0, 0, Math.min(cw, 512), Math.min(ch, 256)).data;
+      let ink = false;
+      for (let i = 3; i < d.length; i += 32) if (d[i] > 8) { ink = true; break; }
+      if (!ink) { o.updateText(); healed++; }
+    } catch (e) { }
+  });
+  if (scene && scene.children) walk(scene.children.list);
+  if (healed) DIAG('healed ' + healed + ' blank text(s) · ' + (tag || '?'));
+  return healed;
+}
+// a return from the background is when iOS is most likely to have purged
+// canvas backing stores — sweep every live scene as the game wakes
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !window.game || !game.isBooted) return;
+  try { for (const sc of game.scene.getScenes(true)) ssHealBlankTexts(sc, 'wake'); } catch (e) { }
+});
+
 // The title wordmark — live text drawn once into a canvas texture in the palette
 // of the painted set. Latin titles get the hand-set treatment (gentle arch,
 // bookend letters a touch larger, tight tracking, per-letter tilt along the
@@ -2429,7 +2467,9 @@ function ssSigilCard(scene, l, sg, w, h) {
    Returns { c, close } — callers stash it and may force-close on battle end. */
 function ssSigilPanel(scene, opts) {
   const l = ssLayout(scene);
-  const c = scene.add.container(0, 0).setDepth(95);
+  // depth 95 rides over play; the end screen (overlayC, 100) needs the panel
+  // above itself, so callers may raise it
+  const c = scene.add.container(0, 0).setDepth(opts.depth || 95);
   const veil = scene.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
   scene.tweens.add({ targets: veil, alpha: 0.72, duration: 200 });
   c.add(veil);
@@ -2532,6 +2572,7 @@ function ssSigilPanel(scene, opts) {
   wc.y = l.u(14); wc.alpha = 0;
   scene.tweens.add({ targets: wc, y: 0, alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
   SFX.ui();
+  ssHealBlankTexts(scene, 'sigil-panel');
   return { c, close };
 }
 
@@ -5104,6 +5145,7 @@ class Battle extends Phaser.Scene {
     });
     items.push(sparks);
     this.overlayC.add(items);
+    ssHealBlankTexts(this, 'sigil-pick');
   }
 
   // ---------- the map between fights ----------
@@ -5259,11 +5301,25 @@ class Battle extends Phaser.Scene {
       items.push(ssTxt(this, l.x(150), py(266 + i * 26), v, l.u(13.5), '#e8e0c8').setOrigin(1, 0.5));
     });
 
-    // sigils held, as their icons
+    // sigils held, as their icons — and TAPPABLE: the whole row opens the
+    // inspector so a finished run can still be read (Wyatt's TestFlight ask).
+    // The panel must outrank overlayC (100), hence the depth.
     items.push(ssTxt(this, l.x(-150), py(400), SS_T('stSigils'), l.u(13), '#a89f85').setOrigin(0, 0.5));
     const glyphs = this.run.sigils.map((id) => (SS_SIGILS.find((s) => s.id === id) || {}).icon || '✦');
     items.push(ssTxt(this, l.x(150), py(400), glyphs.length ? glyphs.join(' ') : '—', l.u(glyphs.length > 10 ? 12 : 14), '#d7b45c').setOrigin(1, 0.5)
       .setShadow(0, 0, '#c9b676', l.u(6), true, true));
+    if (this.run.sigils.length || this.signZ) {
+      const sigZone = this.add.zone(l.x(0), py(400), l.u(384), l.u(34)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      sigZone.on('pointerdown', () => {
+        if (this.endInspectP) return;
+        SFX.ui();
+        this.endInspectP = ssSigilPanel(this, {
+          sigils: this.run.sigils, sign: this.signZ, depth: 130,
+          onClose: () => { this.endInspectP = null; },
+        });
+      });
+      items.push(sigZone);
+    }
 
     // the rating readout — when the number moved, show it move
     if (rDelta) {
@@ -5305,6 +5361,7 @@ class Battle extends Phaser.Scene {
     // the Act III payoff: win the campaign and you descend into sunrise
     homeB.on('pointerdown', () => { SFX.ui(); this.goHome({ from: won ? 'battle' : 'defeat', dawn: won && this.mode === 'campaign' }); });
     this.overlayC.add([veil, ...items]);
+    ssHealBlankTexts(this, 'end-screen');
 
     // while the fanfare plays, the window's (invisible) buttons can't eat taps
     if (fanWait) {

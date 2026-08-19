@@ -379,6 +379,57 @@ async function main() {
     await c.ev(`localStorage.getItem('beta3.fps') === null &&
       ![...document.querySelectorAll('div')].some(d => /FPS ·/.test(d.textContent||''))`) === true);
 
+  // ---- v0.38.0: blank-text healing + the end screen's readable sigils ----
+  // TestFlight 8/19: a rare card reached Wyatt's phone with its effect text
+  // BLANK (one Text object, everything around it fine) — unreproducible in
+  // Chrome AND real WebKit. Texts bake into a private canvas once and blit it
+  // forever, so one failed/purged bake is permanent. The healer re-bakes any
+  // visible non-empty Text whose canvas holds no ink.
+  ok('healer reports zero blanks on a healthy scene (no false positives)',
+    await c.ev(`ssHealBlankTexts(game.scene.getScenes(true)[0], 'suite') === 0`) === true);
+  await c.ev(`(() => { game.scene.getScenes(true).find(s=>s.scene.key==='home')
+    .scene.start('battle', { mode: 'quick', resume: null }); return 1 })()`);
+  await sleep(6000);
+  const heal = JSON.parse(await c.ev(`(() => {
+    const b = game.scene.getScenes(true).find(s => s.scene.key === 'battle');
+    b.rollSigilOpts = () => [SS_SIGILS.find(s=>(s.rarity|0)===0), SS_SIGILS.find(s=>s.id==='ward'), SS_SIGILS.find(s=>(s.rarity|0)===2)];
+    b.showSigilPick();
+    let target = null;
+    const walk = (ls) => ls.forEach(o => { if (o.type==='Text' && /deal 3 less/.test(o.text||'')) target = o; if (o.list) walk(o.list); });
+    walk(b.children.list);
+    if (!target) return '{"found":false}';
+    (target.context || target.canvas.getContext('2d')).clearRect(0, 0, target.canvas.width, target.canvas.height);
+    const healed = ssHealBlankTexts(b, 'suite-forced');
+    const d = (target.context || target.canvas.getContext('2d')).getImageData(0, 0, target.canvas.width, Math.min(256, target.canvas.height)).data;
+    let ink = false; for (let i = 3; i < d.length; i += 32) if (d[i] > 8) { ink = true; break; }
+    return JSON.stringify({ found: true, healed, ink });
+  })()`));
+  ok('a force-blanked sigil desc is detected and re-baked (the TestFlight blank)',
+    heal.found && heal.healed === 1 && heal.ink, JSON.stringify(heal));
+  // the end screen: the sigils-held row is a doorway to the full inspector
+  await c.ev(`(() => { const b = game.scene.getScenes(true).find(s => s.scene.key === 'battle');
+    b.state = 'anim'; b.run.sigils = ['quill','ward','tome'];
+    b.run.words = 9; b.run.letters = 40; b.run.longest = 'manage'; b.run.fightIdx = 5;
+    b.endRun(true); return 1 })()`);
+  await sleep(4500);
+  const insp = JSON.parse(await c.ev(`(() => {
+    const b = game.scene.getScenes(true).find(s => s.scene.key === 'battle');
+    let z = null; const walk = (ls) => ls.forEach(o => { if (o.type==='Zone' && o.input && o.input.enabled) z = o; if (o.list) walk(o.list); });
+    walk(b.overlayC.list);
+    if (!z) return '{"zone":false}';
+    z.emit('pointerdown');
+    if (!b.endInspectP) return '{"zone":true,"open":false}';
+    const texts = []; const w2 = (ls) => ls.forEach(o => { if (o.type==='Text') texts.push(o.text||''); if (o.list) w2(o.list); });
+    w2(b.endInspectP.c.list);
+    const hasDescs = texts.some(t => /deal 3 less/.test(t)) && texts.some(t => /\\+4 damage/.test(t));
+    const depth = b.endInspectP.c.depth;
+    b.endInspectP.close();
+    return JSON.stringify({ zone: true, open: true, depth, hasDescs });
+  })()`));
+  ok('end-screen sigils row opens the inspector ABOVE the window, descs readable',
+    insp.zone && insp.open && insp.depth > 100 && insp.hasDescs, JSON.stringify(insp));
+  await c.nav(BASE + '?fps=0', 9000);   // leave a clean home for the sections below
+
   // ---- v0.36.2: SAFE-AREA LAW (the TestFlight prerequisite) ----
   // In a browser the chrome hides the notch. In a full-screen WKWebView shell
   // the canvas owns every pixel, and the 420x800 design box was landing its top
