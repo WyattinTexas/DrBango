@@ -29067,6 +29067,7 @@ const HARD_SARGE_HP=10;      // ⚑ the captain's plate — the FOURTH cell in t
 // the cell carrying an fsCd clock — the away cell mints none.
 const HARD_CRYSTALS=['green','purple','blue','silver'];   // ⚑ his four, in his order — RED stays NEMESIS's signature (his identity, his saber; never in this pool)
 const HARD_FS_NEAR=2;   // ⚑ flamestrike pressed on clusters only — the snipe target must have this many OTHER enemies within FS_R*1.5 (FS_FF burns EVERY side; never a lone scout, never his own line)
+const HARD_SMART_ALL=0; // ⚑ 0420 §2.5 THE SMART MARCH dresses HARD-BOT seats only (easy/medium keep their comedy — a 60%-WR kid still gets it); 1 widens it to every CPU seat if Wyatt rules "the computer just shouldn't be stupid, ever" — the kit lives beside aiGapGoal (PIT_KEEP · hardSmartU · aiJaxObs · aiPitGoal)
 function hardBotDue(team){ const r=wrRec(team), n=r.w+r.l;
   return (team===1||team===2) && n>=HARD_GAMES && r.w/n>=HARD_WR; }
 // 0418 THE BRASS table (§2.3): nemesisLineup's up-arg arithmetic in TABLE
@@ -29368,6 +29369,72 @@ function aiGapGoal(x,y,gx,gy){
   }
   return null;
 }
+// 0420 THE SMART MARCH (FM-GVT-HARDBOT-01 §2.5) [WYATT 8/18: "No just
+// sending units to their death by walking into lava pits. We need to be
+// smart. We aren't walking right into a mine."] — the hard bot stops
+// donating men to the terrain. PITS were already steered (rockSteer scans
+// them, 8/8) and canPlace already refuses them — but a goal INSIDE a bowl
+// DISENGAGES the steer (the boulder-on-the-bridge rule: rocks shoulder,
+// pits kill) and the wander waypoints mint blind, so a hard-bot walker's
+// goal is FOLDED out of every bowl first: radially to the rim + PIT_KEEP,
+// a dead-centre goal backing out the walker's own side; at most 3 passes
+// settles the overlapping-lens case (THE BACKYARD's centre jack against
+// its east bowl). LIVE JAX get the same fold PLUS a seat in the steer's
+// own obstacle list (aiJaxObs → rockSteer's xtra arg) — the jacks are
+// DRAWN on the carpet, so reading them is fair play, not wallhacks; a
+// swept/blown jack frees the lane by vanishing from S.mines. Hard-bot
+// seats ONLY (hardSmartU; HARD_SMART_ALL widens). Pure geometry, zero
+// RNG, zero new state: twenty sims and any seeded replay stay in
+// lockstep. Jets never consulted a lane (the jetT guard — the gap law's
+// own); bosses/swoopers/the burrowed never walk a battleground seat. The
+// ICE JOKE is PRESERVED: the skid in bfMarch damps this steering too —
+// the fold aims the goal, it never deletes physics; a hard bot sliding
+// into a bowl on an ice map is the map working.
+const PIT_KEEP=26;   // ⚑ the rim margin, bowls AND jacks — GAP_KEEP's class; folded goals land ABOVE rockSteer's r+pad disengage by construction
+function hardSmartU(u){
+  if(!S.bf || !u.side || u.seat==null || u.jetT>0) return false;
+  const st=S.bf.seats[u.seat]; if(!st || st.human) return false;
+  return HARD_SMART_ALL? true : !!(S.bf.hard && u.side==='foe');
+}
+function aiJaxObs(){
+  let o=null;
+  for(const mn of S.mines){ if(mn.jx && mn.armT<=0){ if(!o) o=[]; o.push({x:mn.x, y:mn.y, r:(mn.big? 26*ENH_MINE_TRIG : 26)}); } }   // the exact trip circle the mine loop charges (jx ×1; BF jax are always small — the formula stays truthful anyway)
+  return o;
+}
+function aiPitGoal(x,y,gx,gy,jx){
+  const PS=S.cfg.terrain.pits;
+  if(!(PS&&PS.length) && !jx) return null;
+  let bx=gx, by=gy, moved=false;
+  for(let k=0;k<3;k++){
+    let mv=false;
+    const fold=(cx,cy,R)=>{
+      const dx=bx-cx, dy=by-cy, d=Math.hypot(dx,dy);
+      if(d>=R) return;
+      if(d>0.5){ bx=cx+dx/d*R; by=cy+dy/d*R; }
+      else { const ax=x-cx, ay=y-cy, ad=Math.hypot(ax,ay)||1; bx=cx+ax/ad*R; by=cy+ay/ad*R; }
+      mv=true;
+    };
+    for(const p of (PS||[])) fold(p.x,p.y,p.r+PIT_KEEP);
+    if(jx) for(const m of jx) fold(m.x,m.y,m.r+PIT_KEEP);
+    if(!mv) break;
+    moved=true;
+  }
+  // the LENS fallback: two overlapping keep rings can ping-pong the fold
+  // (THE BACKYARD's centre jack against either 240-row bowl) and strand
+  // the goal inside a ring — inside the pit's own DISENGAGE radius at the
+  // worst, which un-steers the walk (the exact suicide this card retires;
+  // battery-caught on the hard soak). If any ring still holds the folded
+  // goal, park it on the DEEPEST ring's rim on the WALKER'S OWN side —
+  // the near rim: always walkable, never crossed.
+  if(moved){
+    let wc=null, wd=0;
+    const chk=(cx,cy,R)=>{ const d=Math.hypot(bx-cx,by-cy); if(d<R && R-d>wd){ wd=R-d; wc={cx,cy,R}; } };
+    for(const p of (PS||[])) chk(p.x,p.y,p.r+PIT_KEEP);
+    if(jx) for(const m of jx) chk(m.x,m.y,m.r+PIT_KEEP);
+    if(wc){ const ax=x-wc.cx, ay=y-wc.cy, ad=Math.hypot(ax,ay)||1; bx=wc.cx+ax/ad*wc.R; by=wc.cy+ay/ad*wc.R; }
+  }
+  return moved? {x:bx,y:by} : null;
+}
 // the long drop, both carpets: the show, then the kill. Battleground units
 // take the trainKill law verbatim; campaign greens ride knock()'s own kill
 // tail (knockKill — lives, refund, Sarge's clock and the coach stay one law,
@@ -29586,7 +29653,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.76';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.77';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -36185,11 +36252,16 @@ function applyDeploy(seat,type,x,y,relay){
 // as it was underneath (rocks still block, still shoulder, still can't be
 // stood on); this only decides which way you WALK while it does.
 const ROCK_PAD_FOE=16, ROCK_PAD_FORM=40;   // shoulder room: one man / a whole block
-function rockSteer(x,y,gx,gy,pad){
+function rockSteer(x,y,gx,gy,pad,xtra){
   const RK0=S.cfg.terrain.rocks, PTS=S.cfg.terrain.pits;
   // 8/8: a pit steers exactly like a rock — nobody WANTS to walk into one —
   // but it never shoulders (falling in is what happens instead of a shoulder)
-  const RK=(PTS&&PTS.length)? RK0.concat(PTS) : RK0;
+  let RK=(PTS&&PTS.length)? RK0.concat(PTS) : RK0;
+  // 0420 THE SMART MARCH: a hard-bot walker hands in the LIVE jax trip
+  // circles too (aiJaxObs — bfMarch's own call, nobody else's); they steer
+  // like rocks and never shoulder, exactly the pit's law. Every other
+  // caller passes nothing and is byte-what-it-was.
+  if(xtra&&xtra.length) RK=RK.concat(xtra);
   if(!RK||!RK.length) return null;
   let dx=gx-x, dy=gy-y; const gd=Math.hypot(dx,dy);
   if(gd<1) return null;
@@ -36350,11 +36422,23 @@ function bfMarch(u,dt,goal){
     const st8=S.bf.seats[u.seat];
     if(st8 && !st8.human){ const d8=aiGapGoal(u.x,u.y,gx,gy); if(d8){ gx=d8.x; gy=d8.y; } }
   }
+  // 0420 THE SMART MARCH (§2.5): a HARD-BOT walker folds his goal OUT of
+  // every magma bowl and live jack circle (aiPitGoal — the wander waypoints
+  // roll blind and a goal ON an obstacle disengages rockSteer, which for a
+  // pit means walking in), and reads the live jax as steer obstacles (jx9
+  // rides into rockSteer below). Runs AFTER the gap/river/ship rewrites so
+  // the FINAL aimed point is the folded one; the ice skid below still damps
+  // everything — physics is never deleted. Zero RNG, zero state.
+  let jx9=null;
+  if(hardSmartU(u)){
+    jx9=aiJaxObs();
+    const d9=aiPitGoal(u.x,u.y,gx,gy,jx9); if(d9){ gx=d9.x; gy=d9.y; }
+  }
   // DOUBLE TIME (v1.62) rides the stride itself — one factor here covers both
   // carpets, because the campaign march is this same function (v1.30)
   const dx=gx-u.x, dy=gy-u.y, d=Math.hypot(dx,dy)||1, sp=(u.def.moveSpd||36)*(u.gait||1)*bfGround(u)*emgMoveMul(u)*gearMoveMul(u);   // v2.36: the green beam (and Sarge's belt/boots/vest off the bag) ride the stride itself — one factor, both carpets
   const pad=u.squeeze?3:ROCK_PAD_FOE;
-  const st=rockSteer(u.x,u.y,gx,gy,pad);          // walk ROUND the blocks, not into them
+  const st=rockSteer(u.x,u.y,gx,gy,pad,jx9);      // walk ROUND the blocks, not into them (jx9: a hard-bot walker rounds the live jacks too)
   let nx=st?st.x:dx/d, ny=st?st.y:dy/d;
   // YOU CANNOT TURN ON ICE. Applied AFTER the steering, so the steering is
   // damped too - that's the joke, and it's what makes ice ICE instead of just a
@@ -37780,6 +37864,16 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
   // AI-difficulty law).
   const cqS=(S.bf && S.cfg && S.cfg.terrain && S.cfg.terrain.cq)? S.cfg.terrain.cq.sup : null;
   const bayHungry = !!(cqS && view && S.bf.seats[view.mySeat] && S.bf.cqHolder!==S.bf.seats[view.mySeat].team);
+  // 0420 THE SMART MARCH, placement edition (§2.5): the fold's own reads,
+  // once per pick — a hard-smart brain never ORDERS a man onto a live jack
+  // (the drop lands, the spawn ghost expires, bfEnemies answers, 26px).
+  // Bowls need no fold here: canPlace's 8/8 pit clause already refuses
+  // every pit for EVERY commander, and the brain is legal by inheritance
+  // (view.cp). st.mir un-mirrors the candidate (foe seats are world-frame
+  // already; the HARD_SMART_ALL widening is what needs the flip).
+  const st9=(S.bf && view)? S.bf.seats[view.mySeat] : null, mir9=!!(st9&&st9.mir);
+  const smart9=!!(st9 && !st9.human && (HARD_SMART_ALL || (S.bf.hard && st9.team==='foe')));
+  const jx9=smart9? aiJaxObs() : null;
   let best=null, bs=-1e9;
   for(let i=0;i<24;i++){          // 24 tries, not 16 — the strewn maps eat candidates
     const x=Math.round(lo+Math.random()*(hi-lo));
@@ -37791,6 +37885,13 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
     // referees the folded spot like any other).
     for(const g6 of (S.cfg.terrain.gaps||[])){
       if(y<g6.y1+GAP_KEEP+8) y=Math.round(Math.min(WORLD_H-108, g6.y1+GAP_KEEP+8+(g6.y1+GAP_KEEP+8-y)*0.25)); }
+    // 0420: the mine fold — skipped like a cp-refusal, never re-rolled, so
+    // the 24-try loop absorbs it and the head-of-loop RNG draws stay
+    // identical for every seat that isn't hard-smart.
+    if(jx9){ const wx9=mir9? WORLD_W-x : x;
+      let bad9=false;
+      for(const m9 of jx9){ if(Math.hypot(m9.x-wx9,m9.y-y)<m9.r+PIT_KEEP){ bad9=true; break; } }
+      if(bad9) continue; }
     if(!view.cp(x,y,type)) continue;         // the view knows which half is legal (and un-mirrors)
     const fwd=(x-lo)/(hi-lo);
     let s=(back? fwd : 1-fwd)*1.5;
@@ -65524,6 +65625,10 @@ window.GVT = {
     const u=S.units.find(q=>!q.dead&&q.seat===s&&q.type==='sarge'); if(!u) return null;
     u.hp=0; hitCheck(u,null); return GVT.bfSarge(s); },
   bfRec(n,w,l){ if(n){ META.bfRecord[n]={w:w|0,l:l|0,s:0}; saveMeta(); } return META.bfRecord; },
+  // 0420: the smart-march QA door — dials + the live obstacle reads
+  smartMarch(){ return { all:HARD_SMART_ALL, keep:PIT_KEEP,
+    jax:(aiJaxObs()||[]).map(m=>({x:m.x|0,y:m.y|0,r:m.r})),
+    pits:((S.cfg&&S.cfg.terrain&&S.cfg.terrain.pits)||[]).map(p=>({x:p.x|0,y:p.y|0,r:p.r})) }; },
   // 0417: the hard-bot gate's QA door — due per book, live cell if a hard
   // carpet is up (deep copy — the rig can never poke the real cell through it)
   hardBot(){ const bf=S.bf;
