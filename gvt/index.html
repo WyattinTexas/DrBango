@@ -23071,6 +23071,7 @@ function nemEggTick(dt){
       let best=null, bd=1e9;
       for(const u of S.units){
         if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+        if(u.cloakT>0 && u.type==='spy') continue;   // 0422 THE GHOST WALK: he strolls through the mouth radius — no chase, no bite (the law is spelled at nemNearFig; spy only — the TK ghost Sarge stays meat)
         const d=Math.hypot(u.x-h.x,u.y-h.y);
         if(d<bd){ bd=d; best=u; }
       }
@@ -23116,6 +23117,19 @@ function nemNearFig(x,y,R){
   let b=null, bd=(R==null?1e9:R);
   for(const u of S.units){
     if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+    // 0422 THE GHOST WALK (FM-GVT-FEEDBACK-0819 §1 — Wyatt 8/19: "just the
+    // spies should be able to get through the dinosaurs undetected and walk
+    // right by them"): a cloaked SPY is invisible to every dino AIM — the
+    // armies' own engage law (bfCanTarget's v2.42 line) mirrored into the
+    // third side's own picks, which never ask that door. SPY-GATED by decree
+    // ("other stealth characters… the dinosaurs still track them"): the TK
+    // ghost Sarge is type 'sarge', so he stays meat by construction, and a
+    // decloaked spy is meat again the same tick. Strict compare, dice-free —
+    // the bites' own drift-tolerated posture (cloakT rides every sim: local
+    // drops, the campaign door, and roomApply's um re-stamp). Area is area:
+    // ram lanes, stomp slams, swoop passes, cone membership, rolling rocks
+    // and the magma still find him (the engage door's own carve-out).
+    if(u.cloakT>0 && u.type==='spy') continue;
     const d=Math.hypot(u.x-x,u.y-y);
     if(d<bd){ bd=d; b=u; }
   }
@@ -23318,6 +23332,7 @@ function nemBoulTick(h,kt,dt){
     let m=null, bd=kt.rng;
     for(const u of S.units){
       if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+      if(u.cloakT>0 && u.type==='spy') continue;   // 0422 THE GHOST WALK: the stego's own dead-zone aim (the one pick nemNearFig can't serve) honors the same law
       const d=Math.hypot(u.x-h.x,u.y-h.y);
       if(d<bd && d>=kt.minRng){ bd=d; m=u; }
     }
@@ -29653,7 +29668,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.78';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.79';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -65629,6 +65644,11 @@ window.GVT = {
   smartMarch(){ return { all:HARD_SMART_ALL, keep:PIT_KEEP,
     jax:(aiJaxObs()||[]).map(m=>({x:m.x|0,y:m.y|0,r:m.r})),
     pits:((S.cfg&&S.cfg.terrain&&S.cfg.terrain.pits)||[]).map(p=>({x:p.x|0,y:p.y|0,r:p.r})) }; },
+  // 0422: the ghost-walk QA door — what the dinos' shared pick sees at (x,y)
+  // within R (null = unbounded), plus the cloak facts the filter reads
+  nemPick(x,y,R){ const b=nemNearFig(+x||0,+y||0,R==null?null:+R);
+    return b? { t:b.type, side:b.side, cloak:((b.cloakT||0)>0)?1:0, ghost:b.tkGhost?1:0,
+      x:Math.round(b.x), y:Math.round(b.y) } : null; },
   // 0417: the hard-bot gate's QA door — due per book, live cell if a hard
   // carpet is up (deep copy — the rig can never poke the real cell through it)
   hardBot(){ const bf=S.bf;
