@@ -21893,7 +21893,7 @@ const NOADS=[ {sku:'com.corkscrewgames.gvt.noads.d30',    days:30},
 // the entitlement: forever, or a live timer. Expiry is QUIET by construction
 // (Wyatt: "ads quietly resume") — the predicate just starts answering false
 // and every gate resumes; nothing announces, nothing cleans the stale stamp.
-// Comet-law flats (adFreeT/adFreeF/naOff): NOT in META_DEFAULT, tolerated
+// Comet-law flats (adFreeT/adFreeF/naOff/naDay): NOT in META_DEFAULT, tolerated
 // undefined, carried wholesale by old clients (Object.assign + whole-META
 // saveMeta — the okd/okp purge touches only rdec/roomPosR shapes).
 function adFree(){ try{ return !!(META.adFreeF || (META.adFreeT && Date.now()<META.adFreeT)); }catch(e){ return false; } }
@@ -28833,7 +28833,7 @@ function hideAllOverlays(){ shakeTeardown();   // SH-01: the dance dies at every
   crewHoldClear();                          // ...nor the squad hold card (v2.73)
   adTeardown(false);                        // ...nor a live rewarded show — torn down = aborted, pays nothing, the day survives (v2.59)
   namePromptHide();                         // ...nor the first-rankings name card (v3.08 — unresolved burns nothing, it asks again)
-  naOfferClear();                           // 0333a: ...nor the one-time no-ads offer — the held launch is DROPPED (an external teardown means something else already navigated; never a double-launch), the once-flag burned at show, the shop remains its permanent home
+  naOfferClear();                           // 0333a/0410: ...nor the no-ads offer — the held launch is DROPPED (an external teardown means something else already navigated; never a double-launch), the day burned at show (quiet till tomorrow), the shop remains its permanent home
   ['title','lose','win','menu','picker','wartable','campscene','parkscene','raidscene','icerite','worldrank','toyshop','sabrite','soulrite','xpjuice','shakeStage','trainbar','nameProm'].forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); }); }
 
 // ============ INVASIONS ARE RETIRED (v1.28, Wyatt 7/25) ============
@@ -29918,7 +29918,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.81';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.82';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -55840,7 +55840,7 @@ function maxOnResult(d){
   if(!d) return; const p=MAXA.pend[d.id]; if(!p) return;   // double-resolve guard: one entry, deleted first
   delete MAXA.pend[d.id]; clearTimeout(p.wd);
   if(MAXA.last) MAXA.repPend=1;   // a real creative was on screen — the report chip is owed (§V3.12)
-  p.res({completed:!!d.completed});
+  p.res({completed:!!d.completed, displayed:!!p.disp});   // 0410: displayed = a creative reached the screen for THIS show (maxOnCreative's stamp) — completed alone can't say (no-fill and the never-displayed belt both resolve completed:true for an interstitial)
   if(MAXA.repPend && S.mode==='menu') adRepShow();
 }
 function maxOnCreative(d){
@@ -55849,7 +55849,7 @@ function maxOnCreative(d){
   // 0380: the ad is ON SCREEN — the never-displayed belt stands down for this
   // kind's pending show; the result now belongs to onAdHidden alone. (If the
   // process dies mid-ad the page dies with it — nothing to guard page-side.)
-  try{ for(const k in MAXA.pend){ const p=MAXA.pend[k]; if(p && p.kind===d.kind && p.wd){ clearTimeout(p.wd); p.wd=0; } } }catch(e){}
+  try{ for(const k in MAXA.pend){ const p=MAXA.pend[k]; if(p && p.kind===d.kind){ if(p.wd){ clearTimeout(p.wd); p.wd=0; } p.disp=1; } } }catch(e){}   // 0410: disp = the SERVED proof (Wyatt: "after they're served an ad") — stamped by the same on-screen event that stands the belt down, and it rides the pend into the result
 }
 // §V3.10 for REAL interstitials only: the gap, the session cap, the payer
 // exemption. The placeholder keeps its own arithmetic verbatim.
@@ -55957,7 +55957,7 @@ function squadAdGate(launch){
     if(brk && soloDue) ADQ.soloPaid=ADQ.games; // 0399: the solo latch — same law
   }catch(e){ brk=false; }               // the gate may fail — the exit may not (fail-safe law)
   if(brk){
-    try{ ADS.showInterstitial().then(()=>naMaybeOffer(launch), ()=>naMaybeOffer(launch)); }   // 0333a: the first break ever pitches once; the held exit blocks nobody else's (the squad gate's own property)
+    try{ ADS.showInterstitial().then(r=>naMaybeOffer(launch, !!(r&&r.displayed)), ()=>naMaybeOffer(launch, false)); }   // 0410 THE DAILY PITCH rides 0333a's seat: the day's first SERVED break pitches (naMaybeOffer's day latch) — served = the creative was ON SCREEN, maxOnCreative's own proof, so a no-fill, never-displayed, failed or rejected exit launches straight and silent (his word). The held exit still blocks nobody else's (the squad gate's own property)
     catch(e){ launch(); }
   } else launch();
 }
@@ -62377,8 +62377,11 @@ function noAdsRowHTML(){
            '<button type="button" class="sh-narest" onclick="UI.naRestore()" data-notr>'+t('RESTORE PURCHASES')+'</button>':''))
     +'</div>';
 }
-// ---- the ONE-TIME offer (Wyatt: right after the FIRST ad ever closes,
-// exactly once, then the shop is its permanent home). A dynamic top-level
+// ---- THE DAILY PITCH (0410, FM-GVT-FEEDBACK-0819 §4 — Wyatt 8/19: "we do
+// want to push the no-ads prompt … after they're served an ad the first time
+// they play each day, and that's after they're served an interstitial").
+// Supersedes 0333a's once-EVER: one offer per day, on the day's first SERVED
+// interstitial exit; the shop stays its permanent home. A dynamic top-level
 // modal at z26 (over the shop's z9, under the safety chip's z28), ZERO
 // animation by construction. It holds exactly one launch continuation and
 // fires it exactly once, whichever road out is taken. ----
@@ -62415,10 +62418,16 @@ function naOfferClose(fire){
   if(fire && go){ try{ go(); }catch(e){} }
 }
 function naOfferClear(){ naOfferClose(false); }
-function naMaybeOffer(launch){
+function naMaybeOffer(launch, served){
   try{
-    if(META.naOff || !IAP.avail() || !noAdsCanOccur() || adFree()){ launch(); return; }
-    META.naOff=1; saveMeta();            // once EVER — flag first, ceremony second (the keyFound grammar); burned only where the offer can actually render (a bridge exists to sell through — plain web launches straight through, flag intact)
+    // 0410: served = the exit's own arm says a creative was actually ON
+    // SCREEN — no real show, no ceremony. META.naOff (0333a's once-EVER
+    // flag) is SUPERSEDED and deliberately unread: every installed save has
+    // it burned, and honoring it would keep the daily ruling from the whole
+    // installed base. The field stays in saves untouched. ⚑ a future
+    // never-again door would be a NEW setting, never that flag.
+    if(!served || META.naDay===todayStr() || !IAP.avail() || !noAdsCanOccur() || adFree()){ launch(); return; }
+    META.naDay=todayStr(); saveMeta();   // once PER DAY — day first, ceremony second (the keyFound grammar on tvGrant's day-burn cadence); naDay is a comet-law FLAT (adFreeT's idiom: not in META_DEFAULT, tolerated, Object.assign-safe); burned only where the offer can actually render (a bridge exists to sell through — a bridge-less exit passed through above with the day intact)
     naOfferShow(launch);
   }catch(e){ launch(); }                 // the offer may fail — the game may not (the adGate fail-safe law)
 }
@@ -65444,7 +65453,7 @@ window.GVT = {
     return GVT.ads(); },
   age(m,d,y){ return ageGateAnswer(m,d,y); },   // FM-GVT-MAX-01 rig: answer the gate (null = rejected input); GVT.ads().track reads it back
   // ---- 0333a NO ADS rig: read-only entitlement state ----
-  noads(){ return { t:META.adFreeT||0, f:META.adFreeF||0, off:META.naOff||0, free:adFree(), offer:!!NAOFF.el }; },
+  noads(){ return { t:META.adFreeT||0, f:META.adFreeF||0, off:META.naOff||0, day:META.naDay||'', free:adFree(), offer:!!NAOFF.el }; },   // 0410: day = the daily-pitch latch (off = the superseded 0333a flag, save archaeology only)
   // ---- 0291 CADENCE rig: commanded beats, dials and cv — read-only (beats
   // re-roll their ±20% breath per call; assert on bands, never equality) ----
   nx(){ return { cv:GVT_CV, capMul:NX_CAP_MUL,
