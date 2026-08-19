@@ -29950,7 +29950,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.85';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.86';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -58021,6 +58021,8 @@ const RAID_TRK_N   ={ e:3, m:4,   h:6,   g:6   };               // syeti per fla
 const RAID_CAP_R=110;                          // the capture ring (sug ~110px)
 const RAID_CAP_T=3;                            // uncontested seconds to flip
 const RAID_TUR_RNG=230;                        // the mini turret's reach
+const TUR_BEAM_W=5;                            // 0413 ⚑: the silver beam's width (the laser mods fire w:4 — wider so a bolt READS across 230px; Wyatt: "quite obvious")
+const TUR_BEAM_T=0.22;                         // 0413 ⚑: the beam's life in seconds (the mods' 0.14, longer for the same reason)
 const RAID_TUR_DMG=2;                          // per bolt vs yetis
 const RAID_TUR_CD={ e:1.6, m:1.3, h:1.0 };     // bolt cadence vs yetis (difficulty-scaled dps)
 const RAID_TUR_CDG={ e:4.5, m:3.6, h:2.7 };    // bolt cadence vs YOUR men when the yetis hold it
@@ -58645,11 +58647,29 @@ function raidCapSet(i,o,crush,remote){
   }
   if(!remote && sqRef() && S.coop) coopSend({k:'cap', n:i|0, t:o, x:crush?1:0});
 }
-// one bolt — a silver tracer from the post's little gun
+// one bolt — the SILVER LASER from the post's little gun (0413, Wyatt 8/19:
+// "you don't see the turrets firing… use a silver laser and make it apparent
+// so the turrets visually have more presence" — this comment promised the
+// tracer since BF-02; now the code draws it). The beam = the shipped tracer
+// grammar in the game's own silver (LZ_SILVER_ROW, v3.39) under the 0391
+// two-stroke white core, leaving the ROTATED barrel tip (P.aim is stamped
+// here; drawRaidPosts turns the little gun to match — the barrel's
+// centerline seat is P.y-18.5, the fillRect's own y-21..y-16 middle). BOTH
+// lanes wear the same silver (D1: green-held at a yeti, yeti-held at your
+// man — one look). The cue = the game's REGULAR laser through the
+// positioned door, ONE per bolt, never pew (Wyatt: "the sound effect for
+// the turret is a little obnoxious… make it sound like a regular laser").
+// Reduced motion: the beam and rings still draw (the information); the
+// muzzle star rides the weapon loop's own RM shrink.
 function raidTurBolt(P,tx,ty){
-  S.fx.push({k:'ring',x:P.x,y:P.y-26,r:2,R:10,t:0,dur:0.18,col:'#EAF3FA'});
-  S.fx.push({k:'ring',x:tx,y:ty,r:3,R:14,t:0,dur:0.22,col:'#C8CDD6'});
-  bfSfx(SFX.pew, P.x, P.y);
+  P.aim=Math.atan2(ty-(P.y-18.5), tx-P.x);
+  const RM=reducedMotion(), mx=P.x+Math.cos(P.aim)*22, my=(P.y-18.5)+Math.sin(P.aim)*22;
+  S.fx.push({k:'tracer',x1:mx,y1:my,x2:tx,y2:ty,t:0,dur:TUR_BEAM_T,col:LZ_SILVER_ROW.hex,w:TUR_BEAM_W});
+  S.fx.push({k:'tracer',x1:mx,y1:my,x2:tx,y2:ty,t:0,dur:TUR_BEAM_T*0.75,col:'#ffffff',w:1.6});
+  S.fx.push({k:'flash',x:mx,y:my,ang:P.aim,R:RM?10:16,lw:RM?2:3,t:0,dur:0.12});
+  S.fx.push({k:'ring',x:mx,y:my,r:2,R:10,t:0,dur:0.18,col:'#EAF3FA'});
+  S.fx.push({k:'ring',x:tx,y:ty,r:3,R:14,t:0,dur:0.22,col:LZ_SILVER_ROW.hex});
+  bfSfx(SFX.laser, P.x, P.y);
 }
 // ===== 0374 THE STAMPEDE MACHINE — the herd is HAZARD BODIES on the raid
 // bag, never spawnFoe (the 0372 self-register 2×-ghost law): no leak, no
@@ -58826,12 +58846,12 @@ function raidTick(dt){
       let best=null,bd=RAID_TUR_RNG;
       for(const f of S.foes){ if(f.dead||f.burrow) continue;
         const d=Math.hypot(f.x-P.x,f.y-P.y); if(d<bd){ bd=d; best=f; } }
-      if(best){ P.tur=RAID_TUR_CD[rd.t]; raidTurBolt(P,best.x,best.y-14); hurt(best,RAID_TUR_DMG,null); }
+      if(best){ P.tur=RAID_TUR_CD[rd.t]||RAID_TUR_CD.h; raidTurBolt(P,best.x,best.y-14); hurt(best,RAID_TUR_DMG,null); }   // 0413 found-in-passing: MEGA rides Hard's cells (the 0341 idiom) — 'g' had no row, so (undefined||0)-dt armed the turret EVERY FRAME at MEGA (measured 60 bolts/s on v4.85)
     } else {
       let best=null,bd=RAID_TUR_RNG;
       for(const u of S.units){ if(u.dead||u.down||u.dropT>0||u.jetT>0||u.cloakT>0||u.falling) continue;
         const d=Math.hypot(u.x-P.x,u.y-P.y); if(d<bd){ bd=d; best=u; } }
-      if(best){ P.tur=RAID_TUR_CDG[rd.t]; raidTurBolt(P,best.x,best.y-14); knock(best,P.x,P.y,false); }
+      if(best){ P.tur=RAID_TUR_CDG[rd.t]||RAID_TUR_CDG.h; raidTurBolt(P,best.x,best.y-14); knock(best,P.x,P.y,false); }   // 0413: the same g fallback — yeti-held at MEGA was a knock EVERY FRAME (measured: a man deleted per frame)
     }
   }
   if(!sqRef()) return;   // capture + crush are the REFEREE's word — guests render relayed truth
@@ -58887,9 +58907,15 @@ function drawRaidPosts(){
     cx.fillStyle=P.o? col : (bone? '#8a6b4a' : '#8E9BAA'); cx.strokeStyle=bone? '#3A1808' : '#5E6B7A'; cx.lineWidth=2;
     cx.fillRect(P.x-7,P.y-26,14,18); cx.strokeRect(P.x-7,P.y-26,14,18);
     cx.fillStyle='#3A4350';
-    cx.fillRect(P.x+5,P.y-21,17,5);
+    cx.save(); cx.translate(P.x,P.y-18.5); cx.rotate(P.aim||0); cx.fillRect(5,-2.5,17,5); cx.restore();   // 0413: the barrel tracks its last bolt (raidTurBolt stamps P.aim; east when unfired)
     cx.beginPath(); cx.moveTo(P.x-2,P.y-26); cx.lineTo(P.x-2,P.y-38); cx.lineTo(P.x+12,P.y-33); cx.lineTo(P.x-2,P.y-30);
     cx.closePath(); cx.fillStyle=col; cx.fill();
+    if(P.o && !reducedMotion()){   // 0413 D2: a held turret is ARMED — a faint silver pilot light breathing on S.t
+      cx.globalAlpha=0.35*(0.6+0.4*Math.sin(S.t*5));
+      cx.strokeStyle=LZ_SILVER_ROW.hex; cx.lineWidth=2;
+      cx.beginPath(); cx.arc(P.x,P.y-17,20,0,Math.PI*2); cx.stroke();
+      cx.globalAlpha=1;
+    }
     cx.restore();
   }
 }
