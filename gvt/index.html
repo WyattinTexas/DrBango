@@ -29333,6 +29333,26 @@ const HARD_SARGE_HP=5;       // ⚑ the captain's plate — the FOURTH cell in t
 const HARD_CRYSTALS=['green','purple','blue','silver'];   // ⚑ his four, in his order — RED stays NEMESIS's signature (his identity, his saber; never in this pool)
 const HARD_FS_NEAR=2;   // ⚑ flamestrike pressed on clusters only — the snipe target must have this many OTHER enemies within FS_R*1.5 (FS_FF burns EVERY side; never a lone scout, never his own line)
 const HARD_SMART_ALL=0; // ⚑ 0420 §2.5 THE SMART MARCH dresses HARD-BOT seats only (easy/medium keep their comedy — a 60%-WR kid still gets it); 1 widens it to every CPU seat if Wyatt rules "the computer just shouldn't be stupid, ever" — the kit lives beside aiGapGoal (PIT_KEEP · hardSmartU · aiJaxObs · aiPitGoal)
+// 0411 §2.7 THE QUIET HAND (Wyatt 8/19, binding: "The slight cheating we're
+// letting the computer do is good, but we want to make sure that's not too
+// obvious. Have them not play a jeep or a vehicle super early within the
+// first 15 seconds, because otherwise the player knows that they're being
+// slightly cheated against.") — THE LAW, HARD_ANN's own silence rule made
+// mechanism: every hard-bot lever stays BELOW the player's notice; a visible
+// cheat converts "this guy is good" into "this game is rigged", and anything
+// that reads as a tell in the first 15 seconds is a bug EVEN WHEN THE
+// NUMBERS ARE RIGHT. While a carpet's elapsed (bf.age — the sim's own
+// counter beside timeLeft; never the HUD clock, which sudden death resets
+// and a relayed tl or the rig's bfClock can rewrite) sits under HARD_VEH_T0,
+// an embargoed seat's brain never fields a vehKind type (bfjeep/bftank/
+// jeep2): the type is struck from `afford` (the spy/jeep2 grammar) AND the
+// MOTOR POOL FUND never OPENS — so no open fund can exist at the boundary
+// by construction and nothing QUEUES a buy at T0; after it, vehicles
+// re-enter through the ordinary score grammar only, so the first vehicle
+// lands when the BOARD says so (a fixed-second jeep every match would be
+// the same tell wearing a watch). hardQuietSeat below answers both cells.
+const HARD_VEH_T0=15;      // ⚑ his number — no hard-bot vehicle (pick OR fund) before 15s of carpet time
+const HARD_VEH_T0_AWAY=1;  // ⚑ the away captain (BF_START+AWAY_BONUS=260 ≥ the jeep's 250 — the same t≈1 tell) wears the same embargo; 0 = hard seats only
 function hardBotDue(team){ const r=wrRec(team), n=r.w+r.l;
   return (team===1||team===2) && n>=HARD_GAMES && r.w/n>=HARD_WR; }
 // 0418 THE BRASS table (§2.3): nemesisLineup's up-arg arithmetic in TABLE
@@ -29343,6 +29363,18 @@ function hardBotDue(team){ const r=wrRec(team), n=r.w+r.l;
 // card C's. A type the player never owned has no row and fields at stock
 // rank (there is no "your rank" to promote — the muscle muls still land).
 function hardRanks(){ const up={}; for(const k of ownedUnits()) up[k]=Math.min(RANK_MAX,(META.up[k]|0)+HARD_RANK_UP); return up; }
+// 0411: the embargo predicate — hardSmartU's sibling in seat form. Answers
+// "is THIS seat's hand quiet right now": the hard cell's foe seats, and
+// (⚑ HARD_VEH_T0_AWAY) the away captain's one chair — the only wallets
+// that can reach a vehicle inside the window. Everybody else (easy/medium/
+// rookie/NEMESIS/rooms/co-op/2v2 teammates on 'you') is structurally false
+// and never consults the clock at all.
+function hardQuietSeat(seat){
+  const bf=S.bf; if(!bf || (bf.age||0)>=HARD_VEH_T0) return false;
+  if(bf.hard){ const st=bf.seats[seat]; return !!(st && !st.human && st.team==='foe'); }
+  if(HARD_VEH_T0_AWAY && bf.away) return seat===bf.team;
+  return false;
+}
 // a map generator builds the LEFT half; everything mirrors across MID so both
 // armies always fight the exact same ground (and every existing rock loop works).
 // A feature that already straddles the middle IS its own mirror — stamp it once.
@@ -29918,7 +29950,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.82';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.83';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -35521,7 +35553,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   const myTeam=meSeat.team;
   S.cfg={ n:0, hpMul:1, cntMul:1, waves:[], terrain:bfTerrain(map) };
   S.bf = { resolved:false, ending:false, mapId:map.id, mapName:map.name, phase:'live',
-    team, timeLeft:bfClockFor(team), ot:false, seats, myKills:0,
+    team, timeLeft:bfClockFor(team), age:0, ot:false, seats, myKills:0,
     mySeat:meSeat.i, myTeam,
     base:{ you:{x:(map.baseX||130),y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0},   // 0375: a map may seat its toy boxes (THE STARSHIP's doubled hangar centres them at 308); every other row keeps 130 to the pixel
            foe:{x:WORLD_W-(map.baseX||130),y:WORLD_H/2,hp:bhp,hpMax:bhp,dmgTaken:0} },
@@ -37819,6 +37851,7 @@ function bfTick(dt){
   if(S.cfg.terrain.cq) cqShipTick(dt);   // 0303 THE STARSHIP: door beat + nudge, the vent, room presence, the supply drip — all f(battle clock)
   if(bf.sargeFlash>0) bf.sargeFlash=Math.max(0,bf.sargeFlash-dt);   // the "he's back" flash on the tray card
   bf.timeLeft-=dt;
+  bf.age+=dt;   // 0411: the carpet's own elapsed, counting UP — sudden-death's timeLeft reset, a room's relayed tl and the rig's bfClock can never rewind it (hardQuietSeat reads this, never the HUD clock)
   const secs=Math.max(0,Math.ceil(bf.timeLeft));
   if(secs<=15 && secs!==bf.lastTick){ bf.lastTick=secs; if(secs>0) SFX.blip(); }   // the last fifteen tick
   const my=bf.base.foe.dmgTaken, th=bf.base.you.dmgTaken;
@@ -38007,7 +38040,8 @@ OpponentBrain.prototype.decide=function(view,budget){
   // the player's to find. One name in one filter; relayed HUMAN spies still
   // land through applyDeploy like any order.
   const aw9=(S.bf&&S.bf.away&&view.mySeat===S.bf.team)? S.bf.away : null;   // 0393: the away captain fields only what THEY own (+ sarge, + the CPU's own motor pool — "accurate to what they have"); every other seat byte-what-it-was
-  const afford=BF_TYPES.filter(t=>t!=='spy' && t!=='jeep2' && (!aw9 || t==='sarge'||t==='bfjeep'||t==='bftank'||(aw9.lo.own||[]).indexOf(t)>=0) && BF_COST[t]<=budget && (t!=='sarge'||!hasSarge));   // 0316: THE KING'S OWN MACHINE never fields in enemy colors — the generic pick could reach it on a windfall (pref defaulted to 1); one name in one filter, the spy's own grammar
+  const quiet=hardQuietSeat(view.mySeat);   // 0411 §2.7 THE QUIET HAND: the opening vehicle embargo — while it holds, vehKind is struck from afford below AND the MOTOR POOL FUND cannot open (both cells: the hard bot's foe seats + ⚑ the away captain)
+  const afford=BF_TYPES.filter(t=>t!=='spy' && t!=='jeep2' && !(quiet&&vehKind(t)) && (!aw9 || t==='sarge'||t==='bfjeep'||t==='bftank'||(aw9.lo.own||[]).indexOf(t)>=0) && BF_COST[t]<=budget && (t!=='sarge'||!hasSarge));   // 0316: THE KING'S OWN MACHINE never fields in enemy colors — the generic pick could reach it on a windfall (pref defaulted to 1); one name in one filter, the spy's own grammar
   if(!afford.length) return [];
   const pressure = theirs.some(u=>u.dropT<=0&&u.x>MID-80) || own.length<2;
   // ===== THE MOTOR POOL FUND (7/25) =====
@@ -38019,6 +38053,11 @@ OpponentBrain.prototype.decide=function(view,budget){
   // including the bad half of it: while the fund is open it reinforces NOTHING.
   // It abandons the fund the moment somebody is actually breaking through, so
   // this can never be baited into a collapse, and it stops at two a match.
+  // 0411 THE QUIET HAND (§2.7): an embargoed seat (hardQuietSeat — the hard
+  // bot's or the away captain's opening HARD_VEH_T0 seconds) never OPENS a
+  // fund either — the open branch below reads `quiet` (and `afford` above
+  // already struck vehKind), so no open fund can exist at the boundary and
+  // nothing QUEUES a buy to land the second the window closes.
   // ⚠ THE GATE THAT MATTERS: it only ever shops while it is AHEAD OR LEVEL on
   // base damage. Measured — with the fund open on every board it cost the
   // computer army ~17% of its output, because a minute of banking is a minute
@@ -38055,7 +38094,7 @@ OpponentBrain.prototype.decide=function(view,budget){
     else { const ft=this.fund; this.fund=null; this.vehicles=(this.vehicles||0)+1;
       const fs=this.pickSpot(ft,theirs,mine,view);
       if(fs) return [{ kind:'place', type:ft, x:fs.x, y:fs.y }]; }
-  } else if(!pressure && (winning||surge) && own.length>=3 && (this.vehicles||0)<vcap && Math.random()<motorP){
+  } else if(!quiet && !pressure && (winning||surge) && own.length>=3 && (this.vehicles||0)<vcap && Math.random()<motorP){
     // the tank is a long shot on a short clock; the jeep is the one an army can
     // realistically get to, so it's the default order — a surging army eyes
     // the tank harder
@@ -65964,8 +66003,12 @@ window.GVT = {
       x:Math.round(b.x), y:Math.round(b.y) } : null; },
   // 0417: the hard-bot gate's QA door — due per book, live cell if a hard
   // carpet is up (deep copy — the rig can never poke the real cell through it)
+  // + 0411: the quiet-hand dials, the carpet's own age, and the foe captain
+  // chair's live embargo answer
   hardBot(){ const bf=S.bf;
     return { due1:hardBotDue(1), due2:hardBotDue(2), active:!!(bf&&bf.hard),
+      vehT0:HARD_VEH_T0, vehT0Away:HARD_VEH_T0_AWAY,
+      age:bf? +((bf.age||0).toFixed(2)) : null, quiet:bf? hardQuietSeat(bf.team) : false,
       cell:(bf&&bf.hard)? JSON.parse(JSON.stringify(bf.hard)) : null }; },
   // piggy test rig: GVT.pig(12) = 12-day streak defended yesterday, unclaimed
   pig(streak,opts){ opts=opts||{};
