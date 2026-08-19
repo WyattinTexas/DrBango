@@ -213,6 +213,9 @@ kbd{background:#161B10; border:1px solid #4A5740; border-radius:4px; padding:0 5
    erase it, recolor it, add shapes (fixed like #backCounter, z25 under drawers) */
 #kitbar{position:fixed; left:50%; transform:translateX(-50%); bottom:86px; z-index:25; display:flex; gap:8px;}
 #kitbar .kitb{font-size:14px; padding:10px 14px; border-radius:12px; box-shadow:0 3px 12px #000A;}
+/* the GVT dogs' pat tongue (.dogTng) sleeps until the pat — the game's own rule; here it also
+   never takes a tap (an invisible piece must not steal the finger from the muzzle) */
+.dogTng{opacity:0; pointer-events:none;}
 </style>
 </head>
 <body>
@@ -726,21 +729,27 @@ const svg=$('board');
 const uid=()=> 's'+Math.random().toString(36).slice(2,9);
 const B=()=>BOARDS[DOC.board];
 
-/* ---- mold parsing → editable group ---- */
-function parseMold(str,label,vb){
+/* ---- mold parsing → editable group ----
+   keepCls: the GVT dogs' pivot classes (.dgPin .dogHeadG .dogwagG .dgLegA/B
+   .dogEarG .dogTng) ride along on the pieces — own class + every ancestor
+   group's — so the game-code / JSON exports still carry the game's pivots
+   ("bring him back" = a paste into dogArtSVG). Everything else stays molded
+   plastic: classes dropped, as always. */
+function parseMold(str,label,vb,keepCls){
   const dom=new DOMParser().parseFromString('<svg xmlns="'+NS+'">'+str.split('currentColor').join('#7FA35C')+'</svg>','image/svg+xml');
   const kids=[];
-  const walk=(el,inh,tchain)=>{
+  const walk=(el,inh,tchain,cls)=>{
     for(const c of el.children){
       const tag=c.tagName;
       if(tag==='g'){
         const n={...inh};
         for(const a of ['fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','opacity'])
           if(c.hasAttribute(a)) n[a]=c.getAttribute(a);
-        walk(c,n,(tchain+' '+(c.getAttribute('transform')||'')).trim());
+        walk(c,n,(tchain+' '+(c.getAttribute('transform')||'')).trim(), keepCls? (cls+' '+(c.getAttribute('class')||'')).trim() : '');
       } else if(['path','circle','ellipse','rect','line','polygon'].includes(tag)){
         const at={};
         for(const a of c.getAttributeNames()) if(a!=='class') at[a]=c.getAttribute(a);
+        if(keepCls){ const k=(cls+' '+(c.getAttribute('class')||'')).trim(); if(k) at.class=[...new Set(k.split(/\s+/))].join(' '); }
         for(const k in inh) if(!(k in at)) at[k]=inh[k];
         const own=at.transform||''; delete at.transform;
         if(!('fill' in at) && ('stroke' in at)) at.fill='none';
@@ -748,7 +757,7 @@ function parseMold(str,label,vb){
       }
     }
   };
-  walk(dom.documentElement,{},'');
+  walk(dom.documentElement,{},'','');
   return {id:uid(), t:'group', label, vb, kids, x:0,y:0, scale:1, rot:0, flip:false};
 }
 
@@ -894,9 +903,9 @@ function centerOf(){
   }
   return {x:r2(Math.max(16,Math.min(b.w-16,x))), y:r2(Math.max(16,Math.min(b.h-16,y)))};
 }
-function insertArt(str,label,vb){
+function insertArt(str,label,vb,keepCls){
   pushUndo();
-  const g=parseMold(str, label, vb);
+  const g=parseMold(str, label, vb, keepCls);
   const [vx,vy,vw,vh]=vb.split(' ').map(Number);
   const target=DOC.board==='wide'? 190 : 116;
   const s=Math.min(target/vw, target/vh);
@@ -1666,8 +1675,14 @@ function exportPNG(mult){
   };
   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(docSVG($('expBG').checked));
 }
+/* the GVT dogs: pieces wearing the game's pivot classes export with the frame note —
+   "bring him back" is a paste into dogArtSVG (feet at y16, facing LEFT, the seat lives in the game) */
+const DOG_PINS=/\b(dgLeg[AB]|dogwagG|dogHeadG|dogEarG|dogTng)\b/;
+const DOG_NOTE='GVT dog: paste as dogArtSVG body, frame = feet y16 facing LEFT';
+function hasDog(){ return DOC.shapes.some(s=> !s.hide && (s.t==='group'? s.kids : [s]).some(k=>k.attrs && DOG_PINS.test(k.attrs.class||''))); }
 function exportJSON(){
   const data={app:'shapestore',v:1,name:$('docname').value,doc:DOC};
+  if(hasDog()) data.note=DOG_NOTE;
   dl(slugName()+'.json','data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(data)));
 }
 function importJSONFile(){
@@ -1687,7 +1702,7 @@ function importJSONFile(){
 }
 function gameCode(){
   const inner=DOC.shapes.filter(s=>!s.hide).map(shapeStr).join('');
-  return "SPRITES_SRC."+slugName().replace(/-/g,'')+" = '"+inner.replace(/'/g,"\\'")+"';";
+  return (hasDog()? '// '+DOG_NOTE+'\n' : '')+"SPRITES_SRC."+slugName().replace(/-/g,'')+" = '"+inner.replace(/'/g,"\\'")+"';";
 }
 function openExport(){ $('codeOut').value=gameCode(); $('expModal').classList.add('on'); }
 function copyCode(){ const t=$('codeOut'); t.select(); document.execCommand('copy'); if(navigator.clipboard) navigator.clipboard.writeText(t.value); }
@@ -1905,7 +1920,7 @@ function sendBackToCounter(){
   if(EDITJOB){
     try{ localStorage.setItem('ss.parked', localStorage.getItem('ss.cur')||''); }catch(e){}
     if(EDITJOB.board && BOARDS[EDITJOB.board]) DOC.board=EDITJOB.board;   // a wide drawing's piece gets the wide paper
-    const g=parseMold(EDITJOB.svg||'', EDITJOB.label||'PART', EDITJOB.vb||'0 0 140 140');
+    const g=parseMold(EDITJOB.svg||'', EDITJOB.label||'PART', EDITJOB.vb||'0 0 140 140', !!EDITJOB.pins);   // pins: a GVT dog part keeps its pivot classes
     if(g.kids.length){ DOC.shapes.push(g); selT=g.id; }
     const b=document.createElement('button'); b.id='backCounter'; b.className='gold';
     b.textContent=EDITJOB.gal!=null? '⬅ PUT IT BACK IN MY DRAWING' : '⬅ BACK TO THE CHARACTER MAKER — wear it';
@@ -1930,7 +1945,7 @@ function sendBackToCounter(){
   }
   syncBoardUI();
   requestAnimationFrame(()=>{ zoomFit();
-    if(!EDITJOB && PLACE && PLACE.svg){ insertArt(PLACE.svg, PLACE.label||'TOY', PLACE.vb||'0 0 140 140'); PLACE=null; }
+    if(!EDITJOB && PLACE && PLACE.svg){ insertArt(PLACE.svg, PLACE.label||'TOY', PLACE.vb||'0 0 140 140', !!PLACE.pins); PLACE=null; }
   });
 })();
 </script>

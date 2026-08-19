@@ -87,6 +87,8 @@ body.scrolled #mix, body.scrolled #drawOn{padding:3px 9px; font-size:10px;}
 .chip .rst{position:absolute; top:1px; left:4px; font-size:12px; color:#8A2F26; font-weight:bold; background:#fff9; border-radius:4px; padding:0 4px;}
 .chip .dye{width:52px; height:52px; border-radius:50%; margin:7px auto; border:3px solid #0006;}
 footer{text-align:center; color:#57574A; font-size:10px; letter-spacing:1px; padding:26px 0 10px;}
+/* the game's own law: the dogs' pat tongue (.dogTng) sleeps until the pat — hidden here too, carried in every export */
+.dogTng{opacity:0;}
 @media (pointer:coarse){ .chip{width:112px;} .chip svg{width:100px; height:72px;} }
 </style>
 </head>
@@ -590,6 +592,172 @@ const CHARS=[];
  });
 })();
 
+/* ================= 🐕 THE DOGS — THE GOOD BOY + THE HOUND (GVT's companions) =================
+   The art is the game's dog design kit RUN, never transcribed: ~/gvt/design/dog-companion-0818/
+   candidates.html dogA() = THE GOOD BOY and dogB() = THE HOUND (Wyatt's picks, 8/18), sliced by
+   paint order into the counter's slots — every DEFAULT variant is the pick VERBATIM, so a fresh
+   bubble is THE dog from the board. Frame = the game's own local frame (faces LEFT, feet at
+   y≈16; the seat translate(0,6) scale(2) lives in the game). The pivots stay two-level frames
+   (translate seat › .dgPin class group), so an export pastes back as a dogArtSVG body:
+   .dogwagG tail · .dgLegA/.dgLegB hips · .dogHeadG neck · .dogEarG ear root · .dogTng the pat
+   tongue (asleep here as in the game). THE COATS (§ REV 2) are the dye rack: coat on
+   currentColor, shade/cream/ear on the DOGSHADE/DOGCREAM/DOGEAR tokens; ink, collar, tag and
+   tongue are fixed. Poses speak the game's pivot grammar (SNIFF = the head at the neck, the
+   game's own numbers) — SIT is new here: rump down, hind legs folded, tail flat. */
+(function(){
+ const INK='#23211E', TNG='#E0656B', WHITE='#FFFFFF', COLLAR='#C0392B', TAG='#E8C878', DKM='#3B1F1D';
+ const S='DOGSHADE', CR='DOGCREAM', E='DOGEAR';
+ const tr=t=> t? ' transform="'+t+'"' : '';
+ const puck=(c,e,cr)=>'linear-gradient(135deg,'+c+' 0 52%,'+e+' 52% 74%,'+cr+' 74%)';
+ const r1=n=>Math.round(n*100)/100;
+ /* the pick's line language: INK strokes ~0.9, round caps; fills, no outlines */
+ const ln=(d,w)=>'<path d="'+d+'" stroke="'+INK+'" stroke-width="'+(w||0.9)+'" fill="none" stroke-linecap="round"/>';
+ const legAt=(x,y,cls,inner)=>'<g transform="translate('+x+','+y+')"><g class="dgPin '+cls+'">'+inner+'</g></g>';
+ const shin=(x1,y1,x2,y2,col,w,sock)=>'<path d="M'+x1+' '+y1+' L'+x2+' '+y2+'" stroke="'+col+'" stroke-width="'+w+'" fill="none" stroke-linecap="round"/>'+(sock? '<circle cx="'+x2+'" cy="'+y2+'" r="'+r1(w*0.55)+'" fill="'+CR+'"/>':'');
+ /* one shared face grammar for both dogs — anchored on the pick's eye (ex,ey,r), nose (nx,ny) and mouth seat (mx,my) */
+ const eyesKit=(ex,ey,r,pick)=>[
+  {n:'his eye', s:pick},
+  {n:'sleepy', s:'<circle cx="'+ex+'" cy="'+ey+'" r="'+r+'" fill="'+INK+'"/><path d="M'+r1(ex-r-0.35)+' '+r1(ey+0.15)+' A'+r1(r+0.35)+' '+r1(r+0.35)+' 0 0 1 '+r1(ex+r+0.35)+' '+r1(ey+0.15)+' Z" fill="currentColor"/>'+ln('M'+r1(ex-r-0.4)+' '+r1(ey+0.1)+' Q'+ex+' '+r1(ey+0.5)+' '+r1(ex+r+0.4)+' '+r1(ey+0.1),0.8)},
+  {n:'wide alert', s:'<circle cx="'+ex+'" cy="'+ey+'" r="'+r1(r+0.8)+'" fill="'+WHITE+'" stroke="'+INK+'" stroke-width="0.5"/><circle cx="'+r1(ex-0.25)+'" cy="'+r1(ey+0.1)+'" r="'+r1(r*0.9)+'" fill="'+INK+'"/><circle cx="'+r1(ex-0.75)+'" cy="'+r1(ey-0.55)+'" r="'+r1(r*0.36)+'" fill="'+WHITE+'"/>'},
+  {n:'happy', s:ln('M'+r1(ex-r-0.4)+' '+r1(ey+0.5)+' Q'+ex+' '+r1(ey-r-1.4)+' '+r1(ex+r+0.4)+' '+r1(ey+0.5),1)},
+  {n:'sad', s:pick+ln('M'+r1(ex-2.7)+' '+r1(ey-3.3)+' L'+r1(ex+2)+' '+r1(ey-2.4))},
+ ];
+ const browsKit=(ex,ey)=>[
+  {n:'none', s:''},
+  {n:'angry', s:ln('M'+r1(ex-2.9)+' '+r1(ey-2.4)+' L'+r1(ex+2.2)+' '+r1(ey-3.7),1)},
+  {n:'worried', s:ln('M'+r1(ex-2.9)+' '+r1(ey-3.7)+' Q'+r1(ex-0.6)+' '+r1(ey-2.4)+' '+r1(ex+2.2)+' '+r1(ey-2.6),0.9)},
+  {n:'raised', s:ln('M'+r1(ex-3)+' '+r1(ey-3.3)+' Q'+ex+' '+r1(ey-5.7)+' '+r1(ex+3)+' '+r1(ey-3.3),0.9)},
+ ];
+ /* mouths — the tongue shapes reuse the pick's own pat tongue geometry, awake */
+ const mouthsKit=(pick, tongue, mx,my)=>[
+  {n:'his mouth', s:pick},
+  {n:'tongue out', s:pick+'<path d="'+tongue+'" fill="'+TNG+'"/>'},
+  {n:'open smile', s:pick+'<path d="M'+r1(mx-1.4)+' '+r1(my)+' Q'+r1(mx+1.2)+' '+r1(my+4)+' '+r1(mx+3.8)+' '+r1(my+0.2)+' Z" fill="'+DKM+'"/><path d="M'+r1(mx-0.2)+' '+r1(my+1.3)+' Q'+r1(mx+1.2)+' '+r1(my+3.2)+' '+r1(mx+2.6)+' '+r1(my+1.4)+' Z" fill="'+TNG+'"/>'},
+  {n:'pant', s:pick+'<path d="M'+r1(mx-1.8)+' '+r1(my-0.1)+' Q'+r1(mx+1.2)+' '+r1(my+4.6)+' '+r1(mx+4.4)+' '+r1(my+0.4)+' Z" fill="'+DKM+'"/><path d="M'+r1(mx-0.4)+' '+r1(my+1.2)+' Q'+r1(mx-0.6)+' '+r1(my+5.6)+' '+r1(mx+1.4)+' '+r1(my+5.2)+' Q'+r1(mx+2.6)+' '+r1(my+3.8)+' '+r1(mx+2.4)+' '+r1(my+1.4)+' Z" fill="'+TNG+'"/>'},
+  {n:'lip lick', s:pick+'<path d="M'+r1(mx+0.4)+' '+r1(my+0.9)+' Q'+r1(mx-2.9)+' '+r1(my+0.4)+' '+r1(mx-2.5)+' '+r1(my-1.6)+' Q'+r1(mx-1.2)+' '+r1(my-2)+' '+r1(mx-0.2)+' '+r1(my-0.4)+' Z" fill="'+TNG+'"/>'},
+ ];
+ const earsKit=(at, pick, list)=>[{n:'his ear', s:pick}].concat(list.map(v=>({n:v.n, s:'<g transform="'+at+'"><g class="dogEarG dgPin">'+v.s+'</g></g>'})));
+ const EAR_FLOP='<path d="M0 0 Q6.2 -0.4 5.2 7 Q4.6 11.2 1.4 10.7 Q-1.4 10.2 0 0 Z" fill="'+E+'"/>';                 // the good boy's flop
+ const EAR_HOUND='<path d="M0 0 Q5 0.6 3.8 8 Q3 12.8 0 12.2 Q-2.6 11.6 0 0 Z" fill="'+E+'"/>';                       // the hound's long ear
+ const EAR_BIG='<path d="M0 0 Q7.4 -0.6 6.4 8.4 Q5.6 13.4 1.6 12.8 Q-1.6 12.2 0 0 Z" fill="'+E+'"/>';                 // a big soft flop
+ const EAR_PRICK='<path d="M0 0 Q-0.4 -3.2 2.4 -5.6 Q5.6 -2.6 5.2 1.4 Q2.6 2.6 0 0 Z" fill="'+E+'"/><path d="M1.5 -0.4 Q1.6 -2.8 2.5 -4 Q3.9 -1.9 3.8 0.6 Z" fill="'+CR+'" opacity="0.55"/>';   // pricked, listening
+ const EAR_BUTTON='<path d="M0 0 Q4.6 -0.4 4.6 3.6 Q4.2 7.4 1.4 7 Q-1 6.4 0 0 Z" fill="'+E+'"/>';                    // a short button flap
+ const tailKit=(pick, list)=>[{n:'his tail', s:pick}].concat(list);
+ const TAIL_CURL='<path d="M0 0 Q4.2 -1 4.6 -6 Q4.8 -8.6 2.6 -8.6" stroke="currentColor" stroke-width="3.2" fill="none"/><circle cx="2.6" cy="-8.6" r="1.7" fill="'+CR+'"/>';
+ const TAIL_UP='<path d="M0 0 Q3.2 -3.6 3.6 -9.4" stroke="currentColor" stroke-width="2.9" fill="none"/><circle cx="3.6" cy="-9.4" r="1.4" fill="'+CR+'"/>';
+ const TAIL_NUB='<path d="M0 0 Q1.8 -1.6 1.6 -3.6" stroke="currentColor" stroke-width="3.2" fill="none"/><circle cx="1.6" cy="-3.6" r="1.5" fill="'+CR+'"/>';
+ const collarKit=(pick, path, tx,ty, tagR, sw)=>[
+  {n:'red collar', s:pick},
+  {n:'blue collar', s:'<path d="'+path+'" stroke="#3A78C2" stroke-width="'+sw+'" fill="none"/><circle cx="'+tx+'" cy="'+ty+'" r="'+tagR+'" fill="'+TAG+'"/>'},
+  {n:'bandana', s:'<path d="'+path+'" stroke="'+COLLAR+'" stroke-width="'+sw+'" fill="none"/><path d="M'+r1(tx-4.6)+' '+r1(ty-3)+' L'+r1(tx+4.2)+' '+r1(ty-2.6)+' L'+r1(tx-0.2)+' '+r1(ty+3.6)+' Z" fill="'+COLLAR+'"/><circle cx="'+r1(tx-1.6)+'" cy="'+r1(ty-1.4)+'" r="0.5" fill="#F2EBD8"/><circle cx="'+r1(tx+1.4)+'" cy="'+r1(ty-1)+'" r="0.5" fill="#F2EBD8"/><circle cx="'+r1(tx-0.2)+'" cy="'+r1(ty+0.9)+'" r="0.5" fill="#F2EBD8"/>'},
+  {n:'no collar', s:''},
+ ];
+ const bibKit=(pick, cx,cy, rx,ry, spots)=>[
+  {n:'cream bib', s:pick},
+  {n:'big bib', s:'<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+r1(rx*1.4)+'" ry="'+r1(ry*1.35)+'" fill="'+CR+'" transform="rotate(14 '+cx+' '+cy+')"/>'},
+  {n:'spots', s:pick+spots},
+  {n:'plain', s:''},
+ ];
+ /* the seat: a small mold's part rides to the shop's paper scaled up (clean 1/k so the round trip is exact) */
+ const seatFor=vb=>slot=>{ const b=(slot.cropC||vb).split(' ').map(Number); const fit=Math.min(112/b[2],112/b[3]); let k=2;
+   for(const q of [2,2.5,4,5,8,10,12.5,16,20,25]) if(q<=fit) k=q;
+   return {k, ik:1/k, x:r1(70-(b[0]+b[2]/2)*k), y:r1(70-(b[1]+b[3]/2)*k)}; };
+
+ function dogChar(D){
+  const P=()=>{ const s=D.self.slots.find(x=>x.id==='pose'); const v=curVar(s); return (v&&v.P)||{}; };
+  const head=inner=>'<g transform="'+D.headAt+(P().head?' '+P().head:'')+'"><g class="dogHeadG dgPin">'+inner+'</g></g>';
+  const poseChip=i=>()=>{ const p=picks(), k=p.pose; p.pose=i; const s=heroStr(); p.pose=k; return s; };
+  const c={
+   key:D.key, name:D.name, ask:D.ask, vb:D.vb, pins:true, refresh:true, seat:seatFor(D.vb),
+   layers:[
+    '<ellipse cx="0" cy="16" rx="8.5" ry="2.3" fill="#000" opacity="0.2"/>',   // the game's shadow, in local units
+    ()=>'<g style="color:PLASTIC" stroke-linecap="round"'+tr(P().root)+'>',
+    {slot:'tail'},
+    ()=>'<g data-slot="pose">'+(P().far||D.FAR)+'</g>',                        // far legs, behind the body
+    ()=>'<g data-slot="belly">'+(P().bodyArt||D.BODY)+'</g>',                 // SIT brings its own body: the pick's chest + a haunch on the ground
+    ()=>'<g data-slot="pose">'+(P().near||D.NEAR)+'</g>',                      // near legs, in front
+    {slot:'belly'}, {slot:'collar'},
+    ()=>head('<g data-slot="eyes">'+D.SKULL+'</g><g data-slot="mouth">'+D.MUZZLE+'</g>'),
+    {slot:'mouth'},
+    ()=>head('<g data-slot="mouth">'+D.TONGUE+'</g>'),                         // the pat tongue, asleep (.dogTng)
+    {slot:'eyes'}, {slot:'brows'}, {slot:'ear'},
+    {slot:'pose'},
+    '</g>',
+   ],
+   slots:[
+    {id:'plastic', label:'THE COAT', note:'pick his colors', v:D.coats.map(k=>({n:k.n, c:k.coat, puck:puck(k.coat,k.ear,k.cream), map:{DOGSHADE:k.shade, DOGCREAM:k.cream, DOGEAR:k.ear}}))},
+    {id:'eyes', label:'EYES', wrap:D.headAt, pin:'dogHeadG dgPin', pivot:()=>P().head, chipVB:D.eyeVB, cropC:D.eyeCrop, v:D.eyes},
+    {id:'brows', label:'EYEBROWS', wrap:D.headAt, pin:'dogHeadG dgPin', pivot:()=>P().head, chipVB:D.eyeVB, cropC:D.eyeCrop, v:D.brows},
+    {id:'mouth', label:'MOUTH', wrap:D.headAt, pin:'dogHeadG dgPin', pivot:()=>P().head, chipVB:D.mouthVB, cropC:D.mouthCrop, v:D.mouths},
+    {id:'ear', label:'THE EAR', wrap:D.headAt, pin:'dogHeadG dgPin', pivot:()=>P().head, chipVB:D.earVB, cropC:D.earCrop, v:D.ears},
+    {id:'pose', label:'THE POSE', note:'trot · sniff · sit', edit:false, chipVB:D.vb, v:[
+      {n:'trot', s:'', P:{}, chip:poseChip(0)},
+      {n:'sniff', s:'', P:{head:'rotate(-30) translate(1,2.5)', root:'rotate(3 0 -3) translate(-1,0.5)'}, chip:poseChip(1)},   // the game's doghsniff midpoint + the 3° lean
+      {n:'sit', s:'', P:D.sit, chip:poseChip(2)},
+    ]},
+    {id:'tail', label:'THE TAIL', wrap:D.tailAt, pin:'dogwagG dgPin', pivot:()=>P().tail, chipVB:'-5.5 -13 15 15', cropC:D.tailCrop, v:D.tails},
+    {id:'collar', label:'THE COLLAR', chipVB:D.collarVB, cropC:D.collarVB, v:D.collars},
+    {id:'belly', label:'THE BIB', note:'chest markings', chipVB:D.bibVB, cropC:D.bibVB, v:D.bibs},
+   ],
+  };
+  D.self=c; CHARS.push(c);
+ }
+
+ /* ---- 🐕 THE GOOD BOY — dogA(), the pick ---- */
+ dogChar({
+  key:'goodboy', name:'THE GOOD BOY', ask:'🐕 THE GOOD BOY?', vb:'-27 -19 50 42',
+  tailAt:'translate(11.5,-1)', headAt:'translate(-9,-2)',
+  FAR:'<g transform="translate(-2.5,7)"><g class="dgPin dgLegB"><path d="M0 0 L0 8.5" stroke="DOGSHADE" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="0" cy="8.5" r="1.87" fill="DOGCREAM"/></g></g><g transform="translate(9.5,7)"><g class="dgPin dgLegA"><path d="M0 0 L0 8.5" stroke="DOGSHADE" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="0" cy="8.5" r="1.87" fill="DOGCREAM"/></g></g>', BODY:'<path d="M-11.9 2.4 C-11.9 -2.6 -8.6 -4.6 -4.2 -4.6 L5.4 -4.2 C10 -4 12.6 -1.2 12.6 3 C12.6 7.4 9.8 9.6 5.8 9.6 L-4.6 9.8 C-9.6 9.8 -11.9 7.2 -11.9 2.4 Z" fill="currentColor"/>', NEAR:'<g transform="translate(-6.5,7)"><g class="dgPin dgLegA"><path d="M0 0 L0 8.5" stroke="currentColor" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="0" cy="8.5" r="1.9800000000000002" fill="DOGCREAM"/></g></g><g transform="translate(6,7)"><g class="dgPin dgLegB"><path d="M0 0 L0 8.5" stroke="currentColor" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="0" cy="8.5" r="1.9800000000000002" fill="DOGCREAM"/></g></g>',
+  SKULL:'<circle cx="-3" cy="-4.5" r="7.2" fill="currentColor"/>', MUZZLE:'<rect x="-12.6" y="-5" width="8.6" height="6.2" rx="3" fill="DOGCREAM"/>', TONGUE:'<path class="dogTng" d="M-9.6 0.5 Q-8.4 4.4 -6.9 0.7 Z" fill="#E0656B"/>',
+  coats:[   // § REV 2 — gb
+   {n:'classic',        coat:'#8a6544', shade:'#7A553A', cream:'#EFE0BC', ear:'#5b3a22'},
+   {n:'golden',         coat:'#D9A85A', shade:'#B8863E', cream:'#FFF3D6', ear:'#B07A2E'},
+   {n:'black &amp; tan',coat:'#2B2622', shade:'#1B1816', cream:'#C98A4A', ear:'#1B1816'},
+   {n:'blue',           coat:'#8C97A0', shade:'#6B757D', cream:'#EFE0BC', ear:'#525B63'},
+  ],
+  eyes:eyesKit(-4.6,-6.6,1.75, '<circle cx="-4.6" cy="-6.6" r="1.75" fill="#23211E"/><circle cx="-5.2" cy="-7.2" r="0.62" fill="#FFFFFF"/>'), eyeVB:'-10 -12 11 8', eyeCrop:'-19 -14 11 8',
+  brows:browsKit(-4.6,-6.6),
+  mouths:mouthsKit('<circle cx="-11.6" cy="-2.9" r="1.95" fill="#23211E"/><path d="M-9.4 0.2 q1.4 1.5 2.9 0.1" stroke="#23211E" stroke-width="0.9" fill="none"/>', 'M-9.6 0.5 Q-8.4 4.4 -6.9 0.7 Z', -9.4,0.6), mouthVB:'-15 -5.5 13 12', mouthCrop:'-24 -7.5 13 12',
+  ears:earsKit('translate(1.2,-10.2)', '<g transform="translate(1.2,-10.2)"><g class="dogEarG dgPin"><path d="M0 0 Q6.2 -0.4 5.2 7 Q4.6 11.2 1.4 10.7 Q-1.4 10.2 0 0 Z" fill="DOGEAR"/></g></g>', [{n:'big floppy',s:EAR_BIG},{n:'pricked',s:EAR_PRICK},{n:'hound ear',s:EAR_HOUND}]), earVB:'-4 -16.5 14 19.5', earCrop:'-13 -18.5 14 19.5',
+  tails:tailKit('<path d="M0 0 Q4.2 -1 4.6 -6 Q4.8 -8.6 2.6 -8.6" stroke="currentColor" stroke-width="3.2" fill="none"/><circle cx="2.6" cy="-8.6" r="1.7" fill="DOGCREAM"/>', [{n:'straight up',s:TAIL_UP},{n:'nub',s:TAIL_NUB}]), tailCrop:'6 -14 15 15',
+  collars:collarKit('<path d="M-14 -0.6 Q-9.2 3.6 -3.6 -0.2" stroke="#C0392B" stroke-width="2.6" fill="none"/><circle cx="-9.4" cy="3.6" r="1.5" fill="#E8C878"/>', 'M-14 -0.6 Q-9.2 3.6 -3.6 -0.2', -9.4,3.6, 1.5, 2.6), collarVB:'-18 -4 18 13',
+  bibs:bibKit('<ellipse cx="-8.4" cy="5.2" rx="3.1" ry="3.9" fill="DOGCREAM" transform="rotate(14 -8.4 5.2)"/>', -8.4,5.2, 3.1,3.9, '<circle cx="3.6" cy="1.2" r="2.6" fill="'+S+'"/><circle cx="8.6" cy="5" r="1.7" fill="'+S+'"/>'), bibVB:'-15 -4 26 18',
+  sit:{ head:'rotate(4)', tail:'translate(0.3,14.4) rotate(96)',
+   bodyArt:'<path d="M-11.9 2.4 C-11.9 -2.6 -8.6 -4.6 -4.2 -4.6 C2 -4.4 9.6 0.6 12.4 7.4 C13.6 10.6 13.4 13.4 11.4 15 C10 16 4 16 2.6 14.6 C1 13.2 -0.4 10.4 -3.4 9.8 L-4.6 9.8 C-9.6 9.8 -11.9 7.2 -11.9 2.4 Z" fill="currentColor"/>',
+   far: legAt(-2.5,7,'dgLegB', shin(0,0,0,8.5,S,3.4,true))
+       +legAt(5.3,13.2,'dgLegA', shin(-0.3,0.6,-3.8,2.3,S,3.4,true)),
+   near:legAt(-6.5,7,'dgLegA', shin(0,0,0,8.5,'currentColor',3.6,true))
+       +legAt(2.3,11.5,'dgLegB', shin(1.2,2.1,-2.8,4,'currentColor',3.6,true)) },
+ });
+
+ /* ---- 🐕 THE HOUND — dogB(), the pick ---- */
+ dogChar({
+  key:'hound', name:'THE HOUND', ask:'🐕 THE HOUND?', vb:'-27 -19 50 42',
+  tailAt:'translate(13,-2)', headAt:'translate(-10.4,-3)',
+  FAR:'<g transform="translate(-3.6,7.4)"><g class="dgPin dgLegB"><path d="M0 0 L0 8.6" stroke="DOGSHADE" stroke-width="3.2" fill="none" stroke-linecap="round"/></g></g><g transform="translate(11.2,7.2)"><g class="dgPin dgLegA"><ellipse cx="0.4" cy="1.6" rx="3.1" ry="4.2" fill="DOGSHADE"/><path d="M0.8 4 L1.4 8.8" stroke="DOGSHADE" stroke-width="3.2" fill="none" stroke-linecap="round"/></g></g>', BODY:'<circle cx="8.6" cy="3.2" r="6.1" fill="currentColor"/><circle cx="-6.6" cy="2.6" r="6.4" fill="currentColor"/><rect x="-6.6" y="-3.6" width="15.2" height="12.4" fill="currentColor"/><path d="M-6.4 -3.4 Q1.5 -6.6 10.4 -2.6 Q11.6 1.6 8.4 2.6 Q1.2 -0.6 -6.2 0.8 Z" fill="DOGEAR"/>', NEAR:'<g transform="translate(-8,7.4)"><g class="dgPin dgLegA"><path d="M0 0 L0 8.6" stroke="currentColor" stroke-width="3.4" fill="none" stroke-linecap="round"/></g></g><g transform="translate(7,7.6)"><g class="dgPin dgLegB"><ellipse cx="0.4" cy="1.6" rx="3.1" ry="4.2" fill="currentColor"/><path d="M0.8 4 L1.4 8.8" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round"/></g></g>',
+  SKULL:'<circle cx="-2.6" cy="-4.4" r="6.4" fill="currentColor"/>', MUZZLE:'<rect x="-13.2" y="-4.6" width="10.6" height="5.6" rx="2.6" fill="currentColor"/><rect x="-12.4" y="-1.2" width="7.4" height="2.8" rx="1.4" fill="DOGCREAM"/>', TONGUE:'<path class="dogTng" d="M-9.8 1 Q-8.8 4.4 -7.4 1.2 Z" fill="#E0656B"/>',
+  coats:[   // § REV 2 — hd (the saddle rides the EAR slot)
+   {n:'tricolour', coat:'#B87333', shade:'#96551E', cream:'#EFE0BC', ear:'#2B2622'},
+   {n:'redbone',   coat:'#A9502A', shade:'#7E3A1C', cream:'#EFE0BC', ear:'#5B2A12'},
+   {n:'bluetick',  coat:'#5B6C7A', shade:'#3E4B56', cream:'#EFE0BC', ear:'#242C33'},
+   {n:'lemon',     coat:'#E3C88A', shade:'#C4A96A', cream:'#FFF7E6', ear:'#B89250'},
+  ],
+  eyes:eyesKit(-4.4,-6.4,1.55, '<circle cx="-4.4" cy="-6.4" r="1.55" fill="#23211E"/><circle cx="-4.9" cy="-6.9" r="0.55" fill="#FFFFFF"/>'), eyeVB:'-10 -12 11 8', eyeCrop:'-20.4 -15 11 8',
+  brows:browsKit(-4.4,-6.4),
+  mouths:mouthsKit('<circle cx="-12.4" cy="-3" r="1.65" fill="#23211E"/>', 'M-9.8 1 Q-8.8 4.4 -7.4 1.2 Z', -10.2,1.4), mouthVB:'-16 -6 14 12.5', mouthCrop:'-26.4 -9 14 12.5',
+  ears:earsKit('translate(1.6,-9.6)', '<g transform="translate(1.6,-9.6)"><g class="dogEarG dgPin"><path d="M0 0 Q5 0.6 3.8 8 Q3 12.8 0 12.2 Q-2.6 11.6 0 0 Z" fill="DOGEAR"/></g></g>', [{n:'floppy',s:EAR_FLOP},{n:'pricked',s:EAR_PRICK},{n:'button',s:EAR_BUTTON}]), earVB:'-4 -16 15 22', earCrop:'-14.4 -19 15 22',
+  tails:tailKit('<path d="M0 0 Q3.2 -3.6 3.6 -9.4" stroke="currentColor" stroke-width="2.9" fill="none"/><circle cx="3.6" cy="-9.4" r="1.4" fill="DOGCREAM"/>', [{n:'curled',s:TAIL_CURL},{n:'nub',s:TAIL_NUB}]), tailCrop:'7.5 -15 15 15',
+  collars:collarKit('<path d="M-15.6 -1.6 Q-10.6 2.6 -5 -1.2" stroke="#C0392B" stroke-width="2.4" fill="none"/><circle cx="-10.8" cy="2.6" r="1.35" fill="#E8C878"/>', 'M-15.6 -1.6 Q-10.6 2.6 -5 -1.2', -10.8,2.6, 1.35, 2.4), collarVB:'-19.5 -5 18 13',
+  bibs:bibKit('<ellipse cx="-9.6" cy="5.4" rx="2.9" ry="3.6" fill="DOGCREAM" transform="rotate(14 -9.6 5.4)"/>', -9.6,5.4, 2.9,3.6, '<circle cx="4" cy="4.6" r="2.2" fill="'+S+'"/><circle cx="-1.6" cy="6.4" r="1.5" fill="'+S+'"/>'), bibVB:'-16.5 -4 26 18',
+  sit:{ head:'rotate(4)', tail:'translate(-1.5,16.2) rotate(105)',
+   bodyArt:'<circle cx="7" cy="9.9" r="6.1" fill="currentColor"/><circle cx="-6.6" cy="2.6" r="6.4" fill="currentColor"/><path d="M-6.6 -3.6 L6 2.6 Q12.4 7.6 10.8 16 L2.4 16 Q-1.4 11.4 -6.6 9 Z" fill="currentColor"/><path d="M-6.4 -3.4 Q1.5 -5.4 9.4 1.4 Q11.2 5 8.6 6.4 Q1.4 0.4 -6.2 0.8 Z" fill="'+E+'"/>',
+   far: legAt(-3.6,7.4,'dgLegB', shin(0,0,0,8.6,S,3.2,false))
+       +legAt(6.5,13.6,'dgLegA', shin(-2.1,0.4,-5.9,2.4,S,3.2,false)),
+   near:legAt(-8,7.4,'dgLegA', shin(0,0,0,8.6,'currentColor',3.4,false))
+       +legAt(2.7,11.7,'dgLegB', shin(-0.1,1.7,-4.2,4.3,'currentColor',3.2,false)) },
+ });
+})();
+
 /* ================= MY DRAWINGS — every gallery save can walk up to the counter =================
    The shop's own serialization + v1 offset migration, lifted verbatim from index.html
    so a saved drawing's pieces read (and round-trip) exactly as the shop draws them. */
@@ -661,13 +829,29 @@ function resetOver(slotId, vi){
 }
 function picks(){ const c=C(); if(!PICKS[c.key]){ PICKS[c.key]={}; c.slots.forEach(s=>PICKS[c.key][s.id]=s.d||0); } return PICKS[c.key]; }
 function curVar(slot){ const l=vlist(slot); return l[Math.min(picks()[slot.id]||0, l.length-1)]; }
-function slotSVG(slot){ const v=curVar(slot); if(v.c) return ''; return (slot.wrap && !v.raw)? '<g transform="'+slot.wrap+'">'+v.s+'</g>' : v.s; }
-function dyeOf(){ const c=C(); const p=c.slots.find(s=>s.id==='plastic'); return p? curVar(p).c : null; }
+/* slot frames — wrap = the seat (char coords → the part's own frame); pin = a
+   named pivot group INSIDE the seat (the dogs' .dogHeadG / .dogwagG: two-level
+   frames, never flattened, so the export keeps the game's pivots); pivot() = a
+   pose transform about the seat's origin. Raw (returned) variants already live
+   in char coords: no wrap, but a pose still turns them about the same point.
+   neutral = the un-posed part (the edit hand-off rides to the shop un-posed). */
+function slotSVG(slot, neutral){
+  const v=curVar(slot); if(v.c) return '';
+  const pv=(!neutral && slot.pivot)? slot.pivot() : '';
+  if(slot.wrap && !v.raw){ const inner=slot.pin? '<g class="'+slot.pin+'">'+v.s+'</g>' : v.s; return '<g transform="'+slot.wrap+(pv?' '+pv:'')+'">'+inner+'</g>'; }
+  if(slot.wrap && v.raw && pv) return '<g transform="'+slot.wrap+' '+pv+' '+invT(slot.wrap)+'">'+v.s+'</g>';
+  return v.s;
+}
+function invT(t){ const m=/translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\s*\)/.exec(t); return m? 'translate('+(-m[1])+','+(-m[2])+')' : ''; }
+/* the dye rack: one hex on PLASTIC / currentColor (the army plastics) — or a
+   whole palette (the dogs' COATS: coat on currentColor + shade/cream/ear tokens) */
+function dyeVar(){ const c=C(); const p=c.slots.find(s=>s.id==='plastic'); return p? curVar(p) : null; }
+function dyeOf(){ const v=dyeVar(); return v? v.c : null; }
+function dyeStr(s){ const v=dyeVar(); if(!v||!v.c) return s; s=s.split('PLASTIC').join(v.c); if(v.map) for(const k in v.map) s=s.split(k).join(v.map[k]); return s; }
 function heroStr(){
   const c=C();
-  let s=c.layers.map(l=> typeof l==='string'? l : '<g data-slot="'+l.slot+'">'+slotSVG(c.slots.find(x=>x.id===l.slot))+'</g>').join('');
-  const dye=dyeOf(); if(dye) s=s.split('PLASTIC').join(dye);
-  return s;
+  let s=c.layers.map(l=> typeof l==='string'? l : typeof l==='function'? l() : '<g data-slot="'+l.slot+'">'+slotSVG(c.slots.find(x=>x.id===l.slot))+'</g>').join('');
+  return dyeStr(s);
 }
 function renderHero(){
   const c=C();
@@ -678,10 +862,10 @@ function renderHero(){
   applySelGlow();   // the rebuild wipes classes — the picked part keeps its glow
 }
 function chipSVG(slot, v){
-  if(v.c) return '<div class="dye" style="background:'+v.c+'"></div>';
+  if(v.c) return '<div class="dye" style="background:'+(v.puck||v.c)+'"></div>';   // a palette puck may wear its whole coat
   const vb = v.raw? (slot.cropC||C().vb) : slot.chipVB;
-  let inner=v.s;
-  if(inner && /currentColor|PLASTIC/.test(inner)){ const dye=dyeOf()||'#7FA35C'; inner='<g style="color:'+dye+'">'+inner.split('PLASTIC').join(dye)+'</g>'; }
+  let inner= typeof v.chip==='function'? v.chip() : (v.chip||v.s);   // a chip may show more than it wears (the dogs' POSES preview the whole dog)
+  if(inner && /currentColor|PLASTIC|DOG(SHADE|CREAM|EAR)\b/.test(inner)){ const dye=dyeOf()||'#7FA35C'; inner='<g style="color:'+dye+'">'+dyeStr(inner.split('PLASTIC').join(dye))+'</g>'; }
   if(!inner){ const b=vb.split(' ').map(Number);
     inner='<text x="'+(b[0]+b[2]/2)+'" y="'+(b[1]+b[3]/2+3)+'" text-anchor="middle" font-size="'+Math.round(b[3]/3)+'" fill="#B8A888" font-family="Trebuchet MS">·</text>'; }
   return '<svg xmlns="'+NS+'" viewBox="'+vb+'">'+inner+'</svg>';
@@ -706,10 +890,10 @@ function pick(slotId, i){
   }
   const slot=C().slots.find(s=>s.id===slotId), l=vlist(slot);
   const worn=Math.min(picks()[slotId]||0, l.length-1);
-  if(worn===i && l[i] && !l[i].c){ editPart(slotId); return; }   /* tap the worn chip again = edit it (dyes have nothing to draw) */
+  if(worn===i && l[i] && !l[i].c && slot.edit!==false){ editPart(slotId); return; }   /* tap the worn chip again = edit it (dyes and pose racks have nothing to draw) */
   picks()[slotId]=i;
   renderHero();
-  if(slotId==='plastic') renderSheet();   // dye tints the outfit chips too
+  if(slotId==='plastic' || C().refresh) renderSheet();   // dye tints the outfit chips too; a preview rack (the dogs' POSES) follows every pick
   else {
     const c=C();
     document.querySelectorAll('.sec').forEach((sec,si)=>{
@@ -755,7 +939,7 @@ function drawOnToy(){
   let svg=heroStr();
   const dye=dyeOf(); if(dye) svg=svg.split('currentColor').join(dye);
   try{
-    localStorage.setItem('ss.place', JSON.stringify({svg, label:c.name, vb:c.vb}));
+    localStorage.setItem('ss.place', JSON.stringify({svg, label:c.name, vb:c.vb, pins:!!c.pins}));   // pins: keep the game's pivot classes through the shop
     location.href='index.html?place=1';
   }catch(e){ alert('Storage is full.'); }
 }
@@ -771,11 +955,16 @@ function editPart(slotId){
     }catch(e){ alert('Storage is full.'); }
     return;
   }
-  let svg=slotSVG(slot);
-  const dye=dyeOf(); if(dye) svg=svg.split('PLASTIC').join(dye).split('currentColor').join(dye);
+  if(slot.edit===false){ selectPart(slotId); return; }   // a pose rack: nothing to draw — the chips are the choice
+  let svg=slotSVG(slot, true);   // the un-posed part
+  const dye=dyeOf(); if(dye) svg=dyeStr(svg).split('currentColor').join(dye);
   const vi=Math.min(picks()[slotId]||0, vlist(slot).length-1);   // WHICH design is being redrawn
+  let vb=c.vb;
+  if(c.seat){   // a small mold (the dogs live in the game's ~40-unit frame) rides to the paper scaled up on its seat; the return leg undoes it
+    const st=c.seat(slot); svg='<g transform="translate('+st.x+','+st.y+') scale('+st.k+')">'+svg+'</g>'; vb='0 0 140 140';
+  }
   try{
-    localStorage.setItem('ss.edit', JSON.stringify({char:c.key, slot:slotId, vi, label:c.name+' '+slot.label, svg, vb:c.vb}));
+    localStorage.setItem('ss.edit', JSON.stringify({char:c.key, slot:slotId, vi, label:c.name+' '+slot.label, svg, vb, pins:!!c.pins}));
     location.href='index.html?edit=1';
   }catch(e){ alert('Storage is full.'); }
 }
@@ -787,6 +976,7 @@ function editPart(slotId){
   const ci=CHARS.findIndex(x=>x.key===out.char); if(ci<0||!out.svg) return;
   CUR=ci;
   const slot=CHARS[ci].slots.find(s=>s.id===out.slot); if(!slot) return;
+  if(CHARS[ci].seat){ const st=CHARS[ci].seat(slot); out.svg='<g transform="scale('+st.ik+') translate('+(-st.x)+','+(-st.y)+')">'+out.svg+'</g>'; }   // off the paper seat, back into char coords
   const pushMyOwn=()=>{   // pre-vi edits (or a vanished custom) land as a MY OWN chip
     const cu=customs(); cu[out.char]=cu[out.char]||{}; cu[out.char][out.slot]=cu[out.char][out.slot]||[];
     cu[out.char][out.slot].push({n:'MY OWN'+(cu[out.char][out.slot].length? ' '+(cu[out.char][out.slot].length+1):''), s:out.svg});
@@ -827,7 +1017,7 @@ function selectPart(slot){
   const tag=$('picked');
   if(slot){
     const s=C().slots.find(x=>x.id===slot);
-    tag.innerHTML='✏️ EDIT '+s.label;
+    tag.innerHTML= s.edit===false? '👇 '+s.label+' — pick one below' : '✏️ EDIT '+s.label;   // a pose rack picks by chip, not by pencil
     tag.classList.add('on');
     jumpTo(slot);
   } else tag.classList.remove('on');
