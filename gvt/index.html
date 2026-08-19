@@ -19929,7 +19929,13 @@ const BF_MAPS = [
       cq:cqShipBuild() }) }
 ];
 // AI difficulty. Economy is IDENTICAL to yours at every tier — the difficulty is
-// decisions, never resources. blunderP is the humanizing dial.
+// decisions, never resources — with ONE named exception, 0417 THE HARD BOT
+// (FM-GVT-HARDBOT-01): a ranked all-CPU 1v1/2v2 against an 85%+/10-game
+// commander forces 'hard' and mints S.bf.hard, and that chain's later cards
+// fund and promote the foe BEYOND parity (Wyatt, 8/18: "if we have to cheat
+// to make it happen a little bit, that's fine" — the cheat is silent, the
+// director's gas floors at 1 there so ease-off never refunds it). Everywhere
+// else the law stands byte-for-byte. blunderP is the humanizing dial.
 // Softened 7/24 (Wyatt: "players should win ~80% — not a pushover"). Measured
 // with a sensible-player harness: decision knobs alone barely moved win rates
 // (the AI's teeth are interception placement + economy parity), so the real
@@ -28997,6 +29003,21 @@ function bfMapLabel(id){ return id==='random'? 'RANDOM' : bfMap(id).name; }
 // raids included — a room game COUNTS as played, it is just never rigged).
 function bfGamesPlayed(){ return (META.bfWins|0)+(META.bfLosses|0); }
 function bfRookie(){ return bfGamesPlayed()<BF_ROOKIE_GAMES; }
+// 0417 THE HARD-BOT GATE (FM-GVT-HARDBOT-01 §2.1 — Wyatt 8/18, binding: "if
+// you have an 85% or higher win rate in 1v1s, we make sure the computer
+// opponent is difficult. We want you to lose occasionally... I want to see
+// another loss on some of these players"). The book is the per-mode LIFETIME
+// pair the ranked verdicts already write (META.bfRecord[1|2] via wrRec) — so
+// HARD_WR is a structural ceiling, not a vibe: a 40W-2L farmer meets the
+// hard opponent until his book dips under 85%, then the ordinary ramp
+// returns. Pure read, zero new storage. Only modes 1 and 2 carry books; the
+// rookie tier can never co-fire (HARD_GAMES 10 > BF_ROOKIE_GAMES 4 —
+// asserted at the gate anyway).
+const HARD_WR=0.85, HARD_GAMES=10;   // "85% or higher win rate ... played over 10 games" (contract §3 = LAW)
+const HARD_T0=4;    // the hard captain's first special press, seconds after his Sarge stands (=AWAY_T0's law — the player must be LOOKING; clocks live ON THE CELL, never S.*)
+const HARD_ANN=0;   // ⚑ reserved OFF — the cheat is silent by design; 1 = a future announce card (whole-key l10n ×7 when flipped)
+function hardBotDue(team){ const r=wrRec(team), n=r.w+r.l;
+  return (team===1||team===2) && n>=HARD_GAMES && r.w/n>=HARD_WR; }
 // a map generator builds the LEFT half; everything mirrors across MID so both
 // armies always fight the exact same ground (and every existing rock loop works).
 // A feature that already straddles the middle IS its own mirror — stamp it once.
@@ -29506,7 +29527,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.73';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.74';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -35032,7 +35053,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   // the daily raid above all — keeps todaysRival exactly as before
   const riv=rivX||todaysRival();
   const team=Math.max(1,Math.min(BF_MAX_TEAM, teamSize||META.bfTeam||1));
-  const diff=diffOverride||bfDifficulty();
+  let diff=diffOverride||bfDifficulty();   // let, not const — the 0417 hard-bot gate below makes the one write ('hard')
   WORLD_W=bfWidth(team)+(map.wAdd||0); MID=WORLD_W/2;        // a bigger war gets a bigger carpet; 0375: a map may add hull of its own (THE STARSHIP's doubled complex, 1800) — every other row has no cell and keeps its span to the pixel
   WORLD_H=H*(map.hMul||1);                     // WESTERN LAND is two carpets TALL (v1.57); every other map keeps H to the pixel
   const seats=(plan && plan.length===team*2)? plan : bfSeatPlan(team,riv);
@@ -35058,6 +35079,23 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   // moves a byte. Teammate AIs on YOUR side are never modulated either (the
   // gas only ever touches team 'foe' — see bfTick).
   const dirGain=(!coopLaunching && seats.every(st=>!st.human||st.me))? (rookie? BF_DIR.rookie : BF_DIR.vet) : 0;
+  // 0417 THE HARD-BOT GATE (FM-GVT-HARDBOT-01 §2.1): a ranked all-CPU 1v1 or
+  // 2v2 whose commander's lifetime book reads HARD_WR+ over HARD_GAMES+
+  // games fields the hard opponent — the stars ramp is BYPASSED UPWARD here,
+  // never touched for anyone else. Scope = the director's own carpet test
+  // (any human foe, any room, any squad kills it) + !diffOverride (the AWAY
+  // serve and the four NEMESIS ambush doors pass 'hard' themselves; the
+  // rig's explicit tiers outrank) + team 1|2 (the only modes with books).
+  // The daily-raid quick 1v1 gates — correct, it feeds bfRecord[1]. riv.id
+  // guards the ONE null-diffOverride serve that dresses a captain cell after
+  // return: THE NEMESIS (his pity ladder is his own thermostat, and his
+  // serve rides the stars ramp by design — the contract's structural-
+  // exclusion note missed that door; verified at fire). !rookie is
+  // arithmetic (HARD_GAMES 10 > BF_ROOKIE_GAMES 4) — asserted anyway, per
+  // the contract.
+  const hard=!diffOverride && !coopLaunching && !rookie && (team===1||team===2)
+    && riv.id!=='nemesis' && seats.every(st=>!st.human||st.me) && hardBotDue(team);
+  if(hard) diff='hard';
   for(const st of seats){ st.purse=BF_START; st.tagT=0; st.mir=(st.team==='you');
     buildUnitTint(st.hex);
     if(map.ground==='snow'||map.ground==='deck'){ buildUnitRim(st.hex); buildUnitRim(GREEN); }   // both armies, on white (0303: the pale deck is light ground too)
@@ -35105,6 +35143,14 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
     // every hMul-1 map the y clamp is 0..0, so nothing that shipped moves
     cam:{ x:(myTeam==='foe'? Math.max(0,WORLD_W-VW) : 0), vx:0,
           y:Math.max(0,(WORLD_H-H)/2), vy:0 } };
+  // 0417 the hard cell — the THIRD captain cell (nem · away · hard), minted
+  // EMPTY: the shape the war-chest/brass (up), enemy-sarge (kitW/col/mo +
+  // the five clocks) and smart-march cards fill and consume. bf.hard is the
+  // whole feature's flag (absent on every other carpet); clocks live ON THE
+  // CELL, never S.snpCd/S.gsT — those are the player's own, and the HUD
+  // reads them (the away brain's law, verbatim).
+  if(hard) S.bf.hard={ up:{}, kitW:null, col:null, mo:[],
+    tkCd:HARD_T0, snpCd:HARD_T0, gsCd:HARD_T0, rpCd:HARD_T0, fsCd:HARD_T0, sgId:0 };
   // ===== v2.15 JAX: the map's little toy jacks go down BEFORE the first boot.
   // They ride S.mines so the sweeper's own loop serves them whole: armT 0 =
   // live from the whistle, big/sl false = the stock 26-trigger and the stock
@@ -37389,7 +37435,15 @@ function bfTick(dt){
           pick.brain.cd=Math.min(pick.brain.cd,0.15); d.stakes++; d.emptyT=0; }
       }
     } else d.emptyT=0;
-    return d.gas;
+    // 0417 THE HARD CARPET'S FLOOR (FM-GVT-HARDBOT-01 §1 — non-negotiable):
+    // unclamped, the v2.43 rubber band refunds every sanctioned cheat — a
+    // hard bot pulling AHEAD gets its drip and its decision clock eased
+    // DOWN. On a hard-bot carpet the foe gas applies at 1.0 minimum to BOTH
+    // reads below (the tagT drip lane and the brain clock); pick-up-the-gas
+    // stays — a LOSING hard bot still accelerates past 1. The dir ledger
+    // keeps its raw chase (d.gas untouched — telemetry stays honest about
+    // what the band WANTED).
+    return bf.hard? Math.max(1,d.gas) : d.gas;
   })();
   for(const st of bf.seats){
     // SARGE'S TEN SECONDS. Counted here, on the sim's own dt, so it runs at the
@@ -65359,6 +65413,11 @@ window.GVT = {
     const u=S.units.find(q=>!q.dead&&q.seat===s&&q.type==='sarge'); if(!u) return null;
     u.hp=0; hitCheck(u,null); return GVT.bfSarge(s); },
   bfRec(n,w,l){ if(n){ META.bfRecord[n]={w:w|0,l:l|0,s:0}; saveMeta(); } return META.bfRecord; },
+  // 0417: the hard-bot gate's QA door — due per book, live cell if a hard
+  // carpet is up (deep copy — the rig can never poke the real cell through it)
+  hardBot(){ const bf=S.bf;
+    return { due1:hardBotDue(1), due2:hardBotDue(2), active:!!(bf&&bf.hard),
+      cell:(bf&&bf.hard)? JSON.parse(JSON.stringify(bf.hard)) : null }; },
   // piggy test rig: GVT.pig(12) = 12-day streak defended yesterday, unclaimed
   pig(streak,opts){ opts=opts||{};
     META.piggy={ streak:streak|0, last:(streak>0? (opts.last||dayBack(1)) : ''), claimed:opts.claimed||'' };
