@@ -29950,7 +29950,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.83';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.84';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -32902,12 +32902,28 @@ let PTY_POP=null;     // the one full-screen card (join | go | catch | kicked)
 let PTY_K2={seat:-1, t:0};   // the sheet's armed KICK chip (§2b — 3 s disarm)
 const LFG_WINDOW=30000, LFG_SETTLE=8000, LFG_AUTO=10000, LFG_WISH=3000, KICK_ARM_MS=3000;
 const PTY_PLACES={ bf:'THE BATTLEFIELD', c:'THE CAMPAIGN', yeti:'YETI PARK',
-                   dino:'DINO PARK', west:'OUTLAW TOWN', hide:'THE HIDEOUT' };
+                   dino:'DINO PARK', west:'OUTLAW TOWN', hide:'THE HIDEOUT',
+                   ice:'THE ICE CASTLE', lair:"KING REX'S LAIR" };   // 0411a D2/D3: the castle + the lair are party places — both names are the wordmarks' own ×7 keys (AT %1 composes, zero new l10n); the server's plc regex ^[a-z]{1,6}$ fits both words
+// 0411a: the raid place words and their doors, ONE map both ways (the wish
+// bands are crewRaidBoom's own numbers; the king crops are the scene flanks').
+function raidDoorOf(plc){
+  return plc==='hide'? { door:'croak', enc:6000, name:"KING CROAK'S HIDEOUT", king:'kingcroak', crop:'0 0 140 140' }
+       : plc==='lair'? { door:'bone',  enc:4000, name:"KING REX'S LAIR",      king:'kingrex',   crop:'0 0 140 140' }
+       : plc==='ice' ? { door:'ice',   enc:3000, name:'THE ICE CASTLE',       king:'kingyeti',  crop:'-37 -26 194 168' }
+       : null;
+}
+function raidWordOf(rk){ return rk==='croak'? 'hide' : rk==='bone'? 'lair' : 'ice'; }
 function ptyPlaceNow(){
+  // 0411a D4: the RAID SCENE OUTRANKS the rest — every raid door opens OVER
+  // its park (castleTap/volcTap/hideTap never close it), so the shipped
+  // park-first order read OUTLAW TOWN inside the hideout on the real walk
+  // (measured, feedback-0819-pm2 §1) and never seated the castle or the
+  // lair at all. Topmost scene wins; the war table and the campaign scene
+  // never stand under a raid scene.
+  if(raidSceneOpen()) return raidWordOf(RAID_CUR);
   if(typeof wartableOpen==='function' && wartableOpen()) return 'bf';
   if(campSceneOpen()) return 'c';
   if(parkSceneOpen()) return PARK_CUR==='dino'? 'dino' : PARK_CUR==='western'? 'west' : 'yeti';
-  if(raidSceneOpen() && RAID_CUR==='croak') return 'hide';
   return null;
 }
 function ptyPlaceName(p){ return t(PTY_PLACES[p]||PTY_PLACES.c); }
@@ -32948,9 +32964,10 @@ function ptyPickParse(plc){
     if(a[0]==='c'){ const n=parseInt(a[1],10); if(n>=1 && n<=nx) lvl=n; }
     return { lvl:lvl, nx:nx };
   }
-  if(plc==='hide'){
-    let tier=(RAID_TIERS.indexOf(a[1])>=0 && a[0]==='h')? a[1] : (raidTierOpen(RAID_SEL)? RAID_SEL:'e');
-    if(!raidTierOpen(tier)) tier='e';
+  const rd9=raidDoorOf(plc);   // 0411a: hide/ice/lair — one tier grammar ('h:<t>'), each throne's OWN ladder (a member standing elsewhere must never read the worn scene's locks)
+  if(rd9){
+    let tier=(RAID_TIERS.indexOf(a[1])>=0 && a[0]==='h')? a[1] : (raidTierOpenFor(rd9.door,RAID_SEL)? RAID_SEL:'e');
+    if(!raidTierOpenFor(rd9.door,tier)) tier='e';
     return { tier:tier };
   }
   const id=(plc==='west')? 'western' : plc;
@@ -33111,7 +33128,7 @@ function ptyEnterCode(){
   audio(); SFX.blip(); PTY.open=0;
   try{ if(wartableOpen()) closeWarTable(); else if(campSceneOpen()) closeCampScene();
        else if(parkSceneOpen()) closeParkScene(); else if(raidSceneOpen()) closeRaidScene(); }catch(e){}
-  UI.coopEnterUI();   // the campBuddies pattern — the sheet sits UNDER the z20 scenes (N-19648)
+  UI.coopEnterUI();   // scene down FIRST — the coop sheet sits UNDER the z20 scenes (N-19648; 0411a: campBuddies itself retired for skipping exactly this close)
 }
 // ═══════════ 0394 REV 5 — INVITE IS THE BUTTON ═══════════
 // the stable per-player code: HQ mints it once (players.pcode) and the /sync
@@ -33372,7 +33389,7 @@ function ptyWish(){
   else if(plc==='yeti') enc=1000+(pk.rung|0);
   else if(plc==='dino') enc=2000+(pk.rung|0);
   else if(plc==='west') enc=5000+(pk.rung|0);
-  else if(plc==='hide') enc=6000+(RAID_TIERS.indexOf(pk.tier)+1);
+  else { const rd9=raidDoorOf(plc); if(rd9) enc=rd9.enc+(RAID_TIERS.indexOf(pk.tier)+1); }   // 0411a: each throne's own wish band (3000 ice · 4000 bone · 6000 croak — crewRaidBoom's numbers; bf stays the plain 0 go-wish)
   COOP.crewCamp=true; COOP.campWish={lvl:enc};         // bf: enc 0 = a plain go-wish
   clearTimeout(COOP.pollT); coopTick();
   wtLockSpeak(plc==='bf'? undefined : 'camp');
@@ -33406,14 +33423,14 @@ function ptyDeployGo(){
     if(n>=2) CREW.gatedLaunch=1;                       // SQUAD AD LAW: 2+ humans launch ad-free
     else coopBotArmed(null,1);                         // PAD LAW: a lone table's computers arm before the order fires
     if(plc==='c'){ COOP.wantLvl=(pk.lvl|0)===pk.nx? 0 : pk.lvl|0; UI.coopDeploy(COOP.wantLvl); }
-    else if(plc==='hide'){ COOP.wantPark={ id:'croak', n:RAID_TIERS.indexOf(pk.tier)+1 }; UI.coopDeploy(0); }
+    else if(raidDoorOf(plc)){ COOP.wantPark={ id:raidDoorOf(plc).door, n:RAID_TIERS.indexOf(pk.tier)+1 }; UI.coopDeploy(0); }   // 0411a: each throne launches its OWN duel (ice/bone/croak — the receive side has spoken all three since 0278e/0340)
     else { COOP.wantPark={ id:pk.id, n:pk.rung|0 }; UI.coopDeploy(0); }
     ptyRender();
     return;
   }
   // no party at all: the door's own solo lane
   if(plc==='c') UI.campPlay((pk.lvl|0)===pk.nx? undefined : pk.lvl);
-  else if(plc==='hide'){ if(raidTierOpen(pk.tier)) RAID_SEL=pk.tier; UI.raidPlay(); }
+  else if(raidDoorOf(plc)){ if(raidTierOpenFor(raidDoorOf(plc).door,pk.tier)) RAID_SEL=pk.tier; UI.raidPlay(); }   // 0411a: the solo fall-through at any throne (standing AT the scene — RAID_CUR is the worn door)
   else UI.parkPlay(pk.rung);
 }
 // ---- THE BATTLEFIELD WAR — the host mints a room at START; ONE lobby word
@@ -33666,7 +33683,7 @@ function ptyGoWalk(plc){
   PTY.open=1;
   if(plc==='bf') openWarTable();
   else if(plc==='c') openCampScene();
-  else if(plc==='hide') openRaidScene('croak');
+  else if(raidDoorOf(plc)) openRaidScene(raidDoorOf(plc).door);   // 0411a: all three thrones — a keyless member's scene refuses (openRaidScene gates on the key) and the refuse branch below parks the kid, party waits
   else openParkScene(plc==='west'? 'western' : plc);
   if(ptyPlaceNow()!==plc){ PTY.open=0; renderMenu(); }   // a locked park door refuses — the party waits (flagged)
   else ptyRender();
@@ -33751,7 +33768,14 @@ function ptyPopNo(){
 // shell and the render sweeps every other scene's copy empty.
 function ptySheetShell(){ return '<div class="ptySheet hidden"></div>'; }
 function ptySheetEl(){
-  for(const id of ['wartable','campscene','parkscene','raidscene']){
+  // 0411a D4, sheet edition: the raid scene OUTRANKS the park it opens over —
+  // the resolver walks scenes in ptyPlaceNow's OWN order so the sheet always
+  // lands on the scene the place word names. Before this, a sheet opened at a
+  // throne entered the real way (park still open underneath) rendered into
+  // the PARK's shell, BURIED under the z20 raid scene — live at the
+  // hideout-via-town since 0387 (the five-scenes-one-id trap, resolver
+  // edition; this card's battery caught it).
+  for(const id of ['raidscene','wartable','campscene','parkscene']){
     const sc=document.getElementById(id);
     if(sc && !sc.classList.contains('hidden')) return sc.querySelector('.ptySheet');
   }
@@ -33763,7 +33787,7 @@ function renderPartySheet(){
   document.querySelectorAll('.ptySheet').forEach(x=>{ if(x!==el){ x.classList.add('hidden'); if(x.innerHTML) x.innerHTML=''; } });
   const here=ptyPlaceNow();
   if(!PTY.open || !here || BFQ){ el.classList.add('hidden'); ptyTickArm(false); return; }
-  const skin= here==='hide'? 'th-west' : 'th-'+here;   // S6: the hideout wears Outlaw Town's
+  const skin= (here==='hide'||here==='lair')? 'th-west' : here==='ice'? 'th-yeti' : 'th-'+here;   // S6: the hideout wears Outlaw Town's; 0411a D1: the lair's magma browns sit in the same amber dress, the castle wears its park's ice-blue (⚑ mint th-ice/th-lair CSS vars only if a frame proves the borrow wrong)
   el.className='ptySheet th '+skin;
   const L=ptyLobby(), n=L? (COOP.members||[]).length : 1;
   if(L && n===1) coopBotArmed(null,1);                 // PAD LAW: the pretend chairs arm on the sheet's own clock
@@ -33944,17 +33968,18 @@ function ptyPickerHTML(here){
       +(chips? '<div class="pts-lab" data-notr>'+escH(t('REPLAY'))+'</div><div class="pts-chips">'+chips+'</div>' : '')
       +'</div>';
   }
-  if(here==='hide'){
-    const pk=ptyPickParse('hide');
+  const rdp=raidDoorOf(here);
+  if(rdp){   // 0411a: ONE picker, three thrones — the door's OWN ladder (raidTierOpenFor) + its OWN wordmark/king (the scene flanks' crops). MEGA stays OUT of the party picker (0341 solo law: no wish band exists; raidPlay's toast + crewRaidBoom's 'g'→false stand)
+    const pk=ptyPickParse(here);
     let chips='';
     for(const k2 of RAID_TIERS){
-      const open=raidTierOpen(k2);
+      const open=raidTierOpenFor(rdp.door,k2);
       chips+='<button type="button" class="pts-chip'+(pk.tier===k2?' on':'')+(open?'':' lk')+'" data-notr '
         +'onclick="'+(open? 'ptyPickSet(\'h:'+k2+'\')' : 'SFX.clack()')+'">'+(open?'':'🔒 ')+escH(t(RAID_TIER_NAMES[k2]))+'</button>';
     }
     return '<div class="pts-pick'+(lock?' lk2':'')+'">'
-      +'<div class="pts-next on" data-notr><span class="nu">'+escH(t('NEXT UP'))+'</span><b>'+escH(t("KING CROAK'S HIDEOUT"))+'</b>'
-      +'<img src="'+sprURI('kingcroak',null,'0 0 140 140')+'" alt=""></div>'
+      +'<div class="pts-next on" data-notr><span class="nu">'+escH(t('NEXT UP'))+'</span><b>'+escH(t(rdp.name))+'</b>'
+      +'<img src="'+sprURI(rdp.king,null,rdp.crop)+'" alt=""></div>'
       +'<div class="pts-chips">'+chips+'</div></div>';
   }
   const pk=ptyPickParse(here);
@@ -33988,7 +34013,7 @@ function ptyGoBtnHTML(here){
   let lab;
   if(here==='bf') lab=escH(t('⚔ PLAY'))+' · '+pk.size+'v'+pk.size+' · '+escH(bfMapLabel(pk.map));
   else if(here==='c') lab=escH(t('⚔ DEPLOY!'))+' · '+escH(tf('LEVEL %1', pk.lvl));
-  else if(here==='hide') lab=escH(t('⚔ DEPLOY!'))+' · '+escH(t(RAID_TIER_NAMES[pk.tier]));
+  else if(raidDoorOf(here)) lab=escH(t('⚔ DEPLOY!'))+' · '+escH(t(RAID_TIER_NAMES[pk.tier]));   // 0411a: any throne
   else lab=escH(t('⚔ DEPLOY!'))+' · '+escH(tf('LEVEL %1', pk.rung));
   let sub='';
   if(L && n>=2){
@@ -58032,14 +58057,14 @@ function raidKamikaze(u,B){
   knockKill(u,false);   // the shipped vehicle death — tip-over, boom corpse
 }
 function raidSceneOpen(){ const rs=document.getElementById('raidscene'); return !!(rs && !rs.classList.contains('hidden')); }
-function raidTierOpen(tier){
-  if(tier==='g') return (RAID_CUR==='ice' && iceMegaOpen()) || (RAID_CUR==='bone' && boneMegaOpen()) || (RAID_CUR==='croak' && croakMegaOpen());   // 0341: MEGA — the ICE door's 50/50 gate; 0357: the LAIR's joins; 0372: the HIDEOUT's own 50/50 gate joins (OUTLAW TOWN lv50)
-  if(RAID_CUR==='croak'){                            // 0340: the hideout's ladder — the door itself IS the key (OUTLAW TOWN lv 20)
+function raidTierOpenFor(rk,tier){   // 0411a: the PLACE's ladder, RAID_CUR-free — a party member standing elsewhere reads the party door's OWN locks (the worn scene's was the wrong ladder; latent for the hideout since 0387)
+  if(tier==='g') return (rk==='ice' && iceMegaOpen()) || (rk==='bone' && boneMegaOpen()) || (rk==='croak' && croakMegaOpen());   // 0341: MEGA — the ICE door's 50/50 gate; 0357: the LAIR's joins; 0372: the HIDEOUT's own 50/50 gate joins (OUTLAW TOWN lv50)
+  if(rk==='croak'){                            // 0340: the hideout's ladder — the door itself IS the key (OUTLAW TOWN lv 20)
     if(tier==='e') return !!(META.parks&&META.parks.western&&META.parks.western.lv>=20);
     if(tier==='m') return !!(META.croak&&META.croak.e);
     return !!(META.croak&&META.croak.m);
   }
-  if(RAID_CUR==='bone'){                             // 0278c: the volcano door's ladder (D19 mirrored on the bronze key; 0278e writes META.bone)
+  if(rk==='bone'){                             // 0278c: the volcano door's ladder (D19 mirrored on the bronze key; 0278e writes META.bone)
     if(tier==='e') return !!META.bronzeKey;
     if(tier==='m') return !!(META.bone&&META.bone.e);
     return !!(META.bone&&META.bone.m);
@@ -58048,6 +58073,7 @@ function raidTierOpen(tier){
   if(tier==='m') return !!(META.ice&&META.ice.e);   // D19: progressive — Medium after Easy
   return !!(META.ice&&META.ice.m);                   // Hard after Medium
 }
+function raidTierOpen(tier){ return raidTierOpenFor(RAID_CUR, tier); }   // the worn scene's one-arg door (shipped callers byte-still)
 // THE GATE ART — one drawing, two states: chained shut (dim slate, padlock)
 // and LIT (aurora ice, the doors ajar). ~106×140 in its own box. 0278f
 // (Wyatt 8/13): the menu door is GONE from every floor — the silver-key
@@ -58135,11 +58161,10 @@ let RAID_SEL='e';
 let RAID_CUR='ice';   // 0278c: which raid the ONE scene is wearing (the PARK_CUR shape) — the volcano door says 'bone'; no arg = 'ice' (shipped callers)
 function renderRaidScene(){
   const pLock=partyLocked('camp'), pLead=partyLeader('camp');
-  const mus = COOP && COOP.mode==='squad' && COOP.code && S.mode==='menu';
   const dye=dyeHex()||undefined;
   if(!raidTierOpen(RAID_SEL)) RAID_SEL='e';
   const led=RAID_CUR==='bone'? META.bone : RAID_CUR==='croak'? META.croak : META.ice;   // 0278c: each door reads its own first-clear ledger (0340: the hideout's too)
-  const grp=(RAID_CUR==='croak');   // 0366: the hideout re-houses its party furniture behind a bottom-right 🤝 door (the 0278k grammar) — ice/lair keep the shipped always-on furniture (scope = Wyatt's ask; one swap here extends the door)
+  const here=raidWordOf(RAID_CUR);   // 0411a THE PARTY DOOR AT EVERY THRONE (Wyatt 8/19: "in each of the boss rooms … you're able to do the inviting and everything"): the 0366/0387 grp fork is GONE — every raid door wears the party door + the glass sheet, speaking the worn throne's own place word
   const chips=RAID_TIERS.map(k=>{
     const open=raidTierOpen(k), done=!!(led&&led[k]);
     return '<button type="button" class="rd-tier'+(RAID_SEL===k?' on':'')+(open?'':' lk')+'" id="rdtier-'+k+'" '
@@ -58159,23 +58184,23 @@ function renderRaidScene(){
       +'</div>'
       +(pLock&&pLead? '<div class="wt-ldhint" data-notr>⚑ '+tf('%1 STARTS THE BATTLE', escH(String(pLead.name||'ALLY').toUpperCase().slice(0,12)))+'</div>' : '')
       +'</div>'
-    // 0366 (Wyatt 8/16, the hideout): the always-on party furniture is OFF
-    // the floor — one bottom-right PLAY AS A GROUP door re-houses the party
-    // rectangle, the seat strip, the squad-code door and the lobby rail in
-    // the parks' own #pkGroup panel (0278k grammar and chrome VERBATIM —
-    // fixtures keep their shipped ids/handlers, a re-house not a rewrite;
-    // default CLOSED at every door entry so King Croak reads clear). The
-    // ice castle and the lair keep the shipped always-on furniture.
-    // 0387 THE PARTY: the party strip came off EVERY door (Wyatt's blanket) —
-    // the ice castle and the lair keep only the 🎟️ code door below
+    // 0366 (Wyatt 8/16, the hideout): the always-on party furniture came OFF
+    // the floor; 0387 THE PARTY took the strip off EVERY door (Wyatt's
+    // blanket) and dealt the hideout the glass sheet while ice/lair kept a
+    // bare 🎟️ code door. 0411a (Wyatt 8/19): that door was a DEAD DOOR —
+    // campBuddies' coopEnterUI sheet paints at z5 UNDER the z20 raid scene
+    // (measured live on v4.82) — and a kid who wants to INVITE saw only a
+    // place to type a code. EVERY throne wears the 🤝/📤 party door now (the
+    // parks' own grammar); ENTER A SQUAD CODE lives on inside the sheet's
+    // invite panel (HAVE A CODE? — ptyEnterCode closes the scene first) and
+    // the invite card's THEIR CODE lane. ⚑ D7: a 🎟️ BESIDE the party door =
+    // one extra button line right here, if Wyatt ever wants both.
     +'<div class="wt-shelf"></div>'
     +'<div class="wt-foot"><div class="wt-spacer"></div>'
-      +(grp? '<button type="button" class="wt-door wt-ptydoor'+ptyDoorFace('hide')+'" id="rdGrpBtn" onclick="UI.party()"><span class="wt-troph" data-notr>'+ptyDoorGlyph('hide')+'</span>'
-        +'<span class="dlab" data-notr>'+ptyDoorLabel('hide')+'</span></button>'
-      : '<button type="button" class="wt-door" onclick="UI.campBuddies()"><span class="wt-troph" data-notr>🎟️</span>'
-        +'<span class="dlab" data-notr>'+(mus&&COOP.code? escH(String(COOP.code)) : TXT('ENTER A SQUAD CODE'))+'</span></button>')
+      +'<button type="button" class="wt-door wt-ptydoor'+ptyDoorFace(here)+'" id="rdGrpBtn" onclick="UI.party()"><span class="wt-troph" data-notr>'+ptyDoorGlyph(here)+'</span>'
+        +'<span class="dlab" data-notr>'+ptyDoorLabel(here)+'</span></button>'
       +'</div>'
-    +(grp? ptySheetShell() : '');   // 0387: the hideout's 0366 #pkGroup panel RETIRED — the glass sheet (Outlaw Town's dress, S6)
+    +ptySheetShell();   // 0387/0411a: the glass sheet at every throne (ice wears th-yeti, lair th-west, the hideout Outlaw Town's — D1)
   document.getElementById('raidscene').classList.toggle('ptylock', pLock);
   document.getElementById('raidBg').style.background=RAID_CUR==='bone'? 'linear-gradient(180deg,#2a0f08,#6b2a12 46%,#c96a3a)' : RAID_CUR==='croak'? 'linear-gradient(180deg,#1a0e06,#4a2a12 46%,#8a5a30)' : 'linear-gradient(180deg,#0c1626,#243c5e 46%,#8fb2c8)';   // the volcanic dusk vs the aurora night vs the lamplit den (0278e re-skins the lair side with its hero; 0340 the hideout's)
   // 0278d: the graded throne room rides INLINE in #raidBg (a background
@@ -58194,7 +58219,7 @@ function renderRaidScene(){
   document.getElementById('raidscene').classList.toggle('houndown', !!(META.dog&&META.dog.own2));   // 0413: the RIGHT bone's own flag, the same law
   if(RAID_CUR==='bone') lairBoneLayout();   // 0385: seat the tap box under the fresh innerHTML (every render re-mints it)
   document.getElementById('raidscene').classList.toggle('hideout', RAID_CUR==='croak');
-  if(grp) renderPartySheet();   // 0387: the hideout's glass sheet rides every repaint
+  renderPartySheet();   // 0387/0411a: the glass sheet rides every repaint, at every throne
 }
 // 0385 THE DOG'S BONE: seat the z:3 tap box over the LEFT dais bone — scene
 // units -> px under the hero's slice crop (parkSceneLayout's own math). The
@@ -64126,9 +64151,11 @@ window.UI = {
   campPlay(n){ audio(); SFX.blip();
     if(partyLocked('camp')){ wtLockSpeak('camp'); return; }   // v3.10 (card 08): LEADER-ONLY START — the guard holds even against a stale render (the wtPlay law)
     crewCampBoom(n).then(taken=>{ if(!taken) adGate('camp', ()=>startCampaign(n)); }); },   // no n = the next rung; v2.70 boom; v2.73 replay chips; v2.82 SQUAD AD LAW: the squad decision comes FIRST — a 2+-human boom launches ad-free (its break rides the verdict exit), only the solo fall-through pays the camp gate
-  campBuddies(){ audio(); SFX.blip(); closeCampScene();
-    if(COOP && coopSquad() && COOP.code){ roomModal(coopPanelHTML()); return; }   // mustered: the sheet IS the party's page
-    UI.coopEnterUI(); },  // v3.10 (card 08): the big bar is gone — the foot chip's door: straight to ENTER A SQUAD CODE (its ← back reveals START/FIND — the reachability law), the wtRoom pattern otherwise (scene down, sheet up)
+  // 0411a: campBuddies RETIRED (v1.28 delete-not-gate law) — its last caller
+  // was the raid scene's 🎟️ door, itself a DEAD DOOR (the coop sheet paints
+  // UNDER the z20 scene; measured live on v4.82). Code entry lives on in the
+  // party sheet's HAVE A CODE? and the invite card's THEIR CODE lane — both
+  // close the scene first (ptyEnterCode / the partyPop over everything).
   campClose(){ SFX.clack(); closeCampScene(); },
   // ---- THE YETI PARK scene (v3.33 TP-02) ----
   parkPlay(n){ audio(); SFX.blip();
