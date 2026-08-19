@@ -22972,7 +22972,7 @@ const AWAY_PREF=0.6;        // nemPref's away arm: + this × rank/RANK_MAX per w
 const AWAY_T0=4;            // his first special press ~4s after his Sarge stands (NEMESIS_TK_T0's kid brother — the player must be LOOKING)
 const AWAY_RETRY=0.5;       // a refused press retries on nemTkTick's own short fuse
 const AWAY_GS_NEAR=1.6;     // the forge opens only with an enemy inside this × his gun reach — a window with nobody to kill is wasted (⚑ gate)
-const AWAY_RP_GAP=1.5;      // seconds between renegade channels ON TOP of the rooted channel itself (⚑ 0 = truly back-to-back; the gap is only so he still walks)
+const AWAY_RP_GAP=1.5;      // seconds between renegade channels ON TOP of the channel itself (⚑ 0 = truly back-to-back; since 0414 the channel is an overlay — he walks and fights through it too)
 const AWAY_SARGE_HP_BONUS=0;// accuracy is the law — the nemesis +3/+20 never lands on an away captain; wired DEAD at the same placeUnit seat (one cell for Wyatt)
 // the away ledger (the piggy day grammar): `done` resets at the day's first
 // read; `rec` is the lifetime head-to-head book, healed upward from HQ.
@@ -23737,7 +23737,7 @@ function awayTick(dt){
     else cell.gsCd=AWAY_RETRY;
   } else if(w==='pistol' && mo.indexOf('renegadepistol')>=0){
     cell.rpCd-=dt; if(cell.rpCd>0) return;
-    if(rpFire(sg, true)) cell.rpCd=RP_PLANT+RP_BURST+AWAY_RP_GAP;   // rooted through the channel; the gap is only so he still WALKS between storms (⚑ 0 = truly back-to-back)
+    if(rpFire(sg, true)) cell.rpCd=RP_PLANT+RP_BURST+AWAY_RP_GAP;   // 0414: an overlay now, the mirror law — he fights and walks THROUGH the channel; the gap just paces his storms (⚑ 0 = truly back-to-back)
     else cell.rpCd=AWAY_RETRY;
   }
 }
@@ -29950,7 +29950,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.86';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.87';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41103,16 +41103,17 @@ function gsDmgMul(u){
 // ===== 0361/0370 THE RENEGADE PISTOL — KING CROAK'S OWN BARRAGE in green
 // hands ("It really needs to come out blasting" — Wyatt, three times).
 // rpOn: the mod FITTED and the PISTOL racked. rpActivate: aims at the crowd
-// (the king's own average, valid enemies inside his e-tier reach), roots the
-// man (u.rpT — the kyHeldT shelf parks his feet AND his own gun) and plays
+// (the king's own average, valid enemies inside his e-tier reach), arms the
+// storm (u.rpT — an OVERLAY since 0414: his own gun and feet stay live;
+// only the playable king's rpKC channel still parks) and plays
 // Croak's exact machine through rpStep: 0.55s plant tell -> the BRG_WAVES
 // channel (brgWave — brass OutLaw Slugs, RIGHT-LEFT-RIGHT-LEFT off his two
 // irons' own seats and bucks since 0382, per-wave sweep; 1.6s at BRG_GAP
 // 0.2). Each wave lands the pistol's levelled base ÷ BRG_WAVES
 // (UDEF.sarge.dmg x upMul — no vet/laser/outfit extras; an enemy who stands
 // the whole storm takes exactly the 0361 number, flagged) through hurt(),
-// so deflects and resists hold. The shelf is HELD until the last wave flies
-// — clock jitter can never eat the finisher.
+// so deflects and resists hold. The channel clock is HELD until the last
+// wave flies — clock jitter can never eat the finisher.
 function rpOn(){ return enhOn('renegadepistol') && (META.sargeWeapon||'pistol')==='pistol'; }
 function rpScan(u,R0){
   const R=R0||RP_R; let sx=0,sy=0,n=0;   // 0372: the king's branch passes HIS reach; 0373: the bare call is the RENEGADE'S OWN — RP_R, his doubled radius, never the boss's shared cell
@@ -41134,8 +41135,8 @@ function rpScan(u,R0){
 }
 // 0393: the per-unit primitive (snpFire's law) — relay=true skips the mine
 // gates and never touches S.rpCd (the HUD's clock); the channel state
-// (u.rpT/rpSt/rpAim/rpDmg) is per-unit already — the kyHeldT shelf and
-// rpStep run for ANY unit, so the away captain's storm walks the shipped
+// (u.rpT/rpSt/rpAim/rpDmg) is per-unit already — rpStep runs for ANY
+// unit, so the away captain's storm walks the shipped
 // machine (his rounds wear HIS laser through the 0391 paint law's away arm).
 function rpFire(u,relay){
   // 0373 FIRE AT WILL (Wyatt: "activate it anytime while the pistol sarge is
@@ -45305,10 +45306,19 @@ function update(dt){
     // slide, gun quiet, but HITTABLE (a lunge is aggression, not the jet's
     // shelter). The payload swings inside the step when the slide lands.
     if(u.tkLg){ tkLgStep(u,dt); continue; }
-    // 0361 THE RENEGADE'S PLANT: a fanning Sarge is the king's own statue —
-    // feet spoken for, his own gun quiet, and HITTABLE (the kyHeldT shelf:
-    // a plant is aggression, not shelter). rpStep runs Croak's machine.
-    if(u.rpT>0){ rpStep(u,dt); continue; }
+    // 0414 THE RENEGADE IS AN OVERLAY (Wyatt 8/19: "The active goes off, and
+    // the player continues firing, so it doesn't interrupt his firing.
+    // There's no pause."): the active never parks the man's own gun or feet
+    // — rpStep is a SIDE-CLOCK now (the radioTick law: alive is the only
+    // condition), so the ordinary fire branch below keeps his pistol's
+    // cadence and campUnitStep/bfUnitStep keep his feet, through the plant
+    // AND the burst; still HITTABLE mid-storm, and one storm at a time
+    // (rpFire's u.rpT guard). THE ONE EXCEPTION, by his own act: the
+    // playable KING CROAK's channel (u.rpKC) keeps the 0361 statue — root,
+    // fan, back off IS the royal barrage (0372). His flag is read BEFORE
+    // rpStep's finisher clears it, so the back-off leg still starts the
+    // frame AFTER the last volley — his trajectory byte-what-it-was.
+    if(u.rpT>0){ const kc9=u.rpKC; rpStep(u,dt); if(kc9) continue; }
     // 0372 KING CROAK'S BACK-OFF — the barrage's second half ("he moves
     // forwards and backwards"): after the channel he walks WEST a few steps
     // — the only unit that retreats on purpose — then the stock march takes
@@ -45579,7 +45589,8 @@ function update(dt){
     // standard dmg product ÷ BRG_WAVES through hurt() (vet/rank/laser/soul
     // all inherit; walking out is the counterplay — his boss self's law).
     // Every shipped shelf honors him free (feet + gun parked at the rpT
-    // seat, HITTABLE like the planted Sarge); the finisher arms the
+    // seat via u.rpKC — HIS statue survives 0414's overlay, the root is
+    // the royal act itself; HITTABLE); the finisher arms the
     // BACK-OFF leg (u.kcBack — "he moves forwards and backwards").
     if(u.type==='kingcroak'){
       const kcAim=rpScan(u, rng*rngMul);
