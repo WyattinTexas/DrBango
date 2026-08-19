@@ -3332,11 +3332,38 @@
   .dogTng { opacity:0; }
   .dogpatA .dogTng { animation:dogtng 0.7s ease-out; }
   @keyframes dogtng { 0%{opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{opacity:0} }
+  /* 0416 THE FACES COME HOME (dog-companion REV 3): the maker's expression
+     kits ride the beats. Base face = the day's MOOD (deterministic, minted per
+     leg); SNIFF wears sleepy eyes; a sniff stop's second half = SIT (wide-alert
+     eyes + raised brows) on the dgSit rear; PAT = happy eyes ALONE for the
+     pat's 0.7s — dfoff parks every other eye while dogtng's own clock raises
+     the happy pair, and when it ends the static rules take back over. The
+     sniff/sit swaps are static opacity (RM-neutral by design). */
+  .dfSniff, .dfSit, .dfPat { opacity:0; }
+  .dogsniffB .dfBase.dfEyes { opacity:0; }
+  .dogsniffB .dfSniff { opacity:1; }
+  .dogsitB .dfBase.dfEyes, .dogsitB .dfBase.dfBrows { opacity:0; }
+  .dogsitB .dfSit { opacity:1; }
+  .dogpatA .dfBase.dfEyes, .dogpatA .dfSniff, .dogpatA .dfSit { animation:dfoff 0.7s ease-out; }
+  .dogpatA .dfPat { animation:dogtng 0.7s ease-out; }
+  @keyframes dfoff { from{opacity:0} to{opacity:0} }
+  /* the SIT rig: dogArtSVG carries BOTH rears — the trot rear (body, hind leg
+     pivots, tail seat) on .dgTrot and the maker's sit (chest+haunch bodyArt,
+     folded hinds, the tail re-seated flat) on .dgSit; the FRONT legs are one
+     shared pair. The 4° sit head tilt is static (mirrors the kit's P.head) —
+     the nod/drop animations are pose-class-scoped and never run under dogsitB,
+     and .dogHeadG carries no transform attribute for it to clobber. */
+  .dgSit { display:none; }
+  .dogsitB .dgSit { display:inline; }
+  .dogsitB .dgTrot { display:none; }
+  .dogsitB .dogHeadG { transform:rotate(4deg); }
   @media (prefers-reduced-motion: reduce){
     #ro-gooddog .dogtrotB, #ro-gooddog .dogsniffB, #ro-gooddog .dogwagG,
     #ro-gooddog .dogpatA { animation:none; }
     #ro-gooddog .dgLegA, #ro-gooddog .dgLegB, #ro-gooddog .dogHeadG,
-    #ro-gooddog .dogEarG, #ro-gooddog .dogTng { animation:none; } }
+    #ro-gooddog .dogEarG, #ro-gooddog .dogTng { animation:none; }
+    #ro-gooddog .dfBase, #ro-gooddog .dfSniff, #ro-gooddog .dfSit,
+    #ro-gooddog .dfPat { animation:none; } }   /* 0416: a pat keeps the beat's face; the sniff/sit swaps are static opacity and still toggle */
   /* ROBO-SARGE 3000 — bounded by construction: no wander keyframe is more than
      150px out from where he's parked, so he can never leave the rug. */
   .dec-whorse.react { animation:whtrot 1s ease-in-out; }
@@ -29479,7 +29506,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.72';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.73';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -53437,6 +53464,7 @@ setInterval(robZTick, 250);
 const DOG_STARS=5;                 // ⚑ the pat's purse — once per room per day
 const DOG_SPEED=42;                // ⚑ stroll pace px/s (a stroll, not TG's 5.8s gag)
 const DOG_SNIFF_S=7;               // ⚑ seconds planted at each sniff stop
+const DOG_SIT_AT=3.5;              // ⚑ 0416: seconds into a sniff stop when he SITS (half sniffing, half sitting looking at you)
 const DOG_GAP_S=40;                // ⚑ the invisible walk between rooms
 const DOG_BOOT_S=6;                // ⚑ the beat after boot before he enters your room
 const DOG_FADE_S=1.1;              // the dino-gate fade
@@ -53569,30 +53597,121 @@ function dogLeadBreed(){
   if(DOG_LEADF.br && DOG_LEADF.day===todayStr()) return DOG_LEADF.br;
   return dogDayN(todayStr())%2? 'hd':'gb';
 }
-function dogArtSVG(b9,c9){
+// 0416 THE FACES COME HOME (FM-GVT-DOG-04 — Wyatt 8/18 late on the maker's
+// dogs: "They look amazing. Can we utilize these expressions inside of GVT?").
+// DOG_KIT = the CHARACTER MAKER's expression kits CAPTURED from the shipped
+// sheet (DrBango ff7f05bd line; capture416.mjs -> dog-kit.json in the design
+// kit, md5 6a9b5902ae8727b5736b6ae6ec6fe71e) — head-LOCAL strings authored in the
+// game's own frame, dye tokens intact (currentColor = coat, DOGSHADE/DOGCREAM/
+// DOGEAR = the maker's dyeStr map); dogDye inlines the wearer's hexes at
+// render. eyes: his · sleepy · wide alert · happy · sad (⚑ unused — the
+// gate-fade dial) · brows: none · angry (⚑) · worried (⚑) · raised · mouth:
+// his · tongue out · open smile (⚑) · pant (⚑) · lip lick. sit = the maker's
+// SIT pose P verbatim: bodyArt = the pick's chest + a haunch on the ground;
+// far/near = the standing FRONT leg verbatim + the folded HIND (dogSitHind
+// slices the hind — the front renders once, shared with the trot);
+// tail/head = re-seats about the tail seat / the neck.
+const DOG_KIT={
+ gb: {
+  eyes:[ '<circle cx="-4.6" cy="-6.6" r="1.75" fill="#23211E"/><circle cx="-5.2" cy="-7.2" r="0.62" fill="#FFFFFF"/>',
+         '<circle cx="-4.6" cy="-6.6" r="1.75" fill="#23211E"/><path d="M-6.7 -6.45 A2.1 2.1 0 0 1 -2.5 -6.45 Z" fill="currentColor"/><path d="M-6.75 -6.5 Q-4.6 -6.1 -2.45 -6.5" stroke="#23211E" stroke-width="0.8" fill="none" stroke-linecap="round"/>',
+         '<circle cx="-4.6" cy="-6.6" r="2.55" fill="#FFFFFF" stroke="#23211E" stroke-width="0.5"/><circle cx="-4.85" cy="-6.5" r="1.58" fill="#23211E"/><circle cx="-5.35" cy="-7.15" r="0.63" fill="#FFFFFF"/>',
+         '<path d="M-6.75 -6.1 Q-4.6 -9.75 -2.45 -6.1" stroke="#23211E" stroke-width="1" fill="none" stroke-linecap="round"/>',
+         '<circle cx="-4.6" cy="-6.6" r="1.75" fill="#23211E"/><circle cx="-5.2" cy="-7.2" r="0.62" fill="#FFFFFF"/><path d="M-7.3 -9.9 L-2.6 -9" stroke="#23211E" stroke-width="0.9" fill="none" stroke-linecap="round"/>' ],
+  brows:[ '',
+          '<path d="M-7.5 -9 L-2.4 -10.3" stroke="#23211E" stroke-width="1" fill="none" stroke-linecap="round"/>',
+          '<path d="M-7.5 -10.3 Q-5.2 -9 -2.4 -9.2" stroke="#23211E" stroke-width="0.9" fill="none" stroke-linecap="round"/>',
+          '<path d="M-7.6 -9.9 Q-4.6 -12.3 -1.6 -9.9" stroke="#23211E" stroke-width="0.9" fill="none" stroke-linecap="round"/>' ],
+  mouth:[ '<circle cx="-11.6" cy="-2.9" r="1.95" fill="#23211E"/><path d="M-9.4 0.2 q1.4 1.5 2.9 0.1" stroke="#23211E" stroke-width="0.9" fill="none"/>',
+          '<circle cx="-11.6" cy="-2.9" r="1.95" fill="#23211E"/><path d="M-9.4 0.2 q1.4 1.5 2.9 0.1" stroke="#23211E" stroke-width="0.9" fill="none"/><path d="M-9.6 0.5 Q-8.4 4.4 -6.9 0.7 Z" fill="#E0656B"/>',
+          '<circle cx="-11.6" cy="-2.9" r="1.95" fill="#23211E"/><path d="M-9.4 0.2 q1.4 1.5 2.9 0.1" stroke="#23211E" stroke-width="0.9" fill="none"/><path d="M-10.8 0.6 Q-8.2 4.6 -5.6 0.8 Z" fill="#3B1F1D"/><path d="M-9.6 1.9 Q-8.2 3.8 -6.8 2 Z" fill="#E0656B"/>',
+          '<circle cx="-11.6" cy="-2.9" r="1.95" fill="#23211E"/><path d="M-9.4 0.2 q1.4 1.5 2.9 0.1" stroke="#23211E" stroke-width="0.9" fill="none"/><path d="M-11.2 0.5 Q-8.2 5.2 -5 1 Z" fill="#3B1F1D"/><path d="M-9.8 1.8 Q-10 6.2 -8 5.8 Q-6.8 4.4 -7 2 Z" fill="#E0656B"/>',
+          '<circle cx="-11.6" cy="-2.9" r="1.95" fill="#23211E"/><path d="M-9.4 0.2 q1.4 1.5 2.9 0.1" stroke="#23211E" stroke-width="0.9" fill="none"/><path d="M-9 1.5 Q-12.3 1 -11.9 -1 Q-10.6 -1.4 -9.6 0.2 Z" fill="#E0656B"/>' ],
+  sit:{ bodyArt:'<path d="M-11.9 2.4 C-11.9 -2.6 -8.6 -4.6 -4.2 -4.6 C2 -4.4 9.6 0.6 12.4 7.4 C13.6 10.6 13.4 13.4 11.4 15 C10 16 4 16 2.6 14.6 C1 13.2 -0.4 10.4 -3.4 9.8 L-4.6 9.8 C-9.6 9.8 -11.9 7.2 -11.9 2.4 Z" fill="currentColor"/>',
+        far:'<g transform="translate(-2.5,7)"><g class="dgPin dgLegB"><path d="M0 0 L0 8.5" stroke="DOGSHADE" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="0" cy="8.5" r="1.87" fill="DOGCREAM"/></g></g><g transform="translate(5.3,13.2)"><g class="dgPin dgLegA"><path d="M-0.3 0.6 L-3.8 2.3" stroke="DOGSHADE" stroke-width="3.4" fill="none" stroke-linecap="round"/><circle cx="-3.8" cy="2.3" r="1.87" fill="DOGCREAM"/></g></g>',
+        near:'<g transform="translate(-6.5,7)"><g class="dgPin dgLegA"><path d="M0 0 L0 8.5" stroke="currentColor" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="0" cy="8.5" r="1.98" fill="DOGCREAM"/></g></g><g transform="translate(2.3,11.5)"><g class="dgPin dgLegB"><path d="M1.2 2.1 L-2.8 4" stroke="currentColor" stroke-width="3.6" fill="none" stroke-linecap="round"/><circle cx="-2.8" cy="4" r="1.98" fill="DOGCREAM"/></g></g>',
+        tail:'translate(0.3,14.4) rotate(96)', head:'rotate(4)' } },
+ hd: {
+  eyes:[ '<circle cx="-4.4" cy="-6.4" r="1.55" fill="#23211E"/><circle cx="-4.9" cy="-6.9" r="0.55" fill="#FFFFFF"/>',
+         '<circle cx="-4.4" cy="-6.4" r="1.55" fill="#23211E"/><path d="M-6.3 -6.25 A1.9 1.9 0 0 1 -2.5 -6.25 Z" fill="currentColor"/><path d="M-6.35 -6.3 Q-4.4 -5.9 -2.45 -6.3" stroke="#23211E" stroke-width="0.8" fill="none" stroke-linecap="round"/>',
+         '<circle cx="-4.4" cy="-6.4" r="2.35" fill="#FFFFFF" stroke="#23211E" stroke-width="0.5"/><circle cx="-4.65" cy="-6.3" r="1.4" fill="#23211E"/><circle cx="-5.15" cy="-6.95" r="0.56" fill="#FFFFFF"/>',
+         '<path d="M-6.35 -5.9 Q-4.4 -9.35 -2.45 -5.9" stroke="#23211E" stroke-width="1" fill="none" stroke-linecap="round"/>',
+         '<circle cx="-4.4" cy="-6.4" r="1.55" fill="#23211E"/><circle cx="-4.9" cy="-6.9" r="0.55" fill="#FFFFFF"/><path d="M-7.1 -9.7 L-2.4 -8.8" stroke="#23211E" stroke-width="0.9" fill="none" stroke-linecap="round"/>' ],
+  brows:[ '',
+          '<path d="M-7.3 -8.8 L-2.2 -10.1" stroke="#23211E" stroke-width="1" fill="none" stroke-linecap="round"/>',
+          '<path d="M-7.3 -10.1 Q-5 -8.8 -2.2 -9" stroke="#23211E" stroke-width="0.9" fill="none" stroke-linecap="round"/>',
+          '<path d="M-7.4 -9.7 Q-4.4 -12.1 -1.4 -9.7" stroke="#23211E" stroke-width="0.9" fill="none" stroke-linecap="round"/>' ],
+  mouth:[ '<circle cx="-12.4" cy="-3" r="1.65" fill="#23211E"/>',
+          '<circle cx="-12.4" cy="-3" r="1.65" fill="#23211E"/><path d="M-9.8 1 Q-8.8 4.4 -7.4 1.2 Z" fill="#E0656B"/>',
+          '<circle cx="-12.4" cy="-3" r="1.65" fill="#23211E"/><path d="M-11.6 1.4 Q-9 5.4 -6.4 1.6 Z" fill="#3B1F1D"/><path d="M-10.4 2.7 Q-9 4.6 -7.6 2.8 Z" fill="#E0656B"/>',
+          '<circle cx="-12.4" cy="-3" r="1.65" fill="#23211E"/><path d="M-12 1.3 Q-9 6 -5.8 1.8 Z" fill="#3B1F1D"/><path d="M-10.6 2.6 Q-10.8 7 -8.8 6.6 Q-7.6 5.2 -7.8 2.8 Z" fill="#E0656B"/>',
+          '<circle cx="-12.4" cy="-3" r="1.65" fill="#23211E"/><path d="M-9.8 2.3 Q-13.1 1.8 -12.7 -0.2 Q-11.4 -0.6 -10.4 1 Z" fill="#E0656B"/>' ],
+  sit:{ bodyArt:'<circle cx="7" cy="9.9" r="6.1" fill="currentColor"/><circle cx="-6.6" cy="2.6" r="6.4" fill="currentColor"/><path d="M-6.6 -3.6 L6 2.6 Q12.4 7.6 10.8 16 L2.4 16 Q-1.4 11.4 -6.6 9 Z" fill="currentColor"/><path d="M-6.4 -3.4 Q1.5 -5.4 9.4 1.4 Q11.2 5 8.6 6.4 Q1.4 0.4 -6.2 0.8 Z" fill="DOGEAR"/>',
+        far:'<g transform="translate(-3.6,7.4)"><g class="dgPin dgLegB"><path d="M0 0 L0 8.6" stroke="DOGSHADE" stroke-width="3.2" fill="none" stroke-linecap="round"/></g></g><g transform="translate(6.5,13.6)"><g class="dgPin dgLegA"><path d="M-2.1 0.4 L-5.9 2.4" stroke="DOGSHADE" stroke-width="3.2" fill="none" stroke-linecap="round"/></g></g>',
+        near:'<g transform="translate(-8,7.4)"><g class="dgPin dgLegA"><path d="M0 0 L0 8.6" stroke="currentColor" stroke-width="3.4" fill="none" stroke-linecap="round"/></g></g><g transform="translate(2.7,11.7)"><g class="dgPin dgLegB"><path d="M-0.1 1.7 L-4.2 4.3" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round"/></g></g>',
+        tail:'translate(-1.5,16.2) rotate(105)', head:'rotate(4)' } } };
+const DOG_MOODS=[ {}, {}, {mouth:1}, {mouth:4}, {brows:3} ];   // ⚑ 0416 the stroll wardrobe — pick · pick · tongue out · lip lick · raised brows (DOG_KIT indices; angry/worried/sad are feelings, not moods — they stay off the stroll)
+function dogDye(s9,K){ return s9.replace(/currentColor/g,K.coat).replace(/DOGSHADE/g,K.shade).replace(/DOGCREAM/g,K.cream).replace(/DOGEAR/g,K.ear); }
+function dogSitHind(s9){ const p9=s9.split('</g></g>'); return p9[1]+'</g></g>'; }   // sit far/near = [front verbatim, folded hind] — the hind is the SECOND seat group
+function dogMood(br){
+  // 0416: deterministic mood (the ZERO-RANDOMNESS law) — a tiny string hash
+  // of the ledger day + the leg picks one of DOG_MOODS per room; the OTHER
+  // breed reads the NEXT leg (a future pack's mate never matches its lead —
+  // 0413 shipped ALTERNATE DAYS, so today this arm is the hook, not a walker).
+  // The node re-mints per leg: a new room = a new face, never a live swap.
+  const n9=((DOGT&&DOGT.leg)|0)+(br===dogLeadBreed()? 0:1);
+  const s9=((META.dog&&META.dog.day)||'')+':'+n9;
+  let h9=0; for(let i9=0;i9<s9.length;i9++) h9=(h9*31+s9.charCodeAt(i9))|0;
+  return ((h9%5)+5)%5;
+}
+function dogArtSVG(b9,c9,f9){
   if(b9 && typeof b9==='object'){ c9=b9; b9='gb'; }   // 0412's one-arg coat call
   const hd=b9==='hd';
   const K=c9||DOG_COATS[hd?'hd':'gb'][0];
+  const KT=DOG_KIT[hd?'hd':'gb'], F=f9||{};   // 0416: face = {eyes,brows,mouth} kit indices (absent = 0 = the pick); dogNodeSVG mints the day's mood, the cards mint the pick
+  const dy9=s9=>dogDye(s9,K);
+  // 0416 THE FACE GRAMMAR (the .dogTng idiom, per part): the BASE face = the
+  // minted mood at its paint seat; the BEAT faces sleep beside it and wake by
+  // pose class (dfSniff = sleepy · dfSit = wide alert + raised brows · dfPat =
+  // happy). Paint order keeps the maker's head shelf: mouth · tongue · eyes ·
+  // brows · ear.
+  const mouth9='<g class="df dfBase dfMouth">'+dy9(KT.mouth[F.mouth|0])+'</g>';
+  const face9='<g class="df dfBase dfEyes">'+dy9(KT.eyes[F.eyes|0])+'</g>'
+    +'<g class="df dfSniff dfEyes">'+dy9(KT.eyes[1])+'</g>'
+    +'<g class="df dfSit dfEyes">'+dy9(KT.eyes[2])+'</g>'
+    +'<g class="df dfPat dfEyes">'+dy9(KT.eyes[3])+'</g>'
+    +'<g class="df dfBase dfBrows">'+dy9(KT.brows[F.brows|0])+'</g>'
+    +'<g class="df dfSit dfBrows">'+dy9(KT.brows[3])+'</g>';
   const leg=(x,y,len,col,w,cls,sock)=>'<g transform="translate('+x+','+y+')"><g class="dgPin '+cls+'">'
     +'<path d="M0 0 L0 '+len+'" stroke="'+col+'" stroke-width="'+w+'" fill="none" stroke-linecap="round"/>'
     +(sock? '<circle cx="0" cy="'+len+'" r="'+(w*0.55)+'" fill="'+K.cream+'"/>' : '')
     +'</g></g>';
   if(hd){
     // THE HOUND (candidates dogB): longer and taller, the shade saddle and the
-    // long ear on the EAR slot, thigh+shin hind legs, a cream chin, tail up
+    // long ear on the EAR slot, thigh+shin hind legs, a cream chin, tail up.
+    // 0416 SIT RIG: the trot rear rides .dgTrot, the maker's sit rear .dgSit
+    // (display-toggled by dogsitB); the front legs render ONCE, shared — the
+    // kit's sit fronts equal the trot's (battery-asserted).
     const thigh=(x,y,cls,col)=>'<g transform="translate('+x+','+y+')"><g class="dgPin '+cls+'">'
       +'<ellipse cx="0.4" cy="1.6" rx="3.1" ry="4.2" fill="'+col+'"/>'
       +'<path d="M0.8 4 L1.4 8.8" stroke="'+col+'" stroke-width="3.2" fill="none" stroke-linecap="round"/></g></g>';
+    const tail9='<path d="M0 0 Q3.2 -3.6 3.6 -9.4" stroke="'+K.coat+'" stroke-width="2.9" fill="none"/><circle cx="3.6" cy="-9.4" r="1.4" fill="'+K.cream+'"/>';
     return '<g stroke-linecap="round">'
-      +'<g transform="translate(13,-2)"><g class="dogwagG dgPin"><path d="M0 0 Q3.2 -3.6 3.6 -9.4" stroke="'+K.coat+'" stroke-width="2.9" fill="none"/><circle cx="3.6" cy="-9.4" r="1.4" fill="'+K.cream+'"/></g></g>'
+      +'<g class="dgTrot"><g transform="translate(13,-2)"><g class="dogwagG dgPin">'+tail9+'</g></g></g>'
+      +'<g class="dgSit"><g transform="translate(13,-2) '+KT.sit.tail+'"><g class="dogwagG dgPin">'+tail9+'</g></g></g>'
       +leg(-3.6,7.4,8.6,K.shade,3.2,'dgLegB',false)
-      +thigh(11.2,7.2,'dgLegA',K.shade)
+      +'<g class="dgTrot">'+thigh(11.2,7.2,'dgLegA',K.shade)+'</g>'
+      +'<g class="dgSit">'+dy9(dogSitHind(KT.sit.far))+'</g>'
+      +'<g class="dgTrot">'
       +'<circle cx="8.6" cy="3.2" r="6.1" fill="'+K.coat+'"/>'
       +'<circle cx="-6.6" cy="2.6" r="6.4" fill="'+K.coat+'"/>'
       +'<rect x="-6.6" y="-3.6" width="15.2" height="12.4" fill="'+K.coat+'"/>'
       +'<path d="M-6.4 -3.4 Q1.5 -6.6 10.4 -2.6 Q11.6 1.6 8.4 2.6 Q1.2 -0.6 -6.2 0.8 Z" fill="'+K.ear+'"/>'
+      +'</g>'
+      +'<g class="dgSit">'+dy9(KT.sit.bodyArt)+'</g>'
       +leg(-8,7.4,8.6,K.coat,3.4,'dgLegA',false)
-      +thigh(7,7.6,'dgLegB',K.coat)
+      +'<g class="dgTrot">'+thigh(7,7.6,'dgLegB',K.coat)+'</g>'
+      +'<g class="dgSit">'+dy9(dogSitHind(KT.sit.near))+'</g>'
       +'<ellipse cx="-9.6" cy="5.4" rx="2.9" ry="3.6" fill="'+K.cream+'" transform="rotate(14 -9.6 5.4)"/>'
       +'<path d="M-15.6 -1.6 Q-10.6 2.6 -5 -1.2" stroke="'+K.collar+'" stroke-width="2.4" fill="none"/>'
       +'<circle cx="-10.8" cy="2.6" r="1.35" fill="'+K.tag+'"/>'
@@ -53600,32 +53719,34 @@ function dogArtSVG(b9,c9){
         +'<circle cx="-2.6" cy="-4.4" r="6.4" fill="'+K.coat+'"/>'
         +'<rect x="-13.2" y="-4.6" width="10.6" height="5.6" rx="2.6" fill="'+K.coat+'"/>'
         +'<rect x="-12.4" y="-1.2" width="7.4" height="2.8" rx="1.4" fill="'+K.cream+'"/>'
-        +'<circle cx="-12.4" cy="-3" r="1.65" fill="'+K.ink+'"/>'
+        +mouth9
         +'<path class="dogTng" d="M-9.8 1 Q-8.8 4.4 -7.4 1.2 Z" fill="#E0656B"/>'
-        +'<circle cx="-4.4" cy="-6.4" r="1.55" fill="'+K.ink+'"/>'
-        +'<circle cx="-4.9" cy="-6.9" r="0.55" fill="#FFFFFF"/>'
+        +face9
         +'<g transform="translate(1.6,-9.6)"><g class="dogEarG dgPin"><path d="M0 0 Q5 0.6 3.8 8 Q3 12.8 0 12.2 Q-2.6 11.6 0 0 Z" fill="'+K.ear+'"/></g></g>'
       +'</g></g>'
       +'</g>';
   }
+  const tail8='<path d="M0 0 Q4.2 -1 4.6 -6 Q4.8 -8.6 2.6 -8.6" stroke="'+K.coat+'" stroke-width="3.2" fill="none"/><circle cx="2.6" cy="-8.6" r="1.7" fill="'+K.cream+'"/>';
   return '<g stroke-linecap="round">'
-    +'<g transform="translate(11.5,-1)"><g class="dogwagG dgPin"><path d="M0 0 Q4.2 -1 4.6 -6 Q4.8 -8.6 2.6 -8.6" stroke="'+K.coat+'" stroke-width="3.2" fill="none"/><circle cx="2.6" cy="-8.6" r="1.7" fill="'+K.cream+'"/></g></g>'
+    +'<g class="dgTrot"><g transform="translate(11.5,-1)"><g class="dogwagG dgPin">'+tail8+'</g></g></g>'
+    +'<g class="dgSit"><g transform="translate(11.5,-1) '+KT.sit.tail+'"><g class="dogwagG dgPin">'+tail8+'</g></g></g>'
     +leg(-2.5,7,8.5,K.shade,3.4,'dgLegB',true)
-    +leg(9.5,7,8.5,K.shade,3.4,'dgLegA',true)
-    +'<path d="M-11.9 2.4 C-11.9 -2.6 -8.6 -4.6 -4.2 -4.6 L5.4 -4.2 C10 -4 12.6 -1.2 12.6 3 C12.6 7.4 9.8 9.6 5.8 9.6 L-4.6 9.8 C-9.6 9.8 -11.9 7.2 -11.9 2.4 Z" fill="'+K.coat+'"/>'
+    +'<g class="dgTrot">'+leg(9.5,7,8.5,K.shade,3.4,'dgLegA',true)+'</g>'
+    +'<g class="dgSit">'+dy9(dogSitHind(KT.sit.far))+'</g>'
+    +'<g class="dgTrot"><path d="M-11.9 2.4 C-11.9 -2.6 -8.6 -4.6 -4.2 -4.6 L5.4 -4.2 C10 -4 12.6 -1.2 12.6 3 C12.6 7.4 9.8 9.6 5.8 9.6 L-4.6 9.8 C-9.6 9.8 -11.9 7.2 -11.9 2.4 Z" fill="'+K.coat+'"/></g>'
+    +'<g class="dgSit">'+dy9(KT.sit.bodyArt)+'</g>'
     +leg(-6.5,7,8.5,K.coat,3.6,'dgLegA',true)
-    +leg(6,7,8.5,K.coat,3.6,'dgLegB',true)
+    +'<g class="dgTrot">'+leg(6,7,8.5,K.coat,3.6,'dgLegB',true)+'</g>'
+    +'<g class="dgSit">'+dy9(dogSitHind(KT.sit.near))+'</g>'
     +'<ellipse cx="-8.4" cy="5.2" rx="3.1" ry="3.9" fill="'+K.cream+'" transform="rotate(14 -8.4 5.2)"/>'
     +'<path d="M-14 -0.6 Q-9.2 3.6 -3.6 -0.2" stroke="'+K.collar+'" stroke-width="2.6" fill="none"/>'
     +'<circle cx="-9.4" cy="3.6" r="1.5" fill="'+K.tag+'"/>'
     +'<g transform="translate(-9,-2)"><g class="dogHeadG dgPin">'
       +'<circle cx="-3" cy="-4.5" r="7.2" fill="'+K.coat+'"/>'
       +'<rect x="-12.6" y="-5" width="8.6" height="6.2" rx="3" fill="'+K.cream+'"/>'
-      +'<circle cx="-11.6" cy="-2.9" r="1.95" fill="'+K.ink+'"/>'
-      +'<path d="M-9.4 0.2 q1.4 1.5 2.9 0.1" stroke="'+K.ink+'" stroke-width="0.9" fill="none"/>'
+      +mouth9
       +'<path class="dogTng" d="M-9.6 0.5 Q-8.4 4.4 -6.9 0.7 Z" fill="#E0656B"/>'
-      +'<circle cx="-4.6" cy="-6.6" r="1.75" fill="'+K.ink+'"/>'
-      +'<circle cx="-5.2" cy="-7.2" r="0.62" fill="#FFFFFF"/>'
+      +face9
       +'<g transform="translate(1.2,-10.2)"><g class="dogEarG dgPin"><path d="M0 0 Q6.2 -0.4 5.2 7 Q4.6 11.2 1.4 10.7 Q-1.4 10.2 0 0 Z" fill="'+K.ear+'"/></g></g>'
     +'</g></g>'
     +'</g>';
@@ -53634,7 +53755,7 @@ function dogFlipNow(q){
   if(q.s.k==='walk' && q.s.x1!==q.s.x0) DOGT.f=(q.s.x1>q.s.x0)? 1 : -1;
   return DOGT.f||1;
 }
-function dogPoseNow(q){ return q.s.k==='sniff'? 'dogsniffB' : (q.s.k==='fade'? '' : 'dogtrotB'); }
+function dogPoseNow(q){ return q.s.k==='sniff'? ((DOGT.t-q.s.t0)<DOG_SIT_AT? 'dogsniffB':'dogsitB') : (q.s.k==='fade'? '' : 'dogtrotB'); }   // 0416: a sniff stop's second half = SIT (he sits and looks at you); dogPaint's pose-diff swaps the class
 function dogNodeSVG(){
   const q=dogPos(), f=dogFlipNow(q);
   const op=q.s.k==='fade'? Math.max(0,1-q.k) : 1;
@@ -53647,7 +53768,7 @@ function dogNodeSVG(){
     +'<g id="dogPat" class="dgPin">'
     +'<g id="dogFlip"'+(f>0? ' transform="scale(-1,1)"':'')+'>'
     +'<g id="dogPose" class="dgPin'+(pose? ' '+pose:'')+'">'
-    +'<g transform="translate(0,6) scale(2)">'+dogArtSVG(br,dogCoat(br))+'</g>'
+    +'<g transform="translate(0,6) scale(2)">'+dogArtSVG(br,dogCoat(br),DOG_MOODS[dogMood(br)])+'</g>'
     +'</g></g></g></g></g></g>';
 }
 function dogZSeat(fresh){
@@ -64713,7 +64834,7 @@ window.GVT = {
       day:META.dog&&META.dog.day, paid:(META.dog&&META.dog.paid||[]).slice(), done:META.dog&&META.dog.done,
       own:META.dog&&META.dog.own?1:0, own2:META.dog&&META.dog.own2?1:0,   // 0413: precise per-bone flags
       coat:{ gb:(META.dog&&META.dog.coat&&META.dog.coat.gb)|0, hd:(META.dog&&META.dog.coat&&META.dog.coat.hd)|0 },
-      lead:dogLeadBreed() }; },
+      lead:dogLeadBreed(), sitAt:DOG_SIT_AT, mood:dogMood(dogLeadBreed()) }; },   // 0416: the sit dial + the day's mood index
   dogFreeze(on){ DOGRIG.frozen=on?1:0; DOG_LAST=0; return DOGRIG.frozen; },
   dogStep(s){ if(!DOGT) dogArm(); let r=Math.max(0,+s||0);
     while(r>0){ const d=Math.min(0.1,r); dogAdvance(d); r-=d; }
