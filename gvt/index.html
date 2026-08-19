@@ -29950,7 +29950,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.84';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.85';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -65418,6 +65418,25 @@ document.getElementById('retryBtn').addEventListener('click', ()=>{
     // v2.41: a raid rematch is a fresh attack (the ground is drawn again),
     // and a RANDOM pref redraws too — an explicit pick still replays itself.
     adGate('bf', ()=>{ startBattlefield(((raid||META.bfMap==='random') && m!=='nempark' && m!=='nembank' && m!=='nemtown')?'random':m, null, t); if(raid && S.bf) S.bf.raid=true; }); return; }   // instant rematch, same size, no queue (0305 BF-03 +0346 +0371: a RANDOM pref must never redraw an ambush away)
+  // 0412a (Wyatt 8/19: "when I hit retry and I'm fighting King Yeti, for
+  // some reason it throws me back into the regular campaign… this needs to
+  // be addressed"): a RAID loss retries ITS OWN raid at ITS OWN tier. Not
+  // MEGA's bug: startRaidBattle zeroes levelN and the park bag the moment it
+  // mints S.raid, so EVERY raid loss — ice/bone/croak, e/m/h/g — fell
+  // through the campaign door below as startCampaign(0), which startBattle's
+  // n|| folds to META.campaign+1: the kid's NEXT war, measured. 0308 named
+  // this exact sibling when it fixed the parks. The retry re-enters through the
+  // solo door's own landing (RAID_CUR + startRaid — the body UI.raidPlay's
+  // adGate runs): the party branch above took every party case, so this lane
+  // is solo by construction; the tier's door was open when the kid walked in
+  // and a retry never re-rolls it (D23); crewRaidBoom is a fresh crew
+  // launch, and a retry is not one (D24). A raid outranks the stale park bag
+  // below by startRaidBattle's own law.
+  // THE LAW OF THIS SEAT: the verdict's exits must know EVERY battle kind —
+  // party / bf / RAID / park / campaign. A new kind that forgets to stamp
+  // itself here falls into the campaign door (0308 met it for parks, 8/19
+  // for raids).
+  if(S.raid){ const rk=S.raid.k, tier=S.raid.t; adGate('camp', ()=>{ RAID_CUR=rk; startRaid(tier); }); return; }   // a raid RE-start is a level start too (the v2.60 law UI.raidPlay already pays)
   // 0308 (Wyatt 8/13): a PARK loss retries ITS OWN rung. S.park still wears
   // the run on the verdict screen (only showMenu takes it off), so the
   // campaign door below would quietly re-route the kid to the regular war —
