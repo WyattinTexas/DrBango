@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.37.1';
+const BUILD = 'STARSPELL v0.37.2';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -334,15 +334,12 @@ window.SSPERF = PERF;   // the headless perf harness reads/starts probes through
    diagnosed entirely from one screenshot of line 2 — but that investigation is
    closed, and it sat on top of the QUICK PLAY header for every player. The
    measurement machinery below always runs; only the readout is gated. */
-/* The overlay has no URL to be summoned from inside the iOS shell — it loads a
-   fixed address with no query string — so it is also reachable by tapping the
-   version footer five times, and the choice sticks in `beta3.fps` so it
-   survives an app relaunch. ⚠ TEMPORARY: this gesture exists to check the
-   renderer verdict and frame time on the TestFlight build, where the browser's
-   URL bar isn't available. Remove it (and this comment) once the shell is
-   confirmed good — see ssArmFpsTap. */
+/* (v0.37.0's five-tap footer gesture lived here so the readout was reachable
+   inside the iOS shell, which loads a fixed URL. It confirmed the TestFlight
+   build on 8/19 — 60fps/17ms on the full 1284×2778 dpr3 buffer, CV verdict,
+   brightness right — and was removed as promised the same day.) */
 let SS_FPS_EL = null;
-function ssFpsShow(on, persist) {
+function ssFpsShow(on) {
   if (on && !SS_FPS_EL) {
     SS_FPS_EL = document.createElement('div');
     SS_FPS_EL.style.cssText = 'position:fixed;left:4px;top:calc(env(safe-area-inset-top,0px) + 4px);' +
@@ -354,45 +351,14 @@ function ssFpsShow(on, persist) {
     SS_FPS_EL.remove();
     SS_FPS_EL = null;
   }
-  // Only the gesture is sticky. `?fps=1` must stay transient — persisting it
-  // meant one debug load turned the readout on for good, which the suite caught
-  // as "DEFAULT boot has no overlay" failing on the very next navigation.
-  if (persist) { try { localStorage.setItem('beta3.fps', on ? '1' : '0'); } catch (e) { } }
   return !!SS_FPS_EL;
 }
 function ssFpsOn() {
-  if (QS.get('fps') === '1') return true;
-  if (QS.get('fps') === '0') return false;
-  try { return localStorage.getItem('beta3.fps') === '1'; } catch (e) { return false; }
-}
-/* Five taps on the version footer inside 3s toggles the readout. Deliberately
-   dull: no visible affordance, nothing a player finds by accident, and the
-   footer is the one element that is never part of play. */
-function ssArmFpsTap(t) {
-  if (!t || !t.setInteractive) return;
-  t.setInteractive();
-  try {                          // a 9px line is a mean target — widen the hit box
-    const ha = t.input.hitArea;
-    ha.x -= 26; ha.y -= 18; ha.width += 52; ha.height += 36;
-  } catch (e) { }
-  let n = 0, last = 0;
-  t.on('pointerdown', () => {
-    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    n = (now - last > 3000) ? 1 : n + 1;
-    last = now;
-    if (n < 5) return;
-    n = 0;
-    const on = ssFpsShow(!SS_FPS_EL, true);
-    try { SFX.ensure(); SFX.ui(); } catch (e) { }
-    // say so, so a stray five-tap is never a mystery
-    const sc = t.scene;
-    if (sc && sc.add) {
-      const l = ssLayout(sc);
-      const say = ssTxt(sc, l.x(0), l.y(768), on ? 'fps readout on' : 'fps readout off', l.u(10), '#8fa0ff')
-        .setOrigin(0.5).setDepth(700).setScrollFactor(0);
-      sc.tweens.add({ targets: say, alpha: 0, duration: 900, delay: 700, onComplete: () => say.destroy() });
-    }
-  });
+  // the gesture's sticky `beta3.fps` is retired with it — purge it, or a phone
+  // that toggled the readout on during the TestFlight check keeps it FOREVER
+  // with no gesture left to turn it off (Wyatt's phone was in that state)
+  try { localStorage.removeItem('beta3.fps'); } catch (e) { }
+  return QS.get('fps') === '1';
 }
 function ssPerfWatch(gm) {
   if (ssFpsOn()) ssFpsShow(true);
@@ -3233,7 +3199,6 @@ class Home extends Phaser.Scene {
     this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
     const verT = ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5);
     ui(verT);
-    ssArmFpsTap(verT);          // ⚠ TEMPORARY — see ssArmFpsTap, remove after the shell checks out
     this.muteB = ui(ssTxt(this, l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
     this.muteB.on('pointerdown', () => { SFX.ensure(); SFX.setMuted(!SFX.muted); this.muteB.setText(SFX.muted ? '🔇' : '🔊'); });
     // language switcher — opposite the mute toggle; opens the sheet of native names

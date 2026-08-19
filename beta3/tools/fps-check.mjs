@@ -70,8 +70,8 @@ async function main() {
   // ---- v0.36.1: the overlay is OPT-IN — a plain boot shows players nothing ----
   // (it was default-ON through the perf saga and sat on the QUICK PLAY header)
   const noFlag = `![...document.querySelectorAll('div')].some(d => /FPS ·/.test(d.textContent||''))`;
-  // the five-tap gesture persists `beta3.fps`, so a dev who used it would fail
-  // the next line for no reason — clear it first, then assert the clean default
+  // hygiene: a `beta3.fps` left by the retired five-tap gesture would trip the
+  // next line — the game purges it on boot now, but clear it here too
   await c.ev(`(() => { try { localStorage.removeItem('beta3.fps') } catch (e) {}; 'cleared' })()`);
   await c.nav(BASE, 9000);
   ok('DEFAULT boot has no overlay (players get a clean screen)', await c.ev(noFlag) === true);
@@ -357,23 +357,27 @@ async function main() {
   ok('normal boot unaffected after lab (game boots, no lab UI)',
     await c.ev(`!!window.game && !document.getElementById('sslab')`) === true);
 
-  // ---- v0.37.0: the five-tap fps gesture (TEMPORARY, for the TestFlight build) ----
-  // The shell loads a fixed URL with no query string, so ?fps=1 is unreachable
-  // inside the app. Five taps on the version footer toggles the readout and the
-  // choice sticks in `beta3.fps` so it survives an app relaunch.
-  ok('the version footer is tappable (the gesture has a target at all)',
+  // ---- v0.37.2: the five-tap gesture is GONE (it was temporary, and it left) ----
+  // It confirmed the TestFlight build on 8/19 (60fps/17ms, full dpr3 buffer, CV
+  // verdict) and Wyatt asked for it removed once the shell was clear. Assert the
+  // removal is total: no gesture target, no persistence, and the stale sticky
+  // key is purged on boot — a phone that toggled the readout on during the
+  // check must not wear it forever now that no gesture can turn it off.
+  ok('the version footer is INERT (the five-tap gesture is gone)',
     await c.ev(`(() => { const h = game.scene.getScene('home');
       const t = h.children.list.find(o => o.text && /Corkscrew Games/.test(o.text));
-      return !!(t && t.input && t.input.enabled) })()`) === true);
-  ok('?fps=1 does NOT persist (only the gesture is sticky)',
+      return !!t && !(t.input && t.input.enabled) })()`) === true);
+  ok('ssArmFpsTap no longer exists',
+    await c.ev(`typeof ssArmFpsTap === 'undefined'`) === true);
+  ok('ssFpsShow never persists',
     await c.ev(`(() => { try { localStorage.removeItem('beta3.fps') } catch (e) {}
-      ssFpsShow(true); const after = localStorage.getItem('beta3.fps');
+      ssFpsShow(true, true); const after = localStorage.getItem('beta3.fps');
       ssFpsShow(false); return after === null } )()`) === true);
-  ok('ssFpsShow(x, true) persists and round-trips',
-    await c.ev(`(() => { ssFpsShow(true, true); const on = localStorage.getItem('beta3.fps');
-      ssFpsShow(false, true); const off = localStorage.getItem('beta3.fps');
-      try { localStorage.removeItem('beta3.fps') } catch (e) {}
-      return on === '1' && off === '0' })()`) === true);
+  await c.ev(`localStorage.setItem('beta3.fps', '1'); 'planted'`);
+  await c.nav(BASE, 9000);
+  ok('a stale sticky beta3.fps is purged on boot and shows NO overlay',
+    await c.ev(`localStorage.getItem('beta3.fps') === null &&
+      ![...document.querySelectorAll('div')].some(d => /FPS ·/.test(d.textContent||''))`) === true);
 
   // ---- v0.36.2: SAFE-AREA LAW (the TestFlight prerequisite) ----
   // In a browser the chrome hides the notch. In a full-screen WKWebView shell
