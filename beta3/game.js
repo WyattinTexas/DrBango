@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.37.0';
+const BUILD = 'STARSPELL v0.37.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -114,6 +114,16 @@ function ssProbeRun(type) {
       try { gl = g && g.renderer && g.renderer.gl; } catch (e) { }
       const gone = () => {
         try { const ext = gl && gl.getExtension('WEBGL_lose_context'); if (ext) ext.loseContext(); } catch (e) { }
+        // ⚠ strip the probe's styling BEFORE this element can be recycled.
+        // Phaser POOLS game canvases: destroy(true) frees this exact <canvas>,
+        // and the next Phaser.Game — the real one — is handed the same element
+        // back with its inline style intact (verified: same node, style
+        // preserved). v0.37.0 shipped that leak to TestFlight. The game wore
+        // the probe's `opacity:0.05` and the whole sky came up at 5% over the
+        // page's #0a0d1c: Wyatt's phone frame is the browser frame at a
+        // best-fit alpha of 0.049, under 1/255 error across 3.5M pixels.
+        // `pointer-events:none` rode along too — a dark game is a dead one.
+        try { if (g && g.canvas) g.canvas.style.cssText = ''; } catch (e) { }
         try { if (g && g.canvas && g.canvas.parentNode) g.canvas.parentNode.removeChild(g.canvas); } catch (e) { }
         resolve(out);
       };
@@ -5730,6 +5740,12 @@ function fitCanvas() {
   const c = game && game.canvas;
   if (!c) return;
   ssReadInsets();          // rotation moves the notch: re-measure before laying out
+  // the stage is ours: whatever a POOLED canvas arrived wearing, the real game
+  // is opaque, in normal flow and takes taps. Belt to the probe's braces (see
+  // gone()) — this runs on 'ready' and on every viewport settle, so a recycled
+  // canvas can never leave the game faint or untappable again.
+  c.style.opacity = ''; c.style.pointerEvents = '';
+  c.style.position = ''; c.style.left = ''; c.style.top = '';
   c.style.width = window.innerWidth + 'px';
   c.style.height = window.innerHeight + 'px';
   // We own the canvas CSS size (Scale.NONE), and Phaser caches the canvas bounding rect to

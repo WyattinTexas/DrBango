@@ -150,6 +150,40 @@ async function main() {
   await c.nav(BASE + '?fps=0', 16000);
   ok('stale v3 cache is discarded and re-probed (phones in the wild get the fix)',
     await c.ev(`window.__ssprobeMs > 0 && JSON.parse(localStorage.getItem('beta3.raster')).v === 4`) === true);
+
+  // ---- v0.37.1: THE PROBE MUST NOT DRESS THE GAME (the TestFlight blackout) ----
+  // Phaser POOLS game canvases: destroy(true) frees the element and the next
+  // Phaser.Game is handed the SAME node back, inline style and all. The probe
+  // wears `opacity:0.05; pointer-events:none` while it measures, so v0.37.0's
+  // first TestFlight build came up at 5% brightness AND untappable on any phone
+  // whose verdict was `cv` (a forced/cached verdict skips the probe, which is
+  // why every browser run looked perfect). Wyatt's screenshot solved to a
+  // best-fit canvas alpha of 0.049 over #0a0d1c, <1/255 error.
+  // Assert the shipped sequence itself: probe a renderer, then boot on it.
+  const recycled = JSON.parse(await c.ev(`new Promise((res) => {
+    ssProbeRun(Phaser.CANVAS).then(() => setTimeout(() => {
+      const g2 = new Phaser.Game({ type: Phaser.CANVAS, width: 64, height: 64, banner: false, scene: { create(){} } });
+      setTimeout(() => {
+        const o = { opacity: getComputedStyle(g2.canvas).opacity, pe: getComputedStyle(g2.canvas).pointerEvents };
+        try { g2.destroy(true) } catch (e) { }
+        res(JSON.stringify(o));
+      }, 400);
+    }, 400));
+  })`));
+  ok('a game booted after a probe inherits NO probe styling (opaque + tappable)',
+    recycled.opacity === '1' && recycled.pe !== 'none', JSON.stringify(recycled));
+  // and the belt: fitCanvas owns the real canvas CSS, so even a canvas that
+  // arrives dirty is healed on the next 'ready'/viewport settle
+  const healed = JSON.parse(await c.ev(`(() => {
+    game.canvas.style.cssText += ';position:fixed;opacity:0.05;pointer-events:none;';
+    const dirty = getComputedStyle(game.canvas).opacity;
+    fitCanvas();
+    return JSON.stringify({ dirty, opacity: getComputedStyle(game.canvas).opacity,
+      pe: getComputedStyle(game.canvas).pointerEvents, pos: getComputedStyle(game.canvas).position });
+  })()`));
+  ok('fitCanvas heals a dirty canvas (opacity, pointer-events, position)',
+    healed.dirty === '0.05' && healed.opacity === '1' && healed.pe === 'auto' && healed.pos === 'static',
+    JSON.stringify(healed));
   // ?rend=cv forces the canvas renderer and the tint shim bakes tinted copies
   await c.nav(BASE + '?rend=cv', 9000);
   const cvb = JSON.parse(await c.ev(`JSON.stringify({
