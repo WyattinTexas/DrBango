@@ -2822,6 +2822,27 @@
   .roomtag { position:absolute; transform:translate(-50%,-50%); background:rgba(38,40,31,0.9); color:#fff; font-weight:bold; font-size:18px; letter-spacing:0.06em; padding:3px 12px; border-radius:12px; cursor:pointer; white-space:nowrap; text-transform:uppercase; }
   .roomtag:hover { background:#4A6B35; }
   .roomhead { position:absolute; top:0; left:0; right:0; height:46px; background:rgba(20,16,12,0.85); display:flex; align-items:center; padding:0 14px; color:#EDEADF; font-weight:bold; font-size:19px; letter-spacing:0.04em; }
+  /* 0409 §3 THE PIGGY ALWAYS KNOWS THE WAY (FM-GVT-FEEDBACK-0819, Wyatt 8/19:
+     "when a player clicks the picky on the top right, even if they're in a
+     regular menu, it should pull them into Sarge's Surplus to the Stars
+     aisle."): the head's tier·balance readout is the shop register's little
+     sibling now — with a packs aisle it IS a door to it (UI.pigShop), without
+     one it stays the dead readout it always was (the 0097 one-predicate law:
+     tab, section, register and this chip all gate on IAP.avail()). Art +
+     digits only; renderMenu repaints it fresh on every buy/payout, so it
+     holds no state and runs no animation (the piggyHop innerHTML law). */
+  .rh-pig { margin-left:auto; display:flex; align-items:center; gap:5px; flex:0 0 auto;
+    background:none; border:none; padding:0; color:inherit; font:inherit; letter-spacing:inherit; }
+  .rh-pig svg { width:27px; height:22px; flex:0 0 auto; }
+  .rh-pig b { font-variant-numeric:tabular-nums; }
+  button.rh-pig { cursor:pointer; position:relative; }
+  /* the v3.03 --pigpad invisible extender, head edition — stage-px so the box
+     scales with the room. Lips: the whole 46px band is hers (±12) plus a lean
+     into the elastic margin-left:auto gap on the left; the RIGHT lip stays
+     under the music chip's 8px margin because a positioned ::after paints
+     OVER later static siblings — a fatter lip would eat the 🔊 chip's taps. */
+  button.rh-pig::after { content:''; position:absolute; --pigpad:12px;
+    top:calc(-1*var(--pigpad)); bottom:calc(-1*var(--pigpad)); left:-10px; right:-5px; }
   /* backdrop scrolls (margin:auto centers when it fits, reveals top/bottom when it doesn't —
      the flexbox-clips-overflow fix), so nothing is ever cut off on a short phone */
   .rmback { position:fixed; inset:0; background:rgba(10,10,8,0.72); display:flex; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:10px; box-sizing:border-box; z-index:5; }
@@ -29897,7 +29918,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.80';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.81';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -55367,7 +55388,12 @@ function renderMenu(){
       +'<div class="xpbar" style="flex:1;max-width:220px;margin:0 12px"><div style="width:'+Math.min(100,Math.round(100*META.xp/xpNeed()))+'%"></div></div>'
       +(META.pendingPicks>0?'<button class="mbtn alt" style="padding:0.2rem 2.6rem 0.2rem 0.7rem;font-size:1.1rem;position:relative" onclick="UI.promote()">PROMOTION!<span class="pkn" data-notr>×'+META.pendingPicks+'</span></button>':'')
       +duelChipHTML()+crewChipHTML()
-      +'<span style="margin-left:auto">'+t(tierName(META.starsLifetime))+' · ★ '+META.starBank+'</span>'
+      // 0409 §3: the readout is the register's sibling — one door law (0097):
+      // a packs aisle in the store means the piggy walks you to it; no aisle
+      // (plain web / Steam) keeps the dead readout, now wearing the pig (D6).
+      +(IAP.avail()
+        ? '<button type="button" id="rhPig" class="rh-pig" onclick="UI.pigShop()">'+t(tierName(META.starsLifetime))+' · '+SH_PIG+'<b>'+META.starBank+'★</b></button>'
+        : '<span id="rhPig" class="rh-pig">'+t(tierName(META.starsLifetime))+' · '+SH_PIG+'<b>'+META.starBank+'★</b></span>')
       +'<button class="mbtn alt langchip" title="MUSIC" onclick="UI.themeChip()">'+(META.themeOn?'🔊':'🔇')+'</button>'
       +'<button class="mbtn alt langchip" title="LANGUAGE" onclick="UI.langPanel()">🌐</button></div>'
     // v1.85: the ownership line, English on purpose (a copyright notice is
@@ -64177,6 +64203,10 @@ window.UI = {
     closeIceRite();
     openRaidScene(); },
   iceRiteLater(){ SFX.clack(); closeIceRite(); },
+  // ---- 0409 §3 THE PIGGY ALWAYS KNOWS THE WAY ---- the head chip's door:
+  // into the Surplus, snapped to the STARS aisle (the enhShop grammar, room
+  // edition — no modal to close; openShop enters at paint, the jump lands it)
+  pigShop(){ audio(); SFX.blip(); openShop(); shopJump('packs', false); },
   // ---- LANGUAGE ----
   langPanel(){ audio(); SFX.blip(); roomModal(langPanelHTML()); },
   lang(id){ SFX.blip(); setLang(id); roomModal(langPanelHTML()); },
