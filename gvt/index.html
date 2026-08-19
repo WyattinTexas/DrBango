@@ -23405,44 +23405,75 @@ function nemTkTick(dt){
   } else bf.nem.tkCd=0.5;
 }
 // 0393 THE AWAY CAPTAIN'S OWN HANDS — "using those abilities as much as
-// possible" (Wyatt). By THEIR racked iron + THEIR fitted mod (the 0354/0361
-// bench law: wrong iron = stock Sarge, nothing fires): TK on THEIR crystal's
-// own re-arm (TK_CD — red 8s … teal 15s, silver included), the outlaw's
-// snipe on SNIPE_CD whenever a target stands in reach, the forge only when
-// an enemy is near enough to pay for it, the renegade channel back-to-back
-// with a walking gap. Clocks live on the AWAY CELL (they survive a re-bought
-// Sarge and clamp to AWAY_T0 on a fresh figure); his forge WINDOW lives on
-// his unit (u.gsT — gsDmgMul/noteKill read it, it dies with him). NEVER
-// S.snpCd/S.gsT/S.gsCd/S.rpCd — those are MINE and the HUD reads them.
+// possible" (Wyatt). 0419: generalized into ONE CAPTAIN-CELL TICK — the
+// away commander's borrowed hands OR the hard bot's own (cell = bf.away ||
+// bf.hard; never both — the away serve passes diffOverride, so the gate
+// never mints on an away carpet). By THEIR racked iron + THEIR fitted mod
+// (the 0354/0361 bench law: wrong iron = stock Sarge, nothing fires): TK on
+// THEIR crystal's own re-arm (TK_CD — red 8s … teal 15s, silver included),
+// the outlaw's snipe on SNIPE_CD whenever a target stands in reach, the
+// forge only when an enemy is near enough to pay for it, the renegade
+// channel back-to-back with a walking gap — and THE FIFTH ARM (0419, hard
+// cell only): the outlaw captain's FLAMESTRIKE on its own fsCd, pressed
+// only over a cluster (HARD_FS_NEAR others near the snipe target — FS_FF
+// burns EVERY side, so a lone scout is never worth the match). The arm keys
+// on the cell CARRYING an fsCd clock; the away cell mints none (⚑ minting
+// one there = the away captain earns the iron, a later pass). The away
+// commander's mods ride lo.mo (his real bench); the hard cell carries mo on
+// itself (no wardrobe to mirror). Clocks live on the CELL (they survive a
+// re-bought Sarge and clamp to AWAY_T0 on a fresh figure); his forge WINDOW
+// lives on his unit (u.gsT — gsDmgMul/noteKill read it, it dies with him).
+// NEVER S.snpCd/S.gsT/S.gsCd/S.rpCd/S.fsCd — those are MINE and the HUD
+// reads them.
 function awayTick(dt){
-  const bf=S.bf; if(!bf||!bf.away) return;
-  const aw=bf.away;
+  const bf=S.bf; if(!bf||(!bf.away && !bf.hard)) return;
+  const cell=bf.away||bf.hard;
   const sg=S.units.find(u=>u.type==='sarge' && u.side==='foe' && u.seat===bf.team && !u.dead);
   if(!sg || sg.dropT>0) return;
-  if(aw.sgId!==sg.id){ aw.sgId=sg.id;
-    aw.tkCd=Math.max(aw.tkCd,AWAY_T0); aw.snpCd=Math.max(aw.snpCd,AWAY_T0);
-    aw.gsCd=Math.max(aw.gsCd,AWAY_T0); aw.rpCd=Math.max(aw.rpCd,AWAY_T0); }
+  if(cell.sgId!==sg.id){ cell.sgId=sg.id;
+    cell.tkCd=Math.max(cell.tkCd,AWAY_T0); cell.snpCd=Math.max(cell.snpCd,AWAY_T0);
+    cell.gsCd=Math.max(cell.gsCd,AWAY_T0); cell.rpCd=Math.max(cell.rpCd,AWAY_T0);
+    if(cell.fsCd!=null) cell.fsCd=Math.max(cell.fsCd,AWAY_T0); }   // the clamp never MINTS the field — the away cell stays fsCd-less by construction
   if(sg.gsT>0) sg.gsT=Math.max(0, sg.gsT-dt);   // his window burns on the sim clock (the S.gsT law, his seat)
-  const w=unitSargeStats(sg).w, mo=aw.lo.mo||[];
+  const w=unitSargeStats(sg).w, mo=(cell.lo? cell.lo.mo : cell.mo)||[];
+  // THE FIFTH ARM ticks BESIDE the chain below, on its own clock — the
+  // snipe branch's early returns must never starve it. The armed rounds
+  // ride his ORDINARY rifle rounds (the units-fire loop's 0397 hook);
+  // snpFire's red button is its own theater and spends no charge — the
+  // shipped law, unchanged.
+  if(cell.fsCd!=null && w==='sniper' && mo.indexOf('flamestrike')>=0){
+    cell.fsCd-=dt;
+    if(cell.fsCd<=0){
+      const tg=snpTarget(sg); let near=0;
+      if(tg){ const rr=FS_R*1.5;
+        for(const e of bfEnemies(sg.side)){ if(e!==tg && Math.hypot(e.x-tg.x,e.y-tg.y)<=rr) near++; } }
+      if(tg && near>=HARD_FS_NEAR){
+        sg.fsN=FS_SHOTS; cell.fsCd=FS_CD;
+        bfSfx(SFX.ready, sg.x, sg.y);
+        S.fx.push({k:'ring',x:sg.x,y:sg.y-24,r:6,R:40,t:0,dur:0.32,col:'#FF9A3D'});
+        S.floats.push({x:sg.x,y:sg.y-72,txt:'🔥 ×'+FS_SHOTS,t:0,col:'#FF9A3D'});   // fsActivate's own tell verbatim (symbols only — the player must be LOOKING, HARD_T0's law)
+      } else cell.fsCd=AWAY_RETRY;
+    }
+  }
   if(w==='lightsaber' && mo.indexOf('telekinesis')>=0){
-    aw.tkCd-=dt; if(aw.tkCd>0) return;
-    if(tkFire(sg, aw.col, true)){ aw.tkCd=TK_CD[aw.col]||TK_CD.blue; tkTellFx(sg.x, sg.y, tkHexOf(aw.col)); }
-    else aw.tkCd=AWAY_RETRY;
+    cell.tkCd-=dt; if(cell.tkCd>0) return;
+    if(tkFire(sg, cell.col, true)){ cell.tkCd=TK_CD[cell.col]||TK_CD.blue; tkTellFx(sg.x, sg.y, tkHexOf(cell.col)); }
+    else cell.tkCd=AWAY_RETRY;
   } else if(w==='sniper' && mo.indexOf('outlawsniper')>=0){
-    aw.snpCd-=dt; if(aw.snpCd>0) return;
-    if(snpFire(sg, true)) aw.snpCd=SNIPE_CD;
-    else aw.snpCd=AWAY_RETRY;
+    cell.snpCd-=dt; if(cell.snpCd>0) return;
+    if(snpFire(sg, true)) cell.snpCd=SNIPE_CD;
+    else cell.snpCd=AWAY_RETRY;
   } else if(w==='shotgun' && mo.indexOf('guardianshotgun')>=0){
-    aw.gsCd-=dt; if(aw.gsCd>0 || sg.gsT>0) return;
+    cell.gsCd-=dt; if(cell.gsCd>0 || sg.gsT>0) return;
     let near=false; const rr=(unitSargeStats(sg).rng||103)*AWAY_GS_NEAR;
     for(const e of S.units){ if(e.dead||e.side===sg.side||e.dropT>0||e.jetT>0||e.cloakT>0) continue;
       if(Math.hypot(e.x-sg.x,e.y-sg.y)<=rr){ near=true; break; } }
-    if(near && gsFire(sg, true)) aw.gsCd=GS_CD;
-    else aw.gsCd=AWAY_RETRY;
+    if(near && gsFire(sg, true)) cell.gsCd=GS_CD;
+    else cell.gsCd=AWAY_RETRY;
   } else if(w==='pistol' && mo.indexOf('renegadepistol')>=0){
-    aw.rpCd-=dt; if(aw.rpCd>0) return;
-    if(rpFire(sg, true)) aw.rpCd=RP_PLANT+RP_BURST+AWAY_RP_GAP;   // rooted through the channel; the gap is only so he still WALKS between storms (⚑ 0 = truly back-to-back)
-    else aw.rpCd=AWAY_RETRY;
+    cell.rpCd-=dt; if(cell.rpCd>0) return;
+    if(rpFire(sg, true)) cell.rpCd=RP_PLANT+RP_BURST+AWAY_RP_GAP;   // rooted through the channel; the gap is only so he still WALKS between storms (⚑ 0 = truly back-to-back)
+    else cell.rpCd=AWAY_RETRY;
   }
 }
 // (nemTeaseLine retired 0274b — the invader door went on a diet and it was
@@ -29026,6 +29057,16 @@ const HARD_INC=1.25;         // ⚑ "extra dog tags": the income drip — COMPOS
 const HARD_HP=1.15, HARD_DMG=1.10;   // ⚑ "units just a little extra strong": per-unit def-copy muls at placeUnit (the rookie's INVERSE; rng deliberately untouched — a reach cheat reads as aimbotting on a carpet)
 const HARD_RANK_UP=10;       // ⚑ "higher-level units": the player's OWN per-type ranks +10 (capped RANK_MAX), the WHOLE army — see hardRanks + placeUnit's blanket stamp
 const HARD_SARGE_HP=10;      // ⚑ the captain's plate — the FOURTH cell in the NEMESIS(+3)/NEMPARK(+20)/AWAY(0) flat-bonus row at placeUnit
+// 0419 THE ENEMY SARGE (§2.4 — Wyatt 8/18, binding: "a sarge that has some
+// of the real tough mods, like the outlaw sniper with the flame strike
+// attachment, or versing a sarge that has a saber and crystal abilities,
+// like the telekinesis. The green one is crazy, the purple one's crazy, and
+// the blue one's crazy… The silver one's even cool"). The kit is drawn at
+// the gate dress (startBattlefield's mint); the cast brain is awayTick,
+// generalized to the captain cell; the fifth arm (AI flamestrike) keys on
+// the cell carrying an fsCd clock — the away cell mints none.
+const HARD_CRYSTALS=['green','purple','blue','silver'];   // ⚑ his four, in his order — RED stays NEMESIS's signature (his identity, his saber; never in this pool)
+const HARD_FS_NEAR=2;   // ⚑ flamestrike pressed on clusters only — the snipe target must have this many OTHER enemies within FS_R*1.5 (FS_FF burns EVERY side; never a lone scout, never his own line)
 function hardBotDue(team){ const r=wrRec(team), n=r.w+r.l;
   return (team===1||team===2) && n>=HARD_GAMES && r.w/n>=HARD_WR; }
 // 0418 THE BRASS table (§2.3): nemesisLineup's up-arg arithmetic in TABLE
@@ -29545,7 +29586,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.75';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.76';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -35164,14 +35205,32 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
           y:Math.max(0,(WORLD_H-H)/2), vy:0 } };
   // 0417 the hard cell — the THIRD captain cell (nem · away · hard). 0418
   // THE BRASS fills up AT THE MINT (hardRanks — the player's OWN per-type
-  // ranks promoted HARD_RANK_UP; placeUnit's blanket stamp consumes it);
-  // kitW/col/mo + the five clocks wait for the enemy-sarge card, the rest
-  // for smart-march. bf.hard is the
+  // ranks promoted HARD_RANK_UP; placeUnit's blanket stamp consumes it).
+  // 0419 THE ENEMY SARGE dresses here too — the kit draw, 50/50 (⚑ "either
+  // … or" verbatim): THE OUTLAW (sniper + outlawsniper/flamestrike irons)
+  // or THE DUELIST (lightsaber + telekinesis on a crystal drawn uniform
+  // from HARD_CRYSTALS — RED is NEMESIS's signature, never in the pool).
+  // The captain's KIT rides his SEAT (unitSargeStats' own door — the
+  // NEMESIS_SABER idiom at the ambush dress), his blade wears the crystal's
+  // own hex (saberHexU reads the kit whole), his RANK rides cell.up.sarge
+  // (0418's brass), and the cast brain reads kitW/col/mo off the CELL
+  // (awayTick, generalized — the fifth arm keys on fsCd). No outfit bag (⚑
+  // later spice — the away kit carries `of` because it mirrors a REAL
+  // commander; the hard bot has no wardrobe). Per-sim dice are safe here:
+  // the gate structurally excludes rooms (coopLaunching). bf.hard is the
   // whole feature's flag (absent on every other carpet); clocks live ON THE
   // CELL, never S.snpCd/S.gsT — those are the player's own, and the HUD
   // reads them (the away brain's law, verbatim).
-  if(hard) S.bf.hard={ up:hardRanks(), kitW:null, col:null, mo:[],
-    tkCd:HARD_T0, snpCd:HARD_T0, gsCd:HARD_T0, rpCd:HARD_T0, fsCd:HARD_T0, sgId:0 };
+  if(hard){
+    const duel=Math.random()<0.5;
+    const hcol=duel? HARD_CRYSTALS[(Math.random()*HARD_CRYSTALS.length)|0] : null;
+    S.bf.hard={ up:hardRanks(), kitW:(duel?'lightsaber':'sniper'), col:hcol,
+      mo:(duel? ['telekinesis'] : ['outlawsniper','flamestrike']),
+      tkCd:HARD_T0, snpCd:HARD_T0, gsCd:HARD_T0, rpCd:HARD_T0, fsCd:HARD_T0, sgId:0 };
+    const hcap=S.bf.seats[team];
+    if(hcap && !hcap.human){ hcap.kit=bfSargeKit(S.bf.hard.kitW);
+      if(duel) hcap.kit.saber=tkHexOf(hcol); }   // the drawn blade carries HIS crystal, never a random one
+  }
   // ===== v2.15 JAX: the map's little toy jacks go down BEFORE the first boot.
   // They ride S.mines so the sweeper's own loop serves them whole: armT 0 =
   // live from the whistle, big/sl false = the stock 26-trigger and the stock
@@ -37499,7 +37558,7 @@ function bfTick(dt){
     }
   }
   nemTkTick(dt);   // v3.12: NEMESIS's Sarge presses telekinesis on his own clock (no-op on every other carpet)
-  awayTick(dt);    // 0393: the away captain presses THEIR special on his own clocks (no-op on every other carpet)
+  awayTick(dt);    // 0393→0419: the CAPTAIN-CELL tick — the away commander's or the hard bot's captain presses specials on the cell's own clocks (no-op on every other carpet)
   nemParaTick(dt);   // 0305 BF-03: the park ambush's half-clock paratrooper stick (no-op everywhere else)
   nemEggTick(dt);    // 0358 THE LAVA FIELD's half-clock clutch (no-op off the map)
   if(bf.timeLeft<=0){
@@ -40418,6 +40477,10 @@ function snpActivate(){
 // is armed only by MY tap on MY jetSarge — a relayed ally's or an away
 // captain's rounds never ignite in my sim (their button state is not on the
 // wire); every other battlefield seat fields factory stock (enhU's law).
+// The ONE exception (0419): the HARD captain arms his own fsN locally in
+// awayTick (all-CPU carpet by construction — nothing crosses a wire) and
+// his patches land OWNERLESS at the hook (the null-src lane: both sides
+// burn, nobody is paid).
 function fsOn(){ return enhOn('flamestrike') && (META.sargeWeapon||'pistol')==='sniper'; }
 function fsActivate(){
   if(!fsOn() || (S.fsCd||0)>0) return false;
@@ -40434,7 +40497,7 @@ function fsActivate(){
 // clocks, zero dice — the mvSm law; co-op twin sims byte-equal by
 // construction). SFX.jet borrowed for the ignition — no new audio.
 function fsIgnite(x,y,src){
-  (S.fires||(S.fires=[])).push({x:x,y:y,r:FS_R,t:0,life:FS_LIFE,acc:0,tk:0,src:src,side:src.side||null,foe:(!S.bf && !!src && S.foes.indexOf(src)>=0),hit:new Set()});   // 0406: foe = lit by an OUTLAW (the ladies' irons) — fsTick swaps the lanes; a Sarge's patch reads false and burns byte-what-it-was
+  (S.fires||(S.fires=[])).push({x:x,y:y,r:FS_R,t:0,life:FS_LIFE,acc:0,tk:0,src:src,side:(src&&src.side)||null,foe:(!S.bf && !!src && S.foes.indexOf(src)>=0),hit:new Set()});   // 0406: foe = lit by an OUTLAW (the ladies' irons) — fsTick swaps the lanes; a Sarge's patch reads false and burns byte-what-it-was. 0419: src may be NULL (the hard captain's ownerless patch) — null side, and the burn pays nobody
   SFX.jet();
   S.fx.push({k:'ring',x:x,y:y,r:6,R:FS_R,t:0,dur:0.35,col:'#FF7A2A'});
   S.fx.push({k:'flash',x:x,y:y,ang:-Math.PI/2,R:20,lw:3,t:0,dur:0.14});
@@ -44920,8 +44983,9 @@ function update(dt){
           const dkb=duckBlock(mzx,mzy,best.x,best.y-18);
           const htx=dkb?dkb.x:best.x, hty=dkb?dkb.y:best.y-18;
           const ang=Math.atan2(hty-mzy,htx-mzx);
-          // 0397 THE FLAMESTRIKE ROUND: charged (u.fsN — armed only by MY
-          // tap on MY Sarge) and actually LANDING (a duck-blocked round
+          // 0397 THE FLAMESTRIKE ROUND: charged (u.fsN — armed by MY tap
+          // on MY Sarge, or 0419 by the HARD captain's own brain on HIS)
+          // and actually LANDING (a duck-blocked round
           // stopped on the sandbags — nobody was hit, nothing burns, no
           // charge spent). The wild-eye miss continued out above; the
           // red-button round is snpFire's own theater — neither reaches here.
@@ -44959,7 +45023,7 @@ function update(dt){
           S.fx.push({k:'ring',x:htx,y:hty,r:4, R:32,t:0,dur:0.22,col:'#FFFFFF'});
           S.fx.push({k:'ring',x:htx,y:hty,r:10,R:54,t:0,dur:0.34,col:'#FFD24A'});
           if(dkb) duckBlockFx(dkb); else { hurt(best,sw.dmg*vm*cm+scoutX(sw,Math.hypot(best.x-u.x,best.y-u.y)),u);   // v3.27: the longshot plate — flat, after every multiplier
-            if(fsRd){ u.fsN--; fsIgnite(best.x,best.y,u); } }   // 0397: the ground catches fire at the victim's FEET where he stood when the round hit; the 4th round is plain lead
+            if(fsRd){ u.fsN--; fsIgnite(best.x,best.y, mine? u : null); } }   // 0397: the ground catches fire at the victim's FEET where he stood when the round hit; the 4th round is plain lead. 0419: the HARD CAPTAIN's patch is OWNERLESS (null src → null side → bfEnemies(null) answers EVERY figure, the jax neutrality law) — both sides burn, nobody is paid (no dog tag, no kills++, no AI purse: hurt/hitCheck's own src doors); MY patch keeps the standing credit door
         }
         continue;
       }
