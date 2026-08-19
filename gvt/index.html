@@ -1303,17 +1303,25 @@
   @keyframes ldbwig { 0%,85%,100%{transform:rotate(0deg)} 88%{transform:rotate(-7deg)} 91%{transform:rotate(7deg)} 94%{transform:rotate(-4deg)} 97%{transform:rotate(2deg)} }
   #raidBg .ldbg { animation:ldbglint 3.2s ease-in-out infinite; }
   @keyframes ldbglint { 0%,100%{opacity:0.15} 50%{opacity:0.5} }
-  #lairBoneHot { position:absolute; z-index:3; background:transparent; border:none; padding:0; cursor:pointer; }
-  #raidscene.dogown .ldb { animation:none; }
-  #raidscene.dogown .ldbg { display:none; }
+  #lairBoneHot, #lairBoneHot2 { position:absolute; z-index:3; background:transparent; border:none; padding:0; cursor:pointer; }
+  /* 0413 THE HOUND'S BONE: the RIGHT dais bone is a second door (.ldb2/.ldbg2
+     ride the same base rules above) — each owned flag sleeps ITS bone only, so
+     the dogown rows narrow to the left bone and the houndown rows mirror them;
+     the waves sit AFTER the kills at the same (1,3,0) (the 0278c order law). */
+  #raidscene.dogown .ldb:not(.ldb2) { animation:none; }
+  #raidscene.dogown .ldbg:not(.ldbg2) { display:none; }
   #raidscene.dogown #lairBoneHot { cursor:default; }
+  #raidscene.houndown .ldb.ldb2 { animation:none; }
+  #raidscene.houndown .ldbg2 { display:none; }
+  #raidscene.houndown #lairBoneHot2 { cursor:default; }
   #raidscene.dogown .ldb.ldbwave { animation:ldbwig1 0.7s ease-in-out; }
+  #raidscene.houndown .ldb2.ldbwave { animation:ldbwig1 0.7s ease-in-out; }
   @keyframes ldbwig1 { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(-7deg)} 55%{transform:rotate(7deg)} 80%{transform:rotate(-3deg)} }
   @media (prefers-reduced-motion: reduce){
     #raidBg .lkGlow, #raidBg .lFall, #raidBg .emb, #raidBg .bub,
     #raidBg .rxhead, #raidBg .lpour, #raidBg .snort,
     #raidBg .ldb, #raidBg .ldbg,
-    #raidscene.dogown .ldb.ldbwave { animation:none; }
+    #raidscene.dogown .ldb.ldbwave, #raidscene.houndown .ldb2.ldbwave { animation:none; }
     #raidBg .snort { opacity:0; }
   }
   #campBg { position:absolute; inset:0;
@@ -4249,6 +4257,18 @@
   .mbship .sh-dot { width:clamp(26px,5vh,32px); height:clamp(26px,5vh,32px); }
   .mbship .sh-drlab { color:#D8CFA8; font-size:clamp(10px,2.2vh,13px); letter-spacing:0.14em; margin-top:clamp(3px,0.8vh,7px); }
   .mbship .mb-line.mbship-note { margin:0.5em 0 0.35em; color:#C9BFA0; }
+  /* 0413 THE COATS — the wordless swatch row on the DOG UNLOCKED! card: four
+     round chips (a kid's thumb, the 0392 >=26px law), the current one ringed
+     gold; the window above IS the caption (ZERO l10n). The rays overhang the
+     win and would eat chip taps — the 0392 mbship rule, card-scoped (.mbdog). */
+  .mbdog .mb-rays { pointer-events:none; }
+  .mb-coats { display:flex; gap:12px; justify-content:center; margin:6px 0 2px; }
+  .mb-coat { width:34px; height:34px; border-radius:50%; border:2px solid #6b5a33; padding:0; cursor:pointer;
+    position:relative; box-shadow:0 2px 0 rgba(0,0,0,0.4); }
+  .mb-coat span { position:absolute; left:50%; top:50%; width:12px; height:12px; margin:-6px 0 0 -6px;
+    border-radius:50%; display:block; pointer-events:none; }
+  .mb-coat.on { border-color:#FFD24A; box-shadow:0 0 0 3px rgba(255,210,74,0.9), 0 2px 0 rgba(0,0,0,0.4); }
+  .mb-coat:active { transform:translateY(1px); }
   @keyframes mbpop { 0% { opacity:0; transform:scale(0.62); } 62% { opacity:1; transform:scale(1.05); }
     100% { opacity:1; transform:scale(1); } }
   @keyframes mbspin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
@@ -21287,7 +21307,10 @@ META.stripeSeen=Array.isArray(META.stripeSeen)? META.stripeSeen.slice() : [];
   META.dog={ day: typeof g9.day==='string'? g9.day : '',
     paid:(Array.isArray(g9.paid)? g9.paid : []).filter(r=>ROOM_ORDER.indexOf(r)>=0),
     done: typeof g9.done==='string'? g9.done : '',
-    own: g9.own?1:0 }; })();   // 0385 THE DOG'S BONE: ownership rides the rebuild or every boot wipes it (the v1.21 normaliser law); NOBODY is grandfathered
+    own: g9.own?1:0,   // 0385 THE DOG'S BONE: ownership rides the rebuild or every boot wipes it (the v1.21 normaliser law); NOBODY is grandfathered
+    own2: g9.own2?1:0,   // 0413 THE HOUND'S BONE: the second companion, same law (LOCAL like own — a reinstall re-earns at the bone)
+    coat:(function(c9){ c9=(c9&&typeof c9==='object')? c9:{}; const cl=v=>Math.max(0,Math.min(3,v|0));
+      return { gb:cl(c9.gb), hd:cl(c9.hd) }; })(g9.coat) }; })();   // 0413 THE COATS: picked at the unlock card, clamped 0..3
 // THE MOD BENCH (v1.22) — nothing to grandfather (no save has ever owned a part),
 // but `enh` is NESTED, so the Object.assign above hands an older profile the
 // DEFAULT object itself and every purchase would write straight into
@@ -29451,7 +29474,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.70';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.71';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -53416,9 +53439,10 @@ const DOG_LANE_Y=583;              // feet lane — surveyed clear of every floo
 const DOG_SNIFF_X=[295,720];       // ⚑ sniff stops — the ONLY two lanes-clear pockets (survey: the full hit box clears every door + the BATTLEFIELD/MEDALS pills on all five floors; 720 seats his centre clear of the western street's wcw3 cactus, nose right at it)
 const DOG_GATE=[668,438];          // the backyard bone gate seat (ROOM_SPOTS dinopark centre, feet at its base)
 let DOGT=null, DOG_LAST=0;         // the tour + the tick's wall-clock stamp
-const DOGRIG={ frozen:0 };         // battery rig — dt pinned to 0, stepped by GVT.dogStep
+let DOG_LEADF={ br:'', day:'' };   // 0413: the unlock-day latch — the freshly unlocked breed leads the REST of that day (page-lifetime, the DOGT law; a reload hands the chair back to the calendar)
+const DOGRIG={ frozen:0, lead:0 }; // battery rig — dt pinned to 0, stepped by GVT.dogStep; lead forces the alternate-days chair
 const DOGD={ el:null, x:null, y:null, pose:null, f:0, op:-1, seg:-1, zc:0 };   // DOM write cache
-function dogOwned(){ return !!(META.dog && META.dog.own); }   // 0385 THE DOG'S BONE: KING REX'S dais bone is his only door — unowned, the dog does not exist (no DOGT, no node, no tour, no pats)
+function dogOwned(){ return !!(META.dog && (META.dog.own || META.dog.own2)); }   // 0385/0413: a dais bone is the only door — EITHER dog owned arms the ONE machine; neither = no DOGT, no node, no tour, no pats
 function dogArm(){
   if(!dogOwned()){ DOGT=null; return; }
   const today=todayStr();
@@ -53508,15 +53532,77 @@ setInterval(dogTick, 100);
 // translate puts local (0,0) AT the pivot): .dgLegA/.dgLegB ×2 at the hips
 // (diagonal trot pairs), .dogHeadG at the neck, .dogEarG at the ear root,
 // .dogTng the pat tongue; the tail keeps .dogwagG. REV 2 forward-compat:
-// dogArtSVG(coat) takes {coat,shade,cream,ear,ink,collar,tag} — default
-// DOG_COAT_CLASSIC (the TG hexes); the bare call is byte-identical to it.
+// dogArtSVG(breed, coat): breed 'gb' THE GOOD BOY (default) | 'hd' THE HOUND
+// (0413 — candidates.html dogB verbatim: far legs on SHADE, the saddle + ear
+// on the EAR slot, thigh+shin hind legs); coat = {coat,shade,cream,ear,ink,
+// collar,tag}, default the breed's coat 0. 0412's one-arg coat-object call
+// keeps working ('gb' + that coat), so the bare call stays byte-identical to
+// dogArtSVG(DOG_COAT_CLASSIC). The 8 coats: ink/collar/tag/tongue FIXED (the
+// red collar is his TG identity); every hex a one-seat ⚑ dial.
 const DOG_COAT_CLASSIC={ coat:'#8a6544', shade:'#7A553A', cream:'#EFE0BC', ear:'#5b3a22', ink:'#23211E', collar:'#C0392B', tag:'#E8C878' };
-function dogArtSVG(c9){
-  const K=c9||DOG_COAT_CLASSIC;
+const DOG_COATS={
+  gb:[ DOG_COAT_CLASSIC,   // 0 CLASSIC (TG to the hex)
+       { coat:'#C08A3A', shade:'#9C6C28', cream:'#FFF6DC', ear:'#8F621E', ink:'#23211E', collar:'#C0392B', tag:'#E8C878' },     // 1 GOLDEN (deep field-gold — the socks must clear 2.5:1, measured)
+       { coat:'#2B2622', shade:'#1B1816', cream:'#C98A4A', ear:'#1B1816', ink:'#23211E', collar:'#C0392B', tag:'#E8C878' },     // 2 BLACK & TAN (the tan points ARE the cream slots; ear = shade keeps the head's silhouette)
+       { coat:'#7F8B95', shade:'#606B74', cream:'#EFE0BC', ear:'#4C565E', ink:'#23211E', collar:'#C0392B', tag:'#E8C878' } ],   // 3 BLUE (slate — same 2.5:1 law)
+  hd:[ { coat:'#B87333', shade:'#96551E', cream:'#EFE0BC', ear:'#2B2622', ink:'#23211E', collar:'#C0392B', tag:'#E8C878' },     // 0 TRICOLOUR (dogB's saddle + ear ride the EAR slot)
+       { coat:'#A9502A', shade:'#7E3A1C', cream:'#EFE0BC', ear:'#5B2A12', ink:'#23211E', collar:'#C0392B', tag:'#E8C878' },     // 1 REDBONE
+       { coat:'#5B6C7A', shade:'#3E4B56', cream:'#EFE0BC', ear:'#242C33', ink:'#23211E', collar:'#C0392B', tag:'#E8C878' },     // 2 BLUETICK
+       { coat:'#BD9A42', shade:'#9A7A2E', cream:'#FFFBEF', ear:'#8A6C24', ink:'#23211E', collar:'#C0392B', tag:'#E8C878' } ] }; // 3 LEMON (old-gold lemon — the pale original failed the 2.5:1 law by half)
+function dogCoat(br){ const c9=META.dog&&META.dog.coat; return DOG_COATS[br][(c9&&c9[br])|0]||DOG_COATS[br][0]; }   // 0413: the picked coat, 0 the default (the boot row clamps 0..3)
+function dogDayN(d9){ const m=/^(\d+)-(\d+)-(\d+)$/.exec(d9||''); return m? Math.round(Date.UTC(+m[1],+m[2]-1,+m[3])/86400000) : 0; }
+function dogLeadBreed(){
+  // 0413 ALTERNATE DAYS (the REV 2 pack fallback, taken on the MEASURED lane
+  // survey: the promo->tv gap is 114px and the pill->pill gap 131px on every
+  // floor while a 46px-spaced pack's boxes need 142px — no floor holds two
+  // dogs at a sniff stop, so the dogs trade DAYS instead): one dog owned = he
+  // tours; both owned = odd days are the hound's (⚑ dial), and the freshly
+  // unlocked breed takes the REST of its unlock day (DOG_LEADF).
+  const g9=META.dog||{};
+  if(!(g9.own&&g9.own2)) return (g9.own2&&!g9.own)? 'hd':'gb';
+  if(DOGRIG.lead) return DOGRIG.lead;
+  if(DOG_LEADF.br && DOG_LEADF.day===todayStr()) return DOG_LEADF.br;
+  return dogDayN(todayStr())%2? 'hd':'gb';
+}
+function dogArtSVG(b9,c9){
+  if(b9 && typeof b9==='object'){ c9=b9; b9='gb'; }   // 0412's one-arg coat call
+  const hd=b9==='hd';
+  const K=c9||DOG_COATS[hd?'hd':'gb'][0];
   const leg=(x,y,len,col,w,cls,sock)=>'<g transform="translate('+x+','+y+')"><g class="dgPin '+cls+'">'
     +'<path d="M0 0 L0 '+len+'" stroke="'+col+'" stroke-width="'+w+'" fill="none" stroke-linecap="round"/>'
     +(sock? '<circle cx="0" cy="'+len+'" r="'+(w*0.55)+'" fill="'+K.cream+'"/>' : '')
     +'</g></g>';
+  if(hd){
+    // THE HOUND (candidates dogB): longer and taller, the shade saddle and the
+    // long ear on the EAR slot, thigh+shin hind legs, a cream chin, tail up
+    const thigh=(x,y,cls,col)=>'<g transform="translate('+x+','+y+')"><g class="dgPin '+cls+'">'
+      +'<ellipse cx="0.4" cy="1.6" rx="3.1" ry="4.2" fill="'+col+'"/>'
+      +'<path d="M0.8 4 L1.4 8.8" stroke="'+col+'" stroke-width="3.2" fill="none" stroke-linecap="round"/></g></g>';
+    return '<g stroke-linecap="round">'
+      +'<g transform="translate(13,-2)"><g class="dogwagG dgPin"><path d="M0 0 Q3.2 -3.6 3.6 -9.4" stroke="'+K.coat+'" stroke-width="2.9" fill="none"/><circle cx="3.6" cy="-9.4" r="1.4" fill="'+K.cream+'"/></g></g>'
+      +leg(-3.6,7.4,8.6,K.shade,3.2,'dgLegB',false)
+      +thigh(11.2,7.2,'dgLegA',K.shade)
+      +'<circle cx="8.6" cy="3.2" r="6.1" fill="'+K.coat+'"/>'
+      +'<circle cx="-6.6" cy="2.6" r="6.4" fill="'+K.coat+'"/>'
+      +'<rect x="-6.6" y="-3.6" width="15.2" height="12.4" fill="'+K.coat+'"/>'
+      +'<path d="M-6.4 -3.4 Q1.5 -6.6 10.4 -2.6 Q11.6 1.6 8.4 2.6 Q1.2 -0.6 -6.2 0.8 Z" fill="'+K.ear+'"/>'
+      +leg(-8,7.4,8.6,K.coat,3.4,'dgLegA',false)
+      +thigh(7,7.6,'dgLegB',K.coat)
+      +'<ellipse cx="-9.6" cy="5.4" rx="2.9" ry="3.6" fill="'+K.cream+'" transform="rotate(14 -9.6 5.4)"/>'
+      +'<path d="M-15.6 -1.6 Q-10.6 2.6 -5 -1.2" stroke="'+K.collar+'" stroke-width="2.4" fill="none"/>'
+      +'<circle cx="-10.8" cy="2.6" r="1.35" fill="'+K.tag+'"/>'
+      +'<g transform="translate(-10.4,-3)"><g class="dogHeadG dgPin">'
+        +'<circle cx="-2.6" cy="-4.4" r="6.4" fill="'+K.coat+'"/>'
+        +'<rect x="-13.2" y="-4.6" width="10.6" height="5.6" rx="2.6" fill="'+K.coat+'"/>'
+        +'<rect x="-12.4" y="-1.2" width="7.4" height="2.8" rx="1.4" fill="'+K.cream+'"/>'
+        +'<circle cx="-12.4" cy="-3" r="1.65" fill="'+K.ink+'"/>'
+        +'<path class="dogTng" d="M-9.8 1 Q-8.8 4.4 -7.4 1.2 Z" fill="#E0656B"/>'
+        +'<circle cx="-4.4" cy="-6.4" r="1.55" fill="'+K.ink+'"/>'
+        +'<circle cx="-4.9" cy="-6.9" r="0.55" fill="#FFFFFF"/>'
+        +'<g transform="translate(1.6,-9.6)"><g class="dogEarG dgPin"><path d="M0 0 Q5 0.6 3.8 8 Q3 12.8 0 12.2 Q-2.6 11.6 0 0 Z" fill="'+K.ear+'"/></g></g>'
+      +'</g></g>'
+      +'</g>';
+  }
   return '<g stroke-linecap="round">'
     +'<g transform="translate(11.5,-1)"><g class="dogwagG dgPin"><path d="M0 0 Q4.2 -1 4.6 -6 Q4.8 -8.6 2.6 -8.6" stroke="'+K.coat+'" stroke-width="3.2" fill="none"/><circle cx="2.6" cy="-8.6" r="1.7" fill="'+K.cream+'"/></g></g>'
     +leg(-2.5,7,8.5,K.shade,3.4,'dgLegB',true)
@@ -53548,6 +53634,7 @@ function dogNodeSVG(){
   const q=dogPos(), f=dogFlipNow(q);
   const op=q.s.k==='fade'? Math.max(0,1-q.k) : 1;
   const pose=dogPoseNow(q);
+  const br=dogLeadBreed();   // 0413: whose day it is (own-only = the good boy; own2-only = the hound; both = alternate days)
   return '<g id="ro-gooddog">'
     +'<g id="dogWalk" style="transform:translate('+q.x.toFixed(1)+'px,'+(q.y-38).toFixed(1)+'px)">'
     +'<g id="dogFade" style="opacity:'+op.toFixed(3)+'">'
@@ -53555,7 +53642,7 @@ function dogNodeSVG(){
     +'<g id="dogPat" class="dgPin">'
     +'<g id="dogFlip"'+(f>0? ' transform="scale(-1,1)"':'')+'>'
     +'<g id="dogPose" class="dgPin'+(pose? ' '+pose:'')+'">'
-    +'<g transform="translate(0,6) scale(2)">'+dogArtSVG()+'</g>'
+    +'<g transform="translate(0,6) scale(2)">'+dogArtSVG(br,dogCoat(br))+'</g>'
     +'</g></g></g></g></g></g>';
 }
 function dogZSeat(fresh){
@@ -57391,10 +57478,11 @@ function renderRaidScene(){
   // owns the room (the portrait+scene doubling law) and the chips stand
   // CENTERED directly over DEPLOY (the wt-mid default, the graded chrome).
   document.getElementById('raidBg').innerHTML='<svg class="rhero" viewBox="0 0 1600 650" preserveAspectRatio="xMidYMid slice">'+(RAID_CUR==='bone'? lairSVG() : RAID_CUR==='croak'? hideoutSVG() : iceHallSVG())+'</svg>'
-    +(RAID_CUR==='bone'? '<button type="button" id="lairBoneHot" onclick="UI.lairBone()"></button>' : '');   // 0385 THE DOG'S BONE: the z:3 tap box over the LEFT dais bone (the wstarHot grammar — svg-side pads are unreachable under wt-mid, the 0359 law)
+    +(RAID_CUR==='bone'? '<button type="button" id="lairBoneHot" onclick="UI.lairBone()"></button><button type="button" id="lairBoneHot2" onclick="UI.lairBone(2)"></button>' : '');   // 0385/0413: the z:3 tap boxes over the dais bones (the wstarHot grammar — svg-side pads are unreachable under wt-mid, the 0359 law); LEFT = the good dog's, RIGHT = the hound's
   document.getElementById('raidscene').classList.toggle('icehall', RAID_CUR==='ice');
   document.getElementById('raidscene').classList.toggle('lair', RAID_CUR==='bone');
   document.getElementById('raidscene').classList.toggle('dogown', !!(META.dog&&META.dog.own));   // 0385: owned = the dais bone is just a bone (the tell sleeps; the memoed markup never changes)
+  document.getElementById('raidscene').classList.toggle('houndown', !!(META.dog&&META.dog.own2));   // 0413: the RIGHT bone's own flag, the same law
   if(RAID_CUR==='bone') lairBoneLayout();   // 0385: seat the tap box under the fresh innerHTML (every render re-mints it)
   document.getElementById('raidscene').classList.toggle('hideout', RAID_CUR==='croak');
   if(grp) renderPartySheet();   // 0387: the hideout's glass sheet rides every repaint
@@ -57404,12 +57492,15 @@ function renderRaidScene(){
 // box is the bone's art (1108,436 ± ~25x14) padded to a kid's thumb: 88x76
 // scene units = ~51x44px at the 812x375 phone posture, ~108x94 at desktop.
 function lairBoneLayout(){
-  const bg=document.getElementById('raidBg'), el=document.getElementById('lairBoneHot');
-  if(!bg || !el) return;
+  const bg=document.getElementById('raidBg');
+  if(!bg) return;
   const r=bg.getBoundingClientRect(); if(!r.width || !r.height) return;
   const s2=Math.max(r.width/1600, r.height/650), ox=(1600-r.width/s2)/2, oy=(650-r.height/s2)/2;
-  el.style.left=((1064-ox)*s2)+'px'; el.style.top=((398-oy)*s2)+'px';
-  el.style.width=(88*s2)+'px'; el.style.height=(76*s2)+'px';
+  const seat=(id,bx,by)=>{ const el=document.getElementById(id); if(!el) return;
+    el.style.left=((bx-ox)*s2)+'px'; el.style.top=((by-oy)*s2)+'px';
+    el.style.width=(88*s2)+'px'; el.style.height=(76*s2)+'px'; };
+  seat('lairBoneHot',1064,398);
+  seat('lairBoneHot2',1182,402);   // 0413: the RIGHT bone (1226,440 rot 14 sc 0.75, art ±24x±13) padded to the same kid's-thumb box
 }
 window.addEventListener('resize', function(){ if(raidSceneOpen() && RAID_CUR==='bone') lairBoneLayout(); });
 function openRaidScene(id){
@@ -59343,7 +59434,7 @@ function lairSVG(){
     // (the wstarHot grammar) — svg-side pads are UNREACHABLE under the wt chrome
     // (the 0359 law). The markup is STATE-FREE (PARK_HERO.lair memo) — owned
     // looks ride #raidscene.dogown.
-    +(dog? '<ellipse class="ldbg" cx="0" cy="8" rx="36" ry="10" fill="#ffd24a" opacity="0.4"/><g id="lairDogBone" class="ldb">' : '')
+    +(dog? '<ellipse class="ldbg'+(dog===2?' ldbg2':'')+'" cx="0" cy="8" rx="36" ry="10" fill="#ffd24a" opacity="0.4"/><g id="'+(dog===2?'lairHoundBone':'lairDogBone')+'" class="ldb'+(dog===2?' ldb2':'')+'">' : '')
     +'<rect x="-22" y="-4" width="44" height="8" rx="4" fill="#e8cfa4" stroke="#96551E" stroke-width="2"/>'
     +'<circle cx="-24" cy="-5" r="6" fill="#e8cfa4" stroke="#96551E" stroke-width="2"/><circle cx="-24" cy="5" r="6" fill="#e8cfa4" stroke="#96551E" stroke-width="2"/>'
     +'<circle cx="24" cy="-5" r="6" fill="#e8cfa4" stroke="#96551E" stroke-width="2"/><circle cx="24" cy="5" r="6" fill="#e8cfa4" stroke="#96551E" stroke-width="2"/>'
@@ -59416,7 +59507,7 @@ function lairSVG(){
     +'<path d="M1084 414 L1130 402 Q1200 392 1252 408" fill="none" stroke="#ff9a3d" stroke-width="3.5" opacity="0.55"/>'
     +'<ellipse cx="1168" cy="416" rx="86" ry="9" fill="#ff8a3a" opacity="0.18"/>'
     // his bone dais
-    +bone(1108,436,-12,0.8,1)+bone(1226,440,14,0.75)   // 0385: the LEFT dais bone is THE DOG'S BONE (⚑ the bigger, more central one) — tap = UI.lairBone()
+    +bone(1108,436,-12,0.8,1)+bone(1226,440,14,0.75,2)   // 0385/0413: the LEFT dais bone is THE GOOD DOG'S, the RIGHT is THE HOUND'S — taps = UI.lairBone(1|2)
     +'<g transform="translate(1246,414)"><path d="M0 14 Q-2 0 12 -3 Q26 -5 30 6 Q32 12 27 14 z" fill="#e8cfa4" stroke="#96551E" stroke-width="2"/><ellipse cx="10" cy="6" rx="4" ry="5" fill="#2c1208"/><ellipse cx="21" cy="5" rx="3.6" ry="4.6" fill="#2c1208"/></g>'
     // KING REX in his lair — valley-dark mold, crown + amber eye, prowling
     +'<g transform="translate('+(1148-70*1.6)+' '+(416-130*1.6)+') scale(1.6) rotate(-5 70 110)">'+PK_REX
@@ -63334,27 +63425,43 @@ window.UI = {
   // card). `done` clears so the unlock day tours TODAY even if a v4.34 free
   // lap already burned it — but `paid` STANDS: no double stars today.
   // Client-only, zero wire — `own` is LOCAL like bronzeKey/boneRite.
-  lairBone(){ audio();
-    const el=document.getElementById('lairDogBone');
-    if(META.dog && META.dog.own){
+  lairBone(w9){ audio();
+    const hd9=w9===2;   // 0413: one function, a which arg — the shipped no-arg call = the LEFT bone
+    const el=document.getElementById(hd9?'lairHoundBone':'lairDogBone');
+    if(META.dog && META.dog[hd9?'own2':'own']){
       SFX.yip();
       if(el){ el.classList.remove('ldbwave'); void el.getBoundingClientRect(); el.classList.add('ldbwave'); }
       return;
     }
-    META.dog.own=1; META.dog.done=''; saveMeta();   // flag FIRST (the comet law); DOGT re-arms behind the DOG_BOOT_S beat when his clock next runs
-    DOGT=null;
-    const rs=document.getElementById('raidscene'); if(rs) rs.classList.add('dogown');
+    META.dog[hd9?'own2':'own']=1; META.dog.done=''; saveMeta();   // flag FIRST (the comet law); DOGT re-arms behind the DOG_BOOT_S beat when his clock next runs
+    DOGT=null; DOG_LEADF={ br:hd9?'hd':'gb', day:todayStr() };   // the unlock day tours THE NEW DOG (the page-lifetime latch)
+    const rs=document.getElementById('raidscene'); if(rs) rs.classList.add(hd9?'houndown':'dogown');
+    const br=hd9?'hd':'gb', ci=(META.dog.coat&&META.dog.coat[br])|0;
+    let ch=''; for(let i=0;i<4;i++){ const K=DOG_COATS[br][i];   // 0413 THE COATS: a wordless row of four swatches — the window IS the caption (ZERO l10n)
+      ch+='<button type="button" class="mb-coat'+(i===ci?' on':'')+'" data-ci="'+i+'" onclick="UI.dogCoat(\''+br+'\','+i+')" style="background:linear-gradient(135deg,'+K.coat+' 0 55%,'+K.cream+' 55% 100%)"><span style="background:'+K.ear+'"></span></button>'; }
     const p=document.getElementById('milePop');
-    if(p){ p.innerHTML='<div class="mb-card">'
+    if(p){ p.innerHTML='<div class="mb-card mbdog">'
       +'<span class="mb-band">KING REX\'S LAIR</span>'
       +'<h2 class="mb-h">DOG UNLOCKED!</h2>'
-      +'<span class="mb-win">'+MB_RAYS+'<svg viewBox="0 0 120 120"><g transform="translate(62,54) scale(2.6)"><g class="dgPin dogtrotB">'+dogArtSVG()+'</g></g></svg></span>'
+      +'<span class="mb-win">'+MB_RAYS+'<svg viewBox="0 0 120 120"><g transform="'+(hd9?'translate(68,57) scale(2.4)':'translate(62,54) scale(2.6)')+'"><g class="dgPin dogtrotB">'+dogArtSVG(br,DOG_COATS[br][ci])+'</g></g></svg></span>'
+      +'<div class="mb-coats">'+ch+'</div>'
       +'<span class="mb-line">He wanders around!</span>'
       +'<button type="button" class="mb-take" onclick="UI.mileTake()">HE\'S MINE!</button>'
       +'</div>';
       p.classList.remove('hidden'); }
     SFX.fanfare();
     setTimeout(()=>SFX.yip(),200); setTimeout(()=>SFX.yip(),380);   // the happy double yip rides the fanfare's tail
+  },
+  dogCoat(br9,i9){ SFX.blip();   // 0413: the swatch tap — the pick writes IMMEDIATELY (the comet law; HE'S MINE! commits nothing more) and the window dog redraws in place (the trot bob keeps its phase)
+    const br=br9==='hd'?'hd':'gb', i=Math.max(0,Math.min(3,i9|0));
+    if(!META.dog.coat) META.dog.coat={ gb:0, hd:0 };
+    META.dog.coat[br]=i; saveMeta();
+    const p=document.getElementById('milePop');
+    if(p){ for(const b9 of p.querySelectorAll('.mb-coat')) b9.classList.toggle('on', +b9.getAttribute('data-ci')===i);
+      const g9=p.querySelector('.mb-win svg:not(.mb-rays) > g > g');
+      if(g9) g9.innerHTML=dogArtSVG(br,DOG_COATS[br][i]); }
+    const el=document.getElementById('ro-gooddog');   // a mid-tour re-dye reaches the floor too (fresh mint; dogZSeat resumes the phase)
+    if(el){ el.remove(); if(S.mode==='menu') dogPaint(); }
   },
   iceRiteGo(){
     if(!META.silverKey || META.iceRite) return;
@@ -64568,15 +64675,20 @@ window.GVT = {
       pos:q? { x:Math.round(q.x), y:Math.round(q.y), k:q.s.k, i:q.i }:null,
       visible:dogVisible(), tappable:dogTappable(),
       day:META.dog&&META.dog.day, paid:(META.dog&&META.dog.paid||[]).slice(), done:META.dog&&META.dog.done,
-      own:dogOwned()?1:0 }; },
+      own:META.dog&&META.dog.own?1:0, own2:META.dog&&META.dog.own2?1:0,   // 0413: precise per-bone flags
+      coat:{ gb:(META.dog&&META.dog.coat&&META.dog.coat.gb)|0, hd:(META.dog&&META.dog.coat&&META.dog.coat.hd)|0 },
+      lead:dogLeadBreed() }; },
   dogFreeze(on){ DOGRIG.frozen=on?1:0; DOG_LAST=0; return DOGRIG.frozen; },
   dogStep(s){ if(!DOGT) dogArm(); let r=Math.max(0,+s||0);
     while(r>0){ const d=Math.min(0.1,r); dogAdvance(d); r-=d; }
     if(S.mode==='menu') dogPaint(); return GVT.dog(); },
   dogRearm(){ DOGT=null; dogAdvance(0); if(S.mode==='menu') dogPaint(); return GVT.dog(); },
-  dogOwn(v){ META.dog.own=v?1:0; saveMeta(); DOGT=null;   // 0385: the rigs seed ownership here — the shipped 0376 frames are the OWNED world
-    const rs=document.getElementById('raidscene'); if(rs) rs.classList.toggle('dogown', !!META.dog.own);
+  dogOwn(v,w9){ META.dog[w9===2?'own2':'own']=v?1:0; saveMeta(); DOGT=null;   // 0385/0413: the rigs seed ownership here — which 2 = the hound's flag; the shipped 0376 frames are the OWNED world
+    const rs=document.getElementById('raidscene'); if(rs){ rs.classList.toggle('dogown', !!META.dog.own); rs.classList.toggle('houndown', !!META.dog.own2); }
     dogAdvance(0); if(S.mode==='menu') dogPaint(); return GVT.dog(); },
+  dogLead(v){ DOGRIG.lead=(v==='gb'||v==='hd')? v:0;   // 0413 rig: force the alternate-days chair (0 = the calendar's); re-mints the node
+    const el=document.getElementById('ro-gooddog'); if(el) el.remove();
+    if(S.mode==='menu') dogPaint(); return GVT.dog(); },
   // ---- ADS V1a rig (v2.60): gates + dials, deterministic for batteries ----
   ads(){ return { steam:STEAM_SHELL, bridge:ADS_BRIDGE, provider:ADS.provider, track:(META.adTrack||null), mi:MAXA.int, mr:MAXA.rew, msess:MAXA.sess, mgap:AD_MIN_GAP_MIN, mcap:AD_SESS_CAP, mwd:AD_WD_MS, mlog:MAXA.log.slice(), sess:Object.assign({},ADQ), free:AD_FREE_GAMES, camp:AD_CAMP_EVERY, bf:AD_BF_EVERY,
     squad:AD_SQUAD_EVERY,   // v2.82: the post-game squad cadence dial
