@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v10.3 -->
+<!-- TRAINSET v10.4 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -72,7 +72,7 @@
      doubled globe pushes the column down — same 4px tuck under the zooms) ---- */
   #rideChip{ top:calc(222px + env(safe-area-inset-top)); right:calc(12px + env(safe-area-inset-right)); display:none; }
   #rideChip.on{ border-color:#F2C531; color:#F2C531; }
-  .pbtn.on{ border-color:#F2C531; color:#F2C531; }   /* E10: the picked SIZE / LAND / WEATHER tile */
+  .pbtn.on{ border-color:#F2C531; color:#F2C531; }   /* E10→E83: the picked LAND / WEATHER tile */
   /* ---- the bedroom menu (E3): DOM chrome floats over the painted room ---- */
   #menu{
     position:absolute; inset:0; z-index:6; display:none; flex-direction:column;
@@ -309,6 +309,23 @@
                       50%{ box-shadow:0 0 calc(var(--ui)*9px) calc(var(--ui)*2px) rgba(242,197,49,0.75); } }
   /* ---- E13's bank panel — SINCE E53 IT IS THE PIGGY'S (★ MY STARS): the bank
      died as a doorway; her tap opens the count + ledger. The ids kept the bones. ---- */
+  /* ---- E83: THE ✨ NEW RUG — the after-sweep offer + the postcard picker ---- */
+  #nrgCard{ position:absolute; left:50%; bottom:calc(var(--ui)*96px); transform:translateX(-50%);
+    z-index:9; display:none; background:linear-gradient(#8f6b3f,#6e5130); color:#F7E9C4;
+    border:3px solid #513a24; border-radius:14px; font:bold calc(var(--ui)*15px)/1 'Arial Black',Impact,sans-serif;
+    letter-spacing:1px; padding:calc(var(--ui)*10px) calc(var(--ui)*16px);
+    box-shadow:0 8px 22px rgba(0,0,0,0.45); cursor:pointer; touch-action:manipulation; }
+  #nrg{ position:absolute; inset:0; z-index:12; display:none; align-items:center; justify-content:center;
+    padding:10px; background:rgba(10,6,3,0.45); }
+  #nrgPanel{ position:relative; text-align:center;
+    background:linear-gradient(#20304c,#131f36); border:3px solid #8f6b3f; border-radius:20px;
+    padding:calc(var(--ui)*12px) calc(var(--ui)*14px) calc(var(--ui)*6px);
+    box-shadow:0 14px 44px rgba(0,0,0,0.55); max-height:96vh; max-width:96vw; overflow-y:auto; }
+  #nrgCards{ display:grid; grid-template-columns:repeat(5,auto); gap:10px; justify-content:center; }
+  #nrgCards button{ background:none; border:0; padding:0; cursor:pointer; }
+  #nrgCards canvas{ display:block; width:min(calc(var(--ui)*74px),17vw); height:auto; aspect-ratio:208/192; }
+  @media (max-width:700px){ #nrgCards{ grid-template-columns:repeat(3,auto); }
+    #nrgCards canvas{ width:min(calc(var(--ui)*74px),26vw); } }   /* E83: the #wcards 3-across law for narrow glass */
   #bank{ position:absolute; inset:0; z-index:12; display:none; align-items:center; justify-content:center;
     padding:10px; background:rgba(10,6,3,0.45); }
   #bkpanel{ position:relative; text-align:center; max-width:min(96vw,calc(var(--ui)*400px));
@@ -975,6 +992,8 @@
 </div></div>
 <button id="nextBtn" class="mbtn" type="button">NEXT LEVEL ▶</button>
 <div id="toast"></div>
+<button id="nrgCard" type="button">✨ NEW RUG</button>
+<div id="nrg"><div id="nrgPanel"><div id="nrgCards"></div></div></div>
 <div id="bin"><canvas id="binCv" width="196" height="164"></canvas></div>
 <script>
 'use strict';
@@ -992,8 +1011,14 @@
 // campaign and PLAY force the ACTIVE board back to sm — size lives in the
 // free-build world only.
 const C=96, GX=72, GY=72;
-const SIZES={ sm:{gw:12,gh:8}, lg:{gw:18,gh:12}, xl:{gw:26,gh:18} };   // lg/xl dims — Wyatt dials
-let SIZE='sm';                                   // the BUILD rug's size (save v:8)
+const SIZES={ sm:{gw:12,gh:8}, lg:{gw:18,gh:12}, xl:{gw:26,gh:18} };   // the campaign's vocabulary (L.size) + the v≤11 migration table
+// E83 THE ENDLESS RUG — the size picker is DEAD (shrink doesn't exist); the
+// BUILD rug carries explicit dims (save v:12) and GROWS under the hand: a lay
+// within GROW_NEAR cells of an edge quietly adds GROW_BAND cells on that side,
+// up to RUG_CAP — at the cap a side just stops growing, the lay always lands.
+let RUG={w:SIZES.sm.gw,h:SIZES.sm.gh};           // the BUILD rug's dims (save v:12; grow-only from the save's own size)
+const RUG_CAP={w:64,h:44};                       // the soft cap — ONE dial (≈8× the retired XL; kid-scale infinite)
+const GROW_NEAR=2, GROW_BAND=2;                  // trigger ring / band width (dials)
 let GW=SIZES.sm.gw, GH=SIZES.sm.gh;              // the ACTIVE board dims
 let GX0=0, GY0=0;                                // the board's LOWER cell bound — always 0 except
                                                  // inside E18's bedroom wrapper (the attract floor
@@ -1002,8 +1027,12 @@ let GX0=0, GY0=0;                                // the board's LOWER cell bound
 let WORLD_W=GW*C+2*GX, WORLD_H=GH*C+2*GY;        // 1296 × 912 at sm
 const MENU_W=12*C+2*GX, MENU_H=8*C+2*GY;         // the bedroom is a PAINTING — it never grows
 function applyDims(id){                          // swap the active board; the camera refits next resize
-  const s=SIZES[id]||SIZES.sm;
+  const s=SIZES[id]||SIZES.sm;                   // (campaign/PLAY only since E83 — BUILD restores via applyRug)
   GW=s.gw; GH=s.gh; WORLD_W=GW*C+2*GX; WORLD_H=GH*C+2*GY;
+  VIEW.s=0;
+}
+function applyRug(){                             // E83: the BUILD rug at its own saved dims
+  GW=RUG.w; GH=RUG.h; WORLD_W=GW*C+2*GX; WORLD_H=GH*C+2*GY;
   VIEW.s=0;
 }
 // ---- Wyatt dials (EXPANSION 10 — one const each) ----
@@ -1343,7 +1372,8 @@ const PRETTY_POOL=['SO PRETTY!','BEAUTIFUL!','WHAT A LOVELY LINE!','YOU MADE IT 
 // no GO button exists. Stopping = picking the engine up. The rig still
 // choreographs place-then-go itself (TS.placeTrain never auto-goes).
 let AUTO_GO='all';            // 'all' = every human drop rolls · 'camp' · 'off' (a let: flip it live)
-const STARTER_LINE=true;      // a fresh save's rug arrives with the little oval already built
+const STARTER_LINE=true;      // a fresh save's rug arrives with the little oval already built (pre-E83 flip)
+const SHOWPIECE_SEED=true;    // E83: a fresh save's rug arrives as THE SHOWPIECE instead (false = the oval above)
 const SHELF_ORDER=['train','cars','engines'];   // shelf layout, left to right
 // ---- Wyatt dials (EXPANSION 18 — one block) ----
 // THE BEDROOM SET & THE SHY UI: touch the attract rug and the chrome fades away;
@@ -1536,6 +1566,9 @@ const PLAY_POOL=['box','tank','flat','cab'];  // tray spawns tow 1-2 random cars
 // toy, three moods — and the cycle survives the app closing (save v:10 carries
 // playIdx, the ONLY thing PLAY remembers; the E6 stateless law holds for all else).
 const PLAY_CYCLE=9;             // maps in rotation (the PLAYMAPS length — E43 added the canyon)
+const PLAY_MODE=false;          // E83: PLAY-the-mode RETIRED — the nine worlds live on as ✨ NEW RUG
+                                // starter rugs stamped fully editable; true = the wind-up wall
+                                // postcards return (the rm-able flip; the machinery below stays whole)
 const FRONTIER_WEATHER='clear'; // map 2 weather ('dust' if it reads well — taste call, default clear)
 // ---- Wyatt dials (EXPANSION 30 — one block) ----
 // THE MOUNTAIN PASS: E4 elevation + E15 gravity, dormant on flat maps since they
@@ -2048,6 +2081,40 @@ const PLAYMAPS=[
   ],
 },
 ];
+// E83 — THE SHOWPIECE: the really cool one a fresh save wakes up to, and the
+// ✨ NEW RUG picker's first postcard. The PLAYROOM's PROVEN figure-8 through
+// the crossing (shifted +2,+1 onto a 16×10 rug — never hand-invent a new loop
+// when a battle-tested one exists) with its bridge over the river, station,
+// trees and the pocket farm — plus a TOWN STREET along the south edge and
+// dressed edge bands. Stamped UNGLUED: every piece normal, grabbable,
+// removable (the E58 machinery means glue is simply never set).
+const SHOWPIECE={ name:'THE SHOWPIECE', w:16, h:10, land:'rug', weather:'clear',
+  start:[5,7],                       // the resident's home straight (left ring, bottom run)
+  track:[                            // the PLAYROOM rows, +2,+1 — crossing shared, trains MEET there
+    ['x',0,7,5],
+    // the right ring: E port → row 5 east → up col 12 → row 3 west → down into the N port
+    ['s',0,8,5],['br',0,9,5],['s',0,10,5],['s',0,11,5],['c',3,12,5],['s',1,12,4],['c',2,12,3],
+    ['s',0,11,3],['s',0,10,3],['s',0,9,3],['s',0,8,3],['c',1,7,3],['s',1,7,4],
+    // the left ring: S port → down col 7 → row 7 west → up col 3 → row 3 east → into the W port
+    ['s',1,7,6],['c',3,7,7],['s',0,6,7],['s',0,5,7],['s',0,4,7],['c',0,3,7],
+    ['s',1,3,6],['s',1,3,5],['s',1,3,4],['c',1,3,3],['st',0,4,3],['s',0,5,3],['c',2,6,3],
+    ['s',1,6,4],['c',0,6,5],
+  ],
+  scen:[
+    ['rv',9,5],['rv',9,6],['rv',9,7],['rv',9,8],          // the river under the bridge
+    ['ppl',4,4,1],['ppl',5,4,0],                          // people by the station
+    ['tree',2,2],['tree',13,2],['tree',8,4],['tree',4,5], // trees in the pockets
+    ['bush',2,6],['bush',12,2],['bush',11,4],['bush',5,6],
+    ['barn',11,6],['cow',12,7,0],['sheep',10,7,0],        // the pocket farm
+    ['tree',5,1],['tree',10,1],['tree',2,4],['tree',13,5],['tree',8,6],['tree',4,8],
+    ['bush',7,8],['bush',8,8],['bush',8,7],               // a bush cluster by the river mouth
+    ['ppl',10,2,2],['ppl',13,6,1],                        // tiny people out watching
+    // THE TOWN STREET — the south edge earns its band
+    ['fence',3,9],['house',4,9],['ppl',5,9,0],['shop',6,9],['dog',7,9,0],['hall',8,9],['ppl',9,9,2],['fence',10,9],
+    // the edge bands, dressed not padded
+    ['tree',0,2],['bush',0,7],['tree',1,8],['bush',2,0],['bush',12,0],['tree',14,1],['tree',14,6],['bush',13,8],
+  ],
+};
 const playMap=()=>PLAYMAPS[PLAY.mapIdx]||PLAYMAPS[0];   // the ACTIVE map (set at entry)
 // E31 — THE SOFT RAIN GATE: true only on a PLAY map that declares soft:1 (the
 // jungle). Everywhere else every weather expression computes byte-identically.
@@ -2586,25 +2653,50 @@ function followTick(dt){                         // THE CHAIN — presentation o
   VIEW.vx=VIEW.vy=0;
   clampView(); viewApply();                      // the camera never leaves the rug
 }
-// E10 — GROWING KEEPS EVERYTHING (new cells arrive empty, anchored top-left,
-// nothing moves); SHRINKING NEVER DELETES A CHILD'S WORK: if any piece,
-// scenery item or the train sits outside the smaller rug, refuse with the
-// friendly toast and stay put. Clearing first is the child's choice, never ours.
-function worldFits(gw,gh){
-  const bad=k2=>{ const i=k2.indexOf(','); return +k2.slice(0,i)>=gw || +k2.slice(i+1)>=gh; };
-  for(const k2 of grid.keys()) if(bad(k2)) return false;
-  for(const k2 of hgrid.keys()) if(bad(k2)) return false;
-  for(const k2 of scen.keys()) if(bad(k2)) return false;
-  if(TRAIN.placed) for(const c2 of TRAIN.cars) if(c2.rd.cx>=gw||c2.rd.cy>=gh) return false;
-  return true;
+// E83 THE ENDLESS RUG — growth is the only size verb left (E10's worldFits/
+// sizeSet retired with the picker: shrink doesn't exist). A left/top band
+// SHIFTS every world thing by the band and the camera compensates the same
+// frame — the screen never moves, the far edge does. Right/bottom bands only
+// stretch the world. Content-relative everything is preserved by construction.
+function shiftWorld(dx,dy){
+  const px=dx*C, py=dy*C;
+  const rekey=m=>{ const n=new Map();
+    for(const [k2,v] of m){ const i=k2.indexOf(','); n.set((+k2.slice(0,i)+dx)+','+(+k2.slice(i+1)+dy),v); }
+    m.clear(); for(const [k2,v] of n) m.set(k2,v); };   // pc/s object IDENTITY kept — latches, sel, lit ride along
+  rekey(grid); rekey(hgrid); rekey(scen);
+  const skey=k2=>{ if(!k2) return k2;                   // "x,y" or "x,y:tail" — stKey / startSig / platform keys
+    const i=k2.indexOf(','), j=k2.indexOf(':');
+    const x=+k2.slice(0,i), y=+(j<0? k2.slice(i+1) : k2.slice(i+1,j));
+    return (x+dx)+','+(y+dy)+(j<0?'':k2.slice(j)); };
+  for(const c2 of TRAIN.cars){ c2.rd.cx+=dx; c2.rd.cy+=dy; }   // s/pi/dir untouched — the arc math is exact
+  TRAIN.stKey=skey(TRAIN.stKey); TRAIN.startSig=skey(TRAIN.startSig);   // the LAP survives growth
+  { const n=new Map(); for(const [k2,v] of PLAT) n.set(skey(k2),v); PLAT.clear(); for(const [k2,v] of n) PLAT.set(k2,v); }
+  FRIEND.at=skey(FRIEND.at);
+  if(EAGER.last){ EAGER.last.x+=dx; EAGER.last.y+=dy; }
+  for(const p of smoke){ p.x+=px; p.y+=py; }
+  for(const p of fx){ p.x+=px; p.y+=py; }
+  for(let i2=0;i2<TRAIL_PTS;i2++){ TRAIL.x[i2]+=px; TRAIL.y[i2]+=py; }
+  for(const s2 of TRAIL.sparks){ s2.x+=px; s2.y+=py; }
+  PIG.puffs.length=0;                                   // her garnish is seat-anchored art — clear, never strand
+  VIEW.ox-=px*VIEW.s; VIEW.oy-=py*VIEW.s;               // screen = world·s + o — the compensation
+  if(RIDE.prior){ RIDE.prior.ox-=px*RIDE.prior.s; RIDE.prior.oy-=py*RIDE.prior.s; }
 }
-function sizeSet(id){
-  if(!SIZES[id]||CAMP.on||PLAY.on) return false; // campaign + PLAY are sm, always
-  if(id===SIZE){ rugSync(); return true; }
-  const s=SIZES[id];
-  if((s.gw<GW||s.gh<GH)&&!worldFits(s.gw,s.gh)){ SND.toot(); toast('TOO BIG FOR THAT RUG!'); return false; }
-  SIZE=id; applyDims(id); resize(); SND.tok(); rugSync(); save();
-  return true;
+// The one growth seam — called at each placement-commit site BEFORE the piece
+// lands, so everything downstream (EAGER.last, the save, the arrival) derives
+// in FINAL coordinates. Returns the (possibly shifted) target cell. Quiet by
+// law: no toast, no sound, no camera jump. Rig places bypass deliberately.
+function rugGrowFor(cx2,cy2){
+  if(SCREEN!=='game'||CAMP.on||PLAY.on||BED.ctx) return [cx2,cy2];
+  let L2=cx2<GROW_NEAR?GROW_BAND:0, R2=cx2>=GW-GROW_NEAR?GROW_BAND:0;   // GW≥12 keeps the pairs disjoint
+  let T2=cy2<GROW_NEAR?GROW_BAND:0, B2=cy2>=GH-GROW_NEAR?GROW_BAND:0;
+  const wr=Math.max(0,RUG_CAP.w-RUG.w), hr=Math.max(0,RUG_CAP.h-RUG.h);
+  L2=Math.min(L2,wr); R2=Math.min(R2,wr); T2=Math.min(T2,hr); B2=Math.min(B2,hr);   // at the cap: just stops
+  if(!(L2||R2||T2||B2)) return [cx2,cy2];
+  RUG.w+=L2+R2; RUG.h+=T2+B2;
+  GW=RUG.w; GH=RUG.h; WORLD_W=GW*C+2*GX; WORLD_H=GH*C+2*GY;   // never applyRug — that refits the camera
+  if(L2||T2) shiftWorld(L2,T2);
+  clampView(); viewApply();                              // only ever loosens
+  return [cx2+L2,cy2+T2];
 }
 
 // ---- state ----
@@ -9444,7 +9536,7 @@ function buildWall(){
     bk.appendChild(btn); WALL.books.push([b,cv]);
   }
   const wc=$('wcards');
-  for(let i=0;i<PLAY_CYCLE;i++){
+  if(PLAY_MODE) for(let i=0;i<PLAY_CYCLE;i++){   // E83: PLAY retired — the nine ride the ✨ NEW RUG picker now; the wall keeps its books (E84 replaces it whole)
     const btn=document.createElement('button'); btn.type='button'; btn.className='wpc'; btn.dataset.i=i;
     const cv=document.createElement('canvas'); cv.width=208; cv.height=192;
     btn.appendChild(cv);
@@ -9959,6 +10051,7 @@ function menuWeather(){
    not chrome.
    ===================================================================== */
 let PIGGY={claimed:'',streak:0};   // the save's piggy block (v:11); fresh = never claimed
+let FEATS=[];   // E83 (v:12) — THE FEATS ledger, SEEDED EMPTY here so E85 is logic-only, zero schema
 const PIG={hop:0,puffs:[],dayOv:null,x:PIG_SPOT.x,y:PIG_SPOT.y};   // garnish + placement (never saved)
 const pigFmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function todayStr(){ return PIG.dayOv || pigFmt(new Date()); }     // GVT recipe; dayOv = the battery's calendar
@@ -11144,12 +11237,13 @@ function save(){
     // E6: the wind-up rug stashes the same way and persists NOTHING of its own.
     const w=CAMP.on? FREE : (PLAY.on? PFREE : serWorld());
     localStorage.setItem('TRAINSET', JSON.stringify({
-      v:11, grid:w.grid, scen:w.scen, consist:w.consist, color:COLOR, train:w.train,
+      v:12, grid:w.grid, scen:w.scen, consist:w.consist, color:COLOR, train:w.train,
+      w:RUG.w, h:RUG.h,   // v:12 — THE ENDLESS RUG (E83); explicit dims, grow-only (size + playIdx RETIRED)
+      feats:FEATS.slice(),   // v:12 — seeded EMPTY here; E85 THE FEATS brings the logic, zero schema
       coll:[...coll], eng:ENGINE,
       piggy:{claimed:PIGGY.claimed,streak:PIGGY.streak|0},   // v:11 — THE PIGGY BEDROOM (E23); the daily claim + streak
-      playIdx:PLAYI|0,   // v:10 — THREE RUGS (E17); the ONLY thing PLAY remembers
       name:NAME? {w1:NAME.w1,w2:NAME.w2,s:NAME.s} : null,   // v:9 — THE NAME PLATE (E15); the ONLY thing E15 persists
-      size:SIZE, land:LAND, weather:WEATHER,   // v:8 — BIG COUNTRY (E10); VIEW is NOT saved — every boot opens fitted
+      land:LAND, weather:WEATHER,   // v:8 — BIG COUNTRY (E10); VIEW is NOT saved — every boot opens fitted
       stars:stars, equip:{...equip},   // v:7 — THE STAR BANK + the equipped sound packs (E9)
       hand:{...HAND},   // E57 THE GHOST HAND — the seen-bits (ADDITIVE key, v stays 11;
                         // set only by the KID's own verb, never by a demo)
@@ -11168,20 +11262,23 @@ function save(){
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem('TRAINSET')||'null');
-    if(!d){ starterLine(); return; }   // E16: a brand-new kid finds a little line waiting
+    if(!d){ seedRug(); return; }   // E16→E83: a brand-new kid finds THE SHOWPIECE waiting
     appWorld(d);
-    // v:8 — BIG COUNTRY. A v≤7 save migrates to exactly sm/rug/clear and must
-    // render byte-identically to before: sm is today's board, rug is today's
-    // paint, clear draws nothing. Grids, coll, stars, camp — untouched.
-    SIZE=(d.size&&SIZES[d.size])? d.size : 'sm';
+    // v:12 — THE ENDLESS RUG (E83). Explicit dims, grow-only. A v≤11 save
+    // migrates SIZES[d.size] VERBATIM (sm 12×8 / lg 18×12 / xl 26×18) — the
+    // kid's rug survives to the pixel (the headline migration proof). A v:12
+    // save loads its own w,h: floor 12×8 (nothing can have shrunk), hard
+    // sanity ceiling 96×64 against corrupt saves — a save past RUG_CAP loads
+    // verbatim (the cap gates GROWTH, never a load). size + playIdx retired.
+    if(typeof d.w==='number'&&isFinite(d.w)&&typeof d.h==='number'&&isFinite(d.h)){
+      RUG.w=Math.max(SIZES.sm.gw,Math.min(96,Math.floor(d.w)));
+      RUG.h=Math.max(SIZES.sm.gh,Math.min(64,Math.floor(d.h)));
+    } else { const s=SIZES[d.size]||SIZES.sm; RUG.w=s.gw; RUG.h=s.gh; }
     LAND=(d.land&&LANDS.includes(d.land))? d.land : 'rug';
     WEATHER=(d.weather&&WEATHERS.includes(d.weather))? d.weather : 'clear';
-    applyDims(SIZE);
-    // v:10 — THREE RUGS (E17). playIdx counts the PLAY visits this save has
-    // wound up; the NEXT rug is playIdx%PLAY_CYCLE. A v≤9 save migrates to 0 —
-    // the first press opens THE PLAYROOM, exactly as before — and the BUILD rug
-    // proves byte-identical (the house migration law; playIdx touches no paint).
-    PLAYI=(typeof d.playIdx==='number'&&isFinite(d.playIdx))? Math.max(0,Math.floor(d.playIdx)) : 0;
+    applyRug();
+    // v:12 — THE FEATS ledger (E83): seeded empty, E85 owns the vocabulary.
+    FEATS=Array.isArray(d.feats)? d.feats.filter(f=>typeof f==='string').slice(0,64) : [];
     // v:9 — THE NAME PLATE (E15). A v≤8 save migrates to name:null: the sign
     // paints MY RAILROAD and every other pixel proves byte-identical (the E10
     // frozen-clock proof pattern). Only words off the bank ever load.
@@ -11957,6 +12054,74 @@ function starterLine(){
   if(!STARTER_LINE) return;
   for(const [t,r,x,y] of [...ringRows(4,3,7,5,[[5,5]]),['st',0,5,5]]) setTrackPiece(t,r,null,0,x,y);
 }
+// E83 — THE STAMPING DOOR. One mounting move serves the fresh-save seed and
+// every ✨ NEW RUG postcard: dims + land + weather + track + dressing, ALL
+// UNGLUED (glued is simply never set — the E58 machinery makes them normal,
+// grabbable, removable pieces). The eager train (E27) sees a closed loop with
+// a station and arrives on her own law — a train already running, zero code.
+function stampCore(M){
+  grid.clear(); hgrid.clear(); scen.clear();
+  TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; trailClear(); ridersOff();
+  RUG.w=M.w||SIZES.sm.gw; RUG.h=M.h||SIZES.sm.gh; applyRug();
+  LAND=LANDS.includes(M.land)? M.land : 'rug';
+  WEATHER=WEATHERS.includes(M.weather)? M.weather : 'clear';
+  for(const g of M.scen) scen.set(key(g[1],g[2]),{t:g[0],v:g[3]|0,ra:null,pop:0,wave:0});
+  // the playMount elevation law verbatim: a 5th field rides trestles, climbers force 0
+  for(const [t,r,x,y,el] of M.track) setTrackPiece(t,r,null,(t==='rp'||t==='sp')?0:(el?1:0),x,y);
+}
+function seedRug(){   // load()'s no-save branch — seeds in memory, the first mutation saves (the E16 grammar)
+  if(!SHOWPIECE_SEED){ starterLine(); return; }
+  stampCore(SHOWPIECE);
+}
+function stampRug(i){   // the ✨ NEW RUG door: i<0 = THE SHOWPIECE, 0.. = PLAYMAPS order
+  if(SCREEN!=='game'||CAMP.on||PLAY.on||BED.ctx) return false;
+  const M=i<0? SHOWPIECE : PLAYMAPS[i]; if(!M) return false;
+  stampCore(M);
+  nrgOffer(false); nrgShow(false);   // a stamp ends the offering (rig and picker alike)
+  save(); shelfSync(); rugSync();
+  viewBase(); eagerTry();   // frame the fresh railroad, then her arrival pans in
+  return true;
+}
+// E83 — THE ✨ NEW RUG CARD. After the broom's BUILD sweep the empty rug
+// offers one small card; tapping it opens the postcard picker — THE SHOWPIECE
+// first, then the nine worlds in PLAYMAPS order, painted by the E56 wall-card
+// recipe (frame + the world's sky + its glyph, wordless). Session-only,
+// saves nothing; dies on any placement, stamp, or screen change.
+const NRG={cards:[]};
+function nrgCardPaint(cv,i){
+  const g=cv.getContext('2d');
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
+  const m=i<0? SHOWPIECE : (PLAYMAPS[i]||{});
+  const pic=i<0? 'house' : (BOARD_PIC[m.land]||'tree'), sky=BOARD_SKY[m.land]||'#F3E6C0';
+  withCtx(g,()=>{   // E44's board face, the wall-card recipe verbatim
+    cx.fillStyle='#8f6b3f'; rr(0,0,208,192,14); cx.fill();
+    cx.strokeStyle='#6e5130'; cx.lineWidth=5; rr(2.5,2.5,203,187,12); cx.stroke();
+    cx.fillStyle=sky; rr(12,12,184,168,8); cx.fill();
+    cx.save(); cx.beginPath(); rr(12,12,184,168,8); cx.clip();
+    cx.translate(104,116); cx.scale(2*WALL_GS,2*WALL_GS);
+    drawScenItem({t:pic,v:0,ra:null,pop:0,wave:0},-C/2,-C/2,1.2);
+    cx.restore();
+    if(i<0) star5(32,34,2.4,'#F2C531');   // the gold star — the really cool one
+  });
+}
+function nrgOffer(b){ $('nrgCard').style.display=b?'block':'none'; }
+function nrgShow(b){
+  $('nrg').style.display=b?'flex':'none';
+  if(b) for(const [i,cv] of NRG.cards) nrgCardPaint(cv,i);
+}
+function buildNrg(){
+  const wrap=$('nrgCards');
+  for(const i of [-1,0,1,2,3,4,5,6,7,8]){
+    const btn=document.createElement('button'); btn.type='button';
+    const cv=document.createElement('canvas'); cv.width=208; cv.height=192;
+    btn.appendChild(cv);
+    btn.addEventListener('click',()=>{ ac(); if(stampRug(i)){ SND.pop(); nrgShow(false); nrgOffer(false); } });
+    wrap.appendChild(btn); NRG.cards.push([i,cv]);
+  }
+  $('nrgPanel').appendChild(outPlank(()=>nrgShow(false)));   // ⬇ OUT (the 0204 factory, verbatim)
+  $('nrg').addEventListener('pointerdown',e=>{ if(e.target===$('nrg')){ ac(); SND.click(); nrgShow(false); } });   // tap-out dismisses (the E25 law)
+  $('nrgCard').addEventListener('click',()=>{ ac(); SND.tok(); nrgShow(true); });
+}
 const swapBr=(rows,cells)=>rows.map(r=>cells.some(c2=>c2[0]===r[2]&&c2[1]===r[3])? ['br',r[1],r[2],r[3]] : r);
 // Every row below places ONLY pieces the kid owns by that level — straights and
 // curves throughout, plus bridges from 4 on (level 3's bundle hands them over).
@@ -12350,7 +12515,7 @@ function campExit(dest){
   CWIPE.armed=0; CWIPE.on=0; CTRANS.on=0; CTRANS.fired=0;   // E66: walking out mid-ceremony cancels the clouds (E68: and the ride)
   CAMP.on=false; CAMP.level=0; CAMP.won=false; CAMP.wx=null; winT=0; prettyT=0; prettyPend=false;   // E35: the sky pill override dies with the visit
   ridersOff();                                       // E15: the level's platforms empty out
-  applyDims(SIZE);                                   // E10: the BUILD rug comes back at its own size
+  applyRug();                                        // E10→E83: the BUILD rug comes back at its own dims
   appWorld(FREE||{grid:[],scen:[],consist:consist,train:null}); FREE=null;
   $('mark').textContent='🚂 TRAIN GALAXY';
   showScreen(dest); shelfSync(); save();
@@ -13130,7 +13295,7 @@ function playExit(dest){
   SQ.on=0; SQ.t=0; SQ.cd=0; SQ.force=0;  // E40: …and so does the squid
   PORT.on=0; PORT.t=0; PORT.flip=0; PORT.cd=0;   // E48: …and the curtain
   ridersOff();                           // E15: the BUILD rug's platforms restock next tick
-  applyDims(SIZE);                       // E10: back to the BUILD rug at its own size
+  applyRug();                            // E10→E83: back to the BUILD rug at its own dims
   appWorld(PFREE||{grid:[],scen:[],consist:consist,train:null}); PFREE=null;
   $('mark').textContent='🚂 TRAIN GALAXY';
   showScreen(dest); shelfSync();
@@ -13779,6 +13944,8 @@ function upCore(e){
     }
     else if(DRAG.kind==='newScen'||DRAG.kind==='moveScen'){
       if(hover && canPlaceScen(DRAG.t,hover[0],hover[1])){
+        hover=rugGrowFor(hover[0],hover[1]);   // E83: scenery grows the rug too — the verdict survives the shift by construction
+        nrgOffer(false);                       // E83: dressing counts as building — the ✨ card bows out
         scen.set(key(hover[0],hover[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:1,wave:0});
         SND.tok(); puff(GX+hover[0]*C+C/2,GY+hover[1]*C+C/2,14);
         if(DRAG.kind==='newScen'){ if(BED.ctx) GHOST.pend='room'; else if(!PLAY.on) handMark('room'); }   // E57: a fresh scen drop proves the drag too (rides this save; E58: PLAY teaches nothing)
@@ -14007,7 +14174,7 @@ function scenIcon(g,t,time){   // E13: `time` animates the aisle cards; omitted 
   });
 }
 const PAL_BTNS=[];      // every palette button + the toy id that unlocks it (THE GATE)
-const RUG_TILES=[];     // E10: the SIZE / LAND / WEATHER tiles (never gated — the rug is everyone's)
+const RUG_TILES=[];     // E10→E83: the LAND / WEATHER tiles (never gated — the rug is everyone's)
 const MAGIC_TILES=[];   // E35: the four SKY PILLS (never gated — the sky is everyone's, one tap, any floor)
 /* =====================================================================
    E55 THE HANDY SHELF — the E27 HANDY FIVE revived as the rail's FACE
@@ -14150,17 +14317,7 @@ function pickPaint(){               // visibility + diff-repaint (the E55 born-h
   }
 }
 // ---- the RUG tab's picture tiles (E10): painted straight in 104×104 px ----
-function rugTileSize(g,id){
-  const dims={sm:[46,32],lg:[66,46],xl:[90,62]}[id], w=dims[0], h=dims[1];
-  const x=(104-w)/2, y=(104-h)/2;
-  g.fillStyle='#4A1A12'; g.fillRect(x-5,y-5,w+10,h+10);
-  g.fillStyle='#63251C'; g.fillRect(x,y,w,h);
-  g.strokeStyle='#8F4634'; g.lineWidth=2; g.strokeRect(x+4,y+4,w-8,h-8);
-  g.globalAlpha=0.4; g.strokeStyle='#7A3627'; g.lineWidth=1.5;
-  g.beginPath();
-  for(let yy=y+10;yy<y+h-6;yy+=9){ g.moveTo(x+6,yy); g.lineTo(x+w-6,yy); }
-  g.stroke(); g.globalAlpha=1;
-}
+// E83: rugTileSize retired with the size row — the rug grows, shrink doesn't exist
 function rugTileLand(g,id){
   const x=8, y=20, w=88, h=64;
   g.fillStyle='#4A1A12'; g.fillRect(x-4,y-4,w+8,h+8);
@@ -14362,7 +14519,7 @@ function rugTileWx(g,id){
 // the picked tile wears the gold border; called on every pick, load and mode swap
 function rugSync(){
   for(const t of RUG_TILES){
-    const on= t.kind==='size'? SIZE===t.id : t.kind==='land'? LAND===t.id : WEATHER===t.id;
+    const on= t.kind==='land'? LAND===t.id : WEATHER===t.id;   // E83: the size tiles died with the picker
     t.el.classList.toggle('on',on);
   }
   // E35: the sky pills mark by the ACTIVE sky — in BUILD that IS the kid's
@@ -14447,14 +14604,13 @@ function buildPalette(){
     b.addEventListener('click',()=>{
       if(barDragged()) return;     // E20: a scrolled shelf never picks (the E13 aisle law)
       ac();
-      if(kind==='size'){ sizeSet(id); return; }
       if(kind==='land'){ if(LAND!==id){ LAND=id; SND.tok(); save(); } else SND.click(); }
       else { if(WEATHER!==id){ WEATHER=id; SND.tok(); save(); } else SND.click(); }
       rugSync();
     });
     RUG_TILES.push({kind,id,el:b});
   };
-  for(const [id,name] of [['sm','SMALL'],['lg','BIG'],['xl','HUGE']]) mkRug('size',id,name,g=>rugTileSize(g,id));
+  // E83: the SIZE row is DEAD (shrink doesn't exist — the rug grows under the hand)
   for(const [id,name] of [['rug','THE RUG'],['west','WESTERN'],['snow','WINTER'],['mountain','MOUNTAIN'],['jungle','JUNGLE'],['island','ISLAND'],['cloud','CLOUD'],['ice','ICE'],['canyon','CANYON']]) mkRug('land',id,name,g=>rugTileLand(g,id));   // E30 + E31 + E40 + E41 + E42 + E43
   for(const [id,name] of [['clear','CLEAR'],['snowfall','SNOW'],['dust','DUST'],['rain','RAIN']]) mkRug('weather',id,name,g=>rugTileWx(g,id));
   // TIDY UP (E16): the sweep-the-rug button, out of the retired shed's foot.
@@ -14481,7 +14637,7 @@ function buildPalette(){
         return;
       }
       if(CAMP.on) clearPlayer();             // sweep the kid's line; the glued land stays put
-      else { grid.clear(); hgrid.clear(); scen.clear(); trainHome(true); }
+      else { grid.clear(); hgrid.clear(); scen.clear(); trainHome(true); nrgOffer(true); }   // E83: the empty rug offers ✨ NEW RUG
       SND.pop(); save(); toast('ALL TIDY!');
       eagerTry();   // E27: the sweep is a track mutation — a finished glued line may call her
     } else {
@@ -14802,6 +14958,8 @@ function eagerVerdict(pc,x,y){  // both directions from one seed → done? stati
 // one writer for the whole hand-lay ceremony — the drag drop speaks it, so the
 // eager train / hints / coach hear every lay the same way
 function layAt(t,r,sel,cx2,cy2,q){
+  [cx2,cy2]=rugGrowFor(cx2,cy2);   // E83: an edge-lay grows the rug FIRST — the piece lands in final coordinates
+  nrgOffer(false);                 // E83: building is the answer — the ✨ card bows out
   const pc=setTrackPiece(t,r,sel,q.elev,cx2,cy2); pc.pop=1;
   SND.tok(); puff(GX+cx2*C+C/2,GY+cy2*C+C/2,14);
   hintPass(0); if(grid.size>=3) hintPass(1);
@@ -15126,6 +15284,7 @@ function showScreen(s){
   if(!game){ cancelDrag(); down=null; PINCH=null; PTRS.clear(); }
   $('menu').style.display=(s==='menu'&&!FRONT_DOORS)?'flex':'none';   // E82: the paint-shop row was room furniture — the front holds exactly three things
   $('dogLayer').style.display=(FRONT_DOORS&&s==='menu')?'block':'none';   // E82: the dogs walk the front only
+  nrgOffer(false); nrgShow(false);   // E83: the ✨ NEW RUG offer + picker are one room's furniture — a screen change folds them
   $('lvlShop').style.display=(game&&CAMP.on)?'block':'none';   // E82: the store is one tap from inside a level
   $('board').style.display=s==='board'?'flex':'none';
   if(s==='board'){ boardFilter(); boardSync();
@@ -16815,7 +16974,7 @@ function ghBuild(){
 }
 
 
-load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildWall(); buildTray(); buildToybox(); buildStore(); buildNamer(); ghBuild();
+load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildWall(); buildNrg(); buildTray(); buildToybox(); buildStore(); buildNamer(); ghBuild();
 if(ROOM_ATTRACT) buildAttract();   // E82: the oval parks behind its const (the room's tide still rebuilds it)
 if(FRONT_DOORS){ frontBuild(); frontDogs(); }   // E82: the two-door front's little world + the walking dogs
 drawLvlShop(); lvlShopWire();
@@ -17041,7 +17200,21 @@ window.TS={
   play(){ showScreen('game'); return SCREEN; },
   color(name){ if(!LIVERY[name]) return false; COLOR=name; liveryChanged(); save(); return COLOR; },
   // ---- the BIG COUNTRY rig (E10) ----
-  size(id){ return sizeSet(id)? SIZE : false; },
+  // E83 — the endless-rug rig: dims, the growth ceremony, the stamping door.
+  // lay()/scen() walk the REAL hand path (growth included); TS.place stays
+  // growth-free by design so plates never move under a battery.
+  rug:{
+    state(){ return { w:RUG.w, h:RUG.h, cap:{...RUG_CAP}, near:GROW_NEAR, band:GROW_BAND,
+      offer:$('nrgCard').style.display!=='none', picker:$('nrg').style.display!=='none' }; },
+    lay(t,r,x,y){ const q=placeQuery(t,(r|0)%4,x,y); if(!q.ok) return false;
+      layAt(t,(r|0)%4,null,x,y,q); return TS.rug.state(); },
+    scen(t,x,y){ if(!SCENDEF[t]||SCREEN!=='game'||CAMP.on||PLAY.on||!canPlaceScen(t,x,y)) return false;
+      const g=rugGrowFor(x,y); scen.set(key(g[0],g[1]),{t,v:0,ra:null,pop:0,wave:0}); save();
+      return TS.rug.state(); },
+    stamp(i){ return stampRug(i==null? -1 : i|0); },
+    offer(b){ nrgOffer(b!==false); return TS.rug.state(); },
+    picker(b){ nrgShow(b!==false); return TS.rug.state(); },
+  },
   land(id){ if(!LANDS.includes(id)||CAMP.on||PLAY.on) return false;
     LAND=id; rugSync(); save(); return LAND; },
   weather(id){ if(!WEATHERS.includes(id)||CAMP.on||PLAY.on) return false;
@@ -17343,7 +17516,7 @@ window.TS={
     hints(){ return SA_LEVELS.map(L=>L.hint); },
   },
   state(){ return { screen:SCREEN, color:COLOR,
-    size:SIZE, land:LAND, weather:WEATHER, gw:GW, gh:GH,
+    w:RUG.w, h:RUG.h, land:LAND, weather:WEATHER, gw:GW, gh:GH,   // E83: size retired — dims are the truth
     name:NAME? {w1:NAME.w1,w2:NAME.w2,s:NAME.s,text:signText()} : null,   // E15
     view:{ scale:SC, ox:OX, oy:OY },
     placed:TRAIN.placed, running:TRAIN.running, F:TRAIN.F,
