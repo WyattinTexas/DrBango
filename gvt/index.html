@@ -31405,7 +31405,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.09';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.10';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -40445,19 +40445,20 @@ const KING_ROT=5.0, KING_TK_SEEK=300, KING_TK_HOLD=0.9,
       KING_PUSH_SPD=430, KING_PUSH_REACH=280, KING_PUSH_BACK=40,
       KING_SUM_PIGS=20, KING_SUM_YETIS=10, KING_MINION_CAP=30;
 // ===== 0341 MEGA: THE PURPLE LEAP (the 0337 purple buff, boss edition) —
-// kingyeti + sgtcold + sgtsnow at the MEGA tier ONLY (armed by type+tier at
-// the boss block — zero cfg stamps, so E/M/H are byte-behaviour). Windup
-// tell → parabola flight → the landing flattens every man inside the purple
-// ring (knock — this game's massive-damage grammar; men never die). The king
-// hunts the REARMOST mortar, then a machine gunner (the "smarter about
-// machine guns" clause), then the rearmost man; the sergeants hunt mortars
-// then the rearmost man. Dials one line each.
-const LEAP_CD_KING=12, LEAP_CD_SGT=15, LEAP_FIRST=8, LEAP_WIND=0.6, LEAP_T=0.75, LEAP_H=110, LEAP_MIN_D=180;
+// sgtcold + sgtsnow at the MEGA tier ONLY (armed by type+tier at the boss
+// block — zero cfg stamps, so E/M/H are byte-behaviour). 0452: KING YETI'S
+// SEAT IS RETIRED at every door (Wyatt 8/20: "makes the fight just about
+// impossible and not really that fun") — the sergeants keep the move, the
+// king keeps RED/BLUE/SWING + the snow byte-still, and the PLAYABLE king
+// keeps HIS leap (kingUnitTick — the player's power, a different seat).
+// Windup tell → parabola flight → the landing flattens every man inside
+// the purple ring (knock — this game's massive-damage grammar; men never
+// die). The sergeants hunt mortars then the rearmost man. Dials one line.
+const LEAP_CD_SGT=15, LEAP_FIRST=8, LEAP_WIND=0.6, LEAP_T=0.75, LEAP_H=110, LEAP_MIN_D=180;
 function foeLeapPick(f){
   const ok=u=>!(u.dead || u.jetT>0 || u.dropT>0 || u.falling || u.cloakT>0 || (S.drag && S.drag.unit===u));
   const rear=list=>{ let b=null; for(const u of list) if(ok(u) && (!b || u.x<b.x)) b=u; return b; };
   let m=rear(S.units.filter(u=>u.type==='mortar'));
-  if(!m && f.type==='kingyeti') m=rear(S.units.filter(u=>u.type==='mgunner'));
   if(!m) m=rear(S.units);
   if(!m || Math.hypot(m.x-f.x,m.y-f.y)<LEAP_MIN_D) return null;
   return m;
@@ -40470,10 +40471,7 @@ function foeLeapTick(f,dt){
     f.x=f.plX0+(f.plX1-f.plX0)*k; f.y=f.plY0+(f.plY1-f.plY0)*k;
     f.airB=LEAP_H*4*k*(1-k);
     if(f.plT<=0){
-      f.airB=0; f.plCd=(f.type==='kingyeti'? LEAP_CD_KING : LEAP_CD_SGT);
-      if(f.type==='kingyeti'){ f.kyLndAt=S.t;   // 0435: the landing squash stamp + THE SNOW BURST — hash-phased clods, zero dice (the 0261 lick law); the sergeants keep their shipped landing exactly
-        if(!reducedMotion()) for(let sj=0;sj<7;sj++){ const sa=(((f.x|0)*0.73+(f.y|0)*1.21+sj*0.897)%6.283);
-          S.fx.push({k:'sclod',x:f.x+Math.cos(sa)*14,y:f.y-4,a:sa,v:150+((sj*37)%60),h0:26+(sj%3)*9,r0:3+(sj%3),t:0,dur:0.5}); } }
+      f.airB=0; f.plCd=LEAP_CD_SGT;   // 0452: only the sergeants reach this wheel — the king's seat is retired (his 0435 landing squash + snow burst left with it; theirs was always the shipped landing)
       SFX.stomp(); S.shake=0.55;
       S.fx.push({k:'ring',x:f.x,y:f.y-8,r:8,R:TK_PURPLE_R+16,t:0,dur:0.32,col:'#B77DE8'});
       S.fx.push({k:'ring',x:f.x,y:f.y-8,r:4,R:TK_PURPLE_R*0.6,t:0,dur:0.24,col:'rgba(255,255,255,0.9)'});
@@ -40501,7 +40499,7 @@ function foeLeapTick(f,dt){
     return;
   }
   f.plCd-=dt;
-  if(f.plCd<=0 && !f.kyTk){
+  if(f.plCd<=0){   // 0452: the !kyTk seize-interlock left with the king — no sergeant ever carries kyTk
     const m=foeLeapPick(f);
     if(!m){ f.plCd=2.5; return; }
     f.plAim=m; f.plWind=LEAP_WIND;
@@ -40646,7 +40644,7 @@ const KY_UNIT_W=176,       // D2 BIG — royal beside 54px infantry (the boss in
       KY_U_RED_CD=8,       // D4 — the seize's wheel (TK_CD red's own number)
       KY_U_RED_SEEK=300,   // the boss's eye (KING_TK_SEEK)
       KY_U_BLUE_CD=10,     // D4 — the wind-front's wheel
-      KY_U_PURP_CD=12,     // D4 — the leap's wheel (LEAP_CD_KING's own number)
+      KY_U_PURP_CD=12,     // D4 — the leap's wheel (the retired foe leap's old 12 — 0452 removed HIS seat; this wheel is the player's)
       KY_U_PURP_RNG=560,   // the leap's hunting reach (§4 ⚑)
       KY_U_PURP_R=Math.round(TK_PURPLE_R*1.4),   // his royal landing ring — ×1.4 the Sarge's 84 (§4 ⚑)
       KY_U_SW_DMG=6,       // D4 — the silver swing's bite (the boss caps/fan/reach ride as-is)
@@ -47011,7 +47009,7 @@ function update(dt){
     // ===== BOSS attacks (only once they're on the carpet) =====
     if(f.boss && f.x<W-10){
       f.shot+=dt;
-      if(megaActive() && (f.type==='kingyeti'||f.type==='sgtcold'||f.type==='sgtsnow')) foeLeapTick(f,dt);   // 0341 MEGA: the purple leap — mortars and the backline are never safe
+      if(megaActive() && (f.type==='sgtcold'||f.type==='sgtsnow')) foeLeapTick(f,dt);   // 0341 MEGA: the sergeants' purple leap — 0452: KING YETI'S seat is OUT at every door (Wyatt 8/20: "makes the fight just about impossible and not really that fun"; his RED/BLUE/SWING + the snow stand byte-still, and the PLAYABLE king keeps his own leap)
       if(f.type==='giant'||YETI_SHOOTERS[f.type]){
         // the big shot: slow and heavy — it fells the nearest man in reach
         // (v3.33: the park's boss yetis hurl the same one big SNOWBALL —
@@ -51016,23 +51014,23 @@ function drawJane(u,kyl){
 // ═══ 0435 THE YETI KING AT THE SHAPE STORE — THE MOVES (FM-GVT-MAKEOVER-0819 §5) ═══
 // Pose-driven, draw-time only, BOTH SEATS off one reader: kyPoseK answers a
 // pre-built pose key a frame off state the sim already writes — the kit
-// bags (kyTk/kyWave/kySwing, both seats), the leap clocks (plWind/plT foe-
-// side, kyLpW unit-side; mid-flight the unit rides drawTkLeap's tuck), the
-// walk stamps (wkT + the AIR_GAIT hop windows via airT) — plus four
+// bags (kyTk/kyWave/kySwing, both seats), the leap clock (kyLpW unit-side;
+// mid-flight the unit rides drawTkLeap's tuck — the FOE king's plWind/plT
+// clocks retired with his leap, 0452), the walk stamps (wkT + the AIR_GAIT
+// hop windows via airT) — plus four
 // presentation stamps nothing in the sim reads (kyHitAt / kyThAt / kySlmAt
 // / kyLndAt — the wkX/wkT law). NO new rAF (0413), no per-frame URI or
 // string building (the poses are SPRITES_SRC keys, decoded once at boot),
-// no per-frame allocations. Priority, top wins: mid-leap tuck > flinch >
+// no per-frame allocations. Priority, top wins: flinch >
 // the slam chop > grip (reach then fist) > the crouch tell > the swing
 // pair > the two-arm wave > the hurl > the stomp cycle > the regal stand.
 const KY_STOMP_HZ=5.2;   // the unit march's stomp clock (dial; the foe king's stomps ride his own AIR_GAIT windows)
 const KY_AIMED={kingyetireach:1,kingyetigrip:1,kingyetiwave:1,kingyetihurl:1,kingyetiswinga:1,kingyetiswingb:1};
 function kyPoseK(e){
-  if(e.plT>0) return 'kingyetituck';
   if(e.kyHitAt!=null && S.t-e.kyHitAt<0.30) return 'kingyetihurt';
   if(e.kySlmAt!=null && S.t-e.kySlmAt<0.28) return 'kingyetiswingb';
   if(e.kyTk) return (e.kyTk.t>KING_TK_HOLD-0.24)? 'kingyetireach' : 'kingyetigrip';
-  if(e.plWind>0 || e.kyLpW>0) return 'kingyeticrouch';
+  if(e.kyLpW>0) return 'kingyeticrouch';
   if(e.kySwing>0) return (e.kySwing>0.15)? 'kingyetiswinga' : 'kingyetiswingb';
   if(e.kyWave) return 'kingyetiwave';
   if(e.kyThAt!=null && S.t-e.kyThAt<0.30) return 'kingyetihurl';
