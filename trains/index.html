@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v10.4 -->
+<!-- TRAINSET v10.5 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -138,6 +138,14 @@
   #bpanel.bk-sa h1,#bpanel.bk-sa #bsub,#bpanel.bk-sa #tickets,
   #bpanel.bk-sa #pkhead,#bpanel.bk-sa #pksub,#bpanel.bk-sa #pktickets{ display:none; }
   #bpanel.bk-pk #pkhead,#bpanel.bk-sa #sahead{ border-top:none; margin-top:0; padding-top:0; }
+  /* ---- E84 THE REPLAY DOOR — after the last caboose the board comes back as
+     the TROPHY SHELF: bk-all shows all three books at once under the trip's
+     crown (the ONE seam where the whole trip is named). Until the trip is
+     won the board does not exist for the kid — nothing routes here. ---- */
+  #btrip,#btsub{ display:none; }
+  #bpanel.bk-all #btrip{ display:block; font-size:24px; letter-spacing:5px; color:#F2C531; }
+  #bpanel.bk-all #btsub{ display:block; font-size:16px; letter-spacing:10px; margin:6px 0 12px; }
+  #bpanel.bk-all h1{ font-size:15px; letter-spacing:3px; margin-top:14px; }   /* the hundred-book title steps down to section grammar under the crown */
   /* ---- E56 THE POSTCARD WALL — behind the front door (§4-B, THE PICK): a wood
      panel in the board screen's own grammar; three book boards up top, one
      postcard per live world below. Wordless: the places are pictures. ---- */
@@ -825,6 +833,9 @@
     #satickets{ gap:6px; }
     #sahead{ font-size:12px; letter-spacing:2px; margin-top:9px; padding-top:7px; }
     #sasub{ margin:3px 0 6px; font-size:7px; }
+    #bpanel.bk-all #btrip{ font-size:17px; letter-spacing:3px; }
+    #bpanel.bk-all #btsub{ font-size:12px; letter-spacing:6px; margin:4px 0 8px; }
+    #bpanel.bk-all h1{ font-size:12px; letter-spacing:2px; margin-top:9px; }
     .tk{ min-width:54px; padding:6px 2px 5px; }
     .tk b{ font-size:16px; } .tk small{ font-size:6px; }
     .tk .star{ font-size:14px; top:-7px; right:-5px; }
@@ -972,6 +983,8 @@
   </div>
 </div></div>
 <div id="board"><div id="bpanel">
+  <div id="btrip">THE BIG TRIP</div>
+  <div id="btsub">🎫 🎃 🎅</div>
   <h1>ONE HUNDRED LITTLE LINES</h1>
   <div id="bsub">BUILD A LINE THAT LOOPS</div>
   <div id="tickets"></div>
@@ -1107,14 +1120,13 @@ const HERD_SPEED=1.0;                                 // herd idle tempo: graze 
    TRAINSET_ROOM save key stays on disk, orphaned, never deleted. */
 const FRONT_DOORS=true;       // the §1 front: globe masthead + two live picture doors + store tile. false = the bedroom room, byte-true
 const ROOM_DOOR=true;         // the postcards front door (E56 slab + pins + GO pill + the wall entry) — room world only
-const ROOM_TICKETS=true;      // the postcard WALL behind the door (E56) — the door's inside; the board rides behind it until E84
-const ROOM_BOARD=true;        // the E44 departure board
+const ROOM_TICKETS=true;      // the postcard WALL behind the door (E56) — room world only (E84: under the front nothing routes here; the trip door goes straight in, then trophy)
 const ROOM_ATTRACT=true;      // the attract oval + the stock bedroom toy (E18/E54)
 const ROOM_BED=true;          // bedroom build — the whole-floor hand (spill toys, broom, drags; E18/E23/E54)
 const DOOR_SPEED=64;          // the left door's tiny train, px/s along its arc (ATT_SPEED's quieter cousin)
 const PIG_RUG_S=1.0;          // the re-homed piggy's scale on the free-play rug's frame (menu wore 1.35) ⚑
 const TRIP_BOOKS=['ten','pk','sa'];   // the trip's order — 🎫 then 🎃 then 🎅 (dial §8.3 executed-REC: Santa is the finale) ⚑
-const MENU_PROPS=['sign','bed','toybox',...(ROOM_DOOR?['door']:[]),'lamp','station','store',...(ROOM_BOARD?['board']:[])];  // room props list (E26's fixtures; E44 the departure board; E54 retired 'blocks'; E56 retired 'tickets' — the word left the game, the stubs live on the door's wall; E82 door+board park behind their consts)
+const MENU_PROPS=['sign','bed','toybox',...(ROOM_DOOR?['door']:[]),'lamp','station','store'];  // room props list (E26's fixtures; E54 retired 'blocks'; E56 retired 'tickets'; E84 retired the E44 departure board FULLY — the E82 park expired, the rm-able law exercised)
 const ATT_SCALE=0.85;         // attract oval size (scale of the real 4×2 loop)
 const ATT_SPEED=70;           // attract loop speed, px/s — slow; SPEED stays the game's
 const PLAY_LABEL='PLAY';      // E26: the train station's pill (was the big button's copy — re-aimed, never orphaned)
@@ -1124,10 +1136,9 @@ const SIGN_TOP=6;             // the 2× plank's top edge (v3.4 sat at 40; the b
 const SHOP_LABEL='SHOP';      // the storefront's pill
 // E55: TOYS_CARD (the MY-TOYS lid card label) DIED — the box opens the chest.
 const STATION_S=1;            // station art scale — Wyatt's dial
-/* ---- E44 THE DEPARTURE BOARD (NEMO frame #4: a station signed with a PICTURE) ---- */
-const BOARD_SPOT={x:294,y:742};  // face centre, menu coords — the open floor beside the platform's left
-const BOARD_W=100, BOARD_H=84;   // the picture face — big enough to read at 812×375
-const BOARD_GS=1.05;             // glyph scale on the face
+// E44's departure board retired fully in E84 (the sign showed the next PLAY
+// departure and PLAY itself retired in E83). BOARD_PIC/BOARD_SKY live on —
+// the wall's postcards read them (flip world).
 // one glyph per world, keyed by the map's land (unique per map). ⚠ THE SILENT-CACTUS
 // LAW: every entry MUST be a real drawScenItem branch — an unknown kind paints
 // NOTHING, silently. A land without a row falls back to 'tree', never to a blank sign.
@@ -7613,6 +7624,28 @@ const CWIPE={on:0,t:0,flip:0,armed:0};
    instantly (the E52 skip law — the child outranks the show). */
 const CTRANS_MAX=12;          // seconds of watching before the clouds come anyway
 const CTRANS={on:0,t:0,cell:null,r:0,fired:0};
+/* E84 THE TRANSFER MOMENT — between books, ONE law: at a book-finale win,
+   once the stuff is collected, if the trip's next stop lies in ANOTHER book
+   the conductor's platform beat plays (drawTmom — a new phase-gated painter),
+   then the SAME clouds sweep and the next book mounts beneath full cover.
+   Canonically: ten C100 → 🎃 card → PK L1 · pk L5 → 🎅 card → SA L1. No next
+   stop (the whole trip won) → today's lingering GRAND OPENING, verbatim.
+   The skip law rides the E52/E68 line: any tap brings the clouds NOW. */
+const TMOM_S=3.4;             // the platform beat before the clouds (dial)
+const TMOM={on:0,t:0,b:null,n:0,fired:0};
+function tmomTarget(){        // the trip's next stop when it lies in another book
+  if(!(CAMP.on&&CAMP.won&&CAMP.level>=bookL().length)) return null;
+  const t=tripNext();
+  return (t&&t.b!==CAMP.book)? t : null;
+}
+function tmomStart(t){
+  TMOM.on=1; TMOM.t=0; TMOM.b=t.b; TMOM.n=t.n; TMOM.fired=0;
+  musPlay('next');            // the ride's own travel cue (E68) — zero new audio
+}
+function tmomFire(){          // the beat is done (or the kid tapped) — the clouds come
+  if(!TMOM.on||TMOM.fired) return;
+  TMOM.fired=1; CWIPE.on=1; CWIPE.t=0; CWIPE.flip=0; SND.whoosh();
+}
 function ctransStart(cell,r){
   CTRANS.on=1; CTRANS.t=0; CTRANS.cell=cell; CTRANS.r=r|0; CTRANS.fired=0;
   musPlay('next');
@@ -7632,6 +7665,7 @@ function cwipeTick(dt){
       if(L&&L.ride&&TRAIN.placed&&TRAIN.running&&TRAIN.cars.length) ctransStart(L.ride,L.rideR|0);
       else { CWIPE.on=1; CWIPE.t=0; CWIPE.flip=0; SND.whoosh(); }   // the v7.6 direct curtain
     }
+    else { const t2=tmomTarget(); if(t2) tmomStart(t2); }   // E84: the trip carries on into the next book
   }
   if(CTRANS.on&&!CTRANS.fired){
     CTRANS.t+=dt;
@@ -7639,11 +7673,13 @@ function cwipeTick(dt){
     const at=TRAIN.placed&&lc&&lc.rd.cx===CTRANS.cell[0]&&lc.rd.cy===CTRANS.cell[1];
     if(at||CTRANS.t>=CTRANS_MAX||!TRAIN.placed||!TRAIN.running) ctransFire();
   }
+  if(TMOM.on&&!TMOM.fired){ TMOM.t+=dt; if(TMOM.t>=TMOM_S) tmomFire(); }   // E84: the platform beat holds, then the clouds
   if(!CWIPE.on) return;
   CWIPE.t+=dt;
   if(!CWIPE.flip&&CWIPE.t>=PORTAL_WIPE_S*PORTAL_FLIP_AT){
     CWIPE.flip=1; CTRANS.on=0;           // the ride ends beneath full cover
-    campEnter(CAMP.level+1,CAMP.book);   // the world flips beneath full cover (the E48 law)
+    if(TMOM.on){ const b=TMOM.b,n=TMOM.n; TMOM.on=0; TMOM.fired=0; campEnter(n,b); }   // E84: the world flips into the NEXT BOOK (the E48 law)
+    else campEnter(CAMP.level+1,CAMP.book);   // the world flips beneath full cover (the E48 law)
   }
   if(CWIPE.t>=PORTAL_WIPE_S) CWIPE.on=0;
 }
@@ -7658,6 +7694,78 @@ function drawCtransTunnel(){  // PAINT ONLY — the tunnel mouth over the glued 
   cx.translate(GX+gx*C+C/2, GY+gy*C+C/2-(el?LIFT:0)); cx.scale(sc,sc); cx.translate(-C/2,-C/2);
   drawPieceArt({t:'tun',r:CTRANS.r,sel:0,elev:el,latch:null},0,0);
   cx.restore();
+}
+/* E84 — THE TRANSFER MOMENT'S STAGE (SCREEN space, painted under the curtain
+   so the clouds sweep over it and the world flips beneath full cover). The
+   E82 trip-door platform morning grown to the whole glass: the conductor
+   waits on the platform with the engine steaming, and the NEXT book's card
+   flies in — the destination in the child's hand, no words anywhere.
+   Phase-gated on TMOM.on (a collected finale — no plate scenario reaches it);
+   every motion rides TMOM.t, zero Math.random. */
+function drawTmom(){
+  if(!TMOM.on) return;
+  const t=TMOM.t, k0=Math.min(1,t*3);            // the fade-in breath
+  const gy2=H*0.68, u=Math.min(W,H)/420;         // ground line + the stage's own scale
+  cx.save(); cx.globalAlpha=k0;
+  // the platform morning (the door's sky, full bleed)
+  const g=cx.createLinearGradient(0,0,0,gy2);
+  g.addColorStop(0,'#CFE3F2'); g.addColorStop(1,'#E8F0F8');
+  cx.fillStyle=g; cx.fillRect(0,0,W,gy2);
+  cx.fillStyle='#fff';                           // two soft clouds drifting
+  for(const [ph0,cy2,cs] of [[0,0.16,1],[0.55,0.30,0.72]]){
+    const cw=W*0.24*cs, ex=-cw+((t*22+ph0*(W+2*cw))%(W+2*cw));
+    cx.globalAlpha=0.8*k0;
+    cx.beginPath(); cx.ellipse(ex,H*cy2,cw*0.5,14*cs*u,0,0,7);
+    cx.ellipse(ex+cw*0.22,H*cy2-11*cs*u,cw*0.3,12*cs*u,0,0,7); cx.fill();
+  }
+  cx.globalAlpha=k0;
+  cx.fillStyle='#B48A54'; cx.fillRect(0,gy2,W,H-gy2);   // the boards
+  cx.strokeStyle='#8a683e'; cx.lineWidth=2*u;
+  for(let x=18*u;x<W;x+=64*u){ cx.beginPath(); cx.moveTo(x,gy2); cx.lineTo(x,H); cx.stroke(); }
+  cx.fillStyle='#C9A26B'; cx.fillRect(0,gy2,W,5*u);     // the platform's lit cap
+  cx.save(); cx.translate(W*0.10, gy2-16*u); cx.scale(1.5*u,1.5*u);   // the platform lamp
+  drawScenItem({t:'lamp',v:0,ra:null,pop:0,wave:0},-C/2,-C/2,t);
+  cx.restore();
+  // THE CONDUCTOR — the E60 figure at ceremony scale, waving on his own beat
+  const hs=Math.min(H*0.30,W*0.14)/30;
+  cx.save(); cx.translate(W*0.38,gy2);
+  cx.globalAlpha=0.25*k0; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(0,1.2*hs,10*hs,2.6*hs,0,0,7); cx.fill(); cx.globalAlpha=k0;
+  cx.scale(hs,hs); cx.translate(0,-11); frontHostArt('ten',t); cx.restore();
+  // the waiting engine, facing him, steam drifting (the door's 4-puff recipe)
+  const ls=Math.min(W*0.20/56, H*0.16/30);
+  cx.save(); cx.translate(W*0.78, gy2-13*ls); cx.scale(ls,ls);
+  drawCar('loco',0,0,Math.PI,0,0); cx.restore();
+  for(let i=0;i<4;i++){
+    const ph=(t*0.22+i*0.25)%1;
+    cx.globalAlpha=(1-ph)*0.55*k0; cx.fillStyle='#e8e8e8';
+    cx.beginPath();
+    cx.arc(W*0.78-14*ls+Math.sin(ph*5+i)*8*u, gy2-13*ls-24*ls-ph*H*0.34, (4+ph*15)*Math.max(0.7,ls*0.5), 0, 7);
+    cx.fill();
+  }
+  cx.globalAlpha=k0;
+  // THE BOOK'S CARD FLIES IN — easeOutBack from above the glass, then a bob
+  const kc=Math.min(1,Math.max(0,(t-0.55)/0.8));
+  if(kc>0){
+    const b1=1.70158, b3=b1+1, e=1+b3*Math.pow(kc-1,3)+b1*Math.pow(kc-1,2);
+    const tint=TMOM.b==='pk'? ['#F7DCA9','#C9772E'] : TMOM.b==='sa'? ['#EAF4FC','#C0392B'] : ['#F7E9C4','#B48A54'];
+    const chh=Math.min(W,H)*0.34, cww=chh*0.78;
+    const cxr=W*0.60, cyr0=-chh, cyr1=H*0.30, cyr=cyr0+(cyr1-cyr0)*e + (kc>=1? Math.sin(t*2.6)*3*u : 0);
+    cx.save(); cx.translate(cxr,cyr); cx.rotate(-6*Math.PI/180);
+    cx.globalAlpha=0.18*kc*k0; cx.fillStyle='#000';                          // the card's own drop shadow, riding behind it
+    rr(-cww/2+5*u,-chh/2+7*u,cww,chh,14*u); cx.fill();
+    cx.globalAlpha=kc*k0;
+    cx.fillStyle=tint[0]; rr(-cww/2,-chh/2,cww,chh,14*u); cx.fill();
+    cx.strokeStyle=tint[1]; cx.lineWidth=4*u; rr(-cww/2,-chh/2,cww,chh,14*u); cx.stroke();
+    cx.strokeStyle='rgba(242,197,49,0.6)'; cx.lineWidth=2*u;                 // the ticket's dashed gold ring
+    cx.setLineDash([7*u,6*u]); rr(-cww/2+7*u,-chh/2+7*u,cww-14*u,chh-14*u,8*u); cx.stroke(); cx.setLineDash([]);
+    cx.font=Math.round(chh*0.5)+'px "Arial Black",Impact,sans-serif';        // the stamp, BIG
+    cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText(TMOM.b==='pk'? '🎃' : TMOM.b==='sa'? '🎅' : '🎫', 0, chh*0.03);
+    cx.textBaseline='alphabetic';
+    cx.restore();
+  }
+  cx.restore(); cx.globalAlpha=1;
 }
 // ballast, ties, then the two rails — a dashed fat stroke IS a row of sleepers (GVT)
 // E4 pipeline: ground three-pass -> elevated ground shadows -> trestles -> a z-SORTED
@@ -8679,6 +8787,7 @@ function draw(){
   drawGhosts();
   ghPaintWorld();   // E57: the ghost hand's demo — piece + dashed path, the drag pipeline's own painters
   cx.setTransform(DPR,0,0,DPR,0,0);
+  drawTmom();       // E84: the transfer moment's platform stage — under the curtain, so the clouds carry you off it
   drawPortalWipe(); // E48: the steam curtain crosses the SCREEN — the world flips beneath it
   for(const p of confetti){ cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot);
     cx.globalAlpha=Math.min(1,(p.dur-p.t)*2); cx.fillStyle=p.col; cx.fillRect(-4,-2.5,8,5); cx.restore(); }
@@ -9002,38 +9111,9 @@ function menuStation(){
   drawWaiter(72,60,PPL_COLS[2],t,2.3,false);
   cx.restore();
 }
-function boardNext(){
-  // the next departure — the rug the next station tap mounts (the v26 law:
-  // PLAYI is "visits banked / next seed"; at the menu that IS the next rug)
-  return PLAYMAPS[(((PLAYI|0)%PLAY_CYCLE)+PLAY_CYCLE)%PLAY_CYCLE];
-}
-function menuBoard(){
-  // E44 THE DEPARTURE BOARD — a toy trackside sign beside the platform carrying
-  // ONE framed picture: where the next train from this station goes (NEMO frame
-  // #4: a station signed with a PICTURE — a pre-reader reads pictures). No words,
-  // no tap, no sound: signage. Tap the station and you go where the picture said;
-  // coming home from PLAY flips the sign to the new next stop by construction.
-  const m=boardNext(), pic=BOARD_PIC[m.land]||'tree', sky=BOARD_SKY[m.land]||'#F3E6C0';
-  const hw=BOARD_W/2, hh=BOARD_H/2;
-  cx.save(); cx.translate(BOARD_SPOT.x,BOARD_SPOT.y);
-  cx.globalAlpha=0.25; cx.fillStyle='#000';
-  cx.beginPath(); cx.ellipse(0,134,56,9,0,0,7); cx.fill(); cx.globalAlpha=1;
-  // twin posts down to the boards (the sign family's wood)
-  cx.strokeStyle='#6e5130'; cx.lineWidth=9; cx.lineCap='round';
-  cx.beginPath(); cx.moveTo(-hw+16,130); cx.lineTo(-hw+16,0); cx.moveTo(hw-16,130); cx.lineTo(hw-16,0); cx.stroke();
-  cx.lineCap='butt';
-  // plank frame + the postcard face (the world's own colour — land recognition)
-  cx.fillStyle='#8f6b3f'; rr(-hw-6,-hh-6,BOARD_W+12,BOARD_H+12,8); cx.fill();
-  cx.strokeStyle='#6e5130'; cx.lineWidth=3; rr(-hw-6,-hh-6,BOARD_W+12,BOARD_H+12,8); cx.stroke();
-  cx.fillStyle=sky; rr(-hw,-hh,BOARD_W,BOARD_H,5); cx.fill();
-  // the picture — the shipped card recipe (mock scen item, still friendly pose),
-  // clipped to the face so no glyph ever leans off the sign
-  cx.save(); cx.beginPath(); rr(-hw,-hh,BOARD_W,BOARD_H,5); cx.clip();
-  cx.translate(0,6); cx.scale(BOARD_GS,BOARD_GS);
-  drawScenItem({t:pic,v:0,ra:null,pop:0,wave:0},-C/2,-C/2,1.2);
-  cx.restore();
-  cx.restore();
-}
+// E44's boardNext/menuBoard (the departure board) DELETED in E84 — the sign
+// pointed at the next PLAY departure and PLAY retired in E83; the E82 park
+// expired, the rm-able law exercised.
 function menuStore(){
   // SHOP = A LITTLE STOREFRONT — the E22 door recipe stood up on the boards:
   // dark toy-chest wood, the red/cream scalloped awning, a gold star sign, a
@@ -9524,7 +9604,7 @@ function wallTick(){
   WALL.fli=idx; WALL.flr=fl;
 }
 function boardShow(b){ BOARD_BOOK=b; showScreen('board'); }   // one book per visit — the wall's tap grammar
-function boardFilter(){ $('bpanel').className='bk-'+BOARD_BOOK; }
+function boardFilter(){ $('bpanel').className=tripDone()? 'bk-all' : 'bk-'+BOARD_BOOK; }   // E84: the whole trip won → TROPHY dress (all three books under the crown)
 function buildWall(){
   const bk=$('wbooks');
   for(const b of ['ten','pk','sa']){
@@ -10215,11 +10295,8 @@ function bedBounds(){
   // E26: every object's footprint (pill included) is furniture — blocked cells
   // through THE predicate, exactly like the piggy's spot
   for(const o of ROOM_OBJS) addRect(o.hit.x,o.hit.y,o.hit.x+o.hit.w,o.hit.y+o.hit.h);
-  // E44: the departure board is furniture too (frame + posts + shadow). A pre-v5.3
-  // room that already parked a toy here KEEPS it (row-forgiving law) — it simply
-  // stands in front of the sign; only NEW drops are refused.
-  if(ROOM_BOARD) addRect(BOARD_SPOT.x-BOARD_W/2-6, BOARD_SPOT.y-BOARD_H/2-6,
-          BOARD_SPOT.x+BOARD_W/2+6, BOARD_SPOT.y+140);   // E82: parks with its board
+  // E84: the departure board's furniture rect left with the board — those
+  // cells are floor again (a toy a pre-v5.3 room parked there always kept).
   // E54: the SPILL toys + THE BROOM are furniture — where a tap grabs a source
   // (or arms the sweep), a drop must refuse (the piggy law). Painting-space
   // rects through the same door as everything else.
@@ -10333,7 +10410,6 @@ function drawMenu(){
   if(MENU_PROPS.includes('toybox')) menuToybox();
   if(ROOM_BED) drawBroom();                           // E54: TIDY lives on the wall now — furniture, like the pig (E82: parks with bedroom build)
   if(MENU_PROPS.includes('station')) menuStation();   // E26: the floor buildings, south of the rug
-  if(MENU_PROPS.includes('board')) menuBoard();       // E44: the departure board, beside the platform
   if(MENU_PROPS.includes('store')) menuStore();
   if(PIG_SHOW) drawPig();   // E23: the piggy on the boards — furniture, under the toys
   // the attract loop, painted by the real track + car painters (E18: transform
@@ -10417,6 +10493,7 @@ function tripNext(){
   return null;
 }
 function tripHost(){ const t=tripNext(); return t? t.b : 'sa'; }   // all beaten → Santa keeps the door (the finale host) ⚑
+function tripDone(){ return !tripNext(); }   // E84: the whole trip won — the door becomes the REPLAY DOOR (trophy board)
 // ---- the front's state: one dt clock + the left door's little world ----
 const FRONT={t:0, rects:null, smoke:[], smokeT:0,
              set:{grid:new Map(), hg:new Map(), cars:[], wheel:0}};
@@ -10568,18 +10645,21 @@ function frontDoorSet(r){
   cx.restore();
 }
 function frontPlay2(r){ cx.save(); cx.translate(r.x,r.y); frontPlay(r.w,r.h); cx.restore(); }
-function frontHostArt(b){
+function frontHostArt(b,t){
   // the trip door's host at origin, waving (the CHARM law — one arm up):
   // ten = the E60 conductor (his figure verbatim, door scale), pk = drawKing,
   // sa = drawSanta. Painted standing on the scene's ground line.
-  if(b==='pk'){ drawKing({wave:1},FRONT.t); return; }
-  if(b==='sa'){ drawSanta({wave:1},FRONT.t); return; }
+  // E84: an optional clock — the transfer moment runs him on ITS beat while
+  // the front's clock stands frozen; the front's callers pass nothing (byte-true).
+  if(t===undefined) t=FRONT.t;
+  if(b==='pk'){ drawKing({wave:1},t); return; }
+  if(b==='sa'){ drawSanta({wave:1},t); return; }
   // THE CONDUCTOR — drawCaller's body, the door edition (same navy, same cap)
   cx.lineCap='round'; cx.lineJoin='round';
   cx.strokeStyle='#28486B'; cx.fillStyle='#28486B'; cx.lineWidth=4.6;
   cx.beginPath(); cx.moveTo(0,-7); cx.lineTo(0,4); cx.stroke();
   cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(-6,1); cx.stroke();
-  cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(6,-16+Math.sin(FRONT.t*11)*3); cx.stroke();
+  cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(6,-16+Math.sin(t*11)*3); cx.stroke();
   cx.beginPath(); cx.moveTo(0,4); cx.lineTo(-4,11); cx.moveTo(0,4); cx.lineTo(4,11); cx.stroke();
   cx.fillStyle='#E8C39A'; cx.beginPath(); cx.arc(0,-11,4.6,0,7); cx.fill();
   cx.fillStyle='#28486B';
@@ -10784,7 +10864,7 @@ function frontDown(e){
     SND.tok();
     const t=tripNext();
     if(t) campEnter(t.n,t.b);          // straight into the next unbeaten level — no board, no picker
-    else showScreen('wall');           // the whole trip won → the postcard wall stands in until E84's replay door ⚑
+    else showScreen('board');          // E84 THE REPLAY DOOR: the whole trip won → the trophy board (bk-all)
     tapSwallow(); return;
   }
   if(hit(R.store)){ SND.tok(); storeShow(true); tapSwallow(); return; }
@@ -12513,6 +12593,7 @@ function campExit(dest){
   BOARD_BOOK=CAMP.book;   // E56: leaving a level lands you on YOUR book's board (one book per visit)
   cndKill();                                         // E52: leaving mid-moment just ends it — the next entry brings its own
   CWIPE.armed=0; CWIPE.on=0; CTRANS.on=0; CTRANS.fired=0;   // E66: walking out mid-ceremony cancels the clouds (E68: and the ride)
+  TMOM.on=0; TMOM.fired=0;                           // E84: and the transfer — the next finale brings its own
   CAMP.on=false; CAMP.level=0; CAMP.won=false; CAMP.wx=null; winT=0; prettyT=0; prettyPend=false;   // E35: the sky pill override dies with the visit
   ridersOff();                                       // E15: the level's platforms empty out
   applyRug();                                        // E10→E83: the BUILD rug comes back at its own dims
@@ -12812,7 +12893,7 @@ function buildBoard(){
   // E26→E56: the CAMPAIGN button died, then the TICKETS poster did — the door's
   // postcard wall is the way in now, and the board's one close is the ⬇ OUT
   // plank, climbing back out to the wall (#bback retired with its sentence).
-  $('bpanel').appendChild(outPlank(()=>showScreen('wall')));
+  $('bpanel').appendChild(outPlank(()=>showScreen(FRONT_DOORS?'menu':'wall')));   // E84: under the front the trophy board's OUT goes home; the flip world keeps its climb to the wall
   $('backChip').addEventListener('click',()=>{ ac(); SND.click(); campExit('board'); });
   $('goalChip').addEventListener('click',()=>{   // E52: tap the goal = watch the conductor again
     if(!(SCREEN==='game'&&CAMP.on)||CND.on) return;
@@ -12820,7 +12901,8 @@ function buildBoard(){
   });
   $('nextBtn').addEventListener('click',()=>{
     ac(); SND.tok();
-    if(CAMP.level<bookL().length) campEnter(CAMP.level+1,CAMP.book); else campExit('board');   // E50: NEXT stays inside the open book
+    if(CAMP.level<bookL().length) campEnter(CAMP.level+1,CAMP.book);
+    else campExit(tripNext()? 'menu':'board');   // E50→E84: the last caboose lands on the TROPHY BOARD; mid-trip stubs land home (the board does not exist yet)
   });
 }
 function boardSync(){
@@ -12857,7 +12939,9 @@ function winSync(){
   // prizes, and a button under the card is just something to fat-finger (E8).
   // E66: non-final levels advance through the clouds now — only the book's
   // FINALE keeps a button (there is no next level to ride to).
-  const show=SCREEN==='game'&&CAMP.on&&CAMP.won&&!toyCard&&!toyQ.length&&CAMP.level>=bookL().length;
+  // E84: when the trip carries on into another book the transfer moment plays
+  // instead — the plank stands only at the LAST caboose (or a rig-only stub).
+  const show=SCREEN==='game'&&CAMP.on&&CAMP.won&&!toyCard&&!toyQ.length&&CAMP.level>=bookL().length&&!tmomTarget();
   b.style.display=show?'block':'none';
   if(show) b.textContent='BACK TO THE BOARD 🎫';
 }
@@ -13684,6 +13768,7 @@ cvs.addEventListener('pointerdown',e=>{
   ac(); e.preventDefault();
   if(CND.on){ cndEnd(true); return; }            // E52 THE SKIP: any touch lands the moment instantly — and the skip EATS the touch
   if(CTRANS.on&&!CTRANS.fired){ ctransFire(); return; }   // E68: the ride obeys the same law — a tap brings the clouds NOW
+  if(TMOM.on&&!TMOM.fired){ tmomFire(); return; }         // E84: so does the transfer moment — the child outranks the show
   // E55 dismiss law 2 (E25 grammar): a finger on the map folds the chest AND
   // still does its whole normal job — the fold never swallows the press.
   if($('toybox').style.display!=='none') boxShow(false);
@@ -15290,11 +15375,12 @@ function showScreen(s){
   if(s==='board'){ boardFilter(); boardSync();
     // E71: a hundred tickets is a long board — opening it brings the FRONTIER
     // ticket (the first unwon) into view, instantly (no smooth ride for a kid).
-    if(BOARD_BOOK==='ten'){ let n=1; while(n<=LEVELS.length&&CAMP.done.has(n)) n++;
+    // E84: the trophy board opens at its crown — everything is won, top first.
+    if(BOARD_BOOK==='ten'&&!tripDone()){ let n=1; while(n<=LEVELS.length&&CAMP.done.has(n)) n++;
       const tk=document.querySelector('#tickets .tk[data-n="'+Math.min(n,LEVELS.length)+'"]');
       if(tk) tk.scrollIntoView({block:'center',behavior:'auto'});
     } else $('bpanel').scrollTop=0;
-  }   // E56: one book per visit (BOARD_BOOK gates the trio)
+  }   // E56: one book per visit (BOARD_BOOK gates the trio) — E84: bk-all after the last caboose
   $('wall').style.display=s==='wall'?'flex':'none';   // E56 THE POSTCARD WALL — the door's inside
   if(s==='wall') wallSync();
   $('rail').style.display=(game||play)?'flex':'none';    // E33→E55: the rail is BUILD/campaign furniture — E58: PLAY too (YOUR TRACK: the crate follows the hand onto the wind-up rug)
@@ -16989,9 +17075,13 @@ drawLvlShop(); lvlShopWire();
 // frGuideOn() and menuSeen still stamps on the first menu landing.
 function bootLine(){
   if(!BOOT_LINE) return firstRun()&&campEnter(1);   // BOOT_LINE off = the E70 law verbatim
-  let n=1; while(n<=LEVELS.length&&CAMP.done.has(n)) n++;
-  if(n>LEVELS.length) n=LEVELS.length;
-  return campEnter(n);
+  // E84: the morning train rides THE WHOLE TRIP — every boot lands at the
+  // trip's next stop, whatever the book (per-book wip restores in campEnter,
+  // so a mid-level quit reboots exactly where it left off). The whole trip
+  // won → wake on the LAST CABOOSE (the world is the best place to wake up).
+  const t=tripNext();
+  if(t) return campEnter(t.n,t.b);
+  return campEnter(SA_LEVELS.length,'sa');
 }
 if(bootLine()){} else showScreen('menu');
 AU.on=true;   // E71b: the sound chip retired — the phone owns volume, and no old save stays stranded muted
@@ -17102,10 +17192,7 @@ window.TS={
       dog:ROOM.dog? {t:+ROOM.dog.t.toFixed(3),k:ROOM.dog.k} : null,
       gag:ROOM_GAG, every:DOG_EVERY, window:PICKME_S }; },
     sign(){ return { x:MENU_W/2-250*SIGN_K, y:SIGN_TOP, w:500*SIGN_K, h:88*SIGN_K, k:SIGN_K }; },
-    board(){ const m=boardNext();   // E44 — the departure board, for the battery
-      return { pic:BOARD_PIC[m.land]||'tree', land:m.land, name:m.name, sky:BOARD_SKY[m.land]||'#F3E6C0',
-        box:{ x:BOARD_SPOT.x-BOARD_W/2, y:BOARD_SPOT.y-BOARD_H/2, w:BOARD_W, h:BOARD_H } }; },
-    vis(){ return menuVis(); },
+    vis(){ return menuVis(); },   // E84: the board() door left with the departure board
     tap(id){ const o=ROOM_OBJS.find(o2=>o2.id===id); if(!o) return false; o.tap(); return true; },
     reset(){ ROOM.t=0; ROOM.win=-1; ROOM.fx=null; ROOM.dog=null; return true; },
     // E37 — the room-remembers doors: the sky dial, the memory state, the sweep
@@ -17283,6 +17370,12 @@ window.TS={
     trainS(){ const c=FRONT.set.cars[0]; return c? c.rd.cx*1000+c.rd.cy*100+c.rd.s : null; },
     pig(){ return { rug:pigRug(), xy:pigRugXY(), s:PIG_RUG_S }; },
   },
+  // E84 — the transfer moment's battery doors (FLAT keys, the v48 dup-key trap)
+  tmom:{
+    state(){ return { on:TMOM.on, t:+TMOM.t.toFixed(3), b:TMOM.b, n:TMOM.n, fired:TMOM.fired, hold:TMOM_S }; },
+    fire(){ tmomFire(); return !!TMOM.fired; },
+  },
+  trip:{ next(){ return tripNext(); }, done(){ return tripDone(); } },
   xy(gx,gy){ return { x:OX+SC*(GX+gx*C+C/2), y:OY+SC*(GY+gy*C+C/2) }; },   // cell centre in client px (pointer rigs)
   // E31 — the charm probe (rig-only): the scen at a cell with its live wave
   // timer, so a battery can assert a reaction armed on a REAL pass without
