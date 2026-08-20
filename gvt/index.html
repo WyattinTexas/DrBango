@@ -1570,6 +1570,19 @@
   .wr-boss.down .wr-bwell img { filter:grayscale(1) brightness(0.66) drop-shadow(0 2px 2px rgba(0,0,0,0.55)); opacity:0.45; }
   .wr-boss.down .wr-bwell { border-color:rgba(191,198,173,0.14); }
   .wr-boss.down .wr-btick { display:flex; }
+  /* FM-GVT-BADGES-01 (0441): THE WALL WEARS THE METALS — a beaten face's ring
+     is the .wr-bwell border wearing the DEEPEST difficulty beaten (easy
+     BRONZE / medium SILVER / hard GOLD / 👑MEGA PURPLE) + a soft matching
+     glow so bronze-vs-gold reads at badge size on the dark felt. Stateless
+     classes minted in the same innerHTML pass (the rebuild law); tierless
+     faces (NEMESIS · MOM · ROBO-SARGE) never wear one (L4). These rows sit
+     AFTER the .down dim so the metal wins the border at equal specificity;
+     the inset+drop stack is restated (box-shadow never composes). ⚑ the
+     four hexes + glow alphas are dials (§6). */
+  .wr-boss.t-e .wr-bwell { border-color:#C08347; box-shadow:inset 0 -8px 14px rgba(0,0,0,0.45), 0 3px 8px rgba(0,0,0,0.5), 0 0 10px 1px rgba(192,131,71,0.55); }
+  .wr-boss.t-m .wr-bwell { border-color:#C9CFD8; box-shadow:inset 0 -8px 14px rgba(0,0,0,0.45), 0 3px 8px rgba(0,0,0,0.5), 0 0 10px 1px rgba(201,207,216,0.55); }
+  .wr-boss.t-h .wr-bwell { border-color:#E8C24A; box-shadow:inset 0 -8px 14px rgba(0,0,0,0.45), 0 3px 8px rgba(0,0,0,0.5), 0 0 10px 1px rgba(232,194,74,0.60); }
+  .wr-boss.t-g .wr-bwell { border-color:#B45BFF; box-shadow:inset 0 -8px 14px rgba(0,0,0,0.45), 0 3px 8px rgba(0,0,0,0.5), 0 0 11px 2px rgba(180,91,255,0.65); }
   .wr-bname { min-height:1.35em; font-size:clamp(10px,2vh,16px); letter-spacing:0.1em; color:#EDEADF;
     text-align:center; opacity:0; transition:opacity 0.25s; }
   .wr-bname.on { opacity:1; }
@@ -31188,7 +31201,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.03';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.04';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -62976,22 +62989,52 @@ function wrPreload(){ if(wrPreloaded) return; wrPreloaded=true;
 // pieces, and no enemy may borrow your wardrobe (the v2.16 law). Tap a face →
 // its name breathes under the wall ~1.6s (UI.wrBoss). No numbers anywhere on
 // the rail — advCount/ADV_MAX still rank the rows and the muster footer.
-function wrBossWallHTML(){
-  const any=k=>{ const b=META[k]; return !!(b&&(b.e||b.m||b.h||b.g)); };
+// 0441 FM-GVT-BADGES-01 — THE WALL WEARS THE METALS (Wyatt 8/19: "the
+// border around it becomes bronze"): a beaten face's circle border takes the
+// DEEPEST difficulty beaten — easy BRONZE · medium SILVER · hard GOLD ·
+// 👑MEGA PURPLE, best wins (g>h>m>e). Tier truth = the king ledgers
+// ADV_CELLS already reads (bone/ice/croak × e/m/h/g), guarded the same way —
+// a hand-rolled save clamps, never throws. NEMESIS · MOM · ROBO-SARGE are
+// TIERLESS fights: they keep the plain gold-✓ beaten look EXACTLY, no ring
+// (a metal MEANS a difficulty — ⚑ §6). Rings are stateless .t-e/.t-m/.t-h/
+// .t-g classes minted in the same innerHTML pass — zero animation, no new
+// rAF, ZERO new ledgers, zero META writes. wrBossWallHTML stays the ONE
+// renderer: no arg = MY wall off META; 0442 feeds it another commander's
+// decoded tier-bag. The six face URIs mint ONCE per session (wrFaceURIs —
+// the art is boot-static and the wall re-encoded all six every repaint).
+function wrTier(k){ const b=META[k]; return b? (b.g?'g': b.h?'h': b.m?'m': b.e?'e': '') : ''; }
+function wrWallBag(){
+  return { nemesis:{ done:(((META.nemesis&&META.nemesis.w)|0)>0), tier:'' },
+           mom:    { done:!!(META.mom&&META.mom.done),            tier:'' },
+           robo:   { done:!!(META.robo&&META.robo.done),          tier:'' },   // FM-GVT-ROBO-01: the L90 finale is campaign — tierless by design (the ledger latches when he falls on the L90 carpet, foeFell's boss door)
+           rex:    { done:!!wrTier('bone'),  tier:wrTier('bone')  },
+           yeti:   { done:!!wrTier('ice'),   tier:wrTier('ice')   },
+           croak:  { done:!!wrTier('croak'), tier:wrTier('croak') } };
+}
+let WR_FACES=null;
+function wrFaceURIs(){
+  if(WR_FACES) return WR_FACES;
   const nem='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 0 102 102">'
     +(SARGE_ART.lightsaber||SPRITES_SRC.sarge).split('currentColor').join(TAN).split('BLADEHEX').join(NEMESIS_SABER)+'</svg>');
+  WR_FACES={ nemesis:nem, mom:sprURI('mom',null,'0 385 160 122'), robo:sprURI('robo',null,'10 2 100 100'),
+    rex:sprURI('kingrex',null,'6 2 130 130'), yeti:sprURI('kingyeti',null,'-37 -26 194 168'), croak:sprURI('kingcroak',null,'0 0 140 140') };
+  return WR_FACES;
+}
+function wrBossWallHTML(bag){
+  const B=bag||wrWallBag(), F=wrFaceURIs(), TC={e:' t-e',m:' t-m',h:' t-h',g:' t-g'};
   const wall=[   // FM-GVT-WALLDOORS-01: entries carry a stable id — the door dispatcher (UI.wrBossGo) keys on it, never on the localized display name (D9)
-    { id:'nemesis', nm:'NEMESIS',    img:nem,                                        done:(((META.nemesis&&META.nemesis.w)|0)>0) },
-    { id:'mom',     nm:'MOM',        img:sprURI('mom',null,'0 385 160 122'),         done:!!(META.mom&&META.mom.done) },
-    { id:'robo',    nm:'ROBO-SARGE 3000', img:sprURI('robo',null,'10 2 100 100'),    done:!!(META.robo&&META.robo.done) },   // FM-GVT-ROBO-01: the sixth face — "next to Mom" (Wyatt 8/19, right after her); the ledger latches when he falls on the L90 carpet (foeFell's boss door)
-    { id:'rex',     nm:'KING REX',   img:sprURI('kingrex',null,'6 2 130 130'),       done:any('bone') },
-    { id:'yeti',    nm:'KING YETI',  img:sprURI('kingyeti',null,'-37 -26 194 168'),  done:any('ice') },
-    { id:'croak',   nm:'KING CROAK', img:sprURI('kingcroak',null,'0 0 140 140'),     done:any('croak') }
+    { id:'nemesis', nm:'NEMESIS' },
+    { id:'mom',     nm:'MOM' },
+    { id:'robo',    nm:'ROBO-SARGE 3000' },   // FM-GVT-ROBO-01: the sixth face — "next to Mom" (Wyatt 8/19, right after her)
+    { id:'rex',     nm:'KING REX' },
+    { id:'yeti',    nm:'KING YETI' },
+    { id:'croak',   nm:'KING CROAK' }
   ];
   return '<div class="wr-wall"><div class="wr-wrow">'
-    +wall.map(b=>'<button type="button" id="wrb-'+b.id+'" class="wr-boss'+(b.done?' down':'')+'" aria-label="'+b.nm+'" onclick="UI.wrBossGo(\''+b.id+'\',\''+b.nm+'\')">'
-      +'<span class="wr-bwell"><img src="'+b.img+'" alt=""></span>'
-      +'<span class="wr-btick">✓</span></button>').join('')
+    +wall.map(b=>{ const s=B[b.id]||{};
+      return '<button type="button" id="wrb-'+b.id+'" class="wr-boss'+(s.done?' down'+(TC[s.tier]||''):'')+'" aria-label="'+b.nm+'" onclick="UI.wrBossGo(\''+b.id+'\',\''+b.nm+'\')">'
+      +'<span class="wr-bwell"><img src="'+F[b.id]+'" alt=""></span>'
+      +'<span class="wr-btick">✓</span></button>'; }).join('')
     +'</div><div class="wr-bname" id="wrBossName"></div></div>';
 }
 // ============ 0411 THE CHALLENGE, ASYNC — THE WANTED POSTER + THE BAND ============
