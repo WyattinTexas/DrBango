@@ -30016,7 +30016,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.89';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.90';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -61068,14 +61068,16 @@ function chalBandHi(){ const me=chalMe(); return me? (me.rank|0)+CHAL_BAND : 0; 
 // today's away tallies + the unseen came-for-you count (chip/badge/pill)
 function chalToday(){ const A=awayLedger(); let w=0,l=0; for(const k in A.done){ if(A.done[k]) w++; else l++; } return {w:w,l:l}; }
 function chalBadgeN(){ return awayRows().length; }
-// the row's state chip (RATING rows + ALL 100). 💤 = a persona, or a row
-// HQ says never reported (the D4 `a` bit); an old box serves no `a` — the
-// state is learned at tap time, exactly today.
+// the row's state chip (RATING rows + ALL 100). 💤 = a row HQ says never
+// reported (the D4 `a` bit ALONE — 0417: the personas wear v30's minted
+// armies now, so the old uid-prefix test is gone and the furniture fights;
+// an old box still serves a:0 for them and the chip honestly sleeps); no
+// `a` served = the state is learned at tap time, exactly today.
 function chalChip(row, btn){
   const A=awayLedger(), d=A.done[row.uid];
   let cls='', txt;
   if(d!=null){ cls=d?' won':' lost'; txt=d? t('✓ BEATEN') : t('✗ HELD'); }
-  else if(String(row.uid).indexOf('persona_')===0 || row.a===0){ cls=' zz'; txt=t('💤 NO ARMY'); }
+  else if(row.a===0){ cls=' zz'; txt=t('💤 NO ARMY'); }
   else txt=t('⚔ BATTLE');
   return btn? '<button type="button" class="ch2'+cls+'" onclick="UI.wrRow(\''+row.uid+'\')">'+txt+'</button>'
             : '<span class="ch2'+cls+'">'+txt+'</span>';
@@ -61106,7 +61108,7 @@ function chalPosterOpen(uid, name){
     if(rat&&rat.a!=null) row.a=rat.a;   // v27 rat rows carry the D4 bit
     const c9=CHAL.lo[uid];
     if(c9){ row.a=c9.a; row.w=c9.w; row.sb=c9.sb; row.of=c9.of; if(c9.color) row.color=c9.color; }
-    else if(String(uid).indexOf('persona_')!==0 && row.a!==0){
+    else if(row.a!==0){   // 0417: personas dress-fetch like anybody — a:0 is the only sleeper
       netFetch(NET+'/defense?uid='+encodeURIComponent(uid)).then(r=>r.json()).then(d=>{
         if(!(d&&d.ok)) return;
         const ok=d.lo && d.lo.sw && typeof d.lo.sw==='object' && SARGE_WEAPONS[d.lo.sw.w];
@@ -61129,7 +61131,7 @@ function wrPosterHTML(row){
   const nm=wrDress(row.name||'COMMANDER', row.uid, false);   // the 0328 law — the poster wears the board's own dressed name
   const nmU=String(nm).toUpperCase();
   const uidq=escH(String(row.uid)), nmq=escH(String(nm).replace(/'/g,''));
-  const zz=String(row.uid).indexOf('persona_')===0 || row.a===0;
+  const zz=row.a===0;   // 0417: the D4 bit alone — a minted persona wears the red ⚔
   const inBand=chalInBand(row);
   const aw=(DUEL.away||[]).find(a=>a.frm===row.uid);   // the freshest came-for-you row (duel/list serves newest first)
   const rr=A.rec[row.uid];
