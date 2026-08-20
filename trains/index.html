@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v10.5 -->
+<!-- TRAINSET v10.6 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -2280,7 +2280,7 @@ const BELL_IDS=['bl_ding','bl_bell','bl_cuckoo','bl_cow'];
 const MODEL_IDS=['fount','stat','fire','arch','flag','mail2','bench','clock','vtree','bleaf','wolf','peng','iglu','roadr','bcact','pum','scrow','crow','atree','lant','king','pres','cott','rein','cpole','sfir','sant','uni','rbow'];   // E31: the jungle plants join the bits shelf; E35: the wolf; E42: the penguin + the igloo; E43: the roadrunner + the bloom cactus; E50: the patch's six; E51: the village's six; E71: the unicorn + the rainbow
 const COLL_NO_SALE=[];        // of the fifty, ids Wyatt pulls off the shelf (default: all sell)
 // THE STAR BANK — every mint amount is a dial; all of it generous, none of it a wall
-const MINT={ lap:1, station:1, bonk:1, clear:10, firstLap:5, pretty:1, piggy:PIG_PAYS };   // pretty = E14's scenery bonus · piggy = E23's daily base
+const MINT={ lap:1, station:1, bonk:1, clear:10, firstLap:5, pretty:1, piggy:PIG_PAYS, feat:5 };   // pretty = E14's scenery bonus · piggy = E23's daily base · feat = E85's all-owned fallback (wordless — never a ledger row)
 const FART_PITCH=1;           // the fart's pitch (×) — Wyatt's most important dial
 const CLOCK_SPIN=0.02;        // TOWN CLOCK hour hand, rad/s — the hands actually turn, slowly
 const baseColl=()=>new Set([...STARTERS,...STORE_FREE]);
@@ -2288,6 +2288,61 @@ const collN=()=>{ let n=0; for(const r of COLL) if(coll.has(r[0])) n++; return n
 let coll=baseColl();          // THE GATE: owned toy ids (save v:7) — only ADDING is gated,
                               // a save full of locked kinds keeps them on the rug forever
 let ENGINE='loco';            // which engine leads the shed train ('loco' | 'exp')
+
+/* =====================================================================
+   THE FEATS (E85, contract §4) — free play mints toys too. Eight
+   wordless, once-ever feats on the free-play rug; each pops the
+   EXISTING NEW TOY! card and grants the first unowned COLL row (THE
+   FIFTY STAY FIFTY — STORE goods never grant); all fifty owned → ★5
+   through the MINT dial instead. Checked ONLY at the existing
+   save/mutation seams (layAt · the scen commit · goTrain · the station
+   pause · the cell-entry law · the lap law · rugGrowFor) — no new
+   clocks, no per-frame scans. Ids append once-ever to feats:[] (the
+   E83 v:12 seed, zero schema); names render NOWHERE (the wordless
+   call — the gold card's own grammar says everything).
+   ===================================================================== */
+const FEAT_TREES=10, FEAT_TRACK=40, FEAT_KINDS=5, FEAT_TRAINS=3, FEAT_STATIONS=4;   // one dial each
+// Session transients — progress toward UNFIRED feats only (feats:[] is the
+// ledger and it persists; worst case a reload asks for the fun thing again).
+// laid = cells the kid's own hand committed through layAt, in lk "x,y:e"
+// format so shiftWorld re-keys them with the same skey move as stKey.
+const FEAT={ laid:new Set(), trees:0, kinds:new Set(), rig3:0 };
+// Free-play running trains. TODAY that is THE train (≤1) — the multi-train
+// machinery retired with PLAY-the-mode (E83), so THREE AT ONCE ships
+// wired-and-waiting: the day free play learns more trains, count them here
+// and the feat wakes with zero new code. rig3 = the battery's stand-in.
+const featTrains=()=>((TRAIN.placed&&TRAIN.running)?1:0)+(FEAT.rig3|0);
+const featTrack=()=>{ let n=0;                     // rug-state track count — spiral 'ref' stubs are not pieces
+  for(const pc of grid.values()) if(pc.t!=='ref') n++;
+  for(const pc of hgrid.values()) if(pc.t!=='ref') n++; return n; };
+// THE EXTENSION POINT — add a row (id is law, it lands in feats:[]), hang its
+// check on a seam via `on`. Site-qualified rows (bridge/grow) pass when:true —
+// their seam already asked the whole question.
+const FEATDEF=[
+  {id:'loop',    on:'lap',    when:()=>!!TRAIN.ownTrack},                                    // MY FIRST LOOP — your own closed loop runs a lap
+  {id:'trees',   on:'scen',   when:()=>FEAT.trees>=FEAT_TREES},                              // TREE TOWN — the kid's own tree placements this sitting
+  {id:'bridge',  on:'bridge', when:()=>true},                                                // OVER THE WATER — a train crosses a kid-laid bridge
+  {id:'line',    on:'lay',    when:()=>featTrack()>=FEAT_TRACK},                             // THE LONG LINE — rewards the big map (seed + hand alike)
+  {id:'dress',   on:'scen',   when:()=>FEAT.kinds.size>=FEAT_KINDS},                         // ALL DRESSED UP — the E14 pretty law, free-play edition
+  {id:'three',   on:'go',     when:()=>featTrains()>=FEAT_TRAINS},                           // THREE AT ONCE — wired-and-waiting (see featTrains)
+  {id:'central', on:'stop',   when:()=>!!TRAIN.visited&&TRAIN.visited.size>=FEAT_STATIONS},  // GRAND CENTRAL — one run visits four stations
+  {id:'grow',    on:'grow',   when:()=>true},                                                // THE EXPLORER — the rug grew past its first edge
+];
+const featPos=()=>{ if(TRAIN.placed){ const p=pos(TRAIN.cars[0].rd); return {x:p.x,y:p.y-LIFT*(p.z||0)}; }
+  return {x:GX+GW*C/2,y:GY+GH*C/2}; };
+function featFire(id){
+  if(FEATS.includes(id)) return false;             // once-ever, silent forever
+  FEATS.push(id);
+  const row=COLL.find(r=>!coll.has(r[0]));         // first unowned of THE FIFTY — COLL's order IS the curated arc
+  if(row){ coll.add(row[0]); collChanged(); toyQ.push(row[0]); if(!toyCard) toyNext(); }   // the campaign's own NEW TOY! ceremony, free-play door
+  else { const p=featPos(); starMint(MINT.feat,p.x,p.y); }   // all fifty owned → the star flight IS the ceremony
+  save(); return true;
+}
+function featCheck(tag){
+  if(SCREEN!=='game'||CAMP.on||PLAY.on||BED.ctx) return;   // the never-mint law: free play only — campaign, the
+  for(const f of FEATDEF)                                  // retired wind-up mode, the bedroom and the menu never mint
+    if(f.on===tag&&!FEATS.includes(f.id)&&f.when()) featFire(f.id);
+}
 
 const TAU=Math.PI*2;
 const perf=()=>performance.now()/1000;
@@ -2681,6 +2736,10 @@ function shiftWorld(dx,dy){
     return (x+dx)+','+(y+dy)+(j<0?'':k2.slice(j)); };
   for(const c2 of TRAIN.cars){ c2.rd.cx+=dx; c2.rd.cy+=dy; }   // s/pi/dir untouched — the arc math is exact
   TRAIN.stKey=skey(TRAIN.stKey); TRAIN.startSig=skey(TRAIN.startSig);   // the LAP survives growth
+  // E85 — the feat transients live in the same "x,y:e" grammar precisely so
+  // this is the same one move: pending progress survives a left/top band.
+  { const n2=new Set(); for(const k2 of FEAT.laid) n2.add(skey(k2)); FEAT.laid=n2; }
+  if(TRAIN.visited){ const n2=new Set(); for(const k2 of TRAIN.visited) n2.add(skey(k2)); TRAIN.visited=n2; }
   { const n=new Map(); for(const [k2,v] of PLAT) n.set(skey(k2),v); PLAT.clear(); for(const [k2,v] of n) PLAT.set(k2,v); }
   FRIEND.at=skey(FRIEND.at);
   if(EAGER.last){ EAGER.last.x+=dx; EAGER.last.y+=dy; }
@@ -2707,6 +2766,7 @@ function rugGrowFor(cx2,cy2){
   GW=RUG.w; GH=RUG.h; WORLD_W=GW*C+2*GX; WORLD_H=GH*C+2*GY;   // never applyRug — that refits the camera
   if(L2||T2) shiftWorld(L2,T2);
   clampView(); viewApply();                              // only ever loosens
+  featCheck('grow');                                     // E85 THE EXPLORER — the growth seam is already free-play-gated above
   return [cx2+L2,cy2+T2];
 }
 
@@ -2728,7 +2788,8 @@ let LIVE=false;                       // true only while the real consist advanc
 let yayCd=0, pplSeq=0, chirpN=0;      // chirpN: charm chirps fired, for the rig
 let consist=['tender','box'];         // cars behind the loco
 const TRAIN={ placed:false, cars:[], F:true, running:false, pauseT:0, stKey:null,
-              dist:0, startSig:null, goDist:0, revSinceGo:false };
+              dist:0, startSig:null, goDist:0, revSinceGo:false,
+              visited:null, ownTrack:false };   // E85 run transients — distinct stations since GO · the run has crossed a kid-laid cell; never serialized
 let DRAG=null;
 let hover=null;
 let hintStage=0, lapDone=false;
@@ -3420,6 +3481,8 @@ function goTrain(){
   TRAIN.revSinceGo=false;                  // a campaign win wants a TRUE loop, not a ping-pong
   GRAV.mul=1; GRAV.crest=false; clackAcc=0;   // E15: every run starts flat-hearted
   if(CAMP.on){ CAMP.visited=new Set(); goalSync(); }   // station visits count "since GO" (E5 win law; E52: the pips honestly unfill)
+  TRAIN.visited=new Set(); TRAIN.ownTrack=false;       // E85 — GRAND CENTRAL + MY FIRST LOOP count "since GO" too (the same law)
+  featCheck('go');                                     // E85 THREE AT ONCE — a run's birth is when the count can change
   shelfSync(); return true;
 }
 
@@ -3521,7 +3584,8 @@ function update(dt){
             if(CAMP.on){ CAMP.visited.add(lk); goalSync(); }   // pause-visited, since GO (the E5 win check; E52: the pip fills NOW)
             // E9: a station stop pays 1★ in BUILD (the campaign pays per first clear
             // instead). Re-armed by the stKey cell-exit law — no parking-on-the-station farm.
-            else { const sp=pos(lc); starMint(MINT.station,sp.x,sp.y-LIFT*(sp.z||0)); }
+            else { const sp=pos(lc); starMint(MINT.station,sp.x,sp.y-LIFT*(sp.z||0));
+              if(TRAIN.visited){ TRAIN.visited.add(lk); featCheck('stop'); } }   // E85 GRAND CENTRAL — distinct stations since GO, the same (cell,elev) key
           }
         }
         // the diamond (E8, level 7): the loco having ridden a named cell since GO.
@@ -3533,6 +3597,12 @@ function update(dt){
         }
         if(lk!==locoPrev){
           if(TRAIN.stKey && TRAIN.stKey!==lk) TRAIN.stKey=null;
+          // E85 — the cell-entry law asks two feat questions, one Set.has each:
+          // riding a kid-laid cell latches "your own" for the lap; a kid-laid
+          // BRIDGE under the loco is OVER THE WATER (the seed's bridge never
+          // is — FEAT.laid holds only the hand's own commits).
+          if(!CAMP.on&&FEAT.laid.has(lk)){ TRAIN.ownTrack=true;
+            if(lpc&&lpc.t==='br') featCheck('bridge'); }
           // a lap — the loco re-enters where GO was pressed, same heading, SAME LEVEL.
           // Free play keeps its once-per-save FIRST LAP! card; the campaign listens to the
           // very same machinery every lap and never touches the free-play flag.
@@ -3542,7 +3612,8 @@ function update(dt){
             else {
               // E9: every TRUE lap pays 1★ (ping-pong bounces don't — press GO to re-arm);
               // the once-per-save FIRST LAP! card rides its own +5 on top.
-              if(!TRAIN.revSinceGo){ const lp2=pos(lc); starMint(MINT.lap,lp2.x,lp2.y-LIFT*(lp2.z||0)); }
+              if(!TRAIN.revSinceGo){ const lp2=pos(lc); starMint(MINT.lap,lp2.x,lp2.y-LIFT*(lp2.z||0));
+                featCheck('lap'); }   // E85 MY FIRST LOOP — a TRUE lap whose run crossed the kid's own track
               if(!lapDone){ lapDone=true; firstLap(); }
             }
           }
@@ -3595,7 +3666,8 @@ function update(dt){
   if(winT>0){ winT-=dt; if(winT<0) winT=0;
     if(!winT&&prettyPend){ prettyPend=false; prettyT=PRETTY_T; SND.ding(); } }   // E14: the compliment follows the win card out
   if(prettyT>0){ prettyT-=dt; if(prettyT<0) prettyT=0; }
-  if(CAMP.on) toyTick(dt);
+  if(CAMP.on||toyCard) toyTick(dt);   // E85: a feat's card ticks its own pop clock on the free rug
+                                      // (auto-advance stays campaign-only inside — CAMP.won gates it)
   cwipeTick(dt);   // E66: the clouds carry a finished level to the next one
 }
 // E7 — trackside furniture watches the trains go by, keyed (cell, elev) like everything:
@@ -12141,6 +12213,7 @@ function starterLine(){
 // a station and arrives on her own law — a train already running, zero code.
 function stampCore(M){
   grid.clear(); hgrid.clear(); scen.clear();
+  FEAT.laid.clear();   // E85: a stamped bridge on a cell you once laid is NOT your bridge
   TRAIN.placed=false; TRAIN.running=false; TRAIN.cars=[]; trailClear(); ridersOff();
   RUG.w=M.w||SIZES.sm.gw; RUG.h=M.h||SIZES.sm.gh; applyRug();
   LAND=LANDS.includes(M.land)? M.land : 'rug';
@@ -12539,6 +12612,8 @@ function campEnter(n,b){
   applyDims(L.size==='lg'||L.size==='xl'? L.size : 'sm');
   CAMP.on=true; CAMP.book=b; CAMP.level=n; CAMP.won=false; CAMP.tugT=false; CAMP.wx=null;   // E35: every level opens under its own sky
   CAMP.visited=new Set(); winT=0; prettyT=0; prettyPend=false;
+  toyQ.length=0; toyCard=null;                // E85: a pending free-play feat card never leaks into a level (its grant
+                                              // already persisted; campaign flows arrive here drained — the E84 law)
   FRN.armed=false; FRN.t=0;                   // E70: the nudge arms fresh per visit — only a completed rot demo arms it
   CGL.shown=false;                            // E74: a fresh visit earns one fresh first-move show (levels past ten)
   ridersOff();                                // E15: fresh platforms for the level's stations
@@ -12739,7 +12814,8 @@ function gluedTug(pc,s){
   if(CAMP.on&&!CAMP.tugT){ CAMP.tugT=true; toast("IT'S PART OF THE LAND!"); }
 }
 function drawCampCards(){
-  if(!CAMP.on) return;
+  if(!CAMP.on){ drawToyCard(); return; }   // E85: the NEW TOY! card serves THE FEATS on the free rug —
+                                           // same painter, same queue, phase-gated: no card, no pixel
   const L=bookL()[CAMP.level-1]; if(!L) return;   // E50: the open book's copy
   const card=(T,total,title,sub,subCol)=>{
     const k=Math.min(1,(total-T)*5), out=Math.min(1,T*2.5);
@@ -14036,6 +14112,12 @@ function upCore(e){
         if(DRAG.kind==='newScen'){ if(BED.ctx) GHOST.pend='room'; else if(!PLAY.on) handMark('room'); }   // E57: a fresh scen drop proves the drag too (rides this save; E58: PLAY teaches nothing)
         if(!PLAY.on) save();
         if(DRAG.kind==='newScen'&&!BED.ctx) handyBump(DRAG.t);   // E55: a fresh placement bubbles onto the face (moves never do — E27)
+        // E85 — the scen commit is the "placed" seam: fresh placements only
+        // (moves count nothing), free play only. Trees feed TREE TOWN, every
+        // kind feeds ALL DRESSED UP — the kid's own hand, never the seed's.
+        if(DRAG.kind==='newScen'&&!BED.ctx&&!PLAY.on&&!CAMP.on){
+          if(DRAG.t==='tree') FEAT.trees++;
+          FEAT.kinds.add(DRAG.t); featCheck('scen'); }
       } else if(hover){
         if(DRAG.kind==='moveScen'){ scen.set(key(DRAG.from[0],DRAG.from[1]),{t:DRAG.t,v:DRAG.v|0,ra:null,pop:0,wave:0}); if(!PLAY.on) save(); }
         if(FR_SHAPED&&frGuideOn()&&gapRefAt(hover[0],hover[1])&&!pieceAt(hover[0],hover[1])) SND.boing();   // E70: the shaped gap — wordless soft refuse
@@ -14722,7 +14804,7 @@ function buildPalette(){
         return;
       }
       if(CAMP.on) clearPlayer();             // sweep the kid's line; the glued land stays put
-      else { grid.clear(); hgrid.clear(); scen.clear(); trainHome(true); nrgOffer(true); }   // E83: the empty rug offers ✨ NEW RUG
+      else { grid.clear(); hgrid.clear(); scen.clear(); trainHome(true); FEAT.laid.clear(); nrgOffer(true); }   // E83: the empty rug offers ✨ NEW RUG (E85: swept cells are nobody's)
       SND.pop(); save(); toast('ALL TIDY!');
       eagerTry();   // E27: the sweep is a track mutation — a finished glued line may call her
     } else {
@@ -15057,6 +15139,11 @@ function layAt(t,r,sel,cx2,cy2,q){
   if(PLAY.on) playLoopSync(); else save();
   if(!BED.ctx&&!PLAY.on) EAGER.last={x:cx2,y:cy2,el:q.elev?1:0};   // E27: the hand's newest piece — the arrival's fallback anchor
   if(!BED.ctx) handyBump(t);                             // E55: the hand-lay bubbles onto the face (drops + E34 chain taps — rig places never come here; E58: PLAY bumps too — one crate)
+  // E85 — the ONE hand-lay ceremony is the provenance seam: new lays AND moves
+  // mark the cell as the kid's own (rearranging the showpiece into your own
+  // loop counts, which is right). Free-play only — a level's cells are not the
+  // rug's. TS.rug.lay walks this path; TS.place stays inert by design.
+  if(!BED.ctx&&!PLAY.on&&!CAMP.on){ FEAT.laid.add(key(cx2,cy2)+':'+(q.elev?1:0)); featCheck('lay'); }
   eagerTry();                                            // E27: mutation + finished + trainless = she comes
   return pc;
 }
@@ -17297,10 +17384,27 @@ window.TS={
       layAt(t,(r|0)%4,null,x,y,q); return TS.rug.state(); },
     scen(t,x,y){ if(!SCENDEF[t]||SCREEN!=='game'||CAMP.on||PLAY.on||!canPlaceScen(t,x,y)) return false;
       const g=rugGrowFor(x,y); scen.set(key(g[0],g[1]),{t,v:0,ra:null,pop:0,wave:0}); save();
+      if(t==='tree') FEAT.trees++;                        // E85: the rig door behaves like the hand —
+      FEAT.kinds.add(t); featCheck('scen');               // same seam, same counters (plain TS.scen stays inert)
       return TS.rug.state(); },
     stamp(i){ return stampRug(i==null? -1 : i|0); },
     offer(b){ nrgOffer(b!==false); return TS.rug.state(); },
     picker(b){ nrgShow(b!==false); return TS.rug.state(); },
+  },
+  // E85 — THE FEATS rig: the ledger + live progress, the battery's multi-train
+  // stand-in (THREE AT ONCE waits for real free-play multi-train), and a direct
+  // door through the REAL featFire (support + the all-owned proof) — never the
+  // predicates. reset() rewinds transients for a fresh battery section.
+  feat:{
+    state(){ return { done:FEATS.slice(), laid:FEAT.laid.size, trees:FEAT.trees,
+      kinds:[...FEAT.kinds], track:featTrack(), trains:featTrains(),
+      visited:TRAIN.visited? TRAIN.visited.size:0, own:!!TRAIN.ownTrack,
+      card:toyCard, q:toyQ.slice() }; },
+    trains(n){ FEAT.rig3=n|0; return featTrains(); },
+    fire(id){ return FEATDEF.some(f=>f.id===id)? featFire(id) : false; },
+    check(tag){ featCheck(tag); return TS.feat.state(); },
+    reset(){ FEAT.laid.clear(); FEAT.trees=0; FEAT.kinds.clear(); FEAT.rig3=0;
+      TRAIN.visited=null; TRAIN.ownTrack=false; return TS.feat.state(); },
   },
   land(id){ if(!LANDS.includes(id)||CAMP.on||PLAY.on) return false;
     LAND=id; rugSync(); save(); return LAND; },
