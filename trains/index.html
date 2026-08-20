@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>TRAIN GALAXY</title>
 <link rel="icon" href="data:,">
-<!-- TRAINSET v10.2 -->
+<!-- TRAINSET v10.3 -->
 <!-- E11 THE POCKET RAILROAD: the iOS shell (TrainSetShell-iOS) loads this page live -->
 <meta name="trainset-version" content="2.9">
 <style>
@@ -661,6 +661,56 @@
     display:none; background:none; }   /* E79: taller — the doubled globe pushed the column (ride bottom ≈265); every peeked sliver stays covered */
   body.rugmode:not(.cornerout) #cornerHot{ display:block; }
   body.shygame #cornerHot, body.conductor #cornerHot{ display:none; }
+  /* ---- E82 THE TWO DOORS: the front's dog layer + the level store chip ----
+     THE DOG WALKS BY (§1 round 10): the GVT shape-store dogs trot the very
+     bottom of the front on ONE positioned DOM layer over the canvas (the
+     chips' overlay grammar) — art verbatim from the SS-DOGS-01 kit, facing a
+     STATIC scale(-1,1) per direction element (never an animated flip), and
+     the loop-return jump rides step-end on the last visible keyframe or the
+     walker streaks back across the screen (the review artifact's trap). */
+  #dogLayer{ position:absolute; inset:0; z-index:4; pointer-events:none; overflow:hidden; display:none; }
+  .dogwalk{ position:absolute; left:-999px; bottom:calc(env(safe-area-inset-bottom) - 10px);
+    width:clamp(92px,16vw,118px); pointer-events:none; }
+  .dogwalk svg{ display:block; overflow:visible; width:100%; height:auto; }
+  .dgPin{ transform-box:view-box; transform-origin:0 0; }
+  .dogTng{ opacity:0; }
+  .dogtrotB{ animation:dogbob .35s linear infinite; }
+  .dogtrotB .dgLegA{ animation:dogstep .35s ease-in-out infinite alternate; }
+  .dogtrotB .dgLegB{ animation:dogstep .35s ease-in-out infinite alternate-reverse; }
+  .dogtrotB .dogHeadG{ animation:doghnod .35s ease-in-out infinite alternate; }
+  .dogtrotB .dogEarG{ animation:dogearflop .35s ease-in-out infinite alternate; }
+  .dogwalk .dogwagG{ animation:dogwag .75s ease-in-out infinite alternate; }
+  @keyframes dogbob{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  @keyframes dogstep{ from{transform:rotate(-24deg)} to{transform:rotate(24deg)} }
+  @keyframes doghnod{ from{transform:rotate(-2deg)} to{transform:rotate(3deg)} }
+  @keyframes dogearflop{ from{transform:rotate(-8deg)} to{transform:rotate(10deg)} }
+  @keyframes dogwag{ from{transform:rotate(-10deg)} to{transform:rotate(10deg)} }
+  /* cadence ~2 passes/min TOTAL (dial ⚑ — the review demo ran denser for show):
+     GOOD BOY 105s × 2 crossings + HOUND 150s × 2 (−45s phase) ≈ 1.9/min; the
+     different cycle lengths drift, so the chance pack overlap stays (a feature). */
+  .gbR{ animation:gbR 105s linear infinite; }
+  .gbL{ animation:gbL 105s linear infinite; }
+  .hdL{ animation:hdL 150s linear infinite -45s; }
+  .hdR{ animation:hdR 150s linear infinite -45s; }
+  @keyframes gbR{ 0%,2%{left:-170px} 13%{left:calc(100% + 40px); animation-timing-function:step-end} 100%{left:-170px} }
+  @keyframes gbL{ 0%,52%{left:calc(100% + 40px)} 63%{left:-170px; animation-timing-function:step-end} 100%{left:calc(100% + 40px)} }
+  @keyframes hdL{ 0%,10%{left:calc(100% + 40px)} 18%{left:-170px; animation-timing-function:step-end} 100%{left:calc(100% + 40px)} }
+  @keyframes hdR{ 0%,60%{left:-170px} 68%{left:calc(100% + 40px); animation-timing-function:step-end} 100%{left:-170px} }
+  @media (prefers-reduced-motion:reduce){
+    .dogwalk, .dogwalk *{ animation:none!important; }
+    .dogwalk.gbR{ left:6%; }
+    .dogwalk.gbL,.dogwalk.hdL,.dogwalk.hdR{ display:none; }
+  }
+  /* THE STORE IS ALWAYS ONE TAP (§1 law, leg c): a store chip pinned
+     bottom-right INSIDE LEVELS by the return-home corner — painted storefront
+     art (never emoji), the chip family's wood. Folds with the shy/conductor/
+     winstage families below (selectors amended in place). */
+  #lvlShop{ position:absolute; right:calc(10px + env(safe-area-inset-right));
+    bottom:calc(10px + env(safe-area-inset-bottom)); z-index:5; display:none;
+    background:rgba(20,14,8,0.82); border:2px solid #513a24; border-radius:12px;
+    padding:4px; cursor:pointer; transition:opacity var(--shygame,0.25s) ease; }
+  #lvlShop canvas{ display:block; width:72px; height:56px; pointer-events:none; }
+  body.shygame #lvlShop, body.conductor #lvlShop, body.winstage #lvlShop{ opacity:0; pointer-events:none; }
   /* ---- toast + rotate (toast bottom rides the LIVE bar height — resize() sets it) ---- */
   #toast{
     position:absolute; left:50%; bottom:132px; transform:translateX(-50%);
@@ -831,6 +881,9 @@
 <div class="chip" id="homeChip">🔎 WHOLE RUG</div>
 <div id="zbtns"><button id="zin" type="button">+</button><button id="zout" type="button">−</button></div>
 <div id="cornerHot"></div><!-- E72: the peeking corner's summon pad — invisible, rugmode-only -->
+<div id="dogLayer"></div><!-- E82: THE DOG WALKS BY — one positioned layer over the canvas, front only -->
+<button id="lvlShop" type="button"><canvas id="lvlShopCv" width="144" height="112"></canvas></button><!-- E82: the in-level store chip -->
+
 <div class="chip" id="wxChip">☀️</div>
 <div class="chip" id="rideChip">🚂 RIDE ALONG</div>
 <!-- E25: the toy box on the rug — screen-space DOM ("that is at least the UI"),
@@ -1017,7 +1070,22 @@ const CHIRP_VOL=1.0;                                  // moo/baa/cluck loudness 
 const REACT_R=1;                                      // react radius, cells — the train charms animals this close
 const HERD_SPEED=1.0;                                 // herd idle tempo: graze / nibble / peck speed
 // ---- Wyatt dials (EXPANSION 3 — one const each) ----
-const MENU_PROPS=['sign','bed','toybox','door','lamp','station','store','board'];  // room props list (E26's fixtures; E44 the departure board; E54 retired 'blocks'; E56 retired 'tickets' — the word left the game, the stubs live on the door's wall)
+/* ---- E82 THE TWO DOORS (FM-TS-82, contract DESIGN-TWO-DOORS.md §1) ----
+   THE FRONT: the bedroom menu room RETIRES behind ONE const — flip it back and
+   the whole E26-E80 room returns byte-true. The furniture that retires WITH it
+   parks behind one const each (the rm-able law; each is a later sweep's handle;
+   all default true so the resurrected room comes back whole). The
+   TRAINSET_ROOM save key stays on disk, orphaned, never deleted. */
+const FRONT_DOORS=true;       // the §1 front: globe masthead + two live picture doors + store tile. false = the bedroom room, byte-true
+const ROOM_DOOR=true;         // the postcards front door (E56 slab + pins + GO pill + the wall entry) — room world only
+const ROOM_TICKETS=true;      // the postcard WALL behind the door (E56) — the door's inside; the board rides behind it until E84
+const ROOM_BOARD=true;        // the E44 departure board
+const ROOM_ATTRACT=true;      // the attract oval + the stock bedroom toy (E18/E54)
+const ROOM_BED=true;          // bedroom build — the whole-floor hand (spill toys, broom, drags; E18/E23/E54)
+const DOOR_SPEED=64;          // the left door's tiny train, px/s along its arc (ATT_SPEED's quieter cousin)
+const PIG_RUG_S=1.0;          // the re-homed piggy's scale on the free-play rug's frame (menu wore 1.35) ⚑
+const TRIP_BOOKS=['ten','pk','sa'];   // the trip's order — 🎫 then 🎃 then 🎅 (dial §8.3 executed-REC: Santa is the finale) ⚑
+const MENU_PROPS=['sign','bed','toybox',...(ROOM_DOOR?['door']:[]),'lamp','station','store',...(ROOM_BOARD?['board']:[])];  // room props list (E26's fixtures; E44 the departure board; E54 retired 'blocks'; E56 retired 'tickets' — the word left the game, the stubs live on the door's wall; E82 door+board park behind their consts)
 const ATT_SCALE=0.85;         // attract oval size (scale of the real 4×2 loop)
 const ATT_SPEED=70;           // attract loop speed, px/s — slow; SPEED stays the game's
 const PLAY_LABEL='PLAY';      // E26: the train station's pill (was the big button's copy — re-aimed, never orphaned)
@@ -2959,6 +3027,7 @@ function cellBlocksTrack(t,x,y){
   // FURNITURE — blocked cells through THE predicate, so the ghost tint and the
   // drop agree for free. BED.blk only exists inside the bedroom wrapper's world.
   if(BED.ctx&&BED.blk&&BED.blk.has(key(x,y))) return true;
+  if(pigRug()&&x===GW-1&&y===0) return true;   // E82: the piggy's ONE blocked cell on the rug's frame corner (new drops only — an old save's piece there keeps, the E44 forgiveness)
   const s=scenAt(x,y); if(!s) return false;
   if(s.t==='rv'||s.t==='pond') return t!=='br';   // only a bridge may span water (E7: the pond is water too)
   return !!SCENDEF[s.t].blocks;
@@ -3057,6 +3126,7 @@ function placeHelp(t,r,x,y){
 function canPlaceTrack(t,x,y,r){ return placeQuery(t,r|0,x,y).ok; }
 function canPlaceScen(t,x,y){
   if(BED.ctx&&BED.blk&&BED.blk.has(key(x,y))) return false;   // E23: the piggy + button cells refuse scenery too
+  if(pigRug()&&x===GW-1&&y===0) return false;   // E82: her rug corner refuses scenery the same way
   if(FR_SHAPED&&frGuideOn()&&gapRefAt(x,y)&&!pieceAt(x,y)) return false;   // E70: no toy in the track's own slot (the shaped gap)
   if(scenAt(x,y)) return false;
   const lo=pieceAt(x,y), hi=pieceHi(x,y);
@@ -3412,6 +3482,12 @@ function update(dt){
   confetti=confetti.filter(p=>p.t<p.dur);
   for(const f of flights) f.t+=dt;
   flights=flights.filter(f=>f.t<f.dur);
+  // E82: the piggy lives on the free-play rug's frame now — her garnish (hop
+  // decay, back-hole puffs) ticks here for the game screens exactly as the
+  // menu ticks its own. Empty on an untouched rug: zero paint, plates hold.
+  if(PIG.hop>0) PIG.hop=Math.max(0,PIG.hop-dt*2.6);
+  for(const p of PIG.puffs) p.t+=dt;
+  for(let i=PIG.puffs.length-1;i>=0;i--) if(PIG.puffs[i].t>=PIG.puffs[i].dur) PIG.puffs.splice(i,1);
   if(lapCardT>0) lapCardT-=dt;
   if(winT>0){ winT-=dt; if(winT<0) winT=0;
     if(!winT&&prettyPend){ prettyPend=false; prettyT=PRETTY_T; SND.ding(); } }   // E14: the compliment follows the win card out
@@ -8490,6 +8566,7 @@ function draw(){
   drawPuffTops();   // E41: the parting cloud curls off her funnel — over the roof
   drawBreath();     // E42: the breath you can see — tiny wisps off the boiler nose, cold lands only
   drawBalloons();   // E7: balloons fly above the whole rug, shadows drifting along
+  if(PIG_SHOW&&pigRug()){ const p2=pigRugXY(); drawPig(p2.x,p2.y,PIG_RUG_S); }   // E82: the piggy on the rug's frame — furniture, over the toys, under the sky
   drawWireClouds(); // E41: the hung clouds sway above everything — the toy's ceiling
   drawAurora();     // E42: the breathing sky — ribbons over the top band, under the snow
   drawEagles();     // E30: the eagle circles higher still
@@ -8672,11 +8749,19 @@ function menuSign(){
   // between the words — TRAIN ⊕ GALAXY — one identity across chip/icon/sign.
   // Words auto-fit by measureText so the iOS font fallback can never overflow
   // the plank; carve-shadow under cream = painted-into-the-wood, not flat.
+  // E82: the plank+words+medallion factored into menuSignArt (op order
+  // UNCHANGED — byte-true) so the front's masthead paints the SAME sign
+  // floating on the night sky; the posts stay the room's furniture legs.
   const sx=MENU_W/2;
   cx.save(); cx.translate(sx,SIGN_TOP); cx.scale(SIGN_K,SIGN_K); cx.translate(-sx,-40);
   cx.strokeStyle='#6e5130'; cx.lineWidth=10; cx.lineCap='round';
   cx.beginPath(); cx.moveTo(sx-176,152); cx.lineTo(sx-176,70); cx.moveTo(sx+176,152); cx.lineTo(sx+176,70); cx.stroke();
   cx.lineCap='butt';
+  menuSignArt();
+  cx.restore();
+}
+function menuSignArt(){   // the TRAIN ⊕ GALAXY plank at its painting coords (caller seats + scales)
+  const sx=MENU_W/2;
   cx.fillStyle='#8f6b3f'; rr(sx-250,40,500,88,10); cx.fill();
   cx.strokeStyle='#6e5130'; cx.lineWidth=4; rr(sx-250,40,500,88,10); cx.stroke();
   cx.fillStyle='#a37c4a'; rr(sx-242,48,484,72,7); cx.fill();
@@ -8695,7 +8780,6 @@ function menuSign(){
   word('GALAXY', sx+54, 'left');
   star5(sx-222,84,0.8,'#e8d9b0'); star5(sx+222,84,0.8,'#e8d9b0');
   cx.drawImage(signMedal(), sx-47, 39, 94, 94);       // the world between the words
-  cx.restore();
 }
 
 /* =====================================================================
@@ -8863,7 +8947,17 @@ function menuStore(){
   // dark toy-chest wood, the red/cream scalloped awning, a gold star sign, a
   // lit window of goods, the open doorway with its brass knob, and the little
   // bell that glints in the attract rotation.
+  // E82: the art factored into menuStoreArt (op order UNCHANGED — byte-true)
+  // so the front's store tile paints the SAME storefront at its own seat.
   cx.save(); cx.translate(850,778);
+  menuStoreArt();
+  if(ROOM.fx&&ROOM.fx.kind==='store'){   // the bell glint — a travelling sparkle, no sound
+    const k=Math.min(1,ROOM.fx.t/1.4), a=Math.sin(Math.PI*k);
+    cx.globalAlpha=a; star5(65+10*k-5,-14-6*Math.sin(Math.PI*k),0.55+0.25*a,'#FFF3C4'); cx.globalAlpha=1;
+  }
+  cx.restore();
+}
+function menuStoreArt(){   // the storefront at origin — the room seats it at (850,778), the front tile at its own scale
   cx.globalAlpha=0.25; cx.fillStyle='#000';
   cx.beginPath(); cx.ellipse(0,90,130,12,0,0,7); cx.fill(); cx.globalAlpha=1;
   const bg=cx.createLinearGradient(0,-70,0,86); bg.addColorStop(0,'#7A553A'); bg.addColorStop(1,'#5C3F28');
@@ -8896,11 +8990,6 @@ function menuStore(){
   cx.fillStyle='#D9A544';
   cx.beginPath(); cx.arc(65,-4,6.5,Math.PI,0); cx.lineTo(69.5,1); cx.lineTo(60.5,1); cx.closePath(); cx.fill();
   cx.fillStyle='#8F6B1E'; cx.beginPath(); cx.arc(65,2,1.8,0,7); cx.fill();
-  if(ROOM.fx&&ROOM.fx.kind==='store'){   // the bell glint — a travelling sparkle, no sound
-    const k=Math.min(1,ROOM.fx.t/1.4), a=Math.sin(Math.PI*k);
-    cx.globalAlpha=a; star5(65+10*k-5,-14-6*Math.sin(Math.PI*k),0.55+0.25*a,'#FFF3C4'); cx.globalAlpha=1;
-  }
-  cx.restore();
 }
 // E56: menuTickets RETIRED — the TICKETS poster left the bedroom wall (§4-B:
 // the door absorbs the campaign; the stub-and-punch recipe lives on in
@@ -8938,12 +9027,13 @@ const ROOM_OBJS=[
   // station/store seat theirs the same way). Tap → THE POSTCARD WALL (the big
   // room's entry retired — rig-only for one release). Footprint enters
   // BED.blk below like every object's (tap-opens ⇒ drop-refuses, piggy law).
-  { id:'door', hit:{x:966,y:556,w:329,h:230}, px:1090, py:764, label:()=>DOOR_LABEL,
+  // E82: the postcards door parks behind its const (retired with the room)
+  ...(ROOM_DOOR? [{ id:'door', hit:{x:966,y:556,w:329,h:230}, px:1090, py:764, label:()=>DOOR_LABEL,
     tap(){ SND.tok(); handSet('door');   // E57: opening the door IS the lesson learned (once-ever write; rig entries never come here)
       // E70 (named dial, OFF): the door's GO one-taps into the next unwon
       // ten level instead of the postcard wall — a true one-tap continue.
       if(FR_DOOR_CONTINUE){ for(let n2=1;n2<=LEVELS.length;n2++) if(!CAMP.done.has(n2)){ campEnter(n2); return; } }
-      showScreen('wall'); } },
+      if(ROOM_TICKETS) showScreen('wall'); } }] : []),   // E82: the wall parks with its door
 ];
 function objHit(e){
   const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // pigHit's own inverse
@@ -9465,6 +9555,7 @@ function bedDown(e){
   // its own taps before the canvas ever sees them, and the piggy answered
   // first back in the pointerdown ladder.
   ac(); e.preventDefault();
+  if(!ROOM_BED) return;                // E82: bedroom build parks behind its const (retired with the room)
   if(DRAG||down) return;               // one hand at a time
   inBed(()=>{
     const [wx,wy]=worldXY(e);
@@ -9515,6 +9606,11 @@ function bedCancel(){                  // put down whatever the hand held — th
   });
 }
 function bedScreen(s){
+  if(FRONT_DOORS){                     // E82: the room never mounts under the two-door front —
+    if(BED.on) bedDrop();              // no BED, no docks, no floor hand (the front is §1's three things)
+    else bedToolsShow(false);
+    return;
+  }
   if(s==='menu'||s==='board'||s==='wall'){   // E56: the wall stands over the live bedroom exactly like the board
     if(!BED.on) bedReset();            // fresh from the game — the tide rebuilt the sandcastle
     bedToolsShow(s==='menu');          // E54: the two docks serve the menu only (as the bar did)
@@ -9531,7 +9627,8 @@ function bedToolsShow(on){
 }
 function bedReset(){
   BED.on=true;
-  buildAttract();                      // the stock figure-8, pristine — THE EPHEMERAL LAW's tide
+  if(ROOM_ATTRACT) buildAttract();     // the stock figure-8, pristine — THE EPHEMERAL LAW's tide
+  else { AT.grid.clear(); AT.hg.clear(); AT.cars=[]; }   // E82: the oval parks behind its const
   AT.smoke.length=0; AT.wheel=0; AT.smokeT=0;
   BED.scen.clear(); BED.fx=[]; BED.smoke=AT.smoke; BED.boarders=[]; BED.wheel=0;
   BED.grav={mul:1,crest:false}; BED.clack=0;
@@ -9656,7 +9753,7 @@ function buildBedSky(){
 const BROOM_SPOT={x:40,y:644};        // painting coords — leaning on the TOYS box's left flank
 const BROOM={arm:0,wig:0};
 function broomHit(e){
-  if(SCREEN!=='menu') return false;
+  if(SCREEN!=='menu'||!ROOM_BED) return false;   // E82: the broom parks with bedroom build
   const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // the painting's own inverse
   return mx>=16&&mx<=66&&my>=556&&my<=712;
 }
@@ -9876,10 +9973,29 @@ function pigNextStreak(){ return PIGGY.claimed===dayBack(1)? (PIGGY.streak|0)+1 
 function pigLiveStreak(){ const c=PIGGY.claimed; return (c===todayStr()||c===dayBack(1))? PIGGY.streak|0 : 0; }
 function pigClaimable(){ return PIGGY.claimed!==todayStr() && pigPayout(pigNextStreak())>0; }
 function pigTodayPays(){ return pigPayout(PIGGY.claimed===todayStr()? PIGGY.streak : pigNextStreak()); }
+/* E82 PIGGY RE-HOMES ONTO THE FREE-PLAY RUG'S FRAME (contract §1): same daily
+   tap, same streak, same TOMORROW! puff — her seat moves from the bedroom
+   boards to the BUILD rug's top-right frame corner (the band the E15 name
+   sign already lives on; the sign's max width stops ~100px short of her).
+   She pans and zooms WITH the rug (world space), exactly where the ★ chip
+   lives — free play only, never a level, never PLAY. On the rug her claim
+   needs no bedroom exception: the wrapper era ends where she now stands.
+   ONE BLOCKED CELL: (GW-1,0) refuses NEW track + scenery through the same
+   predicates as ever; an old save's piece there KEEPS (the E44 forgiveness —
+   only new drops refuse; she stands in front of it). The old menu seat stays
+   wired for the const-flip world (SCREEN 'menu' && !FRONT_DOORS). */
+const pigRug=()=>FRONT_DOORS&&SCREEN==='game'&&!CAMP.on&&!PLAY.on&&!BED.ctx;
+function pigRugXY(){ return {x:WORLD_W-52,y:42}; }   // the frame corner — derives with the rug SIZE
+function pigSeat(){                                  // the ACTIVE seat: rug corner or bedroom boards
+  return pigRug()? {x:pigRugXY().x,y:pigRugXY().y,s:PIG_RUG_S} : {x:PIG.x,y:PIG.y,s:PIG_SPOT.s};
+}
 function pigHit(e){
-  if(!PIG_SHOW||SCREEN!=='menu') return false;
-  const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // the menu painting's own inverse
-  return Math.abs(mx-PIG.x)<58*PIG_SPOT.s && Math.abs(my-(PIG.y-8*PIG_SPOT.s))<52*PIG_SPOT.s;
+  if(!PIG_SHOW) return false;
+  if(SCREEN==='menu'&&FRONT_DOORS) return false;     // E82: the front has no piggy — she moved to the rug
+  if(SCREEN!=='menu'&&!pigRug()) return false;
+  const P=pigSeat();
+  const mx=(e.clientX-OX)/SC, my=(e.clientY-OY)/SC;   // the painting's own inverse (the rug camera composes the same way)
+  return Math.abs(mx-P.x)<58*P.s && Math.abs(my-(P.y-8*P.s))<52*P.s;
 }
 // E53 — the piggy is the wallet, not a door: every tap opens her panel (the
 // old bank's count + ledger) AFTER the hop's beat, so the claim ceremony —
@@ -9889,7 +10005,7 @@ function pigHit(e){
 let PIGP_T=null;
 function pigPanelSoon(){
   if(PIGP_T) clearTimeout(PIGP_T);
-  PIGP_T=setTimeout(()=>{ PIGP_T=null; if(SCREEN==='menu') bankShow(true); }, PIG_PANEL_DELAY*1000);
+  PIGP_T=setTimeout(()=>{ PIGP_T=null; if((SCREEN==='menu'&&!FRONT_DOORS)||pigRug()) bankShow(true); }, PIG_PANEL_DELAY*1000);   // E82: her panel follows her to the rug
 }
 function pigTap(){
   ac();
@@ -9905,7 +10021,8 @@ function pigTap(){
   PIGGY={claimed:todayStr(), streak:pigNextStreak()};
   SND.boing();
   // starMint = coin + HUD sync + the star flight + THE ONE SAVE (PIGGY rides in it)
-  starMint(pigPayout(), PIG.x, PIG.y-46*PIG_SPOT.s);
+  const P=pigSeat();                    // E82: the flight lifts off whichever seat she stands on
+  starMint(pigPayout(), P.x, P.y-46*P.s);
   voiceAt('piggy');                     // E65: silent (the "Nice" clip retired) — the hop + coins carry it
 }
 // the pig herself — one molded painter for the floor pig and the bank ledger.
@@ -9942,9 +10059,12 @@ function pigArt(t,coin){
   }
   cx.lineCap='butt';
 }
-function drawPig(){
-  const s=PIG_SPOT.s, j=1-PIG.hop, hy=PIG.hop>0? -22*Math.sin(Math.PI*j) : 0;
-  cx.save(); cx.translate(PIG.x,PIG.y); cx.scale(s,s);
+function drawPig(px,py,ps){
+  // E82: the seat became parameters — the menu passes its old values verbatim
+  // (byte-true room), the rug frame passes pigRugXY()+PIG_RUG_S.
+  const s=ps==null?PIG_SPOT.s:ps, ax=px==null?PIG.x:px, ay=py==null?PIG.y:py;
+  const j=1-PIG.hop, hy=PIG.hop>0? -22*Math.sin(Math.PI*j) : 0;
+  cx.save(); cx.translate(ax,ay); cx.scale(s,s);
   // the shadow stays on the boards while she hops (the E4 shadow law)
   cx.globalAlpha=0.25; cx.fillStyle='#000';
   cx.beginPath(); cx.ellipse(0,26,34+hy*0.25,7+hy*0.06,0,0,7); cx.fill(); cx.globalAlpha=1;
@@ -9956,7 +10076,7 @@ function drawPig(){
     const k=Math.min(1,p.t/p.dur);
     cx.globalAlpha=0.9*(1-k); cx.fillStyle='#e8e0cc';
     cx.beginPath();
-    cx.arc(PIG.x-(40+18*k+p.i*6)*s, PIG.y-(6+13*k-p.i*4)*s, (5+9*k)*s, 0, 7);
+    cx.arc(ax-(40+18*k+p.i*6)*s, ay-(6+13*k-p.i*4)*s, (5+9*k)*s, 0, 7);
     cx.fill(); cx.globalAlpha=1;
   }
 }
@@ -10005,16 +10125,18 @@ function bedBounds(){
   // E44: the departure board is furniture too (frame + posts + shadow). A pre-v5.3
   // room that already parked a toy here KEEPS it (row-forgiving law) — it simply
   // stands in front of the sign; only NEW drops are refused.
-  addRect(BOARD_SPOT.x-BOARD_W/2-6, BOARD_SPOT.y-BOARD_H/2-6,
-          BOARD_SPOT.x+BOARD_W/2+6, BOARD_SPOT.y+140);
+  if(ROOM_BOARD) addRect(BOARD_SPOT.x-BOARD_W/2-6, BOARD_SPOT.y-BOARD_H/2-6,
+          BOARD_SPOT.x+BOARD_W/2+6, BOARD_SPOT.y+140);   // E82: parks with its board
   // E54: the SPILL toys + THE BROOM are furniture — where a tap grabs a source
   // (or arms the sweep), a drop must refuse (the piggy law). Painting-space
   // rects through the same door as everything else.
-  for(const it of SPILL){
-    const px2=ATT.ox+(it.x-GX)*ATT_SCALE, py2=ATT.oy+(it.y-GY)*ATT_SCALE, h2=52*ATT_SCALE;
-    addRect(px2-h2,py2-h2,px2+h2,py2+h2);
+  if(ROOM_BED){   // E82: the spill + broom park with bedroom build
+    for(const it of SPILL){
+      const px2=ATT.ox+(it.x-GX)*ATT_SCALE, py2=ATT.oy+(it.y-GY)*ATT_SCALE, h2=52*ATT_SCALE;
+      addRect(px2-h2,py2-h2,px2+h2,py2+h2);
+    }
+    addRect(16,556,66,712);   // the broom's lean
   }
-  addRect(16,556,66,712);   // the broom's lean
   // ...and the two re-homed DOM docks while they stand (drops can land under
   // DOM — the ghost must tell the truth there too)
   for(const el2 of [$('bedsky')]){   // E55: the decor dock retired — the pills are the one DOM dock left
@@ -10116,7 +10238,7 @@ function drawMenu(){
   if(MENU_PROPS.includes('door')) menuDoor();
   if(MENU_PROPS.includes('bed')) menuBed();
   if(MENU_PROPS.includes('toybox')) menuToybox();
-  drawBroom();                                        // E54: TIDY lives on the wall now — furniture, like the pig
+  if(ROOM_BED) drawBroom();                           // E54: TIDY lives on the wall now — furniture, like the pig (E82: parks with bedroom build)
   if(MENU_PROPS.includes('station')) menuStation();   // E26: the floor buildings, south of the rug
   if(MENU_PROPS.includes('board')) menuBoard();       // E44: the departure board, beside the platform
   if(MENU_PROPS.includes('store')) menuStore();
@@ -10129,7 +10251,7 @@ function drawMenu(){
   try{
     if(BED.scen.size) inBed(()=>{ drawRivers(); drawPonds(); });   // E37: water is ground — under the track (a bridge could span it)
     drawTrack(AT.grid);
-    drawSpill();                                                   // E54: the five floor toys — real painters, built size, under the cars
+    if(ROOM_BED) drawSpill();                                      // E54: the five floor toys — real painters, built size, under the cars (E82: park with bedroom build)
     if(BED.scen.size) inBed(drawScen);                             // E37: the room's toys — over the track, under the cars
     drawCarsOnRails(AT.cars,AT.wheel);
     if(BED.train.placed||(BED.ctx&&TRAIN.placed))                       // E18: the kid's train, beside the stock toy
@@ -10158,6 +10280,530 @@ function drawMenu(){
     const k=f.t/f.dur, e2=k*k*(3-2*k);
     star5(f.x+(f.tx-f.x)*e2, f.y+(f.ty-f.y)*e2-Math.sin(Math.PI*k)*36, 0.9+0.35*(1-k), '#F2C531'); }
   cx.globalAlpha=1;
+}
+
+/* =====================================================================
+   E82 THE TWO DOORS — THE FRONT (FM-TS-82, contract DESIGN-TWO-DOORS.md §1).
+   One quiet night-sky screen holding exactly three things: the TRAIN ⊕
+   GALAXY masthead (menuSignArt — the Earth medallion painter UNTOUCHED),
+   TWO BIG PICTURE DOORS with no words on or under them, and a smaller
+   STORE tile. THE DOORS RUN LIVE (dial §8.1 executed-REC): mini-dioramas
+   painted by the game's OWN painters — the left door's tiny train laps
+   forever (attRun over a private grid, the drawMenu swap grammar), the
+   right door breathes (steam / fireflies / snowfall) while the trip's
+   host calls HELP ME! in a chat bubble; THE BUBBLE FOLLOWS THE TRIP.
+   PLAY floats over the left scene in fluffy cloud letters — the LOCKED
+   §1 recipe: Chewy glyphs traced ONCE into Path2D (below), white fill +
+   thin white stroke over a fat #28486B under-letter ringing every edge
+   including inside the P and A, letters tilted alternately ±3°. NO
+   flying train through the letters (round 10 CUT it). The layout is
+   computed per frame from W/H — E81's tall-shape law holds on the front
+   by construction. The clock is FRONT.t (dt only, frozen-clock safe).
+   ===================================================================== */
+// the four Chewy letterforms (Chewy-Regular v18, OFL — Font Diner), traced
+// once into quadratic path data at a 100-tall cap box: the single-file law's
+// cheapest door (no font fetch, no FOUT, byte-deterministic). adv = advance.
+const CHEWY={
+P:{adv:62,d:'M62.5 -67.8Q62.5 -61 59.6 -54.4Q56.6 -47.8 51.6 -42.6Q46.7 -37.3 40.4 -34Q34.1 -30.6 27.3 -30.3Q27.2 -28 27.2 -24.5Q27.1 -21 26.7 -17.2Q26.3 -13.4 25.6 -9.6Q24.9 -5.8 23.6 -2.8Q22.3 0.3 20.2 2.2Q18.1 4.1 15.1 4.1Q11.5 4.1 9.4 1.7Q7.3 -0.6 6.3 -3.9Q5.2 -7.2 4.8 -10.8Q4.4 -14.4 4.3 -17Q4.1 -20.6 4 -24.2Q3.9 -27.7 3.9 -31.4Q3.9 -33 3.9 -37.5Q3.9 -42 4 -47.8Q4.1 -53.5 4.2 -59.8Q4.3 -66.1 4.6 -71.5Q4.8 -76.8 5.1 -80.6Q5.4 -84.4 5.9 -85.1Q6.1 -85.2 6.7 -85.6Q7.3 -86.1 8.1 -86.5Q8.9 -87 9.5 -87.3Q10.1 -87.7 10.4 -87.8Q16.2 -91.1 23.2 -93.5Q30.1 -95.9 37 -95.9Q42.8 -95.9 47.5 -93.6Q52.3 -91.3 55.6 -87.4Q59 -83.5 60.8 -78.4Q62.5 -73.3 62.5 -67.8ZM40.6 -64.9Q40.6 -67.5 39.4 -69.4Q38.2 -71.3 35.4 -71.3Q33 -71.3 30.6 -70.3Q28.2 -69.4 26.2 -68.4Q26.6 -63.9 26.9 -59.7Q27.2 -55.6 27 -51.1Q29 -52.2 31.4 -53.5Q33.8 -54.8 35.8 -56.5Q37.8 -58.1 39.2 -60.2Q40.6 -62.3 40.6 -64.9Z'},
+L:{adv:64,d:'M63.9 -11.7Q63.9 -8.5 61.7 -6.2Q59.5 -3.9 56.5 -3.2Q50.4 -1.8 44.1 -0.8Q37.8 0.3 31.4 0.3Q28.5 0.3 25.6 0Q22.7 -0.2 19.9 -1Q17.4 -1.7 15.1 -2.9Q12.8 -4.1 11.4 -6.2Q10.1 -8.1 9.5 -11.3Q8.9 -14.4 8.6 -18.1Q8.3 -21.8 8.2 -25.8Q8.1 -29.8 8.1 -33.3Q8.1 -35.5 8.1 -38.7Q8.2 -41.9 8.2 -45.3Q8.3 -48.7 8.4 -51.9Q8.5 -55.1 8.6 -57.5Q8.7 -59.5 8.9 -62.4Q9.1 -65.4 9.5 -68.5Q9.9 -71.7 10.4 -74.7Q10.9 -77.7 11.7 -80.1Q12.5 -82.5 13.6 -84Q14.7 -85.5 16.2 -85.5Q17.8 -85.5 19.2 -84.4Q20.6 -83.4 21.7 -81.9Q22.8 -80.4 23.5 -78.7Q24.2 -77 24.2 -75.7Q24.2 -73.3 24.2 -70.6Q24.2 -67.9 24.1 -65.4Q24 -60.9 23.8 -56.3Q23.6 -51.7 23.6 -47.2Q23.6 -43.8 23.6 -40.2Q23.7 -36.6 23.9 -33Q24.1 -29.5 24.5 -26.1Q24.9 -22.8 25.6 -19.8Q28.2 -19.2 30.8 -19Q33.4 -18.8 36.1 -18.8Q39.3 -18.8 42.4 -19.2Q45.6 -19.7 48.8 -20.3Q50 -20.5 51.8 -20.9Q53.6 -21.3 55 -21.3Q57.1 -21.3 58.9 -20.5Q60.7 -19.7 62 -18.3Q63.3 -16.9 63.6 -15.2Q63.9 -13.5 63.9 -11.7Z'},
+A:{adv:72,d:'M71.8 -8.9Q71.8 -6.5 70.4 -4.9Q69.1 -3.3 66.9 -3.3Q64.2 -3.3 62.1 -5.3Q60.1 -7.3 58.5 -10Q57 -12.8 55.9 -15.8Q54.8 -18.8 54 -21Q49.3 -19.9 44.6 -19.2Q39.9 -18.5 35.1 -18.5Q33.2 -18.5 31.3 -18.6Q29.4 -18.8 27.5 -19.1Q27 -17.2 26.2 -14.6Q25.5 -12.1 24.4 -9.8Q23.4 -7.5 21.9 -5.9Q20.5 -4.3 18.6 -4.3Q17 -4.3 15.5 -5.3Q14.1 -6.3 12.9 -7.8Q11.8 -9.3 11.1 -11Q10.4 -12.7 10.4 -14.1Q10.4 -15.2 10.7 -15.8Q12.1 -19.3 13.1 -22.2Q14.1 -25.2 15 -28.2Q15.9 -31.2 16.8 -34.4Q17.7 -37.7 18.9 -41.7Q19.8 -44.7 21 -48.6Q22.2 -52.5 23.7 -56.6Q25.2 -60.7 27 -64.7Q28.8 -68.8 30.9 -72Q33 -75.2 35.5 -77.2Q38 -79.3 40.9 -79.3Q43.3 -79.3 45.4 -77.9Q47.5 -76.5 49.2 -74.5Q51 -72.5 52.3 -70.2Q53.7 -67.9 54.6 -66.1Q55.8 -63.4 57 -60Q58.3 -56.6 59.5 -52.9Q60.7 -49.3 61.8 -45.6Q62.9 -41.9 63.9 -38.6Q65.1 -34.4 66.4 -30Q67.7 -25.6 69 -21.6Q69.5 -20 70.1 -18.3Q70.7 -16.7 71.2 -15Q71.5 -13.9 71.6 -12.6Q71.8 -11.3 71.8 -8.9ZM49.2 -38.7Q48.3 -42 47.4 -45.4Q46.5 -48.9 45.4 -52.1Q44.4 -55.3 43.2 -58Q42 -60.7 40.6 -62.5Q39 -60.4 37.7 -57.2Q36.4 -54 35.3 -50.6Q34.2 -47.2 33.3 -43.9Q32.5 -40.7 31.8 -38.3Q34 -38 36.2 -38Q40.7 -38 44.4 -38.1Q48.1 -38.3 49.2 -38.7Z'},
+Y:{adv:56,d:'M60.7 -78.2Q60.7 -75.6 59.4 -71.5Q58.2 -67.4 56.2 -62.6Q54.2 -57.9 51.6 -52.9Q49.1 -48 46.6 -43.7Q44.1 -39.4 41.9 -36.1Q39.7 -32.8 38.3 -31.2Q37.5 -27.2 36.6 -22.6Q35.8 -18 34.7 -13.8Q33.6 -9.6 32.1 -6.1Q30.7 -2.7 28.7 -0.7Q28.1 -0.1 27.3 0.2Q26.6 0.5 25.8 0.5Q24.3 0.5 22.9 -0.4Q21.5 -1.3 20.4 -2.7Q19.3 -4.1 18.7 -5.6Q18.1 -7.2 18.1 -8.5Q18.1 -9 18.2 -9.3Q19.2 -12.3 20.2 -15.4Q21.2 -18.5 22 -21.8Q22.8 -25 23.4 -28.3Q24 -31.7 24.4 -35.1Q22.9 -37.7 21.2 -41Q19.5 -44.3 17.8 -47.8Q16.1 -51.4 14.6 -55Q13.1 -58.6 11.9 -61.8Q10.8 -65 10.1 -67.7Q9.4 -70.4 9.4 -72.2Q9.4 -73.9 10.4 -74.8Q11.4 -75.7 13 -75.7Q15 -75.7 16.9 -74.3Q18.8 -72.9 20 -70.9Q21.6 -68.2 23 -64.9Q24.5 -61.7 25.9 -58.4Q27.3 -55.1 28.7 -51.9Q30.1 -48.8 31.6 -46.2Q34.5 -51.1 36.6 -55.6Q38.7 -60.1 40.5 -64.3Q41.3 -66.2 42.2 -68.7Q43.2 -71.3 44.4 -73.6Q45.7 -75.9 47.3 -77.5Q48.9 -79.2 51 -79.2Q52.5 -79.2 54.2 -78.9Q55.9 -78.7 57.3 -78.9Q58 -79.7 58.9 -80.1Q59.8 -80.6 60.2 -79.9Q60.7 -79.5 60.7 -78.2Z'}};
+let CHEWY_P2D=null;
+function chewyP2D(){
+  if(!CHEWY_P2D){ CHEWY_P2D={}; for(const ch in CHEWY) CHEWY_P2D[ch]=new Path2D(CHEWY[ch].d); }
+  return CHEWY_P2D;
+}
+const PLAY_ADV=CHEWY.P.adv+CHEWY.L.adv+CHEWY.A.adv+CHEWY.Y.adv+3*8;   // the word's design width (8u letter-spacing)
+// THE TRIP'S NEXT STOP — the first unbeaten level across the books in trip
+// order (🎫 → 🎃 → 🎅, dial §8.3 executed-REC). null = the whole trip is won.
+function tripNext(){
+  for(const b of TRIP_BOOKS){
+    const L=b==='pk'? PK_LEVELS : b==='sa'? SA_LEVELS : LEVELS;
+    for(let n=1;n<=L.length;n++) if(!bookDone(b).has(n)) return {b,n};
+  }
+  return null;
+}
+function tripHost(){ const t=tripNext(); return t? t.b : 'sa'; }   // all beaten → Santa keeps the door (the finale host) ⚑
+// ---- the front's state: one dt clock + the left door's little world ----
+const FRONT={t:0, rects:null, smoke:[], smokeT:0,
+             set:{grid:new Map(), hg:new Map(), cars:[], wheel:0}};
+function frontBuild(){
+  // the left door's railroad — a 6×3 loop of REAL pieces (the v56 corner
+  // grammar), a 'br' bridge on the south run for the river to slide under.
+  const S=FRONT.set; S.grid.clear(); S.hg.clear();
+  const put=(x,y,t,r)=>S.grid.set(key(x,y),mkPiece(t,r));
+  // TWO bridges — the river crosses both runs and the E1 water law stays
+  // honest on the toy's own front door (river refuses track except a bridge)
+  put(0,0,'c',1); put(1,0,'s',0); put(2,0,'br',0); put(3,0,'s',0); put(4,0,'s',0); put(5,0,'c',2);
+  put(0,1,'s',1);                                                 put(5,1,'s',1);
+  put(0,2,'c',0); put(1,2,'s',0); put(2,2,'br',0); put(3,2,'s',0); put(4,2,'s',0); put(5,2,'c',3);
+  RGRID=S.grid; HGRID=S.hg;
+  try{
+    const loco={cx:3,cy:0,pi:0,dir:1,s:48,el:0};   // heads east along the top run
+    S.cars=[{type:'loco',rd:loco,face:1,squash:0}];
+    for(let i=1;i<=2;i++){ const rd=clone(loco); back(rd,GAP*i);
+      S.cars.push({type:i===1?'tender':'box',rd,face:1,squash:0}); }
+  } finally { RGRID=grid; HGRID=hgrid; }
+}
+function frontUpdate(dt){
+  FRONT.t+=dt;
+  const S=FRONT.set;
+  if(!S.cars.length) return;
+  RGRID=S.grid; HGRID=S.hg;
+  try{
+    const step=DOOR_SPEED*dt;
+    attRun(S.cars,step);               // a closed loop never turns around
+    S.wheel+=step/8;
+    FRONT.smokeT-=dt;
+    if(FRONT.smokeT<=0){               // the funnel puffs — the menu's exact recipe
+      FRONT.smokeT=0.38;
+      const loco=S.cars[0], p=pos(loco.rd);
+      const artAng=p.ang+(loco.face<0?Math.PI:0);
+      const flip=Math.cos(artAng)<0;
+      const lx=18*KART, ly=(flip?28:-28)*KART;
+      const ca=Math.cos(artAng), sa=Math.sin(artAng);
+      FRONT.smoke.push({ x:p.x+ca*lx-sa*ly, y:p.y+sa*lx+ca*ly, t:0, dur:1.2,
+                         vx:(Math.random()-0.5)*10, vy:-30, r:3+Math.random()*2 });
+    }
+  } finally { RGRID=grid; HGRID=hgrid; }
+  for(const s of FRONT.smoke){ s.t+=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy-=8*dt; }
+  for(let i=FRONT.smoke.length-1;i>=0;i--) if(FRONT.smoke[i].t>=FRONT.smoke[i].dur) FRONT.smoke.splice(i,1);
+  for(const f of flights) f.t+=dt;     // stray mint flights still land (the menu's own line)
+  flights=flights.filter(f=>f.t<f.dur);
+}
+// ---- the night sky (the E77 icon's family: deep-space gradient, fixed stars) ----
+const FRONT_STARS=[[0.08,0.10,2.4],[0.22,0.05,1.5],[0.36,0.14,1.2],[0.55,0.05,1.8],[0.70,0.11,1.3],
+                   [0.86,0.07,2.2],[0.95,0.20,1.4],[0.04,0.32,1.4],[0.97,0.42,1.9],[0.03,0.58,1.7],
+                   [0.96,0.66,1.2],[0.06,0.83,2.0],[0.13,0.94,1.3],[0.30,0.90,1.6],[0.52,0.955,1.2],
+                   [0.72,0.93,2.1],[0.90,0.88,1.5],[0.44,0.08,1.0],[0.63,0.94,1.0],[0.985,0.79,1.3]];
+function frontSky(){
+  const g=cx.createRadialGradient(W*0.5,H*0.38,H*0.10,W*0.5,H*0.55,Math.max(W,H)*0.75);
+  g.addColorStop(0,'#1B2C52'); g.addColorStop(1,'#0B1128');
+  cx.fillStyle=g; cx.fillRect(0,0,W,H);
+  cx.fillStyle='#F7E9C4';
+  for(const st of FRONT_STARS){
+    cx.globalAlpha=st[2]>1.8? 0.9 : 0.5;
+    cx.beginPath(); cx.arc(W*st[0],H*st[1],st[2],0,7); cx.fill();
+  }
+  cx.globalAlpha=1;
+  star5(W*0.085,H*0.72,0.8,'#F2C531');   // two gold toybox stars (the icon's own charm)
+  star5(W*0.93,H*0.16,0.6,'#F2C531');
+}
+function frontSign(cxs,top,wpx){
+  // the masthead — menuSignArt VERBATIM (plank, carve words, medallion; the
+  // Earth painter untouched), floating on the sky over its own soft shadow.
+  const sx=MENU_W/2, k=wpx/500;
+  cx.globalAlpha=0.35; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(cxs, top+104*k, wpx*0.52, 16*k, 0, 0, 7); cx.fill(); cx.globalAlpha=1;
+  cx.save(); cx.translate(cxs-sx*k, top-39*k); cx.scale(k,k);
+  menuSignArt();
+  cx.restore();
+}
+// ---- the doors ----
+function doorFrame(r,gold){
+  // toy-chest wood in the sign family; the trip door wears the gold-deep edge
+  cx.globalAlpha=0.4; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(r.x+r.w/2, r.y+r.h+7, r.w*0.52, 10, 0, 0, 7); cx.fill(); cx.globalAlpha=1;
+  cx.fillStyle='#8f6b3f'; rr(r.x-7,r.y-7,r.w+14,r.h+14,14); cx.fill();
+  cx.strokeStyle=gold?'#8F6B1E':'#6e5130'; cx.lineWidth=4; rr(r.x-7,r.y-7,r.w+14,r.h+14,14); cx.stroke();
+}
+function frontPlay(fw,fh){
+  // PLAY in fluffy cloud letters — the LOCKED recipe: navy under-pass first
+  // (ringing every edge, counters included), then the white pass; ±3° tilts.
+  const P2=chewyP2D();
+  const k=Math.min(fw*0.66/PLAY_ADV, fh*0.52/100);
+  const w=PLAY_ADV*k, x0=(fw-w)/2, base=fh-fh*0.10;
+  cx.lineJoin='round'; cx.lineCap='round';
+  for(const pass of [0,1]){
+    let xx=x0;
+    for(const ch of 'PLAY'){
+      const gl=CHEWY[ch];
+      cx.save();
+      cx.translate(xx+gl.adv*k/2, base);
+      cx.rotate((('PA'.includes(ch))?-3:3)*Math.PI/180);
+      cx.scale(k,k); cx.translate(-gl.adv/2,0);
+      if(!pass){ cx.strokeStyle='#28486B'; cx.lineWidth=9/k; cx.stroke(P2[ch]); }
+      else { cx.fillStyle='#fff'; cx.fill(P2[ch]); cx.strokeStyle='#fff'; cx.lineWidth=2.5/k; cx.stroke(P2[ch]); }
+      cx.restore();
+      xx+=gl.adv*k+8*k;
+    }
+  }
+  cx.lineCap='butt';
+}
+function frontDoorSet(r){
+  // MY TRAIN SET — a running railroad through trees and water, painted by the
+  // game's own painters inside the door's glass. The train laps forever.
+  cx.save();
+  rr(r.x,r.y,r.w,r.h,8); cx.clip();
+  cx.fillStyle='#7C9A55'; cx.fillRect(r.x,r.y,r.w,r.h);            // the meadow (E30's field)
+  cx.globalAlpha=0.55; cx.strokeStyle='#6C8A49'; cx.lineWidth=3;   // the wind combing
+  for(let y=r.y+18;y<r.y+r.h;y+=34){
+    cx.beginPath(); cx.moveTo(r.x,y);
+    for(let x=r.x;x<r.x+r.w;x+=52) cx.quadraticCurveTo(x+26,y+((x/52)%2?4:-4),x+52,y);
+    cx.stroke();
+  }
+  cx.globalAlpha=1;
+  const S=FRONT.set;
+  const sw=680, sh=430;                                            // the little world's design box
+  const k=Math.min(r.w/sw, r.h/sh), ox=r.x+(r.w-sw*k)/2, oy=r.y+(r.h-sh*k)/2;
+  cx.save();
+  cx.translate(ox,oy); cx.scale(k,k); cx.translate(-GX+52,-GY+96);
+  // the river slides under the bridge column (cell 2), bank → water → light
+  const rx=GX+2*C+C/2;
+  cx.fillStyle=RIVER_BANK; cx.fillRect(rx-30,GY-160,60,C*3+320);
+  cx.fillStyle=RIVER_BLUE; cx.fillRect(rx-23,GY-160,46,C*3+320);
+  cx.globalAlpha=0.5; cx.fillStyle=RIVER_LIGHT;
+  cx.fillRect(rx-8,GY-160,7,C*3+320); cx.globalAlpha=1;
+  RGRID=S.grid; HGRID=S.hg;
+  try{
+    drawTrack(S.grid);
+    // trees and water dressing — drawScenItem, the postcard grammar
+    for(const [t,gx2,gy2,dx,dy] of [['tree',0,0,-58,-40],['pine',4,0,60,-46],['bush',1,1,-6,4],
+                                    ['tree',3,1,10,8],['pine',0,2,-60,52],['tree',4,2,58,48],['bush',5,0,64,-38]]){
+      cx.save(); cx.translate(GX+gx2*C+C/2+dx, GY+gy2*C+C/2+dy); cx.scale(1.15,1.15);
+      drawScenItem({t,v:0,ra:null,pop:0,wave:0},-C/2,-C/2,FRONT.t);
+      cx.restore();
+    }
+    drawCarsOnRails(S.cars,S.wheel);
+    for(const s of FRONT.smoke){ const q=s.t/s.dur;
+      cx.globalAlpha=(1-q)*0.4; cx.fillStyle='#bbb';
+      cx.beginPath(); cx.arc(s.x,s.y,s.r+9*q,0,7); cx.fill(); }
+    cx.globalAlpha=1;
+  } finally { RGRID=grid; HGRID=hgrid; }
+  cx.restore();
+  frontPlay2(r);
+  cx.restore();
+}
+function frontPlay2(r){ cx.save(); cx.translate(r.x,r.y); frontPlay(r.w,r.h); cx.restore(); }
+function frontHostArt(b){
+  // the trip door's host at origin, waving (the CHARM law — one arm up):
+  // ten = the E60 conductor (his figure verbatim, door scale), pk = drawKing,
+  // sa = drawSanta. Painted standing on the scene's ground line.
+  if(b==='pk'){ drawKing({wave:1},FRONT.t); return; }
+  if(b==='sa'){ drawSanta({wave:1},FRONT.t); return; }
+  // THE CONDUCTOR — drawCaller's body, the door edition (same navy, same cap)
+  cx.lineCap='round'; cx.lineJoin='round';
+  cx.strokeStyle='#28486B'; cx.fillStyle='#28486B'; cx.lineWidth=4.6;
+  cx.beginPath(); cx.moveTo(0,-7); cx.lineTo(0,4); cx.stroke();
+  cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(-6,1); cx.stroke();
+  cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(6,-16+Math.sin(FRONT.t*11)*3); cx.stroke();
+  cx.beginPath(); cx.moveTo(0,4); cx.lineTo(-4,11); cx.moveTo(0,4); cx.lineTo(4,11); cx.stroke();
+  cx.fillStyle='#E8C39A'; cx.beginPath(); cx.arc(0,-11,4.6,0,7); cx.fill();
+  cx.fillStyle='#28486B';
+  cx.beginPath(); cx.arc(0,-12.2,4.6,Math.PI*1.02,Math.PI*1.98); cx.fill();
+  cx.fillRect(-5.4,-13.1,10.8,1.7);
+  cx.fillStyle='#23211E';
+  cx.beginPath(); cx.arc(-1.6,-10.6,0.8,0,7); cx.fill();
+  cx.beginPath(); cx.arc(1.6,-10.6,0.8,0,7); cx.fill();
+  cx.lineCap='butt';
+}
+function frontBubble(bx,by,s){
+  // HELP ME! — a cream comic bubble, bobbing on the front's clock
+  const bob=Math.sin(FRONT.t*2.6)*3*s;
+  cx.save(); cx.translate(bx,by+bob);
+  cx.font='bold '+Math.round(15*s)+'px "Arial Black",Impact,sans-serif';
+  const txt='HELP ME!', tw=cx.measureText(txt).width, w=tw+26*s, h=30*s;
+  cx.lineJoin='round';
+  cx.fillStyle='#FFF8E7'; cx.strokeStyle='#23211E'; cx.lineWidth=2.5*s;
+  rr(-w/2,-h/2,w,h,10*s); cx.fill(); cx.stroke();
+  cx.beginPath(); cx.moveTo(-w*0.18,h/2-1); cx.lineTo(-w*0.05,h/2+11*s); cx.lineTo(w*0.02,h/2-1); cx.closePath();
+  cx.fill(); cx.stroke();
+  cx.fillStyle='#FFF8E7'; cx.fillRect(-w*0.16,h/2-2.4*s,w*0.16,3*s);   // open the throat
+  cx.fillStyle='#23211E'; cx.textAlign='center'; cx.textBaseline='middle';
+  cx.fillText(txt,0,1*s);
+  cx.textBaseline='alphabetic';
+  cx.restore();
+}
+function frontDoorTrip(r){
+  // THE BIG TRIP — a ticket-edged scene that breathes; the host calls.
+  const b=tripHost();
+  cx.save();
+  rr(r.x,r.y,r.w,r.h,8); cx.clip();
+  const gy2=r.y+r.h*0.68;                                          // the ground line
+  if(b==='pk'){                                                    // the patch at dusk
+    const g=cx.createLinearGradient(0,r.y,0,gy2);
+    g.addColorStop(0,'#F2C9A0'); g.addColorStop(1,'#F7DCA9');
+    cx.fillStyle=g; cx.fillRect(r.x,r.y,r.w,r.h);
+    cx.fillStyle='#5d7a3a'; cx.fillRect(r.x,gy2,r.w,r.h);
+  } else if(b==='sa'){                                             // the village night
+    const g=cx.createLinearGradient(0,r.y,0,gy2);
+    g.addColorStop(0,'#20355C'); g.addColorStop(1,'#41608F');
+    cx.fillStyle=g; cx.fillRect(r.x,r.y,r.w,r.h);
+    cx.fillStyle='#E9EEF4'; cx.fillRect(r.x,gy2,r.w,r.h);
+  } else {                                                         // the platform morning
+    const g=cx.createLinearGradient(0,r.y,0,gy2);
+    g.addColorStop(0,'#CFE3F2'); g.addColorStop(1,'#E8F0F8');
+    cx.fillStyle=g; cx.fillRect(r.x,r.y,r.w,r.h);
+    cx.fillStyle='#fff';                                           // two soft clouds drifting (the sky breathes too)
+    for(const [ph0,cy2,cs] of [[0,0.16,1],[0.55,0.30,0.72]]){
+      const cw=r.w*0.24*cs, ex=r.x-cw+((FRONT.t*4+ph0*(r.w+2*cw))%(r.w+2*cw));
+      cx.globalAlpha=0.8;
+      cx.beginPath(); cx.ellipse(ex,r.y+r.h*cy2,cw*0.5,12*cs,0,0,7);
+      cx.ellipse(ex+cw*0.22,r.y+r.h*cy2-9*cs,cw*0.3,10*cs,0,0,7); cx.fill();
+    }
+    cx.globalAlpha=1;
+    cx.fillStyle='#B48A54'; cx.fillRect(r.x,gy2,r.w,r.h);          // the boards
+    cx.strokeStyle='#8a683e'; cx.lineWidth=2;
+    for(let x=r.x+14;x<r.x+r.w;x+=46){ cx.beginPath(); cx.moveTo(x,gy2); cx.lineTo(x,r.y+r.h); cx.stroke(); }
+    cx.fillStyle='#C9A26B'; cx.fillRect(r.x,gy2,r.w,4);            // the platform's lit cap
+    cx.save(); cx.translate(r.x+r.w*0.12, gy2-14); cx.scale(1.1,1.1);   // the platform lamp
+    drawScenItem({t:'lamp',v:0,ra:null,pop:0,wave:0},-C/2,-C/2,FRONT.t);
+    cx.restore();
+  }
+  const hx=r.x+r.w*(b==='ten'?0.42:0.40);                          // the host stands left of the bubble
+  if(b==='ten'){                                                   // the conductor: art −19..+11 ≈ 30u
+    const hs=Math.min(r.h*0.34/30, r.w*0.16/30);
+    cx.save(); cx.translate(hx,gy2); cx.scale(hs,hs);
+    cx.globalAlpha=0.25; cx.fillStyle='#000';
+    cx.beginPath(); cx.ellipse(0,1.2,10,2.6,0,0,7); cx.fill(); cx.globalAlpha=1;
+    cx.translate(0,-11); frontHostArt(b); cx.restore();
+  } else {                                                         // king/santa: boots +25 to hat −28 ≈ 56u
+    const hs=Math.min(r.h*0.42/56, r.w*0.20/56);
+    cx.save(); cx.translate(hx,gy2); cx.scale(hs,hs);
+    cx.globalAlpha=0.25; cx.fillStyle='#000';
+    cx.beginPath(); cx.ellipse(0,2,26,6.5,0,0,7); cx.fill(); cx.globalAlpha=1;
+    cx.translate(0,-25); frontHostArt(b); cx.restore();
+  }
+  if(b==='pk'){                                                    // his pumpkins + fireflies
+    for(const [dx,v,s2] of [[-0.26,0,0.9],[0.22,1,1.05],[0.36,2,0.8]]){
+      cx.save(); cx.translate(r.x+r.w*(0.40+dx), gy2-14*s2); cx.scale(s2,s2);
+      drawScenItem({t:'pum',v,ra:null,pop:0,wave:0},-C/2,-C/2,FRONT.t);
+      cx.restore();
+    }
+    cx.fillStyle='#FFD98A';
+    for(let i=0;i<7;i++){                                          // the breath: amber motes drifting
+      const ph=(FRONT.t*0.11+i*0.143)%1, fx2=r.x+r.w*((i*0.137+0.1+Math.sin(FRONT.t*0.7+i)*0.02)%1);
+      cx.globalAlpha=0.5+0.5*Math.sin(FRONT.t*2+i*2.1);
+      cx.beginPath(); cx.arc(fx2, r.y+r.h*(0.85-ph*0.7), 2.2, 0, 7); cx.fill();
+    }
+    cx.globalAlpha=1;
+  } else if(b==='sa'){                                             // his present + snowfall
+    cx.save(); cx.translate(r.x+r.w*0.62, gy2-16); cx.scale(1.1,1.1);
+    drawScenItem({t:'pres',v:0,ra:null,pop:0,wave:0},-C/2,-C/2,FRONT.t);
+    cx.restore();
+    cx.fillStyle='#fff';
+    for(let i=0;i<16;i++){                                         // the breath: snow, deterministic
+      const ph=(FRONT.t*0.09+i*0.0625)%1;
+      const fx2=r.x+((i*61)%97)/97*r.w + Math.sin(FRONT.t*0.9+i)*6;
+      cx.globalAlpha=0.85-ph*0.4;
+      cx.beginPath(); cx.arc(fx2, r.y+ph*r.h, 1.6+((i*13)%3)*0.5, 0, 7); cx.fill();
+    }
+    cx.globalAlpha=1;
+  } else {                                                         // the waiting engine — the trip's own smoke (the breath)
+    const ls=Math.min(r.w*0.22/56, r.h*0.20/30);
+    cx.save(); cx.translate(r.x+r.w*0.80, gy2-13*ls); cx.scale(ls,ls);
+    drawCar('loco',0,0,Math.PI,0,0);                               // standing, facing the conductor (flip-upright law inside)
+    cx.restore();
+    for(let i=0;i<4;i++){
+      const ph=(FRONT.t*0.22+i*0.25)%1;
+      cx.globalAlpha=(1-ph)*0.55; cx.fillStyle='#e8e8e8';
+      cx.beginPath();
+      cx.arc(r.x+r.w*0.80-14*ls+Math.sin(ph*5+i)*8, gy2-13*ls-24*ls-ph*r.h*0.42, (4+ph*15)*Math.max(0.7,ls*0.5), 0, 7);
+      cx.fill();
+    }
+    cx.globalAlpha=1;
+  }
+  frontBubble(r.x+r.w*0.68, r.y+r.h*0.24, Math.max(0.8,Math.min(1.35,r.w/340)));
+  // the three book stamps riding the corner (cream punch-squares, wall grammar)
+  const ss=Math.max(0.75,Math.min(1.15,r.w/380)), sq=30*ss;
+  for(let i=0;i<3;i++){
+    const sx2=r.x+10+i*(sq+6), sy2=r.y+r.h-10-sq;
+    cx.fillStyle='#F7E9C4'; rr(sx2,sy2,sq,sq,6*ss); cx.fill();
+    cx.strokeStyle='#8F6B1E'; cx.lineWidth=2; rr(sx2,sy2,sq,sq,6*ss); cx.stroke();
+    cx.font=Math.round(18*ss)+'px "Arial Black",Impact,sans-serif';
+    cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText(['🎫','🎃','🎅'][i], sx2+sq/2, sy2+sq/2+1);
+    cx.textBaseline='alphabetic';
+  }
+  // the ticket edge — the dashed gold ring that says "this one is a ticket"
+  cx.strokeStyle='rgba(242,197,49,0.55)'; cx.lineWidth=2;
+  cx.setLineDash([7,6]); rr(r.x+6,r.y+6,r.w-12,r.h-12,7); cx.stroke(); cx.setLineDash([]);
+  cx.restore();
+}
+function frontStoreTile(r){
+  // the smaller STORE tile — the room's storefront art verbatim (menuStoreArt)
+  // over a little SHOP plank. One tap → the aisle (E53 law).
+  doorFrame(r,false);
+  cx.save();
+  rr(r.x,r.y,r.w,r.h,8); cx.clip();
+  cx.fillStyle='#241a0e'; cx.fillRect(r.x,r.y,r.w,r.h);
+  const k=r.w/268;
+  cx.save(); cx.translate(r.x+r.w/2, r.y+76*k); cx.scale(k,k);
+  menuStoreArt();
+  cx.restore();
+  cx.restore();
+  // the SHOP plank under the tile (an existing reader word — the chip's own)
+  const pw=Math.max(86,r.w*0.58), ph=26, px2=r.x+(r.w-pw)/2, py2=r.y+r.h-4;
+  cx.fillStyle='#8f6b3f'; rr(px2,py2,pw,ph,7); cx.fill();
+  cx.strokeStyle='#6e5130'; cx.lineWidth=3; rr(px2,py2,pw,ph,7); cx.stroke();
+  cx.font='bold 15px "Arial Black",Impact,sans-serif'; cx.textAlign='center';
+  cx.fillStyle='#5d452a'; cx.fillText('SHOP',px2+pw/2,py2+19.5);
+  cx.fillStyle='#F7E9C4'; cx.fillText('SHOP',px2+pw/2,py2+18);
+}
+function frontLayout(){
+  // per-frame, from W/H alone — every window shape seats all three things
+  const pad=Math.max(14,Math.min(W,H)*0.02);
+  const mw=Math.min(W*0.80,560,H*0.85);
+  const signH=96*(mw/500), y0=pad+6;
+  const stW=Math.min(W*0.30,170,H*0.36), stH=stW*0.62+30;
+  const dTop=y0+signH+16, dBot=H-pad-stH-16;
+  const stack=W<640;
+  let doors;
+  if(!stack){
+    const dw=Math.min((W-2*pad-26)/2,470);
+    const dh=Math.max(110,Math.min(dw*0.74,dBot-dTop));
+    const y=dTop+Math.max(0,(dBot-dTop-dh)/2), x0=(W-2*dw-26)/2;
+    doors={ play:{x:x0,y,w:dw,h:dh}, trip:{x:x0+dw+26,y,w:dw,h:dh} };
+  } else {
+    const dw=Math.min(W-2*pad,470);
+    const dh=Math.max(104,Math.min(dw*0.68,(dBot-dTop-14)/2));
+    const x=(W-dw)/2;
+    doors={ play:{x,y:dTop,w:dw,h:dh}, trip:{x,y:dTop+dh+14,w:dw,h:dh} };
+  }
+  const st={x:(W-stW)/2, y:H-pad-stH, w:stW, h:stH-30+4};
+  FRONT.rects={ sign:{cx:W/2,top:y0,w:mw}, play:doors.play, trip:doors.trip, store:st };
+  return FRONT.rects;
+}
+function drawFront(){
+  cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,cvs.width,cvs.height);
+  cx.setTransform(DPR,0,0,DPR,0,0);
+  const R=frontLayout();
+  frontSky();
+  doorFrame(R.play,false); frontDoorSet(R.play);
+  doorFrame(R.trip,true);  frontDoorTrip(R.trip);
+  frontStoreTile(R.store);
+  frontSign(R.sign.cx,R.sign.top,R.sign.w);
+  // minted stars still fly on the front (nothing mints here today — but the
+  // painter stays honest if one ever does)
+  for(const f of flights){ if(f.t<=0) continue;
+    const k=f.t/f.dur, e2=k*k*(3-2*k);
+    star5(f.x+(f.tx-f.x)*e2, f.y+(f.ty-f.y)*e2-Math.sin(Math.PI*k)*36, 0.9+0.35*(1-k), '#F2C531'); }
+  cx.globalAlpha=1;
+}
+function frontDown(e){
+  // the front's whole hand: two doors + the store tile (the ROOM_OBJS tap
+  // grammar — answer at pointerdown, swallow the synthesized click)
+  ac(); e.preventDefault();
+  const R=FRONT.rects||frontLayout();
+  const hit=r=>e.clientX>=r.x-7&&e.clientX<=r.x+r.w+7&&e.clientY>=r.y-7&&e.clientY<=r.y+r.h+7;
+  if(hit(R.play)){ SND.tok(); showScreen('game'); tapSwallow(); return; }   // free play as it stands (E83 grows it)
+  if(hit(R.trip)){
+    SND.tok();
+    const t=tripNext();
+    if(t) campEnter(t.n,t.b);          // straight into the next unbeaten level — no board, no picker
+    else showScreen('wall');           // the whole trip won → the postcard wall stands in until E84's replay door ⚑
+    tapSwallow(); return;
+  }
+  if(hit(R.store)){ SND.tok(); storeShow(true); tapSwallow(); return; }
+}
+/* ---- THE DOG WALKS BY (§1 round 10) — the GVT shape-store dogs, art
+   verbatim from ~/gvt/design/dog-companion-0818/candidates.html dogA/dogB
+   (the review artifact's exact builders, parameterized by coat: GOOD BOY
+   classic · HOUND tricolour, the saddle riding the EAR token). One DOM
+   layer; the walk keyframes live in the stylesheet. ---- */
+const DOG_INK='#23211E', DOG_COLLAR='#C0392B', DOG_TAG='#E8C878', DOG_TNG='#E0656B';
+function dogLeg(x,y,len,col,w,cls,sock,CREAM){
+  return '<g transform="translate('+x+','+y+')"><g class="dgPin '+cls+'">'
+    +'<path d="M0 0 L0 '+len+'" stroke="'+col+'" stroke-width="'+w+'" fill="none" stroke-linecap="round"/>'
+    +(sock? '<circle cx="0" cy="'+len+'" r="'+(w*0.55)+'" fill="'+CREAM+'"/>' : '')
+    +'</g></g>';
+}
+function dogArtA(COAT,SHADE,CREAM,EAR){   // THE GOOD BOY
+  return '<g stroke-linecap="round">'
+    +'<g transform="translate(11.5,-1)"><g class="dogwagG dgPin"><path d="M0 0 Q4.2 -1 4.6 -6 Q4.8 -8.6 2.6 -8.6" stroke="'+COAT+'" stroke-width="3.2" fill="none"/><circle cx="2.6" cy="-8.6" r="1.7" fill="'+CREAM+'"/></g></g>'
+    +dogLeg(-2.5,7,8.5,SHADE,3.4,'dgLegB',true,CREAM)
+    +dogLeg(9.5,7,8.5,SHADE,3.4,'dgLegA',true,CREAM)
+    +'<path d="M-11.9 2.4 C-11.9 -2.6 -8.6 -4.6 -4.2 -4.6 L5.4 -4.2 C10 -4 12.6 -1.2 12.6 3 C12.6 7.4 9.8 9.6 5.8 9.6 L-4.6 9.8 C-9.6 9.8 -11.9 7.2 -11.9 2.4 Z" fill="'+COAT+'"/>'
+    +dogLeg(-6.5,7,8.5,COAT,3.6,'dgLegA',true,CREAM)
+    +dogLeg(6,7,8.5,COAT,3.6,'dgLegB',true,CREAM)
+    +'<ellipse cx="-8.4" cy="5.2" rx="3.1" ry="3.9" fill="'+CREAM+'" transform="rotate(14 -8.4 5.2)"/>'
+    +'<path d="M-14 -0.6 Q-9.2 3.6 -3.6 -0.2" stroke="'+DOG_COLLAR+'" stroke-width="2.6" fill="none"/>'
+    +'<circle cx="-9.4" cy="3.6" r="1.5" fill="'+DOG_TAG+'"/>'
+    +'<g transform="translate(-9,-2)"><g class="dogHeadG dgPin">'
+      +'<circle cx="-3" cy="-4.5" r="7.2" fill="'+COAT+'"/>'
+      +'<rect x="-12.6" y="-5" width="8.6" height="6.2" rx="3" fill="'+CREAM+'"/>'
+      +'<circle cx="-11.6" cy="-2.9" r="1.95" fill="'+DOG_INK+'"/>'
+      +'<path d="M-9.4 0.2 q1.4 1.5 2.9 0.1" stroke="'+DOG_INK+'" stroke-width="0.9" fill="none"/>'
+      +'<path class="dogTng" d="M-9.6 0.5 Q-8.4 4.4 -6.9 0.7 Z" fill="'+DOG_TNG+'"/>'
+      +'<circle cx="-4.6" cy="-6.6" r="1.75" fill="'+DOG_INK+'"/>'
+      +'<circle cx="-5.2" cy="-7.2" r="0.62" fill="#FFFFFF"/>'
+      +'<g transform="translate(1.2,-10.2)"><g class="dogEarG dgPin"><path d="M0 0 Q6.2 -0.4 5.2 7 Q4.6 11.2 1.4 10.7 Q-1.4 10.2 0 0 Z" fill="'+EAR+'"/></g></g>'
+    +'</g></g>'
+    +'</g>';
+}
+function dogArtB(COAT,SHADE,CREAM,EAR){   // THE HOUND
+  const thigh=(x,y,cls,col)=>'<g transform="translate('+x+','+y+')"><g class="dgPin '+cls+'">'
+    +'<ellipse cx="0.4" cy="1.6" rx="3.1" ry="4.2" fill="'+col+'"/>'
+    +'<path d="M0.8 4 L1.4 8.8" stroke="'+col+'" stroke-width="3.2" fill="none" stroke-linecap="round"/></g></g>';
+  return '<g stroke-linecap="round">'
+    +'<g transform="translate(13,-2)"><g class="dogwagG dgPin"><path d="M0 0 Q3.2 -3.6 3.6 -9.4" stroke="'+COAT+'" stroke-width="2.9" fill="none"/><circle cx="3.6" cy="-9.4" r="1.4" fill="'+CREAM+'"/></g></g>'
+    +dogLeg(-3.6,7.4,8.6,SHADE,3.2,'dgLegB',false,CREAM)
+    +thigh(11.2,7.2,'dgLegA',SHADE)
+    +'<circle cx="8.6" cy="3.2" r="6.1" fill="'+COAT+'"/>'
+    +'<circle cx="-6.6" cy="2.6" r="6.4" fill="'+COAT+'"/>'
+    +'<rect x="-6.6" y="-3.6" width="15.2" height="12.4" fill="'+COAT+'"/>'
+    +'<path d="M-6.4 -3.4 Q1.5 -6.6 10.4 -2.6 Q11.6 1.6 8.4 2.6 Q1.2 -0.6 -6.2 0.8 Z" fill="'+EAR+'"/>'
+    +dogLeg(-8,7.4,8.6,COAT,3.4,'dgLegA',false,CREAM)
+    +thigh(7,7.6,'dgLegB',COAT)
+    +'<ellipse cx="-9.6" cy="5.4" rx="2.9" ry="3.6" fill="'+CREAM+'" transform="rotate(14 -9.6 5.4)"/>'
+    +'<path d="M-15.6 -1.6 Q-10.6 2.6 -5 -1.2" stroke="'+DOG_COLLAR+'" stroke-width="2.4" fill="none"/>'
+    +'<circle cx="-10.8" cy="2.6" r="1.35" fill="'+DOG_TAG+'"/>'
+    +'<g transform="translate(-10.4,-3)"><g class="dogHeadG dgPin">'
+      +'<circle cx="-2.6" cy="-4.4" r="6.4" fill="'+COAT+'"/>'
+      +'<rect x="-13.2" y="-4.6" width="10.6" height="5.6" rx="2.6" fill="'+COAT+'"/>'
+      +'<rect x="-12.4" y="-1.2" width="7.4" height="2.8" rx="1.4" fill="'+CREAM+'"/>'
+      +'<circle cx="-12.4" cy="-3" r="1.65" fill="'+DOG_INK+'"/>'
+      +'<path class="dogTng" d="M-9.8 1 Q-8.8 4.4 -7.4 1.2 Z" fill="'+DOG_TNG+'"/>'
+      +'<circle cx="-4.4" cy="-6.4" r="1.55" fill="'+DOG_INK+'"/>'
+      +'<circle cx="-4.9" cy="-6.9" r="0.55" fill="#FFFFFF"/>'
+      +'<g transform="translate(1.6,-9.6)"><g class="dogEarG dgPin"><path d="M0 0 Q5 0.6 3.8 8 Q3 12.8 0 12.2 Q-2.6 11.6 0 0 Z" fill="'+EAR+'"/></g></g>'
+    +'</g></g>'
+    +'</g>';
+}
+function frontDogs(){
+  // four walkers: each direction is its OWN element wearing a STATIC flip —
+  // never an animated one (the facing law). Kit frame: viewBox -52 -36 104 84,
+  // seat translate(0,6) scale(2), shadow at (0,38) — feet on the screen floor.
+  const gb=dogArtA('#8a6544','#7A553A','#EFE0BC','#5b3a22');            // classic
+  const hd=dogArtB('#B87333','#96551E','#EFE0BC','#2B2622');            // tricolour — the saddle rides the EAR token
+  const walker=(cls,art,flip)=>'<div class="dogwalk '+cls+'" aria-hidden="true">'
+    +'<svg viewBox="-52 -36 104 84"><ellipse cx="0" cy="38" rx="17" ry="4.6" fill="#000" opacity="0.2"/>'
+    +(flip?'<g transform="scale(-1,1)">':'<g>')
+    +'<g class="dgPin dogtrotB"><g transform="translate(0,6) scale(2)">'+art+'</g></g>'
+    +'</g></svg></div>';
+  $('dogLayer').innerHTML=
+    walker('gbR',gb,true)+walker('gbL',gb,false)+
+    walker('hdL',hd,false)+walker('hdR',hd,true);
+}
+// ---- the in-level store chip (§1 law leg c): storefront art, painted ----
+function drawLvlShop(){
+  const cv=$('lvlShopCv'); if(!cv) return;
+  const g=cv.getContext('2d');
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,cv.width,cv.height);
+  g.setTransform(2,0,0,2,0,0);   // 144×112 backing → 72×56 CSS
+  withCtx(g,()=>{
+    // a pocket storefront: wood, the scalloped awning, the gold star, a lit door
+    cx.fillStyle='#5C3F28'; rr(4,14,64,38,4); cx.fill();
+    cx.strokeStyle='#3a2a18'; cx.lineWidth=2; rr(4,14,64,38,4); cx.stroke();
+    star5(36,10,0.55,'#F2C531');
+    for(let i=0;i<5;i++){ cx.fillStyle=i%2?'#F7E9C4':'#C0392B'; cx.fillRect(2+i*13.6,16,13.6,8); }
+    cx.strokeStyle='#3a2a18'; cx.lineWidth=1.6; cx.strokeRect(2,16,68,8);
+    for(let i=0;i<5;i++){ cx.fillStyle=i%2?'#F7E9C4':'#C0392B';
+      cx.beginPath(); cx.arc(2+i*13.6+6.8,24,6.8,0,Math.PI); cx.fill(); }
+    cx.fillStyle='#141008'; rr(12,30,22,16,2); cx.fill();
+    cx.fillStyle='rgba(255,246,220,0.16)'; rr(12,30,22,16,2); cx.fill();
+    cx.strokeStyle='#3a2a18'; cx.lineWidth=1.6; rr(12,30,22,16,2); cx.stroke();
+    star5(23,38,0.4,'#F2C531');
+    cx.fillStyle='#141008'; rr(42,28,18,24,2); cx.fill();
+    cx.strokeStyle='#3a2a18'; rr(42,28,18,24,2); cx.stroke();
+    cx.fillStyle='#C7913B'; cx.beginPath(); cx.arc(57,40,1.6,0,7); cx.fill();
+  });
+}
+function lvlShopWire(){   // wired at boot with the other chip handlers ($ lives below this block)
+  $('lvlShop').addEventListener('click',()=>{
+    if(!(SCREEN==='game'&&CAMP.on)) return;
+    ac(); SND.tok(); storeShow(true);  // one tap — and storeBuy grants live into coll, so the rail holds the toy the same second
+  });
 }
 
 /* =====================================================================
@@ -12859,6 +13505,7 @@ cvs.addEventListener('pointerdown',e=>{
   if(SCREEN!=='game'&&SCREEN!=='play'){          // the menu room is furniture + a live floor (E18→E26)
     if(PIGP_T&&!(SCREEN==='menu'&&pigHit(e))){ clearTimeout(PIGP_T); PIGP_T=null; }   // E53: another press = the sandcastle wins; her pending panel folds
     if(SCREEN==='room'){ bigDown(e); return; }   // E49: the big room — models + the way home, nothing else
+    if(SCREEN==='menu'&&FRONT_DOORS){ frontDown(e); return; }   // E82: the two-door front — doors + store tile, nothing else
     if(SCREEN==='menu'&&!DRAG&&!down&&pigHit(e)){ e.preventDefault(); pigTap(); return; }   // E23: the piggy answers first
     if(SCREEN==='menu'&&!DRAG&&!down&&dogHit(e)){ e.preventDefault(); ac(); dogTap(); return; }   // E65: the dog answers before the furniture (he crosses the shop's rect)
     if(SCREEN==='menu'&&!DRAG&&!down){
@@ -12875,6 +13522,10 @@ cvs.addEventListener('pointerdown',e=>{
   // E55 dismiss law 2 (E25 grammar): a finger on the map folds the chest AND
   // still does its whole normal job — the fold never swallows the press.
   if($('toybox').style.display!=='none') boxShow(false);
+  // E82: the piggy answers before the rug (her menu ladder seat, rug edition) —
+  // and any press that isn't hers folds her pending panel (the sandcastle wins).
+  if(PIGP_T&&!pigHit(e)){ clearTimeout(PIGP_T); PIGP_T=null; }
+  if(pigRug()&&!DRAG&&!down&&pigHit(e)){ pigTap(); return; }
   if(camGate()){                                 // E10: two fingers on the rug = pinch zoom
     PTRS.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(PTRS.size===2&&!DRAG){ pinchStart(); return; }
@@ -14473,7 +15124,9 @@ function showScreen(s){
   const game=s==='game', play=s==='play';
   document.body.classList.toggle('rugmode',game||play);   // E26→E81: the peeking corner's floor (the sideways gate died in E81 — every shape plays)
   if(!game){ cancelDrag(); down=null; PINCH=null; PTRS.clear(); }
-  $('menu').style.display=s==='menu'?'flex':'none';
+  $('menu').style.display=(s==='menu'&&!FRONT_DOORS)?'flex':'none';   // E82: the paint-shop row was room furniture — the front holds exactly three things
+  $('dogLayer').style.display=(FRONT_DOORS&&s==='menu')?'block':'none';   // E82: the dogs walk the front only
+  $('lvlShop').style.display=(game&&CAMP.on)?'block':'none';   // E82: the store is one tap from inside a level
   $('board').style.display=s==='board'?'flex':'none';
   if(s==='board'){ boardFilter(); boardSync();
     // E71: a hundred tickets is a long board — opening it brings the FRONTIER
@@ -15710,7 +16363,7 @@ function resize(){
   }
   else {
     SC=Math.min(W/MENU_W,(H-BAR)/MENU_H); OX=(W-MENU_W*SC)/2; OY=(H-BAR-MENU_H*SC)/2;
-    bedBounds();   // E23: the bedroom floor is every cell the screen can hold — re-derived here
+    if(!FRONT_DOORS) bedBounds();   // E23: the bedroom floor is every cell the screen can hold — re-derived here (E82: the front lays itself out per frame, no floor to measure)
   }
   // E36 THE TRAIN SHELF — the spread is PLAY's resident shelf now (one flat
   // row, bottom-center; CSS sizes it from its cards). Only the card dials
@@ -15813,6 +16466,7 @@ function ghCtx(){
   if($('store').style.display==='flex') return HAND.shop? null:'shop';
   if(ghOverlayUp()) return null;
   if(SCREEN==='menu'){
+    if(FRONT_DOORS) return null;   // E82: the front teaches itself — two doors, no lesson (the HAND bits stay in the save)
     if(!HAND.room) return 'room';
     if(!HAND.door) return 'door';
     return null;
@@ -16161,7 +16815,10 @@ function ghBuild(){
 }
 
 
-load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildWall(); buildTray(); buildToybox(); buildStore(); buildNamer(); buildAttract(); ghBuild();
+load(); buildPalette(); buildShelf(); buildBarScroll(); buildTbox(); buildBedTools(); buildMenu(); buildBoard(); buildWall(); buildTray(); buildToybox(); buildStore(); buildNamer(); ghBuild();
+if(ROOM_ATTRACT) buildAttract();   // E82: the oval parks behind its const (the room's tide still rebuilds it)
+if(FRONT_DOORS){ frontBuild(); frontDogs(); }   // E82: the two-door front's little world + the walking dogs
+drawLvlShop(); lvlShopWire();
 // E70 THE FIRST MORNING → E71 THE MORNING TRAIN: EVERY boot lands INSIDE the
 // ten book's frontier level (Wyatt 8/8: "even if it's not a fresh account, we
 // should start them always in the latest campaign level") — the first unwon
@@ -16193,6 +16850,7 @@ function frame(t){
     if(SCREEN==='game') update(dt);
     else if(SCREEN==='play'){ update(dt); playUpdate(dt); }             // the shared juice + the wind-up trains
     else if(SCREEN==='room') bigTick(dt);                               // E49: the big room's tour (dt only — frozen-clock safe)
+    else if(FRONT_DOORS) frontUpdate(dt);                               // E82: the two-door front's clock (dt only — frozen-clock safe)
     else menuUpdate(dt);                                                // the board keeps the bedroom alive behind it
   }
   if(DRAG) withBed(dragSync);          // E19: the lift ramp is paint-time — it rises under a still finger
@@ -16200,7 +16858,7 @@ function frame(t){
   winShySync();                        // E80: the victory lap reads the won state every frame
   quietSync();                         // E61: the quiet rug reads the resting hand every frame
   tboxBreath(t);                       // E25: the idle lid sigh — paint only, never a save
-  if(SCREEN==='game'||SCREEN==='play') draw(); else if(SCREEN==='room') drawBig(); else drawMenu();
+  if(SCREEN==='game'||SCREEN==='play') draw(); else if(SCREEN==='room') drawBig(); else if(FRONT_DOORS) drawFront(); else drawMenu();
   if($('store').style.display==='flex') aisleFrame();   // E13: the aisle's live cards (visible ones only)
   requestAnimationFrame(frame);
 }
@@ -16439,7 +17097,19 @@ window.TS={
   step(dt){ const d=dt||1/60;
     if(SCREEN==='game') update(d);
     else if(SCREEN==='play'){ update(d); playUpdate(d); }
+    else if(FRONT_DOORS) frontUpdate(d);   // E82: the rig steps the front's clock too
     else menuUpdate(d); },
+  // E82 — the front's battery doors: the clock, the rects, the trip's answer,
+  // the left train's live arc position (proves the diorama runs).
+  front:{
+    t:()=>FRONT.t,
+    seek(v){ FRONT.t=v||0; },
+    rects(){ return FRONT.rects||frontLayout(); },
+    next(){ return tripNext(); },
+    host(){ return tripHost(); },
+    trainS(){ const c=FRONT.set.cars[0]; return c? c.rd.cx*1000+c.rd.cy*100+c.rd.s : null; },
+    pig(){ return { rug:pigRug(), xy:pigRugXY(), s:PIG_RUG_S }; },
+  },
   xy(gx,gy){ return { x:OX+SC*(GX+gx*C+C/2), y:OY+SC*(GY+gy*C+C/2) }; },   // cell centre in client px (pointer rigs)
   // E31 — the charm probe (rig-only): the scen at a cell with its live wave
   // timer, so a battery can assert a reaction armed on a REAL pass without
