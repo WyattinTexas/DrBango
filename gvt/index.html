@@ -2025,6 +2025,25 @@
     box-shadow:0 4px 9px rgba(0,0,0,0.5), inset 0 0 0 2px #8FBF63; }
   .sh-ofit.worn .sh-opart svg { filter:drop-shadow(0 0 5px rgba(143,191,99,0.55)) drop-shadow(0 3px 3px rgba(0,0,0,0.35)); }
   .sh-ofit.owned:not(.worn) { opacity:0.8; }
+  /* THE HARDWARE RACK (FM-GVT-SARGERACK-01): his guns as bubbles under the man
+     on the outfits stage — OWNED ONLY (absent, never padlocked). The disc is
+     the outfit card's own cream stock so gunmetal reads; the lit ring is the
+     bench's green (.sh-ofit.worn), the saber's ring is the crystal (--sab).
+     Scoped to #shOutfit: the PAINT mirror shares .sh-oroom and must not change
+     (v3.18). He yields height ONLY if a squeezed window can't hold him + the
+     rack — never at the battery viewports (measured: he rides up 35-49px,
+     same size). No strings in here at all. */
+  #shOutfit .sh-oroom img { min-height:0; flex:0 1 auto; }
+  .sh-wrack { flex:0 0 auto; width:100%; display:flex; justify-content:center; align-items:center;
+    gap:clamp(3px,0.8vw,8px); margin-top:clamp(4px,1.4vh,10px); padding:0 1%; }
+  .sh-wep { flex:1 1 0; max-width:clamp(30px,7.6vh,48px); aspect-ratio:1; min-width:0; border:none;
+    border-radius:50%; padding:0; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 40% 32%, #F6EDD3, #DCCDA6 62%, #C0AA80);
+    box-shadow:0 3px 7px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.18); opacity:0.82; }
+  .sh-wep img { width:78%; height:78%; object-fit:contain; filter:drop-shadow(0 2px 2px rgba(0,0,0,0.35)); }
+  .sh-wep.eq { opacity:1; box-shadow:0 3px 7px rgba(0,0,0,0.5), inset 0 0 0 2px #8FBF63, 0 0 10px rgba(143,191,99,0.45); }
+  .sh-wep.eq.sab { box-shadow:0 3px 7px rgba(0,0,0,0.5), inset 0 0 0 2px var(--sab), 0 0 12px var(--sab); }
+  .sh-wep:active { transform:translateY(2px); }
   /* ---- THE MAGIC LENS (v2.40, recategorized v2.42 — Wyatt: "It's very
      subtle at the bottom. It doesn't have its own category like lens. It
      doesn't tell you what it does."): the curio dept is gone; one quiet
@@ -27044,6 +27063,36 @@ function sargeArtW(wk){
 // disagree with the war table's own flank about what's in his hands.
 // sargeWepURI already defaults the blade to saberHex() — the crystal rides.
 function menuSargeURI(hex){ return sargeWepURI(sargeArtW(META.sargeWeapon||'pistol'), hex); }
+// THE HARDWARE GLYPH (FM-GVT-SARGERACK-01): the bare portrait cropped to the
+// iron — one drawing, two framings (outfitPartSVG's law). NOT outfitDress: a
+// worn vest/helmet intrudes into the crop (mock v2 proved it). The body's
+// currentColor paints the disc's own cream #E4D6AE so head and arms vanish
+// into the disc and only the molded gunmetal (+ the saber's BLADEHEX →
+// saberHex()) reads. Keyed by ART id (7 rows), not weapon key (5); a missing
+// crop falls back to the whole figure, never a blank disc. Re-minted every
+// render (stateless); no new SVG assets — the molded guns already exist.
+const WEP_CROP={ pistol:'62 24 36 32', pistol2:'62 24 40 56', shotgun:'40 60 76 32', sniper:'40 54 80 36',
+                 lightsaber:'66 0 48 62', commander:'66 4 44 58', claymore:'62 -2 52 72' };
+function wepGlyphURI(art){ return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+(WEP_CROP[art]||'0 0 120 140')+'">'
+  +(SARGE_ART[art]||SPRITES_SRC.sarge).split('currentColor').join('#E4D6AE').split('BLADEHEX').join(saberHex())+'</svg>'); }
+// THE HARDWARE RACK string (FM-GVT-SARGERACK-01): his guns as round bubbles
+// under the man on the OUTFITS stage — OWNED ONLY, absent otherwise (no
+// padlock, no silhouette, no gap: the v3.38 §17 rack grammar + the 0092
+// commander law; the ACADEMY keeps its locked teases — it is the catalogue,
+// this rack is the switcher). art = sargeArtW(wk), so the pistol bubble goes
+// DUAL at rank 10 and the commander's goes CLAYMORE at co-op 95 by the same
+// reader the figure uses — bubble and man can never disagree. Stateless
+// string, no listeners (the innerHTML-wipe law); #shOutfit ONLY — the PAINT
+// mirror's stage gets no rack (D8) and still shows the new iron through
+// menuSargeURI by construction. Order = SARGE_ORDER, his list order (D9).
+function shopWrackHTML(){
+  const eq=META.sargeWeapon||'pistol';
+  return '<div class="sh-wrack">'+SARGE_ORDER.filter(wkOwned).map(wk=>{
+    const sab=(wk==='lightsaber');
+    return '<button type="button" class="sh-wep'+(wk===eq?' eq':'')+(sab?' sab':'')+'" id="shwep-'+wk+'" data-wep="'+wk+'"'
+      +(sab?' style="--sab:'+saberHex()+'"':'')+' onclick="UI.shopWep(\''+wk+'\')">'
+      +'<img src="'+wepGlyphURI(sargeArtW(wk))+'" alt=""></button>'; }).join('')+'</div>';
+}
 // ===== SARGE'S GEAR art (v1.39, figure reseated 0101) — the academy composite
 // in the SARGE_ART style: BASE legs/torso, head sunk chin-into-the-torso-cap
 // and a touch forward (the rifleman convention — the pistol portrait's seat
@@ -30204,7 +30253,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.94';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.95';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -62047,7 +62096,13 @@ function closeWorldRank(){
 // order: recruits · motors · outfits · decor · mods · the dark run · stars.
 const SHOP_TABS = [ {id:'paint', lab:'PAINT'},
                     {id:'figs', lab:'FIGURES'}, {id:'motor', lab:'MOTORS'},
-                    {id:'outfit', lab:'OUTFITS'},
+                    // FM-GVT-SARGERACK-01 (Wyatt 8/19: "Change the Outfits
+                    // tab to read Sarge."): the plaque reads SARGE — the id,
+                    // its seat and the aisle arithmetic are byte-still, and
+                    // the "SARGE" l10n key already has rows ×7 (zero new
+                    // rows). The department sign inside is unchanged (D1 —
+                    // his ask was the tab).
+                    {id:'outfit', lab:'SARGE'},
                     {id:'decor', lab:'DECOR'},
                     // 0363 (Wyatt 8/16, verbatim: "Reorder the tab bar so the
                     // Rooms and Stars tabs sit immediately after the Decor tab
@@ -63381,7 +63436,7 @@ function renderShop(){
       // knows."): the how-to counsel line is CUT too — the department stands
       // on its header and the man in the mirror. Six l10n rows went with it.
       +'<section class="sh-dept" id="shOutfit"><h2>SARGE\'S OUTFITS<small>DRESS THE MAN · WEAR IT OR LEAVE IT IN THE FOOTLOCKER</small></h2>'
-        +'<div class="sh-oshelf"><div class="sh-oroom"><img src="'+menuSargeURI(dyeHex()||undefined)+'" alt=""><div class="sh-ostand"></div></div>'
+        +'<div class="sh-oshelf"><div class="sh-oroom"><img src="'+menuSargeURI(dyeHex()||undefined)+'" alt=""><div class="sh-ostand"></div>'+shopWrackHTML()+'</div>'
         +'<div class="sh-ocards">'+OUTFIT_ORDER.map(shopOutfitHTML).join('')+'</div></div>'
         +'</section>'
       // v2.42 (Wyatt 8/5): the v2.40 CURIO SHELF dept is GONE — the MAGIC LENS
@@ -65698,6 +65753,15 @@ window.UI = {
     if(n) n(); else renderMenu(); },
   equipSarge(wk){ if(!wkOwned(wk)) return;   // 0092: one truth for all five — the commander's is the RECORD's
     META.sargeWeapon=wk; SFX.snap(); saveMeta(); renderMenu(); roomModal(panelHTML('promo')); },
+  // THE HARDWARE RACK (FM-GVT-SARGERACK-01): the bubble under the man equips —
+  // the academy card's own write, landing back in the store (the dye-jar
+  // grammar: tap it, the man in the mirror changes). The saber bubble is a
+  // plain equip with the CURRENT crystal — never the rite, never a sale (D6);
+  // never writes sargeUnlocked/sargeSeen/coopLevels. SFX.snap on equip,
+  // SFX.blip on the already-in-hand tap (D7 — no dead buttons).
+  shopWep(wk){ if(!wkOwned(wk)) return;   // 0092: one truth for all five — the commander's is the RECORD's
+    if((META.sargeWeapon||'pistol')===wk){ SFX.blip(); return; }
+    META.sargeWeapon=wk; SFX.snap(); saveMeta(); renderMenu(); shopRefresh(); },
   // an owned blade toggles for nothing, from the academy row (choosing one still
   // equips the saber — that's been the deal since v1.2.2)
   saberColor(hex){ if(!sabHasSaber() || !sabOwns(hex)) return;
