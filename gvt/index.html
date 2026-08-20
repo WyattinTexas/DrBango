@@ -30016,7 +30016,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='4.88';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='4.89';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -39830,7 +39830,8 @@ function updateFoeSneak(f,dt){
 function updateFoeSnake(f,dt){
   const bg=f.def.bur;
   const bx1=f.burx||1;   // 0340 HARD: the whole strike cycle runs 20% faster (dig, rattle, away)
-  if(!f.snakeState){ f.snakeState='surf'; f.snkT=bg.digCd*(0.6+Math.random()*0.6)/bx1; }
+  const sx1=f.surfx||1;   // 0416 (Wyatt 8/19: "how about less burrowing?"): the DUEL's wave row stretches the SURF window alone — up longer between dives, diving as hard as ever (D16; dig/rise/away untouched). Nobody else stamps it, so every other snake reads 1 byte-still.
+  if(!f.snakeState){ f.snakeState='surf'; f.snkT=bg.digCd*(0.6+Math.random()*0.6)*sx1/bx1; }
   if(f.snakeState==='enter'){
     // 0406 THE ENTRANCE (duel only — spawnFoe arms it): the mound races
     // from the rim to the mid-street mark at the dig's own pace (digSpd ×
@@ -39843,7 +39844,7 @@ function updateFoeSnake(f,dt){
     const sp=bg.digSpd*(f.spdMul||1);
     f.x+=dx/Math.max(1,d)*sp*dt; f.y+=dy/Math.max(1,d)*sp*dt+Math.sin(S.t*9+f.wob)*34*dt;
     if(Math.random()<dt*9) S.fx.push({k:'puff',x:f.x,y:f.y+4,t:0,dur:0.3,R:9});
-    if(d<14){ f.snakeState='surf'; f.snkT=bg.digCd*(0.6+Math.random()*0.6)/bx1; f.burrow=false;
+    if(d<14){ f.snakeState='surf'; f.snkT=bg.digCd*(0.6+Math.random()*0.6)*sx1/bx1; f.burrow=false;
       SFX.rumble(); S.shake=Math.max(S.shake,0.6);
       S.fx.push({k:'puff',x:f.x,y:f.y,t:0,dur:0.5,R:60});
       if(!reducedMotion()) for(let d6=0;d6<5;d6++) S.fx.push({k:'puff',x:f.x+(Math.random()-0.5)*120,y:f.y-4-Math.random()*16,t:0,dur:0.45,R:16});
@@ -39887,8 +39888,57 @@ function updateFoeSnake(f,dt){
       for(const u of S.units){ if(u.dead||u.jetT>0||u.cloakT>0) continue; if(S.drag&&S.drag.unit===u) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<md){md=d;m=u;} }
       if(m){ S.fx.push({k:'ring',x:m.x,y:m.y-6,r:8,R:bg.lungeR,t:0,dur:0.3,col:'rgba(192,71,58,0.9)'});
         bfSfx(SFX.thock, f.x, f.y); S.shake=Math.max(S.shake,0.4);   // 0367: the bite kicks as hard as the surface (0.25→0.4)
-        for(const g8 of S.units){ if(g8.dead||g8.jetT>0) continue; if(S.drag&&S.drag.unit===g8) continue;
-          if(Math.hypot(g8.x-m.x,g8.y-m.y)<bg.lungeR) knock(g8,f.x,f.y); } }
+        // 0416 THE SWALLOW (Wyatt 8/19: "Have the snake lunge at times, taking
+        // out an individual player") — DUEL ONLY, the 0406 entrance's own
+        // identity test; an Outlaw Town lunge keeps the shipped knock() kill
+        // in the else below, byte-what-it-was. The die is DETERMINISTIC —
+        // never Math.random: the surf/dig clocks ride each sim's own dice
+        // (per-sim divergence, drift-tolerated), and a random roll here would
+        // let two party sims disagree about a DEATH. The hash reads three
+        // cross-sim words — the muster ordinal (0313a: every sim spawns the
+        // authored stream in the same order), the bite ordinal, and the
+        // victim's relayed cid — so sims whose snakes agree on the found man
+        // reach the same verdict; the death itself still rides knockKill's
+        // owner's-word door + the 'ud' relay, so a man is only ever buried by
+        // his owner's sim (the swallow cannot desync an army even where the
+        // snakes drift). The SARGE is exempt (D17 — the commander is not a
+        // snack; he takes the stagger below like everyone else). The bite is
+        // the standing GREEN funnel, never a delete (the stampede's law):
+        // pips = his remaining grit + 1 through tanHit, so block/deflect/
+        // duck/medic-shield each have their say — a man saved by a save
+        // LIVES, and takes no stagger on top (the bite WAS his knock).
+        const duel9=!!(S.raid && S.raid.k==='croak' && S.raid.cfg===S.cfg);
+        let eat9=null;
+        if(duel9 && m.type!=='sarge'){
+          f.eatN=(f.eatN||0)+1;
+          let vk9=0; const vs9=String(m.cid||m.type); for(let c9=0;c9<vs9.length;c9++) vk9=(Math.imul(vk9,31)+vs9.charCodeAt(c9))|0;
+          if((Math.imul((f.foN||1)*2654435761+f.eatN*40503+vk9,1597334677)>>>0)<SNAKE_EAT_P*4294967296){
+            eat9=m;
+            // the head DARTS rise-spot→man for a beat — the 0406 entrance's
+            // sand/ring vocabulary over the 0413 two-stroke tracer (body
+            // under, pale core over), and the jaws SNAP (the yeti chomp's cue)
+            S.fx.push({k:'tracer',x1:f.x,y1:f.y-24,x2:m.x,y2:m.y-10,t:0,dur:0.18,col:'rgba(122,74,58,0.95)',w:11});
+            S.fx.push({k:'tracer',x1:f.x,y1:f.y-24,x2:m.x,y2:m.y-10,t:0,dur:0.14,col:'rgba(217,201,160,0.9)',w:4});
+            S.fx.push({k:'puff',x:m.x,y:m.y-6,t:0,dur:0.45,R:40});
+            S.fx.push({k:'ring',x:m.x,y:m.y-10,r:6,R:44,t:0,dur:0.35,col:'rgba(154,90,74,0.95)'});
+            bfSfx(SFX.snap, m.x, m.y); S.shake=Math.max(S.shake,0.5);
+            tanHit(m, f.x, f.y, {pipN:Math.max(1,gritCap(m)-(m.hits||0)+1), dmgX:1, type:'wsnake'});
+          }
+        }
+        for(const g8 of S.units){ if(g8.dead||g8.jetT>0) continue; if(S.drag&&S.drag.unit===g8) continue; if(g8===eat9) continue;
+          if(Math.hypot(g8.x-m.x,g8.y-m.y)<bg.lungeR){
+            if(duel9){
+              // THE STAGGER — the stampede's own law verbatim (0374: "DAMAGE,
+              // not deletion"): pips through tanHit's funnel + the 26px shove
+              // away from the snake; a fresh man staggers and stands, a spent
+              // one falls through the standard grit-out. ⚑ restore the shipped
+              // wipe = replace this branch with knock(g8,f.x,f.y).
+              tanHit(g8,f.x,f.y,{pipN:SNAKE_LUNGE_PIPS,dmgX:1,type:'wsnake'});
+              const dx9=g8.x-f.x, dy9=g8.y-f.y, k9=Math.max(0.1,Math.hypot(dx9,dy9)); g8.x+=dx9/k9*26; g8.y+=dy9/k9*26;
+              g8.y=Math.max(74,Math.min(WORLD_H-96,g8.y));
+              if(g8.home){ g8.home.x=g8.x; g8.home.y=g8.y; }
+            } else knock(g8,f.x,f.y);
+          } } }
       f.snakeState='away'; f.snkT=bg.away/bx1; f.burrow=true;
       S.fx.push({k:'puff',x:f.x,y:f.y,t:0,dur:0.4,R:40});   // 0367: the dive-under grows with the body (16→32; 0374: →40)
     }
@@ -39901,7 +39951,7 @@ function updateFoeSnake(f,dt){
     if(f.snkT<=0 || f.x>W-50){
       { const RVa=S.cfg.terrain.river;
         if(RVa && f.x>RVa.x-24 && f.x<RVa.x+RVa.w+24) f.x=RVa.x+RVa.w+24; }   // 0370: the home dive carries past the far bank — he never pops up in the water
-      f.snakeState='surf'; f.snkT=bg.digCd*(0.7+Math.random()*0.7)/bx1; f.burrow=false;
+      f.snakeState='surf'; f.snkT=bg.digCd*(0.7+Math.random()*0.7)*sx1/bx1; f.burrow=false;
       S.fx.push({k:'puff',x:f.x,y:f.y-6,t:0,dur:0.35,R:14}); }
     return;
   }
@@ -42277,6 +42327,7 @@ function spawnGroup(g){
       if(fo2 && g.hpX) fo2.hp=fo2.hpMax=Math.max(1,Math.round(fo2.hpMax*g.hpX));
       if(fo2 && g.spdx) fo2.spdMul=+g.spdx||1;
       if(fo2 && g.burx) fo2.burx=+g.burx||1;
+      if(fo2 && g.surfx) fo2.surfx=+g.surfx||1;   // 0416: the duel snake's surf stretch — same idiom, read in updateFoeSnake's surf windows alone
     }
     return;
   }
@@ -58047,6 +58098,7 @@ const CROAK_SHOT_PIPS=2;                       // the strong single round — tw
 const CROAK_ROAM_SPD=125, CROAK_RUN_SPD=220;   // the roam wander vs the dash for cover
 const CROAK_BREAK_SPD=320;                     // 0406 THE BREAK (Wyatt 8/18: "when he takes a certain amount of damage, he needs to immediately run away really quick, and then his ladies come out"): the instant his bar CROSSES an hpGate threshold he BOLTS for the nearest cover at this pace — no shrug roll — and the gate's wave walks on while he's away; the between-gate 14% debt-roll keeps CROAK_RUN_SPD (⚑ dial; ⚑ retire-the-roll alt flagged)
 const SNAKE_IN_X=1180;                         // 0406 THE SNAKE'S ENTRANCE (Wyatt 8/18: "When the snake comes out, it needs to be a big deal as well"): DUEL ONLY — he spawns underground on the rim and the mound races to this mid-street mark (WORLD_H/2), where he ERUPTS under the red card (⚑ dial; east of the creek, clear of the crates at 1500)
+const SNAKE_DUEL_HPX=4, SNAKE_SURF_X=1.85, SNAKE_EAT_P=0.35, SNAKE_LUNGE_PIPS=2;   // 0416 THE SNAKE'S SECOND WIND (Wyatt 8/19: "how about less burrowing? Maybe 30% less burrowing, but 300% more health. Have the snake lunge at times, taking out an individual player") — DUEL ONLY, all four; Outlaw Town's rungs byte-still. hpX rides the duel wave row ("300% more" read literally, D15: M 30→120; H/g compose the shipped 1.2 → 144; ⚑ ×3 if he meant triple — one cell). surfx stretches the SURF window ALONE (D16 — he stays up longer between dives and dives as hard as ever): ⚑ 1.85, NOT the contract's naive 1/0.7≈1.43 — the dig/rise/away legs he keeps are ~half the cycle (measured M surf 2.35 of 4.61s over 64 cycles), so 1.43 lands only −18% digs/min; 1.85 lands Wyatt's −30%±5 MEASURED (M/H both in band over 100+ cycles — the 0367 grammar: the card binds itself to the band, the cell moves; one cell to restore 1.43). eatP = THE SWALLOW's odds at the lunge (the found man, never the Sarge — D17; the die is DETERMINISTIC, see updateFoeSnake's rise arm). lungePips = THE STAGGER the duel lunge deals everyone else (the stampede's own law — tanHit pips + the shove, never the outright kill; ⚑ CORRECTION: the contract's TODAY read "nobody dies" at the shipped lunge, but knock() IS the campaign death door (0374's own law) — one lunge deleted a 3-man cluster on the probe. Under the literal spec the swallow would have been theater on an already-lethal wipe — the opposite of "taking out an INDIVIDUAL player" — so in the DUEL the lunge staggers and the swallow alone kills; one clause in the rise arm restores the old kill if Wyatt wants the wipe back)
 const CROAK_COVER_T=2.2;                       // seconds ducked behind the boxes (untargetable — f.burrow)
 const CROAK_COVER_DEBT=0.14;                   // he runs for cover after losing this fraction of his bar
 const CROAK_COVERS=[[1556,214],[1600,508]];    // the ducking seats — just east of the two crate stacks (0370: SHARED seats — the little king ducks behind his father's boxes)
@@ -58429,7 +58481,7 @@ function raidCfg(tier,rk){
       {f:'line',t:'wlady',n:NL,e:'street',at:0} ] });
     cfg2.waves.push({ name:'THE OUTLAWS RUSH OUT!', hpGate:{t:'kingcroak',k:0.6,bark:"YOU'LL PAY FOR THAT!"}, groups:bd(NB,NS) });
     if(tier!=='e') cfg2.waves.push({ name:'⚠ THE GIANT RATTLESNAKE ⚠', piece:true, hpGate:{t:'kingcroak',k:0.5,bark:"SSSIC 'EM!"}, groups:[
-      Object.assign({f:'solo',t:'wsnake',n:1,e:'right',at:0}, (tier==='h'||tier==='g')? {hpX:1.2, spdx:1.2, burx:1.2} : {}) ] });   // 0372: the H snake's teeth ride at MEGA too (the 0357 h-only-hatches-nothing audit; the snake tier!=='e' door passes g free) · 0406: premiere → PIECE (the boss-cap clause touches f:'boss' groups alone — a solo snake scales as it always did)
+      Object.assign({f:'solo',t:'wsnake',n:1,e:'right',at:0, hpX:SNAKE_DUEL_HPX, surfx:SNAKE_SURF_X}, (tier==='h'||tier==='g')? {hpX:SNAKE_DUEL_HPX*1.2, spdx:1.2, burx:1.2} : {}) ] });   // 0416 (Wyatt: "300% more health… 30% less burrowing"): hpX 4 every duel tier (M 120; the h/g override COMPOSES the shipped 1.2 → 4.8 = 144 — Object.assign replaces, so the product is written out; the 0357 not-stacked law is about the raid CURVE, these stamps compose) + the surf stretch, both through spawnGroup's solo-branch stamps; the GLOBAL wsnake row and Outlaw Town's rungs never move · 0372: the H snake's teeth ride at MEGA too (the 0357 h-only-hatches-nothing audit; the snake tier!=='e' door passes g free) · 0406: premiere → PIECE (the boss-cap clause touches f:'boss' groups alone — a solo snake scales as it always did)
     cfg2.waves.push({ name:'THE OUTLAWS RUSH OUT!', hpGate:{t:'kingcroak',k:0.4,bark:"YOU'LL PAY FOR THAT!"}, groups:bd(NB,NS) });
     cfg2.waves.push({ name:'⚠ LITTLE KING CROAK HOPS IN ⚠', piece:true, hpGate:{t:'kingcroak',k:0.3,bark:"GET 'EM, SONNY BOY!"}, groups:[   // 0370 (Wyatt: "same attacks, except his cone is smaller, and he has 80% less health. He comes out once King Croak is at 30% hp left" — EVERY tier, flagged): piece = the red card + the king's own co-op boss cap; his brain, covers, pips and clocks are the king's (def.croak); the smaller cone is the RADIUS dial (flagged)
       {f:'boss',t:'kingcroaklil',n:1,e:'right',at:0, hpX:CROAK_HPX[tier], dmgX:CROAK_DMGX[tier],
