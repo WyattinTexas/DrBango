@@ -1124,6 +1124,34 @@ async function main() {
         tester on the first boot after this shipped.
      The whole mechanic — conditions, counters, the notice, ten languages —
      is walked by tools/drip-check.mjs. */
+  /* v0.47.0 — THE CAMPAIGN DOORS, the two laws (tools/tagline-check.mjs walks
+     every state on real taps): without a checkpoint CONTINUE CAMPAIGN is DEAD
+     (input off, 0.45) and NEW CAMPAIGN opens no warning; with one the door is
+     alive and NEW CAMPAIGN must warn before a climb is lost. */
+  await c.ev(`(() => { localStorage.removeItem('beta3.profile'); localStorage.removeItem('beta3.campaign'); localStorage.removeItem('beta3.campsign'); return 'wiped' })()`);
+  await c.nav(BASE + '?fps=0', 12000);
+  await until(`(() => { const h = game.scene.getScene('home'); return game.scene.isActive('home') && !!h.rowBtns && !h.introPlaying && !h.busy() })()`);
+  const DOOR = `(() => { const h = game.scene.getScene('home'), b = h.rowBtns.campaign, t = h.rowLabels.campaign;
+    return JSON.stringify({ label: t.text, hit: !!b.input && b.input.enabled, a: +b.alpha.toFixed(2), alive: h.campAlive, sheet: !!h.confirmC, sign: !!h.signC }) })()`;
+  let door = JSON.parse(await c.ev(DOOR));
+  ok('NO CHECKPOINT → CONTINUE CAMPAIGN is dead: input off, 0.45, reads contCamp',
+    !door.hit && door.a === 0.45 && !door.alive && door.label === await c.ev(`SS_T('contCamp')`), JSON.stringify(door));
+  await c.ev(`game.scene.getScene('home').newCampaign(); 1`);
+  await sleep(300);
+  door = JSON.parse(await c.ev(DOOR));
+  ok('NO CHECKPOINT → NEW CAMPAIGN opens no warning, straight to the stars', !door.sheet && door.sign, JSON.stringify(door));
+  await c.ev(`localStorage.setItem('beta3.campaign', JSON.stringify({ fightIdx: 4, actIdx: 0, hp: 10, hpMax: 12, sigils: [], words: [] })); 1`);
+  await c.nav(BASE + '?fps=0', 12000);
+  await until(`(() => { const h = game.scene.getScene('home'); return game.scene.isActive('home') && !!h.rowBtns && !h.introPlaying && !h.busy() })()`);
+  door = JSON.parse(await c.ev(DOOR));
+  ok('A CHECKPOINT → the door is alive and lit', door.hit && door.a === 1 && door.alive, JSON.stringify(door));
+  await c.ev(`game.scene.getScene('home').newCampaign(); 1`);
+  await sleep(300);
+  door = JSON.parse(await c.ev(DOOR));
+  ok('A CHECKPOINT → NEW CAMPAIGN warns before the climb is lost (sheet up, checkpoint untouched)',
+    door.sheet && !door.sign && await c.ev(`JSON.parse(localStorage.getItem('beta3.campaign')).fightIdx === 4`) === true, JSON.stringify(door));
+  ok('the restart copy is in every language', await c.ev(`Object.keys(SS_STR).every(L => ['contCamp','restartTitle','restartBody','restartBack','restartNew'].every(k => typeof SS_STR[L][k] === 'string' && SS_STR[L][k].length > 0)) && Object.keys(SS_STR).every(L => !('abandonTitle' in SS_STR[L]))`) === true);
+
   await c.ev(`(() => { localStorage.removeItem('beta3.profile'); localStorage.removeItem('beta3.campaign'); return 'wiped' })()`);
   await c.nav(BASE + '?fps=0&daily=1', 20000);
   ok('a fresh profile boots into the drip holding twelve, 9 basic / 2 rare / 1 legendary',

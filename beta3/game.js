@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.46.0';
+const BUILD = 'STARSPELL v0.47.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4171,21 +4171,28 @@ class Home extends Phaser.Scene {
        button; when a line arrives the label glides up 9 to make room (a
        200ms tween, so the meadow never jumps). The buttons keep their 58
        height either way — the meadow's rhythm is set by them. */
+    /* v0.47.0 — THE CAMPAIGN DOORS (Wyatt). The first door reads CONTINUE
+       CAMPAIGN, always: with a checkpoint standing it is alive and carries
+       the climb's position ("ACT I · fight 3 of 5") as its live line; with
+       none it wears the game's disabled dress (0.45, no hand) and its taps
+       are DEAD — input off, not merely ignored-looking. NEW CAMPAIGN is the
+       only way into a fresh climb, and warns first when a climb would be
+       lost (newCampaign). */
     const campRow = () => {
       const ck = this.campaignCheckpoint();
       return {
-        label: ck ? SS_T('cont') + '  ·  ' + SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim() : SS_T('campaign'),
-        sub: ck ? SS_T('fightN', ck.fightIdx % 5 + 1) : '',
+        label: SS_T('contCamp'), alive: !!ck,
+        sub: ck ? SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim() + '  ·  ' + SS_T('fightN', ck.fightIdx % 5 + 1) : '',
       };
     };
     this.campRow = campRow;
     const cr = campRow();
     const rows = [
-      // CAMPAIGN / CONTINUE opens the star chart — the campaign always enters
-      // through the map, at the checkpoint when one is standing
-      { y: 420, h: 58, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.campaignDoor() },
+      // CONTINUE CAMPAIGN opens the star chart at the standing checkpoint;
+      // dead until there is one
+      { y: 420, h: 58, label: cr.label, sub: cr.sub, key: 'campaign', alive: cr.alive, fn: () => this.campaignDoor() },
       // NEW CAMPAIGN took the daily's old row (the daily is a chip now):
-      // abandon the checkpoint (confirmed) and start the long night over
+      // restart the climb (warned first when a checkpoint stands)
       { y: 488, h: 58, label: SS_T('newCamp'), key: 'newcamp', dark: true, fn: () => this.newCampaign() },
       { y: 556, h: 58, label: SS_T('quick'), key: 'quick', fn: () => this.startMode('quick') },
       { y: 624, h: 46, label: SS_T('board'), fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
@@ -4202,16 +4209,17 @@ class Home extends Phaser.Scene {
       const live = !!r.sub;
       const lab = ui(ssTxt(this, l.x(0), l.y(r.y - (live ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
       lab.rowY = r.y;
-      if (r.key === 'campaign') this.campLabelT = lab;
       if (r.sub !== undefined) {
         // a slot for live information (campaign progress, friends online):
         // hidden and empty until there is something to say
         const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5).setVisible(live));
-        if (r.key === 'campaign') this.campSubT = sub;
         this.rowSubs[r.key] = sub;
       }
       if (r.key) { this.rowBtns[r.key] = b; this.rowLabels[r.key] = lab; }
-      b.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
+      // the dead dress is a BASE alpha: the intro and the wake path restore
+      // every ui item to baseAlpha, so a plain setAlpha would be undone
+      if (r.alive === false) { b.disableInteractive(); b.setAlpha(b.baseAlpha = 0.45); lab.setAlpha(lab.baseAlpha = 0.55); }
+      b.on('pointerdown', () => { if (this.busy() || (r.key === 'campaign' && !this.campAlive)) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
       b.on('pointerover', () => b.setScale(b.scaleX * 1.03, b.scaleY * 1.03));
       b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.h)));
     }
@@ -4229,6 +4237,22 @@ class Home extends Phaser.Scene {
       this.tweens.killTweensOf(lab);
       if (snap || Math.abs(lab.y - ty) < 0.5) lab.setY(ty);
       else this.tweens.add({ targets: lab, y: ty, duration: 200, ease: 'Sine.easeInOut' });
+    };
+    /* the CONTINUE CAMPAIGN door re-reads the checkpoint: alive (full dress,
+       hand cursor, live progress line) or dead (0.45, input OFF). Called on
+       first paint, on every return from a battle (a win or loss clears the
+       checkpoint → the door greys again) and after a restart wipes it. */
+    this.campAlive = cr.alive;
+    this.refreshCampDoor = (snap) => {
+      const b = this.rowBtns.campaign, lab = this.rowLabels.campaign;
+      if (!b || !b.active || !lab || !lab.active) return;
+      const r = this.campRow();
+      this.campAlive = r.alive;
+      lab.setText(r.label);
+      this.setRowSub('campaign', r.sub, null, snap);
+      this.tweens.killTweensOf(b);
+      if (r.alive) { b.setInteractive({ useHandCursor: true }); b.setAlpha(b.baseAlpha = 1); lab.setAlpha(lab.baseAlpha = 1); }
+      else { b.disableInteractive(); b.setDisplaySize(l.u(300), l.u(58)); b.setAlpha(b.baseAlpha = 0.45); lab.setAlpha(lab.baseAlpha = 0.55); }
     };
     // Profile chip — the stargazer's name, up in the corner on the same line as
     // every other scene's back link. Long or non-Latin names are trimmed to the
@@ -5034,9 +5058,11 @@ class Home extends Phaser.Scene {
     this.tweens.add({ targets: chart.c, y: 0, alpha: 1, duration: 300, ease: 'Back.easeOut' });
   }
 
-  /* NEW CAMPAIGN — abandon the standing checkpoint (confirmed first: a
-     checkpoint is hours of climb) and open the chart at the first node.
-     With no checkpoint there is nothing to abandon: it is simply the door. */
+  /* NEW CAMPAIGN — with a checkpoint standing, warn first (v0.47.0, Wyatt's
+     words): "This will restart your current campaign in progress." BACK
+     dismisses to the meadow with nothing lost; NEW wipes the checkpoint and
+     runs the normal fresh-campaign flow, sign choice included. With no
+     checkpoint there is nothing to lose: it is simply the door. */
   newCampaign() {
     if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC || this.signC) return;
     const ck = this.campaignCheckpoint();
@@ -5057,29 +5083,29 @@ class Home extends Phaser.Scene {
     c.add(veil);
     const items = [];
     items.push(this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(336), l.u(272)).setInteractive());
-    const tk = ssGoldTex(this, SS_T('abandonTitle'), 17);
+    const tk = ssGoldTex(this, SS_T('restartTitle'), 17);
     const tsc = Math.min(1, 280 / tk.w);
     items.push(this.add.image(l.x(0), l.y(304), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
-    items.push(ssTextBlock(this, l.x(0), l.y(362), SS_T('abandonBody', SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim(), ck.fightIdx % 5 + 1), {
+    items.push(ssTextBlock(this, l.x(0), l.y(352), SS_T('restartBody'), {
       fontSize: l.u(12) + 'px', color: '#c9c3ae', fontStyle: 'italic', shadow: true,
       wrapW: l.u(280), align: 'center', ox: 0.5, oy: 0.5,
     }));
-    // KEEP CLIMBING wears the gold — walking away from a checkpoint should
-    // never be the brightest thing on screen
-    const keepB = this.add.image(l.x(0), l.y(438), ssBtn(this, false, 250, 50)).setDisplaySize(l.u(250), l.u(50)).setInteractive({ useHandCursor: true });
-    const keepT = ssTxt(this, l.x(0), l.y(438), SS_T('abandonNo'), l.u(15), BTN_INK()).setOrigin(0.5);
-    const abB = this.add.image(l.x(0), l.y(492), ssBtn(this, true, 250, 40)).setDisplaySize(l.u(250), l.u(40)).setInteractive({ useHandCursor: true });
-    const abT = ssTxt(this, l.x(0), l.y(492), SS_T('abandonYes'), l.u(13), '#e6a2a2').setOrigin(0.5);
-    items.push(keepB, keepT, abB, abT);
-    keepB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
-    abB.on('pointerdown', () => {
+    // where the climb stands, so the player knows exactly what NEW costs
+    items.push(ssTxt(this, l.x(0), l.y(388), SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim() + '  ·  ' + SS_T('fightN', ck.fightIdx % 5 + 1), l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
+    // BACK wears the gold — restarting a climb should never be the brightest
+    // thing on screen
+    const backB = this.add.image(l.x(0), l.y(438), ssBtn(this, false, 250, 50)).setDisplaySize(l.u(250), l.u(50)).setInteractive({ useHandCursor: true });
+    const backT = ssTxt(this, l.x(0), l.y(438), SS_T('restartBack'), l.u(15), BTN_INK()).setOrigin(0.5);
+    const newB = this.add.image(l.x(0), l.y(492), ssBtn(this, true, 250, 40)).setDisplaySize(l.u(250), l.u(40)).setInteractive({ useHandCursor: true });
+    const newT = ssTxt(this, l.x(0), l.y(492), SS_T('restartNew'), l.u(13), '#e6a2a2').setOrigin(0.5);
+    items.push(backB, backT, newB, newT);
+    backB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    newB.on('pointerdown', () => {
       SFX.ui();
-      ssClearCampaign();
-      const cr = this.campRow();
-      if (this.campLabelT && this.campLabelT.active) this.campLabelT.setText(cr.label);
-      this.setRowSub('campaign', cr.sub);
+      ssClearCampaign();          // the old climb is gone — the door greys
+      this.refreshCampDoor();
       closeSheet();
-      this.signSheet();   // the fresh climb opens under fresh stars
+      this.signSheet();           // the fresh climb opens under fresh stars
     });
     c.add(items);
     items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
@@ -5090,8 +5116,8 @@ class Home extends Phaser.Scene {
      picker — sign chosen, map opened, fight not yet entered) goes straight to
      the chart; a truly fresh campaign asks the stars first. */
   campaignDoor() {
-    if (this.campaignCheckpoint() || ssCampSignChosen()) this.mapSheet();
-    else this.signSheet();
+    if (!this.campaignCheckpoint()) return;   // the door is dead without a climb to continue
+    this.mapSheet();
   }
 
   /* ---------- the zodiac picker ----------
@@ -5196,8 +5222,16 @@ class Home extends Phaser.Scene {
     }
   }
 
+  /* the standing checkpoint, or null. A checkpoint from an older build is
+     welcome as long as it knows which fight it stands on; an act index it
+     lacks (or one past the roster) is re-derived from the fight, so the
+     door never throws on a save it did not write. */
   campaignCheckpoint() {
-    try { return JSON.parse(localStorage.getItem('beta3.campaign')); } catch (e) { return null; }
+    let ck = null;
+    try { ck = JSON.parse(localStorage.getItem('beta3.campaign')); } catch (e) { return null; }
+    if (!ck || typeof ck !== 'object' || typeof ck.fightIdx !== 'number' || !(ck.fightIdx >= 0)) return null;
+    if (!SS_ACTS[ck.actIdx]) ck.actIdx = Math.min(SS_ACTS.length - 1, Math.floor(ck.fightIdx / 5));
+    return ck;
   }
   busy() { return this.ascending || this.descending || this.introPlaying || SS_RITE.busy; }
   startMode(mode) {
@@ -5346,9 +5380,7 @@ class Home extends Phaser.Scene {
     for (const o of this.uiItems) { this.tweens.killTweensOf(o); o.setAlpha(o.baseAlpha); }
     this.idleTweens();
     this.sky.restoreFlies();
-    const cr = this.campRow();   // battle moved the campaign checkpoint
-    if (this.campLabelT.active) this.campLabelT.setText(cr.label);
-    this.setRowSub('campaign', cr.sub, null, true);
+    this.refreshCampDoor(true);  // battle moved (or cleared) the campaign checkpoint
     this.updateDailyChip();
     this.milestoneCheck();       // the hunt we just came home from may have grown the lamp
     this.sigilNotice();

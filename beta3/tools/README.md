@@ -131,6 +131,22 @@ What TestFlight v0.43.0 taught, in three lines:
 
 ## tagline-check.mjs
 
+Also THE CAMPAIGN DOORS (v0.47.0, 57 checks). Wyatt: the first door reads
+CONTINUE CAMPAIGN (`contCamp`, not the in-run `cont`); with no checkpoint it
+is grey (button 0.45 / label 0.55 as BASE alphas — the intro and wake paths
+restore every ui item to `baseAlpha`, so a plain `setAlpha` is undone) and
+DEAD (`disableInteractive()`, a real tap opens nothing); with one it is alive
+and its live line is `ACT I · fight 3 of 5`. NEW CAMPAIGN over a checkpoint
+opens the restart sheet ("This will restart your current campaign in
+progress." · BACK keeps the climb · NEW wipes it and the door greys at
+once); with none it goes straight to the stars. `home.refreshCampDoor(snap)`
+is the one door for the state and runs on first paint, every return from a
+battle (a win or loss clears the checkpoint → grey again) and after NEW.
+`campaignCheckpoint()` validates what it reads: an older build's save without
+an `actIdx` re-derives it from the fight, garbage reads as none. Harness
+lesson: `\s` inside a template literal reaches the page as `s` — the sheet
+reader joins lines with split/filter, never a regex escape.
+
 The meadow buttons without their flavour lines (v0.46.0). Wyatt: "remove the
 text below CAMPAIGN, NEW CAMPAIGN, QUICK PLAY and VERSUS." The four labels
 now sit dead-centre in their 58-tall buttons; the only sub-lines left are

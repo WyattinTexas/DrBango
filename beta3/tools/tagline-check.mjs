@@ -1,4 +1,12 @@
-// TAGLINE-CHECK — the meadow buttons without their flavour lines (v0.46.0).
+// TAGLINE-CHECK — the meadow buttons without their flavour lines (v0.46.0)
+// + THE CAMPAIGN DOORS (v0.47.0): the first door reads CONTINUE CAMPAIGN in
+// every state — grey (0.45) and DEAD (input off, a real tap does nothing)
+// without a checkpoint, alive and resuming the right fight with one; NEW
+// CAMPAIGN goes straight to the stars with no checkpoint, and with one opens
+// the restart sheet — BACK keeps the climb, NEW wipes it and the door greys.
+// A just-won campaign (checkpoint cleared) greys the door on the way home, and
+// an older build's checkpoint without an actIdx still opens the door.
+//
 // Wyatt: "remove the text below CAMPAIGN, NEW CAMPAIGN, QUICK PLAY and
 // VERSUS." This pins what replaced them: the four labels sit dead-centre in
 // 58-tall buttons with nothing under them; the ONLY sub-lines left are live
@@ -25,7 +33,12 @@ let id = 0; const pend = new Map(); const errs = [];
 ws.onmessage = (m) => {
   const d = JSON.parse(m.data);
   if (d.id && pend.has(d.id)) { pend.get(d.id)(d.result); pend.delete(d.id); }
-  if (d.method === 'Runtime.exceptionThrown') errs.push(d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text);
+  if (d.method === 'Runtime.exceptionThrown') {
+    const x = d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text;
+    // a fresh profile's boot probes GL once; under --disable-gpu Phaser's
+    // "Cannot create WebGL context" is the probe's verdict, not a page error
+    if (!/Cannot create WebGL context/.test(x || '')) errs.push(x);
+  }
 };
 await new Promise(r => ws.onopen = r);
 const send = (method, params) => new Promise(res => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
@@ -58,7 +71,8 @@ const ROWS = `(() => { const h = ${H}; const u = h.sky ? (h.lanternB.displayWidt
   const U = h.rowBtns.versus.displayWidth / 300;
   const row = (k) => { const b = h.rowBtns[k], t = h.rowLabels[k], s = h.rowSubs[k];
     return { h: +(b.displayHeight / U).toFixed(1), lift: +((b.y - t.y) / U).toFixed(1), label: t.text,
-      sub: s ? (s.visible ? s.text : null) : undefined, subColor: s && s.visible ? s.style.color : null, hit: !!b.input && b.input.enabled }; };
+      sub: s ? (s.visible ? s.text : null) : undefined, subColor: s && s.visible ? s.style.color : null, hit: !!b.input && b.input.enabled,
+      alpha: +b.alpha.toFixed(2), labA: +t.alpha.toFixed(2), hand: !!b.input && b.input.cursor === 'pointer' }; };
   const board = h.uiItems.find(o => o.type === 'Image' && Math.abs(o.displayWidth / U - 300) < 0.5 && Math.abs(o.displayHeight / U - 46) < 0.5);
   return JSON.stringify({ campaign: row('campaign'), newcamp: row('newcamp'), quick: row('quick'), versus: row('versus'),
     board: board ? +(board.displayHeight / U).toFixed(1) : null, daily: h.dailyChipT.text,
@@ -86,11 +100,19 @@ await sleep(800);
 let g = JSON.parse(await ev(ROWS));
 ok('none of the four flavour lines is anywhere on the meadow', g.flavour === 0, String(g.flavour));
 for (const k of ['campaign', 'newcamp', 'quick', 'versus'])
-  ok(k + ': 58-tall button, label dead-centre, no sub-line showing', g[k].h === 58 && g[k].lift === 0 && !g[k].sub && g[k].hit, JSON.stringify(g[k]));
+  ok(k + ': 58-tall button, label dead-centre, no sub-line showing', g[k].h === 58 && g[k].lift === 0 && !g[k].sub && (k === 'campaign' || g[k].hit), JSON.stringify(g[k]));
 ok('NEW CAMPAIGN and QUICK PLAY have no sub slot at all', g.newcamp.sub === undefined && g.quick.sub === undefined);
 ok('LEADERBOARD untouched: still its 46-tall row', g.board === 46, String(g.board));
 ok('the daily chip still carries its countdown / tick', !!g.daily && g.daily.length > 1, g.daily);
-ok('the meadow reads CAMPAIGN with no checkpoint', g.campaign.label === await ev(`SS_T('campaign')`), g.campaign.label);
+const CONT = await ev(`SS_T('contCamp')`);
+ok('the first door reads CONTINUE CAMPAIGN (its own key, not the in-run "' + await ev(`SS_T('cont')`) + '")', g.campaign.label === CONT && CONT !== await ev(`SS_T('cont')`), g.campaign.label);
+ok('no checkpoint → the door wears the disabled dress: button 0.45, label 0.55', g.campaign.alpha === 0.45 && g.campaign.labA === 0.55, JSON.stringify(g.campaign));
+ok('…and its input is OFF (taps dead)', !g.campaign.hit);
+ok('the other three doors are alive and fully lit', ['newcamp', 'quick', 'versus'].every(k => g[k].hit && g[k].alpha === 1));
+await tap(`${H}.rowLabels.campaign`);
+await sleep(900);
+ok('a REAL tap on the dead CONTINUE door opens nothing (no sign sheet, no map, no ascent)',
+  await ev(`!${H}.signC && !${H}.mapC && !${H}.confirmC && !${H}.ascending`) === true);
 await snap('meadow-after');
 
 // ---------------------------------------------------------------- the four retired keys
@@ -118,35 +140,92 @@ await sleep(400);
 g = JSON.parse(await ev(ROWS));
 ok('the counter goes and the label re-centres — no orphaned gap', g.versus.sub === null && g.versus.lift === 0, JSON.stringify(g.versus));
 
-// ---------------------------------------------------------------- a checkpoint → "fight N of 5"
-await ev(`localStorage.setItem('beta3.campaign', JSON.stringify({ fightIdx: 2, actIdx: 0, hp: 12, hpMax: 12, sigils: [], words: [], longest: '', totalDmg: 0, scried: 0, featherUsed: 0, letters: 0, bigHit: 0, playMs: 0, overkill: 0 })); 1`);
+// ---------------------------------------------------------------- a checkpoint → the door wakes
+const CK = `JSON.stringify({ fightIdx: 2, actIdx: 0, hp: 12, hpMax: 12, sigils: [], words: [], longest: '', totalDmg: 0, scried: 0, featherUsed: 0, letters: 0, bigHit: 0, playMs: 0, overkill: 0 })`;
+await ev(`localStorage.setItem('beta3.campaign', ${CK}); 1`);
 await nav(BASE + '?fps=0', 12000);
 ok('the meadow stands with a checkpoint', await until(HOME_REST));
 await sleep(800);
 g = JSON.parse(await ev(ROWS));
 const fight3 = await ev(`SS_T('fightN', 3)`);
-ok('CONTINUE carries "' + fight3 + '" under it (progress, not flavour) and lifts 9', g.campaign.sub === fight3 && g.campaign.lift === 9 && g.campaign.label.startsWith(await ev(`SS_T('cont')`)), JSON.stringify(g.campaign));
+const act1 = await ev(`SS_ACT_N(SS_ACTS[0]).split('·')[0].trim()`);
+ok('CONTINUE CAMPAIGN carries "' + act1 + ' · ' + fight3 + '" under it (progress, not flavour) and lifts 9',
+  g.campaign.sub === act1 + '  ·  ' + fight3 && g.campaign.lift === 9 && g.campaign.label === CONT, JSON.stringify(g.campaign));
+ok('…and is fully alive: lit, input on, hand cursor', g.campaign.hit && g.campaign.hand && g.campaign.alpha === 1 && g.campaign.labA === 1, JSON.stringify(g.campaign));
 ok('the other rows stay centred', g.newcamp.lift === 0 && g.quick.lift === 0 && g.versus.lift === 0);
 await snap('campaign-checkpoint');
-// a REAL tap on NEW CAMPAIGN → the abandon sheet → a REAL tap on abandon
+// a REAL tap on CONTINUE → the star chart at fight 3 → the node → the ascent resumes THAT fight
+await tap(`${H}.rowLabels.campaign`);
+ok('a real tap on CONTINUE CAMPAIGN opens the star chart (no sign sheet — the sign is pinned)', await until(`!!${H}.mapC && !${H}.signC`, 5000));
+await sleep(600);
+await tap(`${H}.mapC.list.find(o => o.type === 'Container' && o.getData('mapZone')).getData('mapZone')`);
+ok('tapping the glowing node resumes the climb', await until(`${H}.ascending === true || game.scene.isActive('battle')`, 8000));
+ok('…at the checkpoint\'s own fight (fightIdx 2 = fight 3 of 5)', await until(`(() => { const b = game.scene.getScene('battle');
+  return game.scene.isActive('battle') && !!b && !!b.run && b.run.fightIdx === 2 && b.mode === 'campaign' })()`, 30000),
+  await ev(`(() => { const b = game.scene.getScene('battle'); return b && b.run ? b.mode + '/' + b.run.fightIdx : 'no run' })()`));
+
+// ---------------------------------------------------------------- NEW CAMPAIGN over a checkpoint → the restart sheet
+await ev(`localStorage.setItem('beta3.campaign', ${CK}); 1`);
+await nav(BASE + '?fps=0', 12000);
+ok('the meadow stands again with the checkpoint', await until(HOME_REST)); await sleep(800);
 await tap(`${H}.rowLabels.newcamp`);
-ok('a real tap on NEW CAMPAIGN (aimed at the label) opens the abandon sheet', await until(`!!${H}.confirmC`, 5000));
+ok('a real tap on NEW CAMPAIGN (aimed at the label) opens the restart sheet', await until(`!!${H}.confirmC`, 5000));
 await sleep(400);
-await tap(`${H}.confirmC.list.find(o => o.type === 'Text' && o.text === SS_T('abandonYes'))`);
-ok('abandoning opens the sign sheet', await until(`!!${H}.signC && !${H}.confirmC`, 5000));
+// ssTextBlock renders one Text per line inside a container (v0.44.0) — read the sheet's words recursively, lines joined
+const sheet = JSON.parse(await ev(`JSON.stringify((function walk(c) { return c.list.flatMap(o => o.type === 'Text' ? [o.text] : o.list ? [walk(o).join(' ').split(' ').filter(Boolean).join(' ')] : []) })(${H}.confirmC))`));
+ok('the sheet says "' + await ev(`SS_T('restartBody')`) + '"', sheet.includes(await ev(`SS_T('restartBody')`)), JSON.stringify(sheet));
+ok('…with BACK and NEW', sheet.includes(await ev(`SS_T('restartBack')`)) && sheet.includes(await ev(`SS_T('restartNew')`)));
+await snap('restart-sheet');
+await tap(`${H}.confirmC.list.find(o => o.type === 'Text' && o.text === SS_T('restartBack'))`);
+ok('BACK dismisses to the meadow', await until(`!${H}.confirmC && !${H}.signC && !${H}.mapC`, 5000));
 await sleep(400);
 g = JSON.parse(await ev(ROWS));
-ok('…and the campaign row drops its progress line and re-centres as CAMPAIGN', g.campaign.sub === null && g.campaign.lift === 0 && g.campaign.label === await ev(`SS_T('campaign')`), JSON.stringify(g.campaign));
+ok('…with the climb intact: the checkpoint still stands and the door is still alive at fight 3',
+  await ev(`JSON.parse(localStorage.getItem('beta3.campaign')).fightIdx === 2`) === true && g.campaign.hit && g.campaign.sub === act1 + '  ·  ' + fight3, JSON.stringify(g.campaign));
+await tap(`${H}.rowLabels.newcamp`);
+ok('NEW CAMPAIGN again → the sheet again', await until(`!!${H}.confirmC`, 5000));
+await sleep(400);
+await tap(`${H}.confirmC.list.find(o => o.type === 'Text' && o.text === SS_T('restartNew'))`);
+ok('NEW wipes the climb and opens the sign sheet — the normal fresh flow', await until(`!!${H}.signC && !${H}.confirmC`, 5000));
+ok('the old checkpoint is GONE', await ev(`localStorage.getItem('beta3.campaign') === null`) === true);
+await sleep(400);
+g = JSON.parse(await ev(ROWS));
+ok('…and the door greys at once: progress line gone, label re-centred, input off, 0.45',
+  g.campaign.sub === null && g.campaign.lift === 0 && g.campaign.label === CONT && !g.campaign.hit && g.campaign.alpha === 0.45, JSON.stringify(g.campaign));
+
+// ---------------------------------------------------------------- an older build's checkpoint (no actIdx)
+await ev(`localStorage.setItem('beta3.campaign', JSON.stringify({ fightIdx: 7, hp: 9, hpMax: 12, sigils: [], words: [] })); 1`);
+await nav(BASE + '?fps=0', 12000);
+ok('the meadow stands on an older build\'s checkpoint (no actIdx)', await until(HOME_REST)); await sleep(800);
+g = JSON.parse(await ev(ROWS));
+const act2 = await ev(`SS_ACT_N(SS_ACTS[1]).split('·')[0].trim()`);
+ok('the door is alive and re-derives the act: "' + act2 + ' · ' + await ev(`SS_T('fightN', 3)`) + '"', g.campaign.hit && g.campaign.sub === act2 + '  ·  ' + fight3, JSON.stringify(g.campaign));
+ok('a garbage checkpoint reads as none', await ev(`(() => { localStorage.setItem('beta3.campaign', '"x"'); const r = ${H}.campaignCheckpoint() === null;
+  localStorage.setItem('beta3.campaign', '{"hp":3}'); return r && ${H}.campaignCheckpoint() === null })()`) === true);
+
+// ---------------------------------------------------------------- a won campaign → the door greys on the way home
+await ev(`localStorage.setItem('beta3.campaign', ${CK}); 1`);
+await nav(BASE + '?fps=0', 12000);
+ok('the meadow stands for the win', await until(HOME_REST)); await sleep(600);
+ok('the door is alive before the win', JSON.parse(await ev(ROWS)).campaign.hit);
+await ev(`(() => { const h = ${H}; h.bloomBtn = h.rowBtns.campaign; h.startMode('campaign'); return 1 })()`);
+ok('the climb resumes', await until(`(() => { const b = game.scene.getScene('battle'); return game.scene.isActive('battle') && !!b && !!b.run })()`, 30000));
+await sleep(1500);
+// the last fight falls: the run ends won, the checkpoint clears, HOME brings the dawn meadow
+await ev(`(() => { const b = game.scene.getScene('battle'); b.run.fightIdx = b.fights.length; ssClearCampaign(); b.endRun(true); return 1 })()`);
+ok('the campaign is won: checkpoint cleared', await until(`localStorage.getItem('beta3.campaign') === null`, 5000));
+await sleep(3000);
+await ev(`(() => { const b = game.scene.getScene('battle'); b.goHome({ from: 'battle', dawn: true }); return 1 })()`);
+ok('home again after the win', await until(HOME_REST, 40000)); await sleep(800);
+g = JSON.parse(await ev(ROWS));
+ok('…and the CONTINUE door is grey and dead: nothing left to continue', !g.campaign.hit && g.campaign.alpha === 0.45 && g.campaign.sub === null && g.campaign.lift === 0, JSON.stringify(g.campaign));
 
 // ---------------------------------------------------------------- all four doors, real taps at the label
 await ev(`localStorage.removeItem('beta3.campaign'); localStorage.removeItem('beta3.campsign'); 1`);
 await nav(BASE + '?fps=0', 12000);
 ok('meadow back for the doors', await until(HOME_REST)); await sleep(600);
-await tap(`${H}.rowLabels.campaign`);
-ok('CAMPAIGN (no checkpoint) → the sign sheet', await until(`!!${H}.signC`, 5000));
-await nav(BASE + '?fps=0', 12000); ok('meadow back', await until(HOME_REST)); await sleep(600);
 await tap(`${H}.rowLabels.newcamp`);
-ok('NEW CAMPAIGN (no checkpoint) → the sign sheet', await until(`!!${H}.signC`, 5000));
+ok('NEW CAMPAIGN (no checkpoint) → straight to the sign sheet, no warning sheet', await until(`!!${H}.signC`, 5000) && await ev(`!${H}.confirmC`) === true);
 await nav(BASE + '?fps=0', 12000); ok('meadow back', await until(HOME_REST)); await sleep(600);
 await tap(`${H}.rowLabels.versus`);
 ok('VERSUS → the versus menu', await until(`game.scene.isActive('vsmenu')`, 8000));
