@@ -23876,12 +23876,18 @@ function nemBoulTick(h,kt,dt){
   }
   return h.nkGW>0;
 }
-// THE BREATH (dilo multi 4 cone .5 · the king multi 6 cone .6): fireCd →
-// the INHALE kt.aim (planted — the gold mouth glow is the fairness tell,
-// drawUnit) → the jets: every figure of either army inside rng and the
-// cone, nearest-first up to multi, NEMKIT_BREATH each through the funnel;
-// ONE layered 'breath' fx is the picture (the 0357 field precedent). The
-// king keeps his D2 turn dance: a fired breath hands the CHARGE its turn.
+// THE BREATH (dilo cone .5 · the king cone .6 — the row's multi+cone pick
+// the branch): fireCd → the INHALE kt.aim (planted — the gold mouth glow is
+// the fairness tell, drawUnit) → the jet. 0461 THE JET IS ITS PICTURE,
+// hatchling edition — the 0396 campaign law ported (this copy carried S1 the
+// FEET-test under a JAW-drawn picture, S2 the one-frame hitscan and S3 the
+// multi trim — "noted, not ported" then): the tongue roots at the JAW he
+// shows, the centerline runs JAW→figure, the burn is the DRAWN 0.26 wedge
+// (breathHitsU vs BR_BODY), it LIVES its whole fx dur as a standing region
+// in S.breaths (lane 'nem' — a figure stepping into the standing fire burns
+// too), EVERY figure of either army in the picture burns (no multi trim),
+// NEMKIT_BREATH each through the funnel, nobody's kill. The king keeps his
+// D2 turn dance: a fired breath hands the CHARGE its turn.
 function nemBreathTick(h,kt,dt){
   const kg=h.k==='kingrex';
   if(h.nkAW>0){
@@ -23899,22 +23905,14 @@ function nemBreathTick(h,kt,dt){
 }
 function nemBreathFire(h,kt){
   const m=nemNearFig(h.x,h.y,kt.rng); if(!m) return;
-  const ang=Math.atan2(m.y-h.y,m.x-h.x);
-  let hits=[];
-  for(const u of S.units){
-    if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
-    if(Math.hypot(u.x-h.x,u.y-h.y)>kt.rng) continue;
-    let da=Math.abs(Math.atan2(u.y-h.y,u.x-h.x)-ang); if(da>Math.PI) da=Math.PI*2-da;
-    if(da>=kt.cone/2+0.12) continue;
-    hits.push(u);
-  }
-  if(hits.length>kt.multi){ hits.sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y)); hits=hits.slice(0,kt.multi); }
-  if(!hits.length) return;
-  const kg=h.k==='kingrex', mo=kg?{x:46,y:-56,sc:1.5}:{x:25,y:-24,sc:1};
-  h.fx=Math.cos(ang)>0;
+  const kg=h.k==='kingrex', mo=kg?{x:46,y:-56,sc:1.5}:{x:25,y:-24,sc:1}, dur=kg?0.7:0.65;
+  h.fx=m.x>h.x;                                                  // he faces the figure he burns — the jaw flips with him (drawUnit's own read)
+  const jx=h.x+(h.fx?mo.x:-mo.x), jy=h.y+mo.y, ang=Math.atan2(m.y-jy,m.x-jx);   // the centerline runs JAW→figure — picture and burn share it
   bfSfx(SFX.jet,h.x,h.y);
-  S.fx.push({k:'breath',x:h.x+(h.fx?mo.x:-mo.x),y:h.y+mo.y,ang:ang,rng:kt.rng,sc:mo.sc,t:0,dur:kg?0.7:0.65});
-  for(const u of hits) hurt(u, NEMKIT_BREATH, null);
+  S.fx.push({k:'breath',x:jx,y:jy,ang:ang,rng:kt.rng,sc:mo.sc,sp:0.26,t:0,dur:dur});
+  const b={x:jx,y:jy,ang:ang,sp:0.26,rng:kt.rng,t:0,dur:dur,src:h,lane:'nem',hit:new Set()};
+  (S.breaths||(S.breaths=[])).push(b);
+  breathBurn(b);                                                 // the fire frame: everyone in the picture burns NOW; update() ticks the rest of the window
 }
 // v3.23 (card 03): the WORDLESS tell — Wyatt: "doesn't need to say
 // telekinesis. The action should speak for itself." The word came off the
@@ -31344,7 +31342,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.18';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.19';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41899,7 +41897,47 @@ function breathHitsU(b,u){
   if(along<=b.rng) return d*Math.sin(be)<=BR_BODY;
   return Math.hypot(along-b.rng,d*Math.sin(be))<=BR_BODY;
 }
+// 0461 THE FLAME CONE HITBOX (Wyatt 8/20 23:18: "fire dinosaurs' flame cone
+// attack does no damage — troops standing inside the visible fire cone are
+// unharmed. The damage hitbox does not match the rendered cone… Check every
+// dino/unit variant that shares the flame attack, including King Rex's
+// breath"): ONE burn for EVERY tongue in the game. A region carries its LANE —
+// 'camp' (the foes' breath: one grit pip through tanHit, the 0396 law
+// byte-what-it-was) · 'nem' (the BF hatchlings' breath, ported off
+// nemBreathFire's one-frame FEET-hitscan: NEMKIT_BREATH through hurt(),
+// nobody's kill, the third side's own skip-set) · 'hero' (the playable KING
+// REX's breath, ported off the fire loop's ±0.42 FEET-cone: the standard dmg
+// captured at the fire, the loop's own eligibility, the kill his). Every
+// lane: the region IS the fx (root/ang/sp/rng shared), it LIVES the fx's
+// whole dur, ONE hit per figure per breath (the set), EVERY figure in the
+// picture burns — no multi trim (Wyatt's hitbox law). BREATH_TELL: a figure
+// that burns SHOWS it — the lava beam's own 🔥 float + ember ring (the
+// game's fire-hit grammar; presentation, dice-free — the campaign pip was a
+// silent 0.1s tracer inside the flame, which read as "unharmed").
+const BREATH_TELL=1;   // ⚑ 0 = the silent pip again (every lane's damage is unchanged either way)
+function breathTell(u){ if(!BREATH_TELL) return; S.floats.push({x:u.x,y:u.y-52,txt:'🔥',t:0,col:'#FF9A3D'}); S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:18,t:0,dur:0.22,col:'#FF9A3D'}); }
 function breathBurn(b){
+  if(b.lane==='nem'){                            // the BF hatchling's tongue: either army, never a hatchling (nemNearFig's own skip-set)
+    for(const u of S.units){
+      if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
+      if(b.hit.has(u)) continue;                 // one hit per figure per breath
+      if(!breathHitsU(b,u)) continue;
+      b.hit.add(u); hurt(u, NEMKIT_BREATH, null); breathTell(u);   // the no-blame funnel, byte-what-it-was
+    }
+    return;
+  }
+  if(b.lane==='hero'){                           // the playable king's tongue: the fire loop's own eligibility, the standard dmg captured at the fire
+    const k=b.src;
+    for(const f of TGT(k)){
+      if(f.dead||f.burrow||f.jetT>0) continue;   // under the rug / in the air: the loop's own doors
+      if(!bfCanTarget(k,f)) continue;            // the lip law
+      if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;   // no burning offscreen
+      if(b.hit.has(f)) continue;                 // one hit per foe per breath
+      if(!breathHitsU(b,f)) continue;
+      b.hit.add(f); hurt(f,b.dmg,k); breathTell(f);   // vet/mods/rank rode the captured line; the kill is his
+    }
+    return;
+  }
   for(const u of S.units){
     if(u.dead||u.jetT>0) continue;               // airborne: the v1.39 grace stands
     if(S.drag&&S.drag.unit===u) continue;        // the dragged man: "drag your men out" stands (a DROPPED man burns)
@@ -41908,6 +41946,7 @@ function breathBurn(b){
     if(!breathHitsU(b,u)) continue;
     b.hit.add(u);
     tanHit(u,b.fx0,b.fy0,b.src);                 // one grit pip on the standard save path (⚑ FIRE_PIPS: a pipN row seat is the one-line dial, NOT moved)
+    breathTell(u);                               // 0461: the pip SHOWS now
   }
 }
 function breathFire(f,aimM){
@@ -47452,19 +47491,28 @@ function update(dt){
       });
       continue;
     }
-    // 0357 MEGA REX'S PRIZE — KING REX breathes for YOU: the flame branch's
-    // own grammar, breath edition (aim at the picked man; his boss cone's
-    // ±0.42 arc; nearest-first up to multi victims — damage rides the
-    // standard dmg line above, so vet/mods/rank all inherit; ONE 'breath'
-    // fx from the right-facing muzzle, +34/−40 = the boss mold's −46/−56
-    // mirrored to the unit lane).
+    // 0357 MEGA REX'S PRIZE — KING REX breathes for YOU. 0461 THE FLAME CONE
+    // HITBOX: his tongue is ITS PICTURE now, the 0396 law at the unit lane —
+    // the jaw is the mold's own muzzle (+34/-40 = the boss mold's -46/-56
+    // mirrored to the unit lane) on the side he SHOWS (unitFl: the v3.61 side
+    // mirror XOR walk-flip — a BF foe-side king or a man striding west
+    // breathes from the jaw you see), the centerline runs JAW→the picked
+    // man's chest, the burn is the DRAWN 0.26 wedge (breathHitsU vs BR_BODY —
+    // the old ±0.42 FEET-cone reached past the picture's edge and fell short
+    // of its tip), it LIVES its whole fx dur as a standing region in
+    // S.breaths (lane 'hero' — a man marching into the standing fire burns
+    // too), EVERY foe in the picture burns (the multi-4 trim is gone; UDEF
+    // multi keeps its branch-pick job), and the damage is the standard dmg
+    // line above CAPTURED at the fire — vet/mods/rank all inherit, the kill
+    // is his (hurt's own credit).
     if(u.type==='kingrex'){
       bfSfx(SFX.jet, u.x, u.y);
-      const kAng=Math.atan2((best.y-14)-(u.y-40), best.x-(u.x+34));
-      S.fx.push({k:'breath',x:u.x+34,y:u.y-40,ang:kAng,rng:UDEF.kingrex.rng,sc:1.2,t:0,dur:0.65});
-      extra.filter(f2=>{ let da=Math.abs(Math.atan2(f2.y-u.y,f2.x-u.x)-kAng); if(da>Math.PI) da=Math.PI*2-da; return da<0.42; })
-        .sort((a2,b2)=>Math.hypot(a2.x-u.x,a2.y-u.y)-Math.hypot(b2.x-u.x,b2.y-u.y))
-        .slice(0,def.multi).forEach(f2=>hurt(f2,dmg,u));
+      const kfl=unitFl(u)?-1:1, kx=u.x+34*kfl, ky=u.y-40;
+      const kAng=Math.atan2((best.y-14)-ky, best.x-kx);
+      S.fx.push({k:'breath',x:kx,y:ky,ang:kAng,rng:UDEF.kingrex.rng,sc:1.2,sp:0.26,t:0,dur:0.65});
+      const kb={x:kx,y:ky,ang:kAng,sp:0.26,rng:UDEF.kingrex.rng,t:0,dur:0.65,src:u,lane:'hero',dmg:dmg,hit:new Set()};
+      (S.breaths||(S.breaths=[])).push(kb);
+      breathBurn(kb);   // the fire frame: everyone in the picture burns NOW; update() ticks the rest of the window
       continue;
     }
     // 0372 MEGA CROAK'S PRIZE — KING CROAK barrages for YOU: the kingrex
