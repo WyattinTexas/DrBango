@@ -88,6 +88,47 @@ nothing in it forces the WebGL renderer.
 node tools/streak-check.mjs      # served on :8899, headless Chrome on :9444
 ```
 
+## lamp-check.mjs
+
+The lantern's PIXELS (v0.45.0). streak-check pins what the lamp IS; this one
+snapshots the lamp's on-screen rect in all five dresses and asserts it LOOKS
+like a lamp — warm glass when lit, visible pewter when cold — on three boots:
+as shipped, with `roundRect` deleted before compat.js (iOS 15, the shell's
+floor: the polyfill must carry every bake), and with `roundRect` killed AFTER
+compat.js so every painter that calls it throws (`ssBake` must wipe, fall
+back, DIAG and carry on). Takes the CDP port and the renderer; run it once per
+renderer, with a Chrome that can honour it:
+
+```
+node tools/lamp-check.mjs 9444 cv      # --disable-gpu Chrome
+node tools/lamp-check.mjs 9446 gl      # the three swiftshader flags
+```
+
+What TestFlight v0.43.0 taught, in three lines:
+
+- **Wyatt's "gray rectangle" was the COLD lamp, by design.** The end screen
+  says "the lantern is lit" after the very first hunt and the cold sheet
+  promises "tonight's hunt lights it", but `ssLanternTier` lit the meadow's
+  lamp only from night TWO — so night one showed dark iron at 50% alpha,
+  26×36 CSS px, against the dusk: a box. Every desktop harness "verified" it
+  because it was asserting the texture KEY, and the key was the one the law
+  asked for. Now lit from night one (numbered from two), and the cold dress
+  is pale pewter at 0.82 with a glint on the glass.
+- **A painter that throws used to poison every bake after it.** Phaser
+  registers the key the moment `createCanvas` returns, so the meadow wore a
+  half-drawn texture and every later `mk()` never ran. `ssBake` (both
+  factories) wipes the canvas, resets the context (a throw after
+  `save()`/`translate()`/`'lighter'` leaves all of it behind — `restore()`
+  past the stack is a no-op, so it is called sixteen times), runs the bake's
+  fallback painter if it has one (the lantern's is straight lines and
+  `fillRect` only), DIAGs `bake failed: <key> · <message>` and carries on.
+  `window.__ssBakeFail` lists them for a harness.
+- **`roundRect` is polyfilled in compat.js (arcTo path) and that polyfill is
+  now pinned**: the iOS-15 boot paints warm/iron counts within 10% of the
+  native one. Nothing else in the bakes is newer than iOS 15
+  (`setLineDash`, `multiply`/`destination-in`, `direction`,
+  `actualBoundingBoxAscent` are all Safari ≤ 11.1).
+
 ## drip-check.mjs
 
 The sigil drip's own harness — both halves (v0.43.0). `fps-check.mjs` pins

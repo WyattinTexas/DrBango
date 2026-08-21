@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.44.0';
+const BUILD = 'STARSPELL v0.45.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -650,16 +650,47 @@ function ssMaxTex(scene) {
   }
   return SS_MAXTEX;
 }
+/* Run one texture painter on its canvas, and never ship half a picture.
+   Phaser registers the key the moment createCanvas returns, so a painter
+   that throws partway (a canvas API the phone's WebKit lacks — roundRect is
+   polyfilled in compat.js precisely because iOS 15 has none) used to leave a
+   registered texture with whatever was drawn before the throw, and every
+   bake queued after it never ran at all: one bad line, silently, and the
+   meadow wears it. Now the canvas is wiped, the fallback painter (if the
+   bake offers one) draws a plain stand-in, the DIAG names the key, and the
+   factory carries on to the next texture. `window.__ssBakeFail` counts them
+   for the harness. */
+function ssBake(t, key, w, h, fn, fb) {
+  const c = t.context;
+  // the factory's resolution scale, so the fallback paints in the same units
+  const base = c.getTransform ? c.getTransform() : null;
+  try { fn(c, w, h); }
+  catch (e) {
+    const m = key + ' · ' + ((e && e.message) || e);
+    DIAG('bake failed: ' + m);
+    (window.__ssBakeFail = window.__ssBakeFail || []).push(m);
+    try {
+      // a painter that threw after save()/translate()/clip()/'lighter' left
+      // all of it on the context; restore() past the stack is a no-op
+      for (let i = 0; i < 16; i++) c.restore();
+      c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.setLineDash([]);
+      c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+      if (base) c.setTransform(base);
+      if (fb) fb(c, w, h);
+    } catch (e2) { DIAG('bake fallback failed: ' + key + ' · ' + ((e2 && e2.message) || e2)); }
+  }
+  t.refresh();
+}
 function ssMakeTextures(scene) {
   const R = ssTexRes(scene);
   const ARTON = ART && SSART.ready;
-  const mk = (key, w, h, fn, r) => {
+  const mk = (key, w, h, fn, r, fb) => {
     if (scene.textures.exists(key)) return;
     r = r || 1;
     const cap = Math.min(1, ssMaxTex(scene) / Math.max(w * r, h * r));
     const t = scene.textures.createCanvas(key, Math.round(w * r * cap), Math.round(h * r * cap));
     t.context.scale(r * cap, r * cap);
-    fn(t.context, w, h); t.refresh();
+    ssBake(t, key, w, h, fn, fb);
   };
   mk('dot', 16, 16, (c, w, h) => {
     const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
@@ -793,10 +824,11 @@ function ssMakeTextures(scene) {
     c.save();
     c.translate(8, 22);                       // …into the original 44x62 box
     const w = 44, h = 62;
-    // the iron warms as the flame grows: dull blue-grey cold, brass lit,
-    // pale gold at the marks
-    const iron = ['#4a5170', '#c9a84c', '#d8b955', '#eccb6c', '#f6e08e'][tier + 1];
-    const irons = ['#2e3350', '#8a6a22', '#9b7826', '#b08c2e', '#c9a84c'][tier + 1];
+    // the iron warms as the flame grows: pewter cold, brass lit, pale gold at
+    // the marks. The cold pewter is deliberately pale: the lamp is 26x36 on a
+    // phone, against a dusk sky, and dark iron there simply disappears.
+    const iron = ['#8d96bd', '#c9a84c', '#d8b955', '#eccb6c', '#f6e08e'][tier + 1];
+    const irons = ['#4d5680', '#8a6a22', '#9b7826', '#b08c2e', '#c9a84c'][tier + 1];
     // the ring and the hook it hangs from
     c.lineWidth = 2.4; c.strokeStyle = iron;
     c.beginPath(); c.arc(w / 2, 8, 4.6, Math.PI * 0.15, Math.PI * 0.85, true); c.stroke();
@@ -821,6 +853,15 @@ function ssMakeTextures(scene) {
       c.fillStyle = g;
     }
     c.fill();
+    if (!lit) {                                         // a cold pane is still GLASS: one slant of sky on it
+      c.save();
+      c.beginPath(); c.roundRect(gx, gy, gw, gh, 3.5); c.clip();
+      c.beginPath(); c.moveTo(gx + 3, gy); c.lineTo(gx + 10, gy); c.lineTo(gx + 3, gy + gh); c.lineTo(gx, gy + gh); c.closePath();
+      c.fillStyle = 'rgba(150,170,230,0.22)'; c.fill();
+      c.beginPath(); c.moveTo(gx + 13, gy); c.lineTo(gx + 16, gy); c.lineTo(gx + 9, gy + gh); c.lineTo(gx + 6, gy + gh); c.closePath();
+      c.fillStyle = 'rgba(150,170,230,0.1)'; c.fill();
+      c.restore();
+    }
     if (lit) {                                          // the flame's bloom inside the pane
       const b = c.createRadialGradient(w / 2, gy + gh * 0.62, 1, w / 2, gy + gh * 0.62, 15);
       b.addColorStop(0, 'rgba(255,255,235,0.95)');
@@ -902,7 +943,20 @@ function ssMakeTextures(scene) {
       c.beginPath(); c.arc(hx, hy, 6.5, 0, Math.PI * 2); c.fillStyle = hg; c.fill();
       c.restore();
     }
-  }, R);
+  }, R, (c, W) => {
+    // the stand-in, should the painter above throw: straight lines only —
+    // a ring, cap, pane and base in the tier's colours, no gradients, no
+    // roundRect, nothing newer than the first canvas spec. A lamp, still.
+    const lit = tier >= 0, x = W / 2;
+    const iron = ['#8d96bd', '#c9a84c', '#d8b955', '#eccb6c', '#f6e08e'][tier + 1];
+    c.lineWidth = 2.4; c.strokeStyle = iron;
+    c.beginPath(); c.arc(x, 30, 4.6, Math.PI * 0.15, Math.PI * 0.85, true); c.stroke();
+    c.fillStyle = iron; c.fillRect(x - 13, 36.5, 26, 5.5);
+    c.fillStyle = lit ? ['#ffb547', '#ffc45e', '#ffd070', '#ffd980'][tier] : '#151a3a';
+    c.fillRect(x - 12, 42, 24, 30);
+    c.strokeStyle = iron; c.lineWidth = 2; c.strokeRect(x - 12, 42, 24, 30);
+    c.fillStyle = iron; c.fillRect(x - 14, 71.5, 28, 6.5);
+  });
   lantern('lantern-cold', -1);
   lantern('lantern-lit', 0);
   lantern('lantern-m1', 1);
@@ -1090,9 +1144,15 @@ function ssGraceLine(st) {
 function ssMarkCopy(m) {
   return { name: SS_T('stkMs' + m), sub: SS_T('stkMsSub' + m), ach: SS_MS_ACH[m] };
 }
-// which dress the lamp wears: -1 cold, 0 lit, 1/2/3 the marks
+/* which dress the lamp wears: -1 cold, 0 lit, 1/2/3 the marks.
+   Lit from the FIRST night. The end screen says "the lantern is lit" after
+   the very first hunt and the cold sheet promises "tonight's hunt lights it",
+   and until v0.45.0 the meadow then showed the COLD lamp for a night — at
+   phone size, half-transparent iron against the dusk is a gray rectangle
+   (TestFlight v0.43.0, Wyatt's first daily). The count in the glass still
+   starts at two; a lone "1" is not a number worth printing. */
 function ssLanternTier(n) {
-  if (!(n >= 2)) return -1;
+  if (!(n >= 1)) return -1;
   let t = 0;
   SS_MILESTONES.forEach((m, i) => { if (n >= m) t = i + 1; });
   return t;
@@ -1422,14 +1482,14 @@ function ssAscentP(ms) {
 }
 
 function ssSkyTextures(scene, dawn) {
-  const mk = (key, w, h, fn, r) => {
+  const mk = (key, w, h, fn, r, fb) => {
     if (scene.textures.exists(key)) return;
     r = r || 1;
     // same defensive ceiling clamp as ssMakeTextures (see ssMaxTex)
     const cap = Math.min(1, ssMaxTex(scene) / Math.max(w * r, h * r));
     const t = scene.textures.createCanvas(key, Math.round(w * r * cap), Math.round(h * r * cap));
     t.context.scale(r * cap, r * cap);
-    fn(t.context, w, h); t.refresh();
+    ssBake(t, key, w, h, fn, fb);
   };
   const gradTex = (key, stops) => mk(key, 64, 1024, (c, w, h) => {
     const g = c.createLinearGradient(0, 0, 0, h);
@@ -4193,8 +4253,8 @@ class Home extends Phaser.Scene {
 
     /* THE STREAK LANTERN — it hangs beside the herald, and it is the only
        thing on this screen the player made themselves. Cold and quiet with no
-       streak; from the second night it carries the count in its glass and
-       breathes. Never louder than the chip: the halo tops out well under the
+       streak; lit from the first night, and from the second it carries the
+       count in its glass and breathes. Never louder than the chip: the halo tops out well under the
        daily's ember, and nothing here moves fast. */
     // 35x49 of texture, of which the lamp body is the same 26x36 it has been
     // since v0.39.0 — the margin is the crowns' room (see ssMakeTextures).
@@ -4396,23 +4456,24 @@ class Home extends Phaser.Scene {
     this.updateLantern();
   }
   // the lantern's whole state, in one place: cold glass with no streak, warm
-  // glass carrying the count from the second night on. Idempotent — every
+  // glass from the first night, the count from the second. Idempotent — every
   // caller (build, the 1s tick, the wake from a finished hunt) runs it whole.
   updateLantern() {
     if (!this.lanternB || !this.lanternB.active) return;
     const l = ssLayout(this);
     const st = ssStreakState();
     const n = st.n;
-    const lit = n >= 2;
+    const lit = n >= 1;
     const tier = ssLanternTier(n);
     const grew = this.lanternShown != null && n > this.lanternShown;
     this.lanternShown = n;
     // setTexture resets the frame size, so the display size is re-asserted.
-    // A cold lantern also steps back: dark iron at full opacity read heavier
-    // than the herald beside it, which is exactly backwards.
+    // A cold lantern steps back a little (it must not outweigh the herald
+    // beside it) but no further: at 0.5 its iron vanished into the dusk and
+    // only the dark pane survived — a gray box, not a lamp.
     this.lanternB.setTexture(SS_LANTERN_TEX[tier + 1])
       .setDisplaySize(l.u(SS_LANTERN_W), l.u(SS_LANTERN_H));
-    this.lanternB.baseAlpha = lit ? 1 : 0.5;
+    this.lanternB.baseAlpha = lit ? 1 : 0.82;
     const g = this.lanternGlow;
     // the halo grows with the marks but still never reaches the daily chip's
     // own ember at its brightest (0.13) — the herald leads this corner
@@ -4427,7 +4488,7 @@ class Home extends Phaser.Scene {
     const t = this.lanternT;
     if (t && t.active) {
       t.setFontSize(l.u(11));                  // start from full size every time…
-      t.setText(lit ? String(n) : '');
+      t.setText(n >= 2 ? String(n) : '');      // the flame shows at one, the count from two
       // …then shrink to the pane rather than spill over its iron posts
       let fs = 11;
       while (t.width > l.u(12.5) && fs > 6) { fs -= 0.75; t.setFontSize(l.u(fs)); }
@@ -4642,7 +4703,7 @@ class Home extends Phaser.Scene {
 
     // the lamp itself, at twice its corner size — this is the one screen where
     // the thing the player built is allowed to be the subject
-    if (n >= 2) {
+    if (n >= 1) {
       const gl = this.add.image(l.x(0), py(108), 'glowbig').setDisplaySize(l.u(160), l.u(160))
         .setTint(tier >= 2 ? 0xffd77a : 0xffb457).setAlpha(0).setBlendMode('ADD');
       items.push(fx(gl));
@@ -4652,7 +4713,7 @@ class Home extends Phaser.Scene {
     }
     const LS = 2;
     const lamp = this.add.image(l.x(0), py(108), SS_LANTERN_TEX[tier + 1])
-      .setDisplaySize(l.u(SS_LANTERN_W * LS), l.u(SS_LANTERN_H * LS)).setAlpha(n >= 2 ? 1 : 0.55);
+      .setDisplaySize(l.u(SS_LANTERN_W * LS), l.u(SS_LANTERN_H * LS)).setAlpha(n >= 1 ? 1 : 0.82);
     items.push(lamp);
     if (n >= 2) {
       const cT = ssTxt(this, l.x(0), py(108 + SS_LANTERN_TY * LS), String(n), l.u(24), '#3a2408').setOrigin(0.5);

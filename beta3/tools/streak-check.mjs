@@ -141,7 +141,9 @@ ok('twice on a graced night is still one night', r.twice === 'graced/4 same/4', 
 ok('each mark fires exactly once', r.ms === '7,0,30,0,100', r.ms);
 ok('every mark reached is offered for awarding', r.marks100 === '7,30,100' && r.pend === 100, r.marks100 + ' pend=' + r.pend);
 ok('a broken streak clears its marks and may earn them again', r.mkAfterReset === 0, String(r.mkAfterReset));
-ok('the lamp dresses by the marks', r.tiers === '-1,-1,0,0,1,1,2,2,3,3', r.tiers);
+// v0.45.0: lit from the FIRST night — the end screen says "the lantern is lit"
+// after it, and the cold lamp it used to show at phone size read as a gray box
+ok('the lamp dresses by the marks, lit from night one', r.tiers === '-1,0,0,0,1,1,2,2,3,3', r.tiers);
 
 // ================================================================
 // 2. THE LAMP AND ITS SHEET — the surfaces the rules drive
@@ -158,8 +160,9 @@ const lamp = (n, extra) => ev(`(() => { const h = game.scene.getScene('home');
     onScreen: h.lanternB.getBounds().top > 0 }) })()`).then(JSON.parse);
 const L = {};
 for (const n of [0, 1, 2, 6, 7, 30, 100, 365]) L[n] = await lamp(n);
-ok('cold below two nights', L[0].tex === 'lantern-cold' && L[1].tex === 'lantern-cold' && L[0].count === '' && L[0].glow === 0);
-ok('lit and numbered from night two', L[2].tex === 'lantern-lit' && L[6].count === '6' && L[6].glow > 0, JSON.stringify(L[6]));
+ok('cold with no streak, and still legible (alpha never below 0.8)', L[0].tex === 'lantern-cold' && L[0].count === '' && L[0].glow === 0 && L[0].lamp >= 0.8, JSON.stringify(L[0]));
+ok('LIT from the first night, with its halo and no number yet', L[1].tex === 'lantern-lit' && L[1].count === '' && L[1].glow > 0 && L[1].lamp === 1, JSON.stringify(L[1]));
+ok('numbered from night two', L[2].tex === 'lantern-lit' && L[2].count === '2' && L[6].count === '6' && L[6].glow > 0, JSON.stringify(L[6]));
 ok('night 7 → the ember crown', L[7].tex === 'lantern-m1', L[7].tex);
 ok('night 30 → the true lantern', L[30].tex === 'lantern-m2', L[30].tex);
 ok('night 100 → comet-crowned, and it stays there', L[100].tex === 'lantern-m3' && L[365].tex === 'lantern-m3', L[100].tex + '/' + L[365].tex);

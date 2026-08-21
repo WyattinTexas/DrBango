@@ -505,7 +505,8 @@ async function main() {
   ok('a missed night puts it out and starts over at 1, keeping the best',
     rules.cold === 0 && rules.relit === 1 && rules.best === 2, JSON.stringify(rules));
 
-  // the lantern on the meadow: cold below 2, lit and numbered from 2 up
+  // the lantern on the meadow: cold with no streak, lit from night 1 (v0.45.0),
+  // numbered from night 2
   ok('the meadow settles with a lantern beside the daily chip', await until(HOME_REST));
   const lamp = (n) => c.ev(`(() => { const h = game.scene.getScene('home');
     SS.prof.streak = { n: ${n}, last: SSNET.dayKey(), best: ${n} }; h.updateLantern();
@@ -517,9 +518,9 @@ async function main() {
   // ⚠ the sample is 5, not 9: from v0.40.0 the seventh night re-dresses the
   // lamp, so a plain 'lantern-lit' assertion has to stay under the first mark
   const l0 = await lamp(0), l1 = await lamp(1), l5 = await lamp(5), l365 = await lamp(365);
-  ok('no streak (and a single night) leave the lantern COLD and unnumbered',
-    l0.tex === 'lantern-cold' && l0.count === '' && l1.tex === 'lantern-cold' && l0.glow === 0,
-    l0.tex + '/' + l1.tex);
+  ok('no streak leaves the lantern COLD and unnumbered; the first night LIGHTS it, still unnumbered',
+    l0.tex === 'lantern-cold' && l0.count === '' && l0.glow === 0 && l1.tex === 'lantern-lit' && l1.count === '' && l1.glow > 0,
+    l0.tex + '/' + l1.tex + ' count=' + JSON.stringify(l1.count));
   ok('from the second night it is LIT and carries the count',
     l5.tex === 'lantern-lit' && l5.count === '5' && l5.glow > 0 && l5.lamp === 1, JSON.stringify(l5));
   ok('the halo never outshines the daily chip ember (0.13)', l5.glow <= 0.13, String(l5.glow));
@@ -699,8 +700,10 @@ async function main() {
     graceRules.ms === '7,0,30,0,100' && graceRules.mkAfterReset === 0, graceRules.ms + ' mk=' + graceRules.mkAfterReset);
   ok('every mark reached is offered for awarding, and the ceremony is queued',
     graceRules.marks === '7,30,100' && graceRules.pend === 100, graceRules.marks + ' pend=' + graceRules.pend);
-  ok('the lamp dresses by the marks (cold/lit/7/30/100)',
-    graceRules.tiers === '-1,-1,0,0,1,1,2,2,3,3', graceRules.tiers);
+  // v0.45.0: lit from the FIRST night (the cold lamp read as a gray box on
+  // the phone after an end screen that had already said "the lantern is lit")
+  ok('the lamp dresses by the marks (cold/lit-from-one/7/30/100)',
+    graceRules.tiers === '-1,0,0,0,1,1,2,2,3,3', graceRules.tiers);
 
   // the five dresses, on the meadow, at the size the corner actually shows
   ok('meadow back for the lamp dresses', await until(HOME_REST));
