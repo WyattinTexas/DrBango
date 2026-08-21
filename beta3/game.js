@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.38.0';
+const BUILD = 'STARSPELL v0.39.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -477,6 +477,23 @@ const SS = {
     p.rating = Number.isFinite(p.rating) ? Math.round(p.rating) : 1000;
     p.rhide = !!p.rhide;                                   // veil my rating from others
     p.rday = (p.rday && typeof p.rday === 'object') ? p.rday : { d: 0, g: 0 };   // PvE daily-cap ledger
+    /* THE STREAK — consecutive days on which the daily hunt was run.
+       Stored as {n, last, best}, never a bare number: `last` is the day key
+       that was counted, so the CURRENT streak is always derivable from today
+       (a number alone can't tell a live streak from a cold one), and a later
+       grace night can forgive a one-day gap by reading the same two fields.
+       No migration will be needed for it — only new rules. */
+    if (!p.streak || typeof p.streak !== 'object') {
+      // Profiles that predate the lantern seed from the score log they already
+      // kept: those days genuinely were hunted, and the daily sheet has been
+      // showing that very number since v0.19.0. Starting everyone at zero
+      // would take something away that the game already granted.
+      const seed = ssSeedStreak(p);
+      p.streak = { n: seed.n, last: seed.last, best: seed.n };
+    }
+    p.streak.n = Math.max(0, p.streak.n | 0);
+    p.streak.last = p.streak.last | 0;
+    p.streak.best = Math.max(p.streak.best | 0, p.streak.n);
     return p;
   },
   save() { try { localStorage.setItem('beta3.profile', JSON.stringify(this.prof)); } catch (e) { } },
@@ -487,6 +504,10 @@ const SS = {
       vsWins: this.prof.vsWins,
       achCount: Object.keys(this.prof.ach).length,
       rating: this.prof.rating, rhide: this.prof.rhide ? 1 : 0,
+      // the flame rides along with the rest of the profile: `streakDay` is the
+      // day key it was last fed, so the number can be read back honestly (a
+      // bare count would say nothing about whether it is still burning)
+      streak: this.prof.streak.n, streakDay: this.prof.streak.last, streakBest: this.prof.streak.best,
     });
   },
   has(id) { return !!this.prof.ach[id]; },
@@ -692,6 +713,52 @@ function ssMakeTextures(scene) {
     g2.addColorStop(0, 'rgba(255,255,255,0.28)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
     c.fillStyle = g2; c.fill();
   }, R);
+  /* The streak lantern — the little iron-and-glass lamp that stands beside the
+     daily herald and carries the number of nights. Drawn twice: cold (no
+     streak: dark glass, dull iron) and lit (warm pane, ember bloom inside).
+     Two baked textures rather than one tinted image, because setTint is a
+     silent no-op under the Canvas renderer and the game boots either. */
+  const lantern = (key, lit) => mk(key, 44, 62, (c, w, h) => {
+    const iron = lit ? '#c9a84c' : '#4a5170', irons = lit ? '#8a6a22' : '#2e3350';
+    // the ring and the hook it hangs from
+    c.lineWidth = 2.4; c.strokeStyle = iron;
+    c.beginPath(); c.arc(w / 2, 8, 4.6, Math.PI * 0.15, Math.PI * 0.85, true); c.stroke();
+    c.beginPath(); c.moveTo(w / 2 - 9, 15); c.lineTo(w / 2 + 9, 15); c.stroke();
+    // the cap
+    c.beginPath(); c.moveTo(w / 2 - 13, 20); c.lineTo(w / 2 + 13, 20); c.lineTo(w / 2 + 9, 14.5);
+    c.lineTo(w / 2 - 9, 14.5); c.closePath();
+    c.fillStyle = iron; c.fill();
+    // the glass: a tall pane between two posts
+    const gx = w / 2 - 12, gw = 24, gy = 20, gh = 30;
+    c.beginPath(); c.roundRect(gx, gy, gw, gh, 3.5);
+    if (lit) {
+      const g = c.createLinearGradient(0, gy, 0, gy + gh);
+      g.addColorStop(0, '#fff0b8'); g.addColorStop(0.45, '#ffb547'); g.addColorStop(1, '#e0761f');
+      c.fillStyle = g;
+    } else {
+      const g = c.createLinearGradient(0, gy, 0, gy + gh);
+      g.addColorStop(0, '#1b2140'); g.addColorStop(1, '#101534');
+      c.fillStyle = g;
+    }
+    c.fill();
+    if (lit) {                                          // the flame's bloom inside the pane
+      const b = c.createRadialGradient(w / 2, gy + gh * 0.62, 1, w / 2, gy + gh * 0.62, 15);
+      b.addColorStop(0, 'rgba(255,255,235,0.95)'); b.addColorStop(0.5, 'rgba(255,196,96,0.45)');
+      b.addColorStop(1, 'rgba(255,150,60,0)');
+      c.beginPath(); c.roundRect(gx, gy, gw, gh, 3.5); c.fillStyle = b; c.fill();
+    }
+    c.lineWidth = 2; c.strokeStyle = iron;
+    c.beginPath(); c.roundRect(gx, gy, gw, gh, 3.5); c.stroke();
+    c.lineWidth = 1.6; c.strokeStyle = irons;           // corner posts
+    c.beginPath(); c.moveTo(gx + 1.2, gy + 1); c.lineTo(gx + 1.2, gy + gh - 1); c.stroke();
+    c.beginPath(); c.moveTo(gx + gw - 1.2, gy + 1); c.lineTo(gx + gw - 1.2, gy + gh - 1); c.stroke();
+    // the base
+    c.beginPath(); c.moveTo(w / 2 - 14, 56); c.lineTo(w / 2 + 14, 56); c.lineTo(w / 2 + 10, 49.5);
+    c.lineTo(w / 2 - 10, 49.5); c.closePath();
+    c.fillStyle = iron; c.fill();
+  }, R);
+  lantern('lantern-cold', false);
+  lantern('lantern-lit', true);
   mk('panel', 256, 256, (c) => {
     c.beginPath(); c.roundRect(4, 4, 248, 248, 22);
     const g = c.createLinearGradient(0, 0, 0, 256);
@@ -763,15 +830,66 @@ function ssClock(ms) {
   return Math.floor(s / 3600) + ':' + p(Math.floor(s / 60) % 60) + ':' + p(s % 60);
 }
 
-// The player's own daily-completion streak, from the local score log. A streak
-// broken only by TODAY still counts — today's sky is still up, go keep it.
-// (RTDB can't answer this: daily boards prune to today+yesterday.)
-function ssDailyStreak() {
-  const log = (SS.prof && SS.prof.daily) || {};
-  let t = Date.now(), n = 0;
-  if (!log[String(SSNET.dayKey(new Date(t)))]) t -= 86400000;
-  while (log[String(SSNET.dayKey(new Date(t)))]) { n++; t -= 86400000; }
-  return n;
+/* ---- THE STREAK: the lantern's fuel ---------------------------------------
+   One number the player built, and the only thing in the game that a missed
+   night can take away. Every calendar day (SSNET.dayKey — the game's one day
+   clock, UTC, the same one that chooses the sky) on which a daily hunt run is
+   completed feeds it. Twice in a night counts once; a missed night puts it
+   out.
+   Day keys are YYYYMMDD integers, so the distance between two of them is
+   calendar arithmetic, not a subtraction — 20260901 minus 20260831 is 70. */
+function ssDayKeyMs(k) {
+  k = k | 0;
+  return Date.UTC(Math.floor(k / 10000), (Math.floor(k / 100) % 100) - 1, k % 100);
+}
+// whole days from key `a` to key `b` (negative if b is earlier). Infinity when
+// there is no `a` at all — "never hunted" is not a one-day gap.
+function ssDayGap(a, b) {
+  if (!a || !b) return Infinity;
+  return Math.round((ssDayKeyMs(b) - ssDayKeyMs(a)) / 86400000);
+}
+// The streak AS IT STANDS TODAY. A flame last fed yesterday is still burning —
+// tonight's sky is up, go keep it — but anything older is cold, and the stored
+// count is simply not shown (it stays put until the next hunt overwrites it,
+// which is what lets a grace night resurrect one without a migration).
+// A clock that ran backwards (gap < 0) is never punished.
+function ssStreakCount(dk) {
+  const s = SS.prof && SS.prof.streak;
+  if (!s || !(s.n > 0) || !s.last) return 0;
+  return ssDayGap(s.last, dk || SSNET.dayKey()) <= 1 ? s.n : 0;
+}
+// Tonight's hunt is done: feed the flame. Returns {n, ev} where ev is
+// 'lit' (the very first night), 'extended', 'relit' (a cold flame started
+// over) or 'same' (already counted tonight — playing twice is still one day).
+function ssStreakNote() {
+  const s = SS.prof.streak, dk = SSNET.dayKey(), gap = ssDayGap(s.last, dk);
+  let ev;
+  if (gap <= 0) ev = 'same';                                  // today, or a clock that slipped back
+  else if (gap === 1) { s.n = (s.n | 0) + 1; ev = 'extended'; }
+  else { ev = s.last ? 'relit' : 'lit'; s.n = 1; }
+  if (ev !== 'same') s.last = dk;
+  if (s.n > (s.best | 0)) s.best = s.n;
+  return { n: s.n, ev };
+}
+// One-time seed for profiles that predate the streak fields: walk the local
+// daily score log backwards from today. A log that stops at YESTERDAY still
+// seeds a live streak (same rule as ssStreakCount), one that stops earlier
+// seeds nothing. Called from SS.load(), so it must not touch SS.prof.
+function ssSeedStreak(p) {
+  try { return ssSeedStreakFrom(p); } catch (e) { return { n: 0, last: 0 }; }
+}
+function ssSeedStreakFrom(p) {
+  const log = (p && p.daily) || {};
+  const today = SSNET.dayKey();
+  let dk = log[String(today)] ? today : 0;
+  if (!dk) {
+    const y = SSNET.dayKey(new Date(ssDayKeyMs(today) - 86400000));
+    if (log[String(y)]) dk = y;
+  }
+  if (!dk) return { n: 0, last: 0 };
+  let n = 0, walk = dk;
+  while (log[String(walk)]) { n++; walk = SSNET.dayKey(new Date(ssDayKeyMs(walk) - 86400000)); }
+  return { n, last: dk };
 }
 
 // Button texture for a given display size. The painted source is 627x344 but consumers
@@ -3018,6 +3136,7 @@ class Home extends Phaser.Scene {
     // scene instances persist across restarts — a rotation mid-sheet would
     // otherwise leave these truthy forever and the sheets could never reopen
     this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null;
+    this.lanternShown = null; this.lanternSwell = null;   // a restart re-renders, it does not celebrate
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
     // full frame's work on a slow phone, and a descent-by-create (the dawn
@@ -3132,6 +3251,9 @@ class Home extends Phaser.Scene {
         this.dailyGlow.setAlpha(0.13);
         this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       }
+      // the lantern owns its own breath (it depends on whether it's lit at
+      // all), so the wake path just asks it to redress itself
+      if (this.lanternB) this.updateLantern();
     };
     this.idleTweens();
     const bk = ssBraidTex(this);
@@ -3226,6 +3348,24 @@ class Home extends Phaser.Scene {
     dchip.on('pointerover', () => dchip.setScale(dchip.scaleX * 1.05, dchip.scaleY * 1.05));
     dchip.on('pointerout', () => dchip.setDisplaySize(l.u(DW), l.u(DH)));
     this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    /* THE STREAK LANTERN — it hangs beside the herald, and it is the only
+       thing on this screen the player made themselves. Cold and quiet with no
+       streak; from the second night it carries the count in its glass and
+       breathes. Never louder than the chip: the halo tops out well under the
+       daily's ember, and nothing here moves fast. */
+    const LW = 26, LH = 36, lx = -70;
+    this.lanternGlow = ui(this.add.image(l.x(lx), l.y(29), 'glowbig')
+      .setDisplaySize(l.u(52), l.u(52)).setTint(0xffb457).setAlpha(0).setBlendMode('ADD'));
+    const lamp = this.lanternB = ui(this.add.image(l.x(lx), l.y(27), 'lantern-cold')
+      .setDisplaySize(l.u(LW), l.u(LH)).setInteractive({ useHandCursor: true }));
+    // the count rides in the pane itself, shrunk to fit rather than clipped —
+    // a hundred-night flame is a problem worth rendering properly
+    this.lanternT = ui(ssTxt(this, l.x(lx), l.y(29.3), '', l.u(11), '#3a2408').setOrigin(0.5));
+    // same door as the chip: the lantern is the daily hunt's own story
+    lamp.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.dailySheet(); });
+    lamp.on('pointerover', () => lamp.setScale(lamp.scaleX * 1.06, lamp.scaleY * 1.06));
+    lamp.on('pointerout', () => lamp.setDisplaySize(l.u(LW), l.u(LH)));
     this.updateDailyChip();
 
     // the VERSUS door knows who's waiting behind it: with friends online the
@@ -3396,10 +3536,68 @@ class Home extends Phaser.Scene {
   // the herald's second-by-second clock; also flips the chip between its
   // alive (unplayed — ember glow) and quiet (✓ hunted) dress
   updateDailyChip() {
-    if (!this.dailyChipT || !this.dailyChipT.active) return;
-    const played = !!SS.prof.daily[String(SSNET.dayKey())];
-    this.dailyChipT.setText((played ? '✓ ' : '☀ ') + ssClock(SSNET.msToNextDay()));
-    if (this.dailyGlow && this.dailyGlow.active) this.dailyGlow.setVisible(!played);
+    if (this.dailyChipT && this.dailyChipT.active) {
+      const played = !!SS.prof.daily[String(SSNET.dayKey())];
+      this.dailyChipT.setText((played ? '✓ ' : '☀ ') + ssClock(SSNET.msToNextDay()));
+      if (this.dailyGlow && this.dailyGlow.active) this.dailyGlow.setVisible(!played);
+    }
+    // the lantern rides the herald's clock: when midnight UTC turns under a
+    // player standing in the grass, a flame that just went cold must go dark
+    // on the same tick the chip lights back up
+    this.updateLantern();
+  }
+  // the lantern's whole state, in one place: cold glass with no streak, warm
+  // glass carrying the count from the second night on. Idempotent — every
+  // caller (build, the 1s tick, the wake from a finished hunt) runs it whole.
+  updateLantern() {
+    if (!this.lanternB || !this.lanternB.active) return;
+    const l = ssLayout(this);
+    const n = ssStreakCount();
+    const lit = n >= 2;
+    const grew = this.lanternShown != null && n > this.lanternShown;
+    this.lanternShown = n;
+    // setTexture resets the frame size, so the display size is re-asserted.
+    // A cold lantern also steps back: dark iron at full opacity read heavier
+    // than the herald beside it, which is exactly backwards.
+    this.lanternB.setTexture(lit ? 'lantern-lit' : 'lantern-cold').setDisplaySize(l.u(26), l.u(36));
+    this.lanternB.baseAlpha = lit ? 1 : 0.5;
+    const g = this.lanternGlow;
+    if (g && g.active) g.baseAlpha = lit ? 0.12 : 0;   // recorded even mid-flight; see below
+    const t = this.lanternT;
+    if (t && t.active) {
+      t.setFontSize(l.u(11));                  // start from full size every time…
+      t.setText(lit ? String(n) : '');
+      // …then shrink to the pane rather than spill over its iron posts
+      let fs = 11;
+      while (t.width > l.u(12.5) && fs > 6) { fs -= 0.75; t.setFontSize(l.u(fs)); }
+    }
+    /* ⚠ The herald tick keeps running through the ascent and the opening, and
+       both of those own every ui item's alpha for their duration. Writing
+       alpha here mid-flight would pop the lantern back over the rising sky —
+       and killTweensOf() below would take the whole group fade with it, since
+       that fade is ONE tween over all of uiItems. So: record the resting
+       alphas above (the restore paths read baseAlpha) and touch nothing else
+       until the meadow is standing still. */
+    if (this.ascending || this.introPlaying) return;
+    this.lanternB.setAlpha(this.lanternB.baseAlpha);
+    if (g && g.active) {
+      // The wake path runs this twice (idleTweens re-arms the breathers, then
+      // the herald tick refreshes both heralds). A swell already in flight for
+      // this same count must survive the second call, or the celebration is
+      // killed 0ms after it starts.
+      if (lit && !grew && this.lanternSwell && this.lanternSwell.isPlaying()) return;
+      this.tweens.killTweensOf(g);
+      g.setAlpha(g.baseAlpha);
+      // a lantern breathes; it does not blink. Slower and dimmer than the
+      // daily chip's ember (0.13↔0.05 over a far bigger sprite) on purpose —
+      // the herald still leads this corner.
+      const breathe = () => { if (g.active) this.tweens.add({ targets: g, alpha: 0.04, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }); };
+      if (!lit) return;
+      // one soft swell the first time you come home with a longer flame,
+      // and the steady breath picks up where it lands
+      if (grew) this.lanternSwell = this.tweens.add({ targets: g, alpha: 0.30, duration: 420, yoyo: true, ease: 'Sine.easeOut', onComplete: breathe });
+      else breathe();
+    }
   }
   // the language sheet — a parchment list of native names. Picking one rewrites
   // ?lang= and reloads: strings.js saves the choice, and every string plus the
@@ -3475,7 +3673,17 @@ class Home extends Phaser.Scene {
     items.push(this.add.image(l.x(0), py(46), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
     items.push(ssTxt(this, l.x(0), py(76), SSNET.dayKeyISO() + ' · ' + SS_T('dpOneSky'), l.u(11), '#8a94c4', 'italic').setOrigin(0.5));
     const cdT = ssTxt(this, l.x(0), py(98), '', l.u(12), '#c9b676').setOrigin(0.5);
-    const tickCd = () => { if (cdT.active) cdT.setText('☾ ' + SS_T('lbNewSky', ssCountdownLive(SSNET.msToNextDay()))); };
+    // The countdown IS the streak's clock once a flame stands and tonight is
+    // still unhunted — same seconds, but they now measure something you own.
+    // Once you've hunted (or have no flame to lose) it goes back to heralding
+    // the next sky.
+    const tickCd = () => {
+      if (!cdT.active) return;
+      const cd = ssCountdownLive(SSNET.msToNextDay());
+      const atRisk = ssStreakCount() >= 1 && !SS.prof.daily[String(SSNET.dayKey())];
+      cdT.setText(atRisk ? '🔥 ' + SS_T('stkKeep', cd) : '☾ ' + SS_T('lbNewSky', cd));
+      cdT.setColor(atRisk ? '#ffb457' : '#c9b676');
+    };
     tickCd();
     tick = this.time.addEvent({ delay: 1000, loop: true, callback: tickCd });
     items.push(cdT);
@@ -3487,9 +3695,11 @@ class Home extends Phaser.Scene {
     items.push(ssTxt(this, l.x(0), py(140), played ? SS_T('dpPlayed', played) : SS_T('dpAwait'),
       l.u(13.5), played ? '#f0e8d2' : '#ffe9a8').setOrigin(0.5)
       .setShadow(0, 0, played ? 'rgba(0,0,0,0.45)' : '#c9b676', l.u(played ? 2 : 8), true, true));
-    const streak = ssDailyStreak();
+    // the lantern's own number, in the same words the end screen uses
+    const streak = ssStreakCount();
     if (streak >= 2) {
-      items.push(ssTxt(this, l.x(0), py(161), '✶ ' + SS_T('dpStreak', streak) + ' ✶', l.u(10.5), '#d7b45c').setOrigin(0.5));
+      items.push(ssTxt(this, l.x(0), py(161), '🔥 ' + SS_T('stkNight', streak), l.u(11), '#ffb457').setOrigin(0.5)
+        .setShadow(0, 0, '#a8520d', l.u(6), true, true));
     }
     rule(178);
 
@@ -5219,9 +5429,14 @@ class Battle extends Phaser.Scene {
       }
     }
     if (this.mode === 'campaign') ssClearCampaign();
+    let streak = null;
     if (this.mode === 'daily') {
       SS.award('daily-devout', this.game);
       if (!SS.prof.daily[dk] || score > SS.prof.daily[dk]) SS.prof.daily[dk] = score;
+      // THE FLAME — tonight's hunt feeds the lantern. Win or lose, like the
+      // daily's own ledger: this counts having HUNTED, not having won. A
+      // second run tonight is the same night and changes nothing.
+      streak = ssStreakNote();
     }
     // the rating stirs: a win pays by mode, a mighty word pays a pinch — all
     // through the PvE gate (daily cap + diminishing), so solo play can seed a
@@ -5247,8 +5462,9 @@ class Battle extends Phaser.Scene {
       { text: SS_T(this.mode === 'campaign' ? 'fanCamp' : 'fanWin') });
     const items = [];
 
-    // the window: an opaque midnight/gold panel, sized to its contents
-    const ph = this.mode === 'daily' ? 610 : 566;
+    // the window: an opaque midnight/gold panel, sized to its contents (the
+    // daily carries two extra rows: the flame line and the share button)
+    const ph = this.mode === 'daily' ? 646 : 566;
     const top = 410 - ph / 2;
     const py = (d) => l.y(top + d);
     items.push(this.add.image(l.x(0), py(ph / 2), 'endpanel').setDisplaySize(l.u(372), l.u(ph)));
@@ -5330,8 +5546,16 @@ class Battle extends Phaser.Scene {
 
     let by = 470;
     if (this.mode === 'daily') {
-      const share = this.add.image(l.x(0), py(452), ssBtn(this, true, 240, 44)).setDisplaySize(l.u(240), l.u(44)).setInteractive({ useHandCursor: true });
-      const shareT = ssTxt(this, l.x(0), py(452), SS_T('shareBtn'), l.u(13), '#9fb0e8').setOrigin(0.5);
+      // THE ONE LINE: what tonight did to the flame. The first night lights
+      // the lantern; every night after names its number.
+      const sn = (streak && streak.n) || 1;
+      const flame = ssTxt(this, l.x(0), py(448), '🔥 ' + (sn <= 1 ? SS_T('stkLit') : SS_T('stkNight', sn)),
+        l.u(15), '#ffb457').setOrigin(0.5).setShadow(0, 0, '#a8520d', l.u(9), true, true);
+      items.push(flame);
+      // it breathes like the lantern it feeds
+      this.tweens.add({ targets: flame, alpha: 0.72, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: (fanWait || 0) + 700 });
+      const share = this.add.image(l.x(0), py(486), ssBtn(this, true, 240, 44)).setDisplaySize(l.u(240), l.u(44)).setInteractive({ useHandCursor: true });
+      const shareT = ssTxt(this, l.x(0), py(486), SS_T('shareBtn'), l.u(13), '#9fb0e8').setOrigin(0.5);
       items.push(share, shareT);
       share.on('pointerdown', () => {
         const txt = 'STARSPELL Daily ' + SSNET.dayKeyISO() + '\n' +
@@ -5344,7 +5568,7 @@ class Battle extends Phaser.Scene {
           shareT.setText(SS_T('shareCopied'));
         } catch (e) { shareT.setText(SS_T('shareFail')); }
       });
-      by = 506;
+      by = 542;
     }
     const again = this.add.image(l.x(0), py(by), ssBtn(this, false, 240, 56)).setDisplaySize(l.u(240), l.u(56)).setInteractive({ useHandCursor: true });
     const againT = ssTxt(this, l.x(0), py(by), SS_T(won || this.mode !== 'campaign' ? 'newRun' : 'tryAgain'), l.u(17), BTN_INK()).setOrigin(0.5);

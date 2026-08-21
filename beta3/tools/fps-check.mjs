@@ -1,4 +1,4 @@
-// v0.36.1 verification: fps overlay (OPT-IN via ?fps=1), full-DPR law, WORKLOAD probe + renderer
+// v0.39.0 verification: the streak lantern (part 1) + fps overlay (OPT-IN via ?fps=1), full-DPR law, WORKLOAD probe + renderer
 // verdict (~300-sprite/tilesprite/text/emitter run on BOTH real renderers at
 // boot — the fill-rate probe is dead; perf-lab run fxios-…/1786853475034 proved
 // object-count collapse that fill rate can't see), canvas tint shim, counter
@@ -256,9 +256,21 @@ async function main() {
   ok('daily board letters identical across renderers (seed untouched)',
     dGL.letters === dCV.letters && dGL.letters !== 'TIMEOUT', dGL.letters + ' vs ' + dCV.letters);
   // measured 8.1 healthy (random bg stars + software-GL gradient dither);
-  // a canvas scene that lost its tiles/buttons reads 30+
-  const bd = gridDiff(dGL.grid, dCV.grid, 16);
-  ok('canvas-parity: battle board matches WebGL (grid diff < 14)', bd < 14, bd + ' avg channel diff');
+  // a canvas scene that lost its tiles/buttons reads 30+.
+  // ⚠ BEST OF TWO on purpose (v0.39.0): the background stars are re-rolled per
+  // boot and the beast idles are mid-animation, so this number is noisy — on
+  // Chrome 150 + swiftshader a GL-vs-GL comparison of the SAME build measured
+  // 8.76, while GL-vs-CV over three identical rounds read 8.07 / 8.10 / 18.39.
+  // One sample was tripping the threshold at random. The law it guards is "a
+  // renderer that lost its tiles reads 30+", and best-of-two keeps that intact.
+  let bd = gridDiff(dGL.grid, dCV.grid, 16);
+  if (bd >= 14) {
+    const rGL = await dailyBoard('gl'), rCV = await dailyBoard('cv');
+    const bd2 = gridDiff(rGL.grid, rCV.grid, 16);
+    console.log('    (parity re-roll: ' + bd + ' → ' + bd2 + ')');
+    bd = Math.min(bd, bd2);
+  }
+  ok('canvas-parity: battle board matches WebGL (grid diff < 14, best of two)', bd < 14, bd + ' avg channel diff');
 
   // ---- counters: drain lands exact, throttle really skips repaints ----
   await c.nav(BASE + '?diag=1', 9000);
@@ -429,6 +441,161 @@ async function main() {
   ok('end-screen sigils row opens the inspector ABOVE the window, descs readable',
     insp.zone && insp.open && insp.depth > 100 && insp.hasDescs, JSON.stringify(insp));
   await c.nav(BASE + '?fps=0', 9000);   // leave a clean home for the sections below
+
+
+  // ---- v0.39.0: THE STREAK LANTERN (part 1 — the streak itself) ----
+  // Consecutive days on which the daily hunt was RUN, counted on the game's
+  // one day clock (SSNET.dayKey, UTC). Stored as {n, last, best} rather than a
+  // bare number: `last` is what makes a live streak distinguishable from a
+  // cold one, and what will let a grace night forgive a gap with no migration.
+  // ⚠ `?daykey=`/SSNET.setDayKey() is the dev time-travel seam — without it
+  // none of this is testable, since a test cannot wait a day. ⚠ every wait
+  // here POLLS: on a software renderer this suite runs at ~12fps, which
+  // stretches the meadow's 1s scene timer ~5x, and a fixed sleep reads as a
+  // bug that isn't there.
+  const until = async (expr, capMs = 40000) => {
+    for (let i = 0; i < capMs / 500; i++) {
+      try { if (await c.ev(expr) === true) return true; } catch (e) { }
+      await sleep(500);
+    }
+    return false;
+  };
+  const HOME_REST = `!!window.game && game.scene.isActive('home')
+    && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB`;
+
+  const rules = JSON.parse(await c.ev(`(() => {
+    const keep = JSON.stringify(SS.prof.streak);
+    const out = {};
+    out.gapMonth = ssDayGap(20260831, 20260901);   // day keys are dates, not numbers
+    out.gapYear = ssDayGap(20251231, 20260101);
+    SSNET.setDayKey('20260601'); SS.prof.streak = { n: 0, last: 0, best: 0 };
+    out.first = ssStreakNote().ev;                 // the very first daily ever
+    out.twice = ssStreakNote().ev + ':' + SS.prof.streak.n;   // twice a night is one night
+    SSNET.setDayKey('20260602'); out.alive = ssStreakCount();  // yesterday's flame still burns
+    out.second = ssStreakNote().n;
+    SSNET.setDayKey('20260604'); out.cold = ssStreakCount();   // a missed night is out…
+    out.relit = ssStreakNote().n;                              // …and starts over at 1
+    out.best = SS.prof.streak.best;                            // but the longest is kept
+    SSNET.setDayKey(''); SS.prof.streak = JSON.parse(keep);
+    return JSON.stringify(out);
+  })()`));
+  ok('day gaps are calendar arithmetic (month + year boundaries)',
+    rules.gapMonth === 1 && rules.gapYear === 1, rules.gapMonth + '/' + rules.gapYear);
+  ok('first daily lights it, twice-a-night counts once, the next night extends',
+    rules.first === 'lit' && rules.twice === 'same:1' && rules.alive === 1 && rules.second === 2,
+    JSON.stringify(rules));
+  ok('a missed night puts it out and starts over at 1, keeping the best',
+    rules.cold === 0 && rules.relit === 1 && rules.best === 2, JSON.stringify(rules));
+
+  // the lantern on the meadow: cold below 2, lit and numbered from 2 up
+  ok('the meadow settles with a lantern beside the daily chip', await until(HOME_REST));
+  const lamp = (n) => c.ev(`(() => { const h = game.scene.getScene('home');
+    SS.prof.streak = { n: ${n}, last: SSNET.dayKey(), best: ${n} }; h.updateLantern();
+    return JSON.stringify({ tex: h.lanternB.texture.key, count: h.lanternT.text,
+      glow: h.lanternGlow.baseAlpha, lamp: h.lanternB.alpha,
+      fits: h.lanternT.width <= ssLayout(h).u(12.5) + 0.5,
+      beside: h.lanternB.getBounds().centerX > h.dailyChipB.getBounds().right }) })()`)
+    .then(JSON.parse);
+  const l0 = await lamp(0), l1 = await lamp(1), l9 = await lamp(9), l365 = await lamp(365);
+  ok('no streak (and a single night) leave the lantern COLD and unnumbered',
+    l0.tex === 'lantern-cold' && l0.count === '' && l1.tex === 'lantern-cold' && l0.glow === 0,
+    l0.tex + '/' + l1.tex);
+  ok('from the second night it is LIT and carries the count',
+    l9.tex === 'lantern-lit' && l9.count === '9' && l9.glow > 0 && l9.lamp === 1, JSON.stringify(l9));
+  ok('the halo never outshines the daily chip ember (0.13)', l9.glow <= 0.13, String(l9.glow));
+  ok('a three-digit flame shrinks to fit the pane', l365.count === '365' && l365.fits, JSON.stringify(l365));
+  ok('the lantern stands beside the herald, not on top of it', l9.beside);
+
+  // midnight turning UNDER a standing player: the herald tick carries both
+  await c.ev(`(() => { const h = game.scene.getScene('home');
+    SS.prof.streak = { n: 5, last: 20260610, best: 5 };
+    SS.prof.daily = { 20260610: 400 }; SSNET.setDayKey('20260610'); h.updateDailyChip();
+    return 'set' })()`);
+  const was = await c.ev(`game.scene.getScene('home').dailyChipT.text.slice(0,1)`);
+  await c.ev(`SSNET.setDayKey('20260611')`);                    // one night on: still alive
+  const relit = await until(`game.scene.getScene('home').dailyChipT.text.slice(0,1) === '☀'`);
+  const mid = await c.ev(`game.scene.getScene('home').lanternB.texture.key`);
+  await c.ev(`SSNET.setDayKey('20260612')`);                    // a night MISSED: out
+  const wentOut = await until(`game.scene.getScene('home').lanternB.texture.key === 'lantern-cold'`);
+  const out = JSON.parse(await c.ev(`(() => { const h = game.scene.getScene('home');
+    SSNET.setDayKey('');
+    return JSON.stringify({ count: h.lanternT.text, stored: SS.prof.streak.n }) })()`));
+  ok('midnight relights the daily chip on its own tick (no reload)', was === '✓' && relit,
+    was + ' → ' + (relit ? '☀' : 'stuck'));
+  ok('the lantern follows that clock: alive one night on, out the next',
+    mid === 'lantern-lit' && wentOut && out.count === '', mid + ' → ' + (wentOut ? 'lantern-cold' : 'stuck'));
+  ok('going cold on screen does not destroy the stored count (a grace night can still reach it)',
+    out.stored === 5, String(out.stored));
+
+  // the daily end screen's one line, and the copy it shares with the sheet.
+  // submitScore is stubbed for the beat: this asserts the LINE, and leaving a
+  // fake day's row on the live daily board would be litter.
+  await c.ev(`(() => { SSNET.__sub = SSNET.submitScore; SSNET.submitScore = () => Promise.resolve();
+    SSNET.setDayKey('20260812'); SS.prof.streak = { n: 13, last: 20260811, best: 13 }; SS.prof.daily = {};
+    game.scene.getScene('home').scene.start('battle', { mode: 'daily', resume: null }); return 'armed' })()`);
+  ok('a daily battle stands up for the end-screen check',
+    await until(`(() => { const b = game.scene.getScene('battle');
+      return game.scene.isActive('battle') && !!b && !!b.board && b.board.length === 16 })()`));
+  await c.ev(`(() => { const b = game.scene.getScene('battle');
+    b.state = 'anim'; b.run.words = 9; b.run.letters = 40; b.run.longest = 'moonlight'; b.run.fightIdx = 6;
+    b.endRun(true); return 'ended' })()`);
+  const flame = JSON.parse(await c.ev(`(() => {
+    const b = game.scene.getScene('battle');
+    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+    w(b.overlayC.list);
+    // nothing may fall outside the (taller) daily window
+    let win = null, lo = 1e9, hi = -1e9;
+    const w2 = (ls) => ls.forEach(o => {
+      if (o.texture && o.texture.key === 'endpanel') win = o;
+      else if (o.visible && o.getBounds && !(o.texture && o.texture.key === 'veil')) {
+        const bb = o.getBounds(); if (bb.height) { lo = Math.min(lo, bb.top); hi = Math.max(hi, bb.bottom); }
+      }
+      if (o.list) w2(o.list);
+    });
+    w2(b.overlayC.list);
+    const wb = win ? win.getBounds() : { top: 0, bottom: 0 };
+    SSNET.submitScore = SSNET.__sub; SSNET.setDayKey('');
+    return JSON.stringify({ line: txt.find(t => /🔥/.test(t)) || null, streak: SS.prof.streak.n,
+      win: !!win, lo, hi, winTop: wb.top, winBot: wb.bottom, screenH: game.scale.height });
+  })()`));
+  ok('the daily end screen names the night the hunt just fed',
+    flame.streak === 14 && flame.line && /14/.test(flame.line), flame.line + ' n=' + flame.streak);
+  ok('every end-screen item still sits inside the (taller) daily window',
+    flame.win && flame.lo >= flame.winTop - 2 && flame.hi <= flame.winBot + 2 && flame.winBot <= flame.screenH,
+    Math.round(flame.lo) + '..' + Math.round(flame.hi) + ' in ' + Math.round(flame.winTop) + '..' + Math.round(flame.winBot));
+  ok('all 10 languages carry the lantern copy',
+    await c.ev(`Object.keys(SS_STR).every(k => SS_STR[k].stkLit && SS_STR[k].stkNight && SS_STR[k].stkKeep)`) === true);
+
+  // ⚠ the ascent owns every ui item's alpha for 2.6s while the 1s herald tick
+  // keeps firing — a tick that re-asserted its own alpha would hang the
+  // lantern over the rising sky, and killTweensOf would take the group fade
+  // (ONE tween over all of uiItems) with it
+  await c.nav(BASE + '?fps=0', 9000);
+  ok('meadow back for the ascent check', await until(HOME_REST));
+  const flight = JSON.parse(await c.ev(`(async () => {
+    const h = game.scene.getScene('home');
+    SS.prof.streak = { n: 6, last: SSNET.dayKey(), best: 6 }; h.updateLantern();
+    const rest = h.lanternB.alpha;
+    h.beginAscent({ mode: 'quick' });
+    await new Promise(r => setTimeout(r, 1200));
+    const during = h.lanternB.alpha;
+    h.updateDailyChip();
+    return JSON.stringify({ rest: +rest.toFixed(3), during: +during.toFixed(3),
+      after: +h.lanternB.alpha.toFixed(3) });
+  })()`));
+  ok('a herald tick mid-ascent leaves the lantern faded with the sky',
+    flight.rest === 1 && flight.after <= flight.during + 0.01 && flight.after < 0.9, JSON.stringify(flight));
+
+  // a profile from before the lantern: no fields, no crash, no invented streak
+  await c.ev(`(() => { const p = JSON.parse(localStorage.getItem('beta3.profile') || '{}');
+    delete p.streak; p.daily = { 20260101: 500 };
+    localStorage.setItem('beta3.profile', JSON.stringify(p)); return 'aged' })()`);
+  await c.nav(BASE + '?fps=0', 10000);
+  ok('a profile predating the streak boots clean and reads 0',
+    await c.ev(`!!window.game && ssStreakCount() === 0 && SS.prof.streak.n === 0 && SS.prof.streak.last === 0`) === true,
+    await c.ev(`JSON.stringify(SS.prof.streak)`));
+  await c.ev(`(() => { SS.prof.daily = {}; SS.prof.streak = { n: 0, last: 0, best: 0 }; SS.save(); return 'reset' })()`);
+  await c.nav(BASE + '?fps=0', 9000);   // clean home again for the sections below
 
   // ---- v0.36.2: SAFE-AREA LAW (the TestFlight prerequisite) ----
   // In a browser the chrome hides the notch. In a full-screen WKWebView shell

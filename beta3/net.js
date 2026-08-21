@@ -131,9 +131,29 @@ const SSNET = (() => {
   // in UTC+14 reads "today" as a date that clients in UTC-11 are still
   // playing, and sweeps their live board out from under them.
   // Rollover is 00:00 UTC — 7pm CDT, 1am BST, 9am JST.
+  // Dev-only time travel. The streak lantern only means anything across DAYS,
+  // and a test cannot wait one. `?daykey=20260101` pins today's key at boot;
+  // setDayKey(k) moves it mid-session (the rollover case — the meadow's
+  // heralds must follow a day that turns while the player stands in the
+  // grass). Only the no-argument call is overridden: pruneBoards and anything
+  // else that asks about a SPECIFIC date still gets the truth.
+  let dayOvr = 0;
+  try {
+    const q = /[?&]daykey=(\d{8})(&|$)/.exec(location.search);
+    if (q) dayOvr = +q[1];
+  } catch (e) { }
+  function setDayKey(k) {
+    dayOvr = /^\d{8}$/.test(String(k || '')) ? +k : 0;
+    // left visible on purpose: a session running on a fake day is worth seeing
+    // in a diag readout or a bug report rather than guessing at later
+    try { window.__ssDayOvr = dayOvr || undefined; } catch (e) { }
+    return dayOvr;
+  }
+  if (dayOvr) setDayKey(dayOvr);
   function dayKey(d) {
     // via Date.now() so the whole clock surface (dayKey, msToNextDay) reads
     // one source — identical in production, and freezable as a pair in tests
+    if (!d && dayOvr) return dayOvr;
     d = d || new Date(Date.now());
     return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
   }
@@ -350,5 +370,5 @@ const SSNET = (() => {
     async decline(fromUid) { try { await dbSet('invites/' + uid() + '/' + fromUid, null); } catch (e) { } },
   };
 
-  return { connect, uid, myName, setName, submitScore, getBoard, syncProfile, dayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
+  return { connect, uid, myName, setName, submitScore, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
 })();

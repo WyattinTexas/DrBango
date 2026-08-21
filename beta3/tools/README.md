@@ -111,6 +111,35 @@ timer ~25x and makes "the game is frozen" a false diagnosis. Swap the three GL f
 Serve the folder over HTTP rather than opening `file://`: the painted art is drawn into
 canvas textures, and a `file://` image taints the canvas so the WebGL upload throws.
 
+## Time travel: `?daykey=` and `SSNET.setDayKey()` (v0.39.0)
+
+The streak lantern only means anything across days, and a test cannot wait one.
+Two dev-only seams in `net.js`, both aimed at `SSNET.dayKey()`:
+
+```
+http://localhost:8899/index.html?daykey=20260601     # pin today's key at boot
+SSNET.setDayKey('20260602')                          # move it mid-session
+SSNET.setDayKey('')                                  # back to the real clock
+```
+
+Only the **no-argument** `dayKey()` is overridden. `dayKey(someDate)` — which is
+what `pruneBoards` and anything else asking about a specific date uses — always
+gets the truth, so a fake today cannot make the pruner sweep live boards.
+
+Two things to know before using it:
+
+- **It moves the whole daily surface, not just the streak.** The board seed, the
+  RTDB path (`daily/<key>`) and the played-flag all follow it, so a harness that
+  plays dailies under fake keys writes real rows to future days. Those days will
+  never be pruned (the sweep only deletes keys *older* than its cutoff), so
+  delete them yourself: `curl -X DELETE .../starspell/daily/<key>.json`, plus the
+  `players/test_*` and `weekly/<week>/test_*` rows the run leaves behind.
+- **Mid-session moves are the only way to test rollover.** The meadow's daily
+  chip and lantern re-check on a 1s tick; `setDayKey` then waiting ~2.6s proves
+  midnight lands without a reload. Do not use a 1.6s wait — under load the scene
+  clock stretches and a single tick may not have fired yet, which reads as a bug
+  that isn't there.
+
 ## Harness gotchas learned on the friends/invites work (v0.25.0)
 
 - **Never let headless Chrome reach `navigator.share`.** Headless Chrome on macOS still
