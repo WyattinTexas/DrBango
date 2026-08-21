@@ -203,6 +203,31 @@ are the display constants; the texture carries 13 units of transparent crown
 margin above the lamp body, and `SS_LANTERN_Y` is exactly half the height so
 the sprite's top edge lands ON the safe band and never under a notch.
 
+## The share card, and clicking a button that was born this frame (v0.41.0)
+
+The daily's SHARE button copies `ssShareCard(...)` — a pure builder, so
+`fps-check` asserts the string itself before it ever touches the UI, and the
+same function is what the button runs. Two things that only show up when you
+test it for real:
+
+- **A single click on a just-built end screen is dropped.** The window's
+  buttons are created and made interactive in one frame, and Phaser registers
+  them with its input plugin on the NEXT update. Under the software renderer
+  (~12fps) a click fired the instant the label appears lands on nothing, and
+  reads exactly like a broken button. The suite's `tapUntil` re-taps every 3s
+  until the effect shows — the same POLL, NEVER SLEEP law as the scene timers.
+- **`beta3.result` is stamped on the way HOME, not by `endRun`.** A harness
+  that reads it straight after ending a run gets the PREVIOUS run's score and
+  "proves" the card is wrong. For a daily, `SS.prof.daily[<dayKey>]` is the
+  score the end screen actually used.
+
+The clipboard is read back by defining an own `navigator.clipboard` property
+with a capturing `writeText` (the prototype getter cannot be assigned over),
+and the WKWebView fallback by hooking `document.execCommand` and reading
+`document.activeElement.value`. `navigator.share` is replaced with a tripwire
+for the whole section: it proves the game never calls it AND makes sure the
+native macOS sheet can never open and freeze the browser (see below).
+
 ## Harness gotchas learned on the friends/invites work (v0.25.0)
 
 - **Never let headless Chrome reach `navigator.share`.** Headless Chrome on macOS still

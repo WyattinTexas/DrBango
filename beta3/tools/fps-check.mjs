@@ -878,6 +878,160 @@ async function main() {
   await c.ev(`(() => { SS.prof.daily = {}; SS.prof.ach = {}; SS.prof.streak = { n:0,last:0,best:0,g:1,gp:0,gd:[],mk:0,pend:0 }; SS.save(); return 'reset' })()`);
   await c.nav(BASE + '?fps=0', 9000);   // clean home again for the sections below
 
+  /* ---- v0.41.0: THE DAILY SHARE CARD (the spoiler-free sky) ----
+     What the daily's SHARE button puts on the clipboard is the whole feature:
+     a card that travels to a group chat and gives NOTHING away. The laws it
+     must obey, in order of how badly breaking them would hurt:
+       1. the finest word's LETTERS never appear — the tile row is a count
+       2. one mark per beast, in fight order, so the row IS the run's shape
+       3. nothing personal: two hunters with the same numbers copy the same card
+       4. the clipboard mechanics stay WKWebView-safe (no navigator.share, no
+          dialogs) — the payload changed, the plumbing did not.
+     The pure builder is asserted first, then the REAL button is clicked with
+     the clipboard stubbed, because a screenshot of a share button proves
+     nothing about what it copies. */
+  const CARD_URL = 'https://drbango.com/beta3/?daily=1';
+  const card = async (o) => c.ev(`(() => { SSNET.setDayKey('20260812');
+    const t = ssShareCard(${JSON.stringify(o)}); SSNET.setDayKey(''); return t })()`);
+  const c14 = await card({ score: 719, felled: 4, beasts: 5, wordLen: 7, streak: 14 });
+  ok('the card is built line for line, and nothing else is in it',
+    c14 === ['STARSPELL Daily · 2026-08-12', '✶ ✶ ✶ ✶ 🌑', '🟨'.repeat(7),
+      '719 pts · finest word: 7 tiles', '🔥 14-night streak', CARD_URL].join('\n'),
+    JSON.stringify(c14));
+  const rows = (t) => t.split('\n');
+  const c0 = await card({ score: 88, felled: 0, beasts: 5, wordLen: 3, streak: 0 });
+  const c1 = await card({ score: 1240, felled: 9, beasts: 5, wordLen: 1, streak: 1 });
+  const cNo = await card({ score: 0, felled: 0, beasts: 5, wordLen: 0, streak: 0 });
+  ok('the sky is one mark per beast in fight order — felled ✶ first, then 🌑',
+    rows(c14)[1] === '✶ ✶ ✶ ✶ 🌑' && rows(c0)[1] === '🌑 🌑 🌑 🌑 🌑'
+    && rows(c1)[1] === '✶ ✶ ✶ ✶ ✶' && rows(c14)[1].split(' ').length === 5,
+    rows(c0)[1] + ' | ' + rows(c1)[1]);
+  ok('the finest word is a tile COUNT: one 🟨 per letter, and only 🟨',
+    rows(c14)[2] === '🟨🟨🟨🟨🟨🟨🟨' && rows(c0)[2] === '🟨🟨🟨' && rows(c1)[2] === '🟨',
+    rows(c0)[2] + ' | ' + rows(c1)[2]);
+  ok('a run that cast no word drops the tile row rather than leaving a hole',
+    rows(cNo).length === 4 && !/🟨/.test(cNo) && /no word cast/.test(cNo), JSON.stringify(cNo));
+  ok('the flame line appears only when there is a flame, and reads plainly at 1',
+    !/🔥/.test(c0) && /🔥 night one/.test(c1) && /🔥 14-night streak/.test(c14),
+    rows(c1)[4]);
+  ok('the play link is the last line, always', rows(c14).pop() === CARD_URL
+    && rows(c0).pop() === CARD_URL && rows(cNo).pop() === CARD_URL);
+
+  // the card in another language: the WORDS change, the shape and the line
+  // order do not. ?lang= also SAVES the choice, so it is put back after.
+  await c.nav(BASE + '?fps=0&lang=de', 11000);
+  const de = await card({ score: 719, felled: 4, beasts: 5, wordLen: 7, streak: 14 });
+  await c.nav(BASE + '?fps=0&lang=en', 11000);
+  ok('a German hunter shares the same six lines in the same order',
+    de === ['STARSPELL Tagesjagd · 2026-08-12', '✶ ✶ ✶ ✶ 🌑', '🟨'.repeat(7),
+      '719 Punkte · bestes Wort: 7 Steine', '🔥 14-Nächte-Serie', CARD_URL].join('\n'),
+    JSON.stringify(de));
+  ok('all 10 languages carry the share-card copy',
+    await c.ev(`Object.keys(SS_STR).every(k => ['shHead','shScore','shFinest','shFinest1','shNoWord','shStreak','shStreak1'].every(s => !!SS_STR[k][s]))`) === true);
+  ok('every language keeps the %1 the card fills in',
+    await c.ev(`Object.keys(SS_STR).every(k => ['shHead','shScore','shFinest','shStreak'].every(s => SS_STR[k][s].includes('%1')))`) === true);
+
+  /* THE REAL BUTTON. A daily is played to its end screen and the share button
+     is CLICKED — the clipboard stubbed on the navigator so the payload can be
+     read back. submitScore is stubbed too: a fake day's row on the live daily
+     board would be litter. */
+  await c.ev(`(() => { SSNET.__sub = SSNET.submitScore; SSNET.submitScore = () => Promise.resolve();
+    SSNET.setDayKey('20260812'); SS.prof.streak = { n: 13, last: 20260811, best: 13, g: 1, gp: 0, gd: [], mk: 7, pend: 0 };
+    SS.prof.daily = {}; window.__copied = null; window.__shared = false;
+    Object.defineProperty(navigator, 'clipboard', { configurable: true,
+      value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } } });
+    // a TRIPWIRE, not a convenience: headless Chrome really has navigator.share,
+    // and reaching it inside a user-activation window opens the native macOS
+    // sheet and freezes the whole browser process (README). This both proves
+    // the game never calls it and makes sure it cannot.
+    Object.defineProperty(navigator, 'share', { configurable: true,
+      value: () => { window.__shared = true; return Promise.resolve(); } });
+    game.scene.getScene('home').scene.start('battle', { mode: 'daily', resume: null }); return 'armed' })()`);
+  ok('a daily battle stands up for the share check',
+    await until(`(() => { const b = game.scene.getScene('battle');
+      return game.scene.isActive("battle") && !!b && !!b.run && !!b.board && b.board.length === 16 })()`));
+  const run = JSON.parse(await c.ev(`(() => { const b = game.scene.getScene('battle');
+    b.state = 'anim'; b.run.words = 7; b.run.letters = 31; b.run.longest = 'moonlight'; b.run.fightIdx = 3;
+    b.endRun(false);
+    return JSON.stringify({ beasts: b.fights.length, felled: b.run.fightIdx,
+      word: b.run.longest, streak: SS.prof.streak.n }) })()`));
+  ok('the share button is on the daily end screen',
+    await until(`(() => { const b = game.scene.getScene('battle'); let f = false;
+      const w = (ls) => ls.forEach(o => { if (o.type === 'Text' && o.text === SS_T('shareBtn')) f = true; if (o.list) w(o.list); });
+      w(b.overlayC.list); return f })()`));
+  const btn = JSON.parse(await c.ev(`(() => { const b = game.scene.getScene('battle'); let t = null;
+    const w = (ls) => ls.forEach(o => { if (o.type === 'Text' && o.text === SS_T('shareBtn')) t = o; if (o.list) w(o.list); });
+    w(b.overlayC.list);
+    const cam = b.cameras.main, bb = t.getBounds(), D = game.scale.width / innerWidth;
+    return JSON.stringify({ x: (bb.centerX - cam.scrollX) / D, y: (bb.centerY - cam.scrollY) / D }) })()`));
+  /* ⚠ the tap REPEATS until it takes. The end screen's buttons are built and
+     made interactive in one frame, and Phaser registers them with its input
+     plugin on the NEXT one — at the ~12fps a software renderer imposes here,
+     a single click fired the instant the label appears is simply dropped, and
+     that reads as a broken share button. Clicking again costs nothing: the
+     handler only copies. */
+  const tapUntil = async (pt, cond, cap = 24000) => {
+    for (let i = 0; i < cap / 3000; i++) {
+      await c.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x, y: pt.y });
+      await c.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
+      await c.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
+      if (await until(cond, 3000)) return true;
+    }
+    return false;
+  };
+  const tapped = await tapUntil(btn, `typeof window.__copied === 'string' && window.__copied.length > 0`);
+  ok('a REAL tap on it copies something and says so', tapped
+    && await c.ev(`(() => { const b = game.scene.getScene('battle'); let f = false;
+      const w = (ls) => ls.forEach(o => { if (o.type === 'Text' && o.text === SS_T('shareCopied')) f = true; if (o.list) w(o.list); });
+      w(b.overlayC.list); return f })()`) === true);
+  const paste = await c.ev(`window.__copied`);
+  // the score the end screen actually used: the daily log is written with it
+  // (beta3.result is only stamped on the way HOME, so it would be a stale read)
+  const score = await c.ev(`SS.prof.daily['20260812']`);
+  const pl = rows(paste);
+  ok('the pasted card is EXACTLY the run that was just played',
+    paste === ['STARSPELL Daily · 2026-08-12', '✶ ✶ ✶ 🌑 🌑', '🟨'.repeat(9),
+      score + ' pts · finest word: 9 tiles', '🔥 14-night streak', CARD_URL].join('\n'),
+    JSON.stringify(paste));
+  ok('grid width is the beast count, tile count is the finest word’s length',
+    pl[1].split(' ').length === run.beasts && (pl[2].match(/🟨/gu) || []).length === run.word.length,
+    pl[1].split(' ').length + ' beasts · ' + (pl[2].match(/🟨/gu) || []).length + ' tiles for ' + run.word.length);
+  ok('THE SPOILER LAW: not one letter of the finest word is in the card',
+    !new RegExp(run.word, 'i').test(paste)
+    && !run.word.toUpperCase().split('').some((ch) => pl[2].includes(ch)),
+    run.word.toUpperCase() + ' vs ' + JSON.stringify(pl[2]));
+  const me = JSON.parse(await c.ev(`JSON.stringify({ name: SSNET.myName(), uid: SSNET.uid(), rating: SS.prof.rating })`));
+  ok('nothing personal rides along: no name, no uid, no rating',
+    !paste.includes(me.name) && !paste.includes(me.uid) && !/✦/.test(paste),
+    me.name + ' / ' + String(me.uid).slice(0, 10) + '… absent');
+
+  /* THE WKWEBVIEW PATH. The shell has no async clipboard, and the fallback —
+     a textarea plus execCommand — is what actually runs there. It is clicked
+     for real too, and must carry the identical payload and leave nothing in
+     the DOM behind it. */
+  await c.ev(`(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    window.__exec = null; window.__realExec = document.execCommand;
+    document.execCommand = function (cmd) {
+      if (cmd === 'copy') window.__exec = document.activeElement && document.activeElement.value;
+      return true;
+    };
+    return 'wk' })()`);
+  const gotFb = await tapUntil(btn, `typeof window.__exec === 'string' && window.__exec.length > 0`);
+  const fb = JSON.parse(await c.ev(`(() => {
+    const out = { grabbed: window.__exec, leftovers: document.querySelectorAll('textarea').length,
+      shared: !!window.__shared };
+    document.execCommand = window.__realExec; delete navigator.clipboard; delete navigator.share;
+    return JSON.stringify(out) })()`));
+  ok('the WKWebView fallback copies the very same card, leaving no textarea behind',
+    gotFb && fb.grabbed === paste && fb.leftovers === 0,
+    JSON.stringify((fb.grabbed || '').slice(0, 28)) + ' · ' + fb.leftovers + ' left');
+  ok('neither path ever reaches navigator.share (it freezes the shell)', fb.shared === false);
+  await c.ev(`(() => { SSNET.submitScore = SSNET.__sub; SSNET.setDayKey('');
+    SS.prof.daily = {}; SS.prof.streak = { n:0,last:0,best:0,g:1,gp:0,gd:[],mk:0,pend:0 }; SS.save(); return 'swept' })()`);
+  await c.nav(BASE + '?fps=0', 9000);
+
+
   // ---- v0.36.2: SAFE-AREA LAW (the TestFlight prerequisite) ----
   // In a browser the chrome hides the notch. In a full-screen WKWebView shell
   // the canvas owns every pixel, and the 420x800 design box was landing its top

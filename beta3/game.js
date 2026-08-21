@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.40.0';
+const BUILD = 'STARSPELL v0.41.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1104,6 +1104,40 @@ function ssStreakWeek(dk) {
     out.push({ k, state });
   }
   return out;
+}
+/* ---- THE SHARE CARD: the run as a spoiler-free sky -------------------------
+   What the daily's SHARE button puts on the clipboard, and what lands in a
+   group chat. Wordle's lesson is that the SHAPE of a result travels further
+   than the result itself: the beasts are stars in fight order (felled ✶,
+   left standing 🌑), and the finest word is one 🟨 tile per letter — the
+   COUNT is the hook, the letters would be the spoiler. Nothing personal is in
+   it: two hunters who walked the same sky to the same numbers copy the very
+   same card.
+   The three glyphs are chosen to read on a light chat bubble AND a dark one
+   — the star is a text glyph and takes the bubble's own ink, the two emoji
+   carry their own colour with them.
+   Line order is fixed in every language, and the streak line is simply absent
+   when there is no flame, so the card never has a hole in it. Pure and
+   argument-fed, so the end screen and the harness read the same function. */
+const SS_SHARE_URL = 'https://drbango.com/beta3/?daily=1';
+function ssShareCard(o) {
+  o = o || {};
+  const beasts = Math.max(0, o.beasts | 0);
+  const felled = Math.max(0, Math.min(beasts, o.felled | 0));
+  const tiles = Math.max(0, o.wordLen | 0);
+  const n = Math.max(0, o.streak | 0);
+  const lines = [SS_T('shHead', SSNET.dayKeyISO())];
+  // the sky: one mark per beast, spaced so the narrow star and the wide moon
+  // still read as a row of equals rather than a ragged line
+  if (beasts) lines.push(Array.from({ length: beasts }, (_, i) => (i < felled ? '✶' : '🌑')).join(' '));
+  // one square per LETTER — which is the count the score itself pays on, so a
+  // digraph tile (qu, ch, ll, rr) shows as the two letters it spells
+  if (tiles) lines.push('🟨'.repeat(tiles));
+  lines.push(SS_T('shScore', o.score | 0) + ' · '
+    + (tiles ? SS_T(tiles === 1 ? 'shFinest1' : 'shFinest', tiles) : SS_T('shNoWord')));
+  if (n >= 1) lines.push('🔥 ' + SS_T(n === 1 ? 'shStreak1' : 'shStreak', n));
+  lines.push(SS_SHARE_URL);
+  return lines.join('\n');
 }
 // One-time seed for profiles that predate the streak fields: walk the local
 // daily score log backwards from today. A log that stops at YESTERDAY still
@@ -6100,10 +6134,14 @@ class Battle extends Phaser.Scene {
       const shareT = ssTxt(this, l.x(0), py(508), SS_T('shareBtn'), l.u(13), '#9fb0e8').setOrigin(0.5);
       items.push(share, shareT);
       share.on('pointerdown', () => {
-        const txt = 'STARSPELL Daily ' + SSNET.dayKeyISO() + '\n' +
-          '✶ ' + score + ' pts · ' + this.run.fightIdx + '/' + this.fights.length + ' beasts\n' +
-          '❦ finest word: ' + (this.run.longest || '—').toUpperCase() + '\n' +
-          'https://drbango.com/beta3/?daily=1';
+        // the spoiler-free card (ssShareCard). The streak line rides on
+        // tonight's own count when the lantern exists at all, and the card
+        // simply omits it otherwise — nothing here may depend on it.
+        const txt = ssShareCard({
+          score, felled: this.run.fightIdx, beasts: this.fights.length,
+          wordLen: (this.run.longest || '').length,
+          streak: (streak && streak.n) || (typeof ssStreakCount === 'function' ? ssStreakCount() : 0),
+        });
         try {
           if (navigator.clipboard) navigator.clipboard.writeText(txt);
           else { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
