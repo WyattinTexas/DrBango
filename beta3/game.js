@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.39.0';
+const BUILD = 'STARSPELL v0.40.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -462,6 +462,16 @@ const SERIF = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
 /* ============================================================
    Profile, stats, achievements (local-first; best-effort sync)
    ============================================================ */
+/* THE LANTERN'S LAW — the two numbers the streak rules turn on. They live
+   here rather than down in the streak section because SS.load() runs during
+   module evaluation and a `const` further down the file is still in its dead
+   zone at that moment.
+   GRACE_EARN: nights hunted to walk a spent grace back. MILESTONES: the marks
+   at which the lantern itself grows (ember → true lantern → comet-crowned). */
+const SS_GRACE_EARN = 5;
+const SS_MILESTONES = [7, 30, 100];
+const SS_MS_ACH = { 7: 'flame-7', 30: 'flame-30', 100: 'flame-100' };
+
 const SS = {
   prof: null,
   load() {
@@ -494,6 +504,28 @@ const SS = {
     p.streak.n = Math.max(0, p.streak.n | 0);
     p.streak.last = p.streak.last | 0;
     p.streak.best = Math.max(p.streak.best | 0, p.streak.n);
+    /* THE GRACE NIGHT (v0.40.0) — one safety net, and never more than one.
+       `g` is whether it is in hand, `gp` how many nights of the five that
+       re-earn a spent one are already walked, `gd` the day keys a grace has
+       actually bridged (the week strip draws its ◌ rings from these, so it
+       keeps a fortnight and no more). Everyone alive when this shipped — and
+       every player who ever starts fresh — wakes holding one: the net is
+       generous on day one, but it is still only ever ONE.
+       `mk` is the highest mark this run of the streak has already celebrated,
+       so a crossing rings once; `pend` is a mark that has been earned but not
+       yet honoured on the meadow (the ceremony survives an app that was
+       closed on the end screen). */
+    if (typeof p.streak.g !== 'number') { p.streak.g = 1; p.streak.gp = 0; }
+    p.streak.g = clamp(p.streak.g | 0, 0, 1);
+    p.streak.gp = clamp(p.streak.gp | 0, 0, SS_GRACE_EARN);
+    p.streak.gd = Array.isArray(p.streak.gd) ? p.streak.gd.map((k) => k | 0).filter((k) => k > 0).slice(-14) : [];
+    p.streak.pend = p.streak.pend | 0;
+    // marks already passed are seeded, not re-run: a profile arriving with a
+    // 40-night flame must not be told "SEVEN NIGHTS" on its next hunt
+    if (typeof p.streak.mk !== 'number') {
+      p.streak.mk = SS_MILESTONES.reduce((a, m) => (p.streak.n >= m ? m : a), 0);
+    }
+    p.streak.mk = p.streak.mk | 0;
     return p;
   },
   save() { try { localStorage.setItem('beta3.profile', JSON.stringify(this.prof)); } catch (e) { } },
@@ -508,6 +540,9 @@ const SS = {
       // day key it was last fed, so the number can be read back honestly (a
       // bare count would say nothing about whether it is still burning)
       streak: this.prof.streak.n, streakDay: this.prof.streak.last, streakBest: this.prof.streak.best,
+      // the grace in hand and the highest mark reached ride along too, so a
+      // read of the synced profile tells the whole lantern, not half of it
+      streakGrace: this.prof.streak.g, streakMark: this.prof.streak.mk,
     });
   },
   has(id) { return !!this.prof.ach[id]; },
@@ -713,13 +748,33 @@ function ssMakeTextures(scene) {
     g2.addColorStop(0, 'rgba(255,255,255,0.28)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
     c.fillStyle = g2; c.fill();
   }, R);
-  /* The streak lantern — the little iron-and-glass lamp that stands beside the
-     daily herald and carries the number of nights. Drawn twice: cold (no
-     streak: dark glass, dull iron) and lit (warm pane, ember bloom inside).
-     Two baked textures rather than one tinted image, because setTint is a
-     silent no-op under the Canvas renderer and the game boots either. */
-  const lantern = (key, lit) => mk(key, 44, 62, (c, w, h) => {
-    const iron = lit ? '#c9a84c' : '#4a5170', irons = lit ? '#8a6a22' : '#2e3350';
+  /* THE STREAK LANTERN — the little iron-and-glass lamp that stands beside the
+     daily herald and carries the number of nights. FIVE baked textures rather
+     than one tinted image, because setTint is a silent no-op under the Canvas
+     renderer and the game boots either:
+
+       tier -1  cold          no streak — dark glass, dull iron
+       tier  0  lit           two nights and up — warm pane, ember bloom
+       tier  1  ember         SEVEN nights — embers drift up off the glass
+       tier  2  true lantern  THIRTY nights — gilded filigree, white-hot core,
+                              light spilling out in rays
+       tier  3  comet-crowned ONE HUNDRED nights — a comet arcs over the whole
+                              lamp, trailing sparks
+
+     The canvas is 60x84 for every tier and the lamp body itself is drawn into
+     the same 44x62 box at (8, 22) it always occupied — the extra margin exists
+     purely so the crowns have air to live in. Consumers display at 35x49,
+     which puts the lamp back at exactly the 26x36 it has been since v0.39.0.
+     No new art files: everything here is baked, like the rest of the game. */
+  const lantern = (key, tier) => mk(key, 60, 84, (c, W, H) => {
+    const lit = tier >= 0;
+    c.save();
+    c.translate(8, 22);                       // …into the original 44x62 box
+    const w = 44, h = 62;
+    // the iron warms as the flame grows: dull blue-grey cold, brass lit,
+    // pale gold at the marks
+    const iron = ['#4a5170', '#c9a84c', '#d8b955', '#eccb6c', '#f6e08e'][tier + 1];
+    const irons = ['#2e3350', '#8a6a22', '#9b7826', '#b08c2e', '#c9a84c'][tier + 1];
     // the ring and the hook it hangs from
     c.lineWidth = 2.4; c.strokeStyle = iron;
     c.beginPath(); c.arc(w / 2, 8, 4.6, Math.PI * 0.15, Math.PI * 0.85, true); c.stroke();
@@ -733,7 +788,10 @@ function ssMakeTextures(scene) {
     c.beginPath(); c.roundRect(gx, gy, gw, gh, 3.5);
     if (lit) {
       const g = c.createLinearGradient(0, gy, 0, gy + gh);
-      g.addColorStop(0, '#fff0b8'); g.addColorStop(0.45, '#ffb547'); g.addColorStop(1, '#e0761f');
+      // each mark burns a shade whiter at the top — the same flame, fed longer
+      g.addColorStop(0, ['#fff0b8', '#fff6d2', '#fffdf0', '#ffffff'][tier]);
+      g.addColorStop(0.45, ['#ffb547', '#ffc45e', '#ffd980', '#ffe9a8'][tier]);
+      g.addColorStop(1, ['#e0761f', '#e88a26', '#f0a032', '#f6b648'][tier]);
       c.fillStyle = g;
     } else {
       const g = c.createLinearGradient(0, gy, 0, gy + gh);
@@ -743,7 +801,8 @@ function ssMakeTextures(scene) {
     c.fill();
     if (lit) {                                          // the flame's bloom inside the pane
       const b = c.createRadialGradient(w / 2, gy + gh * 0.62, 1, w / 2, gy + gh * 0.62, 15);
-      b.addColorStop(0, 'rgba(255,255,235,0.95)'); b.addColorStop(0.5, 'rgba(255,196,96,0.45)');
+      b.addColorStop(0, 'rgba(255,255,235,0.95)');
+      b.addColorStop(0.5, 'rgba(255,196,96,' + (0.45 + tier * 0.09) + ')');
       b.addColorStop(1, 'rgba(255,150,60,0)');
       c.beginPath(); c.roundRect(gx, gy, gw, gh, 3.5); c.fillStyle = b; c.fill();
     }
@@ -756,9 +815,77 @@ function ssMakeTextures(scene) {
     c.beginPath(); c.moveTo(w / 2 - 14, 56); c.lineTo(w / 2 + 14, 56); c.lineTo(w / 2 + 10, 49.5);
     c.lineTo(w / 2 - 10, 49.5); c.closePath();
     c.fillStyle = iron; c.fill();
+    // ---- tier 2+: gilded filigree on cap and base, and the light gets out ----
+    if (tier >= 2) {
+      c.lineWidth = 1.2; c.strokeStyle = '#ffe9a8';
+      for (const [cy, dir] of [[17.5, 1], [52.5, -1]]) {
+        c.beginPath();
+        c.moveTo(w / 2 - 15, cy); c.quadraticCurveTo(w / 2 - 7, cy + dir * 3.4, w / 2, cy);
+        c.quadraticCurveTo(w / 2 + 7, cy + dir * 3.4, w / 2 + 15, cy);
+        c.stroke();
+      }
+      c.save();                                          // rays of spilled light
+      c.globalCompositeOperation = 'lighter';
+      c.strokeStyle = 'rgba(255,214,132,0.4)'; c.lineWidth = 1.6;
+      for (const a of [-0.62, -0.24, 0.24, 0.62]) {
+        const dx = Math.sin(a), dy = Math.cos(a);
+        c.beginPath();
+        c.moveTo(w / 2 + dx * 15, gy + gh * 0.55 + dy * 2);
+        c.lineTo(w / 2 + dx * 27, gy + gh * 0.55 + dy * 13);
+        c.stroke();
+      }
+      c.restore();
+    }
+    c.restore();
+    /* ---- tier 1+: the lamp throws EMBERS ----
+       The first mark's whole job is to be legible at 26x36 in the corner of a
+       phone. A flame tuft on the cap was tried and failed: at that size it sat
+       inside the hanging ring and read as a smudge. Embers drifting up out of
+       the crown margin change the lamp's SILHOUETTE, which is the only thing
+       that survives being small. */
+    if (tier >= 1) {
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      const motes = [[-11, 14, 3.2, 0.85], [9, 8.5, 2.6, 0.7], [1.5, 2.8, 2.1, 0.5], [13.5, 17.5, 1.8, 0.45]];
+      for (const [dx, my, r, a] of motes.slice(0, tier >= 2 ? 4 : 3)) {
+        const ex = W / 2 + dx;
+        const g = c.createRadialGradient(ex, my, 0.2, ex, my, r);
+        g.addColorStop(0, 'rgba(255,255,236,' + a + ')');
+        g.addColorStop(0.42, 'rgba(255,196,96,' + (a * 0.62) + ')');
+        g.addColorStop(1, 'rgba(255,140,50,0)');
+        c.beginPath(); c.arc(ex, my, r, 0, Math.PI * 2); c.fillStyle = g; c.fill();
+      }
+      c.restore();
+    }
+    // ---- tier 3: the comet crown, arcing over the whole lamp ----
+    if (tier >= 3) {
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      // the tail: an arc that thins and fades as it sweeps back to the left
+      for (let i = 0; i < 26; i++) {
+        const t = i / 25;
+        const a = Math.PI * (1.06 - t * 0.62);           // left-to-right over the cap
+        const rx = 26, ry = 15;
+        const x = W / 2 + Math.cos(a) * rx, y = 27 + -Math.sin(a) * ry;
+        c.beginPath();
+        c.arc(x, y, 0.5 + t * 1.9, 0, Math.PI * 2);
+        c.fillStyle = 'rgba(255,' + Math.round(214 + t * 34) + ',' + Math.round(120 + t * 110) + ',' + (0.06 + t * 0.62) + ')';
+        c.fill();
+      }
+      // the head, with its own little bloom
+      const hx = W / 2 + Math.cos(Math.PI * 0.44) * 26, hy = 27 - Math.sin(Math.PI * 0.44) * 15;
+      const hg = c.createRadialGradient(hx, hy, 0.4, hx, hy, 6.5);
+      hg.addColorStop(0, 'rgba(255,255,255,1)'); hg.addColorStop(0.42, 'rgba(255,236,168,0.75)');
+      hg.addColorStop(1, 'rgba(255,190,90,0)');
+      c.beginPath(); c.arc(hx, hy, 6.5, 0, Math.PI * 2); c.fillStyle = hg; c.fill();
+      c.restore();
+    }
   }, R);
-  lantern('lantern-cold', false);
-  lantern('lantern-lit', true);
+  lantern('lantern-cold', -1);
+  lantern('lantern-lit', 0);
+  lantern('lantern-m1', 1);
+  lantern('lantern-m2', 2);
+  lantern('lantern-m3', 3);
   mk('panel', 256, 256, (c) => {
     c.beginPath(); c.roundRect(4, 4, 248, 248, 22);
     const g = c.createLinearGradient(0, 0, 0, 256);
@@ -848,28 +975,135 @@ function ssDayGap(a, b) {
   if (!a || !b) return Infinity;
   return Math.round((ssDayKeyMs(b) - ssDayKeyMs(a)) / 86400000);
 }
-// The streak AS IT STANDS TODAY. A flame last fed yesterday is still burning —
-// tonight's sky is up, go keep it — but anything older is cold, and the stored
-// count is simply not shown (it stays put until the next hunt overwrites it,
-// which is what lets a grace night resurrect one without a migration).
-// A clock that ran backwards (gap < 0) is never punished.
-function ssStreakCount(dk) {
+// the day key `d` days from `k` — calendar arithmetic again, never +/- 1 on
+// the integer (20260901 - 1 is not a date)
+function ssDayKeyStep(k, d) { return SSNET.dayKey(new Date(ssDayKeyMs(k) + d * 86400000)); }
+
+/* The streak AS IT STANDS TODAY, and how it is standing. A flame last fed
+   yesterday is still burning — tonight's sky is up, go keep it. One night
+   older and it is the GRACE NIGHT holding it up: the net is not spent by the
+   miss, it is spent by the hunt that needs it, so the lantern must show the
+   flame alive while the player still has a chance to come back for it.
+   Anything older than that is cold — grace bridges a night, never a vacation
+   — and the stored count is simply not shown (it stays put until the next
+   hunt overwrites it, which is what let the grace reach it in the first
+   place). A clock that ran backwards (gap < 0) is never punished.
+   Returns {n, grace, held, gp}: n as it should be READ tonight, grace true
+   when only the net is keeping it, held whether one is in hand, gp how far
+   along the five nights that re-earn a spent one. */
+function ssStreakState(dk) {
   const s = SS.prof && SS.prof.streak;
-  if (!s || !(s.n > 0) || !s.last) return 0;
-  return ssDayGap(s.last, dk || SSNET.dayKey()) <= 1 ? s.n : 0;
+  const out = { n: 0, grace: false, held: 0, gp: 0 };
+  if (!s) return out;
+  out.held = s.g | 0; out.gp = s.gp | 0;
+  if (!(s.n > 0) || !s.last) return out;
+  const gap = ssDayGap(s.last, dk || SSNET.dayKey());
+  if (gap <= 1) out.n = s.n;
+  else if (gap === 2 && out.held > 0) { out.n = s.n; out.grace = true; }
+  return out;
 }
-// Tonight's hunt is done: feed the flame. Returns {n, ev} where ev is
-// 'lit' (the very first night), 'extended', 'relit' (a cold flame started
-// over) or 'same' (already counted tonight — playing twice is still one day).
+function ssStreakCount(dk) { return ssStreakState(dk).n; }
+/* Tonight's hunt is done: feed the flame. Returns
+   {n, ev, grace, ms, marks, held, gp} where ev is 'lit' (the very first
+   night), 'extended', 'graced' (a missed night bridged by the safety net),
+   'relit' (a cold flame started over) or 'same' (already counted tonight —
+   playing twice is still one day); grace is true when this hunt SPENT the
+   net; ms is the mark this hunt just crossed (0 for none) and marks every
+   mark the streak now satisfies (the caller awards those, so a player who
+   arrives already deep into a streak collects what they earned). */
 function ssStreakNote() {
   const s = SS.prof.streak, dk = SSNET.dayKey(), gap = ssDayGap(s.last, dk);
-  let ev;
+  let ev, grace = false;
   if (gap <= 0) ev = 'same';                                  // today, or a clock that slipped back
   else if (gap === 1) { s.n = (s.n | 0) + 1; ev = 'extended'; }
-  else { ev = s.last ? 'relit' : 'lit'; s.n = 1; }
-  if (ev !== 'same') s.last = dk;
+  else if (gap === 2 && (s.g | 0) > 0) {
+    // THE GRACE NIGHT, spent. The bridged day is written down so the week
+    // strip can own up to it — the streak survived, but not untouched.
+    const bridged = ssDayKeyStep(s.last, 1);
+    s.gd = (s.gd || []).filter((k) => k !== bridged);
+    s.gd.push(bridged); s.gd = s.gd.slice(-14);
+    s.g = 0; s.gp = 0;
+    s.n = (s.n | 0) + 1; ev = 'graced'; grace = true;
+  } else {
+    // A streak that is BORN starts holding a grace — the very first hunt ever,
+    // and equally the one that restarts a flame that went out. The night after
+    // a break is exactly when a player walks away for good, and handing the
+    // net back there is the whole point of this feature. Never two, ever: it
+    // is SET, not incremented, and a streak already holding one is unchanged.
+    ev = s.last ? 'relit' : 'lit'; s.n = 1; s.mk = 0; s.g = 1; s.gp = 0;
+  }
+  if (ev !== 'same') {
+    s.last = dk;
+    // five nights hunted walk a spent grace back. The bridging hunt itself is
+    // not one of them: the net is re-earned AFTER it saves you, not by it.
+    if (!(s.g | 0) && !grace) {
+      s.gp = (s.gp | 0) + 1;
+      if (s.gp >= SS_GRACE_EARN) { s.g = 1; s.gp = 0; }
+    }
+  }
   if (s.n > (s.best | 0)) s.best = s.n;
-  return { n: s.n, ev };
+  // THE MARKS. mk is the highest one this run of the streak has celebrated,
+  // so each crossing rings exactly once — and a streak that broke may earn
+  // its marks again on the climb back up, because that climb was real too.
+  let ms = 0;
+  for (const m of SS_MILESTONES) if (s.n >= m && (s.mk | 0) < m) { ms = m; s.mk = m; }
+  if (ms) s.pend = ms;                       // honoured on the meadow, not here
+  return { n: s.n, ev, grace, ms, held: s.g | 0, gp: s.gp | 0,
+    marks: SS_MILESTONES.filter((m) => s.n >= m) };
+}
+/* THE GRACE NIGHT, in one sentence, wherever it is read — the lantern sheet,
+   the daily notice board and the end screen all borrow this so the game never
+   tells the story two ways. Three states, and the wording never pretends:
+     held    · one is in hand, a missed night will not put the flame out
+     bridge  · last night WAS missed and the net is what is holding it up
+     spent   · "grace night held — re-earned in N more hunts" */
+function ssGraceLine(st) {
+  st = st || ssStreakState();
+  if (st.grace) return { text: '◌ ' + SS_T('stkGraceBridge'), color: '#ffb457', glow: '#a8520d' };
+  if (st.held > 0) return { text: '◌ ' + SS_T('stkGraceHeld'), color: '#c9b676' };
+  const left = Math.max(1, SS_GRACE_EARN - (st.gp | 0));
+  return { text: '◌ ' + SS_T(left === 1 ? 'stkGraceSpent1' : 'stkGraceSpent', left), color: '#8a94c4' };
+}
+// a mark's own words: its name and what the lantern just grew
+function ssMarkCopy(m) {
+  return { name: SS_T('stkMs' + m), sub: SS_T('stkMsSub' + m), ach: SS_MS_ACH[m] };
+}
+// which dress the lamp wears: -1 cold, 0 lit, 1/2/3 the marks
+function ssLanternTier(n) {
+  if (!(n >= 2)) return -1;
+  let t = 0;
+  SS_MILESTONES.forEach((m, i) => { if (n >= m) t = i + 1; });
+  return t;
+}
+const SS_LANTERN_TEX = ['lantern-cold', 'lantern-lit', 'lantern-m1', 'lantern-m2', 'lantern-m3'];
+/* How the lamp is worn. The texture is 60x84 with the lamp body itself drawn
+   into a 44x62 box at (8, 22); 35x49 puts that body back at exactly the 26x36
+   it has been since v0.39.0, and the 13 units above it are the crowns' room.
+   SS_LANTERN_TY is where the glass pane's middle sits relative to the IMAGE's
+   centre, which is where the night count rides at any scale.
+   ⚠ SS_LANTERN_Y (the meadow's anchor) is 25 — exactly half the height, so
+   the sprite's top edge lands ON the design box's top and never above it. The
+   box centres in the phone's SAFE band, and a lamp hanging even half a unit
+   proud of it would be wearing its comet under the notch on a real handset. */
+const SS_LANTERN_W = 35, SS_LANTERN_H = 49, SS_LANTERN_Y = 25, SS_LANTERN_TY = 8.75;
+/* THE LAST SEVEN NIGHTS, oldest first — what the week strip draws.
+   Each entry is {k, state} with state 'lit' (the daily log holds a score for
+   that day), 'grace' (a grace night bridged it), 'open' (tonight, still
+   unhunted — the one ring the player can still change) or 'dark'. The local
+   daily score log IS the completion list, which is why this needs nothing
+   from the network. */
+function ssStreakWeek(dk) {
+  const today = dk || SSNET.dayKey();
+  const s = (SS.prof && SS.prof.streak) || {};
+  const gd = s.gd || [];
+  const log = (SS.prof && SS.prof.daily) || {};
+  const out = [];
+  for (let i = 6; i >= 0; i--) {
+    const k = i ? ssDayKeyStep(today, -i) : today;
+    const state = log[String(k)] ? 'lit' : gd.indexOf(k) >= 0 ? 'grace' : i === 0 ? 'open' : 'dark';
+    out.push({ k, state });
+  }
+  return out;
 }
 // One-time seed for profiles that predate the streak fields: walk the local
 // daily score log backwards from today. A log that stops at YESTERDAY still
@@ -3136,6 +3370,7 @@ class Home extends Phaser.Scene {
     // scene instances persist across restarts — a rotation mid-sheet would
     // otherwise leave these truthy forever and the sheets could never reopen
     this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null;
+    this.streakC = null; this.riteC = null; this.riteTimer = null;
     this.lanternShown = null; this.lanternSwell = null;   // a restart re-renders, it does not celebrate
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
@@ -3180,6 +3415,9 @@ class Home extends Phaser.Scene {
     this.time.delayedCall(700, () => { if (this.scene.isActive()) ssPrewarmGlyphs(this); });
 
     // arriving from a battle: descend home · from defeat: wake up on the grass
+    // a mark earned in the battle we just came home from (or on a night the
+    // app was closed before it could be honoured) waits for still grass
+    this.milestoneCheck();
     if (entry === 'battle') this.descendHome();
     else if (entry === 'defeat') {
       const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(600);
@@ -3354,16 +3592,23 @@ class Home extends Phaser.Scene {
        streak; from the second night it carries the count in its glass and
        breathes. Never louder than the chip: the halo tops out well under the
        daily's ember, and nothing here moves fast. */
-    const LW = 26, LH = 36, lx = -70;
-    this.lanternGlow = ui(this.add.image(l.x(lx), l.y(29), 'glowbig')
+    // 35x49 of texture, of which the lamp body is the same 26x36 it has been
+    // since v0.39.0 — the margin is the crowns' room (see ssMakeTextures).
+    const LW = SS_LANTERN_W, LH = SS_LANTERN_H, lx = -62;
+    this.lanternGlow = ui(this.add.image(l.x(lx), l.y(SS_LANTERN_Y + 5), 'glowbig')
       .setDisplaySize(l.u(52), l.u(52)).setTint(0xffb457).setAlpha(0).setBlendMode('ADD'));
-    const lamp = this.lanternB = ui(this.add.image(l.x(lx), l.y(27), 'lantern-cold')
+    const lamp = this.lanternB = ui(this.add.image(l.x(lx), l.y(SS_LANTERN_Y), 'lantern-cold')
       .setDisplaySize(l.u(LW), l.u(LH)).setInteractive({ useHandCursor: true }));
     // the count rides in the pane itself, shrunk to fit rather than clipped —
     // a hundred-night flame is a problem worth rendering properly
-    this.lanternT = ui(ssTxt(this, l.x(lx), l.y(29.3), '', l.u(11), '#3a2408').setOrigin(0.5));
-    // same door as the chip: the lantern is the daily hunt's own story
-    lamp.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.dailySheet(); });
+    this.lanternT = ui(ssTxt(this, l.x(lx), l.y(SS_LANTERN_Y + SS_LANTERN_TY), '', l.u(11), '#3a2408').setOrigin(0.5));
+    // the honest mark: a dashed ring under the glass while the flame is
+    // standing on its grace night and nothing else
+    this.lanternG = ui(ssTxt(this, l.x(lx), l.y(SS_LANTERN_Y + 26), '◌', l.u(9), '#ffb457').setOrigin(0.5).setAlpha(0));
+    // the lantern's own door now: the streak sheet, where the week of nights
+    // and the grace night are read (a HUNT button there keeps the daily one
+    // tap away, the way tapping the lamp used to be)
+    lamp.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.streakSheet(); });
     lamp.on('pointerover', () => lamp.setScale(lamp.scaleX * 1.06, lamp.scaleY * 1.06));
     lamp.on('pointerout', () => lamp.setDisplaySize(l.u(LW), l.u(LH)));
     this.updateDailyChip();
@@ -3552,17 +3797,29 @@ class Home extends Phaser.Scene {
   updateLantern() {
     if (!this.lanternB || !this.lanternB.active) return;
     const l = ssLayout(this);
-    const n = ssStreakCount();
+    const st = ssStreakState();
+    const n = st.n;
     const lit = n >= 2;
+    const tier = ssLanternTier(n);
     const grew = this.lanternShown != null && n > this.lanternShown;
     this.lanternShown = n;
     // setTexture resets the frame size, so the display size is re-asserted.
     // A cold lantern also steps back: dark iron at full opacity read heavier
     // than the herald beside it, which is exactly backwards.
-    this.lanternB.setTexture(lit ? 'lantern-lit' : 'lantern-cold').setDisplaySize(l.u(26), l.u(36));
+    this.lanternB.setTexture(SS_LANTERN_TEX[tier + 1])
+      .setDisplaySize(l.u(SS_LANTERN_W), l.u(SS_LANTERN_H));
     this.lanternB.baseAlpha = lit ? 1 : 0.5;
     const g = this.lanternGlow;
-    if (g && g.active) g.baseAlpha = lit ? 0.12 : 0;   // recorded even mid-flight; see below
+    // the halo grows with the marks but still never reaches the daily chip's
+    // own ember at its brightest (0.13) — the herald leads this corner
+    if (g && g.active) {
+      g.baseAlpha = lit ? [0.12, 0.125, 0.13, 0.13][tier] : 0;
+      g.setDisplaySize(l.u(lit ? [52, 58, 64, 72][tier] : 52), l.u(lit ? [52, 58, 64, 72][tier] : 52));
+      g.setTint(tier >= 2 ? 0xffd77a : 0xffb457);
+    }
+    // a flame standing on its grace night says so, right on the meadow
+    const gm = this.lanternG;
+    if (gm && gm.active) gm.baseAlpha = st.grace ? 0.9 : 0;
     const t = this.lanternT;
     if (t && t.active) {
       t.setFontSize(l.u(11));                  // start from full size every time…
@@ -3580,6 +3837,7 @@ class Home extends Phaser.Scene {
        until the meadow is standing still. */
     if (this.ascending || this.introPlaying) return;
     this.lanternB.setAlpha(this.lanternB.baseAlpha);
+    if (gm && gm.active) gm.setAlpha(gm.baseAlpha);
     if (g && g.active) {
       // The wake path runs this twice (idleTweens re-arms the breathers, then
       // the herald tick refreshes both heralds). A swell already in flight for
@@ -3599,13 +3857,265 @@ class Home extends Phaser.Scene {
       else breathe();
     }
   }
+  /* ---------- THE MARKS: the lantern grows ----------
+     Crossing 7 / 30 / 100 nights re-dresses the lamp, and a change that big
+     is not allowed to happen behind the player's back. `streak.pend` carries
+     the earned mark from the battle that earned it all the way to the grass —
+     it survives an app closed on the end screen, which is exactly where a
+     player who just finished a hunt tends to close it.
+     The beat waits for a meadow that is standing still: the ascent and the
+     descent own the camera and every ui alpha for their duration, and a sheet
+     open over the grass owns the player's attention. */
+  milestoneCheck() {
+    const m = SS.prof.streak.pend | 0;
+    if (!m || !SS_MS_ACH[m] || this.riteC) return;
+    if (this.riteTimer) { this.riteTimer.remove(false); this.riteTimer = null; }
+    let tries = 0;
+    const settled = () => !this.busy() && !this.streakC && !this.dailyC && !this.langC
+      && !this.mapC && !this.confirmC && !this.signC && !!this.lanternB && this.lanternB.active;
+    const armed = () => {
+      if (!this.scene.isActive()) return;
+      if (settled()) { this.riteTimer = null; this.milestoneRite(m); return; }
+      if (++tries > 40) { this.riteTimer = null; return; }   // ~16s of grass, then let it lie for next time
+      this.riteTimer = this.time.delayedCall(400, armed);
+    };
+    this.riteTimer = this.time.delayedCall(700, armed);
+  }
+  milestoneRite(m) {
+    if (this.riteC) return;
+    const copy = ssMarkCopy(m);
+    const tier = SS_MILESTONES.indexOf(m) + 1;
+    // spend the mark the moment it is honoured, not when it is scheduled — an
+    // app closed mid-wait must still get its ceremony on the next visit
+    SS.prof.streak.pend = 0; SS.save();
+    const l = ssLayout(this);
+    const c = this.riteC = this.add.container(0, 0).setDepth(660);
+    let done = false;
+    const close = () => {
+      if (done) return;
+      done = true;
+      this.tweens.add({
+        targets: c, alpha: 0, duration: 520, ease: 'Sine.easeIn',
+        onComplete: () => { if (this.riteC === c) this.riteC = null; c.destroy(); },
+      });
+      // and the corner lamp takes its new dress, with one swell of its own
+      this.lanternShown = null;
+      this.updateLantern();
+    };
+
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H)
+      .setScrollFactor(0).setAlpha(0).setInteractive();
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    // deep, like the sigil pick — anything lighter and the meadow's own gold
+    // buttons keep reading THROUGH the ceremony and the words land on them
+    this.tweens.add({ targets: veil, alpha: 0.9, duration: 420 });
+    c.add(veil);
+
+    // the forge/award language: the anvil chime, then the award arpeggio
+    SFX.ensure(); SFX.forge();
+    this.time.delayedCall(360, () => { if (SFX.ok) SFX.ach(); });
+
+    // the lamp, in its new dress, rising out of the dark at the sky's middle
+    const LS = 3.4, ly = 288;
+    const glow = this.add.image(l.x(0), l.y(ly), 'glowbig').setDisplaySize(l.u(60), l.u(60))
+      .setTint(tier >= 2 ? 0xffd77a : 0xffb457).setAlpha(0).setBlendMode('ADD').setScrollFactor(0);
+    const lamp = this.add.image(l.x(0), l.y(ly), SS_LANTERN_TEX[tier + 1])
+      .setDisplaySize(l.u(SS_LANTERN_W * LS * 0.6), l.u(SS_LANTERN_H * LS * 0.6))
+      .setAlpha(0).setScrollFactor(0);
+    c.add([glow, lamp]);
+    this.tweens.add({ targets: lamp, alpha: 1, duration: 620, ease: 'Cubic.easeOut' });
+    this.tweens.add({
+      targets: lamp, displayWidth: l.u(SS_LANTERN_W * LS), displayHeight: l.u(SS_LANTERN_H * LS),
+      duration: 760, ease: 'Back.easeOut',
+    });
+    this.tweens.add({
+      targets: glow, alpha: 0.34, displayWidth: l.u(250), displayHeight: l.u(250), duration: 760, ease: 'Cubic.easeOut',
+      onComplete: () => { if (glow.active) this.tweens.add({ targets: glow, alpha: 0.16, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }); },
+    });
+    // the number, riding in the pane the way it does on the meadow
+    const nT = ssTxt(this, l.x(0), l.y(ly + SS_LANTERN_TY * LS), String(SS.prof.streak.n | 0), l.u(30), '#3a2408').setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+    let fs = 30;
+    while (nT.width > l.u(12.5 * LS) && fs > 11) { fs -= 2; nT.setFontSize(l.u(fs)); }
+    c.add(nT);
+    this.tweens.add({ targets: nT, alpha: 1, duration: 500, delay: 300 });
+
+    // sparks off the glass — the forge's own particles
+    if (!ssReduceMotion()) {
+      const em = this.add.particles(0, 0, 'dot', {
+        speed: { min: 20, max: 190 }, lifespan: { min: 700, max: 1700 }, gravityY: -26,
+        scale: { start: 0.7, end: 0 }, alpha: { start: 0.95, end: 0 },
+        blendMode: 'ADD', tint: [0xffd77a, 0xfff2c9, 0xffb457], emitting: false,
+      }).setScrollFactor(0);
+      c.add(em);
+      const burst = (n2) => { for (let k = 0; k < n2; k++) em.emitParticleAt(l.x(0) + (Math.random() - 0.5) * l.u(52), l.y(ly) + (Math.random() - 0.5) * l.u(60)); };
+      this.time.delayedCall(220, () => { if (em.active) burst(38); });
+      this.time.delayedCall(700, () => { if (em.active) burst(22); });
+      if (tier >= 3) this.time.delayedCall(1150, () => { if (em.active) burst(26); });
+    }
+
+    // the words
+    const head = ssTxt(this, l.x(0), l.y(452), SS_T('stkMsHead'), l.u(12), '#c9b676').setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+    const gk = ssGoldTex(this, copy.name, 26);
+    const gsc = Math.min(1, 330 / gk.w);
+    const name = this.add.image(l.x(0), l.y(494), gk.key).setDisplaySize(l.u(gk.w * gsc), l.u(gk.h * gsc)).setScrollFactor(0).setAlpha(0);
+    const sub = ssTxt(this, l.x(0), l.y(534), copy.sub, l.u(12), '#ffe9a8', 'italic').setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+    const hint = ssTxt(this, l.x(0), l.y(596), SS_T('inspSub'), l.u(9.5), '#8a94c4', 'italic').setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+    c.add([head, name, sub, hint]);
+    [[head, 620], [name, 800], [sub, 1060], [hint, 1600]].forEach(([o, d]) => {
+      o.y += l.u(10);
+      this.tweens.add({ targets: o, y: o.y - l.u(10), alpha: o === hint ? 0.85 : 1, duration: 420, delay: d, ease: 'Cubic.easeOut' });
+    });
+
+    ssHealBlankTexts(this, 'lantern-rite');
+    // it holds long enough to be read, then lets the meadow back
+    this.time.delayedCall(5200, close);
+    this.events.once('shutdown', () => { if (this.riteC === c) this.riteC = null; });
+  }
+
+  /* ---------- THE LANTERN SHEET ----------
+     Tapping the lamp opens its own story rather than the daily's: the lantern
+     at whatever size it has grown to, the number of nights, THE WEEK STRIP —
+     the last seven nights as small rings, lit ✓, grace ◌, dark for a miss —
+     and the plain truth about the grace night. The daily is still one tap
+     away at the bottom, which is the door the lamp used to be. */
+  streakSheet() {
+    if (this.busy() || this.streakC || this.dailyC || this.langC || this.mapC || this.confirmC || this.signC || this.riteC) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.streakC = this.add.container(0, 0).setDepth(700);
+    const closeSheet = () => {
+      if (this.streakC !== c) return;
+      this.streakC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.72, duration: 220 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+
+    const PH = 486, top = 400 - PH / 2;
+    const py = (d) => l.y(top + d);
+    /* One ordered list, because z-order here is the halo BEHIND the lamp and
+       the rings ABOVE the window. Anything that owns its own alpha (the
+       breathing halo, tonight's pulsing ring) is flagged __fx and skipped by
+       the entrance tween — a fade-to-1 over one of those kills the repeating
+       yoyo the moment it starts. */
+    const items = [];
+    const fx = (o) => { o.__fx = true; return o; };
+    const win = this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(340), l.u(PH)).setInteractive();
+    items.push(win);
+    const xB = ssTxt(this, l.x(148), py(26), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    items.push(xB);
+
+    const st = ssStreakState();
+    const n = st.n, tier = ssLanternTier(n);
+    const hk = ssGoldTex(this, SS_T('stkSheet'), 19);
+    const hsc = Math.min(1, 276 / hk.w);
+    items.push(this.add.image(l.x(0), py(42), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
+
+    // the lamp itself, at twice its corner size — this is the one screen where
+    // the thing the player built is allowed to be the subject
+    if (n >= 2) {
+      const gl = this.add.image(l.x(0), py(108), 'glowbig').setDisplaySize(l.u(160), l.u(160))
+        .setTint(tier >= 2 ? 0xffd77a : 0xffb457).setAlpha(0).setBlendMode('ADD');
+      items.push(fx(gl));
+      this.tweens.add({ targets: gl, alpha: 0.2, duration: 500, onComplete: () => {
+        if (gl.active) this.tweens.add({ targets: gl, alpha: 0.09, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      } });
+    }
+    const LS = 2;
+    const lamp = this.add.image(l.x(0), py(108), SS_LANTERN_TEX[tier + 1])
+      .setDisplaySize(l.u(SS_LANTERN_W * LS), l.u(SS_LANTERN_H * LS)).setAlpha(n >= 2 ? 1 : 0.55);
+    items.push(lamp);
+    if (n >= 2) {
+      const cT = ssTxt(this, l.x(0), py(108 + SS_LANTERN_TY * LS), String(n), l.u(24), '#3a2408').setOrigin(0.5);
+      let fs = 24;
+      while (cT.width > l.u(12.5 * LS) && fs > 9) { fs -= 1.5; cT.setFontSize(l.u(fs)); }
+      items.push(cT);
+    }
+
+    // the count, in the same words the end screen and the daily sheet use
+    items.push(ssTxt(this, l.x(0), py(176), n >= 1 ? '🔥 ' + SS_T('stkNight', n) : SS_T('stkCold'),
+      l.u(n >= 1 ? 16 : 14), n >= 1 ? '#ffb457' : '#5a6390', n >= 1 ? null : 'italic').setOrigin(0.5)
+      .setShadow(0, 0, n >= 1 ? '#a8520d' : 'rgba(0,0,0,0)', l.u(n >= 1 ? 9 : 0), true, true));
+    if (n < 1) items.push(ssTxt(this, l.x(0), py(198), SS_T('stkColdSub'), l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
+    else if (SS.prof.streak.best > n) items.push(ssTxt(this, l.x(0), py(198), SS_T('stkBest', SS.prof.streak.best | 0), l.u(10), '#8a94c4', 'italic').setOrigin(0.5));
+
+    items.push(this.add.rectangle(l.x(0), py(216), l.u(288), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
+
+    // ---- THE WEEK STRIP: the last seven nights, oldest first ----
+    items.push(ssTxt(this, l.x(0), py(236), SS_T('stkWeekHead'), l.u(10.5), '#c9b676').setOrigin(0.5));
+    const week = ssStreakWeek();
+    const RY = 268, RR = 11, GAP = 41;
+    week.forEach((d, i) => {
+      const x = l.x((i - 3) * GAP), y = py(RY);
+      const g = this.add.graphics({ x, y });
+      if (d.state === 'lit') {
+        // a night that was hunted: a warm disc with a gold rim, and a tick
+        g.fillStyle(0xffb457, 0.9); g.fillCircle(0, 0, l.u(RR - 1));
+        g.lineStyle(l.u(1.6), 0xffe9a8, 1); g.strokeCircle(0, 0, l.u(RR));
+        items.push(g, ssTxt(this, x, y, '✓', l.u(11), '#3a2408').setOrigin(0.5, 0.55));
+      } else if (d.state === 'grace') {
+        // THE GRACE NIGHT, owned up to: a dashed ring, hollow where a hunt
+        // should have been. Twelve arcs with twelve gaps.
+        g.lineStyle(l.u(1.7), 0xffb457, 0.95);
+        for (let k = 0; k < 12; k++) {
+          const a0 = (k / 12) * Math.PI * 2, a1 = a0 + (Math.PI * 2 / 12) * 0.55;
+          g.beginPath(); g.arc(0, 0, l.u(RR), a0, a1); g.strokePath();
+        }
+        items.push(g, ssTxt(this, x, y, '◌', l.u(11), '#ffb457').setOrigin(0.5, 0.52).setAlpha(0.95));
+      } else if (d.state === 'open') {
+        // tonight, still unhunted — the one ring the player can still change
+        g.lineStyle(l.u(1.5), 0xffb457, 0.55); g.strokeCircle(0, 0, l.u(RR));
+        items.push(fx(g));
+        this.tweens.add({ targets: g, alpha: 0.35, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      } else {
+        g.lineStyle(l.u(1.4), 0x39406b, 1); g.strokeCircle(0, 0, l.u(RR));
+        items.push(g);
+      }
+      // the date under each ring — digits read in every language
+      items.push(ssTxt(this, x, py(RY + 20), String(d.k % 100), l.u(9),
+        d.state === 'lit' || d.state === 'grace' ? '#c9b676' : '#4a5480').setOrigin(0.5));
+    });
+    items.push(ssTxt(this, l.x(0), py(RY + 40), SS_T('stkLegend'), l.u(8.5), '#5a6390', 'italic').setOrigin(0.5));
+
+    items.push(this.add.rectangle(l.x(0), py(340), l.u(288), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
+
+    // ---- the grace night, said plainly ----
+    const gr = ssGraceLine(st);
+    items.push(ssTxt(this, l.x(0), py(360), gr.text, l.u(11), gr.color).setOrigin(0.5)
+      .setShadow(0, 0, gr.glow || 'rgba(0,0,0,0)', l.u(gr.glow ? 6 : 0), true, true));
+    // ---- the next mark ----
+    const next = SS_MILESTONES.find((m) => m > n);
+    if (next) items.push(ssTxt(this, l.x(0), py(382), SS_T('stkNextMark', next), l.u(10), '#8a94c4', 'italic').setOrigin(0.5));
+    else items.push(ssTxt(this, l.x(0), py(382), SS_T('stkMs100'), l.u(10), '#ffd77a', 'italic').setOrigin(0.5));
+
+    // ---- the door the lamp used to be ----
+    const played = !!SS.prof.daily[String(SSNET.dayKey())];
+    const pb = this.add.image(l.x(0), py(434), ssBtn(this, false, 240, 52)).setDisplaySize(l.u(240), l.u(52)).setInteractive({ useHandCursor: true });
+    const pbT = ssTxt(this, l.x(0), py(434), SS_T(played ? 'dpAgain' : 'dpPlay'), l.u(15), BTN_INK()).setOrigin(0.5);
+    items.push(pb, pbT);
+    pb.on('pointerover', () => pb.setScale(pb.scaleX * 1.03, pb.scaleY * 1.03));
+    pb.on('pointerout', () => pb.setDisplaySize(l.u(240), l.u(52)));
+    pb.on('pointerdown', () => { if (this.busy()) return; SFX.ui(); closeSheet(); this.dailySheet(); });
+
+    c.add(items);
+    // the week strip is a dozen small Texts on one screen — exactly the shape
+    // that lost a bake on Wyatt's phone in v0.38.0 (see ssHealBlankTexts)
+    ssHealBlankTexts(this, 'lantern-sheet');
+    // entrance: the same settle-up the daily notice board uses
+    const rise = items.filter((it) => !it.__fx);
+    rise.forEach((it) => { it.__a = it.alpha; it.y += l.u(14); it.alpha = 0; });
+    rise.forEach((it) => this.tweens.add({ targets: it, y: it.y - l.u(14), alpha: it.__a, duration: 300, ease: 'Back.easeOut' }));
+  }
   // the language sheet — a parchment list of native names. Picking one rewrites
   // ?lang= and reloads: strings.js saves the choice, and every string plus the
   // baked wordmark texture re-render in the new language. Rewriting the URL
   // (rather than only saving) matters because a ?lang= already in the address
   // would out-rank the saved preference on the next load.
   langSheet() {
-    if (this.busy() || this.langC || this.dailyC || this.mapC || this.confirmC || this.signC) return;
+    if (this.busy() || this.langC || this.dailyC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.langC = this.add.container(0, 0).setDepth(700);
@@ -3641,7 +4151,7 @@ class Home extends Phaser.Scene {
      list IS the completion list, and RTDB prunes past days, so the streak
      shown here is the player's own, kept in the local profile log.) */
   dailySheet() {
-    if (this.busy() || this.dailyC || this.langC || this.mapC || this.confirmC || this.signC) return;
+    if (this.busy() || this.dailyC || this.langC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.dailyC = this.add.container(0, 0).setDepth(700);
@@ -3695,16 +4205,26 @@ class Home extends Phaser.Scene {
     items.push(ssTxt(this, l.x(0), py(140), played ? SS_T('dpPlayed', played) : SS_T('dpAwait'),
       l.u(13.5), played ? '#f0e8d2' : '#ffe9a8').setOrigin(0.5)
       .setShadow(0, 0, played ? 'rgba(0,0,0,0.45)' : '#c9b676', l.u(played ? 2 : 8), true, true));
-    // the lantern's own number, in the same words the end screen uses
-    const streak = ssStreakCount();
+    // the lantern's own number, in the same words the end screen uses, and —
+    // when there is anything to say — where the grace night stands. Tapping
+    // either opens the lantern sheet, where the week of nights is drawn.
+    const sState = ssStreakState();
+    const streak = sState.n;
     if (streak >= 2) {
-      items.push(ssTxt(this, l.x(0), py(161), '🔥 ' + SS_T('stkNight', streak), l.u(11), '#ffb457').setOrigin(0.5)
+      items.push(ssTxt(this, l.x(0), py(158), '🔥 ' + SS_T('stkNight', streak), l.u(11), '#ffb457').setOrigin(0.5)
         .setShadow(0, 0, '#a8520d', l.u(6), true, true));
     }
-    rule(178);
+    if (streak >= 1 || !sState.held) {
+      const gl = ssGraceLine(sState);
+      const gT = ssTxt(this, l.x(0), py(streak >= 2 ? 176 : 164), gl.text, l.u(9.5), gl.color, 'italic')
+        .setOrigin(0.5).setInteractive({ useHandCursor: true });
+      gT.on('pointerdown', () => { SFX.ui(); closeSheet(); this.streakSheet(); });
+      items.push(gT);
+    }
+    rule(190);
 
     // today's board — live from RTDB while the sheet stands open
-    items.push(ssTxt(this, l.x(0), py(198), '— ' + SS_T('dpTop') + ' —', l.u(12), '#c9b676').setOrigin(0.5));
+    items.push(ssTxt(this, l.x(0), py(206), '— ' + SS_T('dpTop') + ' —', l.u(12), '#c9b676').setOrigin(0.5));
     const loadT = ssTxt(this, l.x(0), py(300), SS_T('lbLoading'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5);
     items.push(loadT);
     SSNET.getBoard('daily', ssGameLang()).then((b) => {
@@ -3716,7 +4236,7 @@ class Home extends Phaser.Scene {
         rows.push(ssTxt(this, l.x(0), py(300), SS_T('lbEmpty'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5));
       }
       b.rows.slice(0, 6).forEach((r, i) => {
-        const y = py(226 + i * 34);
+        const y = py(230 + i * 34);
         const me = r.id === meId;
         if (me) rows.push(this.add.rectangle(l.x(0), y, l.u(324), l.u(28), 0xd7b45c, 0.13));
         if (i < 3) {
@@ -4111,6 +4631,7 @@ class Home extends Phaser.Scene {
     if (this.campLabelT.active) this.campLabelT.setText(cr.label);
     if (this.campSubT.active) this.campSubT.setText(cr.sub);
     this.updateDailyChip();
+    this.milestoneCheck();       // the hunt we just came home from may have grown the lamp
     if (this.refreshRatingPill) this.refreshRatingPill();   // the battle may have moved the number
     const l = ssLayout(this);
     if (this.ascVeil) {          // reduce-motion rise → reduce-motion return
@@ -5437,6 +5958,10 @@ class Battle extends Phaser.Scene {
       // daily's own ledger: this counts having HUNTED, not having won. A
       // second run tonight is the same night and changes nothing.
       streak = ssStreakNote();
+      // the marks the flame now satisfies. award() is idempotent, so this
+      // both rings a fresh crossing and quietly settles up with a player who
+      // arrived already deep into a streak the marks did not exist for yet.
+      streak.marks.forEach((m) => SS.award(SS_MS_ACH[m], this.game));
     }
     // the rating stirs: a win pays by mode, a mighty word pays a pinch — all
     // through the PvE gate (daily cap + diminishing), so solo play can seed a
@@ -5464,7 +5989,9 @@ class Battle extends Phaser.Scene {
 
     // the window: an opaque midnight/gold panel, sized to its contents (the
     // daily carries two extra rows: the flame line and the share button)
-    const ph = this.mode === 'daily' ? 646 : 566;
+    // (the daily carries three extra rows now: the flame, the lantern's own
+    // note — a mark crossed, or where the grace night stands — and the share)
+    const ph = this.mode === 'daily' ? 672 : 566;
     const top = 410 - ph / 2;
     const py = (d) => l.y(top + d);
     items.push(this.add.image(l.x(0), py(ph / 2), 'endpanel').setDisplaySize(l.u(372), l.u(ph)));
@@ -5554,8 +6081,23 @@ class Battle extends Phaser.Scene {
       items.push(flame);
       // it breathes like the lantern it feeds
       this.tweens.add({ targets: flame, alpha: 0.72, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: (fanWait || 0) + 700 });
-      const share = this.add.image(l.x(0), py(486), ssBtn(this, true, 240, 44)).setDisplaySize(l.u(240), l.u(44)).setInteractive({ useHandCursor: true });
-      const shareT = ssTxt(this, l.x(0), py(486), SS_T('shareBtn'), l.u(13), '#9fb0e8').setOrigin(0.5);
+      /* …and one line beneath it for what the flame's own night cost or won:
+         a mark just crossed (the meadow will hold the ceremony), the grace
+         night this very hunt spent, or simply where the safety net stands. */
+      let note;
+      if (streak && streak.ms) {
+        note = ssTxt(this, l.x(0), py(470), '✦ ' + ssMarkCopy(streak.ms).name + ' ✦', l.u(12.5), '#ffd77a').setOrigin(0.5)
+          .setShadow(0, 0, '#c9b676', l.u(8), true, true);
+      } else if (streak && streak.ev === 'graced') {
+        note = ssTxt(this, l.x(0), py(470), '◌ ' + SS_T('stkGraced'), l.u(11.5), '#ffb457').setOrigin(0.5)
+          .setShadow(0, 0, '#a8520d', l.u(6), true, true);
+      } else {
+        const gl2 = ssGraceLine();
+        note = ssTxt(this, l.x(0), py(470), gl2.text, l.u(10.5), gl2.color, 'italic').setOrigin(0.5);
+      }
+      items.push(note);
+      const share = this.add.image(l.x(0), py(508), ssBtn(this, true, 240, 44)).setDisplaySize(l.u(240), l.u(44)).setInteractive({ useHandCursor: true });
+      const shareT = ssTxt(this, l.x(0), py(508), SS_T('shareBtn'), l.u(13), '#9fb0e8').setOrigin(0.5);
       items.push(share, shareT);
       share.on('pointerdown', () => {
         const txt = 'STARSPELL Daily ' + SSNET.dayKeyISO() + '\n' +
@@ -5568,7 +6110,7 @@ class Battle extends Phaser.Scene {
           shareT.setText(SS_T('shareCopied'));
         } catch (e) { shareT.setText(SS_T('shareFail')); }
       });
-      by = 542;
+      by = 564;
     }
     const again = this.add.image(l.x(0), py(by), ssBtn(this, false, 240, 56)).setDisplaySize(l.u(240), l.u(56)).setInteractive({ useHandCursor: true });
     const againT = ssTxt(this, l.x(0), py(by), SS_T(won || this.mode !== 'campaign' ? 'newRun' : 'tryAgain'), l.u(17), BTN_INK()).setOrigin(0.5);
@@ -5738,11 +6280,12 @@ class Profile extends Phaser.Scene {
       ssZodiacGlyph(this, z, l.u(0.085), x, y, cleared ? 0xffd77a : 0x39406b, cleared ? 1 : 0.8);
     });
 
-    ssTxt(this, l.x(0), l.y(424), '— ACHIEVEMENTS  ' + Object.keys(p.ach).length + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
-    // the grid is 20 deep now — tighter rows so the whole ledger still fits
+    ssTxt(this, l.x(0), l.y(420), '— ACHIEVEMENTS  ' + Object.keys(p.ach).length + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
+    // the grid is 23 deep now (the lantern's three marks) — 12 rows at 29
+    // apart is the last spacing that keeps the whole ledger above the seal
     SS_ACH.forEach((a, i) => {
       const col = i % 2, row = Math.floor(i / 2);
-      const x = l.x(col === 0 ? -100 : 100), y = l.y(450 + row * 34);
+      const x = l.x(col === 0 ? -100 : 100), y = l.y(442 + row * 29);
       const got = !!p.ach[a.id];
       ssTxt(this, x - l.u(88), y, a.icon, l.u(14), got ? '#ffd77a' : '#39406b').setOrigin(0.5);
       ssTxt(this, x - l.u(68), y - l.u(7.5), a.name, l.u(10.5), got ? '#f0e8d2' : '#4a5480').setOrigin(0, 0.5);

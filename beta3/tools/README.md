@@ -1,6 +1,6 @@
 # beta3 dev tools
 
-Three scripts, all dev-only — nothing here ships to the browser.
+Six scripts, all dev-only — nothing here ships to the browser.
 
 ## make-word-packs.py
 
@@ -73,6 +73,21 @@ If the art ever goes default-on (not just `?art=1`), convert the output to WebP 
 button goes 427 KB → ~55 KB with no quality loss (the meadow 639 KB → similar savings).
 Palette-quantised PNG is smaller too but adds visible dither to the dark face.
 
+## streak-check.mjs
+
+The streak lantern's own harness (v0.40.0), and the companion to
+`fps-check.mjs`: that suite pins the LAWS in a handful of checks, this one
+walks the SURFACES — the five lamp dresses on the meadow, the lantern sheet's
+week strip opened by a real tap, the daily end screen's two lines, the profile
+ledger, the migration paths, and the full player flow (play a daily that
+crosses a mark → tap HOME → the ceremony arrives on the grass by itself).
+Same CDP shape as `click-test.js`; `--disable-gpu` is fine here because
+nothing in it forces the WebGL renderer.
+
+```
+node tools/streak-check.mjs      # served on :8899, headless Chrome on :9444
+```
+
 ## click-test.js
 
 Verifies the game is actually **clickable**, which a screenshot cannot. Drives headless
@@ -108,6 +123,16 @@ timer ~25x and makes "the game is frozen" a false diagnosis. Swap the three GL f
 `--disable-gpu`: Phaser falls back to its Canvas renderer, real clicks and
 `--force-device-scale-factor=3` still work, and the loop runs at 60fps again.
 
+A LONG-LIVED headless Chrome eventually stops running the game loop altogether
+(2026-08-20, ~40 min in): scenes never start, `busy()` sticks true forever, and
+every check after that point fails at once while the page reports no
+exceptions. It is the browser, not the build — kill it and launch a fresh one
+before believing a wall of red. Related: `?rend=gl` cannot pass under
+`--disable-gpu` (the harness aborts on `game === null` there), so a FULL
+fps-check run needs the three swiftshader flags and takes ~25 minutes at the
+~12fps they impose. `streak-check.mjs` forces neither renderer and runs happily
+on `--disable-gpu` in about four.
+
 Serve the folder over HTTP rather than opening `file://`: the painted art is drawn into
 canvas textures, and a `file://` image taints the canvas so the WebGL upload throws.
 
@@ -139,6 +164,44 @@ Two things to know before using it:
   midnight lands without a reload. Do not use a 1.6s wait — under load the scene
   clock stretches and a single tick may not have fired yet, which reads as a bug
   that isn't there.
+
+## The grace night and the marks (v0.40.0)
+
+Part 2 of the lantern adds state that `?daykey=` alone will not put you in.
+The whole ledger is one object, so a harness sets it directly:
+
+```js
+SS.prof.streak = { n, last, best, g, gp, gd, mk, pend }
+```
+
+- `g` 0/1 — the grace night in hand. `gp` 0-4 — nights walked toward
+  re-earning a spent one (five re-earn it). `gd` — day keys a grace actually
+  bridged; the week strip draws its ◌ rings from this and from `p.daily`.
+- `mk` — the highest mark (7/30/100) this run of the streak has celebrated.
+  `pend` — a mark earned but not yet honoured on the grass.
+
+Three things that are easy to get wrong when testing this:
+
+- **The grace is spent by the HUNT, not by the miss.** At a two-day gap with a
+  grace in hand, `ssStreakCount()` still returns the streak and
+  `ssStreakState().grace` is true — the lamp is meant to keep burning while
+  the player still has tonight to come back for it. Nothing is deducted until
+  `ssStreakNote()` runs.
+- **`pend` survives a reload on purpose**, so a mark earned on the end screen
+  still gets its ceremony if the app was closed there. `milestoneCheck()` then
+  POLLS for a meadow that is standing still (no ascent, no sheet) for ~16s.
+  A test that sets `pend` and looks immediately will find nothing; poll for
+  `home.riteC`.
+- **A leftover `pend` in `beta3.profile` poisons the next test.** The rite
+  opens over the meadow on the next boot and the run you *meant* to test is
+  behind a veil. Reset the whole streak object between cases.
+
+The lamp is five baked textures (`lantern-cold`, `lantern-lit`,
+`lantern-m1..m3`) rather than one tinted image — `setTint` is a silent no-op
+under the Canvas renderer and this game boots either. `SS_LANTERN_W/H/Y/TY`
+are the display constants; the texture carries 13 units of transparent crown
+margin above the lamp body, and `SS_LANTERN_Y` is exactly half the height so
+the sprite's top edge lands ON the safe band and never under a notch.
 
 ## Harness gotchas learned on the friends/invites work (v0.25.0)
 

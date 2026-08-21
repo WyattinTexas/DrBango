@@ -413,4 +413,10 @@ const SS_ACH = [
   { id: 'wheel-walker', icon: '❁', name: 'WHEEL WALKER', desc: 'Clear campaigns under 3 different signs.' },
   { id: 'grand-zodiac', icon: '✪', name: 'THE GRAND ZODIAC', desc: 'Clear a campaign under all 12 signs.' },
   { id: 'star-crossed', icon: '☌', name: 'STAR-CROSSED', desc: 'Fell the beast that wears your own sign.' },
+  // the lantern's three marks (v0.40.0). Earned by the streak crossing 7 / 30 /
+  // 100 nights, which is also where the lantern itself grows a new dress — so
+  // each of these is the ledger's record of a visible change on the meadow.
+  { id: 'flame-7', icon: '🕯', name: 'SEVEN NIGHTS', desc: 'Keep the lantern lit seven nights running.' },
+  { id: 'flame-30', icon: '🏮', name: 'THE LONG BURN', desc: 'Keep the lantern lit thirty nights running.' },
+  { id: 'flame-100', icon: '🌠', name: 'THE COMET CROWN', desc: 'Keep the lantern lit one hundred nights running.' },
 ];
