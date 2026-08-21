@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.45.0';
+const BUILD = 'STARSPELL v0.46.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4163,11 +4163,19 @@ class Home extends Phaser.Scene {
     ui(ssTxt(this, l.x(0), l.y(358), SS_T('tagline'), l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
 
     // buttons
+    /* v0.46.0: the four play buttons lost their flavour sublines ("four acts
+       · one long night" and kin — Wyatt). What remains under a label is only
+       ever INFORMATION that is live right now: the campaign's "fight N of 5"
+       while a checkpoint stands, and versus's "✦ N of your friends online"
+       while any are. With nothing to say, the label sits dead-centre in its
+       button; when a line arrives the label glides up 9 to make room (a
+       200ms tween, so the meadow never jumps). The buttons keep their 58
+       height either way — the meadow's rhythm is set by them. */
     const campRow = () => {
       const ck = this.campaignCheckpoint();
       return {
         label: ck ? SS_T('cont') + '  ·  ' + SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim() : SS_T('campaign'),
-        sub: ck ? SS_T('fightN', ck.fightIdx % 5 + 1) : SS_T('campaignSub'),
+        sub: ck ? SS_T('fightN', ck.fightIdx % 5 + 1) : '',
       };
     };
     this.campRow = campRow;
@@ -4175,32 +4183,53 @@ class Home extends Phaser.Scene {
     const rows = [
       // CAMPAIGN / CONTINUE opens the star chart — the campaign always enters
       // through the map, at the checkpoint when one is standing
-      { y: 420, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.campaignDoor() },
+      { y: 420, h: 58, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.campaignDoor() },
       // NEW CAMPAIGN took the daily's old row (the daily is a chip now):
       // abandon the checkpoint (confirmed) and start the long night over
-      { y: 488, label: SS_T('newCamp'), sub: SS_T('newCampSub'), key: 'newcamp', dark: true, fn: () => this.newCampaign() },
-      { y: 556, label: SS_T('quick'), sub: SS_T('quickSub'), fn: () => this.startMode('quick') },
-      { y: 624, label: SS_T('board'), sub: null, fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
+      { y: 488, h: 58, label: SS_T('newCamp'), key: 'newcamp', dark: true, fn: () => this.newCampaign() },
+      { y: 556, h: 58, label: SS_T('quick'), key: 'quick', fn: () => this.startMode('quick') },
+      { y: 624, h: 46, label: SS_T('board'), fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
       // PROFILE moved to the chip up in the corner, which frees this row for
       // VERSUS — it is a play mode, so it gets a real button like the rest.
-      { y: 692, label: SS_T('versus'), sub: SS_T('versusSub'), key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
+      // Its sub-line is the live friends counter, and nothing else.
+      { y: 692, h: 58, label: SS_T('versus'), sub: '', key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
     ];
     this.rowSubs = {};
+    this.rowLabels = {};
     this.rowBtns = {};
     for (const r of rows) {
-      const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.sub ? 58 : 46)).setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)).setInteractive({ useHandCursor: true }));
-      const lab = ui(ssTxt(this, l.x(0), l.y(r.y - (r.sub ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
+      const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.h)).setDisplaySize(l.u(300), l.u(r.h)).setInteractive({ useHandCursor: true }));
+      const live = !!r.sub;
+      const lab = ui(ssTxt(this, l.x(0), l.y(r.y - (live ? 9 : 0)), r.label, l.u(16), r.dark ? '#9fb0e8' : BTN_INK()).setOrigin(0.5));
+      lab.rowY = r.y;
       if (r.key === 'campaign') this.campLabelT = lab;
-      if (r.sub) {
-        const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5));
+      if (r.sub !== undefined) {
+        // a slot for live information (campaign progress, friends online):
+        // hidden and empty until there is something to say
+        const sub = ui(ssTxt(this, l.x(0), l.y(r.y + 13), r.sub, l.u(10), r.dark ? '#5a6390' : BTN_INK2(), 'italic').setOrigin(0.5).setVisible(live));
         if (r.key === 'campaign') this.campSubT = sub;
-        if (r.key) this.rowSubs[r.key] = sub;
+        this.rowSubs[r.key] = sub;
       }
-      if (r.key) this.rowBtns[r.key] = b;
+      if (r.key) { this.rowBtns[r.key] = b; this.rowLabels[r.key] = lab; }
       b.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
       b.on('pointerover', () => b.setScale(b.scaleX * 1.03, b.scaleY * 1.03));
-      b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.sub ? 58 : 46)));
+      b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.h)));
     }
+    /* set (or clear) a row's live sub-line. The label re-centres when the
+       line is empty and lifts 9 when one is live; `snap` skips the glide
+       (first paint, the wake path under a veil). */
+    this.setRowSub = (key, text, color, snap) => {
+      const sub = this.rowSubs[key], lab = this.rowLabels[key];
+      if (!sub || !sub.active || !lab || !lab.active) return;
+      const live = !!text;
+      sub.setText(text || '');
+      if (color) sub.setColor(color);
+      sub.setVisible(live);
+      const ty = l.y(lab.rowY - (live ? 9 : 0));
+      this.tweens.killTweensOf(lab);
+      if (snap || Math.abs(lab.y - ty) < 0.5) lab.setY(ty);
+      else this.tweens.add({ targets: lab, y: ty, duration: 200, ease: 'Sine.easeInOut' });
+    };
     // Profile chip — the stargazer's name, up in the corner on the same line as
     // every other scene's back link. Long or non-Latin names are trimmed to the
     // chip rather than sized to it, so the pill keeps one baked texture.
@@ -4277,14 +4306,13 @@ class Home extends Phaser.Scene {
     lamp.on('pointerout', () => lamp.setDisplaySize(l.u(LW), l.u(LH)));
     this.updateDailyChip();
 
-    // the VERSUS door knows who's waiting behind it: with friends online the
-    // sub-line turns gold and counts them (live from the presence layer)
+    // the VERSUS door knows who's waiting behind it: with friends online a
+    // gold sub-line counts them (live from the presence layer); with none,
+    // the label sits alone, centred (v0.46.0 — the old flavour line is gone)
     if (this.frOff) this.frOff();
     this.frOff = SSNET.FR.on((FR) => {
-      const t = this.rowSubs.versus;
-      if (!t || !t.active) return;
       const n = FR.onlineCount();
-      t.setText(n > 0 ? SS_T('vsFriendsOn', n) : SS_T('versusSub')).setColor(n > 0 ? '#ffe9a8' : BTN_INK2());
+      this.setRowSub('versus', n > 0 ? SS_T('vsFriendsOn', n) : '', '#ffe9a8');
     });
     this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
     const verT = ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5);
@@ -5049,7 +5077,7 @@ class Home extends Phaser.Scene {
       ssClearCampaign();
       const cr = this.campRow();
       if (this.campLabelT && this.campLabelT.active) this.campLabelT.setText(cr.label);
-      if (this.campSubT && this.campSubT.active) this.campSubT.setText(cr.sub);
+      this.setRowSub('campaign', cr.sub);
       closeSheet();
       this.signSheet();   // the fresh climb opens under fresh stars
     });
@@ -5320,7 +5348,7 @@ class Home extends Phaser.Scene {
     this.sky.restoreFlies();
     const cr = this.campRow();   // battle moved the campaign checkpoint
     if (this.campLabelT.active) this.campLabelT.setText(cr.label);
-    if (this.campSubT.active) this.campSubT.setText(cr.sub);
+    this.setRowSub('campaign', cr.sub, null, true);
     this.updateDailyChip();
     this.milestoneCheck();       // the hunt we just came home from may have grown the lamp
     this.sigilNotice();

@@ -1,6 +1,6 @@
 # beta3 dev tools
 
-Eight scripts, all dev-only — nothing here ships to the browser.
+Nine scripts, all dev-only — nothing here ships to the browser.
 
 ## make-word-packs.py
 
@@ -128,6 +128,31 @@ What TestFlight v0.43.0 taught, in three lines:
   native one. Nothing else in the bakes is newer than iOS 15
   (`setLineDash`, `multiply`/`destination-in`, `direction`,
   `actualBoundingBoxAscent` are all Safari ≤ 11.1).
+
+## tagline-check.mjs
+
+The meadow buttons without their flavour lines (v0.46.0). Wyatt: "remove the
+text below CAMPAIGN, NEW CAMPAIGN, QUICK PLAY and VERSUS." The four labels
+now sit dead-centre in their 58-tall buttons; the only sub-lines left are
+LIVE INFORMATION — versus's `✦ N of your friends online` while friends are
+on, the campaign's `fight N of 5` while a checkpoint stands — and
+`home.setRowSub(key, text, color, snap)` is the one door for them: the label
+glides up 9 (200ms) when a line arrives and back down when it goes. The
+`campaignSub` / `newCampSub` / `quickSub` / `versusSub` keys are gone from
+all ten languages (`vsFriendsOn` and `fightN` stay).
+
+```
+node tools/tagline-check.mjs 9444     # served on :8899, --disable-gpu Chrome on :9444
+BEFORE=http://localhost:8898/index.html SHOTS=/tmp/shots node tools/tagline-check.mjs 9444
+```
+
+35 checks: geometry of the five rows (height, label lift, no sub showing,
+LEADERBOARD still 46, daily chip untouched), the retired keys absent in
+every language, two then three friends arriving through the presence layer
+(`FR.friends` + `FR.presence`, `FR._emit()`) and leaving again, a checkpoint
+boot wearing CONTINUE · fight 3 of 5, the abandon flow on real taps dropping
+it, and all four doors opened by a real tap AIMED AT THE LABEL. `BEFORE=` a
+served copy of the previous build adds a before/after snapshot pair.
 
 ## drip-check.mjs
 
