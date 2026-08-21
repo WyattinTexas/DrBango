@@ -28014,6 +28014,15 @@ function themeRevive(){
 //     fades the bed in; a CHANGE still crossfades in LOC_XFADE. KING FIGHTS ARE
 //     MUSIC-FREE (S.raid answers null — the throne's bed belongs to its scene);
 //     the Nemesis keeps his track. No new asset: the fade IS the feature.
+//   · 0462 THE BATTLE MUTE (Wyatt 8/20, from the phone): "music must NOT play
+//     during any battle — pause/fade the location track when a battle starts,
+//     resume when it ends. Exception: nemesis battles keep their music
+//     playing." 0444 silenced the king fights; this is the law for EVERY
+//     battle: locNow() answers null whenever a battle stands (locBattle) —
+//     the park ladders and the carpets included, their 0432a clauses
+//     superseded — and the Nemesis is the one exception, by name. The battle
+//     door fades the bed out over LOC_BATTLE (audible, not the 0.12 cut); the
+//     way home knocks as it always did, so the bed comes back where you stand.
 // ============ 0432c THE MIX — VOLUME AND THE MOBILE PASS ============
 // Wyatt (8/20, from the phone): "make sure the music isn't too loud & suitable
 // for the mobile experience... CORRECTION TO 0432: that note said music cues sit
@@ -28076,6 +28085,7 @@ const MIX_MUSIC=-33.0,        // a music cue at the speaker, LUFS (0.20 on a -19
       MIX_DUCK_OUT=0.5;       // ...and how slowly it comes back
 const LOC_XFADE=0.4,          // the CHANGE: the old place ramps out while the new one ramps in
       LOC_FADE=THEME_FADE;    // the EXIT cut — 0.12s, the theme's own "immediately"
+const LOC_BATTLE=0.7;         // 0462 THE BATTLE MUTE: the battle door's fade OUT — audible ("pause/fade"), THEME_HAND's own length, under the level card. ⚑ the dial (0.4 = LOC_XFADE's length · 0.12 = the door cut)
 // SOURCE:  "Epic Boss Battle [Seamlessly Looping]" — Juhani Junkala (SubspaceAudio), 2015
 // LICENSE: CC0 1.0 public domain — https://opengameart.org/content/boss-battle-music
 // THE CUT (measured, not eyeballed): the 21.8MB master is 90 bars at exactly
@@ -28382,16 +28392,30 @@ const LOC={ id:null, src:null, g:null, d:null, buf:null, bid:null, busy:null, ar
 // plays in its SCENE ("when you go inside his hideout, that is when it should
 // play"), never DURING the fight; the NEMESIS keeps his battle track (Wyatt
 // listed it — and the molten claim over the lava IS a Nemesis battle).
+// 0462 THE BATTLE MUTE — the reader: a battle is standing (or its verdict).
+// Every game door writes S.mode='play' before its knock and showMenu() writes
+// 'menu' before its own; the three bags say it again (reset() nulls them at
+// every game-start door, showMenu() on the way home) — belt and braces, not a
+// race.
+function locBattle(){ return S.mode!=='menu' || !!(S.raid||S.park||S.bf); }
 function locNow(){
   if(S.bf && S.bf.nem) return 'nemesis';        // THE MAN outranks any carpet he walks onto (0432) — and keeps his track in every claim (0444)
-  // 0432a — the other three place kinds. reset() nulls all three bags at every
-  // game-start door and showMenu() nulls them on the way home, so exactly one of
-  // these can ever be standing: the order below is belt and braces, not a race.
-  if(S.raid) return null;                       // 0444: the three thrones are SILENT during the fight — their beds play in the scene (below)
-  if(S.park) return S.park.id==='dino'? 'dinopark' : S.park.id==='western'? 'outlaw' : 'yetipark';   // the three ladders — every rung, without a restart
-  if(S.bf){ const m=S.bf.mapId;                 // the carpets that have a sound of their own
-    return m==='backyard'? 'soccer' : m==='rooftop'? 'roof' : m==='winter'? 'snow' : m==='western'? 'western' : null; }
-  if(S.mode!=='menu') return null;              // the bedroom campaign, the open rug, the lava field, the starship, the title: silence, on purpose
+  // 0462 THE BATTLE MUTE (Wyatt 8/20, from the phone): "music must NOT play
+  // during any battle — pause/fade the location track when a battle starts,
+  // resume when it ends. Exception: nemesis battles keep their music playing
+  // (location track, or the nemesis theme if one exists). Applies to every
+  // other battle type." So the Nemesis clause above is the ONE battle with
+  // music, and every other battle answers null here: the three thrones (0444),
+  // the three park ladders and the four carpets with a sound of their own —
+  // 0432a's "every rung, without a restart" and "the carpets that have a sound
+  // of their own" clauses are SUPERSEDED by this later ruling; their beds play
+  // at the gate and on the floor (below), never in the fight — the bedroom
+  // campaign, mom's raid, the range, the title. The PAUSE is locSync's
+  // LOC_BATTLE fade at the battle door; the RESUME is the way home's own knock
+  // (showMenu's room, the 0341 park landing's gate, the throne's ✕ onto its
+  // park) — the bed comes back where you stand, a fresh pass from the top (the
+  // one-buffer law lets the PCM go for the fight, as every other door does).
+  if(locBattle()) return null;
   // 0444 — at the menu, the place you STAND. A throne scene opens OVER a park
   // scene, a park scene opens over its room, and the rooms answer by roomCur().
   // Lobbies (the campaign scene, the war table, the rankings, the shop) are
@@ -28536,7 +28560,7 @@ function locSync(){
   const id=locNow();
   if(id!==LOC.id){
     const live=!!LOC.src;
-    locStop(id? LOC_XFADE : LOC_FADE);       // a CHANGE crossfades; leaving cuts in 0.12s
+    locStop(id? LOC_XFADE : locBattle()? LOC_BATTLE : LOC_FADE);   // a CHANGE crossfades; a battle door fades the bed out over LOC_BATTLE (0462 — "pause/fade", audible); leaving at the menu (the ferry home) still cuts in 0.12s
     LOC.id=id;
     LOC.fade=(live&&id)? LOC_XFADE : 0;      // ...and the new place fades UP over the old one's ramp
     if(LOC.bid!==id) locFree();              // our reference to the old PCM goes right here
@@ -31342,7 +31366,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.19';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.20';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
