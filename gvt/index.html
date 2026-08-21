@@ -23886,7 +23886,8 @@ function nemBoulTick(h,kt,dt){
 // (breathHitsU vs BR_BODY), it LIVES its whole fx dur as a standing region
 // in S.breaths (lane 'nem' — a figure stepping into the standing fire burns
 // too), EVERY figure of either army in the picture burns (no multi trim),
-// NEMKIT_BREATH each through the funnel, nobody's kill. The king keeps his
+// NEMKIT_BREATH each through the funnel — every BR_TICK beat he stands in it
+// (0462b) — nobody's kill. The king keeps his
 // D2 turn dance: a fired breath hands the CHARGE its turn.
 function nemBreathTick(h,kt,dt){
   const kg=h.k==='kingrex';
@@ -23910,7 +23911,7 @@ function nemBreathFire(h,kt){
   const jx=h.x+(h.fx?mo.x:-mo.x), jy=h.y+mo.y, ang=Math.atan2(m.y-jy,m.x-jx);   // the centerline runs JAW→figure — picture and burn share it
   bfSfx(SFX.jet,h.x,h.y);
   S.fx.push({k:'breath',x:jx,y:jy,ang:ang,rng:kt.rng,sc:mo.sc,sp:0.26,t:0,dur:dur});
-  const b={x:jx,y:jy,ang:ang,sp:0.26,rng:kt.rng,t:0,dur:dur,src:h,lane:'nem',hit:new Set()};
+  const b={x:jx,y:jy,ang:ang,sp:0.26,rng:kt.rng,t:0,dur:dur,src:h,lane:'nem',hit:new Map()};   // 0462b: hit = figure → his next beat
   (S.breaths||(S.breaths=[])).push(b);
   breathBurn(b);                                                 // the fire frame: everyone in the picture burns NOW; update() ticks the rest of the window
 }
@@ -31429,7 +31430,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.21';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.22';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41961,7 +41962,9 @@ function tanCone(f){
 // grammar), the half-spread is the DRAWN 0.26·coneX, the reach is the drawn
 // frng. The tongue LIVES its whole fx dur as a standing fire region in
 // S.breaths — deterministic (positions + sim clocks only, zero dice — the
-// mvSm law holds), ONE pip per man per breath (the set), airborne (jetT) and
+// mvSm law holds), a pip on contact and one more every BR_TICK beat he
+// stands in it (0462b THE BEAT — the 0396 one-pip-per-breath set is
+// SUPERSEDED; breathBurn carries the law), airborne (jetT) and
 // the dragged man untouchable (the standing "drag your men out" grace,
 // unchanged). EVERY man in the picture burns — no multi trim inside the
 // tongue (Wyatt's hitbox law; multi keeps its other jobs: the teddy's
@@ -41996,20 +41999,45 @@ function breathHitsU(b,u){
 // REX's breath, ported off the fire loop's ±0.42 FEET-cone: the standard dmg
 // captured at the fire, the loop's own eligibility, the kill his). Every
 // lane: the region IS the fx (root/ang/sp/rng shared), it LIVES the fx's
-// whole dur, ONE hit per figure per breath (the set), EVERY figure in the
-// picture burns — no multi trim (Wyatt's hitbox law). BREATH_TELL: a figure
+// whole dur, EVERY figure in the picture burns — no multi trim (Wyatt's
+// hitbox law) — and (0462b) burns AGAIN every BR_TICK beat he stands in it.
+// BREATH_TELL: a figure
 // that burns SHOWS it — the lava beam's own 🔥 float + ember ring (the
 // game's fire-hit grammar; presentation, dice-free — the campaign pip was a
 // silent 0.1s tracer inside the flame, which read as "unharmed").
+// 0462b THE BREATH BURNS EVERY BEAT (Wyatt 8/21, the third report: "The fire
+// breath effect from the fire dinosaurs and King Rex still doesn't seem to be
+// working every time. We need to make sure that it works and deals the damage
+// to people who are inside of that, as that is their attack."): 0396 and 0461
+// kept ONE hit per figure per breath — a man standing in the flame for its
+// whole life took one pip and then stood in fire unharmed, which reads as
+// "not working". SUPERSEDED: the region's `hit` is a per-figure NEXT-BEAT
+// clock now (a Map: figure → the region time his next beat is due) — he burns
+// on contact and again every BR_TICK (the flamestrike's own drum, FS_TICK)
+// while he stands in the living tongue, through the same lane funnels (camp:
+// one grit pip via tanHit — every save keeps its say, per beat · nem:
+// NEMKIT_BREATH · hero: the captured dmg). A 0.65/0.7 tongue is TWO beats for
+// a man in it from the fire frame; a man who steps in late gets the beats that
+// remain. Dice-free (positions + sim clocks) — co-op's twin sims stay
+// byte-equal. THE DOORS between "in the picture" and the burn, audited live
+// 8/21 and KEPT: dead · airborne (jetT) · the dragged man · dropping (dropT) /
+// falling · burrow · the cloaked spy · the fog bank and the starship's walls ·
+// the trench sight law (⚑ a foxhole is cover — a design call, default KEEP) ·
+// the campaign's walk-on rim (f.x>W-10 — W IS the mat's span, the grand mat's
+// own 1920, never the screen; VW is the window) · tanHit/hurt's saves, every
+// one of which SHOWS (REFLECTED! · JUST A DENT! · BLOCKED! · COVER! · the
+// blade's ring + snap) except Sarge's worn-plate roll (silent by the v2.16
+// law, ±6% — ⚑ his call).
+const BR_TICK=FS_TICK;   // ⚑ THE BEAT: the breath's drum = the flamestrike's (0.5 s) — one const; the tongue's dur (0.65/0.7) is the other dial
 const BREATH_TELL=1;   // ⚑ 0 = the silent pip again (every lane's damage is unchanged either way)
 function breathTell(u){ if(!BREATH_TELL) return; S.floats.push({x:u.x,y:u.y-52,txt:'🔥',t:0,col:'#FF9A3D'}); S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:18,t:0,dur:0.22,col:'#FF9A3D'}); }
 function breathBurn(b){
   if(b.lane==='nem'){                            // the BF hatchling's tongue: either army, never a hatchling (nemNearFig's own skip-set)
     for(const u of S.units){
       if(u.side==='nem'||u.dead||u.dropT>0||u.jetT>0||u.falling) continue;
-      if(b.hit.has(u)) continue;                 // one hit per figure per breath
+      const nb=b.hit.get(u); if(nb!=null && b.t<nb) continue;   // 0462b: his next beat is not due yet
       if(!breathHitsU(b,u)) continue;
-      b.hit.add(u); hurt(u, NEMKIT_BREATH, null); breathTell(u);   // the no-blame funnel, byte-what-it-was
+      b.hit.set(u,b.t+BR_TICK); hurt(u, NEMKIT_BREATH, null); breathTell(u);   // the no-blame funnel, byte-what-it-was — once a beat
     }
     return;
   }
@@ -42019,21 +42047,21 @@ function breathBurn(b){
       if(f.dead||f.burrow||f.jetT>0) continue;   // under the rug / in the air: the loop's own doors
       if(!bfCanTarget(k,f)) continue;            // the lip law
       if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;   // no burning offscreen
-      if(b.hit.has(f)) continue;                 // one hit per foe per breath
+      const nb=b.hit.get(f); if(nb!=null && b.t<nb) continue;   // 0462b: his next beat is not due yet
       if(!breathHitsU(b,f)) continue;
-      b.hit.add(f); hurt(f,b.dmg,k); breathTell(f);   // vet/mods/rank rode the captured line; the kill is his
+      b.hit.set(f,b.t+BR_TICK); hurt(f,b.dmg,k); breathTell(f);   // vet/mods/rank rode the captured line; the kill is his — once a beat
     }
     return;
   }
   for(const u of S.units){
     if(u.dead||u.jetT>0) continue;               // airborne: the v1.39 grace stands
     if(S.drag&&S.drag.unit===u) continue;        // the dragged man: "drag your men out" stands (a DROPPED man burns)
-    if(b.hit.has(u)) continue;                   // one pip per man per breath
-    if(b.src&&!bfCanTarget(b.src,u)) continue;   // 0129 the trench sight law, unchanged
+    const nb=b.hit.get(u); if(nb!=null && b.t<nb) continue;   // 0462b: his next beat is not due yet (the 0396 "one pip per man per breath" set is SUPERSEDED — a man who stands in the fire burns every BR_TICK)
+    if(b.src&&!bfCanTarget(b.src,u)) continue;   // 0129 the trench sight law, unchanged (⚑ fire vs the foxhole is a design call — KEPT: a trench is cover)
     if(!breathHitsU(b,u)) continue;
-    b.hit.add(u);
-    tanHit(u,b.fx0,b.fy0,b.src);                 // one grit pip on the standard save path (⚑ FIRE_PIPS: a pipN row seat is the one-line dial, NOT moved)
-    breathTell(u);                               // 0461: the pip SHOWS now
+    b.hit.set(u,b.t+BR_TICK);
+    tanHit(u,b.fx0,b.fy0,b.src);                 // one grit pip PER BEAT on the standard save path — every save keeps its say each beat (⚑ FIRE_PIPS: a pipN row seat is the one-line dial, NOT moved)
+    breathTell(u);                               // 0461: the pip SHOWS now — 0462b: every beat
   }
 }
 function breathFire(f,aimM){
@@ -42042,7 +42070,7 @@ function breathFire(f,aimM){
   const ang=Math.atan2(aimM.y-g.y,aimM.x-g.x);   // the centerline runs JAW→man — picture, glow and burn share it
   SFX.jet();
   S.fx.push({k:'breath',x:g.x,y:g.y,ang:ang,rng:g.rng,sc:g.sc,sp:g.sp,t:0,dur:dur});
-  const b={x:g.x,y:g.y,ang:ang,sp:g.sp,rng:g.rng,t:0,dur:dur,src:f,fx0:f.x,fy0:f.y,hit:new Set()};
+  const b={x:g.x,y:g.y,ang:ang,sp:g.sp,rng:g.rng,t:0,dur:dur,src:f,fx0:f.x,fy0:f.y,hit:new Map()};   // 0462b: hit = figure → his next beat
   (S.breaths||(S.breaths=[])).push(b);
   if(BR_PLANT) f.brT=dur;                        // the stance holds while his own jet stands (drawFoe + the planted read)
   breathBurn(b);                                 // the fire frame: everyone in the picture burns NOW
@@ -46622,8 +46650,9 @@ function update(dt){
   }
   if(S.tanBase && S.tanBase.hitT>0) S.tanBase.hitT-=dt;   // the crate's hit flash cools here, on sim time
   // 0396 R2: the standing fire tongues live their whole fx dur — a man who
-  // steps (or is dropped) into a tongue mid-life burns his one pip too; the
-  // region outlives its breather (the flame already left his mouth).
+  // steps (or is dropped) into a tongue mid-life burns too, and (0462b THE
+  // BEAT) a man who STANDS in it burns again every BR_TICK; the region
+  // outlives its breather (the flame already left his mouth).
   if(S.breaths && S.breaths.length){
     for(const b9 of S.breaths){ b9.t+=dt; breathBurn(b9); }
     S.breaths=S.breaths.filter(b9=>b9.t<b9.dur);
@@ -47581,23 +47610,29 @@ function update(dt){
     // 0357 MEGA REX'S PRIZE — KING REX breathes for YOU. 0461 THE FLAME CONE
     // HITBOX: his tongue is ITS PICTURE now, the 0396 law at the unit lane —
     // the jaw is the mold's own muzzle (+34/-40 = the boss mold's -46/-56
-    // mirrored to the unit lane) on the side he SHOWS (unitFl: the v3.61 side
-    // mirror XOR walk-flip — a BF foe-side king or a man striding west
-    // breathes from the jaw you see), the centerline runs JAW→the picked
+    // mirrored to the unit lane) on the side he SHOWS (0462b: u.brFc — he
+    // TURNS to the man he burns at the fire, the boss's own 0396 R4 turn, and
+    // unitFaceW/unitDrawFl draw him that way for the tongue's life; before
+    // 0462b the jaw math assumed east while the west-authored mold showed
+    // west — the tongue left the side he did not show), the centerline runs
+    // JAW→the picked
     // man's chest, the burn is the DRAWN 0.26 wedge (breathHitsU vs BR_BODY —
     // the old ±0.42 FEET-cone reached past the picture's edge and fell short
     // of its tip), it LIVES its whole fx dur as a standing region in
     // S.breaths (lane 'hero' — a man marching into the standing fire burns
-    // too), EVERY foe in the picture burns (the multi-4 trim is gone; UDEF
+    // too), EVERY foe in the picture burns — every BR_TICK beat he stands in
+    // it (0462b) — (the multi-4 trim is gone; UDEF
     // multi keeps its branch-pick job), and the damage is the standard dmg
     // line above CAPTURED at the fire — vet/mods/rank all inherit, the kill
     // is his (hurt's own credit).
     if(u.type==='kingrex'){
       bfSfx(SFX.jet, u.x, u.y);
-      const kfl=unitFl(u)?-1:1, kx=u.x+34*kfl, ky=u.y-40;
+      const kDur=0.65;
+      u.brFc=(best.x>u.x)?1:-1; u.brTo=S.t+kDur;   // 0462b THE KING FACES HIS FIGHT: he turns to the man he burns and holds it for the tongue's life (unitFaceW reads it — presentation only, nothing in the sim reads it back)
+      const kfl=u.brFc, kx=u.x+34*kfl, ky=u.y-40;   // the jaw on the side he now SHOWS (+34 east / −34 west)
       const kAng=Math.atan2((best.y-14)-ky, best.x-kx);
-      S.fx.push({k:'breath',x:kx,y:ky,ang:kAng,rng:UDEF.kingrex.rng,sc:1.2,sp:0.26,t:0,dur:0.65});
-      const kb={x:kx,y:ky,ang:kAng,sp:0.26,rng:UDEF.kingrex.rng,t:0,dur:0.65,src:u,lane:'hero',dmg:dmg,hit:new Set()};
+      S.fx.push({k:'breath',x:kx,y:ky,ang:kAng,rng:UDEF.kingrex.rng,sc:1.2,sp:0.26,t:0,dur:kDur});
+      const kb={x:kx,y:ky,ang:kAng,sp:0.26,rng:UDEF.kingrex.rng,t:0,dur:kDur,src:u,lane:'hero',dmg:dmg,hit:new Map()};   // 0462b: hit = foe → his next beat
       (S.breaths||(S.breaths=[])).push(kb);
       breathBurn(kb);   // the fire frame: everyone in the picture burns NOW; update() ticks the rest of the window
       continue;
@@ -48408,6 +48443,30 @@ function drawSprite(k,x,y,w,rot,wob,imgOverride,flip){
 const WKF_HOLD=0.15;
 function wkBack(o,dir){ return !!(o.wkT && S.t-o.wkT<WKF_HOLD && o.wkX===-dir); }
 function unitFl(u){ const b=!!(S.bf && u.side==='foe'); return b !== wkBack(u, b?-1:1); }   // ⚠ !! matters: null!==false is TRUE — an uncoerced campaign b mirrored every green (battery r1's find)
+// 0462b KING REX FACES HIS FIGHT (Wyatt 8/21: "when you have King Rex as a
+// hero, he just walks backwards. He's just facing the left, even though you
+// are on the left as a player"): unitFl answers WHICH WAY A FIGURE FACES
+// (true = west), and every green mold was authored facing EAST — except the
+// king borrowed from the campaign bestiary: SPRITES_SRC.kingrex IS the foe
+// mold, AUTHORED FACING WEST (the boss marches west at the toy box; breathMo's
+// jaw sits at −46 by default), and the unit lane never mirrored a green, so
+// your king showed his west face while marching east, and his tongue (the
+// jaw math already assumed east) left the side he did not show. UNIT_WEST
+// names every west-authored mold on the unit lane; unitDrawFl XORs it into
+// the facing so the DRAW shows the way he faces — unitFl stays the one facing
+// reader and every muzzle/jaw seat that reads it stands byte-what-it-was.
+// unitFaceW adds the breather's own turn (u.brFc/u.brTo, stamped at the
+// fire): a standing king burning a man behind him faces him for the tongue's
+// life. AUDITED 8/21 (every hero mold rendered un-flipped): kingcroak = a
+// FRONTAL puppet ("his right is your left", croakMz) — no facing, untouched ·
+// kingyeti = a frontal stance (the blade held east) and drawKing already
+// mirrors his west-molded AIMED poses for the unit seat — untouched · jane
+// and every soldier were molded facing east. The tray / academy / shelf /
+// celebration art keeps the mold's own face (⚑ one line each if he wants
+// those east too).
+const UNIT_WEST={kingrex:1};   // ⚑ one cell per west-authored mold on the unit lane
+function unitFaceW(u){ return (u.brTo!=null && S.t<u.brTo)? u.brFc!==1 : unitFl(u); }   // true = he faces west; the breather's turn outranks the walk read while his jet stands
+function unitDrawFl(u){ return unitFaceW(u) !== !!UNIT_WEST[u.type]; }                  // the mirror the DRAW applies: the facing XOR the mold's authored face
 function rr(x,y,w,h,r){ cx.beginPath(); cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r); cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath(); }
 
 // ===== THE BEDROOM FLOOR (v1.79) — mom's battlefield IS the room. Same
@@ -51197,7 +51256,7 @@ function drawUnit(u){
   }
   // airborne (v1.39): the arc replaces the man, both carpets. THE DROP (v1.45)
   // borrows that state and NOT its picture — the canopy is the whole tell.
-  if(u.falling){ drawFaller(u, (u.type==='kingyeti'&&IMG.kingyetiko)||unitImg(u.type,u), unitW(u.type), S.bf&&u.side==='foe'); return; }   // 8/8 v2.76 the long drop — 0435: the king tips crown-askew (the ko mold)
+  if(u.falling){ drawFaller(u, (u.type==='kingyeti'&&IMG.kingyetiko)||unitImg(u.type,u), unitW(u.type), (S.bf&&u.side==='foe') !== !!UNIT_WEST[u.type]); return; }   // 8/8 v2.76 the long drop — 0435: the king tips crown-askew (the ko mold) — 0462b: the west-authored king drops facing his army's way too
   if(u.jetT>0){ if(u.para) drawChute(u); else if(u.tkJump||u.kyLeap) drawTkLeap(u); else drawJetFlight(u); return; }   // v3.11 PURPLE flies its own picture — 0424: the king's royal leap rides the same violet arc
   const w=unitW(u.type), im=unitImg(u.type,u);
   if(S.bf){ drawBFUnit(u,w,im); return; }
@@ -51218,7 +51277,7 @@ function drawUnit(u){
   if(u.type==='jane') drawJane(u,kyl);   // 0434 THE SHAPE-STORE JANE: her own pose-driven draw (pre-built poses + the entrance rig above; every other figure keeps the shared line below byte-what-it-was)
   else if(u.type==='kingyeti') drawKing(u,u.x,u.y-kyl,w,Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03),false,unitFl(u));   // 0435 THE SHAPE-STORE KING, playable seat — the same pose reader as the boss (his wave arcs + seize lift keep their shipped seats around this fork)
   else if(u.type==='kingcroak' && crFlinch(u)) drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03)),crFlinch(u),unitFl(u));   // 0454: the playable outlaw king — ONLY the flinch forks (the hurt mold on the shared transform); every other frame falls to the generic line below, the old waddle byte-what-it-was
-  else drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03)),im,unitFl(u));   // v2.78: the recoil, campaign edition — v3.61: + the walk-flip seat — 0424: the king's swing lean (the boss's own -0.14)
+  else drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03)),im,unitDrawFl(u));   // v2.78: the recoil, campaign edition — v3.61: + the walk-flip seat — 0424: the king's swing lean (the boss's own -0.14) — 0462b: the facing XOR the mold's authored face (UNIT_WEST) + the breather's turn
   if(u.type==='radioman') drawRadioCall(u);
   if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); drawAbsorbPips(u); }   // v3.11: a vanished Sarge's kit ghosts WITH him — the alpha holds through the extras
   if(u.type==='commando') drawCmdoPip(u);
@@ -51255,7 +51314,7 @@ function drawUnit(u){
 // countdown ring. No sprue box cluttering the field. He can't move, can't
 // shoot, can't be shot — placement stays a PREDICTION.
 function drawBFUnit(u,w,im){
-  const flip=unitFl(u);   // v3.61 (0307): the side mirror XOR the walk-flip — a man striding against his army's facing turns to face his walk
+  const flip=unitDrawFl(u);   // v3.61 (0307): the side mirror XOR the walk-flip — a man striding against his army's facing turns to face his walk · 0462b: XOR the mold's authored face (UNIT_WEST — the king borrowed from the bestiary) + the breather's turn
   // v2.42 THE SPY on the battleground: while he is cloaked (or still dropping
   // in) the OPPOSING team's screens draw NOTHING — not the ghost, not the
   // shadow, not a bar. "For the enemy player, he is invisible." His own
