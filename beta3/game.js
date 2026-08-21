@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.43.0';
+const BUILD = 'STARSPELL v0.43.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -92,6 +92,10 @@ function ssProbeScene() {
 // to boot/sample, and `how` says WHICH so the verdict (and the overlay) can
 // tell "this renderer is broken" from "this renderer was never tried"
 function ssProbeRun(type) {
+  // While this window is open, Phaser's async "Cannot create WebGL context"
+  // throw is the PROBE failing to sample — a verdict, not a crisis — and
+  // compat.js must not paint it at the player (ssBoot closes the window).
+  window.__ssProbing = true;
   return new Promise((resolve) => {
     const out = { ms: -1, n: 0, how: 'noboot', gpu: '' };
     const f = [];                                    // sampled frame deltas
@@ -1156,6 +1160,39 @@ function ssShareCard(o) {
   if (n >= 1) lines.push('🔥 ' + SS_T(n === 1 ? 'shStreak1' : 'shStreak', n));
   lines.push(SS_SHARE_URL);
   return lines.join('\n');
+}
+/* ---- THE COPY THAT TELLS THE TRUTH ----------------------------------------
+   Every clipboard write in the game funnels through here — the daily share
+   card, versus's invite and friend links (vsShare). Two laws TestFlight
+   1.0 (1) taught the hard way:
+   1. In the WKWebView shell navigator.clipboard EXISTS but writeText REJECTS
+      (NotAllowedError). A fire-and-forget write there puts NOTHING on the
+      board while the button claims success — so the write is awaited, and any
+      refusal falls through to the textarea + execCommand path, which the
+      shell still honours inside a tap. (WebKit carries the user-gesture token
+      across the promise rejection, so the fallback still counts as gestured.)
+   2. The textarea is readonly (no keyboard flash on iOS) and its selection is
+      set explicitly — iOS ignores a bare select() on a textarea.
+   Resolves true only when a path ACTUALLY copied, so a caller can never show
+   COPIED over an empty clipboard. */
+async function ssCopyText(txt) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(txt);
+      return true;
+    }
+  } catch (e) { }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;left:-1000px;top:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, txt.length);
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return !!ok;
+  } catch (e) { return false; }
 }
 // One-time seed for profiles that predate the streak fields: walk the local
 // daily score log backwards from today. A log that stops at YESTERDAY still
@@ -6620,7 +6657,11 @@ class Battle extends Phaser.Scene {
       const share = this.add.image(l.x(0), py(508), ssBtn(this, true, 240, 44)).setDisplaySize(l.u(240), l.u(44)).setInteractive({ useHandCursor: true });
       const shareT = ssTxt(this, l.x(0), py(508), SS_T('shareBtn'), l.u(13), '#9fb0e8').setOrigin(0.5);
       items.push(share, shareT);
-      share.on('pointerdown', () => {
+      /* Fires on the UP, not the down: iOS grants the clipboard only inside
+         a user activation, and Phaser's pointerdown comes from touchstart,
+         which is not one — touchend is (versus's share buttons learned this
+         first; vsOnTap is their arm-on-down/fire-on-up pattern). */
+      vsOnTap(share, () => {
         // the spoiler-free card (ssShareCard). The streak line rides on
         // tonight's own count when the lantern exists at all, and the card
         // simply omits it otherwise — nothing here may depend on it.
@@ -6629,11 +6670,9 @@ class Battle extends Phaser.Scene {
           wordLen: (this.run.longest || '').length,
           streak: (streak && streak.n) || (typeof ssStreakCount === 'function' ? ssStreakCount() : 0),
         });
-        try {
-          if (navigator.clipboard) navigator.clipboard.writeText(txt);
-          else { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
-          shareT.setText(SS_T('shareCopied'));
-        } catch (e) { shareT.setText(SS_T('shareFail')); }
+        ssCopyText(txt).then((okd) => {
+          if (shareT.active) shareT.setText(SS_T(okd ? 'shareCopied' : 'shareFail'));
+        });
       });
       by = 564;
     }
@@ -7059,6 +7098,9 @@ function ssAddScene(key, cls) {
   if (game) game.scene.add(key, cls); else SS_LATE_SCENES.push([key, cls]);
 }
 function ssBoot() {
+  // the probes are over: from here the same GL throw would be the REAL game
+  // dying, and compat.js must stay loud about it
+  window.__ssProbing = false;
   game = new Phaser.Game({
     // CANVAS only when the raster probe proved this device's GL is a software
     // rasterizer and its Canvas2D is faster (see SS_REND) — same resolution,

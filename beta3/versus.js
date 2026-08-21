@@ -335,17 +335,11 @@ async function vsShare(text, url) {
     try { await navigator.share({ title: 'STARSPELL', text, url }); return 'shared'; }
     catch (e) { if (e && e.name === 'AbortError') return 'aborted'; }
   }
+  // one copy routine for the whole game (ssCopyText, game.js): awaited async
+  // clipboard, WKWebView's rejection falling through to textarea+execCommand,
+  // true only when a path really copied
   const full = text + ' ' + url;
-  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(full); return 'copied'; } } catch (e) { }
-  try {
-    const ta = document.createElement('textarea');
-    ta.value = full; ta.style.cssText = 'position:fixed;left:-1000px;top:0;opacity:0';
-    document.body.appendChild(ta); ta.select();
-    const ok = document.execCommand('copy');
-    ta.remove();
-    if (ok) return 'copied';
-  } catch (e) { }
-  return 'failed';
+  return (await ssCopyText(full)) ? 'copied' : 'failed';
 }
 // a toast on whatever screen is up (the summons overlay scene draws it)
 function vsNotify(text) {

@@ -48,11 +48,43 @@ window.addEventListener('error', function (e) {
     if (SS_DIAG_ON && window.SSDIAG) window.SSDIAG('masked cross-origin error (browser/CDN internals) — ignored');
     return;
   }
+  // The workload probe boots a throwaway forced-WebGL Phaser game to measure
+  // it; on a box with no GL at all Phaser throws "Cannot create WebGL
+  // context" ASYNCHRONOUSLY — outside the probe's own try/catch. The probe
+  // survives (that failure IS its answer) and the game plays on in canvas, so
+  // a red box here is a false alarm over a working game. Gated to the probe
+  // window only (game.js opens/closes window.__ssProbing): the same throw
+  // from the REAL game means a dead screen and stays loud.
+  if (window.__ssProbing && /Cannot create WebGL context/i.test(e.message || '')) {
+    ssDiagLog('probe: ' + e.message);
+    if (SS_DIAG_ON && window.SSDIAG) window.SSDIAG('probe gl: Cannot create WebGL context (verdict, not a crash)');
+    return;
+  }
   ssPaint((e.message || String(e.type)) + '  @ ' + String(e.filename || '').split('/').pop() + ':' + e.lineno + '  (tap to dismiss)');
 });
+// A rejected promise is ROUTINE on a phone — WKWebView refuses clipboard
+// writes, audio contexts refuse to wake in the background — and raw red text
+// over the game scared a real TestFlight player (two PROMISE banners over the
+// daily end screen, 2026-08-21). The readout has earned its keep in debugging,
+// so it is not gone: with ?diag=1 the banner paints exactly as before, and
+// without it the same line is written silently to a small localStorage log so
+// a LATER ?diag=1 session can still read the history. Uncaught ERRORS (above)
+// still paint for everyone — those mean the game itself is broken, and a
+// visible line beats a silent black screen.
+function ssDiagLog(line) {
+  try {
+    var K = 'beta3.diaglog';
+    var a = JSON.parse(localStorage.getItem(K) || '[]');
+    a.push(new Date().toISOString().slice(0, 19).replace('T', ' ') + ' ' + line);
+    if (a.length > 20) a = a.slice(a.length - 20);
+    localStorage.setItem(K, JSON.stringify(a));
+  } catch (_) { }
+}
 window.addEventListener('unhandledrejection', function (e) {
   var r = e && e.reason;
-  ssPaint('PROMISE: ' + (r && (r.message || r.code || String(r)) || '?') + '  (tap to dismiss)');
+  var line = 'PROMISE: ' + (r && (r.message || r.code || String(r)) || '?');
+  ssDiagLog(line);
+  if (SS_DIAG_ON) ssPaint(line + '  (tap to dismiss)');
 });
 
 // 3) ?diag=1 — a live on-screen readout so a phone screenshot tells the whole
@@ -72,6 +104,14 @@ if (/[?&]diag=1/.test(location.search)) {
       if (lines.length > 14) d.textContent = lines.slice(lines.length - 14).join('\n');
     } catch (_) { }
   };
+  // what the quiet sessions recorded: stored rejection history paints into
+  // the tap-to-dismiss box, NOT the rolling readout — the boot's own DIAG
+  // chatter (vp/intro/rend lines) drowns a 14-line window in seconds. Slate,
+  // not red: this is history, not a live failure.
+  try {
+    var ssPastLog = JSON.parse(localStorage.getItem('beta3.diaglog') || '[]');
+    if (ssPastLog.length) ssPaint('stored log (' + ssPastLog.length + '):\n' + ssPastLog.slice(-6).join('\n') + '\n(tap to dismiss)', '#26304f');
+  } catch (_) { }
   window.SSDIAG('ua ' + navigator.userAgent.replace(/Mozilla\/5\.0 |\(KHTML, like Gecko\) /g, ''));
   window.SSDIAG('vp ' + window.innerWidth + 'x' + window.innerHeight + ' dpr ' + window.devicePixelRatio);
   window.SSDIAG('reduce-motion ' + !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches));

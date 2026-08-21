@@ -1,3 +1,8 @@
+// v0.43.1 verification: the honest share copy (WKWebView's rejecting
+// clipboard falls through to execCommand; COPIED only when a path REALLY
+// copied; COPY FAILED otherwise) + the banner policy (unhandled rejections
+// never paint for players — beta3.diaglog ring + ?diag=1 replay; the probe's
+// GL-less throw gated; real errors stay loud), plus
 // v0.43.0 verification: the sigil drip's three laws (the pool never starves ·
 // nobody who already plays loses a sigil · no sigil is ever listed asleep and
 // awake at once — the whole mechanic, both halves, is walked by
@@ -26,8 +31,11 @@ async function cdp() {
   ws.onmessage = (m) => {
     const d = JSON.parse(m.data);
     if (d.id && pend.has(d.id)) { pend.get(d.id)(d.result); pend.delete(d.id); }
-    if (d.method === 'Runtime.exceptionThrown')
-      errs.push(d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text);
+    if (d.method === 'Runtime.exceptionThrown') {
+      const t = d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text;
+      // the banner drill REJECTS on purpose (that is the test); not a page error
+      if (!/banner drill/.test(t || '')) errs.push(t);
+    }
   };
   await new Promise(r => ws.onopen = r);
   const send = (method, params) => new Promise(res => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
@@ -1009,12 +1017,26 @@ async function main() {
     !paste.includes(me.name) && !paste.includes(me.uid) && !/✦/.test(paste),
     me.name + ' / ' + String(me.uid).slice(0, 10) + '… absent');
 
-  /* THE WKWEBVIEW PATH. The shell has no async clipboard, and the fallback —
-     a textarea plus execCommand — is what actually runs there. It is clicked
-     for real too, and must carry the identical payload and leave nothing in
-     the DOM behind it. */
+  /* THE WKWEBVIEW PATH — as the shell REALLY behaves (v0.43.1). TestFlight
+     1.0 (1) proved navigator.clipboard EXISTS there but writeText REJECTS
+     (NotAllowedError). The old fire-and-forget write painted two red PROMISE
+     banners over the end screen, the button read COPIED — GO BOAST, and the
+     board was empty. So the rejection is emulated here — never assume
+     Chrome's grant — the tap is real, and COPIED may show only because the
+     textarea + execCommand fallback ACTUALLY carried the identical payload. */
+  const resetShareT = () => c.ev(`(() => { const b = game.scene.getScene('battle');
+    const w = (ls) => ls.forEach(o => { if (o.type === 'Text' && (o.text === SS_T('shareCopied') || o.text === SS_T('shareFail'))) o.setText(SS_T('shareBtn')); if (o.list) w(o.list); });
+    w(b.overlayC.list); return 'reset' })()`);
+  const shareSays = (key) => `(() => { const b = game.scene.getScene('battle'); let f = false;
+    const w = (ls) => ls.forEach(o => { if (o.type === 'Text' && o.text === SS_T('${key}')) f = true; if (o.list) w(o.list); });
+    w(b.overlayC.list); return f })()`;
+  await resetShareT();
   await c.ev(`(() => {
-    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    localStorage.removeItem('beta3.diaglog');
+    Object.defineProperty(navigator, 'clipboard', { configurable: true,
+      value: { writeText: () => Promise.reject(Object.assign(
+        new Error('The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.'),
+        { name: 'NotAllowedError' })) } });
     window.__exec = null; window.__realExec = document.execCommand;
     document.execCommand = function (cmd) {
       if (cmd === 'copy') window.__exec = document.activeElement && document.activeElement.value;
@@ -1024,15 +1046,64 @@ async function main() {
   const gotFb = await tapUntil(btn, `typeof window.__exec === 'string' && window.__exec.length > 0`);
   const fb = JSON.parse(await c.ev(`(() => {
     const out = { grabbed: window.__exec, leftovers: document.querySelectorAll('textarea').length,
-      shared: !!window.__shared };
-    document.execCommand = window.__realExec; delete navigator.clipboard; delete navigator.share;
+      shared: !!window.__shared, banner: !!document.getElementById('errbox') };
     return JSON.stringify(out) })()`));
-  ok('the WKWebView fallback copies the very same card, leaving no textarea behind',
+  ok('a REJECTED clipboard falls through: the fallback copies the very same card, no textarea left behind',
     gotFb && fb.grabbed === paste && fb.leftovers === 0,
     JSON.stringify((fb.grabbed || '').slice(0, 28)) + ' · ' + fb.leftovers + ' left');
+  ok('…and the button still says COPIED, because a path REALLY ran',
+    await until(shareSays('shareCopied'), 8000));
+  ok('the shell’s refusal paints no red banner over the player', fb.banner === false);
   ok('neither path ever reaches navigator.share (it freezes the shell)', fb.shared === false);
+
+  /* BOTH PATHS BROKEN. The button must confess — COPY FAILED — because a
+     button that lies costs a player who just boasted an empty paste. And
+     still no red banner: the failure is the game's to report, not compat's. */
+  await resetShareT();
+  await c.ev(`(() => { window.__exec = null; document.execCommand = function () { return false; }; return 'dead' })()`);
+  ok('with the fallback dead too, the button confesses COPY FAILED',
+    await tapUntil(btn, shareSays('shareFail')));
+  const dead = JSON.parse(await c.ev(`(() => {
+    const out = { banner: !!document.getElementById('errbox'), leftovers: document.querySelectorAll('textarea').length };
+    document.execCommand = window.__realExec; delete navigator.clipboard; delete navigator.share;
+    return JSON.stringify(out) })()`));
+  ok('a total failure still paints no banner and leaves no textarea', dead.banner === false && dead.leftovers === 0);
+
+  /* THE RED BANNER POLICY (compat.js, v0.43.1). An unhandled rejection is
+     ROUTINE on a phone — the player never sees one. Without ?diag=1 the line
+     goes silently to the beta3.diaglog ring; with the flag the banner paints
+     as before, and the history stored by quieter sessions is replayed into
+     the readout. */
+  await c.ev(`(() => { Promise.reject(new Error('banner drill NotAllowedError')); return 'fired' })()`);
+  ok('an unhandled rejection paints NOTHING without ?diag=1, but is logged for later',
+    await until(`(JSON.parse(localStorage.getItem('beta3.diaglog') || '[]')).some((l) => l.includes('banner drill'))`, 8000)
+    && await c.ev(`!document.getElementById('errbox')`) === true);
+  /* The workload probe's forced-WebGL boot throws "Cannot create WebGL
+     context" ASYNC on a GL-less box — outside the probe's try/catch. The
+     probe survives (that failure IS its verdict) and the game runs on
+     canvas, so painting it is a red box over a WORKING game. Gated to the
+     probe window; a real error must stay loud for everyone. */
+  ok('the probe’s GL-less throw is gated — a working canvas game never wears a red box',
+    await c.ev(`(() => { window.__ssProbing = true;
+      window.dispatchEvent(new ErrorEvent('error', { message: 'Cannot create WebGL context, aborting.', filename: 'phaser.min.js', lineno: 1 }));
+      window.__ssProbing = false;
+      return !document.getElementById('errbox') })()`) === true);
+  ok('a REAL uncaught error still paints for everyone (a visible line beats a silent black screen)',
+    await c.ev(`(() => { window.dispatchEvent(new ErrorEvent('error', { message: 'genuine boom', filename: 'game.js', lineno: 1 }));
+      const d = document.getElementById('errbox'); const up = !!d && d.textContent.includes('genuine boom');
+      if (d) d.remove(); return up })()`) === true);
   await c.ev(`(() => { SSNET.submitScore = SSNET.__sub; SSNET.setDayKey('');
     SS.prof.daily = {}; SS.prof.streak = { n:0,last:0,best:0,g:1,gp:0,gd:[],mk:0,pend:0 }; SS.save(); return 'swept' })()`);
+  // the replay lands in the tap-to-dismiss box (slate, persists until tapped)
+  // — NOT the rolling diagbox, whose 14-line window the boot's own chatter
+  // floods in seconds
+  await c.nav(BASE + '?fps=0&diag=1', 2500);
+  ok('?diag=1 replays the stored history from the quiet session',
+    await until(`(() => { const d = document.getElementById('errbox'); return !!d && d.textContent.includes('banner drill') })()`, 15000));
+  await c.ev(`(() => { Promise.reject(new Error('banner drill two')); return 'fired' })()`);
+  ok('…and a live rejection paints the red banner again under the flag',
+    await until(`(() => { const d = document.getElementById('errbox'); return !!d && d.textContent.includes('banner drill two') })()`, 8000));
+  await c.ev(`(() => { localStorage.removeItem('beta3.diaglog'); return 'clean' })()`);
   await c.nav(BASE + '?fps=0', 9000);
 
 

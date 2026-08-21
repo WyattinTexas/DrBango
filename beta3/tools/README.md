@@ -360,6 +360,36 @@ and the WKWebView fallback by hooking `document.execCommand` and reading
 for the whole section: it proves the game never calls it AND makes sure the
 native macOS sheet can never open and freeze the browser (see below).
 
+## The honest copy and the banner policy (v0.43.1)
+
+TestFlight 1.0 (1) proved that in the WKWebView shell `navigator.clipboard`
+EXISTS but `writeText()` REJECTS (NotAllowedError) — so a WKWebView stub must
+be a clipboard whose writeText rejects, **never** `clipboard: undefined`
+(that tests a browser that does not exist). Every clipboard write now funnels
+through `ssCopyText()` (game.js): awaited async write, rejection falls
+through to the readonly-textarea + execCommand path, resolves true only when
+a path really copied — and the share button fires on the UP via `vsOnTap`
+(touchstart is not an iOS user activation; touchend is).
+
+The banner policy (compat.js): an unhandled REJECTION never paints for
+players — it is appended to the `beta3.diaglog` localStorage ring (last 20)
+— while under `?diag=1` it paints as before and the stored ring is replayed
+at boot. Three harness traps:
+
+- **The replay must land in the tap-to-dismiss errbox, not the rolling
+  diagbox** — the boot's own DIAG chatter (five `vp … minor` lines alone)
+  floods the 14-line window in seconds, and a harness that polls the diagbox
+  "proves" the replay broken.
+- **Phaser's "Cannot create WebGL context, aborting." throw is ASYNC** — it
+  escapes the workload probe's try/catch and used to paint a red box over a
+  perfectly working canvas game on any GL-less box (headless `--disable-gpu`
+  reproduces it on a COLD profile only: the verdict is cached 7 days).
+  `window.__ssProbing` marks the probe window; compat.js gates exactly that
+  message inside it. The same throw from the real game still paints.
+- A synthesized `window.dispatchEvent(new ErrorEvent('error', {message,
+  filename, lineno}))` runs the real compat handler and never opens a native
+  dialog — that is how the error path is pinned without crashing anything.
+
 ## Harness gotchas learned on the friends/invites work (v0.25.0)
 
 - **Never let headless Chrome reach `navigator.share`.** Headless Chrome on macOS still
