@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.42.0';
+const BUILD = 'STARSPELL v0.43.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2916,6 +2916,40 @@ function ssSigilCardTex(scene, tier, w, h) {
   return { key, mx, mr };
 }
 
+/* The sleeping card (v0.43.0): the same chrome, asleep. Slate glass instead
+   of midnight, a dashed frame instead of the tier's gold hairline, and an
+   EMPTY socket — the silhouette must give away the rarity dress and nothing
+   else, so a player can want a sigil without having been shown it. Same
+   {key, mx, mr} contract as the waking card, so both draw off one layout. */
+function ssSleepCardTex(scene, w, h) {
+  const mr = Math.min(h * 0.30, 40), mx = Math.max(mr + 14, h * 0.42);
+  const key = 'sigsleep@' + w + 'x' + h;
+  if (scene.textures.exists(key)) return { key, mx, mr };
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(w * R), Math.round(h * R));
+  const c = t.context;
+  c.scale(R, R);
+  const rad = Math.min(16, h * 0.2);
+  const rr = (inset, r) => { c.beginPath(); c.roundRect(inset, inset, w - inset * 2, h - inset * 2, r); };
+  rr(2.5, rad);
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#111634'); g.addColorStop(0.55, '#0c1027'); g.addColorStop(1, '#080b1c');
+  c.fillStyle = g; c.fill();
+  c.lineWidth = 1.4; c.strokeStyle = 'rgba(90,99,144,0.55)';
+  c.setLineDash([5, 5]); rr(2.5, rad); c.stroke(); c.setLineDash([]);
+  // the empty socket: a dim ring with a soft hollow, no compass points
+  const my = h / 2;
+  const rg = c.createRadialGradient(mx, my, 2, mx, my, mr);
+  rg.addColorStop(0, 'rgba(90,99,144,0.16)'); rg.addColorStop(1, 'rgba(90,99,144,0)');
+  c.beginPath(); c.arc(mx, my, mr, 0, Math.PI * 2); c.fillStyle = rg; c.fill();
+  c.lineWidth = 1.3; c.strokeStyle = 'rgba(90,99,144,0.6)';
+  c.setLineDash([3, 4]);
+  c.beginPath(); c.arc(mx, my, mr, 0, Math.PI * 2); c.stroke();
+  c.setLineDash([]);
+  t.refresh();
+  return { key, mx, mr };
+}
+
 // One ornate pick card: baked chrome, glyph in the medallion, gold-letterpress
 // nameplate, rarity ribbon, italic desc. Interactive container, w x h design
 // units; heights under 100 lay out as the compact (versus) one-liner.
@@ -2977,14 +3011,32 @@ function ssSigilPanel(scene, opts) {
   };
   veil.on('pointerdown', () => { SFX.ui(); close(); });
 
+  /* Rows are heterogeneous now (v0.43.0): the birth sign, the sigils you
+     hold, then — when the caller asks for it — a STILL SLEEPING section, the
+     locked half of the sky drawn as silhouettes with the bar that is filling
+     toward each one. Heights differ per kind, so the layout runs off a
+     prefix sum rather than k * (RH + GAP); the mask and the drag-scroll below
+     read contentH exactly as they always did.
+     THE LAW: a sigil is in ONE state or the other, never both. `asleep` is
+     computed from ssSigilUnlocked, which is the same truth ssSigilOpen()
+     draws the pick boards from, so the moment a rite hands one over it leaves
+     this list and appears above it on the next open. */
+  const RW = 340, RH = 84, GAP = 8, HEAD = 56, FOOT = 30, HDR = 44, SH = 74;
   const rows = [];
-  if (opts.sign) rows.push({ sign: opts.sign });
+  if (opts.sign) rows.push({ sign: opts.sign, h: RH });
   for (const id of opts.sigils || []) {
-    const sg = SS_SIGILS.find((s) => s.id === id);
-    if (sg) rows.push({ sg });
+    const sg = SS_SIG_BY[id] || SS_SIGILS.find((s) => s.id === id);
+    if (sg) rows.push({ sg, h: RH });
   }
-  const RW = 340, RH = 84, GAP = 8, HEAD = 56, FOOT = 30;
-  const contentH = rows.length * RH + Math.max(0, rows.length - 1) * GAP;
+  if (opts.sleeping) {
+    const asleep = SS_SIGILS.filter((s) => s.lock && !ssSigilUnlocked(s.id));
+    rows.push({ head: 1, n: asleep.length, h: HDR });
+    for (const sg of asleep) rows.push({ sg, sleep: 1, h: SH });
+  }
+  const ys = [];
+  let acc = 0;
+  for (const r of rows) { ys.push(acc + r.h / 2); acc += r.h + GAP; }
+  const contentH = Math.max(0, acc - GAP);
   const viewH = Math.min(contentH, 552);
   const winH = HEAD + viewH + FOOT;
   const top = 400 - winH / 2;
@@ -2994,7 +3046,7 @@ function ssSigilPanel(scene, opts) {
   const win = scene.add.image(l.x(0), l.y(top + winH / 2), 'endpanel')
     .setDisplaySize(l.u(372), l.u(winH)).setInteractive();
   wc.add(win);
-  const tk = ssGoldTex(scene, SS_T('inspTitle'), 16);
+  const tk = ssGoldTex(scene, SS_T(opts.title || 'inspTitle'), 16);
   const tsc = Math.min(1, 250 / tk.w);
   wc.add(scene.add.image(l.x(-6), l.y(top + 30), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
   const xT = ssTxt(scene, l.x(164), l.y(top + 29), '✕', l.u(17), '#8a94c4').setOrigin(0.5);
@@ -3006,7 +3058,54 @@ function ssSigilPanel(scene, opts) {
   // rows live in a masked container; dragging the window scrolls them
   const rc = scene.add.container(0, 0);
   rows.forEach((r, k) => {
-    const yk = top + HEAD + k * (RH + GAP) + RH / 2;
+    const yk = top + HEAD + ys[k];
+    // ---- the section rule: what is still out there, and how much of it ----
+    if (r.head) {
+      rc.add(ssTxt(scene, l.x(0), l.y(yk - 6), '—  ' + SS_T('slpHead') + '  —', l.u(11), '#8a94c4')
+        .setOrigin(0.5).setLetterSpacing(l.u(2)));
+      rc.add(ssTxt(scene, l.x(0), l.y(yk + 12), r.n ? SS_T(r.n === 1 ? 'slpSub1' : 'slpSub', r.n) : SS_T('slpNone'),
+        l.u(9.5), r.n ? '#5a6390' : '#c9b676', 'italic').setOrigin(0.5));
+      return;
+    }
+    // ---- a sleeping sigil: a silhouette, its condition, and its bar ----
+    if (r.sleep) {
+      const tex = ssSleepCardTex(scene, RW, SH);
+      rc.add(scene.add.image(l.x(0), l.y(yk), tex.key).setDisplaySize(l.u(RW), l.u(SH)));
+      const gx = -RW / 2 + tex.mx;
+      rc.add(ssTxt(scene, l.x(gx), l.y(yk), '?', l.u(tex.mr * 1.05), '#4a5480').setOrigin(0.5, 0.56));
+      const lx = gx + tex.mr + 14, maxW = RW / 2 - lx - 16;
+      const RCs = SS_RARITY[r.sg.rarity | 0];
+      if (RCs.label) {
+        rc.add(ssTxt(scene, l.x(RW / 2 - 16), l.y(yk - SH / 2 + 15), SS_T(RCs.label), l.u(8), RCs.labelColor)
+          .setOrigin(1, 0.5).setLetterSpacing(l.u(1.5)).setAlpha(0.42));
+      }
+      // the condition sits on the row's own centre line, so a one-line English
+      // sentence and a two-line German one both hang level over the bar
+      rc.add(scene.add.text(l.x(lx), l.y(yk - 12), SS_SIG_HOW(r.sg), {
+        fontFamily: SERIF, fontSize: l.u(11.5) + 'px', color: '#9aa3cc', fontStyle: 'italic',
+        wordWrap: { width: l.u(maxW - (RCs.label ? 58 : 6)) }, lineSpacing: l.u(1.5),
+      }).setOrigin(0, 0.5));
+      /* the bar: a dim track with a gold run across it, and the plain count.
+         barW leaves 72 design units at the right for "100 / 400" — and the
+         panel's mask ends at x 186, so a bar wider than the row does not just
+         look wrong, it is CUT by the mask at the window's edge. */
+      const pr = ssSigilProgress(r.sg);
+      const frac = Math.max(0, Math.min(1, pr.need ? pr.have / pr.need : 0));
+      const barW = Math.max(40, maxW - 72), by = yk + SH / 2 - 16;
+      rc.add(scene.add.rectangle(l.x(lx), l.y(by), l.u(barW), l.u(3.5), 0x2b3157, 1).setOrigin(0, 0.5));
+      if (frac > 0) {
+        const fill = scene.add.rectangle(l.x(lx), l.y(by), l.u(Math.max(2, barW * frac)), l.u(3.5), 0xd7b45c, 1).setOrigin(0, 0.5);
+        rc.add(fill);
+        if (frac > 0.04) {
+          rc.add(scene.add.image(l.x(lx + barW * frac), l.y(by), 'glowbig').setDisplaySize(l.u(26), l.u(16))
+            .setTint(0xffd77a).setAlpha(0.30).setBlendMode('ADD'));
+        }
+      }
+      rc.add(ssTxt(scene, l.x(RW / 2 - 16), l.y(by), pr.have + ' / ' + pr.need, l.u(9.5), '#8a94c4')
+        .setOrigin(1, 0.5));
+      return;
+    }
+    // ---- what is already yours ----
     const tier = r.sg ? (r.sg.rarity | 0) : 0;
     const RC = SS_RARITY[tier];
     const tex = ssSigilCardTex(scene, tier, RW, RH);
@@ -3368,68 +3467,226 @@ function ssStarChart(scene, opts) {
   return { c, zone };
 }
 
-/* THE DISCOVERY, in its smallest honest form: a sigil that was locked a
-   moment ago slides in at the top of the screen wearing its own pick card —
-   glyph in the medallion, gold nameplate, rarity ribbon, the effect in full —
-   with the condition that earned it written underneath in the game's own
-   italic. It is a NOTICE, not a ceremony (the forge rite is the next task),
-   so it never takes the screen, never waits for a tap, and is equally at home
-   over the end window and over the meadow grass.
-   ⚠ scrollFactor 0 on the container: the meadow's camera sits ~4200px down
-   the sky world, and a banner drawn in world space there is drawn nowhere.
-   ⚠ SS_SIG_TOAST_Y is a LANE, not a taste. Above it the meadow keeps its
-   daily chip, name chip and rating pill, and every screen keeps ssAchToast
-   (which rides at y 52 and is 58 tall) — an unlock and an achievement land
-   together often enough that they must never be able to print over each
-   other. Below it the meadow's title plate begins at ~276. The notice is 168
-   tall, so 178 puts it in the 94..262 band: clear at both ends. */
-const SS_SIG_TOAST_Y = 178;
+/* ---- THE FORGE CEREMONY --------------------------------------------------
+   v0.43.0. A sigil coming out of the drip is an EVENT, not a line of text.
+   The sky goes dark, the anvil rings, and the glyph rises in its own rarity
+   medallion with the name struck in gold beneath it — the same ceremony
+   language as the lamp's mark rite and the v0.18 sigil pick: a deep veil (the
+   meadow's gold buttons read straight THROUGH anything lighter), the forge
+   chime, a tiered arrival, and letterpress copy that lands in beats.
 
-function ssSigilToast(scene, sg, delay) {
+   Four laws it keeps, and every one of them is pinned by a check:
+   · IT NEVER TRAPS. One tap anywhere dismisses it, and it lets itself out on
+     its own after a hold long enough to read — the end screen's NEW RUN and
+     HOME buttons are sitting underneath it.
+   · IT NEVER STACKS. Two discoveries in one run queue: the second is BUILT
+     when the first has closed, never drawn on top of it (SS_RITE.busy, which
+     also gates the meadow so a mark rite and a forge rite cannot collide).
+   · IT IS CANVAS-SAFE. Baked canvas textures, plain images, shapes and text —
+     nothing WebGL-only, because Wyatt's phone boots the CV renderer.
+   · EVERY CHILD CARRIES scrollFactor 0. The meadow's camera sits ~4200px down
+     the sky world, and inside a Container it is the CHILD's scroll factor the
+     camera consults, not the container's — a rite drawn in world space there
+     is drawn nowhere at all.
+*/
+const SS_RITE = { busy: false };
+
+// The ceremony's medallion — the pick card's socket, alone and five times the
+// size: tier ring, inner hairline, the four compass points, and the
+// legendary's ring of rays. Baked once per tier+size like every other piece of
+// chrome in this file.
+function ssSigilMedalTex(scene, tier, d) {
+  const key = 'sigmedal' + tier + '@' + Math.round(d);
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(d * R), Math.round(d * R));
+  const c = t.context;
+  c.scale(R, R);
+  const frame = ['#c9a84c', '#7fb4ff', '#ffd77a'][tier];
+  const faint = ['rgba(215,180,92,', 'rgba(127,180,255,', 'rgba(255,215,122,'][tier];
+  const cx = d / 2, cy = d / 2, r = d / 2 - d * 0.11;
+  if (tier === 2) {                                   // the legendary's rays
+    c.strokeStyle = 'rgba(255,215,122,0.28)';
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2 + 0.13, lng = i % 2 ? d * 0.045 : d * 0.085;
+      c.lineWidth = i % 2 ? 1 : 1.8;
+      c.beginPath(); c.moveTo(cx + Math.cos(a) * (r + d * 0.018), cy + Math.sin(a) * (r + d * 0.018));
+      c.lineTo(cx + Math.cos(a) * (r + lng), cy + Math.sin(a) * (r + lng)); c.stroke();
+    }
+  }
+  const rg = c.createRadialGradient(cx, cy, 2, cx, cy, r);
+  rg.addColorStop(0, faint + '0.34)'); rg.addColorStop(0.72, faint + '0.12)'); rg.addColorStop(1, faint + '0.02)');
+  c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fillStyle = rg; c.fill();
+  c.lineWidth = d * 0.016; c.strokeStyle = frame;
+  c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.stroke();
+  c.lineWidth = d * 0.006; c.strokeStyle = faint + '0.55)';
+  c.beginPath(); c.arc(cx, cy, r - d * 0.035, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = frame;
+  for (const [dx, dy] of [[0, -r], [0, r], [-r, 0], [r, 0]]) {
+    c.beginPath(); c.arc(cx + dx, cy + dy, d * 0.017, 0, Math.PI * 2); c.fill();
+  }
+  t.refresh();
+  return key;
+}
+
+/* One discovery, held like a rite. Returns the container; calls onDone once
+   the sky is clear again (which is how the queue knows to bring the next). */
+function ssSigilRite(scene, sg, onDone) {
   const l = ssLayout(scene);
-  const CW = 336, CH = 88, PW = 372, PH = 168, tier = sg.rarity | 0;
-  const c = scene.add.container(l.x(0), l.y(-120)).setDepth(400).setScrollFactor(0);
-  // the plate first: the end window's own midnight/gold chrome. The card
-  // inside it is opaque, but the two lines of copy are not — over the end
-  // screen they would print straight through the window's title and score.
-  const plate = scene.add.image(0, 0, 'endpanel').setDisplaySize(l.u(PW), l.u(PH));
-  const glow = scene.add.image(0, 0, 'glowbig').setDisplaySize(l.u(PW + 150), l.u(PH + 110))
-    .setTint(SS_RARITY[tier].glow).setAlpha(0).setBlendMode('ADD');
-  const head = ssTxt(scene, 0, -l.u(PH / 2 - 20), SS_T('unlHead'), l.u(10.5), '#ffd77a').setOrigin(0.5)
-    .setLetterSpacing(l.u(2)).setShadow(0, 0, '#c9b676', l.u(8), true, true);
-  const card = ssSigilCard(scene, l, sg, CW, CH).setPosition(0, -l.u(8));
-  card.disableInteractive();
-  const how = scene.add.text(0, l.u(50), '✓ ' + SS_SIG_HOW(sg), {
-    fontFamily: SERIF, fontSize: l.u(9.5) + 'px', color: '#8a94c4', fontStyle: 'italic',
-    align: 'center', wordWrap: { width: l.u(CW) },
-  }).setOrigin(0.5);
-  c.add([glow, plate, head, card, how]);
-  c.setAlpha(0);
-  const go = () => {
-    if (!c.active) return;
-    SFX.forge();
-    scene.tweens.add({ targets: c, y: l.y(SS_SIG_TOAST_Y), alpha: 1, duration: 460, ease: 'Back.easeOut' });
-    scene.tweens.add({ targets: glow, alpha: tier === 2 ? 0.30 : tier === 1 ? 0.22 : 0.16, duration: 500 });
-    scene.tweens.add({ targets: glow, alpha: 0.06, delay: 700, duration: 1100, yoyo: true, repeat: 1, ease: 'Sine.easeInOut' });
+  const tier = sg.rarity | 0, RC = SS_RARITY[tier], loc = SS_SIG(sg);
+  SS_RITE.busy = true;
+  // spend this one from the queue the moment it is SHOWN — not when it was
+  // scheduled (a rite the scene died before building must survive to be said
+  // on the grass) and not when it closes (being told twice reads as a bug)
+  const p = SS.prof;
+  if (p.sig && p.sig.pend.length) { p.sig.pend = p.sig.pend.filter((id) => id !== sg.id); SS.save(); }
+
+  const c = scene.add.container(0, 0).setDepth(680).setScrollFactor(0);
+  c.setData('sigilRite', sg.id);          // the harness reads WHICH rite is up
+  const sf = (o) => o.setScrollFactor(0);
+  let done = false;
+  const close = () => {
+    if (done) return;
+    done = true;
     scene.tweens.add({
-      targets: c, alpha: 0, y: l.y(SS_SIG_TOAST_Y - 28), delay: 3400, duration: 460,
-      onComplete: () => c.destroy(),
+      targets: c, alpha: 0, duration: 420, ease: 'Sine.easeIn',
+      onComplete: () => { if (c.active) c.destroy(); SS_RITE.busy = false; if (onDone) onDone(); },
     });
   };
-  if (delay) scene.time.delayedCall(delay, go); else go();
+  scene.events.once('shutdown', () => { SS_RITE.busy = false; });
+
+  const veil = sf(scene.add.image(l.W / 2, l.H / 2, 'veil')).setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+  veil.on('pointerdown', () => { SFX.ui(); close(); });
+  // 0.985, not the mark rite's 0.9: this beat puts its copy across the middle
+  // of the screen, where the meadow's own gold buttons sit, and at anything
+  // lighter their letters read straight THROUGH the sigil's name
+  scene.tweens.add({ targets: veil, alpha: 0.985, duration: 380 });
+  c.add(veil);
+
+  // the anvil, then the award arpeggio for anything above a common
+  SFX.ensure(); SFX.forge();
+  if (tier > 0) scene.time.delayedCall(340, () => { if (SFX.ok && c.active) SFX.ach(); });
+
+  // ---- the glyph, rising in its medallion ----
+  const MY = 296, MD = tier === 2 ? 216 : 196;
+  const glow = sf(scene.add.image(l.x(0), l.y(MY), 'glowbig')).setDisplaySize(l.u(80), l.u(80))
+    .setTint(RC.glow).setAlpha(0).setBlendMode('ADD');
+  const medal = sf(scene.add.image(l.x(0), l.y(MY), ssSigilMedalTex(scene, tier, MD)))
+    .setDisplaySize(l.u(MD * 0.55), l.u(MD * 0.55)).setAlpha(0);
+  const glyph = sf(ssTxt(scene, l.x(0), l.y(MY), sg.icon, l.u(MD * 0.44), RC.ink)).setOrigin(0.5)
+    .setShadow(0, 0, RC.shadow, l.u(16), true, true).setAlpha(0);
+  c.add([glow, medal, glyph]);
+  scene.tweens.add({ targets: medal, alpha: 1, duration: 560, ease: 'Cubic.easeOut' });
+  scene.tweens.add({
+    targets: medal, displayWidth: l.u(MD), displayHeight: l.u(MD), duration: 700, ease: 'Back.easeOut',
+  });
+  scene.tweens.add({ targets: glyph, alpha: 1, duration: 520, delay: 200 });
+  scene.tweens.add({
+    targets: glow, alpha: tier === 2 ? 0.34 : tier === 1 ? 0.26 : 0.19,
+    displayWidth: l.u(MD * 1.9), displayHeight: l.u(MD * 1.9), duration: 700, ease: 'Cubic.easeOut',
+    onComplete: () => {
+      if (!glow.active || ssReduceMotion()) return;
+      scene.tweens.add({ targets: glow, alpha: tier === 2 ? 0.15 : 0.09, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    },
+  });
+
+  // ---- the arrival: a rare announces itself, a legendary shakes the sky ----
+  if (!ssReduceMotion()) {
+    const em = sf(scene.add.particles(0, 0, 'dot', {
+      speed: { min: 20, max: 210 }, lifespan: { min: 700, max: 1700 }, gravityY: -22,
+      scale: { start: 0.75, end: 0 }, alpha: { start: 0.95, end: 0 }, blendMode: 'ADD',
+      tint: tier === 1 ? [0x9fc8ff, 0xd4e4ff, 0xfff2c9] : [0xffd77a, 0xfff2c9, 0xffb457],
+      emitting: false,
+    }));
+    c.add(em);
+    const burst = (n) => {
+      if (!em.active) return;
+      for (let k = 0; k < n; k++) {
+        em.emitParticleAt(l.x(0) + (Math.random() - 0.5) * l.u(MD * 0.8), l.y(MY) + (Math.random() - 0.5) * l.u(MD * 0.8));
+      }
+    };
+    scene.time.delayedCall(240, () => burst(tier === 2 ? 40 : tier === 1 ? 26 : 16));
+    if (tier > 0) scene.time.delayedCall(760, () => burst(tier === 2 ? 26 : 14));
+    if (tier === 2) scene.time.delayedCall(1220, () => burst(22));
+    scene.time.delayedCall(260, () => {
+      if (!c.active) return;
+      if (tier === 2) scene.cameras.main.flash(340, 255, 214, 120, false);
+      else if (tier === 1) scene.cameras.main.flash(260, 150, 190, 255, false);
+    });
+  }
+
+  // ---- the words ----
+  const head = sf(ssTxt(scene, l.x(0), l.y(146), '✦  ' + SS_T('unlHead') + '  ✦', l.u(14), '#ffd77a')).setOrigin(0.5)
+    .setLetterSpacing(l.u(3)).setShadow(0, 0, '#c9b676', l.u(10), true, true).setAlpha(0);
+  const gk = ssGoldTex(scene, loc.name, 25);
+  const gsc = Math.min(1, 340 / gk.w);
+  const name = sf(scene.add.image(l.x(0), l.y(452), gk.key)).setDisplaySize(l.u(gk.w * gsc), l.u(gk.h * gsc)).setAlpha(0);
+  const words = [head, name];
+  if (RC.label) {
+    words.push(sf(ssTxt(scene, l.x(0), l.y(488), '✦ ' + SS_T(RC.label) + ' ✦', l.u(11.5), RC.labelColor)).setOrigin(0.5)
+      .setLetterSpacing(l.u(2.5)).setShadow(0, 0, RC.shadow, l.u(8), true, true).setAlpha(0));
+  }
+  /* The three lines under the nameplate stack on MEASURED heights, not fixed
+     rows: a two-line effect and a two-line condition are both common once the
+     copy is German, and a fixed ladder either overlaps there or leaves a hole
+     under the English. `dh` converts a Text's pixel height back to design. */
+  const dh = (o) => o.height / l.s;
+  const descY = RC.label ? 520 : 498;
+  const desc = sf(scene.add.text(l.x(0), l.y(descY), loc.desc, {
+    fontFamily: SERIF, fontSize: l.u(13.5) + 'px', color: '#e6dfc6', fontStyle: 'italic',
+    align: 'center', wordWrap: { width: l.u(330) }, lineSpacing: l.u(3),
+  })).setOrigin(0.5, 0).setAlpha(0);
+  words.push(desc);
+  let ny = descY + dh(desc) + 26;
+  const how = SS_SIG_HOW(sg);
+  if (how) {
+    const hw = sf(scene.add.text(l.x(0), l.y(ny), '✓ ' + how, {
+      fontFamily: SERIF, fontSize: l.u(10) + 'px', color: '#8a94c4', fontStyle: 'italic',
+      align: 'center', wordWrap: { width: l.u(320) },
+    })).setOrigin(0.5, 0).setAlpha(0);
+    words.push(hw);
+    ny += dh(hw) + 28;
+  }
+  const skies = sf(ssTxt(scene, l.x(0), l.y(ny + 6), SS_T('unlSkies'), l.u(12), '#ffe9a8', 'italic')).setOrigin(0.5).setAlpha(0);
+  const hint = sf(ssTxt(scene, l.x(0), l.y(694), SS_T('unlTap'), l.u(9.5), '#8a94c4', 'italic')).setOrigin(0.5).setAlpha(0);
+  words.push(skies, hint);
+  c.add(words);
+  // head, then the nameplate, then every line under it in its own beat
+  const beats = [[head, 540], [name, 760]];
+  words.slice(2).forEach((o, i) => beats.push([o, 940 + i * 170]));
+  beats.forEach(([o, d]) => {
+    if (!o) return;
+    o.y += l.u(10);
+    scene.tweens.add({ targets: o, y: o.y - l.u(10), alpha: o === hint ? 0.85 : 1, duration: 420, delay: d, ease: 'Cubic.easeOut' });
+  });
+
+  ssHealBlankTexts(scene, 'sigil-rite');
+  // it holds long enough to be read — a legendary a beat longer — then lets
+  // whatever is underneath have the screen back, tapped or not
+  scene.time.delayedCall(tier === 2 ? 6600 : tier === 1 ? 6000 : 5400, close);
   return c;
 }
-/* Say out loud whatever is waiting, one card at a time. The queue is spent
-   the moment it is SCHEDULED, not when the last card fades: a player who
-   walks away mid-notice has been told, and being told twice would read as a
-   bug. Returns the milliseconds the whole sequence will take. */
+
+/* Say out loud whatever is waiting, one rite at a time. The queue is spent
+   rite by rite as each one is BUILT (see ssSigilRite), so two discoveries in
+   one run arrive in sequence and a scene that dies mid-queue leaves the rest
+   in `pend` for the meadow to hold instead. A second caller arriving while a
+   rite is on screen is turned away rather than allowed to stack — its ids are
+   still in `pend`, so nothing is lost. Returns the milliseconds the whole
+   sequence will take. */
+const SS_RITE_MS = [5400, 6000, 6600];
 function ssSigilAnnounce(scene, ids) {
   ids = (ids || []).filter((id) => !!SS_SIG_BY[id]);
-  if (!ids.length || !scene || !scene.scene.isActive()) return 0;
-  const p = SS.prof;
-  if (p.sig) { p.sig.pend = p.sig.pend.filter((id) => ids.indexOf(id) < 0); SS.save(); }
-  ids.forEach((id, i) => ssSigilToast(scene, SS_SIG_BY[id], i * 4400));
-  return (ids.length - 1) * 4400 + 4320;
+  if (!ids.length || !scene || !scene.scene.isActive() || SS_RITE.busy) return 0;
+  const q = ids.slice();
+  const step = () => {
+    if (!scene.scene.isActive()) return;
+    const sg = SS_SIG_BY[q.shift()];
+    if (!sg) return;
+    ssSigilRite(scene, sg, () => { if (q.length) scene.time.delayedCall(420, step); });
+  };
+  step();
+  return ids.reduce((a, id) => a + SS_RITE_MS[SS_SIG_BY[id].rarity | 0] + 840, 0);
 }
 
 // achievement toast, usable from any scene
@@ -4711,7 +4968,7 @@ class Home extends Phaser.Scene {
   campaignCheckpoint() {
     try { return JSON.parse(localStorage.getItem('beta3.campaign')); } catch (e) { return null; }
   }
-  busy() { return this.ascending || this.descending || this.introPlaying; }
+  busy() { return this.ascending || this.descending || this.introPlaying || SS_RITE.busy; }
   startMode(mode) {
     if (this.busy()) return;
     SFX.ui();
@@ -5114,7 +5371,7 @@ class Battle extends Phaser.Scene {
     this.state = 'inspect';
     this.dockC.setVisible(false);          // the compact form yields to the window
     this.inspectP = ssSigilPanel(this, {
-      sigils: this.run.sigils, sign: this.signZ,
+      sigils: this.run.sigils, sign: this.signZ, sleeping: true,
       onClose: () => {
         this.inspectP = null;
         this.dockC.setVisible(true);
@@ -6321,7 +6578,7 @@ class Battle extends Phaser.Scene {
         if (this.endInspectP) return;
         SFX.ui();
         this.endInspectP = ssSigilPanel(this, {
-          sigils: this.run.sigils, sign: this.signZ, depth: 130,
+          sigils: this.run.sigils, sign: this.signZ, sleeping: true, depth: 130,
           onClose: () => { this.endInspectP = null; },
         });
       });
@@ -6507,6 +6764,8 @@ class Profile extends Phaser.Scene {
   constructor() { super('profile'); }
   create() {
     const l = ssLayout(this);
+    this.skiesP = null;          // scene instances persist across restarts
+
     ssMakeTextures(this);
     ssStarfield(this, 90);
 
@@ -6537,8 +6796,10 @@ class Profile extends Phaser.Scene {
       ['mightiest hit', p.bigHit || '—'], ['best quick play', p.bestQuick || '—'],
       ['versus victories', p.vsWins || '—'],
     ];
+    // 26 apart, not 30: the drip's door had to come from somewhere, and the
+    // ledger's own rows were the only slack above the achievement grid
     rows.forEach(([k, v], i) => {
-      const y = l.y(170 + i * 30);
+      const y = l.y(170 + i * 26);
       ssTxt(this, l.x(-150), y, k, l.u(13), '#8a94c4').setOrigin(0, 0.5);
       ssTxt(this, l.x(150), y, String(v), l.u(13), '#f0e8d2').setOrigin(1, 0.5);
     });
@@ -6546,18 +6807,44 @@ class Profile extends Phaser.Scene {
     // the zodiac strip: every campaign sign, burning gold once cleared under.
     // Cleared glyphs wear their element color's glow; the rest hang dim.
     SS_ZODIAC.forEach((z, i) => {
-      const x = l.x(-165 + i * 30), y = l.y(400);
+      const x = l.x(-165 + i * 30), y = l.y(372);
       const sr = p.signs[z.id];
       const cleared = !!(sr && sr.clears > 0);
       ssZodiacGlyph(this, z, l.u(0.085), x, y, cleared ? 0xffd77a : 0x39406b, cleared ? 1 : 0.8);
     });
 
-    ssTxt(this, l.x(0), l.y(420), '— ACHIEVEMENTS  ' + Object.keys(p.ach).length + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
-    // the grid is 23 deep now (the lantern's three marks) — 12 rows at 29
+    /* THE DOOR TO THE SKY (v0.43.0). The gallery has to be reachable from
+       somewhere that is not a battle, because the whole point of the sleeping
+       list is the bar you are chasing between runs. It reads out how much of
+       the sky you hold, and opens the same panel the inspector does — held
+       above, STILL SLEEPING below. */
+    const doorB = this.add.image(l.x(0), l.y(398), ssBtn(this, true, 236, 34)).setDisplaySize(l.u(236), l.u(34))
+      .setInteractive({ useHandCursor: true });
+    const doorT = ssTxt(this, l.x(0), l.y(398), '', l.u(12.5), '#e8c86a')
+      .setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(7), true, true);
+    // the count is DRESSED, never baked: a rite can hand a sigil over while
+    // this scene is alive, and a door still reading 12 / 24 would be a lie
+    const dressDoor = () => doorT.setText('✦  ' + SS_T('skiesTitle') + '  ' + ssSigilOpen().length + ' / ' + SS_SIGILS.length + '  ›');
+    dressDoor();
+    const openSkies = () => {
+      if (this.skiesP) return;
+      SFX.ui();
+      // read the sky as it stands RIGHT NOW — what the drip handed over since
+      // this scene was built belongs above the STILL SLEEPING rule, not under
+      this.skiesP = ssSigilPanel(this, {
+        sigils: ssSigilOpen().map((s) => s.id), sleeping: true, title: 'skiesTitle', depth: 120,
+        onClose: () => { this.skiesP = null; dressDoor(); },
+      });
+    };
+    doorB.on('pointerdown', openSkies);
+    doorT.setInteractive({ useHandCursor: true }).on('pointerdown', openSkies);
+
+    ssTxt(this, l.x(0), l.y(428), '— ACHIEVEMENTS  ' + Object.keys(p.ach).length + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
+    // the grid is 23 deep now (the lantern's three marks) — 12 rows at 28
     // apart is the last spacing that keeps the whole ledger above the seal
     SS_ACH.forEach((a, i) => {
       const col = i % 2, row = Math.floor(i / 2);
-      const x = l.x(col === 0 ? -100 : 100), y = l.y(442 + row * 29);
+      const x = l.x(col === 0 ? -100 : 100), y = l.y(448 + row * 28);
       const got = !!p.ach[a.id];
       ssTxt(this, x - l.u(88), y, a.icon, l.u(14), got ? '#ffd77a' : '#39406b').setOrigin(0.5);
       ssTxt(this, x - l.u(68), y - l.u(7.5), a.name, l.u(10.5), got ? '#f0e8d2' : '#4a5480').setOrigin(0, 0.5);

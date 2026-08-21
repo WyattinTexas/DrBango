@@ -1,5 +1,6 @@
-// v0.42.0 verification: the sigil drip's two laws (the pool never starves ·
-// nobody who already plays loses a sigil — the whole mechanic is walked by
+// v0.43.0 verification: the sigil drip's three laws (the pool never starves ·
+// nobody who already plays loses a sigil · no sigil is ever listed asleep and
+// awake at once — the whole mechanic, both halves, is walked by
 // tools/drip-check.mjs) + the daily share card + the streak lantern (part 2 —
 // the grace night and the
 // marks) + part 1's streak core + fps overlay (OPT-IN via ?fps=1), full-DPR law, WORKLOAD probe + renderer
@@ -1083,6 +1084,44 @@ async function main() {
     await c.ev(`ssSigilOpen().length === 24 && (SS.prof.sig.gf | 0) === 1
       && SS_SIGILS.every(s => ssSigilUnlocked(s.id))`) === true,
     await c.ev(`ssSigilOpen().length`) + ' open · gf=' + await c.ev(`SS.prof.sig.gf | 0`));
+
+  /* 3. NO SIGIL IS EVER LISTED TWICE (v0.43.0). The gallery draws what you
+     hold in full dress above a STILL SLEEPING rule and the locked half as
+     silhouettes below it. Both lists come from ssSigilUnlocked — the same
+     truth ssSigilOpen() draws the pick boards from — so a discovery leaves
+     one list the instant it joins the other. If the two ever came from
+     different sources (a cached id list, a count taken at scene build) a
+     freshly forged sigil would be shown in full dress AND as a silhouette
+     still asking to be found, which is the one thing this surface may never
+     do. Built and read directly, so the law is checked on what is DRAWN. */
+  await c.ev(`(() => { localStorage.removeItem('beta3.profile'); return 'wiped' })()`);
+  await c.nav(BASE + '?fps=0', 10000);
+  await until(`game.scene.isActive('home')`);
+  const dbl = JSON.parse(await c.ev(`(() => {
+    const s = game.scene.getScene('home');
+    const read = () => {
+      const p = ssSigilPanel(s, { sigils: ssSigilOpen().map(g => g.id), sleeping: true, depth: 900 });
+      const txt = [];
+      const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+      w(p.c.list);
+      const kill = (o) => { s.tweens.killTweensOf(o); if (o.list) o.list.forEach(kill); };
+      kill(p.c); p.c.destroy();
+      const held = SS_SIGILS.filter(g => txt.includes(SS_SIG(g).desc)).map(g => g.id);
+      const asleep = SS_SIGILS.filter(g => g.lock && txt.includes(SS_SIG_HOW(g))).map(g => g.id);
+      return { held, asleep, both: held.filter(i => asleep.includes(i)) };
+    };
+    const before = read();
+    SS.prof.sig.c.w8 = 1; SS.save(); ssSigilCheck(); SS.prof.sig.pend = []; SS.save();
+    const after = read();
+    return JSON.stringify({ before, after }) })()`));
+  ok('NO DOUBLE LISTING: a forged sigil leaves the sleeping list the instant it joins the held one',
+    dbl.before.held.length === 12 && dbl.before.asleep.length === 12 && !dbl.before.both.length
+    && dbl.after.held.length === 13 && dbl.after.asleep.length === 11 && !dbl.after.both.length
+    && dbl.after.held.includes('nova') && !dbl.after.asleep.includes('nova'),
+    'held/asleep ' + dbl.before.held.length + '/' + dbl.before.asleep.length
+    + ' → ' + dbl.after.held.length + '/' + dbl.after.asleep.length
+    + (dbl.after.both.length ? ' BOTH: ' + dbl.after.both.join(',') : ''));
+
   await c.ev(`(() => { localStorage.removeItem('beta3.profile'); return 'swept' })()`);
   await c.nav(BASE + '?fps=0', 9000);
 

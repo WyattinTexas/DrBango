@@ -90,26 +90,50 @@ node tools/streak-check.mjs      # served on :8899, headless Chrome on :9444
 
 ## drip-check.mjs
 
-The sigil drip's own harness (v0.42.0). `fps-check.mjs` pins the two LAWS —
-the pool never starves, and nobody who already plays loses a sigil — while
-this one walks the whole mechanic: the starting twelve and their tier split,
-the twelve locks and the twelve stats behind them, the counters under a real
-demo run (plus the two a demo cannot reach, driven through their real code
-paths), the unlock at a LOSS's end, the notice and its lane, persistence,
-versus's immunity, grandfathering in seven shapes, and the copy in ten
-languages. Same CDP shape as `streak-check.mjs`, on its own port so all three
-suites can run side by side; `--disable-gpu` is fine.
+The sigil drip's own harness — both halves (v0.43.0). `fps-check.mjs` pins
+the three LAWS — the pool never starves, nobody who already plays loses a
+sigil, and no sigil is ever listed asleep and awake at once — while this one
+walks the whole mechanic: the starting twelve and their tier split, the twelve
+locks and the twelve stats behind them, the counters under a real demo run
+(plus the two a demo cannot reach, driven through their real code paths), the
+unlock at a LOSS's end, THE FORGE CEREMONY (its dress, its screen-space
+drawing, one real tap to dismiss, and two discoveries queueing rather than
+stacking), THE SLEEPING GALLERY (the profile door, the STILL SLEEPING section,
+every bar against the counter behind it, the silhouette that gives away
+nothing, and the migration from asleep to held), persistence, versus's
+immunity, grandfathering in seven shapes, and the copy in ten languages. Same
+CDP shape as `streak-check.mjs`, on its own port so all three suites can run
+side by side; `--disable-gpu` is fine.
 
 ```
 node tools/drip-check.mjs      # served on :8899, headless Chrome on :9445
 ```
 
-Three things this file learned the hard way:
+⚠ **Run the suites ONE AT A TIME.** Three headless Chromes at DPR 3 will
+starve each other's game loop on this box (one renderer was measured at 295%
+CPU), and a starved loop reads as a wall of red in whichever suite is
+unlucky — 2026-08-21, streak-check went 58/58 → 50/58 → hard crash purely from
+company. It also reproduces on a *previous* commit, which is how it was
+identified. Kill every `/tmp/cdp-*` Chrome between suites.
 
-- **The meadow's notice fires about a second after the grass does, and lives
-  ~4 seconds.** A harness that waits out a 12-second navigation and *then*
-  looks finds an empty meadow and calls a working feature broken. Start the
-  poll before the boot settles.
+Six things this file learned the hard way:
+
+- **Inside a Container it is the CHILD's scroll factor the camera consults,
+  not the container's.** A full-screen beat whose container carries
+  `setScrollFactor(0)` while its children do not is drawn in WORLD space — on
+  the meadow, whose camera sits thousands of pixels down the sky, that means
+  drawn nowhere. Every child of the forge ceremony sets it for itself, and the
+  harness asserts it rather than trusting a screenshot.
+- **A `\/` inside a template literal is just `/`.** The gallery reader
+  originally filtered its bars with `` `... / \/ /.test(t) ...` ``, which
+  reached the page as `/ / /` — a syntax error thrown from inside
+  `Runtime.evaluate`, twenty lines from anything that looked wrong. Use
+  `indexOf(' / ')` in an evaluated string, never a regex with an escaped
+  slash.
+- **The meadow's ceremony fires about a second after the grass does.** A
+  harness that waits out a 12-second navigation and *then* looks finds an
+  empty meadow and calls a working feature broken. Start the poll before the
+  boot settles.
 - **The demo solver is never struck.** It fells everything before the timer
   runs out, so `hit` and `brnk` stay at zero through a whole automated run.
   Both are driven for real instead: `shieldUsed = true; beast.count = 1;
@@ -119,6 +143,19 @@ Three things this file learned the hard way:
   against a starting pool holding one legendary (already taken) and two rares
   give two rare cards and then a basic — the board spends the rares itself as
   it fills.
+- **Verifying the ceremony on `?rend=gl` needs a different tap and a different
+  camera.** The swiftshader box runs the loop as slowly as **1 fps**, and at
+  1 fps a press+release 60 ms apart lands inside a single frame, so Phaser
+  never sees a pointer that was DOWN and nothing is ever clicked. Move, wait
+  ~600 ms, press, **hold ~2.2 s**, release. And `Page.captureScreenshot` on a
+  WebGL canvas hands back an early or stale frame (no `preserveDrawingBuffer`)
+  — the 2026-08-21 GL shot of the forge rite showed a bright meadow and no
+  copy at all, which looked exactly like a broken renderer and was not.
+  `game.renderer.snapshot(img => …)` reads the buffer properly.
+- **At 1 fps the scene clock stretches every tween ~25×**, so a rite that
+  looks finished after 3 wall-clock seconds at 60 fps is still at veil 0.79
+  and every word at alpha 0. Poll the display list's alphas; never sleep and
+  shoot.
 
 ## click-test.js
 
@@ -253,10 +290,50 @@ localStorage.removeItem('beta3.profile')      // …or start from nothing
 - **The grandfather decision is made ONCE**, when `sig` is first created, and
   saved on the spot. To re-test it you must delete the whole profile, not just
   its stats — a profile that already carries `sig` will never re-decide.
-- `SS_SIG_TOAST_Y` (178) is the notice's lane. Above it sit the meadow's chips
-  and `ssAchToast` (y 52, 58 tall); below it the meadow's title plate starts
-  at ~276. A long word can earn LEXICON and finish a drip condition in the
-  same cast, so the two notices must never be able to print over each other.
+
+## The forge ceremony and the sleeping gallery (v0.43.0)
+
+Part two of the drip has two surfaces and no new flag either.
+
+**The ceremony** (`ssSigilRite` / `ssSigilAnnounce`, `SS_RITE.busy`) is a
+full-screen beat in the mark rite's language: veil at **0.985** — not the mark
+rite's 0.9, because this one prints its copy across the middle of the screen
+where the meadow's own gold buttons live, and at anything lighter their
+letters read straight through the sigil's name — the glyph rising in a baked
+`ssSigilMedalTex` medallion, the name in `ssGoldTex`, the rarity ribbon, the
+effect, the condition that earned it, and "now appearing in your skies."
+
+- Its container stamps `setData('sigilRite', id)`. That is the harness handle:
+  which rite is up, and how many are (the answer must always be ≤ 1).
+- `SS_RITE.busy` is part of `Home.busy()`, so no run can start, no sheet can
+  open and no mark rite can cut in while a discovery is being held.
+- The queue is spent **as each rite is built** — not when it is scheduled (a
+  scene that dies first must leave the rest in `pend` for the grass) and not
+  when it closes (being told twice reads as a bug).
+- Lines under the nameplate stack on MEASURED text heights (`o.height / l.s`),
+  because a two-line German effect and a two-line German condition are both
+  ordinary and a fixed ladder either overlaps or leaves a hole.
+
+**The gallery** is `ssSigilPanel(scene, { …, sleeping: true })`. It appends a
+STILL SLEEPING section built from `SS_SIGILS.filter(s => s.lock &&
+!ssSigilUnlocked(s.id))` — the same truth `ssSigilOpen()` draws pick boards
+from, which is what makes the no-double-listing law hold by construction
+rather than by care. Rows are heterogeneous now, so the panel lays out on a
+prefix sum of per-row heights; the mask and the drag-scroll still read
+`contentH`.
+
+- The Profile's `✦ YOUR SKIES n / 24 ›` door reads the sky **live** on every
+  open (`ssSigilOpen()` inside the handler, `dressDoor()` on close). Baking
+  the list at scene build was the one real bug this task shipped and caught:
+  a rite handing a sigil over while the profile stood open left the gallery
+  one short.
+- A sleeping row shows the rarity ribbon and NOTHING else that identifies it —
+  no name, no glyph, no effect. `ssSleepCardTex` is a separate baked card
+  (slate glass, dashed frame, empty socket) rather than a tinted one, so the
+  Canvas renderer needs no tint at all.
+- `barW = maxW - 72`. The panel's mask ends at design x 186, so a bar wider
+  than its row is not merely ugly — it is CUT at the window's edge, which is
+  how the first draft looked.
 
 ## The share card, and clicking a button that was born this frame (v0.41.0)
 

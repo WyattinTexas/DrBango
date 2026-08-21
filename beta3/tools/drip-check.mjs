@@ -1,8 +1,10 @@
-// DRIP-CHECK — the sigil drip (v0.42.0, part 1: locks, conditions, discovery).
-// fps-check.mjs pins the two LAWS that must never break (the pool never
-// starves, and nobody who already plays loses a sigil); this walks the whole
-// mechanic — the twelve, the conditions, the counters under real play, the
-// unlock at the run's end, the notice, persistence, and versus's immunity.
+// DRIP-CHECK — the sigil drip, both halves (v0.43.0).
+// fps-check.mjs pins the three LAWS that must never break (the pool never
+// starves, nobody who already plays loses a sigil, and no sigil is ever
+// listed asleep and awake at once); this walks the whole mechanic — the
+// twelve, the conditions, the counters under real play, the unlock at the
+// run's end, the FORGE CEREMONY and its queue, the SLEEPING GALLERY and its
+// bars, persistence, and versus's immunity.
 // Run from beta3/ with the folder served on :8899 and a headless Chrome on
 // :9445 (its own port, so this can run beside fps-check's 9333 and
 // streak-check's 9444; --disable-gpu is fine — nothing here forces WebGL):
@@ -51,21 +53,67 @@ const HOME_REST = `!!window.game && game.scene.isActive('home')
   && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB`;
 // a fresh profile, from nothing — the only way into the drip
 const wipe = async () => { await ev(`(()=>{ localStorage.removeItem('beta3.profile'); localStorage.removeItem('beta3.campaign'); return 'wiped' })()`); };
-// the unlock notice, found by its header wherever it is on the display list
-const NOTICE = `(() => { let f = 0;
-  const w = (ls) => ls.forEach(o => { if (o.type === 'Text' && o.text === SS_T('unlHead')) f++; if (o.list) w(o.list); });
-  w(game.scene.getScenes(true).flatMap(s => s.children.list)); return f })()`;
-// the notice's own container, read back in DESIGN units — the one number the
-// lane law is about (nothing above 94, nothing below 262)
-const LANE = `(() => { let c = null;
-  const w = (ls) => ls.forEach(o => { if (o.list && o.list.some(k => k.type === 'Text' && k.text === SS_T('unlHead'))) c = o; else if (o.list) w(o.list); });
-  w(game.scene.getScenes(true).flatMap(s => s.children.list));
-  if (!c) return 'none';
-  const l = ssLayout(game.scene.getScenes(true)[0]);
-  return JSON.stringify({ y: Math.round((c.y - l.y(0)) / l.s), sf: c.scrollFactorY,
-    h: Math.round(c.list.find(o => o.type === 'Image' && o.texture.key === 'endpanel').displayHeight / l.s) }) })()`;
+/* THE CEREMONY, found by the id its container stamps on itself. `RITE` is
+   which discovery is on screen right now, `RITES` how many are — and the
+   second number is a law, not a curiosity: two unlocks in one run must queue,
+   never stack. */
+const RITE = `(() => { const o = game.scene.getScenes(true).flatMap(s => s.children.list)
+  .find(x => x.getData && x.getData('sigilRite')); return o ? o.getData('sigilRite') : 'none' })()`;
+const RITES = `game.scene.getScenes(true).flatMap(s => s.children.list).filter(x => x.getData && x.getData('sigilRite')).length`;
+// every string the ceremony is currently printing, flattened
+const RITE_TEXT = `(() => { const c = game.scene.getScenes(true).flatMap(s => s.children.list)
+    .find(x => x.getData && x.getData('sigilRite'));
+  if (!c) return '[]';
+  const out = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') out.push(o.text); if (o.list) w(o.list); });
+  w(c.list); return JSON.stringify(out) })()`;
+/* A press+release at a DESIGN coordinate, straight on the canvas. The
+   ceremony's veil covers the screen and every child of it is drawn in SCREEN
+   space (scrollFactor 0), so the camera scroll that a world-object tap has to
+   subtract must NOT be subtracted here — on the meadow the camera sits ~4200px
+   down the sky and the tap would land in the dirt.
+   ⚠ A tap on a JUST-BUILT surface is dropped: Phaser registers new
+   interactive objects on the NEXT update, and the software renderer runs the
+   loop as slowly as 12fps. Every caller re-taps until the effect shows. */
+const tapD = async (dx, dy) => {
+  const p = JSON.parse(await ev(`(() => { const s = game.scene.getScenes(true)[0], l = ssLayout(s);
+    const b = game.canvas.getBoundingClientRect();
+    return JSON.stringify({ x: b.left + l.x(${dx}) / game.canvas.width * b.width,
+                            y: b.top + l.y(${dy}) / game.canvas.height * b.height }) })()`));
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y });
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+};
+// tap until `done` reads true (or we run out of patience)
+const tapUntil = async (dx, dy, done, tries = 10) => {
+  for (let i = 0; i < tries; i++) { await tapD(dx, dy); await sleep(450); if (await ev(done) === true) return true; }
+  return false;
+};
+// drag the gallery's window up, which is how its rows scroll
+const dragUp = async (px = 260) => {
+  const b = JSON.parse(await ev(`(() => { const r = game.canvas.getBoundingClientRect();
+    return JSON.stringify({ x: r.left + r.width / 2, y: r.top + r.height * 0.62, h: r.height }) })()`));
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: b.x, y: b.y, button: 'left', clickCount: 1 });
+  for (let i = 1; i <= 8; i++) {
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: b.x, y: b.y - px * i / 8, buttons: 1 });
+    await sleep(40);
+  }
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: b.x, y: b.y - px, button: 'left', clickCount: 1 });
+};
+/* THE GALLERY, read back as data. Held rows carry a real sigil id; sleeping
+   rows carry a `?` in an empty socket and a bar. Both are read off the panel's
+   own row container so the NO-DOUBLE-LISTING law can be checked on what is
+   actually drawn, not on what the model says should be. */
+const GALLERY = `(() => { const s = game.scene.getScenes(true).find(x => x.skiesP || x.inspectP || x.endInspectP);
+  const p = s && (s.skiesP || s.endInspectP || s.inspectP);
+  if (!p) return 'none';
+  const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+  w(p.c.list);
+  const held = SS_SIGILS.filter(g => txt.includes(SS_SIG(g).desc)).map(g => g.id);
+  const asleep = SS_SIGILS.filter(g => g.lock && txt.includes(SS_SIG_HOW(g))).map(g => g.id);
+  return JSON.stringify({ head: txt.includes('—  ' + SS_T('slpHead') + '  —'), held, asleep,
+    bars: txt.filter(t => t.indexOf(' / ') >= 0), both: held.filter(i => asleep.includes(i)) }) })()`;
 
-console.log('\nDRIP-CHECK · the sigil drip, part 1\n');
+console.log('\nDRIP-CHECK · the sigil drip, both halves\n');
 
 // ================================================================
 // 1. THE TWELVE — who starts in the pool, and who is locked
@@ -269,25 +317,27 @@ const after = await evj(`JSON.stringify({ open: ssSigilOpen().length, longbow: s
 ok('a LOSS that finished the condition unlocks it all the same',
   after.longbow === true && after.open === 13 && after.stamp === true,
   'open ' + after.open + ' pend ' + JSON.stringify(after.pend));
-ok('the notice arrives at the run’s end, over the settled window',
-  await until(`${NOTICE} === 1`, 30000), await ev(NOTICE) + ' notice(s)');
-const card = await evj(`(() => { const found = [];
-  const w = (ls) => ls.forEach(o => { if (o.type === 'Text') found.push(o.text); if (o.list) w(o.list); });
-  w(game.scene.getScenes(true).flatMap(s => s.children.list));
-  const sg = SS_SIG_BY.longbow;
-  return JSON.stringify({ head: found.includes(SS_T('unlHead')), glyph: found.includes(sg.icon),
-    rarity: found.some(t => /RARE|LEGENDARY/.test(t)) || (sg.rarity | 0) === 0,
-    desc: found.some(t => t === SS_SIG(sg).desc), how: found.some(t => t.includes(SS_SIG_HOW(sg))) }) })()`);
-ok('and it carries the name-plate, the glyph, the effect and the condition that earned it',
-  card.head && card.glyph && card.desc && card.how, JSON.stringify(card));
-/* THE LANE. The notice must never be able to print over the achievement toast
-   (y 52, 58 tall → it owns 23..81) — the two land together constantly, since
-   a long word both earns LEXICON and finishes a drip condition. */
-await until(`(() => { const r = ${LANE}; return r !== 'none' && JSON.parse(r).y === SS_SIG_TOAST_Y })()`, 25000);
-const lane = await evj(LANE);
-ok('the notice keeps its own lane, clear of the achievement toast above it',
-  lane !== 'none' && lane.y === 178 && lane.y - lane.h / 2 > 81,
-  'band ' + (lane.y - lane.h / 2) + '..' + (lane.y + lane.h / 2));
+ok('the FORGE CEREMONY arrives at the run’s end, over the settled window',
+  await until(`${RITE} === 'longbow'`, 40000), await ev(RITE));
+const rite = JSON.parse(await ev(RITE_TEXT));
+const sgHow = await ev(`SS_SIG_HOW(SS_SIG_BY.longbow)`);
+const sgDesc = await ev(`SS_SIG(SS_SIG_BY.longbow).desc`);
+const sgIcon = await ev(`SS_SIG_BY.longbow.icon`);
+const rHead = await ev(`SS_T('unlHead')`), rSkies = await ev(`SS_T('unlSkies')`), rTap = await ev(`SS_T('unlTap')`);
+ok('it wears the whole rite: the head, the glyph in its medallion, the effect, the condition, and the promise',
+  rite.some(t => t.includes(rHead)) && rite.includes(sgIcon) && rite.includes(sgDesc)
+  && rite.some(t => t.includes(sgHow)) && rite.includes(rSkies) && rite.includes(rTap),
+  rite.map(t => t.slice(0, 22)).join(' | '));
+ok('it is drawn in SCREEN space over everything else — a rite in world space on the meadow is drawn nowhere',
+  await ev(`(() => { const c = game.scene.getScenes(true).flatMap(s => s.children.list)
+    .find(x => x.getData && x.getData('sigilRite'));
+    return c.depth === 680 && c.list.every(o => (o.scrollFactorY | 0) === 0) })()`) === true);
+ok('the name is struck in the wordmark’s gold, not typed as text',
+  await ev(`(() => { const c = game.scene.getScenes(true).flatMap(s => s.children.list)
+    .find(x => x.getData && x.getData('sigilRite'));
+    return c.list.some(o => o.type === 'Image' && /^gold@/.test(o.texture.key)) })()`) === true);
+ok('ONE TAP dismisses it — it never traps the player on the end screen',
+  await tapUntil(0, 146, `${RITE} === 'none'`), 'rite ' + await ev(RITE));
 ok('saying it out loud spends the queue — nobody is told twice',
   await until(`SS.prof.sig.pend.length === 0`, 20000), JSON.stringify(await evj(`JSON.stringify(SS.prof.sig.pend)`)));
 await nav(BASE + '?fps=0', 12000);
@@ -299,24 +349,50 @@ ok('…and it can now be offered by a real roll',
   await ev(`(() => { const opens = ssSigilOpen().map(s => s.id); return opens.includes('longbow') })()`) === true);
 
 // ================================================================
-// 6. THE NOTICE ON THE GRASS — the safety net for an app closed early
+// 6. THE CEREMONY ON THE GRASS — the safety net, and the queue
 // ================================================================
-console.log('\n6. the notice on the grass');
+console.log('\n6. the ceremony on the grass');
 await ev(`(() => { SS.prof.sig.u.nova = 1; SS.prof.sig.pend = ['nova']; SS.save(); return 'planted' })()`);
-/* ⚠ the poll starts BEFORE the boot settles. The notice arrives about a
-   second after the grass does and lives ~4s; a harness that waits out a
-   12-second navigation and looks afterwards finds an empty meadow and calls
-   a working feature broken. */
+/* ⚠ the poll starts BEFORE the boot settles. The rite arrives about a second
+   after the grass does; a harness that waits out a 12-second navigation and
+   then looks may find it already gone and call a working feature broken. */
 await nav(BASE + '?fps=0', 1500);
-ok('a discovery that was never said out loud is said on still grass',
-  await until(`(() => { try { return ${NOTICE} >= 1 } catch (e) { return false } })()`, 60000));
-await until(`(() => { const r = ${LANE}; return r !== 'none' && JSON.parse(r).y === SS_SIG_TOAST_Y })()`, 25000);
-const mlane = await evj(LANE);
-ok('…in the same lane, clear of the meadow’s chips above and its title below',
-  mlane !== 'none' && mlane.sf === 0 && mlane.y - mlane.h / 2 > 81 && mlane.y + mlane.h / 2 < 276,
-  'band ' + (mlane.y - mlane.h / 2) + '..' + (mlane.y + mlane.h / 2) + ' scrollFactor ' + mlane.sf);
+ok('a discovery that was never said out loud is held on still grass',
+  await until(`(() => { try { return ${RITE} === 'nova' } catch (e) { return false } })()`, 60000));
+/* The meadow is the reason every child of the rite carries scrollFactor 0:
+   inside a Container it is the CHILD's scroll factor the camera consults, not
+   the container's, and the meadow's camera can sit thousands of pixels down
+   the sky world. Assert the factor, and assert the result — every piece of
+   the rite inside the visible frame. */
+ok('…in screen space, wholly inside the frame, over a meadow whose camera has climbed the sky',
+  await ev(`(() => { const h = game.scene.getScene('home');
+    const c = h.children.list.find(x => x.getData && x.getData('sigilRite'));
+    if (!c) return false;
+    const fixed = c.list.every(o => (o.scrollFactorY | 0) === 0);
+    const inside = c.list.filter(o => o.type === 'Text').every(o => o.y > 0 && o.y < game.canvas.height);
+    return fixed && inside })()`) === true,
+  'camera scrollY ' + await ev(`String(Math.round(game.scene.getScene('home').cameras.main.scrollY || 0))`));
+ok('the meadow is held while it plays — no run may begin under a ceremony',
+  await ev(`game.scene.getScene('home').busy() === true`) === true);
 ok('and the meadow spends the queue too', await until(`SS.prof.sig.pend.length === 0`, 20000));
+ok('one tap lets the meadow back', await tapUntil(0, 146, `${RITE} === 'none'`));
 ok('the meadow is standing normally underneath it', await until(HOME_REST));
+ok('…and it is free again the moment the rite is gone', await until(`game.scene.getScene('home').busy() === false`, 15000));
+
+/* TWO IN ONE RUN. A long word can finish two conditions at once, and the two
+   ceremonies must arrive one after the other — never drawn on top of each
+   other, and never one swallowing the other. */
+await ev(`(() => { SS.prof.sig.u.nova = 1; SS.prof.sig.u.longbow = 1;
+  SS.prof.sig.pend = ['nova', 'longbow']; SS.save();
+  ssSigilAnnounce(game.scene.getScene('home'), ['nova', 'longbow']); return 'queued' })()`);
+ok('two discoveries queue: the legendary is held first, alone',
+  await until(`${RITE} === 'nova' && ${RITES} === 1`, 25000), 'on screen ' + await ev(RITES));
+let stacked = 0;
+for (let i = 0; i < 26; i++) { if (await ev(RITES) > 1) stacked++; await sleep(500); if (await ev(RITE) === 'longbow') break; }
+ok('…then the second follows it', await until(`${RITE} === 'longbow'`, 25000), 'now ' + await ev(RITE));
+ok('and NEVER two at once', stacked === 0, stacked + ' frame(s) with two rites up');
+ok('the queue empties itself', await until(`SS.prof.sig.pend.length === 0`, 25000));
+await until(`${RITE} === 'none'`, 25000);
 
 // ================================================================
 // 7. GRANDFATHERING — nobody who already plays loses anything
@@ -366,6 +442,135 @@ const es = await evj(`JSON.stringify({ head: SS_T('unlHead'), how: SS_SIG_HOW(SS
 ok('a Spanish boot reads the condition in Spanish, number and all',
   /SIGILO/.test(es.head) && /seis letras/.test(es.how) && es.how.includes('8'), es.how);
 await nav(BASE + '?fps=0&lang=en', 11000);
+
+// ================================================================
+// 9. THE SLEEPING GALLERY — the bars there is always one more of
+// ================================================================
+console.log('\n9. the sleeping gallery');
+await wipe();
+await nav(BASE + '?fps=0', 12000);
+await until(HOME_REST);
+// plant real, partial progress so the bars have honest fractions to draw
+await ev(`(() => { Object.assign(SS.prof.sig.c, { scry: 5, w6: 2, frg: 19, w7: 1, ovk: 60, hit: 40, brnk: 1 });
+  SS.prof.words = 100; SS.prof.beasts = 15; SS.prof.wins = 1; SS.prof.bigHit = 30; SS.save(); return 'planted' })()`);
+await nav(BASE + '?fps=0', 12000);
+await until(HOME_REST);
+ok('the profile carries a door to the sky, and it reads how much of it is yours',
+  await tapUntil(195, 26, `game.scene.isActive('profile')`)
+  && await ev(`(() => { const t = game.scene.getScene('profile').children.list
+      .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0);
+    return !!t && t.text.indexOf('12 / 24') >= 0 })()`) === true,
+  await ev(`(() => { const t = game.scene.getScene('profile').children.list
+    .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); return t ? t.text : 'no door' })()`));
+ok('the door opens the gallery', await tapUntil(0, 398, `!!game.scene.getScene('profile').skiesP`));
+await sleep(900);
+for (let i = 0; i < 12; i++) await dragUp();     // all the way to the bottom
+await sleep(600);
+const gal = await evj(GALLERY);
+ok('it holds the STILL SLEEPING section, and every locked sigil is in it',
+  gal !== 'none' && gal.head === true && gal.asleep.length === 12,
+  'asleep ' + gal.asleep.length + ' · held ' + gal.held.length);
+ok('THE LAW: no sigil is ever listed asleep AND awake',
+  gal.both.length === 0, gal.both.join(',') || 'none in both');
+ok('the twelve you hold are all above it, in full dress',
+  gal.held.length === 12 && await ev(`(() => { const p = game.scene.getScene('profile').skiesP;
+    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+    w(p.c.list);
+    return SS_SIGILS.filter(g => g.lock && !ssSigilUnlocked(g.id)).every(g => !txt.includes(SS_SIG(g).desc)) })()`) === true,
+  gal.held.join(' '));
+// the bars, read against the counters that feed them
+const bars = await evj(`(() => { const out = {};
+  for (const g of SS_SIGILS) if (g.lock && !ssSigilUnlocked(g.id)) {
+    const pr = ssSigilProgress(g); out[g.id] = pr.have + ' / ' + pr.need;
+  } return JSON.stringify(out) })()`);
+const want = ['5 / 20', '2 / 8', '19 / 25', '1 / 5', '30 / 60', '15 / 30', '1 / 3', '60 / 120', '40 / 80', '0 / 1', '100 / 400', '1 / 3'];
+ok('every bar reads the real counter behind it, capped at its target',
+  JSON.stringify(Object.values(bars)) === JSON.stringify(want), Object.values(bars).join(' · '));
+ok('…and every one of those fractions is drawn on its own row',
+  want.every(w => gal.bars.includes(w)), gal.bars.join(' · '));
+ok('a silhouette gives away the rarity dress and NOTHING else — no name, no glyph',
+  await ev(`(() => { const p = game.scene.getScene('profile').skiesP;
+    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+    w(p.c.list);
+    const locked = SS_SIGILS.filter(g => g.lock && !ssSigilUnlocked(g.id));
+    return locked.every(g => !txt.includes(SS_SIG(g).name) && !txt.includes(SS_SIG(g).desc) && !txt.includes(g.icon))
+      && txt.filter(t => t === '?').length === locked.length })()`) === true);
+
+/* THE MIGRATION. A sigil that has just been through its ceremony must be in
+   the held list and out of the sleeping one the very next time the gallery is
+   opened — this is the rule the whole surface lives or dies by. */
+await tapUntil(0, 60, `!game.scene.getScene('profile').skiesP`);
+await ev(`(() => { SS.prof.sig.c.scry = 20; SS.save(); ssSigilCheck(); SS.prof.sig.pend = []; SS.save(); return 'forged' })()`);
+await tapUntil(0, 398, `!!game.scene.getScene('profile').skiesP`);
+await sleep(900);
+for (let i = 0; i < 12; i++) await dragUp();
+await sleep(600);
+const gal2 = await evj(GALLERY);
+ok('after the forge, COMET TRAIL has moved from sleeping to held — and is in exactly one of them',
+  gal2.held.includes('comet') && !gal2.asleep.includes('comet') && gal2.both.length === 0,
+  'held ' + gal2.held.length + ' asleep ' + gal2.asleep.length);
+ok('and the count above the list came down with it',
+  gal2.asleep.length === 11 && await ev(`(() => { const p = game.scene.getScene('profile').skiesP;
+    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+    w(p.c.list); return txt.includes(SS_T('slpSub', 11)) })()`) === true);
+ok('…and the door itself re-counts the sky on the way out',
+  await tapUntil(0, 60, `!game.scene.getScene('profile').skiesP`)
+  && await ev(`(() => { const t = game.scene.getScene('profile').children.list
+      .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0);
+    return !!t && t.text.indexOf('13 / 24') >= 0 })()`) === true,
+  await ev(`(() => { const t = game.scene.getScene('profile').children.list
+    .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); return t ? t.text : 'no door' })()`));
+
+// the in-battle inspector carries the same section — the bar to chase is
+// readable from inside the fight that is filling it
+await ev(`(() => { localStorage.removeItem('beta3.campaign'); return 'x' })()`);
+await nav(BASE + '?fps=0&daily=1', 20000);
+await until(`(() => { const b = game.scene.getScene('battle'); return game.scene.isActive('battle') && !!b && !!b.run })()`);
+await ev(`(() => { const b = game.scene.getScene('battle');
+  b.run.sigils = ['quill', 'choir']; b.state = 'pick'; b.openInspect(); return 'opened' })()`);
+await sleep(800);
+const gal3 = await evj(GALLERY);
+ok('the in-battle inspector shows the same sleeping list under what you hold',
+  gal3 !== 'none' && gal3.head === true && gal3.asleep.length === 11 && gal3.both.length === 0,
+  'held ' + gal3.held.join(' ') + ' · asleep ' + gal3.asleep.length);
+ok('…and it still shows only the sigils this run actually holds above it',
+  gal3.held.length === 2 && gal3.held.includes('quill') && gal3.held.includes('choir'), gal3.held.join(' '));
+
+// ================================================================
+// 10. THE WHOLE SKY — the gallery with nothing left asleep
+// ================================================================
+console.log('\n10. the whole sky');
+await ev(`localStorage.setItem('beta3.profile', JSON.stringify({ runs: 5, words: 90 })); 'planted'`);
+await nav(BASE + '?fps=0', 12000);
+await until(HOME_REST);
+await tapUntil(195, 26, `game.scene.isActive('profile')`);
+await tapUntil(0, 398, `!!game.scene.getScene('profile').skiesP`);
+await sleep(900);
+const full = await evj(GALLERY);
+ok('a grandfathered sky lists all 24 held and none asleep',
+  full !== 'none' && full.held.length === 24 && full.asleep.length === 0 && full.both.length === 0,
+  'held ' + full.held.length + ' asleep ' + full.asleep.length);
+ok('and the section says so rather than standing empty',
+  await ev(`(() => { const p = game.scene.getScene('profile').skiesP;
+    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+    w(p.c.list); return txt.includes(SS_T('slpNone')) })()`) === true);
+
+// ================================================================
+// 11. THE COPY OF PART TWO — ten languages, again
+// ================================================================
+console.log('\n11. the copy of the ceremony and the gallery');
+const i18n2 = await evj(`JSON.stringify(['unlHead','unlSkies','unlTap','slpHead','slpSub','slpSub1','slpNone','skiesTitle']
+  .map(k => [k, Object.keys(SS_STR).filter(l => (SS_STR[l][k] || '').length > 1).length]))`);
+ok('every new line of the ceremony and the gallery exists in all ten languages',
+  i18n2.every(([, n]) => n === 10), i18n2.map(([k, n]) => k + ':' + n).join(' '));
+ok('and the two plural forms of the sleeping count really differ',
+  await ev(`Object.keys(SS_STR).every(l => SS_STR[l].slpSub !== SS_STR[l].slpSub1 && /%1/.test(SS_STR[l].slpSub))`) === true);
+await nav(BASE + '?fps=0&lang=de', 12000);
+const de = await evj(`JSON.stringify({ head: SS_T('unlHead'), skies: SS_T('unlSkies'), sleep: SS_T('slpHead'), door: SS_T('skiesTitle') })`);
+ok('a German boot reads the whole rite in German',
+  /SIGEL/.test(de.head) && /Himmel/.test(de.skies) && /SCHLAFEND/.test(de.sleep) && /HIMMEL/.test(de.door),
+  [de.head, de.sleep, de.door].join(' · '));
+await nav(BASE + '?fps=0&lang=en', 12000);
 
 // ---------------------------------------------------------------- sweep
 await ev(`(() => { localStorage.removeItem('beta3.profile'); return 'swept' })()`);
