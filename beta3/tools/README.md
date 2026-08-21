@@ -1,6 +1,6 @@
 # beta3 dev tools
 
-Nine scripts, all dev-only — nothing here ships to the browser.
+Ten scripts, all dev-only — nothing here ships to the browser.
 
 ## make-word-packs.py
 
@@ -128,6 +128,36 @@ What TestFlight v0.43.0 taught, in three lines:
   native one. Nothing else in the bakes is newer than iOS 15
   (`setLineDash`, `multiply`/`destination-in`, `direction`,
   `actualBoundingBoxAscent` are all Safari ≤ 11.1).
+
+## vs-match.mjs
+
+The rival queue, matched by rating (v0.48.0). Wyatt: "searching for a rival
+should queue you up against someone close to your rating." The UX did not
+move — a searcher still IS a waiting public room (FIND A RIVAL takes a seat
+or opens one), so the queue entry is the room: `seekAt` is the moment FIND
+was pressed (`now - seekAt` is the wait, for the 12s-fallback task to read),
+the host seat already carries the true `rating` (rhide is display-only).
+`vsPickRoom` takes the CLOSEST host within a tolerance that opens with the
+pair's COMBINED wait (±75 at once, +75 per 3s between them — `vsTolerance`),
+skipping private rooms, full rooms and hosts who faded (`gone`). A host
+waiting alone rescans every 2.5s and only ever migrates into an OLDER room
+(the elder stays put, so two hosts can never cross), shutting its own door
+with an only-if-still-alone transaction first and reopening it under the
+same code and wait if the elder room filled meanwhile. The seat itself is
+still claimed by the same join transaction as before.
+
+Three headless Chromes (:9461–:9463, `/tmp/cdp-vsm1..3`) against the
+testroom RTDB — the local fallback refuses versus — each seeded with its
+own rating through `beta3.profile` on `ascent.html` before the game boots,
+pressing FIND A RIVAL with real taps:
+
+```
+python3 -m http.server 8899 &
+node tools/vs-match.mjs       # 24 checks: near over far, lone widens (+veil), 3-at-once ×3
+```
+
+Harness lesson: a page http.server serves as `text/markdown` has no
+localStorage (opaque document) — seed on a real HTML page of the origin.
 
 ## tagline-check.mjs
 

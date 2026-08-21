@@ -417,6 +417,57 @@ function vsCode() {
   for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
   return s;
 }
+/* ---------- the rival queue: matched by rating (v0.48.0) ----------
+   A searcher IS a waiting public room — pressing FIND A RIVAL either takes a
+   seat in someone's room or opens one and waits. The queue entry is the room
+   itself: `seekAt` is the moment FIND was pressed, so "how long has this
+   searcher waited" is always `now - seekAt` (the fallback tasks read it
+   there); `createdAt` is the room's own age, and they diverge once a host has
+   migrated (below). The host seat already carries `rating` (true number even
+   under rhide — the veil is display-only).
+   Pairing prefers the CLOSEST rating on offer, within a tolerance that opens
+   with the pair's COMBINED wait: ±75 at once, +75 per 3s waited between them,
+   so a lone searcher meets anyone soon enough. A host waiting alone rescans
+   every 2.5s (VsBattle.rescan) — and only a YOUNGER room ever migrates into
+   an OLDER one, so two hosts rescanning at the same instant can never cross
+   into each other's room. Seats are still claimed by the same single join
+   transaction as before: the rating preference chooses WHICH door to try,
+   the transaction decides who got through it. */
+const VS_MM = { TOL: 75, STEP: 75, STEP_MS: 3000, RESCAN_MS: 2500 };
+function vsTolerance(waitA, waitB) {
+  return VS_MM.TOL + VS_MM.STEP * Math.floor((Math.max(0, waitA | 0) + Math.max(0, waitB | 0)) / VS_MM.STEP_MS);
+}
+function vsRoomRating(r) {
+  const h = r && r.players && r.players[r.hostUid];
+  return h && Number.isFinite(h.rating) ? h.rating : SS_RATING.BASE;
+}
+function vsRoomSeekAt(r, now) { return r.seekAt || r.createdAt || now; }
+// the best open room of `mode` for me right now, or null. `own` is my own
+// waiting room ({code, createdAt}) when I already hold one: then only rooms
+// OLDER than mine qualify. `skip` lists codes whose door already shut on me.
+function vsPickRoom(rooms, mode, now, seekAt, own, skip) {
+  let best = null;
+  for (const [id, r] of Object.entries(rooms || {})) {
+    if (!r || r.status !== 'waiting' || r.mode !== mode) continue;
+    if (r.private) continue;   // sealed for a friend or an invite link — not open sky
+    if (now - (r.createdAt || 0) > 5 * 60000) continue;
+    if (skip && skip.has(id)) continue;
+    const players = r.players || {};
+    if (players[vsUid()]) continue;
+    if (Object.keys(players).length >= VS_MAX[mode]) continue;
+    const host = players[r.hostUid];
+    if (!host || host.gone) continue;   // a host who faded away never starts the duel
+    if (own) {
+      if (id === own.code) continue;
+      const age = r.createdAt || 0;
+      if (age > own.createdAt || (age === own.createdAt && id > own.code)) continue;   // the elder stays put
+    }
+    const diff = Math.abs(SS.prof.rating - vsRoomRating(r));
+    if (diff > vsTolerance(now - seekAt, now - vsRoomSeekAt(r, now))) continue;
+    if (!best || diff < best.diff || (diff === best.diff && (r.createdAt || 0) < best.createdAt)) best = { id, diff, createdAt: r.createdAt || 0 };
+  }
+  return best;
+}
 async function vsQuickMatch(mode) {
   try {
     const rooms = (await SSNET.dbGet('mp/rooms').catch(() => null)) || {};
@@ -427,18 +478,21 @@ async function vsQuickMatch(mode) {
     for (const [id, r] of Object.entries(rooms)) {
       if (r && (!r.createdAt || now - r.createdAt > 40 * 60000)) SSNET.dbSet('mp/rooms/' + id, null).catch(() => { });
     }
+    // a seat I already hold (a reload mid-wait) is mine to return to
     for (const [id, r] of Object.entries(rooms)) {
-      if (!r || r.status !== 'waiting' || r.mode !== mode) continue;
-      if (r.private) continue;   // sealed for a friend or an invite link — not open sky
-      if (now - (r.createdAt || 0) > 5 * 60000) continue;
-      const n = Object.keys(r.players || {}).length;
-      if (n >= VS_MAX[mode]) continue;
-      if ((r.players || {})[vsUid()]) return id;
-      if (await vsJoinRoom(id)) return id;
+      if (r && r.status === 'waiting' && r.mode === mode && !r.private && (r.players || {})[vsUid()]) return id;
     }
-    // open a new room
+    // the closest rival first; if their door shuts as I reach it, the next
+    const skip = new Set();
+    for (;;) {
+      const pick = vsPickRoom(rooms, mode, now, now, null, skip);
+      if (!pick) break;
+      if (await vsJoinRoom(pick.id)) return pick.id;
+      skip.add(pick.id);
+    }
+    // open a new room and wait in the queue
     const code = vsCode();
-    if (!(await vsSealRoom(code, mode, {}))) return null;
+    if (!(await vsSealRoom(code, mode, { seekAt: now }))) return null;
     return code;
   } catch (e) { return null; }
 }
@@ -452,6 +506,7 @@ async function vsSealRoom(code, mode, opts) {
       seed: Math.floor(Math.random() * 1e9),
       lang: ssGameLang(),   // the creator's tongue rules the duel — both bags and dictionaries follow it
       private: !!(opts && opts.private), invited: (opts && opts.invited) || null,
+      seekAt: (opts && opts.seekAt) || null,   // set = this host is in the rival queue, since then
       players: { [vsUid()]: vsSeat(0) },
     });
     return true;
@@ -669,7 +724,7 @@ class VsBattle extends Phaser.Scene {
   }
 
   onRoom(room) {
-    if (!room) { if (this.state !== 'done') { this.scene.start('vsmenu'); } return; }
+    if (!room) { if (this.migrating) return; if (this.state !== 'done') { this.scene.start('vsmenu'); } return; }
     const first = !this.room;
     const prevStatus = this.room && this.room.status;
     this.room = room;
@@ -731,6 +786,58 @@ class VsBattle extends Phaser.Scene {
       return next;
     }).catch(() => { });
     this.scene.start('vsmenu');
+  }
+
+  /* ---------- the queue, from the host's chair ----------
+     Waiting alone in a room I opened by FIND A RIVAL, I look again every
+     2.5s: as my wait grows the tolerance opens, and a rival who was too far
+     a moment ago may be close enough now. Only an OLDER room is ever joined
+     from here (vsPickRoom's elder rule) — the other host sees mine as younger
+     and stays put, so we can never swap rooms under each other. */
+  rescan() {
+    const r = this.room;
+    if (this.rescanning || this.migrating || !r || r.status !== 'waiting') return;
+    if (r.private || !r.seekAt || r.hostUid !== vsUid() || this.challenged) return;
+    if (Object.keys(r.players || {}).length !== 1) return;
+    if (Date.now() - (this.lastScan || 0) < VS_MM.RESCAN_MS) return;
+    this.lastScan = Date.now();
+    this.rescanning = true;
+    (async () => {
+      try {
+        const rooms = (await SSNET.dbGet('mp/rooms').catch(() => null)) || {};
+        if (!this.sys.isActive() || !this.room || this.room.status !== 'waiting' || Object.keys(this.room.players || {}).length !== 1) return;
+        const pick = vsPickRoom(rooms, r.mode, Date.now(), r.seekAt, { code: this.code, createdAt: r.createdAt || 0 }, null);
+        if (pick) await this.migrate(pick.id);
+      } catch (e) { } finally { this.rescanning = false; }
+    })();
+  }
+  async migrate(target) {
+    const mode = this.room.mode, seekAt = this.room.seekAt;
+    this.migrating = true;
+    // 1. shut my own door — atomically, and only if I am still alone behind
+    //    it; a rival who took the seat meanwhile wins, and I stay
+    try { if (this.meRef) this.meRef.child('gone').onDisconnect().cancel(); } catch (e) { }
+    const shut = await SSNET.dbTxn('mp/rooms/' + this.code, (cur) => {
+      if (!cur) return cur;
+      if (cur.status !== 'waiting' || !cur.players || !cur.players[vsUid()] || Object.keys(cur.players).length !== 1) return cur;
+      return null;
+    });
+    if (shut.value) {   // taken — the duel is here after all
+      this.migrating = false;
+      try { if (this.meRef) this.meRef.child('gone').onDisconnect().set(true); } catch (e) { }
+      return;
+    }
+    // 2. the same seat-claim transaction a newcomer uses; the elder room may
+    //    have filled in the meantime, and then my own door reopens under the
+    //    same code with the same wait (the queue never forgets how long)
+    if (await vsJoinRoom(target)) {
+      this.left = true;   // nothing to mark gone — the old room is already gone
+      if (this.sys.isActive()) this.scene.start('vsbattle', { code: target });
+      return;
+    }
+    await vsSealRoom(this.code, mode, { seekAt });
+    try { if (this.meRef) this.meRef.child('gone').onDisconnect().set(true); } catch (e) { }
+    this.migrating = false;
   }
 
   beginBattle() {
@@ -861,6 +968,7 @@ class VsBattle extends Phaser.Scene {
 
   secondTick() {
     if (this.scryCooldown > 0) this.scryCooldown--;
+    if (this.room && this.room.status === 'waiting') this.rescan();
     if (!this.room || this.room.status !== 'active') return;
     if (this.room.mode === 'timed') {
       const left = Math.max(0, VS_TIME_MS - (Date.now() - this.room.startedAt));
