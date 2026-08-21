@@ -31831,7 +31831,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.27';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.28';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -40883,15 +40883,21 @@ const KING_ROT=5.0, KING_TK_SEEK=300, KING_TK_HOLD=0.9,
       KING_PUSH_SPD=430, KING_PUSH_REACH=280, KING_PUSH_BACK=40,
       KING_SUM_PIGS=20, KING_SUM_YETIS=10, KING_MINION_CAP=30;
 // ===== 0341 MEGA: THE PURPLE LEAP (the 0337 purple buff, boss edition) —
-// sgtcold + sgtsnow at the MEGA tier ONLY (armed by type+tier at the boss
+// SERGEANT COLD at the MEGA tier ONLY (armed by type+tier at the boss
 // block — zero cfg stamps, so E/M/H are byte-behaviour). 0452: KING YETI'S
 // SEAT IS RETIRED at every door (Wyatt 8/20: "makes the fight just about
-// impossible and not really that fun") — the sergeants keep the move, the
-// king keeps RED/BLUE/SWING + the snow byte-still, and the PLAYABLE king
-// keeps HIS leap (kingUnitTick — the player's power, a different seat).
-// Windup tell → parabola flight → the landing flattens every man inside
-// the purple ring (knock — this game's massive-damage grammar; men never
-// die). The sergeants hunt mortars then the rearmost man. Dials one line.
+// impossible and not really that fun") — the king keeps RED/BLUE/SWING +
+// the snow byte-still, and the PLAYABLE king keeps HIS leap (kingUnitTick
+// — the player's power, a different seat). 0470: SERGEANT SNOWMAN'S SEAT
+// IS RETIRED too (Wyatt 8/20 eve: the giant snowman "should not jump on
+// you… better throwing out his snowballs from his side of the map when
+// he's slowly walking" — his snowboulder arm, the spd-20 roll-in, the
+// minRng-140 standoff and the death-split stand byte-still; at M/H he
+// never leapt, MEGA now matches). Cold keeps the move (⚑ D12: the whole
+// castle grounded = his type leaves the same gate, one cell). Windup tell
+// → parabola flight → the landing flattens every man inside the purple
+// ring (knock — this game's massive-damage grammar; men never die). The
+// sergeant hunts mortars then the rearmost man. Dials one line.
 const LEAP_CD_SGT=15, LEAP_FIRST=8, LEAP_WIND=0.6, LEAP_T=0.75, LEAP_H=110, LEAP_MIN_D=180;
 function foeLeapPick(f){
   const ok=u=>!(u.dead || u.jetT>0 || u.dropT>0 || u.falling || u.cloakT>0 || (S.drag && S.drag.unit===u));
@@ -40903,13 +40909,13 @@ function foeLeapPick(f){
 }
 function foeLeapTick(f,dt){
   if(f.plCd==null){ f.plCd=LEAP_FIRST; f.plWind=0; f.plT=0; }
-  if(f.plWind>0 || f.plT>0) f.shot=0;   // no big shot / boulder mid-leap
+  if(f.plWind>0 || f.plT>0) f.shot=0;   // no big shot mid-leap (0470: the boulder clause left with the snowman's seat — only cold leaps now)
   if(f.plT>0){
     f.plT-=dt; const k=Math.max(0,Math.min(1,1-f.plT/LEAP_T));
     f.x=f.plX0+(f.plX1-f.plX0)*k; f.y=f.plY0+(f.plY1-f.plY0)*k;
     f.airB=LEAP_H*4*k*(1-k);
     if(f.plT<=0){
-      f.airB=0; f.plCd=LEAP_CD_SGT;   // 0452: only the sergeants reach this wheel — the king's seat is retired (his 0435 landing squash + snow burst left with it; theirs was always the shipped landing)
+      f.airB=0; f.plCd=LEAP_CD_SGT;   // 0452/0470: only SERGEANT COLD reaches this wheel — the king's seat (0452) and the snowman's (0470) are retired (the king's 0435 landing squash + snow burst left with his; cold's was always the shipped landing)
       SFX.stomp(); S.shake=0.55;
       S.fx.push({k:'ring',x:f.x,y:f.y-8,r:8,R:TK_PURPLE_R+16,t:0,dur:0.32,col:'#B77DE8'});
       S.fx.push({k:'ring',x:f.x,y:f.y-8,r:4,R:TK_PURPLE_R*0.6,t:0,dur:0.24,col:'rgba(255,255,255,0.9)'});
@@ -47658,7 +47664,7 @@ function update(dt){
     // ===== BOSS attacks (only once they're on the carpet) =====
     if(f.boss && f.x<W-10){
       f.shot+=dt;
-      if(megaActive() && (f.type==='sgtcold'||f.type==='sgtsnow')) foeLeapTick(f,dt);   // 0341 MEGA: the sergeants' purple leap — 0452: KING YETI'S seat is OUT at every door (Wyatt 8/20: "makes the fight just about impossible and not really that fun"; his RED/BLUE/SWING + the snow stand byte-still, and the PLAYABLE king keeps his own leap)
+      if(megaActive() && f.type==='sgtcold') foeLeapTick(f,dt);   // 0341 MEGA: SERGEANT COLD'S purple leap — 0470: SERGEANT SNOWMAN'S seat is OUT (Wyatt 8/20 eve: the giant snowman "should not jump on you… better throwing out his snowballs from his side of the map when he's slowly walking" — he fights as his snowboulder self at every door now; M/H never leapt, MEGA matches them; ⚑ D12: the whole castle grounded = cold's type leaves here too, one cell); 0452: KING YETI'S seat is OUT at every door (Wyatt 8/20: "makes the fight just about impossible and not really that fun"; his RED/BLUE/SWING + the snow stand byte-still, and the PLAYABLE king keeps his own leap)
       if(f.type==='giant'||YETI_SHOOTERS[f.type]){
         // the big shot: slow and heavy — it fells the nearest man in reach
         // (v3.33: the park's boss yetis hurl the same one big SNOWBALL —
