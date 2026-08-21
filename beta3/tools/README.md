@@ -1,6 +1,6 @@
 # beta3 dev tools
 
-Six scripts, all dev-only — nothing here ships to the browser.
+Seven scripts, all dev-only — nothing here ships to the browser.
 
 ## make-word-packs.py
 
@@ -87,6 +87,38 @@ nothing in it forces the WebGL renderer.
 ```
 node tools/streak-check.mjs      # served on :8899, headless Chrome on :9444
 ```
+
+## drip-check.mjs
+
+The sigil drip's own harness (v0.42.0). `fps-check.mjs` pins the two LAWS —
+the pool never starves, and nobody who already plays loses a sigil — while
+this one walks the whole mechanic: the starting twelve and their tier split,
+the twelve locks and the twelve stats behind them, the counters under a real
+demo run (plus the two a demo cannot reach, driven through their real code
+paths), the unlock at a LOSS's end, the notice and its lane, persistence,
+versus's immunity, grandfathering in seven shapes, and the copy in ten
+languages. Same CDP shape as `streak-check.mjs`, on its own port so all three
+suites can run side by side; `--disable-gpu` is fine.
+
+```
+node tools/drip-check.mjs      # served on :8899, headless Chrome on :9445
+```
+
+Three things this file learned the hard way:
+
+- **The meadow's notice fires about a second after the grass does, and lives
+  ~4 seconds.** A harness that waits out a 12-second navigation and *then*
+  looks finds an empty meadow and calls a working feature broken. Start the
+  poll before the boot settles.
+- **The demo solver is never struck.** It fells everything before the timer
+  runs out, so `hit` and `brnk` stay at zero through a whole automated run.
+  Both are driven for real instead: `shieldUsed = true; beast.count = 1;
+  tickEnemy(() => {})` for the strike, and `beast.hpNow = -64; run.hp = 9;
+  beastDeath()` for a fell on the brink.
+- **`110`, not `111`, is the correct tier-fall.** Three legendary rolls
+  against a starting pool holding one legendary (already taken) and two rares
+  give two rare cards and then a basic — the board spends the rares itself as
+  it fills.
 
 ## click-test.js
 
@@ -202,6 +234,29 @@ under the Canvas renderer and this game boots either. `SS_LANTERN_W/H/Y/TY`
 are the display constants; the texture carries 13 units of transparent crown
 margin above the lamp body, and `SS_LANTERN_Y` is exactly half the height so
 the sprite's top edge lands ON the safe band and never under a notch.
+
+## The sigil drip: the profile IS the seam (v0.42.0)
+
+There is no `?drip=` flag, because there does not need to be one. Everything
+the drip does hangs off `prof.sig`, and a harness sets it directly:
+
+```js
+SS.prof.sig = { u: { longbow: 1 }, c: { w6: 8, frg: 25 }, pend: [], gf: 0 }
+localStorage.removeItem('beta3.profile')      // …or start from nothing
+```
+
+- `u` id → unlocked stamp · `c` the counters · `pend` unlocked but not yet
+  announced · `gf` this profile was grandfathered.
+- `ssSigilOpen()`, `ssSigilUnlocked(id)`, `ssSigilStat(key)`,
+  `ssSigilProgress(sg)` and `ssSigilCheck()` are all plain globals, so the
+  whole rule set can be asserted without a pixel.
+- **The grandfather decision is made ONCE**, when `sig` is first created, and
+  saved on the spot. To re-test it you must delete the whole profile, not just
+  its stats — a profile that already carries `sig` will never re-decide.
+- `SS_SIG_TOAST_Y` (178) is the notice's lane. Above it sit the meadow's chips
+  and `ssAchToast` (y 52, 58 tall); below it the meadow's title plate starts
+  at ~276. A long word can earn LEXICON and finish a drip condition in the
+  same cast, so the two notices must never be able to print over each other.
 
 ## The share card, and clicking a button that was born this frame (v0.41.0)
 

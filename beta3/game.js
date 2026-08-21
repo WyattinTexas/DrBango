@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.41.0';
+const BUILD = 'STARSPELL v0.42.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -526,6 +526,24 @@ const SS = {
       p.streak.mk = SS_MILESTONES.reduce((a, m) => (p.streak.n >= m ? m : a), 0);
     }
     p.streak.mk = p.streak.mk | 0;
+    /* THE SIGIL DRIP (v0.42.0) — see ssSigilCheck & co. The `sig` object is
+       created exactly once, and creating it is also the moment the
+       grandfather decision is made and written down: a profile with ANY prior
+       play recorded takes all twenty-four with it, a genuinely empty one
+       enters the drip with the open twelve. Saved on the spot, so the
+       decision cannot be re-made against a profile the session has since
+       changed. */
+    if (!p.sig || typeof p.sig !== 'object') {
+      p.sig = { u: {}, c: {}, pend: [] };
+      if (ssSigilPlayedBefore(p)) {
+        for (const sg of SS_SIGILS) if (sg.lock) p.sig.u[sg.id] = 1;
+        p.sig.gf = 1;
+      }
+      this.save();
+    }
+    p.sig.u = (p.sig.u && typeof p.sig.u === 'object') ? p.sig.u : {};
+    p.sig.c = (p.sig.c && typeof p.sig.c === 'object') ? p.sig.c : {};
+    p.sig.pend = Array.isArray(p.sig.pend) ? p.sig.pend.filter((id) => !!SS_SIG_BY[id]) : [];
     return p;
   },
   save() { try { localStorage.setItem('beta3.profile', JSON.stringify(this.prof)); } catch (e) { } },
@@ -1158,6 +1176,98 @@ function ssSeedStreakFrom(p) {
   let n = 0, walk = dk;
   while (log[String(walk)]) { n++; walk = SSNET.dayKey(new Date(ssDayKeyMs(walk) - 86400000)); }
   return { n, last: dk };
+}
+
+/* ---- THE SIGIL DRIP: half the sky is earned -------------------------------
+   A new hunter starts with twelve of the twenty-four sigils and DISCOVERS the
+   rest by playing. Every locked sigil carries one condition (data.js, `lock`)
+   matched to what it does, and every condition is counted from play — not
+   from winning. A run that ends in defeat and advanced a condition advanced
+   it; that is the whole point of the mechanic.
+
+   The whole ledger is `prof.sig`:
+     u   · id → the timestamp it was unlocked (the only permanent record)
+     c   · the cheap counters this file feeds (w6/w7/w8/frg/scry/ovk/hit/brnk)
+     pend· unlocked but not yet ANNOUNCED — the notice survives an app closed
+           on the end screen, exactly like the lantern's `pend`
+     gf  · this profile was grandfathered (see below), kept for the record
+
+   GRANDFATHERING. Nobody who already plays loses anything: the first boot
+   after this ships reads any evidence of prior play at all and hands that
+   profile all twenty-four, permanently. Only a genuinely empty profile enters
+   the drip. This runs ONCE — `sig` existing afterwards is the record of the
+   decision, so a grandfathered player who then wipes their stats keeps their
+   sigils.
+
+   Versus is untouched by every line of this: it draws from its own VS_OK
+   allowlist in versus.js and always has. */
+
+// the stats a lock may name. Four are the profile's own lifetime figures; the
+// rest are counters this file keeps, fed at the moment the thing happens.
+function ssSigilStat(key) {
+  const p = SS.prof;
+  if (key === 'word') return p.words | 0;
+  if (key === 'fell') return p.beasts | 0;
+  if (key === 'wins') return p.wins | 0;
+  if (key === 'big') return p.bigHit | 0;
+  return ((p.sig && p.sig.c) || {})[key] | 0;
+}
+// a sigil with no lock has always been yours
+function ssSigilUnlocked(id) {
+  const sg = SS_SIG_BY[id];
+  if (!sg) return false;
+  if (!sg.lock) return true;
+  return !!(SS.prof.sig && SS.prof.sig.u && SS.prof.sig.u[id]);
+}
+// THE POOL every solo pick draws from — quick, campaign and daily alike
+function ssSigilOpen() { return SS_SIGILS.filter((s) => ssSigilUnlocked(s.id)); }
+// {have, need, done} for one sigil, for any surface that wants to draw it
+// (the locked gallery is the next task; this is what it will read)
+function ssSigilProgress(sg) {
+  if (!sg || !sg.lock) return { have: 1, need: 1, done: true };
+  const have = ssSigilStat(sg.lock.s);
+  return { have: Math.min(have, sg.lock.n), need: sg.lock.n, done: have >= sg.lock.n };
+}
+/* Feed a counter. Deliberately does NOT write to storage itself: every call
+   site sits immediately in front of a save that was going to happen anyway (a
+   word cast, a beast felled) or adds one where the event is rare enough to
+   afford it (a scry, a strike weathered). The rule the call sites keep is
+   that no counter may end a battle unsaved — the whole mechanic is progress
+   ACROSS runs, and a count that dies with an abandoned run is a lie. */
+function ssSigilBump(key, n) {
+  const p = SS.prof;
+  if (!p.sig) return;
+  p.sig.c[key] = (p.sig.c[key] | 0) + (n === undefined ? 1 : n | 0);
+}
+/* Settle up: every locked sigil whose condition is now met becomes yours.
+   Called at the safe beats only (a run's end, the meadow), never mid-volley.
+   Returns the ids unlocked by THIS call; the announcement reads `pend`, which
+   also holds anything an earlier call never got to say out loud. */
+function ssSigilCheck() {
+  const p = SS.prof, fresh = [];
+  if (!p.sig) return fresh;
+  for (const sg of SS_SIGILS) {
+    if (!sg.lock || p.sig.u[sg.id]) continue;
+    if (ssSigilStat(sg.lock.s) < sg.lock.n) continue;
+    p.sig.u[sg.id] = Date.now();
+    p.sig.pend.push(sg.id);
+    fresh.push(sg.id);
+  }
+  if (fresh.length) { p.sig.pend = p.sig.pend.slice(-8); SS.save(); }
+  return fresh;
+}
+// what is waiting to be announced, as a plain array of ids
+function ssSigilPending() { return (((SS.prof || {}).sig || {}).pend || []).slice(); }
+// evidence that this profile was played before the drip existed. Deliberately
+// wide: every counter, every book, every ledger. A false positive costs a new
+// player nothing they would ever notice; a false NEGATIVE would take twelve
+// sigils off a TestFlight tester, which is the one outcome that is not allowed.
+function ssSigilPlayedBefore(p) {
+  return !!(p.runs || p.wins || p.words || p.beasts || p.longest || p.bigHit
+    || p.bestQuick || p.bestCampaign || p.vsWords || p.vsWins
+    || (p.streak && p.streak.n) || (p.rating && p.rating !== 1000)
+    || Object.keys(p.daily || {}).length || Object.keys(p.ach || {}).length
+    || Object.keys(p.signs || {}).length);
 }
 
 // Button texture for a given display size. The painted source is 627x344 but consumers
@@ -3258,6 +3368,70 @@ function ssStarChart(scene, opts) {
   return { c, zone };
 }
 
+/* THE DISCOVERY, in its smallest honest form: a sigil that was locked a
+   moment ago slides in at the top of the screen wearing its own pick card —
+   glyph in the medallion, gold nameplate, rarity ribbon, the effect in full —
+   with the condition that earned it written underneath in the game's own
+   italic. It is a NOTICE, not a ceremony (the forge rite is the next task),
+   so it never takes the screen, never waits for a tap, and is equally at home
+   over the end window and over the meadow grass.
+   ⚠ scrollFactor 0 on the container: the meadow's camera sits ~4200px down
+   the sky world, and a banner drawn in world space there is drawn nowhere.
+   ⚠ SS_SIG_TOAST_Y is a LANE, not a taste. Above it the meadow keeps its
+   daily chip, name chip and rating pill, and every screen keeps ssAchToast
+   (which rides at y 52 and is 58 tall) — an unlock and an achievement land
+   together often enough that they must never be able to print over each
+   other. Below it the meadow's title plate begins at ~276. The notice is 168
+   tall, so 178 puts it in the 94..262 band: clear at both ends. */
+const SS_SIG_TOAST_Y = 178;
+
+function ssSigilToast(scene, sg, delay) {
+  const l = ssLayout(scene);
+  const CW = 336, CH = 88, PW = 372, PH = 168, tier = sg.rarity | 0;
+  const c = scene.add.container(l.x(0), l.y(-120)).setDepth(400).setScrollFactor(0);
+  // the plate first: the end window's own midnight/gold chrome. The card
+  // inside it is opaque, but the two lines of copy are not — over the end
+  // screen they would print straight through the window's title and score.
+  const plate = scene.add.image(0, 0, 'endpanel').setDisplaySize(l.u(PW), l.u(PH));
+  const glow = scene.add.image(0, 0, 'glowbig').setDisplaySize(l.u(PW + 150), l.u(PH + 110))
+    .setTint(SS_RARITY[tier].glow).setAlpha(0).setBlendMode('ADD');
+  const head = ssTxt(scene, 0, -l.u(PH / 2 - 20), SS_T('unlHead'), l.u(10.5), '#ffd77a').setOrigin(0.5)
+    .setLetterSpacing(l.u(2)).setShadow(0, 0, '#c9b676', l.u(8), true, true);
+  const card = ssSigilCard(scene, l, sg, CW, CH).setPosition(0, -l.u(8));
+  card.disableInteractive();
+  const how = scene.add.text(0, l.u(50), '✓ ' + SS_SIG_HOW(sg), {
+    fontFamily: SERIF, fontSize: l.u(9.5) + 'px', color: '#8a94c4', fontStyle: 'italic',
+    align: 'center', wordWrap: { width: l.u(CW) },
+  }).setOrigin(0.5);
+  c.add([glow, plate, head, card, how]);
+  c.setAlpha(0);
+  const go = () => {
+    if (!c.active) return;
+    SFX.forge();
+    scene.tweens.add({ targets: c, y: l.y(SS_SIG_TOAST_Y), alpha: 1, duration: 460, ease: 'Back.easeOut' });
+    scene.tweens.add({ targets: glow, alpha: tier === 2 ? 0.30 : tier === 1 ? 0.22 : 0.16, duration: 500 });
+    scene.tweens.add({ targets: glow, alpha: 0.06, delay: 700, duration: 1100, yoyo: true, repeat: 1, ease: 'Sine.easeInOut' });
+    scene.tweens.add({
+      targets: c, alpha: 0, y: l.y(SS_SIG_TOAST_Y - 28), delay: 3400, duration: 460,
+      onComplete: () => c.destroy(),
+    });
+  };
+  if (delay) scene.time.delayedCall(delay, go); else go();
+  return c;
+}
+/* Say out loud whatever is waiting, one card at a time. The queue is spent
+   the moment it is SCHEDULED, not when the last card fades: a player who
+   walks away mid-notice has been told, and being told twice would read as a
+   bug. Returns the milliseconds the whole sequence will take. */
+function ssSigilAnnounce(scene, ids) {
+  ids = (ids || []).filter((id) => !!SS_SIG_BY[id]);
+  if (!ids.length || !scene || !scene.scene.isActive()) return 0;
+  const p = SS.prof;
+  if (p.sig) { p.sig.pend = p.sig.pend.filter((id) => ids.indexOf(id) < 0); SS.save(); }
+  ids.forEach((id, i) => ssSigilToast(scene, SS_SIG_BY[id], i * 4400));
+  return (ids.length - 1) * 4400 + 4320;
+}
+
 // achievement toast, usable from any scene
 function ssAchToast(scene, def) {
   const l = ssLayout(scene);
@@ -3404,7 +3578,7 @@ class Home extends Phaser.Scene {
     // scene instances persist across restarts — a rotation mid-sheet would
     // otherwise leave these truthy forever and the sheets could never reopen
     this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null;
-    this.streakC = null; this.riteC = null; this.riteTimer = null;
+    this.streakC = null; this.riteC = null; this.riteTimer = null; this.sigTimer = null;
     this.lanternShown = null; this.lanternSwell = null;   // a restart re-renders, it does not celebrate
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
@@ -3452,6 +3626,7 @@ class Home extends Phaser.Scene {
     // a mark earned in the battle we just came home from (or on a night the
     // app was closed before it could be honoured) waits for still grass
     this.milestoneCheck();
+    this.sigilNotice();          // …and a sigil the drip handed over may still be unsaid
     if (entry === 'battle') this.descendHome();
     else if (entry === 'defeat') {
       const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(600);
@@ -3914,6 +4089,28 @@ class Home extends Phaser.Scene {
       this.riteTimer = this.time.delayedCall(400, armed);
     };
     this.riteTimer = this.time.delayedCall(700, armed);
+  }
+  /* THE DRIP'S SAFETY NET. The end screen says a discovery out loud the
+     moment it happens, but a player can leave before it does — tap NEW RUN on
+     the beat, close the app on the end window, or abandon a run whose last
+     word finished a condition. Anything still in `pend` is therefore said on
+     the grass instead, on the same terms as the lantern's ceremony: it waits
+     for a meadow that is standing still, and it never cuts in front of a mark
+     (riteTimer/riteC are part of `settled`, so the lamp's rite goes first). */
+  sigilNotice() {
+    if (this.sigTimer || !ssSigilPending().length) return;
+    let tries = 0;
+    const settled = () => !this.busy() && !this.riteC && !this.riteTimer && !this.streakC
+      && !this.dailyC && !this.langC && !this.mapC && !this.confirmC && !this.signC;
+    const armed = () => {
+      if (!this.scene.isActive()) return;
+      const pend = ssSigilPending();
+      if (!pend.length) { this.sigTimer = null; return; }
+      if (settled()) { this.sigTimer = null; ssSigilAnnounce(this, pend); return; }
+      if (++tries > 60) { this.sigTimer = null; return; }   // ~24s, then let it lie for next time
+      this.sigTimer = this.time.delayedCall(400, armed);
+    };
+    this.sigTimer = this.time.delayedCall(900, armed);
   }
   milestoneRite(m) {
     if (this.riteC) return;
@@ -4666,6 +4863,7 @@ class Home extends Phaser.Scene {
     if (this.campSubT.active) this.campSubT.setText(cr.sub);
     this.updateDailyChip();
     this.milestoneCheck();       // the hunt we just came home from may have grown the lamp
+    this.sigilNotice();
     if (this.refreshRatingPill) this.refreshRatingPill();   // the battle may have moved the number
     const l = ssLayout(this);
     if (this.ascVeil) {          // reduce-motion rise → reduce-motion return
@@ -5427,6 +5625,16 @@ class Battle extends Phaser.Scene {
     if (letters > this.run.longest.length) this.run.longest = word;
     if (word.length > SS.prof.longest.length) SS.prof.longest = word;
     if (dmg > SS.prof.bigHit) SS.prof.bigHit = dmg;
+    // the drip's word counters. Length is counted in LETTERS (a digraph tile
+    // spells two), which is the same figure the score and the share card pay
+    // on — never tiles, or a Qu word would be short-changed.
+    if (letters >= 6) ssSigilBump('w6');
+    if (letters >= 7) ssSigilBump('w7');
+    if (letters >= 8) ssSigilBump('w8');
+    // …and the tile this word forges. `letters >= 5` is the very test the
+    // drop below makes (tier = 7+ ? 2 : 5+ ? 1 : 0), read here so the count
+    // lands inside the save that already runs on every cast.
+    if (letters >= 5) ssSigilBump('frg');
     SS.save();
     if (letters >= 7) SS.award('lexicon-7', this.game);
     if (letters >= 8) SS.award('grand-weaver', this.game);
@@ -5611,6 +5819,10 @@ class Battle extends Phaser.Scene {
     if (this.fights[this.run.fightIdx].id === 'phoenix') SS.award('first-flame', this.game);
     if (this.signZ && this.signZ.beast === this.fights[this.run.fightIdx].id) SS.award('star-crossed', this.game);
     if (!this.struckThisBattle) SS.award('untouched', this.game);
+    // the drip counts the surplus whether or not ECHO OF RUIN is there to
+    // spend it, and counts a kill made on the brink BEFORE the fell's heal
+    ssSigilBump('ovk', Math.max(0, -this.beast.hpNow));
+    if (this.run.hp <= 10) ssSigilBump('brnk');
     SS.save();
     if (this.hasSigil('echo')) this.run.overkill = Math.max(0, -this.beast.hpNow);
     this.run.fightIdx++;
@@ -5686,6 +5898,7 @@ class Battle extends Phaser.Scene {
       this.cameras.main.flash(220, 120, 20, 30);
       ssEdgeFlash(this, this.beast.eye, Math.min(0.85, 0.42 * mult * (boss ? 1.25 : 1)));
       this.struckThisBattle = true;
+      ssSigilBump('hit'); SS.save();
       let atk = this.beast.atk;
       if (this.hasSigil('eclipse')) atk = Math.ceil(atk / 2);
       if (this.sign === 'cancer' && !this.shellUsed) {   // the shell takes the first blow
@@ -5735,6 +5948,7 @@ class Battle extends Phaser.Scene {
     SFX.ensure(); SFX.noise(0.4, 600, 1, 0.12, 1800);
     this.state = 'anim';
     this.run.scried = true;
+    ssSigilBump('scry'); SS.save();
     this.clearHintFx();
     if (this.purifyArmed) this.setPurifyArmed(false);
     this.unselectFrom(0);
@@ -5837,7 +6051,14 @@ class Battle extends Phaser.Scene {
   }
   rollSigilOpts() {
     const { rare, leg } = this.sigilChances();
-    const pools = [0, 1, 2].map((r) => SS_SIGILS.filter((s) => (s.rarity | 0) === r && !this.run.sigils.includes(s.id)));
+    /* THE DRIP'S ONE GATE. Every solo pick — quick, campaign and daily alike
+       — draws from ssSigilOpen(), so a locked sigil can never be offered.
+       The tier-fall below is what makes a thin pool safe: a dry legendary or
+       rare tier falls DOWNWARD into the fat basic tier, and only a run that
+       has already taken everything it is allowed to hold can come back with
+       fewer than three cards (showSigilPick then centres what there is). */
+    const open = ssSigilOpen();
+    const pools = [0, 1, 2].map((r) => open.filter((s) => (s.rarity | 0) === r && !this.run.sigils.includes(s.id)));
     const opts = [];
     for (let k = 0; k < 3; k++) {
       const roll = rng();
@@ -5865,8 +6086,11 @@ class Battle extends Phaser.Scene {
       speed: { min: 40, max: 240 }, lifespan: { min: 300, max: 900 }, scale: { start: 0.8, end: 0 },
       tint: [0xffd77a, 0xfff2c9], blendMode: 'ADD', emitting: false,
     });
+    // a short board (the drip's pool exhausted by a long climb) centres on the
+    // same middle row a full one uses, rather than hanging from the top
+    const cy0 = 268 + (3 - opts.length) * 84;
     opts.forEach((sg, k) => {
-      const cy = l.y(268 + k * 168);
+      const cy = l.y(cy0 + k * 168);
       const tier = sg.rarity | 0;
       const glow = this.add.image(l.x(0), cy, 'glowbig').setDisplaySize(l.u(470), l.u(240))
         .setTint(SS_RARITY[tier].glow).setAlpha(0).setBlendMode('ADD');
@@ -6006,6 +6230,12 @@ class Battle extends Phaser.Scene {
     else if (this.run.bigHit >= 40) rDelta += SS_RATING.pve(1);
     if (won) SS.prof.wins++;
     SS.save(); SS.sync();
+    /* THE DRIP settles here and nowhere else in a battle: the volley is over,
+       the books are closed, and a LOSS that finished a condition finishes it
+       exactly as a win would. `pend` is read rather than the fresh ids, so a
+       notice an earlier run never got to say is said now. */
+    ssSigilCheck();
+    const unlocked = ssSigilPending();
     // mode rides along: only daily runs may land on the daily board (the
     // weekly takes any run; campaign still only when the whole climb is won)
     if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest, PACK.lang, this.mode);
@@ -6185,6 +6415,10 @@ class Battle extends Phaser.Scene {
         this.tweens.add({ targets: m, x: title.x + Math.cos(a) * r * 2.4, y: title.y - l.u(16) + Math.sin(a) * r, alpha: 0, scale: 0.1, duration: 900 + rng() * 500, ease: 'Cubic.easeOut', onComplete: () => m.destroy() });
       }
     });
+
+    // the discovery rides in after the window has settled (and after any
+    // fanfare) — never over the top of a triumph beat
+    if (unlocked.length) this.time.delayedCall((fanWait || 0) + 1400, () => ssSigilAnnounce(this, unlocked));
 
     if (DEMO) {
       localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, words: this.run.words, longest: this.run.longest, letters: this.run.letters, bigHit: this.run.bigHit, elapsed, rating: SS.prof.rating, rd: rDelta }));

@@ -1,4 +1,7 @@
-// v0.40.0 verification: the streak lantern (part 2 — the grace night and the
+// v0.42.0 verification: the sigil drip's two laws (the pool never starves ·
+// nobody who already plays loses a sigil — the whole mechanic is walked by
+// tools/drip-check.mjs) + the daily share card + the streak lantern (part 2 —
+// the grace night and the
 // marks) + part 1's streak core + fps overlay (OPT-IN via ?fps=1), full-DPR law, WORKLOAD probe + renderer
 // verdict (~300-sprite/tilesprite/text/emitter run on BOTH real renderers at
 // boot — the fill-rate probe is dead; perf-lab run fxios-…/1786853475034 proved
@@ -1029,6 +1032,58 @@ async function main() {
   ok('neither path ever reaches navigator.share (it freezes the shell)', fb.shared === false);
   await c.ev(`(() => { SSNET.submitScore = SSNET.__sub; SSNET.setDayKey('');
     SS.prof.daily = {}; SS.prof.streak = { n:0,last:0,best:0,g:1,gp:0,gd:[],mk:0,pend:0 }; SS.save(); return 'swept' })()`);
+  await c.nav(BASE + '?fps=0', 9000);
+
+
+  /* ---- v0.42.0: THE SIGIL DRIP — the two laws it may never break ----
+     Half the twenty-four sigils are now locked on a fresh profile, so every
+     solo pick draws from a pool of TWELVE.
+     1. THE POOL NEVER STARVES. rollSigilOpts falls DOWNWARD through the
+        tiers, which only works while the fat tier is tier 0 — the starting
+        twelve are 9 basic / 2 rare / 1 legendary for exactly that reason. A
+        board must be full whenever three unlocked sigils remain unheld, a
+        locked sigil may never appear on any board in any solo mode, and a
+        pool run dry by a long climb must return nothing rather than throw.
+     2. GRANDFATHERING. A profile with prior play wakes holding all 24. This
+        is the law that would otherwise take twelve sigils off a TestFlight
+        tester on the first boot after this shipped.
+     The whole mechanic — conditions, counters, the notice, ten languages —
+     is walked by tools/drip-check.mjs. */
+  await c.ev(`(() => { localStorage.removeItem('beta3.profile'); localStorage.removeItem('beta3.campaign'); return 'wiped' })()`);
+  await c.nav(BASE + '?fps=0&daily=1', 20000);
+  ok('a fresh profile boots into the drip holding twelve, 9 basic / 2 rare / 1 legendary',
+    await c.ev(`ssSigilOpen().length === 12 && [0,1,2].map(r => ssSigilOpen().filter(s => (s.rarity|0) === r).length).join('/') === '9/2/1'`) === true,
+    await c.ev(`ssSigilOpen().map(s => s.id).join(' ')`));
+  await until(`(() => { const b = game.scene.getScene('battle');
+    return game.scene.isActive('battle') && !!b && !!b.run })()`);
+  const drip = JSON.parse(await c.ev(`(() => {
+    const b = game.scene.getScene('battle'), keep = b.run.sigils.slice();
+    const out = { openN: ssSigilOpen().length, boards: [], locked: 0, dupe: 0, bad: 0, short: 0, threw: null };
+    b.run.sigils = [];
+    try {
+      for (let k = 0; k < 19; k++) {                     // a whole campaign's worth of picks
+        const left = out.openN - b.run.sigils.length;
+        const o = b.rollSigilOpts();
+        if (o.some(s => !s || !s.id)) out.bad++;
+        if (o.some(s => s.lock && !SS.prof.sig.u[s.id])) out.locked++;
+        if (new Set(o.map(s => s.id)).size !== o.length || o.some(s => b.run.sigils.includes(s.id))) out.dupe++;
+        if (o.length !== Math.min(3, Math.max(0, left))) out.short++;
+        out.boards.push(o.length);
+        if (o.length) b.run.sigils.push(o[0].id);
+      }
+    } catch (e) { out.threw = String(e); }
+    b.run.sigils = keep;
+    return JSON.stringify(out) })()`));
+  ok('THE POOL NEVER STARVES: 19 daily/campaign picks off the starting twelve, no locked card, no repeat, no throw',
+    drip.openN === 12 && !drip.locked && !drip.dupe && !drip.bad && !drip.short && !drip.threw,
+    'boards ' + drip.boards.join(',') + ' · locked ' + drip.locked + ' dupe ' + drip.dupe + (drip.threw || ''));
+  await c.ev(`localStorage.setItem('beta3.profile', JSON.stringify({ runs: 3, words: 40 })); 'planted'`);
+  await c.nav(BASE + '?fps=0', 10000);
+  ok('GRANDFATHERED: a profile with prior play wakes holding all 24, and it is written down',
+    await c.ev(`ssSigilOpen().length === 24 && (SS.prof.sig.gf | 0) === 1
+      && SS_SIGILS.every(s => ssSigilUnlocked(s.id))`) === true,
+    await c.ev(`ssSigilOpen().length`) + ' open · gf=' + await c.ev(`SS.prof.sig.gf | 0`));
+  await c.ev(`(() => { localStorage.removeItem('beta3.profile'); return 'swept' })()`);
   await c.nav(BASE + '?fps=0', 9000);
 
 

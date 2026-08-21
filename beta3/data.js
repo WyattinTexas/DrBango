@@ -361,6 +361,23 @@ for (const _z of SS_ZODIAC) SS_ZODIAC_BY[_z.id] = _z;
 // rarity: 0 = basic, 1 = rare, 2 = legendary. Rares and legendaries surface
 // deeper into the campaign (and at low odds anywhere in quick/daily) — the
 // gating curve lives in Battle.sigilChances().
+/* THE DRIP (v0.42.0). Twelve of these twenty-four are yours from the first
+   night; the other twelve carry a `lock` and are DISCOVERED by playing.
+   `lock` is {s, n, how}: `s` names a stat the game already keeps (ssSigilStat
+   resolves it — lifetime profile figures, or a cheap counter fed by play),
+   `n` is what it must reach, `how` the English sentence (%1 = n; other
+   languages carry an `unl` map in strings.js and fall back to this one).
+   Two rules the choice of the twelve obeys:
+   · EVERY TIER KEEPS MEMBERS. The starting pool is 9 basic + 2 rare + 1
+     legendary, not "all the basics" — rollSigilOpts falls DOWNWARD when a
+     tier is dry, so the fat tier has to be tier 0, and a new player must
+     still be able to meet a rare and a legendary in their first week.
+   · THE OPEN TWELVE TEACH, THE LOCKED TWELVE REWARD. What is open needs no
+     knowledge of forging, scrying or tile tiers to be worth taking; what is
+     locked either pays off a habit (SCRY, long words, overkill) or asks the
+     player to already know the board.
+   Conditions progress across runs and a LOSS that advanced one counts exactly
+   the same — the counters are fed by play, never by winning. */
 const SS_SIGILS = [
   // ---- basic ----
   { id: 'quill', icon: '❦', rarity: 0, name: 'EMBER QUILL', desc: 'Every word deals +4 damage.' },
@@ -370,26 +387,28 @@ const SS_SIGILS = [
   { id: 'aegis', icon: '✺', rarity: 0, name: 'AEGIS OF DAWN', desc: '+20 max health, healed now.' },
   { id: 'first', icon: '✧', rarity: 0, name: 'FIRST LIGHT', desc: 'Your first word each battle deals double.' },
   { id: 'hush', icon: '⧗', rarity: 0, name: 'HUSHED HOURGLASS', desc: 'Beasts strike one cast later.' },
-  { id: 'comet', icon: '☄', rarity: 0, name: 'COMET TRAIL', desc: 'SCRY no longer hastens the strike.' },
+  { id: 'comet', icon: '☄', rarity: 0, name: 'COMET TRAIL', desc: 'SCRY no longer hastens the strike.', lock: { s: 'scry', n: 20, how: 'Call on SCRY %1 times.' } },
   { id: 'shield', icon: '◈', rarity: 0, name: 'SILVER SHIELD', desc: 'Block the first strike of every battle.' },
   { id: 'leech', icon: '❉', rarity: 0, name: 'DEW DRINKER', desc: 'Every word heals you 1.' },
-  { id: 'longbow', icon: '➳', rarity: 0, name: 'STARRY LONGBOW', desc: 'Words of 6+ letters deal +12.' },
-  { id: 'gilded', icon: '✹', rarity: 0, name: 'GILDED DAWN', desc: 'Every battle begins with a gilded tile.' },
+  { id: 'longbow', icon: '➳', rarity: 0, name: 'STARRY LONGBOW', desc: 'Words of 6+ letters deal +12.', lock: { s: 'w6', n: 8, how: 'Weave %1 words of six letters or more.' } },
+  { id: 'gilded', icon: '✹', rarity: 0, name: 'GILDED DAWN', desc: 'Every battle begins with a gilded tile.', lock: { s: 'frg', n: 25, how: 'Forge %1 tiles with long words.' } },
   // ---- rare ----
-  { id: 'forge', icon: '❂', rarity: 1, name: 'STAR FORGE', desc: 'Forged tiles come one tier higher.' },
-  { id: 'blood', icon: '✠', rarity: 1, name: 'BLOOD INK', desc: 'Your words +25%. Beast strikes +25%.' },
-  { id: 'tome', icon: '◉', rarity: 1, name: 'WHISPERING TOME', desc: 'The eye ◉ reveals a strong word, once per battle. Tome’s price: −25% final score.' },
-  { id: 'storm', icon: '↯', rarity: 1, name: 'STORMBINDER', desc: 'Every third word you cast strikes twice.' },
+  { id: 'forge', icon: '❂', rarity: 1, name: 'STAR FORGE', desc: 'Forged tiles come one tier higher.', lock: { s: 'w7', n: 5, how: 'Weave %1 words of seven letters or more.' } },
+  { id: 'blood', icon: '✠', rarity: 1, name: 'BLOOD INK', desc: 'Your words +25%. Beast strikes +25%.', lock: { s: 'big', n: 60, how: 'Deal %1 damage with a single word.' } },
+  { id: 'tome', icon: '◉', rarity: 1, name: 'WHISPERING TOME', desc: 'The eye ◉ reveals a strong word, once per battle. Tome’s price: −25% final score.', lock: { s: 'fell', n: 30, how: 'Fell %1 star-beasts.' } },
+  { id: 'storm', icon: '↯', rarity: 1, name: 'STORMBINDER', desc: 'Every third word you cast strikes twice.', lock: { s: 'wins', n: 3, how: 'Win %1 hunts.' } },
   { id: 'roots', icon: '❧', rarity: 1, name: 'LEYLINE ROOTS', desc: 'Words deal +2 for every sigil you hold.' },
   { id: 'ward', icon: '✥', rarity: 1, name: 'MOONWARD', desc: 'Beast strikes deal 3 less, never below 1.' },
-  { id: 'echo', icon: '☍', rarity: 1, name: 'ECHO OF RUIN', desc: 'Overkill damage wounds the next beast.' },
+  { id: 'echo', icon: '☍', rarity: 1, name: 'ECHO OF RUIN', desc: 'Overkill damage wounds the next beast.', lock: { s: 'ovk', n: 120, how: 'Spill %1 damage of overkill.' } },
   // ---- legendary ----
   { id: 'feather', icon: '❋', rarity: 2, name: 'PHOENIX FEATHER', desc: 'Once per run, survive death at 1 health.' },
-  { id: 'eclipse', icon: '◐', rarity: 2, name: 'THE ECLIPSE', desc: 'Beast strikes deal only half.' },
-  { id: 'nova', icon: '✸', rarity: 2, name: 'CROWN OF NOVAE', desc: 'Words of 7+ letters deal double.' },
-  { id: 'verse', icon: '∞', rarity: 2, name: 'THE UNENDING VERSE', desc: 'Words deal +1 for every word woven this run.' },
-  { id: 'meteor', icon: '✽', rarity: 2, name: 'HEART OF THE METEOR', desc: 'Felling a beast restores you to full health.' },
+  { id: 'eclipse', icon: '◐', rarity: 2, name: 'THE ECLIPSE', desc: 'Beast strikes deal only half.', lock: { s: 'hit', n: 80, how: 'Weather %1 beast strikes.' } },
+  { id: 'nova', icon: '✸', rarity: 2, name: 'CROWN OF NOVAE', desc: 'Words of 7+ letters deal double.', lock: { s: 'w8', n: 1, how: 'Weave a word of eight letters.' } },
+  { id: 'verse', icon: '∞', rarity: 2, name: 'THE UNENDING VERSE', desc: 'Words deal +1 for every word woven this run.', lock: { s: 'word', n: 400, how: 'Weave %1 words, lifetime.' } },
+  { id: 'meteor', icon: '✽', rarity: 2, name: 'HEART OF THE METEOR', desc: 'Felling a beast restores you to full health.', lock: { s: 'brnk', n: 3, how: 'Fell %1 beasts at ten health or less.' } },
 ];
+const SS_SIG_BY = {};
+for (const _s of SS_SIGILS) SS_SIG_BY[_s.id] = _s;
 
 // Achievements — checked against the event bag the battle scene maintains.
 const SS_ACH = [
