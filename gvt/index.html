@@ -20609,9 +20609,22 @@ const TK_GREEN_T=2,                // 0457 (Wyatt 8/20): "Nerf the green telekin
 const TK_GREEN_AS=1.4,             // 0347 (Wyatt 8/15): "+40% attack speed" out of stealth — tkSlowMul divides every cadence clock by this while the frenzy runs
       TK_GREEN_WALK=0.72,          // 0341 (Wyatt 8/15): the ghost WALKS 28% slower — the stealth-walk knob (base pace + the decloak frenzy untouched; flagged as the chosen knob)
       TK_GREEN_AST=5;              // "...for 5 seconds" (u.tkFrenzT, burnt at the clock head)
-const TK_ORANGE_R=120+2*TK_M,      // 0347 (Wyatt 8/15): the rally circle grew "+2m" — the radio man's 120 plus 56 = 176
-      TK_ORANGE_T=3,               // "for 3 seconds"
-      TK_ORANGE_LS=1;              // "100% lifesteal" — heal = damage dealt × this
+// 0462c ORANGE — THE CHANNELED HEAL (Wyatt 8/21, verbatim: "Change Orange's
+// power to healing 0.2 damage every second. He stands there, and it's
+// channeled to all the units within 6 m during its duration of 5 seconds. It
+// heals everyone, and then he increases their damage by 2 if they are inside
+// of his aura"). The v3.11/0347 instant lifesteal RALLY (176 px · 3 s · 100%
+// of the damage he dealt paid back) is RETIRED WHOLE: the tap PLANTS him
+// (u.tkChanT — campUnitStep/bfUnitStep hold his feet, the fire loop his
+// hands) and, while the channel stands, every ally inside his 6 m (himself
+// included) is channeled each frame by tkChanPass, beside the medic's pass.
+// One const per claim; his explicit "6 m" rules the circle now (the 0347
+// "+2m on the radio man's 120" = 176 retires — ⚑ one const).
+const TK_ORANGE_R=6*TK_M,          // 168px — "all the units within 6 m" (⚑ one const; the 0347 176 retired)
+      TK_ORANGE_T=5,               // "during its duration of 5 seconds" — the plant's clock (u.tkChanT; was the rally's 3)
+      TK_ORANGE_HEAL=0.2,          // "healing 0.2 damage every second" — hp/s per channeled man: a dt-based fractional accumulator (u.tkOrAcc) that restores ONE pip at 1.0 = exactly one pip over the 5 s (⚑ alt: the whole pip at the 5 s mark)
+      TK_ORANGE_DMG=2,             // "increases their damage by 2 if they are inside of his aura" — a flat +2 on every hit a channeled man lands while the channel stands (the SCOUT ARMOR OF_SCOUT_DMG grammar, at the damage funnel: tkOrX)
+      TK_ORANGE_LOCK=1;            // "He stands there": 1 = planted AND holding fire (his hands are the channel) · ⚑ 0 = he fights from the plant (the blade's own chain then dashes him between strikes — the feet law)
 const TK_PURPLE_HASTE=1.3,         // "30% faster movement speed"
       TK_PURPLE_HASTE_T=1.75,      // "...for 1.75 seconds"
       TK_PURPLE_R=3*TK_M,          // 0347 (Wyatt 8/15): "roughly 3m around the landing point..."
@@ -31430,7 +31443,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.22';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.23';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -37908,6 +37921,7 @@ function bfSfx(fn,x,y){ if(bfVis(x,y)) fn(); }
 const FLAME_SNOW_X=2;
 function hurt(f,dmg,src){
   if(S.bf && f.side && (f.jetT>0||f.falling)) return;   // airborne (v1.39) — and v2.76's fallers — untouchable on the battlefield too
+  dmg+=tkOrX(src);   // 0462c ORANGE: +2 on every hit a channeled man lands from inside the circle — a flat add at the funnel's mouth (the SCOUT ARMOR grammar: after every multiplier the caller applied; a thrown-back round carries it at its full weight, and the reflector's own +2 never rides the throw — tkOrX's TK_REFL gate)
   // v3.11 BLUE → 0347 (Wyatt 8/15): the 0.4s wall is INVULNERABILITY now —
   // it stands ABOVE the plate and every other save (tanHit's own seat: one
   // event, one save, resolved wall-first), so no pip is spent and nothing
@@ -37948,7 +37962,7 @@ function hurt(f,dmg,src){
   f.hp-=dmg;
   if(f.type==='kingyeti') f.kyHitAt=S.t;   // 0435: the boss flinch stamp — presentation only, nothing in the sim reads it
   if(f.def&&f.def.croak) f.crHitAt=S.t;   // 0436: the croak kings flinch too — BOTH via def.croak (presentation only, nothing in the sim reads it)
-  if(src && src.tkRallyT>0) tkLeech(src,dmg*TK_ORANGE_LS);   // v3.11 ORANGE: the rally window pays an attacker back what he deals
+  // (v3.11 ORANGE's lifesteal paid the attacker back here — RETIRED 0462c: the orange +2 rides tkOrX at the funnel's mouth above)
   hitCheck(f,src);
 }
 // ===== CRITICAL HITS (Wyatt 7/24): the trigger-men — rifleman, MG and Sarge
@@ -38477,6 +38491,7 @@ function bfUnitStep(u,dt){
   }
   if(u.falling){ unitFallStep(u,dt); return false; }       // 8/8 v2.76: a falling man is falling — nothing else this frame
   if(u.shv){ ggShoveStep(u,dt); return false; }            // 8/8 gravity gun: a hurled man is a passenger this frame
+  if(u.tkChanT>0){ u.marching=false; return true; }        // 0462c ORANGE: the channel plants him on the battleground too — the mortar's own dig-in line (true = the weapon loop runs; LOCK holds his hands); the Nemesis's orange press plants him by construction
   // v2.77 (Wyatt 8/8: "Adjust the mortar to not move and be in a fixed state
   // when you play it in battlegrounds mode"): the tube DIGS IN where it
   // drops — the campaign's own artillery law, battlegrounds edition, both
@@ -38944,6 +38959,7 @@ function raidHalfPost(u){
 function campUnitStep(u,dt){
   if(u.falling){ unitFallStep(u,dt); u.marching=false; return false; }   // 8/8 v2.76 the long drop
   if(u.shv){ ggShoveStep(u,dt); u.marching=false; return false; }        // 0278a: the king's blue wave hurls campaign men down the gravity gun's own rails — a passenger this frame (bfUnitStep's twin line; campaign men were never shoved before)
+  if(u.tkChanT>0){ u.marching=false; return true; }   // 0462c ORANGE: the channel PLANTS him — the dig-in idiom (true = the weapon loop runs, where TK_ORANGE_LOCK holds his hands); a knock/jet/drag breaks it in tkChanPass
   // v2.79: the wipe plants his feet on the campaign carpet too — the full
   // animation finishes before the march resumes (Wyatt's own staging)
   if(u.type==='commando' && u.cmdoFireT>0){ u.marching=false; return true; }
@@ -42500,8 +42516,9 @@ function ggShoveStep(o,dt){
 }
 // ===== v3.11 TELEKINESIS — the six powers behind ONE door =====
 // Every one of them is borrowed plumbing: the gravity gun's slide (blue), the
-// blade's strike grammar (red), the spy's cloak (green), the radio circle's
-// "nearby" (orange), the jet pack's arc (purple), the mine's blast ruler
+// blade's strike grammar (red), the spy's cloak (green), the medic's quiet
+// channel (orange — 0462c; the radio circle's "nearby" rally before it), the
+// jet pack's arc (purple), the mine's blast ruler
 // (teal). AI-CALLABLE BY CONTRACT: tkFire(u,col,true) skips every META/
 // cooldown gate — card 10's Nemesis Sarge presses this same button. The
 // relay word {k:'tk'} rides t/x/y/n/id, all on CMD_KEYS: zero server change.
@@ -42518,10 +42535,11 @@ function tkSlowMul(o){ let m=(o && o.tkSlowT>0)? TK_TEAL_SLOW : 1; if(o && o.tkF
 // slowF only ever accrues at tanHit's campaign seam (snowfig balls), so the
 // battlefield and every un-snowed man read exactly 1 — byte-inert.
 function snowSlowMul(o){ return o && o.slowF>0 ? 1/Math.max(0.10, 1-o.slowF) : 1; }
-// ORANGE pays an attacker back in his own currency: battleground plastic is
-// hp (never past his own hpMax), campaign green resilience is GRIT — the
-// hits he carries melt off. Campaign FOES are never rallied (friendly-only
-// aura), so the hp branch can never touch one.
+// THE TWO-CURRENCY HEAL PRIMITIVE (born as v3.11 ORANGE's lifesteal — retired
+// 0462c — and kept by the medic's pass and the orange CHANNEL): battleground
+// plastic is hp (never past his own hpMax), campaign green resilience is GRIT
+// — the hits he carries melt off. Only FRIENDLIES ever come this way (the
+// medic's circle, the channel), so the hp branch can never touch a campaign foe.
 function tkLeech(u,amt){
   if(!u || u.dead || !(amt>0)) return;
   if(u.hp!=null && u.hpMax){ if(u.hp<u.hpMax) u.hp=Math.min(u.hpMax, u.hp+amt); }
@@ -42695,7 +42713,7 @@ function tkOverTick(u,dt){
 function tkFire(u,col,relay,ax,ay){
   if(!u || u.type!=='sarge' || u.dead) return false;
   if(!TK_CD[col]) col='blue';
-  if(u.jetT>0 || u.tkLg || u.falling || u.shv || u.dropT>0 || u.cloakT>0) return false;   // no stacking states — a relayed press this stale just misses (accepted class)
+  if(u.jetT>0 || u.tkLg || u.falling || u.shv || u.dropT>0 || u.cloakT>0 || u.tkChanT>0) return false;   // no stacking states — a relayed press this stale just misses (accepted class) · 0462c: a standing orange channel is one of them
   if(!relay){
     if(!tkOwned() || S.mode!=='play' || S.tkCd>0) return false;
     if(S.drag && S.drag.unit===u) return false;
@@ -42753,20 +42771,27 @@ function tkFire(u,col,relay,ax,ay){
     S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:34,t:0,dur:0.3,col:hex});
     bfSfx(SFX.blip, u.x, u.y);
   } else if(col==='orange'){
-    // RALLY: a radio-circle snapshot — every friendly inside the circle
-    // (himself included) leeches 100% of the damage he deals for the next 3
-    // seconds. 0347 (Wyatt 8/15): the circle grew +2m, and every troop
-    // caught rings a little orange the moment the buff starts — "they're
-    // powered up" must READ (information, so it fires under reduced motion).
+    // THE CHANNELED HEAL (0462c, Wyatt 8/21): he PLANTS where he stands for
+    // TK_ORANGE_T seconds (u.tkChanT — campUnitStep/bfUnitStep hold his
+    // feet, and with TK_ORANGE_LOCK the fire loop holds his hands too), and
+    // tkChanPass channels every ally inside TK_ORANGE_R each frame while it
+    // stands: 0.2 hp/s into a fractional accumulator that restores a pip at
+    // 1.0 (exactly one pip over the 5 s), and +TK_ORANGE_DMG on every hit
+    // they land from inside the circle. A knock/kill, a jet, a fall, a shove
+    // or the figure in your hand breaks the channel (the pass reads it —
+    // "drag your men out"). The blade state drops on the spot (the green/
+    // purple grammar) and his post becomes his mark, so no chain carries him
+    // off it. The cast ring is the tell (information — it fires under
+    // reduced motion); the held circle, the threads and the per-man ring
+    // ride the draw passes. Deterministic (positions + sim clocks, zero
+    // dice) — a relayed cast replays the whole channel on its own sim (the
+    // two-sims law). The v3.11/0347 lifesteal rally retired here.
+    if(u.saberState && u.saberState!=='idle'){ u.saberState='idle'; u.saberTarget=null; }
+    u.saberSwing=0; sgDashEnd(u);
+    u.home={x:u.x,y:u.y};
+    u.tkChanT=TK_ORANGE_T;
     S.fx.push({k:'ring',x:u.x,y:u.y-8,r:8,R:TK_ORANGE_R,t:0,dur:0.4,col:hex});
     bfSfx(SFX.ready, u.x, u.y);
-    for(const o of S.units){
-      if(o.dead || o.dropT>0) continue;
-      if(S.bf && o.side!==u.side) continue;
-      if(Math.hypot(o.x-u.x,o.y-u.y)<=TK_ORANGE_R){ o.tkRallyT=TK_ORANGE_T;
-        S.fx.push({k:'ring',x:o.x,y:o.y-12,r:3,R:16,t:0,dur:0.35,col:hex});
-        S.fx.push({k:'ring',x:o.x,y:o.y-12,r:2,R:9,t:0,dur:0.28,col:'rgba(255,255,255,0.8)'}); }
-    }
   } else if(col==='purple'){
     // LEAP: the jet arc with no pack and no flame — resolve like the quick
     // tap (a relay lands verbatim); the landing writes the 30% haste clock
@@ -47230,6 +47255,7 @@ function update(dt){
   S.crewN=S.crew||{};  // v1.72: last frame's FINISHED siege census — campSmash's damage share reads this, never the half-built count below
   S.crew={};  // the census re-forms every frame — every attacker in reach counts himself in (the share does the capping now)
   medicPass(dt);   // 0365 THE MEDIC PASS — its own walk down S.units BESIDE the loop, never inside a step: a marching man heals like a halted one, and the 4s quiet clock below keeps its own recovery on top
+  tkChanPass(dt);  // 0462c THE ORANGE CHANNEL — the medic pass's twin walk: the plant's clock, the break law, the fractional heal and the +2 window (u.tkOrIn) for every man a standing channel reaches this frame
   for(const u of S.units){
     if(u.dead) continue;             // a casualty is out of the fight the frame he falls (swept below)
     if(u.side==='nem') continue;     // 0386: a hatchling is nemEggTick's — no clocks, no auras, no march, no gun (0389: his fight is his own kit — the bite and his species' trick)
@@ -47259,7 +47285,7 @@ function update(dt){
     if(u.rapT>0) u.rapT-=dt;   // 0242 HOT DROP — the landing burst burns at the loop head, the cloak's own law
     // v3.11 TELEKINESIS clocks burn at the same head (sim dt: frozen with the
     // battlefield under a briefing, and 2x can't stretch a window)
-    if(u.tkRallyT>0){ u.tkRallyT-=dt; if(u.tkRallyT<0) u.tkRallyT=0; }
+    // (v3.11's rally clock burned here — RETIRED 0462c: the orange channel's clock, u.tkChanT, burns in tkChanPass beside the medic's pass, on this same sim dt)
     if(u.tkSilvT>0){ u.tkSilvT-=dt; if(u.tkSilvT<0) u.tkSilvT=0; }
     // v3.39 THE SILVER AURA — one scan per figure per frame (the v1.22 law):
     // near a silver-bladed Sarge (mine via sargeStats, an ally's via the sw
@@ -47383,6 +47409,7 @@ function update(dt){
       const sw=unitSargeStats(u);              // yours carries what you equipped; the AI's carries the pistol
       if(sw.w!=='pistol'){
         if(u.cloakT>0) continue;   // v3.11 GREEN vanish: an invisible Sarge holds EVERY weapon (the spy's own hold-fire law; the sidearm path below has its own)
+        if(TK_ORANGE_LOCK && u.tkChanT>0) continue;   // 0462c ORANGE: a planted Sarge holds every weapon too — his hands are the channel (the blade's chain never starts, no dash; ⚑ LOCK 0 = he fights from the plant)
         if(sw.w==='lightsaber'){ updateSaber(u,dt,sw); continue; }
         // 0092 THE COMMANDER swings from where he stands — his own branch IS
         // the feature (the v1.16/v1.73 law: stats written only in sargeStats
@@ -47528,6 +47555,7 @@ function update(dt){
     const rng =ssw? (ssw.rng ||def.rng ) : def.rng;
     if(rate===0) continue;                  // radioman: all antenna, no rifle
     if(u.cloakT>0) continue;                // v2.42 THE SPY: invisible means holding fire — "while he's invisible, he cannot engage in combat" (his cd freezes with him; the first shot can come the frame he appears)
+    if(TK_ORANGE_LOCK && u.tkChanT>0) continue;   // 0462c ORANGE: the planted Sarge's sidearm holds with the rest (his cd freezes with him — the cloak's own law; only a Sarge ever carries tkChanT)
     u.cd-=dt;
     if(u.cd>0) continue;
     // radioman aura: +25% range when he's got your back — and, with the booster
@@ -48007,6 +48035,62 @@ function medicPass(dt){
     tkLeech(u, ps*dt);
   }
 }
+// ===== 0462c ORANGE — THE CHANNELED HEAL's pass (Wyatt 8/21) =====
+// The medic pass's twin: its own walk down S.units BESIDE the per-unit step.
+// For every Sarge whose channel stands (u.tkChanT): the break law first (a
+// knock/kill is u.dead since v1.32; a jet, a fall, a shove, a lunge, the BF
+// drop ghost, the figure in your hand — "drag your men out"), then every
+// ally the channel reaches THIS frame (tkChanAlly: same side on the
+// battleground, alive, not dropping/airborne/falling, inside TK_ORANGE_R,
+// himself included) wears the +2 window (u.tkOrIn — tkOrX reads it at the
+// damage funnels) and accrues TK_ORANGE_HEAL·dt into his own accumulator
+// (u.tkOrAcc); at 1.0 it restores ONE pip through tkLeech (hp toward hpMax
+// on the battleground, one grit hit off on the rug) and floats a "+1". The
+// last frame channels only what is left of the 5 s, so the whole channel is
+// exactly 5·0.2 = one pip (an epsilon guards the dt sum; the last beat's
+// frame keeps him planted — tkChanEnd — and the NEXT pass releases him, so
+// his feet, his hands and the window all let go on the same frame). Two channels on
+// one man DON'T STACK (the medic's own law — ⚑ flagged). The plant's clock
+// burns here on the same sim dt the loop head uses (frozen under a briefing,
+// never stretched by 2x). RNG-free, dt-based — co-op's twin sims stay
+// byte-equal on a relayed cast (positions + sim clocks only). When the last
+// channel ends, the windows and the accumulators clear in one sweep.
+function tkOrX(src){ return (src && src.tkOrIn && !TK_REFL)? TK_ORANGE_DMG : 0; }   // the +2 a channeled man's hit carries (never the reflector's own on a thrown-back round)
+function tkChanAlly(sg,o){
+  if(!o || o.dead || o.down || o.dropT>0 || o.jetT>0 || o.falling || o.side==='nem') return false;
+  if(S.bf && o.side!==sg.side) return false;
+  return Math.hypot(o.x-sg.x,o.y-sg.y)<=TK_ORANGE_R;
+}
+function tkChanBreak(sg){ return !!(sg.dead || sg.down || sg.jetT>0 || sg.falling || sg.shv || sg.tkLg || sg.dropT>0 || (S.drag && S.drag.unit===sg)); }
+function tkChanPass(dt){
+  let live=false;
+  for(const sg of S.units){
+    if(!(sg.tkChanT>0)) continue;
+    if(sg.tkChanEnd || tkChanBreak(sg)){ sg.tkChanT=0; sg.tkChanEnd=0; continue; }   // the frame AFTER the last beat (or a break) releases the plant — he stands the beat's own frame out
+    live=true;
+  }
+  if(!live){ if(S.tkChanOn){ S.tkChanOn=0; for(const o of S.units){ o.tkOrIn=0; o.tkOrAcc=0; } } return; }
+  S.tkChanOn=1;
+  for(const o of S.units) o.tkOrIn=0;
+  for(const sg of S.units){
+    if(!(sg.tkChanT>0)) continue;
+    const step=Math.min(dt, sg.tkChanT);   // the last frame channels only what is left of the 5 s
+    for(const o of S.units){
+      if(o.tkOrIn || !tkChanAlly(sg,o)) continue;
+      o.tkOrIn=1;
+      o.tkOrAcc=(o.tkOrAcc||0)+TK_ORANGE_HEAL*step;
+      if(o.tkOrAcc>=1-1e-6){
+        o.tkOrAcc=Math.max(0, o.tkOrAcc-1);
+        const was=(o.hp!=null&&o.hpMax)? o.hp : (o.hits||0);
+        tkLeech(o,1);
+        const now=(o.hp!=null&&o.hpMax)? o.hp : (o.hits||0);
+        if(now!==was) S.floats.push({x:o.x,y:o.y-76,txt:'+1',t:0,col:sg.tkHex||'#FF9A3D'});
+      }
+    }
+    sg.tkChanT-=dt;
+    if(sg.tkChanT<1e-6){ sg.tkChanT=1e-6; sg.tkChanEnd=1; }   // the last beat landed (a dt-sum residue never buys another): the clock floors a hair above 0 so the plant and the hold read >0 through THIS frame — the next pass releases him
+  }
+}
 // a kill just landed on u's tally — is it a personal best for one of YOUR men?
 // (on the battlefield, only the chair you are actually sitting in is yours)
 function noteAce(u){
@@ -48340,7 +48424,7 @@ function splash(x,y,R,dmg,vx2,src,mach,refl,bigSelf){
       f.hp -= dmg * (f.def.vehicle? (mach?ENH_MINE_VX:(vx2?VX2_MUL:1)) : 1)
         * (jeepKind(f.type)&&srcArm(src)==='mortar'?JEEP_MORTAR_RESIST:1)
         * mgCtr(src&&src.type, f.type);   // 0354: your rockets and bombs find the tan MG ×1.3 — the campaign shell door decrements direct (v1.38), so the counter-list rides here too
-      if(src && src.tkRallyT>0) tkLeech(src,dmg*TK_ORANGE_LS);   // v3.11 ORANGE: shells leech at their listed weight
+      f.hp -= tkOrX(src);   // 0462c ORANGE: a channeled man's shell lands +2 on every foe it catches — the flat add after every multiplier (hurt()'s own seat; the campaign shell door decrements direct, so the add rides here too; v3.11's shell leech RETIRED)
       hitCheck(f,src);
     }
   }
@@ -49910,6 +49994,24 @@ function draw(){
     cx.strokeStyle=foeM?'rgba(255,205,190,0.65)':'rgba(244,241,232,0.72)';
     cx.lineWidth=2.5; cx.stroke(); cx.setLineDash([]);
   }
+  // 0462c THE ORANGE CHANNEL'S CIRCLE — the medic ring's own pass in the
+  // crystal's tint: while a Sarge stands planted (tkChanT), his 6 m circle
+  // lies ON THE GROUND at the mechanic's own radius (TK_ORANGE_R quoted,
+  // never copied — the picture cannot drift from the math), a soft fill and
+  // a SOLID rim (the dashes are the radio's and the medic's reads), held for
+  // the whole channel and gone with it. Static — zero reduced-motion
+  // surface. tkChanLive arms the threads after the actor pass.
+  let tkChanLive=false;
+  for(const r of S.units){
+    if(!(r.tkChanT>0) || r.dead) continue;
+    tkChanLive=true;
+    const hx=r.tkHex||'#FF9A3D', foeC=S.bf && r.side==='foe';
+    cx.beginPath(); cx.arc(r.x,r.y,TK_ORANGE_R,0,7);
+    cx.fillStyle=foeC?'rgba(255,154,61,0.05)':'rgba(255,154,61,0.075)';
+    cx.fill();
+    if(lightField()){ cx.strokeStyle='rgba(20,26,20,0.35)'; cx.lineWidth=4.5; cx.stroke(); }
+    cx.save(); cx.globalAlpha=foeC?0.55:0.75; cx.strokeStyle=hx; cx.lineWidth=2.5; cx.stroke(); cx.restore();
+  }
   // v2.56 (Wyatt 8/6: "a circle indicator when the mine's going to drop") —
   // THE SWEEPER'S TELL: while a drop is queued, a small pulsing dashed circle
   // marks the exact spot the charge will land, on the same ground layer as
@@ -50047,6 +50149,30 @@ function draw(){
     cx.strokeStyle=foeU?'rgba(255,205,190,0.95)':'rgba(244,241,232,0.95)'; cx.lineWidth=2.6;
     cx.beginPath(); cx.moveTo(bx-5,by); cx.lineTo(bx+5,by); cx.moveTo(bx,by-5); cx.lineTo(bx,by+5); cx.stroke();
     cx.lineCap='butt';
+  }
+  // 0462c THE THREADS — while a Sarge channels, a thin line of his crystal's
+  // light runs from his hands to every man the channel reaches THIS frame
+  // (tkChanAlly: the very predicate the pass heals by, so picture and heal
+  // can never disagree), with a pip of light riding each thread toward the
+  // man (the radio man's own charging-pip grammar, drawRadioCall); under
+  // reduced motion the pip rests mid-thread (information, not motion). After
+  // the actor pass so the thread reads over the figures; the enemy's
+  // vanished Sarge keeps the invisibility law (no thread reveals him).
+  if(tkChanLive) for(const r of S.units){
+    if(!(r.tkChanT>0) || r.dead) continue;
+    const hx=r.tkHex||'#FF9A3D', RM=reducedMotion();
+    const sx=r.x, sy=r.y-44;
+    for(const o of S.units){
+      if(o===r || !tkChanAlly(r,o)) continue;
+      if((o.type==='spy'||o.type==='sarge') && o.cloakT>0 && S.bf && o.side!==bfMyTeam()) continue;
+      const ox=o.x, oy=o.y-30;
+      cx.save(); cx.globalAlpha=0.5; cx.strokeStyle=hx; cx.lineWidth=1.6; cx.lineCap='round';
+      cx.beginPath(); cx.moveTo(sx,sy); cx.lineTo(ox,oy); cx.stroke();
+      const k=RM? 0.5 : ((S.t*0.9+(o.phase||0))%1);
+      cx.globalAlpha=0.9; cx.fillStyle='#FFF1D6';
+      cx.beginPath(); cx.arc(sx+(ox-sx)*k, sy+(oy-sy)*k, 2.2, 0, 7); cx.fill();
+      cx.restore();
+    }
   }
   // 0140: mom's ONE airborne toy sails OVER the figures (it is in the air);
   // its ground shadow inside tracks the flight point, the mortar's own idiom
@@ -51050,7 +51176,7 @@ function drawTkFx(u){
     cx.beginPath(); cx.arc(u.x,u.y-20,26,Math.PI-1.1,Math.PI+1.1); cx.stroke();
     cx.lineCap='butt'; cx.restore();
   }
-  if(u.tkRallyT>0){
+  if(u.tkOrIn){   // 0462c ORANGE: the channel's per-man ring — every man the channel reaches this frame, himself included (the v3.11 rally window's ring, re-keyed)
     cx.save(); cx.globalAlpha=reducedMotion()? 0.45 : (0.3+0.2*Math.sin(S.t*7+(u.phase||0)));
     cx.strokeStyle='#FF9A3D'; cx.lineWidth=2;
     cx.beginPath(); cx.ellipse(u.x,u.y,16,5.5,0,0,7); cx.stroke(); cx.restore();
@@ -51290,7 +51416,7 @@ function drawUnit(u){
     cx.beginPath(); cx.arc(Wv.cx,Wv.cy,Math.max(3,Wv.r-14),-Math.PI*0.22,Math.PI*0.22); cx.stroke();
     cx.globalAlpha=1; cx.lineCap='butt'; }
   if(ck) cx.globalAlpha=1;
-  drawTkFx(u);   // v3.11: overdrive / wall / rally tells
+  drawTkFx(u);   // v3.11: overdrive / wall / channel tells (0462c: the orange per-man ring rides u.tkOrIn)
   if(u.vet){ cx.fillStyle=vetStripe(); cx.fillRect(u.x-12,u.y-3,24,4); }
   // 0278a: a snowed man wears his ❄ stacks — pure glyphs, zero l10n rows
   // (❄❄❄❄❄ IS the −90% cap read; the aura's half-stacks still show one).
@@ -51352,7 +51478,7 @@ function drawBFUnit(u,w,im){
   if(ck){ cx.globalAlpha=1; return; }
   if(u.type==='radioman') drawRadioCall(u);
   if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); }
-  drawTkFx(u);   // v3.11: overdrive / wall / rally tells
+  drawTkFx(u);   // v3.11: overdrive / wall / channel tells (0462c: the orange per-man ring rides u.tkOrIn)
   if(u.hp<u.hpMax){
     const k=Math.max(0,u.hp/u.hpMax);
     // a man's bar clears his helmet at 60; a tank is taller than that, so the
@@ -69077,12 +69203,12 @@ window.GVT = {
       cds:Object.assign({},TK_CD), m:TK_M,
       dials:{ blueR:TK_BLUE_R, blueR2:TK_BLUE_R2, bluePush:TK_BLUE_PUSH, blueDmg:TK_BLUE_DMG, blueDefl:TK_BLUE_DEFL, blueReflC:TK_BLUE_REFL_C,
         redDash:TK_RED_DASH, redDmg:TK_RED_DMG, redR:TK_RED_R, redSeek:TK_RED_SEEK, greenT:TK_GREEN_T, greenAS:TK_GREEN_AS, greenAST:TK_GREEN_AST,
-        orangeR:TK_ORANGE_R, orangeT:TK_ORANGE_T, orangeLS:TK_ORANGE_LS, silverR:TK_SILVER_R, silverR2:TK_SILVER_R2,
+        orangeR:TK_ORANGE_R, orangeT:TK_ORANGE_T, orangeHeal:TK_ORANGE_HEAL, orangeDmg:TK_ORANGE_DMG, orangeLock:TK_ORANGE_LOCK, silverR:TK_SILVER_R, silverR2:TK_SILVER_R2,
         purpleHaste:TK_PURPLE_HASTE, purpleHasteT:TK_PURPLE_HASTE_T, purpleR:TK_PURPLE_R, purpleDmg:TK_PURPLE_DMG,
         tealT:TK_TEAL_T, tealEvery:TK_TEAL_EVERY, tealSeek:TK_TEAL_SEEK, tealAoe:TK_TEAL_AOE, tealSlow:TK_TEAL_SLOW, tealSlowT:TK_TEAL_SLOWT },
       btn:btnRects.tk? btnRects.tk.slice() : null,
       u:u? { x:u.x, y:u.y, cloakT:u.cloakT||0, overT:u.tkOverT||0, deflT:u.tkDeflT||0,
-             hasteT:u.tkHasteT||0, rallyT:u.tkRallyT||0, lg:!!u.tkLg, jetT:u.jetT||0,
+             hasteT:u.tkHasteT||0, chanT:u.tkChanT||0, orIn:!!u.tkOrIn, orAcc:u.tkOrAcc||0, lg:!!u.tkLg, jetT:u.jetT||0,
              frenzT:u.tkFrenzT||0, ghost:!!u.tkGhost, bluePop:!!u.tkBluePop, silvT:u.tkSilvT||0,
              tkJump:!!u.tkJump, spd:(u.def&&u.def.moveSpd)||0, hits:u.hits||0, hp:(u.hp==null?null:u.hp) } : null }; },
   tkGo(col){ const u=jetSarge(); if(!u) return false; return tkFire(u, col||tkMyCol(), false); },
