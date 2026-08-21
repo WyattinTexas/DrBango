@@ -20602,7 +20602,7 @@ const TK_RED_DASH=9*TK_M,          // 0347 (Wyatt 8/15): "triple the current dis
       TK_RED_R=46,                 // the overhead arc's reach — the blade's own cleave circle
       TK_RED_T=0.32,               // the lunge's clock (smoothstep slide)
       TK_RED_SEEK=660;             // 0347: the eye triples with the legs — how far he looks for a man to lunge at (nobody there = he swings at the air ahead)
-const TK_GREEN_T=4,                // "invisible for 4 seconds" — the spy's own cloakT state on the Sarge
+const TK_GREEN_T=2,                // 0457 (Wyatt 8/20): "Nerf the green telekinesis stealth time by 2 seconds." — the v3.11 "invisible for 4 seconds" now 2; the spy's own cloakT state on the Sarge
       TK_GREEN_SPD=1.6;            // 0308 (Wyatt 8/13): the vanish moves 60% faster — the spy speed column ×1.6 while cloaked, both carpets (the decloak restore reads tkVSpd0, the PRE-cloak snapshot, so it never sees this)
 const TK_GREEN_AS=1.4,             // 0347 (Wyatt 8/15): "+40% attack speed" out of stealth — tkSlowMul divides every cadence clock by this while the frenzy runs
       TK_GREEN_WALK=0.72,          // 0341 (Wyatt 8/15): the ghost WALKS 28% slower — the stealth-walk knob (base pace + the decloak frenzy untouched; flagged as the chosen knob)
@@ -26135,6 +26135,16 @@ const SILVER_HEX='#C8CDD6';
 // (a run of levels or a few days of rivals). The full set = 600★, a shade more than
 // one ray gun, which feels like the right ceiling for a colour you keep forever.
 const SABER_PRICE=120;
+// 0457 THE PRICE LADDER (Wyatt 8/20 verbatim): "after they buy their second color
+// crystal, from now on it's going to be 400 more stars each time they buy a new
+// crystal." The rung is OWNERSHIP COUNT, any source counted — the free rite pick,
+// the silver trophy, a v1.18-migrated blade all stand as rungs ("their second
+// color crystal" read as the second OWNED, §10 D8's default): own 1 → the second
+// still costs SABER_PRICE; own 2 → the third is +400; own 3 → +800; and so on.
+// Every label site, the guard, the ask and the till read THIS one function (the
+// dye escalator's v3.03 law), so the shelf never shows a price the till won't charge.
+const SABER_ESCALATOR=400;
+function sabPrice(){ return SABER_PRICE + SABER_ESCALATOR*Math.max(0,(META.sabColOwned||[]).length-1); }
 function saberHex(){ return META.saberColor || '#4DA6FF'; }
 function sabOwns(hex){ return (META.sabColOwned||[]).indexOf(hex)>=0; }
 function sabHasSaber(){ return META.sargeUnlocked.indexOf('lightsaber')>=0; }
@@ -31292,7 +31302,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.14';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.15';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -63919,11 +63929,12 @@ function shopGunHTML(a){
 }
 // A crystal on the shelf. Three states, and which one you get depends on where the
 // player is in the story: no saber yet = the case is just a tease, free pick owed =
-// every crystal is a door to the ceremony, otherwise = yours to fit or 120★ to buy.
+// every crystal is a door to the ceremony, otherwise = yours to fit or the ladder's
+// rung to buy (0457: the brass quotes sabPrice() LIVE — never a stale const).
 function shopVialHTML(c){
   const own=sabOwns(c.hex), fit=(saberHex()===c.hex && own), shut=(!sabHasSaber()||sabRiteOwed());
   const cls = fit? 'fit' : own? 'own' : 'seal';
-  const brass = shut? 'UNDER GLASS' : fit? 'IN THE HILT' : own? 'TAP TO FIT' : SABER_PRICE+'★';
+  const brass = shut? 'UNDER GLASS' : fit? 'IN THE HILT' : own? 'TAP TO FIT' : sabPrice()+'★';
   return '<button type="button" class="sh-vial '+cls+(shut?' seal':'')+'" id="shvl-'+c.id+'" data-lens="cz:'+c.id+'" '
     +'style="--vhex:'+c.hex+'" onclick="UI.sabBuy(\''+c.hex+'\')">'
     +vialSVG(c.hex, own && !shut)
@@ -64956,7 +64967,7 @@ function renderShop(){
             ? (sabRiteOwed()? '<div class="sh-veil">your first blade is on the house — tap any crystal to claim it</div>':'')
             : '<div class="sh-veil">the case stays shut until Sarge earns the saber — campaign level '+SARGE_WEAPONS.lightsaber.unlock+'</div>')
         +'</div>'
-        +'<div class="sh-counsel">'+SABER_PRICE+'★ the crystal · one is free the day he earns it · swap between yours any time</div></section>'
+        +'<div class="sh-counsel">'+sabPrice()+'★ the crystal · one is free the day he earns it · swap between yours any time</div></section>'
       +'<section class="sh-dept" id="shFw"><h2>THE FIREWORKS STAND<small>LIGHT UP THE SKY WHEN YOU WIN</small></h2>'
         +'<div class="sh-fwrow">'+shopFwHTML()+'</div>'
         +'<div class="sh-fwpick">PICK WHAT PLAYS WHEN YOU WIN</div>'
@@ -65482,7 +65493,7 @@ function panelHTML(id){
                 +'" onclick="UI.'+(own?'saberColor':'sabShop')+'(\''+c.hex+'\')">'
                 +'<span class="sabdot'+(on?' on':'')+'" style="background:'+c.hex
                 +(own?';box-shadow:0 0 11px '+c.hex:'')+'">'+(own?'':'<i>🔒</i>')+'</span>'
-                +'<span class="sabcap">'+(own? (on?'IN HAND':'YOURS') : SABER_PRICE+'★')+'</span></button>';
+                +'<span class="sabcap">'+(own? (on?'IN HAND':'YOURS') : sabPrice()+'★')+'</span></button>';
             }).join('')+'</div>';
       }
       // ===== SARGE'S GEAR (v1.39): the campaign-milestone shelf. The locked
@@ -65791,16 +65802,20 @@ function ppSettle(){
 // (worn dye, equipped laser, fitted blade colour) are deliberately NOT
 // switched — a box must never repaint an army mid-collection — while a bench
 // part arrives fitted, because that is the buy's own documented behaviour and
-// a switch the player can flip off. Crystals only enter the pool once the
-// case is actually selling (saber unlocked, free pick spent) so the v1.18
-// ceremony is never collided with; Sarge's GEAR is campaign-only and never
+// a switch the player can flip off. Crystals NEVER enter the pool — 0457 THE
+// FREEBIE FENCE (Wyatt 8/20: "forbid telekinesis from being gained from the
+// level 5 class free item"): every colour carries a TK power (his own words
+// call the green crystal "the green telekinesis") and the ladder now prices
+// the case, so the box must undercut neither — the TELEKINESIS part itself
+// sits out of the mod lane below on the same word. Forward-only: anything the
+// box granted BEFORE the fence stays owned (the 0363 no-claw law — the fence
+// closes the door, never the vault); Sarge's GEAR is campaign-only and never
 // sold, so it never enters at all. Empty pool = no box, and the card's debt
 // STAYS OPEN — it pays the day the shop stocks something new.
 const MB_LINES={
   fig:  'A new soldier joins your army!',
   decor:'A new toy for your room!',
   bank: 'Your piggy bank pays +1★ a day more!',
-  sab:  "A new colour for Sarge's blade!",
   laser:'Laser fire for your whole army!',
   dye:  'A fresh coat of paint for your whole army!',
   veh:  'A new machine for the motor pool!',
@@ -65836,11 +65851,6 @@ function mboxPool(){
       pool.push({k:'bank', id:'t'+(r+1), name:BANK_TIERS[r].name, line:MB_LINES.bank,
         art:'<svg viewBox="'+BANK_VB+'">'+bankArt(r+1)+pigSvg(true)+'</svg>',
         g(){ META.bankTier=r+1; }}); }
-  if(sabHasSaber() && !sabRiteOwed())
-    for(const c of SABER_COLORS) if(!sabOwns(c.hex) && !c.earn)
-      pool.push({k:'sab', id:c.id, name:tf('THE %1 CRYSTAL', TXT(c.id.toUpperCase())), notr:1,
-        line:MB_LINES.sab, art:vialSVG(c.hex,true),
-        g(){ META.sabColOwned.push(c.hex); }});
   for(const a of LASER_COLORS) if(META.lasers.indexOf(a.id)<0)
     pool.push({k:'laser', id:a.id, name:tf('THE %1 LASER', TXT(a.id.toUpperCase())), notr:1,
       line:MB_LINES.laser, art:'<img src="'+rayURI(a.hex)+'" alt="">',
@@ -65866,10 +65876,12 @@ function mboxPool(){
     pool.push({k:'jetup', id:'jet', name:'A JET BOOSTER', line:MB_LINES.jetup,
       art:'<img src="'+sargeGearURI('jetpack')+'" alt="">',
       g(){ META.jetLvl=jetLvl()+1; }});
-  for(const id of ENH_ORDER) if(!enhOwns(id) && !enhLocked(id))
+  for(const id of ENH_ORDER) if(!enhOwns(id) && !enhLocked(id) && id!=='telekinesis')
     // v1.68: a GATED part stays out of the box until the store itself would
-    // sell it (the crystal-case precedent — the case has to be selling first),
-    // so the box can never hand out a mod the drawer still refuses.
+    // sell it, so the box can never hand out a mod the drawer still refuses.
+    // 0457 THE FREEBIE FENCE: TELEKINESIS never rolls — the box must not hand
+    // out the part Wyatt priced dearest BY DECREE (1200★), nor the power his
+    // fence forbids by name.
     pool.push({k:'mod', id, name:ENH_INFO[id].name, line:MB_LINES.mod,
       art:enhPartSVG(id),
       g(){ META.enh.own.push(id); META.enh.on.push(id); }});
@@ -67365,12 +67377,17 @@ window.UI = {
     if(sabOwns(hex)){
       if(saberHex()===hex){ SFX.laser(); shopRefresh(); return; }   // already in the hilt
       META.saberColor=hex; META.sargeWeapon='lightsaber'; SFX.snap();
-    } else if(META.starBank>=SABER_PRICE){
-      if(!shopAsk('sabBuy',[hex],SABER_PRICE,tf('THE %1 CRYSTAL',t(c.id)))) return;   // 0320
-      META.starBank-=SABER_PRICE; META.sabColOwned.push(hex);
+    } else { const p=sabPrice();
+      // 0457 THE LADDER: price it ONCE, before the ledger grows — the guard, the
+      // ask and the till all read the same rung, and p re-quotes live on the YES
+      // re-entry (the dye escalator's own v3.03 law: nobody is denied a crystal
+      // he can afford, nobody pays a price the shelf never showed).
+      if(META.starBank<p){ shopDeny('shvl-'+c.id); return; }
+      if(!shopAsk('sabBuy',[hex],p,tf('THE %1 CRYSTAL',t(c.id)))) return;   // 0320
+      META.starBank-=p; META.sabColOwned.push(hex);
       META.saberColor=hex; META.sargeWeapon='lightsaber';
       SFX.laser(); setTimeout(()=>SFX.coin(), 120);
-    } else { shopDeny('shvl-'+c.id); return; }
+    }
     saveMeta(); renderMenu(); shopRefresh();
   },
   avatar(k){ META.avatar=k; saveMeta(); renderMenu(); roomModal(panelHTML('avatar')); },
@@ -68300,7 +68317,7 @@ window.GVT = {
     return o; },
   // THE BLADE test rig: GVT.blades() reads the whole colour economy in one call,
   // GVT.rite() forces the ceremony open, GVT.blade('teal') asserts what a tap does
-  blades(){ return { price:SABER_PRICE, saber:sabHasSaber(), free:!!META.sabColFree,
+  blades(){ return { price:sabPrice(), base:SABER_PRICE, step:SABER_ESCALATOR, saber:sabHasSaber(), free:!!META.sabColFree,
     owed:sabRiteOwed(), riteOpen:sabRiteIsOpen(), sel:SABRITE.sel,
     chosen:META.saberColor, chosenName:META.saberColor?sabName(META.saberColor):null,
     hex:saberHex(), owned:(META.sabColOwned||[]).map(sabName), stars:META.starBank,
