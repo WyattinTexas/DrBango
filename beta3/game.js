@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.43.1';
+const BUILD = 'STARSPELL v0.44.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2575,6 +2575,93 @@ function ssTxt(scene, x, y, str, size, color, style) {
   }).setShadow(0, Math.max(1, size * 0.05), 'rgba(0,0,0,0.45)', size * 0.09);
 }
 
+/* ---- ONE LINE PER TEXT -----------------------------------------------------
+   TestFlight v0.43.0 (8/21): FIRST LIGHT, BLOOD INK and LEYLINE ROOTS reached
+   Wyatt's phone with their effect text BLANK — and v0.38's MOONWARD before
+   them. Every victim is a desc that WRAPS TO A SECOND LINE; every one-line
+   desc renders. A Phaser multi-line wrapped-italic bake produces an inkless
+   canvas on iOS WebKit for these strings, every time, and the healer's
+   RE-bake fails the same way — so the fix is to never ask Phaser to bake a
+   multi-line Text on these surfaces at all. Phaser's own wrap measurement is
+   still used (so the breaks land exactly where wordWrap put them), but each
+   line becomes its OWN single-line Text object, stacked at the same
+   lineSpacing. Single-line bakes are proven good on his device.
+   Scripts: ja/zh wrap without spaces, so they take Phaser's char-level
+   (advanced) wrap; Arabic/Hindi split only at spaces, and each line is shaped
+   and bidi-ordered by the canvas on its own, exactly as the line would have
+   been inside one canvas. A word that cannot break inside the width shrinks
+   the whole block's font (to 70%) rather than ever baking a multi-line Text.
+   Returns { lines, size } — the line strings and the font size that fit. */
+function ssWrapLines(scene, str, style, wrapW) {
+  const s = String(str == null ? '' : str);
+  const cjk = SS_LANG === 'ja' || SS_LANG === 'zh' || /[぀-ヿ㐀-鿿]/.test(s);
+  const size0 = parseFloat(style.fontSize) || 12;
+  let size = size0, lines = [s];
+  for (let tries = 0; tries < 12; tries++) {
+    const probe = scene.make.text({
+      text: s, style: Object.assign({}, style, { fontSize: size + 'px', wordWrap: { width: wrapW, useAdvancedWrap: cjk } }),
+    }, false);
+    let fits = true;
+    try {
+      const w = probe.getWrappedText(s);
+      lines = Array.isArray(w) ? w.slice() : String(w).split('\n');
+      probe.style.syncFont(probe.canvas, probe.context);
+      for (const ln of lines) if (probe.context.measureText(ln).width > wrapW + 0.5) { fits = false; break; }
+    } catch (e) { fits = true; }
+    probe.destroy();
+    if (fits || size <= size0 * 0.7) break;
+    size = Math.max(size0 * 0.7, size - Math.max(0.5, size0 * 0.06));
+  }
+  return { lines, size };
+}
+// A wrapped paragraph as a container of single-line Texts. `o` carries the
+// Text style (fontSize/color/fontStyle, SERIF by default) plus wrapW (px),
+// lineSpacing (px), align ('left'|'center'), ox/oy (origin), shadow (the
+// ssTxt drop) and sf (scrollFactor 0 on EVERY child — inside a container the
+// camera consults the child's, see tools/README.md). Sizes itself so
+// `.height` reads like a Text's for the rite's measured ladder; `.lines` are
+// the children, `setBlockText` rebuilds them in place. No child ever holds
+// a newline: that is the law the suites pin.
+function ssTextBlock(scene, x, y, str, o) {
+  const c = scene.add.container(x, y);
+  c.setData('textBlock', true);
+  c.lines = [];
+  c.blockOpts = o;
+  const build = (txt) => {
+    for (const t of c.lines) t.destroy();
+    c.lines = [];
+    const style = { fontFamily: o.fontFamily || SERIF, fontSize: o.fontSize, color: o.color, fontStyle: o.fontStyle || 'normal' };
+    const wrapW = o.wrapW, sp = o.lineSpacing || 0, ox = o.ox || 0, oy = o.oy || 0;
+    const r = ssWrapLines(scene, txt, style, wrapW);
+    style.fontSize = r.size + 'px';
+    const made = r.lines.map((ln) => {
+      const t = scene.add.text(0, 0, ln, style);
+      if (o.shadow) t.setShadow(0, Math.max(1, r.size * 0.05), 'rgba(0,0,0,0.45)', r.size * 0.09);
+      if (o.sf) t.setScrollFactor(0);
+      return t;
+    });
+    const lh = made.length ? made[0].height : 0;
+    const n = made.length, totalH = n * lh + Math.max(0, n - 1) * sp;
+    const blockW = Math.max(wrapW || 0, ...made.map((t) => t.width));
+    made.forEach((t, k) => {
+      const ly = -oy * totalH + k * (lh + sp);
+      if (o.align === 'center') t.setOrigin(0.5, 0).setPosition((0.5 - ox) * blockW, ly);
+      else t.setOrigin(0, 0).setPosition(-ox * blockW, ly);
+      c.add(t);
+    });
+    c.lines = made;
+    c.setSize(blockW, totalH);
+    c.text = txt;
+  };
+  c.setBlockText = (txt) => { if (c.active) build(String(txt == null ? '' : txt)); return c; };
+  // the Text verbs call sites already use, so a wrapped label can swap in
+  c.setText = c.setBlockText;
+  c.setColor = (col) => { o.color = col; return c.setBlockText(c.text); };
+  if (o.sf) c.setScrollFactor(0);
+  build(String(str == null ? '' : str));
+  return c;
+}
+
 /* ---- blank-text self-healing ---------------------------------------------
    TestFlight, 8/19: a rare sigil card reached Wyatt's screen with its rarity
    ribbon painted and its effect text BLANK — the one Text object on the card
@@ -2587,23 +2674,36 @@ function ssTxt(scene, x, y, str, size, color, style) {
    a non-empty string but zero ink. Runs after the surfaces where a silent
    blank costs the player information (sigil cards, inspector, end screen) and
    whenever the app returns to the foreground. DIAG counts every save. */
+function ssHasInk(o) {
+  const cw = o.canvas.width, ch = o.canvas.height;
+  if (!cw || !ch) return false;
+  const ctx = o.context || o.canvas.getContext('2d');
+  const d = ctx.getImageData(0, 0, Math.min(cw, 512), Math.min(ch, 256)).data;
+  for (let i = 3; i < d.length; i += 32) if (d[i] > 8) return true;
+  return false;
+}
+/* A heal is only a heal once the RE-bake has been checked for ink too. On
+   Wyatt's phone (v0.43.0) this sweep was "healing" the two-line sigil descs
+   on every pick and shipping blanks, because the re-bake failed exactly as
+   the first bake had; now a Text that stays inkless is reported as
+   `unhealable: <first words>` instead of counted, so the DIAG tells the
+   truth and the next bug has a name. */
 function ssHealBlankTexts(scene, tag) {
   let healed = 0;
+  const stuck = [];
   const walk = (list) => list.forEach((o) => {
     if (o.list) walk(o.list);
     if (o.type !== 'Text' || !o.canvas || !o.visible || !(o.text || '').trim()) return;
     try {
-      const cw = o.canvas.width, ch = o.canvas.height;
-      if (!cw || !ch) { o.updateText(); healed++; return; }
-      const ctx = o.context || o.canvas.getContext('2d');
-      const d = ctx.getImageData(0, 0, Math.min(cw, 512), Math.min(ch, 256)).data;
-      let ink = false;
-      for (let i = 3; i < d.length; i += 32) if (d[i] > 8) { ink = true; break; }
-      if (!ink) { o.updateText(); healed++; }
+      if (ssHasInk(o)) return;
+      o.updateText();
+      if (ssHasInk(o)) healed++;
+      else stuck.push(String(o.text).replace(/\s+/g, ' ').trim().split(' ').slice(0, 4).join(' '));
     } catch (e) { }
   });
   if (scene && scene.children) walk(scene.children.list);
   if (healed) DIAG('healed ' + healed + ' blank text(s) · ' + (tag || '?'));
+  for (const s of stuck) DIAG('unhealable: ' + s + ' · ' + (tag || '?'));
   return healed;
 }
 // a return from the background is when iOS is most likely to have purged
@@ -3014,10 +3114,10 @@ function ssSigilCard(scene, l, sg, w, h) {
     c.add(lab.setLetterSpacing(l.u(2)).setShadow(0, 0, RC.shadow, l.u(6), true, true));
   }
   const descY = compact ? 0 : (RC.label ? nameY + 30 : nameY + 15);
-  c.add(scene.add.text(l.u(lx), l.u(descY), loc.desc, {
-    fontFamily: SERIF, fontSize: l.u(compact ? 10 : 12.5) + 'px', color: '#c3c6da', fontStyle: 'italic',
-    wordWrap: { width: l.u(maxW + 4) }, lineSpacing: l.u(2),
-  }).setOrigin(0, 0));
+  c.add(ssTextBlock(scene, l.u(lx), l.u(descY), loc.desc, {
+    fontSize: l.u(compact ? 10 : 12.5) + 'px', color: '#c3c6da', fontStyle: 'italic',
+    wrapW: l.u(maxW + 4), lineSpacing: l.u(2),
+  }).setData('sigilDesc', sg.id));
   c.setSize(l.u(w), l.u(h)).setInteractive({ useHandCursor: true });
   c.setData('sigilCard', true);
   return c;
@@ -3118,10 +3218,10 @@ function ssSigilPanel(scene, opts) {
       }
       // the condition sits on the row's own centre line, so a one-line English
       // sentence and a two-line German one both hang level over the bar
-      rc.add(scene.add.text(l.x(lx), l.y(yk - 12), SS_SIG_HOW(r.sg), {
-        fontFamily: SERIF, fontSize: l.u(11.5) + 'px', color: '#9aa3cc', fontStyle: 'italic',
-        wordWrap: { width: l.u(maxW - (RCs.label ? 58 : 6)) }, lineSpacing: l.u(1.5),
-      }).setOrigin(0, 0.5));
+      rc.add(ssTextBlock(scene, l.x(lx), l.y(yk - 12), SS_SIG_HOW(r.sg), {
+        fontSize: l.u(11.5) + 'px', color: '#9aa3cc', fontStyle: 'italic',
+        wrapW: l.u(maxW - (RCs.label ? 58 : 6)), lineSpacing: l.u(1.5), oy: 0.5,
+      }).setData('sigilHow', r.sg.id));
       /* the bar: a dim track with a gold run across it, and the plain count.
          barW leaves 72 design units at the right for "100 / 400" — and the
          panel's mask ends at x 186, so a bar wider than the row does not just
@@ -3169,10 +3269,10 @@ function ssSigilPanel(scene, opts) {
       .setDisplaySize(l.u(gk.w * nsc), l.u(gk.h * nsc)));
     if (ribbon) rc.add(ssTxt(scene, l.x(RW / 2 - 30), l.y(yk - RH / 2 + 19), ribbon, l.u(8.5), ribbonColor)
       .setOrigin(1, 0.5).setLetterSpacing(l.u(1.5)).setShadow(0, 0, RC.shadow, l.u(6), true, true));
-    rc.add(scene.add.text(l.x(lx), l.y(yk - RH / 2 + 31), desc, {
-      fontFamily: SERIF, fontSize: l.u(12) + 'px', color: '#c9ccde', fontStyle: 'italic',
-      wordWrap: { width: l.u(maxW + 6) }, lineSpacing: l.u(1.5),
-    }).setOrigin(0, 0));
+    rc.add(ssTextBlock(scene, l.x(lx), l.y(yk - RH / 2 + 31), desc, {
+      fontSize: l.u(12) + 'px', color: '#c9ccde', fontStyle: 'italic',
+      wrapW: l.u(maxW + 6), lineSpacing: l.u(1.5),
+    }).setData('sigilDesc', r.sg ? r.sg.id : 'sign'));
   });
   wc.add(rc);
 
@@ -3669,18 +3769,19 @@ function ssSigilRite(scene, sg, onDone) {
      under the English. `dh` converts a Text's pixel height back to design. */
   const dh = (o) => o.height / l.s;
   const descY = RC.label ? 520 : 498;
-  const desc = sf(scene.add.text(l.x(0), l.y(descY), loc.desc, {
-    fontFamily: SERIF, fontSize: l.u(13.5) + 'px', color: '#e6dfc6', fontStyle: 'italic',
-    align: 'center', wordWrap: { width: l.u(330) }, lineSpacing: l.u(3),
-  })).setOrigin(0.5, 0).setAlpha(0);
+  // one single-line Text per line (ssTextBlock): sf rides on every child
+  const desc = ssTextBlock(scene, l.x(0), l.y(descY), loc.desc, {
+    fontSize: l.u(13.5) + 'px', color: '#e6dfc6', fontStyle: 'italic',
+    align: 'center', wrapW: l.u(330), lineSpacing: l.u(3), ox: 0.5, oy: 0, sf: true,
+  }).setData('sigilDesc', sg.id).setAlpha(0);
   words.push(desc);
   let ny = descY + dh(desc) + 26;
   const how = SS_SIG_HOW(sg);
   if (how) {
-    const hw = sf(scene.add.text(l.x(0), l.y(ny), '✓ ' + how, {
-      fontFamily: SERIF, fontSize: l.u(10) + 'px', color: '#8a94c4', fontStyle: 'italic',
-      align: 'center', wordWrap: { width: l.u(320) },
-    })).setOrigin(0.5, 0).setAlpha(0);
+    const hw = ssTextBlock(scene, l.x(0), l.y(ny), '✓ ' + how, {
+      fontSize: l.u(10) + 'px', color: '#8a94c4', fontStyle: 'italic',
+      align: 'center', wrapW: l.u(320), ox: 0.5, oy: 0, sf: true,
+    }).setData('sigilHow', sg.id).setAlpha(0);
     words.push(hw);
     ny += dh(hw) + 28;
   }
@@ -4870,8 +4971,10 @@ class Home extends Phaser.Scene {
     const tk = ssGoldTex(this, SS_T('abandonTitle'), 17);
     const tsc = Math.min(1, 280 / tk.w);
     items.push(this.add.image(l.x(0), l.y(304), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
-    items.push(ssTxt(this, l.x(0), l.y(362), SS_T('abandonBody', SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim(), ck.fightIdx % 5 + 1),
-      l.u(12), '#c9c3ae', 'italic').setOrigin(0.5).setWordWrapWidth(l.u(280)).setAlign('center'));
+    items.push(ssTextBlock(this, l.x(0), l.y(362), SS_T('abandonBody', SS_ACT_N(SS_ACTS[ck.actIdx]).split('·')[0].trim(), ck.fightIdx % 5 + 1), {
+      fontSize: l.u(12) + 'px', color: '#c9c3ae', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(280), align: 'center', ox: 0.5, oy: 0.5,
+    }));
     // KEEP CLIMBING wears the gold — walking away from a checkpoint should
     // never be the brightest thing on screen
     const keepB = this.add.image(l.x(0), l.y(438), ssBtn(this, false, 250, 50)).setDisplaySize(l.u(250), l.u(50)).setInteractive({ useHandCursor: true });
@@ -4941,8 +5044,10 @@ class Home extends Phaser.Scene {
     items.push(selGlow, selG);
     const powerT = ssTxt(this, l.x(0), l.y(548), '', l.u(12), '#ffe9a8').setOrigin(0.5)
       .setShadow(0, 0, '#c9b676', l.u(7), true, true);
-    const descT = ssTxt(this, l.x(0), l.y(578), '', l.u(10.5), '#c9c3ae', 'italic').setOrigin(0.5)
-      .setWordWrapWidth(l.u(324)).setAlign('center');
+    const descT = ssTextBlock(this, l.x(0), l.y(578), '', {
+      fontSize: l.u(10.5) + 'px', color: '#c9c3ae', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(324), align: 'center', ox: 0.5, oy: 0.5,
+    });
     items.push(powerT, descT);
     const beginB = this.add.image(l.x(0), l.y(636), ssBtn(this, false, 260, 50)).setDisplaySize(l.u(260), l.u(50))
       .setInteractive({ useHandCursor: true }).setAlpha(0.45);

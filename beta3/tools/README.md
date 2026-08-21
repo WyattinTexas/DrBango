@@ -1,6 +1,6 @@
 # beta3 dev tools
 
-Seven scripts, all dev-only — nothing here ships to the browser.
+Eight scripts, all dev-only — nothing here ships to the browser.
 
 ## make-word-packs.py
 
@@ -389,6 +389,61 @@ at boot. Three harness traps:
 - A synthesized `window.dispatchEvent(new ErrorEvent('error', {message,
   filename, lineno}))` runs the real compat handler and never opens a native
   dialog — that is how the error path is pinned without crashing anything.
+
+## One line per Text: desc-check.mjs (v0.44.0)
+
+TestFlight v0.43.0: FIRST LIGHT, BLOOD INK and LEYLINE ROOTS reached Wyatt's
+phone with NO effect text, and v0.38's MOONWARD before them. The pattern that
+cracked it: **every victim is a desc that wraps to a second line**, every
+one-line desc renders, and it is deterministic per sigil. It has never
+reproduced in headless Chrome or real desktop WebKit, on either renderer — so
+do not chase a local repro. A Phaser multi-line wrapped-italic bake is
+inkless on iOS WebKit for these strings, and the healer's re-bake fails the
+same way (on his phone it had been "healing" these cards on every pick and
+shipping blanks).
+
+The fix that cannot lose: **no desc bakes multi-line in a single Text.**
+`ssWrapLines` asks Phaser's own wrap measurement for the line strings (so the
+breaks land exactly where `wordWrap` put them — desc-check pixel-compares a
+two-line card against a legacy wordWrap card at the same spot and gets an
+average channel diff of 0.04), and `ssTextBlock` renders one single-line Text
+per line, stacked at `lineHeight + lineSpacing`, inside a Container that sizes
+itself so `.height` reads like a Text's (the rite's measured ladder depends on
+it). Used by the pick card, the inspector rows, the sleeping gallery's
+conditions, the forge ceremony's effect + condition, the abandon dialog, the
+zodiac pick's desc and versus's wrapped notes. `setText`/`setColor` rebuild in
+place, so call sites that re-set a label did not change.
+
+- **ja/zh wrap without spaces**: those take Phaser's char-level
+  (`useAdvancedWrap`) measurement — the old basic wrap left them one
+  overflowing line. Arabic and Hindi split only at spaces; each line is
+  shaped and bidi-ordered by the canvas on its own, exactly as it was inside
+  one canvas. A run that cannot break inside the width shrinks the block's
+  font (to 70%) rather than ever baking multi-line.
+- **The healer now confirms its heals.** After `updateText()` the canvas is
+  sampled again; a Text that stays inkless is NOT counted and DIAGs as
+  `unhealable: <first four words> · <tag>`. If Wyatt's phone ever shows that
+  line, the bug has moved and has a name.
+- **`getWrappedText()` returns an ARRAY in Phaser 3.90**, not a string — the
+  first draft of the wrapper called `.split` on it.
+- **Pixel-compare two cards at the SAME position, sequentially.** A card 200
+  design units lower sits at a different fractional pixel, and every
+  antialiased edge then differs by itself (avg diff 3.7 for identical cards);
+  and put an opaque ground under them, or the sky gradient is the diff.
+- The suite readers in drip-check and fps-check collect `o.text` from a
+  block container too (`getData('textBlock')`), because `txt.includes(desc)`
+  on the line Texts alone would never match a two-line desc.
+
+```
+node tools/desc-check.mjs      # served on :8899, swiftshader Chrome on :9446
+```
+
+86 checks: 24 sigils × 10 languages on the pick card, the inspector + gallery
+and the rite, on BOTH `?rend=cv` and `?rend=gl` — every line inked, no
+newline, breaks matching legacy wordWrap (or fitting, for CJK), scrollFactor 0
+on every rite child, the ladder on measured height, the healer drill, a real
+tap through a pick of the three phone cards, and real `?lang=ar` / `?lang=ja`
+boots. `SHOTS=<dir>` keeps the snapshots.
 
 ## Harness gotchas learned on the friends/invites work (v0.25.0)
 

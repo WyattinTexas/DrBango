@@ -561,7 +561,7 @@ async function main() {
     b.endRun(true); return 'ended' })()`);
   const flame = JSON.parse(await c.ev(`(() => {
     const b = game.scene.getScene('battle');
-    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.list) w(o.list); });
     w(b.overlayC.list);
     // nothing may fall outside the (taller) daily window
     let win = null, lo = 1e9, hi = -1e9;
@@ -743,7 +743,7 @@ async function main() {
   ok('a real tap on the lamp opens the lantern sheet', await until(`!!game.scene.getScene('home').streakC`));
   const strip = JSON.parse(await c.ev(`(() => { const h = game.scene.getScene('home'), c = h.streakC;
     const txt = [], imgs = []; let rings = 0;
-    const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.texture && o.texture.key) imgs.push(o.texture.key);
+    const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.texture && o.texture.key) imgs.push(o.texture.key);
       if (o.type === 'Graphics') rings++; if (o.list) w(o.list); });
     w(c.list);
     let win = null, lo = 1e9, hi = -1e9;
@@ -777,7 +777,7 @@ async function main() {
   ok('a pending mark holds a ceremony on the meadow', await until(`!!game.scene.getScene('home').riteC`, 25000));
   const rite = JSON.parse(await c.ev(`(() => { const h = game.scene.getScene('home'), c = h.riteC;
     const txt = [], imgs = [];
-    const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.texture && o.texture.key) imgs.push(o.texture.key); if (o.list) w(o.list); });
+    const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.texture && o.texture.key) imgs.push(o.texture.key); if (o.list) w(o.list); });
     w(c.list);
     return JSON.stringify({ txt, imgs, depth: c.depth, parts: c.list.some(o => o.type === 'ParticleEmitter'),
       pend: SS.prof.streak.pend, stored: JSON.parse(localStorage.getItem('beta3.profile')).streak.pend }) })()`));
@@ -807,7 +807,7 @@ async function main() {
       b.endRun(true); return 'ended' })()`);
     await sleep(900);
     return JSON.parse(await c.ev(`(() => { const b = game.scene.getScene('battle');
-      const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+      const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.list) w(o.list); });
       w(b.overlayC.list);
       let win = null, lo = 1e9, hi = -1e9;
       const w2 = (ls) => ls.forEach(o => { if (o.texture && o.texture.key === 'endpanel') win = o;
@@ -1173,7 +1173,7 @@ async function main() {
     const read = () => {
       const p = ssSigilPanel(s, { sigils: ssSigilOpen().map(g => g.id), sleeping: true, depth: 900 });
       const txt = [];
-      const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+      const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.list) w(o.list); });
       w(p.c.list);
       const kill = (o) => { s.tweens.killTweensOf(o); if (o.list) o.list.forEach(kill); };
       kill(p.c); p.c.destroy();

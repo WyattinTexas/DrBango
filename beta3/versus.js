@@ -103,7 +103,10 @@ class VsMenu extends Phaser.Scene {
     const joinB = this.add.image(l.x(0), l.y(664), ssBtn(this, true, 250, 44)).setDisplaySize(l.u(250), l.u(44)).setInteractive({ useHandCursor: true });
     ssTxt(this, l.x(0), l.y(664), SS_T('vsSeal'), l.u(13), '#9fb0e8').setOrigin(0.5);
     joinB.on('pointerdown', () => this.codePrompt(l));
-    this.noteT = ssTxt(this, l.x(0), l.y(708), '', l.u(11), '#c9b676', 'italic').setOrigin(0.5).setAlign('center').setWordWrapWidth(l.u(340));
+    this.noteT = ssTextBlock(this, l.x(0), l.y(708), '', {
+      fontSize: l.u(11) + 'px', color: '#c9b676', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
+    });
 
     this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
     if (VSAUTO) this.time.delayedCall(600, () => this.match(this.mode));
@@ -150,7 +153,10 @@ class VsMenu extends Phaser.Scene {
     const friends = FR.list();
     const ROWS = 5, rowY = (i) => l.y(top + 54 + i * 38);
     if (!friends.length) {
-      items.push(ssTxt(this, l.x(0), l.y(top + 120), SS_T('vsNoFriends'), l.u(11), '#5a6390', 'italic').setOrigin(0.5).setAlign('center').setWordWrapWidth(l.u(320)));
+      items.push(ssTextBlock(this, l.x(0), l.y(top + 120), SS_T('vsNoFriends'), {
+        fontSize: l.u(11) + 'px', color: '#5a6390', fontStyle: 'italic', shadow: true,
+        wrapW: l.u(320), align: 'center', ox: 0.5, oy: 0.5,
+      }));
     }
     const shown = friends.length > ROWS ? friends.slice(0, ROWS - 1) : friends;
     shown.forEach((f, i) => {
@@ -619,8 +625,10 @@ class VsBattle extends Phaser.Scene {
     while (this.lobbyTitle.width > l.u(360) && this.lobbyTitle.text.length > 8) this.lobbyTitle.setText(this.lobbyTitle.text.slice(0, -2) + '…');
     this.lobbyCode = txt(l.x(0), l.y(262), this.code, 44, '#ffe9a8').setOrigin(0.5)
       .setShadow(0, 0, '#c9a94f', l.u(18), true, true);
-    this.lobbySub = txt(l.x(0), l.y(308), ch ? SS_T('vsWaitAnswer', ch.name) : SS_T('lobbySub'), 11, '#8a94c4', 'italic').setOrigin(0.5)
-      .setAlign('center').setWordWrapWidth(l.u(340));
+    this.lobbySub = ssTextBlock(this, l.x(0), l.y(308), ch ? SS_T('vsWaitAnswer', ch.name) : SS_T('lobbySub'), {
+      fontSize: l.u(11) + 'px', color: '#8a94c4', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
+    });
     // native invite from the lobby too — same link, same pointerUP rule
     this.shareB = this.add.image(l.x(0), l.y(360), ssBtn(this, false, 250, 46)).setDisplaySize(l.u(250), l.u(46)).setInteractive({ useHandCursor: true });
     this.shareT = txt(l.x(0), l.y(360), SS_T('vsShareInvite'), 13, BTN_INK()).setOrigin(0.5);

@@ -106,7 +106,7 @@ const dragUp = async (px = 260) => {
 const GALLERY = `(() => { const s = game.scene.getScenes(true).find(x => x.skiesP || x.inspectP || x.endInspectP);
   const p = s && (s.skiesP || s.endInspectP || s.inspectP);
   if (!p) return 'none';
-  const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+  const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.list) w(o.list); });
   w(p.c.list);
   const held = SS_SIGILS.filter(g => txt.includes(SS_SIG(g).desc)).map(g => g.id);
   const asleep = SS_SIGILS.filter(g => g.lock && txt.includes(SS_SIG_HOW(g))).map(g => g.id);
@@ -474,7 +474,7 @@ ok('THE LAW: no sigil is ever listed asleep AND awake',
   gal.both.length === 0, gal.both.join(',') || 'none in both');
 ok('the twelve you hold are all above it, in full dress',
   gal.held.length === 12 && await ev(`(() => { const p = game.scene.getScene('profile').skiesP;
-    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.list) w(o.list); });
     w(p.c.list);
     return SS_SIGILS.filter(g => g.lock && !ssSigilUnlocked(g.id)).every(g => !txt.includes(SS_SIG(g).desc)) })()`) === true,
   gal.held.join(' '));
@@ -490,7 +490,7 @@ ok('…and every one of those fractions is drawn on its own row',
   want.every(w => gal.bars.includes(w)), gal.bars.join(' · '));
 ok('a silhouette gives away the rarity dress and NOTHING else — no name, no glyph',
   await ev(`(() => { const p = game.scene.getScene('profile').skiesP;
-    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.list) w(o.list); });
     w(p.c.list);
     const locked = SS_SIGILS.filter(g => g.lock && !ssSigilUnlocked(g.id));
     return locked.every(g => !txt.includes(SS_SIG(g).name) && !txt.includes(SS_SIG(g).desc) && !txt.includes(g.icon))
@@ -511,7 +511,7 @@ ok('after the forge, COMET TRAIL has moved from sleeping to held — and is in e
   'held ' + gal2.held.length + ' asleep ' + gal2.asleep.length);
 ok('and the count above the list came down with it',
   gal2.asleep.length === 11 && await ev(`(() => { const p = game.scene.getScene('profile').skiesP;
-    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.list) w(o.list); });
     w(p.c.list); return txt.includes(SS_T('slpSub', 11)) })()`) === true);
 ok('…and the door itself re-counts the sky on the way out',
   await tapUntil(0, 60, `!game.scene.getScene('profile').skiesP`)
@@ -552,7 +552,7 @@ ok('a grandfathered sky lists all 24 held and none asleep',
   'held ' + full.held.length + ' asleep ' + full.asleep.length);
 ok('and the section says so rather than standing empty',
   await ev(`(() => { const p = game.scene.getScene('profile').skiesP;
-    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.list) w(o.list); });
+    const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.list) w(o.list); });
     w(p.c.list); return txt.includes(SS_T('slpNone')) })()`) === true);
 
 // ================================================================
