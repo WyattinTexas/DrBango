@@ -31292,7 +31292,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.13';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.14';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -60103,6 +60103,7 @@ const JANE_BURST_N=6, JANE_BURST_GAP=0.09;     // 0384 THE ENTRANCE BURST — si
 const JZ_ZIP=0.62, JZ_LAND=0.38, JK_KICK=0.12, JTIP_EV=7.5, JTIP_D=0.7;   // 0434 HER MOVES' OWN CLOCKS — the zip down the drawn line, the knee-dip landing, the per-round kick, the idle brim-touch cadence/hold (draw-time only, every one a dial; the arrival reads in ~1.0s < the contract's 1.5)
 const JANE_KING_X=0.2;                         // 0384 (Wyatt 8/17: "against King Croak himself, reduce her damage by like 90%") → 0433 (Wyatt 8/19 overnight: "She should do 10 more damage to King Croak" — +10 points on his own dial: a FIFTH lands now) — counterDmg's own row, BOTH croaks via def.croak (the little-king inclusion flagged; every other target byte-what-it-was)
 const JANE_SNAKE_X=0.2;                        // 0433 (Wyatt 8/19 overnight: "Jane needs to do about 80 less damage to the snake" — his 8/17 percent grammar: −80%) — counterDmg's snake row, DUEL ONLY via the 0416 identity test (S.raid.k==='croak' && cfg===S.cfg): the hideout's giant rattlesnake shrugs her to a fifth; an Outlaw-Town cameo Jane vs the r13/r14 rattle sections is byte-what-it-was (⚑ one clause drops the identity if he wants it global)
+const JANE_VIS_TOP=78, JANE_VIS_HMAX=240;      // 0456 THE SKY-SHOT, STRIKE THREE (Wyatt 8/20: "When Jane comes out, she still fires right above the screen") — TOP = the HUD band in logical px: the top bar (drawHUD, 0..44) + the boss plate (drawBaseBar at y54, 47..75) + a hair. janeVis asks for a foe's WHOLE FIGURE below it (feet − the drawn height ≥ cam.y + TOP): the 0433 law judged the FEET anchor, so a king hunting his y=100 band or a lady on the north porch lane (y124-164) stood "visible" with the body above the rim / under the plate, and her rounds ran 200px straight up into the HUD at a figure the player could not see (measured: 24 of her rounds across 33 v5.13 entrances at a king whose head sat under the plate). HMAX caps the height read at the tallest figure she ever meets — the giant rattlesnake's coil (w384 on a square box: ink 238px, measured by getBBox; the kings 110, the ladies 75) — so a big mold's empty box never reads as a taller figure. ⚑ dials — TOP 0 restores the feet-only law
 const CROAK_BOX_LIVES=1;                       // 0384 THE SIEGE — a FULL storm on the toy box costs one life (the 1-per-4-volleys reading is the flagged alternate)
 const CROAK_POSSE_HPX=1.5, CROAK_POSSE_SPDX=1.15;   // 0384 IMPACTFUL POSSE (Wyatt: "his minions to be impactful") — M/H/MEGA wave STAMPS in bd(); the GLOBAL wbandit/wsniper rows never move (Outlaw Town's rungs read them)
 const SNIPE_CD=14;                             // 0340 OUTLAW SNIPER: the red button's re-arm
@@ -60707,12 +60708,22 @@ function raidArm(hm){
 // per-sim in co-op by the shipped 0340 model, so her fire never crosses a
 // wire and each screen holds only what ITS player can see. Jane-scoped on
 // purpose (the 0415 muzzle-scope law) — every other figure keeps the
-// stock loop's world test alone.
+// stock loop's world test alone. 0456 STRIKE THREE (Wyatt 8/20: "she still
+// fires right above the screen"): the box test read a foe's FEET anchor —
+// a figure standing on the top band of the screen passed it with its body
+// above the rim or under the HUD plate, and her round ran straight up into
+// the top of the screen at someone the player could not see. The test now
+// asks for the WHOLE FIGURE on screen below the HUD band: the drawn height
+// off the feet (drawSprite bottom-anchors at y+0.08h; the mold's own
+// ratio, capped at JANE_VIS_HMAX for the big square boxes) must clear
+// cam.y+JANE_VIS_TOP. Same per-sim read, same two callers (the burst + her
+// stock gun), the narrow-rug answer untouched.
 function janeVis(f){
   const cm=(!S.bf && W>VW && S.cCam)||null;
   if(!cm) return true;
   const cy=cm.y||0;
-  return f.x>=cm.x && f.x<=cm.x+VW && f.y>=cy && f.y<=cy+H;
+  const im=IMG[f.type], fh=Math.min(JANE_VIS_HMAX, 0.92*((f.def&&f.def.w)||48)*((im&&im.width)? im.height/im.width : 1));
+  return f.x>=cm.x && f.x<=cm.x+VW && f.y-fh>=cy+JANE_VIS_TOP && f.y<=cy+H;
 }
 function janeBurst(u,dt){
   const B=u.jBurst;
