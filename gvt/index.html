@@ -33351,7 +33351,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.51';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.52';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -66808,7 +66808,7 @@ const WR_CTA = { bf1:'⚔ PLAY 1v1', bf2:'⚔⚔ PLAY 2v2', adv:'🗺 TO THE CAM
 const WR_REWARD = { rating:'⚔ TAP A COMMANDER · ONCE A DAY · FULL STRENGTH', bf1:'★ WIN = +25★ + XP', bf2:'★ GRAB AN ALLY · +25★ + XP', squad:'⚑ FIFTEEN OF YOU. ONE CARPET.' };
 const WR_EMPTY = { rating:'FIGHT A BATTLE TO GET RATED', bf1:'WIN A 1v1 TO GET ON THE BOARD', bf2:'WIN A 2v2 TO GET ON THE BOARD', adv:'BEAT A LEVEL TO GET ON THE BOARD', squad:'WIN A BATTLE WITH YOUR SQUAD TO GET ON THE BOARD' };
 const WR_TITLE = { rating:'RANKINGS — RATING', bf1:'RANKINGS — 1v1', bf2:'RANKINGS — 2v2', adv:'RANKINGS — ADVENTURE', squad:'RANKINGS — SQUADS' };
-let WR = { tab:'rating', data:null, err:false, muster:false, rename:false, mine:null, view:null };   // 0442: view = the uid of the ADVENTURE row whose boss wall the side column shows (page-lifetime, never persisted); null = MY wall
+let WR = { tab:'rating', data:null, err:false, muster:false, mine:null, view:null };   // 0442: view = the uid of the ADVENTURE row whose boss wall the side column shows (page-lifetime, never persisted); null = MY wall · 0494b: the rename flag is gone — the pencil opens a card, never the hundred
 // THE RATING's display form: the raw wire int is 0..7000, the player only ever
 // sees the /1000 reading — "4.35". Two decimals everywhere, same as FAVOR.
 function fmtRating(r){ r=(r==null? 1000 : r); r=Math.max(0, Math.min(7000, Math.round(r)));
@@ -67225,12 +67225,7 @@ function wrMusterHTML(list){
     +'<div class="wr-mfoot"><p>'+ladder+'</p>'
     +'<p style="margin-top:6px">You: <b style="color:#EDEADF" data-notr>'+escH(META.name)+'</b> · '
       +tf('Rating %1', fmtRating(myRating()))+' · '
-      +'<a href="#" style="color:#7FA35C" onclick="UI.renameStart();return false">✎ rename</a></p>'
-    +'<div id="renameBox" class="'+(WR.rename?'':'hidden')+'" style="margin:8px 0">'
-      +'<input id="renameIn" maxlength="18" spellcheck="false" style="font-family:inherit;font-size:1.1rem;padding:0.45rem 0.6rem;border-radius:10px;border:2px solid #4A6B35;background:#141810;color:#EDEADF;width:56%">'
-      +' <button class="mbtn" onclick="UI.renameSave()">SAVE</button>'
-      +'<div id="renameNote" style="font-size:0.9rem;opacity:0.6;margin-top:6px">3–18 characters. This is the name the whole world sees.</div>'
-    +'</div>'
+      +'<a href="#" style="color:#7FA35C" onclick="UI.wrRename();return false">✎ rename</a></p>'   // 0494b THE RENAME COMES BACK: the foot's link opens THE NAME CARD over the muster (the foot's own rename box retired with it)
     +(window.__GVTSHELL
       ? (META.account? '<p style="color:#7FA35C">✓ ACCOUNT LINKED (APPLE) — your army follows you across devices.</p>'
         : '<p style="margin-top:6px"><button class="mbtn" onclick="UI.linkApple()"> SIGN IN WITH APPLE</button> '
@@ -67257,23 +67252,47 @@ function namePromptTry(){
   }
   namePromptShow();
 }
-function namePromptShow(){
+function namePromptShow(rename){   // 0494b: rename = the pencil's card — the SAME markup, SAVE / KEEP / Enter / the veil wired to the rename handlers (no once-ever stamp); omitted = the v3.08 first prompt, byte-for-byte
   const el=document.getElementById('nameProm'); if(!el) return;
+  const save=rename? 'UI.renameSave()' : 'UI.namePromptSave()', keep=rename? 'UI.renameKeep()' : 'UI.namePromptKeep()';
   el.innerHTML='<div class="np-card">'
     +'<h2>CHOOSE YOUR NAME</h2>'
     +'<input id="npIn" maxlength="18" spellcheck="false" autocomplete="off">'
     +'<div id="npNote">3–18 characters. This is the name the whole world sees.</div>'
-    +'<div class="np-row"><button class="mbtn" onclick="UI.namePromptSave()">SAVE</button>'
-    +'<button class="mbtn np-keep" onclick="UI.namePromptKeep()">KEEP THIS NAME</button></div>'
+    +'<div class="np-row"><button class="mbtn" onclick="'+save+'">SAVE</button>'
+    +'<button class="mbtn np-keep" onclick="'+keep+'">KEEP THIS NAME</button></div>'
     +'</div>';
   const i=document.getElementById('npIn');
   if(i){ i.value=META.name;   // a VALUE, never markup — untranslated, unescaped, unstyled by the caps rule
-    i.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); UI.namePromptSave(); } }; }
-  el.onclick=e=>{ if(e.target===el) UI.namePromptKeep(); };   // veil tap = keep (kid-proof)
+    i.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); if(rename) UI.renameSave(); else UI.namePromptSave(); } }; }
+  el.onclick=e=>{ if(e.target===el){ if(rename) UI.renameKeep(); else UI.namePromptKeep(); } };   // veil tap = keep (kid-proof)
+  el.classList.toggle('np-rename', !!rename);   // 0494b: the card's kind rides the veil — renameCardClose reads it; the first prompt never wears it
   el.classList.remove('hidden');
 }
 function namePromptHide(){ const el=document.getElementById('nameProm');
-  if(el){ el.classList.add('hidden'); el.innerHTML=''; } }
+  if(el){ el.classList.add('hidden'); el.classList.remove('np-rename'); el.innerHTML=''; } }
+// ============ 0494b THE RENAME COMES BACK ============
+// Wyatt 8/22: "if you click your name to rename it or the pencil, you're not
+// able to rename your name like you used to. Now it's just sending you to
+// where you are on the leaderboard." The pencil used to open ALL 100 (which
+// wears YOUR WINDOW lit since 0411 — "where you are") and defer the focus()
+// of a box BELOW the hundred rows to a setTimeout(0): outside the tap's own
+// gesture, so the phone raised no keyboard and the box never surfaced. Now
+// the rename is ITS OWN CARD — the v3.08 first-rankings card, the same
+// markup — built AND focused synchronously inside the tap (a user-gesture
+// focus: the keyboard rises on iOS), Enter = save, veil tap / KEEP = close.
+// The hundred is never opened for it; a kid mid-muster renames over the
+// muster and lands back on it. The board's own close folds the card
+// (closeWorldRank → namePromptHide, as the first prompt); a tab hop or a
+// re-open folds the RENAME card only (renameCardClose reads the veil's
+// kind — the first prompt keeps its v3.08 life).
+function renameCardOpen(){
+  namePromptShow(true);
+  const i=document.getElementById('npIn');
+  if(i){ i.focus(); i.select(); }   // the same call stack as the tap — never a setTimeout
+}
+function renameCardClose(){ const el=document.getElementById('nameProm');
+  if(el && el.classList.contains('np-rename')) namePromptHide(); }
 // ============ 0285 THE REPORT-NAME PATH ============
 // One quiet ⚑ on every surface that shows a stranger's name (the challenge
 // modal, the ALL-100 muster, the campaign muster, the private-battle benches,
@@ -67330,7 +67349,8 @@ function repPair(){   // the pair-shim mate (fam 'c': chair 0 = host, 1 = guest)
   repAsk(c.mate.name, {fam:'c', code:c.code, seat:(c.role==='h'||c.host)?1:0, ctx:'pair'});
 }
 function openWorldRank(){ safeOnce();   // v3.60 (0297): rankings own both name entries — the safety line precedes the roster
-  WR.muster=false; WR.rename=false; CHAL.pos=null; WR.view=null;   // 0442: the board opens on MY wall
+  WR.muster=false; CHAL.pos=null; WR.view=null;   // 0442: the board opens on MY wall
+  renameCardClose();   // 0494b: a re-open folds a standing rename card (the first prompt below keeps its own life)
   wrPreload();
   renderWorldRank();
   document.getElementById('worldrank').classList.remove('hidden');
@@ -67339,7 +67359,7 @@ function openWorldRank(){ safeOnce();   // v3.60 (0297): rankings own both name 
 }
 function closeWorldRank(){
   const el=document.getElementById('worldrank'); if(el) el.classList.add('hidden');
-  WR.muster=false; WR.rename=false; CHAL.pos=null; WR.view=null;   // 0442: a closed board forgets the viewed wall
+  WR.muster=false; CHAL.pos=null; WR.view=null;   // 0442: a closed board forgets the viewed wall
   namePromptHide();   // an unresolved prompt leaves with the scene — flag still 0, it asks again
 }
 
@@ -70886,7 +70906,7 @@ window.UI = {
     locGate(); locTry();                            // 0432: ONE music switch — a location bed gates live, or starts if the chip just opened it
     renderMenu(); },
   // ---- WORLD RANKINGS ----
-  wrTab(id){ audio(); SFX.blip(); WR.tab=id; WR.muster=false; WR.rename=false; CHAL.pos=null; WR.view=null;   // 0411: the poster is the RATING tab's — a tab hop folds it; 0442: so is the viewed wall — a hop returns MY wall
+  wrTab(id){ audio(); SFX.blip(); WR.tab=id; WR.muster=false; CHAL.pos=null; WR.view=null; renameCardClose();   // 0411: the poster is the RATING tab's — a tab hop folds it; 0442: so is the viewed wall — a hop returns MY wall; 0494b: so does the rename card
     if(id!=='rating' && (META.wrSeen||[]).indexOf(id)<0){ META.wrSeen.push(id); saveMeta(); }
     renderWorldRank(); },
   // the one button, on the battleground tabs only: queue a match. The stars
@@ -70948,12 +70968,12 @@ window.UI = {
   },
   // 0411: a row tap = THE POSTER in the side column — the board STAYS open
   // (the B2 glass-sheet learning); the row highlights gold while it stands.
-  wrRow(uid){ audio(); SFX.blip(); WR.muster=false; WR.rename=false; chalPosterOpen(uid); },
+  wrRow(uid){ audio(); SFX.blip(); WR.muster=false; chalPosterOpen(uid); },
   // 0442 THE WALL RIDES THE WIRE: an ADVENTURE row tap = THEIR boss wall in
   // the side column (the poster's B2 law — the board stays open, the row
   // lights gold); your own row, the ✕, a tab hop and the board's own
   // open/close all return MY wall. WR.view is page-lifetime, never persisted.
-  wrView(uid, you){ audio(); SFX.blip(); WR.muster=false; WR.rename=false; WR.view=(you||!uid)? null : String(uid); renderWorldRank(); },
+  wrView(uid, you){ audio(); SFX.blip(); WR.muster=false; WR.view=(you||!uid)? null : String(uid); renderWorldRank(); },
   wrViewX(){ SFX.clack(); WR.view=null; renderWorldRank(); },
   chalX(){ SFX.clack(); CHAL.pos=null; renderWorldRank(); },
   chalPty(uid,name){ ptyInvMate(uid,name); setTimeout(()=>{ if(CHAL.pos&&wrIsOpen()) renderWorldRank(); },600); },   // 0411 (C5/R4): live 1v1 = THE PARTY, any range — the button flips to INVITE SENT!
@@ -70970,9 +70990,11 @@ window.UI = {
     const back=document.querySelector('#worldrank .wr-mback'), y=document.querySelector('#worldrank .wr-mrow.you');
     if(back&&y) back.scrollTop=Math.max(0, y.getBoundingClientRect().top - back.getBoundingClientRect().top - back.clientHeight*0.42); },
   wrMTop(){ SFX.blip(); const back=document.querySelector('#worldrank .wr-mback'); if(back) back.scrollTop=0; },
-  wrMusterClose(ev){ if(ev&&ev.target!==ev.currentTarget) return; SFX.clack(); WR.muster=false; WR.rename=false; renderWorldRank(); },
-  wrRename(){ SFX.blip(); WR.muster=true; WR.rename=true; renderWorldRank();
-    setTimeout(()=>UI.renameStart(),0); },
+  wrMusterClose(ev){ if(ev&&ev.target!==ev.currentTarget) return; SFX.clack(); WR.muster=false; renderWorldRank(); },
+  // 0494b THE RENAME COMES BACK: the YOU: ✎ pill (and the muster foot's ✎
+  // link) open THE NAME CARD over the board, synchronously in the tap —
+  // never the hundred (the card's story sits at renameCardOpen).
+  wrRename(){ SFX.blip(); renameCardOpen(); },
   wrClose(){ SFX.clack(); closeWorldRank(); },
   // ===== 0320 THE SECOND LOOK: the card's two answers =====
   // YES folds the card FIRST, then re-enters the buy verb through every one
@@ -71859,15 +71881,15 @@ window.UI = {
   awayX(cr){ SFX.clack(); const A=awayLedger(); A.seen=Math.max(A.seen|0, cr|0); saveMeta();
     DUEL.sig=duelSig(); renderMenu();
     if(awayRows().length) UI.duelOpen(); else UI.closeModal(); },
-  renameStart(){
-    const b=document.getElementById('renameBox'); if(!b) return;
-    b.classList.remove('hidden');
-    const i=document.getElementById('renameIn');
-    if(i){ i.value=META.name; i.focus(); i.select();
-      i.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); UI.renameSave(); } }; }
-  },
+  // 0494b THE RENAME COMES BACK: the pencil's card — SAVE = the v3.08 card's
+  // recipe verbatim (cleanName gate → the red note → META.name → saveMeta →
+  // the lastSync=0 flush → HQ adopt-back → the room, the board, the refetch
+  // WITH force: the open primed the 60s cache with the OLD name) MINUS the
+  // once-ever stamp — a rename never touches META.comms.wrName. KEEP / the
+  // veil = close, nothing moves. Separate handlers: the first prompt's two
+  // exits below are byte-still.
   renameSave(){
-    const i=document.getElementById('renameIn'), note=document.getElementById('renameNote');
+    const i=document.getElementById('npIn'), note=document.getElementById('npNote');
     if(!i) return;
     const clean=cleanName(i.value);
     if(!clean){
@@ -71876,9 +71898,10 @@ window.UI = {
     }
     META.name=clean; saveMeta(); SFX.snap();
     lastSync=0;                       // the 15s throttle would eat the rename
-    WR.rename=false;
-    Promise.resolve(netSync()).then(()=>{ renderMenu(); if(wrIsOpen()){ renderWorldRank(); wrLoad(); } });
+    namePromptHide();
+    Promise.resolve(netSync()).then(()=>{ renderMenu(); if(wrIsOpen()){ renderWorldRank(); wrLoad(true); } });
   },
+  renameKeep(){ SFX.clack(); namePromptHide(); },
   // v3.08: the first-rankings prompt's two exits. SAVE = renameSave's recipe
   // verbatim (cleanName gate -> META.name -> lastSync=0 flush -> HQ adopt-back)
   // plus the once-ever stamp; the board refetch is wrLoad(true) because the
