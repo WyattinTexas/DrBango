@@ -24695,6 +24695,15 @@ const CAMP_GRAND_W=1920;   // the battleground's own 1v1 span — one const for 
 // campaign clock. It PLOWS (campBallTick's push, both armies, boss/burrow
 // exempt) and never kills; kill:true per row is the battleground's law as
 // Wyatt's MEAN TRAIN dial, shipped OFF. No shipped rung carries one.
+// 0475 WESTERN ROAD 4/8 adds a fifth: dust:[{at,dur,y,x,gift,n?,big?}] = ONE
+// MARKED dustball per row — it enters from the east horizon at `at`
+// (battle seconds), rolls west on the rung's own wind and at at+dur EXITS
+// at (x,y), where it bursts and leaves its SURPRISE: gift 'jax' = one jack
+// (the 0194 seat verbatim — either army trips it) or 'crawl' = n crawlers
+// popping out (guerrilla; they join the wave). No banner, no mark — the
+// ambush read. SAND rungs only (campDustArm reads the final ground): a row
+// on any other costume is dormant. The ambient dustballs need no row —
+// every sand rung rolls them (CAMP_DUST_OFF bars the noon street).
 // Authored straight in each rung's LIVE span — the deep rows below sit on
 // grand rungs, so those numbers are the ARMED 1920's (merged AFTER
 // campGrandArm's x-scale pass, so nothing here is ever re-scaled; 0193 opened
@@ -24790,6 +24799,26 @@ const CAMP_DRESS={
   // L7 law). Validated against the referee dump's seeded terrain.
   34:{ pits:[{x:700,y:180,r:18},{x:920,y:400,r:18}] },
   38:{ pits:[{x:640,y:170,r:18},{x:960,y:430,r:18}] },
+  // ===== 0475 WESTERN ROAD 4/8 — THE DUST SURPRISE (WESTERN-ROAD-PLAN.md §4.5,
+  // D14: the three sand rungs 32·41·49). One MARKED dustball per rung: it
+  // enters from the east horizon at `at`, crosses on the same wind as the
+  // ambient dust (campDustArm / dustPos — pure f(battle clock), the steer
+  // round the crate and every rock built at the door), and at at+dur it EXITS
+  // at (x,y): the ball bursts and leaves the gift — 'jax' = one jack (task 5's
+  // seat; EITHER army trips it) · 'crawl' = n crawlers popping out (guerrilla
+  // — the infest read; they join the wave: leak, bounty, the win door, all
+  // real). No banner, no mark on the ball — the ambush read is that it looked
+  // like every other tumbleweed. Spots on the marching lanes EAST of the 480
+  // deploy line, ≥120 off the crate (1110,300), clear of the river corridor
+  // and every seeded rock (the L7 / §4.3 jax law). ⚠ DORMANT until the rung's
+  // ground is SAND (a tumbleweed on the roof is the wrong costume): task 6
+  // deals CAMP_STAGES 'sand' + the tall 1920 mat to these three rungs and
+  // RE-AUTHORS these spots in that span (the 0129 span-coherence law — the
+  // numbers here are the plain 1240 rug's). ⚑ 'crawler' is the campaign's
+  // own low crawler (no outlaw-skinned crawler exists at HEAD — one cell).
+  32:{ dust:[{at:26, dur:14, y:250, x:790, gift:'jax'}] },           // lands at 40 s as wave 2 walks on — a jack in front of the vent line
+  41:{ dust:[{at:78, dur:16, y:400, x:700, gift:'crawl', n:4}] },   // the emptiest rung on the road: four crawlers pop out of the only thing moving on it, mid wave 4
+  49:{ dust:[{at:40, dur:15, y:200, x:720, gift:'jax'}] },           // the road to noon: a jack on the east bank of the crossing
   25:{ rocks:[{x:608,y:296,r:16,art:'bags',row:'a'},{x:634,y:314,r:16,art:'bags',row:'a'},{x:660,y:332,r:16,art:'bags',row:'a'}],
        balls:[{x:1200,y0:160,y1:430,r:42,spd:54}] },
   30:{ rocks:[{x:900,y:190,r:33,art:'block',ltr:'G',bc:'#6E8F4E'},{x:1010,y:300,r:34,art:'block',ltr:'V',bc:'#4E7FA8'},{x:880,y:420,r:33,art:'block',ltr:'T',bc:'#C0483B'},
@@ -30532,6 +30561,10 @@ function campGrandArm(){
   // sims bury identical jacks (the relPos law's spirit).
   for(const j of (t.jax||[]))
     S.mines.push({ owner:null, side:'jax', seat:null, x:j.x, y:j.y, armT:0, big:!!j.big, sl:false, jx:true });
+  // 0475 WESTERN ROAD 4/8: the dustballs arm LAST — their lanes steer round
+  // every rock the merge above just landed (sand rungs only; zero RNG; a
+  // COPY per battle on t — CAMP_DRESS is never written).
+  campDustArm(t);
 }
 function startCampaign(n){
   startBattle(n||META.campaign+1, null);
@@ -31879,7 +31912,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.31';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.32';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -39722,6 +39755,195 @@ function campBallTick(dt){
     hitCheck(f,{side:'jax'});
   }
 }
+// ===== 0475 WESTERN ROAD 21-50 · 4/8 — DUSTBALLS (Wyatt 8/21 verbatim: "Improve
+// dustballs."). ⚠ Before this there were NO dustballs in the sim — the only
+// tumbleweed was OUTLAW TOWN's lobby street SVG (DOM decor, never the carpet).
+// So "improve" = BUILD, on the CAMP_PROPS contract: pure decor, ZERO hitbox —
+// never in terrain.rocks, never in S.units/S.foes, no steer reads, no
+// targeting reads, no placement reads — drawn as ACTORS sorted with the men
+// (the train/stampede law: a ball rolling past a man reads right). Every SAND
+// rung rolls them (the stage costume's own weather: CAMP_STAGES 'sand' → 44 ·
+// 88 today, the 0197 tall western mats as task 6 deals them) EXCEPT the noon
+// street (CAMP_DUST_OFF — the 0129 law: L50 carries no dress; Wyatt's dial).
+// MOTION (the fog-bank / trainCars law — pure f(battle clock), ZERO RNG, every
+// sim and every seat sees the same weather): one shared WIND GUST clock
+// (DUST_P) with a closed-form distance integral dustG(u), so a ball's travel
+// is EVALUATED from the clock each frame — never integrated, never drifts,
+// never reads dt. Three scales (DUST_R small·mid·big), three peak speeds
+// (DUST_V), bursts and lulls (a big ball stops dead and rocks in a lull; a
+// small one creeps — DUST_FLOOR), a gust lag by scale (DUST_LAG — inertia,
+// the small ones go first), spin = distance/r (matched to the ground), a
+// bounce beat on the big ones only while a gust carries them, and a puff
+// kicked at every landing (the heel-dust clock-edge idiom — dice-free). THE
+// PATH is built ONCE at the crate door (campDustArm, AFTER the dress merge so
+// every rock it steers round is final): a lane across the mat that STEERS
+// round every rock/mesa/bag/block/pond, the crate and the toy box (a small
+// ball HOPS a small stone instead), and HOPS the water, every pit and the
+// trench. Reduced motion: the hops stay (a path necessity — a ball must never
+// clip a stone; it rides the wind, so a ball the gust drops mid-hop settles
+// onto the stone / the water and lifts again with the next gust), the bounce
+// beat, the lull rock and the puffs stand down (the v1.25 law: the calm run
+// is stiller; the travel itself is information).
+// THE INFEST HOOK (WESTERN-ROAD-PLAN.md §4.5 / D14 — 32·41·49): an authored
+// CAMP_DRESS[n].dust row = ONE MARKED dustball per rung. It enters from the
+// east horizon at `at` (battle seconds), crosses on the same wind, and at
+// at+dur it EXITS at its authored spot (x,y): the ball bursts and leaves its
+// SURPRISE — gift 'jax' = one jack (task 5's seat, the campGrandArm push
+// verbatim: phantom side 'jax', armT 0, EITHER army trips it) or 'crawl' = n
+// crawlers (spawnFoe, guerrilla — the infest read; they join the wave). No
+// banner, no mark on the ball. The gift is a SIM event on the battle clock
+// (rt ≥ at+dur, once) at the AUTHORED spot — identical on every sim in a
+// lobby by construction (same levelN → same row → same clock); it stands
+// down behind the flag / the clear (the wheels law). Default OFF everywhere:
+// no row = no mark; the rows on 32/41/49 are DORMANT until the rung's ground
+// is sand (task 6). ⚑ A late co-op joiner's rt starts at ITS door (the duck/
+// train/fog clocks share this — foe drift is tolerated by design).
+const DUST_P=7.5;                       // the gust period (s): one gust, one lull
+const DUST_R=[9,14,20];                 // the three scales (small · mid · big), r px
+const DUST_V=[150,115,85];              // peak speed per scale (px/s at the top of a gust)
+const DUST_FLOOR=[0.10,0.06,0];         // the lull creep per scale (a big ball stops dead and rocks)
+const DUST_LAG=[0,0.35,0.8];            // gust lag per scale (s) — inertia
+const DUST_HOP_R=26;                    // a stone up to this r, a SMALL ball hops instead of steering round
+const DUST_BOUNCE=70;                   // the big ball's bounce wavelength (px of travel per hop)
+const CAMP_DUST_OFF={ 50:1 };           // the noon street stays dust-free (the 0129 law; Wyatt's dial)
+// the gust g(u)=max(0,sin(2πu/P)) and its closed-form integral from 0 — the
+// whole determinism law in two lines: distance is a FUNCTION of the clock.
+function dustGust(u){ return u<=0? 0 : Math.max(0, Math.sin(2*Math.PI*u/DUST_P)); }
+function dustG(u){ if(u<=0) return 0; const P=DUST_P, k=Math.floor(u/P), m=u-k*P;
+  return k*P/Math.PI + (m<P/2 ? (P/(2*Math.PI))*(1-Math.cos(2*Math.PI*m/P)) : P/Math.PI); }
+// the lane: a sampled polyline from x0 (east) to x1 (west) at lane y, swung
+// round every solid thing in the way on a gentle ellipse (the nearer
+// shoulder, unless the rim has no room), with HOP spans in path distance for
+// the things a ball bounces over. Pure reads of the FINAL terrain — zero RNG.
+function dustBall(t,y,r,x0,x1){
+  const PAD=10, obs=[], hops=[];
+  for(const rk of t.rocks) obs.push({x:rk.x, y:rk.y, r:rk.r, hop:(r<=DUST_R[0] && rk.r<=DUST_HOP_R)});
+  for(const p of (t.ponds||[])) obs.push({x:p.x, y:p.y, r:Math.max(p.rx,p.ry), hop:false});
+  for(const p of (t.pits||[])) obs.push({x:p.x, y:p.y, r:p.r, hop:true});
+  obs.push({x:W-130, y:WORLD_H/2, r:64, hop:false});   // the crate (every campaign rung's — startCampaign's own seat)
+  obs.push({x:T.x, y:T.y, r:58, hop:false});           // the toy box
+  for(const o of obs){ if(o.hop) continue; o.reach=o.r+r+PAD; let side=(y<=o.y)? -1 : 1;
+    const yd=o.y+side*(o.reach+6); if(yd<FOE_TOP+8 || yd>FOE_BOT-8) side=-side; o.side=side; }
+  const xs=[], ys=[], cum=[]; let L=0;
+  for(let x=x0;; x-=6){
+    if(x<x1) x=x1;
+    let yy=y;
+    for(const o of obs){ if(o.hop) continue; const dx=x-o.x, RX=o.reach+26;   // an ellipse wider than tall — the swing starts early, stays gentle
+      if(Math.abs(dx)>=RX) continue;
+      const need=o.reach*Math.sqrt(1-(dx*dx)/(RX*RX)), off=yy-o.y;
+      if(o.side<0 ? off>-need : off<need) yy=o.y+o.side*need; }
+    yy=Math.max(FOE_TOP+4, Math.min(FOE_BOT-4, yy));
+    if(xs.length) L+=Math.hypot(x-xs[xs.length-1], yy-ys[ys.length-1]);
+    xs.push(x); ys.push(yy); cum.push(L);
+    if(x<=x1) break;
+  }
+  const sAt=x9=>{ if(x9>=xs[0]) return 0; const n=xs.length; if(x9<=xs[n-1]) return L;
+    for(let i=1;i<n;i++){ if(xs[i]<=x9){ const d=xs[i-1]-xs[i]; return cum[i-1]+(d>0? (xs[i-1]-x9)/d : 0)*(cum[i]-cum[i-1]); } } return L; };
+  const hop=(xa,xb,h)=>{ const a=sAt(xa), b=sAt(xb); if(b>a+1) hops.push([a,b,h]); };
+  for(const o of obs){ if(!o.hop || Math.abs(o.y-y)>=o.r+r+PAD) continue; hop(o.x+o.r+r+6, o.x-o.r-r-6, 10+r*0.9); }
+  if(t.river) hop(t.river.x+t.river.w+r+8, t.river.x-r-8, 14+r);
+  if(t.trench && t.trench.pts){ const P=t.trench.pts, w=t.trench.w||64;
+    for(let i=1;i<P.length;i++){ const [ax,ay]=P[i-1], [bx,by]=P[i]; if((y-ay)*(y-by)>0 || ay===by) continue;
+      const xc=ax+(bx-ax)*(y-ay)/(by-ay); hop(xc+w/2+r+6, xc-w/2-r-6, 8+r*0.8); break; } }
+  return { xs, ys, cum, len:L, hops, r, lane:y };
+}
+// where along its lane a ball is at path distance s — and how high its hop is there
+function dustAt(b,s){
+  const c=b.cum, n=c.length; let lo=0, hi=n-1;
+  if(s>=c[hi]) lo=n-2; else if(s>0){ while(hi-lo>1){ const m=(lo+hi)>>1; if(c[m]<=s) lo=m; else hi=m; } }
+  const i=Math.max(0,Math.min(n-2,lo)), d=c[i+1]-c[i], k=d>0? Math.max(0,Math.min(1,(s-c[i])/d)) : 0;
+  let hop=0; for(const h of b.hops){ if(s>h[0] && s<h[1]) hop=Math.max(hop, h[2]*Math.sin(Math.PI*(s-h[0])/(h[1]-h[0]))); }
+  return { x:b.xs[i]+(b.xs[i+1]-b.xs[i])*k, y:b.ys[i]+(b.ys[i+1]-b.ys[i])*k, hop };
+}
+// the picture at battle second rt — pure: x/y/lift/spin/gust off the clock
+// and the arm-time path, nothing read from the last frame. null = not on the
+// mat (a marked ball before its `at` or after its burst).
+function dustPos(b,rt,RM){
+  let s, gust;
+  if(b.mark){
+    if(b.done) return null; const u=rt-b.at; if(u<0) return null;
+    const fl=DUST_FLOOR[1], F=q=>fl*q+(1-fl)*dustG(q);
+    s=b.len*Math.min(1, F(u)/F(b.dur)); gust=dustGust(u);
+  } else {
+    const u=rt-b.lag-b.ph, fl=DUST_FLOOR[b.k];
+    s=(b.s0 + b.v*(fl*Math.max(0,u)+(1-fl)*dustG(u))) % b.len; gust=dustGust(u);
+  }
+  const p=dustAt(b,s);
+  // the hop over a stone / the water / a pit rides the WIND: a ball the gust
+  // drops mid-hop settles onto the thing it was clearing (caught on the
+  // stone, floating on the creek) and lifts again with the next gust — never
+  // a ball hanging in the air through a lull. Under reduced motion too (a
+  // path necessity, never juice).
+  let lift=p.hop*Math.min(1, gust*2);
+  if(!RM && b.k===2) lift+=gust*(6+b.r*0.3)*Math.abs(Math.sin(s*2*Math.PI/DUST_BOUNCE));   // the big ball's bounce beat — only while the gust carries it
+  const spin=s/b.r + (RM? 0 : 0.18*Math.sin(rt*3.1+b.ph*7)*(1-gust));   // spin = distance/r; a lull rocks the ball (stills under RM)
+  return { x:p.x, y:p.y, lift, spin, gust, s };
+}
+// the crate door's arm — AFTER the dress merge (every rock final). Sand only:
+// every other rug pays one truthy test and t.dust never exists.
+function campDustArm(t){
+  if(t.ground!=='sand') return;
+  const D=CAMP_DRESS[S.levelN], all=[], marks=[];
+  if(!CAMP_DUST_OFF[S.levelN]){
+    const n=Math.min(10, Math.round(5*(W/CAMP_W)*(WORLD_H/H)));   // 5 on the 1240 rug · 8 on the 1920 grand · 10 on the tall mat
+    const y0=FOE_TOP+40, y1=FOE_BOT-40;
+    for(let i=0;i<n;i++){
+      const k=[0,2,1,0,1,2,0,1,0,2][i%10];                          // the scale deal — small-led, every third a big one
+      const lane=y0+(y1-y0)*((i+0.5)/n)+(((i*37)%23)-11);           // even lanes + a fixed jitter (a table, never dice)
+      const b=dustBall(t, lane, DUST_R[k], W+70, -70);
+      b.k=k; b.v=DUST_V[k]; b.lag=DUST_LAG[k]; b.ph=((i*0.37)%1)*0.9; b.s0=(i*0.618034*b.len)%b.len; b.mark=0; b.hi=-1; b.hs=0;
+      all.push(b);
+    }
+  }
+  if(D && D.dust) for(const m of D.dust){
+    const b=dustBall(t, m.y, m.r||DUST_R[2], W+70, m.x);
+    b.k=2; b.mark=1; b.at=m.at; b.dur=m.dur; b.ex=m.x; b.ey=m.y; b.gift=m.gift||'jax'; b.n=m.n||0; b.big=!!m.big; b.done=0;
+    b.v=0; b.lag=0; b.ph=0; b.s0=0; b.hi=-1; b.hs=0;
+    all.push(b); marks.push(b);
+  }
+  if(!all.length) return;
+  t.dust={ t0:S.t, all, marks };
+}
+// the SURPRISE — the marked ball bursts at its authored spot and leaves the
+// gift. The jack rides campGrandArm's own push (phantom side 'jax', armT 0:
+// live at once, either army trips it, the sweeper's loop serves it whole);
+// the crawlers ride spawnFoe (guerrilla — the sneak attack's own crawlers:
+// leak, bounty, the win door, every seam real). The burst fx are a fixed fan
+// (clock-stamped, dice-free); the thock is the crate's own.
+function dustGift(b){
+  const x=b.ex, y=b.ey;
+  S.fx.push({k:'ring',x,y:y-8,r:6,R:40,t:0,dur:0.4,col:'rgba(214,178,120,0.9)'});
+  if(!reducedMotion()) for(let i=0;i<5;i++){ const a=i*1.2566+0.4; S.fx.push({k:'puff',x:x+Math.cos(a)*14,y:y-6+Math.sin(a)*7,t:0,dur:0.45,R:13}); }
+  bfSfx(SFX.thock,x,y);
+  if(b.gift==='crawl'){
+    const n=Math.max(1,b.n|0);
+    for(let i=0;i<n;i++){ const a=i*6.2832/n; spawnFoe('crawler', x+Math.cos(a)*18, foeBandY(y+Math.sin(a)*12), null, true); }
+  } else {
+    S.mines.push({ owner:null, side:'jax', seat:null, x, y, armT:0, big:!!b.big, sl:false, jx:true });
+  }
+}
+// ticks beside campBallTick (same hold, same sim dt; mode 'play' spans the
+// whole flag ceremony, so the dust keeps blowing behind the flag — the duck/
+// train law). The picture is pure f(clock) — this tick only (a) kicks the
+// landing puffs off a clock-edge and (b) fires the marked balls' SIM event.
+function campDustTick(dt){
+  const D=S.cfg.terrain.dust; if(!D) return;   // every undressed / non-sand rug: one truthy test, zero work
+  const rt=S.t-D.t0, RM=reducedMotion();
+  for(const b of D.all){
+    if(b.mark && !b.done && rt>=b.at+b.dur){
+      b.done=1;
+      if(!(S.vflag || S.cleared)) dustGift(b);   // the wheels law: behind the ceremony the surprise stands down
+      continue;
+    }
+    if(RM) continue;
+    const p=dustPos(b,rt,false); if(!p) continue;
+    let land=false;
+    if(b.k===2 && p.gust>0.3){ const hi=Math.floor(p.s*2/DUST_BOUNCE); if(b.hi>=0 && hi!==b.hi && p.s>b.hs) land=true; b.hi=hi; }   // the bounce beat's landings
+    for(const h of b.hops){ if(b.hs<h[1] && p.s>=h[1] && p.s>b.hs) land=true; }                                                  // a hop's landing
+    b.hs=p.s;
+    if(land && bfVis(p.x,p.y)) S.fx.push({k:'puff',x:p.x,y:p.y+2,t:0,dur:0.3,R:6+b.r*0.3});   // the heel-dust idiom: a puff kicked on every bounce
+  }
+}
 function bfTick(dt){
   const bf=S.bf;
   if(bf.hintT>0) bf.hintT-=dt;                    // the scroll nudge burns down (v1.44)
@@ -46992,6 +47214,7 @@ function update(dt){
   // 0129: and the dressed rugs' wrecking balls beside THAT, same hold, same
   // sim dt — an open letter freezes the whole toy room, patrols included.
   if(!S.bf && S.mode==='play' && !COMM.brief) campBallTick(dt);
+  if(!S.bf && S.mode==='play' && !COMM.brief) campDustTick(dt);   // 0475 WESTERN ROAD 4/8: the sand rungs' dustballs — same hold, same clock (the picture is pure f(S.t); this fires the landing puffs + the marked balls' surprise)
   // v2.28 THE TOY CHEST's duck ticks beside the balls — same hold, same sim
   // dt, and mode 'play' spans the WHOLE vflag ceremony (endBattle flips it
   // only when the card lands), so the drift never freezes behind the flag:
@@ -50314,6 +50537,36 @@ function drawSandbags(rk){
 }
 // the toy crane's wrecking ball, off its chain and on patrol — the shackle eye
 // orbits with the roll so it genuinely reads as tumbling
+// ===== 0475 WESTERN ROAD 4/8 — THE DUSTBALL: a ball of dry twigs off the
+// Outlaw Town street's own recipe (two rings, four crossing twigs, the broken
+// stubs) transcribed to canvas at the ball's r, with a straw highlight for the
+// round read. The soft ground shadow sits where the ball would touch and
+// shrinks + fades as it lifts (the bomber's racing-shadow idiom); the body
+// rolls by p.spin (distance/r — matched to the ground). Pure draw: zero RNG.
+function drawDustball(b,p){
+  const r=b.r, lift=p.lift, sh=Math.max(0.35, 1-lift/(r*2.2));
+  cx.fillStyle='rgba(40,16,6,'+(0.26*sh).toFixed(3)+')';
+  cx.beginPath(); cx.ellipse(p.x+3, p.y+r*0.42, r*1.05*sh, r*0.36*sh, 0, 0, 7); cx.fill();
+  cx.save(); cx.translate(p.x, p.y-r*0.55-lift); cx.rotate(p.spin);
+  cx.lineCap='round'; cx.globalAlpha=0.94;
+  cx.strokeStyle='#A8844A'; cx.lineWidth=Math.max(1.6, r*0.15);
+  cx.beginPath(); cx.arc(0,0,r,0,7); cx.stroke();
+  cx.strokeStyle='#7A5530'; cx.lineWidth=Math.max(1.2, r*0.11);
+  cx.beginPath(); cx.arc(0,0,r*0.6,0,7); cx.stroke();
+  cx.strokeStyle='#96703E'; cx.lineWidth=Math.max(1.1, r*0.1);
+  cx.beginPath();
+  cx.moveTo(-r*0.85,-r*0.5); cx.quadraticCurveTo(0,r*0.12,r*0.85,-r*0.4);
+  cx.moveTo(-r*0.7,r*0.55); cx.quadraticCurveTo(r*0.1,-r*0.1,r*0.8,r*0.5);
+  cx.moveTo(-r*0.25,-r*0.95); cx.quadraticCurveTo(r*0.12,0,-r*0.2,r*0.95);
+  cx.moveTo(r*0.5,-r*0.85); cx.quadraticCurveTo(-r*0.1,r*0.1,r*0.4,r*0.9);
+  cx.stroke();
+  cx.strokeStyle='#7A5530';
+  cx.beginPath(); cx.moveTo(-r,-r*0.2); cx.lineTo(-r*1.22,-r*0.32); cx.moveTo(r*0.95,-r*0.35); cx.lineTo(r*1.18,-r*0.52);
+  cx.moveTo(-r*0.35,r*0.95); cx.lineTo(-r*0.47,r*1.2); cx.moveTo(r*0.6,r*0.82); cx.lineTo(r*0.78,r*1.06); cx.stroke();
+  cx.strokeStyle='rgba(240,214,156,0.7)'; cx.lineWidth=Math.max(1.1, r*0.11);
+  cx.beginPath(); cx.arc(0,0,r*0.82,3.5,4.6); cx.stroke();   // the straw highlight — upper-left, the round read
+  cx.globalAlpha=1; cx.lineCap='butt'; cx.restore();
+}
 function drawWreckBall(bl){
   cx.fillStyle='rgba(0,0,0,0.3)'; cx.beginPath(); cx.ellipse(bl.x+5,bl.y+bl.r*0.72,bl.r*1.1,bl.r*0.38,0,0,7); cx.fill();
   const g=cx.createRadialGradient(bl.x-bl.r*0.35,bl.y-bl.r*0.45,bl.r*0.15,bl.x,bl.y,bl.r);
@@ -50741,6 +50994,11 @@ function draw(){
   // 0374 THE STAMPEDE: the herd sorts WITH the men too (the train's own law
   // — an actor, not wallpaper); the gallop bob rides the draw, never the sort.
   if(!S.bf && S.raid && S.raid.cfg===S.cfg && S.raid.stamp) for(const hh of S.raid.stamp.horses){ if(hh.x>-140 && hh.x<W+120) actors.push({y:hh.y+6,f:()=>drawStampH(hh)}); }
+  // 0475 WESTERN ROAD 4/8 DUSTBALLS: the sand rungs' tumbleweeds sort WITH the
+  // men (an actor, not wallpaper — a ball rolling past a man reads right);
+  // the picture is pure f(S.t) (dustPos), the aprons cull, ZERO hitbox.
+  if(!S.bf && S.cfg.terrain.dust){ const D9=S.cfg.terrain.dust, rt9=S.t-D9.t0, RM9=reducedMotion();
+    for(const b of D9.all){ const p=dustPos(b,rt9,RM9); if(!p || p.x<-70 || p.x>W+70) continue; actors.push({y:p.y+4, f:()=>drawDustball(b,p)}); } }
   // WESTERN LAND (v1.57): the consist and the crossbucks sort WITH the men, so
   // a soldier below the line walks in front of the boxcars and one above is
   // hidden behind them — the train is an actor, not wallpaper
@@ -69384,6 +69642,13 @@ window.GVT = {
                   theme:{ started:THEME.started, dead:THEME.dead, live:!!THEME.src,
                           buf:!!THEMEB.buf, busy:THEMEB.busy,
                           vol:THEME.g? +THEME.g.gain.value.toFixed(3) : -1 } }; },
+  // 0475 WESTERN ROAD 4/8 DUSTBALLS rig — read-only state for batteries: the
+  // battle second, every ball's picture off dustPos (pure), the marks' clocks.
+  dust(){ const D=S.cfg&&S.cfg.terrain&&S.cfg.terrain.dust; if(!D) return null; const rt=S.t-D.t0, RM=reducedMotion();
+    return { rt:+rt.toFixed(3), rm:RM, n:D.all.length, amb:D.all.filter(b=>!b.mark).length,
+      marks:D.marks.map(b=>({at:b.at,dur:b.dur,ex:b.ex,ey:b.ey,gift:b.gift,n:b.n|0,big:!!b.big,done:!!b.done,len:+b.len.toFixed(1),hops:b.hops.length})),
+      balls:D.all.map(b=>{ const p=dustPos(b,rt,RM); return { k:b.k, r:b.r, mark:!!b.mark, lane:b.lane, len:+b.len.toFixed(1), hops:b.hops.length, on:!!p,
+        x:p? +p.x.toFixed(2):null, y:p? +p.y.toFixed(2):null, lift:p? +p.lift.toFixed(2):null, spin:p? +p.spin.toFixed(4):null, gust:p? +p.gust.toFixed(3):null, s:p? +p.s.toFixed(2):null }; }) }; },
   place(t,x,y){ return placeUnit(t,x,y); },
   cash(n){ S.plastic=n; },
   start(){ spawnWave(); },
