@@ -33292,7 +33292,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.45';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.46';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -35265,6 +35265,15 @@ const EV_STARS=100;            // D9: the purse on a win — paid by the event d
 const EV_POOL=['bigpop','longeye','cougar','unarmed','stride'];   // D11: ONE random drop of FIVE, unowned-first (the pool minus what the bench owns), hashed on wk+uid (the 0474 wildRoll law — zero Math.random)
 const EV_BLADE_FIRST=1;        // D11: THE HIGH COMMANDER'S BLADE is the NAMED first-win reward (every win until held); 0 = the alternative (a) — the blade rolls in the pool with the five
 const EV_FULLSET_STARS=0;      // D12: extra ★ per win once all five are owned (FULL SET — THE KING FEARS YOU pays the 100★ + the line, nothing else)
+// 0490 THE BRAKE (FM-GVT-PRIMETIME-01 card 8, §10.2): a ceiling on LIVE foes per sim in an EVENT battle —
+// 0 = off (shipped; the line it guards is byte-inert). Above the ceiling a group whose time has come WAITS
+// in the queue: nothing is dropped (sqPushWave APPENDS, so every authored body still walks on — later), and
+// the wave's clear check reads the queue, so a held group can never end a wave early. ⚑ per-sim by design:
+// two screens may hatch the same group a beat apart (the loose-sim law; the referee's census words still
+// name every foe by type + muster number). The one cell a frame-cost emergency turns — the dress rehearsal's
+// balance pass says the number it should be if update()+draw() pass 8 ms at the ULTRA peak. `let`, so the
+// rig (GVT.swarmCap) can measure candidates on the same bytes; a redial is still this one cell.
+let EV_SWARM_CAP=0;
 let EV={ bell:0, open:0, wk:'', now0:0, offs:0, live:0, sealed:0, rooms:0, players:0, code:null, seat:0, claimed:0, rung:0, pc:0, mine:null, last:null, note:null };
 // learn HQ's clock from ANY reply carrying `now` (every lobby poll since v33) — the
 // one number every screen's bell reads; a device's own clock never matters
@@ -49530,7 +49539,9 @@ function update(dt){
   // spawn queue (groups)
   if(S.waveActive){
     S.waveT+=dt;
-    for(let i=S.queue.length-1;i>=0;i--){ if(S.queue[i].at<=S.waveT){ spawnGroup(S.queue[i]); S.queue.splice(i,1); } }
+    for(let i=S.queue.length-1;i>=0;i--){ if(S.queue[i].at<=S.waveT){
+      if(EV_SWARM_CAP>0 && S.foes.length>=EV_SWARM_CAP && evBattle()) continue;   // 0490 THE BRAKE: the field is full — this group waits its turn (0 = off: the guard never reads)
+      spawnGroup(S.queue[i]); S.queue.splice(i,1); } }
     if(S.queue.length===0 && S.foes.length===0){
       S.waveActive=false;
       // allied mission: the guest sim never calls the verdict — the referee does
@@ -73052,6 +73063,7 @@ window.GVT = {
       men:S.units.filter(u=>!u.dead).map(u=>({ cid:u.cid||null, t:u.type, x:u.x|0, y:u.y|0, by:u.coopBy||null, hex:u.coopHex||null })),
       roster:(S.sq&&S.sq.ev)? evRoster() : [], ann:S.ann? S.ann.txt : null, pgv:PGV }; },
   evJoin(){ return evJoin(); },
+  swarmCap(n){ if(n!=null) EV_SWARM_CAP=Math.max(0,n|0); return { cap:EV_SWARM_CAP, foes:S.foes.length, queue:S.queue.length, due:S.queue.filter(q=>q.at<=S.waveT).length, waveT:+(S.waveT||0).toFixed(2), evb:(typeof evBattle==='function' && evBattle())?1:0 }; },   // 0490 THE BRAKE rig: the ceiling + what it holds
   evState(){ return evState(); },
   evBell(){ evBell(); return GVT.evRoom(); },
   // ---- 0485 THE INVASION DOOR rig: evDoor (the band's state) · evForce (a bell without a server) · evSeen (the week latch) · evTouch / evAfk (D13) ----
