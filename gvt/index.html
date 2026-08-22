@@ -19973,8 +19973,14 @@ const DECOR_COST={ elephant:80, teddy:95, train:110, robot:140, spacerug:170, ba
 // "Please add two more decorative items that you can [earn] from beating level
 // 5 of the Campaign. A rubber ducky. For beating 50 opponents in battlefields,
 // award them with the Wind up Racecar decoration." ⚠ "BEATING level 5" reads
-// BEATEN (campaign>=5, the card says LV 6) — unlike the jet pack's rung, where
-// his own word was "reached" (gearDue). v3.41 (Wyatt 8/12: "delay the
+// BEATEN (campaign>=lvl — the card says the NEXT level) — unlike the jet pack's
+// rung, where his own word was "reached" (gearDue). 0494c (Wyatt 8/22, verbatim:
+// "give the Rubber Ducky to the player at level three … incentivized more to
+// open up the campaign"): the ducky's rung is 3 now — DECOR_EARN.ducky.lvl is
+// the ONE owner (due(), the shelf lock line, the card band and the win door
+// all read it; the digit is tokenised, so zero l10n rows moved). A save at
+// campaign 3-4 without him collects on its next win or room visit (the two-door
+// law); a save that owns him keeps him. v3.41 (Wyatt 8/12: "delay the
 // Sarge's car reward. It's too nice ... You have to defend the invaders
 // five times instead of just once"): the racecar reads the CAREER daily-
 // defense counter now — META.stats.rivalWins, rivalDayWin's once-per-LOCAL-
@@ -19988,7 +19994,7 @@ const DECOR_COST={ elephant:80, teddy:95, train:110, robot:140, spacerug:170, ba
 // visit. Ownership (decor.own) is the ledger — granted once, by construction.
 const DECOR_EARN_ORDER=['ducky','racecar','helmet','warplane','goldkey','silverkey','bronzekey','yeti','bait','pole','dino','hook','puffer','ship','pdino','whorse','bluedragon'];   // 0341: THE STUFFED BLUE DRAGON — the triple-crown FREE prize (census 24→25, hm6/hm10/QUARTERS grow — the TP-02 law, LOUD)   // 0340: THE WIND-UP HORSE — the lasso's catch (census 23→24, hm6/hm10/QUARTERS grow again — the TP-02 growth law, LOUD)   // 0315: THE PUFFERFISH (the pond's catch IS the prize now — granted WITH the map at the first cast; retro through wmap) + THE FLYING PIRATE SHIP (endgame trophy: both raids' HARD + campaign 50) — census 21→23, hm6/hm10/QUARTERS grow again (the TP-02 growth law, LOUD: the ship parks the FULL FLOOR capstone behind the endgame, exactly as the hook parked it behind bone.m)   // 0278e KING REX'S LAIR arms the pole's due() and adds its own two: THE DINOSAUR (Easy, beside the pole) + THE HOOKSHOT (Medium, decor-for-now [WYATT]) — census 19→21, hm6/hm10/QUARTERS grow again (the TP-02 growth law, flagged LOUD in the notes); THE FULL FLOOR is earnable again the moment bone.e lands   // v3.40 TP-06: THE FISHING POLE joins AHEAD of its raid (KING REX'S LAIR = 0278e; its due() sleeps till META.bone.e exists) — census 18→19, hm6/hm10/QUARTERS grow (the TP-02 growth law; THE FULL FLOOR is unearnable for NEW earns until 0278e lands, flagged LOUD in the build notes)   // v3.39 TP-04: the Ice Castle's Easy prizes (placedCount + the box-census medals GROW again — 16→18, both intended, the TP-02 law)   // v3.32: the golden key — the trinket family's first tenant (placedCount and the box-census medals read this list and GROW with it, both intended; the mom throw list deliberately does NOT)
 const DECOR_EARN={
-  ducky:   { lvl:5,    due:()=>META.campaign>=DECOR_EARN.ducky.lvl },
+  ducky:   { lvl:3,    due:()=>META.campaign>=DECOR_EARN.ducky.lvl },   // 0494c: 5 → 3 (Wyatt 8/22: "give the Rubber Ducky to the player at level three")
   racecar: { defends:5, due:()=>(((META.stats||{}).rivalWins)|0)>=DECOR_EARN.racecar.defends },   // v3.41: defends is the ONE owner of the rung's number — due(), the shelf lock line and the card band all read it (the helmet-lvl law)
   // v1.80 (0090): the co-op milestone prizes — the level must be beaten WITH
   // A REAL FRIEND (coopBeat reads META.coopLevels, which endBattle only
@@ -20211,9 +20217,22 @@ function roomGrant(id){
 // walks. THE SHIP comes by construction: DECOR_EARN.ship due() is the second
 // room, and the caller sits ABOVE the verdict's earn walk so the ship's own
 // line lands on the same screen. Every seat of a party ambush pays its own
-// save (the 0305 nemPark law); zero wire.
+// save (the 0305 nemPark law); zero wire. 0494c adds a THIRD door, inside.
 function backyardGift(door){
   if(META.byGift) return false;                                          // once ever
+  // 0494c THE BACKYARD + THE SHIP AT SEVEN (Wyatt 8/22, verbatim: "Give the
+  // player the Pirate Ship & The Soccer Field Map at Level 7 if they don't
+  // already have them unlocked" + "The ship is what brings people to
+  // different rooms"): the campaign door — level BY_FREE_LVL beaten (the
+  // callers gate on the rung: endBattle's composer above its earn walk, and
+  // bySweep at the room). "If they don't already have them" = the backyard
+  // if unowned, bought OR gifted — so this door carries NO no-room-bought
+  // gate (⚑ #3; the two 8/16 doors below keep theirs byte-still). THE SHIP
+  // follows by construction (DECOR_EARN.ship = two rooms): a fresh save gets
+  // both lines on one verdict, a winter owner already holds the ship and
+  // gets the backyard alone — and with 2+ rooms the ship's tap IS the ferry
+  // to it (shipTravelDue), so the gift is the room AND the way there.
+  if(door==='campaign'){ if(roomOwns('backyard')) return false; META.byGift=1; return roomGrant('backyard'); }   // flag FIRST, then THE ONE DOOR
   if(roomOwns('backyard') || (META.rooms.own||[]).length) return false;   // already yours, or a room was bought
   META.byGift=1;                                                        // flag FIRST
   return roomGrant('backyard');
@@ -21793,6 +21812,15 @@ function lensOwned(){ return !!META.lens; }
 // 15 — whichever they complete first. The unlock must fire once, be idempotent,
 // and persist"): Commander LEVEL 15 (META.lvl) OR the REGULAR campaign's level
 // 15 beaten (META.campaign — the park ladders are their own wings, flagged).
+// 0494c THE SPYGLASS AT FIVE (Wyatt 8/22, verbatim: "at level five we'll give
+// the Spyglass to the player … incentivized more to open up the campaign") —
+// the Spyglass read as THE MAGIC LENS (the one optic the game hands over; no
+// string in the build says spyglass — ⚑ if he meant LONG EYE or a new toy):
+// the CAMPAIGN door moves to LENS_FREE_CAMP=5, the commander-level door keeps
+// LENS_FREE_LVL=15 (⚑). lensFreeDoor() = the door that opened, for the
+// announce line and the sweep card's band (the digit is tokenised — zero
+// l10n rows move). lensGift's flag-first write, the aisle's OWNED read,
+// lensBuy never re-charging, lensSweep's once-ever card: byte-still.
 // The gearDue two-door law: the verdict that crosses the rung hands it over on
 // ITS OWN screen (lensGift right after each xpAward — a promotion can cross
 // on any verdict, win or loss, campaign or battleground), and the room sweep
@@ -21801,9 +21829,12 @@ function lensOwned(){ return !!META.lens; }
 // META.lens IS the ownership bit (lensOwned — the aisle reads OWNED, lensBuy
 // never re-charges, the room glass lays itself); lensFree = the earn ledger
 // (a BOUGHT lens never cards); lensAnn = the room card dealt, once ever.
-const LENS_FREE_LVL=15;
-function lensDue(){ return (META.lvl|0)>=LENS_FREE_LVL || (META.campaign|0)>=LENS_FREE_LVL; }
-function lensFreeLine(){ return '🔍 THE MAGIC LENS IS YOURS — free at level '+LENS_FREE_LVL+'! Pick it up in the DECOR aisle and go snooping.'; }   // digits ride the {0}-form key (trLookup tokenises them — the SHIELD +{0}! precedent)
+const LENS_FREE_LVL=15;    // the commander-level door (unchanged by 0494c — ⚑ #2)
+const LENS_FREE_CAMP=5;    // 0494c: the campaign door — THE ASK (was LENS_FREE_LVL's 15)
+const BY_FREE_LVL=7;       // 0494c THE BACKYARD + THE SHIP AT SEVEN — backyardGift('campaign')'s rung (the verdict + bySweep gate on it)
+function lensDue(){ return (META.lvl|0)>=LENS_FREE_LVL || (META.campaign|0)>=LENS_FREE_CAMP; }
+function lensFreeDoor(){ return (META.campaign|0)>=LENS_FREE_CAMP? LENS_FREE_CAMP : LENS_FREE_LVL; }   // 0494c: the door that opened — the campaign's 5 first, else the commander's 15
+function lensFreeLine(){ return '🔍 THE MAGIC LENS IS YOURS — free at level '+lensFreeDoor()+'! Pick it up in the DECOR aisle and go snooping.'; }   // digits ride the {0}-form key (trLookup tokenises them — the SHIELD +{0}! precedent)
 function lensGift(){
   if(lensOwned() || !lensDue()) return false;
   META.lens=1; META.lensFree=1; saveMeta();   // flag FIRST (the comet law) — the ownership bit and the earn ledger in ONE write
@@ -22193,8 +22224,9 @@ const META_DEFAULT = {
   wstar:0, dmeteor:0,
   // 0363 THE FREE UNLOCKS (Wyatt 8/16): byGift = THE BACKYARD handed over
   // FREE (the first Nemesis defeat, or a battlegrounds battle played on THE
-  // BACKYARD map — one gift, either door, once ever); lensFree = THE MAGIC
-  // LENS granted free at LENS_FREE_LVL (the earn ledger — a BOUGHT lens
+  // BACKYARD map — or, 0494c, campaign level BY_FREE_LVL beaten; one gift,
+  // any door, once ever); lensFree = THE MAGIC LENS granted free at
+  // LENS_FREE_LVL / LENS_FREE_CAMP (0494c — the earn ledger — a BOUGHT lens
   // never cards); lensAnn = its room card dealt. The comet law all three:
   // Object.assign migrates older saves to 0 free; truthy blocks forever.
   byGift:0, lensFree:0, lensAnn:0,
@@ -33351,7 +33383,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.52';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.53';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -49070,10 +49102,19 @@ function endBattle(win){
     if(coopHumans() > (META.stats.coopMost||0)) META.stats.coopMost = coopHumans();
   }
   // …and the EARNED DECORATIONS (v1.71) — the same two-door idiom as the gear:
-  // beating level 5 hands the ducky over on ITS OWN win screen, and a save
+  // beating level 3 (0494c; 5 until then) hands the ducky over on ITS OWN win screen, and a save
   // already past any rung banks its prize here on its next win OR at the room
   // sweep (decorSweep), whichever comes first. Predicates read META only, so
   // this door doesn't care which mode moved the number.
+  // 0494c THE BACKYARD + THE SHIP AT SEVEN: the third door of the 0363 gift
+  // — campaign level BY_FREE_LVL beaten (the number moved above, host and
+  // guest alike). The call sits ABOVE the earn walk on purpose (endBattlefield's
+  // own order law): the grant makes this the SECOND room, so DECOR_EARN.ship
+  // falls due in the walk right below and the ship's line lands on this very
+  // screen, right behind the room's. backyardGift reads META only (the ducky's
+  // own law), so a save already past the rung collects on its next win here
+  // or at the room sweep (bySweep), whichever door opens first.
+  const byNew=(META.campaign|0)>=BY_FREE_LVL && backyardGift('campaign');
   let decorNew=[];
   for(const dk of DECOR_EARN_ORDER)
     if(DECOR_EARN[dk].due() && !decOwns(dk)){ META.decor.own.push(dk); decorNew.push(dk); }
@@ -49137,6 +49178,7 @@ function endBattle(win){
   if(bakNew) msg += ' · '+TXT("THE BAKER RIFLE IS YOURS — check SARGE'S SURPLUS!");
   // the prize lines are DIGIT-FREE on purpose, exactly like the jet pack's —
   // a digit in composed prose would demand a {0}-shaped key (the v1.29.2 law)
+  if(byNew) msg += ' · '+TXT('🏡 THE BACKYARD IS YOURS — a whole new room, FREE! Find it in the ROOMS aisle.');   // 0494c: the 0363 key verbatim — the ship's own line (DECOR_LINE.ship) lands right behind it from the walk
   for(const dk of decorNew) msg += ' · '+TXT(DECOR_LINE[dk]);
   if(bmbNew) msg += ' · '+TXT('✈ SECRET UNIT UNLOCKED — THE AIRPLANE BOMBER reports to the shop!');
   // 0092: digit-free on purpose (the v1.29.2 law), and the same sentences card
@@ -61072,6 +61114,37 @@ function shipTravel(){
   setTimeout(()=>w.classList.add('out'), 2300);
   setTimeout(()=>{ try{ w.remove(); }catch(e){} SHIPTRV=0; shipCineSweep(); }, 3260);   // 0335: sailing home stages the bed card (self-guarded no-op anywhere else)
 }
+// ===== 0494c THE BACKYARD AT SEVEN — the room door (the lensSweep law: a save
+// past the rung that never saw the verdict — a guest whose campaign moved by
+// wire, a migrated save already at 9 — collects the room on its next landing
+// and the card deals here, one per visit). The stage is checked FIRST so the
+// grant and its card always land together (the room has no announce ledger
+// but the grant itself); then backyardGift → roomGrant = THE ONE DOOR (push ·
+// save · repaint — the room already stands behind its own card, the v1.70
+// law). The ship's own BED ARRIVAL follows: shipCineSweep sits right behind
+// this in the chain, so it deals on the next landing (one card per visit).
+// ZERO new strings: the gear card's LEVEL {0}! band, ROOM_INFO's name, the
+// realtor's window (roomCardArt, the shop's own poster idiom), the 0363 line,
+// IT'S MINE! — every key already carries its seven rows.
+function bySweep(){
+  if(!((META.campaign|0)>=BY_FREE_LVL) || META.byGift || roomOwns('backyard')) return false;   // nothing owed
+  const p=document.getElementById('milePop');
+  if(!p || !p.classList.contains('hidden')) return false;   // one card at a time (the chain's law) — the grant waits for its card
+  if(!backyardGift('campaign')) return false;
+  byCard(); return true;
+}
+function byCard(){
+  const p=document.getElementById('milePop'); if(!p) return;
+  p.innerHTML='<div class="mb-card">'
+    +'<span class="mb-band">LEVEL '+BY_FREE_LVL+'!</span>'   // the gear card's own LEVEL {0}! key
+    +'<h2 class="mb-h">'+ROOM_INFO.backyard.name+'</h2>'
+    +'<span class="mb-win">'+MB_RAYS+'<svg viewBox="0 0 150 220" preserveAspectRatio="xMidYMid slice">'+roomCardArt('backyard')+'</svg></span>'   // the realtor's window (shopRoomCardHTML's own idiom)
+    +'<span class="mb-line">🏡 THE BACKYARD IS YOURS — a whole new room, FREE! Find it in the ROOMS aisle.</span>'
+    +'<button type="button" class="mb-take" onclick="UI.mileTake()">IT\'S MINE!</button>'
+    +'</div>';
+  p.classList.remove('hidden');
+  SFX.fanfare();
+}
 // ===== 0335 PART B — THE SHIP ARRIVES ON YOUR BED (Wyatt verbatim: buy the
 // room, it says the room is unlocked, THEN you unlock the flying pirate
 // ship, and it appears ON YOUR BED — a cinematic moment). due() is the
@@ -61198,8 +61271,10 @@ function showMenu(){
   // gearUnlocked, so on that visit the gear card deals and marks both ledgers.)
   // v2.42: the spy's crash-recovery card rides the chain too (spyFound
   // normally writes grant+seen together, so this slot almost never speaks)
+  // 0494c: the free backyard's own sweep (bySweep) rides AHEAD of the ship's
+  // bed arrival — the room's card first, the ferry's on the next landing.
   hbHeal();   // 0488: the escrow converts at every landing (flag-first, before any card); hbSweep's card rides the chain behind the class card
-  if(!riteSweep() && !gearSweep() && !shipCineSweep() && !megaSweep() && !rpSweep() && !bkSweep() && !evSweep() && !decorSweep() && !lensSweep() && !bmbSweep() && !cmdSweep() && !hbSweep() && !cmdoSweep() && !spySweep() && !keySweep() && !castleSweep() && !skeySweep() && !dinoSweep() && !bkeySweep() && !wlSweep() && !outfitSweep() && !stripeSweep() && !soulSweep() && !heroPickSweep()) mileSweep();   // 0464: a banked hero choice rides the chain too (one card per visit; a save that ranked past the tenth before this build chooses on arrival)   // v3.32: the golden key's recovery card rides the chain too — v3.33: the ice castle's recovery card and the silver key's park card ride behind it (one card per visit, the ceremony law)
+  if(!riteSweep() && !gearSweep() && !bySweep() && !shipCineSweep() && !megaSweep() && !rpSweep() && !bkSweep() && !evSweep() && !decorSweep() && !lensSweep() && !bmbSweep() && !cmdSweep() && !hbSweep() && !cmdoSweep() && !spySweep() && !keySweep() && !castleSweep() && !skeySweep() && !dinoSweep() && !bkeySweep() && !wlSweep() && !outfitSweep() && !stripeSweep() && !soulSweep() && !heroPickSweep()) mileSweep();   // 0464: a banked hero choice rides the chain too (one card per visit; a save that ranked past the tenth before this build chooses on arrival)   // v3.32: the golden key's recovery card rides the chain too — v3.33: the ice castle's recovery card and the silver key's park card ride behind it (one card per visit, the ceremony law)
   // v2.27: the menu theme knocks here — its own guards make it once per
   // session, and a virgin's straight-to-L1 title tap has already killed it
   // (v2.32: the 🔊 chip's saved OFF is one of those guards now)
@@ -70321,7 +70396,7 @@ function lensSweep(){
 function lensOpen(){
   const p=document.getElementById('milePop'); if(!p) return;
   p.innerHTML='<div class="mb-card">'
-    +'<span class="mb-band">LEVEL '+LENS_FREE_LVL+'!</span>'   // the gear card's own LEVEL {0}! key
+    +'<span class="mb-band">LEVEL '+lensFreeDoor()+'!</span>'   // the gear card's own LEVEL {0}! key — 0494c: the door that opened (5 / 15)
     +'<h2 class="mb-h">THE MAGIC LENS</h2>'
     +'<span class="mb-win">'+MB_RAYS+'<svg viewBox="0 0 120 168">'+lensArt()+'</svg></span>'
     +'<span class="mb-line">'+lensFreeLine()+'</span>'
@@ -72317,7 +72392,7 @@ window.GVT = {
   campCam(x,hold){ if(S.cCam && !S.bf){ S.cCam.x=clampCam(x); S.cCam.vx=0; S.cCam.vy=0; if(hold) S.camHold=9999; } return S.cCam&&S.cCam.x; },
   camOwn(v){ if(v!==undefined) S.camOwn=!!v; return !!S.camOwn; },   // v2.09: the pan claim — read or set it from the rig
   roomPos(){ return JSON.parse(JSON.stringify(META.roomPos||{})); },   // v2.12: the room arrangement, for the battery's eyes
-  roomsState(){ return { cur:roomCur(), own:(META.rooms&&META.rooms.own||[]).slice(), gone:Array.from(ROOF_GONE), byGift:!!META.byGift, ship:decOwns('ship'), shipSeen:META.decorSeen.indexOf('ship')>=0 }; },   // 0363: + the free-backyard gift ledger and the ship, for the battery's eyes   // v3.06: the rooms aisle, for the battery's eyes
+  roomsState(){ return { cur:roomCur(), own:(META.rooms&&META.rooms.own||[]).slice(), gone:Array.from(ROOF_GONE), byGift:!!META.byGift, byLvl:BY_FREE_LVL, ship:decOwns('ship'), shipSeen:META.decorSeen.indexOf('ship')>=0 }; },   // 0363: + the free-backyard gift ledger and the ship, for the battery's eyes   // v3.06: the rooms aisle, for the battery's eyes
   rdecState(){ return JSON.parse(JSON.stringify({ cur:roomCur(), rooms:ownedRooms(), rdec:META.rdec, pos:META.roomPosR, seen:META.rdecSeen, ship:META.rdecShip, v:META.rdecV||0, trv:SHIPTRV })); },   // 0330a: the room-linked floor, for the battery's eyes
   meta(){ return JSON.parse(JSON.stringify(META)); },
   // v2.59 THE REWARDED TV rig — state read, the day-stamp seeder (rollover
@@ -72457,7 +72532,7 @@ window.GVT = {
   // THE MAGIC LENS rig (v2.40) — the toy's whole state plus every line the
   // glass can ever read, straight off the shipped consts. The harness's own
   // door (the outfit rig's law: nothing here prints anywhere a player sees).
-  lens(){ return { cost:LENS_COST, owned:lensOwned(), stars:META.starBank, free:LENS_FREE_LVL, due:lensDue(), lensFree:!!META.lensFree, ann:!!META.lensAnn,   // 0363: the free-at-15 doors, for the battery's eyes
+  lens(){ return { cost:LENS_COST, owned:lensOwned(), stars:META.starBank, free:LENS_FREE_LVL, camp:LENS_FREE_CAMP, door:lensFreeDoor(), due:lensDue(), lensFree:!!META.lensFree, ann:!!META.lensAnn,   // 0363: the free-at-15 doors, for the battery's eyes
     out:!!document.getElementById('shLensFly'), held:LENS.held, over:LENS.over,
     at:[Math.round(LENS.x),Math.round(LENS.y)],   // the HELD anchor — the handle tip since 0402
     glassAt:[Math.round(LENS.x),Math.round(LENS.y-(LENS_AF-LENS_CF)*lensFlyW()*1.4)],   // 0402: the glass EYE the scan reads
