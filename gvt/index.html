@@ -18986,7 +18986,31 @@ const BF_MOVE = {
 // battleground carpet is twice as deep as the table's assumed ~900px walk — and
 // ~900px is exactly the campaign carpet. At the raw column a rifleman closes at
 // 44 against Tan marching 34-54, so both armies meet at toy-soldier pace.
-const CAMP_SPD={}; for(const k in BF_MOVE) CAMP_SPD[k]=BF_MOVE[k].moveSpd; CAMP_SPD.kingyeti=16; CAMP_SPD.kingrex=16; CAMP_SPD.kingcroak=16;   // 0341: the king's march — NO BF_MOVE row (he has no battlefield seat; the BF tables stay byte-still) · 0357: KING REX marches at the same royal pace, same no-BF-row law
+const CAMP_SPD={}; for(const k in BF_MOVE) CAMP_SPD[k]=BF_MOVE[k].moveSpd;
+// 0480 HERO MOVE SPEED (Wyatt 8/21, verbatim: "we need the heroes to move
+// faster when you have them on your squad. Yeti king & King rex should move
+// at the speed of a rifleman. king croak should be the speed of the Fire
+// unit.") — the kings the PLAYER fields walk like soldiers on his squad.
+// THE COUPLING, quoted never copied: KING YETI + KING REX = the green
+// RIFLEMAN's own march cell (CAMP_SPD.rifleman — the raw BF_MOVE column
+// this table captures, 44 at this writing); KING CROAK = the green FLAME
+// man's (CAMP_SPD.flame, 40 — UDEF.flame, your flamethrower: never
+// tanflame, never the fire dinosaurs). Retune the soldier and his king
+// follows. SQUAD-SIDE ONLY: this is the cell placeUnit's campaign branch
+// copies onto the PLAYABLE king's def (CAMP_SPD[type]) — the park bosses
+// you fight walk on FDEF's own spd (22 / 22 / 24, byte-still), so the
+// seat was already split; the battleground deals no king card (BF_TYPES),
+// and a Nemesis MIRROR king there still strides on the mover's bare
+// fallback (⚑ one line in placeUnit's BF branch if ruled). The royal 16
+// (0341/0357/0372) is gone. The jump tank's ENH_FLAME_PACE is the flame
+// MAN's own first-step upgrade, never the king's (⚑). Jane is NOT in the
+// ruling — her CAMP_SPD default stands. 0463's crystal wheels and 0465's
+// family read u.* and CK_BACK_SPD — neither touches this cell; the 0435
+// kyWkT walk memory stands (the shared wkX stamp fires for him too now
+// that his stride clears its 20 px/s floor — both gates read as one pose).
+// NO BF_MOVE row still (he has no battlefield seat; the BF tables stay
+// byte-still — the 0341 law).
+CAMP_SPD.kingyeti=CAMP_SPD.rifleman; CAMP_SPD.kingrex=CAMP_SPD.rifleman; CAMP_SPD.kingcroak=CAMP_SPD.flame;   // 0480: the kings' march = the soldier's cell (44 / 44 / 40 at HEAD) — was the royal 16
 for(const k in BF_MOVE) BF_MOVE[k].moveSpd=Math.round(BF_MOVE[k].moveSpd*BF_PACE);
 // ===== THE VEHICLE HUB (v1.20, Wyatt 7/25) =====
 // "the tank and the machine" — the motor pool stops being something the
@@ -23155,7 +23179,7 @@ const CK_LAD_N=3;                     // ⚑ "the 3 ladies"
 const CK_LIL_DX=64, CK_LIL_DY=18;     // ⚑ where the son lands: behind the king (west on the campaign carpet), a step down the lane
 const CK_LAD_DX=78, CK_LAD_DY=44;     // ⚑ the ladies' line: behind him, fanned across the lane
 const CK_LIL_W=84, CK_LAD_W=62;       // ⚑ draw widths (the king 128, a rifleman 54)
-CAMP_SPD.kingcroaklil=26; CAMP_SPD.wlady=26;   // ⚑ their march (the king's own 16 is royal; the family keeps an infantry step)
+CAMP_SPD.kingcroaklil=26; CAMP_SPD.wlady=26;   // ⚑ their march (the family keeps an infantry step; 0480: the king himself strides at the flame man's cell now — CAMP_SPD.kingcroak, 40 — the family's 26 is its own dial, unruled)
 function isCroakU(u){ return !!u && (u.type==='kingcroak' || u.type==='kingcroaklil'); }   // the storm branch, the flinch stamp and the flinch draw share the father's law
 function ckStormMul(u){ return u && u.type==='kingcroak'? heroPickMul(heroPickN(u,'storm'), CK_STORM_PCT) : 1; }   // the wedge: rpR · rpHalf together (the fire branch); the son ×1
 function ckRateMul(u){ return u && u.type==='kingcroak'? heroPickMul(heroPickN(u,'draw'), CK_RATE_PCT) : 1; }     // the drum: ×rate (heroRateMul → the shared cadence line)
@@ -32318,7 +32342,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.36';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.37';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41774,7 +41798,7 @@ function kingKitTick(f,dt){
 // the units loop BENEATH the standing shelves (a ducked, jetted, seized,
 // held or lunging king casts nothing — the 0414 shelf-order law) and ABOVE
 // the step functions (he casts ON THE MARCH — the walk-up was the
-// complaint). The march (CAMP_SPD 16, D8), the snowball gun row, @350 (0445),
+// complaint). The march (CAMP_SPD — D8's royal 16 until 0480: the rifleman's cell now), the snowball gun row, @350 (0445),
 // once-per-battle (kingSpent) and the solo-only TRAY filter ALL STAND.
 // Foe-side kingKitTick/foeLeapTick/kySummon: BYTE-STILL. NO summons (D5 —
 // his "maybe"). Every clock self-seeds (the raw-spawn NaN law); every pick
@@ -41872,8 +41896,9 @@ function kingUnitTick(u,dt){
   if(u.falling || u.shv) return;          // down or mid-shove: no court today
   if(u.tkChanT>0 || u.cloakT>0) return;   // 0463: a PLANTED king's hands are the channel (the orange LOCK law — the 0462c pass holds his feet, the sidearm path his snowballs) and a VANISHED king casts nothing (the blade's "hunts what it can see" law) — every wheel waits
   // 0435: THE WEIGHTY MARCH READS — one snow puff at each stomp footfall.
-  // The shared walk stamp never fires for him (CAMP_SPD 16 sits under the
-  // wkX law's 20 px/s noise floor — measured, battery c5), so the kit keeps
+  // The shared walk stamp never fired for him at the royal 16 (under the
+  // wkX law's 20 px/s noise floor — measured, battery c5; 0480: at the
+  // rifleman's cell it fires too — both gates read as one pose), so the kit keeps
   // its OWN presentation walk memory: kyPX (last x) -> kyWkT (fresh while
   // striding, the pose reader's gate) -> kyStpS (the stomp sign; a flip = a
   // footfall = one puff). All presentation, zero dice, nothing in the sim
@@ -52669,7 +52694,7 @@ function kyPoseK(e){
   if(e.kySwing>0) return (e.kySwing>0.15)? 'kingyetiswinga' : 'kingyetiswingb';
   if(e.kyWave) return 'kingyetiwave';
   if(e.kyThAt!=null && S.t-e.kyThAt<0.30) return 'kingyetihurl';
-  if((e.wkT && S.t-e.wkT<WKF_HOLD) || (e.kyWkT && S.t-e.kyWkT<WKF_HOLD)){   // foe: the shared walk stamp · unit: the kit's own kyWkT (CAMP_SPD 16 sits under the wkX law's 20 px/s floor)
+  if((e.wkT && S.t-e.wkT<WKF_HOLD) || (e.kyWkT && S.t-e.kyWkT<WKF_HOLD)){   // foe: the shared walk stamp · unit: the kit's own kyWkT (the royal 16 sat under the wkX law's 20 px/s floor; 0480: the rifleman's cell clears it — both gates, one pose)
     if(e.airT!=null){ const g9=AIR_GAIT.kingyeti, ph9=e.airT%g9.cyc;   // the foe king: pose rides his own hop windows
       if(ph9<g9.win[0][1]) return 'kingyetistompa';
       if(ph9>=g9.win[1][0]&&ph9<g9.win[1][1]) return 'kingyetistompb';
