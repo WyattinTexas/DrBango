@@ -393,6 +393,85 @@ things to compare first: `dpr` vs `DPR` vs the `?` query (a forced dpr),
 `buffer` vs `css × dpr` and vs `gl drawingBuffer` (a small buffer), and
 `visual @scale` (a zoomed visual viewport reads as blur too).
 
+## crisp-check.mjs — the portrait device matrix (v0.50.1)
+
+Wyatt's standing order: "make sure the game looks good in portrait no matter
+what the device is." This is the proof. Eight phones, each emulated over CDP
+(`Emulation.setDeviceMetricsOverride`: mobile + touch, the real css size and
+devicePixelRatio, the notch insets through `?inset=T,B`), and on each the four
+surfaces — home, a battle board, CHOOSE A SIGIL, the daily share card — walked
+with REAL TOUCHES (`Input.dispatchTouchEvent`), asserting geometry (buffer ===
+css × dpr, game.scale === buffer, no CSS transform, visualViewport scale 1, the
+v0.50.0 sentinel crisp with zero heals), SHARPNESS, layout (safe band, nothing
+clipped, ≥ 44-pt tap targets, no text overlaps, the one-line law) and that
+every tap landed.
+
+```
+python3 -m http.server 8899 &
+node tools/crisp-check.mjs                    # all eight + the ?dpr=1 control (~2.5 min, --disable-gpu)
+node tools/crisp-check.mjs --only=se,16       # a subset (substring of the id); --nocontrol skips the blur run
+node tools/crisp-check.mjs --gl               # swiftshader GL instead of Canvas
+SHOTS=/tmp/crisp node tools/crisp-check.mjs   # keep a PNG per surface
+```
+
+**The sharpness metric.** `Page.captureScreenshot` at device px (what the
+screen shows — a small buffer stretched by CSS arrives stretched), cropped to
+the title / button-label / tile regions; mean |Laplacian| of luminance, divided
+by the same for that region shrunk to 1 css px per px and bilinearly stretched
+back (= a 1× buffer upscaled, Wyatt's phone). Measured 2026-08-21, Canvas
+renderer, min ratio per surface (home · battle · sigils · share):
+
+| device | css @dpr | home | battle | sigils | share |
+|---|---|---|---|---|---|
+| iPhone SE | 375×667 @2 | 2.77 | 2.28 | 2.00 | 2.10 |
+| iPhone 8 Plus | 414×736 @3 | 3.10 | 2.61 | 2.86 | 2.51 |
+| iPhone XR / 11 | 414×896 @2 | 2.23 | 1.93 | 2.13 | 2.05 |
+| iPhone 13 mini | 375×812 @3 | 3.70 | 2.73 | 2.67 | 2.61 |
+| iPhone 15 / 16 | 393×852 @3 | 3.87 | 2.70 | 2.38 | 2.12 |
+| iPhone 16 Pro Max | 440×956 @3 | 2.95 | 2.16 | 2.71 | 2.06 |
+| iPad portrait | 820×1180 @2 | 2.10 | 1.83 | 2.04 | 1.77 |
+| small Android | 360×800 @2.625 | 2.68 | 2.76 | 2.79 | 2.28 |
+| **15/16 at ?dpr=1 (control)** | 393×852 @3 | 1.22 | 1.26 | 1.26 | 1.23 |
+
+The PIN floors (1.55 at dpr ≥ 3, 1.4 at 2.625, 1.3 at 2) sit between the
+crisp pack and the control's ~1.25 with margin on both sides; the control's
+ceiling is 1.35. Re-pin from the printed table if the art changes. 242/242 on
+the first full run; the 2× devices (XR, iPad) score lowest because the shrink
+is only 2× — still 40 % clear of the floor.
+
+**No device profile reproduces Wyatt's blur.** Every one of the eight boots to
+a full-DPR buffer and a crisp frame in headless Chrome, so the blur is not in
+the game's scaling law for any phone geometry — it lives on his device / shell
+(the v0.50.0 device report in `devices/<uid>` is what will name it).
+
+**What the matrix DID find: tap targets under 44 pt** (the 🔊/🌐 glyphs at
+13×15, ‹ back at 8×23, the ✕ closes, the profile chip / rating pill / daily
+chip, and on narrow phones every 44/46-pt design button, since the 420-wide
+design box scales to 0.83–0.94 css px per pt). Fixed in game.js by `ssHitPad`:
+`setInteractive()` is wrapped so every RECTANGULAR hit area is padded, centred,
+to ≥ 44 css pt on each axis — the art keeps its size, only the hit rect grows.
+Custom shapes / pixel-perfect areas are untouched; the first rect is kept on
+the object so a re-pad is never cumulative; a swapped texture (the lantern
+lighting up) re-bases on the new frame. `ssHitPad(o, 44, 'up'|'down')` anchors
+growth for stacked pairs (profile chip over rating pill) so the lower never
+steals the upper's taps.
+
+Gotchas:
+
+- **`DPR` is a script binding, not `window.DPR`.** The page-side lib reads it
+  by name inside an evaluated function; `window.DPR` is undefined.
+- **Taps repeat until the scene answers** (`touchUntil`): objects built in one
+  frame register with the input plugin on the next, and at software frame
+  rates a touch fired the instant a surface appears is simply lost.
+- **Full-screen blockers are skipped by size** (≥ 90 % of both axes), and
+  everything drawn before an opaque veil is dropped from the layout walk — it
+  is neither tappable nor read.
+- **Text ink vs canvas**: a Text's canvas carries its shadow/glow padding; the
+  band and overlap checks strip `padding` so a glow under the safe line is not
+  a fail.
+- **No `timeout` on macOS** — `perl -e 'alarm 580; exec @ARGV' node tools/crisp-check.mjs`
+  caps a foreground run (the JUMPR rule: never background a harness).
+
 ## click-test.js
 
 Verifies the game is actually **clickable**, which a screenshot cannot. Drives headless

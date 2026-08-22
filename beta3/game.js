@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.50.0';
+const BUILD = 'STARSPELL v0.50.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -3432,6 +3432,49 @@ function ssLayout(scene) {
   return { W, H, s, x: (d) => W / 2 + d * s, y: (d) => cy + (d - 400) * s, u: (d) => d * s };
 }
 
+/* ---- tap targets: the 44-pt law (v0.50.1) --------------------------------
+   tools/crisp-check.mjs walked eight phones and found fingers meeting hit
+   areas far under Apple's 44 pt: the 🔊/🌐 glyphs at 13×15, the ‹ back at
+   8×23, the ✕ closes, the profile chip / rating pill / daily chip, and — on
+   the narrow phones, where the 420-wide design box scales to 0.83–0.94 css
+   px per design pt — every 44- and 46-pt button. The ART keeps its size;
+   only the hit RECTANGLE grows: setInteractive() is wrapped so every
+   rectangular hit area is padded, centred, to at least 44 css pt on each
+   axis (local space, origin handled by the input plugin; the first rect is
+   kept on the object so a re-pad is never cumulative). Custom shapes and
+   pixel-perfect areas are left alone. ssHitPad(o, css, anchor) re-pads a
+   single object with an anchor — 'up' keeps the bottom edge and grows
+   upward, 'down' the reverse — for a stacked pair like the profile chip over
+   the rating pill, where centred growth would let the lower one steal the
+   upper one's taps. */
+function ssHitPad(o, minCss, anchor) {
+  try {
+    const ha = o && o.input && o.input.hitArea;
+    if (!ha || !(ha instanceof Phaser.Geom.Rectangle) || o.input.customHitArea) return o;
+    // a swapped texture (the lantern lighting up) brings a new frame size and a
+    // new display scale: the base rect is the frame again, not the old pad
+    const fw = o.frame ? o.frame.realWidth : 0, fh = o.frame ? o.frame.realHeight : 0;
+    if (o.__ha0 && fw && (o.__ha0.fw !== fw || o.__ha0.fh !== fh)) o.__ha0 = { x: 0, y: 0, w: fw, h: fh, fw, fh };
+    if (!o.__ha0) o.__ha0 = { x: ha.x, y: ha.y, w: ha.width, h: ha.height, fw, fh };
+    const h0 = o.__ha0, need = (minCss || 44) * DPR;
+    const sx = Math.abs(o.scaleX) || 1, sy = Math.abs(o.scaleY) || 1;
+    const w = Math.max(h0.w, need / sx), h = Math.max(h0.h, need / sy);
+    const x = h0.x + (h0.w - w) * (anchor === 'left' ? 0 : anchor === 'right' ? 1 : 0.5);
+    const y = h0.y + (h0.h - h) * (anchor === 'down' ? 0 : anchor === 'up' ? 1 : 0.5);
+    if (w !== ha.width || h !== ha.height || x !== ha.x || y !== ha.y) ha.setTo(x, y, w, h);
+  } catch (e) { }
+  return o;
+}
+(function () {
+  const P = Phaser.GameObjects.GameObject.prototype, orig = P.setInteractive;
+  P.setInteractive = function (a, b, c) {
+    const r = orig.call(this, a, b, c);
+    // a caller's own shape (a circle, a polygon, a callback) is its own law
+    if (this.input && !(a && typeof a === 'object' && (a.hitArea || a.pixelPerfect)) && !(a && a.type !== undefined && !(a instanceof Phaser.Geom.Rectangle)) && !(b && typeof b === 'function' && b !== Phaser.Geom.Rectangle.Contains)) ssHitPad(this, 44);
+    return r;
+  };
+})();
+
 /* ---- the campaign star chart --------------------------------------------
    The whole long night on one window of sky: every fight of every act is a
    constellation node on a winding path that climbs from the meadow's edge
@@ -4261,6 +4304,7 @@ class Home extends Phaser.Scene {
     const CW = 152, CH = 30;
     const chip = this.profileChip = ui(this.add.image(l.x(195), l.y(26), ssBtn(this, true, CW, CH))
       .setDisplaySize(l.u(CW), l.u(CH)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }));
+    ssHitPad(chip, 44, 'up');       // the pill sits 26 beneath: grow toward the sky, never over the pill
     const chipT = ui(ssTxt(this, l.x(195 - CW / 2), l.y(26), '✦ ' + SSNET.myName(), l.u(11), '#9fb0e8').setOrigin(0.5));
     let nm = SSNET.myName();
     while (chipT.width > l.u(CW - 18) && nm.length > 2) { nm = nm.slice(0, -1); chipT.setText('✦ ' + nm + '…'); }
@@ -4275,6 +4319,7 @@ class Home extends Phaser.Scene {
     const RW = 108, RH = 22;
     const rpill = this.ratingPill = ui(this.add.image(l.x(195), l.y(52), ssBtn(this, true, RW, RH))
       .setDisplaySize(l.u(RW), l.u(RH)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }));
+    ssHitPad(rpill, 44, 'down');    // and the pill grows toward the meadow
     this.ratingT = ui(ssTxt(this, l.x(195 - RW / 2), l.y(52), '', l.u(11), '#cfd8ff').setOrigin(0.5));
     this.ratingTierT = ui(ssTxt(this, l.x(195), l.y(68), '', l.u(8.5), '#cfd8ff', 'italic').setOrigin(1, 0.5).setAlpha(0.85));
     this.refreshRatingPill = () => {
@@ -4526,6 +4571,7 @@ class Home extends Phaser.Scene {
     // only the dark pane survived — a gray box, not a lamp.
     this.lanternB.setTexture(SS_LANTERN_TEX[tier + 1])
       .setDisplaySize(l.u(SS_LANTERN_W), l.u(SS_LANTERN_H));
+    ssHitPad(this.lanternB, 44);     // the new frame's scale: re-pad to the 44-pt law
     this.lanternB.baseAlpha = lit ? 1 : 0.82;
     const g = this.lanternGlow;
     // the halo grows with the marks but still never reaches the daily chip's
