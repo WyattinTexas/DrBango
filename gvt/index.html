@@ -1596,6 +1596,25 @@
   .wr-wview b { color:#FFE9A8; }
   .wr-wview .x { background:none; border:none; color:#BFC6AD; font:inherit; text-transform:inherit; font-size:clamp(14px,3vh,20px); cursor:pointer; padding:0 2px; }
   .wr-bname.zz { color:#9DA084; letter-spacing:0.08em; }
+  /* 0494a THE BOSS STRIP (FM-GVT-FEEDBACK-0822-EVE §2 — Wyatt 8/22: "display the
+     bosses that you defeated on the rating screen, right below your SR, so you
+     can see where everyone is kind of at"): the six faces as ONE compact row —
+     YOURS under the RATING line in the side column (.wr-strip: the live faces,
+     doors + rings intact), THEIRS on the poster under THEIR SARGE (.wr-strip.ro:
+     read-only spans). Face cap ⚑ 40px (max-width — the 6-up calc still rules a
+     narrow column: ~29px at 812×375); the name slot hidden (no breath, the
+     aria-labels stay); the 💤 note as the strip's own <small> line. Rings,
+     ticks and the .down dim are the wall's own rows above — nothing restated;
+     nothing here animates. ⚠ never `.strip`: that class is the title's marching
+     strip (position:absolute + the waddle) and would seat the wall off-column. */
+  .wr-wall.wr-strip { flex:0 0 auto; gap:2px; }
+  .wr-wall.wr-strip .wr-wrow { gap:clamp(4px,0.7vw,8px); }
+  .wr-wall.wr-strip .wr-boss { max-width:40px; }
+  .wr-wall.wr-strip .wr-bname { display:none; }
+  .wr-wall.wr-strip .wr-btick { width:clamp(10px,34%,14px); font-size:clamp(7px,1.3vh,10px); right:-2px; bottom:-2px; }
+  .wr-wall.wr-strip.ro .wr-boss { cursor:default; }
+  .wr-wall.wr-strip.ro .wr-boss:active { transform:none; }
+  .wr-bnote { display:block; max-width:100%; font-size:clamp(8px,1.6vh,11px); color:#9DA084; letter-spacing:0.08em; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* ALL 100 — the ONLY thing on this screen that scrolls. Backdrop scrolls,
      card takes margin:auto: a tall card centred with align-items:center clips
      its own top and the ✕ with it (v1.2.2 lesson). */
@@ -33332,7 +33351,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.50';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.51';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -66815,7 +66834,8 @@ function wrList(tab){
   // the RATING rows: HQ already ranks them (rating desc) and always appends
   // YOUR row when you're not on the hundred — a fresh save shows its 1.00.
   if(tab==='rating') return (d.rat||[]).map((r,i)=>({ uid:r.uid, name:r.name, val:fmtRating(r.rating),
-    color:r.color, you:!!r.you, rank:r.rank||i+1, stars:r.stars||0, w:r.w||0, l:r.l||0 }));
+    color:r.color, you:!!r.you, rank:r.rank||i+1, stars:r.stars||0, w:r.w||0, l:r.l||0,
+    bw:(typeof r.bw==='string'? r.bw : null) }));   // 0494a THE BOSS STRIP: a v34 box serves the wall string on every RATING row (a v33 box serves none, a never-reported row null — the poster then tries the ADVENTURE row, else the 💤 line)
   // v2.65 THE SQUAD LADDER: rows are whole squads — no uid (nothing to tap),
   // the member CROWD's colours instead of one figure, wins as the number
   if(tab==='squad') return (d.squads||[]).map((r,i)=>({ name:r.name, val:(r.w||0)+'W',
@@ -66901,8 +66921,20 @@ function wrFaceURIs(){
     rex:sprURI('kingrex',null,'6 2 130 130'), yeti:sprURI('kingyeti',null,'-37 -26 194 168'), croak:sprURI('kingcroak',null,'0 0 140 140') };
   return WR_FACES;
 }
-function wrBossWallHTML(bag, note){
+// 0494a THE BOSS STRIP (FM-GVT-FEEDBACK-0822-EVE §2 — Wyatt 8/22: "display the
+// bosses that you defeated on the rating screen, right below your SR, so you
+// can see where everyone is kind of at"): the same six faces as ONE compact
+// row. The third arg — OMITTED = the ADVENTURE wall, 0441's markup byte-for-
+// byte; FALSE = YOUR strip (the RATING side column under the RATING line):
+// the live faces — buttons, ids, the UI.wrBossGo doors, the .deny shake —
+// at strip size (.wr-strip — never .strip, the title's marching strip:
+// absolute + waddle), the name slot hidden by CSS (no breath; the aria-labels
+// stay); TRUE = THEIR strip (the poster, under THEIR SARGE): read-only — faces
+// as <span> (no onclick, no id, no .deny seat), .wr-strip.ro, and the 💤 note
+// as the strip's own <small> line since the name slot is gone.
+function wrBossWallHTML(bag, note, ro){
   const B=bag||wrWallBag(), F=wrFaceURIs(), TC={e:' t-e',m:' t-m',h:' t-h',g:' t-g'};
+  const strip=(ro!==undefined), inert=!!ro;   // 0494a: undefined = the wall · false = YOUR strip (live) · true = THEIR strip (inert)
   const wall=[   // FM-GVT-WALLDOORS-01: entries carry a stable id — the door dispatcher (UI.wrBossGo) keys on it, never on the localized display name (D9)
     { id:'nemesis', nm:'NEMESIS' },
     { id:'mom',     nm:'MOM' },
@@ -66911,12 +66943,13 @@ function wrBossWallHTML(bag, note){
     { id:'yeti',    nm:'KING YETI' },
     { id:'croak',   nm:'KING CROAK' }
   ];
-  return '<div class="wr-wall"><div class="wr-wrow">'
-    +wall.map(b=>{ const s=B[b.id]||{};
-      return '<button type="button" id="wrb-'+b.id+'" class="wr-boss'+(s.done?' down'+(TC[s.tier]||''):'')+'" aria-label="'+b.nm+'" onclick="UI.wrBossGo(\''+b.id+'\',\''+b.nm+'\')">'
-      +'<span class="wr-bwell"><img src="'+F[b.id]+'" alt=""></span>'
-      +'<span class="wr-btick">✓</span></button>'; }).join('')
-    +'</div><div class="wr-bname'+(note?' on zz':'')+'" id="wrBossName"'+(note?' data-notr data-note="'+escH(note)+'"':'')+'>'+(note? escH(note):'')+'</div></div>';   // 0442: a 💤 no-report note may own the name slot (the viewer's L8 wall — the breath yields it back); no note = the 0441 markup byte-for-byte
+  return '<div class="wr-wall'+(strip?' wr-strip':'')+(inert?' ro':'')+'"><div class="wr-wrow">'
+    +wall.map(b=>{ const s=B[b.id]||{}, cls='wr-boss'+(s.done?' down'+(TC[s.tier]||''):''),
+        face='<span class="wr-bwell"><img src="'+F[b.id]+'" alt=""></span>'+'<span class="wr-btick">✓</span>';
+      return inert? '<span class="'+cls+'" role="img" aria-label="'+b.nm+'">'+face+'</span>'   // 0494a: THEIR strip — a picture, never a door
+        : '<button type="button" id="wrb-'+b.id+'" class="'+cls+'" aria-label="'+b.nm+'" onclick="UI.wrBossGo(\''+b.id+'\',\''+b.nm+'\')">'+face+'</button>'; }).join('')
+    +'</div>'+(inert? (note? '<small class="wr-bnote" data-notr>'+escH(note)+'</small>':'')   // 0494a: the 💤 note on a read-only strip = its own one-line <small> (the name slot is gone)
+      : '<div class="wr-bname'+(note?' on zz':'')+'" id="wrBossName"'+(note?' data-notr data-note="'+escH(note)+'"':'')+'>'+(note? escH(note):'')+'</div>')+'</div>';   // 0442: a 💤 no-report note may own the name slot (the viewer's L8 wall — the breath yields it back); no note = the 0441 markup byte-for-byte
 }
 // 0442 FM-GVT-BADGES-01 CARD 2 — THE WALL RIDES THE WIRE (Wyatt 8/19: "When
 // you view other players on the leaderboard under the Adventures tab, you
@@ -66968,6 +67001,16 @@ let CHAL={ pos:null, lo:{} };   // pos = the open poster's row bag · lo = the /
 function chalNear(){ return (WR.data && WR.data.near) || null; }
 function chalMe(){ const n=chalNear(); return n? n.find(r=>r.you) : null; }
 function chalRowFor(uid){ const n=chalNear(); return (n && n.find(r=>r.uid===uid)) || null; }
+// 0494a THE BOSS STRIP: the poster row's wall. The row itself first (a v34
+// near row carries bw; so does a rat-built CHAL.pos once wrList maps it),
+// then the RATING row by uid, then the uid's ADVENTURE row (a v33 box serves
+// bw on adv rows only — tolerance both ways), else null = the 💤 line.
+function wrPosterBW(row){
+  if(row && wrWallHas(row.bw)) return row.bw;
+  const uid=row&&row.uid; if(!uid) return null;
+  const rat=wrList('rating').find(r=>r.uid===uid); if(rat && wrWallHas(rat.bw)) return rat.bw;
+  const adv=wrList('adv').find(r=>r.uid===uid);    return (adv && wrWallHas(adv.bw))? adv.bw : null;
+}
 // the band gate — the client is the gate, HQ's referee is the truth (R2).
 // Revenge is exempt while their came-for-you row rides the 7-day inbox
 // (R1 — the server's reverse-book check mirrors this exactly).
@@ -67041,7 +67084,10 @@ function chalPosterOpen(uid, name){
 // THE POSTER (§6-B, dressed down — frames r1/r2/r5): dressed name · #rank ·
 // rating · THE SARGE BIG · the record line · ONE button with five faces ·
 // the quiet row. NOTHING here names a unit, a rank, a mod, a laser, a
-// tier or W·L (B2: "seeing their Sarge is enough").
+// tier or W·L (B2: "seeing their Sarge is enough"). 0494a: + THEIR BOSS
+// STRIP right under the Sarge — the wall's six faces with THEIR rings,
+// read-only (bosses beaten are a campaign story, not an army secret; B2
+// stands — still nothing about their units or mods).
 function wrPosterHTML(row){
   const A=awayLedger(), d=A.done[row.uid];
   const nm=wrDress(row.name||'COMMANDER', row.uid, false);   // the 0328 law — the poster wears the board's own dressed name
@@ -67057,6 +67103,8 @@ function wrPosterHTML(row){
     +(rkp? '<span class="rk" data-notr>'+rkp+'</span>':'')
     +'<button type="button" class="x" onclick="UI.chalX()">✕</button></div>';
   h+='<div class="po-big"><img src="'+(row.w? chalSargeURI(row.w, chalHex(row), row.sb, row.of) : chalPlainURI(chalHex(row)))+'" alt=""><small>'+t('THEIR SARGE')+'</small></div>';
+  const bw=wrPosterBW(row);   // 0494a THE BOSS STRIP: THEIR wall right under THEIR SARGE — read-only, decoded off the served string (near -> rat -> adv), the 💤 line when nobody reported
+  h+=wrBossWallHTML(wrWallDecode(bw), wrWallHas(bw)? '' : t('💤 NO WALL REPORTED YET'), true);
   let line='';
   if(!inBand && !zz && d==null){
     const me=chalMe(), dk=(row.rank|0)-((me&&me.rank)|0);
@@ -67138,6 +67186,7 @@ function renderWorldRank(){
         +((tab==='rating'&&chalBadgeN())? (()=>{ const f9=awayRows().filter(a=>a.won).length;   // 0411: the came-for-you pill — tap = the one-row-kind inbox
           return '<button type="button" class="pill2" onclick="UI.duelOpen()">'+tf('⚔ %1 CAME FOR YOUR ARMY','<b>'+chalBadgeN()+'</b>')+(f9? ' · '+tf('%1 FELL','<b>'+f9+'</b>'):'')+'</button>'; })() : '')
         +rec
+        +((tab==='rating')? wrBossWallHTML(null, '', false) : '')   // 0494a THE BOSS STRIP: YOUR six faces right under the RATING line — the live renderer (doors + rings exactly as the ADVENTURE tab's; wrViewRow() is null off that tab, so every door walks)
         +'<button type="button" class="wr-all" onclick="UI.wrMuster()">ALL 100 →</button>'
       +'</div>')+'</div>'
     +(WR.muster? wrMusterHTML(list) : '');
