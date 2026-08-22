@@ -33287,7 +33287,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.48';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.49';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -54288,7 +54288,7 @@ function janePoseK(u){
 function drawJane(u,kyl){
   const w=unitW('jane');
   const et=(u.jInT!=null && !reducedMotion())? S.t-u.jInT : 99;
-  const wob=Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03);
+  const wob=unitWob(u);   // 0494 THE WOBBLE: the integrated phase (one helper, four seats) — the zip's wob*0.4 / wob*0.5 and her standing seat all read this one
   const fired=(u.jkAt!=null && u.jInT!=null && u.jkAt>=u.jInT);
   if(et<JZ_ZIP+JZ_LAND+0.30){
     const ph=u.jPoleH||120, px=u.jPoleX!=null? u.jPoleX : u.x+90;
@@ -54401,6 +54401,47 @@ function drawKing(e,x,y,w,wob,seatFoe,defFl){
 // ZERO new dice.
 const CR_HURT_T=0.30;   // how long the flinch owns the picture (the 0436 window, kept — dial)
 function crFlinch(e){ return (e.crHitAt!=null && S.t-e.crHitAt<CR_HURT_T && IMG.kingcroakhurt) || null; }
+// ═══ 0494 THE WOBBLE — ONE INTEGRATED PHASE (FM-GVT-FEEDBACK-0822-PM §4) ═══
+// Wyatt 8/22: "Healing/damage wobbling too fast sometimes". The hit-wobble's
+// four playable seats (drawJane's wob · the playable yeti's drawKing · the
+// croak flinch fork · the shared drawSprite line in drawUnit below) read THIS
+// helper in place of the shipped
+// Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03). Two defects in
+// that line: ① THE PHASE JUMP — the speed multiplied S.t, so any change of
+// u.hits re-phased the sine by S.t·2.5·Δhits; a medic moves hits EVERY frame
+// (medicPass → tkLeech, fractional pips), so at S.t≈120 s a 0.008-pip heal
+// jumped the phase ~2.4 rad a frame — the figure VIBRATED at random while being
+// healed; the 4 s regen and every landing round jumped it once. ② NO CAP —
+// speed 2+2.5·hits and swing 0.022+0.03·hits were tuned for 3-8-pip soldiers;
+// a 50-pip hero at 30 hits spun at 77 rad/s with ±0.92 rad of swing, a blur.
+// NOW: a per-unit phase u.wobPh INTEGRATES the speed over the sim clock —
+// advanced off S.t once per frame (u.wobT holds the last read: a second read
+// in the same frame sees dt 0; a frame the figure sits out — the kySwing lean,
+// a fall, the battleground — integrates the gap on return). h = min(hits,
+// WOB_CAP) glides toward its target at WOB_EASE/s (u.wobH — a fractional heal
+// eases, a landing round raises the SPEED over ~¼ s, never the phase); swing
+// WOB_A0+WOB_A1·h. Seeded on the figure's first frame as phase+WOB_F0·S.t, so
+// an unhurt figure's angle series IS the shipped one (2 rad/s · 0.022 —
+// battery-asserted within 1e-3). Presentation only: nothing in the sim reads
+// wobPh/wobH/wobT (the wkX/wkT law), placeUnit/tanHit/tkLeech/medicPass
+// untouched, no wire (GVT.coop's unit snap lists type/x/y/vet), no dice, no
+// per-frame allocations. Reduced motion: the four seats were ungated and stay
+// ungated — byte-same (⚑ RM gating, one seat). The foe-side drawKing (the boss,
+// S.t*3.4+f.wob) and every f.-side draw untouched.
+const WOB_F0=2, WOB_F1=2.5;       // rad/s at 0 hits, + per capped hit (today's 2+2.5·hits look for 0-3 hits) — dials
+const WOB_A0=0.022, WOB_A1=0.03;  // swing (rad) at 0 hits, + per capped hit — dials
+const WOB_CAP=3;                  // hits past this add no speed and no swing: a 50-pip hero wobbles like a 3-grit man at worst (≤9.5 rad/s · ≤0.112 rad) — ⚑ dial
+const WOB_EASE=4;                 // /s — h glides toward min(hits,WOB_CAP); 0 = snap — dial
+function unitWob(u){
+  if(u.wobT==null){ u.wobT=S.t; u.wobPh=(u.phase||0)+WOB_F0*S.t; u.wobH=Math.min(u.hits||0,WOB_CAP); }
+  const dt=S.t-u.wobT; u.wobT=S.t;
+  if(dt>0){
+    const h=Math.min(u.hits||0,WOB_CAP);
+    u.wobH+=(h-u.wobH)*(WOB_EASE>0? Math.min(1,WOB_EASE*dt) : 1);
+    u.wobPh+=(WOB_F0+WOB_F1*u.wobH)*dt;
+  }
+  return Math.sin(u.wobPh)*(WOB_A0+WOB_A1*u.wobH);
+}
 function drawUnit(u){
   // 0386: a hatchling — the shipped molds/wob/flip at his own width (the
   // king at KING REX'S OWN 148), plus the units' hp-bar grammar in a
@@ -54464,9 +54505,9 @@ function drawUnit(u){
   if(kyl){ cx.strokeStyle='rgba(192,71,58,0.85)'; cx.lineWidth=2.5;
     cx.beginPath(); cx.arc(u.x,u.y-30-kyl,15+3*Math.sin(S.t*11),0,7); cx.stroke(); }
   if(u.type==='jane') drawJane(u,kyl);   // 0434 THE SHAPE-STORE JANE: her own pose-driven draw (pre-built poses + the entrance rig above; every other figure keeps the shared line below byte-what-it-was)
-  else if(u.type==='kingyeti') drawKing(u,u.x,u.y-kyl,w,Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03),false,unitFl(u));   // 0435 THE SHAPE-STORE KING, playable seat — the same pose reader as the boss (his wave arcs + seize lift keep their shipped seats around this fork)
-  else if(isCroakU(u) && crFlinch(u)) drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03)),crFlinch(u),unitFl(u));   // 0454: the playable outlaw king — ONLY the flinch forks (the hurt mold on the shared transform); every other frame falls to the generic line below, the old waddle byte-what-it-was
-  else drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : Math.sin(S.t*(2+u.hits*2.5)+u.phase)*(0.022+u.hits*0.03)),im,unitDrawFl(u));   // v2.78: the recoil, campaign edition — v3.61: + the walk-flip seat — 0424: the king's swing lean (the boss's own -0.14) — 0462b: the facing XOR the mold's authored face (UNIT_WEST) + the breather's turn
+  else if(u.type==='kingyeti') drawKing(u,u.x,u.y-kyl,w,unitWob(u),false,unitFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase (one helper, four seats) — 0435 THE SHAPE-STORE KING, playable seat — the same pose reader as the boss (his wave arcs + seize lift keep their shipped seats around this fork)
+  else if(isCroakU(u) && crFlinch(u)) drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : unitWob(u)),crFlinch(u),unitFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase — 0454: the playable outlaw king — ONLY the flinch forks (the hurt mold on the shared transform); every other frame falls to the generic line below, the old waddle byte-what-it-was
+  else drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : unitWob(u)),im,unitDrawFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase (one helper, four seats) — v2.78: the recoil, campaign edition — v3.61: + the walk-flip seat — 0424: the king's swing lean (the boss's own -0.14) — 0462b: the facing XOR the mold's authored face (UNIT_WEST) + the breather's turn
   if(u.type==='radioman') drawRadioCall(u);
   if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); drawAbsorbPips(u); drawHbPips(u); }   // v3.11: a vanished Sarge's kit ghosts WITH him — the alpha holds through the extras
   if(u.type==='commando') drawCmdoPip(u);
