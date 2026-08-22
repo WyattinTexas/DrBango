@@ -24441,7 +24441,15 @@ function startAwayBattle(row, lo){
   if(A.done[row.uid]!=null) return;                    // once a day per commander — the client gate (HQ's book is the referee)
   const ca=row.color&&ARMIES.find(a=>a.id===row.color);
   const riv={ id:'away', name:String(row.name||'COMMANDER'), hex:(ca? ca.hex : GREEN), blurb:'', mod:{}, uid:row.uid };
-  startBattlefield(bfMapResolve(META.bfMap), 'hard', 1, null, riv);   // ⚑ the challenger's own standing carpet ('random' = one cell)
+  // 0494e A CHALLENGE DRAWS A RANDOM CARPET (Wyatt 8/22: "when you challenge
+  // someone in a fight on the leaderboard, the map needs to be random"): the
+  // serve asks for 'random' BY NAME — startBattlefield makes the draw at match
+  // start from bfMapResolve's pool (BF_MAPS minus the four claim arenas) and its
+  // write-back guard (mapReq!=='random') leaves META.bfMap, the challenger's own
+  // standing pick, exactly as it was. A pre-resolved id would be REMEMBERED as
+  // the pick (the v2.41 guard reads the request, not the draw). The queue, the
+  // rooms (the host's draw), the daily raid and the party duel keep their laws.
+  startBattlefield('random', 'hard', 1, null, riv);   // 0494e: a random carpet every challenge, never the standing pick (⚑ the daily invader too · a RANDOM CARPET word on the poster)
   if(!S.bf) return;
   A.done[row.uid]=0; A.pend=row.uid; saveMeta();       // burned at the serve; 0 = the provisional L until the verdict lands
   const st=S.bf.seats[S.bf.team];                      // the foe captain — bfSeatPlan seats him at i=team
@@ -33403,7 +33411,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.54';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.55';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
