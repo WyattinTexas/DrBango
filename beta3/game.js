@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.49.0';
+const BUILD = 'STARSPELL v0.50.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -7352,6 +7352,7 @@ function ssBoot() {
   while (SS_LATE_SCENES.length) { const [k, c] = SS_LATE_SCENES.shift(); game.scene.add(k, c); }
   game.events.once('ready', fitCanvas);
   game.events.once('ready', () => ssPerfWatch(game));
+  game.events.once('ready', () => ssDeviceBeat('ready'));
 }
 function fitCanvas() {
   const c = game && game.canvas;
@@ -7372,6 +7373,132 @@ function fitCanvas() {
   // ?art=1 deferred boot ran ssBoot() after document-complete and flipped the order.
   if (game.scale) game.scale.refresh();
 }
+/* ---- the device report + the crisp sentinel (v0.50.0) ------------------
+   Wyatt's phone rendered v0.49.0 uniformly SOFT in the TestFlight app —
+   every surface a 2–3× upscale of a small buffer — and headless Chrome at
+   the same CSS size and DPR is pixel-crisp. Nothing in the game told us a
+   single number about his device, so this is the instrument, not a fix:
+   one compact object built after `ready` and after every viewport settle,
+   written to devices/<uid> in the RTDB (the same channel SS.sync rides,
+   the same uid as players/<uid>), kept in a 5-deep localStorage ring
+   (`beta3.devlog`), painted into the ?diag=1 box, and read back with
+   `node tools/device-rows.mjs`. No player-facing strings, no secrets.
+   The sentinel: the back-buffer must be round(css × DPR) on both axes, and
+   under WebGL the drawing buffer must match the canvas (iOS can silently
+   allocate a smaller one — Phaser never checks). A miss is DIAGed, recorded
+   (`crisp:false` with the numbers as found) and healed ONCE per beat by
+   re-running the resize/fit path; on every desktop browser and every
+   harness the measure simply agrees and nothing moves. */
+const SS_DEV = { last: null, heals: 0, found: null, sentAt: 0, sentSig: '', diagSig: '' };
+window.__ssdev = SS_DEV;
+function ssCrispMeasure() {
+  const c = game && game.canvas;
+  if (!c || !game.isBooted) return null;
+  const r = (v) => Math.round(v);
+  const m = { cw: c.width, ch: c.height, cc: [c.clientWidth, c.clientHeight], ok: true, why: '' };
+  m.ew = r(m.cc[0] * DPR); m.eh = r(m.cc[1] * DPR);
+  if (m.cw !== m.ew || m.ch !== m.eh) { m.ok = false; m.why = 'buffer ' + m.cw + 'x' + m.ch + ' ≠ css×dpr ' + m.ew + 'x' + m.eh; }
+  try {
+    const gl = game.renderer && game.renderer.type === Phaser.WEBGL ? game.renderer.gl : null;
+    if (gl) {
+      m.db = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+      if (m.db[0] !== m.cw || m.db[1] !== m.ch) { m.ok = false; m.why += (m.why ? ' · ' : '') + 'drawingBuffer ' + m.db[0] + 'x' + m.db[1] + ' ≠ canvas ' + m.cw + 'x' + m.ch; }
+    }
+  } catch (e) { }
+  // a forced ?dpr= (a stale Home-Screen bookmark would carry one) is not a
+  // buffer fault the fit path can heal — named separately, never "healed"
+  const want = Math.min(window.devicePixelRatio || 1, 3);
+  if (Math.abs(DPR - want) > 0.01) m.dprOff = want;
+  return m;
+}
+function ssTextCount() {
+  let n = 0;
+  const walk = (list) => { for (const o of list || []) { if (o.type === 'Text') n++; if (o.list) walk(o.list); } };
+  try { for (const sc of game.scene.getScenes(true)) walk(sc.children.list); } catch (e) { }
+  return n;
+}
+function ssDeviceReport(tag, m) {
+  const c = game.canvas, P = SS_REND, pp = P.p || {}, vv = window.visualViewport;
+  let cs = null;
+  try { const s = getComputedStyle(c); cs = [parseFloat(s.width), parseFloat(s.height)]; } catch (e) { }
+  let sa = false;
+  try { sa = !!navigator.standalone || !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches); } catch (e) { }
+  const rep = {
+    ts: Date.now(), build: BUILD, tag,
+    ua: String(navigator.userAgent || '').replace(/Mozilla\/5\.0 |\(KHTML, like Gecko\) /g, '').slice(0, 150),
+    shell: (window.__STARSHELL && (window.__STARSHELL.platform + ' ' + window.__STARSHELL.build)) || '',
+    sa, q: String(location.search || '').slice(0, 80),
+    iw: window.innerWidth, ih: window.innerHeight,
+    vv: vv ? [Math.round(vv.width), Math.round(vv.height), Math.round((vv.scale || 1) * 100) / 100] : null,
+    dpr: window.devicePixelRatio || 1, DPR,
+    cw: m.cw, ch: m.ch, cc: m.cc, cs,
+    gw: game.scale.width, gh: game.scale.height,
+    rend: game.renderer.type === Phaser.WEBGL ? 'gl' : 'cv', mode: P.mode, why: P.why,
+    probe: pp.glMs != null ? [pp.glMs, pp.cvMs, pp.probeMs || 0, (pp.glHow || '') + '/' + (pp.cvHow || '')] : null,
+    gpu: String(pp.gpu || '').slice(0, 40),
+    db: m.db || null,
+    mem: navigator.deviceMemory || 0, hc: navigator.hardwareConcurrency || 0,
+    inset: [SS_INSET.top, SS_INSET.bottom],
+    ncv: document.querySelectorAll('canvas').length, ntx: ssTextCount(),
+    ntex: Object.keys(game.textures.list).length,
+    crisp: m.ok && !m.dprOff, heals: SS_DEV.heals,
+  };
+  if (SS_DEV.found) rep.found = SS_DEV.found;   // the last miss as found, sticky for the session
+  if (m.dprOff) rep.dprOff = m.dprOff;
+  if (!m.ok) rep.miss = m.why;
+  return rep;
+}
+function ssDeviceDiag(rep) {
+  DIAG('dev ' + rep.tag + ' · ' + rep.ua.slice(0, 90) + (rep.shell ? ' · ' + rep.shell : '') + (rep.sa ? ' · standalone' : '') + (rep.q ? ' · q ' + rep.q : ''));
+  DIAG('dev vp ' + rep.iw + 'x' + rep.ih + (rep.vv ? ' vv ' + rep.vv[0] + 'x' + rep.vv[1] + '@' + rep.vv[2] : '') +
+    ' dpr ' + rep.dpr + ' chose ' + rep.DPR + ' inset ' + rep.inset[0] + '/' + rep.inset[1] + ' mem ' + rep.mem + ' hc ' + rep.hc);
+  DIAG('dev buf ' + rep.cw + 'x' + rep.ch + ' css ' + rep.cc[0] + 'x' + rep.cc[1] + (rep.cs ? ' style ' + rep.cs[0] + 'x' + rep.cs[1] : '') +
+    ' game ' + rep.gw + 'x' + rep.gh + (rep.db ? ' gl ' + rep.db[0] + 'x' + rep.db[1] : '') + ' · canvases ' + rep.ncv + ' texts ' + rep.ntx + ' tex ' + rep.ntex);
+  DIAG('dev rend ' + rep.rend + ' ' + rep.mode + '/' + rep.why + (rep.probe ? ' probe gl ' + rep.probe[0] + ' cv ' + rep.probe[1] + ' ' + rep.probe[2] + 'ms' : '') +
+    (rep.gpu ? ' · ' + rep.gpu : '') + ' · ' + (rep.crisp ? 'CRISP' : 'NOT CRISP ' + (rep.miss || '') + (rep.dprOff ? ' dpr forced ' + rep.DPR + ' vs ' + rep.dprOff : '')) +
+    (rep.heals ? ' heals ' + rep.heals : ''));
+}
+function ssDeviceSend(rep) {
+  // never the harnesses' shared test identities (unless a run asks for it)
+  if (/^test_/.test(SSNET.uid()) && QS.get('devreport') !== '1') return;
+  const sig = JSON.stringify(Object.assign({}, rep, { ts: 0, tag: '' }));
+  if (sig === SS_DEV.sentSig && rep.ts - SS_DEV.sentAt < 60000) return;
+  SS_DEV.sentSig = sig; SS_DEV.sentAt = rep.ts;
+  SSNET.connect().then((m) => { if (m === 'firebase') return SSNET.dbSet('devices/' + SSNET.uid(), SS_DEV.last); }).catch(() => { });
+}
+// `found` is the measure taken BEFORE the fit path ran (a settle measures
+// the canvas as the viewport left it); the beat measures again after it
+function ssDeviceBeat(tag, found) {
+  if (!game || !game.isBooted || !game.canvas) return null;
+  let m = ssCrispMeasure();
+  if (!m) return null;
+  if (found && !found.ok) { DIAG('crisp: found ' + found.why + ' before the fit'); SS_DEV.found = [tag, found.cw, found.ch, found.cc[0], found.cc[1]].concat(found.db || []); }
+  if (!m.ok) {
+    DIAG('crisp: ' + m.why + ' — healing');
+    SS_DEV.heals++;
+    const asFound = m;
+    try { game.scale.resize(Math.round(window.innerWidth * DPR), Math.round(window.innerHeight * DPR)); fitCanvas(); } catch (e) { }
+    m = ssCrispMeasure() || asFound;
+    SS_DEV.found = [tag, asFound.cw, asFound.ch, asFound.cc[0], asFound.cc[1]].concat(asFound.db || []);
+    DIAG('crisp: ' + (m.ok ? 'healed → ' + m.cw + 'x' + m.ch : 'STILL ' + m.why));
+  }
+  const rep = ssDeviceReport(tag, m);
+  SS_DEV.last = rep;
+  try {
+    const K = 'beta3.devlog';
+    let a = JSON.parse(localStorage.getItem(K) || '[]'); a.push(rep);
+    if (a.length > 5) a = a.slice(a.length - 5);
+    localStorage.setItem(K, JSON.stringify(a));
+  } catch (e) { }
+  // the settle loop re-polls a kick four times: paint the four lines only
+  // when something in them changed, or the 14-line box is all chatter
+  const dsig = JSON.stringify(Object.assign({}, rep, { ts: 0, tag: '' }));
+  if (tag === 'ready' || dsig !== SS_DEV.diagSig) ssDeviceDiag(rep);
+  SS_DEV.diagSig = dsig;
+  ssDeviceSend(rep);
+  return rep;
+}
+window.__ssDevBeat = ssDeviceBeat;
 // Textures are built inside the first scene's create(), so the art has to be decoded before
 // Phaser starts. Capped at 2.5s — a slow or dead image never blocks the game, it just falls
 // back to the procedural art. Without ?art=1 this is a straight synchronous boot as before.
@@ -7428,8 +7555,10 @@ function ssVpSettle() {
   }
   if (!game.loop.running) game.loop.wake();
   const w = window.innerWidth, h = window.innerHeight;
+  const found = ssCrispMeasure();   // the canvas as the viewport left it
   game.scale.resize(Math.round(w * DPR), Math.round(h * DPR));
   fitCanvas();
+  ssDeviceBeat('settle', found);
   const major = Math.abs(w - vpW) > 4 || Math.abs(h - vpH) > 200;
   DIAG('vp ' + w + 'x' + h + (major ? ' MAJOR → scene restart' : ' minor'));
   if (major) {

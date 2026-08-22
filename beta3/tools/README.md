@@ -1,6 +1,6 @@
 # beta3 dev tools
 
-Eleven scripts, all dev-only — nothing here ships to the browser.
+Thirteen scripts, all dev-only — nothing here ships to the browser.
 
 ## make-word-packs.py
 
@@ -327,6 +327,71 @@ Six things this file learned the hard way:
   looks finished after 3 wall-clock seconds at 60 fps is still at veil 0.79
   and every word at alpha 0. Poll the display list's alphas; never sleep and
   shoot.
+
+## device-rows.mjs + dev-check.mjs — the device report and the crisp sentinel (v0.50.0)
+
+Wyatt's phone rendered v0.49.0 uniformly SOFT inside the TestFlight app —
+sky, buttons, title, sigil cards, body text, all a 2–3× upscale of a small
+buffer (`~/starspell-jumpr/ref/wyatt-blur-*.jpg`, a 1170×2532 screenshot:
+a 390×844 @3 class phone) — while headless Chrome at the same CSS size and
+DPR is pixel-crisp. The game had never said one number about the device it
+runs on, so v0.50.0 is the INSTRUMENT, not a fix (instrument before
+guessing). Nothing player-facing changed.
+
+**The device report** (`ssDeviceBeat` in game.js) is one ~560-byte object
+built after `ready` and after every viewport settle: ua, the iOS shell's
+`__STARSHELL` build, standalone, `location.search` (a stale `?dpr=1` in a
+Home-Screen bookmark would explain everything), inner + visualViewport
+dims, `devicePixelRatio` vs the `DPR` the game chose, the canvas buffer /
+clientWidth / computed style / `game.scale`, renderer + `SS_REND`
+mode/why + probe ms + gpu string, `gl.drawingBufferWidth/Height` under
+WebGL, deviceMemory / cores, the insets, and three counts — `<canvas>`
+elements, Phaser Text objects alive (each is its own canvas) and textures.
+It goes three places: `devices/<uid>` in the RTDB (same SSNET channel and
+uid as `players/<uid>`, overwritten per device, throttled to changes or
+60s), a 5-deep `beta3.devlog` localStorage ring, and four `dev …` lines in
+the `?diag=1` box (painted again only when something changed, so the crisp
+lines survive the settle loop's four re-polls). The harnesses' `test_`
+identities write nothing home unless the run passes `?devreport=1`.
+
+**The crisp sentinel** runs inside the same beat: `canvas.width` must equal
+`round(clientWidth × DPR)` on both axes and, under WebGL, the drawing buffer
+must equal the canvas (iOS can silently allocate a smaller one — Phaser
+never checks). A settle measures the canvas AS THE VIEWPORT LEFT IT before
+the resize/fit path runs (`found`, kept for the session with the tag it
+happened under), and the beat measures again after; a miss that survives
+is DIAGed `crisp: … — healing`, healed ONCE by re-running
+`scale.resize` + `fitCanvas`, and the report carries `crisp`, `found`,
+`miss` and `heals`. A forced `?dpr=` that disagrees with the device is
+named as `dprOff` (the fit path cannot heal a choice) and makes
+`crisp:false` without a heal. On every desktop browser and every harness
+the measure simply agrees: zero heals, nothing moves.
+
+```
+node tools/device-rows.mjs                 # every devices/* row, newest first
+node tools/device-rows.mjs --name=hare     # filter by players/<uid> name
+node tools/device-rows.mjs --uid=u26 --json
+node tools/device-rows.mjs --all           # include test_ identities
+
+node tools/dev-check.mjs                   # served on :8899, Chrome on :9447 (either renderer)
+```
+
+`device-rows.mjs` is read-only over the RTDB REST endpoint and joins the
+name from `players/<uid>`. `dev-check.mjs` is the sentinel's harness —
+21 checks: the report after ready (buffer = css×dpr, crisp, under 1 KB, the
+counts, the query), the diag lines, the ring, the row landing in the RTDB
+with a throwaway `test_dev…` identity (deleted at the end), a forced
+mismatch (`canvas.width = 500`) caught AS FOUND by the settle and healed,
+a live mismatch healed by the beat itself with the RTDB row overwritten,
+and a plain boot that heals nothing, paints nothing and writes nothing.
+Run it once under `--disable-gpu` and once with the swiftshader flags to
+walk both the Canvas and the `drawingBuffer` branches.
+
+**Reading Wyatt's phone:** once he has relaunched the app on v0.50.0,
+`node tools/device-rows.mjs --name="<his name>"` prints the row. The
+things to compare first: `dpr` vs `DPR` vs the `?` query (a forced dpr),
+`buffer` vs `css × dpr` and vs `gl drawingBuffer` (a small buffer), and
+`visual @scale` (a zoomed visual viewport reads as blur too).
 
 ## click-test.js
 
