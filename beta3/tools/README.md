@@ -1,6 +1,6 @@
 # beta3 dev tools
 
-Ten scripts, all dev-only — nothing here ships to the browser.
+Eleven scripts, all dev-only — nothing here ships to the browser.
 
 ## make-word-packs.py
 
@@ -158,6 +158,65 @@ node tools/vs-match.mjs       # 24 checks: near over far, lone widens (+veil), 3
 
 Harness lesson: a page http.server serves as `text/markdown` has no
 localStorage (opaque document) — seed on a real HTML page of the origin.
+
+Since v0.49.0 the same run also pins the quiet sky (below): the one of three
+left alone is met by a circle mage 12–16s in, and two far-apart searchers
+(1000 vs 1700 — beyond the opened tolerance) who both reach the 12s mark
+pair with EACH OTHER, never with the circle. 34 checks.
+
+## rival-check.mjs
+
+The rival engine (`rival.js`, v0.49.0) and the quiet sky it answers. One
+duelist per `SS_RIVAL.spawn({ code, rating })`: it takes a seat through the
+very join transaction a phone runs, over its OWN Firebase app instance
+(`SSNET.side('rival')` — so its writes reach this tab the way a remote
+client's do, no optimistic local apply), deals the identical board from the
+room seed with a private RNG (never the game's `rng()`, which is dealing the
+human's board in the same page), and plays under a skill dial that is a
+TARGET RATING: how long a word it can see, how often it passes the best
+word over, when a poor board is worth a SCRY — plus a person's pacing (a
+hesitation before the first move, log-normal jitter, a rush when the clock
+runs low; never under 1.6s, never past the mode's stall limit).
+
+Dev seam: `?botduel=<rating>[&vsmode=turns|timed][&seed=N]` seals a room and
+seats a rival opposite you; `?vsdemo=1` alongside lets the solver play the
+human seat. The transcript is in `window.__ssRivalLog` (page memory only).
+
+**The quiet sky** (`VsBattle.quietSky`, `VS_FB` in versus.js): a searcher the
+queue has not served 11.2–14.4s after FIND (jittered, then a 0.5–1.3s breath
+for the arrival) is met by one of THE CIRCLE — up to eight mages this device
+has met, kept in localStorage (`starspellCircle`), each with a uid and name
+from the same minters a new device uses and an ordinary `players/<uid>` row
+holding exactly the fields `SS.sync` writes, which grows with every duel
+(runs, words, wins, and a rating moved by the same Elo the human's client
+applies to itself). The seat is rated 40–90 off the player's, either side.
+People always win the race: the last instant before the door opens the
+queue is read once more — an ELDER room takes the searcher whatever the
+rating gap, and a YOUNGER room already on its way (within tolerance, or
+past its own clock) holds the door up to 6s. FIND on a reclaimed seat that
+had no clock (an unanswered rematch) now stamps `seekAt`. Never a presence
+row, never a score on a board, never an answer to a friend request — a
+quiet player, by inspection. The versus rating math needed NO special-casing:
+Elo runs off the seat's `rating` as for any stranger.
+
+```
+node tools/rival-check.mjs          # everything, ~12 minutes
+node tools/rival-check.mjs brain    # sim + pacing pins (seconds)
+node tools/rival-check.mjs queue    # the quiet sky: reveal 11–17s, forced WIN then LOSS
+                                    # (rating + / −), rows, boards, presence, console
+```
+
+Harness lessons: a top-level `const` is not a `window` property — wait on
+`typeof SS_RIVAL !== 'undefined'`, not `window.SS_RIVAL` (the old wait burned
+its whole 60s timeout and every assert ran on a finished duel). FIND reclaims
+any waiting seat the uid already holds, so a stale room from a previous run
+(the rematch nobody answered) must be swept BEFORE the run. Two game bugs
+the harness's real taps exposed, both fixed in v0.49.0: a refill tile was
+tappable while still falling (it crosses the rival's nameplate on the way
+down — a tap on the name wove the tile, and the solver froze on a selection
+it never made), and the other client settling the room on your wound
+before your cast animation landed let the animation's tail write `state =
+'pick'` over `'done'`, which killed REMATCH.
 
 ## tagline-check.mjs
 

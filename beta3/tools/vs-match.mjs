@@ -14,7 +14,10 @@
 // What it pins: the near rival is chosen over the far one; a lone searcher
 // still meets anyone once the tolerance has opened (and a veiled rating
 // queues by its true number); three simultaneous searchers never
-// double-claim or orphan a room, over repeated runs. Every wait POLLS —
+// double-claim or orphan a room, over repeated runs; since v0.49.0 the one
+// left alone is met by a circle mage ~12–16s in, and two far-apart searchers
+// who both reach the 12s mark pair with EACH OTHER (the last look beats the
+// rating gap — nobody gets a circle mage while a person waits). Every wait POLLS —
 // three software-rendered tabs share one CPU and nothing here is quick.
 const BASE = 'http://localhost:8899/index.html';
 const DB = 'https://testroom-75200-default-rtdb.firebaseio.com/starspell/mp/rooms';
@@ -78,7 +81,14 @@ async function client(port, tag) {
 
 const rooms = async () => (await (await fetch(DB + '.json')).json()) || {};
 const testRooms = async () => Object.fromEntries(Object.entries(await rooms()).filter(([, r]) => r && /^test_/.test(r.hostUid || '') || Object.keys((r && r.players) || {}).some(k => /^test_/.test(k))));
-const sweep = async () => { for (const id of Object.keys(await testRooms())) await fetch(DB + '/' + id + '.json', { method: 'DELETE' }); };
+// sweep the test rooms, and the profile rows of any circle mage who sat in one
+const sweep = async () => {
+  const rs = await testRooms();
+  for (const [id, r] of Object.entries(rs)) {
+    for (const k of Object.keys((r && r.players) || {})) if (!/^test_/.test(k)) await fetch(DB.replace(/\/mp\/rooms$/, '') + '/players/' + k + '.json', { method: 'DELETE' });
+    await fetch(DB + '/' + id + '.json', { method: 'DELETE' });
+  }
+};
 const seatsOf = (rs, uid) => Object.entries(rs).filter(([, r]) => r && r.players && r.players[uid]).map(([id]) => id);
 const poll = async (fn, cap) => { for (let i = 0; i < cap / 700; i++) { if (await fn()) return true; await sleep(700); } return false; };
 
@@ -165,14 +175,36 @@ for (let run = 1; run <= 3; run++) {
     const rs = await testRooms();
     const sizes = Object.values(rs).map((r) => Object.keys(r.players || {}).length).sort();
     return sizes.join(',') === '1,2' && [A, B, C].every((c) => seatsOf(rs, c.uid).length === 1);
-  }, 45000);
-  const rs = await testRooms();
+  }, 10000);
+  let rs = await testRooms();
   const sizes = Object.values(rs).map((r) => Object.keys(r.players || {}).length).sort().join(',');
   ok('run ' + run + ': one pair and one lone searcher, every uid seated exactly once', settled, 'rooms ' + sizes);
   ok('run ' + run + ': no room holds more than two, none is orphaned (every room has its host seated)',
     Object.values(rs).every((r) => Object.keys(r.players || {}).length <= 2 && !!(r.players || {})[r.hostUid]));
+  // the quiet sky: the one left alone is met by a circle mage, never by a test uid
+  const metAt = Date.now();
+  const met = await poll(async () => { rs = await testRooms(); return Object.values(rs).every((r) => Object.keys(r.players || {}).length === 2); }, 22000);
+  const lone = Object.values(rs).find((r) => Object.keys(r.players || {}).some((k) => !/^test_/.test(k)));
+  const guest = lone && Object.keys(lone.players).find((k) => !/^test_/.test(k));
+  ok('run ' + run + ': the lone searcher was met by one of the circle (uid cut like a device uid)', met && !!guest && /^u[a-z0-9]{8,}$/.test(guest), guest + ' after ' + Math.round((Date.now() - metAt) / 1000) + 's');
+  ok('run ' + run + ': exactly one such seat across the sky', Object.values(rs).reduce((n, r) => n + Object.keys(r.players || {}).filter((k) => !/^test_/.test(k)).length, 0) === 1);
   await A.park(); await B.park(); await C.park(); await sweep();
 }
+
+// ---------------------------------------------------------------- two reach the 12s mark together, far apart
+console.log('-- two at 12s, 700 apart: each other, never the circle');
+await A.boot({ rating: 1000 }); await B.boot({ rating: 1700 });
+await Promise.all([A.find(), B.find()]);
+ok('A (1000) and B (1700) each open a room — 700 apart is beyond any early tolerance', await poll(async () => { const rs = await testRooms(); return seatsOf(rs, A.uid).length === 1 && seatsOf(rs, B.uid).length === 1 && seatsOf(rs, A.uid)[0] !== seatsOf(rs, B.uid)[0]; }, 15000));
+{
+  const t0 = Date.now();
+  const paired = await poll(async () => { const rs = await testRooms(); const a = seatsOf(rs, A.uid), b = seatsOf(rs, B.uid); return a.length === 1 && b.length === 1 && a[0] === b[0]; }, 30000);
+  const rs = await testRooms();
+  ok('at the 12s mark the younger crossed the gap into the elder: A and B share a room', paired, 'after ' + Math.round((Date.now() - t0) / 1000) + 's');
+  ok('no circle mage anywhere — only the two of them', Object.values(rs).every((r) => Object.keys(r.players || {}).every((k) => /^test_/.test(k))) && Object.keys(rs).length === 1, Object.keys(rs).length + ' rooms');
+  ok('the duel rises', await poll(async () => Object.values(await testRooms()).some((r) => r.status === 'active'), 20000));
+}
+await A.park(); await B.park(); await sweep();
 
 const errs = [...A.errs, ...B.errs, ...C.errs];
 ok('no page exceptions across the three tabs', errs.length === 0, errs.slice(0, 3).join(' | '));

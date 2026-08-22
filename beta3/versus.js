@@ -434,6 +434,34 @@ function vsCode() {
    transaction as before: the rating preference chooses WHICH door to try,
    the transaction decides who got through it. */
 const VS_MM = { TOL: 75, STEP: 75, STEP_MS: 3000, RESCAN_MS: 2500 };
+/* ---------- the quiet sky (v0.49.0) ----------
+   A searcher the queue has not served ~12s after FIND is met by one of the
+   circle (rival.js): a mage of this device's acquaintance, rated a believable
+   distance from the player, who comes in through the same door as anyone.
+   The moment is jittered (AT + up to SPREAD after seekAt, then a breath for
+   the arrival) — the same instant every time would be a tell. People always
+   win the race: the last instant before the door opens the queue is read once
+   more, an ELDER room takes me whatever its rating, and a YOUNGER room already
+   on its way (within tolerance, or past its own clock — it will read the queue
+   the same way and find me) holds the door up to HOLD_MS. */
+const VS_FB = { AT: 11200, SPREAD: 3200, HOLD_MS: 6000, ARRIVE_MS: 500, ARRIVE_SPREAD: 800, RETRY_MS: 9000 };
+// a younger public room of `mode`, host alone, that is about to migrate into mine
+function vsYoungerComing(rooms, mode, now, own, seekAt) {
+  for (const [id, r] of Object.entries(rooms || {})) {
+    if (!r || r.status !== 'waiting' || r.mode !== mode || r.private || id === own.code) continue;
+    if (now - (r.createdAt || 0) > 5 * 60000) continue;
+    const players = r.players || {};
+    if (Object.keys(players).length !== 1) continue;
+    const host = players[r.hostUid];
+    if (!host || host.gone) continue;
+    const age = r.createdAt || 0;
+    if (age < own.createdAt || (age === own.createdAt && id < own.code)) continue;   // an elder: vsPickRoom's business
+    const theirWait = now - vsRoomSeekAt(r, now);
+    const diff = Math.abs(SS.prof.rating - vsRoomRating(r));
+    if (diff <= vsTolerance(now - seekAt, theirWait) || theirWait >= VS_FB.AT) return true;
+  }
+  return false;
+}
 function vsTolerance(waitA, waitB) {
   return VS_MM.TOL + VS_MM.STEP * Math.floor((Math.max(0, waitA | 0) + Math.max(0, waitB | 0)) / VS_MM.STEP_MS);
 }
@@ -478,9 +506,14 @@ async function vsQuickMatch(mode) {
     for (const [id, r] of Object.entries(rooms)) {
       if (r && (!r.createdAt || now - r.createdAt > 40 * 60000)) SSNET.dbSet('mp/rooms/' + id, null).catch(() => { });
     }
-    // a seat I already hold (a reload mid-wait) is mine to return to
+    // a seat I already hold (a reload mid-wait) is mine to return to — and
+    // FIND is FIND: a room that had no queue clock (a rematch nobody answered)
+    // gets one now, so the quiet sky can answer it like any other wait
     for (const [id, r] of Object.entries(rooms)) {
-      if (r && r.status === 'waiting' && r.mode === mode && !r.private && (r.players || {})[vsUid()]) return id;
+      if (r && r.status === 'waiting' && r.mode === mode && !r.private && (r.players || {})[vsUid()]) {
+        if (!r.seekAt) await SSNET.dbUpdate('mp/rooms/' + id, { seekAt: now }).catch(() => { });
+        return id;
+      }
     }
     // the closest rival first; if their door shuts as I reach it, the next
     const skip = new Set();
@@ -503,7 +536,7 @@ async function vsSealRoom(code, mode, opts) {
   try {
     await SSNET.dbSet('mp/rooms/' + code, {
       mode, status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
-      seed: Math.floor(Math.random() * 1e9),
+      seed: (opts && opts.seed) || Math.floor(Math.random() * 1e9),   // ?botduel&seed= pins a board for the harness
       lang: ssGameLang(),   // the creator's tongue rules the duel — both bags and dictionaries follow it
       private: !!(opts && opts.private), invited: (opts && opts.invited) || null,
       seekAt: (opts && opts.seekAt) || null,   // set = this host is in the rival queue, since then
@@ -539,6 +572,10 @@ class VsBattle extends Phaser.Scene {
     this.code = d.code;
     this.challenged = d.challenged || null;   // {id,name} when this room was sealed by a CHALLENGE
     this.sharing = d.sharing || null;         // the INVITE share promise, for lobby feedback
+    // the scene instance outlives a room: the quiet sky's clock must start
+    // fresh with every seal, or the NEXT search would be answered at once
+    this.fbAt = 0; this.fbRival = null; this.fbSpawnAt = 0; this.fbBusy = false;
+    this.migrating = false; this.rescanning = false; this.lastScan = 0; this.left = false;
   }
 
   create() {
@@ -840,6 +877,38 @@ class VsBattle extends Phaser.Scene {
     this.migrating = false;
   }
 
+  /* ---------- the quiet sky, from the host's chair (VS_FB above) ---------- */
+  quietSky() {
+    const r = this.room;
+    if (this.fbBusy || this.migrating || this.rescanning || !r || r.status !== 'waiting') return;
+    if (r.private || !r.seekAt || r.hostUid !== vsUid() || this.challenged) return;
+    if (VS_MAX[r.mode] !== 2) return;   // the battlegrounds fill by hand
+    if (Object.keys(r.players || {}).length !== 1) return;
+    if (typeof SS_RIVAL === 'undefined' || SSNET.mode !== 'firebase') return;
+    if (!this.fbAt) this.fbAt = r.seekAt + VS_FB.AT + Math.random() * VS_FB.SPREAD;
+    const now = Date.now();
+    if (now < this.fbAt) return;
+    if (this.fbRival && (this.fbRival.alive || now - this.fbSpawnAt < VS_FB.RETRY_MS)) return;   // on the way (or a door that stayed cold: once more, later)
+    this.fbBusy = true;
+    (async () => {
+      try {
+        const rooms = (await SSNET.dbGet('mp/rooms').catch(() => null)) || {};
+        if (!this.sys.isActive() || this.migrating || !this.room || this.room.status !== 'waiting' || Object.keys(this.room.players || {}).length !== 1) return;
+        const t = Date.now();
+        const own = { code: this.code, createdAt: r.createdAt || 0 };
+        // the last look: an elder room takes me whatever the gap
+        const pick = vsPickRoom(rooms, r.mode, t, t - 1e7, own, null);
+        if (pick) { await this.migrate(pick.id); return; }
+        // a younger room on its way holds the door
+        if (t - this.fbAt < VS_FB.HOLD_MS && vsYoungerComing(rooms, r.mode, t, own, r.seekAt)) return;
+        const who = SS_RIVAL.persona(SS.prof.rating);
+        this.fbSpawnAt = Date.now();
+        this.fbRival = SS_RIVAL.spawn({ code: this.code, rating: who.rating, seatRating: who.rating, uid: who.uid, name: who.name, persona: who,
+          delay: VS_FB.ARRIVE_MS + Math.random() * VS_FB.ARRIVE_SPREAD });
+      } catch (e) { } finally { this.fbBusy = false; }
+    })();
+  }
+
   beginBattle() {
     // the room's tongue rules the duel: both clients must hold its dictionary
     // BEFORE the shared-seed deal, or their identical boards diverge. The
@@ -968,7 +1037,7 @@ class VsBattle extends Phaser.Scene {
 
   secondTick() {
     if (this.scryCooldown > 0) this.scryCooldown--;
-    if (this.room && this.room.status === 'waiting') this.rescan();
+    if (this.room && this.room.status === 'waiting') { this.rescan(); this.quietSky(); }
     if (!this.room || this.room.status !== 'active') return;
     if (this.room.mode === 'timed') {
       const left = Math.max(0, VS_TIME_MS - (Date.now() - this.room.startedAt));
@@ -1007,11 +1076,14 @@ class VsBattle extends Phaser.Scene {
       color: tier === 2 ? '#215a7c' : tier === 1 ? '#5f420a' : '#655636',
     }).setOrigin(0.5);
     c.add([img, letter, val]);
-    c.setSize(this.tileSize, this.tileSize).setInteractive({ useHandCursor: true });
+    // a tile is tappable once it has LANDED: on its way down it crosses the
+    // rival's nameplate, and a tap meant for the name would weave it instead
+    c.setSize(this.tileSize, this.tileSize);
     c.on('pointerdown', () => this.tapTile(i));
     this.boardC.add(c);
     this.board[i] = { ch, tier, c, img, letter, val };
-    this.tweens.add({ targets: c, y: p.y, duration: 450, ease: 'Bounce.easeOut', delay: initial ? i * 40 : Math.random() * 90 });
+    this.tweens.add({ targets: c, y: p.y, duration: 450, ease: 'Bounce.easeOut', delay: initial ? i * 40 : Math.random() * 90,
+      onComplete: () => { if (c.active) c.setInteractive({ useHandCursor: true }); } });
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
   // USE IT OR LOSE IT, versus edition: same law as the solo board — a bonus
@@ -1176,11 +1248,15 @@ class VsBattle extends Phaser.Scene {
       this.fillBoard(false);
       this.layoutLine();
       // roguelite pick-3 every 3 of my casts
+      // the rival's client may have settled the room on my wound before my
+      // tiles landed: the end screen is already up, and nothing here may
+      // reopen the board over it (REMATCH reads state === 'done')
+      if (this.state === 'done') return;
       if (myCasts % 3 === 0) this.showSigilPick();
       else this.state = 'pick';
       this.checkEnd();
     } catch (e) {
-      this.state = 'pick';
+      if (this.state !== 'done') this.state = 'pick';
     }
     this.updatePanels();
   }

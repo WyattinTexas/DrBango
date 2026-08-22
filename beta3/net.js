@@ -27,22 +27,26 @@ const SSNET = (() => {
   // this tab is — a friend record keyed by one uid and a seat keyed by
   // another would never find each other.
   const MPUID = (() => { try { return new URLSearchParams(location.search).get('mpuid'); } catch (e) { return null; } })();
+  // the two minters are shared: a device's own identity and any other seat
+  // this client seats (versus's rival engine) are cut from the same cloth
+  function mintUid() { return 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
   function uid() {
     if (MPUID) return 'test_' + MPUID;
     let u = localStorage.getItem('starspellUid');
     if (!u) {
-      u = 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      u = mintUid();
       localStorage.setItem('starspellUid', u);
     }
     return u;
   }
   const NAME_A = ['Astral', 'Gilded', 'Quiet', 'Umbral', 'Silver', 'Dawn', 'Comet', 'Rune', 'Velvet', 'Winter', 'Ember', 'Moonlit'];
   const NAME_B = ['Quill', 'Fox', 'Owl', 'Weaver', 'Scribe', 'Hare', 'Raven', 'Mage', 'Widow', 'Serpent', 'Bear', 'Lantern'];
+  function mintName() { return NAME_A[Math.floor(Math.random() * NAME_A.length)] + ' ' + NAME_B[Math.floor(Math.random() * NAME_B.length)]; }
   function myName() {
     if (MPUID) return 'Wisp ' + MPUID.toUpperCase();
     let n = localStorage.getItem('starspellName');
     if (!n) {
-      n = NAME_A[Math.floor(Math.random() * NAME_A.length)] + ' ' + NAME_B[Math.floor(Math.random() * NAME_B.length)];
+      n = mintName();
       localStorage.setItem('starspellName', n);
     }
     return n;
@@ -262,6 +266,26 @@ const SSNET = (() => {
 
   // raw ref for live listeners (multiplayer); null when offline/local
   function ref(path) { return mode === 'firebase' && fdb ? fdb.ref(NS + '/' + path) : null; }
+  // a SECOND connection to the same sky: its own SDK instance, socket, local
+  // cache, transaction queue and onDisconnect — so whatever it writes reaches
+  // this client the way a remote client's writes do (no optimistic local
+  // apply, no transaction aborted by this tab's own update on the same path).
+  // Versus's rival engine seats its duelist through one of these.
+  function side(tag) {
+    if (mode !== 'firebase') return null;
+    let db;
+    try {
+      const app = (firebase.apps || []).find((a) => a.name === tag) || firebase.initializeApp(FB_CONFIG, tag);
+      db = firebase.database(app);
+    } catch (e) { return null; }
+    return {
+      ref: (p) => db.ref(NS + '/' + p),
+      async txn(p, fn) {
+        const r = await db.ref(NS + '/' + p).transaction((cur) => { const n = fn(cur); return n === undefined ? cur : n; });
+        return { committed: r.committed, value: r.snapshot ? r.snapshot.val() : null };
+      },
+    };
+  }
 
   /* ---- friends · presence · summons · recent rivals ------------------------
      The social layer under versus, all client-authoritative like the rest:
@@ -370,5 +394,5 @@ const SSNET = (() => {
     async decline(fromUid) { try { await dbSet('invites/' + uid() + '/' + fromUid, null); } catch (e) { } },
   };
 
-  return { connect, uid, myName, setName, submitScore, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
+  return { connect, uid, myName, setName, mintUid, mintName, side, submitScore, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
 })();

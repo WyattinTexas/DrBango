@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.48.0';
+const BUILD = 'STARSPELL v0.49.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4046,7 +4046,7 @@ class Home extends Phaser.Scene {
     // battle/defeat returns, demo/daily/vsdemo runs and the lang-switch reload
     // all land straight on the interactive meadow
     const deep = typeof vsDeepPending === 'function' && vsDeepPending();   // ?join= / ?friend= (versus.js)
-    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && QS.get('daily') !== '1' && !deep && !ssIntroBypassed();
+    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel') && QS.get('daily') !== '1' && !deep && !ssIntroBypassed();
     if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
     else if (intro) this.playIntro(l);
     else this.buildMeadowUi(l);
@@ -4096,6 +4096,7 @@ class Home extends Phaser.Scene {
     // friend's challenge banner and the friends-layer toasts live there
     if (this.scene.get('summons') && !this.scene.isActive('summons')) { this.scene.launch('summons'); this.scene.bringToTop('summons'); }
     if (deep) this.time.delayedCall(300, () => vsDeepRun(this));
+    else if (QS.get('botduel') && typeof ssBotDuelBoot === 'function') this.time.delayedCall(500, () => ssBotDuelBoot(this));   // the rival engine's dev seam (rival.js) — before vsdemo, which may ride along to play the human seat
     else if (QS.get('vsdemo') === '1' || QS.get('frdemo') === 'host' || QS.get('frdemo') === 'invite') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
     else if (DEMO || QS.get('daily') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : 'quick') : 'daily'));
   }
