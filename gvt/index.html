@@ -100,7 +100,7 @@
   @keyframes waddle { from { transform:rotate(-4.5deg);} to { transform:rotate(4.5deg);} }
   .coinop { position:absolute; bottom:3%; width:100%; text-align:center; font-family:var(--ui); font-weight:bold; font-size:0.75rem; letter-spacing:0.22em; color:#5A5D4C; text-transform:uppercase; pointer-events:none; }
   .scanlines { position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,0.16) 2px 4px); }
-  @media (prefers-reduced-motion: reduce){ .press,.strip,.rivsquad,.rivfig,.vicfig,.roomtag.alarm,.pigwrap.hop,.starfloat,.wt-flank,.wt-play,.accard img,.promobanner,.wr-flank,.wr-act,.pkn.tick,.pickcard.ppwin,.pp-ring,.pp-star,.pp-rank{ animation:none; } }
+  @media (prefers-reduced-motion: reduce){ .press,.strip,.rivsquad,.rivfig,.vicfig,.roomtag.alarm,.roomtag.beacon,.pigwrap.hop,.starfloat,.wt-flank,.wt-play,.accard img,.promobanner,.wr-flank,.wr-act,.pkn.tick,.pickcard.ppwin,.pp-ring,.pp-star,.pp-rank{ animation:none; } }
   @media (orientation: portrait) {
     #rotate { display:flex; z-index:50; }
   }
@@ -3392,6 +3392,26 @@
   /* gold = a reward waiting (red .alarm stays for threats) */
   .roomtag.gold { background:#8a6d1c; box-shadow:0 0 15px rgba(217,165,68,0.85); animation:blink 1.25s linear infinite; }
   .roomtag.gold:hover { background:#a5851f; }
+  /* 0494d THE IDLE BEACON: the gold pill's colours with a BREATH, not the alarm's
+     blink — the room's quiet-watch (roomBeaconTick) lights the CAMPAIGN pill and
+     the BATTLEFIELD pill after ROOM_IDLE_S of nothing. The base rule IS the reduce
+     state (a static glow — the v1.21 base-value law; the kill-list at the top AND
+     the block below park the breath). The keyframes carry .roomtag's own
+     translate(-50%,-50%) so the pill breathes in place. The hotspot divs wear a
+     halo on their OWN box over the art (border-radius + box-shadow; pointer-events
+     untouched — the div IS the tap target; zero SVG surgery). The campaign leads:
+     the battlefield pair starts 0.4 s behind (⚑ ~70% glow instead). */
+  .roomtag.beacon { background:#8a6d1c; box-shadow:0 0 18px 3px rgba(255,210,74,0.8); animation:beacon 1.7s ease-in-out infinite; }
+  .roomtag.beacon:hover { background:#a5851f; }
+  @keyframes beacon { 0%,100% { transform:translate(-50%,-50%) scale(1); box-shadow:0 0 10px rgba(255,210,74,0.9); }
+    50% { transform:translate(-50%,-50%) scale(1.05); box-shadow:0 0 26px 6px rgba(255,210,74,0.9); } }
+  #rspot-campaign.beacon, #rspot-bf.beacon { border-radius:14px; box-shadow:0 0 0 2px rgba(255,210,74,0.45), 0 0 34px 12px rgba(255,210,74,0.35); animation:beaconhalo 1.7s ease-in-out infinite; }
+  @keyframes beaconhalo { 0%,100% { box-shadow:0 0 0 2px rgba(255,210,74,0.45), 0 0 16px 5px rgba(255,210,74,0.18); }
+    50% { box-shadow:0 0 0 2px rgba(255,210,74,0.45), 0 0 34px 12px rgba(255,210,74,0.35); } }
+  #rtag-bf.beacon, #rspot-bf.beacon { animation-delay:0.4s; }
+  @media (prefers-reduced-motion: reduce){
+    .roomtag.beacon, #rspot-campaign.beacon, #rspot-bf.beacon { animation:none; }
+  }
   /* ---- THE LANGUAGE PICKER (v1.29). Native labels only: a child who cannot
      read the interface cannot read "Japanese" either, but 日本語 they know on
      sight. Two columns on a phone, thumb-sized rows, and nothing to read. */
@@ -33383,7 +33403,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.53';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.54';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -33412,10 +33432,21 @@ function nxBeat(def,nx,srvDef){ const m=nxMul(nx,srvDef); if(m<=1) return def;
 // Party-seated players NEVER hard-evict (Law 5 — the leader just reads 💤).
 // Hidden/idle beats are ALREADY the stretched form: pressure (0291) never
 // multiplies them (audit M5, enforced by construction in the ternaries).
+//   C · THE IDLE BEACON (0494d, Wyatt 8/22: "highlight it when they're not
+//       doing anything and just staring at the screen wondering what to do,
+//       they should be doing battlefields or they should be doing campaign")
+//       — ROOM_IDLE_S of nothing on the ROOM itself (solo, nothing open)
+//       lights the CAMPAIGN box and the BATTLEFIELD door with a breathing
+//       gold glow, the campaign first; any input puts it out at once, quiet
+//       brings it back. A light, not a pill, not a card, not a sound: the
+//       stamp below clears it, roomBeaconTick (on the room's 1 s tick)
+//       re-arms it. See roomQuiet / roomBeaconSet / roomBeaconTick.
 let HIDDEN_BEAT=20;                              // s — the worker-driven hidden party beat
 let IDLE_SOFT=90, IDLE_HARD=240, IDLE_RING=25;   // s — stamp · pill · ring (design §4 dials)
+let ROOM_IDLE_S=12;                              // s — 0494d THE IDLE BEACON: quiet on the room before the doors breathe (⚑ 8 / 10 / 15)
+const ROOM_BEACON=['campaign','bf'];             // 0494d: the doors that call — ROOM_SPOTS mv keys (#rspot-/#rtag-<mv>); the campaign leads by CSS (⚑ campaign alone)
 let IDLE_BEATS={ door:10000, room:20000, duel:60000 };   // ms — the M3 stretches
-let IDLE={ last:Date.now(), pill:0, ringT:0, ringLeft:0 };
+let IDLE={ last:Date.now(), pill:0, ringT:0, ringLeft:0, beacon:0 };   // 0494d: beacon = the room's light is on (runtime only, never persisted)
 let HIDW=null, HIDW_ON=false;
 function hidWorker(){
   if(HIDW!==null) return HIDW;
@@ -33451,6 +33482,7 @@ function idleStamp(){
   const was=idleNow(), pill=IDLE.pill;
   IDLE.last=Date.now();
   if(pill) idlePillClear();
+  if(IDLE.beacon) roomBeaconSet(false);   // 0494d: the beacon goes out ON the tap, never a second later
   if(was && S.mode==='menu'){
     // the snap-back: ONE immediate report-in per idle spell (the
     // visibilitychange idiom) — every later beat prices off idleNow()=false
@@ -33461,6 +33493,35 @@ function idleStamp(){
 window.addEventListener('pointerdown', idleStamp, {passive:true, capture:true});
 window.addEventListener('keydown', idleStamp, {passive:true, capture:true});
 window.addEventListener('wheel', idleStamp, {passive:true, capture:true});
+// ---- 0494d THE IDLE BEACON (species C): the room's quiet-watch. roomQuiet() =
+// the room with nothing open — the evAnnTry guard idiom, enumerated (every
+// overlay that can stand over the stage, by its .hidden class or its
+// body-parented node). roomBeaconTick rides evDoorTick (the room's own 1 s
+// tick, S.mode==='menu' only) and RE-APPLIES the classes every second while
+// on, so a stage repaint (every buy, every payout rebuilds the innerHTML)
+// bakes nothing and loses the light for a second at most. Never on the
+// title, a door scene, the shop, a battle, a hidden tab; the Sarge pill
+// (door scenes, IDLE_HARD) is untouched. Zero strings, zero META, zero wire. ----
+function roomQuiet(){
+  if(!idleFree()) return false;                                              // the menu mode, no queue, no live ad, no squad hold
+  const mn=document.getElementById('menu'); if(!mn || mn.classList.contains('hidden')) return false;
+  if(COOP && COOP.code) return false;                                        // a party / squad room held (a gold campaign pill = a squad = not quiet)
+  if(PIGRUN || GLASS.held) return false;                                     // the piggy's payout run · the glass in hand
+  if(doorSceneOpen() || HQS.on) return false;                                // wartable / camp / park / raid · the HQ sheet
+  for(const id of ['milePop','mboxPop','picker','worldrank','toyshop','icerite','sabrite','soulrite','nameProm','repProm','creditsStage','shakeStage','trainbar','evAfk']){
+    const el=document.getElementById(id); if(el && !el.classList.contains('hidden')) return false; }   // the .hidden overlays (cards, rites, scenes, the shop, the rankings)
+  for(const id of ['ageGate','adAsk','partyPop','crewhold','idlePill']) if(document.getElementById(id)) return false;   // the body-parented cards (present = up)
+  if(document.querySelector('#roomModal .rmback') || document.querySelector('#comms .cm-win')) return false;   // a room modal · a Sarge comm window
+  return true;
+}
+function roomBeaconSet(on){   // the four elements (two doors × hotspot + pill), painted by renderMenu — toggled, never baked
+  IDLE.beacon=on?1:0;
+  for(const mv of ROOM_BEACON) for(const pre of ['rspot-','rtag-']){ const el=document.getElementById(pre+mv); if(el) el.classList.toggle('beacon', !!on); }
+}
+function roomBeaconTick(){   // rides evDoorTick — the room's 1 s tick
+  const on=S.mode==='menu' && !document.hidden && roomQuiet() && idleQuiet()>=ROOM_IDLE_S;
+  if(on || IDLE.beacon) roomBeaconSet(on);   // on: re-applied every second (a repaint bakes nothing); off: cleared once
+}
 // ---- the Sarge pill (IDLE_HARD, solo at a door scene only) ----
 function idlePillClear(){
   clearInterval(IDLE.ringT); IDLE.ringT=0; IDLE.pill=0; IDLE.ringLeft=0;
@@ -35746,6 +35807,7 @@ function evDoorTick(){
   EVD.t=setTimeout(evDoorTick, 1000);
   evDoorRender();
   evAnnTry();
+  roomBeaconTick();   // 0494d THE IDLE BEACON: the room's quiet-watch rides the same second
 }
 function evDoorDeny(){ const d=document.getElementById('evDoor'); if(!d) return; d.classList.remove('deny'); void d.offsetWidth; d.classList.add('deny'); setTimeout(()=>{ try{ d.classList.remove('deny'); }catch(e){} }, 500); }
 // the PRIME TIME premiere (the 0341 MEGA announce grammar): the first LIVE sighting this
@@ -72320,10 +72382,11 @@ window.GVT = {
   idle(){ return { soft:IDLE_SOFT, hard:IDLE_HARD, ring:IDLE_RING, hb:HIDDEN_BEAT,
     beats:Object.assign({},IDLE_BEATS), quiet:+idleQuiet().toFixed(1), free:idleFree(),
     idle:idleNow(), pill:!!IDLE.pill, ringLeft:IDLE.ringLeft|0, wk:HIDW_ON,
+    roomIdle:ROOM_IDLE_S, beacon:ROOM_BEACON.slice(), beaconOn:!!IDLE.beacon, roomQuiet:roomQuiet(),   // 0494d THE IDLE BEACON
     wkLive:!!HIDW, n:CREW.wtN|0 }; },
   idleCfg(p){ p=p||{}; if(p.soft!=null) IDLE_SOFT=p.soft; if(p.hard!=null) IDLE_HARD=p.hard;
     if(p.ring!=null) IDLE_RING=p.ring; if(p.hb!=null) HIDDEN_BEAT=p.hb;
-    if(p.beats) Object.assign(IDLE_BEATS,p.beats); if(p.last!=null) IDLE.last=+p.last; return GVT.idle(); },
+    if(p.beats) Object.assign(IDLE_BEATS,p.beats); if(p.roomIdle!=null) ROOM_IDLE_S=+p.roomIdle; if(p.last!=null) IDLE.last=+p.last; return GVT.idle(); },   // 0494d: roomIdle dials ROOM_IDLE_S
   // ---- 0294 REVOLVING DOOR rig: the chip clock, the AVOID mirror (server
   // round-trip), and the leader's seat-release — read/act doors for batteries ----
   breather(){ return { until:BR.until, left:Math.max(0,Math.ceil((BR.until-Date.now())/1000)),
