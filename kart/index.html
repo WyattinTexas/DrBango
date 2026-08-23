@@ -1,0 +1,962 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="description" content="Drive the Bear Mountain State Park cross country course in 3D — the real trail traced from the meet map, Hessian Lake, and a kart quick enough to climb it.">
+<meta name="theme-color" content="#0E120E">
+<meta property="og:title" content="Bear Mountain Kart">
+<meta property="og:description" content="A cross country course remembered, drawn, and turned into somewhere you can drive.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%8F%8E</text></svg>">
+<title>Bear Mountain Kart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ink:#F2F5EE; --dim:#A9B6A6; --panel:rgba(14,20,14,.62); --rule:rgba(210,225,205,.22);
+  --accent:#7FD6E1; --hot:#F2A03D; --good:#84D69B; --bad:#E4795A;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0E120E;color:var(--ink);
+  font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;-webkit-font-smoothing:antialiased}
+#gl{display:block;width:100vw;height:100dvh;touch-action:none}
+.disp{font-family:"Big Shoulders Display",Impact,sans-serif;font-weight:900;letter-spacing:.02em}
+.hud{position:fixed;pointer-events:none;z-index:5}
+.pane{background:var(--panel);border:1px solid var(--rule);border-radius:5px;
+  backdrop-filter:blur(7px);padding:9px 13px}
+#tl{top:14px;left:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+#tr{top:14px;right:14px;text-align:right;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+#br{right:14px;bottom:14px;text-align:right}
+#bl{left:14px;bottom:14px}
+.k{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:2px}
+.v{font-variant-numeric:tabular-nums;font-size:15px;font-weight:500;line-height:1.1}
+#spd .v{font-size:46px;font-weight:600;letter-spacing:-.02em;line-height:.92}
+#spd small{font-size:12px;color:var(--dim);margin-left:3px}
+#clock .v{font-size:26px}
+#grade .v{font-size:20px}
+#bar{width:190px;height:5px;background:rgba(255,255,255,.14);border-radius:3px;overflow:hidden;margin-top:5px}
+#bar i{display:block;height:100%;background:var(--accent);width:0%}
+#toast{position:fixed;left:50%;top:22%;transform:translateX(-50%) translateY(-6px);
+  font-family:"Big Shoulders Display",Impact,sans-serif;font-weight:900;font-size:44px;
+  letter-spacing:.05em;text-transform:uppercase;opacity:0;transition:opacity .3s,transform .3s;
+  text-shadow:0 3px 18px rgba(0,0,0,.75);z-index:6;pointer-events:none;white-space:nowrap}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#air{position:fixed;left:50%;top:38%;transform:translateX(-50%);font-family:"Big Shoulders Display",Impact,sans-serif;
+  font-weight:900;font-size:34px;color:var(--hot);opacity:0;transition:opacity .15s;z-index:6;pointer-events:none;
+  text-shadow:0 3px 18px rgba(0,0,0,.7)}
+#air.on{opacity:1}
+#loading{position:fixed;inset:0;display:grid;place-items:center;background:#0E120E;z-index:20;transition:opacity .5s}
+#loading.gone{opacity:0;pointer-events:none}
+#loading .in{text-align:center}
+#loading h1{font-family:"Big Shoulders Display",Impact,sans-serif;font-weight:900;font-size:min(13vw,86px);
+  margin:0 0 6px;letter-spacing:.03em;text-transform:uppercase}
+#loading p{margin:0;color:var(--dim);font-size:13px;letter-spacing:.06em}
+#loading .bar{width:230px;height:3px;background:rgba(255,255,255,.14);margin:20px auto 0;border-radius:2px;overflow:hidden}
+#loading .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+#keys{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);color:var(--dim);font-size:11px;
+  letter-spacing:.08em;z-index:5;pointer-events:none;text-align:center;transition:opacity .6s}
+#keys.fade{opacity:0}
+kbd{border:1px solid var(--rule);border-bottom-width:2px;border-radius:3px;padding:0 5px;margin:0 1px}
+#pads{position:fixed;inset:auto 0 0 0;height:42%;z-index:7;display:none}
+body.touch #pads{display:block}
+#pads div{position:absolute;bottom:16px;width:88px;height:88px;border-radius:50%;
+  border:1px solid var(--rule);background:rgba(20,28,20,.5);display:grid;place-items:center;
+  color:var(--ink);font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+  pointer-events:auto;user-select:none;touch-action:none;backdrop-filter:blur(5px)}
+#pads div:active{background:var(--accent);color:#062028}
+#pL{left:16px}#pR{left:114px}#pB{right:114px}#pG{right:16px;width:104px;height:104px}
+@media (max-width:760px){
+  #spd .v{font-size:34px} #clock .v{font-size:20px} #toast{font-size:30px} #keys{display:none}
+  #bar{width:130px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div class="hud pane" id="tl">
+  <div id="clock"><span class="k">Elapsed</span><span class="v" id="t">0:00.0</span></div>
+  <div id="best"><span class="k">Best run</span><span class="v" id="tb">--</span></div>
+</div>
+<div class="hud" id="tr">
+  <div class="pane" id="grade"><span class="k">Gradient</span><span class="v" id="g">+0.0%</span></div>
+  <div class="pane" id="alt"><span class="k">Altitude</span><span class="v" id="al">0 ft</span></div>
+</div>
+<div class="hud pane" id="br" >
+  <div id="spd"><span class="k">Speed</span><span class="v" id="s">0<small>mph</small></span></div>
+</div>
+<div class="hud pane" id="bl">
+  <span class="k" id="segname">Bear Mountain</span>
+  <span class="v" id="dist">0.00 / 2.28 mi</span>
+  <div id="bar"><i id="barf"></i></div>
+</div>
+<div id="toast"></div>
+<div id="air">AIRBORNE</div>
+<div id="keys"><kbd>W</kbd>/<kbd>&uarr;</kbd> gas &nbsp; <kbd>S</kbd>/<kbd>&darr;</kbd> brake &nbsp;
+  <kbd>A</kbd><kbd>D</kbd> steer &nbsp; <kbd>space</kbd> drift &nbsp; <kbd>shift</kbd> turbo &nbsp; <kbd>C</kbd> camera &nbsp; <kbd>R</kbd> reset</div>
+<div id="pads"><div id="pL">&#9664;</div><div id="pR">&#9654;</div><div id="pB">brake</div><div id="pG">gas</div></div>
+
+<div id="loading"><div class="in">
+  <h1>Bear Mountain</h1>
+  <p id="lp">BUILDING THE MOUNTAIN&hellip;</p>
+  <div class="bar"><i id="lb"></i></div>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+var COURSE = {"name":"Bear Mountain","loc":"Bear Mountain State Park, NY","lakeFrom":5,"lakeTo":35,"nodes":[{"x":0.0,"y":0.0,"z":0.0,"w":2.5},{"x":-18.9,"y":-153.9,"z":0.0,"w":2.5},{"x":-31.4,"y":-211.0,"z":0.0,"w":2.5},{"x":-35.7,"y":-233.7,"z":0.0,"w":2.5},{"x":-55.5,"y":-240.4,"z":0.0,"w":2.5},{"x":-215.2,"y":-243.3,"z":0.18,"w":2.5},{"x":-257.8,"y":-258.7,"z":0.43,"w":2.5},{"x":-293.0,"y":-294.8,"z":0.96,"w":2.5},{"x":-323.5,"y":-341.7,"z":2.0,"w":2.5},{"x":-356.2,"y":-432.4,"z":4.88,"w":2.5},{"x":-356.0,"y":-495.5,"z":6.99,"w":2.5},{"x":-320.8,"y":-633.4,"z":10.45,"w":2.5},{"x":-318.2,"y":-694.2,"z":11.1,"w":2.5},{"x":-332.4,"y":-820.5,"z":11.35,"w":2.5},{"x":-361.7,"y":-917.8,"z":10.47,"w":2.5},{"x":-375.6,"y":-1007.9,"z":9.67,"w":2.5},{"x":-367.0,"y":-1044.7,"z":9.51,"w":2.5},{"x":-349.9,"y":-1062.1,"z":9.47,"w":2.5},{"x":-332.0,"y":-1068.0,"z":9.48,"w":2.5},{"x":-303.0,"y":-1061.0,"z":9.56,"w":2.5},{"x":-184.2,"y":-973.6,"z":11.35,"w":2.5},{"x":-136.5,"y":-950.7,"z":12.02,"w":2.5},{"x":-110.8,"y":-927.5,"z":12.37,"w":2.5},{"x":-91.5,"y":-872.4,"z":12.92,"w":2.5},{"x":-87.9,"y":-806.7,"z":13.66,"w":2.5},{"x":-61.3,"y":-700.9,"z":15.28,"w":2.5},{"x":-52.7,"y":-625.2,"z":16.45,"w":2.5},{"x":-53.5,"y":-538.8,"z":17.69,"w":2.5},{"x":-74.4,"y":-449.8,"z":18.84,"w":2.5},{"x":-83.2,"y":-428.7,"z":19.14,"w":2.5},{"x":-100.4,"y":-403.7,"z":19.6,"w":2.5},{"x":-154.3,"y":-349.7,"z":21.47,"w":2.5},{"x":-203.8,"y":-319.3,"z":24.31,"w":2.5},{"x":-241.2,"y":-313.4,"z":27.42,"w":2.5},{"x":-266.3,"y":-302.2,"z":30.63,"w":2.5},{"x":-292.0,"y":-300.1,"z":34.57,"w":2.5},{"x":-297.9,"y":-282.7,"z":38.01,"w":2.5},{"x":-292.3,"y":-248.2,"z":46.18,"w":2.5},{"x":-299.5,"y":-237.3,"z":49.79,"w":2.5},{"x":-339.4,"y":-234.2,"z":62.58,"w":2.5},{"x":-387.1,"y":-247.8,"z":80.99,"w":2.5},{"x":-401.0,"y":-238.8,"z":87.4,"w":2.5},{"x":-406.0,"y":-217.3,"z":95.87,"w":2.5},{"x":-405.4,"y":-171.5,"z":112.54,"w":2.5},{"x":-397.8,"y":-134.2,"z":124.72,"w":2.5},{"x":-359.5,"y":-54.4,"z":143.23,"w":2.5},{"x":-317.5,"y":69.2,"z":138.81,"w":2.5},{"x":-305.0,"y":70.1,"z":137.13,"w":2.5},{"x":-288.8,"y":54.7,"z":133.73,"w":2.5},{"x":-268.3,"y":19.6,"z":126.1,"w":2.5},{"x":-253.0,"y":-26.1,"z":114.29,"w":2.5},{"x":-240.0,"y":-44.7,"z":107.61,"w":2.5},{"x":-207.4,"y":-72.8,"z":92.92,"w":2.5},{"x":-177.9,"y":-84.0,"z":80.48,"w":2.5},{"x":-163.7,"y":-76.9,"z":73.7,"w":2.5},{"x":-82.4,"y":-8.8,"z":25.98,"w":2.5},{"x":-78.0,"y":84.2,"z":4.31,"w":2.5},{"x":-59.3,"y":107.4,"z":2.1,"w":2.5},{"x":-35.6,"y":114.5,"z":1.11,"w":2.5},{"x":16.7,"y":108.9,"z":0.26,"w":2.5},{"x":29.3,"y":94.0,"z":0.15,"w":2.5},{"x":37.2,"y":67.3,"z":0.06,"w":2.5},{"x":37.6,"y":-8.9,"z":0.01,"w":2.5},{"x":29.0,"y":-50.9,"z":0.0,"w":2.5},{"x":27.8,"y":-144.7,"z":0.0,"w":2.5}],"landmarks":{"1023":"Comfort Station","1034":"Playground","1046":"Marker 5","1054":"Marker 9","1058":"Marker 7"},"ids":[1000,1001,1002,1003,1004,1005,1006,1007,1008,1009,1010,1011,1012,1013,1014,1015,1016,1017,1018,1019,1020,1021,1022,1023,1024,1025,1026,1027,1028,1029,1030,1031,1032,1033,1034,1035,1036,1037,1038,1039,1040,1041,1042,1043,1044,1045,1046,1047,1048,1049,1050,1051,1052,1053,1054,1055,1056,1057,1058,1059,1060,1061,1062,1063,1064]};
+
+/* ══ tiny math ═══════════════════════════════════════════════════════ */
+function m4(){ return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
+function mul(a,b,o){
+  o=o||new Float32Array(16);
+  for(var i=0;i<4;i++)for(var j=0;j<4;j++){
+    var s=0; for(var k=0;k<4;k++) s+=a[k*4+j]*b[i*4+k];
+    o[i*4+j]=s;
+  }
+  return o;
+}
+function persp(fovy,asp,n,f){
+  var t=1/Math.tan(fovy/2), o=new Float32Array(16);
+  o[0]=t/asp; o[5]=t; o[10]=(f+n)/(n-f); o[11]=-1; o[14]=2*f*n/(n-f);
+  return o;
+}
+function lookAt(e,c,u){
+  var zx=e[0]-c[0], zy=e[1]-c[1], zz=e[2]-c[2];
+  var l=Math.hypot(zx,zy,zz)||1; zx/=l; zy/=l; zz/=l;
+  var xx=u[1]*zz-u[2]*zy, xy=u[2]*zx-u[0]*zz, xz=u[0]*zy-u[1]*zx;
+  l=Math.hypot(xx,xy,xz)||1; xx/=l; xy/=l; xz/=l;
+  var yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+  return new Float32Array([xx,yx,zx,0, xy,yy,zy,0, xz,yz,zz,0,
+    -(xx*e[0]+xy*e[1]+xz*e[2]), -(yx*e[0]+yy*e[1]+yz*e[2]), -(zx*e[0]+zy*e[1]+zz*e[2]), 1]);
+}
+function clamp(v,a,b){ return v<a?a:v>b?b:v; }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function smoothstep(a,b,x){ var t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); }
+
+/* deterministic value noise */
+function hash2(x,y){
+  var h=x*374761393+y*668265263; h=(h^(h>>13))*1274126177; return ((h^(h>>16))>>>0)/4294967296;
+}
+function vnoise(x,y){
+  var xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi;
+  var u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf);
+  return lerp(lerp(hash2(xi,yi),hash2(xi+1,yi),u), lerp(hash2(xi,yi+1),hash2(xi+1,yi+1),u), v);
+}
+function fbm(x,y,oct){
+  var a=0.5,f=1,s=0,n=0;
+  for(var i=0;i<oct;i++){ s+=a*vnoise(x*f,y*f); n+=a; a*=0.5; f*=2.03; }
+  return s/n;
+}
+
+/* ══ the course ══════════════════════════════════════════════════════ */
+/* course data is x east / y south; the world is X east, Y north, Z up  */
+var ND = COURSE.nodes.map(function(n){ return {x:n.x, y:-n.y, z:n.z, w:n.w}; });
+var PATH=[], PLEN=0;
+
+function crv(a,b,c,d,K,t){
+  function lp(p,q,ta,tb){ var s=tb-ta; if(!s) return p; return p*((tb-t2)/s)+q*((t2-ta)/s); }
+  var t2=K[1]+(K[2]-K[1])*t;
+  var A1=lp(a,b,K[0],K[1]), A2=lp(b,c,K[1],K[2]), A3=lp(c,d,K[2],K[3]);
+  var B1=lp(A1,A2,K[0],K[2]), B2=lp(A2,A3,K[1],K[3]);
+  return lp(B1,B2,K[1],K[2]);
+}
+function knots(p0,p1,p2,p3){
+  var k0=0,
+      k1=k0+Math.pow(Math.hypot(p1.x-p0.x,p1.y-p0.y)||1e-6,0.5),
+      k2=k1+Math.pow(Math.hypot(p2.x-p1.x,p2.y-p1.y)||1e-6,0.5),
+      k3=k2+Math.pow(Math.hypot(p3.x-p2.x,p3.y-p2.y)||1e-6,0.5);
+  return [k0,k1,k2,k3];
+}
+function buildPath(){
+  var n=ND.length, dense=[];
+  for(var i=0;i<n-1;i++){
+    var p0=ND[Math.max(i-1,0)], p1=ND[i], p2=ND[i+1], p3=ND[Math.min(i+2,n-1)];
+    var K=knots(p0,p1,p2,p3);
+    for(var j=0;j<14;j++){
+      var t=j/14;
+      dense.push({ x:crv(p0.x,p1.x,p2.x,p3.x,K,t), y:crv(p0.y,p1.y,p2.y,p3.y,K,t),
+                   z:crv(p0.z,p1.z,p2.z,p3.z,K,t), w:crv(p0.w,p1.w,p2.w,p3.w,K,t), ni:i });
+    }
+  }
+  dense.push({x:ND[n-1].x,y:ND[n-1].y,z:ND[n-1].z,w:ND[n-1].w,ni:n-1});
+  var cum=[0],tot=0;
+  for(var k=1;k<dense.length;k++){ tot+=Math.hypot(dense[k].x-dense[k-1].x,dense[k].y-dense[k-1].y); cum.push(tot); }
+  PLEN=tot;
+  var N=Math.max(300,Math.round(tot/3)), di=0;
+  for(var m=0;m<=N;m++){
+    var s=Math.min(m*(tot/N), tot);
+    while(di<cum.length-2 && cum[di+1]<s) di++;
+    var seg=cum[di+1]-cum[di], f=seg>1e-9?(s-cum[di])/seg:0, A=dense[di], B=dense[di+1];
+    PATH.push({ x:lerp(A.x,B.x,f), y:lerp(A.y,B.y,f), z:lerp(A.z,B.z,f),
+                w:lerp(A.w,B.w,f), s:s, hd:0, ni:A.ni });
+  }
+  for(var q=0;q<PATH.length;q++){
+    var a=PATH[Math.max(q-1,0)], b=PATH[Math.min(q+1,PATH.length-1)];
+    PATH[q].hd=Math.atan2(b.y-a.y, b.x-a.x);
+  }
+}
+
+/* ══ terrain heightfield ═════════════════════════════════════════════ */
+var TER={x0:0,y0:0,cw:6,nx:0,ny:0,h:null,d:null};
+var LAKE={ring:[],lvl:0,minx:0,maxx:0,miny:0,maxy:0};
+var HASH={cell:70,map:null,x0:0,y0:0,nx:0,ny:0};
+
+function buildHash(){
+  var minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
+  for(var i=0;i<PATH.length;i++){ var p=PATH[i];
+    if(p.x<minx)minx=p.x; if(p.x>maxx)maxx=p.x; if(p.y<miny)miny=p.y; if(p.y>maxy)maxy=p.y; }
+  HASH.x0=minx-HASH.cell; HASH.y0=miny-HASH.cell;
+  HASH.nx=Math.ceil((maxx-minx)/HASH.cell)+3; HASH.ny=Math.ceil((maxy-miny)/HASH.cell)+3;
+  HASH.map=new Array(HASH.nx*HASH.ny);
+  for(var k=0;k<PATH.length;k++){
+    var q=PATH[k];
+    var cx=Math.floor((q.x-HASH.x0)/HASH.cell), cy=Math.floor((q.y-HASH.y0)/HASH.cell);
+    var id=cy*HASH.nx+cx;
+    if(cx<0||cy<0||cx>=HASH.nx||cy>=HASH.ny) continue;
+    (HASH.map[id]||(HASH.map[id]=[])).push(k);
+  }
+}
+function nearPath(x,y,radCells){
+  var out=[], cx=Math.floor((x-HASH.x0)/HASH.cell), cy=Math.floor((y-HASH.y0)/HASH.cell);
+  for(var j=-radCells;j<=radCells;j++) for(var i=-radCells;i<=radCells;i++){
+    var ax=cx+i, ay=cy+j;
+    if(ax<0||ay<0||ax>=HASH.nx||ay>=HASH.ny) continue;
+    var b=HASH.map[ay*HASH.nx+ax]; if(b) out.push.apply(out,b);
+  }
+  return out;
+}
+/* nearest centreline distance + inverse-distance height */
+function roadField(x,y){
+  var cand=nearPath(x,y,2);
+  if(!cand.length) cand=nearPath(x,y,5);
+  var bd=1e18, bh=0, num=0, den=0;
+  for(var i=0;i<cand.length;i++){
+    var p=PATH[cand[i]], dx=x-p.x, dy=y-p.y, d2=dx*dx+dy*dy;
+    if(d2<bd){ bd=d2; bh=p.z; }
+    var w=1/(d2*d2+1e-3);
+    num+=p.z*w; den+=w;
+  }
+  if(!den) return {d:1e6, h:0};
+  return { d:Math.sqrt(bd), h:num/den };
+}
+function pointInRing(x,y,ring){
+  var inside=false;
+  for(var i=0,j=ring.length-1;i<ring.length;j=i++){
+    var xi=ring[i][0], yi=ring[i][1], xj=ring[j][0], yj=ring[j][1];
+    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/((yj-yi)||1e-9)+xi)) inside=!inside;
+  }
+  return inside;
+}
+function distToRing(x,y,ring){
+  var best=1e18;
+  for(var i=0,j=ring.length-1;i<ring.length;j=i++){
+    var ax=ring[j][0],ay=ring[j][1],bx=ring[i][0],by=ring[i][1];
+    var vx=bx-ax, vy=by-ay, L2=vx*vx+vy*vy;
+    var t=L2>0?clamp(((x-ax)*vx+(y-ay)*vy)/L2,0,1):0;
+    var dx=x-(ax+vx*t), dy=y-(ay+vy*t), d=dx*dx+dy*dy;
+    if(d<best) best=d;
+  }
+  return Math.sqrt(best);
+}
+function buildLake(){
+  var r=[], zs=[];
+  for(var i=COURSE.lakeFrom;i<=COURSE.lakeTo;i++){
+    r.push([ND[i].x, ND[i].y]); zs.push(ND[i].z);
+  }
+  zs.sort(function(a,b){return a-b;});
+  // sit the water just under the LOW shore, so the low end meets the water
+  // naturally and the climbing shore reads as a bank above it
+  LAKE.ring=r; LAKE.lvl=zs[0]+1.0;
+  var minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
+  for(var k=0;k<r.length;k++){ minx=Math.min(minx,r[k][0]);maxx=Math.max(maxx,r[k][0]);
+    miny=Math.min(miny,r[k][1]);maxy=Math.max(maxy,r[k][1]); }
+  LAKE.minx=minx;LAKE.maxx=maxx;LAKE.miny=miny;LAKE.maxy=maxy;
+}
+function buildTerrain(){
+  var minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
+  for(var i=0;i<PATH.length;i++){ var p=PATH[i];
+    minx=Math.min(minx,p.x);maxx=Math.max(maxx,p.x);miny=Math.min(miny,p.y);maxy=Math.max(maxy,p.y); }
+  var pad=260;
+  TER.x0=minx-pad; TER.y0=miny-pad;
+  TER.nx=Math.ceil((maxx-minx+pad*2)/TER.cw)+1;
+  TER.ny=Math.ceil((maxy-miny+pad*2)/TER.cw)+1;
+  TER.h=new Float32Array(TER.nx*TER.ny);
+  TER.d=new Float32Array(TER.nx*TER.ny);
+  for(var gy=0;gy<TER.ny;gy++){
+    var wy=TER.y0+gy*TER.cw;
+    for(var gx=0;gx<TER.nx;gx++){
+      var wx=TER.x0+gx*TER.cw;
+      var rf=roadField(wx,wy);
+      var away=smoothstep(9,90,rf.d);
+      var rough=(fbm(wx*0.010,wy*0.010,4)-0.5)*15*away
+              + (fbm(wx*0.045,wy*0.045,3)-0.5)*3.0*away;
+      var rise=away*away*26*fbm(wx*0.0035+11,wy*0.0035+7,3);
+      var h=rf.h+rough+rise;
+      if(pointInRing(wx,wy,LAKE.ring)){
+        var dr=distToRing(wx,wy,LAKE.ring);
+        // a long shelving bank, not a quarry wall
+        // reach the bed quickly or the waterline hides offshore under terrain
+        var carve=smoothstep(6,50,dr);
+        h=lerp(h, LAKE.lvl-4.5, carve);
+        if(dr>18 && h>LAKE.lvl-0.4) h=LAKE.lvl-0.4;
+      } else {
+        var dro=distToRing(wx,wy,LAKE.ring);
+        if(dro<40) h=lerp(h, Math.max(h,LAKE.lvl+0.8), 1-smoothstep(0,40,dro));
+      }
+      TER.h[gy*TER.nx+gx]=h;
+      TER.d[gy*TER.nx+gx]=rf.d;
+    }
+  }
+}
+function terH(x,y){
+  var fx=(x-TER.x0)/TER.cw, fy=(y-TER.y0)/TER.cw;
+  var ix=Math.floor(fx), iy=Math.floor(fy);
+  if(ix<0||iy<0||ix>=TER.nx-1||iy>=TER.ny-1) return 0;
+  var tx=fx-ix, ty=fy-iy, n=TER.nx;
+  var a=TER.h[iy*n+ix], b=TER.h[iy*n+ix+1], c=TER.h[(iy+1)*n+ix], d=TER.h[(iy+1)*n+ix+1];
+  return lerp(lerp(a,b,tx), lerp(c,d,tx), ty);
+}
+function terD(x,y){
+  var fx=(x-TER.x0)/TER.cw, fy=(y-TER.y0)/TER.cw;
+  var ix=Math.round(fx), iy=Math.round(fy);
+  if(ix<0||iy<0||ix>=TER.nx||iy>=TER.ny) return 1e6;
+  return TER.d[iy*TER.nx+ix];
+}
+
+/* ══ mesh building ═══════════════════════════════════════════════════ */
+function MB(){ this.v=[]; this.i=[]; this.n=0; }
+MB.prototype.tri=function(a,b,c,col){
+  var ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2];
+  var vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
+  var nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+  var l=Math.hypot(nx,ny,nz)||1; nx/=l;ny/=l;nz/=l;
+  var P=[a,b,c];
+  for(var k=0;k<3;k++){
+    this.v.push(P[k][0],P[k][1],P[k][2], nx,ny,nz, col[0],col[1],col[2]);
+    this.i.push(this.n++);
+  }
+};
+MB.prototype.quad=function(a,b,c,d,col){ this.tri(a,b,c,col); this.tri(a,c,d,col); };
+MB.prototype.box=function(cx,cy,cz,sx,sy,sz,col,rot){
+  var co=Math.cos(rot||0), si=Math.sin(rot||0), self=this;
+  function P(x,y,z){ return [cx+x*co-y*si, cy+x*si+y*co, cz+z]; }
+  var X=sx/2,Y=sy/2,Z=sz/2;
+  var p=[P(-X,-Y,-Z),P(X,-Y,-Z),P(X,Y,-Z),P(-X,Y,-Z),
+         P(-X,-Y, Z),P(X,-Y, Z),P(X,Y, Z),P(-X,Y, Z)];
+  function s(c){ return [c[0],c[1],c[2]]; }
+  self.quad(s(p[4]),s(p[5]),s(p[6]),s(p[7]),col);
+  self.quad(s(p[1]),s(p[0]),s(p[3]),s(p[2]),col);
+  self.quad(s(p[0]),s(p[1]),s(p[5]),s(p[4]),col);
+  self.quad(s(p[2]),s(p[3]),s(p[7]),s(p[6]),col);
+  self.quad(s(p[1]),s(p[2]),s(p[6]),s(p[5]),col);
+  self.quad(s(p[3]),s(p[0]),s(p[4]),s(p[7]),col);
+};
+MB.prototype.cyl=function(cx,cy,cz,r,h,seg,col,axis){
+  for(var i=0;i<seg;i++){
+    var a0=i/seg*Math.PI*2, a1=(i+1)/seg*Math.PI*2;
+    var p0,p1,q0,q1;
+    if(axis==="x"){
+      p0=[cx-h/2,cy+Math.cos(a0)*r,cz+Math.sin(a0)*r];
+      p1=[cx-h/2,cy+Math.cos(a1)*r,cz+Math.sin(a1)*r];
+      q0=[cx+h/2,cy+Math.cos(a0)*r,cz+Math.sin(a0)*r];
+      q1=[cx+h/2,cy+Math.cos(a1)*r,cz+Math.sin(a1)*r];
+      this.tri([cx-h/2,cy,cz],p1,p0,col); this.tri([cx+h/2,cy,cz],q0,q1,col);
+    } else {
+      p0=[cx+Math.cos(a0)*r,cy+Math.sin(a0)*r,cz];
+      p1=[cx+Math.cos(a1)*r,cy+Math.sin(a1)*r,cz];
+      q0=[cx+Math.cos(a0)*r,cy+Math.sin(a0)*r,cz+h];
+      q1=[cx+Math.cos(a1)*r,cy+Math.sin(a1)*r,cz+h];
+      this.tri([cx,cy,cz+h],q0,q1,col);
+    }
+    this.quad(p0,p1,q1,q0,col);
+  }
+};
+MB.prototype.cone=function(cx,cy,cz,r,h,seg,col){
+  for(var i=0;i<seg;i++){
+    var a0=i/seg*Math.PI*2, a1=(i+1)/seg*Math.PI*2;
+    this.tri([cx+Math.cos(a0)*r,cy+Math.sin(a0)*r,cz],
+             [cx+Math.cos(a1)*r,cy+Math.sin(a1)*r,cz], [cx,cy,cz+h], col);
+    this.tri([cx,cy,cz],[cx+Math.cos(a1)*r,cy+Math.sin(a1)*r,cz],
+             [cx+Math.cos(a0)*r,cy+Math.sin(a0)*r,cz], col);
+  }
+};
+
+/* ── terrain mesh, coloured by height / slope / surface ── */
+function terrainMesh(){
+  var v=[], idx=[], n=TER.nx, m=TER.ny;
+  for(var gy=0;gy<m;gy++){
+    for(var gx=0;gx<n;gx++){
+      var x=TER.x0+gx*TER.cw, y=TER.y0+gy*TER.cw, h=TER.h[gy*n+gx];
+      var hx=TER.h[gy*n+Math.min(gx+1,n-1)]-TER.h[gy*n+Math.max(gx-1,0)];
+      var hy=TER.h[Math.min(gy+1,m-1)*n+gx]-TER.h[Math.max(gy-1,0)*n+gx];
+      var nx=-hx, ny=-hy, nz=2*TER.cw;
+      var L=Math.hypot(nx,ny,nz)||1; nx/=L;ny/=L;nz/=L;
+      var slope=1-nz;
+      var d=TER.d[gy*n+gx];
+      var t=fbm(x*0.06,y*0.06,2);
+      var r,g,b;
+      if(h<LAKE.lvl+0.6 && pointInRing(x,y,LAKE.ring)){ r=0.40;g=0.36;b=0.28; }
+      else {
+        var gr=smoothstep(0.02,0.30,slope);
+        r=lerp(0.24,0.44,gr)+t*0.06;
+        g=lerp(0.40,0.39,gr)+t*0.05;
+        b=lerp(0.20,0.34,gr)+t*0.04;
+        var alt=smoothstep(60,150,h);
+        r=lerp(r,0.47,alt*0.5); g=lerp(g,0.46,alt*0.5); b=lerp(b,0.40,alt*0.5);
+        if(d<16){ var near=1-smoothstep(7,16,d); r=lerp(r,0.40,near*0.5); g=lerp(g,0.38,near*0.5); b=lerp(b,0.28,near*0.5); }
+        var sh=smoothstep(LAKE.lvl-1,LAKE.lvl+3,h);
+        if(sh<1 && pointInRing(x,y,LAKE.ring)===false && distToRing(x,y,LAKE.ring)<26){
+          r=lerp(0.56,r,sh); g=lerp(0.52,g,sh); b=lerp(0.40,b,sh);
+        }
+      }
+      v.push(x,y,h, nx,ny,nz, r,g,b);
+    }
+  }
+  for(var j=0;j<m-1;j++) for(var i=0;i<n-1;i++){
+    var a=j*n+i, b=a+1, c=a+n, d2=c+1;
+    idx.push(a,b,d2, a,d2,c);
+  }
+  return {v:new Float32Array(v), i:new Uint32Array(idx)};
+}
+
+/* ── the trail ribbon, sitting just proud of the ground ── */
+function roadMesh(){
+  var mb=new MB(), HW=3.6;
+  for(var i=0;i<PATH.length-1;i++){
+    var p=PATH[i], q=PATH[i+1];
+    var n0x=-Math.sin(p.hd), n0y=Math.cos(p.hd);
+    var n1x=-Math.sin(q.hd), n1y=Math.cos(q.hd);
+    var lift=0.20;
+    function P(pt,nx,ny,o){
+      var x=pt.x+nx*o, y=pt.y+ny*o;
+      return [x,y,Math.max(terH(x,y),pt.z-1.2)+lift];
+    }
+    var t=fbm(p.x*0.09,p.y*0.09,2);
+    var col=[0.44+t*0.07, 0.36+t*0.05, 0.26+t*0.04];
+    mb.quad(P(p,n0x,n0y,-HW),P(q,n1x,n1y,-HW),P(q,n1x,n1y,HW),P(p,n0x,n0y,HW),col);
+    var ec=[0.62,0.60,0.54];
+    mb.quad(P(p,n0x,n0y,-HW-0.55),P(q,n1x,n1y,-HW-0.55),P(q,n1x,n1y,-HW),P(p,n0x,n0y,-HW),ec);
+    mb.quad(P(p,n0x,n0y,HW),P(q,n1x,n1y,HW),P(q,n1x,n1y,HW+0.55),P(p,n0x,n0y,HW+0.55),ec);
+  }
+  return {v:new Float32Array(mb.v), i:new Uint32Array(mb.i)};
+}
+
+/* ── water ── */
+function waterMesh(){
+  var v=[],idx=[],N=48;
+  var x0=LAKE.minx-30,x1=LAKE.maxx+30,y0=LAKE.miny-30,y1=LAKE.maxy+30;
+  for(var j=0;j<=N;j++) for(var i=0;i<=N;i++){
+    var x=lerp(x0,x1,i/N), y=lerp(y0,y1,j/N);
+    v.push(x,y,LAKE.lvl, 0,0,1, 0.13,0.32,0.40);
+  }
+  for(var b=0;b<N;b++) for(var a=0;a<N;a++){
+    var p=b*(N+1)+a; idx.push(p,p+1,p+N+2, p,p+N+2,p+N+1);
+  }
+  return {v:new Float32Array(v), i:new Uint32Array(idx)};
+}
+
+/* ── one tree, instanced thousands of times ── */
+function treeMesh(){
+  var mb=new MB();
+  mb.cyl(0,0,0,0.24,1.5,5,[0.30,0.22,0.15]);
+  mb.cone(0,0,1.1,1.5,3.1,7,[0.16,0.34,0.20]);
+  mb.cone(0,0,2.7,1.05,2.6,7,[0.19,0.39,0.23]);
+  return {v:new Float32Array(mb.v), i:new Uint32Array(mb.i)};
+}
+function treeInstances(){
+  var inst=[], tries=0, want=4200;
+  while(inst.length/7 < want && tries < want*14){
+    tries++;
+    var r1=hash2(tries*7919, 104729), r2=hash2(tries*15485863, 32452843);
+    var x=TER.x0+r1*(TER.nx-1)*TER.cw, y=TER.y0+r2*(TER.ny-1)*TER.cw;
+    var d=terD(x,y); if(d<13) continue;
+    if(pointInRing(x,y,LAKE.ring)) continue;
+    var h=terH(x,y); if(h<LAKE.lvl+1.0) continue;
+    var hx=terH(x+3,y)-terH(x-3,y), hy=terH(x,y+3)-terH(x,y-3);
+    if(Math.hypot(hx,hy)/6 > 0.85) continue;
+    var dens=hash2(Math.floor(x*0.08), Math.floor(y*0.08));
+    if(dens<0.20) continue;
+    var sc=0.75+hash2(tries,991)*1.05;
+    var tint=0.82+hash2(tries,7)*0.40;
+    inst.push(x,y,h-0.25, sc, tint*0.98, tint, tint*0.90);
+  }
+  return new Float32Array(inst);
+}
+
+/* ── the kart ── */
+function kartMesh(){
+  var mb=new MB();
+  var body=[0.95,0.42,0.12], dark=[0.19,0.22,0.21], tyre=[0.12,0.12,0.13],
+      trim=[0.96,0.90,0.80];
+  mb.box(0.10,0,0.42, 1.95,0.86,0.30, body);
+  mb.box(0.95,0,0.40, 0.75,0.62,0.18, body);
+  mb.box(-0.62,0,0.60, 0.62,0.74,0.36, dark);
+  mb.box(-0.30,0,0.66, 0.10,0.66,0.46, [0.20,0.22,0.21]);
+  mb.box(-0.86,0,1.02, 0.14,0.70,0.56, body);
+  mb.box(-0.88,0,1.02, 0.06,0.52,0.34, trim);
+  mb.box(0.40,0,0.62, 0.10,0.44,0.30, dark);
+  mb.box(0.46,0,0.76, 0.06,0.50,0.06, dark);
+  mb.box(0.10,-0.52,0.36, 1.70,0.14,0.16, body);
+  mb.box(0.10, 0.52,0.36, 1.70,0.14,0.16, body);
+  mb.box(-0.98,0,0.46, 0.10,0.80,0.22, trim);
+  mb.cyl( 0.80,-0.56,0.34, 0.34,0.26,10, tyre, "x");
+  mb.cyl( 0.80, 0.30,0.34, 0.34,0.26,10, tyre, "x");
+  mb.cyl(-0.72,-0.60,0.38, 0.38,0.32,10, tyre, "x");
+  mb.cyl(-0.72, 0.28,0.38, 0.38,0.32,10, tyre, "x");
+  mb.box(-0.44,0,1.02, 0.34,0.34,0.34, [0.92,0.78,0.62]);
+  mb.box(-0.46,0,1.22, 0.40,0.40,0.16, [0.95,0.35,0.20]);
+  return {v:new Float32Array(mb.v), i:new Uint32Array(mb.i)};
+}
+
+/* ── landmark posts + start / finish gates ── */
+function propsMesh(){
+  var mb=new MB();
+  var ids=COURSE.ids||[];
+  var byId={}; for(var i=0;i<ids.length;i++) byId[ids[i]]=i;
+  function postAt(ni,col){
+    var nd=ND[ni]; if(!nd) return;
+    var pi=Math.round(ni/(ND.length-1)*(PATH.length-1));
+    var p=PATH[clamp(pi,0,PATH.length-1)];
+    var nx=-Math.sin(p.hd), ny=Math.cos(p.hd);
+    for(var side=-1;side<=1;side+=2){
+      var x=p.x+nx*side*5.4, y=p.y+ny*side*5.4, h=terH(x,y);
+      mb.box(x,y,h+1.1, 0.20,0.20,2.2, [0.34,0.28,0.20]);
+      mb.box(x,y,h+2.3, 1.15,0.12,0.62, col, p.hd);
+    }
+  }
+  for(var k in COURSE.landmarks){ var ni=byId[k]; if(ni!=null) postAt(ni,[0.30,0.72,0.78]); }
+  function gate(p,col){
+    var nx=-Math.sin(p.hd), ny=Math.cos(p.hd);
+    for(var side=-1;side<=1;side+=2){
+      var x=p.x+nx*side*5.0, y=p.y+ny*side*5.0, h=terH(x,y);
+      mb.box(x,y,h+2.2, 0.30,0.30,4.4, [0.92,0.92,0.88]);
+    }
+    var cx=p.x, cy=p.y, ch=terH(cx,cy);
+    mb.box(cx,cy,ch+4.55, 10.6,0.34,0.80, col, p.hd);
+    mb.box(cx,cy,ch+3.95, 10.6,0.20,0.30, [0.96,0.96,0.92], p.hd);
+  }
+  gate(PATH[0],[0.35,0.78,0.52]);
+  gate(PATH[PATH.length-1],[0.92,0.30,0.26]);
+  return {v:new Float32Array(mb.v), i:new Uint32Array(mb.i)};
+}
+
+/* ══ WebGL ═══════════════════════════════════════════════════════════ */
+var cvs=document.getElementById("gl"), gl=null;
+var VS = [
+"#version 300 es",
+"in vec3 aPos; in vec3 aNrm; in vec3 aCol;",
+"in vec4 aInst; in vec3 aTint;",
+"uniform mat4 uVP; uniform mat4 uM; uniform float uTime; uniform float uWave;",
+"out vec3 vCol; out vec3 vNrm; out float vDep; out float vZ;",
+"void main(){",
+"  vec3 p = aPos * aInst.w + aInst.xyz;",
+"  if(uWave > 0.5){",
+"    p.z += sin(p.x*0.075 + uTime*1.3)*0.13 + sin(p.y*0.098 - uTime*1.05)*0.13;",
+"  }",
+"  vec4 wp = uM * vec4(p,1.0);",
+"  gl_Position = uVP * wp;",
+"  vCol = aCol * aTint;",
+"  vNrm = mat3(uM) * aNrm;",
+"  vDep = gl_Position.w;",
+"  vZ = wp.z;",
+"}"].join("\n");
+var FS = [
+"#version 300 es",
+"precision highp float;",
+"in vec3 vCol; in vec3 vNrm; in float vDep; in float vZ;",
+"uniform vec3 uSun; uniform vec3 uFog; uniform vec2 uFogR; uniform float uAlpha;",
+"out vec4 outC;",
+"void main(){",
+"  vec3 N = normalize(vNrm);",
+"  float d = max(dot(N, uSun), 0.0);",
+"  float sky = 0.30 + 0.22 * max(N.z, 0.0);",
+"  vec3 c = vCol * (sky + 0.80*d);",
+"  c += vec3(0.05,0.06,0.07) * pow(max(N.z,0.0), 3.0);",
+"  float f = clamp((vDep-uFogR.x)/(uFogR.y-uFogR.x), 0.0, 1.0);",
+"  c = mix(c, uFog, f*0.92);",
+"  outC = vec4(c, uAlpha);",
+"}"].join("\n");
+
+var prog, U={}, A={};
+function sh(t,src){
+  var s=gl.createShader(t); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+function initGL(){
+  gl=cvs.getContext("webgl2",{antialias:true,alpha:false,powerPreference:"high-performance"});
+  if(!gl) return false;
+  prog=gl.createProgram();
+  gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS));
+  gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS));
+  gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  ["aPos","aNrm","aCol","aInst","aTint"].forEach(function(n){ A[n]=gl.getAttribLocation(prog,n); });
+  ["uVP","uM","uSun","uFog","uFogR","uTime","uWave","uAlpha"].forEach(function(n){ U[n]=gl.getUniformLocation(prog,n); });
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.BACK);
+  return true;
+}
+function makeMesh(d, inst){
+  var o={};
+  o.vao=gl.createVertexArray(); gl.bindVertexArray(o.vao);
+  var vb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,vb);
+  gl.bufferData(gl.ARRAY_BUFFER,d.v,gl.STATIC_DRAW);
+  var S=9*4;
+  gl.enableVertexAttribArray(A.aPos); gl.vertexAttribPointer(A.aPos,3,gl.FLOAT,false,S,0);
+  gl.enableVertexAttribArray(A.aNrm); gl.vertexAttribPointer(A.aNrm,3,gl.FLOAT,false,S,12);
+  gl.enableVertexAttribArray(A.aCol); gl.vertexAttribPointer(A.aCol,3,gl.FLOAT,false,S,24);
+  var ib=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,d.i,gl.STATIC_DRAW);
+  o.count=d.i.length; o.instances=0;
+  if(inst && inst.length){
+    var ibuf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,ibuf);
+    gl.bufferData(gl.ARRAY_BUFFER,inst,gl.STATIC_DRAW);
+    var IS=7*4;
+    gl.enableVertexAttribArray(A.aInst); gl.vertexAttribPointer(A.aInst,4,gl.FLOAT,false,IS,0);
+    gl.vertexAttribDivisor(A.aInst,1);
+    gl.enableVertexAttribArray(A.aTint); gl.vertexAttribPointer(A.aTint,3,gl.FLOAT,false,IS,16);
+    gl.vertexAttribDivisor(A.aTint,1);
+    o.instances=inst.length/7;
+  } else {
+    gl.disableVertexAttribArray(A.aInst); gl.vertexAttrib4f(A.aInst,0,0,0,1);
+    gl.disableVertexAttribArray(A.aTint); gl.vertexAttrib3f(A.aTint,1,1,1);
+  }
+  gl.bindVertexArray(null);
+  return o;
+}
+var IDENT=m4();
+function drawMesh(m, model, wave, alpha){
+  gl.bindVertexArray(m.vao);
+  gl.uniformMatrix4fv(U.uM,false,model||IDENT);
+  gl.uniform1f(U.uWave, wave?1:0);
+  gl.uniform1f(U.uAlpha, alpha==null?1:alpha);
+  if(m.instances) gl.drawElementsInstanced(gl.TRIANGLES,m.count,gl.UNSIGNED_INT,0,m.instances);
+  else gl.drawElements(gl.TRIANGLES,m.count,gl.UNSIGNED_INT,0);
+}
+
+/* ══ the kart ════════════════════════════════════════════════════════ */
+var K={x:0,y:0,z:0,hd:0,v:0,vz:0,ground:true,steer:0,drift:0,roll:0,pitch:0,air:0,bestAir:0};
+var keys={}, pads={l:0,r:0,g:0,b:0};
+var camMode=0, cam={x:0,y:0,z:0,tx:0,ty:0,tz:0};
+var run={t:0,on:false,done:false,best:null,idx:0,seen:{}};
+
+function pathIndexNear(x,y,from){
+  var N=PATH.length, best=from, bd=1e18, R=Math.max(30,Math.floor(N/12));
+  for(var k=-R;k<=R;k++){
+    var i=clamp(from+k,0,N-1), dx=PATH[i].x-x, dy=PATH[i].y-y, d=dx*dx+dy*dy;
+    if(d<bd){bd=d;best=i;}
+  }
+  if(bd>90*90){
+    for(var j=0;j<N;j+=3){
+      var dx2=PATH[j].x-x, dy2=PATH[j].y-y, d2=dx2*dx2+dy2*dy2;
+      if(d2<bd){bd=d2;best=j;}
+    }
+  }
+  return best;
+}
+function resetKart(){
+  var p=PATH[0];
+  K.x=p.x; K.y=p.y; K.z=terH(p.x,p.y); K.hd=p.hd; K.v=0; K.vz=0;
+  K.ground=true; K.steer=0; K.drift=0; K.air=0;
+  run.t=0; run.on=false; run.done=false; run.idx=0; run.seen={};
+  setBar(0);
+}
+function respawn(){
+  var p=PATH[run.idx];
+  K.x=p.x; K.y=p.y; K.z=terH(p.x,p.y)+0.4; K.hd=p.hd; K.v=Math.min(K.v,6); K.vz=0; K.ground=true;
+  toast("BACK ON THE TRAIL");
+}
+function step(dt){
+  var thr=(keys.KeyW||keys.ArrowUp||pads.g)?1:0;
+  var brk=(keys.KeyS||keys.ArrowDown||pads.b)?1:0;
+  var sl=(keys.KeyA||keys.ArrowLeft||pads.l)?1:0;
+  var sr=(keys.KeyD||keys.ArrowRight||pads.r)?1:0;
+  var hb=(keys.Space)?1:0;
+  var turbo=(keys.ShiftLeft||keys.ShiftRight)?1:0;
+
+  var i=pathIndexNear(K.x,K.y,run.idx); run.idx=i;
+  var dRoad=terD(K.x,K.y);
+  var onRoad=dRoad<5.2;
+
+  var want=(sl-sr);
+  K.steer += (want-K.steer)*Math.min(1,dt*9);
+
+  var grip=onRoad?1.0:0.64;
+  var maxSp=(onRoad?46:30)*(hb?0.88:1)*(turbo?1.34:1);
+  var pw=(onRoad?34:22)*(turbo?1.5:1);
+
+  var ah=terH(K.x+Math.cos(K.hd)*3, K.y+Math.sin(K.hd)*3);
+  var bh=terH(K.x-Math.cos(K.hd)*3, K.y-Math.sin(K.hd)*3);
+  var slope=(ah-bh)/6;
+
+  // resistance OPPOSES motion. Subtracting it unconditionally pushes a
+  // standing kart backwards until it hits the reverse clamp.
+  var sgn = K.v>0.05 ? 1 : (K.v<-0.05 ? -1 : 0);
+  var a=0;
+  if(thr) a += pw*(1-Math.max(K.v,0)/maxSp);
+  if(brk) a += (K.v>0.3) ? -27 : -9;
+  a -= 9.81*Math.sin(Math.atan(slope))*1.15;      // gravity: signed by the hill
+  a -= sgn*0.0090*K.v*K.v;                         // aero
+  a -= sgn*(onRoad?0.6:2.6);                       // rolling
+  if(!K.ground) a = -sgn*0.02*K.v*K.v;
+  K.v+=a*dt;
+  // on near-level ground with no pedal, settle rather than creep
+  if(!thr && !brk && Math.abs(K.v)<0.4 && Math.abs(slope)<0.045) K.v=0;
+  if(K.v<-11) K.v=-11;
+  if(K.v>maxSp*1.35) K.v=maxSp*1.35;
+
+  var spf=clamp(Math.abs(K.v)/24,0,1);
+  var yaw=K.steer*(2.05-1.15*spf)*(hb?1.5:1.0)*grip*Math.min(1,Math.abs(K.v)/2.2);
+  if(K.v<0) yaw=-yaw;
+  if(!K.ground) yaw*=0.35;
+  K.hd+=yaw*dt;
+
+  K.drift += ((hb&&Math.abs(K.v)>9?1:0)-K.drift)*Math.min(1,dt*6);
+  var slip=K.drift*0.42*K.steer;
+
+  var mvx=Math.cos(K.hd-slip)*K.v, mvy=Math.sin(K.hd-slip)*K.v;
+  K.x+=mvx*dt; K.y+=mvy*dt;
+
+  var gh=terH(K.x,K.y);
+  if(K.ground){
+    var drop=gh-K.z;
+    if(drop < -0.55 && K.v>9){ K.ground=false; K.vz=0; }
+    else { K.z=lerp(K.z,gh,Math.min(1,dt*22)); }
+  }
+  if(!K.ground){
+    K.vz-=17.5*dt; K.z+=K.vz*dt; K.air+=dt;
+    if(K.z<=gh){
+      K.z=gh; K.ground=true;
+      if(K.air>0.55){ K.bestAir=Math.max(K.bestAir,K.air); K.v*=0.86; }
+      if(K.air>0.35) showAir(false);
+      K.air=0; K.vz=0;
+    } else if(K.air>0.35) showAir(true);
+  }
+
+  var e=1.6;
+  var nx=(terH(K.x+e,K.y)-terH(K.x-e,K.y))/(2*e);
+  var ny=(terH(K.x,K.y+e)-terH(K.x,K.y-e))/(2*e);
+  var fw=Math.cos(K.hd)*nx+Math.sin(K.hd)*ny;
+  var rt=-Math.sin(K.hd)*nx+Math.cos(K.hd)*ny;
+  var tp=K.ground?-Math.atan(fw):clamp(-K.vz*0.03,-0.5,0.5);
+  var tr=K.ground?Math.atan(rt):0;
+  K.pitch=lerp(K.pitch,tp,Math.min(1,dt*7));
+  K.roll =lerp(K.roll, tr - K.drift*K.steer*0.22, Math.min(1,dt*7));
+
+  if(K.z < LAKE.lvl-1.5 && pointInRing(K.x,K.y,LAKE.ring)){ respawn(); }
+  if(K.x<TER.x0+20||K.y<TER.y0+20||
+     K.x>TER.x0+(TER.nx-2)*TER.cw||K.y>TER.y0+(TER.ny-2)*TER.cw){ respawn(); }
+
+  if(!run.on && !run.done && Math.abs(K.v)>1.2 && PATH[i].s>4) run.on=true;
+  if(run.on && !run.done){
+    run.t+=dt;
+    checkMarks(i);
+    if(PATH[i].s > PLEN-14 && Math.hypot(K.x-PATH[PATH.length-1].x, K.y-PATH[PATH.length-1].y)<22){
+      run.done=true; run.on=false;
+      if(run.best==null||run.t<run.best){ run.best=run.t; toast("FINISH · NEW BEST"); }
+      else toast("FINISH");
+      document.getElementById("tb").textContent=fmt(run.best);
+    }
+  }
+}
+
+/* ══ HUD ═════════════════════════════════════════════════════════════ */
+var MARKS=[];
+function buildMarks(){
+  var ids=COURSE.ids||[], byId={};
+  for(var i=0;i<ids.length;i++) byId[ids[i]]=i;
+  for(var k in COURSE.landmarks){
+    var ni=byId[k]; if(ni==null) continue;
+    var pi=Math.round(ni/(ND.length-1)*(PATH.length-1));
+    MARKS.push({i:clamp(pi,0,PATH.length-1), name:COURSE.landmarks[k]});
+  }
+  MARKS.sort(function(a,b){ return a.i-b.i; });
+}
+function checkMarks(i){
+  for(var m=0;m<MARKS.length;m++){
+    if(!run.seen[m] && i>=MARKS[m].i){
+      run.seen[m]=1; toast(MARKS[m].name);
+      document.getElementById("segname").textContent=MARKS[m].name;
+    }
+  }
+}
+function fmt(t){
+  if(t==null) return "--";
+  var m=Math.floor(t/60), s=t-m*60;
+  return m+":"+(s<10?"0":"")+s.toFixed(1);
+}
+var toastT=null;
+function toast(msg){
+  var el=document.getElementById("toast");
+  el.textContent=msg; el.classList.add("on");
+  clearTimeout(toastT); toastT=setTimeout(function(){ el.classList.remove("on"); },1900);
+}
+function showAir(on){ document.getElementById("air").classList.toggle("on",!!on); }
+function setBar(f){ document.getElementById("barf").style.width=(f*100).toFixed(1)+"%"; }
+var hudT=0;
+function hud(dt){
+  hudT+=dt; if(hudT<0.07) return; hudT=0;
+  var mph=Math.abs(K.v)*2.236936;
+  document.getElementById("s").innerHTML=Math.round(mph)+"<small>mph</small>";
+  document.getElementById("t").textContent=fmt(run.t);
+  var i=run.idx, ah=terH(K.x+Math.cos(K.hd)*3,K.y+Math.sin(K.hd)*3),
+      bh=terH(K.x-Math.cos(K.hd)*3,K.y-Math.sin(K.hd)*3);
+  var g=(ah-bh)/6*100;
+  var ge=document.getElementById("g");
+  ge.textContent=(g>=0?"+":"")+g.toFixed(1)+"%";
+  ge.style.color = g>4?"var(--bad)": g<-4?"var(--good)":"var(--ink)";
+  document.getElementById("al").textContent=Math.round(K.z*3.28084)+" ft";
+  var se=document.getElementById("spd");
+  if(se) se.style.color=(keys.ShiftLeft||keys.ShiftRight)?"var(--hot)":"";
+  var s=PATH[i].s;
+  document.getElementById("dist").textContent=(s/1609.344).toFixed(2)+" / "+(PLEN/1609.344).toFixed(2)+" mi";
+  setBar(s/PLEN);
+}
+
+/* ══ frame ═══════════════════════════════════════════════════════════ */
+var M={}, T0=0, VP=m4();
+var SUN=(function(){ var v=[0.42,-0.34,0.84], l=Math.hypot(v[0],v[1],v[2]); return [v[0]/l,v[1]/l,v[2]/l]; })();
+function kartModel(){
+  var cp=Math.cos(K.pitch), sp=Math.sin(K.pitch);
+  var cr=Math.cos(K.roll),  sr=Math.sin(K.roll);
+  var ch=Math.cos(K.hd),    sh2=Math.sin(K.hd);
+  var rx=[1,0,0, 0,cr,sr, 0,-sr,cr];
+  var ry=[cp,0,-sp, 0,1,0, sp,0,cp];
+  var rz=[ch,sh2,0, -sh2,ch,0, 0,0,1];
+  function mm(a,b){ var o=new Array(9);
+    for(var i=0;i<3;i++)for(var j=0;j<3;j++){ var s=0;
+      for(var k=0;k<3;k++) s+=a[k*3+j]*b[i*3+k]; o[i*3+j]=s; } return o; }
+  var R=mm(rz,mm(ry,rx));
+  return new Float32Array([R[0],R[1],R[2],0, R[3],R[4],R[5],0, R[6],R[7],R[8],0, K.x,K.y,K.z,1]);
+}
+function frame(ts){
+  requestAnimationFrame(frame);
+  var dt=Math.min(0.05,(ts-T0)/1000||0.016); T0=ts;
+  var sub=2; for(var q=0;q<sub;q++) step(dt/sub);
+  hud(dt);
+
+  var w=cvs.clientWidth, h=cvs.clientHeight;
+  var dpr=Math.min(window.devicePixelRatio||1, 2);
+  if(cvs.width!==Math.round(w*dpr)||cvs.height!==Math.round(h*dpr)){
+    cvs.width=Math.round(w*dpr); cvs.height=Math.round(h*dpr);
+  }
+  gl.viewport(0,0,cvs.width,cvs.height);
+
+  var back=camMode===0?9.2:(camMode===1?15.5:3.2);
+  var up=camMode===0?3.7:(camMode===1?6.4:1.9);
+  var tx=K.x-Math.cos(K.hd)*back, ty=K.y-Math.sin(K.hd)*back, tz=K.z+up;
+  var gz=terH(tx,ty)+1.6; if(tz<gz) tz=gz;
+  var k=Math.min(1,dt*(camMode===2?18:6.5));
+  cam.x=lerp(cam.x,tx,k); cam.y=lerp(cam.y,ty,k); cam.z=lerp(cam.z,tz,k);
+  var lx=K.x+Math.cos(K.hd)*7, ly=K.y+Math.sin(K.hd)*7, lz=K.z+1.5;
+  cam.tx=lerp(cam.tx,lx,k); cam.ty=lerp(cam.ty,ly,k); cam.tz=lerp(cam.tz,lz,k);
+
+  var P=persp(1.06, w/h, 0.5, 2600);
+  var V=lookAt([cam.x,cam.y,cam.z],[cam.tx,cam.ty,cam.tz],[0,0,1]);
+  mul(P,V,VP);
+
+  gl.clearColor(0.62,0.72,0.78,1);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(prog);
+  gl.uniformMatrix4fv(U.uVP,false,VP);
+  gl.uniform3fv(U.uSun,SUN);
+  gl.uniform3f(U.uFog,0.62,0.72,0.78);
+  gl.uniform2f(U.uFogR,330,1500);
+  gl.uniform1f(U.uTime,ts/1000);
+
+  drawMesh(M.ter);
+  drawMesh(M.road);
+  drawMesh(M.props);
+  drawMesh(M.trees);
+  drawMesh(M.kart,kartModel());
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+  gl.depthMask(false);
+  drawMesh(M.water,null,true,0.84);
+  gl.depthMask(true); gl.disable(gl.BLEND);
+}
+
+/* ══ input ═══════════════════════════════════════════════════════════ */
+addEventListener("keydown",function(e){
+  keys[e.code]=true;
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code)>=0) e.preventDefault();
+  if(e.code==="KeyR") resetKart();
+  if(e.code==="KeyC") camMode=(camMode+1)%3;
+  var kk=document.getElementById("keys"); if(kk) kk.classList.add("fade");
+});
+addEventListener("keyup",function(e){ keys[e.code]=false; });
+/* a key held while the window loses focus never sees its keyup, and the
+   kart would drive itself forever. Drop everything on blur. */
+function releaseAll(){ keys={}; pads.l=pads.r=pads.g=pads.b=0; }
+addEventListener("blur", releaseAll);
+document.addEventListener("visibilitychange", function(){ if(document.hidden) releaseAll(); });
+["pL","pR","pG","pB"].forEach(function(id){
+  var el=document.getElementById(id), key={pL:"l",pR:"r",pG:"g",pB:"b"}[id];
+  function on(e){ e.preventDefault(); pads[key]=1; }
+  function off(){ pads[key]=0; }
+  el.addEventListener("pointerdown",on);
+  el.addEventListener("pointerup",off);
+  el.addEventListener("pointercancel",off);
+  el.addEventListener("pointerleave",off);
+});
+if(matchMedia&&matchMedia("(pointer: coarse)").matches) document.body.classList.add("touch");
+
+/* ══ boot, in slices so the loader can breathe ═══════════════════════ */
+function prog2(p,msg){
+  document.getElementById("lb").style.width=(p*100)+"%";
+  if(msg) document.getElementById("lp").textContent=msg;
+}
+function boot(){
+  if(!initGL()){
+    document.getElementById("lp").innerHTML=
+      "This needs WebGL2, which this browser isn't giving us.<br>Try Chrome, Safari 15+, or Firefox.";
+    return;
+  }
+  var steps=[
+    ["TRACING THE COURSE", function(){ buildPath(); buildHash(); buildLake(); buildMarks(); }],
+    ["RAISING THE MOUNTAIN", function(){ buildTerrain(); }],
+    ["LAYING THE GROUND", function(){ M.ter=makeMesh(terrainMesh()); }],
+    ["CUTTING THE TRAIL", function(){ M.road=makeMesh(roadMesh()); M.props=makeMesh(propsMesh()); }],
+    ["FLOODING HESSIAN LAKE", function(){ M.water=makeMesh(waterMesh()); }],
+    ["PLANTING THE WOODS", function(){ M.trees=makeMesh(treeMesh(), treeInstances()); }],
+    ["WHEELING OUT THE KART", function(){ M.kart=makeMesh(kartMesh()); resetKart();
+        cam.x=K.x-12; cam.y=K.y; cam.z=K.z+5; cam.tx=K.x; cam.ty=K.y; cam.tz=K.z; }]
+  ];
+  var n=0;
+  (function next(){
+    if(n>=steps.length){
+      prog2(1,"READY");
+      setTimeout(function(){
+        document.getElementById("loading").classList.add("gone");
+        toast("BEAR MOUNTAIN");
+      },260);
+      requestAnimationFrame(function(t){ T0=t; frame(t); });
+
+      return;
+    }
+    prog2(n/steps.length, steps[n][1] ? steps[n][0] : "");
+    var fn=steps[n][1]; n++;
+    setTimeout(function(){
+      try{ fn(); }catch(err){
+        document.getElementById("lp").textContent="Stalled: "+err.message;
+        console.error(err); return;
+      }
+      next();
+    },16);
+  })();
+}
+boot();
+})();
+
+</script>
+
+</body>
+</html>
