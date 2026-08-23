@@ -22116,6 +22116,7 @@ const META_DEFAULT = {
   v:1, lvl:1, xp:0, pendingPicks:0, up:{},           // player level + unit upgrade ranks (+10% dmg a rank, tapering, to RANK_MAX)
   campaign:0, levelStars:{},                          // highest level beaten, stars per level
   lossRun:{},                                         // 0098 QUIET MERCY: consecutive solo losses per level — 'l36':3; reset on that level's win; device-local (the levelStars precedent — never crosses the wire)
+  replays:{},                                         // 0495a THE REPLAY TAX: paid replays per campaign rung — 'l25':k (0..REPLAY_PAID_MAX); device-local like levelStars/lossRun (never crosses the wire; ⚑ a v35 column); the parks' twin is parks[id].rp
   starBank:0, starsLifetime:0,                        // spendable + lifetime (rating later)
   unlocked:['rifleman','mgunner','bazooka','mortar','sarge'],
   lasers:[], laserOn:null, dyes:[], dyeOn:null,
@@ -22291,7 +22292,7 @@ const META_DEFAULT = {
   // v3.35 TP-03 THE DINO PARK — the same comet-law quartet, safari edition
   // (the parks.dino ledger itself shipped with v3.33's fresh-build block).
   parkDino:0, parkDinoSeen:0, bronzeKey:0, bronzeKeySeen:0,
-  parks:{ yeti:{lv:0,stars:0,pd:0,pd2:0}, dino:{lv:0,stars:0,pd:0,pd2:0} },   // 0327: pd2 = the deep ladder's split purse ledger (rungs 31-50)
+  parks:{ yeti:{lv:0,stars:0,pd:0,pd2:0,rp:{}}, dino:{lv:0,stars:0,pd:0,pd2:0,rp:{}} },   // 0327: pd2 = the deep ladder's split purse ledger (rungs 31-50); 0495a: rp = the paid-replay counts per rung ('r25':k — THE REPLAY TAX)
   // v3.39 TP-04 THE ICE CASTLE — iceRite = the silver key turned in the lock
   // (the door lights forever); ice = per-tier first-clear flags {e,m,h}
   // (HOST-only writes, D20 — they gate the progressive tier ladder D19 AND
@@ -22386,6 +22387,10 @@ if(!META.crownV2){ META.crownV2=1;
   // the QUIET MERCY loss-run ledger (0098): same object-default rebuild, same
   // alias reason — an older save must never write into META_DEFAULT's own {}.
   META.lossRun = Object.assign({}, META.lossRun||{});
+  // 0495a THE REPLAY TAX ledger (replays): the same object-default rebuild, the
+  // same alias reason — paid replays per campaign rung ('l25':k); the parks'
+  // twin (parks[id].rp) rides the parks rebuild below.
+  META.replays = Object.assign({}, META.replays||{});
   // 0393: the away ledger is nested — build it FRESH (the alias law), maps
   // rebuilt plain, numbers coerced; garbage can only ever under-record.
   (function(){ const src=META.away||{}, done={}, rec={};
@@ -22510,8 +22515,10 @@ if(!META.crownV2){ META.crownV2=1;
   // only under-grant. pd2 = 0327's SPLIT LEDGER (rungs 31-50; pd keeps rungs
   // 1-30 on bits 0-29 — bits 30/31 fenced unused FOREVER: bit 31 flips pd
   // negative and this very clamp would wipe it to 0, refarming the purse).
-  (function(){ const p=META.parks||{}, mk=(s,L)=>({ lv:Math.max(0,Math.min(L,(s&&s.lv)|0)),
-      stars:Math.max(0,(s&&s.stars)|0), pd:Math.max(0,(s&&s.pd)|0), pd2:Math.max(0,(s&&s.pd2)|0) });
+  (function(){ const p=META.parks||{},
+      rp9=o=>{ const r={}, s=(o&&typeof o==='object')? o:{}; for(const k in s){ if(/^r\d+$/.test(k)) r[k]=Math.max(0,s[k]|0); } return r; },   // 0495a THE REPLAY TAX: the paid-replay counts per rung ('r25':k) rebuilt fresh — non-negative ints, rung keys only; NO upper clamp here (REPLAY_PAID_MAX is TDZ at load, the v1.26 law; the verdict never writes past it, and a larger count can only under-pay)
+      mk=(s,L)=>({ lv:Math.max(0,Math.min(L,(s&&s.lv)|0)),
+      stars:Math.max(0,(s&&s.stars)|0), pd:Math.max(0,(s&&s.pd)|0), pd2:Math.max(0,(s&&s.pd2)|0), rp:rp9(s&&s.rp) });
     META.parks={ yeti:mk(p.yeti,50), dino:mk(p.dino,50), western:mk(p.western,50) }; })();   // 0372: the outlaw deep ladder joins (clamp 50); 0357: the dino's — the TDZ-literal law: these literals and parkLevels() must always agree
   // v3.39 TP-04: the raid ledgers are NESTED — fresh-build (the parks law
   // above): ice tier flags collapse to 0/1, the day ledger to {d:string,
@@ -23328,6 +23335,38 @@ const CAMP_PURSE=20, CAMP_PURSE_LVLS=10;
 // FIRST clear of L11-100 pays a thin 5★ on the same first-clear law (farm-proof
 // by the same `!prev` gate). +450★ across the journey; bridges the 20★→680★ canyon.
 const CAMP_PURSE2=5, CAMP_PURSE2_TOP=100;
+// ================= 0495a THE REPLAY TAX (Wyatt 8/22, "this one is very important") =================
+// "If someone replays a level, they should get one-fifth the amount of XP and
+// stars … max it … five times … after that … reduce it to zero … permanently.
+// That way, this will fight off people who bot." A LEVEL = a campaign rung (solo
+// or with company) or a park rung; a REPLAY = a win on a rung your record
+// already said you beat BEFORE this battle began. Replays one through
+// REPLAY_PAID_MAX pay REPLAY_F of the XP and of every banked star (medals +
+// purse + bounty, and the gear tune reads that paid base); every replay after
+// pays 0 / 0 for that rung, forever — per save, per rung. The ledgers:
+// META.replays['l25'] (the campaign) and META.parks[id].rp['r25'] (the parks)
+// = the PAID count, never counted past MAX. The medals themselves (the ★★★
+// row, levelStars) stay a RECORD and still display in full — a medal is a
+// record, not a coin; the BANK is what the tax touches. MOM keeps her own
+// replay rate (v2.21); the battleground, rival sorties, the kings' raids and
+// the event room are not "levels" and pay byte-what-they-did. Device-local
+// like levelStars — the counter never rides /sync (⚑ a v35 column would make
+// it airtight); the replay TEST already survives a wiped save through the
+// server's monotonic campaign column (S.levelN<=META.campaign). ⚑ DIALS:
+// REPLAY_F 0.2 / 0.25 / 0.1 · REPLAY_PAID_MAX 5 / 3 / 10 · replay LOSSES
+// (XP_LOSS pays in full on every loss today — NOT taxed, flagged).
+const REPLAY_F=0.2, REPLAY_PAID_MAX=5;
+// the pay factor of ONE win + the ledger bump: led = the rung's ledger, key =
+// 'l25' / 'r25', replay = the test (read before the win writes anything). A
+// first clear pays 1; a replay with k<MAX pays REPLAY_F and counts; at MAX it
+// pays 0 and the count stays put (a bounded int on the save).
+function replayPay(led, key, replay){
+  if(!replay) return 1;
+  const k=led[key]|0;
+  if(k>=REPLAY_PAID_MAX) return 0;
+  led[key]=k+1;
+  return REPLAY_F;
+}
 function xpNeed(){ return 100 + (META.lvl-1)*50; }
 function xpFor(frac){ return Math.max(1, Math.round(xpNeed()*frac*gearXpMul())); }   // a fraction of a level -> real XP (v2.36: the platform's −5% rides HERE, so every spoken number IS the banked number at all six end paths; MOM's three-promotion jackpot is xpToLevels and stays whole by design)
 // the exact XP that lands k promotions from where the bar stands right now —
@@ -33441,7 +33480,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.56';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.57';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -48911,6 +48950,7 @@ function endBattle(win){
   // down to time — the words on the win screen never changed.)
   const m1=true, m2=S.lives>=10, m3=(S.lostLevel|0)===0;
   let stars=(m1?1:0)+(m2?1:0)+(m3?1:0), purse=0, gearN=0;   // purse: the early-campaign winnings (v2.34) — set only on the plain campaign branch; gearN (v2.36): what the quiet gear tune is allowed to see — plain-branch stars only, never the sortie/MOM calendar purse
+  let payF=1;   // 0495a THE REPLAY TAX: the pay factor of THIS win — 1 on a first clear and on every door that is not a "level" (sorties, MOM, the raids, the event room); REPLAY_F on replays one through REPLAY_PAID_MAX, 0 after — set by replayPay on the campaign and park branches below, read at the bank and the XP
   document.getElementById('medalRow').textContent = (m1?'★':'☆')+' '+(m2?'★':'☆')+' '+(m3?'★':'☆');
   let msg = t('Victory') + (m2? ' · '+t('Untouched Toy Box'):'') + (m3? ' · '+t('No soldier left behind'):'');
 
@@ -48956,6 +48996,12 @@ function endBattle(win){
     stars=0;
     const pk=META.parks && META.parks[S.park.id];
     if(pk){
+      // 0495a THE REPLAY TAX, park edition: the purse bit already set OR the
+      // ladder (pk.lv) at or past this rung says replay — read BEFORE the bit
+      // and the ladder write below. The park's stars are 0 on a replay already
+      // (the v3.33 D12 law), so the tax lands on the XP here; parks[id].rp
+      // ('r25':k) is the paid count, the campaign ledger's twin.
+      payF=replayPay(pk.rp||(pk.rp={}), 'r'+S.park.n, !!((S.park.n<=30)? (pk.pd>>(S.park.n-1))&1 : (pk.pd2>>(S.park.n-31))&1) || S.park.n<=pk.lv);
       // 0327 SPLIT LEDGER: pd = rungs 1-30 (bits 0-29; bits 30/31 fenced
       // forever — bit 31 would flip pd negative and the load normalizer wipes
       // a negative pd to 0, refarming the whole purse; bit 32 wraps onto rung
@@ -49148,8 +49194,14 @@ function endBattle(win){
     const r=rivalDayWin(S.rival.id);
     stars=r.stars; msg=r.msg;
   } else {
-    // stars flow freely (7/22): every win pays its medals in full, replays too
+    // the medals flow freely (7/22): every win WRITES its medals in full,
+    // replays too — a medal is a record, not a coin. 0495a THE REPLAY TAX is
+    // on the BANK: prev (a medal already on this rung) OR the campaign number
+    // at or past it (the server's monotonic column — a wiped save still reads
+    // its replays as replays; a sync-raised guest's record counts on its own
+    // seat) says this is a replay; read BEFORE this win writes anything.
     const prev=META.levelStars['l'+S.levelN]||0;
+    payF=replayPay(META.replays||(META.replays={}), 'l'+S.levelN, prev>0 || S.levelN<=META.campaign);
     META.levelStars['l'+S.levelN]=Math.max(prev,stars);
     if(S.levelN>META.campaign) META.campaign=S.levelN;
     // 0098 QUIET MERCY: a win — solo OR co-op — clears the level's loss run
@@ -49244,12 +49296,20 @@ function endBattle(win){
   if(soulOwned() && !META.soulSeen){ META.soulSeen=1; soulNew=true; }
   // a felled boss pays a bounty on top of the level's medals (v1.79: not mom —
   // the allowance headlines her win; her rounds already dropped their tags)
-  if(S.bossKilled && !S.rival && !S.momRaid && !S.park && !S.raid){ META.starBank+=2; META.starsLifetime+=2; gearN+=2; }   // v3.33: a park boss replay must pay 0 — the rung purse is the park's whole economy (D12); v3.39: the raid's purse is the daily ledger's, same law
-  META.starBank+=stars+purse; META.starsLifetime+=stars+purse;   // v2.34: medals + the early-campaign purse (purse is 0 everywhere it always was)
+  const bounty=(S.bossKilled && !S.rival && !S.momRaid && !S.park && !S.raid)? 2 : 0;   // v3.33: a park boss replay must pay 0 — the rung purse is the park's whole economy (D12); v3.39: the raid's purse is the daily ledger's, same law
+  // 0495a THE REPLAY TAX at the bank: the medals + the purse + the bounty land
+  // as ONE whole number × payF (Math.round, floor 0 — 3 medals → 1★, 1 medal →
+  // 0★, the bounty folds in); a first clear is ×1 and banks byte-what-it-was.
+  // The medal row, levelStars and META.campaign wrote above untaxed.
+  const paid=Math.max(0, Math.round((stars+purse+bounty)*payF));
+  META.starBank+=paid; META.starsLifetime+=paid;   // v2.34: medals + the early-campaign purse (purse is 0 everywhere it always was) + the v1.79 bounty, taxed together
   // v2.36 THE QUIET WINNINGS — the plain campaign branch only (gearN stays 0
   // for sorties and MOM: their stars are rivalDayWin's day-capped calendar
   // purse, a different purse with its own books — the v1.28 law says one
   // tune each, never across). Silent: no spoken line, no medal row moves.
+  // 0495a: the tune reads the PAID base (gearN was stars+purse and the bounty
+  // used to add its 2 here — paid carries both, taxed).
+  if(gearN) gearN=paid;
   { const gx=gearStarX(gearN); if(gx){ META.starBank+=gx; META.starsLifetime+=gx; } }
   // HOLD THE LINE pays a full level for turning up and 6% more for every
   // commander who stood with you (ten of you = 1.54 levels) — and MOM tops
@@ -49260,11 +49320,16 @@ function endBattle(win){
   // queue, and the v1.25 ceremony fires three plaques' worth for free).
   // v2.21: momFirst keeps that jackpot to the FIRST win — a medal replay
   // pays a boss level's own replay rate instead (0.60 of a level; DIAL).
+  // 0495a THE REPLAY TAX on the XP: the fraction × payF on the squad branch and
+  // the campaign branch alike (each seat read its OWN ledger above); at payF 0
+  // the gain is 0 and the award below is skipped whole — xpFor's max(1) floor
+  // must never turn a replayed-out rung into one XP. MOM's own replay rate
+  // stands (the v2.21 law — her door is not a level).
   const xpGain = S.momRaid? (momFirst? xpToLevels(MOM_LEVELS) : xpFor(XP_CAMPAIGN_WIN+XP_BOSS))
-    : xpFor(coopSquad()
+    : !payF? 0 : xpFor(payF*(coopSquad()
     ? XP_SQUAD_WIN + XP_SQUAD_MATE*Math.max(0,coopHumans()-1) + (S.bossKilled? XP_BOSS:0)
-    : XP_CAMPAIGN_WIN + (S.bossKilled? XP_BOSS:0));
-  if(S.bossKilled && !S.rival && !S.momRaid) msg = t('BOSS DOWN!')+' '+msg+((S.park||S.raid)? '' : ' · '+t('+2★ bounty'));   // v3.35 TP-03: the TEXT takes the grant's own park guard — a park win screen must not CLAIM the bounty the park refuses (v3.34 cosmetic bug on the yeti finale, caught by this battery: bank moved exactly +10 while the screen said +2★)
+    : XP_CAMPAIGN_WIN + (S.bossKilled? XP_BOSS:0)));
+  if(S.bossKilled && !S.rival && !S.momRaid) msg = t('BOSS DOWN!')+' '+msg+((S.park||S.raid||payF!==1)? '' : ' · '+t('+2★ bounty'));   // 0495a: on a replay the bounty is folded into the taxed star total the +N★ segment speaks — the literal +2★ is a first clear's; v3.35 TP-03: the TEXT takes the grant's own park guard — a park win screen must not CLAIM the bounty the park refuses (v3.34 cosmetic bug on the yeti finale, caught by this battery: bank moved exactly +10 while the screen said +2★)
   if(sargeNew.length) msg += ' · '+tf('⚔ SARGE UNLOCKED THE %1! Equip it at the Training Academy',
                                       sargeNew.map(w=>t(w)).join(' & '));
   // the jet pack announce rides the same composed line — TXT() at composition
@@ -49293,10 +49358,14 @@ function endBattle(win){
   // v2.34: a purse win speaks the battleground's own composed WINNINGS key
   // (both numbers tokenized — zero new rows); every purse-less win is the
   // byte-identical line it always was.
-  msg += ' · '+(purse>0? t('+'+purse+'★ WINNINGS · +'+xpGain+' XP') : t('+'+xpGain+' XP')) + (stars>0? ' · '+t('+'+stars+'★'):'');
+  // 0495a: the spoken numbers are the PAID numbers — a first clear speaks the
+  // line it always did; a replay speaks its taxed XP and its one taxed star
+  // total (the +N★ segment); a segment at zero is omitted (never "+0 XP").
+  { const sayStars=(payF===1)? stars : paid;
+    msg += (xpGain>0? ' · '+((purse>0 && payF===1)? t('+'+purse+'★ WINNINGS · +'+xpGain+' XP') : t('+'+xpGain+' XP')) : '') + (sayStars>0? ' · '+t('+'+sayStars+'★'):''); }
   // the first mission ALWAYS promotes — xpAward applies that rule itself, so the
   // ceremony sees the real end state and that promotion earns its own fanfare
-  const promos=xpAward(xpGain,{src:(coopSquad()?'squad':'campaign'), forcePromo:firstEver});
+  const promos=xpGain>0? xpAward(xpGain,{src:(coopSquad()?'squad':'campaign'), forcePromo:firstEver}) : 0;   // 0495a: a replayed-out rung (payF 0) pays no XP, no promotion, no ceremony — firstEver is never a replay
   if(promos>0) msg += ' · '+tf('PROMOTED TO LEVEL %1!', META.lvl);
   if(lensGift()) msg += ' · '+TXT(lensFreeLine());   // 0363: campaign 15 beaten above OR the promotion just paid — either crossing hands the lens over on this very screen (the gearDue two-door law)
   if(S.coop && COOP && coopSquad()){
