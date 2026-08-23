@@ -21687,6 +21687,7 @@ function unarmedU(u,sw){ if(!u || u.type!=='sarge' || !enhU(u,'unarmed')) return
 function enhSoakM(f){ let m=1;
   if(enhU(f,'medicshield')) m*=ENH_MED_SOAK;
   if(enhU(f,'ambush')) m*=ENH_SPY_SOAK;
+  if(f.cmdWallT>0) m*=CMD_WALL.soak;   // 0510 THE STONE WALL: +500% defense = ×1/6 on every intake door (tanHit's pips, hurt's BF hp, the CQ vent, the wall bonk — both carpets), BELOW his saves: the blocks fire first, one event one save; six rounds to spend one pip — dice-free like the rest of the scalar, so twenty co-op sims agree; stacks with the medic plate (×1/12 for the window, bounded by the 28% uptime)
   return m; }
 // 0408 AMBUSH — the flank, Wyatt's words made math: the spy's round
 // lands ×ENH_SPY_FLANK when HE stands closer to the VICTIM'S OWN home box
@@ -27956,6 +27957,25 @@ const CMD_SW_T=0.46;   // 0508 THE CRESCENT CUT: the swing's draw clock (u.cmdFx
 // after the last cut (draw only).
 const CMD_DUEL_N=3, CMD_DUEL_C=0.22, CMD_DUEL_ARM=0.7, CMD_DUEL_STEP=34, CMD_DUEL_REC=0.55;
 const CMD_DUEL_CUTS=[ {f:-1.48,to:0.30}, {f:0.95,to:-0.62}, {f:-0.12,to:-0.12,th:1} ];   // cut 1 overhead, down-right · cut 2 a RISING backhand · cut 3 the thrust (the angle holds, the blade extends 46 → 62 px and snaps back)
+// 0510 THE STONE WALL (cs 3; FM-GVT-COMMANDER-SPECS rounds 2-6 §2.1/§4.4/§5;
+// Wyatt 8/23: "we need him not to be grabbing the blade itself… him holding
+// the blade in a more defensive position and then him just having +500%
+// defense for 7 seconds"): THE BRACE — +500% defense = ×1/6 intake
+// (CMD_WALL.soak) through enhSoakM, the file's own intake scalar, for
+// CMD_WALL.t seconds; the rest (CMD_WALL.cd, 18 — sized to the wave drum:
+// 7+18=25, there for every deep wave, never twice in one) arms when the
+// window ENDS (the v1.73 law). He has no button, so the INTAKE FUNNELS
+// decide (cmdWallTry below cmdAbsorbs): a redcoat volley lands every
+// member's round in ONE sim frame — a per-frame wheel would arm the guard
+// over his body. The eye: two foes inside 280 — the king's own blue-wheel
+// window (KING_PUSH_REACH's number, written as the literal: that const
+// sits ~15,700 lines below and a top-level read here is a TDZ
+// ReferenceError). Named CMD_WALL, never bare WALL_* (GG_WALL_DMG exists).
+// ⚠⚠ NEVER seat this on defM (the worn-plate roll): that form is tuned for
+// [0.94, 1.22] and at dM >= 2 the roll is always true — flat total
+// invulnerability, not +500%. Anyone later "simplifying" the Stone Wall
+// onto defM would ship an immortal Commander.
+const CMD_WALL={ soak:1/6, t:7, cd:18, eye:280, n:2 };
 // ⚠ TDZ (the v1.26 law): coopBeat is a const ~5,900 lines below — these only
 // ever RUN lazily (render/battle/endBattle time), never at load. CMD_LVL itself
 // initializes here, ABOVE COOP_MILES, so the table rows can reference it
@@ -33829,7 +33849,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.71';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.72';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41129,6 +41149,7 @@ function hurt(f,dmg,src){
     S.fx.push({k:'ring',x:f.x,y:f.y-18,r:4,R:22,t:0,dur:0.2,col:'#C9D2D8'}); SFX.thock(); return; }
   if(src && src.type==='flame' && f.def.sno) dmg*=FLAME_SNOW_X;   // 0318: fire beats snow — the licks and the combustion stub alike
   dmg=counterDmg(f,dmg,src);   // v1.40: a jeep hull shrugs the long rifle and the blade
+  if(S.bf && f.side && (f.cmdWallT>0 || cmdWallTry(f))) cmdWallSkid(f);   // 0510 THE STONE WALL on the battleground: the hp funnel's own arm, fenced to a sided unit (a campaign f here is always a tan foe) — the very next line soaks the arming round too
   dmg*=enhSoakM(f);   // 0408 THE INTAKE SCALAR: the BF hp funnel — the medic's plate pays half, the AMBUSH spy pays ×1.1; bullets, shells, mines, bites, fire beats and every dino kit machine land through THIS door
   f.hp-=dmg;
   if(f.type==='kingyeti') f.kyHitAt=S.t;   // 0435: the boss flinch stamp — presentation only, nothing in the sim reads it
@@ -41664,6 +41685,7 @@ function bfUnitStep(u,dt){
   if(u.falling){ unitFallStep(u,dt); return false; }       // 8/8 v2.76: a falling man is falling — nothing else this frame
   if(u.shv){ ggShoveStep(u,dt); return false; }            // 8/8 gravity gun: a hurled man is a passenger this frame
   if(u.tkChanT>0){ u.marching=false; return true; }        // 0462c ORANGE: the channel plants him on the battleground too — the mortar's own dig-in line (true = the weapon loop runs; LOCK holds his hands); the Nemesis's orange press plants him by construction
+  if(u.cmdWallT>0){ u.marching=false; return true; }       // 0510 THE STONE WALL: planted on the battleground too — the dig-in idiom's other carpet
   // v2.77 (Wyatt 8/8: "Adjust the mortar to not move and be in a fixed state
   // when you play it in battlegrounds mode"): the tube DIGS IN where it
   // drops — the campaign's own artillery law, battlegrounds edition, both
@@ -42133,6 +42155,7 @@ function campUnitStep(u,dt){
   if(u.falling){ unitFallStep(u,dt); u.marching=false; return false; }   // 8/8 v2.76 the long drop
   if(u.shv){ ggShoveStep(u,dt); u.marching=false; return false; }        // 0278a: the king's blue wave hurls campaign men down the gravity gun's own rails — a passenger this frame (bfUnitStep's twin line; campaign men were never shoved before)
   if(u.tkChanT>0){ u.marching=false; return true; }   // 0462c ORANGE: the channel PLANTS him — the dig-in idiom (true = the weapon loop runs, where TK_ORANGE_LOCK holds his hands); a knock/jet/drag breaks it in tkChanPass
+  if(u.cmdWallT>0){ u.marching=false; return true; }   // 0510 THE STONE WALL: the guard PLANTS him — the orange dig-in line's own idiom. Without this, cmdDashReady=false drops his halt radius 168 → 38 below and he walks INTO the line he is bracing against
   // v2.79: the wipe plants his feet on the campaign carpet too — the full
   // animation finishes before the march resumes (Wyatt's own staging)
   if(u.type==='commando' && u.cmdoFireT>0){ u.marching=false; return true; }
@@ -43482,6 +43505,42 @@ function cmdAbsorbs(u){
       S.fx.push({k:'tracer',x1:mx+ca*3,y1:my+sa*3,x2:mx+ca*tl,y2:my+sa*tl,t:0,dur:0.09,col:'#EAF4FF',w:1.6}); } }
   return true;
 }
+// ===== 0510 THE STONE WALL — THE BRACE (cs 3; rounds 2-6; Wyatt: "+500%
+// defense for 7 seconds"). He has no button, so the FUNNELS decide:
+// cmdWallTry is called on a round already past his saves (tanHit's one
+// line below the worn-plate roll · hurt's line above the BF soak · knock's
+// Seat E) — so the ARMING round is soaked too (a scalar is not a save: an
+// 11-pip man must not arm and die in one call). The eye:
+// kyFoesIn(u,280,2) — the king's own census helper, two men inside the
+// blue-wheel window; a volley line qualifies, a lone plinker does not.
+// Local-sim, zero dice (the co-op law); a relayed ally braces from the
+// bag's own cs on each sim's census. While the guard stands: NO CUTS
+// (D26 — updateCmd returns; the penned no-cost Wall strictly dominated
+// the null pick), no dash launch (cmdDashReady refuses), FEET PLANTED
+// (the orange dig-in line in both step functions — without it
+// cmdDashReady=false drops his campaign halt radius 168 → 38 and he
+// walks INTO the line he is bracing against). The clocks burn at the
+// loop head; the rest arms when the window ENDS.
+function cmdWallTry(u){
+  if(!u || u.type!=='sarge' || u.dead || u.cmdWallT>0 || u.cmdWallCd>0 || u.dropT>0) return false;
+  const sw=unitSargeStats(u);
+  if(sw.w!=='commander' || (sw.cs|0)!==3) return false;   // off the BAG (the csU law) — a relayed ally braces from the number the wire carried; every AI kit is plain by construction
+  if(kyFoesIn(u,CMD_WALL.eye,CMD_WALL.n)<CMD_WALL.n) return false;
+  u.cmdWallT=CMD_WALL.t;
+  if(u.cmdDash){ u.cmdDash='back'; u.cmdTarget=null; u.cmdDashCd=CMD_DASH.cd; }   // a wall, not a lunge — a live dash goes home on the machine's own 'back' walk
+  bfSfx(SFX.thock,u.x,u.y);
+  S.fx.push({k:'ring',x:u.x,y:u.y-24,r:5,R:30,t:0,dur:0.22,col:'#C9D2D8'});   // the block's own steel ring — the guard comes up
+  S.fx.push({k:'puff',x:u.x-4,y:u.y-2,t:0,dur:0.3,R:17});
+  S.fx.push({k:'puff',x:u.x+14,y:u.y-2,t:0,dur:0.3,R:14});   // boots dig in (the bench's own plant; puffs kept under RM, the 43440 law)
+  if(bfHumanU(u)) S.shake=Math.max(S.shake,0.10);
+  return true;
+}
+function cmdWallSkid(u){   // every soaked round throws one tight steel ring + one tick off the guard — the window is legible from the feedback alone. NO float ('STONE WALL!' would fall back to English in seven languages until rows exist). i-keyed off the post + the pip count + the clock, never dice (the 0261 law); the ring rides reduced motion (rings are information), the tick does not.
+  const fs=u.cmdFs||1, ky=(((u.x|0)*7+((u.hits*4)|0)*13+((u.cmdWallT*9)|0))|0), yy=u.y-24-((ky*13)%34);
+  S.fx.push({k:'ring',x:u.x+fs*18,y:yy,r:3,R:17,t:0,dur:0.16,col:'#C9D2D8'});
+  if(!reducedMotion()){ const th=((ky*0.897)%1), ta=0.95+1.5708+(th-0.5)*1.3, ca=Math.cos(ta)*fs, sa=Math.sin(ta), mx=u.x+fs*23, my=u.y-21, tl=8+th*5;   // one tick off the blade's middle under the point-down guard (hand (+10,−40), +0.95 rad)
+    S.fx.push({k:'tracer',x1:mx+ca*3,y1:my+sa*3,x2:mx+ca*tl,y2:my+sa*tl,t:0,dur:0.09,col:'#EAF4FF',w:1.6}); }
+}
 function tanHit(u,fx,fy,src){
   if(u.dead) return;
   if(u.jetT>0) return;                       // airborne (v1.39): no grit ticks mid-arc
@@ -43507,6 +43566,7 @@ function tanHit(u,fx,fy,src){
     if(dM>1 && Math.random()<dM-1) return;
     if(dM<1 && Math.random()<1-dM) u.hits++;
   }
+  if(u.cmdWallT>0 || cmdWallTry(u)) cmdWallSkid(u);   // 0510 THE STONE WALL — the ONE campaign line: below every save (jet · blue wall · plate · block · duck · blade · the worn-plate roll), above BOTH pip writes, so the round that ARMS the guard is already soaked by them (enhSoakM reads the timer this call just set)
   // ===== 0278a THE SNOW-SLOW LAW v2 (Wyatt round 3, verbatim: snowmen
   // "deal 2 damage per snowball… You can only get it down to −90% speed
   // max. They can't prevent someone hit by the snowballs from attacking")
@@ -43645,6 +43705,7 @@ function cmdNearest(u,r){ let best=null,bd=r;
 function updateCmd(u,dt,sw){
   if(u.cmdDash==='duel'){ updateCmdDuel(u,dt,sw); return; }   // 0509 THE DUELIST: a running flourish owns the frame (the hops, the cuts, the beats)
   if((sw.hb || u.cmdDash) && updateCmdDash(u,dt,sw)) return;   // 0488 THE HIGH BLADE (D19): the dash owns his feet this frame; a LANDING falls through to the swing below at full aoeR (the high blade's bag carries the circle) · 0509: a flourish's end parks him in the machine's own 'land'/'back' seats (work at the sword, or the walk home) — the second clause ticks those for a bladeless Duelist; a plain Commander never sets cmdDash, so this reads exactly as before
+  if(u.cmdWallT>0) return;   // 0510 THE STONE WALL (D26): a wall does not cut — 7 s of no swing under the heaviest fire is the honest trade (the penned no-cost Wall strictly dominated the null pick, rule C). His blocks still answer in the funnels; sits below the dash hand-off so a sent-home dash still walks
   const best=cmdNearest(u,sw.rng);              // nearest foe inside the sword's reach (named once above — the Duelist's cuts re-pick through the same scan)
   if(!best || u.cmdSwT>0) return;
   if(csU(u,sw)===1){ cmdDuelStart(u,sw,best); return; }   // 0509 THE DUELIST: his swing IS the flourish — cut 1 launches on this very frame
@@ -43768,7 +43829,7 @@ function cmdDuelEnd(u,sw){            // the sim part over: the breath paid, the
 // halt-matches-the-trigger law), campUnitStep/bfUnitStep yield his feet
 // mid-dash. The class's "he never dashes" (0092) stands for every commander
 // WITHOUT the high blade — sw.hb is the one door, mine or an ally's.
-function cmdDashReady(u,sw){ return !!sw.hb && !(u.cmdDashCd>0) && !u.cmdDash && !(u.dropT>0) && !(u.cmdBlkT>0); }
+function cmdDashReady(u,sw){ return !!sw.hb && !(u.cmdDashCd>0) && !u.cmdDash && !(u.dropT>0) && !(u.cmdBlkT>0) && !(u.cmdWallT>0); }   // 0510: no launch through a standing guard
 function cmdDashEnd(u){
   if(u.cmdDuel){ u.cmdDuel=null; if(!(u.cmdSwT>0)) u.cmdSwT=cmdDuelArm(u); }   // 0509: a jet, a moved post, a drop or the dock ends a running flourish through the same nine callers — the cuts he never landed still cost the breath (the v1.73 law)
   if(u.cmdDash) u.cmdDashCd=CMD_DASH.cd; u.cmdDash=null; u.cmdTarget=null; }
@@ -47676,6 +47737,23 @@ function knock(u, srcx, srcy, rolled){
   // plate's own list). The grit-out from tanHit already passed it up there.
   if(cmdAbsorbs(u)) return;
   if(!rolled && saberBlocks(u)) return;      // the blade turns it aside (unless this round already rolled)
+  // 0510 THE STONE WALL — SEAT E (D24): enhSoakM is read on the pip, hp, CQ
+  // and bonk paths, never here — and every one-hit knocker (the officer's
+  // potshot, a jeep ram, the tan cannon, EVERY elite boss strike, the tan
+  // rocket, splash FF) arrives whole. Every elite boss rung 105-200 is a
+  // knock boss — THEIR SARGE at 150, the Wall's own door, included — so
+  // without this seat the spec does nothing on the rung it unlocks on. The
+  // guard lands a whole knock as a SIXTH of a knock, in pips: gritCap ×
+  // CMD_WALL.soak = 2 on his 12 (the TAN_MORTAR_F grammar — a fraction of
+  // gritCap through the pip seat — and the vehicle dent's own shape below).
+  // Dice-free. A grit-out (rolled, hits >= cap) passes straight through.
+  if(!S.bf && u.type==='sarge' && u.hits<gritCap(u) && (u.cmdWallT>0 || cmdWallTry(u))){
+    u.hits+=gritCap(u)*CMD_WALL.soak; u.hitT=0;
+    S.fx.push({k:'ring',x:u.x,y:u.y-20,r:4,R:22,t:0,dur:0.2,col:'#C9D2D8'});
+    bfSfx(SFX.thock, u.x, u.y);
+    if(u.hits>=gritCap(u)) knockKill(u);
+    return;
+  }
   // A MACHINE CANNOT BE KNOCKED OFF ITS FEET (v1.62): the campaign's one-hit
   // knockdown sources — the officer's potshot, a ram, the tan cannon, a boss —
   // would otherwise delete the emergency loaner in one round, when the same
@@ -51207,6 +51285,8 @@ function update(dt){
     if(u.cmdSwT>0) u.cmdSwT-=dt;     // 0092 the commander's swing recovery — the same law (re-arms on the walk between fights)
     if(u.cmdDashCd>0) u.cmdDashCd-=dt;   // 0488 THE HIGH BLADE: the quiet between dashes (armed at the landing) — sim dt, loop head only, the sgCd law
     if(u.cmdBlkT>0) u.cmdBlkT-=dt;       // 0488: the block beat cmdAbsorbs writes — he never launches through it
+    if(u.cmdWallT>0){ u.cmdWallT-=dt; if(u.cmdWallT<=0){ u.cmdWallT=0; u.cmdWallCd=CMD_WALL.cd; } }   // 0510 THE STONE WALL: the 7 s window burns at the loop head (sim dt — frozen under a briefing, 2x can't stretch it; ticks before the jet skip, so the guard burns in the air — tanHit already ignores an airborne man; dead men are skipped above and the Sarge respawns as a fresh unit, reset by construction). The rest arms when the window ENDS (the v1.73 law)…
+    else if(u.cmdWallCd>0) u.cmdWallCd-=dt;   // …and burns only once the guard is down (drawSargeWeapon reads its first 0.30 s as the guard coming down — zero extra fields)
     if(u.cmdFx>0) u.cmdFx-=dt;       // ...and his arm settles mid-stride (draw timer, sim dt like the forend's)
     else if(u.cmdDuelK) u.cmdDuelK=0;   // 0509: the flourish's drawn cut expired with its clock — the pose reader falls back to the guard (a plain Commander never carries the field)
     if(u.snipeT>0) u.snipeT-=dt;     // the long rifle's recoil rides out on the figure
@@ -55224,6 +55304,19 @@ function drawTkLeap(u){
 // wall's arc, and a rallied man's faint orange ring. Information under
 // reduced motion (a steady ring), juice only when motion is welcome.
 function drawTkFx(u){
+  if(u.cmdWallT>0){   // 0510 THE STONE WALL: the countdown at his feet — a steady ground ellipse (the overdrive ring's own 28×10, cx.ellipse — HEAD has no scale(1,0.34) anywhere) + the draining arc, #EAF4FF over a #C9D2D8 ghost ring, both through fxSnow (the white-on-white sweep). STEADY under reduced motion — rings are information, and the drain IS the motion. Plus the boot trenches: static ink while he is dug in (the bench's own strokes, behind the boots, mirrored by facing).
+    const wl=Math.max(0,Math.min(1,u.cmdWallT/CMD_WALL.t)), wfs=u.cmdFs||1;
+    cx.save();
+    cx.globalAlpha=0.22; cx.strokeStyle=fxSnow('#C9D2D8'); cx.lineWidth=3.4;
+    cx.beginPath(); cx.ellipse(u.x,u.y,28,10,0,0,7); cx.stroke();
+    cx.globalAlpha=0.92; cx.strokeStyle=fxSnow('#EAF4FF'); cx.lineCap='round';
+    cx.beginPath(); cx.ellipse(u.x,u.y,28,10,0,-Math.PI/2,-Math.PI/2+6.2832*wl); cx.stroke();
+    cx.globalAlpha=0.54; cx.strokeStyle='#4a4536'; cx.lineWidth=3.4;
+    cx.beginPath();
+    cx.moveTo(u.x-wfs*14,u.y-1); cx.lineTo(u.x-wfs*30,u.y+1.5);
+    cx.moveTo(u.x+wfs*8,u.y-1);  cx.lineTo(u.x-wfs*7,u.y+1.5); cx.stroke();
+    cx.lineCap='butt'; cx.restore();
+  }
   if(u.tkOverT>0){
     // 0347 (Wyatt 8/15): the OVERDRIVE tell got loud ("much more
     // noticeable") — a bigger, brighter ground ring and three orbiting
@@ -55832,10 +55925,26 @@ function drawSargeWeapon(u){
     let ang=-0.52, flash=false, glint=false;
     if(u.cmdBlkT>0){ const pb=1-u.cmdBlkT/CMD_DASH.blkT, q=pb<0.1667? 1-Math.pow(1-pb/0.1667,2.4) : pb<0.7333? 1 : Math.pow(1-(pb-0.7333)/0.2667,2); ang=-0.52+(-1.9+0.52)*q; }
     else if(sp){ ang=sp.a; flash=!!sp.flash; glint=!!sp.glint; }
+    // 0510 THE STONE WALL — THE POINT-DOWN GUARD (D18; the bench's wall3, the
+    // one silhouette of the three unlike both the swing's wind-up and the
+    // parry's vertical blade): hand at the shoulder (+10,−40), blade +0.95
+    // rad — the point in the dirt in front, a barrier from shoulder to rug;
+    // the pommel 5 px clear of the helmet crown. NO second-fist stroke
+    // (5.2 px #3a2c1c on a 5.5 px #3a2c1c grip is Δcolour 0 — the
+    // silhouette says two hands); NO lean. Up over 0.26 s; down over 0.30 s
+    // read off the rest clock's first beats (cmdWallCd arms exactly when
+    // the window ends, so its top IS the guard's end — zero new fields).
+    // The ramp BLENDS from whatever the blade was doing (the parry snap, a
+    // swing's tail), so the guard never pops.
+    let wgk=0;
+    if(u.cmdWallT>0) wgk=Math.min(1,(CMD_WALL.t-u.cmdWallT)/0.26);
+    else if(u.cmdWallCd>0 && (CMD_WALL.cd-u.cmdWallCd)<0.30) wgk=1-(CMD_WALL.cd-u.cmdWallCd)/0.30;
+    const wge=wgk>0? 1-Math.pow(1-Math.max(0,Math.min(1,wgk)),2) : 0;
+    if(wge>0) ang=ang+(0.95-ang)*wge;
     const cs1=(usw.cs|0)===1;   // 0509 THE DUELIST: the long sword — the claymore mold at the reach his bag carries (46), thrust-extended through sp.ext; blade or no blade
     const big=cs1||!!usw.aoe, hb=!!usw.hb;   // 0488 THE HIGH BLADE (D25): the claymore mold with a longer blade, a GOLD crossguard + pommel and ONE pale edge-light — off the BAG like the claymore, so a relayed ally's high blade crosses with his loadout; fixed colours, no hex, no bloom (the class law stands)
     const len=cs1? 46+((sp&&sp.ext)||0) : hb?46:big?40:30;
-    const hx=u.x+8, hy=u.y-22;                                  // the hand (the saber hilt's own seat)
+    const hx=u.x+8+2*wge, hy=u.y-22-18*wge;                     // the hand (the saber hilt's own seat) — 0510: risen to the shoulder (+10,−40) while the guard stands
     const gx=hx-Math.cos(ang)*(big?7:5.5), gy=hy-Math.sin(ang)*(big?7:5.5);
     const bx=hx+Math.cos(ang)*2.5, by=hy+Math.sin(ang)*2.5;
     const tx=hx+Math.cos(ang)*len, ty=hy+Math.sin(ang)*len;
