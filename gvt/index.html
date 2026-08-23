@@ -33778,7 +33778,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.67';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.68';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -62300,9 +62300,10 @@ function tvGrant(){
 let AD_FREE_GAMES=1;   // door games at session start that are always ad-free (DIAL; let = rig-tunable)
 let AD_CAMP_EVERY=1;   // campaign: a break before every Nth level start — 2 = every other, 0 = off (DIAL)
 let AD_BF_EVERY=1;     // battlegrounds: a break before every Nth match launch — 0 = off (DIAL)
-let AD_SQUAD_EVERY=1;  // v2.82 squad law, retuned 0383 (Wyatt: an ad after 'each game that you essentially play') — every finished squad game's exit; 0 = off (DIAL)
+let AD_SQUAD_EVERY=1;  // v2.82 squad law, retuned 0383 (Wyatt: an ad after 'each game that you essentially play') — every finished squad game's exit; 0 = off (DIAL). Under AD_SQUAD_LIFE=1 (8/23) this is only the on/off switch — the cadence is the lifetime clock's
+let AD_SQUAD_LIFE=1;   // 8/23 THE SQUAD EXIT JOINS THE 2-3 CLOCK (Wyatt, after a co-op session: "we're still getting served interstitial ads each campaign game; can we make sure its only every 2-3 games?") — 1: the squad verdict exit pays only when META.adNext says so (the SAME lifetime marker the solo exit reads: 2-3 games past the cradle or the last paid break, any game counting — alone or together) and a paid squad break re-arms it 2-3 games out; 0 = the 0383 law (every AD_SQUAD_EVERY-th finished squad game of the session) byte-exact (DIAL)
 let AD_NEWBIE_GAMES=6; // 0504 THE NEWBIE AD GATE (Wyatt 8/23: "We dont want brand new players served any interstitial ads until they play 6 games") — a LIFETIME gate on EVERY real interstitial, solo and squad alike: META.adGames counts door-launched games across sessions (adGate ticks it beside ADQ.games and saves; a pre-0504 save seeds ONCE from its own record — campaign rung + battlefield W+L — so a veteran never re-enters the cradle, a fresh install seeds 0); no break of any kind while adGames <= N. 0 = off (DIAL)
-let AD_SOLO_MIN=2, AD_SOLO_MAX=3;   // 0504 (Wyatt 8/23: "Then after every 2-3 games they should get an interstitial") — the solo verdict cadence is LIFETIME-paced now, not per session: META.adNext = the lifetime game whose verdict exit pays the next break, armed at max(adGames, the cradle) + a whole number drawn in [MIN, MAX] (at boot when missing, again the moment a break is paid). Due UNTIL paid — a due break the session's first game (AD_FREE_GAMES), the gap, the cap or a no-fill swallows slides to the next exit: fewer ads than the schedule, never more (the 0383 law). Replaces 0399's AD_SOLO_EVERY=3 (games 3, 6, 9… of each session). ⚑ the squad exit keeps AD_SQUAD_EVERY=1 past the cradle — the 0383 retune (DIAL)
+let AD_SOLO_MIN=2, AD_SOLO_MAX=3;   // 0504 (Wyatt 8/23: "Then after every 2-3 games they should get an interstitial") — the solo verdict cadence is LIFETIME-paced now, not per session: META.adNext = the lifetime game whose verdict exit pays the next break, armed at max(adGames, the cradle) + a whole number drawn in [MIN, MAX] (at boot when missing, again the moment a break is paid). Due UNTIL paid — a due break the session's first game (AD_FREE_GAMES), the gap, the cap or a no-fill swallows slides to the next exit: fewer ads than the schedule, never more (the 0383 law). Replaces 0399's AD_SOLO_EVERY=3 (games 3, 6, 9… of each session). 8/23: the squad exit reads this SAME marker now (AD_SQUAD_LIFE) — the 0504 ⚑ resolved by Wyatt's own word (DIAL)
 let AD_SOLO_POST=1;    // v3.60 (0297 §V3.8): the adapter-era placement flip — 0 = today's placeholder door law; 1 moves SOLO breaks post-game. A COMPLIANCE PRECONDITION for real ads (Wyatt sign-off, ADS-V1.md §V3 gate 5), never auto-flipped; NO reader in the placeholder era BY DESIGN — the adapter card flips a staged switch, not a new build (DIAL)   // ⛔ GATE 5 SIGNED — Wyatt 8/17 verbatim: "for C, let's turn it on. We want to show solo players an ad after playing" — the reader shipped in v4.35; the dial flips ON here (0379). Real-provider only by construction: soloDue requires ADS.provider!=='placeholder', so web/child/Steam stay break-free
 const ADQ={ games:0, camp:0, bf:0, squad:0, sqPaid:0, soloPaid:0 };   // the session gate counters (door-launched games only; squad = finished 2+-human games, sqPaid = the squad count whose break already showed; 0399: soloPaid = the games count whose SOLO verdict break already showed — the sqPaid idiom, one break per due verdict however many exits race)
 // 0504 THE NEWBIE AD GATE — the lifetime side. adNewbie() = still in the cradle (no
@@ -62531,7 +62532,12 @@ function squadAdGate(launch){
     // screen (the iPad-suspend prune) nulls S.coop, and the finished squad
     // game it latched must still pay its due break on the way out.
     const sq=!!((S.bf&&S.bf.sqAdT)||(S.sq&&S.sq.sqAdT));
-    const due= sq && AD_SQUAD_EVERY>0 && ADQ.squad>0 && (ADQ.squad%AD_SQUAD_EVERY)===0 && ADQ.sqPaid!==ADQ.squad;
+    if(META.adNext==null) adNextArm();   // 0504: a save with no marker (the boot arm failed, or a rig cleared it) draws its first due game here — 8/23: BEFORE either exit consults it
+    // 8/23 THE SQUAD EXIT JOINS THE 2-3 CLOCK: under AD_SQUAD_LIFE the finished squad game pays only when the
+    // LIFETIME marker names it (adGames counts this game already — sqGameTick ticked it at the verdict raise),
+    // the sqPaid latch still keeps racing exits to one break; the 0383 every-Nth-of-the-session law stands under 0
+    const due= sq && AD_SQUAD_EVERY>0 && ADQ.squad>0 && ADQ.sqPaid!==ADQ.squad
+       && (AD_SQUAD_LIFE? (META.adGames|0)>=META.adNext : (ADQ.squad%AD_SQUAD_EVERY)===0);
     // FM-GVT-MAX-01 §V3.8: AD_SOLO_POST's reader lands — dial 1 + a live
     // adapter moves SOLO breaks HERE, the verdict exit, the only legal real
     // seam. Ships 0; flips only on Wyatt's gate-5 sign-off (a dial, not a build).
@@ -62543,12 +62549,11 @@ function squadAdGate(launch){
     // kind inside the cradle (adNewbie). The three verdict exits below route SOLO games here
     // now (v4.56 only entered this gate from a PARTY origin — the reader was
     // dead code for every player who plays alone; the fix is at the taps).
-    if(META.adNext==null) adNextArm();   // 0504: a save with no marker (the boot arm failed, or a rig cleared it) draws its first due game here
     const soloDue= !sq && AD_SOLO_POST===1 && ADS.provider!=='placeholder' && ADQ.games>AD_FREE_GAMES
        && AD_SOLO_MAX>0 && (META.adGames|0)>=META.adNext && ADQ.soloPaid!==ADQ.games;   // 0504: the LIFETIME marker, due until paid — a swallowed break slides to the next exit
     brk= !STEAM_SHELL && !adFree() && !adNewbie() && !live && (due||soloDue)   // 0333a: the paid package suppresses the post-game break too; 0504: so does the cradle — no real break of ANY kind, squad included, until the player has 6 games behind them
        && ADS.provider!=='placeholder' && maxIntOk();   // 0383: REAL ads only — the placeholder break is retired everywhere (web/child/Steam see ZERO interstitials, ever); §V3.10's gap/cap/payer law governs every real one, and a due break the gap swallows simply skips — fewer ads than the schedule, never more
-    if(brk && due) ADQ.sqPaid=ADQ.squad;       // one break per due game, however many exits race
+    if(brk && due){ ADQ.sqPaid=ADQ.squad; if(AD_SQUAD_LIFE) adNextArm(); }   // one break per due game, however many exits race; 8/23: a paid squad break draws the next due game 2-3 out on the shared clock
     if(brk && soloDue){ ADQ.soloPaid=ADQ.games; adNextArm(); }   // 0399: the solo latch — same law; 0504: paid → the next due game is drawn 2-3 games out and saved
   }catch(e){ brk=false; }               // the gate may fail — the exit may not (fail-safe law)
   if(brk){
@@ -72987,6 +72992,7 @@ window.GVT = {
   // ---- ADS V1a rig (v2.60): gates + dials, deterministic for batteries ----
   ads(){ return { steam:STEAM_SHELL, bridge:ADS_BRIDGE, provider:ADS.provider, track:(META.adTrack||null), mi:MAXA.int, mr:MAXA.rew, msess:MAXA.sess, mgap:AD_MIN_GAP_MIN, mcap:AD_SESS_CAP, mwd:AD_WD_MS, mlog:MAXA.log.slice(), sess:Object.assign({},ADQ), free:AD_FREE_GAMES, camp:AD_CAMP_EVERY, bf:AD_BF_EVERY,
     squad:AD_SQUAD_EVERY,   // v2.82: the post-game squad cadence dial
+    squadLife:AD_SQUAD_LIFE,   // 8/23: the squad exit on the lifetime clock
     solo:AD_SOLO_POST,      // v3.60 (0297): the parked adapter-era placement dial (§V3.8)
     newbie:AD_NEWBIE_GAMES, soloMin:AD_SOLO_MIN, soloMax:AD_SOLO_MAX,   // 0504: the cradle + the 2-3 draw (AD_SOLO_EVERY retired)
     life:(META.adGames|0), next:(META.adNext==null? null : META.adNext), cradle:adNewbie(),   // 0504: the lifetime pair + the gate's verdict
@@ -72994,7 +73000,7 @@ window.GVT = {
     int:typeof ADS.showInterstitial==='function', rw:typeof ADS.showRewarded==='function' }; },
   adSess(p){ Object.assign(ADQ,p||{}); return Object.assign({},ADQ); },
   adCfg(p){ p=p||{}; if(p.free!=null) AD_FREE_GAMES=p.free; if(p.camp!=null) AD_CAMP_EVERY=p.camp;
-    if(p.bf!=null) AD_BF_EVERY=p.bf; if(p.squad!=null) AD_SQUAD_EVERY=p.squad;
+    if(p.bf!=null) AD_BF_EVERY=p.bf; if(p.squad!=null) AD_SQUAD_EVERY=p.squad; if(p.squadLife!=null) AD_SQUAD_LIFE=p.squadLife;   // 8/23: the squad exit's clock dial
     if(p.solo!=null) AD_SOLO_POST=p.solo;   // v3.60 (0297): the §V3.8 dial
     if(p.newbie!=null) AD_NEWBIE_GAMES=p.newbie; if(p.soloMin!=null) AD_SOLO_MIN=p.soloMin; if(p.soloMax!=null) AD_SOLO_MAX=p.soloMax;   // 0504: the cradle + the 2-3 draw
     if(p.life!=null){ META.adGames=p.life; saveMeta(); } if(p.next!==undefined){ META.adNext=p.next; saveMeta(); }   // 0504: the lifetime pair (batteries stage a save's history; next:null re-arms at the next exit)
