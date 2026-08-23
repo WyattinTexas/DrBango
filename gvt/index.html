@@ -27927,7 +27927,7 @@ const CMD={
 // the ULTRA MEGA KING YETI INVASION (the spoils door, card 7) and never
 // sold. One seat per dial.
 const CMD_DASH={ r:168, spd:WPN_MILE.sgSpd, cd:6, blkT:0.3 };   // D19: detect 6 m (TK_M 28 px/m, quoted not invented) · the shotgun dash's own flight (680) · the quiet between dashes, armed at the LANDING · the block beat he never launches through
-const CMD_REFL_N=3, CMD_REFL_WIDE=0;                          // D20: three catches per figure per battle (the commando's SHELL-only law — rockets, mortar bombs, tank rounds) · 0 = his own boots only (1 = the buddy-shield widening)
+const CMD_SW_T=0.46;   // 0508 THE CRESCENT CUT: the swing's draw clock (u.cmdFx at the strike) — WIND 0-0.11 · CUT 0.11-0.195 · POSE 0.195-0.265 · RECOVER 0.265-0.46; draw-only, not a wire key, not in a save. (The three reflexes of 0488 — the REFL consts that sat here, the per-figure catch count, the charged reader, the seat in cmdoCatch — RETIRED 0508, Wyatt 8/23: "we don't want him reflecting, and parrying is okay"; his counted blocks (cmdAbsorbs) ARE the parry now, and a caught shell is consumed, never returned.)
 // ⚠ TDZ (the v1.26 law): coopBeat is a const ~5,900 lines below — these only
 // ever RUN lazily (render/battle/endBattle time), never at load. CMD_LVL itself
 // initializes here, ABOVE COOP_MILES, so the table rows can reference it
@@ -33778,7 +33778,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.69';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.70';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -43092,7 +43092,6 @@ OpponentBrain.prototype.pickSpot=function(type,theirs,mine,view){
 
 function placeUnit(type,x,y,side,seat){
   const u = { id:idc++, type, x, y, def:UDEF[type], cd:0, down:false, downT:0, vet:false, phase:Math.random()*6.28, sprue:0.45, kills:0, hits:0, hitT:0 };
-  if(type==='sarge') u.cmdRefN=CMD_REFL_N;   // 0488 THE HIGH BLADE (D20): three catches per FIGURE per battle (units are rebuilt each battle — reset by construction, the commando's cmdoRefN shape); inert unless hbCharged reads sw.hb off his bag (mine / an ally's wire)
   // BATTLEFIELD combatant: HP + death + a marching goal. Campaign callers pass
   // no `side` — their men get the campaign's own march kit in the else below.
   if(S.bf && side){
@@ -43426,6 +43425,9 @@ function cmdAbsorbs(u){
   bfSfx(SFX.thock, u.x, u.y);
   S.fx.push({k:'ring',x:u.x,y:u.y-24,r:5,R:30,t:0,dur:0.22,col:'#C9D2D8'});
   S.floats.push({x:u.x,y:u.y-72,txt:'BLOCKED!',t:0,col:'#C9D2D8'});   // raw key — floats translate at draw
+  if(!reducedMotion()){ const pf=(S.bf&&u.side==='foe')?-1:1, mx=u.x+pf*2, my=u.y-40;   // 0508 THE PARRY: three steel ticks off the blade's middle (the draw stands it at −1.9 rad from the hand seat (±8,−22) for the block beat — its middle ≈ (±2,−40)); i-keyed off the post, never dice; none under reduced motion
+    for(let ti=0;ti<3;ti++){ const th=(((u.x|0)*0.73+(u.y|0)*1.21+ti*2.094)%1), ta=-0.4+(th-0.5)*1.6, ca=Math.cos(ta)*pf, sa=Math.sin(ta), tl=8+th*5;
+      S.fx.push({k:'tracer',x1:mx+ca*3,y1:my+sa*3,x2:mx+ca*tl,y2:my+sa*tl,t:0,dur:0.09,col:'#EAF4FF',w:1.6}); } }
   return true;
 }
 function tanHit(u,fx,fy,src){
@@ -43572,6 +43574,13 @@ function updateSaber(u,dt,sw){
 // (cmdSwT recovery, cmdFx draw timer) tick at the units-fire loop HEAD beside
 // saberCd/sgCd — sim dt, marching or not — so the walk between fights re-arms
 // him and the arm settles mid-stride.
+// 0508 THE CRESCENT CUT (Wyatt 8/23: "go more proto-man on it"): the draw
+// timer runs CMD_SW_T (0.46) now — four beats (cmdSwingPose) — and the
+// contact fx are born BELOW ZERO (t:−0.195, the 0391 stagger) so the ring,
+// the hanging crescent and the tip ticks land on the POSE frame, where the
+// blade visibly arrives; the hurt still lands at t=0 as it always has (⚑
+// accepted, revisit with the Duelist). Facing from SIM data (u.cmdFs, the
+// sign of best.x−u.x) — never unitFl (the mvSm law). Fixed steels, no glow.
 function updateCmd(u,dt,sw){
   if(sw.hb && updateCmdDash(u,dt,sw)) return;   // 0488 THE HIGH BLADE (D19): the dash owns his feet this frame; a LANDING falls through to the swing below at full aoeR (the high blade's bag carries the circle)
   let best=null,bd=sw.rng;                      // nearest foe inside the sword's reach
@@ -43580,7 +43589,7 @@ function updateCmd(u,dt,sw){
     if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;
     const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
   if(!best || u.cmdSwT>0) return;
-  u.cmdSwT=tkSlowMul(u)/(sw.rate*lzRateMul(u)); u.cmdFx=0.22;   // the arm swings for the draw code (v2.36: the blue beam winds his clock too · v3.11: TEAL's concussion stretches it)
+  u.cmdSwT=tkSlowMul(u)/(sw.rate*lzRateMul(u)); u.cmdFx=CMD_SW_T; u.cmdFs=(best.x>=u.x)?1:-1;   // the arm swings for the draw code (v2.36: the blue beam winds his clock too · v3.11: TEAL's concussion stretches it) · 0508: the four-beat clock + the strike's facing (sim data, for the lean, the step and the crescent)
   const vm=(u.vet?1.5:1)*lzDmgMul(u), cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(best);   // v2.36: red beam + teal crits, the saber sites' own shape
   if(sw.aoe){                                    // THE BLADE: everything in the circle, full weight
     for(const g of TGT(u)){ if(g.burrow||g.jetT>0||g.dead) continue;
@@ -43591,7 +43600,12 @@ function updateCmd(u,dt,sw){
     for(const g of TGT(u)){ if(g!==best && !g.burrow && !g.dead && bfCanTarget(u,g)
       && Math.hypot(g.x-u.x,g.y-u.y)<CMD.cleave) hurt(g,sw.dmg*CMD.cleaveF*vm*cm,u); }  // …and its own cleave (the blade's own numbers)
   }
-  S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:(sw.aoe||CMD.cleave)+4,t:0,dur:0.26,col:'#C9D2D8'});  // STEEL, never a glow colour
+  S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:(sw.aoe||CMD.cleave)+4,t:-0.195,dur:0.26,col:'#C9D2D8'});  // STEEL, never a glow colour — 0508: born at −0.195 so the contact finally agrees with the blade (the pose frame)
+  { const fs=u.cmdFs, bl=sw.hb?46:sw.aoe?40:30, cl=Math.cos(0.18), sl=Math.sin(0.18);   // 0508 THE CRESCENT: the blade's own length off the bag; the pose's lean (0.18 rad about the boots) + hip step (+7) re-derived here so the fx land where the steel is drawn (cmdLeanIn / cmdSwingPose), mirrored by the facing
+    const rp=(px,py)=>[u.x+fs*(7+px*cl-py*sl), u.y+px*sl+py*cl], hs=rp(8,-22), tp=rp(8+Math.cos(0.70)*bl,-22+Math.sin(0.70)*bl);
+    S.fx.push({k:'cres',x:hs[0],y:hs[1],fs:fs,a0:-1.48,a1:0.70,R:42,t:-0.195,dur:0.22,hold:0});   // three fixed-steel arcs over the swept angle, born on the pose frame; they HANG while he recovers through them
+    if(!reducedMotion()) for(let ti=0;ti<6;ti++){ const th=(((u.x|0)*0.73+(u.y|0)*1.21+ti*0.897)%1), ta=0.70+1.5708+(th-0.5)*1.3, ca=Math.cos(ta)*fs, sa=Math.sin(ta), td=2+((ti*0.37+th)%1)*5, tl=td+5+th*6;   // six tip ticks along the tangent, i-keyed off the post (never dice); none under reduced motion
+      S.fx.push({k:'tracer',x1:tp[0]+ca*td,y1:tp[1]+sa*td,x2:tp[0]+ca*tl,y2:tp[1]+sa*tl,t:-0.195,dur:0.09,col:'#EAF4FF',w:1.6}); } }
   bfSfx(SFX.swish,u.x,u.y); if(bfHumanU(u)) S.shake=Math.max(S.shake,0.12);
 }
 // ===== 0488 THE HIGH COMMANDER'S BLADE — THE DASH (D19; Wyatt 8/21: "it adds
@@ -45875,20 +45889,11 @@ function foeSplash(x,y,R,src){
 // costs at most one charge and nobody inside it also rolls a second save —
 // the v1.19 one-round-one-save law applied to a whole shell.
 function cmdoCharged(u){ return !!u && u.type==='commando' && !u.dead && !(u.cmdoRefN>0); }
-// 0488 THE HIGH COMMANDER'S BLADE (D20; Wyatt: "three reflexes, kind of like
-// how the Commando reflects"): a high-bladed Commander with a catch left —
-// u.cmdRefN counts down from CMD_REFL_N (stamped at placement, per figure per
-// battle), the ownership off his bag (highU: mine / an ally's wire). He
-// answers ONLY in cmdoCatch — the shells' funnel (rockets, mortar bombs, tank
-// rounds); bullets, blades, stomps, mines never come there, and the
-// boulder/snowball door (cmdoIntercept) stays the commando's own (⚑ flagged).
-function hbCharged(u){ return !!u && u.type==='sarge' && !u.dead && (u.cmdRefN|0)>0 && highU(u); }
 // does this charged commando answer for a blast at (x,y,R)? Base kit: the
 // blast would catch HIM. THE BUDDY SHIELD widens the catch to any live
 // friendly standing inside his guard circle (enhU — the OWNER's bench).
 function cmdoCovers(c,x,y,R,margin){
   if(Math.hypot(c.x-x,c.y-y)<=R+margin) return true;
-  if(c.type!=='commando' && !CMD_REFL_WIDE) return false;   // 0488 (D20): the high-bladed Commander answers for HIS boots only — no buddy-shield widening (CMD_REFL_WIDE 1 = his guard circle like the commando's)
   if(!enhU(c,'buddyshield')) return false;
   for(const o of S.units){
     if(o===c || o.dead || o.dropT>0) continue;
@@ -45905,14 +45910,14 @@ function cmdoCovers(c,x,y,R,margin){
 function cmdoCatch(x,y,R,margin,src,kind,dmg,vx2){
   let C=null;
   for(const u of S.units){
-    if(!cmdoCharged(u) && !hbCharged(u)) continue;              // 0488: + the high-bladed Commander with a charge left (SHELLS only — this funnel is theirs alone)
+    if(!cmdoCharged(u)) continue;   // 0508: the commando alone — the Commander's 0488 reflect seat is retired (his block in cmdAbsorbs stops a shell dead, nothing comes back)
     if(u.dropT>0) continue;                                     // the drop-in ghost guards nobody yet
     if(S.drag&&S.drag.unit===u) continue;
     if(S.bf && src.side && u.side===src.side) continue;         // never catch your own side's shell
     if(cmdoCovers(u,x,y,R,margin)){ C=u; break; }
   }
   if(!C) return false;
-  if(C.type==='commando') C.cmdoRefN=1; else C.cmdRefN=(C.cmdRefN|0)-1;   // 0488: the Commander spends ONE of his three (cmdRefN--); the commando his one — the same return shell, the same REFLECTED!, refl:true below (the TK_REFL ping-pong law)
+  C.cmdoRefN=1;
   bfSfx(SFX.laser, C.x, C.y);
   S.fx.push({k:'ring',x:C.x,y:C.y-24,r:6,R:40,t:0,dur:0.3,col:'#9FE0FF'});
   S.fx.push({k:'ring',x,y,r:Math.max(6,R*0.5),R,t:0,dur:0.25,col:'#9FE0FF'});
@@ -54130,7 +54135,7 @@ function draw(){
 
   // fx
   for(const e of S.fx){
-    if(e.t<0) continue;   // 0391: a staggered barrage round waits its turn — born t=−i·BRG_STAG (brgWave), it draws nothing till the tick walks its clock past zero (no other fx is ever born below zero)
+    if(e.t<0) continue;   // 0391: a staggered barrage round waits its turn — born t=−i·BRG_STAG (brgWave), it draws nothing till the tick walks its clock past zero (0508: the Commander's contact ring, crescent and tip ticks are born at −0.195 the same way — the pose frame)
     const k=e.t/e.dur;
     if(e.k==='tracer'){ cx.globalAlpha=(1-k)*(e.a||1); cx.strokeStyle=e.col||'#FFF3C4'; cx.lineWidth=e.w||2.5; cx.beginPath(); cx.moveTo(e.x1,e.y1); cx.lineTo(e.x2,e.y2); cx.stroke(); cx.globalAlpha=1; }
     if(e.k==='rope'){   // 0340: Jane's hook-shot line — taut from the eave, gone as she lands (0433: no pusher tonight — the sky rope is retired at janeIn; 0438's cinematic cut re-anchors it from a DRAWN eave)
@@ -54238,6 +54243,13 @@ function draw(){
       }
       cx.lineCap='butt'; cx.globalAlpha=1;
     }
+    else if(e.k==='cres'){ // 0508 THE CRESCENT — the Commander's hanging slash: the King Yeti's wind-front grammar (drawUnit's three travelling arcs) in FIXED STEEL — lw 9 #8f979f · lw 3.4 #EAF4FF at r−5 over ×0.8 of the span · lw 2 #C9D2D8 at r−14 over ×0.58 — the two pale layers through fxSnow (the ring's own snow law); R grows +10 as it fades over dur; an optional hold (0509's WAKE) stands it at full first; the span is the swept angle (a0..a1), mirrored by fs; no glow, no shadowBlur (the class law)
+      const hk=e.hold? Math.max(0,(e.t-e.hold)/(e.dur-e.hold)) : k, gr=e.R+10*hk, hw=(e.a1-e.a0)/2, mid=(e.fs<0? Math.PI-(e.a0+e.a1)/2 : (e.a0+e.a1)/2);
+      cx.lineCap='round';
+      cx.globalAlpha=(1-hk)*0.42; cx.lineWidth=9;   cx.strokeStyle='#8f979f';         cx.beginPath(); cx.arc(e.x,e.y,gr,mid-hw,mid+hw); cx.stroke();
+      cx.globalAlpha=(1-hk)*0.88; cx.lineWidth=3.4; cx.strokeStyle=fxSnow('#EAF4FF'); cx.beginPath(); cx.arc(e.x,e.y,Math.max(4,gr-5),mid-hw*0.8,mid+hw*0.8); cx.stroke();
+      cx.globalAlpha=(1-hk)*0.34; cx.lineWidth=2;   cx.strokeStyle=fxSnow('#C9D2D8'); cx.beginPath(); cx.arc(e.x,e.y,Math.max(3,gr-14),mid-hw*0.58,mid+hw*0.58); cx.stroke();
+      cx.globalAlpha=1; cx.lineCap='butt'; }
     else if(e.k==='smoke'){ cx.globalAlpha=(1-k)*0.4; cx.fillStyle='#bbb'; cx.beginPath(); cx.arc(e.x,e.y,3+5*k,0,7); cx.fill(); cx.globalAlpha=1; }
     else if(e.k==='wisp'){ // gun smoke off a muzzle: drifts with the shot, curls upward, thins out
       cx.globalAlpha=(1-k)*0.42; cx.fillStyle=e.col||'#b8b6ae';   // 0481: an optional col — powder-white for the Baker (the 0397 slug-renderer grammar; zero-byte for every other wisp)
@@ -55361,12 +55373,13 @@ function drawUnit(u){
   const kyl=(u.kyHeldT>0)? 17+3*Math.sin(S.t*16) : 0;
   if(kyl){ cx.strokeStyle='rgba(192,71,58,0.85)'; cx.lineWidth=2.5;
     cx.beginPath(); cx.arc(u.x,u.y-30-kyl,15+3*Math.sin(S.t*11),0,7); cx.stroke(); }
+  const cl=cmdLeanIn(u);   // 0508 THE CRESCENT CUT: the body lean + the hip step — ONE transform around sprite + outfit + weapon (drawSargeOutfit paints at u.x/u.y in world coords; a rot on the sprite alone leaves the helmet off the head); closed on the sarge line below, before the pips. Every other figure: false, zero bytes
   if(u.type==='jane') drawJane(u,kyl);   // 0434 THE SHAPE-STORE JANE: her own pose-driven draw (pre-built poses + the entrance rig above; every other figure keeps the shared line below byte-what-it-was)
   else if(u.type==='kingyeti') drawKing(u,u.x,u.y-kyl,w,unitWob(u),false,unitFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase (one helper, four seats) — 0435 THE SHAPE-STORE KING, playable seat — the same pose reader as the boss (his wave arcs + seize lift keep their shipped seats around this fork)
   else if(isCroakU(u) && crFlinch(u)) drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : unitWob(u)),crFlinch(u),unitFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase — 0454: the playable outlaw king — ONLY the flinch forks (the hurt mold on the shared transform); every other frame falls to the generic line below, the old waddle byte-what-it-was
   else drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : unitWob(u)),im,unitDrawFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase (one helper, four seats) — v2.78: the recoil, campaign edition — v3.61: + the walk-flip seat — 0424: the king's swing lean (the boss's own -0.14) — 0462b: the facing XOR the mold's authored face (UNIT_WEST) + the breather's turn
   if(u.type==='radioman') drawRadioCall(u);
-  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); drawAbsorbPips(u); drawHbPips(u); }   // v3.11: a vanished Sarge's kit ghosts WITH him — the alpha holds through the extras
+  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); if(cl) cx.restore(); drawAbsorbPips(u); drawCmdBlkPips(u); }   // v3.11: a vanished Sarge's kit ghosts WITH him — the alpha holds through the extras · 0508: the lean wrapper closes before the pips (they ride the helmet, never the lean)
   if(u.type==='commando') drawCmdoPip(u);
   if(u.type==='kingyeti'&&u.kyWave){ const Wv=u.kyWave; cx.lineCap='round';   // 0424: the unit king's wind-front — the boss's own travelling arcs, mirrored east toward the Tan
     cx.globalAlpha=0.55; cx.lineWidth=9; cx.strokeStyle='#7FB2E0';
@@ -55435,10 +55448,11 @@ function drawBFUnit(u,w,im){
   // solid bar over a ghost reads as a bug; it returns the frame he appears)
   const ck=u.cloakT>0;
   if(ck) cx.globalAlpha=0.42;
+  const cl=cmdLeanIn(u);   // 0508: the crescent cut's lean wrapper — sprite + outfit + weapon, closed before the bar and the pips
   drawSprite(u.type,u.x,u.y,w,cmdoRecoil(u), wob, im, flip);   // v2.78: the cannon's recoil rides the whole figure
-  if(ck){ cx.globalAlpha=1; return; }
+  if(ck){ if(cl) cx.restore(); cx.globalAlpha=1; return; }
   if(u.type==='radioman') drawRadioCall(u);
-  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); }
+  if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); if(cl) cx.restore(); }
   drawTkFx(u);   // v3.11: overdrive / wall / channel tells (0462c: the orange per-man ring rides u.tkOrIn)
   if(u.hp<u.hpMax){
     const k=Math.max(0,u.hp/u.hpMax);
@@ -55450,7 +55464,7 @@ function drawBFUnit(u,w,im){
     cx.fillRect(u.x-15,u.y-bo,30*k,4);
   }
   if(u.type==='sarge') drawAbsorbPips(u);
-  if(u.type==='sarge') drawHbPips(u);   // 0488: the high blade's three catches
+  if(u.type==='sarge') drawCmdBlkPips(u);   // 0508: his blocks left, in steel
   if(u.type==='commando') drawCmdoPip(u);
 }
 // 0121 the commando's charge pip — one steel-blue kite shield over the helmet
@@ -55465,16 +55479,17 @@ function drawCmdoPip(u){
   cx.lineTo(u.x-2.4,py+2.6); cx.lineTo(u.x-3.4,py-1.6); cx.closePath(); cx.fill();
   cx.strokeStyle='rgba(20,22,16,0.6)'; cx.lineWidth=1; cx.stroke();
 }
-// 0488 THE HIGH BLADE's three charges — the commando's kite shield, one per
-// catch left, in a row over the helmet on both carpets (the riot plate's
-// register at y-66); spent ones draw nothing (the 0121 law: an empty pip is
-// clutter over a man it no longer guards). Only a high-bladed Commander ever
-// reads true here (hbCharged) — every other Sarge draws nothing.
-function drawHbPips(u){
-  if(!hbCharged(u)) return;
-  const n=Math.min(CMD_REFL_N, u.cmdRefN|0), py=u.y-66;
+// 0508 THE PARRY's picture — the Commander's COUNTED BLOCKS (0092's
+// cmdAbsorbs, CMD.blk per figure per battle) finally have a pip row: one STEEL
+// kite per block left (the commando's kite mold on the riot plate's y-66
+// register, both carpets); a spent row draws nothing (the 0121 law). Reads the
+// BAG's blk (sw.blk!=null — a bag may carry 0 or 1); commander rig only, so
+// it is weapon-exclusive with drawAbsorbPips by construction.
+function drawCmdBlkPips(u){
+  const sw=unitSargeStats(u); if(u.dead || sw.w!=='commander') return;
+  const n=(sw.blk!=null? sw.blk : CMD.blk)-(u.cmdBlkN|0), py=u.y-66; if(n<=0) return;
   for(let i=0;i<n;i++){ const px=u.x+(i-(n-1)/2)*8;
-    cx.fillStyle='#9FE0FF'; cx.beginPath();
+    cx.fillStyle='#C9D2D8'; cx.beginPath();
     cx.moveTo(px,py-4.2); cx.lineTo(px+3.4,py-1.6); cx.lineTo(px+2.4,py+2.6); cx.lineTo(px,py+4.6);
     cx.lineTo(px-2.4,py+2.6); cx.lineTo(px-3.4,py-1.6); cx.closePath(); cx.fill();
     cx.strokeStyle='rgba(20,22,16,0.6)'; cx.lineWidth=1; cx.stroke(); }
@@ -55500,6 +55515,35 @@ function drawAbsorbPips(u){
       cx.beginPath(); cx.arc(px,py,2.1,0,7); cx.stroke();
     }
   }
+}
+// 0508 THE CRESCENT CUT — the swing's four beats (Wyatt 8/23: "go more
+// proto-man on it"; the round-6 bench's angNew, the authored curve): t = time
+// since the strike. WIND 0→0.11 (guard −0.52 → −1.48, ease-out 1.8, lean
+// −0.12, hip −3; a tip glint in the last 20 ms) · CUT 0.11→0.195 (→ +0.70 by
+// cutEase — 2.18 rad in 85 ms; lean → +0.18, hip → +7: he STEPS into it) ·
+// POSE 0.195→0.265 (holds +0.70, the edge flashes #F4F9FF for 50 ms; the ring
+// and the crescent are born on this frame) · RECOVER 0.265→0.46 (ease-out 2,
+// back to guard through his own fading slash). The hip is DRAW-ONLY — the
+// sim's x never moves (the mvSm law); the crescent's seat is re-derived from
+// these same numbers in updateCmd.
+function cmdSwingPose(fx){
+  const t=CMD_SW_T-fx, G=-0.52, TOP=-1.48, BOT=0.70;
+  if(t<0.11){ const p=1-Math.pow(1-t/0.11,1.8); return {a:G+(TOP-G)*p, lean:-0.12*p, hip:-3*p, glint:(t>0.09&&t<0.11)}; }
+  if(t<0.195){ const q=(t-0.11)/0.085, p=q<0.70? 0.86*Math.pow(q/0.70,1.6) : 0.86+0.14*(1-Math.pow(1-(q-0.70)/0.30,2)); return {a:TOP+(BOT-TOP)*p, lean:-0.12+0.30*p, hip:-3+10*p}; }
+  if(t<0.265) return {a:BOT, lean:0.18, hip:7, flash:(t<0.245)};
+  if(t<CMD_SW_T){ const p=1-Math.pow(1-(t-0.265)/0.195,2); return {a:BOT+(G-BOT)*p, lean:0.18*(1-p), hip:7*(1-p)}; }
+  return {a:G, lean:0, hip:0};
+}
+// the body lean + the hip step — ONE wrapper transform around sprite + outfit
+// + weapon (drawSargeOutfit paints every piece at u.x/u.y in world coords — a
+// rot passed into drawSprite would move the sprite alone and leave the helmet
+// 6.4 px off the head at the pose). Opened here, closed by the caller after
+// the weapon (before the pips). Facing = u.cmdFs, the strike's own (sim data).
+function cmdLeanIn(u){
+  if(u.type!=='sarge' || !(u.cmdFx>0) || unitSargeStats(u).w!=='commander') return false;
+  const p=cmdSwingPose(u.cmdFx), fs=u.cmdFs||1;
+  cx.save(); cx.translate(u.x+fs*p.hip,u.y); cx.rotate(fs*p.lean); cx.translate(-u.x,-u.y);
+  return true;
 }
 // show what Sarge is packing, right on the figure
 function drawSargeWeapon(u){
@@ -55613,9 +55657,20 @@ function drawSargeWeapon(u){
     // pump-forend timer idiom, decayed at the loop head); the claymore reads
     // THE BAG (usw.aoe), so a relayed ally's blade state crosses with their
     // loadout and never off this save's record.
-    const k=(u.cmdFx>0? u.cmdFx/0.22 : 0);                      // 1 at the strike → 0 at rest
+    // 0508 THE CRESCENT CUT + THE PARRY: the sine bob is gone — the four beats
+    // ride cmdSwingPose (the lean + hip step are the caller's wrapper, cmdLeanIn);
+    // a block in progress (u.cmdBlkT, cmdAbsorbs' own 0.3 s) snaps the blade
+    // vertical, edge out (−1.9 rad): snap 50 ms · hold 170 · home 80, no lean
+    // (Wyatt: "the parry looks good"). During a swing the steel follows the
+    // STRIKE's facing (u.cmdFs — the step and the crescent already do); a foe
+    // behind him is the only frame the walk-flip and the strike ever disagree.
+    const sp=(u.cmdFx>0)? cmdSwingPose(u.cmdFx) : null;
+    const rem=!!sp && ((u.cmdFs<0)!==wflip);
+    if(rem){ cx.save(); cx.translate(u.x*2,0); cx.scale(-1,1); }
+    let ang=-0.52, flash=false, glint=false;
+    if(u.cmdBlkT>0){ const pb=1-u.cmdBlkT/CMD_DASH.blkT, q=pb<0.1667? 1-Math.pow(1-pb/0.1667,2.4) : pb<0.7333? 1 : Math.pow(1-(pb-0.7333)/0.2667,2); ang=-0.52+(-1.9+0.52)*q; }
+    else if(sp){ ang=sp.a; flash=!!sp.flash; glint=!!sp.glint; }
     const big=!!usw.aoe, hb=!!usw.hb;   // 0488 THE HIGH BLADE (D25): the claymore mold with a longer blade, a GOLD crossguard + pommel and ONE pale edge-light — off the BAG like the claymore, so a relayed ally's high blade crosses with his loadout; fixed colours, no hex, no bloom (the class law stands)
-    const ang=-0.52 + 0.95*Math.sin(Math.PI*Math.min(1,k));     // idle guard → a downward cut → back
     const len=hb?46:big?40:30;
     const hx=u.x+8, hy=u.y-22;                                  // the hand (the saber hilt's own seat)
     const gx=hx-Math.cos(ang)*(big?7:5.5), gy=hy-Math.sin(ang)*(big?7:5.5);
@@ -55629,12 +55684,14 @@ function drawSargeWeapon(u){
     cx.lineCap='round';
     cx.strokeStyle='#8f979f'; cx.lineWidth=big?7:5; cx.beginPath(); cx.moveTo(bx,by); cx.lineTo(tx,ty); cx.stroke();       // steel body
     if(big){ cx.strokeStyle='#5a5f66'; cx.lineWidth=1.2; cx.beginPath(); cx.moveTo(bx,by); cx.lineTo(tx,ty); cx.stroke(); }// the center ridge
-    cx.strokeStyle='#d8d8d8'; cx.lineWidth=1.5; cx.beginPath();
+    cx.strokeStyle=flash?'#F4F9FF':'#d8d8d8'; cx.lineWidth=flash?2.6:1.5; cx.beginPath();   // 0508: the pose's edge flash — one brighter, wider glint on the steel for 50 ms (a light ON steel, never light FROM it)
     cx.moveTo(bx+Math.cos(ang)*3+pxx*(big?1.7:1.2), by+Math.sin(ang)*3+pyy*(big?1.7:1.2));
     cx.lineTo(tx+pxx*(big?1.7:1.2), ty+pyy*(big?1.7:1.2)); cx.stroke();                                                    // the edge glint
     if(hb){ cx.strokeStyle='#EAF4FF'; cx.lineWidth=1.1; cx.beginPath();   // 0488: the pale edge-light down the far edge + a glint at the tip — a light on the steel, never a glow
       cx.moveTo(bx+Math.cos(ang)*4-pxx*2.4, by+Math.sin(ang)*4-pyy*2.4); cx.lineTo(tx-pxx*2.4, ty-pyy*2.4); cx.stroke();
       cx.fillStyle='#F4F9FF'; cx.beginPath(); cx.arc(tx,ty,1.4,0,7); cx.fill(); }
+    if(glint){ cx.fillStyle='#F4F9FF'; cx.beginPath(); cx.arc(tx,ty,2,0,7); cx.fill(); }   // 0508: the tip glint at the top of the wind (the last 20 ms) — the blade LOADS before it falls
+    if(rem) cx.restore();
   }
   else if(w==='lightsaber' && unarmedU(u,usw)){
     // 0487 UNARMED (D25): the blade DISMISSED — no hilt in hand, no blade,
@@ -73846,8 +73903,8 @@ window.GVT = {
   // ===== 0488 THE HIGH COMMANDER'S BLADE — rig door (read-only; the honest GRANT is META.highBlade=1 / META.ev.bladeOwed=1 on the save — the spoils door's own word, no synthetic grant) =====
   hb(){ const u9=(S.mode==='play')? S.units.find(x=>x.type==='sarge'&&!x.dead&&!x.coopBy&&(!S.bf||x.seat===bfMySeat())) : null, sw9=u9? unitSargeStats(u9) : sargeStats();
     return { own:highOwned()?1:0, flag:META.highBlade?1:0, owed:(META.ev&&META.ev.bladeOwed)?1:0, ann:META.hbAnn?1:0, cmd:cmdOwned()?1:0, art:sargeArtW('commander'), bag:{ w:sw9.w, hb:sw9.hb?1:0, rng:sw9.rng!=null? sw9.rng : null, aoe:sw9.aoe||0 },
-      u:u9? { hb:highU(u9,sw9)?1:0, dash:u9.cmdDash||null, cd:+(u9.cmdDashCd||0).toFixed(3), refN:u9.cmdRefN|0, charged:hbCharged(u9)?1:0, home:u9.home? [Math.round(u9.home.x),Math.round(u9.home.y)] : null, x:+u9.x.toFixed(1), y:+u9.y.toFixed(1), blkT:+(u9.cmdBlkT||0).toFixed(2) } : null,
-      k:{ r:CMD_DASH.r, spd:CMD_DASH.spd, cd:CMD_DASH.cd, blkT:CMD_DASH.blkT, refl:CMD_REFL_N, wide:CMD_REFL_WIDE } }; },
+      u:u9? { hb:highU(u9,sw9)?1:0, dash:u9.cmdDash||null, cd:+(u9.cmdDashCd||0).toFixed(3), home:u9.home? [Math.round(u9.home.x),Math.round(u9.home.y)] : null, x:+u9.x.toFixed(1), y:+u9.y.toFixed(1), blkT:+(u9.cmdBlkT||0).toFixed(2) } : null,
+      k:{ r:CMD_DASH.r, spd:CMD_DASH.spd, cd:CMD_DASH.cd, blkT:CMD_DASH.blkT } }; },
   wm(){ return { gsOwn:enhOwns('guardianshotgun')?1:0, gsOnW:gsOn()?1:0, gsCd:+(S.gsCd||0).toFixed(2), gsT:+(S.gsT||0).toFixed(2),
       rpOwn:enhOwns('renegadepistol')?1:0, rpOnW:rpOn()?1:0, rpCd:+(S.rpCd||0).toFixed(2),
       rects:{ gs:btnRects.gs? btnRects.gs.slice():null, rp:btnRects.rp? btnRects.rp.slice():null },
