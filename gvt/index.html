@@ -28179,16 +28179,16 @@ function edgePt(e){
   // the street band is the duel's own and never meets a ring. 0 everywhere
   // else — the same Math.random() draws, the same arithmetic, byte-still.
   const rl=(S.cfg&&S.cfg.terrain&&S.cfg.terrain.cring)? CRING_LANE : 0;
-  if(e==='right-top')    return { x:W+60, y:off+rl-fl+110+Math.random()*110 };
-  if(e==='right-bottom') return { x:W+60, y:off+rl+fl+380+Math.random()*110 };
+  if(e==='right-top')    return { x:W+60, y:off+rl-fl+110+rnd9()*110 };
+  if(e==='right-bottom') return { x:W+60, y:off+rl+fl+380+rnd9()*110 };
   // 0370 THE STREET BAND (the croak duel's own lane — Wyatt: "His support
   // units need to come out quicker to help him"): the posse rushes out of
   // the alleys and porches BESIDE the fight — the mid-street building band
   // (east of the creek, west of the crate stacks), north or south rim —
   // instead of the ~25s walk from the east rim at bandit pace.
-  if(e==='street'){ const sx=900+Math.random()*420;
-    return (Math.random()<0.5)? { x:sx, y:off+64+Math.random()*40 } : { x:sx, y:WORLD_H-off-64-Math.random()*40 }; }
-  return { x:W+60, y:off+rl+140+Math.random()*320 };   // right (center lane)
+  if(e==='street'){ const sx=900+rnd9()*420;
+    return (rnd9()<0.5)? { x:sx, y:off+64+rnd9()*40 } : { x:sx, y:WORLD_H-off-64-rnd9()*40 }; }
+  return { x:W+60, y:off+rl+140+rnd9()*320 };   // right (center lane)
 }
 // ===== 0479 WESTERN ROAD 8/8 — THE RIM DOORS. A new entry edge for the infest
 // floods (Wyatt 8/21: "Lacks infesting moments." — the plan's §4.6: "a crawler
@@ -33778,7 +33778,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.68';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.69';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -34711,6 +34711,7 @@ function coopOnPoll(r, sentWant){
     }
   } else if(r.mate){ COOP.mate=r.mate; COOP.lastSeen=r.mate.seen||0; }
   let sqTop=0;
+  S.cenQ=(S.cenQ|0)+1;   // FIX-B: one census beat per poll reply (the formation translate's guard)
   (r.cmds||[]).forEach(cm=>{
     if(cm.q>COOP.seq) COOP.seq=cm.q;
     if(cm.p===COOP.role) return;
@@ -35017,7 +35018,12 @@ function coopApply(cm){
   if(cm.k==='fcn'){
     if(S.bf || COOP.host || String(cm.p||'')===String(COOP.role) || !Array.isArray(cm.mo)) return;
     FCN_KEYS||(FCN_KEYS=Object.keys(FDEF));
-    S.cenQ=(S.cenQ|0)+1;
+    // FIX-B: one rigid translate per formation per POLL REPLY (S.cenQ is
+    // bumped in coopOnPoll — the two census words of a beat land in the
+    // same reply before any glide moves a body; a per-WORD id let a
+    // formation straddling both words take its translate TWICE: the anchor
+    // twice as far as its men, the ranks then springing past the truth and
+    // the next beat pulling them back — the oscillation Wyatt saw).
     // 0343 (item 3): the beat's census opens with the referee's true
     // standing count (n — absent off an 0330 referee: no sweep, the hurry
     // still honest); the per-type muster high-water is the one gate both
@@ -35025,6 +35031,13 @@ function coopApply(cm){
     const hi9=S.fcnHi||(S.fcnHi={});
     if(typeof cm.n==='number' && cm.n>0) S.fcnAcc={n:cm.n|0, seen:{}, c:0};
     const ac9=S.fcnAcc;
+    // FIX-D: the word's age — the referee stamps his sim clock (t); both
+    // sims start at the battle mark (≤0.25s apart), so S.t−t ≈ how old the
+    // pins are (the relay's phase, 0.1–1.2s). Each pin is moved forward
+    // along the twin's OWN velocity for that long, so a healthy marcher is
+    // compared with where the referee's man is NOW, not a beat ago.
+    const age9=(typeof cm.t==='number' && isFinite(cm.t))? Math.max(0,Math.min(1.5,S.t-cm.t)) : 0;
+    const fm9=new Map();   // FIX-B: formation → the IMPLIED-ANCHOR deltas summed over the word's rows
     for(const r9 of cm.mo){ const p9=String(r9).split(','); if(p9.length<4) continue;
       const t9=FCN_KEYS[parseInt(p9[0],36)|0]; if(!t9) continue;
       const n9=parseInt(p9[1],36)|0;
@@ -35032,14 +35045,110 @@ function coopApply(cm){
       if(ac9 && !ac9.seen[t9+':'+n9]){ ac9.seen[t9+':'+n9]=1; ac9.c++; }
       const f9=S.foes.find(g9=>g9.type===t9 && (g9.foN|0)===n9);
       if(!f9 || f9.dead || f9.pendDie) continue;
-      const nx=Math.max(-400,Math.min(W+400,parseInt(p9[2],36)|0)), ny=Math.max(40,Math.min(WORLD_H-40,parseInt(p9[3],36)|0));
-      const dx=nx-f9.x, dy=ny-f9.y;
-      if(Math.abs(dx)<=FCN_TOL && Math.abs(dy)<=FCN_TOL) continue;
+      const nx=Math.max(-400,Math.min(W+4000,parseInt(p9[2],36)|0)), ny=Math.max(40,Math.min(WORLD_H-40,parseInt(p9[3],36)|0));   // FIX-A: a deep line's tail walks on ~W+2900 — W+400 made its rows lie, and the rigid translate teleported the whole block
       if(f9.form && f9.off && S.forms.indexOf(f9.form)>=0){
-        if(f9.form._cenQ===S.cenQ) continue;
-        f9.form._cenQ=S.cenQ; f9.form.x+=dx; f9.form.y+=dy;
-        for(const m9 of f9.form.members){ if(m9 && !m9.dead && !m9.pendDie) glStart(m9, m9.x+dx, m9.y+dy); }   // 0343 (item 2): the rigid translate GLIDES — ranks slide level together
-      } else glStart(f9,nx,ny);   // 0343 (item 2)
+        // FIX-B: a formed row is EVIDENCE about the referee's BLOCK — its
+        // anchor AND its heading. The two sims' blocks wheel onto different
+        // headings (a beat of lag into the bridge turn, a rock, ranks that
+        // broke a second earlier on one screen) and a 1200px column's tail
+        // swings hundreds of px for a few degrees — a rigid TRANSLATE can
+        // never line them up, and a member pulled level springs straight
+        // back to his wrong slot (the sawtooth Wyatt saw). Rows are pooled
+        // per block across the reply's words (the second word only ever ADDS
+        // evidence) and the pose is re-fitted below as an ABSOLUTE seat.
+        const fo9=f9.form;
+        if(!fo9._cenR || fo9._cenR.q!==S.cenQ || Math.abs(fo9._cenR.age-age9)>0.25) fo9._cenR={q:S.cenQ, age:age9, rows:[]};   // one pool per beat — a reply that carries TWO of the referee's beats (the ages tell them apart) fits each on its own rows, the newer seat standing
+        fo9._cenR.rows.push({x:nx, y:ny, fx:+f9.off.fx||0, fy:+f9.off.fy||0, m:f9});
+        fm9.set(fo9,1);
+        continue;
+      }
+      const dx=nx+(f9.vx9||0)*age9-f9.x, dy=ny+(f9.vy9||0)*age9-f9.y;   // FIX-D: the pin, aged forward along the twin's own walk
+      if(Math.abs(dx)<=FCN_TOL && Math.abs(dy)<=FCN_TOL) continue;
+      glStart(f9,f9.x+dx,f9.y+dy);   // 0343 (item 2)
+    }
+    // FIX-B: THE BLOCK FIT — per formation, the referee's anchor + heading
+    // that best explain his men's pins: a rotation+translation least-squares
+    // on the authored slot offsets when the evidence is rich (≥3 rows, real
+    // spread, tight residual), else a translate on my own heading. Rows that
+    // fold off the band on either screen (foeBandY) sit out of the fit — a
+    // folded man is not where his slot says. A residual past FORM_RES_MAX
+    // under BOTH models means the referee's ranks have BROKEN: mine break
+    // too and the named men pin singly. A good fit re-seats the anchor
+    // (aged forward along the heading at the block's own pace — FIX-D),
+    // adopts the heading, and every rank GLIDES to its slot — the spring
+    // then agrees with the pin instead of fighting it.
+    for(const fo9 of fm9.keys()){
+      const R=(fo9._cenR&&fo9._cenR.rows)||[]; if(!R.length) continue;
+      const d0=fo9.dir, th0=Math.atan2(d0.y,d0.x);
+      const F=R.filter(r=>{ const sy=fo9.y+d0.y*r.fx+d0.x*r.fy; return Math.abs(foeBandY(sy)-sy)<1 && r.y>FOE_TOP+6 && r.y<FOE_BOT-6; });
+      // evidence law: three clean rows, one of them near the HEAD — a deep
+      // tail lags its swinging slots on the referee's screen too, and a pose
+      // read off the tail alone and carried 1000px to the head is a guess
+      if(F.length<3 || !F.some(r=>Math.abs(r.fx)+Math.abs(r.fy)<=220)) continue;
+      // translate-only model on my heading (always available) — over the CLEAN rows F (0507 build F1: a folded
+      // man sits at foeBandY of his slot on BOTH screens, never at the slot itself; a translate that averaged him
+      // in dragged the pose toward the fold and its residual tripped the misfit door — the guest's 14-tube line
+      // broke ranks at 17 s while the referee's marched on. The contract's own law: folded rows sit out of the fit)
+      let sx=0,sy=0; for(const r of F){ sx+=r.x-(fo9.x+d0.x*r.fx-d0.y*r.fy); sy+=r.y-(fo9.y+d0.y*r.fx+d0.x*r.fy); }
+      let A={x:fo9.x+sx/F.length, y:fo9.y+sy/F.length}, th=th0, resT=0, res=null, rot9=false;
+      for(const r of F){ const ex=A.x+d0.x*r.fx-d0.y*r.fy-r.x, ey=A.y+d0.y*r.fx+d0.x*r.fy-r.y; resT+=ex*ex+ey*ey; } resT=Math.sqrt(resT/F.length);
+      if(F.length>=3){
+        let px=0,py=0,ox=0,oy=0; for(const r of F){ px+=r.x; py+=r.y; ox+=r.fx; oy+=r.fy; } px/=F.length; py/=F.length; ox/=F.length; oy/=F.length;
+        let sxx=0,sxy=0,spread=0; for(const r of F){ const ax=r.fx-ox, ay=r.fy-oy, bx=r.x-px, by=r.y-py; sxx+=ax*bx+ay*by; sxy+=ax*by-ay*bx; spread+=ax*ax+ay*ay; }
+        if(spread>F.length*6400){ const t1=Math.atan2(sxy,sxx), c1=Math.cos(t1), s1=Math.sin(t1);
+          const A1={x:px-(c1*ox-s1*oy), y:py-(s1*ox+c1*oy)}; let r1=0;
+          for(const r of F){ const ex=A1.x+c1*r.fx-s1*r.fy-r.x, ey=A1.y+s1*r.fx+c1*r.fy-r.y; r1+=ex*ex+ey*ey; } r1=Math.sqrt(r1/F.length);
+          let d1=t1-th0; while(d1>Math.PI) d1-=2*Math.PI; while(d1<-Math.PI) d1+=2*Math.PI;
+          // the heading is adopted only from a WIDE baseline (RMS ≥80px of
+          // slot spread), a tight fit, and a small turn — a block mid-wheel
+          // on one screen catches up under the same steering law once its
+          // anchor sits right; a 1200px tail must never swing on a guess
+          res=r1; if(r1<=15 && r1<resT && Math.abs(d1)<=0.2){ A=A1; th=t1; rot9=true; } }
+      }
+      const c=Math.cos(th), sn=Math.sin(th), vf=fo9.halted?0:fo9.speed, ageP=fo9._cenR.age;
+      A.x+=c*vf*ageP; A.y+=sn*vf*ageP;
+      if(window.__FDBG) window.__FDBG.push({t:Date.now(), kind:fo9.kind, rows:R.length, used:F.length, anc:[Math.round(fo9.x),Math.round(fo9.y)], fit:[Math.round(A.x),Math.round(A.y)], th0:+th0.toFixed(3), th:+th.toFixed(3), resT:Math.round(resT), res:res==null?null:Math.round(res), age:+age9.toFixed(2)});
+      // the referee's own RANKS-BREAK rule, read off the fitted pose: his
+      // block dissolves 115 out from its goal (or at the river's bank) and
+      // his men walk on singly — mine must not march on as a block for the
+      // beat it takes the misfit to show; the fitted anchor IS his anchor,
+      // so the same test breaks mine on the same ground
+      let brk9=false; if(FORM_BRK_MIRROR){ const RV=S.cfg&&S.cfg.terrain&&S.cfg.terrain.river;
+        const g9=(RV && A.x>RV.x+RV.w+40)? {x:RV.x+RV.w/2, y:RV.bridgeY} : T;
+        const dg=Math.hypot(g9.x-A.x, g9.y-A.y);
+        if(dg<115 || (RV && A.x<RV.x+RV.w+80 && A.x>RV.x-20)) brk9=true; }
+      if(brk9 || (resT>FORM_RES_MAX && (res==null || res>FORM_RES_MAX))){
+        for(const m of fo9.members){ if(m) m.form=null; } const fi=S.forms.indexOf(fo9); if(fi>=0) S.forms.splice(fi,1);
+        for(const r of R){ const m=r.m; if(!m||m.dead||m.pendDie) continue; const tx=r.x+(m.vx9||0)*age9, ty=r.y+(m.vy9||0)*age9;
+          if(Math.abs(tx-m.x)<=FCN_TOL && Math.abs(ty-m.y)<=FCN_TOL) continue; glStart(m,tx,ty); }
+        continue;
+      }
+      // 0507 build F2: the translate MISFITS but the rotation says the referee's block is INTACT on a heading I
+      // may not swing to on this evidence (a block mid-wheel round a rock, the word a beat old) — that pose is not a
+      // seat: no seat, no nudge this beat. The same steering law from the same spot keeps the two blocks together
+      // (measured in lockstep through a 50° wheel) and the next beat re-fits; seating on the misfit re-seated the
+      // 35-man column 200-350 px off its line twice a level (the rock at x≈755, measured on every POST leg)
+      if(!rot9 && resT>FORM_RES_MAX) continue;
+      let dth=th-th0; while(dth>Math.PI) dth-=2*Math.PI; while(dth<-Math.PI) dth+=2*Math.PI;
+      if(Math.abs(A.x-fo9.x)<=FORM_SEAT && Math.abs(A.y-fo9.y)<=FORM_SEAT && Math.abs(dth)<0.06){
+        // a modest, steady disagreement is NUDGED — half way each beat, no
+        // glide: the ranks' own slot spring carries them level, and a block
+        // a beat behind closes up without anyone seeing it move. The stall
+        // watch restarts from the nudged spot (a block pushed back toward
+        // its door is not a block that stopped gaining ground).
+        fo9.x+=(A.x-fo9.x)*0.5; fo9.y+=(A.y-fo9.y)*0.5; fo9.best=null; fo9.stall=0; continue; }
+      fo9.x=A.x; fo9.y=A.y; fo9.dir={x:c,y:sn}; fo9.best=null; fo9.stall=0;   // an ABSOLUTE seat — a second word in the same reply re-fits on more rows, never stacks; the stall watch restarts here
+      const pin9=new Map(); for(const r of R) if(r.m) pin9.set(r.m, r);
+      for(const m of fo9.members){ if(!m||m.dead||m.pendDie||!m.off) continue; const o=m.off, r=pin9.get(m);
+        // a man the word NAMED glides to his pin (the truth, aged); the rest
+        // to their re-seated slots — but never the DEEP tail (|slot|>500,
+        // off the rug and lagging its own swinging slot on the referee's
+        // screen too): its spring and its own rows bring it level
+        let tx, ty;
+        if(r){ tx=r.x+c*vf*ageP; ty=r.y+sn*vf*ageP; }
+        else { if(Math.abs(o.fx)+Math.abs(o.fy)>500) continue; tx=A.x+c*o.fx-sn*o.fy; ty=foeBandY(A.y+sn*o.fx+c*o.fy); }
+        if(Math.abs(tx-m.x)<=GL_MIN && Math.abs(ty-m.y)<=GL_MIN) continue;   // the spring closes a small gap on its own
+        glStart(m,tx,ty); }   // 0343 (item 2): the ranks GLIDE level
     }
     fcnHurry(hi9);   // 0343 (item 3a): rows past my counters = my stream lags — its due groups pull forward
     if(ac9 && ac9.c>=ac9.n){ fcnSweep(ac9.seen, hi9); S.fcnAcc=null; }   // 0343 (item 3b): a COMPLETE census settles absences within the beat
@@ -39384,11 +39493,20 @@ const CEN_TOL=14, FCN_TOL=48, CEN_ROWS=16, CEN_LOGWIN=1200;
 // here; 'fd' owns real deaths and always precedes the census that omits its
 // man in the log, so a death is never double-booked).
 const GL_MIN=24, GL_T=0.16, GL_OVER=420;
+const FORM_RES_MAX=40, FORM_SEAT=100, FORM_BRK_MIRROR=0;   // FIX-B: (⚑ FORM_BRK_MIRROR=1 breaks my block on the referee's own 115/river rule read off the fitted pose — measured within noise of the misfit door, OFF by default) past this RMS misfit under both models the referee's ranks have broken · a block inside FORM_SEAT of its pose is nudged, never re-seated
+const GL_SPD=260, GL_TMAX=0.6;   // FIX-E: a FOE's correction is paced — ~260px/s, never longer than 0.6s (a unit keeps GL_T: his pin is a re-seat, not a march)
 function glStart(b,nx,ny){
   const d9=Math.hypot(nx-b.x,ny-b.y);
   if(d9<=GL_MIN || d9>GL_OVER){ b.x=nx; b.y=ny; b.glT=0; return; }
-  b.glX=nx; b.glY=ny; b.glT=GL_T;
+  b.glX=nx; b.glY=ny; b.glT=(b.foN!=null)? Math.max(GL_T,Math.min(GL_TMAX,d9/GL_SPD)) : GL_T;
   if(!b.glOn){ b.glOn=1; (S.glid||(S.glid=[])).push(b); }
+}
+function velTick(dt){   // FIX-D: every standing foe's own velocity (px/s), smoothed — what an aged pin is moved along
+  if(!(dt>0)) return;
+  for(const f of S.foes){ if(f.dead) continue;
+    if(f.lx9!=null){ const vx=(f.x-f.lx9)/dt, vy=(f.y-f.ly9)/dt;
+      if(Math.abs(vx)<600 && Math.abs(vy)<600){ f.vx9=(f.vx9||0)*0.7+vx*0.3; f.vy9=(f.vy9||0)*0.7+vy*0.3; } }
+    f.lx9=f.x; f.ly9=f.y; }
 }
 function glideTick(dt){
   const L=S.glid; if(!L || !L.length) return;
@@ -39504,8 +39622,8 @@ function cenBeat(){
     for(const f of win)
       mo.push(FCN_KEYS.indexOf(f.type).toString(36)+','+(f.foN|0).toString(36)+','+
               Math.round(f.x).toString(36)+','+Math.round(f.y).toString(36));
-    coopSend({k:'fcn', n:act.length, mo:mo.slice(0,CEN_ROWS)});   // 0343 (item 3): n = the true standing count — absence becomes evidence on a complete census
-    if(mo.length>CEN_ROWS) coopSend({k:'fcn', mo:mo.slice(CEN_ROWS)});
+    coopSend({k:'fcn', n:act.length, t:+S.t.toFixed(2), mo:mo.slice(0,CEN_ROWS)});   // 0343 (item 3): n = the true standing count — absence becomes evidence on a complete census · FIX-D: t = the referee's sim clock at the sample (CMD_KEYS carries t; a number passes clamp_cmd)
+    if(mo.length>CEN_ROWS) coopSend({k:'fcn', t:+S.t.toFixed(2), mo:mo.slice(CEN_ROWS)});
   }
 }
 // THE HOST'S FIELD, one seat per beat. Census rows index into BF_TYPES (a
@@ -47718,7 +47836,22 @@ function raidStampHalf(f,y){
   if(!rd || rd.k!=='ice' || rd.cfg!==S.cfg) return;
   f.rcI = (y < T.y)? 0 : 1;
 }
+// FIX-C: in a co-op battle every sim rolls the walk-on dice from the SAME
+// seed — level · wave · type · that type's muster count (the foN contract
+// already makes the spawn order identical) — so a group walks on at the same
+// spot on every screen and the first census has nothing to pull. Solo play
+// keeps Math.random() byte-exact. rnd9() is the one door: edgePt + the
+// solo/guerrilla jitter read it; everything else rolls as before.
+function dice9(seed){ let x=(seed>>>0)||1; return function(){ x^=x<<13; x>>>=0; x^=x>>>17; x^=x<<5; x>>>=0; return (x>>>0)/4294967296; }; }
+function rnd9(){ return S.dq9? S.dq9() : Math.random(); }
 function spawnGroup(g){
+  if(S.coop && !S.bf){ const q0=(S.foeSeq||{}); let h=2166136261>>>0;
+    const t=(S.levelN|0)+':'+(S.wave|0)+':'+String(g.t||'')+':'+((q0[g.t]|0)+1)+':'+String(g.f||'')+':'+String(g.e||'')+':'+(g.n|0);
+    for(let i=0;i<t.length;i++){ h^=t.charCodeAt(i); h=Math.imul(h,16777619)>>>0; }
+    S.dq9=dice9(h); }
+  try{ spawnGroup9(g); } finally { S.dq9=null; }
+}
+function spawnGroup9(g){
   if(g.f==='boss'){
     // one boss, marching for the toy box — but a SQUAD mission fields more
     // than one, so they come down the right edge in a row instead of stacking
@@ -47793,7 +47926,7 @@ function spawnGroup(g){
   }
   if(g.f==='guerrilla'||g.f==='solo'){
     const rim=(g.e==='top'||g.e==='bottom');   // 0479: a RIM door (the infest floods) seats each body by rimPt — dice-free, no jitter, so twin sims agree to the pixel; every other door's draws stand in their own order
-    for(let i=0;i<g.n;i++){ const p=rim? rimPt(g.e,i,g.k|0) : edgePt(g.e); const fo2=spawnFoe(g.t, rim? p.x : p.x+(Math.random()-0.5)*60, rim? p.y : p.y+(Math.random()-0.5)*40, null, g.f==='guerrilla');
+    for(let i=0;i<g.n;i++){ const p=rim? rimPt(g.e,i,g.k|0) : edgePt(g.e); const fo2=spawnFoe(g.t, rim? p.x : p.x+(rnd9()-0.5)*60, rim? p.y : p.y+(rnd9()-0.5)*40, null, g.f==='guerrilla');
       if(fo2 && g.cap!=null) fo2.capI=g.cap|0;   // v3.39: the capture-squad stamp — the march fork reads it
       else if(fo2 && !fo2.boss) raidStampHalf(fo2, p.y);   // 0318: the castle's own rule — every wave body fights for its half's turret
       // 0340: the HARD snake's dials ride a formless spawn (Wyatt: +20% hp,
@@ -47924,7 +48057,7 @@ function spawnGroup(g){
     if(g.radio)   list.push({t:'tanradio', fx:rear-48, fy:38});
   }
   if(g.elite){ const front=Math.max.apply(null, list.map(o=>o.fx)); list.push({t:g.elite, fx:front+34, fy:0}); }
-  const form={ x:ep.x, y:ep.y, kind:g.f, timer:Math.random(), halted:false, dir:{x:-1,y:0}, members:[],
+  const form={ x:ep.x, y:ep.y, kind:g.f, timer:rnd9(), halted:false, dir:{x:-1,y:0}, members:[],   // FIX-C: the volley phase rolls the shared dice too — two redcoat lines halt on the same beat
     best:null, stall:0,                    // ranks break if the block stops gaining ground
     speed:Math.min.apply(null, list.map(o=>FDEF[o.t].spd)) };
   const d0=Math.hypot(T.x-ep.x,T.y-ep.y);
@@ -72949,7 +73082,7 @@ function frame(ts){
       if(coach.step===4&&coach.lostT>0){ coach.lostT-=dt; if(coach.lostT<=0){ coach.lostT=0; coach.step=5; coach.t=0; } }
       if(coach.step===5&&coach.toast>0){ coach.toast-=dt; if(coach.toast<0)coach.toast=-1; } }
   }
-  if(S.mode==='play') glideTick(dt);   // 0343 (item 2): census corrections glide on the WALL clock — beside vflag, never inside update's scaled dt
+  if(S.mode==='play'){ velTick(dt); glideTick(dt); }   // 0343 (item 2): census corrections glide on the WALL clock — beside vflag, never inside update's scaled dt · FIX-D: the velocity tracker rides beside it
   draw();
 }
 buildSprites(()=>{ ready=true;
