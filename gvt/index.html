@@ -22065,7 +22065,7 @@ function outfitTune(b){
   if(outfitOn('scout')){
     if(b.rate!=null) b.rate*=1-OF_SCOUT_RATE;
     if(b.cd!=null)   b.cd/=1-OF_SCOUT_RATE;  // slower hands, longer rest — the mustache's clock law
-    b.sco=1;
+    if(b.w!=='commander') b.sco=1;   // 0509: dead for the Commander (all three scoutX sites sit below his `continue` in the fire loop) — unstamped, so a spec'd max-load campaign bag stays 17 keys, never 18 (the relay's list cut)
   }
   // 0361 BANDIT MASK REBALANCED (Wyatt 8/16: "+15% attack speed & range…
   // 30% chance to miss, just like how the bandits miss"): the cadence idiom
@@ -22209,6 +22209,10 @@ const META_DEFAULT = {
   // 0092 THE COMMANDER: the same law — class and blade ownership DERIVED from
   // the record; these bits only remember each reveal was SHOWN, once ever.
   cmdSeen:0, bladeSeen:0,
+  // 0509 THE SPEC PICK (0 plain, 1 duel, 2 fear, 3 wall) — read only through
+  // cmdSpec() (a reader that clamps and re-checks the door); DARK until the
+  // 0512 picker: only the debug setter GVT.cmdSpec(n) writes it till then.
+  cmdSpec:0,
   // 0121 THE COMMANDO: the same law again — ownership DERIVES from the
   // campaign record (cmdoOwned: L50 BEATEN), retroactive for any save already
   // past it; this bit only remembers his reveal fired, once ever.
@@ -27906,6 +27910,18 @@ function mileLvl(wk){ return wk==='lightsaber'? WPN_MILE.sabFullLvl
 // bomber's own law): zero unlock fields, retroactive, crosses devices with the
 // record. All numbers proposals, logged for Wyatt — one line each.
 const CMD_LVL=20, CMD_BLADE_LVL=95;      // the 0090 table's Wyatt-pinned rungs
+// 0509 THE COMMANDER'S SPECIALIZATIONS (FM-GVT-COMMANDER-SPECS rounds 2-6;
+// Wyatt 8/23: the Duelist free with the class, Men Without Fear off Captain
+// Teddy, the Stone Wall at campaign 150, Zorgy Babababa holds all three).
+// The pick is META.cmdSpec (0 plain, 1 duel, 2 fear, 3 wall), read ONLY
+// through cmdSpec() below. THE SPECS SHIP DARK: nothing writes the pick but
+// the debug setter GVT.cmdSpec(n) until the spec row (0512) paints the picker.
+// D4: the Teddy stand-in door is the CAMPAIGN's L25 BUFFALO BILL (the
+// campaign ledger, never Outlaw Town's park rung); the day Captain Teddy
+// lands, teddyBeat grows `|| (META.parks.teddy.lv|0)>=5` — an OR and NEVER a
+// swap (the 0363 no-clawback law).
+const CS_WALL_LVL=150, CS_TEDDY_STANDIN=25, CS_TEST='zorgybabababa';
+const CS_DEF=[ {id:'plain',name:'THE COMMANDER',door:0}, {id:'duel',name:'THE DUELIST',door:0}, {id:'fear',name:'MEN WITHOUT FEAR',door:CS_TEDDY_STANDIN}, {id:'wall',name:'THE STONE WALL',door:CS_WALL_LVL} ];   // the picker's four rows (0512 renders them + registers the 21 dict rows; nothing here is rendered yet)
 const CMD={
   reach:38,     // melee — foes walk in; he halts here (bfAggro/campFoeInReach read it)
   reach2:46,    // the claymore is a longer sword
@@ -27928,6 +27944,18 @@ const CMD={
 // sold. One seat per dial.
 const CMD_DASH={ r:168, spd:WPN_MILE.sgSpd, cd:6, blkT:0.3 };   // D19: detect 6 m (TK_M 28 px/m, quoted not invented) · the shotgun dash's own flight (680) · the quiet between dashes, armed at the LANDING · the block beat he never launches through
 const CMD_SW_T=0.46;   // 0508 THE CRESCENT CUT: the swing's draw clock (u.cmdFx at the strike) — WIND 0-0.11 · CUT 0.11-0.195 · POSE 0.195-0.265 · RECOVER 0.265-0.46; draw-only, not a wire key, not in a save. (The three reflexes of 0488 — the REFL consts that sat here, the per-figure catch count, the charged reader, the seat in cmdoCatch — RETIRED 0508, Wyatt 8/23: "we don't want him reflecting, and parrying is okay"; his counted blocks (cmdAbsorbs) ARE the parry now, and a caught shell is consumed, never returned.)
+// 0509 THE DUELIST (cs 1; rounds 2-6; Wyatt 8/23: "make sure that he dashes
+// forward a little… the three cuts, which are each dashes forward where you
+// can hit multiple people"): THE FLOURISH — CMD_DUEL_N cuts, CMD_DUEL_C
+// apart (the swing's old 0.22 beat), each cut its own CMD_DUEL_STEP-px hop
+// toward its man at the shipped dash's own 680 (50 ms — the hop IS the
+// wind-up), then the long breath CMD_DUEL_ARM × the swing period (0.778 s):
+// the 1.2178 s cycle. CMD_DUEL_CUTS = the bench's three directions for the
+// draw and THE WAKE (cut 2 travels UP — reversing direction is what stops
+// three cuts reading as one cut repeated); CMD_DUEL_REC = the arm's way home
+// after the last cut (draw only).
+const CMD_DUEL_N=3, CMD_DUEL_C=0.22, CMD_DUEL_ARM=0.7, CMD_DUEL_STEP=34, CMD_DUEL_REC=0.55;
+const CMD_DUEL_CUTS=[ {f:-1.48,to:0.30}, {f:0.95,to:-0.62}, {f:-0.12,to:-0.12,th:1} ];   // cut 1 overhead, down-right · cut 2 a RISING backhand · cut 3 the thrust (the angle holds, the blade extends 46 → 62 px and snaps back)
 // ⚠ TDZ (the v1.26 law): coopBeat is a const ~5,900 lines below — these only
 // ever RUN lazily (render/battle/endBattle time), never at load. CMD_LVL itself
 // initializes here, ABOVE COOP_MILES, so the table rows can reference it
@@ -27948,6 +27976,29 @@ function highOwned(){ return cmdOwned() && !!META.highBlade; }
 // passable so the loop never builds it twice.
 function highU(u,sw){ if(!u || u.type!=='sarge' || u.dead) return false;
   sw=sw||unitSargeStats(u); return sw.w==='commander' && !!sw.hb; }
+// 0509 THE SPEC DOORS — every reader lazy (cmdOwned's coopBeat is a const far
+// below, the TDZ law). csTester: the ONE site a name is ever consulted for
+// ownership (normalized, so case and spacing cannot break it). csOwned(n):
+// plain and the Duelist come with the class; 2 = the Teddy stand-in beaten;
+// 3 = campaign 150; the class itself is always the first door. cmdSpec(): a
+// READER that clamps the save's pick and re-checks the door on every read
+// (the jetLvl reader-clamp law — no boot normalizer, exactly like
+// sargeWeapon; garbage only under-grants, and a pick made behind a door
+// sleeps in the save till the door opens).
+function csTester(){ return String(META.name||'').toLowerCase().replace(/[^a-z0-9]/g,'')===CS_TEST; }
+function teddyBeat(){ return (META.campaign|0)>=CS_TEDDY_STANDIN; }   // the campaign's L25 Buffalo Bill; grows `|| parks.teddy` the day Teddy lands — an OR, never a swap
+function csOwned(n){ n=n|0;
+  if(!cmdOwned() || n<0 || n>3) return false;   // the class is still the first door
+  if(n<=1) return true;                         // plain + the Duelist come with the class (Wyatt)
+  if(csTester()) return true;                   // the whole test grant, one site
+  return n===2 ? teddyBeat() : (META.campaign|0)>=CS_WALL_LVL; }
+function cmdSpec(){ const n=Math.max(0,Math.min(3,META.cmdSpec|0)); return csOwned(n)? n : 0; }
+// the spec OFF THE BAG (highU's own idiom, never off my save): sargeStats
+// stamps cs only when >0, so my bag, a relayed ally's kit (coopSW — both
+// lanes) and the away snapshot all answer from the wire's own word, and
+// every AI kit (bfSargeKit / BF_AI_SARGE) is plain by construction.
+function csU(u,sw){ if(!u || u.type!=='sarge' || u.dead) return 0;
+  sw=sw||unitSargeStats(u); return sw.w==='commander'? (sw.cs|0) : 0; }
 // is this weapon key in this save's hands' reach? ONE reader for the academy,
 // the picker, the equip gate and the pick gate — the commander's answer is the
 // RECORD's, never sargeUnlocked's (a stray entry there can't unlock a secret).
@@ -28129,9 +28180,9 @@ function sargeStats(){
   // SELF-CONTAINED on purpose: blk and aoe ride it so a relayed ally's blocks
   // and blade state come off the WIRE's numbers, never off MY save (the
   // WPN_MILE raw-rank law, applied to the whole identity).
-  if(w==='commander'){ const hb=highOwned(), bl=bladeOwned()||hb;   // 0488 (D26): THE HIGH BLADE supersedes whichever sword he holds — the claymore's reach and circle ride the bag for him too, and hb:1 rides it ONLY when owned (the §5 silence fence: an unowned save's bag and every wire cmd built from it stay byte-identical). The flag is the one seat every ally's sim reads — 'sw' has been on CMD_KEYS forever (the jet's own seat; zero server change). Seated BEFORE outfitTune's extras and the jet/saber/of tail so the relay's first-16 keep can never eat it.
-    return outfitTune({ w, r, rng:(bl?CMD.reach2:CMD.reach), rate:CMD.rate,
-             dmg:(CMD.dmg0+CMD.dmgPer*u)*so, ...(so>1?{soul:1}:{}), blk:CMD.blk, aoe:(bl?CMD.aoeR:0), ...(hb?{hb:1}:{}) }); }
+  if(w==='commander'){ const hb=highOwned(), bl=bladeOwned()||hb, cs=cmdSpec();   // 0509: the spec rides the bag as `cs` (1 duel, 2 fear, 3 wall) ONLY when >0 — the hb silence fence: a plain save's bag and every wire cmd built from it stay byte-identical — seated ahead of the jet/saber/of tail (the relay's first-16 keep) · 0488 (D26): THE HIGH BLADE supersedes whichever sword he holds — the claymore's reach and circle ride the bag for him too, and hb:1 rides it ONLY when owned (the §5 silence fence: an unowned save's bag and every wire cmd built from it stay byte-identical). The flag is the one seat every ally's sim reads — 'sw' has been on CMD_KEYS forever (the jet's own seat; zero server change). Seated BEFORE outfitTune's extras and the jet/saber/of tail so the relay's first-16 keep can never eat it.
+    return outfitTune({ w, r, rng:((bl||cs===1)?CMD.reach2:CMD.reach), rate:CMD.rate,
+             dmg:(CMD.dmg0+CMD.dmgPer*u)*so, ...(so>1?{soul:1}:{}), blk:(cs===1?1:CMD.blk), aoe:(bl?CMD.aoeR:0), ...(hb?{hb:1}:{}), ...(cs?{cs}:{}) }); }   // 0509 THE DUELIST'S CELLS: the long sword's reach (CMD.reach2, blade or no blade — reach 46 unconditionally) and ONE block (blk:1, real since the 43234 trap fix); the circle/cleave price is paid in updateCmd (his cuts land on one man alone)
   // the sidearm: 70% faster than it used to be, +5% a rank on top of that (see
   // PISTOL_RATE). Damage still comes off the SARGE unit's upMul on the default
   // firing path, which is where the pistol lands.
@@ -33778,7 +33829,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.70';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.71';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -43420,7 +43471,8 @@ function cmdAbsorbs(u){
   if(!u || u.type!=='sarge' || u.dead) return false;
   const sw=unitSargeStats(u);
   if(sw.w!=='commander') return false;
-  if((u.cmdBlkN||0) >= (sw.blk||CMD.blk)) return false;
+  if(u.cmdDash==='duel') return false;   // 0509 THE DUELIST: the guard is DOWN while the flourish runs (round 2's price — the round lands whole)
+  if((u.cmdBlkN||0) >= (sw.blk!=null? sw.blk : CMD.blk)) return false;   // 0509 THE 43234 TRAP FIXED: `0||3` is 3, so a bag carrying blk 0 or 1 was a silent no-op — the pips (drawCmdBlkPips) already read the bag's own count this way; the Duelist's blk:1 becomes real here
   u.cmdBlkN=(u.cmdBlkN||0)+1; u.cmdBlkT=CMD_DASH.blkT;   // 0488: a block in progress — the high blade's dash waits it out (D19: never while blocking)
   bfSfx(SFX.thock, u.x, u.y);
   S.fx.push({k:'ring',x:u.x,y:u.y-24,r:5,R:30,t:0,dur:0.22,col:'#C9D2D8'});
@@ -43563,6 +43615,15 @@ function updateSaber(u,dt,sw){
   if(d>4){ const sp=390; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }
   else { u.x=u.home.x; u.y=u.home.y; u.saberState='idle'; u.saberTarget=null; }   // home clean — no stale man on the hook
 }
+// 0509: the Commander's nearest-man scan, named once — updateCmd's own
+// filters verbatim (burrow/jet/dead, bfCanTarget, the campaign's offscreen
+// law). The swing and the Duelist's every cut pick through THIS.
+function cmdNearest(u,r){ let best=null,bd=r;
+  for(const f of TGT(u)){ if(f.burrow||f.jetT>0||f.dead) continue;
+    if(!bfCanTarget(u,f)) continue;
+    if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;
+    const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
+  return best; }
 // ===== 0092 THE COMMANDER's swing (Wyatt 7/29: "He does a basic saber attack…
 // a regular sword. It's not a glowing blade… there is no dash. He never
 // dashes.") — the saber's STRIKE grammar without the feet: nearest foe inside
@@ -43582,14 +43643,12 @@ function updateSaber(u,dt,sw){
 // accepted, revisit with the Duelist). Facing from SIM data (u.cmdFs, the
 // sign of best.x−u.x) — never unitFl (the mvSm law). Fixed steels, no glow.
 function updateCmd(u,dt,sw){
-  if(sw.hb && updateCmdDash(u,dt,sw)) return;   // 0488 THE HIGH BLADE (D19): the dash owns his feet this frame; a LANDING falls through to the swing below at full aoeR (the high blade's bag carries the circle)
-  let best=null,bd=sw.rng;                      // nearest foe inside the sword's reach
-  for(const f of TGT(u)){ if(f.burrow||f.jetT>0||f.dead) continue;
-    if(!bfCanTarget(u,f)) continue;
-    if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;
-    const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
+  if(u.cmdDash==='duel'){ updateCmdDuel(u,dt,sw); return; }   // 0509 THE DUELIST: a running flourish owns the frame (the hops, the cuts, the beats)
+  if((sw.hb || u.cmdDash) && updateCmdDash(u,dt,sw)) return;   // 0488 THE HIGH BLADE (D19): the dash owns his feet this frame; a LANDING falls through to the swing below at full aoeR (the high blade's bag carries the circle) · 0509: a flourish's end parks him in the machine's own 'land'/'back' seats (work at the sword, or the walk home) — the second clause ticks those for a bladeless Duelist; a plain Commander never sets cmdDash, so this reads exactly as before
+  const best=cmdNearest(u,sw.rng);              // nearest foe inside the sword's reach (named once above — the Duelist's cuts re-pick through the same scan)
   if(!best || u.cmdSwT>0) return;
-  u.cmdSwT=tkSlowMul(u)/(sw.rate*lzRateMul(u)); u.cmdFx=CMD_SW_T; u.cmdFs=(best.x>=u.x)?1:-1;   // the arm swings for the draw code (v2.36: the blue beam winds his clock too · v3.11: TEAL's concussion stretches it) · 0508: the four-beat clock + the strike's facing (sim data, for the lean, the step and the crescent)
+  if(csU(u,sw)===1){ cmdDuelStart(u,sw,best); return; }   // 0509 THE DUELIST: his swing IS the flourish — cut 1 launches on this very frame
+  u.cmdSwT=tkSlowMul(u)/(sw.rate*lzRateMul(u)); u.cmdFx=CMD_SW_T; u.cmdFs=(best.x>=u.x)?1:-1; if(u.cmdDuelK) u.cmdDuelK=0;   // the arm swings for the draw code (v2.36: the blue beam winds his clock too · v3.11: TEAL's concussion stretches it) · 0508: the four-beat clock + the strike's facing (sim data, for the lean, the step and the crescent)
   const vm=(u.vet?1.5:1)*lzDmgMul(u), cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(best);   // v2.36: red beam + teal crits, the saber sites' own shape
   if(sw.aoe){                                    // THE BLADE: everything in the circle, full weight
     for(const g of TGT(u)){ if(g.burrow||g.jetT>0||g.dead) continue;
@@ -43607,6 +43666,86 @@ function updateCmd(u,dt,sw){
     if(!reducedMotion()) for(let ti=0;ti<6;ti++){ const th=(((u.x|0)*0.73+(u.y|0)*1.21+ti*0.897)%1), ta=0.70+1.5708+(th-0.5)*1.3, ca=Math.cos(ta)*fs, sa=Math.sin(ta), td=2+((ti*0.37+th)%1)*5, tl=td+5+th*6;   // six tip ticks along the tangent, i-keyed off the post (never dice); none under reduced motion
       S.fx.push({k:'tracer',x1:tp[0]+ca*td,y1:tp[1]+sa*td,x2:tp[0]+ca*tl,y2:tp[1]+sa*tl,t:-0.195,dur:0.09,col:'#EAF4FF',w:1.6}); } }
   bfSfx(SFX.swish,u.x,u.y); if(bfHumanU(u)) S.shake=Math.max(S.shake,0.12);
+}
+// ===== 0509 THE DUELIST — THE FLOURISH (cs 1; FM-GVT-COMMANDER-SPECS rounds
+// 2-6; Wyatt 8/23: "for the duelist, make sure that he dashes forward a
+// little because it's very hard to get that close and swing on somebody
+// versus the three cuts, which are each dashes forward where you can hit
+// multiple people"). He stops swinging the sword like a club and starts
+// fencing: CMD_DUEL_N cuts CMD_DUEL_C apart, each cut its own
+// CMD_DUEL_STEP-px hop toward its man at the dash's own speed (the hop and
+// the wind-up are the same 50 ms beat — the dash machine's flight line, a
+// SIM move bounded by the step, never u.home drift), the blow landing WHERE
+// THE HOP PUT HIM on the nearest man inside the long sword's reach — alone,
+// at full weight (no circle, no cleave: round 2's price, the blade's 74
+// included) — then CMD_DUEL_ARM × the swing period of breath, armed at the
+// LAST cut's start so the 1.2178 s cycle is exact. A cut with nobody in
+// reach ends the flourish and arms the breath anyway (the v1.73 law: the
+// cut he never landed still costs him the arm). While it runs
+// (u.cmdDash==='duel') the dash machine's own seats yield his feet on both
+// carpets, cmdDashReady refuses (no hb launch mid-flourish) and cmdAbsorbs
+// refuses (the guard is down); the end parks him in the machine's 'land'
+// (work at the sword) or 'back' (the walk home to u.home at WPN_MILE.sgRet)
+// — zero new feet code. Draw state: u.cmdDuelK (the cut being drawn) +
+// u.cmdFx (its clock; the last cut carries the recover tail) + u.cmdFs (the
+// cut's own facing) — cmdDuelPose reads them; THE WAKE's fx are pushed at
+// each landing, born below zero so they land on the blade's own frame (the
+// 0391 stagger). Local-sim, per-unit timers, zero dice beyond the swing's
+// own crit (the co-op law); a relayed ally's Duelist runs from the cs his
+// bag carried. The high blade's dash stays: it delivers him, the flourish
+// lands (the circle still never applies to a Duelist).
+function cmdDuelArm(u,sw){ sw=sw||unitSargeStats(u); return CMD_DUEL_ARM*tkSlowMul(u)/(sw.rate*lzRateMul(u)); }   // the breath: 0.7 × the swing period (0.778 s stock), the swing's own clock laws
+function cmdDuelStart(u,sw,best){
+  if(!u.home) u.home={x:u.x,y:u.y};   // the post — the machine's 'back' walk returns here (campUnitStep/bfMarch already carry it, the 0488 seat)
+  u.cmdDash='duel'; u.cmdDuel={ t:0, n:0, el:0, left:0, tgt:null, hx:1, hy:0 };
+  cmdDuelCut(u,sw,best);              // cut 1 launches on the swing's own frame
+}
+function cmdDuelCut(u,sw,pick){       // begin the next cut: the man, the hop's line, the clocks
+  const D=u.cmdDuel, f=pick||cmdNearest(u,sw.rng);
+  if(!f){ cmdDuelEnd(u,sw); return; } // nobody inside the sword — the flourish ends, the breath still paid (v1.73)
+  u.cmdFs=(f.x>=u.x)?1:-1;
+  const d0=Math.hypot(f.x-u.x,f.y-u.y);   // the hop's LINE pins at the launch — toward where the man stands NOW; he passes straight THROUGH him (the bench's own picture), never curving after a walker
+  D.n++; D.el=0; D.tgt=f; D.left=CMD_DUEL_STEP; D.hx=(d0>0.5)? (f.x-u.x)/d0 : (u.cmdFs||1); D.hy=(d0>0.5)? (f.y-u.y)/d0 : 0;
+  u.cmdDuelK=D.n; u.cmdFx=(D.n>=CMD_DUEL_N? 0.16 : CMD_DUEL_C)+CMD_DUEL_REC;   // the cut's draw clock: wind/sweep/pose (+ the recover tail, drawn only when no next cut re-arms it; the thrust hands the arm home at its own 0.16)
+  if(D.n>=CMD_DUEL_N) u.cmdSwT=cmdDuelArm(u,sw);   // the breath arms at the LAST cut's start — 0.44 + 0.778 = the 1.2178 cycle, exact
+  S.fx.push({k:'puff',x:u.x,y:u.y-4,t:0,dur:0.3,R:13});   // boots dig in at each launch — one small puff, still under RM (the 43440 law)
+}
+function updateCmdDuel(u,dt,sw){      // the flourish owns the frame
+  const D=u.cmdDuel; if(!D){ u.cmdDash=null; return; }   // belt: never stand in 'duel' without the state
+  D.t+=dt; D.el+=dt;
+  if(D.left>0){                       // THE HOP — the dash machine's flight line on the pinned launch line, bounded by the step (exactly 3 frames at 60 fps: 680/60 × 3 = 34)
+    const mv=Math.min(D.left, CMD_DASH.spd*dt);
+    u.x+=D.hx*mv; u.y+=D.hy*mv;
+    D.left-=mv;
+    if(D.left<=0) cmdDuelLand(u,sw);  // he arrives — the cut lands where the hop put him
+    return;
+  }
+  if(D.n<CMD_DUEL_N){ if(D.t>=CMD_DUEL_C*D.n) cmdDuelCut(u,sw); return; }
+  cmdDuelEnd(u,sw);                   // belt: three cuts landed (the last landing already ends it)
+}
+function cmdDuelLand(u,sw){           // THE CUT: full weight on the nearest man alone; THE WAKE on the draw side
+  const D=u.cmdDuel, f=cmdNearest(u,sw.rng);
+  if(!f){ cmdDuelEnd(u,sw); return; } // he hopped and the man was gone — the whiffed cut still costs the arm (v1.73)
+  const vm=(u.vet?1.5:1)*lzDmgMul(u), cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(f);   // the swing's own damage grammar, per cut
+  hurt(f,sw.dmg*vm*cm,u);             // him ALONE — no circle, no cleave (round 2's price)
+  const c=CMD_DUEL_CUTS[D.n-1], fs=u.cmdFs, tb=-Math.max(0,0.145-D.el), hx=u.x+fs*8, hy=u.y-22;   // born below zero → the fx land on the blade's own frame (the 0391 stagger; the hop is ~0.05 of the sweep's 0.145)
+  S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:(c.th?34:26),t:tb,dur:0.24,col:'#C9D2D8'});   // the landing's ring — STEEL, never a glow colour
+  if(c.th){                           // the thrust leaves no arc — a tip ring at the blade's full 62-px reach (D27's default; the ±0.35 bracket not built)
+    S.fx.push({k:'ring',x:hx+fs*Math.cos(c.f)*62,y:hy+Math.sin(c.f)*62,r:3,R:14,t:-Math.max(0,0.10-D.el),dur:0.18,col:'#C9D2D8'});
+  } else {                            // THE WAKE (D21, hold-then-fade): cut 1 stands at full till the thrust lands, cut 2 the same — then they fade TOGETHER through the tip ring
+    const a0=Math.min(c.f,c.to), a1=Math.max(c.f,c.to);
+    S.fx.push({k:'cres',x:hx,y:hy,fs:fs,a0:a0,a1:a1,R:46,t:tb,dur:(D.n===1?0.66:0.44),hold:(D.n===1?0.44:0.22)});   // centres one hop apart = a trail of steel through three men
+  }
+  if(!reducedMotion()){ const tl0=c.th?62:46, tp=[hx+fs*Math.cos(c.to)*tl0, hy+Math.sin(c.to)*tl0], nt=c.th?6:4;   // tip ticks along the tangent, i-keyed off the post (never dice — the 0261 law); none under reduced motion
+    for(let ti=0;ti<nt;ti++){ const th=(((u.x|0)*0.73+(u.y|0)*1.21+ti*0.897)%1), ta=c.to+1.5708+(th-0.5)*1.3, ca=Math.cos(ta)*fs, sa=Math.sin(ta), td=2+((ti*0.37+th)%1)*5, tl=td+5+th*6;
+      S.fx.push({k:'tracer',x1:tp[0]+ca*td,y1:tp[1]+sa*td,x2:tp[0]+ca*tl,y2:tp[1]+sa*tl,t:tb,dur:0.09,col:'#EAF4FF',w:1.6}); } }
+  bfSfx(SFX.swish,u.x,u.y); if(bfHumanU(u)) S.shake=Math.max(S.shake,0.11);
+  if(D.n>=CMD_DUEL_N) cmdDuelEnd(u,sw);   // the thrust landed — the flourish's sim is over, the guard comes back up
+}
+function cmdDuelEnd(u,sw){            // the sim part over: the breath paid, the feet handed to the machine's own seats
+  const D=u.cmdDuel; u.cmdDuel=null;
+  if(D && D.n<CMD_DUEL_N && !(u.cmdSwT>0)) u.cmdSwT=cmdDuelArm(u,sw);   // an early end still pays the whole breath (v1.73); the full three armed it at the last cut's start
+  u.cmdDash=(S.bf ? bfNearestEnemy(u,sw.rng) : campFoeInReach(u,sw.rng))? 'land' : 'back';   // the 0488 machine's own two seats: work at the sword → stand where the hops put him; nobody → the walk home
 }
 // ===== 0488 THE HIGH COMMANDER'S BLADE — THE DASH (D19; Wyatt 8/21: "it adds
 // a dash attack") — the shotgun gap-close's own machine (the v1.67/v1.73
@@ -43630,7 +43769,9 @@ function updateCmd(u,dt,sw){
 // mid-dash. The class's "he never dashes" (0092) stands for every commander
 // WITHOUT the high blade — sw.hb is the one door, mine or an ally's.
 function cmdDashReady(u,sw){ return !!sw.hb && !(u.cmdDashCd>0) && !u.cmdDash && !(u.dropT>0) && !(u.cmdBlkT>0); }
-function cmdDashEnd(u){ if(u.cmdDash) u.cmdDashCd=CMD_DASH.cd; u.cmdDash=null; u.cmdTarget=null; }
+function cmdDashEnd(u){
+  if(u.cmdDuel){ u.cmdDuel=null; if(!(u.cmdSwT>0)) u.cmdSwT=cmdDuelArm(u); }   // 0509: a jet, a moved post, a drop or the dock ends a running flourish through the same nine callers — the cuts he never landed still cost the breath (the v1.73 law)
+  if(u.cmdDash) u.cmdDashCd=CMD_DASH.cd; u.cmdDash=null; u.cmdTarget=null; }
 function updateCmdDash(u,dt,sw){
   if(!u.home) u.home={x:u.x,y:u.y};
   const reach=sw.rng;   // the sword's own reach — updateCmd's scan and campUnitStep's halt read the same raw number
@@ -51067,6 +51208,7 @@ function update(dt){
     if(u.cmdDashCd>0) u.cmdDashCd-=dt;   // 0488 THE HIGH BLADE: the quiet between dashes (armed at the landing) — sim dt, loop head only, the sgCd law
     if(u.cmdBlkT>0) u.cmdBlkT-=dt;       // 0488: the block beat cmdAbsorbs writes — he never launches through it
     if(u.cmdFx>0) u.cmdFx-=dt;       // ...and his arm settles mid-stride (draw timer, sim dt like the forend's)
+    else if(u.cmdDuelK) u.cmdDuelK=0;   // 0509: the flourish's drawn cut expired with its clock — the pose reader falls back to the guard (a plain Commander never carries the field)
     if(u.snipeT>0) u.snipeT-=dt;     // the long rifle's recoil rides out on the figure
     if(u.pistT>0) u.pistT-=dt;       // the sidearm's buck (v1.50), same idea
     if(u.pist2T>0) u.pist2T-=dt;     // ...and the OFF-hand's buck once he's holding two (v1.67)
@@ -55534,6 +55676,26 @@ function cmdSwingPose(fx){
   if(t<CMD_SW_T){ const p=1-Math.pow(1-(t-0.265)/0.195,2); return {a:BOT+(G-BOT)*p, lean:0.18*(1-p), hip:7*(1-p)}; }
   return {a:G, lean:0, hip:0};
 }
+// 0509 THE DUELIST's pose (the round-6 bench's authored duel curve): cut k =
+// u.cmdDuelK (1..3), its clock u.cmdFx counting down (cmdDuelCut arms it).
+// Per cut: WIND 0→0.055 — the hop's own beat, the sim x is moving under this
+// (ease-out 1.6 to the cut's from-angle, lean −0.10) · the SWEEP 0.055→0.145
+// (the crescent cut's own ease to the to-angle — cut 2 travels UP, the whole
+// trick; the thrust holds −0.12 and EXTENDS the blade 46 → 62 px and back) ·
+// the POSE → 0.22 (the lean settles; the thrust hands off at its own 0.16) ·
+// then the RECOVER (ease-out 2 over CMD_DUEL_REC to the guard) — drawn only
+// after the LAST cut, because the next cut re-arms the clock at its wind.
+// hip stays 0 throughout: the hop is a sim move, not draw paint.
+function cmdDuelPose(u){
+  const k=u.cmdDuelK|0, c=CMD_DUEL_CUTS[k-1]||CMD_DUEL_CUTS[0], G=-0.52;
+  const pe=c.th? 0.16 : CMD_DUEL_C, t=pe+CMD_DUEL_REC-u.cmdFx;
+  if(t<0.055){ const p=1-Math.pow(1-t/0.055,1.6); return {a:G+(c.f-G)*p, lean:-0.10*p, hip:0}; }
+  if(t<0.145){ const q=(t-0.055)/0.09, p=q<0.70? 0.86*Math.pow(q/0.70,1.6) : 0.86+0.14*(1-Math.pow(1-(q-0.70)/0.30,2));
+    if(c.th){ const e=16*(p<0.5? 1-Math.pow(1-p*2,2) : 1-Math.pow(p*2-1,2)); return {a:c.f, lean:0.10, hip:0, ext:e}; }
+    return {a:c.f+(c.to-c.f)*p, lean:-0.10+0.22*p, hip:0}; }
+  if(t<pe){ const p=Math.min(1,(t-0.145)/0.075); return {a:c.to, lean:0.10*(1-p), hip:0}; }
+  const p=1-Math.pow(1-Math.min(1,(t-pe)/CMD_DUEL_REC),2); return {a:c.to+(G-c.to)*p, lean:0, hip:0};
+}
 // the body lean + the hip step — ONE wrapper transform around sprite + outfit
 // + weapon (drawSargeOutfit paints every piece at u.x/u.y in world coords — a
 // rot passed into drawSprite would move the sprite alone and leave the helmet
@@ -55541,7 +55703,7 @@ function cmdSwingPose(fx){
 // the weapon (before the pips). Facing = u.cmdFs, the strike's own (sim data).
 function cmdLeanIn(u){
   if(u.type!=='sarge' || !(u.cmdFx>0) || unitSargeStats(u).w!=='commander') return false;
-  const p=cmdSwingPose(u.cmdFx), fs=u.cmdFs||1;
+  const p=(u.cmdDuelK>0)? cmdDuelPose(u) : cmdSwingPose(u.cmdFx), fs=u.cmdFs||1;   // 0509: a flourishing Duelist leans with his cut — the hip is REAL now (the hop moved the sim's x), so the wrapper carries the lean alone
   cx.save(); cx.translate(u.x+fs*p.hip,u.y); cx.rotate(fs*p.lean); cx.translate(-u.x,-u.y);
   return true;
 }
@@ -55664,14 +55826,15 @@ function drawSargeWeapon(u){
     // (Wyatt: "the parry looks good"). During a swing the steel follows the
     // STRIKE's facing (u.cmdFs — the step and the crescent already do); a foe
     // behind him is the only frame the walk-flip and the strike ever disagree.
-    const sp=(u.cmdFx>0)? cmdSwingPose(u.cmdFx) : null;
+    const sp=(u.cmdFx>0)? ((u.cmdDuelK>0)? cmdDuelPose(u) : cmdSwingPose(u.cmdFx)) : null;   // 0509: a flourishing Duelist draws his cut's own curve (three directions + the thrust)
     const rem=!!sp && ((u.cmdFs<0)!==wflip);
     if(rem){ cx.save(); cx.translate(u.x*2,0); cx.scale(-1,1); }
     let ang=-0.52, flash=false, glint=false;
     if(u.cmdBlkT>0){ const pb=1-u.cmdBlkT/CMD_DASH.blkT, q=pb<0.1667? 1-Math.pow(1-pb/0.1667,2.4) : pb<0.7333? 1 : Math.pow(1-(pb-0.7333)/0.2667,2); ang=-0.52+(-1.9+0.52)*q; }
     else if(sp){ ang=sp.a; flash=!!sp.flash; glint=!!sp.glint; }
-    const big=!!usw.aoe, hb=!!usw.hb;   // 0488 THE HIGH BLADE (D25): the claymore mold with a longer blade, a GOLD crossguard + pommel and ONE pale edge-light — off the BAG like the claymore, so a relayed ally's high blade crosses with his loadout; fixed colours, no hex, no bloom (the class law stands)
-    const len=hb?46:big?40:30;
+    const cs1=(usw.cs|0)===1;   // 0509 THE DUELIST: the long sword — the claymore mold at the reach his bag carries (46), thrust-extended through sp.ext; blade or no blade
+    const big=cs1||!!usw.aoe, hb=!!usw.hb;   // 0488 THE HIGH BLADE (D25): the claymore mold with a longer blade, a GOLD crossguard + pommel and ONE pale edge-light — off the BAG like the claymore, so a relayed ally's high blade crosses with his loadout; fixed colours, no hex, no bloom (the class law stands)
+    const len=cs1? 46+((sp&&sp.ext)||0) : hb?46:big?40:30;
     const hx=u.x+8, hy=u.y-22;                                  // the hand (the saber hilt's own seat)
     const gx=hx-Math.cos(ang)*(big?7:5.5), gy=hy-Math.sin(ang)*(big?7:5.5);
     const bx=hx+Math.cos(ang)*2.5, by=hy+Math.sin(ang)*2.5;
@@ -73771,6 +73934,11 @@ window.GVT = {
   // v1.66: the rank arg lands on the WEAPON's own sargeUp track for all four
   // (the pistol included) — the man's damage rank is GVT.rank('sarge', r).
   sarge(w,rank){ if(w&&w!=='pistol'&&w!=='commander'&&META.sargeUnlocked.indexOf(w)<0) META.sargeUnlocked.push(w); META.sargeWeapon=w||'pistol'; if(rank!=null){ META.sargeUp[w||'pistol']=Math.max(0,Math.min(RANK_MAX,rank|0)); } saveMeta(); return sargeStats(); },   // 0092: a rig must not fabricate the secret's unlock path — the honest grant is seeding META.coopLevels
+  // 0509 THE SPEC SETTER (debug) — writes the save's pick + saves; the READER
+  // (cmdSpec) still decides, so an unowned pick reads 0. This is how the
+  // specs are exercised before 0512's picker exists (they ship dark).
+  cmdSpec(n){ if(n!=null){ META.cmdSpec=Math.max(0,Math.min(3,n|0)); saveMeta(); }
+    return { pick:META.cmdSpec|0, cs:cmdSpec(), owned:[0,1,2,3].map(i=>csOwned(i)?1:0), tester:csTester()?1:0, teddy:teddyBeat()?1:0, camp:META.campaign|0, bag:sargeStats() }; },
   // THE BLADE IN YOUR FACE test rig: the whole saber state machine in one call,
   // plus how many tan are close enough to stop presenting arms and just shoot him
   saberState(){ const u=S.units.find(x=>x.type==='sarge'); if(!u) return null;
@@ -74002,7 +74170,7 @@ window.GVT = {
     return { owned:cmdOwned(), blade:bladeOwned(), seen:!!META.cmdSeen, bladeSeen:!!META.bladeSeen,
       lvl:CMD_LVL, bladeLvl:CMD_BLADE_LVL, rank:Math.min(RANK_MAX,(META.sargeUp||{}).commander|0),
       sw:(sargeStats().w==='commander')? sargeStats() : null,
-      fielded:u? { w:unitSargeStats(u).w, blkN:u.cmdBlkN|0, swT:+(u.cmdSwT||0).toFixed(3),
+      fielded:u? { w:unitSargeStats(u).w, cs:csU(u), dash:u.cmdDash||null, blkN:u.cmdBlkN|0, swT:+(u.cmdSwT||0).toFixed(3),
                    x:+u.x.toFixed(1), y:+u.y.toFixed(1), spd:u.def.moveSpd,
                    hp:(u.hp!=null?u.hp:null), grit:gritCap(u) } : null }; },
   // ===== 0093 THE SOUL OF A SOLDIER — the state probe + the two honest doors.
