@@ -24723,14 +24723,22 @@ function awayLedger(){
   return A;
 }
 // the account-level snapshot netSync reports: the co-op wire's own grammar
-// (cm.sw = sargeStats + saber + rack · cm.mo = enhWire · ranks · laser)
+// (cm.sw = sargeStats + saber + rack + jet · cm.mo = enhWire · ranks · laser)
 // lifted to the account — exactly what an away battle needs to field my
 // REAL army on somebody else's screen. ~650 bytes measured.
+// 0521 THE HONEST CHALLENGE (FM-GVT-FEEDBACK-0823-EVE §7, Wyatt 8/23: "make
+// sure that the opponent you challenge is using their proper laser mod
+// crystal and sarge equipment"): the chain was audited end-to-end — every
+// bag number, the crystal, the rack, hb/cs, the laser, the bench and the
+// roster cross and apply; THE JET PACK was the one piece of Sarge's gear the
+// snapshot never carried (the co-op place order does — cm.sw.jet — and the
+// server has whitelisted `jet` since v23). It rides here now, on the wire's
+// own word and the soul flag's silence fence: no pack, no key.
 function awayLoadout(){
   const own=ownedUnits().filter(k=>BF_TYPES.indexOf(k)>=0);
   const up={}; for(const k of own) up[k]=Math.min(RANK_MAX, META.up[k]|0);
   return { v:1,
-    sw:Object.assign({}, sargeStats(), { saber:saberHex(), of:(META.outfit&&META.outfit.wear||[]).slice(0,16) }),
+    sw:Object.assign({}, sargeStats(), { saber:saberHex(), of:(META.outfit&&META.outfit.wear||[]).slice(0,16) }, jetOwned()? {jet:1} : {}),
     mo:(META.enh&&META.enh.own||[]).slice(), lz:META.laserOn||null, up:up, own:own };   // 0411 (C3/D2): THEIR BEST — every OWNED mod lit, not the switched-on bench (Wyatt: "they use their best layout possible"); server _away_lo_clean caps 15 under v27 (a v26 box clips one — accepted)
 }
 // their `own` types at their `up` ranks, UNSHUFFLED — the 0317 "he is you"
@@ -24771,7 +24779,7 @@ function startAwayBattle(row, lo){
   st.purse=BF_START+AWAY_BONUS;                        // "an extra 50 stars" — opening purse only
   const sc=SABER_COLORS.find(x=>x.hex===kit.saber);
   S.bf.away={ uid:row.uid, name:riv.name, lo:lo, col:(sc? sc.id : 'blue'),
-    lineup:awayLineup(lo), tkCd:AWAY_T0, snpCd:AWAY_T0, gsCd:AWAY_T0, rpCd:AWAY_T0, sgId:0 };
+    lineup:awayLineup(lo), tkCd:AWAY_T0, snpCd:AWAY_T0, gsCd:AWAY_T0, rpCd:AWAY_T0, fsCd:AWAY_T0, popCd:AWAY_T0, sgId:0 };   // 0521 THE HONEST CHALLENGE: the away cell CARRIES the fifth arm's clock now (fsCd — 0419 left it unminted, ⚑ closed: an away sniper captain with FLAMESTRIKE presses it under the hard captain's own cluster law) and THE SIXTH ARM's (popCd — BIG POP, 0486, postdated the away arms and never got a hand): every trophy on their bench that has a press now has a hand on the away carpet
   S.ann={ txt:tf("%1'S ARMY TAKES THE FIELD!", riv.name.toUpperCase()), t:3.0, warn:true };
   commBriefing('away', true);                          // 0819-PM2: YOUR Sarge holds the door (Wyatt 8/19) (one page; a first-save's 'bf' lesson wins the window quietly)
 }
@@ -25415,12 +25423,15 @@ function nemTkTick(dt){
 // THEIR crystal's own re-arm (TK_CD — red 8s … teal 15s, silver included),
 // the outlaw's snipe on SNIPE_CD whenever a target stands in reach, the
 // forge only when an enemy is near enough to pay for it, the renegade
-// channel back-to-back with a walking gap — and THE FIFTH ARM (0419, hard
-// cell only): the outlaw captain's FLAMESTRIKE on its own fsCd, pressed
+// channel back-to-back with a walking gap — and THE FIFTH ARM (0419; both
+// cells since 0521): the outlaw captain's FLAMESTRIKE on its own fsCd, pressed
 // only over a cluster (HARD_FS_NEAR others near the snipe target — FS_FF
 // burns EVERY side, so a lone scout is never worth the match). The arm keys
-// on the cell CARRYING an fsCd clock; the away cell mints none (⚑ minting
-// one there = the away captain earns the iron, a later pass). The away
+// on the cell CARRYING an fsCd clock — the hard cell's since 0419, the away
+// cell's since 0521 (THE HONEST CHALLENGE: the away captain earns every iron
+// on his bench; the away sniper's patches land OWNERLESS exactly like the
+// hard captain's — both sides burn, nobody is paid) — and THE SIXTH ARM
+// (0521): BIG POP on popCd, the away cell's own (see below). The away
 // commander's mods ride lo.mo (his real bench); the hard cell carries mo on
 // itself (no wardrobe to mirror). Clocks live on the CELL (they survive a
 // re-bought Sarge and clamp to AWAY_T0 on a fresh figure); his forge WINDOW
@@ -25435,7 +25446,8 @@ function awayTick(dt){
   if(cell.sgId!==sg.id){ cell.sgId=sg.id;
     cell.tkCd=Math.max(cell.tkCd,AWAY_T0); cell.snpCd=Math.max(cell.snpCd,AWAY_T0);
     cell.gsCd=Math.max(cell.gsCd,AWAY_T0); cell.rpCd=Math.max(cell.rpCd,AWAY_T0);
-    if(cell.fsCd!=null) cell.fsCd=Math.max(cell.fsCd,AWAY_T0); }   // the clamp never MINTS the field — the away cell stays fsCd-less by construction
+    if(cell.fsCd!=null) cell.fsCd=Math.max(cell.fsCd,AWAY_T0);
+    if(cell.popCd!=null) cell.popCd=Math.max(cell.popCd,AWAY_T0); }   // the clamp never MINTS a field (0521: both captain cells carry fsCd now; popCd is the away cell's own — the hard cell's sniper/saber draw never fields a shotgun)
   if(sg.gsT>0) sg.gsT=Math.max(0, sg.gsT-dt);   // his window burns on the sim clock (the S.gsT law, his seat)
   const w=unitSargeStats(sg).w, mo=(cell.lo? cell.lo.mo : cell.mo)||[];
   // THE FIFTH ARM ticks BESIDE the chain below, on its own clock — the
@@ -25455,6 +25467,28 @@ function awayTick(dt){
         S.fx.push({k:'ring',x:sg.x,y:sg.y-24,r:6,R:40,t:0,dur:0.32,col:'#FF9A3D'});
         S.floats.push({x:sg.x,y:sg.y-72,txt:'🔥 ×'+FS_SHOTS,t:0,col:'#FF9A3D'});   // fsActivate's own tell verbatim (symbols only — the player must be LOOKING, HARD_T0's law)
       } else cell.fsCd=AWAY_RETRY;
+    }
+  }
+  // 0521 THE SIXTH ARM — BIG POP (0486) on the away captain's own clock, BESIDE
+  // the chain like the fifth: the shotgun captain with the choke on his bench
+  // ARMS his next shell (u.popArm — the fire loop's one seat: reach ×2, cone ×2,
+  // the fat white ring + the double report) whenever an enemy stands inside his
+  // reach × AWAY_GS_NEAR (the forge's own gate — an armed pull with nobody in
+  // reach is a wasted 14 s), re-armed on POP_CD from the press (popActivate's
+  // law). The arm keys on the cell CARRYING a popCd clock (the away cell mints
+  // it; the hard cell's sniper/saber draw never fields a shotgun). An already
+  // armed shell waits for its pull — never double-armed; a refused press retries
+  // on AWAY_RETRY. The tell is popActivate's own (the player must be LOOKING).
+  if(cell.popCd!=null && w==='shotgun' && mo.indexOf('bigpop')>=0 && !sg.popArm){
+    cell.popCd-=dt;
+    if(cell.popCd<=0){
+      let near=false; const rr=(unitSargeStats(sg).rng||103)*AWAY_GS_NEAR;
+      for(const e of S.units){ if(e.dead||e.side===sg.side||e.dropT>0||e.jetT>0||e.cloakT>0) continue;
+        if(Math.hypot(e.x-sg.x,e.y-sg.y)<=rr){ near=true; break; } }
+      if(near){ sg.popArm=1; cell.popCd=POP_CD;
+        bfSfx(SFX.ready, sg.x, sg.y);
+        S.fx.push({k:'ring',x:sg.x,y:sg.y-24,r:6,R:40,t:0,dur:0.32,col:'#FFFFFF'}); }
+      else cell.popCd=AWAY_RETRY;
     }
   }
   if(w==='lightsaber' && mo.indexOf('telekinesis')>=0){
@@ -34180,7 +34214,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.84';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.85';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41602,11 +41636,16 @@ function unitSargeStats(u){
 // the ALLY's gear off the wire (coopSW.jet, set at placement); every
 // battlefield seat that isn't yours — private-room friends included — and
 // every AI Sarge is factory stock. No code path ever hands the AI brain or
-// another seat a launch.
+// another seat a launch. 0521 THE HONEST CHALLENGE: the AWAY captain wears
+// THEIR pack (kit.jet rode the snapshot — sargeWearU's own away seat, for the
+// picture: drawSargePack is this predicate's one consumer). The launch law
+// above stands: the AI never launches (⚑ a jet arm for the captain cell is a
+// later pass), so nothing about the fight moves — only what he carries.
 function unitJet(u){
   if(!u || u.type!=='sarge') return false;
   if(u.coopSW) return !!u.coopSW.jet;      // relayed ally: the ALLY's gear, off the wire
   if(u.coopMods) return false;             // relayed man with no Sarge loadout can't be one (belt+braces)
+  if(awayU(u)) return !!unitSargeStats(u).jet;   // 0521: the away captain — THEIR pack off THEIR snapshot (absent stays absent: the silence fence)
   if(S.bf && !bfHumanU(u)) return false;   // every other battlefield seat: factory stock
   return jetOwned();                       // mine
 }
@@ -47694,8 +47733,9 @@ function snpActivate(){
 // is armed only by MY tap on MY jetSarge — a relayed ally's or an away
 // captain's rounds never ignite in my sim (their button state is not on the
 // wire); every other battlefield seat fields factory stock (enhU's law).
-// The ONE exception (0419): the HARD captain arms his own fsN locally in
-// awayTick (all-CPU carpet by construction — nothing crosses a wire) and
+// The ONE exception (0419, and the away captain since 0521): a CAPTAIN CELL
+// arms its own fsN locally in awayTick (nothing crosses a wire — the hard
+// carpet is all-CPU, the away serve is my sim alone) and
 // his patches land OWNERLESS at the hook (the null-src lane: both sides
 // burn, nobody is paid).
 function fsOn(){ return enhOn('flamestrike') && (META.sargeWeapon||'pistol')==='sniper'; }
@@ -75358,6 +75398,12 @@ window.GVT = {
       live:(S.bf&&S.bf.away)? { uid:S.bf.away.uid, col:S.bf.away.col,
         tkCd:+(S.bf.away.tkCd||0).toFixed(2), snpCd:+(S.bf.away.snpCd||0).toFixed(2),
         gsCd:+(S.bf.away.gsCd||0).toFixed(2), rpCd:+(S.bf.away.rpCd||0).toFixed(2),
+        fsCd:(S.bf.away.fsCd==null)? null : +S.bf.away.fsCd.toFixed(2), popCd:(S.bf.away.popCd==null)? null : +S.bf.away.popCd.toFixed(2),   // 0521: the fifth + sixth arms' clocks (null = the cell carries no such arm)
+        jet:((S.bf.seats[S.bf.team].kit||{}).jet)? 1 : 0,   // 0521: the pack on the snapshot
+        arms:(function(aw){ const w9=(S.bf.seats[S.bf.team].kit||{}).w, mo=aw.lo.mo||[], L=[];   // 0521: every arm the captain cell would press for THIS iron + bench (the shipped `armed` keeps its one word)
+          if(w9==='lightsaber'&&mo.indexOf('telekinesis')>=0) L.push('tk'); if(w9==='sniper'&&mo.indexOf('outlawsniper')>=0) L.push('snp');
+          if(w9==='sniper'&&mo.indexOf('flamestrike')>=0&&aw.fsCd!=null) L.push('fs'); if(w9==='shotgun'&&mo.indexOf('guardianshotgun')>=0) L.push('gs');
+          if(w9==='shotgun'&&mo.indexOf('bigpop')>=0&&aw.popCd!=null) L.push('pop'); if(w9==='pistol'&&mo.indexOf('renegadepistol')>=0) L.push('rp'); return L; })(S.bf.away),
         purse:S.bf.seats[S.bf.team].purse, kitW:(S.bf.seats[S.bf.team].kit||{}).w||null,
         armed:(function(aw){ const w9=(S.bf.seats[S.bf.team].kit||{}).w, mo=aw.lo.mo||[];
           return (w9==='lightsaber'&&mo.indexOf('telekinesis')>=0)? 'tk' : (w9==='sniper'&&mo.indexOf('outlawsniper')>=0)? 'snp'
