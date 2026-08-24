@@ -4357,9 +4357,10 @@
      = hop/jump + facing (the flip rides INSIDE every keyframe via --fx, because a
      transform animation REPLACES a static transform — the v1.21 lesson) */
   .shk-d { position:absolute; width:76px; height:92px; margin-left:-38px;
-    transform:scale(var(--sc,1)); transform-origin:50% 100%; }
+    transform:scale(var(--sc,1)); transform-origin:50% 100%;
+    z-index:var(--z,auto); }   /* 0522b THE FRONT ROW ON TOP (Wyatt 8/24: "the characters that are in the front are on a higher layer. Otherwise, the image looks broken"): the DEPTH seat from the builder — back row 1 · front row 2 · the solo 3 (nearer paints over farther); Jane 4 and the words 5 below. The cameo lane sets no --z (auto — behind every dancer, as it always painted); never a DOM reorder (the 0446 law: the entrance animations key off --i and their own blocks). */
   .shk-d.shk-m { transform:translateX(var(--mx,420px)) scale(var(--sc,1)); }
-  .shk-d.shk-jane { z-index:2; }  /* 0446: Jane's dancer on the TOP layer — above every auto-z figure on the stage (the cameo lane included), under .shk-txt's 3 */
+  .shk-d.shk-jane { z-index:4; }  /* 0446: Jane's dancer on the TOP layer — above every figure on the stage (the cameo lane included) · 0522b: 4 — above the depth ladder's 1-3, under .shk-txt's 5 */
   .shk-w { position:absolute; inset:0; transform-origin:50% 96%; }
   .shk-i { position:absolute; inset:0; width:100%; height:100%;
     transform:scaleX(var(--fx,1)); transform-origin:50% 100%;
@@ -4459,7 +4460,7 @@
      gold shows (delay = the 2-beat cut at the baked 132 BPM), immediately on
      .shk-lite (short shows open at the drop), static and visible in the RM
      tableau. The capture preset slaves this animation like every other. */
-  .shk-txt { position:absolute; left:6%; right:6%; top:8%; z-index:3; text-align:center;
+  .shk-txt { position:absolute; left:6%; right:6%; top:8%; z-index:5; text-align:center;   /* 0522b: 5 — the words over every figure (the depth ladder 1-3 + Jane's 4) */
     display:flex; flex-direction:column; align-items:center; gap:9px; }
   .shk-t1 { font-family:var(--ui); font-weight:800; letter-spacing:0.5px; line-height:1;
     font-size:clamp(34px,7vw,64px); color:#FFD24A;
@@ -31523,11 +31524,15 @@ function shakeBuild(root, RM){
   h+=shakeCamHTML(K? K.id:null, RM, !!(K&&K.short));   // SH-02: the cameo underpaints the line (walk-ons read behind the dancers)
   const others=[]; for(let i=0;i<types.length;i++) if(i!==solo) others.push(i);
   const front=others.slice(0,4), back=others.slice(4);
-  const D=[{ i:solo, x:50, b:7, sc:1.06, dir:1, fx:1, solo:true }];
+  // 0522b THE FRONT ROW ON TOP: z = the DEPTH seat — the back row 1, the front
+  // row 2, the solo 3 (nearer paints over farther; .shk-d reads it as --z). The
+  // DOM order below is the 0446 law's and never moves; Jane's class takes 4,
+  // the words 5.
+  const D=[{ i:solo, x:50, b:7, sc:1.06, dir:1, fx:1, solo:true, z:3 }];
   const px=[[41,-1,1],[59,1,-1],[27,-1,1],[73,1,-1]];   // buddy pairs face off across the gap
-  for(let k=0;k<front.length;k++) D.push({ i:front[k], x:px[k][0], b:9, sc:0.96, dir:px[k][1], fx:px[k][2] });
+  for(let k=0;k<front.length;k++) D.push({ i:front[k], x:px[k][0], b:9, sc:0.96, dir:px[k][1], fx:px[k][2], z:2 });
   for(let k=0;k<back.length;k++){ const x=10+((k*31+13)%74);
-    D.push({ i:back[k], x:x, b:20, sc:0.76, dir:(k%2? -1:1), fx:(x>50? -1:1) }); }
+    D.push({ i:back[k], x:x, b:20, sc:0.76, dir:(k%2? -1:1), fx:(x>50? -1:1), z:1 }); }
   const padStart=types.length-cast.pad.length;
   let n=0;
   for(const d of D){
@@ -31536,10 +31541,11 @@ function shakeBuild(root, RM){
     // screen, we have to make sure that Jane is on the top layer. Currently,
     // she is on layers behind"): when she is in the cast, HER dancer div
     // takes a z seat (.shk-jane — above the king, little KC and the couch
-    // ladies, under the words' own z:3); never a reorder of the cameo lane
+    // ladies, under the words' own z — 0522b: her 4 over the depth ladder's
+    // 1-3, the words at 5); never a reorder of the cameo lane
     // (their entrance animations key off their own blocks) nor of the line.
     h+='<div class="shk-d'+(d.solo?' shk-solo':'')+(m?' shk-m':'')+(types[d.i].t==='jane'?' shk-jane':'')
-      +'" style="left:'+d.x+'%;bottom:'+d.b+'%;--i:'+n+';--dir:'+d.dir+';--sc:'+d.sc
+      +'" style="left:'+d.x+'%;bottom:'+d.b+'%;--i:'+n+';--dir:'+d.dir+';--sc:'+d.sc+';--z:'+d.z
       +';--mx:'+((d.x<50? -1:1)*(420+((n*37)%160)))+'px">'
       +'<div class="shk-w"><img class="shk-i" src="'+shakeDancerURI(types[d.i])+'" style="--fx:'+d.fx+'" alt=""><i class="shk-h"></i></div></div>';
     n++;
@@ -34374,7 +34380,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.89';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.90';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -36835,10 +36841,10 @@ function evVerdictTeardown(){ PGV=null; sqNoteClear(); S.coop=null; if(COOP){ cl
 // NEXT <day> <time>, day/time as tokens, never words). evDoorTick re-renders at 1 s
 // while the room is open (the structure once per state, the counter every second);
 // evDoorPoll reads /gvt/event/state every EV_POLL_MS (the 0291 nx beat). THE PRIME TIME
-// CARD (0506): once per LAUNCH on the first quiet menu landing once HQ's bell is known,
-// quiet OR live (EVD.annWk — a session flag; META.evSeen is still written for the books),
-// with an ✕ (mb-x) beside GOT IT, the nightly line when HQ says daily; a second time at
-// T−EV_POP_S once per bell per launch (EVD.popBell) — the menu only; sealed = no card.
+// CARD (0506 → 0522b): ONCE PER PLAYER, EVER — the SAVED META.evSeen gates it (0522b, Wyatt
+// 8/24; EVD.annWk stays as the session latch) on the first quiet menu landing once HQ's bell
+// is known, quiet OR live, with an ✕ (mb-x) beside GOT IT, the nightly line when HQ says daily;
+// the T−5 card at T−EV_POP_S once per bell per launch (EVD.popBell) — the menu only; sealed = no card.
 // D13 THE YOU-THERE TAP: in the hold, a seat with no placement and no canvas tap gets
 // the card at T−EV_AFK_S; still untouched at the bell → the seat goes to a computer
 // (coopLeave at evIn()<=1 so the 1 s poll carries it before HQ's freeze → the room →
@@ -37140,16 +37146,24 @@ function evAnnLine(){
     : tf('The castle is under siege — every %1 at %2. Ten commanders, one king, a level for everyone who fights and spoils for the winners.', evBellDayLong(1), evBellTime(1));
 }
 function evPopLine(){ return tf('THE CASTLE IS UNDER SIEGE IN %1 — TAP THE INVASION TO JOIN.', evMMSS(evIn())); }
-// THE CARD ON EVERY LOGIN (0506 §3.2 — Wyatt 8/23: "It should come every time they log in"): once per
-// LAUNCH (EVD.annWk, a session flag — META.evSeen is still written for the books, it gates nothing now)
-// on the first quiet menu landing once HQ's bell is known, quiet OR live (no longer live-only); sealed
-// = no card (the bell rang; the band is the door). A landing already inside the T−EV_POP_S window gets
-// the T−5 line and spends that latch too — one card per landing, never two back to back.
+// THE CARD ON EVERY LOGIN (0506 §3.2 — Wyatt 8/23: "It should come every time they log in") —
+// SUPERSEDED by 0522b THE PRIME TIME CARD, ONCE (Wyatt 8/24: "Let's pause on having the pop-up for Ultra
+// Mega King Yeti after the first time the player sees it. They shouldn't have to see it every time that
+// they log in"): the launch card deals ONCE PER PLAYER, EVER — the SAVED META.evSeen (written at the deal
+// since v5.67, the flag-first law) is the gate now: any value = this player has seen it; a fresh install
+// sees it once; every existing player who was dealt it never sees it again. EVD.annWk (the session flag)
+// stays as the second latch. The rest of the law stands: the first quiet menu landing once HQ's bell is
+// known, quiet OR live; sealed = no card (the bell rang; the band is the door). A landing already inside
+// the T−EV_POP_S window by a player who has never seen the card gets the T−5 line, spends that latch too
+// and latches for good — one card per landing, never two back to back. THE T−5 CARD (evPopTry) IS
+// UNTOUCHED — five minutes before the bell is the useful pop; THE INVASION band at HQ stays the door every
+// night; the desert JOIN card (bdAnnTry) keeps 0516's own law. ⚑ alt: once per NIGHT (META.evSeen===EV.wk).
+// Reversal for a rig / for Wyatt: GVT.evSeen(0).
 function evAnnTry(){
   const st=evDoorState();
-  if(!EV.wk || !(EV.bell>0) || st==='none' || st==='sealed' || EVD.annWk===EV.wk) return false;
+  if(!EV.wk || !(EV.bell>0) || st==='none' || st==='sealed' || EVD.annWk===EV.wk || META.evSeen) return false;   // 0522b: META.evSeen = seen once, seen for good
   if(!evAnnQuiet()) return false;
-  EVD.annWk=EV.wk; META.evSeen=EV.wk; saveMeta();   // the one-shot FIRST (the flag-first law): the session latch + the books
+  EVD.annWk=EV.wk; META.evSeen=EV.wk; saveMeta();   // the one-shot FIRST (the flag-first law): the session latch + the books (0522b: the books ARE the gate now)
   const pop=!!(EV_POP_S>0 && st==='live' && evIn()<=EV_POP_S);
   if(pop) EVD.popBell=EV.bell;
   return evAnnCard(pop? evPopLine() : evAnnLine());
@@ -53617,9 +53631,21 @@ function hitCheck(f,u){
     if(S.corpses.length>90) S.corpses.shift();
     // his dog tag goes to whoever'S SEAT got him — yours as a collectible blob,
     // an AI seat's straight into that purse
-    const v=bfBounty(f.type);
+    // 0522b THE PARATROOPER PAYS NOBODY (Wyatt 8/24: "When a radio man spawns
+    // a rifleman and that rifleman is defeated, the player should not be
+    // receiving any dog tags for that defeated spawned rifleman"): a fallen
+    // man under the canopy flag (f.para — the radio man's drop; ⚑ the same
+    // stamp the EMERGENCY stick's four and THE NEMESIS's half-time canopies
+    // wear, paraChute is the one seat) pays NO dog tags to ANYONE — no blob
+    // for a human seat, no purse credit for a computer's: v=0 on this one
+    // gate. The kill still COUNTS (kills/noteKill above, myKills below); the
+    // corpse, the clack, bfSargeDown and combustCheck are untouched. The
+    // owner's side was already off the books (knock: !u.para — no refund, no
+    // casualty, no lost-star tax); this closes the killer's side. A free man
+    // is a faucet in either direction.
+    const v=f.para? 0 : bfBounty(f.type);
     const st=(u && u.seat!=null && S.bf)? S.bf.seats[u.seat] : null;
-    if(st && st.me){ S.blobs.push({x:f.x,y:f.y-8,v,t:0}); S.bf.myKills=(S.bf.myKills||0)+1; }
+    if(st && st.me){ if(v>0) S.blobs.push({x:f.x,y:f.y-8,v,t:0}); S.bf.myKills=(S.bf.myKills||0)+1; }
     // v2.43 ROOKIE: the enemy's kill bounties ride the DIRECTOR's gas now,
     // capped at par. Close game → full pay (a beginner's casualties funding
     // enemy walk-ons IS the back-and-forth — the flow is the feature); the
@@ -53628,7 +53654,7 @@ function hitCheck(f,u){
     // riflemen ≈ 360 tags — triple the drip). Never ABOVE par: a pressing
     // director presses through the drip and the decision clock, never
     // through richer kills.
-    else if(st && !st.human) st.purse += (S.bf && S.bf.rookie && st.team==='foe')? Math.round(v*Math.min(1,(S.bf.dirGain&&S.bf.dir)?S.bf.dir.gas:1)) : v;
+    else if(st && !st.human && v>0) st.purse += (S.bf && S.bf.rookie && st.team==='foe')? Math.round(v*Math.min(1,(S.bf.dirGain&&S.bf.dir)?S.bf.dir.gas:1)) : v;   // 0522b: a paratrooper (v 0) credits no purse
     // a man clatters over; a vehicle goes up (same beat the campaign gives them)
     if(f.def.vehicle){ bfSfx(SFX.boom, f.x, f.y); S.fx.push({k:'puff',x:f.x,y:f.y-20,t:0,dur:0.5,R:40}); }
     else bfSfx(SFX.clack, f.x, f.y);
