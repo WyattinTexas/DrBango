@@ -19899,7 +19899,18 @@ function vehOwns(t){ return (META.vehOwned||[]).indexOf(t)>=0; }
 // dying the frame the trigger drops. 221 base → 486 at full song — the
 // trike's own dash is 470 (measured, not vibes); the engine's ×1.45 still
 // stacks on the def copy. Both dials are one-const Wyatt levers.
-const J2_HP_MUL=1.4, J2_CHARGE=2.2, J2_RAMP=0.5, J2_SIGHT=260;
+// 0522a THE NIGHT TUNE (Wyatt 8/23 ~21:50: "Jeep v2 add 12 hp and x1.8
+// acceleration towards enemies. +10 damage on regular units, here's and
+// sarge on collision" — "here's" read as HEROES ⚑): J2_HP_ADD = +12
+// plastic on the V2's plated hull alone (vehHP's jeep2 branch — the
+// jeep's own tiers stand; tier 0 26 … tier 8 62; the garage card, the
+// co-op wire and the fielded hull all read the one seat) · J2_RAMP
+// 0.5 → 0.5/1.8 (the burst winds to full ×1.8 FASTER — his ACCELERATION
+// toward enemies; the ×2.2 top of the song stands, ⚑ ×1.8 on the top is
+// one const) · J2_RAM_ADD = +10 bumper damage against every NON-VEHICLE
+// target (rifles, heroes, sarge — bfRam's per-target read, both carpets;
+// vehicle-vs-vehicle and the scout jeep's own 4 stand).
+const J2_HP_MUL=1.4, J2_HP_ADD=12, J2_CHARGE=2.2, J2_RAMP=0.5/1.8, J2_RAM_ADD=10, J2_SIGHT=260;
 function vehKind(t){ return VEH_ORDER.indexOf(t)>=0 || t==='jeep2'; }
 // 0316 THE REPLACEMENT LAW [WYATT]: "Once acquired, it simply TAKES THE
 // SCOUT JEEP'S SLOT." vehHas answers "is this garage OPEN" — the jeep's
@@ -19919,7 +19930,7 @@ function vehFaceK(t){ return (t==='bfjeep' && vehOwns('jeep2'))? 'jeep2' : t; }
 function vehEng(t){ if(t==='jeep2') t='bfjeep'; const a=META.vehEng; return Array.isArray(a) && a.indexOf(t)>=0; }   // 0278e: one garage — the V2 rides the jeep's own engine
 function jetEngOn(){ return META.jetEng===1; }
 function vehTier(t){ return Math.max(0, Math.min(VEH_TIERS, (META.vehUp&&META.vehUp[t])|0)); }
-function vehHP(t,tier){ if(t==='jeep2') return Math.round(vehHP('bfjeep',tier)*J2_HP_MUL); const a=VEH_HP[t]; if(!a) return 0; return a[tier==null? vehTier(t) : Math.max(0,Math.min(VEH_TIERS,tier))]; }   // 0278e [WYATT]: V2 = +40% over the jeep at the SAME plate tier the garage holds
+function vehHP(t,tier){ if(t==='jeep2') return Math.round(vehHP('bfjeep',tier)*J2_HP_MUL)+J2_HP_ADD; const a=VEH_HP[t]; if(!a) return 0; return a[tier==null? vehTier(t) : Math.max(0,Math.min(VEH_TIERS,tier))]; }   // 0278e [WYATT]: V2 = +40% over the jeep at the SAME plate tier the garage holds · 0522a: +J2_HP_ADD flat on the V2 alone (Wyatt: "Jeep v2 add 12 hp")
 function vehNextCost(t){ const r=vehTier(t); return r>=VEH_TIERS? 0 : VEH_TIER_COST[t][r]; }
 // THE TRAY IS YOURS, NOT THE BOARD'S. A vehicle you have not unlocked at the
 // Surplus is simply not on the shelf — no dead card, nothing to tap. BF_TYPES
@@ -27442,7 +27453,7 @@ const FLOOD_AT={ 31:3, 37:4, 43:2, 86:4 };                    // ⚑ D14 — run
 const FLOOD_RIM={ 31:'bottom', 37:'bottom', 43:'top', 86:'bottom' };   // the rim the flood boils over — the roof rungs' GAP sits on the north band, so they flood from the south; the bare 43 from the north
 const FLOOD_N=5, FLOOD_GAP=2.5, FLOOD_C=2;              // ripples · seconds apart · each ripple = c(FLOOD_C) crawlers (the 0098 arithmetic: 8 at 31, 9 at 37/43 — the wave 41/46 bodies, under the wall)
 const TIDE_L=40;                                        // ⚑ D10 — THE TEDDY TIDE's rung (a non-×3 BIG PUSH rung; 0 = off, L40's finale byte-what-it-was; a ×3 slot would also need its tease re-pointed — the ⚠⚠ L90 law)
-const TIDE_T='wteddy';                                  // ⚑ THE TEDDY SEAM — the tide's bear: OUTLAW TOWN's shotgun bear (the shipped mold, v4.0x; hp 12 → 48 felt at 40, leak 2). When TP-04's roster lands in FDEF, its bear key drops in HERE — one cell; every pulse row reads it
+const TIDE_T='wteddy';                                  // ⚑ THE TEDDY SEAM — the tide's bear: OUTLAW TOWN's shotgun bear (the shipped mold, v4.0x; hp 27 → 108 felt at 40 (0522a: +15), leak 2). When TP-04's roster lands in FDEF, its bear key drops in HERE — one cell; every pulse row reads it
 function waveFromKey(key, m, R, lvl){
   const c = x=>Math.max(1,Math.round(x*m));
   // 0474 WESTERN ROAD 2/8 — THE OUTLAW BAND (21-50). Wyatt's dials on
@@ -27910,8 +27921,8 @@ const FDEF = {
   wsniper: { hp:2,  spd:26, bounty:35, leak:1, w:54, rng:404, fireCd:5.2, aim:1.4, pips:3, elite:true },   // 0475 WESTERN ROAD 3/8: pips 3 — the CLASS reading (WESTERN-ROAD-PLAN.md D4: "outlaw sniper" = tansniper on the road, wsniper in the park — both rows ×3; ⚑ ONE cell to revert the park's). rng 404 · aim 1.4 · fireCd 5.2 untouched; wlady keeps her own pips:2 + the iron (task 7 prices the ladies)
   wrider:  { hp:6,  spd:96, bounty:30, leak:2, w:76, rng:204, elite:true, wild:0.84, ride:{cd:1.15, ramR:52, brN:7, brGap:0.11, lull:0.35, lullVar:0.6} },   // 0474 WESTERN ROAD 2/8 ("…and the ones on horseback"): rng 170→204 (×1.2 EXACT — under sgDetect 210, the card's 205 cap never fires) · wild 0.80→0.84 = HITS ×0.8 (the 0367 storm pricing ×0.8 — ~0.8 of the old hits/s on the 60Hz grid, never zero; ⚑ D3) · the roll hashed (wildRoll; the spray's lull keeps its shipped clock) · THE JEEP PARADE's OUTRIDER on the 21-50 road (waveFromKey) · 0355 SPORADIC spray law (brN rounds brGap apart, then lull + rand×lullVar; a miss spends the pull, lands beside the man and kicks sand) · 0367 (Wyatt: "20% faster… firing like crazy. They can miss all over the place, but they need to feel impactful"): spd 80→96 EXACT; the spray goes to 7 rounds on a short leash — ~5.3 rounds/s vs the old ~2.0, the crazy is REAL — and wild 0.8 prices the storm back to ~+20% hits/s over the 0355 clock ON THE REAL 60Hz GRID (grid-measured 5.02 vs 2.07 rounds/s; impactful, never double-deadly — 0.7 would DOUBLE it; every cell a dial; the ram at ramR stands)
   wmouse:  { hp:3,  spd:44, bounty:12, leak:1, w:36, rng:90,  fireCd:1.4, burst:3, aim:0.25, sneak:{t:5, spd:210, gx:330, gap:70, hold:170, mineAt:1, mineR:100} },
-  wteddy:  { hp:12, spd:26, bounty:32, leak:2, w:60, rng:100, fireCd:3.2, aim:0.6, multi:3, cone:0.95, pellet:true, elite:true },   // 0367 (Wyatt: "not really impactful at all. Let's give him 50% more health"): hp 8→12 EXACT — the shotgun bear stands half again longer; every rung inherits through spawnFoe's one hpMul seat
-  wsnake:  { hp:30, spd:22, bounty:40, leak:2, w:384, elite:true, bur:{digCd:2.2, digSpd:200, rattle:0.5, lungeR:200, seekR:440, away:1.1} },   // 0374 (Wyatt: "the giant rattlesnake needs to be 2x larger and have 3x health"): hp ×3 EXACT, w ×2 (feet-anchored — the belly stays grounded; the def.w×0.3 body circle rides the one funnel → 115.2), reach rides the body per the 0367 law (lungeR/seekR ×2); the GLOBAL row — park rungs inherit ×cfg.hpMul on top (r13 ≈ 115hp, flagged), the duel's H/g ride hpX 1.2
+  wteddy:  { hp:27, spd:26, bounty:32, leak:2, w:60, rng:100, fireCd:1.6, aim:0.6, multi:3, cone:0.95, pellet:true, elite:true },   // 0522a THE NIGHT TUNE (Wyatt 8/23 ~21:50: "Teddy outlaws need +15 hp and x2 attack speed" — ⚑ THE READING: the teddy of the outlaw cast = THIS row, OUTLAW TOWN's shotgun bear, the game's only shipped teddy outlaw; correct us if another was meant): hp 12→27 (+15 EXACT — every rung inherits through spawnFoe's one hpMul seat: Outlaw Town, the 21-50 road, the L40 TEDDY TIDE) · fireCd 3.2→1.6 (×0.5 — the drum between volleys HALVES; the aim 0.6 windup stands, so the felt whole cycle lands ~×1.8 — ⚑ aim 0.3 is one cell if the full ×2 felt was meant)   // 0367 (Wyatt: "not really impactful at all. Let's give him 50% more health"): hp 8→12 EXACT — the shotgun bear stands half again longer; every rung inherits through spawnFoe's one hpMul seat
+  wsnake:  { hp:30, spd:22, bounty:40, leak:2, w:326, elite:true, bur:{digCd:12.2, digSpd:200, rattle:0.5, lungeR:170, seekR:374, away:1.1} },   // 0522a THE NIGHT TUNE (Wyatt 8/23 ~21:50: "Giant sandsnakes to be 15% smaller and have a 10 second longer cooldown on burrow"): w 384→326 (×0.85, feet-anchored — the ×0.3 body circle rides the one funnel → 97.8; the racing mound's 6.4 scales with him at drawFoe), reach rides the body per the 0367 law (lungeR 200→170 · seekR 440→374; ⚑ one line holds reach if he meant the body alone) · digCd 2.2→12.2 (+10 s EXACT — the SURF window between dives; both re-arm seats in updateFoeSnake read this one cell; the duel's SNAKE_SURF_X 1.85 still stretches on top, its own 0416 law ⚑)   // 0374 (Wyatt: "the giant rattlesnake needs to be 2x larger and have 3x health"): hp ×3 EXACT, w ×2 (feet-anchored — the belly stays grounded; the def.w×0.3 body circle rides the one funnel → 115.2), reach rides the body per the 0367 law (lungeR/seekR ×2); the GLOBAL row — park rungs inherit ×cfg.hpMul on top (r13 ≈ 115hp, flagged), the duel's H/g ride hpX 1.2
   // 0370 KING CROAK'S LADIES (Wyatt: "They fight using snipers. They're
   // basically an elite sniper unit with 50% more health than a regular
   // sniper, so it's each of the girls on the couch") — the wsniper row with
@@ -34363,7 +34374,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.88';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.89';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -36598,7 +36609,7 @@ function evLaunch(r){
 function evRefuse(r){
   const err=r&&r.err; let msg;
   if(err==='closed'){ const op=(typeof r.open==='number')? r.open : EV.open; const when=new Date(op*1000); let hm='';
-    try{ hm=when.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }catch(e){ hm=when.getHours()+':'+String(when.getMinutes()).padStart(2,'0'); }
+    try{ hm=when.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit',timeZoneName:'short'}); }catch(e){ hm=when.getHours()+':'+String(when.getMinutes()).padStart(2,'0'); }   // 0522a: the gates-open hour wears its zone (the no-Intl catch stays bare — a fallback, not a render law)
     const left=Math.max(0,op-evNow());
     msg=tf('THE GATES OPEN AT %1 — %2 TO GO', hm, left>=3600? Math.floor(left/3600)+'h '+Math.floor((left%3600)/60)+'m' : evMMSS(left)); }
   else if(err==='sealed') msg=EV.daily? tf('THE BELL HAS RUNG — EVERY NIGHT AT %1', evBellTime()) : t('THE BELL HAS RUNG — NEXT SATURDAY');   // 0823-NIGHT: the nightly law reaches the toast (the 0506 ⚑) — the weekly words stand byte-still for EV_DAILY 0
@@ -36880,7 +36891,7 @@ function bdDoorState(){
   if(now>=open) return 'live';
   return 'quiet';
 }
-function bdBellTime(raw){ const s=evFmt(BD.bell, {hour:'numeric', minute:'2-digit'}); return raw? s : s.toUpperCase(); }
+function bdBellTime(raw){ const s=evFmt(BD.bell, {hour:'numeric', minute:'2-digit', timeZoneName:'short'}); return raw? s : s.toUpperCase(); }   // 0522a: the desert bell wears its zone too (evBellTime's law)
 // the card (the evAnnCard grammar: band · head · the Sarge · the line · ✕ + the button; mbev = the ray rule)
 function bdAnnCard(line, join){
   const p=document.getElementById('milePop'); if(!p) return false;
@@ -36965,7 +36976,7 @@ function bdLaunch(){
 function bdRefuse(r){
   const err=r&&r.err, b=(r&&r.bd)||{}; let msg;
   if(err==='closed'){ const op=(typeof b.open==='number' && b.open>0)? b.open : (BD.open||BD.bell-BD_POP_S); const when=new Date(op*1000); let hm='';
-    try{ hm=when.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}); }catch(e){ hm=when.getHours()+':'+String(when.getMinutes()).padStart(2,'0'); }
+    try{ hm=when.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit',timeZoneName:'short'}); }catch(e){ hm=when.getHours()+':'+String(when.getMinutes()).padStart(2,'0'); }   // 0522a: the gates-open hour wears its zone (the no-Intl catch stays bare — a fallback, not a render law)
     const left=Math.max(0,op-evNow());
     msg=tf('THE GATES OPEN AT %1 — %2 TO GO', hm, left>=3600? Math.floor(left/3600)+'h '+Math.floor((left%3600)/60)+'m' : evMMSS(left)); }
   else if(err==='sealed') msg=t('THE BELL HAS RUNG — THE DESERT IS SEALED TONIGHT');
@@ -37014,7 +37025,7 @@ function evLocale(){
 function evFmt(epoch, opts){ const d=new Date((epoch||0)*1000); try{ return new Intl.DateTimeFormat(evLocale(), opts).format(d); }catch(e){ try{ return d.toLocaleString(); }catch(e2){ return String(d); } } }
 function evBellDay(raw){ const s=evFmt(EV.bell, {weekday:'short'}); return raw? s : s.toUpperCase(); }        // SAT — Intl, never the table
 function evBellDayLong(raw){ const s=evFmt(EV.bell, {weekday:'long'}); return raw? s : s.toUpperCase(); }    // SATURDAY
-function evBellTime(raw){ const s=evFmt(EV.bell, {hour:'numeric', minute:'2-digit'}); return raw? s : s.toUpperCase(); }   // 9:15 PM / 21:15 by locale
+function evBellTime(raw){ const s=evFmt(EV.bell, {hour:'numeric', minute:'2-digit', timeZoneName:'short'}); return raw? s : s.toUpperCase(); }   // 9:15 PM EDT / 21:15 MESZ — 0522a THE ZONE ON THE CLOCK (Wyatt 8/23 ~22:12: "include EST … in case they don't live in the EST time zone"): every displayed clock time carries ITS OWN zone label. The bell is ONE instant rendered in the player's LOCAL clock (the 0485 Intl law), so an Eastern player reads 9:15 PM EDT and a Pacific one 6:15 PM PDT — a bare pinned "EST" would mislabel every non-Eastern render (and August is EDT, EST is the winter name; ⚑ the literal pinned string is one format option). Intl-native — zero dict rows; every "AT %1" line inherits through this one seat.
 function evBellDT(){ return evBellDay()+' '+evBellTime(); }
 function evDur(s){ s=Math.max(0,Math.floor(s)); const d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60);
   if(d>=1) return d+'d '+String(h).padStart(2,'0')+'h'; if(h>=1) return h+'h '+String(m).padStart(2,'0')+'m'; return evMMSS(s); }
@@ -42686,6 +42697,12 @@ function bfLeak(u){
 function bfRam(u){
   if(!u.rammed) u.rammed={};
   const R=u.def.ramR||46;
+  // 0522a THE NIGHT TUNE: the V2's bumper bites +J2_RAM_ADD on every
+  // NON-VEHICLE it clips — rifles, heroes, sarge (Wyatt's own three) —
+  // read per target at the strike; a vehicle hull (def.vehicle — the tan
+  // tank/jeep, the battleground hulls) takes the family's own 4, and the
+  // scout jeep's bumper never moves (rdm hands him his bare def.ram).
+  const rdm=t9=> u.def.ram + ((u.type==='jeep2' && !(t9.def&&t9.def.vehicle))? J2_RAM_ADD : 0);
   // THE CAMPAIGN RAM (v1.62): a green jeep on the rug clips FOES. Same bumper
   // law — once each, never slows — through hurt(), the campaign's own bullet
   // funnel, so the kill and the bounty land like any other hit. THEIR SARGE's
@@ -42699,8 +42716,8 @@ function bfRam(u){
       u.rammed[f.id]=1;
       S.fx.push({k:'puff',x:f.x,y:f.y-18,t:0,dur:0.3,R:20});
       bfSfx(SFX.thock, u.x, u.y);
-      if(f.def.saber){ f.hp-=u.def.ram; hitCheck(f,u); }
-      else hurt(f, u.def.ram, u);
+      if(f.def.saber){ f.hp-=rdm(f); hitCheck(f,u); }
+      else hurt(f, rdm(f), u);
     }
     if(u.marching && Math.random()<0.4)
       S.fx.push({k:'puff',x:u.x-28,y:u.y-4,t:0,dur:0.3,R:11});
@@ -42719,7 +42736,7 @@ function bfRam(u){
     // own deflect can't turn the bumper aside). His chair starts its clock
     // like any battlefield death. Everyone else takes the same ram as ever.
     if(saberArm(o)){ o.hp=0; hitCheck(o,u); bfSfx(SFX.boom, u.x, u.y); }
-    else hurt(o, u.def.ram, u);
+    else hurt(o, rdm(o), u);
   }
   // rooster tail of carpet dust off the back wheels — you can hear it coming
   if(u.marching && Math.random()<0.4)
@@ -57579,7 +57596,7 @@ function drawFoe(f){
       return;
     }
     // under the rug: just a moving bump and a guilty ripple
-    const bw8=f.type==='wsnake'?6.4:1;   // 0339: the giant rattlesnake races a bigger mound (0367: doubled with the body; 0374: doubled AGAIN — w 192→384, the racing mound reads at the new scale)
+    const bw8=f.type==='wsnake'?5.44:1;   // 0522a: ×0.85 with the body (w 326) — the mound reads at HIS scale, the 0374 law run backwards   // 0339: the giant rattlesnake races a bigger mound (0367: doubled with the body; 0374: doubled AGAIN — w 192→384, the racing mound reads at the new scale)
     cx.fillStyle='rgba(0,0,0,0.18)'; cx.beginPath(); cx.ellipse(f.x,f.y+4,22*bw8,8*bw8,0,0,7); cx.fill();
     cx.fillStyle='#9a5a4a'; cx.beginPath(); cx.ellipse(f.x,f.y-2,19*bw8,10*bw8,0,0,7); cx.fill();
     cx.strokeStyle='rgba(255,255,255,0.25)'; cx.lineWidth=2;
@@ -75380,7 +75397,7 @@ window.GVT = {
              unlock:VEH_UNLOCK[t], next:vehNextCost(t), track:VEH_HP[t].slice(), costs:VEH_TIER_COST[t].slice(),
              eng:{ owned:vehEng(t), cost:ENG_COST[t], mul:ENG_MUL },
              spd:{ base:BF_MOVE[t].moveSpd, eng:Math.round(BF_MOVE[t].moveSpd*ENG_MUL) } }; });
-    o.jeep2={ owned:vehOwns('jeep2'), hp:vehHP('jeep2'), stock:BF_MOVE.jeep2.hp, charge:J2_CHARGE, ramp:J2_RAMP, sight:J2_SIGHT, eng:vehEng('jeep2'), has:vehHas('bfjeep'), face:vehFaceK('bfjeep'), spd:{ base:BF_MOVE.jeep2.moveSpd, eng:Math.round(BF_MOVE.jeep2.moveSpd*ENG_MUL) } };   // 0278e→0316: the charge dials + the replacement answers
+    o.jeep2={ owned:vehOwns('jeep2'), hp:vehHP('jeep2'), stock:BF_MOVE.jeep2.hp, charge:J2_CHARGE, ramp:J2_RAMP, sight:J2_SIGHT, hpAdd:J2_HP_ADD, ramAdd:J2_RAM_ADD, eng:vehEng('jeep2'), has:vehHas('bfjeep'), face:vehFaceK('bfjeep'), spd:{ base:BF_MOVE.jeep2.moveSpd, eng:Math.round(BF_MOVE.jeep2.moveSpd*ENG_MUL) } };   // 0278e→0316: the charge dials + the replacement answers
     return o; },
   // straight to a state, no shopping: give(t) unlocks, tier(t,n) sets the plates
   vehGive(t){ if(VEH_ORDER.indexOf(t)<0) return null;
