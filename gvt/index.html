@@ -799,6 +799,13 @@
   #partyPop .pp-card.gone { border-color:#8A6A25; }
   #partyPop .pp-card.gone .pp-head { color:#E8D48A; }
   #partyPop .pp-card.gone .pp-big { padding-left:24px; padding-right:24px; }
+  /* 0527a THE INVITER'S SARGE — their guy beside the words (the 0411 came-for-you row's own shape); the slot keeps
+     its box while the dress-fetch is in flight, so JOIN / NOT NOW never move under a thumb */
+  #partyPop .pp-who { display:flex; align-items:center; gap:clamp(8px,2vw,14px); max-width:100%; }
+  #partyPop .pp-who .pp-head { text-align:left; }
+  #partyPop .pp-sarge { flex:0 0 auto; width:clamp(55px,14.6vh,86px); height:clamp(64px,17vh,100px);
+    display:flex; align-items:center; justify-content:center; }
+  #partyPop .pp-sarge img { height:100%; width:auto; filter:drop-shadow(0 3px 4px rgba(0,0,0,0.6)); }
   /* the sheet: the banner line + the DARK chair */
   .ptySheet .pts-ban { display:flex; align-items:center; gap:8px; margin:0 0 clamp(4px,1vh,8px); padding:clamp(4px,1vh,8px) 10px;
     background:linear-gradient(180deg,rgba(76,122,46,0.55),rgba(44,74,23,0.55)); border:2px solid #9BC06A; border-radius:9px;
@@ -30109,6 +30116,24 @@ function sargeGearURI(gk, bodyHex){
   const body = art.split('currentColor').join(bodyHex||'#7FA35C');
   return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">'+body+'</svg>');
 }
+// 0527a THE INVITER'S SARGE (FM-GVT-GROUP-03 §R7): THE JET PACK on a WEAPON
+// portrait — GEAR_ART.jetpack's own pack (the two gunmetal cylinders + the
+// nozzle flames, SLICED off the gear card's art: zero new paths) spliced in
+// right after BASE so the man stands IN FRONT of it (the card's own
+// layering — the back leg crosses the flame there too), and its harness
+// strap laid over the chest right after the limbs group. Dress the pack
+// BEFORE outfitDress: the worn chest piece then lands between the limbs and
+// the strap, so the harness reads OVER the clothes. Any SARGE_ART figure
+// (every one opens with BASE); a figure with no molded base gets the pack
+// behind him whole. Stateless, re-minted per render like every portrait.
+const GEAR_PACK=GEAR_ART.jetpack.slice(BASE.length, GEAR_ART.jetpack.indexOf(OF_LIMBS));
+const GEAR_STRAP=GEAR_ART.jetpack.slice(GEAR_ART.jetpack.indexOf('<g stroke="#26261f" stroke-width="3.5"'), GEAR_ART.jetpack.indexOf('<g transform="translate(59,55)">'));
+function sargePackDress(art){
+  const i=art.indexOf(BASE), j=(i<0)? 0 : i+BASE.length;
+  let s=art.slice(0,j)+GEAR_PACK+art.slice(j);
+  const k=s.indexOf(OF_LIMBS), e=(k>=0)? s.indexOf('</g>', k) : -1;
+  return (e>=0)? s.slice(0,e+4)+GEAR_STRAP+s.slice(e+4) : s+GEAR_STRAP;
+}
 // ===== v1.38 THEIR SARGE — the academy's own saber composite on a TAN body,
 // mirrored to face left like every Tan model. His blade is FIXED RED #FF4D4D,
 // never saberHex() — that is YOUR colour, and his gear reads nothing of yours.
@@ -34266,7 +34291,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.86';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.87';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -39010,10 +39035,12 @@ function partyPopSync(){
   const nm=String(v.frm||'A COMMANDER').toUpperCase().slice(0,14);
   const plcLine=(v.fam!=='r' && v.plc && PTY_PLACES[v.plc])?
     '<div class="pp-sub">'+escH(tf('AT %1', ptyPlaceName(v.plc)))+((v.n|0)>0? ' · '+escH(tf('%1 OF %2', v.n|0, 5)) : '')+'</div>' : '';
+  const headLine='<div class="pp-head">'+tf('%1 WANTS YOU IN THEIR PARTY!', escH(nm))+'</div>';
+  const who=ptyInvSargeHTML(v.fu);   // 0527a THE INVITER'S SARGE: their guy beside the words; '' = today's card, byte-same
   partyPopShow('join',
     '<div class="pp-card" data-notr>'
     +(v.sq? '<div class="pp-sq">⚑ '+escH(String(v.sq).toUpperCase().slice(0,18))+'</div>' : '')
-    +'<div class="pp-head">'+tf('%1 WANTS YOU IN THEIR PARTY!', escH(nm))+'</div>'
+    +(who? '<div class="pp-who" data-fu="'+escH(String(v.fu))+'">'+who+headLine+'</div>' : headLine)
     +plcLine
     +'<button type="button" class="pp-big" onclick="ptyPopJoin(\''+escH(String(v.code))+'\',\''+escH(String(v.fam||'l'))+'\')">'+escH(t('JOIN'))+'</button>'
     +'<button type="button" class="pp-quiet" onclick="ptyPopNo()">'+escH(t('NOT NOW'))+'</button>'
@@ -39031,6 +39058,64 @@ function ptyPopNo(){
   SFX.clack(); partyPopClear();
   crewPost('pdrop',{}).catch(()=>{});
   CREW.pinv=[]; CREW.pknk=[];   // 0394: the knock letters ride the same drop
+}
+// ═══ 0527a THE INVITER'S SARGE (FM-GVT-GROUP-03 §R7 — Wyatt 8/24, review 8:
+// "include their Sarge plus their personalization. Does their Sarge use a
+// sniper or a saber? What color is their saber? Does their Sarge have gear?
+// Okay, let's put that gear on them … 'Hey, that's their guy.'"): the consent
+// card wears the INVITER'S Sarge off THEIR save. §R7 PLAN A — the loadout is
+// server-known per uid (0393/0521: /gvt/defense → color · saber · lo.sw{w r
+// saber of jet hb aoe}); ONE read through the poster's own dress cache
+// (CHAL.lo, page-lifetime, chalLoOf's row), ZERO server bytes, zero strings.
+// The card deals AT ONCE — a knock is never blocked on cosmetics: a uid never
+// asked = the fetch + a reserved slot the portrait lands in (JOIN / NOT NOW
+// never move under a thumb); asked-and-none (💤, no such player, HQ's polite
+// no, offline) = today's plain card, byte-same; HQ unreachable = the slot
+// folds and the next deal asks again. THEIR dye (an undyed friend stands in
+// Sarge's own green — the room's idiom, never the poster's rival tan) · THEIR
+// iron through chalArtOf (dual pistols, claymore, high blade off the bag) ·
+// THEIR crystal · THEIR rack · THEIR pack (sargePackDress). Through
+// outfitDress with THEIR wear list, never sargeWepURI — that door wears YOUR
+// wardrobe (the v2.16 law, re-held at 0409 and here). ⚑ the knock-offer card
+// (%1 WANTS TO PARTY!) is its own builder — one line gives it this slot on
+// Wyatt's word.
+const PTY_INVLO={};   // uid → 1 while a dress-fetch is in flight (page-lifetime; the row itself is CHAL.lo's)
+function chalHexOf(c){ const a=c&&c.color&&ARMIES.find(x=>x.id===c.color); return a? a.hex : '#7FA35C'; }
+function ptyInvSargeURI(c){
+  const art=chalArtOf(c); if(!art) return null;
+  let s=SARGE_ART[art]||SPRITES_SRC.sarge;
+  if(c.jet) s=sargePackDress(s);
+  s=outfitDress(s, art, Array.isArray(c.of)? c.of.filter(x=>typeof x==='string') : []);
+  const body=s.split('currentColor').join(chalHexOf(c)).split('BLADEHEX').join((typeof c.sb==='string' && /^#[0-9A-Fa-f]{6}$/.test(c.sb))? c.sb : '#4DA6FF');
+  return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">'+body+'</svg>');
+}
+// the cache read that asks once: a row → dressed, or null (💤 = plain) · no
+// row = kick ONE fetch and answer undefined (the slot waits)
+function ptyInvDress(uid){
+  uid=String(uid||''); if(!uid) return null;
+  const c=CHAL.lo[uid];
+  if(c) return (c.a && c.w)? c : null;
+  if(PTY_INVLO[uid]) return undefined;
+  PTY_INVLO[uid]=1;
+  netFetch(NET+'/defense?uid='+encodeURIComponent(uid)).then(r=>r.json()).then(d=>{
+    CHAL.lo[uid]=chalLoOf((d&&d.ok)? d : null);   // a no (no such player · HQ's polite refusals · offline) = the a:0 row: asked, none, never asked again this visit
+    delete PTY_INVLO[uid]; ptyInvSargeLand(uid);
+  }).catch(()=>{ delete PTY_INVLO[uid]; ptyInvSargeLand(uid); });   // unreachable: nothing cached — the slot folds now, the next deal asks again
+  return undefined;
+}
+function ptyInvSargeHTML(uid){
+  const c=ptyInvDress(uid); if(c===null) return '';
+  const u=c? ptyInvSargeURI(c) : null;
+  return '<span class="pp-sarge">'+(u? '<img src="'+u+'" alt="">' : '')+'</span>';
+}
+// the landing: the OPEN consent card for THIS uid gets its portrait in the
+// slot (nothing else moves), or folds to the plain head (asked, none)
+function ptyInvSargeLand(uid){
+  if(PTY_POP!=='join') return;
+  const el=document.querySelector('#partyPop .pp-who'); if(!el || el.getAttribute('data-fu')!==String(uid)) return;
+  const c=CHAL.lo[uid], u=(c&&c.a&&c.w)? ptyInvSargeURI(c) : null, s=el.querySelector('.pp-sarge');
+  if(u && s) s.innerHTML='<img src="'+u+'" alt="">';
+  else { const h=el.querySelector('.pp-head'); if(h) el.replaceWith(h); else el.remove(); }
 }
 // ═══ 0515 G1 — THE GROUP BUTTON AT HQ (FM-GVT-GROUP-02 §5): the group
 // follows you home. One blue GROUP button, bottom-right of the room — the
@@ -69548,6 +69633,25 @@ function chalSargeURI(w, hex, sb, of){
 function chalPlainURI(hex){ return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 140">'+SPRITES_SRC.sarge.split('currentColor').join(hex||'#C09E6C')+'</svg>'); }
 function chalAgo(s){ s=Math.max(0,s|0); return s<3600? Math.max(1,Math.round(s/60))+'M' : s<86400? Math.round(s/3600)+'H' : Math.round(s/86400)+'D'; }
 function chalHex(row){ const a=row&&row.color&&ARMIES.find(x=>x.id===row.color); return a? a.hex : '#C09E6C'; }
+// 0527a THE INVITER'S SARGE (§R7): ONE reader for a /defense answer → the
+// dress-cache row (the poster's own CHAL.lo shape, + what a portrait needs
+// to stand him up the way HIS room does: the rank for the dual pistols, the
+// commander's blade flags, the pack). No lo (💤) or no answer = the a:0 row
+// awayGo writes — asked, none.
+function chalLoOf(d){
+  const sw=d&&d.lo&&d.lo.sw, ok=!!(sw && typeof sw==='object' && SARGE_WEAPONS[sw.w]);
+  return { a:ok?1:0, w:ok? sw.w:null, sb:ok? sw.saber:null, of:(ok&&Array.isArray(sw.of))? sw.of.slice(0,16):null, color:(d&&d.color)||null,
+           r:ok? (sw.r|0):0, hb:ok? (sw.hb|0):0, aoe:ok? (+sw.aoe||0):0, jet:ok? (sw.jet|0):0 };
+}
+// which SARGE_ART stands for THEIR iron — sargeArtW's own three-way, read off
+// the bag instead of my save: the dual pistols at WPN_MILE.pistolLvl, the
+// high blade when hb rides, the claymore when the circle (aoe) does.
+function chalArtOf(c){
+  const w=c&&c.w; if(!SARGE_WEAPONS[w]) return null;
+  if(w==='pistol') return ((c.r|0)>=WPN_MILE.pistolLvl)? 'pistol2' : 'pistol';
+  if(w==='commander') return c.hb? 'highblade' : (c.aoe>0? 'claymore' : 'commander');
+  return w;
+}
 // open the poster for a uid — from a board row (the near bag rides whole),
 // an ALL-100 row, the inbox sheet or the came-for-you card. A row the near
 // answer doesn't carry paints instantly with what it has, then ONE
@@ -69566,9 +69670,7 @@ function chalPosterOpen(uid, name){
     else if(row.a!==0){   // 0417: personas dress-fetch like anybody — a:0 is the only sleeper
       netFetch(NET+'/defense?uid='+encodeURIComponent(uid)).then(r=>r.json()).then(d=>{
         if(!(d&&d.ok)) return;
-        const ok=d.lo && d.lo.sw && typeof d.lo.sw==='object' && SARGE_WEAPONS[d.lo.sw.w];
-        CHAL.lo[uid]={ a:ok?1:0, w:ok? d.lo.sw.w:null, sb:ok? d.lo.sw.saber:null,
-                       of:(ok&&Array.isArray(d.lo.sw.of))? d.lo.sw.of.slice(0,16):null, color:d.color||null };
+        CHAL.lo[uid]=chalLoOf(d);   // 0527a: the one reader — the consent card reads the same row (the pack + the blade flags ride it now)
         if(CHAL.pos && CHAL.pos.uid===uid && wrIsOpen()) chalPosterOpen(uid, name);
       }).catch(()=>{});
     }
