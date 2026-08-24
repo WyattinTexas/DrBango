@@ -27098,7 +27098,28 @@ function levelCfg(n){
     fw.groups=[ {f:'boss',t:'robo',n:1,e:'right',at:0},
                 {f:'redcoat',t:'tanrifle',n:29,e:'right',at:3.0,officer:true},
                 {f:'solo',t:'jeep',n:2,e:'right-top',at:4.2},
-                {f:'wedge',t:'tank',n:1,e:'right-bottom',at:5.0,escort:15} ]; }
+                {f:'wedge',t:'tank',n:1,e:'right-bottom',at:5.0,escort:15} ];
+    // 0519 THE DEATH ROBOT AT NINETY (FM-GVT-FEEDBACK-0823-EVE §5, Wyatt 8/23:
+    // "increase the amount of spawned units he spawns by 4 units per wave.
+    // Including 1 enemy morton each time") — the robot spawns nothing of his
+    // own (his machine is the walk, THE LASER LINE and THE MORTAR), so "the
+    // units he spawns per wave" are read as HIS LEVEL'S WAVES: every one of
+    // the seven gains +4 — three more of the wave's own foot (the first
+    // foot-soldier group's type: rifles, or the sneak attack's crawlers) in a
+    // trailing line, and ONE tan MORTAR walking on behind them ("morton" has
+    // no seat in the game — read as the tan mortar/tube foe, ⚑ LOUD). Two
+    // fresh groups appended per wave (the shipped groups byte-still — the
+    // walked 29-man escort stands), literal counts, zero R() consumed; the
+    // shelf runs for n===90 alone (elite 190 closes on THE BIG SHOT, below).
+    // `rim:1` on the tube = THE RIM LAW (0514's f.x<W-60 word, on the tubes'
+    // park shelf): a tube born off-world with a green already inside its 404
+    // walks ON before it parks — never the invisible off-carpet statue.
+    // ⚑ dials: the foot's type (+3 all-rifle is one word) · the two beats
+    // (+1.5 / +3.0 s after the wave's last group) · the rim law for every tube.
+    for(const w9 of cfg.waves){ let la9=0, ft9='tanrifle';
+      for(const g9 of w9.groups){ if((g9.at||0)>la9) la9=g9.at||0; }
+      for(const g9 of w9.groups){ if(g9.f!=='boss' && !(FDEF[g9.t]&&FDEF[g9.t].vehicle)){ ft9=g9.t; break; } }
+      w9.groups.push({f:'line',t:ft9,n:3,e:'right',at:la9+1.5}, {f:'line',t:'tanmortar',n:1,e:'right',at:la9+3.0,rim:1}); } }
   // ===== 0479 WESTERN ROAD 8/8 — THE INFEST FLOODS (Wyatt 8/21: "Lacks
   // infesting moments."; the plan's D14: 31 · 37 · 43). One middle wave of
   // each rung is replaced IN PLACE (post-cut, post-sort — the L90 robo idiom;
@@ -27749,8 +27770,16 @@ const FDEF = {
   // zig/leg/holdW the walk (radians: zig 0.70=40°), lz* THE LASER LINE
   // (lzAng 0.61=35°), mort*+fire* THE MORTAR's shell and ground-fire patch,
   // sayAt his line's beat after walk-on.
-  robo:    { hp:400, spd:26, bounty:250, leak:8, w:104, rng:420, boss:true,
-             robo:{ zig:0.70, leg:2.2, holdW:90, lzCd:4.5, lzTell:0.6, lzN:2, lzGap:0.35,
+  // 0519 THE DEATH ROBOT AT NINETY (FM-GVT-FEEDBACK-0823-EVE §5, Wyatt 8/23:
+  // "Reduce death robot at level 90 hp by 50%, increase the cooldown on his
+  // laser move by 30%"): hp 400→200 — the CELL halves, so the L90 bar halves
+  // through the same curve (3653→1826 at hpm 9.13; he is L90's tenant alone —
+  // the elite finale at 190 is THE BIG SHOT off eliteBig, never him); lzCd
+  // 4.5→5.85 (×1.3 — the salvo clock, the first salvo included; the tell, the
+  // beam pair and THE MORTAR's own 7.0 clock stand). The "+4 spawned units per
+  // wave, 1 enemy mortar each" ride L90's shelf in levelCfg (⚑ "morton").
+  robo:    { hp:200, spd:26, bounty:250, leak:8, w:104, rng:420, boss:true,
+             robo:{ zig:0.70, leg:2.2, holdW:90, lzCd:5.85, lzTell:0.6, lzN:2, lzGap:0.35,
                     lzAng:0.61, lzLead:120, lzSpd:520, lzRun:380, lzR:22, lzPips:2,
                     mortCd:7.0, mortSeed:3.0, mortScatter:60, mortR:58, fireR:64, fireLife:6, sayAt:1.0 } },
   // v1.38 THEIR SARGE — the Tan's own commander, red saber in hand (the three
@@ -34112,7 +34141,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.82';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.83';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -49117,6 +49146,7 @@ function spawnGroup9(g){
     // army changed; the duel posse's stamps are its first customer)
     if(g.hpX) foe.hp=foe.hpMax=Math.max(1,Math.round(foe.hpMax*g.hpX));
     if(g.spdx) foe.spdMul=+g.spdx||1;
+    if(g.rim) foe.rimIn=1;   // 0519 THE RIM LAW rides the group (L90's added tubes): the park shelf walks a stamped tube ON before it may hold him
     form.members.push(foe);
   });
   // 0318: the block itself wheels for its half's turret (the fgoal fork in
@@ -51648,7 +51678,13 @@ function update(dt){
       : (RV && !f.crossed && f.type!=='crawler' && !f.boss && f.x>RV.x+RV.w)
       ? { x:RV.x+RV.w/2, y:RV.bridgeY } : T;
     if(RV && f.x<=RV.x-4) f.crossed=true;
-    if(f.def.minRng && !f.boss && hasGreenTarget(f)){
+    if(f.def.minRng && !f.boss && !(f.rimIn && f.x>=W-60) && hasGreenTarget(f)){
+      // 0519 THE RIM LAW (the 0514 word, for a stamped tube alone — L90's added
+      // mortars ride `rim:1`): born at the rim with a green already inside its
+      // 404, an unstamped tube parks OFF-WORLD (invisible, untargetable, silent
+      // — the flagged freeze class; every other rung's tubes keep that law,
+      // ⚑ one guard makes it every tube's); a stamped tube marches ON to W-60
+      // first, then the shelf below is byte-what-it-was.
       // 0117: the BATTERY PARKS — a tube with any green inside its reach
       // stands and works the gun instead of marching into its own minRng
       // dead zone. hasGreenTarget asks reach only (no dead-zone filter), so
