@@ -22311,7 +22311,8 @@ const META_DEFAULT = {
   // 0092 THE COMMANDER: the same law — class and blade ownership DERIVED from
   // the record; these bits only remember each reveal was SHOWN, once ever.
   cmdSeen:0, bladeSeen:0,
-  // 0509 THE SPEC PICK (0 plain, 1 duel, 2 fear, 3 wall) — read only through
+  // 0509 THE SPEC PICK (0517: 0 UNPICKED → the class default THE DUELIST for
+  // owners · −1 the deliberate plain · 1 duel, 2 fear, 3 wall) — read only through
   // cmdSpec() (a reader that clamps and re-checks the door); written by the
   // 0512 spec row (UI.csPick — the academy's picker) and the debug setter GVT.cmdSpec(n).
   cmdSpec:0,
@@ -28015,7 +28016,8 @@ const CMD_LVL=20, CMD_BLADE_LVL=95;      // the 0090 table's Wyatt-pinned rungs
 // 0509 THE COMMANDER'S SPECIALIZATIONS (FM-GVT-COMMANDER-SPECS rounds 2-6;
 // Wyatt 8/23: the Duelist free with the class, Men Without Fear off Captain
 // Teddy, the Stone Wall at campaign 150, Zorgy Babababa holds all three).
-// The pick is META.cmdSpec (0 plain, 1 duel, 2 fear, 3 wall), read ONLY
+// The pick is META.cmdSpec (0 UNPICKED — the class default THE DUELIST for
+// owners, the 0517 law · −1 the deliberate plain · 1 duel, 2 fear, 3 wall), read ONLY
 // through cmdSpec() below. The pick is written by the academy's spec row (0512
 // UI.csPick — the picker every owner reaches) and the debug setter GVT.cmdSpec(n).
 // D4: the Teddy stand-in door is the CAMPAIGN's L25 BUFFALO BILL (the
@@ -28141,7 +28143,11 @@ function csOwned(n){ n=n|0;
   if(n<=1) return true;                         // plain + the Duelist come with the class (Wyatt)
   if(csTester()) return true;                   // the whole test grant, one site
   return n===2 ? teddyBeat() : (META.campaign|0)>=CS_WALL_LVL; }
-function cmdSpec(){ const n=Math.max(0,Math.min(3,META.cmdSpec|0)); return csOwned(n)? n : 0; }
+function cmdSpec(){ const r=META.cmdSpec|0;   // 0517: −1 = the deliberate BASE pick (UI.csPick(0) writes it; the setter accepts it)
+  if(r===-1) return 0;
+  const n=Math.max(0,Math.min(3,r));
+  if(n>0 && csOwned(n)) return n;
+  return csOwned(1)? 1 : 0; }   // 0517 THE CLASS DEFAULT: unpicked — and a pick asleep behind its door — falls to THE DUELIST (his door is 0, he comes with the class; Wyatt 8/23: "The commander currently doesn't have his dualist ability")
 // the spec OFF THE BAG (highU's own idiom, never off my save): sargeStats
 // stamps cs only when >0, so my bag, a relayed ally's kit (coopSW — both
 // lanes) and the away snapshot all answer from the wire's own word, and
@@ -34008,7 +34014,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.77';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.78';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41858,7 +41864,8 @@ function bfMarch(u,dt,goal){
   // facing — nx is post-steer/post-ice, so a bridge detour stamps the way he
   // actually strides; the rock-shoulder below is displacement, never a walk,
   // and deliberately never stamps. 20 px/s clears the noise floor.
-  const wkv=nx*sp*v2m; if(wkv>20){ u.wkX=1; u.wkT=S.t; } else if(wkv<-20){ u.wkX=-1; u.wkT=S.t; }
+  const wkv=nx*sp*v2m, wkf=u.cmdWkF?7:20;   // 0517 THE MOONWALK: the Commander's stride (CMD.pace ×0.55 → 14 campaign / 22 BF) sat UNDER the 20 floor, so his walk never stamped and he faced east on every westward step (Wyatt: "unable to turn around… just walks backwards"); the floor drops to 7 where the pace seats mark him (u.cmdWkF — half his slowest stride, the same ±60-degree acceptance the 20 gives a 40 px/s walker; displacement never routes through this line, so the jitter guard keeps) — every other figure keeps the 20 byte-what-it-was
+  if(wkv>wkf){ u.wkX=1; u.wkT=S.t; } else if(wkv<-wkf){ u.wkX=-1; u.wkT=S.t; }
   for(const rk of S.cfg.terrain.rocks){          // rocks shoulder him aside (reused kernel)
     const ax=u.x-rk.x, ay=u.y-rk.y, dd=Math.hypot(ax,ay), min=rk.r+pad;
     if(dd>0.1&&dd<min){ u.x+=ax/dd*(min-dd)*Math.min(1,dt*8); u.y+=ay/dd*(min-dd)*Math.min(1,dt*8); }
@@ -42503,7 +42510,7 @@ function campUnitStep(u,dt){
     // 0092 THE COMMANDER walks slow (the class identity) — written on his first
     // step for the same reason the jump tank's is: a relayed ally's bag lands
     // after placement, and the first STEP is the first frame that reads it right.
-    if(u.type==='sarge' && unitSargeStats(u).w==='commander') u.def.moveSpd=Math.round((u.def.moveSpd||26)*CMD.pace); }
+    if(u.type==='sarge' && unitSargeStats(u).w==='commander'){ u.def.moveSpd=Math.round((u.def.moveSpd||26)*CMD.pace); u.cmdWkF=1; } }   // 0517: the walk-flip floor rides the pace (bfMarch's wkf)
   // the green jeep's bumper checks before the wheels turn (v1.62) — the same
   // call bfUnitStep makes, and bfRam's campaign branch does the foe walking
   if(u.def.ram) bfRam(u);
@@ -43648,7 +43655,7 @@ function placeUnit(type,x,y,side,seat){
       // before the soul/rookie steps. The old saber ×2 / commander ×3 that
       // stood here are RETIRED; only the commander's walk remains.)
       // 0092 THE COMMANDER keeps the slow walk (his plate rides above).
-      if(unitSargeStats(u).w==='commander'){ u.def.moveSpd=Math.round((u.def.moveSpd||40)*CMD.pace); }
+      if(unitSargeStats(u).w==='commander'){ u.def.moveSpd=Math.round((u.def.moveSpd||40)*CMD.pace); u.cmdWkF=1; }   // 0517: the walk-flip floor rides the pace (bfMarch's wkf)
       // 0093: a souled rig in MY Sarge's hands — multiplies the whole pool,
       // rank row and weapon plate included (v3.01; it used to compose with
       // the saber ×2 / commander ×3 that stood here). (A relayed Sarge's bag
@@ -44127,6 +44134,7 @@ function updateCmd(u,dt,sw){
 // own crit (the co-op law); a relayed ally's Duelist runs from the cs his
 // bag carried. The high blade's dash stays: it delivers him, the flourish
 // lands (the circle still never applies to a Duelist).
+function cmdWkStamp(u,wv){ if(wv>20){ u.wkX=1; u.wkT=S.t; } else if(wv<-20){ u.wkX=-1; u.wkT=S.t; } }   // 0517 THE MOONWALK: the machine's own movers (the 0488 flight, the 0509 hops, the walk home) move u.x directly and never met bfMarch's stride stamp — each stamps the walk facing off its stride's INTENT velocity (bfMarch's own law; presentation only, nothing in the sim reads it — the mvSm law)
 function cmdDuelArm(u,sw){ sw=sw||unitSargeStats(u); return CMD_DUEL_ARM*tkSlowMul(u)/(sw.rate*lzRateMul(u)); }   // the breath: 0.7 × the swing period (0.778 s stock), the swing's own clock laws
 function cmdDuelStart(u,sw,best){
   if(!u.home) u.home={x:u.x,y:u.y};   // the post — the machine's 'back' walk returns here (campUnitStep/bfMarch already carry it, the 0488 seat)
@@ -44149,6 +44157,7 @@ function updateCmdDuel(u,dt,sw){      // the flourish owns the frame
   if(D.left>0){                       // THE HOP — the dash machine's flight line on the pinned launch line, bounded by the step (exactly 3 frames at 60 fps: 680/60 × 3 = 34)
     const mv=Math.min(D.left, CMD_DASH.spd*dt);
     u.x+=D.hx*mv; u.y+=D.hy*mv;
+    cmdWkStamp(u, D.hx*CMD_DASH.spd);   // 0517: the hop strides at the dash's own speed — he faces through the man he cuts
     D.left-=mv;
     if(D.left<=0) cmdDuelLand(u,sw);  // he arrives — the cut lands where the hop put him
     return;
@@ -44231,7 +44240,7 @@ function updateCmdDash(u,dt,sw){
     }
     const dx=f.x-u.x, dy=f.y-u.y, d=Math.hypot(dx,dy);
     const stop=Math.max(26, reach-8);   // land a hair INSIDE the sword's reach so the swing is legal this frame
-    if(d>stop){ const sp=CMD_DASH.spd; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; return true; }
+    if(d>stop){ const sp=CMD_DASH.spd; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; cmdWkStamp(u,dx/d*sp); return true; }   // 0517: the flight faces its man
     u.cmdDash='land'; u.cmdTarget=null; u.cmdDashCd=CMD_DASH.cd;   // ARRIVED: the quiet arms HERE (D19) and the swing below lands NOW
     return false;
   }
@@ -44241,7 +44250,7 @@ function updateCmdDash(u,dt,sw){
   }
   // 'back': nobody left at the sword — walk to the post, then the march resumes
   const dx=u.home.x-u.x, dy=u.home.y-u.y, d=Math.hypot(dx,dy);
-  if(d>4){ const sp=WPN_MILE.sgRet; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }
+  if(d>4){ const sp=WPN_MILE.sgRet; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; cmdWkStamp(u,dx/d*sp); }   // 0517: the walk home faces the walk — THE MOONWALK's clearest frame
   else { u.x=u.home.x; u.y=u.home.y; u.cmdDash=null; u.cmdTarget=null; }
   return true;
 }
@@ -53035,7 +53044,9 @@ function drawSprite(k,x,y,w,rot,wob,imgOverride,flip){
 // (the mvSm law), so co-op's twin sims and seeded replays stay byte-equal.
 const WKF_HOLD=0.15;
 function wkBack(o,dir){ return !!(o.wkT && S.t-o.wkT<WKF_HOLD && o.wkX===-dir); }
-function unitFl(u){ const b=!!(S.bf && u.side==='foe'); return b !== wkBack(u, b?-1:1); }   // ⚠ !! matters: null!==false is TRUE — an uncoerced campaign b mirrored every green (battery r1's find)
+function unitFl(u){ const b=!!(S.bf && u.side==='foe');   // ⚠ !! matters: null!==false is TRUE — an uncoerced campaign b mirrored every green (battery r1's find)
+  if(u.cmdFs && !(u.wkT && S.t-u.wkT<WKF_HOLD) && (u.cmdSwT>0||u.cmdFx>0||u.cmdWallT>0)) return u.cmdFs<0;   // 0517: WORKING AT THE SWORD the Commander faces his man — u.cmdFs, the strike's own (the blade already turned on it, drawSargeWeapon's rem; now the body agrees, and outfit/weapon/pack follow this one reader). A fresh stride still outranks: travel first, then the work. Only a Commander ever holds cmdFs; every other figure reads the line below byte-what-it-was.
+  return b !== wkBack(u, b?-1:1); }
 // 0462b KING REX FACES HIS FIGHT (Wyatt 8/21: "when you have King Rex as a
 // hero, he just walks backwards. He's just facing the left, even though you
 // are on the left as a player"): unitFl answers WHICH WAY A FIGURE FACES
@@ -73292,7 +73303,7 @@ window.UI = {
   // your finger. Writes nothing else — never sargeUnlocked / sargeSeen /
   // coopLevels; the rack stays one bubble (it equips him with THIS pick).
   csPick(n){ n=n|0; if(!csOwned(n)){ SFX.blip(); return; }
-    META.cmdSpec=n; META.sargeWeapon='commander'; SFX.snap(); saveMeta();
+    META.cmdSpec=(n===0? -1 : n); META.sargeWeapon='commander'; SFX.snap(); saveMeta();   // 0517: 0 in the save now means UNPICKED (→ the Duelist default) — the deliberate THE COMMANDER pick stores −1
     const sc=document.querySelector('#roomModal .rmback'), st=sc?sc.scrollTop:0;
     renderMenu(); roomModal(panelHTML('promo'));
     const s2=document.querySelector('#roomModal .rmback'); if(s2) s2.scrollTop=st; },
@@ -74583,7 +74594,7 @@ window.GVT = {
   // 0509 THE SPEC SETTER (debug) — writes the save's pick + saves; the READER
   // (cmdSpec) still decides, so an unowned pick reads 0. The player's own
   // door is the academy's spec row (0512 UI.csPick); this one is the rig's.
-  cmdSpec(n){ if(n!=null){ META.cmdSpec=Math.max(0,Math.min(3,n|0)); saveMeta(); }
+  cmdSpec(n){ if(n!=null){ META.cmdSpec=Math.max(-1,Math.min(3,n|0)); saveMeta(); }   // 0517: −1 = the deliberate BASE pick
     return { pick:META.cmdSpec|0, cs:cmdSpec(), owned:[0,1,2,3].map(i=>csOwned(i)?1:0), tester:csTester()?1:0, teddy:teddyBeat()?1:0, camp:META.campaign|0, bag:sargeStats() }; },
   // THE BLADE IN YOUR FACE test rig: the whole saber state machine in one call,
   // plus how many tan are close enough to stop presenting arms and just shoot him
