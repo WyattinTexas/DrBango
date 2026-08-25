@@ -220,44 +220,59 @@ before your cast animation landed let the animation's tail write `state =
 
 ## tagline-check.mjs
 
-Also THE CAMPAIGN DOORS (v0.47.0, 57 checks). Wyatt: the first door reads
-CONTINUE CAMPAIGN (`contCamp`, not the in-run `cont`); with no checkpoint it
-is grey (button 0.45 / label 0.55 as BASE alphas — the intro and wake paths
-restore every ui item to `baseAlpha`, so a plain `setAlpha` is undone) and
-DEAD (`disableInteractive()`, a real tap opens nothing); with one it is alive
-and its live line is `ACT I · fight 3 of 5`. NEW CAMPAIGN over a checkpoint
-opens the restart sheet ("This will restart your current campaign in
-progress." · BACK keeps the climb · NEW wipes it and the door greys at
-once); with none it goes straight to the stars. `home.refreshCampDoor(snap)`
-is the one door for the state and runs on first paint, every return from a
-battle (a win or loss clears the checkpoint → grey again) and after NEW.
-`campaignCheckpoint()` validates what it reads: an older build's save without
-an `actIdx` re-derives it from the fight, garbage reads as none. Harness
-lesson: `\s` inside a template literal reaches the page as `s` — the sheet
-reader joins lines with split/filter, never a regex escape.
+THE HOME MENU's own harness (v0.46.0 flavour cull · v0.47.0 campaign doors ·
+v0.51.0 HOME RESHAPE — 68 checks). The column since v0.51.0, top to bottom:
+`[CONTINUE GAME while a climb stands] · NEW GAME · LEADERBOARD · VERSUS`.
 
-The meadow buttons without their flavour lines (v0.46.0). Wyatt: "remove the
-text below CAMPAIGN, NEW CAMPAIGN, QUICK PLAY and VERSUS." The four labels
-now sit dead-centre in their 58-tall buttons; the only sub-lines left are
-LIVE INFORMATION — versus's `✦ N of your friends online` while friends are
-on, the campaign's `fight N of 5` while a checkpoint stands — and
-`home.setRowSub(key, text, color, snap)` is the one door for them: the label
-glides up 9 (200ms) when a line arrives and back down when it goes. The
-`campaignSub` / `newCampSub` / `quickSub` / `versusSub` keys are gone from
-all ten languages (`vsFriendsOn` and `fightN` stay).
+- **CONTINUE GAME exists only while a checkpoint stands.** Without one it is
+  NOT RENDERED AT ALL (the v0.47.0 grey dress retired — `visible` carries the
+  state, because the intro and wake paths restore every ui item's ALPHA to
+  `baseAlpha` and would undo any alpha dress). `home.refreshCampDoor(snap)`
+  is still the one door for the state, and `home.layoutMenu(snap)` closes the
+  ranks: visible rows sit 68 apart centred on 522 — four rows read 420..624,
+  three read 454..590, never a gap. `campaignCheckpoint()` validation
+  unchanged (older build's save re-derives `actIdx`, garbage reads as none).
+- **QUICK PLAY's button left the meadow** (Wyatt is testing the menu without
+  it and may bring it back). The MODE is intact — daily chip, `m:'quick'`
+  leaderboard rows, in-battle labels, and `?quick=1` boots straight into a
+  quick run (no intro) for any harness that used to tap the button.
+- **The rename is total**: `newCamp`/`contCamp` and the restart sheet's
+  `restartTitle`/`restartBody` say game, not campaign, in all ten languages
+  (the suite scans for each language's old campaign word). The `quick` string
+  key deliberately SURVIVES in every language.
+- **The tagline is MEASURED, not eyeballed** (v0.51.0: parchment-gold ink,
+  the crest's navy rim + letterpress glow — the old `#8a94c4` measured
+  1.04:1 against the dusk rose band, i.e. invisible, which was exactly the
+  complaint). `game.renderer.snapshot` → the text rect + two side strips of
+  pure band on the same rows; bright/dark = top/bottom 4% of WCAG-linearized
+  luminances. Asserted on BOTH skies: one side of the glyph pops from the
+  band (the gold on dusk ~2.1, the rim on dawn ~8-9 — gold ink alone MELTS
+  into the bright dawn band at 1.14, the rim is what carries it) and the
+  core-vs-rim span beats the old grey's whole contrast by ≥1.5×. Pins sit
+  under the 2026-08-25 measurements with margin; re-pin from the printed
+  line if the ink or the sky changes.
+- The v0.46.0 laws still hold: labels dead-centre in 58-tall buttons, only
+  LIVE sub-lines (campaign progress, friends online) via
+  `home.setRowSub(key, text, color, snap)`, the label gliding 9 for them;
+  retired `*Sub` keys stay gone from all ten languages.
 
 ```
 node tools/tagline-check.mjs 9444     # served on :8899, --disable-gpu Chrome on :9444
 BEFORE=http://localhost:8898/index.html SHOTS=/tmp/shots node tools/tagline-check.mjs 9444
 ```
 
-35 checks: geometry of the five rows (height, label lift, no sub showing,
-LEADERBOARD still 46, daily chip untouched), the retired keys absent in
-every language, two then three friends arriving through the presence layer
-(`FR.friends` + `FR.presence`, `FR._emit()`) and leaving again, a checkpoint
-boot wearing CONTINUE · fight 3 of 5, the abandon flow on real taps dropping
-it, and all four doors opened by a real tap AIMED AT THE LABEL. `BEFORE=` a
-served copy of the previous build adds a before/after snapshot pair.
+Walks both checkpoint states plus `?lang=de` / `?lang=ja` boots on REAL taps
+aimed at the labels: CONTINUE hidden then shown (and the tap chain NEW GAME →
+sign sheet → unsigned climb → star chart node → a real campaign battle),
+the restart sheet (BACK keeps the climb, NEW wipes it and the door VANISHES
+with the column closing live), the won-campaign dawn return, friends
+presence, and the `?quick=1` seam. Firebase is BLOCKED at the network layer
+(`Network.setBlockedURLs`) — the suite plays campaigns to their end and must
+never write a live row. It also wipes `beta3.profile`/`beta3.lang` at boot
+(a leftover `?lang=ja` run failed the label pins, and a grown profile's
+forge ceremony once veiled the dawn measurement black), and grants all 24
+sigils before the win flow for the same reason. `BEFORE=` a served copy of
+the previous build adds a before/after snapshot pair.
 
 ## drip-check.mjs
 

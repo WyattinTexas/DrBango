@@ -323,13 +323,16 @@ async function device(dv, control) {
     await snap(`${tag}-${surface}`);
   };
   // --- HOME ---
-  await judge('home', `window.__cc.rectsOf(window.__cc.texts(game.scene.getScene('home'), [SS_T('quick'), SS_T('versus'), SS_T('newCamp'), SS_T('tagline')]).concat([game.scene.getScene('home').profileChip]))`);
-  // --- a real touch on QUICK PLAY takes the meadow into a battle ---
-  const qp = await evj(`JSON.stringify(window.__cc.css(game.scene.getScene('home').rowBtns.quick))`);
+  await judge('home', `window.__cc.rectsOf(window.__cc.texts(game.scene.getScene('home'), [SS_T('board'), SS_T('versus'), SS_T('newCamp'), SS_T('tagline')]).concat([game.scene.getScene('home').profileChip]))`);
+  // --- a real touch on NEW GAME opens the sign sheet (QUICK PLAY left the
+  //     meadow in v0.51.0 — the quick RUN below boots through the mode's own
+  //     door, the same one ?quick=1 uses) ---
+  const qp = await evj(`JSON.stringify(window.__cc.css(game.scene.getScene('home').rowBtns.newcamp))`);
   const BOARD = `(() => { const b = game.scene.getScene('battle'); return game.scene.isActive('battle') && !!b && !!b.board && b.board.filter(Boolean).length === 16 && b.state === 'pick' })()`;
-  row.taps.menu = await touchUntil(qp, BOARD, 10);
-  ok('a real touch on QUICK PLAY opens the board (16 tiles, state pick)', row.taps.menu, `touch at ${Math.round(qp.x)},${Math.round(qp.y)} css`);
-  if (!row.taps.menu) { await ev(`(() => { game.scene.getScene('home').scene.start('battle', { mode: 'quick', resume: null }); return 1 })()`); await until(BOARD, 60000); }
+  row.taps.menu = await touchUntil(qp, `!!game.scene.getScene('home').signC`, 10);
+  ok('a real touch on NEW GAME opens the sign sheet', row.taps.menu, `touch at ${Math.round(qp.x)},${Math.round(qp.y)} css`);
+  await ev(`(() => { game.scene.getScene('home').scene.start('battle', { mode: 'quick', resume: null }); return 1 })()`);
+  ok('the quick run stands (16 tiles, state pick)', await until(BOARD, 60000));
   await lib();
   await sleep(1500);   // the tiles' bounce settles
   // --- BATTLE: the board's letters and the beast's name ---

@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.50.1';
+const BUILD = 'STARSPELL v0.51.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4089,7 +4089,7 @@ class Home extends Phaser.Scene {
     // battle/defeat returns, demo/daily/vsdemo runs and the lang-switch reload
     // all land straight on the interactive meadow
     const deep = typeof vsDeepPending === 'function' && vsDeepPending();   // ?join= / ?friend= (versus.js)
-    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel') && QS.get('daily') !== '1' && !deep && !ssIntroBypassed();
+    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel') && QS.get('daily') !== '1' && QS.get('quick') !== '1' && !deep && !ssIntroBypassed();
     if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
     else if (intro) this.playIntro(l);
     else this.buildMeadowUi(l);
@@ -4141,7 +4141,10 @@ class Home extends Phaser.Scene {
     if (deep) this.time.delayedCall(300, () => vsDeepRun(this));
     else if (QS.get('botduel') && typeof ssBotDuelBoot === 'function') this.time.delayedCall(500, () => ssBotDuelBoot(this));   // the rival engine's dev seam (rival.js) — before vsdemo, which may ride along to play the human seat
     else if (QS.get('vsdemo') === '1' || QS.get('frdemo') === 'host' || QS.get('frdemo') === 'invite') this.time.delayedCall(500, () => this.scene.start('vsmenu'));
-    else if (DEMO || QS.get('daily') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : 'quick') : 'daily'));
+    // ?quick=1 — the harnesses' door into a quick run since the QUICK PLAY
+    // button left the meadow (v0.51.0): the mode lives on, the meadow just
+    // doesn't offer it
+    else if (DEMO || QS.get('daily') === '1' || QS.get('quick') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : 'quick') : QS.get('quick') === '1' ? 'quick' : 'daily'));
   }
   buildMeadowUi(l) {
     // baseAlpha: the ascent fades all ui to 0 — the wake path (return from
@@ -4204,7 +4207,15 @@ class Home extends Phaser.Scene {
     this.idleTweens();
     const bk = ssBraidTex(this);
     ui(this.add.image(l.x(0), l.y(300 + tk.h * tScale * 0.5 + 6), bk.key).setDisplaySize(l.u(bk.w), l.u(bk.h)).setAlpha(0.9));
-    ui(ssTxt(this, l.x(0), l.y(358), SS_T('tagline'), l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
+    // the tagline wears the crest's own dress in miniature (v0.51.0, Wyatt:
+    // the old #8a94c4 vanished into the rose band — measured at 1.04:1, i.e.
+    // invisible): parchment-gold ink in the crest's navy rim over a soft navy
+    // letterpress glow — never flat white, never a box. The RIM is what
+    // carries it on the bright dawn band, where gold ink alone melts in;
+    // tools/tagline-check.mjs measures both skies.
+    ui(ssTxt(this, l.x(0), l.y(358), SS_T('tagline'), l.u(12), '#f2e0a8', 'italic').setOrigin(0.5)
+      .setStroke('#241c40', l.u(1.25))
+      .setShadow(0, l.u(1.2), 'rgba(16,12,34,0.92)', l.u(4), true, true));
 
     // buttons
     /* v0.46.0: the four play buttons lost their flavour sublines ("four acts
@@ -4215,13 +4226,13 @@ class Home extends Phaser.Scene {
        button; when a line arrives the label glides up 9 to make room (a
        200ms tween, so the meadow never jumps). The buttons keep their 58
        height either way — the meadow's rhythm is set by them. */
-    /* v0.47.0 — THE CAMPAIGN DOORS (Wyatt). The first door reads CONTINUE
-       CAMPAIGN, always: with a checkpoint standing it is alive and carries
-       the climb's position ("ACT I · fight 3 of 5") as its live line; with
-       none it wears the game's disabled dress (0.45, no hand) and its taps
-       are DEAD — input off, not merely ignored-looking. NEW CAMPAIGN is the
-       only way into a fresh climb, and warns first when a climb would be
-       lost (newCampaign). */
+    /* v0.47.0 — THE CAMPAIGN DOORS (Wyatt). NEW GAME is the only way into a
+       fresh climb, and warns first when a climb would be lost (newCampaign).
+       v0.51.0 — THE HOME RESHAPE (Wyatt, 8/25): CONTINUE GAME exists ONLY
+       while a checkpoint stands — no checkpoint, no button (the grey dead
+       dress is retired), and the column closes ranks below. QUICK PLAY's
+       button left the meadow (the mode, its daily chip and its leaderboard
+       rows all live on — ?quick=1 is the harnesses' door). */
     const campRow = () => {
       const ck = this.campaignCheckpoint();
       return {
@@ -4232,22 +4243,21 @@ class Home extends Phaser.Scene {
     this.campRow = campRow;
     const cr = campRow();
     const rows = [
-      // CONTINUE CAMPAIGN opens the star chart at the standing checkpoint;
-      // dead until there is one
-      { y: 420, h: 58, label: cr.label, sub: cr.sub, key: 'campaign', alive: cr.alive, fn: () => this.campaignDoor() },
-      // NEW CAMPAIGN took the daily's old row (the daily is a chip now):
-      // restart the climb (warned first when a checkpoint stands)
+      // CONTINUE GAME opens the star chart at the standing checkpoint —
+      // rendered only while one stands (refreshCampDoor is the one door)
+      { y: 420, h: 58, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.campaignDoor() },
+      // NEW GAME: a fresh climb (warned first when a checkpoint stands)
       { y: 488, h: 58, label: SS_T('newCamp'), key: 'newcamp', dark: true, fn: () => this.newCampaign() },
-      { y: 556, h: 58, label: SS_T('quick'), key: 'quick', fn: () => this.startMode('quick') },
-      { y: 624, h: 46, label: SS_T('board'), fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
+      { y: 556, h: 46, label: SS_T('board'), key: 'board', fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
       // PROFILE moved to the chip up in the corner, which frees this row for
       // VERSUS — it is a play mode, so it gets a real button like the rest.
       // Its sub-line is the live friends counter, and nothing else.
-      { y: 692, h: 58, label: SS_T('versus'), sub: '', key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
+      { y: 624, h: 58, label: SS_T('versus'), sub: '', key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
     ];
     this.rowSubs = {};
     this.rowLabels = {};
     this.rowBtns = {};
+    this.menuRows = [];
     for (const r of rows) {
       const b = ui(this.add.image(l.x(0), l.y(r.y), ssBtn(this, r.dark, 300, r.h)).setDisplaySize(l.u(300), l.u(r.h)).setInteractive({ useHandCursor: true }));
       const live = !!r.sub;
@@ -4260,13 +4270,32 @@ class Home extends Phaser.Scene {
         this.rowSubs[r.key] = sub;
       }
       if (r.key) { this.rowBtns[r.key] = b; this.rowLabels[r.key] = lab; }
-      // the dead dress is a BASE alpha: the intro and the wake path restore
-      // every ui item to baseAlpha, so a plain setAlpha would be undone
-      if (r.alive === false) { b.disableInteractive(); b.setAlpha(b.baseAlpha = 0.45); lab.setAlpha(lab.baseAlpha = 0.55); }
+      this.menuRows.push({ key: r.key, b, lab, sub: this.rowSubs[r.key] });
       b.on('pointerdown', () => { if (this.busy() || (r.key === 'campaign' && !this.campAlive)) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
       b.on('pointerover', () => b.setScale(b.scaleX * 1.03, b.scaleY * 1.03));
       b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.h)));
     }
+    /* the column owns its shape (v0.51.0): the rows that stand are laid 68
+       apart, centred on the band's middle (522) — four rows read 420..624,
+       three read 454..590, and no gap is ever left where a hidden door
+       would be. `snap` skips the glide (first paint, any change under a
+       veil); a live change slides the meadow's furniture, never jumps it. */
+    this.layoutMenu = (snap) => {
+      const vis = this.menuRows.filter((m) => m.b.visible);
+      let ry = 522 - (vis.length - 1) * 34;
+      for (const m of vis) {
+        m.lab.rowY = ry;
+        const lift = m.sub && m.sub.visible ? 9 : 0;
+        const move = [[m.b, l.y(ry)], [m.lab, l.y(ry - lift)]];
+        if (m.sub) move.push([m.sub, l.y(ry + 13)]);
+        for (const [o, ty] of move) {
+          this.tweens.killTweensOf(o);
+          if (snap || Math.abs(o.y - ty) < 0.5) o.setY(ty);
+          else this.tweens.add({ targets: o, y: ty, duration: 220, ease: 'Sine.easeInOut' });
+        }
+        ry += 68;
+      }
+    };
     /* set (or clear) a row's live sub-line. The label re-centres when the
        line is empty and lifts 9 when one is live; `snap` skips the glide
        (first paint, the wake path under a veil). */
@@ -4282,22 +4311,37 @@ class Home extends Phaser.Scene {
       if (snap || Math.abs(lab.y - ty) < 0.5) lab.setY(ty);
       else this.tweens.add({ targets: lab, y: ty, duration: 200, ease: 'Sine.easeInOut' });
     };
-    /* the CONTINUE CAMPAIGN door re-reads the checkpoint: alive (full dress,
-       hand cursor, live progress line) or dead (0.45, input OFF). Called on
-       first paint, on every return from a battle (a win or loss clears the
-       checkpoint → the door greys again) and after a restart wipes it. */
+    /* the CONTINUE GAME door re-reads the checkpoint: alive (full dress,
+       hand cursor, live progress line) or NOT RENDERED AT ALL (v0.51.0 —
+       the grey dead dress retired; the column reflows). Called on first
+       paint, on every return from a battle (a win or loss clears the
+       checkpoint → the door goes) and after a restart wipes it. visible is
+       the state's carrier here because the intro and the wake path restore
+       every ui item's ALPHA to baseAlpha — a hidden door must stay hidden
+       through both. */
     this.campAlive = cr.alive;
     this.refreshCampDoor = (snap) => {
-      const b = this.rowBtns.campaign, lab = this.rowLabels.campaign;
+      const b = this.rowBtns.campaign, lab = this.rowLabels.campaign, sub = this.rowSubs.campaign;
       if (!b || !b.active || !lab || !lab.active) return;
       const r = this.campRow();
       this.campAlive = r.alive;
       lab.setText(r.label);
-      this.setRowSub('campaign', r.sub, null, snap);
       this.tweens.killTweensOf(b);
-      if (r.alive) { b.setInteractive({ useHandCursor: true }); b.setAlpha(b.baseAlpha = 1); lab.setAlpha(lab.baseAlpha = 1); }
-      else { b.disableInteractive(); b.setDisplaySize(l.u(300), l.u(58)); b.setAlpha(b.baseAlpha = 0.45); lab.setAlpha(lab.baseAlpha = 0.55); }
+      b.setDisplaySize(l.u(300), l.u(58));
+      if (r.alive) {
+        b.setVisible(true).setInteractive({ useHandCursor: true });
+        lab.setVisible(true);
+        b.setAlpha(b.baseAlpha = 1); lab.setAlpha(lab.baseAlpha = 1);
+        if (sub) { sub.setText(r.sub); sub.setVisible(!!r.sub); }
+      } else {
+        b.setVisible(false).disableInteractive();
+        lab.setVisible(false);
+        b.setAlpha(b.baseAlpha = 1); lab.setAlpha(lab.baseAlpha = 1);
+        if (sub) { sub.setText(''); sub.setVisible(false); }
+      }
+      this.layoutMenu(snap);
     };
+    this.refreshCampDoor(true);
     // Profile chip — the stargazer's name, up in the corner on the same line as
     // every other scene's back link. Long or non-Latin names are trimmed to the
     // chip rather than sized to it, so the pill keeps one baked texture.
