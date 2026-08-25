@@ -28375,7 +28375,7 @@ const CMD={
   dmg0:6, dmgPer:2,   // dmg = 6 + 2·rankUnits(r) — under the saber's 7+2.5u (offense stays the blade's)
   cleave:46, cleaveF:0.5,  // the saber's own basic-strike cleave, verbatim numbers
   blk:3,        // Wyatt: "a few blocks, maybe three" — counted absorbs, per figure per battle
-  aoeR:74,      // THE BLADE: every swing hits EVERYTHING inside this circle at full damage
+  aoeR:74,      // THE BLADE: every swing hits EVERYTHING inside this circle at full damage · 0522c: the circle is the SWEEP's reach now — everything inside the drawn sweep on his FACING side at this radius, never behind him (cmdCutLand; ⚑ the 0488 360° circle was Wyatt's own word, 8/24's "if it connects, then that should hit" wins)
   pace:0.55,    // moveSpd ×0.55 (40→22) — "pretty slow-moving", between the MG's 20 and the rifleman's 44
   grit:3        // campaign: grit ×3 (4→12 pips; saber is ×2=8) — "a lot of HP"
   // hpMul RETIRED v3.01: the battleground plate is FLAT now
@@ -28388,8 +28388,20 @@ const CMD={
 // like how the Commando reflects.") — the Commander's THIRD tier, won at
 // the ULTRA MEGA KING YETI INVASION (the spoils door, card 7) and never
 // sold. One seat per dial.
-const CMD_DASH={ r:168, spd:WPN_MILE.sgSpd, cd:6, blkT:0.3 };   // D19: detect 6 m (TK_M 28 px/m, quoted not invented) · the shotgun dash's own flight (680) · the quiet between dashes, armed at the LANDING · the block beat he never launches through
-const CMD_SW_T=0.46;   // 0508 THE CRESCENT CUT: the swing's draw clock (u.cmdFx at the strike) — WIND 0-0.11 · CUT 0.11-0.195 · POSE 0.195-0.265 · RECOVER 0.265-0.46; draw-only, not a wire key, not in a save. (The three reflexes of 0488 — the REFL consts that sat here, the per-figure catch count, the charged reader, the seat in cmdoCatch — RETIRED 0508, Wyatt 8/23: "we don't want him reflecting, and parrying is okay"; his counted blocks (cmdAbsorbs) ARE the parry now, and a caught shell is consumed, never returned.)
+const CMD_DASH={ r:168, spd:WPN_MILE.sgSpd, cd:6, blkT:0.3 };   // D19: detect 6 m (TK_M 28 px/m, quoted not invented) · the shotgun dash's own flight (680) · the quiet between dashes, armed at the LANDING · the block beat he never launches through · 0522c: r = the HIGH BLADE's step-in window and the pressed Duelist's (the plain sword's is cmdStepR, 2× its reach); cd arms ONLY on a knock mid-flight and through cmdDashEnd's nine callers — a landing arms nothing, the swing's own cadence is the beat between step-ins
+const CMD_SW_T=0.46;   // 0508 THE CRESCENT CUT: the swing's draw clock (u.cmdFx at the strike) — WIND 0-0.11 · CUT 0.11-0.195 · POSE 0.195-0.265 · RECOVER 0.265-0.46; draw-only, not a wire key, not in a save. 0522c: the HURT reads this clock too — it lands at CMD_CUT_AT (cmdCutLand at the loop head), never at t=0. (The three reflexes of 0488 — the REFL consts that sat here, the per-figure catch count, the charged reader, the seat in cmdoCatch — RETIRED 0508, Wyatt 8/23: "we don't want him reflecting, and parrying is okay"; his counted blocks (cmdAbsorbs) ARE the parry now, and a caught shell is consumed, never returned.)
+// 0522c THE COMMANDER CLOSES (FM-GVT-FEEDBACK-0824-DAY §3; Wyatt 8/24: "we never
+// want him just swinging. If he's going to swing, he should dash forward and swing
+// each time on the auto, because currently he's swinging and people are outside
+// of the slash range. It just looks bad. If he dashes forward, swings, and it
+// connects, then that should hit."): one seat per dial. CMD_STEP_X — the plain
+// sword's step-in window as a multiple of its reach (the high blade keeps
+// CMD_DASH.r); CMD_CUT_AT — how far into the swing's clock the hurt lands (the
+// middle of the CUT beat, where the edge passes level; ⚑ 0.11 = the beat's first
+// frame / 0.195 = the pose frame); CMD_SWEEP_HAIR — the sweep's reach past the
+// sword's own (a walker's step during the wind-up); CMD_SWEEP_BACK — how far
+// behind his boots the sweep still counts a man (one straddling them).
+const CMD_STEP_X=2, CMD_CUT_AT=0.15, CMD_SWEEP_HAIR=6, CMD_SWEEP_BACK=10;
 // 0509 THE DUELIST (cs 1; rounds 2-6; Wyatt 8/23: "make sure that he dashes
 // forward a little… the three cuts, which are each dashes forward where you
 // can hit multiple people"): THE FLOURISH — CMD_DUEL_N cuts, CMD_DUEL_C
@@ -34380,7 +34392,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.90';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.91';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -42429,7 +42441,7 @@ function bfAggro(u){
   // halts at the cone exactly as ever (no statue standing at 210 doing nothing).
   if(u.type==='sarge'){ const sw=unitSargeStats(u);
     if(sgDashReady(u,sw)) return WPN_MILE.sgDetect;
-    if(cmdDashReady(u,sw)) return CMD_DASH.r;   // 0488 THE HIGH BLADE (D19): the armed dash halts inside ITS window too (the v1.67 seat, commander edition)
+    if(cmdDashReady(u,sw)) return cmdStepR(sw);   // 0488 THE HIGH BLADE (D19): the armed dash halts inside ITS window too (the v1.67 seat, commander edition) · 0522c THE STEP-IN: every commander's now — the plain sword's window is 2× its reach, the high blade keeps 168 (the 0129 halt-matches-the-trigger law)
     return (sw.aggro||sw.rng||108)*((sw.w==='shotgun' && u.popArm)? POP_X : 1)*lzRngMul(u)+tkSilvRng(u); }   // 0486 BIG POP: the armed choke moves the halt WITH the trigger too · v2.36: the tan beam moves the halt WITH the trigger (the 0129 law, BF edition)
   if(u.def.rng>=9000) return 260;            // the mortar would "see" the whole world and never advance
   return (u.def.rng*lzRngMul(u) || u.def.auraR || 120)+tkSilvRng(u);    // the radioman halts with the line he is buffing (his rng 0 falls through the tune untouched)
@@ -43303,8 +43315,8 @@ function campUnitStep(u,dt){
       if(!(u.tkGhost&&u.cloakT>0) && saberNext(u,sw)){ u.marching=false; return true; }    // work inside his aggro — stand and let the blade take it (0347: the GHOST WALK excepted — an invisible blade stands for nobody, he walks on)
     } else if(sw.w==='commander'){
       if(u.cmdDash){ if(!u.home) u.home={x:u.x,y:u.y}; u.marching=false; return true; }   // 0488 THE HIGH BLADE: mid-dash the dash owns his feet (the v1.67 shotgun seat, commander edition)
-      rng=sw.rng;   // 0092: halt at the sword's own reach — no aura on a blade (D6), no dash clauses EVER (the class law — the 0488 HIGH BLADE is the one exception, gated on sw.hb); the ordinary march below walks him
-      if(cmdDashReady(u,sw)){ if(!u.home) u.home={x:u.x,y:u.y}; rng=Math.max(rng, CMD_DASH.r); }   // 0488 (D19): with the dash armed he halts inside the window so the weapon loop's launch check gets its frame (the 0129 halt-matches-the-trigger law — measured: without this seat he walks into the sword's reach and never dashes)
+      rng=sw.rng;   // 0092: halt at the sword's own reach — no aura on a blade (D6); the ordinary march below walks him. (0092's "no dash clauses EVER" — the 0488 HIGH BLADE was the one exception — is SUPERSEDED by 0522c on Wyatt's 8/24 word: every Commander steps in to every man he swings at)
+      if(cmdDashReady(u,sw)){ if(!u.home) u.home={x:u.x,y:u.y}; rng=Math.max(rng, cmdStepR(sw)); }   // 0488 (D19): with the dash armed he halts inside the window so the weapon loop's launch check gets its frame (the 0129 halt-matches-the-trigger law — measured: without this seat he walks into the sword's reach and never dashes) · 0522c: the window is the sword's own (cmdStepR — 2× reach; the high blade 168), every commander, whenever his clocks are quiet
     } else {
       // v1.67 THE GAP-CLOSE DASH (shotgun @10): mid-dash the dash owns his
       // feet, exactly like the blade above; and with it armed he halts inside
@@ -44735,15 +44747,19 @@ function csCast(u,relay,dry){
   const sw=unitSargeStats(u), cs=(sw.w==='commander')? (sw.cs|0) : 0; if(!cs) return false;
   if(!relay){ if(S.mode!=='play' || S.evHold) return false; if(S.drag && S.drag.unit===u) return false; }
   if(u.dropT>0 || u.jetT>0 || u.falling || u.shv || u.tkLg || u.cmdBlkT>0) return false;
-  if(cs===1){   // THE DASH-SLASH: a man inside the sword → the flourish NOW; a man inside the dash window → the 0488 flight delivers it (the flourish lands on arrival); nobody → refused (the no-dead-buttons law: the card's face is dim). 'land'/'back' are parked states, not flights — a press through them is legal
-    if(u.cmdDash==='out' || u.cmdDash==='duel' || u.cmdSignT>0 || u.cmdWallT>0 || u.cmdDuelCd>0) return false;
-    const best=cmdNearest(u,sw.rng);
-    if(best){ if(dry) return true; u.cmdDuelCd=CMD_DUEL_CD; csCastFx(u); cmdDuelStart(u,sw,best); return true; }
-    const tgt=sgDashNext(u,CMD_DASH.r); if(!tgt) return false;
+  if(cs===1){   // THE DASH-SLASH: a man inside the sword → the flourish NOW; a man inside the dash window → the 0488 flight delivers it (the flourish lands on arrival) · 0522c THE DUELIST ANY TIME (Wyatt 8/24: "needs to be able to be used at any time, not just when there are enemies in range… he could potentially miss"): the press is NEVER refused for nobody — on a quiet 12 s a standing man's press always lands. A step-in already flying (cmdDash 'out') takes the arm and flourishes on ITS landing; nobody in the window → THE LUNGE (cmdLungeGo): the pinned line toward the nearest foe anywhere on the carpet (BF: the trench sight law), else his facing, the window's length, and the flourish on arrival whether or not anyone is there (a whiff is a whiff — the 12 s spent). The face (csBtn.can) is READY whenever the clocks are quiet. 'land'/'back' are parked states, not flights — a press through them is legal; the only refusals left are the flourish itself, a lunge already flying, the sword in the rug, the guard and the 12 s
+    if(u.cmdDash==='duel' || u.cmdDash==='lunge' || u.cmdSignT>0 || u.cmdWallT>0 || u.cmdDuelCd>0) return false;
     if(dry) return true;
+    u.cmdDuelCd=CMD_DUEL_CD; csCastFx(u);
+    const best=cmdNearest(u,sw.rng);
+    if(best){ cmdDuelStart(u,sw,best); return true; }
     if(!u.home) u.home={x:u.x,y:u.y};
-    u.cmdDuelCd=CMD_DUEL_CD; u.csArm=S.t+2; u.cmdDash='out'; u.cmdTarget=tgt; u.cmdDashHits=u.hits|0;   // the arm outlives the flight by a breath — a man who died mid-flight leaves it to expire, never to fire a minute later
-    csCastFx(u); return true;
+    if(u.cmdDash==='out'){ u.csArm=S.t+2; return true; }   // the step-in in flight delivers the flourish where it lands (the arm outlives the flight by a breath — a man who died mid-flight whiffs it there)
+    const tgt=cmdStepNext(u,CMD_DASH.r);
+    if(tgt){ u.csArm=S.t+2; cmdStepGo(u,tgt); return true; }   // the 0488 flight delivers it — the arm outlives the flight by a breath
+    const far=cmdStepNext(u,1e9); let hx=cmdDirFs(u), hy=0;   // THE LUNGE: nobody in the window — the line to the nearest foe anywhere, else his facing
+    if(far){ const d=Math.hypot(far.x-u.x,far.y-u.y); if(d>0.5){ hx=(far.x-u.x)/d; hy=(far.y-u.y)/d; u.cmdFs=(far.x>=u.x)?1:-1; } }
+    u.csArm=S.t+2; cmdLungeGo(u,hx,hy,CMD_DASH.r); return true;
   }
   if(cs===2){   // THE CHANNEL: 10 s planted with the circle, then the 20 s quiet (cmdSignEnd arms SP_CD at the pull — the 0511 clock, its own const now)
     if(!cmdSignReady(u,sw) || u.cmdWallT>0) return false;
@@ -44922,14 +44938,37 @@ function cmdNearest(u,r){ let best=null,bd=r;
 // timer runs CMD_SW_T (0.46) now — four beats (cmdSwingPose) — and the
 // contact fx are born BELOW ZERO (t:−0.195, the 0391 stagger) so the ring,
 // the hanging crescent and the tip ticks land on the POSE frame, where the
-// blade visibly arrives; the hurt still lands at t=0 as it always has (⚑
-// accepted, revisit with the Duelist). Facing from SIM data (u.cmdFs, the
-// sign of best.x−u.x) — never unitFl (the mvSm law). Fixed steels, no glow.
+// blade visibly arrives. Facing from SIM data (u.cmdFs, the sign of
+// best.x−u.x) — never unitFl (the mvSm law). Fixed steels, no glow.
+// 0522c THE STEP-IN CUT (FM-GVT-FEEDBACK-0824-DAY §3; Wyatt 8/24: "we never
+// want him just swinging. If he's going to swing, he should dash forward and
+// swing each time on the auto, because currently he's swinging and people are
+// outside of the slash range. It just looks bad. If he dashes forward, swings,
+// and it connects, then that should hit."): the 0508 mismatch (the hurt at
+// t=0 on an invisible 74 circle / the 46 cleave while the drawn crescent is
+// 30-46 px long on his facing side and arrives 0.195 s later; only the high
+// blade ever moved his feet) is closed for EVERY Commander, both carpets, the
+// auto (mine, an ally's, a computer's). THE LAW: a man in his window
+// (cmdStepR — 2× the sword's reach, the high blade its 168) and nobody at the
+// sword → he LAUNCHES (cmdStepGo: the 0488 machine's flight at 680, the hb
+// door retired), lands at blade contact (updateCmdDash's stop) and the swing
+// arms on the landing frame; the HURT is OWED (u.cmdCut) and lands on the CUT
+// frame — CMD_CUT_AT into CMD_SW_T, at the loop head (cmdCutLand) — on the men
+// the DRAWN blade reaches: the sweep on his facing side, never behind him,
+// never at t=0 (THE BLADE's circle became the sweep at its own 74). A man who
+// steps out of the arc during the wind-up is missed; a man who walks into it
+// is cut. No quiet between step-ins: the swing's own cadence (cmdSwT) is the
+// beat, and a landing chains to the next man in the window (updateCmdDash's
+// 'land'); CMD_DASH.cd arms on a knock mid-flight alone. The 'back' walk home,
+// u.home, the block/parry, the Wall, the planted sign and the Duelist's
+// pressed flourish are untouched; a computer's commander keeps THE WHEEL and
+// the auto-flourish (csHuman, 0517a) — its auto steps in like everyone's.
 function updateCmd(u,dt,sw){
   if(u.cmdSignT>0) return;   // 0511 MEN WITHOUT FEAR: THE SWORD IS IN THE RUG — no dash, no swing, no scan; the loop head owns the end-check and a knock-grammar shell pulls it first (W-c). Sits above every hand-off: a planted man's frame is the sign's
   if(u.cmdDash==='duel'){ updateCmdDuel(u,dt,sw); return; }   // 0509 THE DUELIST: a running flourish owns the frame (the hops, the cuts, the beats)
-  if((sw.hb || u.cmdDash) && updateCmdDash(u,dt,sw)) return;   // 0488 THE HIGH BLADE (D19): the dash owns his feet this frame; a LANDING falls through to the swing below at full aoeR (the high blade's bag carries the circle) · 0509: a flourish's end parks him in the machine's own 'land'/'back' seats (work at the sword, or the walk home) — the second clause ticks those for a bladeless Duelist; a plain Commander never sets cmdDash, so this reads exactly as before
+  if(u.cmdDash && updateCmdDash(u,dt,sw)) return;   // 0488 THE HIGH BLADE (D19) → 0522c every commander: a live state owns his feet this frame (the flight, the lunge, the walk home, the hold at a landing); a LANDING falls through to the swing below, which arms on that frame and lands its hurt on the CUT frame · 0509: a flourish's end parks him in the machine's own 'land'/'back' seats (work at the sword, or the walk home)
   if(u.cmdWallT>0) return;   // 0510 THE STONE WALL (D26): a wall does not cut — 7 s of no swing under the heaviest fire is the honest trade (the penned no-cost Wall strictly dominated the null pick, rule C). His blocks still answer in the funnels; sits below the dash hand-off so a sent-home dash still walks
+  if(cmdDashReady(u,sw) && !cmdAtSword(u,sw)){ const tgt=cmdStepNext(u,cmdStepR(sw)); if(tgt){ cmdStepGo(u,tgt); return; } }   // 0522c THE STEP-IN: a man in the window and nobody at the sword → he LAUNCHES (the clocks quiet: no recovery, no knock quiet, no block, no guard, no sign); the flight lands him at contact and the swing arms there. Above the wheel — fight first (the 0511 law kept)
   if(!csHuman(u) && cmdSignReady(u,sw)){   // 0517a: THE WHEEL turns for a COMPUTER's commander only — the owner presses (csCast → cmdSignPlant) · 0511 MEN WITHOUT FEAR — THE WHEEL (the king's auto-cast grammar): plant when the guns have work and nobody is at the sword — a tube inside SP_R, a foe inside SP_WORK (tkNearFoe carries the fire loop's own offscreen filter). A man in the dash window outranked the plant above (fight first); a dry scan holds the cast on the 2.5 s retry and never burns the quiet (the kyWO literal, never SP_CD)
     if(!cmdAtSword(u,sw) && spTubesIn(u,SP_R)>=1 && tkNearFoe(u,SP_WORK)){ cmdSignPlant(u); return; }
     u.cmdSignW=2.5;
@@ -44938,16 +44977,7 @@ function updateCmd(u,dt,sw){
   if(!best || u.cmdSwT>0) return;
   if(csU(u,sw)===1 && (u.csArm>S.t || !csHuman(u))){ u.csArm=0; cmdDuelStart(u,sw,best); return; }   // 0509 THE DUELIST: his swing IS the flourish — cut 1 launches on this very frame · 0517a: for an OWNER the flourish is the PRESSED active (csArm — the dash-slash's arm, consumed where the flight lands; a press with the man already at the sword started it directly), and an unpressed Duelist swings the class's crescent cut with the long sword; a computer's commander keeps the auto-flourish
   u.cmdSwT=tkSlowMul(u)/(sw.rate*lzRateMul(u)); u.cmdFx=CMD_SW_T; u.cmdFs=(best.x>=u.x)?1:-1; if(u.cmdDuelK) u.cmdDuelK=0;   // the arm swings for the draw code (v2.36: the blue beam winds his clock too · v3.11: TEAL's concussion stretches it) · 0508: the four-beat clock + the strike's facing (sim data, for the lean, the step and the crescent)
-  const vm=(u.vet?1.5:1)*lzDmgMul(u), cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(best);   // v2.36: red beam + teal crits, the saber sites' own shape
-  if(sw.aoe){                                    // THE BLADE: everything in the circle, full weight
-    for(const g of TGT(u)){ if(g.burrow||g.jetT>0||g.dead) continue;
-      if(!bfCanTarget(u,g)) continue;
-      if(Math.hypot(g.x-u.x,g.y-u.y)<=sw.aoe) hurt(g,sw.dmg*vm*cm,u); }
-  } else {
-    hurt(best,sw.dmg*vm*cm,u);                   // the basic saber strike…
-    for(const g of TGT(u)){ if(g!==best && !g.burrow && !g.dead && bfCanTarget(u,g)
-      && Math.hypot(g.x-u.x,g.y-u.y)<CMD.cleave) hurt(g,sw.dmg*CMD.cleaveF*vm*cm,u); }  // …and its own cleave (the blade's own numbers)
-  }
+  u.cmdCut=1;   // 0522c THE CUT FRAME: the hurt is OWED, not dealt — cmdCutLand (the loop head, CMD_CUT_AT into the clock) sweeps his facing side then and hurts what the drawn blade reaches: the nearest man full, the others the cleave's half, THE BLADE everyone inside its 74 sweep. The dice (the crit) roll there too — a swing that meets nobody rolls nothing
   S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:(sw.aoe||CMD.cleave)+4,t:-0.195,dur:0.26,col:'#C9D2D8'});  // STEEL, never a glow colour — 0508: born at −0.195 so the contact finally agrees with the blade (the pose frame)
   { const fs=u.cmdFs, bl=sw.hb?46:sw.aoe?40:30, cl=Math.cos(0.18), sl=Math.sin(0.18);   // 0508 THE CRESCENT: the blade's own length off the bag; the pose's lean (0.18 rad about the boots) + hip step (+7) re-derived here so the fx land where the steel is drawn (cmdLeanIn / cmdSwingPose), mirrored by the facing
     const rp=(px,py)=>[u.x+fs*(7+px*cl-py*sl), u.y+px*sl+py*cl], hs=rp(8,-22), tp=rp(8+Math.cos(0.70)*bl,-22+Math.sin(0.70)*bl);
@@ -44992,10 +45022,12 @@ function cmdDuelStart(u,sw,best){
 }
 function cmdDuelCut(u,sw,pick){       // begin the next cut: the man, the hop's line, the clocks
   const D=u.cmdDuel, f=pick||cmdNearest(u,sw.rng);
-  if(!f){ cmdDuelEnd(u,sw); return; } // nobody inside the sword — the flourish ends, the breath still paid (v1.73)
-  u.cmdFs=(f.x>=u.x)?1:-1;
-  const d0=Math.hypot(f.x-u.x,f.y-u.y);   // the hop's LINE pins at the launch — toward where the man stands NOW; he passes straight THROUGH him (the bench's own picture), never curving after a walker
-  D.n++; D.el=0; D.tgt=f; D.left=CMD_DUEL_STEP; D.hx=(d0>0.5)? (f.x-u.x)/d0 : (u.cmdFs||1); D.hy=(d0>0.5)? (f.y-u.y)/d0 : 0;
+  if(!f && D.n>0){ cmdDuelEnd(u,sw); return; } // a later beat with nobody inside the sword — the flourish ends, the breath still paid (v1.73)
+  // 0522c THE WHIFF (Wyatt 8/24: "he could potentially miss"): the FIRST cut with nobody there — the lunge's arrival, a man gone under the arm — hops along his facing and sweeps at the air (cmdDuelLand draws the wake and hurts nothing); one whiff, then home (⚑ all three whiffing)
+  if(f) u.cmdFs=(f.x>=u.x)?1:-1; else { D.whiff=1; u.cmdFs=cmdDirFs(u); }   // a whiff faces where he was facing (the side's own march for a man who never swung — the wake needs a sign)
+  const d0=f? Math.hypot(f.x-u.x,f.y-u.y) : 0;   // the hop's LINE pins at the launch — toward where the man stands NOW; he passes straight THROUGH him (the bench's own picture), never curving after a walker
+  D.n++; D.el=0; D.tgt=f||null; D.hx=(f && d0>0.5)? (f.x-u.x)/d0 : cmdDirFs(u); D.hy=(f && d0>0.5)? (f.y-u.y)/d0 : 0;
+  D.left=f? CMD_DUEL_STEP : Math.max(1,cmdBandLeft(u,D.hx,D.hy,CMD_DUEL_STEP));   // the whiff's hop never leaves the felt (the band clamp; at least a px so the landing still fires and the wake draws)
   u.cmdDuelK=D.n; u.cmdFx=(D.n>=CMD_DUEL_N? 0.16 : CMD_DUEL_C)+CMD_DUEL_REC;   // the cut's draw clock: wind/sweep/pose (+ the recover tail, drawn only when no next cut re-arms it; the thrust hands the arm home at its own 0.16)
   if(D.n>=CMD_DUEL_N) u.cmdSwT=cmdDuelArm(u,sw);   // the breath arms at the LAST cut's start — 0.44 + 0.778 = the 1.2178 cycle, exact
   S.fx.push({k:'puff',x:u.x,y:u.y-4,t:0,dur:0.3,R:13});   // boots dig in at each launch — one small puff, still under RM (the 43440 law)
@@ -45016,9 +45048,8 @@ function updateCmdDuel(u,dt,sw){      // the flourish owns the frame
 }
 function cmdDuelLand(u,sw){           // THE CUT: full weight on the nearest man alone; THE WAKE on the draw side
   const D=u.cmdDuel, f=cmdNearest(u,sw.rng);
-  if(!f){ cmdDuelEnd(u,sw); return; } // he hopped and the man was gone — the whiffed cut still costs the arm (v1.73)
-  const vm=(u.vet?1.5:1)*lzDmgMul(u), cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(f);   // the swing's own damage grammar, per cut
-  hurt(f,sw.dmg*vm*cm,u);             // him ALONE — no circle, no cleave (round 2's price)
+  if(f){ const vm=(u.vet?1.5:1)*lzDmgMul(u), cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(f);   // the swing's own damage grammar, per cut
+    hurt(f,sw.dmg*vm*cm,u); }         // him ALONE — no circle, no cleave (round 2's price) · 0522c: nobody there = THE WHIFF — the steel still sweeps below (the ring, the arc, the ticks, the swish), nothing is hurt, and the flourish ends after it (the whiffed cut still costs the arm, v1.73)
   const c=CMD_DUEL_CUTS[D.n-1], fs=u.cmdFs, tb=-Math.max(0,0.145-D.el), hx=u.x+fs*8, hy=u.y-22;   // born below zero → the fx land on the blade's own frame (the 0391 stagger; the hop is ~0.05 of the sweep's 0.145)
   S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:(c.th?44:34),t:tb,dur:0.24,col:'#C9D2D8'});   // the landing's ring — STEEL, never a glow colour · 0517a: a size up (Wyatt: "looking significant")
   if(c.th){                           // the thrust leaves no arc — a tip ring at the blade's full 62-px reach (D27's default; the ±0.35 bracket not built)
@@ -45031,7 +45062,7 @@ function cmdDuelLand(u,sw){           // THE CUT: full weight on the nearest man
     for(let ti=0;ti<nt;ti++){ const th=(((u.x|0)*0.73+(u.y|0)*1.21+ti*0.897)%1), ta=c.to+1.5708+(th-0.5)*1.3, ca=Math.cos(ta)*fs, sa=Math.sin(ta), td=2+((ti*0.37+th)%1)*5, tl=td+5+th*6;
       S.fx.push({k:'tracer',x1:tp[0]+ca*td,y1:tp[1]+sa*td,x2:tp[0]+ca*tl,y2:tp[1]+sa*tl,t:tb,dur:0.09,col:'#EAF4FF',w:1.6}); } }
   bfSfx(SFX.swish,u.x,u.y); if(bfHumanU(u)) S.shake=Math.max(S.shake,0.11);
-  if(D.n>=CMD_DUEL_N) cmdDuelEnd(u,sw);   // the thrust landed — the flourish's sim is over, the guard comes back up
+  if(!f || D.n>=CMD_DUEL_N) cmdDuelEnd(u,sw);   // the thrust landed — the flourish's sim is over, the guard comes back up · 0522c: a whiff ends it too (one whiff then home, ⚑)
 }
 function cmdDuelEnd(u,sw){            // the sim part over: the breath paid, the feet handed to the machine's own seats
   const D=u.cmdDuel; u.cmdDuel=null;
@@ -45057,24 +45088,86 @@ function cmdDuelEnd(u,sw){            // the sim part over: the breath paid, the
 // law — no drag-to-relaunch). Campaign AND battleground: campUnitStep and
 // bfAggro halt him inside the window while the dash is ready (the 0129
 // halt-matches-the-trigger law), campUnitStep/bfUnitStep yield his feet
-// mid-dash. The class's "he never dashes" (0092) stands for every commander
-// WITHOUT the high blade — sw.hb is the one door, mine or an ally's.
-function cmdDashReady(u,sw){ return !!sw.hb && !(u.cmdDashCd>0) && !u.cmdDash && !(u.dropT>0) && !(u.cmdBlkT>0) && !(u.cmdWallT>0); }   // 0510: no launch through a standing guard
+// mid-dash. The class's "he never dashes" (0092) stood for every commander
+// WITHOUT the high blade — sw.hb was the one door, mine or an ally's.
+// 0522c THE STEP-IN (Wyatt 8/24): the machine is EVERY Commander's now — the
+// hb door is retired; the window is the sword's own (cmdStepR: 2× its reach,
+// 76 plain / 92 the long sword; the high blade keeps CMD_DASH.r 168); the
+// launch is updateCmd's (cmdStepGo, above the wheel — fight first) whenever
+// his clocks are quiet (cmdDashReady: no recovery, no knock quiet, no block,
+// no guard, no sign, no ghost); the landing arms NO quiet (the swing's own
+// cadence is the beat) and falls through to the swing, whose hurt is owed to
+// the CUT frame (cmdCutLand); a landing with nobody at the sword CHAINS to the
+// next man in the window once the beat is stood out (the walk home only when
+// the window is empty); a knock mid-flight still sends him home and arms
+// CMD_DASH.cd (the v1.19/v1.73 laws). 'lunge' (cmdLungeGo) is the pressed
+// Duelist's empty-window flight — a PINNED line (the flourish's own hop
+// grammar), the window's length, bounded by the rug's band, the flourish on
+// arrival whether or not anyone is there.
+function cmdStepR(sw){ return sw.hb? CMD_DASH.r : Math.round(sw.rng*CMD_STEP_X); }   // the step-in window: the high blade's 168, else 2× the sword's reach
+function cmdStepClocks(u){ return !(u.cmdDashCd>0) && !(u.cmdSwT>0) && !(u.dropT>0) && !(u.cmdBlkT>0) && !(u.cmdWallT>0) && !(u.cmdSignT>0); }   // the launch's clocks alone (a landing asks these to chain)
+function cmdDashReady(u,sw){ return !u.cmdDash && cmdStepClocks(u); }   // 0510: no launch through a standing guard · 0522c: every commander (no hb door), and never mid-recovery — the swing's cadence is the beat
+function cmdStepNext(u,r){ return S.bf? bfNearestEnemy(u,r) : cmdNearest(u,r); }   // the window's scan: BF the trench sight law (sgDashNext's own seat — he never steps at a man behind his line); the campaign the swing's own filters (cmdNearest)
+function cmdDirFs(u){ return u.cmdFs || ((S.bf&&u.side==='foe')?-1:1); }   // his facing when no strike has set it: the side's own march
+function cmdStepGo(u,tgt){   // THE LAUNCH: the 0488 flight at the man (updateCmdDash's 'out' flies and lands it)
+  if(!u.home) u.home={x:u.x,y:u.y};
+  u.cmdDash='out'; u.cmdTarget=tgt; u.cmdDashHits=u.hits|0;
+  bfSfx(SFX.swish, u.x, u.y);
+  S.fx.push({k:'puff',x:u.x,y:u.y-4,t:0,dur:0.3,R:16});   // boots dig in — one puff, still under RM
+}
+function cmdBandLeft(u,hx,hy,len){   // how far along (hx,hy) he may fly before the rug's own band (the mv/leap clamps) — the lunge and the whiff's hop never land off the felt
+  const X0=S.bf?40:58, X1=(S.bf?WORLD_W:W)-(S.bf?40:24), Y0=S.bf?74:70, Y1=WORLD_H-(S.bf?96:92);
+  let left=len;
+  if(hx>1e-6) left=Math.min(left,(X1-u.x)/hx); else if(hx<-1e-6) left=Math.min(left,(X0-u.x)/hx);
+  if(hy>1e-6) left=Math.min(left,(Y1-u.y)/hy); else if(hy<-1e-6) left=Math.min(left,(Y0-u.y)/hy);
+  return Math.max(0,left); }
+function cmdLungeGo(u,hx,hy,len){   // THE LUNGE (the pressed Duelist, nobody in the window): a pinned line of len px along (hx,hy), cut to the rug's own band so he never lands off the felt
+  if(!u.home) u.home={x:u.x,y:u.y};
+  u.cmdDash='lunge'; u.cmdLunge={ hx:hx, hy:hy, left:cmdBandLeft(u,hx,hy,len) }; u.cmdTarget=null; u.cmdDashHits=u.hits|0;
+  bfSfx(SFX.swish, u.x, u.y);
+  S.fx.push({k:'puff',x:u.x,y:u.y-4,t:0,dur:0.3,R:16});
+}
+// 0522c THE CUT FRAME: the swing's hurt, owed since the arm (u.cmdCut), lands
+// HERE — called at the loop head the frame the clock reaches CMD_CUT_AT — on
+// the men the DRAWN blade reaches: the sweep on his FACING side (u.cmdFs, the
+// strike's own), never behind him (CMD_SWEEP_BACK), at the sword's reach + a
+// hair (CMD_SWEEP_HAIR) — THE BLADE's 74 circle is the 74 sweep. The nearest
+// man takes the full weight, every other man inside the sweep the cleave's
+// half (the 0092 grammar on the sweep's radius); the blade's men all full.
+// The crit rolls only when a man is met (a whiff draws no dice).
+function cmdCutLand(u,sw){
+  if(!u || u.dead || u.type!=='sarge' || sw.w!=='commander') return;
+  const fs=cmdDirFs(u), R=sw.aoe? sw.aoe : sw.rng+CMD_SWEEP_HAIR;
+  let best=null, bd=1e9; const hit=[];
+  for(const g of TGT(u)){ if(g.burrow||g.jetT>0||g.dead) continue;
+    if(!bfCanTarget(u,g)) continue;
+    if(!S.bf && (g.x>W-10||g.x<-40||g.y<-30||g.y>WORLD_H+30)) continue;
+    if((g.x-u.x)*fs < -CMD_SWEEP_BACK) continue;   // never behind him
+    const d=Math.hypot(g.x-u.x,g.y-u.y); if(d>R) continue;
+    hit.push(g); if(d<bd){ bd=d; best=g; } }
+  if(!best) return;   // the man stepped out of the arc during the wind-up — a miss
+  const vm=(u.vet?1.5:1)*lzDmgMul(u), cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(best);   // v2.36: red beam + teal crits, the saber sites' own shape
+  if(sw.aoe){ for(const g of hit) hurt(g,sw.dmg*vm*cm,u); }   // THE BLADE: everything in the sweep, full weight
+  else { hurt(best,sw.dmg*vm*cm,u);   // the basic saber strike…
+    for(const g of hit){ if(g!==best) hurt(g,sw.dmg*CMD.cleaveF*vm*cm,u); } }   // …and its cleave — the other men the same sweep reached (the blade's own half)
+}
 function cmdDashEnd(u){
   if(u.cmdDuel){ u.cmdDuel=null; if(!(u.cmdSwT>0)) u.cmdSwT=cmdDuelArm(u); }   // 0509: a jet, a moved post, a drop or the dock ends a running flourish through the same nine callers — the cuts he never landed still cost the breath (the v1.73 law)
   if(u.cmdSignT>0) cmdSignEnd(u);   // 0511: the jet launch and landing, a relayed moved-post and the drop pull the planted sword through these same nine callers — zero new caller lines (the four TK callers too; a Commander never reaches them)
-  if(u.cmdDash) u.cmdDashCd=CMD_DASH.cd; u.cmdDash=null; u.cmdTarget=null; }
+  if(u.cmdDash) u.cmdDashCd=CMD_DASH.cd; u.cmdDash=null; u.cmdTarget=null; u.cmdLunge=null; u.cmdCut=0; }   // 0522c: a lunge ends the same way; a cut owed by a swing these callers interrupt is never dealt
 function updateCmdDash(u,dt,sw){
   if(!u.home) u.home={x:u.x,y:u.y};
   const reach=sw.rng;   // the sword's own reach — updateCmd's scan and campUnitStep's halt read the same raw number
-  if(!u.cmdDash){
-    if(!cmdDashReady(u,sw)) return false;
-    if(S.bf ? bfNearestEnemy(u,reach) : campFoeInReach(u,reach)) return false;   // someone already at the sword → there is no gap to close (the v1.67 law)
-    const tgt=sgDashNext(u,CMD_DASH.r);   // the detect window — the shotgun scan's own filters (BF: the trench sight law)
-    if(!tgt) return false;
-    u.cmdDash='out'; u.cmdTarget=tgt; u.cmdDashHits=u.hits|0;
-    bfSfx(SFX.swish, u.x, u.y);
-    S.fx.push({k:'puff',x:u.x,y:u.y-4,t:0,dur:0.3,R:16});   // boots dig in — one puff, still under RM
+  if(!u.cmdDash) return false;   // 0522c: the launch is updateCmd's (cmdStepGo / csCast) — the machine ticks live states alone
+  if(u.cmdDash==='lunge'){   // 0522c THE LUNGE: the pinned line, then the flourish where it ends — a man at the sword takes the real cut, nobody takes THE WHIFF
+    if((u.hits|0)<u.cmdDashHits) u.cmdDashHits=u.hits|0;
+    if((u.hits|0)>u.cmdDashHits){ u.cmdDash='back'; u.cmdTarget=null; u.cmdLunge=null; u.csArm=0; u.cmdDashCd=CMD_DASH.cd; return true; }   // knocked mid-lunge: home, the arm spent (the v1.19 law)
+    const L=u.cmdLunge; if(!L){ u.cmdDash=null; return false; }
+    const mv=Math.min(L.left, CMD_DASH.spd*dt);
+    u.x+=L.hx*mv; u.y+=L.hy*mv; cmdWkStamp(u, L.hx*CMD_DASH.spd); L.left-=mv;
+    if(L.left>1e-6) return true;
+    u.cmdDash=null; u.cmdLunge=null; u.csArm=0;   // ARRIVED: the flourish runs whether or not anyone is there
+    cmdDuelStart(u,sw,cmdNearest(u,sw.rng));
     return true;
   }
   if(u.cmdDash==='out'){
@@ -45083,18 +45176,21 @@ function updateCmdDash(u,dt,sw){
     const f=u.cmdTarget;
     const gone = S.bf ? (!f||f.dead||f.hp<=0) : (!f||f.burrow||S.foes.indexOf(f)<0);
     if(gone){
-      const nx=sgDashNext(u,CMD_DASH.r);
+      const nx=cmdStepNext(u,cmdStepR(sw));
       if(nx){ u.cmdTarget=nx; return true; }
-      u.cmdDash='back'; u.cmdTarget=null; u.cmdDashCd=CMD_DASH.cd; return true;
+      if(u.csArm>S.t){ u.cmdDash=null; u.cmdTarget=null; u.csArm=0; cmdDuelStart(u,sw,null); return true; }   // 0522c: the pressed flight's man died under the arm and the window is empty — the flourish whiffs where he is (the press always lands)
+      u.cmdDash='back'; u.cmdTarget=null; return true;   // 0522c: no quiet — the swing's cadence is the beat
     }
     const dx=f.x-u.x, dy=f.y-u.y, d=Math.hypot(dx,dy);
     const stop=Math.max(26, reach-8);   // land a hair INSIDE the sword's reach so the swing is legal this frame
     if(d>stop){ const sp=CMD_DASH.spd; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; cmdWkStamp(u,dx/d*sp); return true; }   // 0517: the flight faces its man
-    u.cmdDash='land'; u.cmdTarget=null; u.cmdDashCd=CMD_DASH.cd;   // ARRIVED: the quiet arms HERE (D19) and the swing below lands NOW
+    u.cmdDash='land'; u.cmdTarget=null;   // ARRIVED: the swing below arms NOW (its hurt lands on the CUT frame) · 0522c: no quiet armed here — the cadence is the beat (D19's landing quiet retired)
     return false;
   }
   if(u.cmdDash==='land'){
     if(S.bf ? bfNearestEnemy(u,reach) : campFoeInReach(u,reach)) return false;   // work at the sword — he swings from where the dash put him
+    const nx=cmdStepNext(u,cmdStepR(sw));   // 0522c: nobody at the sword — the next man in the window is the next step-in FROM HERE once the beat is stood out (no walk home between men); a knock's quiet sends him home
+    if(nx){ if(cmdStepClocks(u)){ cmdStepGo(u,nx); return true; } if(!(u.cmdDashCd>0)) return true; }
     u.cmdDash='back'; u.cmdTarget=null; return true;
   }
   // 'back': nobody left at the sword — walk to the post, then the march resumes
@@ -52616,6 +52712,8 @@ function update(dt){
     if(u.cmdSignT>0){ u.cmdSignT-=dt; if(u.cmdSignT<=0 || cmdSignBreak(u,unitSargeStats(u))) cmdSignEnd(u); }   // 0511: the sign's clock + THE END-CHECK — the 10 s, the orange break law, a foe at the sword (D17: he pulls the blade and fights). Above the jet/drag skips; dead men are skipped above, which is WHY every sign reader carries its own dead filter (a corpse keeps cmdSignT>0)
     if(u.cmdFx>0) u.cmdFx-=dt;       // ...and his arm settles mid-stride (draw timer, sim dt like the forend's)
     else if(u.cmdDuelK) u.cmdDuelK=0;   // 0509: the flourish's drawn cut expired with its clock — the pose reader falls back to the guard (a plain Commander never carries the field)
+    if(u.cmdCut && u.cmdFx<=CMD_SW_T-CMD_CUT_AT+1e-6){ u.cmdCut=0;   // 0522c THE CUT FRAME: the swing's owed hurt lands the frame its clock reaches CMD_CUT_AT (the loop head — the clock law: the frame arrives marching or not), on the men the drawn blade reaches then; never from the air, the rug, the guard, a fall, a shove or your hand
+      if(!u.falling && !u.shv && !(u.jetT>0) && !(u.cmdSignT>0) && !(u.cmdWallT>0) && !(S.drag && S.drag.unit===u)) cmdCutLand(u,unitSargeStats(u)); }
     if(u.snipeT>0) u.snipeT-=dt;     // the long rifle's recoil rides out on the figure
     if(u.pistT>0) u.pistT-=dt;       // the sidearm's buck (v1.50), same idea
     if(u.pist2T>0) u.pist2T-=dt;     // ...and the OFF-hand's buck once he's holding two (v1.67)
@@ -57410,7 +57508,7 @@ function drawSargeWeapon(u){
         for(let bi9=0;bi9<3;bi9++) cx.fillRect(sgx9+40+bi9*10, by9+4.6, 7, 1.6); }
     }
     if(rem) cx.restore();
-    if(u.cmdDash==='out' && u.csArm>S.t && !reducedMotion()){   // 0517a THE DASH-SLASH's flight: two pale speed lines trail him (the unarmed blade's own idiom; presentation only, mirrored with the figure, none under RM)
+    if((u.cmdDash==='out' || u.cmdDash==='lunge') && u.csArm>S.t && !reducedMotion()){   // 0517a THE DASH-SLASH's flight: two pale speed lines trail him (the unarmed blade's own idiom; presentation only, mirrored with the figure, none under RM) · 0522c: the empty press's lunge wears them too
       cx.strokeStyle='rgba(234,244,255,0.55)'; cx.lineWidth=1.8; cx.lineCap='round';
       cx.beginPath(); cx.moveTo(u.x-16,u.y-32); cx.lineTo(u.x-34,u.y-33); cx.stroke();
       cx.beginPath(); cx.moveTo(u.x-13,u.y-22); cx.lineTo(u.x-31,u.y-23); cx.stroke(); cx.lineCap='butt'; }
