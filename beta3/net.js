@@ -114,6 +114,18 @@ const SSNET = (() => {
     const txn = db ? (p, fn) => db.txn(p, fn) : dbTxn;
     await txn('names/' + key, (cur) => cur === u ? null : undefined);
   }
+  // reach a player by name alone (task 43): the registry resolves the typed
+  // name (sloppy case/spacing folds through nameKey) to a uid, and the
+  // players row gives back the name as they wear it. null = no such mage.
+  async function findByName(name) {
+    const key = nameKey(name);
+    if (!key || mode !== 'firebase') return null;
+    const u = await dbGet('names/' + key);
+    if (!u || typeof u !== 'string') return null;
+    let shown = null;
+    try { const p = await dbGet('players/' + u); shown = p && p.name; } catch (e) { }
+    return { uid: u, key, name: shown || String(name).trim() };
+  }
   // mint until a claim wins: fresh mints first, then a mint wearing a short
   // numeral cut from the uid (deterministic per device, so retries converge)
   async function mintClaimed(forUid, db) {
@@ -501,5 +513,5 @@ const SSNET = (() => {
     async decline(fromUid) { try { await dbSet('invites/' + uid() + '/' + fromUid, null); } catch (e) { } },
   };
 
-  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, mintClaimed, ensureName, renameNotice, side, submitScore, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
+  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
 })();

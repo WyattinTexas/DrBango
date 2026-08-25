@@ -98,11 +98,19 @@ class VsMenu extends Phaser.Scene {
     ssTxt(this, l.x(0), l.y(570), SS_T('vsFind'), l.u(17), BTN_INK()).setOrigin(0.5);
     ssTxt(this, l.x(0), l.y(592), SS_T('vsFindSub'), l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
     findB.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.match(this.mode); });
-    // the seal code — still the cross-device fallback that needs no friend setup
-    ssTxt(this, l.x(0), l.y(632), SS_T('vsOrSeal'), l.u(11), '#5a6390').setOrigin(0.5);
-    const joinB = this.add.image(l.x(0), l.y(664), ssBtn(this, true, 250, 44)).setDisplaySize(l.u(250), l.u(44)).setInteractive({ useHandCursor: true });
-    ssTxt(this, l.x(0), l.y(664), SS_T('vsSeal'), l.u(13), '#9fb0e8').setOrigin(0.5);
-    joinB.on('pointerdown', () => this.codePrompt(l));
+    // reaching a mage yourself: BY NAME (task 43 — the unique-name registry
+    // resolves whoever you type) beside the seal code, still the cross-device
+    // fallback that needs no friend setup
+    ssTxt(this, l.x(0), l.y(632), SS_T('vsOrReach'), l.u(11), '#5a6390').setOrigin(0.5);
+    const door = (x, key, cb) => {
+      const b = this.add.image(l.x(x), l.y(664), ssBtn(this, true, 166, 44)).setDisplaySize(l.u(166), l.u(44)).setInteractive({ useHandCursor: true });
+      const t = ssTxt(this, l.x(x), l.y(664), SS_T(key), l.u(12), '#9fb0e8').setOrigin(0.5);
+      for (let fs = 12; t.width > l.u(150) && fs > 8; fs -= 0.5) t.setFontSize(l.u(fs));
+      b.on('pointerdown', cb);
+      return b;
+    };
+    this.nameB = door(-88, 'vsByName', () => this.namePrompt(l));
+    door(88, 'vsSeal', () => this.codePrompt(l));
     this.noteT = ssTextBlock(this, l.x(0), l.y(708), '', {
       fontSize: l.u(11) + 'px', color: '#c9b676', fontStyle: 'italic', shadow: true,
       wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
@@ -232,8 +240,51 @@ class VsMenu extends Phaser.Scene {
       if (!ok || !this.sys.isActive()) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
       await SSNET.FR.challenge(f.id, code, this.mode);
       if (!this.sys.isActive()) return;
-      this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name } });
+      // away/busy ride along so the lobby can say where the summons waits
+      this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name, away: !!f.away, busy: !!f.busy } });
     } catch (e) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; }
+  }
+  /* CHALLENGE BY NAME (task 43): type a mage's name, the registry finds them
+     (case and spacing fold through nameKey), and the summons rings through
+     the same invites/ bell a friend CHALLENGE uses. Online: they answer like
+     any invite. Away: the bell waits under their stars while this lobby
+     stands. A miss keeps what was typed for a second try. */
+  namePrompt(l, prefill) {
+    if (this.busyC) return;
+    SFX.ui();
+    if (SSNET.mode !== 'firebase') { this.note(SS_T('vsNoSky'), 3000); return; }
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.maxLength = 24; inp.placeholder = SS_T('vsNamePh');
+    inp.setAttribute('autocapitalize', 'words'); inp.setAttribute('autocorrect', 'off');
+    inp.setAttribute('autocomplete', 'off'); inp.setAttribute('enterkeyhint', 'go'); inp.spellcheck = false;
+    inp.value = prefill != null ? prefill : (this.lastTyped || '');
+    inp.style.cssText = 'position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:9999;font:700 ' +
+      Math.round(l.u(20)) + 'px Georgia,serif;text-align:center;background:#141a33;color:#f3e5b4;border:2px solid #c9a94f;border-radius:10px;padding:10px 14px;outline:none;width:70%;max-width:320px;';
+    // no commitOnShutdown: leaving the menu mid-type must not ring anyone
+    ssDomInput(this, inp, (v) => this.seekByName(v, l));
+    if (inp.value) inp.select();
+  }
+  async seekByName(v, l) {
+    const typed = String(v || '').trim().replace(/\s+/g, ' ');
+    this.lastTyped = typed;
+    if (!typed || !this.sys.isActive() || this.busyC) return;
+    if (SSNET.nameKey(typed) === SSNET.nameKey(vsName())) { this.note(SS_T('vsNameSelf'), 3500); return; }
+    this.busyC = true;
+    this.note(SS_T('vsNameSeek', typed));
+    let hit = null;
+    try { hit = await SSNET.findByName(typed); } catch (e) { hit = null; }
+    if (!this.sys.isActive()) return;
+    this.busyC = false;
+    if (!hit || hit.uid === vsUid()) {
+      if (hit) { this.note(SS_T('vsNameSelf'), 3500); return; }
+      // an honest miss — and the field comes back holding what they typed
+      this.note(SS_T('vsNameNone', typed), 4000);
+      this.namePrompt(l, typed);
+      return;
+    }
+    this.lastTyped = '';
+    const FR = SSNET.FR;
+    this.challenge({ id: hit.uid, name: hit.name, away: !FR.isOnline(hit.uid), busy: FR.isOnline(hit.uid) && FR.isBusy(hit.uid) });
   }
   inviteFriend() {
     if (this.busyC || SSNET.mode !== 'firebase') { if (SSNET.mode !== 'firebase') this.note(SS_T('vsNoSky'), 3000); return; }
@@ -603,7 +654,8 @@ class VsBattle extends Phaser.Scene {
     if (this.challenged) {
       this.invRef = SSNET.ref('invites/' + this.challenged.id + '/' + vsUid());
       this.onInvCb = (snap) => {
-        if (snap.val() != null) return;
+        if (snap.val() != null) { this.bellSeen = true; return; }
+        if (this.bellSeen) this.bellDeclined = true;   // keepBell must not ring a mage who said no
         this.time.delayedCall(1500, () => {
           if (!this.sys.isActive() || !this.room || this.room.status !== 'waiting') return;
           if ((this.room.players || {})[this.challenged.id]) return;
@@ -717,7 +769,8 @@ class VsBattle extends Phaser.Scene {
     while (this.lobbyTitle.width > l.u(360) && this.lobbyTitle.text.length > 8) this.lobbyTitle.setText(this.lobbyTitle.text.slice(0, -2) + '…');
     this.lobbyCode = txt(l.x(0), l.y(262), this.code, 44, '#ffe9a8').setOrigin(0.5)
       .setShadow(0, 0, '#c9a94f', l.u(18), true, true);
-    this.lobbySub = ssTextBlock(this, l.x(0), l.y(308), ch ? SS_T('vsWaitAnswer', ch.name) : SS_T('lobbySub'), {
+    const waitKey = ch ? (ch.away ? 'vsWaitAway' : ch.busy ? 'vsWaitBusy' : 'vsWaitAnswer') : null;
+    this.lobbySub = ssTextBlock(this, l.x(0), l.y(308), ch ? SS_T(waitKey, ch.name) : SS_T('lobbySub'), {
       fontSize: l.u(11) + 'px', color: '#8a94c4', fontStyle: 'italic', shadow: true,
       wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
     });
@@ -804,6 +857,21 @@ class VsBattle extends Phaser.Scene {
     if (!this.room || this.room.status !== 'waiting' || this.room.hostUid !== vsUid()) return;
     const seats = Object.entries(this.room.players).map(([id, p]) => ({ id, seat: p.seat })).sort((a, b) => a.seat - b.seat);
     this.roomRef.update({ status: 'active', startedAt: Date.now(), turnUid: seats[0].id, turnCount: 0 }).catch(() => { });
+  }
+
+  // a summons ages out of the bell after INVITE_MS (a summons from someone
+  // who gave up must not ring an hour later) — but while THIS lobby still
+  // stands the challenge is live, so the bell is re-rung every two minutes:
+  // a mage who arrives after a long wait still finds it under their stars
+  keepBell() {
+    const ch = this.challenged;
+    if (!ch || this.bellDeclined || this.room.hostUid !== vsUid()) return;
+    if ((this.room.players || {})[ch.id]) return;
+    const now = Date.now();
+    if (!this.bellAt) this.bellAt = now;
+    if (now - this.bellAt < 120000) return;
+    this.bellAt = now;
+    SSNET.FR.challenge(ch.id, this.code, this.room.mode);
   }
 
   /* ---------- leave: surrender the seat, not just the screen ---------- */
@@ -1037,7 +1105,7 @@ class VsBattle extends Phaser.Scene {
 
   secondTick() {
     if (this.scryCooldown > 0) this.scryCooldown--;
-    if (this.room && this.room.status === 'waiting') { this.rescan(); this.quietSky(); }
+    if (this.room && this.room.status === 'waiting') { this.rescan(); this.quietSky(); this.keepBell(); }
     if (!this.room || this.room.status !== 'active') return;
     if (this.room.mode === 'timed') {
       const left = Math.max(0, VS_TIME_MS - (Date.now() - this.room.startedAt));

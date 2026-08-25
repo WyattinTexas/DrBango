@@ -850,3 +850,39 @@ the desc law on the notice in all 10 languages (no child Text holds a
 newline, every line fits 292u). Harness lesson: a `Page.navigate` fired while
 about:blank is still settling can be DROPPED — `nav` proves `location.href`
 and `typeof SSNET` before waiting on the game.
+
+## byname-check.mjs — challenge by name (v0.54.0)
+
+A duel started from a name alone (task 43, on task 42's registry). VERSUS
+has a BY NAME door beside the seal code: the same floating DOM input the
+rename and seal code use (`ssDomInput`, fixed-position, scene-tied — the
+iOS keyboard never touches the canvas, and the crisp sentinel stays green)
+takes a name, `SSNET.findByName` folds it through `nameKey` (case, spacing)
+to `names/<key>` → uid and reads the name back as its owner wears it, and
+`VsMenu.challenge` rings the EXISTING bell (`invites/<to>/<from>`, a
+private room sealed with `invited`). Online → the usual "waiting for X to
+answer"; away → `vsWaitAway` ("your summons waits under their stars"),
+mid-duel → `vsWaitBusy`. A miss says so (`vsNameNone`) and the field comes
+back holding what was typed; your own name is `vsNameSelf`. Because a
+summons ages out of `FR.pending()` after INVITE_MS (5 min), a standing
+challenge lobby re-rings the bell every two minutes (`VsBattle.keepBell`,
+never after a decline) — a mage arriving an hour later still finds it.
+
+```
+python3 -m http.server 8899 &
+for p in a:9450 b:9451; do "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --no-sandbox --mute-audio --disable-gpu --remote-debugging-port=${p#*:} \
+  --user-data-dir=/tmp/cdp-byname-${p%%:*} --window-size=390,844 --force-device-scale-factor=3 about:blank & done
+node tools/byname-check.mjs      # 51 checks, ~2.5 min, deletes everything it wrote
+```
+
+Two REAL throwaway uids (test_ rigs never enter the registry): A taps BY
+NAME for real, types B's name sloppily (`Input.insertText` + a real Enter),
+lands in the lobby; B's banner rings and a real ACCEPT starts the duel. Then
+the miss/retry/Escape/prefill path, own name, and the offline path: B parked,
+the row lands and survives, the re-ring refreshes `at` under the same seal,
+B boots later, finds and answers it. Harness lessons: tap the banner only
+after its 420 ms entrance settles (a tap mid-tween lands where the button
+WAS); `nav` marks the old document and never fires a second navigate over a
+load in progress (that aborts game.js and versus.js throws on a missing QS);
+seed guards key on the uid so a reused `/tmp/cdp-*` profile re-seeds.
