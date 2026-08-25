@@ -809,3 +809,44 @@ boots. `SHOTS=<dir>` keeps the snapshots.
   FRIEND → private lobby), `?frdemo=join&mpuid=x` (solver on, nothing automatic — the
   real-click harness drives it). Beacons: `beta3.summons`, `beta3.deeplink`,
   `beta3.vsresult`. Clean up `friends|recent|invites|presence|players/test_*` after.
+
+## names-check.mjs — unique player names (v0.53.0)
+
+One person per name, so a player can be reached by name alone (task 43
+builds the reaching; this is the registry). `names/<key>` → uid in the
+SSNET RTDB, `<key>` = `SSNET.nameKey(name)`: NFKC, trim, collapse
+whitespace, lower-case, RTDB-forbidden `. # $ [ ] /` → `_` (the header of
+net.js is the spec). A claim is a transaction (`SSNET.claimName`): it lands
+only when the key is free or already yours. A fresh device (`starspellNameFresh`
+set by the first mint) keeps minting until its claim wins, silently. An
+existing player claims their standing name at connect and on every profile
+sync (`ensureName`, one proven key cached per session); beaten to it, they are
+re-minted (`mintClaimed`: 8 fresh mints, then `<Second word> <3 digits cut
+from the uid>`) and told ONCE, in fiction (`nameTakenTitle/Body`), by the
+`ss-renamed` event → `ssRenameNotice` on whichever scene is live, or the
+meadow the next time it builds. A rename onto a taken name is HELD: the old
+name comes back with `nameHeldTitle/Body`; a clean rename releases the old
+claim. THE CIRCLE's mages claim over their own `SSNET.side('rival')` door
+before they take a seat (`SS_RIVAL.claimCircleName`); `?botduel` seats and
+`test_` identities (`?mpuid`) never enter the registry. RTDB security rules
+are not managed in this repo (the database is open, hobby-scale) — constrain
+`names/<key>` there when rules land.
+
+```
+python3 -m http.server 8899 &
+for p in a:9448 b:9449; do "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --no-sandbox --mute-audio --disable-gpu --remote-debugging-port=${p#*:} \
+  --user-data-dir=/tmp/cdp-names-${p%%:*} --window-size=390,844 --force-device-scale-factor=3 about:blank & done
+node tools/names-check.mjs      # 67 checks, ~2 min, deletes everything it wrote
+```
+
+Two REAL throwaway uids (seeded into localStorage by
+`Page.addScriptToEvaluateOnNewDocument`, with `sessionStorage.beta3.skipIntro`)
+race one standing name at connect: exactly one holds it, the loser is
+re-minted and sees the notice on the meadow; then the instant race (both
+`claimName` transactions fired in the same tick, 3 rounds), held/free renames,
+the silent fresh-device path, the `test_` exemption, the circle, nameKey, and
+the desc law on the notice in all 10 languages (no child Text holds a
+newline, every line fits 292u). Harness lesson: a `Page.navigate` fired while
+about:blank is still settling can be DROPPED — `nav` proves `location.href`
+and `typeof SSNET` before waiting on the game.

@@ -355,6 +355,8 @@ const SS_RIVAL = (() => {
       this.code = code;
       this.room = null; this.board = null; this.state = 'join';
       this.pending = null; this.scryAt = 0; this.turnSince = 0; this.answered = false;
+      // one of the circle answers under a name the registry knows is its own
+      if (this.persona) { await claimCircleName(this.db, this.persona); if (!this.alive) return; this.name = this.persona.name; }
       if (!(await this.join(code))) { note('cold', Object.assign({ code }, this.lastJoin)); this.stop(); return; }
       if (!this.alive) return;
       this.duels++;
@@ -666,6 +668,23 @@ const SS_RIVAL = (() => {
     try { localStorage.setItem(CIRCLE_KEY + 'Last', p.uid); } catch (e) { }
     return p;
   }
+  // the mage's name through the same registry a device claims in — over its
+  // own door, so the claim reaches the sky as a remote client's. A name
+  // somebody else already holds is re-minted; the circle remembers the new one.
+  async function claimCircleName(db, p) {
+    try {
+      const r = await SSNET.claimName(p.name, p.uid, db);
+      if (r.won) return p.name;
+      const n = await SSNET.mintClaimed(p.uid, db);
+      if (!n) return p.name;
+      note('renamed', { uid: p.uid, from: p.name, to: n });
+      p.name = n;
+      const pool = circle();
+      const i = pool.findIndex((x) => x.uid === p.uid);
+      if (i >= 0) { pool[i].name = n; saveCircle(pool); }
+    } catch (e) { note('error', { msg: String(e && e.message || e) }); }
+    return p.name;
+  }
   function rowOf(p) {
     const row = Object.assign({}, p, { name: p.name });
     delete row.uid;
@@ -692,7 +711,7 @@ const SS_RIVAL = (() => {
   function sweep() { for (let i = live.length - 1; i >= 0; i--) if (!live[i].alive) live.splice(i, 1); }
   setInterval(sweep, 30000);
 
-  return { spawn, sim, paceSample, profile, thinkMs, choose, candidates, Board, packFor, mkRng, PACE, live, log, persona, spreadRating, circle };
+  return { spawn, sim, paceSample, profile, thinkMs, choose, candidates, Board, packFor, mkRng, PACE, live, log, persona, spreadRating, circle, claimCircleName };
 })();
 
 /* ---------- ?botduel=<rating>: seal a room, seat a rival, rise ----------

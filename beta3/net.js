@@ -5,6 +5,23 @@
    every feature working offline; the UI shows a quiet banner.
    Scores are client-authoritative, hobby-scale — same caveat as
    FAVOR; revisit rules before any paid stakes.
+
+   UNIQUE NAMES (v0.53.0): one person per name, so a player can be
+   reached by name alone. `names/<key>` → uid is the claim registry;
+   <key> is nameKey(name): NFKC-normalize, trim, collapse runs of
+   whitespace to one space, lower-case (locale-free toLowerCase), and
+   the RTDB-forbidden characters . # $ [ ] / plus controls become '_'.
+   So "Astral  Fox", "astral fox" and "ASTRAL FOX" are one name. A
+   claim is a transaction: it lands only when the key is free or
+   already yours. A fresh device mints until its claim wins (silently
+   — it never saw the name it lost). An existing player claims their
+   standing name at connect; beaten to it, they re-mint (fresh mints,
+   then a mint plus a short numeral cut from the uid) and are told
+   once, in fiction, through the ss-renamed event (game.js toasts it).
+   THE CIRCLE's mages claim through the same registry over their own
+   SSNET.side door (rival.js). test_ identities (?mpuid) never touch it.
+   Old claims are released when a name changes hands honestly; a
+   rename to a taken name keeps the old one (and says so).
    ============================================================ */
 
 const SSNET = (() => {
@@ -42,21 +59,106 @@ const SSNET = (() => {
   const NAME_A = ['Astral', 'Gilded', 'Quiet', 'Umbral', 'Silver', 'Dawn', 'Comet', 'Rune', 'Velvet', 'Winter', 'Ember', 'Moonlit'];
   const NAME_B = ['Quill', 'Fox', 'Owl', 'Weaver', 'Scribe', 'Hare', 'Raven', 'Mage', 'Widow', 'Serpent', 'Bear', 'Lantern'];
   function mintName() { return NAME_A[Math.floor(Math.random() * NAME_A.length)] + ' ' + NAME_B[Math.floor(Math.random() * NAME_B.length)]; }
+  const FRESH_KEY = 'starspellNameFresh', RN_KEY = 'starspellRenamed';
   function myName() {
     if (MPUID) return 'Wisp ' + MPUID.toUpperCase();
     let n = localStorage.getItem('starspellName');
     if (!n) {
       n = mintName();
       localStorage.setItem('starspellName', n);
+      try { localStorage.setItem(FRESH_KEY, '1'); } catch (e) { }   // unclaimed: a lost race re-mints silently
     }
     return n;
   }
+  // a rename: applied at once (the profile card shows it), then claimed.
+  // Lost the claim → the old name comes back, its own claim never let go.
   function setName(n) {
-    n = String(n || '').trim().slice(0, 18);
+    n = String(n || '').trim().replace(/\s+/g, ' ').slice(0, 18);
     if (!n) return myName();
+    const old = myName();
     localStorage.setItem('starspellName', n);
-    dbUpdate('players/' + uid(), { name: n }).catch(() => { });
+    localStorage.removeItem(FRESH_KEY);
+    if (nameKey(n) === nameKey(old)) { dbUpdate('players/' + uid(), { name: n }).catch(() => { }); return n; }
+    claimName(n).then((r) => {
+      if (r.won) { claimedKey = r.key; releaseName(old).catch(() => { }); return dbUpdate('players/' + uid(), { name: n }); }
+      if (myName() !== n) return null;            // renamed again meanwhile
+      localStorage.setItem('starspellName', old);
+      renamed({ from: n, to: old, kind: 'held' });
+      return dbUpdate('players/' + uid(), { name: old });
+    }).catch(() => { });
     return n;
+  }
+
+  // ---- unique names: the claim registry (see the header) ----
+  let claimedKey = null;   // the key this session has proven its own (skips the txn on every sync)
+  function nameKey(n) {
+    let s = String(n == null ? '' : n);
+    try { s = s.normalize('NFKC'); } catch (e) { }
+    return s.trim().replace(/\s+/g, ' ').toLowerCase().replace(/[.#$\[\]\/\u0000-\u001f\u007f]/g, '_');
+  }
+  // test rigs (?mpuid → test_<x>) share a machine and never enter the registry
+  function offRegistry(u) { return !u || /^test_/.test(u); }
+  // won: names/<key> is <forUid>'s once the transaction settles. `db` is an
+  // SSNET.side door for a seat this client holds for someone else (the circle).
+  async function claimName(name, forUid, db) {
+    const key = nameKey(name), u = forUid || uid();
+    if (!key) return { won: false, key };
+    if (mode !== 'firebase' || offRegistry(u)) return { won: true, key };
+    const txn = db ? (p, fn) => db.txn(p, fn) : dbTxn;
+    const r = await txn('names/' + key, (cur) => (cur == null || cur === u) ? u : undefined);
+    return { won: !!r.committed && r.value === u, key };
+  }
+  async function releaseName(name, forUid, db) {
+    const key = nameKey(name), u = forUid || uid();
+    if (!key || mode !== 'firebase' || offRegistry(u)) return;
+    const txn = db ? (p, fn) => db.txn(p, fn) : dbTxn;
+    await txn('names/' + key, (cur) => cur === u ? null : undefined);
+  }
+  // mint until a claim wins: fresh mints first, then a mint wearing a short
+  // numeral cut from the uid (deterministic per device, so retries converge)
+  async function mintClaimed(forUid, db) {
+    const u = forUid || uid();
+    const tag = String(100 + (parseInt(u.replace(/\D/g, '').slice(-6) || '0', 10) % 900));
+    for (let i = 0; i < 14; i++) {
+      const n = i < 8 ? mintName() : mintName().split(' ')[1] + ' ' + tag + (i > 10 ? String(i) : '');
+      const r = await claimName(n, u, db);
+      if (r.won) return n;
+    }
+    return null;
+  }
+  // the one-time rename notice, kept until a scene has shown it
+  function renamed(d) {
+    const rec = Object.assign({ at: Date.now() }, d);
+    try { localStorage.setItem(RN_KEY, JSON.stringify(rec)); } catch (e) { }
+    try { window.dispatchEvent(new CustomEvent('ss-renamed', { detail: rec })); } catch (e) { }
+  }
+  function renameNotice(take) {
+    let r = null;
+    try { r = JSON.parse(localStorage.getItem(RN_KEY)); } catch (e) { }
+    if (r && take) { try { localStorage.removeItem(RN_KEY); } catch (e) { } }
+    return r || null;
+  }
+  // at connect (and every profile sync): the standing name must be mine
+  let ensuring = null;
+  function ensureName() {
+    if (ensuring) return ensuring;
+    ensuring = (async () => {
+      if (mode !== 'firebase' || MPUID) return true;
+      const had = myName();
+      if (nameKey(had) === claimedKey) return true;
+      const fresh = !!localStorage.getItem(FRESH_KEY);
+      const r = await claimName(had);
+      if (r.won) { claimedKey = r.key; localStorage.removeItem(FRESH_KEY); return true; }
+      const n = await mintClaimed();
+      if (!n) return false;                          // the sky is busy; next sync tries again
+      localStorage.setItem('starspellName', n);
+      localStorage.removeItem(FRESH_KEY);
+      claimedKey = nameKey(n);
+      await dbUpdate('players/' + uid(), { name: n }).catch(() => { });
+      if (!fresh) renamed({ from: had, to: n, kind: 'taken' });
+      return true;
+    })().catch(() => false).finally(() => { ensuring = null; });
+    return ensuring;
   }
 
   // ---- local fallback tree ----
@@ -123,7 +225,11 @@ const SSNET = (() => {
     } catch (e) {
       mode = 'local';
     }
-    if (mode === 'firebase') { try { FR.start(); } catch (e) { } }
+    if (mode === 'firebase') {
+      try { FR.start(); } catch (e) { }
+      // the name must be mine before the profile row carries it anywhere
+      try { await ensureName(); } catch (e) { }
+    }
     return mode;
   }
 
@@ -260,6 +366,7 @@ const SSNET = (() => {
   // ---- profile sync (best-effort, one row per player) ----
   async function syncProfile(stats) {
     try {
+      if (mode === 'firebase' && !MPUID) await ensureName();
       await dbTxn('players/' + uid(), (cur) => Object.assign({}, cur || {}, { name: myName() }, stats, { at: Date.now() }));
     } catch (e) { }
   }
@@ -394,5 +501,5 @@ const SSNET = (() => {
     async decline(fromUid) { try { await dbSet('invites/' + uid() + '/' + fromUid, null); } catch (e) { } },
   };
 
-  return { connect, uid, myName, setName, mintUid, mintName, side, submitScore, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
+  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, mintClaimed, ensureName, renameNotice, side, submitScore, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
 })();

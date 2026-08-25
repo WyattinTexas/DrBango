@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.52.0';
+const BUILD = 'STARSPELL v0.53.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -3942,6 +3942,41 @@ function ssAchToast(scene, def) {
   scene.tweens.add({ targets: c, alpha: 0, delay: 2600, duration: 400, onComplete: () => c.destroy() });
 }
 
+/* ---- the rename notice: a name the stars already knew ----------------------
+   Unique names (net.js): a player whose standing name was claimed first by
+   somebody else is re-minted at connect, and a rename to a taken name keeps
+   the old one. Either way they are told ONCE, here, in the achievement
+   toast's frame: the title one line, the body an ssTextBlock (never a
+   multi-line bake — the desc law). Shown by whichever scene is live when
+   the ss-renamed event lands, else by the meadow when it next builds. */
+function ssRenameNotice(scene, rec) {
+  rec = rec || SSNET.renameNotice(true);
+  if (!rec || !scene || !scene.sys || !scene.sys.isActive()) return null;
+  SSNET.renameNotice(true);
+  const l = ssLayout(scene);
+  const held = rec.kind === 'held';
+  const c = scene.add.container(l.x(0), l.y(-60)).setDepth(400);
+  const body = ssTextBlock(scene, 0, l.u(8), SS_T(held ? 'nameHeldBody' : 'nameTakenBody', rec.from, rec.to),
+    { fontSize: l.u(10) + 'px', color: BTN_INK2(), fontStyle: 'italic', wrapW: l.u(272), lineSpacing: l.u(1), align: 'center', ox: 0.5, oy: 0 });
+  const H = Math.max(58, 36 + body.height / l.u(1));
+  const bg = scene.add.image(0, 0, ssBtn(scene, false, 300, Math.round(H))).setDisplaySize(l.u(300), l.u(H));
+  const t1 = ssTxt(scene, 0, -l.u(H / 2 - 14), SS_T(held ? 'nameHeldTitle' : 'nameTakenTitle'), l.u(13), BTN_INK()).setOrigin(0.5);
+  body.y = -l.u(H / 2 - 24);
+  c.add([bg, t1, body]);
+  c.setData('renameNotice', true);
+  if (scene.nameT && scene.nameT.active) scene.nameT.setText(rec.to);
+  scene.tweens.add({ targets: c, y: l.y(52 + (H - 58) / 2), duration: 450, ease: 'Back.easeOut' });
+  scene.tweens.add({ targets: c, alpha: 0, delay: 6500, duration: 500, onComplete: () => c.destroy() });
+  return c;
+}
+window.addEventListener('ss-renamed', (e) => {
+  try {
+    const live = (window.game && game.scene.getScenes(true) || []).filter((sc) => sc.scene.key !== 'boot');
+    const sc = live.find((x) => x.scene.key === 'home' || x.scene.key === 'profile') || live[0];
+    if (sc) ssRenameNotice(sc, e.detail);
+  } catch (err) { }
+});
+
 /* ---- the rating card: tap any stargazer's name, see their standing -------
    One small window of sky: the name, the star-class glyph burning in its
    tier's color over a breathing glow, the number in gold letterpress. Pass
@@ -4147,6 +4182,8 @@ class Home extends Phaser.Scene {
     else if (DEMO || QS.get('daily') === '1' || QS.get('quick') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : 'quick') : QS.get('quick') === '1' ? 'quick' : 'daily'));
   }
   buildMeadowUi(l) {
+    // a name the stars already knew (net.js, unique names): told once, here
+    this.time.delayedCall(700, () => { if (this.sys.isActive() && SSNET.renameNotice()) ssRenameNotice(this); });
     // baseAlpha: the ascent fades all ui to 0 — the wake path (return from
     // battle without a re-create) restores each item to the alpha it was born
     // with, which is not 1 for sparkles, braid, mute/lang buttons

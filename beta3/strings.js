@@ -98,6 +98,8 @@ const SS_STR = {
     frLinkTitle: 'a friend joins your sky', vsFriendsOn: '✦ %1 of your friends online', endAddFriend: '✦ ADD %1 AS A FRIEND',
     endFriends: '✦ FRIENDS ✦',
     vsLang: '⚔ this duel is woven in %1',
+    nameTakenTitle: '✦ A NAME ALREADY WRITTEN ✦', nameTakenBody: 'the stars already know another %1 · from tonight you are %2',
+    nameHeldTitle: '✦ THAT NAME IS SPOKEN FOR ✦', nameHeldBody: 'another stargazer already answers to %1 · you remain %2',
     // sigil names/descs come from data.js in English; other languages carry a `sig` map
     // zodiac titles/descs come from data.js in English; other languages carry a `zod` map
   },
@@ -201,6 +203,8 @@ const SS_STR = {
     frLinkTitle: 'un amigo se une a tu cielo', vsFriendsOn: '✦ %1 de tus amigos en línea', endAddFriend: '✦ AÑADIR A %1 COMO AMIGO',
     endFriends: '✦ AMIGOS ✦',
     vsLang: '⚔ este duelo se teje en %1',
+    nameTakenTitle: '✦ UN NOMBRE YA ESCRITO ✦', nameTakenBody: 'las estrellas ya conocen a otro %1 · desde esta noche eres %2',
+    nameHeldTitle: '✦ ESE NOMBRE YA TIENE DUEÑO ✦', nameHeldBody: 'otro observador ya responde a %1 · sigues siendo %2',
     zod: {
       aries: ['EL CARNERO', 'Cada combate abre con una embestida: la bestia recibe 8.'],
       taurus: ['EL TORO', 'El toro resiste: +15 de salud máxima al empezar el ascenso.'],
@@ -356,6 +360,8 @@ const SS_STR = {
     frLinkTitle: 'un ami rejoint votre ciel', vsFriendsOn: '✦ %1 de vos amis en ligne', endAddFriend: '✦ AJOUTER %1 COMME AMI',
     endFriends: '✦ AMIS ✦',
     vsLang: '⚔ ce duel se tisse en %1',
+    nameTakenTitle: '✦ UN NOM DÉJÀ ÉCRIT ✦', nameTakenBody: 'les étoiles connaissent déjà un autre %1 · dès ce soir vous êtes %2',
+    nameHeldTitle: '✦ CE NOM EST DÉJÀ PRIS ✦', nameHeldBody: 'un autre astronome répond déjà à %1 · vous restez %2',
     zod: {
       aries: ['LE BÉLIER', 'Chaque combat s\'ouvre sur une charge : la bête subit 8.'],
       taurus: ['LE TAUREAU', 'Le taureau endure : +15 de santé maximale au départ de l\'ascension.'],
@@ -511,6 +517,8 @@ const SS_STR = {
     frLinkTitle: 'um amigo junta-se ao teu céu', vsFriendsOn: '✦ %1 dos teus amigos online', endAddFriend: '✦ ADICIONAR %1 COMO AMIGO',
     endFriends: '✦ AMIGOS ✦',
     vsLang: '⚔ este duelo se tece em %1',
+    nameTakenTitle: '✦ UM NOME JÁ ESCRITO ✦', nameTakenBody: 'as estrelas já conhecem outro %1 · desta noite em diante és %2',
+    nameHeldTitle: '✦ ESSE NOME JÁ TEM DONO ✦', nameHeldBody: 'outro observador já atende por %1 · continuas a ser %2',
     zod: {
       aries: ['O CARNEIRO', 'Cada combate abre com uma investida: a fera sofre 8.'],
       taurus: ['O TOURO', 'O touro resiste: +15 de vida máxima no início da subida.'],
@@ -666,6 +674,8 @@ const SS_STR = {
     frLinkTitle: 'ein Freund betritt deinen Himmel', vsFriendsOn: '✦ %1 deiner Freunde online', endAddFriend: '✦ %1 ALS FREUND HINZUFÜGEN',
     endFriends: '✦ FREUNDE ✦',
     vsLang: '⚔ dieses Duell wird auf %1 gewoben',
+    nameTakenTitle: '✦ EIN NAME, SCHON GESCHRIEBEN ✦', nameTakenBody: 'die Sterne kennen schon einen %1 · ab heute Nacht bist du %2',
+    nameHeldTitle: '✦ DIESER NAME IST VERGEBEN ✦', nameHeldBody: 'ein anderer Sterngucker hört schon auf %1 · du bleibst %2',
     zod: {
       aries: ['DER WIDDER', 'Jeder Kampf beginnt mit einem Rammstoß: das Biest erleidet 8.'],
       taurus: ['DER STIER', 'Der Stier hält stand: +15 maximale Gesundheit zu Beginn des Aufstiegs.'],
@@ -821,6 +831,8 @@ const SS_STR = {
     frLinkTitle: 'フレンドがあなたの空へ', vsFriendsOn: '✦ フレンド %1 人がオンライン', endAddFriend: '✦ %1 をフレンドに追加',
     endFriends: '✦ フレンド ✦',
     vsLang: '⚔ この決闘は%1で織られる',
+    nameTakenTitle: '✦ すでに記された名 ✦', nameTakenBody: '星々はもう別の%1を知っている · 今夜からあなたは%2',
+    nameHeldTitle: '✦ その名はすでに誰かのもの ✦', nameHeldBody: '別の星見がすでに%1と名乗っている · あなたは%2のまま',
     zod: {
       aries: ['牡羊', '各戦闘の開幕に突進：獣に8ダメージ。'],
       taurus: ['牡牛', '牡牛は耐える：登り開始時に最大体力+15。'],
@@ -976,6 +988,8 @@ const SS_STR = {
     frLinkTitle: '친구가 당신의 하늘에 합류', vsFriendsOn: '✦ 친구 %1명 온라인', endAddFriend: '✦ %1 친구 추가',
     endFriends: '✦ 친구 ✦',
     vsLang: '⚔ 이 결투는 %1(으)로 짜입니다',
+    nameTakenTitle: '✦ 이미 적힌 이름 ✦', nameTakenBody: '별들은 이미 다른 %1을(를) 알고 있어요 · 오늘 밤부터 당신은 %2',
+    nameHeldTitle: '✦ 이미 주인이 있는 이름 ✦', nameHeldBody: '다른 별지기가 이미 %1(이)라 불려요 · 당신은 여전히 %2',
     zod: {
       aries: ['양자리', '전투 시작마다 들이받기: 짐승이 8 피해를 입는다.'],
       taurus: ['황소자리', '황소의 인내: 등반 시작 시 최대 체력 +15.'],
@@ -1131,6 +1145,8 @@ const SS_STR = {
     frLinkTitle: '一位好友加入你的星空', vsFriendsOn: '✦ %1 位好友在线', endAddFriend: '✦ 添加 %1 为好友',
     endFriends: '✦ 好友 ✦',
     vsLang: '⚔ 这场对决以%1编织',
+    nameTakenTitle: '✦ 早已写下的名字 ✦', nameTakenBody: '星辰已认识另一位%1 · 从今夜起你是%2',
+    nameHeldTitle: '✦ 这个名字已有归属 ✦', nameHeldBody: '另一位观星者已叫作%1 · 你仍是%2',
     zod: {
       aries: ['白羊', '每场战斗开场猛撞：星兽受到8点伤害。'],
       taurus: ['金牛', '金牛坚忍：攀登开始时生命上限+15。'],
@@ -1286,6 +1302,8 @@ const SS_STR = {
     frLinkTitle: 'एक मित्र आपके आकाश में आया', vsFriendsOn: '✦ आपके %1 मित्र ऑनलाइन', endAddFriend: '✦ %1 को मित्र बनाएँ',
     endFriends: '✦ मित्र ✦',
     vsLang: '⚔ यह द्वंद्व %1 में बुना गया है',
+    nameTakenTitle: '✦ एक नाम जो पहले से लिखा है ✦', nameTakenBody: 'तारे पहले से एक और %1 को जानते हैं · आज रात से आप %2 हैं',
+    nameHeldTitle: '✦ वह नाम पहले से किसी का है ✦', nameHeldBody: 'एक और तारा-दर्शी पहले से %1 कहलाता है · आप %2 ही रहेंगे',
     zod: {
       aries: ['मेष', 'हर लड़ाई की शुरुआत टक्कर से: दानव को 8 क्षति।'],
       taurus: ['वृषभ', 'वृषभ डटा रहता है: चढ़ाई की शुरुआत में अधिकतम जीवन +15।'],
@@ -1441,6 +1459,8 @@ const SS_STR = {
     frLinkTitle: 'صديق ينضم إلى سمائك', vsFriendsOn: '✦ %1 من أصدقائك متصلون', endAddFriend: '✦ أضف %1 صديقًا',
     endFriends: '✦ الأصدقاء ✦',
     vsLang: '⚔ هذه المبارزة تُنسج بلغة %1',
+    nameTakenTitle: '✦ اسم مكتوب من قبل ✦', nameTakenBody: 'النجوم تعرف بالفعل %1 آخر · من الليلة أنت %2',
+    nameHeldTitle: '✦ هذا الاسم محجوز ✦', nameHeldBody: 'مراقب نجوم آخر يُدعى %1 بالفعل · تبقى %2',
     zod: {
       aries: ['الحمل', 'تفتتح كل معركة بنطحة: يتلقى الوحش 8.'],
       taurus: ['الثور', 'الثور يصمد: +15 للصحة القصوى عند بدء الصعود.'],
