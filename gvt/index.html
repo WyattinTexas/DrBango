@@ -34390,7 +34390,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.93';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.94';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -52054,8 +52054,9 @@ function update(dt){
   if(S.sq && S.mode==='play' && !S.bf){
     S.tagT+=dt;
     if(S.tagT>=CAMP_TICK_EVERY){ S.tagT-=CAMP_TICK_EVERY;   // v1.40: three pours where there was one — “about three times faster income”
-      S.plastic+=CAMP_TICK;
-      S.floats.push({x:166, y:280, txt:'+'+CAMP_TICK, t:0, col:'#FFF3C4'});
+      const pour=CAMP_TICK+((S.raid && S.raid.t==='u')? EV_TICK_ADD : 0);   // 0824-NIGHT: the ULTRA MEGA room pours 30 (the +10); everywhere else the same 20 it always was
+      S.plastic+=pour;
+      S.floats.push({x:166, y:280, txt:'+'+pour, t:0, col:'#FFF3C4'});
     }
   }
   if(S.raid) raidTick(dt);   // v3.39: the raid's own clocks — win door, capture, crush, turrets
@@ -66695,6 +66696,8 @@ const RAID_RETREAT_F=0.4;                      // the king's scripted retreat (~
 const RAID_PURSE={ e:10, m:15, h:25, g:25, u:0 };         // repeat purse per clear (§9; 0341: MEGA pays the Hard purse under the same day cap) · 0484 D9: the event pays its own 100★ OUTSIDE the day cap (card 7) — the raid's repeat purse never double-pays
 const RAID_DAY_CAP=25;                         // ≤25★/day/player across BOTH raids
 const RAID_TAGS=240;                           // opening dog tags — three phases deserve a deeper purse than a park rung
+const EV_TAGS_ADD=40;                          // 0824-NIGHT THE DEEPER PURSE (Wyatt 8/24 night, after the recorded battle: "let us start with 40 more dog tags"): the ULTRA MEGA KING YETI room (tier 'u') opens on RAID_TAGS+40 = 280 — every other raid/park/campaign purse byte-still; the computers keep RAID_TAGS×EV_BOT_F (120). ⚑ 40 (default) · 0 (0506)
+const EV_TICK_ADD=10;                          // 0824-NIGHT: "ten more dog tags per dog tag tick" — the campaign faucet pours CAMP_TICK+10 = 30 every 10/3 s in the 'u' room only (the float says +30); BF_TICK/CAMP_TICK untouched everywhere else. ⚑ 10 (default) · 0 (0506)
 const RAID_KING_FCX={ e:1, m:0.8, h:0.65, g:1.25, u:1.25 };    // the per-tier boss mechanic: his one-big-snowball clock tightens (M/H) — 0357 MEGA REX: 3.2×1.25 = a flat 4.0s breath clock (Wyatt: "the cooldown on his flame breath should only be about 4 seconds"; the D2 turn-wait is waived at mega so the clock IS the felt cadence, and the angry return x0.8 lands 3.2s)
 // ===== 0340 KING CROAK'S HIDEOUT — the campaign family's FOURTH door
 // (rk='croak'; gates on OUTLAW TOWN lv>=20, no key, no rite). The duel:
@@ -67307,7 +67310,7 @@ function startRaidBattle(tier,rk){
     crushT:RAID_CRUSH_CD[tier] };
   S.cfg=raidCfg(tier,rk);
   S.raid.cfg=S.cfg;   // the identity stamp — raidTick serves THIS battle only (a stale S.raid on a rigged next battle goes inert instead of running turrets on a park)
-  S.plastic=RAID_TAGS;
+  S.plastic=RAID_TAGS+(tier==='u'? EV_TAGS_ADD : 0);   // 0824-NIGHT: the event room opens 40 deeper (280); e/m/h/g stand at 240
   hideAllOverlays();
   S.mode='play';
   locSync();   // 0432: the LAST line of a game-start door — themeKill() ran first, so a location can never start over the menu theme
@@ -76303,7 +76306,7 @@ window.GVT = {
   bdForce(bell, open, wk){ BD.bell=+bell||0; BD.open=(open!=null)? +open : (BD.bell? BD.bell-BD_POP_S : 0); if(wk) BD.wk=String(wk); else if(!BD.wk) BD.wk='bd:2026-08-23'; evDoorTick(); return bdDoorState(); },   // 0516: a rig's desert clock
   bdJoin(){ return bdJoin(); },
   bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, n:s.name })) : null, note:BD.note }; },
-  evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read
+  evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read
   evSeen(v){ if(v===0||v===false) delete META.evSeen; else if(v!=null) META.evSeen=String(v); saveMeta(); return META.evSeen||null; },
   evTouch(){ evTouch(); return GVT.evDoor(); },
   evAfk(){ evAfkTick(); return GVT.evDoor(); },
