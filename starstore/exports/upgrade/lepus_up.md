@@ -1,0 +1,47 @@
+NEEDS SS-SKY-01 FIRST (this record uses: hues named pulse). Do not fire this card until SS-SKY-01 is LIVE; if it must ship sooner, use MAKE A PLAIN COPY (stars/edges/eyes/fx only), which is READY TODAY.
+# SS-UP-lepus — LEPUS · THE MOONLIT HARE — re-authored in the Star Store
+lane: /Users/drbango/DrBango/beta3 · account: per the ring · effort: max · made in the Star Store 2026-08-25 by Skylar
+
+## WHAT IT IS
+Arneb cream at the chest as the wish-star, Nihal gold, and Hind's Crimson Star, a drop of blood on the ear tip, swelling and fading every six seconds (427 days compressed). Zero new objects.
+Changed against the shipped record: new layers: hues named pulse.
+
+## WHERE IT LIVES
+- replaces the existing record in place; no pool changes
+- SS_BEASTS (data.js): the lepus record in the basics block @34-81 — swap it for the block below, verbatim.
+- Paste INSIDE the SS_BEASTS literal, above the closing `};` at data.js:218 — never as an assignment after the tier loop at 221-229.
+- The home showcase cycler @4155 picks it up automatically.
+
+## THE DATA
+```js
+// STARSPELL sky object · LEPUS · THE MOONLIT HARE · opponent (an UPGRADE of the shipped record) (basic lvl 2)
+// NEEDS SS-SKY-01 (uses: hues named pulse) · objects 24 battle / 24 home
+// REPLACE the lepus record in SS_BEASTS (data.js) with this one — stats/titles/fx kept unless changed
+lepus: {
+  name: 'LEPUS', title: 'THE MOONLIT HARE', tier: 'basic', lvl: 2, tint: 0xbfe8c9, eye: 0xa8ffc4,
+  stars: [[-10,-64],[14,-60],[-2,-38],[8,-30],[26,-26],[0,-4],[8,18],[-28,-18],[-52,-6],[-58,16],[-36,34],[-66,-14]],
+  edges: [[0,2],[1,2],[2,3],[3,4],[3,5],[5,6],[5,7],[7,8],[8,9],[9,10],[8,11]], eyes: [[12,-32]],
+  hues: [null,0xff4d6b,null,null,null,0xfff2cc,null,0xffdc7a,null,null,null,null],
+  named: [[5,'ARNEB']],
+  pulse: [[1,6,0.3]],
+  fx: { idle:'bob', atk:'pounce', hops:2 },
+},
+// strings.js — title unchanged: the 9 beast maps (es:112 fr:267 pt:422 de:577 ja:732 ko:887 zh:1042 hi:1197 ar:1352) stay as they are
+// BESTIARY.md table @26: the lepus row stays
+```
+
+## REGISTER
+1. strings.js: title unchanged — the 9 beast maps (es:112 fr:267 pt:422 de:577 ja:732 ko:887 zh:1042 hi:1197 ar:1352) stay as they are.
+2. BESTIARY.md: the lepus row stays; remove nothing.
+3. Version ritual: `const BUILD` game.js:11 and `?v=` on all 11 script tags index.html:29-48 bump together (0.50.1 → next). Phaser stays cacheable.
+
+## PROOF (all must be green before deploy)
+- SS-SKY-01 creates tools/sky-check.mjs; if it is absent, write it first per tools/README.md on the crisp-check pattern, then:
+- `perl -e 'alarm 580; exec @ARGV' node tools/sky-check.mjs --beast lepus` on `?rend=cv` AND `--gl`, SE/14/iPad: boots the Preview seat, `cont.list.length` <= 40 in battle and <= 30 at home (expected 24 / 24), `window.__ssBakeFail` empty, zero Runtime.exceptionThrown, one strike fires and `fx.attacking` clears within 2600 ms, no glint error over 20 s (edges non-empty here, but the guard must be present).
+- `SS_BEAST_T(SS_BEASTS.lepus)` (strings.js:1547 — SS_BEAST_T(b) takes the beast OBJECT and reads b.id, never an id string) resolves in all 10 SS_LANGS.
+- the other 25 shipped beasts unchanged by object counts and texture keys (the 'nothing moves' proof — by counts, never pixels; the fly-in angle @1781 is Math.random).
+- Deploy: stage only the five beta3 files (beta3/data.js beta3/strings.js beta3/BESTIARY.md beta3/game.js beta3/index.html), never `git commit -a` / `add -A`, push, then `curl -s https://drbango.com/beta3/game.js | grep BUILD` (Pages can lag minutes).
+
+## DOES NOT MOVE
+- hp/atk/timer/title/tier/lvl/fx unchanged unless listed here: nothing — all as shipped.
+- No other beast, no pool, no fight math, no saves, no versus emblems (VS_EMBLEMS versus.js:29 stays four), no star chart or zodiac glyph code.
