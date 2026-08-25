@@ -30828,7 +30828,23 @@ SPRITES_SRC.stampb='<ellipse cx="70" cy="132" rx="50" ry="7" fill="#000" opacity
 // the 0434 seat (66,50) would sit ON her face now — and drawJane's taut
 // line ends at (+6.8,-34.2), frame-proven. Move an iron and the flash
 // floats.
-function janeArt(P){
+// 0537 JANE'S MOTION REWORK — THE PART RIG (FM-GVT-JANE-ANIM-01 §2): the
+// SAME groups, one more door. janeArt(P, only) answers ONE group by name
+// (ground legF legN armF armFD armND torso head headBare hat armN) so the
+// SPRITES_SRC shelf decodes her PARTS (janeP_*) once each and drawJane draws
+// them per frame on a joint rig — continuous now, no pose cuts. The full-
+// figure return (no second arg) is BYTE-WHAT-IT-WAS: every existing caller
+// (the tray/academy cards, janeSpeaker's portrait, the celebration dancer,
+// sprURI, the zip pose) reads the same string. Two NEW groups for Wyatt's
+// 8/25 ruling ("She needs to put her arms down"): armFD / armND — straight
+// arms hanging from the shipped shoulder caps, hands at the thighs, the
+// irons pointed DOWN (ironD: the grip inside the fist, the barrel down and
+// FORWARD of the hand, sight at the muzzle — facing east the slide is
+// forward); the near arm falls down her SIDE (64.4 → 62.5, over the
+// torso's front third and the holster), the far arm behind her (53 → 51.3).
+// ⚠ a hanging limb is checked against the TORSO EDGES (52.5-65.5): outside
+// them she reads as dangling the gun in front of her (bench round 3).
+function janeArt(P,only){
   P=P||{};
   const g=(t,b)=>'<g'+(t?' transform="'+t+'"':'')+'>'+b+'</g>';
   const iron=(x,y)=>'<rect x="'+x+'" y="'+(y-2.5)+'" width="14" height="5" rx="2" fill="#3a3630"/>'
@@ -30888,40 +30904,67 @@ function janeArt(P){
     +'<path d="M59.5 31.2 L59.5 37.6" stroke="#E0AC2C" stroke-width="2" stroke-linecap="round"/>'
     +'<rect x="49.7" y="39.2" width="19.6" height="3.8" fill="#7A5A14"/>'
     +'<rect x="63.6" y="38.8" width="4.2" height="4.6" rx="1" fill="#A63B2A"/>';
+  // 0537 THE HOLSTER-READY IRON: barrel DOWN and FORWARD of the fist, muzzle at the thigh, the grip
+  // inside the hand (drawn first so the fist closes over it). Facing east = the slide forward.
+  const ironD=(x,y)=>'<rect x="'+(x-1.5)+'" y="'+(y-4)+'" width="5" height="8" rx="1.6" fill="#26221E"/>'
+    +'<rect x="'+(x+0.8)+'" y="'+(y+1)+'" width="5" height="12.5" rx="2" fill="#3a3630"/>'
+    +'<rect x="'+(x+1.6)+'" y="'+(y+11.6)+'" width="3" height="2.4" rx="1" fill="#C9A227"/>';
+  // 0537 HANGING ARMS: the near arm falls down her SIDE (over the torso's front third, x 64.4 → 62.5),
+  // the far arm behind her (53 → 51.3) — hands at hip height, a whisper of elbow.
+  const armFD=ironD(51.3,93.5)
+    +'<path d="M52.4 79 L51.4 91.5" stroke="#E8B890" stroke-width="6" stroke-linecap="round"/>'
+    +'<circle cx="51.3" cy="92.6" r="3.6" fill="#E8B890"/>'
+    +'<path d="M53 68.5 L52.4 80" stroke="#C9A06A" stroke-width="7" stroke-linecap="round"/>'
+    +'<circle cx="53" cy="68.5" r="4.8" fill="#C9A06A"/>';
+  const armND='<circle cx="64.4" cy="71" r="4.8" fill="#C9A06A"/>'
+    +'<path d="M64.4 71 L63.8 82" stroke="#C9A06A" stroke-width="7" stroke-linecap="round"/>'
+    +'<path d="M63.8 81 L62.6 93" stroke="#E8B890" stroke-width="6" stroke-linecap="round"/>'
+    +(P.nIron===0?'':ironD(62.5,94.2))
+    +'<circle cx="62.5" cy="94.2" r="3.6" fill="#E8B890"/>';
+  // 0537 THE PART DOOR: one group by name (load-time only — the shelf decodes each once; never a per-frame call)
+  if(only){ const M={legF,legN,armF,armFD,armND,torso,hat,headBare:headCore,head:headCore+(P.noHat?'':hat),armN,ground:'<ellipse cx="60" cy="129" rx="30" ry="7" fill="#000" opacity="0.28"/><ellipse cx="60" cy="126" rx="30" ry="7" fill="#C77E3E"/>'}; return M[only]; }
   return '<ellipse cx="60" cy="129" rx="30" ry="7" fill="#000" opacity="0.28"/><ellipse cx="60" cy="126" rx="30" ry="7" fill="#C77E3E"/>'
     + g(P.lF,legF) + g(P.lN,legN) + g(P.aF,armF) + g(P.tor,torso)
     + g(P.hd, headCore + (P.noHat?'':hat)) + g(P.aN,armN);
 }
-// THE POSE SHELF — 2-4 stances per action, composed ONCE here at load and
-// decoded ONCE by buildSprites (they are ordinary SPRITES_SRC keys, default
-// 120x140 box): zero per-frame URI/string work, the 0413 no-stray-rAF and
-// 0411 no-allocation laws hold by construction. drawJane picks a key per
-// frame off the sim clock; the eased lean/squash/recoil ride drawSprite's
-// own rot arg plus one canvas scale wrap. Every angle below is a dial —
-// 0458 re-pivoted every one onto the new joint caps, and kept the deltas
-// modest so the runa/runb stride and the fire kicks read smooth, no pops.
+// THE POSE SHELF → 0537 THE PART SHELF. The 0434/0458 shelf composed 2-4
+// whole-figure stances per action (relax · tip · runa · runb · firehi ·
+// firehip · hurt · gulp) and drawJane cut between them one key a frame —
+// the two-frame square-wave march, every stance a hard cut (Wyatt 8/25:
+// "she just looks so broken"). Those eight keys RETIRE here; their angles
+// live on as the rig's numeric targets in drawJane (the relax arms replaced
+// by the hanging parts — arms DOWN is her default now). TWO whole-figure
+// keys stay: `jane` = the aim mold (every card/portrait/dancer seat +
+// sprURI read it; guns-up on the rig IS this mold — the muzzle law) and
+// `janezip` = the entrance tuck on the taut line (drawJane's zip + the
+// jexit goodbye, byte-what-they-were). Below them, her PARTS: janeArt's
+// groups decoded once each on the ordinary shelf (the janeP_ name prefix;
+// buildSprites boxes them 120x140 like the mold, so a part's pixels land
+// exactly where the whole figure's did — the seams close by construction).
 const JANE_POSES={
   aim:  {},
-  relax:{aF:'rotate(46 53 68.5)', aN:'rotate(30 64.4 71)', hd:'rotate(2 59 63)'},
-  tip:  {tipArm:1, aN:'rotate(30 64.4 71)', hd:'rotate(-3 59 63)'},
-  runa: {lF:'rotate(-24 55 97)', lN:'rotate(19 62 97)', tor:'rotate(4 58 93)', aF:'rotate(28 53 68.5)', aN:'rotate(10 64.4 71)', hd:'rotate(-2 59 63)'},
-  runb: {lF:'rotate(20 55 97)', lN:'rotate(-22 62 97)', tor:'rotate(4 58 93)', aF:'rotate(44 53 68.5)', aN:'rotate(-6 64.4 71)', hd:'rotate(-1 59 63)'},
-  firehi:{aF:'rotate(-10 53 68.5)', hd:'rotate(-2 59 63)'},
-  firehip:{aN:'rotate(-9 64.4 71)'},
-  hurt: {shock:1, tor:'rotate(-8 58 93)', hd:'rotate(-9 59 63)', aF:'rotate(28 53 68.5)', aN:'rotate(24 64.4 71)', lF:'rotate(6 55 97)', lN:'rotate(-6 62 97)'},
-  gulp: {noHat:1, shock:1, aF:'rotate(-38 53 68.5)', aN:'rotate(-40 64.4 71)', hd:'rotate(-13 59 63)', lF:'rotate(-24 55 97)', lN:'rotate(20 62 97)', tor:'rotate(-6 58 93)'},
   zip:  {aN:'rotate(-47.6 64.4 71)', nIron:0, hol:1, aF:'rotate(34 53 68.5)', hd:'rotate(6 59 63)', lF:'rotate(26 55 97)', lN:'rotate(32 62 97)', tor:'rotate(7 58 93)'}
 };
 SPRITES_SRC.jane=janeArt(JANE_POSES.aim);
-SPRITES_SRC.janerelax=janeArt(JANE_POSES.relax);
-SPRITES_SRC.janetip=janeArt(JANE_POSES.tip);
-SPRITES_SRC.janeruna=janeArt(JANE_POSES.runa);
-SPRITES_SRC.janerunb=janeArt(JANE_POSES.runb);
-SPRITES_SRC.janefirehi=janeArt(JANE_POSES.firehi);
-SPRITES_SRC.janefirehip=janeArt(JANE_POSES.firehip);
-SPRITES_SRC.janehurt=janeArt(JANE_POSES.hurt);
-SPRITES_SRC.janegulp=janeArt(JANE_POSES.gulp);
 SPRITES_SRC.janezip=janeArt(JANE_POSES.zip);
+// 0537 THE PART SHELF — the ground · the legs · the far arm (aim / brim-tip / hanging) · the near arm (aim / bare-handed /
+// hanging) · the torso (plain / holstered) · the head (hat / shock / bare / bare+shock) · the hat alone (the jhat fx flies it)
+SPRITES_SRC.janeP_ground=janeArt({},'ground');
+SPRITES_SRC.janeP_legF=janeArt({},'legF');
+SPRITES_SRC.janeP_legN=janeArt({},'legN');
+SPRITES_SRC.janeP_armF=janeArt({},'armF');
+SPRITES_SRC.janeP_armFtip=janeArt({tipArm:1},'armF');
+SPRITES_SRC.janeP_armFD=janeArt({},'armFD');
+SPRITES_SRC.janeP_armND=janeArt({},'armND');
+SPRITES_SRC.janeP_torso=janeArt({},'torso');
+SPRITES_SRC.janeP_torsoHol=janeArt({hol:1},'torso');
+SPRITES_SRC.janeP_head=janeArt({},'head');
+SPRITES_SRC.janeP_headShock=janeArt({shock:1},'head');
+SPRITES_SRC.janeP_headBare=janeArt({},'headBare');
+SPRITES_SRC.janeP_headBareShock=janeArt({shock:1},'headBare');
+SPRITES_SRC.janeP_hat=janeArt({},'hat');
+SPRITES_SRC.janeP_armN=janeArt({},'armN');
+SPRITES_SRC.janeP_armNBare=janeArt({nIron:0},'armN');
 SPRITES_SRC.tanmg    = MIRROR(SPRITES_SRC.mgunner);
 // 7/25: YOUR motor pool. Same two vehicles the Tan have been driving at you
 // since v0.2 — cast in green (buildSprites paints anything not on the TAN list)
@@ -31940,6 +31983,7 @@ function buildSprites(done){
     // these two (the v1.14/v1.20 sliced-sprite law).
     // 0435: the king AND his 12 pose keys (kingyeti*) all decode in the royal box — one name prefix, no list to forget
     // 0436/0454: KING CROAK, his son AND his flinch key (kingcroak*) all decode in the shipped 140 box — the same name-prefix law
+    // 0537: JANE'S PARTS (janeP_*) decode in the default 120x140 box — the mold's own; no row, no list to forget (the same name-prefix law)
     const vb = TEDDY_BOX[k] ? TEDDY_BOX[k] : (k.slice(0,8)==='kingyeti') ? '-37 -26 194 168' : (k.slice(0,9)==='kingcroak') ? '0 0 140 140' : (k==='bomber') ? '0 0 170 100' : (k==='wsniper') ? '-12 0 132 140' : (k==='jeep'||k==='tank'||k==='bfjeep'||k==='bftank'||k==='rex'||k==='rollpig'||k==='bluepig'||k==='sdino'||k==='bdino'||k==='spitter'||k==='dinoboss1'||k==='dinoboss2'||k==='dinoboss3'||k==='kingrex'||k==='trike'||k==='btrike'||k==='ptero'||k==='stego'||k==='dilo'||k==='jeep2'||k==='tank2'||k==='wrider'||k==='wmouse'||k==='wteddy'||k==='wsnake'||k==='stamph'||k==='stampb') ? '0 0 140 140' : (k==='mom') ? '0 0 160 530' : (k==='toybox') ? '0 0 160 140' : (k==='blob') ? '0 0 104 63' : '0 0 120 140';   // v3.33: the blue piggy rides his big brother's wide box — 120 slices the trotter curl
     // 0117: every new tan walks on painted TAN — miss this list and a perfect
     // FDEF row fields in GREEN, silently (the checklist's own warning)
@@ -35787,7 +35831,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.24';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.25';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -58333,13 +58377,15 @@ function draw(){
       cx.fillStyle='#C9A227'; cx.fillRect(-2.1,-1.2,4.2,2.4);
       cx.fillStyle='#8a6a1e'; cx.fillRect(-2.1,-1.2,1.2,2.4);
       cx.restore(); cx.globalAlpha=1; }
-    else if(e.k==='jhat'){ // 0434 THE HAT POP — the gold hat leaps off at the snake's bite and flutters down (her gulp pose ships bare-headed for the beat; same hash law, no dice)
+    else if(e.k==='jhat'){ // 0434 THE HAT POP — the gold hat leaps off at the snake's bite and flutters down (her gulp pose ships bare-headed for the beat; same hash law, no dice) · 0537: HER OWN HAT — the mold's gold explorer hat (the janeP_hat part, its crown crease, band and red patch) flies in place of the sketch; the hash-law motion, the flutter and the alpha byte-what-they-were; the sketch stays as the fallback while a decode is missing
       const hsh=(e.x*1.3+e.y*0.7)%1, up=46+14*hsh;
       const hx=e.x+18*e.t*(hsh>0.5?1:-1), hy=e.y-up*e.t+92*e.t*e.t, hr=Math.sin(e.t*9+hsh*6)*0.5;
-      cx.save(); cx.globalAlpha=Math.min(1,(1-k)*2.2); cx.translate(hx,hy); cx.rotate(hr); cx.scale(0.5,0.5); cx.translate(-59,-45);
-      cx.fillStyle='#FFD24A'; cx.beginPath(); cx.ellipse(59,45.5,15.5,4.6,0,0,7); cx.fill();
-      cx.beginPath(); cx.moveTo(49.5,45.5); cx.quadraticCurveTo(49.5,33,59,33); cx.quadraticCurveTo(68.5,33,68.5,45.5); cx.closePath(); cx.fill();
-      cx.fillStyle='#7A5A14'; cx.fillRect(49.7,40.6,18.6,3.8);
+      cx.save(); cx.globalAlpha=Math.min(1,(1-k)*2.2); cx.translate(hx,hy); cx.rotate(hr); cx.scale(0.5,0.5);
+      if(IMG.janeP_hat){ cx.translate(-59.5,-44); cx.drawImage(IMG.janeP_hat,0,0,120,140); }
+      else { cx.translate(-59,-45);
+        cx.fillStyle='#FFD24A'; cx.beginPath(); cx.ellipse(59,45.5,15.5,4.6,0,0,7); cx.fill();
+        cx.beginPath(); cx.moveTo(49.5,45.5); cx.quadraticCurveTo(49.5,33,59,33); cx.quadraticCurveTo(68.5,33,68.5,45.5); cx.closePath(); cx.fill();
+        cx.fillStyle='#7A5A14'; cx.fillRect(49.7,40.6,18.6,3.8); }
       cx.restore(); cx.globalAlpha=1; }
     else if(e.k==='tkarc'){ // 0347 BLUE pop: two half-circle curtains born at
       // 12:00 and swept to 6:00 down each side — the giant arc IS the
@@ -59283,24 +59329,79 @@ function drawTkFx(u){
     cx.beginPath(); cx.ellipse(u.x,u.y,17,6,0,0,7); cx.stroke(); cx.restore();
   }
 }
-// ═══ 0434 JANE AT THE SHAPE STORE — THE MOVES (FM-GVT-MAKEOVER-0819 §4) ═══
-// Pose-driven, draw-time only: janePoseK answers ONE pre-built pose key a
-// frame off state the sim already writes (plus the jkAt/jHitAt/jSnakeT/jInT
-// stamps — presentation fields nothing in the sim ever reads, the wkX/wkT
-// law), and drawJane draws that IMG with the eased recoil lean and landing
-// squash on top. NO new rAF (0413), no per-frame URI/string building (the
-// poses are SPRITES_SRC keys, decoded once at boot), no per-frame
-// allocations (pure math on the standing canvas). Priority, top wins: the
-// snake's yank > the flinch > the fire kick > the stride > guns-up > the
-// brim touch > at ease.
-function janePoseK(u){
-  if(u.jSnakeT!=null && S.t-u.jSnakeT<0.55) return 'janegulp';
-  if(u.jHitAt!=null && S.t-u.jHitAt<0.32) return 'janehurt';
-  if(u.jkAt!=null && S.t-u.jkAt<JK_KICK) return u.jkH? 'janefirehip':'janefirehi';
-  if(u.wkT && S.t-u.wkT<WKF_HOLD) return (Math.sin(S.t*10.5+u.phase)>=0)? 'janeruna':'janerunb';
-  if(u.jBurst || (u.jkAt!=null && S.t-u.jkAt<2.2)) return 'jane';
-  if(((S.t+u.phase*2.2)%JTIP_EV)<JTIP_D) return 'janetip';
-  return 'janerelax';
+// ═══ 0537 JANE'S MOTION REWORK — THE PART RIG (FM-GVT-JANE-ANIM-01 §2) ═══
+// Wyatt 8/25: "Jane's animations need a rework… Right now she just looks so
+// broken. We have to make her animations really look smooth." → three bench
+// rounds (design/jane-anim-0825/bench.html, agreed on 'arms-at-sides-v3').
+// The 0434/0458 pose shelf — ten whole-figure decodes, ONE key a frame
+// (janePoseK), every stance a hard cut, the two-frame square-wave march
+// (sin(S.t*10.5)>=0 ? runa : runb — a 44° leg jump, no bob, no footfall),
+// the whole-cutout sway (unitWob on drawSprite's pivot at her feet) and the
+// whole-body recoil rot — RETIRES. THE SAME MOLD, SIX PARTS, ONE RIG:
+// janeArt's groups decode once each (janeP_* on the SPRITES_SRC shelf, the
+// default 120×140 box) and drawJane draws them per frame in MOLD SPACE —
+// translate(u.x, u.y-kyl) · the unitFl flip · scale(w/120) · translate
+// (-60,-128.8): the very seat drawSprite's -h+h*0.08 lands the 120×140 box
+// on at w54, so the ground anchor and every muzzle seat hold. The torso
+// carries the head and both arms (the 0458 seams close for good).
+// JOINT STATE = plain numeric presentation fields on the unit (jA_lF jA_lN
+// jA_aF jA_aN jA_tor jA_hd · jPhi · jUp · jTip · jBob · jSqx jSqy · jBack ·
+// jShock · jT), seeded on her first rig frame, eased on the SIM clock through
+// the unit's own last-read stamp (jT — the unitWob/wobT grammar: a second
+// read in a frame sees dt 0, a paused sim holds the pose, a catch-up frame
+// integrates the gap). NOTHING IN THE SIM READS THEM (the wkX/wkT law; co-op
+// twin sims and seeded replays stay byte-equal; no wire, no save). The rig's
+// INPUTS are the stamps that already stood: jInT (the zip) · jBurst / jkAt /
+// jkH (the guns, which iron bucked) · jHitAt (the flinch) · jSnakeT (the
+// gulp) · wkT (the stride) · phase.
+// ARMS DOWN is her default (Wyatt 8/25 round 2: "She needs to put her arms
+// down") — the hanging-arm parts, irons at her thighs: at ease (breathing:
+// ±1.4° head, ±2° arms, a ½ px bob at 2.6 rad/s; the brim tip every JTIP_EV
+// reaches over JANE_TIP_IN, holds JTIP_D, lowers over JANE_TIP_OUT — a
+// crossfade onto the tip part, no cut), on the march (±13° counter to the
+// legs), on the hit (they flare). THE GUNS RISE ONLY WHILE A BURST STANDS —
+// jBurst, or a round inside JANE_ARM_HOLD — through jUp (0→1 at 22/s ≈ 0.12
+// s, back at 12/s): the down parts swing back 22° and fade, the aim parts
+// come in from +38° (a lift from the hip), the part SWAP inside a 0.2-wide
+// window at mid-lift, then jUp snaps at |Δ|<0.01 (no lingering ghost arm).
+// GUNS-UP = ANGLE 0 ON BOTH AIM ARMS AND THE TORSO = THE SHIPPED AIM MOLD, so
+// the burst (+17,-40)/(+18,-30) and stock-flash (+17.5,-28) seats are untouched
+// BY CONSTRUCTION (the muzzle law above janeArt). THE MARCH is a real gait:
+// legs −22/+20 on sin φ (the runa/runb extremes), arms counter-phase, torso
+// 4+1.2 sin(2φ+.6), head −2−cos 2φ, a JANE_BOB px bob on cos 2φ, a 3.5 %
+// footfall squash about the base; φ̇ = JANE_STRIDE (the shipped 10.5 beat,
+// continuous now; D7 ties it to moveSpd). THE RECOIL is the FIRING ARM (jkH
+// picks the iron) at −JANE_RECOIL°·(1−k)² over JANE_KICK_T, torso −2.5°,
+// head −1.5°, a 1.6 px push — the whole-body rot retires. THE HURT reads the
+// shipped flinch angles in 50 ms, holds 170 ms, lets go over 300 ms (the
+// shock face while k>0.3, a 3 px knock-back). THE GULP reads the shipped gulp
+// angles bare-headed (the sim's own jhat fx flies the hat — one hat, HER
+// hat), guns up in the flail, a 6 px half-sine lift. unitWob rides the TORSO
+// angle alone (rad→deg), never the body. reducedMotion(): the joints still
+// ease; the bob, the squash, the breathing and the gulp lift zero out (the
+// zip stays skipped as 0434 shipped). The zip entrance below is BYTE-WHAT-
+// IT-WAS (IMG.janezip on the taut line, the aim mold in the knee-dip
+// landing). NO new rAF (0413); no per-frame URI/string building; no
+// per-frame allocations (0411) — the ground + six parts per frame, up to
+// two more inside a raise window, pure math on the standing canvas. A part
+// that never decoded (the onerror path) falls back to the aim mold for the
+// frame. Dials = the bench sliders: D1 JANE_STRIDE · D2 JANE_EASE · D3
+// JANE_BOB · D4 JANE_RECOIL · D5 ✅ arms DOWN · D5b JANE_ARM_HOLD · D6 the hat
+// pop = the jhat fx, kept · D7 JANE_STRIDE_SPD.
+const JANE_STRIDE=10.5;      // D1 — the gait's φ̇ (rad/s); the shipped square wave ran sin(S.t*10.5) — the same beat, continuous now (dial)
+const JANE_EASE=14;          // D2 — the joint ease (/s): at ease ×0.5, the tip ×1, the march ×1.6, the guns ×2.2; the impulses (kick, hurt-in, gulp-in) ride 60 (dial)
+const JANE_BOB=2.2;          // D3 — the march bob (screen px at w54) on cos 2φ (dial)
+const JANE_RECOIL=13;        // D4 — the firing arm's kick (deg), (1−k)² over JANE_KICK_T (dial)
+const JANE_ARM_HOLD=1.6;     // D5b — the guns stay up this long after the last round (the shipped 2.2 s aim hold, shortened — Wyatt 8/25 round 2) (dial)
+const JANE_STRIDE_SPD=0;     // D7 — 0 = the flat stride; a base speed (px/s) ties φ̇ to JANE_STRIDE·moveSpd/JANE_STRIDE_SPD so the royal greaves lengthen her stride (⚑ Wyatt: yes/no)
+const JANE_KICK_T=0.18;      // the kick's decay (s) — the 0434 pose window (JK_KICK 0.12) was a cut; the arm's own buck reads a beat longer (dial)
+const JANE_TIP_IN=0.22, JANE_TIP_OUT=0.25;   // the brim tip's reach and lower (s) — the hold is JTIP_D, the cadence JTIP_EV (0434, kept)
+const J_DEG=Math.PI/180;
+// one part: image · pivot (mold px) · angle (deg) · alpha (× the caller's own — the cloak's 0.42 rides through) — a save/restore pair around ONE drawImage in the standing mold space
+function janePart(im,px,py,ang,al,ga){
+  cx.save(); cx.globalAlpha=ga*al;
+  if(ang){ cx.translate(px,py); cx.rotate(ang*J_DEG); cx.translate(-px,-py); }
+  cx.drawImage(im,0,0,120,140); cx.restore();
 }
 // THE ENTRANCE (the 0433 flag honored): the sky rope stays retired — the
 // zip re-anchors from a DRAWN post planted INSIDE the world (jPoleH clamps
@@ -59314,7 +59415,7 @@ function janePoseK(u){
 function drawJane(u,kyl){
   const w=unitW('jane');
   const et=(u.jInT!=null && !reducedMotion())? S.t-u.jInT : 99;
-  const wob=unitWob(u);   // 0494 THE WOBBLE: the integrated phase (one helper, four seats) — the zip's wob*0.4 / wob*0.5 and her standing seat all read this one
+  const wob=unitWob(u);   // 0494 THE WOBBLE: the integrated phase (one helper, four seats) — the zip's wob*0.4 / wob*0.5 read this one; the rig puts it on the TORSO angle
   const fired=(u.jkAt!=null && u.jInT!=null && u.jkAt>=u.jInT);
   if(et<JZ_ZIP+JZ_LAND+0.30){
     const ph=u.jPoleH||120, px=u.jPoleX!=null? u.jPoleX : u.x+90;
@@ -59350,10 +59451,75 @@ function drawJane(u,kyl){
       return;
     }
   }
-  const pk=janePoseK(u);
-  let rot=0;
-  if(u.jkAt!=null){ const ka=S.t-u.jkAt; if(ka<JK_KICK) rot=-(u.jkH?0.040:0.055)*(1-ka/JK_KICK); }
-  drawSprite('jane',u.x,u.y-kyl,w,rot,wob,IMG[pk]||IMG.jane,unitFl(u));
+  // ── 0537 THE RIG ──
+  const PT=IMG.janeP_torso;
+  if(!PT || !IMG.janeP_ground || !IMG.janeP_legF || !IMG.janeP_legN || !IMG.janeP_head || !IMG.janeP_armFD || !IMG.janeP_armND || !IMG.janeP_armF || !IMG.janeP_armN){   // a part that never decoded: the aim mold, one frame (the onerror path — never a crash)
+    drawSprite('jane',u.x,u.y-kyl,w,0,wob,IMG.jane,unitFl(u)); return; }
+  const RM=reducedMotion();
+  const burst=!!u.jBurst || (u.jkAt!=null && S.t-u.jkAt<JANE_ARM_HOLD);
+  if(u.jT==null){   // her first rig frame: the joints at rest (the guns already up if a burst stands — the landing's aim mold hands off without a lift)
+    u.jT=S.t; u.jA_lF=0; u.jA_lN=0; u.jA_aF=0; u.jA_aN=0; u.jA_tor=0; u.jA_hd=2;
+    u.jTip=0; u.jUp=burst?1:0; u.jBob=0; u.jSqx=1; u.jSqy=1; u.jBack=0; u.jShock=0; u.jPhi=u.phase||0;
+  }
+  const dt=Math.max(0,S.t-u.jT); u.jT=S.t;
+  // THE TARGETS — pure numbers, the shipped JANE_POSES angles as the anchors
+  let tlF=0, tlN=0, taF=0, taN=0, ttor=0, thd=2, rate=JANE_EASE*0.5, tip=0, shock=0, hatOff=0, bob=0, sqx=1, sqy=1, back=0, up=0;
+  const walking=!!(u.wkT && S.t-u.wkT<WKF_HOLD);
+  if(walking){   // THE MARCH — the gait on φ
+    const om=(JANE_STRIDE_SPD>0 && u.def && u.def.moveSpd)? JANE_STRIDE*u.def.moveSpd/JANE_STRIDE_SPD : JANE_STRIDE;
+    u.jPhi+=om*dt;
+    const sn=Math.sin(u.jPhi), c2=Math.cos(2*u.jPhi);
+    tlF=-22*sn; tlN=20*sn; taF=13*sn; taN=-13*sn; ttor=4+1.2*Math.sin(2*u.jPhi+0.6); thd=-2-c2;
+    if(!RM){ const fc=Math.max(0,c2); bob=-JANE_BOB*(0.5-0.5*c2); sqy=1-0.035*fc; sqx=1+0.03*fc; }
+    rate=JANE_EASE*1.6;
+  } else if(!burst){   // AT EASE — breathing + the brim tip (the 0434 cadence on her own phase, so twin Janes never tip together)
+    if(!RM){ const br=Math.sin(S.t*2.6+u.phase); thd=2+1.4*br; taF=2.5*br; taN=-2*Math.sin(S.t*2.6+u.phase+0.7); bob=0.5*br; }
+    const tp=(S.t+u.phase*2.2)%JTIP_EV, tpEnd=JANE_TIP_IN+JTIP_D+JANE_TIP_OUT;
+    if(tp<tpEnd){ const k= tp<JANE_TIP_IN? tp/JANE_TIP_IN : tp>JANE_TIP_IN+JTIP_D? (tpEnd-tp)/JANE_TIP_OUT : 1;
+      tip=k; thd=-3*k+thd*(1-k); rate=JANE_EASE; }
+  }
+  if(burst){   // GUNS UP — angle 0 on both aim arms and the torso = the shipped aim mold (THE MUZZLE LAW); the legs keep striding if she is
+    up=1; taF=0; taN=0; if(!walking){ ttor=0; thd=-1; rate=JANE_EASE*2.2; }
+    if(u.jkAt!=null){ const ka=S.t-u.jkAt;   // THE KICK — the firing arm bucks, the shoulder absorbs it
+      if(ka>=0 && ka<JANE_KICK_T){ const k=1-ka/JANE_KICK_T, kk=k*k;
+        if(u.jkH) taN-=JANE_RECOIL*kk; else taF-=JANE_RECOIL*kk;
+        ttor-=2.5*kk; thd-=1.5*kk; back=1.6*kk; rate=60; } }
+  }
+  if(u.jHitAt!=null){ const ht=S.t-u.jHitAt;   // THE FLINCH — the shipped hurt angles, in 50 ms · hold 170 ms · out 300 ms
+    if(ht>=0 && ht<0.52){ const k= ht<0.05? ht/0.05 : ht<0.22? 1 : 1-(ht-0.22)/0.30, j=1-k;
+      tlF=tlF*j+6*k; tlN=tlN*j-6*k; taF=taF*j-26*k; taN=taN*j+22*k; ttor=ttor*j-8*k; thd=thd*j-9*k;
+      if(k>0.3) shock=1; back=3*k; rate= ht<0.05? 60 : JANE_EASE; } }
+  if(u.jSnakeT!=null){ const gt=S.t-u.jSnakeT;   // THE GULP — the shipped gulp angles bare-headed, guns up in the flail, the lift on a half-sine
+    if(gt>=0 && gt<1.0){ const k= gt<0.06? gt/0.06 : gt<0.5? 1 : Math.max(0,1-(gt-0.5)/0.35), j=1-k;
+      tlF=tlF*j-24*k; tlN=tlN*j+20*k; taF=taF*j-38*k; taN=taN*j-40*k; ttor=ttor*j-6*k; thd=thd*j-13*k;
+      if(k>0.3) shock=1; hatOff=1; if(k>0.2) up=1; back=-2*k; if(!RM) bob=-6*Math.sin(Math.min(1,gt/0.5)*Math.PI);
+      rate= gt<0.06? 60 : JANE_EASE; } }
+  // THE EASE — a += (target − a)·min(1, rate·dt), the frame's own dt
+  const e=Math.min(1,rate*dt), e30=Math.min(1,30*dt);
+  u.jA_lF+=(tlF-u.jA_lF)*e; u.jA_lN+=(tlN-u.jA_lN)*e; u.jA_aF+=(taF-u.jA_aF)*e; u.jA_aN+=(taN-u.jA_aN)*e; u.jA_tor+=(ttor-u.jA_tor)*e; u.jA_hd+=(thd-u.jA_hd)*e;
+  u.jTip+=(tip-u.jTip)*Math.min(1,18*dt);
+  u.jUp+=(up-u.jUp)*Math.min(1,(up>u.jUp?22:12)*dt); if(Math.abs(up-u.jUp)<0.01) u.jUp=up;
+  u.jShock=shock;
+  u.jBob+=(bob-u.jBob)*e30; u.jSqx+=(sqx-u.jSqx)*e30; u.jSqy+=(sqy-u.jSqy)*e30; u.jBack+=(back-u.jBack)*Math.min(1,40*dt);
+  // THE DRAW — mold space; the ground, the legs at the hips, then the torso carrying the head and both arms (the mold's own order: legF legN armF torso head armN)
+  const sc=w/120, ga=cx.globalAlpha, jup=u.jUp, jdn=1-jup, tpk=u.jTip;
+  const aUp=Math.max(0,Math.min(1,(jup-0.4)/0.2)), aDn=Math.max(0,Math.min(1,(0.6-jup)/0.2));   // the RAISE: both arms travel, the part swaps inside a 0.2-wide window at mid-lift
+  cx.save();
+  cx.translate(u.x,u.y-kyl); if(unitFl(u)) cx.scale(-1,1); cx.scale(sc,sc);
+  cx.translate(-60,-128.8);                                     // mold space: feet at my≈121, the ground anchor at 128.8 (drawSprite's -h+h*0.08 seat)
+  cx.drawImage(IMG.janeP_ground,0,0,120,140);
+  cx.translate(60,126); cx.scale(u.jSqx,u.jSqy); cx.translate(-60,-126);   // the footfall squash, about the base
+  cx.translate(-u.jBack, u.jBob/sc);                            // the knock-back (mold px) + the bob (screen px → mold)
+  janePart(IMG.janeP_legF,55,97,u.jA_lF,1,ga); janePart(IMG.janeP_legN,62,97,u.jA_lN,1,ga);
+  cx.translate(58,93); cx.rotate((u.jA_tor+wob*57.29578)*J_DEG); cx.translate(-58,-93);   // the torso carries arms + head; THE WOBBLE rides here (rad→deg), never the body
+  if(aDn>0 && tpk<0.999) janePart(IMG.janeP_armFD,53,68.5,u.jA_aF*jdn-22*jup+14*tpk, aDn*(1-tpk), ga);
+  if(aUp>0) janePart(IMG.janeP_armF,53,68.5,u.jA_aF*jup+38*jdn, aUp, ga);
+  if(tpk>0.001 && IMG.janeP_armFtip) janePart(IMG.janeP_armFtip,53,68.5,0, tpk*aDn, ga);
+  cx.drawImage(PT,0,0,120,140);
+  janePart(shock? (hatOff? (IMG.janeP_headBareShock||IMG.janeP_headShock||IMG.janeP_head) : (IMG.janeP_headShock||IMG.janeP_head)) : (hatOff? (IMG.janeP_headBare||IMG.janeP_head) : IMG.janeP_head), 59,63,u.jA_hd,1,ga);
+  if(aDn>0) janePart(IMG.janeP_armND,64.4,71,u.jA_aN*jdn-22*jup, aDn, ga);
+  if(aUp>0) janePart(IMG.janeP_armN,64.4,71,u.jA_aN*jup+38*jdn, aUp, ga);
+  cx.restore();
 }
 // ═══ 0435 THE YETI KING AT THE SHAPE STORE — THE MOVES (FM-GVT-MAKEOVER-0819 §5) ═══
 // Pose-driven, draw-time only, BOTH SEATS off one reader: kyPoseK answers a
@@ -59531,7 +59697,7 @@ function drawUnit(u){
   if(kyl){ cx.strokeStyle='rgba(192,71,58,0.85)'; cx.lineWidth=2.5;
     cx.beginPath(); cx.arc(u.x,u.y-30-kyl,15+3*Math.sin(S.t*11),0,7); cx.stroke(); }
   const cl=cmdLeanIn(u);   // 0508 THE CRESCENT CUT: the body lean + the hip step — ONE transform around sprite + outfit + weapon (drawSargeOutfit paints at u.x/u.y in world coords; a rot on the sprite alone leaves the helmet off the head); closed on the sarge line below, before the pips. Every other figure: false, zero bytes
-  if(u.type==='jane') drawJane(u,kyl);   // 0434 THE SHAPE-STORE JANE: her own pose-driven draw (pre-built poses + the entrance rig above; every other figure keeps the shared line below byte-what-it-was)
+  if(u.type==='jane') drawJane(u,kyl);   // 0434 THE SHAPE-STORE JANE → 0537 THE PART RIG: her own draw (six parts on a joint rig + the entrance rig above; every other figure keeps the shared line below byte-what-it-was)
   else if(u.type==='kingyeti') drawKing(u,u.x,u.y-kyl,w,unitWob(u),false,unitFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase (one helper, four seats) — 0435 THE SHAPE-STORE KING, playable seat — the same pose reader as the boss (his wave arcs + seize lift keep their shipped seats around this fork)
   else if(isCroakU(u) && crFlinch(u)) drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : unitWob(u)),crFlinch(u),unitFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase — 0454: the playable outlaw king — ONLY the flinch forks (the hurt mold on the shared transform); every other frame falls to the generic line below, the old waddle byte-what-it-was
   else drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : unitWob(u)),im,unitDrawFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase (one helper, four seats) — v2.78: the recoil, campaign edition — v3.61: + the walk-flip seat — 0424: the king's swing lean (the boss's own -0.14) — 0462b: the facing XOR the mold's authored face (UNIT_WEST) + the breather's turn
