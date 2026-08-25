@@ -32985,7 +32985,7 @@ function reset(){
   // 0313a THE REFEREE'S WORD: per-battle event-sync state — the per-type
   // muster counters, the shelf of unmatched referee words, the protocol
   // evidence latch and the honest-wait clock all die with every battle.
-  S.foeSeq={}; S.pendFd=[]; S.evRef=false; S.sqwT=0; S.fcnHi={}; S.fcnAcc=null; S.glid=[];   // 0343: the muster high-water, the census accumulator and the glide registry too
+  S.foeSeq={}; S.pendFd=[]; S.evRef=false; S.sqwT=0; S.fcnHi={}; S.fcnAcc=null; S.glid=[]; S.fdSeen={};   // 0343: the muster high-water, the census accumulator and the glide registry too · 0559 A: the receipts of my own kills
 }
 // ===== THE CAMPAIGN SPEED LADDER (v2.14 structure · v2.37 rows, Wyatt 8/4) =====
 // v2.37 (Wyatt 8/4 eve, verbatim: "By level 5, we need to set the speed to
@@ -34511,7 +34511,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.98';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.99';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -35173,6 +35173,20 @@ function coopFresh(ui,mode){
            // room only: the table settings, and which chair you took
            team:META.bfTeam||1, map:bfMapResolve(META.bfMap), side:'y', slot:0, wantSide:null, wantTeam:0 };   // v2.41: a party never holds 'random' — the draw is made here
 }
+// 0559 D1 · THE WORD TRAVELS FASTER (FM-GVT-RAID-LAG-01 §3-D): an event room's
+// battle beat 1000 → EV_BEAT_MS 500 (⚑ Wyatt's cell; alt 700). RL_POLL is
+// 150/min per seat: 500 + the 0-250 jitter = a 625 ms mean = 96/min, under
+// the lid; ten seats × ~1.6/s = 16 req/s a room against the box's measured
+// 80-100 in-battle knee (the FIRST shed lever at 10k). Ordinary squads and
+// rooms keep 1000, the lobby 2000; HQ's nx (0291) still only ever SLOWS it
+// (nxBeat floors at the base). D0 · a slow reply never skips a beat: the
+// pre-armed timer stands (the chain can never be lost), and the reply
+// RE-ARMS it at max(0, beat − elapsed) + jitter — a poll that took longer
+// than the beat is followed at once, never after the timer comes round again.
+const EV_BEAT_MS=500;
+function coopBeatBase(){ return S.coop? (evBattle()? EV_BEAT_MS : 1000) : 2000; }
+function coopBeatMs(){ return nxBeat(coopBeatBase(), COOP.nx, COOP.nxD||2000)*Math.min(4, 1+(COOP.misses||0)*0.5); }
+function coopChain(t0){ if(!COOP) return; clearTimeout(COOP.pollT); COOP.pollT=setTimeout(coopTick, Math.max(0, coopBeatMs()-(Date.now()-t0)) + Math.random()*250); }
 // one heartbeat for everything: pairing, matchmaking, and the in-battle relay
 function coopTick(wk){   // 0292: wk = the worker's hidden beat — chain untouched, stamps hid:1
   if(!COOP) return;
@@ -35184,8 +35198,7 @@ function coopTick(wk){   // 0292: wk = the worker's hidden beat — chain untouc
     // stride — HQ's own 'slow down' (429) and dead wifi both land here, and the
     // first clean reply snaps it back to cadence. Cap ×4: a lobby chair is only
     // held 45s, so even five straight misses keep the seat warm.
-    COOP.pollT=setTimeout(coopTick,
-      nxBeat(S.coop? 1000 : 2000, COOP.nx, COOP.nxD||2000)*Math.min(4, 1+(COOP.misses||0)*0.5) + Math.random()*250);   // 0291: commanded base — misses/jitter unchanged
+    COOP.pollT=setTimeout(coopTick, coopBeatMs() + Math.random()*250);   // 0291: commanded base — misses/jitter unchanged · 0559 D1: the event room's beat rides the same arithmetic (coopBeatMs)
     // 0292 species A: while hidden the WORKER owns the wire — Chrome clamps
     // this chain to ~1 wake/min past minute five, so it stays only as a
     // cheap self-check that never POSTs; visibilitychange fires the return.
@@ -35272,8 +35285,10 @@ function coopTick(wk){   // 0292: wk = the worker's hidden beat — chain untouc
     // replay the log from 0 and read it before their own launch too).
     if(COOP.wantPark) body.cmds=(body.cmds||[]).concat([{k:'park', t:COOP.wantPark.id, n:COOP.wantPark.n|0}]);
   }
+  const t0=Date.now();   // 0559 D0: the chain re-arms off the reply
   coopPost('poll', body).then(r=>{
     if(COOP!==forParty) return; COOP.busy=false;
+    if(!wk) coopChain(t0);   // 0559 D0: the next beat counts from THIS request's send, never from the timer that came round while it flew (the worker's hidden beat keeps its own chain — 0292)
     if(!r||!r.ok){ coopMiss(r); return; }
     COOP.misses=0;
     if(r.nx){ COOP.nx=r.nx|0; COOP.nxD=(r.state==='battle')?1000:2000; }   // 0291
@@ -35286,7 +35301,7 @@ function coopTick(wk){   // 0292: wk = the worker's hidden beat — chain untouc
     if(sentPub!=null && COOP.wantPub===sentPub) COOP.wantPub=null;
     if(sentBfc!=null && COOP.wantBfc===sentBfc) COOP.wantBfc=null;
     coopOnPoll(r, sentWant);
-  }).catch(()=>{ if(COOP===forParty){ COOP.busy=false; coopMiss(); } });
+  }).catch(()=>{ if(COOP===forParty){ COOP.busy=false; coopMiss(); if(!wk) coopChain(t0); } });   // 0559 D0: a dropped reply re-arms on the stretched beat (misses)
 }
 function coopMiss(r){
   if(!COOP) return;
@@ -35396,7 +35411,7 @@ function coopOnPoll(r, sentWant){
     // the chair is mine — and the shelf of old words clears (I no longer
     // take dictation). Downward walk = splice-safe; splits append behind it.
     if(!wasHost && COOP.host && S.coop && S.mode==='play' && !S.bf){
-      S.pendFd=[];
+      S.pendFd=[]; S.fdSeen={};   // 0559 A: the chair is mine — no more dictation to consume
       for(let i=S.foes.length-1;i>=0;i--){ const pf=S.foes[i];
         if(pf.pendDie){ pf.fdBless=1; pf.hp=0; foeFell(pf, pf.lastHitU||null); } }
     }
@@ -35724,6 +35739,7 @@ function coopApply(cm){
     if(S.bf) return;
     S.evRef=true;
     const t8=String(cm.t||''), n8=cm.id|0;
+    const k8=t8+':'+n8; if(S.fdSeen && S.fdSeen[k8]){ delete S.fdSeen[k8]; return; }   // 0559 A: my own dice already felled him — the word is a RECEIPT, consumed here (never re-aimed at a standing twin, never paid twice)
     const m8=S.foes.find(f8=>f8.type===t8 && (f8.foN|0)===n8);
     if(m8) evKillByWord(m8);
     else { (S.pendFd||(S.pendFd=[])).push({t:t8, id:n8, n:cm.n|0, a:0}); if(S.pendFd.length>240) S.pendFd.shift(); }
@@ -36058,33 +36074,42 @@ function sqWaitShow(){
     }
   },400);
 }
+// 0559 B · NO BULLET SPONGES — the shelf's fungible re-aims 1.5/3 → 0.8/1.6 s
+// and the valve 6 → 2 s (⚑ Wyatt's cells, one const each). With A a zeroed
+// foe never waits at all; these bound the last sponge an old-build referee or
+// a lost relay tail could still leave standing.
+const EV_VALVE_S=2, EV_REAIM1_S=0.8, EV_REAIM2_S=1.6;
 function evTick(dt){
   if(!S.coop || S.bf || S.mode!=='play') return;
   const pl=S.pendFd;
   if(pl && pl.length){
     for(let i=pl.length-1;i>=0;i--){ const e=pl[i]; e.a+=dt;
-      // exact muster number → (aged 1.5s) his locally-zeroed twin → (aged
-      // 3s) the oldest standing twin of the same type+wave — foes are
-      // outcome-fungible within type; the CENSUS is what must agree. The
-      // wave filter keeps a seq-0 replay's stale words from culling a fresh
-      // field (they name waves that are gone, and expire): the 0322 rejoin
-      // lane's safety. A word nothing answers expires at 12s (leaked here).
+      // 0559 A: a shelved word my own dice have since answered (his twin
+      // walked on and fell to my men before the exact match ran) — consumed,
+      // never re-aimed at a standing twin.
+      if(S.fdSeen && S.fdSeen[e.t+':'+e.id]){ delete S.fdSeen[e.t+':'+e.id]; pl.splice(i,1); continue; }
+      // exact muster number → (aged EV_REAIM1_S) his locally-zeroed twin →
+      // (aged EV_REAIM2_S) the oldest standing twin of the same type+wave —
+      // foes are outcome-fungible within type; the CENSUS is what must
+      // agree. The wave filter keeps a seq-0 replay's stale words from
+      // culling a fresh field (they name waves that are gone, and expire):
+      // the 0322 rejoin lane's safety. A word nothing answers expires at 12s.
       let m=S.foes.find(f8=>f8.type===e.t && (f8.foN|0)===e.id);
-      if(!m && e.a>1.5){ const c8=S.foes.filter(f8=>f8.type===e.t && Math.abs((f8.wv|0)-(e.n|0))<=1 && f8.pendDie);   // 0330: wave ±1 — the spawn-moment stamp skew
+      if(!m && e.a>EV_REAIM1_S){ const c8=S.foes.filter(f8=>f8.type===e.t && Math.abs((f8.wv|0)-(e.n|0))<=1 && f8.pendDie);   // 0330: wave ±1 — the spawn-moment stamp skew (0559: no pendDie twins exist under A — the tier stands for old-build referees)
         if(c8.length){ c8.sort((a8,b8)=>(a8.foN|0)-(b8.foN|0)); m=c8[0]; } }
-      if(!m && e.a>3){ const c8=S.foes.filter(f8=>f8.type===e.t && Math.abs((f8.wv|0)-(e.n|0))<=1);   // 0330: wave ±1, same skew law
+      if(!m && e.a>EV_REAIM2_S){ const c8=S.foes.filter(f8=>f8.type===e.t && Math.abs((f8.wv|0)-(e.n|0))<=1);   // 0330: wave ±1, same skew law
         if(c8.length){ c8.sort((a8,b8)=>(a8.foN|0)-(b8.foN|0)); m=c8[0]; } }
       if(m){ evKillByWord(m); pl.splice(i,1); continue; }
       if(e.a>12) pl.splice(i,1);
     }
   }
-  // the 6s valve: a locally-zeroed foe nobody's word ever names dies by the
-  // local dice after all (an old-build referee inheriting the chair, a
-  // wedged/hidden referee, a lost relay tail under 0324's future RAM relay)
-  // — divergence bounded, the game never wedges on a silent chair.
+  // the valve (EV_VALVE_S): a locally-zeroed foe nobody's word ever names
+  // dies by the local dice after all (an old-build referee inheriting the
+  // chair, a wedged/hidden referee, a lost relay tail under 0324's future
+  // RAM relay) — divergence bounded, the game never wedges on a silent chair.
   if(!coopIsHost()){
     for(let i=S.foes.length-1;i>=0;i--){ const f8=S.foes[i];
-      if(f8.pendDie){ f8.pendA=(f8.pendA||0)+dt; if(f8.pendA>6) evKillByWord(f8); } }
+      if(f8.pendDie){ f8.pendA=(f8.pendA||0)+dt; if(f8.pendA>EV_VALVE_S) evKillByWord(f8); } }
   }
   // the honest wait (the 0313a tail symptom — "sat waiting at the level
   // end" with dead air): my sim is done, the referee's verdict isn't in —
@@ -43446,7 +43471,7 @@ function campFoeInReach(u,rng){
   // arm — same statue, same cure as bfNearestEnemy (campaign dir is always 1).
   const cmDir=(u.type==='commando')? paraBand(u).dir : 0;
   for(const f of S.foes){
-    if(f.burrow) continue;
+    if(f.burrow||f.pendDie) continue;   // 0559 B: a sliver-held foe halts nobody
     if(f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30) continue;
     if(cmDir && (f.x-u.x)*cmDir<=CMDO_MZX+2) continue;
     if(!bfCanTarget(u,f)) continue;   // 0129: the halt matches the trigger (the v1.48 law) — never stand staring at a man below the lip. campNearestFoe deliberately does NOT filter: you march in after them, and the moment you're in the cut it's a fight.
@@ -43466,7 +43491,7 @@ function campFoeInReach(u,rng){
 function campNearestFoe(u){
   let best=null, bd=1e9;
   for(const f of S.foes){
-    if(f.burrow) continue;
+    if(f.burrow||f.pendDie) continue;   // 0559 B
     if(f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30) continue;
     const d=Math.hypot(f.x-u.x,f.y-u.y);
     if(d<bd){ bd=d; best=f; }
@@ -45104,7 +45129,7 @@ function saberNext(u,sw){
   // every gun (the helmet's −1% already lives in sw.aggro itself)
   if(S.bf) return bfNearestEnemy(u,sw.aggro*lzRngMul(u));
   let best=null,bd=sw.aggro*lzRngMul(u);
-  for(const f of S.foes){ if(f.burrow||f.x>W-6) continue; const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
+  for(const f of S.foes){ if(f.burrow||f.x>W-6||f.pendDie) continue; const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }   // 0559 B: a sliver-held foe draws no dash
   return best;
 }
 function updateSaber(u,dt,sw){
@@ -45118,7 +45143,7 @@ function updateSaber(u,dt,sw){
   }
   if(u.saberState==='out'){
     const f=u.saberTarget;
-    const gone = S.bf ? (!f||f.dead||f.hp<=0) : (!f||S.foes.indexOf(f)<0);
+    const gone = S.bf ? (!f||f.dead||f.hp<=0) : (!f||f.pendDie||S.foes.indexOf(f)<0);   // 0559 B
     if(gone){
       const nx=saberNext(u,sw);                   // denied his kill — carve the next one instead
       if(nx){ u.saberTarget=nx; u.saberFirstT=nx; return; }   // 0278l: the fresh dash carries the advantage onto the new man
@@ -45154,7 +45179,7 @@ function updateSaber(u,dt,sw){
 // filters verbatim (burrow/jet/dead, bfCanTarget, the campaign's offscreen
 // law). The swing and the Duelist's every cut pick through THIS.
 function cmdNearest(u,r){ let best=null,bd=r;
-  for(const f of TGT(u)){ if(f.burrow||f.jetT>0||f.dead) continue;
+  for(const f of TGT(u)){ if(f.burrow||f.jetT>0||f.dead||f.pendDie) continue;   // 0559 B
     if(!bfCanTarget(u,f)) continue;
     if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;
     const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
@@ -45410,7 +45435,7 @@ function updateCmdDash(u,dt,sw){
     if((u.hits|0)<u.cmdDashHits) u.cmdDashHits=u.hits|0;   // the floor follows the 4 s recovery down, so a fresh pip always reads as a knock
     if((u.hits|0)>u.cmdDashHits){ u.cmdDash='back'; u.cmdTarget=null; u.cmdDashCd=CMD_DASH.cd; return true; }   // knocked mid-dash: home, the target dropped (the v1.19 law); the quiet arms so a stagger never re-launches him
     const f=u.cmdTarget;
-    const gone = S.bf ? (!f||f.dead||f.hp<=0) : (!f||f.burrow||S.foes.indexOf(f)<0);
+    const gone = S.bf ? (!f||f.dead||f.hp<=0) : (!f||f.burrow||f.pendDie||S.foes.indexOf(f)<0);   // 0559 B: a sliver-held man is gone to the blade
     if(gone){
       const nx=cmdStepNext(u,cmdStepR(sw));
       if(nx){ u.cmdTarget=nx; return true; }
@@ -45473,7 +45498,7 @@ function sgDashEnd(u){ if(u.sgDash) u.sgCd=WPN_MILE.sgCd; u.sgDash=null; u.sgTar
 function sgDashNext(u,r){
   if(S.bf) return bfNearestEnemy(u, r);
   let best=null, bd=r;
-  for(const f of S.foes){ if(f.burrow) continue; if(f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30) continue;
+  for(const f of S.foes){ if(f.burrow||f.pendDie) continue; /* 0559 B */ if(f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30) continue;
     const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }
   return best;
 }
@@ -45494,7 +45519,7 @@ function updateSgDash(u,dt,sw){
   }
   if(u.sgDash==='out'){
     const f=u.sgTarget;
-    const gone = S.bf ? (!f||f.dead||f.hp<=0) : (!f||f.burrow||S.foes.indexOf(f)<0);
+    const gone = S.bf ? (!f||f.dead||f.hp<=0) : (!f||f.burrow||f.pendDie||S.foes.indexOf(f)<0);   // 0559 B: a sliver-held man is gone to the blade
     if(gone){
       const nx=sgDashNext(u,fireR);               // v1.73: he finishes the cluster at ARM'S REACH and no further — chaining the whole 210 window was the saber's hunt
       if(nx){ u.sgTarget=nx; return; }
@@ -52769,6 +52794,13 @@ function update(dt){
     // TARGETABLE: a lift is a predicament, not a shelter.
     if(f.kyHeldT>0){ f.kyHeldT-=dt;
       if(!f.boss && !f.falling && !f.shv){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; continue; } }
+    // 0559 B · NO BULLET SPONGES: a foe held at the sliver for a word (pendDie
+    // — no setter on this build since A fells a guest's zero at once; the
+    // branch stands for any path that still holds a foe) is a STATUE: no
+    // feet, no gun, no kit, no leak — the grip's own idiom above; the
+    // campaign scans skip him too (untargetable), so the men turn to the
+    // next one; he drops on the word or evTick's valve (EV_VALVE_S).
+    if(f.pendDie && !f.falling && !f.shv){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; continue; }
     // v2.44: the MG stays stopped TWO SECONDS past his last round (mgRootT
     // rides beside aimT in this freeze) — the "walks his burst in" brrrt
     // below fires from a standstill now, and the walk back to his formation
@@ -53470,7 +53502,7 @@ function update(dt){
         const popX9=(sw.w==='shotgun' && u.popArm)? POP_X : 1;   // 0486 BIG POP (D23): the ARMED pull's TRIGGER reaches ×2 too — the scan IS the reach (the v1.73 law: a reach written only in the fire branch would read right in a rig and never move this trigger; measured)
         const list=TGT(u);
         let best=null,bs=1e9;
-        for(const f of list){ if(f.burrow||f.jetT>0) continue; if(!bfCanTarget(u,f)) continue; if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;
+        for(const f of list){ if(f.burrow||f.jetT>0||f.pendDie) continue; if(!bfCanTarget(u,f)) continue; if(!S.bf && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)) continue;   // 0559 B: a sliver-held foe is not a target
           const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>sw.rng*rb*popX9) continue; const db=PRIO(u,f); if(db<bs){bs=db;best=f;} }
         if(!best) continue;
         u.cd=tkSlowMul(u)*snowSlowMul(u)/(sw.rate*ra.rate*emgRateMul(u)*lzRateMul(u)); const vm=(u.vet?1.5:1)*lzDmgMul(u)*gsDmgMul(u);   // v2.36: blue beam on the clock, red beam on the round · v3.11: TEAL's concussion too · 0278a: the snow-slow stack stretches the same drum · 0390: the guardian window rides the same round (x1.20 inside MY window, shotgun only)
@@ -54362,16 +54394,24 @@ function hitCheck(f,u){
   if(u && !u.side) f.lastHitU=u;
   if(f.retFloor!=null && f.hp<=f.hpMax*f.retFloor){ f.hp=f.hpMax*f.retFloor; return; }
   if(f.hp<=0){
-    // 0313a THE REFEREE'S WORD: on a party GUEST's sim a foe only FALLS on
-    // the referee's word — the local zero holds him at a sliver (poised,
-    // still fighting: the retreat-floor idiom) so two screens can never
-    // disagree about who is dead. Armed only once the referee has proven it
-    // speaks the protocol (S.evRef — beacon cr / any 'fd'); evTick's 6s
-    // valve is the escape hatch for a wedged or old-build referee.
-    if(S.coop && COOP && !COOP.host && !S.bf && S.evRef && !f.fdBless){
-      f.hp=0.01; if(!f.pendDie){ f.pendDie=true; f.pendA=0; }
-      return;
-    }
+    // 0559 A · FALL NOW, SETTLE LATER (FM-GVT-RAID-LAG-01 §3-A; Wyatt 8/24,
+    // a guest in the ULTRA raid: "their health is like they're dead already,
+    // but they're still being shot … a lag and a catch-up"). 0313a THE
+    // REFEREE'S WORD held a party guest's zeroed foe at a sliver (pendDie,
+    // still walking, still shooting, still shot) until the referee's own
+    // sim killed its twin AND that 'fd' word rode the relay — a beat of
+    // sponge on a healthy referee, six seconds on a slow one, and every
+    // fall landed in per-poll bunches. Now MY KILL IS MY KILL: a guest's
+    // own zero FELLS him through the one door at once — bounty, credit,
+    // medals, the boss latch, the same theatrics — and the muster number is
+    // remembered (S.fdSeen) so the referee's late word for him is a RECEIPT,
+    // not a permission slip: coopApply/evTick CONSUME it (never re-aimed at
+    // a standing twin, never paid twice). The books stay the referee's
+    // (lives · the crate · sqw · cap · the verdict — 0313a's other words
+    // untouched); the census (fcn n / high-water / HURRY / SWEEP, 0330 +
+    // 0343) already covers "the guest has MORE standing", and FEWER (he
+    // killed faster) needs nothing. fdBless = the word's own kill (evKillByWord).
+    if(S.coop && COOP && !COOP.host && !S.bf && !f.fdBless) (S.fdSeen||(S.fdSeen={}))[f.type+':'+(f.foN|0)]=1;
     foeFell(f,u);
   }
 }
@@ -76158,10 +76198,27 @@ document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); s
 
 // ================= LOOP =================
 let last=0, ready=false;
+// 0559 C · THE REFEREE'S CLOCK KEEPS WALL TIME (FM-GVT-RAID-LAG-01 §3-C; §5.1
+// measured the law: dt clamps at 0.05, so a frame gap g > 50 ms advances the
+// sim 0.05 — a referee under 20 fps runs the war at 0.05/g of wall and owes
+// the room every word (deaths · sqw · lives · the crate · outposts) later by
+// the difference; ×8 CPU = 54 % of wall, 15 s behind after 34 s). Now a long
+// frame SUB-STEPS: the gap splits into ≤ SIM_STEPS_MAX equal steps, none
+// over SIM_STEP_S (the shipped cap), up to SIM_CATCH_S of catch-up a frame —
+// past the cap the device is hopeless and the sim lags, as today. A gap ≤
+// SIM_STEP_S (20 fps or better) is ONE step of the gap: byte-what-it-was.
+// Every wall-clock tick (hitStop, the flag, the hold's clock, the glide and
+// velocity trackers, the coach) stays OUTSIDE the steps on the frame's own
+// dt; draw() runs once a frame (btnRects/trayRects are draw's — 0522d).
+// Determinism: the sim integrates on dt as ever; a fixed-size step between
+// screens only tightens the lockstep. ⚑ Wyatt's cell: SIM_STEPS_MAX 4 (alt 3).
+const SIM_STEP_S=0.05, SIM_STEPS_MAX=4, SIM_CATCH_S=SIM_STEP_S*SIM_STEPS_MAX;
+const FRAME_STATS={ frames:0, steps:0, multi:0, maxSteps:1, lagS:0 };   // the rig's window (GVT.frameStats): play frames · sim steps · frames that sub-stepped · the widest frame · wall seconds the cap let slip
 function frame(ts){
   requestAnimationFrame(frame);
   if(!ready) return;
-  const dt=Math.min(0.05,(ts-last)/1000||0.016); last=ts;
+  const gap=(ts-last)/1000||0.016; last=ts;
+  const dt=Math.min(SIM_STEP_S,gap);   // the per-frame wall-clock tick every clock below reads — byte-what-it-was
   if(S.hitStop>0) S.hitStop=Math.max(0,S.hitStop-dt);   // drains on the WALL clock, so it always lets go
   if(S.vflag) vflagTick(dt);                            // the victory flag rides the same wall clock (v1.47)
   const slow = (coach && coach.step===4 && coach.lostT>0) ? 0.45                        // lean in for the first casualty
@@ -76179,7 +76236,13 @@ function frame(ts){
     if(COOP.ev.rung) evBotsArm(COOP.ev.pc||(COOP.members||[]).length);
     else if(evNow()>=S.sq.ev.bell+EV_ARM_GRACE) evBotsArm(Math.max(1,(COOP.members||[]).length)); }
   if(S.mode==='play' && !(HQS.on && !S.coop) && !S.evHold){
-    update(dt*S.speed*S.slowmo*slow);   // dial × KO-beat × coach/hit-stop — three knobs, never one variable (v1.93)
+    // 0559 C: g ≤ one step = ONE step of the gap (byte-what-it-was); longer =
+    // ≤ SIM_STEPS_MAX equal steps under the cap; the 2 % slack keeps a device
+    // sitting exactly on 20 fps at one step
+    const g9=Math.min(SIM_CATCH_S,gap), n9=Math.max(1,Math.min(SIM_STEPS_MAX,Math.ceil(g9/SIM_STEP_S-0.02))), d9=g9/n9;
+    FRAME_STATS.frames++; FRAME_STATS.steps+=n9; if(n9>1) FRAME_STATS.multi++; if(n9>FRAME_STATS.maxSteps) FRAME_STATS.maxSteps=n9; if(gap>SIM_CATCH_S) FRAME_STATS.lagS+=gap-SIM_CATCH_S;
+    for(let i9=0;i9<n9;i9++){ if(S.mode!=='play' || S.evHold) break;
+      update(d9*S.speed*S.slowmo*slow); }   // dial × KO-beat × coach/hit-stop — three knobs, never one variable (v1.93)
     if(coach){ coach.t+=dt;
       if(coach.step===4&&coach.lostT>0){ coach.lostT-=dt; if(coach.lostT<=0){ coach.lostT=0; coach.step=5; coach.t=0; } }
       if(coach.step===5&&coach.toast>0){ coach.toast-=dt; if(coach.toast<0)coach.toast=-1; } }
@@ -77228,7 +77291,9 @@ window.GVT = {
   sqPush(){ if(!S.sq) return null; sqPushWave(S.wave+1); return GVT.sq(); },
   // 0313a: the event-sync window, for the battery's eyes only — protocol
   // evidence, the word shelf, the clamped census and both rosters.
+  frameStats(){ return Object.assign({}, FRAME_STATS, { stepS:SIM_STEP_S, stepsMax:SIM_STEPS_MAX, catchS:SIM_CATCH_S }); },   // 0559 C: the accumulator's window (read-only)
   ev(){ return { ref:!!S.evRef, host:coopIsHost(), pend:(S.pendFd||[]).length,
+      seen:Object.keys(S.fdSeen||{}).length, beat:(COOP? coopBeatBase() : 0), evBeat:EV_BEAT_MS, valve:EV_VALVE_S, reaim:[EV_REAIM1_S,EV_REAIM2_S],   // 0559: the receipts my own kills left · this party's beat (D1) · the dials
       clamped:S.foes.filter(f=>f.pendDie).length,
       census:S.foes.reduce((k,f)=>{ k[f.type]=(k[f.type]||0)+1; return k; },{}),
       foes:S.foes.map(f=>({t:f.type,n:f.foN|0,w:f.wv|0,hp:+(+f.hp).toFixed(2)})),
