@@ -3272,6 +3272,14 @@
   #evDoor.quiet b { color:#BFE3FF; font-variant-numeric:tabular-nums; }
   #evDoor.quiet #evDoorIn { color:#FFD24A; font-variant-numeric:tabular-nums; }
   #evDoor.sealed { height:28px; font-size:15px; background:rgba(20,16,12,0.62); border-bottom:2px solid rgba(166,59,42,0.7); color:#F5D48A; }
+  /* 0824-LATE THE DESERT ON THE BAND: the same band in the desert's dress (sand + dusk) once the yeti bell has rung */
+  #evDoor.quiet.bd { border-bottom-color:rgba(232,194,90,0.5); }
+  #evDoor.quiet.bd b { color:#F5D48A; }
+  #evDoor.live.bd { background:linear-gradient(180deg,rgba(58,30,10,0.95),rgba(112,64,22,0.92)); border-bottom-color:#E8C25A; animation:bdlive 1.2s ease-in-out infinite alternate; }
+  #evDoor.live.bd .ev-warn { text-shadow:0 0 10px #F5D48A, 0 2px 0 rgba(0,0,0,0.6); }
+  #evDoor.live.bd .ev-in { color:#F5D48A; }
+  #evDoor.live.bd .ev-king { height:84px; bottom:-10px; }
+  @keyframes bdlive { from{box-shadow:0 6px 22px rgba(0,0,0,0.45)} to{box-shadow:0 6px 34px rgba(232,194,90,0.42)} }
   #evDoor.live { height:64px; cursor:pointer; overflow:hidden; font-size:17px;
     background:linear-gradient(180deg,rgba(12,20,46,0.95),rgba(28,40,84,0.92)); border-bottom:3px solid #BFE3FF;
     box-shadow:0 6px 22px rgba(0,0,0,0.45); animation:evlive 1.2s ease-in-out infinite alternate; }
@@ -3325,7 +3333,7 @@
   /* reduced motion: static cones (the base angle), no stomp loop, no sweep, no pulse — the
      pulse becomes a RING; the snow sits still (the base state is the pattern at rest) */
   @media (prefers-reduced-motion: reduce){
-    #evDoor.live, #evDoor .ev-go, #evDoor .ev-king, #evSpots i, #evSnow i, #evAfk .mb-card, #evAfk .mb-take { animation:none; }
+    #evDoor.live, #evDoor.live.bd, #evDoor .ev-go, #evDoor .ev-king, #evSpots i, #evSnow i, #evAfk .mb-card, #evAfk .mb-take { animation:none; }
     #evDoor .ev-go, #evAfk .mb-take { box-shadow:0 0 0 3px #FFF3C4, 0 3px 0 #8a6a1d; }
   }
   /* THE ROOFTOP'S FALL — the ghost svg is authored by roofFall (no SVG
@@ -34390,7 +34398,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.94';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.95';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -36881,6 +36889,16 @@ const BD_POP_S=300;            // the JOIN card's window = the doors (T−5, Wya
 const BD_AFK_S=30;             // the you-there window before the bell (the EV_AFK idiom; 0 = no AFK check)
 const BD_REDEAL_MS=30000;      // a ✕'d JOIN card comes back after this while the doors are open (⚑ furniture later)
 const BD_ANN_AFTER_YETI=1;     // 1 = the announce card waits for tonight's yeti bell; 0 = its own quiet landing
+// ═══ 0824-LATE THE DESERT ON THE BAND (Wyatt 8/24 21:35 ET, direct: "Our Desert Event should be promoted. It currently
+// just says The Battle is on — every night at 9:15pm EDT. The Desert Battle Event is at 10pm EDT. After that event there
+// shouldn't be any message in the menu until Noon the next day.") — the menu's band gets its OWN law (evBandState) on top
+// of the two untouched door states: nothing before noon on HQ's clock · the yeti's quiet/live band as before · once the
+// yeti bell has rung the band is THE DESERT's (quiet chip → live = the JOIN door, UI.bdJoin) · after the desert bell
+// NOTHING until noon. The cards (PRIME TIME / T−5 / the desert's announce + JOIN) keep their own laws; the sealed line
+// (THE BATTLE IS ON — EVERY NIGHT AT …) is retired from the band (its 7 dict rows stand; the sealed refusal toast keeps its own THE BELL HAS RUNG line).
+const EV_BAND_FROM_H=12;       // the band wakes at this hour (HQ's clock, EV_TZ) on the bell's own day — before it the menu says nothing. ⚑ 12 (Wyatt: noon) · 0 = all day (the old law)
+const EV_TZ='America/New_York';   // HQ's one clock (the server's EV_TZ) — read ONLY for the wake hour; every displayed time stays the player's own zone (0522a)
+const BD_BAND_S=6*3600;        // the desert band needs its bell inside this window (and tonight's yeti bell rung) — a far-off desert bell (BD_DAILY 0) never paints
 let BD={ bell:0, open:0, wk:'', live:0, sealed:0, rooms:0, players:0, mine:null, team:6, max:12, map:'western', last:null, daily:1, note:null };
 let BDD={ annWk:'', popBell:0, popT:0 };   // the desert door's session latches (runtime flags — a launch is a fresh slate)
 function bdSync(r){
@@ -36908,6 +36926,7 @@ function bdDoorState(){
   return 'quiet';
 }
 function bdBellTime(raw){ const s=evFmt(BD.bell, {hour:'numeric', minute:'2-digit', timeZoneName:'short'}); return raw? s : s.toUpperCase(); }   // 0522a: the desert bell wears its zone too (evBellTime's law)
+function bdBellDT(){ return evFmt(BD.bell, {weekday:'short'}).toUpperCase()+' '+bdBellTime(); }   // 0824-LATE: MON 10:00 PM EDT — the band's chip (evBellDT's law on the desert's bell)
 // the card (the evAnnCard grammar: band · head · the Sarge · the line · ✕ + the button; mbev = the ray rule)
 function bdAnnCard(line, join){
   const p=document.getElementById('milePop'); if(!p) return false;
@@ -37055,14 +37074,48 @@ function evDoorState(){
   if(now>=open) return 'live';
   return 'quiet';
 }
-function evDoorSig(){ return evDoorState()+'|'+(EV.bell|0)+'|'+LANG+'|'+(EV.wk||'')+'|'+roomCur(); }
+// 0824-LATE THE BAND'S OWN LAW — what the menu's band wears, on top of the two door states (which the cards and the
+// join doors keep reading untouched): before EV_BAND_FROM_H on HQ's clock → nothing · the yeti's quiet/live → as before ·
+// the yeti bell rung (sealed) → the DESERT's quiet/live band until ITS bell → then nothing. HQ answers a rung bell for
+// EV_ROOM_TTL, then tomorrow's — tomorrow's quiet band waits for noon by the same rule, so the menu is silent from the
+// desert bell to noon. The wake instant is cached per bell (one Intl format per bell, not per tick).
+function evTZHM(epoch){   // the wall-clock hour+minute of an instant on HQ's clock (Intl; null where the zone is unknown)
+  try{ const p=new Intl.DateTimeFormat('en-US', {timeZone:EV_TZ, hour:'numeric', minute:'numeric', hour12:false}).formatToParts(new Date((epoch||0)*1000));
+    const g=k=>parseInt((p.find(x=>x.type===k)||{}).value, 10); const h=g('hour'), m=g('minute');
+    if(h>=0 && h<=24 && m>=0 && m<60) return { h:h%24, m }; }catch(e){}
+  return null;
+}
+function evBandWake(){   // the epoch the band wakes: EV_BAND_FROM_H:00 on the bell's own day at HQ (= the bell minus its wall-clock distance past that hour)
+  if(!(EV_BAND_FROM_H>0) || !(EV.bell>0)) return 0;
+  if(EVD.wakeFor===EV.bell) return EVD.wake;
+  const hm=evTZHM(EV.bell);
+  let w=EV.bell-33300;   // no zone support: 9 h 15 m before the bell = noon for a 21:15 bell
+  if(hm) w=(hm.h<EV_BAND_FROM_H)? 0 : EV.bell-((hm.h-EV_BAND_FROM_H)*3600+hm.m*60);   // a morning bell: the band is awake all day
+  EVD.wakeFor=EV.bell; EVD.wake=w; return w;
+}
+function evBandState(){
+  const st=evDoorState();
+  if(st==='quiet') return (evNow()<evBandWake())? 'none' : 'quiet';
+  if(st!=='sealed') return st;   // none · live
+  const bd=bdDoorState();
+  if(bd==='live' || (bd==='quiet' && bdIn()<=BD_BAND_S)) return 'bd-'+bd;
+  return 'none';
+}
+function evDoorSig(){ return evBandState()+'|'+(EV.bell|0)+'|'+(BD.bell|0)+'|'+LANG+'|'+(EV.wk||'')+'|'+roomCur(); }
 function evDoorHTML(){
-  const st=evDoorState(); if(st==='none') return '';
+  const st=evBandState(); if(st==='none') return '';   // 0824-LATE: the band's own law (the door states stand for the cards)
   const rtl=(LANG==='ar')? ' dir="rtl"' : '';
   if(st==='quiet')
     return '<div id="evDoor" class="quiet"'+rtl+'><span>ULTRA MEGA KING YETI</span><span class="ev-sep">·</span><b data-notr>'+escH(evBellDT())+'</b><span class="ev-sep">·</span><span id="evDoorIn" data-notr>'+escH(tf('IN %1', evDur(evIn())))+'</span></div>';
-  if(st==='sealed')
-    return '<div id="evDoor" class="sealed"'+rtl+'><span data-notr>'+escH(EV.daily? tf('THE BATTLE IS ON — EVERY NIGHT AT %1', evBellTime()) : tf('THE BATTLE IS ON — NEXT %1 %2', evBellDayLong(), evBellTime()))+'</span></div>';   // 0823-NIGHT: under the nightly law "NEXT SUNDAY" read as next week — say the schedule; the weekly line stands for EV_DAILY 0
+  if(st==='bd-quiet')   // 0824-LATE: the desert's chip once the yeti bell has rung (the sealed line retired — Wyatt: promote the desert, then nothing till noon)
+    return '<div id="evDoor" class="quiet bd"'+rtl+'><span>THE BATTLE OF THE DESERT</span><span class="ev-sep">·</span><b data-notr>'+escH(bdBellDT())+'</b><span class="ev-sep">·</span><span id="evDoorIn" data-notr>'+escH(tf('IN %1', evDur(bdIn())))+'</span></div>';
+  if(st==='bd-live')   // 0824-LATE: the desert's door — the whole band = JOIN THE BATTLE → UI.bdJoin (the JOIN card's own door; the Sarge storms in where the king did)
+    return '<button type="button" id="evDoor" class="live bd"'+rtl+' onclick="UI.bdJoin()">'
+      +'<span class="ev-warn">THE BATTLE OF THE DESERT</span>'
+      +'<span class="ev-in" id="evDoorIn" data-notr>'+escH(tf('THE BELL IN %1', evMMSS(bdIn())))+'</span>'
+      +'<span class="ev-go">JOIN THE BATTLE</span>'
+      +'<img class="ev-king" src="'+sprURI('sarge')+'" alt="">'
+    +'</button>';
   // LIVE — THE INVASION (D14 the cones, the king's silhouette, the counter, the button)
   const c0=EV_SPOT[0]||'#BFE3FF', c1=EV_SPOT[1]||'#FFFFFF';
   const cone=(c,a,cls)=>'<i class="'+cls+'" style="background:conic-gradient(from '+a+'deg,'+c+'00 0deg,'+c+'99 8deg,'+c1+'CC 12deg,'+c+'99 16deg,'+c+'00 26deg,#00000000 360deg)"></i>';
@@ -37079,20 +37132,21 @@ function evDoorPaint(){ EVD.sig=evDoorSig(); return evDoorHTML(); }   // renderM
 function evSetTxt(el,s){ while(el.firstChild) el.removeChild(el.firstChild); el.appendChild(document.createTextNode(s)); }   // a text node, never textContent — the l10n setter would re-translate a line tf() already composed
 function evDoorRender(){
   const st=document.getElementById('roomStage'); if(!st) return;
-  const state=evDoorState(), sig=evDoorSig();
+  const state=evBandState(), sig=evDoorSig();   // 0824-LATE: the band's own law
   let el=document.getElementById('evDoor');
   if(sig!==EVD.sig || (!el && state!=='none')){
     EVD.sig=sig;
     for(const id of ['evSpots','evSnow','evDoor']){ const o=document.getElementById(id); if(o) o.remove(); }
     const html=evDoorHTML(); if(!html) return;
     const cr=st.querySelector('.roomcr');   // the same DOM seat renderMenu gives it — just before the © line
-    const tmp=document.createElement('div'); tmp.innerHTML=html;   // the innerHTML hook translates the RAW EN
-    while(tmp.firstChild) st.insertBefore(tmp.firstChild, cr||null);
+    const tmp=document.createElement('div'); tmp.innerHTML=html;   // the innerHTML hook runs here but SKIPS detached text nodes — the localize pass below is the one that lands (0824-LATE)
+    const put=[]; while(tmp.firstChild){ put.push(tmp.firstChild); st.insertBefore(tmp.firstChild, cr||null); }
+    if(LANG!=='en') for(const n of put) if(n.nodeType===1) localizeTree(n);   // 0824-LATE: the raw EN keys (ULTRA MEGA KING YETI · ⚔ JOIN THE FIGHT · THE BATTLE OF THE DESERT · JOIN THE BATTLE) translate once CONNECTED — a pre-existing trap on every tick-driven band flip, measured on es
     return;
   }
   if(state==='none') return;
   const inEl=document.getElementById('evDoorIn');
-  if(inEl) evSetTxt(inEl, state==='live'? tf('THE BELL IN %1', evMMSS(evIn())) : tf('IN %1', evDur(evIn())));
+  if(inEl) evSetTxt(inEl, state==='live'? tf('THE BELL IN %1', evMMSS(evIn())) : state==='bd-live'? tf('THE BELL IN %1', evMMSS(bdIn())) : state==='bd-quiet'? tf('IN %1', evDur(bdIn())) : tf('IN %1', evDur(evIn())));   // 0824-LATE: the desert's clock on its faces
 }
 function evDoorStart(){   // showMenu's seat: the 1 s tick + the truth (once now, then every EV_POLL_MS)
   clearTimeout(EVD.t); clearTimeout(EVD.pollT);
@@ -76294,7 +76348,7 @@ window.GVT = {
   // ---- 0485 THE INVASION DOOR rig: evDoor (the band's state) · evForce (a bell without a server) · evSeen (the week latch) · evTouch / evAfk (D13) ----
   evDoor(){ const d=document.getElementById('evDoor'), sp=document.getElementById('evSpots'), sn=document.getElementById('evSnow'), af=document.getElementById('evAfk'), inEl=document.getElementById('evDoorIn'), tst=document.getElementById('evToast');
     const sub=e=>e? e.getAnimations({subtree:true}).length : 0;
-    return { state:evDoorState(), cls:d? d.className : null, tag:d? d.tagName : null, text:d? d.textContent.replace(/\s+/g,' ').trim() : null, inTxt:inEl? inEl.textContent : null, dir:d? getComputedStyle(d).direction : null,
+    return { state:evDoorState(), band:evBandState(), wake:evBandWake(), cls:d? d.className : null, tag:d? d.tagName : null, text:d? d.textContent.replace(/\s+/g,' ').trim() : null, inTxt:inEl? inEl.textContent : null, dir:d? getComputedStyle(d).direction : null,
       spots:sp? sp.querySelectorAll('i').length : 0, dusk:!!(sp&&sp.querySelector('.ev-dusk')), snow:sn? sn.querySelectorAll('i').length : 0, king:!!(d&&d.querySelector('.ev-king')), go:!!(d&&d.querySelector('.ev-go')), onclick:d? (d.getAttribute('onclick')||'') : '',
       afk:!!(af && !af.classList.contains('hidden')), afkTxt:af? af.textContent.replace(/\s+/g,' ').trim() : null, touched:S.evTouched?1:0, afkUp:S.evAfk?1:0, toast:tst? tst.textContent : null,
       seen:META.evSeen||null, tick:EVD.t?1:0, poll:EVD.pollT?1:0, sig:EVD.sig, locale:evLocale(), dt:(EV.bell>0)? evBellDT() : null, day:(EV.bell>0)? evBellDayLong() : null, time:(EV.bell>0)? evBellTime() : null, dur:evDur(evIn()),
@@ -76305,7 +76359,7 @@ window.GVT = {
   evForce(bell, open, wk, daily){ EV.bell=+bell||0; EV.open=(open!=null)? +open : (EV.bell? EV.bell-600 : 0); if(wk) EV.wk=String(wk); else if(!EV.wk) EV.wk='2026-08-22'; if(daily!=null) EV.daily=daily?1:0; evDoorTick(); return GVT.evDoor(); },   // a forced truth for the band (no server) — the rig's bell (0506: + daily)
   bdForce(bell, open, wk){ BD.bell=+bell||0; BD.open=(open!=null)? +open : (BD.bell? BD.bell-BD_POP_S : 0); if(wk) BD.wk=String(wk); else if(!BD.wk) BD.wk='bd:2026-08-23'; evDoorTick(); return bdDoorState(); },   // 0516: a rig's desert clock
   bdJoin(){ return bdJoin(); },
-  bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, n:s.name })) : null, note:BD.note }; },
+  bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), band:evBandState(), live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, n:s.name })) : null, note:BD.note }; },
   evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read
   evSeen(v){ if(v===0||v===false) delete META.evSeen; else if(v!=null) META.evSeen=String(v); saveMeta(); return META.evSeen||null; },
   evTouch(){ evTouch(); return GVT.evDoor(); },
