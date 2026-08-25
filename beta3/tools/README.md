@@ -886,3 +886,48 @@ after its 420 ms entrance settles (a tap mid-tween lands where the button
 WAS); `nav` marks the old document and never fires a second navigate over a
 load in progress (that aborts game.js and versus.js throws on a missing QS);
 seed guards key on the uid so a reused `/tmp/cdp-*` profile re-seeds.
+
+## recent-check.mjs — recent rivals in VERSUS (v0.55.0)
+
+The RECENT roll (task 44): the friends panel now holds three friend rows, a
+`— RECENT RIVALS —` heading and the last three mages you crossed swords
+with, newest first (`SSNET.FR.recentList(n)` — friends included, unlike the
+older `rivals(n)`), each with the coarse night clock (`vsNightsAgo`:
+tonight / last night / N nights ago / long ago — nights are local
+noon-to-noon, so a 1 a.m. duel is still "tonight" at 3 a.m.), the friends
+roll's presence glint, a gold ⚔ AGAIN and a `+` (befriend). The whole row is
+the door: `VsMenu.rematch(r)` → the same `challenge(f)` a friend CHALLENGE /
+BY NAME rides — online rings the bell, away lands a standing invite and the
+lobby says so. A mage of THE CIRCLE is recognised by uid
+(`SS_RIVAL.circle()`), rings NO bell: the private room is sealed the same
+way, `challenged.circle` carries the persona, and `VsBattle.create` seats it
+through `SS_RIVAL.spawn` 1.4–3s later (its own rating and row; the invite
+watcher is skipped so the lobby never says "declined" while the mage walks
+in). `recent/` is fed once, in `beginBattle`, for every seated opponent —
+queue, seal code, by-name, challenge, rematch and the engine's seat alike —
+and the FR listener paints it live. A first-night player sees `vsNoRecent`.
+Fixed on the way: `(at | 0)` folded a millisecond stamp to 32 bits (every
+row read "long ago"; the old `rivals()` sort suffered the same).
+
+```
+python3 -m http.server 8899 &
+for p in a:9452 b:9453; do "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless=new --no-sandbox --mute-audio --disable-gpu --remote-debugging-port=${p#*:} \
+  --user-data-dir=/tmp/cdp-recent-${p%%:*} --window-size=390,844 --force-device-scale-factor=3 about:blank & done
+node tools/recent-check.mjs      # 64 checks, ~3 min, deletes everything it wrote
+```
+
+Two REAL uids: the empty line; a by-name duel writes `recent/` on both
+sides and the row is in memory mid-duel (no reload); back in VERSUS B is
+first, "tonight", lit; a real tap on AGAIN rings B, B accepts, the rematch
+lands; B offline → the same tap → `vsWaitAway` + a standing invite; then A
+searches alone, a circle mage answers, the row appears marked of the
+circle, a real tap routes through the engine (no `invites/` row, private
+room sealed for the mage, `seated` in `__ssRivalLog`, status active).
+Harness lessons: a PARKED headless tab (about:blank) keeps its Firebase
+socket for a minute or more, so the server's onDisconnect — and every
+"X left the sky" check — fires late and flaky; leave the sky through the
+client's own `firebase.database().goOffline()` first, then park (byname-check
+now does the same). And a dropped first navigate (see names-check) leaves a
+half-loaded document that throws `SFX/SS_BEASTS is not defined` — clear the
+exception log after the boot that landed.

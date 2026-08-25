@@ -159,9 +159,9 @@ class VsMenu extends Phaser.Scene {
     this.frC.removeAll(true);
     const items = [];
     const friends = FR.list();
-    const ROWS = 5, rowY = (i) => l.y(top + 54 + i * 38);
+    const ROWS = 3, rowY = (i) => l.y(top + 52 + i * 36);   // three rows: RECENT lives below (task 44)
     if (!friends.length) {
-      items.push(ssTextBlock(this, l.x(0), l.y(top + 120), SS_T('vsNoFriends'), {
+      items.push(ssTextBlock(this, l.x(0), l.y(top + 88), SS_T('vsNoFriends'), {
         fontSize: l.u(11) + 'px', color: '#5a6390', fontStyle: 'italic', shadow: true,
         wrapW: l.u(320), align: 'center', ox: 0.5, oy: 0.5,
       }));
@@ -198,22 +198,58 @@ class VsMenu extends Phaser.Scene {
     if (friends.length > ROWS) {
       items.push(ssTxt(this, l.x(0), rowY(ROWS - 1), SS_T('vsMore', friends.length - shown.length), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5));
     }
-    // recent rivals → one-tap adds
-    const rivals = FR.rivals(3);
-    if (rivals.length) {
-      let x = -168;
-      const lab = ssTxt(this, l.x(x), l.y(top + 254), SS_T('vsRecent') + ':', l.u(9.5), '#5a6390', 'italic').setOrigin(0, 0.5);
-      items.push(lab);
-      x += lab.width / l.u(1) + 10;
-      for (const r of rivals) {
-        const t = ssTxt(this, l.x(x), l.y(top + 254), SS_T('vsAdd') + ' ' + r.name, l.u(10), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-        while (t.width > l.u(120) && t.text.length > 6) t.setText(t.text.slice(0, -2) + '…');
-        t.on('pointerdown', () => { SFX.ui(); t.setColor('#5a6390'); FR.add(r.id, r.name).then(() => vsNotify(SS_T('frAdded', r.name))); });
-        items.push(t);
-        x += t.width / l.u(1) + 14;
-        if (x > 150) break;
-      }
+    /* ---------- RECENT (task 44) ----------
+       The last handful of mages you crossed swords with, newest first —
+       name, how long ago (coarse: tonight / last night / N nights ago), the
+       same presence glint the friends roll wears. One tap on the row → the
+       same challenge path a friend CHALLENGE / BY NAME rides: online = a live
+       summons, away = a standing invite (the lobby says so); a mage of THE
+       CIRCLE answers through the rival engine. A first-night player sees one
+       quiet line. `+` befriends without a duel. */
+    items.push(ssTxt(this, l.x(0), l.y(top + 158), SS_T('vsRecentHead'), l.u(10.5), '#c9b676').setOrigin(0.5));
+    const recent = FR.recentList(3);
+    this.recentRows = [];
+    if (!recent.length) {
+      items.push(ssTextBlock(this, l.x(0), l.y(top + 212), SS_T('vsNoRecent'), {
+        fontSize: l.u(11) + 'px', color: '#5a6390', fontStyle: 'italic', shadow: true,
+        wrapW: l.u(320), align: 'center', ox: 0.5, oy: 0.5,
+      }));
     }
+    const circle = (typeof SS_RIVAL !== 'undefined') ? SS_RIVAL.circle() : [];
+    recent.forEach((r, i) => {
+      const y = l.y(top + 182 + i * 30);
+      const ofCircle = circle.some((c) => c.uid === r.id);
+      const lit = r.online || ofCircle;   // a mage of the circle always answers — it glints ready
+      const dot = this.add.circle(l.x(-160), y, l.u(4), lit ? (r.busy ? 0xe8a87f : 0x7fe0a0) : 0x39406b);
+      if (lit && !r.busy) {
+        dot.setStrokeStyle(l.u(1), 0xbfffd8, 0.6);
+        this.tweens.add({ targets: dot, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      }
+      items.push(dot);
+      const nm = ssTxt(this, l.x(-146), y, r.name, l.u(12), lit ? '#f0e8d2' : '#a9a99a').setOrigin(0, 0.5);
+      while (nm.width > l.u(118) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+      items.push(nm);
+      const ago = ssTxt(this, l.x(-22), y, vsNightsAgo(Date.now() - r.at), l.u(9), '#5a6390', 'italic').setOrigin(0, 0.5);
+      while (ago.width > l.u(78) && ago.text.length > 3) ago.setText(ago.text.slice(0, -2) + '…');
+      items.push(ago);
+      // the whole row is the door; the small gold AGAIN says so
+      const ab = this.add.image(l.x(112), y, ssBtn(this, false, 76, 24)).setDisplaySize(l.u(76), l.u(24)).setInteractive({ useHandCursor: true });
+      ssHitPad(ab, 30);
+      const at = ssTxt(this, l.x(112), y, SS_T('vsAgain'), l.u(9.5), BTN_INK()).setOrigin(0.5);
+      for (let fs = 9.5; at.width > l.u(70) && fs > 7; fs -= 0.5) at.setFontSize(l.u(fs));
+      const go = () => { SFX.ensure(); SFX.ui(); this.rematch(r, ofCircle); };
+      ab.on('pointerdown', go);
+      const zone = this.add.zone(l.x(-30), y, l.u(280), l.u(28)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', go);
+      items.push(zone, ab, at);
+      if (!r.friend) {
+        const add = ssTxt(this, l.x(176), y, '+', l.u(14), '#9fb0e8').setOrigin(0.5).setInteractive({ useHandCursor: true });
+        ssHitPad(add, 30);
+        add.on('pointerdown', () => { SFX.ui(); add.setColor('#5a6390'); FR.add(r.id, r.name).then(() => vsNotify(SS_T('frAdded', r.name))); });
+        items.push(add);
+      }
+      this.recentRows.push({ id: r.id, name: r.name, row: zone, again: ab, nameT: nm, agoT: ago, circle: ofCircle });
+    });
     // your friend link — the way to add someone without a duel first
     const fl = ssTxt(this, l.x(0), l.y(top + 278), SS_T('vsFriendLink'), l.u(10), '#c9b676').setOrigin(0.5).setInteractive({ useHandCursor: true });
     vsOnTap(fl, () => {
@@ -228,6 +264,16 @@ class VsMenu extends Phaser.Scene {
   }
 
   /* ---------- the three doors ---------- */
+  // a RECENT row tapped: the same challenge a friend CHALLENGE / BY NAME rides.
+  // A mage of the circle has no phone to ring — the room is sealed the same
+  // way and the rival engine seats them in it (they answer, as they answer
+  // rematches), so the tap lands a live duel, never a dead invite
+  rematch(r, ofCircle) {
+    const FR = SSNET.FR;
+    const p = ofCircle ? SS_RIVAL.circle().find((c) => c.uid === r.id) : null;
+    if (p) { this.challenge({ id: p.uid, name: p.name, circle: p }); return; }
+    this.challenge({ id: r.id, name: r.name, away: !FR.isOnline(r.id), busy: FR.isOnline(r.id) && FR.isBusy(r.id) });
+  }
   async challenge(f) {
     if (this.busyC) return;
     this.busyC = true;
@@ -238,10 +284,10 @@ class VsMenu extends Phaser.Scene {
       const code = vsCode();
       const ok = await vsSealRoom(code, this.mode, { private: true, invited: f.id });
       if (!ok || !this.sys.isActive()) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
-      await SSNET.FR.challenge(f.id, code, this.mode);
+      if (!f.circle) await SSNET.FR.challenge(f.id, code, this.mode);   // the circle has no bell to ring
       if (!this.sys.isActive()) return;
       // away/busy ride along so the lobby can say where the summons waits
-      this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name, away: !!f.away, busy: !!f.busy } });
+      this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name, away: !!f.away, busy: !!f.busy, circle: f.circle || null } });
     } catch (e) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; }
   }
   /* CHALLENGE BY NAME (task 43): type a mage's name, the registry finds them
@@ -347,6 +393,18 @@ class VsMenu extends Phaser.Scene {
   }
 }
 
+// the RECENT roll's coarse clock: "tonight" / "last night" / "3 nights ago"
+// — a duel is an evening's thing, so it is counted in nights, and the night
+// boundary is local noon-to-noon (a 1 a.m. duel is still "tonight" at 3 a.m.)
+function vsNightsAgo(ms) {
+  if (!(ms > 0)) return SS_T('vsAgoTonight');
+  const night = (t) => Math.floor((t - 12 * 3600000 - new Date(t).getTimezoneOffset() * 60000) / 86400000);
+  const now = Date.now(), n = night(now) - night(now - ms);
+  if (n <= 0) return SS_T('vsAgoTonight');
+  if (n === 1) return SS_T('vsAgoLastNight');
+  if (n >= 60) return SS_T('vsAgoLong');
+  return SS_T('vsAgoNights', n);
+}
 // "seen 3d ago" / "seen 2h 10m ago" / "seen 4m ago"
 function vsAgo(ms) {
   const d = Math.floor(ms / 86400000);
@@ -651,7 +709,7 @@ class VsBattle extends Phaser.Scene {
     SSNET.FR.setBusy(true);   // friends see "in a duel" and can't ring me mid-fight
     // a CHALLENGE lobby watches its own bell: if the friend removes it without
     // taking a seat, they declined
-    if (this.challenged) {
+    if (this.challenged && !this.challenged.circle) {   // the circle rings no bell (task 44)
       this.invRef = SSNET.ref('invites/' + this.challenged.id + '/' + vsUid());
       this.onInvCb = (snap) => {
         if (snap.val() != null) { this.bellSeen = true; return; }
@@ -687,6 +745,15 @@ class VsBattle extends Phaser.Scene {
       if (!this.left && this.meRef && this.room && this.room.status !== 'done') this.meRef.update({ gone: true }).catch(() => { });
     });
 
+    // a RECENT rematch on one of the circle: the mage arrives through the
+    // rival engine a breath after the door opens (task 44) — its own seat
+    // rating, its own row, the same join a phone runs
+    if (this.challenged && this.challenged.circle && typeof SS_RIVAL !== 'undefined') {
+      const p = this.challenged.circle;
+      this.fbRival = SS_RIVAL.spawn({ code: this.code, rating: p.rating, seatRating: p.rating, uid: p.uid, name: p.name, persona: p,
+        delay: 1400 + Math.random() * 1600 });
+      try { localStorage.setItem('starspellCircleLast', p.uid); } catch (e) { }
+    }
     if (VSDEMO) this.time.addEvent({ delay: 1500, loop: true, callback: () => this.demoStep() });
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.secondTick() });
     this.input.on('pointerdown', () => SFX.ensure());
@@ -865,7 +932,7 @@ class VsBattle extends Phaser.Scene {
   // a mage who arrives after a long wait still finds it under their stars
   keepBell() {
     const ch = this.challenged;
-    if (!ch || this.bellDeclined || this.room.hostUid !== vsUid()) return;
+    if (!ch || ch.circle || this.bellDeclined || this.room.hostUid !== vsUid()) return;
     if ((this.room.players || {})[ch.id]) return;
     const now = Date.now();
     if (!this.bellAt) this.bellAt = now;

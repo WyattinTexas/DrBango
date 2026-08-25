@@ -90,6 +90,8 @@ const SS_STR = {
     vsFind: 'FIND A RIVAL', vsFindSub: 'quick match beneath the open sky', vsOrSeal: '— or answer a summons —',
     vsOrReach: '— or reach a mage yourself —', vsByName: 'BY NAME', vsNamePh: 'a mage’s name', vsNameSeek: 'seeking %1 among the stars…',
     vsNameNone: 'no mage bears the name %1 — check the spelling and try again', vsNameSelf: 'that is your own name — the stars will not set you against yourself', vsWaitAway: '%1 is away from the sky — your summons waits under their stars until they return', vsWaitBusy: '%1 is mid-duel — your summons waits for it to end',
+    // recent rivals (v0.55.0, task 44)
+    vsRecentHead: '— RECENT RIVALS —', vsNoRecent: 'no rivals yet — your first duel writes the first name here', vsAgoTonight: 'tonight', vsAgoLastNight: 'last night', vsAgoNights: '%1 nights ago', vsAgoLong: 'long ago', vsAgain: '⚔ AGAIN',
     vsSeal: 'ENTER A SEAL CODE', vsNoSky: 'the wider sky is unreachable —\nduels need a connection', vsConsult: 'consulting the stars…',
     vsRefused: 'the stars refused — try again', vsColdSeal: 'that seal answers to no one', vsSent: 'SUMMONS SENT TO %1',
     vsWaitAnswer: 'waiting for %1 to answer… the seal above works too', vsDeclined: '%1 declined the summons — share the seal, or challenge another', vsShareInvite: '✶ SHARE INVITE LINK',
@@ -197,6 +199,8 @@ const SS_STR = {
     vsFind: 'BUSCAR RIVAL', vsFindSub: 'partida rápida bajo el cielo abierto', vsOrSeal: '— o responde a una llamada —',
     vsOrReach: '— o busca tú a un mago —', vsByName: 'POR NOMBRE', vsNamePh: 'nombre de un mago', vsNameSeek: 'buscando a %1 entre las estrellas…',
     vsNameNone: 'ningún mago lleva el nombre %1 — revisa la ortografía e inténtalo de nuevo', vsNameSelf: 'ese es tu propio nombre — las estrellas no te enfrentarán contigo mismo', vsWaitAway: '%1 está lejos del cielo — tu llamada espera bajo sus estrellas hasta que vuelva', vsWaitBusy: '%1 está en pleno duelo — tu llamada espera a que termine',
+    // recent rivals (v0.55.0, task 44)
+    vsRecentHead: '— RIVALES RECIENTES —', vsNoRecent: 'aún sin rivales — tu primer duelo escribe aquí el primer nombre', vsAgoTonight: 'esta noche', vsAgoLastNight: 'anoche', vsAgoNights: 'hace %1 noches', vsAgoLong: 'hace mucho', vsAgain: '⚔ OTRA VEZ',
     vsSeal: 'INTRODUCIR UN SELLO', vsNoSky: 'el cielo ancho es inalcanzable —\nlos duelos necesitan conexión', vsConsult: 'consultando a las estrellas…',
     vsRefused: 'las estrellas se negaron — inténtalo de nuevo', vsColdSeal: 'ese sello no responde a nadie', vsSent: 'LLAMADA ENVIADA A %1',
     vsWaitAnswer: 'esperando la respuesta de %1… el sello de arriba también sirve', vsDeclined: '%1 rechazó la llamada — comparte el sello o reta a otro', vsShareInvite: '✶ COMPARTIR ENLACE',
@@ -356,6 +360,8 @@ const SS_STR = {
     vsFind: 'TROUVER UN RIVAL', vsFindSub: 'partie rapide sous le ciel ouvert', vsOrSeal: '— ou répondez à un appel —',
     vsOrReach: '— ou cherchez un mage vous-même —', vsByName: 'PAR NOM', vsNamePh: 'le nom d’un mage', vsNameSeek: 'recherche de %1 parmi les étoiles…',
     vsNameNone: 'aucun mage ne porte le nom %1 — vérifiez l’orthographe et réessayez', vsNameSelf: 'c’est votre propre nom — les étoiles ne vous opposeront pas à vous-même', vsWaitAway: '%1 est loin du ciel — votre appel attend sous ses étoiles jusqu’à son retour', vsWaitBusy: '%1 est en plein duel — votre appel attend qu’il s’achève',
+    // recent rivals (v0.55.0, task 44)
+    vsRecentHead: '— RIVAUX RÉCENTS —', vsNoRecent: 'pas encore de rivaux — ton premier duel écrira le premier nom ici', vsAgoTonight: 'ce soir', vsAgoLastNight: 'hier soir', vsAgoNights: 'il y a %1 nuits', vsAgoLong: 'il y a longtemps', vsAgain: '⚔ ENCORE',
     vsSeal: 'SAISIR UN SCEAU', vsNoSky: 'le grand ciel est hors d\'atteinte —\nles duels ont besoin d\'une connexion', vsConsult: 'consultation des étoiles…',
     vsRefused: 'les étoiles ont refusé — réessayez', vsColdSeal: 'ce sceau ne répond à personne', vsSent: 'APPEL ENVOYÉ À %1',
     vsWaitAnswer: 'en attente de la réponse de %1… le sceau ci-dessus marche aussi', vsDeclined: '%1 a décliné l\'appel — partagez le sceau, ou défiez quelqu\'un d\'autre', vsShareInvite: '✶ PARTAGER LE LIEN',
@@ -515,6 +521,8 @@ const SS_STR = {
     vsFind: 'ENCONTRAR UM RIVAL', vsFindSub: 'partida rápida sob o céu aberto', vsOrSeal: '— ou responda a um chamado —',
     vsOrReach: '— ou procure um mago você mesmo —', vsByName: 'POR NOME', vsNamePh: 'o nome de um mago', vsNameSeek: 'procurando %1 entre as estrelas…',
     vsNameNone: 'nenhum mago tem o nome %1 — confira a grafia e tente de novo', vsNameSelf: 'esse é o seu próprio nome — as estrelas não o colocarão contra si mesmo', vsWaitAway: '%1 está longe do céu — o seu chamado espera sob as estrelas dele até voltar', vsWaitBusy: '%1 está em pleno duelo — o seu chamado espera que termine',
+    // recent rivals (v0.55.0, task 44)
+    vsRecentHead: '— RIVAIS RECENTES —', vsNoRecent: 'ainda sem rivais — seu primeiro duelo escreve aqui o primeiro nome', vsAgoTonight: 'esta noite', vsAgoLastNight: 'ontem à noite', vsAgoNights: 'há %1 noites', vsAgoLong: 'há muito tempo', vsAgain: '⚔ DE NOVO',
     vsSeal: 'INSERIR UM SELO', vsNoSky: 'o vasto céu está inalcançável —\nduelos precisam de ligação', vsConsult: 'consultando as estrelas…',
     vsRefused: 'as estrelas recusaram — tente de novo', vsColdSeal: 'esse selo não responde a ninguém', vsSent: 'CHAMADO ENVIADO A %1',
     vsWaitAnswer: 'à espera da resposta de %1… o selo acima também serve', vsDeclined: '%1 recusou o chamado — partilhe o selo ou desafie outro', vsShareInvite: '✶ PARTILHAR O LINK',
@@ -674,6 +682,8 @@ const SS_STR = {
     vsFind: 'RIVALEN FINDEN', vsFindSub: 'Schnellduell unter offenem Himmel', vsOrSeal: '— oder folge einem Ruf —',
     vsOrReach: '— oder erreiche selbst einen Magier —', vsByName: 'NACH NAMEN', vsNamePh: 'Name eines Magiers', vsNameSeek: 'suche %1 zwischen den Sternen…',
     vsNameNone: 'kein Magier trägt den Namen %1 — prüfe die Schreibweise und versuch es erneut', vsNameSelf: 'das ist dein eigener Name — die Sterne stellen dich nicht gegen dich selbst', vsWaitAway: '%1 ist fern vom Himmel — dein Ruf wartet unter seinen Sternen, bis er zurückkehrt', vsWaitBusy: '%1 ist mitten im Duell — dein Ruf wartet auf dessen Ende',
+    // recent rivals (v0.55.0, task 44)
+    vsRecentHead: '— LETZTE RIVALEN —', vsNoRecent: 'noch keine Rivalen — dein erstes Duell schreibt hier den ersten Namen', vsAgoTonight: 'heute Nacht', vsAgoLastNight: 'letzte Nacht', vsAgoNights: 'vor %1 Nächten', vsAgoLong: 'vor langer Zeit', vsAgain: '⚔ NOCHMAL',
     vsSeal: 'SIEGEL EINGEBEN', vsNoSky: 'der weite Himmel ist unerreichbar —\nDuelle brauchen eine Verbindung', vsConsult: 'die Sterne werden befragt…',
     vsRefused: 'die Sterne verweigerten sich — versuch es erneut', vsColdSeal: 'dieses Siegel antwortet niemandem', vsSent: 'RUF GESANDT AN %1',
     vsWaitAnswer: 'warte auf die Antwort von %1… das Siegel oben geht auch', vsDeclined: '%1 hat den Ruf abgelehnt — teile das Siegel oder fordere jemand anderen', vsShareInvite: '✶ EINLADUNGSLINK TEILEN',
@@ -833,6 +843,8 @@ const SS_STR = {
     vsFind: '対戦相手を探す', vsFindSub: '開けた空の下でクイックマッチ', vsOrSeal: '— または召喚に応える —',
     vsOrReach: '— または自分で魔導士を探す —', vsByName: '名前で', vsNamePh: '魔導士の名前', vsNameSeek: '星々の中から %1 を探しています…',
     vsNameNone: '%1 という名の魔導士はいません — つづりを確かめてもう一度', vsNameSelf: 'それはあなた自身の名前です — 星々はあなたを自分と戦わせません', vsWaitAway: '%1 は空を離れています — 召喚は戻るまでその星の下で待ちます', vsWaitBusy: '%1 は決闘中です — 召喚はその終わりを待ちます',
+    // recent rivals (v0.55.0, task 44)
+    vsRecentHead: '— 最近の対戦相手 —', vsNoRecent: 'まだ対戦相手がいません — 最初の決闘で最初の名前がここに刻まれます', vsAgoTonight: '今夜', vsAgoLastNight: '昨夜', vsAgoNights: '%1 夜前', vsAgoLong: 'ずっと前', vsAgain: '⚔ もう一度',
     vsSeal: '封印コードを入力', vsNoSky: '広い空に届きません —\n決闘には接続が必要です', vsConsult: '星に問いかけ中…',
     vsRefused: '星は拒みました — もう一度', vsColdSeal: 'その封印は誰にも応えません', vsSent: '%1 に召喚を送りました',
     vsWaitAnswer: '%1 の返事を待っています… 上の封印コードでも参加できます', vsDeclined: '%1 は召喚を断りました — 封印を共有するか、別の相手へ', vsShareInvite: '✶ 招待リンクを共有',
@@ -992,6 +1004,8 @@ const SS_STR = {
     vsFind: '상대 찾기', vsFindSub: '열린 하늘 아래 빠른 대전', vsOrSeal: '— 아니면 소환에 응답 —',
     vsOrReach: '— 아니면 직접 마법사를 찾기 —', vsByName: '이름으로', vsNamePh: '마법사의 이름', vsNameSeek: '별들 사이에서 %1 을(를) 찾는 중…',
     vsNameNone: '%1 이라는 이름의 마법사는 없어요 — 철자를 확인하고 다시 시도하세요', vsNameSelf: '그건 당신의 이름이에요 — 별들은 당신을 자신과 맞붙이지 않아요', vsWaitAway: '%1 은(는) 하늘을 떠나 있어요 — 소환은 돌아올 때까지 그의 별 아래서 기다려요', vsWaitBusy: '%1 은(는) 결투 중이에요 — 소환은 끝날 때까지 기다려요',
+    // recent rivals (v0.55.0, task 44)
+    vsRecentHead: '— 최근 상대 —', vsNoRecent: '아직 상대가 없어요 — 첫 결투가 첫 이름을 여기에 새깁니다', vsAgoTonight: '오늘 밤', vsAgoLastNight: '어젯밤', vsAgoNights: '%1 밤 전', vsAgoLong: '오래 전', vsAgain: '⚔ 다시',
     vsSeal: '인장 코드 입력', vsNoSky: '넓은 하늘에 닿을 수 없어요 —\n결투에는 연결이 필요해요', vsConsult: '별에게 묻는 중…',
     vsRefused: '별이 거부했어요 — 다시 시도하세요', vsColdSeal: '그 인장은 아무에게도 응답하지 않아요', vsSent: '%1에게 소환을 보냈어요',
     vsWaitAnswer: '%1의 응답을 기다리는 중… 위 인장으로도 참가할 수 있어요', vsDeclined: '%1이(가) 소환을 거절했어요 — 인장을 공유하거나 다른 친구에게 도전하세요', vsShareInvite: '✶ 초대 링크 공유',
@@ -1151,6 +1165,8 @@ const SS_STR = {
     vsFind: '寻找对手', vsFindSub: '开阔星空下的快速匹配', vsOrSeal: '— 或应召而来 —',
     vsOrReach: '— 或亲自寻找一位法师 —', vsByName: '按名字', vsNamePh: '法师的名字', vsNameSeek: '正在群星间寻找 %1…',
     vsNameNone: '没有法师叫 %1 — 检查拼写后再试一次', vsNameSelf: '那是你自己的名字 — 群星不会让你与自己对决', vsWaitAway: '%1 不在星空之下 — 你的召唤会在其星辰下等候，直到归来', vsWaitBusy: '%1 正在决斗中 — 你的召唤会等到决斗结束',
+    // recent rivals (v0.55.0, task 44)
+    vsRecentHead: '— 最近的对手 —', vsNoRecent: '还没有对手 — 你的第一场决斗会把第一个名字写在这里', vsAgoTonight: '今晚', vsAgoLastNight: '昨晚', vsAgoNights: '%1 夜前', vsAgoLong: '很久以前', vsAgain: '⚔ 再来',
     vsSeal: '输入印记代码', vsNoSky: '广阔星空无法触及 —\n决斗需要网络连接', vsConsult: '正在请示群星…',
     vsRefused: '群星拒绝了 — 请再试一次', vsColdSeal: '这枚印记无人应答', vsSent: '已向 %1 发出召唤',
     vsWaitAnswer: '等待 %1 应答… 上方的印记同样可用', vsDeclined: '%1 拒绝了召唤 — 分享印记，或挑战他人', vsShareInvite: '✶ 分享邀请链接',
@@ -1310,6 +1326,8 @@ const SS_STR = {
     vsFind: 'प्रतिद्वंद्वी खोजें', vsFindSub: 'खुले आकाश तले त्वरित मुकाबला', vsOrSeal: '— या किसी आह्वान का उत्तर दें —',
     vsOrReach: '— या स्वयं किसी जादूगर तक पहुँचें —', vsByName: 'नाम से', vsNamePh: 'किसी जादूगर का नाम', vsNameSeek: 'तारों के बीच %1 को खोज रहे हैं…',
     vsNameNone: '%1 नाम का कोई जादूगर नहीं — वर्तनी जाँचें और फिर कोशिश करें', vsNameSelf: 'यह आपका ही नाम है — तारे आपको स्वयं के विरुद्ध नहीं खड़ा करेंगे', vsWaitAway: '%1 आकाश से दूर है — आपका आह्वान उसके तारों तले उसके लौटने तक प्रतीक्षा करेगा', vsWaitBusy: '%1 द्वंद्व के बीच है — आपका आह्वान उसके समाप्त होने तक प्रतीक्षा करेगा',
+    // recent rivals (v0.55.0, task 44)
+    vsRecentHead: '— हाल के प्रतिद्वंद्वी —', vsNoRecent: 'अभी कोई प्रतिद्वंद्वी नहीं — तुम्हारा पहला द्वंद्व यहाँ पहला नाम लिखेगा', vsAgoTonight: 'आज रात', vsAgoLastNight: 'कल रात', vsAgoNights: '%1 रातें पहले', vsAgoLong: 'बहुत पहले', vsAgain: '⚔ फिर से',
     vsSeal: 'मुहर कोड डालें', vsNoSky: 'विस्तृत आकाश पहुँच से बाहर है —\nद्वंद्व के लिए कनेक्शन चाहिए', vsConsult: 'तारों से पूछ रहे हैं…',
     vsRefused: 'तारों ने मना कर दिया — फिर कोशिश करें', vsColdSeal: 'वह मुहर किसी की नहीं सुनती', vsSent: '%1 को आह्वान भेजा गया',
     vsWaitAnswer: '%1 के उत्तर की प्रतीक्षा… ऊपर की मुहर भी काम करती है', vsDeclined: '%1 ने आह्वान ठुकरा दिया — मुहर साझा करें, या किसी और को चुनौती दें', vsShareInvite: '✶ आमंत्रण लिंक साझा करें',
@@ -1469,6 +1487,8 @@ const SS_STR = {
     vsFind: 'ابحث عن خصم', vsFindSub: 'مباراة سريعة تحت السماء المفتوحة', vsOrSeal: '— أو لبِّ نداءً —',
     vsOrReach: '— أو ابحث عن ساحر بنفسك —', vsByName: 'بالاسم', vsNamePh: 'اسم ساحر', vsNameSeek: 'نبحث عن %1 بين النجوم…',
     vsNameNone: 'لا ساحر يحمل الاسم %1 — تحقّق من الكتابة وحاول مجددًا', vsNameSelf: 'هذا اسمك أنت — لن تضعك النجوم في مواجهة نفسك', vsWaitAway: '%1 بعيد عن السماء — نداؤك ينتظر تحت نجومه حتى يعود', vsWaitBusy: '%1 في خضمّ مبارزة — نداؤك ينتظر انتهاءها',
+    // recent rivals (v0.55.0, task 44)
+    vsRecentHead: '— الخصوم الأخيرون —', vsNoRecent: 'لا خصوم بعد — مبارزتك الأولى تكتب الاسم الأول هنا', vsAgoTonight: 'الليلة', vsAgoLastNight: 'ليلة أمس', vsAgoNights: 'قبل %1 ليالٍ', vsAgoLong: 'منذ زمن', vsAgain: '⚔ مجددًا',
     vsSeal: 'أدخل رمز الختم', vsNoSky: 'السماء الواسعة بعيدة المنال —\nالمبارزات تحتاج اتصالًا', vsConsult: 'نستشير النجوم…',
     vsRefused: 'رفضت النجوم — حاول مجددًا', vsColdSeal: 'هذا الختم لا يجيب أحدًا', vsSent: 'أُرسل النداء إلى %1',
     vsWaitAnswer: 'بانتظار رد %1… الختم أعلاه يعمل أيضًا', vsDeclined: 'رفض %1 النداء — شارك الختم أو تحدَّ غيره', vsShareInvite: '✶ شارك رابط الدعوة',

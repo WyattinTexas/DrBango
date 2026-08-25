@@ -413,7 +413,8 @@ const SSNET = (() => {
        invites/{toUid}/{from}= {name, code, mode, at}   a challenge = a private
                                room already sealed by the challenger; accepting
                                is just joining it by code
-       recent/{uid}/{fuid}   = {name, at}      the last few rivals, for one-tap adds
+       recent/{uid}/{fuid}   = {name, at}      the last few rivals — the VERSUS
+                               RECENT roll (rematch / summons) and one-tap adds
      One live snapshot of all four is kept here and every UI that cares
      subscribes with FR.on(cb) — the versus menu, the summons banner, the
      home button's "friends online" line. Nothing here touches Phaser. */
@@ -458,13 +459,21 @@ const SSNET = (() => {
     // display name: presence carries the freshest one, the friend record a snapshot
     nameOf(fuid) { const p = this.presence[fuid], f = this.friends[fuid], r = this.recent[fuid]; return (p && p.name) || (f && f.name) || (r && r.name) || '???'; },
     list() {   // friends, online first, then most recently added
-      return Object.entries(this.friends).map(([id, f]) => ({ id, name: this.nameOf(id), at: (f && f.at) | 0, online: this.isOnline(id), busy: this.isBusy(id) }))
+      return Object.entries(this.friends).map(([id, f]) => ({ id, name: this.nameOf(id), at: +(f && f.at) || 0, online: this.isOnline(id), busy: this.isBusy(id) }))
         .sort((a, b) => (b.online - a.online) || (b.at - a.at));
     },
     onlineCount() { return Object.keys(this.friends).filter((id) => this.isOnline(id)).length; },
+    // everyone I crossed swords with lately, newest first — friends too
+    // (task 44: the VERSUS RECENT roll), with the live glint the friends
+    // roll wears; `at` is when that duel began
+    recentList(n) {
+      return Object.entries(this.recent).filter(([id, r]) => r && id !== uid())
+        .map(([id, r]) => ({ id, name: this.nameOf(id), at: +(r && r.at) || 0, online: this.isOnline(id), busy: this.isBusy(id), friend: !!this.friends[id] }))
+        .sort((a, b) => b.at - a.at).slice(0, n || 6);
+    },
     rivals(n) {   // recent rivals who aren't friends yet, newest first
       return Object.entries(this.recent).filter(([id]) => !this.friends[id] && id !== uid())
-        .map(([id, r]) => ({ id, name: this.nameOf(id), at: (r && r.at) | 0 })).sort((a, b) => b.at - a.at).slice(0, n || 6);
+        .map(([id, r]) => ({ id, name: this.nameOf(id), at: +(r && r.at) || 0 })).sort((a, b) => b.at - a.at).slice(0, n || 6);
     },
     pending() {   // live challenges to me, newest first
       const cut = Date.now() - this.INVITE_MS;
@@ -491,7 +500,7 @@ const SSNET = (() => {
       if (!fuid || fuid === uid()) return;
       try {
         const cur = Object.assign({}, this.recent, { [fuid]: { name: name || '???', at: Date.now() } });
-        const keep = Object.entries(cur).sort((a, b) => (b[1].at | 0) - (a[1].at | 0)).slice(0, 8);
+        const keep = Object.entries(cur).sort((a, b) => (+b[1].at || 0) - (+a[1].at || 0)).slice(0, 8);   // (| 0 would fold a ms stamp to 32 bits)
         await dbSet('recent/' + uid(), Object.fromEntries(keep));
       } catch (e) { }
     },

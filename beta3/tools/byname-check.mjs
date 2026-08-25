@@ -129,6 +129,7 @@ ok('registry holds both names', (await rt('names/' + kA)) === UA && (await rt('n
 ok('SSNET.findByName folds case and spacing to the uid', await A.ev(`SSNET.findByName('  ' + ${JSON.stringify(NB.toLowerCase().replace(' ', '   '))} + ' ').then(r => r && r.uid === ${JSON.stringify(UB)} && r.name === ${JSON.stringify(NB)})`));
 ok('SSNET.findByName misses honestly', await A.ev(`SSNET.findByName('Nobody Here ${rnd()}').then(r => r === null)`));
 ok('A sees B online', await A.until(`SSNET.FR.isOnline(${JSON.stringify(UB)})`, 20000));
+errs.length = 0;   // a dropped/aborted first navigate (nav above) leaves a half-loaded document's noise behind
 
 // ---- 1. A challenges B by typed name (sloppy case), B accepts, the duel starts ----
 ok('A opens VERSUS (BY NAME door built)', await toMenu(A));
@@ -171,6 +172,11 @@ await sleep(800);
 ok('own name: no lobby, no input, menu free', await A.ev(`game.scene.isActive('vsmenu') && !game.scene.isActive('vsbattle') && !document.getElementById('ss-overlay-input') && !game.scene.getScene('vsmenu').busyC`));
 
 // ---- 3. offline: B is closed, the bell lands and stands, B arrives later and answers ----
+// a parked headless tab keeps its socket for a minute or more (the server's
+// onDisconnect fires late — recent-check found it) — leave the sky the way a
+// phone losing signal does, through the client's own goOffline, then park
+await B.ev(`firebase.database().goOffline(); 1`).catch(() => { });
+await sleep(800);
 await B.park();
 ok('A sees B leave the sky', await A.until(`!SSNET.FR.isOnline(${JSON.stringify(UB)})`, 40000));
 ok('BY NAME opens the input', await tapByName(A));
