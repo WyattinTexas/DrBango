@@ -35053,7 +35053,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.04';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.05';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -37551,6 +37551,19 @@ const EV_POLL_MS=30000;        // the /event/state beat on the menu (the server'
 const EV_AFK_S=30;             // D13: the you-there window before the bell (0 = no AFK check)
 const EV_POP_S=300;            // 0506 THE T−5 CARD (Wyatt 8/23: "5 minutes before, it should show up"): the PRIME TIME card deals a second time at evIn()<=EV_POP_S, once per bell per launch, the menu only (0 = off). ⚑ 300 (default) · 600 · a battle toast at T−5 too
 const EV_SNOW=1;               // the winter skin's snowfall while live (two sheets — "doubles")
+// ═══ 0530 THE NIGHT GATE (FM-GVT-NEWBIE-01 §4; Wyatt 8/24: "3) Yes hold off night events until they are
+// level 9") — until NIGHT_MIN_LVL campaign rungs are beaten the night war does not PITCH: the launch card
+// (evAnnTry), the T−5 card (evPopTry), the desert's announce + JOIN cards (bdAnnTry / bdPopTry) and the band
+// the two events light on the room (evBandState → 'none': no chip, no INVASION door, no cones, no dusk, no
+// snow) all deal nothing. ⚠ THE 0522b SEQUENCE LAW: the gate sits ABOVE both the deal and the once-ever
+// latch — META.evSeen and EVD.annWk stay unwritten below the rung, so a cradled player's once is not burned;
+// their first pitch lands the first night at rung 9+. HQ, evSync and the state reads on the menu beat
+// (evState / bdState) are untouched — the events run for everyone else on the same bells, and the clock
+// truth keeps flowing so the band paints the moment the rung is beaten. A room code from a friend still
+// opens its door: the gate holds the PITCHES, it never polices a door a friend opens (evJoin / bdJoin / the
+// lobby untouched — zero wire). ⚑ 9 (default: nine rungs beaten) · 8 = "while playing rung 9" · 0 = off
+const NIGHT_MIN_LVL=9;
+function nightGateOpen(){ return (META.campaign|0)>=NIGHT_MIN_LVL; }   // the one read every pitch makes first (the roomGiftDue idiom)
 // ═══ 0516 THE BATTLE OF THE DESERT (design/feedback-0823-eve/00-FEEDBACK.md §2; Wyatt 8/23 note 10 +
 // the 20:16 ruling "Make sure the Battle of the Desert is top priority so we can play it tonight") — the
 // SECOND event door, on the BATTLEGROUND room family. HQ (server v37) rings a nightly bell at 22:00 ET
@@ -37630,6 +37643,7 @@ function bdYetiRung(){ return !BD_ANN_AFTER_YETI || (EV.bell>0 && evNow()>=EV.be
 // THE ANNOUNCE CARD: once per launch, the quiet landing, after the yeti bell, never sealed; a landing already
 // inside the JOIN window gets the JOIN card and spends both latches (one card per landing — the 0506 law)
 function bdAnnTry(){
+  if(!nightGateOpen()) return false;   // 0530 THE NIGHT GATE — above the desert's deal and its session latch (BDD.annWk stays unwritten below the rung)
   const st=bdDoorState();
   if(!BD.wk || !(BD.bell>0) || st==='none' || st==='sealed' || BDD.annWk===BD.wk) return false;
   if(!bdYetiRung()) return false;
@@ -37642,6 +37656,7 @@ function bdAnnTry(){
 // THE T−5 JOIN CARD: while the doors are open — once per bell per LANDING (evDoorStart clears the latch), and
 // again BD_REDEAL_MS after a ✕ — so a commander at HQ can always reach JOIN within one tap
 function bdPopTry(){
+  if(!nightGateOpen()) return false;   // 0530 THE NIGHT GATE: the JOIN card waits for the rung too
   if(!(BD_POP_S>0) || !(BD.bell>0)) return false;
   if(bdDoorState()!=='live' || bdIn()>BD_POP_S) return false;
   if(BDD.popBell===BD.bell && !(BD_REDEAL_MS>0 && Date.now()-BDD.popT>BD_REDEAL_MS)) return false;
@@ -37793,6 +37808,7 @@ function evBandWake(){   // the epoch the band wakes: EV_BAND_FROM_H:00 on the b
   EVD.wakeFor=EV.bell; EVD.wake=w; return w;
 }
 function evBandState(){
+  if(!nightGateOpen()) return 'none';   // 0530 THE NIGHT GATE: below the rung the room lights no chip and no door (the two door states stand — the cards read the gate themselves)
   const st=evDoorState();
   if(st==='quiet') return (evNow()<evBandWake())? 'none' : 'quiet';
   if(st!=='sealed') return st;   // none · live
@@ -37923,6 +37939,7 @@ function evPopLine(){ return tf('THE CASTLE IS UNDER SIEGE IN %1 — TAP THE INV
 // night; the desert JOIN card (bdAnnTry) keeps 0516's own law. ⚑ alt: once per NIGHT (META.evSeen===EV.wk).
 // Reversal for a rig / for Wyatt: GVT.evSeen(0).
 function evAnnTry(){
+  if(!nightGateOpen()) return false;   // 0530 THE NIGHT GATE — ABOVE the deal AND the 0522b once-ever latch: below the rung neither META.evSeen nor EVD.annWk is written, the once is kept for the first night at rung 9+
   const st=evDoorState();
   if(!EV.wk || !(EV.bell>0) || st==='none' || st==='sealed' || EVD.annWk===EV.wk || META.evSeen) return false;   // 0522b: META.evSeen = seen once, seen for good
   if(!evAnnQuiet()) return false;
@@ -37936,6 +37953,7 @@ function evAnnTry(){
 // (EVD.popBell), the same quiet-landing rules, the MENU only — a commander mid-battle is never
 // interrupted (⚑ a battle toast). The marquee band behind it is already breathing THE INVASION.
 function evPopTry(){
+  if(!nightGateOpen()) return false;   // 0530 THE NIGHT GATE: the T−5 card waits for the rung too
   if(!(EV_POP_S>0) || !(EV.bell>0) || EVD.popBell===EV.bell) return false;
   if(evDoorState()!=='live' || evIn()>EV_POP_S) return false;
   if(!evAnnQuiet()) return false;
@@ -78552,6 +78570,7 @@ window.GVT = {
   bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), band:evBandState(), fielded:(S.bf&&S.bf.bd)? (S.bf.bdN|0) : 0, teamMin:BD_TEAM_MIN, live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, e:s.empty?1:0, k:s.kit?1:0, n:s.name })) : null, note:BD.note }; },
   evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read
   evSeen(v){ if(v===0||v===false) delete META.evSeen; else if(v!=null) META.evSeen=String(v); saveMeta(); return META.evSeen||null; },
+  nightGate(){ return { open:nightGateOpen(), lvl:NIGHT_MIN_LVL, camp:META.campaign|0, band:evBandState(), door:evDoorState(), bd:bdDoorState(), seen:META.evSeen||null, annWk:EVD.annWk||null, popBell:EVD.popBell|0, bdAnnWk:BDD.annWk||null, bdPopBell:BDD.popBell|0, el:!!document.getElementById('evDoor'), spots:!!document.getElementById('evSpots'), snow:!!document.getElementById('evSnow'), pop:!document.getElementById('milePop').classList.contains('hidden'), band0:(b=>b? b.textContent : null)(document.querySelector('#milePop .mb-band')), head:(h=>h? h.textContent : null)(document.querySelector('#milePop .mb-h')), mode:S.mode }; },   // 0530 THE NIGHT GATE — the rig's one read: the gate, the two door states, the band, the four latches, the DOM
   evTouch(){ evTouch(); return GVT.evDoor(); },
   evAfk(){ evAfkTick(); return GVT.evDoor(); },
   raid(tier){ if(tier==='u'){ RAID_CUR='ice'; startRaid('u'); return GVT.evRoom(); }   // 0484 rig: the tier on the solo door — ULTRA has no solo chip, this is the battery's door only
