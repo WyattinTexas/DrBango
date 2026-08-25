@@ -691,19 +691,15 @@
     font-size:clamp(9px,2vh,13px); }
   .ptySheet .pts-go.hold { background:linear-gradient(180deg,#8A6A25,#5E4718); border-color:#D8A845; }
   /* 0527 M1 — the hero: inside the launch column every face of ptyGoBtnHTML is BIG (the basis gives way before
-     the pickers do at a tight height — §2.4); the member-elsewhere GO wears the same size class and the group
-     blue (a lobby always stands behind that face) */
+     the pickers do at a tight height — §2.4). 0537 M2: the member-elsewhere column (ptyAwayColHTML) wears this
+     same skeleton — a .pts-next card on top, a .pts-go.grp hero beneath — so these rules and THE GROUP BLUE dress
+     it too; 0527's size rule for the bare away GO (the .pp-big under .pts-right) went with the face it sized —
+     the HQ sheet's compact .pts-awayp keeps its own rule below */
   .ptySheet .pts-right .pts-go { flex:1 1 clamp(64px,34vh,180px); min-height:0; justify-content:center;
     font-size:clamp(16px,3.6vh,26px); letter-spacing:0.07em; border-radius:14px; border-width:3px; border-bottom-width:5px;
     padding:clamp(8px,2vh,16px) clamp(8px,1.6vw,14px); text-wrap:balance; }   /* balance: a desktop wrap splits ⚔ DEPLOY! · / LEVEL 101, never LEVEL / 101 */
   .ptySheet .pts-right .pts-go small { font-size:clamp(9px,2vh,13px); }
   .ptySheet .pts-right .pts-go.mem { font-size:clamp(13px,2.9vh,20px); }
-  .ptySheet .pts-right .pts-awayp .pp-big { font-family:inherit; width:100%; flex:1 1 clamp(64px,34vh,180px); min-height:0;
-    font-size:clamp(16px,3.6vh,26px); letter-spacing:0.08em; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,0.4);
-    background:linear-gradient(180deg,#4DA6FF,#2b7fe0 52%,#2372cf); border:3px solid #1c5fb8; border-bottom-width:5px;
-    border-radius:14px; padding:clamp(8px,2vh,16px); cursor:pointer;
-    box-shadow:0 0 14px rgba(77,166,255,0.35), 0 5px 12px rgba(0,0,0,0.45); }
-  .ptySheet .pts-right .pts-awayp .pp-big:active { transform:translateY(1px); }
   .ptySheet .pts-leave { font-family:inherit; flex:0 0 auto; font-size:clamp(8px,1.8vh,12px);
     color:var(--pmut); background:none; border:1px solid var(--ppb); border-radius:8px;
     padding:clamp(3px,0.8vh,6px) 8px; cursor:pointer; opacity:0.8; }
@@ -34392,7 +34388,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='5.91';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='5.92';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -38430,6 +38426,20 @@ function ptyDoorFace(here){
 }
 // 0518b D16 THE HANDSHAKE SWEEP: ptyDoorGlyph retired — the door face is
 // its words alone (INVITE · your code · PARTY · n · AT %1 →), no glyph.
+// 0537 M1 — THE LAW MEETS EVERY DOOR: the LOCATION LAW's stamps, ONE helper (ptyToggle's own lines, verbatim —
+// the party MOVES to `here`: the chairs shut, the pick voids, the lone search ends, the leader's word rides the
+// next poll). Three doors speak it: ptyToggle (the door's PARTY button), UI.party's solo host, and — new — the
+// door render itself (renderPartySheet), so the party is where the LEADER'S OPEN SHEET STANDS: the HQ GROUP
+// button → any door, a GO → walk, a post-battle door with the sheet still open — every one moves the party the
+// way the PARTY button always did, and the leader never meets the member-elsewhere face (the 8/24 screenshot:
+// the campaign door under a sheet that said AT DINO PARK). The door booms (M3) pass kick=false — their own
+// UI.coopDeploy fires the same beat, so the move and the order ride ONE request (the server applies plc before
+// set:'battle'; a poll already in flight carries both on the next beat, the deploy-race law).
+function ptyMoveHere(here, kick){
+  COOP.wantPlc=here; COOP.plc=here; COOP.pub=0; COOP.pick=''; PTY_LFG=null; PTY.place=here;
+  if(kick===false) return;
+  clearTimeout(COOP.pollT); coopTick();
+}
 function ptyToggle(){
   const here=ptyPlaceNow(); if(!here) return;
   const L=ptyLobby(), plc=L? ptyPlace() : null;
@@ -38438,10 +38448,8 @@ function ptyToggle(){
     // THE LOCATION LAW: the party is where the LEADER's sheet was opened
     // last — a leader opening PARTY elsewhere MOVES it (pub shuts, pick
     // voids server-side); members elsewhere get the GO face instead.
-    if(L && COOP.host && plc!==here){
-      COOP.wantPlc=here; COOP.plc=here; COOP.pub=0; COOP.pick=''; PTY_LFG=null;
-      clearTimeout(COOP.pollT); coopTick();
-    }
+    // 0537 M1: the stamps live in ptyMoveHere (the door render speaks them too).
+    if(L && COOP.host && plc!==here) ptyMoveHere(here);
   } else { PTY.open=0; PTY.inv=0; PTY.rep=0; }
   ptyRender();
   if(PTY.open){ clearTimeout(CREW.pollT); crewTick(); }   // fresh presence for the HERE column
@@ -39327,9 +39335,16 @@ function renderPartySheet(){
   el.className='ptySheet th '+skin;
   const L=ptyLobby(), n=L? (COOP.members||[]).length : 1;
   if(L && n===1) coopBotArmed(null,1);                 // PAD LAW: the pretend chairs arm on the sheet's own clock
-  const plc=L? (ptyPlace()||here) : here;
+  let plc=L? (ptyPlace()||here) : here;
   const lead=L? (COOP.members||[]).find(m=>m.host) : null;
-  const away=L? (plc!==here) : false;                  // a MEMBER looking at a party parked elsewhere
+  let away=L? (plc!==here) : false;                    // a MEMBER looking at a party parked elsewhere
+  // 0537 M1 THE LAW MEETS EVERY DOOR: the party is where the LEADER'S OPEN SHEET STANDS — the host's sheet painting
+  // at a door the party is not parked at moves it there (ptyToggle's own condition + stamps: the HQ GROUP button →
+  // a door, a GO → walk, a post-battle door with the sheet still open all land here) and this very render paints
+  // the deploy column. Never a loop: the first stamp makes the place `here`; a stale poll echo re-fires it ONCE and
+  // the next beat converges (b7). A place word the client does not know ('ev' — the event room) is the SERVER's
+  // and never ours to move (the server would refuse it every beat).
+  if(L && COOP.host && ptyPlace()!==here && !(COOP.plc && !PTY_PLACES[COOP.plc])){ ptyMoveHere(here); plc=here; away=false; }
   const flo= (skin==='th-yeti')? '❄ ❄ ❄' : (skin==='th-dino')? '🌿 🥚 🌿' : (skin==='th-west')? '★ WANTED ★' : '';
   let h='<div class="pts-head" data-notr><span class="pts-t"><b>'+escH(t('PARTY'))+'</b></span>'
     +'<span class="pts-at">'+escH(tf('AT %1', ptyPlaceName(plc)))+'</span>'
@@ -39344,7 +39359,7 @@ function renderPartySheet(){
   // .pts-pick (the .lk2 member lock must never swallow the wish button — §3 trap 4), every face big; the replay
   // chips live behind the corner button (PTY.rep — the drop panel is an overlay on .pts-cols, never a reflow);
   // the foot bar keeps LEAVE alone.
-  h+='<div class="pts-right">'+(away? ptyAwayHTML(plc) : ptyPickerHTML(here)+ptyGoBtnHTML(here))+'</div>'
+  h+='<div class="pts-right">'+(away? ptyAwayColHTML(plc) : ptyPickerHTML(here)+ptyGoBtnHTML(here))+'</div>'   // 0537 M2: the away column wears the launch column's own skeleton (card + hero)
     +(away? '' : ptyRepDropHTML(here))+'</div>';
   h+='<div class="pts-gobar">'
     +(L? '<button type="button" class="pts-leave" onclick="ptyLeaveGo()">✕ '+escH(t('LEAVE THE PARTY'))+'</button>' : '')+'</div>';
@@ -39636,10 +39651,27 @@ function ptyStateHTML(here){
   if(COOP.host) return '<button type="button" class="pts-state" data-notr onclick="ptyLfm()">'+face+'</button>';
   return '<div class="pts-state dim" data-notr>'+face+'</div>';
 }
-// the member-elsewhere face (R7): the party's place + one big GO
+// the member-elsewhere face (R7): the party's place + one big GO — since 0537 the HQ sheet's edition alone (0515
+// D2 / W4: the muster hall launches nothing, its compact AT %1 / GO → stays); the DOOR column is ptyAwayColHTML
 function ptyAwayHTML(plc){
   return '<div class="pts-awayp" data-notr><div class="pp-head">'+escH(tf('AT %1', ptyPlaceName(plc)))+'</div>'
     +'<button type="button" class="pp-big" onclick="ptyGoWalk(\''+escH(String(plc))+'\')">'+escH(t('GO'))+' →</button></div>';
+}
+// 0537 M2 — THE MEMBER'S AWAY FACE, BUILT TO THE DESIGN (Wyatt 8/24 eve, the campaign door painting ONE giant blue
+// GO → over nothing: "looks nothing compared to what we designed"). The door sheet's member-elsewhere column wears
+// the 0527 skeleton: a .pts-pick holding ONE .pts-next card (YOUR PARTY · AT %1 · ⚑ %1 STARTS THE BATTLE — the .mem
+// face's own leader line; no leader on the roster → no third line; no king, no chips) over the hero — a .pts-go.grp
+// SIBLING of .pts-pick (0527 §3 trap 4: never inside a pointer-events:none lock) that inherits the launch column's
+// size rule and THE GROUP BLUE, labelled GO → %1 (the word GO + ' → ' + the place name — every locale composes the
+// same way, zero new keys). A tap walks there (ptyGoWalk). No REPLAY corner, no drawer (nothing to replay elsewhere).
+function ptyAwayColHTML(plc){
+  const ld=(COOP.members||[]).find(m=>m.host);
+  return '<div class="pts-pick"><div class="pts-next on" data-notr><span class="nu">'+escH(t('YOUR PARTY'))+'</span>'
+    +'<b>'+escH(tf('AT %1', ptyPlaceName(plc)))+'</b>'
+    +(ld? '<small>⚑ '+escH(tf('%1 STARTS THE BATTLE', String(ld.name||'ALLY').toUpperCase().slice(0,12)))+'</small>' : '')
+    +'</div></div>'
+    +'<button type="button" class="pts-go grp" data-notr onclick="ptyGoWalk(\''+escH(String(plc))+'\')">'
+    +escH(t('GO'))+' → '+escH(ptyPlaceName(plc))+'</button>';
 }
 // ---- THE PICKERS (R2-R4) — this place's own levels ----
 function ptyPickerHTML(here){
@@ -40398,7 +40430,15 @@ function crewCampBoom(n){
   if((COOP.members||[]).length<2) return Promise.resolve(false);   // party of one marches alone (Wyatt's own example)
   CREW.gatedLaunch=1;                    // v2.82 SQUAD AD LAW: 2+ humans launch ad-free (the break rides the verdict exit)
   const lvl=(n|0)>0? (n|0) : 0;          // v2.73: the tapped replay chip names the party's level
-  if(COOP.host){ UI.coopDeploy(lvl); }
+  if(COOP.host){
+    // 0537 M3 THE LEADER'S DEPLOY IS THE LEADER'S WORD: a party parked elsewhere moves to THIS door first (the
+    // stamps alone — coopDeploy's own kick carries plc + the order in ONE request, and the server applies the
+    // move before the flip), so every head chip, every sheet and an absent member's CATCH UP card name THE
+    // CAMPAIGN — the truth of where the battle is (the 8/24 side note: "brings them both into a regular campaign
+    // game" under a sheet that said DINO PARK). ⚑ W3's alternative: refuse + toast AT %1 + walk the leader there.
+    if(ptyPlace()!=='c') ptyMoveHere('c', false);
+    UI.coopDeploy(lvl);
+  }
   else {
     COOP.crewCamp=true; COOP.campWish={lvl:lvl}; CREW.campGo=COOP.code; CREW.campGoLvl=lvl;   // both wish wires — the party's own stamps + the old crew line for a mixed-window host
     clearTimeout(COOP.pollT); coopTick();
@@ -66545,7 +66585,11 @@ function crewParkBoom(park, n){
   if(!parkSceneOpen() || !(COOP && coopSquad() && COOP.code)) return Promise.resolve(false);
   if((COOP.members||[]).length<2) return Promise.resolve(false);
   CREW.gatedLaunch=1;                    // v2.82 SQUAD AD LAW: 2+ humans launch ad-free
-  if(COOP.host){ COOP.wantPark={ id:park, n:n|0 }; UI.coopDeploy(0); }
+  if(COOP.host){
+    const pw=(park==='western')? 'west' : park;      // the park's place word (PTY_PLACES: yeti · dino · west)
+    if(ptyPlace()!==pw) ptyMoveHere(pw, false);      // 0537 M3: the leader's deploy is the leader's word — one law, every door (crewCampBoom's note)
+    COOP.wantPark={ id:park, n:n|0 }; UI.coopDeploy(0);
+  }
   else {
     COOP.crewCamp=true; const enc=(park==='dino'?2000:park==='western'?5000:1000)+(n|0);   // v3.35: the dino park speaks the 2000-band — same clamp window (1..9999), the bands can never collide (0339: the outlaws speak 5000 — 3000/4000 are the raids')
     COOP.campWish={lvl:enc}; CREW.campGo=COOP.code; CREW.campGoLvl=enc;   // the banded encoding rides both wish wires
@@ -66902,7 +66946,10 @@ function crewRaidBoom(tier){
   if((COOP.members||[]).length<2) return Promise.resolve(false);
   const n=RAID_TIERS.indexOf(tier)+1, rk=(RAID_CUR==='bone')?'bone':(RAID_CUR==='croak')?'croak':'ice';   // 0278e: the scene names the door (raidSceneOpen was asserted above; 0340: the hideout speaks too)
   CREW.gatedLaunch=1;                    // v2.82 SQUAD AD LAW: 2+ humans launch ad-free
-  if(COOP.host){ COOP.wantPark={ id:rk, n:n }; UI.coopDeploy(0); }
+  if(COOP.host){
+    if(ptyPlace()!==raidWordOf(rk)) ptyMoveHere(raidWordOf(rk), false);   // 0537 M3: one law, every door (hide · lair · ice — raidWordOf is the 0411a map)
+    COOP.wantPark={ id:rk, n:n }; UI.coopDeploy(0);
+  }
   else {
     COOP.crewCamp=true; const enc=(rk==='bone'?4000:rk==='croak'?6000:3000)+n;   // v3.39: the ice band 3000+n; 0278e: the bone band 4000+n; 0340: the hideout band 6000+n (5000 is the outlaw park's) — the same 1..9999 clamp window, the bands can never collide
     COOP.campWish={lvl:enc}; CREW.campGo=COOP.code; CREW.campGoLvl=enc;
@@ -73637,10 +73684,7 @@ window.UI = {
     // by code would be walked to the stale place while the host sits here).
     const L=ptyLobby(), plc=L? ptyPlace() : null, here=ptyPlaceNow();
     if((L? (COOP.members||[]).length:0)<2){
-      if(L && COOP.host && here && plc!==here){
-        COOP.wantPlc=here; COOP.plc=here; COOP.pub=0; COOP.pick=''; PTY_LFG=null; PTY.place=here;
-        clearTimeout(COOP.pollT); coopTick(); ptyRender();
-      }
+      if(L && COOP.host && here && plc!==here){ ptyMoveHere(here); ptyRender(); }   // 0537 M1: the one helper (the stamps + the kick, byte-same)
       ptyInviteCard();
     }
     else ptyToggle(); },
