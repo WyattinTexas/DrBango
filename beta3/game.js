@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.51.0';
+const BUILD = 'STARSPELL v0.52.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4248,11 +4248,13 @@ class Home extends Phaser.Scene {
       { y: 420, h: 58, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.campaignDoor() },
       // NEW GAME: a fresh climb (warned first when a checkpoint stands)
       { y: 488, h: 58, label: SS_T('newCamp'), key: 'newcamp', dark: true, fn: () => this.newCampaign() },
-      { y: 556, h: 46, label: SS_T('board'), key: 'board', fn: () => { SFX.ui(); this.scene.start('board'); }, dark: true },
+      // LEADERBOARD left the meadow for the profile (v0.52.0): the column is
+      // play modes only — the profile chip up in the corner is the door to
+      // the night's finest now.
       // PROFILE moved to the chip up in the corner, which frees this row for
       // VERSUS — it is a play mode, so it gets a real button like the rest.
       // Its sub-line is the live friends counter, and nothing else.
-      { y: 624, h: 58, label: SS_T('versus'), sub: '', key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
+      { y: 556, h: 58, label: SS_T('versus'), sub: '', key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
     ];
     this.rowSubs = {};
     this.rowLabels = {};
@@ -4276,8 +4278,8 @@ class Home extends Phaser.Scene {
       b.on('pointerout', () => b.setDisplaySize(l.u(300), l.u(r.h)));
     }
     /* the column owns its shape (v0.51.0): the rows that stand are laid 68
-       apart, centred on the band's middle (522) — four rows read 420..624,
-       three read 454..590, and no gap is ever left where a hidden door
+       apart, centred on the band's middle (522) — three rows read 454..590,
+       two read 488..556, and no gap is ever left where a hidden door
        would be. `snap` skips the glide (first paint, any change under a
        veil); a live change slides the meadow's furniture, never jumps it. */
     this.layoutMenu = (snap) => {
@@ -7146,16 +7148,31 @@ class Profile extends Phaser.Scene {
     const dressVeil = () => veilT.setText(SS_T('rVeilRow') + ':  ' + (SS.prof.rhide ? '☾ ' + SS_T('rVeiled') : '✦ ' + SS_T('rShown')));
     dressVeil();
     veilT.on('pointerdown', () => { SFX.ui(); SS.prof.rhide = !SS.prof.rhide; SS.save(); SS.sync(); dressVeil(); });
+
+    /* THE DOOR TO THE NIGHT'S FINEST (v0.52.0, Wyatt 8/25): the leaderboard
+       left the meadow's column and lives here, right under your standing —
+       the same dress as the sky door below. The Board is told where it was
+       opened from so its back link returns HERE, never to the meadow. */
+    const lbB = this.leaderB = this.add.image(l.x(0), l.y(179), ssBtn(this, true, 236, 34)).setDisplaySize(l.u(236), l.u(34))
+      .setInteractive({ useHandCursor: true });
+    const lbT = this.leaderT = ssTxt(this, l.x(0), l.y(179), '✦  ' + SS_T('board') + '  ›', l.u(12.5), '#e8c86a')
+      .setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(7), true, true);
+    // a long word for it (CLASIFICACIÓN, لوحة الصدارة) fits the door, never spills it
+    if (lbT.width > l.u(216)) lbT.setScale(l.u(216) / lbT.width);
+    const openBoard = () => { SFX.ui(); this.scene.start('board', { from: 'profile' }); };
+    lbB.on('pointerdown', openBoard);
+    lbT.setInteractive({ useHandCursor: true }).on('pointerdown', openBoard);
+
     const rows = [
       ['runs begun', p.runs], ['runs won', p.wins], ['beasts felled', p.beasts],
       ['words woven', p.words], ['finest word', p.longest ? p.longest.toUpperCase() : '—'],
       ['mightiest hit', p.bigHit || '—'], ['best quick play', p.bestQuick || '—'],
       ['versus victories', p.vsWins || '—'],
     ];
-    // 26 apart, not 30: the drip's door had to come from somewhere, and the
-    // ledger's own rows were the only slack above the achievement grid
+    // 23 apart, not 26: the leaderboard's door had to come from somewhere,
+    // and the ledger's own rows were the only slack above the sky door
     rows.forEach(([k, v], i) => {
-      const y = l.y(170 + i * 26);
+      const y = l.y(205 + i * 23);
       ssTxt(this, l.x(-150), y, k, l.u(13), '#8a94c4').setOrigin(0, 0.5);
       ssTxt(this, l.x(150), y, String(v), l.u(13), '#f0e8d2').setOrigin(1, 0.5);
     });
@@ -7163,7 +7180,7 @@ class Profile extends Phaser.Scene {
     // the zodiac strip: every campaign sign, burning gold once cleared under.
     // Cleared glyphs wear their element color's glow; the rest hang dim.
     SS_ZODIAC.forEach((z, i) => {
-      const x = l.x(-165 + i * 30), y = l.y(372);
+      const x = l.x(-165 + i * 30), y = l.y(386);
       const sr = p.signs[z.id];
       const cleared = !!(sr && sr.clears > 0);
       ssZodiacGlyph(this, z, l.u(0.085), x, y, cleared ? 0xffd77a : 0x39406b, cleared ? 1 : 0.8);
@@ -7174,9 +7191,9 @@ class Profile extends Phaser.Scene {
        list is the bar you are chasing between runs. It reads out how much of
        the sky you hold, and opens the same panel the inspector does — held
        above, STILL SLEEPING below. */
-    const doorB = this.add.image(l.x(0), l.y(398), ssBtn(this, true, 236, 34)).setDisplaySize(l.u(236), l.u(34))
+    const doorB = this.add.image(l.x(0), l.y(412), ssBtn(this, true, 236, 34)).setDisplaySize(l.u(236), l.u(34))
       .setInteractive({ useHandCursor: true });
-    const doorT = ssTxt(this, l.x(0), l.y(398), '', l.u(12.5), '#e8c86a')
+    const doorT = ssTxt(this, l.x(0), l.y(412), '', l.u(12.5), '#e8c86a')
       .setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(7), true, true);
     // the count is DRESSED, never baked: a rite can hand a sigil over while
     // this scene is alive, and a door still reading 12 / 24 would be a lie
@@ -7195,12 +7212,13 @@ class Profile extends Phaser.Scene {
     doorB.on('pointerdown', openSkies);
     doorT.setInteractive({ useHandCursor: true }).on('pointerdown', openSkies);
 
-    ssTxt(this, l.x(0), l.y(428), '— ACHIEVEMENTS  ' + Object.keys(p.ach).length + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
-    // the grid is 23 deep now (the lantern's three marks) — 12 rows at 28
+    ssTxt(this, l.x(0), l.y(441), '— ACHIEVEMENTS  ' + Object.keys(p.ach).length + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
+    // the grid is 23 deep now (the lantern's three marks) — 12 rows at 27
     // apart is the last spacing that keeps the whole ledger above the seal
+    // (and 25 under the heading: at 20 the first row's names kissed it)
     SS_ACH.forEach((a, i) => {
       const col = i % 2, row = Math.floor(i / 2);
-      const x = l.x(col === 0 ? -100 : 100), y = l.y(448 + row * 28);
+      const x = l.x(col === 0 ? -100 : 100), y = l.y(466 + row * 27);
       const got = !!p.ach[a.id];
       ssTxt(this, x - l.u(88), y, a.icon, l.u(14), got ? '#ffd77a' : '#39406b').setOrigin(0.5);
       ssTxt(this, x - l.u(68), y - l.u(7.5), a.name, l.u(10.5), got ? '#f0e8d2' : '#4a5480').setOrigin(0, 0.5);
@@ -7235,15 +7253,21 @@ class Profile extends Phaser.Scene {
    ============================================================ */
 class Board extends Phaser.Scene {
   constructor() { super('board'); }
-  create() {
+  create(data) {
     const l = ssLayout(this);
     ssMakeTextures(this);
     ssStarfield(this, 110);
     // a faint gold dawn crowns the summit of the list
     this.add.image(l.x(0), l.y(160), 'glowbig').setScale(l.u(2.6)).setTint(0xd7b45c).setAlpha(0.05).setBlendMode('ADD');
 
-    const back = ssTxt(this, l.x(-195), l.y(24), '‹ ' + SS_T('home'), l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-    back.on('pointerdown', () => { SFX.ui(); this.scene.start('home'); });
+    // back goes to whoever opened the board — the profile since v0.52.0 —
+    // and the meadow when nobody said (a scene restart, a stray call)
+    this.from = data && data.from === 'profile' ? 'profile' : 'home';
+    // Phaser keeps a scene's last start data for a start() that passes none
+    // — spend it, so a bare restart of the board comes home, not somewhere stale
+    this.scene.settings.data = {};
+    const back = ssTxt(this, l.x(-195), l.y(24), '‹ ' + SS_T(this.from), l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    back.on('pointerdown', () => { SFX.ui(); this.scene.start(this.from); });
 
     // the title in the wordmark's gold letterpress, flanked by flourishes
     const tk = ssGoldTex(this, SS_T('lbTitle'), 19);

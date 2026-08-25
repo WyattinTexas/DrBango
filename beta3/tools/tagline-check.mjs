@@ -1,12 +1,18 @@
 // TAGLINE-CHECK — THE HOME MENU (v0.46.0 flavour cull · v0.47.0 campaign
-// doors · v0.51.0 THE HOME RESHAPE, Wyatt 8/25):
+// doors · v0.51.0 THE HOME RESHAPE · v0.52.0 LEADERBOARD INTO THE PROFILE,
+// Wyatt 8/25):
 //
-//   [CONTINUE GAME while a climb stands] · NEW GAME · LEADERBOARD · VERSUS
+//   [CONTINUE GAME while a climb stands] · NEW GAME · VERSUS
+//
+// - LEADERBOARD's button left the meadow (v0.52.0): the board is a door in
+//   the PROFILE now (under the star rating), its back link returning to the
+//   profile, and from there to the meadow. The column is play modes only:
+//   three rows read 454..590 with a checkpoint, two read 488..556 without.
 //
 // - CONTINUE GAME (contCamp) exists ONLY while a checkpoint stands. Without
 //   one it is NOT RENDERED AT ALL — no grey dress, no dead input, no gap: the
-//   column closes ranks (rows 68 apart, centred on 522 — four rows read
-//   420..624, three read 454..590). With one it is alive with its progress
+//   column closes ranks (rows 68 apart, centred on 522 — three rows read
+//   454..590, two read 488..556). With one it is alive with its progress
 //   line, exactly as v0.47.0 built it.
 // - QUICK PLAY's button left the meadow. The MODE lives on (daily chip,
 //   m:'quick' leaderboard rows, ?quick=1 boots a quick run for harnesses) —
@@ -77,7 +83,7 @@ const tap = async (expr) => {
 const HOME_REST = `!!window.game && game.scene.isActive('home')
   && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB && !game.scene.getScene('home').busy()`;
 const H = `game.scene.getScene('home')`;
-// the four rows, in design units — rowY is the layout's own truth (layoutMenu
+// the rows, in design units — rowY is the layout's own truth (layoutMenu
 // stamps it), vis carries the v0.51.0 render-or-not law
 const ROWS = `(() => { const h = ${H};
   const U = h.rowBtns.versus.displayWidth / 300;
@@ -90,11 +96,12 @@ const ROWS = `(() => { const h = ${H};
       hand: !!b.input && b.input.cursor === 'pointer' }; };
   return JSON.stringify({ campaign: row('campaign'), newcamp: row('newcamp'), board: row('board'), versus: row('versus'),
     quickBtn: 'quick' in h.rowBtns, quickTxt: h.children.list.some(o => o.type === 'Text' && o.text === SS_T('quick')),
+    boardBtn: 'board' in h.rowBtns, boardTxt: h.children.list.some(o => o.type === 'Text' && o.text === SS_T('board')),
     daily: h.dailyChipT.text,
     flavour: h.children.list.filter(o => o.type === 'Text' && /four acts|long night anew|then the Star Eater|duel beneath/.test(o.text)).length }) })()`;
 // the visible column: rowYs in order, 68 apart, centred on 522, no gap
 const column = (g) => ['campaign', 'newcamp', 'board', 'versus'].filter(k => g[k] && g[k].vis).map(k => g[k].rowY);
-const COL3 = [454, 522, 590], COL4 = [420, 488, 556, 624];
+const COL3 = [454, 522, 590], COL2 = [488, 556];
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 /* ---- the tagline, measured -------------------------------------------------
    game.renderer.snapshot → the text's rect + two side strips of pure band on
@@ -176,10 +183,10 @@ ok('QUICK PLAY is gone from the meadow: no button, no label', !g.quickBtn && !g.
 ok('…but the quick MODE keeps its string in every language (Wyatt may bring it back)',
   await ev(`Object.keys(SS_STR).every(L => typeof SS_STR[L].quick === 'string' && SS_STR[L].quick.length > 0)`) === true);
 ok('NO CHECKPOINT → CONTINUE GAME is not rendered at all: invisible, input off', g.campaign && !g.campaign.vis && !g.campaign.hit, JSON.stringify(g.campaign));
-ok('the column closes ranks — NEW GAME · LEADERBOARD · VERSUS at 454/522/590, no gap', same(column(g), COL3), JSON.stringify(column(g)));
+ok('the column closes ranks — NEW GAME · VERSUS at 488/556, no gap', same(column(g), COL2), JSON.stringify(column(g)));
 for (const k of ['newcamp', 'versus'])
   ok(k + ': 58-tall button, label dead-centre, no sub-line showing', g[k].h === 58 && g[k].lift === 0 && !g[k].sub && g[k].hit, JSON.stringify(g[k]));
-ok('LEADERBOARD untouched: still its 46-tall row, now between NEW GAME and VERSUS', g.board.h === 46 && g.board.hit, JSON.stringify(g.board));
+ok('LEADERBOARD is gone from the meadow (v0.52.0): no row, no label — it lives in the profile', !g.board && !g.boardBtn && !g.boardTxt, JSON.stringify({ btn: g.boardBtn, txt: g.boardTxt }));
 ok('NEW GAME wears its new name', g.newcamp.label === await ev(`SS_T('newCamp')`) && g.newcamp.label === 'NEW GAME', g.newcamp.label);
 ok('the daily chip still carries its countdown / tick', !!g.daily && g.daily.length > 1, g.daily);
 // a REAL tap on the empty sky where the door once stood opens nothing
@@ -219,7 +226,7 @@ g = JSON.parse(await ev(ROWS));
 const want2 = await ev(`SS_T('vsFriendsOn', 2)`);
 ok('versus shows "' + want2 + '" in gold', g.versus.sub === want2 && g.versus.subColor === '#ffe9a8', JSON.stringify(g.versus));
 ok('and the VERSUS label lifts 9 to make room', g.versus.lift === 9, String(g.versus.lift));
-ok('the other rows did not move', g.newcamp.lift === 0 && g.board.lift === 0 && same(column(g), COL3));
+ok('the other rows did not move', g.newcamp.lift === 0 && same(column(g), COL2));
 await snap('versus-friends-on');
 ok('the friends log off', await ev(FRIENDS(0)) === 0);
 await sleep(400);
@@ -236,7 +243,7 @@ g = JSON.parse(await ev(ROWS));
 const CONT = await ev(`SS_T('contCamp')`);
 const fight3 = await ev(`SS_T('fightN', 3)`);
 const act1 = await ev(`SS_ACT_N(SS_ACTS[0]).split('·')[0].trim()`);
-ok('CONTINUE GAME is rendered at the head of the column — 420/488/556/624, no gap', g.campaign.vis && same(column(g), COL4), JSON.stringify(column(g)));
+ok('CONTINUE GAME is rendered at the head of the column — 454/522/590, no gap', g.campaign.vis && same(column(g), COL3), JSON.stringify(column(g)));
 ok('it reads CONTINUE GAME (contCamp, not the in-run "' + await ev(`SS_T('cont')`) + '")', g.campaign.label === CONT && CONT === 'CONTINUE GAME' && CONT !== await ev(`SS_T('cont')`), g.campaign.label);
 ok('…carries "' + act1 + ' · ' + fight3 + '" under it (progress, not flavour) and lifts 9',
   g.campaign.sub === act1 + '  ·  ' + fight3 && g.campaign.lift === 9, JSON.stringify(g.campaign));
@@ -269,7 +276,7 @@ ok('BACK dismisses to the meadow', await until(`!${H}.confirmC && !${H}.signC &&
 await sleep(400);
 g = JSON.parse(await ev(ROWS));
 ok('…with the climb intact: the checkpoint still stands and the door still heads the column',
-  await ev(`JSON.parse(localStorage.getItem('beta3.campaign')).fightIdx === 2`) === true && g.campaign.vis && g.campaign.hit && same(column(g), COL4), JSON.stringify(g.campaign));
+  await ev(`JSON.parse(localStorage.getItem('beta3.campaign')).fightIdx === 2`) === true && g.campaign.vis && g.campaign.hit && same(column(g), COL3), JSON.stringify(g.campaign));
 await tap(`${H}.rowLabels.newcamp`);
 ok('NEW GAME again → the sheet again', await until(`!!${H}.confirmC`, 5000));
 await sleep(400);
@@ -278,8 +285,8 @@ ok('NEW wipes the climb and opens the sign sheet — the normal fresh flow', awa
 ok('the old checkpoint is GONE', await ev(`localStorage.getItem('beta3.campaign') === null`) === true);
 await sleep(700);   // the 220ms reflow glide settles behind the sheet
 g = JSON.parse(await ev(ROWS));
-ok('…and the door VANISHES at once — not rendered, and the column closes to 454/522/590',
-  !g.campaign.vis && !g.campaign.hit && same(column(g), COL3), JSON.stringify({ vis: g.campaign.vis, col: column(g) }));
+ok('…and the door VANISHES at once — not rendered, and the column closes to 488/556',
+  !g.campaign.vis && !g.campaign.hit && same(column(g), COL2), JSON.stringify({ vis: g.campaign.vis, col: column(g) }));
 
 // ---------------------------------------------------------------- an older build's checkpoint (no actIdx)
 await ev(`localStorage.setItem('beta3.campaign', JSON.stringify({ fightIdx: 7, hp: 9, hpMax: 12, sigils: [], words: [] })); 1`);
@@ -311,7 +318,7 @@ await sleep(3000);
 await ev(`(() => { const b = game.scene.getScene('battle'); b.goHome({ from: 'battle', dawn: true }); return 1 })()`);
 ok('home again after the win', await until(HOME_REST, 40000)); await sleep(1200);
 g = JSON.parse(await ev(ROWS));
-ok('…and CONTINUE GAME is gone, the column closed: nothing left to continue', !g.campaign.vis && !g.campaign.hit && same(column(g), COL3), JSON.stringify(column(g)));
+ok('…and CONTINUE GAME is gone, the column closed: nothing left to continue', !g.campaign.vis && !g.campaign.hit && same(column(g), COL2), JSON.stringify(column(g)));
 await judgeTag('dawn', 2.5, 6.0);
 await snap('dawn-meadow');
 
@@ -341,15 +348,15 @@ ok('?quick=1 boots straight into a quick run (no intro, no meadow tap)', await u
 await nav(BASE + '?fps=0&lang=de', 12000);
 ok('the German meadow stands', await until(HOME_REST)); await sleep(600);
 g = JSON.parse(await ev(ROWS));
-ok('de, no checkpoint: NEUES SPIEL heads a three-row column, CONTINUE not rendered',
-  !g.campaign.vis && g.newcamp.label === 'NEUES SPIEL' && same(column(g), COL3), JSON.stringify({ label: g.newcamp.label, col: column(g) }));
+ok('de, no checkpoint: NEUES SPIEL heads a two-row column, CONTINUE not rendered',
+  !g.campaign.vis && g.newcamp.label === 'NEUES SPIEL' && same(column(g), COL2), JSON.stringify({ label: g.newcamp.label, col: column(g) }));
 ok('de: the tagline is one line (one-line law)', await ev(`(() => { const t = ${H}.children.list.find(o => o.type === 'Text' && o.text === SS_T('tagline')); return !!t && !t.text.includes('\\n') })()`) === true);
 await ev(`localStorage.setItem('beta3.campaign', ${CK}); 1`);
 await nav(BASE + '?fps=0&lang=ja', 12000);
 ok('the Japanese meadow stands', await until(HOME_REST)); await sleep(600);
 g = JSON.parse(await ev(ROWS));
-ok('ja, with checkpoint: つづきから heads the four-row column, alive with its progress line',
-  g.campaign.vis && g.campaign.hit && g.campaign.label === 'つづきから' && g.newcamp.label === 'はじめから' && !!g.campaign.sub && same(column(g), COL4),
+ok('ja, with checkpoint: つづきから heads the three-row column, alive with its progress line',
+  g.campaign.vis && g.campaign.hit && g.campaign.label === 'つづきから' && g.newcamp.label === 'はじめから' && !!g.campaign.sub && same(column(g), COL3),
   JSON.stringify({ cont: g.campaign.label, neu: g.newcamp.label, col: column(g) }));
 ok('ja: the tagline is one line', await ev(`(() => { const t = ${H}.children.list.find(o => o.type === 'Text' && o.text === SS_T('tagline')); return !!t && !t.text.includes('\\n') })()`) === true);
 await ev(`localStorage.removeItem('beta3.campaign'); localStorage.removeItem('beta3.campsign'); localStorage.removeItem('beta3.lang'); 1`);

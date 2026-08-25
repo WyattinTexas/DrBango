@@ -221,16 +221,27 @@ before your cast animation landed let the animation's tail write `state =
 ## tagline-check.mjs
 
 THE HOME MENU's own harness (v0.46.0 flavour cull · v0.47.0 campaign doors ·
-v0.51.0 HOME RESHAPE — 68 checks). The column since v0.51.0, top to bottom:
-`[CONTINUE GAME while a climb stands] · NEW GAME · LEADERBOARD · VERSUS`.
+v0.51.0 HOME RESHAPE · v0.52.0 leaderboard into the profile — 68 checks). The
+column since v0.52.0, top to bottom:
+`[CONTINUE GAME while a climb stands] · NEW GAME · VERSUS`.
+
+- **LEADERBOARD left the meadow (v0.52.0, Wyatt 8/25).** It is a door in the
+  PROFILE now — `Profile.leaderB` / `leaderT`, right under the star rating,
+  dressed like the ✦ YOUR SKIES › door — opening the same Board ceremony with
+  `{ from: 'profile' }`, so its back link reads ‹ PROFILE and returns there
+  (‹ HOME from the profile closes the chain). The Board spends its start data
+  on create: Phaser replays the LAST start data for a `start()` that passes
+  none, so a bare `scene.start('board')` would otherwise inherit a stale
+  `from`. No new strings — `board` / `profile` / `home` keys reused. With a
+  checkpoint the column reads 454/522/590, without one 488/556.
 
 - **CONTINUE GAME exists only while a checkpoint stands.** Without one it is
   NOT RENDERED AT ALL (the v0.47.0 grey dress retired — `visible` carries the
   state, because the intro and wake paths restore every ui item's ALPHA to
   `baseAlpha` and would undo any alpha dress). `home.refreshCampDoor(snap)`
   is still the one door for the state, and `home.layoutMenu(snap)` closes the
-  ranks: visible rows sit 68 apart centred on 522 — four rows read 420..624,
-  three read 454..590, never a gap. `campaignCheckpoint()` validation
+  ranks: visible rows sit 68 apart centred on 522 — three rows read 454..590,
+  two read 488..556, never a gap. `campaignCheckpoint()` validation
   unchanged (older build's save re-derives `actIdx`, garbage reads as none).
 - **QUICK PLAY's button left the meadow** (Wyatt is testing the menu without
   it and may bring it back). The MODE is intact — daily chip, `m:'quick'`
