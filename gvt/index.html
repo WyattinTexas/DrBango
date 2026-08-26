@@ -2287,6 +2287,16 @@
   .sh-ofit.worn .sh-opart svg { filter:drop-shadow(0 0 5px rgba(143,191,99,0.55)) drop-shadow(0 3px 3px rgba(0,0,0,0.35)); }
   .sh-ofit.owned:not(.worn) { opacity:0.8; }
   .sh-ofit.deny .sh-oprice { animation:shno 0.42s; }   /* 0554f: the outfit sticker shakes on a poor tap (every other shelf's price law) */
+  /* 0562 STATS ON THE RACK (Wyatt 8/25: "show their stats in the shop so you don't need to use the magnifying glass there"):
+     every outfit card prints its trade under the name — ▲ rows then ▼ rows in the lens tag's own type and colours, owned or
+     not, glass or no glass; the art above yields the height (the column's min-height:0). Outfits ONLY — the glass keeps its
+     role on the crystals, the lasers, the decor and the room finds. */
+  .sh-ostat { display:flex; flex-direction:column; align-items:center; flex:0 0 auto; width:100%; padding:1px 0 2px; }
+  .sh-ostat b { display:flex; align-items:baseline; gap:3px; max-width:100%; font-family:var(--ui); font-weight:bold;
+    font-size:clamp(8px,1.5vh,11.5px); color:#2F5A2A; line-height:1.12; text-align:left; }
+  .sh-ostat b i { font-style:normal; font-size:0.82em; flex:0 0 auto; }
+  .sh-ostat u { text-decoration:none; min-width:0; }
+  .sh-ostat .lz-dn { color:#8A2F22; }
   /* THE HARDWARE RACK (FM-GVT-SARGERACK-01): his guns as bubbles under the man
      on the outfits stage — OWNED ONLY (absent, never padlocked). The disc is
      the outfit card's own cream stock so gunmetal reads; the lit ring is the
@@ -24408,12 +24418,20 @@ function outfitExClear(id){ const ex=OUTFIT_EXCL[id]; if(!ex) return;
 // army while the crystal in the hilt tunes SARGE alone, saber in hand. Still
 // not a word on any card in any language — the shop stays cosmetic-looking
 // and a player DISCOVERS the tune. One const per number, all Wyatt's dials.
-const OF_MUS_DMG=0.02,  OF_MUS_RATE=0.02;    // MUSTACHE: +2% damage · −2% attack speed
-const OF_BELT_SPD=0.02, OF_BELT_DEF=0.02;    // BELT: +2% move speed · −2% defense
-const OF_BOOT_SPD=0.02, OF_BOOT_DEF=0.02;    // BOOTS: −2% speed worn · +2% defense
-const OF_VEST_DEF=0.02, OF_VEST_SPD=0.02;    // VEST: +2% defense · −2% speed
-const OF_HELM_DEF=0.02, OF_HELM_RNG=0.01;    // HELMET: +2% defense · −1% attack range
-const OF_PLAT_STARS=0.05, OF_PLAT_XP=0.05;   // PLATFORM: +5% stars from games · −5% XP
+// 0562 THE WARDROBE REBALANCE (Wyatt 8/25, design/wardrobe-balance-0825/00-DESIGN.md — "Looks good. Push these changes."):
+// every dial below re-tuned to the AGREED column. The laws: the BANDIT MASK is the yardstick (untouched); shop < earned
+// (the star shelf tops out ~+8, every park/elite piece opens at +10, and inside a park the deeper rung is the stronger
+// piece); the parks own LANES, not ranks (yeti = armor, the jacket's +18 the best plate · dino = march, the boots' +18 the
+// fastest feet, + the best clean reach · outlaw = damage, the badge's +12, + attack · elite = flat, free, +12); REACH is the
+// dangerous stat — capped at ±5% everywhere, the cowboy hat's 0.5 m the ONE flat; the negatives kept on most. And the
+// outfit cards now PRINT their trade in the open (shopOutfitHTML → lensRows, Wyatt: "show their stats in the shop so you
+// don't need to use the magnifying glass there") — the lasers, the crystals, the decor and the room finds keep the glass.
+const OF_MUS_DMG=0.06,  OF_MUS_RATE=0.03;    // MUSTACHE: +6% damage · fires 3% slower (0562)
+const OF_BELT_SPD=0.08, OF_BELT_DEF=0.03;    // BELT: marches 8% faster · −3% armor (0562)
+const OF_BOOT_SPD=0.02, OF_BOOT_DEF=0.06;    // BOOTS: +6% armor · marches 2% slower (0562: the armor up, the march cost as it was)
+const OF_VEST_DEF=0.08, OF_VEST_SPD=0.04;    // VEST: +8% armor · marches 4% slower (0562)
+const OF_HELM_DEF=0.08, OF_HELM_RNG=0.02;    // HELMET: +8% armor · −2% reach (0562)
+const OF_PLAT_STARS=0.15, OF_PLAT_XP=0.08;   // PLATFORM: +15% stars from games · −8% XP (0562)
 // v3.27 (card 07, Wyatt verbatim: "A cowboy hat gives +2 range and -2 HP" ·
 // "Scout Armor… increases damage done from over 4 m away by +2 damage but
 // slows attack speed by 2%"). His range and distance are METERS — the house
@@ -24421,30 +24439,32 @@ const OF_PLAT_STARS=0.05, OF_PLAT_XP=0.05;   // PLATFORM: +5% stars from games �
 // EXACTLY: flat px on the same rng/aggro the helmet already tunes, flat
 // plastic off the pool, flat damage on the qualifying round. The −2% attack
 // speed is the mustache's own cadence idiom (the fire clock, never feet).
-const OF_HAT_RNG=2*TK_M,  OF_HAT_HP=2;       // COWBOY HAT: +2 m reach · −2 max HP
-const OF_SCOUT_DMG=2, OF_SCOUT_M=4*TK_M, OF_SCOUT_RATE=0.02;   // SCOUT ARMOR: +2 dmg past 4 m · fires 2% slower
+// 0562 (Wyatt 8/25): the hat's flat is 0.5 m now (the reach-cap law — ±5% everywhere, this ONE flat) and the scout's
+// line is 3 m: 4 m sat past the stock pistol's 3.9 m, so the plate never fired for the gun Sarge carries first.
+const OF_HAT_RNG=0.5*TK_M, OF_HAT_HP=2;      // COWBOY HAT: +0.5 m reach (14 px — the ONE flat under the ±5% reach cap, 0562) · −2 max HP
+const OF_SCOUT_DMG=2, OF_SCOUT_M=3*TK_M, OF_SCOUT_RATE=0.04;   // SCOUT ARMOR: +2 dmg past 3 m (84 px — the stock pistol's 108 qualifies; 4 m sat past it, 0562) · fires 4% slower
 // v3.33 TP-02 THE SNOW SET (earned at the yeti park; §8 — snow leans DEFENSE;
 // executor dials, one const per number). The boots beat the 90-star pair on
-// purpose: same armor, half the march cost — a prize should out-fit the shelf.
-const OF_SNOWHAT_DEF=0.03,  OF_SNOWHAT_RNG=0.01;   // SNOW HAT: +3% armor · −1% reach
-const OF_CROWN_RNG=0.03, OF_CROWN_DEF=0.02, OF_CROWN_SPD=0.02;   // 0327 THE KING'S CROWN: +3% reach · +2% armor · marches 2% slower (heavy is the head — Wyatt dials)
-const OF_SNOWJKT_DEF=0.03,  OF_SNOWJKT_SPD=0.02;   // SNOW JACKET: +3% armor · marches 2% slower
-const OF_SNOWBOOT_DEF=0.02, OF_SNOWBOOT_SPD=0.01;  // SNOW BOOTS: +2% armor · marches 1% slower
+// purpose: more armor at the same march cost (0562: +10 vs +6) — a prize should out-fit the shelf.
+const OF_SNOWHAT_DEF=0.14,  OF_SNOWHAT_RNG=0.03;   // SNOW HAT: +14% armor · −3% reach (0562 — Wyatt: "raise Snow Hat's defense to be, let's say, 14%")
+const OF_CROWN_RNG=0.05, OF_CROWN_DEF=0.05, OF_CROWN_SPD=0.05;   // 0327 THE KING'S CROWN: +5% reach · +5% armor · marches 5% slower (0562 — Wyatt: "Maybe it should just add 5%, 5%, 5%. I just don't want Snow Hat to be completely irrelevant that fast"; reach at the cap)
+const OF_SNOWJKT_DEF=0.18,  OF_SNOWJKT_SPD=0.06;   // SNOW JACKET: +18% armor (the best plate in the game — yeti = the armor lane) · marches 6% slower (0562)
+const OF_SNOWBOOT_DEF=0.10, OF_SNOWBOOT_SPD=0.02;  // SNOW BOOTS: +10% armor · marches 2% slower (0562)
 // v3.35 TP-03 THE SAFARI SET (earned at the dino park; §8 — safari leans
 // MOBILITY/RANGE, the snow set's opposite lane; executor dials, one const
 // per number). The explorer's boots are the game's first feet piece that
 // SPEEDS the march — the mobility lane's whole point.
-const OF_SAFHAT_RNG=0.02,  OF_SAFHAT_DEF=0.01;   // SAFARI HAT: +2% reach · −1% armor
+const OF_SAFHAT_RNG=0.05,  OF_SAFHAT_DEF=0.04;   // SAFARI HAT: +5% reach (the best clean reach — the cap) · −4% armor (0562)
 // 0340 THE WESTERN SET (earned at OUTLAW TOWN; the third lane leans OFFENSE —
 // snow=defense, safari=mobility; executor dials, one const per number). The
 // badge is the capstone: two ups, one down — the crown's own shape.
 const OF_WMASK_AS=0.15, OF_WMASK_RNG=0.15, OF_WMASK_WILD=0.40;      // 0361 BANDIT MASK: +15% attack speed · +15% reach · 40% wild lateral miss (the bandits' own law — 0401 on Wyatt's 8/18 word: 30→40, wbandit's own 0.4 exactly)
-const OF_PONCHO_DEF=0.03, OF_PONCHO_RATE=0.02;   // PONCHO: +3% armor · fires 2% slower
-const OF_SPURS_SPD=0.02, OF_SPURS_DEF=0.01;      // SPURS: marches 2% faster · −1% armor
-const OF_BADGE_DMG=0.02, OF_BADGE_DEF=0.02, OF_BADGE_SPD=0.01;   // SHERIFF'S BADGE: +2% damage · +2% armor · marches 1% slower
-const OF_EXPVEST_SPD=0.02, OF_EXPVEST_DEF=0.01;  // EXPLORER'S VEST: marches 2% faster · −1% armor
-const OF_EXPBOOT_SPD=0.02, OF_EXPBOOT_DEF=0.01;  // EXPLORER'S BOOTS: marches 2% faster · −1% armor
-const OF_EFHELM_DEF=0.03, OF_EFARMOR_DEF=0.03;   // 0539 ELITE FORCES HELMET / ARMOR: +3% armor each (D3 — "+3 Defense" in the wardrobe's own percentage grammar, the SNOW HAT's number), no trade: a prize, not a deal
+const OF_PONCHO_DEF=0.12, OF_PONCHO_RATE=0.05;   // PONCHO: +12% armor · fires 5% slower (0562)
+const OF_SPURS_SPD=0.12, OF_SPURS_DEF=0.03;      // SPURS: marches 12% faster · −3% armor (0562)
+const OF_BADGE_DMG=0.12, OF_BADGE_DEF=0.08, OF_BADGE_SPD=0.04;   // SHERIFF'S BADGE: +12% damage (outlaw = the damage lane) · +8% armor · marches 4% slower (0562)
+const OF_EXPVEST_SPD=0.12, OF_EXPVEST_DEF=0.03;  // EXPLORER'S VEST: marches 12% faster · −3% armor (0562)
+const OF_EXPBOOT_SPD=0.18, OF_EXPBOOT_DEF=0.04;  // EXPLORER'S BOOTS: marches 18% faster (the fastest feet — dino = the march lane) · −4% armor (0562)
+const OF_EFHELM_DEF=0.12, OF_EFARMOR_DEF=0.12;   // 0539 ELITE FORCES HELMET / ARMOR: +12% armor each (0562 — elite = flat, free, +12; D3's "+3 Defense" was the SNOW HAT's old number), no trade: a prize, not a deal
 // 0556 BEAR PARK — THE PRIZES (FM-GVT-GIFTS-01 §7 + the 8/25 rider). THE FOUR RUNG-30 HATS carry SPECIALS, not stats: read at the
 // funnels off the worn list the wire already carries (sw.of — sargeOfU below), deterministic per D14 (a coin flip would diverge
 // two co-op sims): the two "avoid" hats HALVE the intake from their classes at both carpets' funnels (hurt's BF hp, tanHit's
@@ -24668,6 +24688,17 @@ function lensLines2(id){ const p=lensPct;
   if(id==='muskhelmet')  return ['+'+OF_MHELM_HP+' HP', '+'+p(OF_MHELM_DEF)+'% armor', '−'+p(OF_MHELM_RNG)+'% reach'];
   return null;
 }
+// 0562 STATS ON THE RACK (Wyatt 8/25: "show their stats in the shop so you don't need to use the magnifying glass there…
+// having it out in front of these different items will incentivize people to play the game and grind more"): the ROWS an
+// outfit deals — every line lensLines2 writes, split ▲/▼ by the line's own grammar (a ▼ line opens with a minus, names a
+// slower clock or the wild eye; no ▲ line does) and dealt ▲ first. TWO readers, one truth: the outfit card (shopOutfitHTML)
+// prints them in the open, owned or not, glass or no glass; the lens tag (lensScan) deals the same rows over the glass —
+// its old two-seat frame folded a third line (the crown, the badge) and marked the sheriff hat's second ▲ as a ▼. Outfits
+// ONLY: a laser, a crystal, a decor piece and a room find still speak only under the glass (lensLine). No new string —
+// every row is a lensLines2 line whose {0}-form key already stands ×7; the ▲/▼ glyphs ride data-notr like the tag's.
+function lensDn(s){ return /^−|\bslower\b|\bmisses\b/.test(s); }
+function lensRows(id){ const L=lensLines2(id)||[]; return L.filter(s=>!lensDn(s)).concat(L.filter(lensDn)).map(s=>({dn:lensDn(s), s})); }
+function lensRowsHTML(rows){ return rows.map(r=>'<b class="'+(r.dn?'lz-dn':'lz-up')+'"><i data-notr>'+(r.dn?'▼':'▲')+'</i><u>'+r.s+'</u></b>').join(''); }
 // WHOSE laser tunes this figure? enhU's own ownership law, laser edition: a
 // relayed man reads the token his OWNER sent inside `mo` ('lz:<id>' on the
 // soul's 'sl' seat, so the live server's CMD_KEYS passes it untouched and an
@@ -31566,7 +31597,7 @@ function sargeStats(){
   // bag's own numbers (and hang spdM/defM/dgM/cz only when an effect exists —
   // the soul flag's silence fence, so an undressed save's bag and every wire
   // cmd built from it stays byte-identical to stock). The v2.16 fit count is
-  // retired. No screen anywhere prints any of it (Wyatt: hidden stats).
+  // retired. No screen prints the BAG itself; since 0562 the outfit rack prints each piece's own lines (lensRows).
   // the cone is the one stat with a hard ceiling, because it's an ANGLE: the old
   // straight line passes a half-angle of π around rank 50 — a full circle, Sarge
   // shooting the men behind him. 1.2 rad half-angle (a ~137° fan, reached about
@@ -32983,9 +33014,9 @@ const OF_SNOWBOOT_B=OF_SNOWBOOT([38,122,54,96])+OF_SNOWBOOT([80,120,58,96]);
 // v3.35 TP-03 THE SAFARI SET on the portrait — khaki and leather, never
 // currentColor (the dye slides past, the v2.16 law). Same seats as the snow
 // pieces: hat around (0,0), vest in the torso space, boots on the leg pairs.
-const OF_CROWN='<path d="M -9.4 0.6 L -9.4 -6.8 L -4.7 -3.2 L 0 -9.2 L 4.7 -3.2 L 9.4 -6.8 L 9.4 0.6 Z" fill="#E8C24A" stroke="#B8922E" stroke-width="1.3"/>'
-  +'<circle cx="-4.7" cy="-1" r="1.05" fill="#C0392B"/><circle cx="0" cy="-1.4" r="1.05" fill="#2E86C1"/><circle cx="4.7" cy="-1" r="1.05" fill="#27AE60"/>'
-  +'<circle cx="0" cy="-10.6" r="1.5" fill="#E8C24A" stroke="#B8922E" stroke-width="0.9"/>';   // 0327 THE KING'S CROWN — gold band, three jewels, the middle spike's pearl (head-local like every hat: portrait, rack card and the 40px man all read this ONE drawing)
+const OF_CROWN='<path d="M -9.4 -2.4 L -9.4 -9.8 L -4.7 -6.2 L 0 -12.2 L 4.7 -6.2 L 9.4 -9.8 L 9.4 -2.4 Z" fill="#E8C24A" stroke="#B8922E" stroke-width="1.3"/>'
+  +'<circle cx="-4.7" cy="-4" r="1.05" fill="#C0392B"/><circle cx="0" cy="-4.4" r="1.05" fill="#2E86C1"/><circle cx="4.7" cy="-4" r="1.05" fill="#27AE60"/>'
+  +'<circle cx="0" cy="-13.6" r="1.5" fill="#E8C24A" stroke="#B8922E" stroke-width="0.9"/>';   // 0327 THE KING'S CROWN — gold band, three jewels, the middle spike's pearl · 0562: the whole crown sits 3 px HIGHER (every y −3 — Wyatt 8/25: "it currently doesn't fit on his head very well"; the rack crop in outfitPartSVG lifts with it) (head-local like every hat: portrait, rack card and the 40px man all read this ONE drawing)
 // 0539 THE ELITE SHELF — the camo pieces (FM-GVT-GIFTS-01 §2: "A Camo helmet" · "Camo armor"). The pot's own dome and the
 // recon plate's own cut, in olive with the blotches — a prize reads as a prize; no star on the helmet (a camo lid hides its rank).
 const OF_EFHELM='<path d="M -11.2 0.2 a 11.2 11.2 0 0 1 22.4 0 z" fill="#5C6B3A"/>'
@@ -37245,7 +37276,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.60';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.61';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -77804,7 +77835,7 @@ function outfitPartSVG(id){
   if(id==='cowboy')   return '<svg viewBox="40 36 40 20"><g transform="translate(60,50)">'+OF_HAT+'</g></svg>';
   if(id==='scout')    return '<svg viewBox="47 62 22 38">'+OF_SCOUT+'</svg>';
   if(id==='snowhat')    return '<svg viewBox="44 36 32 22"><g transform="translate(60,50)">'+OF_SNOWHAT+'</g></svg>';
-  if(id==='kingcrown')  return '<svg viewBox="44 36 32 22"><g transform="translate(60,50)">'+OF_CROWN+'</g></svg>';
+  if(id==='kingcrown')  return '<svg viewBox="44 33 32 22"><g transform="translate(60,50)">'+OF_CROWN+'</g></svg>';   // 0562: the crop rides the crown's 3 px lift (y 36 → 33) — the same ink framed the same
   if(id==='efhelmet')   return '<svg viewBox="42 36 36 26"><g transform="translate(60,50)">'+OF_EFHELM+'</g></svg>';   // 0539: the pot's own crop
   if(id==='efarmor')    return '<svg viewBox="47 62 22 38">'+OF_EFARMOR+'</svg>';   // 0539: the recon plate's own crop
   if(id==='dogglasses') return '<svg viewBox="48 43 24 14"><g transform="translate(60,49)">'+OF_DOGGL+'</g></svg>';   // 0543: the frames' own crop
@@ -77845,6 +77876,7 @@ function shopOutfitHTML(id){
   return '<button type="button" class="sh-ofit'+(own?(on?' worn':' owned'):'')+'" id="shof-'+id+'" data-lens="of:'+id+'" onclick="UI.outfit(\''+id+'\')">'
     +'<span class="sh-opart">'+outfitPartSVG(id)+'</span>'
     +'<span class="sh-on">'+OUTFIT_INFO[id].name+'</span>'
+    +'<span class="sh-ostat">'+lensRowsHTML(lensRows(id))+'</span>'   // 0562 STATS ON THE RACK: the trade in the open under the name — ▲ rows then ▼ rows (the lens tag's own), owned or not, glass or no glass; a hidden prize never reaches this line (the 0274c return above)
     +(own? '' : OUTFIT_EARN[id]
       ? '<span class="sh-oprice" style="font-size:0.62em;line-height:1.2" data-notr>'+tf(OUTFIT_EARN_CAMP[id]? '🔒 WIN IT ON THE ELITE LADDER · LEVEL %1' : OUTFIT_EARN_PARK[id]==='dino'? '🔒 WIN IT AT THE DINO PARK · LEVEL %1' : OUTFIT_EARN_PARK[id]==='western'? '🔒 WIN IT AT OUTLAW TOWN · LEVEL %1' : OUTFIT_EARN_PARK[id]==='teddy'? '🔒 WIN IT AT BEAR PARK · LEVEL %1' : '🔒 WIN IT AT THE YETI PARK · LEVEL %1', OUTFIT_EARN[id])+'</span>'
       : '<span class="sh-oprice">'+OUTFIT_COST[id]+'★</span>')
@@ -78525,6 +78557,7 @@ function renderShop(){
       // mirror can never lie), six molded accessories racked beside him. The
       // card is the purchase AND the toggle (the dye-jar convention). Not one
       // word in here mentions what a worn piece quietly does — Wyatt's call.
+      // 0562 (Wyatt 8/25): reversed for the OUTFITS — every card prints its trade (shopOutfitHTML's .sh-ostat rows).
       // v2.36 (Wyatt: "Let's just remove all that. The player already
       // knows."): the how-to counsel line is CUT too — the department stands
       // on its header and the man in the mirror. Six l10n rows went with it.
@@ -78889,13 +78922,14 @@ function lensScan(){
   const tag=f.querySelector('.sh-lztag'); if(!tag) return;
   if(!hit){ tag.classList.add('off'); return; }
   const kind=hit.slice(0,2), id=hit.slice(3);
-  let a=null, b=null;
-  if(kind==='of'){ const L=lensLines2(id); if(L){ a=L[0]; b=L[1]; } }
-  else a=lensLine(kind,id);
-  if(!a){ tag.classList.add('off'); LENS.over=null; return; }
-  tag.querySelector('.lz-up u').textContent=a;
-  tag.querySelector('.lz-dn u').textContent=b||'';
-  tag.classList.toggle('two', !!b);
+  // 0562: an outfit deals EVERY row it has (lensRows — the crown's and the badge's third line, the sheriff hat's second ▲,
+  // all true now); a laser or a crystal still deals its one ▲ line. innerHTML, so the l10n door localizes the rows.
+  let rows=null;
+  if(kind==='of') rows=lensRows(id);
+  else { const a=lensLine(kind,id); if(a) rows=[{dn:false, s:a}]; }
+  if(!rows || !rows.length){ tag.classList.add('off'); LENS.over=null; return; }
+  tag.innerHTML=lensRowsHTML(rows);
+  tag.classList.toggle('two', rows.some(r=>r.dn));
   tag.classList.remove('off');
   tag.classList.remove('pop'); void tag.offsetWidth; tag.classList.add('pop');
   SFX.blip();
