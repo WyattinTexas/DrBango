@@ -36114,7 +36114,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.31';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.32';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -44580,6 +44580,7 @@ function bfAggro(u){
   // halts at the cone exactly as ever (no statue standing at 210 doing nothing).
   if(u.type==='sarge'){ const sw=unitSargeStats(u);
     if(sgDashReady(u,sw)) return WPN_MILE.sgDetect;
+    // 8/25 THE STATUE FIX: cmdDashReady answers for the COMMANDER alone (its own weapon door) — every other Sarge falls through to his own reach below, exactly as before 0522c (v5.91-v6.31 halted a pistol at 216, a shotgun at 206, a sniper at 816, the saber at NaN)
     if(cmdDashReady(u,sw)) return cmdStepR(sw);   // 0488 THE HIGH BLADE (D19): the armed dash halts inside ITS window too (the v1.67 seat, commander edition) · 0522c THE STEP-IN: every commander's now — the plain sword's window is 2× its reach, the high blade keeps 168 (the 0129 halt-matches-the-trigger law)
     return (sw.aggro||sw.rng||108)*((sw.w==='shotgun' && u.popArm)? POP_X : 1)*lzRngMul(u)+tkSilvRng(u); }   // 0486 BIG POP: the armed choke moves the halt WITH the trigger too · v2.36: the tan beam moves the halt WITH the trigger (the 0129 law, BF edition)
   if(u.def.rng>=9000) return 260;            // the mortar would "see" the whole world and never advance
@@ -47253,7 +47254,7 @@ function cmdDuelEnd(u,sw){            // the sim part over: the breath paid, the
 // arrival whether or not anyone is there.
 function cmdStepR(sw){ return sw.hb? CMD_DASH.r : Math.round(sw.rng*CMD_STEP_X); }   // the step-in window: the high blade's 168, else 2× the sword's reach
 function cmdStepClocks(u){ return !(u.cmdDashCd>0) && !(u.cmdSwT>0) && !(u.dropT>0) && !(u.cmdBlkT>0) && !(u.cmdWallT>0) && !(u.cmdSignT>0); }   // the launch's clocks alone (a landing asks these to chain)
-function cmdDashReady(u,sw){ return !u.cmdDash && cmdStepClocks(u); }   // 0510: no launch through a standing guard · 0522c: every commander (no hb door), and never mid-recovery — the swing's cadence is the beat
+function cmdDashReady(u,sw){ return !!sw && sw.w==='commander' && !u.cmdDash && cmdStepClocks(u); }   // 0510: no launch through a standing guard · 0522c: every commander (no hb door), and never mid-recovery — the swing's cadence is the beat · 8/25 THE STATUE FIX: the COMMANDER'S predicate answers for the commander ALONE — bfAggro asks it for EVERY Sarge, and with 0522c's hb door gone (v5.91-v6.31) a pistol/shotgun/sniper Sarge halted at cmdStepR's 2× HIS OWN gun's reach and stood there staring (a pistol at 216, a sniper at 816; the saber at NaN — never halted, never swung); the campaign's two sites were always inside the commander branch (Wyatt 8/25: "they just sit there, stopped and staring")
 function cmdStepNext(u,r){ return S.bf? bfNearestEnemy(u,r) : cmdNearest(u,r); }   // the window's scan: BF the trench sight law (sgDashNext's own seat — he never steps at a man behind his line); the campaign the swing's own filters (cmdNearest)
 function cmdDirFs(u){ return u.cmdFs || ((S.bf&&u.side==='foe')?-1:1); }   // his facing when no strike has set it: the side's own march
 function cmdStepGo(u,tgt){   // THE LAUNCH: the 0488 flight at the man (updateCmdDash's 'out' flies and lands it)
