@@ -26170,7 +26170,7 @@ function netSync(){
         ptyPcAdopt(d);   // 0394: YOUR CODE IS YOUR CODE — HQ mints it once, the door prints it forever
         giftAdopt(d);   // 0826 A GIFT FROM HQ: the oldest unclaimed gift rides the reply (server v45) — banked once, claimed, carded
         // 0550: the elite book adopts the same way (longer wins — HQ unions, nothing is ever taken away); the bench prize + the card follow
-        if(d&&d.ok&&Array.isArray(d.coopElite)){ const el9=d.coopElite.map(n=>n|0).filter(n=>n>=101&&n<=200).sort((a,b)=>a-b); if(el9.length>META.coopElite.length){ META.coopElite=el9; ecHeal(); checkAch(); if(S.mode==='menu'){ renderMenu(); ecSweep(); } saveMeta(); } }
+        if(d&&d.ok&&Array.isArray(d.coopElite)){ const el9=d.coopElite.map(n=>n|0).filter(n=>n>=101&&n<=200).sort((a,b)=>a-b); if(el9.length>META.coopElite.length){ META.coopElite=el9; ecHeal(); checkAch(); if(S.mode==='menu'){ renderMenu(); if(!milePopUp()) ecSweep(); } saveMeta(); } }   // 0564 THE CARDS LINE UP: the door yields to a standing card — the rung's card is still owed by ledger (ecAnn) and deals on the next fold or landing
         const dcl9=(d&&d.ok&&Array.isArray(d.coopLevels))? d.coopLevels.map(n=>n|0).filter(n=>n>=1&&n<=100) : null;   // 0550: the first hundred alone — an elite stray in an older HQ's list never pads THE GIANT BANANA
         if(dcl9 && dcl9.length>META.coopLevels.length){
           META.coopLevels=dcl9.slice();
@@ -26179,7 +26179,7 @@ function netSync(){
           // standing in the room, repaint it and let the decor sweep card
           // any prize (the v1.70 law: a sweep that unlocks must renderMenu
           // itself). Mid-battle, the next room visit's own sweep catches up.
-          checkAch(); if(S.mode==='menu'){ renderMenu(); hbHeal(); if(!decorSweep() && !bmbSweep() && !cmdSweep() && !hbSweep() && !csSweep() && !cmdoSweep()) soulSweep(); }   // 0488: the escrow heal + its card ride the synced-record door too · 0554b: the ideology cards ride it behind the class card
+          checkAch(); if(S.mode==='menu'){ renderMenu(); hbHeal(); if(!milePopUp() && !decorSweep() && !bmbSweep() && !cmdSweep() && !hbSweep() && !csSweep() && !cmdoSweep()) soulSweep(); }   // 0488: the escrow heal + its card ride the synced-record door too · 0554b: the ideology cards ride it behind the class card · 0564 THE CARDS LINE UP: the mini-chain yields to a standing card (still owed by ledger — the next fold or landing deals it)
           saveMeta();
         }
         return d;
@@ -37286,7 +37286,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.62';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.63';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -40023,7 +40023,7 @@ function bdPopTry(){
 // THE DOOR: POST /gvt/bd/join -> a ROOM party in battle state -> bdLaunch. A refusal speaks and folds.
 function bdJoin(){
   if(S.coop || S.mode!=='menu') return Promise.resolve(null);
-  try{ UI.mileTake(); }catch(e){}
+  mileFold();   // 0564 THE CARDS LINE UP: a JOIN is not a take — the quiet fold (no blip, no line): no prize card ever lands over the desert join; what is owed deals at the next landing
   if(COOP) coopLeave();
   COOP=coopFresh('lobby','room');
   const forParty=COOP;
@@ -69978,6 +69978,46 @@ function shipCineCard(){
   SFX.fanfare();
 }
 let lastMarch=0;
+// ===== 0564 THE CARDS LINE UP (FM-GVT-LINE-01 design/cards-line-up-0825/00-DESIGN.md; Wyatt 8/25 ~20:45 ET, verbatim:
+// "if you got the doghouse and then you also unlock the Yeti store and the Western store and the dino store, it will still
+// only show you one after every battle. Really, you have four updates for things waiting for you. We just need to give them
+// to the player, so even if it's four in a row, line them up"). The room door's ceremony chain, lifted WHOLE out of showMenu's
+// seat below (hbHeal flag-first, then every seat in showMenu's own order, first true wins, mileSweep the tail) so a FOLD can
+// run it again: ceremonyNext (the three takes — UI.mileTake · UI.heroPick · UI.riteTake at the room) deals the next owed card,
+// and the next, till nothing is owed. The first card of every landing is byte-what-it-was; each prize keeps its own card, its
+// own fanfare, its own tap — nothing merged, nothing skipped, nothing dealt twice: every seat's own once-ever ledger ends the
+// line by itself. The old "one card per visit" law survives as "one card at a TIME" — the #milePop host stays single.
+// THE GUARD (D4): a seat that ever forgets its ledger would deal the same card on every tap — the same innerHTML twice in one
+// landing folds itself and ends the line (MB_LAST); MB_LINE_CAP deals per landing is the backstop (more seats than the chain
+// has — an honest chain never meets it). Both reset at showMenu. The four full-screen rites (saber colour · soul · the
+// General's favor · paint day) stay OUT of the line — choices, not prizes; their if/else-if ladder above re-offers one per
+// landing as before (D7). Zero new strings; the fold IS the beat — synchronous, no timer (D8; ⚑ MB_NEXT_MS if Wyatt wants air).
+let MB_LAST='', MB_DEALT=0, MB_END='';   // the last card dealt this landing (its innerHTML) · deals this landing · why the line ended early ('' | 'repeat' | 'cap') — reset at showMenu
+const MB_LINE_CAP=40;                    // ⚑ deals per landing — the trap's backstop (38 seats + the hero choices), never a rule an honest chain meets
+function milePopUp(){ const p=document.getElementById('milePop'); return !!p && !p.classList.contains('hidden'); }   // a card is standing on the ceremony host
+function mileFold(){ const p=document.getElementById('milePop'); if(p){ p.classList.add('hidden'); p.innerHTML=''; } }   // the QUIET fold — no blip, no line, no repaint: the three takes' shared half, and the desert JOIN's programmatic door (D3: a join is not a take)
+function ceremonyChain(){
+  hbHeal();   // 0488: the escrow converts at every landing (flag-first, before any card); hbSweep's card rides the chain behind the class card
+  const dealt = riteSweep() || gearSweep() || bySweep() || shipCineSweep() || roomGiftSweep() || megaSweep() || rpSweep() || bkSweep() || gtSweep() || jv2Sweep() || cannonSweep() || ecSweep() || efSweep() || evSweep() || bdSweep() || decorSweep() || lensSweep() || bmbSweep() || cmdSweep() || hbSweep() || csSweep() || cmdoSweep() || spySweep() || keySweep() || castleSweep() || skeySweep() || dinoSweep() || giftSweep() || teddySweep() || tkeySweep() || bkeySweep() || storeSweep() || wlSweep() || outfitSweep() || stripeSweep() || soulSweep() || pickSweep() || heroPickSweep();   // 0464: a banked hero choice rides the chain too (one card per visit; a save that ranked past the tenth before this build chooses on arrival)   // v3.32: the golden key's recovery card rides the chain too — v3.33: the ice castle's recovery card and the silver key's park card ride behind it (one card per visit, the ceremony law)   // 0564 THE CARDS LINE UP: showMenu's line, lifted VERBATIM in its order — a() || b() || … is the same short-circuit as !a() && !b() && …, first true wins
+  if(!dealt) mileSweep();   // the tail, as before: the weapon milestones' migration gift when nothing else dealt (its own once-ever ledger; it returns nothing — the verdict reads the host)
+  const up=milePopUp();
+  if(!dealt && !up) return false;   // nothing owed — the line is over
+  const h=up? document.getElementById('milePop').innerHTML : '';
+  if(h && h===MB_LAST){ mileFold(); MB_END='repeat'; return false; }   // D4: the same card twice in one landing — a seat forgot its ledger; fold it, end the line (the next landing deals it once, as today)
+  if(h) MB_LAST=h;
+  MB_DEALT++;
+  return true;   // a seat dealt — its card stands, or (the ship's 1.9 s flight) is on its way: the take must NOT repaint under it
+}
+// the fold's door (D2): at the room with no card standing — a banked hero choice first (0464's seat, exactly where the takes
+// dealt it before this card), then the chain again, older debt first. true = a card was dealt (the take leaves the room alone —
+// every seat repaints before it paints, the v1.70 law); false = nothing owed (the take repaints: the bench and the academy
+// read the new save). Never mid-battle, never over a standing card, never past the cap.
+function ceremonyNext(){
+  if(S.mode!=='menu' || milePopUp()) return false;
+  if(MB_DEALT>=MB_LINE_CAP){ MB_END='cap'; return false; }
+  if(heroPickDrain()){ MB_DEALT++; return true; }
+  return ceremonyChain();
+}
 function showMenu(){
   awayForfeit();   // 0393: an unresolved away battle folded at the door = the L on the record (the day burned at the serve; ⚑ forfeit rule)
   S.mode='menu';
@@ -70051,8 +70091,8 @@ function showMenu(){
   // normally writes grant+seen together, so this slot almost never speaks)
   // 0494c: the free backyard's own sweep (bySweep) rides AHEAD of the ship's
   // bed arrival — the room's card first, the ferry's on the next landing.
-  hbHeal();   // 0488: the escrow converts at every landing (flag-first, before any card); hbSweep's card rides the chain behind the class card
-  if(!riteSweep() && !gearSweep() && !bySweep() && !shipCineSweep() && !roomGiftSweep() && !megaSweep() && !rpSweep() && !bkSweep() && !gtSweep() && !jv2Sweep() && !cannonSweep() && !ecSweep() && !efSweep() && !evSweep() && !bdSweep() && !decorSweep() && !lensSweep() && !bmbSweep() && !cmdSweep() && !hbSweep() && !csSweep() && !cmdoSweep() && !spySweep() && !keySweep() && !castleSweep() && !skeySweep() && !dinoSweep() && !giftSweep() && !teddySweep() && !tkeySweep() && !bkeySweep() && !storeSweep() && !wlSweep() && !outfitSweep() && !stripeSweep() && !soulSweep() && !pickSweep() && !heroPickSweep()) mileSweep();   // 0464: a banked hero choice rides the chain too (one card per visit; a save that ranked past the tenth before this build chooses on arrival)   // v3.32: the golden key's recovery card rides the chain too — v3.33: the ice castle's recovery card and the silver key's park card ride behind it (one card per visit, the ceremony law)
+  MB_LAST=''; MB_DEALT=0; MB_END='';   // 0564 THE CARDS LINE UP: a new landing — the line's guard starts clean (D4)
+  ceremonyChain();   // 0564 THE CARDS LINE UP: hbHeal + the whole ceremony chain, lifted out of this seat VERBATIM (the first card of every landing is byte-what-it-was); the fold deals the next — ceremonyNext, in the three takes
   // v2.27: the menu theme knocks here — its own guards make it once per
   // session, and a virgin's straight-to-L1 title tap has already killed it
   // (v2.32: the 🔊 chip's saved OFF is one of those guards now)
@@ -81571,22 +81611,19 @@ window.UI = {
     wtToast(t(META.baited? '🎣 BAITED! NOW DRAG THE POLE TO THE POND!'
       : decorOn('bait')? '🎣 DRAG THE POLE ONTO THE BAIT BUCKET!'
       : '🪱 THE HOOK IS BARE. BAIT FIRST!')); },
-  mileTake(){ SFX.blip(); const p=document.getElementById('milePop');
-    if(p){ p.classList.add('hidden'); p.innerHTML=''; }
-    heroPickDrain();   // 0464: a banked hero choice deals behind the card just folded
-    renderMenu(); },
+  mileTake(){ SFX.blip(); mileFold();   // 0564 THE CARDS LINE UP: the shared quiet fold
+    if(!ceremonyNext()) renderMenu(); },   // 0564: the fold deals the NEXT owed card — a banked hero choice first (0464, as before), then the chain again, older debt first; the room repaints only when the line dealt nothing (every seat repaints before it paints — the v1.70 law; and never a repaint under the ship's 1.9 s flight)
   heroPick(k,id,el){   // 0464 THE HERO CHOICE — the card's tap: the choice lands in the save (heroPickTake, the one writer), the option's own voice, the fold, then the NEXT banked choice deals at once (several milestones owed → one card after another), then the room repaints (the academy glyph row)
     if(!heroPickTake(k,id)) return;
     audio(); const o9=(HERO_PICKS[k].opts.find(q9=>q9.id===id)||{}); if(o9.sfx && SFX[o9.sfx]) SFX[o9.sfx](); else SFX.snap();
-    const p=document.getElementById('milePop'); if(p){ p.classList.add('hidden'); p.innerHTML=''; }
-    if(!heroPickDrain()) renderMenu(); },
+    mileFold();
+    if(!ceremonyNext()) renderMenu(); },   // 0564 THE CARDS LINE UP: the next banked choice first (as before), then the rest of the line
   // v2.34: the unlock rite's take — mileTake's own shape, plus the continuation
   // (the picker the tap interrupted). At the room riteNext is null and this IS
   // mileTake, repaint and all.
-  riteTake(){ SFX.blip(); const p=document.getElementById('milePop');
-    if(p){ p.classList.add('hidden'); p.innerHTML=''; }
+  riteTake(){ SFX.blip(); mileFold();
     const n=riteNext; riteNext=null;
-    if(n) n(); else { heroPickDrain(); renderMenu(); } },   // 0464: the room-side fold deals a banked hero choice behind it, like mileTake
+    if(n) n(); else if(!ceremonyNext()) renderMenu(); },   // 0464: the room-side fold deals a banked hero choice behind it, like mileTake · 0564 THE CARDS LINE UP: then the rest of the line (the picker continuation riteNext untouched — the line runs only at the room)
   equipSarge(wk){ if(!wkOwned(wk)) return;   // 0092: one truth for all five — the commander's is the RECORD's
     META.sargeWeapon=wk; SFX.snap(); saveMeta(); renderMenu(); roomModal(panelHTML('promo')); },
   // THE HARDWARE RACK (FM-GVT-SARGERACK-01): the bubble under the man equips —
@@ -83326,6 +83363,8 @@ window.GVT = {
   hpOpen(k){ return heroPickOpen(k||heroPickOwed()||'kingrex'); },
   hpDrain(){ return heroPickDrain(); },
   hpOwed(){ return heroPickOwed(); },
+  // ===== 0564 THE CARDS LINE UP — the read door (the line's one host is #milePop; the guard's ledger resets at showMenu) =====
+  line(){ const p=document.getElementById('milePop'); return { cv:GVT_CV, up:milePopUp(), dealt:MB_DEALT, cap:MB_LINE_CAP, last:(MB_LAST.match(/<h2 class="mb-h"[^>]*>([^<]*)</)||[])[1]||'', end:MB_END, band:(p&&p.querySelector('.mb-band')||{}).textContent||'', head:(p&&p.querySelector('.mb-h')||{}).textContent||'', mode:S.mode }; },
   // ===== 0466 JANE'S AURA CHOICES — the read door (the choice's one writer is heroPickTake; the aura's one pass is tkChanPass) =====
   ja(id){ const u=(id!=null? S.units.find(q=>q.id===id) : S.units.find(q=>q.type==='jane'&&!q.dead))||null;
     const a=u? jaAura(u) : null, p=u? jaPicks(u) : null;
