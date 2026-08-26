@@ -37380,7 +37380,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.52';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.53';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -58770,20 +58770,38 @@ function drawRug(){
       cx.globalAlpha=1;
     }
   } else if(qlt){
-    // 0524 THE QUILT LIES ON THE RUG — the winter law in blanket cloth: patch cells in the
-    // demo's own six hexes over a warm cream (drawPen's QUILT verbatim, re-gridded to the
-    // mat's 56px frame at the pen's own 0.42), quiet stitch seams on the cell grid.
-    cx.fillStyle='#f2e8d0'; cx.fillRect(56,56,WD-112,HT-112);
-    const QH=['#c9a06a','#b9533a','#4a8ca0','#3f6b4a','#d9a544','#8a6fb0'];
-    cx.globalAlpha=0.42;
-    { let r9=0; for(let y=56;y<HT-56;y+=58){ let c9=0;
-      for(let x=56;x<WD-56;x+=70){ cx.fillStyle=QH[(r9*3+c9)%QH.length];
-        cx.fillRect(x,y,Math.min(70,WD-56-x),Math.min(58,HT-56-y)); c9++; } r9++; } }
+    // 0826 THE PILLOW FLOOR (design/feedback-0826-park-floor/00-FEEDBACK.md §2; Wyatt 8/26: "I think we should go with the
+    // off-white pillows versus the multi-colored quilt. It's just impossible to even see where the divider is, where you can put
+    // your units, and then some of the units get lost in the colors."): BEAR PARK's mat is a bed of big off-white pillows in the
+    // fort's own cream — courses brick-lapped on a pale lilac sheet, every pillow the fort's slab (the puff highlight, the fold
+    // shade, the piping inset, the seam roll), NO stitch dashes (they camouflaged the deploy line's cream dashes). ONE pale tone
+    // under every army, the winter law's own budget: the tan figure reads 2.2:1 on it (the winter field's own 2.2), the greens 5.3:1; the colour
+    // on this mat is the rocks, the river, the hem and the figures. PF_PATCH=1 = the 0524 six-hue patch quilt back, byte-still.
+    if(PF_PATCH){
+      // 0524 THE QUILT LIES ON THE RUG — the winter law in blanket cloth: patch cells in the demo's own six hexes over a warm
+      // cream (drawPen's QUILT verbatim, re-gridded to the mat's 56px frame at the pen's own 0.42), quiet stitch seams below.
+      cx.fillStyle='#f2e8d0'; cx.fillRect(56,56,WD-112,HT-112);
+      const QH=['#c9a06a','#b9533a','#4a8ca0','#3f6b4a','#d9a544','#8a6fb0'];
+      cx.globalAlpha=0.42;
+      { let r9=0; for(let y=56;y<HT-56;y+=58){ let c9=0;
+        for(let x=56;x<WD-56;x+=70){ cx.fillStyle=QH[(r9*3+c9)%QH.length];
+          cx.fillRect(x,y,Math.min(70,WD-56-x),Math.min(58,HT-56-y)); c9++; } r9++; } }
+    } else {
+      cx.fillStyle=PF_SHEET; cx.fillRect(56,56,WD-112,HT-112);
+      cx.save(); cx.beginPath(); cx.rect(56,56,WD-112,HT-112); cx.clip();   // the pillows run under the frame — no slivers at the hem
+      const nc=Math.max(1,Math.round((WD-112)/(PF_W+PF_GAP))), nr=Math.max(1,Math.round((HT-112)/(PF_H+PF_GAP))), px=(WD-112)/nc, py=(HT-112)/nr;   // whole courses fit the mat: 6×4 on the flat carpet, 10×5 on the fields' 720 mat
+      for(let r=0;r<nr;r++){ const y=56+r*py+PF_GAP/2, off=(r&1)? px/2 : 0;   // brick-lapped: the odd courses slide half a pillow
+        for(let c=-1;c<=nc;c++){ const x=56+c*px-off+PF_GAP/2; if(x+px-PF_GAP<56||x>WD-56) continue; drawPillowSlab(x,y,px-PF_GAP,py-PF_GAP); } }
+      cx.restore();
+    }
     if(fieldsRaid()){ cx.globalAlpha=FIELDS_MOON_A; cx.fillStyle='#2a3d8c'; cx.fillRect(56,56,WD-112,HT-112); }   // 0526 MOONLIGHT (01 §5.4 [01:52:47]): THE PILLOW FIELDS' quilt takes a blue wash — the cells under it, the stitch seams over it
-    cx.globalAlpha=1; cx.strokeStyle='rgba(255,243,196,0.7)'; cx.lineWidth=1.6; cx.setLineDash([4,4]);
-    for(let x=56;x<=WD-56;x+=70){ cx.beginPath(); cx.moveTo(x,56); cx.lineTo(x,HT-56); cx.stroke(); }
-    for(let y=56;y<=HT-56;y+=58){ cx.beginPath(); cx.moveTo(56,y); cx.lineTo(WD-56,y); cx.stroke(); }
-    cx.setLineDash([]);
+    cx.globalAlpha=1;
+    if(PF_PATCH){
+      cx.globalAlpha=1; cx.strokeStyle='rgba(255,243,196,0.7)'; cx.lineWidth=1.6; cx.setLineDash([4,4]);
+      for(let x=56;x<=WD-56;x+=70){ cx.beginPath(); cx.moveTo(x,56); cx.lineTo(x,HT-56); cx.stroke(); }
+      for(let y=56;y<=HT-56;y+=58){ cx.beginPath(); cx.moveTo(56,y); cx.lineTo(WD-56,y); cx.stroke(); }
+      cx.setLineDash([]);
+    }
   } else if(grass){
     // 8/8 THE LAWN LIES ON THE RUG — the winter law in mower stripes.
     // v2.89 (Wyatt 8/9, card 0240): the lawn goes PALE. The old deep green
@@ -58886,10 +58904,16 @@ function drawRug(){
     if(!roof){   // 8/8: no runner crosses a roof — the shingles are the whole floor
       cx.save(); cx.translate(0,(WORLD_H-H)/2);
       cx.lineCap='round'; cx.globalAlpha=0.35;
+      if(qlt&&!PF_PATCH){ if(PF_TRAIL_A>0){ cx.globalAlpha=PF_TRAIL_A; cx.strokeStyle=PF_C[1]; cx.lineWidth=70; pathStroke(); } }   // 0826 THE PILLOW FLOOR: the worn path — the sheet's own shade, one faint band (the tan runner smeared the cream; 00-FEEDBACK §2 D-P3)
+      else {
       cx.strokeStyle=snow?'rgba(90,110,134,0.45)':sand?'rgba(70,26,10,0.5)':grass?'rgba(38,52,28,0.55)':'rgba(60,30,24,0.5)'; cx.lineWidth=84; pathStroke();
       cx.strokeStyle=snow?'#D7E1EC':sand?'#7A3318':grass?'#B99B62':'#D9C4A0'; cx.lineWidth=70; pathStroke();   // 8/8: the lawn wears a worn dirt track
+      }
       cx.globalAlpha=1; cx.restore();
     }
+    // 0826 THE HEM (D-P2): on the pillow floor the deploy line is SEWN across the pillows — drag or no drag — on the canPlace gate's
+    // own condition (the crate rungs · the crateless finale · the fields raid), under the water, the rocks and every figure.
+    if(qlt&&!PF_PATCH&&PF_HEM&&(S.tanBase||(S.raid&&S.raid.cfg===S.cfg)||S.park)) drawPillowHem(HT);
   }
   // v1.96 GRAND STAGES: the stage terrain draws on BOTH carpets now — BF order
   // is untouched to the pixel (field → chalk → terrain), the campaign gains
@@ -59273,6 +59297,38 @@ function drawDesertTerrain(){
 // 0524 TEDDY PARK'S PILLOW (D10) — a round soft anchor in the park's lilac, piped like the
 // demo's pillow() builder: the same plain-circle hitbox as every rock (block + shoulder), so
 // it refuses placement and stops a charge for free; only the paint is plush.
+// ===== 0826 THE PILLOW FLOOR — BEAR PARK's mat (design/feedback-0826-park-floor/00-FEEDBACK.md §2). Wyatt 8/26: "we need to do a
+// background redesign of the levels. It's still not that easy to see… go with the off-white pillows versus the multi-colored
+// quilt… impossible to even see where the divider is, where you can put your units… some of the units get lost in the colors."
+// The mat = a pale lilac sheet with courses of big off-white pillows in the fort's cream (bearFortArt's C — the fort, the barricade
+// and the floor are ONE cloth); the deploy line = a lilac hem sewn across them; the runner = a faint worn path. Draw-only, no sim.
+let PF_PATCH=0;                                             // ⚑ 1 = the 0524 six-hue patch quilt back (its cells, its stitch dashes, its tan runner, the cream drag hint — byte-still)
+const PF_C=['#f1ecf7','#a9a0c4','#ffffff','#c9bfe0'];       // the fort's cream: body · shade · seam roll · piping (bearFortArt's C, bbSlab's BB_C)
+const PF_SHEET='#e2dcee';                                   // the sheet under the pillows — the fort's shade a third over its cream; the gutters and the corners show it
+const PF_W=176, PF_H=116, PF_GAP=10;                        // ⚑ one pillow on the mat (a figure stands ~40 tall — a bed pillow beside a toy soldier) + the gutter; the courses are fitted whole
+const PF_HEM=1;                                             // ⚑ the deploy line sewn across the pillows at campDeployX(), drag or no drag (0 = the drag hint alone, as every other rug)
+const PF_HEM_C='#8f86ad';                                   // the hem's ribbon = the fort's lilac shade; the thread on it white
+const PF_TRAIL_A=0.14;                                      // ⚑ the worn path (the rug runner's seat) — the sheet's shade at one faint band; 0 = no path on the pillows
+// one pillow, origin top-left (bbSlab's grammar in canvas): the rounded body · the puff highlight · the fold shade sagging low on the
+// left · the piping inset · the seam roll along the top. No quilt seam across — a dash on this floor is the hem's alone.
+function drawPillowSlab(x,y,w,h){
+  const rx=Math.min(w,h)*0.22, k=PF_C;
+  cx.globalAlpha=1; cx.fillStyle=k[0]; rr(x,y,w,h,rx); cx.fill();
+  cx.globalAlpha=0.34; cx.fillStyle='#ffffff'; cx.beginPath(); cx.ellipse(x+w*0.34,y+h*0.24,w*0.24,h*0.15,0,0,7); cx.fill();
+  cx.globalAlpha=0.16; cx.fillStyle=k[1]; cx.beginPath(); cx.moveTo(x+rx*0.4,y+h*0.38); cx.quadraticCurveTo(x+w*0.24,y+h*0.98,x+w*0.66,y+h*0.98); cx.lineTo(x+rx*0.8,y+h*0.98); cx.closePath(); cx.fill();
+  cx.globalAlpha=0.7; cx.strokeStyle=k[3]; cx.lineWidth=1.5; rr(x+3.2,y+3.2,w-6.4,h-6.4,Math.max(1.5,rx-2.6)); cx.stroke();
+  cx.globalAlpha=0.5; cx.strokeStyle=k[2]; cx.lineWidth=Math.min(11,Math.max(2,Math.min(w,h)*0.13)); cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(x+w*0.2,y+h*0.12); cx.quadraticCurveTo(x+w*0.45,y+h*0.01,x+w*0.72,y+h*0.1); cx.stroke(); cx.lineCap='butt';
+  cx.globalAlpha=1;
+}
+// the hem: a soft shadow, the lilac ribbon, a white running stitch — the one dashed line on the floor, at the deploy x, the mat's height
+function drawPillowHem(HT){
+  const hx=campDeployX();
+  cx.globalAlpha=0.14; cx.strokeStyle='#3a2e62'; cx.lineWidth=12; cx.beginPath(); cx.moveTo(hx+2,56); cx.lineTo(hx+2,HT-56); cx.stroke();
+  cx.globalAlpha=0.9; cx.strokeStyle=PF_HEM_C; cx.lineWidth=5; cx.beginPath(); cx.moveTo(hx,56); cx.lineTo(hx,HT-56); cx.stroke();
+  cx.globalAlpha=0.6; cx.strokeStyle='#ffffff'; cx.lineWidth=1.2; cx.setLineDash([7,5]); cx.beginPath(); cx.moveTo(hx,56); cx.lineTo(hx,HT-56); cx.stroke(); cx.setLineDash([]);
+  cx.globalAlpha=1;
+}
 function drawPillowRock(rk){
   const s=rk.r;
   cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(rk.x+4,rk.y+s*0.55,s*1.08,s*0.42,0,0,7); cx.fill();
@@ -59931,9 +59987,9 @@ function draw(){
     // v1.31: with an enemy crate on the carpet your half is the deploy zone —
     // shade the ground you must TAKE, so a refused drop explains itself
     if(!S.bf && (S.tanBase || (S.raid && S.raid.cfg===S.cfg) || S.park)){   // 0305 BF-00: the newly-wired deploy line SHOWS itself in raids + the park finale too
-      const dpx=campDeployX();   // v1.98: the line rides the grand stretch
-      cx.fillStyle='rgba(166,59,42,0.07)'; cx.fillRect(dpx,64,W-dpx-4,WORLD_H-64-88);   // 0197: the shade covers the live height (===H flat)
-      cx.strokeStyle='rgba(255,243,196,0.4)'; cx.lineWidth=2; cx.setLineDash([10,10]);
+      const dpx=campDeployX(), q9=quiltField()&&!PF_PATCH;   // v1.98: the line rides the grand stretch — 0826 THE PILLOW FLOOR: on the pillows the hint wears the hem's lilac (the cream dashes vanished on the cream quilt)
+      cx.fillStyle=q9?'rgba(143,134,173,0.16)':'rgba(166,59,42,0.07)'; cx.fillRect(dpx,64,W-dpx-4,WORLD_H-64-88);   // 0197: the shade covers the live height (===H flat)
+      cx.strokeStyle=q9?'#8f86ad':'rgba(255,243,196,0.4)'; cx.lineWidth=q9?3:2; cx.setLineDash(q9?[12,10]:[10,10]);
       cx.beginPath(); cx.moveTo(dpx,70); cx.lineTo(dpx,WORLD_H-92); cx.stroke(); cx.setLineDash([]);
     }
     const ok=S.drag.unit? true : canPlace(S.drag.x,S.drag.y,S.drag.type,S.bf?bfMyTeam():undefined);
@@ -83281,6 +83337,7 @@ window.GVT = {
       bear:{ owned:unitOwned('kingbear'), sel:heroSel(), inRoster:ownedUnits().indexOf('kingbear'), cost:COSTS.kingbear, def:Object.assign({},UDEF.kingbear), w:unitW('kingbear'), west:UNIT_WEST.kingbear|0, img:!!IMG.kingbear, box:TEDDY_BOX.kingbear, heroes:HEROES.slice(), soul:SOUL_EXTRA.indexOf('kingbear')>=0 },
       bicorne:teddyBicorneOn()?1:0, bicorneNode:!!document.querySelector('#decTeddy .tedbicorne'), posters:(function(){ const w=document.getElementById('posterWall'); return w? { lv:+w.dataset.lv, torn:w.classList.contains('torn'), rungs:[...w.querySelectorAll('.pw-poster')].map(g=>+g.dataset.rung), tears:w.querySelectorAll('.pw-tear').length, l:w.style.left, t:w.style.top, w:w.style.width, h:w.style.height } : null; })(),
       seen:(META.outfitSeen||[]).filter(i=>ids.indexOf(i)>=0) }; },
+  parkFloor(v){ if(v!==undefined) PF_PATCH=v?1:0; return { patch:PF_PATCH, hem:PF_HEM, hemC:PF_HEM_C, trailA:PF_TRAIL_A, w:PF_W, h:PF_H, gap:PF_GAP, sheet:PF_SHEET, c:PF_C.slice(), qlt:quiltField(), deployX:campDeployX(), W:W, WH:WORLD_H }; },   // 0826 THE PILLOW FLOOR's probe — the dials + the flip (design/feedback-0826-park-floor)
   fieldsGo(t){ RAID_CUR='fields'; startRaid(RAID_TIERS.indexOf(t)>=0? t : 'e'); return S.raid && S.raid.k; },   // the solo door exactly as UI.raidPlay drives it (the croakGo grammar; the battery's door — the gate is the scene's)
   fieldsState(){ const g=S.foes.find(f9=>f9.type==='bearnaparte'); const pr=((S.cfg&&S.cfg.terrain&&S.cfg.terrain.props)||[]).filter(p=>p.art==='pyramid');
     return { raid:S.raid? { k:S.raid.k, t:S.raid.t, p3King:S.raid.p3King?1:0, kingDown:S.raid.kingDown?1:0, kingLeak:S.raid.kingLeak?1:0, won:S.raid.won?1:0, hpMul:S.cfg&&S.cfg.hpMul, cntMul:S.cfg&&S.cfg.cntMul } : null,
