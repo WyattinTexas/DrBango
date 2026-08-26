@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.56.0';
+const BUILD = 'STARSPELL v0.57.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -422,8 +422,15 @@ function ssPerfWatch(gm) {
    forces that fallback for debugging. */
 const ART = QS.get('art') !== '0';
 const SSART = { ready: false, img: {} };
+// sign-card art that ships (art/zod_<id>.webp) — see ssZodArtKey; empty until
+// Wyatt's MJ set lands, one id per line then
+const SS_ZOD_ART = [];
 function ssLoadArt() {
   const names = ['btn', 'btndark', 'tile_face', 'tile_over', 'meadow'];
+  // the sign cards' art rides the same fetch, but is never required: a missing
+  // plate falls back to the asterism, and never turns the whole set off
+  const zod = SS_ZOD_ART.map((id) => 'zod_' + id);
+  zod.forEach((n) => { const im = new Image(); im.onload = () => { SSART.img[n] = im; }; im.src = 'art/' + n + '.webp?v=' + encodeURIComponent(BUILD); });
   return Promise.all(names.map((n) => new Promise((res) => {
     const im = new Image();
     im.onload = () => { SSART.img[n] = im; res(true); };
@@ -3571,6 +3578,52 @@ function ssZodiacGlyph(scene, z, k, x, y, tint, alpha) {
   return g;
 }
 
+/* ---- zodiac card art: the seam (v0.57.0) ------------------------------
+   The sign cards ask for texture `zod_<id>` — Wyatt's MJ card art
+   (art/ZODIAC-ART.md, portrait 2:3). SS_ZOD_ART lists the ids whose
+   art/zod_<id>.webp ships; ssLoadArt fetches them beside the other plates and
+   ssZodArtKey hands the card a texture key, or null → the card draws the
+   sign's asterism large on the night-sky wash. Dropping real art in is one
+   id per line here plus the webp. */
+function ssZodArtKey(scene, id) {
+  const key = 'zod_' + id;
+  if (scene.textures.exists(key)) return key;
+  const im = SSART.img[key];
+  if (!im) return null;
+  scene.textures.addImage(key, im);
+  return key;
+}
+// the placeholder art: the game's own twilight gradient with a scatter of
+// faint stars, baked once at texture res — rounded, portrait 2:3
+function ssZodSkyTex(scene) {
+  const key = 'zodsky';
+  if (scene.textures.exists(key)) return key;
+  const R = Math.max(2, ssTexRes(scene));
+  const W = Math.round(160 * R), H = Math.round(240 * R);
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context;
+  c.beginPath(); c.roundRect(0, 0, W, H, 6 * R);
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#0c1030'); g.addColorStop(0.42, '#2a2558'); g.addColorStop(0.72, '#4d3a72'); g.addColorStop(0.92, '#7a4a7c'); g.addColorStop(1, '#9a5f7e');
+  c.fillStyle = g; c.fill();
+  c.save(); c.clip();
+  let s = 7;
+  const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  for (let i = 0; i < 46; i++) {
+    const x = rnd() * W, y = rnd() * H * 0.9, r = (0.5 + rnd() * 1.1) * R;
+    c.fillStyle = 'rgba(232,226,255,' + (0.18 + rnd() * 0.5).toFixed(2) + ')';
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+  }
+  // the meadow's dark ridge along the foot of the sky
+  c.fillStyle = '#0e0c22';
+  c.beginPath(); c.moveTo(0, H);
+  for (let x = 0; x <= W; x += W / 16) c.lineTo(x, H - (10 + 5 * Math.sin(x / W * 9.4) + 3 * Math.cos(x / W * 21)) * R);
+  c.lineTo(W, H); c.closePath(); c.fill();
+  c.restore();
+  t.refresh();
+  return key;
+}
+
 function ssStarChart(scene, opts) {
   const l = ssLayout(scene);
   const acts = opts.acts || SS_ACTS;
@@ -5262,12 +5315,21 @@ class Home extends Phaser.Scene {
     this.mapSheet();
   }
 
-  /* ---------- the zodiac picker ----------
-     Before a fresh campaign: the twelve birth signs on one window of sky,
-     each a small constellation in its element's color, with the player's
-     per-sign records under the names. Tap a sign to read its power, BEGIN to
-     walk under it, or take the unsigned classic climb. The choice is pinned
-     for the whole campaign (beta3.campsign) and cleared with it. */
+  /* ---------- the zodiac picker: THE CARDS (v0.57.0, Wyatt 8/26) ----------
+     Before a fresh campaign: one full-size card at a time — the sign's name
+     and title, a portrait art region, its power at the card's bottom and
+     the player's record under that sign — with ‹ › arrows in the margins
+     and a real swipe on the card (the neighbor peeks in as you drag, a
+     settle tween finishes the move; wraps at both ends). The FIRST card is
+     THE OPEN SKY, the unsigned classic climb; the twelve follow in
+     SS_ZODIAC order. BEGIN is always live — the card you are looking at IS
+     the choice. Only three card containers ever exist (prev/cur/next),
+     recycled on every move — the Canvas renderer never carries a 13-card
+     stack. The art region asks ssZodArtKey() for `zod_<id>` (the MJ card
+     art, ZODIAC-ART.md) and falls back to the asterism drawn large on a
+     night-sky wash, so the real art drops in per sign with no relayout.
+     The choice is pinned for the whole campaign (beta3.campsign) and
+     cleared with it. */
   signSheet() {
     if (this.busy() || this.signC || this.mapC || this.dailyC || this.langC || this.confirmC) return;
     SFX.ensure(); SFX.ui();
@@ -5294,70 +5356,172 @@ class Home extends Phaser.Scene {
     items.push(this.add.image(l.x(0), l.y(106), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
     items.push(ssTxt(this, l.x(0), l.y(132), SS_T('zpSub'), l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
 
-    // the wheel: 3 x 4 constellations, records under the names
-    let chosen = null;
-    const selG = this.add.graphics();       // the ring around the chosen sign
-    const selGlow = this.add.image(0, 0, 'glowbig').setDisplaySize(l.u(150), l.u(112)).setBlendMode('ADD').setAlpha(0);
-    items.push(selGlow, selG);
-    const powerT = ssTxt(this, l.x(0), l.y(548), '', l.u(12), '#ffe9a8').setOrigin(0.5)
-      .setShadow(0, 0, '#c9b676', l.u(7), true, true);
-    const descT = ssTextBlock(this, l.x(0), l.y(578), '', {
-      fontSize: l.u(10.5) + 'px', color: '#c9c3ae', fontStyle: 'italic', shadow: true,
-      wrapW: l.u(324), align: 'center', ox: 0.5, oy: 0.5,
-    });
-    items.push(powerT, descT);
-    const beginB = this.add.image(l.x(0), l.y(636), ssBtn(this, false, 260, 50)).setDisplaySize(l.u(260), l.u(50))
-      .setInteractive({ useHandCursor: true }).setAlpha(0.45);
-    const beginT = ssTxt(this, l.x(0), l.y(636), SS_T('zpBegin'), l.u(15), BTN_INK()).setOrigin(0.5).setAlpha(0.55);
-    items.push(beginB, beginT);
-    const skipT = ssTxt(this, l.x(0), l.y(682), SS_T('zpSkip'), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-    items.push(skipT);
+    /* the deck: THE OPEN SKY first, then the twelve. Each entry is what a
+       card needs — id, name, title, desc, tint, and the sign (null = open) */
+    const deck = [{ id: 'none', z: null, name: SS_T('zpOpenName'), title: SS_T('zpOpenTitle'), desc: SS_T('zpOpenDesc'), tint: 0xb9c2e6 }]
+      .concat(SS_ZODIAC.map((z) => { const t = SS_ZOD(z); return { id: z.id, z, name: z.name, title: t.title, desc: t.desc, tint: SS_ELEMENTS[z.el] }; }));
+    const N = deck.length;
+    // geometry (design units): the card, its stride, and the window the
+    // deck shows through — the margins either side belong to the arrows
+    const CW = 272, CH = 424, CY = 362, STRIDE = 300, ART_W = 160, ART_H = 240;
+    const hex = (n) => '#' + ('000000' + n.toString(16)).slice(-6);
 
+    const mkCard = (i) => {
+      const d = deck[((i % N) + N) % N];
+      const k = this.add.container(0, 0);
+      const tint = d.tint;
+      // the card's face: a dark pane with the element's rim
+      const g = this.add.graphics();
+      g.fillStyle(0x0a0e1f, 0.78);
+      g.fillRoundedRect(-l.u(CW / 2), -l.u(CH / 2), l.u(CW), l.u(CH), l.u(14));
+      g.lineStyle(l.u(1.4), tint, 0.7);
+      g.strokeRoundedRect(-l.u(CW / 2), -l.u(CH / 2), l.u(CW), l.u(CH), l.u(14));
+      g.lineStyle(l.u(0.7), tint, 0.28);
+      g.strokeRoundedRect(-l.u(CW / 2 - 4), -l.u(CH / 2 - 4), l.u(CW - 8), l.u(CH - 8), l.u(11));
+      k.add(g);
+      // name + title
+      k.add(ssTxt(this, 0, -l.u(CH / 2 - 26), d.name, l.u(19), hex(tint)).setOrigin(0.5)
+        .setShadow(0, 0, hex(tint), l.u(8), true, true));
+      k.add(ssTxt(this, 0, -l.u(CH / 2 - 47), d.title, l.u(10.5), '#c9c3ae', 'italic').setOrigin(0.5));
+      // the art region: 2:3 portrait. The real card art when it is loaded,
+      // else the sign's own stars drawn large over a night-sky wash
+      const ay = -l.u(CH / 2 - 62 - ART_H / 2);
+      const artKey = ssZodArtKey(this, d.id);
+      if (artKey) {
+        k.add(this.add.image(0, ay, artKey).setDisplaySize(l.u(ART_W), l.u(ART_H)));
+      } else {
+        k.add(this.add.image(0, ay, ssZodSkyTex(this)).setDisplaySize(l.u(ART_W), l.u(ART_H)));
+        if (d.z) {
+          k.add(this.add.image(0, ay, 'glowbig').setDisplaySize(l.u(ART_W * 1.2), l.u(ART_H * 0.8)).setTint(tint).setBlendMode('ADD').setAlpha(0.16));
+          k.add(ssZodiacGlyph(this, d.z, l.u(0.6), 0, ay));
+        }
+      }
+      const af = this.add.graphics();
+      af.lineStyle(l.u(0.9), tint, 0.45);
+      af.strokeRoundedRect(-l.u(ART_W / 2), ay - l.u(ART_H / 2), l.u(ART_W), l.u(ART_H), l.u(6));
+      k.add(af);
+      // the power, at the card's bottom — one Text per line (ssTextBlock)
+      const desc = ssTextBlock(this, 0, l.u(CH / 2 - 92), d.desc, {
+        fontSize: l.u(11) + 'px', color: '#e6dfc8', fontStyle: 'italic', shadow: true,
+        wrapW: l.u(CW - 36), align: 'center', ox: 0.5, oy: 0,
+      });
+      desc.setData('zodDesc', d.id);
+      k.add(desc);
+      // the record under this sign, styled in
+      const sr = d.z ? SS.prof.signs[d.id] : null;
+      if (sr && sr.clears > 0) {
+        k.add(ssTxt(this, 0, l.u(CH / 2 - 18), '★ ' + SS_T('zpRec', sr.clears, sr.best), l.u(9.5), '#d7b45c').setOrigin(0.5));
+      }
+      k.setData('zodCard', d.id);
+      return k;
+    };
+
+    /* the deck's window: three live cards ride a strip that the finger drags;
+       a geometry mask keeps neighbors to a peek at the card's edges */
+    const strip = this.add.container(l.x(0), l.y(CY));
+    const mg = this.make.graphics();
+    mg.fillRect(l.x(-(CW / 2 + 8)), l.y(CY - CH / 2 - 6), l.u(CW + 16), l.u(CH + 12));
+    strip.setMask(mg.createGeometryMask());
+    let cur = 0, moving = false;
+    const cards = { prev: null, cur: null, next: null };
+    const place = () => {
+      cards.prev.x = -l.u(STRIDE); cards.cur.x = 0; cards.next.x = l.u(STRIDE);
+      cards.prev.setVisible(false); cards.next.setVisible(false); cards.cur.setVisible(true);
+    };
+    const build = () => {
+      for (const key of ['prev', 'cur', 'next']) if (cards[key]) cards[key].destroy();
+      cards.prev = mkCard(cur - 1); cards.cur = mkCard(cur); cards.next = mkCard(cur + 1);
+      strip.add([cards.prev, cards.cur, cards.next]);
+      strip.x = l.x(0);
+      place();
+    };
+    build();
+    const counter = ssTxt(this, l.x(0), l.y(CY + CH / 2 + 14), '', l.u(9), '#5a6390').setOrigin(0.5);
+    const setCounter = () => counter.setText((cur + 1) + ' / ' + N);
+    setCounter();
+    items.push(counter);
+
+    // a move: the strip slides one stride (settle tween), then the three
+    // cards are recycled around the new index and the strip snaps home
+    const go = (dir, fromX) => {
+      if (moving) return;
+      moving = true;
+      cards.prev.setVisible(true); cards.next.setVisible(true);
+      if (fromX != null) strip.x = fromX;
+      this.tweens.add({
+        targets: strip, x: l.x(0) - dir * l.u(STRIDE), duration: 240, ease: 'Cubic.easeOut',
+        onComplete: () => {
+          if (this.signC !== c) return;
+          cur = ((cur + dir) % N + N) % N;
+          build(); setCounter();
+          moving = false;
+        },
+      });
+    };
+    const settle = () => {
+      if (moving) return;
+      moving = true;
+      this.tweens.add({ targets: strip, x: l.x(0), duration: 200, ease: 'Cubic.easeOut', onComplete: () => { if (this.signC === c) { place(); moving = false; } } });
+    };
+    // the harness seams: which card stands, and a programmatic move
+    this.signGo = (dir) => go(dir);
+    this.signPeek = () => ({ id: deck[cur].id, cur, n: N, moving, x: strip.x - l.x(0), card: cards.cur });
+
+    // the arrows, in the margins the card leaves free (44-pt law via ssHitPad)
+    const mkArrow = (dx, glyph, dir) => {
+      const a = ssTxt(this, l.x(dx), l.y(CY), glyph, l.u(30), '#d7b45c').setOrigin(0.5)
+        .setShadow(0, 0, '#c9a94f', l.u(8), true, true).setInteractive({ useHandCursor: true });
+      ssHitPad(a, 48);
+      a.on('pointerdown', () => { if (moving) return; SFX.ui(); go(dir); });
+      return a;
+    };
+    const arrowL = mkArrow(-168, '‹', -1), arrowR = mkArrow(168, '›', 1);
+    items.push(arrowL, arrowR);
+
+    // the swipe: a real drag anywhere on the card. Past a third of the card
+    // (or a quick flick) it commits to the neighbor; short of that it settles
+    const zone = this.add.zone(l.x(0), l.y(CY), l.u(CW + 16), l.u(CH + 12)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    let drag = null;
+    zone.on('pointerdown', (p) => { if (moving) return; drag = { x: p.x, t: performance.now() }; cards.prev.setVisible(true); cards.next.setVisible(true); });
+    const mv = (p) => {
+      if (!drag) return;
+      if (!p.isDown) { drag = null; settle(); return; }
+      strip.x = l.x(0) + clamp(p.x - drag.x, -l.u(STRIDE), l.u(STRIDE));
+    };
+    const up = (p) => {
+      if (!drag) return;
+      const dx = p.x - drag.x, dt = Math.max(1, performance.now() - drag.t);
+      drag = null;
+      const flick = Math.abs(dx) > l.u(18) && Math.abs(dx) / dt > 0.45;
+      if (Math.abs(dx) > l.u(CW / 3) || flick) { SFX.ui(); go(dx < 0 ? 1 : -1, strip.x); }
+      else settle();
+    };
+    this.input.on('pointermove', mv);
+    this.input.on('pointerup', up);
+    c.once('destroy', () => { this.input.off('pointermove', mv); this.input.off('pointerup', up); mg.destroy(); this.signGo = null; this.signPeek = null; });
+
+    // BEGIN — always live: the visible card is the choice
     const enter = (id) => {
       // pin the choice and open the chart — the map is the campaign's own door
       try { localStorage.setItem('beta3.campsign', id); } catch (e) { }
       closeSheet();
       this.mapSheet();
     };
-    const cells = [];
-    SS_ZODIAC.forEach((z, i) => {
-      const cx = (-124 + (i % 3) * 124), cy = 200 + Math.floor(i / 3) * 82;
-      const g = ssZodiacGlyph(this, z, l.u(0.16), l.x(cx), l.y(cy - 10));
-      const nameT = ssTxt(this, l.x(cx), l.y(cy + 18), z.name, l.u(9.5), '#8a94c4').setOrigin(0.5);
-      items.push(g, nameT);
-      const sr = SS.prof.signs[z.id];
-      if (sr && sr.clears > 0) {
-        items.push(ssTxt(this, l.x(cx), l.y(cy + 30), '★' + sr.clears + ' · ' + sr.best, l.u(8), '#d7b45c').setOrigin(0.5));
-      }
-      const zone = this.add.zone(l.x(cx), l.y(cy - 2), l.u(116), l.u(76)).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      items.push(zone);
-      cells.push({ z, cx, cy, nameT });
-      zone.on('pointerdown', () => {
-        SFX.ui();
-        chosen = z.id;
-        for (const cell of cells) cell.nameT.setColor(cell.z.id === chosen ? '#ffe9a8' : '#8a94c4');
-        const col = SS_ELEMENTS[z.el];
-        selG.clear();
-        selG.lineStyle(l.u(1.3), col, 0.75);
-        selG.strokeRoundedRect(l.x(cx) - l.u(56), l.y(cy - 2) - l.u(36), l.u(112), l.u(72), l.u(10));
-        selGlow.setPosition(l.x(cx), l.y(cy - 2)).setTint(col).setAlpha(0.13);
-        const t = SS_ZOD(z);
-        powerT.setText(z.name + ' · ' + t.title);
-        descT.setText(t.desc);
-        beginB.setAlpha(1); beginT.setAlpha(1);
-      });
-    });
-    beginB.on('pointerover', () => { if (chosen) beginB.setScale(beginB.scaleX * 1.03, beginB.scaleY * 1.03); });
+    const beginB = this.add.image(l.x(0), l.y(650), ssBtn(this, false, 260, 50)).setDisplaySize(l.u(260), l.u(50))
+      .setInteractive({ useHandCursor: true });
+    const beginT = ssTxt(this, l.x(0), l.y(650), SS_T('zpBegin'), l.u(15), BTN_INK()).setOrigin(0.5);
+    beginB.on('pointerover', () => beginB.setScale(beginB.scaleX * 1.03, beginB.scaleY * 1.03));
     beginB.on('pointerout', () => beginB.setDisplaySize(l.u(260), l.u(50)));
-    beginB.on('pointerdown', () => { if (!chosen) return; SFX.ui(); enter(chosen); });
-    skipT.on('pointerdown', () => { SFX.ui(); enter('none'); });
+    beginB.on('pointerdown', () => { if (moving) return; SFX.ui(); enter(deck[cur].id); });
+    items.push(beginB, beginT);
 
     c.add(items);
+    c.add(strip);
+    c.add(zone);
     // entrance: the sky of signs settles up into place like the other sheets.
     // Zones are pure hit areas (no alpha component) — they stay where they are.
-    for (const it of items) {
-      if (it === selG || it === selGlow || it.type === 'Zone') continue;
+    for (const it of items.concat([strip])) {
+      if (it.type === 'Zone') continue;
       const baseA = it.alpha;
       it.y += l.u(14); it.alpha = 0;
       this.tweens.add({ targets: it, y: it.y - l.u(14), alpha: baseA, duration: 300, ease: 'Back.easeOut' });
