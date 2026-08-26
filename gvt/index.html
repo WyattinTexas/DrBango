@@ -4533,6 +4533,17 @@
   .xj-shine { position:absolute; inset:0; opacity:0;
     background:linear-gradient(90deg,rgba(255,255,255,0) 38%,rgba(255,255,255,0.9) 50%,rgba(255,255,255,0) 62%); }
   .xj-card.pop { animation:xjpop 0.28s ease-out; }
+  /* 0826 card C — THE BAR IN THE COLUMN (design/feedback-0826-noon/00-FEEDBACK.md §6; Wyatt: "It was bigger, it was more in the right
+     area of focus"): on a verdict the ribbon is built INSIDE the overlay's own slot — #win's right under the title (the medal strip on a campaign win),
+     above the result rows and the pay tiles; #lose's under the quote — a real bar, ~2× the pill, where the eye already is. The slot is display:none until xpQueue arms it, so
+     a payout-less verdict keeps its column exactly; the star bits and the PROMOTION plaque stay in the fixed #xpjuice layer above. */
+  .xjslot { display:none; width:min(600px,94vw); margin:clamp(6px,1.6vh,14px) auto 0; box-sizing:border-box; pointer-events:none; }
+  .xjslot.armed { display:block; height:clamp(34px,9vh,48px); }
+  .xjslot .xj-card { position:relative; top:auto; left:auto; transform:none; width:100%; height:100%; padding:0 clamp(12px,2.2vw,22px); }
+  .xjslot .xj-lvl, .xjslot .xj-num { font-size:clamp(0.9rem,3.6vh,1.3rem); letter-spacing:0.1em; }
+  .xjslot .xj-card.pop { animation:xjpopS 0.28s ease-out; }
+  .xj-card.out { opacity:0; transition:opacity 0.2s linear; }
+  @keyframes xjpopS { 0%,100% { transform:scale(1); } 45% { transform:scale(1.05); } }
   @keyframes xjpop { 0%,100% { transform:translateX(-50%) scale(1); } 45% { transform:translateX(-50%) scale(1.06); } }
   .xj-card.flash .xj-shine { animation:xjshine 0.46s ease-out; }
   @keyframes xjshine { 0% { opacity:0.95; transform:translateX(-100%); } 100% { opacity:0; transform:translateX(100%); } }
@@ -4585,7 +4596,7 @@
      .xj-fill keeps its TRANSITION (a transition is not an animation), so the
      bar still slides calmly to where it ended up. */
   @media (prefers-reduced-motion: reduce){
-    #xpjuice .xj-card, #xpjuice .xj-shine, #xpjuice .xj-bit,
+    .xjslot .xj-card, .xjslot .xj-shine, #xpjuice .xj-card, #xpjuice .xj-shine, #xpjuice .xj-bit,
     #xpjuice .xj-up, #xpjuice .xj-rays, #xpjuice .xj-burst, #xpjuice * { animation:none; }
   }
 
@@ -5098,6 +5109,7 @@
 <div class="overlay hidden" id="lose">
   <h1 id="loseTitle">THE TOY BOX<br>HAS FALLEN</h1><!-- 0552b: the colour is painted in JS at every reveal (loseFace): the campaign defeat LOSE_RED, the plain face tan, the battleground its winner's display hex -->
   <div class="lquote" id="loseQuoteBox"><p id="loseQuote"></p><small id="loseQuoteBy"></small></div><!-- 0532 THE KINDEST DEFEAT: Napoleon's line and his name on its own line, filled by loseFace on a campaign loss, empty and hidden on every other verdict -->
+  <div class="xjslot" id="xjSlotLose" aria-hidden="true"></div><!-- 0826 card C: the loss face's slot — a lesson's XP pours here, under the quote -->
   <p id="loseText">The Tan flag flies over your carpet. Sarge would like a word.</p>
   <button class="btn" id="retryBtn">Rally &amp; Retry</button>
   <button class="btn" id="hqBtn" style="background:#5A5D4C; margin-top:0.6rem">Retreat to HQ</button>
@@ -5106,6 +5118,7 @@
 <div class="overlay hidden" id="win">
   <h1 style="color:#7FA35C" id="winTitle">CARPET<br>SECURED</h1>
   <div class="medals" id="medalRow"></div>
+  <div class="xjslot" id="xjSlotWin" aria-hidden="true"></div><!-- 0826 card C: THE BAR IN THE COLUMN — the XP ribbon is built in here on a verdict (xpCeremony → xpSlot), right under the title (the medal strip on a campaign win), above the result rows and the pay tiles — the centre of the screen; armed by xpQueue, emptied by xpTeardown -->
   <p id="medalText"></p>
   <button class="btn" id="againBtn">Continue</button>
 </div>
@@ -26362,6 +26375,7 @@ const XPJ_BITS=14,        // star bits per payout — enough to read as a stream
       XPJ_QUIET=0.55,     // ...and how long a plain gain lingers before it fades
       XPJ_RM_FILL=0.32, XPJ_RM_HOLD=0.85,   // the calm run: same information, no motion
       XPJ_LEAD=200,       // let the end screen land first, THEN pour
+      XPJ_IN_COLUMN=1,    // ⚑ 0826 card C (D-C1/D-C2; Wyatt: "It was bigger, it was more in the right area of focus"): on a verdict the ribbon is built INSIDE the overlay's own slot (.xjslot — right under the title / the medal strip, above the result rows and the pay tiles) as a real bar; 0 = the top pill everywhere
       XPJ_VERDICT_HOLD=1; // ⚑ 0826 card B (D-B3; Wyatt 8/26: "There was no XP bar. The XP bar is massive. That's one of the most dopamine-filling things here."): on a verdict screen the ribbon HOLDS at its end state until the door; 0 = the XPJ_QUIET fade of old
 let XPJ=null, XPJ_PEND=0, XPJ_A=null;   // XPJ_A (SH-01): the last queued ceremony args — the pantheon stage holds a verdict's juice and replays it after the dance
 
@@ -26396,20 +26410,26 @@ function xpQueue(a){
   if(XPJ_PEND && XPJ_A && !XPJ_A.fp && !a.fp && a.lvl0===XPJ_A.lvl1 && a.xp0===XPJ_A.xp1)
     a={ lvl0:XPJ_A.lvl0, xp0:XPJ_A.xp0, need0:XPJ_A.need0, amt:XPJ_A.amt+a.amt, src:a.src||XPJ_A.src, promos:(XPJ_A.promos|0)+(a.promos|0), lvl1:a.lvl1, xp1:a.xp1, need1:a.need1 };
   XPJ_A=a;   // SH-01: the args must outlive the timeout the pantheon hold clears
+  { const sl=xpSlot(); if(sl) sl.classList.add('armed'); }   // 0826 card C: the verdict's slot reserves its band NOW (before the lead) — nothing jumps when the card lands
   if(XPJ_PEND) clearTimeout(XPJ_PEND);
   XPJ_PEND=setTimeout(()=>{ XPJ_PEND=0; try{ xpCeremony(a); }catch(e){ xpTeardown(); } },
                       reducedMotion()? 90 : XPJ_LEAD);
 }
+// 0826 card C: the verdict overlay's own slot, when one stands and the dial is on — the ribbon is built in there (a real bar in the
+// column) instead of the fixed top pill; null = the pill (an award outside a verdict, or the dial off)
+function xpSlot(){ if(!XPJ_IN_COLUMN) return null; return document.querySelector('#win:not(.hidden) .xjslot, #lose:not(.hidden) .xjslot'); }
 function xpCeremony(a){
   const root=document.getElementById('xpjuice'); if(!root) return;
   xpTeardown();                                   // one ceremony at a time
   const RM=reducedMotion();
-  root.innerHTML=
-      '<div class="xj-card" id="xjCard">'
+  const CARD='<div class="xj-card" id="xjCard">'
     +   '<div class="xj-fill'+(RM?' slide':'')+'" id="xjFill"></div><div class="xj-shine"></div>'
     +   '<span class="xj-lvl" id="xjLvl">LEVEL '+a.lvl0+'</span>'
     +   '<span class="xj-num" id="xjNum">+0 XP</span>'
-    + '</div>'
+    + '</div>';
+  const slot=xpSlot();   // 0826 card C: the card lives in the verdict's column when a slot stands; the bits + the plaque stay in the fixed layer
+  if(slot){ slot.classList.add('armed'); slot.innerHTML=CARD; }
+  root.innerHTML=(slot? '' : CARD)
     + '<div class="xj-bits" id="xjBits"></div>'
     + '<div class="xj-up hidden" id="xjUp"></div>';
   root.classList.remove('hidden','out');
@@ -26495,6 +26515,7 @@ function xpFade(){
   const J=XPJ; if(!J||J.outT) return;
   if(J.holdT){ clearTimeout(J.holdT); J.holdT=0; }
   if(J.el.up && !J.el.up.classList.contains('hidden')) J.el.up.classList.add('out');
+  if(J.el.card) J.el.card.classList.add('out');   // 0826 card C: a slot card fades with the layer (it is not under #xpjuice)
   const root=document.getElementById('xpjuice'); if(root) root.classList.add('out');
   J.outT=setTimeout(xpTeardown, 230);
 }
@@ -26520,6 +26541,7 @@ function xpTeardown(){
   XPJ=null;
   const root=document.getElementById('xpjuice');
   if(root){ root.classList.add('hidden'); root.classList.remove('out'); root.innerHTML=''; }
+  document.querySelectorAll('.xjslot').forEach(sl=>{ sl.innerHTML=''; sl.classList.remove('armed'); });   // 0826 card C: every verdict slot emptied + disarmed (every door tears the ceremony down)
 }
 // ============ THE HUNDRED-RANK LADDER (Wyatt 7/25) ============
 // Every unit and every one of Sarge's weapons levels to 100 now, not 5. But
@@ -37298,7 +37320,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.47';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.48';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -83539,6 +83561,7 @@ window.GVT = {
     const q=(sel)=>[...(mt? mt.querySelectorAll(sel) : [])].map(e=>e.innerText.replace(/\s+/g,' ').trim());
     return { cv:GVT_CV, hold:XPJ_VERDICT_HOLD, order:Object.assign({},BF_VD_ORDER), camp:!!win&&win.classList.contains('camp'), vdone:!!win&&win.classList.contains('vdone'), vtiles:!!mt&&mt.classList.contains('vtiles'), vrows:!!mt&&mt.classList.contains('vrows'),
       rows:q('.vr.vh'), tiles:[...(mt? mt.querySelectorAll('.vt [data-n]') : [])].map(b=>({ n:+b.dataset.n, f:b.dataset.f, text:b.textContent })), chips:q('.vc'), tickets:q('.vz'), gold:q('.vg'), v:mt? mt.dataset.v : null,
+      slot:(function(){ const sl=document.querySelector('#win:not(.hidden) .xjslot, #lose:not(.hidden) .xjslot'); const c=sl&&sl.querySelector('.xj-card'); const r=c&&c.getBoundingClientRect(); return { armed:!!sl&&sl.classList.contains('armed'), card:!!c, inCol:XPJ_IN_COLUMN, rect:r? [Math.round(r.left),Math.round(r.top),Math.round(r.right),Math.round(r.bottom)] : null, top:!!(xj&&xj.querySelector('.xj-card')) }; })(),
       xj:{ shown:!!xj && !xj.classList.contains('hidden'), out:!!xj && xj.classList.contains('out'), card:!!g('xjCard'), fill:fill? fill.style.width : null, lvl:g('xjLvl')? g('xjLvl').textContent : null, num:g('xjNum')? g('xjNum').textContent : null, up:!!up && !up.classList.contains('hidden'), upOut:!!up && up.classList.contains('out'), live:!!XPJ, pend:!!XPJ_PEND },
       mode:S.mode }; },
   bfCash(n){ S.plastic=n; if(S.bf) S.bf.seats.forEach(st=>{ if(!st.human) st.purse=n; }); },
