@@ -1,6 +1,6 @@
 # beta3 dev tools
 
-Thirteen scripts, all dev-only — nothing here ships to the browser.
+Fourteen scripts, all dev-only — nothing here ships to the browser.
 
 ## make-word-packs.py
 
@@ -931,3 +931,32 @@ client's own `firebase.database().goOffline()` first, then park (byname-check
 now does the same). And a dropped first navigate (see names-check) leaves a
 half-loaded document that throws `SFX/SS_BEASTS is not defined` — clear the
 exception log after the boot that landed.
+
+## dew-check.mjs — the green tile (v0.56.0)
+
+THE DEW TILE, Wyatt's third forged special: orange +6, blue ×1.5, GREEN heals.
+Tier 3 in the same tier plumbing (`tile3` face in both the painted and the
+procedural bake, `SS_TILE_INK[3]`/`SS_TILE_VINK[3]`, `SS_TIER_GLOW`), so
+spawnTile, the word line, the use-it-or-lose-it sweep, the blackout and the
+hint solver all see it for free. `DEW_HEAL` / `DEW_CHANCE` beside `LEN_MULT`
+are the dials. A landed strike calls `Battle.dewTile()` (seeded rng — the
+daily deals the same dew to everyone; `dewTile(slot)` pins it for a harness);
+`tryCast` heals `DEW_HEAL` per green in the word at the impact beat, with the
+`♥ +n ♥` float and `SFX.dew()`. The chip prints `♥6`, never the points
+(orange↔green is the colorblind pair — the heart is the tell). The blackout
+weighs a green as its letter +6 (`inkWorth`) so the volley eats balm like any
+special. Versus has its own board engine and never spawns one.
+
+Self-launching (server on :8899 if nothing serves, Chrome on :9456,
+`/tmp/cdp-dew`, `--disable-gpu`). Every cast is REAL taps at DPR3 — the
+harness walks the game's own trie for a word that must include (or avoid)
+given slots, waits for the refill's bounce to settle (a tap on a moving tile
+is dropped) and re-taps until the selection shows. The PvE half blocks
+Firebase at the network layer; the versus half rides `?botduel` on the live
+sky like rival-check (uid `test_dw`, rooms tidied after).
+
+```
+node tools/dew-check.mjs           # 60 checks, ~3 min
+node tools/dew-check.mjs --novs    # PvE only (53, ~1 min)
+node tools/dew-check.mjs --onlyvs  # the duel only
+```

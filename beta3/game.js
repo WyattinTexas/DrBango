@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.55.0';
+const BUILD = 'STARSPELL v0.56.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -461,6 +461,12 @@ function ssUsePack(lang) {
 }
 ssUsePack(ssGameLang());
 const LEN_MULT = [0, 0, 0.6, 1, 1.15, 1.35, 1.6, 1.9, 2.3];
+// THE DEW TILE (Wyatt, 8/26): the forged family's third member — orange +6,
+// blue x1.5, GREEN heals. A beast's strike leaves dew on one plain tile; it
+// heals DEW_HEAL when it rides the very next cast (use it or lose it, same
+// sweep as the others), still scoring its letter for damage. Not in versus.
+const DEW_HEAL = 6;      // the dial: hp restored per green tile in a cast word
+const DEW_CHANCE = 1.0;  // the dial: odds a landed strike leaves a dew tile
 const SERIF = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
 
 /* ============================================================
@@ -739,11 +745,13 @@ function ssMakeTextures(scene) {
     tileArt('tile0', '#e2deec');   // plain
     tileArt('tile1', '#ffcd6e');   // +6 value
     tileArt('tile2', '#96d7ff');   // 1.5x word
+    tileArt('tile3', '#b4e698');   // dew — heals on the next cast
     tileArt('tileblk', '#494263'); // blackout curse — the void face
   } else {
     tileTex('tile0', '#f7f1e2', '#dfd3b8', '#b8a67f');
     tileTex('tile1', '#ffe9a8', '#e8b84b', '#a97c1c');
     tileTex('tile2', '#e6f6ff', '#a8d9f2', '#5f9fc4');
+    tileTex('tile3', '#e9f8dc', '#a8e08a', '#5f9a48');
     tileTex('tileblk', '#453f63', '#28233f', '#6b5fa8');
   }
   mk('veil', 8, 8, (c, w, h) => { c.fillStyle = '#060812'; c.fillRect(0, 0, w, h); });
@@ -2562,13 +2570,17 @@ function ssBeastFx(scene, cont, beast, unitScale, asm, opts) {
    Box is 64x48 design units with the letter at font 36 (Qu at 30); consumers
    scale the box, so the word-line's font-20 look is the same texture at
    20/36 scale. */
-const SS_TILE_INK = ['#3a3020', '#5a3c05', '#1d4a66'];    // letter ink per tier
+const SS_TILE_INK = ['#3a3020', '#5a3c05', '#1d4a66', '#1f4d22'];    // letter ink per tier (3 = dew)
 // value ink per tier — deliberately near the letter ink's darkness: the old
 // pale inks made the worth unreadable at arm's length (Wyatt's call)
-const SS_TILE_VINK = ['#655636', '#5f420a', '#215a7c'];
+const SS_TILE_VINK = ['#655636', '#5f420a', '#215a7c', '#22572a'];
+// the dew's value chip is ♥6, never the letter's points — orange↔green is the
+// classic colorblind pair and the heart is the tell (SS_TILE_VINK[3] ink)
+const SS_DEW_CHIP = () => '♥' + DEW_HEAL;
 // the blackout curse: inked letters read in pale ash on the void face —
 // still legible, clearly cursed, and the flat 0 says what they're worth
 const SS_BLK_INK = '#b9b0d8';
+const SS_TIER_GLOW = [0xffd77a, 0xffd77a, 0x9fd8ff, 0xa8e88a];   // bloom tint per tier
 const SS_BLK_VINK = '#9a90c4';
 const SS_LINE_GREEN = '#1d6a35';                          // word-line "valid" ink
 function ssGlyph(scene, ch, color) {
@@ -2612,8 +2624,8 @@ function ssPrewarmGlyphs(scene) {
   const jobs = [];
   for (const base of Object.keys(PACK.bag)) {
     const ch = PACK.digraph[base] || base;
-    for (let tier = 0; tier < 3; tier++) {
-      const v = (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0);
+    for (let tier = 0; tier < 4; tier++) {
+      const v = tier === 3 ? SS_DEW_CHIP() : (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0);
       jobs.push(() => { ssGlyph(scene, ch, SS_TILE_INK[tier]); ssGlyphVal(scene, v, SS_TILE_VINK[tier]); });
     }
     jobs.push(() => ssGlyph(scene, ch, SS_LINE_GREEN));
@@ -5797,13 +5809,13 @@ class Battle extends Phaser.Scene {
     const img = this.add.image(0, 0, 'tile' + tier).setDisplaySize(this.tileSize, this.tileSize);
     const letter = this.add.image(0, -l.u(2), ssGlyph(this, ch, SS_TILE_INK[tier]))
       .setDisplaySize(l.u(64), l.u(48));
-    const val = this.add.image(l.u(24), l.u(21), ssGlyphVal(this, this.tileVal(ch, tier), SS_TILE_VINK[tier]))
+    const val = this.add.image(l.u(24), l.u(21), ssGlyphVal(this, this.tileChip(ch, tier), SS_TILE_VINK[tier]))
       .setDisplaySize(l.u(30), l.u(20));
     c.add([img, letter, val]);
     let glow = null;
     if (tier > 0) {
       glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(tier === 2 ? 0.35 : 0.25)
-        .setTint(tier === 2 ? 0x9fd8ff : 0xffd77a).setBlendMode('ADD');
+        .setTint(SS_TIER_GLOW[tier]).setBlendMode('ADD');
       c.addAt(glow, 0);
     }
     c.setSize(this.tileSize, this.tileSize).setInteractive({ useHandCursor: true });
@@ -5813,6 +5825,51 @@ class Battle extends Phaser.Scene {
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
+  // what the value chip prints: the points, or ♥6 on a dew tile
+  tileChip(ch, tier) { return tier === 3 ? SS_DEW_CHIP() : this.tileVal(ch, tier); }
+
+  /* THE DEW (Wyatt): where the blow fell, dew gathers — one random plain
+     tile (tier 0, never a forged special or an inked one) turns green after
+     a strike lands. Seeded rng, not Math.random: the daily must deal the same
+     dew to everyone. Returns the slot, or -1 when no tile could take it.
+     `at` pins the slot (harness seam; a taken or inked slot is refused). */
+  dewTile(at) {
+    const l = this.L;
+    if (at === undefined && rng() >= DEW_CHANCE) return -1;
+    const open = [];
+    for (let i = 0; i < 16; i++) { const s = this.board[i]; if (s && s.tier === 0 && !s.blk && s.c.active) open.push(i); }
+    if (!open.length) return -1;
+    const i = at === undefined ? open[Math.floor(rng() * open.length)] : at, s = this.board[i];
+    if (!open.includes(i)) return -1;
+    s.tier = 3;
+    SFX.dew();
+    // the settle: green glass crossfades in under cooling inks, the chip
+    // turns to ♥6, a soft glow blooms and three droplets sink onto the face
+    const g = this.add.image(0, 0, 'tile3').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
+    s.c.addAt(g, s.c.list.indexOf(s.img) + 1);
+    const old = s.img;
+    s.img = g;
+    this.tweens.add({ targets: g, alpha: 1, duration: 420, ease: 'Sine.easeOut', onComplete: () => { if (old.active) old.destroy(); } });
+    if (s.glow) { this.tweens.killTweensOf(s.glow); s.glow.destroy(); }
+    s.glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(0).setTint(SS_TIER_GLOW[3]).setBlendMode('ADD');
+    s.c.addAt(s.glow, 0);
+    this.tweens.add({ targets: s.glow, alpha: 0.5, duration: 260, ease: 'Sine.easeOut',
+      onComplete: () => { if (s.glow && s.glow.active) this.tweens.add({ targets: s.glow, alpha: 0.25, duration: 500 }); } });
+    for (let k = 0; k < 3; k++) {
+      const drop = this.add.image(s.c.x + (Math.random() - 0.5) * l.u(30), s.c.y - l.u(30 + Math.random() * 12), 'dot')
+        .setScale(0.45 + Math.random() * 0.3).setTint(SS_TIER_GLOW[3]).setAlpha(0).setBlendMode('ADD').setDepth(60);
+      this.boardC.add(drop);
+      this.tweens.add({ targets: drop, y: s.c.y + (Math.random() - 0.5) * l.u(10), alpha: { from: 0.8, to: 0 }, delay: 80 + k * 110, duration: 460, ease: 'Sine.easeIn', onComplete: () => drop.destroy() });
+    }
+    this.tweens.add({ targets: s.c, scaleX: 1.08, scaleY: 1.08, duration: 130, yoyo: true, ease: 'Sine.easeOut', delay: 60 });
+    this.time.delayedCall(200, () => {
+      if (!s.c.active) return;
+      s.letter.setTexture(ssGlyph(this, s.ch, SS_TILE_INK[3])).setDisplaySize(l.u(64), l.u(48));
+      s.val.setTexture(ssGlyphVal(this, SS_DEW_CHIP(), SS_TILE_VINK[3])).setDisplaySize(l.u(30), l.u(20));
+    });
+    window.__ssdew = { i, ch: s.ch, fight: this.run.fightIdx, t: Date.now() };   // verification beacon
+    return i;
+  }
 
   // USE IT OR LOSE IT (Wyatt): a bonus tile must ride the very next cast or
   // its power drains away — the letter stays, the shimmer goes. Swept after a
@@ -5825,7 +5882,7 @@ class Battle extends Phaser.Scene {
     for (const s of this.board) {
       if (!s || !s.tier || !s.c.active) continue;
       drained = true;
-      const wasTier = s.tier, tint = wasTier === 2 ? 0x9fd8ff : 0xffd77a;
+      const wasTier = s.tier, tint = SS_TIER_GLOW[wasTier];
       s.tier = 0;
       // the goodbye: the glow swells once and drains, gold dust sinks out of
       // the letter, and the plain face crossfades in under cooling inks
@@ -5886,7 +5943,7 @@ class Battle extends Phaser.Scene {
     const dark = this.board.filter((s) => s && s.blk).length;
     const n = Math.min(this.beast.fx.ink || 2, Math.max(0, 6 - dark));
     const targets = this.board.map((s, i) => ({ s, i })).filter((x) => x.s && !x.s.blk && x.s.c.active)
-      .sort((a, b) => this.tileVal(b.s.ch, b.s.tier) - this.tileVal(a.s.ch, a.s.tier) || a.i - b.i)
+      .sort((a, b) => this.inkWorth(b.s) - this.inkWorth(a.s) || a.i - b.i)
       .slice(0, n);
     if (!targets.length) { done(); return; }
     let fin = false;
@@ -5941,6 +5998,8 @@ class Battle extends Phaser.Scene {
       });
     });
   }
+  // what the blackout weighs: points, with the dew's balm counted as the +6 it is
+  inkWorth(s) { return this.tileVal(s.ch, s.tier) + (s.tier === 3 ? DEW_HEAL : 0); }
   blackTile(i) {
     const s = this.board[i];
     if (!s || !s.c.active || s.blk) return;
@@ -6321,6 +6380,18 @@ class Battle extends Phaser.Scene {
       this.cameras.main.shake(140, 0.006);
       if (this.hasSigil('salve') && letters >= 5) this.heal(4);
       if (this.hasSigil('leech')) this.heal(1);
+      // the dew rides the cast: every green in the word heals DEW_HEAL (they
+      // sum), in addition to the letter's own points already in dmg
+      const dews = this.sel.filter((i) => this.board[i] && this.board[i].tier === 3 && !this.board[i].blk).length;
+      if (dews > 0) {
+        const before = this.run.hp;
+        this.heal(DEW_HEAL * dews);
+        SFX.dew();
+        const ht = ssTxt(this, l.x(-150), l.y(94), '♥ +' + (this.run.hp - before) + ' ♥', l.u(16), '#9fe87a').setOrigin(0.5).setDepth(70)
+          .setShadow(0, 0, '#2a7a3a', l.u(8), true, true);
+        this.tweens.add({ targets: ht, alpha: 0, y: l.y(74), delay: 700, duration: 450, onComplete: () => ht.destroy() });
+        window.__ssdewHeal = { n: dews, healed: this.run.hp - before, hp: this.run.hp, t: Date.now() };
+      }
       if (this.sign === 'scorpio') this.venom = (this.venom | 0) + 1;   // the sting settles in
       const used = [...this.sel];
       this.sel = [];
@@ -6584,7 +6655,12 @@ class Battle extends Phaser.Scene {
       }
       this.updateBars();
       if (this.run.hp <= 0) this.endRun(false);
-      else done();
+      else {
+        // dew gathers where the blow fell — one plain tile greens, a beat
+        // after the hit reads (never in versus: VsBattle has its own strike)
+        this.time.delayedCall(260, () => { if (this.state !== 'end' && this.scene.isActive()) this.dewTile(); });
+        done();
+      }
     };
     if (this.beastFx && this.beastFx.ready) this.beastFx.attack(land);
     else {   // struck before the constellation finished assembling — plain lunge

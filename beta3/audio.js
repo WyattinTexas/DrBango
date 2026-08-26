@@ -121,6 +121,8 @@ class SynthAudio {
   forge() { this.tone(880, 0.3, 'sine', 0.1); this.tone(1318.5, 0.45, 'sine', 0.09, 0.09); }
   // the forge's mirror: a quiet descending shimmer — an unspent bonus tile
   // drains back to plain (must never overpower the cast/impact it rides under)
+  // the dew: two soft sines, a drop and its ring — the forge chime's gentler cousin
+  dew() { this.tone(1174.7, 0.22, 'sine', 0.05); this.tone(1568, 0.4, 'sine', 0.045, 0.1); this.tone(2349.3, 0.3, 'sine', 0.02, 0.16); }
   fizzle() { this.tone(1046.5, 0.22, 'sine', 0.045); this.tone(784, 0.28, 'sine', 0.04, 0.08); this.tone(587.3, 0.4, 'sine', 0.035, 0.17); }
   // the blackout curse — a low void swell with a falling minor sigh; it rides
   // under the boss telegraph's rumble, so it stays a whisper, never a stab
