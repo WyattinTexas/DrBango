@@ -37298,7 +37298,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.46';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.47';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -39928,7 +39928,7 @@ function nightGateOpen(){ return (META.campaign|0)>=NIGHT_MIN_LVL; }   // the on
 // battle state, the joiner on the THINNER side — tie -> Team 1 = LEFT, the 13th human opens room 2, sealed
 // at the bell). This side: bdState() beside evState on the menu beat · THE ANNOUNCE CARD once per launch on
 // the quiet landing AFTER tonight's yeti bell (Wyatt: "the announcement comes after the Yeti event") · THE
-// T−5 JOIN CARD while the doors are open (re-dealt every landing + 30 s after a ✕, so JOIN is one tap away)
+// T−5 JOIN CARD while the doors are open (re-dealt every landing; 0560: never on its own after a ✕ — the v5.95 band is the door)
 // · bdJoin -> a room party -> roomStartBattle on WESTERN LAND (the desert carpet, 2560 px for 6 a side) ->
 // THE HOLD (the 0484 S.evHold grammar: place men, nothing moves, the counter runs to the bell; the D13
 // you-there card at T−BD_AFK_S; untouched at the bell -> the seat leaves = YOUR SEAT WENT TO A COMPUTER)
@@ -39937,7 +39937,7 @@ function nightGateOpen(){ return (META.campaign|0)>=NIGHT_MIN_LVL; }   // the on
 // mechanic: chairs flip human/computer IN PLACE while the roster fills during the hold. ⚑ dials one cell each.
 const BD_POP_S=300;            // the JOIN card's window = the doors (T−5, Wyatt's words) — the card IS the door
 const BD_AFK_S=30;             // the you-there window before the bell (the EV_AFK idiom; 0 = no AFK check)
-const BD_REDEAL_MS=30000;      // a ✕'d JOIN card comes back after this while the doors are open (⚑ furniture later)
+const BD_REDEAL_MS=0;          // 0560 THE JOIN CARD ONCE (design/feedback-0824-late/00-FEEDBACK.md §3; Wyatt 8/24 after the first desert: "the prompt pop-up, which after a while was a little obnoxious"): a ✕'d JOIN card never comes back on its own. 0516's 30 s re-deal was the law while the card was the ONLY door ("⚑ furniture later") — the v5.95 live band (bd-live · JOIN THE BATTLE → UI.bdJoin) is that furniture, the standing door for the whole T−5 window with the live countdown on it. The card still deals ONCE PER MENU LANDING while the doors are open (evDoorStart clears BDD.popBell — the shop and back = once more). ⚑ 0 (default) · 30000 = the 0516 law (a card every 30 s, up to ten a window) · a last-call re-deal at T−60 was judged unneeded
 const BD_ANN_AFTER_YETI=1;     // 1 = the announce card waits for tonight's yeti bell; 0 = its own quiet landing
 // ═══ 0824-LATE THE DESERT ON THE BAND (Wyatt 8/24 21:35 ET, direct: "Our Desert Event should be promoted. It currently
 // just says The Battle is on — every night at 9:15pm EDT. The Desert Battle Event is at 10pm EDT. After that event there
@@ -40010,8 +40010,8 @@ function bdAnnTry(){
   if(pop){ BDD.popBell=BD.bell; BDD.popT=Date.now(); }
   return bdAnnCard(pop? bdPopLine() : bdAnnLine(), pop);
 }
-// THE T−5 JOIN CARD: while the doors are open — once per bell per LANDING (evDoorStart clears the latch), and
-// again BD_REDEAL_MS after a ✕ — so a commander at HQ can always reach JOIN within one tap
+// THE T−5 JOIN CARD: while the doors are open — once per bell per LANDING (evDoorStart clears the latch); a ✕'d card
+// comes back on its own only while BD_REDEAL_MS>0 (0560: it is 0 — the band is the standing door, the card the announcement)
 function bdPopTry(){
   if(!nightGateOpen()) return false;   // 0530 THE NIGHT GATE: the JOIN card waits for the rung too
   if(!(BD_POP_S>0) || !(BD.bell>0)) return false;
@@ -83413,7 +83413,7 @@ window.GVT = {
   nb(){ return { cv:GVT_CV, base:NB.base||null, stamp:NB.stamp||null, newer:NB.newer?1:0, checks:NB.checks, fails:NB.fails, last:NB.last, beats:NB.beats, busy:!!NB.busy, chip:NB.chip?1:0, card:!!document.getElementById('nbCard'), snoozeT:NB.snoozeT, went:NB.went, auto:nbAutoOK()?1:0, quiet:nbQuiet()?1:0, idle:+idleQuiet().toFixed(1), bellFar:nbBellFar()?1:0, every:NB_EVERY, snoozeMs:NB_SNOOZE_MS, autoS:NB_AUTO_S, guardS:NB_BELL_GUARD_S, path:location.pathname, proto:location.protocol }; },
   nbForce(stamp){ stamp=String(stamp||'forced'); if(!NB.base) NB.base='(rig)'; NB.stamp=stamp; NB.newer=(stamp!==NB.base); NB.last=Date.now(); nbTick(); return GVT.nb(); },
   nbCheck(){ return nbCheck().then(()=>GVT.nb()); },
-  bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), band:evBandState(), fielded:(S.bf&&S.bf.bd)? (S.bf.bdN|0) : 0, teamMin:BD_TEAM_MIN, live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, e:s.empty?1:0, k:s.kit?1:0, n:s.name })) : null, note:BD.note }; },
+  bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), band:evBandState(), fielded:(S.bf&&S.bf.bd)? (S.bf.bdN|0) : 0, teamMin:BD_TEAM_MIN, live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, popT:BDD.popT, redealMs:BD_REDEAL_MS, popS:BD_POP_S, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, e:s.empty?1:0, k:s.kit?1:0, n:s.name })) : null, note:BD.note }; },
   evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read
   evSeen(v){ if(v===0||v===false) delete META.evSeen; else if(v!=null) META.evSeen=String(v); saveMeta(); return META.evSeen||null; },
   nightGate(){ return { open:nightGateOpen(), lvl:NIGHT_MIN_LVL, camp:META.campaign|0, band:evBandState(), door:evDoorState(), bd:bdDoorState(), seen:META.evSeen||null, annWk:EVD.annWk||null, popBell:EVD.popBell|0, bdAnnWk:BDD.annWk||null, bdPopBell:BDD.popBell|0, el:!!document.getElementById('evDoor'), spots:!!document.getElementById('evSpots'), snow:!!document.getElementById('evSnow'), pop:!document.getElementById('milePop').classList.contains('hidden'), band0:(b=>b? b.textContent : null)(document.querySelector('#milePop .mb-band')), head:(h=>h? h.textContent : null)(document.querySelector('#milePop .mb-h')), mode:S.mode }; },   // 0530 THE NIGHT GATE — the rig's one read: the gate, the two door states, the band, the four latches, the DOM
