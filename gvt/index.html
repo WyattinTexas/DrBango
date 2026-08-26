@@ -37286,7 +37286,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.63';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.64';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -73085,8 +73085,9 @@ const RAID_PURSE={ e:10, m:15, h:25, g:25, u:0 };         // repeat purse per cl
 const RAID_DAY_CAP=25;                         // ≤25★/day/player across BOTH raids
 const RAID_TAGS=240;                           // opening dog tags — three phases deserve a deeper purse than a park rung
 const ELITE_RAID_TAGS=60;                      // 0539 THE ELITE SHELF (elite 160; Wyatt: "+60 Dogtags when you play Raids at the start"): the opening purse's gift once rung 160 is on the ledger — every raid family here + the two nightly bells (D24); the bots' EV_BOT_F math never reads it
-const EV_TAGS_ADD=40;                          // 0824-NIGHT THE DEEPER PURSE (Wyatt 8/24 night, after the recorded battle: "let us start with 40 more dog tags"): the ULTRA MEGA KING YETI room (tier 'u') opens on RAID_TAGS+40 = 280 — every other raid/park/campaign purse byte-still; the computers keep RAID_TAGS×EV_BOT_F (120). ⚑ 40 (default) · 0 (0506)
+const EV_TAGS_ADD=100;                         // 0824-NIGHT THE DEEPER PURSE (Wyatt 8/24 night, after the recorded battle: "let us start with 40 more dog tags") · 0565 THE ULTRA MEGA TUNE (Wyatt 8/25 ~21:25 ET: "give the players 60 more dogtags to use while in the raid as well" — the opening purse is where the 40 landed; +60 = 100): the ULTRA MEGA KING YETI room (tier 'u') opens on RAID_TAGS+100 = 340 (400 with the elite-160 gift) — every other raid/park/campaign purse byte-still; the computers keep RAID_TAGS×EV_BOT_F (120), the faucet its +10. ⚑ 100 (default) · 40 (0824-NIGHT) · 0 (0506) · alt: leave 40 and put the 60 on the faucet (EV_TICK_ADD 10 → 28)
 const EV_TICK_ADD=10;                          // 0824-NIGHT: "ten more dog tags per dog tag tick" — the campaign faucet pours CAMP_TICK+10 = 30 every 10/3 s in the 'u' room only (the float says +30); BF_TICK/CAMP_TICK untouched everywhere else. ⚑ 10 (default) · 0 (0506)
+const EV_HPX={ snowfig:0.5, sgtcold:0.5, syeti:0.25, byeti:0.25, bluepig:0.5 };   // 0565 THE ULTRA MEGA TUNE (FM-GVT-NIGHT-01 §2, design/night-pair-0825/00-DESIGN.md; Wyatt 8/25 ~21:10-21:25 ET verbatim: "in the Ultra Mega Yeti fight, the snowmen mob reduced their HP by 50%. And reduce the first boss, the Sergeant Cold (I think his name is), his HP by 50%." · "Little yetis & big yetis 75% less hp. Piggy banks 50% hp."): the ULTRA MEGA KING YETI room's per-type hp cells — raidCfg's 'u' block stamps each as g.hpX on EVERY group of every wave (the columns/lines/redcoats/guerrillas, the 24 pre-scheduled trk landings AND the boss groups; the count loop's exemptions do not apply) and spawnGroup's shipped hpX seats (the boss/guerrilla/solo branch · the formless second body · the formation groups, 0384) price it POST-CURVE: snowfig 79 → 40 · sgtcold 1,109 → 555 · syeti 12 → 3 (column and landing) · byeti 95 → 24 · bluepig 63 → 32. sgtsnow (1,109), the king (4,210 — ICE_KING_HPADD.u stands) and Sergeant Snowman's five flat-2 split minis carry no cell; RAID_HP_MUL.u / bossF / spawnFoe / FDEF untouched, e/m/h/g cfgs byte-what-they-were. ⚑ one cell each (default) · sgtsnow:0.5 (the alt — "the snowmen mob" read as the snowfig lines only) · every ice tier = an FDEF cut instead (the 0278k/0278l precedent)
 const RAID_KING_FCX={ e:1, m:0.8, h:0.65, g:1.25, u:1.25 };    // the per-tier boss mechanic: his one-big-snowball clock tightens (M/H) — 0357 MEGA REX: 3.2×1.25 = a flat 4.0s breath clock (Wyatt: "the cooldown on his flame breath should only be about 4 seconds"; the D2 turn-wait is waived at mega so the clock IS the felt cadence, and the angry return x0.8 lands 3.2s)
 // ===== 0340 KING CROAK'S HIDEOUT — the campaign family's FOURTH door
 // (rk='croak'; gates on OUTLAW TOWN lv>=20, no key, no rite). The duel:
@@ -73709,6 +73710,16 @@ function raidCfg(tier,rk){
       // bodies land at half of 8/22's (the 0490 SITREP numbers are the before).
       const kx=(RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F;
       for(const w of cfg.waves) for(const g of w.groups){ if(g.f==='boss' || trk.indexOf(g)>=0) continue; g.n=Math.max(1,Math.round((g.n||1)*kx)); }
+      // 0565 THE ULTRA MEGA TUNE (Wyatt 8/25: "the snowmen mob reduced their HP by
+      // 50% … Sergeant Cold … his HP by 50% … Little yetis & big yetis 75% less hp.
+      // Piggy banks 50% hp."): EV_HPX's five cells ride this same block as a SECOND
+      // pass over EVERY group of EVERY wave — the count loop's exemptions above do
+      // NOT apply here (Sergeant Cold's boss group and the 24 trk landings are the
+      // ask; trk's objects sit in W3's groups, stamped once). g.hpX is v2.48's
+      // authored per-group dial, read post-curve at spawnGroup's three hpX seats,
+      // multiplied onto any cell a group already carries (no shipped ice row does).
+      // sgtsnow, the king and his flat-2 death-split minis carry no cell.
+      for(const w of cfg.waves) for(const g of w.groups){ const x=EV_HPX[g.t]; if(x) g.hpX=(g.hpX||1)*x; }
     }
   }
   return cfg;
@@ -73739,7 +73750,7 @@ function startRaidBattle(tier,rk){
     crushT:RAID_CRUSH_CD[tier] };
   S.cfg=raidCfg(tier,rk);
   S.raid.cfg=S.cfg;   // the identity stamp — raidTick serves THIS battle only (a stale S.raid on a rigged next battle goes inert instead of running turrets on a park)
-  S.plastic=RAID_TAGS+(tier==='u'? EV_TAGS_ADD : 0)+eliteRaidTags();   // 0824-NIGHT: the event room opens 40 deeper (280); e/m/h/g stand at 240 · 0539: +ELITE_RAID_TAGS once elite 160 is on the ledger (the yeti bell's 'u' tier rides this same seat)
+  S.plastic=RAID_TAGS+(tier==='u'? EV_TAGS_ADD : 0)+eliteRaidTags();   // 0824-NIGHT · 0565: the event room opens EV_TAGS_ADD deeper (100 → 340); e/m/h/g stand at 240 · 0539: +ELITE_RAID_TAGS once elite 160 is on the ledger (the yeti bell's 'u' tier rides this same seat)
   hideAllOverlays();
   S.mode='play';
   locSync();   // 0432: the LAST line of a game-start door — themeKill() ran first, so a location can never start over the menu theme
@@ -83798,7 +83809,7 @@ window.GVT = {
   nbForce(stamp){ stamp=String(stamp||'forced'); if(!NB.base) NB.base='(rig)'; NB.stamp=stamp; NB.newer=(stamp!==NB.base); NB.last=Date.now(); nbTick(); return GVT.nb(); },
   nbCheck(){ return nbCheck().then(()=>GVT.nb()); },
   bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), band:evBandState(), fielded:(S.bf&&S.bf.bd)? (S.bf.bdN|0) : 0, teamMin:BD_TEAM_MIN, live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, popT:BDD.popT, redealMs:BD_REDEAL_MS, popS:BD_POP_S, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, e:s.empty?1:0, k:s.kit?1:0, n:s.name })) : null, note:BD.note }; },
-  evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read
+  evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, hpx:Object.assign({},EV_HPX), purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read · 0565 THE ULTRA MEGA TUNE: hpx = EV_HPX, the ULTRA room's per-type hp cells (a read-only copy)
   evSeen(v){ if(v===0||v===false) delete META.evSeen; else if(v!=null) META.evSeen=String(v); saveMeta(); return META.evSeen||null; },
   nightGate(){ return { open:nightGateOpen(), lvl:NIGHT_MIN_LVL, camp:META.campaign|0, band:evBandState(), door:evDoorState(), bd:bdDoorState(), seen:META.evSeen||null, annWk:EVD.annWk||null, popBell:EVD.popBell|0, bdAnnWk:BDD.annWk||null, bdPopBell:BDD.popBell|0, el:!!document.getElementById('evDoor'), spots:!!document.getElementById('evSpots'), snow:!!document.getElementById('evSnow'), pop:!document.getElementById('milePop').classList.contains('hidden'), band0:(b=>b? b.textContent : null)(document.querySelector('#milePop .mb-band')), head:(h=>h? h.textContent : null)(document.querySelector('#milePop .mb-h')), mode:S.mode }; },   // 0530 THE NIGHT GATE — the rig's one read: the gate, the two door states, the band, the four latches, the DOM
   giftRoad(){ const nx=ptyPickParse('c').nx, b=document.querySelector('.ptySheet:not(.hidden) .pts-toprow .pts-next'); return { camp:META.campaign|0, nx:nx, sign:giftRoadSign(nx), road:GIFT_ROAD.map(r=>({ lvl:r.lvl()|0, key:r.key, owned:!!r.owned() })), card:b? { nu:b.querySelector('.nu').textContent, b:b.querySelector('b').textContent, small:b.querySelector('small').textContent, on:b.classList.contains('on') } : null, lang:LANG }; },   // 0531 THE ROAD SIGNS — the rig's one read: the pick, the sign, every row's rung + owned, the open door's card
