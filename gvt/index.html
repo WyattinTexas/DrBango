@@ -37245,7 +37245,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.58';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.59';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -71123,6 +71123,137 @@ function campHeroURI(){
   CAMP_HERO='data:image/svg+xml;utf8,'+encodeURIComponent(v);
   return CAMP_HERO;
 }
+// ---- ELITE FORCES WEARS THE NIGHT (0826 D6) ---- Wyatt 8/26: "please make
+// sure the Elite Forces campaign background screen looks special. It should
+// be a different kind of background." Past the first summit the door paints
+// its OWN diorama in campHeroURI's language — the same SPRITES_SRC figures,
+// the same 1600×650 stage and composition law (cover-crop at 16:10 shows
+// world x 280-1320: the advance holds the left third, the crate the right
+// sixth, the centre carries only glow, beams and smoke under the DEPLOY
+// button) — but it is MIDNIGHT: a starfield and the moon, two searchlights
+// crossing over the field, cold slate ground with moonlit crests, tracers and
+// muzzle flashes in white-blue, the elite classes (commando · spy · medic ·
+// officer · the heavy tank) up front and the elite tan line answering
+// (sabers lit, the roller pig, a giant) with one burning wreck as the single
+// warm note. Built once, cached; pure data URI, zero fetches, zero text for
+// the l10n walk, zero new strings. The first hundred keeps the dusk byte-still.
+let ELITE_HERO=null;
+function eliteHeroURI(){
+  if(ELITE_HERO) return ELITE_HERO;
+  const VEH={jeep:1,tank:1,bfjeep:1,bftank:1,jeep2:1,tank2:1,bomber:1};
+  const F=(k,x,y,s,col,op)=>'<g transform="translate('+(x-(VEH[k]?70:60)*s).toFixed(1)+' '+(y-128*s).toFixed(1)+') scale('+s+')"'+(op<1?' opacity="'+op+'"':'')+'>'
+    +SPRITES_SRC[k].split('currentColor').join(col)+'</g>';
+  // white-blue fire: a soft halo under a bright core
+  const tracer=(x1,y1,x2,y2)=>'<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#6f9dff" stroke-width="6" opacity="0.16"/>'
+    +'<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#e6f0ff" stroke-width="2" opacity="0.8"/>';
+  // a searchlight: a tapered beam from its lamp on the ground, fading into the sky
+  const beam=(x0,y0,x1,y1,w0,w1,op)=>{ const dx=x1-x0, dy=y1-y0, L=Math.hypot(dx,dy), nx=-dy/L, ny=dx/L;
+    const p=[[x0+nx*w0,y0+ny*w0],[x1+nx*w1,y1+ny*w1],[x1-nx*w1,y1-ny*w1],[x0-nx*w0,y0-ny*w0]].map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' L ');
+    return '<path d="M '+p+' Z" fill="url(#bm)" opacity="'+op+'"/><circle cx="'+x0+'" cy="'+y0+'" r="7" fill="#f2f7ff" opacity="0.95"/><circle cx="'+x0+'" cy="'+y0+'" r="16" fill="#cfe0ff" opacity="0.35"/>'; };
+  // cold smoke leaning off the wreck
+  const smoke=(x,tilt)=>'<path d="M '+x+' 345 C '+(x-14)+' 302 '+(x+20+tilt)+' 266 '+(x+8+tilt)+' 216" fill="none" stroke="#05070d" stroke-width="26" stroke-linecap="round" opacity="0.14"/>'
+    +'<path d="M '+(x+2)+' 342 C '+(x-8)+' 306 '+(x+16+tilt)+' 274 '+(x+6+tilt)+' 226" fill="none" stroke="#0c1119" stroke-width="12" stroke-linecap="round" opacity="0.18"/>';
+  // the starfield: a fixed little generator, never Math.random (the page seeds it)
+  let rs=826; const rnd=()=>{ rs=(rs*1103515245+12345)&0x7fffffff; return rs/0x7fffffff; };
+  let stars='';
+  for(let i=0;i<110;i++){ const x=rnd()*1600, y=rnd()*300, r=(rnd()<0.12? 2.1 : 1.1)+rnd()*0.6, o=0.25+rnd()*0.6;
+    stars+='<circle cx="'+x.toFixed(0)+'" cy="'+y.toFixed(0)+'" r="'+r.toFixed(1)+'" fill="'+(rnd()<0.2? '#cfe0ff' : '#f4f6ff')+'" opacity="'+o.toFixed(2)+'"/>'; }
+  let v='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 650">'
+    +'<defs>'
+    +'<linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#030510"/><stop offset="0.4" stop-color="#070c1e"/><stop offset="0.78" stop-color="#0f1a38"/><stop offset="1" stop-color="#1a2a52"/></linearGradient>'
+    +'<radialGradient id="hz"><stop offset="0" stop-color="#9fb8ff" stop-opacity="0.42"/><stop offset="0.45" stop-color="#5d7ccf" stop-opacity="0.2"/><stop offset="1" stop-color="#2a3d7a" stop-opacity="0"/></radialGradient>'
+    +'<radialGradient id="mn"><stop offset="0" stop-color="#eef2ff" stop-opacity="0.55"/><stop offset="0.4" stop-color="#c8d6ff" stop-opacity="0.16"/><stop offset="1" stop-color="#c8d6ff" stop-opacity="0"/></radialGradient>'
+    +'<radialGradient id="fr"><stop offset="0" stop-color="#ffe2a8" stop-opacity="0.9"/><stop offset="0.3" stop-color="#ff9c3f" stop-opacity="0.5"/><stop offset="1" stop-color="#c2531e" stop-opacity="0"/></radialGradient>'
+    +'<linearGradient id="bm" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#e8f0ff" stop-opacity="0.55"/><stop offset="0.5" stop-color="#c9daff" stop-opacity="0.16"/><stop offset="1" stop-color="#c9daff" stop-opacity="0"/></linearGradient>'
+    +'</defs>'
+    // the midnight wall, the stars, the moon
+    +'<rect width="1600" height="344" fill="url(#sk)"/>'
+    +stars
+    +'<circle cx="1150" cy="150" r="150" fill="url(#mn)"/>'
+    +'<circle cx="1150" cy="150" r="46" fill="#f3f1e4"/>'
+    +'<circle cx="1132" cy="138" r="9" fill="#d9d6c6" opacity="0.7"/><circle cx="1163" cy="166" r="12" fill="#d9d6c6" opacity="0.6"/><circle cx="1168" cy="132" r="5" fill="#d9d6c6" opacity="0.6"/><circle cx="1140" cy="172" r="4" fill="#d9d6c6" opacity="0.5"/>'
+    // a cold glow on the horizon, low fog
+    +'<ellipse cx="800" cy="345" rx="760" ry="200" fill="url(#hz)"/>'
+    +'<rect y="318" width="1600" height="30" fill="#8fa6d0" opacity="0.08"/>'
+    // the ground rolls away in cold folds — each crest catches the moon
+    +'<rect y="336" width="1600" height="314" fill="#141b2c"/>'
+    +'<path d="M0 352 C300 344 600 358 900 348 C1200 340 1450 354 1600 346 L1600 414 L0 414 Z" fill="#1c2538"/>'
+    +'<ellipse cx="800" cy="382" rx="780" ry="92" fill="#5d7ccf" opacity="0.12"/>'
+    +'<path d="M0 352 C300 344 600 358 900 348 C1200 340 1450 354 1600 346" fill="none" stroke="#a9bde8" stroke-width="3" opacity="0.22"/>'
+    +'<path d="M0 408 C350 398 700 416 1050 404 C1300 398 1500 410 1600 404 L1600 502 L0 502 Z" fill="#26345a"/>'
+    +'<ellipse cx="1150" cy="440" rx="460" ry="52" fill="#9fb8ff" opacity="0.13"/>'
+    +'<ellipse cx="700" cy="462" rx="720" ry="44" fill="#8fa6d0" opacity="0.1"/>'
+    +'<path d="M0 408 C350 398 700 416 1050 404 C1300 398 1500 410 1600 404" fill="none" stroke="#b8c8ee" stroke-width="3" opacity="0.28"/>'
+    +'<path d="M0 492 C300 482 650 502 1000 488 C1300 478 1500 496 1600 488 L1600 586 L0 586 Z" fill="#1c2742"/>'
+    +'<path d="M0 492 C300 482 650 502 1000 488 C1300 478 1500 496 1600 488" fill="none" stroke="#a9bde8" stroke-width="3" opacity="0.2"/>'
+    +'<path d="M0 576 C400 564 900 588 1600 570 L1600 650 L0 650 Z" fill="#121a30"/>'
+    // the searchlights cross over the field
+    +beam(1236,352,690,-60,10,110,0.72)+beam(372,354,930,-40,9,96,0.58)
+    // the burning wreck on the tan front — the one warm note
+    +'<ellipse cx="1080" cy="372" rx="120" ry="46" fill="url(#fr)"/>'
+    +smoke(1062,-10)+smoke(1098,14)
+    +F('tank2', 1078, 366, 0.34, '#1a1410', 1)
+    +'<circle cx="1072" cy="352" r="11" fill="#ffb454" opacity="0.7"/><circle cx="1072" cy="352" r="5" fill="#fff0c8" opacity="0.95"/><circle cx="1090" cy="346" r="7" fill="#ff9a3c" opacity="0.6"/>';
+  // the far ranks, small in the dark
+  for(let i=0;i<6;i++) v+=F('rifleman', 310+i*58, 356+((i*7)%3)*3, 0.16, '#0c1322', 0.7);
+  for(let i=0;i<7;i++) v+=F('tanrifle', 1010+i*56, 358+((i*5)%3)*3, 0.16, '#1a1d2c', 0.7);
+  v+='<rect y="330" width="1600" height="44" fill="#9fb8ff" opacity="0.06"/>'
+    // THEIR TOY BOX — the whole point of the war, in the moonlight
+    +'<ellipse cx="1215" cy="432" rx="112" ry="18" fill="#070a14" opacity="0.85"/>'
+    +'<line x1="1160" y1="352" x2="1160" y2="266" stroke="#2a2a3a" stroke-width="4"/>'
+    +'<path d="M1160 266 L1122 281 L1160 296 Z" fill="#8a3a3a"/>'
+    +'<circle cx="1160" cy="264" r="3" fill="#2a2a3a"/>'
+    +'<path d="M1150 368 L1168 350 L1262 350 L1280 368 Z" fill="#8c8398"/>'
+    +'<rect x="1150" y="368" width="130" height="58" fill="#4e4660"/>'
+    +'<path d="M1280 368 L1298 352 L1298 410 L1280 426 Z" fill="#332d42"/>'
+    +'<line x1="1150" y1="387" x2="1280" y2="387" stroke="#000" stroke-width="2" opacity="0.25"/>'
+    +'<line x1="1150" y1="406" x2="1280" y2="406" stroke="#000" stroke-width="2" opacity="0.25"/>'
+    +'<rect x="1150" y="368" width="130" height="58" fill="none" stroke="#000" stroke-width="2" opacity="0.3"/>'
+    +'<path d="M1150 368 L1168 350 L1262 350" fill="none" stroke="#e6ecff" stroke-width="2.5" opacity="0.55"/>'
+    +'<path d="M1215 380 L1219 391.5 L1231.2 391.7 L1221.5 399.1 L1225 410.8 L1215 403.8 L1205 410.8 L1208.5 399.1 L1198.8 391.7 L1211 391.5 Z" fill="#f5ead2" opacity="0.92"/>'
+    +F('tancommander', 1215, 362, 0.26, '#2a2436', 1)
+    +F('tanrifle', 1122, 438, 0.3, '#262238', 0.95)
+    +F('tanrifle', 1305, 442, 0.3, '#262238', 0.95)
+    // the elite advance — the marquee action, left third
+    +F('tank2', 402, 452, 0.55, '#0b1220', 0.95)
+    +F('medic', 240, 460, 0.38, '#0f1727', 0.92)
+    +F('officer', 302, 466, 0.4, '#0f1727', 0.95)
+    +F('spy', 352, 468, 0.4, '#0f1727', 0.95)
+    +F('commando', 428, 472, 0.41, '#0f1727', 0.95)
+    +F('bazooka', 508, 470, 0.42, '#0d1423', 0.95)
+    +F('commando', 578, 474, 0.43, '#0d1423', 0.95)
+    +F('mgunner', 660, 477, 0.44, '#0b111e', 0.95)
+    // the elite tan line answering — sabers lit, the roller pig, a giant
+    +F('giant', 1300, 470, 0.9, '#1c1a2a', 0.9)
+    +F('rollpig', 1190, 470, 0.48, '#2a2538', 0.95)
+    +F('tansarge', 1108, 471, 0.42, '#2a2538', 0.95)
+    +F('tancommander', 1038, 473, 0.43, '#2a2538', 0.95)
+    +F('tanmg', 962, 477, 0.44, '#262236', 0.95)
+    // muzzle flashes at both front guns, white-blue
+    +'<path d="M684 462 L706 462 M684 456 L700 452 M684 468 L700 472" stroke="#e6f0ff" stroke-width="3" stroke-linecap="round" opacity="0.9"/><circle cx="684" cy="462" r="4" fill="#ffffff" opacity="0.95"/>'
+    +'<path d="M938 462 L916 462 M938 456 L922 452 M938 468 L922 472" stroke="#e6f0ff" stroke-width="3" stroke-linecap="round" opacity="0.9"/><circle cx="938" cy="462" r="4" fill="#ffffff" opacity="0.95"/>'
+    // fire crossing the gap, anchored at the two muzzles (the v2.48 law)
+    +tracer(690,461,916,450)+tracer(690,461,930,445)+tracer(688,463,908,456)+tracer(932,461,706,469)
+    +'<path d="M562 432 Q800 208 1056 400" fill="none" stroke="#cfe0ff" stroke-width="2.5" stroke-dasharray="3 12" opacity="0.4"/>'
+    +'<circle cx="904" cy="322" r="3.5" fill="#ffffff" opacity="0.9"/>'
+    // the shell that just landed on the tan front — a cold white flash
+    +'<circle cx="920" cy="452" r="40" fill="#8fb0ff" opacity="0.2"/><circle cx="920" cy="452" r="26" fill="#c3d6ff" opacity="0.38"/>'
+    +'<circle cx="920" cy="452" r="13" fill="#e9f0ff" opacity="0.8"/><circle cx="920" cy="452" r="6" fill="#ffffff" opacity="0.98"/>'
+    +'<path d="M920 452 L947 434 M920 452 L949 458 M920 452 L936 425 M920 452 L900 428 M920 452 L893 447 M920 452 L940 476 M920 452 L903 474" stroke="#dfe9ff" stroke-width="2.5" stroke-linecap="round" opacity="0.85"/>'
+    +'<circle cx="914" cy="414" r="14" fill="#05070d" opacity="0.35"/><circle cx="926" cy="396" r="17" fill="#05070d" opacity="0.3"/><circle cx="916" cy="376" r="20" fill="#05070d" opacity="0.22"/>'
+    +'<circle cx="748" cy="470" r="15" fill="#8fb0ff" opacity="0.16"/><circle cx="748" cy="470" r="8" fill="#c3d6ff" opacity="0.26"/>'
+    // sparks off the wreck, frost in the air
+    +'<g fill="#ffd68a"><circle cx="1052" cy="318" r="2" opacity="0.5"/><circle cx="1096" cy="296" r="1.6" opacity="0.45"/><circle cx="1070" cy="262" r="1.4" opacity="0.35"/><circle cx="1118" cy="330" r="2.2" opacity="0.5"/></g>'
+    +'<g fill="#dfe9ff"><circle cx="612" cy="318" r="1.6" opacity="0.3"/><circle cx="724" cy="344" r="1.8" opacity="0.32"/><circle cx="838" cy="306" r="1.5" opacity="0.28"/><circle cx="420" cy="220" r="1.6" opacity="0.2"/><circle cx="1240" cy="230" r="1.5" opacity="0.2"/></g>'
+    // foreground silhouettes frame the stage (edges = phone bonus, v1.42 law)
+    +F('commando', 332, 668, 0.85, '#05070f', 0.97)
+    +F('officer', 148, 700, 1.25, '#04060d', 0.98)
+    +F('tanshotgun', 1286, 662, 0.8, '#07080f', 0.96)
+    +F('giant', 1452, 698, 1.2, '#04060d', 0.98)
+    +'</svg>';
+  ELITE_HERO='data:image/svg+xml;utf8,'+encodeURIComponent(v);
+  return ELITE_HERO;
+}
 // v2.48 (Wyatt 8/5: "the level was called Rocks... have the names be more
 // accurate — level 10 of 100: There Might Be Giants. Perfect name!"): every
 // rung gets a title written off what the level ACTUALLY fields — authored
@@ -76034,7 +76165,7 @@ function renderCampScene(){
   // v2.33: the diorama arrives as a background STYLE, not markup — zero text,
   // so the l10n DOM walk never has to consider a 30KB data URI
   document.getElementById('campBg').style.backgroundImage =
-    'url("'+campHeroURI()+'"), linear-gradient(180deg,#0e0805,#62301a 52%,#250d07)';
+    'url("'+(elite? eliteHeroURI() : campHeroURI())+'"), '+(elite? 'linear-gradient(180deg,#030510,#1a2a52 52%,#0b1020)' : 'linear-gradient(180deg,#0e0805,#62301a 52%,#250d07)');   // 0826 D6 ELITE FORCES WEARS THE NIGHT: past the first summit the door paints the midnight diorama (its own fallback tone under it); the first hundred keeps the dusk byte-still
   // v2.48: the replay shelf opens parked on the NEWEST chips — the levels a
   // player just fought are the ones worth replaying
   const rrow=document.querySelector('#campscene .cs-replay');
