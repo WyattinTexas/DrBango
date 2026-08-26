@@ -37243,7 +37243,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.56';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.57';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -42496,6 +42496,24 @@ function renderPartySheet(){
     if(fi && document.activeElement===fi){ grpBtnSync(); return; }   // §7.1: a poll repaint must not eat the kid's typing — the 1 s tick retries after blur
     renderPartySheetHQ(el); return;
   }
+  // ═══ 0571 THE KEYBOARD STAYS UP (Wyatt 8/26, Laura's video: "the keyboard
+  // moves up and down. It does it rapidly, so you can't actually type anyone's
+  // name in"): the PLACE sheets' invite field (pfName-p, ptyInvPanelHTML) had
+  // no typing guard, so the sheet's own 1 s tick (ptyTickArm) and every
+  // poll-delta ptyRender wiped el.innerHTML under her fingers — the focused
+  // input died, iOS dropped the keyboard, and each fresh tap replayed it: up,
+  // down, up. §7.1's HQ law (the pfName-h line above), applied to the scene
+  // branch verbatim: a repaint must never eat the kid's typing — the tick
+  // retries after blur (the LOCATION LAW's host stamp and the deploy column
+  // wait that beat with it, the HQ precedent's own shape). AFTER the hidden
+  // check, so ✕ / a closing sheet still shuts mid-typing; the top sweep never
+  // reaches this input (it lives in el, the OPEN scene's own sheet — a scene
+  // swap sweeps the old copy first and the guard correctly stands down).
+  // PFIND.q (pfindIn) already carries the text across the after-blur repaint —
+  // only the focus was dying. Do not "fix" this by re-focusing after a wipe:
+  // a programmatic focus cannot hold an iOS keyboard, and the wipe is the bug.
+  const fp=document.getElementById('pfName-p');
+  if(fp && document.activeElement===fp){ grpBtnSync(); return; }
   const skin= (here==='hide'||here==='lair')? 'th-west' : (here==='ice'||here==='fields')? 'th-yeti' : 'th-'+here;   // S6: the hideout wears Outlaw Town's; 0411a D1: the lair's magma browns sit in the same amber dress, the castle wears its park's ice-blue (⚑ mint th-ice/th-lair CSS vars only if a frame proves the borrow wrong)
   el.className='ptySheet th '+skin;
   const L=ptyLobby(), n=L? (COOP.members||[]).length : 1;
