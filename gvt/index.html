@@ -25184,6 +25184,7 @@ const META_DEFAULT = {
   // (the parks.dino ledger itself shipped with v3.33's fresh-build block).
   parkDino:0, parkDinoSeen:0, bronzeKey:0, bronzeKeySeen:0,
   parkTeddy:0, parkTeddySeen:0,   // 0524 TP-04 TEDDY PARK — the comet-law pair (the find + the seen latch); 0555: written together by the deed (tollTake) — the park's card grammar
+  bpDrillReset:0,   // 0826 THE DRILL COMES OFF THE LADDER (design/feedback-0826-pm/00-FEEDBACK.md §3): the one-shot stamp of the boot migration below the parks normalise — flat primitive (the comet law: an older save reads 0 and the wipe runs once)
   teddyDeed:0, teddyKey:0, teddyKeySeen:0, teddyMegaAnn:0,   // 0555 BEAR PARK — THE PUBLIC DOOR: the deed (THE BEAR BARRICADE's toll, paid ONCE — D11), THE PLUSH KEY (won at rung 20 on every seat, the silver/bronze model) + its seen latch, MEGA's herald latch; flat primitives (the comet law: Object.assign migrates older saves to 0 free, garbage can only under-grant)
   giftLast:0, giftPend:0, giftNote:'',   // 0826 A GIFT FROM HQ (design/feedback-0826-barricade/00-FEEDBACK.md §3): the highest gift id banked (the latch), the stars owed a card, the note it prints — flat primitives (the comet law)
   parks:{ yeti:{lv:0,stars:0,pd:0,pd2:0,rp:{}}, dino:{lv:0,stars:0,pd:0,pd2:0,rp:{}} },   // 0327: pd2 = the deep ladder's split purse ledger (rungs 31-50); 0495a: rp = the paid-replay counts per rung ('r25':k — THE REPLAY TAX)
@@ -25428,6 +25429,27 @@ if(!META.crownV2){ META.crownV2=1;
     META.croak={ e:c.e?1:0, m:c.m?1:0, h:c.h?1:0, g:c.g?1:0 }; })();   // 0372: the MEGA CROAK first-clear flag rides the same normalize (the 0341/0357 grammar — without this cell the boot latch would wipe a hand-rolled g)
   (function(){ const c=META.fields||{};   // 0526: THE PILLOW FIELDS' first-clear ledger (the hideout's normalize verbatim; 0555: the MEGA cell joins — the fifty opens it)
     META.fields={ e:c.e?1:0, m:c.m?1:0, h:c.h?1:0, g:c.g?1:0 }; })();
+  // 0826 BEAR PARK — THE DRILL COMES OFF THE LADDER (design/feedback-0826-pm/00-FEEDBACK.md §3; Wyatt 8/26: "Those are all
+  // rewards from Bear Park, and I haven't done any of Bear Park yet" · "I did beat a few levels of Teddy Park before the wall
+  // came up"): the 8/25 tester drill (0524-0538c, the name gate) climbed BEAR PARK's ladder before THE BEAR BARRICADE (0555)
+  // stood in front of it, and 0556's boot heal (below the outfit normaliser) paid those rungs' prizes. A save that never paid
+  // the deed has never done BEAR PARK — since 0555 the deed is the one door to a rung as owner (a party guest rides with
+  // mine=false) — and the two HQ test gifts (server v45, A GIFT FROM HQ) are the only way the drill's testers pay it, so "no
+  // deed, or the gift landed" names exactly the drill's ladders. ONCE, stamped (META.bpDrillReset): the teddy ledger, THE PLUSH
+  // KEY + its card latch, MEGA's herald latch and THE PILLOW FIELDS' four tiers (all behind rung 20) go back to zero; the rack
+  // block below the outfit normaliser takes the bear lane's pieces back. The stars the drill paid stay in the bank (no clawback).
+  // Seated ABOVE the plush-key heal (it would read a drill lv ≥ 20 and hand the key straight back) and BELOW the parks + fields
+  // normalise (the v1.26 TDZ law). A save with nothing of the drill's on the ladder is left alone (a deed-less party guest keeps
+  // his purse bits and his stars).
+  window.BP_DRILL_WIPE=false;   // this boot's verdict — read by the rack block below and by the rig (GVT.park('teddy').wipe); a window row, not a let: this normalise region is block-scoped and the rack block sits outside it
+  (function(){ if(META.bpDrillReset) return; META.bpDrillReset=1;
+    if(META.teddyDeed && !(META.giftLast|0)) return;   // a paid deed with no HQ gift = a real climb through the door — untouched
+    const pk=META.parks.teddy, f=META.fields;
+    if(!((pk.lv|0)>0 || META.teddyKey || f.e || f.m || f.h || f.g)) return;   // nothing of the drill's here
+    window.BP_DRILL_WIPE=true;
+    META.parks.teddy={ lv:0, stars:0, pd:0, pd2:0, rp:{} };
+    META.teddyKey=0; META.teddyKeySeen=0; META.teddyMegaAnn=0;
+    META.fields={ e:0, m:0, h:0, g:0 }; })();
   if(META.parks.teddy.lv>=20 && !META.teddyKey) META.teddyKey=1;   // 0555 THE PLUSH KEY's boot heal — a save already past BEAR PARK's rung 20 (the drill's testers) holds the key (the flamestrike/baker heal grammar; the seen card deals on its next room visit); 20 = PARK_KEY_RUNG, a TDZ literal here (the v1.26 law)
   (function(){ const i=META.ice||{};
     META.ice={ e:i.e?1:0, m:i.m?1:0, h:i.h?1:0, g:i.g?1:0, u:i.u?1:0 };   // 0341: the MEGA first-clear flag rides the same normalize (old saves read 0) · 0484: the ULTRA first-clear (D16) rides it too
@@ -25676,6 +25698,17 @@ META.stripeSeen=Array.isArray(META.stripeSeen)? META.stripeSeen.slice() : [];
   const wear=(Array.isArray(o.wear)? o.wear : []).filter(id=>own.indexOf(id)>=0)
     .filter((id,i,a)=>{ const ex=OUTFIT_EXCL[id]; return !(ex && ex.some(e=>a.indexOf(e)>=0 && a.indexOf(e)<i)); });   // v3.33: the pairs are SETS now — any earlier-listed partner wins
   META.outfit={ own, wear }; })();
+// 0826 THE DRILL COMES OFF THE LADDER — the rack half (design/feedback-0826-pm/00-FEEDBACK.md §3): the pieces the drill's
+// rungs paid leave the rack — owned, worn AND seen — so the cards deal fresh the day they are earned through the door: every
+// OUTFIT_EARN_PARK id on the teddy lane (the Musketeer set + THE FUZZY HAT) and the MEGA lane's KING BEAR'S HAT (impossible
+// without the fifty — listed for completeness). Seated BELOW the outfit normaliser (own/wear rebuilt, outfitSeen seeded above)
+// and ABOVE the 0556 heal (which then reads rung 0 and pays nothing). One saveMeta so the wipe and its stamp hold even if the
+// app dies before the next write (the boot never saves on its own; the verdict is idempotent either way).
+(function(){ if(!window.BP_DRILL_WIPE) return;
+  const bear=Object.keys(OUTFIT_EARN_PARK).filter(id=>OUTFIT_EARN_PARK[id]==='teddy').concat(Object.keys(OUTFIT_EARN_MEGA));
+  const keep=id=>bear.indexOf(id)<0;
+  META.outfit.own=META.outfit.own.filter(keep); META.outfit.wear=META.outfit.wear.filter(keep); META.outfitSeen=META.outfitSeen.filter(keep);
+  saveMeta(); })();
 // 0556 BEAR PARK — THE PRIZES' boot heal (the flamestrike/baker grammar; the
 // campaign lane's twin lives in the elite heal): the park lane pays a veteran
 // who climbed past a rung before this build — the four rung-30 hats on every
@@ -37296,7 +37329,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.49';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.50';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -82661,7 +82694,7 @@ window.GVT = {
   // the room, and where the fly is if a hand has it.
   park(id){ if(id==='teddy'){   // 0555: the gate is gone — the probe answers every save (the deed + the key ride beside the find pair)
       const pk9=parkLedger('teddy');
-      return { id:'teddy', cur:PARK_CUR, found:!!META.parkTeddy, seen:!!META.parkTeddySeen, deed:!!META.teddyDeed, key:!!META.teddyKey, keySeen:!!META.teddyKeySeen, lv:pk9.lv, stars:pk9.stars, pd:pk9.pd, pd2:pk9.pd2,
+      return { id:'teddy', cur:PARK_CUR, found:!!META.parkTeddy, seen:!!META.parkTeddySeen, deed:!!META.teddyDeed, key:!!META.teddyKey, keySeen:!!META.teddyKeySeen, bpReset:META.bpDrillReset|0, wipe:window.BP_DRILL_WIPE?1:0, lv:pk9.lv, stars:pk9.stars, pd:pk9.pd, pd2:pk9.pd2,
         spot:{x:704,y:56,w:112,h:76}, scene:parkSceneOpen(),
         run:S.park? {id:S.park.id, n:S.park.n, mine:!!S.park.mine, hex:S.park.hex||null} : null,
         gate:!!(S.cfg&&S.cfg.waves&&S.cfg.waves.some(w=>w.actGate)),
@@ -83129,7 +83162,7 @@ window.GVT = {
   prizes556(){   // 0556 BEAR PARK — THE PRIZES — the rig's one read (read-only)
     const ids=['advhat','furryhat','sheriffhat','fuzzyhat','kingbearhat','muskboots','musksash','muskpads','muskarmor','muskhelmet'];
     const sw=sargeStats();
-    return { cv:GVT_CV, own:ids.filter(outfitOwns), on:ids.filter(outfitOn), earn:ids.map(i=>i+':'+(OUTFIT_EARN[i]||'MEGA')+'/'+(OUTFIT_EARN_PARK[i]||OUTFIT_EARN_MEGA[i])), lens:ids.map(i=>i+' = '+lensLines2(i).join(' · ')),
+    return { cv:GVT_CV, own:ids.filter(outfitOwns), on:ids.filter(outfitOn), seen:ids.filter(i=>META.outfitSeen.indexOf(i)>=0), earn:ids.map(i=>i+':'+(OUTFIT_EARN[i]||'MEGA')+'/'+(OUTFIT_EARN_PARK[i]||OUTFIT_EARN_MEGA[i])), lens:ids.map(i=>i+' = '+lensLines2(i).join(' · ')),
       heads:OUTFIT_EXCL.cowboy.length+1, bag:{ dmg:sw.dmg, rng:sw.rng, rate:sw.rate, spdM:sw.spdM||1, defM:sw.defM||1, ofHpX:sw.ofHpX||0, w:sw.w }, dials:{ adv:OF_ADVHAT_X, fur:OF_FURHAT_X, shf:[OF_SHF_DMG,OF_SHF_M,OF_SHF_VS], fuz:OF_FUZ_EVERY, kbh:[OF_KBH_SPD,OF_KBH_DMG,OF_KBH_DEF] },
       bear:{ owned:unitOwned('kingbear'), sel:heroSel(), inRoster:ownedUnits().indexOf('kingbear'), cost:COSTS.kingbear, def:Object.assign({},UDEF.kingbear), w:unitW('kingbear'), west:UNIT_WEST.kingbear|0, img:!!IMG.kingbear, box:TEDDY_BOX.kingbear, heroes:HEROES.slice(), soul:SOUL_EXTRA.indexOf('kingbear')>=0 },
       bicorne:teddyBicorneOn()?1:0, bicorneNode:!!document.querySelector('#decTeddy .tedbicorne'), posters:(function(){ const w=document.getElementById('posterWall'); return w? { lv:+w.dataset.lv, torn:w.classList.contains('torn'), rungs:[...w.querySelectorAll('.pw-poster')].map(g=>+g.dataset.rung), tears:w.querySelectorAll('.pw-tear').length, l:w.style.left, t:w.style.top, w:w.style.width, h:w.style.height } : null; })(),
