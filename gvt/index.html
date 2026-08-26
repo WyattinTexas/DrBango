@@ -29968,6 +29968,9 @@ const UDEF = {
   bftank:  { rng:210, rate:0.5, dmg:6, air:false, grit:3, name:'TANK', vehicle:true, splash:48, scatter:26 },
   tank2:   { rng:210, rate:0.5, dmg:6, air:false, grit:3, name:'V2 TANK', vehicle:true, splash:48, scatter:26 }   // 0547 THE V2 TANK — the campaign's prize at 75: the tank's own row (the J2 grammar — the ×1.3 cadence / +14 blast / 30 pace land at the fire drum, the push and the stride, never in the shared def)
 };
+// 0554c THE JUMP-IN: SERGEANT COLD's purple-leap dials (0341), seated above the roster so his row names them verbatim (the
+// tick reads the row's `leap` bag — see foeLeapTick). Dials one line, unchanged numbers.
+const LEAP_CD_SGT=15, LEAP_FIRST=8, LEAP_WIND=0.6, LEAP_T=0.75, LEAP_H=110, LEAP_MIN_D=180;
 const FDEF = {
   tanrifle:{ hp:2,  spd:40, bounty:5,  leak:1, w:50, rng:198, fireCd:3.2, name:'tan' },  // matches your rifleman's ADVANCED FIRING reach (v1.40) — the ~0.5s aim wind-up is their only tell
   tanmg:   { hp:3,  spd:34, bounty:8,  leak:1, w:54, rng:161, fireCd:2.6, burst:2 },  // 0117: the 18289 literal moved onto the table — burst:2 IS the shipped 3-round brrrt (one aimed + two chased), verbatim. v2.44: rng 112→134; v2.49: 134→161 (×1.2 again with the class — the green twin still out-reaches him 180 to 161, the v2.35 order kept) — and he pays the same ROOTED BURST law (tanShoot arms f.mgRootT, the walking brrrt now fires from a standstill)
@@ -30089,7 +30092,7 @@ const FDEF = {
   // YETI_SHOOTERS. SNOWMAN "works like a giant snowman, except he has ten
   // more health" — the comparison is to the UNIT, so the +10 rides the ROW
   // (60→70) and tier-prices with him; his volley count is the group's sbn.
-  sgtcold: { sno:1, hp:70,  spd:30, bounty:110,leak:4, w:96,  boss:true, rng:190, fireCd:3.0, sprint:{aggro:150, dash:420, swing:1.2, cap:2, cd:3.5} },
+  sgtcold: { sno:1, hp:70,  spd:30, bounty:110,leak:4, w:96,  boss:true, rng:190, fireCd:3.0, sprint:{aggro:150, dash:420, swing:1.2, cap:2, cd:3.5}, leap:{cd:LEAP_CD_SGT, first:LEAP_FIRST, wind:LEAP_WIND, t:LEAP_T, h:LEAP_H, minD:LEAP_MIN_D, mega:1} },   // 0554c: the purple leap as a ROW CELL (the 0117 capability law the boss gate's own comment asked for) — his consts verbatim; mega:1 = the MEGA/ULTRA raid's alone (0341: M/H never leapt), byte-equal on his fixture
   sgtsnow: { sno:1, hp:70,  spd:20, bounty:110,leak:4, w:118, boss:true, rng:440, minRng:140, fireCd:4.5, snowboulder:{spd:200, r:26, range:820, wind:0.6}, split:{n:5, hp:2} },
   kingyeti:{ sno:1, hp:190, spd:22, bounty:250,leak:8, w:148, rng:200, fireCd:2.6, boss:true },
   // ===== v3.35 TP-03 THE DINO PARK CAST — reworked 0278b FM-GVT-DINO-01
@@ -30373,6 +30376,33 @@ const FDEF = {
   // unreachable anyway ("it never dies" is structural, not a big number).
   dummy:   { hp:999999, spd:0, bounty:0, leak:0, w:58 }
 };
+// ===== 0554c TEDDY PARK — THE BEARS BITE (design/feedback-0825-pm/00-FEEDBACK.md §6 · card E; Wyatt 8/25: "They're just too
+// weak right now. The campaigns are too easy. … the bears need to rush charging and then when they're in range they stop and
+// then they start firing. … The Sarge and the guy with the pillow should jump in and give him the purple telekinesis to jump in
+// so then that way he's in there and then raises health by about 50%. As for the squad leader guy, we gotta have him blowing
+// that whistle, lining people up. We gotta give him 80% more health and he needs to feel like an army commander."). Five parts,
+// every number a dial, one const each: THE RUSH (a `rush` cell — spd × while no man stands inside reach×TEDDY_RUSH_TO; the
+// formless walk, the block anchor and the members' slot spring read it; the halt → aim → fire is the shipped grammar), THE
+// JUMP-IN (a `leap` bag — foeLeapTick's own wheel behind the 0117 capability cell; SERGEANT COLD's bag is his consts + mega:1),
+// THE WHISTLE LINE (teddyFallIn — TEDDY_LEADER's whistle mints a runtime redcoat block of the gun bears inside his aura;
+// VOLLEY_CYCLE.redcoat runs it), THE HP (TEDDY_HPX at the row — layer 1, the NEMPARK_SARGE_HP idiom; the raid inherits, ⚑ D-E7)
+// and THE CURVE (PARK_EDITS.teddy — the first teddy rows).
+// WHO IS WHO (⚑ D-E1, Wyatt rules — one const each): "the guy with the pillow" = BIG TED WALLOW (the only pillow in the game) ·
+// "the squad leader guy … blowing that whistle, lining people up" = SARGE GRUFFLE (the whistle is his shipped kit) · "the Sarge"
+// (jumps in, +50 %) = CAPTAIN BEARNAPARTE (the L5 commander who HOLDS between the guns and never reached the line). If the Sarge
+// IS Gruffle: TEDDY_LEADER='tcaptain' (he lines them up on HAT UP), TEDDY_LEAPERS=['tgruffle','twallow'], TEDDY_HPX swaps 1.5/1.8.
+const TEDDY_LEADER='tgruffle';
+const TEDDY_LEAPERS=['tcaptain','twallow'];
+const TEDDY_HPX={ twallow:1.5, tcaptain:1.5, tgruffle:1.8 };                 // Wallow 12→18 · the Captain 60→90 · Gruffle 14→25
+const TEDDY_RUSH={ tsnugg:2.2, tpara:2.0, twallow:1.8 };                     // ⚑ D-E2: Snugg 45→99 px/s (under the cub's 140) · the paratrooper 40→80 once out of the tangle · Wallow 26→47 to his slam; NOT the cannon (artillery emplaces), NOT the cubs (they pounce already)
+const TEDDY_RUSH_TO=1.15;                                                    // the rush runs while no man stands inside reach×this (a gun's frng; Wallow's stompR+40 — the hello wave's own trigger); inside it the shipped walk → halt → aim → fire
+const TEDDY_LEAP={ cd:12, first:5, wind:0.6, t:0.75, h:110, minD:180, minX:300, r:72 };   // ⚑ D-E6 the leap bag (Cold's: 15 / 8 / 0.6 / 0.75 / 110 / 180, his landing ring TK_PURPLE_R 90) — the tell, the parabola, the landing that flattens every man inside r+16 (the knock — men never die). minX = the closest to the toy box a bear may LAND (the line's own x): Cold's picker hunts the rear mortar at x≈150, thirty pixels from the box — a bear landing there leaked within a second (measured); clamped to 300 he lands IN the line, knocks it, and fights there. r = a BEAR-sized landing (Wallow's own stompR — the landing is a slam): Cold's 90 was sized for a landing among the rear tubes; on the dense line it flattened seven men a landing and three landings at rung 9 collapsed the line (measured)
+const TEDDY_MUSTER_R=300;                                                    // ⚑ the whistle carries farther than the hup: the gun bears inside THIS of the leader fall in (his auraR 140 stays the rally's — measured: the spawn lanes jitter ±150 px in y and the rush carries a Snugg 100 px/s, so a 140 muster caught nobody at rung 7)
+const TEDDY_MUSTER_HOME=400;                                                 // no fall-in this close to the toy box (the men's line stands at ~250; the block's anchor forms 90 west of the leader and breaks at the box's 115 — a muster here is a churn, measured)
+const TEDDY_FALLIN_COL='#8FBF63';                                            // the FALL IN! ring on the whistle (⚑ default: a ring, zero strings)
+for(const t in TEDDY_HPX) FDEF[t].hp=Math.round(FDEF[t].hp*TEDDY_HPX[t]);   // AT THE ROW (layer 1): spawnFoe reads FDEF[t].hp — the campaign's curve and the raid's FIELDS_HPX multiply it as they always did (the teddyDef copy law downstream is untouched: these land once, at load, on the shared rows)
+for(const t in TEDDY_RUSH) FDEF[t].rush=TEDDY_RUSH[t];
+for(const t of TEDDY_LEAPERS) FDEF[t].leap=TEDDY_LEAP;
 // Boss display + wave-announce copy. `wave` = the red card AND the boss health
 // bar's plate (drawBossBar reads it; `title` is the name row the verdict and
 // the editor read); 0499: an OPTIONAL `bar` cell outranks `wave` on the plate
@@ -36598,7 +36628,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.37';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.38';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -48095,33 +48125,37 @@ const KING_ROT=5.0, KING_TK_SEEK=300, KING_TK_HOLD=0.9,
 // → parabola flight → the landing flattens every man inside the purple
 // ring (knock — this game's massive-damage grammar; men never die). The
 // sergeant hunts mortars then the rearmost man. Dials one line.
-const LEAP_CD_SGT=15, LEAP_FIRST=8, LEAP_WIND=0.6, LEAP_T=0.75, LEAP_H=110, LEAP_MIN_D=180;
+// 0554c: the six dials (LEAP_CD_SGT · LEAP_FIRST · LEAP_WIND · LEAP_T · LEAP_H · LEAP_MIN_D) now sit above the roster so SERGEANT
+// COLD's row can carry them as his `leap` bag — the tick below reads f.def.leap (the 0117 capability cell); the playable king's
+// leap (kyUnit…) and the king's picker keep reading the consts by name.
 function foeLeapPick(f){
   const ok=u=>!(u.dead || u.jetT>0 || u.dropT>0 || u.falling || u.cloakT>0 || (S.drag && S.drag.unit===u));
   const rear=list=>{ let b=null; for(const u of list) if(ok(u) && (!b || u.x<b.x)) b=u; return b; };
   let m=rear(S.units.filter(u=>u.type==='mortar'));
   if(!m) m=rear(S.units);
-  if(!m || Math.hypot(m.x-f.x,m.y-f.y)<LEAP_MIN_D) return null;
+  if(!m || Math.hypot(m.x-f.x,m.y-f.y)<f.def.leap.minD) return null;   // 0554c: the row's own minD
   return m;
 }
 function foeLeapTick(f,dt){
-  if(f.plCd==null){ f.plCd=LEAP_FIRST; f.plWind=0; f.plT=0; }
+  const L=f.def.leap;   // 0554c: the row's `leap` bag (Cold's = his consts verbatim; the teddy leapers' = TEDDY_LEAP)
+  if(f.plCd==null){ f.plCd=L.first; f.plWind=0; f.plT=0; }
   if(f.plWind>0 || f.plT>0) f.shot=0;   // no big shot mid-leap (0470: the boulder clause left with the snowman's seat — only cold leaps now)
   if(f.plT>0){
-    f.plT-=dt; const k=Math.max(0,Math.min(1,1-f.plT/LEAP_T));
+    f.plT-=dt; const k=Math.max(0,Math.min(1,1-f.plT/L.t));
     f.x=f.plX0+(f.plX1-f.plX0)*k; f.y=f.plY0+(f.plY1-f.plY0)*k;
-    f.airB=LEAP_H*4*k*(1-k);
+    f.airB=L.h*4*k*(1-k);
     if(f.plT<=0){
-      f.airB=0; f.plCd=LEAP_CD_SGT;   // 0452/0470: only SERGEANT COLD reaches this wheel — the king's seat (0452) and the snowman's (0470) are retired (the king's 0435 landing squash + snow burst left with his; cold's was always the shipped landing)
+      f.airB=0; f.plCd=L.cd; const KR=L.r||TK_PURPLE_R;   // 0554c: the row's cd; the landing ring = the bag's r (a bear-sized slam) or Cold's TK_PURPLE_R · 0452/0470: only SERGEANT COLD reaches this wheel — the king's seat (0452) and the snowman's (0470) are retired (the king's 0435 landing squash + snow burst left with his; cold's was always the shipped landing)
       SFX.stomp(); S.shake=0.55;
-      S.fx.push({k:'ring',x:f.x,y:f.y-8,r:8,R:TK_PURPLE_R+16,t:0,dur:0.32,col:'#B77DE8'});
-      S.fx.push({k:'ring',x:f.x,y:f.y-8,r:4,R:TK_PURPLE_R*0.6,t:0,dur:0.24,col:'rgba(255,255,255,0.9)'});
-      S.fx.push({k:'puff',x:f.x,y:f.y-6,t:0,dur:0.32,R:TK_PURPLE_R});
+      S.fx.push({k:'ring',x:f.x,y:f.y-8,r:8,R:KR+16,t:0,dur:0.32,col:'#B77DE8'});
+      S.fx.push({k:'ring',x:f.x,y:f.y-8,r:4,R:KR*0.6,t:0,dur:0.24,col:'rgba(255,255,255,0.9)'});
+      S.fx.push({k:'puff',x:f.x,y:f.y-6,t:0,dur:0.32,R:KR});
       for(const u of S.units){
         if(u.dead || u.jetT>0 || u.dropT>0 || u.falling) continue;
         if(S.drag && S.drag.unit===u) continue;
-        if(Math.hypot(u.x-f.x,u.y-f.y)<=TK_PURPLE_R+((u.def&&u.def.w)||54)*0.3) knock(u,f.x,f.y);
+        if(Math.hypot(u.x-f.x,u.y-f.y)<=KR+((u.def&&u.def.w)||54)*0.3) knock(u,f.x,f.y);
       }
+      if(TEDDY_CAST[f.type]) teddyLand(f);   // 0554c THE JUMP-IN: the cast's own landing beats (the Captain goes home to his guns, Wallow's slam resumes where he stands); a Cold no-op
     }
     return;
   }
@@ -48132,10 +48166,11 @@ function foeLeapTick(f,dt){
       f.plAim=null;
       if(!m){ f.plCd=3; return; }
       f.plX0=f.x; f.plY0=f.y;
-      f.plX1=Math.max(60,Math.min((S.bf?WORLD_W:W)-60,m.x+10));
+      f.plX1=Math.max(L.minX||60,Math.min((S.bf?WORLD_W:W)-60,m.x+10));   // 0554c: a bag's minX holds the landing east of the box's lap (the teddy leapers' 300 — the line's own x); Cold's bag carries none → his 60, byte-still
       f.plY1=Math.max(84,Math.min(WORLD_H-104,m.y));
-      f.plT=LEAP_T;
+      f.plT=L.t;
       bfSfx(SFX.jet, f.x, f.y);
+      if(TEDDY_CAST[f.type]) tdLog(f,'leap',[Math.round(f.plX1),Math.round(f.plY1)]);   // 0554c: the tape
     }
     return;
   }
@@ -48143,7 +48178,8 @@ function foeLeapTick(f,dt){
   if(f.plCd<=0){   // 0452: the !kyTk seize-interlock left with the king — no sergeant ever carries kyTk
     const m=foeLeapPick(f);
     if(!m){ f.plCd=2.5; return; }
-    f.plAim=m; f.plWind=LEAP_WIND;
+    f.plAim=m; f.plWind=L.wind;
+    if(TEDDY_CAST[f.type]){ f.plHome={x:f.x,y:f.y}; tdLog(f,'tell'); }   // 0554c: where he leapt from (the Captain's way home) + the tape
     tkTellFx(f.x,f.y);
     S.fx.push({k:'ring',x:f.x,y:f.y-30,r:6,R:44,t:0,dur:0.5,col:'#B77DE8'});
   }
@@ -49551,6 +49587,57 @@ const TDLOG=[];
 function tdLog(f,beat,x){ if(TDLOG.length>=800) TDLOG.shift(); TDLOG.push({t:+S.t.toFixed(2),id:f.id,type:f.type,beat:beat,x:(x==null?undefined:x)}); }
 function teddyDef(f){ if(!f.tdc){ f.def=Object.assign({},f.def); f.tdc=1; } return f.def; }
 function teddyNear(f,R){ let b=null,bd=R; for(const u of S.units){ if(u.dead||u.jetT>0||u.falling||u.cloakT>0) continue; if(S.drag&&S.drag.unit===u) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<bd){bd=d;b=u;} } return b; }
+// ---- 0554c THE BEARS BITE: the rush's readers, the jump-in's landing, the whistle line ----
+function teddyReach(f){ return f.def.rng? frng(f) : (f.def.stompR? f.def.stompR+40 : 0); }   // a gun's reach, or the bruiser's slam trigger (the hello wave's own radius)
+function teddyRushOn(f){   // THE RUSH: a `rush` row charges while no man stands inside reach×TEDDY_RUSH_TO; a planted state, the drop/tangle, a leap in progress and the pats never rush
+  if(!f.def.rush || f.dead || f.tdFeet || f.tdPat || f.tdSleep) return false;
+  if(f.paraSt && f.paraSt!=='foot') return false;
+  if(f.plWind>0 || f.plT>0) return false;
+  const R=teddyReach(f)*TEDDY_RUSH_TO; return R>0 && !teddyNear(f,R);
+}
+function teddyRushX(f){ return teddyRushOn(f)? f.def.rush : 1; }   // the formless walk's reader
+function teddyFormRush(fo){   // the block anchor's reader: a block of rushers rushes AS A BLOCK — at its fastest rusher's ×, until any rusher in it has a man inside his reach (the line halts as one); a block with no rusher reads ×1 (every tan form, byte-still)
+  let x=1; for(const m of fo.members){ if(!m.def.rush) continue; if(!teddyRushOn(m)) return 1; if(m.def.rush>x) x=m.def.rush; } return x;
+}
+function teddyLand(f){   // THE JUMP-IN's landing, the cast's own beats (the knock, the purple ring, SFX.stomp + the shake are foeLeapTick's shared law)
+  if(f.form){ const fo=f.form, i=fo.members.indexOf(f); if(i>=0) fo.members.splice(i,1); f.form=null; f.off=null; }   // he stands where he landed — no slot spring drags him back east
+  f.shot=0; f.aW=0;   // Wallow: the slam machine resumes where he stands, his stomp cd starting at the landing
+  if(f.type==='tcaptain'){ f.gnHome=f.plHome||null; f.gnSt='home'; f.tdFeet=1; }   // the Captain: the leap broke his HOLD — he walks HOME to his guns (⚑ D-E3)
+  else f.tdFeet=0;
+  tdLog(f,'land',[Math.round(f.x),Math.round(f.y)]);
+}
+function teddyFallInList(f){   // the muster: the GUN bears inside TEDDY_MUSTER_R of the leader that are not already in a volley block (on the carpet or still walking on — the block walks them on)
+  const R=TEDDY_MUSTER_R, list=[]; if(!(f.def.auraR>0)) return list;
+  for(const o of S.foes){
+    if(o===f || o.dead || !TEDDY_CAST[o.type] || !o.def.fireCd || o.def.cotton || o.boss) continue;   // the infantry trigger's own licence (a fireCd on a non-boss row), never the cannon's lob
+    if(o.tdFeet || o.tdPat || o.tdSleep) continue;
+    if(o.paraSt && o.paraSt!=='foot') continue;
+    if(o.form && VOLLEY_CYCLE[o.form.kind]) continue;   // already in a volley block
+    if(Math.hypot(o.x-f.x,o.y-f.y)>=R) continue;
+    list.push(o);
+  }
+  return list;
+}
+function teddyFallIn(f){   // THE WHISTLE LINE (the squad leader, TEDDY_LEADER): every GUN bear inside TEDDY_MUSTER_R of him that is not already in a volley block FALLS IN — a runtime redcoat block (spawnGroup's own slots, ±42 × 38, the leader at the officer's seat rear-48; built at runtime for the first time), walking at the block's pace (the rush multiplies it), volleying ON HIS ORDER (VOLLEY_CYCLE.redcoat — the fire licence reads doVolley), breaking by the shipped law (d<115, a river, the stall); the next whistle re-forms. Melee bears (the cubs, Wallow, Buttons) and the cannon (it emplaces) are never members — the swarm stays a swarm. One shared-dice draw: the block's own volley phase (rnd9 — FIX-C's law).
+  const R=TEDDY_MUSTER_R, gx=f.x, gy=f.y; if(!(f.def.auraR>0) || f.dead || f.tdPat) return 0;
+  const RV=S.cfg.terrain.river, ax=gx-90;   // the anchor sits 90 forward (west) of him — his own seat is rear-48 behind the block's rear rank
+  if(Math.hypot(T.x-gx,T.y-gy)<TEDDY_MUSTER_HOME) return 0;   // no muster inside the line's own ground — a block minted there dissolves at the box's 115 on its next frame and re-forms in a churn (measured)
+  if(RV && ax<RV.x+RV.w+80 && ax>RV.x-20) return 0;   // no block forms at a popsicle bridge (the river break law)
+  const list=teddyFallInList(f); if(!list.length) return 0;
+  const leave=o=>{ if(o.form){ const fo=o.form, i=fo.members.indexOf(o); if(i>=0) fo.members.splice(i,1); } o.form=null; o.off=null; };   // a plain line/column/push has no discipline — the block does
+  list.forEach(leave); leave(f);
+  const n=list.length, cols=Math.ceil(n/2), slots=[];
+  for(let i=0;i<n;i++){ const r=i%2, c=(i/2)|0; slots.push({t:list[i].type, fx:-r*42, fy:(c-(cols-1)/2)*38}); }
+  const rear=Math.min.apply(null, slots.map(o=>o.fx));
+  let dx=T.x-ax, dy=T.y-gy; const d0=Math.hypot(dx,dy)||1; dx/=d0; dy/=d0;
+  const form={ x:ax, y:gy, kind:'redcoat', timer:rnd9(), halted:false, dir:{x:dx,y:dy}, members:[], best:null, stall:0,
+    speed:Math.min.apply(null, list.map(o=>o.def.spd)) };   // the block's pace is its GUN BEARS' slowest row (never the officer's — he trots at the spring's ×1.8 to keep his seat): measured at his 30 px/s the block crept at the corks' 280 out-ranging the rifles' 198 and L7 cost eight lives; at the Snuggs' 45 it closes into the line's reach
+  list.forEach((o,i)=>{ o.form=form; o.off=slots[i]; form.members.push(o); });
+  f.form=form; f.off={t:f.type, fx:rear-48, fy:0}; form.members.push(f);
+  S.forms.push(form);
+  S.fx.push({k:'ring',x:gx,y:gy-30,r:10,R:R,t:0,dur:0.7,col:TEDDY_FALLIN_COL});   // FALL IN! — a ring in the park's green at the muster's reach (zero strings)
+  tdLog(f,'fallin',n); return n;
+}
 function teddySpawn(f){   // spawnFoe's one door: the per-type stamps (the def copy waits for the first phase that needs it)
   if(f.type==='tcub') f.lead=((f.foN-1)%3===0)?1:0;   // §3.2: the FIRST of each three wears the helmet; the file wears newspaper (foN — spawnFoe's own per-type ordinal)
   else if(f.type==='tbuttons'){ f.tdSleep=1; f.tdFeet=1; }   // pre-placed scenery is a REAL foe from frame 0 (spd 0 — the dummy's law); the pounce waits for the wake
@@ -49603,16 +49690,18 @@ function updateFoeGruffle(f,dt){
   if(f.yellT>0) f.yellT-=dt;
   if(f.rallyT>0){ f.rallyT-=dt; if(f.rallyT<=0){ f.rallyT=0; D.auraSpd=1; tdLog(f,'window-end'); } }
   f.rallyCd-=dt;
-  if(f.rallyCd<=0){ let n=0;
+  if(f.rallyCd<=0 || (f.type===TEDDY_LEADER && f.rallyT<=0 && teddyFallInList(f).length)){ let n=0;   // 0554c: the squad leader whistles ON SIGHT of gun bears not yet in his block (the rush would otherwise carry them past him before the 3.5 s first whistle — measured at rung 7); the shipped 7 s rally stays the cadence, one whistle per rally window at most
     for(const o of S.foes){ if(o===f||o.dead||!TEDDY_CAST[o.type]) continue; if(Math.hypot(o.x-f.x,o.y-f.y)<f.def.auraR){ n++; o.tdHupT=rb.hup; } }
     if(n){ f.rallyCd=rb.cd; f.rallyT=rb.dur; D.auraSpd=FDEF.tgruffle.auraSpd; f.yellT=0.6;
-      S.fx.push({k:'ring',x:f.x,y:f.y-30,r:8,R:f.def.auraR,t:0,dur:0.45,col:'#fff3c4'}); bfSfx(SFX.whistle,f.x,f.y); tdLog(f,'whistle',n); }
+      S.fx.push({k:'ring',x:f.x,y:f.y-30,r:8,R:f.def.auraR,t:0,dur:0.45,col:'#fff3c4'}); bfSfx(SFX.whistle,f.x,f.y); tdLog(f,'whistle',n);
+      if(f.type===TEDDY_LEADER) teddyFallIn(f); }   // 0554c THE WHISTLE LINE: the squad leader's whistle LINES THEM UP (the hup + the haste stand as shipped)
     else f.rallyCd=1.0; }
 }
 // §3.5 BIG TED 'WALLOW' — THE WAVE: the first time a man enters stompR+40 he stops and waves hello for `wave` s (the
 // stomp's own clock held at zero — an extra opening window); then the bruiser's stomp branch (the rear-up tell, the
 // slam) is his as shipped. THREE DAMAGE STATES off hp thirds: seams leaking wisps → a walking fluff blizzard (puffs).
 function updateFoeWallow(f,dt){
+  if(f.plWind>0 || f.plT>0){ f.tdFeet=1; f.aW=0; f.shot=0; return; }   // 0554c THE JUMP-IN: the tell plants him, the flight carries him (foeLeapTick writes his feet); the slam waits
   if(f.wisp==null) f.wisp=0;
   if(f.waveT>0){ f.waveT-=dt; f.shot=0; f.aW=0; if(f.waveT<=0){ f.waveT=0; f.tdFeet=0; f.shot=f.def.stompCd*0.6; tdLog(f,'wave-end'); } }
   else if(!f.waved && f.x<W-10 && teddyNear(f,f.def.stompR+40)){ f.waved=1; f.waveT=f.def.wave; f.tdFeet=1; f.shot=0; f.aW=0; tdLog(f,'wave'); }
@@ -49693,12 +49782,18 @@ function updateFoeGen(f,dt){
       if(fieldsRaid()) fieldsWagon(0); }   // 0526 THE WAGON: the fourth guard falls, Phase 2 opens — the battery's cotton pyramid goes up in confetti (the charge comes out of the smoke)
     return; }
   if(f.gnSt==='hold'){
+    if(f.plWind>0 || f.plT>0){ f.tdFeet=1; return; }   // 0554c THE JUMP-IN: the tell plants him, the flight carries him (foeLeapTick) — the leap breaks his HOLD (teddyLand seats 'home')
     if(f.hatCd==null) f.hatCd=D.hatCd*0.6;
     f.hatCd-=dt;
     let near=false; const guns=[];
     for(const o of S.foes){ if(o.type!=='tcannon'||o.dead) continue; const d=Math.hypot(o.x-f.x,o.y-f.y); if(d<D.auraR){ if(hasGreenTarget(o)) near=true; if(!(o.gsWind>0)&&o.x<W-10) guns.push(o); } }
     f.tdFeet=near?1:0;   // he holds where the guns are set
-    if(f.hatCd<=0){ if(guns.length>=2){ f.hatCd=D.hatCd; f.hatT=0.4; guns[0].shot=1e3; guns[1].tdDblT=0.25; tdLog(f,'hatup',guns.length); } else f.hatCd=1.0; }
+    if(f.hatCd<=0){ if(guns.length>=2){ f.hatCd=D.hatCd; f.hatT=0.4; guns[0].shot=1e3; guns[1].tdDblT=0.25; tdLog(f,'hatup',guns.length); if(f.type===TEDDY_LEADER) teddyFallIn(f); } else f.hatCd=1.0; }   // 0554c: the ⚑ D-E1 alt seat — a Captain leader lines them up on HAT UP
+    return; }
+  if(f.gnSt==='home'){   // 0554c THE JUMP-IN's way back: after the landing he walks HOME to his guns (⚑ D-E3 — the hit-and-run; alt: stays and swings with tgen's foot bag); teddyFeet walks him, the hold resumes at the seat
+    if(f.plWind>0 || f.plT>0){ f.tdFeet=1; return; }
+    f.tdFeet=1;
+    if(!f.gnHome || Math.hypot(f.gnHome.x-f.x,f.gnHome.y-f.y)<=6){ f.gnSt='hold'; f.tdFeet=0; tdLog(f,'home'); }
     return; }
   if(f.gnSt==='charge'||f.gnSt==='march'||f.gnSt==='run'){
     if(D.foot && !f.gnFoot && f.hp<=f.hpMax*D.foot.at){
@@ -49716,6 +49811,7 @@ function updateFoeGen(f,dt){
 }
 function teddyTick(f,dt){   // the one dispatch — the common head, then the type's own machine
   if(f.tdHupT>0) f.tdHupT-=dt;
+  if(f.def.rush){ const on=teddyRushOn(f)?1:0; if(on!==(f.tdRush|0)){ f.tdRush=on; if(on) tdLog(f,'rush'); else { tdLog(f,'halt'); if(f.x<W-10 && !f.dead) S.fx.push({k:'puff',x:f.x+5,y:f.y+2,t:0,dur:0.22,R:7}); } } }   // 0554c THE RUSH's tape + the touchdown dust at the halt (the AIR_GAIT landing's own puff); the draw doubles the hop-bob on f.tdRush
   if(f.tdHes>0){ f.tdHes-=dt; if(f.tdHes<=0){ f.tdHes=0; f.tdFeet=0; tdLog(f,'hesitate-end'); } }
   if(f.tdPat){ f.shot=0; f.aimT=0; f.gsWind=0; return; }   // THE PATS — no more attacks; the match is over
   if(f.tdShot!=null && f.shot<f.tdShot-0.5){ f.tdFired=1; tdLog(f,'shot'); }   // a trigger pulled (the shipped drum resets) — the reel draw reads it; the tape logs it
@@ -49735,6 +49831,8 @@ function teddyTick(f,dt){   // the one dispatch — the common head, then the ty
 function teddyFeet(f,dt,aura){   // the mover chain's door — true = the machine owned his feet this frame
   if(f.tdPat && S.tdPat){ const dx=S.tdPat.x+28-f.x, dy=S.tdPat.y-f.y, d=Math.hypot(dx,dy);
     if(d>30){ const sp=(f.def.spd||40)*aura; f.x+=dx/d*Math.min(d-30,sp*dt); f.y+=dy/d*Math.min(d-30,sp*dt); } return true; }
+  if(f.type==='tcaptain' && f.gnSt==='home' && f.gnHome && !(f.plWind>0 || f.plT>0)){ const dx=f.gnHome.x-f.x, dy=f.gnHome.y-f.y, d=Math.hypot(dx,dy);   // 0554c: home to his guns, at a trot
+    if(d>2){ const sp=f.def.spd*aura*1.6; f.x+=dx/d*Math.min(d,sp*dt); f.y+=dy/d*Math.min(d,sp*dt); } return true; }
   if(f.type==='tguard' && !(f.gdDive>0) && !(f.gdSalute>0) && f.gdWard && f.gdTx!=null){ const dx=f.gdTx-f.x, dy=f.gdTy-f.y, d=Math.hypot(dx,dy);
     if(d>2){ const sp=f.def.spd*aura*(d>70?1.8:1.15); f.x+=dx/d*Math.min(d,sp*dt); f.y+=dy/d*Math.min(d,sp*dt); } return true; }
   return true;   // every other tdFeet state is PLANTED: the drop, the tangle, dormant Buttons, the wave, the court, the speech, the hesitation, the battery hold, the snap, a dive, a salute
@@ -49784,7 +49882,7 @@ function drawTeddy(f,wbk){
   const ring=(R,a)=>{ cx.save(); cx.globalAlpha=a; cx.strokeStyle='#fff3c4'; cx.setLineDash([4,6]); cx.lineWidth=1.5; cx.beginPath(); cx.arc(f.x,f.y,R,0,7); cx.stroke(); cx.restore(); };
   if(f.tdPat){ drawSprite(t,f.x,f.y-3*Math.abs(Math.sin(S.t*6+f.wob)),w,0,0,im,wbk); return true; }   // patting him: a gentle rock beside the fallen General
   if(t==='tsnugg'){
-    drawSprite(t,f.x,f.y-bob(26,3)-hup,w,0,wob,f.slip?tdImg('tsnuggslip')||im:im,wbk);
+    drawSprite(t,f.x,f.y-bob(26,f.tdRush?6:3)-hup,w,0,wob,f.slip?tdImg('tsnuggslip')||im:im,wbk);   // 0554c: the hop-bob doubles on the rush
     if(f.tdFired && f.shot<D.fireCd){   // THE RELOAD IS THE COOLDOWN MADE VISIBLE — the cork reeled back in on its string
       const p=Math.max(0,Math.min(1,f.shot/D.fireCd)), gx=f.x-fl*66*k, gy=f.y-34*k, len=46*(1-p)*k, ex=gx-fl*len, ey=f.y-18*k+Math.sin(S.t*12)*3;
       cx.strokeStyle='rgba(232,226,212,0.95)'; cx.lineWidth=1.3; cx.beginPath(); cx.moveTo(gx,gy); cx.quadraticCurveTo(gx-fl*len*0.6,gy+6,ex,ey); cx.stroke();
@@ -49803,13 +49901,14 @@ function drawTeddy(f,wbk){
       cx.save(); cx.translate(f.x,f.y-2); cx.scale(1.1,0.34); if(ch) drawSprite('tparachute',0,40+Math.sin(S.t*16)*3,92*(w/52),0,0,ch); cx.restore();
       bar(); return true; }
     if(f.paraRag>0 && ch){ cx.save(); cx.globalAlpha=Math.min(1,f.paraRag/1.2)*0.9; cx.translate(f.ragX,f.ragY-2); cx.scale(1.1,0.34); drawSprite('tparachute',0,40,92*(w/52),0,0,ch); cx.restore(); cx.globalAlpha=1; }   // the rainbow rag where he landed
-    drawSprite(t,f.x,f.y-bob(26,3)-hup,w,0,(f.aimT>0?0.08:wob),im,wbk); bar(); return true; }
+    drawSprite(t,f.x,f.y-bob(26,f.tdRush?6:3)-hup,w,0,(f.aimT>0?0.08:wob),im,wbk); bar(); return true; }   // 0554c: the hop-bob doubles on the rush
   if(t==='tgruffle'){ drawSprite(t,f.x,f.y-bob(40,2)-hup,w,0,(f.yellT>0?-0.08:Math.sin(S.t*8+f.wob)*0.03),f.yellT>0?(tdImg('tgruffleyell')||im):im,wbk);
     if(f.yellT>0){ cx.fillStyle='#fff3c4'; for(let i=0;i<3;i++){ const a=-0.5-i*0.5, r=20+((S.t*60+i*7)%18); cx.beginPath(); cx.arc(f.x-fl*26+Math.cos(a)*r,f.y-40+Math.sin(a)*r*0.5,2.2,0,7); cx.fill(); } }
     ring(D.auraR,f.rallyT>0?0.5:0.22); bar(); return true; }
   if(t==='twallow'){ const bw=w*(240/140), third=f.hp/f.hpMax;
     if(third<=0.34){ cx.globalAlpha=0.22; cx.fillStyle='#fff'; cx.beginPath(); cx.ellipse(f.x,f.y-50,64,60,0,0,7); cx.fill(); cx.globalAlpha=1; }   // the walking blizzard
-    drawSprite(t,f.x,f.y-(f.aW>0?8:bob(40,4)),bw,0,(f.aW>0?0.16:Math.sin(S.t*6+f.wob)*0.03*mv),f.waveT>0?(tdImg('twallowwave')||im):im,wbk);
+    if(f.plT>0){ cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(f.x,f.y+3,bw*0.16,bw*0.045,0,0,7); cx.fill(); }   // 0554c: the ground shadow under the jump-in
+    drawSprite(t,f.x,f.y-(f.airB||0)-(f.aW>0?8:bob(40,f.tdRush?8:4)),bw,0,(f.aW>0?0.16:(f.plT>0?-0.2:Math.sin(S.t*6+f.wob)*0.03*mv)),f.waveT>0?(tdImg('twallowwave')||im):im,wbk);   // 0554c: the leap's lift + lean, the rush's doubled bob
     bar(); return true; }
   if(t==='tbuttons'){ const ai=tdImg('tbuttonsawake')||im, st=f.tbSt||'dormant';
     if(st==='dormant'||st==='slump'){ drawSprite(t,f.x,f.y,w,0,0,im,wbk);
@@ -49829,8 +49928,9 @@ function drawTeddy(f,wbk){
     ring(D.minRng,0.3);   // the blind spot inside 120 — under the barrel a man is safe
     bar(); return true; }
   if(t==='tcaptain'){ const up=f.hatT>0;
-    drawSprite(t,f.x,f.y-bob(26,3)-hup,w,0,(up?-0.05:wob),up?(tdImg('tcaptainbare')||im):im,wbk);
-    if(up){ const jump=24*k*Math.sin(Math.PI*Math.max(0,Math.min(1,1-f.hatT/0.4))); const hi=tdImg('tcaptainhat'); if(hi) drawSprite('tcaptainhat',f.x,f.y-bob(26,3)-hup-jump,w,0.1,0,hi,wbk); }   // THE HAT GOES UP — the L5 tell
+    if(f.plT>0){ cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(f.x,f.y+3,w*0.28,w*0.08,0,0,7); cx.fill(); }   // 0554c: the ground shadow under the jump-in
+    drawSprite(t,f.x,f.y-(f.airB||0)-bob(26,3)-hup,w,0,(up?-0.05:(f.plT>0?-0.18:wob)),up?(tdImg('tcaptainbare')||im):im,wbk);   // 0554c: the leap's lift + lean
+    if(up){ const jump=24*k*Math.sin(Math.PI*Math.max(0,Math.min(1,1-f.hatT/0.4))); const hi=tdImg('tcaptainhat'); if(hi) drawSprite('tcaptainhat',f.x,f.y-(f.airB||0)-bob(26,3)-hup-jump,w,0.1,0,hi,wbk); }   // THE HAT GOES UP — the L5 tell
     return true; }
   if(t==='tbrig'||t==='tgen'||t==='bearnaparte'){
     const st=f.gnSt||'in', sprint=(f.pounceState==='out');
@@ -55452,6 +55552,7 @@ function update(dt){
     fo.members=fo.members.filter(m=>S.foes.indexOf(m)>=0);
     if(fo.members.length===0){ S.forms.splice(i,1); continue; }
     let spd=fo.speed;
+    fo.rushX=teddyFormRush(fo); spd*=fo.rushX;   // 0554c THE RUSH, the anchor's seat: a block of rushers rushes as a block (×1 for every block without one — byte-still); the members' spring reads fo.rushX below
     fo.doVolley=false;
     // v1.38: the halt-volley discipline is a per-kind table now (redcoat row
     // verbatim; the creeping line runs it at double tempo)
@@ -55649,7 +55750,7 @@ function update(dt){
       if(S.cfg.terrain.gaps){ const d6=aiGapGoal(f.x,f.y,sx,sy); if(d6){ tx=d6.x; ty=d6.y; } }
       const dd=Math.hypot(tx-f.x, ty-f.y);
       if(dd>2){
-        const sp=(fo.halted&&dd<24)?0 : f.def.spd*aura*(dd>70?1.8:1.15);
+        const sp=(fo.halted&&dd<24)?0 : f.def.spd*aura*(fo.rushX||1)*(dd>70?1.8:1.15);   // 0554c: a rushing block's men spring at the block's pace
         f.x+=(tx-f.x)/dd*Math.min(sp*amv,dd); f.y+=(ty-f.y)/dd*Math.min(sp*amv,dd);   // 0278a: a formation snowman springs to his slot in hops too (amv===dt for everyone else)
       }
     } else if(f.gu){
@@ -55706,7 +55807,7 @@ function update(dt){
         const d6=aiGapGoal(f.x,f.y,g6.x,g6.y); if(d6) g6=d6;
       }
       const d=Math.hypot(g6.x-f.x, g6.y-f.y);
-      if(d>1){ const sp=f.def.spd*aura, st=rockSteer(f.x,f.y,g6.x,g6.y,f.squeeze?3:ROCK_PAD_FOE);
+      if(d>1){ const sp=f.def.spd*aura*(f.def.rush? teddyRushX(f) : 1), st=rockSteer(f.x,f.y,g6.x,g6.y,f.squeeze?3:ROCK_PAD_FOE);   // 0554c THE RUSH, the walk's seat (a `rush` row alone; every other foe reads ×1)
         f.x+=(st?st.x:(g6.x-f.x)/d)*sp*amv; f.y+=(st?st.y:(g6.y-f.y)/d)*sp*amv; }   // 0278a: amv — the air-step gate (=== dt for every non-gait foe)
     }
     // NOBODY STANDS STILL FOREVER. Steering gets a man round any rock we can
@@ -55823,7 +55924,7 @@ function update(dt){
       // a redcoat waits for the order — unless he is about to be cut in half,
       // and then he breaks ranks and defends himself like anybody would
       if(f.form && VOLLEY_CYCLE[f.form.kind] && !panic){
-        if(f.form.doVolley) tanFire(f);
+        if(f.form.doVolley && tanFire(f) && TEDDY_CAST[f.type]){ f.shot=0; tdLog(f,'volley'); }   // 0554c THE WHISTLE LINE: a bear's cork on the order — his drum resets (the reel draw) and the tape logs it; the redcoat's own call byte-still (its return was never read)
       } else if(f.burst>0){
         f.burstT-=dt;   // the MG walks his burst in — brrrt, one grit hit per round
         if(f.burstT<=0){ tanShoot(f); f.burst--; f.burstT=0.12; if(f.burst<=0) f.shot=Math.random()*0.4; }
@@ -55911,6 +56012,7 @@ function update(dt){
     if(f.def.swoop && !f.boss && f.x<W-10) updateFoeSwoop(f,dt);
     if(f.def.boulder && !f.boss && f.x<W-10){ f.shot+=dt; gsnowTick(f,dt); }
     if(f.def.stompCd && !f.boss && f.x<W-10) updateFoeStomp(f,dt);
+    if(f.def.leap && !f.boss && f.x<W-10 && !(f.aW>0) && !(f.waveT>0)) foeLeapTick(f,dt);   // 0554c THE JUMP-IN, the field's seat: BIG TED WALLOW (elite, never a boss section) — never mid rear-up, never mid hello-wave (the window stands); the tell plants him, the flight carries him, the landing knocks (TK_PURPLE_R+16), then the slam machine resumes where he stands
     if(f.def.hatch && !f.boss && f.x<W-10) updateFoeEgg(f,dt);
     if(f.def.ride && !f.boss && f.x<W-10) updateFoeRide(f,dt);     // 0339: the mounted bandit — the gun that never halts (trample rides the jeep bumper block above)
     if(f.def.bur && !f.boss && f.x<W-10) updateFoeSnake(f,dt);     // 0339: the rattlesnake's burrow machine
@@ -55922,7 +56024,7 @@ function update(dt){
     // ===== BOSS attacks (only once they're on the carpet) =====
     if(f.boss && !f.def.gun && f.x<W-10){   // 0478: a `gun` boss is the aim machinery's (above) — his f.shot is THAT drum, never this one
       f.shot+=dt;
-      if(megaActive() && f.type==='sgtcold') foeLeapTick(f,dt);   // 0341 MEGA: SERGEANT COLD'S purple leap — 0470: SERGEANT SNOWMAN'S seat is OUT (Wyatt 8/20 eve: the giant snowman "should not jump on you… better throwing out his snowballs from his side of the map when he's slowly walking" — he fights as his snowboulder self at every door now; M/H never leapt, MEGA matches them; ⚑ D12: the whole castle grounded = cold's type leaves here too, one cell); 0452: KING YETI'S seat is OUT at every door (Wyatt 8/20: "makes the fight just about impossible and not really that fun"; his RED/BLUE/SWING + the snow stand byte-still, and the PLAYABLE king keeps his own leap)
+      if(f.def.leap && (!f.def.leap.mega || megaActive())) foeLeapTick(f,dt);   // 0554c THE JUMP-IN: the capability cell this line's own comment asked for — a `leap` bag on the row (0117's law); SERGEANT COLD's carries mega:1 so his stays the MEGA/ULTRA raid's alone (byte-equal on his fixture); CAPTAIN BEARNAPARTE (boss:true) reaches this wheel through it — the Sarge who JUMPS IN (⚑ D-E1) · 0341 MEGA: SERGEANT COLD'S purple leap — 0470: SERGEANT SNOWMAN'S seat is OUT (Wyatt 8/20 eve: the giant snowman "should not jump on you… better throwing out his snowballs from his side of the map when he's slowly walking" — he fights as his snowboulder self at every door now; M/H never leapt, MEGA matches them; ⚑ D12: the whole castle grounded = cold's type leaves here too, one cell); 0452: KING YETI'S seat is OUT at every door (Wyatt 8/20: "makes the fight just about impossible and not really that fun"; his RED/BLUE/SWING + the snow stand byte-still, and the PLAYABLE king keeps his own leap)
       if(f.type==='giant'||YETI_SHOOTERS[f.type]){
         // the big shot: slow and heavy — it fells the nearest man in reach
         // (v3.33: the park's boss yetis hurl the same one big SNOWBALL —
@@ -69958,6 +70060,28 @@ function parkCampAxes(L){
 // group n rides c() (the rung's own campaign-mapped cntMul) unless raw:1 —
 // eggs and single set-piece anchors are AUTHORED FLAT (the egg law below).
 const PARK_EDITS={
+ teddy:{   // 0554c THE BEARS BITE — THE CURVE (⚑ D-E5): the FIRST teddy rows. The factory's ladder is FLAT (parkCampAxes(40+(n-1)*14/19): cntMul pegged at the axis cap, hpMul +16.6 % over twenty rungs) — these MULTIPLY its own axes (hpMulX / rateMulX, the two overlay cells parkApplyEdits reads): hp ×1.0 at rung 1 → ×1.284 at rung 19, the corks 7.1 % faster by rung 19; rung 20 (the authored finale) ×1/×1; counts and bossF untouched. hpMulX = 1+0.3·(n−1)/19 · rateMulX = 1−0.075·(n−1)/19 for n ≤ 19, four places. MEASURED (win554c, the 0524 line, rung 20): the doc's ×1.6 top is a WALL (0/2 — NEMESIS's tan act at hpMul 5.95 wipes the line in wave 1); ×1.5 2/2 · ×1.4 3/4 · ×1.3 9/12 (a coin flip — the General's leak is 8 of 10 lives) · ×1.0 + the rush 4/4 (86–92 s = 0524's own summit) — the finale keeps ×1.0, the ladder below it climbs to ×1.28. The factory's waves and terrain stand (no waves cell).
+  1:{ hpMulX:1, rateMulX:1 },
+  2:{ hpMulX:1.0158, rateMulX:0.9961 },
+  3:{ hpMulX:1.0316, rateMulX:0.9921 },
+  4:{ hpMulX:1.0474, rateMulX:0.9882 },
+  5:{ hpMulX:1.0632, rateMulX:0.9842 },
+  6:{ hpMulX:1.0789, rateMulX:0.9803 },
+  7:{ hpMulX:1.0947, rateMulX:0.9763 },
+  8:{ hpMulX:1.1105, rateMulX:0.9724 },
+  9:{ hpMulX:1.1263, rateMulX:0.9684 },
+  10:{ hpMulX:1.1421, rateMulX:0.9645 },
+  11:{ hpMulX:1.1579, rateMulX:0.9605 },
+  12:{ hpMulX:1.1737, rateMulX:0.9566 },
+  13:{ hpMulX:1.1895, rateMulX:0.9526 },
+  14:{ hpMulX:1.2053, rateMulX:0.9487 },
+  15:{ hpMulX:1.2211, rateMulX:0.9447 },
+  16:{ hpMulX:1.2368, rateMulX:0.9408 },
+  17:{ hpMulX:1.2526, rateMulX:0.9368 },
+  18:{ hpMulX:1.2684, rateMulX:0.9329 },
+  19:{ hpMulX:1.2842, rateMulX:0.9289 },
+  20:{ hpMulX:1, rateMulX:1 },   // THE SUMMIT rides its AUTHORED two-act finale on the factory's own curve (0372's law: rung 20's finale + its Nemesis door stay byte-identical) — its new bite is THE RUSH (five Snuggs charging beside the General); measured: ×1.3 here was a coin flip (9/12 — the General's leak is 8 of 10 lives), ×1.0 + the rush 4/4 at 86–92 s = 0524's own summit
+ },
  yeti:{
   2:{ waves:[   // SNOWBALL PRACTICE — the snowfig range: the pitchers premiere BEFORE the melee
     { name:'TARGET PRACTICE', groups:[ {f:'line',t:'snowfig',n:2,raw:1,e:'right',at:0} ] },
@@ -70683,6 +70807,8 @@ function parkApplyEdits(cfg, park, n){
   if(o.cntMul!=null)  cfg.cntMul=o.cntMul;
   if(o.bossF!=null)   cfg.bossF=o.bossF;
   if(o.rateMul!=null) cfg.rateMul=o.rateMul;
+  if(o.hpMulX!=null)   cfg.hpMul*=o.hpMulX;                       // 0554c: MULTIPLIERS on the factory's own axes (PARK_EDITS.teddy — the first teddy rows); the absolute cells above stand
+  if(o.rateMulX!=null) cfg.rateMul=(cfg.rateMul||1)*o.rateMulX;
   if(o.terrain){   // seats replace the SEED'S OWN OUTPUT — copies, never shared rows (the 11055 law)
     if('river' in o.terrain) cfg.terrain.river = o.terrain.river ? Object.assign({}, o.terrain.river) : null;
     if(o.terrain.rocks)      cfg.terrain.rocks = o.terrain.rocks.map(r=>Object.assign({},r));
@@ -71436,7 +71562,7 @@ const RAID_KING_FCX={ e:1, m:0.8, h:0.65, g:1.25, u:1.25 };    // the per-tier b
 // dials are authored per GROUP (cfg.hpMul stays 1 at every tier — his
 // +20%/+50% hp and +10% dmg are the hpX/dmgX stamps, never the raid curve).
 const CROAK_HPX ={ e:1, m:1.2, h:1.5, g:2.25 };   // Wyatt verbatim: M +20% health · H +50% — 0372 MEGA: Hard ×1.5 EXACT (the 0341/0357 not-stacked law; king 360, little king 72)
-const FIELDS_HPX={ e:1, m:1.35, h:1.7 };   // 0538b D62 THE PILLOW FIELDS HARD DIAL (Wyatt 8/25, option (b) — the fields' OWN hp curve, the hideout's grammar): raidCfg's fields branch reads THIS in place of RAID_HP_MUL — at the shared 2.2 the on-foot General (146 hp of tansarge's chain-killing saber core) walked into the toy box through the rig's whole line (0526: 0/16 Hard, a leaked king = a LOSS); the counts stay on RAID_CNT_MUL, bossF 1, FIELDS_TURN_T 4, no foot.hp — E/M/H each still harder than the last (the fight526 numbers in build-hd/00-BUILD.md). Every other raid (ice/bone/croak) keeps RAID_HP_MUL untouched.
+const FIELDS_HPX={ e:1, m:1.35, h:1.5 };   // 0554c THE BEARS BITE (§6.6, the ordering law): the raid inherits the Snuggs' RUSH (its moonlight files + its Snugg lines) — on the rig's standard line Hard at 1.7 fell to 2/6 KILLED, 1.6 read 12/24 across four batteries (the coin flip 0538b shipped at 1.7), 1.5 measured 5/6 → D62 re-ruled at h 1.5 (the 0538b rule: ≥3/6 KILLS, ship the highest that qualifies — 1.6 qualified in three batteries of four, not on the shipped bytes' own) · 0538b D62 THE PILLOW FIELDS HARD DIAL (Wyatt 8/25, option (b) — the fields' OWN hp curve, the hideout's grammar): raidCfg's fields branch reads THIS in place of RAID_HP_MUL — at the shared 2.2 the on-foot General (146 hp of tansarge's chain-killing saber core) walked into the toy box through the rig's whole line (0526: 0/16 Hard, a leaked king = a LOSS); the counts stay on RAID_CNT_MUL, bossF 1, FIELDS_TURN_T 4, no foot.hp — E/M/H each still harder than the last (the fight526 numbers in build-hd/00-BUILD.md). Every other raid (ice/bone/croak) keeps RAID_HP_MUL untouched.
 const CROAK_DMGX={ e:1, m:1.1, h:1.1, g:1.2 };   // Wyatt verbatim: M/H +10% damage — 0372 MEGA: one more notch (a 3-grit stander drops a wave sooner; dial)
 const CROAK_FAN_CD={ e:10, m:10, h:10, g:10 };   // 0382 (Wyatt 8/17: "It should have a 10-second cooldown. And the same goes for King Croak"): TEN, every tier — a WALL clock since 0382 (ticks through cover); the earlier ladder e7/m7/h4.5/g3.5 (H "shorter cooldown", 0372 MEGA faster still) is one cell each to restore (flagged)
 const CROAK_FAN_R ={ e:210, m:210, h:294, g:420 };   // the cone's reach — H "+40% bigger radius" (210×1.4); 0372 MEGA: ×2 (the 0357 rngx-doubling shape; the little king rides ×0.6=252 free; dial)
@@ -80732,8 +80858,14 @@ window.GVT = {
   // ---- 0523 TEDDY PARK rig: the cast's state (read-only) + the event tape ----
   teddy(){ return S.foes.filter(f=>TEDDY_CAST[f.type]).map(f=>({ id:f.id, type:f.type, x:Math.round(f.x), y:Math.round(f.y), hp:+f.hp.toFixed(2), hpMax:f.hpMax, w:f.def.w, spd:f.def.spd,
       st:f.paraSt||f.tbSt||f.gnSt||null, feet:f.tdFeet|0, sleep:f.tdSleep|0, pounce:f.pounceState||null, shot:+(f.shot||0).toFixed(2), wind:+(f.gsWind||0).toFixed(2), aim:+(f.aimT||0).toFixed(2),
-      lead:f.lead|0, dives:f.tdDives|0, dove:f.gdDove|0, hup:+(f.tdHupT||0).toFixed(2), aura:f.def.auraSpd||null, wave:+(f.waveT||0).toFixed(2), waved:f.waved|0, sprint:!!f.def.sprint, foot:f.gnFoot|0, pat:f.tdPat|0, hat:+(f.hatT||0).toFixed(2) })); },
+      lead:f.lead|0, dives:f.tdDives|0, dove:f.gdDove|0, hup:+(f.tdHupT||0).toFixed(2), aura:f.def.auraSpd||null, wave:+(f.waveT||0).toFixed(2), waved:f.waved|0, sprint:!!f.def.sprint, foot:f.gnFoot|0, pat:f.tdPat|0, hat:+(f.hatT||0).toFixed(2),
+      rush:f.tdRush|0, form:(f.form? f.form.kind : null), fn:(f.form? f.form.members.length : 0), pl:[(f.plCd==null? null : +f.plCd.toFixed(2)), +(f.plWind||0).toFixed(2), +(f.plT||0).toFixed(2)], airB:+(f.airB||0).toFixed(1), home:(f.gnHome? [Math.round(f.gnHome.x),Math.round(f.gnHome.y)] : null) })); },   // 0554c: the rush · the block · the leap clocks · the way home
   tdlog(){ return TDLOG.slice(); }, tdclear(){ TDLOG.length=0; S.tdPat=null; },
+  // ---- 0554c THE BEARS BITE rig (read-only): the dials + the rows they stamped, the curve every rung deals, the live blocks ----
+  teddyDials(){ const c=[]; for(let n=1;n<=20;n++){ const q=parkCfg('teddy',n); c.push({ n, hpMul:+q.hpMul.toFixed(4), rateMul:+(q.rateMul||1).toFixed(4), cntMul:+q.cntMul.toFixed(4), bossF:+q.bossF.toFixed(4), waves:q.waves.length }); }
+    return { leader:TEDDY_LEADER, leapers:TEDDY_LEAPERS.slice(), hpx:Object.assign({},TEDDY_HPX), rush:Object.assign({},TEDDY_RUSH), rushTo:TEDDY_RUSH_TO, muster:TEDDY_MUSTER_R, leap:Object.assign({},TEDDY_LEAP), rows:{ twallow:FDEF.twallow.hp, tcaptain:FDEF.tcaptain.hp, tgruffle:FDEF.tgruffle.hp, tsnugg:FDEF.tsnugg.hp, tpara:FDEF.tpara.hp, tcannon:FDEF.tcannon.hp, tcub:FDEF.tcub.hp },
+      cells:{ tsnugg:FDEF.tsnugg.rush||0, tpara:FDEF.tpara.rush||0, twallow:FDEF.twallow.rush||0, tcannon:FDEF.tcannon.rush||0, tcub:FDEF.tcub.rush||0, tgruffle:FDEF.tgruffle.rush||0, leapC:!!FDEF.tcaptain.leap, leapW:!!FDEF.twallow.leap, leapG:!!FDEF.tgruffle.leap, cold:FDEF.sgtcold.leap? Object.assign({},FDEF.sgtcold.leap) : null }, curve:c, edits:(PARK_EDITS.teddy? Object.keys(PARK_EDITS.teddy).length : 0) }; },
+  forms(){ return S.forms.map(fo=>({ kind:fo.kind, n:fo.members.length, x:Math.round(fo.x), y:Math.round(fo.y), halted:!!fo.halted, speed:fo.speed, rushX:fo.rushX||1, types:fo.members.map(m=>m.type) })); },
   // ---- 0395 THE CHIN rig: force the chin (env() is 0 in headless); null clears
   // the override. Never persisted, never in saves. ----
   chin(px){ CHIN.ov=(px==null? null : Math.max(0,+px||0)); chinApply(); return CHIN.px; },
