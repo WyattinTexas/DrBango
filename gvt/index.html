@@ -27145,7 +27145,7 @@ const CK_PICK_REPEAT=1;               // ⚑ 1 = every tenth rank after it repea
 const CK_LIL_HP=0.4, CK_LAD_HP=0.6;  // ⚑ the bar fractions (his words: 40% / 60%) — at or below, once per battle each
 const CK_STORM_PCT=0.2;               // ⚑ "Renegade pistol … 20% larger" per pick — the storm's reach AND half-angle together (the 0461/0462b law: region = picture)
 const CK_RATE_PCT=0.1;                // ⚑ "attack speed 10% faster" per pick — UDEF.kingcroak.rate (0.5) through the shared cadence line (heroRateMul)
-const CK_STORM_REACH=0;               // ⚑ 1 = the storm picks grow his TRIGGER reach too; 0 = he walks to his usual reach and the wider storm sweeps the pack behind the first man (the 0464 reading)
+const CK_STORM_REACH=1;               // ⚑ 0575 KING CROAK, HERO EDITION (Wyatt 8/26: "While he's out there, he needs to be using his AoE cone ability"): 1 = the storm picks grow his TRIGGER reach too — the crowd his wedge can sweep is the crowd he storms (the fire loop's own scan reads it at the rng seat, the Rex RX_FIRE_REACH grammar) · 0 = the 0464 read: he walks to his usual reach and the wider storm sweeps the pack behind the first man (the 0464 reading)
 const CK_STORM_SARGE=0;               // ⚑ 1 = the storm picks ALSO grow the Sarge's RENEGADE PISTOL active (RP_R) — the other reading of "Renegade pistol active 20% larger"; 0 = the king's own pistols (shipped)
 const CK_MIRROR=1;                    // ⚑ 1 = a mirrored king (nrk) fields the family his rank would; 0 = the family is MY save's alone
 const CK_LAD_N=3;                     // ⚑ "the 3 ladies"
@@ -37622,7 +37622,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.78';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.79';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -47179,7 +47179,7 @@ function campUnitStep(u,dt){
   }
   else if(u.type==='radioman'||u.type==='medic') rng=UDEF.rifleman.rng;   // he halts where the rifle line halts — a step behind the fight, where an aura belongs (0365: the medic too — bfAggro's `|| u.def.auraR` fallthrough already halts him with the line on the battleground; the campaign's halt is BY NAME, so his name joins the radioman's here — verified, not re-plumbed; a rng-0 man would otherwise chase the nearest foe into contact)
   else if(u.def.mine) rng=null;                         // 8/8: the sweeper never halts for a man — he marches for their crate
-  else rng=((u.type==='mortar' && enhU(u,'cannon'))? CANNON_RUN : u.def.rng)*radioAura(u).rng*lzRngMul(u)*((u.type==='bazooka'&&enhU(u,'longtube'))?ENH_BAZ_RNG:1)+tkSilvRng(u)+bakRng(u);   // 0542 THE CANNON halts where its BALL reaches (CANNON_RUN), not where the tube's 9999 sees — he crawls toward a far foe and stands to fire inside the roll   // 0481: the halt matches the trigger (the 0129 law) — the Baker line halts where it fires (⚑ the radioman/medic aura halt above quotes the STOCK rifle cell on purpose)
+  else rng=((u.type==='mortar' && enhU(u,'cannon'))? CANNON_RUN : u.def.rng)*radioAura(u).rng*lzRngMul(u)*((u.type==='bazooka'&&enhU(u,'longtube'))?ENH_BAZ_RNG:1)*((CK_STORM_REACH && isCroakU(u))? ckStormMul(u) : 1)+tkSilvRng(u)+bakRng(u);   // 0575 ⚑ CK_STORM_REACH: KING CROAK halts where his TRIGGER reaches (the 0129 halt-matches-the-trigger law — a frame spent walking never reaches the weapon loop, measured) · the son and every other type read ×1   // 0542 THE CANNON halts where its BALL reaches (CANNON_RUN), not where the tube's 9999 sees — he crawls toward a far foe and stands to fire inside the roll   // 0481: the halt matches the trigger (the 0129 law) — the Baker line halts where it fires (⚑ the radioman/medic aura halt above quotes the STOCK rifle cell on purpose)
   // v2.42 THE SPY, cloaked: he cannot engage, so nothing in reach may HALT
   // him — the sprint is the cloak's whole worth; he decloaks where his legs
   // put him and the ordinary halt takes over next frame.
@@ -52939,7 +52939,7 @@ function rpStep(u,dt){
     bfSfx(SFX.thock, u.x, u.y);   // 0373: the closing cone pulse retired with the tell
     S.shake=Math.max(S.shake,0.3);
     u.rpT=0; u.rpSt=null;
-    if(u.rpKC){ u.rpKC=0; u.kcBack=KC_BACK_PX; }   // 0372 the royal HIT-AND-RUN: the channel's finisher arms the back-off leg (campUnitStep walks it west — "he moves forwards and backwards")
+    if(u.rpKC){ u.rpKC=0; u.kcBack=KC_BACK_PX; u.kcN=(u.kcN|0)+1; u.kcBackN=(u.kcBackN|0)+1; u.kcJuke=(KC_JUKE_P>0 && kcJukeRoll(u)<KC_JUKE_P)? 1 : 0; }   // 0575 THE OUTLAW STRIDE: the finisher counts the storm (kcN — GVT.ck's ledger and the juke's seed), arms the 80 px back-off and ROLLS the juke (kcJuke 1 = one more KC_JUKE_PX hop-back when the leg ends; the leg below re-arms kcBack once) · 0372 the royal HIT-AND-RUN: the channel's finisher arms the back-off leg (campUnitStep walks it west — "he moves forwards and backwards")
   }
 }
 function tkActivate(){
@@ -53878,6 +53878,11 @@ function unitImg(k,u){
 // (bfMe() replaced the old const BF_ME here in v1.24 — your chair moves now)
 // how big a figure is drawn on the carpet — one answer, so the man, his ghost
 // and his corpse are always the same size (the vehicles dwarf the infantry)
+// 0575 THE MEDIC'S CROSS: a figure's DRAWN height — drawSprite's own arithmetic (w × the decoded mold's aspect; Chrome reports these
+// SVG molds at their viewBox ratio) — so a badge can clear the crown of a 128 px king or the 176 px yeti as surely as a rifleman's
+// hat. The base mold by TYPE (a pose/skin mold shares its viewBox); before decode the viewBox ratio the molds are authored at.
+function unitH(t){ const im=IMG[t], w=unitW(t); return (im && im.width>0)? w*(im.height/im.width) : w*(150/129); }
+function medBadgeY(u){ return u.y-unitH(u.type)*0.92-6; }   // the '+' seat: 6 px over the DRAWN top (drawSprite seats the mold at −h+h·0.08, so the top is y−0.92h): a rifleman lands at y−63.8 — within a pixel of the 0365 y−64; King Croak/Rex y−123.8, King Yeti over his crown the same way
 function unitW(t){ return t==='kingyeti'? KY_UNIT_W : (t==='kingrex'||t==='kingcroak')? 128 : t==='kingbear'? KB_UNIT_W : t==='kingcroaklil'? CK_LIL_W : t==='wlady'? CK_LAD_W : (t==='bftank'||t==='tank2')? 92 : (t==='bfjeep'||t==='jeep2')? 76 : t==='mortar'? 58 : t==='commando'? 58 : 54; }   // 0357: both kings dwarf the motor pool   // 0341: the king dwarfs the motor pool   // 0316: the V2 draws at the jeep family's width — the slot's machine, not a 54px infantryman (a 0278e miss)
 // the veteran stripe has to contrast with whatever colour that army is wearing
 function vetStripe(){ const h=dyeHex(); return (h&&h.toUpperCase()==='#E8E8E8')?'#4A4A4A':'#fff'; }
@@ -53902,6 +53907,14 @@ function raidStampHalf(f,y){
 // solo/guerrilla jitter read it; everything else rolls as before.
 function dice9(seed){ let x=(seed>>>0)||1; return function(){ x^=x<<13; x>>>=0; x^=x>>>17; x^=x<<5; x>>>=0; return (x>>>0)/4294967296; }; }
 function rnd9(){ return S.dq9? S.dq9() : Math.random(); }
+// 0575 THE JUKE's ONE die: a dice9 (the FIX-C xorshift above) seeded off facts EVERY sim shares by construction — the level, this
+// king's wire id (u.cid: coopPlaced's stamp on the owner's seat = cm.id on every partner's copy; solo = his placement id) and his
+// storm ordinal (u.kcN, stamped at rpStep's finisher) — so a co-op twin sim rolls the very same juke on the same storm even while
+// the two sims' positions drift a pixel (measured: they do, from frame 1 — the mv relay reconciles), and a seeded replay repeats
+// it; never Math.random (the mvSm law: the fire loop's own dice would split two sims). One draw per storm.
+function kcJukeRoll(u){ let h=2166136261>>>0; const t=(S.levelN|0)+':'+(u.cid||('u'+(u.id|0)))+':'+(u.kcN|0);
+  for(let i=0;i<t.length;i++){ h^=t.charCodeAt(i); h=Math.imul(h,16777619)>>>0; }
+  return dice9(h)(); }
 function spawnGroup(g){
   if(S.coop && !S.bf){ const q0=(S.foeSeq||{}); let h=2166136261>>>0;
     const t=(S.levelN|0)+':'+(S.wave|0)+':'+String(g.t||'')+':'+((q0[g.t]|0)+1)+':'+String(g.f||'')+':'+String(g.e||'')+':'+(g.n|0);
@@ -57579,6 +57592,7 @@ function update(dt){
     // floor keeps him inside the deploy band, never past the toy box.
     if(u.kcBack>0 && !(S.drag && S.drag.unit===u)){
       const kst=KC_BACK_SPD*dt; u.x=Math.max(KC_BACK_MIN, u.x-kst); u.kcBack=(u.x<=KC_BACK_MIN)?0:u.kcBack-kst;
+      if(u.kcBack<=0 && u.kcJuke){ u.kcJuke=0; if(u.x>KC_BACK_MIN){ u.kcBack=KC_JUKE_PX; u.kcJukeN=(u.kcJukeN|0)+1; } }   // 0575 THE JUKE: the leg's last step re-arms it ONCE for the rolled hop-back (never at the floor); the second leg ends with kcJuke already 0
       continue;
     }
     // 0424 THE KING FIGHTS LIKE A KING — the auto-cast kit, BENEATH every
@@ -57766,7 +57780,7 @@ function update(dt){
     // sargeStats would read right in the rig and never move this trigger.
     const ssw=(u.type==='sarge')? unitSargeStats(u) : null;
     const rate=(ssw? (ssw.rate||def.rate) : (def.rate||medrRate(u)))*(cougU(u,ssw)? COUGAR.rate : 1);   // 0486 D22 THE COUGAR MAGNUM: the drum turns at a fifth — at the v1.16 rate local, the REAL cadence path (the bag's rate stays the display number); ownership per cougU (my bench / an ally's mo / every AI seat ×1)
-    const rng =(ssw? (ssw.rng ||def.rng ) : (def.rng||medrRng(u)))*((RX_FIRE_REACH && u.type==='kingrex')? rxFireMul(u) : 1);   // 0464 ⚑ RX_FIRE_REACH (0): the king's trigger reach stands while his tongue grows; 1 = the picks grow his reach too
+    const rng =(ssw? (ssw.rng ||def.rng ) : (def.rng||medrRng(u)))*((RX_FIRE_REACH && u.type==='kingrex')? rxFireMul(u) : 1)*((CK_STORM_REACH && isCroakU(u))? ckStormMul(u) : 1);   // 0575 ⚑ CK_STORM_REACH (1): KING CROAK's BIGGER STORM picks grow his TRIGGER reach at the ONE seat the scan below reads (the son's ckStormMul is 1 — byte-what-he-was) · 0464 ⚑ RX_FIRE_REACH (0): the king's trigger reach stands while his tongue grows; 1 = the picks grow his reach too
     if(rate===0) continue;                  // radioman: all antenna, no rifle
     if(u.cloakT>0) continue;                // v2.42 THE SPY: invisible means holding fire — "while he's invisible, he cannot engage in combat" (his cd freezes with him; the first shot can come the frame he appears)
     if(TK_ORANGE_LOCK && u.tkChanT>0) continue;   // 0462c ORANGE: the planted Sarge's sidearm holds with the rest (his cd freezes with him — the cloak's own law) · 0463: the planted KING YETI's snowballs hold here too (kyCast orange)
@@ -57900,9 +57914,9 @@ function update(dt){
     // BACK-OFF leg (u.kcBack — "he moves forwards and backwards").
     if(isCroakU(u)){   // 0465: + LITTLE KING CROAK, the ally edition — his father's storm at his own reach (the kingcroaklil row), the same plant, channel and back-off
       const ckM=ckStormMul(u);   // 0465 KING CROAK'S CHOICES: the BIGGER STORM picks grow the wedge — its reach (rpR) AND its half-angle (rpHalf) together, region = picture (brgWave draws and deals the one wedge); ⚑ CK_STORM_REACH (0): the trigger reach stands
-      const kcAim=rpScan(u, rng*rngMul*(CK_STORM_REACH? ckM : 1));
+      const kcAim=rpScan(u, rng*rngMul);   // 0575: `rng` carries ckM when CK_STORM_REACH is on (the seat above — the shared scan and this one now read the SAME reach; at 0 both read the row's 240)
       if(!kcAim){ u.cd=0.25; continue; }   // the commando's own hold-fire retry — never drain the drum on a storm that hits nobody
-      u.rpT=RP_PLANT+BRG_WAVES*BRG_GAP; u.rpSt=0; u.rpAim=kcAim.ang; u.rpDmg=dmg; u.rpR=rng*rngMul*ckM; u.rpHalf=CROAK_FAN_HALF*ckM; u.rpKC=1;   // 0410: the king keeps the SHARED clocks (RP_BURST is the renegade's own now) — his 2.15s trajectory byte-what-it-was
+      u.rpT=RP_PLANT+BRG_WAVES*BRG_GAP; u.rpSt=0; u.rpAim=kcAim.ang; u.rpDmg=dmg; u.rpR=def.rng*rngMul*ckM; u.rpHalf=CROAK_FAN_HALF*ckM; u.rpKC=1;   // 0410: the king keeps the SHARED clocks (RP_BURST is the renegade's own now) — his 2.15s trajectory byte-what-it-was
       bfSfx(SFX.thock, u.x, u.y);
       continue;
     }
@@ -60846,11 +60860,11 @@ function draw(){
     if(u.dead||u.jetT>0||u.dropT>0) continue;
     if((u.type==='spy'||u.type==='sarge') && u.cloakT>0 && S.bf && u.side!==bfMyTeam()) continue;
     if(!(medHealing(u)>0)) continue;
-    const bx=u.x+((radioLive && u.type!=='radioman' && radioAura(u).rng>1)? 14 : 0), by=u.y-64;
+    const bx=u.x+((radioLive && u.type!=='radioman' && radioAura(u).rng>1)? 14 : 0), by=medBadgeY(u);   // 0575 THE MEDIC'S CROSS ON EVERY KING (Wyatt: "We don't see the healing icon when we're playing them as heroes"): the fixed y−64 sat INSIDE a king's torso, white on white — the seat is the drawn height now (unitH)
     const foeU=S.bf && u.side==='foe';
     cx.lineCap='round';
-    if(lightField()){ cx.strokeStyle='rgba(20,26,20,0.55)'; cx.lineWidth=4.6;
-      cx.beginPath(); cx.moveTo(bx-5,by); cx.lineTo(bx+5,by); cx.moveTo(bx,by-5); cx.lineTo(bx,by+5); cx.stroke(); }
+    cx.strokeStyle='rgba(20,26,20,0.55)'; cx.lineWidth=4.6;   // 0575 ⚑ Q3: the dark under-stroke on EVERY field (was lightField() only) — a near-white cross over a king's pale crown needs its shadow everywhere
+    cx.beginPath(); cx.moveTo(bx-5,by); cx.lineTo(bx+5,by); cx.moveTo(bx,by-5); cx.lineTo(bx,by+5); cx.stroke();
     cx.strokeStyle=foeU?'rgba(255,205,190,0.95)':'rgba(244,241,232,0.95)'; cx.lineWidth=2.6;
     cx.beginPath(); cx.moveTo(bx-5,by); cx.lineTo(bx+5,by); cx.moveTo(bx,by-5); cx.lineTo(bx,by+5); cx.stroke();
     cx.lineCap='butt';
@@ -74218,10 +74232,11 @@ const GS_WIN=5;                                // 0361 GUARDIAN SHOTGUN: the for
 const GS_CD=SNIPE_CD;                          // ...on the outlaw button's own re-arm economy (flagged)
 const GS_DMG=0.20;                             // 0390 (Wyatt 8/17 PM: "increase your damage by 20% while... the guardian ability is active") — the forge window's damage rider; the lens prose + the float quote the 20 (one moves, all move; dial)
 const RP_GAP=BRG_GAP/6, RP_STAG=BRG_STAG/6;    // 0410 THE QUICKDRAW (Wyatt 8/18: "Increase attack speed of the activatible ability by 500%"): the RENEGADE'S OWN volley gap + round stagger = the shared cells /6 — 8 volleys in ~0.27s, ~300 rounds/s mid-storm, the volleys' staggered rounds overlapping into one stream (R-L-R-L still legible — proportional stag). The boss (croakStep) and the playable king (rpStep's rpKC arm) keep BRG_GAP/BRG_STAG byte-still. Flagged: /5 if "500%" meant five-times; dials
+const KC_JUKE_P=0.33, KC_JUKE_PX=40;   // 0575 THE JUKE (⚑ Q2): after the back-off, a 1-in-3 second hop-back of 40 px before the march resumes — rolled by kcJukeRoll (a dice9 off sim facts: never Math.random, the FIX-C/mvSm law, so co-op twin sims roll alike); 0 = the plain hit-and-run
 const RP_PLANT=0.55, RP_BURST=BRG_WAVES*RP_GAP;   // 0361/0370 RENEGADE PISTOL: KING CROAK'S OWN plant tell + HIS OWN channel since 0410 (1.6s -> ~0.27s at RP_GAP; per-wave damage /BRG_WAVES untouched, so a stood storm's total is byte-the-old-number — six times faster). The away mirror's rpCd (RP_PLANT+RP_BURST+AWAY_RP_GAP) rides this cell free — THEIR sarge's renegade storms on the same dials
 const RP_CD=10;                                // 0382 (Wyatt 8/17: "It should have a 10-second cooldown") — the re-arm is BACK at ten (0373's fire-at-will 0 retired the sniper's 14; the crowd refusal stays retired — the tap always fires when the clock is drained); dial
 const RP_R=CROAK_FAN_R.e*2*1.2;                // 0373 DOUBLE THE SIZE x 0410 +20% (Wyatt 8/18: "increase the range by 20% of the cone"): the renegade's OWN radius = 504 — never the boss's shared CROAK_FAN_R cells (MEGA math builds off .e); half-angle untouched (the 0373 radius reading, re-flagged vs angle); one cell moves the aim pick, the channel sweep and the button's count together
-const KC_BACK_PX=64, KC_BACK_SPD=96, KC_BACK_MIN=150;   // 0372 PLAYABLE KING CROAK's hit-and-run: the back-off distance/pace after his channel + the west floor (east of the toy box at x120, inside the deploy band; dials)
+const KC_BACK_PX=80, KC_BACK_SPD=96, KC_BACK_MIN=150;   // 0575 THE OUTLAW STRIDE (Wyatt 8/26: "he moves a bit elusively forward and back, but mostly moving forward"): the back-off 64 → 80 (⚑ Q4) · 0372 PLAYABLE KING CROAK's hit-and-run: the back-off distance/pace after his channel + the west floor (east of the toy box at x120, inside the deploy band; dials)
 // the two outposts — authored on the 1920×1200 mat, both flanks of the
 // midfield so holding one is a FORWARD position, never a spawn camp
 const RAID_POSTS=[ {x:1010,y:330}, {x:1360,y:880} ];   // both PAST the deploy line (campDeployX()=743 on the grand mat — INERT until 0305 BF-00 wired the canPlace gate) — a hold must be MARCHED to, never dropped on
@@ -84514,8 +84529,12 @@ window.GVT = {
   // ===== 0465 KING CROAK'S MILESTONES — the read door (the family's one door is ckFamilyIn, reached only through the bar) =====
   ck(id){ const u=(id!=null? S.units.find(q=>q.id===id) : S.units.find(q=>q.type==='kingcroak'&&!q.dead))||null;
     const fam=S.units.filter(q=>q.ckOf!=null).map(q=>({ id:q.id, type:q.type, x:+q.x.toFixed(2), y:+q.y.toFixed(2), of:q.ckOf, side:q.side||null, seat:(q.seat==null?null:q.seat), dead:!!q.dead, hits:q.hits||0, hp:(q.hp==null?null:q.hp), hpMax:(q.hpMax==null?null:q.hpMax), cap:(S.bf?null:gritCap(q)), rng:q.def.rng, rate:q.def.rate, dmg:q.def.dmg, cd:+(q.cd||0).toFixed(4), rpT:+(q.rpT||0).toFixed(3), rpKC:q.rpKC||0, rpR:q.rpR||0, rpHalf:+(q.rpHalf||0).toFixed(4), gift:!!q.ckGift, nrk:(q.nrk==null?null:q.nrk), fl:unitDrawFl(q), w:unitW(q.type), spd:(q.def&&q.def.moveSpd)||0, dropT:+(q.dropT||0).toFixed(3), crHit:(q.crHitAt!=null) }));
-    return { king:u? { id:u.id, x:+u.x.toFixed(3), y:+u.y.toFixed(3), side:u.side||null, seat:(u.seat==null?null:u.seat), frac:+ckHpFrac(u).toFixed(4), hits:u.hits||0, cap:(S.bf?null:gritCap(u)), hp:(u.hp==null?null:u.hp), hpMax:(u.hpMax==null?null:u.hpMax), lil:!!u.ckLil, lad:!!u.ckLad, has:{ lil:ckHas(u,'lil'), ladies:ckHas(u,'ladies') }, mine:heroMine(u), nrk:(u.nrk==null?null:u.nrk), storm:heroPickN(u,'storm'), draw:heroPickN(u,'draw'), stormMul:+ckStormMul(u).toFixed(4), rateMul:+ckRateMul(u).toFixed(4), heroRate:+heroRateMul(u).toFixed(4), rate:u.def.rate, rng:u.def.rng, cd:+(u.cd||0).toFixed(4), rpT:+(u.rpT||0).toFixed(3), rpKC:u.rpKC||0, rpR:u.rpR||0, rpHalf:+(u.rpHalf||0).toFixed(4), kcBack:+(u.kcBack||0).toFixed(2), dead:!!u.dead } : null, fam:fam, sargeMul:ckSargeMul(),
-      consts:{ lilAt:CK_LIL_AT, ladAt:CK_LAD_AT, pickAt:CK_PICK_AT, repeat:CK_PICK_REPEAT, lilHp:CK_LIL_HP, ladHp:CK_LAD_HP, stormPct:CK_STORM_PCT, ratePct:CK_RATE_PCT, reach:CK_STORM_REACH, sarge:CK_STORM_SARGE, mirror:CK_MIRROR, ladN:CK_LAD_N, lilDx:CK_LIL_DX, lilDy:CK_LIL_DY, ladDx:CK_LAD_DX, ladDy:CK_LAD_DY, lilW:CK_LIL_W, ladW:CK_LAD_W, fanHalf:CROAK_FAN_HALF, compound:HERO_PICK_COMPOUND } }; },
+    return { king:u? { id:u.id, x:+u.x.toFixed(3), y:+u.y.toFixed(3), side:u.side||null, seat:(u.seat==null?null:u.seat), frac:+ckHpFrac(u).toFixed(4), hits:u.hits||0, cap:(S.bf?null:gritCap(u)), hp:(u.hp==null?null:u.hp), hpMax:(u.hpMax==null?null:u.hpMax), lil:!!u.ckLil, lad:!!u.ckLad, has:{ lil:ckHas(u,'lil'), ladies:ckHas(u,'ladies') }, mine:heroMine(u), nrk:(u.nrk==null?null:u.nrk), storm:heroPickN(u,'storm'), draw:heroPickN(u,'draw'), stormMul:+ckStormMul(u).toFixed(4), rateMul:+ckRateMul(u).toFixed(4), heroRate:+heroRateMul(u).toFixed(4), rate:u.def.rate, rng:u.def.rng, cd:+(u.cd||0).toFixed(4), rpT:+(u.rpT||0).toFixed(3), rpKC:u.rpKC||0, rpR:u.rpR||0, rpHalf:+(u.rpHalf||0).toFixed(4), kcBack:+(u.kcBack||0).toFixed(2), dead:!!u.dead,
+      storm:(()=>{ const rb=radioAura(u).rng*lzRngMul(u), ck=ckStormMul(u); return { trig:+(u.def.rng*rb*(CK_STORM_REACH? ck : 1)+tkSilvRng(u)+bakRng(u)).toFixed(3), wedge:+(u.def.rng*rb*ck).toFixed(3), half:+(CROAK_FAN_HALF*ck).toFixed(4), n:u.kcN|0, backs:u.kcBackN|0, jukes:u.kcJukeN|0, juke:u.kcJuke|0 }; })() } : null, fam:fam, sargeMul:ckSargeMul(),   // 0575: storm = the trigger reach the scan reads · the wedge's reach · the half-angle · the storms/back-offs/jukes this king has rolled (kcN/kcBackN/kcJukeN — rpStep's finisher + the leg)
+      consts:{ lilAt:CK_LIL_AT, ladAt:CK_LAD_AT, pickAt:CK_PICK_AT, repeat:CK_PICK_REPEAT, lilHp:CK_LIL_HP, ladHp:CK_LAD_HP, stormPct:CK_STORM_PCT, ratePct:CK_RATE_PCT, reach:CK_STORM_REACH, sarge:CK_STORM_SARGE, mirror:CK_MIRROR, ladN:CK_LAD_N, lilDx:CK_LIL_DX, lilDy:CK_LIL_DY, ladDx:CK_LAD_DX, ladDy:CK_LAD_DY, lilW:CK_LIL_W, ladW:CK_LAD_W, fanHalf:CROAK_FAN_HALF, compound:HERO_PICK_COMPOUND, backPx:KC_BACK_PX, backSpd:KC_BACK_SPD, backMin:KC_BACK_MIN, jukeP:KC_JUKE_P, jukePx:KC_JUKE_PX } }; },
+  // ===== 0575 THE MEDIC'S CROSS — the read door: where the '+' sits for a unit (medBadgeY off unitH), beside the heal's own predicates =====
+  med(id){ const u=(id!=null? S.units.find(q=>q.id===id) : S.units.find(q=>HEROES.indexOf(q.type)>=0&&!q.dead))||null; if(!u) return null; const im=IMG[u.type];
+    return { id:u.id, type:u.type, x:+u.x.toFixed(3), y:+u.y.toFixed(3), w:unitW(u.type), h:+unitH(u.type).toFixed(3), by:+medBadgeY(u).toFixed(3), top:+(u.y-unitH(u.type)*0.92).toFixed(3), im:im? { w:im.width, h:im.height } : null, patient:medPatient(u), rate:+medHealRate(u).toFixed(4), healing:+medHealing(u).toFixed(4), hits:u.hits||0, hp:(u.hp==null?null:u.hp), hpMax:(u.hpMax==null?null:u.hpMax), cap:(S.bf?null:gritCap(u)), consts:{ auraR:UDEF.medic.auraR, healPS:UDEF.medic.healPS } }; },
   rx(id){ const u=(id!=null? S.units.find(q=>q.id===id) : S.units.find(q=>q.type==='kingrex'&&!q.dead))||null; if(!u) return null;
     const b=(S.breaths||[]).filter(b9=>b9.src===u).slice(-1)[0]||null, e=S.fx.filter(e9=>e9.k==='breath').slice(-1)[0]||null;
     return { id:u.id, x:+u.x.toFixed(3), y:+u.y.toFixed(3), mine:heroMine(u), fire:heroPickN(u,'fire'), speed:heroPickN(u,'speed'), fireMul:+rxFireMul(u).toFixed(4), rateMul:+rxRateMul(u).toFixed(4), heroRate:+heroRateMul(u).toFixed(4),
