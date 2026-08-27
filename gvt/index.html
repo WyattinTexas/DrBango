@@ -3316,6 +3316,20 @@
   #picker > p { font-size:1.15rem; }
   .pickrow { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; margin-top:1rem; }
   .pickcard { position:relative; background:rgba(255,255,255,0.08); border:3px solid #4A6B35; border-radius:16px; padding:16px 20px; cursor:pointer; text-align:center; min-width:150px; }
+  /* 0572 PROMOTION TIER BORDERS (design/promo-tiers-0826/00-DESIGN.md; Wyatt
+     8/26: "When you hit level 20 on a character; that unit should have a bronze
+     border. 50 gives a silver border and 100 gives a gold border. It just shows
+     these borders while viewing the promotions screen."): the picker's cards
+     wear the metal of the rank they hold — 0441's wall metals (the t-e/t-m/t-h
+     hexes) + a soft matching glow, minted by showPicker (pkTierCls) and re-read
+     in place by the pick beat (pkTierSet). These three rows sit ABOVE .ppwin
+     and .pksoul in the sheet ON PURPOSE: at equal specificity the later rule
+     wins, so the soul's gold and the win-pop stay over the tier and the tier
+     over the stock green. ⚑ the hexes + glow alphas are dials (the JS table
+     PK_TIERS carries the same three hexes for the weapon cards' inline). */
+  .pickcard.pk-bronze { border-color:#C08347; box-shadow:0 0 12px 1px rgba(192,131,71,0.50); }
+  .pickcard.pk-silver { border-color:#C9CFD8; box-shadow:0 0 12px 1px rgba(201,207,216,0.50); }
+  .pickcard.pk-gold   { border-color:#E8C24A; box-shadow:0 0 12px 1px rgba(232,194,74,0.55); }
   /* rank badge, pinned INSIDE the corner — #picker scrolls, and anything hung
      off the edge of a card gets clipped by that scroller */
   .pickcard .lvchip { position:absolute; top:7px; right:9px; margin:0; font-size:0.8rem; }
@@ -3339,7 +3353,7 @@
   /* ⚠ the two absolute-pinned badges keep their translateY OUT of the tick
      animation on purpose — only the picker's inline badge ever ticks live */
   .mbtn .pkn.tick, .promobanner .pkn.tick { animation:none; }
-  .pickcard.ppwin { border-color:#FFD24A; box-shadow:0 0 26px rgba(255,210,74,0.75); animation:ppwinpop 0.5s cubic-bezier(0.2,1.5,0.4,1); }
+  .pickcard.ppwin { border-color:#FFD24A !important; box-shadow:0 0 26px rgba(255,210,74,0.75); animation:ppwinpop 0.5s cubic-bezier(0.2,1.5,0.4,1); }   /* 0572: !important — the weapon cards carry their tier INLINE, and the pop stays on top of it */
   @keyframes ppwinpop { 0% { transform:scale(1); } 30% { transform:scale(1.12); } 100% { transform:scale(1); } }
   .pp-ring { position:absolute; left:50%; top:50%; width:90px; height:90px; margin:-45px 0 0 -45px; border-radius:50%;
     border:5px solid rgba(255,243,196,0.95); pointer-events:none; animation:ppring 0.55s ease-out forwards; }
@@ -37594,7 +37608,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.74';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.75';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -80426,6 +80440,38 @@ function creditsHTML(){
 // the collector jargon (bagged/sprue/footlocker/shelf) is gone. The ladder is
 // school-sticker words now: bronze star, silver star, gold star. Kept: PRIVATE.
 function tierName(s){ return s>=2000?'LEGEND':s>=1000?'DIAMOND STAR':s>=500?'GOLD STAR':s>=250?'SILVER STAR':s>=100?'BRONZE STAR':'PRIVATE'; }
+// ===== 0572 PROMOTION TIER BORDERS (design/promo-tiers-0826/00-DESIGN.md; Wyatt
+// 8/26 verbatim: "When you hit level 20 on a character; that unit should have a
+// bronze border. 50 gives a silver border and 100 gives a gold border. It just
+// shows these borders while viewing the promotions screen.") — the picker's
+// cards wear the metal of the rank they hold: BRONZE at 20, SILVER at 50, GOLD
+// at 100 (= RANK_MAX, so gold is the maxed card's own ring). Units read
+// META.up, Sarge's weapons META.sargeUp — the two rows are one screen, so
+// both wear it. The metals are 0441's wall metals (the wall's t-e/t-m/t-h
+// hexes — bronze-vs-gold already proven to read on the dark felt) as three
+// .pickcard classes carrying the border + a soft matching glow; the weapon
+// cards set border-color INLINE (the soul/green expression below), and an
+// inline beats every class, so their tier rides the same expression (soul
+// first, tier second, green last — .ppwin's border carries !important so the
+// win-pop stays over all three on both rows). Picker ONLY: the academy, the
+// mystery box, the rites and the HQ bench never wear one ("while viewing the
+// promotions screen"). lvChip is byte-what-it-was. ⚑ the thresholds + the
+// hexes are dials (the CSS rows carry the same three hexes).
+const PK_TIERS=[[100,'pk-gold','#E8C24A'],[50,'pk-silver','#C9CFD8'],[20,'pk-bronze','#C08347']];
+function pkTier(r){ r=r|0; for(const t of PK_TIERS) if(r>=t[0]) return t; return null; }
+function pkTierCls(r){ const t=pkTier(r); return t? ' '+t[1] : ''; }
+function pkTierHex(r){ const t=pkTier(r); return t? t[2] : ''; }
+// the tapped card re-reads its metal IN PLACE (the picker never re-deals
+// mid-flow — v3.26's law — so a pick that crosses 19→20 / 49→50 / 99→100
+// shows its new border on the next paint, under the win-pop, and keeps it
+// when the pop folds; a weapon card's inline colour walks showPicker's own
+// soul/tier/green expression)
+function pkTierSet(el,kind,key,r){
+  if(!el) return;
+  for(const t of PK_TIERS) el.classList.remove(t[1]);
+  const t=pkTier(r); if(t) el.classList.add(t[1]);
+  if(kind==='w') el.style.borderColor = soulIs('w',key)? '#E8C46A' : (t? t[2] : '#7FA35C');
+}
 function showPicker(){
   // v2.34 THE UNLOCK CEREMONY: any pending campaign-ladder unlock announces
   // BEFORE its card is ever dealt on this screen — the rite card pops over
@@ -80440,7 +80486,7 @@ function showPicker(){
   // class from this screen forever (unpromotable with no error).
   const units=ownedUnits().map(k=>{
     const r=META.up[k]||0;
-    return '<div class="pickcard'+(soulIs('u',k)?' pksoul':'')+'" id="pk-u-'+k+'" onclick="UI.pick(\''+k+'\',this)">'+lvChip(r)+soulChip('u',k)+pickChip(k)+'<img src="'+sprURI(k)+'"><b>'+UDEF[k].name+'</b><small>'+(r>=RANK_MAX?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
+    return '<div class="pickcard'+(soulIs('u',k)?' pksoul':'')+pkTierCls(r)+'" id="pk-u-'+k+'" onclick="UI.pick(\''+k+'\',this)">'+lvChip(r)+soulChip('u',k)+pickChip(k)+'<img src="'+sprURI(k)+'"><b>'+UDEF[k].name+'</b><small>'+(r>=RANK_MAX?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
   });
   // Sarge's weapons are upgradeable here too — that's the whole "level it up"
   // path. v1.66 (Wyatt): the SERVICE PISTOL is ALWAYS one of the options — it
@@ -80452,7 +80498,7 @@ function showPicker(){
   const wkeys=SARGE_ORDER.filter(wk=>wkOwned(wk));   // 0092: one reader — the commander's card is dealt by the RECORD, the four exactly as ever
   const weps=wkeys.map(wk=>{
     const r=META.sargeUp[wk]||0;
-    return '<div class="pickcard'+(soulIs('w',wk)?' pksoul':'')+'" style="border-color:'+(soulIs('w',wk)?'#E8C46A':'#7FA35C')+'" id="pk-w-'+wk+'" onclick="UI.pickW(\''+wk+'\',this)">'+lvChip(r)+soulChip('w',wk)+'<img src="'+sargeWepURI(sargeArtW(wk), dyeHex()||undefined)+'"><b>'+SARGE_WEAPONS[wk].name+'</b><small>'+(r>=RANK_MAX?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
+    return '<div class="pickcard'+(soulIs('w',wk)?' pksoul':'')+pkTierCls(r)+'" style="border-color:'+(soulIs('w',wk)?'#E8C46A':(pkTierHex(r)||'#7FA35C'))+'" id="pk-w-'+wk+'" onclick="UI.pickW(\''+wk+'\',this)">'+lvChip(r)+soulChip('w',wk)+'<img src="'+sargeWepURI(sargeArtW(wk), dyeHex()||undefined)+'"><b>'+SARGE_WEAPONS[wk].name+'</b><small>'+(r>=RANK_MAX?'MAXED':'RANK '+r+' → '+(r+1))+'</small></div>';
   });
   document.getElementById('pickRow').innerHTML = units.concat(weps).join('');
   pkHUD();   // v3.26 (card 06): the ×N badge + the all-maxed exit/hint pair — shared with the per-pick beat
@@ -80484,6 +80530,7 @@ let PP_T=0, PP_Q=[];
 function ppCardRefresh(el,kind,key){
   if(!el) return;
   const r=(kind==='u'? (META.up[key]||0) : (META.sargeUp[key]||0));
+  pkTierSet(el,kind,key,r);   // 0572: the metal follows the rank in place (19→20 bronze · 49→50 silver · 99→100 gold), under the win-pop
   const sm=el.querySelector('small');
   if(sm) sm.textContent = r>=RANK_MAX? 'MAXED' : 'RANK '+r+' → '+(r+1);
   let ch=el.querySelector('.lvchip');
