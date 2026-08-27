@@ -27640,8 +27640,8 @@ function nemParkBank(){
     if(!(pk.pd&bit)){ pk.pd|=bit; pk.stars+=PARK_PURSE; } }
   else { const bit=1<<(S.park.n-31);
     if(!(pk.pd2&bit)){ pk.pd2|=bit; pk.stars+=PARK_PURSE; } }
-  if(S.park.mine && S.park.n>pk.lv) pk.lv=S.park.n;
-  if(S.park.mine){ for(const oid in OUTFIT_EARN){
+  if(S.park.n>pk.lv) pk.lv=S.park.n;   // 0826 D10 THE WIN IS EVERYONE'S: every seated save (LOCKSTEP with the verdict branch — the referee gate retired there too)
+  { for(const oid in OUTFIT_EARN){
     if(OUTFIT_EARN_PARK[oid]!==S.park.id) continue;
     if(pk.lv>=OUTFIT_EARN[oid] && !outfitOwns(oid)) META.outfit.own.push(oid);
   } }
@@ -37296,7 +37296,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.66';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.67';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -55477,8 +55477,9 @@ function endBattle(win){
     // v3.33 TP-02 THE PARK VERDICT (D16/D12): replays pay ZERO stars — the
     // purse is a per-rung ONE-TIME bit (pd) on EVERY seat's OWN save (host
     // and guest alike, so no seat can farm a buddy's ladder); the LADDER and
-    // the OUTFIT rungs move only for the sim that launched as referee
-    // (S.park.mine — host's rung, host's prizes); the L20 SILVER KEY banks
+    // the OUTFIT rungs moved only for the sim that launched as referee
+    // (S.park.mine) until 0826 D10 THE WIN IS EVERYONE'S — they move on EVERY
+    // seated save now (the block below); the L20 SILVER KEY banks
     // on EVERY seated save (D16's own words), deduped by the flag — the
     // earned-decor loop below grants the trinket and speaks its line, and
     // skeySweep deals the card at the room. The campaign ledger (levelStars/
@@ -55500,7 +55501,7 @@ function endBattle(win){
         if(!(pk.pd&bit)){ pk.pd|=bit; purse=PARK_PURSE; pk.stars+=PARK_PURSE; } }
       else { const bit=1<<(S.park.n-31);
         if(!(pk.pd2&bit)){ pk.pd2|=bit; purse=PARK_PURSE; pk.stars+=PARK_PURSE; } }
-      if(S.park.mine){
+      {   // 0826 D10 THE WIN IS EVERYONE'S (design/feedback-0826-coop/00-FEEDBACK.md §7; Wyatt 8/26: "when we beat level one, she never got to go to level two. Winning as co-op needs to count as winning as regular as well. This is very important."): the LADDER and the OUTFIT rungs move on EVERY seated save — host and guest alike; the referee gate (S.park.mine, v3.33 D16) is retired here (a party plays the lowest commander's next rung, D4, so no seat banks a rung it could not have played alone); LOCKSTEP with nemParkBank
         if(S.park.n>pk.lv) pk.lv=S.park.n;
         for(const oid in OUTFIT_EARN){
           if(OUTFIT_EARN_PARK[oid]!==S.park.id) continue;   // v3.35 TP-03: each park pays only its OWN rack lane — a yeti win can never hand out safari gear
@@ -55551,8 +55552,11 @@ function endBattle(win){
     // v3.39 TP-04 THE RAID VERDICT (D19/D20/§9): medal stars are suppressed
     // (the replay-farm trap, the park's own law) — the raid pays the REPEAT
     // PURSE on every win, per-player per-day capped ≤25★ across BOTH raids
-    // (META.raidDay, the piggy-ceiling idiom). First-clear ITEMS land on the
-    // HOST's save ONLY (S.raid.mine): Easy → BAIT + THE YETI (the decor loop
+    // (META.raidDay, the piggy-ceiling idiom). First-clear ITEMS landed on the
+    // HOST's save ONLY (S.raid.mine) until 0826 D10 — every seat that OWNS the
+    // door's key banks them too (raidTierOpenFor(k,'e'): the silver key for the
+    // castle, the bronze key for the lair; a keyless seat keeps the D20 law):
+    // Easy → BAIT + THE YETI (the decor loop
     // below reads the flag this branch writes), Medium → THE SILVER LASER,
     // Hard → THE SILVER CRYSTAL. Tier flags also open the next mode (D19).
     // A VOIDED run (host gone) pays NOTHING — no purse, no flags (§7).
@@ -55634,7 +55638,7 @@ function endBattle(win){
           if(!S.raid.girl || (jn9 && !jn9.dead)){ META.unlocked.push('jane'); META.heroSel='jane';
             prizes.push(heroTicket('jane', 'JANE')); }   // 0569 D4.b
         }
-      } else if((S.raid.mine || S.raid.t==='u') && !led[S.raid.t]){   // 0484 D16 EV_CROWN: an ULTRA win writes META.ice.u and pays the crown on EVERY seat (the 0361 every-seat grammar — the event has no key to gate hosting); e/m/h/g keep the D20 host-only law byte-for-byte
+      } else if((S.raid.mine || S.raid.t==='u' || raidTierOpenFor(S.raid.k,'e')) && !led[S.raid.t]){   // 0826 D10 THE WIN IS EVERYONE'S: + every seat that owns the door's key (the ice/lair lanes; croak/fields are every-seat already)   // 0484 D16 EV_CROWN: an ULTRA win writes META.ice.u and pays the crown on EVERY seat (the 0361 every-seat grammar — the event has no key to gate hosting); e/m/h/g keep the D20 host-only law byte-for-byte
         led[S.raid.t]=1;
         if(S.raid.k==='bone'){
           // KING REX'S LAIR (0278e, D20 host-only): Easy → THE FISHING POLE
