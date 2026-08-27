@@ -31210,7 +31210,7 @@ const FDEF = {
   twallow: { hp:12, spd:26, bounty:24, leak:2, w:96, elite:true, stompCd:2.6, stompR:72, stompWind:0.6, wave:1.2 },   // §3.5 BIG TED 'WALLOW' — bdino's stomp cells at w 96 · spd 26 · R 72 · wind 0.6; THE WAVE = the first-sight hello (1.2 s planted, updateFoeWallow); three seam states off hp thirds (draw); the TIMBER death
   tbuttons:{ hp:4,  spd:0,  bounty:18, leak:1, w:46, dormant:{wake:180, t:14, spd:140}, pounce:{aggro:150, leap:460, swing:0.9}, relax:6 },   // §3.6 MR. BUTTONS — pre-placed scenery that is a REAL foe from frame 0 (spd 0: the dummy's law; targetable dormant, D8); the wake (a man inside 180 OR 14 s) → the head turns first → the crayon → the syeti pounce verbatim; dormant.spd = his awake walk on the def copy; RE-DISGUISE after `relax` s with nobody inside aggro
   tguard:  { hp:8,  spd:40, bounty:20, leak:2, w:56, elite:true, guard:'bearnaparte', dive:{r:220, leap:520} },   // §3.7 THE HONOR GUARD — escorts his ward (guard names whom; 'bearnaparte' covers the General's younger ranks — 01 §5.3's one guard at 15), never attacks (no rng); THE DIVE: a bullet meant for the ward inside dive.r lands on the nearest guard, full damage (hurt() → guardDive); splash bypasses (D9)
-  tcannon: { hp:10, spd:18, bounty:24, leak:2, w:88, elite:true, rng:400, minRng:120, fireCd:3.6, cotton:{spd:190, r:24, range:760, wind:0.5, splashR:40} },   // §3.11 THE POP-CANNON CREW — the stego row VERBATIM with the boulder bag re-read as a LOBBED COTTON BALL (cannonTick: the tube park at 400, the 0.5 s wind = the spring compresses, the lob, foeSplash's knock at splashR 40); under 120 a statue (tanPick's minRng — the blind spot); ×0.7 faster inside the General's aura
+  tcannon: { hp:10, spd:18, bounty:24, leak:2, w:88, elite:true, rng:400, minRng:120, fireCd:3.6, cotton:{spd:190, r:24, range:760, wind:0.5, splashR:40} },   // 0586: fireCd → TEDDY_GUN_CD 3.0 and cotton.splashR → TEDDY_GUN_R 50 are RE-DEALT at load (the consts line at PARK_BASE_HP; the literals here are the pre-0586 cells) · §3.11 THE POP-CANNON CREW — the stego row VERBATIM with the boulder bag re-read as a LOBBED COTTON BALL (cannonTick: the tube park at 400, the 0.5 s wind = the spring compresses, the lob, foeSplash's knock at splashR 40); under 120 a statue (tanPick's minRng — the blind spot); ×0.7 faster inside the General's aura
   tcaptain:{ hp:60, spd:26, bounty:80,  leak:4, w:64,  boss:true, auraR:140, auraFire:0.7, hatCd:9.0 },   // 01 §5.1 L5 THE BATTERY — CAPTAIN BEARNAPARTE: Private-sized, the too-big bicorne, never shoots; his aura aims the guns (fireAura ×0.7 → 2.5 s) and HAT UP is the double volley (both guns inside 140 fire within 0.5 s — updateFoeGen); bounty/leak = the beat band's (dinoboss1)
   tbrig:   { hp:90, spd:24, bounty:100, leak:4, w:120, boss:true, speech:2.0, charge:{aggro:170, dash:420, swing:1.2, cap:1, cd:4.0} },   // 01 §5.2 L10 THE BRIDGE — BRIGADIER BEARNAPARTE: the first horse LEVEL, no cape; THE SPEECH (2 s planted on the carpet — free shots), then ONE charge (kingrex's sprint bag capped at one dash)
   tgen:    { hp:70, spd:22, bounty:90,  leak:4, w:130, boss:true, hesitate:1.0, charge:{aggro:170, dash:420, swing:1.2, cap:1, cd:4.0} },   // 01 §5.3 L15 THE STANDARD — GENERAL BEARNAPARTE: the cape + the paw-print standard; he runs at the line ALONE and his Privates hesitate 1.0 s (planted — the joke told straight); ONE guard dives for him (tguard beside him)
@@ -35615,6 +35615,7 @@ const SFX = {
   mg:    ()=>tone(700,250,0.05,'square',0.04),
   rocket:()=>tone(200,90,0.35,'sawtooth',0.07),
   boom:  ()=>{ noise(0.35,0.22,700); tone(120,40,0.3,'sine',0.14); },
+  cotboom:()=>{ noise(0.35,0.2,380); tone(60,22,0.34,'sine',0.16); },   // 0586 THE COTTON LANDS: the boom one octave down (120→40 becomes 60→22, the noise darker) — the pop-cannon's own thud in the thock's family; no new asset
   thock: ()=>tone(180,120,0.07,'sine',0.2),
   thwack:()=>{ noise(0.05,0.24,1400); tone(210,60,0.09,'sine',0.17); tone(95,40,0.12,'triangle',0.07); },   // 0487 UNARMED: the punch — a short slap of noise over a low thump, under the thock; every bare-handed strike reads it (bfSfx-distanced like the blade's laser)
   clack: ()=>{ noise(0.09,0.2,3000); tone(300,150,0.06,'triangle',0.1); },
@@ -37354,13 +37355,14 @@ function drawFog(){
   // dino mist and every battleground half keep the sage bytes exactly.
   const fSnow=!!(S.park && S.park.cfg===S.cfg && S.cfg.terrain && S.cfg.terrain.ground==='snow');
   const fSand=!!(S.park && S.park.cfg===S.cfg && S.cfg.terrain && S.cfg.terrain.ground==='sand');   // 0371 TRAIN ROBBERY WEATHER: the dust storm wears sand ink (the D9 blizzard law, western edition)
-  const fC=fSnow?'223,235,247':fSand?'216,196,156':'219,230,208', fC2=fSnow?'240,247,253':fSand?'229,213,180':'231,240,222';
+  const fQlt=!!(TEDDY_FOG>0 && quiltField());   // 0586 THE FLUFF (Wyatt: "weird fart clouds because they're green"): on the pillow sheet the banks wear the sheet's own lilac and read as fluff — the SAME banks (fogBanks / fogIdxAt byte-still: the hide stays, the 0573a tables hold). The tint table knew snow and sand and nothing else; the default sage is the dino's jungle mist. TEDDY_FOG −1 = the old sage on the quilt (the rig's control)
+  const fC=fSnow?'223,235,247':fSand?'216,196,156':fQlt?'233,226,244':'219,230,208', fC2=fSnow?'240,247,253':fSand?'229,213,180':fQlt?'249,246,251':'231,240,222', fA=fQlt?0.90:0.97;   // ⚑ the quilt core 0.90 — the pillows show through (fluff, not a wall); every other floor keeps 0.97 and its own ink
   for(let i=0;i<banks.length;i++){ const b=banks[i];
     // v2.75 (Wyatt: "more immersive… really hide the units"): the core sits
     // near-opaque now, and two soft lobes churn around the heart so the bank
     // reads as weather, not a sticker — still pure f(clock), zero RNG.
     const g=cx.createRadialGradient(b.x,b.y,b.rx*0.12,b.x,b.y,b.rx);
-    g.addColorStop(0,'rgba('+fC+',0.97)');
+    g.addColorStop(0,'rgba('+fC+','+fA+')');
     g.addColorStop(0.6,'rgba('+fC+',0.9)');
     g.addColorStop(1,'rgba('+fC+',0)');
     cx.save(); cx.translate(b.x,b.y); cx.scale(1,b.ry/b.rx); cx.translate(-b.x,-b.y);
@@ -37373,6 +37375,10 @@ function drawFog(){
       cx.fillStyle=g2; cx.beginPath(); cx.arc(wx,wy,b.rx*0.5,0,7); cx.fill();
     }
     cx.restore();
+    if(fQlt && !reducedMotion()) for(let j=0;j<3;j++){   // 0586 THE FEATHERS: three small white curved strokes riding the bank's own lissajous at fixed phases (pure f(clock), zero RNG — the banks' law); reduced motion keeps the banks and drops these
+      const p9=j*2.094+i*0.7, fx9=b.x+Math.cos(S.t*0.21+p9)*b.rx*0.55, fy9=b.y+Math.sin(S.t*0.17+p9*1.3)*b.ry*0.5;
+      cx.save(); cx.translate(fx9,fy9); cx.rotate(S.t*0.5+p9); cx.globalAlpha=0.8; cx.strokeStyle='#ffffff'; cx.lineWidth=1.6; cx.lineCap='round';
+      cx.beginPath(); cx.moveTo(-7,0); cx.quadraticCurveTo(0,-5,7,0); cx.quadraticCurveTo(0,4,-7,0); cx.moveTo(-7,0); cx.lineTo(3,0); cx.stroke(); cx.restore(); }
   }
   // v2.75 (Wyatt: "allow players to play their units under the fog"): YOUR
   // men in the mist stay yours to command — a soft blip marks each of MY
@@ -37815,7 +37821,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.89';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.90';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -51044,7 +51050,7 @@ function teddyRushOn(f){   // THE RUSH: a `rush` row charges while no man stands
   if(f.plWind>0 || f.plT>0) return false;
   const R=teddyReach(f)*TEDDY_RUSH_TO; return R>0 && !teddyNear(f,R);
 }
-function teddyRushX(f){ return teddyRushOn(f)? f.def.rush : 1; }   // the formless walk's reader
+function teddyRushX(f){ return teddyRushOn(f)? (f.flank? TEDDY_FLANK_RUSH : f.def.rush) : 1; }   // the formless walk's reader · 0586 THE FLANK DROP: a flank-dropped chute (f.flank — updateFoePara's re-seat stamps it when the band's east lip sits WEST of the hem) walks at TEDDY_FLANK_RUSH 1.0 instead of the row's rush (⚑ 2.0 = the box in ~2 s; a walk gives the line the three seconds to turn)
 function teddyFormRush(fo){   // the block anchor's reader: a block of rushers rushes AS A BLOCK — at its fastest rusher's ×, until any rusher in it has a man inside his reach (the line halts as one); a block with no rusher reads ×1 (every tan form, byte-still)
   let x=1; for(const m of fo.members){ if(!m.def.rush) continue; if(!teddyRushOn(m)) return 1; if(m.def.rush>x) x=m.def.rush; } return x;
 }
@@ -51102,6 +51108,7 @@ function updateFoePara(f,dt){
   const dp=f.def.drop;
   if(!f.paraSt){ f.paraSt='drop'; f.paraT=dp.t; f.paraSw=Math.random()*6.283; f.form=null; f.tdFeet=1;
     const dx9=f.dropX||dp.x;   // 0526: a wave group may re-seat the drop band (dropX — THE PILLOW FIELDS' deep drop); every other drop reads the row's own
+    f.flank=(dx9[1]*W<campDeployX())?1:0;   // 0586 THE FLANK DROP: a band whose EAST lip lands west of the hem is a flank — he walks (teddyRushX reads TEDDY_FLANK_RUSH); the row's band [0.36,0.62] and the fields' deep drop read 0 (byte-behaviour)
     f.x=Math.round(W*(dx9[0]+Math.random()*(dx9[1]-dx9[0]))); f.y=Math.round(FOE_TOP+Math.random()*(FOE_BOT-FOE_TOP)); f.paraX0=f.x;
     S.fx.push({k:'ring',x:f.x,y:f.y,r:6,R:30,t:0,dur:0.5,col:'rgba(255,255,255,0.7)'}); tdLog(f,'drop',[f.x,f.y]); }
   if(f.paraSt==='drop'){ f.paraT-=dt; f.shot=0; f.aimT=0;
@@ -52056,9 +52063,11 @@ function foeSplash(x,y,R,src){
   // thrown back must actually hurt the battery that fired it).
   if(src && cmdoCatch(x,y,R,0,src, src.def&&src.def.minRng?'lob':'rocket',
       src.type==='tanbazooka'?UDEF.bazooka.dmg:UDEF.mortar.dmg, src.type==='tanbazooka')) return true;   // FM-GVT-ROBO-01: the burst reports an intercept — a caught shell never landed (the robot's lob branch reads the word; every shipped caller ignores returns, byte-behaviour)
-  bfSfx(SFX.boom, x, y); S.shake=Math.max(S.shake,0.3);
+  const cot9=!!(src && src.def && src.def.cotton);   // 0586 THE COTTON LANDS ITS OWN BEAT (Wyatt: "more significant when they hit"): the pop-cannon's lob — the one shell whose sender carries a cotton row (sh.cot rides the shot; the sender is the same truth, and the two landing seats stay byte-still) — lands a BIGGER PICTURE, not a number: a lower boom, shake TEDDY_GUN_SHAKE, the ring at R×1.4 in white, a cotton burst. The knock loop below is byte-still (dmg 0 — a knock IS a casualty); every other shell's beat is byte-what-it-was
+  bfSfx(cot9? SFX.cotboom : SFX.boom, x, y); S.shake=Math.max(S.shake, cot9? TEDDY_GUN_SHAKE : 0.3);
   S.fx.push({k:'puff',x,y:y-10,t:0,dur:0.45,R:R});
-  S.fx.push({k:'ring',x,y,r:10,R,t:0,dur:0.34,col:'rgba(255,255,255,0.55)'});
+  if(cot9){ S.fx.push({k:'ring',x,y,r:10,R:R*1.4,t:0,dur:0.4,col:'rgba(255,255,255,0.85)'}); S.fx.push({k:'cotburst',x,y:y-8,t:0,dur:0.35}); }   // six cotton puffs flung outward + three feathers — DRAW-ONLY, hashed seats, zero dice
+  else S.fx.push({k:'ring',x,y,r:10,R,t:0,dur:0.34,col:'rgba(255,255,255,0.55)'});
   let refl9=false;   // FM-GVT-ROBO-01: a TK-wall reflect is the other intercept the robot's lob branch reads
   for(const u of S.units){
     if(u.dead) continue;
@@ -57125,6 +57134,7 @@ function update(dt){
     if(fo.members.length===0){ S.forms.splice(i,1); continue; }
     let spd=fo.speed;
     fo.rushX=teddyFormRush(fo); spd*=fo.rushX;   // 0554c THE RUSH, the anchor's seat: a block of rushers rushes as a block (×1 for every block without one — byte-still); the members' spring reads fo.rushX below
+    fo.rollX=teddyFormRoll(fo); spd*=fo.rollX;   // 0586 THE ROLL, the anchor's seat: a line of bear guns EAST of THE GUN LINE rolls on at ×TEDDY_GUN_ROLL (every other block ×1 — byte-still); the members' spring reads fo.rollX below
     fo.doVolley=false;
     // v1.38: the halt-volley discipline is a per-kind table now (redcoat row
     // verbatim; the creeping line runs it at double tempo)
@@ -57245,7 +57255,7 @@ function update(dt){
       ? { x:RV.x+RV.w/2, y:RV.bridgeY }
       : WLs? canyonGoal(f,WLs) : T;   // 0570: the funnel without the water — NO crawler exemption (R2: the cubs don't squeeze under), NO boss exemption (⚑), no wade (the stall re-picks below)
     if(RV && f.x<=RV.x-4) f.crossed=true;
-    if(f.def.minRng && !f.boss && !(f.rimIn && f.x>=W-60) && hasGreenTarget(f)){
+    if(f.def.minRng && !f.boss && !(f.rimIn && f.x>=W-60) && !(teddyGun(f) && f.x>gunLineX()) && hasGreenTarget(f)){   // 0586 THE GUN LINE: a bear cannon EAST of gunLineX() (W×0.80 = 992) may not park — born at W+60 with the line already at the crate he froze OFF the bed (invisible, untargetable, silent) or parked BEHIND the box; he rolls on instead (teddyGunRoll / teddyFormRoll) and the shipped shelf takes him at the line. rim:1 on every teddy cannon group makes the 0519 clause his too — belt and braces
       // 0519 THE RIM LAW (the 0514 word, for a stamped tube alone — L90's added
       // mortars ride `rim:1`): born at the rim with a green already inside its
       // 404, an unstamped tube parks OFF-WORLD (invisible, untargetable, silent
@@ -57326,7 +57336,7 @@ function update(dt){
       if(S.cfg.terrain.gaps){ const d6=aiGapGoal(f.x,f.y,sx,sy); if(d6){ tx=d6.x; ty=d6.y; } }
       const dd=Math.hypot(tx-f.x, ty-f.y);
       if(dd>2){
-        const sp=(fo.halted&&dd<24)?0 : f.def.spd*aura*(fo.rushX||1)*(dd>70?1.8:1.15);   // 0554c: a rushing block's men spring at the block's pace
+        const sp=(fo.halted&&dd<24)?0 : f.def.spd*aura*(fo.rushX||1)*(fo.rollX||1)*(dd>70?1.8:1.15);   // 0554c: a rushing block's men spring at the block's pace · 0586: a rolling battery's crew keeps its seat (fo.rollX — ×1 on every other block)
         f.x+=(tx-f.x)/dd*Math.min(sp*amv,dd); f.y+=(ty-f.y)/dd*Math.min(sp*amv,dd);   // 0278a: a formation snowman springs to his slot in hops too (amv===dt for everyone else)
       }
     } else if(f.gu){
@@ -57383,7 +57393,7 @@ function update(dt){
         const d6=aiGapGoal(f.x,f.y,g6.x,g6.y); if(d6) g6=d6;
       }
       const d=Math.hypot(g6.x-f.x, g6.y-f.y);
-      if(d>1){ const sp=f.def.spd*aura*(f.def.rush? teddyRushX(f) : 1), st=rockSteer(f.x,f.y,g6.x,g6.y,f.squeeze?3:ROCK_PAD_FOE);   // 0554c THE RUSH, the walk's seat (a `rush` row alone; every other foe reads ×1)
+      if(d>1){ const sp=f.def.spd*aura*(f.def.rush? teddyRushX(f) : 1)*teddyGunRoll(f), st=rockSteer(f.x,f.y,g6.x,g6.y,f.squeeze?3:ROCK_PAD_FOE);   // 0554c THE RUSH, the walk's seat (a `rush` row alone; every other foe reads ×1) · 0586 THE ROLL: a bear cannon east of THE GUN LINE hauls on at ×TEDDY_GUN_ROLL (×1 for every other foe)
         f.x+=(st?st.x:(g6.x-f.x)/d)*sp*amv; f.y+=(st?st.y:(g6.y-f.y)/d)*sp*amv; }   // 0278a: amv — the air-step gate (=== dt for every non-gait foe)
     }
     // NOBODY STANDS STILL FOREVER. Steering gets a man round any rock we can
@@ -61273,8 +61283,8 @@ function draw(){
     }
     else if(sh.cot){ // 0523 THE COTTON BALL — the pop-cannon's lobbed round: a white ball on the mortar's arc, its shadow on the ground
       const k=sh.t/sh.dur, hgt=96*Math.sin(Math.PI*k), mx=sh.x+(sh.tx-sh.x)*k, my=sh.y+(sh.ty-sh.y)*k;
-      cx.fillStyle='rgba(0,0,0,0.18)'; cx.beginPath(); cx.ellipse(mx,my+4,8,3,0,0,7); cx.fill();
-      cx.fillStyle='#ffffff'; cx.strokeStyle='#cfc9bb'; cx.lineWidth=1.4; cx.beginPath(); cx.arc(mx,my-hgt,7,0,7); cx.fill(); cx.stroke(); }
+      cx.fillStyle='rgba(0,0,0,0.18)'; cx.beginPath(); cx.ellipse(mx,my+4,10.4,3.9,0,0,7); cx.fill();   // 0586: the shadow ×1.3
+      cx.fillStyle='#ffffff'; cx.strokeStyle='#cfc9bb'; cx.lineWidth=1.4; cx.beginPath(); cx.arc(mx,my-hgt,9,0,7); cx.fill(); cx.stroke(); }   // 0586: r 7 → 9 — the flight reads from across the bed
     else { const k=sh.t/sh.dur, hgt=140*Math.sin(Math.PI*k);
       const mx=sh.x+(sh.tx-sh.x)*k, my=sh.y+(sh.ty-sh.y)*k;
       cx.globalAlpha=0.35; cx.fillStyle='#000'; cx.beginPath(); cx.ellipse(mx,sh.ty<sh.y?my:my+6,6*(1-k*0.3),3,0,0,7); cx.fill(); cx.globalAlpha=1;
@@ -61353,6 +61363,13 @@ function draw(){
     else if(e.k==='tdie'){ drawTeddyDie(e,k); }   // 0523 TEDDY PARK: a plush death beat (the deflate · the timber · the poof) + the rocker's snap
     else if(e.k==='puff'){ cx.globalAlpha=(1-k)*0.7; cx.fillStyle=fxSnow(e.col||'#e8e0cc'); cx.beginPath(); cx.arc(e.x,e.y,e.R*k+6,0,7); cx.fill(); cx.globalAlpha=1; }   // 0476: an optional col — the jack's sand-ink pop; every colourless puff draws byte-what-it-was (the slug's own precedent)
     else if(e.k==='ring'){ cx.globalAlpha=1-k; cx.strokeStyle=fxSnow(e.col); cx.lineWidth=e.lw||3; cx.beginPath(); cx.arc(e.x,e.y,e.r+(e.R-e.r)*k,0,7); cx.stroke(); cx.globalAlpha=1; }   // 0583a: an optional lw — zero-byte for every other ring
+    else if(e.k==='cotburst'){ // 0586 THE COTTON BURST — the pop-cannon's landing: six white cotton puffs flung outward on hashed seats (zero dice — the tdPoof grammar) + three feathers that lift and spin, all fading over the 0.35 s; draw-only
+      for(let i=0;i<6;i++){ const h=((i*2654435761)>>>0)%1000/1000, a=i*1.0472+h*0.5, sp=26+18*h;
+        cx.globalAlpha=Math.max(0,1-k)*0.9; cx.fillStyle='#ffffff'; cx.beginPath(); cx.arc(e.x+Math.cos(a)*sp*k,e.y-Math.abs(Math.sin(a))*sp*0.5*k-8*k,12*(0.6+0.6*k),0,7); cx.fill(); }
+      for(let i=0;i<3;i++){ const h=((i*40503+17)>>>0)%1000/1000, a=1.2+i*1.9+h*0.4, fx9=e.x+Math.cos(a)*(22+30*k), fy9=e.y-14-34*k-h*10;
+        cx.save(); cx.translate(fx9,fy9); cx.rotate(a+k*4); cx.globalAlpha=Math.max(0,1-k*1.1)*0.9; cx.strokeStyle='#f1ecf7'; cx.lineWidth=2; cx.lineCap='round';
+        cx.beginPath(); cx.moveTo(-6,0); cx.quadraticCurveTo(0,-5,6,0); cx.quadraticCurveTo(0,4,-6,0); cx.stroke(); cx.restore(); }
+      cx.globalAlpha=1; }
     else if(e.k==='cburst'){ // 0526 THE WAGON: the cotton pyramid goes up in confetti — N bits on hashed seats (no dice), the house toy palette + white cotton, each on its own gravity arc, fading
       const N=e.n||28, PAL=['#4A8CA0','#3F6B4A','#D9A544','#8A6FB0','#C0473A','#ffffff','#ffffff'];
       for(let i=0;i<N;i++){ const h=((i*2654435761)>>>0)%1000/1000, h2=((i*40503+17)>>>0)%1000/1000, a=h*6.283, sp=70+150*h2;
@@ -72955,6 +72972,26 @@ const PARK_BASE_HP=n=>Math.round((Math.round(200*(1+0.03*(Math.max(1,n)-1)))+70)
 // (MEASURED on the 0570 canyon ground: [0,3,6] as first tabled reads 1/6 on the fixed line — the walls already meter the flood, the full spread un-jams the mouths; [0,1.5,3] 3/6 · [0,0.5,1] 2/6; heavy 5/6 at the ship) · TEDDY_DROP_SHIELD 0 (1 = the fall unshootable till its last
 // 40% — bfCanTarget's clause; area still finds him). THE FALL / THE THUMP / THE BAND ride FDEF.tpara.drop (alt 240 · r 60 · x). =====
 const TEDDY_BOX_X=2.0, TEDDY_FORT=1, TEDDY_FORT_BOSS=1, TEDDY_BITE2=1.15, TEDDY_BITE2_FROM=6, TEDDY_GAP_HI=13, TEDDY_FORGE=1, TEDDY_SITTER=1, TEDDY_PARADE_AT=[0,1.5,3.0], TEDDY_DROP_SHIELD=0;
+// ===== 0586 THE GUNS COME ONTO THE BED (FM-GVT-BEAR-GUNS-01; Wyatt 8/27: "Sometimes the enemy cannons are off screen … they just
+// kind of stay back there … behind the box and the characters are hitting the box" · "fire a little quicker and be more significant
+// when they hit" · "the rainbow paratroopers … flank players" · "weird fart clouds because they're green"). THE BUG: every 'right'
+// group is BORN at W+60 = 1300 on a rug that is wholly on the glass (VW===W, 'off screen' = x>1240); the BATTERY PARKS shelf froze a
+// cannon the frame any green stood inside his 400 — born during a siege he parked at 1300 forever (off the bed, untargetable, silent:
+// cannonTick is gated f.x<W-10), born a beat earlier he parked BEHIND the box. Nothing ever made a gun roll ONTO the bed first.
+// ⚑ the dials, one cell each: TEDDY_GUN_X 0.80 THE GUN LINE (W×0.80 = 992 on the 1240 rug — a teddy gun EAST of it may not park;
+// ⚑ 0.76 = 943) · TEDDY_GUN_ROLL 2.0 the crew hauls the gun on at spd×this east of the line, 1300→992 in ~8.5 s (⚑ 1 = a 17-s walk-on)
+// · TEDDY_GUN_CD 3.0 the cannon's own fireCd (was 3.6; the Captain's aura → 2.1; ⚑ 2.6) · TEDDY_GUN_R 50 the cotton's knock radius
+// (was 40; ⚑ 58 = the mortar's; dmg stays 0 — a knock IS a casualty) · TEDDY_GUN_SHAKE 0.5 the landing's shake · TEDDY_FLANK_X
+// [0.20,0.32] THE FLANK DROP band (248-397 — behind the hem 480, clear of the box lap 215) on the stamped chutes from rung
+// TEDDY_FLANK_FROM 9 (⚑ 13 · 4) · TEDDY_FLANK_RUSH 1.0 a flanker WALKS (⚑ 2.0 = the chute's own rush — the box in ~2 s) · TEDDY_FOG 1
+// THE FLUFF (the banks dressed in the sheet's lilac + feathers, the hide stays — the 0573a tables hold; 0 = no smoke on the teddy
+// levels, a GAMEPLAY change (fogIdxAt hides men on rungs 3-50 — re-measure); −1 = the old sage, the rig's control). =====
+const TEDDY_GUN_X=0.80, TEDDY_GUN_ROLL=2.0, TEDDY_GUN_CD=3.0, TEDDY_GUN_R=50, TEDDY_GUN_SHAKE=0.5, TEDDY_FLANK_X=[0.20,0.32], TEDDY_FLANK_FROM=9, TEDDY_FLANK_RUSH=1.0, TEDDY_FOG=1;
+FDEF.tcannon.fireCd=TEDDY_GUN_CD; FDEF.tcannon.cotton.splashR=TEDDY_GUN_R;   // AT THE ROW, once, at load (the TEDDY_HPX idiom): cannonTick's one cadence seat and the lob's splash read the row; the tan mortar and the dino's stego keep their own cells
+function gunLineX(){ return Math.round(W*TEDDY_GUN_X); }   // THE GUN LINE — the battery mark ~120 px west of the box's lap, inside the glass on every device (VW===W on the park rug), in front of the crate the crew is smashing
+function teddyGun(f){ return !!(S.park && S.park.id==='teddy' && f.type==='tcannon'); }   // a bear cannon on the bear park (the pillow fields raid fields none; the campaign's tubes never read this)
+function teddyGunRoll(f){ return (teddyGun(f) && f.x>gunLineX())? TEDDY_GUN_ROLL : 1; }   // THE ROLL — the formless walk's reader: east of the line the crew hauls the gun ON at ×TEDDY_GUN_ROLL (the one place a bear cannon moves faster than a walk — "the guns roll on"); west of it the shipped walk, ×1 for every other foe
+function teddyFormRoll(fo){ return (fo.members.length && fo.x>gunLineX() && fo.members.every(m=>teddyGun(m)))? TEDDY_GUN_ROLL : 1; }   // the block anchor's reader: a line of bear guns rolls AS A BLOCK east of the line (every other block reads ×1 — byte-still)
 // THE PILLOW FORT — a PREDICATE re-read every whack, never a latched flag (S.wave / f.boss / S.queue are the relayed truths,
 // so every sim in a party reads the same fort; only the PRESENTATION latches, sq.fortAnn below). Up while the last wave has
 // not walked on OR a named bear stands (alive on the rug or still in the spawn queue — the beat plays out before the box is
@@ -74372,7 +74409,7 @@ function parkCfgTeddy(n){
   if(n===15) cfg.terrain.pits=[
     { x:Math.round(300+R()*120), y:Math.round(150+R()*90),  r:Math.round(16+R()*5) },
     { x:Math.round(320+R()*120), y:Math.round(360+R()*110), r:Math.round(15+R()*5) }];
-  if(n>=3) cfg.terrain.fog=[ {rx:130,ry:74,vx:0.085,vy:0.06},{rx:110,ry:64,vx:0.06,vy:0.1} ];
+  if(n>=3 && TEDDY_FOG!==0) cfg.terrain.fog=[ {rx:130,ry:74,vx:0.085,vy:0.06},{rx:110,ry:64,vx:0.06,vy:0.1} ];   // 0586 ⚑ TEDDY_FOG 0 = no smoke on the teddy levels (the banks HIDE men from targeting — a gameplay change, rungs 3-50 re-measured); 1 = THE FLUFF (drawFog dresses the same banks lilac, the hide stays); zero R() draws either way
   // 0570 PILLOW CANYONS (D1/D5/D6/D7 — design/pillow-canyons-0826/00-DESIGN.md): on a canyon rung the ridge lands HERE, after every
   // R() draw above (the v1.40 nothing-moves-a-seed law: the other forty-two rungs' cfgs are byte-what-they-were). The walls sit
   // EAST-FIRST (the chicane's second ridge is walked first); the odd rungs' pillow rocks step WEST of the first wall (§6 — a rock in
@@ -74384,6 +74421,7 @@ function parkCfgTeddy(n){
     for(const rk of wallChains(cfg.terrain.walls)) cfg.terrain.rocks.push(rk);
   }
   const c=x=>Math.max(1,Math.round(x*cfg.cntMul));
+  const fk=g=>{ if(n>=TEDDY_FLANK_FROM) g.dropX=TEDDY_FLANK_X; return g; };   // 0586 THE FLANK DROP: from rung TEDDY_FLANK_FROM the stamped chute drops BEHIND the line (dropX — the 0526 group hook updateFoePara reads; TEDDY_FLANK_X [0.20,0.32] = 248-397 of the rug); below it the row's own band. The premiere (rung 4) and THE SKY DROP keep the line band on every rung — rung 4 is the lesson ("the sky drop lands ON you"), rung 9 the twist ("now they land BEHIND you")
   if(n===PARK_KEY_RUNG){   // 0555: re-keyed to the KEY RUNG (the 0372 grammar) — rung 20's authored finale + its Nemesis door stay BYTE-IDENTICAL; rungs 21-50 walk the factory below
     // D16's TWO ACTS — NEMESIS's red-saber captain with HIS army must fall first (the yeti-20
     // grammar; the claim card rides the shipped annIn slot 3 s behind the banner); the actGate
@@ -74447,8 +74485,8 @@ function parkCfgTeddy(n){
       {f:'push',t:'tsnugg',n:c(3),e:'right-bottom',at:1.0},
       {f:'column',t:'tcub',n:3,e:'right-bottom',at:2.0} ]) });
   else if(n===11) wv.push({ name:'THE BATTERY RETURNS', groups:[
-    {f:'line',t:'tcannon',n:1,e:'right-top',at:0},
-    {f:'line',t:'tcannon',n:1,e:'right-bottom',at:0.7},
+    {f:'line',t:'tcannon',n:1,e:'right-top',at:0,rim:1},
+    {f:'line',t:'tcannon',n:1,e:'right-bottom',at:0.7,rim:1},   // 0586: rim:1 on every teddy cannon group — the 0519 RIM LAW walks a stamped tube ON past W-60 before it may park (THE GUN LINE clause takes him the rest of the way)
     {f:'column',t:'tgruffle',n:1,e:'right',at:A},
     {f:'column',t:'tsnugg',n:c(2),e:'right',at:1.5*A} ] });
   else if(n===12) wv.push({ name:'THE PAIR LAW', groups:[
@@ -74464,22 +74502,22 @@ function parkCfgTeddy(n){
   else if(n===14) wv.push({ name:'THE CORK BARRAGE', groups:[
     {f:'line',t:'tsnugg',n:c(3),e:'right-top',at:0},
     {f:'line',t:'tsnugg',n:c(3),e:'right-bottom',at:0.6},
-    {f:'line',t:'tcannon',n:1,e:'right-top',at:A},
-    {f:'line',t:'tcannon',n:1,e:'right-bottom',at:A+0.7} ] });
+    {f:'line',t:'tcannon',n:1,e:'right-top',at:A,rim:1},
+    {f:'line',t:'tcannon',n:1,e:'right-bottom',at:A+0.7,rim:1} ] });   // 0586: rim:1
   else if(n===17) wv.push({ name:'THE FUNNEL', groups:[
     {f:'column',t:'tsnugg',n:c(2),e:'right',at:0},
     {f:'column',t:'twallow',n:1,e:'right',at:A},
     {f:'column',t:'tsnugg',n:c(2),e:'right',at:2*A},
-    {f:'solo',t:'tpara',n:1,e:'right-top',at:2.5*A} ] });
+    fk({f:'solo',t:'tpara',n:1,e:'right-top',at:2.5*A}) ] });   // 0586 THE FLANK DROP: the funnel's chute lands BEHIND the line
   else if(n>=9) wv.push({ name:'THE HEAVY HEAP', groups:[
     {f:'column',t:'twallow',n:(n>=12?2:1),e:'right',at:0},
     {f:'line',t:'tsnugg',n:c(2),e:'right-top',at:A},
-    {f:'solo',t:'tpara',n:1,e:'right-bottom',at:1.5*A} ] });
+    fk({f:'solo',t:'tpara',n:1,e:'right-bottom',at:1.5*A}) ] });   // 0586 THE FLANK DROP: the heap's chute lands BEHIND the line (rung 9 = the twist)
   else if(n>=5) wv.push({ name:'THE GUNS ROLL ON', groups:[
-    {f:'line',t:'tcannon',n:1,e:'right-top',at:0},
+    {f:'line',t:'tcannon',n:1,e:'right-top',at:0,rim:1},   // 0586: rim:1 — and now they DO roll on (THE GUN LINE)
     {f:'column',t:'tsnugg',n:c(2),e:'right',at:A} ] });
   else if(n===3 && TEDDY_FORGE) wv.push({ name:'THE FORGE', groups:[
-    {f:'line',t:'tcannon',n:1,e:'right',at:0},
+    {f:'line',t:'tcannon',n:1,e:'right',at:0,rim:1},   // 0586: rim:1
     {f:'line',t:'tsnugg',n:c(3),e:'right',at:A} ] });   // 0573a THE DOSES: CORK DRILL's W3 — Toulon's guns speak first, two rungs before the Captain's battery (the artillery rules: he emplaces, never rushes; the cotton lob splashes the LINE — a mortar answers him, a line without one eats corks from 400: the lesson, not a bug)
   else wv.push({ name:'THE RUG PARADE', groups:[
     {f:'line',t:'tsnugg',n:c(3),e:'right',at:0},
@@ -74488,7 +74526,7 @@ function parkCfgTeddy(n){
   const beat=TPARK_BEATS[n];
   if(beat) wv.push({ name:BOSSDEF[beat].wave, boss:beat, groups:[
       {f:'boss',t:beat,n:1,e:'right',at:0}]
-    .concat(beat==='tcaptain'? [{f:'line',t:'tcannon',n:1,e:'right-top',at:1.5}] : [])
+    .concat(beat==='tcaptain'? [{f:'line',t:'tcannon',n:1,e:'right-top',at:1.5,rim:1}] : [])   // 0586: rim:1
     .concat(beat==='tgen'? [{f:'line',t:'tguard',n:1,e:'right',at:1.0}] : [])
     .concat([
       {f:'redcoat',t:'tsnugg',n:c(3),e:'right',at:3.0},
@@ -74498,15 +74536,16 @@ function parkCfgTeddy(n){
     {f:'push',t:'tsnugg',n:c(3),e:'right',at:0.4},
     {f:'line',t:'tcub',n:3,e:'right-top',at:1.2},
     {f:'column',t:'twallow',n:1,e:'right-bottom',at:2.0},
-    {f:'solo',t:'tpara',n:2,e:'right-top',at:2.8},
-    {f:'line',t:'tcannon',n:1,e:'right-bottom',at:3.4},
+    {f:'solo',t:'tpara',n:1,e:'right-top',at:2.8},
+    fk({f:'solo',t:'tpara',n:1,e:'right-top',at:2.8}),   // 0586 THE FLANK DROP: ONE of the two chutes flanks, one lands on the line (two groups of one — the same two bodies, the same two dice)
+    {f:'line',t:'tcannon',n:1,e:'right-bottom',at:3.4,rim:1},   // 0586: rim:1
     {f:'column',t:'tgruffle',n:1,e:'right',at:4.0} ] });
   else wv.push({ name:'EVERYONE OFF THE BED', groups:[
       {f:'push',t:'tsnugg',n:(n>=16?c(4):c(5)),e:'right',at:0},
       {f:'line',t:'tcub',n:3,e:'right-top',at:A} ]
     .concat(n>=6? [{f:'line',t:'tbuttons',n:1,e:'right',at:0}] : [])
     .concat(n>=9? [{f:'column',t:'twallow',n:1,e:'right-bottom',at:1.5*A}] : [])
-    .concat(n>=13? [{f:'solo',t:'tpara',n:1,e:'right-top',at:2*A}] : []) });
+    .concat(n>=13? [fk({f:'solo',t:'tpara',n:1,e:'right-top',at:2*A})] : []) });   // 0586 THE FLANK DROP: the closer's chute lands BEHIND the line
   return cfg;
 }
 // THE LADDER FACTORY — deterministic per (park, rung): every sim in a lobby
@@ -84463,7 +84502,8 @@ window.GVT = {
   teddyDials(){ const c=[]; for(let n=1;n<=20;n++){ const q=parkCfg('teddy',n); c.push({ n, hpMul:+q.hpMul.toFixed(4), rateMul:+(q.rateMul||1).toFixed(4), cntMul:+q.cntMul.toFixed(4), bossF:+q.bossF.toFixed(4), waves:q.waves.length }); }
     return { leader:TEDDY_LEADER, leapers:TEDDY_LEAPERS.slice(), hpx:Object.assign({},TEDDY_HPX), rush:Object.assign({},TEDDY_RUSH), rushTo:TEDDY_RUSH_TO, muster:TEDDY_MUSTER_R, leap:Object.assign({},TEDDY_LEAP), rows:{ twallow:FDEF.twallow.hp, tcaptain:FDEF.tcaptain.hp, tgruffle:FDEF.tgruffle.hp, tsnugg:FDEF.tsnugg.hp, tpara:FDEF.tpara.hp, tcannon:FDEF.tcannon.hp, tcub:FDEF.tcub.hp },
       cells:{ tsnugg:FDEF.tsnugg.rush||0, tpara:FDEF.tpara.rush||0, twallow:FDEF.twallow.rush||0, tcannon:FDEF.tcannon.rush||0, tcub:FDEF.tcub.rush||0, tgruffle:FDEF.tgruffle.rush||0, leapC:!!FDEF.tcaptain.leap, leapW:!!FDEF.twallow.leap, leapG:!!FDEF.tgruffle.leap, cold:FDEF.sgtcold.leap? Object.assign({},FDEF.sgtcold.leap) : null }, curve:c, edits:(PARK_EDITS.teddy? Object.keys(PARK_EDITS.teddy).length : 0),
-      fort:{on:TEDDY_FORT,boss:TEDDY_FORT_BOSS}, box:TEDDY_BOX_X, bite2:{x:TEDDY_BITE2,from:TEDDY_BITE2_FROM}, gap:TEDDY_GAP_HI, drop:Object.assign({},FDEF.tpara.drop,{x:FDEF.tpara.drop.x.slice()}), doses:{forge:TEDDY_FORGE,sitter:TEDDY_SITTER,paradeAt:TEDDY_PARADE_AT.slice(),shield:TEDDY_DROP_SHIELD} }; },   // 0573a: the card's dials on the rig door
+      fort:{on:TEDDY_FORT,boss:TEDDY_FORT_BOSS}, box:TEDDY_BOX_X, bite2:{x:TEDDY_BITE2,from:TEDDY_BITE2_FROM}, gap:TEDDY_GAP_HI, drop:Object.assign({},FDEF.tpara.drop,{x:FDEF.tpara.drop.x.slice()}), doses:{forge:TEDDY_FORGE,sitter:TEDDY_SITTER,paradeAt:TEDDY_PARADE_AT.slice(),shield:TEDDY_DROP_SHIELD},
+      guns:{ x:TEDDY_GUN_X, line:gunLineX(), roll:TEDDY_GUN_ROLL, cd:TEDDY_GUN_CD, rowCd:FDEF.tcannon.fireCd, r:TEDDY_GUN_R, rowR:FDEF.tcannon.cotton.splashR, shake:TEDDY_GUN_SHAKE, flankX:TEDDY_FLANK_X.slice(), flankFrom:TEDDY_FLANK_FROM, flankRush:TEDDY_FLANK_RUSH, fog:TEDDY_FOG } }; },   // 0573a: the card's dials on the rig door · 0586: the guns', the flank's and the fog's
   forms(){ return S.forms.map(fo=>({ kind:fo.kind, n:fo.members.length, x:Math.round(fo.x), y:Math.round(fo.y), halted:!!fo.halted, speed:fo.speed, rushX:fo.rushX||1, types:fo.members.map(m=>m.type) })); },
   // ---- 0395 THE CHIN rig: force the chin (env() is 0 in headless); null clears
   // the override. Never persisted, never in saves. ----
