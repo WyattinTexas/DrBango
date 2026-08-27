@@ -3853,9 +3853,9 @@
   @keyframes beaconhalo { 0%,100% { filter:drop-shadow(0 0 6px rgba(255,210,74,0.55)); }
     50% { filter:drop-shadow(0 0 16px rgba(255,214,74,0.95)); } }
   #rtag-bf.beacon, #ro-bf.beacon { animation-delay:0.4s; }
-  #ro-ship.nudge { filter:drop-shadow(0 0 9px rgba(255,210,74,0.7)); animation:beaconhalo 1.7s ease-in-out infinite; }   /* 0546 THE SHIP'S NUDGE — the idle beacon's own halo on the ferry */
+  #ro-ship.nudge, #ro-warplane.nudge { filter:drop-shadow(0 0 9px rgba(255,210,74,0.7)); animation:beaconhalo 1.7s ease-in-out infinite; }   /* 0568 D9: the halo rides whichever ride is out */   /* 0546 THE SHIP'S NUDGE — the idle beacon's own halo on the ferry */
   @media (prefers-reduced-motion: reduce){
-    .roomtag.beacon, #ro-campaign.beacon, #ro-bf.beacon, #ro-ship.nudge { animation:none; }
+    .roomtag.beacon, #ro-campaign.beacon, #ro-bf.beacon, #ro-ship.nudge, #ro-warplane.nudge { animation:none; }
   }
   /* ---- THE LANGUAGE PICKER (v1.29). Native labels only: a child who cannot
      read the interface cannot read "Japanese" either, but 日本語 they know on
@@ -4238,7 +4238,7 @@
   .wpprop { transform-box:fill-box; transform-origin:50% 50%; animation:wptick 7s linear infinite; }
   @keyframes wptick { 0%,90% { transform:rotate(0); } 97%,100% { transform:rotate(180deg); } }
   .wpw { transform-box:view-box; transform-origin:0 0; }
-  .wpdisc, .wppuff { opacity:0; transform-box:fill-box; transform-origin:50% 50%; }
+  .wpdisc, .wppuff, .wpdust { opacity:0; transform-box:fill-box; transform-origin:50% 50%; }   /* 0568: + the wheel dust (the base-value law) */
   .dec-plane.react .wpprop { animation:wpspin 0.11s linear infinite; }
   @keyframes wpspin { from { transform:rotate(0); } to { transform:rotate(180deg); } }
   .dec-plane.react .wpdisc { animation:wpdz 1.4s linear; }
@@ -4252,6 +4252,55 @@
   .dec-plane.react .wppuff { animation:wppf 0.6s ease-out 0.18s; }
   @keyframes wppf { 0% { opacity:0; transform:translate(0,0) scale(0.5); } 20% { opacity:0.8; }
     100% { opacity:0; transform:translate(-13px,-11px) scale(1.7); } }
+  /* ===== 0568 THE TOY WARPLANE FLIES (FM-GVT-WARPLANE-01; Wyatt 8/26: "it should
+     function the same way that the Flying Pirate Ship functions… it gets up and it
+     flies off and looks cool. Landing on the next level."): THE SQUAD'S SECOND RIDE.
+     All three legs ride .wpw (transform-free — the 0353 attr law honoured by the mold)
+     RELATIVE to the seat, so she takes off from and lands on wherever the player
+     parked her in THAT room. TAKEOFF: the run-up (prop blur, the shiver, two exhaust
+     puffs), THE TAXI east along the boards, ROTATE (the shadow ellipse — #decPlane's
+     first child, outside .wpw — goes with her), THE CLIMB banking to the top-right,
+     GONE off the ship's own exit corner. THE LANDING (from ~2060, on the fresh paint):
+     BACK AROUND from that corner FLIPPED to head west (scaleX(-1) in the keyframes,
+     about the wrapper's own origin), THE PASS descending across the whole room as the
+     clouds part from the east, THE FLARE, TOUCHDOWN 100 px east of the seat (the
+     squash, the wheel dust — .wpdust, a sibling of .wpw parked at opacity 0), THE
+     ROLL-OUT west to the seat, THE PIVOT on the spot back to face EAST. Every rule
+     lives under #decPlane: the ID-scoped reduced-motion kill parks it for free, and
+     the JS never adds a class under reduced motion (the ship's own law). */
+  .dec-plane.travel .wpprop { animation:wpspin 0.11s linear infinite; }
+  .dec-plane.travel .wpdisc { animation:wpdzt 1.5s linear forwards; }
+  @keyframes wpdzt { 0% { opacity:0; } 12%,100% { opacity:0.5; } }
+  .dec-plane.travel .wppuff { animation:wppf 0.32s ease-out 0.18s 2; }
+  .dec-plane.travel .wpw { animation:wptakeoff 1.5s cubic-bezier(.55,.05,.85,.4) forwards; }
+  @keyframes wptakeoff { 0% { transform:translate(0,0) rotate(0) scale(1); opacity:1; }
+    7% { transform:translate(1.6px,0.3px) rotate(-0.7deg) scale(1); } 14% { transform:translate(2.4px,-0.3px) rotate(0.4deg) scale(1); }
+    20% { transform:translate(26px,1px) rotate(1deg) scale(1); }
+    36% { transform:translate(78px,-4px) rotate(-6deg) scale(1); }
+    50% { transform:translate(150px,-40px) rotate(-14deg) scale(1); }
+    70% { transform:translate(420px,-150px) rotate(-22deg) scale(0.92); }
+    86% { opacity:1; }
+    100% { transform:translate(1200px,-420px) rotate(-16deg) scale(0.7); opacity:0; } }
+  .dec-plane.travel > ellipse:first-child { animation:wpshade 0.75s linear forwards; }
+  @keyframes wpshade { from { opacity:0.25; } to { opacity:0; } }
+  .dec-plane.land .wpprop { animation:wpspin 0.11s linear 13; }
+  .dec-plane.land .wpdisc { animation:wpdzl 1.75s linear; }
+  @keyframes wpdzl { 0%,72% { opacity:0.5; } 88%,100% { opacity:0; } }
+  .dec-plane.land .wpw { animation:wpland 1.75s cubic-bezier(.2,.7,.3,1) both; }
+  @keyframes wpland { 0% { transform:translate(1200px,-420px) rotate(-6deg) scale(0.72,0.72) scaleX(-1); opacity:0; }
+    10% { opacity:1; }
+    45% { transform:translate(560px,-120px) rotate(4deg) scale(0.88,0.88) scaleX(-1); }
+    72% { transform:translate(150px,-22px) rotate(8deg) scale(1,1) scaleX(-1); }
+    78% { transform:translate(100px,0) rotate(2deg) scale(1,0.94) scaleX(-1); }
+    83% { transform:translate(72px,0) rotate(1deg) scale(1,1.02) scaleX(-1); }
+    92% { transform:translate(18px,0) rotate(0) scale(1,1) scaleX(-1); }
+    96% { transform:translate(8px,0) rotate(0) scale(1,1.05) scaleX(0.2); }
+    100% { transform:translate(0,0) rotate(0) scale(1,1) scaleX(1); opacity:1; } }
+  .dec-plane.land > ellipse:first-child { animation:wpshadein 0.5s linear 0.85s both; }
+  @keyframes wpshadein { from { opacity:0; } to { opacity:0.25; } }
+  .dec-plane.land .wpdust { animation:wpdustpf 0.5s ease-out 1.26s; }
+  @keyframes wpdustpf { 0% { opacity:0; transform:translate(100px,0) scale(0.5); } 20% { opacity:0.85; }
+    100% { opacity:0; transform:translate(72px,-9px) scale(1.9); } }
   /* THE TEDDY BEAR (v1.76) — sat at the foot of the bed, breathing in his
      sleep. Tap = the SQUEEZE: the whole bear squashes like a hugged plush and
      jiggles back out (nanawob's decay family), the arms fold in, the head
@@ -7049,6 +7098,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "TAP THE SHIP TO SAIL TO YOUR OTHER ROOMS!":"اضغط على السفينة للإبحار إلى غرفك الأخرى!",
 "YOUR SHIP · IT SAILS BETWEEN ROOMS":"سفينتك · تبحر بين الغرف",
 "TAP IT! IT SAILS TO YOUR OTHER ROOMS!":"اضغط عليها! تبحر إلى غرفك الأخرى!",
+"TAP IT! IT FLIES TO YOUR OTHER ROOMS!":"اضغط عليها! تطير إلى غرفك الأخرى!",
 "🏴‍☠️ THE FLYING PIRATE SHIP is yours! Tap it to sail to your other rooms!":"🏴‍☠️ سفينة القراصنة الطائرة صارت لك! اضغط عليها للإبحار إلى غرفك الأخرى!",
 "🏡 THE BACKYARD IS YOURS — a whole new room! Find it in the ROOMS aisle.":"🏡 الفناء الخلفي صار لك — غرفة جديدة كاملة! تجده في ممر الغرف.",
 "❄ THE WINTER FIELD IS YOURS — a whole new room! Your ship sails you there.":"❄ حقل الشتاء صار لك — غرفة جديدة كاملة! سفينتك تبحر بك إليه.",
@@ -10010,6 +10060,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "TAP THE SHIP TO SAIL TO YOUR OTHER ROOMS!":"ふねを タップして ほかのへやへ しゅっぱつ！",
 "YOUR SHIP · IT SAILS BETWEEN ROOMS":"きみのふね · へやから へやへ とんでいく",
 "TAP IT! IT SAILS TO YOUR OTHER ROOMS!":"タップしてみて！ ほかのへやへ とんでいくよ！",
+"TAP IT! IT FLIES TO YOUR OTHER ROOMS!":"タップしてみて！ ほかのへやへ ひとっとび！",
 "🏴‍☠️ THE FLYING PIRATE SHIP is yours! Tap it to sail to your other rooms!":"🏴‍☠️ そらとぶかいぞくせんは きみのもの！ タップして ほかのへやへ しゅっぱつ！",
 "🏡 THE BACKYARD IS YOURS — a whole new room! Find it in the ROOMS aisle.":"🏡 うらにわは きみのもの — あたらしい おへやが まるごと！ おへやコーナーで さがしてね。",
 "❄ THE WINTER FIELD IS YOURS — a whole new room! Your ship sails you there.":"❄ ふゆのはらっぱは きみのもの — あたらしい おへやが まるごと！ ふねが つれていってくれるよ。",
@@ -12318,6 +12369,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "TAP THE SHIP TO SAIL TO YOUR OTHER ROOMS!":"배를 탭해서 다른 방으로 항해해!",
 "YOUR SHIP · IT SAILS BETWEEN ROOMS":"내 배 · 방과 방 사이를 날아다녀",
 "TAP IT! IT SAILS TO YOUR OTHER ROOMS!":"탭해 봐! 다른 방으로 항해해!",
+"TAP IT! IT FLIES TO YOUR OTHER ROOMS!":"탭해 봐! 다른 방으로 날아가!",
 "🏴‍☠️ THE FLYING PIRATE SHIP is yours! Tap it to sail to your other rooms!":"🏴‍☠️ 하늘을 나는 해적선이 네 거야! 탭하면 다른 방으로 데려다줘!",
 "🏡 THE BACKYARD IS YOURS — a whole new room! Find it in the ROOMS aisle.":"🏡 뒷마당이 네 거야 — 새 방 하나가 통째로! 방 코너에서 찾아봐.",
 "❄ THE WINTER FIELD IS YOURS — a whole new room! Your ship sails you there.":"❄ 겨울 들판이 네 거야 — 새 방 하나가 통째로! 네 배가 거기까지 데려다줘.",
@@ -14626,6 +14678,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "TAP THE SHIP TO SAIL TO YOUR OTHER ROOMS!":"点一下船，开去你的其他房间！",
 "YOUR SHIP · IT SAILS BETWEEN ROOMS":"你的船 · 在房间之间飞来飞去",
 "TAP IT! IT SAILS TO YOUR OTHER ROOMS!":"点一下！它会开去你的其他房间！",
+"TAP IT! IT FLIES TO YOUR OTHER ROOMS!":"点一下！它会飞去你的其他房间！",
 "🏴‍☠️ THE FLYING PIRATE SHIP is yours! Tap it to sail to your other rooms!":"🏴‍☠️ 飞天海盗船是你的了！点一下就开去其他房间！",
 "🏡 THE BACKYARD IS YOURS — a whole new room! Find it in the ROOMS aisle.":"🏡 后院是你的了——整整一个新房间！去房间货架找找。",
 "❄ THE WINTER FIELD IS YOURS — a whole new room! Your ship sails you there.":"❄ 冬日雪原是你的了——整整一个新房间！你的船会带你去。",
@@ -16934,6 +16987,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "TAP THE SHIP TO SAIL TO YOUR OTHER ROOMS!":"Tipp das Schiff an und segle in deine anderen Zimmer!",
 "YOUR SHIP · IT SAILS BETWEEN ROOMS":"DEIN SCHIFF · ES SEGELT VON ZIMMER ZU ZIMMER",
 "TAP IT! IT SAILS TO YOUR OTHER ROOMS!":"TIPP ES AN! ES SEGELT IN DEINE ANDEREN ZIMMER!",
+"TAP IT! IT FLIES TO YOUR OTHER ROOMS!":"TIPP ES AN! ES FLIEGT IN DEINE ANDEREN ZIMMER!",
 "🏴‍☠️ THE FLYING PIRATE SHIP is yours! Tap it to sail to your other rooms!":"🏴‍☠️ DAS FLIEGENDE PIRATENSCHIFF gehört dir! Tipp es an und segle in deine anderen Zimmer!",
 "🏡 THE BACKYARD IS YOURS — a whole new room! Find it in the ROOMS aisle.":"🏡 DER HINTERHOF gehört dir — ein ganzes neues Zimmer! Du findest ihn in der ZIMMER-Abteilung.",
 "❄ THE WINTER FIELD IS YOURS — a whole new room! Your ship sails you there.":"❄ DAS WINTERFELD gehört dir — ein ganzes neues Zimmer! Dein Schiff segelt dich hin.",
@@ -19242,6 +19296,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "TAP THE SHIP TO SAIL TO YOUR OTHER ROOMS!":"Нажми на корабль и плыви в другие комнаты!",
 "YOUR SHIP · IT SAILS BETWEEN ROOMS":"ТВОЙ КОРАБЛЬ · ЛЕТАЕТ ИЗ КОМНАТЫ В КОМНАТУ",
 "TAP IT! IT SAILS TO YOUR OTHER ROOMS!":"НАЖМИ! ОН ПОПЛЫВЁТ В ДРУГИЕ КОМНАТЫ!",
+"TAP IT! IT FLIES TO YOUR OTHER ROOMS!":"НАЖМИ! ОН ПОЛЕТИТ В ДРУГИЕ КОМНАТЫ!",
 "🏴‍☠️ THE FLYING PIRATE SHIP is yours! Tap it to sail to your other rooms!":"🏴‍☠️ ЛЕТАЮЩИЙ ПИРАТСКИЙ КОРАБЛЬ твой! Нажми на него и плыви в другие комнаты!",
 "🏡 THE BACKYARD IS YOURS — a whole new room! Find it in the ROOMS aisle.":"🏡 ЗАДНИЙ ДВОР твой — целая новая комната! Ищи её в отделе КОМНАТЫ.",
 "❄ THE WINTER FIELD IS YOURS — a whole new room! Your ship sails you there.":"❄ ЗИМНЕЕ ПОЛЕ твоё — целая новая комната! Твой корабль отвезёт тебя туда.",
@@ -21550,6 +21605,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "TAP THE SHIP TO SAIL TO YOUR OTHER ROOMS!":"¡Toca el barco para navegar a tus otros cuartos!",
 "YOUR SHIP · IT SAILS BETWEEN ROOMS":"TU BARCO · NAVEGA ENTRE CUARTOS",
 "TAP IT! IT SAILS TO YOUR OTHER ROOMS!":"¡TÓCALO! ¡NAVEGA A TUS OTROS CUARTOS!",
+"TAP IT! IT FLIES TO YOUR OTHER ROOMS!":"¡TÓCALO! ¡VUELA A TUS OTROS CUARTOS!",
 "🏴‍☠️ THE FLYING PIRATE SHIP is yours! Tap it to sail to your other rooms!":"🏴‍☠️ ¡EL BARCO PIRATA VOLADOR es tuyo! ¡Tócalo para navegar a tus otros cuartos!",
 "🏡 THE BACKYARD IS YOURS — a whole new room! Find it in the ROOMS aisle.":"🏡 ¡EL PATIO TRASERO es tuyo — un cuarto nuevo entero! Búscalo en el pasillo de CUARTOS.",
 "❄ THE WINTER FIELD IS YOURS — a whole new room! Your ship sails you there.":"❄ ¡EL CAMPO INVERNAL es tuyo — un cuarto nuevo entero! Tu barco te lleva hasta allí.",
@@ -22923,7 +22979,9 @@ function decOwns(id){ const d=META.decor; return !!(d && d.own && d.own.indexOf(
 // per-room now — placed on THIS room's floor (META.rdec[roomCur()]). The
 // park gear (pole/bait) renders at the DINO PARK, not in any room, so it
 // keeps the old global off-list (absence-means-on) untouched.
-const DECOR_GLOBAL=['pole','bait'];
+const DECOR_GLOBAL=['pole','bait','ship','warplane'];   // 0568 THE TOY WARPLANE FLIES (FM-GVT-WARPLANE-01 D4 THE HOME LAW): the RIDES are GLOBAL toys — out everywhere or put away everywhere (META.decor.off, the park gear's own idiom); the ship's answers stay byte-same for every existing save (no off row = out, exactly as before; the boot's rideV one-shot scrubs a pre-0335 off row)
+const RIDES=['ship','warplane'];   // 0568 D1 THE RIDES — THE FLYING PIRATE SHIP (0330a) and THE TOY WARPLANE: one latch (SHIPTRV), one port (SHIP_DEST), the ship first
+function rideIs(k){ return RIDES.indexOf(k)>=0; }
 function rdecList(r){ const m=META.rdec; const l=m && m[r]; return Array.isArray(l)? l : []; }
 function decorOn(id){ const d=META.decor; if(!decOwns(id)) return false;
   if(DECOR_GLOBAL.indexOf(id)>=0) return !(d.off && d.off.indexOf(id)>=0);
@@ -23035,7 +23093,7 @@ function decorHome(id){
   // 0335 TRANSPORT LAW: the ship is aboard EVERY room the moment it's owned
   // — never stowable, never roof-fallen (it FLIES). The ferry may not
   // strand its sailor: with the rail retired this read is the travel door.
-  if(id==='ship') return decOwns(id);
+  if(rideIs(id)) return decorOn(id);   // 0568 D4: a RIDE is aboard every room while it is out (the off-list is its toy box — D5 keeps the LAST ride out of it; ROOF_GONE never asked — it FLIES)
   return decorOn(id) && !ROOF_GONE.has(id); }
 function bankTier(){ return Math.max(0, Math.min(BANK_TIERS.length, (META.bankTier)|0)); }
 function bankNextCost(){ const r=bankTier(); return r>=BANK_TIERS.length? 0 : BANK_TIERS[r].cost; }
@@ -25513,6 +25571,21 @@ if(!META.crownV2){ META.crownV2=1;
         // vehicle deal in rdecSweep never overrides the put-away
         for(const r of okr){ if(r==='bedroom' || (r==='western'&&META.wmap) || META.rooms.own.indexOf(r)>=0) META.rdecShip[r]=1; }
       }
+    }
+  })();
+  // 0568 THE TOY WARPLANE FLIES — D4 THE HOME LAW's one-shot (META.rideV=1, idempotent; a guest device without the stamp re-derives the
+  // same answer): the rides read the GLOBAL off-list now. A plane owned but on NO room's rdec list (stowed everywhere, or never dealt)
+  // → off carries it (the player's own choice honoured); otherwise nothing — out everywhere, the ship's law. The ship: aboard every
+  // room since 0335 whatever a pre-0335 off row said — that row is scrubbed so its answers stay byte-same. Ids inlined (the TDZ law).
+  (function(){
+    if(META.rideV) return; META.rideV=1;
+    const d=META.decor; if(!d || !Array.isArray(d.own)) return;
+    const off=Array.isArray(d.off)? d.off : (d.off=[]);
+    const i9=off.indexOf('ship'); if(i9>=0) off.splice(i9,1);
+    if(d.own.indexOf('warplane')>=0){
+      let out9=false; const rd9=META.rdec||{};
+      for(const r9 in rd9){ if(Array.isArray(rd9[r9]) && rd9[r9].indexOf('warplane')>=0){ out9=true; break; } }
+      if(!out9 && off.indexOf('warplane')<0) off.push('warplane');
     }
   })();
   // 0555 moved THE SHIP'S BERTH to the foot of the bed (the fortress had the pillow end); 0826 card A moves the fortress to the
@@ -37501,7 +37574,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.69';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.70';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -37648,7 +37721,8 @@ function roomBeaconSet(on){   // the four elements (two doors × art group + pil
 function shipNextStop(){ const own=ownedRooms(); const i=own.indexOf(roomCur()); return (SHIP_DEST && own.indexOf(SHIP_DEST)>=0 && SHIP_DEST!==roomCur())? SHIP_DEST : own[(i+1)%own.length]; }
 function shipNudgeDue(){ return !!META.lens && roomOwns('backyard') && !(META.parkDino && (((META.parks||{}).dino||{}).lv|0)>=1); }
 function shipNudgeOn(){ return S.mode==='menu' && decOwns('ship') && roomCur()!=='backyard' && shipNudgeDue() && shipNextStop()==='backyard'; }
-function shipNudgeTick(){ const el=document.getElementById('ro-ship'); if(el) el.classList.toggle('nudge', shipNudgeOn()); }
+function rideOut(){ for(const k of RIDES){ if(decorHome(k)) return k; } return null; }   // 0568 D9: the ride that is out — the ship first
+function shipNudgeTick(){ const on=shipNudgeOn(), r=rideOut(); for(const k of RIDES){ const el=document.getElementById('ro-'+k); if(el) el.classList.toggle('nudge', on && k===r); } }   // 0568 D9: the 0546 halo rides whichever ride is out (#ro-warplane.nudge joins the rule); due() untouched
 function roomBeaconTick(){   // rides evDoorTick — the room's 1 s tick
   const on=S.mode==='menu' && !document.hidden && roomQuiet() && idleQuiet()>=roomBeaconS();   // 0503: the newbie gate picks the clock
   if(on || IDLE.beacon) roomBeaconSet(on);   // on: re-applied every second (a repaint bakes nothing); off: cleared once
@@ -56185,7 +56259,7 @@ function momDecorBake(){
     if(MOMDECOR[id] && MOMDECOR[id].bakeKey===key) continue;
     const art=momDecorArt(id).replace(/<ellipse[^>]*fill="#000"[^>]*\/>/g,'');
     const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+momDecorVB(id)+'">'
-      +'<style>.tedheart,.trpuff,.wpdisc,.wppuff,.rctp,.rcdust{display:none}</style>'+art+'</svg>';
+      +'<style>.tedheart,.trpuff,.wpdisc,.wppuff,.wpdust,.rctp,.rcdust{display:none}</style>'+art+'</svg>';
     const im=new Image(); im.bakeKey=key;
     im.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)));
     MOMDECOR[id]=im;
@@ -64802,7 +64876,10 @@ function warplaneArt(){
       +'<circle class="wpdisc" cx="47" cy="1" r="16" fill="#E8E4D4"/>'
     +'</g>'
     // the one exhaust puff — a sibling of the strain group, never inside it
-    +'<circle class="wppuff" cx="33" cy="10" r="6" fill="#E8E4D4"/>';
+    +'<circle class="wppuff" cx="33" cy="10" r="6" fill="#E8E4D4"/>'
+    // 0568 THE TOY WARPLANE FLIES: the wheel dust of THE LANDING — a sibling of .wpw like the puff (v1.34), parked at opacity 0 by CSS (the
+    // base-value law) and hidden in Mom's bake: the shop card, the ticket, the win face, the bake and the room at rest paint pixel-identical
+    +'<circle class="wpdust" cx="12" cy="24" r="6" fill="#E8E4D4"/>';
 }
 const PLANE_VB='-60 -31 116 64';
 function warplaneSVG(){
@@ -66955,6 +67032,7 @@ function decorReact(id){
   if(id==='puffer') puffPurse();   // 0315: pays before the solo latch can swallow the tap — by the second tap the flag is long since banked
   if(id==='bass') bassPurse();     // 0540: the bass's first flop pays LAKE_BASS_STARS (the same grammar)
   if(id==='ship' && shipTravelDue()){ shipTravel(); return; }   // 0330a THE PIRATE FERRY: with 2+ rooms the tap is travel — the one-room save keeps the 0315 lap byte-exact
+  if(id==='warplane'){ if(PLANE_LAND) return; if(rideDue('warplane')){ planeTravel(); return; } }   // 0568 THE TOY WARPLANE FLIES (D2 THE TAP DOOR): with 2+ rooms the tap is TRAVEL — the squad's second ride; a landing plane is not a toy (D10); the one-room save keeps the prop run-up byte-exact
   if(id==='pdino' && !META.deggH){ dpEggCrack(); return; }   // 0332: the egg's tap is the HATCH CHAIN — the roar row wakes only once the baby stands
   if(id==='whorse'){ if(WH_RUN) return;   // 0368: solo — the racecar law (a mid-wind or mid-run tap does nothing at all)
     if(whCanRun()){ whGallop(); return; } }   // the wind-up tap is a REAL RUN now; reduced motion / Mom's day fall through to the shipped jitter
@@ -67577,6 +67655,7 @@ function nemTargets(){
       out.push({kind:'troop', k:tb.k, cx:tb.x+tb.w/2+d[0], cy:tb.y+tb.h+d[1]-6});
     }
   for(const k of NEM_PREY){
+    if(rideIs(k)) continue;                                 // 0568 D6: a RIDE is never smashed (NEM_PREY's table untouched — the guard is the louder diff)
     if(!decorHome(k)) continue;                             // gone is gone (the roof's doing or his)
     if(k==='soccer'&&SOC_FLY) continue;                     // mid-flight the ball isn't at its spot (rdragPick's law)
     if(RDRAG&&RDRAG.k===k) continue;                        // never smash the toy in the player's hand
@@ -68376,6 +68455,7 @@ function rdragPick(p){
     if(!decorHome(k)) continue;   // v3.06: a fallen toy can't be grabbed again
     if(k==='soccer' && SOC_FLY) continue;   // v3.16: mid-flight the ball isn't at its parked spot to grab
     if(k==='whorse' && WH_RUN) continue;   // 0368: mid-gallop the horse isn't at his spot either (the ball's own law); his HOME — the drag's word — never moves
+    if(k==='warplane' && PLANE_LAND) continue;   // 0568 D10: a LANDING plane is not a toy (the horse's WH_RUN law) — the grab waits for the wheels
     const b=DECOR_SPOTS[k], d=rpXY(k);
     if(p.x>=b.x+d[0] && p.x<=b.x+b.w+d[0] && p.y>=b.y+d[1] && p.y<=b.y+b.h+d[1])
       return { k:k, base:b };
@@ -69160,7 +69240,7 @@ function rdragEnd(e){
     // and the saved arrangement is deliberately NOT written, so the relaunch
     // that brings the toy back brings it back where it lived before the drop
     if(d.k==='lakerod'){ lakeDrop(d.base, d.dx, d.dy); return; }   // 0540 THE FROZEN LAKE: the pole's drop is a cast or a snap-back — never a park (nothing written)
-    const z=(roomCur()==='rooftop' && d.k!=='ship' && d.k!=='robot')? roofFallZone(d.base, d.dx, d.dy) : '';   // 0335: the flying ship never falls — a gap drop just parks it (0341: the robot's LIVE gap check answers for him — robRoofCheck)
+    const z=(roomCur()==='rooftop' && !rideIs(d.k) && d.k!=='robot')? roofFallZone(d.base, d.dx, d.dy) : '';   // 0568 D6: a RIDE never falls — the ship since 0335, THE TOY WARPLANE now (it FLIES; a gap drop just parks it)   // 0335: the flying ship never falls — a gap drop just parks it (0341: the robot's LIVE gap check answers for him — robRoofCheck)
     if(z){ if(d.k==='hook' && z==='gap'){ hookDeliver(d.base, d.dx, d.dy); return; }   // 0348: the GAP is her mail slot — the edge stays v3.06's session fall (no delivery, back on relaunch)
       roofFall(d.k, d.base, d.dx, d.dy, z); return; }
     if(d.dx||d.dy) rpMap()[d.k]=[d.dx, d.dy]; else delete rpMap()[d.k];   // 0330a: THIS room's arrangement
@@ -70273,12 +70353,19 @@ function roomSwitch(id, quiet){
 // transform) and its own overlay node — never the art inside, so 0335's
 // sail redesign drops in with zero ferry edits. All state page-lifetime.
 let SHIPTRV=0;
-function shipTravelDue(){
+let PLANE_LAND=0;          // 0568: THE TOY WARPLANE is landing (the .land leg on the fresh paint) — a landing plane is not a toy (D10); renderMenu's head clears it (the ball's rule)
+// 0568 D1 THE RIDES: rideDue(id) = shipTravelDue generalised — menu · 2+ rooms · the ride aboard (decorHome) · its #dec node standing with
+// neither .react nor .land (a lap — or a landing — must finish); ONE latch (SHIPTRV — every rig door reads it: one ride in the air at a
+// time, never both) and ONE port (SHIP_DEST, whichever ride sails). shipTravelDue answers byte-same.
+function rideDue(id){
   if(SHIPTRV || S.mode!=='menu') return false;
-  if(ownedRooms().length<2 || !decorHome('ship')) return false;
-  const g=document.getElementById('decShip');
-  return !!g && !g.classList.contains('react');   // a lap must FINISH (v1.78)
+  if(ownedRooms().length<2 || !decorHome(id)) return false;
+  const g=document.getElementById(DECOR_REACT[id].el);
+  return !!g && !g.classList.contains('react') && !g.classList.contains('land');   // a lap must FINISH (v1.78) — and a landing (0568)
 }
+function shipTravelDue(){ return rideDue('ship'); }
+function rideNextRoom(){ return shipNextRoom(); }   // 0568: the pin is shared — one port, whichever ride
+function rideStowOK(id){ return ownedRooms().length<2 || RIDES.some(o=>o!==id && decorHome(o)); }   // 0568 D5 THE LAST RIDE LAW (anti-strand): the toy box takes a ride only while the other ride is out — or with one room (nowhere to fly)
 function shipNextRoom(){
   const own=ownedRooms(); const i=own.indexOf(roomCur());
   if(SHIP_DEST){ const d=SHIP_DEST; SHIP_DEST=null; if(own.indexOf(d)>=0 && d!==roomCur()) return d; }   // 0528 MOVING DAY: the pinned port, one sail — the cycle resumes after
@@ -70314,6 +70401,38 @@ function shipTravel(){
   setTimeout(go, 2050);                          // under full cover
   setTimeout(()=>w.classList.add('out'), 2300);
   setTimeout(()=>{ try{ w.remove(); }catch(e){} SHIPTRV=0; shipCineSweep(); }, 3260);   // 0335: sailing home stages the bed card (self-guarded no-op anywhere else)
+}
+// ===== 0568 THE TOY WARPLANE FLIES (FM-GVT-WARPLANE-01, design/warplane-ferry-0826/00-DESIGN.md; Wyatt 8/26 ~13:30 ET verbatim:
+// "it should function the same way that the Flying Pirate Ship functions. If you click on it, it should do the same thing, where
+// you're able to travel from map to map, and it gets up and it flies off and looks cool. Landing on the next level. This will
+// allow players to be able to not have to have the flying pirate ship out in order to change levels.") — THE SQUAD'S SECOND RIDE.
+// planeTravel = shipTravel's clock VERBATIM (the RM branch verbatim · SFX.prop · .travel on #decPlane · the SAME #cloudwipe · 1150 .in
+// + twink · 2050 go = roomSwitch quiet + thock · 2300 .out · 3260 the wipe gone) PLUS the plane's own beats: the top seat before the
+// class (D7 — re-seat FIRST, class SECOND, the re-seat law), SFX.zoom at 900 (the climb), THE LANDING — .land on the freshly painted
+// #decPlane right after go() (top-seated first), PLANE_LAND=1, SFX.bounce at the touchdown (~3420) — and the plane's teardown at 3850:
+// .land off, PLANE_LAND=0, SHIPTRV=0, shipCineSweep() (the latch and the sweep move to the END of the landing — never 3260 — so the bed
+// card can never repaint a plane mid-glide). All three legs ride .wpw (transform-free — the 0353 attr law honoured by the mold itself),
+// RELATIVE to the seat: she takes off from, and lands on, wherever the player parked her in THAT room (the per-room drag delta).
+function rideTop(){ const ro=document.getElementById('ro-warplane'); const p=ro && ro.parentNode; if(p && p.lastElementChild!==ro) p.appendChild(ro); return ro; }   // D7 THE RIDE FLIES ON TOP: the end of the room svg — the ship's own top seat (the takeoff crosses the sails, the men and the models IN FRONT)
+function planeTravel(){
+  SHIPTRV=1;
+  const go=()=>{ roomSwitch(rideNextRoom(), true); SFX.thock(); };
+  if(reducedMotion()){ SFX.prop(); go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // the ship's RM branch verbatim: no class, no seat, no landing (travel is information; the theatre is not)
+  SFX.prop();
+  rideTop(); const g=document.getElementById('decPlane'); if(g) g.classList.add('travel');   // seat first, class second
+  const w=document.createElement('div'); w.id='cloudwipe';
+  w.innerHTML='<div class="cwb">'+cloudWipeSVG()+'</div>';
+  document.body.appendChild(w);   // the glass is DOWN from beat one — no door mid-flight (the ship's own law)
+  setTimeout(()=>SFX.zoom(), 900);                // THE CLIMB — banking away to the top-right
+  setTimeout(()=>{ w.classList.add('in'); SFX.twink(); }, 1150);
+  setTimeout(()=>{ go();                          // under full cover
+    rideTop(); const h=document.getElementById('decPlane');   // THE LANDING on the fresh paint: the top seat, then the class
+    if(h){ h.classList.remove('travel'); h.classList.add('land'); PLANE_LAND=1; } }, 2050);
+  setTimeout(()=>w.classList.add('out'), 2300);
+  setTimeout(()=>{ try{ w.remove(); }catch(e){} }, 3260);   // the wipe alone — the latch holds through the landing
+  setTimeout(()=>{ if(PLANE_LAND) SFX.bounce(); }, 3420);   // TOUCHDOWN — the gear compresses, the wheel dust puffs
+  setTimeout(()=>{ try{ const h=document.getElementById('decPlane'); if(h) h.classList.remove('land','travel'); }catch(e){}
+    PLANE_LAND=0; SHIPTRV=0; shipCineSweep(); }, 3850);   // THE PIVOT done: parked exactly as drawn; the bed card may deal now (never at 3260)
 }
 // ===== 0494c THE BACKYARD AT SEVEN — the room door (the lensSweep law: a save
 // past the rung that never saw the verdict — a guest whose campaign moved by
@@ -70419,8 +70538,9 @@ function mvDayQuiet(){
   const m=document.getElementById('roomModal');
   if(m && m.firstChild) return false;                   // a room modal is open
   if(META.decorSeen.indexOf('ship')<0) return false;    // the ship's own BED ARRIVAL comes first (its card says TAP THE SHIP) — the demonstration waits for the next quiet landing
-  return shipTravelDue();                               // the ferry is due: 2+ rooms, the ship aboard, no lap mid-flight
+  return !!mvDayRide();                                 // 0568 D8: a RIDE is due (the ship first, else the plane): 2+ rooms, the ride aboard, no lap mid-flight
 }
+function mvDayRide(){ for(const k of RIDES){ if(rideDue(k)) return k; } return null; }   // 0568 D8 THE HAND: the first of RIDES with rideDue — with the ship in the toy box the game's own hand presses THE PLANE (0566's glove rides the same anchor)
 function mvDayDisarm(){ if(MVDAY.armed){ document.removeEventListener('pointerdown', mvDayTap, true); MVDAY.armed=0; } }
 function mvDayCancel(consume){
   if(MVDAY.tid){ clearInterval(MVDAY.tid); MVDAY.tid=0; }
@@ -70446,14 +70566,15 @@ function mvDayTry(){
 }
 function mvDayGo(id){
   META.mvDay=0; saveMeta();   // consumed FIRST (the comet law) — once per gift, ever; a reload mid-sail never replays it
+  const ride=mvDayRide()||'ship';   // 0568 D8: the ride the hand presses — the ship first; with the ship in the toy box, THE PLANE
   const press=()=>{
     mvDayDisarm();
-    if(S.mode!=='menu' || !shipTravelDue()) return;   // the room changed under the hand — no press, no fork
-    SHIP_DEST=id; UI.decorTap('ship');   // THE ONE TAP DOOR: the dspot's own onclick (audio → decorReact → shipTravel), the port pinned for this one sail
+    if(S.mode!=='menu' || !rideDue(ride)) return;   // the room changed under the hand — no press, no fork
+    SHIP_DEST=id; UI.decorTap(ride);   // THE ONE TAP DOOR: the dspot's own onclick (audio → decorReact → shipTravel / planeTravel), the port pinned for this one sail
     if(!SHIPTRV) SHIP_DEST=null;         // the ferry did not cast off — never leave a pin for a later tap
   };
   if(reducedMotion()){ press(); return; }   // no hand — the sail itself is the lesson (v1.25's law: a grant never depends on its theater)
-  const sp=document.getElementById('dspot-ship') || document.getElementById('decShip');
+  const sp=document.getElementById('dspot-'+ride) || document.getElementById(DECOR_REACT[ride].el);   // 0568 D8: the hand lands on whichever ride is due
   if(!sp){ press(); return; }
   const r=sp.getBoundingClientRect();
   const h=document.createElement('div'); h.id='mvHand';
@@ -70686,6 +70807,7 @@ function renderMenu(){
   // (the renderShop/LENS lesson, verbatim)
   GLASS.held=false; GLASS.pid=null;
   if(GLASS.raf){ cancelAnimationFrame(GLASS.raf); GLASS.raf=0; }
+  PLANE_LAND=0;   // 0568 D10: a repaint wipes the landing plane's .land with the innerHTML — drop the latch with it (the ball's rule)
   // (0140: momSetCheck died with the day-gate — momDue reads the floor live)
   // v2.12: a draggable row's hotspot div AND its label pill both wear the
   // saved [dx,dy] and deterministic ids (#rspot-/#rtag-<mv>), so every
@@ -78622,7 +78744,7 @@ function shopDecHTML(id){
   // law), so a retune can never make six languages lie
   const lock=decEarned(id) && !own;
   // 0332: the hatchling's card speaks the egg till it pops (the state is the story)
-  const ptag = (id==='pdino' && !META.deggH)? 'IT WIGGLES! IT WANTS TO HATCH!' : inf.tag;
+  const ptag = (id==='pdino' && !META.deggH)? 'IT WIGGLES! IT WANTS TO HATCH!' : (id==='warplane' && ownedRooms().length>=2)? 'TAP IT! IT FLIES TO YOUR OTHER ROOMS!' : inf.tag;   // 0568 D12: with 2+ rooms the plane's card teaches the ride (the sub stays; no announce card — ⚑ Q1)
   // 0554f EVERY LOCKED THING ANSWERS: a locked PRIZE keeps its what-it-does tag UNDER the lock line (the lock line alone said how, never what)
   const lk9 = lock
     ? '<span class="sh-dlk">'+(id==='ducky'
@@ -81873,7 +81995,7 @@ window.UI = {
     // it again never charges a second time). Away = a soft thock into the toy
     // box; back = a blip, then the toy introduces itself again on the floor.
     if(decOwns(id)){
-      if(id==='ship'){ SFX.blip(); return; }   // 0335 TRANSPORT LAW: the ferry never goes in the toy box (stowing it would strand you); drag it around the room instead
+      if(rideIs(id) && decorOn(id) && !rideStowOK(id)){ SFX.blip(); return; }   // 0335 TRANSPORT LAW → 0568 D5 THE LAST RIDE LAW: the toy box never takes the LAST ride out (stowing it would strand you) — the ship's own nod, now on whichever ride is last; with the other ride out, either goes in the box (the DECOR_GLOBAL off-list below)
       // 0330a: for furniture the card is THIS ROOM's switch now — the same
       // stamp strings were already per-room truthful ("IN YOUR ROOM").
       // The park gear (pole/bait) keeps the global off-list it always had.
@@ -83210,6 +83332,9 @@ window.GVT = {
       lead:dogLeadBreed(), sitAt:DOG_SIT_AT, mood:dogMood(dogLeadBreed()) }; },   // 0416: the sit dial + the day's mood index
   doghouse(){ return { cv:GVT_CV, lvl:DOGHOUSE_LVL, own:['doghouse','doghouse2'].map(decOwns), rooms:doghouseRooms(), legs:(DOGT&&DOGT.legs||[]).map(l=>l.room), stops:(DOGT&&DOGT.plan)? DOGT.plan.segs.filter(q=>q.k==='sniff').map(q=>q.x0) : null, plan:(DOGT&&DOGT.legs&&DOGT.legs[DOGT.leg])? dogStops(DOGT.legs[DOGT.leg].room, DOGT.legs[DOGT.leg].dir) : null, spots:{ doghouse:Object.assign({},DECOR_SPOTS.doghouse), doghouse2:Object.assign({},DECOR_SPOTS.doghouse2) }, allN:DECOR_ALL_N, keys:{ doghouse:dhKey('doghouse'), doghouse2:dhKey('doghouse2') }, cols:{ doghouse:dhCols('doghouse').slice(), doghouse2:dhCols('doghouse2').slice() }, dh:(META.decor&&META.decor.dh&&typeof META.decor.dh==='object')? Object.assign({},META.decor.dh) : null, palette:KENNEL_PALETTE.map(p=>p[0]), lead:dogLeadBreed() }; },   // 0546 rig door — read-only · 0554e: the effective keys, the six hexes each, the saved picks, the palette's keys, the walking dog
   shipNudge(){ const el=document.getElementById('ro-ship'); return { cv:GVT_CV, due:shipNudgeDue(), on:shipNudgeOn(), next:shipNextStop(), cur:roomCur(), lens:!!META.lens, parkDino:!!META.parkDino, lv:(((META.parks||{}).dino||{}).lv|0), ship:decOwns('ship'), cls:!!(el&&el.classList.contains('nudge')), pinned:SHIP_DEST||null }; },   // 0546 rig door — read-only
+  rideState(){ const st={}; for(const k of RIDES){ const el=document.getElementById(DECOR_REACT[k].el), ro=document.getElementById('ro-'+k);
+      st[k]={ own:decOwns(k), out:decorHome(k), due:rideDue(k), cls:el? String(el.className.baseVal||el.className) : null, top:!!(ro && ro.parentNode && ro.parentNode.lastElementChild===ro), nudge:!!(ro && ro.classList.contains('nudge')) }; }
+    return { cv:GVT_CV, trv:SHIPTRV, land:PLANE_LAND, next:shipNextStop(), pinned:SHIP_DEST||null, hand:mvDayRide(), out:rideOut(), rooms:ownedRooms(), cur:roomCur(), off:(META.decor.off||[]).slice(), rideV:META.rideV|0, wipe:!!document.getElementById('cloudwipe'), rides:st }; },   // 0568 D11 rig door — read-only (next = the PURE read; the pin is never consumed here)
   dogFreeze(on){ DOGRIG.frozen=on?1:0; DOG_LAST=0; return DOGRIG.frozen; },
   dogStep(s){ if(!DOGT) dogArm(); let r=Math.max(0,+s||0);
     while(r>0){ const d=Math.min(0.1,r); dogAdvance(d); r-=d; }
@@ -83332,7 +83457,7 @@ window.GVT = {
   camOwn(v){ if(v!==undefined) S.camOwn=!!v; return !!S.camOwn; },   // v2.09: the pan claim — read or set it from the rig
   roomPos(){ return JSON.parse(JSON.stringify(META.roomPos||{})); },   // v2.12: the room arrangement, for the battery's eyes
   roomsState(){ return { cur:roomCur(), own:(META.rooms&&META.rooms.own||[]).slice(), gone:Array.from(ROOF_GONE), byGift:!!META.byGift, byLvl:BY_FREE_LVL, ship:decOwns('ship'), shipSeen:META.decorSeen.indexOf('ship')>=0, mvDay:META.mvDay||0, winLvl:WIN_GIFT_LVL, roofLvl:ROOF_GIFT_LVL }; },   // 0528: + the room gifts' rungs and the moving-day latch   // 0363: + the free-backyard gift ledger and the ship, for the battery's eyes   // v3.06: the rooms aisle, for the battery's eyes
-  mvDayState(){ return { latch:META.mvDay||0, due:mvDayDue(), quiet:mvDayQuiet(), staged:!!MVDAY.tid, armed:MVDAY.armed|0, hand:MVDAY.hand? (MVDAY.geo||true) : false, glove:FHAND.ok, handEl:!!document.getElementById('mvHand'), dest:SHIP_DEST, trv:SHIPTRV, cur:roomCur() }; },   // 0528: the moving-day stager, for the battery's eyes · 0566: glove = the FHAND bake landed; hand = the standing glove's {w,h,k,tip:[x,y]} (true when it stands bare — the !FHAND.ok ring)
+  mvDayState(){ return { latch:META.mvDay||0, due:mvDayDue(), quiet:mvDayQuiet(), staged:!!MVDAY.tid, armed:MVDAY.armed|0, hand:MVDAY.hand? (MVDAY.geo||true) : false, glove:FHAND.ok, handEl:!!document.getElementById('mvHand'), dest:SHIP_DEST, trv:SHIPTRV, cur:roomCur(), ride:mvDayRide() }; },   // 0568: + ride = the ride the hand would press · 0528: the moving-day stager, for the battery's eyes · 0566: glove = the FHAND bake landed; hand = the standing glove's {w,h,k,tip:[x,y]} (true when it stands bare — the !FHAND.ok ring)
   paintState(){ return { owed:paintRiteOwed(), open:paintRiteIsOpen(), lvl:PAINT_GIFT_LVL, dyes:(META.dyes||[]).slice(), on:META.dyeOn||null, gift:META.dyeGift||null, price:dyePrice(), paid:dyePaid(), base:DYE_BASE, step:PAINT_ESCALATOR, sel:PAINTRITE.sel===undefined? null : PAINTRITE.sel }; },   // 0529: the paint ceremony + the escalator's paid read, for the battery's eyes
   rdecState(){ return JSON.parse(JSON.stringify({ cur:roomCur(), rooms:ownedRooms(), rdec:META.rdec, pos:META.roomPosR, seen:META.rdecSeen, ship:META.rdecShip, v:META.rdecV||0, trv:SHIPTRV })); },   // 0330a: the room-linked floor, for the battery's eyes
   meta(){ return JSON.parse(JSON.stringify(META)); },
