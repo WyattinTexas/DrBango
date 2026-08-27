@@ -29240,7 +29240,15 @@ const ELITE_TOP=200;   // D1: the ladder's second summit — the scene's nextL, 
 //             (v1.40's parity with the STOCK rifleman); the delta Wyatt sees is THE BAKER RIFLE's 3 m (ENH_BAK_RNG 84) that every campaign-100 save owns
 //             (the 0481 boot heal) → 198+84 = 282. spawnFoe stamps f.rngAdd = rifleRng − def.rng on the elite ladder's tanrifle alone (the generator's
 //             groups AND the sally columns inherit), frng adds it LAST — the Baker's own additive grammar. ⚑ 198 = the stock cell (no change) · 0 = off.
-const ELITE_STRENGTH={ premium:1.15, hpSlope:0.01, cntSlope:0.012, cntCap:2.2, rate0:0.90, rateFloor:0.70, bossFloor:2.21, tankFrom:50, hpX:2, rifleRng:282 };
+//   rankFloor= 0583 THE LEVEL-60 LAW (design/elite-campaign-0827/00-DESIGN.md; Wyatt 8/27 03:25: "Elite forces levels need to be alot harder. Think level 60
+//             versions of all their units"): the roster the elite army is priced against is NEVER under a rank-60 roster's — eliteUp() = max(the
+//             player's own owned mean, upMulR at rankFloor = 3.199) — so a rank-0 finisher meets men ×3.2 (×1.15 ×2 THE MUSCLE: a 15-hp rifle at
+//             101, 29 at 200) and a maxed roster still meets men a little better than its own (the premium stands above the floor). 0 = the 0497 reader alone.
+//   bossFloor 2.21 → 1.8 (0583): under THE LEVEL-60 LAW hpMul−1 starts at 2.68 for every roster (it was 0.98 for a rank-9 one), so the old floor priced a boss ×13.8 at 101 where 0497 meant ×6.3 — 1.8 keeps
+//             0497's boss-to-infantry proportion at the new floor (THEIR SARGE 400 at 101, the rex 3,100 at 200 for every roster; the pristine dealt a rank-100 roster 3,577 there).
+//   crateX  = 0583 THE LONGER SIEGE: THEIR TOY BOX on an elite rung holds ×crateX (936 at 101 → 1554 at 200; the 2%/level law under it stands) — the raze clock is the level's
+//             real clock (0498 §1.3): at ×1 a twenty-man line razed 101-120 by wave 3 of 7 with the kit still in the queue; ×1.3 lands waves 4-5 on every rung. 1 = the 0497 crate.
+const ELITE_STRENGTH={ premium:1.15, hpSlope:0.01, cntSlope:0.012, cntCap:2.2, rate0:0.90, rateFloor:0.70, bossFloor:1.8, tankFrom:50, hpX:2, rifleRng:282, rankFloor:60, crateX:1.3 };
 // THE CADENCE (D6): k%5 = SEMI-BOSS (the officer-class carousel + a small escort) · k%10 = BIG BOSS (the monster
 // carousel + his guard, a jeep, and from k=tankFrom a wedge tank; the bar) · 200 = THE LAST STAND reprised at elite
 // strength (⚑ a new finale = card 0498's page). Built BY FORMULA — the curated twenty are card 0498's design.
@@ -29302,6 +29310,55 @@ function campBaseRung(n){ return n>100? n-100 : n; }
 // D4's rank reader (⚑ alt readers: the fielded mix at deploy · META.lvl). ⚠ a co-op seat reads ITS OWN ranks — the
 // referee's verdict is the truth (the old-build-ally precedent: sims may differ, the host's cfg decides the crate).
 function eliteUpAvg(){ const L=ownedUnits(); if(!L.length) return 1; let s=0; for(const t of L) s+=upMul(t); return s/L.length; }
+// ===== 0583 THE ELITE CAMPAIGN (design/elite-campaign-0827/00-DESIGN.md; Wyatt 8/27 03:25, from the phone, verbatim:
+// "Elite forces levels need to be alot harder. Think level 60 versions of all their units. Occasionally give the enemies
+// gear and snipers, commanders, interesting units. Balance levels 101-200 accordingly.") — three laws on the 0497 machine,
+// every number ONE cell (⚑ Wyatt's page):
+//   THE LEVEL-60 LAW — eliteUp(): the elite army is priced as a RANK-60 roster at the least (ELITE_STRENGTH.rankFloor).
+//   THE KIT — eliteKitPass(): a post-build pass over an elite rung's PLAIN waves on the rung's OWN dice (an LCG seeded on
+//   n — zero R(), so the generator's own draws never move; boss waves, pieces, the tease opener and the finale stand as
+//   THE CADENCE dealt them): an ACE at the head of the biggest rank (the elite tan classes of 0117 — snipers weigh
+//   double), a SNIPER NEST on a flank lane, a COMMANDER (the officer's aura on a rank that had none, his radioman deeper),
+//   GEAR on one squad a wave (THE PLATE — ×plateHp with a drawn chest plate · THE SANDBAGS — a gun crew dug in takes
+//   bullets at bagsSoak, shells bypass · THE LONG TUBE — the rockets reach +tubeRng), and on a plain rung's heavy beat ONE
+//   of the interesting rows below (every name a shipped key ×7; a guest boss priced by hpX, the bar with no card — the
+//   L15 mid-wave-pig idiom). The first hundred never enters (n>100 alone); co-op sims agree (n seeds the dice).
+const ELITE_KIT={ from:3, ace:0.30, aceW:{ tansniper:2, tanshotgun:1, tanpistol2:1, tanflame:1 }, nest:0.22, nestN:2, nestN3:999, officer:0.35, radio:0.3, radioFrom:20,
+  gear:0.30, plateHp:1.5, bagsSoak:0.6, tubeRng:90, special:0.45, specialFrom:4, guestHpX:0.45 };   // every rate is PER WAVE (~7 waves a rung): a nest on one wave in five, an ace on one in three, a commander on one in three, gear on one in three, a special on half the plain rungs
+const ELITE_SPECIALS=[   // "interesting units" — the heavy beat of a plain rung wears one of these (fresh objects; infantry rides c(), armor and guests raw)
+  (c,k)=>({ name:'THE COMMANDER', special:1, groups:[{f:'boss',t:'tancommander',n:1,e:'right',at:0,hpX:ELITE_KIT.guestHpX},{f:'redcoat',t:'tanrifle',n:c(5),e:'right',at:2.0,officer:true},{f:'column',t:'tanrifle',n:c(3),e:'right-top',at:3.5}] }),   // THEIR COMMANDER mid-level: his plate, his aura driving the rank behind him
+  (c,k)=>({ name:'THE MARKSMEN', special:1, groups:[{f:'creep',t:'tanrifle',n:c(5),e:'right',at:0},{f:'line',t:'tansniper',n:c(2),e:'right-top',at:2.6},{f:'line',t:'tansniper',n:c(2),e:'right-bottom',at:2.6}] }),   // the long rifles on BOTH lanes behind a creeping screen
+  (c,k)=>({ name:BOSSDEF.tansarge.wave, special:1, groups:[{f:'boss',t:'tansarge',n:1,e:'right',at:0,hpX:ELITE_KIT.guestHpX},{f:'line',t:'tanrifle',n:c(6),e:'right',at:2.0,elite:'tanpistol2'}] }),   // THEIR SARGE mid-level, the ace at the line's head
+  (c,k)=>({ name:'THE HEAVY TANK', special:1, groups:[{f:'wedge',t:'tank',n:1,e:'right',at:0,escort:c(4),officer:true},{f:'guerrilla',t:'crawler',n:c(3),e:'right-bottom',at:3.0}] }),   // a wedge under an officer, crawlers on the low rim
+  (c,k)=>({ name:'THE JEEP PARADE', special:1, groups:[{f:'solo',t:'jeep',n:1,e:'right-top',at:0},{f:'column',t:'tanrifle',n:c(4),e:'right-top',at:1.5,elite:'tanpistol2'},{f:'solo',t:'jeep',n:1,e:'right-bottom',at:4},{f:'column',t:'tanrifle',n:c(4),e:'right-bottom',at:5.5,officer:true}] }),
+  (c,k)=>({ name:'THE ROCKET TEAM', special:1, groups:[{f:'column',t:'tanrifle',n:c(5),e:'right',at:0,officer:true},{f:'line',t:'tanbazooka',n:c(2),e:'right',at:2.4,kit:'tube'}] }),   // the tubes, with THE LONG TUBE
+  (c,k)=>({ name:'THE MORTAR BATTERY', special:1, groups:[{f:'line',t:'tanrifle',n:c(6),e:'right',at:0,officer:true,kit:'plate'},{f:'line',t:'tanmortar',n:c(2),e:'right',at:2.0}] }),   // an armored screen in front of the mortars
+  (c,k)=>({ name:'THE GUN LINE', special:1, groups:[{f:'column',t:'tanrifle',n:c(4),e:'right',at:0},{f:'line',t:'tanmg',n:c(5),e:'right',at:2.0,elite:'tanflame',kit:'bags'}] })   // the gun crews DUG IN behind sandbags, a flame at the head (0498's finale row, with THE SANDBAGS)
+];
+function eliteUp(){ const ES=ELITE_STRENGTH; return Math.max(eliteUpAvg(), ES.rankFloor>0? upMulR('rifleman', ES.rankFloor) : 0); }   // THE LEVEL-60 LAW's reader — the owned mean or the rank floor, whichever is stronger
+function eliteKitPass(cfg,n,c){
+  const k=n-100, K=ELITE_KIT; if(k<K.from) return;
+  let s9=((n*2654435761)>>>0)^0x5bd1e995; const E=()=>{ s9=(Math.imul(s9,1103515245)+12345)>>>0; return s9/4294967296; };   // the rung's own dice — never R() (the v1.40 nothing-moves-a-seed law)
+  const FORM=/^(column|line|redcoat|crescent|creep|vee|push)$/, inf=t=>t==='tanrifle'||t==='tanmg';   // the shapes an attachment rides (spawnGroup's officer/radio/elite seats)
+  const last=cfg.waves.length-1;
+  if(k%5!==0 && k>=K.specialFrom && last>=2 && E()<K.special){ const row=ELITE_SPECIALS[Math.floor(E()*ELITE_SPECIALS.length)%ELITE_SPECIALS.length]; cfg.waves[last-1]=row(c,k); }   // THE SPECIAL takes the heavy beat (the slot the generator's HEAVIES draw)
+  for(let i=0;i<=last;i++){ const w=cfg.waves[i]; if(!w||w.tease||w.piece||w.boss||w.infest||w.special) continue;
+    const G=w.groups||[], forms=G.filter(g=>FORM.test(g.f)&&inf(g.t)&&(g.n|0)>=3); if(!forms.length) continue;
+    const big=forms.slice().sort((a,b)=>(b.n|0)-(a.n|0))[0];
+    if(!big.elite && E()<K.ace){ let tot=0; for(const t in K.aceW) tot+=K.aceW[t]; let r=E()*tot; for(const t in K.aceW){ r-=K.aceW[t]; if(r<=0){ big.elite=t; break; } } if(!big.elite) big.elite='tansniper'; }   // THE ACE
+    const noOff=forms.filter(g=>!g.officer); if(noOff.length && E()<K.officer){ const g=noOff[Math.floor(E()*noOff.length)%noOff.length]; g.officer=true; if(k>=K.radioFrom && !g.radio && E()<K.radio) g.radio=true; }   // THE COMMANDER (+ his radioman deeper)
+    if(E()<K.gear){ const cand=G.filter(g=>FORM.test(g.f)&&!g.kit&&(g.t==='tanrifle'||g.t==='tanmg'||g.t==='tanbazooka')); const crew=cand.filter(g=>g.t!=='tanrifle'); const pool=crew.length? crew : cand; if(pool.length){ const g=pool[Math.floor(E()*pool.length)%pool.length]; g.kit= g.t==='tanmg'? 'bags' : g.t==='tanbazooka'? 'tube' : 'plate'; } }   // THE GEAR — one squad a wave; a gun crew or a rocket team takes it first when the wave fields one (the rotation deals them rarely — the plate would take every roll)
+    if(E()<K.nest) G.push({f:'solo',t:'tansniper',n:(k>=K.nestN3? K.nestN+1 : K.nestN),e:E()<0.5?'right-top':'right-bottom',at:1.5});   // THE NEST — snipers on a flank lane
+  }
+}
+function eliteKitStamp(f,kit){ f.kit=kit; const K=ELITE_KIT;   // spawnGroup's seat: the squad's own men wear the gear
+  if(kit==='plate') f.hp=f.hpMax=Math.max(1,Math.round(f.hpMax*K.plateHp));
+  else if(kit==='tube') f.rngAdd=(f.rngAdd||0)+K.tubeRng;   // frng adds it LAST (0520's own additive grammar)
+}
+function eliteKitCensus(cfg){ const r={ ace:{}, nests:0, officers:0, radios:0, kits:{}, special:null, waves:cfg.waves.length };   // the rig's read (GVT.elite) — product-inert
+  for(const w of cfg.waves){ for(const g of (w.groups||[])){ if(g.elite) r.ace[g.elite]=(r.ace[g.elite]||0)+1; if(g.officer) r.officers++; if(g.radio) r.radios++; if(g.kit) r.kits[g.kit]=(r.kits[g.kit]||0)+1; if(g.f==='solo'&&g.t==='tansniper') r.nests+=(g.n|0); }
+    if(w.special) r.special=w.name; }
+  return r; }
 const BOSS_PAIR={ giant:'rollpig', rollpig:'rex', rex:'giant' };
 // the rungs where the drama spikes: every cycle boss + every set piece
 function campBossRung(n){ if(n>100) return (n-100)%5===0; return (n>=3 && n%3===0) || !!SET_PIECES[n]; }   // 0497: past 100 the drama spikes every 5 (D6) — this test is %5 alone, semi and big alike; the every-10 BIG BOSS tease is campTease's (0563 THE ATLAS SWEEPS) — the ×3 rhythm is OFF in elite
@@ -29549,7 +29606,7 @@ function levelCfg(n){
   // cut); the finale is re-cut by THE CADENCE at the foot. n≤100 never
   // enters — the first hundred is byte-still. =====
   if(n>100){
-    const k=n-100, ES=ELITE_STRENGTH, up=eliteUpAvg();
+    const k=n-100, ES=ELITE_STRENGTH, up=eliteUp();   // 0583 THE LEVEL-60 LAW: the owned mean, never under a rank-60 roster's (ELITE_STRENGTH.rankFloor)
     cfg.hpMul  = ES.premium*up*(1+ES.hpSlope*(k-1));
     cfg.cntMul = Math.min(ES.cntCap, (1+ES.cntSlope*(k-1))*(spike?1.08:breather?0.92:1));
     cfg.bossF  = ES.bossFloor*(1+ES.hpSlope*(k-1));
@@ -29557,6 +29614,7 @@ function levelCfg(n){
     cfg.hpX    = ES.hpX;        // 0520 THE MUSCLE: ×2 on every elite foe at spawnFoe's one seat (bosses too — the doubled bar); a cfg without the seat is ×1
     cfg.rifleRng= ES.rifleRng;  // 0520 THE REACH: the elite tan rifle's trigger + halt reach (spawnFoe's stamp on tanrifle alone)
     cfg.terrain= levelCfg(campBaseRung(n)).terrain;
+    cfg.terrain.night=1;   // 0583 THE NIGHT CARPET (Wyatt 8/27 ~10:15: "Elite forces in game background should be different than the originals. So it feels more like elite forces campaign"): every elite rung fights after dark — the ONE writer of terrain.night (the one-reader law that guards terrain.ground, extended: nightField() reads it, drawRug paints it); the base rung's terrain is a fresh object every call, so the flag never reaches a rung under 100
   }
   const c=x=>Math.max(1,Math.round(x*cfg.cntMul));
   // v1.40: the set is FINITE — the list IS the level. L1 stays the hand-
@@ -30515,6 +30573,7 @@ function levelCfg(n){
       cfg.waves[last]={ name:BOSSDEF[bt].wave, boss:bt, groups:[{f:'boss',t:bt,n:1,e:'right',at:0},{f:'redcoat',t:'tanrifle',n:c(6),e:'right',at:3.0,officer:true}] };
     }
   }
+  if(n>100) eliteKitPass(cfg,n,c);   // 0583 THE KIT — the last word on an elite rung's plain waves (after THE CADENCE: the finale, every boss/piece wave and the tease opener stand as dealt)
   return cfg;
 }
 const WLADY_FROM=36;   // 0478 WESTERN ROAD 7/8: the first rung THE LADIES ride the drawn THIN TAN LINE (the debut law: L35's piece premieres them, the band after carries them; the tanpistol2-at-26 adjutant precedent); 0 = the rotation off (every 36-50 line byte-what-it-was)
@@ -37275,6 +37334,7 @@ function deckField(){ return !!(S.cfg && S.cfg.terrain && S.cfg.terrain.ground==
 // snowField's gate, never a blanket snowField widen: the falling flakes and
 // the winter terrain painters stay snow's alone.
 function lightField(){ return snowField() || deckField(); }
+function nightField(){ return !!(S.cfg && S.cfg.terrain && S.cfg.terrain.night); }   // 0583 THE NIGHT CARPET — the elite ladder fights after dark (terrain.night: written by levelCfg's n>100 branch alone, the one-reader law); the pale-kit rims stay lightField's — the night is DARK ground
 // v2.94 THE LAWN COMPROMISE IS CONDITIONAL (Wyatt 8/10: "If any of the players
 // are playing as green… keep it this new paler green color. If the green
 // character is not in the level… display its original color. We like that
@@ -37632,7 +37692,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.85';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.86';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -46092,6 +46152,7 @@ function hurt(f,dmg,src){
     f.cmdBlkN=(f.cmdBlkN||0)+1;
     S.fx.push({k:'ring',x:f.x,y:f.y-18,r:4,R:22,t:0,dur:0.2,col:'#C9D2D8'}); SFX.thock(); return; }
   if(src && src.type==='flame' && f.def.sno) dmg*=FLAME_SNOW_X;   // 0318: fire beats snow — the licks and the combustion stub alike
+  if(!S.bf && f.kit==='bags' && (f.mgRootT>0 || (f.form&&f.form.halted))) dmg*=ELITE_KIT.bagsSoak;   // 0583 THE SANDBAGS: a gun crew dug in (rooted for the burst, or halted in rank) takes bullets at bagsSoak — shells bypass (splash never asks; the saber/commander law)
   dmg=counterDmg(f,dmg,src);   // v1.40: a jeep hull shrugs the long rifle and the blade
   if(S.bf && f.side && (f.cmdWallT>0 || cmdWallTry(f))) cmdWallSkid(f);   // 0510 THE STONE WALL on the battleground: the hp funnel's own arm, fenced to a sided unit (a campaign f here is always a tan foe) — the very next line soaks the arming round too
   dmg*=enhSoakM(f)*hatSoakM(f,src);   // 0556 THE ADVENTURER'S / THE FURRY HAT: half from their classes (deterministic, D14) · 0408 THE INTAKE SCALAR: the BF hp funnel — the medic's plate pays half, the AMBUSH spy pays ×1.1; bullets, shells, mines, bites, fire beats and every dino kit machine land through THIS door
@@ -46776,7 +46837,7 @@ function bfUnitStep(u,dt){
 // ⚑ a 200 cell is one row here). QUIET MERCY and the co-op sqEnemyMul
 // multiply on top at the two readers, byte-what-they-were.
 const CAMP_CRATE_X={ 1:1.5, 2:1.5, 3:1.5, 4:1.5, 5:1.5, 99:1.4, 100:2 };   // ⚑ one cell each (1 = the shipped crate) · 0552a THE BOX ALARM (D2): the young crate holds ×1.5 so the HALF mark (BOX_ALARM) lands INSIDE the W3→W4 gap with ~180-195 hp still on the boards — on the shipped 240 the half-mark was W3's own push frame and the finale's rifles reached a 20 hp crate. ⚑ Wyatt's playtest dial, one cell per rung
-const CAMP_BASE_HP=n=>Math.round(240*(1+0.02*(Math.max(1,n)-1))*(CAMP_CRATE_X[n]||1));  // L1 240×1.5=360 · L2 367 · L3 374 · L4 382 · L5 389 (0552a) · L6 264 … L98 706 · L99 710×1.4=995 · L100 715×2=1430
+const CAMP_BASE_HP=n=>Math.round(240*(1+0.02*(Math.max(1,n)-1))*(CAMP_CRATE_X[n]||(n>100? ELITE_STRENGTH.crateX : 1)));   // 0583 THE LONGER SIEGE: an elite crate holds ×crateX (the table's own rows first; every rung ≤100 byte-what-it-was)  // L1 240×1.5=360 · L2 367 · L3 374 · L4 382 · L5 389 (0552a) · L6 264 … L98 706 · L99 710×1.4=995 · L100 715×2=1430
 const CAMP_SIEGE_CD=2.0;      // one whack every two seconds per man at the crate
 // ⚠ THE WRECKING CREW — measured, not guessed: siege damage scales with
 // HEADCOUNT × cadence, so a rebuying commander walked TEN men over and deleted
@@ -54209,6 +54270,7 @@ function spawnGroup9(g){
     // army changed; the duel posse's stamps are its first customer)
     if(g.hpX) foe.hp=foe.hpMax=Math.max(1,Math.round(foe.hpMax*g.hpX));
     if(g.spdx) foe.spdMul=+g.spdx||1;
+    if(g.kit && o.t===g.t) eliteKitStamp(foe,g.kit);   // 0583 THE KIT: the squad's own men wear the gear (the officer, the radio and the ace at the head ride bare)
     if(g.rim) foe.rimIn=1;   // 0519 THE RIM LAW rides the group (L90's added tubes): the park shelf walks a stamped tube ON before it may hold him
     form.members.push(foe);
   });
@@ -59124,6 +59186,37 @@ function drawDeckShip(WD,HT){
     cx.fillText(''+rem, M, 438); cx.textAlign='left'; }
   cx.restore();
 }
+// ===== 0583 RIDER THE NIGHT CARPET (design/elite-campaign-0827/00-DESIGN.md §N; Wyatt 8/27 ~10:15: "Elite forces in game
+// background should be different than the originals. So it feels more like elite forces campaign-and not the same old") —
+// every elite rung fights AFTER DARK in the door screen's own palette (eliteHeroURI's midnight diorama, 0826 D6, approved):
+// the frame to slate, the plain rug to the diorama's ground (its slate folds as the pile lines), the costume bands (snow ·
+// sand · grass · roof) under a moon wash, and THE WINDOW LIGHT — one soft moonlight parallelogram cast across the mat from
+// the top-left, the one bright note. Zero strings, zero sim: paint only, read through nightField(). ⚑ every cell:
+const ELITE_NIGHT={ frame:'#12101c', edge:'#0b0a14', line:'#26345a', field:'#141b2c', pile:'#1c2742', pileA:0.35, dot:'#0b0f1c',
+  washBy:{ snow:['#4a5f9a',0.25], grass:['#0f1a38',0.62], sand:['#0f1a38',0.58], roof:['#0f1a38',0.60] },   // THE CONTRAST GATE (the 0826 pillow-floor law) set each band's wash: the snow keeps its luminance (a moonlit blue at 0.25 holds the tan figure's 1.5 bar; 0.42 sank it to 1.2), the lawn goes DEEP at night (LAWN_DEEP under the wash — the pale lawn had no headroom for the tan at all), the desert and the roof take the plain wash
+  light:'159,184,255', lightA:0.10, lightW:0.40, skew:18, runShade:'rgba(10,16,34,0.55)', run:'#3a4a72', beam:0, beamA:0.07 };   // beam:1 = the door screen's two searchlights sweep the mat (OFF: measure the frame cost under 400 figures first)
+function drawNightRug(WD,HT){ const N=ELITE_NIGHT;   // the plain rug's night arm — the shipped arm's own geometry in the midnight set
+  cx.fillStyle=N.field; cx.fillRect(56,56,WD-112,HT-112);
+  cx.globalAlpha=0.5; cx.fillStyle=N.dot;
+  [[112,112],[WD-112,112],[112,HT-112],[WD-112,HT-112]].forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
+  cx.globalAlpha=N.pileA; cx.strokeStyle=N.pile; cx.lineWidth=2;
+  for(let y=90;y<HT-60;y+=56){ cx.beginPath(); cx.moveTo(30,y); cx.lineTo(WD-30,y); cx.stroke(); }
+  cx.globalAlpha=1;
+}
+function drawNightLight(WD,HT,ground){ const N=ELITE_NIGHT, fw=WD-112, fh=HT-112, wb=ground? N.washBy[ground] : null;   // after the arm, before the runner: the costume band's own wash + the window light on every night rung
+  cx.save(); cx.beginPath(); cx.rect(56,56,fw,fh); cx.clip();
+  if(wb){ cx.globalAlpha=wb[1]; cx.fillStyle=wb[0]; cx.fillRect(56,56,fw,fh); cx.globalAlpha=1; }
+  const w0=fw*N.lightW, sk=Math.tan(N.skew*Math.PI/180)*fh;
+  const g=cx.createLinearGradient(56,0,56+w0+sk,0);
+  g.addColorStop(0,'rgba('+N.light+','+N.lightA+')'); g.addColorStop(0.55,'rgba('+N.light+','+(N.lightA*0.5).toFixed(3)+')'); g.addColorStop(1,'rgba('+N.light+',0)');
+  cx.fillStyle=g; cx.beginPath(); cx.moveTo(56,56); cx.lineTo(56+w0,56); cx.lineTo(56+w0+sk,56+fh); cx.lineTo(56+sk,56+fh); cx.closePath(); cx.fill();
+  if(N.beam){   // the searchlights: two tapered beams sweeping slowly from lamps at the mat's foot (the diorama's beam(), on the battle clock — deterministic, never RNG in a draw call)
+    for(const B of [[WD*0.86,HT-60,0.0],[WD*0.30,HT-60,2.1]]){ const a=-Math.PI/2+Math.sin(S.t*0.22+B[2])*0.5, L=Math.hypot(WD,HT), x1=B[0]+Math.cos(a)*L, y1=B[1]+Math.sin(a)*L, nx=-Math.sin(a), ny=Math.cos(a);
+      const gb=cx.createLinearGradient(B[0],B[1],x1,y1); gb.addColorStop(0,'rgba(232,240,255,'+N.beamA+')'); gb.addColorStop(1,'rgba(201,218,255,0)');
+      cx.fillStyle=gb; cx.beginPath(); cx.moveTo(B[0]+nx*6,B[1]+ny*6); cx.lineTo(x1+nx*70,y1+ny*70); cx.lineTo(x1-nx*70,y1-ny*70); cx.lineTo(B[0]-nx*6,B[1]-ny*6); cx.closePath(); cx.fill(); }
+  }
+  cx.restore();
+}
 function drawRug(){
   if(S.momRaid){ drawRoomFloor(); drawMomToys(); return; }   // v1.79: the mom fight is fought on the floorboards, not a rug — 0140: her props sit on the boards (ground layer, under every figure)
   const WD = S.bf? WORLD_W : W;      // the battlefield is two carpets wide
@@ -59133,15 +59226,16 @@ function drawRug(){
   // near-identical luminance (1.08:1 — measured, which is why greens vanished);
   // #63251C sits below EVERY army colour, so green reads 1.9:1, tan 4.6:1, and
   // even the BLACK army keeps its old separation (1.3:1, was 1.35).
-  cx.fillStyle='#63251C'; cx.fillRect(0,0,WD,HT);
-  cx.strokeStyle='#4A1A12'; cx.lineWidth=56; cx.strokeRect(0,0,WD,HT);
-  cx.strokeStyle='#8F4634'; cx.lineWidth=7; cx.strokeRect(42,42,WD-84,HT-84);
+  const night=nightField();   // 0583 THE NIGHT CARPET: the elite ladder's rugs after dark — the frame to slate here, the field by its arm below, the wash + THE WINDOW LIGHT after the arm
+  cx.fillStyle=night?ELITE_NIGHT.frame:'#63251C'; cx.fillRect(0,0,WD,HT);
+  cx.strokeStyle=night?ELITE_NIGHT.edge:'#4A1A12'; cx.lineWidth=56; cx.strokeRect(0,0,WD,HT);
+  cx.strokeStyle=night?ELITE_NIGHT.line:'#8F4634'; cx.lineWidth=7; cx.strokeRect(42,42,WD-84,HT-84);
   const snow=snowField(), sand=sandField(), grass=grassField(), roof=roofField(), lair=lairField(), deck=deckField(), qlt=quiltField();   // 0303 (0524: + the quilt)
   // v2.94: the lawn recipe is chosen per frame — pale while any fielded army
   // would hide on the deep green, the original deep lawn otherwise (the law
   // and both recipes live at lawnPale/LAWN_DEEP). Stable in practice: dyes
   // and seat deals are fixed once a battle starts.
-  const gLawn = grass? (lawnPale()? LAWN_PALE : LAWN_DEEP) : null;
+  const gLawn = grass? ((lawnPale() && !night)? LAWN_PALE : LAWN_DEEP) : null;   // 0583 THE NIGHT CARPET: after dark the lawn is the DEEP original under a moon wash (the pale lawn's 1.5:1 tan budget had no headroom for a wash — measured)
   if(snow){
     // THE SNOW LIES ON THE RUG — the carpet frame is deliberately kept, which is
     // what makes this a toy-box blizzard rather than a different game. The field
@@ -59324,6 +59418,8 @@ function drawRug(){
     cx.globalAlpha=0.5; cx.fillStyle='#170D08';
     cx.fillRect(42,42,WD-84,14); cx.fillRect(42,HT-56,WD-84,14);
     cx.globalAlpha=1;
+  } else if(night){
+    drawNightRug(WD,HT);   // 0583: the plain carpet's night — every plain elite rung
   } else {
     cx.globalAlpha=0.5; cx.fillStyle='#4A1A12';
     [[112,112],[WD-112,112],[112,HT-112],[WD-112,HT-112]].forEach(p=>{ cx.beginPath(); cx.arc(p[0],p[1],13,0,7); cx.fill(); });
@@ -59331,6 +59427,7 @@ function drawRug(){
     for(let y=90;y<HT-60;y+=56){ cx.beginPath(); cx.moveTo(30,y); cx.lineTo(WD-30,y); cx.stroke(); }
     cx.globalAlpha=1;
   }
+  if(night) drawNightLight(WD,HT, S.cfg.terrain.ground||null);   // 0583: the costume band takes its own moon wash (ELITE_NIGHT.washBy), every night rug the window light — after the arm, before the runner and every terrain painter
   if(S.bf){
     // the halfway chalk line, and the no-drop strip either side of it that stops
     // anyone parachuting a spawn ghost straight into the enemy line.
@@ -59356,8 +59453,8 @@ function drawRug(){
       cx.lineCap='round'; cx.globalAlpha=0.35;
       if(qlt&&!PF_PATCH){ const ta9=bayOn()? BAY_TRAIL : PF_TRAIL_A; if(ta9>0){ cx.globalAlpha=ta9; cx.strokeStyle=PF_C[1]; cx.lineWidth=70; pathStroke(); } }   // 0826 THE PILLOW FLOOR: the worn path — the sheet's own shade, one faint band (the tan runner smeared the cream; 00-FEEDBACK §2 D-P3) · 0573 THE BAY: the slept-in dent at BAY_TRAIL (the lit sheet wants a lighter foot)
       else {
-      cx.strokeStyle=snow?'rgba(90,110,134,0.45)':sand?'rgba(70,26,10,0.5)':grass?'rgba(38,52,28,0.55)':'rgba(60,30,24,0.5)'; cx.lineWidth=84; pathStroke();
-      cx.strokeStyle=snow?'#D7E1EC':sand?'#7A3318':grass?'#B99B62':'#D9C4A0'; cx.lineWidth=70; pathStroke();   // 8/8: the lawn wears a worn dirt track
+      cx.strokeStyle=snow?'rgba(90,110,134,0.45)':sand?'rgba(70,26,10,0.5)':grass?'rgba(38,52,28,0.55)':night?ELITE_NIGHT.runShade:'rgba(60,30,24,0.5)'; cx.lineWidth=84; pathStroke();   // 0583: the plain night rug's worn path is a moonlit path (the costume bands keep their own road)
+      cx.strokeStyle=snow?'#D7E1EC':sand?'#7A3318':grass?'#B99B62':night?ELITE_NIGHT.run:'#D9C4A0'; cx.lineWidth=70; pathStroke();   // 8/8: the lawn wears a worn dirt track
       }
       cx.globalAlpha=1; cx.restore();
     }
@@ -63071,6 +63168,24 @@ function tanAimTell(f){
   cx.beginPath(); cx.moveTo(f.x-mz[0],f.y-mz[1]); cx.lineTo(tg.x,tg.y-18); cx.stroke();   // 0353: the prone sniper's muzzle rides the dirt
   cx.globalAlpha=1;
 }
+// 0583 THE KIT's tell — drawn over the plain tan figure (the molds face −x; a +x walk mirrors, drawFoe's own flip seat)
+function drawFoeKit(f,wbk){ const K=f.kit, w=f.def.w, h=w*(140/120), dir=wbk?1:-1;
+  if(K==='plate'){   // THE PLATE — a dark chest plate over the tunic, a pale rim catching the light, two straps to the shoulders
+    const pw=w*0.22, ph=w*0.17, px=f.x-dir*w*0.01, py=f.y-h*0.31;
+    cx.fillStyle='#2b2b30'; cx.fillRect(px-pw/2,py-ph/2,pw,ph);
+    cx.strokeStyle='#8a8a96'; cx.lineWidth=1.5; cx.strokeRect(px-pw/2+0.75,py-ph/2+0.75,pw-1.5,ph-1.5);
+    cx.beginPath(); cx.moveTo(px-pw/2+2,py-ph/2); cx.lineTo(px-pw/2-2,py-ph/2-5); cx.moveTo(px+pw/2-2,py-ph/2); cx.lineTo(px+pw/2+2,py-ph/2-5); cx.stroke();
+  } else if(K==='bags'){   // THE SANDBAGS — three bags stacked low in front of the gun (the foxhole kit's own idiom, tan edition)
+    const bx=f.x+dir*w*0.46, by=f.y-2;
+    cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(bx,by+4,18,5,0,0,7); cx.fill();
+    cx.fillStyle='#b39a66'; cx.strokeStyle='#6b5a38'; cx.lineWidth=1.5;
+    for(const o of [[-8,0],[8,0],[0,-7]]){ cx.beginPath(); cx.ellipse(bx+o[0],by+o[1],9,5,0,0,7); cx.fill(); cx.stroke(); }
+  } else if(K==='tube'){   // THE LONG TUBE — the rocket tube runs on past the muzzle, a red band at the extension
+    const tx=f.x+dir*w*0.12, ty=f.y-h*0.60;
+    cx.lineCap='round'; cx.strokeStyle='#3a2c1c'; cx.lineWidth=5; cx.beginPath(); cx.moveTo(tx,ty); cx.lineTo(tx+dir*w*0.36,ty+2); cx.stroke();
+    cx.strokeStyle='#C05A4A'; cx.beginPath(); cx.moveTo(tx+dir*w*0.22,ty+1.2); cx.lineTo(tx+dir*w*0.29,ty+1.6); cx.stroke(); cx.lineCap='butt';
+  }
+}
 function drawFoe(f){
   if(f.falling){ drawFaller(f, foeImg(f.type), f.def.w, false); return; }   // 8/8 v2.76 the long drop, tan edition
   const wbk=wkBack(f,-1);   // v3.61 (0307 WALK-FLIP): the tan molds face -x — a fresh +x walk mirrors the figure (halted strikes decay to the army facing in WKF_HOLD, so every standing tell sits where it always did)
@@ -63346,6 +63461,7 @@ function drawFoe(f){
       cx.beginPath(); cx.arc(g9.x,g9.y,6+2.5*Math.sin(S.t*14),0,7); cx.fill(); cx.globalAlpha=1; }
   } else
   drawSprite(f.type,f.x,f.y-(f.hopZ||0),f.def.w,0,wob+croakRc(f),crFire(f)||crFlinch(f)||foeImg(f.type),wbk);   // 8/25 THE FIRING FACE: the little king's storm stance outranks his flinch   // v2.53: the yeti's bound lifts the BODY only — his shadow stays on the ground where the contact circle lives (v3.61: + the walk-flip seat; 0382: + the little king's volley recoil rock, zero for everyone else)
+  if(f.kit) drawFoeKit(f,wbk);   // 0583 THE KIT's tell — the plate, the sandbags, the long tube
   // 0117 THE SNIPER'S TELL — the fairness contract for the 205 reach: a long
   // aim (def.aim >= 1) draws its line for the whole wind-up, pointed at the
   // same man tanPick will hand the trigger, so you can SEE it and move him.
@@ -85170,7 +85286,7 @@ window.GVT = {
     return { n, elite:n>100, k:n>100? n-100:0, base:b, top:ELITE_TOP, up:+eliteUpAvg().toFixed(4), axes:{ hpMul:+cfg.hpMul.toFixed(4), cntMul:+cfg.cntMul.toFixed(4), bossF:+cfg.bossF.toFixed(4), rateMul:+cfg.rateMul.toFixed(4), hpX:cfg.hpX||1, rifleRng:cfg.rifleRng||0 },
       spike:campBossRung(n), breather:campBreather(n), tease:campTease(n), marquee:campTeaseMarquee(n), wc:cfg.waves.length, finale:{ name:last.name, boss:last.boss||null, piece:!!last.piece, kinds:last.groups.map(g=>g.f+':'+g.t+':'+(g.f==='wedge'?1:g.n)+(g.escort?'+e'+g.escort:'')).join(' ') },
       bodies:cfg.waves.map(w=>w.groups.reduce((j,g)=>j+(g.f==='wedge'?1:(g.n||1))+(g.escort||0)+(g.officer?1:0)+(g.radio?1:0)+(g.elite?1:0),0)), names:cfg.waves.map(w=>w.name),
-      ground:cfg.terrain.ground||null, rocks:cfg.terrain.rocks.length, river:cfg.terrain.river? cfg.terrain.river.x : null, grand:CAMP_GRAND[b]|0, dress:!!CAMP_DRESS[b], name:LEVEL_NAMES[b-1]||'', prizes:Object.keys(ELITE_PRIZES), led:Object.assign({},eliteLed()), strength:Object.assign({},ELITE_STRENGTH) }; },   // 0539: + the prize ledger
+      night:!!cfg.terrain.night, kit:eliteKitCensus(cfg), ground:cfg.terrain.ground||null, rocks:cfg.terrain.rocks.length, river:cfg.terrain.river? cfg.terrain.river.x : null, grand:CAMP_GRAND[b]|0, dress:!!CAMP_DRESS[b], name:LEVEL_NAMES[b-1]||'', prizes:Object.keys(ELITE_PRIZES), led:Object.assign({},eliteLed()), strength:Object.assign({},ELITE_STRENGTH) }; },   // 0539: + the prize ledger
   sqPlan(p,n){ const cfg=levelCfg(n||(META.campaign+1)); sqScaleCfg(cfg, p||1);
     return { level:n||(META.campaign+1), players:p||1, mul:+sqEnemyMul(p||1).toFixed(3),
       waves:cfg.waves.length, foes:cfg.waves.reduce((k,w)=>k+w.groups.reduce((j,g)=>j+(g.n||0)+(g.escort||0),0),0),
