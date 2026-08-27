@@ -1864,6 +1864,13 @@
   .sh-tk b { color:#8A2A1E; }
   .shc-yes:active, .shc-no:active { transform:scale(0.97); }
   .shc-yes:disabled { opacity:0.55; }   /* the arm-delay beat — a double-tap's tail lands on a sleeping button */
+  /* 0577 THE FITTING ROOM (D2 — Wyatt: "your Sarge on the left should be wearing it, and the player can see that, not blocked
+     by the prompt"): the OUTFIT ask's veil steps aside — shopTryPlace lands its left edge on the stage column's own measured
+     right edge (never a literal here), the host goes pointer-transparent so the man stays hit-testable, and the card slims to
+     fit right of the 29% column on a 812×375 phone. Scoped to .shc-try — every other confirm keeps the full veil above. */
+  #shConfirm.shc-tryhost { pointer-events:none; }
+  #shConfirm.shc-tryhost .shc-veil.shc-try { pointer-events:auto; }
+  .shc-veil.shc-try .shc-card { width:min(66vw,420px); }
   @media (prefers-reduced-motion: reduce){ .shc-card.pop { animation:none; } }
   /* the door out, the hanging shop sign, the plaques, the register */
   .sh-bar { position:relative; z-index:3; flex:0 0 auto; display:flex; align-items:center;
@@ -24696,6 +24703,15 @@ function outfitFit(){ return OUTFIT_ORDER.reduce((n,id)=>n+(outfitOn(id)?1:0),0)
 // v3.27: the exclusive partner steps off before a new piece goes on (OUTFIT_EXCL above)
 function outfitExClear(id){ const ex=OUTFIT_EXCL[id]; if(!ex) return;
   for(const e of ex){ const w=META.outfit.wear||[], j=w.indexOf(e); if(j>=0) w.splice(j,1); } }
+// 0577 THE FITTING ROOM (D1 — Wyatt: "please add in the ability to preview
+// what an item looks like before you purchase"): the stage's try-on list —
+// the wardrobe as WORN with the candidate on and its exclusive partners
+// stepped off (outfitExClear's own rule, read without writing). The array
+// rides outfitDress's 0411 wear door, so an unowned piece can dress the
+// SHOP STAGE ONLY — the save, the sim and every other surface still read
+// META.outfit.wear.
+function wearWith(id){ const ex=OUTFIT_EXCL[id]||[];
+  return (META.outfit.wear||[]).filter(w=>ex.indexOf(w)<0).concat([id]); }
 
 // ===== v2.36 THE HIDDEN STATS (Wyatt 8/4 eve, patch 4 of 6, verbatim: "Add
 // hidden stats to the equipment. I know we have stats in there already, but
@@ -24734,7 +24750,7 @@ const OF_SCOUT_DMG=2, OF_SCOUT_M=3*TK_M, OF_SCOUT_RATE=0.04;   // SCOUT ARMOR: +
 // executor dials, one const per number). The boots beat the 90-star pair on
 // purpose: more armor at the same march cost (0562: +10 vs +6) — a prize should out-fit the shelf.
 const OF_SNOWHAT_DEF=0.14,  OF_SNOWHAT_RNG=0.03;   // SNOW HAT: +14% armor · −3% reach (0562 — Wyatt: "raise Snow Hat's defense to be, let's say, 14%")
-const OF_CROWN_RNG=0.05, OF_CROWN_DEF=0.05, OF_CROWN_SPD=0.05;   // 0327 THE KING'S CROWN: +5% reach · +5% armor · marches 5% slower (0562 — Wyatt: "Maybe it should just add 5%, 5%, 5%. I just don't want Snow Hat to be completely irrelevant that fast"; reach at the cap)
+const OF_CROWN_STARS=0.05, OF_CROWN_DEF=0.05, OF_CROWN_SPD=0.05;   // 0327 THE KING'S CROWN: +5% stars from wins · +5% armor · marches 5% slower (0577 — Wyatt: "please remove the plus range from the crown decor item and replace it with 5% more stars"; the reach seat is GONE, the crown pays at gearStarMul's ONE seat now — the platform's own stars grammar)
 const OF_SNOWJKT_DEF=0.18,  OF_SNOWJKT_SPD=0.06;   // SNOW JACKET: +18% armor (the best plate in the game — yeti = the armor lane) · marches 6% slower (0562)
 const OF_SNOWBOOT_DEF=0.10, OF_SNOWBOOT_SPD=0.02;  // SNOW BOOTS: +10% armor · marches 2% slower (0562)
 // v3.35 TP-03 THE SAFARI SET (earned at the dino park; §8 — safari leans
@@ -24951,7 +24967,7 @@ function lensLines2(id){ const p=lensPct;
   if(id==='snowhat')    return ['+'+p(OF_SNOWHAT_DEF)+'% armor',  '−'+p(OF_SNOWHAT_RNG)+'% reach'];
   if(id==='snowjacket') return ['+'+p(OF_SNOWJKT_DEF)+'% armor',  'marches '+p(OF_SNOWJKT_SPD)+'% slower'];
   if(id==='snowboots')  return ['+'+p(OF_SNOWBOOT_DEF)+'% armor', 'marches '+p(OF_SNOWBOOT_SPD)+'% slower'];
-  if(id==='kingcrown')  return ['+'+p(OF_CROWN_RNG)+'% reach', '+'+p(OF_CROWN_DEF)+'% armor', 'marches '+p(OF_CROWN_SPD)+'% slower'];
+  if(id==='kingcrown')  return ['+'+p(OF_CROWN_STARS)+'% stars from wins', '+'+p(OF_CROWN_DEF)+'% armor', 'marches '+p(OF_CROWN_SPD)+'% slower'];   // 0577: the reach row is the STARS row now (the platform's own {0}-form key, ×7 already; ▲ by the lensDn grammar — no "slower", no leading minus)
   if(id==='safarihat')     return ['+'+p(OF_SAFHAT_RNG)+'% reach', '−'+p(OF_SAFHAT_DEF)+'% armor'];
   if(id==='explorervest')  return ['marches '+p(OF_EXPVEST_SPD)+'% faster', '−'+p(OF_EXPVEST_DEF)+'% armor'];
   if(id==='explorerboots') return ['marches '+p(OF_EXPBOOT_SPD)+'% faster', '−'+p(OF_EXPBOOT_DEF)+'% armor'];
@@ -25036,7 +25052,7 @@ function gearMoveMul(u){
 // save reads only, so your platform never fattens an ally's purse; the ladder
 // books (bfRecord.s), the daily-raid calendar purse and HQ's own first-win
 // bonus stay raw — one tune per purse, never across them (the v1.28 law).
-function gearStarMul(){ return (outfitOn('platform')?1+OF_PLAT_STARS:1)*(META.laserOn==='gold'?1+LZ_GOLD_STARS:1); }
+function gearStarMul(){ return (outfitOn('platform')?1+OF_PLAT_STARS:1)*(outfitOn('kingcrown')?1+OF_CROWN_STARS:1)*(META.laserOn==='gold'?1+LZ_GOLD_STARS:1); }   // 0577: the crown joins the stars pipe (multiplicative — the product law, ⚑ Q5; every payout reads gearStarX)
 function gearStarX(n){ return Math.max(0, Math.round(n*gearStarMul())-n); }   // the quiet extra, whole stars
 function gearXpMul(){ return outfitOn('platform')? 1-OF_PLAT_XP : 1; }
 // v3.27 SCOUT ARMOR's longshot plate — read at the three GUN sites off the
@@ -25175,11 +25191,9 @@ function outfitTune(b){
     if(b.rng!=null)   b.rng*=1+OF_SAFHAT_RNG;
     if(b.aggro!=null) b.aggro*=1+OF_SAFHAT_RNG;
   }
-  // 0327 THE KING'S CROWN: the summit trophy — the king sees the whole field
-  if(outfitOn('kingcrown')){
-    if(b.rng!=null)   b.rng*=1+OF_CROWN_RNG;
-    if(b.aggro!=null) b.aggro*=1+OF_CROWN_RNG;
-  }
+  // 0327 → 0577 THE KING'S CROWN: the reach seat is GONE (Wyatt: "remove the
+  // plus range") — the crown pays +5% STARS at gearStarMul's one seat instead;
+  // its armor (dM) and march (sM) below are byte-what-they-were.
   // 0556 BEAR PARK — THE PRIZES: the tunes that ride the bag (the four hats'
   // specials never do — they read the worn list at the funnels, sargeOfU).
   if(outfitOn('kingbearhat')){   // KING BEAR'S HAT (Wyatt: "10% faster March, +10% damage, +5% Armor") — damage here, the march + the armor at sM/dM below
@@ -33586,13 +33600,13 @@ function outfitDress(art, wk, wear){
   if(head) s+='<g transform="translate('+st[0]+','+st[1]+')">'+head+'</g>';
   return s;
 }
-function sargeWepURI(wk, bodyHex, bladeHex, vb){
+function sargeWepURI(wk, bodyHex, bladeHex, vb, wear){   // 0577: + the optional wear pass-through (the fitting room's try — every shipped caller passes nothing, byte-identical URIs)
   // SARGE'S OUTFITS (v2.16): every owned-by-YOU portrait dresses through this
   // one door — the room, the academy, the picker, the case, the reveal cards,
   // the briefing and the shop rack can never disagree about what he's wearing.
   // The Tan mirrors read SARGE_ART directly and every other figure rides
   // sprURI, so no enemy, ally or AI figure can ever borrow your wardrobe here.
-  const art = outfitDress(SARGE_ART[wk] || SPRITES_SRC.sarge, wk);
+  const art = outfitDress(SARGE_ART[wk] || SPRITES_SRC.sarge, wk, wear);   // 0577: absent = MY wardrobe (outfitOn), byte-what-it-was
   const body = art.split('currentColor').join(bodyHex||'#7FA35C').split('BLADEHEX').join(bladeHex||saberHex());
   return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+(vb||'0 0 120 140')+'">'+body+'</svg>');
 }
@@ -33613,7 +33627,7 @@ function sargeArtW(wk){
 // victory man on the toy box, the YOUR FIGURE card), so no surface can
 // disagree with the war table's own flank about what's in his hands.
 // sargeWepURI already defaults the blade to saberHex() — the crystal rides.
-function menuSargeURI(hex){ return sargeWepURI(sargeArtW(META.sargeWeapon||'pistol'), hex); }
+function menuSargeURI(hex, wear){ return sargeWepURI(sargeArtW(META.sargeWeapon||'pistol'), hex, undefined, undefined, wear); }   // 0577: + the optional wear pass-through (the fitting room's try)
 // THE HARDWARE GLYPH (FM-GVT-SARGERACK-01): the bare portrait cropped to the
 // iron — one drawing, two framings (outfitPartSVG's law). NOT outfitDress: a
 // worn vest/helmet intrudes into the crop (mock v2 proved it). The body's
@@ -37629,7 +37643,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.80';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.81';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -79809,7 +79823,7 @@ function renderShop(){
       // knows."): the how-to counsel line is CUT too — the department stands
       // on its header and the man in the mirror. Six l10n rows went with it.
       +'<section class="sh-dept" id="shOutfit"><h2>SARGE\'S OUTFITS<small>DRESS THE MAN · WEAR IT OR LEAVE IT IN THE FOOTLOCKER</small></h2>'
-        +'<div class="sh-oshelf"><div class="sh-oroom"><img src="'+menuSargeURI(dyeHex()||undefined)+'" alt=""><div class="sh-ostand"></div>'+shopWrackHTML()+'</div>'
+        +'<div class="sh-oshelf"><div class="sh-oroom"><img src="'+menuSargeURI(dyeHex()||undefined, shopTryLive()? wearWith(SHOP_TRY) : undefined)+'" alt=""><div class="sh-ostand"></div>'+shopWrackHTML()+'</div>'   // 0577: a rebuild mid-question keeps the TRY on the stage (shopTryLive is false on every plain render — the byte-same URI)
         +'<div class="sh-ocards">'+OUTFIT_ORDER.map(shopOutfitHTML).join('')+'</div></div>'
         +'</section>'
       // v2.42 (Wyatt 8/5): the v2.40 CURIO SHELF dept is GONE — the MAGIC LENS
@@ -79875,6 +79889,7 @@ function renderShop(){
   a.addEventListener('scroll', shopScroll, {passive:true});
   shopJump(SHOP.tab, false);
   for(const k in keptY){ const d=document.getElementById(k); if(d) d.scrollTop=keptY[k]; }
+  shopTryPlace();   // 0577: the rebuild door — measured AFTER the aisle lands (shopJump)
 }
 // Which department you're standing in front of, from where the aisle stopped.
 function shopScroll(){
@@ -79915,7 +79930,7 @@ function shopJump(id, smooth){
   if(!smooth) a.style.scrollBehavior='';
   shopMarkTabs(id);
 }
-function shopRefresh(){ if(shopIsOpen()) renderShop(); }
+function shopRefresh(){ if(SHOP_TRY && !shopTryLive()) SHOP_TRY=null; if(shopIsOpen()) renderShop(); }   // 0577: a refresh with no standing outfit ask drops a stale try (the 0320 rebuild-mid-question door KEEPS a live one)
 // no dead disabled buttons: the price tag shakes its head and clacks at you
 function shopDeny(id){
   SFX.clack();
@@ -79936,6 +79951,7 @@ function shopDeny(id){
 // the very next ask, so no path exists on which one confirm spends twice.
 let SHOP_CONFIRM=null;   // the ONE open card: {k,verb,args,cost,name,t}
 let SHOP_ARMED='';       // the one-shot blessing the next ask consumes
+let SHOP_TRY=null;       // 0577 THE FITTING ROOM: the outfit id the stage is trying on while its ask stands (transient — never saved; cleared at shopCardClose, the deny branches and a no-ask shopRefresh)
 const CONFIRM_ARM_MS=450;   // BUY IT sleeps through the card's first beat, so the
 // ===== 0544 THE BUY ANYTHING TICKET (FM-GVT-GIFTS-01 §2 · elite 190; Wyatt:
 // "Pick any item or upgrade in Sarge's Surplus and you may purchase it with
@@ -79976,7 +79992,7 @@ function shopConfirmHTML(){
   const c=SHOP_CONFIRM; if(!c) return '';
   const hold=(Date.now()-c.t)<CONFIRM_ARM_MS? ' disabled' : '';
   const tk=ticketHeld() && c.verb!=='roomBuy', poor=META.starBank<c.cost;   // 0544: the ticket door (never for a room); BUY IT! sleeps while the piggy is short
-  return '<div class="shc-veil" onclick="UI.confirmNo(event)"><div class="shc-card">'
+  return '<div class="shc-veil'+(shopTryLive()?' shc-try':'')+'" onclick="UI.confirmNo(event)"><div class="shc-card">'   // 0577: the outfit ask's veil steps aside (shopTryPlace measures its left edge); every other verb = the full veil, byte-what-it-was
     +'<span class="shc-ask">SURE ABOUT THIS ONE, SOLDIER?</span>'
     +'<b class="shc-name">'+c.name+'</b>'
     +'<span class="shc-line">'+tf('IT COSTS %1★.','<b>'+c.cost+'</b>')+'</span>'
@@ -79986,6 +80002,43 @@ function shopConfirmHTML(){
     +(tk? '<button type="button" class="shc-tk" onclick="UI.confirmTicket()"><span>🎫 USE THE TICKET</span></button>' : '')   // 0544: the ticket door
     +'<button type="button" class="shc-no" onclick="UI.confirmNo()"><span>NOT TODAY</span></button>'
     +'</div></div>';
+}
+// ===== 0577 THE FITTING ROOM (FM-GVT-FITTING-ROOM-01; Wyatt 8/26 ~22:00 ET:
+// "please add in the ability to preview what an item looks like before you
+// purchase. When you click the poncho, your Sarge on the left should be
+// wearing it, and the player can see that, not blocked by the prompt.") =====
+// THE TRY-ON: while an outfit's SURE-ABOUT-THIS card stands, the man on the
+// outfits stage wears the asked piece (wearWith → outfitDress's 0411 array
+// door — the shop stage ONLY; the save and the sim never read it) and the
+// veil steps aside so he shows. shopTryOn paints the try and shopTryClear
+// hands back the REAL wardrobe (both through the stage's one menuSargeURI
+// line); shopTryPlace carves the veil: its left edge = the stage column's
+// own right edge, MEASURED (getBoundingClientRect, never a second literal),
+// the #shConfirm host pointer-transparent so the man stays hit-testable.
+// Scoped to the OUTFIT verb — every other confirm keeps the full veil
+// byte-what-it-was. (An OWNED tap still toggles free with no card, and an
+// unowned park/elite prize still hides — the 0274c law; the eight priced
+// pieces are the cards that ask.)
+function shopTryLive(){ return !!(SHOP_TRY && SHOP_CONFIRM && SHOP_CONFIRM.verb==='outfit'); }
+function shopTryOn(id){
+  SHOP_TRY=id;
+  const im=document.querySelector('#shOutfit .sh-oroom img');
+  if(im) im.src=menuSargeURI(dyeHex()||undefined, wearWith(id));
+}
+function shopTryClear(){
+  if(!SHOP_TRY) return;
+  SHOP_TRY=null;
+  const im=document.querySelector('#shOutfit .sh-oroom img');
+  if(im) im.src=menuSargeURI(dyeHex()||undefined);   // the stage's own line — the real wear
+}
+function shopTryPlace(){
+  const host=document.getElementById('shConfirm'); if(!host) return;
+  const v=host.querySelector('.shc-veil'); if(!v) return;
+  const st=shopTryLive()? document.querySelector('#shOutfit .sh-oroom') : null;
+  if(!st){ host.classList.remove('shc-tryhost'); v.classList.remove('shc-try'); v.style.left=''; return; }
+  const hr=host.getBoundingClientRect(), sr=st.getBoundingClientRect();
+  host.classList.add('shc-tryhost'); v.classList.add('shc-try');
+  v.style.left=Math.max(0, Math.round(sr.right-hr.left))+'px';
 }
 // wake BUY IT when the arm beat has passed — called by BOTH card doors (the
 // direct show and a renderShop rebuild), so the window rides the ASK's own
@@ -80004,11 +80057,13 @@ function shopCardShow(){
   if(!el){ el=document.createElement('div'); el.id='shConfirm'; sh.appendChild(el); }
   el.innerHTML=shopConfirmHTML();   // the hooked setter localizes the card
   shopCardArm();
+  shopTryPlace();   // 0577: the try veil's edge measured with the card in the DOM (the direct door)
   const cd=el.querySelector('.shc-card');   // a re-ask on the same row pops it again
   if(cd){ cd.classList.remove('pop'); void cd.offsetWidth; cd.classList.add('pop'); }
 }
 function shopCardClose(){
   SHOP_CONFIRM=null;
+  shopTryClear();   // 0577: every exit through this door (cancel · buy · ticket · scene change · a shut store) hands the stage back its real wardrobe
   const el=document.getElementById('shConfirm'); if(el){ try{ el.remove(); }catch(e){} }
 }
 // ===== THE MAGIC LENS IN HAND (v2.40) =====
@@ -83366,8 +83421,9 @@ window.UI = {
   outfit(id){
     if(!OUTFIT_INFO[id]) return;
     if(!outfitOwns(id)){
-      if(OUTFIT_EARN[id] || OUTFIT_EARN_MEGA[id]){ shopDeny('shof-'+id); return; }   // 0556: the MEGA lane's piece is never for sale either · v3.33 TP-02: an earned piece is never for sale — the park ladder is the only door (and a priceless buy would subtract undefined into NaN)
-      if(META.starBank<OUTFIT_COST[id] && !ticketHeld()){ shopDeny('shof-'+id); return; }   // 0544
+      if(OUTFIT_EARN[id] || OUTFIT_EARN_MEGA[id]){ shopTryClear(); shopDeny('shof-'+id); return; }   // 0556: the MEGA lane's piece is never for sale either · v3.33 TP-02: an earned piece is never for sale — the park ladder is the only door (and a priceless buy would subtract undefined into NaN)
+      if(META.starBank<OUTFIT_COST[id] && !ticketHeld()){ shopTryClear(); shopDeny('shof-'+id); return; }   // 0544 · 0577: a deny clears any stale try
+      shopTryOn(id);   // 0577 THE FITTING ROOM (D1): BEFORE the ask — the stage wears the piece for the whole question (the card steps aside via shc-try); cancel/deny restore through shopTryClear, a confirmed buy re-renders the REAL wear through shopRefresh below
       if(!shopAsk('outfit',[id],OUTFIT_COST[id],OUTFIT_INFO[id].name)) return;   // 0320
       META.starBank-=till(OUTFIT_COST[id]);
       META.outfit.own.push(id); outfitExClear(id); META.outfit.wear.push(id); SFX.coin();   // v3.27: a buy wears it — the exclusive partner steps off first (one head, one chest)
@@ -84254,7 +84310,7 @@ window.GVT = {
   // the tuned bag and the payout multipliers. Nothing here prints anywhere a
   // player can see; this is the harness's own door.
   outfit(){ return { stars:META.starBank, own:(META.outfit.own||[]).slice(),
-    wear:(META.outfit.wear||[]).slice(), fit:outfitFit(), bag:sargeStats(),
+    wear:(META.outfit.wear||[]).slice(), try:SHOP_TRY, fit:outfitFit(), bag:sargeStats(),
     starMul:+gearStarMul().toFixed(4), xpMul:+gearXpMul().toFixed(4),
     prices:OUTFIT_ORDER.map(id=>id+':'+OUTFIT_COST[id]+(outfitOwns(id)?(outfitOn(id)?' WORN':' OWNED'):'')) }; },
   // ===== ROOM DECORATIONS RIG =====
