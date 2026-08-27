@@ -37622,7 +37622,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.77';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.78';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -49914,7 +49914,7 @@ function gsnowTick(f,dt){
     }
     return;
   }
-  if(f.shot>=f.def.fireCd*tkSlowMul(f)){
+  if(f.shot>=f.def.fireCd*tkSlowMul(f)+(f.cdAdd||0)){   // 0574 THE ULTRA MEGA TUNE II: + the per-foe cdAdd (the 'u' room's Sergeant Snowman: 4.5 → 10.5 s between volleys; every unstamped thrower reads +0 — byte-behaviour); the statue re-ask below untouched
     const m=tanPick(f);
     if(m){ const dx=m.x-f.x, dy=m.y-f.y, d=Math.hypot(dx,dy)||1;
       f.gsDir={x:dx/d,y:dy/d}; f.gsWind=sb.wind; }
@@ -53935,6 +53935,7 @@ function spawnGroup9(g){
       //   kyx  → the king's TK wheel clock  ·  swx → his melee re-arm
       //   sbn  → boulders per volley (gsnowTick's fan)
       //   ret  → the retreat floor (hitCheck clamps; raidKingStands opens)
+      //   cdAdd → f.cdAdd (0574: + seconds on gsnowTick's volley clock) · hopOn → f.hopOn (0574: the halt-to-hurl yields to the hop)
       if(f && g.spdx) f.spdMul=+g.spdx||1;
       if(f && g.rngx) f.rngX=+g.rngx||1;
       if(f && g.conex) f.coneX=+g.conex||1;   // 0357 MEGA REX: the breath's arc doubles (tanMulti's one cone read)
@@ -53943,6 +53944,8 @@ function spawnGroup9(g){
       if(f && g.kyx)  f.kyx=+g.kyx||1;
       if(f && g.swx)  f.swx=+g.swx||1;
       if(f && g.sbn)  f.sbn=Math.max(1,g.sbn|0);
+      if(f && g.cdAdd) f.cdAdd=+g.cdAdd||0;   // 0574 THE ULTRA MEGA TUNE II: seconds ADDED to this boss's volley cooldown — gsnowTick's one read (the 'u' room's Sergeant Snowman rides EV_SNOW_CD_ADD; every unstamped thrower reads +0)
+      if(f && g.hopOn) f.hopOn=1;             // 0574: the march chain's halt-to-hurl yields to the AIR_GAIT hop for THIS foe alone ("They should be hopping forward") — he plants only for the wind-up
       if(f && g.ret!=null) f.retFloor=+g.ret;
       // 0340 KING CROAK's tier stamps: dmgX scales every pip his rounds
       // carry (tanHit's one read), fanCd/fanR re-seat his twin-pistol cone
@@ -56955,7 +56958,7 @@ function update(dt){
       // dead zone. hasGreenTarget asks reach only (no dead-zone filter), so
       // a man UNDER the tube still pins him here: a 2-hp statue that cannot
       // shoot — the mortar's authored weakness, by construction.
-    } else if(f.def.snowboulder && f.x<W-60 && hasGreenTarget(f)){   // 0305 BF-02: re-keyed on the FIELD (the 0117 capability law) — gsnowman AND sgtsnow; the stego carries def.boulder, not this
+    } else if(f.def.snowboulder && f.x<W-60 && hasGreenTarget(f) && (!f.hopOn || f.gsWind>0)){   // 0574 THE ULTRA MEGA TUNE II: a hopOn Sergeant ("They should be hopping forward") keeps the march below — the halt takes him only for the wind-up (gsWind>0: planted for the hurl, airB 0, then he hops on); every unstamped thrower reads the shipped halt · 0305 BF-02: re-keyed on the FIELD (the 0117 capability law) — gsnowman AND sgtsnow; the stego carries def.boulder, not this
       // 0514 THE ROLL-IN (Wyatt 8/23: "SERGEANT SNOWMAN is not coming out"): the halt asks
       // for his WHOLE cell on the carpet FIRST (f.x<W-60 — the croak brain's own rim: the
       // march walks him ON, then the field is his). Shipped since 0305 the shelf read
@@ -74147,7 +74150,9 @@ const RAID_TAGS=240;                           // opening dog tags — three pha
 const ELITE_RAID_TAGS=60;                      // 0539 THE ELITE SHELF (elite 160; Wyatt: "+60 Dogtags when you play Raids at the start"): the opening purse's gift once rung 160 is on the ledger — every raid family here + the two nightly bells (D24); the bots' EV_BOT_F math never reads it
 const EV_TAGS_ADD=100;                         // 0824-NIGHT THE DEEPER PURSE (Wyatt 8/24 night, after the recorded battle: "let us start with 40 more dog tags") · 0565 THE ULTRA MEGA TUNE (Wyatt 8/25 ~21:25 ET: "give the players 60 more dogtags to use while in the raid as well" — the opening purse is where the 40 landed; +60 = 100): the ULTRA MEGA KING YETI room (tier 'u') opens on RAID_TAGS+100 = 340 (400 with the elite-160 gift) — every other raid/park/campaign purse byte-still; the computers keep RAID_TAGS×EV_BOT_F (120), the faucet its +10. ⚑ 100 (default) · 40 (0824-NIGHT) · 0 (0506) · alt: leave 40 and put the 60 on the faucet (EV_TICK_ADD 10 → 28)
 const EV_TICK_ADD=10;                          // 0824-NIGHT: "ten more dog tags per dog tag tick" — the campaign faucet pours CAMP_TICK+10 = 30 every 10/3 s in the 'u' room only (the float says +30); BF_TICK/CAMP_TICK untouched everywhere else. ⚑ 10 (default) · 0 (0506)
-const EV_HPX={ snowfig:0.5, sgtcold:0.5, syeti:0.25, byeti:0.25, bluepig:0.5 };   // 0565 THE ULTRA MEGA TUNE (FM-GVT-NIGHT-01 §2, design/night-pair-0825/00-DESIGN.md; Wyatt 8/25 ~21:10-21:25 ET verbatim: "in the Ultra Mega Yeti fight, the snowmen mob reduced their HP by 50%. And reduce the first boss, the Sergeant Cold (I think his name is), his HP by 50%." · "Little yetis & big yetis 75% less hp. Piggy banks 50% hp."): the ULTRA MEGA KING YETI room's per-type hp cells — raidCfg's 'u' block stamps each as g.hpX on EVERY group of every wave (the columns/lines/redcoats/guerrillas, the 24 pre-scheduled trk landings AND the boss groups; the count loop's exemptions do not apply) and spawnGroup's shipped hpX seats (the boss/guerrilla/solo branch · the formless second body · the formation groups, 0384) price it POST-CURVE: snowfig 79 → 40 · sgtcold 1,109 → 555 · syeti 12 → 3 (column and landing) · byeti 95 → 24 · bluepig 63 → 32. sgtsnow (1,109), the king (4,210 — ICE_KING_HPADD.u stands) and Sergeant Snowman's five flat-2 split minis carry no cell; RAID_HP_MUL.u / bossF / spawnFoe / FDEF untouched, e/m/h/g cfgs byte-what-they-were. ⚑ one cell each (default) · sgtsnow:0.5 (the alt — "the snowmen mob" read as the snowfig lines only) · every ice tier = an FDEF cut instead (the 0278k/0278l precedent)
+const EV_HPX={ snowfig:0.5, sgtcold:0.5, syeti:0.25, byeti:0.25, bluepig:0.5, sgtsnow:0.5, kingyeti:0.7 };   // 0565 THE ULTRA MEGA TUNE (FM-GVT-NIGHT-01 §2, design/night-pair-0825/00-DESIGN.md; Wyatt 8/25 ~21:10-21:25 ET verbatim: "in the Ultra Mega Yeti fight, the snowmen mob reduced their HP by 50%. And reduce the first boss, the Sergeant Cold (I think his name is), his HP by 50%." · "Little yetis & big yetis 75% less hp. Piggy banks 50% hp."): the ULTRA MEGA KING YETI room's per-type hp cells — raidCfg's 'u' block stamps each as g.hpX on EVERY group of every wave (the columns/lines/redcoats/guerrillas, the 24 pre-scheduled trk landings AND the boss groups; the count loop's exemptions do not apply) and spawnGroup's shipped hpX seats (the boss/guerrilla/solo branch · the formless second body · the formation groups, 0384) price it POST-CURVE: snowfig 79 → 40 · sgtcold 1,109 → 555 · syeti 12 → 3 (column and landing) · byeti 95 → 24 · bluepig 63 → 32. Sergeant Snowman's five flat-2 split minis carry no cell (0574 THE ULTRA MEGA TUNE II — FM-GVT-ULTRA-TUNE-02 design/ultra-tune2-0826/00-DESIGN.md, Wyatt 8/26 ~21:30 ET verbatim: "The second guys need to have about half as much HP" · "the Ultra Mega King Yeti needs to have 30% less HP": sgtsnow 0.5 = 1,109 → 555; kingyeti 0.7 on his WHOLE bar — the pass scales the row's hpAdd by the same cell, 3,010+1,200 = 4,210 → 2,107+840 = 2,947 = ×0.7 exactly, where hpX alone would read −21%); RAID_HP_MUL.u / bossF / spawnFoe / FDEF untouched, e/m/h/g cfgs byte-what-they-were. ⚑ one cell each (default; 0574 spent the sgtsnow:0.5 alt on Wyatt's own word and added the king's 0.7) · every ice tier = an FDEF cut instead (the 0278k/0278l precedent)
+const EV_SNOW_CD_ADD=6;                        // 0574 THE ULTRA MEGA TUNE II (FM-GVT-ULTRA-TUNE-02; Wyatt 8/26 ~21:30 ET: "they need about a 6-second longer cooldown on their snowball throw"): seconds ADDED to SERGEANT SNOWMAN's volley cooldown in the ULTRA ('u') room only — raidCfg's 'u' block stamps W2's sgtsnow boss row g.cdAdd, spawnGroup copies it to f.cdAdd beside the sbn stamp, gsnowTick's ONE read adds it (fireCd 4.5 → 10.5 s between volleys; the volley of RAID_SB_N.u 6 and the 0.7 statue re-ask untouched). NEVER a FDEF edit — f.def IS the shared row (every other room's Sergeant, the giant and the stego read +0, byte-behaviour). ⚑ 6 (default — "6-second longer" taken literally) · 0 (0565) · a flat number = fireCd on a per-foe def copy instead
+const EV_W3_F=0.5;                             // 0574 THE ULTRA MEGA TUNE II (Wyatt 8/26: "there are just too many mobs … that final wave was just way too big. It needs to be about half the size."): the 'u' room's W3 (⚠ KING YETI COMES DOWN THE MOUNTAIN ⚠ — asserted by NAME in the block, never by index) count factor on every NON-boss group INCLUDING the 24 pre-scheduled trk landings (the count loop's kx exempts them; this pass does not): byeti 2 → 1, each landing RAID_TRK_N.u 7 → 4 (Math.round(3.5)) = 96 syeti over the 120 s vs 168; the king's row stands (a party's min(bs,2) stays sqScaleCfg's law, × sqEnemyMul on the rest); W1/W2 byte-what-they-were; e/m/h/g never enter the block. ⚑ 0.5 (default, landing 4) · 0.43 (landing 3, −57%) · 1 (0565)
 const RAID_KING_FCX={ e:1, m:0.8, h:0.65, g:1.25, u:1.25 };    // the per-tier boss mechanic: his one-big-snowball clock tightens (M/H) — 0357 MEGA REX: 3.2×1.25 = a flat 4.0s breath clock (Wyatt: "the cooldown on his flame breath should only be about 4 seconds"; the D2 turn-wait is waived at mega so the clock IS the felt cadence, and the angry return x0.8 lands 3.2s)
 // ===== 0340 KING CROAK'S HIDEOUT — the campaign family's FOURTH door
 // (rk='croak'; gates on OUTLAW TOWN lv>=20, no key, no rite). The duel:
@@ -74778,8 +74783,33 @@ function raidCfg(tier,rk){
       // ask; trk's objects sit in W3's groups, stamped once). g.hpX is v2.48's
       // authored per-group dial, read post-curve at spawnGroup's three hpX seats,
       // multiplied onto any cell a group already carries (no shipped ice row does).
-      // sgtsnow, the king and his flat-2 death-split minis carry no cell.
-      for(const w of cfg.waves) for(const g of w.groups){ const x=EV_HPX[g.t]; if(x) g.hpX=(g.hpX||1)*x; }
+      // the flat-2 death-split minis carry no cell (0574: sgtsnow + the king joined).
+      // 0574 THE ULTRA MEGA TUNE II (FM-GVT-ULTRA-TUNE-02; Wyatt 8/26 ~21:30 ET: "the
+      // Ultra Mega King Yeti needs to have 30% less HP"): a cell on a row that carries
+      // hpAdd (the king's ICE_KING_HPADD[tier] copy — the only shipped ice row) scales
+      // that hpAdd by the same cell, so the cell cuts the WHOLE bar: spawnGroup applies
+      // hpX THEN hpAdd (never reorder those seats), and ×0.7 on the base alone would
+      // read −21%, not Wyatt's 30% (3,010+1,200 = 4,210 → 2,107+840 = 2,947 exactly).
+      // The ROW's copy moves, never the ICE_KING_HPADD table (e/m/h/g read it whole).
+      for(const w of cfg.waves) for(const g of w.groups){ const x=EV_HPX[g.t]; if(x){ g.hpX=(g.hpX||1)*x; if(g.hpAdd) g.hpAdd=Math.round(g.hpAdd*x); } }
+      // 0574 THE ULTRA MEGA TUNE II (Wyatt 8/26 ~21:30 ET: "they need about a 6-second
+      // longer cooldown on their snowball throw. They should be hopping forward."):
+      // W2's SERGEANT SNOWMAN boss row carries the two stamps — cdAdd (EV_SNOW_CD_ADD:
+      // gsnowTick's one read, 4.5 → 10.5 s between volleys; f.def is the shared FDEF
+      // row and never moves) and hopOn (the march chain's halt-to-hurl yields to the
+      // AIR_GAIT hop: he keeps marching while the arm works its own clock, PLANTS only
+      // for the 0.6 s wind-up, hurls, hops on; under minRng 140 tanPick refuses and he
+      // hops into the line and LEAKS — the pressure the ask wants). spawnGroup copies
+      // both beside the sbn stamp; a party's min(bs,2) rows two stamped Sergeants.
+      for(const w of cfg.waves) for(const g of w.groups){ if(g.f==='boss' && g.t==='sgtsnow'){ g.cdAdd=EV_SNOW_CD_ADD; g.hopOn=1; } }
+      // 0574 THE ULTRA MEGA TUNE II ("that final wave was just way too big. It needs to
+      // be about half the size."): W3 alone — asserted by its NAME, never by index —
+      // every non-boss group INCLUDING the 24 trk landings (the count loop above exempts
+      // them; this pass does not) × EV_W3_F: byeti 2 → 1, each landing 7 → 4 = 96 syeti
+      // over the 120 s vs 168. The king's row stands (a party's min(bs,2) stays
+      // sqScaleCfg's law); W1/W2 byte-what-they-were; trk's objects live once, in W3's
+      // groups, so the wave walk stamps each landing exactly once.
+      for(const w of cfg.waves){ if(w.name!=='⚠ KING YETI COMES DOWN THE MOUNTAIN ⚠') continue; for(const g of w.groups){ if(g.f==='boss') continue; g.n=Math.max(1,Math.round((g.n||1)*EV_W3_F)); } }
     }
   }
   return cfg;
@@ -84916,7 +84946,7 @@ window.GVT = {
   nbForce(stamp){ stamp=String(stamp||'forced'); if(!NB.base) NB.base='(rig)'; NB.stamp=stamp; NB.newer=(stamp!==NB.base); NB.last=Date.now(); nbTick(); return GVT.nb(); },
   nbCheck(){ return nbCheck().then(()=>GVT.nb()); },
   bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), band:evBandState(), fielded:(S.bf&&S.bf.bd)? (S.bf.bdN|0) : 0, teamMin:BD_TEAM_MIN, live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, popT:BDD.popT, redealMs:BD_REDEAL_MS, popS:BD_POP_S, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, e:s.empty?1:0, k:s.kit?1:0, n:s.name })) : null, note:BD.note }; },
-  evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, hpx:Object.assign({},EV_HPX), purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read · 0565 THE ULTRA MEGA TUNE: hpx = EV_HPX, the ULTRA room's per-type hp cells (a read-only copy)
+  evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, hpx:Object.assign({},EV_HPX), snowCdAdd:EV_SNOW_CD_ADD, w3F:EV_W3_F, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read · 0565 THE ULTRA MEGA TUNE: hpx = EV_HPX, the ULTRA room's per-type hp cells (a read-only copy) · 0574 THE ULTRA MEGA TUNE II: hpx shows seven cells; + snowCdAdd (EV_SNOW_CD_ADD) and w3F (EV_W3_F)
   evSeen(v){ if(v===0||v===false) delete META.evSeen; else if(v!=null) META.evSeen=String(v); saveMeta(); return META.evSeen||null; },
   nightGate(){ return { open:nightGateOpen(), lvl:NIGHT_MIN_LVL, camp:META.campaign|0, band:evBandState(), door:evDoorState(), bd:bdDoorState(), seen:META.evSeen||null, annWk:EVD.annWk||null, popBell:EVD.popBell|0, bdAnnWk:BDD.annWk||null, bdPopBell:BDD.popBell|0, el:!!document.getElementById('evDoor'), spots:!!document.getElementById('evSpots'), snow:!!document.getElementById('evSnow'), pop:!document.getElementById('milePop').classList.contains('hidden'), band0:(b=>b? b.textContent : null)(document.querySelector('#milePop .mb-band')), head:(h=>h? h.textContent : null)(document.querySelector('#milePop .mb-h')), mode:S.mode }; },   // 0530 THE NIGHT GATE — the rig's one read: the gate, the two door states, the band, the four latches, the DOM
   giftRoad(){ const nx=ptyPickParse('c').nx, b=document.querySelector('.ptySheet:not(.hidden) .pts-toprow .pts-next'); return { camp:META.campaign|0, nx:nx, sign:giftRoadSign(nx), road:GIFT_ROAD.map(r=>({ lvl:r.lvl()|0, key:r.key, owned:!!r.owned() })), card:b? { nu:b.querySelector('.nu').textContent, b:b.querySelector('b').textContent, small:b.querySelector('small').textContent, on:b.classList.contains('on') } : null, lang:LANG }; },   // 0531 THE ROAD SIGNS — the rig's one read: the pick, the sign, every row's rung + owned, the open door's card
