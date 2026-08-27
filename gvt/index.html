@@ -4308,11 +4308,35 @@
      ROLL-OUT west to the seat, THE PIVOT on the spot back to face EAST. Every rule
      lives under #decPlane: the ID-scoped reduced-motion kill parks it for free, and
      the JS never adds a class under reduced motion (the ship's own law). */
-  .dec-plane.travel .wpprop { animation:wpspin 0.11s linear infinite; }
-  .dec-plane.travel .wpdisc { animation:wpdzt 1.5s linear forwards; }
-  @keyframes wpdzt { 0% { opacity:0; } 12%,100% { opacity:0.5; } }
+  /* ===== 0584 THE PLANE FLIES SMOOTH (FM-GVT-WARPLANE-03; Wyatt 8/27 03:42: "looks like it lags when it flies. Make it fly
+     smooth and occasionally he does a fun loop de loop before flying to the next map"): THE FLIGHT LAYER. A CSS transform animated on
+     a <g> inside the 960×600 room svg runs on the MAIN THREAD in WebKit (the iPhone shell, Safari — no layer-based svg engine there):
+     every frame re-walks the svg render tree and re-rasterises the stage under the plane (floorboards, rug, every model the dirty
+     tiles overlap) while frame() draws the canvas behind the room — and the phone drops frames = the lag. (Chrome composites an
+     animated svg element on its own — measured: LayerTree lists .wpw mid-flight — which is why the desktop never showed it.) So the
+     flight moves OUT of the svg for its two legs: #wpfly is an HTML twin of the seat (the wrapper's drag delta + translate(56,250)
+     scale(0.78) rotate(-4) as ONE inline style on .wps), the art in its own 116×64 svg inside .wpa — a real 116×64 box at (-60,-31)
+     whose transform-origin (60px 31px) IS the art's own 0,0, will-change:transform — so BOTH engines hand her to the compositor and
+     the room is never repainted for a frame of it. The SAME keyframes, in the SAME local units (a px inside .wpa = a px inside .wpw =
+     one room unit under the seat's scale), about the SAME origin (the plane's own 0,0): the layer's first frame IS the parked plane
+     and the landing's last frame IS the seat, so the swap in and out is pixel-still. The room's own .wpw HIDES while the layer flies; the GROUND stays in the svg — the shadow fade, the exhaust puffs,
+     the wheel dust — one-shot, small, exactly where they were. THE LOOP-DE-LOOP (WP_LOOP_ODDS of flights, the rig door pins it): the
+     same run-up, taxi and rotate, then past the climb she pulls a full loop over the room — wploop, 24 stops at 15° on a linear
+     clock, drifting forward so she exits ahead of where she entered — and leaves by the same corner; every later beat of
+     planeTravel's clock waits WP_LOOP_MS. Every rule under #wpfly (the ID-scoped RM kill parks it; the JS never builds it under RM). */
+  .dec-plane.travel .wpw, .dec-plane.land .wpw { visibility:hidden; }   /* 0584: the room's plane steps aside while THE FLIGHT LAYER carries her */
   .dec-plane.travel .wppuff { animation:wppf 0.32s ease-out 0.18s 2; }
-  .dec-plane.travel .wpw { animation:wptakeoff 1.5s cubic-bezier(.55,.05,.85,.4) forwards; }
+  .dec-plane.travel > ellipse:first-child { animation:wpshade 0.75s linear forwards; }
+  @keyframes wpshade { from { opacity:0.25; } to { opacity:0; } }
+  #wpfly { position:absolute; left:0; top:0; width:960px; height:600px; overflow:hidden; pointer-events:none; }   /* the svg's own 960×600 viewport, clipped alike */
+  #wpfly .wps { position:absolute; left:0; top:0; width:0; height:0; transform-origin:0 0; }   /* the seat */
+  #wpfly .wpa { position:absolute; left:-60px; top:-31px; width:116px; height:64px; transform-origin:60px 31px; will-change:transform, opacity; }   /* PLANE_VB's box — its origin = the art's 0,0 = the seat */
+  #wpfly .wpa svg { display:block; width:116px; height:64px; overflow:visible; }
+  #wpfly svg > ellipse:first-child { display:none; }   /* the shadow stays on the floor (the room's own, fading at the seat) */
+  #wpfly .wpprop { animation:wpspin 0.11s linear infinite; }
+  #wpfly.travel .wpdisc { animation:wpdzt 1.5s linear forwards; }
+  @keyframes wpdzt { 0% { opacity:0; } 12%,100% { opacity:0.5; } }
+  #wpfly.travel .wpa { animation:wptakeoff 1.5s cubic-bezier(.55,.05,.85,.4) forwards; }
   @keyframes wptakeoff { 0% { transform:translate(0,0) rotate(0) scale(1); opacity:1; }
     7% { transform:translate(1.6px,0.3px) rotate(-0.7deg) scale(1); } 14% { transform:translate(2.4px,-0.3px) rotate(0.4deg) scale(1); }
     20% { transform:translate(26px,1px) rotate(1deg) scale(1); }
@@ -4321,12 +4345,12 @@
     70% { transform:translate(420px,-150px) rotate(-22deg) scale(0.92); }
     86% { opacity:1; }
     100% { transform:translate(1200px,-420px) rotate(-16deg) scale(0.7); opacity:0; } }
-  .dec-plane.travel > ellipse:first-child { animation:wpshade 0.75s linear forwards; }
-  @keyframes wpshade { from { opacity:0.25; } to { opacity:0; } }
-  .dec-plane.land .wpprop { animation:wpspin 0.11s linear 13; }
-  .dec-plane.land .wpdisc { animation:wpdzl 1.75s linear; }
+  #wpfly.travel.loop .wpa { animation:wploop 2.7s linear forwards; }   /* THE LOOP-DE-LOOP: the whole takeoff on one linear clock (the stops carry the pace) */
+  @keyframes wploop { 0% { transform:translate(0px,0px) rotate(0deg) scale(1); opacity:1; } 5.56% { transform:translate(1.6px,0.3px) rotate(-0.7deg) scale(1); } 11.11% { transform:translate(2.4px,-0.3px) rotate(0.4deg) scale(1); } 16.67% { transform:translate(26px,1px) rotate(1deg) scale(1); } 29.63% { transform:translate(78px,-4px) rotate(-6deg) scale(1); } 37.04% { transform:translate(150px,-40px) rotate(-14deg) scale(1); } 46.3% { transform:translate(260px,-24px) rotate(-14deg) scale(1); } 47.99% { transform:translate(286.8px,-33.9px) rotate(-29deg) scale(1); } 49.69% { transform:translate(310.5px,-49.3px) rotate(-44deg) scale(1); } 51.39% { transform:translate(329.9px,-69.2px) rotate(-59deg) scale(1); } 53.09% { transform:translate(344px,-92.3px) rotate(-74deg) scale(1); } 54.78% { transform:translate(352px,-117.2px) rotate(-89deg) scale(1); } 56.48% { transform:translate(353.7px,-142.2px) rotate(-104deg) scale(1); } 58.18% { transform:translate(349.3px,-165.6px) rotate(-119deg) scale(1); } 59.88% { transform:translate(339.5px,-186px) rotate(-134deg) scale(1); } 61.57% { transform:translate(325.2px,-202.1px) rotate(-149deg) scale(1); } 63.27% { transform:translate(307.6px,-212.8px) rotate(-164deg) scale(1); } 64.97% { transform:translate(288.3px,-217.5px) rotate(-179deg) scale(1); } 66.67% { transform:translate(268.9px,-215.8px) rotate(-194deg) scale(1); } 68.36% { transform:translate(251px,-208.1px) rotate(-209deg) scale(1); } 70.06% { transform:translate(236.1px,-195px) rotate(-224deg) scale(1); } 71.76% { transform:translate(225.6px,-177.3px) rotate(-239deg) scale(1); } 73.46% { transform:translate(220.5px,-156.4px) rotate(-254deg) scale(1); } 75.15% { transform:translate(221.4px,-133.7px) rotate(-269deg) scale(1); } 76.85% { transform:translate(228.5px,-111px) rotate(-284deg) scale(1); } 78.55% { transform:translate(241.8px,-89.7px) rotate(-299deg) scale(1); } 80.25% { transform:translate(260.5px,-71.5px) rotate(-314deg) scale(1); } 81.94% { transform:translate(283.8px,-57.7px) rotate(-329deg) scale(1); } 83.64% { transform:translate(310.2px,-49.2px) rotate(-344deg) scale(1); } 85.34% { transform:translate(338.4px,-46.8px) rotate(-359deg) scale(1); } 87.04% { transform:translate(366.7px,-50.6px) rotate(-374deg) scale(1); } 92.59% { transform:translate(700px,-240px) rotate(-377deg) scale(0.9); } 96.3% { opacity:1; } 100% { transform:translate(1200px,-420px) rotate(-376deg) scale(0.7); opacity:0; } }
+  #wpfly.land .wpprop { animation:wpspin 0.11s linear 13; }
+  #wpfly.land .wpdisc { animation:wpdzl 1.75s linear; }
   @keyframes wpdzl { 0%,72% { opacity:0.5; } 88%,100% { opacity:0; } }
-  .dec-plane.land .wpw { animation:wpland 1.75s cubic-bezier(.2,.7,.3,1) both; }
+  #wpfly.land .wpa { animation:wpland 1.75s cubic-bezier(.2,.7,.3,1) both; }
   @keyframes wpland { 0% { transform:translate(1200px,-420px) rotate(-6deg) scale(0.72,0.72) scaleX(-1); opacity:0; }
     10% { opacity:1; }
     45% { transform:translate(560px,-120px) rotate(4deg) scale(0.88,0.88) scaleX(-1); }
@@ -4749,6 +4773,9 @@
     /* the shop cards draw the same art with the same animated classes on it —
        the ID-scoped windows park them too (v1.34) */
     #toyshop .sh-dwin *, #toyshop .sh-nwin *, #toyshop .sh-bwin * { animation:none; }
+    /* 0584 THE FLIGHT LAYER — its rules carry the #wpfly id AND a class, so the shared list above cannot outrank them: the kill
+       is written at each rule's own specificity, after them (the JS never builds the layer under reduced motion anyway) */
+    #wpfly .wpprop, #wpfly.travel .wpdisc, #wpfly.land .wpprop, #wpfly.land .wpdisc, #wpfly.travel .wpa, #wpfly.travel.loop .wpa, #wpfly.land .wpa { animation:none; }
   }
   /* 0392: THE COMET EXCEPTION (Wyatt 8/17: "Shooting star Rug is not properly
      showing shooting stars for a lot of players") — measured root cause: under
@@ -6332,6 +6359,14 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "I always thought I'd seen everything. But in front of you stands the fearsome enemy they call %1.":"لطالما ظننت أنني رأيت كل شيء. لكن أمامك يقف العدو المرعب الذي يسمونه %1.",
 "IN HAND":"في اليد",
 "SECOND SOCKET":"الفتحة الثانية",
+"GARAGE":"المرآب",
+"TREASURES":"الكنوز",
+"ADVENTURES":"المغامرات",
+"RECRUITS":"المجنَّدون",
+"ADVENTURES<small>BUY THE PLACE · YOUR SHIP SAILS YOU THERE</small>":"المغامرات<small>اشترِ المكان · سفينتك تبحر بك إليه</small>",
+"TREASURES<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING · PUT AWAY ANY TIME</small>":"الكنوز<small>اجعل المكان جميلًا · كل قطعة تفعل شيئًا · أبعدها متى شئت</small>",
+"THE BACKYARD IS YOURS. A whole new room! Find it in the ADVENTURES aisle.":"الفناء الخلفي صار لك. غرفة جديدة كاملة! تجده في ممر المغامرات.",
+"THE MAGIC LENS IS YOURS. Level {0} earned it! Pick it up in the TREASURES aisle and go snooping.":"العدسة السحرية صارت لك. المستوى {0} استحقها! التقطها من ممر الكنوز واذهب للتلصص.",
 "ONE COLOR":"لون واحد",
 "THE COLORS MIX":"الألوان تمتزج",
 "IN QUEUE":"في الانتظار",
@@ -9473,6 +9508,14 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "His trusty sidearm — always there, and it empties a magazine faster than anything else on the carpet. Every rank he earns speeds it up and reaches a little further.":"いつでも手もとにあるあいぼう。カーペットでいちばん速くマガジンをからにする。ランクが上がるたびにもっと速く、もうちょっと遠くまでとどくようになるよ。",
 "IN HAND":"てにもってる",
 "SECOND SOCKET":"ふたつめの ソケット",
+"GARAGE":"ガレージ",
+"TREASURES":"たからもの",
+"ADVENTURES":"ぼうけん",
+"RECRUITS":"しんぺい",
+"ADVENTURES<small>BUY THE PLACE · YOUR SHIP SAILS YOU THERE</small>":"ぼうけん<small>ばしょを かおう · ふねが つれていってくれる</small>",
+"TREASURES<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING · PUT AWAY ANY TIME</small>":"たからもの<small>へやをすてきに · どれもなにかしてくれる · いつでもおかたづけできる</small>",
+"THE BACKYARD IS YOURS. A whole new room! Find it in the ADVENTURES aisle.":"うらにわは きみのもの。あたらしい おへやが まるごと！ ぼうけんコーナーで さがしてね。",
+"THE MAGIC LENS IS YOURS. Level {0} earned it! Pick it up in the TREASURES aisle and go snooping.":"まほうのルーペは きみのもの。レベル {0} の ごほうびだ！ たからものコーナーで もちあげて おみせをのぞいてまわろう。",
 "ONE COLOR":"いろは ひとつ",
 "THE COLORS MIX":"いろが まざる",
 "IN QUEUE":"まちうけ中",
@@ -11762,6 +11805,14 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "His trusty sidearm — always there, and it empties a magazine faster than anything else on the carpet. Every rank he earns speeds it up and reaches a little further.":"언제나 곁에 있는 짝꿍. 카펫에서 가장 빠르게 탄창을 비운다. 랭크가 오를 때마다 더 빨라지고 조금 더 멀리까지 닿아!",
 "IN HAND":"손에 들었어",
 "SECOND SOCKET":"두 번째 소켓",
+"GARAGE":"차고",
+"TREASURES":"보물",
+"ADVENTURES":"모험",
+"RECRUITS":"신병",
+"ADVENTURES<small>BUY THE PLACE · YOUR SHIP SAILS YOU THERE</small>":"모험<small>방을 사면 · 배가 데려다줘요</small>",
+"TREASURES<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING · PUT AWAY ANY TIME</small>":"보물<small>방을 멋지게 · 하나하나 뭔가를 해 · 언제든 넣어 둘 수 있어</small>",
+"THE BACKYARD IS YOURS. A whole new room! Find it in the ADVENTURES aisle.":"뒷마당이 네 거야. 새 방 하나가 통째로! 모험 코너에서 찾아봐.",
+"THE MAGIC LENS IS YOURS. Level {0} earned it! Pick it up in the TREASURES aisle and go snooping.":"마법 돋보기가 네 거야. 레벨 {0}이 따낸 거야! 보물 코너에서 집어 들고 구석구석 살펴봐.",
 "ONE COLOR":"한 가지 색",
 "THE COLORS MIX":"색이 섞여요",
 "IN QUEUE":"대기 중",
@@ -14051,6 +14102,14 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "His trusty sidearm — always there, and it empties a magazine faster than anything else on the carpet. Every rank he earns speeds it up and reaches a little further.":"永远在身边的老伙计。它清空弹匣的速度是地毯上最快的。每升一级不但更快，还能打得更远一点。",
 "IN HAND":"握在手里",
 "SECOND SOCKET":"第二个插槽",
+"GARAGE":"车库",
+"TREASURES":"宝物",
+"ADVENTURES":"冒险",
+"RECRUITS":"新兵",
+"ADVENTURES<small>BUY THE PLACE · YOUR SHIP SAILS YOU THERE</small>":"冒险<small>买下地方 · 你的船送你过去</small>",
+"TREASURES<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING · PUT AWAY ANY TIME</small>":"宝物<small>把房间弄漂亮 · 每一件都会动 · 随时可以收起来</small>",
+"THE BACKYARD IS YOURS. A whole new room! Find it in the ADVENTURES aisle.":"后院是你的了。整整一个新房间！去冒险货架找找。",
+"THE MAGIC LENS IS YOURS. Level {0} earned it! Pick it up in the TREASURES aisle and go snooping.":"魔法放大镜是你的了。{0} 级赢来的！去宝物货架拿起来，满店照照看。",
 "ONE COLOR":"一种颜色",
 "THE COLORS MIX":"颜色混合",
 "IN QUEUE":"排队中",
@@ -16340,6 +16399,14 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "His trusty sidearm — always there, and it empties a magazine faster than anything else on the carpet. Every rank he earns speeds it up and reaches a little further.":"Seine treue Zweitwaffe — immer dabei, und sie leert ein Magazin schneller als alles andere auf dem Teppich. Jeder Rang macht sie noch schneller und lässt sie ein Stückchen weiter reichen.",
 "IN HAND":"IN DER HAND",
 "SECOND SOCKET":"ZWEITE FASSUNG",
+"GARAGE":"GARAGE",
+"TREASURES":"SCHÄTZE",
+"ADVENTURES":"ABENTEUER",
+"RECRUITS":"REKRUTEN",
+"ADVENTURES<small>BUY THE PLACE · YOUR SHIP SAILS YOU THERE</small>":"ABENTEUER<small>KAUF DEN ORT · DEIN SCHIFF SEGELT DICH HIN</small>",
+"TREASURES<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING · PUT AWAY ANY TIME</small>":"SCHÄTZE<small>MACH'S HÜBSCH · JEDES EINZELNE MACHT ETWAS · JEDERZEIT WEGRÄUMBAR</small>",
+"THE BACKYARD IS YOURS. A whole new room! Find it in the ADVENTURES aisle.":"DER HINTERHOF gehört dir. Ein ganzes neues Zimmer! Du findest ihn in der ABENTEUER-Abteilung.",
+"THE MAGIC LENS IS YOURS. Level {0} earned it! Pick it up in the TREASURES aisle and go snooping.":"DIE ZAUBERLUPE gehört dir. Level {0} hat sie verdient! Nimm sie in der SCHÄTZE-Abteilung und geh auf Schnüffeltour.",
 "ONE COLOR":"EINE FARBE",
 "THE COLORS MIX":"DIE FARBEN MISCHEN SICH",
 "IN QUEUE":"IN DER WARTESCHLANGE",
@@ -18629,6 +18696,14 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "His trusty sidearm — always there, and it empties a magazine faster than anything else on the carpet. Every rank he earns speeds it up and reaches a little further.":"Верный пистолет — всегда под рукой и опустошает магазин быстрее всех на ковре. С каждым рангом стреляет ещё быстрее и достаёт чуть дальше.",
 "IN HAND":"В РУКЕ",
 "SECOND SOCKET":"ВТОРОЕ ГНЕЗДО",
+"GARAGE":"ГАРАЖ",
+"TREASURES":"СОКРОВИЩА",
+"ADVENTURES":"ПРИКЛЮЧЕНИЯ",
+"RECRUITS":"НОВОБРАНЦЫ",
+"ADVENTURES<small>BUY THE PLACE · YOUR SHIP SAILS YOU THERE</small>":"ПРИКЛЮЧЕНИЯ<small>КУПИ МЕСТО · ТВОЙ КОРАБЛЬ ТЕБЯ ДОСТАВИТ</small>",
+"TREASURES<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING · PUT AWAY ANY TIME</small>":"СОКРОВИЩА<small>СДЕЛАЙ КОМНАТУ КРАСИВОЙ · КАЖДАЯ ШТУКА ЧТО-ТО ДЕЛАЕТ · МОЖНО УБРАТЬ В ЛЮБОЙ МОМЕНТ</small>",
+"THE BACKYARD IS YOURS. A whole new room! Find it in the ADVENTURES aisle.":"ЗАДНИЙ ДВОР твой. Целая новая комната! Ищи её в отделе ПРИКЛЮЧЕНИЯ.",
+"THE MAGIC LENS IS YOURS. Level {0} earned it! Pick it up in the TREASURES aisle and go snooping.":"ВОЛШЕБНАЯ ЛУПА твоя. Уровень {0} её заслужил! Возьми её в отделе СОКРОВИЩА и всё разгляди.",
 "ONE COLOR":"ОДИН ЦВЕТ",
 "THE COLORS MIX":"ЦВЕТА СМЕШИВАЮТСЯ",
 "IN QUEUE":"В ОЧЕРЕДИ",
@@ -20918,6 +20993,14 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "His trusty sidearm — always there, and it empties a magazine faster than anything else on the carpet. Every rank he earns speeds it up and reaches a little further.":"Su fiel arma corta: siempre lista, vacía el cargador más rápido que nadie en la alfombra. Cada rango la acelera aún más y le da un poquito más de alcance.",
 "IN HAND":"EN LA MANO",
 "SECOND SOCKET":"SEGUNDA RANURA",
+"GARAGE":"GARAJE",
+"TREASURES":"TESOROS",
+"ADVENTURES":"AVENTURAS",
+"RECRUITS":"RECLUTAS",
+"ADVENTURES<small>BUY THE PLACE · YOUR SHIP SAILS YOU THERE</small>":"AVENTURAS<small>COMPRA EL LUGAR · TU BARCO TE LLEVA</small>",
+"TREASURES<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING · PUT AWAY ANY TIME</small>":"TESOROS<small>PON BONITO EL CUARTO · TODAS HACEN ALGO · GUÁRDALAS CUANDO QUIERAS</small>",
+"THE BACKYARD IS YOURS. A whole new room! Find it in the ADVENTURES aisle.":"¡EL PATIO TRASERO es tuyo. Un cuarto nuevo entero! Búscalo en el pasillo de AVENTURAS.",
+"THE MAGIC LENS IS YOURS. Level {0} earned it! Pick it up in the TREASURES aisle and go snooping.":"¡LA LUPA MÁGICA es tuya. El nivel {0} la ganó! Agárrala en el pasillo de TESOROS y curiosea.",
 "ONE COLOR":"UN COLOR",
 "THE COLORS MIX":"LOS COLORES SE MEZCLAN",
 "IN QUEUE":"EN COLA",
@@ -24872,7 +24955,7 @@ function giftRoadSign(nx){
 }
 function lensDue(){ return (META.lvl|0)>=LENS_FREE_LVL || (META.campaign|0)>=LENS_FREE_CAMP; }
 function lensFreeDoor(){ return (META.campaign|0)>=LENS_FREE_CAMP? LENS_FREE_CAMP : LENS_FREE_LVL; }   // 0494c: the door that opened — the campaign's 5 first, else the commander's 15
-function lensFreeLine(){ return 'THE MAGIC LENS IS YOURS. Level '+lensFreeDoor()+' earned it! Pick it up in the DECOR aisle and go snooping.'; }   // 0582 D1/D3: the 🔍 and the dash left (the lens card carries the lens art); the verdict faces deal the TICKET instead (D6) — this line is the room card's alone now   // digits ride the {0}-form key (trLookup tokenises them — the SHIELD +{0}! precedent); 0538 THE SWEEPS: the road never says FREE (Wyatt 8/24: "just dont say 'Free'") — the word came off, the {0} door (5 / 15 off lensFreeDoor) stays
+function lensFreeLine(){ return 'THE MAGIC LENS IS YOURS. Level '+lensFreeDoor()+' earned it! Pick it up in the TREASURES aisle and go snooping.'; }   // 0582 D1/D3: the 🔍 and the dash left (the lens card carries the lens art); the verdict faces deal the TICKET instead (D6) — this line is the room card's alone now   // digits ride the {0}-form key (trLookup tokenises them — the SHIELD +{0}! precedent); 0538 THE SWEEPS: the road never says FREE (Wyatt 8/24: "just dont say 'Free'") — the word came off, the {0} door (5 / 15 off lensFreeDoor) stays
 function lensGift(){
   if(lensOwned() || !lensDue()) return false;
   META.lens=1; META.lensFree=1; saveMeta();   // flag FIRST (the comet law) — the ownership bit and the earn ledger in ONE write
@@ -37732,7 +37815,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.87';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.88';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -71062,6 +71145,8 @@ function roomSwitch(id, quiet){
 // sail redesign drops in with zero ferry edits. All state page-lifetime.
 let SHIPTRV=0;
 let PLANE_LAND=0;          // 0568: THE TOY WARPLANE is landing (the .land leg on the fresh paint) — a landing plane is not a toy (D10); renderMenu's head clears it (the ball's rule)
+let PLANE_LOOP=0, PLANE_LOOP_NEXT=null;   // 0584 THE LOOP-DE-LOOP: this flight loops (the dice once per flight) · the rig's pin for the NEXT flight (null = the dice)
+const WP_LOOP_ODDS=0.35, WP_LOOP_MS=1200;   // 0584: how often she loops (⚑) · how long the loop holds every later beat of the clock (= wploop 2.7 s − wptakeoff 1.5 s)
 // 0568 D1 THE RIDES: rideDue(id) = shipTravelDue generalised — menu · 2+ rooms · the ride aboard (decorHome) · its #dec node standing with
 // neither .react nor .land (a lap — or a landing — must finish); ONE latch (SHIPTRV — every rig door reads it: one ride in the air at a
 // time, never both) and ONE port (SHIP_DEST, whichever ride sails). shipTravelDue answers byte-same.
@@ -71122,25 +71207,52 @@ function shipTravel(){
 // card can never repaint a plane mid-glide). All three legs ride .wpw (transform-free — the 0353 attr law honoured by the mold itself),
 // RELATIVE to the seat: she takes off from, and lands on, wherever the player parked her in THAT room (the per-room drag delta).
 function rideTop(){ const ro=document.getElementById('ro-warplane'); const p=ro && ro.parentNode; if(p && p.lastElementChild!==ro) p.appendChild(ro); return ro; }   // D7 THE RIDE FLIES ON TOP: the end of the room svg — the ship's own top seat (the takeoff crosses the sails, the men and the models IN FRONT)
+// ===== 0584 THE PLANE FLIES SMOOTH (FM-GVT-WARPLANE-03, design/warplane-smooth-0827/00-DESIGN.md; Wyatt 8/27 03:42 phone verbatim: "The toy
+// war-plan looks like it lags when it flies. Make it fly smooth and occasionally he does a fun loop de loop before flying to the next map.")
+// THE FLIGHT LAYER: the two legs of the flight no longer animate a <g> inside the room svg (main-thread in WebKit — the iPhone shell:
+// the stage re-rasterised under her every frame, and the phone dropped frames; Chrome composites it, so the desktop never showed it);
+// wpFly(kind) builds #wpfly, an HTML twin of the seat, right AFTER
+// the room svg inside #roomStage (the svg's own layer order — under the header band and the tags, over every model), the wrapper's drag
+// delta + the seat's own translate(56,250) scale(0.78) rotate(-4) as ONE inline style on .wps, the art (warplaneArt — the shop's, the
+// bake's, 0587's paint for free) in its own small svg, and the leg's class on the layer so the CSS moves .wpa — will-change:transform,
+// the compositor's own thread. The room's .wpw hides by CSS while the layer stands (the ground stays in the svg: the shadow fade, the
+// puffs, the dust); the layer's first frame is the parked plane and the landing's last frame is the seat, so the swap is pixel-still.
+// A repaint mid-flight (a card, a door) wipes the layer with the stage's innerHTML — the same fate as the class it replaces (the ball's
+// rule); the teardown's wpFlyEnd() is a no-op on a gone node. THE LOOP-DE-LOOP: PLANE_LOOP rolls once per flight (WP_LOOP_ODDS; the
+// rig door GVT.planeLoop pins the next), .loop on the layer picks wploop (2.7 s) over wptakeoff (1.5 s), and every later beat of the
+// clock — the wipe, the switch, the landing, the touchdown, the teardown — waits WP_LOOP_MS so she is gone before the clouds come.
+function wpFly(kind){
+  wpFlyEnd();
+  const st=document.getElementById('roomStage'), p=document.getElementById('decPlane'); if(!st || !p) return null;
+  const svg=st.querySelector('svg'), d=rpXY('warplane');
+  const f=document.createElement('div'); f.id='wpfly'; f.className=kind+((kind==='travel' && PLANE_LOOP)? ' loop' : '');
+  f.innerHTML='<div class="wps" style="transform:translate('+(56+d[0])+'px,'+(250+d[1])+'px) scale(0.78) rotate(-4deg)"><div class="wpa"><svg viewBox="'+PLANE_VB+'" xmlns="http://www.w3.org/2000/svg">'+warplaneArt()+'</svg></div></div>';
+  if(svg && svg.parentNode===st) svg.insertAdjacentElement('afterend', f); else st.appendChild(f);
+  return f;
+}
+function wpFlyEnd(){ const f=document.getElementById('wpfly'); if(f) f.remove(); }
+function planeLoopRoll(){ const r=(PLANE_LOOP_NEXT===null)? (Math.random()<WP_LOOP_ODDS? 1 : 0) : (PLANE_LOOP_NEXT? 1 : 0); PLANE_LOOP_NEXT=null; return r; }   // the dice once per flight; a pinned answer is spent by the flight it pins
 function planeTravel(){
   SHIPTRV=1;
   const go=()=>{ roomSwitch(rideNextRoom(), true); SFX.thock(); };
-  if(reducedMotion()){ SFX.prop(); go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // the ship's RM branch verbatim: no class, no seat, no landing (travel is information; the theatre is not)
+  if(reducedMotion()){ SFX.prop(); go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // the ship's RM branch verbatim: no class, no seat, no landing, no layer (travel is information; the theatre is not)
+  PLANE_LOOP=planeLoopRoll(); const L=PLANE_LOOP? WP_LOOP_MS : 0;   // 0584 THE LOOP-DE-LOOP: every beat past the takeoff waits for it
   SFX.prop();
-  rideTop(); const g=document.getElementById('decPlane'); if(g) g.classList.add('travel');   // seat first, class second
+  rideTop(); const g=document.getElementById('decPlane'); if(g) g.classList.add('travel'); wpFly('travel');   // seat first, class second — then THE FLIGHT LAYER lifts her out of the svg (0584)
   const w=document.createElement('div'); w.id='cloudwipe';
   w.innerHTML='<div class="cwb">'+cloudWipeSVG()+'</div>';
   document.body.appendChild(w);   // the glass is DOWN from beat one — no door mid-flight (the ship's own law)
-  setTimeout(()=>SFX.zoom(), 900);                // THE CLIMB — banking away to the top-right
-  setTimeout(()=>{ w.classList.add('in'); SFX.twink(); }, 1150);
+  setTimeout(()=>SFX.zoom(), 900);                // THE CLIMB — banking away to the top-right (or up into the loop)
+  if(L) setTimeout(()=>SFX.swish(), 1700);        // 0584: over the top of the loop
+  setTimeout(()=>{ w.classList.add('in'); SFX.twink(); }, 1150+L);
   setTimeout(()=>{ go();                          // under full cover
-    rideTop(); const h=document.getElementById('decPlane');   // THE LANDING on the fresh paint: the top seat, then the class
-    if(h){ h.classList.remove('travel'); h.classList.add('land'); PLANE_LAND=1; } }, 2050);
-  setTimeout(()=>w.classList.add('out'), 2300);
-  setTimeout(()=>{ try{ w.remove(); }catch(e){} }, 3260);   // the wipe alone — the latch holds through the landing
-  setTimeout(()=>{ if(PLANE_LAND) SFX.bounce(); }, 3420);   // TOUCHDOWN — the gear compresses, the wheel dust puffs
+    rideTop(); const h=document.getElementById('decPlane');   // THE LANDING on the fresh paint: the top seat, then the class, then the layer
+    if(h){ h.classList.remove('travel'); h.classList.add('land'); PLANE_LAND=1; wpFly('land'); } }, 2050+L);
+  setTimeout(()=>w.classList.add('out'), 2300+L);
+  setTimeout(()=>{ try{ w.remove(); }catch(e){} }, 3260+L);   // the wipe alone — the latch holds through the landing
+  setTimeout(()=>{ if(PLANE_LAND) SFX.bounce(); }, 3420+L);   // TOUCHDOWN — the gear compresses, the wheel dust puffs
   setTimeout(()=>{ try{ const h=document.getElementById('decPlane'); if(h) h.classList.remove('land','travel'); }catch(e){}
-    PLANE_LAND=0; SHIPTRV=0; shipCineSweep(); }, 3850);   // THE PIVOT done: parked exactly as drawn; the bed card may deal now (never at 3260)
+    wpFlyEnd(); PLANE_LAND=0; SHIPTRV=0; shipCineSweep(); }, 3850+L);   // THE PIVOT done: the layer's last frame = the seat, the room's plane steps back in; the bed card may deal now (never at 3260)
 }
 // ===== 0494c THE BACKYARD AT SEVEN — the room door (the lensSweep law: a save
 // past the rung that never saw the verdict — a guest whose campaign moved by
@@ -71167,7 +71279,7 @@ function byCard(){
     +'<span class="mb-band">LEVEL '+BY_FREE_LVL+'!</span>'   // the gear card's own LEVEL {0}! key
     +'<h2 class="mb-h">'+ROOM_INFO.backyard.name+'</h2>'
     +'<span class="mb-win">'+MB_RAYS+'<svg viewBox="0 0 150 220" preserveAspectRatio="xMidYMid slice">'+roomCardArt('backyard')+'</svg></span>'   // the realtor's window (shopRoomCardHTML's own idiom)
-    +'<span class="mb-line">THE BACKYARD IS YOURS. A whole new room! Find it in the ROOMS aisle.</span>'   // 0538 THE SWEEPS: no FREE (the road law) — the same key as the two verdict seats
+    +'<span class="mb-line">THE BACKYARD IS YOURS. A whole new room! Find it in the ADVENTURES aisle.</span>'   // 0538 THE SWEEPS: no FREE (the road law) — the same key as the two verdict seats
     +'<button type="button" class="mb-take" onclick="UI.mileTake()">IT\'S MINE!</button>'
     +'</div>';
   p.classList.remove('hidden');
@@ -78485,7 +78597,13 @@ function closeWorldRank(){
 // you walk in has no first shelf). Everything else keeps v2.86's relative
 // order: recruits · motors · outfits · decor · mods · the dark run · stars.
 const SHOP_TABS = [ {id:'paint', lab:'PAINT'},
-                    {id:'figs', lab:'FIGURES'}, {id:'motor', lab:'MOTORS'},
+                    // 0584 THE FOUR PLAQUES (Wyatt 8/27 03:42: "Rename Motors in the shop to Garage. Rename Decor to
+                    // Treasures. Rename Rooms to adventures. Rename figures to Recruits."): the ids, the seats and the
+                    // aisle arithmetic are byte-still — the plaques read RECRUITS · GARAGE · TREASURES · ADVENTURES.
+                    // The department signs inside keep their names (NEW RECRUITS · THE MOTOR POOL — the shop's own
+                    // tab-vs-sign grammar, the 0819 SARGE ruling); the two signs that WERE the old word follow it
+                    // (ROOMS → ADVENTURES; ROOM DECORATIONS → TREASURES, his word for the whole shelf today).
+                    {id:'figs', lab:'RECRUITS'}, {id:'motor', lab:'GARAGE'},
                     // FM-GVT-SARGERACK-01 (Wyatt 8/19: "Change the Outfits
                     // tab to read Sarge."): the plaque reads SARGE — the id,
                     // its seat and the aisle arithmetic are byte-still, and
@@ -78493,7 +78611,7 @@ const SHOP_TABS = [ {id:'paint', lab:'PAINT'},
                     // rows). The department sign inside is unchanged (D1 —
                     // his ask was the tab).
                     {id:'outfit', lab:'SARGE'},
-                    {id:'decor', lab:'DECOR'},
+                    {id:'decor', lab:'TREASURES'},
                     // 0363 (Wyatt 8/16, verbatim: "Reorder the tab bar so the
                     // Rooms and Stars tabs sit immediately after the Decor tab
                     // and before the Mods tab … Decor -> Rooms -> Stars ->
@@ -78503,7 +78621,7 @@ const SHOP_TABS = [ {id:'paint', lab:'PAINT'},
                     // word. Every other plaque keeps its relative order, and
                     // the renderShop sections move WITH them (lockstep —
                     // shopScroll/shopJump index by position, the 0097 law).
-                    {id:'rooms', lab:'ROOMS'},
+                    {id:'rooms', lab:'ADVENTURES'},
                     // 0097: the packs aisle exists only where the native IAP
                     // bridge does — decided once, at load (the bridge is
                     // injected at documentStart, so it is knowable here). Tab
@@ -79831,7 +79949,7 @@ function shopRoomsHTML(){
   // scrolls down (the v1.75 shelf law). One line of math; CSS consumes.
   const vis=ROOM_ORDER.filter(id=>id!=='western'||roomOwns(id));   // 0313: WESTERN LAND appears only once the map is home (§17 — no locked teasers, the key shelf-hidden grammar)
   const cols=vis.length<=5? vis.length : Math.ceil(vis.length/2);
-  return '<section class="sh-dept" id="shRooms"><h2>ROOMS<small>BUY THE PLACE · YOUR SHIP SAILS YOU THERE</small></h2>'
+  return '<section class="sh-dept" id="shRooms"><h2>ADVENTURES<small>BUY THE PLACE · YOUR SHIP SAILS YOU THERE</small></h2>'
     +'<div class="sh-roomrow'+(vis.length>=6?' wall':'')+'" style="--rmcols:'+cols+'">'+vis.map(shopRoomCardHTML).join('')+'</div>'
     +'</section>';
 }
@@ -80172,7 +80290,7 @@ function renderShop(){
       // (below the bank and the banana), deliberately subtle: name and price
       // and not one word about what it does. The drag-reveal machinery is
       // untouched — the entry point moved, the toy didn't.
-      +'<section class="sh-dept" id="shDecor"><h2>ROOM DECORATIONS<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING · PUT AWAY ANY TIME</small></h2>'
+      +'<section class="sh-dept" id="shDecor"><h2>TREASURES<small>MAKE THE PLACE NICE · EVERY ONE OF THEM DOES SOMETHING · PUT AWAY ANY TIME</small></h2>'
         +'<div class="sh-decrow">'+['elephant','teddy','train','robot','spacerug','ducky','racecar','helmet','warplane'].map(shopDecHTML).join('')+'</div>'
         +'<div class="sh-decbig">'+shopBankHTML()+shopDecHTML('banana')+'</div>'
         // v2.61: the unicorn takes the shelf's LAST slot, above only the lens
@@ -84335,7 +84453,8 @@ window.GVT = {
   shipNudge(){ const el=document.getElementById('ro-ship'); return { cv:GVT_CV, due:shipNudgeDue(), on:shipNudgeOn(), next:shipNextStop(), cur:roomCur(), lens:!!META.lens, parkDino:!!META.parkDino, lv:(((META.parks||{}).dino||{}).lv|0), ship:decOwns('ship'), cls:!!(el&&el.classList.contains('nudge')), pinned:SHIP_DEST||null }; },   // 0546 rig door — read-only
   rideState(){ const st={}; for(const k of RIDES){ const el=document.getElementById(DECOR_REACT[k].el), ro=document.getElementById('ro-'+k);
       st[k]={ own:decOwns(k), out:decorHome(k), due:rideDue(k), cls:el? String(el.className.baseVal||el.className) : null, top:!!(ro && ro.parentNode && ro.parentNode.lastElementChild===ro), nudge:!!(ro && ro.classList.contains('nudge')) }; }
-    return { cv:GVT_CV, trv:SHIPTRV, land:PLANE_LAND, next:shipNextStop(), pinned:SHIP_DEST||null, hand:mvDayRide(), out:rideOut(), rooms:ownedRooms(), cur:roomCur(), off:(META.decor.off||[]).slice(), rideV:META.rideV|0, wipe:!!document.getElementById('cloudwipe'), rides:st }; },   // 0568 D11 rig door — read-only (next = the PURE read; the pin is never consumed here)
+    return { cv:GVT_CV, trv:SHIPTRV, land:PLANE_LAND, loop:PLANE_LOOP, pin:PLANE_LOOP_NEXT, fly:!!document.getElementById('wpfly'), odds:WP_LOOP_ODDS, loopMs:WP_LOOP_MS, next:shipNextStop(), pinned:SHIP_DEST||null, hand:mvDayRide(), out:rideOut(), rooms:ownedRooms(), cur:roomCur(), off:(META.decor.off||[]).slice(), rideV:META.rideV|0, wipe:!!document.getElementById('cloudwipe'), rides:st }; },   // 0584: + loop/pin/fly/odds/loopMs
+  planeLoop(n){ PLANE_LOOP_NEXT=(n===undefined||n===null)? null : (n? 1 : 0); return PLANE_LOOP_NEXT; },   // 0584 rig door: pin the NEXT flight (1 loop · 0 plain · null = the dice)   // 0568 D11 rig door — read-only (next = the PURE read; the pin is never consumed here)
   dogFreeze(on){ DOGRIG.frozen=on?1:0; DOG_LAST=0; return DOGRIG.frozen; },
   dogStep(s){ if(!DOGT) dogArm(); let r=Math.max(0,+s||0);
     while(r>0){ const d=Math.min(0.1,r); dogAdvance(d); r-=d; }
