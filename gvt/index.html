@@ -37578,7 +37578,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.72';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.73';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -47252,6 +47252,18 @@ function campUnitStep(u,dt){
       if(Math.random()<0.08) S.fx.push({k:'ring',x:u.x,y:u.y-2,r:4,R:18,t:0,dur:0.4,col:'#6E9DC4'});
     }
   }
+  // 0570 PILLOW CANYONS (D2, the men's side — the river funnel above, generalised; design/pillow-canyons-0826): a man whose goal lies
+  // beyond a ridge walks to the NEAREST mouth's west lip first (the battleground's bridge law), then straight through to its east lip —
+  // the wander waypoints never aim him into the pillows. Measured before this seat: the crate march bottlenecked in the chicane's
+  // corridor (rung 35 read 1/4 against 34's 4/4 on win555's army — the men grinding at the ridge for a waypoint rolled inside it, wave 4
+  // catching them there). The cfg holds its walls EAST-FIRST; a man meets them west-first. No wade, no squeeze: a wall lets nobody
+  // through but the mouths (R2's law for both armies).
+  const CW=S.cfg.terrain.walls;
+  if(CW && CW.length){ for(let i=CW.length-1;i>=0;i--){ const wl=CW[i];
+    if(u.x<wl.x+wl.w+4 && goal.x>wl.x){
+      let g9=wl.gaps[0], bd=1e9; for(const g8 of wl.gaps){ const d=Math.abs(g8.y-u.y); if(d<bd){ bd=d; g9=g8; } }
+      goal = (u.x<wl.x-34 && Math.abs(u.y-g9.y)>g9.h*0.3) ? { x:wl.x-30, y:g9.y } : { x:wl.x+wl.w+30, y:g9.y };
+      break; } } }
   const g=u.gait||1; u.gait=g*wade*((u.tkGhost&&u.cloakT>0)? TK_GREEN_WALK : 1);   // 0341: the ghost glides 28% slower (Wyatt — the green nerf; wade and base pace untouched)
   bfMarch(u,dt,goal);
   u.gait=g;
@@ -50766,6 +50778,7 @@ function teddyFallIn(f){   // THE WHISTLE LINE (the squad leader, TEDDY_LEADER):
   const RV=S.cfg.terrain.river, ax=gx-90;   // the anchor sits 90 forward (west) of him — his own seat is rear-48 behind the block's rear rank
   if(Math.hypot(T.x-gx,T.y-gy)<TEDDY_MUSTER_HOME) return 0;   // no muster inside the line's own ground — a block minted there dissolves at the box's 115 on its next frame and re-forms in a churn (measured)
   if(RV && ax<RV.x+RV.w+80 && ax>RV.x-20) return 0;   // no block forms at a popsicle bridge (the river break law)
+  if(canyonBandAt(ax)) return 0;   // 0570 PILLOW CANYONS (D9): no block forms inside a wall's band either — Gruffle lines the gun bears up EAST of the ridge and they file through in his order
   const list=teddyFallInList(f); if(!list.length) return 0;
   const leave=o=>{ if(o.form){ const fo=o.form, i=fo.members.indexOf(o); if(i>=0) fo.members.splice(i,1); } o.form=null; o.off=null; };   // a plain line/column/push has no discipline — the block does
   list.forEach(leave); leave(f);
@@ -56759,9 +56772,11 @@ function update(dt){
       if(fo.halted&&fo.volley!=null){ fo.volley-=dt; if(fo.volley<=0){ fo.doVolley=true; fo.volley=null; SFX.volley(); } }  // ...FIRE!
     }
     const RV=S.cfg.terrain.river;
+    const WLf=canyonWallAhead(fo.x,null);   // 0570 PILLOW CANYONS (D2): the wall the block is walking at — null on every rug without one (byte-still)
     const fcp=(S.raid && fo.rcI!=null && S.raid.cfg===S.cfg)? S.raid.posts[fo.rcI] : null;   // 0318: the block's own turret RACE — while the flag flies no colour (Wyatt's literal revert)
     const fgoal = (fcp && !fcp.o)? {x:fcp.x, y:fcp.y}
-      : (RV && fo.x>RV.x+RV.w+40) ? {x:RV.x+RV.w/2, y:RV.bridgeY} : T;
+      : (RV && fo.x>RV.x+RV.w+40) ? {x:RV.x+RV.w/2, y:RV.bridgeY}
+      : (WLf && fo.x>WLf.wl.x+WLf.wl.w+40) ? canyonFormGoal(fo,WLf) : T;   // 0570: the river's own funnel, generalised — the block aims at its mouth's east lip (D3 picks it once, in the band)
     const d=Math.hypot(fgoal.x-fo.x, fgoal.y-fo.y);
     // a block of men is WIDE. If the anchor stops gaining ground on its goal —
     // a gap the formation can't fit through, a pinch against the edge — the
@@ -56771,7 +56786,7 @@ function update(dt){
     if(fo.best==null || d<fo.best-1){ fo.best=d; fo.stall=0; }
     else if(!fo.halted) fo.stall=(fo.stall||0)+dt;
     // ranks break early at a river — no formation fits on a popsicle bridge
-    if(d<115 || (RV && fo.x<RV.x+RV.w+80 && fo.x>RV.x-20) || fo.stall>2.5){
+    if(d<115 || (RV && fo.x<RV.x+RV.w+80 && fo.x>RV.x-20) || (WLf && fo.x<WLf.wl.x+WLf.wl.w+80 && fo.x>WLf.wl.x-20) || fo.stall>2.5){   // 0570: the ranks break in a wall's band exactly as at a river — a block never fits a mouth (D2, §6)
       fo.members.forEach(m=>{ m.form=null; }); S.forms.splice(i,1); continue;
     }
     // wheel onto the heading (round a rock if one's in the way) rather than
@@ -56859,10 +56874,12 @@ function update(dt){
     if(RV && f.squeeze && !f.crossed) f.crossed=true;
     const capP=(S.raid && f.capI!=null)? S.raid.posts[f.capI] : null;   // v3.39: a capture squad marches for its OUTPOST while the yetis don't hold it
     const rcP=(!capP && S.raid && f.rcI!=null && S.raid.cfg===S.cfg)? S.raid.posts[f.rcI] : null;   // 0318: the RACE class — half-stamped wave bodies fight for an UNCONTROLLED flag, then stand down (Wyatt's literal revert)
+    const WLs=canyonWallAhead(f.x,f);   // 0570 PILLOW CANYONS (D2/D3): the wall this bear still has to pass (per-wall latches f.wDone — the river's f.crossed is the river's alone); null on every rug without one (byte-still)
     const goal = (capP && capP.o!==2)? { x:capP.x, y:capP.y }
       : (rcP && !rcP.o)? { x:rcP.x, y:rcP.y }
       : (RV && !f.crossed && f.type!=='crawler' && !f.boss && f.x>RV.x+RV.w)
-      ? { x:RV.x+RV.w/2, y:RV.bridgeY } : T;
+      ? { x:RV.x+RV.w/2, y:RV.bridgeY }
+      : WLs? canyonGoal(f,WLs) : T;   // 0570: the funnel without the water — NO crawler exemption (R2: the cubs don't squeeze under), NO boss exemption (⚑), no wade (the stall re-picks below)
     if(RV && f.x<=RV.x-4) f.crossed=true;
     if(f.def.minRng && !f.boss && !(f.rimIn && f.x>=W-60) && hasGreenTarget(f)){
       // 0519 THE RIM LAW (the 0514 word, for a stamped tube alone — L90's added
@@ -57059,11 +57076,12 @@ function update(dt){
     else {
       // stepping off the bridge swaps the goal for the Toy Box, and the
       // distance jumps with it — that's a new march, not a stall
-      const tag = goal===T ? 'box' : 'br';
+      const tag = goal===T ? 'box' : (goal.tag||'br');   // 0570: a mouth's lip is its own march (w<wall>e<mouth> / w<wall>w<mouth>) — stepping from the east lip to the west one is a new march, not a stall
       if(f.goalTag!==tag){ f.goalTag=tag; f.best=null; f.stall=0; }
       const gd=Math.hypot(goal.x-f.x, goal.y-f.y);
       if(f.best==null || gd<f.best-1){ f.best=gd; f.stall=0; }
       else f.stall=(f.stall||0)+dt;
+      if(goal.tag && f.stall>2.5 && canyonRepick(f,WLs)){ f.best=null; f.stall=0; }   // 0570 THE STALL RE-PICKS (D2/D3, §6): a bear parked at a mouth takes another one — never the river's wade; at a one-mouth wall the squeeze's shrunk shoulder stands (the chain's overlap still holds him)
     }
     f.squeeze = (f.stall||0)>2.5;
     }
@@ -59199,6 +59217,9 @@ function drawRug(){
     // 0826 THE HEM (D-P2): on the pillow floor the deploy line is SEWN across the pillows — drag or no drag — on the canPlace gate's
     // own condition (the crate rungs · the crateless finale · the fields raid), under the water, the rocks and every figure.
     if(qlt&&!PF_PATCH&&PF_HEM&&(S.tanBase||(S.raid&&S.raid.cfg===S.cfg)||S.park)) drawPillowHem(HT);
+    // 0570 PILLOW CANYONS (D8): the ridge stands on the floor after the hem — under the water, the rocks and every figure (the rock
+    // painter below skips its chain). Campaign rows only; the walls are BEAR PARK's cfg alone (D12).
+    if(S.cfg.terrain.walls && S.cfg.terrain.walls.length) drawCanyon(S.cfg.terrain.walls, HT);
   }
   // v1.96 GRAND STAGES: the stage terrain draws on BOTH carpets now — BF order
   // is untouched to the pixel (field → chalk → terrain), the campaign gains
@@ -59346,6 +59367,7 @@ function drawRug(){
     if(rk.art==='cup'){ drawCupRock(rk); continue; }
     if(rk.art==='block'){ drawToyBlock(rk); continue; }
     if(rk.art==='drift'||rk.art==='clod') continue;     // snowbanks draw as CHAINS, in drawSnowTerrain
+    if(rk.art==='wall') continue;                        // 0570 PILLOW CANYONS: the wall's chain solids draw as THE WALL (drawCanyon, under the water and the rocks), never as rocks
     if(rk.art==='mesa'){ drawMesa(rk); continue; }      // WESTERN LAND's rocks in costume (v1.57)
     if(rk.art==='cactus'){ drawCactus(rk); continue; }
     if(rk.art==='bags'){ drawSandbags(rk); continue; }  // 0129 the barricade rows
@@ -59613,6 +59635,123 @@ function drawPillowHem(HT){
   cx.globalAlpha=0.9; cx.strokeStyle=PF_HEM_C; cx.lineWidth=5; cx.beginPath(); cx.moveTo(hx,56); cx.lineTo(hx,HT-56); cx.stroke();
   cx.globalAlpha=0.6; cx.strokeStyle='#ffffff'; cx.lineWidth=1.2; cx.setLineDash([7,5]); cx.beginPath(); cx.moveTo(hx,56); cx.lineTo(hx,HT-56); cx.stroke(); cx.setLineDash([]);
   cx.globalAlpha=1;
+}
+// ===== 0570 PILLOW CANYONS — BEAR PARK's ridges with two or three mouths (design/pillow-canyons-0826/00-DESIGN.md, FM-GVT-CANYONS-01).
+// Wyatt 8/26: "narrow canyons is a good way to go if we want to really trip up players with some levels. Especially if there are two
+// to three different pathways they can take" · "Bears split strategically across all gaps. The Cubs don't squeeze under the wall.
+// Know [no] the player can't plug a gap. Mix them in sparingly in the deep march and the original few levels because it will be exciting."
+// THE WALL IS TERRAIN (D1): terrain.walls=[{x,w,gaps:[{y,h}]}] on the canyon rungs only, built the snowbank way — a CHAIN of round
+// solids (art:'wall') pushed into terrain.rocks, so steering, the shoulder kernel, placement refusal and the charge BONK inherit for
+// free; the chain draws as THE WALL (drawCanyon), never as rocks. THE FUNNEL WITHOUT THE WATER (D2): the river's goal override,
+// generalised — a bear east of a wall aims at his mouth's EAST lip, then its WEST lip, then the toy box; a block aims the same way and
+// its ranks BREAK in the wall's band; NO crawler exemption (R2), NO boss exemption (⚑), no wade — a stalled bear RE-PICKS his mouth.
+// THE SPLIT (D3, R1): a bear picks his mouth ONCE on entering the approach band — the least-defended one (your firepower within
+// GAP_FIRE_R of its west lip + GAP_CROWD × the bears already bound for it) — and keeps it. THE MOUTHS ARE YOURS TO HOLD, NEVER TO
+// PLUG (D4, R3): every wall stands EAST of the hem (x ≥ 640 > campDeployX 480), so the deploy law already refuses every drop there.
+let GAP_PICK='weak';                                        // ⚑ how the bears split: 'weak' = the least-defended mouth (ships) · 'round' = round-robin · 'near' = the nearest (the battleground's bridge law)
+const GAP_CROWD=25;                                         // ⚑ one bear already bound for a mouth weighs this much of your firepower (a rifleman is 40): an empty line splits by the count alone
+const GAP_FIRE_R=200;                                       // your men within this of a mouth's WEST lip defend it (a mortar counts half from anywhere)
+const GAP_BAND=260;                                         // the approach band east of a wall's face: a bear (or a block) picks its mouth ONCE on entering it and keeps it
+const CANYON_CHAIN_R=30, CANYON_CHAIN_STEP=44;              // the wall's solids: r 30 every ≤44 px (16 px of overlap — no shoulder, shrunk or not, slips between them)
+const CANYON_ROCK_CLEAR=60;                                 // §6: on a canyon rung the odd rungs' pillow rocks stand WEST of the first wall by this (east edge ≤ wall.x−60) — never in a mouth's approach, never a pocket against the chain
+const CANYON_PASS_A=0.16;                                   // the trodden pass through each mouth — the sheet's shade at the worn path's own ink
+const CANYON_C=[['#b9aed8','#6f6591','#ece7f7','#7d729f'],['#cbc1e6','#7d729f','#f2eefa','#8f86ad']];   // two DEEP lilacs (body · fold shade · seam roll · piping) — the pillow rocks' family a step darker, so a wall is never mistaken for a floor pillow
+// ⚑ D5/D6/D7 — the three layouts on eight rungs, FIXED per rung (the levelCfg law: a party sees one bed). Never 10/15/17 (the rivers),
+// 18 (the drill), 19 (the warning), 20/50 (the courts). On a phone the tray hides y > ~496 — every mouth sits at y ≤ 452.
+const CANYON_FORK=[{x:660,w:64,gaps:[{y:140,h:84},{y:440,h:84}]}];                                   // one long ridge, a mouth at each end — the bears split high and low
+const CANYON_PICKET=[{x:660,w:64,gaps:[{y:112,h:76},{y:300,h:76},{y:452,h:76}]}];                    // three files through three mouths — spread the line or lose a mouth
+const CANYON_PICKET_M=[{x:660,w:64,gaps:[{y:148,h:76},{y:336,h:76},{y:452,h:76}]}];                  // the picket mirrored (rung 41)
+const CANYON_CHICANE=[{x:640,w:64,gaps:[{y:120,h:96},{y:440,h:96}]},{x:840,w:64,gaps:[{y:290,h:108}]}]; // in through the middle, out through the corners — the long way under your mortar (§4 THE WIN TABLE: the doc's 80/92 widened 8 px per miss on rung 35, TWICE — see build-cn/00-BUILD.md: the corridor's single east mouth is the chicane's real weight, not its width)
+const CANYON_RUNGS={ 6:CANYON_FORK, 11:CANYON_PICKET, 13:CANYON_PICKET, 24:CANYON_FORK, 29:CANYON_PICKET, 35:CANYON_CHICANE, 41:CANYON_PICKET_M, 46:CANYON_CHICANE };
+function canyonSegs(wl,top,bot){   // the solid runs between the mouths (sorted by y), clipped to [top,bot]
+  const segs=[]; let y0=top; const gaps=wl.gaps.slice().sort((a,b)=>a.y-b.y);
+  for(const g of gaps){ const gy0=g.y-g.h/2; if(gy0>y0+4) segs.push([y0,gy0]); y0=Math.max(y0,g.y+g.h/2); }
+  if(bot>y0+4) segs.push([y0,bot]); return segs;
+}
+function wallChains(walls){   // D1: the chain — one solid every ≤CANYON_CHAIN_STEP along each solid segment, from the foe band's top to its floor (FOE_TOP..H−12: nobody rounds an end under the frame); a short segment gets ONE smaller solid at its centre
+  const out=[];
+  walls.forEach((wl,i)=>{ const cxw=wl.x+wl.w/2, r=CANYON_CHAIN_R;
+    for(const [a,b] of canyonSegs(wl,FOE_TOP,H-12)){ const len=b-a;
+      if(len<2*r+8){ out.push({x:cxw, y:Math.round((a+b)/2), r:Math.max(8,Math.round(len/2)), art:'wall', chain:'w'+i}); continue; }
+      const n=Math.max(1,Math.ceil((len-2*r)/CANYON_CHAIN_STEP)), st=(len-2*r)/n;
+      for(let k=0;k<=n;k++) out.push({x:cxw, y:Math.round(a+r+k*st), r:r, art:'wall', chain:'w'+i}); } });
+  return out;
+}
+// D8 THE ART — one standing pillow of the wall (bbSlab's grammar in canvas; the floor's drawPillowSlab a step deeper: the fold shade at 0.4, the piping at 0.85)
+function drawCanyonSlab(x,y,w,h,k){
+  const rx=Math.min(w,h)*0.3;
+  cx.globalAlpha=1; cx.fillStyle=k[0]; rr(x,y,w,h,rx); cx.fill();
+  cx.globalAlpha=0.34; cx.fillStyle='#ffffff'; cx.beginPath(); cx.ellipse(x+w*0.34,y+h*0.24,w*0.24,h*0.15,0,0,7); cx.fill();
+  cx.globalAlpha=0.4; cx.fillStyle=k[1]; cx.beginPath(); cx.moveTo(x+rx*0.4,y+h*0.38); cx.quadraticCurveTo(x+w*0.24,y+h*0.98,x+w*0.66,y+h*0.98); cx.lineTo(x+rx*0.8,y+h*0.98); cx.closePath(); cx.fill();
+  cx.globalAlpha=0.85; cx.strokeStyle=k[3]; cx.lineWidth=2; rr(x+3.2,y+3.2,w-6.4,h-6.4,Math.max(1.5,rx-2.6)); cx.stroke();
+  cx.globalAlpha=0.55; cx.strokeStyle=k[2]; cx.lineWidth=Math.min(9,Math.max(2,Math.min(w,h)*0.13)); cx.lineCap='round';
+  cx.beginPath(); cx.moveTo(x+w*0.2,y+h*0.12); cx.quadraticCurveTo(x+w*0.45,y+h*0.01,x+w*0.72,y+h*0.1); cx.stroke(); cx.lineCap='butt';
+  cx.globalAlpha=1;
+}
+// the ridge: for each mouth the trodden pass (under everything), then for each solid segment the shadow east + south (the wall STANDS),
+// a course of standing pillows (one every ~58 px, the two lilacs alternating), and a lilac lip at each open end
+function drawCanyon(walls,HT){
+  for(const wl of walls){
+    for(const g of wl.gaps){ cx.globalAlpha=CANYON_PASS_A; cx.fillStyle=PF_HEM_C; rr(wl.x-22,g.y-g.h/2+6,wl.w+44,g.h-12,10); cx.fill(); cx.globalAlpha=1; }
+    for(const [a,b] of canyonSegs(wl,56,HT-56)){ const len=b-a;
+      cx.globalAlpha=0.34; cx.fillStyle='#3a2e62'; rr(wl.x+12,a+11,wl.w,len,12); cx.fill(); cx.globalAlpha=1;
+      const n=Math.max(1,Math.round(len/58)), sh=len/n;
+      for(let i=0;i<n;i++) drawCanyonSlab(wl.x,a+i*sh+2,wl.w,sh-5,((Math.round(a/37)+i)%2)? CANYON_C[0] : CANYON_C[1]);
+      cx.globalAlpha=0.5; cx.strokeStyle=PF_HEM_C; cx.lineWidth=2.5; cx.beginPath(); cx.moveTo(wl.x+4,a+2); cx.lineTo(wl.x+wl.w-4,a+2); cx.moveTo(wl.x+4,b-3); cx.lineTo(wl.x+wl.w-4,b-3); cx.stroke(); cx.globalAlpha=1;
+    }
+  }
+}
+// D2 THE FUNNEL — the wall still ahead of a walker at x (the cfg holds its walls EAST-FIRST). A bear latches each wall as he clears its
+// west face (f.wDone[i] — the river's f.crossed is the river's alone, so the chicane's second wall works after the first); thrown back
+// east of a wall he had cleared (a slam, a shove) he funnels again. A block (f null) reads position alone — it breaks in the band and
+// never crosses. null on every rug without walls.
+function canyonWallAhead(x,f){
+  const CW=S.cfg.terrain.walls; if(!CW||!CW.length) return null;
+  for(let i=0;i<CW.length;i++){ const wl=CW[i];
+    if(f){ const dn=f.wDone||(f.wDone=[]);
+      if(x<=wl.x-4){ dn[i]=1; continue; }
+      if(dn[i]){ if(x>wl.x+wl.w+4){ dn[i]=0; if(f.wPick) f.wPick[i]=null; } else continue; }
+      return {wl:wl, i:i}; }
+    if(x>wl.x-20) return {wl:wl, i:i}; }
+  return null;
+}
+function canyonBandAt(x){   // the wall whose band [x−20, x+w+80] holds x — the river's own ranks-break band, one per wall
+  const CW=S.cfg.terrain.walls; if(!CW) return null;
+  for(const wl of CW){ if(x<wl.x+wl.w+80 && x>wl.x-20) return wl; } return null;
+}
+function canyonBound(i,k){   // the bears already bound for mouth k of wall i (a block counts its members)
+  let n=0; for(const f of S.foes){ if(f.wPick && f.wPick[i]===k && !(f.wDone&&f.wDone[i])) n++; }
+  for(const fo of S.forms){ if(fo.wPick && fo.wPick[i]===k) n+=fo.members.length; } return n;
+}
+function canyonScore(wl,i,k){   // D3: your firepower within GAP_FIRE_R of the mouth's west lip (every living green's cost; a mortar counts half from anywhere) + GAP_CROWD × the bears bound for it
+  const lx=wl.x-30, ly=wl.gaps[k].y; let sc=0;
+  for(const u of S.units){ if(u.dead) continue; const c=COSTS[u.type]||0; if(u.type==='mortar') sc+=c*0.5; else if(Math.hypot(u.x-lx,u.y-ly)<GAP_FIRE_R) sc+=c; }
+  return sc+GAP_CROWD*canyonBound(i,k);
+}
+function canyonPick(wl,i,y,excl){   // THE SPLIT (R1): the lowest score wins (⚑ GAP_PICK); excl = the mouth just given up on (the stall's re-pick); a hair for the nearer mouth breaks ties
+  const G=wl.gaps, n=G.length; if(n===1) return 0;
+  if(GAP_PICK==='round'){ const rr9=(S.gapRR=S.gapRR||[]); let k=(rr9[i]|0)%n; if(k===excl) k=(k+1)%n; rr9[i]=k+1; return k; }
+  let best=0, bs=1e12;
+  for(let k=0;k<n;k++){ if(k===excl) continue;
+    const sc=(GAP_PICK==='near'? 0 : canyonScore(wl,i,k))+0.01*Math.abs(G[k].y-y);
+    if(sc<bs){ bs=sc; best=k; } }
+  return best;
+}
+function canyonGoal(f,WA){   // a bear's march at a wall: pick on entering the band (once, sticky), then the EAST lip, then (from 4 px shy of it) the WEST lip straight through the mouth; each leg its own tag for the stall watch
+  const wl=WA.wl, i=WA.i, P=f.wPick||(f.wPick=[]); let gi=P[i];
+  if(gi==null){ if(f.x>=wl.x+wl.w+GAP_BAND) return T; gi=P[i]=canyonPick(wl,i,f.y,-1); }
+  const g=wl.gaps[gi];
+  return f.x>wl.x+wl.w+34 ? { x:wl.x+wl.w+30, y:g.y, tag:'w'+i+'e'+gi } : { x:wl.x-30, y:g.y, tag:'w'+i+'w'+gi };   // the hand-off sits 4 px BEYOND the east lip: the walk halts within 1 px of a goal, so a lip reached is a lip passed
+}
+function canyonFormGoal(fo,WA){   // a block's march at a wall: the same pick on entering the band, the EAST lip — the band breaks it before the mouth (a block never fits one)
+  const wl=WA.wl, i=WA.i, P=fo.wPick||(fo.wPick=[]); let gi=P[i];
+  if(gi==null){ if(fo.x>=wl.x+wl.w+GAP_BAND) return T; gi=P[i]=canyonPick(wl,i,fo.y,-1); }
+  return { x:wl.x+wl.w+30, y:wl.gaps[gi].y };
+}
+function canyonRepick(f,WA){   // THE STALL RE-PICKS (D2/D3): a bear parked at a mouth takes another one — never the river's wade; true = the mouth changed (a one-mouth wall answers false and the squeeze's shrunk shoulder stands — the chain's overlap still holds him)
+  if(!WA) return false; const wl=WA.wl, i=WA.i, cur=f.wPick? f.wPick[i] : null;
+  if(cur==null || wl.gaps.length<2) return false;
+  const k=canyonPick(wl,i,f.y,cur); if(k===cur) return false; f.wPick[i]=k; return true;
 }
 function drawPillowRock(rk){
   const s=rk.r;
@@ -73494,6 +73633,16 @@ function parkCfgTeddy(n){
     { x:Math.round(300+R()*120), y:Math.round(150+R()*90),  r:Math.round(16+R()*5) },
     { x:Math.round(320+R()*120), y:Math.round(360+R()*110), r:Math.round(15+R()*5) }];
   if(n>=3) cfg.terrain.fog=[ {rx:130,ry:74,vx:0.085,vy:0.06},{rx:110,ry:64,vx:0.06,vy:0.1} ];
+  // 0570 PILLOW CANYONS (D1/D5/D6/D7 — design/pillow-canyons-0826/00-DESIGN.md): on a canyon rung the ridge lands HERE, after every
+  // R() draw above (the v1.40 nothing-moves-a-seed law: the other forty-two rungs' cfgs are byte-what-they-were). The walls sit
+  // EAST-FIRST (the chicane's second ridge is walked first); the odd rungs' pillow rocks step WEST of the first wall (§6 — a rock in
+  // a mouth blocks it; post-roll, zero R()); the chain solids join terrain.rocks as art:'wall' (D1).
+  if(CANYON_RUNGS[n]){
+    cfg.terrain.walls=CANYON_RUNGS[n].map(w=>({ x:w.x, w:w.w, gaps:w.gaps.map(g=>({y:g.y,h:g.h})) })).sort((a,b)=>b.x-a.x);
+    const wx0=Math.min.apply(null, cfg.terrain.walls.map(w=>w.x));
+    for(const rk of cfg.terrain.rocks) rk.x=Math.min(rk.x, wx0-CANYON_ROCK_CLEAR-rk.r);
+    for(const rk of wallChains(cfg.terrain.walls)) cfg.terrain.rocks.push(rk);
+  }
   const c=x=>Math.max(1,Math.round(x*cfg.cntMul));
   if(n===PARK_KEY_RUNG){   // 0555: re-keyed to the KEY RUNG (the 0372 grammar) — rung 20's authored finale + its Nemesis door stay BYTE-IDENTICAL; rungs 21-50 walk the factory below
     // D16's TWO ACTS — NEMESIS's red-saber captain with HIS army must fall first (the yeti-20
@@ -84160,6 +84309,11 @@ window.GVT = {
       bear:{ owned:unitOwned('kingbear'), sel:heroSel(), inRoster:ownedUnits().indexOf('kingbear'), cost:COSTS.kingbear, def:Object.assign({},UDEF.kingbear), w:unitW('kingbear'), west:UNIT_WEST.kingbear|0, img:!!IMG.kingbear, box:TEDDY_BOX.kingbear, heroes:HEROES.slice(), soul:SOUL_EXTRA.indexOf('kingbear')>=0 },
       bicorne:teddyBicorneOn()?1:0, bicorneNode:!!document.querySelector('#decTeddy .tedbicorne'), posters:(function(){ const w=document.getElementById('posterWall'); return w? { lv:+w.dataset.lv, torn:w.classList.contains('torn'), rungs:[...w.querySelectorAll('.pw-poster')].map(g=>+g.dataset.rung), tears:w.querySelectorAll('.pw-tear').length, l:w.style.left, t:w.style.top, w:w.style.width, h:w.style.height } : null; })(),
       seen:(META.outfitSeen||[]).filter(i=>ids.indexOf(i)>=0) }; },
+  canyon(pick){ if(pick!==undefined) GAP_PICK=pick; const TR=(S.cfg&&S.cfg.terrain)||{}, RK=TR.rocks||[];   // 0570 PILLOW CANYONS' probe — read-only but the ⚑ GAP_PICK flip (design/pillow-canyons-0826)
+    return { cv:GVT_CV, pick:GAP_PICK, crowd:GAP_CROWD, fireR:GAP_FIRE_R, band:GAP_BAND, rungs:Object.keys(CANYON_RUNGS).map(Number), n:S.park&&S.park.n, frontX:campFrontX(), deployX:campDeployX(),
+      walls:TR.walls? TR.walls.map(w=>({ x:w.x, w:w.w, gaps:w.gaps.map(g=>[g.y,g.h]) })) : null, chain:RK.filter(r=>r.art==='wall').map(r=>[r.x,r.y,r.r,r.chain]), rocks:RK.filter(r=>r.art!=='wall').map(r=>[r.x,r.y,r.r,r.art||'rock']),
+      foes:S.foes.map(f=>({ id:f.id, t:f.type, x:Math.round(f.x), y:Math.round(f.y), pick:f.wPick? f.wPick.slice() : null, done:f.wDone? f.wDone.slice() : null, tag:f.goalTag||null, sq:f.squeeze?1:0, st:+(f.stall||0).toFixed(2), form:f.form?1:0 })),
+      forms:S.forms.map(fo=>({ x:Math.round(fo.x), y:Math.round(fo.y), n:fo.members.length, pick:fo.wPick? fo.wPick.slice() : null })) }; },
   parkFloor(v){ if(v!==undefined) PF_PATCH=v?1:0; return { patch:PF_PATCH, hem:PF_HEM, hemC:PF_HEM_C, trailA:PF_TRAIL_A, w:PF_W, h:PF_H, gap:PF_GAP, sheet:PF_SHEET, c:PF_C.slice(), qlt:quiltField(), deployX:campDeployX(), W:W, WH:WORLD_H }; },   // 0826 THE PILLOW FLOOR's probe — the dials + the flip (design/feedback-0826-park-floor)
   fieldsGo(t){ RAID_CUR='fields'; startRaid(RAID_TIERS.indexOf(t)>=0? t : 'e'); return S.raid && S.raid.k; },   // the solo door exactly as UI.raidPlay drives it (the croakGo grammar; the battery's door — the gate is the scene's)
   fieldsState(){ const g=S.foes.find(f9=>f9.type==='bearnaparte'); const pr=((S.cfg&&S.cfg.terrain&&S.cfg.terrain.props)||[]).filter(p=>p.art==='pyramid');
