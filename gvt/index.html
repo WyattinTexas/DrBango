@@ -38382,7 +38382,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.00';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.01';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -82825,12 +82825,35 @@ function promoBeat(el,kind,key,mb,mi){
   if(PP_T) clearTimeout(PP_T);
   PP_T=setTimeout(ppSettle, RM? PP_BEAT_RM : PP_BEAT);
 }
+// ===== 0596 THE BANNER THAT WOULDN'T STAND DOWN (FM-GVT-FEEDBACK-0827-EVE §1 — design/feedback-0827-eve/
+// 00-FEEDBACK.md; Wyatt 8/27 eve: "You do your promotion, but then the big gold 'You have a promotion'
+// banner is still up. When you click out, it does nothing, but then it fixes itself when you exit the
+// promotions screen. It visually says you have a promotion when you don't.") =====
+// The academy is a ROOM MODAL: #roomModal lives INSIDE #menu (.rmback z5), outside hideAllOverlays' id
+// list and untouched by showMenu — so the picker (an .overlay, z10) hides the room on the way in and
+// showMenu shows it again on the way out, the academy EXACTLY as UI.room('promo') painted it: the gold
+// PROMOTIONS READY ×N banner off a count that is now 0 (its UI.promote guards pendingPicks>0 — the dead
+// tap Wyatt saw), the rank chevrons a rank behind. Every other surface painted off pendingPicks (the HQ
+// head's PROMOTION! ×N button, the PROMOTIONS pill's label + gold, the chalkboard's cascade) is
+// renderMenu's and is repainted at every showMenu — never stale; the modal alone stood. acSync re-deals
+// the academy IN PLACE (the 0554a scroll-held idiom — saberColor's / csPick's own line) whenever the
+// picker leaves the screen onto it: the drained exit (ppSettle's walk, below) and the all-maxed door
+// (pickOutBtn). Nothing here touches the ledger — pendingPicks, grantXP, UI.pick/pickW, the party beat and
+// the exit law (showMenu + pgTake) are byte-what-they-were; this is a repaint, and a repaint of nothing
+// when the academy is not standing (a verdict's picker, a scene's, the HQ head's own button).
+function acSync(){
+  if(!document.querySelector('#roomModal .acgrid')) return false;   // the academy is not standing — nothing to tell
+  const sc=document.querySelector('#roomModal .rmback'), st=sc?sc.scrollTop:0;
+  roomModal(panelHTML('promo'));
+  const s2=document.querySelector('#roomModal .rmback'); if(s2) s2.scrollTop=st;
+  return true;
+}
 function ppSettle(){
   PP_T=0;
   const pk=document.getElementById('picker');
   // the exit only walks if the picker still owns the screen (the all-maxed
   // door or a scene sweep may have left already — never showMenu over them)
-  if(META.pendingPicks<=0 && pk && !pk.classList.contains('hidden')){ showMenu(); pgTake(); }
+  if(META.pendingPicks<=0 && pk && !pk.classList.contains('hidden')){ showMenu(); pgTake(); acSync(); }   // 0596 THE BANNER THAT WOULDN'T STAND DOWN: the drained exit lands on the academy as it stood — re-dealt to the count (the room head + the pill are renderMenu's, fresh at showMenu); the banked cards below pop over the truthful academy
   const q=PP_Q; PP_Q=[];
   for(const e of q) (e[0]==='mb'? mboxOpen : e[0]==='st'? stripeOpen : mileOpen)(e[1]);
   heroPickDrain();   // 0464: a hero choice the pick just banked deals now — behind a queued card if one took #milePop (it waits for that fold), over the picker or the room otherwise
@@ -85094,7 +85117,7 @@ window.UI = {
     saveMeta(); renderMenu(); shopRefresh();
   },
   avatar(k){ META.avatar=k; saveMeta(); renderMenu(); roomModal(panelHTML('avatar')); },
-  promote(){ if(META.pendingPicks>0) showPicker(); },
+  promote(){ if(META.pendingPicks>0) showPicker(); else { SFX.clack(); if(S.mode==='menu') renderMenu(); acSync(); } },   // 0596: a PROMOTION door tapped with nothing to spend is a stale paint (the banner Wyatt saw) — no dead buttons (D7): the clack, and the room head + the academy repaint to the count
   // ===== CO-OP: the campaign's buddies door (v1.37 — the ONE door) =====
   // Walking in on a live party lands you back IN it; otherwise the squad muster.
   coopOpen(){ SFX.blip();
@@ -85885,7 +85908,7 @@ document.getElementById('againBtn').addEventListener('click', ()=>{
   });
 });
 document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); PGO=null; PGV=null; PGPV=null; PGPK=null; showMenu(); });   // 0341: HQ stays the explicit menu door — it clears the park stamp too (flagged)
-document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); showMenu(); pgTake(); });
+document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); showMenu(); pgTake(); acSync(); });   // 0596: the all-maxed door lands on the academy too — its banner re-dealt to the picks still banked (a ×2 painted before the pick reads ×1 the moment the door shuts) and its tap walks back in
 
 // ================= LOOP =================
 let last=0, ready=false;
