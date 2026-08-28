@@ -22920,12 +22920,14 @@ function emgTick(dt){
 const BMB_LVL=50;          // the 0090 slot (its rationale lives on that table)
 const BMB_COST=350;        // 0580 THE MOTOR POOL GOES TO WAR (Wyatt 8/26: "lower the cost of using the bomber to 350. It should be usable in Battlegrounds as well as campaign"): 350 a sortie — was Wyatt's "600 to play" (DOG TAGS, the vehicle ladder's rung above the tank's 500). THE ONE DIAL: the HUD digits, the shop line ({0}-templated ×7 — zero dict rows), the afford gray and the rig read this cell. The battleground was ALWAYS wired (every gate is S.bf||S.tanBase, the button draws in both HUD branches, the room relay word) — the lock was the PRICE: a desert night's purse tops near 470 on its 130-s clock (210 + 20 a drip), so 600 was never on call; 350 lights at the 7th drip, ~70 s in
 const BMB_N=6;             // bombs in the stick
-const BMB_DMG=4.5;         // 0826 (Wyatt 8/26 16:08 ET: "increase the damage of the bomber when it bombs stuff by 50%"): 3 → 4.5 = 1.5× the mine's 3 and 3× a mortar shell (0502 halved the tube to 1.5); the stick (BMB_N/BMB_LOAD), the burst (BMB_R) and the wire word stand (the campaign sink is f.hp -= dmg, a float lane). 0580 ⚑ Q5 LOUD: Wyatt's ~22:45 note ("increase the bomber damage by 50% base") reads as THIS +50%, already live — 4.5 STANDS; if he meant another +50% on top, 6.75 here, one literal, nothing else moves
+const BMB_DMG=13.5;        // 0609 (Wyatt 8/28: "Bomber is too weak. Increase its damage by 200%"): the ladder — 3 → 4.5 (0826, +50%) → 13.5 (this card, +200% = ×3; ⚑ Q1 a doubling would be 9 — one literal). A bomb = 13.5 vs the mortar's 1.5 and the mine's 3; the stick (BMB_N/BMB_LOAD), the burst (BMB_R), the price (BMB_COST 350) and the wire word stand (the campaign sink is f.hp -= dmg, a float lane); the relay carries n·r only, so an ally's sim reads its OWN BMB_DMG — an old client's bomb lands lighter on its own screen, the two-sims law already tolerates it
 const BMB_R=70;            // burst radius — between the mortar's 60 and the mine's 90
 const BMB_BAND=420;        // the back line: this far in front of their base, base-anchored
 const BMB_SPD=185;         // px/s of flight — the long front crosses in ~8s
 const BMB_ALT=120;         // how high above its ground track the plane draws
 const BMB_FALL=0.55;       // seconds a bomb takes to come down
+const BMB_LOOK=40;         // 0609: the shadow's reach past the fall lead — the scan sees this far beyond where a bomb released now could land
+const BMB_SW=100;          // 0609: the swath — bodies this far off the track (either side of it) are under the plane's eyes
 const BMB_EXIT=170;        // this far past the world edge = gone
 const BMB_VB='0 6 166 90';    // shop/reveal crop — getBBox-measured ink (x 0-166, y 6.9-95), never guessed
 // 0561a THE BOMBER FITS THE PAGE — THE LADDER (design/feedback-0825-am/00-FEEDBACK.md §1; Wyatt 8/25: "we also need to have
@@ -22972,8 +22974,57 @@ function bmbSpawn(side, seat, mine, n, spd){
     drops.push(eb.x - dir*BMB_BAND + dir*(i+0.5)*(BMB_BAND/n));
   if(dir<0) drops.sort((a,b)=>b-a);          // pass order matches flight order
   S.planes.push({ side:S.bf?side:null, seat:S.bf?seat:null, mine:!!mine,
-    x:x0, dir, y:eb.y, drops, di:0, bombs:[], gone:false, spd });   // 0561a: + the pace it flies
+    x:x0, dir, y:eb.y, bx:eb.x, drops, di:0, bombs:[], gone:false, spd });   // 0561a: + the pace it flies; 0609: + the band's anchor (bx — the re-space over the band left reads it)
   bfSfx(SFX.prop, Math.max(0,Math.min(wEdge,x0)), eb.y);   // the engine heard entering, if the camera is near that edge
+}
+// 0609 THE BOMBER AIMS (Wyatt 8/28: "Have it be more accurate to bombing when it
+// detects units below, but with no regard for your own units."): the eyes of the
+// plane. The scan pools are rpScan's own two loops — the ENEMY pool ONLY: campaign
+// S.foes (alive, not burrow/falling, on the carpet), battlefield S.units of the
+// other side. Your own men are never counted and never AVOIDED — a green man beside
+// the target stands in the same blast: the campaign's own-men law and the
+// battlefield's no-friendly-fire law at splash() both stand, byte-still. THE
+// SHADOW: a body is "below" while it sits within spd×BMB_FALL+BMB_LOOK of the nose
+// EITHER WAY (the doc's "under and just ahead" — a bomb hangs where it is released,
+// so the trailing half is as bombable as the leading; the mirror is what lets a
+// clump be served more than twice at the release gap) and ±BMB_SW of the track. The
+// answer: the densest body's x (bodies within BMB_R of each other count together;
+// a tie prefers the body still ahead of the nose, then the nearer one) and that
+// cluster's mean y. Deterministic — zero dice; per-sim aim (each seat's plane reads
+// its OWN field; the sims differ by frames and the splash already resolves locally
+// per sim — the {k:'bmb', n, r} wire word is byte-still, §6).
+function bmbBelow(p){
+  const lead=(p.spd||BMB_SPD)*BMB_FALL+BMB_LOOK;
+  const xs=[], ys=[];
+  if(S.bf){
+    for(const e of S.units){
+      if(e.dead||e.side===p.side||e.jetT>0||e.falling||e.cloakT>0) continue;
+      if(Math.abs(e.x-p.x)>lead || Math.abs(e.y-p.y)>BMB_SW) continue;
+      xs.push(e.x); ys.push(e.y);
+    }
+  } else {
+    for(const f of S.foes){
+      if(f.dead||f.burrow||f.falling) continue;
+      if(f.x>W-6) continue;
+      if(Math.abs(f.x-p.x)>lead || Math.abs(f.y-p.y)>BMB_SW) continue;
+      xs.push(f.x); ys.push(f.y);
+    }
+  }
+  if(!xs.length) return null;
+  let bi=-1, bn=0;
+  for(let i=0;i<xs.length;i++){
+    let n=0;
+    for(let j=0;j<xs.length;j++) if(Math.abs(xs[j]-xs[i])<=BMB_R) n++;
+    if(bi<0 || n>bn){ bi=i; bn=n; continue; }
+    if(n===bn){
+      const ai=(xs[i]-p.x)*p.dir, ab=(xs[bi]-p.x)*p.dir;   // signed along the flight: ahead > 0
+      if((ai>=0)!==(ab>=0)){ if(ai>=0) bi=i; continue; }
+      if(Math.abs(ai)<Math.abs(ab)) bi=i;
+    }
+  }
+  let sy=0, m=0;
+  for(let j=0;j<xs.length;j++) if(Math.abs(xs[j]-xs[bi])<=BMB_R){ sy+=ys[j]; m++; }
+  return { x:xs[bi], y:sy/m };
 }
 function bmbTick(dt){
   if(!S.planes || !S.planes.length) return;
@@ -22981,11 +23032,38 @@ function bmbTick(dt){
   for(const p of S.planes){
     if(!p.gone){
       p.x += p.dir*(p.spd||BMB_SPD)*dt;   // 0561a: the plane's own pace (the engine's, or the factory's)
+      // 0609: each release is decided IN FLIGHT. While enemy bodies sit in the shadow
+      // (bmbBelow) and MORE THAN ONE bomb remains, the stick releases ON them: the bomb
+      // lands AT the answer's x and its cluster's mean y clamped to the track ±60 (the
+      // burst covers the rest), releases pace themselves BMB_BAND/n of nose travel apart
+      // (⚑ Q3 the old stick's own pitch — one cluster cannot eat the whole load, and the
+      // LAST bomb is always the schedule's), and after every early release the remaining
+      // seats re-space evenly over the band left. With nobody below, the schedule flies
+      // the old stick to the byte — never a wasted sortie: the load is always spent by
+      // the band's end. The scan dies at the world's edge so no seat outlives the flight.
+      const onW = p.dir>0? p.x<=wEdge : p.x>=0;
+      const ans = (onW && p.di<p.drops.length-1)? bmbBelow(p) : null;
+      if(ans){
+        if(p.lastNx==null || Math.abs(p.x-p.lastNx)>=BMB_BAND/p.drops.length){
+          if(p.di===0) bfSfx(SFX.prop, p.x, p.y);   // the run begins over the bodies themselves
+          p.bombs.push({x:ans.x, y1:Math.max(p.y-60, Math.min(p.y+60, ans.y)), t:0});
+          bfSfx(SFX.fallw, ans.x, p.y);
+          p.lastNx=p.x; p.di++;
+          const k=p.drops.length-p.di;
+          if(k>0){   // the seats left re-space over the band left — the fallback keeps the band covered
+            const b0=p.bx-p.dir*BMB_BAND;
+            let from=p.dir>0? Math.max(p.x,b0) : Math.min(p.x,b0);
+            let span=(p.bx-from)*p.dir; if(span<0){ from=p.bx; span=0; }
+            for(let q=0;q<k;q++) p.drops[p.di+q]=from+p.dir*((q+0.5)*span/k);
+          }
+        }
+      } else
       while(p.di<p.drops.length && (p.dir>0? p.x>=p.drops[p.di] : p.x<=p.drops[p.di])){
         if(p.di===0) bfSfx(SFX.prop, p.drops[0], p.y);   // the run begins over the band itself
         const off = (p.di%2? 36 : -36);        // the stick fans a 72px swath — deterministic, no dice on the wire
         p.bombs.push({x:p.drops[p.di], y1:p.y+off, t:0});
         bfSfx(SFX.fallw, p.drops[p.di], p.y);
+        p.lastNx=p.x;
         p.di++;
       }
       if(p.dir>0? p.x>wEdge+BMB_EXIT : p.x<-BMB_EXIT) p.gone=true;   // "once it reaches the edge of the map, it goes away"
@@ -38611,7 +38689,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.14';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.15';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
