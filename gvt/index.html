@@ -29727,10 +29727,8 @@ const CAMP_DRESS={
   46:{ jax:[{x:760,y:230},{x:940,y:380}] },                        // the breather — two on the bare rug
   48:{ jax:[{x:820,y:200},{x:840,y:380},{x:980,y:290}] },          // the giant's river crossing — a north/south pair past the stones and one before the crate
   25:{ rocks:[{x:608,y:296,r:16,art:'bags',row:'a'},{x:634,y:314,r:16,art:'bags',row:'a'},{x:660,y:332,r:16,art:'bags',row:'a'}] },   // 0499: the rolling ball LEFT this rung (Wyatt 8/22: "Remove the rolling ball in level 25 of the regular campaign") — no balls row → S.cfg.terrain.balls stays unset and campBallTick's one truthy test returns; the sandbag trio stays; L30's and every other rung's balls untouched
-  30:{ rocks:[{x:900,y:190,r:33,art:'block',ltr:'G',bc:'#6E8F4E'},{x:1010,y:300,r:34,art:'block',ltr:'V',bc:'#4E7FA8'},{x:880,y:420,r:33,art:'block',ltr:'T',bc:'#C0483B'},
-              {x:1150,y:250,r:24},{x:1120,y:400,r:22},
-              {x:592,y:300,r:16,art:'bags',row:'a'},{x:618,y:318,r:16,art:'bags',row:'a'},{x:644,y:336,r:16,art:'bags',row:'a'}],
-       balls:[{x:1290,y0:150,y1:440,r:44,spd:54}] },
+  30:{ rocks:[{x:1150,y:250,r:24},{x:1120,y:400,r:22},
+              {x:592,y:300,r:16,art:'bags',row:'a'},{x:618,y:318,r:16,art:'bags',row:'a'},{x:644,y:336,r:16,art:'bags',row:'a'}] },   // 0594a THE CLASSIC RIVER: the ball LEFT this rung (Wyatt 8/27: "no rolling ball" — the 0499 grammar: no balls row → S.cfg.terrain.balls stays unset) and the G/V/T letter blocks with it (the G and the V straddled the new channel at 926-982; ⚑ one line seats them on the east bank); the two stones and the sandbag row stand — "I like the sandbags, some rocks, that's fine". Level 130 wears this row through campBaseRung.
   35:{ rocks:[{x:612,y:268,r:16,art:'bags',row:'a'},{x:638,y:286,r:16,art:'bags',row:'a'},{x:664,y:304,r:16,art:'bags',row:'a'}],
        trench:{ w:64, pts:[[1180,120],[1200,200],[1185,280],[1200,360],[1230,430],[1200,505]] } },
   40:{ rocks:[{x:600,y:180,r:16,art:'bags',row:'a'},{x:626,y:196,r:16,art:'bags',row:'a'},{x:652,y:212,r:16,art:'bags',row:'a'}],
@@ -32028,6 +32026,13 @@ const BOSSDEF = {
 // override moves no bodies) and the hp ceiling is the knife-edge's, not
 // this table's. Overrides are ABSOLUTE values (the grammar replaces).
 const CAMP_EDITS = { v:1, levels:{
+  // 0594a THE CLASSIC RIVER AT 30 / 130 (design/larson-0827/01-CLASSIC-RIVER.md; Wyatt 8/27 ~23:35: "I'm seeing a rolling ball on level 130 …
+  // Just do classic river. I like the sandbags, some rocks, that's fine, but I just want classic river with two bridges, no rolling ball"):
+  // level 30's seed draws no river — the wrapper authors THE CROSSING's shape on the campaign's own grammar: the channel at the rug's middle
+  // (598 in the 1240 span the wrapper owns → 926-982 after the grand stretch), TWO plank spans at THE CROSSING's rows 172 / 428 (bridgeY2 —
+  // 0594a's cell; every walker takes the nearer one), the campaign's plank width. Elite 130 wears it whole (levelCfg's elite branch reads
+  // the base rung through this wrapper) under the night carpet. The dress row below keeps the sandbags and the two stones; the ball is gone.
+  30:{ terrain:{ river:{ x:598, w:56, bridgeY:172, bridgeY2:428, bw:76 } } },
   72:{ bossF:1.54 }, 78:{ bossF:1.70 }, 84:{ bossF:1.87 }, 96:{ bossF:2.19 } } };
 if(CAMP_EDITS && CAMP_EDITS.v){
   const E = CAMP_EDITS;
@@ -35631,7 +35636,7 @@ function shakeMusicStop(){
 // ===== THE PANTHEON (the trigger registry — order IS priority) =====
 const PANTHEON=[
   { id:'lv100',   due:()=>META.lvl>=100 },
-  { id:'camp100', due:()=>META.campaign>=100 },
+  { id:'camp100', due:()=>META.campaign>=100 && !(S.levelN>100 && !S.bf && !S.rival && !S.park && !S.raid && !S.momRaid) },   // 0594a (Wyatt 8/27 ~23:35, the recorder at 130: "it told me that I defeated the campaign, which is not accurate"): the first hundred's dance never plays on an ELITE verdict (101-200 — the summit's own elite200 is that ladder's word); a save that crosses 100 on the recorder's jump, a party's carry or a healed ledger dances on its next first-hundred / battleground / park / raid verdict instead (the retro law stands)
   { id:'elite200', due:()=>!!eliteLed()[100] },   // 0545 THE SUMMIT: the elite ladder's own gold dance — the ledger's 200 stamp (the win foot stamps it live, the boot heal a veteran; state-based like the rest)
   { id:'nemesis', due:()=>{ const n=META.nemesis||{}; return (n.w|0)>0 && (n.st|0)>=NEMESIS_DAYS.length; } },   // the retirement — co-fires with hm14, one moment
   { id:'mom',     due:()=>!!(META.mom&&META.mom.done) },
@@ -36970,7 +36975,7 @@ function campGrandArm(){
     S.gk=CAMP_GRAND_W/CAMP_W;
     W=CAMP_GRAND_W; resize();
     t.rocks.forEach(rk=>{ rk.x=Math.round(rk.x*S.gk); if(off) rk.y+=off; });
-    if(t.river){ t.river.x=Math.round(t.river.x*S.gk); if(off) t.river.bridgeY+=off; }
+    if(t.river){ t.river.x=Math.round(t.river.x*S.gk); if(off){ t.river.bridgeY+=off; if(t.river.bridgeY2!=null) t.river.bridgeY2+=off; } }   // 0594a: a second span slides with the first
     if(t.props) t.props=t.props.map(pr=>Object.assign({},pr,{x:Math.round(pr.x*S.gk)},off?{y:pr.y+off}:{}));
   }
   // 0129 THE DRESSING rides the same door, AFTER the stretch — and 0193 opens
@@ -38388,7 +38393,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='6.98';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='6.99';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -39786,7 +39791,7 @@ function coopApply(cm){
       // beat it takes the misfit to show; the fitted anchor IS his anchor,
       // so the same test breaks mine on the same ground
       let brk9=false; if(FORM_BRK_MIRROR){ const RV=S.cfg&&S.cfg.terrain&&S.cfg.terrain.river;
-        const g9=(RV && A.x>RV.x+RV.w+40)? {x:RV.x+RV.w/2, y:RV.bridgeY} : T;
+        const g9=(RV && A.x>RV.x+RV.w+40)? {x:RV.x+RV.w/2, y:rvBridge(RV,A.y)} : T;   // 0594a: the nearer bridge
         const dg=Math.hypot(g9.x-A.x, g9.y-A.y);
         if(dg<115 || (RV && A.x<RV.x+RV.w+80 && A.x>RV.x-20)) brk9=true; }
       if(brk9 || (resT>FORM_RES_MAX && (res==null || res>FORM_RES_MAX))){
@@ -48072,6 +48077,12 @@ function campRefund(t,vet){ return Math.round(COSTS[t]*(vet?1+VET_COST_MUL:1)*CA
 const CAMP_FRONT_X=600;
 // …except where the seed parked the RIVER under that exact line: a watch stood
 // in the water is nonsense, so on those carpets the line is the east bank.
+// 0594a THE CLASSIC RIVER (design/larson-0827/01-CLASSIC-RIVER.md §2 D1; Wyatt 8/27 ~23:35: "I just want classic river with two
+// bridges, no rolling ball"): the campaign river may carry a SECOND plank span — `bridgeY2` on the row (the same bw). Every walker
+// funnels to the bridge NEARER his own y (rvBridge — a one-bridge river answers its one bridge, so every other rung is byte-behaviour);
+// the draw paints every span (rvBridges). Level 30 authors the pair through the CAMP_EDITS wrapper (THE CROSSING's own rows 172 / 428).
+function rvBridge(RV,y){ return (RV.bridgeY2!=null && Math.abs(y-RV.bridgeY2)<Math.abs(y-RV.bridgeY))? RV.bridgeY2 : RV.bridgeY; }
+function rvBridges(RV){ return RV.bridgeY2!=null? [RV.bridgeY, RV.bridgeY2] : [RV.bridgeY]; }
 function campFrontX(){
   const fx=Math.round(CAMP_FRONT_X*(S.gk||1));   // v1.98: the forward line rides the grand stretch (identity at gk 1)
   const RV=S.cfg.terrain.river;
@@ -48333,11 +48344,12 @@ function campUnitStep(u,dt){
   if(RV){
     if(!u.wade && u.squeeze && u.x>RV.x-60 && u.x<RV.x+RV.w+30) u.wade=true;
     if(!u.wade && u.x<RV.x+RV.w && goal.x>RV.x){
-      goal = (Math.abs(u.y-RV.bridgeY) > RV.bw*0.3)
-        ? { x:RV.x-30, y:RV.bridgeY }            // walk the bank to the bridge mouth first
-        : { x:RV.x+RV.w+30, y:RV.bridgeY };      // then straight over the planks
+      const by9=rvBridge(RV,u.y);   // 0594a: the NEARER bridge (level 30's classic crossing carries two; a one-bridge river answers its one)
+      goal = (Math.abs(u.y-by9) > RV.bw*0.3)
+        ? { x:RV.x-30, y:by9 }            // walk the bank to the bridge mouth first
+        : { x:RV.x+RV.w+30, y:by9 };      // then straight over the planks
     }
-    if(u.x>RV.x-4 && u.x<RV.x+RV.w+4 && Math.abs(u.y-RV.bridgeY)>RV.bw*0.55){
+    if(u.x>RV.x-4 && u.x<RV.x+RV.w+4 && Math.abs(u.y-rvBridge(RV,u.y))>RV.bw*0.55){
       wade=0.42;                                 // in the water, off the planks — a wade, at wading pace
       if(Math.random()<0.08) S.fx.push({k:'ring',x:u.x,y:u.y-2,r:4,R:18,t:0,dur:0.4,col:'#6E9DC4'});
     }
@@ -58033,7 +58045,7 @@ function update(dt){
     const WLf=canyonWallAhead(fo.x,null);   // 0570 PILLOW CANYONS (D2): the wall the block is walking at — null on every rug without one (byte-still)
     const fcp=(S.raid && fo.rcI!=null && S.raid.cfg===S.cfg)? S.raid.posts[fo.rcI] : null;   // 0318: the block's own turret RACE — while the flag flies no colour (Wyatt's literal revert)
     const fgoal = (fcp && !fcp.o)? {x:fcp.x, y:fcp.y}
-      : (RV && fo.x>RV.x+RV.w+40) ? {x:RV.x+RV.w/2, y:RV.bridgeY}
+      : (RV && fo.x>RV.x+RV.w+40) ? {x:RV.x+RV.w/2, y:rvBridge(RV,fo.y)}   // 0594a: the block aims at the bridge nearer its own y
       : (WLf && fo.x>WLf.wl.x+WLf.wl.w+40) ? canyonFormGoal(fo,WLf) : T;   // 0570: the river's own funnel, generalised — the block aims at its mouth's east lip (D3 picks it once, in the band)
     const d=Math.hypot(fgoal.x-fo.x, fgoal.y-fo.y);
     // a block of men is WIDE. If the anchor stops gaining ground on its goal —
@@ -58117,7 +58129,9 @@ function update(dt){
       if(f.falling.t>=f.falling.dur){ const fk=f.falling.kind; f.falling=null; f.fellVoid={kind:fk}; }
       if(dt>0){ f.vx=0; f.vy=0; } }
     else if(f.shv){ ggShoveStep(f,dt); if(dt>0){ f.vx=0; f.vy=0; } }   // 8/8 gravity gun: the flight owns his feet this frame
-    else if(f.retreat){ const sp9=f.def.spd*LR_ROUT_X, st9=rockSteer(f.x,f.y,W+120,f.y,ROCK_PAD_FOE); f.x+=(st9? st9.x : 1)*sp9*dt; f.y+=(st9? st9.y : 0)*sp9*dt; }   // 0594 THE ROUT: a survivor of Larson's fall runs for the east edge on his own pace × LR_ROUT_X, steering round the furniture like every walker (rockSteer — a straight push against a boulder's shoulder stood a man there forever, measured); the walk-flip stamp below turns him east; the mover chain never owns him again
+    else if(f.retreat){ const sp9=f.def.spd*LR_ROUT_X, RV9=S.cfg.terrain.river; let gx9=W+120, gy9=f.y;
+      if(RV9 && f.x<RV9.x+RV9.w+4){ gy9=rvBridge(RV9,f.y); if(f.x<RV9.x-4 && Math.abs(f.y-gy9)>RV9.bw*0.3) gx9=RV9.x-30; }   // 0594a: a survivor west of the water runs for the NEARER bridge mouth first, then straight over the planks — the men's own bank-first funnel, never a wade home
+      const dx9=gx9-f.x, dy9=gy9-f.y, d9=Math.hypot(dx9,dy9)||1, st9=rockSteer(f.x,f.y,gx9,gy9,ROCK_PAD_FOE); f.x+=(st9? st9.x : dx9/d9)*sp9*dt; f.y+=(st9? st9.y : dy9/d9)*sp9*dt; }   // 0594 THE ROUT: a survivor of Larson's fall runs for the east edge on his own pace × LR_ROUT_X, steering round the furniture like every walker (rockSteer — a straight push against a boulder's shoulder stood a man there forever, measured); the walk-flip stamp below turns him east; the mover chain never owns him again
     else if(f.aimT>0 || f.mgRootT>0 || f.aW>0 || f.brT>0 || foeHolds(f)){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; }   // 0478: + THE SHOWDOWN — a `hold` boss stands where the line can answer (foeHolds)   // stopped to shoot — your window (0278a: a halted air-stepper stands planted, never frozen mid-hop; 0278b: f.aW = the bruiser's rear-up + the king's inhale, the same planted read; 0396: f.brT = a breather stands through his own standing jet — ⚑ BR_PLANT)
     else {
     // 0278a THE AIR-STEP GATE: airMv() integrates this frame's airborne
@@ -58140,7 +58154,7 @@ function update(dt){
     const goal = (capP && capP.o!==2)? { x:capP.x, y:capP.y }
       : (rcP && !rcP.o)? { x:rcP.x, y:rcP.y }
       : (RV && !f.crossed && f.type!=='crawler' && !f.boss && f.x>RV.x+RV.w)
-      ? { x:RV.x+RV.w/2, y:RV.bridgeY }
+      ? { x:RV.x+RV.w/2, y:rvBridge(RV,f.y) }   // 0594a: the bridge nearer his own y (two on level 30's crossing)
       : WLs? canyonGoal(f,WLs) : T;   // 0570: the funnel without the water — NO crawler exemption (R2: the cubs don't squeeze under), NO boss exemption (⚑), no wade (the stall re-picks below)
     if(RV && f.x<=RV.x-4) f.crossed=true;
     if(f.def.minRng && !f.boss && !(f.rimIn && f.x>=W-60) && !(teddyGun(f) && f.x>gunLineX()) && hasGreenTarget(f)){   // 0586 THE GUN LINE: a bear cannon EAST of gunLineX() (W×0.80 = 992) may not park — born at W+60 with the line already at the crate he froze OFF the bed (invisible, untargetable, silent) or parked BEHIND the box; he rolls on instead (teddyGunRoll / teddyFormRoll) and the shipped shelf takes him at the line. rim:1 on every teddy cannon group makes the 0519 clause his too — belt and braces
@@ -60667,10 +60681,11 @@ function drawRug(){
     // planks, so he slides UNDER the popsicle bridge exactly like a real
     // bath toy would (v2.15's own layering, the crossing's law).
     if(S.cduck) drawCrossDuck(S.cduck);
-    const by=RV.bridgeY;
+    for(const by of rvBridges(RV)){   // 0594a: every plank span the river carries (one — or level 30's two)
     cx.fillStyle='#B48A54'; cx.fillRect(RV.x-10, by-RV.bw/2, RV.w+20, RV.bw);
     cx.strokeStyle='#8a683e'; cx.lineWidth=3;
     for(let k=0;k<5;k++){ const yy=by-RV.bw/2+6+k*(RV.bw-12)/4; cx.beginPath(); cx.moveTo(RV.x-8,yy); cx.lineTo(RV.x+RV.w+8,yy); cx.stroke(); }
+    }
   }
   // rocks (borrowed from the fish tank too) — or, in costume: the tipped juice
   // cup and the alphabet blocks (round hitbox, square heart)
