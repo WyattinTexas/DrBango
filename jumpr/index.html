@@ -291,7 +291,7 @@ function renderSent() {
     const d = document.createElement("div"); d.className = "sent-item";
     const s = document.createElement("span");
     s.className = "st " + o.state;
-    s.textContent = o.state === "queued" ? ("🦘 " + (o.task || "queued")) :
+    s.textContent = o.state === "queued" ? ("🦘 " + (o.task || "queued") + (o.fired ? " ⚡" : "")) :
                     o.state === "delivered" ? "☁️ delivered" :
                     o.state === "failed" ? "✕ failed" : "⏳ sending…";
     const p = document.createElement("p"); p.textContent = o.preview;
@@ -348,8 +348,9 @@ async function pollAcks() {
         if (a) {
           o.state = a.error ? "failed" : "queued";
           o.task = a.error ? a.error : (a.task || "").replace(/\.md$/,"").slice(0,10);
+          o.fired = a.fired ? 1 : 0;   // 8/29: the bridge turned an OFF jumpr on for this card
           setJ(LS.outbox, outbox); renderSent();
-          if (!a.error) toast(`Queued as ${a.task} (#${a.pos} in line)`);
+          if (!a.error) toast(`Queued as ${a.task} (#${a.pos} in line)` + (a.note ? ` · ${a.note}` : ""));
           fetch(`${DB}/${CHAN}/acks/${o.pid}.json`, { method:"DELETE" }).catch(()=>{});
         }
       }
@@ -377,7 +378,7 @@ async function pollStatus() {
     if (age < 180) { dot.className = "dot ok"; line.innerHTML = ""; line.append(dot, ` Mac online · ${Math.round(age)}s ago`); }
     else { dot.className = "dot asleep"; line.innerHTML = ""; line.append(dot, ` Mac asleep — notes land on wake`); }
     const rows = [
-      `<span class="chip">${s.armed ? "⛓ chain <b>ARMED</b>" : "chain idle"}</span>`,
+      `<span class="chip">${s.armed ? "⛓ chain <b>ARMED</b>" : "chain idle · your next note turns it on"}</span>`,
       `<span class="chip">queue <b>${s.queue_n}</b></span>`,
       `<span class="chip">jumps <b>${s.jumps}</b>/${s.cap}</span>`
     ];
