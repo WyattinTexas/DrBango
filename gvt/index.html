@@ -3923,6 +3923,7 @@
     background:#fff; color:#1c5fb8; font-size:11px; font-weight:800; line-height:20px; padding:0 5px;
     box-shadow:0 2px 5px rgba(0,0,0,0.4); }
   #grpBtn.hidden { display:none; }
+  #grpBtn.up { z-index:7; }   /* 0633 THE QUIET PARTY SHEET: the ✕ is gone — while the glass sheet stands (z6, the right two thirds of the scene) the GROUP button rides over it: the one door in AND out */
   @keyframes gbPulse { 0%{transform:scale(1)} 35%{transform:scale(1.12)} 100%{transform:scale(1)} }
   #grpBtn.pulse { animation:gbPulse 0.5s ease; }
   @media (prefers-reduced-motion: reduce) { #grpBtn.pulse { animation:none; } }
@@ -39216,7 +39217,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.33';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.34';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -43596,6 +43597,22 @@ let PTY_POP=null;     // the one full-screen card (join | go | catch | kicked)
 let PTY_K2={seat:-1, t:0};   // the sheet's armed KICK chip (§2b — 3 s disarm)
 const LFG_WINDOW=30000, LFG_SETTLE=8000, LFG_AUTO=10000, LFG_WISH=3000, KICK_ARM_MS=3000;
 const ASK_TTL=180000, PASS_ARM_MS=6000;   // 0588 THE PARTY TALKS BACK: an ask stands 3 min (⚑ D2 — withdraw any time, dies on leave/arrival); the PASS LEADER window 6 s (⚑ D7 — a kid reads five rows)
+// ═══ 0633 THE QUIET PARTY SHEET (FM-GVT-JUICE-01 §6 P9a — Wyatt's #6, the SURFACE half; design/juice-reach-0830/00-DESIGN.md
+// §3b / §3c / §6 P9a / §7 Q19 + Q20; the plan ~/jumpr/plans/0830-P09a-the-quiet-party-sheet.md; GO on the queue 8/30 ~20:40). Wyatt
+// 8/30 13:39, verbatim: "Empty party screen shows only a name field, an Invite button, and a Send Link button. … Remove the
+// X-to-back-out, show small 'in a group' blips instead, and drop the large 'look for group' sheet for now." THE READ (§3b / §3c):
+// co-op is 2.7% reach and its players are 2.7× the stars of their peers at L20+ (80% vs 67% still active). THE SHAPE: the empty sheet
+// = THEIR NAME + INVITE + SEND A LINK, nothing else — the pool's face (FIND A GROUP · the 30 s window · LOOKING FOR MORE) behind
+// LFG_ON (⚑ Q19: the pool stays on the box, ptyLfg / ptyLfgCancel / ptyLfm keep their bodies, one const brings the face back); the
+// standing HAVE A CODE? folded into the >4-matches honesty line where it already lives (pfindRowsHTML, 0527 R6); RECENT COMMANDERS
+// only with a ledger (already so). The ✕ is gone: the GROUP corner button is the one door in AND out (grpTap → ptyToggle; grpBtnSync
+// lifts it over the open sheet's glass, #grpBtn.up). THE BLIP: the sheet folds itself when a walk lands (ptyGoWalk — the 0617 lane)
+// and when an invite is accepted (the FELL IN row of ptyOnPoll), so both players see the play screen with the GROUP button's count
+// pip; pgFold stays the verdict's fold (0619). ⚑ Q20 "a name field" = THEIR NAME (the friend to invite — the field that exists).
+// Zero new keys, zero wire, zero META writes, zero server bytes. The mechanics (whoever queues pulls the group; both names on the
+// team) = P9b, the next card.
+let LFG_ON=0;   // ⚑ Q19: the pool's face on the sheets — 0 = off (the shipped default), 1 = the pristine face (FIND A GROUP · FINDING A GROUP… 0:30 · LOOKING FOR MORE); GVT.psCfg({lfgOn}) dials it live
+function psFold(){ PTY.open=0; PTY.inv=0; PTY.rep=0; }   // 0633 THE BLIP: the sheet folds itself (pgFold's own stamps, no clack) — the GROUP corner button (the blue glow + the count pip) is the minimized group
 const PTY_PLACES={ bf:'THE BATTLEFIELD', c:'THE CAMPAIGN', yeti:'YETI PARK',
                    dino:'DINO PARK', teddy:'BEAR PARK', west:'OUTLAW TOWN', hide:'THE HIDEOUT',   // 0826 D3: + BEAR PARK (the wordmark's own key ×7; 'teddy' fits the server's ^[a-z]{1,6}$)
                    ice:'THE ICE CASTLE', lair:"KING REX'S LAIR", fields:'THE PILLOW FIELDS' };   // 0526: the fields are a party place too (the wordmark's own ×7 key; 'fields' fits the server's ^[a-z]{1,6}$)   // 0411a D2/D3: the castle + the lair are party places — both names are the wordmarks' own ×7 keys (AT %1 composes, zero new l10n); the server's plc regex ^[a-z]{1,6}$ fits both words
@@ -44476,6 +44493,7 @@ function ptyOnPoll(r){
     const fresh=(COOP.members||[]).slice().sort((a,b)=>(b.seat|0)-(a.seat|0))[0];
     if(fresh && (fresh.seat|0)!==(COOP.seat|0)){
       PTY.litSeat=fresh.seat|0; PTY.litT=Date.now();
+      psFold(); ptyRender();   // 0633 THE QUIET PARTY SHEET: a commander fell in — my sheet folds (the play screen + the pip on both seats); the toast below still speaks, centred now
       ptySay('fell', String(fresh.name||'ALLY').toUpperCase().slice(0,12), n);   // 0394: toast + banner
       SFX.horn(); dirty=true;
       if(PTY_LFG){ PTY_LFG=null; }                     // dealt in — the search is over
@@ -44552,7 +44570,7 @@ function ptyGoWalk(plc){
   try{ if(wartableOpen()) closeWarTable(); if(campSceneOpen()) closeCampScene();
        if(parkSceneOpen()) closeParkScene(); if(raidSceneOpen()) closeRaidScene(); }catch(e){}
   UI.closeModal();
-  PTY.open=1;
+  psFold();   // 0633 THE QUIET PARTY SHEET: the walk lands FOLDED — the play screen with the GROUP button's pip is the blip (0619's Q2 opened the member's sheet over the door; the owner's word turned it)
   if(plc==='bf') openWarTable();
   else if(plc==='c') openCampScene();
   else if(raidDoorOf(plc)) openRaidScene(raidDoorOf(plc).door);   // 0411a: all three thrones — a keyless member's scene refuses (openRaidScene gates on the key) and the refuse branch below parks the kid, party waits
@@ -44754,6 +44772,7 @@ function grpBtnSync(){
   if(el.__gb!==h){ el.__gb=h; el.innerHTML=h; }
   el.classList.toggle('grn', grn);
   el.classList.toggle('srch', !grn && !!PTY_LFG);
+  el.classList.toggle('up', !!document.querySelector('.ptySheet:not(.hidden)'));   // 0633 THE QUIET PARTY SHEET: the one door in AND out — lifted over the open sheet's glass (z7 > the sheet's z6), under it otherwise (z2, the 0515 stack)
   const nNow=L? n : 0;
   if(GRP_BTN_PULSE && GRP.lastN && nNow && nNow!==GRP.lastN){
     el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');   // D10 — the ptySay toast speaks at the same moment (redundant-by-design)
@@ -44856,7 +44875,7 @@ function renderPartySheet(){
     +(L? '<span class="pts-code">'+escH(String(COOP.code))+'</span>' : '')
     +'<span class="pts-who">'+escH(t("WHO'S HERE"))+' · '+escH(tf('%1 OF %2', ptyHere().length, Math.max(5,n)))+'</span>'
     +(flo? '<span class="pts-flo">'+flo+'</span>' : '')
-    +'<button type="button" class="pts-x" onclick="ptyX()">✕</button></div>';
+    +'</div>';   // 0633 THE QUIET PARTY SHEET: the ✕ is gone — the GROUP corner button is the one door in and out (grpTap → ptyToggle; grpBtnSync lifts it over the glass)
   const ban94=(PTY.ban && Date.now()-PTY.ban.t0<10000)? PTY.ban : (PTY.ban=null);
   if(ban94) h+='<div class="pts-ban'+(ban94.gold?' gold':'')+'" data-notr>'+ban94.txt+'</div>';
   h+=ptyAskStripHTML();   // 0588 THE ASK STRIP under the head (≤2; the leader taps it, a member reads it)
@@ -44891,7 +44910,7 @@ function renderPartySheetHQ(el){
     +(plc? '<span class="pts-at">'+escH(tf('AT %1', ptyPlaceName(plc)))+'</span>' : '')
     +(L? '<span class="pts-code">'+escH(String(COOP.code))+'</span>' : '')
     +(L? '<span class="pts-who">'+escH(t("WHO'S HERE"))+' · '+escH(tf('%1 OF %2', ptyHere().length, Math.max(5,n)))+'</span>' : '')
-    +'<button type="button" class="pts-x" onclick="ptyX()">✕</button></div>';
+    +'</div>';   // 0633 THE QUIET PARTY SHEET: the ✕ is gone — the GROUP corner button is the one door in and out (grpTap)
   const ban94=(PTY.ban && Date.now()-PTY.ban.t0<10000)? PTY.ban : (PTY.ban=null);
   if(ban94) h+='<div class="pts-ban'+(ban94.gold?' gold':'')+'" data-notr>'+ban94.txt+'</div>';
   h+=ptyAskStripHTML();   // 0588 THE ASK STRIP under the head (≤2; the leader taps it, a member reads it)
@@ -44901,8 +44920,7 @@ function renderPartySheetHQ(el){
     +ptyStateHTML(null)
     +(L&&n>1? ptyRowsHTML(null) : '')
     +(L&&n>1&&plc? ptyAwayHTML(plc) : '')
-    +'<button type="button" class="pts-quiet pts-hqcode" onclick="ptyEnterCode()">'+escH(t('HAVE A CODE?'))+'</button>'
-    +'</div>';
+    +'</div>';   // 0633 THE QUIET PARTY SHEET: the standing HAVE A CODE? button is gone — the code door lives where the game says to use a code, the >4-matches honesty line (pfindRowsHTML, 0527 R6)
   h+='<div class="pts-gobar">'+(L? ptyLeadSlotHTML()+'<button type="button" class="pts-leave" onclick="ptyLeaveGo()">✕ '+escH(t('LEAVE THE PARTY'))+'</button>' : '')+'</div>';   // 0588: THE LEADER SLOT on the HQ edition too (ASK TO LEAD from the room — ⚑ D13)
   el.innerHTML=h;
   ptyTickArm(!!(PTY_LFG || (L&&(COOP.pub|0)) || PTY.ban || PTY.pass
@@ -45169,6 +45187,7 @@ function ptyRecentsHTML(){
 }
 // the ONE green state button — §2 rev 4
 function ptyStateHTML(here){
+  if(!LFG_ON) return '';   // 0633 THE QUIET PARTY SHEET (⚑ Q19): the pool's face is off — FIND A GROUP, the 30 s window and LOOKING FOR MORE stay behind the const (the machinery byte-still: ptyLfg · ptyLfgCancel · ptyLfm · the queue on the box)
   const L=ptyLobby(), n=L? (COOP.members||[]).length : 1;
   const fmt=(ms)=>{ const s=Math.max(0,Math.ceil(ms/1000)); return '0:'+String(s).padStart(2,'0'); };
   if(!L || n<2){
@@ -88452,6 +88471,14 @@ window.GVT = {
       lit:{ campaign:cl('ro-campaign'), campaignTag:cl('rtag-campaign'), bf:cl('ro-bf'), bfTag:cl('rtag-bf'), board:cl('ro-board'), boardTag:cl('rtag-board') }, tag:(g('rtag-board')||{}).textContent||'', tagBox:R(g('rtag-board')), stage:R(g('roomStage')), rivalBox:R(g('rspot-rival')), boardBox:R(g('rspot-board')), cup:cs('ro-board'), pill:cs('rtag-board'), crate:cs('ro-campaign'),
       beaconOn:!!IDLE.beacon, quiet:roomQuiet(), idle:+idleQuiet().toFixed(1), clock:roomBeaconS(), mode:S.mode, wr:wrIsOpen(), scr:telScreen(), room:roomCur() }; },   // 0632 THE DAILY DOORS BLIP — the rig's one read (read-only)
   ddCfg(p){ p=p||{}; if(p.minCamp!=null) DD_MIN_CAMP=+p.minCamp; return GVT.dd(); },   // 0632: the one dial (⚑ DD_MIN_CAMP)
+  ps(){ const g=id=>document.getElementById(id); const sh=document.querySelector('.ptySheet:not(.hidden)'); const gb=g('grpBtn'); const tx=e=>e? String(e.textContent||'').replace(/\s+/g,' ').trim() : null;
+    const R=el=>{ if(!el) return null; const b=el.getBoundingClientRect(); return { l:+b.left.toFixed(1), t:+b.top.toFixed(1), r:+b.right.toFixed(1), b:+b.bottom.toFixed(1), w:+b.width.toFixed(1), h:+b.height.toFixed(1) }; };
+    const q=sel=>sh? sh.querySelectorAll(sel).length : 0; const L=ptyLobby(); let hit=null;
+    if(gb && !gb.classList.contains('hidden')){ const b=gb.getBoundingClientRect(); const e=document.elementFromPoint((b.left+b.right)/2, (b.top+b.bottom)/2); hit=!!e && (e===gb || gb.contains(e)); }
+    return { cv:GVT_CV, lfgOn:LFG_ON, open:PTY.open|0, inv:PTY.inv|0, rep:PTY.rep|0, lfg:!!PTY_LFG, here:ptyPlaceNow(), lobby:!!L, n:L? (COOP.members||[]).length : 0, host:!!(L&&COOP.host), place:ptyPlace(), mode:S.mode, ban:(PTY.ban&&PTY.ban.txt)||'',
+      sheet:sh? { id:sh.id||'', cls:sh.className, host:sh.parentNode? (sh.parentNode.id||'') : '', box:R(sh), x:q('.pts-x'), state:q('.pts-state'), code:q('.pts-hqcode'), inputs:[...sh.querySelectorAll('input')].map(i=>i.id), buttons:[...sh.querySelectorAll('button')].map(b=>(b.className.split(' ')[0]||b.id)+':'+tx(b).slice(0,24)), share:q('.pts-share'), inv:q('.pts-inv'), panel:q('.pts-invp'), picker:q('.pts-pick'), go:q('.pts-go'), roster:q('.pts-roster'), recents:q('.pts-recs'), foot:q('.pts-gobar'), leave:q('.pts-leave'), head:tx(sh.querySelector('.pts-head')), text:tx(sh).slice(0,400) } : null,
+      grp:gb? { vis:!gb.classList.contains('hidden'), host:gb.parentNode? gb.parentNode.id : null, txt:tx(gb), pip:tx(gb.querySelector('.gb-pip')), grn:gb.classList.contains('grn'), srch:gb.classList.contains('srch'), up:gb.classList.contains('up'), z:getComputedStyle(gb).zIndex, box:R(gb), hit } : null }; },   // 0633 THE QUIET PARTY SHEET — the rig's one read (read-only)
+  psCfg(p){ p=p||{}; if(p.lfgOn!=null) LFG_ON=+p.lfgOn; return GVT.ps(); },   // 0633: the one dial (⚑ Q19 LFG_ON)
   // ---- 0292 IDLE DOOR-STANDER rig: dials + live machine state (idleCfg is
   // the battery's dial door — the adCfg precedent; rig doors never gate) ----
   idle(){ return { soft:IDLE_SOFT, hard:IDLE_HARD, ring:IDLE_RING, hb:HIDDEN_BEAT,
