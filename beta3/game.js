@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.58.0';
+const BUILD = 'STARSPELL v0.59.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -6116,16 +6116,17 @@ class Battle extends Phaser.Scene {
      leaves the board — spend it for nothing, scry the board away, or purify
      it (VIRGO cleanses) — because those valves already exist, "until used"
      plays better than a timed lift. Targets are the highest-value clean
-     tiles (the boss eats your best letters, freshly forged specials first —
-     a blacked special loses its shimmer outright: blackout wins). Never more
-     than 6 dark at once, and an inked letter still spells, so a board is
-     never uncastable. */
+     PLAIN tiles — a forged special (orange, blue, green) is spared until no
+     plain tile is left to ink (Skylar, 8/31: the boss eats your best
+     letters, not your earned ones; when a special IS inked it still loses
+     its shimmer outright — blackout wins). Never more than 6 dark at once,
+     and an inked letter still spells, so a board is never uncastable. */
   blackoutAttack(done) {
     const l = this.L;
     const dark = this.board.filter((s) => s && s.blk).length;
     const n = Math.min(this.beast.fx.ink || 2, Math.max(0, 6 - dark));
     const targets = this.board.map((s, i) => ({ s, i })).filter((x) => x.s && !x.s.blk && x.s.c.active)
-      .sort((a, b) => this.inkWorth(b.s) - this.inkWorth(a.s) || a.i - b.i)
+      .sort((a, b) => (a.s.tier > 0) - (b.s.tier > 0) || this.inkWorth(b.s) - this.inkWorth(a.s) || a.i - b.i)
       .slice(0, n);
     if (!targets.length) { done(); return; }
     let fin = false;

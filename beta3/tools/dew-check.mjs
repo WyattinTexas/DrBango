@@ -2,7 +2,8 @@
 // The forged family's third member: orange +6, blue ×1.5, GREEN heals. A
 // beast's strike leaves dew on ONE plain tile; it heals DEW_HEAL when it
 // rides the very next cast (still scoring its letter), drains if skipped,
-// is eaten by the blackout like any special, is never touched by STAR
+// is SPARED by the blackout while a plain tile remains (specials last,
+// v0.59.0 — though an ink that does land still wins), is never touched by STAR
 // FORGE, and never spawns in versus. Every cast here is REAL taps at DPR3 —
 // tiles and the CAST button are pressed through Input.dispatchMouseEvent.
 // Self-launching, like rival-check: serves beta3 on :8899 if nothing does,
@@ -220,9 +221,9 @@ w = await findWord([slot], []);
 ok('cast the drained letter', await castWord(w));
 ok('…and it heals nothing', (await hp())[0] === h0 && (await evj(`JSON.stringify(window.__ssdewHeal.t)`)) === healT0, h0 + '→' + (await hp())[0]);
 
-console.log('\n— THE BLACKOUT EATS IT · THE FORGE LEAVES IT —');
+console.log('\n— THE BLACKOUT SPARES IT · THE FORGE LEAVES IT —');
 await ev(`${B}.beast.count = 9; 'ok'`);
-// pick a green whose letter+6 outranks every other tile so the volley must take it
+// pick a green whose letter+6 outranks every other tile — the volley must STILL pass it by (specials last, v0.59.0)
 const target = await evj(`(() => { const b = ${B}; let best = -1, bw = -1, other = 0;
   b.board.forEach((s, i) => { if (!s) return; const v = b.tileVal(s.ch, s.tier); if (s.tier === 0 && !s.blk && v + 6 > bw) { bw = v + 6; best = i; } });
   b.board.forEach((s, i) => { if (s && i !== best) other = Math.max(other, b.inkWorth(s)); });
@@ -233,13 +234,18 @@ ok('inkWorth counts the balm as +6', await evj(`JSON.stringify(${B}.inkWorth(${B
 await ev(`${B}.beast.fx = { curse: 'blackout', ink: 1 }; ${B}.state = 'anim'; ${B}.blackoutAttack(() => { ${B}.state = 'pick'; }); 'ok'`);
 ok('volley returns the turn', await until(`${B}.state === 'pick'`, 8000));
 const ink = await evj(`JSON.stringify(window.__ssink)`);
-ok('the volley chose the green', ink && ink.tiles.length === 1 && ink.tiles[0] === target, JSON.stringify(ink && ink.tiles));
+ok('the volley spares the green (specials last)', ink && ink.tiles.length === 1 && ink.tiles[0] !== target, JSON.stringify(ink && ink.tiles));
+const inkIdx = ink.tiles[0];
 bd = await board();
-ok('blackout wins: inked, tier 0, no glow', bd[target].blk && bd[target].tier === 0 && !bd[target].glow, JSON.stringify(bd[target]));
+ok('…and inked a plain tile instead', bd[inkIdx].blk && bd[target].tier === 3 && !bd[target].blk && !!bd[target].glow, JSON.stringify({ inked: bd[inkIdx], green: bd[target] }));
+// when no plain tile remains the volley falls through to the special — blackTile is that landing
+await ev(`${B}.blackTile(${target}); 'ok'`);
+bd = await board();
+ok('blackout wins when it lands: inked, tier 0, no glow', bd[target].blk && bd[target].tier === 0 && !bd[target].glow, JSON.stringify(bd[target]));
 await ev(`${B}.beast.fx = null; 'ok'`);
 // STAR FORGE: the drop law stays length→power; green is neither upgraded nor forged
 await ev(`${B}.run.sigils = ['forge']; ${B}.beast.count = 9; ${B}.run.hp = ${B}.run.hpMax - 20; ${B}.updateBars(); 'ok'`);
-w = await findWord([], [target]);
+w = await findWord([], [target, inkIdx]);
 slot = await evj(`JSON.stringify(${B}.dewTile(${w[0]}))`);
 ok('green under STAR FORGE stays tier 3', (await board())[slot].tier === 3);
 ok('cast it with the forge', await castWord(w));
@@ -249,7 +255,7 @@ bd = await board();
 ok('the forge minted no green', bd.filter((s) => s && s.tier === 3).length === 0 && bd.every((s) => !s || s.tier !== 3));
 ok('pendingTier never says dew', await evj(`JSON.stringify([${B}.pendingTier | 0].every((t) => t !== 3))`));
 // a word of 5+ forges tier 2 with the sigil — the law, unchanged
-w = await findWord([], [target], 5);
+w = await findWord([], [target, inkIdx], 5);
 if (w) {
   ok('cast a 5+ word', await castWord(w));
   bd = await board();
