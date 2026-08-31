@@ -26336,6 +26336,10 @@ const META_DEFAULT = {
 };
 let META = META_DEFAULT;
 try { const m = JSON.parse(localStorage.getItem('gvt_meta')||'null'); if(m && m.v===1){ META = Object.assign({}, META_DEFAULT, m); META.stats=Object.assign({},META_DEFAULT.stats,m.stats||{}); META.piggy=Object.assign({},META_DEFAULT.piggy,m.piggy||{}); if(!META.iceR2){ META.iceR2=1; if(m.nemPark===undefined) META.ice={}; } } } catch(e) {}   // 0305 BF-02 (D14): the castle is a NEW fight — a pre-BF-02 ice ledger would open HARD on a fight the player never saw, so it resets ONCE (iceR2 latches; banked medals live in META.ach and never move; granted items stay owned). 0344 (Wyatt 8/15): the reset keys on the save's VINTAGE now — nemPark shipped in the same 0305 wave, so only true pre-BF-02 storage lacks it; before this, a fresh save that beat the castle in its FIRST session lost its honest ice ledger on boot 2 and 21-50 relocked at relaunch
+// 0624 THE RULER (FM-GVT-RULER-01 §3 D3): was this the device's FIRST boot? Read here, right after the
+// load and BEFORE the migration IIFEs below save it back — a link that brought a device here with no
+// gvt_meta at all is "link → install" (tel 'lnk_in' fresh; META.ref rides netSync until HQ latches it).
+const META_FRESH=(()=>{ try{ return !localStorage.getItem('gvt_meta'); }catch(e){ return false; } })();
 // THE CROSSING is the battlefield's flagship map — anyone who never actually
 // fought a match gets nudged onto it; testers with real history keep their pick.
 // v2.41 RANDOM BY DEFAULT (Wyatt 8/4: "please have the default map be
@@ -27189,6 +27193,7 @@ function iapCredit(d){
     // first read). A restore onto a fresh save lands here as a fresh credit
     // and re-stamps — that loop IS restore on all three stores.
     if(na){ if(na.days) META.adFreeT=Math.max(Date.now(),META.adFreeT||0)+na.days*86400000; else META.adFreeF=1; }
+    tel(p? 'sp_done' : 'na_done', String(d.sku||'').split('.').pop(), NAOFF.el? 1 : 0);   // 0624 D4: a fresh credit — once per txid, only a pack this build sells (the 0097 law)
     META.paidEver=1;   // FM-GVT-MAX-01 §V3.10 payer exemption: ANY real purchase retires REAL interstitials for good (rewarded stays — a gift, not a toll; the placeholder era has no reader). Flat comet-law field, Object.assign-safe.
     led.t.push(tx); if(led.t.length>300) led.t=led.t.slice(-300);
   }
@@ -27228,6 +27233,141 @@ const NET='https://nationgame.live/gvt';
 // an unhandled rejection. This is also where a 429 lands, unchanged.
 const NET_OFF={ ok:false, status:0, json:()=>Promise.resolve({ok:false, err:'offline'}) };
 function netFetch(u, o){ return netAllowed()? fetch(u, o) : Promise.resolve(NET_OFF); }
+// ═══ 0624 THE RULER'S FOUR GAUGES (FM-GVT-RULER-01, design/ruler-0830/00-DESIGN.md; Wyatt 8/30 13:46 by phone:
+// "Log which upgrade was chosen, how long the player deliberated, and whether they backed out without picking …
+// Where in the flow does the session actually end — mid-level, on the campaign screen, after an ad … Invite sent,
+// link sent, link converted to install, queue entered as a group versus solo … Impressions on the star pop-up and
+// the no-ads icon, taps, and completions"). ONE wire: POST /gvt/tel {device, cv, ev:[[name, a?, b?], …]} — a batch
+// of typed events the box folds into its RAM day-ledger (no DB write on the hot path; server v50). The client keeps
+// a small queue (gvt_tel, ≤ TEL_KEEP rows), flushes at TEL_BATCH events or TEL_FLUSH_MS after the first queued, and
+// SPEAKS AT THE EDGES: every visibilitychange→hidden and pagehide sends the queue + ['end', screen] by sendBeacon
+// (the 0292 farewell transport — a bare JSON string, text/plain, zero preflight). telScreen() names the screen under
+// the player from state the game already keeps; a 5-s tick keeps gvt_tel_scr current so a run that dies with no
+// edge is recovered at the next boot as ['endx', screen] (gvt_tel_bye = the farewell stamp). LAW 7: an old HQ 404s
+// the door and the client DROPS the batch (never a retry loop); offline / a thrown fetch re-queues, capped. Zero
+// l10n, zero dice, zero UI. Rig: GVT.tel(p?) — the read + the dials (the GVT.adCfg precedent). ═══
+let TEL_FLUSH_MS=20000, TEL_BATCH=12, TEL_KEEP=120, TEL_AD_MS=20000;   // DIALS (doc §7 Q4)
+const TEL={ q:[], t:0, sent:0, scr:'', seen:{}, pkT0:0, pkOpen:0, adT:0 };
+function telLoad(){ try{ const a=JSON.parse(localStorage.getItem('gvt_tel')||'[]'); if(Array.isArray(a)) TEL.q=a.filter(e=>Array.isArray(e)&&typeof e[0]==='string').slice(-TEL_KEEP); }catch(e){} }
+function telSave(){ try{ if(TEL.q.length) localStorage.setItem('gvt_tel', JSON.stringify(TEL.q.slice(-TEL_KEEP))); else localStorage.removeItem('gvt_tel'); }catch(e){} }
+function telArm(ms){ if(!TEL.t) TEL.t=setTimeout(()=>{ TEL.t=0; telFlush(); }, ms||TEL_FLUSH_MS); }
+function tel(n,a,b){
+  try{
+    if(typeof n!=='string' || !n) return;
+    const e=[n.slice(0,8)];
+    if(a!==undefined && a!==null) e.push(typeof a==='number'? (a|0) : String(a).slice(0,24));
+    if(b!==undefined && b!==null){ if(e.length<2) e.push(''); e.push(Math.max(0, Math.min(1e9, b|0))); }
+    TEL.q.push(e); if(TEL.q.length>TEL_KEEP) TEL.q=TEL.q.slice(-TEL_KEEP);
+    telSave();
+    if(TEL.q.length>=TEL_BATCH) telFlush(); else telArm();
+  }catch(e){}
+}
+function telRequeue(ev, arm){ try{ TEL.q=ev.concat(TEL.q).slice(0,TEL_KEEP); telSave(); if(arm) telArm(TEL_FLUSH_MS*3); }catch(e){} }
+function telFlush(beacon){
+  try{
+    if(!META.deviceId || !TEL.q.length) return;
+    if(TEL.t){ clearTimeout(TEL.t); TEL.t=0; }
+    const ev=TEL.q.slice(0,40);
+    const body=JSON.stringify({device:META.deviceId, cv:GVT_CV, ev:ev});
+    if(beacon){
+      if(!navigator.sendBeacon) return;
+      if(navigator.sendBeacon(NET+'/tel', body)){ TEL.q=TEL.q.slice(ev.length); TEL.sent+=ev.length; telSave(); }
+      return;
+    }
+    TEL.q=TEL.q.slice(ev.length); telSave();
+    netFetch(NET+'/tel',{method:'POST',headers:{'Content-Type':'application/json'},body:body,keepalive:true})
+      .then(r=>r.json()).then(d=>{ if(d&&d.ok) TEL.sent+=ev.length; else if(d&&d.err==='offline') telRequeue(ev, false); })   // any other refusal (an old HQ's 404, a 429) DROPS the batch — Law 7
+      .catch(()=>telRequeue(ev, true));
+    if(TEL.q.length) telArm();   // more than one batch waiting — the rest follows on the clock
+  }catch(e){}
+}
+// the screen under the player — one resolver, the order is the law (doc §3 D2)
+function telScreen(){
+  try{
+    const vis=id=>{ const e=document.getElementById(id); return !!e && !e.classList.contains('hidden'); };
+    let adLive=false; try{ adLive=!!AD; }catch(e){}
+    try{ if(!adLive && MAXA && MAXA.pend) for(const k in MAXA.pend){ if(MAXA.pend[k] && MAXA.pend[k].disp){ adLive=true; break; } } }catch(e){}
+    if(adLive) return 'ad';
+    if(TEL.adT && Date.now()-TEL.adT<TEL_AD_MS) return 'ad+';
+    try{ if(NAOFF.el) return 'pitch'; }catch(e){}
+    if(vis('title')) return 'title';
+    if(vis('picker')) return 'picker';
+    if(milePopUp()) return 'card';
+    if(S.mode==='play') return 'play:'+(S.bf? 'bf' : (S.raid&&S.raid.cfg===S.cfg)? 'raid' : (S.park&&S.park.cfg===S.cfg)? 'park' : S.train? 'range' : S.momRaid? 'mom' : 'camp');
+    if(S.mode==='win' || S.mode==='lose') return 'verdict:'+S.mode;
+    if(shopIsOpen()) return 'shop:'+String(SHOP.tab||'').slice(0,8);
+    if(wrIsOpen()) return 'rankings';
+    const rm=document.getElementById('roomModal'); if(rm && rm.innerHTML) return 'modal';
+    try{ if(PTY.open) return 'party'; }catch(e){}
+    if(wartableOpen()) return 'wartable';
+    if(campSceneOpen()) return 'campaign';
+    if(parkSceneOpen()) return 'park:'+PARK_CUR;
+    if(raidSceneOpen()) return 'raid:'+RAID_CUR;
+    if(S.mode==='menu') return 'room:'+roomCur();
+    return 'other';
+  }catch(e){ return 'err'; }
+}
+function telTick(){ try{ const sc=telScreen(); if(sc!==TEL.scr){ TEL.scr=sc; localStorage.setItem('gvt_tel_scr', sc); } }catch(e){} }
+function telHide(){
+  try{
+    const sc=telScreen(); TEL.scr=sc;
+    try{ localStorage.setItem('gvt_tel_scr', sc); localStorage.setItem('gvt_tel_bye','1'); }catch(e){}
+    TEL.q.push(['end', sc]); if(TEL.q.length>TEL_KEEP) TEL.q=TEL.q.slice(-TEL_KEEP);
+    telFlush(true);
+  }catch(e){}
+}
+function telBoot(){
+  try{
+    telLoad();
+    const sc=localStorage.getItem('gvt_tel_scr'), bye=localStorage.getItem('gvt_tel_bye');
+    if(sc && !bye) tel('endx', sc);   // the last run died with no farewell — its last known screen, recovered
+    localStorage.removeItem('gvt_tel_bye'); localStorage.removeItem('gvt_tel_scr');
+  }catch(e){}
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) telHide(); else { try{ localStorage.removeItem('gvt_tel_bye'); }catch(e){} } });
+window.addEventListener('pagehide', telHide);
+// D1 the picker: the clock starts at the paint (showPicker), a pick reads it and restarts it, a door with picks owed is a back-out
+function telPick(kind,key){ try{ const ms=TEL.pkT0? Date.now()-TEL.pkT0 : 0; tel('up', (kind==='w'? 'w:' : '')+key, ms); TEL.pkT0=Date.now(); }catch(e){} }
+function telPickOut(why){
+  try{
+    if(!TEL.pkOpen) return;
+    const pk=document.getElementById('picker');
+    if(pk && !pk.classList.contains('hidden') && (META.pendingPicks|0)>0) tel('upx', why, TEL.pkT0? Date.now()-TEL.pkT0 : 0);
+    TEL.pkOpen=0;
+  }catch(e){}
+}
+// D2 the ad stamp: a creative that reached the screen (0410's displayed proof; the TV's completed) arms `ad+` for TEL_AD_MS
+function telAd(kind,r){ try{ const disp=!!(r && (r.displayed || (kind==='rew' && r.completed))); if(disp){ TEL.adT=Date.now(); if(kind==='int'){ META.adShown=(META.adShown|0)+1; saveMeta(); } } tel('ad', kind, disp? 1 : 0); }catch(e){} }   // P12: adShown = interstitials SERVED, lifetime (a comet-law flat; the sync carries it)
+// D3 the start doors: humans on the carpet at the START (the party door sets S.coop only AFTER its start call — coopLaunching is the tell)
+function telHumans(){
+  try{
+    if(!COOP || !COOP.code || !(coopLaunching || S.coop)) return 1;
+    if(coopRoom()) return Math.max(1, (COOP.members||[]).length);
+    if(coopSquad()) return Math.max(1, (COOP.pc|0) || (COOP.members||[]).length);
+    return 2;
+  }catch(e){ return 1; }
+}
+function telGo(mode){ try{ tel('go', mode, telHumans()); }catch(e){} }
+function telFam(){ try{ return coopRoom()? 'r' : coopSquad()? 's' : 'c'; }catch(e){ return 'c'; } }
+// P12 (JUICE-01 §8, the two items the dictation lost — the peer read's reconstruction): the SOLO campaign's outcome per rung
+// (win 1 · loss 0 · quit 2 — a loss also stamps META.lossN/lossRung, the sync's two loss ints) and the chain's reach on the
+// sync (the four park ladders · the hookshot 0 none/1 owned/2 delivered/3 the map · interstitials served · dino by lens/gift)
+function telLv(o){ try{ if(S.coop || S.bf || S.rival || S.train || S.momRaid || (S.park&&S.park.cfg===S.cfg) || (S.raid&&S.raid.cfg===S.cfg)) return; const n=S.levelN|0; if(n<1) return; tel('lv', n, o); if(o===0){ META.lossN=(META.lossN|0)+1; META.lossRung=n; } }catch(e){} }
+function parksLv(){ try{ const o={}; for(const k of ['yeti','dino','western','teddy']) o[k]=Math.max(0, Math.min(99, parkLedger(k).lv|0)); return o; }catch(e){ return undefined; } }
+function hookState(){ try{ return META.wmap? 3 : decOwns('hook')? (META.hookDrop? 2 : 1) : 0; }catch(e){ return 0; } }
+function dinoBy(){ try{ return META.parkDino? (META.parkDinoBy==='gift'? 'g' : 'l') : undefined; }catch(e){ return undefined; } }
+// D4 the till: an impression is once per page session per surface; taps and completions never dedupe
+function telMon(n,a,b){ try{ if(/_imp$/.test(n)){ const k=n+'@'+a; if(TEL.seen[k]) return; TEL.seen[k]=1; } tel(n,a,b); }catch(e){} }
+function telShop(id){
+  try{
+    if(id!=='packs' || !shopIsOpen()) return;
+    const br=IAP.avail()? 1 : 0;
+    telMon('sp_imp','aisle',br);
+    if(noAdsCanOccur() && !adFree()) telMon('na_imp','aisle',br);
+  }catch(e){}
+}
+telBoot();
+setInterval(telTick, 5000);
 // a friend's invite link (?coop=CODE): stash the code, scrub the URL so a
 // refresh doesn't re-join, and connect the moment they reach the room
 let coopJoinPend=null, coopJoinMode='pair';
@@ -27235,6 +27375,11 @@ try{ const cm=location.search.match(/[?&](coop|squad|room)=([A-Za-z0-9]{4,8})/i)
   if(cm){ const kd=cm[1].toLowerCase();
     coopJoinMode = kd==='squad'? 'squad' : kd==='room'? 'room' : 'pair';
     coopJoinPend=cm[2].toUpperCase(); history.replaceState(null,'',location.pathname); } }catch(e){}
+// 0624 (doc §3 D3): which family brought this device here, and whether it had a save yet — link → install
+let TEL_LINK=null;
+try{ if(coopJoinPend){ const fam9=coopJoinMode==='room'? 'r' : coopJoinMode==='squad'? 's' : 'c'; TEL_LINK={ fam:fam9, fresh:META_FRESH? 1 : 0 };
+  if(META_FRESH && !META.ref){ META.ref=fam9; saveMeta(); }   // a comet-law flat: netSync carries it until HQ latches players.ref (v50)
+  tel('lnk_in', fam9, META_FRESH? 1 : 0); } }catch(e){}
 // ═══ 0322 P1 "REPORT BACK TO YOUR SQUAD?" — the mid-battle rejoin card.
 // COOP lives in RAM: a kid who fully CLOSES the app mid-battle reboots with
 // no memory of the live party, while HQ still holds their chair (the 0310
@@ -27357,6 +27502,8 @@ function netSync(){
         // no-op; the field is here for the future account story). No adopt
         // door: the choice never crosses devices, exactly like ranks (R7).
         soul:META.soul||undefined,
+        ref:META.ref||undefined,   // 0624: the link family that installed this device (v50 latches it NULL-only; a v49 box ignores the key)
+        lossN:META.lossN|0, lossRung:META.lossRung|0, parks:parksLv(), hook:hookState(), adsh:META.adShown|0, dinoby:dinoBy(),   // 0624 P12: the six honest ints (v50 latches them monotonic; a v49 box ignores the keys)
         // 0393: the away loadout snapshot — what an away battle needs to
         // field MY real army (the co-op wire's grammar at account level);
         // the server stores it only when it parses (the saber idiom).
@@ -37433,6 +37580,7 @@ function startBattle(levelN, rival){
   }
   hideAllOverlays();
   S.mode='play';
+  telGo(rival? 'rival' : 'camp');   // 0624 D3: ['go', mode, humans] — solo 1, a party's roster (coopLaunching)
   // no boot-camp coach mid co-op — the ally IS the coach
   if(META.campaign===0 && levelN===1 && !coopLaunching) coachStart();
   locSync();   // 0432: the LAST line of a game-start door — themeKill() ran first, so a location can never start over the menu theme
@@ -37764,7 +37912,7 @@ function tkDemoTick(dt){
       if(f.tkAcc>0){ S.floats.push({x:f.x, y:f.y-76, txt:'-'+trainFmt(f.tkAcc), t:0, col:'#FFD24A'}); f.tkAcc=0; } }
   }
 }
-function hideAllOverlays(){ shakeTeardown();   // SH-01: the dance dies at every door — music hard-stopped, held juice handed to the xpTeardown right after (which clears it, the pristine navigation law)
+function hideAllOverlays(){ telPickOut('door'); shakeTeardown();   // 0624 D1: the picker torn down with picks still owed = 'upx' (read BEFORE the hide below)   // SH-01: the dance dies at every door — music hard-stopped, held juice handed to the xpTeardown right after (which clears it, the pristine navigation law)
   xpTeardown();   // a ceremony must never survive into the next screen
   winFaceClear();                           // ...nor the campaign win's face (0552c: its timers, its classes, its tap listener)
   commClear();                              // ...and neither may a comm window (v1.41)
@@ -38896,7 +39044,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.24';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.25';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -46713,6 +46861,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   resize();                                    // the world just got wider — refit
   hideAllOverlays();
   S.mode='play';
+  telGo(team>1? 'bf2' : 'bf1');   // 0624 D3
   spdInit();   // ×1 out of the box (v2.37: the ×0.9 default retired) — or the ×2 this device already chose
   S.ann={ txt:(team>1? tf('%1 v %1 · %2', team, t(map.name)) : tf('BATTLEFIELD · %1', t(map.name))), t:2.6 };
   SFX.horn();
@@ -58063,6 +58212,7 @@ function endBattle(win){
     return;
   }
   S.mode = win?'win':'lose';
+  telLv(win? 1 : 0);   // 0624 P12: ['lv', rung, 1 win · 0 loss] for a SOLO campaign rung (a loss stamps lossN/lossRung) — after the first-battle mercy above, so the verdict the player sees is the one recorded
   sqNoteClear();   // 0322: a verdict on this sim means no battle is waiting — the rejoin note dies here (win, lose, solo alike)
   sqGameTick();   // v2.82 SQUAD AD LAW: a finished 2+-human game counts, win or lose (S.sq.sqAdT latches it once)
   PGV=pgOrigin();   // v2.84 POST-GAME LANDING LAW: the verdict itself remembers where this game was launched from — a party that dies on the verdict screen (iPad suspended past the box's 45s prune → 'no party' → dissolve) must not rob the exit taps of their squad landing
@@ -74892,7 +75042,7 @@ function squadAdGate(launch){
     if(brk && soloDue){ ADQ.soloPaid=ADQ.games; adNextArm(); }   // 0399: the solo latch — same law; 0504: paid → the next due game is drawn 2-3 games out and saved
   }catch(e){ brk=false; }               // the gate may fail — the exit may not (fail-safe law)
   if(brk){
-    try{ ADS.showInterstitial().then(r=>naMaybeOffer(launch, !!(r&&r.displayed)), ()=>naMaybeOffer(launch, false)); }   // 0410 THE DAILY PITCH rides 0333a's seat: the day's first SERVED break pitches (naMaybeOffer's day latch) — served = the creative was ON SCREEN, maxOnCreative's own proof, so a no-fill, never-displayed, failed or rejected exit launches straight and silent (his word). The held exit still blocks nobody else's (the squad gate's own property)
+    try{ ADS.showInterstitial().then(r=>{ telAd('int', r); naMaybeOffer(launch, !!(r&&r.displayed)); }, ()=>{ telAd('int', null); naMaybeOffer(launch, false); }); }   // 0624 D2: the result rides the ruler on both arms   // 0410 THE DAILY PITCH rides 0333a's seat: the day's first SERVED break pitches (naMaybeOffer's day latch) — served = the creative was ON SCREEN, maxOnCreative's own proof, so a no-fill, never-displayed, failed or rejected exit launches straight and silent (his word). The held exit still blocks nobody else's (the squad gate's own property)
     catch(e){ launch(); }
   } else launch();
 }
@@ -77228,6 +77378,7 @@ function startParkBattle(park, n){
   if(S.park.hex) buildFoeTint(S.park.hex);
   hideAllOverlays();
   S.mode='play';
+  telGo('park:'+park);   // 0624 D3
   locSync();   // 0432: the LAST line of a game-start door — themeKill() ran first, so a location can never start over the menu theme
 }
 // the SOLO door (the party door is coopStartBattle's park fork)
@@ -78029,6 +78180,7 @@ function startRaidBattle(tier,rk){
   S.plastic=RAID_TAGS+(tier==='u'? EV_TAGS_ADD : 0)+eliteRaidTags();   // 0824-NIGHT · 0565: the event room opens EV_TAGS_ADD deeper (100 → 340); e/m/h/g stand at 240 · 0539: +ELITE_RAID_TAGS once elite 160 is on the ledger (the yeti bell's 'u' tier rides this same seat)
   hideAllOverlays();
   S.mode='play';
+  telGo('raid:'+rk);   // 0624 D3
   locSync();   // 0432: the LAST line of a game-start door — themeKill() ran first, so a location can never start over the menu theme
 }
 // the tall mat — campGrandArm's hm2 recipe on the raid's own door (the raid
@@ -83114,6 +83266,7 @@ function naOfferShow(launch){
   const d=document.createElement('div'); d.id='naOffer';
   NAOFF.el=d; naOfferPaint();
   document.body.appendChild(d);
+  telMon('of_imp','pitch',1);   // 0624 D4
   SFX.blip();
   IAP.products();                        // the shell re-answers on every ask — prices land through _iapProducts' refresh tail
 }
@@ -83383,7 +83536,7 @@ function shopScroll(){
     SHOP.jumpT=0;                                             // gave up — trust the aisle again
   }
   if(T[i].id===SHOP.tab) return;
-  SHOP.tab=T[i].id; shopMarkTabs(SHOP.tab);
+  SHOP.tab=T[i].id; shopMarkTabs(SHOP.tab); telShop(SHOP.tab);   // 0624 D4: the aisle landed there by hand
 }
 function shopMarkTabs(id){
   const tabs=document.querySelectorAll('#toyshop .sh-tab');
@@ -83398,7 +83551,7 @@ function shopMarkTabs(id){
 }
 // A tap on a plaque walks you down the aisle; a re-render must LAND there, not slide.
 function shopJump(id, smooth){
-  SHOP.tab=id;
+  SHOP.tab=id; telShop(id);   // 0624 D4: the STARS department became the current stop
   SHOP.jumpT = smooth? Date.now()+1400 : 0;
   const a=document.getElementById('shAisle'); if(!a||!a.firstElementChild) return;
   const i=Math.max(0, shopTabs().findIndex(t=>t.id===id));   // 0331: the LIVE list
@@ -84301,6 +84454,7 @@ function showPicker(){
   if(riteFire(showPicker)) return;
   hideAllOverlays();
   document.getElementById('picker').classList.remove('hidden');
+  TEL.pkT0=Date.now(); TEL.pkOpen=1;   // 0624 D1: the deliberation clock starts at the paint, never at the verdict
   // 0121: ownedUnits(), never a slice of META.unlocked — the commando derives
   // off the record and the old slice(0,8) would have silently dropped a ninth
   // class from this screen forever (unpromotable with no error).
@@ -85702,7 +85856,7 @@ window.UI = {
     // mirrors spdInit's slide, so old and new builds read one save one way)
     if(M.k){ META[M.k]= spdMode()==='c'? (S.spdI<R.length-1? R[S.spdI] : 0) : spdMode()==='b'? S.spdI+1 : S.spdI; saveMeta(); }
     SFX.blip(); hqRender(); },
-  hqRetreat(){ const tr=S.training; S.drag=null; hqClose(); if(S.coop) coopLeave(); showMenu(); if(tr) roomModal(panelHTML('promo')); },  // walking out still folds the party — and the range's retreat lands on the academy too (0248: EVERY exit door honors "when you exit, you're back in the promotion screen")
+  hqRetreat(){ if(S.mode==='play') telLv(2); const tr=S.training; S.drag=null; hqClose(); if(S.coop) coopLeave(); showMenu(); if(tr) roomModal(panelHTML('promo')); },  // walking out still folds the party — and the range's retreat lands on the academy too (0248: EVERY exit door honors "when you exit, you're back in the promotion screen")
   // the War Table's door into a PRIVATE BATTLE — no chooser in the way
   wtRoom(){ audio(); SFX.blip();
     if(partyLocked()){ wtLockSpeak(); return; }   // v3.09 (card 07): a private battle is a start too
@@ -86053,15 +86207,15 @@ window.UI = {
   iapBuy(sku){ audio();
     const p=PACKS.find(k=>k.sku===sku), na=NOADS.find(k=>k.sku===sku); if(!p&&!na) return;   // 0333a: the no-ads tiers ride the SAME till — the native sheet IS the confirm (0320's real-money law, no shopAsk)
     const id=(NAOFF.el?'nao-':'shiap-')+sku.split('.').pop();   // 0333a: under the open offer every tap is the offer's own card (the shop sits beneath z26)
-    if(na && META.adFreeF){ shopDeny(id); return; }   // 0333a: forever supersedes — nothing left to sell, a timed top-up would be wasted money
-    if(!IAP.avail() || IAP_STATE.busy || !(IAP_STATE.prices&&IAP_STATE.prices[sku])){ shopDeny(id); return; }
-    IAP_STATE.busy=sku; delete IAP_STATE.note[sku];
+    if(na && META.adFreeF){ tel('na_den', sku.split('.').pop(), 3); shopDeny(id); return; }   // 0624 D4: :3 forever already owned   // 0333a: forever supersedes — nothing left to sell, a timed top-up would be wasted money
+    if(!IAP.avail() || IAP_STATE.busy || !(IAP_STATE.prices&&IAP_STATE.prices[sku])){ tel(p? 'sp_den' : 'na_den', sku.split('.').pop(), !IAP.avail()? 1 : IAP_STATE.busy? 2 : 4); shopDeny(id); return; }   // 0624 D4: :1 no bridge · :2 busy · :4 no prices yet
+    IAP_STATE.busy=sku; delete IAP_STATE.note[sku]; tel(p? 'sp_tap' : 'na_tap', sku.split('.').pop(), NAOFF.el? 1 : 0);   // 0624 D4: the tap that reaches the native sheet (b = under the pitch)
     SFX.blip(); renderShop(); naOfferRefresh(); IAP.buy(sku); },   // 0333a: the open offer card paints its busy state too
   // 0333a: the offer's own verbs — dismissal fires the held launch (once);
   // the Apple restore chip walks the native door (an unknown cmd on an old
   // shell is a silent no-op; the chip only renders once a new shell priced
   // the forever tier).
-  naDismiss(){ audio(); SFX.blip(); naOfferClose(true); },
+  naDismiss(){ audio(); SFX.blip(); tel('of_no'); naOfferClose(true); },   // 0624 D4
   naRestore(){ audio(); if(!IAP.avail()) return; SFX.blip(); IAP.restore(); },
   // THE EMERGENCY PACKAGE (v1.62): same buy ceremony, its own flag — never
   // through META.unlocked (that list is the recruits, and two medals count it).
@@ -86610,12 +86764,14 @@ window.UI = {
     adGate('bf', ()=>startBankHeist());
   },
   pick(t,el){ if(META.pendingPicks<=0) return; if((META.up[t]||0)>=RANK_MAX) return;
+    telPick('u',t);   // 0624 D1: ['up', key, ms] — the clock restarts for the next pick of the batch
     META.up[t]=(META.up[t]||0)+1; heroMileSync(t); META.pendingPicks--; checkAch();   // 0463: the pick that crosses a hero's tenth rank claims his milestone HERE (the ledger + the rank land in the same saveMeta below) — no card, no prompt
     const mb=mboxRoll('u:'+t, META.up[t]);
     const si=stripeCross(t);   // 0278k: the pick that crosses a class's stripe rung fires the PROMOTION card — marked BEFORE showMenu so stripeSweep can't double-fire (the v1.67 law)
     saveMeta();
     promoBeat(el,'u',t,mb,si); },   // v3.26 (card 06): the party beat; v2.82's own doors (picker holds / showMenu+pgTake) fire in ppSettle
   pickW(wk,el){ if(META.pendingPicks<=0) return; if(!SARGE_WEAPONS[wk]) return; if(!wkOwned(wk)) return; if((META.sargeUp[wk]||0)>=RANK_MAX) return;   // 0092: the console door can't rank a secret either (the 0070 naive-card trap's cousin)
+    telPick('w',wk);   // 0624 D1
     META.sargeUp[wk]=(META.sargeUp[wk]||0)+1; META.pendingPicks--;
     const mb=mboxRoll('w:'+wk, META.sargeUp[wk]);
     const mi=mileCross(wk) || (wk==='lightsaber'? mileCross('saber2') : mileCross('ult'+wk));   // v1.67: the pick that crosses 10 (saber: 20) fires the milestone card — marked BEFORE showMenu so its sweep can't double-fire · 0583a: the rank that opens the SECOND SOCKET cards the same way · 0605: the pick that crosses 50 cards the class's ultimate (mileCross('ultlightsaber') has no row and answers null by construction)
@@ -86984,9 +87140,9 @@ window.UI = {
     // ⚠ navigator.share never touches a DOM setter, so this text must be
     // translated AT COMPOSITION (v1.29.2 law) — the old share lines sat in the
     // tables fully translated and DEAD, and every invite went out in English
-    if(navigator.share){ navigator.share({title:'Green vs Tan', text:TXT(coopRoom()?'Get in here — PRIVATE BATTLE! Code':'Get in here — join my campaign squad! Code')+' '+COOP.code, url:link}).then(()=>done('INVITE SENT!')).catch(()=>{}); }
-    else if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(link).then(()=>done('LINK COPIED: PASTE IT TO YOUR FRIEND!')).catch(()=>{ if(note) note.textContent=link; }); }
-    else if(note){ note.textContent=link; }
+    if(navigator.share){ navigator.share({title:'Green vs Tan', text:TXT(coopRoom()?'Get in here — PRIVATE BATTLE! Code':'Get in here — join my campaign squad! Code')+' '+COOP.code, url:link}).then(()=>{ done('INVITE SENT!'); tel('lnk', telFam(), 1); }).catch(()=>{}); }
+    else if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(link).then(()=>{ done('LINK COPIED: PASTE IT TO YOUR FRIEND!'); tel('lnk', telFam(), 2); }).catch(()=>{ if(note) note.textContent=link; }); }
+    else if(note){ note.textContent=link; tel('lnk', telFam(), 3); }   // 0624 D3
   },
   coopCancel(noteText){
     // leaving ANY campaign party (a shim pair included) lands on the squad door
@@ -87036,7 +87192,7 @@ window.UI = {
   // ---- FM-GVT-MAX-01: the age gate + the rewarded disclosure ----
   ageOk(){ const m=(document.getElementById('agM')||{}).value, d=(document.getElementById('agD')||{}).value, y=(document.getElementById('agY')||{}).value; if(!(m&&d&&y)) return; ageGateAnswer(m,d,y); },
   ageSkip(){ S.ageAsked=1; const el=document.getElementById('ageGate'); if(el) el.remove(); },
-  adRoll(){ const el=document.getElementById('adAsk'); if(el) el.remove(); ADS.showRewarded().then(r=>{ if(r && r.completed) tvGrant(); }); },
+  adRoll(){ const el=document.getElementById('adAsk'); if(el) el.remove(); ADS.showRewarded().then(r=>{ telAd('rew', r); if(r && r.completed) tvGrant(); }); },   // 0624 D2: the TV counts as an ad for `ad+` (⚑ Q8)
   adAskX(){ const el=document.getElementById('adAsk'); if(el) el.remove(); },
   // tap a badge: it steps forward on its own card, with the story and the count
   medal(n){ const b=MC[n]; if(!b) return;
@@ -87667,7 +87823,7 @@ document.getElementById('againBtn').addEventListener('click', ()=>{
   });
 });
 document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); PGO=null; PGV=null; PGPV=null; PGPK=null; showMenu(); });   // 0341: HQ stays the explicit menu door — it clears the park stamp too (flagged)
-document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); showMenu(); pgTake(); acSync(); });   // 0596: the all-maxed door lands on the academy too — its banner re-dealt to the picks still banked (a ×2 painted before the pick reads ×1 the moment the door shuts) and its tap walks back in
+document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); tel('upo'); TEL.pkOpen=0; showMenu(); pgTake(); acSync(); });   // 0624 D1: the all-maxed door is its own count, never a back-out   // 0596: the all-maxed door lands on the academy too — its banner re-dealt to the picks still banked (a ×2 painted before the pick reads ×1 the moment the door shuts) and its tap walks back in
 
 // ================= LOOP =================
 let last=0, ready=false;
@@ -88772,6 +88928,10 @@ window.GVT = {
                    hp:(u.hp!=null?u.hp:null), grit:gritCap(u) } : null }; },
   // ===== 0621 THE CODES COUNTER — read-only probe: the counter's state + the class's two doors. Never a grant door
   // (the honest grant is the counter itself — type the word); the record's own seed stays META.coopLevels. =====
+  // 0624 THE RULER — the read + the dials (flushMs · batch · adMs); the queue is read, never written from here
+  tel(p){ p=p||{}; if(p.flushMs!=null) TEL_FLUSH_MS=p.flushMs; if(p.batch!=null) TEL_BATCH=p.batch; if(p.adMs!=null) TEL_AD_MS=p.adMs;
+    return { q:TEL.q.slice(), sent:TEL.sent, scr:telScreen(), last:TEL.scr, seen:Object.keys(TEL.seen), pkT0:TEL.pkT0, pkOpen:TEL.pkOpen, adT:TEL.adT,
+      link:TEL_LINK, ref:META.ref||null, fresh:META_FRESH, humans:telHumans(), dials:{ flushMs:TEL_FLUSH_MS, batch:TEL_BATCH, keep:TEL_KEEP, adMs:TEL_AD_MS } }; },
   codes(){ const g=id=>document.getElementById(id); const mp=g('milePop'); const band=mp? mp.querySelector('.mb-band') : null; const ss=g('shCodeSay');
     return { owned:cmdOwned(), key:META.cmdKey|0, rec:coopBeat(CMD_LVL), used:(META.codes||[]).slice(), words:Object.keys(SECRET_CODES), tabs:shopTabs().map(t=>t.id),
       sec:!!g('shCodes'), input:!!g('shCodeIn'), val:g('shCodeIn')? g('shCodeIn').value : null, say:ss? ss.textContent : null, sayCls:ss? ss.className : null,
