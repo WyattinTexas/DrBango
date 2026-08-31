@@ -39079,7 +39079,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.27';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.28';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -74850,13 +74850,31 @@ let AD_SQUAD_LIFE=1;   // 8/23 THE SQUAD EXIT JOINS THE 2-3 CLOCK (Wyatt, after 
 let AD_NEWBIE_GAMES=6; // 0504 THE NEWBIE AD GATE (Wyatt 8/23: "We dont want brand new players served any interstitial ads until they play 6 games") — a LIFETIME gate on EVERY real interstitial, solo and squad alike: META.adGames counts door-launched games across sessions (adGate ticks it beside ADQ.games and saves; a pre-0504 save seeds ONCE from its own record — campaign rung + battlefield W+L — so a veteran never re-enters the cradle, a fresh install seeds 0); no break of any kind while adGames <= N. 0 = off (DIAL)
 let AD_SOLO_MIN=2, AD_SOLO_MAX=3;   // 0504 (Wyatt 8/23: "Then after every 2-3 games they should get an interstitial") — the solo verdict cadence is LIFETIME-paced now, not per session: META.adNext = the lifetime game whose verdict exit pays the next break, armed at max(adGames, the cradle) + a whole number drawn in [MIN, MAX] (at boot when missing, again the moment a break is paid). Due UNTIL paid — a due break the session's first game (AD_FREE_GAMES), the gap, the cap or a no-fill swallows slides to the next exit: fewer ads than the schedule, never more (the 0383 law). Replaces 0399's AD_SOLO_EVERY=3 (games 3, 6, 9… of each session). 8/23: the squad exit reads this SAME marker now (AD_SQUAD_LIFE) — the 0504 ⚑ resolved by Wyatt's own word (DIAL)
 let AD_SOLO_POST=1;    // v3.60 (0297 §V3.8): the adapter-era placement flip — 0 = today's placeholder door law; 1 moves SOLO breaks post-game. A COMPLIANCE PRECONDITION for real ads (Wyatt sign-off, ADS-V1.md §V3 gate 5), never auto-flipped; NO reader in the placeholder era BY DESIGN — the adapter card flips a staged switch, not a new build (DIAL)   // ⛔ GATE 5 SIGNED — Wyatt 8/17 verbatim: "for C, let's turn it on. We want to show solo players an ad after playing" — the reader shipped in v4.35; the dial flips ON here (0379). Real-provider only by construction: soloDue requires ADS.provider!=='placeholder', so web/child/Steam stay break-free
+// ═══ 0627 ADS AFTER THE UPGRADE, FROM LEVEL 5 (FM-GVT-JUICE-01 §6 P3 — design/juice-reach-0830/00-DESIGN.md; Wyatt 8/30 13:39 by
+// phone, verbatim: "Ad placement follows the upgrade, not the level. The ad fires after the player has selected their chosen upgrade
+// and the upgrade animation has played out, so it lands immediately after a reward moment and reads as the price of continuing rather
+// than an interruption to momentum. The earliest levels remain ad-free. Tell me at which level number the data suggests ads should
+// begin.") — THE ANSWER IS FIVE (§5): L2/L3/L4 kill 21/27/29% of arrivals and L5's wall kills 3% — a player who beat L4 is committed
+// (57% reach L10); today the 6-game cradle counts RETRIES, so a level-2 kid who lost four times has already met an interstitial, and
+// 13 days of interstitials earned $3.84. TWO MOVES, client only, the AD LAW §V3 untouched (nobody waits on an ad; the party
+// invariant holds; web/Steam/child see zero interstitials, ever; the rewarded TV is a choice and is NOT gated here):
+// (1) THE CLIFF IS AD-FREE — adNewbie() (the cradle: no real break of ANY kind, any mode) also answers true while campaign
+//     AD_MIN_CAMP is unbeaten (⚑ Q7: 5 = the data · 4 = the knee · 6 = one more level of margin).
+// (2) THE SEAT MOVES BEHIND THE UPGRADE — a CONTINUE tap that owes a pick opens the picker WITHOUT the gate (pickGate); the picker's
+//     drained exit (ppSettle, after the last pick's beat — PP_BEAT — the banked cards drained behind it) pays the verdict's break
+//     before its landing (the room) — and in 0625's flow the break rides campFlowLaunch, after the gift road's cards and before the
+//     next level: verdict → picker → gift cards → AD → next level (with P1) · verdict → picker → AD → room (without). The all-maxed
+//     door (pickOutBtn) is the picker's other exit and pays the same. No pick owed → the gate stays at CONTINUE (⚑ Q8; the 2-3 clock
+//     slides by construction — squadAdGate's soloPaid latch keeps a verdict to ONE break however many seats consult it). TRY AGAIN,
+//     the party's own gate arm, the cradle's game count, the 2-3 cadence, the paid package, the daily pitch: byte-still.
+const AD_MIN_CAMP=5;   // ⚑ Q7 THE ONE CONST — the first campaign rung whose verdict may carry a real break (5 = beaten, i.e. the L5 win's exit is the first)
 const ADQ={ games:0, camp:0, bf:0, squad:0, sqPaid:0, soloPaid:0 };   // the session gate counters (door-launched games only; squad = finished 2+-human games, sqPaid = the squad count whose break already showed; 0399: soloPaid = the games count whose SOLO verdict break already showed — the sqPaid idiom, one break per due verdict however many exits race)
 // 0504 THE NEWBIE AD GATE — the lifetime side. adNewbie() = still in the cradle (no
 // real break of any kind); adNextArm() draws the next due game 2-3 past the cradle
 // or the game just paid and saves it. The seed runs ONCE per save (the `==null`
 // idiom — 0 is a real count, only a missing key seeds): a pre-0504 save counts the
 // games it can prove (campaign rung + battlefield W+L), a fresh install counts 0.
-function adNewbie(){ try{ return AD_NEWBIE_GAMES>0 && (META.adGames|0)<=AD_NEWBIE_GAMES; }catch(e){ return true; } }   // the gate may fail — on the side of NO ad
+function adNewbie(){ try{ return (AD_NEWBIE_GAMES>0 && (META.adGames|0)<=AD_NEWBIE_GAMES) || (META.campaign|0)<AD_MIN_CAMP; }catch(e){ return true; } }   // the gate may fail — on the side of NO ad   // 0627: ...and THE CLIFF — no real break of any kind, any mode, until campaign AD_MIN_CAMP is beaten (the games half is byte-what-it-was)
 function adNextArm(){ try{ const span=Math.max(0, (AD_SOLO_MAX|0)-(AD_SOLO_MIN|0)); META.adNext=Math.max(META.adGames|0, AD_NEWBIE_GAMES|0) + (AD_SOLO_MIN|0) + Math.floor(Math.random()*(span+1)); saveMeta(); return META.adNext; }catch(e){ return null; } }
 (function(){ try{
   if(META.adGames==null){ META.adGames=(META.campaign|0)+bfGamesPlayed(); saveMeta(); }   // the once-ever seed
@@ -84653,8 +84671,11 @@ function ppSettle(){
   // the exit only walks if the picker still owns the screen (the all-maxed
   // door or a scene sweep may have left already — never showMenu over them)
   if(META.pendingPicks<=0 && pk && !pk.classList.contains('hidden')){
-    if(PGFLOW && S.mode!=='menu'){ const q9=PP_Q; PP_Q=[]; for(const e of q9) (e[0]==='mb'? mboxOpen : e[0]==='st'? stripeOpen : mileOpen)(e[1]); campFlowCards(); return; }   // 0625 THE CONTINUOUS CAMPAIGN: the drained exit stays in the flow — the banked cards pop FIRST (they take the hosts; their takes carry the flow), then the owed line, then the next level. No room, no academy (none is standing)
-    showMenu(); pgTake(); acSync(); }   // 0596 THE BANNER THAT WOULDN'T STAND DOWN: the drained exit lands on the academy as it stood — re-dealt to the count (the room head + the pill are renderMenu's, fresh at showMenu); the banked cards below pop over the truthful academy
+    if(PGFLOW && S.mode!=='menu'){ const q9=PP_Q; PP_Q=[]; for(const e of q9) (e[0]==='mb'? mboxOpen : e[0]==='st'? stripeOpen : mileOpen)(e[1]); campFlowCards(); return; }   // 0625 THE CONTINUOUS CAMPAIGN: the drained exit stays in the flow — the banked cards pop FIRST (they take the hosts; their takes carry the flow), then the owed line, then the next level. No room, no academy (none is standing)   // 0627: the flow's break rides campFlowLaunch — after the owed line, before the next level
+    squadAdGate(()=>{ showMenu(); pgTake(); acSync(); ppPop(); }); return; }   // 0627 ADS AFTER THE UPGRADE: the drained exit pays the verdict's break HERE — after the last pick's beat, before the room (Wyatt: "after the player has selected their chosen upgrade and the upgrade animation has played out") — and the shipped landing runs whole behind it: 0596's academy re-deal, the banked cards popping over the room, a banked hero choice (ppPop), in the shipped order
+  ppPop();
+}
+function ppPop(){   // 0627: the beat's queue, one seat for the three exits (the shipped lines) — the banked box / stripe / mile cards pop, then a banked hero choice
   const q=PP_Q; PP_Q=[];
   for(const e of q) (e[0]==='mb'? mboxOpen : e[0]==='st'? stripeOpen : mileOpen)(e[1]);
   heroPickDrain();   // 0464: a hero choice the pick just banked deals now — behind a queued card if one took #milePop (it waits for that fold), over the picker or the room otherwise
@@ -87866,7 +87887,7 @@ function campFlowNext(){   // the flow's fold door — ceremonyNext's body witho
   if(MB_DEALT<MB_LINE_CAP){ if(heroPickDrain()){ MB_DEALT++; return true; } if(ceremonyChain()) return true; } else MB_END='cap';
   campFlowLaunch(); return true;
 }
-function campFlowLaunch(){ PGFLOW=0; hideAllOverlays(); adGate('camp', ()=>startCampaign()); }   // the DEPLOY door's own launch — startCampaign() with no n = META.campaign+1; the P3 ad seat sits between the picker and this line (its own card)
+function campFlowLaunch(){ PGFLOW=0; squadAdGate(()=>{ hideAllOverlays(); adGate('camp', ()=>startCampaign()); }); }   // the DEPLOY door's own launch — startCampaign() with no n = META.campaign+1 · 0627 ADS AFTER THE UPGRADE: the flow's break rides HERE — after the picker and the gift road's cards, before the next level (the price of continuing); a no-pick verdict already paid at CONTINUE and squadAdGate's soloPaid latch keeps it to one
 document.getElementById('retryBtn').addEventListener('click', ()=>{
   audio();
   { const o=pgTakeV(); if(o){ squadAdGate(()=>pgLand(o)); return; } }   // go again together — FROM the origin screen (v2.82; v2.84: the stamp survives a party that died on this screen)
@@ -87909,13 +87930,17 @@ document.getElementById('retryBtn').addEventListener('click', ()=>{
   adGate('camp', ()=>startCampaign(S.levelN));   // a level RE-start is a level start (v2.60)
   });
 });
+// 0627 ADS AFTER THE UPGRADE: CONTINUE's gate steps aside when a pick is owed — every branch below opens the picker then, and the
+// picker's drained exit (ppSettle) / the flow's launch (campFlowLaunch) / the all-maxed door pay the verdict's break behind the
+// upgrade. No pick owed → squadAdGate at the tap, exactly as shipped (⚑ Q8).
+function pickGate(land){ if((META.pendingPicks|0)>0) land(); else squadAdGate(land); }
 document.getElementById('againBtn').addEventListener('click', ()=>{
   audio();
   { const o=pgTakeV(); if(o){
-    squadAdGate(()=>{ if(META.pendingPicks>0){ PGO=o; showPicker(); } else pgLand(o); }); return; } }
+    pickGate(()=>{ if(META.pendingPicks>0){ PGO=o; showPicker(); } else pgLand(o); }); return; } }   // 0627: the party's picker first, its break at the drained exit
   // 0399 THE SOLO VERDICT BREAK: the solo Continue pays the same gate (the
   // party branch above is byte-still); the v4.56 landing runs after the break.
-  squadAdGate(()=>{
+  pickGate(()=>{   // 0627 ADS AFTER THE UPGRADE: ...unless a pick is owed — then the picker first, the break behind it
   if(campFlowDue()){ campFlowGo(); return; }   // 0625 THE CONTINUOUS CAMPAIGN: a solo campaign win on a flow rung never sees the room — the picker (when owed), the owed cards, the next level
   { const p=pgTakePk(); if(p){ if(META.pendingPicks>0){ PGPK=p; showPicker(); } else { showMenu(); openParkScene(p); } return; } }   // 0341: a park verdict lands on ITS park screen (win and loss alike), never the main menu
   if(S.bf){ if(META.pendingPicks>0) showPicker(); else showMenu(); return; }   // battlefield XP can promote you
@@ -87924,7 +87949,7 @@ document.getElementById('againBtn').addEventListener('click', ()=>{
 });
 document.getElementById('hqBtn').addEventListener('click', ()=>{ audio(); PGO=null; PGV=null; PGPV=null; PGPK=null; showMenu(); });   // 0341: HQ stays the explicit menu door — it clears the park stamp too (flagged)
 document.getElementById('winHqBtn').addEventListener('click', ()=>{ audio(); PGO=null; PGV=null; PGPV=null; PGPK=null; showMenu(); });   // 0625 THE CONTINUOUS CAMPAIGN: HEADQUARTERS — the hqBtn handler's own body (the deliberate exit, the 0341 law: no gate, the stamps cleared); showMenu ends the flow
-document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); tel('upo'); TEL.pkOpen=0; showMenu(); pgTake(); acSync(); });   // 0624 D1: the all-maxed door is its own count, never a back-out   // 0596: the all-maxed door lands on the academy too — its banner re-dealt to the picks still banked (a ×2 painted before the pick reads ×1 the moment the door shuts) and its tap walks back in
+document.getElementById('pickOutBtn').addEventListener('click', ()=>{ audio(); tel('upo'); TEL.pkOpen=0; squadAdGate(()=>{ showMenu(); pgTake(); acSync(); }); });   // 0627 ADS AFTER THE UPGRADE: the picker's other exit pays the verdict's break too (CONTINUE no longer does when a pick is owed)   // 0624 D1: the all-maxed door is its own count, never a back-out   // 0596: the all-maxed door lands on the academy too — its banner re-dealt to the picks still banked (a ×2 painted before the pick reads ×1 the moment the door shuts) and its tap walks back in
 
 // ================= LOOP =================
 let last=0, ready=false;
@@ -88090,6 +88115,7 @@ window.GVT = {
     solo:AD_SOLO_POST,      // v3.60 (0297): the parked adapter-era placement dial (§V3.8)
     newbie:AD_NEWBIE_GAMES, soloMin:AD_SOLO_MIN, soloMax:AD_SOLO_MAX,   // 0504: the cradle + the 2-3 draw (AD_SOLO_EVERY retired)
     life:(META.adGames|0), next:(META.adNext==null? null : META.adNext), cradle:adNewbie(),   // 0504: the lifetime pair + the gate's verdict
+    minCamp:AD_MIN_CAMP, rung:(META.campaign|0), cliff:((META.campaign|0)<AD_MIN_CAMP),   // 0627: the level gate (⚑ Q7) and its own half of the cradle's verdict
     live:(()=>{ try{ return !!AD; }catch(e){ return false; } })(),
     int:typeof ADS.showInterstitial==='function', rw:typeof ADS.showRewarded==='function' }; },
   adSess(p){ Object.assign(ADQ,p||{}); return Object.assign({},ADQ); },
