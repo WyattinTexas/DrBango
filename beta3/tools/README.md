@@ -1,6 +1,43 @@
 # beta3 dev tools
 
-Fourteen scripts, all dev-only — nothing here ships to the browser.
+Sixteen scripts, all dev-only — nothing here ships to the browser.
+
+## zod-export.mjs + zod-art-check.mjs — the zodiac card art (v0.58.0)
+
+Task 47: the 12 MJ sign portraits (flat-vector constellation set,
+`art/ZODIAC-ART.md`) land in the card picker's `zod_<id>` seam.
+`zod-export.mjs` is the repeatable cut: it reads the 1-INDEXED frame picks
+from `~/starspell-jumpr/ref/zodiac-mj/PICKS.md` (pick n = source file
+`zod_<sign><n-1>.webp` — MJ frames land zero-indexed; aries pick Bn =
+`aries_B<n-1>.webp`, the anchor job), downscales each 896×1344 full-bleed
+source to 512×768 (the art region is 160×240 design units; the largest
+phone, a 16 Pro Max at dpr 3, renders it at 503×754 device px) and emits
+`art/zod_<id>.webp` at q78 — the whole set is ~440 KB against the 2.5 MB
+budget. `art/zod-manifest.json` records what each output was cut from, so a
+one-pick change regenerates one file; `FORCE=1` rebuilds all. sharp lives
+OUT of the repo at `~/starspell-jumpr/tools-deps/` (no npm install in
+~/DrBango — the Pages budget again); full-res MJ sources never enter the
+repo. The seam side (`ssZodArtKey`) bakes the plate behind the
+placeholder's rounded corners at load, so the webp ships square, no alpha.
+
+`zod-art-check.mjs` pins the result with real touches at DPR 3 (25 checks):
+all 12 plates arrive beside the other art, every sign card walked by arrow
+wears its `zod_<id>` texture — proven by `renderer.snapshotPixel` in the
+art region against the placeholder wash at the same relative points
+(Δ150–196 measured), not by texture key alone — THE OPEN SKY keeps its
+quiet empty sky, a blocked plate (deleted from SSART.img + the texture
+store) still draws the asterism while its neighbors keep their art, and
+BEGIN still pins the sign. `SHOTS=<dir>` keeps a PNG + card-rect JSON per
+card — the review sheet (skypilot82.github.io/starspell-zodiac-review)
+crops its true-size cards from exactly these. No `?diag=1` on its boots:
+the diag box paints over the card's foot in the shots. sign-check.mjs now
+BLOCKS aries's plate at boot so its asterism-fallback checks keep walking
+the placeholder path that real art would otherwise cover.
+
+```
+node tools/zod-export.mjs                # cut/refresh art/zod_<id>.webp
+node tools/zod-art-check.mjs             # 25 checks, ~2 min, --disable-gpu
+```
 
 ## make-word-packs.py
 

@@ -142,9 +142,13 @@ const boot = async (dv, inset) => {
   const up = await until(HOME_REST, 90000);
   if (!up) return false;
   errs.length = 0;
-  // a history under LEO, a clean campaign, and a fake TAURUS plate for the art seam
+  // a history under LEO, a clean campaign, a fake TAURUS plate (the seam's
+  // exists() precedence), and — since v0.58.0 ships real art for all 12 —
+  // ARIES's plate BLOCKED once it lands, so the asterism fallback still walks
+  await until(`typeof SSART !== 'undefined' && !!SSART.img.zod_aries`, 20000);
   await ev(`(() => { ssClearCampaign(); SS.prof.signs = SS.prof.signs || {}; SS.prof.signs.leo = { best: 1234, clears: 2, runs: 3 }; SS.save();
-    const s = ${H}; if (!s.textures.exists('zod_taurus')) { const t = s.textures.createCanvas('zod_taurus', 40, 60); t.context.fillStyle = '#ff00aa'; t.context.fillRect(0, 0, 40, 60); t.refresh(); } return 1 })()`);
+    const s = ${H}; if (!s.textures.exists('zod_taurus')) { const t = s.textures.createCanvas('zod_taurus', 40, 60); t.context.fillStyle = '#ff00aa'; t.context.fillRect(0, 0, 40, 60); t.refresh(); }
+    delete SSART.img.zod_aries; if (s.textures.exists('zod_aries')) s.textures.remove('zod_aries'); return 1 })()`);
   await sleep(600);
   return true;
 };
@@ -166,7 +170,7 @@ ok('mid-drag the strip follows the finger and the neighbor peeks in', mid && mid
 ok('the swipe settles on ARIES', await until(`${STILL} && ${H}.signPeek().id === 'aries' && Math.abs(${H}.signPeek().x) < 1`, 4000), JSON.stringify(await peek()));
 tx = await cardTexts();
 ok('ARIES · THE RAM with its power at the card bottom', tx.includes('ARIES') && tx.includes('THE RAM') && tx.some(t => /headlong ram/.test(t)), tx.join(' | ').slice(0, 160));
-ok('the aries card draws the asterism placeholder (no zod_aries plate)', await ev(`(() => { const k = ${H}.signPeek().card; return !k.list.some(o => o.texture && o.texture.key === 'zod_aries') && k.list.some(o => o.texture && o.texture.key === 'zodsky') && k.list.filter(o => o.type === 'Graphics').length === 3 })()`));
+ok('the aries card draws the asterism placeholder (plate blocked — the not-loaded fallback)', await ev(`(() => { const k = ${H}.signPeek().card; return !k.list.some(o => o.texture && o.texture.key === 'zod_aries') && k.list.some(o => o.texture && o.texture.key === 'zodsky') && k.list.filter(o => o.type === 'Graphics').length === 3 })()`));
 await judge('16 · aries');
 // --- a short drag settles back ---
 mid = await drag(cp.x, cp.y, -40, 4);

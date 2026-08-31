@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.57.0';
+const BUILD = 'STARSPELL v0.58.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -422,9 +422,14 @@ function ssPerfWatch(gm) {
    forces that fallback for debugging. */
 const ART = QS.get('art') !== '0';
 const SSART = { ready: false, img: {} };
-// sign-card art that ships (art/zod_<id>.webp) — see ssZodArtKey; empty until
-// Wyatt's MJ set lands, one id per line then
-const SS_ZOD_ART = [];
+// sign-card art that ships (art/zod_<id>.webp) — see ssZodArtKey. The 12 MJ
+// portraits (flat-vector constellation set, art/ZODIAC-ART.md) are cut by
+// tools/zod-export.mjs from the full-res sources kept OUT of the repo;
+// swapping a frame is a pick change there + rerun, never an id change here.
+const SS_ZOD_ART = [
+  'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
+  'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces',
+];
 function ssLoadArt() {
   const names = ['btn', 'btndark', 'tile_face', 'tile_over', 'meadow'];
   // the sign cards' art rides the same fetch, but is never required: a missing
@@ -3590,7 +3595,20 @@ function ssZodArtKey(scene, id) {
   if (scene.textures.exists(key)) return key;
   const im = SSART.img[key];
   if (!im) return null;
-  scene.textures.addImage(key, im);
+  // bake the plate behind the placeholder's rounded corners (6 units on a
+  // 160-wide region) so the full-bleed webp sits in the same frame — the
+  // shipped files carry no alpha of their own
+  try {
+    const W = im.naturalWidth || im.width, H = im.naturalHeight || im.height;
+    const t = scene.textures.createCanvas(key, W, H);
+    const c = t.context;
+    c.beginPath(); c.roundRect(0, 0, W, H, W * (6 / 160)); c.clip();
+    c.drawImage(im, 0, 0, W, H);
+    t.refresh();
+  } catch (e) {
+    if (scene.textures.exists(key)) scene.textures.remove(key);
+    scene.textures.addImage(key, im);
+  }
   return key;
 }
 // the placeholder art: the game's own twilight gradient with a scatter of

@@ -1,5 +1,8 @@
 # STARSPELL — ZODIAC SIGN ART · prompt formula & spec · v1 · 2026-08-25
-Status: ANCHOR LOCKED 2026-08-25 — style B (flat-vector constellation), frame B2 =
+Status: SHIPPED v0.58.0 2026-08-31 (task 47) — all 12 cut into art/zod_<id>.webp by
+tools/zod-export.mjs from the default picks in ~/starspell-jumpr/ref/zodiac-mj/PICKS.md;
+review sheet skypilot82.github.io/starspell-zodiac-review. Sagittarius still the reroll
+candidate. Previously: ANCHOR LOCKED 2026-08-25 — style B (flat-vector constellation), frame B2 =
 cdn.midjourney.com/7ad41d09-9759-4ade-a9d1-fcf641eb8983/0_1.webp (Skylar's pick).
 FROZEN FORMULA (only [SUBJECT]+[TINT] swap): "flat vector illustration, [SUBJECT] formed of
 glowing [TINT] constellation stars [ACTION] across a twilight sky, layered indigo violet plum
