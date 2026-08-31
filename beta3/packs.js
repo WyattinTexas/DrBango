@@ -3,7 +3,10 @@
    STARSPELL language packs — the GAME in your language.
    strings.js localizes the UI; this file localizes the PLAY:
    a letter bag with that language's real frequencies and point
-   values (official Scrabble distributions, minus the blanks),
+   values (official Scrabble distributions, minus the blanks;
+   rebalanced 8/31: each pack's four most-common vowels -1, every
+   2-count consonant +1 — consonant variety, not vowel supply, is
+   what limits word-making on a 16-tile board with the 5-vowel floor),
    its special tiles (Ñ, Ç, Ä/Ö/Ü, and the CH/LL/RR digraphs of
    Spanish), and a dictionary of that language's words.
 
@@ -26,27 +29,27 @@
 const SS_PACKS = {
   en: {
     lang: 'en', vowels: 'aeiou', digraph: { q: 'qu' },
-    bag: { e: 12, a: 9, i: 9, o: 8, n: 6, r: 6, t: 6, l: 4, s: 4, u: 4, d: 4, g: 3, b: 2, c: 2, m: 2, p: 2, f: 2, h: 2, v: 2, w: 2, y: 2, k: 1, j: 1, x: 1, q: 1, z: 1 },
+    bag: { e: 11, a: 8, i: 8, o: 7, n: 6, r: 6, t: 6, l: 4, s: 4, u: 4, d: 4, g: 3, b: 3, c: 3, m: 3, p: 3, f: 3, h: 3, v: 3, w: 3, y: 3, k: 1, j: 1, x: 1, q: 1, z: 1 },
     vals: { a: 1, b: 3, c: 3, d: 2, e: 1, f: 4, g: 2, h: 4, i: 1, j: 8, k: 5, l: 1, m: 3, n: 1, o: 1, p: 3, q: 9, r: 1, s: 1, t: 1, u: 1, v: 4, w: 4, x: 8, y: 4, z: 10, qu: 10 },
   },
   es: {
     lang: 'es', vowels: 'aeiou', digraph: { q: 'qu' },
-    bag: { a: 12, e: 12, o: 9, i: 6, s: 6, n: 5, r: 5, u: 5, d: 5, l: 4, t: 4, c: 4, g: 2, b: 2, m: 2, p: 2, h: 2, f: 1, v: 1, y: 1, q: 1, j: 1, 'ñ': 1, x: 1, z: 1, ch: 1, ll: 1, rr: 1 },
+    bag: { a: 11, e: 11, o: 8, i: 5, s: 6, n: 5, r: 5, u: 5, d: 5, l: 4, t: 4, c: 4, g: 3, b: 3, m: 3, p: 3, h: 3, f: 1, v: 1, y: 1, q: 1, j: 1, 'ñ': 1, x: 1, z: 1, ch: 1, ll: 1, rr: 1 },
     vals: { a: 1, e: 1, o: 1, i: 1, s: 1, n: 1, r: 1, u: 1, l: 1, t: 1, d: 2, g: 2, b: 3, c: 3, m: 3, p: 3, h: 4, f: 4, v: 4, y: 4, q: 5, j: 8, 'ñ': 8, x: 8, z: 10, ch: 5, ll: 8, rr: 8, qu: 6 },
   },
   fr: {
     lang: 'fr', vowels: 'aeiou', digraph: { q: 'qu' },
-    bag: { e: 15, a: 9, i: 8, n: 6, o: 6, r: 6, s: 6, t: 6, u: 6, l: 5, d: 3, m: 3, g: 2, b: 2, c: 2, p: 2, f: 2, h: 2, v: 2, j: 1, q: 1, k: 1, w: 1, x: 1, y: 1, z: 1 },
+    bag: { e: 14, a: 8, i: 7, n: 6, o: 5, r: 6, s: 6, t: 6, u: 6, l: 5, d: 3, m: 3, g: 3, b: 3, c: 3, p: 3, f: 3, h: 3, v: 3, j: 1, q: 1, k: 1, w: 1, x: 1, y: 1, z: 1 },
     vals: { e: 1, a: 1, i: 1, n: 1, o: 1, r: 1, s: 1, t: 1, u: 1, l: 1, d: 2, m: 2, g: 2, b: 3, c: 3, p: 3, f: 4, h: 4, v: 4, j: 8, q: 8, k: 10, w: 10, x: 10, y: 10, z: 10, qu: 9 },
   },
   pt: {
     lang: 'pt', vowels: 'aeiou', digraph: { q: 'qu' },
-    bag: { a: 14, e: 11, i: 10, o: 10, s: 8, u: 7, m: 6, r: 6, t: 5, d: 5, l: 5, c: 4, p: 4, n: 4, b: 3, 'ç': 2, f: 2, g: 2, h: 2, v: 2, j: 2, q: 1, x: 1, z: 1 },
+    bag: { a: 13, e: 10, i: 9, o: 9, s: 8, u: 7, m: 6, r: 6, t: 5, d: 5, l: 5, c: 4, p: 4, n: 4, b: 3, 'ç': 3, f: 3, g: 3, h: 3, v: 3, j: 3, q: 1, x: 1, z: 1 },
     vals: { a: 1, e: 1, i: 1, o: 1, s: 1, u: 1, m: 1, r: 1, t: 1, d: 2, l: 2, c: 2, p: 2, n: 3, b: 3, 'ç': 3, f: 4, g: 4, h: 4, v: 4, j: 5, q: 6, x: 8, z: 8, qu: 7 },
   },
   de: {
     lang: 'de', vowels: 'aeiouäöü', digraph: { q: 'qu' },
-    bag: { e: 15, n: 9, s: 7, i: 6, r: 6, t: 6, u: 6, a: 5, d: 4, h: 4, m: 4, g: 3, l: 3, o: 3, b: 2, c: 2, f: 2, k: 2, w: 1, z: 1, p: 1, 'ä': 1, j: 1, 'ü': 1, v: 1, 'ö': 1, x: 1, q: 1, y: 1 },
+    bag: { e: 14, n: 9, s: 7, i: 5, r: 6, t: 6, u: 5, a: 4, d: 4, h: 4, m: 4, g: 3, l: 3, o: 3, b: 3, c: 3, f: 3, k: 3, w: 1, z: 1, p: 1, 'ä': 1, j: 1, 'ü': 1, v: 1, 'ö': 1, x: 1, q: 1, y: 1 },
     vals: { e: 1, n: 1, s: 1, i: 1, r: 1, t: 1, u: 1, a: 1, d: 1, h: 2, g: 2, l: 2, o: 2, m: 3, b: 3, w: 3, z: 3, c: 4, f: 4, k: 4, p: 4, 'ä': 6, j: 6, 'ü': 6, v: 6, 'ö': 8, x: 8, q: 10, y: 10, qu: 11 },
   },
 };
