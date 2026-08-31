@@ -3997,9 +3997,9 @@
   @keyframes beaconhalo { 0%,100% { filter:drop-shadow(0 0 6px rgba(255,210,74,0.55)); }
     50% { filter:drop-shadow(0 0 16px rgba(255,214,74,0.95)); } }
   #rtag-bf.beacon, #ro-bf.beacon { animation-delay:0.4s; }
-  #ro-ship.nudge, #ro-warplane.nudge { filter:drop-shadow(0 0 9px rgba(255,210,74,0.7)); animation:beaconhalo 1.7s ease-in-out infinite; }   /* 0568 D9: the halo rides whichever ride is out */   /* 0546 THE SHIP'S NUDGE — the idle beacon's own halo on the ferry */
+  #ro-ship.nudge, #ro-warplane.nudge, #ro-hook.nudge { filter:drop-shadow(0 0 9px rgba(255,210,74,0.7)); animation:beaconhalo 1.7s ease-in-out infinite; }   /* 0630 THE ROOF AFTER THE KING: the hookshot pulses on the roof until the drop */   /* 0568 D9: the halo rides whichever ride is out */   /* 0546 THE SHIP'S NUDGE — the idle beacon's own halo on the ferry */
   @media (prefers-reduced-motion: reduce){
-    .roomtag.beacon, #ro-campaign.beacon, #ro-bf.beacon, #ro-ship.nudge, #ro-warplane.nudge { animation:none; }
+    .roomtag.beacon, #ro-campaign.beacon, #ro-bf.beacon, #ro-ship.nudge, #ro-warplane.nudge, #ro-hook.nudge { animation:none; }
   }
   /* ---- THE LANGUAGE PICKER (v1.29). Native labels only: a child who cannot
      read the interface cannot read "Japanese" either, but 日本語 they know on
@@ -39104,7 +39104,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.30';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.31';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -42121,6 +42121,7 @@ function evDoorTick(){
   roomBeaconTick();   // 0494d THE IDLE BEACON: the room's quiet-watch rides the same second
   nbTick();   // 0559 THE NEW BUILD: the chip on a quiet second, the auto once idle — the same second, zero new timers
   shipNudgeTick();   // 0546 THE SHIP'S NUDGE: the same second — the class rides the ship's own group, never baked by a repaint
+  hookNudgeTick();   // 0630 THE ROOF AFTER THE KING: the hookshot's pulse on the same second (+ the landing's word on its first quiet second)
   grpBtnSync();   // 0515 G1: the GROUP button rides the room's own second (§5.1 — the searching countdown, zero new timers)
 }
 function evDoorDeny(){ const d=document.getElementById('evDoor'); if(!d) return; d.classList.remove('deny'); void d.offsetWidth; d.classList.add('deny'); setTimeout(()=>{ try{ d.classList.remove('deny'); }catch(e){} }, 500); }
@@ -87977,6 +87978,36 @@ function bfAgainNext(){   // the lane's fold door: a standing picker or card hol
 }
 function bfAgainLaunch(){ BF_AGAIN=0; const sz=(S.bf && S.bf.team)||META.bfTeam||1; squadAdGate(()=>{ hideAllOverlays(); bfQueueStart(sz, { gate:1, again:1 }); }); }   // the war table's own door at the size just played — the verdict's break rides HERE when a pick was owed (0627: after the upgrade); a no-pick tap already paid at CONTINUE and squadAdGate's soloPaid latch keeps it to one; the queue's own gate (adGate) counts the door-launched game
 function bfAgainOut(){ PGO=null; PGV=null; PGPV=null; PGPK=null; showMenu(); openWarTable(); }   // the lane's way out (WITHDRAW · STAND DOWN · a real opponent's relay): the hqBtn body's stamps cleared, the room, then the war table over it (0619's 'wt' door — the mode's home)
+// ═══ 0630 THE ROOF AFTER THE KING (FM-GVT-JUICE-01 §6 P6 — Wyatt's #1; design/juice-reach-0830/00-DESIGN.md §4 / §6 P6 / §7 Q10-Q12;
+// Wyatt 8/30 13:39 by phone, verbatim: "After a player beats King Yeti and King Rex, auto-navigate them to the roof and pulse the
+// hook shot, unconditionally. The hook shot is the gateway to Western World, which is the path toward the King Frog fight, and
+// players are currently beating both kings without ever finding it.") THE LOST STEP (§4): 5 players slew King Rex, 2 went west —
+// a solo raid verdict had NO landing stamp (CONTINUE fell to showMenu: the bedroom), the only pointer was one whisper on the Easy
+// verdict, and rdecSweep dealt the hookshot into THE ROOFTOP's list whether or not the player owned the roof, where it never draws.
+// THE LANDING: a SOLO King Rex WIN (⚑ Q10: King Yeti's too) with the hookshot owned and undelivered → CONTINUE stamps the landing
+// (raidLandRoof — the roof granted UNCONDITIONALLY when unowned, ⚑ Q11: the king-slayer's roof; rooms.cur = the roof; one save)
+// and the shipped exit lands ON IT: showMenu — or the picker first when a pick is owed, whose drained exit is the same showMenu
+// (⚑ Q12: the plain landing, not MOVING DAY's sail). THE PULSE: #ro-hook.nudge (the ship's own halo rule; the reduced-motion kill
+// with it) re-applied on the room's 1 s tick — on EVERY roof landing until the drop (hookNudgeOn), never once. THE WORD: the
+// verdict's own whisper (0534's key, ×7 already) spoken once as Sarge's room line (commInviteLine — the dino rumor's door) on the
+// first QUIET second of that landing (roomQuiet: the hookshot's own prize card, a rite, a standing window all go first).
+// hookDeliver → the catch → janeMapOpen byte-still: the western chain is the shipped one. A save that already delivered
+// (META.hookDrop) never lands the roof by this door; the party raid keeps 0619's throne door (pgTakeV above this seat); the event
+// room (tier 'u'), the hideout and the fields keep their own landings. ROOF_SAY is the session's only flag (never saved).
+let ROOF_SAY=0;            // the landing's word is owed (the stamp's clock, ms) — spoken on the first quiet second on the roof, dropped on any other floor
+function raidLandDue(){ return S.mode==='win' && !!S.raid && S.raid.cfg===S.cfg && !pgOrigin() && !S.coop && (S.raid.k==='bone' || S.raid.k==='ice') && S.raid.t!=='u' && decOwns('hook') && !META.hookDrop; }   // the SOLO king-slayer whose hookshot waits: King Rex (the Easy prize landed this very verdict) or King Yeti after him (⚑ Q10) — the party (0619's throne), the event room, the hideout, the fields and a delivered hookshot keep their doors
+function raidLandRoof(){   // THE STAMP (dinoGift's grammar — flag first, one save): the roof owned (⚑ Q11: granted, never sold to a king-slayer), the roof current, the word armed; the caller's own exit paints it
+  if(!roomOwns('rooftop')) roomGrant('rooftop');   // THE ONE DOOR (push · save · no repaint off 'menu') — roomGiftSweep later finds it owned and deals nothing; a bought roof refunds nothing
+  META.rooms.cur='rooftop'; ROOF_SAY=Date.now(); saveMeta();
+}
+function hookNudgeOn(){ return S.mode==='menu' && roomCur()==='rooftop' && decOwns('hook') && !META.hookDrop; }   // the pulse: on the roof with the hookshot owned and undelivered — every landing until the drop (the ship's nudge law: re-applied every second, a repaint bakes nothing; the rule's reduced-motion kill stands)
+function hookNudgeTick(){   // rides evDoorTick beside shipNudgeTick — the room's 1 s tick
+  const el=document.getElementById('ro-hook'); if(el) el.classList.toggle('nudge', hookNudgeOn());
+  if(!ROOF_SAY) return;
+  if(roomCur()!=='rooftop' || !hookNudgeOn()){ ROOF_SAY=0; return; }   // another floor, or the hookshot already down the hole — the moment passed
+  if(Date.now()-ROOF_SAY<1000 || !roomQuiet()) return;                // the landing's own cards first (the hookshot's prize card, a rite, a modal); a standing comm window keeps its seat
+  ROOF_SAY=0; commInviteLine(TXT("THE HOOKSHOT WANTS TO REACH SOMEONE… TRY THE ROOF."));   // 0534's breadcrumb as Sarge's room line — the same key, no new row
+}
 document.getElementById('retryBtn').addEventListener('click', ()=>{
   audio();
   { const o=pgTakeV(); if(o){ squadAdGate(()=>pgLand(o)); return; } }   // go again together — FROM the origin screen (v2.82; v2.84: the stamp survives a party that died on this screen)
@@ -88033,6 +88064,7 @@ document.getElementById('againBtn').addEventListener('click', ()=>{
   if(campFlowDue()){ campFlowGo(); return; }   // 0625 THE CONTINUOUS CAMPAIGN: a solo campaign win on a flow rung never sees the room — the picker (when owed), the owed cards, the next level
   { const p=pgTakePk(); if(p){ if(META.pendingPicks>0){ PGPK=p; showPicker(); } else { showMenu(); openParkScene(p); } return; } }   // 0341: a park verdict lands on ITS park screen (win and loss alike), never the main menu
   if(S.bf){ if(bfAgainDue()){ bfAgainGo(); return; } if(META.pendingPicks>0) showPicker(); else showMenu(); return; }   // battlefield XP can promote you   // 0629 BATTLEGROUNDS: PLAY AGAIN — the solo win re-queues (the picker first when a pick is owed); every other battleground verdict lands as it did
+  if(raidLandDue()) raidLandRoof();   // 0630 THE ROOF AFTER THE KING: the king-slayer's landing stamp — the roof owned + current, the word armed; the exit below (the picker when owed → its drained exit, else the room) lands ON the roof
   if(META.pendingPicks>0) showPicker(); else showMenu();
   });
 });
@@ -89391,6 +89423,7 @@ window.GVT = {
   croakSurp(){ const ids=DECOR_BOSS.slice(12); return { cv:GVT_CV, open:croakSurpOpen(), ids, cost:ids.map(k=>DECOR_COST[k]), owned:ids.filter(decOwns), allN:DECOR_ALL_N, gate:ids.map(decBossOpen), spots:ids.map(k=>DECOR_SPOTS[k]), react:ids.map(k=>DECOR_REACT[k]&&DECOR_REACT[k].el), ychar:ids.filter(k=>YCHAR_DECOR.indexOf(k)>=0).length, ink:ids.map(k=>BOSS_INK[k]), art:ids.map(k=>BOSS_ART[k]&&BOSS_ART[k].fs), dye:Object.keys(BOSS_DYE), shut:STORE_SHUT.croaks.sec }; },   // 0552 CROAK'S SURPLUS
   boxAlarm(){ return { cv:GVT_CV, alarm:BOX_ALARM, after:BOX_ALARM_AFTER, to:BOX_ALARM_TO, near:BOX_ALARM_NEAR, bite:BOX_ALARM_BITE, biteFrom:BITE_FROM, biteTo:BITE_TO, crateX:Object.assign({},CAMP_CRATE_X), crate:[1,2,3,4,5,6].map(CAMP_BASE_HP), band:campBoxAlarmBand(), due:campBoxAlarmDue(), latched:!!(S.sq&&S.sq.boxAlarm), salAnn:!!(S.sq&&S.sq.salAnn), sqBite:!!(S.sq&&S.sq.bite), biteDue:[1,2,3,4,5,6].map(biteDue), wave:S.wave, len:S.cfg? S.cfg.waves.length : 0, names:S.cfg? S.cfg.waves.map(w=>w.name) : [], hp:S.tanBase? [Math.round(S.tanBase.hp), S.tanBase.hpMax] : null, press:Math.round((S.sq&&S.sq.press)||0), nextIn:S.sq? +(S.sq.nextT-S.sq.t).toFixed(2) : null, ref:sqRef(), ann:S.ann? S.ann.txt : null, annWait:S.annWait? {txt:S.annWait.ann&&S.annWait.ann.txt, in:+S.annWait.in.toFixed(2)} : null, say:COMM.say? (COMM.say.win&&COMM.say.win.textContent||'') : '' }; },   // 0552a THE BOX ALARM (read-only)
   bfVerdict(){ const bf=S.bf, g=id=>document.getElementById(id); return { cv:GVT_CV, lead:BF_TIME_LEAD, leadScale:BF_LEAD_SCALE, loseRed:LOSE_RED, vlongChips:BF_VLONG_CHIPS, colText:Object.assign({},BF_COL_TEXT), end:Object.assign({},BF_END), armies:ARMIES.map(a=>[a.id,a.col,a.hex]), me:META.dyeOn||null, seats:bf? bf.seats.map(s=>({ i:s.i, team:s.team, dye:(s.dye===undefined? null : s.dye), hex:s.hex, human:!!s.human, me:!!s.me })) : null, you:bf? bfSideCol(bfMyTeam()) : null, foe:bf? bfSideCol(bfFoeTeam()) : null, hp:bf? [Math.max(0,Math.ceil(bf.base[bfMyTeam()].hp)), Math.max(0,Math.ceil(bf.base[bfFoeTeam()].hp))] : null, named:!!(bf&&(bf.away||bf.raid||bf.nem)), whistled:!!(bf&&bf.whistled), jingled:!!(bf&&bf.jingled), ending:!!(bf&&bf.ending), resolved:!!(bf&&bf.resolved), slowmo:S.slowmo, mode:S.mode, title:{ win:g('winTitle').innerHTML, winHex:g('winTitle').style.color, lose:g('loseTitle').innerHTML, loseHex:g('loseTitle').style.color }, body:{ win:g('medalText').innerHTML, lose:g('loseText').innerHTML }, medalRow:g('medalRow').textContent }; },   // 0552b COLOUR WINS (read-only)
+  roof(){ const el=document.getElementById('ro-hook'); return { cv:GVT_CV, due:raidLandDue(), on:hookNudgeOn(), say:ROOF_SAY? 1 : 0, cur:roomCur(), rawCur:(META.rooms&&META.rooms.cur)||null, roof:roomOwns('rooftop'), rooms:((META.rooms&&META.rooms.own)||[]).slice(), hook:decOwns('hook'), home:decorHome('hook'), drop:META.hookDrop? 1 : 0, wmap:META.wmap? 1 : 0, wmapSeen:META.wmapSeen? 1 : 0, el:!!el, nudge:!!el && el.classList.contains('nudge'), comm:!!document.querySelector('#comms .cm-win'), commTxt:(document.querySelector('#comms .cm-txt')||{}).textContent||'', mode:S.mode, raid:S.raid? { k:S.raid.k, t:S.raid.t, mine:!!S.raid.mine } : null, bone:Object.assign({}, META.bone||{}), ice:Object.assign({}, META.ice||{}), rdecRoof:((META.rdec&&META.rdec.rooftop)||[]).slice(), mvDay:META.mvDay||0, pend:META.pendingPicks|0, hookState:hookState(), scr:telScreen() }; },   // 0630 THE ROOF AFTER THE KING — the rig's one read (read-only)
   bfAgain(){ const g=id=>document.getElementById(id), vis=id=>{ const e=g(id); return !!e && !e.classList.contains('hidden'); }, on=id=>{ const e=g(id); return !!e && e.classList.contains('on'); }; const hb=g('winHqBtn'), ab=g('againBtn'); return { cv:GVT_CV, on:BF_AGAIN, due:bfAgainDue(), label:ab? ab.textContent : null, hq:!!hb && !hb.classList.contains('off'), q:BFQ? { size:BFQ.size, again:!!BFQ.again, state:BFQ.state, joined:BFQ.joined, seek:BFQ.seek? BFQ.seek.st : null, mapId:BFQ.mapId, crewRoom:BFQ.crewRoom||null } : null, mode:S.mode, bf:!!S.bf, team:S.bf? S.bf.team : null, menu:vis('menu'), win:vis('win'), lose:vis('lose'), picker:vis('picker'), wt:wartableOpen(), chip:on('bfqChip'), roster:on('bfqRoster'), ring:on('bfqFound'), sub:(g('bfqSub')||{}).textContent||'', scr:telScreen(), pend:META.pendingPicks|0, bfTeam:META.bfTeam||null, bfMap:META.bfMap||null }; },   // 0629 BATTLEGROUNDS: PLAY AGAIN — the rig's one read (read-only)
   ui(){ const c=S.bf? S.bf.cam : S.cCam; return { cv:GVT_CV, k:uiK(), big:UI_BIG_K, top:UI_BIG_TOP, rung:(META.campaign|0), css:(()=>{ try{ return document.documentElement.style.getPropertyValue('--uik'); }catch(e){ return null; } })(), panS:panS(), panMax:RUG_PAN_S, worldH:WORLD_H, h:H, w:W, vw:VW, scale:scale, cam:c? { x:c.x, y:(c.y||0), vx:c.vx||0, vy:c.vy||0 } : null, own:!!S.camOwn, pan:!!S.pan, tray:trayRects.map(r=>r.slice(0,4)), vet:btnRects.vet? btnRects.vet.slice(0,4) : null, hq:btnRects.hq? btnRects.hq.slice() : null, mode:S.mode }; },   // 0628 BIG BUTTONS + THE MAP PANS DOWN rig — read-only: the factor, its stylesheet copy, the pan margin, the live camera, the drawn rects
   dp(){ return { cv:GVT_CV, lvl:DINO_GIFT_LVL, winGift:WIN_GIFT_LVL, dino:!!META.parkDino, dinoSeen:!!META.parkDinoSeen, dinoBy:META.parkDinoBy||null, yeti:!!META.parkYeti, yetiSeen:!!META.parkYetiSeen, yetiBy:META.parkYetiBy||null, by:dinoBy()||null, cur:roomCur(), rawCur:(META.rooms&&META.rooms.cur)||null, own:(META.rooms&&META.rooms.own||[]).slice(), byGift:META.byGift|0, door:!!MB_TAKE, scene:parkSceneOpen(), park:PARK_CUR, mode:S.mode, flow:PGFLOW, card:milePopUp(), head:(document.querySelector('#milePop .mb-h')||{}).textContent||'', band:(document.querySelector('#milePop .mb-band')||{}).textContent||'', rumor:dinoRumorDue(), nudge:shipNudgeOn(), nudgeDue:shipNudgeDue(), glass:glassDue(), mvDay:META.mvDay||0, lens:!!META.lens }; },   // 0626 DINO PARK AT THREE — the rig's one read (read-only)
