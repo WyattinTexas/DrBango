@@ -26027,7 +26027,7 @@ function lensOwned(){ return !!META.lens; }
 // (a BOUGHT lens never cards); lensAnn = the room card dealt, once ever.
 const LENS_FREE_LVL=15;    // the commander-level door (unchanged by 0494c — ⚑ #2)
 const LENS_FREE_CAMP=3;    // 0617 (Wyatt 8/29: "Get them the magnify glass and the ship by lvl 3") — was 5 at 0494c, 15 before that
-const BY_FREE_LVL=3;       // 0617 THE BACKYARD + THE SHIP AT THREE (Wyatt 8/29; was 7 at 0494c) — backyardGift('campaign')'s rung (the verdict + bySweep gate on it); the ship still springs off ownedRooms()>=2, its own 0335 law, the moment the backyard lands
+const BY_FREE_LVL=3;       // 0617 THE BACKYARD + THE SHIP AT THREE (Wyatt 8/29; was 7 at 0494c; 0663: the rung reads META.lvl now — his 8/29 "by lvl 3" meant the players level) — backyardGift('campaign')'s rung (the verdict + bySweep gate on it); the ship still springs off ownedRooms()>=2, its own 0335 law, the moment the backyard lands
 // ═══ 0626 DINO PARK AT THREE (FM-GVT-JUICE-01 §6 P2 — design/juice-reach-0830/00-DESIGN.md; Wyatt 8/30 13:39 by phone, verbatim:
 // "Around level three to four, surface an 'unlocked Dino Park' prompt and take the player directly there, bypassing the magnifying
 // glass. Backing out returns them to the soccer field. Dino Park is the region that eventually leads to the King Rex fight, so this
@@ -26048,7 +26048,7 @@ const BY_FREE_LVL=3;       // 0617 THE BACKYARD + THE SHIP AT THREE (Wyatt 8/29;
 // DAY's own sail to the winter field stands byte-still (rooms.cur is not moved — the ship's press is the lesson). Zero new l10n
 // rows: the gift road's band is the gear card's own LEVEL {0}! key (byCard's idiom); the glass road keeps IN THE TALL GRASS! and
 // ON THE FROZEN POND!.
-const DINO_GIFT_LVL=3;     // ⚑ Q1 THE ONE CONST — the Dino Park gift rung (3 rides the backyard + lens + ship rung; 4 the paint ceremony)
+const DINO_GIFT_LVL=3;     // ⚑ Q1 THE ONE CONST — the Dino Park gift rung, on META.lvl since 0663 (3 rides the backyard + lens + ship rung; 4 the paint ceremony)
 // ===== 0528 THE ROOM GIFTS (FM-GVT-NEWBIE-01 §2; Wyatt 8/24, verbatim: "I want
 // to give the player the rooftop room at level 18. … I want to give them the
 // winter room at … either level 8 or level 12. The reasons for these are that I
@@ -26070,11 +26070,16 @@ const DINO_GIFT_LVL=3;     // ⚑ Q1 THE ONE CONST — the Dino Park gift rung (
 // MOVING DAY rides the grant: META.mvDay latches the gifted room (the LOWER
 // rung's if both land on one verdict — a hand-rolled save) and mvDayTry, LAST
 // in showMenu, presses the ship for the player on the first quiet landing.
-const WIN_GIFT_LVL=8;      // ⚑ THE WINTER FIELD's rung (Wyatt: "either level 8 or level 12")
+const WIN_GIFT_LVL=8;      // ⚑ THE WINTER FIELD's rung (Wyatt: "either level 8 or level 12"; 0663: winter + the yeti park read it off META.lvl — the rooftop below stays campaign)
 const ROOF_GIFT_LVL=18;    // ⚑ THE ROOFTOP's rung (Wyatt: "at level 18")
 const ROOM_GIFT={ winter:WIN_GIFT_LVL, rooftop:ROOF_GIFT_LVL };   // room → rung
 const ROOM_GIFT_ORDER=['winter','rooftop'];                        // the LOWER rung first — the verdict's order, the sweep's order, the moving-day latch's pick
-function roomGiftDue(id){ return !!ROOM_GIFT[id] && (META.campaign|0)>=ROOM_GIFT[id] && !roomOwns(id); }
+// 0663 (Wyatt 8/31: "its the players level that we care about ... giving them the ship so they can travel and see the soccer
+// field, Winter map & western map"): THE WINTER FIELD reads the COMMANDER level now (META.lvl — the XP promotions on EVERY
+// mode, the treasure road's own source @0589) at the SAME rung 8; THE ROOFTOP keeps the campaign rung — Wyatt named the parks,
+// the ship and the ship's three destinations, never the roof (⚑ 0663 Q3: one term below joins it to the commander ladder).
+function roomGiftLvl(id){ return id==='winter'? (META.lvl|0) : (META.campaign|0); }   // the door's own source, per room (0663)
+function roomGiftDue(id){ return !!ROOM_GIFT[id] && roomGiftLvl(id)>=ROOM_GIFT[id] && !roomOwns(id); }
 function roomGift(id){
   if(!roomGiftDue(id)) return false;   // below the rung, or already theirs (bought or gifted) — nothing happens
   if(!META.mvDay) META.mvDay=id;       // MOVING DAY latched FIRST (the comet law) — roomGrant's own save carries it; a latch already held (the lower rung's) stands
@@ -39571,7 +39576,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.56';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.57';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -59438,7 +59443,7 @@ function endBattle(win){
   // screen, right behind the room's. backyardGift reads META only (the ducky's
   // own law), so a save already past the rung collects on its next win here
   // or at the room sweep (bySweep), whichever door opens first.
-  const byDue=(META.campaign|0)>=BY_FREE_LVL && !META.byGift && !roomOwns('backyard');   // 0552c D4: READ ONLY — the verdict no longer grants the room; bySweep grants it WITH its card at the first landing home (its own gate, verbatim), the ship's arrival right behind (shipCineSweep now sits ahead of roomGiftSweep in the chain)
+  const byDue=(META.lvl|0)>=BY_FREE_LVL && !META.byGift && !roomOwns('backyard');   // 0663: the COMMANDER level (bySweep's own read moved with it) · 0552c D4: READ ONLY — the verdict no longer grants the room; bySweep grants it WITH its card at the first landing home (its own gate, verbatim), the ship's arrival right behind (shipCineSweep now sits ahead of roomGiftSweep in the chain)
   // 0528 THE ROOM GIFTS: the same door, two rungs deeper — THE WINTER FIELD at
   // WIN_GIFT_LVL, THE ROOFTOP at ROOF_GIFT_LVL (roomGiftDue reads META only;
   // roomOwns is the latch — an owner feels nothing). ABOVE the earn walk like
@@ -74301,7 +74306,7 @@ function castleOpen(){
 // of it) — the find alone (parkYeti), how it came (parkYetiBy 'gift'); rooms.cur is NOT moved: MOVING DAY's own sail to the winter
 // field (the latch inside roomGift) stands byte-still — the ship's press is the lesson. 3 players have ever found the castle by the glass.
 function yetiGift(){
-  if(META.parkYeti || (META.campaign|0)<WIN_GIFT_LVL || !roomOwns('winter')) return false;
+  if(META.parkYeti || (META.lvl|0)<WIN_GIFT_LVL || !roomOwns('winter')) return false;   // 0663: the COMMANDER level (the players level — Wyatt 8/31); the winter room rides the same ladder now, so the pair still lands together
   META.parkYeti=1; META.parkYetiBy='gift'; saveMeta();
   return true;
 }
@@ -74369,7 +74374,7 @@ function dinoOpen(){
 // once. Flag FIRST (the comet law), one save. A glass find (parkDino already 1), a rung below DINO_GIFT_LVL, or no backyard yet =
 // nothing.
 function dinoGift(){
-  if(META.parkDino || (META.campaign|0)<DINO_GIFT_LVL || !roomOwns('backyard')) return false;
+  if(META.parkDino || (META.lvl|0)<DINO_GIFT_LVL || !roomOwns('backyard')) return false;   // 0663: the COMMANDER level (the players level — Wyatt 8/31)
   META.parkDino=1; META.parkDinoBy='gift'; META.rooms.cur='backyard'; saveMeta();
   return true;
 }
@@ -74922,7 +74927,7 @@ function planeTravel(){
 // realtor's window (roomCardArt, the shop's own poster idiom), the 0363 line,
 // IT'S MINE! — every key already carries its seven rows.
 function bySweep(){
-  if(!((META.campaign|0)>=BY_FREE_LVL) || META.byGift || roomOwns('backyard')) return false;   // nothing owed
+  if(!((META.lvl|0)>=BY_FREE_LVL) || META.byGift || roomOwns('backyard')) return false;   // nothing owed · 0663: the COMMANDER level (the players level — Wyatt 8/31; byDue at the verdict reads the same door)
   const p=document.getElementById('milePop');
   if(!p || !p.classList.contains('hidden')) return false;   // one card at a time (the chain's law) — the grant waits for its card
   if(!backyardGift('campaign')) return false;
@@ -90392,7 +90397,7 @@ window.GVT = {
   ui(){ const c=S.bf? S.bf.cam : S.cCam; return { cv:GVT_CV, k:uiK(), big:UI_BIG_K, top:UI_BIG_TOP, rung:(META.campaign|0), css:(()=>{ try{ return document.documentElement.style.getPropertyValue('--uik'); }catch(e){ return null; } })(), panS:panS(), panMax:RUG_PAN_S, worldH:WORLD_H, h:H, w:W, vw:VW, scale:scale, cam:c? { x:c.x, y:(c.y||0), vx:c.vx||0, vy:c.vy||0 } : null, own:!!S.camOwn, pan:!!S.pan, tray:trayRects.map(r=>r.slice(0,4)), vet:btnRects.vet? btnRects.vet.slice(0,4) : null, hq:btnRects.hq? btnRects.hq.slice() : null, mode:S.mode }; },   // 0628 BIG BUTTONS + THE MAP PANS DOWN rig — read-only: the factor, its stylesheet copy, the pan margin, the live camera, the drawn rects
   dp(){ return { cv:GVT_CV, lvl:DINO_GIFT_LVL, winGift:WIN_GIFT_LVL, dino:!!META.parkDino, dinoSeen:!!META.parkDinoSeen, dinoBy:META.parkDinoBy||null, yeti:!!META.parkYeti, yetiSeen:!!META.parkYetiSeen, yetiBy:META.parkYetiBy||null, by:dinoBy()||null, cur:roomCur(), rawCur:(META.rooms&&META.rooms.cur)||null, own:(META.rooms&&META.rooms.own||[]).slice(), byGift:META.byGift|0, door:!!MB_TAKE, scene:parkSceneOpen(), park:PARK_CUR, mode:S.mode, flow:PGFLOW, card:milePopUp(), head:(document.querySelector('#milePop .mb-h')||{}).textContent||'', band:(document.querySelector('#milePop .mb-band')||{}).textContent||'', rumor:dinoRumorDue(), nudge:shipNudgeOn(), nudgeDue:shipNudgeDue(), glass:glassDue(), mvDay:META.mvDay||0, lens:!!META.lens }; },   // 0626 DINO PARK AT THREE — the rig's one read (read-only)
   flow(){ const g=id=>document.getElementById(id), vis=id=>{ const e=g(id); return !!e && !e.classList.contains('hidden'); }; const hb=g('winHqBtn'); return { cv:GVT_CV, top:CAMP_FLOW_TOP, on:PGFLOW, due:campFlowDue(), hq:!!hb && !hb.classList.contains('off'), hqRect:hb? (r=>[Math.round(r.left),Math.round(r.top),Math.round(r.right),Math.round(r.bottom)])(hb.getBoundingClientRect()) : null, hqText:hb? hb.textContent : null, mode:S.mode, levelN:S.levelN, camp:META.campaign|0, pend:META.pendingPicks|0, menu:vis('menu'), scene:vis('campscene'), picker:vis('picker'), win:vis('win'), lose:vis('lose'), card:milePopUp(), box:mboxUp(), dealt:MB_DEALT, end:MB_END, head:(document.querySelector('#milePop .mb-h')||{}).textContent||'' }; },   // 0625 THE CONTINUOUS CAMPAIGN — the rig's one read (read-only)
-  winVerdict(){ const g=id=>document.getElementById(id), win=g('win'), mr=g('medalRow'), mt=g('medalText'); return { cv:GVT_CV, starGap:VD_STAR_GAP, artPx:VD_ART_PX, whisperFrom:VD_WHISPER_FROM, beats:[VD_MEDAL_AT,VD_MEDAL_STAG,VD_TILE_AT,VD_TILE_MS,VD_ROW_AT], sfx:VD_MEDAL_SFX, swords:VD_BOSS_SWORDS, foot:Object.assign({},VD_FOOT), camp:win.classList.contains('camp'), done:win.classList.contains('vdone'), running:!!VD, stars:mr.dataset.stars||null, v:mt.dataset.v||null, parts:[...mt.children].map(e=>({ k:e.className, t:e.innerText.replace(/\s+/g,' ').trim(), op:getComputedStyle(e).opacity })), medals:[...mr.querySelectorAll('.vm')].map(e=>({ g:e.textContent, on:e.classList.contains('on'), off:e.classList.contains('off'), op:getComputedStyle(e).opacity })), title:g('winTitle').innerText.replace(/\s+/g,' ').trim(), btn:g('againBtn').getBoundingClientRect().bottom, due:{ by:(META.campaign|0)>=BY_FREE_LVL && !META.byGift && !roomOwns('backyard'), winter:roomGiftDue('winter'), rooftop:roomGiftDue('rooftop'), bomber:bmbOwned() && !META.bomberSeen, cmd:cmdOwned() && !META.cmdSeen, blade:bladeOwned() && !META.bladeSeen, cmdo:cmdoOwned() && !META.cmdoSeen, soul:soulOwned() && !META.soulSeen, paint:paintRiteOwed(), lens:lensDue() && !lensOwned() }, whispered:[REX_WHISPERED, RANK_WHISPERED], mode:S.mode }; },   // 0552c STARS · PAY · ONE TICKET — the rig's one read (read-only)
+  winVerdict(){ const g=id=>document.getElementById(id), win=g('win'), mr=g('medalRow'), mt=g('medalText'); return { cv:GVT_CV, starGap:VD_STAR_GAP, artPx:VD_ART_PX, whisperFrom:VD_WHISPER_FROM, beats:[VD_MEDAL_AT,VD_MEDAL_STAG,VD_TILE_AT,VD_TILE_MS,VD_ROW_AT], sfx:VD_MEDAL_SFX, swords:VD_BOSS_SWORDS, foot:Object.assign({},VD_FOOT), camp:win.classList.contains('camp'), done:win.classList.contains('vdone'), running:!!VD, stars:mr.dataset.stars||null, v:mt.dataset.v||null, parts:[...mt.children].map(e=>({ k:e.className, t:e.innerText.replace(/\s+/g,' ').trim(), op:getComputedStyle(e).opacity })), medals:[...mr.querySelectorAll('.vm')].map(e=>({ g:e.textContent, on:e.classList.contains('on'), off:e.classList.contains('off'), op:getComputedStyle(e).opacity })), title:g('winTitle').innerText.replace(/\s+/g,' ').trim(), btn:g('againBtn').getBoundingClientRect().bottom, due:{ by:(META.lvl|0)>=BY_FREE_LVL && !META.byGift && !roomOwns('backyard'), winter:roomGiftDue('winter'), rooftop:roomGiftDue('rooftop'), bomber:bmbOwned() && !META.bomberSeen, cmd:cmdOwned() && !META.cmdSeen, blade:bladeOwned() && !META.bladeSeen, cmdo:cmdoOwned() && !META.cmdoSeen, soul:soulOwned() && !META.soulSeen, paint:paintRiteOwed(), lens:lensDue() && !lensOwned() }, whispered:[REX_WHISPERED, RANK_WHISPERED], mode:S.mode }; },   // 0552c STARS · PAY · ONE TICKET — the rig's one read (read-only)
   // ---- 0559 THE NEW BUILD rig: nb (the state + every dial) · nbForce (as if a check returned this stamp) · nbCheck (one check now) ----
   nb(){ return { cv:GVT_CV, base:NB.base||null, stamp:NB.stamp||null, newer:NB.newer?1:0, checks:NB.checks, fails:NB.fails, last:NB.last, beats:NB.beats, busy:!!NB.busy, chip:NB.chip?1:0, card:!!document.getElementById('nbCard'), snoozeT:NB.snoozeT, went:NB.went, auto:nbAutoOK()?1:0, quiet:nbQuiet()?1:0, idle:+idleQuiet().toFixed(1), bellFar:nbBellFar()?1:0, every:NB_EVERY, snoozeMs:NB_SNOOZE_MS, autoS:NB_AUTO_S, guardS:NB_BELL_GUARD_S, path:location.pathname, proto:location.protocol }; },
   nbForce(stamp){ stamp=String(stamp||'forced'); if(!NB.base) NB.base='(rig)'; NB.stamp=stamp; NB.newer=(stamp!==NB.base); NB.last=Date.now(); nbTick(); return GVT.nb(); },
