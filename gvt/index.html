@@ -37935,7 +37935,7 @@ function reset(){
   S.annWait=null;                                         // v1.41: a deferred boss card dies with the battle it was staged for
   COMM.cd=0; COMM.leakCd=0; COMM.last={};                 // ...and the comm cooldowns re-arm fresh each battle
   S.jetCd=0; S.jetFlash=0; S.jetAim=null;
-  S.csFlash=0; S.csWas=0;                                  // 0517a: the Commander's active card — the re-arm rim (mine; the clocks ride the unit)                 // the jet re-arms fresh each battle (v1.39)
+  S.csFlash=0; S.csWas=0; S.cs2Flash=0; S.cs2Was=0;        // 0517a: the Commander's active card — the re-arm rim (mine; the clocks ride the unit) · 0650: the second rung's own beside it                 // the jet re-arms fresh each battle (v1.39)
   S.tkCd=0; S.tkFlash=0; S.tkCd2=0; S.tkFlash2=0;         // v3.11: telekinesis re-arms fresh each battle (the jet's law) · 0583a: the second socket's clock beside it
   // THE EMERGENCY PACKAGE re-arms each battle too (v1.62): the spent flag, the
   // buff clocks, the mend, the stick of pending canopies, the per-sender dedupe
@@ -39490,7 +39490,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.46';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.47';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41089,7 +41089,7 @@ function coopApply(cm){
   // relayed press is a fact; a stale one just misses). An old build falls off
   // the chain: its screen misses the cast and re-converges on the next mv/jet
   // snap (the accepted-divergence class).
-  if(cm.k==='cs'){ if(u.type==='sarge') csCast(u,true); return; }
+  if(cm.k==='cs'){ if(u.type==='sarge') csCast(u,true,false,cm.e|0); return; }   // 0650: a word carrying 'e' replays exactly the stance it cast (the two-rung press); an e-less word — a ≤v7.46 sender — walks the shipped chain
   // 'up' RETIRED (v1.32): tap-to-stand is gone — a casualty stays down. An ally
   // on an older build still SENDS this for their own sim's knockdowns; here the
   // man either fell for good already or never fell at all, so the word is
@@ -46910,7 +46910,7 @@ function roomApply(cm){
     if(S.bf && S.mode==='play'){
       const st=(typeof cm.n==='number')? (cm.n|0) : -1;
       const u=S.units.find(v=>v.type==='sarge' && (v.seat|0)===st && !v.dead);
-      if(u) csCast(u,true);
+      if(u) csCast(u,true,false,cm.e|0);   // 0650: the 'e' replay — the named stance exactly; e-less = the shipped chain
     }
     return;
   }
@@ -50935,13 +50935,15 @@ function cmdWallArm(u){   // THE BRACE goes up — the body cmdWallTry ran once 
 // then). relay = a fact from the wire: it
 // skips MY gates (the mode, the hold, the figure in my hand), never the man's
 // own state (a press this stale just misses — the tkFire class).
-function csCast(u,relay,dry){
+function csCast(u,relay,dry,n){
   if(!u || u.type!=='sarge' || u.dead) return false;
   const sw=unitSargeStats(u), cs=(sw.w==='commander')? (sw.cs|0) : 0; if(!cs) return false;
   if(!relay){ if(S.mode!=='play' || S.evHold) return false; if(S.drag && S.drag.unit===u) return false; }
   if(u.dropT>0 || u.jetT>0 || u.falling || u.shv || u.tkLg || u.cmdBlkT>0 || (u.ultChT||0)>0) return false;   // 0606: the INSPIRE plant is his hands too — no philosophy through the raise ("not moving but channeling")
-  if(csCastOne(u,sw,cs,dry)) return true;   // the primary answers first (the shipped order)
-  const c2=(sw.cs2|0);   // 0603 THE EMPEROR'S BLADE: the blade's SECOND philosophy answers when the first's clocks refuse — ONE press, the first READY stance casts, each on its own clocks (the cross-gates below already keep the actives physically honest: no flourish off a planted sword, no plant through a guard, no guard over a plant); without the blade cs2 never rides the bag and this line never fires
+  n=n|0;   // 0650 Card A: a NAMED seat — each rung presses its own philosophy and the wire's 'e' replays exactly the stance that cast; a word for a stance no seat carries just misses (the tkFire class)
+  if(n) return (n===cs || n===(sw.cs2|0))? csCastOne(u,sw,n,dry) : false;
+  if(csCastOne(u,sw,cs,dry)) return true;   // the primary answers first (the un-named order — old wire words and old rigs; 0650: MY rungs always name their seat)
+  const c2=(sw.cs2|0);   // 0603 THE EMPEROR'S BLADE: the blade's SECOND philosophy answers when the first's clocks refuse — the one-press chain, kept for the e-less word alone since 0650 (the cross-gates below already keep the actives physically honest: no flourish off a planted sword, no plant through a guard, no guard over a plant); without the blade cs2 never rides the bag and this line never fires
   return (c2 && c2!==cs)? csCastOne(u,sw,c2,dry) : false;
 }
 function csCastOne(u,sw,cs,dry){   // 0603: the shipped per-stance bodies, verbatim, behind one head (csCast owned all three inline until the blade taught the press two seats); callers guard the man's own state above
@@ -50971,13 +50973,17 @@ function csCastOne(u,sw,cs,dry){   // 0603: the shipped per-stance bodies, verba
 }
 function csCardU(){ const u=jetSarge(); if(!u) return null; const sw=unitSargeStats(u); return (sw.w==='commander' && (sw.cs|0)>0)? u : null; }   // MY fielded Commander with a spec — his BUTTON on the right column stands while he does (0522d; his tray card was the button from 0517a to 0522c and keeps his spec's name as its caption) (jetSarge: mine, alive, landed, not in my hand)
 function csOn(){ return !!csCardU(); }   // 0522d THE BUTTON ON THE RIGHT: the stack's own flag — the rung stands only while MY fielded Commander with a spec is on the carpet; every button above it counts it (the 0340 slot law) and the strip carries zero new pixels for everyone else
-function csBtn(u,lite){ const sw=unitSargeStats(u), cs=sw.cs|0, can=lite? false : csCast(u,false,true);   // the button's face (0522d — the tray card's until then): the channel left, the quiet left, and whether a press would land (lite = the clocks alone)
+function cs2N(u){ if(!u) return 0; const sw=unitSargeStats(u); return (sw.w==='commander')? (sw.cs2|0) : 0; }   // 0650 THE EMPEROR'S BLADE: the second seat off the BAG (csU's own law — the wire's word for an ally; zero without the blade by construction, and a computer's kit never carries cs2)
+function cs2On(){ return cs2N(csCardU())>0; }   // 0650 THE SECOND RUNG: stands only while the Commander's own rung does AND his bag carries a second philosophy — every button above counts it beside csOn (the 0340 slot law; the 0607 shared-pitch ceiling absorbs the taller census by construction)
+function csBtn(u,lite,sn){ const sw=unitSargeStats(u), cs=(sn|0)||(sw.cs|0), can=lite? false : csCast(u,false,true,cs);   // the button's face (0522d — the tray card's until then): the channel left, the quiet left, and whether a press would land (lite = the clocks alone) · 0650: sn names a rung's own stance (the second rung reads its seat; unnamed = the primary, byte-what-it-was) and the face dry-runs THAT stance alone — a rung's face and its press agree by construction (the pristine's chain-lit-while-cooling confusion retired)
   if(cs===1) return { cs:1, chan:0, chanMax:1, cd:Math.max(0,u.cmdDuelCd||0), cdMax:CMD_DUEL_CD, can:can };
   if(cs===2) return { cs:2, chan:Math.max(0,u.cmdSignT||0), chanMax:SP_T, cd:Math.max(0,u.cmdSignW||0), cdMax:SP_CD, can:can };
   return { cs:3, chan:Math.max(0,u.cmdWallT||0), chanMax:CMD_WALL.t, cd:Math.max(0,u.cmdWallCd||0), cdMax:CMD_WALL.cd, can:can }; }
-function csPress(u){   // MY tap on his button (0522d: the right-column rung — the tray card's doors are closed): the local gate + the cast, then the word crosses (the pop relay shape — seat in a room, cid on the campaign lane)
-  if(!csCast(u,false)) return false;
-  if(S.coop){ const cm={k:'cs'}; if(roomBattle()) cm.n=u.seat|0; else if(u.cid) cm.id=u.cid; coopSend(cm); }
+function csPress(u,sn){   // MY tap on his rung (0522d: the right column — the tray card's doors are closed): the local gate + the cast, then the word crosses (the pop relay shape — seat in a room, cid on the campaign lane) · 0650: each rung presses ITS OWN philosophy (sn — the second rung passes its seat; unnamed = the primary, the shipped tap)
+  if(!u || u.type!=='sarge' || u.dead) return false;
+  const swp=unitSargeStats(u), two=(swp.cs2|0)>0; sn=(sn|0)||(swp.cs|0);
+  if(!csCast(u,false,false,sn)) return false;
+  if(S.coop){ const cm={k:'cs'}; if(two) cm.e=sn; if(roomBattle()) cm.n=u.seat|0; else if(u.cid) cm.id=u.cid; coopSend(cm); }   // 0650 THE WIRE: the stance rides 'e' — an int 0..7 already on the server's CMD_KEYS since v41/0551 (the 0561a reuse law, ZERO server bytes) — stamped ONLY off a two-seat bag (the 0509/0603 silence fence: a bladeless or one-philosophy save's word stays byte-identical); a ≤v7.46 receiver ignores it and walks the shipped chain (the accepted 0517a divergence class, re-converging on the next snap)
   return true; }   // the orange channel's break law verbatim (dead/down/jet/falling/shove/lunge/drop/dragged) + a foe at the sword (D17)
 function tanHit(u,fx,fy,src){
   if(u.dead) return;
@@ -59831,7 +59837,9 @@ function update(dt){
   }
   if(S.jetFlash>0) S.jetFlash-=dt;
   { const cu9=(S.mode==='play')? csCardU() : null, cd9=cu9? csBtn(cu9,true).cd : 0;   // 0517a THE BUTTON's re-arm tell: the gold rim on MY button (0522d: the right-column rung — it was the tray card) the frame his quiet ends (the jet's law — no float, no sound; the clocks themselves ride the unit at the loop head)
-    if(cu9 && (S.csWas||0)>0 && cd9<=0) S.csFlash=0.9; S.csWas=cd9; if((S.csFlash||0)>0) S.csFlash-=dt; }
+    if(cu9 && (S.csWas||0)>0 && cd9<=0) S.csFlash=0.9; S.csWas=cd9; if((S.csFlash||0)>0) S.csFlash-=dt;
+    const c29=cu9? cs2N(cu9) : 0, cdB9=c29? csBtn(cu9,true,c29).cd : 0;   // 0650: the second rung's own re-arm rim — the same law on its own stance's clock
+    if(c29 && (S.cs2Was||0)>0 && cdB9<=0) S.cs2Flash=0.9; S.cs2Was=cdB9; if((S.cs2Flash||0)>0) S.cs2Flash-=dt; }
   // v3.11 TELEKINESIS cooldown — the jet's law verbatim: sim dt, ticks in
   // update() OUTSIDE the briefing hold (a held battlefield still re-arms the
   // button; the EFFECT clocks freeze with the sim at the units loop head).
@@ -66988,8 +66996,9 @@ function btn(id,x,y,w,h,label){
 // never a second column, never a dropped button. Today's tallest census is 6
 // (a decked sniper or shotgun on the battlefield), so the pitch answers 64 in
 // every reachable state and every shipped rect is byte-what-it-was; a future
-// seventh rung tightens the whole column at once, by construction.
-function colRungN(){ return (jetOwned()?1:0)+(emgOwned()?1:0)+(tkOwned()?1:0)+(tkTwoOn()?1:0)+(csOn()?1:0)+(snpOn()?1:0)+(fsOn()?1:0)+(gsOn()?1:0)+(rpOn()?1:0)+(popOn()?1:0)+((bmbOwned()&&(S.bf||S.tanBase))?1:0)+(ultOn()?1:0); }
+// seventh rung tightens the whole column at once, by construction (0650: the
+// blade's SECOND RUNG — cs2On — is that seventh on a decked Commander).
+function colRungN(){ return (jetOwned()?1:0)+(emgOwned()?1:0)+(tkOwned()?1:0)+(tkTwoOn()?1:0)+(csOn()?1:0)+(cs2On()?1:0)+(snpOn()?1:0)+(fsOn()?1:0)+(gsOn()?1:0)+(rpOn()?1:0)+(popOn()?1:0)+((bmbOwned()&&(S.bf||S.tanBase))?1:0)+(ultOn()?1:0); }
 function colPitch(){ return (H-232-64*(colRungN()-1)<8)? 58 : 64; }
 function drawJetBtn(){
   btnRects.jet=null;
@@ -67234,13 +67243,18 @@ function drawTkBtn2(){
 // THE STONE WALL = the wall (three courses of stone). The tap door sits beside
 // the crystal's (csPress: the local gate + the cast, then the {k:'cs'} word).
 function drawCsBtn(){
-  btnRects.cs=null;
+  btnRects.cs=null; btnRects.cs2=null;
   if(S.mode!=='play') return;
   const u=csCardU(); if(!u) return;
   const bw=64, bh=56, x=VW-88;
   const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0));   // 0583a: and past the second socket's rung
   btnRects.cs=[x,y,bw,bh];
-  const b=csBtn(u), chan=b.chan>0, cool=!chan && b.cd>0, lit=!chan && !cool && b.can;
+  csRung(x,y,bw,bh,csBtn(u),S.csFlash||0);   // the primary's rung, its own face alone now (csBtn's sn law)
+  const c2=cs2N(u);   // 0650 THE SECOND RUNG — the blade's second philosophy directly above the first (the 0583a second-socket grammar walked onto the battle column): its own glyph, clocks, digits, re-arm rim and press; every rung above walks one seat up through cs2On (the 0340 slot law; the 0607 pitch ceiling absorbs the census by construction)
+  if(c2){ const y2=y-colPitch(); btnRects.cs2=[x,y2,bw,bh]; csRung(x,y2,bw,bh,csBtn(u,false,c2),S.cs2Flash||0); }
+}
+function csRung(x,y,bw,bh,b,flash){   // 0650: drawCsBtn's shipped paint, verbatim, behind one head (it owned the one rung inline until the blade's second seat needed the same brush); flash = the rung's own re-arm rim
+  const chan=b.chan>0, cool=!chan && b.cd>0, lit=!chan && !cool && b.can;
   cx.fillStyle = lit? 'rgba(38,40,31,0.92)' : 'rgba(38,40,31,0.6)';
   rr(x,y,bw,bh,12); cx.fill();
   cx.save(); cx.globalAlpha = (chan||cool)? 0.25 : 0.8;
@@ -67257,8 +67271,8 @@ function drawCsBtn(){
     cx.fillStyle='rgba(120,170,80,0.5)'; cx.fillRect(x,y+bh-fh,bw,fh);
     cx.fillStyle='#BFE39A'; cx.fillRect(x,y+bh-fh,bw,3);
     cx.restore();
-  } else if((S.csFlash||0)>0){   // he's ready again — a gold rim, fading out over the next beat
-    cx.save(); cx.globalAlpha=reducedMotion()? 0.85 : Math.min(1,S.csFlash/0.9);
+  } else if((flash||0)>0){   // he's ready again — a gold rim, fading out over the next beat (each rung its own)
+    cx.save(); cx.globalAlpha=reducedMotion()? 0.85 : Math.min(1,flash/0.9);
     cx.strokeStyle='#FFD24A'; cx.lineWidth=3; rr(x,y,bw,bh,12); cx.stroke(); cx.restore();
   }
   cx.globalAlpha = (chan||cool)? 0.16 : (lit?1:0.35);
@@ -67320,7 +67334,7 @@ function drawSnpBtn(){
   btnRects.snp=null;
   if(!snpOn() || S.mode!=='play') return;
   const bw=64, bh=56, x=VW-88;
-  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0));   // 0522d: and past the Commander's rung (it stands where the crystal's would — the two irons never rack together)
+  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (cs2On()?1:0));   // 0522d: and past the Commander's rung (it stands where the crystal's would — the two irons never rack together)
   btnRects.snp=[x,y,bw,bh];
   const js=jetSarge(), cd=S.snpCd||0;
   const ready=js && cd<=0 && unitSargeStats(js).w==='sniper' && !!snpTarget(js);
@@ -67380,7 +67394,7 @@ function drawFsBtn(){
   btnRects.fs=null;
   if(!fsOn() || S.mode!=='play') return;
   const bw=64, bh=56, x=VW-88;
-  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (snpOn()?1:0));   // 0522d: and past the Commander's rung
+  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (cs2On()?1:0) + (snpOn()?1:0));   // 0522d: and past the Commander's rung
   btnRects.fs=[x,y,bw,bh];
   const js=jetSarge(), cd=S.fsCd||0, chg=js? (js.fsN|0) : 0;
   const ready=js && cd<=0 && unitSargeStats(js).w==='sniper';
@@ -67433,7 +67447,7 @@ function drawPopBtn(){
   btnRects.pop=null;
   if(!popOn() || S.mode!=='play') return;
   const bw=64, bh=56, x=VW-88;
-  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (snpOn()?1:0) + (fsOn()?1:0) + (gsOn()?1:0) + (rpOn()?1:0));   // 0486: the pop walks a rung past the renegade · 0522d: and past the Commander's rung
+  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (cs2On()?1:0) + (snpOn()?1:0) + (fsOn()?1:0) + (gsOn()?1:0) + (rpOn()?1:0));   // 0486: the pop walks a rung past the renegade · 0522d: and past the Commander's rung
   btnRects.pop=[x,y,bw,bh];
   const js=jetSarge(), cd=S.popCd||0, armed=!!(S.popArm||(js&&js.popArm));
   const ready=js && cd<=0 && unitSargeStats(js).w==='shotgun';
@@ -67487,7 +67501,7 @@ function drawGsBtn(){
   btnRects.gs=null;
   if(!gsOn() || S.mode!=='play') return;
   const bw=64, bh=56, x=VW-88;
-  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (snpOn()?1:0) + (fsOn()?1:0));   // 0397: the guardian walks a rung past the flamestrike · 0522d: and past the Commander's rung
+  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (cs2On()?1:0) + (snpOn()?1:0) + (fsOn()?1:0));   // 0397: the guardian walks a rung past the flamestrike · 0522d: and past the Commander's rung
   btnRects.gs=[x,y,bw,bh];
   const js=jetSarge(), cd=S.gsCd||0, win=S.gsT||0;
   const ready=js && cd<=0 && unitSargeStats(js).w==='shotgun';
@@ -67672,7 +67686,7 @@ function drawUltBtn(){   // 0605 THE RANK-50 ULTIMATE — ONE button, the equipp
   btnRects.ult=null;
   if(!ultOn() || S.mode!=='play') return;
   const bw=64, bh=56, x=VW-88;   // 0607 THE ONE COLUMN (Wyatt 8/28: "lined up on the right with everything else. We shouldn't be creating two separate columns") — the 0605 BASE-ROW seat retires; V2 · GO TIME · SMOKY POWDER keep the row (⚑ Q1)
-  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (snpOn()?1:0) + (fsOn()?1:0) + (gsOn()?1:0) + (rpOn()?1:0) + (popOn()?1:0) + ((bmbOwned()&&(S.bf||S.tanBase))?1:0));   // the TOP rung of whatever class is racked (the 0340 slot law): every rung the column can hold below it, the bomber's own door included; the tap dispatch reads the rect — byte-still
+  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (cs2On()?1:0) + (snpOn()?1:0) + (fsOn()?1:0) + (gsOn()?1:0) + (rpOn()?1:0) + (popOn()?1:0) + ((bmbOwned()&&(S.bf||S.tanBase))?1:0));   // the TOP rung of whatever class is racked (the 0340 slot law): every rung the column can hold below it, the bomber's own door included; the tap dispatch reads the rect — byte-still
   btnRects.ult=[x,y,bw,bh];
   const js=jetSarge(), wk=ultWk(), cd=S.ultCd||0;
   const ch=js? (js.ultChT||0) : 0, hv=js? (js.ultHvT||0) : 0;
@@ -67807,7 +67821,7 @@ function drawRpBtn(){
   btnRects.rp=null;
   if(!rpOn() || S.mode!=='play') return;
   const bw=64, bh=56, x=VW-88;
-  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (snpOn()?1:0) + (fsOn()?1:0) + (gsOn()?1:0));   // 0397: and the renegade with him · 0522d: and past the Commander's rung
+  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (cs2On()?1:0) + (snpOn()?1:0) + (fsOn()?1:0) + (gsOn()?1:0));   // 0397: and the renegade with him · 0522d: and past the Commander's rung
   btnRects.rp=[x,y,bw,bh];
   const js=jetSarge(), cd=S.rpCd||0;
   const ready=js && !(cd>0) && !(js.rpT>0) && unitSargeStats(js).w==='pistol';   // 0373 FIRE AT WILL — the crowd gate stays retired; 0382: the re-arm gate is back (Wyatt's 10s), read here exactly as rpActivate reads it
@@ -67869,7 +67883,7 @@ function drawBmbBtn(){
   btnRects.bmb=null;
   if(!bmbOwned() || S.mode!=='play' || !(S.bf || S.tanBase)) return;
   const bw=64, bh=56, x=VW-88;
-  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (snpOn()?1:0) + (fsOn()?1:0) + (gsOn()?1:0) + (rpOn()?1:0) + (popOn()?1:0));   // 0486: and past the pop — v3.11: the bomber walks one rung higher past a fitted TELEKINESIS (0340: and past the outlaw button; 0361: and the guardian/renegade; 0397: and the flamestrike; 0522d: and the Commander's rung)
+  const y = H-232 - colPitch()*((jetOwned()?1:0) + (emgOwned()?1:0) + (tkOwned()?1:0) + (tkTwoOn()?1:0) + (csOn()?1:0) + (cs2On()?1:0) + (snpOn()?1:0) + (fsOn()?1:0) + (gsOn()?1:0) + (rpOn()?1:0) + (popOn()?1:0));   // 0486: and past the pop — v3.11: the bomber walks one rung higher past a fitted TELEKINESIS (0340: and past the outlaw button; 0361: and the guardian/renegade; 0397: and the flamestrike; 0522d: and the Commander's rung)
   btnRects.bmb=[x,y,bw,bh];
   const on=bmbReady();
   cx.fillStyle = on? 'rgba(38,40,31,0.92)' : 'rgba(38,40,31,0.6)';
@@ -67986,6 +68000,13 @@ cv.addEventListener('pointerdown', e=>{
   // clacks (the no-dead-buttons law — the dim face already says why).
   if(inRect(p.x,p.y,btnRects.cs)){
     if(!csPress(csCardU())) SFX.clack();
+    S.sel=null; return;
+  }
+  // 0650 THE SECOND RUNG: the blade's second philosophy — its own press (csPress
+  // names the seat; the word crosses with the stance on 'e'). The same
+  // no-dead-buttons clack — the dim face already says why.
+  if(inRect(p.x,p.y,btnRects.cs2)){
+    const u9c=csCardU(); if(!u9c || !csPress(u9c,cs2N(u9c))) SFX.clack();
     S.sel=null; return;
   }
   // 0340 THE OUTLAW SNIPER: one tap, one round, the furthest outlaw. A
@@ -82763,19 +82784,25 @@ function enhPartSVG(id){
   if(id==='bakerrifle') return '<svg viewBox="0 0 132 62"><g fill="#d9d5c9" stroke="#171512" stroke-width="1.2" stroke-linejoin="round"><circle cx="4" cy="25" r="3.4" opacity="0.92"/><circle cx="2.5" cy="18.5" r="4.3" opacity="0.86"/><circle cx="8.5" cy="14.5" r="3.2" opacity="0.8"/><circle cx="3.5" cy="9" r="2.3" opacity="0.6"/></g><path d="M99 27 L121 23 L126 29 L126 45 L121 49 L99 43 Z" fill="#5a4a34" stroke="#171512" stroke-width="2"/><path d="M121 23 L126 29 L126 45 L121 49 Z" fill="#C9A227" stroke="#7A5E1C" stroke-width="1.3"/><path d="M101 29 L118 26" stroke="#7d6a4c" stroke-width="1.4" stroke-linecap="round"/><ellipse cx="112" cy="39" rx="5" ry="3.4" fill="#C9A227" stroke="#7A5E1C" stroke-width="1.2"/><ellipse cx="112" cy="38.3" rx="3" ry="1.3" fill="#E8C878" opacity="0.8"/><path d="M76 28 L100 27 L100 42 L88 44 L76 39 Z" fill="#5a4a34" stroke="#171512" stroke-width="2"/><path d="M80 42 Q84 50 92 46 L96 44" fill="none" stroke="#C9A227" stroke-width="2.4" stroke-linecap="round"/><path d="M84 41 L85 45" stroke="#4a4238" stroke-width="1.6" stroke-linecap="round"/><path d="M70 30 L86 29 L88 36 L72 37 Z" fill="#4a4238" stroke="#171512" stroke-width="1.6"/><path d="M83 29 L82 22 L86 19 L88 23 L85 29" fill="#4a4238" stroke="#171512" stroke-width="1.6" stroke-linejoin="round"/><circle cx="84.5" cy="22" r="1.1" fill="#E8C878"/><path d="M73 29 L72 24 L76 23 L77 29" fill="#6b6257" stroke="#171512" stroke-width="1.4" stroke-linejoin="round"/><path d="M14 33 L76 29 L76 38 L14 38 Z" fill="#3a2c1c" stroke="#171512" stroke-width="2"/><path d="M18 34.5 L72 31" stroke="#7d6a4c" stroke-width="1.2" stroke-linecap="round"/><rect x="28" y="36" width="5" height="4" rx="1" fill="#C9A227" stroke="#7A5E1C" stroke-width="1"/><rect x="52" y="35" width="5" height="4" rx="1" fill="#C9A227" stroke="#7A5E1C" stroke-width="1"/><path d="M12 40.5 L74 40.5" stroke="#6b6257" stroke-width="1.3" stroke-linecap="round"/><path d="M5 27.5 L72 26 L72 31 L5 32.5 Z" fill="#4a4238" stroke="#171512" stroke-width="1.8"/><path d="M8 28.6 L68 27.3" stroke="#6b6257" stroke-width="1.1" stroke-linecap="round"/><rect x="4" y="26" width="4.5" height="8" rx="1" fill="#6b6257" stroke="#171512" stroke-width="1.4"/><rect x="8" y="34" width="9" height="2.6" rx="1" fill="#6b6257" stroke="#171512" stroke-width="1"/><path d="M10 26 L10 23.5" stroke="#171512" stroke-width="1.6" stroke-linecap="round"/></svg>';
   // 0603 THE EMPEROR'S BLADE — the 0460 BENCH LAW: the part IS the hardware,
   // molded (#171512 outlines, flat fills + one sheen), business end WEST. KING
-  // BEAR'S own parade sabre as a toy would mold it: the curved steel tipped
-  // west with one pale edge-light, the gold crossguard, the oak grip carrying
-  // TWO gold bands (the mod's tell — two philosophies on one hilt; nothing
-  // else on the bench wears two rings), and the king's own crown for a pommel.
+  // BEAR'S own parade sabre as a toy would mold it — redrawn 0650 Card A
+  // (Wyatt: "needs to look more like a Napoleonic saber"): the slender curved
+  // cavalry blade sweeping west with the point RISING, one pale edge-light
+  // riding the sweep; the gold STIRRUP KNUCKLE-BOW swinging from the
+  // crossguard's foot to the pommel (the era's tell — molded as the two-stroke
+  // limb, tucked BEHIND the furniture); the oak grip keeps TWO gold bands
+  // (the mod's tell — two philosophies on one hilt; nothing else on the bench
+  // wears two rings) and the king's own crown for a pommel.
   if(id==='emperorsblade') return '<svg viewBox="0 0 132 62">'
-    +'<path d="M5 24 Q36 12 90 15 L90 29 Q40 29 5 24 Z" fill="#d9d5c9" stroke="#171512" stroke-width="2" stroke-linejoin="round"/>'
-    +'<path d="M14 22.5 Q44 15.5 84 17" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.55"/>'
-    +'<rect x="88" y="8" width="7" height="38" rx="3" fill="#D9A544" stroke="#171512" stroke-width="2"/>'
-    +'<rect x="95" y="16" width="26" height="13" rx="6" fill="#7a4a26" stroke="#171512" stroke-width="2"/>'
-    +'<rect x="100" y="15" width="4.5" height="15" rx="1.5" fill="#D9A544" stroke="#171512" stroke-width="1.2"/>'
-    +'<rect x="110" y="15" width="4.5" height="15" rx="1.5" fill="#D9A544" stroke="#171512" stroke-width="1.2"/>'
-    +'<path d="M121 15 L128 15 L130.5 22.5 L128 30 L121 30 Z" fill="#D9A544" stroke="#171512" stroke-width="2"/>'
-    +'<path d="M121.5 15 L123 9.5 L125 13.5 L127 9 L128.5 15 Z" fill="#FFD24A" stroke="#171512" stroke-width="1.2"/>'
+    +'<path d="M93.5 40 Q112 49 124 31" fill="none" stroke="#171512" stroke-width="6.4" stroke-linecap="round"/>'
+    +'<path d="M93.5 40 Q112 49 124 31" fill="none" stroke="#D9A544" stroke-width="3.2" stroke-linecap="round"/>'
+    +'<path d="M92 21 Q46 23 8 5 Q14 16 34 24 Q60 32.5 92 31 Z" fill="#d9d5c9" stroke="#171512" stroke-width="2" stroke-linejoin="round"/>'
+    +'<path d="M85 24 Q50 25.5 16 9" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.55"/>'
+    +'<rect x="90" y="9" width="7" height="32" rx="3" fill="#D9A544" stroke="#171512" stroke-width="2"/>'
+    +'<rect x="97" y="16" width="26" height="13" rx="6" fill="#7a4a26" stroke="#171512" stroke-width="2"/>'
+    +'<rect x="102" y="15" width="4.5" height="15" rx="1.5" fill="#D9A544" stroke="#171512" stroke-width="1.2"/>'
+    +'<rect x="111" y="15" width="4.5" height="15" rx="1.5" fill="#D9A544" stroke="#171512" stroke-width="1.2"/>'
+    +'<path d="M122 15 L129 15 L131 22.5 L129 30 L122 30 Z" fill="#D9A544" stroke="#171512" stroke-width="2"/>'
+    +'<path d="M122.5 15 L124 9.5 L126 13.5 L128 9 L129.5 15 Z" fill="#FFD24A" stroke="#171512" stroke-width="1.2"/>'
     +'</svg>';
   // 0611 THE ELDER SABER — the 0460 BENCH LAW: the part IS the hardware, molded (#171512 outlines, flat fills +
   // one sheen), business end WEST, the energy INTO the object. An ancient saber as a toy would mold it: the
@@ -89682,8 +89709,9 @@ window.GVT = {
       slug:META.lasers.indexOf('slug')>=0?1:0, mod:enhOwns('outlawsniper')?1:0, modOn:enhOn('outlawsniper')?1:0, snpCd:+(S.snpCd||0).toFixed(1) }; },
   snp(){ return snpActivate(); },
   snpBtn(){ return { rect:btnRects.snp? btnRects.snp.slice():null, on:snpOn()?1:0, cd:+(S.snpCd||0).toFixed(1), tk:btnRects.tk? btnRects.tk.slice():null, bmb:btnRects.bmb? btnRects.bmb.slice():null }; },
-  csBtn(){ const u9=csCardU(), b9=u9? window.csBtn(u9) : null;   // 0522d THE BUTTON ON THE RIGHT — the read door beside the crystal's and the outlaw's: the rect, the face, the clocks, the whole stack (every 64×56 rung, top-down)
+  csBtn(){ const u9=csCardU(), b9=u9? window.csBtn(u9) : null, c29=u9? cs2N(u9) : 0, b29=(u9&&c29)? window.csBtn(u9,false,c29) : null;   // 0522d THE BUTTON ON THE RIGHT — the read door beside the crystal's and the outlaw's: the rect, the face, the clocks, the whole stack (every 64×56 rung, top-down) · 0650: the second rung's face beside the first's
     return { rect:btnRects.cs? btnRects.cs.slice():null, on:csOn()?1:0, cs:b9? b9.cs : 0, can:b9? (b9.can?1:0) : 0, cd:b9? +b9.cd.toFixed(2) : 0, cdMax:b9? b9.cdMax : 0, chan:b9? +b9.chan.toFixed(2) : 0, chanMax:b9? b9.chanMax : 0, flash:+(S.csFlash||0).toFixed(2),
+      on2:cs2On()?1:0, rect2:btnRects.cs2? btnRects.cs2.slice():null, cs2:c29, can2:b29? (b29.can?1:0) : 0, cd2:b29? +b29.cd.toFixed(2) : 0, cdMax2:b29? b29.cdMax : 0, chan2:b29? +b29.chan.toFixed(2) : 0, flash2:+(S.cs2Flash||0).toFixed(2),
       tk:btnRects.tk? btnRects.tk.slice():null, snp:btnRects.snp? btnRects.snp.slice():null, bmb:btnRects.bmb? btnRects.bmb.slice():null,
       stack:Object.keys(btnRects).filter(k9=>btnRects[k9]&&btnRects[k9][2]===64&&btnRects[k9][3]===56).map(k9=>[k9,Math.round(btnRects[k9][1])]).sort((p9,q9)=>p9[1]-q9[1]) }; },
   // ===== 0486 THE GUN DROPS — rig doors =====
