@@ -118,7 +118,7 @@ const boot = async (q, seed) => {
   await send('Page.navigate', { url: BASE + '?fps=0' + (q ? '&' + q : '') }); await sleep(2500);
   return until(`!!window.game && typeof SSNET !== 'undefined'`, 30000);
 };
-const findWord = async (must, avoid, minLen = 2) => evj(`(() => {
+const findWord = async (must, avoid, minLen = 2, maxLen = 8) => evj(`(() => {
   const b = ${B}, must = ${JSON.stringify(must)}, avoid = ${JSON.stringify(avoid)}; b.buildTrie();
   const tiles = b.board.map((s, i) => ({ s, i })).filter((x) => x.s && !avoid.includes(x.i));
   let best = null;
@@ -126,7 +126,7 @@ const findWord = async (must, avoid, minLen = 2) => evj(`(() => {
   const dive = (node) => {
     const idx = pick.map((k) => tiles[k].i);
     if (node.$ && idx.length >= ${minLen} && must.every((m) => idx.includes(m)) && (!best || idx.length > best.length)) best = idx.slice();
-    if (pick.length >= 8) return;
+    if (pick.length >= ${maxLen}) return;
     for (let k = 0; k < tiles.length; k++) {
       if (used[k]) continue;
       let n = node, okk = true;
@@ -227,7 +227,10 @@ await ev(`SS.prof.sig.c.frg = 25; SS.save(); ${B}.run.sigils = []; ${B}.beast.hp
 // the board must have LANDED before a tile is tapped — a falling tile's
 // bounds are somewhere else entirely (comet-check's settle law)
 await until(`${B}.board.every((s, i) => !s || Math.abs(s.c.y - ${B}.slotPos(i).y) < 0.5)`, 8000, 100);
-const w = await findWord([], []);
+// capped at SEVEN letters: this cast must cross the forge counter alone —
+// the board's longest can be a real 8-letter word, and casting it would
+// also wake NOVA (w8 n1), a fourth waking the tallies below never budgeted
+const w = await findWord([], [], 2, 7);
 ok('a real word to cast', !!w, JSON.stringify(w));
 for (const i of w) {
   for (let t = 0; t < 4; t++) { await tap(`${B}.board[${i}].c`); await sleep(140); if (await ev(`${B}.sel.includes(${i})`)) break; }
@@ -258,7 +261,8 @@ await dismissRite();
 ok('STARRY LONGBOW follows, never stacked', await until(`${RITE} === 'longbow'`, 15000, 200) && await ev(`${RITES} === 1`), await ev(RITE));
 await dismissRite();
 ok('the queue empties back into play', await until(`${B}.state === 'pick'`, 12000, 200) && await ev(`SS.prof.sig.pend.length === 0`));
-ok('three woke this run — all stamped, all open', await ev(`!!SS.prof.sig.u.gilded && !!SS.prof.sig.u.comet && !!SS.prof.sig.u.longbow && ssSigilOpen().length === 15`));
+ok('three woke this run — all stamped, all open', await ev(`!!SS.prof.sig.u.gilded && !!SS.prof.sig.u.comet && !!SS.prof.sig.u.longbow && ssSigilOpen().length === 15`),
+  await ev(`JSON.stringify({ n: ssSigilOpen().length, u: Object.keys(SS.prof.sig.u) })`));
 const achP = await evj(`(() => { const k = 'first-blood'; delete SS.prof.ach[k];
   SS.award(k, game); const once = Object.keys(SS.prof.ach).length;
   SS.award(k, game); const twice = Object.keys(SS.prof.ach).length;

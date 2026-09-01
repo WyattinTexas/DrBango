@@ -33,8 +33,12 @@
    · SS_SEED.enabled = false (here) or ?ghosts=0 (a URL) turns the
      whole layer off — boards show only real rows again.
 
-   Future boards (endless, hard) draw on the same layer: add a
-   SS_SEED_TUNE entry and call SS_SEED.merge with the new kind.
+   The ENDLESS board (v0.68.0) draws on this same layer with kind
+   'endless' and key 'all': its band is LEVELS (loL..hiL), scores
+   follow the level, arrivals spread over the mode's first month
+   from LAUNCH, and the champion law compares (level, score).
+   Future boards (hard) extend the same way: add a SS_SEED_TUNE
+   entry and call SS_SEED.merge with the new kind.
    ============================================================ */
 
 const SS_SEED_NAMES = [
@@ -91,9 +95,15 @@ const SS_SEED_WORDS = {
 
 // How many ghosts a board carries and where their scores live. `hi` doubles
 // as the no-real-rows ceiling: a decent winning run always clears it.
+// The endless board (v0.68.0) is banded by LEVEL, not score — loL..hiL is
+// the believable middle band (a real climb past 14 outranks every ghost),
+// and each ghost's score follows its level at the real curve's own rate
+// (~78-133 points a level). span 'all': the all-time board fills over the
+// mode's first month from LAUNCH and then stands.
 const SS_SEED_TUNE = {
   daily: { span: 'day', min: 6, max: 10, lo: 120, hi: 560 },
   weekly: { span: 'week', min: 12, max: 18, lo: 150, hi: 640 },
+  endless: { span: 'all', min: 8, max: 13, loL: 3, hiL: 14 },
 };
 
 const SS_SEED = (() => {
@@ -142,9 +152,14 @@ const SS_SEED = (() => {
     const s = String(key);
     return isoWeek(Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8)));
   }
+  // the endless mode's dawn — the all-time board's arrivals spread from here
+  // over its first month, so early days honestly hold a thin field that
+  // thickens as "word gets around", then stands forever
+  const LAUNCH = Date.UTC(2026, 8, 1);   // 2026-09-01, the mode's ship day
   // when the board's window opens (ghost arrivals are spread from here)
   function spanStart(kind, key, now) {
     const T = SS_SEED_TUNE[kind];
+    if (T && T.span === 'all') return LAUNCH;
     if (T && T.span === 'week') {
       const d = new Date(now);
       const day0 = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
@@ -198,28 +213,42 @@ const SS_SEED = (() => {
     for (let i = cand.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = cand[i]; cand[i] = cand[j]; cand[j] = t; }
     const n = Math.min(cand.length, T.min + Math.floor(rnd() * (T.max - T.min + 1)));
     const start = spanStart(kind, key, Date.now());
-    const span = T.span === 'week' ? WEEK : DAY;
+    const span = T.span === 'all' ? 30 * DAY : T.span === 'week' ? WEEK : DAY;
     const usedWords = {}, usedScores = {}, out = [];
     for (let i = 0; i < n; i++) {
       const nm = cand[i].nm;
       const g = rngFor('g:' + tag + ':' + nm);
       // arrivals: one early hunter, then a spread through the window (the
-      // weekly front-loads — a fresh board draws its crowd early)
+      // weekly front-loads — a fresh board draws its crowd early; the
+      // all-time endless board fills over its first month the same way)
       let f;
-      if (i === 0) f = ((T.span === 'week' ? 240 + g() * 1800 : 60 + g() * 150) * 1000) / span;
+      if (i === 0) f = ((T.span === 'day' ? 60 + g() * 150 : 240 + g() * 1800) * 1000) / span;
       else if (T.span === 'week') f = Math.pow((i + 0.9 * g()) / n, 1.45);
+      else if (T.span === 'all') f = Math.pow((i + 0.9 * g()) / n, 1.35);
       else f = Math.pow((i + 0.9 * g()) / n, 1.25);   // rollover is evening in the Americas — the crowd leans early
       const at = Math.round(start + Math.min(0.995, f) * span + g() * 40000);
-      // scores: middle-to-lower band, and never more than a run this early
-      // in the window could have earned
-      let score = Math.round(T.lo + (T.hi - T.lo) * Math.pow(g(), 1.35));
-      score = Math.min(score, Math.max(25, Math.floor(25 + ((at - start) / 60000) * 40)));
-      while (usedScores[score] && score > 5) score--;
-      usedScores[score] = 1;
+      let score, level;
+      if (kind === 'endless') {
+        // the endless band is LEVELS; the score follows the level at the
+        // real curve's own rate — and no ghost's level outruns its arrival
+        // (a rung takes minutes of play)
+        level = Math.max(2, Math.round(T.loL + (T.hiL - T.loL) * Math.pow(g(), 1.25)));
+        level = Math.min(level, Math.max(2, Math.floor(((at - start) / 60000) / 4)));
+        score = Math.round(level * (78 + g() * 55));
+        while (usedScores[score] && score > 5) score--;
+        usedScores[score] = 1;
+      } else {
+        // scores: middle-to-lower band, and never more than a run this early
+        // in the window could have earned
+        score = Math.round(T.lo + (T.hi - T.lo) * Math.pow(g(), 1.35));
+        score = Math.min(score, Math.max(25, Math.floor(25 + ((at - start) / 60000) * 40)));
+        while (usedScores[score] && score > 5) score--;
+        usedScores[score] = 1;
+      }
       out.push({
         id: PREFIX + hash('id:' + nm).toString(36),
-        name: nm, score,
-        word: pickWord(kind === 'daily' ? lang : (cand[i].tag || 'en'), score, g, usedWords),
+        name: nm, score, level,
+        word: pickWord(kind === 'daily' ? lang : (cand[i].tag || 'en'), kind === 'endless' ? level * 40 : score, g, usedWords),
         at, ghost: true,
         rating: 880 + Math.floor(frac('rt:' + nm) * 280),
         rhide: frac('rh:' + nm) < 0.22,
@@ -252,6 +281,37 @@ const SS_SEED = (() => {
         for (const r of rows) taken[fold(r.name)] = 1;
         if (selfName) taken[fold(selfName)] = 1;
         g = g.filter((x) => !taken[fold(x.name)]);
+        /* the endless board ranks two keys — LEVEL, then score — so its cap
+           law works on levels: the best real climb is always champion, any
+           ghost at/above its level is remapped strictly below (proportional
+           from the tune band, per-ghost stable, its score rescaled to stay
+           coherent), and a ghost that can't fit under a level-1 or -2
+           champion simply stands down. */
+        if (kind === 'endless') {
+          const T = SS_SEED_TUNE.endless;
+          let bestL = -1, bestS = -1;
+          for (const r of rows) {
+            const lv = r.level | 0, sc = r.score | 0;
+            if (lv > bestL || (lv === bestL && sc > bestS)) { bestL = lv; bestS = sc; }
+          }
+          if (bestL >= 0) {
+            const fLo = Math.max(2, Math.ceil(bestL * 0.45)), fHi = bestL - 1;
+            const kept = [];
+            for (const x of g) {
+              if ((x.level | 0) < bestL) { kept.push(x); continue; }
+              if (fHi < fLo) continue;                   // no room below the champion — one fewer hunter
+              let lv = Math.floor(fLo + (((x.level | 0) - T.loL) / Math.max(1, T.hiL - T.loL)) * (fHi - fLo));
+              lv = Math.min(fHi, Math.max(fLo, lv));
+              x.score = Math.max(10, Math.round((x.score | 0) * (lv / Math.max(1, x.level | 0))));
+              x.level = lv;
+              kept.push(x);
+            }
+            g = kept;
+          }
+          const merged = rows.concat(g);
+          merged.sort((a, b) => ((b.level | 0) - (a.level | 0)) || ((b.score | 0) - (a.score | 0)));
+          return merged;
+        }
         let bestReal = -1;
         for (const r of rows) if ((r.score | 0) > bestReal) bestReal = r.score | 0;
         if (bestReal >= 0) {

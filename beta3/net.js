@@ -333,6 +333,25 @@ const SSNET = (() => {
       await dbTxn('weekly/' + weekKey() + '/' + me, rec);
     } catch (e) { }
   }
+  /* The endless board (v0.68.0): one row per player, ranked by LEVEL with
+     the score as the tiebreak — so the transaction keeps the better of the
+     two by that same order, never by score alone (a deep lean climb beats a
+     shallow rich one, exactly as the board sorts). `endless/all` is the
+     all-time board the tab shows; a weekly slice rides along under
+     `endless/<isoWeek>` (pruned like the weeklies) so a living
+     this-week's-climbs tab is one read away if it is ever wanted. */
+  async function submitEndless(level, score, finestWord) {
+    level = level | 0; score = score | 0;
+    const rec = (cur) => {
+      if (cur && ((cur.lvl | 0) > level || ((cur.lvl | 0) === level && (cur.score | 0) >= score))) return cur;
+      return { name: myName(), lvl: level, score, word: (finestWord || '').toUpperCase(), at: Date.now() };
+    };
+    const me = uid();
+    try {
+      await dbTxn('endless/all/' + me, rec);
+      await dbTxn('endless/' + weekKey() + '/' + me, rec);
+    } catch (e) { }
+  }
   // housekeeping: old day/week boards would pile up forever — sweep them as we
   // pass by. Once/session.
   // Sweep STRICTLY OLDER than the cutoff, never "anything not in the keep
@@ -353,13 +372,18 @@ const SSNET = (() => {
       for (const k of Object.keys(days)) if (Number(String(k).slice(0, 8)) < dayCut) dbSet('daily/' + k, null).catch(() => { });
       const weeks = (await dbGet('weekly').catch(() => null)) || {};
       for (const k of Object.keys(weeks)) if (k < weekCut) dbSet('weekly/' + k, null).catch(() => { });
+      // the endless weekly slices age out like the weeklies; 'all' is the
+      // all-time board and is never swept
+      const endl = (await dbGet('endless').catch(() => null)) || {};
+      for (const k of Object.keys(endl)) if (/^\d{4}-W\d{2}$/.test(k) && k < weekCut) dbSet('endless/' + k, null).catch(() => { });
     } catch (e) { }
   }
 
   async function getBoard(kind, lang) {
     pruneBoards();
-    const daily = kind !== 'weekly';
-    const path = daily ? dailyPath(lang) : 'weekly/' + weekKey();
+    const endless = kind === 'endless';
+    const daily = kind !== 'weekly' && !endless;
+    const path = endless ? 'endless/all' : daily ? dailyPath(lang) : 'weekly/' + weekKey();
     const all = (await dbGet(path).catch(() => null)) || {};
     let rows = Object.entries(all)
       // The daily board shows ONLY rows stamped m:'daily'. Belt to the write
@@ -369,16 +393,17 @@ const SSNET = (() => {
       // at deploy; older unstamped boards are never read — dailyPath is
       // always today's.)
       .filter(([, r]) => !daily || (r && r.m === 'daily'))
-      .map(([id, r]) => ({ id, name: r.name || '???', score: r.score | 0, word: r.word || '', at: r.at }))
-      .sort((a, b) => b.score - a.score);
+      .map(([id, r]) => ({ id, name: r.name || '???', score: r.score | 0, level: r.lvl | 0, word: r.word || '', at: r.at }))
+      // the endless ladder ranks by LEVEL, the score breaking ties
+      .sort((a, b) => (endless ? (b.level - a.level || b.score - a.score) : b.score - a.score));
     // the seeded hunters (seed-names.js): deterministic ghosts merged in so a
     // young board never reads empty. They adapt around the real rows (never
     // #1 over one), never carry this player's uid or name, and one switch
     // (SS_SEED.enabled / ?ghosts=0) restores the bare board.
     try {
       if (typeof SS_SEED !== 'undefined' && SS_SEED.enabled) {
-        rows = SS_SEED.merge(rows, daily ? 'daily' : 'weekly',
-          daily ? String(dayKey()) : weekKey(), daily ? (lang || 'en') : null, null, myName());
+        rows = SS_SEED.merge(rows, endless ? 'endless' : daily ? 'daily' : 'weekly',
+          endless ? 'all' : daily ? String(dayKey()) : weekKey(), daily ? (lang || 'en') : null, null, myName());
       }
     } catch (e) { }
     const meIdx = rows.findIndex((r) => r.id === uid());
@@ -532,5 +557,5 @@ const SSNET = (() => {
     async decline(fromUid) { try { await dbSet('invites/' + uid() + '/' + fromUid, null); } catch (e) { } },
   };
 
-  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
+  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, submitEndless, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
 })();

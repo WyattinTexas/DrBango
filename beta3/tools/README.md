@@ -1,6 +1,74 @@
 # beta3 dev tools
 
-Twenty-three scripts, all dev-only — nothing here ships to the browser.
+Twenty-four scripts, all dev-only — nothing here ships to the browser.
+
+## endless-check.mjs — fight until you fall, see how far you climb (v0.68.0)
+
+Skylar's call (9/1): "the players will keep playing, getting random enemies
+and then sometimes bosses mixed in, and it just keeps getting progressively
+harder and harder to see how far they can make it. At the end it should
+read what level they got to, if that's their highest level … high score …
+There should be a leaderboard for endless showing what the highest level
+that person got to and what was their score … If you ever lose to a beast,
+your run should end and then it should give you stats on that endless run."
+The game side: `SS_ENDLESS` (data.js) is the whole curve — a boss every 5th
+level, `hpMult` linear-then-quadratic (L10 ≈ end of campaign act II, L20 ≈
+the finale, no ceiling), `atkAdd`, the strike clock cut at 16 and 36 (floor
+2), lvl-banded pools opening with depth, the umbral dress mixing in from 11,
+every boss cursed from 21 (ink 3 from 41) — walked by `ssEndlessFights`
+(game.js) off a per-run seed riding the `beta3.endless` checkpoint: ONE
+seeded stream consumed in level order, so a longer build keeps its prefix
+exactly and the unbounded ladder extends itself (extendEndless) before
+anyone can touch its edge. The meadow's ENDLESS door (between NEW GAME and
+VERSUS — four doors tighten to 62 apart when a campaign stands) resumes a
+standing climb through a CONTINUE/BEGIN-ANEW sheet and opens the zodiac
+picker for a fresh one (`signSheet('endless')` pins beta3.endsign; powers
+apply exactly as in the campaign). A fall ends the climb — the feather's
+survive-once still counts — and the reckoning window reads LEVEL REACHED
+and the score, each with its own NEW BEST flag, plus every campaign stat.
+`prof.endless {bestLevel, bestScore, runs}` migrates in SS.load; the sign
+ledger takes `eBest`; TEN RUNGS UP / PAST THE CROWN ring at levels 10/20
+mid-run. The board: `endless/all` ranked (level, score) with a weekly slice
+riding along, a third Board tab (44-pt padded pills — dressTabs re-pads
+after setTexture, which hands the hit area back to the bare frame), rows
+reading "L 23 · 4180", ghosts through the v0.64 seed layer (levels 3-14,
+scores following the level, the champion law compared on BOTH keys, the
+all-time cast arriving over the mode's first month from LAUNCH). Endless
+pays NO rating and never feeds the daily lantern — the ladder is its own
+ledger.
+
+Self-launching like cadence-check (server on :8899 if nothing serves,
+Chrome on :9467, `/tmp/cdp-endless`, `--disable-gpu`), Firebase blocked at
+the network layer throughout; `SHOTS=<dir>` keeps DPR-3 screenshots.
+
+```
+node tools/endless-check.mjs      # 87 checks, ~5 min
+```
+
+The curve as the card's balance sheet (feel pins at L1/10/20/30/50,
+monotone in every dial), the ladder's laws over 400 rungs (determinism,
+prefix stability, boss-every-5th, pool caps, no-repeat, umbral/curse
+bands, the def never poisoned by a fight's dress — fx is cloned), the
+cadence row's plan (hook + every boss + gaps 2-4 forever), the door by
+real DPR-3 taps (three rows 454..590 bare, four 429..615 with a campaign
+standing, the verb/best/level sub-lines, the picker serving the endless
+climb), a REAL 12-level walk (offers exactly on the plan, bosses at 5 and
+10, the curve paid on every live beast, a mid-climb kill+reload resuming
+by real taps with the same ladder/sigils/clock), the fall (feather burns
+once, the second death ends it, the reckoning's fields, no denominator,
+no rating line, checkpoint+sign spent), a better second climb pulsing
+BOTH NEW BEST flags (and a worse one pulsing none), the sign on the
+ladder (aries ram opens endless battles; eBest written without touching
+the campaign ledger), the submit law in four shapes, ghost
+determinism/coherence/champion-law, the third tab by real tap with rows
+and the still all-time line, and the es dress.
+
+Rig lessons: walk the player's own road to the board (end screen HOME →
+profile chip → leaderboard door) — a harness-side `scene.start` chain from
+a live battle leaves the battle rendering under everything and the
+screenshots lie; and wake-check's cast helper is capped at SEVEN letters
+now, because a board whose longest word is a real 8-letter one would also
+wake NOVA (w8 n1) and break any tally that budgeted three wakings.
 
 ## wake-check.mjs — unlock progress you can track, a waking you can watch (v0.67.0)
 

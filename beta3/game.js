@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.67.0';
+const BUILD = 'STARSPELL v0.68.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -566,6 +566,14 @@ const SS = {
     p.sig.u = (p.sig.u && typeof p.sig.u === 'object') ? p.sig.u : {};
     p.sig.c = (p.sig.c && typeof p.sig.c === 'object') ? p.sig.c : {};
     p.sig.pend = Array.isArray(p.sig.pend) ? p.sig.pend.filter((id) => !!SS_SIG_BY[id]) : [];
+    /* THE ENDLESS LEDGER (v0.68.0) — how far the climb has ever gone.
+       bestLevel is the level REACHED (died on), bestScore the taxed final
+       score, runs the climbs begun; every profile that predates the mode
+       simply wakes with zeros. */
+    p.endless = (p.endless && typeof p.endless === 'object') ? p.endless : {};
+    p.endless.bestLevel = p.endless.bestLevel | 0;
+    p.endless.bestScore = p.endless.bestScore | 0;
+    p.endless.runs = p.endless.runs | 0;
     return p;
   },
   save() { try { localStorage.setItem('beta3.profile', JSON.stringify(this.prof)); } catch (e) { } },
@@ -583,6 +591,8 @@ const SS = {
       // the grace in hand and the highest mark reached ride along too, so a
       // read of the synced profile tells the whole lantern, not half of it
       streakGrace: this.prof.streak.g, streakMark: this.prof.streak.mk,
+      // the endless climb's high-water marks (v0.68.0)
+      endlessBest: this.prof.endless.bestLevel, endlessScore: this.prof.endless.bestScore,
     });
   },
   has(id) { return !!this.prof.ach[id]; },
@@ -2916,12 +2926,12 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
    clockV 2 save is already honest and trusted as written. The storage copy
    wins when newer — a resize restart replays the ORIGINAL resume data, and
    the stop-event persists above may have moved the checkpoint on since. */
-function ssClockInherit(resume) {
+function ssClockInherit(resume, key) {
   if (!resume) return 0;
   let ms = Math.max(0, resume.playMs | 0);
   if ((resume.clockV | 0) < 2) ms = Math.min(ms, ((resume.fightIdx | 0) + 1) * 15 * 60000);
   try {
-    const ck = JSON.parse(localStorage.getItem('beta3.campaign'));
+    const ck = JSON.parse(localStorage.getItem(key || 'beta3.campaign'));
     if (ck && (ck.fightIdx | 0) === (resume.fightIdx | 0) && (ck.clockV | 0) >= 2) ms = Math.max(ms, ck.playMs | 0);
   } catch (e) { }
   return ms;
@@ -3711,6 +3721,61 @@ function ssClearCampaign() {
   localStorage.removeItem('beta3.campsign');
 }
 
+/* ---- the endless ladder (v0.68.0) ----------------------------------------
+   Levels built as fights, n at a time, from ONE seeded stream consumed in
+   level order — so ssEndlessFights(seed, 400) and (seed, 800) agree on their
+   first 400 rungs exactly, a resumed run rebuilds the identical ladder from
+   the checkpoint's seed, and the ladder can extend itself mid-run without
+   moving a single level already climbed. Every dial lives on SS_ENDLESS
+   (data.js): boss every 5th, lvl-banded pools, minis thickening, the umbral
+   dress mixing in past umbralFrom, deep bosses cursed, the strike clock cut.
+   actIdx groups levels in bands of five so the cadence's actBoss law pays
+   every boss, exactly as the campaign's act-closers do. */
+function ssEndlessFights(seed, n) {
+  const E = SS_ENDLESS;
+  const r = ssMulberry((seed >>> 0) || 1);
+  const fights = [];
+  let prev = null;
+  for (let i = 0; i < n; i++) {
+    const level = i + 1;
+    const boss = level % E.bossEvery === 0;
+    let pool;
+    if (boss) {
+      const cap = Math.max(1, E.bossLvlCap(level));
+      pool = E.pools.bosses.filter((id) => (SS_BEASTS[id].lvl || 1) <= cap);
+    } else {
+      const cap = E.lvlCap(level);
+      const src = r() < E.pMini(level) ? E.pools.minis : E.pools.basics;
+      pool = src.filter((id) => (SS_BEASTS[id].lvl || 1) <= cap);
+      if (!pool.length) pool = E.pools.basics.filter((id) => (SS_BEASTS[id].lvl || 1) <= cap);
+    }
+    let cand = pool.filter((id) => id !== prev);
+    if (!cand.length) cand = pool;
+    const id = cand[Math.floor(r() * cand.length)];
+    prev = id;
+    const f = {
+      id, actIdx: Math.floor(i / E.bossEvery), level,
+      mult: E.hpMult(level), atkAdd: E.atkAdd(level),
+      umbral: level >= E.umbralFrom && r() < E.pUmbral(level),
+    };
+    const tc = E.timerCut(level);
+    if (tc) f.tcut = tc;
+    if (boss && level >= E.curseFrom) { f.curse = 'blackout'; f.ink = level >= E.curseDeep ? 3 : 2; }
+    fights.push(f);
+  }
+  return fights;
+}
+/* The endless run's pinned sign — chosen on the same picker the campaign
+   uses, living and dying with the climb (its checkpoint clears both). */
+function ssEndSign() {
+  const v = localStorage.getItem('beta3.endsign');
+  return SS_ZODIAC_BY[v] ? v : null;
+}
+function ssClearEndless() {
+  localStorage.removeItem('beta3.endless');
+  localStorage.removeItem('beta3.endsign');
+}
+
 /* ---- the sigil cadence (v0.65.0) -----------------------------------------
    Skylar (9/1): offers every 2-3 fights, not every fight. ssSigilPlan walks
    the mode's SS_CADENCE row once per run and returns the Set of fight
@@ -4480,7 +4545,8 @@ class Home extends Phaser.Scene {
     // ?quick=1 — the harnesses' door into a quick run since the QUICK PLAY
     // button left the meadow (v0.51.0): the mode lives on, the meadow just
     // doesn't offer it
-    else if (DEMO || QS.get('daily') === '1' || QS.get('quick') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : 'quick') : QS.get('quick') === '1' ? 'quick' : 'daily'));
+    // ?endless=1 boots straight into an endless climb the same way (v0.68.0)
+    else if (DEMO || QS.get('daily') === '1' || QS.get('quick') === '1' || QS.get('endless') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : QS.get('mode') === 'endless' ? 'endless' : 'quick') : QS.get('quick') === '1' ? 'quick' : QS.get('endless') === '1' ? 'endless' : 'daily'));
   }
   buildMeadowUi(l) {
     // a name the stars already knew (net.js, unique names): told once, here
@@ -4580,19 +4646,34 @@ class Home extends Phaser.Scene {
     };
     this.campRow = campRow;
     const cr = campRow();
+    /* THE ENDLESS DOOR's sub-line (v0.68.0, Skylar): the climb that stands
+       ("level 7 · the climb holds"), else the best ever reached, else the
+       mode's own verb — a brand-new player is told what the door IS. */
+    const endRow = () => {
+      const ck = this.endlessCheckpoint();
+      if (ck) return SS_T('endlessCont', (ck.fightIdx | 0) + 1);
+      const b = (SS.prof.endless && SS.prof.endless.bestLevel) | 0;
+      return b > 0 ? SS_T('endlessBest', b) : SS_T('endlessSub');
+    };
+    this.endRow = endRow;
     const rows = [
       // CONTINUE GAME opens the star chart at the standing checkpoint —
       // rendered only while one stands (refreshCampDoor is the one door)
       { y: 420, h: 58, label: cr.label, sub: cr.sub, key: 'campaign', fn: () => this.campaignDoor() },
       // NEW GAME: a fresh climb (warned first when a checkpoint stands)
       { y: 488, h: 58, label: SS_T('newCamp'), key: 'newcamp', dark: true, fn: () => this.newCampaign() },
+      // ENDLESS (v0.68.0, Skylar): fight until you fall, see how far you
+      // climb. One door — it resumes a standing climb, offers the choice
+      // when one stands and a fresh start is wanted, and opens the sign
+      // picker for a new climb.
+      { y: 556, h: 58, label: SS_T('endless'), sub: endRow(), key: 'endless', fn: () => this.endlessDoor() },
       // LEADERBOARD left the meadow for the profile (v0.52.0): the column is
       // play modes only — the profile chip up in the corner is the door to
       // the night's finest now.
       // PROFILE moved to the chip up in the corner, which frees this row for
       // VERSUS — it is a play mode, so it gets a real button like the rest.
       // Its sub-line is the live friends counter, and nothing else.
-      { y: 556, h: 58, label: SS_T('versus'), sub: '', key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
+      { y: 624, h: 58, label: SS_T('versus'), sub: '', key: 'versus', fn: () => { SFX.ui(); this.scene.start('vsmenu'); } },
     ];
     this.rowSubs = {};
     this.rowLabels = {};
@@ -4618,11 +4699,14 @@ class Home extends Phaser.Scene {
     /* the column owns its shape (v0.51.0): the rows that stand are laid 68
        apart, centred on the band's middle (522) — three rows read 454..590,
        two read 488..556, and no gap is ever left where a hidden door
-       would be. `snap` skips the glide (first paint, any change under a
+       would be. Four rows (v0.68.0: ENDLESS joined the column) tighten to
+       62 apart — 429..615 — so the foot still clears the meadow's grass.
+       `snap` skips the glide (first paint, any change under a
        veil); a live change slides the meadow's furniture, never jumps it. */
     this.layoutMenu = (snap) => {
       const vis = this.menuRows.filter((m) => m.b.visible);
-      let ry = 522 - (vis.length - 1) * 34;
+      const gap = vis.length >= 4 ? 62 : 68;
+      let ry = 522 - (vis.length - 1) * gap / 2;
       for (const m of vis) {
         m.lab.rowY = ry;
         const lift = m.sub && m.sub.visible ? 9 : 0;
@@ -4633,7 +4717,7 @@ class Home extends Phaser.Scene {
           if (snap || Math.abs(o.y - ty) < 0.5) o.setY(ty);
           else this.tweens.add({ targets: o, y: ty, duration: 220, ease: 'Sine.easeInOut' });
         }
-        ry += 68;
+        ry += gap;
       }
     };
     /* set (or clear) a row's live sub-line. The label re-centres when the
@@ -4680,6 +4764,12 @@ class Home extends Phaser.Scene {
         if (sub) { sub.setText(''); sub.setVisible(false); }
       }
       this.layoutMenu(snap);
+    };
+    /* the ENDLESS door re-reads its own state — a battle just left ends or
+       suspends a climb, and the sub-line must follow (the door itself is
+       always rendered; only its line changes) */
+    this.refreshEndDoor = (snap) => {
+      this.setRowSub('endless', this.endRow(), BTN_INK2(), snap);
     };
     this.refreshCampDoor(true);
     // Profile chip — the stargazer's name, up in the corner on the same line as
@@ -5551,6 +5641,75 @@ class Home extends Phaser.Scene {
     this.mapSheet();
   }
 
+  /* ---------- THE ENDLESS DOOR (v0.68.0) ----------
+     One door for the whole mode: a standing climb opens a small sheet —
+     CONTINUE THE CLIMB (the ladder holds its level, sigils, clock) or
+     BEGIN A NEW CLIMB (the sheet IS the warning: the standing level is
+     named on it) — and with nothing standing it goes straight to the
+     sign picker, zodiac powers applying to endless exactly as they do
+     to the campaign. */
+  endlessCheckpoint() {
+    let ck = null;
+    try { ck = JSON.parse(localStorage.getItem('beta3.endless')); } catch (e) { return null; }
+    if (!ck || typeof ck !== 'object' || typeof ck.fightIdx !== 'number' || !(ck.fightIdx >= 0) || !Number.isFinite(ck.eseed)) return null;
+    return ck;
+  }
+  endlessDoor() {
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC || this.signC) return;
+    const ck = this.endlessCheckpoint();
+    // nothing standing: wipe any half-made choice (a pinned sign never
+    // entered) and ask the stars afresh
+    if (!ck) { ssClearEndless(); this.signSheet('endless'); return; }
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.confirmC = this.add.container(0, 0).setDepth(720);
+    const closeSheet = () => {
+      if (this.confirmC !== c) return;
+      this.confirmC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+    const items = [];
+    items.push(this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(336), l.u(272)).setInteractive());
+    const tk = ssGoldTex(this, SS_T('endlessTitle'), 17);
+    const tsc = Math.min(1, 280 / tk.w);
+    items.push(this.add.image(l.x(0), l.y(304), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    items.push(ssTextBlock(this, l.x(0), l.y(352), SS_T('endStands', (ck.fightIdx | 0) + 1), {
+      fontSize: l.u(12) + 'px', color: '#c9c3ae', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(280), align: 'center', ox: 0.5, oy: 0.5,
+    }));
+    // where the climb stands, in the ledger's own voice
+    items.push(ssTxt(this, l.x(0), l.y(388), '✦ ' + SS_T('endLvl', (ck.fightIdx | 0) + 1) + ' ✦', l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
+    // CONTINUE wears the gold — abandoning a climb should never be the
+    // brightest thing on screen (the restart sheet's own law)
+    const contB = this.add.image(l.x(0), l.y(438), ssBtn(this, false, 250, 50)).setDisplaySize(l.u(250), l.u(50)).setInteractive({ useHandCursor: true });
+    const contT = ssTxt(this, l.x(0), l.y(438), SS_T('endContBtn'), l.u(14), BTN_INK()).setOrigin(0.5);
+    if (contT.width > l.u(226)) contT.setScale(l.u(226) / contT.width);
+    const newB = this.add.image(l.x(0), l.y(492), ssBtn(this, true, 250, 40)).setDisplaySize(l.u(250), l.u(40)).setInteractive({ useHandCursor: true });
+    const newT = ssTxt(this, l.x(0), l.y(492), SS_T('endNewBtn'), l.u(12.5), '#e6a2a2').setOrigin(0.5);
+    if (newT.width > l.u(226)) newT.setScale(l.u(226) / newT.width);
+    items.push(contB, contT, newB, newT);
+    contB.on('pointerdown', () => {
+      SFX.ui();
+      closeSheet();
+      this.bloomBtn = this.rowBtns && this.rowBtns.endless;
+      this.startMode('endless');
+    });
+    newB.on('pointerdown', () => {
+      SFX.ui();
+      ssClearEndless();           // the old climb is gone — the door's line follows
+      this.refreshEndDoor();
+      closeSheet();
+      this.signSheet('endless');  // the fresh climb opens under fresh stars
+    });
+    c.add(items);
+    items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 260, ease: 'Back.easeOut' });
+  }
+
   /* ---------- the zodiac picker: THE CARDS (v0.57.0, Wyatt 8/26) ----------
      Before a fresh campaign: one full-size card at a time — the sign's name
      and title, a portrait art region, its power at the card's bottom and
@@ -5566,8 +5725,11 @@ class Home extends Phaser.Scene {
      night-sky wash, so the real art drops in per sign with no relayout.
      The choice is pinned for the whole campaign (beta3.campsign) and
      cleared with it. */
-  signSheet() {
+  signSheet(forMode) {
     if (this.busy() || this.signC || this.mapC || this.dailyC || this.langC || this.confirmC) return;
+    // the picker serves two climbs (v0.68.0): the campaign pins its sign and
+    // opens the chart; the endless ladder pins its own and rises at once
+    this.signFor = forMode === 'endless' ? 'endless' : 'campaign';
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.signC = this.add.container(0, 0).setDepth(700);
@@ -5738,6 +5900,15 @@ class Home extends Phaser.Scene {
 
     // BEGIN — always live: the visible card is the choice
     const enter = (id) => {
+      if (this.signFor === 'endless') {
+        // pin the endless climb's sign and rise at once — the ladder has no
+        // chart; its map is the level counter itself
+        try { localStorage.setItem('beta3.endsign', id); } catch (e) { }
+        closeSheet();
+        this.bloomBtn = this.rowBtns && this.rowBtns.endless;
+        this.startMode('endless');
+        return;
+      }
       // pin the choice and open the chart — the map is the campaign's own door
       try { localStorage.setItem('beta3.campsign', id); } catch (e) { }
       closeSheet();
@@ -5779,7 +5950,8 @@ class Home extends Phaser.Scene {
   startMode(mode) {
     if (this.busy()) return;
     SFX.ui();
-    const resume = mode === 'campaign' ? this.campaignCheckpoint() : null;
+    const resume = mode === 'campaign' ? this.campaignCheckpoint()
+      : mode === 'endless' ? this.endlessCheckpoint() : null;
     this.beginAscent({ mode, resume, ascended: true });
   }
 
@@ -5923,6 +6095,7 @@ class Home extends Phaser.Scene {
     this.idleTweens();
     this.sky.restoreFlies();
     this.refreshCampDoor(true);  // battle moved (or cleared) the campaign checkpoint
+    this.refreshEndDoor(true);   // …and the endless climb's own line follows it
     this.updateDailyChip();
     this.milestoneCheck();       // the hunt we just came home from may have grown the lamp
     this.sigilNotice();
@@ -5982,6 +6155,12 @@ class Battle extends Phaser.Scene {
       const roster = ssCampaignRoster();
       this.fights = SS_CAMPAIGN_FIGHTS(roster);
       planSeed = ssStrSeed(roster.join('·'));   // pinned roster → a resumed climb keeps its schedule
+    } else if (this.mode === 'endless') {
+      // the ladder's seed rides the checkpoint — a resumed climb rebuilds the
+      // IDENTICAL ladder and sigil schedule; a fresh climb rolls its own sky
+      this.eseed = this.resume && Number.isFinite(this.resume.eseed) ? this.resume.eseed : Math.floor(Math.random() * 1e9);
+      this.fights = ssEndlessFights(this.eseed, SS_ENDLESS.horizon);
+      planSeed = this.eseed;
     } else {
       const pool = [...SS_QUICK_POOL];
       for (let i = 0; i < 4; i++) this.fights.push({ id: pool.splice(Math.floor(rng() * pool.length), 1)[0], actIdx: 0, mult: 1 + i * 0.12, atkAdd: Math.floor(i / 2), umbral: false });
@@ -5998,14 +6177,17 @@ class Battle extends Phaser.Scene {
       fightIdx: this.resume.fightIdx, hpMax: this.resume.hpMax, hp: this.resume.hp,
       sigils: this.resume.sigils || [], words: this.resume.words | 0, longest: this.resume.longest || '',
       totalDmg: this.resume.totalDmg | 0, scried: !!this.resume.scried, featherUsed: !!this.resume.featherUsed,
-      letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0, playMs: ssClockInherit(this.resume),
+      letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0,
+      playMs: ssClockInherit(this.resume, this.mode === 'endless' ? 'beta3.endless' : 'beta3.campaign'),
       overkill: this.resume.overkill | 0, tiers: this.resume.tiers || {},
     } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0, overkill: 0, tiers: {} };
     this.clockLast = 0;   // the active-play heartbeat's last stamp — 0 until the first update ticks
     this.run.firstUsed = false;
-    // the birth sign — campaign only, pinned for the whole climb. TAURUS's
-    // endurance lands once at the run's start and rides the checkpoint's hpMax.
-    this.sign = this.mode === 'campaign' ? ssCampSign() : null;
+    // the birth sign — the campaign's and the endless climb's, each pinned
+    // for its whole climb (v0.68.0: zodiac powers apply to endless exactly
+    // as to the campaign). TAURUS's endurance lands once at the run's start
+    // and rides the checkpoint's hpMax.
+    this.sign = this.mode === 'campaign' ? ssCampSign() : this.mode === 'endless' ? ssEndSign() : null;
     this.signZ = this.sign ? SS_ZODIAC_BY[this.sign] : null;
     if (this.sign === 'taurus' && !this.resume) { this.run.hpMax += 15; this.run.hp = this.run.hpMax; }
     this.state = 'boot';
@@ -6048,14 +6230,15 @@ class Battle extends Phaser.Scene {
      where it began — the minutes spent on the abandoned attempt were
      played, and they count. */
   clockPersist() {
-    if (this.mode !== 'campaign' || this.state === 'end' || !this.run) return;
+    const key = this.mode === 'campaign' ? 'beta3.campaign' : this.mode === 'endless' ? 'beta3.endless' : null;
+    if (!key || this.state === 'end' || !this.run) return;
     try {
-      const raw = localStorage.getItem('beta3.campaign');
+      const raw = localStorage.getItem(key);
       if (!raw) return;
       const ck = JSON.parse(raw);
       if (!ck || (ck.fightIdx | 0) !== (this.run.fightIdx | 0)) return;
       ck.playMs = this.run.playMs | 0; ck.clockV = 2;
-      localStorage.setItem('beta3.campaign', JSON.stringify(ck));
+      localStorage.setItem(key, JSON.stringify(ck));
     } catch (e) { }
   }
 
@@ -6076,7 +6259,9 @@ class Battle extends Phaser.Scene {
 
     this.headT = txt(l.x(0), l.y(24), this.modeTitle(), 13, '#c9b676').setOrigin(0.5).setAlpha(0.9);
     this.pips = [];
-    const nP = this.mode === 'campaign' ? 5 : this.fights.length;
+    // campaign pips band by act; endless bands its levels in fives the same
+    // way (the boss is the band's last pip) — never one pip per fight there
+    const nP = this.mode === 'campaign' || this.mode === 'endless' ? 5 : this.fights.length;
     for (let i = 0; i < nP; i++) this.pips.push(this.add.image(l.x(-40 + i * 20), l.y(46), 'dot').setScale(0.6).setTint(0x4a5480));
     this.scoreT = txt(l.x(190), l.y(24), '0', 15).setOrigin(1, 0.5);
 
@@ -6235,6 +6420,7 @@ class Battle extends Phaser.Scene {
   }
   modeTitle() {
     if (this.mode === 'campaign') return SS_ACT_N(SS_ACTS[this.fights[this.run.fightIdx].actIdx]);
+    if (this.mode === 'endless') return SS_T('endlessTitle') + ' · ' + SS_T('endLvl', this.run.fightIdx + 1);
     if (this.mode === 'daily') return '☀ DAILY HUNT · ' + SSNET.dayKeyISO();
     return 'QUICK PLAY';
   }
@@ -6680,11 +6866,25 @@ class Battle extends Phaser.Scene {
     if (this.hasSigil('blood')) b.atk = Math.round(b.atk * (1 + this.sigVal('blood', 'smult') / 100));
     if (f.umbral && !base.boss) { b.tint = SS_UMBRAL.tint; b.eye = SS_UMBRAL.eye; b.name = SS_UMBRAL.prefix + base.name; }
     if (f.umbral && base.boss && f.id !== 'phoenix') { b.tint = SS_UMBRAL.tint; b.eye = SS_UMBRAL.eye; b.name = SS_UMBRAL.prefix + base.name; }
+    // the endless deepening (v0.68.0): the ladder squeezes the strike clock
+    // (never below 2 casts) and its deep bosses drink the light. fx is
+    // cloned before the curse lands — the def in SS_BEASTS must never learn
+    // what one fight dressed it in.
+    if (f.tcut) b.timer = Math.max(2, b.timer - f.tcut);
+    if (f.curse === 'blackout' && base.boss) {
+      b.fx = Object.assign({}, b.fx, { curse: 'blackout', ink: Math.max(f.ink || 2, (base.fx && base.fx.ink) || 0) });
+    }
     return b;
   }
   startFight() {
     const l = this.L;
     const f = this.fights[this.run.fightIdx];
+    // the endless climb's rungs ring the moment they are REACHED (v0.68.0):
+    // award() is idempotent, so a resumed climb settles up quietly
+    if (this.mode === 'endless') {
+      if (this.run.fightIdx + 1 >= 10) SS.award('end-10', this.game);
+      if (this.run.fightIdx + 1 >= 20) SS.award('end-20', this.game);
+    }
     this.beast = this.beastFor(f);
     if (this.hasSigil('hush')) this.beast.timer += this.sigVal('hush', 'delay');
     this.beast.hpNow = this.beast.hp;
@@ -6730,7 +6930,7 @@ class Battle extends Phaser.Scene {
     this.cometLeft = this.hasSigil('comet') ? ssSigilCharges('comet', this.sigTier('comet')) : 0;
     this.clearHintFx();
     this.headT.setText(this.modeTitle());
-    const pipBase = this.mode === 'campaign' ? Math.floor(this.run.fightIdx / 5) * 5 : 0;
+    const pipBase = this.mode === 'campaign' || this.mode === 'endless' ? Math.floor(this.run.fightIdx / 5) * 5 : 0;
     this.pips.forEach((p, i) => {
       const gi = pipBase + i;
       p.setTint(gi < this.run.fightIdx ? 0xd7b45c : gi === this.run.fightIdx ? 0xffffff : 0x4a5480)
@@ -7053,7 +7253,11 @@ class Battle extends Phaser.Scene {
       this.run.hpMax += this.sigVal('meteor', 'hpAdd') | 0;
       this.heal(this.run.hpMax);
     } else this.heal(6);
-    if (this.mode === 'campaign') this.saveCheckpoint();
+    // the endless ladder extends itself long before anyone can touch its
+    // edge — the climb is UNBOUNDED, so the exhausted-fights win below must
+    // stay unreachable there (the same seed grows the same ladder)
+    if (this.mode === 'endless' && this.run.fightIdx >= this.fights.length - 2) this.extendEndless();
+    if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
     this.time.delayedCall(1150, () => {
       // the final win ends the run — endRun settles and announces for itself
       if (this.run.fightIdx >= this.fights.length) { this.endRun(true); return; }
@@ -7112,6 +7316,19 @@ class Battle extends Phaser.Scene {
     if (!ssSigilAnnounce(this, pend, () => { if (this.state === 'rite') this.state = 'pick'; })) this.state = 'pick';
   }
   saveCheckpoint() {
+    // the endless climb survives an app kill exactly as the campaign does
+    // (v0.68.0): the seed rebuilds the identical ladder, the level and the
+    // active-play clock ride along, and the same fight-start semantics hold
+    if (this.mode === 'endless') {
+      localStorage.setItem('beta3.endless', JSON.stringify({
+        fightIdx: this.run.fightIdx, hp: this.run.hp, hpMax: this.run.hpMax,
+        sigils: this.run.sigils, tiers: this.run.tiers, words: this.run.words, longest: this.run.longest,
+        totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
+        letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
+        overkill: this.run.overkill | 0, eseed: this.eseed, clockV: 2,
+      }));
+      return;
+    }
     if (this.run.fightIdx >= this.fights.length) { ssClearCampaign(); return; }
     const f = this.fights[this.run.fightIdx];
     localStorage.setItem('beta3.campaign', JSON.stringify({
@@ -7121,6 +7338,14 @@ class Battle extends Phaser.Scene {
       letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
       overkill: this.run.overkill | 0, clockV: 2,
     }));
+  }
+  // deterministic growth: the same seed re-runs the same stream, so the new
+  // stretch changes nothing already climbed; the sigil plan re-walks the
+  // longer ladder (its prefix is identical for the same reason)
+  extendEndless() {
+    this.fights = ssEndlessFights(this.eseed, this.fights.length + SS_ENDLESS.horizon);
+    this.sigPlan = ssSigilPlan(this.mode, this.fights, this.eseed);
+    this.sigTypes = ssOfferTypes(this.mode, this.sigPlan, this.eseed);
   }
   runElapsed() { return this.run.playMs | 0; }
 
@@ -7375,8 +7600,11 @@ class Battle extends Phaser.Scene {
   // the same odds however many offers came before it, and the last act's
   // offers still reach the legendary band (leg 0.12-0.18 at fights 15-19).
   sigilChances() {
-    if (this.mode === 'campaign') {
-      const p = this.run.fightIdx / Math.max(1, this.fights.length - 1);
+    if (this.mode === 'campaign' || this.mode === 'endless') {
+      // endless rides the campaign's own 20-fight ramp and then holds at the
+      // summit band forever — level 20+ deals like the campaign's last act
+      const span = this.mode === 'endless' ? 19 : Math.max(1, this.fights.length - 1);
+      const p = Math.min(1, this.run.fightIdx / span);
       return {
         rare: this.run.fightIdx >= 3 ? 0.12 + 0.28 * p : 0,
         leg: this.run.fightIdx >= 7 ? 0.04 + 0.14 * Math.max(0, p - 0.5) / 0.5 : 0,
@@ -7459,7 +7687,7 @@ class Battle extends Phaser.Scene {
         // vessel, data-read so the ladder and the pick can never disagree
         if (sg.id === 'aegis') { this.run.hpMax += ssSigilVal('aegis', 'hp', 1); this.run.hp = this.run.hpMax; }
         this.repaintChips();   // a letter-bonus sigil shows on the standing board at once
-        if (this.mode === 'campaign') this.saveCheckpoint();
+        if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
         sparks.emitParticleAt(card.x, card.y, tier === 2 ? 26 : 12);
         this.tweens.add({ targets: card, scale: 1.05, duration: 130, yoyo: true });
         for (const it of items) if (it !== card && it !== sparks) this.tweens.add({ targets: it, alpha: 0, duration: 200 });
@@ -7523,7 +7751,7 @@ class Battle extends Phaser.Scene {
         this.run.hpMax += d; this.heal(d);
       }
       this.repaintChips();   // a choir/runes step shows on the standing board at once
-      if (this.mode === 'campaign') this.saveCheckpoint();
+      if (this.mode === 'campaign' || this.mode === 'endless') this.saveCheckpoint();
       const glow = this.add.image(row.x, row.y + rc.y, 'glowbig').setDisplaySize(l.u(440), l.u(180))
         .setTint(GD.glow).setAlpha(0).setBlendMode('ADD');
       this.overlayC.add(glow);
@@ -7673,12 +7901,38 @@ class Battle extends Phaser.Scene {
     const score = tomeTax ? Math.round(rawScore * (1 - tomeTax / 100)) : rawScore;
     const elapsed = this.runElapsed();
     if (!won) SFX.defeat();
+    /* THE ENDLESS RECKONING (v0.68.0, Skylar): "at the end it should read
+       what level they got to, if that's their highest level … if that's
+       high score". The level REACHED is the one you fell on — you made it
+       there — and both bests are captured before the books move so the NEW
+       BEST flags are honest. A fall always ends the climb (no continue;
+       PHOENIX FEATHER's survive-once already intercepted before this). */
+    const isEnd = this.mode === 'endless';
+    const level = isEnd ? this.run.fightIdx + (won ? 0 : 1) : 0;
+    let prevBestLvl = -1, newBestLvl = false, newBestScore = false;
     // best-run reference, captured before the books are updated below
     const dk = String(SSNET.dayKey());
     let prevBest = -1;                                     // -1 = no best line for this mode/result
     if (won && this.mode === 'quick') prevBest = SS.prof.bestQuick;
     if (won && this.mode === 'campaign') prevBest = SS.prof.bestCampaign;
     if (this.mode === 'daily') prevBest = SS.prof.daily[dk] | 0;
+    if (isEnd) {
+      prevBestLvl = SS.prof.endless.bestLevel | 0;
+      prevBest = SS.prof.endless.bestScore | 0;
+      newBestLvl = prevBestLvl > 0 && level > prevBestLvl;
+      newBestScore = prevBest > 0 && score > prevBest;
+      const e = SS.prof.endless;
+      e.runs++;
+      if (level > e.bestLevel) e.bestLevel = level;
+      if (score > e.bestScore) e.bestScore = score;
+      // the sign ledger's endless line: the deepest level ever reached
+      // under this sign (campaign clears/best stay campaign-only)
+      if (this.sign) {
+        const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0 });
+        if (level > (sr.eBest | 0)) sr.eBest = level;
+      }
+      ssClearEndless();
+    }
     if (won && this.mode === 'quick') {
       SS.award('star-caller', this.game);
       if (!this.run.scried) SS.award('no-scry', this.game);
@@ -7717,11 +7971,17 @@ class Battle extends Phaser.Scene {
     }
     // the rating stirs: a win pays by mode, a mighty word pays a pinch — all
     // through the PvE gate (daily cap + diminishing), so solo play can seed a
-    // rating but never inflate one past what versus supports
+    // rating but never inflate one past what versus supports. The ENDLESS
+    // climb pays no rating at all (v0.68.0 — the ladder is its own ledger:
+    // best level, best score, the endless board; grinding an unbounded mode
+    // must never become the rating's back door), the mighty-word pinch
+    // included.
     let rDelta = 0;
-    if (won) rDelta += SS_RATING.pve(this.mode === 'campaign' ? 10 : 5);
-    if (this.run.bigHit >= 60) rDelta += SS_RATING.pve(3);
-    else if (this.run.bigHit >= 40) rDelta += SS_RATING.pve(1);
+    if (won && !isEnd) rDelta += SS_RATING.pve(this.mode === 'campaign' ? 10 : 5);
+    if (!isEnd) {
+      if (this.run.bigHit >= 60) rDelta += SS_RATING.pve(3);
+      else if (this.run.bigHit >= 40) rDelta += SS_RATING.pve(1);
+    }
     if (won) SS.prof.wins++;
     SS.save(); SS.sync();
     /* THE DRIP settles here and nowhere else in a battle: the volley is over,
@@ -7731,7 +7991,10 @@ class Battle extends Phaser.Scene {
     ssSigilCheck();
     const unlocked = ssSigilPending();
     // mode rides along: only daily runs may land on the daily board (the
-    // weekly takes any run; campaign still only when the whole climb is won)
+    // weekly takes any run; campaign still only when the whole climb is won).
+    // An endless fall lands on the ENDLESS board — level first, score the
+    // tiebreak — and its score joins the weekly like any other run's.
+    if (isEnd) SSNET.submitEndless(level, score, this.run.longest);
     if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest, PACK.lang, this.mode);
 
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
@@ -7749,68 +8012,99 @@ class Battle extends Phaser.Scene {
     // daily carries two extra rows: the flame line and the share button)
     // (the daily carries three extra rows now: the flame, the lantern's own
     // note — a mark crossed, or where the grace night stands — and the share)
-    const ph = this.mode === 'daily' ? 672 : 566;
+    // (the endless reckoning carries the LEVEL plate above the score, so it
+    // stands a little taller than a quick run's window)
+    const ph = this.mode === 'daily' ? 672 : isEnd ? 620 : 566;
     const top = 410 - ph / 2;
     const py = (d) => l.y(top + d);
     items.push(this.add.image(l.x(0), py(ph / 2), 'endpanel').setDisplaySize(l.u(372), l.u(ph)));
 
-    const title = ssTxt(this, l.x(0), py(42), SS_T(won ? 'endWin' : 'endLose'), l.u(24), won ? '#ffe9a8' : '#e66a6a').setOrigin(0.5)
-      .setShadow(0, 0, won ? '#c9b676' : '#802020', l.u(12), true, true);
+    /* the endless fall is read out with pride, not a defeat mask — the level
+       reached IS the run's prize (a fresh best wears the win's gold) */
+    const titleKey = isEnd ? 'endEndTitle' : won ? 'endWin' : 'endLose';
+    const tGold = won || (isEnd && (newBestLvl || newBestScore));
+    const title = ssTxt(this, l.x(0), py(42), SS_T(titleKey), l.u(isEnd ? 22 : 24), tGold ? '#ffe9a8' : isEnd ? '#d8c8e8' : '#e66a6a').setOrigin(0.5)
+      .setShadow(0, 0, tGold ? '#c9b676' : isEnd ? '#5a4a80' : '#802020', l.u(12), true, true);
     items.push(title);
-    items.push(ssTxt(this, l.x(0), py(70), SS_T(won ? 'endWinSub' : 'endLoseSub'), l.u(12), won ? '#c9b676' : '#8f8090', 'italic').setOrigin(0.5));
+    items.push(ssTxt(this, l.x(0), py(70), SS_T(isEnd ? 'endEndSub' : won ? 'endWinSub' : 'endLoseSub'), l.u(12), tGold ? '#c9b676' : '#8f8090', 'italic').setOrigin(0.5));
     const rule = (d) => items.push(this.add.rectangle(l.x(0), py(d), l.u(316), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
     rule(92);
 
-    // the score, in gold letterpress, with the best-run reference under it
-    items.push(ssTxt(this, l.x(0), py(112), SS_T('stScore'), l.u(11), '#8f8873').setOrigin(0.5));
-    const gk = ssGoldTex(this, String(score), 30);
-    items.push(this.add.image(l.x(0), py(140), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
-    // the bargain stated where it bit — the score shown already paid it
-    if (tomeTax) items.push(ssTxt(this, l.x(0), py(163), SS_T('endTomeTax', tomeTax), l.u(9.5), '#cf8fa0', 'italic').setOrigin(0.5));
-    const bestY = tomeTax ? 178 : 170;
-    if (prevBest >= 0 && score > prevBest && prevBest > 0) {
-      const nb = ssTxt(this, l.x(0), py(bestY), SS_T('newBest'), l.u(14), '#ffe9a8').setOrigin(0.5)
-        .setShadow(0, 0, '#c9b676', l.u(10), true, true);
-      items.push(nb);
-      this.tweens.add({ targets: nb, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 1000 });
-    } else if (prevBest > 0) {
-      items.push(ssTxt(this, l.x(0), py(bestY), SS_T('stBest', prevBest), l.u(12), '#8f8873').setOrigin(0.5));
+    // the best-flag pair, shared by every plate below: pulsing NEW BEST when
+    // a standing best fell, the quiet reference line otherwise
+    const bestLine = (d, isNew, ref, refKey) => {
+      if (isNew) {
+        const nb = ssTxt(this, l.x(0), py(d), SS_T('newBest'), l.u(14), '#ffe9a8').setOrigin(0.5)
+          .setShadow(0, 0, '#c9b676', l.u(10), true, true);
+        items.push(nb);
+        this.tweens.add({ targets: nb, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 1000 });
+      } else if (ref > 0) {
+        items.push(ssTxt(this, l.x(0), py(d), SS_T(refKey, ref), l.u(12), '#8f8873').setOrigin(0.5));
+      }
+    };
+    let lvlPlateY = 0;
+    if (isEnd) {
+      // LEVEL REACHED — the climb's own headline, above the score
+      items.push(ssTxt(this, l.x(0), py(110), SS_T('endLvlReached'), l.u(11), '#8f8873').setOrigin(0.5));
+      const lk = ssGoldTex(this, SS_T('endLvl', level), 26);
+      const lsc = Math.min(1, 316 / lk.w);
+      lvlPlateY = 138;
+      items.push(this.add.image(l.x(0), py(138), lk.key).setDisplaySize(l.u(lk.w * lsc), l.u(lk.h * lsc)));
+      bestLine(164, newBestLvl, prevBestLvl, 'endBestLvl');
+      // the score beneath, with its own best flag
+      items.push(ssTxt(this, l.x(0), py(186), SS_T('stScore'), l.u(11), '#8f8873').setOrigin(0.5));
+      const gk2 = ssGoldTex(this, String(score), 20);
+      items.push(this.add.image(l.x(0), py(210), gk2.key).setDisplaySize(l.u(gk2.w), l.u(gk2.h)));
+      if (tomeTax) items.push(ssTxt(this, l.x(150), py(210), SS_T('endTomeTax', tomeTax), l.u(9), '#cf8fa0', 'italic').setOrigin(1, 0.5));
+      bestLine(232, newBestScore, prevBest, 'stBest');
+    } else {
+      // the score, in gold letterpress, with the best-run reference under it
+      items.push(ssTxt(this, l.x(0), py(112), SS_T('stScore'), l.u(11), '#8f8873').setOrigin(0.5));
+      const gk = ssGoldTex(this, String(score), 30);
+      items.push(this.add.image(l.x(0), py(140), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
+      // the bargain stated where it bit — the score shown already paid it
+      if (tomeTax) items.push(ssTxt(this, l.x(0), py(163), SS_T('endTomeTax', tomeTax), l.u(9.5), '#cf8fa0', 'italic').setOrigin(0.5));
+      bestLine(tomeTax ? 178 : 170, prevBest >= 0 && score > prevBest && prevBest > 0, prevBest, 'stBest');
     }
 
     // the finest word gets the nameplate treatment
-    items.push(ssTxt(this, l.x(0), py(196), SS_T('stFinest'), l.u(11), '#8f8873').setOrigin(0.5));
+    const wordY = isEnd ? 252 : 196;
+    items.push(ssTxt(this, l.x(0), py(wordY), SS_T('stFinest'), l.u(11), '#8f8873').setOrigin(0.5));
     if (this.run.longest) {
       const wk = ssGoldTex(this, this.run.longest.toUpperCase(), 20);
       const sc = Math.min(1, 300 / wk.w);
-      items.push(this.add.image(l.x(0), py(222), wk.key).setDisplaySize(l.u(wk.w * sc), l.u(wk.h * sc)));
+      items.push(this.add.image(l.x(0), py(wordY + 26), wk.key).setDisplaySize(l.u(wk.w * sc), l.u(wk.h * sc)));
     } else {
-      items.push(ssTxt(this, l.x(0), py(222), '—', l.u(18), '#d8d2bd').setOrigin(0.5));
+      items.push(ssTxt(this, l.x(0), py(wordY + 26), '—', l.u(18), '#d8d2bd').setOrigin(0.5));
     }
-    rule(246);
+    rule(isEnd ? 302 : 246);
 
-    // the ledger: label left, value right
+    // the ledger: label left, value right — the endless climb's beast count
+    // has no denominator (the ladder has no end to be counted against)
     const mins = Math.floor(elapsed / 60000), secs = Math.floor(elapsed / 1000) % 60;
+    const ledgerY = isEnd ? 320 : 266;
     const rows = [
-      [SS_T('stBeasts'), this.run.fightIdx + ' / ' + this.fights.length],
+      [SS_T('stBeasts'), isEnd ? String(this.run.fightIdx) : this.run.fightIdx + ' / ' + this.fights.length],
       [SS_T('stWords'), String(this.run.words)],
       [SS_T('stLetters'), String(this.run.letters)],
       [SS_T('stBigHit'), this.run.bigHit ? String(this.run.bigHit) : '—'],
       [SS_T('stTime'), mins + ':' + String(secs).padStart(2, '0')],
     ];
     rows.forEach(([k, v], i) => {
-      items.push(ssTxt(this, l.x(-150), py(266 + i * 26), k, l.u(13), '#a89f85').setOrigin(0, 0.5));
-      items.push(ssTxt(this, l.x(150), py(266 + i * 26), v, l.u(13.5), '#e8e0c8').setOrigin(1, 0.5));
+      items.push(ssTxt(this, l.x(-150), py(ledgerY + i * 26), k, l.u(13), '#a89f85').setOrigin(0, 0.5));
+      items.push(ssTxt(this, l.x(150), py(ledgerY + i * 26), v, l.u(13.5), '#e8e0c8').setOrigin(1, 0.5));
     });
 
     // sigils held, as their icons — and TAPPABLE: the whole row opens the
     // inspector so a finished run can still be read (Wyatt's TestFlight ask).
     // The panel must outrank overlayC (100), hence the depth.
-    items.push(ssTxt(this, l.x(-150), py(400), SS_T('stSigils'), l.u(13), '#a89f85').setOrigin(0, 0.5));
+    const sigY = isEnd ? 448 : 400;
+    items.push(ssTxt(this, l.x(-150), py(sigY), SS_T('stSigils'), l.u(13), '#a89f85').setOrigin(0, 0.5));
     const glyphs = this.run.sigils.map((id) => (SS_SIGILS.find((s) => s.id === id) || {}).icon || '✦');
-    items.push(ssTxt(this, l.x(150), py(400), glyphs.length ? glyphs.join(' ') : '—', l.u(glyphs.length > 10 ? 12 : 14), '#d7b45c').setOrigin(1, 0.5)
+    items.push(ssTxt(this, l.x(150), py(sigY), glyphs.length ? glyphs.join(' ') : '—', l.u(glyphs.length > 10 ? 12 : 14), '#d7b45c').setOrigin(1, 0.5)
       .setShadow(0, 0, '#c9b676', l.u(6), true, true));
     if (this.run.sigils.length || this.signZ) {
-      const sigZone = this.add.zone(l.x(0), py(400), l.u(384), l.u(34)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      const sigZone = this.add.zone(l.x(0), py(sigY), l.u(384), l.u(34)).setOrigin(0.5).setInteractive({ useHandCursor: true });
       sigZone.on('pointerdown', () => {
         if (this.endInspectP) return;
         SFX.ui();
@@ -7829,7 +8123,7 @@ class Battle extends Phaser.Scene {
         .setShadow(0, 0, '#c9b676', l.u(6), true, true));
     }
 
-    let by = 470;
+    let by = isEnd ? 500 : 470;
     if (this.mode === 'daily') {
       // THE ONE LINE: what tonight did to the flame. The first night lights
       // the lantern; every night after names its number.
@@ -7877,15 +8171,19 @@ class Battle extends Phaser.Scene {
       by = 564;
     }
     const again = this.add.image(l.x(0), py(by), ssBtn(this, false, 240, 56)).setDisplaySize(l.u(240), l.u(56)).setInteractive({ useHandCursor: true });
-    const againT = ssTxt(this, l.x(0), py(by), SS_T(won || this.mode !== 'campaign' ? 'newRun' : 'tryAgain'), l.u(17), BTN_INK()).setOrigin(0.5);
+    const againT = ssTxt(this, l.x(0), py(by), SS_T(isEnd ? 'endAgain' : won || this.mode !== 'campaign' ? 'newRun' : 'tryAgain'), l.u(17), BTN_INK()).setOrigin(0.5);
+    if (againT.width > l.u(216)) againT.setScale(l.u(216) / againT.width);
     const homeB = this.add.image(l.x(0), py(by + 58), ssBtn(this, true, 240, 46)).setDisplaySize(l.u(240), l.u(46)).setInteractive({ useHandCursor: true });
     const homeT = ssTxt(this, l.x(0), py(by + 58), SS_T('home'), l.u(14), '#9fb0e8').setOrigin(0.5);
     items.push(again, againT, homeB, homeT);
     again.on('pointerdown', () => {
       SFX.ui();
       // a campaign retry keeps the sign you climbed under; only the meadow's
-      // NEW CAMPAIGN asks the stars again
+      // NEW CAMPAIGN asks the stars again — and CLIMB AGAIN keeps the
+      // endless sign the same way (endRun's books wiped the pin with the
+      // checkpoint, so the retry re-pins the identity it climbed under)
       if (this.mode === 'campaign' && this.sign) { try { localStorage.setItem('beta3.campsign', this.sign); } catch (e) { } }
+      if (isEnd && this.sign) { try { localStorage.setItem('beta3.endsign', this.sign); } catch (e) { } }
       this.scene.restart({ mode: this.mode, resume: null });
     });
     // the Act III payoff: win the campaign and you descend into sunrise
@@ -7902,13 +8200,17 @@ class Battle extends Phaser.Scene {
     // entrance: the window settles up into place; a defeat sinks in more slowly
     items.forEach((it) => { it.y += l.u(16); it.alpha = 0; });
     this.tweens.add({ targets: items, y: '-=' + l.u(16), alpha: 1, duration: won ? 380 : 600, ease: won ? 'Back.easeOut' : 'Sine.easeOut', delay: won ? fanWait : 250 });
-    if (won) this.time.delayedCall(fanWait + 180, () => {  // gold motes crown a victory
+    // gold motes crown a victory — and an endless fall that set a NEW BEST
+    // level (the beast won the fight, but the climb won the ledger)
+    const crown = won || (isEnd && newBestLvl);
+    if (crown) this.time.delayedCall(fanWait + (won ? 180 : 750), () => {
+      const cy = isEnd && lvlPlateY ? py(lvlPlateY) : title.y - l.u(16);
       for (let i = 0; i < 14; i++) {
         const a = (i / 14) * Math.PI * 2, r = l.u(30 + rng() * 40);
-        const m = this.add.image(title.x, title.y - l.u(16), 'dot').setScale(0.5 + rng() * 0.5)
+        const m = this.add.image(title.x, cy, 'dot').setScale(0.5 + rng() * 0.5)
           .setTint(0xffe9a8).setBlendMode('ADD').setDepth(101);
         this.overlayC.add(m);
-        this.tweens.add({ targets: m, x: title.x + Math.cos(a) * r * 2.4, y: title.y - l.u(16) + Math.sin(a) * r, alpha: 0, scale: 0.1, duration: 900 + rng() * 500, ease: 'Cubic.easeOut', onComplete: () => m.destroy() });
+        this.tweens.add({ targets: m, x: title.x + Math.cos(a) * r * 2.4, y: cy + Math.sin(a) * r, alpha: 0, scale: 0.1, duration: 900 + rng() * 500, ease: 'Cubic.easeOut', onComplete: () => m.destroy() });
       }
     });
 
@@ -7917,7 +8219,7 @@ class Battle extends Phaser.Scene {
     if (unlocked.length) this.time.delayedCall((fanWait || 0) + 1400, () => ssSigilAnnounce(this, unlocked));
 
     if (DEMO) {
-      localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, words: this.run.words, longest: this.run.longest, letters: this.run.letters, bigHit: this.run.bigHit, elapsed, rating: SS.prof.rating, rd: rDelta }));
+      localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, level: isEnd ? level : undefined, words: this.run.words, longest: this.run.longest, letters: this.run.letters, bigHit: this.run.bigHit, elapsed, rating: SS.prof.rating, rd: rDelta }));
       this.time.delayedCall(2500, () => again.emit('pointerdown'));
     }
   }
@@ -8055,12 +8357,16 @@ class Profile extends Phaser.Scene {
       ['runs begun', p.runs], ['runs won', p.wins], ['beasts felled', p.beasts],
       ['words woven', p.words], ['finest word', p.longest ? p.longest.toUpperCase() : '—'],
       ['mightiest hit', p.bigHit || '—'], ['best quick play', p.bestQuick || '—'],
+      // the endless climb's high-water mark (v0.68.0): level first, the
+      // score beside it — the same order the endless board ranks by
+      ['endless climb', p.endless.bestLevel ? SS_T('endLvlShort', p.endless.bestLevel) + ' · ' + p.endless.bestScore : '—'],
       ['versus victories', p.vsWins || '—'],
     ];
-    // 23 apart, not 26: the leaderboard's door had to come from somewhere,
-    // and the ledger's own rows were the only slack above the sky door
+    // 21 apart now (23 before the endless row, 26 before the leaderboard's
+    // door): every squeeze came out of this ledger, the only slack above
+    // the sky door
     rows.forEach(([k, v], i) => {
-      const y = l.y(205 + i * 23);
+      const y = l.y(205 + i * 21);
       ssTxt(this, l.x(-150), y, k, l.u(13), '#8a94c4').setOrigin(0, 0.5);
       ssTxt(this, l.x(150), y, String(v), l.u(13), '#f0e8d2').setOrigin(1, 0.5);
     });
@@ -8110,12 +8416,13 @@ class Profile extends Phaser.Scene {
     doorT.setInteractive({ useHandCursor: true }).on('pointerdown', openSkies);
 
     ssTxt(this, l.x(0), l.y(441), '— ACHIEVEMENTS  ' + Object.keys(p.ach).length + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
-    // the grid is 23 deep now (the lantern's three marks) — 12 rows at 27
-    // apart is the last spacing that keeps the whole ledger above the seal
-    // (and 25 under the heading: at 20 the first row's names kissed it)
+    // the grid is 25 deep now (the endless climb's two rungs joined the
+    // lantern's marks) — 13 rows at 25 apart keeps the whole ledger above
+    // the seal (and 25 under the heading: at 20 the first row's names
+    // kissed it)
     SS_ACH.forEach((a, i) => {
       const col = i % 2, row = Math.floor(i / 2);
-      const x = l.x(col === 0 ? -100 : 100), y = l.y(466 + row * 27);
+      const x = l.x(col === 0 ? -100 : 100), y = l.y(466 + row * 25);
       const got = !!p.ach[a.id];
       ssTxt(this, x - l.u(88), y, a.icon, l.u(14), got ? '#ffd77a' : '#39406b').setOrigin(0.5);
       ssTxt(this, x - l.u(68), y - l.u(7.5), a.name, l.u(10.5), got ? '#f0e8d2' : '#4a5480').setOrigin(0, 0.5);
@@ -8175,17 +8482,23 @@ class Board extends Phaser.Scene {
         .setShadow(0, 0, '#c9b676', l.u(6), true, true);
     }
 
-    // tabs: two pills — the active board wears the gold
+    // tabs: three pills — the active board wears the gold (ENDLESS joined
+    // daily/weekly in v0.68.0: the all-time ladder, ranked level then score)
     this.tab = 'daily';
     this.tabBtns = {};
+    this.tabW = 118;
     const mkTab = (key, dx, label) => {
-      const bg = this.add.image(l.x(dx), l.y(104), ssBtn(this, true, 150, 38)).setDisplaySize(l.u(150), l.u(38)).setInteractive({ useHandCursor: true });
-      const lab = ssTxt(this, l.x(dx), l.y(104), label, l.u(14), '#5a6390').setOrigin(0.5);
+      const bg = this.add.image(l.x(dx), l.y(104), ssBtn(this, true, this.tabW, 38)).setDisplaySize(l.u(this.tabW), l.u(38)).setInteractive({ useHandCursor: true });
+      ssHitPad(bg, 44);   // a 38-tall pill alone is under the 44-pt law
+      const lab = ssTxt(this, l.x(dx), l.y(104), label, l.u(13), '#5a6390').setOrigin(0.5);
+      // a long word for the pill (WÖCHENTLICH, CLASSEMENT kin) fits, never spills
+      if (lab.width > l.u(this.tabW - 16)) lab.setScale(l.u(this.tabW - 16) / lab.width);
       bg.on('pointerdown', () => this.setTab(key));
       this.tabBtns[key] = { bg, lab };
     };
-    mkTab('daily', -80, SS_T('lbDaily'));
-    mkTab('weekly', 80, SS_T('lbWeekly'));
+    mkTab('daily', -125, SS_T('lbDaily'));
+    mkTab('weekly', 0, SS_T('lbWeekly'));
+    mkTab('endless', 125, SS_T('endless'));
     this.dressTabs(l);
 
     // the reset clock, ticking every second. Both flips are UTC (daily 00:00,
@@ -8205,12 +8518,17 @@ class Board extends Phaser.Scene {
   dressTabs(l) {
     for (const [key, t] of Object.entries(this.tabBtns)) {
       const on = key === this.tab;
-      t.bg.setTexture(ssBtn(this, !on, 150, 38)).setDisplaySize(l.u(150), l.u(38));
+      t.bg.setTexture(ssBtn(this, !on, this.tabW, 38)).setDisplaySize(l.u(this.tabW), l.u(38));
+      // setTexture hands the hit area back to the bare frame — re-pad to the
+      // 44-pt law every dress (ssHitPad is never cumulative)
+      ssHitPad(t.bg, 44);
       t.lab.setColor(on ? BTN_INK() : '#5a6390');
     }
   }
   tickCd() {
     if (!this.cdT || !this.cdT.active) return;
+    // the endless ladder never resets — its line is the ledger's own, still
+    if (this.tab === 'endless') { this.cdT.setText('✦ ' + SS_T('lbAllTime')); return; }
     const daily = this.tab === 'daily';
     const ms = daily ? SSNET.msToNextDay() : SSNET.msToNextWeek();
     this.cdT.setText((daily ? '☾ ' : '✦ ') + SS_T(daily ? 'lbNewSky' : 'lbWeekEnds', ssCountdownLive(ms)));
@@ -8237,6 +8555,7 @@ class Board extends Phaser.Scene {
       return;
     }
     const meId = SSNET.uid();
+    const isE = tab === 'endless';        // rows carry BOTH level and score there
     const ent = [];                       // entrance-animated, in cascade order
     const trim = (t2, w) => { while (t2.width > l.u(w) && t2.text.length > 2) t2.setText(t2.text.slice(0, -2) + '…'); return t2; };
 
@@ -8261,9 +8580,12 @@ class Board extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       pnm.on('pointerdown', () => ssRatingCard(this, r.ghost ? { name: r.name, rating: r.rating, rhide: r.rhide } : { uid: r.id, name: r.name }));
       grp.push(pnm);
-      const gk = ssGoldTex(this, String(r.score), P.big);
+      // the endless podium wears the LEVEL as its gold plate — the score and
+      // finest word ride the italic line beneath
+      const gk = ssGoldTex(this, isE ? SS_T('endLvlShort', r.level | 0) : String(r.score), P.big);
       grp.push(this.add.image(l.x(P.dx), l.y(P.my + P.r + 37), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
-      if (r.word) grp.push(trim(ssTxt(this, l.x(P.dx), l.y(P.my + P.r + 56), r.word, l.u(9), '#8a94c4', 'italic').setOrigin(0.5), 124));
+      const sub = isE ? String(r.score) + (r.word ? ' · ' + r.word : '') : r.word;
+      if (sub) grp.push(trim(ssTxt(this, l.x(P.dx), l.y(P.my + P.r + 56), sub, l.u(9), '#8a94c4', 'italic').setOrigin(0.5), 124));
       ent.push(...grp);
       this.rowsC.add(grp);
     });
@@ -8290,8 +8612,10 @@ class Board extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       rnm.on('pointerdown', () => ssRatingCard(this, r.ghost ? { name: r.name, rating: r.rating, rhide: r.rhide } : { uid: r.id, name: r.name }));
       grp.push(rnm);
-      if (r.word) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#5a6390', 'italic').setOrigin(0, 0.5));
-      grp.push(ssTxt(this, l.x(172), y, String(r.score), l.u(13.5), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));
+      // the endless roll prints "L 23 · 4180" — wider than a bare score, so
+      // the finest-word column stands down there
+      if (r.word && !isE) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#5a6390', 'italic').setOrigin(0, 0.5));
+      grp.push(ssTxt(this, l.x(172), y, isE ? SS_T('endLvlShort', r.level | 0) + ' · ' + r.score : String(r.score), l.u(13.5), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));
       ent.push(...grp);
       this.rowsC.add(grp);
     });
@@ -8308,8 +8632,8 @@ class Board extends Phaser.Scene {
           .setInteractive({ useHandCursor: true });
         ynm.on('pointerdown', () => ssRatingCard(this, { own: true }));
         grp.push(ynm);
-        if (r.word) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#8a94c4', 'italic').setOrigin(0, 0.5));
-        grp.push(ssTxt(this, l.x(172), y, String(r.score), l.u(13.5), '#ffe9a8').setOrigin(1, 0.5));
+        if (r.word && !isE) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#8a94c4', 'italic').setOrigin(0, 0.5));
+        grp.push(ssTxt(this, l.x(172), y, isE ? SS_T('endLvlShort', r.level | 0) + ' · ' + r.score : String(r.score), l.u(13.5), '#ffe9a8').setOrigin(1, 0.5));
       }
       grp.push(ssTxt(this, l.x(0), l.y(b.me >= 10 ? 718 : 700), SS_T('lbYouRank', b.me + 1, b.total), l.u(11.5), '#c9b676').setOrigin(0.5));
       ent.push(...grp);

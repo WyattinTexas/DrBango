@@ -280,6 +280,58 @@ const SS_QUICK_POOL = ['vulpes', 'lepus', 'serpens', 'cancer', 'corvus', 'ursa',
 const SS_QUICK_BOSS = 'draco';
 
 /* ============================================================
+   THE ENDLESS CLIMB (v0.68.0). Skylar (9/1): "the players will
+   keep playing, getting random enemies and then sometimes bosses
+   mixed in, and it just keeps getting progressively harder and
+   harder to see how far they can make it."
+   An unbounded ladder of LEVELS (level N is fights[N-1], built by
+   ssEndlessFights in game.js off a per-run seed that rides the
+   checkpoint). Every bossEvery-th level is a boss; the rest draw
+   basics and minis, minis growing more common as the climb deepens.
+   THE CURVE — smooth, in data, no ceiling. It rides ON TOP of each
+   beast's own stats (a boss still hits like a boss), so the pool
+   gates below keep the early rungs honest while the whole bestiary
+   opens by the mid-teens.
+   INTENDED FEEL (the pins endless-check asserts):
+     level 1   = a campaign opening fight (mult 1.00 · atk +0)
+     level 10  ≈ the end of campaign act II (mult ~1.5 · atk +3;
+                 the level-10 boss draws draco's weight class)
+     level 20  ≈ the campaign finale (mult ~2.1 · atk +7; all
+                 bosses in the pool, curses live, the clock cut)
+     level 30+   harder than anything the campaign asks — the
+                 quadratic kicker has no top and the strike clock
+                 tightens again at 36.
+   Pressure comes from four dials, not one:
+     hp     · hpMult(lv)  — linear early, quadratic past KICK_AT
+     strike · atkAdd(lv)  — a steady lean on every blow
+     clock  · timerCut(lv) — −1 cast from 16, −2 from 36 (floor 2)
+     curses · boss levels from curseFrom carry the void's blackout
+              (ink 3 from curseDeep); umbral dress mixes in from
+              umbralFrom and deepens
+   ============================================================ */
+const SS_ENDLESS = {
+  bossEvery: 5,          // every 5th level is a boss — Skylar's rhythm
+  horizon: 400,          // fights built per stretch; the ladder extends itself before anyone can touch the edge
+  hpMult: (lv) => +(1 + 0.06 * (lv - 1) + 0.004 * Math.pow(Math.max(0, lv - 20), 2)).toFixed(3),
+  atkAdd: (lv) => Math.round(0.35 * (lv - 1)),
+  timerCut: (lv) => (lv >= 36 ? 2 : lv >= 16 ? 1 : 0),
+  // which of the bestiary a level may draw: lvl-banded so the early rungs
+  // stay a meadow and the deep sky holds everything
+  lvlCap: (lv) => Math.min(4, 1 + Math.floor(lv / 4)),        // basics + minis
+  bossLvlCap: (lv) => Math.min(4, Math.floor(lv / 5)),        // bosses: 1 at L5 · 2 at L10 · 3 at L15 · all at L20
+  pMini: (lv) => (lv < 3 ? 0 : Math.min(0.55, 0.10 + 0.035 * lv)),
+  umbralFrom: 11,        // the umbral dress mixes in past here…
+  pUmbral: (lv) => Math.min(0.75, 0.10 + 0.045 * Math.max(0, lv - 10)),
+  curseFrom: 21,         // …and past here every boss drinks the light
+  curseDeep: 41,         // ink 3 volleys from the deep sky
+  pools: { basics: [], minis: [], bosses: [] },
+};
+for (const _id in SS_BEASTS) {
+  const _b = SS_BEASTS[_id];
+  SS_ENDLESS.pools[_b.tier === 'boss' ? 'bosses' : _b.tier === 'mini' ? 'minis' : 'basics'].push(_id);
+}
+
+/* ============================================================
    THE SIGIL CADENCE (v0.65.0). Skylar (9/1): "Right now you're
    getting sigils too fast … maybe every two or three turns they
    should get a new sigil" — so a won fight no longer always pays
@@ -326,7 +378,12 @@ const SS_CADENCE = {
   quick: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil', up: 0.35 },
   daily: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil', up: 0.35 },
   versus: { casts: 3, type: 'sigil' },
-  endless: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil', up: 0.35 },   // reserved — the endless card tunes it
+  // endless (v0.68.0): levels group in bands of five ending on a boss, so
+  // actBoss pays every 5th level and the gap jitters between — an offer
+  // roughly every 2-3 levels, forever, upgrades keeping pace once the
+  // 24 are held (the pool-dry crossover). The plan seed is the run's own
+  // ladder seed, so a resumed climb keeps its schedule exactly.
+  endless: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil', up: 0.35 },
   hard: { gapAdd: 1 },                                                // reserved modifier — the hard-mode card reads it
 };
 const SS_OFFER_TYPES = ['sigil', 'upgrade'];   // an unknown type falls back to 'sigil' — never a dead screen
@@ -576,4 +633,8 @@ const SS_ACH = [
   { id: 'flame-7', icon: '🕯', name: 'SEVEN NIGHTS', desc: 'Keep the lantern lit seven nights running.' },
   { id: 'flame-30', icon: '🏮', name: 'THE LONG BURN', desc: 'Keep the lantern lit thirty nights running.' },
   { id: 'flame-100', icon: '🌠', name: 'THE COMET CROWN', desc: 'Keep the lantern lit one hundred nights running.' },
+  // the endless climb's two rungs (v0.68.0) — awarded the moment the level
+  // is REACHED, mid-run, so the toast lands where it was earned
+  { id: 'end-10', icon: 'X', name: 'TEN RUNGS UP', desc: 'Reach level 10 of the endless climb.' },
+  { id: 'end-20', icon: 'XX', name: 'PAST THE CROWN', desc: 'Reach level 20 — beyond the campaign\'s own summit.' },
 ];
