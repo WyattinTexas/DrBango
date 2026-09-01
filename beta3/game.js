@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.63.0';
+const BUILD = 'STARSPELL v0.64.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -5305,7 +5305,7 @@ class Home extends Phaser.Scene {
         const nm = ssTxt(this, l.x(-124), y, r.name, l.u(12.5), me ? '#ffe9a8' : '#e8e0c8').setOrigin(0, 0.5)
           .setInteractive({ useHandCursor: true });
         while (nm.width > l.u(190) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
-        nm.on('pointerdown', () => ssRatingCard(this, { uid: r.id, name: r.name }));
+        nm.on('pointerdown', () => ssRatingCard(this, r.ghost ? { name: r.name, rating: r.rating, rhide: r.rhide } : { uid: r.id, name: r.name }));
         rows.push(nm);
         rows.push(ssTxt(this, l.x(146), y, String(r.score), l.u(13), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));
       });
@@ -7864,7 +7864,7 @@ class Board extends Phaser.Scene {
         .setShadow(0, 0, '#c9b676', l.u(6), true, true));
       const pnm = trim(ssTxt(this, l.x(P.dx), l.y(P.my + P.r + 15), r.name, l.u(i === 0 ? 13.5 : 12), me ? '#ffe9a8' : '#e8e0c8').setOrigin(0.5), 124)
         .setInteractive({ useHandCursor: true });
-      pnm.on('pointerdown', () => ssRatingCard(this, { uid: r.id, name: r.name }));
+      pnm.on('pointerdown', () => ssRatingCard(this, r.ghost ? { name: r.name, rating: r.rating, rhide: r.rhide } : { uid: r.id, name: r.name }));
       grp.push(pnm);
       const gk = ssGoldTex(this, String(r.score), P.big);
       grp.push(this.add.image(l.x(P.dx), l.y(P.my + P.r + 37), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
@@ -7893,7 +7893,7 @@ class Board extends Phaser.Scene {
       grp.push(ssTxt(this, l.x(-172), y, '#' + (k + 4), l.u(11), me ? '#ffd77a' : '#8a94c4').setOrigin(0, 0.5));
       const rnm = trim(ssTxt(this, l.x(-140), y, r.name, l.u(13), me ? '#ffe9a8' : '#f0e8d2').setOrigin(0, 0.5), 176)
         .setInteractive({ useHandCursor: true });
-      rnm.on('pointerdown', () => ssRatingCard(this, { uid: r.id, name: r.name }));
+      rnm.on('pointerdown', () => ssRatingCard(this, r.ghost ? { name: r.name, rating: r.rating, rhide: r.rhide } : { uid: r.id, name: r.name }));
       grp.push(rnm);
       if (r.word) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#5a6390', 'italic').setOrigin(0, 0.5));
       grp.push(ssTxt(this, l.x(172), y, String(r.score), l.u(13.5), me ? '#ffe9a8' : '#d8d2bd').setOrigin(1, 0.5));

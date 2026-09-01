@@ -361,7 +361,7 @@ const SSNET = (() => {
     const daily = kind !== 'weekly';
     const path = daily ? dailyPath(lang) : 'weekly/' + weekKey();
     const all = (await dbGet(path).catch(() => null)) || {};
-    const rows = Object.entries(all)
+    let rows = Object.entries(all)
       // The daily board shows ONLY rows stamped m:'daily'. Belt to the write
       // gate's suspenders: clients running cached pre-v0.31.1 code still
       // submit quick/campaign runs here for a while after deploy, and their
@@ -371,6 +371,16 @@ const SSNET = (() => {
       .filter(([, r]) => !daily || (r && r.m === 'daily'))
       .map(([id, r]) => ({ id, name: r.name || '???', score: r.score | 0, word: r.word || '', at: r.at }))
       .sort((a, b) => b.score - a.score);
+    // the seeded hunters (seed-names.js): deterministic ghosts merged in so a
+    // young board never reads empty. They adapt around the real rows (never
+    // #1 over one), never carry this player's uid or name, and one switch
+    // (SS_SEED.enabled / ?ghosts=0) restores the bare board.
+    try {
+      if (typeof SS_SEED !== 'undefined' && SS_SEED.enabled) {
+        rows = SS_SEED.merge(rows, daily ? 'daily' : 'weekly',
+          daily ? String(dayKey()) : weekKey(), daily ? (lang || 'en') : null, null, myName());
+      }
+    } catch (e) { }
     const meIdx = rows.findIndex((r) => r.id === uid());
     return { rows: rows.slice(0, 50), me: meIdx, total: rows.length };
   }

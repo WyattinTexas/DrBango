@@ -1,6 +1,63 @@
 # beta3 dev tools
 
-Nineteen scripts, all dev-only — nothing here ships to the browser.
+Twenty scripts, all dev-only — nothing here ships to the browser.
+
+## seed-check.mjs — the boards' seeded hunters (v0.64.0)
+
+Skylar's call (9/1): the young game's boards read empty ("if you look at
+the daily, it says no one has played it today, which is not great") — give
+the impression of more players, names non-ridiculous, scores never crazy,
+NEVER the top spot. The game side: `seed-names.js` — `SS_SEED_NAMES` (the
+~90-name cast Skylar edits: plain strings are international, `{n, l}` are
+locals bound to their language's boards), `SS_SEED_WORDS` (per-language
+finest-word pools, every word real in its dictionary), `SS_SEED_TUNE`
+(count + score band per board kind: daily 6-10 @ 120-560, weekly 12-18 @
+150-640), and the `SS_SEED` engine. `SSNET.getBoard` merges
+`SS_SEED.merge(rows, kind, key, lang, null, myName())` inside a try/catch —
+deterministic ghosts seeded from the board key (same cast for every player
+all day), arriving THROUGH the day (one early hunter minutes after
+rollover, the field filling by night; the weekly front-loads its week),
+scores in the mode's middle-to-lower band with word length following the
+score. Every ghost carries `ghost:true`, uid `sg_…`, a stable per-name
+rating (880-1160, ~22% veiled) that the three board name-taps hand
+straight to `ssRatingCard` (`{name, rating, rhide}` — no `players/` fetch,
+so the card never reads a row that doesn't exist). NOTHING is ever written
+to the RTDB: no registry claim, no players/presence rows, so a ghost can
+never be found by BY NAME, befriended, or challenged — and versus/rival
+never read boards at all (asserted from source).
+
+THE CAP LAW: the best real score of a board is ALWAYS champion. Any ghost
+at/above it is remapped proportionally from the tune band into
+`[45% of cap, cap-1]` — per-ghost stable through the day and naturally
+spread (never a consecutive wall under the champion); a ghost that can't
+fit stands down. With no real rows the tune's `hi` is the ceiling, chosen
+so any winning run (daily ~650+, quick ~1000, campaign ~3500+) beats every
+ghost. A real row wearing a ghost's name retires that ghost; the viewing
+player's own name is never echoed. One switch removes everything:
+`SS_SEED.enabled = false` (or `?ghosts=0`); the daily/weekly partition is
+per-week so the two boards can never contradict each other (a weekly name
+never sits on that week's dailies).
+
+Self-launching like dew-check (server on :8899 if nothing serves, Chrome
+on :9460, `/tmp/cdp-seed`, `--disable-gpu`), Firebase blocked at the
+network layer throughout — every board is a cold sky; local mode carries
+the same merge.
+
+```
+node tools/seed-check.mjs      # 64 checks, ~2 min
+```
+
+Cast determinism/legality/bands, arrival monotonicity, the cap in four
+shapes (300, a humble 45 among ghosts, a 28 champion, an untouched 4652
+band), the unstamped-row belt, name dedupe both ways, the one switch both
+directions, and real DPR-3 taps: daily chip → sheet lists hunters, profile
+→ leaderboard door → seeded podium, a ghost's rating card (filled, never
+loading), a real 300 crowning ✦ YOU ✦ #1 of the merged field. Time-pinned
+to `?daykey=20260901` + week 2026-W36 so the fixed casts hold forever;
+only 00:00-00:02 UTC on the pinned day itself could ever read empty.
+Harness note: the first getBoard of a session runs pruneBoards — write
+test rows only under the pinned key (older keys are swept from the local
+tree like the real sky).
 
 ## comet-check.mjs — the limited free scry (v0.63.0)
 
