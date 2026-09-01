@@ -39491,7 +39491,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.49';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.50';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -49089,8 +49089,10 @@ const VFLAG_LAG=0.25, VFLAG_RISE=1.0, VFLAG_HOLD=0.9;   // colours down · the r
 // ceremony's falling colours, the loss ceremony's raised standard (v1.56's
 // own seats). Rival hex still outranks everything; the regular campaign
 // keeps the Tan flag byte-exactly. Colours only — no sim path reads this.
-const PARK_FLAG={ yeti:'#9FC4E0', dino:'#4E8C4A' };
-function campFoeHex(){ return (S.rival && S.rival.hex) || (S.park && PARK_FLAG[S.park.id]) || TAN; }
+const PARK_FLAG={ yeti:'#9FC4E0', dino:'#4E8C4A', teddy:'#4A6B35' };   // 0653 Card D (Wyatt 8/31: "The Bear Toy Box has the tan flag up … It should be the bear's green flag. That's throughout the whole campaign"): BEAR PARK flies the paw standard's own cloth — HELM '#4A6B35', the green men's own green (the STANDARD prop's fill: the honor guard's, the General's, the squad leader's flag); a LITERAL because HELM's const sits 20k lines below (the TDZ-literal law — staticBX asserts the two agree). Every crate rung (1-49; the finales 20/50 are crateless), the party door, the win ceremony's falling cloth and the loss ceremony's raised standard read it through campFoeHex ⚑ Q1
+const BOX_PAW=1;             // 0653 — the STANDARD's white paw print on the bear cloth (drawTanBase's badge seat, beside the yeti face and the rex skull); 0 = the plain green cloth ⚑ Q2
+const RAID_FLAG={ fields:'#4A6B35' };   // 0653 — the bears' OWN raid (THE PILLOW FIELDS) raises the bears' green over YOUR box at the escape, not the Tan's; ice/bone/croak keep the shipped tan (⚑ Q4: one row each seats a park's cloth)
+function campFoeHex(){ return (S.rival && S.rival.hex) || (S.park && PARK_FLAG[S.park.id]) || (S.raid && S.raid.cfg===S.cfg && RAID_FLAG[S.raid.k]) || TAN; }   // 0653: + the raid row (the raid bag's identity-stamp law, v3.39 — a stale bag reads inert)
 // v1.56 (Wyatt: "it should work the same way for the enemy"): the ceremony
 // belongs to the WINNER now, whoever that is — `foeWin` marks a pole that is
 // not yours, swaps the fanfare for the low defeat sting, and keeps the star
@@ -58947,7 +58949,7 @@ function endBattle(win){
     // AGAIN) byte-still; the ticket's base CSS (.vz/.vg) is unscoped, so it stands on #lose as it does on #win.
     const lParts=[];
     if(kind) lParts.push(['r', tf(KIND_LINE, xpGain)]);
-    else { lParts.push(['r', t(S.momRaid? (META.mom.done? "The room is SO clean. Your army is in the toy bin. She's heading home. Tap her medal in the case whenever you want a rematch." : "The room is SO clean. Your army is in the toy bin. Mom is waiting at your door. Fight her when YOU are ready. Or box your toys down to "+(MOM_TRIGGER_N-1)+" in SARGE'S SURPLUS and she'll go home.") : (S.raid&&S.raid.cfg===S.cfg)? (S.raid.k==='fields'? 'The bears hold the fields. The whole fight restarts at the pillow alps.' : S.raid.k==='bone'? 'The dinos hold the lair. The whole fight restarts at the gate, outposts and all.' : S.raid.k==='croak'? 'The outlaws hold the hideout. The whole duel restarts at the doors.' : 'The yetis hold the castle. The whole fight restarts at the gate, outposts and all.') : S.rival? 'Their flag flies over your carpet. Sarge would like a word.' : 'The Tan flag flies over your carpet. Sarge would like a word.')]); lParts.push(['c', tf('+%1 XP for the trouble', xpGain)]); }
+    else { lParts.push(['r', t(S.momRaid? (META.mom.done? "The room is SO clean. Your army is in the toy bin. She's heading home. Tap her medal in the case whenever you want a rematch." : "The room is SO clean. Your army is in the toy bin. Mom is waiting at your door. Fight her when YOU are ready. Or box your toys down to "+(MOM_TRIGGER_N-1)+" in SARGE'S SURPLUS and she'll go home.") : (S.raid&&S.raid.cfg===S.cfg)? (S.raid.k==='fields'? 'The bears hold the fields. The whole fight restarts at the pillow alps.' : S.raid.k==='bone'? 'The dinos hold the lair. The whole fight restarts at the gate, outposts and all.' : S.raid.k==='croak'? 'The outlaws hold the hideout. The whole duel restarts at the doors.' : 'The yetis hold the castle. The whole fight restarts at the gate, outposts and all.') : (S.rival || campFoeHex()!==TAN)? 'Their flag flies over your carpet. Sarge would like a word.' : 'The Tan flag flies over your carpet. Sarge would like a word.')]); /* 0653 Card D: the line follows the resolver — a park whose crate flies its own cloth (ice · rex-hide · the bear's green) is not told "the Tan flag" while that cloth runs up the pole behind the card (the rival's army-agnostic key, zero new words); OUTLAW TOWN flies tan and keeps the Tan line ⚑ Q6 — a BLOCK comment: the XP chip and the else's brace share this physical line (the 0651 swallowed-tail trap) */ lParts.push(['c', tf('+%1 XP for the trouble', xpGain)]); }
     if(promos>0) lParts.push(['g', tf('PROMOTED TO LEVEL %1!', META.lvl)]);
     if(lensGift()) lParts.push(['z', vdTicketHTML({ o:8, t:'THE MAGIC LENS', f:'room', a:'<svg viewBox="0 0 120 168">'+lensArt()+'</svg>' })]);   // 0363: a defeat's tenth of a level can cross the lens rung too — the ticket now (the win faces' own)
     if(evBattle() && META.ev && META.ev.ann){ lParts.push(['c', t('YOU FOUGHT THE KING')]); lParts.push(['r', t('A LEVEL FOR EVERYONE WHO FIGHTS')]); }   // 0489: the loss echo (digit-free) — the level landed in evSpoils above; the card is evSweep's
@@ -63791,10 +63793,14 @@ function drawTanBase(){
   cx.fillStyle=campFoeHex();   // the opposition's own colours (v1.56) — tan on the campaign, the park's own cloth in a park (0309), by the same resolver every flag reads
   cx.beginPath(); cx.moveTo(bx,by-176); cx.lineTo(bx-36,by-166+wav); cx.lineTo(bx,by-150); cx.closePath(); cx.fill();
   cx.strokeStyle='rgba(26,18,10,0.9)'; cx.lineWidth=2; cx.stroke();
-  if(S.park && S.park.id!=='teddy'){   // 0309: the badge that makes it a YETI (or DINO) flag — drawn at the cloth's centroid, riding its wave (0524: the teddy park flies the plain tan cloth — a paw badge is one ⚑ art ask)
+  if(S.park){   // 0309: the badge that makes it a YETI (or DINO) flag — drawn at the cloth's centroid, riding its wave · 0653 Card D: BEAR PARK joins the line (0524's ⚑ art ask, now asked for — "the bear's green flag"): the STANDARD's own white print on the green cloth; every other park id byte-what-it-was
     const ex=bx-13, ey=by-163+wav*0.33;
     cx.save(); cx.translate(ex,ey);
-    if(S.park.id==='dino'){
+    if(S.park.id==='teddy'){   // 0653 THE PAW: the STANDARD prop's print (the pad + four toes, white) at ×0.56, mirrored for the leftward pennant — the same print the honor guard, the General and the squad leader carry
+      if(BOX_PAW){ cx.fillStyle='#fff';
+        cx.beginPath(); cx.ellipse(0.6,2.2,3.4,2.8,0,0,7); cx.fill();
+        for(const p9 of [[5,-2.8,1.5],[1.7,-4.5,1.5],[-2.2,-3.9,1.5],[-5,-1.1,1.3]]){ cx.beginPath(); cx.arc(p9[0],p9[1],p9[2],0,7); cx.fill(); } }
+    } else if(S.park.id==='dino'){
       cx.fillStyle='#F5EFD8';   // the bone-cream rex skull, off the army's own teeth swatch
       cx.beginPath(); cx.moveTo(-5.5,1.5); cx.quadraticCurveTo(-5.5,-3.5,-0.5,-4); cx.quadraticCurveTo(5.5,-4.5,5.5,0); cx.quadraticCurveTo(5.5,2.5,2.5,2.5); cx.lineTo(-3.5,2.5); cx.closePath(); cx.fill();
       cx.fillRect(-3.2,2.5,1.4,1.8); cx.fillRect(0.2,2.5,1.4,1.8);
@@ -89845,6 +89851,7 @@ window.GVT = {
     return { patch:PF_PATCH, hem:PF_HEM, hemC:PF_HEM_C, trailA:PF_TRAIL_A, w:PF_W, h:PF_H, gap:PF_GAP, sheet:PF_SHEET, c:PF_C.slice(), qlt:quiltField(), deployX:campDeployX(), W:W, WH:WORLD_H,
       bay:{ on:BAY, live:bayOn()?1:0, sheet:BAY_SHEET, lit:BAY_LIT, deep:BAY_DEEP, drop:BAY_DROP, folds:BAY_FOLDS.map(f=>[f.y,f.a,f.l,f.p,f.w,f.d,f.edge|0]), tuck:BAY_TUCK, grain:BAY_GRAIN, trail:BAY_TRAIL, fields:BAY_FIELDS, bolster:BAY_BOLSTER, stain:BAY_MARSH_STAIN, off:(WORLD_H-H)/2, rimTop:RIM_TOP_IN, rimBot:RIM_BOT_IN } }; },
   tf(){ return { cv:GVT_CV, on:AIM_FACE, hold:AIM_HOLD }; },   // 0652 Card C — the rig's one read (read-only)
+  bx(){ return { cv:GVT_CV, teddy:PARK_FLAG.teddy, raid:RAID_FLAG.fields, paw:BOX_PAW, hex:campFoeHex() }; },   // 0653 Card D — the rig's one read (read-only)
   bb(){ return { cv:GVT_CV, stalk:KB_STALK_STOP, wallWalk:KB_WALL_WALK, track:KB_TRACK_STOP, sting:KB_STING_T, mwf:{ roy:KB_MWF_ROY, can:KB_MWF_CAN, hold:KB_MWF_HOLD, min:KB_MWF_MIN, max:KB_MWF_MAX, min2:KB_MWF_MIN2, max2:KB_MWF_MAX2 }, roy:{ first:KB_ROY_1ST, min:KB_ROY_MIN, max:KB_ROY_MAX, hold:KB_ROY_HOLD, file:KB_ROY_FILE, bat:KB_ROY_BAT }, rav:{ every:KB_RAV_EVERY, cd:KB_RAV_CD, rest:KB_REST, restF:KB_REST_F, hp:FDEF.bearnaparte.hp }, river:(S.cfg&&S.cfg.terrain&&S.cfg.terrain.river)? { x:S.cfg.terrain.river.x, w:S.cfg.terrain.river.w, b:[S.cfg.terrain.river.bridgeY, S.cfg.terrain.river.bridgeY2==null? null : S.cfg.terrain.river.bridgeY2] } : null, court:FDEF.bearnaparte.court? 1 : 0, ann:{ smk:META.smkAnn|0, eb:META.ebAnn|0 }, footOwn:VD_FOOT.own, waves:(S.cfg && S.raid && S.raid.k==='fields')? S.cfg.waves.map(w9=>w9.name) : null, p2n:S.cfg? (S.cfg.p2n==null? null : S.cfg.p2n) : null }; },   // 0645 Card B — the rig's one read (read-only)
   kc(){ const K=S.foes.find(f9=>f9.type==='bearnaparte'); const c=S.cfg||{}; return { priceX:(c.kbPX==null)? null : c.kbPX, coop:!!S.coop, launching:!!coopLaunching, campaign:META.campaign|0, king:K? { hp:+K.hp.toFixed(2), hpMax:K.hpMax, st:K.gnSt||null, life:K.kbLife|0, floor:K.retFloor==null? null : K.retFloor, fierce:K.kbFierce|0, chN:K.kbChN|0, rideT:+(K.kbRideT||0).toFixed(2), gate1:K.kbGate1|0, gate2:K.kbGate2|0, pr:+(K.dkPr||0).toFixed(2), said1:K.kbSaid1|0, footT:+(K.kbFootT||0).toFixed(2), lungeN:K.kbLungeN|0, wallN:K.kbWallN|0, wallT:+(K.cmdWallT||0).toFixed(2), wallCd:K.kbWallCd==null? null : +K.kbWallCd.toFixed(2), mwfN:K.kbMwfN|0, dead:K.dead?1:0 } : null, stamps:{ rv:PGRV, rk:PGRK, pv:PGPV, pk:PGPK }, raidOpen:raidSceneOpen(), raidCur:RAID_CUR }; },   // 0639 KING BEAR EARNS HIS CROWN — read-only: the price, the floors, the acts, the wall, the landing stamps
   fieldsGo(t){ RAID_CUR='fields'; startRaid(RAID_TIERS.indexOf(t)>=0? t : 'e'); return S.raid && S.raid.k; },   // the solo door exactly as UI.raidPlay drives it (the croakGo grammar; the battery's door — the gate is the scene's)
