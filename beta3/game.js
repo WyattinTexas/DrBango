@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.61.0';
+const BUILD = 'STARSPELL v0.62.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2586,6 +2586,30 @@ const SS_TILE_INK = ['#3a3020', '#5a3c05', '#1d4a66', '#1f4d22'];    // letter i
 // value ink per tier — deliberately near the letter ink's darkness: the old
 // pale inks made the worth unreadable at arm's length (Wyatt's call)
 const SS_TILE_VINK = ['#655636', '#5f420a', '#215a7c', '#22572a'];
+// …and the ink when a held sigil raises the letter (Skylar 9/1: the board must
+// show the true worth, not just the cast): the same darkness a shade WARMER on
+// the plain and gilded faces, and every raised chip wears a small spark
+// (ssGlyphVal's 4th argument) — the quiet tell that reads "this S is worth 3
+// because of my River Runes". The star tile's blue face keeps its ink (warm
+// brown muddies on blue glass); the spark carries the tell alone there. The
+// dew chip is never raised — ♥6 stands, the heal is that tile's worth.
+const SS_BUFF_VINK = ['#7d4a10', '#6e3c03', '#215a7c', '#22572a'];
+// per-letter sigil bonuses, data-driven off SS_SIGILS `lb` entries — the ONE
+// place the chip, the CAST preview, the blackout's weighing and every damage
+// loop (solo, versus, and the rival engine, which passes its room's own
+// vowels) all read, so the printed tile can never drift from the damage math.
+// First character decides, exactly as the damage loop always has (RR rides an
+// `r` rune; Qu is q).
+function ssSigilLetterAdd(sigils, ch, vowels) {
+  let add = 0;
+  const c0 = ch[0], vw = vowels || VOWELS;
+  for (const id of sigils) {
+    const lb = SS_SIG_BY[id] && SS_SIG_BY[id].lb;
+    if (!lb) continue;
+    if ((lb.letters && lb.letters.includes(c0)) || (lb.vowels && vw.includes(c0))) add += lb.add;
+  }
+  return add;
+}
 // the dew's value chip is ♥6, never the letter's points — orange↔green is the
 // classic colorblind pair and the heart is the tell (SS_TILE_VINK[3] ink)
 const SS_DEW_CHIP = () => '♥' + DEW_HEAL;
@@ -2615,8 +2639,10 @@ function ssGlyph(scene, ch, color) {
   }
   return key;
 }
-function ssGlyphVal(scene, v, color) {
-  const key = 'gv-' + v + '-' + color;
+function ssGlyphVal(scene, v, color, spark) {
+  // the spark is part of the key — a raised chip and a plain chip that happen
+  // to print the same number are different textures
+  const key = 'gv-' + v + '-' + color + (spark ? '-s' : '');
   if (!scene.textures.exists(key)) {
     const R = ssTexRes(scene);
     const t = scene.textures.createCanvas(key, Math.round(30 * R), Math.round(20 * R));
@@ -2628,17 +2654,36 @@ function ssGlyphVal(scene, v, color) {
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillStyle = color;
     c.fillText(String(v), 15, 10.7);
+    if (spark) {
+      // a held sigil raised this letter: a small four-point spark in the
+      // number's own ink, riding the chip's upper-right corner (clear of a
+      // two-digit value — 20 is the widest chip the game can mint)
+      c.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4 - Math.PI / 2, r = i % 2 ? 1.1 : 3.1;
+        c[i ? 'lineTo' : 'moveTo'](26.5 + Math.cos(a) * r, 4.7 + Math.sin(a) * r);
+      }
+      c.closePath(); c.fill();
+    }
     t.refresh();
   }
   return key;
 }
 function ssPrewarmGlyphs(scene) {
   const jobs = [];
+  // a standing climb's letter-bonus sigils (River Runes, the Choir) mean the
+  // resume deals RAISED chips — prewarm those variants too, or the board
+  // build at the top of the rise bakes them all in one frame
+  let held = [];
+  try { held = (JSON.parse(localStorage.getItem('beta3.campaign')) || {}).sigils || []; } catch (e) { }
+  if (!Array.isArray(held)) held = [];
   for (const base of Object.keys(PACK.bag)) {
     const ch = PACK.digraph[base] || base;
+    const add = ssSigilLetterAdd(held, ch);
     for (let tier = 0; tier < 4; tier++) {
       const v = tier === 3 ? SS_DEW_CHIP() : (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0);
       jobs.push(() => { ssGlyph(scene, ch, SS_TILE_INK[tier]); ssGlyphVal(scene, v, SS_TILE_VINK[tier]); });
+      if (add > 0 && tier < 3) jobs.push(() => ssGlyphVal(scene, v + add, SS_BUFF_VINK[tier], true));
     }
     jobs.push(() => ssGlyph(scene, ch, SS_LINE_GREEN));
   }
@@ -6074,7 +6119,7 @@ class Battle extends Phaser.Scene {
     const img = this.add.image(0, 0, 'tile' + tier).setDisplaySize(this.tileSize, this.tileSize);
     const letter = this.add.image(0, -l.u(2), ssGlyph(this, ch, SS_TILE_INK[tier]))
       .setDisplaySize(l.u(64), l.u(48));
-    const val = this.add.image(l.u(24), l.u(21), ssGlyphVal(this, this.tileChip(ch, tier), SS_TILE_VINK[tier]))
+    const val = this.add.image(l.u(24), l.u(21), this.chipKey(ch, tier))
       .setDisplaySize(l.u(30), l.u(20));
     c.add([img, letter, val]);
     let glow = null;
@@ -6090,8 +6135,27 @@ class Battle extends Phaser.Scene {
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
-  // what the value chip prints: the points, or ♥6 on a dew tile
-  tileChip(ch, tier) { return tier === 3 ? SS_DEW_CHIP() : this.tileVal(ch, tier); }
+  // what a held sigil adds to this letter (0 when none apply)
+  sigilLetterAdd(ch) { return ssSigilLetterAdd(this.run.sigils, ch); }
+  // what the value chip prints: the TRUE points the cast will pay — letter +
+  // tier + held-sigil letter bonuses — or ♥6 on a dew tile (the heal is that
+  // tile's worth; its letter still scores through wordDamage)
+  tileChip(ch, tier) { return tier === 3 ? SS_DEW_CHIP() : this.tileVal(ch, tier) + this.sigilLetterAdd(ch); }
+  // the chip's texture: a sigil-raised letter prints warmer and wears the spark
+  chipKey(ch, tier) {
+    if (tier !== 3 && this.sigilLetterAdd(ch) > 0) return ssGlyphVal(this, this.tileChip(ch, tier), SS_BUFF_VINK[tier], true);
+    return ssGlyphVal(this, this.tileChip(ch, tier), SS_TILE_VINK[tier]);
+  }
+  // the held set changed mid-run (a sigil picked between fights): every
+  // standing chip repaints to the true worth — inked tiles keep their flat 0,
+  // the dew keeps its heart
+  repaintChips() {
+    const l = this.L;
+    for (const s of this.board) {
+      if (!s || !s.c.active || s.blk) continue;
+      s.val.setTexture(this.chipKey(s.ch, s.tier)).setDisplaySize(l.u(30), l.u(20));
+    }
+  }
 
   /* THE DEW (Wyatt): where the blow fell, dew gathers — one random plain
      tile (tier 0, never a forged special or an inked one) turns green after
@@ -6130,7 +6194,7 @@ class Battle extends Phaser.Scene {
     this.time.delayedCall(200, () => {
       if (!s.c.active) return;
       s.letter.setTexture(ssGlyph(this, s.ch, SS_TILE_INK[3])).setDisplaySize(l.u(64), l.u(48));
-      s.val.setTexture(ssGlyphVal(this, SS_DEW_CHIP(), SS_TILE_VINK[3])).setDisplaySize(l.u(30), l.u(20));
+      s.val.setTexture(this.chipKey(s.ch, 3)).setDisplaySize(l.u(30), l.u(20));
     });
     window.__ssdew = { i, ch: s.ch, fight: this.run.fightIdx, t: Date.now() };   // verification beacon
     return i;
@@ -6175,7 +6239,7 @@ class Battle extends Phaser.Scene {
       this.time.delayedCall(280, () => {
         if (!s.c.active) return;
         s.letter.setTexture(ssGlyph(this, s.ch, SS_TILE_INK[0])).setDisplaySize(l.u(64), l.u(48));
-        s.val.setTexture(ssGlyphVal(this, this.tileVal(s.ch, 0), SS_TILE_VINK[0])).setDisplaySize(l.u(30), l.u(20));
+        s.val.setTexture(this.chipKey(s.ch, 0)).setDisplaySize(l.u(30), l.u(20));
       });
       // teach it once per run — after that the drain speaks for itself
       if (!this.run.fadeShown) {
@@ -6264,8 +6328,9 @@ class Battle extends Phaser.Scene {
       });
     });
   }
-  // what the blackout weighs: points, with the dew's balm counted as the +6 it is
-  inkWorth(s) { return this.tileVal(s.ch, s.tier) + (s.tier === 3 ? DEW_HEAL : 0); }
+  // what the blackout weighs: the letter's true worth — points, held-sigil
+  // letter bonuses, and the dew's balm counted as the +6 it is
+  inkWorth(s) { return this.tileVal(s.ch, s.tier) + this.sigilLetterAdd(s.ch) + (s.tier === 3 ? DEW_HEAL : 0); }
   blackTile(i) {
     const s = this.board[i];
     if (!s || !s.c.active || s.blk) return;
@@ -6411,18 +6476,17 @@ class Battle extends Phaser.Scene {
   // ---------- damage ----------
   hasSigil(id) { return this.run.sigils.includes(id); }
   wordDamage(tiles) {
-    let base = 0, starMult = 1, vowelsN = 0, vowelsPaid = 0, letters = 0;
+    let base = 0, starMult = 1, vowelsN = 0, letters = 0;
     for (const s of tiles) {
       letters += s.ch.length;
       const c0 = s.ch[0];
       if (VOWELS.includes(c0)) vowelsN++;      // structural — LIBRA's balance sees even inked vowels
       if (s.blk) continue;                     // blackout: the letter spells, but pays NOTHING
-      base += this.tileVal(s.ch, s.tier);
+      // the chip's own arithmetic — letter + tier + held-sigil letter bonuses
+      // (River Runes, the Choir) — so the board and the cast can never differ
+      base += this.tileVal(s.ch, s.tier) + this.sigilLetterAdd(s.ch);
       if (s.tier === 2) starMult = 1.5;
-      if (VOWELS.includes(c0)) vowelsPaid++;
-      if (this.hasSigil('runes') && 'sret'.includes(c0)) base += 2;
     }
-    if (this.hasSigil('choir')) base += vowelsPaid * 2;
     let dmg = base * (LEN_MULT[Math.min(letters, 8)] || 2.3) * starMult;
     if (this.hasSigil('quill')) dmg += 4;
     if (this.hasSigil('longbow') && letters >= 6) dmg += 12;
@@ -7113,6 +7177,7 @@ class Battle extends Phaser.Scene {
         SFX.sigil();
         this.run.sigils.push(sg.id);
         if (sg.id === 'aegis') { this.run.hpMax += 20; this.run.hp = this.run.hpMax; }
+        this.repaintChips();   // a letter-bonus sigil shows on the standing board at once
         if (this.mode === 'campaign') this.saveCheckpoint();
         sparks.emitParticleAt(card.x, card.y, tier === 2 ? 26 : 12);
         this.tweens.add({ targets: card, scale: 1.05, duration: 130, yoyo: true });

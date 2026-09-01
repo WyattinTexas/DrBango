@@ -377,12 +377,21 @@ for (const _z of SS_ZODIAC) SS_ZODIAC_BY[_z.id] = _z;
      locked either pays off a habit (SCRY, long words, overkill) or asks the
      player to already know the board.
    Conditions progress across runs and a LOSS that advanced one counts exactly
-   the same — the counters are fed by play, never by winning. */
+   the same — the counters are fed by play, never by winning.
+   `lb` marks a sigil that raises single LETTERS' worth: { add, letters:'sret' }
+   and/or { add, vowels:true } (the letter's FIRST character decides, so RR
+   rides an `r` rune and Qu is q — exactly as the damage math always read it).
+   ssSigilLetterAdd (game.js) folds every held lb into one per-letter figure
+   that the tile's printed chip, the CAST preview, the blackout's weighing and
+   wordDamage all read — one place, so the board can never disagree with the
+   cast. Future sigil tiers change `add` here, never the renderer. Word-level
+   effects (Ember Quill, the longbow, doublers) are NOT lb — they belong to the
+   whole word and never print on a tile. */
 const SS_SIGILS = [
   // ---- basic ----
   { id: 'quill', icon: '❦', rarity: 0, name: 'EMBER QUILL', desc: 'Every word deals +4 damage.' },
-  { id: 'choir', icon: '♫', rarity: 0, name: 'VOWEL CHOIR', desc: 'Vowels are worth +2 each.' },
-  { id: 'runes', icon: '✣', rarity: 0, name: 'RIVER RUNES', desc: 'S, R, E and T are worth +2 each.' },
+  { id: 'choir', icon: '♫', rarity: 0, name: 'VOWEL CHOIR', desc: 'Vowels are worth +2 each.', lb: { vowels: true, add: 2 } },
+  { id: 'runes', icon: '✣', rarity: 0, name: 'RIVER RUNES', desc: 'S, R, E and T are worth +2 each.', lb: { letters: 'sret', add: 2 } },
   { id: 'salve', icon: '☾', rarity: 0, name: 'MOON SALVE', desc: 'Words of 5+ letters heal you 4.' },
   { id: 'aegis', icon: '✺', rarity: 0, name: 'AEGIS OF DAWN', desc: '+20 max health, healed now.' },
   { id: 'first', icon: '✧', rarity: 0, name: 'FIRST LIGHT', desc: 'Your first word each battle deals double.' },

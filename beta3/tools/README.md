@@ -1,6 +1,57 @@
 # beta3 dev tools
 
-Seventeen scripts, all dev-only — nothing here ships to the browser.
+Eighteen scripts, all dev-only — nothing here ships to the browser.
+
+## chip-check.mjs — the tile prints the TRUE worth (v0.62.0)
+
+Skylar's call (9/1): a sigil that raises a letter's value — River Runes
+(S/R/E/T +2), the Vowel Choir (vowels +2) — must show it ON the board's
+tiles, not only in the cast arithmetic. The game side: sigil letter bonuses
+are data-driven `lb` entries on SS_SIGILS (`{ letters:'sret', add }` /
+`{ vowels:true, add }`), folded by ONE function (`ssSigilLetterAdd`) that
+the chip (`tileChip`/`chipKey`), the CAST preview, the blackout's
+`inkWorth` and every damage loop — solo `wordDamage`, versus, the rival
+engine (fed its room's own vowels) — all read, so the printed tile can
+never drift from the cast. A raised chip prints base+add in a warmer ink
+(`SS_BUFF_VINK`; the star tile keeps its blue — warm brown muddies on blue
+glass) plus a small four-point spark baked into the glyph
+(`ssGlyphVal(scene, v, color, spark)` — the spark is part of the texture
+key, `gv-<v>-<ink>-s`). The dew chip is never raised (♥6 stands; its
+letter still scores +add through wordDamage) and an inked tile keeps its
+flat 0. `repaintChips()` runs on every sigil apply (solo pick, versus
+mid-duel pick — that board persists) and every spawn path (deal, refill,
+scry, drain, purify) is born through `chipKey`. ssPrewarmGlyphs also
+prewarms the raised variants when a standing checkpoint holds lb sigils.
+
+Self-launching like dew-check (server on :8899 if nothing serves, Chrome
+on :9458, `/tmp/cdp-chip`, `--disable-gpu`); PvE half blocks Firebase at
+the network layer, the versus half rides `?botduel` on the live sky (uid
+`test_cp`, rooms tidied after).
+
+```
+node tools/chip-check.mjs           # 57 checks, ~4 min
+node tools/chip-check.mjs --novs    # PvE only (45)
+node tools/chip-check.mjs --onlyvs  # the duel only (12)
+```
+
+Real spawnTile spawns place known racks; real taps cast; the cast total is
+asserted equal to the SUM OF THE PRINTED CHIPS × LEN_MULT (+ word-level
+adds — the quill's +4 rides the word, never a chip), and the beast's hp
+drop equals the preview. The def is proven to be the dial (lb.add=5 live →
+the chip prints base+5 → restored). A real between-fights pick (choir
+forced into the offer by holding 21 of 24) repaints the next deal; a real
+mid-duel pick (Math.random pinned for the three option draws only) repaints
+the STANDING versus board. Three raised chips are pixel-measured sharp at
+dpr 3 with crisp-check's shrink-stretch Laplacian (ratio ≥ 1.4; measured
+~2.6).
+
+Learned here: **pin Math.random for the draws you steer, never for the
+whole call** — Phaser mints texture UUIDs from Math.random, and a constant
+pin collides every generated key (the sigil cards then die inside
+`add.text` with a null-context throw twenty lines from anything that looks
+wrong). And bounds read before the scried board has LANDED crop empty
+glass — the sharpness metric reads a perfect 1.0 blur on a chip that is
+somewhere else; settle first.
 
 ## clock-check.mjs — the active-play run clock (v0.61.0)
 

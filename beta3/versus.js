@@ -1204,12 +1204,11 @@ class VsBattle extends Phaser.Scene {
       fontFamily: SERIF, fontSize: l.u(ch.length > 1 ? 30 : 36) + 'px', fontStyle: 'bold',
       color: tier === 2 ? '#1d4a66' : tier === 1 ? '#5a3c05' : '#3a3020',
     }).setOrigin(0.5);
-    // value at 15px in near-letter-dark ink — it has to read at arm's length
-    // (and tier 2 finally gets its own blue ink, matching the solo board)
-    const val = this.add.text(l.u(24), l.u(21), String(this.tileVal(ch, tier)), {
-      fontFamily: SERIF, fontSize: l.u(15) + 'px', fontStyle: 'bold',
-      color: tier === 2 ? '#215a7c' : tier === 1 ? '#5f420a' : '#655636',
-    }).setOrigin(0.5);
+    // the value chip rides the solo board's baked glyphs now (same inks, same
+    // arm's-length 15px) — so a sigil-raised letter wears the same warm spark
+    // here, and the TRUE worth is what prints (Skylar 9/1)
+    const val = this.add.image(l.u(24), l.u(21), this.chipKey(ch, tier))
+      .setDisplaySize(l.u(30), l.u(20));
     c.add([img, letter, val]);
     // a tile is tappable once it has LANDED: on its way down it crosses the
     // rival's nameplate, and a tap meant for the name would weave it instead
@@ -1221,6 +1220,24 @@ class VsBattle extends Phaser.Scene {
       onComplete: () => { if (c.active) c.setInteractive({ useHandCursor: true }); } });
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
+  // per-letter sigil bonuses — the same one data-driven place the solo board
+  // reads (ssSigilLetterAdd over SS_SIGILS `lb`), fed my held list
+  sigilLetterAdd(ch) { return ssSigilLetterAdd(this.mySigils, ch); }
+  // the chip's texture: the TRUE worth (letter + tier + held sigils); a raised
+  // letter prints warmer and wears the spark, exactly as in solo
+  chipKey(ch, tier) {
+    if (this.sigilLetterAdd(ch) > 0) return ssGlyphVal(this, this.tileVal(ch, tier) + this.sigilLetterAdd(ch), SS_BUFF_VINK[tier], true);
+    return ssGlyphVal(this, this.tileVal(ch, tier), SS_TILE_VINK[tier]);
+  }
+  // the held set changed MID-DUEL (a sigil every third cast) and this board
+  // persists — every standing chip repaints to the true worth
+  repaintChips() {
+    const l = this.L;
+    for (const s of this.board) {
+      if (!s || !s.c.active) continue;
+      s.val.setTexture(this.chipKey(s.ch, s.tier)).setDisplaySize(l.u(30), l.u(20));
+    }
+  }
   // USE IT OR LOSE IT, versus edition: same law as the solo board — a bonus
   // tile not woven into your very next cast drains to plain. Both clients run
   // the rule on their own boards, so the duel stays fair.
@@ -1248,7 +1265,7 @@ class VsBattle extends Phaser.Scene {
       this.time.delayedCall(280, () => {
         if (!s.c.active) return;
         s.letter.setColor('#3a3020');
-        s.val.setText(String(this.tileVal(s.ch, 0))).setColor('#655636');
+        s.val.setTexture(this.chipKey(s.ch, 0)).setDisplaySize(l.u(30), l.u(20));
       });
     }
     if (drained) SFX.fizzle();
@@ -1300,15 +1317,14 @@ class VsBattle extends Phaser.Scene {
   }
   hasSigil(id) { return this.mySigils.includes(id); }
   wordDamage(tiles) {
-    let base = 0, starMult = 1, vowelsN = 0, letters = 0;
+    let base = 0, starMult = 1, letters = 0;
     for (const s of tiles) {
-      base += this.tileVal(s.ch, s.tier);
+      // the chip's own arithmetic (letter + tier + held-sigil letter bonuses)
+      // — the board and the cast can never differ
+      base += this.tileVal(s.ch, s.tier) + this.sigilLetterAdd(s.ch);
       if (s.tier === 2) starMult = 1.5;
       letters += s.ch.length;
-      if (VOWELS.includes(s.ch[0])) vowelsN++;
-      if (this.hasSigil('runes') && 'sret'.includes(s.ch[0])) base += 2;
     }
-    if (this.hasSigil('choir')) base += vowelsN * 2;
     let dmg = base * (LEN_MULT[Math.min(letters, 8)] || 2.3) * starMult;
     if (this.hasSigil('quill')) dmg += 4;
     if (this.hasSigil('longbow') && letters >= 6) dmg += 12;
@@ -1459,6 +1475,7 @@ class VsBattle extends Phaser.Scene {
         if (this.state !== 'sigil') return;
         SFX.sigil();
         this.mySigils.push(sg.id);
+        this.repaintChips();   // the duel board persists — a letter bonus shows at once
         if (this.meRef) this.meRef.update({ sigils: this.mySigils }).catch(() => { });
         for (const it of items) it.destroy();
         this.state = 'pick';

@@ -106,15 +106,14 @@ const SS_RIVAL = (() => {
   function tileVal(pack, ch, tier) { return (pack.vals[ch] || pack.vals[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
   function damage(pack, tiles, sigils) {
     const has = (id) => sigils.includes(id);
-    let base = 0, starMult = 1, vowelsN = 0, letters = 0;
+    let base = 0, starMult = 1, letters = 0;
     for (const s of tiles) {
-      base += tileVal(pack, s.ch, s.tier);
+      // letter bonuses ride the shared data-driven lookup (SS_SIGILS `lb` via
+      // game.js), fed THIS room's vowels — the mage's math tracks the game's
+      base += tileVal(pack, s.ch, s.tier) + ssSigilLetterAdd(sigils, s.ch, pack.vowels);
       if (s.tier === 2) starMult = 1.5;
       letters += s.ch.length;
-      if (pack.vowels.includes(s.ch[0])) vowelsN++;
-      if (has('runes') && 'sret'.includes(s.ch[0])) base += 2;
     }
-    if (has('choir')) base += vowelsN * 2;
     let dmg = base * (LEN_M[Math.min(letters, 8)] || 2.3) * starMult;
     if (has('quill')) dmg += 4;
     if (has('longbow') && letters >= 6) dmg += 12;
