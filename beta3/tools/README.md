@@ -1,6 +1,45 @@
 # beta3 dev tools
 
-Sixteen scripts, all dev-only — nothing here ships to the browser.
+Seventeen scripts, all dev-only — nothing here ships to the browser.
+
+## clock-check.mjs — the active-play run clock (v0.61.0)
+
+Skylar's call: the run timer must count only what is actually played — a
+phone locked mid-campaign for three days must still read as minutes. The
+game side: `run.playMs` accumulates one frame at a time in `Battle.update`
+(quick, daily and campaign all share it; versus reports no time, and its
+timed duel's countdown is a synchronized wall clock on purpose), gated on
+visible + focused + a live run state, with a heartbeat that DROPS any
+single delta past `SS_CLOCK_STEP_MAX` (4s) — a frozen tab's whole absence
+lands as one giant delta on the way back, and iOS WebKit does not promise a
+`visibilitychange` on lock, so the frozen loop itself is the one honest
+signal. Focus stops the clock only on a real `blur` EVENT: headless boots
+(and some webviews) report `document.hasFocus()` false with the player
+right there, so a false read is never trusted to stop it — and a true read
+heals a missed focus event. Every stop signal (blur, hidden, pagehide,
+scene shutdown) folds the count into the standing campaign checkpoint —
+ONLY `playMs` moves, the run state keeps its fight-start semantics — and
+`saveCheckpoint` stamps `clockV: 2`; an unversioned (pre-v0.61) checkpoint
+migrates through a cap of 15 min per fight reached. `beta3.result.elapsed`
+and the end screen's mm:ss row read the same accumulator.
+
+Self-launching (server on :8899 if nothing serves, Chrome on :9457,
+`/tmp/cdp-clock`, `--disable-gpu`), Firebase blocked at the network layer
+throughout. The rig rides `Page.addScriptToEvaluateOnNewDocument`: Date.now
+skewed by `window.__skew`, `visibilityState`/`hidden` read `window.__vis`,
+`hasFocus` reads `window.__foc` — so a lock is "advance the skew an hour
+between two frames", a hide is a steered state plus the real event, and
+every listener under test is the page's own.
+
+```
+node tools/clock-check.mjs      # 34 checks, ~4 min
+```
+
+Learned here: advancing the skew while the loop RUNS lands the whole jump
+in one delta (the frozen-tab shape); chunks under the cap (+2s at a time)
+sneak past the heartbeat and prove the focus gate holds alone. And the
+end-screen row assert sets `playMs` and calls `endRun` in ONE eval — ticks
+cannot run inside a single evaluate, so the mm:ss compare is exact.
 
 ## zod-export.mjs + zod-art-check.mjs — the zodiac card art (v0.58.0)
 

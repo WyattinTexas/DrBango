@@ -245,9 +245,13 @@ ok('blackout wins when it lands: inked, tier 0, no glow', bd[target].blk && bd[t
 await ev(`${B}.beast.fx = null; 'ok'`);
 // STAR FORGE: the drop law stays length→power; green is neither upgraded nor forged
 await ev(`${B}.run.sigils = ['forge']; ${B}.beast.count = 9; ${B}.run.hp = ${B}.run.hpMax - 20; ${B}.updateBars(); 'ok'`);
-w = await findWord([], [target, inkIdx]);
+// the dewed slot must be PLAIN: earlier long casts leave forged drops on the
+// board, and dewTile refuses a special slot (that refusal is its own check
+// above) — so the word rides plain tiles only, like the two-greens cast
+const sp2 = (await board()).filter((s) => s && (s.tier !== 0 || s.blk)).map((s) => s.i);
+w = await findWord([], sp2);
 slot = await evj(`JSON.stringify(${B}.dewTile(${w[0]}))`);
-ok('green under STAR FORGE stays tier 3', (await board())[slot].tier === 3);
+ok('green under STAR FORGE stays tier 3', slot === w[0] && (await board())[slot].tier === 3, slot + ' of ' + JSON.stringify(w));
 ok('cast it with the forge', await castWord(w));
 hb = await evj(`JSON.stringify(window.__ssdewHeal)`);
 ok('forge does not upgrade the heal', hb.n === 1 && hb.healed === 6, JSON.stringify(hb));

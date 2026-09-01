@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.60.0';
+const BUILD = 'STARSPELL v0.61.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2796,6 +2796,58 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || !window.game || !game.isBooted) return;
   try { for (const sc of game.scene.getScenes(true)) ssHealBlankTexts(sc, 'wake'); } catch (e) { }
 });
+
+/* ---------- THE ACTIVE-PLAY CLOCK (v0.61.0) ----------
+   A run's clock counts only what is actually played. run.playMs accumulates
+   one frame at a time in Battle.update, gated three ways: the page must be
+   visible, it must be focused, and the run must be live (the end screen
+   never ticks; the meadow and the profile never tick because the battle
+   scene itself is stopped there). A locked phone or a switched-away app
+   freezes the RAF loop, so the whole absence lands as ONE giant delta on
+   the way back — the heartbeat drops any step past SS_CLOCK_STEP_MAX rather
+   than back-fill a gap (iOS WebKit does not promise a visibilitychange on
+   lock; the frozen loop is the one signal that never lies). Focus is
+   tracked by EVENTS, and a false document.hasFocus() is never trusted to
+   stop the clock: headless boots and some webviews report false with the
+   player right there — only a real blur event stops it, and a live true
+   read heals a missed focus event. */
+const SS_CLOCK_STEP_MAX = 4000;
+const SS_CLOCK = { foc: true, gone: false };
+function ssPageActive() {
+  if (SS_CLOCK.gone || document.visibilityState === 'hidden') return false;
+  if (!SS_CLOCK.foc && document.hasFocus()) SS_CLOCK.foc = true;
+  return SS_CLOCK.foc;
+}
+// every stop signal folds the count into the campaign checkpoint on the way
+// out — a climb finished over three nights must read as minutes, not days
+function ssClockPersist() {
+  try {
+    if (!window.game || !game.isBooted) return;
+    const b = game.scene.getScene('battle');
+    if (b && b.sys.isActive() && b.clockPersist) b.clockPersist();
+  } catch (e) { }
+}
+window.addEventListener('blur', () => { SS_CLOCK.foc = false; ssClockPersist(); });
+window.addEventListener('focus', () => { SS_CLOCK.foc = true; });
+window.addEventListener('pagehide', () => { SS_CLOCK.gone = true; ssClockPersist(); });
+window.addEventListener('pageshow', () => { SS_CLOCK.gone = false; });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') ssClockPersist(); });
+/* what a resumed checkpoint's playMs is worth: a pre-v0.61 save counted
+   wall-clock between save points (a phone parked on the map rode in whole),
+   so an unversioned value is capped at a generous active-play bound; a
+   clockV 2 save is already honest and trusted as written. The storage copy
+   wins when newer — a resize restart replays the ORIGINAL resume data, and
+   the stop-event persists above may have moved the checkpoint on since. */
+function ssClockInherit(resume) {
+  if (!resume) return 0;
+  let ms = Math.max(0, resume.playMs | 0);
+  if ((resume.clockV | 0) < 2) ms = Math.min(ms, ((resume.fightIdx | 0) + 1) * 15 * 60000);
+  try {
+    const ck = JSON.parse(localStorage.getItem('beta3.campaign'));
+    if (ck && (ck.fightIdx | 0) === (resume.fightIdx | 0) && (ck.clockV | 0) >= 2) ms = Math.max(ms, ck.playMs | 0);
+  } catch (e) { }
+  return ms;
+}
 
 // The title wordmark — live text drawn once into a canvas texture in the palette
 // of the painted set. Latin titles get the hand-set treatment (gentle arch,
@@ -5772,10 +5824,10 @@ class Battle extends Phaser.Scene {
       fightIdx: this.resume.fightIdx, hpMax: this.resume.hpMax, hp: this.resume.hp,
       sigils: this.resume.sigils || [], words: this.resume.words | 0, longest: this.resume.longest || '',
       totalDmg: this.resume.totalDmg | 0, scried: !!this.resume.scried, featherUsed: !!this.resume.featherUsed,
-      letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0, playMs: this.resume.playMs | 0,
+      letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0, playMs: ssClockInherit(this.resume),
       overkill: this.resume.overkill | 0,
     } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0, overkill: 0 };
-    this.run.startAt = Date.now();
+    this.clockLast = 0;   // the active-play heartbeat's last stamp — 0 until the first update ticks
     this.run.firstUsed = false;
     // the birth sign — campaign only, pinned for the whole climb. TAURUS's
     // endurance lands once at the run's start and rides the checkpoint's hpMax.
@@ -5797,9 +5849,40 @@ class Battle extends Phaser.Scene {
     if (DEMO) this.demoTimer = this.time.addEvent({ delay: 1400, loop: true, callback: () => this.demoStep() });
     this.input.on('pointerdown', () => SFX.ensure());
     this.game.events.on('ss-ach', this.onAch, this);
-    this.events.once('shutdown', () => this.game.events.off('ss-ach', this.onAch, this));
+    this.events.once('shutdown', () => { this.clockPersist(); this.game.events.off('ss-ach', this.onAch, this); });
   }
   onAch(def) { ssAchToast(this, def); }
+
+  /* THE ACTIVE-PLAY CLOCK's heartbeat (see ssPageActive). Every live frame
+     adds its own delta; a delta past SS_CLOCK_STEP_MAX is a frozen tab
+     waking up, not play, and is dropped — the clock resumes where it
+     stopped, never back-filling the gap. Date.now, not Phaser's delta:
+     the TimeStep smooths spikes away, which would count a freeze as play. */
+  update() {
+    const now = Date.now(), last = this.clockLast;
+    this.clockLast = now;
+    if (!last || this.state === 'end' || !this.run) return;
+    const dt = now - last;
+    if (dt > SS_CLOCK_STEP_MAX) { DIAG('clock: dropped ' + Math.round(dt / 1000) + 's gap'); return; }
+    if (dt <= 0 || !ssPageActive()) return;
+    this.run.playMs += dt;
+  }
+  /* a stop event (blur / hidden / pagehide / scene shutdown) writes the
+     honest count into the standing checkpoint. ONLY playMs moves: the run
+     state keeps its fight-start semantics, so a resumed fight still opens
+     where it began — the minutes spent on the abandoned attempt were
+     played, and they count. */
+  clockPersist() {
+    if (this.mode !== 'campaign' || this.state === 'end' || !this.run) return;
+    try {
+      const raw = localStorage.getItem('beta3.campaign');
+      if (!raw) return;
+      const ck = JSON.parse(raw);
+      if (!ck || (ck.fightIdx | 0) !== (this.run.fightIdx | 0)) return;
+      ck.playMs = this.run.playMs | 0; ck.clockV = 2;
+      localStorage.setItem('beta3.campaign', JSON.stringify(ck));
+    } catch (e) { }
+  }
 
   // Wake the sleeping meadow instead of re-creating it — the descent must
   // start on the very next frame. The dawn return (campaign win) needs the
@@ -6745,10 +6828,10 @@ class Battle extends Phaser.Scene {
       sigils: this.run.sigils, words: this.run.words, longest: this.run.longest,
       totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
       letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
-      overkill: this.run.overkill | 0,
+      overkill: this.run.overkill | 0, clockV: 2,
     }));
   }
-  runElapsed() { return (this.run.playMs | 0) + Math.max(0, Date.now() - this.run.startAt); }
+  runElapsed() { return this.run.playMs | 0; }
 
   heal(n) { this.run.hp = clamp(this.run.hp + n, 0, this.run.hpMax); this.updateBars(); }
 
