@@ -30243,6 +30243,7 @@ const MOM_HP=300;                     // one fill of the big bar — same fill a
 const MOM_W=160;                      // she is drawn at giant scale: the biggest thing ever on the carpet
 const MOM_TAGS=260;                   // the scramble purse (the sortie's 240 + a little — three rounds is a longer shift)
 const MOM_BOUNTY=60;                  // dog tags each time a fill of her bar is emptied
+const MOM_P3_TAGX=1.5;                // 0662 Card I (FM-GVT-MOMTAGS-0831; Wyatt 8/31: "…I also wanted to extend it to the fights against Mom."): ROUND 3 — the third fill of her bar — pays every dog tag ×this through momP3TagX() (the door beside iceP3TagX, 0648 D2's grammar); rounds 1-2, the two +30 wave clears and the MOM_TAGS scramble purse never move ⚑ §5 Q1/Q2
 const MOM_REACH=110;                  // she stops HERE to tidy — outside LEAK_R, so she can never hit the leak splice
 const MOM_TIDY_T=2.2;                 // seconds spent picking your toys up per pass — the big stationary window
 const MOM_TIDY_LIVES=2;               // toys tidied away per completed pass (the loss the player already knows)
@@ -39570,7 +39571,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.55';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.56';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -56935,7 +56936,8 @@ function spawnFoe(type,x,y,form,gu){
     gu:!!gu, dash:false, burrow:false, gt:Math.random()*0.8, tgt:null, crossed:false, aimT:0, burst:0, burstT:0,
     best:null, stall:0, squeeze:false, goalTag:null,   // ground-gained watch — see the squeeze backstop in update()
     boss:!!d.boss, spin:0 };
-  if(type==='mom') f.phaseN=S.momRaid? (S.wave||1) : 1;   // v1.79 raid: which fill of her bar this is — the phase arrays key off it. v2.29: a CAMPAIGN mom defaults CALM — the authored TEMPER lands in spawnGroup, never the stream's wave index (measured: wave 12 read as permanent FURIOUS)
+  if(type==='mom'){ f.phaseN=S.momRaid? (S.wave||1) : 1;   // v1.79 raid: which fill of her bar this is — the phase arrays key off it. v2.29: a CAMPAIGN mom defaults CALM — the authored TEMPER lands in spawnGroup, never the stream's wave index (measured: wave 12 read as permanent FURIOUS)
+    if(S.momRaid && f.phaseN>=3) S.floats.push({x:166,y:280,txt:'DOG TAGS ×'+MOM_P3_TAGX+'!',t:0,col:'#FFD24A'}); }   // 0662 Card I THE VISIBILITY (0648 D2's float grammar verbatim — the 0645 lesson): one gold float over the purse the frame her round-3 mom walks on (one mom per round = fires once, after the round-2 clear float has flown); the raw key resolves the castle's own string, so the shipped DOG TAGS ×{0}! row ×7 translates it — ZERO new l10n rows
   // 0313a: the MUSTER NUMBER — foe identity for the referee's 'fd' word.
   // Per-type ordinal since battle start (every sim spawns the same authored
   // stream in the same order; reset() zeroes the counters) + the wave he
@@ -60022,7 +60024,7 @@ function update(dt){
   if(S.sq && S.mode==='play' && !S.bf){
     S.tagT+=dt;
     if(S.tagT>=CAMP_TICK_EVERY){ S.tagT-=CAMP_TICK_EVERY;   // v1.40: three pours where there was one — “about three times faster income”
-      const pour=Math.round((CAMP_TICK+((S.raid && S.raid.t==='u')? EV_TICK_ADD : 0))*iceP3TagX());   // 0824-NIGHT: the ULTRA MEGA room pours 30 (the +10); everywhere else the same 20 it always was · 0648 D2: the castle's third act pours ×ICE_P3_TAGX (30; the 'u' room 45) — this float prints the poured number
+      const pour=Math.round((CAMP_TICK+((S.raid && S.raid.t==='u')? EV_TICK_ADD : 0))*iceP3TagX()*momP3TagX());   // 0824-NIGHT: the ULTRA MEGA room pours 30 (the +10); everywhere else the same 20 it always was · 0648 D2: the castle's third act pours ×ICE_P3_TAGX (30; the 'u' room 45) — this float prints the poured number · 0662: ×momP3TagX rides for the one-grammar law — her fight never pours (S.sq stays null at startMomRaid), so the mom factor is provably 1 wherever this line runs
       S.plastic+=pour;
       S.floats.push({x:166, y:280, txt:'+'+pour, t:0, col:'#FFF3C4'});
     }
@@ -61900,7 +61902,7 @@ function foeFell(f,u){
       // law, and a five-jack rug must never be a plastic faucet. Every other
       // death still drops the dog tag exactly as it always has.
       if(!(u&&u.side==='jax') && !FS_NOBLOB)
-        S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)*iceP3TagX()),t:0});   // their dog tag — your bounty (0426: a foe burned dead in ground fire pays NOBODY — fire belongs to nobody, 0404, now at the ledger's last door; a pit fall keeps its v2.71 tag) · 0648 D2: the castle's third act pays ×ICE_P3_TAGX (iceP3TagX — identity 1 everywhere else)
+        S.blobs.push({x:f.x,y:f.y-8,v:Math.round(f.def.bounty*(f.bountyMul||1)*iceP3TagX()*momP3TagX()),t:0});   // their dog tag — your bounty (0426: a foe burned dead in ground fire pays NOBODY — fire belongs to nobody, 0404, now at the ledger's last door; a pit fall keeps its v2.71 tag) · 0648 D2: the castle's third act pays ×ICE_P3_TAGX (iceP3TagX — identity 1 everywhere else) · 0662 Card I: MOM'S ROUND 3 pays ×MOM_P3_TAGX (momP3TagX — identity 1 everywhere else, the same one-door law)
       if(f.type==='crawler'){ META.stats.crawlerKills++; }
       if(f.boss){
         // a boss goes down LOUD: shake, a burst of smoke, and a victory shout
@@ -79293,6 +79295,21 @@ function raidCapSet(i,o,crush,remote){
 // tier e/m/h/g/u. Identity 1 everywhere else — croak/bone/fields, the
 // campaign and the battleground never read a changed number. ⚑ §4 Q4.
 function iceP3TagX(){ const rd=S.raid; return (rd && rd.k==='ice' && rd.cfg===S.cfg && rd.p3)? ICE_P3_TAGX : 1; }
+// ===== 0662 Card I — MOM'S THIRD ROUND PAYS THE SAME ×1.5 (FM-GVT-MOMTAGS-0831
+// §3; Wyatt 8/31: "We had one pass today that increased the dog tags in the
+// Yeti, King Yeti fight, correct? … I also wanted to extend it to the fights
+// against Mom.") — 0648's phase-3-sourced reading mirrored onto her fight's
+// own phase split: the waves ARE her three bar fills (phaseN===S.wave, the
+// v1.79 law), so ROUND 3 is her third act. The same two income seats read
+// this second door chained after iceP3TagX (one grammar: every dogtag seat
+// reads every climax door); the faucet cannot pour in her fight anyway —
+// startMomRaid leaves S.sq null by construction — so there the factor is
+// provably inert. Identity 1 everywhere else: rounds 1-2, the +30 wave
+// clears, the MOM_TAGS purse, the campaign, the battleground, every raid.
+// Her fight is solo by construction (no lobby door) — per-sim is trivial,
+// zero wire. S.momRaid is wiped at every battle door + reset(), the same
+// construction that keeps the ice door out of her room. ⚑ §5 Q1-Q4.
+function momP3TagX(){ return (S.momRaid && (S.wave|0)>=3)? MOM_P3_TAGX : 1; }
 // one bolt — the SILVER LASER from the post's little gun (0413, Wyatt 8/19:
 // "you don't see the turrets firing… use a silver laser and make it apparent
 // so the turrets visually have more presence" — this comment promised the
