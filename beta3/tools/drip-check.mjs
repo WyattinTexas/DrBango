@@ -455,11 +455,11 @@ await ev(`(() => { Object.assign(SS.prof.sig.c, { scry: 5, w6: 2, frg: 19, w7: 1
   SS.prof.words = 100; SS.prof.beasts = 15; SS.prof.wins = 1; SS.prof.bigHit = 30; SS.save(); return 'planted' })()`);
 await nav(BASE + '?fps=0', 12000);
 await until(HOME_REST);
-ok('the profile carries a door to the sky, and it reads how much of it is yours',
+ok('the profile carries a door to the sky, and — with STAR FORGE 19/25 nearly there — it says so (v0.67.0)',
   await tapUntil(195, 26, `game.scene.isActive('profile')`)
   && await ev(`(() => { const t = game.scene.getScene('profile').children.list
       .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0);
-    return !!t && t.text.indexOf('12 / 24') >= 0 })()`) === true,
+    return !!t && t.text.indexOf(SS_T('skiesNear', 12, 1)) >= 0 && t.text.indexOf('12 / 24') < 0 })()`) === true,
   await ev(`(() => { const t = game.scene.getScene('profile').children.list
     .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); return t ? t.text : 'no door' })()`));
 ok('the door opens the gallery', await tapUntil(0, 398, `!!game.scene.getScene('profile').skiesP`));
@@ -513,11 +513,11 @@ ok('and the count above the list came down with it',
   gal2.asleep.length === 11 && await ev(`(() => { const p = game.scene.getScene('profile').skiesP;
     const txt = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text' || (o.getData && o.getData('textBlock'))) txt.push(o.text); if (o.list) w(o.list); });
     w(p.c.list); return txt.includes(SS_T('slpSub', 11)) })()`) === true);
-ok('…and the door itself re-counts the sky on the way out',
+ok('…and the door itself re-counts the sky on the way out (13 awake, the forge still near)',
   await tapUntil(0, 60, `!game.scene.getScene('profile').skiesP`)
   && await ev(`(() => { const t = game.scene.getScene('profile').children.list
       .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0);
-    return !!t && t.text.indexOf('13 / 24') >= 0 })()`) === true,
+    return !!t && t.text.indexOf(SS_T('skiesNear', 13, 1)) >= 0 })()`) === true,
   await ev(`(() => { const t = game.scene.getScene('profile').children.list
     .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); return t ? t.text : 'no door' })()`));
 

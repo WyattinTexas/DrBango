@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.66.0';
+const BUILD = 'STARSPELL v0.67.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1344,6 +1344,24 @@ function ssSigilProgress(sg) {
   if (!sg || !sg.lock) return { have: 1, need: 1, done: true };
   const have = ssSigilStat(sg.lock.s);
   return { have: Math.min(have, sg.lock.n), need: sg.lock.n, done: have >= sg.lock.n };
+}
+/* How close counts as "nearly there" (v0.67.0) — the share of a lock's goal
+   past which the skies door starts talking about it. One dial. */
+const SS_SIG_NEAR = 0.6;
+// the sigils still asleep, CLOSEST TO WAKING FIRST — the order every sleeping
+// list draws in (ties keep the roster's own order; sort is stable)
+function ssSigilAsleep() {
+  return SS_SIGILS.filter((s) => s.lock && !ssSigilUnlocked(s.id))
+    .map((s) => { const pr = ssSigilProgress(s); return { s, f: pr.need ? pr.have / pr.need : 0 }; })
+    .sort((a, b) => b.f - a.f)
+    .map((e) => e.s);
+}
+// how many of those are nearly there — the door's second number
+function ssSigilNearCount() {
+  return ssSigilAsleep().filter((s) => {
+    const pr = ssSigilProgress(s);
+    return !pr.done && pr.need > 0 && pr.have / pr.need >= SS_SIG_NEAR;
+  }).length;
 }
 /* Feed a counter. Deliberately does NOT write to storage itself: every call
    site sits immediately in front of a save that was going to happen anyway (a
@@ -3379,7 +3397,8 @@ function ssSigilPanel(scene, opts) {
     if (sg) rows.push({ sg, h: RH });
   }
   if (opts.sleeping) {
-    const asleep = SS_SIGILS.filter((s) => s.lock && !ssSigilUnlocked(s.id));
+    // closest to waking first (v0.67.0) — the bar you are chasing tops the list
+    const asleep = ssSigilAsleep();
     rows.push({ head: 1, n: asleep.length, h: HDR });
     for (const sg of asleep) rows.push({ sg, sleep: 1, h: SH });
   }
@@ -4191,9 +4210,11 @@ function ssSigilRite(scene, sg, onDone) {
    in `pend` for the meadow to hold instead. A second caller arriving while a
    rite is on screen is turned away rather than allowed to stack — its ids are
    still in `pend`, so nothing is lost. Returns the milliseconds the whole
-   sequence will take. */
+   sequence will take; `onAll` fires when the LAST rite has actually closed
+   (a tap can land that well before the returned worst case — the in-run
+   waking moment resumes play off this, never off the clock). */
 const SS_RITE_MS = [5400, 6000, 6600];
-function ssSigilAnnounce(scene, ids) {
+function ssSigilAnnounce(scene, ids, onAll) {
   ids = (ids || []).filter((id) => !!SS_SIG_BY[id]);
   if (!ids.length || !scene || !scene.scene.isActive() || SS_RITE.busy) return 0;
   const q = ids.slice();
@@ -4201,7 +4222,10 @@ function ssSigilAnnounce(scene, ids) {
     if (!scene.scene.isActive()) return;
     const sg = SS_SIG_BY[q.shift()];
     if (!sg) return;
-    ssSigilRite(scene, sg, () => { if (q.length) scene.time.delayedCall(420, step); });
+    ssSigilRite(scene, sg, () => {
+      if (q.length) scene.time.delayedCall(420, step);
+      else if (onAll) onAll();
+    });
   };
   step();
   return ids.reduce((a, id) => a + SS_RITE_MS[SS_SIG_BY[id].rarity | 0] + 840, 0);
@@ -6881,7 +6905,7 @@ class Battle extends Phaser.Scene {
         if (this.beast.hpNow <= 0) return;   // board rebuilds next fight — nothing to drain
         this.expireSpecials();               // unspent bonuses fade BEFORE the new reward drops
         this.fillBoard(false);
-        this.tickEnemy(() => { this.state = 'pick'; });
+        this.tickEnemy(() => { this.state = 'pick'; this.sigilMoment(); });
       });
     });
   }
@@ -7031,12 +7055,25 @@ class Battle extends Phaser.Scene {
     } else this.heal(6);
     if (this.mode === 'campaign') this.saveCheckpoint();
     this.time.delayedCall(1150, () => {
-      if (this.run.fightIdx >= this.fights.length) this.endRun(true);
+      // the final win ends the run — endRun settles and announces for itself
+      if (this.run.fightIdx >= this.fights.length) { this.endRun(true); return; }
       // THE CADENCE (v0.65.0): only a fight the plan marks pays an offer.
       // The others keep the beat they already had — the death shatter, then
       // the campaign's star chart or the next constellation assembling.
-      else if (this.sigPlan && this.sigPlan.has(this.run.fightIdx - 1)) this.payOffer();
-      else this.afterSigil();
+      const go = () => {
+        if (this.sigPlan && this.sigPlan.has(this.run.fightIdx - 1)) this.payOffer();
+        else this.afterSigil();
+      };
+      /* THE WAKING MOMENT at the fight's own end (v0.67.0): a fell that
+         finished a condition — the beast count, the brink, the spilt
+         overkill — wakes its sigil HERE, settled BEFORE payOffer rolls, so
+         the fresh sigil is draw-eligible in the very offer this win pays.
+         The rite spends `pend`, so endRun and the meadow (both kept as the
+         safety net) can never say it twice. */
+      ssSigilCheck();
+      const pend = ssSigilPending();
+      if (pend.length && !SS_RITE.busy && ssSigilAnnounce(this, pend, go)) return;
+      go();
     });
   }
   /* What a paying fight hands over (v0.66.0). The pre-rolled intent
@@ -7056,6 +7093,23 @@ class Battle extends Phaser.Scene {
     if (opts.length) { this.showSigilPick(opts); return; }
     if (canUp) { this.showUpgradePick(); return; }
     this.afterSigil();
+  }
+  /* THE WAKING MOMENT mid-fight (v0.67.0). The drip used to settle only at
+     endRun; now a condition met DURING a run wakes its sigil at the next
+     quiet beat — the cast resolved, the strike weathered, the scry settled —
+     with the same forge ceremony, right there in the fight. Called wherever
+     the board hands the turn back (state → 'pick'), never mid-animation; the
+     beast strikes on casts, not the clock, so the held board is safe under
+     the rite. The rite spends `pend` as it shows, so the end screen and the
+     meadow can never repeat it — and a `pend` a resumed run carried in is
+     said here too, at the first cast instead of the next meadow. */
+  sigilMoment() {
+    if (this.state !== 'pick' || this.dying || SS_RITE.busy) return;
+    ssSigilCheck();
+    const pend = ssSigilPending();
+    if (!pend.length) return;
+    this.state = 'rite';
+    if (!ssSigilAnnounce(this, pend, () => { if (this.state === 'rite') this.state = 'pick'; })) this.state = 'pick';
   }
   saveCheckpoint() {
     if (this.run.fightIdx >= this.fights.length) { ssClearCampaign(); return; }
@@ -7201,10 +7255,10 @@ class Battle extends Phaser.Scene {
     if (this.hasSigil('comet') && (this.cometLeft | 0) > 0) {
       this.cometLeft--;
       this.updateScryPips(true);
-      this.time.delayedCall(300, () => { this.state = 'pick'; });
+      this.time.delayedCall(300, () => { this.state = 'pick'; this.sigilMoment(); });
       return;
     }
-    this.tickEnemy(() => { this.state = 'pick'; });
+    this.tickEnemy(() => { this.state = 'pick'; this.sigilMoment(); });
   }
 
   /* COMET TRAIL's charge, printed on the SCRY button itself: one small ☄ per
@@ -8030,8 +8084,17 @@ class Profile extends Phaser.Scene {
     const doorT = ssTxt(this, l.x(0), l.y(412), '', l.u(12.5), '#e8c86a')
       .setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(7), true, true);
     // the count is DRESSED, never baked: a rite can hand a sigil over while
-    // this scene is alive, and a door still reading 12 / 24 would be a lie
-    const dressDoor = () => doorT.setText('✦  ' + SS_T('skiesTitle') + '  ' + ssSigilOpen().length + ' / ' + SS_SIGILS.length + '  ›');
+    // this scene is alive, and a door still reading 12 / 24 would be a lie.
+    // While something sleeping is NEARLY THERE the door says so instead of
+    // the plain fraction (v0.67.0) — and the longer line fits by scaling,
+    // since German runs past the button at full size.
+    const dressDoor = () => {
+      const n = ssSigilOpen().length, m = ssSigilNearCount();
+      doorT.setText(m > 0
+        ? '✦  ' + SS_T('skiesTitle') + ' · ' + SS_T('skiesNear', n, m) + '  ›'
+        : '✦  ' + SS_T('skiesTitle') + '  ' + n + ' / ' + SS_SIGILS.length + '  ›');
+      doorT.setScale(Math.min(1, l.u(216) / Math.max(1, doorT.width)));
+    };
     dressDoor();
     const openSkies = () => {
       if (this.skiesP) return;

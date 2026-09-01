@@ -1,6 +1,66 @@
 # beta3 dev tools
 
-Twenty-two scripts, all dev-only — nothing here ships to the browser.
+Twenty-three scripts, all dev-only — nothing here ships to the browser.
+
+## wake-check.mjs — unlock progress you can track, a waking you can watch (v0.67.0)
+
+Skylar's call (9/1): "we need to have a way that they can track it. Maybe in
+your player profile screen it shows you how close you are to unlocking a
+Sigil. Also if you unlock a Sigil during a run, there should be a reward
+screen that … says whatever Sigil was just unlocked." The game side: a lock's
+condition met DURING a run now settles at the next quiet beat instead of
+waiting for endRun — `Battle.sigilMoment()` runs wherever the board hands the
+turn back (the cast resolved, the strike weathered, the scry settled: every
+`state = 'pick'` resolution site), holds the board under `state 'rite'`, and
+plays THE SAME forge ceremony (`ssSigilRite`, reused, not duplicated); a fell
+that crosses a threshold wakes at the fight's own end instead — settled in
+`beastDeath` BEFORE `payOffer` rolls, so the fresh sigil is draw-eligible in
+the very offer that win pays, with the rite between the shatter and the pick.
+The rite spends `pend` as it shows, so endRun and the meadow — both kept as
+the safety net for anything that slips through — can never say it twice, and
+a `pend` a resumed run carries in is said at its first cast. `ssSigilAnnounce`
+grew an `onAll` callback (the queue's true end — a tap can land well before
+the worst-case clock). The sleeping gallery sorts CLOSEST TO WAKING FIRST
+(`ssSigilAsleep`, ties in roster order, stable), and the profile's skies door
+reads "n awake · m nearly there" whenever something sleeping is ≥
+`SS_SIG_NEAR` (0.6) of its goal — `skiesNear` ×10 languages, the longer line
+fit by scaling (German runs past the button at full size). With nothing near,
+the plain `n / 24` stands.
+
+Self-launching like comet-check (server on :8899 if nothing serves, Chrome on
+:9466, `/tmp/cdp-wake`, `--disable-gpu`), Firebase blocked at the network
+layer throughout.
+
+```
+node tools/wake-check.mjs      # 63 checks, ~4 min
+```
+
+The laws on paper (the dial, the onAll seam, skiesNear ×10), the moment by a
+REAL tap (scry 19→20 crosses mid-run: the rite rises naming COMET TRAIL,
+state 'rite' holds the board, one rite never a stack, pend spent at show, a
+tap hands the turn back, the meter reads 19/20 then done, the woken sigil is
+the exact return of the next `rollSigilOpts`, and endRun says NOTHING again),
+the fight's-end waking (the 30th fell wakes the TOME after the shatter and
+BEFORE the pick — the offer then holds exactly the woken sigil and a real tap
+takes it), the never-mid-animation law (the whole cast resolution sampled:
+no rite shares a frame with 'anim'), two discoveries queuing in roster order
+through real dismissing taps, award idempotence, the gallery's sort drawn on
+its rows with true fractions, the door in all three dresses (near · re-counted
+after a waking · plain when nothing is close) and in Spanish.
+
+Suite fallout: drip-check's two door asserts moved to the new law (its
+planted STAR FORGE 19/25 is nearly there, so the door speaks the near form);
+everything else in the battery runs untouched — cadence/tier's campaign walks
+cross no thresholds (fells at −1 overkill, no real casts), and tier-check
+--demo now walks a natural drip-active climb through mid-run rites to the
+summit with zero exceptions.
+
+Rig lessons: `await evj(...).join()` binds the await to the JOIN of the
+promise, not the array — wrap the await; a tile must have LANDED before its
+bounds are tapped (comet-check's settle law bit again); and a dismiss helper
+must wait for THE CURRENT rite id to leave, never for `RITES === 0` — the
+next discovery follows 840ms later and an all-clear poll swallows the very
+queue assert that comes next.
 
 ## tier-check.mjs — sigil tiers and the upgrade offer (v0.66.0)
 
