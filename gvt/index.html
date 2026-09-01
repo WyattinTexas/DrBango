@@ -39491,7 +39491,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.48';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.49';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41059,7 +41059,7 @@ function coopApply(cm){
     // the sprue wobble is a real-move flourish, not a metronome. Big moves
     // (drags, real drift) keep the wobble; under 7px nobody should notice.
     const big=Math.abs(nx-u.x)>7 || Math.abs(ny-u.y)>7;
-    if(GLIDE_FACE && Math.abs(nx-u.x)>6){ u.wkX=(nx>u.x)? 1 : -1; u.wkT=S.t; u.faceX=0; }   // 0585 F4: a real jump (past the settle pulse's 6 px) faces its way — the same draw-side stamp the glide makes
+    if(GLIDE_FACE && Math.abs(nx-u.x)>6){ u.wkX=(nx>u.x)? 1 : -1; u.wkT=S.t; }   // 0585 F4: a real jump (past the settle pulse's 6 px) faces its way — the same draw-side stamp the glide makes (0652: the aim's clear retired — faceX is a sim field now, the muzzle law; the fresh stride still outranks it in the picture)
     u.x=nx; u.y=ny; if(big) u.sprue=0.2;
     u.laneY=u.y; u.wp=null; u.wade=null;           // the ally set his lane — he marches on in it
     if(u.type==='sarge'){ u.home={x:u.x,y:u.y}; u.saberState='idle'; sgDashEnd(u); cmdDashEnd(u); }   // moved post cancels a blade run AND a gap-close (v1.67; v1.73 a cancelled dash arms the hidden five)
@@ -46625,7 +46625,7 @@ function glideTick(dt){
     if(!(b.glT>0) || b.dead){ b.glOn=0; b.glT=0; L.splice(i,1); continue; }
     const k=Math.min(1, dt/b.glT);
     const gx0=b.x; b.x+=(b.glX-b.x)*k; b.y+=(b.glY-b.y)*k; b.glT-=dt;
-    if(b.coopBy && GLIDE_FACE && dt>0){ const gvx=(b.x-gx0)/dt; if(gvx>=GLIDE_FACE){ b.wkX=1; b.wkT=S.t; b.faceX=0; } else if(gvx<=-GLIDE_FACE){ b.wkX=-1; b.wkT=S.t; b.faceX=0; } }   // 0585 F4 THE GLIDE FACES ITS SLIDE: an ally's man (coopBy — a foe never carries it) faces the way the glide moves him on MY screen — draw-side fields, zero wire; bfMarch's own stamp stands down while the glide lives
+    if(b.coopBy && GLIDE_FACE && dt>0){ const gvx=(b.x-gx0)/dt; if(gvx>=GLIDE_FACE){ b.wkX=1; b.wkT=S.t; } else if(gvx<=-GLIDE_FACE){ b.wkX=-1; b.wkT=S.t; } }   // 0585 F4 THE GLIDE FACES ITS SLIDE (0652: the aim's per-screen clear retired — the muzzle law): an ally's man (coopBy — a foe never carries it) faces the way the glide moves him on MY screen — draw-side fields, zero wire; bfMarch's own stamp stands down while the glide lives
     if(b.glT<=0){ b.x=b.glX; b.y=b.glY; b.glOn=0; L.splice(i,1); }
   }
 }
@@ -47899,10 +47899,10 @@ function bfNearestEnemy(u,range){
   // muzzle plane (facing never flips — paraBand's law), so such a man must
   // not HALT him either: halted-for-the-unhittable was the statue Wyatt
   // reported. He marches on instead; every other class is untouched.
-  const cmDir=(u.type==='commando')? paraBand(u).dir : 0;
+  const cmDir=(u.type==='commando')? 1 : 0;   // 0652 Card C: he turns now — only the muzzle-plane band (|dx| ≤ CMDO_MZX+2) walks him on (the campaign arm's own law)
   for(const o of S.units){
     if(o.dead || o.side===u.side || o.dropT>0 || o.jetT>0) continue;   // airborne (v1.39): foes march on past him
-    if(cmDir && (o.x-u.x)*cmDir<=CMDO_MZX+2) continue;
+    if(cmDir && Math.abs(o.x-u.x)<=CMDO_MZX+2) continue;
     if(!bfCanTarget(u,o)) continue;   // the trench sight law (v1.57) — covers the march-halt AND the saber's acquire
     const d=Math.hypot(o.x-u.x,o.y-u.y);
     if(d<bd){ bd=d; best=o; }
@@ -48733,7 +48733,7 @@ function bfMarch(u,dt,goal){
   // and deliberately never stamps. 20 px/s clears the noise floor.
   const wkv=nx*sp*v2m, wkf=u.cmdWkF?7:(u.type==='jane'? JANE_WKF : 20);   // 0585 F3 JANE'S STAMP FLOOR (the 0517 fix shape): her 26 px/s pace against the 20 floor stamped only within ~±40° of the axis — every diagonal step and every wade stamped nothing, her face froze and THE STEP's gait gate shut while she slid (the moonwalk); at JANE_WKF 12 every step she takes stamps and the gate opens whenever she moves — every other figure keeps its floor byte-what-it-was   // 0517 THE MOONWALK: the Commander's stride (CMD.pace ×0.55 → 14 campaign / 22 BF) sat UNDER the 20 floor, so his walk never stamped and he faced east on every westward step (Wyatt: "unable to turn around… just walks backwards"); the floor drops to 7 where the pace seats mark him (u.cmdWkF — half his slowest stride, the same ±60-degree acceptance the 20 gives a 40 px/s walker; displacement never routes through this line, so the jitter guard keeps) — every other figure keeps the 20 byte-what-it-was
   if(u.coopBy && u.glOn && GLIDE_FACE){ /* 0585 F4: a co-op glide is moving this ally's man — the march still moves him between beats, it does not vote on his face (glideTick stamps the way it slides him) ⚑ Q4 */ }
-  else if(wkv>wkf){ u.wkX=1; u.wkT=S.t; u.faceX=0; } else if(wkv<-wkf){ u.wkX=-1; u.wkT=S.t; u.faceX=0; }   // 0585 F2: a walk stamp clears the aim (a walk overrides an aim)
+  else if(wkv>wkf){ u.wkX=1; u.wkT=S.t; } else if(wkv<-wkf){ u.wkX=-1; u.wkT=S.t; }   // 0585 F2's clear of the aim RETIRED 0652: faceX is a sim field now (the muzzle law) and this line stands down behind a per-screen glide — the aim expires by its own hold; the fresh stride still outranks it in the picture
   for(const rk of S.cfg.terrain.rocks){          // rocks shoulder him aside (reused kernel)
     const ax=u.x-rk.x, ay=u.y-rk.y, dd=Math.hypot(ax,ay), min=rk.r+pad;
     if(dd>0.1&&dd<min){ u.x+=ax/dd*(min-dd)*Math.min(1,dt*8); u.y+=ay/dd*(min-dd)*Math.min(1,dt*8); }
@@ -49373,11 +49373,11 @@ function campSiegeRng(u){
 function campFoeInReach(u,rng){
   // v2.90 (card 0241): the commando's behind-the-muzzle-plane skip, campaign
   // arm — same statue, same cure as bfNearestEnemy (campaign dir is always 1).
-  const cmDir=(u.type==='commando')? paraBand(u).dir : 0;
+  const cmDir=(u.type==='commando')? 1 : 0;   // 0652 Card C: the commando TURNS now (unitAim → cmdoMuzzle's dir) — a flanker behind his chair is a man in front once he turns, so the skip below keeps only the muzzle-plane BAND itself (|dx| ≤ CMDO_MZX+2 — unhittable from either face, the v2.90 statue)
   for(const f of S.foes){
     if(f.burrow||f.pendDie) continue;   // 0559 B: a sliver-held foe halts nobody
     if(f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30) continue;
-    if(cmDir && (f.x-u.x)*cmDir<=CMDO_MZX+2) continue;
+    if(cmDir && Math.abs(f.x-u.x)<=CMDO_MZX+2) continue;
     if(!bfCanTarget(u,f)) continue;   // 0129: the halt matches the trigger (the v1.48 law) — never stand staring at a man below the lip. campNearestFoe deliberately does NOT filter: you march in after them, and the moment you're in the cut it's a fight.
     if(Math.hypot(f.x-u.x,f.y-u.y)<=rng) return true;
   }
@@ -49543,7 +49543,7 @@ function campUnitStep(u,dt){
         if(!S.crew) S.crew={};
         S.crew[ck]=(S.crew[ck]|0)+1;             // the census — campSmash shares by LAST frame's finished count
         u.marching=false;
-        if(SIEGE_FACE) u.faceX=(TB.x>u.x)? 1 : -1;   // 0585 F2 A MAN SHOOTING THE BOX FACES THE BOX: a presentation field (never wire, never save) read by unitFl only when no walk stamp is fresh; every walk stamp clears it. The tracer above already assumed the box east of him — now the figure agrees (⚑ Q5: every campaign unit). ⚠ never wkX/wkT here — wkT is the gait gate
+        if(SIEGE_FACE){ u.faceX=(TB.x>u.x)? 1 : -1; u.faceTo=S.t+AIM_HOLD; }   // 0585 F2 A MAN SHOOTING THE BOX FACES THE BOX (0652: + the hold — re-stamped every siege frame, it lapses AIM_HOLD after he leaves the crate): a presentation field (never wire, never save) read by unitFl only when no walk stamp is fresh; every walk stamp clears it. The tracer above already assumed the box east of him — now the figure agrees (⚑ Q5: every campaign unit). ⚠ never wkX/wkT here — wkT is the gait gate
         if(u.type==='jane') u.jSgT=S.t;   // 0585 F1: her guns-up clock at the crate (presentation — drawJane's burst reads it against JANE_SIEGE_HOLD; the kick still rides campSmash's per-whack jkAt)
         if(u.siegeT==null) u.siegeT=0.5+Math.random()*0.9;   // shoulder the rifle, wind up
         u.siegeT-=dt;
@@ -51052,7 +51052,7 @@ function tanHit(u,fx,fy,src){
   if(u.type==='jane') u.jHitAt=S.t;   // 0434: her flinch pose reads THIS stamp, never hitT (the 4s regen resets hitT and would replay the flinch); presentation only — nothing in the sim reads it
   if(u.type==='kingyeti') u.kyHitAt=S.t;   // 0435: the king's flinch stamp — the same law as hers
   if(isCroakU(u)) u.crHitAt=S.t;   // 0436: the playable outlaw king flinches too — same law · 0465: and his son (the kingcroakhurt mold at his own width)
-  S.fx.push({k:'tracer',x1:fx-14,y1:fy-26,x2:u.x,y2:u.y-18,t:0,dur:0.1,col:'#EDD9A8'});
+  S.fx.push({k:'tracer',x1:fx+14*(src? foeFaceX(src) : -1),y1:fy-26,x2:u.x,y2:u.y-18,t:0,dur:0.1,col:'#EDD9A8'});   // 0652 Card C: the landed round's tracer leaves the side the SHOOTER faces (foeFaceX — the aim, else the native west; a bare pip bag or a null src reads native)
   // ONE ROUND, ONE SAVE (7/25): this round already rolled against the blade and
   // got through — the knockdown it earned must not roll a SECOND time. It did,
   // and that quietly squared his block: at rank 5 the deflect reads as 75% on
@@ -52296,11 +52296,11 @@ function gsnowTick(f,dt){
       const nb=Math.max(1,f.sbn||1), a0=Math.atan2(f.gsDir.y,f.gsDir.x);
       for(let bi=0;bi<nb;bi++){
         const aa=a0+(bi-(nb-1)/2)*SB_FAN;
-        (S.gboul||(S.gboul=[])).push({ x:f.x-36, y:f.y-10, dx:Math.cos(aa), dy:Math.sin(aa),
+        (S.gboul||(S.gboul=[])).push({ x:f.x+36*foeFaceX(f), y:f.y-10, dx:Math.cos(aa), dy:Math.sin(aa),   // 0652: the mitt on the side he faces
           run:sb.range, spd:sb.spd, r:(f.def.boulder? sb.r : 13), rMax:sb.r, rot:0, hit:{},
           rock:(f.def.boulder?1:0), pits:(f.def.boulder?1:0), src:f, rng0:sb.range });   // 0318: the thrower + the return budget — the caught-ball reflect reads both
       }
-      S.fx.push({k:'ring',x:f.x-30,y:f.y-16,r:5,R:26,t:0,dur:0.24,col:(f.def.boulder?'#B8A888':'#FFFFFF')});
+      S.fx.push({k:'ring',x:f.x+30*foeFaceX(f),y:f.y-16,r:5,R:26,t:0,dur:0.24,col:(f.def.boulder?'#B8A888':'#FFFFFF')});
       bfSfx(SFX.thock, f.x, f.y);
     }
     return;
@@ -52308,7 +52308,7 @@ function gsnowTick(f,dt){
   if(f.shot>=f.def.fireCd*tkSlowMul(f)+(f.cdAdd||0)){   // 0574 THE ULTRA MEGA TUNE II: + the per-foe cdAdd (the 'u' room's Sergeant Snowman: 4.5 → 10.5 s between volleys; every unstamped thrower reads +0 — byte-behaviour); the statue re-ask below untouched
     const m=tanPick(f);
     if(m){ const dx=m.x-f.x, dy=m.y-f.y, d=Math.hypot(dx,dy)||1;
-      f.gsDir={x:dx/d,y:dy/d}; f.gsWind=sb.wind; }
+      f.gsDir={x:dx/d,y:dy/d}; f.gsWind=sb.wind; foeAim(f,m); }   // 0652: the wind-up turns him
     else f.shot=f.def.fireCd*0.7;   // everyone under the arm — the statue stands (D4)
   }
 }
@@ -53352,12 +53352,12 @@ function cannonTick(f,dt){
   if(f.gsWind>0){ f.gsWind-=dt;
     if(f.gsWind<=0){ f.gsWind=0; f.shot=0; const m=f.ctAim;
       if(m && !m.dead){ const d=Math.hypot(m.x-f.x,m.y-f.y)||1;
-        S.shots.push({k:'lob',x:f.x-30,y:f.y-26,tx:m.x,ty:m.y,t:0,dur:Math.min(1.4,Math.max(0.6,d/cb.spd)),dmg:0,splash:cb.splashR,foe:true,src:f,cot:1,r:cb.r});
-        f.kickT=0.25; bfSfx(SFX.thock,f.x,f.y); S.fx.push({k:'ring',x:f.x-30,y:f.y-16,r:5,R:26,t:0,dur:0.24,col:'#ffffff'}); tdLog(f,'pop',[Math.round(m.x),Math.round(m.y)]); } }
+        S.shots.push({k:'lob',x:f.x+30*foeFaceX(f),y:f.y-26,tx:m.x,ty:m.y,t:0,dur:Math.min(1.4,Math.max(0.6,d/cb.spd)),dmg:0,splash:cb.splashR,foe:true,src:f,cot:1,r:cb.r});   // 0652: the muzzle on the side it faces
+        f.kickT=0.25; bfSfx(SFX.thock,f.x,f.y); S.fx.push({k:'ring',x:f.x+30*foeFaceX(f),y:f.y-16,r:5,R:26,t:0,dur:0.24,col:'#ffffff'}); tdLog(f,'pop',[Math.round(m.x),Math.round(m.y)]); } }
     return; }
   if(f.shot>=f.def.fireCd*(f.fireAura||1)*tkSlowMul(f)){
     const m=tanPick(f);
-    if(m){ f.ctAim=m; f.gsWind=cb.wind; tdLog(f,'wind',[Math.round(m.x),Math.round(m.y)]); }
+    if(m){ f.ctAim=m; f.gsWind=cb.wind; foeAim(f,m); tdLog(f,'wind',[Math.round(m.x),Math.round(m.y)]); }   // 0652: the crew wheel the piece to face its man
     else f.shot=f.def.fireCd*0.7;   // everyone under the arm — the statue stands (the tube law)
   }
 }
@@ -53535,7 +53535,7 @@ function kbTrample(f){   // THE TRAMPLE (D3): the jeep's law foe-side — a man 
 function kbUnhorse(f,u){   // LIFE ONE ENDS (D4): the rocker keels (the 0.8 s snap — the empty charger's own fx), THE KING STANDS ALONE + the horn, the fields' second pyramid; he rises on foot with the SECOND full bar (hp back to hpMax on the same row — one bar, never a sum)
   f.gnFoot=1; f.kbLife=2; f.hp=f.hpMax; f.gnSt='snap'; f.gnT=0.8; f.tdFeet=1; f.kbWay=null; f.kbRest=0; f.kbMv=0; f.pounceState='idle'; f.pounceTarget=null; f.hopZ=0;
   const D2=teddyDef(f); delete D2.sprint;
-  S.fx.push({k:'tdie',kind:'rocker',x:f.x,y:f.y,w:f.def.w,t:0,dur:2.0,flip:!!wkBack(f,-1)}); S.fx.push({k:'ring',x:f.x,y:f.y-20,r:8,R:60,t:0,dur:0.45,col:'#ffffff'});
+  S.fx.push({k:'tdie',kind:'rocker',x:f.x,y:f.y,w:f.def.w,t:0,dur:2.0,flip:foeFl(f)}); S.fx.push({k:'ring',x:f.x,y:f.y-20,r:8,R:60,t:0,dur:0.45,col:'#ffffff'});
   bfSfx(SFX.snap,f.x,f.y); S.shake=Math.max(S.shake,0.35); commSayAs(bearSpeaker(),'EN GARDE!',{rank:3,hz:KB_HZ,hold:3.5}); SFX.horn();   // 0639 EN GARDE! (D3; Wyatt: "Once off his steed he should say 'en garde'"): KING BEAR SPEAKS from the top-left window (rank 3 — the king's seat) — THE KING STANDS ALONE's card retired with its rows
   f.retFloor=(KB_FLOOR>0)? KB_FLOOR : null; f.kbFootT=0; f.kbLungeN=0; f.kbWallN=0; f.kbWallCd=null; f.kbGate2=0; f.cmdWallT=0;   // 0639 D1b: life two's floor goes up at the keel (kbActs2 lifts it: a lunge + a wave + a wall, or the valve); the ground counters
   if(u && !u.side) f.lastHitU=u;
@@ -53730,7 +53730,7 @@ function teddyWorld(dt){   // OUTSIDE the foes loop (the splice law): the pats' 
 function teddyDie(f){   // foeFell's seat: the plastic toy's tip-and-melt (pushed one line up) becomes a plush's own beat (the tdie fx) — the deflate / the timber / the poof
   S.fx.pop();
   const DUR={tsnugg:1.2,tcub:0.9,tpara:(f.paraSt==='drop'?0.7:1.0),tgruffle:1.4,twallow:1.4,tbuttons:1.0,tguard:0.9,troyal:0.9,tcannon:0.9,tcaptain:1.6,tbrig:1.6,tgen:1.6,tduke:1.6,bearnaparte:2.6}[f.type]||1.0;
-  S.fx.push({k:'tdie',kind:f.type,x:f.x,y:f.y,w:f.def.w,t:0,dur:DUR,flip:!!wkBack(f,-1),alt:(f.paraSt==='drop'? Math.max(0,f.paraT/f.def.drop.t) : 0),lead:f.lead|0,foot:f.gnFoot|0,slip:f.slip|0,
+  S.fx.push({k:'tdie',kind:f.type,x:f.x,y:f.y,w:f.def.w,t:0,dur:DUR,flip:foeFl(f),alt:(f.paraSt==='drop'? Math.max(0,f.paraT/f.def.drop.t) : 0),lead:f.lead|0,foot:f.gnFoot|0,slip:f.slip|0,
     awake:(f.tbSt&&f.tbSt!=='dormant'&&f.tbSt!=='slump')?1:0, wave:(f.waveT>0)?1:0, mounted:(TEDDY_GEN[f.type]&&f.type!=='tcaptain'&&!f.gnFoot)?1:0, bear:(f.type==='tguard'&&fieldsRaid())?1:0});   // 0526: the fields' guard dies in his bearskin
   if(f.type==='twallow') S.shake=Math.max(S.shake,0.6);
   if(f.type==='bearnaparte'){ S.tdPat={x:f.x,y:f.y,t:0}; let n=0; commSayAs(bearSpeaker(),'WELL FOUGHT, SOLDIER.',{rank:3,hz:KB_HZ,hold:4});   // 0639 D3: the topple's line in his window (the pats' 2.6 s carry it; commClear at the verdict takes it down)
@@ -54264,10 +54264,10 @@ function tanShoot(f){
   // pays nobody: their monster, their bullet, no dog tag either way.
   const yp=tanYetiPick(f);
   if(yp && (!best || yp.d<Math.hypot(best.x-f.x,best.y-f.y))){
-    const g=yp.g;
+    const g=yp.g; foeAim(f,g); const fz9=foeFaceX(f);   // 0652: the neutral monster turns him too
     (f.type==='tanmg'?SFX.mg:f.type==='tansniper'?SFX.crack:SFX.tpew)();
     if(f.type==='tanmg') f.mgRootT=MG_ROOT;
-    S.fx.push({k:'tracer',x1:f.x-14,y1:f.y-26,x2:g.x,y2:g.y-40,t:0,dur:0.1,col:'#EDD9A8'});
+    S.fx.push({k:'tracer',x1:f.x+14*fz9,y1:f.y-26,x2:g.x,y2:g.y-40,t:0,dur:0.1,col:'#EDD9A8'});
     S.fx.push({k:'ring',x:g.x,y:g.y-40,r:4,R:16,t:0,dur:0.16,col:'#FFD9D9'});
     g.hp-=YETI_TAN_DMG;
     if(g.hp<=0 && !g.yetiSlain){
@@ -54276,7 +54276,8 @@ function tanShoot(f){
     }
     return true;
   }
-  if(best){ ((f.def.slow||f.def.globHex)?SFX.blip:f.type==='tanmg'?SFX.mg:(f.type==='tansniper'||f.type==='mcath'||f.type==='mcathx'||f.type==='wladyx'||f.type==='larson')?SFX.crack:(f.type==='bbill'||f.type==='bbillx')?SFX.wshot:SFX.tpew)();   // 0478: the madam and her ladies CRACK like the sniper; Bill's revolver speaks the OutLaw slug's report (0500: the park twins too)   // 0274a: a snowball leaves on a soft boop, not a rifle pew (0278a: the slow cells are the thrower's licence now)
+  if(best){ foeAim(f,best); const fz9=foeFaceX(f), mx9=f.x+14*fz9;   // 0652 Card C: the pull turns him; the round leaves the side he faces (mx9 — the wild eye, the duck line and every tracer read it)
+    ((f.def.slow||f.def.globHex)?SFX.blip:f.type==='tanmg'?SFX.mg:(f.type==='tansniper'||f.type==='mcath'||f.type==='mcathx'||f.type==='wladyx'||f.type==='larson')?SFX.crack:(f.type==='bbill'||f.type==='bbillx')?SFX.wshot:SFX.tpew)();   // 0478: the madam and her ladies CRACK like the sniper; Bill's revolver speaks the OutLaw slug's report (0500: the park twins too)   // 0274a: a snowball leaves on a soft boop, not a rifle pew (0278a: the slow cells are the thrower's licence now)
     if(f.type==='tanmg') f.mgRootT=MG_ROOT;   // v2.44 THE ROOTED BURST, tan side — the aimed round AND both chased rounds land here, so the burst re-arms the root round by round; the movement freeze reads it beside aimT
     // 0355 THE WILD-AIM LAW (Wyatt: "the Outlaws have 40% less accuracy, so
     // they will be shooting slightly to the left and right of the target at
@@ -54295,7 +54296,7 @@ function tanShoot(f){
     // still post-hoc presentation: the pull is spent either way.
     if(f.def.wild) f.wN=(f.wN|0)+1;
     if(f.def.wild && wildRoll(f,0)<f.def.wild){
-      const wx1=f.x-14, wy1=f.y-26, wdx=best.x-wx1, wdy=(best.y-18)-wy1, wd=Math.hypot(wdx,wdy)||1;
+      const wx1=mx9, wy1=f.y-26, wdx=best.x-wx1, wdy=(best.y-18)-wy1, wd=Math.hypot(wdx,wdy)||1;
       const ws=(f.wSide=!f.wSide)?1:-1, woff=(16+wildRoll(f,1)*26)*ws, wov=(wildRoll(f,2)-0.5)*28;
       const wx=best.x+(-wdy/wd)*woff+(wdx/wd)*wov, wy=best.y-18+(wdx/wd)*woff+(wdy/wd)*wov;
       S.fx.push({k:'tracer',x1:wx1,y1:wy1,x2:wx,y2:wy,t:0,dur:0.1,col:'#EDD9A8'});
@@ -54310,11 +54311,11 @@ function tanShoot(f){
     // the straight tracer (k:'snowb' — tanmortar's arc precedent at small
     // scale), whether it lands or dies on the duck. Post-hoc presentation
     // like every tracer in the game — the hit itself stays hitscan.
-    const dkb=duckBlock(f.x-14,f.y-26,best.x,best.y-18);
-    if(dkb){ if(f.def.slow||f.def.globHex) S.fx.push({k:'snowb',x1:f.x-14,y1:f.y-26,x2:dkb.x,y2:dkb.y,t:0,dur:0.16,col:f.def.globHex,rim:f.def.globRim});   // 0523: a globHex row without a slow (the teddies' cork and pebble) lobs the same picture
-      else S.fx.push({k:'tracer',x1:f.x-14,y1:f.y-26,x2:dkb.x,y2:dkb.y,t:0,dur:0.1,col:'#EDD9A8'});
+    const dkb=duckBlock(mx9,f.y-26,best.x,best.y-18);
+    if(dkb){ if(f.def.slow||f.def.globHex) S.fx.push({k:'snowb',x1:mx9,y1:f.y-26,x2:dkb.x,y2:dkb.y,t:0,dur:0.16,col:f.def.globHex,rim:f.def.globRim});   // 0523: a globHex row without a slow (the teddies' cork and pebble) lobs the same picture
+      else S.fx.push({k:'tracer',x1:mx9,y1:f.y-26,x2:dkb.x,y2:dkb.y,t:0,dur:0.1,col:'#EDD9A8'});
       duckBlockFx(dkb); }
-    else { if(f.def.slow||f.def.globHex) S.fx.push({k:'snowb',x1:f.x-14,y1:f.y-26,x2:best.x,y2:best.y-20,t:0,dur:0.22,col:f.def.globHex,rim:f.def.globRim});   // 0523: the cork / the pebble on the snowb arc
+    else { if(f.def.slow||f.def.globHex) S.fx.push({k:'snowb',x1:mx9,y1:f.y-26,x2:best.x,y2:best.y-20,t:0,dur:0.22,col:f.def.globHex,rim:f.def.globRim});   // 0523: the cork / the pebble on the snowb arc
       if(f.def.pips) f.pipN=f.def.pips;   // 0384 THE LADIES' HEAVY ROUNDS — a def-carried pip count through the king's own pipN grammar (wlady 2 since 0384; 0475: tansniper + wsniper 3 — Wyatt's "three times more damage", the seat's second tenant; every other row is byte-what-it-was; misses and duck-blocked rounds never reach this line)
       if(f.def.scouter){ f.lrN=(f.lrN|0)+1; if(f.lrN%f.def.scouter.n===0) f.pipN=f.def.scouter.pips; }   // 0594 THE SCOUTER on a foe's row (COMMANDER LARSON): his every FOURTH landed round is "the critical" — 4 pips for 3 (a foe has no crit roll; +40% crit damage as a knock count); a wild or duck-blocked round never reaches this line, so the count is of LANDED rounds
       tanHit(best,f.x,f.y,f);   // v2.51: the shooter rides along — the MG's rifle-resist reads it (0274a: and the chip seam)
@@ -54331,7 +54332,7 @@ function tanShoot(f){
 // the shotgun sarge: the green cone math verbatim (aimed pellet fire at the
 // nearest cluster — explicitly not splash, the v1.57 law), one tanHit each
 function tanCone(f){
-  const best=tanPick(f); if(!best) return false;
+  const best=tanPick(f); if(!best) return false; foeAim(f,best); const fz9=foeFaceX(f);   // 0652: the pull turns him
   const ang=Math.atan2(best.y-f.y,best.x-f.x), R=frng(f);
   SFX.thock(); SFX.tpew();
   for(const u of S.units){
@@ -54342,10 +54343,10 @@ function tanCone(f){
     let da=Math.abs(Math.atan2(u.y-f.y,u.x-f.x)-ang); if(da>Math.PI) da=2*Math.PI-da;
     // v2.28: each pellet is aimed fire (the green cone's own v2.15 law,
     // mirrored) — the pellet at the duck dies on him, the pellet beside sails
-    if(da<=f.def.cone){ const dkb=duckBlock(f.x-14,f.y-26,u.x,u.y-18);
+    if(da<=f.def.cone){ const dkb=duckBlock(f.x+14*fz9,f.y-26,u.x,u.y-18);
       if(dkb) duckBlockFx(dkb); else tanHit(u,f.x,f.y,f); }
   }
-  const mzx=f.x-30, mzy=f.y-30;
+  const mzx=f.x+30*fz9, mzy=f.y-30;
   S.fx.push({k:'cone',x:mzx,y:mzy,ang,spread:f.def.cone,rng:R,t:0,dur:0.16});
   S.fx.push({k:'flash',x:mzx,y:mzy,ang,R:reducedMotion()?10:15,lw:reducedMotion()?2:3,t:0,dur:0.12});
   return true;
@@ -54462,7 +54463,7 @@ function breathBurn(b){
   }
 }
 function breathFire(f,aimM){
-  f.brFc=(aimM.x>f.x)?1:-1;                      // R4 authoritative at the fire: the jaw + the figure mirror together
+  f.brFc=(aimM.x>f.x)?1:-1; foeAim(f,aimM);      // R4 authoritative at the fire: the jaw + the figure mirror together (0652: + the shared seat, so he stays turned through his drum after the jet)
   const g=breathGeo(f), dur=f.boss?0.7:0.65;
   const ang=Math.atan2(aimM.y-g.y,aimM.x-g.x);   // the centerline runs JAW→man — picture, glow and burn share it
   SFX.jet();
@@ -54482,7 +54483,7 @@ function breathFire(f,aimM){
 // this same proven hitscan. tanflame carries no cone — byte-what-he-was.
 function tanMulti(f){
   const cone=f.def.cone*(f.coneX||1), mlt=(f.def.multi||0)*(f.multiX||1); let ang=0;   // 0357 MEGA REX: conex/multix spawn stamps (×1 unstamped — every shipped breather reads byte-what-it-was)
-  if(cone){ const aimM=tanPick(f); if(!aimM) return false;
+  if(cone){ const aimM=tanPick(f); if(!aimM) return false; foeAim(f,aimM);   // 0652: the pull turns him (the breathers' own brFc rides beside it)
     if(!f.def.pellet) return breathFire(f,aimM);   // 0396: the fire-breathers (dilo · the king) leave the one-frame feet-hitscan — the jet is its picture now; the teddy's pellet cone and tanflame's lick below stay byte-what-they-were
     ang=Math.atan2(aimM.y-f.y,aimM.x-f.x); }
   let hits=[];
@@ -54496,14 +54497,15 @@ function tanMulti(f){
   }
   if(cone && hits.length>mlt){ hits.sort((a,b)=>Math.hypot(a.x-f.x,a.y-f.y)-Math.hypot(b.x-f.x,b.y-f.y)); hits=hits.slice(0,mlt); }   // 0357: the trim reads the stamped cap
   if(!hits.length) return false;
+  if(!cone) foeAim(f,hits[0]); const fz9=foeFaceX(f);   // 0652: the flame turns to his first man; the nozzle / the pellet cone leave the side he faces
   if(cone){
     // 0339 THE TEDDY'S SHOTGUN — a cone-carrying multi that is PELLETS,
     // never breath (the breathers rerouted above — 0396): the ≤multi trim
     // above already picked the nearest 3; the picture is tanCone's own
     // (cone sweep + muzzle flash + thock), the proven hitscan stands.
     SFX.thock(); SFX.tpew();
-    S.fx.push({k:'cone',x:f.x-14,y:f.y-26,ang,spread:f.def.cone,rng:frng(f),t:0,dur:0.16});
-    S.fx.push({k:'flash',x:f.x-14,y:f.y-26,ang,R:reducedMotion()?10:15,lw:reducedMotion()?2:3,t:0,dur:0.12});
+    S.fx.push({k:'cone',x:f.x+14*fz9,y:f.y-26,ang,spread:f.def.cone,rng:frng(f),t:0,dur:0.16});
+    S.fx.push({k:'flash',x:f.x+14*fz9,y:f.y-26,ang,R:reducedMotion()?10:15,lw:reducedMotion()?2:3,t:0,dur:0.12});
     for(const u of hits) tanHit(u,f.x,f.y,f);
     return true;
   }
@@ -54512,7 +54514,7 @@ function tanMulti(f){
     // 0261: the mirrored man breathes the mirrored lick — tanflame draws at
     // w:56 facing left, so the nozzle lands at −21.9,−20.0 by the same
     // measured-muzzle law; tanHit and its timing are byte-what-they-were.
-    S.fx.push({k:'lick',x:f.x-21.9,y:f.y-20,tx:u.x,ty:u.y-14,t:0,dur:0.28});
+    S.fx.push({k:'lick',x:f.x+21.9*fz9,y:f.y-20,tx:u.x,ty:u.y-14,t:0,dur:0.28});
     tanHit(u,f.x,f.y,f);
   });
   return true;
@@ -54521,13 +54523,13 @@ function tanMulti(f){
 // bazooka (the green 280/vx2 flight), k:'lob' for the mortar's arc — flagged
 // foe:true so the landing resolves through foeSplash below, never splash()
 function tanLaunch(f){
-  const best=tanPick(f); if(!best) return false;
+  const best=tanPick(f); if(!best) return false; foeAim(f,best);   // 0652: the pull turns him (no dice here — the two rolls below stand in their order)
   const d=f.def, a=Math.random()*6.283, r=Math.random()*(f.laid? 0 : d.scatter);   // 0595 MEN WITHOUT FEAR: a tube inside KING BEAR's circle fires LAID — the scatter zeroed (the two dice still roll: twin sims stay in step)
   const tx=Math.max(20,Math.min(W-20,best.x+Math.cos(a)*r)), ty=Math.max(20,Math.min(WORLD_H-20,best.y+Math.sin(a)*r));   // 0197: the live height (===H flat; the tan tubes never fire on a battlefield)
   bfSfx(SFX.rocket, f.x, f.y);
   // (0121: the shell remembers its battery — foeSplash's reflect check reads it)
   if(d.minRng) S.shots.push({k:'lob',x:f.x,y:f.y-30,tx,ty,t:0,dur:1.0,dmg:0,splash:d.splashR,foe:true,src:f});
-  else S.shots.push({k:'rocket',x:f.x-14,y:f.y-30,tx,ty,spd:280,dmg:0,splash:d.splashR,vx2:true,foe:true,src:f});
+  else S.shots.push({k:'rocket',x:f.x+14*foeFaceX(f),y:f.y-30,tx,ty,spd:280,dmg:0,splash:d.splashR,vx2:true,foe:true,src:f});   // 0652: the tube on the side he faces
   return true;
 }
 // ONE dispatch for every tan trigger pull — the volley clock, the aim
@@ -54704,7 +54706,7 @@ function cmdoReflLand(sh){
 // ONE seam: the beam draw, the hit math and the sidestep's line all read it.
 const CMDO_MZX=28, CMDO_MZY=42;
 function cmdoMuzzle(u){
-  const dir=paraBand(u).dir;
+  const dir=unitFaceX(u);   // 0652 Card C: the cannon's fan opens on the side he FACES (the pull's aim, else the chair — paraBand's own dir); a flanker behind him is a man in front once he turns — the sidestep and the beam read the same seat
   return { x:u.x+CMDO_MZX*dir, y:u.y-CMDO_MZY, dir };
 }
 // v2.78 (Wyatt: "There should be a slight movement with the gun when the
@@ -54715,7 +54717,7 @@ function cmdoMuzzle(u){
 function cmdoRecoil(u){
   if(u.type!=='commando' || !(u.cmdoFireT>0)) return 0;
   const k=1-u.cmdoFireT/CMDO.sweepT;
-  const dir=(S.bf&&u.side==='foe')?-1:1;
+  const dir=unitFl(u)? -1 : 1;   // 0652: the kick rides the drawn face
   return dir*(0.055-0.13*k);
 }
 // v2.56: the commando's SIDESTEP — called only when the wipe found nobody.
@@ -55312,7 +55314,7 @@ function snpFire(u,relay){
   const sw=unitSargeStats(u); if(sw.w!=='sniper') return false;
   const tg=snpTarget(u); if(!tg) return false;
   if(!relay) S.snpCd=SNIPE_CD;
-  const mzl=(S.bf&&u.side==='foe')?-1:1;   // 0393: a right-hand chair's long gun leans INTO the battle (my path: +48, byte-what-it-was)
+  unitAim(u,tg); const mzl=unitFaceX(u);   // 0393: a right-hand chair's long gun leans INTO the battle · 0652: the outlaw round turns him to its man first (the button's own pull never met the scan's stamp)
   const mzx=u.x+48*mzl, mzy=u.y-37, htx=tg.x, hty=tg.y-18, ang=Math.atan2(hty-mzy,htx-mzx);
   const RM=reducedMotion();
   bfSfx(SFX.crack, u.x, u.y); if(!RM) S.shake=Math.max(S.shake,0.3);
@@ -55704,8 +55706,8 @@ function ultBeamTarget(u){
 function ultBeamFire(u){
   if(!u || u.dead) return false;
   const sw=unitSargeStats(u); if(sw.w!=='sniper') return false;
-  const mzl=(S.bf&&u.side==='foe')?-1:1, mzx=u.x+48*mzl, mzy=u.y-37;   // the sniper's own muzzle (snpFire's seat)
-  const tg=ultBeamTarget(u);
+  const tg=ultBeamTarget(u); unitAim(u,tg);   // 0652: the overcharged round turns him to its man (no man = the chair)
+  const mzl=unitFaceX(u), mzx=u.x+48*mzl, mzy=u.y-37;   // the sniper's own muzzle (snpFire's seat)
   const ang=tg? Math.atan2((tg.y-18)-mzy, tg.x-mzx) : (mzl>0? 0 : Math.PI);   // no target = due east
   const ca=Math.cos(ang), sa=Math.sin(ang);
   const hits=[];
@@ -55926,10 +55928,10 @@ function rpStep(u,dt){
   // +18/−31, on the mzl facing law) — and buck the gun that fired (pistT /
   // pist2T, the v1.67 pair); the playable king rides his mold's two tips at
   // the unit lane's 128 (croakMz — the boss's own measure), no kick param.
-  const mzl=(S.bf&&u.side==='foe')?-1:1;
+  const mzl=unitFaceX(u);   // 0652: the irons on the side he faces
   const mz=u.rpKC? croakMz(u.x,u.y,unitW(u.type)) : [{x:u.x+17.5*mzl,y:u.y-41.5},{x:u.x+18*mzl,y:u.y-31}];
   if(u.rpSt===0){
-    if(u.rpT<=BSTX){ u.rpSt=1; u.rpWt=GAPX; u.rpWn=0; }   // 0373: the flashing cone tell RETIRED (Wyatt: "it should not show the cone") — the plant stance is the tell (0410: owner-keyed clocks; the 0.55 plant is the same for both by construction)
+    if(u.rpT<=BSTX){ u.rpSt=1; u.rpWt=GAPX; u.rpWn=0; if(!u.rpKC && aimLive(u)) u.faceTo=Math.max(u.faceTo,S.t+BRG_WAVES*BRG_GAP+AIM_HOLD); }   // 0652: the pull's turn holds through the whole channel (the king puppet has no facing — 0462b) · 0373: the flashing cone tell RETIRED (Wyatt: "it should not show the cone") — the plant stance is the tell (0410: owner-keyed clocks; the 0.55 plant is the same for both by construction)
     return;
   }
   if(u.rpT<=0 && u.rpWn<BRG_WAVES) u.rpT=0.016;   // the shelf holds till the last wave flies (the root law) — jitter never eats the finisher
@@ -56092,16 +56094,16 @@ function updateFoeLarson(f,dt){
       return; }
     f.lrBmCd=(f.lrBmCd==null? LR_BM_1ST : Math.max(0,f.lrBmCd-dt));   // D4 his own drum (the cmdT idiom): LR_BM_1ST after the walk-on, LR_BM_CD thereafter
     if(f.lrBmCd<=0 && !(f.aimT>0)){ const u9=larsonMark(f);   // the channel waits out a mid-burn rifle tell (one thing at a time); nobody legal to mark = the drum waits at 0
-      if(u9){ f.lrBmT=LR_BM_CH;
-        const mx9=f.x-20, my9=f.y-36, a9=Math.atan2((u9.y-18)-my9, u9.x-mx9);   // the ray LOCKS at channel start: his muzzle (the tell's own [20,36] seat) through the marked chest to the map edge (the 4600 grammar — the canvas clips the rest)
+      if(u9){ f.lrBmT=LR_BM_CH; foeAim(f,u9);   // 0652: the channel turns him to the marked man
+        const mx9=f.x+20*foeFaceX(f), my9=f.y-36, a9=Math.atan2((u9.y-18)-my9, u9.x-mx9);   // the ray LOCKS at channel start: his muzzle (the tell's own [20,36] seat) through the marked chest to the map edge (the 4600 grammar — the canvas clips the rest)
         f.lrBmX1=mx9; f.lrBmY1=my9; f.lrBmX2=mx9+Math.cos(a9)*4600; f.lrBmY2=my9+Math.sin(a9)*4600;
         SFX.ready(); } } }   // the channel's own arming click (the player tap's sound — the tell carries the information)
   if(!f.lastShot || f.lsDone) return;
   if(f.lsX==null){ const u=larsonMark(f);
     if(!u){ f.lsWait=(f.lsWait||0)+dt; if(f.lsWait>LR_LAST_TELL){ f.lsDone=1; f.lastShot=0; S.larsonLast=0; } return; }   // nobody to mark — the hold lapses after one tell's length
-    f.lsTgt=u; f.lsX=u.x; f.lsY=u.y-18; f.aimT=LR_LAST_TELL; return; }
+    f.lsTgt=u; f.lsX=u.x; f.lsY=u.y-18; f.aimT=LR_LAST_TELL; foeAim(f,u); return; }   // 0652: the tell faces the marked man
   f.aimT-=dt; if(f.aimT>0) return;
-  f.aimT=0; const u=f.lsTgt, mx=f.x-14, my=f.y-26;
+  f.aimT=0; const u=f.lsTgt; foeAim(f,{x:f.lsX}); const mx=f.x+14*foeFaceX(f), my=f.y-26;   // 0652: the round leaves the side he faces (the marked point's side)
   const hit=!!(u && !u.dead && S.units.indexOf(u)>=0 && !(u.jetT>0) && !u.falling && Math.hypot(u.x-f.lsX,(u.y-18)-f.lsY)<=LR_LAST_R);
   SFX.crack(); S.shake=Math.max(S.shake,0.3);
   if(hit){ const dkb=duckBlock(mx,my,u.x,u.y-18);
@@ -56161,8 +56163,8 @@ function larsonBeamFire(f){
 // GUN's throw (ggShove — GG_PUSH along the very ray over GG_T, the boulder bonk GG_WALL_DMG; a pit is the shipped law). Never on the
 // battleground (tanFire's arm is !S.bf; the BF has its own enemy commandos). Zero dice — twin sims agree. =====
 function tanBeam(f){
-  const best=tanPick(f); if(!best) return false;
-  const M={ x:f.x-CMDO_MZX, y:f.y-CMDO_MZY }, rng=frng(f);
+  const best=tanPick(f); if(!best) return false; foeAim(f,best);   // 0652: the pull turns him
+  const M={ x:f.x+CMDO_MZX*foeFaceX(f), y:f.y-CMDO_MZY }, rng=frng(f);   // 0652: the cannon on the side he faces
   const ang=Math.atan2((best.y-18)-M.y, best.x-M.x), ang0=ang-CMDO.a0, ang1=ang-CMDO.a1;   // the wipe's world angles: 25° below his line → 45° above it
   const hits=[];
   for(const u of S.units){
@@ -60411,7 +60413,7 @@ function update(dt){
       // v3.61 (0307 WALK-FLIP): the frame's NET vx stamps the walk facing —
       // 20 px/s clears steering jitter and rock nudges; halted-to-shoot
       // frames zero vx above, so the stamp ages out (WKF_HOLD) and the
-      // strike faces the army side. Presentation only, like mvSm/trotD.
+      // strike faces the army side (0652: the AIM — foeAim/foeFl). Presentation only, like mvSm/trotD.
       if(f.vx>20){ f.wkX=1; f.wkT=S.t; } else if(f.vx<-20){ f.wkX=-1; f.wkT=S.t; } }
 
     if(f.retreat){ if(f.x>W+80) S.foes.splice(i,1); continue; }   // 0594 THE ROUT (§2 D6): the survivors of his fall leave the carpet at W+80 — no dog tag, no leak, no trigger, no ram, no boss arm on the way (the loop walks downward — the splice is safe; the greens' fire loops already refuse x>W-10, so a man past the rim is beyond reach)
@@ -60448,6 +60450,7 @@ function update(dt){
         if(f.shot>=rdy && !(f.def.openFire && trenchAt(f.x,f.y)) && (tanPick(f) || (!f.def.splashR&&!f.def.cone&&!f.def.multi&&tanYetiPick(f)))){   // 0478: an `openFire` row never pulls the trigger from inside a trench band — she keeps walking through the cut and halts on open ground (MADAM CATHRINE; the plan's D9)   // halt... aim... (tanPick honours a tube's dead zone; v2.58: an aimed-round man also halts for the YETI — without this the gate never opens on a green-empty flank and he eats the column unanswered)
           f.aimT = panic? SABER_PANIC_AIM : (f.def.aim||0.55);   // 0117: the sniper's long present-arms is his fairness contract
           if(f.def.multi&&f.def.cone&&!f.def.pellet){ const bm9=tanPick(f); f.brFc=(bm9&&bm9.x>f.x)?1:-1; }   // 0396 R4: the breather turns to face his man BEFORE he inhales (re-stamped at the fire from the real aim man)
+          { const am9=tanPick(f); if(am9) foeAim(f,am9); }   // 0652 Card C TURN TO FACE: the halt turns him to the man he is about to shoot — the 0396 breather turn generalized to EVERY fireCd row (the wind-up faces its man; the pull re-stamps from the real aim man)
         }
       }
     }
@@ -60458,7 +60461,7 @@ function update(dt){
         f.shot=0;
         let best=null,bd=1e9;
         for(const u of S.units){ if(u.dead||u.jetT>0) continue; if(!bfCanTarget(f,u)) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<130&&d<bd){bd=d;best=u;} }   // 0129: a pistol potshot respects the lip like any rifle
-        if(best){
+        if(best){ foeAim(f,best);   // 0652: the potshot turns him
           // v2.28: a pistol potshot is flat fire — the duck eats it like any
           // rifle round, and the tracer dies where the round actually did
           const dkb=duckBlock(f.x,f.y-30,best.x,best.y-20);
@@ -60492,8 +60495,8 @@ function update(dt){
       if(f.shot>=8*tkSlowMul(f)/(v2? T2_RATE_MUL : 1)){
         f.shot=0;
         const cands=S.units.filter(u=>!u.dead&&!(u.jetT>0)&&bfCanTarget(f,u)&&Math.hypot(u.x-f.x,u.y-f.y)<TANK_RNG);   // 0129: the cannon fires flat — a trench man is below it (the BF tank has never been in TRENCH_EXEMPT either)
-        if(cands.length){ const u=cands[(Math.random()*cands.length)|0];
-          const dkb=duckBlock(f.x-42,f.y-44,u.x,u.y-18);
+        if(cands.length){ const u=cands[(Math.random()*cands.length)|0]; foeAim(f,u);   // 0652: the hull turns (no turret grammar on this mold — ⚑ Q3)
+          const dkb=duckBlock(f.x+42*foeFaceX(f),f.y-44,u.x,u.y-18);
           if(dkb){ SFX.boom(); duckBlockFx(dkb); }
           else { SFX.boom(); S.shake=0.5;
             S.fx.push({k:'ring',x:u.x,y:u.y-6,r:8,R:aoe,t:0,dur:0.34,col:'rgba(255,214,138,0.8)'});
@@ -60555,7 +60558,7 @@ function update(dt){
             // unreflectable — Wyatt named snowballs.
             const C0=YETI_SHOOTERS[f.type]? cmdoIntercept(best.x,best.y,0,26) : null;
             if(f.type==='kingyeti') f.kyThAt=S.t;   // 0435: the hurl stamp — the release pose lands its mitt on this tracer's own (-41.8,-57.6) seat
-            SFX.tpew(); S.fx.push({k:'tracer',x1:f.x-41.8,y1:f.y-57.6,x2:best.x,y2:best.y-18,t:0,dur:0.12,col:'#EDD9A8'});
+            foeAim(f,best); SFX.tpew(); S.fx.push({k:'tracer',x1:f.x+41.8*foeFaceX(f),y1:f.y-57.6,x2:best.x,y2:best.y-18,t:0,dur:0.12,col:'#EDD9A8'});   // 0652: the big shot turns him; the barrel on the side he faces
             if(C0){
               S.fx.push({k:'snowb',x1:C0.x,y1:C0.y-26,x2:f.x,y2:f.y-30,t:0,dur:0.3});
               S.fx.push({k:'ring',x:f.x,y:f.y-26,r:6,R:30,t:0,dur:0.3,col:'#EAF3FA'});
@@ -60852,9 +60855,10 @@ function update(dt){
           const d=Math.hypot(f.x-u.x,f.y-u.y); if(d>sw.rng*rb*popX9*smkX9) continue; const db=PRIO(u,f); if(db<bs){bs=db;best=f;} }
         if(!best) continue;
         u.cd=tkSlowMul(u)*snowSlowMul(u)/(sw.rate*ra.rate*emgRateMul(u)*inspRateMul(u)*jv2RateMul(u)*lzRateMul(u)); const vm=(u.vet?1.5:1)*lzDmgMul(u)*gsDmgMul(u);   // v2.36: blue beam on the clock, red beam on the round · v3.11: TEAL's concussion too · 0278a: the snow-slow stack stretches the same drum · 0390: the guardian window rides the same round (x1.20 inside MY window, shotgun only) · 0606 INSPIRE: the drum x2 while his window burns
+        unitAim(u,best);   // 0652 Card C TURN TO FACE: the pull turns him toward his man (the Sarge weapons' scan — the shotgun · the sniper · the rifle · the SMG · the flamethrower · the bazooka); the picture (unitFl) and the muzzle (wdir) follow
         const cm=rollCrit(u)?critMult(u):1; if(cm>1) critFx(best);   // Sarge crits with whatever he's holding — one roll per trigger pull
         // v1.50: a foe-side commander faces left, so his muzzle fx anchor left too
-        const wdir=(S.bf&&u.side==='foe')?-1:1;
+        const wdir=unitFaceX(u);   // 0652 Card C: the AIM's side (the sim's own sign — the cone's duck line and the sniper's tracer both leave it), else the chair as ever
         if(sw.w==='shotgun'){
           // a wide CONE aimed at the nearest cluster — flattens everyone inside it
           bfSfx(SFX.thock, u.x, u.y); bfSfx(SFX.pew, u.x, u.y);
@@ -61071,6 +61075,7 @@ function update(dt){
     // factor on the cooldown, so it stacks with the aura and every mod cleanly
     // (v2.36: and the blue beam is one more factor again, same law)
     u.cd=tkSlowMul(u)*snowSlowMul(u)*ultHvSlow(u)/(rate*bakRateMul(u)*t2RateMul(u)*ra.rate*sp.rate*emgRateMul(u)*inspRateMul(u)*jv2RateMul(u)*lzRateMul(u)*(u.rapT>0?PARA_RAPID_MUL:1)*heroRateMul(u));   // 0464: a hero's attack-speed picks ride the same head (heroRateMul — King Rex's "attack speed +20%" per pick on his 0.55) · 0242 HOT DROP — one more factor on the same cooldown, the aura's own stacking law · v3.11: TEAL's concussion stretches the interval (×1.4) · 0278a: the snow-slow stack rides the same head · 0605 HEAVY SHOTS: the interval ×ULT_PI_SLOW while the window burns ("slows his attack speed by 80%" = one fifth the cadence)
+    unitAim(u,best);   // 0652 Card C TURN TO FACE: the pull turns him toward his man — THE ONE WRITER for every shooter on this scan (rifleman · M. GUNNER · bazooka · mortar · flame · spy · Sarge's sidearm · Jane · the kings · the tanks; the commando's fan reads it below); the picture (unitFl) and every muzzle seat (unitFaceX) follow
     // your promotion ranks come onto the battlefield with you; the opposing army
     // fights at stock strength — its difficulty is decisions, not stat padding
     // ⚠ ORDER MATTERS: a RELAYED man carries his owner's rank in coopUM and it has
@@ -61097,7 +61102,7 @@ function update(dt){
       // w54 → +21.2,−19.3), mirrored the way every muzzle is on the foe side.
       // One lick per hit keeps multi:3 at 3 licks; no dice consumed — damage,
       // cadence and the RNG stream are byte-what-they-were (ink only).
-      const fmz=(S.bf&&u.side==='foe')?-1:1;
+      const fmz=unitFaceX(u);   // 0652: the nozzle on the side he faces
       extra.slice(0,def.multi).forEach(f=>{
         S.fx.push({k:'lick',x:u.x+21.2*fmz,y:u.y-19.3,tx:f.x,ty:f.y-14,t:0,dur:0.28});
         hurt(f,dmg,u);
@@ -61177,7 +61182,7 @@ function update(dt){
       }
       continue;
     }
-    const mzl=(S.bf&&u.side==='foe')?-1:1;         // muzzles point the way the figure faces
+    const mzl=unitFaceX(u);         // muzzles point the way the figure faces — 0652: the AIM's side (unitFaceX — the sim's own sign, never the walk stamp: this origin feeds duckBlock), else the chair as ever
     if(u.type==='bftank' || u.type==='tank2'){   // 0547 THE V2 TANK fires the tank's own shell — the blast dial rides the push below
       // THE CANNON: flat, fast and nearly on the money — it reuses the rocket
       // pipeline, just with a fraction of the bazooka's scatter and no anti-
@@ -61292,10 +61297,10 @@ function update(dt){
         if(!lz){ const RM=reducedMotion();
           const fxx=u.x+(off?18:17.5)*mzl, fxy=off? u.y-31 : u.y-41.5;
           S.fx.push({k:'flash',x:fxx,y:fxy,ang:Math.atan2((tgt.y-18)-fxy,tgt.x-fxx),R:RM?6:9,lw:RM?1.6:2.2,t:0,dur:0.08}); } }
-      if(u.type==='jane'){ u.jkAt=S.t; u.jkH=1; if(JANE_AIM_FACE) u.faceX=(tgt.x>u.x)? 1 : -1;   // 0585 F5 SHE FACES WHAT SHE SHOOTS: her guns-up mold IS the aim, so a round at a foe behind her turns her (unitFl reads faceX when no walk stamp is fresh; Jane only ⚑ Q3 — every other figure keeps the campaign's east-facing law)   // 0434: her stock rounds ride the shared (+16,-26) line above — the HIP IRON's seat — so the dress lands there: Sarge's own flash grammar + the brass + the kick stamp (presentation only; zero dice, zero mechanics)
+      if(u.type==='jane'){ u.jkAt=S.t; u.jkH=1;   // 0585 F5 SHE FACES WHAT SHE SHOOTS → 0652 Card C: the shared unitAim stamp above turns EVERY shooter (⚑ Q3 closed — her own clause retired into it; her flash + brass now leave the side she faces)   // 0434: her stock rounds ride the shared (+16,-26) line above — the HIP IRON's seat — so the dress lands there: Sarge's own flash grammar + the brass + the kick stamp (presentation only; zero dice, zero mechanics)
         const RMj=reducedMotion();
-        S.fx.push({k:'flash',x:u.x+17.5,y:u.y-28,ang:Math.atan2((tgt.y-18)-(u.y-28),tgt.x-(u.x+17.5)),R:RMj?6:9,lw:RMj?1.6:2.2,t:0,dur:0.08});
-        S.fx.push({k:'shell',x:u.x+14,y:u.y-30,h:1,t:0,dur:0.55}); }
+        S.fx.push({k:'flash',x:u.x+17.5*mzl,y:u.y-28,ang:Math.atan2((tgt.y-18)-(u.y-28),tgt.x-(u.x+17.5*mzl)),R:RMj?6:9,lw:RMj?1.6:2.2,t:0,dur:0.08});
+        S.fx.push({k:'shell',x:u.x+14*mzl,y:u.y-30,h:1,t:0,dur:0.55}); }
       if(u.type==='kingyeti') u.kyThAt=S.t;   // 0435: his stock rounds read as the hurl (presentation only — the shared tracer above is byte-what-it-was)
       if(lz && lzc==='slug'){
         // 0340 OUTLAW SLUGS: the projectile LOOKS LIKE A BULLET — a brass
@@ -62089,11 +62094,28 @@ function drawSprite(k,x,y,w,rot,wob,imgOverride,flip){
 // so movement facing IS target facing there; the ptero's dive keeps its own
 // strafe-facing seat. Presentation only — nothing in the sim reads wkX/wkT
 // (the mvSm law), so co-op's twin sims and seeded replays stay byte-equal.
+// 0652 Card C: the stale-out is no longer the attack-facing law — THE AIM SEAT below is (a pull turns the shooter toward his
+// man on both armies and both carpets); the walk still outranks it in the picture while the steps keep coming.
 const WKF_HOLD=0.15;
 function wkBack(o,dir){ return !!(o.wkT && S.t-o.wkT<WKF_HOLD && o.wkX===-dir); }
+// ===== 0652 Card C TURN TO FACE — THE AIM SEAT (Wyatt 8/31: "a lot of units are not turning around when they're firing …
+// They need to turn around, not walk backwards … that applies to all units"). ONE writer per army, called at the trigger
+// pull (unitAim: both green scans · foeAim: the tan aim start + every tan pull), ONE hold (the shooter's own drum + AIM_HOLD),
+// and TWO kinds of reader: THE PICTURE (unitFl / foeFl — a fresh stride still outranks the aim: travel first, then the work,
+// the 0517 grammar) and THE MUZZLE (unitFaceX / foeFaceX — the aim ALONE, never wkX/wkT, because the muzzle origin feeds
+// duckBlock, a sim read since v2.28, and the walk stamps are per-screen presentation — 0585 F4's glide stamps them on MY
+// screen only). The aim stamp is deterministic (every sim picks the same man at the same pull), so twin sims and seeded
+// replays agree; faceX is written at pulls and the siege only and expires by faceTo alone (0585's per-screen clears retired).
+function unitAim(u,o){ if(AIM_FACE && o){ u.faceX=(o.x>u.x)? 1 : -1; u.faceAt=S.t; u.faceTo=S.t+Math.max(0,u.cd||0)+AIM_HOLD; } }
+function foeAim(f,o){ if(AIM_FACE && o){ f.faceX=(o.x>f.x)? 1 : -1; f.faceAt=S.t; f.faceTo=S.t+(f.def.fireCd||2)*(f.fireMul||1)*(f.fireAura||1)+AIM_HOLD; } }
+function aimLive(o){ return !!(AIM_FACE && o.faceX && o.faceTo!=null && S.t<o.faceTo); }
+function aimBeat(o){ return !!(AIM_BEAT>0 && o.faceAt!=null && S.t-o.faceAt<AIM_BEAT && !(o.def && (o.def.ride||o.def.vehicle)) && aimLive(o)); }   // the shot beat: the aim wins the picture over a fresh stride — never for a rider or a hull
+function unitFaceX(u){ return aimLive(u)? u.faceX : ((S.bf&&u.side==='foe')?-1:1); }   // the SIM's own facing sign (+1 east / −1 west): the aim, else the chair — the muzzle law
+function foeFaceX(f){ return aimLive(f)? f.faceX : -1; }                                // ...tan edition (the molds face −x)
+function foeFl(f){ return (f.wkT && S.t-f.wkT<WKF_HOLD && !aimBeat(f))? f.wkX===1 : foeFaceX(f)>0; }  // the tan PICTURE: a fresh stride first (the 0307 walk-flip, byte-what-it-was) unless the shot beat, then the aim; true = mirrored to face east
 function unitFl(u){ const b=!!(S.bf && u.side==='foe');   // ⚠ !! matters: null!==false is TRUE — an uncoerced campaign b mirrored every green (battery r1's find)
   if(u.cmdFs && !(u.wkT && S.t-u.wkT<WKF_HOLD) && (u.cmdSwT>0||u.cmdFx>0||u.cmdWallT>0)) return u.cmdFs<0;   // 0517: WORKING AT THE SWORD the Commander faces his man — u.cmdFs, the strike's own (the blade already turned on it, drawSargeWeapon's rem; now the body agrees, and outfit/weapon/pack follow this one reader). A fresh stride still outranks: travel first, then the work. Only a Commander ever holds cmdFs; every other figure reads the line below byte-what-it-was.
-  if(!S.bf && u.faceX && !(u.wkT && S.t-u.wkT<WKF_HOLD)) return u.faceX<0;   // 0585 F2/F5: standing still on the campaign carpet, the AIM decides (the siege's crate, Jane's target); a fresh walk stamp still wins above (travel first, then the work — the 0517 grammar); no faceX = the shipped decay; the battleground keeps its chair law byte-what-it-was
+  if(aimLive(u) && (!(u.wkT && S.t-u.wkT<WKF_HOLD) || aimBeat(u))) return u.faceX<0;   // 0585 F2/F5 → 0652 Card C: standing still (or inside the shot beat), the AIM decides — on BOTH carpets now (faceX is absolute, so the chair needs no XOR — 0585 §7's lesson) and for the hold of the shooter's own drum + AIM_HOLD (aimLive); a fresh walk stamp still wins above (travel first, then the work — the 0517 grammar); no live aim = the shipped decay
   return b !== wkBack(u, b?-1:1); }
 // 0462b KING REX FACES HIS FIGHT (Wyatt 8/21: "when you have King Rex as a
 // hero, he just walks backwards. He's just facing the left, even though you
@@ -64246,7 +64268,7 @@ function draw(){
       cx.restore();
       continue;
     }
-    const RM9=reducedMotion(), k9=1-r.ultChT/ULT_SN_CH, mzl9=(S.bf&&r.side==='foe')?-1:1, mx9=r.x+48*mzl9, my9=r.y-37;
+    const RM9=reducedMotion(), k9=1-r.ultChT/ULT_SN_CH, mzl9=unitFl(r)? -1 : 1, mx9=r.x+48*mzl9, my9=r.y-37;
     const tg9=ultBeamTarget(r), a9=tg9? Math.atan2((tg9.y-18)-my9,tg9.x-mx9) : (mzl9>0? 0 : Math.PI);
     cx.save();
     cx.globalAlpha=0.3+0.35*k9; cx.strokeStyle=ULT_SN_HEX; cx.lineWidth=1.4;
@@ -65615,9 +65637,12 @@ const JANE_LEG=24;           // the hip-to-sole length of the leg parts (mold px
 // target. ⚠ never stamp wkX/wkT from the siege — wkT is the gait gate (she would march in place at the crate); the siege speaks
 // through faceX only.
 const JANE_WKF=12;           // F3 — her walk-stamp floor (px/s along the axis; the Commander's 7 is 35 % of his 20, this is 46 % of her 26): a 45° step at 26 px/s (18.4 on the axis) stamps, a wade (11) does not ⚑ Q6 (alt 7)
-const JANE_AIM_FACE=1;       // F5 — her stock round turns her toward its target (1) or leaves the campaign's east-facing law (0) ⚑ Q3
+const JANE_AIM_FACE=1;       // F5 — (0652 Card C: RETIRED into the shared AIM_FACE stamp — EVERY shooter turns now; this cell no longer reads) ⚑ Q3 closed
 const SIEGE_FACE=1;          // F2 — a man at the crate faces the crate (1: every campaign unit) ⚑ Q5 (0 = the shipped decay)
 const GLIDE_FACE=12;         // F4 — a co-op glide stamps an ally's man's walk face when it slides him faster than this (px/s), and the local march stops voting while a glide is live; 0 = off (the local march keeps voting — today's law) ⚑ Q4
+const AIM_FACE=1;            // 0652 Card C TURN TO FACE (Wyatt 8/31: "a lot of units are not turning around when they're firing … that applies to all units"): every trigger pull on BOTH armies stamps the shooter's face toward its target (unitAim / foeAim); the pictures (unitFl · foeFl) and every muzzle seat (unitFaceX · foeFaceX) follow it; 0 = the shipped law (the chair + the walk; every seat byte-what-it-was) ⚑ Q1
+const AIM_HOLD=0.6;          // 0652 — the aim holds for the shooter's OWN drum + this beat, then he settles back to his army's facing (a tube stays turned between shells; a pistol settles a beat after its last round) ⚑ Q2
+const AIM_BEAT=0.35;         // 0652 — THE SHOT BEAT: for this long after a pull the aim outranks a fresh stride in the PICTURE too (a walker who fires on the move — the giant, the officer's potshot, the boss yetis — turns for the shot, then walks on: "turn around … keep coming"); a rider or a vehicle never (a horse or a hull galloping backwards is the very thing he named) ⚑ Q6
 const JANE_SIEGE_HOLD=0.35;  // F1 — the guns stay up this long after her last siege frame (u.jSgT, stamped every frame she stands at the crate): the whack cadence is CAMP_SIEGE_CD 2.0 s against JANE_ARM_HOLD 1.6, so a per-whack stamp alone dropped her guns for 0.4 s every whack (measured: jUp fell to 0.33 five frames after the hold) — the siege's own clock keeps them shouldered through the whole siege; 0 = the per-whack hold only
 // 0593 JANE'S ARMS (design/scouter-0827/00-DESIGN.md §2 D1; Wyatt 8/27 ~17:00: "janes arms are still swining backwards"). THE READ:
 // the legs ride 0571's stance/swing curve (a planted foot slides back LINEARLY, the swing sweeps forward on a cosine) while the
@@ -66415,7 +66440,7 @@ function tanAimTell(f){
   const mz=(f.type==='wsniper')?[26,9]:(f.type==='mcath'||f.type==='mcathx')?[46,45]:(f.type==='wladyx')?[41,40]:(f.type==='larson')?[20,36]:[18,32];   // 0594: Larson's rifle at w 60 (the tansniper's [18,32] at w 54, scaled)   // 0500: the park's madam carries the same long rifle
   cx.globalAlpha=reducedMotion()? (ls? 0.7 : 0.45) : (ls? 0.55+0.35*Math.sin(S.t*14) : 0.3+0.25*Math.sin(S.t*10));
   cx.strokeStyle=ls? '#FF3B2A' : '#E8705A'; cx.lineWidth=ls? 3 : 1.5;
-  cx.beginPath(); cx.moveTo(f.x-mz[0],f.y-mz[1]); cx.lineTo(tg.x,tg.y-18); cx.stroke();   // 0353: the prone sniper's muzzle rides the dirt
+  cx.beginPath(); cx.moveTo(f.x+mz[0]*(foeFl(f)?1:-1),f.y-mz[1]); cx.lineTo(tg.x,tg.y-18); cx.stroke();   // 0353: the prone sniper's muzzle rides the dirt · 0652: on the side he faces
   cx.globalAlpha=1;
 }
 // 0583 THE KIT's tell — drawn over the plain tan figure (the molds face −x; a +x walk mirrors, drawFoe's own flip seat)
@@ -66438,7 +66463,7 @@ function drawFoeKit(f,wbk){ const K=f.kit, w=f.def.w, h=w*(140/120), dir=wbk?1:-
 }
 function drawFoe(f){
   if(f.falling){ drawFaller(f, foeImg(f.type), f.def.w, false); return; }   // 8/8 v2.76 the long drop, tan edition
-  const wbk=wkBack(f,-1);   // v3.61 (0307 WALK-FLIP): the tan molds face -x — a fresh +x walk mirrors the figure (halted strikes decay to the army facing in WKF_HOLD, so every standing tell sits where it always did)
+  const wbk=foeFl(f);   // v3.61 (0307 WALK-FLIP): the tan molds face -x — a fresh +x walk mirrors the figure · 0652 Card C: then THE AIM — a halted man faces the man he is shooting for his drum's length (foeFl; every mold, the teddy cast, the kit and the aim tell read this one seat)
   if(TEDDY_CAST[f.type] && drawTeddy(f,wbk)) return;   // 0523 TEDDY PARK: the cast's own draws (hops, the chute, the court, the rocker, the poses, the hp sliver)
   // 0424 THE ROYAL GRIP — a held man draws LIFTED (the drawUnit kyl recipe
   // mirrored): body up, feet clear, the red seize ring pulsing under the
@@ -66497,8 +66522,9 @@ function drawFoe(f){
       drawSprite(f.type,f.x,f.y-(f.airB||0),f.def.w,0,(f.gsWind>0? -0.06 : Math.sin(S.t*3.4+f.wob)*0.028),foeImg(f.type),wbk);
       if(f.gsWind>0){ const wf=1-Math.max(0,f.gsWind)/((f.def.snowboulder&&f.def.snowboulder.wind)||0.6);
         cx.fillStyle='#fff'; cx.strokeStyle='#54606C'; cx.lineWidth=2.5;
-        cx.beginPath(); cx.arc(f.x+42,f.y-92,9+9*wf,0,7); cx.fill(); cx.stroke();
-        if((f.sbn||1)>1){ cx.beginPath(); cx.arc(f.x-40,f.y-90,7+8*wf,0,7); cx.fill(); cx.stroke(); } }   // 0305 BF-02: the SERGEANT loads BOTH mitts — the volley's own tell
+        const ms9=wbk?-1:1;   // 0652: the mitts ride the drawn face
+        cx.beginPath(); cx.arc(f.x+42*ms9,f.y-92,9+9*wf,0,7); cx.fill(); cx.stroke();
+        if((f.sbn||1)>1){ cx.beginPath(); cx.arc(f.x-40*ms9,f.y-90,7+8*wf,0,7); cx.fill(); cx.stroke(); } }   // 0305 BF-02: the SERGEANT loads BOTH mitts — the volley's own tell
       return;
     }
     if(f.type==='kingyeti'){
@@ -89818,6 +89844,7 @@ window.GVT = {
     if(b!==undefined&&b!==null){ if(typeof b==='object'){ if(b.on!==undefined) BAY=b.on?1:0; if(b.fields!==undefined) BAY_FIELDS=b.fields?1:0; if(b.bolster!==undefined) BAY_BOLSTER=b.bolster?1:0; if(b.stain!==undefined) BAY_MARSH_STAIN=b.stain?1:0; } else BAY=b?1:0; }
     return { patch:PF_PATCH, hem:PF_HEM, hemC:PF_HEM_C, trailA:PF_TRAIL_A, w:PF_W, h:PF_H, gap:PF_GAP, sheet:PF_SHEET, c:PF_C.slice(), qlt:quiltField(), deployX:campDeployX(), W:W, WH:WORLD_H,
       bay:{ on:BAY, live:bayOn()?1:0, sheet:BAY_SHEET, lit:BAY_LIT, deep:BAY_DEEP, drop:BAY_DROP, folds:BAY_FOLDS.map(f=>[f.y,f.a,f.l,f.p,f.w,f.d,f.edge|0]), tuck:BAY_TUCK, grain:BAY_GRAIN, trail:BAY_TRAIL, fields:BAY_FIELDS, bolster:BAY_BOLSTER, stain:BAY_MARSH_STAIN, off:(WORLD_H-H)/2, rimTop:RIM_TOP_IN, rimBot:RIM_BOT_IN } }; },
+  tf(){ return { cv:GVT_CV, on:AIM_FACE, hold:AIM_HOLD }; },   // 0652 Card C — the rig's one read (read-only)
   bb(){ return { cv:GVT_CV, stalk:KB_STALK_STOP, wallWalk:KB_WALL_WALK, track:KB_TRACK_STOP, sting:KB_STING_T, mwf:{ roy:KB_MWF_ROY, can:KB_MWF_CAN, hold:KB_MWF_HOLD, min:KB_MWF_MIN, max:KB_MWF_MAX, min2:KB_MWF_MIN2, max2:KB_MWF_MAX2 }, roy:{ first:KB_ROY_1ST, min:KB_ROY_MIN, max:KB_ROY_MAX, hold:KB_ROY_HOLD, file:KB_ROY_FILE, bat:KB_ROY_BAT }, rav:{ every:KB_RAV_EVERY, cd:KB_RAV_CD, rest:KB_REST, restF:KB_REST_F, hp:FDEF.bearnaparte.hp }, river:(S.cfg&&S.cfg.terrain&&S.cfg.terrain.river)? { x:S.cfg.terrain.river.x, w:S.cfg.terrain.river.w, b:[S.cfg.terrain.river.bridgeY, S.cfg.terrain.river.bridgeY2==null? null : S.cfg.terrain.river.bridgeY2] } : null, court:FDEF.bearnaparte.court? 1 : 0, ann:{ smk:META.smkAnn|0, eb:META.ebAnn|0 }, footOwn:VD_FOOT.own, waves:(S.cfg && S.raid && S.raid.k==='fields')? S.cfg.waves.map(w9=>w9.name) : null, p2n:S.cfg? (S.cfg.p2n==null? null : S.cfg.p2n) : null }; },   // 0645 Card B — the rig's one read (read-only)
   kc(){ const K=S.foes.find(f9=>f9.type==='bearnaparte'); const c=S.cfg||{}; return { priceX:(c.kbPX==null)? null : c.kbPX, coop:!!S.coop, launching:!!coopLaunching, campaign:META.campaign|0, king:K? { hp:+K.hp.toFixed(2), hpMax:K.hpMax, st:K.gnSt||null, life:K.kbLife|0, floor:K.retFloor==null? null : K.retFloor, fierce:K.kbFierce|0, chN:K.kbChN|0, rideT:+(K.kbRideT||0).toFixed(2), gate1:K.kbGate1|0, gate2:K.kbGate2|0, pr:+(K.dkPr||0).toFixed(2), said1:K.kbSaid1|0, footT:+(K.kbFootT||0).toFixed(2), lungeN:K.kbLungeN|0, wallN:K.kbWallN|0, wallT:+(K.cmdWallT||0).toFixed(2), wallCd:K.kbWallCd==null? null : +K.kbWallCd.toFixed(2), mwfN:K.kbMwfN|0, dead:K.dead?1:0 } : null, stamps:{ rv:PGRV, rk:PGRK, pv:PGPV, pk:PGPK }, raidOpen:raidSceneOpen(), raidCur:RAID_CUR }; },   // 0639 KING BEAR EARNS HIS CROWN — read-only: the price, the floors, the acts, the wall, the landing stamps
   fieldsGo(t){ RAID_CUR='fields'; startRaid(RAID_TIERS.indexOf(t)>=0? t : 'e'); return S.raid && S.raid.k; },   // the solo door exactly as UI.raidPlay drives it (the croakGo grammar; the battery's door — the gate is the scene's)
