@@ -386,7 +386,12 @@ for (const _z of SS_ZODIAC) SS_ZODIAC_BY[_z.id] = _z;
    wordDamage all read — one place, so the board can never disagree with the
    cast. Future sigil tiers change `add` here, never the renderer. Word-level
    effects (Ember Quill, the longbow, doublers) are NOT lb — they belong to the
-   whole word and never print on a tile. */
+   whole word and never print on a tile.
+   `charges` marks a per-battle allowance (Comet Trail: how many scries ride
+   free before SCRY hastens the strike again — Skylar 9/1: scry must NEVER
+   stop hastening it outright). Granted fresh at every startFight, spent one
+   scry at a time, printed as pips on the SCRY button. The coming sigil tiers
+   turn only this number (base 1, rare 2, legendary 3 — epic skipped). */
 const SS_SIGILS = [
   // ---- basic ----
   { id: 'quill', icon: '❦', rarity: 0, name: 'EMBER QUILL', desc: 'Every word deals +4 damage.' },
@@ -396,7 +401,7 @@ const SS_SIGILS = [
   { id: 'aegis', icon: '✺', rarity: 0, name: 'AEGIS OF DAWN', desc: '+20 max health, healed now.' },
   { id: 'first', icon: '✧', rarity: 0, name: 'FIRST LIGHT', desc: 'Your first word each battle deals double.' },
   { id: 'hush', icon: '⧗', rarity: 0, name: 'HUSHED HOURGLASS', desc: 'Beasts strike one cast later.' },
-  { id: 'comet', icon: '☄', rarity: 0, name: 'COMET TRAIL', desc: 'SCRY no longer hastens the strike.', lock: { s: 'scry', n: 20, how: 'Call on SCRY %1 times.' } },
+  { id: 'comet', icon: '☄', rarity: 0, name: 'COMET TRAIL', desc: 'Your first SCRY each battle does not hasten the strike.', charges: 1, lock: { s: 'scry', n: 20, how: 'Call on SCRY %1 times.' } },
   { id: 'shield', icon: '◈', rarity: 0, name: 'SILVER SHIELD', desc: 'Block the first strike of every battle.' },
   { id: 'leech', icon: '❉', rarity: 0, name: 'DEW DRINKER', desc: 'Every word heals you 1.' },
   { id: 'longbow', icon: '➳', rarity: 0, name: 'STARRY LONGBOW', desc: 'Words of 6+ letters deal +12.', lock: { s: 'w6', n: 8, how: 'Weave %1 words of six letters or more.' } },

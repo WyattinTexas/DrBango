@@ -1,6 +1,50 @@
 # beta3 dev tools
 
-Eighteen scripts, all dev-only — nothing here ships to the browser.
+Nineteen scripts, all dev-only — nothing here ships to the browser.
+
+## comet-check.mjs — the limited free scry (v0.63.0)
+
+Skylar's call (9/1): Comet Trail's blanket "SCRY no longer hastens the
+strike" was way too powerful — "you should only be able to scry for free
+one time … It should never be that scry no longer hastens the strike."
+The game side: the def carries `charges: 1` (data.js — the seam the coming
+sigil tiers turn: rare 2, legendary 3, epic skipped), folded by
+`ssSigilCharges(id)` (game.js, beside ssSigilLetterAdd); `startFight`
+grants `battle.cometLeft` fresh EVERY battle (boss fights included, resume
+included — the checkpoint keeps fight-start semantics, so the charge is
+derived, never persisted); `scry()` spends one charge to skip `tickEnemy`,
+and with none left ticks exactly as if the sigil weren't held. The SCRY
+button prints one ☄ pip per charge via `updateScryPips` — gold with a soft
+glow while it waits, a legible slate cinder (#5a6390) once spent (spending
+flares the pip as it cools), nothing at all when the sigil isn't held.
+Sagittarius' arrow rides every scry regardless of the charge, and a scry
+whose arrow FELLS the beast spends nothing (the death path returns first).
+Copy rewritten in data.js + all 9 strings.js sig maps ("your first SCRY
+each battle does not hasten the strike"); versus untouched (comet was
+never in VS_OK).
+
+Self-launching like dew-check (server on :8899 if nothing serves, Chrome
+on :9459, `/tmp/cdp-comet`, `--disable-gpu`), Firebase blocked at the
+network layer throughout — all PvE; VS_OK's exclusion is asserted from the
+versus.js source.
+
+```
+node tools/comet-check.mjs      # 44 checks, ~2 min
+```
+
+Real-tap scries through the whole ladder: without comet the FIRST scry
+ticks; held, the first rides free (count unchanged), the charge spends and
+the pip cools, the second and third tick, and a scry at count 1 lands the
+strike for real (hp falls); a real felling cast → sigil pick → next fight
+restores the charge and relights the pip; sagittarius' 6-damage arrow
+fires on charged AND spent scries; `charges = 3` set live grants three
+free scries and three pips with the fourth ticking — the def is the dial.
+
+Rig lesson: **poll a COUNTER, not the state, around a tap-driven scry** —
+`state === 'pick'` is true before the tap lands, so "wait for pick" reads
+the PRE-scry pick and passes vacuously. The drip's own `prof.sig.c.scry`
+increments inside `scry()`, so the tap loop re-taps until the counter
+moves, then waits for pick.
 
 ## chip-check.mjs — the tile prints the TRUE worth (v0.62.0)
 

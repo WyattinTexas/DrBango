@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.62.0';
+const BUILD = 'STARSPELL v0.63.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2609,6 +2609,14 @@ function ssSigilLetterAdd(sigils, ch, vowels) {
     if ((lb.letters && lb.letters.includes(c0)) || (lb.vowels && vw.includes(c0))) add += lb.add;
   }
   return add;
+}
+// per-battle allowance sigils, data-driven off SS_SIGILS `charges` — Comet
+// Trail's free-scry count lives on the def, so the coming sigil tiers turn a
+// number there (base 1, rare 2, legendary 3) and nothing here moves. The
+// battle grants the count at every startFight and spends it scry by scry.
+function ssSigilCharges(id) {
+  const s = SS_SIG_BY[id];
+  return s && s.charges ? Math.max(0, s.charges | 0) : 0;
 }
 // the dew's value chip is ♥6, never the letter's points — orange↔green is the
 // classic colorblind pair and the heart is the tell (SS_TILE_VINK[3] ink)
@@ -6001,6 +6009,7 @@ class Battle extends Phaser.Scene {
     // as the home screen's LEADERBOARD/PROFILE — no more bare dev rectangles
     this.scryB = this.add.image(l.x(-150), l.y(754), ssBtn(this, true, 100, 50)).setDisplaySize(l.u(100), l.u(50)).setInteractive({ useHandCursor: true });
     txt(l.x(-150), l.y(754), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
+    this.scryPips = [];   // COMET TRAIL's charge pips, built by updateScryPips
     this.scryB.on('pointerdown', () => this.scry());
     this.hintB = this.add.image(l.x(-62), l.y(754), ssBtn(this, true, 50, 50)).setDisplaySize(l.u(50), l.u(50)).setInteractive({ useHandCursor: true }).setVisible(false);
     this.hintT = txt(l.x(-62), l.y(754), '◉', 18, '#d7b45c').setOrigin(0.5).setVisible(false);
@@ -6562,6 +6571,9 @@ class Battle extends Phaser.Scene {
     this.struckThisBattle = false;
     this.shieldUsed = false;
     this.hintUsed = false;
+    // COMET TRAIL burns fresh each battle — boss fights included; the count
+    // is the sigil def's own dial (ssSigilCharges), never a constant here
+    this.cometLeft = this.hasSigil('comet') ? ssSigilCharges('comet') : 0;
     this.clearHintFx();
     this.headT.setText(this.modeTitle());
     const pipBase = this.mode === 'campaign' ? Math.floor(this.run.fightIdx / 5) * 5 : 0;
@@ -6593,6 +6605,7 @@ class Battle extends Phaser.Scene {
     this.fillBoard(true);
     this.hintB.setVisible(this.hasSigil('tome')); this.hintT.setVisible(this.hasSigil('tome'));
     this.hintB.setAlpha(1); this.hintT.setAlpha(1);
+    this.updateScryPips();
     this.updateBars();
     this.state = 'pick';
   }
@@ -7021,8 +7034,53 @@ class Battle extends Phaser.Scene {
       this.beastHit(6);
       if (this.beast.hpNow <= 0) return;   // the arrow felled it — the death sequence takes over
     }
-    if (this.hasSigil('comet')) { this.time.delayedCall(300, () => { this.state = 'pick'; }); return; }
+    // COMET TRAIL: a limited charge, never a blanket pardon (Skylar 9/1 —
+    // "it should never be that scry no longer hastens the strike"). While a
+    // charge stands the scry rides free; spent, every scry ticks the beast
+    // exactly as if the sigil weren't held. Fresh charges at every startFight.
+    if (this.hasSigil('comet') && (this.cometLeft | 0) > 0) {
+      this.cometLeft--;
+      this.updateScryPips(true);
+      this.time.delayedCall(300, () => { this.state = 'pick'; });
+      return;
+    }
     this.tickEnemy(() => { this.state = 'pick'; });
+  }
+
+  /* COMET TRAIL's charge, printed on the SCRY button itself: one small ☄ per
+     free scry this battle — gold while it waits, a dim cinder once spent,
+     nothing at all when the sigil isn't held. The pip count is data-driven
+     (ssSigilCharges), so the coming rare/legendary tiers print 2 or 3 pips
+     with no new code here. `spent` marks the charge burning out NOW: that pip
+     flares once as it cools, so the next scry's true price reads on the
+     button before it is paid. */
+  updateScryPips(spent) {
+    const l = this.L;
+    const total = this.hasSigil('comet') ? ssSigilCharges('comet') : 0;
+    if (this.scryPips.length !== total) {
+      for (const p of this.scryPips) p.destroy();
+      this.scryPips = [];
+      for (let i = 0; i < total; i++) {
+        this.scryPips.push(ssTxt(this, l.x(-150) + l.u((i - (total - 1) / 2) * 15), l.y(769), '☄', l.u(13), '#ffd77a').setOrigin(0.5));
+      }
+    }
+    // the cinder stays LEGIBLE on the dark button — a spent charge must read
+    // as "used", never as "no sigil" (that state shows no pip at all)
+    const cool = (p) => { p.setColor('#5a6390').setAlpha(0.55).setShadow(0, 0, '#000000', 0, false, false); };
+    this.scryPips.forEach((p, i) => {
+      this.tweens.killTweensOf(p);
+      p.setScale(1);
+      if (i < (this.cometLeft | 0)) {
+        p.setColor('#ffd77a').setAlpha(0.95).setShadow(0, 0, '#ffd77a', l.u(5), true, true);
+      } else if (spent && i === (this.cometLeft | 0)) {
+        // the pip that just burned: one bright flare, then the cinder
+        p.setColor('#fff2c9').setAlpha(1).setShadow(0, 0, '#ffd77a', l.u(8), true, true);
+        this.tweens.add({
+          targets: p, scale: 1.7, duration: 170, yoyo: true, ease: 'Sine.easeOut',
+          onComplete: () => { if (p.scene) cool(p); },
+        });
+      } else cool(p);
+    });
   }
 
   // The hint teaches the ORDER, not just the letters: tiles light one at a
