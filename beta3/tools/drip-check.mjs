@@ -271,7 +271,7 @@ ok('a daily battle stands up to be struck by',
 const before4 = await evj(`(() => { const b = game.scene.getScene('battle');
   SS.prof.sig.c = {}; SS.save();
   b.run.hpMax = 900; b.run.hp = 900;              // survive it, so the run does not end
-  b.shieldUsed = true; b.beast.count = 1;
+  b.shieldUsed = true; b.shieldLeft = 0; b.beast.count = 1;
   b.tickEnemy(() => {});                           // the beast's own strike, for real
   return JSON.stringify(SS.prof.sig.c) })()`);
 ok('a real beast strike is weathered and counted',

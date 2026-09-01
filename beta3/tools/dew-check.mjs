@@ -257,7 +257,7 @@ hb = await evj(`JSON.stringify(window.__ssdewHeal)`);
 ok('forge does not upgrade the heal', hb.n === 1 && hb.healed === 6, JSON.stringify(hb));
 bd = await board();
 ok('the forge minted no green', bd.filter((s) => s && s.tier === 3).length === 0 && bd.every((s) => !s || s.tier !== 3));
-ok('pendingTier never says dew', await evj(`JSON.stringify([${B}.pendingTier | 0].every((t) => t !== 3))`));
+ok('the pending queue never says dew', await evj(`JSON.stringify((${B}.pending || []).every((t) => t !== 3))`));
 // a word of 5+ forges tier 2 with the sigil — the law, unchanged
 w = await findWord([], [target, inkIdx], 5);
 if (w) {

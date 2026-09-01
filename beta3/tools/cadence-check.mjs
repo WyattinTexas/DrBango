@@ -64,6 +64,15 @@ const send = (m, p) => new Promise((res) => { const i = ++id; pend.set(i, res); 
 await send('Runtime.enable'); await send('Page.enable');
 await send('Network.enable'); await send('Network.setCacheDisabled', { cacheDisabled: true });
 await send('Network.setBlockedURLs', { urls: ['*firebaseio.com*', '*firebasedatabase.app*', '*firebase*', '*gstatic.com*'] });
+// THIS SUITE PINS THE CADENCE, NOT THE OFFER KINDS (v0.66.0): the walks
+// below assert WHERE offers land, so the upgrade share is pinned to 0 on
+// every boot (tier-check owns the kinds). Section 7 exercises the 'upgrade'
+// TYPE through the row's own type field, which this pin never touches.
+// (`typeof`, never `window.SS_CADENCE` — a top-level const is not a window
+// property; the rival-check lesson)
+await send('Page.addScriptToEvaluateOnNewDocument', {
+  source: `(function w(){ if (typeof SS_CADENCE !== 'undefined') { for (const k of ['campaign','quick','daily','endless']) if (SS_CADENCE[k]) SS_CADENCE[k].up = 0; } else setTimeout(w, 40); })()`,
+});
 const ev = async (e) => {
   const r = await send('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true });
   if (r?.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || 'eval failed');
@@ -112,7 +121,7 @@ const fell = async () => {
     b.beast.hpNow = -1; b.dying = true; b.beastDeath(); return 'ok' })()`);
   if (armed !== 'ok') return 'lost';
   const landed = await until(`(${B}.state === 'sigil' && ${B}.overlayC.list.some((o) => o.getData && o.getData('sigilCard') && o.alpha === 1))
-    || ${B}.state === 'map' || ${B}.state === 'end' || (${B}.state === 'pick' && !${B}.dying)`, 30000, 250);
+    || ${B}.state === 'upgrade' || ${B}.state === 'map' || ${B}.state === 'end' || (${B}.state === 'pick' && !${B}.dying)`, 30000, 250);
   if (!landed) return 'lost';
   return ev(`${B}.state`);
 };
@@ -149,8 +158,13 @@ ok('one row per mode + the reserved pair', ['campaign', 'quick', 'daily', 'versu
 ok('campaign row: hook 0, gap 2-3, act bosses pay', await ev(`SS_CADENCE.campaign.first === 0 && SS_CADENCE.campaign.gap[0] === 2 && SS_CADENCE.campaign.gap[1] === 3 && SS_CADENCE.campaign.actBoss === true`));
 ok('quick and daily ride the same rhythm', await ev(`['quick','daily'].every((m) => SS_CADENCE[m].first === 0 && SS_CADENCE[m].gap.join() === '2,3')`));
 ok('versus row keeps the duel\'s every-3rd-cast', await ev(`SS_CADENCE.versus.casts === 3`));
-ok('the offer types are sigil + the RESERVED upgrade', await ev(`JSON.stringify(SS_OFFER_TYPES) === '["sigil","upgrade"]'`));
-ok('upgrade is never rolled: every live row types sigil', await ev(`['campaign','quick','daily','versus','endless'].every((m) => (SS_CADENCE[m].type || 'sigil') === 'sigil')`));
+ok('the offer types are sigil + upgrade', await ev(`JSON.stringify(SS_OFFER_TYPES) === '["sigil","upgrade"]'`));
+ok('every live row types sigil — upgrade rides the up share, never the type', await ev(`['campaign','quick','daily','versus','endless'].every((m) => (SS_CADENCE[m].type || 'sigil') === 'sigil')`));
+// v0.66.0: the upgrade SHARE lives on the fight-cadence rows (this boot pins
+// it to 0 — read the source for the shipped dial); versus carries none
+const dataSrc = readFileSync(new URL('../data.js', import.meta.url), 'utf8');
+ok('campaign/quick/daily/endless ship an up share (source)', (dataSrc.match(/up: 0\.35/g) || []).length === 4);
+ok('the versus row carries no up share', await ev(`SS_CADENCE.versus.up === undefined`));
 const vsSrc = readFileSync(new URL('../versus.js', import.meta.url), 'utf8');
 const rvSrc = readFileSync(new URL('../rival.js', import.meta.url), 'utf8');
 ok('versus.js reads the table\'s row (source)', /myCasts % \(\(SS_CADENCE\.versus/.test(vsSrc));
@@ -292,12 +306,33 @@ ok('the daily\'s hook pays at fight 0', dfirst === 'sigil');
 ok('…with a full pick on the table (3 cards)', await ev(`${B}.overlayC.list.filter((o) => o.getData && o.getData('sigilCard')).length === 3`));
 ok('the pick still takes', await takeCard());
 
-/* ================= 7. the upgrade seam rides on ================= */
-console.log('\n— THE RESERVED OFFER TYPE —');
+/* ================= 7. the upgrade offer type (v0.66.0) ================= */
+console.log('\n— THE UPGRADE OFFER TYPE —');
 ok('fight 1 in hand for the seam', await until(`${B}.run.fightIdx === 1 && ${B}.state === 'pick'`, 30000, 250));
+// the walk above took the hook's sigil, so one is held and below max; a
+// pinned fight has no sigTypes entry → payOffer falls to the row's type
 await ev(`SS_CADENCE.daily.type = 'upgrade'; ${B}.sigPlan.add(1); 'ok'`);
 const upSt = await fell();
-ok('an upgrade row pays no screen that does not exist — rides on', upSt === 'pick' && await ev(`${B}.run.fightIdx === 2`), upSt);
+ok('an upgrade-typed row opens the STRENGTHEN screen', upSt === 'upgrade', upSt);
+const upRow = await evj(`(() => { const b = ${B}; const out = { rows: 0, tagged: 0 };
+  const scan = (ls) => ls.forEach((o) => { if (o.getData && o.getData('sigilCard')) out.tagged++; if (o.list) scan(o.list); });
+  scan(b.overlayC.list); out.rows = b.run.sigils.length; return JSON.stringify(out) })()`);
+ok('one upgradable row per held sigil, tagged for the demo picker', upRow.tagged === upRow.rows && upRow.rows >= 1, JSON.stringify(upRow));
+let upTook = false;
+for (let t = 0; t < 6 && !upTook; t++) {
+  await tap(`(() => { let r = null; const scan = (ls) => ls.forEach((o) => { if (!r && o.getData && o.getData('sigilCard')) r = o; if (o.list) scan(o.list); }); scan(${B}.overlayC.list); return r })()`);
+  await sleep(450);
+  upTook = await ev(`${B}.state !== 'upgrade'`);
+}
+ok('a real tap strengthens the held sigil (tier 2 stands)', upTook && await ev(`Object.values(${B}.run.tiers).some((t) => t === 2)`),
+  await ev(`JSON.stringify(${B}.run.tiers)`));
+ok('…and the run rides on to fight 2', await until(`${B}.run.fightIdx === 2 && ${B}.state === 'pick'`, 30000, 250));
+// the forward-compat law: an unknown type falls to the sigil pick, never a
+// dead screen (the map entry for a planned fight is cleared so the row reads)
+await ev(`SS_CADENCE.daily.type = 'banana'; ${B}.sigTypes && ${B}.sigTypes.delete(2); ${B}.sigPlan.add(2); 'ok'`);
+const junkSt = await fell();
+ok('a junk type falls to the sigil pick — never a dead screen', junkSt === 'sigil', junkSt);
+ok('the pick still takes', await takeCard());
 await ev(`SS_CADENCE.daily.type = 'sigil'; 'ok'`);
 ok('restored: the row types sigil again', await ev(`SS_CADENCE.daily.type === 'sigil'`));
 ok('no page errors (daily + seam)', errs.length === 0, errs.join(' | ').slice(0, 200));

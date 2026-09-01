@@ -1,6 +1,70 @@
 # beta3 dev tools
 
-Twenty-one scripts, all dev-only — nothing here ships to the browser.
+Twenty-two scripts, all dev-only — nothing here ships to the browser.
+
+## tier-check.mjs — sigil tiers and the upgrade offer (v0.66.0)
+
+Skylar's call (9/1): "you can level up sigils that you have … a common
+sigil … will upgrade to a rare and if it is a rare it will upgrade into an
+epic. If it was an epic it can upgrade into a legendary … [it] should also
+apply for the daily hunt. [Comet:] base level one free scry, rare two, skip
+epic, legendary three." The game side: every one of the 24 defs carries a
+`tl` ladder in data.js (the base def IS tier I, so today's numbers are the
+first rung and every harness that dials base fields — comet-check's
+`charges`, chip-check's `lb.add` — keeps dialing tier I untouched),
+resolved ONLY by `ssSigilVal(id, field, tier)`; template descs substitute
+`%1..%k` from the fields `dvf` names (SS_SIG, so text can never drift from
+effect), word-changing sigils carry per-tier desc variants and the
+strings.js sig rows grow `[name, descI, descII, …]`. Grades name SLOTS on
+Skylar's common→rare→epic→legendary ladder (SS_GRADE / SS_ROMAN /
+SS_GRADE_SLOTS in game.js): a 3-step ladder reads I · II · IV with the
+epic slot visibly skipped — comet's precedent. `ssOfferTypes` pre-rolls
+each paying fight's KIND on the plan seed XOR a constant (its own mulberry
+stream — the main seeded rng is untouched; the first offer is never an
+upgrade; the daily's kinds are shared-fair); `payOffer` opens
+`showUpgradePick` on an 'upgrade' intent with something upgradable,
+crosses a 'sigil' offer over to the upgrade screen when the new-sigil pool
+is dry, and rides on only when both are dry. `run.tiers` rides the
+checkpoint (a pre-v0.66 save resumes at tier I exactly); per-battle
+allowances (shieldLeft, hintsLeft, cometLeft) are granted at startFight at
+the held tier, derived never persisted.
+
+Self-launching like cadence-check (server on :8899 if nothing serves,
+Chrome on :9465, `/tmp/cdp-tier`, `--disable-gpu`), Firebase blocked at
+the network layer throughout.
+
+```
+node tools/tier-check.mjs           # the laws, ~5 min
+node tools/tier-check.mjs --demo    # a natural ?demo=1 campaign to the
+                                    # summit through real upgrade offers
+                                    # (~6-9 min — give `perl -e 'alarm 700'`)
+```
+
+The pinned ladder table (the card's balance sheet — a def that drifts is a
+finding), comet 1/2/3, the grade slots, every sigil's effect probed at
+every rung (wordDamage math for the damage family, real strikes for
+shield/ward/eclipse/feather, real casts for the salve+leech heal and the
+forge's 4-letter floor, real fells for echo's carry and the meteor's
+vessel, startFight grants for hush/gilded/tome/comet with pips, the aegis
+pick +20 and its upgrade DELTA through the real screen, the tome's 15%
+tax through the daily ledger), desc generation with a live-dial no-drift
+proof, the STRENGTHEN screen by real taps (maxed rows dead under AT ITS
+HEIGHT, the chip repaints +2→+3 with its spark, the dock numeral, rides
+on to the chart), pool-dry crossover and the both-dry graceful skip, the
+share ≈ 0.35 over 300 seeds with the first offer never an upgrade, the
+daily's two-boot shared kinds, the checkpoint round-trip (tiers stand,
+damage pays tier III, prewarmed raised chips, schedule + kinds identical,
+a hand-written pre-v0.66 checkpoint resumes at tier I), and a natural
+`?demo=1` quick run that meets an upgrade unaided (the `--demo` pass walks
+a full campaign to the summit the same way).
+
+Suite fallout absorbed here: cadence-check pins `up = 0` on its boots (it
+asserts WHERE offers land; this suite owns the kinds) and its §7 asserts
+the upgrade type OPENS the screen + a junk type falls to the sigil pick;
+desc-check grew the 39 tier descs per language; dew-check reads the
+`pending` queue (pendingTier's successor); drip-check zeroes `shieldLeft`
+alongside the old flag before forcing a strike. comet-check and chip-check
+run UNTOUCHED — that is the point of the tl-override shape.
 
 ## cadence-check.mjs — sigils every 2-3 fights (v0.65.0)
 

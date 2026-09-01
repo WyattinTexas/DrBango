@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.65.0';
+const BUILD = 'STARSPELL v0.66.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2600,23 +2600,27 @@ const SS_BUFF_VINK = ['#7d4a10', '#6e3c03', '#215a7c', '#22572a'];
 // vowels) all read, so the printed tile can never drift from the damage math.
 // First character decides, exactly as the damage loop always has (RR rides an
 // `r` rune; Qu is q).
-function ssSigilLetterAdd(sigils, ch, vowels) {
+// `tiers` (v0.66.0) is the run's id → tier map: a strengthened choir/runes
+// pays its tier's lb through the same one lookup. Callers with no tiers
+// (versus, the rival engine, the profile) read tier I — today's numbers.
+function ssSigilLetterAdd(sigils, ch, vowels, tiers) {
   let add = 0;
   const c0 = ch[0], vw = vowels || VOWELS;
   for (const id of sigils) {
-    const lb = SS_SIG_BY[id] && SS_SIG_BY[id].lb;
+    const lb = ssSigilVal(id, 'lb', tiers ? tiers[id] : 1);
     if (!lb) continue;
     if ((lb.letters && lb.letters.includes(c0)) || (lb.vowels && vw.includes(c0))) add += lb.add;
   }
   return add;
 }
 // per-battle allowance sigils, data-driven off SS_SIGILS `charges` — Comet
-// Trail's free-scry count lives on the def, so the coming sigil tiers turn a
-// number there (base 1, rare 2, legendary 3) and nothing here moves. The
-// battle grants the count at every startFight and spends it scry by scry.
-function ssSigilCharges(id) {
-  const s = SS_SIG_BY[id];
-  return s && s.charges ? Math.max(0, s.charges | 0) : 0;
+// Trail's free-scry count lives on the def; the tier ladder turns it
+// (base 1, rare 2, legendary 3) and nothing here moves. The battle grants
+// the count at every startFight and spends it scry by scry. Bare calls
+// (no tier) read tier I — exactly the pre-tier behavior.
+function ssSigilCharges(id, tier) {
+  const c = ssSigilVal(id, 'charges', tier || 1);
+  return c ? Math.max(0, c | 0) : 0;
 }
 // the dew's value chip is ♥6, never the letter's points — orange↔green is the
 // classic colorblind pair and the heart is the tell (SS_TILE_VINK[3] ink)
@@ -2682,12 +2686,15 @@ function ssPrewarmGlyphs(scene) {
   // a standing climb's letter-bonus sigils (River Runes, the Choir) mean the
   // resume deals RAISED chips — prewarm those variants too, or the board
   // build at the top of the rise bakes them all in one frame
-  let held = [];
-  try { held = (JSON.parse(localStorage.getItem('beta3.campaign')) || {}).sigils || []; } catch (e) { }
+  let held = [], heldT = {};
+  try {
+    const cp = JSON.parse(localStorage.getItem('beta3.campaign')) || {};
+    held = cp.sigils || []; heldT = cp.tiers || {};
+  } catch (e) { }
   if (!Array.isArray(held)) held = [];
   for (const base of Object.keys(PACK.bag)) {
     const ch = PACK.digraph[base] || base;
-    const add = ssSigilLetterAdd(held, ch);
+    const add = ssSigilLetterAdd(held, ch, undefined, heldT);
     for (let tier = 0; tier < 4; tier++) {
       const v = tier === 3 ? SS_DEW_CHIP() : (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0);
       jobs.push(() => { ssGlyph(scene, ch, SS_TILE_INK[tier]); ssGlyphVal(scene, v, SS_TILE_VINK[tier]); });
@@ -3181,6 +3188,23 @@ const SS_RARITY = [
   { glow: 0xffd77a, ink: '#ffe9a8', shadow: '#ffc94d', label: 'rarityLegendary', labelColor: '#ffdf8f' },
 ];
 
+/* ---- the upgrade GRADES (v0.66.0) --------------------------------------
+   Skylar's common→rare→epic→legendary ladder names tier POSITIONS on a
+   held sigil's own ladder, never drop rarities — EPIC exists only here.
+   Roman numerals name the GRADE SLOT, not the step count: SS_GRADE_SLOTS
+   maps a ladder's length to the slots its steps occupy, so a 3-step ladder
+   reads I · II · IV with the epic slot visibly skipped (comet's precedent:
+   "base one, rare two, skip epic, legendary three") and IV always means
+   "at its legendary height". Slot 1 wears no dress — the numeral alone. */
+const SS_GRADE = [null,
+  { key: 'rarityRare', color: '#9fc8ff', glow: 0x6fa8ff },
+  { key: 'rarityEpic', color: '#d9a8ff', glow: 0xba6be0 },
+  { key: 'rarityLegendary', color: '#ffdf8f', glow: 0xffd77a },
+];
+const SS_ROMAN = ['I', 'II', 'III', 'IV'];
+const SS_GRADE_SLOTS = { 1: [1], 2: [1, 4], 3: [1, 2, 4], 4: [1, 2, 3, 4] };
+function ssGradeSlot(id, step) { return (SS_GRADE_SLOTS[ssSigilMaxT(id)] || [1])[step - 1] || 1; }
+
 // Baked card chrome: midnight glass, tier frame + hairline, corner ornaments,
 // and a medallion socket on the left for the glyph. Returns { key, mx, mr } —
 // medallion centre/radius in design units (recomputed on cache hits).
@@ -3437,13 +3461,23 @@ function ssSigilPanel(scene, opts) {
     const tex = ssSigilCardTex(scene, tier, RW, RH);
     rc.add(scene.add.image(l.x(0), l.y(yk), tex.key).setDisplaySize(l.u(RW), l.u(RH)));
     const gx = -RW / 2 + tex.mx;
-    let name, desc, ribbon, ribbonColor;
+    let name, desc, ribbon, ribbonColor, ribbonShadow;
     if (r.sg) {
       rc.add(ssTxt(scene, l.x(gx), l.y(yk), r.sg.icon, l.u(tex.mr * 0.95), RC.ink).setOrigin(0.5)
         .setShadow(0, 0, RC.shadow, l.u(5), true, true));
-      const loc = SS_SIG(r.sg);
+      // the held copy's TIER (v0.66.0): the desc speaks at its strength, and
+      // a strengthened sigil trades the drop ribbon for its grade's — the
+      // numeral names the slot, so a skipped epic reads II then IV
+      const ht = opts.tiers ? Math.max(1, Math.min((opts.tiers[r.sg.id] | 0) || 1, ssSigilMaxT(r.sg.id))) : 1;
+      const loc = SS_SIG(r.sg, ht);
       name = loc.name; desc = loc.desc;
-      ribbon = RC.label ? SS_T(RC.label) : ''; ribbonColor = RC.labelColor;
+      const slot = ht >= 2 ? ssGradeSlot(r.sg.id, ht) : 1;
+      if (slot >= 2) {
+        const GD = SS_GRADE[slot - 1];
+        ribbon = SS_ROMAN[slot - 1] + ' · ' + SS_T(GD.key); ribbonColor = GD.color; ribbonShadow = GD.color;
+      } else {
+        ribbon = RC.label ? SS_T(RC.label) : ''; ribbonColor = RC.labelColor;
+      }
     } else {
       const g = ssZodiacGlyph(scene, r.sign, l.u(0.145), l.x(gx), l.y(yk));
       rc.add(g);
@@ -3457,7 +3491,7 @@ function ssSigilPanel(scene, opts) {
     rc.add(scene.add.image(l.x(lx), l.y(yk - RH / 2 + 19), gk.key).setOrigin(0, 0.5)
       .setDisplaySize(l.u(gk.w * nsc), l.u(gk.h * nsc)));
     if (ribbon) rc.add(ssTxt(scene, l.x(RW / 2 - 30), l.y(yk - RH / 2 + 19), ribbon, l.u(8.5), ribbonColor)
-      .setOrigin(1, 0.5).setLetterSpacing(l.u(1.5)).setShadow(0, 0, RC.shadow, l.u(6), true, true));
+      .setOrigin(1, 0.5).setLetterSpacing(l.u(1.5)).setShadow(0, 0, ribbonShadow || RC.shadow, l.u(6), true, true));
     rc.add(ssTextBlock(scene, l.x(lx), l.y(yk - RH / 2 + 31), desc, {
       fontSize: l.u(12) + 'px', color: '#c9ccde', fontStyle: 'italic',
       wrapW: l.u(maxW + 6), lineSpacing: l.u(1.5),
@@ -3691,6 +3725,26 @@ function ssSigilPlan(mode, fights, seed) {
     if (bossPays(i) || (i >= next && !bossPays(i + 1))) { pays.add(i); next = i + draw(); }
   }
   return pays;
+}
+/* Which KIND each paying fight offers (v0.66.0): pre-rolled once per run
+   from the plan itself, on the plan seed XOR a constant — its OWN mulberry
+   stream, so the main seeded rng is consumed exactly as before (the daily's
+   shared deal and sigil rolls don't move), a resumed campaign recomputes
+   the identical intents from its roster hash, and the daily's intents are
+   shared-fair (every hunter meets the upgrade offer at the same fight).
+   The run's FIRST paying fight is always 'sigil' — you hold nothing at the
+   hook. `up` is the mode's upgrade share (SS_CADENCE). A fight a harness
+   pins into sigPlan AFTER create has no entry here — payOffer then falls
+   to the row's own type, the comet-check seam unchanged. */
+function ssOfferTypes(mode, plan, seed) {
+  const row = SS_CADENCE[mode] || SS_CADENCE.quick, m = new Map();
+  const rnd = ssMulberry(((seed >>> 0) ^ 0x9e3779b9) || 1);
+  let first = true;
+  for (const i of [...plan].sort((a, b) => a - b)) {
+    m.set(i, !first && rnd() < (row.up || 0) ? 'upgrade' : (row.type || 'sigil'));
+    first = false;
+  }
+  return m;
 }
 
 /* ---- the zodiac ----------------------------------------------------------
@@ -5911,15 +5965,18 @@ class Battle extends Phaser.Scene {
       planSeed = Math.floor(rng() * 1e9);       // daily: seeded stream → every hunter shares the schedule
     }
     this.sigPlan = ssSigilPlan(this.mode, this.fights, planSeed);
+    this.sigTypes = ssOfferTypes(this.mode, this.sigPlan, planSeed);
 
     // ---- run state ----
+    // `tiers` (v0.66.0): id → held tier. A pre-tier checkpoint has no field
+    // and resumes with every sigil at tier I — its exact pre-update strength.
     this.run = this.resume ? {
       fightIdx: this.resume.fightIdx, hpMax: this.resume.hpMax, hp: this.resume.hp,
       sigils: this.resume.sigils || [], words: this.resume.words | 0, longest: this.resume.longest || '',
       totalDmg: this.resume.totalDmg | 0, scried: !!this.resume.scried, featherUsed: !!this.resume.featherUsed,
       letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0, playMs: ssClockInherit(this.resume),
-      overkill: this.resume.overkill | 0,
-    } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0, overkill: 0 };
+      overkill: this.resume.overkill | 0, tiers: this.resume.tiers || {},
+    } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0, overkill: 0, tiers: {} };
     this.clockLast = 0;   // the active-play heartbeat's last stamp — 0 until the first update ticks
     this.run.firstUsed = false;
     // the birth sign — campaign only, pinned for the whole climb. TAURUS's
@@ -5929,6 +5986,7 @@ class Battle extends Phaser.Scene {
     if (this.sign === 'taurus' && !this.resume) { this.run.hpMax += 15; this.run.hp = this.run.hpMax; }
     this.state = 'boot';
     this.board = []; this.sel = []; this.lineTiles = [];
+    this.pending = [];   // bonus tiles owed to the next empty slots (forge drops, GILDED DAWN's start)
     SS.prof.runs++; SS.save();
 
     const tState = performance.now();
@@ -6110,6 +6168,14 @@ class Battle extends Phaser.Scene {
       const t = ssTxt(this, l.x(X), l.y(TOP + 18 + k * STEP), sg.icon, l.u(15), RC.ink).setOrigin(0.5)
         .setShadow(0, 0, RC.shadow, l.u(4), true, true);
       this.dockC.add(t);
+      // a strengthened sigil wears its grade numeral, whisper-quiet at the
+      // icon's foot — the inspector carries the detail (v0.66.0)
+      const ht = this.sigTier(id);
+      if (ht >= 2) {
+        const slot = ssGradeSlot(id, ht), GD = SS_GRADE[slot - 1] || SS_GRADE[1];
+        this.dockC.add(ssTxt(this, l.x(X + 10), l.y(TOP + 27 + k * STEP), SS_ROMAN[slot - 1], l.u(7.5), GD.color)
+          .setOrigin(0.5).setAlpha(0.92));
+      }
       if (newIdx === k) {         // the newest sigil lands with a small bloom
         const b = this.add.image(t.x, t.y, 'glowbig').setDisplaySize(l.u(70), l.u(54))
           .setTint(RC.glow).setAlpha(0.5).setBlendMode('ADD');
@@ -6135,7 +6201,7 @@ class Battle extends Phaser.Scene {
     this.state = 'inspect';
     this.dockC.setVisible(false);          // the compact form yields to the window
     this.inspectP = ssSigilPanel(this, {
-      sigils: this.run.sigils, sign: this.signZ, sleeping: true,
+      sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, sleeping: true,
       onClose: () => {
         this.inspectP = null;
         this.dockC.setVisible(true);
@@ -6157,8 +6223,10 @@ class Battle extends Phaser.Scene {
       let ch = rpick(BAG);
       if (this.boardVowels() < 5 && !VOWELS.includes(ch)) ch = rpick(['a', 'e', 'i', 'o', 'u']);
       ch = PACK.digraph[ch] || ch;
-      let tier = this.pendingTier || 0;
-      this.pendingTier = 0;
+      // the pending queue (v0.66.0): each empty slot takes one owed bonus
+      // tile — GILDED DAWN's start (one gilded; two; two stars at its
+      // height) and the forge's drop ride the same line
+      const tier = this.pending.length ? this.pending.shift() : 0;
       this.spawnTile(i, ch, tier, initial);
     }
   }
@@ -6184,8 +6252,10 @@ class Battle extends Phaser.Scene {
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
-  // what a held sigil adds to this letter (0 when none apply)
-  sigilLetterAdd(ch) { return ssSigilLetterAdd(this.run.sigils, ch); }
+  // what a held sigil adds to this letter (0 when none apply) — at the HELD
+  // tier, so the chip, the preview, the blackout's weighing and the cast
+  // all rise together when the choir or the runes are strengthened
+  sigilLetterAdd(ch) { return ssSigilLetterAdd(this.run.sigils, ch, undefined, this.run.tiers); }
   // what the value chip prints: the TRUE points the cast will pay — letter +
   // tier + held-sigil letter bonuses — or ♥6 on a dew tile (the heal is that
   // tile's worth; its letter still scores through wordDamage)
@@ -6524,6 +6594,20 @@ class Battle extends Phaser.Scene {
 
   // ---------- damage ----------
   hasSigil(id) { return this.run.sigils.includes(id); }
+  // the held copy's tier (1..maxT; 0 unheld) and its dials (v0.66.0) —
+  // every effect site pays the HELD TIER's value through the one resolver
+  sigTier(id) {
+    if (!this.hasSigil(id)) return 0;
+    return Math.max(1, Math.min(((this.run.tiers || {})[id] | 0) || 1, ssSigilMaxT(id)));
+  }
+  sigVal(id, field) { return ssSigilVal(id, field, this.sigTier(id) || 1); }
+  // STORMBINDER's cycle — ONE test for the ×2 and the ↯ toast, so the two
+  // can never disagree; nth-word means run.words ≡ n−1 (mod n), pre-cast
+  stormProc() {
+    if (!this.hasSigil('storm')) return false;
+    const n = this.sigVal('storm', 'every');
+    return this.run.words % n === n - 1;
+  }
   wordDamage(tiles) {
     let base = 0, starMult = 1, vowelsN = 0, letters = 0;
     for (const s of tiles) {
@@ -6537,10 +6621,12 @@ class Battle extends Phaser.Scene {
       if (s.tier === 2) starMult = 1.5;
     }
     let dmg = base * (LEN_MULT[Math.min(letters, 8)] || 2.3) * starMult;
-    if (this.hasSigil('quill')) dmg += 4;
-    if (this.hasSigil('longbow') && letters >= 6) dmg += 12;
-    if (this.hasSigil('roots')) dmg += 2 * this.run.sigils.length;
-    if (this.hasSigil('verse')) dmg += this.run.words;
+    // every dial below reads the HELD TIER's value (v0.66.0) — tier I is
+    // byte-for-byte today's arithmetic
+    if (this.hasSigil('quill')) dmg += this.sigVal('quill', 'add');
+    if (this.hasSigil('longbow') && letters >= 6) dmg += this.sigVal('longbow', 'add');
+    if (this.hasSigil('roots')) dmg += this.sigVal('roots', 'add') * this.run.sigils.length;
+    if (this.hasSigil('verse')) dmg += this.sigVal('verse', 'add') * this.run.words;
     // birth-sign angles (campaign only; this.sign is null elsewhere)
     if (this.sign === 'gemini') {
       const twice = {};
@@ -6551,10 +6637,10 @@ class Battle extends Phaser.Scene {
     if (this.sign === 'libra' && tiles.length && vowelsN * 2 === tiles.length) dmg += 10;
     if (this.sign === 'capricorn') dmg += this.run.fightIdx;
     if (this.sign === 'pisces' && this.beast && this.beast.count === 1 && this.beast.hpNow > 0) dmg *= 1.3;
-    if (this.hasSigil('blood')) dmg *= 1.25;
-    if (this.hasSigil('nova') && letters >= 7) dmg *= 2;
-    if (this.hasSigil('storm') && this.run.words % 3 === 2) dmg *= 2;   // every 3rd cast
-    if (this.hasSigil('first') && !this.run.firstUsed) dmg *= 2;
+    if (this.hasSigil('blood')) dmg *= 1 + this.sigVal('blood', 'mult') / 100;
+    if (this.hasSigil('nova') && letters >= this.sigVal('nova', 'thresh')) dmg *= 2;
+    if (this.stormProc()) dmg *= 2;   // STORMBINDER's cycling word
+    if (this.hasSigil('first') && !this.run.firstUsed) dmg *= this.sigVal('first', 'mult');
     return Math.round(dmg);
   }
   previewDamage() { return this.wordDamage(this.sel.map((i) => this.board[i])); }
@@ -6565,7 +6651,9 @@ class Battle extends Phaser.Scene {
     const b = { ...base };
     b.hp = Math.round(base.hp * f.mult);
     b.atk = base.atk + f.atkAdd;
-    if (this.hasSigil('blood')) b.atk = Math.round(b.atk * 1.25);
+    // BLOOD INK's pact: the beast's side stays +25% at every tier (smult is
+    // flat on the ladder) — upgrading the ink never deepens your wound
+    if (this.hasSigil('blood')) b.atk = Math.round(b.atk * (1 + this.sigVal('blood', 'smult') / 100));
     if (f.umbral && !base.boss) { b.tint = SS_UMBRAL.tint; b.eye = SS_UMBRAL.eye; b.name = SS_UMBRAL.prefix + base.name; }
     if (f.umbral && base.boss && f.id !== 'phoenix') { b.tint = SS_UMBRAL.tint; b.eye = SS_UMBRAL.eye; b.name = SS_UMBRAL.prefix + base.name; }
     return b;
@@ -6574,7 +6662,7 @@ class Battle extends Phaser.Scene {
     const l = this.L;
     const f = this.fights[this.run.fightIdx];
     this.beast = this.beastFor(f);
-    if (this.hasSigil('hush')) this.beast.timer += 1;
+    if (this.hasSigil('hush')) this.beast.timer += this.sigVal('hush', 'delay');
     this.beast.hpNow = this.beast.hp;
     if ((this.run.overkill | 0) > 0) {                 // ECHO OF RUIN carries the surplus
       const carve = Math.min(this.run.overkill | 0, this.beast.hp - 1);
@@ -6609,11 +6697,13 @@ class Battle extends Phaser.Scene {
     this.beast.count = this.beast.timer;
     this.run.firstUsed = false;
     this.struckThisBattle = false;
-    this.shieldUsed = false;
-    this.hintUsed = false;
-    // COMET TRAIL burns fresh each battle — boss fights included; the count
-    // is the sigil def's own dial (ssSigilCharges), never a constant here
-    this.cometLeft = this.hasSigil('comet') ? ssSigilCharges('comet') : 0;
+    // per-battle allowances, granted fresh every fight (resume included —
+    // fight-start semantics, derived never persisted) at the HELD TIER:
+    // SILVER SHIELD's blocks (1; 2 at its height), the TOME's reveals
+    // (1; 2), COMET TRAIL's free scries (1 / 2 / 3)
+    this.shieldLeft = this.hasSigil('shield') ? this.sigVal('shield', 'blocks') : 0;
+    this.hintsLeft = this.hasSigil('tome') ? this.sigVal('tome', 'uses') : 0;
+    this.cometLeft = this.hasSigil('comet') ? ssSigilCharges('comet', this.sigTier('comet')) : 0;
     this.clearHintFx();
     this.headT.setText(this.modeTitle());
     const pipBase = this.mode === 'campaign' ? Math.floor(this.run.fightIdx / 5) * 5 : 0;
@@ -6641,7 +6731,7 @@ class Battle extends Phaser.Scene {
     this.tweens.killTweensOf([this.boardC, this.lineC]);
     this.boardC.setAlpha(1); this.lineC.setAlpha(1);
     this.layoutLine();
-    if (this.hasSigil('gilded')) this.pendingTier = 1;
+    if (this.hasSigil('gilded')) this.pending = [...this.sigVal('gilded', 'start')];
     this.fillBoard(true);
     this.hintB.setVisible(this.hasSigil('tome')); this.hintT.setVisible(this.hasSigil('tome'));
     this.hintB.setAlpha(1); this.hintT.setAlpha(1);
@@ -6709,7 +6799,7 @@ class Battle extends Phaser.Scene {
     const tiles = this.sel.map((i) => this.board[i]);
     const dmg = this.wordDamage(tiles);
     const letters = tiles.reduce((a, s) => a + s.ch.length, 0);
-    const stormProc = this.hasSigil('storm') && this.run.words % 3 === 2;   // before words++
+    const stormProc = this.stormProc();   // before words++ — same test the damage math ran
     this.run.words++; this.run.firstUsed = true;
     this.run.letters += letters;
     if (dmg > this.run.bigHit) this.run.bigHit = dmg;
@@ -6761,8 +6851,8 @@ class Battle extends Phaser.Scene {
     this.time.delayedCall(this.sel.length * 55 + 320, () => {
       SFX.impact();
       this.cameras.main.shake(140, 0.006);
-      if (this.hasSigil('salve') && letters >= 5) this.heal(4);
-      if (this.hasSigil('leech')) this.heal(1);
+      if (this.hasSigil('salve') && letters >= 5) this.heal(this.sigVal('salve', 'heal'));
+      if (this.hasSigil('leech')) this.heal(this.sigVal('leech', 'heal'));
       // the dew rides the cast: every green in the word heals DEW_HEAL (they
       // sum), in addition to the letter's own points already in dmg
       const dews = this.sel.filter((i) => this.board[i] && this.board[i].tier === 3 && !this.board[i].blk).length;
@@ -6779,10 +6869,12 @@ class Battle extends Phaser.Scene {
       const used = [...this.sel];
       this.sel = [];
       this.lineTiles = [];
-      let tier = letters >= 7 ? 2 : letters >= 5 ? 1 : 0;
+      // STAR FORGE at its height lowers the forging floor to 4 letters
+      // (`low`); at tier I it is today's 5, held or not
+      let tier = letters >= 7 ? 2 : letters >= (this.hasSigil('forge') ? this.sigVal('forge', 'low') : 5) ? 1 : 0;
       if (tier > 0 && this.hasSigil('forge')) tier = 2;
       for (const i of used) { this.board[i].c.destroy(); this.board[i] = null; }
-      if (tier > 0) { this.pendingTier = tier; SFX.forge(); }
+      if (tier > 0) { this.pending.push(tier); SFX.forge(); }
       this.layoutLine();
       this.beastHit(dmg);
       this.time.delayedCall(200, () => {
@@ -6928,9 +7020,15 @@ class Battle extends Phaser.Scene {
     ssSigilBump('ovk', Math.max(0, -this.beast.hpNow));
     if (this.run.hp <= 10) ssSigilBump('brnk');
     SS.save();
-    if (this.hasSigil('echo')) this.run.overkill = Math.max(0, -this.beast.hpNow);
+    // ECHO OF RUIN carries the surplus at its tier's weight (×1 / ×1.5 / ×2);
+    // the drip counter above kept the RAW figure
+    if (this.hasSigil('echo')) this.run.overkill = Math.round(Math.max(0, -this.beast.hpNow) * this.sigVal('echo', 'carry'));
     this.run.fightIdx++;
-    this.heal(this.hasSigil('meteor') ? this.run.hpMax : 6);
+    if (this.hasSigil('meteor')) {
+      // at its height the METEOR first grows the vessel (+3 max), THEN fills it
+      this.run.hpMax += this.sigVal('meteor', 'hpAdd') | 0;
+      this.heal(this.run.hpMax);
+    } else this.heal(6);
     if (this.mode === 'campaign') this.saveCheckpoint();
     this.time.delayedCall(1150, () => {
       if (this.run.fightIdx >= this.fights.length) this.endRun(true);
@@ -6941,21 +7039,30 @@ class Battle extends Phaser.Scene {
       else this.afterSigil();
     });
   }
-  /* What a paying fight hands over. 'sigil' — today's only offer — opens the
-     pick; 'upgrade' is RESERVED in SS_OFFER_TYPES for the coming sigil-tier
-     card, so a row carrying it (or anything unknown) rides on rather than
-     opening a screen that does not exist yet. */
+  /* What a paying fight hands over (v0.66.0). The pre-rolled intent
+     (sigTypes) says whether this offer is three new sigils or the
+     STRENGTHEN screen; a fight with no entry (a harness pin) falls to the
+     row's own type, and an unknown type falls to 'sigil' — a bad row can
+     never dead-screen. When the roster of new sigils is dry, a 'sigil'
+     offer crosses over to an upgrade instead of riding on — a long climb
+     that has taken everything still gets paid. Both dry → ride on. */
   payOffer() {
-    const row = SS_CADENCE[this.mode];
-    if (!row || (row.type || 'sigil') === 'sigil') this.showSigilPick();
-    else this.afterSigil();
+    const idx = this.run.fightIdx - 1;                       // beastDeath already ++'d
+    let intent = (this.sigTypes && this.sigTypes.get(idx)) || (SS_CADENCE[this.mode] || {}).type || 'sigil';
+    if (!SS_OFFER_TYPES.includes(intent)) intent = 'sigil';
+    const canUp = this.run.sigils.some((id) => this.sigTier(id) < ssSigilMaxT(id));
+    if (intent === 'upgrade' && canUp) { this.showUpgradePick(); return; }
+    const opts = this.rollSigilOpts();                       // roll ONCE — handed into the pick
+    if (opts.length) { this.showSigilPick(opts); return; }
+    if (canUp) { this.showUpgradePick(); return; }
+    this.afterSigil();
   }
   saveCheckpoint() {
     if (this.run.fightIdx >= this.fights.length) { ssClearCampaign(); return; }
     const f = this.fights[this.run.fightIdx];
     localStorage.setItem('beta3.campaign', JSON.stringify({
       fightIdx: this.run.fightIdx, actIdx: f.actIdx, hp: this.run.hp, hpMax: this.run.hpMax,
-      sigils: this.run.sigils, words: this.run.words, longest: this.run.longest,
+      sigils: this.run.sigils, tiers: this.run.tiers, words: this.run.words, longest: this.run.longest,
       totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
       letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
       overkill: this.run.overkill | 0, clockV: 2,
@@ -6995,8 +7102,8 @@ class Battle extends Phaser.Scene {
       done(); return;
     }
     this.beast.count = this.beast.timer;
-    if (this.hasSigil('shield') && !this.shieldUsed) {
-      this.shieldUsed = true;
+    if (this.hasSigil('shield') && (this.shieldLeft | 0) > 0) {
+      this.shieldLeft--;
       SFX.blocked();
       const bt = ssTxt(this, l.x(0), l.y(240), '✦ BLOCKED ✦', l.u(20), '#9fd8ff').setOrigin(0.5).setDepth(70);
       this.tweens.add({ targets: bt, alpha: 0, y: l.y(220), delay: 600, duration: 400, onComplete: () => bt.destroy() });
@@ -7017,7 +7124,7 @@ class Battle extends Phaser.Scene {
       this.struckThisBattle = true;
       ssSigilBump('hit'); SS.save();
       let atk = this.beast.atk;
-      if (this.hasSigil('eclipse')) atk = Math.ceil(atk / 2);
+      if (this.hasSigil('eclipse')) atk = Math.ceil(atk / this.sigVal('eclipse', 'div'));
       if (this.sign === 'cancer' && !this.shellUsed) {   // the shell takes the first blow
         this.shellUsed = true;
         atk = Math.ceil(atk / 2);
@@ -7025,13 +7132,13 @@ class Battle extends Phaser.Scene {
         const st = ssTxt(this, l.x(0), l.y(240), '◈ ' + SS_T('zShell') + ' ◈', l.u(16), '#9fd8ff').setOrigin(0.5).setDepth(70);
         this.tweens.add({ targets: st, alpha: 0, y: l.y(220), delay: 700, duration: 400, onComplete: () => st.destroy() });
       }
-      if (this.hasSigil('ward')) atk = Math.max(1, atk - 3);
+      if (this.hasSigil('ward')) atk = Math.max(1, atk - this.sigVal('ward', 'cut'));
       this.run.hp -= atk;
       const dt = ssTxt(this, l.x(-160), l.y(68), '-' + atk, l.u(22), '#ff8a8a').setOrigin(0.5).setDepth(70);
       this.tweens.add({ targets: dt, y: dt.y + l.u(30), alpha: 0, duration: 800, onComplete: () => dt.destroy() });
       if (this.run.hp <= 0 && this.hasSigil('feather') && !this.run.featherUsed) {
         this.run.featherUsed = true;
-        this.run.hp = 1;
+        this.run.hp = Math.min(this.sigVal('feather', 'revive'), this.run.hpMax);
         this.cameras.main.flash(500, 255, 160, 60);
         SFX.bigWord();
         const ft = ssTxt(this, l.x(0), l.y(400), '🔥 THE FEATHER BURNS 🔥', l.u(20), '#ffa94d').setOrigin(0.5).setDepth(70);
@@ -7109,7 +7216,7 @@ class Battle extends Phaser.Scene {
      button before it is paid. */
   updateScryPips(spent) {
     const l = this.L;
-    const total = this.hasSigil('comet') ? ssSigilCharges('comet') : 0;
+    const total = this.hasSigil('comet') ? ssSigilCharges('comet', this.sigTier('comet')) : 0;
     if (this.scryPips.length !== total) {
       for (const p of this.scryPips) p.destroy();
       this.scryPips = [];
@@ -7144,11 +7251,14 @@ class Battle extends Phaser.Scene {
   // — and holding is free: only a successful cast clears the fx, so the
   // player can trace the lit path while it stands.
   useHint() {
-    if (this.state !== 'pick' || !this.hasSigil('tome') || this.hintUsed) return;
+    if (this.state !== 'pick' || !this.hasSigil('tome') || (this.hintsLeft | 0) <= 0) return;
     const best = this.bestWord();
     if (!best) return;
-    this.hintUsed = true;
-    this.hintB.setAlpha(0.3); this.hintT.setAlpha(0.3);
+    // the TOME's reveals are a per-battle count now (1; 2 at its higher
+    // tiers) — the eye dims only when the last one is spent
+    this.hintsLeft--;
+    const dim = (this.hintsLeft | 0) <= 0 ? 0.3 : 1;
+    this.hintB.setAlpha(dim); this.hintT.setAlpha(dim);
     SFX.forge();
     const l = this.L;
     this.clearHintFx();
@@ -7241,10 +7351,10 @@ class Battle extends Phaser.Scene {
     }
     return opts;
   }
-  showSigilPick() {
+  showSigilPick(pre) {
     const l = this.L;
     this.state = 'sigil';
-    const opts = this.rollSigilOpts();
+    const opts = pre || this.rollSigilOpts();   // payOffer pre-rolls; bare calls (harnesses) roll here
     if (!opts.length) { this.afterSigil(); return; }           // every sigil owned — ride on
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
@@ -7291,7 +7401,9 @@ class Battle extends Phaser.Scene {
         this.state = 'anim';
         SFX.sigil();
         this.run.sigils.push(sg.id);
-        if (sg.id === 'aegis') { this.run.hpMax += 20; this.run.hp = this.run.hpMax; }
+        // a new sigil always arrives at tier I — the AEGIS grants its base
+        // vessel, data-read so the ladder and the pick can never disagree
+        if (sg.id === 'aegis') { this.run.hpMax += ssSigilVal('aegis', 'hp', 1); this.run.hp = this.run.hpMax; }
         this.repaintChips();   // a letter-bonus sigil shows on the standing board at once
         if (this.mode === 'campaign') this.saveCheckpoint();
         sparks.emitParticleAt(card.x, card.y, tier === 2 ? 26 : 12);
@@ -7307,6 +7419,160 @@ class Battle extends Phaser.Scene {
     items.push(sparks);
     this.overlayC.add(items);
     ssHealBlankTexts(this, 'sigil-pick');
+  }
+
+  /* ---------- the upgrade pick (v0.66.0) ----------
+     Skylar (9/1): "sometimes at the end of a battle, instead of it granting
+     you a new sigil, you get the ability to upgrade a sigil that you
+     already have in your possession." Same panel language as the 3-card
+     pick: the board dims, the veil rises, a gold header — then one row per
+     held sigil in the order they were taken. An upgradable row wears the
+     grade-slot pair (II → IV — a skipped epic visibly skips) in the TARGET
+     grade's dress and speaks the NEXT tier's effect; a maxed row dims
+     under AT ITS HEIGHT and speaks what it already does. Rows pick on the
+     pointer UP under a small drag threshold so the same finger can scroll
+     a long list; a synthetic emit('pointerdown') (the demo, the harnesses)
+     picks at once. The forge is the upgrade's voice — SFX.sigil stays with
+     new arrivals. */
+  showUpgradePick() {
+    const l = this.L;
+    this.state = 'upgrade';
+    this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.86, duration: 300 });
+    const head = ssTxt(this, l.x(0), l.y(116), SS_T('upHead'), l.u(18), '#c9b676').setOrigin(0.5)
+      .setShadow(0, 0, '#c9b676', l.u(10), true, true);
+    const items = [veil, head];
+    const sparks = this.add.particles(0, 0, 'dot', {
+      speed: { min: 40, max: 240 }, lifespan: { min: 300, max: 900 }, scale: { start: 0.8, end: 0 },
+      tint: [0xffd77a, 0xfff2c9], blendMode: 'ADD', emitting: false,
+    });
+    const RW = 340, RH = 84, GAP = 10, TOPY = 146, VIEWH = 616;
+    const ids = this.run.sigils;
+    const contentH = ids.length * (RH + GAP) - GAP;
+    const rc = this.add.container(0, 0);
+    const rows = [];
+    let done = false;
+    const pick = (row, id, idx) => {
+      if (this.state !== 'upgrade' || done) return;
+      done = true;
+      this.state = 'anim';
+      SFX.forge();
+      const cur = this.sigTier(id);
+      this.run.tiers[id] = cur + 1;
+      const slot = ssGradeSlot(id, cur + 1);
+      const GD = SS_GRADE[slot - 1] || SS_GRADE[1];
+      if (id === 'aegis') {
+        // the dawn grows NOW: grant the tier DELTA to the vessel, healed —
+        // and never re-granted on resume (hpMax rides the checkpoint)
+        const d = (ssSigilVal('aegis', 'hp', cur + 1) | 0) - (ssSigilVal('aegis', 'hp', cur) | 0);
+        this.run.hpMax += d; this.heal(d);
+      }
+      this.repaintChips();   // a choir/runes step shows on the standing board at once
+      if (this.mode === 'campaign') this.saveCheckpoint();
+      const glow = this.add.image(row.x, row.y + rc.y, 'glowbig').setDisplaySize(l.u(440), l.u(180))
+        .setTint(GD.glow).setAlpha(0).setBlendMode('ADD');
+      this.overlayC.add(glow);
+      items.push(glow);
+      this.tweens.add({ targets: glow, alpha: 0.42, duration: 170, yoyo: true });
+      sparks.emitParticleAt(row.x, row.y + rc.y, slot >= 4 ? 26 : 14);
+      if (slot >= 4) this.cameras.main.flash(300, 255, 214, 120, false);   // a legendary ascension announces itself
+      this.tweens.add({ targets: row, scale: 1.05, duration: 130, yoyo: true });
+      for (const it of items) if (it !== sparks && it !== glow && it !== rc) this.tweens.add({ targets: it, alpha: 0, duration: 200 });
+      for (const r of rows) if (r !== row) this.tweens.add({ targets: r, alpha: 0, duration: 200 });
+      this.time.delayedCall(360, () => {
+        sparks.destroy();
+        for (const it of items) it.destroy();
+        this.refreshDock(idx);   // the icon re-blooms wearing its new numeral
+        this.afterSigil();
+      });
+    };
+    ids.forEach((id, k) => {
+      const sg = SS_SIG_BY[id];
+      if (!sg) return;
+      const cur = this.sigTier(id), can = cur < ssSigilMaxT(id);
+      const dropT = sg.rarity | 0;
+      const RC = SS_RARITY[dropT];
+      const cy = l.y(TOPY + RH / 2) + l.u(k * (RH + GAP));
+      const tex = ssSigilCardTex(this, dropT, RW, RH);
+      const row = this.add.container(l.x(0), cy);
+      row.add(this.add.image(0, 0, tex.key).setDisplaySize(l.u(RW), l.u(RH)));
+      const gx = -RW / 2 + tex.mx;
+      row.add(ssTxt(this, l.u(gx), 0, sg.icon, l.u(tex.mr * 0.95), RC.ink).setOrigin(0.5)
+        .setShadow(0, 0, RC.shadow, l.u(5), true, true));
+      const lx = gx + tex.mr + 14, maxW = RW / 2 - lx - 12;
+      const loc = SS_SIG(sg, can ? cur + 1 : cur);
+      const gk = ssGoldTex(this, loc.name, 13);
+      const nsc = Math.min(1, (maxW - 74) / gk.w);
+      row.add(this.add.image(l.u(lx), l.u(-RH / 2 + 19), gk.key).setOrigin(0, 0.5)
+        .setDisplaySize(l.u(gk.w * nsc), l.u(gk.h * nsc)));
+      if (can) {
+        const slot = ssGradeSlot(id, cur), next = ssGradeSlot(id, cur + 1);
+        const GD = SS_GRADE[next - 1] || SS_GRADE[1];
+        // no letterSpacing on the right-anchored pair — Phaser renders the
+        // spacing wider than it measures, and the last numeral bleeds past
+        // the card frame (screenshot-caught at dpr3)
+        row.add(ssTxt(this, l.u(RW / 2 - 22), l.u(-RH / 2 + 14), SS_ROMAN[slot - 1] + ' → ' + SS_ROMAN[next - 1], l.u(11), GD.color)
+          .setOrigin(1, 0.5).setShadow(0, 0, GD.color, l.u(6), true, true));
+        row.add(ssTxt(this, l.u(RW / 2 - 22), l.u(-RH / 2 + 28), SS_T(GD.key), l.u(7.5), GD.color)
+          .setOrigin(1, 0.5).setAlpha(0.85));
+      } else {
+        row.add(ssTxt(this, l.u(RW / 2 - 16), l.u(-RH / 2 + 19), '✦ ' + SS_T('upMax') + ' ✦', l.u(8.5), '#8a94c4')
+          .setOrigin(1, 0.5).setLetterSpacing(l.u(1.5)));
+      }
+      row.add(ssTextBlock(this, l.u(lx), l.u(-RH / 2 + 33), loc.desc, {
+        fontSize: l.u(11.5) + 'px', color: can ? '#c9ccde' : '#8a90ac', fontStyle: 'italic',
+        wrapW: l.u(maxW + 6), lineSpacing: l.u(1.5),
+      }).setData('sigilDesc', id));
+      row.setSize(l.u(RW), l.u(RH));
+      if (can) {
+        row.setInteractive({ useHandCursor: true });
+        row.setData('sigilCard', true);
+        let armY = null;
+        row.on('pointerdown', (p) => { if (!p) { pick(row, id, k); return; } armY = p.y; });
+        row.on('pointerup', (p) => {
+          if (armY == null) return;
+          const dy = Math.abs(p.y - armY);
+          armY = null;
+          // a scrolled-away row must not take a blind tap — its centre has
+          // to be inside the viewport when the finger lifts
+          const vy = row.y + rc.y;
+          if (dy < l.u(9) && vy > l.y(TOPY) - l.u(24) && vy < l.y(TOPY + VIEWH) + l.u(24)) pick(row, id, k);
+        });
+      } else row.setAlpha(0.5);
+      rows.push(row); rc.add(row);
+      const restA = can ? 1 : 0.5;
+      row.alpha = 0; row.y = cy + l.u(20);
+      this.tweens.add({ targets: row, alpha: restA, y: cy, delay: 120 + k * 80, duration: 300, ease: 'Cubic.easeOut' });
+    });
+    items.push(rc, sparks);
+    this.overlayC.add(items);
+    // a longer roster than the window holds scrolls under a mask — the
+    // inspector's pattern, driven from anywhere (the rows' pick threshold
+    // arbitrates tap vs drag)
+    const maxOff = Math.max(0, l.u(contentH) - l.u(VIEWH));
+    if (maxOff > 0) {
+      const mg = this.make.graphics();
+      mg.fillRect(l.x(-186), l.y(TOPY), l.u(372), l.u(VIEWH));
+      rc.setMask(mg.createGeometryMask());
+      let drag = null, off = 0;
+      const dn = (p) => { if (this.state === 'upgrade') drag = { y: p.y, off }; };
+      const mv = (p) => {
+        if (!drag) return;
+        if (!p.isDown) { drag = null; return; }
+        off = clamp(drag.off + (drag.y - p.y), 0, maxOff);
+        rc.y = -off;
+      };
+      const up = () => { drag = null; };
+      this.input.on('pointerdown', dn);
+      this.input.on('pointermove', mv);
+      this.input.on('pointerup', up);
+      rc.once('destroy', () => {
+        this.input.off('pointerdown', dn); this.input.off('pointermove', mv); this.input.off('pointerup', up);
+        mg.destroy();
+      });
+    }
+    ssHealBlankTexts(this, 'upgrade-pick');
   }
 
   // ---------- the map between fights ----------
@@ -7344,12 +7610,13 @@ class Battle extends Phaser.Scene {
     const l = this.L;
     this.state = 'end';
     if (this.inspectP) this.inspectP.close();   // no window may outlive the run
-    // THE TOME'S PRICE — holding the Whispering Tome taxes the final score by
-    // 25%. Applied here, before the books: bests, sign records, the daily
-    // ledger, the beacon and the submitted leaderboard score all pay it.
+    // THE TOME'S PRICE — holding the Whispering Tome taxes the final score
+    // by its held tier's rate (25%; 15% at its height). Applied here, before
+    // the books: bests, sign records, the daily ledger, the beacon and the
+    // submitted leaderboard score all pay it.
     const rawScore = this.runScore();
-    const tomeTax = this.hasSigil('tome');
-    const score = tomeTax ? Math.round(rawScore * 0.75) : rawScore;
+    const tomeTax = this.hasSigil('tome') ? this.sigVal('tome', 'tax') : 0;
+    const score = tomeTax ? Math.round(rawScore * (1 - tomeTax / 100)) : rawScore;
     const elapsed = this.runElapsed();
     if (!won) SFX.defeat();
     // best-run reference, captured before the books are updated below
@@ -7445,7 +7712,7 @@ class Battle extends Phaser.Scene {
     const gk = ssGoldTex(this, String(score), 30);
     items.push(this.add.image(l.x(0), py(140), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
     // the bargain stated where it bit — the score shown already paid it
-    if (tomeTax) items.push(ssTxt(this, l.x(0), py(163), SS_T('endTomeTax'), l.u(9.5), '#cf8fa0', 'italic').setOrigin(0.5));
+    if (tomeTax) items.push(ssTxt(this, l.x(0), py(163), SS_T('endTomeTax', tomeTax), l.u(9.5), '#cf8fa0', 'italic').setOrigin(0.5));
     const bestY = tomeTax ? 178 : 170;
     if (prevBest >= 0 && score > prevBest && prevBest > 0) {
       const nb = ssTxt(this, l.x(0), py(bestY), SS_T('newBest'), l.u(14), '#ffe9a8').setOrigin(0.5)
@@ -7494,7 +7761,7 @@ class Battle extends Phaser.Scene {
         if (this.endInspectP) return;
         SFX.ui();
         this.endInspectP = ssSigilPanel(this, {
-          sigils: this.run.sigils, sign: this.signZ, sleeping: true, depth: 130,
+          sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, sleeping: true, depth: 130,
           onClose: () => { this.endInspectP = null; },
         });
       });
@@ -7654,11 +7921,18 @@ class Battle extends Phaser.Scene {
       if (z && z.active) z.emit('pointerdown');
       return;
     }
-    if (this.state === 'sigil') {
+    if (this.state === 'sigil' || this.state === 'upgrade') {
       if (!this.sigilShownAt) this.sigilShownAt = this.time.now;
       if (this.time.now - this.sigilShownAt > 2200) {
         this.sigilShownAt = 0;
-        const cards = this.overlayC.list.filter((o) => o.getData && o.getData('sigilCard'));
+        // the upgrade rows live one container down but wear the same tag —
+        // walk overlayC and its children so both screens' cards are found
+        const cards = [];
+        const scan = (ls) => ls.forEach((o) => {
+          if (o.getData && o.getData('sigilCard')) cards.push(o);
+          else if (o.list) scan(o.list);
+        });
+        scan(this.overlayC.list);
         if (cards.length) cards[Math.floor(Math.random() * cards.length)].emit('pointerdown');
       }
       return;

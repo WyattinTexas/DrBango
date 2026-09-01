@@ -298,9 +298,19 @@ const SS_QUICK_BOSS = 'draco';
                landing one fight before such a boss folds into
                the boss's — never two offers back to back. The
                mid-act boss-TIER elites are ordinary fights here.
-   · type    — what the offer IS. 'sigil' opens the pick screen;
-               'upgrade' (SS_OFFER_TYPES) is RESERVED for the
-               coming sigil-tier card and is never rolled today.
+   · type    — what the offer IS when the `up` roll passes it
+               by. 'sigil' opens the pick screen; 'upgrade'
+               (SS_OFFER_TYPES) opens the STRENGTHEN screen.
+   · up      — the share of paying fights whose offer is an
+               UPGRADE of a held sigil instead of three new ones
+               (v0.66.0, Skylar 9/1: "sometimes at the end of a
+               battle … you get the ability to upgrade a sigil
+               that you already have"). Rolled per offer on the
+               plan's own derived seed (ssOfferTypes, game.js);
+               the run's FIRST paying fight is always 'sigil',
+               and a fight with nothing upgradable falls back to
+               the pick. versus carries no `up` — one duel is
+               one battle, nowhere for an upgrade to live.
    The run's LAST fight never pays — that win ends the run.
    Campaign (4 acts × 5 fights): 7-9 offers per full climb,
    typically 8 (hook + Act I mid on a short gap + the three act
@@ -312,14 +322,14 @@ const SS_QUICK_BOSS = 'draco';
    rows the coming cards fill in.
    ============================================================ */
 const SS_CADENCE = {
-  campaign: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil' },
-  quick: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil' },
-  daily: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil' },
+  campaign: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil', up: 0.35 },
+  quick: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil', up: 0.35 },
+  daily: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil', up: 0.35 },
   versus: { casts: 3, type: 'sigil' },
-  endless: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil' },   // reserved — the endless card tunes it
+  endless: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil', up: 0.35 },   // reserved — the endless card tunes it
   hard: { gapAdd: 1 },                                                // reserved modifier — the hard-mode card reads it
 };
-const SS_OFFER_TYPES = ['sigil', 'upgrade'];   // 'upgrade': reserved, never rolled today
+const SS_OFFER_TYPES = ['sigil', 'upgrade'];   // an unknown type falls back to 'sigil' — never a dead screen
 
 /* ============================================================
    THE ZODIAC — twelve birth signs, pickable before a campaign.
@@ -426,45 +436,117 @@ for (const _z of SS_ZODIAC) SS_ZODIAC_BY[_z.id] = _z;
    ssSigilLetterAdd (game.js) folds every held lb into one per-letter figure
    that the tile's printed chip, the CAST preview, the blackout's weighing and
    wordDamage all read — one place, so the board can never disagree with the
-   cast. Future sigil tiers change `add` here, never the renderer. Word-level
-   effects (Ember Quill, the longbow, doublers) are NOT lb — they belong to the
-   whole word and never print on a tile.
+   cast. A sigil's TIER changes `add` through its tl ladder, never the
+   renderer. Word-level effects (Ember Quill, the longbow, doublers) are NOT
+   lb — they belong to the whole word and never print on a tile.
    `charges` marks a per-battle allowance (Comet Trail: how many scries ride
    free before SCRY hastens the strike again — Skylar 9/1: scry must NEVER
    stop hastening it outright). Granted fresh at every startFight, spent one
-   scry at a time, printed as pips on the SCRY button. The coming sigil tiers
-   turn only this number (base 1, rare 2, legendary 3 — epic skipped). */
+   scry at a time, printed as pips on the SCRY button. The tier ladder turns
+   only this number (base 1, rare 2, legendary 3 — epic skipped).
+   THE TIER LADDER (v0.66.0). Skylar (9/1): a held sigil can be STRENGTHENED
+   over a run — common→rare→epic→legendary. `tl` holds the override objects
+   for tiers II+; the base def IS tier I, so today's live numbers are the
+   ladder's first rung (an old checkpoint resumes at exactly its old
+   strength, versus plays byte-identically, and the harness seams that dial
+   base fields keep dialing tier I). Ladder length = 1 + tl.length (2-4);
+   grade SLOTS map steps onto Skylar's ladder in game.js (SS_GRADE_SLOTS) —
+   a 3-step ladder reads I · II · IV, the epic slot visibly skipped, exactly
+   as he ruled comet ("base one, rare two, skip epic, legendary three").
+   `dvf` names the def fields whose numbers substitute into the desc's
+   %1..%k (a 'lb.add' path walks in) — ONE source, so the text can never
+   drift from the effect; where the moving thing is a WORD (double/triple,
+   once/twice, third/second) the tl entry carries a full `desc` instead and
+   the strings.js sig rows grow [name, descI, descII, …] per language.
+   ssSigilVal (below) is THE one resolver every reader uses — game code,
+   SS_SIG, the harnesses; no site hand-reads `tl`. Unlocks stay PER-SIGIL:
+   the drip, the locks and the sleeping gallery know nothing of tiers. */
 const SS_SIGILS = [
   // ---- basic ----
-  { id: 'quill', icon: '❦', rarity: 0, name: 'EMBER QUILL', desc: 'Every word deals +4 damage.' },
-  { id: 'choir', icon: '♫', rarity: 0, name: 'VOWEL CHOIR', desc: 'Vowels are worth +2 each.', lb: { vowels: true, add: 2 } },
-  { id: 'runes', icon: '✣', rarity: 0, name: 'RIVER RUNES', desc: 'S, R, E and T are worth +2 each.', lb: { letters: 'sret', add: 2 } },
-  { id: 'salve', icon: '☾', rarity: 0, name: 'MOON SALVE', desc: 'Words of 5+ letters heal you 4.' },
-  { id: 'aegis', icon: '✺', rarity: 0, name: 'AEGIS OF DAWN', desc: '+20 max health, healed now.' },
-  { id: 'first', icon: '✧', rarity: 0, name: 'FIRST LIGHT', desc: 'Your first word each battle deals double.' },
-  { id: 'hush', icon: '⧗', rarity: 0, name: 'HUSHED HOURGLASS', desc: 'Beasts strike one cast later.' },
-  { id: 'comet', icon: '☄', rarity: 0, name: 'COMET TRAIL', desc: 'Your first SCRY each battle does not hasten the strike.', charges: 1, lock: { s: 'scry', n: 20, how: 'Call on SCRY %1 times.' } },
-  { id: 'shield', icon: '◈', rarity: 0, name: 'SILVER SHIELD', desc: 'Block the first strike of every battle.' },
-  { id: 'leech', icon: '❉', rarity: 0, name: 'DEW DRINKER', desc: 'Every word heals you 1.' },
-  { id: 'longbow', icon: '➳', rarity: 0, name: 'STARRY LONGBOW', desc: 'Words of 6+ letters deal +12.', lock: { s: 'w6', n: 8, how: 'Weave %1 words of six letters or more.' } },
-  { id: 'gilded', icon: '✹', rarity: 0, name: 'GILDED DAWN', desc: 'Every battle begins with a gilded tile.', lock: { s: 'frg', n: 25, how: 'Forge %1 tiles with long words.' } },
+  { id: 'quill', icon: '❦', rarity: 0, name: 'EMBER QUILL', desc: 'Every word deals +%1 damage.', add: 4, dvf: ['add'],
+    tl: [{ add: 6 }, { add: 8 }, { add: 11 }] },
+  { id: 'choir', icon: '♫', rarity: 0, name: 'VOWEL CHOIR', desc: 'Vowels are worth +%1 each.', lb: { vowels: true, add: 2 }, dvf: ['lb.add'],
+    tl: [{ lb: { vowels: true, add: 3 } }, { lb: { vowels: true, add: 4 } }] },
+  { id: 'runes', icon: '✣', rarity: 0, name: 'RIVER RUNES', desc: 'S, R, E and T are worth +%1 each.', lb: { letters: 'sret', add: 2 }, dvf: ['lb.add'],
+    tl: [{ lb: { letters: 'sret', add: 3 } }, { lb: { letters: 'sret', add: 4 } }] },
+  { id: 'salve', icon: '☾', rarity: 0, name: 'MOON SALVE', desc: 'Words of 5+ letters heal you %1.', heal: 4, dvf: ['heal'],
+    tl: [{ heal: 6 }, { heal: 8 }] },
+  { id: 'aegis', icon: '✺', rarity: 0, name: 'AEGIS OF DAWN', desc: '+%1 max health, healed now.', hp: 20, dvf: ['hp'],
+    tl: [{ hp: 30 }, { hp: 45 }] },
+  { id: 'first', icon: '✧', rarity: 0, name: 'FIRST LIGHT', desc: 'Your first word each battle deals double.', mult: 2,
+    tl: [{ mult: 3, desc: 'Your first word each battle deals triple.' }] },
+  { id: 'hush', icon: '⧗', rarity: 0, name: 'HUSHED HOURGLASS', desc: 'Beasts strike one cast later.', delay: 1,
+    tl: [{ delay: 2, desc: 'Beasts strike two casts later.' }] },
+  { id: 'comet', icon: '☄', rarity: 0, name: 'COMET TRAIL', desc: 'Your first SCRY each battle does not hasten the strike.', charges: 1,
+    tl: [{ charges: 2, desc: 'Your first two SCRIES each battle do not hasten the strike.' },
+      { charges: 3, desc: 'Your first three SCRIES each battle do not hasten the strike.' }],
+    lock: { s: 'scry', n: 20, how: 'Call on SCRY %1 times.' } },
+  { id: 'shield', icon: '◈', rarity: 0, name: 'SILVER SHIELD', desc: 'Block the first strike of every battle.', blocks: 1,
+    tl: [{ blocks: 2, desc: 'Block the first two strikes of every battle.' }] },
+  { id: 'leech', icon: '❉', rarity: 0, name: 'DEW DRINKER', desc: 'Every word heals you %1.', heal: 1, dvf: ['heal'],
+    tl: [{ heal: 2 }, { heal: 3 }] },
+  { id: 'longbow', icon: '➳', rarity: 0, name: 'STARRY LONGBOW', desc: 'Words of 6+ letters deal +%1.', add: 12, dvf: ['add'],
+    tl: [{ add: 18 }, { add: 26 }], lock: { s: 'w6', n: 8, how: 'Weave %1 words of six letters or more.' } },
+  { id: 'gilded', icon: '✹', rarity: 0, name: 'GILDED DAWN', desc: 'Every battle begins with a gilded tile.', start: [1],
+    tl: [{ start: [1, 1], desc: 'Every battle begins with two gilded tiles.' },
+      { start: [2, 2], desc: 'Every battle begins with two star tiles.' }],
+    lock: { s: 'frg', n: 25, how: 'Forge %1 tiles with long words.' } },
   // ---- rare ----
-  { id: 'forge', icon: '❂', rarity: 1, name: 'STAR FORGE', desc: 'Forged tiles come one tier higher.', lock: { s: 'w7', n: 5, how: 'Weave %1 words of seven letters or more.' } },
-  { id: 'blood', icon: '✠', rarity: 1, name: 'BLOOD INK', desc: 'Your words +25%. Beast strikes +25%.', lock: { s: 'big', n: 60, how: 'Deal %1 damage with a single word.' } },
-  { id: 'tome', icon: '◉', rarity: 1, name: 'WHISPERING TOME', desc: 'The eye ◉ reveals a strong word, once per battle. Tome’s price: −25% final score.', lock: { s: 'fell', n: 30, how: 'Fell %1 star-beasts.' } },
-  { id: 'storm', icon: '↯', rarity: 1, name: 'STORMBINDER', desc: 'Every third word you cast strikes twice.', lock: { s: 'wins', n: 3, how: 'Win %1 hunts.' } },
-  { id: 'roots', icon: '❧', rarity: 1, name: 'LEYLINE ROOTS', desc: 'Words deal +2 for every sigil you hold.' },
-  { id: 'ward', icon: '✥', rarity: 1, name: 'MOONWARD', desc: 'Beast strikes deal 3 less, never below 1.' },
-  { id: 'echo', icon: '☍', rarity: 1, name: 'ECHO OF RUIN', desc: 'Overkill damage wounds the next beast.', lock: { s: 'ovk', n: 120, how: 'Spill %1 damage of overkill.' } },
+  { id: 'forge', icon: '❂', rarity: 1, name: 'STAR FORGE', desc: 'Forged tiles come one tier higher.', low: 5,
+    tl: [{ low: 4, desc: 'Forged tiles come one tier higher, and words of 4 letters forge.' }],
+    lock: { s: 'w7', n: 5, how: 'Weave %1 words of seven letters or more.' } },
+  { id: 'blood', icon: '✠', rarity: 1, name: 'BLOOD INK', desc: 'Your words +%1%. Beast strikes +%2%.', mult: 25, smult: 25, dvf: ['mult', 'smult'],
+    tl: [{ mult: 40 }, { mult: 50 }], lock: { s: 'big', n: 60, how: 'Deal %1 damage with a single word.' } },
+  { id: 'tome', icon: '◉', rarity: 1, name: 'WHISPERING TOME', desc: 'The eye ◉ reveals a strong word, once per battle. Tome’s price: −25% final score.', uses: 1, tax: 25,
+    tl: [{ uses: 2, tax: 25, desc: 'The eye ◉ reveals a strong word, twice per battle. Tome’s price: −25% final score.' },
+      { uses: 2, tax: 15, desc: 'The eye ◉ reveals a strong word, twice per battle. Tome’s price: −15% final score.' }],
+    lock: { s: 'fell', n: 30, how: 'Fell %1 star-beasts.' } },
+  { id: 'storm', icon: '↯', rarity: 1, name: 'STORMBINDER', desc: 'Every third word you cast strikes twice.', every: 3,
+    tl: [{ every: 2, desc: 'Every second word you cast strikes twice.' }],
+    lock: { s: 'wins', n: 3, how: 'Win %1 hunts.' } },
+  { id: 'roots', icon: '❧', rarity: 1, name: 'LEYLINE ROOTS', desc: 'Words deal +%1 for every sigil you hold.', add: 2, dvf: ['add'],
+    tl: [{ add: 3 }, { add: 4 }] },
+  { id: 'ward', icon: '✥', rarity: 1, name: 'MOONWARD', desc: 'Beast strikes deal %1 less, never below 1.', cut: 3, dvf: ['cut'],
+    tl: [{ cut: 5 }, { cut: 8 }] },
+  { id: 'echo', icon: '☍', rarity: 1, name: 'ECHO OF RUIN', desc: 'Overkill damage wounds the next beast.', carry: 1,
+    tl: [{ carry: 1.5, desc: 'Overkill damage wounds the next beast, and half again.' },
+      { carry: 2, desc: 'Overkill damage wounds the next beast twice over.' }],
+    lock: { s: 'ovk', n: 120, how: 'Spill %1 damage of overkill.' } },
   // ---- legendary ----
-  { id: 'feather', icon: '❋', rarity: 2, name: 'PHOENIX FEATHER', desc: 'Once per run, survive death at 1 health.' },
-  { id: 'eclipse', icon: '◐', rarity: 2, name: 'THE ECLIPSE', desc: 'Beast strikes deal only half.', lock: { s: 'hit', n: 80, how: 'Weather %1 beast strikes.' } },
-  { id: 'nova', icon: '✸', rarity: 2, name: 'CROWN OF NOVAE', desc: 'Words of 7+ letters deal double.', lock: { s: 'w8', n: 1, how: 'Weave a word of eight letters.' } },
-  { id: 'verse', icon: '∞', rarity: 2, name: 'THE UNENDING VERSE', desc: 'Words deal +1 for every word woven this run.', lock: { s: 'word', n: 400, how: 'Weave %1 words, lifetime.' } },
-  { id: 'meteor', icon: '✽', rarity: 2, name: 'HEART OF THE METEOR', desc: 'Felling a beast restores you to full health.', lock: { s: 'brnk', n: 3, how: 'Fell %1 beasts at ten health or less.' } },
+  { id: 'feather', icon: '❋', rarity: 2, name: 'PHOENIX FEATHER', desc: 'Once per run, survive death at %1 health.', revive: 1, dvf: ['revive'],
+    tl: [{ revive: 15 }] },
+  { id: 'eclipse', icon: '◐', rarity: 2, name: 'THE ECLIPSE', desc: 'Beast strikes deal only half.', div: 2,
+    tl: [{ div: 3, desc: 'Beast strikes deal only a third.' }],
+    lock: { s: 'hit', n: 80, how: 'Weather %1 beast strikes.' } },
+  { id: 'nova', icon: '✸', rarity: 2, name: 'CROWN OF NOVAE', desc: 'Words of %1+ letters deal double.', thresh: 7, dvf: ['thresh'],
+    tl: [{ thresh: 6 }], lock: { s: 'w8', n: 1, how: 'Weave a word of eight letters.' } },
+  { id: 'verse', icon: '∞', rarity: 2, name: 'THE UNENDING VERSE', desc: 'Words deal +%1 for every word woven this run.', add: 1, dvf: ['add'],
+    tl: [{ add: 2 }], lock: { s: 'word', n: 400, how: 'Weave %1 words, lifetime.' } },
+  { id: 'meteor', icon: '✽', rarity: 2, name: 'HEART OF THE METEOR', desc: 'Felling a beast restores you to full health.', hpAdd: 0,
+    tl: [{ hpAdd: 3, desc: 'Felling a beast grants +3 max health and restores you to full.' }],
+    lock: { s: 'brnk', n: 3, how: 'Fell %1 beasts at ten health or less.' } },
 ];
 const SS_SIG_BY = {};
 for (const _s of SS_SIGILS) SS_SIG_BY[_s.id] = _s;
+/* THE ONE TIER RESOLVER (v0.66.0). ssSigilVal(id, field, tier) hands back
+   the tier's dial: the tl override when the tier carries that field, the
+   base def's value otherwise (so a tier that moves only `charges` inherits
+   everything else). `field` may be a path ('lb.add'); tier clamps into
+   1..maxT and defaults to 1, which keeps every pre-tier call site exact. */
+function ssSigilMaxT(id) { const s = SS_SIG_BY[id]; return s ? 1 + ((s.tl || []).length) : 1; }
+function ssSigilField(def, field, tier) {
+  const tl = def.tl || [];
+  const t = Math.max(1, Math.min((tier | 0) || 1, 1 + tl.length));
+  const root = field.split('.')[0];
+  const ov = t >= 2 ? tl[t - 2] : null;
+  let v = ov && ov[root] !== undefined ? ov : def;
+  for (const k of field.split('.')) { v = v == null ? undefined : v[k]; }
+  return v;
+}
+function ssSigilVal(id, field, tier) {
+  const s = SS_SIG_BY[id];
+  return s ? ssSigilField(s, field, tier) : undefined;
+}
 
 // Achievements — checked against the event bag the battle scene maintains.
 const SS_ACH = [

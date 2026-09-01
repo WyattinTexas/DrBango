@@ -136,7 +136,11 @@ for (const rend of ['cv', 'gl']) {
   await ev(LIB);
   const slow = rend === 'gl';
 
-  /* ---- 1. THE PICK CARD, 24 × 10 ---------------------------------------- */
+  /* ---- 1. THE PICK CARD, 24 × 10 — AND EVERY TIER'S DESC (v0.66.0) ------ */
+  // tier I rides the full card build; tiers II+ (39 ladder descs) render as
+  // bare ssTextBlocks at the card's own geometry — the one-line law lives in
+  // the block, not the chrome — asserting ink, wrap, legacy-match and that
+  // SS_SIG substituted every %k (no template marker survives to the glass)
   const total = { cards: 0, two: 0, bad: [] };
   for (const lang of LANGS) {
     await ev(SWAP(lang));
@@ -145,17 +149,25 @@ for (const rend of ['cv', 'gl']) {
         const c = ssSigilCard(s, l, sg, 336, 146).setPosition(l.x(0), l.y(400)).setDepth(999);
         const b = D.blocks(c.list, 'sigilDesc')[0];
         const r = b ? D.read(s, b, SS_SIG(sg).desc) : { n: 0, ink: false };
-        r.id = sg.id; r.law = D.law(c.list);
+        r.id = sg.id; r.law = D.law(c.list); r.pct = /%\\d/.test(SS_SIG(sg).desc);
         out.push(r); c.destroy();
+        const tex = ssSigilCardTex(s, sg.rarity | 0, 336, 146);
+        const gxx = -168 + tex.mx, lxx = gxx + tex.mr + 14, mw = 168 - lxx - 12;
+        for (let t = 2; t <= 1 + ((sg.tl || []).length); t++) {
+          const str = SS_SIG(sg, t).desc;
+          const b2 = ssTextBlock(s, l.x(0), l.y(400), str, { fontSize: l.u(12.5) + 'px', color: '#c3c6da', fontStyle: 'italic', wrapW: l.u(mw + 4), lineSpacing: l.u(2) });
+          const r2 = D.read(s, b2, str); r2.id = sg.id + ':' + t; r2.law = []; r2.pct = /%\\d/.test(str);
+          out.push(r2); b2.destroy();
+        }
       }
       return JSON.stringify(out) })()`);
-    const bad = res.filter(x => !(x.n >= 1 && x.ink && !x.nl && x.match && x.fit && x.law.length === 0));
+    const bad = res.filter(x => !(x.n >= 1 && x.ink && !x.nl && x.match && x.fit && x.law.length === 0 && !x.pct));
     const two = res.filter(x => x.n >= 2).length;
     total.cards += res.length; total.two += two; total.bad.push(...bad.map(b => lang + ':' + b.id + ' ' + JSON.stringify(b).slice(0, 120)));
-    ok(`${lang}: all 24 pick descs — ink on every line, no newline, breaks where wordWrap put them (${two} multi-line, ${res.filter(x => x.shrunk).length} shrunk)`,
-      bad.length === 0 && res.length === 24, bad.length ? bad[0].id + ' ' + JSON.stringify(bad[0]).slice(0, 160) : '');
+    ok(`${lang}: all 24 pick descs + 39 tier descs — ink on every line, no newline, no stray %k, breaks where wordWrap put them (${two} multi-line, ${res.filter(x => x.shrunk).length} shrunk)`,
+      bad.length === 0 && res.length === 63, bad.length ? bad[0].id + ' ' + JSON.stringify(bad[0]).slice(0, 160) : 'n=' + res.length);
   }
-  ok(`${total.cards} cards walked, ${total.two} of them multi-line, and not one bakes a multi-line Text`, total.bad.length === 0);
+  ok(`${total.cards} descs walked, ${total.two} of them multi-line, and not one bakes a multi-line Text`, total.bad.length === 0);
   await ev(SWAP('en'));
   ok('the English two-liners split as the phone saw them: FIRST LIGHT / BLOOD INK / LEYLINE ROOTS / MOONWARD are 2 lines each',
     await ev(`(() => { const s = game.scene.getScene('home'), l = ssLayout(s), D = window.__dc;
