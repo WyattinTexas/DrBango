@@ -1,6 +1,59 @@
 # beta3 dev tools
 
-Twenty scripts, all dev-only — nothing here ships to the browser.
+Twenty-one scripts, all dev-only — nothing here ships to the browser.
+
+## cadence-check.mjs — sigils every 2-3 fights (v0.65.0)
+
+Skylar's call (9/1): "Right now you're getting sigils too fast. You should
+get a sigil after every turn. Maybe every two or three turns…" — in every
+mode, the daily hunt included. The game side: `SS_CADENCE` in data.js (one
+row per mode — `first` / `gap [min,max]` / `actBoss` / `type`, versus's
+per-cast row, and RESERVED `endless` + `hard` rows for the coming cards),
+walked once per run by `ssSigilPlan` (game.js) into `Battle.sigPlan` — the
+Set of fight indices whose WIN pays an offer. The hook (fight 0) always
+pays, the fight that CLOSES an act always pays (STRIX, DRACO, PHOENIX —
+mid-act boss-tier elites are ordinary fights), a due offer landing one
+fight before such a boss folds into it (offers never come back to back),
+and the run's final fight never pays — that win ends the run. Seeds:
+campaign hashes its pinned roster (`ssStrSeed` — a resumed climb recomputes
+the same schedule, no new checkpoint field), the daily draws from the
+shared day seed (every hunter meets offers at the same fights), quick rolls
+fresh. `beastDeath` routes a paying fight through `payOffer()`: 'sigil'
+opens the pick, 'upgrade' (`SS_OFFER_TYPES`) is RESERVED for the sigil-tier
+card and never rolled today — a row carrying it rides on, no screen. The
+rarity ramp keys on FIGHTS FOUGHT (`run.fightIdx`), not offers made, so the
+sparser cadence never slows it. Per full run: campaign 7-9 offers
+(typically 8, was 19); quick/daily exactly 2 ({0,2} or {0,3}, was 4).
+Non-paying fights keep the beat they had: the death shatter, then the
+campaign's star chart or the next constellation assembling.
+
+Self-launching like dew-check (server on :8899 if nothing serves, Chrome on
+:9464, `/tmp/cdp-cadence`, `--disable-gpu`), Firebase blocked at the
+network layer throughout.
+
+```
+node tools/cadence-check.mjs      # 49 checks, ~4 min
+```
+
+The table + the enum (versus.js and rival.js read the versus row — asserted
+from source), the plan's laws over 300 synthetic seeds (determinism, hook,
+bosses, final-fight exclusion, gaps 2-4 never adjacent, counts), a REAL
+20-fight campaign walked fight by fight through `beastDeath` with real
+DPR-3 taps on every pick card and chart node — offers land exactly on the
+plan, a mid-climb reload + resume recomputes the SAME schedule, the quiet
+fights keep the chart beat, the summit ends the run with one sigil per
+offer — the rarity ramp (chances identical however many sigils are held;
+leg 0.151@17 / 0.180@19; a 400-board roll at the summit surfaces
+legendaries), quick's row walked for real (DRACO's fall ends the run, no
+dangling offer), the daily's shared schedule (two boots, same plan), and
+the reserved-type seam (a row set to 'upgrade' live rides on, restored).
+
+**The harness seam**: `Battle.sigPlan` is a plain Set — a suite that needs
+an offer on a specific fight pins it directly
+(`b.sigPlan.add(b.run.fightIdx)`, the drip's profile-seam pattern;
+comet-check does exactly this for its arrow-fell). And `fell()`-style
+helpers must wait for `!b.dying && state === 'pick'` before killing — a
+fell fired mid-death-anim kills nothing and reads a lie.
 
 ## seed-check.mjs — the boards' seeded hunters (v0.64.0)
 

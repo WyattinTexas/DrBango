@@ -102,6 +102,9 @@ const SS_RIVAL = (() => {
      star tile, 5+ a gilded one (STAR FORGE lifts either to a star).          */
   const VS_OK_SIGILS = ['quill', 'choir', 'runes', 'forge', 'longbow', 'blood'];
   const SIGIL_WORTH = { blood: 9, longbow: 8, forge: 6, choir: 5, runes: 4, quill: 4 };
+  // the duel's sigil rhythm — the cadence table's versus row, the very
+  // number versus.js plays by, so mage and human pick in the same measure
+  const VS_CASTS = (typeof SS_CADENCE !== 'undefined' && SS_CADENCE.versus && SS_CADENCE.versus.casts) || 3;
   const LEN_M = [0, 0, 0.6, 1, 1.15, 1.35, 1.6, 1.9, 2.3];
   function tileVal(pack, ch, tier) { return (pack.vals[ch] || pack.vals[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
   function damage(pack, tiles, sigils) {
@@ -277,7 +280,7 @@ const SS_RIVAL = (() => {
         if (pick.scry) { scrys++; b.scry(); continue; }
         dmgs.push(pick.cast.dmg); lens.push(pick.cast.letters); ranks.push(pick.rank);
         b.cast(pick.cast.idx);
-        if (dmgs.length % 3 === 0) {
+        if (dmgs.length % VS_CASTS === 0) {
           const sg = chooseSigil(VS_OK_SIGILS.filter((s) => !b.sigils.includes(s)).slice(0, 3), prof, rnd);
           if (sg) b.sigils.push(sg);
         }
@@ -523,8 +526,8 @@ const SS_RIVAL = (() => {
         if (this.room.mode !== 'timed') await this.roomRef.update({ turnUid: this.nextTurn(), turnCount: (this.room.turnCount | 0) + 1 });
         this.board.cast(c.idx);
         note('cast', { word, dmg, letters: c.letters, target: target.name, board: this.board.letters() });
-        // every 3rd cast: the pick-3, read for a few seconds before choosing
-        if (myCasts % 3 === 0) {
+        // every VS_CASTS-th cast: the pick-3, read for a few seconds before choosing
+        if (myCasts % VS_CASTS === 0) {
           const avail = VS_OK_SIGILS.filter((s) => !this.board.sigils.includes(s));
           const offer = [];
           while (offer.length < 3 && avail.length) offer.push(avail.splice(Math.floor(this.rnd() * avail.length), 1)[0]);

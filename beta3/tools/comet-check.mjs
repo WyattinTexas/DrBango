@@ -217,7 +217,9 @@ ok('arrow hit AND the tick: 494→488, 3→2', await ev(`${B}.beast.hpNow`) === 
   'hp ' + await ev(`${B}.beast.hpNow`) + ' count ' + await ev(`${B}.beast.count`));
 await ev(`${B}.startFight(); 'ok'`);
 await until(PICK, 20000);
-await ev(`${B}.beast.hpNow = 5; ${B}.beast.count = 3; ${B}.updateBars(); 'ok'`);
+// v0.65.0: fights pay offers on the cadence plan now — pin this fight so the
+// arrow's fell still meets its offer (the seam: sigPlan is a plain Set)
+await ev(`${B}.sigPlan.add(${B}.run.fightIdx); ${B}.beast.hpNow = 5; ${B}.beast.count = 3; ${B}.updateBars(); 'ok'`);
 ok('a scry whose arrow FELLS — real tap', await (async () => {
   const n0 = await ev(`SS.prof.sig.c.scry | 0`);
   for (let t = 0; t < 4; t++) { await tap(`${B}.scryB`); await sleep(160); if (await ev(`(SS.prof.sig.c.scry | 0) > ${n0}`)) break; }

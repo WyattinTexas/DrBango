@@ -280,6 +280,48 @@ const SS_QUICK_POOL = ['vulpes', 'lepus', 'serpens', 'cancer', 'corvus', 'ursa',
 const SS_QUICK_BOSS = 'draco';
 
 /* ============================================================
+   THE SIGIL CADENCE (v0.65.0). Skylar (9/1): "Right now you're
+   getting sigils too fast … maybe every two or three turns they
+   should get a new sigil" — so a won fight no longer always pays
+   a sigil offer. One row per mode; game.js ssSigilPlan walks the
+   row once per run into the set of fight indices whose WIN pays.
+   · first   — the fight whose win pays the run's opening offer
+               (0 = the very first fight: the run's hook).
+   · gap     — [min,max] fights between offers; each next offer
+               jitters inside the band on a per-run seed (the
+               campaign's rides its pinned roster, so a resumed
+               climb keeps its schedule; the daily's rides the
+               shared day seed, so every hunter meets offers at
+               the same fights).
+   · actBoss — the fight that CLOSES an act always pays: the
+               story bosses (STRIX, DRACO, PHOENIX). A due offer
+               landing one fight before such a boss folds into
+               the boss's — never two offers back to back. The
+               mid-act boss-TIER elites are ordinary fights here.
+   · type    — what the offer IS. 'sigil' opens the pick screen;
+               'upgrade' (SS_OFFER_TYPES) is RESERVED for the
+               coming sigil-tier card and is never rolled today.
+   The run's LAST fight never pays — that win ends the run.
+   Campaign (4 acts × 5 fights): 7-9 offers per full climb,
+   typically 8 (hook + Act I mid on a short gap + the three act
+   bosses + one mid-act offer each act + Act IV's road), down
+   from 19. Quick/daily (5 fights): exactly 2 (the hook + one at
+   fight 3 or 4). versus grants its pick every `casts` of your
+   own casts inside the one duel (versus.js + the rival engine
+   read it) — no fight cadence there. endless / hard are RESERVED
+   rows the coming cards fill in.
+   ============================================================ */
+const SS_CADENCE = {
+  campaign: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil' },
+  quick: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil' },
+  daily: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil' },
+  versus: { casts: 3, type: 'sigil' },
+  endless: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil' },   // reserved — the endless card tunes it
+  hard: { gapAdd: 1 },                                                // reserved modifier — the hard-mode card reads it
+};
+const SS_OFFER_TYPES = ['sigil', 'upgrade'];   // 'upgrade': reserved, never rolled today
+
+/* ============================================================
    THE ZODIAC — twelve birth signs, pickable before a campaign.
    Each is a starting character with one modest power that bends
    HOW the climb is played, never a straight power-up. Five signs

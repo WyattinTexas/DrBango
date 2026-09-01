@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.64.0';
+const BUILD = 'STARSPELL v0.65.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -3658,6 +3658,41 @@ function ssClearCampaign() {
   localStorage.removeItem('beta3.campsign');
 }
 
+/* ---- the sigil cadence (v0.65.0) -----------------------------------------
+   Skylar (9/1): offers every 2-3 fights, not every fight. ssSigilPlan walks
+   the mode's SS_CADENCE row once per run and returns the Set of fight
+   indices whose WIN pays an offer: the opening hook, then every gap[0..1]
+   fights on seeded jitter, the fight that closes an act always paying (a
+   due offer landing one fight before it folds in, so offers never come
+   back to back), and never the run's final fight — that win ends the run.
+   The seed is stable where it must be: the campaign hashes its pinned
+   roster (a resumed climb recomputes the same schedule — no new checkpoint
+   field), the daily draws from its shared day seed (every hunter meets
+   offers at the same fights), quick rolls fresh each run. Battle keeps the
+   result as this.sigPlan — a harness may pin it directly, like the drip's
+   profile seam. Campaign pays 7-9 offers per full 20-fight climb
+   (typically 8, was 19); quick and the daily pay 2 across their 5. */
+function ssStrSeed(str) {
+  let h = 0x811c9dc5;                                   // FNV-1a, 32-bit
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+function ssSigilPlan(mode, fights, seed) {
+  const row = SS_CADENCE[mode] || SS_CADENCE.quick;
+  const pays = new Set();
+  if (!row || !row.gap) return pays;                    // a row with no fight cadence (versus)
+  const rnd = ssMulberry((seed >>> 0) || 1);
+  const draw = () => row.gap[0] + Math.floor(rnd() * (row.gap[1] - row.gap[0] + 1));
+  const last = fights.length - 1;
+  const closes = (i) => i === last || fights[i + 1].actIdx !== fights[i].actIdx;
+  const bossPays = (i) => !!row.actBoss && i < last && closes(i);
+  let next = row.first | 0;
+  for (let i = 0; i < last; i++) {                      // the final win ends the run — never an offer
+    if (bossPays(i) || (i >= next && !bossPays(i + 1))) { pays.add(i); next = i + draw(); }
+  }
+  return pays;
+}
+
 /* ---- the zodiac ----------------------------------------------------------
    The campaign's birth sign is chosen on the picker sheet and pinned in
    localStorage alongside the roster — it lives and dies with the campaign
@@ -5864,13 +5899,18 @@ class Battle extends Phaser.Scene {
     if (this.mode === 'daily') setSeed(SSNET.dayKey() ^ ssPackSeed(PACK.lang));
     else setSeed(Math.floor(Math.random() * 1e9));
     this.fights = [];
+    let planSeed;
     if (this.mode === 'campaign') {
-      this.fights = SS_CAMPAIGN_FIGHTS(ssCampaignRoster());
+      const roster = ssCampaignRoster();
+      this.fights = SS_CAMPAIGN_FIGHTS(roster);
+      planSeed = ssStrSeed(roster.join('·'));   // pinned roster → a resumed climb keeps its schedule
     } else {
       const pool = [...SS_QUICK_POOL];
       for (let i = 0; i < 4; i++) this.fights.push({ id: pool.splice(Math.floor(rng() * pool.length), 1)[0], actIdx: 0, mult: 1 + i * 0.12, atkAdd: Math.floor(i / 2), umbral: false });
       this.fights.push({ id: SS_QUICK_BOSS, actIdx: 0, mult: 1, atkAdd: 0, umbral: false });
+      planSeed = Math.floor(rng() * 1e9);       // daily: seeded stream → every hunter shares the schedule
     }
+    this.sigPlan = ssSigilPlan(this.mode, this.fights, planSeed);
 
     // ---- run state ----
     this.run = this.resume ? {
@@ -6894,8 +6934,21 @@ class Battle extends Phaser.Scene {
     if (this.mode === 'campaign') this.saveCheckpoint();
     this.time.delayedCall(1150, () => {
       if (this.run.fightIdx >= this.fights.length) this.endRun(true);
-      else this.showSigilPick();
+      // THE CADENCE (v0.65.0): only a fight the plan marks pays an offer.
+      // The others keep the beat they already had — the death shatter, then
+      // the campaign's star chart or the next constellation assembling.
+      else if (this.sigPlan && this.sigPlan.has(this.run.fightIdx - 1)) this.payOffer();
+      else this.afterSigil();
     });
+  }
+  /* What a paying fight hands over. 'sigil' — today's only offer — opens the
+     pick; 'upgrade' is RESERVED in SS_OFFER_TYPES for the coming sigil-tier
+     card, so a row carrying it (or anything unknown) rides on rather than
+     opening a screen that does not exist yet. */
+  payOffer() {
+    const row = SS_CADENCE[this.mode];
+    if (!row || (row.type || 'sigil') === 'sigil') this.showSigilPick();
+    else this.afterSigil();
   }
   saveCheckpoint() {
     if (this.run.fightIdx >= this.fights.length) { ssClearCampaign(); return; }
@@ -7153,6 +7206,10 @@ class Battle extends Phaser.Scene {
   // Quick/daily: any tier can appear anywhere, but at LOW odds, so an early
   // lucky legendary stays a story, not a strategy (the legendary effects are
   // also tuned to scale — none of them flat-nukes an early beast).
+  // The ramp keys on run.fightIdx — FIGHTS FOUGHT, not offers made — so the
+  // sparser cadence (v0.65.0) never slows it: the pick after PHOENIX rolls
+  // the same odds however many offers came before it, and the last act's
+  // offers still reach the legendary band (leg 0.12-0.18 at fights 15-19).
   sigilChances() {
     if (this.mode === 'campaign') {
       const p = this.run.fightIdx / Math.max(1, this.fights.length - 1);
@@ -7253,10 +7310,11 @@ class Battle extends Phaser.Scene {
   }
 
   // ---------- the map between fights ----------
-  // Campaign only: after the sigil settles, the star chart rises — where the
+  // Campaign only: after the win settles — the sigil taken on a paying
+  // fight, the shatter alone on the rest — the star chart rises: where the
   // night stands, what has been felled, what waits above — and the player
   // taps the breathing constellation to march on. Quick/daily keep their
-  // straight fight → sigil → fight rhythm.
+  // straight fight → (sigil when the cadence pays) → fight rhythm.
   afterSigil() {
     if (this.mode === 'campaign') this.showMap();
     else this.startFight();

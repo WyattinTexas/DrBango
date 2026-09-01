@@ -1398,12 +1398,13 @@ class VsBattle extends Phaser.Scene {
       if (this.pendingTier) SFX.forge();
       this.fillBoard(false);
       this.layoutLine();
-      // roguelite pick-3 every 3 of my casts
+      // roguelite pick-3 every N of my casts — N is the cadence table's
+      // versus row (data.js SS_CADENCE; the rival engine reads the same)
       // the rival's client may have settled the room on my wound before my
       // tiles landed: the end screen is already up, and nothing here may
       // reopen the board over it (REMATCH reads state === 'done')
       if (this.state === 'done') return;
-      if (myCasts % 3 === 0) this.showSigilPick();
+      if (myCasts % ((SS_CADENCE.versus && SS_CADENCE.versus.casts) || 3) === 0) this.showSigilPick();
       else this.state = 'pick';
       this.checkEnd();
     } catch (e) {
