@@ -15,9 +15,14 @@
    claim is a transaction: it lands only when the key is free or
    already yours. A fresh device mints until its claim wins (silently
    — it never saw the name it lost). An existing player claims their
-   standing name at connect; beaten to it, they re-mint (fresh mints,
-   then a mint plus a short numeral cut from the uid) and are told
+   standing name at connect; beaten to it, they re-mint and are told
    once, in fiction, through the ss-renamed event (game.js toasts it).
+   Minting past a crowded pool is Skylar's rollover law (v0.72.0):
+   the 144 preset names deal first; once every one is claimed, the
+   pool resets to its first name wearing the counter 1 ('Astral
+   Quill 1'), then 2 once those 144 are gone, and so on forever. A
+   counter never lands while a lower name is free as far as the
+   registry can tell at mint time — the claim txn still settles ties.
    THE CIRCLE's mages claim through the same registry over their own
    SSNET.side door (rival.js). test_ identities (?mpuid) never touch it.
    Old claims are released when a name changes hands honestly; a
@@ -59,6 +64,11 @@ const SSNET = (() => {
   const NAME_A = ['Astral', 'Gilded', 'Quiet', 'Umbral', 'Silver', 'Dawn', 'Comet', 'Rune', 'Velvet', 'Winter', 'Ember', 'Moonlit'];
   const NAME_B = ['Quill', 'Fox', 'Owl', 'Weaver', 'Scribe', 'Hare', 'Raven', 'Mage', 'Widow', 'Serpent', 'Bear', 'Lantern'];
   function mintName() { return NAME_A[Math.floor(Math.random() * NAME_A.length)] + ' ' + NAME_B[Math.floor(Math.random() * NAME_B.length)]; }
+  // the same pool in rollover order: each first word runs through every second
+  // word before the next, so poolName(0) is 'Astral Quill' — the first preset
+  // name, where an exhausted pool resets with its counter (see mintClaimed)
+  const POOL_N = NAME_A.length * NAME_B.length;
+  function poolName(i) { return NAME_A[Math.floor(i / NAME_B.length)] + ' ' + NAME_B[i % NAME_B.length]; }
   const FRESH_KEY = 'starspellNameFresh', RN_KEY = 'starspellRenamed';
   function myName() {
     if (MPUID) return 'Wisp ' + MPUID.toUpperCase();
@@ -126,15 +136,38 @@ const SSNET = (() => {
     try { const p = await dbGet('players/' + u); shown = p && p.name; } catch (e) { }
     return { uid: u, key, name: shown || String(name).trim() };
   }
-  // mint until a claim wins: fresh mints first, then a mint wearing a short
-  // numeral cut from the uid (deterministic per device, so retries converge)
+  // mint until a claim wins. Fresh random draws first — the common case, the
+  // pool is roomy and the first mint lands. When they all lose, ONE registry
+  // read tells which names are truly free, and the walk deals the lowest pass
+  // in pool order: the base 144, then the pool again wearing ' 1', then ' 2',
+  // forever (the rollover law — see the header). A counter only lands when
+  // every name of the passes below is taken as far as that read, plus any
+  // transactions lost on the way, can tell — both are the registry talking.
+  // null = busy sky (the read failed, or 12 straight claim losses);
+  // ensureName leans on that and retries next sync.
   async function mintClaimed(forUid, db) {
     const u = forUid || uid();
-    const tag = String(100 + (parseInt(u.replace(/\D/g, '').slice(-6) || '0', 10) % 900));
-    for (let i = 0; i < 14; i++) {
-      const n = i < 8 ? mintName() : mintName().split(' ')[1] + ' ' + tag + (i > 10 ? String(i) : '');
+    for (let i = 0; i < 8; i++) {
+      const n = mintName();
       const r = await claimName(n, u, db);
       if (r.won) return n;
+    }
+    let taken;
+    try {
+      const v = db ? (await db.ref('names').get()).val() : await dbGet('names');
+      taken = v || {};
+    } catch (e) { return null; }
+    let losses = 0;
+    for (let pass = 0; pass < 10000; pass++) {
+      for (let i = 0; i < POOL_N; i++) {
+        const n = pass ? poolName(i) + ' ' + pass : poolName(i);
+        const key = nameKey(n);
+        if (taken[key] != null) continue;
+        const r = await claimName(n, u, db);
+        if (r.won) return n;
+        taken[key] = 1;                    // raced away between the read and us
+        if (++losses >= 12) return null;   // busy sky; next sync tries again
+      }
     }
     return null;
   }

@@ -1485,7 +1485,7 @@ with the dead key swept). `SHOTS=<dir>` keeps the snapshots.
   real-click harness drives it). Beacons: `beta3.summons`, `beta3.deeplink`,
   `beta3.vsresult`. Clean up `friends|recent|invites|presence|players/test_*` after.
 
-## names-check.mjs — unique player names (v0.53.0)
+## names-check.mjs — unique player names (v0.53.0) + the preset rollover (v0.72.0)
 
 One person per name, so a player can be reached by name alone (task 43
 builds the reaching; this is the registry). `names/<key>` → uid in the
@@ -1496,10 +1496,17 @@ only when the key is free or already yours. A fresh device (`starspellNameFresh`
 set by the first mint) keeps minting until its claim wins, silently. An
 existing player claims their standing name at connect and on every profile
 sync (`ensureName`, one proven key cached per session); beaten to it, they are
-re-minted (`mintClaimed`: 8 fresh mints, then `<Second word> <3 digits cut
-from the uid>`) and told ONCE, in fiction (`nameTakenTitle/Body`), by the
+re-minted and told ONCE, in fiction (`nameTakenTitle/Body`), by the
 `ss-renamed` event → `ssRenameNotice` on whichever scene is live, or the
-meadow the next time it builds. A rename onto a taken name is HELD: the old
+meadow the next time it builds. `mintClaimed` is Skylar's ROLLOVER law
+(9/2): 8 fresh random draws from the 144-name preset pool (12 `NAME_A` ×
+12 `NAME_B`), and when they all lose, ONE registry read + an ordered walk
+that deals the lowest pass in pool order — the base 144, then the pool
+again from 'Astral Quill 1', then ' 2', forever. A counter only lands when
+every name of the passes below is taken as far as that read (plus lost
+transactions) can tell; the old uid-numeral fallback (`Fox 123`) is retired,
+and null (busy sky: failed read or 12 walk losses) leans on ensureName's
+retry-next-sync. A rename onto a taken name is HELD: the old
 name comes back with `nameHeldTitle/Body`; a clean rename releases the old
 claim. THE CIRCLE's mages claim over their own `SSNET.side('rival')` door
 before they take a seat (`SS_RIVAL.claimCircleName`); `?botduel` seats and
@@ -1512,7 +1519,7 @@ python3 -m http.server 8899 &
 for p in a:9448 b:9449; do "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --headless=new --no-sandbox --mute-audio --disable-gpu --remote-debugging-port=${p#*:} \
   --user-data-dir=/tmp/cdp-names-${p%%:*} --window-size=390,844 --force-device-scale-factor=3 about:blank & done
-node tools/names-check.mjs      # 67 checks, ~2 min, deletes everything it wrote
+node tools/names-check.mjs      # 67 checks, ~3 min, deletes everything it wrote
 ```
 
 Two REAL throwaway uids (seeded into localStorage by
@@ -1520,9 +1527,18 @@ Two REAL throwaway uids (seeded into localStorage by
 race one standing name at connect: exactly one holds it, the loser is
 re-minted and sees the notice on the meadow; then the instant race (both
 `claimName` transactions fired in the same tick, 3 rounds), held/free renames,
-the silent fresh-device path, the `test_` exemption, the circle, nameKey, and
+the silent fresh-device path, the `test_` exemption, the circle, THE
+ROLLOVER (the pool derived from net.js source so the shipped walk order is
+the asserted order; a roomy-pool bare draw; free live names saturated by
+claims under `u_roll_*` throwaway uids — NEVER claimed for keeps, released
+at the end and proven gone, prior crash residue swept; the boundary race at
+one free base name settling as the last preset + the first counter-1 name;
+full counter-1 → the first counter-2 name; the bounded busy-sky null proven
+against a fake always-refusing door, 8 + 12 calls exactly), nameKey, and
 the desc law on the notice in all five languages (no child Text holds a
-newline, every line fits 292u). Harness lesson: a `Page.navigate` fired while
+newline, every line fits 292u — the to-name fixture is 'Moonlit Lantern 99',
+the widest name the rollover can mint below pass 100, 18 chars exactly).
+Harness lesson: a `Page.navigate` fired while
 about:blank is still settling can be DROPPED — `nav` proves `location.href`
 and `typeof SSNET` before waiting on the game.
 

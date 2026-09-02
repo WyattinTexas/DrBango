@@ -1,4 +1,6 @@
-// NAMES-CHECK — unique player names (v0.53.0, task 42).
+// NAMES-CHECK — unique player names (v0.53.0, task 42) + the preset-name
+// ROLLOVER (v0.72.0, Skylar's law: the pool of 144 exhausted → back to the
+// first preset name wearing ' 1', then ' 2', forever — no other fallback).
 // Two REAL throwaway uids (not ?mpuid: test_ identities stay out of the
 // registry by design) in two headless Chromes race the same standing name at
 // connect: exactly one keeps it, the loser is re-minted, told once, and
@@ -6,8 +8,13 @@
 // claim race (3 rounds, both transactions fired in the same instant), the
 // silent fresh-device path, a rename onto a taken name (held) and a free one
 // (old claim released), the test_ exemption, THE CIRCLE claiming over its own
-// SSNET.side door, nameKey normalization, and the desc law on the notice in
-// all five languages (no child Text ever holds a newline, every line fits).
+// SSNET.side door, THE ROLLOVER (the roomy-pool base draw · the boundary race
+// at one free base name → the last preset + the first counter-1 name · full
+// counter-1 → the first counter-2 name, in pool order · the bounded busy-sky
+// null — the live 144 are never claimed for keeps: free ones are saturated
+// under u_roll_* throwaway uids, then released and verified gone), nameKey
+// normalization, and the desc law on the notice in all five languages (no
+// child Text ever holds a newline, every line fits).
 // Everything written is deleted at the end.
 //
 //   python3 -m http.server 8899 &
@@ -149,23 +156,72 @@ ok('a mage on a taken name is re-minted and claims the new one', circ.n2 !== RAC
 ok('the circle remembers the new name', circ.pool.some(([u, n]) => u === circ.u2 && n === circ.n2));
 ok('the human still holds the raced name', (await rt('names/' + key)) === holder);
 
-// ---- 7. nameKey normalization ----
+// ---- 7. the rollover (v0.72.0): pool exhausted → ' 1' → ' 2', ordered, race-safe ----
+// The pool derives from net.js SOURCE (the arrays are literals), so the walk
+// order asserted here is the order that ships. Free live names are saturated
+// by claims under u_roll_* throwaway uids (real-shaped — test_ never enters
+// the registry); every claim this section lands is released at its end and
+// proven gone. A crashed previous run's u_roll_* residue is swept first.
+const src = await (await fetch(BASE.replace('index.html', 'net.js'))).text();
+const words = (nm) => new RegExp('const ' + nm + " = \\[([^\\]]+)\\]").exec(src)[1].split(',').map((s) => s.trim().replace(/^'+|'+$/g, '')).filter(Boolean);
+const POOL = []; for (const a of words('NAME_A')) for (const b of words('NAME_B')) POOL.push(a + ' ' + b);
+const keyOf = (n) => n.trim().replace(/\s+/g, ' ').toLowerCase();
+ok('the preset pool is 144 two-word names, first Astral Quill, keys distinct',
+  POOL.length === 144 && POOL[0] === 'Astral Quill' && new Set(POOL.map(keyOf)).size === 144
+  && await A.ev(`SSNET.nameKey('Astral  QUILL 12')`) === 'astral quill 12', POOL.length + ' · ' + POOL[0]);
+const UD = 'u_roll_' + rnd() + 'd', MK = 'u_roll_' + rnd() + 'm', RA = 'u_roll_' + rnd() + 'a', RB = 'u_roll_' + rnd() + 'b', UC2 = 'u_roll_' + rnd() + 'c';
+const bare = await A.ev(`SSNET.mintClaimed('${UD}')`);
+ok('a roomy pool still deals a bare preset name (never a counter)', POOL.includes(bare) && (await rt('names/' + keyOf(bare))) === UD, String(bare));
+const reg0 = (await rt('names')) || {};
+for (const [k, v] of Object.entries(reg0)) if (typeof v === 'string' && v.startsWith('u_roll_') && v !== UD) { await rtDel('names/' + k); delete reg0[k]; }
+const claimAll = (names, u) => A.ev(`(async () => { const ns = ${JSON.stringify(names)}; const out = { won: 0, lost: 0 };
+  for (let i = 0; i < ns.length; i += 24) { const rs = await Promise.all(ns.slice(i, i + 24).map((n) => SSNET.claimName(n, '${u}'))); for (const r of rs) r.won ? out.won++ : out.lost++; }
+  return JSON.stringify(out) })()`).then(JSON.parse);
+const free0 = POOL.filter((n) => reg0[keyOf(n)] == null);
+ok('the live base pool has room to stage the boundary (≥3 free)', free0.length >= 3, free0.length + ' free');
+const X = free0[free0.length - 1], seed0 = free0.slice(0, -1);
+const satA = await claimAll(seed0, MK);
+ok('saturation: every base name but one is now held', satA.won + satA.lost === seed0.length && satA.lost <= 2, JSON.stringify(satA) + ' of ' + seed0.length);
+const E1 = POOL.find((n) => reg0[keyOf(n + ' 1')] == null) + ' 1';
+const [nA, nB] = await Promise.all([A.ev(`SSNET.mintClaimed('${RA}')`), B.ev(`SSNET.mintClaimed('${RB}')`)]);
+ok('boundary race: both settle, distinct, never null', !!nA && !!nB && nA !== nB, nA + ' · ' + nB);
+ok('…wearing exactly the last free preset + the first counter-1 name', JSON.stringify([nA, nB].slice().sort()) === JSON.stringify([X, E1].slice().sort()), 'got ' + nA + ' + ' + nB + ' · want ' + X + ' + ' + E1);
+ok('…and the registry settled each to its claimant', (await rt('names/' + keyOf(nA))) === RA && (await rt('names/' + keyOf(nB))) === RB);
+const reg1 = (await rt('names')) || {};
+const free1 = POOL.map((n) => n + ' 1').filter((n) => reg1[keyOf(n)] == null);
+const satB = await claimAll(free1, MK);
+const E2 = POOL.find((n) => reg1[keyOf(n + ' 2')] == null) + ' 2';
+const n2 = await B.ev(`SSNET.mintClaimed('${UC2}')`);
+ok('counter-1 exhausted → the first counter-2 name, in order', n2 === E2 && (await rt('names/' + keyOf(n2))) === UC2, n2 + ' vs ' + E2 + ' · sat1 ' + JSON.stringify(satB));
+const busy = JSON.parse(await A.ev(`(async () => { let calls = 0; const db = { ref: () => ({ get: async () => ({ val: () => null }) }), txn: async () => { calls++; return { committed: false, value: null } } };
+  const t0 = Date.now(); const n = await SSNET.mintClaimed('u_roll_bz', db); return JSON.stringify({ n, calls, ms: Date.now() - t0 }) })()`));
+ok('a sky refusing every claim returns null, bounded (8 draws + 12 walk losses)', busy.n === null && busy.calls === 20 && busy.ms < 4000, JSON.stringify(busy));
+const rel = (names, u) => A.ev(`(async () => { const ns = ${JSON.stringify(names)};
+  for (let i = 0; i < ns.length; i += 24) await Promise.all(ns.slice(i, i + 24).map((n) => SSNET.releaseName(n, '${u}'))); return true })()`);
+await rel(seed0.concat(free1), MK); await rel([bare], UD); await rel([nA], RA); await rel([nB], RB); await rel([n2], UC2);
+const regZ = (await rt('names')) || {};
+const litter = Object.entries(regZ).filter(([, v]) => typeof v === 'string' && v.startsWith('u_roll_')).map(([k]) => k);
+ok('rollover cleanup: every claim this section made is gone', litter.length === 0, litter.join(' '));
+
+// ---- 8. nameKey normalization ----
 ok('nameKey: trim · collapse · fold', await W.ev(`SSNET.nameKey('  Astral   FOX ') === 'astral fox' && SSNET.nameKey('astral fox') === SSNET.nameKey('ASTRAL\\tFox')`));
 ok('nameKey: RTDB-forbidden chars become _', await W.ev(`SSNET.nameKey('a.b#c$d[e]f/g') === 'a_b_c_d_e_f_g'`));
 ok('nameKey: NFKC folds fullwidth', await W.ev(`SSNET.nameKey('Ｆｏｘ') === 'fox'`));
 
-// ---- 8. the desc law on the notice, all five languages, both kinds ----
+// ---- 9. the desc law on the notice, all five languages, both kinds ----
+// (the to-name fixture is the widest name the rollover can mint below pass
+// 100 — 'Moonlit Lantern 99', 18 characters exactly)
 const LANGS = JSON.parse(await W.ev('JSON.stringify(Object.keys(SS_STR))'));
 const SWAP = (lang) => `(() => { if (!window.__keepEn) window.__keepEn = SS_STR.en; SS_STR.en = '${lang}' === 'en' ? window.__keepEn : SS_STR['${lang}']; return 1 })()`;
 for (const lang of LANGS) {
   await W.ev(SWAP(lang));
   for (const kind of ['taken', 'held']) {
     const r = JSON.parse(await W.ev(`(() => { const s = game.scene.getScene('home'), l = ssLayout(s);
-      const c = ssRenameNotice(s, { from: 'Moonlit Lantern', to: 'Winter Serpent 431', kind: '${kind}' });
+      const c = ssRenameNotice(s, { from: 'Moonlit Lantern', to: 'Moonlit Lantern 99', kind: '${kind}' });
       const txt = []; const walk = (o) => { if (o.text != null) txt.push([o.text, o.width]); if (o.list) o.list.forEach(walk); }; walk(c);
       const out = { n: txt.length, nl: txt.some(([t]) => t.includes('\\n')), wide: txt.filter(([, w]) => w > l.u(292)).length, empty: txt.filter(([t]) => !t.trim()).length,
         body: txt.slice(1).map(([t]) => t).join(' ') }; c.destroy(); return JSON.stringify(out) })()`));
-    ok(lang + ' ' + kind + ': ≥2 single-line Texts, all fit, both names present', r.n >= 2 && !r.nl && r.wide === 0 && r.empty === 0 && r.body.includes('Moonlit Lantern') && r.body.includes('Winter Serpent 431'), JSON.stringify(r).slice(0, 120));
+    ok(lang + ' ' + kind + ': ≥2 single-line Texts, all fit, both names present', r.n >= 2 && !r.nl && r.wide === 0 && r.empty === 0 && r.body.includes('Moonlit Lantern') && r.body.includes('Moonlit Lantern 99'), JSON.stringify(r).slice(0, 120));
   }
 }
 await W.ev(SWAP('en'));
