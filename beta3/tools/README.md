@@ -1,6 +1,92 @@
 # beta3 dev tools
 
-Twenty-four scripts, all dev-only — nothing here ships to the browser.
+Twenty-five scripts, all dev-only — nothing here ships to the browser.
+
+## signlevel-check.mjs — sign levels 1-50, every power grows with play (v0.69.0)
+
+Skylar's call (9/1): "All the signs' powers should be at level one and
+should be weaker than what they are right now … go from level one to level
+50 … Right now the powers should be kind of like the middle ground … start
+off weaker, eventually get to where they are now, and then be even
+stronger … we will also add rewards into that as well … we should have that
+framework in place." The game side: every SS_ZODIAC def carries `pw` —
+named dials as [level, value] breakpoints — resolved ONLY by
+`ssSignVal(id, field, lv)` (data.js, ssSigilVal's sibling); `SS_SIGNLV` is
+the XP curve (cost 50+12n capped 500; cum pins L5 320 · L10 990 · L20
+3230 · L30 6670 · L40 11286 · L50 16286); `SS_SIGN_XP` {fell 12, boss +15,
+clear 120} settles LIVE at beastDeath (before the pick — an abandoned
+climb keeps its fells' XP) and endRun's campaign book; `SS_SIGN_REWARDS`
+is the typed framework (+5 hp vessel @10, +10 @25, one gilded opening tile
+@40 through the pending queue; rows supersede, never stack; charge/title/
+cosmetic/sigil slots documented empty). prof.signs[id] grows `xp`/`ack`
+(SS.load's veteran seed: clears×420 + min(runs,10)×60 + eBest×12, CAPPED
+at cum[20]=3230 — nobody wakes past the today-band's foot — and ack seeds
+to the seeded level so a veteran boot is silent). The battle pins
+`signLv` per FIGHT at startFight (a mid-climb level-up strengthens the
+NEXT battle; taurus reads create, fresh runs only); `purifyLeft`/
+`watersLeft` counters replace the old once-booleans. Descs are GENERATED:
+`SS_ZOD(z, lv)` substitutes `dvf` dials into %1..%k and serves wording
+bands off `z.db` (virgo once/twice/thrice @29/46, capricorn every-second/
+every/+2 @22/50, scorpio twofold @40, aquarius twice @42) in all 10
+tongues. Surfaces: LEVEL + XP bar on every picker sign card (desc
+generated AT CARD BUILD — the no-drift law), tiny wheel numerals on
+played signs in the profile, the inspector sign row at the run's level,
+and `ssSignRite` (the forge ceremony's sibling: element-tinted glyph,
+'LEO · LEVEL 12' gold plate, the levelled power line, the reward when the
+level lands one; ack spent AT SHOW) chained BEHIND the sigil queue at
+endRun with Home.signNotice as the meadow safety net. Laws: L1 weaker
+than today for every dial EXCEPT the count dials (virgo.charges — the
+stated exception — plus scorpio.venomAdd/aquarius.charges, flat 1 through
+the band); today's numbers hold across the WHOLE 22-28 band; L50
+strictly stronger. Quick/daily/versus run unsigned: no XP, no power —
+versus/rival asserted from source. Cancer's cut computes in integer
+space (`atk * (100 - cut) / 100` — the float `1 - 70/100` ceils a clean
+6 into 7; the harness caught it).
+
+Self-launching (server :8899 if nothing serves, Chrome on :9468,
+`/tmp/cdp-signlv`, `--disable-gpu`), Firebase blocked at the network
+layer, real DPR-3 taps; `SHOTS=<dir>` keeps screenshots.
+
+```
+perl -e 'alarm 580; exec @ARGV' node tools/signlevel-check.mjs   # 86 checks, ~6 min
+```
+
+The curve on paper (cum pins, every pw table monotone against the pinned
+balance sheet, the three laws), the resolver's edges (breakpoints/clamps,
+lvFor thresholds 989/990, rewards supersede, capricorn's 0.5 raw), every
+power through the REAL hooks at L1/22/50 (ram off startFight, taurus'
+vessel at create 58/70/88, word dials by wordDamage probes, cancer by a
+real strike 14/10/6, scorpio's seep cap + a REAL cast's venomAdd 1→2 at
+L40, real-tap scries −3/−6/−12, real sub-half waters 5/8/16 + TWO pours
+at L42, taurus/virgo battles CREATED under the sign, two real purifies
+at L29 with the third tap dead), XP accrual (fell 12 AT the fell, boss
+27, clear +120, endless fell 12, a loss keeps its XP, quick and daily
+move NOTHING, versus zero refs), the moment (a real fell crosses L2 →
+the end screen's rite, tagged `signRite`/`signRiteLv`, ack spent at
+show, a tap dismisses; forge rite THEN sign rite, never stacked; a
+killed end screen → the MEADOW says it once), migration (leo 3c/5r →
+1560 = L13 silent; ten clears cap at exactly 3230 = L20; fresh = L1;
+planted xp-less records read L1), rewards (the rite names the vessel,
+hpMax 55 then 60 not 65, the gilded tile at 40 stacking with GILDED
+DAWN through one pending queue, fight-0 only, quick gets none), the
+picker by real taps (open sky bare, LEVEL 4 + bar fraction ±2%, the
+live-dial no-drift proof, LEVEL 50 · AT ITS HEIGHT solid, BEGIN pins
+both the campaign chart and the endless rise), the profile wheel's
+numerals + the sign-check layout judge on picker AND profile at iPhone
+16 / SE / iPad over open-sky/aries/virgo-at-50 stops, and es/de boots
+(picker + rite templated, no %k residue). Zero page exceptions.
+
+Harness seams: `b.signLv` is a plain field — set it beside `b.sign` for
+effect probes (startFight re-derives from the profile; seed
+`SS.prof.signs[id] = {…, xp: SS_SIGNLV.cum[L], ack: L}` first when the
+real derivation matters). comet-check seeds sagittarius INTO the
+today-band (cum[22] — level 20 still reads arrow 5) so its pinned 6s
+double as a band proof; endless-check seeds aries the same way AND
+SS.save()s before its reboot (SS.load must find xp present or the
+veteran seed rewrites it). ⚠ endRun's books call ssClearCampaign — a
+probe that restarts a signed campaign after endRun must RE-PIN
+beta3.campsign first, or the next run is unsigned and every vessel
+assert reads 50.
 
 ## endless-check.mjs — fight until you fall, see how far you climb (v0.68.0)
 

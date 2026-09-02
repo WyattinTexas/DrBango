@@ -398,74 +398,196 @@ const SS_OFFER_TYPES = ['sigil', 'upgrade'];   // an unknown type falls back to 
    English title/desc are canonical here; other languages carry a
    `zod` map in strings.js (SS_ZOD). Latin sign NAMES never
    translate, like beast names. Element tints color the glyphs.
+   SIGN LEVELS (v0.69.0). Skylar (9/1): every sign climbs 1..50
+   by being played. `pw` holds each power's dials as [level,
+   value] breakpoints, ascending, resolved by ssSignVal (below,
+   the ONE resolver — no site hand-reads pw): the value at the
+   highest breakpoint ≤ the level. LAWS the harness pins: level
+   1 is weaker than today (VIRGO's once-count excepted — one per
+   battle has no smaller step), TODAY'S numbers hold across the
+   whole 22-28 band (the "middle ground" Skylar asked for), and
+   50 is clearly stronger. Breakpoints, not formulas, because a
+   level-up either changes the number or doesn't — the rite's
+   "now strikes for +11" line and the desc templates need
+   integer-honest steps, and Skylar moves one rung by editing
+   one pair. Descs are GENERATED from the dials (the sigil law):
+   `dvf` names the fields whose values substitute %1..%k, `db`
+   lists the levels where the WORDING advances and `dvs` carries
+   those further band descs — text and effect cannot drift.
    ============================================================ */
 const SS_ELEMENTS = { fire: 0xffa94d, earth: 0xa8d883, air: 0x9fc4ff, water: 0x6fe0d0 };
 const SS_ZODIAC = [
   {
     id: 'aries', name: 'ARIES', title: 'THE RAM', el: 'fire',
-    desc: 'Each battle opens with a headlong ram: the beast takes 8.',
+    desc: 'Each battle opens with a headlong ram: the beast takes %1.',
+    dvf: ['ram'],
+    pw: { ram: [[1, 4], [6, 5], [11, 6], [16, 7], [22, 8], [29, 9], [36, 10], [43, 11], [50, 13]] },
     stars: [[-60, -20], [-24, -32], [10, -30], [40, -6], [48, 18]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4]],
   },
   {
     id: 'taurus', name: 'TAURUS', title: 'THE BULL', el: 'earth', beast: 'taurus',
-    desc: 'The bull endures: +15 max health at the climb\'s start.',
+    desc: 'The bull endures: +%1 max health at the climb\'s start.',
+    dvf: ['hp'],
+    pw: { hp: [[1, 8], [8, 10], [15, 12], [22, 15], [30, 18], [37, 21], [44, 24], [50, 28]] },
   },
   {
     id: 'gemini', name: 'GEMINI', title: 'THE TWINS', el: 'air',
-    desc: 'Twinned letters: words that use the same letter twice deal +10.',
+    desc: 'Twinned letters: words that use the same letter twice deal +%1.',
+    dvf: ['add'],
+    pw: { add: [[1, 5], [8, 6], [14, 8], [22, 10], [29, 12], [36, 14], [43, 16], [50, 18]] },
     stars: [[-28, -58], [30, -52], [-34, -30], [-42, -2], [-48, 26], [-36, 52], [-64, 34], [24, -26], [34, 2], [28, 28], [44, 52], [60, 30]],
     edges: [[0, 2], [2, 3], [3, 4], [4, 5], [4, 6], [1, 7], [7, 8], [8, 9], [9, 10], [9, 11], [2, 7], [3, 8]],
   },
   {
     id: 'cancer', name: 'CANCER', title: 'THE CRAB', el: 'water', beast: 'cancer',
-    desc: 'The shell holds: the first strike of every battle deals half.',
+    desc: 'The shell holds: the first strike of every battle deals %1% less.',
+    dvf: ['cut'],
+    pw: { cut: [[1, 30], [10, 35], [16, 40], [22, 50], [30, 55], [36, 60], [43, 65], [50, 70]] },
   },
   {
     id: 'leo', name: 'LEO', title: 'THE LION', el: 'fire', beast: 'leo',
-    desc: 'The roar: words of 6+ letters deal +8.',
+    desc: 'The roar: words of 6+ letters deal +%1.',
+    dvf: ['add'],
+    pw: { add: [[1, 4], [9, 5], [15, 6], [22, 8], [29, 9], [36, 10], [43, 12], [50, 14]] },
   },
   {
     id: 'virgo', name: 'VIRGO', title: 'THE MAIDEN', el: 'earth',
     desc: 'Once per battle, tap your sign, then a tile, to purify it into a new letter.',
+    db: [29, 46],
+    dvs: ['Twice per battle, tap your sign, then a tile, to purify it into a new letter.',
+      'Three times per battle, tap your sign, then a tile, to purify it into a new letter.'],
+    pw: { charges: [[1, 1], [29, 2], [46, 3]] },
     stars: [[-72, 44], [-38, 20], [-10, 4], [18, -8], [2, -34], [-18, -56], [46, -24], [74, -40], [40, 18], [66, 36]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [3, 6], [6, 7], [3, 8], [8, 9]],
   },
   {
     id: 'libra', name: 'LIBRA', title: 'THE SCALES', el: 'air',
-    desc: 'The scales: words with vowels and consonants in balance deal +10.',
+    desc: 'The scales: words with vowels and consonants in balance deal +%1.',
+    dvf: ['add'],
+    pw: { add: [[1, 5], [8, 6], [14, 8], [22, 10], [29, 12], [36, 14], [43, 16], [50, 18]] },
     stars: [[0, -52], [-52, -16], [44, -24], [-58, 28], [-44, 52], [38, 24], [54, 50]],
     edges: [[0, 1], [0, 2], [1, 2], [1, 3], [3, 4], [2, 5], [5, 6]],
   },
   {
     id: 'scorpio', name: 'SCORPIO', title: 'THE SCORPION', el: 'water', beast: 'scorpius',
-    desc: 'Venom builds with every word — the beast suffers it after each cast.',
+    desc: 'Venom builds with every word — the beast suffers up to %1 after each cast.',
+    dvf: ['cap'],
+    db: [40],
+    dvs: ['Venom builds twofold with every word — the beast suffers up to %1 after each cast.'],
+    pw: { cap: [[1, 4], [14, 5], [22, 6], [29, 7], [36, 8], [43, 9], [50, 10]], venomAdd: [[1, 1], [40, 2]] },
   },
   {
     id: 'sagittarius', name: 'SAGITTARIUS', title: 'THE ARCHER', el: 'fire', beast: 'sagittarius',
-    desc: 'The nocked arrow: SCRY also strikes the beast for 6.',
+    desc: 'The nocked arrow: SCRY also strikes the beast for %1.',
+    dvf: ['arrow'],
+    pw: { arrow: [[1, 3], [10, 4], [16, 5], [22, 6], [29, 7], [36, 8], [43, 10], [50, 12]] },
   },
   {
     id: 'capricorn', name: 'CAPRICORN', title: 'THE SEA-GOAT', el: 'earth',
-    desc: 'The climb: words deal +1 for every beast felled this run.',
+    desc: 'The climb: words deal +1 for every second beast felled this run.',
+    db: [22, 50],
+    dvs: ['The climb: words deal +1 for every beast felled this run.',
+      'The climb: words deal +2 for every beast felled this run.'],
+    pw: { per: [[1, 0.5], [22, 1], [50, 2]] },
     stars: [[-72, -30], [-62, -10], [-34, 10], [-2, 26], [30, 26], [56, 8], [70, -24], [40, -20], [-16, -24]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 0]],
   },
   {
     id: 'aquarius', name: 'AQUARIUS', title: 'THE WATER-BEARER', el: 'air',
-    desc: 'Once per battle, falling below half health pours the waters: heal 8.',
+    desc: 'Once per battle, falling below half health pours the waters: heal %1.',
+    dvf: ['heal'],
+    db: [42],
+    dvs: ['Twice per battle, falling below half health pours the waters: heal %1.'],
+    pw: { heal: [[1, 5], [12, 6], [17, 7], [22, 8], [30, 10], [38, 12], [44, 14], [50, 16]], charges: [[1, 1], [42, 2]] },
     stars: [[28, -46], [12, -58], [44, -56], [24, -26], [-8, -22], [-42, -30], [-66, -6], [42, -4], [26, 14], [42, 32], [22, 52], [50, 56]],
     edges: [[1, 0], [2, 0], [0, 3], [3, 4], [4, 5], [5, 6], [3, 7], [7, 8], [8, 9], [9, 10], [10, 11]],
   },
   {
     id: 'pisces', name: 'PISCES', title: 'THE TWIN FISH', el: 'water',
-    desc: 'The deep current: words woven at one cast from the strike deal +30%.',
+    desc: 'The deep current: words woven at one cast from the strike deal +%1%.',
+    dvf: ['pct'],
+    pw: { pct: [[1, 15], [10, 20], [16, 25], [22, 30], [30, 35], [38, 40], [44, 45], [50, 50]] },
     stars: [[52, 44], [18, 34], [-14, 26], [-44, 22], [-66, 14], [-84, 20], [-86, 36], [-68, 42], [-52, 34], [46, 16], [40, -12], [34, -40], [24, -58], [44, -60]],
     edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 3], [0, 9], [9, 10], [10, 11], [11, 12], [12, 13], [13, 11]],
   },
 ];
 const SS_ZODIAC_BY = {};
 for (const _z of SS_ZODIAC) SS_ZODIAC_BY[_z.id] = _z;
+
+/* SIGN LEVELS (v0.69.0). Skylar (9/1): level 1..50 per sign, XP from playing
+   it, level-ups every run or two early and a long haul to the summit.
+   cost(n) = XP from level n to n+1; cumulative pins the harness asserts:
+   L5 320 · L10 990 · L20 3230 · L30 6670 · L40 11286 · L50 16286.
+   One campaign clear ≈ 465 XP (SS_SIGN_XP below) → a fresh sign clears its
+   first climb at ~L5-6, reaches the today-band (22) in ~8-9 clears, and
+   the summit in ~35 signed clears ≈ 18-25 hours (or the endless mix). */
+const SS_SIGNLV = { max: 50, cost: (n) => Math.min(500, 50 + 12 * n) };
+SS_SIGNLV.cum = [0, 0];                        // cum[L] = total XP to STAND at L
+for (let _n = 1; _n < SS_SIGNLV.max; _n++) SS_SIGNLV.cum[_n + 1] = SS_SIGNLV.cum[_n] + SS_SIGNLV.cost(_n);
+function ssSignLvFor(xp) {
+  let L = 1;
+  while (L < SS_SIGNLV.max && (xp | 0) >= SS_SIGNLV.cum[L + 1]) L++;
+  return L;
+}
+
+/* What playing a sign pays (v0.69.0). XP settles LIVE at the fell — an
+   abandoned climb keeps what its fells earned, the drip's own philosophy —
+   and only where a sign is actually played: campaign and endless (quick,
+   the daily and versus run unsigned, so they pay nothing by construction
+   and the daily's shared-fair laws cannot move). `fell` per beast felled,
+   `boss` EXTRA on a boss-TIER fell, `clear` on the campaign's summit win
+   only (endless has no end to bonus — its depth IS the bonus). */
+const SS_SIGN_XP = { fell: 12, boss: 15, clear: 120 };
+
+/* SIGN REWARDS (v0.69.0, the framework). Typed rows keyed by level;
+   `default` serves all twelve signs, a per-sign key (e.g. aries: {…})
+   overrides row-by-row when Skylar decides per-sign content. Types live:
+     vessel — +hp max health at a signed run's start (the HIGHEST row ≤
+              level applies; rows supersede, never stack)
+     gilded — n gilded tiles into the run's OPENING battle (fight 0),
+              through the standing `pending` queue (v0.66.0)
+   Types documented for later (the framework's empty slots — the announce
+   and record plumbing already fits them):
+     charge — +1 power charge (virgo/aquarius beyond their own curve)
+     title  — a recorded epithet shown on the picker card (needs i18n)
+     cosmetic — tile tint / card frame (needs art; never emoji)
+     sigil  — begin signed runs holding a named sigil
+   Levels 5/15/20/30/35/45/50 are deliberately EMPTY today. */
+const SS_SIGN_REWARDS = {
+  default: { 10: { t: 'vessel', hp: 5 }, 25: { t: 'vessel', hp: 10 }, 40: { t: 'gilded', n: 1 } },
+};
+// the merged ACTIVE passives at a level ({ hp, gilded }) — default + the
+// sign's own rows folded row-by-row, highest applicable row per type wins
+function ssSignRewards(id, lv) {
+  const L = Math.max(1, Math.min((lv | 0) || 1, SS_SIGNLV.max));
+  const rows = Object.assign({}, SS_SIGN_REWARDS.default, SS_SIGN_REWARDS[id] || {});
+  const out = { hp: 0, gilded: 0 };
+  for (const k of Object.keys(rows).map(Number).filter((n) => n <= L).sort((a, b) => a - b)) {
+    const r = rows[k] || {};
+    if (r.t === 'vessel') out.hp = r.hp | 0;
+    else if (r.t === 'gilded') out.gilded = r.n | 0;
+  }
+  return out;
+}
+// the reward row sitting at EXACTLY this level (the rite names it), or null
+function ssSignRewardAt(id, lv) {
+  const rows = Object.assign({}, SS_SIGN_REWARDS.default, SS_SIGN_REWARDS[id] || {});
+  return rows[lv | 0] || null;
+}
+
+/* THE ONE SIGN RESOLVER (v0.69.0), ssSigilVal's sibling: the dial's value
+   at a level — the highest breakpoint ≤ level. Level clamps into 1..50 and
+   defaults to 1, so a bare call reads the foot of the ladder; the VALUE is
+   returned raw (capricorn's 0.5 must never be |0'd — only levels are). */
+function ssSignVal(id, field, lv) {
+  const z = SS_ZODIAC_BY[id];
+  if (!z || !z.pw || !z.pw[field]) return undefined;
+  const L = Math.max(1, Math.min((lv | 0) || 1, SS_SIGNLV.max));
+  let v = z.pw[field][0][1];
+  for (const [bl, bv] of z.pw[field]) { if (bl <= L) v = bv; else break; }
+  return v;
+}
 
 // rarity: 0 = basic, 1 = rare, 2 = legendary. Rares and legendaries surface
 // deeper into the campaign (and at low odds anywhere in quick/daily) — the

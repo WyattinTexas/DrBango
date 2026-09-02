@@ -387,7 +387,11 @@ ok('no page errors (the bests)', errs.length === 0, errs.join(' | ').slice(0, 20
 /* ================= 6. the sign climbs too ================= */
 console.log('\n— THE SIGN ON THE LADDER —');
 errs.length = 0;
-await ev(`localStorage.setItem('beta3.endsign', 'aries'); 'ok'`);
+// v0.69.0: the ram pays its LEVEL — seed aries into the today-band (22)
+// and SS.save() so the REBOOT's SS.load finds xp present and re-seeds
+// nothing; the eBest/campaign-ledger asserts below stand on this record
+await ev(`localStorage.setItem('beta3.endsign', 'aries');
+  SS.prof.signs.aries = { best: 0, clears: 0, runs: 0, eBest: 0, xp: SS_SIGNLV.cum[22], ack: 22 }; SS.save(); 'ok'`);
 await reboot('endless=1');
 await until(PICK, 60000);
 const ram = await evj(`JSON.stringify({ sign: ${B}.sign, rammed: ${B}.beast.hpNow === ${B}.beast.hp - 8 })`);

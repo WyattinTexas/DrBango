@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.68.0';
+const BUILD = 'STARSPELL v0.69.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -504,7 +504,26 @@ const SS = {
     p.bestCampaign = p.bestCampaign | 0;
     p.vsWords = p.vsWords | 0; p.vsWins = p.vsWins | 0;
     p.daily = p.daily || {}; p.ach = p.ach || {};
-    p.signs = p.signs || {};   // per-zodiac campaign records: id → {best, clears, runs}
+    p.signs = p.signs || {};   // per-zodiac records: id → {best, clears, runs, eBest, xp, ack}
+    /* SIGN LEVELS (v0.69.0): each record grows lifetime `xp` and `ack` (the
+       highest level already ANNOUNCED). THE VETERAN'S SEED, once: the
+       records already earned buy a head start — capped at the FOOT of the
+       today-band (level 20 = cum 3230), so nobody wakes past the middle
+       ground Skylar asked everyone to climb toward — and ack seeds to the
+       seeded level, so a veteran's first boot is silent, never a rite
+       storm. A record a harness plants mid-session without `xp` reads
+       level 1 through the `| 0`s at the read sites, throwing nothing. */
+    for (const k in p.signs) {
+      const sr = p.signs[k];
+      if (!sr || typeof sr !== 'object') { delete p.signs[k]; continue; }
+      if (typeof sr.xp !== 'number') {
+        sr.xp = Math.min(SS_SIGNLV.cum[20],
+          (sr.clears | 0) * 420 + Math.min(sr.runs | 0, 10) * 60 + (sr.eBest | 0) * 12);
+        sr.ack = ssSignLvFor(sr.xp);
+      }
+      sr.xp = Math.max(0, sr.xp | 0);
+      sr.ack = Math.max(1, sr.ack | 0);
+    }
     // star rating: every profile that predates it starts at the baseline
     p.rating = Number.isFinite(p.rating) ? Math.round(p.rating) : 1000;
     p.rhide = !!p.rhide;                                   // veil my rating from others
@@ -3510,8 +3529,11 @@ function ssSigilPanel(scene, opts) {
     } else {
       const g = ssZodiacGlyph(scene, r.sign, l.u(0.145), l.x(gx), l.y(yk));
       rc.add(g);
-      const loc = SS_ZOD(r.sign);
-      name = r.sign.name + ' · ' + loc.title; desc = loc.desc;
+      // the sign row speaks at its LEVEL (v0.69.0): the battle passes the
+      // run's held level; a bare panel reads the profile's standing one
+      const slv = (opts.signLv | 0) || ssSignLv(r.sign.id);
+      const loc = SS_ZOD(r.sign, slv);
+      name = r.sign.name + ' · ' + loc.title + ' · ' + SS_T('svLevel', slv); desc = loc.desc;
       ribbon = SS_T('inspSign'); ribbonColor = '#ffdf8f';
     }
     const lx = gx + tex.mr + 14, maxW = RW / 2 - lx - 12;
@@ -3841,6 +3863,31 @@ function ssCampSign() {
   return SS_ZODIAC_BY[v] ? v : null;
 }
 function ssCampSignChosen() { return localStorage.getItem('beta3.campsign') != null; }
+
+/* SIGN LEVELS (v0.69.0): the standing level of a sign — the profile's
+   lifetime xp through the curve. 1 for null/unknown/unplayed, so a bare
+   read is always lawful (the ssSigilVal default-1 law). */
+function ssSignLv(id) {
+  const sr = id && SS.prof && SS.prof.signs && SS.prof.signs[id];
+  return sr ? ssSignLvFor(sr.xp | 0) : 1;
+}
+/* The level-ups not yet said out loud: every signed record whose level has
+   climbed past `ack` (the announce ledger), in roster order. The rite
+   spends ack as it SHOWS, so two crossings in one run are announced once
+   at the level reached — and a run whose end screen was never seen is
+   announced at the next end screen or on the meadow, never lost, never
+   twice. */
+function ssSignPending() {
+  const out = [];
+  const signs = (SS.prof && SS.prof.signs) || {};
+  for (const z of SS_ZODIAC) {
+    const sr = signs[z.id];
+    if (!sr) continue;
+    const lv = ssSignLvFor(sr.xp | 0);
+    if (lv > Math.max(1, sr.ack | 0)) out.push({ id: z.id, lv });
+  }
+  return out;
+}
 
 // A sign's constellation, drawn small — picker cells, the battle emblem, the
 // profile strip. Signs that share a beast draw the beast's own stars; k maps
@@ -4296,6 +4343,127 @@ function ssSigilAnnounce(scene, ids, onAll) {
   return ids.reduce((a, id) => a + SS_RITE_MS[SS_SIG_BY[id].rarity | 0] + 840, 0);
 }
 
+/* THE SIGN'S OWN RITE (v0.69.0) — a level earned by play, said in the
+   forge ceremony's dress: the veil, the sign's glyph rising where the
+   medallion sits, the gold nameplate 'LEO · LEVEL 12', and the power line
+   AT ITS NEW NUMBERS (SS_ZOD's levelled desc — the "your 6-letter words
+   now strike for +11" line, already localized). A reward row sitting at
+   exactly this level gets its own gold pair beneath. A SIBLING of
+   ssSigilRite, not a parameter-bent reuse — that one is welded to sigil
+   defs (rarity chrome, SS_SIG, the medal texture).
+   Spend-at-show (the v0.43 law): `ack` is written as the rite BUILDS, so
+   endRun and the meadow can never say the same level twice. */
+function ssSignRite(scene, z, lv, onDone) {
+  const l = ssLayout(scene);
+  SS_RITE.busy = true;
+  const sr = SS.prof.signs[z.id];
+  if (sr && (sr.ack | 0) < lv) { sr.ack = lv; SS.save(); }
+  const tint = SS_ELEMENTS[z.el];
+  const hexc = '#' + ('000000' + tint.toString(16)).slice(-6);
+  const c = scene.add.container(0, 0).setDepth(680).setScrollFactor(0);
+  c.setData('signRite', z.id);            // the harness reads WHICH sign rose
+  c.setData('signRiteLv', lv);            // …and to which level
+  const sf = (o) => o.setScrollFactor(0);
+  let done = false;
+  const close = () => {
+    if (done) return;
+    done = true;
+    scene.tweens.add({
+      targets: c, alpha: 0, duration: 420, ease: 'Sine.easeIn',
+      onComplete: () => { if (c.active) c.destroy(); SS_RITE.busy = false; if (onDone) onDone(); },
+    });
+  };
+  scene.events.once('shutdown', () => { SS_RITE.busy = false; });
+
+  const veil = sf(scene.add.image(l.W / 2, l.H / 2, 'veil')).setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+  veil.on('pointerdown', () => { SFX.ui(); close(); });
+  // 0.985, the sigil rite's own weight — this copy crosses the middle of
+  // the screen where gold buttons may sit underneath
+  scene.tweens.add({ targets: veil, alpha: 0.985, duration: 380 });
+  c.add(veil);
+
+  SFX.ensure(); SFX.forge();
+  const rw = ssSignRewardAt(z.id, lv);
+  if (rw) scene.time.delayedCall(340, () => { if (SFX.ok && c.active) SFX.ach(); });
+
+  // ---- the glyph, rising in its element's glow ----
+  const MY = 286;
+  const glow = sf(scene.add.image(l.x(0), l.y(MY), 'glowbig')).setDisplaySize(l.u(80), l.u(80))
+    .setTint(tint).setAlpha(0).setBlendMode('ADD');
+  c.add(glow);
+  const glyph = ssZodiacGlyph(scene, z, l.u(0.7), l.x(0), l.y(MY)).setScrollFactor(0).setAlpha(0).setScale(0.6);
+  c.add(glyph);
+  scene.tweens.add({ targets: glyph, alpha: 1, scale: 1, duration: 700, ease: 'Back.easeOut' });
+  scene.tweens.add({
+    targets: glow, alpha: 0.3, displayWidth: l.u(300), displayHeight: l.u(240), duration: 700, ease: 'Cubic.easeOut',
+    onComplete: () => {
+      if (!glow.active || ssReduceMotion()) return;
+      scene.tweens.add({ targets: glow, alpha: 0.13, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    },
+  });
+
+  // ---- the arrival: one element-tinted burst; a reward flashes the sky ----
+  if (!ssReduceMotion()) {
+    const em = sf(scene.add.particles(0, 0, 'dot', {
+      speed: { min: 20, max: 210 }, lifespan: { min: 700, max: 1700 }, gravityY: -22,
+      scale: { start: 0.75, end: 0 }, alpha: { start: 0.95, end: 0 }, blendMode: 'ADD',
+      tint: [tint, 0xfff2c9], emitting: false,
+    }));
+    c.add(em);
+    scene.time.delayedCall(240, () => {
+      if (!em.active) return;
+      for (let k = 0; k < (rw ? 30 : 18); k++) {
+        em.emitParticleAt(l.x(0) + (Math.random() - 0.5) * l.u(150), l.y(MY) + (Math.random() - 0.5) * l.u(120));
+      }
+    });
+    if (rw) scene.time.delayedCall(280, () => { if (c.active) scene.cameras.main.flash(300, 255, 214, 120, false); });
+  }
+
+  // ---- the words ----
+  const head = sf(ssTxt(scene, l.x(0), l.y(146), '✦  ' + SS_T('svHead') + '  ✦', l.u(14), '#ffd77a')).setOrigin(0.5)
+    .setLetterSpacing(l.u(3)).setShadow(0, 0, '#c9b676', l.u(10), true, true).setAlpha(0);
+  const gk = ssGoldTex(scene, z.name + ' · ' + (lv >= SS_SIGNLV.max ? SS_T('svLevelMax') : SS_T('svLevel', lv)), 25);
+  const gsc = Math.min(1, 340 / gk.w);
+  const name = sf(scene.add.image(l.x(0), l.y(438), gk.key)).setDisplaySize(l.u(gk.w * gsc), l.u(gk.h * gsc)).setAlpha(0);
+  const title = sf(ssTxt(scene, l.x(0), l.y(472), SS_ZOD(z, lv).title, l.u(11), hexc, 'italic')).setOrigin(0.5)
+    .setShadow(0, 0, hexc, l.u(7), true, true).setAlpha(0);
+  const words = [head, name, title];
+  const dh = (o) => o.height / l.s;
+  // the power at its NEW numbers — the levelled desc, one Text per line
+  const desc = ssTextBlock(scene, l.x(0), l.y(498), SS_ZOD(z, lv).desc, {
+    fontSize: l.u(13.5) + 'px', color: '#e6dfc6', fontStyle: 'italic',
+    align: 'center', wrapW: l.u(330), lineSpacing: l.u(3), ox: 0.5, oy: 0, sf: true,
+  }).setData('signDesc', z.id).setAlpha(0);
+  words.push(desc);
+  let ny = 498 + dh(desc) + 24;
+  if (rw) {
+    const rwLine = rw.t === 'vessel' ? SS_T('svRwVessel', rw.hp | 0) : rw.t === 'gilded' ? SS_T('svRwGilded') : '';
+    if (rwLine) {
+      words.push(sf(ssTxt(scene, l.x(0), l.y(ny), '✦ ' + SS_T('svReward') + ' ✦', l.u(10.5), '#ffe9a8')).setOrigin(0.5)
+        .setLetterSpacing(l.u(2)).setShadow(0, 0, '#c9b676', l.u(8), true, true).setAlpha(0));
+      words.push(ssTextBlock(scene, l.x(0), l.y(ny + 20), rwLine, {
+        fontSize: l.u(11.5) + 'px', color: '#ffd77a', fontStyle: 'italic',
+        align: 'center', wrapW: l.u(320), ox: 0.5, oy: 0, sf: true,
+      }).setData('signReward', z.id).setAlpha(0));
+    }
+  }
+  const hint = sf(ssTxt(scene, l.x(0), l.y(694), SS_T('unlTap'), l.u(9.5), '#8a94c4', 'italic')).setOrigin(0.5).setAlpha(0);
+  words.push(hint);
+  c.add(words);
+  const beats = [[head, 540], [name, 760]];
+  words.slice(2).forEach((o, i) => beats.push([o, 940 + i * 170]));
+  beats.forEach(([o, d]) => {
+    if (!o) return;
+    o.y += l.u(10);
+    scene.tweens.add({ targets: o, y: o.y - l.u(10), alpha: o === hint ? 0.85 : 1, duration: 420, delay: d, ease: 'Cubic.easeOut' });
+  });
+
+  ssHealBlankTexts(scene, 'sign-rite');
+  // one quiet beat — it holds to be read, then lets the sky back through
+  scene.time.delayedCall(rw ? 6000 : 5400, close);
+  return c;
+}
+
 // achievement toast, usable from any scene
 function ssAchToast(scene, def) {
   const l = ssLayout(scene);
@@ -4477,7 +4645,7 @@ class Home extends Phaser.Scene {
     // scene instances persist across restarts — a rotation mid-sheet would
     // otherwise leave these truthy forever and the sheets could never reopen
     this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null;
-    this.streakC = null; this.riteC = null; this.riteTimer = null; this.sigTimer = null;
+    this.streakC = null; this.riteC = null; this.riteTimer = null; this.sigTimer = null; this.signLvTimer = null;
     this.lanternShown = null; this.lanternSwell = null;   // a restart re-renders, it does not celebrate
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
@@ -4526,6 +4694,7 @@ class Home extends Phaser.Scene {
     // app was closed before it could be honoured) waits for still grass
     this.milestoneCheck();
     this.sigilNotice();          // …and a sigil the drip handed over may still be unsaid
+    this.signNotice();           // …and a sign level a killed end screen never named
     if (entry === 'battle') this.descendHome();
     else if (entry === 'defeat') {
       const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setScrollFactor(0).setDepth(600);
@@ -5140,6 +5309,35 @@ class Home extends Phaser.Scene {
       this.sigTimer = this.time.delayedCall(400, armed);
     };
     this.sigTimer = this.time.delayedCall(900, armed);
+  }
+  /* A sign level earned in a run whose end screen was never seen is said on
+     the grass instead (v0.69.0) — the same settled terms as the sigil
+     notice, with the sigil queue going FIRST (ssSigilPending in `settled`
+     keeps this one waiting while discoveries still stand). ack is spent as
+     the rite shows, so this can never repeat an end screen's ceremony. */
+  signNotice() {
+    if (this.signLvTimer || !ssSignPending().length) return;
+    let tries = 0;
+    const settled = () => !this.busy() && !this.riteC && !this.riteTimer && !this.streakC
+      && !this.dailyC && !this.langC && !this.mapC && !this.confirmC && !this.signC
+      && !SS_RITE.busy && !ssSigilPending().length;
+    const armed = () => {
+      if (!this.scene.isActive()) return;
+      if (!ssSignPending().length) { this.signLvTimer = null; return; }
+      if (settled()) {
+        this.signLvTimer = null;
+        const say = () => {
+          if (!this.scene.isActive() || SS_RITE.busy) return;
+          const u = ssSignPending()[0];
+          if (u) ssSignRite(this, SS_ZODIAC_BY[u.id], u.lv, say);
+        };
+        say();
+        return;
+      }
+      if (++tries > 60) { this.signLvTimer = null; return; }   // ~24s, then let it lie for next time
+      this.signLvTimer = this.time.delayedCall(400, armed);
+    };
+    this.signLvTimer = this.time.delayedCall(1300, armed);
   }
   milestoneRite(m) {
     if (this.riteC) return;
@@ -5757,7 +5955,12 @@ class Home extends Phaser.Scene {
     /* the deck: THE OPEN SKY first, then the twelve. Each entry is what a
        card needs — id, name, title, desc, tint, and the sign (null = open) */
     const deck = [{ id: 'none', z: null, name: SS_T('zpOpenName'), title: SS_T('zpOpenTitle'), desc: SS_T('zpOpenDesc'), tint: 0xb9c2e6 }]
-      .concat(SS_ZODIAC.map((z) => { const t = SS_ZOD(z); return { id: z.id, z, name: z.name, title: t.title, desc: t.desc, tint: SS_ELEMENTS[z.el] }; }));
+      .concat(SS_ZODIAC.map((z) => {
+        // the desc speaks at the sign's HELD LEVEL (v0.69.0) — the numbers
+        // on the card are the numbers the climb will pay
+        const t = SS_ZOD(z, ssSignLv(z.id));
+        return { id: z.id, z, name: z.name, title: t.title, desc: t.desc, tint: SS_ELEMENTS[z.el] };
+      }));
     const N = deck.length;
     // geometry (design units): the card, its stride, and the window the
     // deck shows through — the margins either side belong to the arrows
@@ -5798,13 +6001,39 @@ class Home extends Phaser.Scene {
       af.lineStyle(l.u(0.9), tint, 0.45);
       af.strokeRoundedRect(-l.u(ART_W / 2), ay - l.u(ART_H / 2), l.u(ART_W), l.u(ART_H), l.u(6));
       k.add(af);
-      // the power, at the card's bottom — one Text per line (ssTextBlock)
-      const desc = ssTextBlock(this, 0, l.u(CH / 2 - 92), d.desc, {
+      // the power, at the card's bottom — one Text per line (ssTextBlock),
+      // GENERATED at card build from the def's own dials at the held level
+      // (v0.69.0 no-drift law: a dial that moves reaches the next build)
+      const desc = ssTextBlock(this, 0, l.u(CH / 2 - 92), d.z ? SS_ZOD(d.z, ssSignLv(d.id)).desc : d.desc, {
         fontSize: l.u(11) + 'px', color: '#e6dfc8', fontStyle: 'italic', shadow: true,
         wrapW: l.u(CW - 36), align: 'center', ox: 0.5, oy: 0,
       });
       desc.setData('zodDesc', d.id);
       k.add(desc);
+      /* the sign's LEVEL + its XP toward the next (v0.69.0) — every sign
+         card, never THE OPEN SKY. Label + thin gold bar centred as one
+         row; at the summit the label wears its crown over a solid bar. */
+      if (d.z) {
+        const lv = ssSignLv(d.id);
+        const srx = SS.prof.signs[d.id];
+        const xp = srx ? (srx.xp | 0) : 0;
+        const atMax = lv >= SS_SIGNLV.max;
+        const frac = atMax ? 1
+          : clamp((xp - SS_SIGNLV.cum[lv]) / Math.max(1, SS_SIGNLV.cum[lv + 1] - SS_SIGNLV.cum[lv]), 0, 1);
+        const ly = l.u(CH / 2 - 34);
+        const lvT = ssTxt(this, 0, ly, atMax ? SS_T('svLevelMax') : SS_T('svLevel', lv), l.u(9.5), '#d7b45c').setOrigin(1, 0.5);
+        if (lvT.width > l.u(104)) lvT.setScale(l.u(104) / lvT.width);
+        const BW = 108, GAP = 9;
+        const lw = (lvT.width * lvT.scaleX) / l.u(1);
+        const left = -(lw + GAP + BW) / 2;
+        lvT.setX(l.u(left + lw));
+        lvT.setData('signLvRow', d.id);
+        const trough = this.add.image(l.u(left + lw + GAP), ly, 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(BW), l.u(5.5));
+        const fill = this.add.image(l.u(left + lw + GAP + 1), ly, 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(BW - 2), l.u(3.5));
+        fill.setCrop(0, 0, fill.frame.width * frac, fill.frame.height);
+        fill.setData('signLvFill', frac);
+        k.add([lvT, trough, fill]);
+      }
       // the record under this sign, styled in
       const sr = d.z ? SS.prof.signs[d.id] : null;
       if (sr && sr.clears > 0) {
@@ -6099,6 +6328,7 @@ class Home extends Phaser.Scene {
     this.updateDailyChip();
     this.milestoneCheck();       // the hunt we just came home from may have grown the lamp
     this.sigilNotice();
+    this.signNotice();           // a sign level the climb earned may be unsaid
     if (this.refreshRatingPill) this.refreshRatingPill();   // the battle may have moved the number
     const l = ssLayout(this);
     if (this.ascVeil) {          // reduce-motion rise → reduce-motion return
@@ -6189,7 +6419,18 @@ class Battle extends Phaser.Scene {
     // and rides the checkpoint's hpMax.
     this.sign = this.mode === 'campaign' ? ssCampSign() : this.mode === 'endless' ? ssEndSign() : null;
     this.signZ = this.sign ? SS_ZODIAC_BY[this.sign] : null;
-    if (this.sign === 'taurus' && !this.resume) { this.run.hpMax += 15; this.run.hp = this.run.hpMax; }
+    // the run's opening level (v0.69.0) — read here for the vessels below,
+    // refreshed per battle at startFight
+    this.signLv = ssSignLv(this.sign);
+    if (this.sign && !this.resume) {
+      // what lands once at a fresh climb's start and rides the checkpoint's
+      // hpMax: the reward table's vessel rows (every sign) and TAURUS's own
+      // endurance at its level — the bull takes both
+      const rw = ssSignRewards(this.sign, this.signLv);
+      let vessel = rw.hp | 0;
+      if (this.sign === 'taurus') vessel += ssSignVal('taurus', 'hp', this.signLv);
+      if (vessel > 0) { this.run.hpMax += vessel; this.run.hp = this.run.hpMax; }
+    }
     this.state = 'boot';
     this.board = []; this.sel = []; this.lineTiles = [];
     this.pending = [];   // bonus tiles owed to the next empty slots (forge drops, GILDED DAWN's start)
@@ -6410,7 +6651,7 @@ class Battle extends Phaser.Scene {
     this.state = 'inspect';
     this.dockC.setVisible(false);          // the compact form yields to the window
     this.inspectP = ssSigilPanel(this, {
-      sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, sleeping: true,
+      sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, signLv: this.signLv, sleeping: true,
       onClose: () => {
         this.inspectP = null;
         this.dockC.setVisible(true);
@@ -6754,7 +6995,7 @@ class Battle extends Phaser.Scene {
   signTap() {
     if (!this.signZ) return;
     if (this.sign === 'virgo') {
-      if (this.state !== 'pick' || this.purifyUsed) return;
+      if (this.state !== 'pick' || (this.purifyLeft | 0) <= 0) return;
       SFX.ensure(); SFX.ui();
       this.setPurifyArmed(!this.purifyArmed);
       return;
@@ -6772,7 +7013,9 @@ class Battle extends Phaser.Scene {
     if (this.purifyArmed) {
       this.signGlow.setAlpha(0.32);
       this.tweens.add({ targets: this.signGlow, alpha: 0.14, duration: 500, yoyo: true, repeat: -1 });
-    } else if (!this.purifyUsed) {
+    } else if ((this.purifyLeft | 0) > 0) {
+      // the charged breath returns while ANY purify stands (v0.69.0 — the
+      // maiden at her height carries two or three per battle)
       this.signGlow.setAlpha(0.10);
       this.tweens.add({ targets: this.signGlow, alpha: 0.04, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     } else this.signGlow.setAlpha(0);
@@ -6789,7 +7032,9 @@ class Battle extends Phaser.Scene {
   purifyTile(i) {
     const s = this.board[i];
     if (!s) return;
-    this.purifyUsed = true;
+    this.purifyLeft = Math.max(0, (this.purifyLeft | 0) - 1);
+    // the disarm stands (a purify is a deliberate two-tap rite) — at 2+
+    // charges the player taps the emblem again for the next one
     this.setPurifyArmed(false);
     const k = this.sel.indexOf(i);
     if (k >= 0) this.unselectFrom(k);
@@ -6811,6 +7056,16 @@ class Battle extends Phaser.Scene {
     return Math.max(1, Math.min(((this.run.tiers || {})[id] | 0) || 1, ssSigilMaxT(id)));
   }
   sigVal(id, field) { return ssSigilVal(id, field, this.sigTier(id) || 1); }
+  // the birth sign's dial at the run's HELD LEVEL (v0.69.0) — one resolver,
+  // the level refreshed per battle at startFight (a mid-climb level-up
+  // strengthens the NEXT battle, never mid-fight)
+  signVal(field) { return ssSignVal(this.sign, field, this.signLv || 1); }
+  // XP settles the moment it is earned; the caller's own SS.save carries it
+  signXp(n) {
+    if (!this.sign || !n) return;
+    const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
+    sr.xp = (sr.xp | 0) + n;
+  }
   // STORMBINDER's cycle — ONE test for the ×2 and the ↯ toast, so the two
   // can never disagree; nth-word means run.words ≡ n−1 (mod n), pre-cast
   stormProc() {
@@ -6837,16 +7092,19 @@ class Battle extends Phaser.Scene {
     if (this.hasSigil('longbow') && letters >= 6) dmg += this.sigVal('longbow', 'add');
     if (this.hasSigil('roots')) dmg += this.sigVal('roots', 'add') * this.run.sigils.length;
     if (this.hasSigil('verse')) dmg += this.sigVal('verse', 'add') * this.run.words;
-    // birth-sign angles (campaign only; this.sign is null elsewhere)
+    // birth-sign angles (campaign + endless; this.sign is null elsewhere) —
+    // every dial reads the HELD LEVEL through signVal (v0.69.0)
     if (this.sign === 'gemini') {
       const twice = {};
       for (const s of tiles) twice[s.ch] = (twice[s.ch] | 0) + 1;
-      for (const ch in twice) if (twice[ch] >= 2) { dmg += 10; break; }
+      for (const ch in twice) if (twice[ch] >= 2) { dmg += this.signVal('add'); break; }
     }
-    if (this.sign === 'leo' && letters >= 6) dmg += 8;
-    if (this.sign === 'libra' && tiles.length && vowelsN * 2 === tiles.length) dmg += 10;
-    if (this.sign === 'capricorn') dmg += this.run.fightIdx;
-    if (this.sign === 'pisces' && this.beast && this.beast.count === 1 && this.beast.hpNow > 0) dmg *= 1.3;
+    if (this.sign === 'leo' && letters >= 6) dmg += this.signVal('add');
+    if (this.sign === 'libra' && tiles.length && vowelsN * 2 === tiles.length) dmg += this.signVal('add');
+    // capricorn's `per` may be fractional (0.5 = every second beast, 2 =
+    // twice per beast) — floor the PRODUCT, never the dial
+    if (this.sign === 'capricorn') dmg += Math.floor(this.run.fightIdx * this.signVal('per'));
+    if (this.sign === 'pisces' && this.beast && this.beast.count === 1 && this.beast.hpNow > 0) dmg *= 1 + this.signVal('pct') / 100;
     if (this.hasSigil('blood')) dmg *= 1 + this.sigVal('blood', 'mult') / 100;
     if (this.hasSigil('nova') && letters >= this.sigVal('nova', 'thresh')) dmg *= 2;
     if (this.stormProc()) dmg *= 2;   // STORMBINDER's cycling word
@@ -6896,15 +7154,20 @@ class Battle extends Phaser.Scene {
         .setShadow(0, 0, '#a86be0', l.u(8), true, true);
       this.tweens.add({ targets: et, alpha: 0, y: l.y(214), delay: 1100, duration: 500, onComplete: () => et.destroy() });
     }
-    // the birth sign wakes with the battle
+    // the birth sign wakes with the battle — at the level the profile holds
+    // NOW (v0.69.0): a level-up mid-climb strengthens the next battle, a
+    // resumed climb reads the same way, and the charge counters below are
+    // per-battle grants at that level (fight-start semantics, derived
+    // never persisted — the cometLeft law)
+    this.signLv = ssSignLv(this.sign);
     this.venom = 0;
     this.shellUsed = false;
-    this.watersUsed = false;
-    this.purifyUsed = false;
+    this.watersLeft = this.sign === 'aquarius' ? this.signVal('charges') : 0;
+    this.purifyLeft = this.sign === 'virgo' ? this.signVal('charges') : 0;
     if (this.purifyArmed) this.setPurifyArmed(false);
     else this.updateSignGlow && this.updateSignGlow();
     if (this.sign === 'aries') {                       // the opening ram
-      const ram = Math.min(8, this.beast.hpNow - 1);
+      const ram = Math.min(this.signVal('ram'), this.beast.hpNow - 1);
       if (ram > 0) {
         this.beast.hpNow -= ram;
         this.run.totalDmg += ram;
@@ -6956,6 +7219,13 @@ class Battle extends Phaser.Scene {
     this.boardC.setAlpha(1); this.lineC.setAlpha(1);
     this.layoutLine();
     if (this.hasSigil('gilded')) this.pending = [...this.sigVal('gilded', 'start')];
+    // the sign's own gilded gift (SS_SIGN_REWARDS, level 40+): the climb's
+    // OPENING battle begins with gilded tiles, stacking with GILDED DAWN's
+    // through the same pending queue (fight-start semantics, like the rest)
+    if (this.sign && this.run.fightIdx === 0) {
+      const rg = ssSignRewards(this.sign, this.signLv).gilded | 0;
+      for (let gi = 0; gi < rg; gi++) this.pending.push(1);
+    }
     this.fillBoard(true);
     this.hintB.setVisible(this.hasSigil('tome')); this.hintT.setVisible(this.hasSigil('tome'));
     this.hintB.setAlpha(1); this.hintT.setAlpha(1);
@@ -7089,7 +7359,7 @@ class Battle extends Phaser.Scene {
         this.tweens.add({ targets: ht, alpha: 0, y: l.y(74), delay: 700, duration: 450, onComplete: () => ht.destroy() });
         window.__ssdewHeal = { n: dews, healed: this.run.hp - before, hp: this.run.hp, t: Date.now() };
       }
-      if (this.sign === 'scorpio') this.venom = (this.venom | 0) + 1;   // the sting settles in
+      if (this.sign === 'scorpio') this.venom = (this.venom | 0) + this.signVal('venomAdd');   // the sting settles in (twofold at level 40)
       const used = [...this.sel];
       this.sel = [];
       this.lineTiles = [];
@@ -7243,6 +7513,12 @@ class Battle extends Phaser.Scene {
     // spend it, and counts a kill made on the brink BEFORE the fell's heal
     ssSigilBump('ovk', Math.max(0, -this.beast.hpNow));
     if (this.run.hp <= 10) ssSigilBump('brnk');
+    // the sign's own experience settles AT THE FELL (v0.69.0) — win or
+    // lose, an abandoned climb keeps what its fells earned (the drip's
+    // philosophy); a boss-TIER fell pays extra. fightIdx++ and the
+    // checkpoint ride the same synchronous beat below, so a fell can never
+    // pay twice across a quit/resume.
+    this.signXp(SS_SIGN_XP.fell + (SS_BEASTS[this.fights[this.run.fightIdx].id].boss ? SS_SIGN_XP.boss : 0));
     SS.save();
     // ECHO OF RUIN carries the surplus at its tier's weight (×1 / ×1.5 / ×2);
     // the drip counter above kept the RAW figure
@@ -7356,7 +7632,7 @@ class Battle extends Phaser.Scene {
     // SCORPIO's venom seeps first — over a long fight it can fell the beast
     // before the strike ever lands
     if (this.sign === 'scorpio' && (this.venom | 0) > 0 && this.beast.hpNow > 0) {
-      const vd = Math.min(6, this.venom | 0);
+      const vd = Math.min(this.signVal('cap'), this.venom | 0);
       this.beast.hpNow -= vd;
       this.run.totalDmg += vd;
       const vt = ssTxt(this, l.x(64), l.y(214), '−' + vd, l.u(15), '#9fe87a').setOrigin(0.5).setDepth(70)
@@ -7406,7 +7682,12 @@ class Battle extends Phaser.Scene {
       if (this.hasSigil('eclipse')) atk = Math.ceil(atk / this.sigVal('eclipse', 'div'));
       if (this.sign === 'cancer' && !this.shellUsed) {   // the shell takes the first blow
         this.shellUsed = true;
-        atk = Math.ceil(atk / 2);
+        // the growing reduction (v0.69.0): cut 50 ≡ the old ceil-half for
+        // every integer atk; ceil keeps the blow ≥ 1 — player-hostile
+        // rounding, so even a 70% shell never zeroes a strike. Integer
+        // space before the divide: (1 − 70/100) is 0.30000000000000004 in
+        // floats and would ceil a clean 6 into 7.
+        atk = Math.ceil(atk * (100 - this.signVal('cut')) / 100);
         SFX.blocked();
         const st = ssTxt(this, l.x(0), l.y(240), '◈ ' + SS_T('zShell') + ' ◈', l.u(16), '#9fd8ff').setOrigin(0.5).setDepth(70);
         this.tweens.add({ targets: st, alpha: 0, y: l.y(220), delay: 700, duration: 400, onComplete: () => st.destroy() });
@@ -7423,14 +7704,16 @@ class Battle extends Phaser.Scene {
         const ft = ssTxt(this, l.x(0), l.y(400), '🔥 THE FEATHER BURNS 🔥', l.u(20), '#ffa94d').setOrigin(0.5).setDepth(70);
         this.tweens.add({ targets: ft, alpha: 0, delay: 1200, duration: 500, onComplete: () => ft.destroy() });
       }
-      // AQUARIUS: the first stumble below half health pours the waters
-      if (this.sign === 'aquarius' && !this.watersUsed && this.run.hp > 0 && this.run.hp < this.run.hpMax / 2) {
-        this.watersUsed = true;
+      // AQUARIUS: a stumble below half health pours the waters — a counted
+      // per-battle grant now (v0.69.0; twice per battle from level 42)
+      if (this.sign === 'aquarius' && (this.watersLeft | 0) > 0 && this.run.hp > 0 && this.run.hp < this.run.hpMax / 2) {
+        this.watersLeft--;
+        const wn = this.signVal('heal');
         this.time.delayedCall(430, () => {
           if (this.state === 'end' || !this.scene.isActive()) return;
-          this.heal(8);
+          this.heal(wn);
           SFX.forge();
-          const wt = ssTxt(this, l.x(-150), l.y(94), '≈ +8 ≈', l.u(16), '#7ae0d8').setOrigin(0.5).setDepth(70)
+          const wt = ssTxt(this, l.x(-150), l.y(94), '≈ +' + wn + ' ≈', l.u(16), '#7ae0d8').setOrigin(0.5).setDepth(70)
             .setShadow(0, 0, '#2a8a8a', l.u(8), true, true);
           this.tweens.add({ targets: wt, alpha: 0, y: l.y(74), delay: 700, duration: 450, onComplete: () => wt.destroy() });
         });
@@ -7470,7 +7753,7 @@ class Battle extends Phaser.Scene {
         targets: ar, y: this.beastC.y, duration: 240, ease: 'Cubic.easeIn',
         onComplete: () => { this.starBurst.emitParticleAt(ar.x, ar.y, 6); ar.destroy(); },
       });
-      this.beastHit(6);
+      this.beastHit(this.signVal('arrow'));
       if (this.beast.hpNow <= 0) return;   // the arrow felled it — the death sequence takes over
     }
     // COMET TRAIL: a limited charge, never a blanket pardon (Skylar 9/1 —
@@ -7928,7 +8211,7 @@ class Battle extends Phaser.Scene {
       // the sign ledger's endless line: the deepest level ever reached
       // under this sign (campaign clears/best stay campaign-only)
       if (this.sign) {
-        const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0 });
+        const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
         if (level > (sr.eBest | 0)) sr.eBest = level;
       }
       ssClearEndless();
@@ -7944,11 +8227,14 @@ class Battle extends Phaser.Scene {
     }
     // the sign's own ledger — best is a winning-run score, like bestCampaign
     if (this.mode === 'campaign' && this.sign) {
-      const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0 });
+      const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
       sr.runs++;
       if (won) {
         sr.clears++;
         if (score > sr.best) sr.best = score;
+        // the summit's own XP bonus (v0.69.0) — the campaign clear only;
+        // the endless ladder has no end to bonus, its depth IS the bonus
+        this.signXp(SS_SIGN_XP.clear);
         SS.award('sign-born', this.game);
         const cleared = Object.keys(SS.prof.signs).filter((k) => SS.prof.signs[k].clears > 0).length;
         if (cleared >= 3) SS.award('wheel-walker', this.game);
@@ -8109,7 +8395,7 @@ class Battle extends Phaser.Scene {
         if (this.endInspectP) return;
         SFX.ui();
         this.endInspectP = ssSigilPanel(this, {
-          sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, sleeping: true, depth: 130,
+          sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, signLv: this.signLv, sleeping: true, depth: 130,
           onClose: () => { this.endInspectP = null; },
         });
       });
@@ -8215,8 +8501,18 @@ class Battle extends Phaser.Scene {
     });
 
     // the discovery rides in after the window has settled (and after any
-    // fanfare) — never over the top of a triumph beat
-    if (unlocked.length) this.time.delayedCall((fanWait || 0) + 1400, () => ssSigilAnnounce(this, unlocked));
+    // fanfare) — never over the top of a triumph beat. The SIGN's level-up
+    // rite (v0.69.0) chains BEHIND the sigil queue (the onAll seam), so
+    // ceremonies never stack; ack is spent as each rite shows, so a rite a
+    // restart kills is simply said later (the meadow's signNotice).
+    const lvups = ssSignPending();
+    const sayLv = () => {
+      if (!this.scene.isActive() || SS_RITE.busy) return;
+      const u = ssSignPending()[0];
+      if (u) ssSignRite(this, SS_ZODIAC_BY[u.id], u.lv, sayLv);
+    };
+    if (unlocked.length) this.time.delayedCall((fanWait || 0) + 1400, () => ssSigilAnnounce(this, unlocked, sayLv));
+    else if (lvups.length) this.time.delayedCall((fanWait || 0) + 1400, sayLv);
 
     if (DEMO) {
       localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, level: isEnd ? level : undefined, words: this.run.words, longest: this.run.longest, letters: this.run.letters, bigHit: this.run.bigHit, elapsed, rating: SS.prof.rating, rd: rDelta }));
@@ -8373,11 +8669,19 @@ class Profile extends Phaser.Scene {
 
     // the zodiac strip: every campaign sign, burning gold once cleared under.
     // Cleared glyphs wear their element color's glow; the rest hang dim.
+    // A PLAYED sign wears its level as a tiny numeral tucked in the glyph
+    // cell's lower-right (v0.69.0 — the strip sits 9u above the skies
+    // door, so a numeral inside the cell is the only thing that fits;
+    // unplayed signs stay quiet).
     SS_ZODIAC.forEach((z, i) => {
       const x = l.x(-165 + i * 30), y = l.y(386);
       const sr = p.signs[z.id];
       const cleared = !!(sr && sr.clears > 0);
       ssZodiacGlyph(this, z, l.u(0.085), x, y, cleared ? 0xffd77a : 0x39406b, cleared ? 1 : 0.8);
+      if (sr && ((sr.xp | 0) > 0 || (sr.runs | 0) > 0 || (sr.clears | 0) > 0 || (sr.eBest | 0) > 0)) {
+        ssTxt(this, x + l.u(8), y + l.u(5.5), String(ssSignLv(z.id)), l.u(7), cleared ? '#ffd77a' : '#8a94c4')
+          .setOrigin(0.5).setShadow(0, 0, '#0a0e1f', l.u(4), true, true).setData('signWheelLv', z.id);
+      }
     });
 
     /* THE DOOR TO THE SKY (v0.43.0). The gallery has to be reachable from

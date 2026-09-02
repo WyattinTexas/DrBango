@@ -206,7 +206,11 @@ ok('new battle\'s first scry rides free again', (await scryOnce()) && (await ev(
 
 /* ================= sagittarius alongside ================= */
 console.log('\n— THE ARCHER STILL LOOSES —');
-await ev(`${B}.sign = 'sagittarius'; ${B}.run.sigils = ['comet']; ${B}.startFight(); 'ok'`);
+// v0.69.0: sign powers pay their LEVEL now — seed the archer into the
+// today-band (22 opens it; 20 still reads arrow 5) so the 6-damage arrow
+// below doubles as a cross-suite proof of the band itself
+await ev(`SS.prof.signs = { sagittarius: { best: 0, clears: 0, runs: 0, xp: SS_SIGNLV.cum[22], ack: 22 } };
+  ${B}.sign = 'sagittarius'; ${B}.run.sigils = ['comet']; ${B}.startFight(); 'ok'`);
 await until(PICK, 20000);
 await ev(`${B}.beast.hpNow = 500; ${B}.beast.count = 3; ${B}.updateBars(); 'ok'`);
 ok('charged scry — real tap', await scryOnce());

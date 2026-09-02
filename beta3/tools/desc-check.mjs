@@ -174,6 +174,30 @@ for (const rend of ['cv', 'gl']) {
       return ['first','blood','roots','ward'].every(id => { const c = ssSigilCard(s, l, SS_SIG_BY[id], 336, 146);
         const n = D.blocks(c.list, 'sigilDesc')[0].lines.length; c.destroy(); return n === 2 }) })()`) === true);
 
+  /* ---- 1b. THE SIGN DESCS AT THEIR LEVELS, 12 × 10 (v0.69.0) ----------- */
+  // each sign's desc rendered at L1 / the today-band (22) / the summit (50)
+  // plus every wording-band crossing (z.db) — bare ssTextBlocks at the
+  // picker card's own geometry (fontSize 11, wrap 236), asserting ink, the
+  // one-line law, wordWrap-equality with SS_ZOD's own return, no stray %k
+  for (const lang of LANGS) {
+    await ev(SWAP(lang));
+    const res = await evj(`(() => { const s = game.scene.getScene('home'), l = ssLayout(s), D = window.__dc; const out = []; const seen = new Set();
+      for (const z of SS_ZODIAC) {
+        for (const lv of [1, 22, 50].concat(z.db || [])) {
+          const str = SS_ZOD(z, lv).desc;
+          if (seen.has(z.id + '|' + str)) continue; seen.add(z.id + '|' + str);
+          const b = ssTextBlock(s, l.x(0), l.y(400), str, { fontSize: l.u(11) + 'px', color: '#e6dfc8', fontStyle: 'italic', wrapW: l.u(236), align: 'center', ox: 0.5, oy: 0 });
+          const r = D.read(s, b, str); r.id = z.id + ':' + lv; r.pct = /%\\d/.test(str);
+          out.push(r); b.destroy();
+        }
+      }
+      return JSON.stringify(out) })()`);
+    const badZ = res.filter(x => !(x.n >= 1 && x.ink && !x.nl && x.match && x.fit && !x.pct));
+    ok(`${lang}: sign descs at L1/22/50 + every wording band — ${res.length} distinct strings, ink on every line, no stray %k`,
+      badZ.length === 0 && res.length >= 36, badZ.length ? badZ[0].id + ' ' + JSON.stringify(badZ[0]).slice(0, 140) : 'n=' + res.length);
+  }
+  await ev(SWAP('en'));
+
   /* ---- 2. A TWO-LINE CARD AGAINST THE OLD BAKE, PIXEL FOR PIXEL --------- */
   // the new card above, a legacy wordWrap card below (same chrome, the desc
   // re-drawn exactly as v0.43.0 drew it); the two regions must match
