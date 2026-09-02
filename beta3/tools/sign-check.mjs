@@ -161,7 +161,9 @@ let p = await peek();
 ok('the FIRST card is THE OPEN SKY (id none, 1 of 13)', p.id === 'none' && p.cur === 0 && p.n === 13, JSON.stringify(p));
 let tx = await cardTexts();
 ok('the open-sky card carries its name, title and the plain desc', tx.includes('THE OPEN SKY') && tx.includes('THE UNSIGNED CLIMB') && tx.some(t => /classic climb/.test(t)), tx.join(' | ').slice(0, 160));
-ok('no asterism and no record on the open-sky card', await ev(`(() => { const k = ${H}.signPeek().card; return k.list.filter(o => o.type === 'Graphics').length === 2 && !k.list.some(o => o.type === 'Text' && /★/.test(o.text)) })()`));
+// graphics counts carry +1 since v0.70.0: every campaign-picker card draws
+// the HARD tick box (one Graphics) beside its frame work
+ok('no asterism and no record on the open-sky card', await ev(`(() => { const k = ${H}.signPeek().card; return k.list.filter(o => o.type === 'Graphics').length === 3 && !k.list.some(o => o.type === 'Text' && /★/.test(o.text)) })()`));
 await judge('16 · open sky');
 // --- a real swipe LEFT (finger moves left → next card) ---
 const cp = await css(`${H}.signPeek().card`);
@@ -170,7 +172,7 @@ ok('mid-drag the strip follows the finger and the neighbor peeks in', mid && mid
 ok('the swipe settles on ARIES', await until(`${STILL} && ${H}.signPeek().id === 'aries' && Math.abs(${H}.signPeek().x) < 1`, 4000), JSON.stringify(await peek()));
 tx = await cardTexts();
 ok('ARIES · THE RAM with its power at the card bottom', tx.includes('ARIES') && tx.includes('THE RAM') && tx.some(t => /headlong ram/.test(t)), tx.join(' | ').slice(0, 160));
-ok('the aries card draws the asterism placeholder (plate blocked — the not-loaded fallback)', await ev(`(() => { const k = ${H}.signPeek().card; return !k.list.some(o => o.texture && o.texture.key === 'zod_aries') && k.list.some(o => o.texture && o.texture.key === 'zodsky') && k.list.filter(o => o.type === 'Graphics').length === 3 })()`));
+ok('the aries card draws the asterism placeholder (plate blocked — the not-loaded fallback)', await ev(`(() => { const k = ${H}.signPeek().card; return !k.list.some(o => o.texture && o.texture.key === 'zod_aries') && k.list.some(o => o.texture && o.texture.key === 'zodsky') && k.list.filter(o => o.type === 'Graphics').length === 4 })()`));
 await judge('16 · aries');
 // --- a short drag settles back ---
 mid = await drag(cp.x, cp.y, -40, 4);
@@ -191,7 +193,7 @@ ok('the counter reads 13 / 13', await ev(`${H}.signC.list.some(o => o.type === '
 for (let i = 0; i < 3; i++) { await touch(ar.x, ar.y); await until(STILL, 3000); }
 p = await peek();
 ok('three › taps from pisces land on TAURUS', p.id === 'taurus', JSON.stringify(p));
-ok('the TAURUS card takes the zod_taurus plate (the seam) and skips the asterism', await ev(`(() => { const k = ${H}.signPeek().card; return k.list.some(o => o.texture && o.texture.key === 'zod_taurus') && !k.list.some(o => o.texture && o.texture.key === 'zodsky') && k.list.filter(o => o.type === 'Graphics').length === 2 })()`));
+ok('the TAURUS card takes the zod_taurus plate (the seam) and skips the asterism', await ev(`(() => { const k = ${H}.signPeek().card; return k.list.some(o => o.texture && o.texture.key === 'zod_taurus') && !k.list.some(o => o.texture && o.texture.key === 'zodsky') && k.list.filter(o => o.type === 'Graphics').length === 3 })()`));
 // --- LEO (5): the record renders ---
 for (let i = 0; i < 3; i++) { await touch(ar.x, ar.y); await until(STILL, 3000); }
 p = await peek();

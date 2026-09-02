@@ -475,7 +475,8 @@ await tapUntil(`game.scene.getScene('profile').leaderB`,
 await until(`game.scene.getScene('board') && game.scene.getScene('board').sys.isActive()`, 20000);
 await sleep(1500);
 const BD = `game.scene.getScene('board')`;
-ok('three pills: daily · weekly · endless', await ev(`Object.keys(${BD}.tabBtns).join() === 'daily,weekly,endless'`));
+// four pills since v0.70.0 — HARD joined the row; endless holds its seat
+ok('four pills: daily · weekly · endless · hard', await ev(`Object.keys(${BD}.tabBtns).join() === 'daily,weekly,endless,hard'`));
 const tabFit = await evj(`(() => { const t = ${BD}.tabBtns.endless.bg; const D = game.scale.width / innerWidth;
   return JSON.stringify({ w: t.input.hitArea.width * t.scaleX / D, h: t.input.hitArea.height * t.scaleY / D }) })()`);
 ok('the tab\'s tap target holds 44pt', tabFit.w >= 43.5 && tabFit.h >= 43.5, Math.round(tabFit.w) + 'x' + Math.round(tabFit.h));

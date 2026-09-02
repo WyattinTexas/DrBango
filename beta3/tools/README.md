@@ -1,6 +1,84 @@
 # beta3 dev tools
 
-Twenty-five scripts, all dev-only — nothing here ships to the browser.
+Twenty-six scripts, all dev-only — nothing here ships to the browser.
+
+## hard-check.mjs — the beast strikes every 10 seconds unless you keep casting (v0.70.0)
+
+Skylar's call (9/1): "under each sign in the new campaign there should be a
+box that lets you tick off if you want to play that sign in hard mode … the
+beast will attack every 10 seconds so you have to spell words quickly …
+Every time you spell a word and cast a word, that timer goes back up to 10
+seconds … the sigils and sigil upgrades should happen even less … your
+score should also be amplified … at the end of your total tally … There
+should also be achievements for beating a certain sign on hard, maybe
+beating all the signs on hard … we could probably add something to the
+leaderboard as well." The game side: hard is a MODIFIER, never a mode —
+`Battle.hard`, pinned by the picker's drawn tick box (visuals per card in
+`mkCard`, ONE fixed tap zone above the swipe zone, because topOnly input
+hands events to the topmost object; remembered per sign in `prof.hardPick`,
+pinned to `beta3.camphard`, riding the checkpoint as `hard`, so endless
+accepts it later by one clause in create). `SS_HARD` (data.js) is every
+dial: strikeMs 10000 · warnMs 3000 · scoreMult 1.5 · the boss knobs
+hardMult 1.0 / hardAtkAdd 0 (Skylar raises those after testing; beastFor
+applies them to bosses only). The strike clock is ACTIVE-PLAY on the v0.61
+heartbeat: it ticks only at state 'pick' with the page visible+focused
+(sigil picks, the map, scries, rites, cast animations and a locked phone
+all hold it — the ring dims while held), resets to the top on every
+successful cast, and at zero throws the beast's NORMAL strike through
+`strikeNow` (extracted from tickEnemy: shield, shell, ward, eclipse,
+feather, the waters all apply; the cast counter is untouched — both
+threats live). The ember ring at the header's left IS the badge and the
+telegraph: arc + seconds, crimson + halo + SFX.tick inside warnMs.
+Cadence: `ssSigilPlan(mode, fights, seed, hard)` stretches the gap band by
+`SS_CADENCE.hard.gapAdd` (fewer sigils AND upgrades; the bare 3-arg call
+is byte-identical). The tally ×1.5 lands in endRun beside the tome's
+price and prints its own ⚑ row; a campaign hard clear records
+`signs[id].hardClears`, rings `hard-<sign>` (defs minted by `ssHardAward`
+— SS_ACH shows the family as ONE evolving row that wears THE EMBER
+ZODIAC's crown at 12/12; a 14th grid row cannot fit above the seal),
+lands on `hard/all` (`SSNET.submitHard`, weekly slice riding along,
+pruned) and stamps its weekly row `h:1` (the ⚑ mark). The Board wears a
+FOURTH 90-wide pill; the hard tab's still line is `lbHardTime` (its own
+words — "the endless ledger" would be a lie there). Ghosts through the
+seed layer: `SS_SEED_TUNE.hard` {5-9, 1700-3400, span 'all'}, the first
+arriving HOURS after launch (a hard clear takes hours; the generic
+minute-cap never bites past two).
+
+Self-launching like endless-check (server :8899 if nothing serves, Chrome
+on :9469, `/tmp/cdp-hard`, `--disable-gpu`), Firebase blocked at the
+network layer; the clock rig is clock-check's own
+(Page.addScriptToEvaluateOnNewDocument: `__skew`/`__vis`/`__foc`), skewing
+in sub-4s chunks — a single 10s jump must be DROPPED (the frozen-tab law
+holds for the hard clock too). `SHOTS=<dir>` keeps DPR-3 screenshots.
+
+```
+perl -e 'alarm 580; exec @ARGV' node tools/hard-check.mjs   # 107 checks, ~5 min
+```
+
+The dials + the cadence law on paper (200 seeds: deterministic, hook +
+act bosses still pay, gaps 3-5, strictly fewer offers, bare call
+unchanged), versus.js/rival.js zero hard symbols from source, the picker
+by real taps (box on every card incl. THE OPEN SKY, per-sign memory
+across swipes AND a full reload, the control sharp at dpr3 by the
+shrink-stretch Laplacian, clear of the power text), BEGIN pinning
+sign+hard into a real battle, the clock for real (a 10s no-cast strike
+with the cast counter untouched, a real-tap cast winding it back, hidden/
+blur/frozen-tab/state-gate holds, the warn dress), the tally (the ⚑ row
+on loss and win, submits captured carrying ×1.5 + the flag, TRY AGAIN
+re-pinning hard), the books (hardClears, hard-aries once, the crown at
+twelve, 'none' a no-op, the evolving grid row at 11/12 and crowned, 26
+display entries above the seal), the checkpoint (resume hard with the
+same plan + a fresh 10s; a stripped pre-v0.70 save resumes normal),
+normal runs (no ring, no clock, playMs untouched, boss knobs idle), the
+boards (ghost cast laws + champion law, getBoard('hard'), the fourth
+pill at 44pt by real tap, the ⚑ on the weekly row) and the es dress
+(DIFÍCIL on card + pill).
+
+Rig lessons: an interactive object INSIDE the deck's cards is dead under
+the full-card swipe zone (topOnly) — the game grew the fixed-zone shape
+and the harness taps that; and `mapZone` data carries the tappable zone
+as its VALUE — tap `carrier.getData('mapZone')`, never the carrier's own
+bounds (its centre is the whole chart's centre).
 
 ## signlevel-check.mjs — sign levels 1-50, every power grows with play (v0.69.0)
 

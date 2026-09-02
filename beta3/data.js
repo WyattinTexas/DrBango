@@ -384,9 +384,51 @@ const SS_CADENCE = {
   // 24 are held (the pool-dry crossover). The plan seed is the run's own
   // ladder seed, so a resumed climb keeps its schedule exactly.
   endless: { first: 0, gap: [2, 3], actBoss: true, type: 'sigil', up: 0.35 },
-  hard: { gapAdd: 1 },                                                // reserved modifier — the hard-mode card reads it
+  // hard (v0.70.0, live): a MODIFIER row, not a mode of its own — a hard run
+  // keeps its mode's row and stretches the gap band by gapAdd, so new sigils
+  // AND upgrades both come rarer (Skylar: "the sigils and sigil upgrades
+  // should happen even less"). ssSigilPlan folds it in when the run is hard.
+  hard: { gapAdd: 1 },
 };
 const SS_OFFER_TYPES = ['sigil', 'upgrade'];   // an unknown type falls back to 'sigil' — never a dead screen
+
+/* ============================================================
+   HARD MODE (v0.70.0). Skylar (9/1): "the beast will attack every
+   10 seconds so you have to spell words quickly … Every time you
+   spell a word and cast a word, that timer goes back up to 10
+   seconds … the sigils and sigil upgrades should happen even less
+   … your score should also be amplified … at the end of your
+   total tally … It will possibly increase the boss's health and
+   the attack they do if it's still too easy."
+   Hard is a MODIFIER a run carries (Battle.hard — pinned by the
+   picker's tick box into beta3.camphard, riding the checkpoint as
+   `hard`), never a separate mode: campaign wears it today, and
+   endless can accept it later by pinning the same flag. The strike
+   clock is ACTIVE-PLAY (the v0.61 run clock's own gates): it runs
+   only while the board is the player's — state 'pick', page
+   visible + focused — so it pauses through sigil picks, the map,
+   the scry flight, rites, cast animations and a locked phone; a
+   successful cast resets it to strikeMs; when it lands, the beast
+   throws its NORMAL strike (shield/shell/ward/eclipse/feather all
+   apply) and the clock re-arms. The cast-counted strike runs
+   alongside untouched — both threats live.
+   THE DIALS (Skylar tunes here):
+     strikeMs   — the clock: strike every 10s unless a cast resets
+     warnMs     — the last-seconds urgency (ring flare + tick)
+     scoreMult  — the FINAL tally's amplifier, applied where the
+                  tome's price lives (endRun) and printed as its
+                  own ⚑ row on the end screen
+     hardMult / hardAtkAdd — BOSS hp × and atk + in hard runs,
+                  shipped 1.0 / 0 (today hard IS the clock; raise
+                  these after testing if it's still too easy —
+                  beastFor applies them)
+   REWARDS (documented slot, EMPTY today): a hard clear already
+   records prof.signs[id].hardClears and the 'hard-<sign>' /
+   'hard-zodiac' achievements — typed reward rows in the
+   SS_SIGN_REWARDS style can hang off those same hooks when
+   Skylar decides the content.
+   ============================================================ */
+const SS_HARD = { strikeMs: 10000, warnMs: 3000, scoreMult: 1.5, hardMult: 1.0, hardAtkAdd: 0 };
 
 /* ============================================================
    THE ZODIAC — twelve birth signs, pickable before a campaign.
@@ -758,5 +800,17 @@ const SS_ACH = [
   // the endless climb's two rungs (v0.68.0) — awarded the moment the level
   // is REACHED, mid-run, so the toast lands where it was earned
   { id: 'end-10', icon: 'X', name: 'TEN RUNGS UP', desc: 'Reach level 10 of the endless climb.' },
-  { id: 'end-20', icon: 'XX', name: 'PAST THE CROWN', desc: 'Reach level 20 — beyond the campaign\'s own summit.' },
+  // desc trimmed in v0.70.0: the hard family row now sits beside it in the
+  // grid, and the old 50-char line ran into that neighbor's icon
+  { id: 'end-20', icon: 'XX', name: 'PAST THE CROWN', desc: 'Reach level 20 — past the campaign\'s summit.' },
+  /* hard mode (v0.70.0): THIRTEEN awardable ids behind ONE evolving grid
+     row. Each sign's hard clear awards its own 'hard-<id>' (a toast naming
+     the sign), and all twelve crown 'hard-zodiac' (its own toast) — ssHardAward
+     mints those defs. famIds is the display contract: the profile grid
+     lights this row on its first member, prints the n / 12 progress, and
+     once the crown is earned the row wears `crown`'s dress outright (the
+     profile stays 13 rows — a 14th cannot fit above the seal, the
+     signlevel layout judge proved it). */
+  { id: 'hard-sign', icon: '⚑', name: 'EMBER-SWORN', desc: 'Beat the campaign on hard under a sign.', famIds: SS_ZODIAC.map((z) => 'hard-' + z.id),
+    crown: { id: 'hard-zodiac', icon: '✹', name: 'THE EMBER ZODIAC', desc: 'All twelve signs beaten on hard.' } },
 ];

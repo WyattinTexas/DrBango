@@ -37,8 +37,12 @@
    'endless' and key 'all': its band is LEVELS (loL..hiL), scores
    follow the level, arrivals spread over the mode's first month
    from LAUNCH, and the champion law compares (level, score).
-   Future boards (hard) extend the same way: add a SS_SEED_TUNE
-   entry and call SS_SEED.merge with the new kind.
+   The HARD board (v0.70.0) is the same all-time shape on plain
+   scores: campaign hard clears sit in a believable middle band
+   (a hard clear amplifies ×1.5, so any real clear ~3400+ outranks
+   every ghost even before the champion law bites), and its FIRST
+   ghost arrives hours — not minutes — after launch, because a
+   full hard campaign takes that long to clear.
    ============================================================ */
 
 const SS_SEED_NAMES = [
@@ -104,6 +108,10 @@ const SS_SEED_TUNE = {
   daily: { span: 'day', min: 6, max: 10, lo: 120, hi: 560 },
   weekly: { span: 'week', min: 12, max: 18, lo: 150, hi: 640 },
   endless: { span: 'all', min: 8, max: 13, loL: 3, hiL: 14 },
+  // hard (v0.70.0): campaign hard clears. hi sits under the weakest real
+  // hard clear (~3400 after the ×1.5), so a real player is champion from
+  // their first clear even before the cap law squeezes.
+  hard: { span: 'all', min: 5, max: 9, lo: 1700, hi: 3400 },
 };
 
 const SS_SEED = (() => {
@@ -222,7 +230,10 @@ const SS_SEED = (() => {
       // weekly front-loads — a fresh board draws its crowd early; the
       // all-time endless board fills over its first month the same way)
       let f;
-      if (i === 0) f = ((T.span === 'day' ? 60 + g() * 150 : 240 + g() * 1800) * 1000) / span;
+      // hard's first hunter lands 2-24 HOURS in — a full hard campaign takes
+      // hours to clear, so a minutes-old "clear" would read as a lie (and
+      // past two hours the generic arrival cap below never bites the band)
+      if (i === 0) f = ((T.span === 'day' ? 60 + g() * 150 : kind === 'hard' ? 7200 + g() * 79200 : 240 + g() * 1800) * 1000) / span;
       else if (T.span === 'week') f = Math.pow((i + 0.9 * g()) / n, 1.45);
       else if (T.span === 'all') f = Math.pow((i + 0.9 * g()) / n, 1.35);
       else f = Math.pow((i + 0.9 * g()) / n, 1.25);   // rollover is evening in the Americas — the crowd leans early

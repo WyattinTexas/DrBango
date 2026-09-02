@@ -322,15 +322,36 @@ const SSNET = (() => {
   // weekly board stays all-modes on purpose: it ranks the week's best single
   // runs wherever they were earned. Both are max-only transactions — a new
   // score only ever replaces a lower one, never adds.
-  async function submitScore(score, finestWord, lang, mode) {
+  // `hard` (v0.70.0) stamps the row `h: 1` so the weekly board can wear a
+  // small ⚑ on hard runs — the row's rank is untouched (the score already
+  // carries hard's amplifier; the mark is the tell, not a bonus).
+  async function submitScore(score, finestWord, lang, mode, hard) {
     const rec = (cur) => {
       if (cur && cur.score >= score) return cur;
-      return { name: myName(), score, word: (finestWord || '').toUpperCase(), at: Date.now(), m: mode || 'quick' };
+      const r = { name: myName(), score, word: (finestWord || '').toUpperCase(), at: Date.now(), m: mode || 'quick' };
+      if (hard) r.h = 1;
+      return r;
     };
     const me = uid();
     try {
       if (mode === 'daily') await dbTxn(dailyPath(lang) + '/' + me, rec);
       await dbTxn('weekly/' + weekKey() + '/' + me, rec);
+    } catch (e) { }
+  }
+  /* The hard board (v0.70.0): campaign hard CLEARS, ranked by score — one
+     row per player under `hard/all` (the all-time board the HARD tab
+     shows), with a weekly slice riding along under `hard/<isoWeek>`
+     (pruned like the weeklies) exactly as the endless board keeps one. */
+  async function submitHard(score, finestWord) {
+    score = score | 0;
+    const rec = (cur) => {
+      if (cur && (cur.score | 0) >= score) return cur;
+      return { name: myName(), score, word: (finestWord || '').toUpperCase(), at: Date.now(), h: 1 };
+    };
+    const me = uid();
+    try {
+      await dbTxn('hard/all/' + me, rec);
+      await dbTxn('hard/' + weekKey() + '/' + me, rec);
     } catch (e) { }
   }
   /* The endless board (v0.68.0): one row per player, ranked by LEVEL with
@@ -373,17 +394,21 @@ const SSNET = (() => {
       const weeks = (await dbGet('weekly').catch(() => null)) || {};
       for (const k of Object.keys(weeks)) if (k < weekCut) dbSet('weekly/' + k, null).catch(() => { });
       // the endless weekly slices age out like the weeklies; 'all' is the
-      // all-time board and is never swept
+      // all-time board and is never swept — and the hard board keeps house
+      // the same way (v0.70.0)
       const endl = (await dbGet('endless').catch(() => null)) || {};
       for (const k of Object.keys(endl)) if (/^\d{4}-W\d{2}$/.test(k) && k < weekCut) dbSet('endless/' + k, null).catch(() => { });
+      const hrd = (await dbGet('hard').catch(() => null)) || {};
+      for (const k of Object.keys(hrd)) if (/^\d{4}-W\d{2}$/.test(k) && k < weekCut) dbSet('hard/' + k, null).catch(() => { });
     } catch (e) { }
   }
 
   async function getBoard(kind, lang) {
     pruneBoards();
     const endless = kind === 'endless';
-    const daily = kind !== 'weekly' && !endless;
-    const path = endless ? 'endless/all' : daily ? dailyPath(lang) : 'weekly/' + weekKey();
+    const hardB = kind === 'hard';                        // the hard tab: campaign hard clears, all-time
+    const daily = kind !== 'weekly' && !endless && !hardB;
+    const path = endless ? 'endless/all' : hardB ? 'hard/all' : daily ? dailyPath(lang) : 'weekly/' + weekKey();
     const all = (await dbGet(path).catch(() => null)) || {};
     let rows = Object.entries(all)
       // The daily board shows ONLY rows stamped m:'daily'. Belt to the write
@@ -393,7 +418,8 @@ const SSNET = (() => {
       // at deploy; older unstamped boards are never read — dailyPath is
       // always today's.)
       .filter(([, r]) => !daily || (r && r.m === 'daily'))
-      .map(([id, r]) => ({ id, name: r.name || '???', score: r.score | 0, level: r.lvl | 0, word: r.word || '', at: r.at }))
+      // `hard` rides out so the weekly can mark its ⚑ rows (v0.70.0)
+      .map(([id, r]) => ({ id, name: r.name || '???', score: r.score | 0, level: r.lvl | 0, word: r.word || '', at: r.at, hard: !!r.h }))
       // the endless ladder ranks by LEVEL, the score breaking ties
       .sort((a, b) => (endless ? (b.level - a.level || b.score - a.score) : b.score - a.score));
     // the seeded hunters (seed-names.js): deterministic ghosts merged in so a
@@ -402,8 +428,8 @@ const SSNET = (() => {
     // (SS_SEED.enabled / ?ghosts=0) restores the bare board.
     try {
       if (typeof SS_SEED !== 'undefined' && SS_SEED.enabled) {
-        rows = SS_SEED.merge(rows, endless ? 'endless' : daily ? 'daily' : 'weekly',
-          endless ? 'all' : daily ? String(dayKey()) : weekKey(), daily ? (lang || 'en') : null, null, myName());
+        rows = SS_SEED.merge(rows, endless ? 'endless' : hardB ? 'hard' : daily ? 'daily' : 'weekly',
+          endless || hardB ? 'all' : daily ? String(dayKey()) : weekKey(), daily ? (lang || 'en') : null, null, myName());
       }
     } catch (e) { }
     const meIdx = rows.findIndex((r) => r.id === uid());
@@ -557,5 +583,5 @@ const SSNET = (() => {
     async decline(fromUid) { try { await dbSet('invites/' + uid() + '/' + fromUid, null); } catch (e) { } },
   };
 
-  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, submitEndless, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
+  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, submitEndless, submitHard, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
 })();

@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.69.0';
+const BUILD = 'STARSPELL v0.70.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -523,7 +523,11 @@ const SS = {
       }
       sr.xp = Math.max(0, sr.xp | 0);
       sr.ack = Math.max(1, sr.ack | 0);
+      sr.hardClears = Math.max(0, sr.hardClears | 0);   // hard-mode clears under this sign (v0.70.0)
     }
+    // hard mode's per-sign tick memory (v0.70.0): the picker's box remembers
+    // each sign's choice across campaigns ('none' = THE OPEN SKY's own)
+    p.hardPick = (p.hardPick && typeof p.hardPick === 'object') ? p.hardPick : {};
     // star rating: every profile that predates it starts at the baseline
     p.rating = Number.isFinite(p.rating) ? Math.round(p.rating) : 1000;
     p.rhide = !!p.rhide;                                   // veil my rating from others
@@ -615,11 +619,14 @@ const SS = {
     });
   },
   has(id) { return !!this.prof.ach[id]; },
-  award(id, game) {
+  // `def` (v0.70.0): a family member ('hard-aries' …) has no SS_ACH row of
+  // its own — the caller mints its toast def; the recorded id is still the
+  // member's, so it fires exactly once per sign.
+  award(id, game, def) {
     if (this.prof.ach[id]) return;
     this.prof.ach[id] = Date.now();
     this.save();
-    const def = SS_ACH.find((a) => a.id === id);
+    def = def || SS_ACH.find((a) => a.id === id);
     if (def && game) game.events.emit('ss-ach', def);
     if (SFX.ok) SFX.ach();
   },
@@ -3741,6 +3748,7 @@ function ssClearCampaign() {
   localStorage.removeItem('beta3.campaign');
   localStorage.removeItem('beta3.camproster');
   localStorage.removeItem('beta3.campsign');
+  localStorage.removeItem('beta3.camphard');
 }
 
 /* ---- the endless ladder (v0.68.0) ----------------------------------------
@@ -3817,12 +3825,16 @@ function ssStrSeed(str) {
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
   return h >>> 0;
 }
-function ssSigilPlan(mode, fights, seed) {
+function ssSigilPlan(mode, fights, seed, hard) {
   const row = SS_CADENCE[mode] || SS_CADENCE.quick;
   const pays = new Set();
   if (!row || !row.gap) return pays;                    // a row with no fight cadence (versus)
+  // HARD (v0.70.0): the modifier row stretches the mode's gap band, so a
+  // hard run meets new sigils AND upgrades rarer — same laws, longer road
+  const add = hard && SS_CADENCE.hard ? (SS_CADENCE.hard.gapAdd | 0) : 0;
+  const gap = add ? [row.gap[0] + add, row.gap[1] + add] : row.gap;
   const rnd = ssMulberry((seed >>> 0) || 1);
-  const draw = () => row.gap[0] + Math.floor(rnd() * (row.gap[1] - row.gap[0] + 1));
+  const draw = () => gap[0] + Math.floor(rnd() * (gap[1] - gap[0] + 1));
   const last = fights.length - 1;
   const closes = (i) => i === last || fights[i + 1].actIdx !== fights[i].actIdx;
   const bossPays = (i) => !!row.actBoss && i < last && closes(i);
@@ -3863,6 +3875,29 @@ function ssCampSign() {
   return SS_ZODIAC_BY[v] ? v : null;
 }
 function ssCampSignChosen() { return localStorage.getItem('beta3.campsign') != null; }
+
+/* ---- HARD MODE (v0.70.0) -------------------------------------------------
+   The campaign's hard pin — set by the picker's tick box at BEGIN, living
+   and dying with the campaign (ssClearCampaign wipes it), so a resumed
+   climb stays hard; the checkpoint carries `hard` too and is the truth on
+   resume. Hard is a MODIFIER the Battle scene reads (this.hard) — endless
+   accepts it later by pinning a sibling key and reading it in create. */
+function ssCampHard() { return localStorage.getItem('beta3.camphard') === '1'; }
+/* A hard campaign CLEAR under a sign: the ledger (prof.signs[id].hardClears)
+   moves, the sign's own 'hard-<id>' achievement rings ONCE with a toast
+   naming the sign (the def is minted here — SS_ACH displays the family as
+   one templated row), and the full zodiac crowns 'hard-zodiac'. The open
+   sky ('none') climbs unsigned — nothing to crown, by design. */
+function ssHardAward(sign, game) {
+  const z = SS_ZODIAC_BY[sign];
+  if (!z) return;
+  const sr = SS.prof.signs[sign] || (SS.prof.signs[sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
+  sr.hardClears = (sr.hardClears | 0) + 1;
+  SS.save();
+  const fam = SS_ACH.find((a) => a.id === 'hard-sign') || {};
+  SS.award('hard-' + sign, game, { icon: fam.icon || '⚑', name: (fam.name || 'EMBER-SWORN') + ' · ' + z.name, desc: fam.desc || '' });
+  if (fam.crown && SS_ZODIAC.every((s) => !!SS.prof.ach['hard-' + s.id])) SS.award(fam.crown.id, game, fam.crown);
+}
 
 /* SIGN LEVELS (v0.69.0): the standing level of a sign — the profile's
    lifetime xp through the curve. 1 for null/unknown/unplayed, so a bare
@@ -6039,6 +6074,48 @@ class Home extends Phaser.Scene {
       if (sr && sr.clears > 0) {
         k.add(ssTxt(this, 0, l.u(CH / 2 - 18), '★ ' + SS_T('zpRec', sr.clears, sr.best), l.u(9.5), '#d7b45c').setOrigin(0.5));
       }
+      /* HARD MODE's tick box (v0.70.0, Skylar: "under each sign in the new
+         campaign there should be a box that lets you tick off if you want
+         to play that sign in hard mode") — a drawn control in the game's
+         own language, never a browser checkbox. Campaign picker only (the
+         endless ladder accepts the modifier later); remembered PER SIGN in
+         prof.hardPick (THE OPEN SKY keeps its own under 'none'). It sits
+         in the quiet band between the art and the power. The VISUALS live
+         on each card (each shows its own remembered state as the deck
+         turns); the TAP lands on one fixed zone layered over the swipe
+         zone below, because Phaser's topOnly input hands every event to
+         the topmost object — a zone inside the card would never hear it. */
+      if (this.signFor === 'campaign') {
+        const hy = l.u(CH / 2 - 108);
+        const lab = ssTxt(this, 0, hy, SS_T('hardLbl'), l.u(9.5), '#8a94c4').setOrigin(0, 0.5).setLetterSpacing(l.u(1));
+        const BOX = 12, GAP2 = 7;
+        const w = BOX + GAP2 + lab.width / l.u(1);
+        const bx = -w / 2 + BOX / 2;
+        lab.setX(l.u(-w / 2 + BOX + GAP2));
+        const hg = this.add.graphics();
+        const tick = ssTxt(this, l.u(bx), hy, '✓', l.u(10), '#ff8a70').setOrigin(0.5)
+          .setShadow(0, 0, '#e05e2a', l.u(5), true, true);
+        tick.setData('hardTick', d.id);
+        const drawBox = (flare) => {
+          const on = !!SS.prof.hardPick[d.id];
+          hg.clear();
+          hg.fillStyle(on ? 0x2a1016 : 0x121628, on ? 0.92 : 0.7);
+          hg.fillRoundedRect(l.u(bx - BOX / 2), hy - l.u(BOX / 2), l.u(BOX), l.u(BOX), l.u(3));
+          hg.lineStyle(l.u(1.2), on ? 0xff5e4d : 0x8a94c4, on ? 0.95 : 0.5);
+          hg.strokeRoundedRect(l.u(bx - BOX / 2), hy - l.u(BOX / 2), l.u(BOX), l.u(BOX), l.u(3));
+          tick.setVisible(on);
+          lab.setColor(on ? '#ff8a70' : '#8a94c4');
+          if (flare && on) {   // one ember breath as the challenge is taken
+            const fl = this.add.image(l.u(bx), hy, 'glowbig').setDisplaySize(l.u(40), l.u(40))
+              .setTint(0xff5e4d).setBlendMode('ADD').setAlpha(0.5);
+            k.add(fl);
+            this.tweens.add({ targets: fl, alpha: 0, displayWidth: l.u(64), displayHeight: l.u(64), duration: 360, onComplete: () => fl.destroy() });
+          }
+        };
+        drawBox();
+        k.setData('hardDraw', drawBox);
+        k.add([hg, tick, lab]);
+      }
       k.setData('zodCard', d.id);
       return k;
     };
@@ -6138,8 +6215,15 @@ class Home extends Phaser.Scene {
         this.startMode('endless');
         return;
       }
-      // pin the choice and open the chart — the map is the campaign's own door
-      try { localStorage.setItem('beta3.campsign', id); } catch (e) { }
+      // pin the choice and open the chart — the map is the campaign's own door.
+      // The HARD pin (v0.70.0) rides beside it: the card's tick box, as it
+      // stands at BEGIN, is the whole climb's difficulty (resume included —
+      // the checkpoint carries it on).
+      try {
+        localStorage.setItem('beta3.campsign', id);
+        if (SS.prof.hardPick[id]) localStorage.setItem('beta3.camphard', '1');
+        else localStorage.removeItem('beta3.camphard');
+      } catch (e) { }
       closeSheet();
       this.mapSheet();
     };
@@ -6151,9 +6235,42 @@ class Home extends Phaser.Scene {
     beginB.on('pointerdown', () => { if (moving) return; SFX.ui(); enter(deck[cur].id); });
     items.push(beginB, beginT);
 
+    /* HARD's one fixed tap zone (v0.70.0): every card draws its control at
+       the same spot, so one zone above the swipe zone takes the tap for
+       whichever card stands (topOnly input — the topmost object gets the
+       event). It arms the deck's own drag on the way down so a swipe that
+       begins here still turns the deck, and the toggle fires on the UP
+       only under a drag threshold — a real swipe never flips the box. */
+    let hardZone = null;
+    if (this.signFor === 'campaign') {
+      hardZone = this.add.zone(l.x(0), l.y(CY + CH / 2 - 108), l.u(150), l.u(30)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      ssHitPad(hardZone, 44);
+      hardZone.setData('hardBox', 1);
+      let harm = null;
+      hardZone.on('pointerdown', (p) => {
+        if (moving) return;
+        harm = { x: p.x, y: p.y };
+        drag = { x: p.x, t: performance.now() };   // the swipe still lives here
+        cards.prev.setVisible(true); cards.next.setVisible(true);
+      });
+      hardZone.on('pointerup', (p) => {
+        if (!harm) return;
+        const moved = Math.abs(p.x - harm.x) > l.u(8) || Math.abs(p.y - harm.y) > l.u(8);
+        harm = null;
+        if (moved || moving) return;
+        SFX.ui();
+        const id = deck[cur].id;
+        if (SS.prof.hardPick[id]) delete SS.prof.hardPick[id];
+        else SS.prof.hardPick[id] = 1;
+        SS.save();
+        const dr = cards.cur && cards.cur.getData && cards.cur.getData('hardDraw');
+        if (dr) dr(true);
+      });
+    }
     c.add(items);
     c.add(strip);
     c.add(zone);
+    if (hardZone) c.add(hardZone);
     // entrance: the sky of signs settles up into place like the other sheets.
     // Zones are pure hit areas (no alpha component) — they stay where they are.
     for (const it of items.concat([strip])) {
@@ -6374,6 +6491,14 @@ class Battle extends Phaser.Scene {
       this.tweens.add({ targets: a, x: a.x + l.u(24), scale: l.u(2.6), duration: 8000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     }
 
+    /* HARD MODE (v0.70.0) — a MODIFIER, read before anything derives from
+       it: the resumed checkpoint is the truth (a climb begun hard stays
+       hard), a fresh campaign reads the picker's pin. Everything hard does
+       keys on this one flag — the 10s strike clock, the sparser sigil
+       cadence, the boss knobs, the ×1.5 tally — so endless accepts it
+       later by extending this expression by one clause. */
+    this.hard = this.resume ? !!this.resume.hard : (this.mode === 'campaign' && ssCampHard());
+
     // ---- build the fight list ----
     // daily: same-language hunters share one seeded sky; the pack salt keeps
     // a language switch from replaying today's English board with new letters
@@ -6397,7 +6522,7 @@ class Battle extends Phaser.Scene {
       this.fights.push({ id: SS_QUICK_BOSS, actIdx: 0, mult: 1, atkAdd: 0, umbral: false });
       planSeed = Math.floor(rng() * 1e9);       // daily: seeded stream → every hunter shares the schedule
     }
-    this.sigPlan = ssSigilPlan(this.mode, this.fights, planSeed);
+    this.sigPlan = ssSigilPlan(this.mode, this.fights, planSeed, this.hard);
     this.sigTypes = ssOfferTypes(this.mode, this.sigPlan, planSeed);
 
     // ---- run state ----
@@ -6464,6 +6589,70 @@ class Battle extends Phaser.Scene {
     if (dt > SS_CLOCK_STEP_MAX) { DIAG('clock: dropped ' + Math.round(dt / 1000) + 's gap'); return; }
     if (dt <= 0 || !ssPageActive()) return;
     this.run.playMs += dt;
+    // hard mode's strike clock rides the SAME honest heartbeat — the gap
+    // drop and the visible+focused gates above already hold for it
+    if (this.hard) this.hardTick(dt);
+  }
+  /* ---- HARD MODE's strike clock (v0.70.0) ----
+     Counts down only while the board is the player's: state 'pick', beast
+     alive, no death animation — so sigil picks, the map, scries, rites and
+     cast animations all HOLD it (the plan's non-play beats), and the
+     update() gates above pause it on hide/blur/lock exactly like the run
+     clock. At zero the beast throws its NORMAL strike (strikeNow — shield,
+     shell, ward, eclipse, feather, the waters: everything a cast-counted
+     strike would meet) and the clock re-arms; the cast counter is NOT
+     touched — both threats live. */
+  hardTick(dt) {
+    const live = this.state === 'pick' && !this.dying && this.beast && this.beast.hpNow > 0;
+    if (!live) { this.hardDraw(false); return; }
+    const before = this.hardLeft;
+    this.hardLeft = Math.max(0, (this.hardLeft | 0) - dt);
+    // the last seconds tick out loud — one tock per second boundary
+    if (this.hardLeft > 0 && this.hardLeft <= SS_HARD.warnMs
+      && Math.ceil(this.hardLeft / 1000) !== Math.ceil(before / 1000)) SFX.tick();
+    this.hardDraw(true);
+    if (this.hardLeft <= 0) this.hardStrike();
+  }
+  hardStrike() {
+    if (this.state !== 'pick' || this.dying || !this.beast || this.beast.hpNow <= 0) return;
+    this.state = 'anim';
+    this.hardLeft = SS_HARD.strikeMs;   // re-armed behind the blow
+    this.strikeNow(() => { this.state = 'pick'; this.sigilMoment(); });
+  }
+  /* the ring: an ember arc draining from twelve o'clock, the seconds
+     inside, a warn flare in the last moments; dim while the clock is held.
+     Redrawn only when the shown fraction/second/liveness moves — never a
+     per-frame repaint at dpr3. */
+  hardDraw(live) {
+    if (!this.hardG || !this.hardG.active) return;
+    const l = this.L;
+    const ms = Math.max(0, this.hardLeft | 0);
+    const f = Math.round((ms / SS_HARD.strikeMs) * 50) / 50;
+    const s = Math.ceil(ms / 1000);
+    const sh = this.hardShown;
+    if (sh.f === f && sh.s === s && sh.live === !!live) return;
+    const warn = live && ms <= SS_HARD.warnMs;
+    if (sh.s !== s && warn && this.hardT.active) {   // the second lands — one small jolt
+      this.hardT.setScale(1.35);
+      this.tweens.add({ targets: this.hardT, scale: 1, duration: 160, ease: 'Sine.easeOut' });
+    }
+    sh.f = f; sh.s = s; sh.live = !!live;
+    const x = l.x(-160), y = l.y(45), r = l.u(13.5);
+    const g = this.hardG;
+    g.clear();
+    g.setAlpha(live ? 1 : 0.45);
+    g.lineStyle(l.u(2.2), 0x39406b, 0.6);
+    g.strokeCircle(x, y, r);
+    if (f > 0) {
+      g.lineStyle(l.u(3), warn ? 0xff3860 : 0xe05e2a, 0.95);
+      g.beginPath();
+      g.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2, false);
+      g.strokePath();
+    }
+    this.hardT.setText(String(s));
+    this.hardT.setColor(warn ? '#ff3860' : '#ff8a70');
+    this.hardT.setAlpha(live ? 1 : 0.5);
+    this.hardGlow.setAlpha(warn ? 0.16 + 0.1 * (1 - ms / SS_HARD.warnMs) : 0);
   }
   /* a stop event (blur / hidden / pagehide / scene shutdown) writes the
      honest count into the standing checkpoint. ONLY playMs moves: the run
@@ -6505,6 +6694,22 @@ class Battle extends Phaser.Scene {
     const nP = this.mode === 'campaign' || this.mode === 'endless' ? 5 : this.fights.length;
     for (let i = 0; i < nP; i++) this.pips.push(this.add.image(l.x(-40 + i * 20), l.y(46), 'dot').setScale(0.6).setTint(0x4a5480));
     this.scoreT = txt(l.x(190), l.y(24), '0', 15).setOrigin(1, 0.5);
+
+    /* HARD MODE's strike clock (v0.70.0) — the ember ring IS the badge: it
+       marks a hard run at a glance in any screenshot AND telegraphs the 10s
+       strike. An arc drains counter-clockwise from twelve o'clock with the
+       seconds inside it; in the last warnMs it burns brighter, breathes,
+       and ticks (SFX.tick). Dimmed whenever the clock is held (a sigil
+       pick, the map, a scry mid-flight, a rite, the cast's own animation).
+       Never built on a normal run — the harness pins hardG === undefined. */
+    if (this.hard) {
+      this.hardGlow = this.add.image(l.x(-160), l.y(45), 'glowbig').setDisplaySize(l.u(58), l.u(58))
+        .setTint(0xff3860).setBlendMode('ADD').setAlpha(0);
+      this.hardG = this.add.graphics().setDepth(20);
+      this.hardT = txt(l.x(-160), l.y(45), '10', 12.5, '#ff8a70').setOrigin(0.5)
+        .setShadow(0, 0, '#e05e2a', l.u(6), true, true).setDepth(21);
+      this.hardShown = { f: -1, s: -1, live: null };
+    }
 
     // the birth sign keeps watch beside the score. Tapping it speaks the
     // power — except VIRGO, whose tap IS the power (arm purify, tap a tile).
@@ -7132,6 +7337,14 @@ class Battle extends Phaser.Scene {
     if (f.curse === 'blackout' && base.boss) {
       b.fx = Object.assign({}, b.fx, { curse: 'blackout', ink: Math.max(f.ink || 2, (base.fx && base.fx.ink) || 0) });
     }
+    // HARD MODE's boss knobs (v0.70.0) — shipped 1.0 / 0, so today they
+    // change nothing: SS_HARD.hardMult / hardAtkAdd are Skylar's dials if
+    // the clock alone leaves hard too easy ("possibly increase the boss's
+    // health and the attack they do")
+    if (this.hard && base.boss) {
+      b.hp = Math.round(b.hp * SS_HARD.hardMult);
+      b.atk += SS_HARD.hardAtkAdd | 0;
+    }
     return b;
   }
   startFight() {
@@ -7191,6 +7404,9 @@ class Battle extends Phaser.Scene {
     this.shieldLeft = this.hasSigil('shield') ? this.sigVal('shield', 'blocks') : 0;
     this.hintsLeft = this.hasSigil('tome') ? this.sigVal('tome', 'uses') : 0;
     this.cometLeft = this.hasSigil('comet') ? ssSigilCharges('comet', this.sigTier('comet')) : 0;
+    // hard mode's strike clock re-arms with every battle (fight-start
+    // semantics, derived never persisted — the cometLeft law)
+    if (this.hard) { this.hardLeft = SS_HARD.strikeMs; this.hardDraw(true); }
     this.clearHintFx();
     this.headT.setText(this.modeTitle());
     const pipBase = this.mode === 'campaign' || this.mode === 'endless' ? Math.floor(this.run.fightIdx / 5) * 5 : 0;
@@ -7288,6 +7504,10 @@ class Battle extends Phaser.Scene {
       return;
     }
     this.state = 'anim';
+    // a successful cast winds hard mode's strike clock back to the top —
+    // "every time you spell a word and cast a word, that timer goes back
+    // up" (the clock itself is held through the cast's animation)
+    if (this.hard) this.hardLeft = SS_HARD.strikeMs;
     this.clearHintFx(true);
     if (this.purifyArmed) this.setPurifyArmed(false);
     const tiles = this.sel.map((i) => this.board[i]);
@@ -7602,6 +7822,7 @@ class Battle extends Phaser.Scene {
         totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
         letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
         overkill: this.run.overkill | 0, eseed: this.eseed, clockV: 2,
+        hard: this.hard ? 1 : undefined,
       }));
       return;
     }
@@ -7613,6 +7834,8 @@ class Battle extends Phaser.Scene {
       totalDmg: this.run.totalDmg, scried: this.run.scried, featherUsed: this.run.featherUsed,
       letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
       overkill: this.run.overkill | 0, clockV: 2,
+      // hard rides the checkpoint (v0.70.0): a climb begun hard resumes hard
+      hard: this.hard ? 1 : undefined,
     }));
   }
   // deterministic growth: the same seed re-runs the same stream, so the new
@@ -7620,7 +7843,7 @@ class Battle extends Phaser.Scene {
   // longer ladder (its prefix is identical for the same reason)
   extendEndless() {
     this.fights = ssEndlessFights(this.eseed, this.fights.length + SS_ENDLESS.horizon);
-    this.sigPlan = ssSigilPlan(this.mode, this.fights, this.eseed);
+    this.sigPlan = ssSigilPlan(this.mode, this.fights, this.eseed, this.hard);
     this.sigTypes = ssOfferTypes(this.mode, this.sigPlan, this.eseed);
   }
   runElapsed() { return this.run.playMs | 0; }
@@ -7657,6 +7880,15 @@ class Battle extends Phaser.Scene {
       done(); return;
     }
     this.beast.count = this.beast.timer;
+    this.strikeNow(done);
+  }
+  /* the strike itself, split from the cast counter (v0.70.0) so hard mode's
+     10s clock can throw the beast's NORMAL blow without touching the count:
+     the shield's block, the signature attack, and every defence in land()
+     — shell, ward, eclipse, feather, the waters, the dew — meet a clock
+     strike exactly as they meet a counted one. */
+  strikeNow(done) {
+    const l = this.L;
     if (this.hasSigil('shield') && (this.shieldLeft | 0) > 0) {
       this.shieldLeft--;
       SFX.blocked();
@@ -8181,7 +8413,13 @@ class Battle extends Phaser.Scene {
     // submitted leaderboard score all pay it.
     const rawScore = this.runScore();
     const tomeTax = this.hasSigil('tome') ? this.sigVal('tome', 'tax') : 0;
-    const score = tomeTax ? Math.round(rawScore * (1 - tomeTax / 100)) : rawScore;
+    let score = tomeTax ? Math.round(rawScore * (1 - tomeTax / 100)) : rawScore;
+    // HARD MODE amplifies the FINAL tally (v0.70.0, Skylar: "not when you're
+    // attacking the beast but at the end of your total tally scored") — here
+    // beside the tome's price, so every book below (bests, sign records, the
+    // boards, the beacon) pays the amplified figure, win or fall alike; the
+    // end screen prints the bargain as its own ⚑ row.
+    if (this.hard) score = Math.round(score * SS_HARD.scoreMult);
     const elapsed = this.runElapsed();
     if (!won) SFX.defeat();
     /* THE ENDLESS RECKONING (v0.68.0, Skylar): "at the end it should read
@@ -8239,6 +8477,9 @@ class Battle extends Phaser.Scene {
         const cleared = Object.keys(SS.prof.signs).filter((k) => SS.prof.signs[k].clears > 0).length;
         if (cleared >= 3) SS.award('wheel-walker', this.game);
         if (cleared >= 12) SS.award('grand-zodiac', this.game);
+        // a HARD clear crowns the sign (v0.70.0): hardClears moves, the
+        // sign's own ember achievement rings, twelve of them the zodiac's
+        if (this.hard) ssHardAward(this.sign, this.game);
       }
     }
     if (this.mode === 'campaign') ssClearCampaign();
@@ -8281,7 +8522,10 @@ class Battle extends Phaser.Scene {
     // An endless fall lands on the ENDLESS board — level first, score the
     // tiebreak — and its score joins the weekly like any other run's.
     if (isEnd) SSNET.submitEndless(level, score, this.run.longest);
-    if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest, PACK.lang, this.mode);
+    if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest, PACK.lang, this.mode, this.hard);
+    // a campaign hard CLEAR also lands on the hard board (v0.70.0) — the
+    // all-time ledger of everyone who beat the mountain with the clock on
+    if (this.hard && this.mode === 'campaign' && won) SSNET.submitHard(score, this.run.longest);
 
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
@@ -8342,12 +8586,20 @@ class Battle extends Phaser.Scene {
       const gk2 = ssGoldTex(this, String(score), 20);
       items.push(this.add.image(l.x(0), py(210), gk2.key).setDisplaySize(l.u(gk2.w), l.u(gk2.h)));
       if (tomeTax) items.push(ssTxt(this, l.x(150), py(210), SS_T('endTomeTax', tomeTax), l.u(9), '#cf8fa0', 'italic').setOrigin(1, 0.5));
+      // unreachable today (endless never runs hard) — stands ready for the
+      // one-line day the modifier reaches the ladder
+      if (this.hard) items.push(ssTxt(this, l.x(-150), py(210), '⚑ ' + SS_T('hardLbl') + ' ×' + SS_HARD.scoreMult, l.u(9), '#ff8a70', 'italic').setOrigin(0, 0.5)
+        .setShadow(0, 0, '#e05e2a', l.u(5), true, true));
       bestLine(232, newBestScore, prevBest, 'stBest');
     } else {
       // the score, in gold letterpress, with the best-run reference under it
       items.push(ssTxt(this, l.x(0), py(112), SS_T('stScore'), l.u(11), '#8f8873').setOrigin(0.5));
       const gk = ssGoldTex(this, String(score), 30);
       items.push(this.add.image(l.x(0), py(140), gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)));
+      // HARD's amplifier, printed where it paid (v0.70.0) — beside the
+      // score plate, the tome's own placement law
+      if (this.hard) items.push(ssTxt(this, l.x(150), py(140), '⚑ ' + SS_T('hardLbl') + ' ×' + SS_HARD.scoreMult, l.u(9.5), '#ff8a70', 'italic').setOrigin(1, 0.5)
+        .setShadow(0, 0, '#e05e2a', l.u(5), true, true));
       // the bargain stated where it bit — the score shown already paid it
       if (tomeTax) items.push(ssTxt(this, l.x(0), py(163), SS_T('endTomeTax', tomeTax), l.u(9.5), '#cf8fa0', 'italic').setOrigin(0.5));
       bestLine(tomeTax ? 178 : 170, prevBest >= 0 && score > prevBest && prevBest > 0, prevBest, 'stBest');
@@ -8470,6 +8722,9 @@ class Battle extends Phaser.Scene {
       // checkpoint, so the retry re-pins the identity it climbed under)
       if (this.mode === 'campaign' && this.sign) { try { localStorage.setItem('beta3.campsign', this.sign); } catch (e) { } }
       if (isEnd && this.sign) { try { localStorage.setItem('beta3.endsign', this.sign); } catch (e) { } }
+      // …and a hard climb retries HARD (the books wiped the pin with the
+      // checkpoint; the retry keeps the challenge it was taken under)
+      if (this.mode === 'campaign' && this.hard) { try { localStorage.setItem('beta3.camphard', '1'); } catch (e) { } }
       this.scene.restart({ mode: this.mode, resume: null });
     });
     // the Act III payoff: win the campaign and you descend into sunrise
@@ -8515,7 +8770,7 @@ class Battle extends Phaser.Scene {
     else if (lvups.length) this.time.delayedCall((fanWait || 0) + 1400, sayLv);
 
     if (DEMO) {
-      localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, level: isEnd ? level : undefined, words: this.run.words, longest: this.run.longest, letters: this.run.letters, bigHit: this.run.bigHit, elapsed, rating: SS.prof.rating, rd: rDelta }));
+      localStorage.setItem('beta3.result', JSON.stringify({ won, mode: this.mode, score, level: isEnd ? level : undefined, hard: this.hard || undefined, words: this.run.words, longest: this.run.longest, letters: this.run.letters, bigHit: this.run.bigHit, elapsed, rating: SS.prof.rating, rd: rDelta }));
       this.time.delayedCall(2500, () => again.emit('pointerdown'));
     }
   }
@@ -8719,18 +8974,29 @@ class Profile extends Phaser.Scene {
     doorB.on('pointerdown', openSkies);
     doorT.setInteractive({ useHandCursor: true }).on('pointerdown', openSkies);
 
-    ssTxt(this, l.x(0), l.y(441), '— ACHIEVEMENTS  ' + Object.keys(p.ach).length + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
-    // the grid is 25 deep now (the endless climb's two rungs joined the
-    // lantern's marks) — 13 rows at 25 apart keeps the whole ledger above
-    // the seal (and 25 under the heading: at 20 the first row's names
-    // kissed it)
+    /* the header counts DISPLAY rows: hard mode's twelve ember signs live
+       behind ONE evolving family row (v0.70.0) that counts once, lit by
+       its first member — so the fraction always matches the grid below */
+    const achGot = SS_ACH.reduce((n, a) => n + (a.famIds ? (a.famIds.some((id) => p.ach[id]) ? 1 : 0) : (p.ach[a.id] ? 1 : 0)), 0);
+    ssTxt(this, l.x(0), l.y(441), '— ACHIEVEMENTS  ' + achGot + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
+    // the grid is 26 deep now (hard mode's family row joined the endless
+    // rungs) — still 13 rows at 25 apart, the proven fit above the seal
+    // (a 14th row cannot fit: the signlevel layout judge showed 23-apart
+    // rows overlapping). A famIds row lights on its FIRST member, prints
+    // the family's running count, and wears its crown's whole dress once
+    // every member is earned (THE EMBER ZODIAC — its own awarded id).
     SS_ACH.forEach((a, i) => {
       const col = i % 2, row = Math.floor(i / 2);
       const x = l.x(col === 0 ? -100 : 100), y = l.y(466 + row * 25);
-      const got = !!p.ach[a.id];
-      ssTxt(this, x - l.u(88), y, a.icon, l.u(14), got ? '#ffd77a' : '#39406b').setOrigin(0.5);
-      ssTxt(this, x - l.u(68), y - l.u(7.5), a.name, l.u(10.5), got ? '#f0e8d2' : '#4a5480').setOrigin(0, 0.5);
-      ssTxt(this, x - l.u(68), y + l.u(8.5), a.desc, l.u(8), got ? '#8a94c4' : '#39406b', 'italic').setOrigin(0, 0.5);
+      const famN = a.famIds ? a.famIds.filter((id) => p.ach[id]).length : 0;
+      const crowned = !!(a.crown && p.ach[a.crown.id]);
+      const got = a.famIds ? famN > 0 : !!p.ach[a.id];
+      const icon = crowned ? a.crown.icon : a.icon;
+      const name = crowned ? a.crown.name : a.name;
+      const desc = crowned ? a.crown.desc : a.famIds ? a.desc + '  ' + famN + ' / ' + a.famIds.length : a.desc;
+      ssTxt(this, x - l.u(88), y, icon, l.u(14), got ? '#ffd77a' : '#39406b').setOrigin(0.5);
+      ssTxt(this, x - l.u(68), y - l.u(7.5), name, l.u(10.5), got ? '#f0e8d2' : '#4a5480').setOrigin(0, 0.5);
+      ssTxt(this, x - l.u(68), y + l.u(8.5), desc, l.u(8), got ? '#8a94c4' : '#39406b', 'italic').setOrigin(0, 0.5);
     });
 
     ssTxt(this, l.x(0), l.y(784), 'seal: ' + SSNET.uid().slice(0, 12) + ' · ' + (SSNET.mode === 'local' ? 'offline' : 'synced'), l.u(9), '#39406b').setOrigin(0.5);
@@ -8786,23 +9052,25 @@ class Board extends Phaser.Scene {
         .setShadow(0, 0, '#c9b676', l.u(6), true, true);
     }
 
-    // tabs: three pills — the active board wears the gold (ENDLESS joined
-    // daily/weekly in v0.68.0: the all-time ladder, ranked level then score)
+    // tabs: four pills now — the active board wears the gold (ENDLESS joined
+    // daily/weekly in v0.68.0; HARD, the all-time ledger of campaign hard
+    // clears, joined in v0.70.0 — the row narrows to seat four)
     this.tab = 'daily';
     this.tabBtns = {};
-    this.tabW = 118;
+    this.tabW = 90;
     const mkTab = (key, dx, label) => {
       const bg = this.add.image(l.x(dx), l.y(104), ssBtn(this, true, this.tabW, 38)).setDisplaySize(l.u(this.tabW), l.u(38)).setInteractive({ useHandCursor: true });
       ssHitPad(bg, 44);   // a 38-tall pill alone is under the 44-pt law
-      const lab = ssTxt(this, l.x(dx), l.y(104), label, l.u(13), '#5a6390').setOrigin(0.5);
+      const lab = ssTxt(this, l.x(dx), l.y(104), label, l.u(12.5), '#5a6390').setOrigin(0.5);
       // a long word for the pill (WÖCHENTLICH, CLASSEMENT kin) fits, never spills
-      if (lab.width > l.u(this.tabW - 16)) lab.setScale(l.u(this.tabW - 16) / lab.width);
+      if (lab.width > l.u(this.tabW - 14)) lab.setScale(l.u(this.tabW - 14) / lab.width);
       bg.on('pointerdown', () => this.setTab(key));
       this.tabBtns[key] = { bg, lab };
     };
-    mkTab('daily', -125, SS_T('lbDaily'));
-    mkTab('weekly', 0, SS_T('lbWeekly'));
-    mkTab('endless', 125, SS_T('endless'));
+    mkTab('daily', -144, SS_T('lbDaily'));
+    mkTab('weekly', -48, SS_T('lbWeekly'));
+    mkTab('endless', 48, SS_T('endless'));
+    mkTab('hard', 144, SS_T('hardLbl'));
     this.dressTabs(l);
 
     // the reset clock, ticking every second. Both flips are UTC (daily 00:00,
@@ -8832,7 +9100,10 @@ class Board extends Phaser.Scene {
   tickCd() {
     if (!this.cdT || !this.cdT.active) return;
     // the endless ladder never resets — its line is the ledger's own, still
+    // — and the hard board keeps the same all-time stillness in its OWN
+    // words (v0.70.0: "the endless ledger" would be a lie on this tab)
     if (this.tab === 'endless') { this.cdT.setText('✦ ' + SS_T('lbAllTime')); return; }
+    if (this.tab === 'hard') { this.cdT.setText('✦ ' + SS_T('lbHardTime')); return; }
     const daily = this.tab === 'daily';
     const ms = daily ? SSNET.msToNextDay() : SSNET.msToNextWeek();
     this.cdT.setText((daily ? '☾ ' : '✦ ') + SS_T(daily ? 'lbNewSky' : 'lbWeekEnds', ssCountdownLive(ms)));
@@ -8884,6 +9155,9 @@ class Board extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       pnm.on('pointerdown', () => ssRatingCard(this, r.ghost ? { name: r.name, rating: r.rating, rhide: r.rhide } : { uid: r.id, name: r.name }));
       grp.push(pnm);
+      // a hard run wears its small ember mark on the weekly (v0.70.0)
+      if (r.hard && tab === 'weekly') grp.push(ssTxt(this, l.x(P.dx) + pnm.displayWidth / 2 + l.u(4), l.y(P.my + P.r + 15), '⚑', l.u(9), '#ff8a70').setOrigin(0, 0.5)
+        .setShadow(0, 0, '#e05e2a', l.u(4), true, true));
       // the endless podium wears the LEVEL as its gold plate — the score and
       // finest word ride the italic line beneath
       const gk = ssGoldTex(this, isE ? SS_T('endLvlShort', r.level | 0) : String(r.score), P.big);
@@ -8916,6 +9190,8 @@ class Board extends Phaser.Scene {
         .setInteractive({ useHandCursor: true });
       rnm.on('pointerdown', () => ssRatingCard(this, r.ghost ? { name: r.name, rating: r.rating, rhide: r.rhide } : { uid: r.id, name: r.name }));
       grp.push(rnm);
+      if (r.hard && tab === 'weekly') grp.push(ssTxt(this, rnm.x + rnm.displayWidth + l.u(4), y, '⚑', l.u(9), '#ff8a70').setOrigin(0, 0.5)
+        .setShadow(0, 0, '#e05e2a', l.u(4), true, true));
       // the endless roll prints "L 23 · 4180" — wider than a bare score, so
       // the finest-word column stands down there
       if (r.word && !isE) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#5a6390', 'italic').setOrigin(0, 0.5));
@@ -8936,6 +9212,8 @@ class Board extends Phaser.Scene {
           .setInteractive({ useHandCursor: true });
         ynm.on('pointerdown', () => ssRatingCard(this, { own: true }));
         grp.push(ynm);
+        if (r.hard && tab === 'weekly') grp.push(ssTxt(this, ynm.x + ynm.displayWidth + l.u(4), y, '⚑', l.u(9), '#ff8a70').setOrigin(0, 0.5)
+          .setShadow(0, 0, '#e05e2a', l.u(4), true, true));
         if (r.word && !isE) grp.push(ssTxt(this, l.x(64), y, r.word, l.u(9.5), '#8a94c4', 'italic').setOrigin(0, 0.5));
         grp.push(ssTxt(this, l.x(172), y, isE ? SS_T('endLvlShort', r.level | 0) + ' · ' + r.score : String(r.score), l.u(13.5), '#ffe9a8').setOrigin(1, 0.5));
       }

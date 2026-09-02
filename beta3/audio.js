@@ -128,6 +128,9 @@ class SynthAudio {
   // under the boss telegraph's rumble, so it stays a whisper, never a stab
   curse() { this.noise(0.7, 140, 1, 0.1, 55); this.tone(233.1, 0.5, 'sine', 0.05, 0.05, 155.6); this.tone(311.1, 0.6, 'triangle', 0.035, 0.15, 207.7); }
   hurt() { this.noise(0.35, 200, 0.8, 0.26, 70); this.tone(90, 0.4, 'sawtooth', 0.12, 0, 50); }
+  // hard mode's strike clock, counting its last seconds — a dry woodblock
+  // tock, quiet enough to ride under the pad but urgent by repetition
+  tick() { this.tone(1180, 0.045, 'triangle', 0.06); this.noise(0.035, 2600, 3, 0.045); }
   blocked() { this.tone(660, 0.15, 'triangle', 0.14); this.noise(0.12, 1200, 2, 0.1); }
   sigil() { [659.3, 784, 987.8].forEach((f, i) => this.tone(f, 0.4, 'sine', 0.09, i * 0.08)); }
   victory() { [523.3, 659.3, 784, 1046.5].forEach((f, i) => this.tone(f, 0.5, 'triangle', 0.1, i * 0.11)); }
