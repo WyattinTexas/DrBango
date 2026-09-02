@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.70.0';
+const BUILD = 'STARSPELL v0.71.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2784,15 +2784,16 @@ function ssTxt(scene, x, y, str, size, color, style) {
    still used (so the breaks land exactly where wordWrap put them), but each
    line becomes its OWN single-line Text object, stacked at the same
    lineSpacing. Single-line bakes are proven good on his device.
-   Scripts: ja/zh wrap without spaces, so they take Phaser's char-level
-   (advanced) wrap; Arabic/Hindi split only at spaces, and each line is shaped
-   and bidi-ordered by the canvas on its own, exactly as the line would have
-   been inside one canvas. A word that cannot break inside the width shrinks
-   the whole block's font (to 70%) rather than ever baking a multi-line Text.
+   Scripts: the shipped five (en/es/fr/pt/de — the v0.71.0 cut) all break at
+   spaces, but CONTENT can still carry CJK glyphs (a rival's player-typed
+   name, say), which wrap without spaces — the sniff below keeps char-level
+   (advanced) wrap for those strings. A word that cannot break inside the
+   width shrinks the whole block's font (to 70%) rather than ever baking a
+   multi-line Text.
    Returns { lines, size } — the line strings and the font size that fit. */
 function ssWrapLines(scene, str, style, wrapW) {
   const s = String(str == null ? '' : str);
-  const cjk = SS_LANG === 'ja' || SS_LANG === 'zh' || /[぀-ヿ㐀-鿿]/.test(s);
+  const cjk = /[぀-ヿ㐀-鿿]/.test(s);
   const size0 = parseFloat(style.fontSize) || 12;
   let size = size0, lines = [s];
   for (let tries = 0; tries < 12; tries++) {
@@ -2966,8 +2967,9 @@ function ssClockInherit(resume, key) {
 // The title wordmark — live text drawn once into a canvas texture in the palette
 // of the painted set. Latin titles get the hand-set treatment (gentle arch,
 // bookend letters a touch larger, tight tracking, per-letter tilt along the
-// curve); any non-Latin title falls back to a single run, because per-letter
-// transforms would break Arabic shaping and RTL ordering. Layers, in paint
+// curve); a non-Latin title (none ships since the v0.71.0 cut to five Latin
+// languages — the guard is content-driven) falls back to a single run,
+// because per-letter transforms would break complex-script shaping. Layers, in paint
 // order: warm halo · letterpress drop · outer gold hairline · navy rim ·
 // per-letter gold gradient · inner bevel · dust speckle · top sheen.
 // Returns { key, w, h, anchors } in design units; anchors are letter-tip
@@ -3019,7 +3021,6 @@ function ssTitleTex(scene) {
     if (!latin) {
       c.save(); c.translate(W / 2, by);
       c.font = font(px); c.textAlign = 'center';
-      if (SS_LANG === 'ar') c.direction = 'rtl';
       fn(text, 1);
       c.restore(); return;
     }

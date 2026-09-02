@@ -15,8 +15,7 @@
    synchronously at boot for the player's own language, or
    asynchronously when joining a versus room sealed in another
    tongue. English (words.js) is always resident — it is the
-   fallback for every language that has no viable letter-tile
-   pack (CJK, Devanagari, Arabic script).
+   fallback whenever a pack or its dictionary is ever absent.
 
    Words are stored normalized the way Scrabble normalizes:
    accents stripped (á→a, é→e) EXCEPT letters that are real
@@ -55,9 +54,10 @@ const SS_PACKS = {
 };
 
 // The gameplay language: the UI language when it has a pack, else English.
-// ja/ko/zh/hi/ar keep their localized UI but play the English game — kana,
-// Hangul blocks, Devanagari conjuncts, CJK and cursive Arabic don't decompose
-// onto independent letter tiles the way alphabetic scripts do.
+// Since the v0.71.0 cut to five languages every shipped SS_LANG has a pack,
+// so the fold is an identity in practice — it stays as the safety seam (a
+// UI language without a pack would play the English game, exactly as the
+// five cut CJK/Devanagari/Arabic UIs always did).
 function ssGameLang() { return SS_PACKS[SS_LANG] ? SS_LANG : 'en'; }
 
 // Deterministic per-pack salt for the daily seed: same-language hunters share

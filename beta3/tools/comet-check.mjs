@@ -157,11 +157,10 @@ ok('charges live on the def: comet carries 1', await ev(`SS_SIG_BY.comet.charges
 ok('a chargeless sigil reads 0', await ev(`ssSigilCharges('quill') === 0 && ssSigilCharges('nope') === 0`));
 ok('en desc says what it does now', await ev(`SS_SIG_BY.comet.desc === 'Your first SCRY each battle does not hasten the strike.'`));
 const OLD = ['SCRY ya no acelera el golpe.', 'SCRY ne hâte plus la frappe.', 'SCRY não apressa mais o golpe.',
-  'SCRY beschleunigt den Schlag nicht mehr.', 'SCRYで一撃が早まらなくなる。', 'SCRY가 일격을 앞당기지 않는다.',
-  'SCRY不再加速攻击。', 'SCRY अब वार तेज़ नहीं करता।', 'لم يعد SCRY يعجّل الضربة.'];
+  'SCRY beschleunigt den Schlag nicht mehr.'];
 const lm = await evj(`JSON.stringify(Object.keys(SS_STR).filter((k) => SS_STR[k].sig && SS_STR[k].sig.comet).map((k) => [k, SS_STR[k].sig.comet[1]]))`);
-ok('all 9 language packs carry the new line', lm.length === 9 && lm.every(([k, d]) => d.includes('SCRY') && !OLD.includes(d)),
-  lm.filter(([k, d]) => OLD.includes(d)).map(([k]) => k).join(',') || '9 fresh');
+ok('all 4 non-English maps carry the new line (the v0.71.0 five-language world)', lm.length === 4 && lm.every(([k, d]) => d.includes('SCRY') && !OLD.includes(d)),
+  lm.filter(([k, d]) => OLD.includes(d)).map(([k]) => k).join(',') || '4 fresh');
 
 /* ================= without comet, every scry ticks ================= */
 console.log('\n— WITHOUT THE TRAIL, EVERY SCRY HASTENS —');

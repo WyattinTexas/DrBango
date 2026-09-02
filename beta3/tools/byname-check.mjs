@@ -202,7 +202,7 @@ ok('B answers and the duel starts', await A.until(`(() => { const s = game.scene
 const cr2 = await crisp(A);
 ok('crisp sentinel still green', cr2.ok && cr2.heals === 0 && cr2.crisp !== false, JSON.stringify(cr2));
 
-// ---- 4. the words exist in all 10 tongues and the door label fits ----
+// ---- 4. the words exist in every tongue and the door label fits ----
 const langs = JSON.parse(await A.ev(`JSON.stringify(Object.keys(SS_STR))`));
 for (const lang of langs) {
   const r = JSON.parse(await A.ev(`JSON.stringify((() => { const t = SS_STR['${lang}']; const K = ['vsOrReach','vsByName','vsNamePh','vsNameSeek','vsNameNone','vsNameSelf','vsWaitAway','vsWaitBusy'];

@@ -584,7 +584,7 @@ async function main() {
   ok('every end-screen item still sits inside the (taller) daily window',
     flame.win && flame.lo >= flame.winTop - 2 && flame.hi <= flame.winBot + 2 && flame.winBot <= flame.screenH,
     Math.round(flame.lo) + '..' + Math.round(flame.hi) + ' in ' + Math.round(flame.winTop) + '..' + Math.round(flame.winBot));
-  ok('all 10 languages carry the lantern copy',
+  ok('all 5 languages carry the lantern copy',
     await c.ev(`Object.keys(SS_STR).every(k => SS_STR[k].stkLit && SS_STR[k].stkNight && SS_STR[k].stkKeep)`) === true);
 
   // ⚠ the ascent owns every ui item's alpha for 2.6s while the 1s herald tick
@@ -888,7 +888,7 @@ async function main() {
   ok('and the grown ledger still clears the seal at the foot of the page',
     led.hi <= led.seal && led.seal < led.screenH,
     Math.round(led.hi) + ' → seal ' + Math.round(led.seal) + ' of ' + led.screenH);
-  ok('all 10 languages carry the grace + marks copy',
+  ok('all 5 languages carry the grace + marks copy',
     await c.ev(`Object.keys(SS_STR).every(k => ['stkSheet','stkWeekHead','stkLegend','stkCold','stkColdSub','stkBest','stkNextMark','stkGraceHeld','stkGraceBridge','stkGraceSpent','stkGraceSpent1','stkGraced','stkMsHead','stkMs7','stkMs30','stkMs100','stkMsSub7','stkMsSub30','stkMsSub100'].every(s => !!SS_STR[k][s]))`) === true);
   await c.ev(`(() => { SS.prof.daily = {}; SS.prof.ach = {}; SS.prof.streak = { n:0,last:0,best:0,g:1,gp:0,gd:[],mk:0,pend:0 }; SS.save(); return 'reset' })()`);
   await c.nav(BASE + '?fps=0', 9000);   // clean home again for the sections below
@@ -941,7 +941,7 @@ async function main() {
     de === ['STARSPELL Tagesjagd · 2026-08-12', '✶ ✶ ✶ ✶ 🌑', '🟨'.repeat(7),
       '719 Punkte · bestes Wort: 7 Steine', '🔥 14-Nächte-Serie', CARD_URL].join('\n'),
     JSON.stringify(de));
-  ok('all 10 languages carry the share-card copy',
+  ok('all 5 languages carry the share-card copy',
     await c.ev(`Object.keys(SS_STR).every(k => ['shHead','shScore','shFinest','shFinest1','shNoWord','shStreak','shStreak1'].every(s => !!SS_STR[k][s]))`) === true);
   ok('every language keeps the %1 the card fills in',
     await c.ev(`Object.keys(SS_STR).every(k => ['shHead','shScore','shFinest','shStreak'].every(s => SS_STR[k][s].includes('%1')))`) === true);
@@ -1122,7 +1122,7 @@ async function main() {
      2. GRANDFATHERING. A profile with prior play wakes holding all 24. This
         is the law that would otherwise take twelve sigils off a TestFlight
         tester on the first boot after this shipped.
-     The whole mechanic — conditions, counters, the notice, ten languages —
+     The whole mechanic — conditions, counters, the notice, five languages —
      is walked by tools/drip-check.mjs. */
   /* v0.47.0/v0.51.0 — THE CAMPAIGN DOORS, the two laws (tools/tagline-check.mjs
      walks every state on real taps): without a checkpoint CONTINUE GAME is NOT

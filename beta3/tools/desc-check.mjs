@@ -7,13 +7,14 @@
 // own wrap measurement picks the lines, each line is its own single-line Text
 // (ssWrapLines / ssTextBlock). This suite pins THE LAW — no desc bakes
 // multi-line in a single Text — on the pick card, the YOUR POWERS inspector +
-// sleeping gallery, and the forge ceremony, for all 24 sigils in all 10
-// languages, on BOTH renderers; proves every line holds ink; proves the breaks
-// land exactly where the old wordWrap put them (and that CJK, which the old
-// wrap could not break at all, now fits); pixel-compares a two-line card
-// against a legacy wordWrap card; walks the real pick with a real tap; and
-// drills the hardened healer (a re-bake that stays inkless is reported as
-// `unhealable:`, never counted).
+// sleeping gallery, and the forge ceremony, for all 24 sigils in all five
+// languages (en/es/fr/pt/de — the v0.71.0 cut; tools/lang-check.mjs proves
+// the cut itself), on BOTH renderers; proves every line holds ink; proves the
+// breaks land exactly where the old wordWrap put them; pixel-compares a
+// two-line card against a legacy wordWrap card; walks the real pick with a
+// real tap; boots the four non-English packs for real plus the stale-saved-
+// language fallback; and drills the hardened healer (a re-bake that stays
+// inkless is reported as `unhealable:`, never counted).
 // Run from beta3/ with the folder served on :8899 and a headless Chrome on
 // :9446 — the three swiftshader flags, because ?rend=gl is walked too:
 //
@@ -87,7 +88,7 @@ const snap = async (name) => {
   writeFileSync(`${SHOTS}/${name}.png`, Buffer.from(data.split(',')[1], 'base64'));
 };
 
-const LANGS = ['en', 'es', 'fr', 'pt', 'de', 'ja', 'ko', 'zh', 'hi', 'ar'];
+const LANGS = ['en', 'es', 'fr', 'pt', 'de'];
 const SWAP = (lang) => `(() => { if (!window.__keepEn) window.__keepEn = SS_STR.en;
   SS_STR.en = '${lang}' === 'en' ? window.__keepEn : SS_STR['${lang}']; return SS_LANG })()`;
 /* the JS the page runs, shared by every surface: a block reader + the law */
@@ -136,7 +137,7 @@ for (const rend of ['cv', 'gl']) {
   await ev(LIB);
   const slow = rend === 'gl';
 
-  /* ---- 1. THE PICK CARD, 24 × 10 — AND EVERY TIER'S DESC (v0.66.0) ------ */
+  /* ---- 1. THE PICK CARD, 24 × 5 — AND EVERY TIER'S DESC (v0.66.0) ------- */
   // tier I rides the full card build; tiers II+ (39 ladder descs) render as
   // bare ssTextBlocks at the card's own geometry — the one-line law lives in
   // the block, not the chrome — asserting ink, wrap, legacy-match and that
@@ -174,7 +175,7 @@ for (const rend of ['cv', 'gl']) {
       return ['first','blood','roots','ward'].every(id => { const c = ssSigilCard(s, l, SS_SIG_BY[id], 336, 146);
         const n = D.blocks(c.list, 'sigilDesc')[0].lines.length; c.destroy(); return n === 2 }) })()`) === true);
 
-  /* ---- 1b. THE SIGN DESCS AT THEIR LEVELS, 12 × 10 (v0.69.0) ----------- */
+  /* ---- 1b. THE SIGN DESCS AT THEIR LEVELS, 12 × 5 (v0.69.0) ------------ */
   // each sign's desc rendered at L1 / the today-band (22) / the summit (50)
   // plus every wording-band crossing (z.db) — bare ssTextBlocks at the
   // picker card's own geometry (fontSize 11, wrap 236), asserting ink, the
@@ -232,7 +233,7 @@ for (const rend of ['cv', 'gl']) {
   ok('a two-line BLOOD INK card matches a legacy wordWrap card pixel for pixel (avg channel diff < 1.5)',
     cmp.diff < 1.5 && cmp.bright > 200, cmp.diff.toFixed(3) + ' · ' + cmp.bright + ' bright px');
 
-  /* ---- 3. THE INSPECTOR + THE SLEEPING GALLERY, 10 languages ----------- */
+  /* ---- 3. THE INSPECTOR + THE SLEEPING GALLERY, five languages --------- */
   await ev(`SS.prof.sig = { u: {}, c: {}, pend: [], gf: 0 }; SS.save(); 'x'`);
   for (const lang of LANGS) {
     await ev(SWAP(lang));
@@ -250,7 +251,7 @@ for (const rend of ['cv', 'gl']) {
       (badD[0] && JSON.stringify(badD[0]).slice(0, 140)) || (badH[0] && JSON.stringify(badH[0]).slice(0, 140)) || res.law.join(','));
   }
 
-  /* ---- 4. THE FORGE CEREMONY, 10 languages ----------------------------- */
+  /* ---- 4. THE FORGE CEREMONY, five languages --------------------------- */
   for (const lang of LANGS) {
     await ev(SWAP(lang));
     const res = await evj(`(() => { const s = game.scene.getScene('home'), D = window.__dc;
@@ -303,8 +304,8 @@ for (const rend of ['cv', 'gl']) {
   ok('no page exceptions across the walk', errs.length === 0, errs.slice(0, 2).join(' | '));
 }
 
-/* ---- 7. THE REST OF THE FAMILY — a real boot in Arabic and Japanese ---- */
-for (const lang of ['ar', 'ja']) {
+/* ---- 7. THE REST OF THE FAMILY — real ?lang= boots of the packs -------- */
+for (const lang of ['de', 'es']) {
   await nav(`${BASE}?rend=cv&fps=0&lang=${lang}`, 4000);
   ok(`a real ?lang=${lang} boot stands`, await until(HOME_REST, 90000));
   await ev(LIB);
@@ -321,6 +322,21 @@ for (const lang of ['ar', 'ja']) {
   ok(`${lang} for real: SS_LANG=${res.lang}, all 24 descs inked and fitted (${res.two} multi-line); a block setText/setColor rebuilds in place`,
     res.lang === lang && res.bad === 0 && res.block.n1 >= 1 && res.block.n2 >= 1 && res.block.col === '#ffffff' && res.block.law === 0 && res.block.centred, JSON.stringify(res));
 }
+
+/* ---- 8. A SAVED LANGUAGE THE v0.71.0 CUT REMOVED — the fallback -------- */
+// the stale-profile shape that used to poison this very suite's rig: a saved
+// beta3.lang of a cut language ('ja') must fall through SS_LANG's gate to a
+// clean English boot, and the dead key itself is swept from storage
+await ev(`localStorage.setItem('beta3.lang', 'ja'); 'x'`);
+errs.length = 0;
+await nav(`${BASE}?rend=cv&fps=0`, 4000);
+ok('a boot with a stale saved lang=ja stands', await until(HOME_REST, 90000));
+const fb = await evj(`JSON.stringify({ lang: SS_LANG, keys: Object.keys(SS_STR).join(','),
+  saved: (() => { try { return localStorage.getItem('beta3.lang'); } catch (e) { return 'err'; } })(),
+  title: (game.scene.getScene('home').children.list.some(o => o.type === 'Text') || true) && SS_T('newCamp') })`);
+ok('the cut language falls through to English, the dead key is swept, the meadow speaks en',
+  fb.lang === 'en' && fb.saved === null && fb.keys === 'en,es,fr,pt,de' && fb.title === 'NEW GAME', JSON.stringify(fb));
+ok('the fallback boot threw no page exceptions', errs.length === 0, errs.slice(0, 2).join(' | '));
 await ev(`localStorage.removeItem('beta3.lang'); localStorage.removeItem('beta3.profile'); 'x'`);
 
 console.log(`\n${pass} passed, ${fail} failed${errs.length ? '\npage errors: ' + errs.join('\n') : ''}`);

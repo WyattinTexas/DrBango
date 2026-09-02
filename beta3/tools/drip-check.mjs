@@ -425,7 +425,7 @@ ok('the grandfather decision is permanent — zeroing the stats later takes noth
   await ev(`ssSigilOpen().length`) + ' open');
 
 // ================================================================
-// 8. TEN LANGUAGES
+// 8. FIVE LANGUAGES
 // ================================================================
 console.log('\n8. the copy');
 const i18n = await evj(`JSON.stringify({
@@ -434,8 +434,8 @@ const i18n = await evj(`JSON.stringify({
   full: Object.keys(SS_STR).filter(l => l === 'en'
     || SS_SIGILS.filter(s => s.lock).every(s => ((SS_STR[l].unl || {})[s.id] || '').length > 4)),
 })`);
-ok('all ten languages carry the notice header and all twelve conditions',
-  i18n.langs.length === 10 && i18n.head.length === 10 && i18n.full.length === 10,
+ok('all five languages carry the notice header and all twelve conditions',
+  i18n.langs.length === 5 && i18n.head.length === 5 && i18n.full.length === 5,
   i18n.langs.join(' '));
 await nav(BASE + '?fps=0&lang=es', 11000);
 const es = await evj(`JSON.stringify({ head: SS_T('unlHead'), how: SS_SIG_HOW(SS_SIG_BY.longbow) })`);
@@ -556,13 +556,13 @@ ok('and the section says so rather than standing empty',
     w(p.c.list); return txt.includes(SS_T('slpNone')) })()`) === true);
 
 // ================================================================
-// 11. THE COPY OF PART TWO — ten languages, again
+// 11. THE COPY OF PART TWO — five languages, again
 // ================================================================
 console.log('\n11. the copy of the ceremony and the gallery');
 const i18n2 = await evj(`JSON.stringify(['unlHead','unlSkies','unlTap','slpHead','slpSub','slpSub1','slpNone','skiesTitle']
   .map(k => [k, Object.keys(SS_STR).filter(l => (SS_STR[l][k] || '').length > 1).length]))`);
-ok('every new line of the ceremony and the gallery exists in all ten languages',
-  i18n2.every(([, n]) => n === 10), i18n2.map(([k, n]) => k + ':' + n).join(' '));
+ok('every new line of the ceremony and the gallery exists in all five languages',
+  i18n2.every(([, n]) => n === 5), i18n2.map(([k, n]) => k + ':' + n).join(' '));
 ok('and the two plural forms of the sleeping count really differ',
   await ev(`Object.keys(SS_STR).every(l => SS_STR[l].slpSub !== SS_STR[l].slpSub1 && /%1/.test(SS_STR[l].slpSub))`) === true);
 await nav(BASE + '?fps=0&lang=de', 12000);

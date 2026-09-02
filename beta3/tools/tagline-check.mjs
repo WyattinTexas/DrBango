@@ -22,7 +22,7 @@
 //   m:'quick' leaderboard rows, ?quick=1 boots a quick run for harnesses) —
 //   only the door is gone, and the column reflows over the hole.
 // - The campaign wording became game wording: NEW GAME / CONTINUE GAME and
-//   the restart sheet's copy, in all ten languages.
+//   the restart sheet's copy, in all five languages (the v0.71.0 cut).
 // - The tagline ('weave words · fell the star-beasts') is no longer #8a94c4
 //   grey lost in the rose band: parchment-gold ink over a soft navy
 //   letterpress glow. MEASURED here — rendered pixels sampled on the dusk
@@ -210,17 +210,17 @@ await snap('meadow-after');
 // ---------------------------------------------------------------- the strings law
 const keys = JSON.parse(await ev(`JSON.stringify(Object.keys(SS_STR).map(L => [L,
   ['campaignSub','newCampSub','quickSub','versusSub'].filter(k => k in SS_STR[L]), 'vsFriendsOn' in SS_STR[L], 'fightN' in SS_STR[L]]))`));
-ok('ten languages loaded', keys.length === 10, String(keys.length));
+ok('five languages loaded (en/es/fr/pt/de — the v0.71.0 cut)', keys.length === 5, String(keys.length));
 ok('campaignSub / newCampSub / quickSub / versusSub pruned from every language', keys.every(k => k[1].length === 0), JSON.stringify(keys.filter(k => k[1].length)));
 ok('vsFriendsOn and fightN kept in every language', keys.every(k => k[2] && k[3]));
 // the rename is total: the two doors and the restart sheet never say the old
 // campaign word again, in any language
-const CAMPWORD = { en: 'CAMPAIGN', es: 'CAMPAÑA', fr: 'CAMPAGNE', pt: 'CAMPANHA', de: 'KAMPAGNE', ja: 'キャンペーン', ko: '캠페인', zh: '战役', hi: 'अभियान', ar: 'حملة' };
+const CAMPWORD = { en: 'CAMPAIGN', es: 'CAMPAÑA', fr: 'CAMPAGNE', pt: 'CAMPANHA', de: 'KAMPAGNE' };
 const stale = JSON.parse(await ev(`JSON.stringify((() => { const W = ${JSON.stringify(CAMPWORD)}; const out = [];
   for (const L of Object.keys(SS_STR)) for (const k of ['newCamp', 'contCamp', 'restartTitle', 'restartBody']) {
     const v = SS_STR[L][k]; if (typeof v !== 'string' || !v.length || v.toUpperCase().includes(W[L])) out.push(L + '.' + k);
   } return out })())`));
-ok('newCamp / contCamp / restartTitle / restartBody renamed in all ten languages (no campaign word survives)', stale.length === 0, stale.join(', '));
+ok('newCamp / contCamp / restartTitle / restartBody renamed in all five languages (no campaign word survives)', stale.length === 0, stale.join(', '));
 ok('the en restart sheet says game, in so many words', await ev(`SS_STR.en.restartBody === 'This will restart your current game in progress.'`) === true);
 
 // ---------------------------------------------------------------- friends online → the counter
@@ -362,13 +362,13 @@ ok('de, no checkpoint: NEUES SPIEL heads a three-row column, CONTINUE not render
   !g.campaign.vis && g.newcamp.label === 'NEUES SPIEL' && same(column(g), COLN), JSON.stringify({ label: g.newcamp.label, col: column(g) }));
 ok('de: the tagline is one line (one-line law)', await ev(`(() => { const t = ${H}.children.list.find(o => o.type === 'Text' && o.text === SS_T('tagline')); return !!t && !t.text.includes('\\n') })()`) === true);
 await ev(`localStorage.setItem('beta3.campaign', ${CK}); 1`);
-await nav(BASE + '?fps=0&lang=ja', 12000);
-ok('the Japanese meadow stands', await until(HOME_REST)); await sleep(600);
+await nav(BASE + '?fps=0&lang=es', 12000);
+ok('the Spanish meadow stands', await until(HOME_REST)); await sleep(600);
 g = JSON.parse(await ev(ROWS));
-ok('ja, with checkpoint: つづきから heads the four-row column, alive with its progress line',
-  g.campaign.vis && g.campaign.hit && g.campaign.label === 'つづきから' && g.newcamp.label === 'はじめから' && !!g.campaign.sub && same(column(g), COLC),
+ok('es, with checkpoint: CONTINUAR PARTIDA heads the four-row column, alive with its progress line',
+  g.campaign.vis && g.campaign.hit && g.campaign.label === 'CONTINUAR PARTIDA' && g.newcamp.label === 'NUEVA PARTIDA' && !!g.campaign.sub && same(column(g), COLC),
   JSON.stringify({ cont: g.campaign.label, neu: g.newcamp.label, col: column(g) }));
-ok('ja: the tagline is one line', await ev(`(() => { const t = ${H}.children.list.find(o => o.type === 'Text' && o.text === SS_T('tagline')); return !!t && !t.text.includes('\\n') })()`) === true);
+ok('es: the tagline is one line', await ev(`(() => { const t = ${H}.children.list.find(o => o.type === 'Text' && o.text === SS_T('tagline')); return !!t && !t.text.includes('\\n') })()`) === true);
 await ev(`localStorage.removeItem('beta3.campaign'); localStorage.removeItem('beta3.campsign'); localStorage.removeItem('beta3.lang'); 1`);
 
 ok('the whole run threw no page exceptions', errs.length === 0, errs.join(' | ').slice(0, 300));

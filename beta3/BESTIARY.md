@@ -19,7 +19,7 @@ tuning: hops, strands, amp, bolts; boss curse: `curse: 'blackout'` + `ink: N`
 cast" telegraph; inked tiles stay usable but score 0 until they leave the
 board). Then add the id to the act pools /
 `SS_QUICK_POOL` and give the title translations in `strings.js` (`beast` map,
-9 languages; English lives in data.js).
+4 languages — es/fr/pt/de, the v0.71.0 five-language world; English lives in data.js).
 
 ## Authored (26)
 

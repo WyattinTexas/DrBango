@@ -1,6 +1,42 @@
 # beta3 dev tools
 
-Twenty-six scripts, all dev-only — nothing here ships to the browser.
+Twenty-seven scripts, all dev-only — nothing here ships to the browser.
+
+## lang-check.mjs — the cut to five languages is total (v0.71.0)
+
+Skylar's call (9/2): "Cut out all Asian languages from star spell and Arabic
+as well, so leaving just English, Spanish, French, Portuguese, and German."
+The game side: the ja/ko/zh/hi/ar `SS_STR` blocks and their `SS_LANGS` rows
+left strings.js whole (~900 lines — the cut five were always UI-only:
+`ssGameLang()` played them on the English pack, so no bags, dictionaries or
+board keys ever existed for them); the parchment `langSheet` derives its rows
+from `Object.keys(SS_STR)` and so offers exactly five; `SS_LANG`'s cascade
+now SWEEPS a saved `beta3.lang` naming a cut language (the dead key is
+removed) and falls through to the device locale's best-of-five, else
+English; and the two removed-language special cases in game.js are retired —
+the `ja`/`zh` half of the CJK wrap test (the content-sniffing regex STAYS,
+because a player-typed versus name can still carry CJK glyphs) and the `ar`
+RTL branch in the wordmark renderer.
+
+Self-launching like seed-check (server :8899 if nothing serves, Chrome on
+:9470, `/tmp/cdp-lang`, `--disable-gpu`), Firebase blocked at the network
+layer, real DPR-3 taps.
+
+```
+node tools/lang-check.mjs      # 33 checks, ~2 min
+```
+
+The source audit (no removed native name, `SS_LANG === '<cut>'` branch or
+block key in any served file; the cascade's sweep; seed-names already five;
+exactly the four non-en dictionaries on disk), the booted tables
+(SS_STR/SS_LANGS/SS_PACKS exactly en,es,fr,pt,de; every pack whole), the
+sheet by real taps (five rows at the 5·30+34 parchment height, ✦ on the
+current language, a real pick of Español saving + rebooting into Spanish
+with its dictionary resident, the marker following), and the three fallback
+shapes: a stale saved `ja` lands a clean English boot with the key swept
+(the shape that used to poison desc-check's reused rig profile), a wild
+`?lang=ja` link neither lands nor saves, and a de-DE device whose saved
+language was cut lands on GERMAN — locale best-of-five, never bare English.
 
 ## hard-check.mjs — the beast strikes every 10 seconds unless you keep casting (v0.70.0)
 
@@ -255,7 +291,7 @@ grew an `onAll` callback (the queue's true end — a tap can land well before
 the worst-case clock). The sleeping gallery sorts CLOSEST TO WAKING FIRST
 (`ssSigilAsleep`, ties in roster order, stable), and the profile's skies door
 reads "n awake · m nearly there" whenever something sleeping is ≥
-`SS_SIG_NEAR` (0.6) of its goal — `skiesNear` ×10 languages, the longer line
+`SS_SIG_NEAR` (0.6) of its goal — `skiesNear` ×5 languages, the longer line
 fit by scaling (German runs past the button at full size). With nothing near,
 the plain `n / 24` stands.
 
@@ -885,7 +921,7 @@ column since v0.52.0, top to bottom:
   leaderboard rows, in-battle labels, and `?quick=1` boots straight into a
   quick run (no intro) for any harness that used to tap the button.
 - **The rename is total**: `newCamp`/`contCamp` and the restart sheet's
-  `restartTitle`/`restartBody` say game, not campaign, in all ten languages
+  `restartTitle`/`restartBody` say game, not campaign, in all five languages
   (the suite scans for each language's old campaign word). The `quick` string
   key deliberately SURVIVES in every language.
 - **The tagline is MEASURED, not eyeballed** (v0.51.0: parchment-gold ink,
@@ -902,14 +938,14 @@ column since v0.52.0, top to bottom:
 - The v0.46.0 laws still hold: labels dead-centre in 58-tall buttons, only
   LIVE sub-lines (campaign progress, friends online) via
   `home.setRowSub(key, text, color, snap)`, the label gliding 9 for them;
-  retired `*Sub` keys stay gone from all ten languages.
+  retired `*Sub` keys stay gone from all five languages.
 
 ```
 node tools/tagline-check.mjs 9444     # served on :8899, --disable-gpu Chrome on :9444
 BEFORE=http://localhost:8898/index.html SHOTS=/tmp/shots node tools/tagline-check.mjs 9444
 ```
 
-Walks both checkpoint states plus `?lang=de` / `?lang=ja` boots on REAL taps
+Walks both checkpoint states plus `?lang=de` / `?lang=es` boots on REAL taps
 aimed at the labels: CONTINUE hidden then shown (and the tap chain NEW GAME →
 sign sheet → unsigned climb → star chart node → a real campaign battle),
 the restart sheet (BACK keeps the climb, NEW wipes it and the door VANISHES
@@ -935,7 +971,7 @@ drawing, one real tap to dismiss, and two discoveries queueing rather than
 stacking), THE SLEEPING GALLERY (the profile door, the STILL SLEEPING section,
 every bar against the counter behind it, the silhouette that gives away
 nothing, and the migration from asleep to held), persistence, versus's
-immunity, grandfathering in seven shapes, and the copy in ten languages. Same
+immunity, grandfathering in seven shapes, and the copy in five languages. Same
 CDP shape as `streak-check.mjs`, on its own port so all three suites can run
 side by side; `--disable-gpu` is fine.
 
@@ -1416,12 +1452,14 @@ place, so call sites that re-set a label did not change.
 node tools/desc-check.mjs      # served on :8899, swiftshader Chrome on :9446
 ```
 
-86 checks: 24 sigils × 10 languages on the pick card, the inspector + gallery
-and the rite, on BOTH `?rend=cv` and `?rend=gl` — every line inked, no
-newline, breaks matching legacy wordWrap (or fitting, for CJK), scrollFactor 0
-on every rite child, the ladder on measured height, the healer drill, a real
-tap through a pick of the three phone cards, and real `?lang=ar` / `?lang=ja`
-boots. `SHOTS=<dir>` keeps the snapshots.
+69 checks: 24 sigils × 5 languages (en/es/fr/pt/de — the v0.71.0 cut;
+lang-check.mjs proves the cut itself) on the pick card, the inspector +
+gallery and the rite, on BOTH `?rend=cv` and `?rend=gl` — every line inked,
+no newline, breaks matching legacy wordWrap, scrollFactor 0 on every rite
+child, the ladder on measured height, the healer drill, a real tap through a
+pick of the three phone cards, real `?lang=de` / `?lang=es` boots, and the
+stale-saved-cut-language fallback (a saved `ja` lands a clean English boot
+with the dead key swept). `SHOTS=<dir>` keeps the snapshots.
 
 ## Harness gotchas learned on the friends/invites work (v0.25.0)
 
@@ -1483,7 +1521,7 @@ race one standing name at connect: exactly one holds it, the loser is
 re-minted and sees the notice on the meadow; then the instant race (both
 `claimName` transactions fired in the same tick, 3 rounds), held/free renames,
 the silent fresh-device path, the `test_` exemption, the circle, nameKey, and
-the desc law on the notice in all 10 languages (no child Text holds a
+the desc law on the notice in all five languages (no child Text holds a
 newline, every line fits 292u). Harness lesson: a `Page.navigate` fired while
 about:blank is still settling can be DROPPED — `nav` proves `location.href`
 and `typeof SSNET` before waiting on the game.

@@ -11,7 +11,7 @@
 // (ssSigilRite) is REUSED, spends `pend` as it shows, and so can never be
 // repeated by endRun or the meadow — both kept as the safety net. The
 // sleeping gallery sorts CLOSEST TO WAKING FIRST (ssSigilAsleep), and the
-// profile's skies door says "n awake · m nearly there" (skiesNear ×10 langs,
+// profile's skies door says "n awake · m nearly there" (skiesNear ×5 langs,
 // SS_SIG_NEAR = 0.6) whenever something sleeping is close.
 // Self-launching like comet-check: serves beta3 on :8899 if nothing does,
 // headless Chrome on :9466 (/tmp/cdp-wake, --disable-gpu), Firebase blocked
@@ -149,8 +149,8 @@ ok('SS_SIG_NEAR is one dial in (0, 1)', await ev(`SS_SIG_NEAR > 0 && SS_SIG_NEAR
 ok('ssSigilAnnounce carries the onAll seam', await ev(`ssSigilAnnounce.length === 3`));
 const i18n = await evj(`JSON.stringify(Object.keys(SS_STR).map((l) => [l,
   /%1/.test(SS_STR[l].skiesNear || '') && /%2/.test(SS_STR[l].skiesNear || '')]))`);
-ok('skiesNear exists in all ten languages, %1 and %2 both', i18n.length === 10 && i18n.every(([, g]) => g),
-  i18n.filter(([, g]) => !g).map(([l]) => l).join(',') || '10');
+ok('skiesNear exists in all five languages, %1 and %2 both', i18n.length === 5 && i18n.every(([, g]) => g),
+  i18n.filter(([, g]) => !g).map(([l]) => l).join(',') || '5');
 
 /* ================= 2. the moment — a real scry crosses ================= */
 console.log('\n— THE MOMENT: A REAL SCRY CROSSES ITS THRESHOLD —');

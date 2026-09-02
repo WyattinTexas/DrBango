@@ -223,8 +223,8 @@ ok('SS_HARD dials as shipped: 10s clock · 3s warn · ×1.5 tally · boss knobs 
   JSON.stringify(dials) === '[10000,3000,1.5,1,0]', JSON.stringify(dials));
 ok('SS_CADENCE.hard is the gapAdd modifier row', await ev(`SS_CADENCE.hard && SS_CADENCE.hard.gapAdd === 1`));
 const langs = await evj(`JSON.stringify(Object.keys(SS_STR).map((l) => [l, !!(SS_STR[l].hardLbl && SS_STR[l].hardLbl.length)]))`);
-ok('hardLbl worded in all ten languages', langs.length === 10 && langs.every(([, g]) => g),
-  langs.filter(([, g]) => !g).map(([l]) => l).join(',') || '10');
+ok('hardLbl worded in all five languages', langs.length === 5 && langs.every(([, g]) => g),
+  langs.filter(([, g]) => !g).map(([l]) => l).join(',') || '5');
 const fam = await evj(`JSON.stringify((SS_ACH.find((a) => a.id === 'hard-sign') || {}).famIds || [])`);
 ok('EMBER-SWORN is one display row over the 12 per-sign ids',
   fam.length === 12 && await ev(`SS_ZODIAC.every((z) => ${JSON.stringify(fam)}.includes('hard-' + z.id))`), fam.length);

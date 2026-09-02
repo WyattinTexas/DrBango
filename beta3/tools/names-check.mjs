@@ -7,7 +7,7 @@
 // silent fresh-device path, a rename onto a taken name (held) and a free one
 // (old claim released), the test_ exemption, THE CIRCLE claiming over its own
 // SSNET.side door, nameKey normalization, and the desc law on the notice in
-// all 10 languages (no child Text ever holds a newline, every line fits).
+// all five languages (no child Text ever holds a newline, every line fits).
 // Everything written is deleted at the end.
 //
 //   python3 -m http.server 8899 &
@@ -154,7 +154,7 @@ ok('nameKey: trim · collapse · fold', await W.ev(`SSNET.nameKey('  Astral   FO
 ok('nameKey: RTDB-forbidden chars become _', await W.ev(`SSNET.nameKey('a.b#c$d[e]f/g') === 'a_b_c_d_e_f_g'`));
 ok('nameKey: NFKC folds fullwidth', await W.ev(`SSNET.nameKey('Ｆｏｘ') === 'fox'`));
 
-// ---- 8. the desc law on the notice, all 10 languages, both kinds ----
+// ---- 8. the desc law on the notice, all five languages, both kinds ----
 const LANGS = JSON.parse(await W.ev('JSON.stringify(Object.keys(SS_STR))'));
 const SWAP = (lang) => `(() => { if (!window.__keepEn) window.__keepEn = SS_STR.en; SS_STR.en = '${lang}' === 'en' ? window.__keepEn : SS_STR['${lang}']; return 1 })()`;
 for (const lang of LANGS) {
