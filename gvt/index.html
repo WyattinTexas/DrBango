@@ -6574,6 +6574,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "CRACK SHOT":"الرامي البارع",
 "CRAWLER CATCHER":"صائد الزواحف",
 "CRIT!":"ضربة حاسمة!",
+"PARRY!":"صَدّ!",
 "CROSSING GUARDS":"حراس المعبر",
 "CRYSTALS":"البلورات",
 "CUT GLASS · ONE BLADE, ANY COLOUR":"زجاج مصقول · نصل واحد بأي لون",
@@ -9789,6 +9790,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "CRACK SHOT":"めいしゅ",
 "CRAWLER CATCHER":"ホフクへいハンター",
 "CRIT!":"クリティカル！",
+"PARRY!":"パリィ！",
 "CRYSTALS":"クリスタル",
 "CUT GLASS · ONE BLADE, ANY COLOUR":"カットガラス · やいばは1つ、いろはじゆう",
 "Choose the colour of his blade":"やいばのいろをえらぼう",
@@ -12127,6 +12129,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "CRACK SHOT":"명사수",
 "CRAWLER CATCHER":"포복병 사냥꾼",
 "CRIT!":"크리티컬!",
+"PARRY!":"패링!",
 "CRYSTALS":"크리스털",
 "CUT GLASS · ONE BLADE, ANY COLOUR":"커팅 글라스 · 검날은 하나, 색은 자유",
 "Choose the colour of his blade":"검날의 색을 골라",
@@ -14465,6 +14468,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "CRACK SHOT":"神枪手",
 "CRAWLER CATCHER":"爬行兵克星",
 "CRIT!":"暴击！",
+"PARRY!":"招架！",
 "CRYSTALS":"水晶",
 "CUT GLASS · ONE BLADE, ANY COLOUR":"切割玻璃 · 一把剑刃，任选颜色",
 "Choose the colour of his blade":"选择剑刃的颜色",
@@ -16803,6 +16807,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "CRACK SHOT":"MEISTERSCHÜTZE",
 "CRAWLER CATCHER":"KRIECHER-FÄNGER",
 "CRIT!":"KRIT!",
+"PARRY!":"PARIERT!",
 "CRYSTALS":"KRISTALLE",
 "CUT GLASS · ONE BLADE, ANY COLOUR":"GESCHLIFFENES GLAS · EINE KLINGE, JEDE FARBE",
 "Choose the colour of his blade":"Wähl die Farbe seiner Klinge",
@@ -19141,6 +19146,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "CRACK SHOT":"СТРЕЛОК-АС",
 "CRAWLER CATCHER":"ЛОВЕЦ ПОЛЗУНОВ",
 "CRIT!":"КРИТ!",
+"PARRY!":"ПАРИРОВАНО!",
 "CRYSTALS":"КРИСТАЛЛЫ",
 "CUT GLASS · ONE BLADE, ANY COLOUR":"ГРАНЁНОЕ СТЕКЛО · ОДИН КЛИНОК, ЛЮБОЙ ЦВЕТ",
 "Choose the colour of his blade":"Выбери цвет его клинка",
@@ -21479,6 +21485,7 @@ ar:{"GROUP":"المجموعة","TAP TO CANCEL":"اضغط للإلغاء","THE CA
 "CRACK SHOT":"TIRADOR DE ÉLITE",
 "CRAWLER CATCHER":"CAZA-REPTADORES",
 "CRIT!":"¡CRÍTICO!",
+"PARRY!":"¡PARADA!",
 "CRYSTALS":"CRISTALES",
 "CUT GLASS · ONE BLADE, ANY COLOUR":"CRISTAL TALLADO · UNA HOJA, EL COLOR QUE QUIERAS",
 "Choose the colour of his blade":"Elige el color de su hoja",
@@ -39628,7 +39635,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.60';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.61';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -50871,7 +50878,7 @@ function saberBlocks(u){
   if(sw.w!=='lightsaber') return false;
   const blk9=unarmedU(u,sw)? sw.block*UNARMED_BLOCK : sw.block;   // 0487 UNARMED (D18): empty hands deflect nothing — the +20 pips is the trade (UNARMED_BLOCK 1 restores the rank-20 roll); no dice rolled while it reads 0
   if(blk9 && Math.random()<blk9){
-    S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:22,t:0,dur:0.2,col:saberHexU(u)}); bfSfx(SFX.snap, u.x, u.y); return true;
+    u.sabBlkN=(u.sabBlkN|0)+1; S.fx.push({k:'ring',x:u.x,y:u.y-18,r:4,R:22,t:0,dur:0.2,col:saberHexU(u)}); bfSfx(SFX.snap, u.x, u.y); return true;   // 0901 Card B P2c: the blocks COUNTED on the man — kbCut reads the count across its one tanHit (the block that turned a KING's cut is THE PARRY); nothing else reads it, nothing persists
   }
   return false;
 }
@@ -51242,7 +51249,7 @@ function updateSaber(u,dt,sw){
     if(d>26){ const sp=680; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }   // a real dash — he's IN quick
     else if(u.saberSwing<=0){
       const ua9=unarmedU(u,sw);   // 0487 UNARMED (D18): the STRIKE becomes a PUNCH — dmg ×UNARMED_DMG_F, the cleave radius UNARMED_CLEAVE (0 = the nearest man only), a short white arc + the thwack, the re-arm cd ×UNARMED_CD_F below. The feet (the dash in, the chain, the walk home) are byte-what-they-were.
-      const vm=(u.vet?1.5:1)*lzDmgMul(u), cm=rollCrit(u)?critMult(u):1;   // v2.36: the red beam rides vm — every strike and cleave below inherits
+      const vm=(u.vet?1.5:1)*lzDmgMul(u), cr9=rollCrit(u), cm=(cr9 || u.sabCritAt>S.t)? critMult(u) : 1; u.sabCritAt=0;   // v2.36: the red beam rides vm — every strike and cleave below inherits · 0901 Card B P2c THE PARRY's crit: the strike inside KB_PARRY_CRIT of a parry crits whatever the die said (the die still rolls — zero new dice, the sequence byte-what-it-was); one strike spends the window (sabCritAt is an absolute S.t stamp — no clock to burn)
       if(cm>1) critFx(f);
       hurt(f,sw.dmg*(ua9?UNARMED_DMG_F:1)*vm*cm,u);                     // massive strike
       for(const g of TGT(u)){ if(g!==f && !g.burrow && !g.dead && bfCanTarget(u,g) && Math.hypot(g.x-u.x,g.y-u.y)<(ua9?UNARMED_CLEAVE:46)){ hurt(g,sw.dmg*(ua9?UNARMED_DMG_F:1)*0.5*vm*cm,u); } }  // a cleave to whatever else is close (never down into the cut he isn't in — v1.57)
@@ -53594,7 +53601,15 @@ const KB_RIDE_SPD=140,    // THE RIDE: the gallop between marks (px/s; the wheel
       KB_PRICE_CAP=4,     // 0901 Card A P3a (FM-GVT-KING-BEAR-SABER-01 §4, ⚑ Q3): kbPriceX never climbs past this — ×4 = 608 a life at Easy on the 152 row (the doc's 781 read 0595's 190 row); at 200 the uncapped price was ×10.03 = 1,524 a life and no class felled him in three minutes. 0 = no cap
       KB_EYE_SABER=2,     // 0901 Card A P5a (⚑ Q5): the wall's eye counts a blade-in-hand Sarge as this many men — a duelist IS the volley, so life two's floor lifts on a lone saber like anyone's (the eye wanted two men inside 280; a lone saber waited the 24 s valve on a 4% bar)
       KB_STAG_BLUE=0.6,   // 0901 Card A P8 (⚑ Q8): the blue pop STAGGERS the mounted king this long instead of shoving him (ggCanShove refuses a boss — the pop moved him 0 px); the feet, the leg's clock and the saddle swing hold (kbRideStep's head)
-      KB_SIDE_HURL=1;     // 0901 Card A P1a (⚑ Q1): the hurl on Sarge / a hero goes SIDEWAYS off the king's heading, the flank he stands on (0 = the shipped vector, along the heading — the same charge leg rode over him again every 0.6-1.1 s)
+      KB_SIDE_HURL=1,     // 0901 Card A P1a (⚑ Q1): the hurl on Sarge / a hero goes SIDEWAYS off the king's heading, the flank he stands on (0 = the shipped vector, along the heading — the same charge leg rode over him again every 0.6-1.1 s)
+      KB_DASH_WIND=0.45,  // 0901 Card B P2a (FM-GVT-KING-BEAR-SABER-01 §4, ⚑ Q2b): THE WIND-UP — the dash-slash PLANTS this long before the flight (the prance's grammar on foot: the sabre back over his shoulder, a steel ring growing at his feet, the swish); the target is frozen where he stands at the wind's END (kbWindTick → kbDashGo's own pinned line). 0 = the shipped launch (no tell); the doc's alternative 0.3
+      KB_WIND_R=66,       // ...the wind's steel ring grows to this radius at his feet (the trample's ring is 52) — ~28 px wide at 812x375
+      KB_WIND_LEAN=0.14,  // ...the pose: the lean BACK off the target (the flight's -0.28 forward lean, reversed and halved)
+      KB_CUT_PIP=1,       // 0901 Card B P2b (⚑ Q2): a dash-slash cut on a Sarge with THE BLADE IN HAND lands this many pips through tanHit (the 50% block still rolls, the plate/wall/poncho have their say, a grit-out still knocks) instead of the death knock — the knock stays for every other man and for a Sarge holding a gun or empty hands. 0 = the shipped death knock (Q2 c); 2 = Q2 b
+      KB_CUT_ONCE=1,      // 0901 Card B P2d: cuts 2 and 3 of a lunge never land on a man cut 1 already took (one set on the lunge's copy — a REFUSED cut never took him); 0 = every cut may find the same man
+      KB_PARRY_STAG=0.6,  // 0901 Card B P2c THE PARRY: when the blade's block turns a king's cut the king STAGGERS this long — the lunge's remaining cuts cancelled, the sword back in the rug, planted (the wall waits too); the lunge still counts as an act
+      KB_PARRY_CRIT=1.0,  // ...and Sarge's next strike inside this many seconds CRITS (critMult — the teal and the scouter stack as on any crit; the window is one strike; the die still rolls)
+      KB_PARRY_STOP=0.07; // ...the clash's hit-stop — the sniper's own punch (0.07; YOUR Sarge alone, never in co-op, never under reduced motion) with PARRY! over him in the blade's colour (the one new key x7)
 function kbRnd(f){ f.kbSeed=(((f.kbSeed||(f.id*7919+913))*9301)+49297)%233280; return f.kbSeed/233280; }
 function kbBossX(n){ const c=levelCfg(n); return (1+(c.hpMul-1)*(c.bossF!=null?c.bossF:0.5))*(c.hpX||1); }   // 0639 D1a: the campaign's OWN boss price at a rung — spawnFoe's hpm × the elite muscle, off levelCfg (one source of truth: the first hundred's curve, the elite law with eliteUp() past 100)
 function kbPriceX(){   // 0639 THE KING'S PRICE (D1a): a SOLO fields raid prices both lives like a boss ON THE PLAYER'S OWN RUNG, normalised at KB_PRICE_RUNG (never below ×1); a party raid keeps the tier's price — THE TWIN-SIM LAW (every sim rebuilds the identical army from the relayed tier alone; ⚑ Q2) — coopLaunching is set BEFORE startRaidBattle, S.coop AFTER it
@@ -53625,7 +53640,7 @@ function kbWallSkid(f){   // every soaked round throws one tight steel ring + on
 function kbWallTick(f,dt){   // 0639 THE STONE WALL (D4) on his own clock (KB_REFL_CD's grammar): the 7 s window burns, then the 18 s rest; the brace arms when the rest is spent, the eye agrees (KB_WALL_N men inside KB_WALL_EYE) and he is not mid-lunge; the first rest is KB_WALL_1ST
   if(f.cmdWallT>0){ f.cmdWallT-=dt; if(f.cmdWallT<=0){ f.cmdWallT=0; f.kbWallCd=KB_WALL_CD; tdLog(f,'wall-end'); } return; }
   f.kbWallCd=(f.kbWallCd==null? KB_WALL_1ST : f.kbWallCd)-dt;
-  if(f.kbWallCd<=0 && !f.kbDash && kbMenIn(f,KB_WALL_EYE)>=KB_WALL_N) kbWallArm(f);
+  if(f.kbWallCd<=0 && !f.kbDash && !f.kbWind && !(f.kbParT>0) && kbMenIn(f,KB_WALL_EYE)>=KB_WALL_N) kbWallArm(f);   // 0901 Card B: a wind-up or a parry's stagger is not a brace either (the no-lunge-mid-brace law, both ways)
 }
 function kbBand(x,y){ return { x:Math.max(80,Math.min(W-80,x)), y:Math.max(FOE_TOP+30,Math.min(FOE_BOT-30,y)) }; }   // never off the mat (the 0305 law)
 function kbMen(){ const out=[]; for(const u of S.units){ if(u.dead||u.jetT>0||u.falling||u.dropT>0||u.cloakT>0) continue; if(S.drag&&S.drag.unit===u) continue; if(u.x<-40||u.x>W-10) continue; out.push(u); } return out; }
@@ -53704,9 +53719,11 @@ function kbTick(f,dt){   // updateFoeGen's hand-off past the court
 }
 function kbFootTick(f,dt){   // THE GROUND DUEL (D4): planted (the sword in the rug — MEN WITHOUT FEAR's own picture), the dash-slash on its clock, the reflect's re-arm, the tube waves on his OWN clock
   f.tdFeet=1; f.kbFootT=(f.kbFootT||0)+dt; kbGate2(f); if(kbActs2(f)) kbFloorLift(f,'acts2'); kbWallTick(f,dt);   // 0639: the ground clock + THE ACT GATES (D1c) + THE FLOOR's lift (D1b) + THE STONE WALL on its own clock (D4)
-  if(f.kbDash) kbDashTick(f,dt);
-  else { f.kbDashCd-=dt/tkSlowMul(f); if(f.kbDashCd<=0 && !(f.cmdWallT>0)){ const u=kbDashPick(f); if(u){ f.kbWalk=0; kbDashGo(f,u); } else f.kbDashCd=0.3; }   // 0901 Card A P8 (⚑ Q8) TEAL: the concussion's slow reads at his dash clock (tkSlowMul — the one read every cadence clock in the game consumes; the pop already stamped tkSlowT on him and nothing of his read it)
-    if(!f.kbDash){ f.kbStalkT=(f.kbStalkT||0)-dt; if(f.kbStalkT<=0){ f.kbStalkT=0.4; const n=foeSaberNext(f,1e9); f.kbWalkTo=(n && bfCanTarget(f,n))? n : null; } f.kbWalk=f.kbWalkTo? 1 : 0; } }   // 0645 THE STALK (Card B ⚑ Q1): the walk is the DEFAULT between lunges — the mark refreshed every 0.4 s (kbWalkStep stops him at KB_STALK_STOP and walks THROUGH a standing brace at KB_WALL_WALK); the dash still fires on its own clock and window
+  if(f.kbParT>0){ f.kbParT-=dt; if(f.kbParT<=0) f.kbParT=0; f.kbWalk=0; }   // 0901 Card B P2c THE PARRY's stagger owns the frame: planted — no wind, no flight, no walk; the dash clock holds (the wall waits too — kbWallTick)
+  else if(f.kbWind) kbWindTick(f,dt);   // 0901 Card B P2a THE WIND-UP owns the frame before the flight
+  else if(f.kbDash) kbDashTick(f,dt);
+  else { f.kbDashCd-=dt/tkSlowMul(f); if(f.kbDashCd<=0 && !(f.cmdWallT>0)){ const u=kbDashPick(f); if(u){ f.kbWalk=0; kbWindGo(f,u); } else f.kbDashCd=0.3; }   // 0901 Card A P8 (⚑ Q8) TEAL: the concussion's slow reads at his dash clock (tkSlowMul — the one read every cadence clock in the game consumes; the pop already stamped tkSlowT on him and nothing of his read it)
+    if(!f.kbDash && !f.kbWind){ f.kbStalkT=(f.kbStalkT||0)-dt; if(f.kbStalkT<=0){ f.kbStalkT=0.4; const n=foeSaberNext(f,1e9); f.kbWalkTo=(n && bfCanTarget(f,n))? n : null; } f.kbWalk=f.kbWalkTo? 1 : 0; } }   // 0901 Card B: a king squaring up does not stalk (the wind's frame keeps his feet)   // 0645 THE STALK (Card B ⚑ Q1): the walk is the DEFAULT between lunges — the mark refreshed every 0.4 s (kbWalkStep stops him at KB_STALK_STOP and walks THROUGH a standing brace at KB_WALL_WALK); the dash still fires on its own clock and window
   if(!f.kbRefl){ f.kbReflCd-=dt; if(f.kbReflCd<=0){ f.kbRefl=1; f.kbReflCd=0; S.fx.push({k:'ring',x:f.x,y:f.y-24,r:6,R:44,t:0,dur:0.4,col:'#FFD24A'}); tdLog(f,'armed'); } }
   kbMwfTick(f,dt);
 }
@@ -53718,6 +53735,28 @@ function kbWalkStep(f,dt,aura){   // teddyFeet's door between lunges: the walk a
   const sp=f.def.spd*(aura||1)*((f.cmdWallT>0)? KB_WALL_WALK : 1), st=rockSteer(f.x,f.y,g9.x,g9.y,ROCK_PAD_FOE), hx=st? st.x : dx/d9, hy=st? st.y : dy/d9, nx=f.x+hx*sp*dt, ny=f.y+hy*sp*dt;   // 0645 THE MARCHING WALL (⚑ Q2): the brace slows the stalk (×KB_WALL_WALK), never plants it
   if(voidAt(nx,ny)){ f.kbWalk=0; return; }
   const p=kbBand(nx,ny); f.x=p.x; f.y=p.y;
+}
+function kbWindGo(f,u){   // 0901 Card B P2a THE WIND-UP (⚑ Q2b): the dash-slash SQUARES UP before it flies — planted, the sabre back over his shoulder, a steel ring growing at his feet (drawTeddy's foot branch reads kbWind), the swish; kbWindTick launches at the wind's end on where the man stands THEN (kbDashGo's own pinned line — the target frozen at the wind's end). KB_DASH_WIND 0 = the shipped launch
+  if(!(KB_DASH_WIND>0)){ kbDashGo(f,u); return; }
+  f.kbWind={ u:u, t:0, fs:(u.x>=f.x)? 1 : -1 }; f.kbWalk=0; f.kbDashCd=KB_DASH_CD;
+  bfSfx(SFX.swish,f.x,f.y); tdLog(f,'wind',[Math.round(u.x),Math.round(u.y)]);
+}
+function kbWindTick(f,dt){   // the wind burns; at its end the flight goes at the frozen target (the man he squared up on — gone, fallen or unreachable, the nearest in the window instead; nobody, the sword goes back in the rug and the clock retries in 0.3 s as a dry pick always did)
+  const Wd=f.kbWind; Wd.t+=dt; f.kbWalk=0; if(Wd.t<KB_DASH_WIND) return;
+  f.kbWind=null; let u=Wd.u;
+  if(!(u && !u.dead && S.units.indexOf(u)>=0 && !u.falling && !(u.dropT>0) && bfCanTarget(f,u))) u=kbDashPick(f);
+  if(u) kbDashGo(f,u); else f.kbDashCd=0.3;
+}
+function kbParry(f,u,L){   // 0901 Card B P2c THE PARRY: steel met steel — the blade's block turned the king's cut (saberBlocks' own 50% roll, COUNTED on the man): the king STAGGERS KB_PARRY_STAG (this lunge's remaining cuts cancelled, the sword back in the rug, the lunge still counts as an act for the floor), Sarge's next strike inside KB_PARRY_CRIT crits, the clash rings in the blade's colour with the sniper's own hit-stop, PARRY! over him (the one new key x7); the tape beat 'parry'
+  const RM=reducedMotion(), hex=saberHexU(u)||'#EAF4FF', mx=(f.x+u.x)/2, my=(f.y+u.y)/2-26;
+  f.kbDash=null; f.kbLungeN=(f.kbLungeN|0)+1; f.kbParT=KB_PARRY_STAG; f.kbParFs=L.fs; f.kbWalk=0;
+  u.sabCritAt=S.t+KB_PARRY_CRIT;
+  S.fx.push({k:'ring',x:mx,y:my,r:6,R:40,t:0,dur:0.26,col:hex}); S.fx.push({k:'flash',x:mx,y:my,ang:0.6,R:RM?18:30,lw:RM?3:4,t:0,dur:0.14});
+  if(!RM){ for(let ti=0;ti<6;ti++){ const th=(((f.x|0)*0.73+(f.y|0)*1.21+ti*0.897)%1), ta=th*6.283, ca=Math.cos(ta), sa=Math.sin(ta), td=4+((ti*0.37+th)%1)*5, tl=td+7+th*7;
+    S.fx.push({k:'tracer',x1:mx+ca*td,y1:my+sa*td,x2:mx+ca*tl,y2:my+sa*tl,t:0,dur:0.11,col:'#EAF4FF',w:1.6}); } }   // the sparks off the clash: hashed off his post (the cut's own tip-tick grammar — no dice)
+  S.floats.push({x:u.x,y:u.y-72,txt:'PARRY!',t:0,col:hex});   // raw key — floats translate at draw
+  if(bfHumanU(u) && !u.coopBy && !RM){ S.shake=Math.max(S.shake,0.22); if(!S.coop) S.hitStop=Math.max(S.hitStop,KB_PARRY_STOP); }   // the punch — YOUR Sarge alone, never in co-op (two sims, one clock), never under reduced motion (the sniper's own law)
+  tdLog(f,'parry',L.n+1);
 }
 function kbDashGo(f,u){   // THE DASH-SLASH (the :cmdLungeGo grammar foe-side): a PINNED line at where the man stands NOW, a pace short of him, cut to the mat's band; the flight at the blade's own CMD_DASH.spd; three cuts on arrival whether or not anyone is still there (a whiff is a whiff); a man already inside the cuts' reach is cut where he stands
   const dx=u.x-f.x, dy=u.y-f.y, d=Math.hypot(dx,dy)||1, hx=dx/d, hy=dy/d;
@@ -53745,8 +53784,10 @@ function kbDashTick(f,dt){   // landed: THREE CUTS a beat apart (CMD_DUEL_C), th
 }
 function kbCut(f,L){   // one cut: a sweep at KB_CUT_R on his facing side — the nearest man takes the knock (the pounce core's own law: one roll per strike inside the funnel; THE CHARGE ADVANTAGE holds), THE WAKE + the tip ticks from the Commander's own cut table (draw-only, no dice)
   const c=CMD_DUEL_CUTS[L.n], fs=L.fs;
-  let best=null,bd=1e9; for(const u of S.units){ if(u.dead||u.jetT>0||u.falling) continue; if(S.drag&&S.drag.unit===u) continue; if((u.x-f.x)*fs < -CMD_SWEEP_BACK) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<=KB_CUT_R && d<bd){ bd=d; best=u; } }
-  if(best && !(best.saberState==='out' && best.saberFirstT===f)) knock(best,f.x,f.y);
+  let best=null,bd=1e9; for(const u of S.units){ if(u.dead||u.jetT>0||u.falling) continue; if(S.drag&&S.drag.unit===u) continue; if(KB_CUT_ONCE && L.took && L.took.indexOf(u)>=0) continue; if((u.x-f.x)*fs < -CMD_SWEEP_BACK) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<=KB_CUT_R && d<bd){ bd=d; best=u; } }   // 0901 Card B P2d: a man this lunge already cut is not cut again (L.took — the set on the lunge's copy; a REFUSED cut never took him)
+  if(best && !(best.saberState==='out' && best.saberFirstT===f)){ if(KB_CUT_ONCE) (L.took||(L.took=[])).push(best);
+    if(KB_CUT_PIP>0 && saberArm(best)){ const b9=best.sabBlkN|0; f.pipN=KB_CUT_PIP; tanHit(best,f.x,f.y,f); f.pipN=0; if(!best.dead && (best.sabBlkN|0)>b9) kbParry(f,best,L); }   // 0901 Card B P2b (⚑ Q2): a Sarge with THE BLADE IN HAND takes a PIP through the normal hit (the trample's own seat — the 50% block still rolls in tanHit, the plate / the wall / the poncho have their say, a grit-out still knocks) instead of the death knock; P2c: the block that turned it (saberBlocks COUNTS on the man) is THE PARRY
+    else knock(best,f.x,f.y); }   // every other man, a gun Sarge and empty hands: the knock (a campaign knock is a death — the plush law for the line)
   const hx=f.x+fs*8, hy=f.y-22;
   S.fx.push({k:'ring',x:f.x,y:f.y-16,r:6,R:(c.th?44:34),t:0,dur:0.24,col:'#C9D2D8'});
   if(c.th) S.fx.push({k:'ring',x:hx+fs*Math.cos(c.f)*62,y:hy+Math.sin(c.f)*62,r:3,R:14,t:0,dur:0.18,col:'#C9D2D8'});
@@ -53982,14 +54023,17 @@ function drawTeddy(f,wbk){
   if(t==='tbrig'||t==='tgen'||t==='bearnaparte'||t==='tduke'){   // 0600: + the duke on the same charger
     const st=f.gnSt||'in', sprint=(f.pounceState==='out') || ((t==='bearnaparte'||t==='tduke') && st==='ride' && !!f.kbMv);   // 0600: the duke gallops on the same ride flag   // 0595: THE RIDE gallops (the rearing charger, the hop, the lean) whenever the wheeling brain moves him
     if(t==='bearnaparte' && st==='foot'){   // 0595 THE GROUND DUEL (§2 D4): planted with the sword in the rug (MEN WITHOUT FEAR's own picture) inside his circle; the reflect's gold shimmer while ARMED; the lunge's speed lines in flight; the cuts' lean
-      const L=f.kbDash, fly=!!(L && L.left>0), cut=!!(L && !fly), RM=reducedMotion(), fi=tdImg('bearnapartefoot')||im;
+      const L=f.kbDash, fly=!!(L && L.left>0), cut=!!(L && !fly), RM=reducedMotion(), fi=tdImg('bearnapartefoot')||im, wd9=f.kbWind||null, wq9=wd9? Math.max(0,Math.min(1,wd9.t/KB_DASH_WIND)) : 0, par9=(f.kbParT>0), pq9=par9? Math.max(0,Math.min(1,f.kbParT/KB_PARRY_STAG)) : 0;   // 0901 Card B: the wind's clock (0 → 1 over KB_DASH_WIND) and the stagger's (1 → 0 over KB_PARRY_STAG)
       ring(KB_AURA_R, 0.22);
       if(f.cmdWallT>0){ const wl=Math.max(0,Math.min(1,f.cmdWallT/KB_WALL_T)); cx.save(); cx.strokeStyle='rgba(234,244,255,0.45)'; cx.lineWidth=2; cx.beginPath(); cx.ellipse(f.x,f.y+4,30,11,0,0,7); cx.stroke(); cx.strokeStyle='#EAF4FF'; cx.lineWidth=3; cx.beginPath(); cx.ellipse(f.x,f.y+4,30,11,0,-1.5708,-1.5708+6.2832*wl); cx.stroke(); cx.restore(); }   // 0639 THE STONE WALL (D4): the countdown at his feet — the 0510 ground ellipse + the draining arc
-      if(!fly && !cut && !f.kbWalk){ const sx=f.x-fl*26, sy=f.y+2; cx.save(); cx.translate(sx,sy); cx.rotate(fl*0.18); cx.lineCap='round';
+      if(!fly && !cut && !f.kbWalk && !wd9 && !par9){ const sx=f.x-fl*26, sy=f.y+2; cx.save(); cx.translate(sx,sy); cx.rotate(fl*0.18); cx.lineCap='round';
         cx.strokeStyle='#cfd6dd'; cx.lineWidth=3.2; cx.beginPath(); cx.moveTo(0,0); cx.lineTo(0,-30); cx.stroke(); cx.strokeStyle='#fff'; cx.lineWidth=1.1; cx.beginPath(); cx.moveTo(0.6,-2); cx.lineTo(0.6,-28); cx.stroke();
         cx.fillStyle='#E8C24A'; cx.fillRect(-4,-34,8,5); cx.strokeStyle='#C0473A'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(-1,-34); cx.quadraticCurveTo(-8,-40,-6,-46); cx.stroke(); cx.restore(); cx.lineCap='butt'; }
       if(f.kbRefl){ cx.save(); cx.globalAlpha=RM? 0.5 : 0.35+0.25*Math.sin(S.t*7); cx.strokeStyle='#FFD24A'; cx.lineWidth=2.5; cx.beginPath(); cx.arc(f.x,f.y-26,38,0,7); cx.stroke(); cx.restore(); }   // ARMED (§4 Q5)
-      drawSprite('bearnapartefoot',f.x,f.y-(fly?6:bob(26,f.kbWalk?5:4)),w,0,(fly?-0.28*L.fs*fl:(cut?-0.12:Math.sin(S.t*10+f.wob)*0.05*mv)),fi,wbk);
+      if(wd9){ const wr=14+(KB_WIND_R-14)*wq9; cx.save(); cx.strokeStyle='rgba(234,244,255,'+(0.4+0.5*wq9).toFixed(2)+')'; cx.lineWidth=2.4+2.2*wq9; cx.beginPath(); cx.ellipse(f.x,f.y+4,wr,wr*0.36,0,0,7); cx.stroke(); cx.strokeStyle='rgba(201,210,216,0.55)'; cx.lineWidth=1.2; cx.beginPath(); cx.ellipse(f.x,f.y+4,wr*0.62,wr*0.36*0.62,0,0,7); cx.stroke(); cx.restore();   // 0901 Card B P2a THE WIND-UP: the steel ring grows at his feet (the prance's dust ring in steel — drawn off the clock, no fx object; RM keeps it: it is information)
+        kbDrawSabre(f.x-wd9.fs*9, f.y-44, -wd9.fs*(0.85+0.75*wq9), 30+8*wq9); }   // ...the sabre drawn BACK over his shoulder, further as the wind grows (the rug sword's own steel, guard and tassel)
+      if(par9) kbDrawSabre(f.x+f.kbParFs*12, f.y-38, f.kbParFs*(2.0-0.9*pq9), 32);   // 0901 Card B P2c THE PARRY: his sabre beaten wide on the blade's side, coming back as the stagger fades
+      drawSprite('bearnapartefoot',f.x,f.y-(fly?6:bob(26,f.kbWalk?5:4)),w,0,(fly?-0.28*L.fs*fl:(cut?-0.12:(wd9? KB_WIND_LEAN*wd9.fs*fl*wq9 : (par9? 0.26*f.kbParFs*fl*pq9 : Math.sin(S.t*10+f.wob)*0.05*mv)))),fi,wbk);   // 0901 Card B: the wind leans him BACK off the target (the flight's forward lean reversed), the parry recoils him and settles
       if(fly && !RM){ const bx=-L.hx; cx.strokeStyle='rgba(234,244,255,0.55)'; cx.lineWidth=1.8; cx.lineCap='round'; cx.beginPath(); cx.moveTo(f.x+bx*16,f.y-32); cx.lineTo(f.x+bx*34,f.y-33); cx.stroke(); cx.beginPath(); cx.moveTo(f.x+bx*13,f.y-22); cx.lineTo(f.x+bx*31,f.y-23); cx.stroke(); cx.lineCap='butt'; }   // the 0517a speed lines
       return true; }
     if(t==='bearnaparte' && st==='snap'){ const q=1-Math.max(0,f.gnT)/0.8, lift=18*Math.sin(Math.PI*Math.min(1,q*1.15)); drawSprite('bearnapartefoot',f.x-fl*(10+26*q),f.y-lift,64,0.2*(1-q),0,tdImg('bearnapartefoot')||im,wbk); return true; }   // 0595 THE KEEL draws ONE bear — the king thrown clear of the rocker (the empty charger keels in its own fx); never the ridden horse beside a second figure (§4 Q1)
@@ -54011,6 +54055,11 @@ function drawTeddy(f,wbk){
 // start, bounces once and settles on its side; the dust ring blooms at the land (hashed seats, no dice); THE PATS' hearts rise as they always
 // did. Reduced motion: the stagger + a straight fade-to-prone (no bounce, no dust). The body is the crownless, sabreless mold — what leaves him
 // is drawn leaving. A mounted death (a guest's referee word) keels the charger beside him first, the shipped deflate's own clause.
+function kbDrawSabre(x,y,rot,len){   // 0901 Card B: the king's sabre as a drawn prop at any angle (the rug sword's own steel, white edge, gold guard and red tassel) — the hand at (x,y), rot 0 = the blade pointing up; draw-only
+  cx.save(); cx.translate(x,y); cx.rotate(rot); cx.lineCap='round';
+  cx.strokeStyle='#cfd6dd'; cx.lineWidth=3.2; cx.beginPath(); cx.moveTo(0,-4); cx.lineTo(0,-len); cx.stroke(); cx.strokeStyle='#fff'; cx.lineWidth=1.1; cx.beginPath(); cx.moveTo(0.6,-6); cx.lineTo(0.6,-(len-2)); cx.stroke();
+  cx.fillStyle='#E8C24A'; cx.fillRect(-4,-5,8,5); cx.strokeStyle='#C0473A'; cx.lineWidth=2; cx.beginPath(); cx.moveTo(-1,0); cx.quadraticCurveTo(-8,6,-6,12); cx.stroke(); cx.restore(); cx.lineCap='butt';
+}
 function kbCrownPath(s){ cx.save(); cx.scale(s,s); cx.fillStyle='#E8C24A'; cx.strokeStyle='#B8922E'; cx.lineWidth=1.3; cx.lineJoin='round'; cx.beginPath(); cx.moveTo(-13,0); cx.lineTo(-13,-11); cx.lineTo(-7,-5); cx.lineTo(0,-14); cx.lineTo(7,-5); cx.lineTo(13,-11); cx.lineTo(13,0); cx.closePath(); cx.fill(); cx.stroke();
   cx.fillStyle='#C0473A'; cx.beginPath(); cx.arc(-7,-5,1.6,0,7); cx.fill(); cx.beginPath(); cx.arc(7,-5,1.6,0,7); cx.fill(); cx.fillStyle='#4A8CA0'; cx.beginPath(); cx.arc(0,-13,1.8,0,7); cx.fill(); cx.restore(); }
 function kbHearts(e,k,ox){ if(k<=0.35) return; for(let i=0;i<5;i++){ const h=((i*2654435761)>>>0)%1000/1000, tt=(k*e.dur-0.9-i*0.3); if(tt<0||tt>1.6) continue; cx.globalAlpha=1-tt/1.6; cx.fillStyle='#C05A4A'; cx.save(); cx.translate(e.x+ox+(h-0.5)*40+Math.sin(tt*5)*8,e.y-50-22*tt); cx.scale(1.1,1.1);
@@ -90095,7 +90144,7 @@ window.GVT = {
   eb(){ const g=document.getElementById('ro-campaign'); const cols=[]; if(g) g.querySelectorAll('[fill],[stroke]').forEach(e=>{ for(const a of ['fill','stroke']){ const v=e.getAttribute(a); if(v && v!=='none') cols.push(v.toLowerCase()); } });
     return { cv:GVT_CV, on:efBoxOn(), camp:META.campaign|0, cols:[...new Set(cols)], n:g? g.querySelectorAll('*').length : 0, box:EF_BOX.length }; },   // 0656 Card G — the rig's one read (read-only): the crate's dress as painted + the gate
   od(){ const sw=sargeStats(); return { cv:GVT_CV, poncho:[OF_PONCHO_DEF,OF_PONCHO_RATE,OF_PONCHO_DODGE], boots:[OF_MBOOT_HP,OF_MBOOT_SPD], armor:[OF_MARMOR_HP,OF_MARMOR_SPD], legs:[OF_PJ_HP,OF_PJ_SPD], lens:['poncho','muskboots','muskarmor','pajamapants'].map(i=>i+' = '+lensLines2(i).join(' · ')), bag:{ ofHpX:sw.ofHpX||0, spdM:sw.spdM||1, defM:sw.defM||1, rate:sw.rate, cd:sw.cd, w:sw.w }, larson:{ hp:nemFluffGearHp(), kit:nemFluffDress({ aggro:100, cd:1 }) } }; },   // 0654 Card E — the rig's one read (read-only)
-  bb(){ return { cv:GVT_CV, stalk:KB_STALK_STOP, wallWalk:KB_WALL_WALK, track:KB_TRACK_STOP, sting:KB_STING_T, mwf:{ roy:KB_MWF_ROY, can:KB_MWF_CAN, hold:KB_MWF_HOLD, min:KB_MWF_MIN, max:KB_MWF_MAX, min2:KB_MWF_MIN2, max2:KB_MWF_MAX2 }, roy:{ first:KB_ROY_1ST, min:KB_ROY_MIN, max:KB_ROY_MAX, hold:KB_ROY_HOLD, file:KB_ROY_FILE, bat:KB_ROY_BAT }, rav:{ every:KB_RAV_EVERY, cd:KB_RAV_CD, rest:KB_REST, restF:KB_REST_F, hp:FDEF.bearnaparte.hp }, ka:{ cap:KB_PRICE_CAP, eye:KB_EYE_SABER, stag:KB_STAG_BLUE, side:KB_SIDE_HURL, orShv:TK_ORANGE_SHV, price:kbPriceX() }, river:(S.cfg&&S.cfg.terrain&&S.cfg.terrain.river)? { x:S.cfg.terrain.river.x, w:S.cfg.terrain.river.w, b:[S.cfg.terrain.river.bridgeY, S.cfg.terrain.river.bridgeY2==null? null : S.cfg.terrain.river.bridgeY2] } : null, court:FDEF.bearnaparte.court? 1 : 0, ann:{ smk:META.smkAnn|0, eb:META.ebAnn|0 }, footOwn:VD_FOOT.own, waves:(S.cfg && S.raid && S.raid.k==='fields')? S.cfg.waves.map(w9=>w9.name) : null, p2n:S.cfg? (S.cfg.p2n==null? null : S.cfg.p2n) : null }; },   // 0645 Card B — the rig's one read (read-only)
+  bb(){ return { cv:GVT_CV, stalk:KB_STALK_STOP, wallWalk:KB_WALL_WALK, track:KB_TRACK_STOP, sting:KB_STING_T, mwf:{ roy:KB_MWF_ROY, can:KB_MWF_CAN, hold:KB_MWF_HOLD, min:KB_MWF_MIN, max:KB_MWF_MAX, min2:KB_MWF_MIN2, max2:KB_MWF_MAX2 }, roy:{ first:KB_ROY_1ST, min:KB_ROY_MIN, max:KB_ROY_MAX, hold:KB_ROY_HOLD, file:KB_ROY_FILE, bat:KB_ROY_BAT }, rav:{ every:KB_RAV_EVERY, cd:KB_RAV_CD, rest:KB_REST, restF:KB_REST_F, hp:FDEF.bearnaparte.hp }, ka:{ cap:KB_PRICE_CAP, eye:KB_EYE_SABER, stag:KB_STAG_BLUE, side:KB_SIDE_HURL, orShv:TK_ORANGE_SHV, price:kbPriceX() }, kd:{ wind:KB_DASH_WIND, windR:KB_WIND_R, lean:KB_WIND_LEAN, pip:KB_CUT_PIP, once:KB_CUT_ONCE, stag:KB_PARRY_STAG, crit:KB_PARRY_CRIT, stop:KB_PARRY_STOP }, river:(S.cfg&&S.cfg.terrain&&S.cfg.terrain.river)? { x:S.cfg.terrain.river.x, w:S.cfg.terrain.river.w, b:[S.cfg.terrain.river.bridgeY, S.cfg.terrain.river.bridgeY2==null? null : S.cfg.terrain.river.bridgeY2] } : null, court:FDEF.bearnaparte.court? 1 : 0, ann:{ smk:META.smkAnn|0, eb:META.ebAnn|0 }, footOwn:VD_FOOT.own, waves:(S.cfg && S.raid && S.raid.k==='fields')? S.cfg.waves.map(w9=>w9.name) : null, p2n:S.cfg? (S.cfg.p2n==null? null : S.cfg.p2n) : null }; },   // 0645 Card B — the rig's one read (read-only)
   kc(){ const K=S.foes.find(f9=>f9.type==='bearnaparte'); const c=S.cfg||{}; return { priceX:(c.kbPX==null)? null : c.kbPX, coop:!!S.coop, launching:!!coopLaunching, campaign:META.campaign|0, king:K? { hp:+K.hp.toFixed(2), hpMax:K.hpMax, st:K.gnSt||null, life:K.kbLife|0, floor:K.retFloor==null? null : K.retFloor, fierce:K.kbFierce|0, chN:K.kbChN|0, rideT:+(K.kbRideT||0).toFixed(2), gate1:K.kbGate1|0, gate2:K.kbGate2|0, pr:+(K.dkPr||0).toFixed(2), said1:K.kbSaid1|0, footT:+(K.kbFootT||0).toFixed(2), lungeN:K.kbLungeN|0, wallN:K.kbWallN|0, wallT:+(K.cmdWallT||0).toFixed(2), wallCd:K.kbWallCd==null? null : +K.kbWallCd.toFixed(2), mwfN:K.kbMwfN|0, dead:K.dead?1:0 } : null, stamps:{ rv:PGRV, rk:PGRK, pv:PGPV, pk:PGPK }, raidOpen:raidSceneOpen(), raidCur:RAID_CUR }; },   // 0639 KING BEAR EARNS HIS CROWN — read-only: the price, the floors, the acts, the wall, the landing stamps
   fieldsGo(t){ RAID_CUR='fields'; startRaid(RAID_TIERS.indexOf(t)>=0? t : 'e'); return S.raid && S.raid.k; },   // the solo door exactly as UI.raidPlay drives it (the croakGo grammar; the battery's door — the gate is the scene's)
   fieldsState(){ const g=S.foes.find(f9=>f9.type==='bearnaparte'); const pr=((S.cfg&&S.cfg.terrain&&S.cfg.terrain.props)||[]).filter(p=>p.art==='pyramid');
