@@ -31336,6 +31336,20 @@ const CAMP_STRENGTH={ hpFrom:50, hpSlope:0.015, hpTo:100, hpPeak:65,
                       bossFrom:51, bossSlope:0.02, bossTo:100,
                       bossFrom2:66, bossSlope2:0.006,
                       rateFrom:50, rateSlope:0.006, rateFloor:0.78, rateTo:100 };
+// ===== 0903 CAMPAIGN BITES (FM-GVT-CAMPAIGN-BITES-01; jumpr 0703 - Wyatt 9/2, verbatim: "Regular campaign difficulty is still too easy.
+// Players are able to get to level 12 unchallenged by just spamming riflemen ... We need to adjust the numbers, especially for wave one: the
+// health of the big shot and the bosses. The speed of the bosses needs to be more of a challenge for players." - "Level 5-20 regular
+// campaign levels; tan army needs help. Still getting owned by unupgraded rifleman spam. Help the enemy Rifleman. Increase their range to be a
+// little better and their hp to be increased by 20%. Make the waves dial in faster by 20%"). THE TABLE - every seat one cell, his numbers
+// exact (rifleHpX 1.2 · gapX 0.8), the unnumbered levers dialed and measured (design/campaign-bites-0902/00-CAMPAIGN.md §2-§4):
+//   from..to       the band his 20 % rides (the tan rifleman's reach + hp, the drum) - 5..20 as he framed it; L1-4 and L21+ byte-still
+//   rifleRng       the tan rifleman's reach on the band (spawnFoe's 0520 seat: rngAdd = rifleRng - his row's 198; fires from a little farther)
+//   rifleHpX       his hp on the band, applied BEFORE the rounding ("hp increased by 20%" on his 2, never on a rounded 2 or 3)
+//   gapX           the ticker's gap on the band (sqGapFor; the alarm's HOLD and the floor at sqPushWave keep their own law)
+//   w1x, w1From..w1To  wave one lands x w1x on rungs 2-12 (the foot groups, escorts too; bosses, vehicles, the crawler sneaks and the tease's monster stand; L1 = the coach's six)
+//   bossHpX, bossSpdX, bossFrom..bossTo  the cycle bosses on 2-20: the piggy's and the rex's hp (the giant's row is x3 - cell 1), every one's pace (tease included); THEIR SARGE and the armor stand
+const CAMP_BITE={ from:5, to:20, rifleRng:218, rifleHpX:1.2, gapX:0.8, w1x:1.25, w1From:2, w1To:12,
+  bossHpX:{ rollpig:1.3, rex:1.3 }, bossSpdX:{ giant:1.2, rollpig:1.2, rex:1.2 }, bossFrom:2, bossTo:20 };
 function levelCfg(n){
   // v1.46 THE 80% CURVE (doc LAW D): the count knee (+0.12/lvl through L30,
   // +0.06 after — L100 fields 8.7x, not 12.9x), the hp ceiling (x6 — a plastic
@@ -32380,6 +32394,29 @@ function levelCfg(n){
     for(const g of w.groups){ if(g.wl){ delete g.wl; if(!g.elite) g.elite='wladyx'; } }   // 0478: THE LADIES' rotation resolves the same way — post-sort, post-cut, an authored elite never overwritten; L35's own (authored) waves carry no marker, the piece is her premiere
     if(w.wr){ delete w.wr; w.groups.push({f:'solo',t:'wrider',n:1,e:'right-top',at:0.8}); }
   }
+  // ===== 0903 CAMPAIGN BITES - THE BAND PASS (the CAMP_BITE table above is the whole dial). Post-build like every block above (after
+  // the crescendo sort, the seven-wave cut and every authored rung 1-100; zero R() consumed; fresh objects; every other rung and the
+  // elite ladder byte-identical - n<=100 alone, and each seat gated to its own band). Co-op: levelCfg is rebuilt per sim from the
+  // relayed level number, so every stamp below is per-sim by construction (no wire word).
+  if(n<=100){
+    const B=CAMP_BITE;
+    // C3 wave one on rungs w1From..w1To: more men (his "especially for wave one"; the number = the dial) - the drawn opener still opens
+    // light (the v1.46 x0.6 cut stands), this is the fight coming behind it. Bosses, vehicles, the crawler sneaks and a tease's monster stand; an escort rides.
+    if(n>=B.w1From && n<=B.w1To && cfg.waves[0]) for(const g of cfg.waves[0].groups){
+      if(g.f==='boss' || g.tease || (FDEF[g.t]&&(FDEF[g.t].vehicle||FDEF[g.t].low))){ if(g.escort) g.escort=Math.max(1,Math.round(g.escort*B.w1x)); continue; }   // the crawler sneaks are never sized (0663z Q8: a rifle line barely dents them - measured: x1.25 on L2's sneak cost the rifle-only kid an L2 loss in four)
+      g.n=Math.max(1,Math.round(g.n*B.w1x));
+    }
+    // C2 the cycle bosses on bossFrom..bossTo: the pace stamp on every carousel boss (spdx - spawnGroup's boss branch reads it into spdMul;
+    // the tease too: the same monster, lighter), the hp stamp on the piggy and the rex (hpX - post-curve, the L10 idiom; never on a tease)
+    if(n>=B.bossFrom && n<=B.bossTo) for(const w of cfg.waves) for(const g of w.groups){
+      if(g.f!=='boss') continue;
+      if(B.bossSpdX[g.t]) g.spdx=+((g.spdx||1)*B.bossSpdX[g.t]).toFixed(3);
+      if(B.bossHpX[g.t] && !g.tease) g.hpX=+((g.hpX||1)*B.bossHpX[g.t]).toFixed(3);
+    }
+    // C5 the tan rifleman on from..to: the reach (the 0520 seat) and the hp factor (spawnFoe's pre-rounding read) - every tan rifle the
+    // rung fields, escorts and the crate's sally columns included; the raids, the parks and the battleground carry no seat (identity)
+    if(n>=B.from && n<=B.to){ cfg.rifleRng=B.rifleRng; cfg.rifleHpX=B.rifleHpX; }
+  }
   // ===== 0497 ELITE FORCES I — THE CADENCE (D6), post-build like every block
   // above (after the sort and the seven-wave cut; zero R(); fresh objects;
   // every name a shipped key — BOSSDEF's own cards and THE LAST STAND's row).
@@ -32575,8 +32612,8 @@ const UDEF = {
   // that table's own), so campaign, battleground and every AI chair move
   // together. The price of the reach is THE ROOTED BURST (MG_ROOT, declared
   // beside MG_JEEP_BONUS): shooting PLANTS him for two whole seconds.
-  rifleman:{ rng:198, rate:1.15, dmg:1, air:true,  grit:3, name:'RIFLEMAN' },
-  mgunner: { rng:192, rate:4.5, dmg:1, air:false, grit:3, name:'M. GUNNER' },   // v2.51: 180→198. v2.53 (Wyatt 8/5): −3%, 198→192 — back under the rifleman's 198 (tanmg stays 161). His two matchups live in the damage funnels: MG_RIFLE_RESIST / MG_TANK_RESIST beside MG_JEEP_BONUS
+  rifleman:{ rng:198, rate:1.15, dmg:0.9, air:true,  grit:3, name:'RIFLEMAN' },   // 0903 CAMPAIGN BITES (Wyatt 9/2, verbatim: "reduce rifleman and machine gun damage by 30% by default" -> "Actually reduce by 10% default instead"): dmg 1 -> 0.9 at the base cell - the rank curve multiplies it, so every rank scales together; every carpet reads this row (the BF seats and the AI chairs included); the crit, MG_RIFLE_RESIST and the resists stand. A 2-hp tan rifleman is three rounds now, not two: the mix matters.
+  mgunner: { rng:192, rate:4.5, dmg:0.9, air:false, grit:3, name:'M. GUNNER' },   // 0903 CAMPAIGN BITES (Wyatt 9/2): dmg 1 -> 0.9 with the rifleman's (the same -10% "by default"); MG_JEEP_BONUS / MG_TANK_RESIST / ROOTED BURST stand. v2.51: 180→198. v2.53 (Wyatt 8/5): −3%, 198→192 — back under the rifleman's 198 (tanmg stays 161). His two matchups live in the damage funnels: MG_RIFLE_RESIST / MG_TANK_RESIST beside MG_JEEP_BONUS
   bazooka: { rng:208, rate:0.32, dmg:4, air:false, grit:3, splash:55, scatter:84, vx2:true, name:'BAZOOKA' },   // 0502 THE TUBE PASS (Wyatt 8/22: "Boost bazooka range by 20% in general"): 173 → 208 (×1.2 = 207.6, nearest whole px — the v2.35 rounding law). THE one reach cell the class reads on BOTH carpets (BF_MOVE carries no bazooka rng override; the v2.44 MG precedent): the trigger, the halt, the siege reach, the reach ring, the BF advance and the rig follow; the LONG TUBE's ×1.6 rides on top (332.8). The tan bazooka's 150 stands (⚑ 180)
   mortar:  { rng:9999, minRng:120, rate:0.2, dmg:1.5, air:false, grit:3, splash:60, scatter:98, name:'MORTAR' },   // 0502 THE TUBE PASS (Wyatt 8/22: "Nerf mortar damage in general by 50%"): dmg 3 → 1.5 — the ONE cell the green shell descends from on every carpet (the lob's dmg product × rank, the BF shell, the HARD copy, the reflect return, the rig); a 3-hp tan takes two shells now; the Prince fight's y20MortarF halving compounds to 0.75. The TAN mortar's shell never read this cell (a knock) — its half is TAN_MORTAR_F beside foeSplash. ⚑ 2 = a whole pip
   sarge:   { rng:108, rate:PISTOL_RATE, dmg:1.5, air:true,  grit:4, name:'SARGE' },
@@ -32764,7 +32801,7 @@ const FDEF = {
   // first-hundred row names it; buildSprites paints it TAN off the foe list, foeImg/the tint and rim buckets carry it.
   tankv2:  { hp:60, spd:Math.round(20*T2_SPD/CAMP_SPD.bftank*10)/10, bounty:100,leak:3, w:96, vehicle:true, v2:true },
   // ===== BOSSES: rare, huge, and each a different problem to solve =====
-  giant:   { hp:42, spd:23.4, bounty:70,  leak:5, w:104, rng:356, fireCd:3.85, boss:true },
+  giant:   { hp:126, spd:23.4, bounty:70,  leak:5, w:104, rng:356, fireCd:3.85, boss:true },   // 0903 CAMPAIGN BITES (FM-GVT-CAMPAIGN-BITES-01; Wyatt 9/2, verbatim: "The big one shouldn't get one-shotted by the sniper. It should take about five shots. I think we need to up the big one's health by about 200%"): hp 42 -> 126 (x3 TOTAL - the 9/2 convention: "200% extra" is x3); the ONE cell every reader inherits - L3 / L7's junior / L10's three (hpX 1.5 stacks) / L12 (the W1 tease at TEASE_HP of it) / L20's twins / L21 / L30 / the elite stamps; spd, reach and the drum stand (v2.51's -10% x3)
   // v2.53 THE ABOMINABLE SNOWMAN (Wyatt 8/5, the Ski Free yeti): a NEUTRAL
   // chaos monster — YETI_LEVELS rungs only, arrives on the clock, bounds
   // around the carpet like the mountain's own yeti and EATS both armies on
@@ -39793,7 +39830,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.72';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.73';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41673,11 +41710,12 @@ function sqGapFor(n){
   // is a chain of full battles now, not a standing mass. One const each.
   const base=SQ_GAP + Math.min((n|0)>=55?16:12, Math.max(0,(n|0)-8)*1.5);   // 0408: 20→16
   const late=((n|0)>=21)? CAMP_LATE_PACE : 1;
+  const bite=((n|0)>=CAMP_BITE.from && (n|0)<=CAMP_BITE.to)? CAMP_BITE.gapX : 1;   // 0903 CAMPAIGN BITES (Wyatt 9/2: "Make the waves dial in faster by 20%" on levels 5-20): the band's drum x gapX, after the bands, before the floor at sqPushWave; L1-4 and L21+ byte-still; the alarm's HOLD keeps its own law
   // tempo bands (doc LAW C): sprint rungs run a fast drum, siege rungs
   // breathe deeper — the wc half of the law lives in levelCfg.
-  if(campSprint(n)) return Math.max(14, base-9)*late;
-  if(campSiege(n))  return (base+3)*late;
-  return base*late;
+  if(campSprint(n)) return Math.max(14, base-9)*late*bite;
+  if(campSiege(n))  return (base+3)*late*bite;
+  return base*late*bite;
 }
 // ===== 0098 QUIET MERCY (Wyatt 7/30: "if someone keeps losing a level, it
 // should probably reduce the difficulty a little, slightly after a few
@@ -57419,7 +57457,8 @@ function spawnFoe(type,x,y,form,gu){
   // climbing to FULL growth across L30-L50 via cfg.bossF, doc LAW A2; battle
   // cfgs with no bossF — the battleground shell, rival raids — keep 0.5.)
   const hpm = (d.boss ? (1+(S.cfg.hpMul-1)*(S.cfg.bossF!=null?S.cfg.bossF:0.5)) : S.cfg.hpMul)*(S.cfg.hpX||1);   // 0520 THE MUSCLE (ELITE_STRENGTH.hpX, the elite ladder alone — "Elite forces need to have 2x hp"): the rung's whole army ×2 AFTER the boss curve, so a boss doubles exactly like his escort; every cfg without the seat is ×1 — byte-what-it-was
-  const f={ id:idc++, type, def:d, hp:Math.round(d.hp*hpm*(m.hp||1)), hpMax:Math.round(d.hp*hpm*(m.hp||1)),
+  const hpq=d.hp*hpm*(m.hp||1)*((type==='tanrifle' && S.cfg.rifleHpX>0)? S.cfg.rifleHpX : 1);   // 0903 CAMPAIGN BITES: the tan rifleman's band factor (levelCfg's CAMP_BITE pass, rungs 5-20) rides his row BEFORE the rounding - "hp increased by 20%" on his 2 (x hpMul), never on a rounded 2 or 3; every other type and every cfg without the seat: the identical product
+  const f={ id:idc++, type, def:d, hp:Math.round(hpq), hpMax:Math.round(hpq),
     x, y, vx:0, vy:0, wob:Math.random()*6.28,
     spdMul:(m.spd||1), fireMul:(m.fire||1)*(S.cfg.rateMul||1), bountyMul:(m.bounty||1),   // 8/11 LEVEL PASS 31-65: the deep-band trigger finger (CAMP_STRENGTH rate axis) — ||1 keeps every no-rateMul cfg byte-identical
     shot:(SHOT_SEED[type]||0), rammed:{}, form:form||null, off:null,
