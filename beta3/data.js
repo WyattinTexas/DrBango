@@ -332,6 +332,35 @@ for (const _id in SS_BEASTS) {
 }
 
 /* ============================================================
+   THE FRONTIER FLAGS (v0.77.0). Skylar (9/3): every mage who
+   finishes an endless run plants ONE flag at their best level —
+   their name across the cloth in a troop colour of their own
+   choosing — and a climber who reaches that level finds it
+   standing there: "oh hey, this player is over here." A new best
+   MOVES the flag; there is never a trail of old ones.
+   The ten jars are GVT's ARMIES troop colours, hex-exact (GVT's
+   elite camo is an earned-only side jar over there — left out on
+   purpose). Ink obeys the contrast law: navy on the pale cloths
+   (WHITE / TAN / GOLD), parchment on the rest — no name is ever
+   unreadable. The default is classic GREEN, the factory's own
+   army man. The flag itself is DRAWN art baked per colour
+   (ssFlagTex in game.js — setTint is a silent no-op under the
+   Canvas renderer, the lantern's own law).
+   ============================================================ */
+const SS_FLAG_COLORS = [
+  { id: 'green', hex: '#55793E' }, { id: 'tan', hex: '#C09E6C' },
+  { id: 'blue', hex: '#5B84C4' }, { id: 'red', hex: '#C05A4A' },
+  { id: 'gold', hex: '#D9A544' }, { id: 'black', hex: '#4A4A4A' },
+  { id: 'white', hex: '#E8E8E8' }, { id: 'purple', hex: '#8E6BAE' },
+  { id: 'orange', hex: '#D07A3A' }, { id: 'teal', hex: '#4AA5A0' },
+];
+const SS_FLAG_DEF = 'green';
+const SS_FLAG_BY = {};
+for (const _c of SS_FLAG_COLORS) SS_FLAG_BY[_c.id] = _c;
+// the contrast law: navy ink on the three pale cloths, parchment on the rest
+function SS_FLAG_INK(id) { return id === 'white' || id === 'tan' || id === 'gold' ? '#26281f' : '#f6ecd2'; }
+
+/* ============================================================
    THE SIGIL CADENCE (v0.65.0). Skylar (9/1): "Right now you're
    getting sigils too fast … maybe every two or three turns they
    should get a new sigil" — so a won fight no longer always pays

@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.76.0';
+const BUILD = 'STARSPELL v0.77.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -620,6 +620,11 @@ const SS = {
     p.endless.bestLevel = p.endless.bestLevel | 0;
     p.endless.bestScore = p.endless.bestScore | 0;
     p.endless.runs = p.endless.runs | 0;
+    /* THE FRONTIER FLAG's jar (v0.77.0) — the one colour this mage flies.
+       Every profile wakes holding the factory's classic green; an unknown
+       stored id (a future jar removed, a hand-edited profile) falls back
+       the same way rather than shipping an undrawable flag. */
+    p.flag = SS_FLAG_BY[p.flag] ? p.flag : SS_FLAG_DEF;
     return p;
   },
   save() { try { localStorage.setItem('beta3.profile', JSON.stringify(this.prof)); } catch (e) { } },
@@ -637,8 +642,10 @@ const SS = {
       // the grace in hand and the highest mark reached ride along too, so a
       // read of the synced profile tells the whole lantern, not half of it
       streakGrace: this.prof.streak.g, streakMark: this.prof.streak.mk,
-      // the endless climb's high-water marks (v0.68.0)
+      // the endless climb's high-water marks (v0.68.0) and the frontier
+      // flag's jar (v0.77.0) — the rating card reads both off this row
       endlessBest: this.prof.endless.bestLevel, endlessScore: this.prof.endless.bestScore,
+      flagColor: this.prof.flag,
     });
   },
   has(id) { return !!this.prof.ach[id]; },
@@ -3348,6 +3355,94 @@ function ssMedalTex(scene, tier) {
   return key;
 }
 
+/* ---- THE FRONTIER FLAG (v0.77.0) ----------------------------------------
+   Skylar's locked shape (REV C, 9/3, from his two reference photos): a
+   banner about 2:1 with the V-notch cut into the FLY edge only, SOLID
+   colour with nothing on it but the name, flying from the VERY TOP of a
+   LONG slim stick — a sliver of point above the cloth, the handle running
+   well below — with a gentle hand-placed tilt and a little star-ledge at
+   its foot. Baked per colour (ten GVT jars, SS_FLAG_COLORS) because
+   setTint is a silent no-op under the Canvas renderer — the lantern's own
+   law. Geometry lives in the mock's 260×236 box; consumed via
+   setDisplaySize (R-scaled texture rule). */
+function ssFlagTex(scene, colorId) {
+  const col = SS_FLAG_BY[colorId] ? colorId : SS_FLAG_DEF;
+  const key = 'flag-' + col;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(260 * R), Math.round(236 * R));
+  const c = t.context;
+  c.scale(R, R);
+  // the star-ledge and its shadow — the flag is PLANTED, never floating
+  c.fillStyle = 'rgba(0,0,0,0.35)';
+  c.beginPath(); c.ellipse(34, 222, 30, 6, 0, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.moveTo(12, 220); c.lineTo(56, 220); c.lineTo(48, 210); c.lineTo(20, 210); c.closePath();
+  c.fillStyle = '#242a4a'; c.fill();
+  c.lineWidth = 1; c.strokeStyle = '#3a4166'; c.stroke();
+  // the stick: long, slim, a bare point above where the cloth attaches
+  c.fillStyle = '#c9b676';
+  c.fillRect(30, 14, 5, 204);
+  c.fillStyle = 'rgba(255,255,255,0.3)';
+  c.fillRect(30, 14, 1.8, 204);
+  c.fillStyle = '#c9b676';
+  c.beginPath(); c.moveTo(30, 15); c.lineTo(35, 15); c.lineTo(32.5, 4); c.closePath(); c.fill();
+  // the banner at the top: ~2:1, fly-edge notch, the slight hand-placed lift
+  const banner = () => {
+    c.beginPath(); c.moveTo(36, 18); c.lineTo(226, 12); c.lineTo(201, 60);
+    c.lineTo(226, 108); c.lineTo(36, 114); c.closePath();
+  };
+  banner();
+  c.fillStyle = SS_FLAG_BY[col].hex; c.fill();
+  c.lineWidth = 2.4; c.lineJoin = 'round'; c.strokeStyle = 'rgba(6,8,18,0.5)'; c.stroke();
+  // a soft sheen so the cloth reads as paper, not a swatch
+  c.save();
+  banner(); c.clip();
+  const g = c.createLinearGradient(0, 12, 0, 114);
+  g.addColorStop(0, 'rgba(255,255,255,0.5)'); g.addColorStop(0.5, 'rgba(255,255,255,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.4)');
+  c.globalAlpha = 0.3; c.fillStyle = g; c.fillRect(0, 0, 260, 236);
+  c.restore();
+  t.refresh();
+  return key;
+}
+/* One planted flag, ready to stand anywhere: cloth in the owner's jar, the
+   NAME across it (the whole point of the moment is reading who stood here),
+   an optional gold level roundel below the banner. The returned container
+   is anchored at the LEDGE's ground point, so placing it is planting it.
+   The name sizes to the cloth then steps 12.5% down (Skylar's exact call);
+   ink follows the contrast law (SS_FLAG_INK). A tiny flag (a profile-row
+   mark) skips the unreadable name rather than shipping ant-print. */
+function ssFlag(scene, o) {
+  const l = ssLayout(scene);
+  const s = (o.w || 130) / 260;
+  const u = (n) => l.u(n * s);
+  const col = SS_FLAG_BY[o.color] ? o.color : SS_FLAG_DEF;
+  const c = scene.add.container(o.x || 0, o.y || 0);
+  c.add(scene.add.image(0, 0, ssFlagTex(scene, col)).setOrigin(34 / 260, 222 / 236)
+    .setDisplaySize(l.u(260 * s), l.u(236 * s)));
+  const name = String(o.name || '').toUpperCase();
+  const fs = Math.min(20, (136 / Math.max(4, name.length)) * 1.55) * 0.875;
+  if (name && fs * s >= 4.2) {
+    const nm = ssTxt(scene, u(117 - 34), u(66 - 222), name, l.u(fs * s), SS_FLAG_INK(col))
+      .setOrigin(0.5).setRotation(-0.035);
+    if (nm.width > u(178)) nm.setScale(u(178) / nm.width);
+    c.add(nm);
+  }
+  if (o.level && (o.w || 130) >= 60) {
+    const coin = scene.add.image(0, u(134 - 222), ssMedalTex(scene, 0)).setDisplaySize(u(36), u(36));
+    const lt = ssTxt(scene, 0, u(134 - 222), String(o.level), l.u((o.level > 99 ? 11.5 : 13.5) * s), SS_MEDAL_INK[0]).setOrigin(0.5);
+    lt.setShadow(0, 0, 'rgba(0,0,0,0)', 0);
+    c.add(coin); c.add(lt);
+  }
+  // alive, gently — the whole pick sways on a slow breath; paper doesn't
+  // ripple. Math.random on purpose: cosmetics never consume the seeded rng.
+  if (o.sway && !ssReduceMotion()) {
+    c.rotation = -0.012;
+    scene.tweens.add({ targets: c, rotation: 0.014, duration: 2600 + Math.random() * 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+  return c;
+}
+
 /* ---- sigil rarity dress ------------------------------------------------
    Three tiers, unmistakable at a glance: basic wears the house gold, rare a
    cool gem-blue frame with an icy glow, legendary a gold radiance with rays
@@ -4681,7 +4776,8 @@ function ssRatingCard(scene, o) {
   scene.tweens.add({ targets: veil, alpha: 0.6, duration: 180 });
   veil.on('pointerdown', () => { SFX.ui(); close(); });
   c.add(veil);
-  const PH = 250, py = (d) => l.y(400 - PH / 2 + d);
+  // 276 (was 250): the foot now seats the frontier flag row (v0.77.0)
+  const PH = 276, py = (d) => l.y(400 - PH / 2 + d);
   const items = [];
   // the window swallows its own taps so a press inside never hits the veil
   items.push(scene.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(300), l.u(PH)).setInteractive());
@@ -4692,9 +4788,10 @@ function ssRatingCard(scene, o) {
   items.push(scene.add.rectangle(l.x(0), py(60), l.u(240), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
   const body = scene.add.container(0, 0);
   items.push(body);
-  const fill = (rating, hidden) => {
+  const fill = (rating, hidden, fl) => {
     if (scene.__rcC !== c || !body.scene) return;
     if (hidden && !own) {
+      // veiled in starlight veils the WHOLE ledger: no rating, no flag, no level
       body.add(ssTxt(scene, l.x(0), py(118), '☾', l.u(30), '#5a6390').setOrigin(0.5).setAlpha(0.9));
       body.add(ssTxt(scene, l.x(0), py(160), SS_T('rHiddenCard'), l.u(12), '#8a94c4', 'italic').setOrigin(0.5));
       return;
@@ -4713,9 +4810,16 @@ function ssRatingCard(scene, o) {
     if (own && SS.prof.rhide) {
       body.add(ssTxt(scene, l.x(0), py(204), '☾ ' + SS_T('rYourVeil'), l.u(9), '#5a6390', 'italic').setOrigin(0.5));
     }
+    // the frontier flag at the card's foot (v0.77.0): the little flag in the
+    // owner's jar and how far it stands — shown for anyone unveiled who has
+    // ever finished an endless run, exactly the endless row's own law
+    if (fl && (fl.lv | 0) > 0) {
+      body.add(ssFlag(scene, { name: '', color: fl.color, w: 56, x: l.x(-100), y: py(258) }));
+      body.add(ssTxt(scene, l.x(-52), py(246), SS_T(own ? 'flagStands' : 'flagAt', fl.lv | 0), l.u(10.5), '#c9c3ae', 'italic').setOrigin(0, 0.5));
+    }
   };
-  if (own) fill(SS.prof.rating, SS.prof.rhide);
-  else if (o.rating != null || !o.uid) fill(Number.isFinite(o.rating) ? o.rating : SS_RATING.BASE, !!o.rhide);
+  if (own) fill(SS.prof.rating, SS.prof.rhide, SS.prof.endless.bestLevel > 0 ? { lv: SS.prof.endless.bestLevel, color: SS.prof.flag } : null);
+  else if (o.rating != null || !o.uid) fill(Number.isFinite(o.rating) ? o.rating : SS_RATING.BASE, !!o.rhide, null);
   else {
     const loadT = ssTxt(scene, l.x(0), py(130), SS_T('lbLoading'), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5);
     body.add(loadT);
@@ -4723,7 +4827,8 @@ function ssRatingCard(scene, o) {
       if (scene.__rcC !== c || !loadT.scene) return;
       loadT.destroy();
       if (p && p.name && !o.name && nm.active) nm.setText(p.name);
-      fill(p && Number.isFinite(p.rating) ? p.rating : SS_RATING.BASE, !!(p && p.rhide));
+      fill(p && Number.isFinite(p.rating) ? p.rating : SS_RATING.BASE, !!(p && p.rhide),
+        p && (p.endlessBest | 0) > 0 ? { lv: p.endlessBest | 0, color: p.flagColor || null } : null);
     });
   }
   c.add(items);
@@ -6762,6 +6867,24 @@ class Battle extends Phaser.Scene {
       this.eseed = this.resume && Number.isFinite(this.resume.eseed) ? this.resume.eseed : Math.floor(Math.random() * 1e9);
       this.fights = ssEndlessFights(this.eseed, SS_ENDLESS.horizon);
       planSeed = this.eseed;
+      /* THE FRONTIER FLAGS (v0.77.0): the ledger is read ONCE, at climb
+         start/resume — never per level, never polled mid-battle. Real
+         players only (getFlags filters the seeded hunters), the veiled
+         gone (their stats are veiled; the flag is a stat), own row out
+         (the local profile is fresher and draws the own flag itself).
+         A late arrival dresses the standing level and rings any beat the
+         entry already earned; the sequence token keeps a slow read from
+         landing on a restarted scene's state. */
+      this.flagRows = null;
+      this.flagMine = null;
+      const fseq = this.flagSeq = (this.flagSeq | 0) + 1;
+      SSNET.getFlags().then((rows) => {
+        if (this.flagSeq !== fseq || this.mode !== 'endless' || !this.flagC || !this.flagC.scene) return;
+        this.flagRows = rows.filter((r) => !r.veiled && r.id !== SSNET.uid());
+        if (this.state === 'end') return;
+        this.plantFlags(true);
+        this.flagBeats();
+      }).catch(() => { });
     } else {
       const pool = [...SS_QUICK_POOL];
       for (let i = 0; i < 4; i++) this.fights.push({ id: pool.splice(Math.floor(rng() * pool.length), 1)[0], actIdx: 0, mult: 1 + i * 0.12, atkAdd: Math.floor(i / 2), umbral: false });
@@ -6781,7 +6904,10 @@ class Battle extends Phaser.Scene {
       letters: this.resume.letters | 0, bigHit: this.resume.bigHit | 0,
       playMs: ssClockInherit(this.resume, this.mode === 'endless' ? 'beta3.endless' : 'beta3.campaign'),
       overkill: this.resume.overkill | 0, tiers: this.resume.tiers || {},
-    } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0, overkill: 0, tiers: {} };
+      // the flag beats already rung this climb (v0.77.0) — a resumed climb
+      // re-reads the ledger but never repeats a ceremony
+      fpassLv: this.resume.fpassLv | 0, ffront: !!this.resume.ffront,
+    } : { fightIdx: 0, hpMax: 50, hp: 50, sigils: [], words: 0, longest: '', totalDmg: 0, scried: false, featherUsed: false, letters: 0, bigHit: 0, playMs: 0, overkill: 0, tiers: {}, fpassLv: 0, ffront: false };
     this.clockLast = 0;   // the active-play heartbeat's last stamp — 0 until the first update ticks
     this.run.firstUsed = false;
     // the birth sign — the campaign's and the endless climb's, each pinned
@@ -6980,6 +7106,10 @@ class Battle extends Phaser.Scene {
     this.hpBar = this.add.image(l.x(-150), l.y(68), 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(250), l.u(9));
     this.hpT = txt(l.x(190), l.y(68), '', 12).setOrigin(1, 0.5);
 
+    // the frontier flags' ground (v0.77.0): built just under the beast so a
+    // planted flag stands IN the sky, never over the constellation's face —
+    // and never interactive, so it cannot eat a tap
+    this.flagC = this.add.container(0, 0);
     this.beastC = this.add.container(l.x(0), l.y(170));
     this.beastNameI = null;   // gold nameplate image, built per beast in setBeastName
     this.beastTitle = txt(l.x(0), l.y(301), '', 10, '#8a94c4').setOrigin(0.5).setLetterSpacing(l.u(2));
@@ -7845,6 +7975,11 @@ class Battle extends Phaser.Scene {
     // presence + attack fx (aura, idle, shimmer, telegraph, signature strikes);
     // it also owns the body's breathing, so no more breathTween here
     this.beastFx = ssBeastFx(this, this.beastC, this.beast, l.u(1.15), asm);
+    // the frontier flags stand at the level's own beat (v0.77.0): whoever's
+    // best this rung is, their flag is HERE — and entering the level above a
+    // flag rings its pass ceremony, the frontier's the biggest of all
+    this.plantFlags();
+    this.flagBeats();
 
     this.sel = [];
     for (const s of this.board) if (s) s.c.destroy();
@@ -8244,6 +8379,9 @@ class Battle extends Phaser.Scene {
         letters: this.run.letters, bigHit: this.run.bigHit, playMs: this.runElapsed(),
         overkill: this.run.overkill | 0, eseed: this.eseed, clockV: 2,
         hard: this.hard ? 1 : undefined,
+        // the flag ceremonies already rung (v0.77.0): a resumed climb never
+        // repeats a pass beat or takes the frontier twice
+        fpassLv: this.run.fpassLv | 0, ffront: this.run.ffront ? 1 : undefined,
       }));
       return;
     }
@@ -8266,6 +8404,138 @@ class Battle extends Phaser.Scene {
     this.fights = ssEndlessFights(this.eseed, this.fights.length + SS_ENDLESS.horizon);
     this.sigPlan = ssSigilPlan(this.mode, this.fights, this.eseed, this.hard);
     this.sigTypes = ssOfferTypes(this.mode, this.sigPlan, this.eseed);
+  }
+  /* ---- THE FRONTIER FLAGS in the climb (v0.77.0, Skylar 9/3) --------------
+     "We want players to have an iconic moment if they pass a flag of
+     another player, to be like, 'Oh, hey, this player is over here.' They
+     see their flag and they see their name."
+     plantFlags dresses the CURRENT level: every rival flag standing at
+     exactly this rung (fetched once at climb start — this.flagRows), plus
+     your own — at your standing best when you climb back to it, riding
+     with you once you're past it (the level you're on IS your best-so-far;
+     the reckoning writes it down at the fall). Up to three fly legibly
+     fanned; more say so on a small ledge mark. Flags live in flagC (under
+     the beast, over the sky), are never interactive, and are torn down and
+     re-planted at every startFight — the same lifecycle as the beast fx. */
+  plantFlags(late) {
+    if (this.mode !== 'endless' || !this.flagC || !this.flagC.scene) return;
+    const l = this.L;
+    for (const ch of this.flagC.list.slice()) this.tweens.killTweensOf(ch);
+    this.flagC.removeAll(true);
+    this.flagMine = null;
+    const L = this.run.fightIdx + 1;
+    const rows = this.flagRows || [];
+    const here = rows.filter((r) => r.level === L);
+    const best = SS.prof.endless.bestLevel | 0;
+    const mine = best > 0 && L >= best ? { name: SSNET.myName(), color: SS.prof.flag, mine: true } : null;
+    const fly = mine ? [mine, ...here] : here.slice();
+    const drawn = fly.slice(0, 3);
+    const more = fly.length - drawn.length;
+    // the fan: the lead flag full-size, the others tucked behind its shoulder
+    const spots = [{ x: -140, y: 292, w: 126 }, { x: -178, y: 300, w: 96 }, { x: -100, y: 302, w: 84 }];
+    const red = ssReduceMotion();
+    for (let i = drawn.length - 1; i >= 0; i--) {   // back-to-front: the lead lands on top
+      const f = drawn[i], sp = spots[i];
+      const c = ssFlag(this, { name: f.name, color: f.color, w: sp.w, x: l.x(sp.x), y: l.y(sp.y), sway: true });
+      if (i > 0) c.setAlpha(0.92);
+      this.flagC.add(c);
+      if (f.mine) this.flagMine = c;
+      const a = c.alpha;
+      c.setAlpha(0);
+      if (red) this.tweens.add({ targets: c, alpha: a, duration: 400, delay: 300 + i * 120 });
+      else {
+        c.y += l.u(10);
+        this.tweens.add({ targets: c, alpha: a, y: '-=' + l.u(10), duration: 520, delay: 380 + i * 140, ease: 'Cubic.easeOut' });
+      }
+    }
+    if (more > 0) {
+      const mt = ssTxt(this, l.x(-108), l.y(283), '+' + more, l.u(8.5), '#c9b676', 'italic').setOrigin(0, 0.5).setAlpha(0);
+      this.flagC.add(mt);
+      this.tweens.add({ targets: mt, alpha: 0.9, duration: 400, delay: 700 });
+    }
+    window.__ssflags = Object.assign(window.__ssflags || {}, {
+      level: L, rows: rows.length, drawn: drawn.length, more, late: !!late,
+      names: drawn.map((f) => f.name), mine: !!mine,
+    });
+  }
+  /* Entering the level ABOVE a flag passes it — a quiet gold line names its
+     owner, once per climb per rung (fpassLv rides the checkpoint so a
+     resumed climb never re-rings). Passing the HIGHEST flag in the sky while
+     it stood at or above your own best is THE FRONTIER: the big beat — your
+     flag plants above theirs, the next climber finds it up there. The passed
+     flag takes one last bow (faded, sinking) unless this rung has flags of
+     its own standing. */
+  flagBeats() {
+    if (this.mode !== 'endless' || !this.flagC || !this.flagC.scene || this.state === 'end') return;
+    const l = this.L;
+    const L = this.run.fightIdx + 1;
+    const rows = this.flagRows || [];
+    const passedLv = L - 1;
+    if (passedLv < 1 || passedLv <= (this.run.fpassLv | 0)) return;
+    const passed = rows.filter((r) => r.level === passedLv);
+    if (!passed.length) return;
+    this.run.fpassLv = passedLv;
+    const frontLv = rows.reduce((m, r) => Math.max(m, r.level), 0);
+    const best = SS.prof.endless.bestLevel | 0;
+    const front = !this.run.ffront && passedLv === frontLv && best <= frontLv;
+    if (front) this.run.ffront = true;
+    this.saveCheckpoint();   // the ceremony is spent the moment it rings — a mid-fight kill must not replay it
+    const top = passed[0];
+    const red = ssReduceMotion();
+    // the passed flag's last bow — tucked lower and to the side so the own
+    // flag planting above it reads as exactly that, never a sandwich
+    if (!rows.some((r) => r.level === L)) {
+      const pf = ssFlag(this, { name: top.name, color: top.color, w: 90, x: l.x(-172), y: l.y(310) });
+      pf.setAlpha(0);
+      this.flagC.add(pf);
+      this.tweens.add({ targets: pf, alpha: 0.5, duration: 420 });
+      this.tweens.add({
+        targets: pf, y: '+=' + l.u(22), alpha: 0, duration: red ? 600 : 2200, delay: 1700,
+        ease: 'Sine.easeIn', onComplete: () => { if (pf.scene) pf.destroy(); },
+      });
+    }
+    // the lines, floating in the open sky band under the vitals
+    const main = front ? SS_T('flagFront')
+      : passed.length > 1 ? SS_T('flagPassMore', top.name, passed.length - 1) : SS_T('flagPass', top.name);
+    const sub = front ? SS_T('flagFrontSub', top.name, L) : SS_T('flagPassSub', passedLv);
+    const beat = [];
+    if (front) {
+      const g = this.add.image(l.x(0), l.y(100), 'glowbig').setDisplaySize(l.u(300), l.u(120))
+        .setTint(0xffd77a).setAlpha(0).setBlendMode('ADD').setDepth(59);
+      beat.push(g);
+      this.tweens.add({ targets: g, alpha: 0.3, duration: 500, yoyo: true, hold: 1400 });
+    }
+    const mT = ssTxt(this, l.x(0), l.y(96), main, l.u(front ? 15 : 12.5), front ? '#ffe9a8' : '#e8c86a', 'italic')
+      .setOrigin(0.5).setDepth(60).setShadow(0, 0, '#c9a94f', l.u(front ? 10 : 7), true, true).setAlpha(0);
+    if (mT.width > l.u(392)) mT.setScale(l.u(392) / mT.width);
+    const sT = ssTxt(this, l.x(0), l.y(front ? 118 : 114), sub, l.u(9.5), '#8a94c4', 'italic')
+      .setOrigin(0.5).setDepth(60).setAlpha(0);
+    if (sT.width > l.u(392)) sT.setScale(l.u(392) / sT.width);
+    beat.push(mT, sT);
+    this.tweens.add({ targets: [mT, sT], alpha: 1, duration: 450, delay: 250 });
+    this.tweens.add({
+      targets: beat, alpha: 0, duration: 600, delay: front ? 4200 : 3300,
+      onComplete: () => beat.forEach((b) => { if (b.scene) b.destroy(); }),
+    });
+    if (front) SFX.sigil(); else SFX.chime(5);
+    // your own flag plants above the one you just passed — with its beat
+    if (this.flagMine) {
+      const m = this.flagMine;
+      this.tweens.killTweensOf(m);
+      m.setAlpha(1);
+      if (!red) {
+        const my = l.y(292);
+        m.y = my - l.u(30);
+        this.tweens.add({ targets: m, y: my, duration: 620, delay: 350, ease: 'Back.easeOut' });
+      }
+      if (this.starBurst) this.time.delayedCall(red ? 400 : 950, () => {
+        if (m.scene && this.starBurst) this.starBurst.emitParticleAt(m.x, m.y - l.u(46), front ? 22 : 10);
+      });
+    }
+    window.__ssflags = Object.assign(window.__ssflags || {}, {
+      passes: ((window.__ssflags || {}).passes | 0) + 1, front: !!front || !!(window.__ssflags || {}).front,
+      beat: main, beatSub: sub, passedLv,
+    });
   }
   runElapsed() { return this.run.playMs | 0; }
 
@@ -8945,7 +9215,10 @@ class Battle extends Phaser.Scene {
     // weekly takes any run; campaign still only when the whole climb is won).
     // An endless fall lands on the ENDLESS board — level first, score the
     // tiebreak — and its score joins the weekly like any other run's.
-    if (isEnd) SSNET.submitEndless(level, score, this.run.longest);
+    // the row carries the flag's dress too (v0.77.0): the jar this mage
+    // flies and whether their stats are veiled — the climb's flag ledger
+    // reads both straight off the board row, no second fetch
+    if (isEnd) SSNET.submitEndless(level, score, this.run.longest, SS.prof.flag, !!SS.prof.rhide);
     if (this.mode !== 'campaign' || won) SSNET.submitScore(score, this.run.longest, PACK.lang, this.mode, this.hard);
     // a campaign hard CLEAR also lands on the hard board (v0.70.0) — the
     // all-time ledger of everyone who beat the mountain with the clock on
@@ -9312,7 +9585,11 @@ class Profile extends Phaser.Scene {
     const veilT = ssTxt(this, l.x(0), l.y(156), '', l.u(8.5), '#5a6390', 'italic').setOrigin(0.5).setInteractive({ useHandCursor: true });
     const dressVeil = () => veilT.setText(SS_T('rVeilRow') + ':  ' + (SS.prof.rhide ? '☾ ' + SS_T('rVeiled') : '✦ ' + SS_T('rShown')));
     dressVeil();
-    veilT.on('pointerdown', () => { SFX.ui(); SS.prof.rhide = !SS.prof.rhide; SS.save(); SS.sync(); dressVeil(); });
+    veilT.on('pointerdown', () => {
+      SFX.ui(); SS.prof.rhide = !SS.prof.rhide; SS.save(); SS.sync(); dressVeil();
+      // the veil covers the flag too (v0.77.0): the standing row follows at once
+      SSNET.dressFlag(SS.prof.flag, !!SS.prof.rhide);
+    });
 
     /* THE DOOR TO THE NIGHT'S FINEST (v0.52.0, Wyatt 8/25): the leaderboard
        left the meadow's column and lives here, right under your standing —
@@ -9333,8 +9610,9 @@ class Profile extends Phaser.Scene {
       ['words woven', p.words], ['finest word', p.longest ? p.longest.toUpperCase() : '—'],
       ['mightiest hit', p.bigHit || '—'], ['best quick play', p.bestQuick || '—'],
       // the endless climb's high-water mark (v0.68.0): level first, the
-      // score beside it — the same order the endless board ranks by
-      ['endless climb', p.endless.bestLevel ? SS_T('endLvlShort', p.endless.bestLevel) + ' · ' + p.endless.bestScore : '—'],
+      // score beside it — the same order the endless board ranks by. Once a
+      // flag stands the row is the door to it (v0.77.0), and says so.
+      ['endless climb', p.endless.bestLevel ? SS_T('endLvlShort', p.endless.bestLevel) + ' · ' + p.endless.bestScore + '  ›' : '—'],
       ['versus victories', p.vsWins || '—'],
     ];
     // 21 apart now (23 before the endless row, 26 before the leaderboard's
@@ -9345,6 +9623,20 @@ class Profile extends Phaser.Scene {
       ssTxt(this, l.x(-150), y, k, l.u(13), '#8a94c4').setOrigin(0, 0.5);
       ssTxt(this, l.x(150), y, String(v), l.u(13), '#f0e8d2').setOrigin(1, 0.5);
     });
+    /* THE FRONTIER FLAG's door (v0.77.0, Skylar 9/3): endless ever played ⇒
+       the row wears the little flag in your jar and opens the flag sheet —
+       the big flag, how far it stands, and the ten troop-colour jars. The
+       packed grid takes a dressed row over a fourteenth full-width one (the
+       v0.70 layout judge's law). No flag yet ⇒ the row stays a plain stat. */
+    this.flagP = null;
+    this.rowFlag = null;
+    if (p.endless.bestLevel > 0) {
+      const fy = l.y(205 + 7 * 21);
+      this.rowFlag = ssFlag(this, { name: '', color: p.flag, w: 30, x: l.x(-44), y: fy + l.u(10) });
+      const fz = this.add.zone(l.x(0), fy, l.u(360), l.u(21)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      fz.setData('flagRow', 1);
+      fz.on('pointerdown', () => this.flagSheet());
+    }
 
     // the zodiac strip: every campaign sign, burning gold once cleared under.
     // Cleared glyphs wear their element color's glow; the rest hang dim.
@@ -9424,6 +9716,83 @@ class Profile extends Phaser.Scene {
     });
 
     ssTxt(this, l.x(0), l.y(784), 'seal: ' + SSNET.uid().slice(0, 12) + ' · ' + (SSNET.mode === 'local' ? 'offline' : 'synced'), l.u(9), '#39406b').setOrigin(0.5);
+  }
+  /* ---------- THE FLAG SHEET (v0.77.0, Skylar 9/3) ----------
+     "Allow the player in the character's profile screen to change the color
+     of their flag. They can choose from all of the GVT colors of troops."
+     The big flag in your jar with your name across it, how far it stands,
+     and the ten troop-colour jars — tap one and the flag repaints LIVE:
+     persisted, synced, and redressed onto the standing board row so every
+     other climber's sky repaints too (SSNET.dressFlag). langSheet pattern:
+     veil + ✕ close, ref nulled at create (stale-ref law). Zones stay OUT of
+     the entrance tween — a Zone has no alpha and detaches from its cell. */
+  flagSheet() {
+    if (this.flagP || this.skiesP) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.flagP = this.add.container(0, 0).setDepth(700);
+    const close = () => { if (this.flagP !== c) return; this.flagP = null; c.destroy(); };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    c.add(veil);
+    const PH = 470, py = (d) => l.y(400 - PH / 2 + d);
+    const items = [];
+    items.push(this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(336), l.u(PH)).setInteractive());
+    const xB = ssTxt(this, l.x(146), py(28), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); close(); });
+    items.push(xB);
+    const tk = ssGoldTex(this, SS_T('flagTitle'), 17);
+    const tsc = Math.min(1, 280 / tk.w);
+    items.push(this.add.image(l.x(0), py(46), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    items.push(ssTxt(this, l.x(0), py(296), SS_T('flagStands', SS.prof.endless.bestLevel), l.u(11.5), '#c9c3ae', 'italic').setOrigin(0.5));
+    items.push(ssTxt(this, l.x(0), py(326), '— ' + SS_T('flagJars') + ' —', l.u(10.5), '#c9b676').setOrigin(0.5));
+    // the ten jars, 48 apart so every padded 44-pt hit stands on its own
+    const ring = this.add.circle(0, 0, l.u(19)).setStrokeStyle(Math.max(1, l.u(2)), 0xffe9a8, 1);
+    const jarXY = (i) => ({ x: l.x(-96 + (i % 5) * 48), y: py(358 + Math.floor(i / 5) * 48) });
+    const zones = [];
+    SS_FLAG_COLORS.forEach((jc, i) => {
+      const { x, y } = jarXY(i);
+      items.push(this.add.circle(x, y, l.u(15), parseInt(jc.hex.slice(1), 16))
+        .setStrokeStyle(Math.max(1, l.u(1)), 0x242a4a, 1));
+      const z = this.add.zone(x, y, l.u(40), l.u(40)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      z.setData('flagJar', jc.id);
+      z.on('pointerdown', () => {
+        if (SS.prof.flag === jc.id) return;
+        SFX.ui();
+        SS.prof.flag = jc.id;
+        SS.save(); SS.sync();
+        SSNET.dressFlag(jc.id, !!SS.prof.rhide);   // the standing row repaints for every climber's sky
+        ring.setPosition(x, y);
+        plant();
+        if (this.rowFlag && this.rowFlag.scene) {  // the profile row's little flag follows
+          const rx = this.rowFlag.x, ry = this.rowFlag.y;
+          this.rowFlag.destroy();
+          this.rowFlag = ssFlag(this, { name: '', color: jc.id, w: 30, x: rx, y: ry });
+        }
+      });
+      zones.push(z);
+      if (SS.prof.flag === jc.id) ring.setPosition(x, y);
+    });
+    items.push(ring);
+    items.push(ssTxt(this, l.x(0), py(446), SS_T('flagJarsHint'), l.u(9), '#5a6390', 'italic').setOrigin(0.5));
+    c.add(items);
+    /* Display order is the law here (topOnly input hands taps to the TOPMOST
+       object — the v0.70 lesson): the interactive win panel went in first,
+       so the flag and the jar zones must land AFTER it or the panel both
+       hides the cloth and eats every jar tap. */
+    let flag = null;
+    const plant = () => {
+      if (flag && flag.scene) { this.tweens.killTweensOf(flag); flag.destroy(); }
+      flag = ssFlag(this, { name: SSNET.myName(), color: SS.prof.flag, level: SS.prof.endless.bestLevel, w: 190, x: l.x(-64), y: py(268), sway: true });
+      flag.setAlpha(0);
+      this.tweens.add({ targets: flag, alpha: 1, duration: 260 });
+      c.add(flag);
+    };
+    plant();
+    zones.forEach((z) => c.add(z));
+    items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
   }
   editName(l) {
     SFX.ui();

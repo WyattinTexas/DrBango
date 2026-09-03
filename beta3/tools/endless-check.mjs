@@ -417,8 +417,9 @@ ok('home again with no reload — the door already speaks the high score',
 await tapUntil(`${H}.profileChip`, `!!game.scene.getScene('profile') && game.scene.getScene('profile').sys.isActive()`);
 await until(`game.scene.getScene('profile') && game.scene.getScene('profile').sys.isActive()`, 20000);
 await sleep(1200);
+// v0.77.0: once a flag stands the row is the flag sheet's door and says so ('  ›')
 ok('the profile ledger reads the endless high-water mark', await ev(`(() => { const p = game.scene.getScene('profile');
-  let hit = false; p.children.list.forEach((o) => { if (o.text === SS_T('endLvlShort', SS.prof.endless.bestLevel) + ' · ' + SS.prof.endless.bestScore) hit = true; });
+  let hit = false; p.children.list.forEach((o) => { if (o.text === SS_T('endLvlShort', SS.prof.endless.bestLevel) + ' · ' + SS.prof.endless.bestScore + '  ›') hit = true; });
   return hit })()`));
 ok('…and the 25-deep achievement grid holds the climb\'s rungs above the seal', await evj(`(() => { const p = game.scene.getScene('profile');
   let ten = null, seal = null; p.children.list.forEach((o) => { if (o.text === 'TEN RUNGS UP') ten = o.y; if (o.text && /^seal:/.test(o.text)) seal = o.y; });

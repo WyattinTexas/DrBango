@@ -1,6 +1,76 @@
 # beta3 dev tools
 
-Thirty-one scripts, all dev-only — nothing here ships to the browser.
+Thirty-two scripts, all dev-only — nothing here ships to the browser.
+
+## flag-check.mjs — the endless frontier flags (v0.77.0)
+
+Skylar's call (9/3): every mage who finishes an endless run plants ONE flag
+at their best level — their name across the cloth in a troop colour of
+their choosing — and a climber who reaches that rung finds it standing
+there ("oh hey, this player is over here"); passing it rings a ceremony,
+passing the HIGHEST flag takes the frontier. The game side: SS_FLAG_COLORS
+(data.js) is the ten-jar GVT ARMIES roster hex-exact (camo excluded,
+default classic green, contrast ink law — navy on white/tan/gold,
+parchment on the rest); the flag is DRAWN art baked per colour
+(`ssFlagTex`/`ssFlag`, game.js — REV C shape: ~2:1 banner, fly-edge
+V-notch, the cloth at the very top of a long stick, star-ledge foot;
+never setTint, the Canvas law). `prof.flag` persists, syncs (flagColor on
+players/{uid}) and rides the endless board row (`submitEndless` c/v;
+`SSNET.dressFlag` redresses the standing row on a jar pick or veil flip;
+`SSNET.getFlags` is the ONE read at climb start — raw endless/all, sg_
+filtered: the flags are real players only, so `?ghosts=0` has nothing to
+sweep). In the climb (`Battle.plantFlags`/`flagBeats`): rival flags stand
+at exactly their level in the left sky band (never interactive, fanned ≤3
+with a '+N' ledge mark), the own flag stands at the standing best and
+rides with the climber past it, pass beats ring once per climb per rung
+(`run.fpassLv`/`ffront` ride the checkpoint so a resume never re-rings),
+and the frontier's big beat (SFX.sigil, glow, the passed flag bowing out
+lower-left) fires when the highest flag falls while it stood at or above
+the own best. Veiled mages (`prof.rhide`): the row carries `v:1`, the
+climb-side filter drops them (their flag stands NOWHERE in others'
+climbs), the rating card shows them nothing — and everything to
+themselves. Profile: the endless row wears the little flag + '  ›' and
+opens the flag sheet (big flag with name + gold level roundel, ten 44-pt
+jar zones 48 apart; the win panel is interactive so the flag and the
+zones are added AFTER `c.add(items)` — the v0.70 topOnly law, learned
+here again the hard way). The rating card grew 250→276 to seat the flag
+row at its foot.
+
+Self-launching (server :8899 if nothing serves, Chrome on :9477,
+`/tmp/cdp-flag` wiped first, `--disable-gpu`), Firebase blocked at the
+network layer (local sky — no cleanup owed), real DPR-3 taps, every wait
+a poll; `SHOTS=<dir>` keeps screenshots.
+
+```
+perl -e 'alarm 580; exec @ARGV' node tools/flag-check.mjs   # 69 checks, ~4.5 min
+```
+
+The paper (release ritual, the ten hexes exact vs the GVT roster, the
+default, the ink law, no setTint near the flag fns, the c/v/dressFlag/
+getFlags plumbing, flagColor in the sync payload, the one-read law, the
+checkpoint fields, all ten strings ×5 tongues with slots); the ledger (a
+first completed run plants the flag with the factory jar + this mage's
+name, a better run MOVES it — one row ever — a worse run never lowers
+it); the climb (the rival sky seeded through the real channel, Velvet
+Fox's blue flag standing AT level 2 with the name across it, the veiled
+row standing nowhere, the two-flag fan + the own flag at the standing
+best, the pass beat naming its owner exactly once per climb, the seeded
+sg_ row planting nothing and ringing nothing, the frontier flag standing
+highest, THE FRONTIER IS YOURS on passing it, fpassLv/ffront riding the
+checkpoint through a real reload — zero re-rings — and the fall planting
+the flag above the old record for the next climber); the veil on the row
+(v stamped by a veiled reckoning, reported by getFlags); the profile (the
+row's little flag + 44-pt door by real taps, the sheet's big flag with
+cloth name + roundel, ten 44-pt jars, a real tap on the red jar
+repainting sheet + row LIVE and reaching both the synced profile and the
+standing board row, persistence across a reload); the rating card (an
+unveiled mage's flag + level at the card's foot, a veiled mage showing
+NOTHING, the own card never veiled from itself, a board ghost's card
+carrying no flag); the Spanish dress (the pass beat + sheet words).
+
+⚠ Suite law reminder (9/3): its bare boots seed `beta3.skipIntro` in
+boot()/reboot() — the v0.75 first-open tutorial fires under any virgin
+boot that forgets.
 
 ## tap-sign-check.mjs — tappable sky signs: the horse rears (v0.76.0)
 

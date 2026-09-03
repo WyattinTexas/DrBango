@@ -394,17 +394,58 @@ const SSNET = (() => {
      all-time board the tab shows; a weekly slice rides along under
      `endless/<isoWeek>` (pruned like the weeklies) so a living
      this-week's-climbs tab is one read away if it is ever wanted. */
-  async function submitEndless(level, score, finestWord) {
+  async function submitEndless(level, score, finestWord, color, veiled) {
     level = level | 0; score = score | 0;
+    // the frontier flag rides the row (v0.77.0): `c` is the jar the owner
+    // chose, `v` marks a stats-veiled owner (their flag stands nowhere in
+    // other people's climbs) — both redressed live by dressFlag when the
+    // profile changes them, and refreshed here whether or not the run beat
+    // the standing row (a colour change should never need a better climb)
     const rec = (cur) => {
-      if (cur && ((cur.lvl | 0) > level || ((cur.lvl | 0) === level && (cur.score | 0) >= score))) return cur;
-      return { name: myName(), lvl: level, score, word: (finestWord || '').toUpperCase(), at: Date.now() };
+      if (cur && ((cur.lvl | 0) > level || ((cur.lvl | 0) === level && (cur.score | 0) >= score))) {
+        const kept = Object.assign({}, cur);
+        if (color) kept.c = color;
+        if (veiled) kept.v = 1; else delete kept.v;
+        return kept;
+      }
+      const r = { name: myName(), lvl: level, score, word: (finestWord || '').toUpperCase(), at: Date.now() };
+      if (color) r.c = color;
+      if (veiled) r.v = 1;
+      return r;
     };
     const me = uid();
     try {
       await dbTxn('endless/all/' + me, rec);
       await dbTxn('endless/' + weekKey() + '/' + me, rec);
     } catch (e) { }
+  }
+  /* THE FRONTIER FLAGS' redress (v0.77.0): a jar picked (or the veil turned)
+     in the profile reaches the standing flag row at once — no better climb
+     required. Touches only a row that already exists; a player who has
+     never finished a run has no flag to dress. */
+  async function dressFlag(color, veiled) {
+    try {
+      await dbTxn('endless/all/' + uid(), (cur) => {
+        if (!cur) return cur;                        // no flag planted — nothing to dress
+        const r = Object.assign({}, cur, { c: color || null });
+        if (!color) delete r.c;
+        if (veiled) r.v = 1; else delete r.v;
+        return r;
+      });
+    } catch (e) { }
+  }
+  /* THE FRONTIER FLAGS' ledger read (v0.77.0): every REAL planted flag, one
+     read at climb start/resume — never per level, never polled mid-battle.
+     Raw endless/all rows, no ghost merge (the seeded hunters are board
+     dressing; the flags in the sky are real players only — sg_ filtered as
+     the belt to that law's suspenders, since ghosts are client-side and
+     never written). Sorted the way endless ranks: level, then score. */
+  async function getFlags() {
+    const all = (await dbGet('endless/all').catch(() => null)) || {};
+    return Object.entries(all)
+      .filter(([id, r]) => r && (r.lvl | 0) > 0 && !/^sg_/.test(id))
+      .map(([id, r]) => ({ id, name: r.name || '???', level: r.lvl | 0, score: r.score | 0, color: r.c || null, veiled: !!r.v }))
+      .sort((a, b) => b.level - a.level || b.score - a.score);
   }
   // housekeeping: old day/week boards would pile up forever — sweep them as we
   // pass by. Once/session.
@@ -616,5 +657,5 @@ const SSNET = (() => {
     async decline(fromUid) { try { await dbSet('invites/' + uid() + '/' + fromUid, null); } catch (e) { } },
   };
 
-  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, submitEndless, submitHard, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
+  return { connect, uid, myName, setName, mintUid, mintName, nameKey, claimName, releaseName, findByName, mintClaimed, ensureName, renameNotice, side, submitScore, submitEndless, submitHard, dressFlag, getFlags, getBoard, syncProfile, dayKey, setDayKey, dayKeyISO, msToNextDay, msToNextWeek, weekKey, ref, dbGet, dbSet, dbUpdate, dbTxn, FR, get mode() { return mode; } };
 })();
