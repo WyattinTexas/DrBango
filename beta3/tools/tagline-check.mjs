@@ -62,7 +62,7 @@ await send('Runtime.enable'); await send('Page.enable');
 await send('Network.enable'); await send('Network.setCacheDisabled', { cacheDisabled: true });
 // never let a harness campaign write home: SSNET falls back to local mode
 await send('Network.setBlockedURLs', { urls: ['*firebaseio.com*', '*firebasedatabase.app*', '*firebase*', '*gstatic.com*'] });
-await send('Page.addScriptToEvaluateOnNewDocument', { source: 'navigator.share = undefined;' });
+await send('Page.addScriptToEvaluateOnNewDocument', { source: "navigator.share = undefined; try { sessionStorage.setItem('beta3.skipIntro', '1'); } catch (e) { }" });   // skipIntro: the v0.75.0 first-open flow must never fire under a harness boot
 const ev = async (e) => {
   const r = await send('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true });
   if (r?.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || 'eval failed');

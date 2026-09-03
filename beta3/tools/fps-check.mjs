@@ -41,6 +41,7 @@ async function cdp() {
   const send = (method, params) => new Promise(res => { const i = ++id; pend.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
   await send('Runtime.enable'); await send('Page.enable');
   await send('Network.enable'); await send('Network.setCacheDisabled', { cacheDisabled: true });
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: "try { sessionStorage.setItem('beta3.skipIntro', '1'); } catch (e) { }" });   // v0.75.0: the first-open flow must never fire under a harness boot
   const ev = async (expr) => {
     const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
     if (r?.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || 'eval failed');

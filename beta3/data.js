@@ -814,3 +814,31 @@ const SS_ACH = [
   { id: 'hard-sign', icon: '⚑', name: 'EMBER-SWORN', desc: 'Beat the campaign on hard under a sign.', famIds: SS_ZODIAC.map((z) => 'hard-' + z.id),
     crown: { id: 'hard-zodiac', icon: '✹', name: 'THE EMBER ZODIAC', desc: 'All twelve signs beaten on hard.' } },
 ];
+
+/* ============================================================
+   THE FIRST OPEN (v0.75.0, Skylar 9/2): a brand-new player's very first
+   game starts on a CURATED board — hand-authored letters with a designated
+   target word the friendly finger walks, letter by letter — instead of
+   rpick(BAG). One deal per shipping language pack (the board must speak the
+   pack's own dictionary; Spanish carries a digraph tile to teach that they
+   exist). Laws the deals obey, and tools/ftue-check.mjs enforces:
+   - 16 lowercase tile units (a digraph is ONE unit, like the bag deals it),
+     every unit a real tile of that pack's bag, >= 5 vowels (the floor the
+     random deal keeps);
+   - `word` is the target as TILE units, its letters present on the board
+     with multiplicity, and the joined word is in that language's
+     dictionary;
+   - the target's tiles are SCATTERED (the hand visibly travels), and the
+     rest of the board carries other easy words — the finger is a
+     suggestion, and a player who wanders must still find plenty.
+   Boards are read row-major, top-left to bottom-right (slot 0-15). */
+const SS_FTUE = {
+  en: { board: ['r', 'e', 'm', 'o', 'a', 'l', 'i', 't', 'n', 's', 'd', 'e', 'o', 't', 'a', 'u'], word: ['s', 't', 'a', 'r'] },
+  es: { board: ['s', 'o', 'l', 'e', 'n', 'a', 'rr', 'i', 'u', 't', 'e', 'o', 'a', 'm', 'd', 'r'], word: ['l', 'u', 'n', 'a'] },
+  fr: { board: ['p', 'a', 'l', 'o', 'n', 'e', 's', 'i', 'u', 'r', 't', 'a', 'e', 'm', 'o', 'd'], word: ['l', 'u', 'n', 'e'] },
+  pt: { board: ['m', 'e', 'c', 'o', 'a', 'l', 'u', 'r', 's', 'i', 't', 'e', 'a', 'd', 'o', 'n'], word: ['c', 'a', 's', 'a'] },
+  de: { board: ['s', 'o', 'm', 'a', 'd', 'e', 'n', 'i', 'o', 'r', 't', 'u', 'n', 'e', 'l', 'h'], word: ['m', 'o', 'n', 'd'] },
+};
+// the deal for a gameplay language — English is the fallback exactly as the
+// pack system's own (a language without a deal plays the English one)
+function ssFtueDeal(lang) { return SS_FTUE[lang] || SS_FTUE.en; }

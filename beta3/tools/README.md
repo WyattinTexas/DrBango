@@ -1,6 +1,98 @@
 # beta3 dev tools
 
-Twenty-eight scripts, all dev-only — nothing here ships to the browser.
+Thirty scripts, all dev-only — nothing here ships to the browser.
+
+## ftue-check.mjs — the first open: a wordless rise and the friendly finger (v0.75.0)
+
+Skylar's call (9/2): "FIRST TIME YOU OPEN THE GAME — The game needs to open
+up with its default Starspell logo and general main menu screen, except
+with no UI. Then it needs to flow upwards just like it does when you start
+a new campaign. However there are no UI prompts for which Horoscope to pick
+instead. You are just transported up and put into a game. The game you're
+put into will start with curated letters. The curated letters will have a
+friendly finger … that will show you how to push each button. After you
+push in a word, whether you pushed in the word that the tutorial wants you
+to push in or whatever word you pushed in, when the Cast button lines up,
+the hand will move over to the Cast and animate as pushing in at the Cast
+button." The game side: `prof.ftue` is decided ONCE in SS.load (the sigil
+drip's grandfather law — ANY stored profile, ANY recorded play, or a
+device the game has run on before (`starspellUid`, which the iOS shell's
+keychain reseeds at reinstall) closes it forever, written on the spot) and
+drops at the first game's end by any door (`ssFtueDone` in endRun win/loss
+and in goHome — the back-arrow abandon). The gated boot (Home.create's
+`ftue` gate — the intro's exclusions plus `?endless`, `?lab` and `?mpuid`,
+with `?ftue=1`/`?ftue=0` as the force/stand-down dev seams; the beacon is
+`window.__ssftue`) builds a BARE meadow (`buildMeadowUi` under `ftueBare`:
+scene + wordmark + tagline, ZERO interactive chrome), plays the default
+cinematic over it, and rises by itself into an unsigned QUICK run
+(`ftueOpen`/`ftueRise` — the same beginAscent as every rise). The first
+fight's opening deal is the language's authored `SS_FTUE` board (data.js —
+five packs, the es board carries an RR digraph tile; every target verified
+in its pack's dictionary; the laws are in the data block's comment). The
+finger (`art/hand.webp`, cut by `make-hand-asset.py`; `Battle.ftueStart`
+and kin) anchors BY ITS FINGERTIP (`SS_FTUE_TIP`), is never interactive
+(it cannot eat a 44-pt tap), mirrors for the board's right half and for
+CAST (approached from the label's left so the damage preview stays
+readable), walks the target word letter by letter — and while the
+selection is still a proper PREFIX of the target it keeps walking even
+when the prefix is itself a word (German makes a word of nearly every
+3-letter opening) — backs off faded when the player wanders, glides to
+CAST when ANY woven word stands valid, and retires for good on the
+player's first real cast. The return home restarts the meadow with full
+chrome (Home.onWake's `ftueBare` seam — a bare meadow is never woken, it
+is re-created).
+
+Self-launching like endless-check (server :8899 if nothing serves, Chrome
+on :9473, `/tmp/cdp-ftue` wiped first, `--disable-gpu`), Firebase blocked
+at the network layer; `SHOTS=<dir>` keeps DPR-3 screenshots.
+
+```
+perl -e 'alarm 580; exec @ARGV' node tools/ftue-check.mjs   # 73 checks, ~6 min
+```
+
+The deals on paper (five packs: 16 legal bag tiles, ≥5 vowels, the target
+on the board with multiplicity and in that language's dictionary, the es
+digraph, the gate's exclusion tokens from source, hand.webp shipped, the
+release ritual); the whole flow by real DPR-3 taps: the wordless open
+(ZERO interactive chrome counted on the live meadow, the wordmark
+standing, the decision already persisted), the unasked rise into an
+unsigned quick game (no signC ever), the exact en deal tile-for-tile (all
+plain glass), the finger's walk (first letter, the wander-and-return
+grace, S→T→A→R with the mirror on the board's right half, the tip resting
+OFF the letter, CAST lit with a preview, the real cast, the retirement
+that never returns), the run driven to its end screen (real fells + real
+sigil-card taps) with the flag down and HOME landing the FULL standard
+meadow, the standard second open, the mid-tutorial reload replaying the
+ride and the back-arrow abandon graduating, the who-never-sees-it shapes
+(prior play, device-seen, skipIntro, ?ftue=0, the ?ftue=1 force), every
+other door (?demo/?quick/?daily/?endless/?vsdemo/?frdemo/?botduel/?join/
+?mpuid/?lab), and the full es walk (authored board, RR dealt as ONE tile,
+LUNA cast for real).
+
+Rig lessons: a VIRGIN `?endless=1` boot has ALWAYS been intro-swallowed
+(the old intro gate never excluded it, so the 400ms `startMode` meets
+`busy()` — every endless-check boot seeds skipIntro, which is why it never
+showed); and the first-open gate made six suites' virgin first boots
+first-opens, so desc/tagline/drip/streak/lamp/fps now carry
+`sessionStorage['beta3.skipIntro']` in their `addScriptToEvaluateOnNewDocument`
+preamble — any NEW suite that boots a truly-empty profile must do the
+same (or ride `?mpuid`).
+
+## make-hand-asset.py
+
+Cuts the tutorial's friendly finger (`art/hand.webp`, 512×282, ~14 KB)
+from Skylar's attachment (`~/jumpr/attachments/ss-0902-hand.png`, kept out
+of the repo). The source arrives with an authored alpha (verified, not
+assumed — the script refuses opaque corners), there is no baked lighting
+to cut, and the output is sized for the largest true consumer (iPad @2 ≈
+359 device px). It prints the FINGERTIP's normalized coords — pinned in
+game.js as `SS_FTUE_TIP`, because the sprite is anchored by the tip so
+pointing lands the tip on its target. Re-run after any source change and
+re-pin.
+
+```
+python3 tools/make-hand-asset.py
+```
 
 ## vspage-check.mjs — the challenge-first versus page (v0.73.0)
 

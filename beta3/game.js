@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.74.0';
+const BUILD = 'STARSPELL v0.75.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -435,6 +435,9 @@ function ssLoadArt() {
   // the sign cards' art rides the same fetch, but is never required: a missing
   // plate falls back to the asterism, and never turns the whole set off
   const zod = SS_ZOD_ART.map((id) => 'zod_' + id);
+  // …and the first-open tutorial's hand (v0.75.0, cut by tools/make-hand-asset.py)
+  // rides the same never-required lane: absent, the finger draws procedurally
+  zod.push('hand');
   zod.forEach((n) => { const im = new Image(); im.onload = () => { SSART.img[n] = im; }; im.src = 'art/' + n + '.webp?v=' + encodeURIComponent(BUILD); });
   return Promise.all(names.map((n) => new Promise((res) => {
     const im = new Image();
@@ -497,8 +500,28 @@ const SS_MS_ACH = { 7: 'flame-7', 30: 'flame-30', 100: 'flame-100' };
 const SS = {
   prof: null,
   load() {
-    try { this.prof = JSON.parse(localStorage.getItem('beta3.profile')) || {}; } catch (e) { this.prof = {}; }
+    let stored = null;
+    try { stored = localStorage.getItem('beta3.profile'); } catch (e) { }
+    try { this.prof = JSON.parse(stored) || {}; } catch (e) { this.prof = {}; }
     const p = this.prof;
+    /* THE FIRST OPEN (v0.75.0, Skylar 9/2) — is this the genuinely-first
+       open of the game? Decided ONCE, the moment the question is first
+       askable, and written down on the spot (the sigil drip's grandfather
+       law): 0 = the guided first game is still owed, 1 = down forever.
+       "First" is deliberately strict — ANY stored profile closes it (even
+       one that never played: that player has already seen the meadow), so
+       does any recorded play (a restore that hands the profile over with
+       the player), and so does a device the game has run on before
+       (`starspellUid` — the iOS shell's keychain reseeds it at reinstall,
+       so a veteran reinstalling is never mistaken for a newcomer; it is
+       minted at connect(), which runs AFTER this load). The flag drops at
+       the first game's end — win, loss or abandon — in ssFtueDone(). */
+    if (typeof p.ftue !== 'number') {
+      let seen = false;
+      try { seen = !!localStorage.getItem('starspellUid'); } catch (e) { }
+      p.ftue = (stored || seen || ssSigilPlayedBefore(p)) ? 1 : 0;
+      this.save();
+    }
     p.runs = p.runs | 0; p.wins = p.wins | 0; p.words = p.words | 0; p.beasts = p.beasts | 0;
     p.longest = p.longest || ''; p.bigHit = p.bigHit | 0; p.bestQuick = p.bestQuick | 0;
     p.bestCampaign = p.bestCampaign | 0;
@@ -1439,6 +1462,16 @@ function ssSigilPlayedBefore(p) {
     || (p.streak && p.streak.n) || (p.rating && p.rating !== 1000)
     || Object.keys(p.daily || {}).length || Object.keys(p.ach || {}).length
     || Object.keys(p.signs || {}).length);
+}
+
+/* ---- THE FIRST OPEN (v0.75.0) ----
+   The guided first game: wordless open, pickerless rise, curated board,
+   the friendly finger. `prof.ftue` is decided once in SS.load (0 = owed,
+   1 = down forever); it drops here when the first game ENDS by any door —
+   endRun (win or loss) and goHome (the back-arrow abandon) both call it. */
+function ssFtuePending() { return !!SS.prof && SS.prof.ftue === 0; }
+function ssFtueDone() {
+  if (SS.prof && SS.prof.ftue !== 1) { SS.prof.ftue = 1; SS.save(); DIAG('ftue: done'); }
 }
 
 // Button texture for a given display size. The painted source is 627x344 but consumers
@@ -4682,6 +4715,7 @@ class Home extends Phaser.Scene {
     // otherwise leave these truthy forever and the sheets could never reopen
     this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null;
     this.streakC = null; this.riteC = null; this.riteTimer = null; this.sigTimer = null; this.signLvTimer = null;
+    this.ftueBare = false;   // the wordless first open re-arms it below if owed
     this.lanternShown = null; this.lanternSwell = null;   // a restart re-renders, it does not celebrate
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
@@ -4694,8 +4728,24 @@ class Home extends Phaser.Scene {
     // battle/defeat returns, demo/daily/vsdemo runs and the lang-switch reload
     // all land straight on the interactive meadow
     const deep = typeof vsDeepPending === 'function' && vsDeepPending();   // ?join= / ?friend= (versus.js)
-    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel') && QS.get('daily') !== '1' && QS.get('quick') !== '1' && !deep && !ssIntroBypassed();
-    if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
+    // ssIntroBypassed CONSUMES its one-shot flag — read it once, for both gates
+    const bypassed = ssIntroBypassed();
+    /* THE FIRST OPEN (v0.75.0, Skylar 9/2): the genuinely-first open is a
+       guided, wordless ride — the logo meadow with NO ui, the signature
+       rise with no questions, a curated first board, the friendly finger.
+       The gate mirrors the intro's exclusions and adds the doors the intro
+       never needed to test explicitly (?endless auto-starts a mode, ?lab
+       hands boot to lab.js, ?mpuid is a harness identity); every excluded
+       boot behaves exactly as it always did. ?ftue=1 forces the flow (the
+       dev seam, ?dawn's pattern); ?ftue=0 stands it down. */
+    const ftue = (ssFtuePending() || QS.get('ftue') === '1') && QS.get('ftue') !== '0'
+      && !entry && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel')
+      && QS.get('daily') !== '1' && QS.get('quick') !== '1' && QS.get('endless') !== '1'
+      && QS.get('lab') !== '1' && !QS.get('mpuid') && !deep && !bypassed;
+    window.__ssftue = { on: ftue, state: ftue ? 'gate' : 'off' };   // headless verification reads this
+    const intro = !entry && !INTRO_SEEN && !DEMO && QS.get('vsdemo') !== '1' && !QS.get('frdemo') && !QS.get('botduel') && QS.get('daily') !== '1' && QS.get('quick') !== '1' && !deep && !bypassed;
+    if (ftue) this.ftueOpen(l, intro);
+    else if (entry) this.time.delayedCall(0, () => { if (this.sys.isActive()) this.buildMeadowUi(l); });
     else if (intro) this.playIntro(l);
     else this.buildMeadowUi(l);
     // the daily chip's clock ticks every second while the meadow sits open.
@@ -4754,8 +4804,15 @@ class Home extends Phaser.Scene {
     else if (DEMO || QS.get('daily') === '1' || QS.get('quick') === '1' || QS.get('endless') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : QS.get('mode') === 'endless' ? 'endless' : 'quick') : QS.get('quick') === '1' ? 'quick' : QS.get('endless') === '1' ? 'endless' : 'daily'));
   }
   buildMeadowUi(l) {
+    /* THE FIRST OPEN's meadow is WORDLESS (v0.75.0): the scene and the
+       wordmark only — no buttons, no chips, no lantern, no footer, no
+       doors, nothing interactive at all. The flag lives on the scene so
+       playIntro's call lands here unchanged; onWake restarts a bare
+       meadow outright (the return from the first game deserves the full
+       chrome, built the normal way). */
+    const bare = !!this.ftueBare;
     // a name the stars already knew (net.js, unique names): told once, here
-    this.time.delayedCall(700, () => { if (this.sys.isActive() && SSNET.renameNotice()) ssRenameNotice(this); });
+    if (!bare) this.time.delayedCall(700, () => { if (this.sys.isActive() && SSNET.renameNotice()) ssRenameNotice(this); });
     // baseAlpha: the ascent fades all ui to 0 — the wake path (return from
     // battle without a re-create) restores each item to the alpha it was born
     // with, which is not 1 for sparkles, braid, mute/lang buttons
@@ -4825,6 +4882,18 @@ class Home extends Phaser.Scene {
     ui(ssTxt(this, l.x(0), l.y(358), SS_T('tagline'), l.u(12), '#f2e0a8', 'italic').setOrigin(0.5)
       .setStroke('#241c40', l.u(1.25))
       .setShadow(0, l.u(1.2), 'rgba(16,12,34,0.92)', l.u(4), true, true));
+
+    if (bare) {
+      // nothing below is built; the refreshers other paths call become
+      // no-ops so a stray refresh can never half-dress a wordless meadow
+      this.layoutMenu = () => { };
+      this.setRowSub = () => { };
+      this.refreshCampDoor = () => { };
+      this.refreshEndDoor = () => { };
+      this.refreshRatingPill = () => { };
+      DIAG('meadow ui built (bare — first open)');
+      return;
+    }
 
     // buttons
     /* v0.46.0: the four play buttons lost their flavour sublines ("four acts
@@ -5220,6 +5289,43 @@ class Home extends Phaser.Scene {
       this.idleTweens();
     }
   }
+  /* ---------- THE FIRST OPEN (v0.75.0, Skylar 9/2) ----------
+     "The game needs to open up with its default Starspell logo and general
+     main menu screen, except with no UI. Then it needs to flow upwards
+     just like it does when you start a new campaign. However there are no
+     UI prompts for which Horoscope to pick… You are just transported up
+     and put into a game."
+     Every piece is the game's own move: the wordless meadow is
+     buildMeadowUi minus its chrome (ftueBare), the open is playIntro over
+     it, the rise is beginAscent. The first game is a QUICK run —
+     pickerless by nature, no checkpoint, no lantern debt — and unsigned:
+     which mode it is stays invisible, and it is exactly the game the
+     meadow's own doors offer tomorrow. */
+  ftueOpen(l, intro) {
+    this.ftueBare = true;                 // buildMeadowUi builds bare; onWake restarts on it
+    DIAG('ftue: first open');
+    window.__ssftue.state = 'open';
+    if (intro) this.playIntro(l);         // the default cinematic, over the bare meadow
+    else this.buildMeadowUi(l);           // a mid-open restart: no second cinematic
+    /* the rise follows the open by itself — nobody is asked to tap. A poll,
+       not a hook: one waiter covers the settle, a tap-skip, the
+       reduce-motion veil AND the intro's own catch-fallback. */
+    this.ftueWait = this.time.addEvent({
+      delay: 350, loop: true, callback: () => {
+        if (this.introPlaying || this.ascending || this.descending || this.arrived) return;
+        if (this.ftueWait) { this.ftueWait.remove(false); this.ftueWait = null; }
+        this.time.delayedCall(850, () => this.ftueRise());
+      },
+    });
+  }
+  ftueRise() {
+    if (!this.ftueBare || this.ascending || this.arrived || !this.scene.isActive()) return;
+    if (this.busy()) { this.time.delayedCall(400, () => this.ftueRise()); return; }
+    DIAG('ftue: rise');
+    window.__ssftue.state = 'rise';
+    this.beginAscent({ mode: 'quick', resume: null, ascended: true, ftue: 1 });
+  }
+
   // Subtitle under DAILY HUNT. Unplayed, it invites and shows how long the sky
   // stays up; played, it shows today's score and when the next one lands.
   // the herald's second-by-second clock; also flips the chip between its
@@ -6430,6 +6536,10 @@ class Home extends Phaser.Scene {
   /* the woken meadow: everything still exists, so returning is bookkeeping —
      restore what the ascent faded/killed, refresh what battle changed, glide */
   onWake(data) {
+    // the first game just ended below a WORDLESS meadow: the player has
+    // graduated — restart into the standard full-chrome meadow (the ftue
+    // flag is already down, so create() builds everything the normal way)
+    if (this.ftueBare) { this.ftueBare = false; this.scene.restart(data); return; }
     // rotated while asleep: the viewport loop only restarts ACTIVE scenes, so
     // a stale layout lands here — rebuild rather than glide a broken frame
     if (this.scale.width !== this.createdW || this.scale.height !== this.createdH) { this.scene.restart(data); return; }
@@ -6472,9 +6582,14 @@ class Home extends Phaser.Scene {
 /* ============================================================
    BATTLE — one scene, three modes
    ============================================================ */
+/* THE FIRST OPEN's fingertip (v0.75.0): where the finger's tip sits inside
+   art/hand.webp, normalized — measured and printed by tools/make-hand-asset.py
+   (the sprite is anchored BY the tip, so pointing lands the tip on target).
+   The drawn fallback pointer is built to the same anchor. */
+const SS_FTUE_TIP = { x: 0.0066, y: 0.7458 };
 class Battle extends Phaser.Scene {
   constructor() { super('battle'); }
-  init(data) { this.mode = data.mode || 'quick'; this.resume = data.resume || null; this.ascended = !!data.ascended; }
+  init(data) { this.mode = data.mode || 'quick'; this.resume = data.resume || null; this.ascended = !!data.ascended; this.ftue = !!data.ftue; }
 
   create() {
     const tCr = performance.now();
@@ -6572,6 +6687,8 @@ class Battle extends Phaser.Scene {
     const tEnd = performance.now();
     DIAG('battle create ' + Math.round(tEnd - tCr) + 'ms (sky ' + Math.round(tSky - tCr) +
       ' · state ' + Math.round(tState - tSky) + ' · ui ' + Math.round(tUi - tState) + ' · fight ' + Math.round(tEnd - tUi) + ')');
+
+    if (this.ftue) this.ftueStart();   // the first open: curated deal landed above; the finger follows
 
     if (DEMO) this.demoTimer = this.time.addEvent({ delay: 1400, loop: true, callback: () => this.demoStep() });
     this.input.on('pointerdown', () => SFX.ensure());
@@ -6681,6 +6798,10 @@ class Battle extends Phaser.Scene {
   // other sky so it takes the full re-create, and so does a home that a
   // mid-ascent resize restart already stopped.
   goHome(data) {
+    // leaving the first game by ANY door — the end screen's HOME or the
+    // back-arrow abandon — completes the first open for good; the woken
+    // (or re-created) meadow builds its full chrome
+    if (this.ftue) ssFtueDone();
     const h = this.scene.get('home');
     if (!data.dawn && h && h.sys.isSleeping()) { this.scene.wake('home', data); this.scene.stop(); }
     else this.scene.start('home', data);
@@ -6875,18 +6996,181 @@ class Battle extends Phaser.Scene {
     return 'QUICK PLAY';
   }
 
+  /* ---------- THE FIRST OPEN's friendly finger (v0.75.0, Skylar 9/2) ----------
+     "The curated letters will have a friendly finger… that will show you
+     how to push each button. After you push in a word, whether you pushed
+     in the word that the tutorial wants you to push in or whatever word
+     you pushed in, when the Cast button lines up, the hand will move over
+     to the Cast and animate as pushing in at the Cast button."
+     The hand DEMONSTRATES; the player performs every real tap. It is never
+     interactive (it cannot eat a touch), it anchors by its fingertip
+     (SS_FTUE_TIP) so pointing lands the tip on the target's edge — never
+     over the letter — and it mirrors for the board's right half so it
+     always has room. Off the target's road it backs away and waits; the
+     moment ANY woven word goes valid it glides to CAST and pushes; the
+     player's first real cast retires it for good. */
+  ftueStart() {
+    const deal = ssFtueDeal(PACK.lang);
+    this.ftueWord = deal.word;
+    this.ftueGone = false; this.ftueAt = null;
+    window.__ssftue = Object.assign(window.__ssftue || {}, {
+      state: 'board', word: deal.word.join(''), deal: this.board.map((s) => (s ? s.ch : '')).join(' '), point: null,
+    });
+    DIAG('ftue: board (' + deal.word.join('') + ')');
+    // the finger rises once the opening deal's bounce has landed — unless
+    // the player has already cast without it (their game; it lets them)
+    this.time.delayedCall(1500, () => { if (this.ftue && !this.ftueGone && this.sys.isActive()) this.ftueShow(); });
+  }
+  ftueShow() {
+    if (this.ftueHand || this.ftueGone) return;
+    const l = this.L;
+    // the painted glove (art/hand.webp, cut by tools/make-hand-asset.py) —
+    // or a drawn stand-in if the fetch never landed. Real art either way,
+    // never a glyph (the no-emoji-as-game-art law).
+    if (!this.textures.exists('ftuehand')) {
+      if (ART && SSART.img.hand) this.textures.addImage('ftuehand', SSART.img.hand);
+      else {
+        const t = this.textures.createCanvas('ftuehand', 128, 71);
+        ssBake(t, 'ftuehand', 128, 71, (c, w, h) => {
+          c.lineCap = 'round'; c.lineJoin = 'round';
+          // dark rim first, then the glove over it — plain primitives only
+          c.fillStyle = '#14141c';
+          c.beginPath(); c.arc(w * 0.62, h * 0.44, h * 0.44, 0, 7); c.fill();
+          c.strokeStyle = '#14141c'; c.lineWidth = h * 0.36;
+          c.beginPath(); c.moveTo(w * 0.10, h * 0.74); c.lineTo(w * 0.52, h * 0.60); c.stroke();
+          c.fillStyle = '#f4f2ee';
+          c.beginPath(); c.arc(w * 0.62, h * 0.44, h * 0.35, 0, 7); c.fill();
+          c.strokeStyle = '#f4f2ee'; c.lineWidth = h * 0.22;
+          c.beginPath(); c.moveTo(w * 0.12, h * 0.73); c.lineTo(w * 0.52, h * 0.59); c.stroke();
+        });
+      }
+    }
+    const src = this.textures.get('ftuehand').getSourceImage();
+    const hw = l.u(86), hh = hw * (src.height / src.width);
+    const h = this.ftueHand = this.add.image(l.x(60), l.y(650), 'ftuehand')
+      .setOrigin(SS_FTUE_TIP.x, SS_FTUE_TIP.y).setDisplaySize(hw, hh).setAlpha(0).setDepth(62);
+    // never interactive — the 44-pt zones it points at stay wholly the player's
+    this.tweens.add({ targets: h, alpha: 0.97, duration: 350, ease: 'Sine.easeOut' });
+    this.ftueTimer = this.time.addEvent({ delay: 500, loop: true, callback: () => this.ftueRepoint() });
+    this.ftueRepoint(true);
+  }
+  // where the finger belongs right now. While the selection is still a
+  // PROPER prefix of the target (empty counts), the walk continues — even
+  // when the prefix happens to be a word itself (German's dictionary makes
+  // a word of nearly every 3-letter opening; the finger teaches the whole
+  // word, and CAST is lit for a player who'd rather stop). The finger
+  // moves to CAST when a woven word stands complete — the target, or
+  // WHATEVER valid word the player built off the road. Otherwise it waits.
+  ftueGoal() {
+    if (this.ftueGone || this.state === 'end') return null;
+    const tt = this.ftueWord;
+    const onRoad = this.sel.length < tt.length
+      && this.sel.every((bi, k) => this.board[bi] && this.board[bi].ch === tt[k]);
+    if (onRoad) {
+      const need = tt[this.sel.length];
+      for (let i = 0; i < 16; i++) {
+        const s = this.board[i];
+        if (s && s.c.active && !s.blk && s.ch === need && this.sel.indexOf(i) < 0) return i;
+      }
+    }
+    const word = this.currentWord();
+    if (this.sel.length >= 2 && WORDSET.has(word)) return 'cast';
+    return 'wait';
+  }
+  ftueRepoint(snap) {
+    const h = this.ftueHand;
+    if (!h || !h.active || this.ftueGone) return;
+    const goal = this.ftueGoal();
+    if (goal === null) { this.ftueRetire(false); return; }
+    const key = typeof goal === 'number' ? 'slot:' + goal : goal;
+    if (window.__ssftue) window.__ssftue.point = key;
+    if (key === this.ftueAt) return;
+    this.ftueAt = key;
+    const l = this.L, ts = this.tileSize;
+    let pose;
+    // CAST is approached MIRRORED, from the label's left, so the glove
+    // never covers the damage preview it is pointing the player at
+    if (goal === 'cast') pose = { x: l.x(70) - l.u(58), y: l.y(754) - l.u(10), flip: true, dip: 9 };
+    else if (goal === 'wait') pose = { x: h.x, y: Math.min(h.y, l.y(700)) - l.u(44), flip: h.flipX, faded: true };
+    else {
+      const p = this.slotPos(goal);
+      const flip = goal % 4 >= 2;   // the right half is pointed at from the left — room on every phone
+      pose = { x: p.x + (flip ? -1 : 1) * ts * 0.36, y: p.y - ts * 0.10, flip, dip: 7 };
+    }
+    this.tweens.killTweensOf(h);
+    // the mirror keeps the TIP as the anchor: flipX mirrors the frame, so
+    // the origin swaps to the opposite edge with it
+    h.setFlipX(pose.flip).setOrigin(pose.flip ? 1 - SS_FTUE_TIP.x : SS_FTUE_TIP.x, SS_FTUE_TIP.y);
+    const arrive = () => {
+      if (!h.active || this.ftueGone || this.ftueAt !== key) return;
+      if (pose.faded) {
+        // wandering is welcome: the finger backs off and breathes until
+        // it has something true to show again
+        this.tweens.add({ targets: h, alpha: 0.4, duration: 300 });
+        this.tweens.add({ targets: h, y: pose.y - l.u(5), duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        return;
+      }
+      h.setAlpha(0.97);
+      // the push: along the finger's own axis, tip-first, with a soft ring
+      // where it lands — repeated gently until the player takes the tap
+      const dx = (pose.flip ? 1 : -1) * l.u(pose.dip), dy = l.u(pose.dip * 0.72);
+      this.tweens.add({
+        targets: h, x: pose.x + dx, y: pose.y + dy,
+        duration: 300, ease: 'Sine.easeIn', yoyo: true, hold: 110, repeat: -1, repeatDelay: 700,
+        onYoyo: () => {
+          if (!h.active) return;
+          const ring = this.add.image(pose.x + dx * 0.4, pose.y + dy * 0.4, ssFxTex(this, 'ring', 0xffd77a))
+            .setBlendMode('ADD').setAlpha(0.55).setScale(0.16).setDepth(61);
+          this.tweens.add({ targets: ring, scale: l.u(0.55), alpha: 0, duration: 340, ease: 'Sine.easeOut', onComplete: () => ring.destroy() });
+        },
+      });
+      this.tweens.add({ targets: h, angle: pose.flip ? 2.5 : -2.5, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    };
+    h.setAngle(0);
+    if (snap) { h.setPosition(pose.x, pose.y); arrive(); }
+    else this.tweens.add({ targets: h, x: pose.x, y: pose.y, alpha: 0.97, duration: 430, ease: 'Sine.easeInOut', onComplete: arrive });
+  }
+  // the player's first real cast (or the run's end) sends the finger off —
+  // its two lessons are taught, and it never comes back
+  ftueRetire(happy) {
+    this.ftueGone = true;
+    if (this.ftueTimer) { this.ftueTimer.remove(false); this.ftueTimer = null; }
+    const h = this.ftueHand;
+    this.ftueHand = null;
+    if (window.__ssftue) { window.__ssftue.point = null; window.__ssftue.state = 'done'; }
+    if (!h || !h.active) return;
+    this.tweens.killTweensOf(h);
+    if (happy) {
+      this.starBurst.emitParticleAt(h.x, h.y, 8);
+      this.tweens.add({ targets: h, y: h.y - this.L.u(60), alpha: 0, angle: -10, duration: 600, ease: 'Sine.easeIn', onComplete: () => h.destroy() });
+    } else {
+      this.tweens.add({ targets: h, alpha: 0, duration: 240, onComplete: () => h.destroy() });
+    }
+  }
+
   // ---------- board ----------
   boardVowels() { return this.board.filter((s) => s && VOWELS.includes(s.ch[0])).length; }
   fillBoard(initial) {
+    /* THE FIRST OPEN (v0.75.0): the very first board a brand-new player
+       ever sees is CURATED — the language's authored deal (SS_FTUE,
+       data.js: friendly letters, a designated target word the finger will
+       walk) instead of the bag's roll. The opening deal of the first fight
+       only; every refill, scry and later fight rolls the bag as always. */
+    const deal = initial && this.ftue && this.run.fightIdx === 0 ? ssFtueDeal(PACK.lang).board : null;
     for (let i = 0; i < 16; i++) {
       if (this.board[i]) continue;
-      let ch = rpick(BAG);
-      if (this.boardVowels() < 5 && !VOWELS.includes(ch)) ch = rpick(['a', 'e', 'i', 'o', 'u']);
-      ch = PACK.digraph[ch] || ch;
+      let ch;
+      if (deal) ch = deal[i];
+      else {
+        ch = rpick(BAG);
+        if (this.boardVowels() < 5 && !VOWELS.includes(ch)) ch = rpick(['a', 'e', 'i', 'o', 'u']);
+        ch = PACK.digraph[ch] || ch;
+      }
       // the pending queue (v0.66.0): each empty slot takes one owed bonus
       // tile — GILDED DAWN's start (one gilded; two; two stars at its
-      // height) and the forge's drop ride the same line
-      const tier = this.pending.length ? this.pending.shift() : 0;
+      // height) and the forge's drop ride the same line. The curated deal
+      // is all plain glass on purpose (nothing to explain yet).
+      const tier = deal ? 0 : this.pending.length ? this.pending.shift() : 0;
       this.spawnTile(i, ch, tier, initial);
     }
   }
@@ -7198,6 +7482,9 @@ class Battle extends Phaser.Scene {
     this.castB.setAlpha(valid ? 1 : 0.45);
     this.castT.setAlpha(valid ? 1 : 0.5);
     this.castT.setText(valid ? 'CAST ' + this.previewDamage() : 'CAST');
+    // the first open's finger follows every selection change the moment it
+    // lands (its own slow poll covers scries and refills)
+    if (this.ftueHand) this.ftueRepoint();
   }
 
   // ---------- the birth sign ----------
@@ -7508,6 +7795,9 @@ class Battle extends Phaser.Scene {
       return;
     }
     this.state = 'anim';
+    // the first open's finger bows out on the player's first real cast —
+    // both of its lessons (weave, then CAST) are now the player's own
+    if (this.ftue && !this.ftueGone) this.ftueRetire(true);
     // a successful cast winds hard mode's strike clock back to the top —
     // "every time you spell a word and cast a word, that timer goes back
     // up" (the clock itself is held through the cast's animation)
@@ -8410,6 +8700,9 @@ class Battle extends Phaser.Scene {
   endRun(won) {
     const l = this.L;
     this.state = 'end';
+    // the first game COMPLETED — win or loss, the first-open flag is down
+    // forever (the abandon door pays the same toll in goHome)
+    if (this.ftue) { ssFtueDone(); if (!this.ftueGone) this.ftueRetire(false); }
     if (this.inspectP) this.inspectP.close();   // no window may outlive the run
     // THE TOME'S PRICE — holding the Whispering Tome taxes the final score
     // by its held tier's rate (25%; 15% at its height). Applied here, before
