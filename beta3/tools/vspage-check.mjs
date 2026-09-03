@@ -55,6 +55,21 @@ ok('all ten new keys ship exactly five times (one per language)',
 ok('no retired key survives in any language',
   OLD_KEYS.every((k) => !new RegExp('[^a-zA-Z]' + k + ':').test(strSrc)),
   OLD_KEYS.filter((k) => new RegExp('[^a-zA-Z]' + k + ':').test(strSrc)).join(','));
+// 9/3 feedback card 01: the summons copy wears two sparkles — the dash, the
+// "to answer" clause and the trailing colon all gone (Skylar's stamped en
+// wording; vsAppText matches by his sibling stamp), in every language
+const ANSWER_TAILS = /to answer|para responder|pour répondre|um zu antworten/;
+const grabVals = (re) => [...strSrc.matchAll(re)].map((m) => m[1]);
+const shareVals = grabVals(/vsShareText: '((?:[^'\\]|\\.)*)'/g);
+const appVals = grabVals(/vsAppText: '((?:[^'\\]|\\.)*)'/g);
+ok("en vsShareText is Skylar's stamped wording exactly",
+  shareVals[0] === '%1 summons you to a STARSPELL duel ✨ tap ✨', shareVals[0]);
+ok('vsShareText ×5: two ✨, no dash, no colon, no "to answer" tail',
+  shareVals.length === 5 && shareVals.every((v) => (v.match(/✨/g) || []).length === 2 && !/[—:]/.test(v) && !ANSWER_TAILS.test(v)),
+  shareVals.join(' | '));
+ok('vsAppText ×5 wears the matching treatment: two ✨, no dash, no colon, the name twice',
+  appVals.length === 5 && appVals.every((v) => (v.match(/✨/g) || []).length === 2 && !/[—:]/.test(v) && !ANSWER_TAILS.test(v) && v.includes('%1') && v.includes('%2')),
+  appVals.join(' | '));
 
 /* ---------- server + two browsers ---------- */
 const kids = [];
@@ -220,6 +235,14 @@ ok('the payload carries the STARSPELL app link', cap.includes('https://testfligh
 ok('…and the sender\'s name for the add-by-name bridge', cap.includes(myName), cap.slice(0, 120));
 ok('…and NEVER a web page: no drbango.com, no localhost, no join/friend deep link',
   !/drbango\.com|localhost|[?&]join=|[?&]friend=/.test(cap), cap);
+// the 9/3 sparkle copy, proven on the LIVE payload (text rides ahead of the
+// link, so slice the link off before the no-colon law — https:// has one)
+const capTxt = cap.slice(0, cap.indexOf('https://'));
+ok('…and the live payload wears the sparkles: ✨ ×2, no dash, no colon, no "to answer", ✨ right before the link',
+  (capTxt.match(/✨/g) || []).length === 2 && !/[—:]/.test(capTxt) && !ANSWER_TAILS.test(capTxt) && /✨\s*$/.test(capTxt),
+  cap.slice(0, 140));
+ok('…the payload is exactly vsAppText, the sender named twice, then the app link',
+  await A.ev(`window.__cap === SS_T('vsAppText', SSNET.myName(), SSNET.myName()) + ' https://testflight.apple.com/join/Hxs8e7fU'`));
 ok('the sheet note says COPIED', await A.until(`(() => { const s = game.scene.getScene('vsmenu'); return s.shNoteT && s.shNoteT.text === SS_T('vsCopied') })()`, 6000));
 
 /* ---------- 4. + adds a friend by name (two real mages, live registry) ---------- */
