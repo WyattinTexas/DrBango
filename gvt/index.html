@@ -30430,7 +30430,8 @@ function awayTick(dt){
 const MOM_ALLOW=2;                    // the allowance: +2★/day on the piggy rail, forever (Wyatt's number)
 // Tuning (my calls, Wyatt-overridable, measured on the real loop — see the
 // commit message for the measured win/loss windows):
-const MOM_HP=300;                     // one fill of the big bar — same fill all three rounds ("it re-fills").
+const MOM_HP_X=0.7;                   // 0906 THE BOSS NUMBERS PASS, Part D (FM-GVT-BOSS-NUMBERS-01; Wyatt 9/2 ~9:52 pm ET: "reduce her hp by 30%" · 10:14 pm "Yes" = the campaign Mom too): ×0.7 on her bar at BOTH seats through this one const — MOM_HP below is FDEF.mom.hp: her raid's fill (300 → 210, three fills stay three) AND the campaign-authored Mom's boss-formula bar (312 L3 → 218 · 516 L20 → 361; the temper untouched)
+const MOM_HP=Math.round(300*MOM_HP_X);   // one fill of the big bar — same fill all three rounds ("it re-fills"): 300 × MOM_HP_X = 210
                                       // MEASURED (see commit): 170 melted in ~30s/fill mid-rank, ~14s maxed
 const MOM_W=160;                      // she is drawn at giant scale: the biggest thing ever on the carpet
 const MOM_TAGS=260;                   // the scramble purse (the sortie's 240 + a little — three rounds is a longer shift)
@@ -30529,6 +30530,17 @@ const MOM_CAMP_TOYS=true;          // v2.29 (Wyatt's dial): on a CAMPAIGN rug sh
                                    // set (block/ball/duck — never the player's shelf) so the kick has ammo;
                                    // false = she brings none and the punt stands down by its own construction
 const MOM_BAR_COL=['#C0473A','#A63B2A','#8a2f26'];   // 0140: her bar wears each round's heat — shipped red → deep → ember
+// 0906 THE BOSS NUMBERS PASS, Part D — THE POUR (Wyatt 9/2 ~9:52 pm ET: "give the player 20 more dog tags every 5 seconds during the mom fight; its
+// currently not enough" · 10:14 pm "Yes" = the campaign Mom too): +MOM_POUR into the purse every MOM_POUR_T s of sim while she is on the rug — her
+// raid whole (from its first tick, so the 6 s MOM_START_T lull already pays one, through the lulls, to the verdict — ⚑ D-Q3 recommended) and a
+// campaign rug from the wave that walks her on until she falls (D-Q1 RULED both) — on its OWN clock (S.momPourT; never S.tagT) beside the v1.32
+// faucet, which keeps its beat and rate (her raid has no faucet: S.sq is null there; a campaign rug's faucet drips beside the pour, ADDITIVE), the
+// faucet's own float grammar (+N over the toy box, the same colour), per-sim like the faucet. 0 = off = a clean no-op. Every other battle's purse
+// byte-still: the campaign faucet on every rug without her, RAID_TAGS, EV_TICK_ADD, BF_TICK, BD_POUR, the rival sortie's no-drip. ⚑ D-Q2 the
+// literal read (+20 every 5 s), not the faucet's beat moved; ⚑ D-Q4 MOM_BOUNTY (one mint), hm11, MOM_LEVELS 3, the +2★ allowance exactly as they were.
+const MOM_POUR=20;                    // dog tags per pour
+const MOM_POUR_T=5;                   // the pour's beat, s of sim time
+function momOnRug(){ return !!(S.momRaid || (!S.bf && S.foes.some(f=>f.type==='mom' && !f.dead))); }   // her raid whole, or a campaign rug while she stands on it (hitCheck splices her from S.foes the frame she falls)
 
 // ================= CAMPAIGN (endless) =================
 // ===== v1.38 — NEW FORMATIONS + SET PIECES. Everything here is DATA on
@@ -32882,7 +32894,10 @@ const FDEF = {
   // YETI_SHOOTERS. SNOWMAN "works like a giant snowman, except he has ten
   // more health" — the comparison is to the UNIT, so the +10 rides the ROW
   // (60→70) and tier-prices with him; his volley count is the group's sbn.
-  sgtcold: { sno:1, hp:70,  spd:30, bounty:110,leak:4, w:96,  boss:true, rng:190, fireCd:3.0, sprint:{aggro:150, dash:420, swing:1.2, cap:2, cd:3.5}, leap:{cd:LEAP_CD_SGT, first:LEAP_FIRST, wind:LEAP_WIND, t:LEAP_T, h:LEAP_H, minD:LEAP_MIN_D, mega:1} },   // 0554c: the purple leap as a ROW CELL (the 0117 capability law the boss gate's own comment asked for) — his consts verbatim; mega:1 = the MEGA/ULTRA raid's alone (0341: M/H never leapt), byte-equal on his fixture
+  // 0906 THE BOSS NUMBERS PASS, Part B (FM-GVT-BOSS-NUMBERS-01; Wyatt 9/2 ~6:45 pm ET: "Sergent cold health decrease by 50%" · 9/2 ~9:38 pm "yes & yes" = everywhere
+  // he appears): hp 70 → 35 at the ROW — every seat inherits through the tier curve (the ice castle's W1 at e/m/h/g/u: 70/105/154/185/1109 → 35/53/77/92/554;
+  // the 'u' room's EV_HPX 0.5 rides on top as it did). He is fielded by ONE row on HEAD (the raid's W1); bounty / leak / rng / fireCd / the sprint / the leap byte-still.
+  sgtcold: { sno:1, hp:35,  spd:30, bounty:110,leak:4, w:96,  boss:true, rng:190, fireCd:3.0, sprint:{aggro:150, dash:420, swing:1.2, cap:2, cd:3.5}, leap:{cd:LEAP_CD_SGT, first:LEAP_FIRST, wind:LEAP_WIND, t:LEAP_T, h:LEAP_H, minD:LEAP_MIN_D, mega:1} },   // 0554c: the purple leap as a ROW CELL (the 0117 capability law the boss gate's own comment asked for) — his consts verbatim; mega:1 = the MEGA/ULTRA raid's alone (0341: M/H never leapt), byte-equal on his fixture
   sgtsnow: { sno:1, hp:70,  spd:20, bounty:110,leak:4, w:118, boss:true, rng:440, minRng:140, fireCd:4.5, snowboulder:{spd:200, r:26, range:820, wind:0.6}, split:{n:5, hp:2} },
   kingyeti:{ sno:1, hp:190, spd:22, bounty:250,leak:8, w:148, rng:200, fireCd:2.6, boss:true },
   // ===== v3.35 TP-03 THE DINO PARK CAST — reworked 0278b FM-GVT-DINO-01
@@ -38298,7 +38313,7 @@ function reset(){
   S.cduck=null; S.cduckClk=0;   // v2.28: a fresh battle deals a fresh duck — replaying the level sails him again (the crossing's own once-per-battle law)
   S.ctrain=null; S.ctrainClk=0; S.ctrainWhis=false;   // 0196: the crossing line re-arms with every battle — a replay runs the same timetable from second 0
   S.gk=1; S.cCam={x:0,y:0,vx:0,vy:0}; S.camHold=0; S.camOwn=false;   // v1.98: the grand-rug factor + the campaign camera re-arm with every battle — v2.09: and the pan claim re-arms with them (a NEW battle's escort walks again until its own first pan)
-  S.momRaid=false; S.momToys=null;   // v1.79/0140: a stale mom flag (or her scattered props) would leak into the next battle
+  S.momRaid=false; S.momToys=null; S.momPourT=0;   // v1.79/0140: a stale mom flag (or her scattered props) would leak into the next battle · 0906: the pour's clock re-arms with every battle
   S.training=false; S.train=null; S.tkDemo=false;   // 0248: the range dies with every battle door (the mom-flag idiom) — v3.23: the review range with it
   S.sargeCd=0; S.sargeFlash=0; S.tagT=0; S.lostLevel=0;   // casualties + Sarge's clock + the faucet (v1.32)
   S.annWait=null;                                         // v1.41: a deferred boss card dies with the battle it was staged for
@@ -39861,7 +39876,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.78';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.79';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -52944,6 +52959,18 @@ function heroDeflB(B,u){   // a rolling S.gboul ball off the king: spent vs him,
   S.fx.push({k:'ring',x:u.x,y:u.y-24,r:5,R:28,t:0,dur:0.26,col:'rgba(255,255,255,0.9)'});
   bfSfx(SFX.thock,B.x,B.y);
 }
+// ═══ 0906 THE BOSS NUMBERS PASS, Parts B + C (FM-GVT-BOSS-NUMBERS-01; the Go Machine's card 9/3 10:48; Wyatt 9/2 ~6:45 pm ET verbatim: "In all King
+// yeti fights, Sergeant snowman should take 100% more damage from reflected snowball." · "Stegosaurus should take 200% extra damage when hit by a
+// boulder (usually reflected)" · 9/2 ~9:38 pm "yes & yes" = ANY boulder): ONE seat. gboulTick's reflected-ball victim loop is the only path on
+// HEAD where a rolling ball damages a FOE — the un-reflected roll knocks UNITS alone, a hatchling's rock (B.nem) hits the armies' units alone,
+// a hero king's bounce (heroDeflB) is spent, the blue crystal's wall negates a knock and returns nothing — so both terms sit there, fenced by
+// victim: SERGEANT SNOWMAN ×SNOW_REFL_X (a reflected snowball by construction of the loop), the STEGOSAURUS ×STEGO_BOUL_X (any boulder — the
+// reflected one is the only one that reaches him on HEAD; a tan rock never touches a tan). Every other victim ×1: UDEF.mortar.dmg 1.5, the
+// reflect currency, byte-still. The knock / pass-through / once-per-man registry, the launch, the roll, BONK, the pits and the reflect's own
+// mechanics (cmdoIntercept, B.refl / B.rby, the re-aim at B.src) untouched.
+const SNOW_REFL_X=2;    // "100% more damage" — Sergeant Snowman's intake from a reflected snowball (⚑ B-Q1: he is fielded by the ice castle's W2 alone on HEAD — no park / valley row; a King Yeti fight gate is one clause if a park ever fields him)
+const STEGO_BOUL_X=3;   // "200% extra damage" = ×3 total — the stego's intake from any boulder (C-Q1 RULED any; ⚑ C-Q2 a HATCHLING stego is never a rock's victim on HEAD — 0389's hatchlings-never-hit law — so nothing to build there)
+function boulFoeX(f){ return (f.type==='sgtsnow')? SNOW_REFL_X : (f.type==='stego')? STEGO_BOUL_X : 1; }   // the victim's factor at the one seat
 const SB_FAN=0.20;   // 0305 BF-0S: radians between adjacent volley boulders (5-wide = 0.80 rad ≈ 46°, just inside the king's own breath cone)
 function gsnowTick(f,dt){
   const sb=f.def.snowboulder||f.def.boulder;
@@ -53096,7 +53123,7 @@ function gboulTick(dt){
         if(f2.dead || f2.burrow || f2.falling) continue;
         if(B.hit[f2.id]) continue;
         if(Math.hypot(f2.x-B.x,f2.y-B.y)<B.r+f2.def.w*0.3){ B.hit[f2.id]=1;
-          f2.hp -= UDEF.mortar.dmg;   // the reflect currency — foeSplash's own return law
+          f2.hp -= UDEF.mortar.dmg*boulFoeX(f2);   // the reflect currency — foeSplash's own return law · 0906 BOSS NUMBERS Parts B + C: ×boulFoeX — the Snowman doubles a reflected snowball, the stego triples any boulder, everyone else ×1
           hitCheck(f2, B.rby); }
       }
     } else if(B.nem) for(const u of S.units){
@@ -53806,7 +53833,7 @@ function updateFoeStomp(f,dt){
 // f.hatchT self-seeds off the row (the raw-'yeti' law).
 function updateFoeEgg(f,dt){
   if(f.hatched) return;
-  if(f.hatchT==null) f.hatchT=f.def.hatch;
+  if(f.hatchT==null) f.hatchT=eggHatch0(f.def);   // 0906 BOSS NUMBERS Part A: 7.2 in a King Rex fight (EGGS ON PARADE's egglings walk this path), the row's 9.6 everywhere else
   f.hatchT-=dt;
   if(f.hatchT<=3 && Math.random()<dt*2.5) S.fx.push({k:'puff',x:f.x+((Math.random()*14)|0)-7,y:f.y-16,t:0,dur:0.3,R:7});   // hairline-crack puffs — the last-3s tell
   if(f.hatchT<=0){
@@ -58138,7 +58165,7 @@ function spawnGroup9(g){
       for(let j=0;j<per;j++){
         const fo=spawnFoe(g.t, pts[i][0]+(j? ((j*17)%29)-14 : 0), foeBandY(pts[i][1]+(j? ((j*11)%21)-10 : 0)), null, false);
         if(!fo) continue;
-        if(g.hatchStep!=null) fo.hatchT=(FDEF[g.t].hatch||0)+(i*per+j)*g.hatchStep;
+        if(g.hatchStep!=null) fo.hatchT=eggHatch0(FDEF[g.t])+(i*per+j)*g.hatchStep;   // 0906 BOSS NUMBERS Part A: the clutch's base = the lair's 7.2 (eggHatch0); the stagger = the row's authored hatchStep (LAIR_HATCH_STEP 0.54 in the lair)
         if(g.hatchTo) fo.hatchTo=g.hatchTo[(i*per+j)%g.hatchTo.length];
       }
       if(g.quiet){ S.fx.push({k:'ring',x:pts[i][0],y:pts[i][1],r:8,R:44,t:0,dur:0.45,col:'#ffffff'}); bfSfx(SFX.thump, pts[i][0], pts[i][1]); }   // 0526: a QUIET point (THE PILLOW FIELDS' moonlight files land, they do not erupt) — a white ring + a soft thump, no smoke, no shake
@@ -60863,6 +60890,13 @@ function update(dt){
       S.plastic+=pour;
       S.floats.push({x:166, y:280, txt:'+'+pour, t:0, col:'#FFF3C4'});
     }
+  }
+  // 0906 THE BOSS NUMBERS PASS, Part D — THE POUR: +MOM_POUR every MOM_POUR_T s of sim while Mom is on the rug (momOnRug — her raid whole, or a
+  // campaign rug that fielded her), on its own clock beside the faucet above (which keeps its beat and rate; her raid has none — S.sq is null
+  // there, so this is her fight's only drip), the faucet's float seat and colour; per-sim like the faucet; every rug without her byte-still.
+  if(MOM_POUR>0 && MOM_POUR_T>0 && S.mode==='play' && !S.bf && momOnRug()){
+    S.momPourT=(S.momPourT||0)+dt;
+    if(S.momPourT>=MOM_POUR_T){ S.momPourT-=MOM_POUR_T; S.plastic+=MOM_POUR; S.floats.push({x:166, y:280, txt:'+'+MOM_POUR, t:0, col:'#FFF3C4'}); }
   }
   if(S.raid) raidTick(dt);   // v3.39: the raid's own clocks — win door, capture, crush, turrets
   if(S.coop && !S.bf) evTick(dt);   // 0313a THE REFEREE'S WORD: pending words, the 6s valve, the honest wait
@@ -67637,8 +67671,8 @@ function drawFoe(f){
     // 0278b THE EGG — the wobble grows as it cooks (hairline puffs ride the
     // machine); the '?' and the cook-ring are the wordless gamble tell
     // (punctuation glyphs, zero l10n — the ❄-glyph law).
-    const hTd=(f.hatchT==null? f.def.hatch : Math.max(0,f.hatchT));
-    const cook=1-hTd/f.def.hatch;
+    const hT0=eggHatch0(f.def), hTd=(f.hatchT==null? hT0 : Math.max(0,f.hatchT));   // 0906 BOSS NUMBERS Part A: the cook ring reads the base the clock was seeded from (7.2 in the lair)
+    const cook=1-hTd/hT0;
     drawSprite(f.type,f.x,f.y,f.def.w,0,Math.sin(S.t*(5+cook*9)+f.wob)*(0.05+0.14*cook),foeImg(f.type));
     cx.font=cf('bold 15px'); cx.textAlign='center';
     cx.globalAlpha=0.5+0.3*Math.sin(S.t*3);
@@ -79268,6 +79302,22 @@ const EV_HPX={ snowfig:0.5, sgtcold:0.5, syeti:0.25, byeti:0.25, bluepig:0.5, sg
 const EV_SNOW_CD_ADD=6;                        // 0574 THE ULTRA MEGA TUNE II (FM-GVT-ULTRA-TUNE-02; Wyatt 8/26 ~21:30 ET: "they need about a 6-second longer cooldown on their snowball throw"): seconds ADDED to SERGEANT SNOWMAN's volley cooldown in the ULTRA ('u') room only — raidCfg's 'u' block stamps W2's sgtsnow boss row g.cdAdd, spawnGroup copies it to f.cdAdd beside the sbn stamp, gsnowTick's ONE read adds it (fireCd 4.5 → 10.5 s between volleys; the volley of RAID_SB_N.u 6 and the 0.7 statue re-ask untouched). NEVER a FDEF edit — f.def IS the shared row (every other room's Sergeant, the giant and the stego read +0, byte-behaviour). ⚑ 6 (default — "6-second longer" taken literally) · 0 (0565) · a flat number = fireCd on a per-foe def copy instead
 const EV_W3_F=0.5;                             // 0574 THE ULTRA MEGA TUNE II (Wyatt 8/26: "there are just too many mobs … that final wave was just way too big. It needs to be about half the size."): the 'u' room's W3 (⚠ KING YETI COMES DOWN THE MOUNTAIN ⚠ — asserted by NAME in the block, never by index) count factor on every NON-boss group INCLUDING the 24 pre-scheduled trk landings (the count loop's kx exempts them; this pass does not): byeti 2 → 1, each landing RAID_TRK_N.u 7 → 4 (Math.round(3.5)) = 96 syeti over the 120 s vs 168; the king's row stands (a party's min(bs,2) stays sqScaleCfg's law, × sqEnemyMul on the rest); W1/W2 byte-what-they-were; e/m/h/g never enter the block. ⚑ 0.5 (default, landing 4) · 0.43 (landing 3, −57%) · 1 (0565)
 const RAID_KING_FCX={ e:1, m:0.8, h:0.65, g:1.25, u:1.25 };    // the per-tier boss mechanic: his one-big-snowball clock tightens (M/H) — 0357 MEGA REX: 3.2×1.25 = a flat 4.0s breath clock (Wyatt: "the cooldown on his flame breath should only be about 4 seconds"; the D2 turn-wait is waived at mega so the clock IS the felt cadence, and the angry return x0.8 lands 3.2s)
+// ═══ 0906 THE BOSS NUMBERS PASS, Part A — THE LAIR HATCHES FASTER (FM-GVT-BOSS-NUMBERS-01; Wyatt 9/2 ~6:45 pm ET verbatim: "In all King rex fights
+// Have the eggs hatch 40% faster in all king rex difficulties."): every egg clock in a KING REX FIGHT (rexFight — the lair through the volcano door
+// at e/m/h/g, solo and party; 0649 left him no other rug) ×LAIR_EGG_X 0.6 OF THE CLOCK HE PLAYED. The incubation he played was 12 s: 0700 DINO
+// EARLY RUNGS (v7.70, 9/3 04:25 ET) moved the eggling ROW to 9.6 for the parks — Wyatt's 40% is against the 12, never ×0.6 on the 9.6 (= 0.48), so
+// the lair's egg incubates LAIR_EGG_HATCH 7.2 s (the clutch's spouts and EGGS ON PARADE's egglings alike — eggHatch0 is the one reader: the
+// self-seed, the spout's stamp, the cook ring) and the clutch's per-egg stagger 0.9 → LAIR_HATCH_STEP 0.54 (a Hard clutch's sixteen pop over 8.1 s,
+// not 13.5; the two clutches still in parallel). The parks, the campaign's egglings and the lava field's nests (not King Rex fights) keep the
+// row's 9.6 / their own clocks byte-still; the egg counts, the pools, the 5% flee, fcx, the actGate / retreatGate untouched. ⚑ A-Q1 Easy still
+// hatches zero eggs (0646 G1); ⚑ A-Q2 the dino park's rung 20 / 50 finales field the king with three flat egglings in wave one — PARK rungs by
+// the card's reading, untouched.
+const LAIR_EGG_X=0.6;                          // "40% faster" — ×0.6 on every egg clock in a King Rex fight
+const LAIR_EGG_HATCH0=12;                      // the incubation Wyatt played (the pre-0700 row cell; the row reads 9.6 now)
+const LAIR_EGG_HATCH=+(LAIR_EGG_HATCH0*LAIR_EGG_X).toFixed(3);   // 7.2 s — the lair egg's incubation (rounded to the thousandth: 12×0.6 is not 7.2 to a float)
+const LAIR_HATCH_STEP=+(0.9*LAIR_EGG_X).toFixed(3);   // 0.54 s — the clutch's per-egg stagger (0646's 0.9 ×0.6, rounded to the thousandth)
+function rexFight(){ return !!(S.raid && S.raid.k==='bone' && S.raid.cfg===S.cfg); }   // a KING REX FIGHT = the lair (the raid's own cfg law), any tier
+function eggHatch0(def){ return (def && def.hatch && rexFight())? LAIR_EGG_HATCH : ((def && def.hatch)||0); }   // an egg's incubation base: LAIR_EGG_HATCH in a King Rex fight, the row's cell everywhere else
 // ===== 0340 KING CROAK'S HIDEOUT — the campaign family's FOURTH door
 // (rk='croak'; gates on OUTLAW TOWN lv>=20, no key, no rite). The duel:
 // 1v1 start, bandito waves at every 20% of his health (hpGate — the new
@@ -79869,14 +79919,14 @@ function raidCfg(tier,rk){
       {f:'spout',t:'dilo',pts:[[1720,230],[1720,500]],at:0},
       {f:'spout',t:'dilo',pts:[[1420,110],[1420,620]],at:1.8},
       {f:'spout',t:'dilo',pts:[[1080,110],[1080,560]],at:3.6},
-      ...(tier==='m'? [ {f:'spout',t:'eggling',hatchStep:0.9,hatchTo:['sdino','ptero'],at:7.0,
+      ...(tier==='m'? [ {f:'spout',t:'eggling',hatchStep:LAIR_HATCH_STEP,hatchTo:['sdino','ptero'],at:7.0,
         pts:[[888,128],[924,156],[960,128],[996,156],[1032,128],[960,168],[840,100],[912,100],[984,100],[840,156],[876,182],[960,208]]} ] : []),   // 0646 Card C ("x2 the amount of eggs in all difficulties"): 6 -> 12 — the six new cells widen the same top ring; every cell in the 56..708 band, >=90px from every lava bowl, none in lava
       ...(tier==='h'||tier==='g'? [   // 0357: MEGA cracks BOTH Hard clutches too (without this cell the top tier would hatch NOTHING)
-        {f:'spout',t:'eggling',hatchStep:0.9,hatchTo:['sdino','ptero'],at:7.0,
+        {f:'spout',t:'eggling',hatchStep:LAIR_HATCH_STEP,hatchTo:['sdino','ptero'],at:7.0,
           pts:[[876,128],[912,156],[948,128],[984,156],[1020,128],[1056,156],[924,182],[1008,182],[840,100],[912,100],[984,100],[840,156],[876,182],[1044,182],[960,208],[1032,208]]},   // 0646 Card C: 8 -> 16 — the ring widens, the shipped cells byte-still
-        {f:'spout',t:'eggling',hatchStep:0.9,hatchTo:['trike','bdino'],at:7.0,
+        {f:'spout',t:'eggling',hatchStep:LAIR_HATCH_STEP,hatchTo:['trike','bdino'],at:7.0,
           pts:[[876,580],[912,552],[948,580],[984,552],[1020,580],[1056,552],[924,526],[1008,526],[840,608],[912,608],[984,608],[840,552],[876,500],[960,500],[1044,500],[912,476]]} ] : []),   // 0646 Card C: 8 -> 16 — the bottom ring widens the same way (band-safe, lava-clear)
-      ...(tier==='g'? [ {f:'spout',t:'eggling',hatchStep:0.9,hatchTo:['sdino','bdino'],at:7.0,
+      ...(tier==='g'? [ {f:'spout',t:'eggling',hatchStep:LAIR_HATCH_STEP,hatchTo:['sdino','bdino'],at:7.0,
         pts:[[1560,330],[1596,358],[1560,386],[1596,414],[1632,330],[1632,386],[1596,302],[1632,414],[1524,330],[1524,386],[1560,302],[1632,302],[1596,274],[1560,430],[1596,470],[1632,442]]} ] : []),   // 0357 MEGA: THE ADDITIONAL EGG SPAWN (Wyatt's word) — a third clutch, 8 -> 16 by 0646 Card C, from the deep-east nest (pool sdino/bdino, the no-more-fire nest law; every cell ≥90px from the spout mouths AND every lava bowl, none in lava)
       Object.assign({f:'boss',t:'kingrex',n:1,e:'right',at:10.0,fcx:RAID_KING_FCX[tier]*0.8,rngx:2,hpAdd:{e:0,m:25,h:40,g:185}[tier]}, tier==='g'? {conex:2,multix:2,mgx:1} : {}),   // 0357 MEGA: the angry return — 502+185=687 = Hard's 458 ×1.5 EXACT; the shipped rngx:2 already doubles his reach here, the arc/victim doubles ride the g stamps
       {f:'pincer',t:'sdino',n:c(6),e:'right-top',at:12.0},
@@ -90367,6 +90417,7 @@ window.GVT = {
   // throw. Always answers false (never armed); ⚠ GVT.momBoot(true) CANNOT
   // re-arm an ambush — the machinery is gone, not gated (the v1.28 law).
   momBoot(){ return false; },
+  bn(){ return { cv:GVT_CV, lairEggX:LAIR_EGG_X, lairHatch0:LAIR_EGG_HATCH0, lairHatch:LAIR_EGG_HATCH, lairStep:LAIR_HATCH_STEP, rexFight:rexFight(), rowHatch:FDEF.eggling.hatch, snowReflX:SNOW_REFL_X, stegoBoulX:STEGO_BOUL_X, reflC:UDEF.mortar.dmg, coldHp:FDEF.sgtcold.hp, snowHp:FDEF.sgtsnow.hp, stegoHp:FDEF.stego.hp, momHp:MOM_HP, momHpX:MOM_HP_X, momRowHp:FDEF.mom.hp, momPour:MOM_POUR, momPourT:MOM_POUR_T, momOn:momOnRug(), pourT:+(S.momPourT||0).toFixed(3), momBounty:MOM_BOUNTY, momTags:MOM_TAGS }; },   // 0906 THE BOSS NUMBERS PASS: the seven cells + the doors, read off the page (the rig's one read)
   momFight(){ startMomRaid(); return true; },
   momState(){ const f=S.foes.find(x=>x.type==='mom');
     return { raid:!!S.momRaid, wave:S.wave, lives:S.lives, plastic:S.plastic,
