@@ -33499,6 +33499,25 @@ const WPN_MILE={ pistolLvl:10, pistolRateMul:1.6, pistolFullLvl:20, pistolFullMu
 // only: the AI kit's stock 0.34 (bfSargeKit) and THEIR SARGE's FDEF 0.5 are
 // their own bags, deliberately unmoved.
 const SABER_L20_BLOCK=0.5;
+// ═══ 0904 SABER SARGE STRIKES TWICE (FM-GVT-SABER-TWO-STEP-01; the Go Machine's card 9/2 20:25:16; Wyatt 9/2 ~6:45 pm ET, voice:
+// "change sabersarge attack to be a two-step in general. He does the dash to the enemy as normal. He swipes the blade, and if the
+// monster is not dead, the attack speed timer goes by, and then he swings the blade in more of a standing animation this time. If
+// the enemy is still not dead, it should be the same thing, but if the monster is dead, then he should dash to the next. If there's
+// someone in range, or otherwise, he should keep moving. We think that this can be a solution because it will provide the boss some
+// time to actually hit sabersarge.") — the LIGHTSABER's cycle on every carpet (the campaign, the parks, the raids, the battleground,
+// the away battle's AI blade; UNARMED fists ride it — a punch is a strike): the flight to a NEW man (680; THE CHARGE ADVANTAGE wraps
+// the arrival swipe alone), then he HOLDS HIS GROUND at the man he cut — no re-pick while the man lives, no re-dash, no walk home —
+// and swings again from a standing pose on SAB2_CAD; a man who drifts past the blade is WALKED after (SAB2_STEP), never flown at;
+// the frame the man falls, the next man inside his window (the flight, the advantage; SAB2_NEXT_CD the quiet) or THE ADVANCE (idle
+// where he stands, the post under his feet, the line's march). HEAD's cycle (the re-pick after every strike, 'back' = the walk home
+// at 390 to u.home) stands behind SAB2_ON=false. The COMMANDER (CMD_DASH / cmdCut / the Duelist), the Nemesis / tansarge blade, the
+// block, the crit, THE ELDER SABER, the crystals and the king's own seats are byte-still — the two-step sits UNDER 0683's exchange.
+const SAB2_ON=true,          // the kill switch (false = HEAD's cycle verbatim)
+      SAB2_CAD=0.5,          // the standing swing's clock, s — HEAD's own chain drum (the frenzy divides it); ⚑ Q4: 2.1 = the bag's attack speed (sw.cd), Wyatt's "attack speed timer" read literally
+      SAB2_STEP=120,         // the walk after a LIVING man who drifted past the blade's 26, px/s (a stride: the legs bob, the face turns; the king's 120 px step-back is out-walked in a second); ⚑ Q5 — 680 = HEAD's chase
+      SAB2_NEXT_CD=0,        // the quiet before the flight to the NEXT man once his man falls, s (0 = none beyond the cadence — ⚑ Q2 recommended)
+      SAB2_REACH=0,          // the NEXT man's window, px: 0 = his hunt reach (saberReach — ⚑ Q1 recommended), 26 = the blade alone
+      SAB2_GUARD=-0.15, SAB2_POSE_UP=-1.75, SAB2_POSE_DN=0.45, SAB2_SWEEP_T=0.16, SAB2_BACK_T=0.22;   // THE STANDING POSE (⚑ Q3): the blade level at the man between cuts; a cut sweeps over the shoulder → the follow-through in SAB2_SWEEP_T, eases back to the guard in SAB2_BACK_T (reduced motion: the guard alone)
 // which rank a weapon's milestone card fires at (the saber's is the @20 restore)
 function mileLvl(wk){ return wk==='lightsaber'? WPN_MILE.sabFullLvl
   : wk==='saber2'? WPN_MILE.sabTwoLvl   // 0583a: the saber's SECOND milestone rides the same reader
@@ -39842,7 +39861,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.76';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.77';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -51590,11 +51609,25 @@ function tanHit(u,fx,fy,src){
 // enemy base as normal. State: idle → out (chains) → back.
 // (u.saberCd now ticks in the units-fire loop head, so a marching battlefield
 // Sarge re-arms on the move instead of standing frozen at first contact.)
-function saberNext(u,sw){
+function saberReach(u,sw){ return sw.aggro*lzRngMul(u)+tkSilvRng(u); }   // 0904: THE HUNT REACH, named once — the bag's aggro (the rank, THE ELDER SABER's +3 m, the pads) × the tan beam's 1% + the silver surge (0901 Card A P8); saberNext's window, the two-step's next-man window (⚑ Q1) and its lost-man gate all read this one line
+function sabGone(u,f){ return S.bf ? (!f||f.dead||f.hp<=0) : (!f||f.pendDie||S.foes.indexOf(f)<0); }   // 0559 B's two readings of "the man is gone", named once (0904: the strike seat asks it too)
+function sab2Lost(u,sw,f){ return !!(f.burrow || (!S.bf && f.x>W-6) || Math.hypot(f.x-u.x,f.y-u.y)>saberReach(u,sw)); }   // 0904: a LIVING man the blade will not chase — burrowed, off the mat's east edge (saberNext's own filters) or past the hunt reach (a rider galloping off): the pick, never a chase
+function sab2Advance(u,sw,rearm){   // 0904 THE ADVANCE — nobody left in reach: NOT the walk home. Idle where the last man fell, the post re-planted under his feet (u.home — the shotgun / commander machines and a re-placement stamp it the same way), the bag's re-arm when the sortie ended with his own cut (the 'back' seat's verbatim line: sw.cd, the 0487 fists' half, the crystals' clocks; a kill denied him re-arms nothing — HEAD's own two paths), and campUnitStep / bfMarch carry him on with the line ("keep moving")
+  u.saberState='idle'; u.saberTarget=null; u.saberFirstT=null; u.sabStand=0; u.marching=false; u.home={x:u.x,y:u.y};
+  if(rearm) u.saberCd=sw.cd*(unarmedU(u,sw)? UNARMED_CD_F : 1)*tkSlowMul(u)/lzRateMul(u);
+}
+function sab2Pose(u){   // 0904 the standing blade's angle off the cut's clock — presentation only (the mvSm law: reads S.t + the cut stamp, writes nothing): a cut sweeps SAB2_POSE_UP → SAB2_POSE_DN over SAB2_SWEEP_T (eased out), eases back to SAB2_GUARD over SAB2_BACK_T, the guard holds between cuts; reduced motion = the guard alone (the ring + the arc carry the read)
+  const k=S.t-(u.sabCutT==null? -9 : u.sabCutT);
+  if(reducedMotion() || k<0 || k>=SAB2_SWEEP_T+SAB2_BACK_T) return { a:SAB2_GUARD, k:-1 };
+  if(k<SAB2_SWEEP_T){ const q=k/SAB2_SWEEP_T, e=1-Math.pow(1-q,2.2); return { a:SAB2_POSE_UP+(SAB2_POSE_DN-SAB2_POSE_UP)*e, k }; }
+  const q2=(k-SAB2_SWEEP_T)/SAB2_BACK_T, e2=q2*q2*(3-2*q2); return { a:SAB2_POSE_DN+(SAB2_GUARD-SAB2_POSE_DN)*e2, k };
+}
+function saberNext(u,sw,r9){
   // v2.36: the tan beam stretches the hunt radius the same 1% it stretches
   // every gun (the helmet's −1% already lives in sw.aggro itself)
-  if(S.bf) return bfNearestEnemy(u,sw.aggro*lzRngMul(u)+tkSilvRng(u));
-  let best=null,bd=sw.aggro*lzRngMul(u)+tkSilvRng(u);   // 0901 Card A P8 (⚑ Q8) SILVER: the +3 m surge rides the blade's HUNT too (every gun's reach gate has read tkSilvRng since v3.39; the blade's window never did — the veteran's 259 becomes 343 while the surge is up; the halt matches the trigger by campFoeInReach's own saberNext read)
+  const R9=(r9>0)? r9 : saberReach(u,sw);   // 0904: a caller may name a tighter window (SAB2_REACH for the next man; 0 = the hunt)
+  if(S.bf) return bfNearestEnemy(u,R9);
+  let best=null,bd=R9;   // 0901 Card A P8 (⚑ Q8) SILVER: the +3 m surge rides the blade's HUNT too (every gun's reach gate has read tkSilvRng since v3.39; the blade's window never did — the veteran's 259 becomes 343 while the surge is up; the halt matches the trigger by campFoeInReach's own saberNext read)
   for(const f of S.foes){ if(f.burrow||f.x>W-6||f.pendDie) continue; const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){bd=d;best=f;} }   // 0559 B: a sliver-held foe draws no dash
   return best;
 }
@@ -51604,20 +51637,25 @@ function updateSaber(u,dt,sw){
   if(u.saberState==='idle'){
     if(u.saberCd>0) return;
     const best=saberNext(u,sw);
-    if(best){ u.saberState='out'; u.saberTarget=best; u.saberFirstT=best; bfSfx(unarmedU(u,sw)? SFX.swish : SFX.laser, u.x, u.y); }   // 0487 UNARMED: the dash is his, the ignition hum is not — a bare-handed man leaves with the commander's swish   // 0278l: the charge OWES this man the first strike (THE CHARGE ADVANTAGE — the guards live in updateFoeSaber/updateFoePounce)
+    if(best){ u.saberState='out'; u.saberTarget=best; u.saberFirstT=best; u.sabStand=0; bfSfx(unarmedU(u,sw)? SFX.swish : SFX.laser, u.x, u.y); }   // 0487 UNARMED: the dash is his, the ignition hum is not — a bare-handed man leaves with the commander's swish   // 0278l: the charge OWES this man the first strike (THE CHARGE ADVANTAGE — the guards live in updateFoeSaber/updateFoePounce)
     return;
   }
   if(u.saberState==='out'){
     const f=u.saberTarget;
-    const gone = S.bf ? (!f||f.dead||f.hp<=0) : (!f||f.pendDie||S.foes.indexOf(f)<0);   // 0559 B
+    const gone = sabGone(u,f) || (SAB2_ON && sab2Lost(u,sw,f));   // 0559 B · 0904: a LIVING man who burrowed, walked off the mat or left his hunt reach is nobody's target either — the pick, never a chase
     if(gone){
-      const nx=saberNext(u,sw);                   // denied his kill — carve the next one instead
-      if(nx){ u.saberTarget=nx; u.saberFirstT=nx; return; }   // 0278l: the fresh dash carries the advantage onto the new man
+      const nx=saberNext(u,sw,SAB2_REACH);        // denied his kill — carve the next one instead · 0904 THE NEXT MAN inside his window (⚑ Q1)
+      if(nx){ u.saberTarget=nx; u.saberFirstT=nx; u.sabStand=0; if(SAB2_ON && SAB2_NEXT_CD>0) u.saberSwing=Math.max(u.saberSwing||0,SAB2_NEXT_CD); return; }   // 0278l: the fresh dash carries the advantage onto the new man · 0904: the flight to the NEXT man (⚑ Q2 SAB2_NEXT_CD: 0 = no quiet beyond the cadence)
+      if(SAB2_ON){ sab2Advance(u,sw,false); return; }   // 0904 THE ADVANCE: nobody in reach — idle where he stands, the post under his feet, the line's march carries him on; NEVER the walk home
       u.saberState='back'; u.saberFirstT=null; return;
     }
     u.saberSwing=(u.saberSwing||0)-dt;            // recovery between chained strikes
     const dx=f.x-u.x, dy=f.y-u.y, d=Math.hypot(dx,dy);
-    if(d>26){ const sp=680; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }   // a real dash — he's IN quick
+    if(SAB2_ON && u.sabStand) cmdWkStamp(u, dx>=0? 30 : -30);   // 0904: a standing man faces the man he is cutting (the walk stamp's 0.15 s hold, refreshed each frame he stands; presentation only)
+    if(d>26){
+      if(SAB2_ON && u.sabStand){ const mv=Math.min(d-22,SAB2_STEP*dt); u.x+=dx/d*mv; u.y+=dy/d*mv; u.marching=true; }   // 0904 THE STEP: the man he already cut drifted past the blade — he WALKS after him (SAB2_STEP, the legs stride), never the flight (Wyatt: "more of a standing animation"); the flight below is for a NEW man
+      else { const sp=680; u.x+=dx/d*sp*dt; u.y+=dy/d*sp*dt; }   // a real dash — he's IN quick
+    }
     else if(u.saberSwing<=0){
       const ua9=unarmedU(u,sw);   // 0487 UNARMED (D18): the STRIKE becomes a PUNCH — dmg ×UNARMED_DMG_F, the cleave radius UNARMED_CLEAVE (0 = the nearest man only), a short white arc + the thwack, the re-arm cd ×UNARMED_CD_F below. The feet (the dash in, the chain, the walk home) are byte-what-they-were.
       const vm=(u.vet?1.5:1)*lzDmgMul(u), cr9=rollCrit(u), cm=(cr9 || u.sabCritAt>S.t)? critMult(u) : 1; u.sabCritAt=0;   // v2.36: the red beam rides vm — every strike and cleave below inherits · 0901 Card B P2c THE PARRY's crit: the strike inside KB_PARRY_CRIT of a parry crits whatever the die said (the die still rolls — zero new dice, the sequence byte-what-it-was); one strike spends the window (sabCritAt is an absolute S.t stamp — no clock to burn)
@@ -51631,9 +51669,16 @@ function updateSaber(u,dt,sw){
       }
       if(ua9){ const pa9=Math.atan2(f.y-u.y,f.x-u.x); S.fx.push({k:'arc',x:u.x,y:u.y-18,R:22,a0:pa9-0.6,a1:pa9+0.6,lw:4,c1:'#F2EFE4',c2:'#ffffff',t:0,dur:0.18}); }   // 0487: a short WHITE arc off the fist toward the man (the 0278a arc kind) — no blade ring, no blade colour
       else S.fx.push({k:'ring',x:u.x,y:u.y-16,r:6,R:50,t:0,dur:0.26,col:saberHexU(u)});
+      if(SAB2_ON && u.sabStand && !ua9) S.fx.push({k:'arc',x:u.x,y:u.y-22,R:36,a0:(dx>=0? SAB2_POSE_UP : Math.PI-SAB2_POSE_UP),a1:(dx>=0? SAB2_POSE_DN : Math.PI-SAB2_POSE_DN),ccw:dx<0,lw:5,c1:saberHexU(u),c2:'#ffffff',t:0,dur:SAB2_SWEEP_T});   // 0904 THE STANDING CUT's path — the blade's crescent from over the shoulder to the follow-through on the side he faces (the 0278a arc kind; ccw mirrors it for a man on his west); the arrival swipe keeps the ring alone
       // twenty commanders can now draw a blade — an offscreen strike must not
       // shove the camera around, and only YOUR Sarge gets to rock the room
-      bfSfx(ua9? SFX.thwack : SFX.laser, u.x, u.y); if(bfHumanU(u)) S.shake=(ua9? 0.12 : 0.2); u.saberSwing=0.5*(u.tkFrenzT>0? 1/TK_GREEN_AS : 1);   // 0487: the thwack + a lighter shake for a fist; the chain's 0.5 s recovery is the blade's own (⚑ one seat if the fists should chain quicker too)   // 0347 GREEN: the frenzy quickens the chain too (frenzy factor ONLY — this line never read the teal slow and still doesn't)
+      bfSfx(ua9? SFX.thwack : SFX.laser, u.x, u.y); if(bfHumanU(u)) S.shake=(ua9? 0.12 : 0.2); u.saberSwing=(SAB2_ON? SAB2_CAD : 0.5)*(u.tkFrenzT>0? 1/TK_GREEN_AS : 1); u.sabCutT=S.t;   // 0487: the thwack + a lighter shake for a fist; the chain's 0.5 s recovery is the blade's own (⚑ one seat if the fists should chain quicker too)   // 0347 GREEN: the frenzy quickens the chain too (frenzy factor ONLY — this line never read the teal slow and still doesn't)
+      if(SAB2_ON){   // 0904 SABER SARGE STRIKES TWICE: the man he cut got his first strike (the exchange is open — the king's answer lands, 0683's law); while he LIVES Sarge holds his ground here and the next swing is a STANDING one when the cadence frees — no re-pick, no re-dash, no walk home; the frame he falls, the next man in his window (the flight, the advantage) or THE ADVANCE
+        u.sabStand=1; u.saberFirstT=null; u.marching=false;
+        if(!sabGone(u,f)) return;
+        const nx2=saberNext(u,sw,SAB2_REACH); if(nx2){ u.saberTarget=nx2; u.saberFirstT=nx2; u.sabStand=0; if(SAB2_NEXT_CD>0) u.saberSwing=Math.max(u.saberSwing,SAB2_NEXT_CD); return; }   // he fell to this cut: the flight to the next man, the advantage his (⚑ Q1 the window, ⚑ Q2 the quiet)
+        sab2Advance(u,sw,true); return;   // nobody left in reach: THE ADVANCE with the bag's re-arm
+      }
       const nx=saberNext(u,sw);                   // anyone still in reach? keep carving forward
       if(nx){ u.saberTarget=nx; u.saberFirstT=(nx===f? null : nx); return; }   // 0278l: a NEW man owes him the first strike; the man he JUST struck got his — the exchange is open (no immunity duel)
       u.saberState='back'; u.saberFirstT=null; u.saberCd=sw.cd*(ua9? UNARMED_CD_F : 1)*tkSlowMul(u)/lzRateMul(u);   // 0487 UNARMED: 'the attack speed is half' — the re-arm at 1.05 s (2.1×0.5) before the blue/teal beams, a MULTIPLIER on the bag's own cd (never a copy of 2.1)   // v2.36: the blue beam re-arms the blade a hair sooner (the crystal's blue lives in sw.cd itself) · v3.11: TEAL's concussion stretches it
@@ -65054,9 +65099,9 @@ function draw(){
       const swp=e.a0+(e.a1-e.a0)*Math.min(1,k*2.4);
       cx.globalAlpha=(1-k)*0.9; cx.lineCap='round';
       cx.lineWidth=e.lw||7; cx.strokeStyle=e.c1||'#C9D5DD';
-      cx.beginPath(); cx.arc(e.x,e.y,e.R,e.a0,swp); cx.stroke();
+      cx.beginPath(); cx.arc(e.x,e.y,e.R,e.a0,swp,!!e.ccw); cx.stroke();
       cx.lineWidth=(e.lw||7)*0.45; cx.strokeStyle=e.c2||'#fff';
-      cx.beginPath(); cx.arc(e.x,e.y,e.R,e.a0,swp); cx.stroke();
+      cx.beginPath(); cx.arc(e.x,e.y,e.R,e.a0,swp,!!e.ccw); cx.stroke();
       cx.lineCap='butt'; cx.globalAlpha=1; }
     else if(e.k==='flash'){ // muzzle / impact star: long spikes along the shot, short ones across it
       cx.globalAlpha=1-k; const R=e.R*(0.55+0.75*k);
@@ -67084,7 +67129,8 @@ function drawSargeWeapon(u){
   }
   else if(w==='lightsaber'){
     const dashing=(u.saberState==='out'||u.saberState==='back');
-    const col=saberHexU(u), len=dashing?38:32, ang=dashing?-0.98:-0.52;
+    const st9=SAB2_ON && u.saberState==='out' && !!u.sabStand, sk9=st9? sab2Pose(u) : null;   // 0904 THE STANDING SWING (⚑ Q3): at the man he cut the blade drops to the guard — level, at him — and every cut sweeps over the shoulder to the follow-through off the cut's own clock (u.sabCutT); the flight keeps its raised blade + halo, the rest its -0.52
+    const col=saberHexU(u), len=dashing?38:32, ang=sk9? sk9.a : (dashing?-0.98:-0.52);
     const hx=u.x+8, hy=u.y-22;                              // the hand
     const gx=hx-Math.cos(ang)*6, gy=hy-Math.sin(ang)*6;     // grip end
     const bx=hx+Math.cos(ang)*3, by=hy+Math.sin(ang)*3;     // blade emitter
@@ -67106,7 +67152,7 @@ function drawSargeWeapon(u){
     cx.shadowBlur=0; cx.strokeStyle='#ffffff'; cx.lineWidth=2.6; cx.beginPath(); cx.moveTo(bx,by); cx.lineTo(tx,ty); cx.stroke();
     cx.fillStyle='#ffffff'; cx.beginPath(); cx.arc(tx,ty,2.8,0,7); cx.fill();
     cx.restore();
-    if(dashing){ cx.globalAlpha=0.26; cx.fillStyle=col; cx.beginPath(); cx.ellipse(u.x,u.y-16,20,26,0,0,7); cx.fill(); cx.globalAlpha=1; }
+    if(dashing && !st9){ cx.globalAlpha=0.26; cx.fillStyle=col; cx.beginPath(); cx.ellipse(u.x,u.y-16,20,26,0,0,7); cx.fill(); cx.globalAlpha=1; }   // 0904: the halo is the flight's — a standing man wears none
   }
   if(wflip) cx.restore();
 }
@@ -90593,10 +90639,11 @@ window.GVT = {
     return { pick:META.cmdSpec|0, pick2:META.cs2|0, cs:cmdSpec(), cs2:cmdSpec2(), owned:[0,1,2,3].map(i=>csOwned(i)?1:0), tester:csTester()?1:0, teddy:teddyBeat()?1:0, camp:META.campaign|0, bag:sargeStats() }; },
   // THE BLADE IN YOUR FACE test rig: the whole saber state machine in one call,
   // plus how many tan are close enough to stop presenting arms and just shoot him
+  ss(){ return { on:SAB2_ON, cad:SAB2_CAD, step:SAB2_STEP, nextCd:SAB2_NEXT_CD, reach:SAB2_REACH, guard:SAB2_GUARD, up:SAB2_POSE_UP, dn:SAB2_POSE_DN, sweepT:SAB2_SWEEP_T, backT:SAB2_BACK_T }; },   // 0904 the two-step's dials, read off the page
   saberState(){ const u=S.units.find(x=>x.type==='sarge'); if(!u) return null;
     const sw=unitSargeStats(u);
     return { w:sw.w, rank:sw.r, block:sw.block||0, state:u.saberState||null,
-      target:!!u.saberTarget, first:!!u.saberFirstT, swing:+(u.saberSwing||0).toFixed(2), cd:+(u.saberCd||0).toFixed(2),
+      target:!!u.saberTarget, first:!!u.saberFirstT, stand:u.sabStand|0, cutT:(u.sabCutT==null? null : +u.sabCutT.toFixed(2)), home:(u.home? [Math.round(u.home.x),Math.round(u.home.y)] : null), swing:+(u.saberSwing||0).toFixed(2), cd:+(u.saberCd||0).toFixed(2),
       dead:!!u.dead, hits:u.hits, grit:gritCap(u),
       x:Math.round(u.x), y:Math.round(u.y),
       home:u.home?{x:Math.round(u.home.x),y:Math.round(u.home.y)}:null,
