@@ -39876,7 +39876,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.79';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.80';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -53428,6 +53428,88 @@ function croakRc(f){ if(!((f.def&&f.def.croak)||isCroakU(f)) || f.rcAt==null) re
 // box: the mover fork's croak arm cedes his feet to this machine. The whole
 // brain serves BOTH kings via def.croak — LITTLE KING CROAK hunts exactly
 // like his father (flagged), fanR ×0.6 with his father's clocks and pips.
+// ═══ 0710 KING CROAK DODGES THE JEEP (FM-GVT-CROAK-DODGE-01; the Go Machine's card 9/2 20:30:19; Wyatt 9/2 ~6:45 pm ET, voice: "In the
+// king croak fight, he should dodge incoming jeep attacks by leaping upwards or downwards") — THE HIDEOUT's boss (rk 'croak', E / M / H / MEGA;
+// the king himself, f.type 'kingcroak' — the little king keeps HEAD ⚑ Q5) LEAPS out of a jeep's line. A JEEP ATTACK on HEAD in his fight is
+// the BUMPER alone: the jeep family (def.vehicle + def.ram — the scout, the V2, the loaner; no gun; the tank has no ram) drives EAST along its
+// lane through the whole street (0410 THE JEEP DRIVES ON — a raid rug has no crate) and bfRam clips every foe inside ramR 46 ONCE for the
+// bumper (a boss is ramSpared from THE WHEELS KILL: the V2 lands 14 = ram 4 + J2_RAM_ADD 10, the scout 4 — through hurt()); the V2 winds its
+// ×2.2 charge inside J2_SIGHT 260. THE READ: a jeep WEST of him, driving (marching — never a spent / retired / dropping copy), inside
+// CKD_READ_X on his row (|dy| <= CKD_LANE) = INCOMING; once per jeep (f.ckdSeen) he ROLLS on one die seeded off facts every sim shares —
+// the door : the tier : his muster number : the read's ordinal (rxRoll, the 0706 / 0575 grammar — never Math.random; the roam's own dice stay
+// HEAD's) against his tier's odds CKD_ODDS (⚑ Q1); a win off the CKD_CD cooldown (⚑ Q2) plants the TELL (CKD_TELL s — the crouch, a ring at
+// his feet, the puff; ⚑ Q3) and he LEAPS one lane (CKD_DY px) UP or DOWN — the side the die picks (the roll's own low bit: both of a party's sims agree), the
+// other if that side has no room (the hold band ry0..ry1, never a crate's circle (r + 14), never the creek — no dodge from the planks: a
+// straight-up leap would land in the water); the flight CKD_T s on f.hopZ (the v2.53 body-lift channel: the shadow and every scan keep the
+// ground — he is SHOOTABLE and clippable the whole hop ⚑ Q4); the landing stands a lane's width off the bumper's circle and the brain
+// resumes where he lands (the roam leg re-aims to the new row; the dash for cover continues). THE DANCE: he dodges only from 'roam' and
+// 'torun' — never mid-plant, mid-storm (the fan) or in cover (the burrow): a dodge WAITS for them; the wall clock and the hpGate latches tick
+// through the tell + the flight (a break landing mid-air bolts from the landing). MEGA dodges at its own odds. A lost roll = the honest hit
+// (the bumper lands as on HEAD). CKD_ON=false = HEAD verbatim.
+const CKD_ON=true,                              // the kill switch
+      CKD_ODDS={ e:0.5, m:0.65, h:0.8, g:0.9 },  // ⚑ Q1 the dodge odds per tier (one roll per incoming jeep)
+      CKD_CD=4,                                  // ⚑ Q2 the cooldown after a dodge, s
+      CKD_TELL=0.25,                             // ⚑ Q3 the tell, s (shorter than the fan's 0.55 plant)
+      CKD_T=0.3, CKD_H=54,                       // the flight, s · its apex on f.hopZ, px
+      CKD_DY=150,                                // ⚑ the leap: one lane up or down, px (the bumper's circle is 46)
+      CKD_READ_X=300,                            // the read: a jeep this close WEST of him on his row is INCOMING (J2_SIGHT 260 + a beat)
+      CKD_LANE=60;                               // ...on his row = inside this many px of his y (ramR 46 + the steer's slop)
+function ckdJeep(f){   // the incoming jeep: WEST of him, driving, inside CKD_READ_X on his row — the nearest
+  let best=null,bd=1e9;
+  for(const u of S.units){
+    if(u.dead||u.dropT>0||u.falling||u.kamiDone||u.jetT>0) continue;
+    if(!(u.def&&u.def.vehicle&&u.def.ram)) continue;
+    if(!u.marching) continue;
+    const dx=f.x-u.x, dy=Math.abs(u.y-f.y);
+    if(dx<=0 || dx>CKD_READ_X || dy>CKD_LANE) continue;
+    if(dx<bd){ bd=dx; best=u; }
+  }
+  return best;
+}
+function ckdKey(f){ return 'ckd:'+rxDoorKey()+':'+(f.foN|0)+':'+(f.ckdN|0); }   // the door : the tier : his muster number (spawnFoe's per-type ordinal — every sim spawns the same stream) : the read's ordinal
+function ckdOdds(){ const t=(S.raid && S.raid.cfg===S.cfg)? S.raid.t : 'e'; return (CKD_ODDS[t]!=null)? CKD_ODDS[t] : CKD_ODDS.e; }
+function ckdLandOK(x,y){
+  if(y<100 || y>WORLD_H-90) return false;   // the hold band (updateFoeCroak's ry0 / ry1)
+  for(const rk of (S.cfg.terrain.rocks||[])){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }   // never into the crates (jetLandOK's own pad)
+  const RV=S.cfg.terrain.river; if(RV && x>RV.x-26 && x<RV.x+RV.w+26) return false;   // never from the planks — a straight-up leap lands in the creek
+  return true;
+}
+function ckdSide(r){ return (Math.floor(r*4096)&1)? 1 : -1; }   // the side: the roll's own low bit (one fact both sims share — a relayed copy's y and lane follow the host's zig at every beat, nothing about the jeep is shared to the pixel); a lane's width clears the bumper's circle on EITHER side in every readable geometry (150 - 60 > 46 + the zig)
+function ckdLand(f,d0){   // the picked side first, the other if that side has no room; nowhere = null (no dodge — the honest hit)
+  for(const d of [d0,-d0]){ const y=f.y+d*CKD_DY; if(ckdLandOK(f.x,y)) return {x:f.x,y:y}; }
+  return null;
+}
+function ckdTick(f,dt){   // true = the dodge owns this frame (the tell or the flight); the state machine waits
+  if(f.ckdN==null){ f.ckdN=0; f.ckdCd=0; f.ckdW=0; f.ckdT=0; f.ckdSeen={}; f.ckdRolls=0; f.ckdDodges=0; }
+  if(f.ckdT>0){   // THE FLIGHT: straight up or down the street on f.hopZ; the landing re-aims a roam leg to the new row
+    f.ckdT-=dt; const k=Math.max(0,Math.min(1,1-f.ckdT/CKD_T));
+    f.y=f.ckdY0+(f.ckdY1-f.ckdY0)*k; f.hopZ=CKD_H*4*k*(1-k);
+    if(f.ckdT<=0){ f.ckdT=0; f.hopZ=0; f.y=f.ckdY1; f.ckdDodges++; f.ckdLastT=S.t; f.ckdCd=CKD_CD;
+      const D=f.duel; if(D && D.st==='roam'){ D.wx=f.x; D.wy=f.y; D.via=null; }
+      S.fx.push({k:'puff',x:f.x,y:f.y+2,t:0,dur:0.35,R:18}); SFX.thock(); tdLog(f,'dodge-land',[Math.round(f.x),Math.round(f.y)]); }
+    return true;
+  }
+  if(f.ckdW>0){   // THE TELL: the crouch; the ground re-tested at the launch (the jeep's side re-read)
+    f.ckdW-=dt;
+    if(f.ckdW<=0){ f.ckdW=0; const u=f.ckdU; f.ckdU=null;
+      const to=(u && !u.dead)? ckdLand(f,f.ckdSide||1) : null;
+      if(!to) return false;
+      f.ckdY0=f.y; f.ckdY1=to.y; f.ckdT=CKD_T; bfSfx(SFX.jet, f.x, f.y); tdLog(f,'dodge',[Math.round(to.x),Math.round(to.y)]); }
+    return true;
+  }
+  f.ckdCd=Math.max(0,f.ckdCd-dt);   // the cooldown runs in every state; only the roll waits
+  const D=f.duel; if(!D || !(D.st==='roam' || D.st==='torun')) return false;   // a dodge waits for the plant, the storm and the cover
+  if(f.burrow || f.pendDie || f.falling) return false;
+  const u=ckdJeep(f); if(!u) return false;
+  if(f.ckdSeen[u.id] || f.ckdCd>0) return false;   // one roll per jeep; none inside the cooldown (the jeep still incoming when it ends is rolled then)
+  f.ckdSeen[u.id]=1; f.ckdN++; f.ckdRolls++;
+  const r=rxRoll(ckdKey(f)); f.ckdLastRoll=r; tdLog(f,'dodge-roll',[+r.toFixed(4),ckdOdds(),Math.round(f.x-u.x)]);
+  if(r>=ckdOdds()) return false;   // the honest hit
+  const sd=ckdSide(r); if(!ckdLand(f,sd)) return false;   // nowhere to leap (the planks; a crate both ways; the band's edge) — the honest hit
+  f.ckdU=u; f.ckdSide=sd; f.ckdW=CKD_TELL;
+  S.fx.push({k:'ring',x:f.x,y:f.y-4,r:6,R:48,t:0,dur:0.35,col:'#FFF3C4'}); S.fx.push({k:'puff',x:f.x,y:f.y+2,t:0,dur:0.3,R:12}); tdLog(f,'dodge-tell');   // the tell: a cream ring at his feet + a puff (existing fx, zero words)
+  return true;
+}
 function updateFoeCroak(f,dt){
   if(!f.duel){ f.duel={ st:'roam', wx:f.x, wy:f.y, shotCd:2,
     fanCd:(f.fanCd!=null? f.fanCd : CROAK_FAN_CD.e)*0.7/(f.rev?SON_REV_AS:1), dmgRef:f.hp, t:0, burst:0, aimAt:Math.PI,   // 0455: a son revenged during his walk-on arms fast too
@@ -53487,6 +53569,7 @@ function updateFoeCroak(f,dt){
       if(!reducedMotion()) for(let b9=0;b9<3;b9++) S.fx.push({k:'puff',x:f.x+(Math.random()-0.5)*40,y:f.y+2,t:0,dur:0.35,R:12});
     }
   }
+  if(CKD_ON && f.type==='kingcroak' && ckdTick(f,dt)) return;   // 0710 CROAK DODGE: the tell + the flight own the frame (the wall clock and the hpGate latches above ticked); the state machine resumes from the landing
   if(D.st==='roam'){
     D.shotCd-=dt;
     // 0374 THE HUNT: vias first; on arrival he ROLLS — hunt legs press at
@@ -67568,7 +67651,8 @@ function drawFoe(f){
       // already draw their own shadows, these three never had one)
       if(lightField()){ cx.fillStyle='rgba(74,90,120,0.30)';
         cx.beginPath(); cx.ellipse(f.x,f.y-1,f.def.w*0.30,8,0,0,7); cx.fill(); }
-      drawSprite(f.type,f.x,f.y,f.def.w,0,Math.sin(S.t*3.4+f.wob)*0.028+croakRc(f),crFire(f)||crFlinch(f)||foeImgF(f),wbk);   // 8/25 THE FIRING FACE: the king's storm stance outranks his flinch   // 0382: + the king's volley recoil rock (zero for every other giant)   // 0522: foeImgF — THE NEMESIS in his own dye, every other boss byte-what-it-was
+      if(f.ckdT>0){ cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(f.x,f.y+3,f.def.w*0.16,f.def.w*0.045,0,0,7); cx.fill(); }   // 0710 CROAK DODGE: the ground shadow under the leap (the jump-in's own)
+      drawSprite(f.type,f.x,f.y-((f.ckdT>0)? (f.hopZ||0) : 0),f.def.w,0,Math.sin(S.t*3.4+f.wob)*0.028+croakRc(f)+((f.ckdW>0)? 0.12 : (f.ckdT>0)? -0.08 : 0),crFire(f)||crFlinch(f)||foeImgF(f),wbk);   // 0710: + the lift on f.hopZ through the dodge's flight alone, the tell's crouch, the flight's lean (zero for every other giant)   // 8/25 THE FIRING FACE: the king's storm stance outranks his flinch   // 0382: + the king's volley recoil rock (zero for every other giant)   // 0522: foeImgF — THE NEMESIS in his own dye, every other boss byte-what-it-was
     }
     if(f.def.gun) tanAimTell(f);   // 0478: the madam's long wind-up shows (the line at the man she will shoot)
     if(f.def.fan) foeFanTell(f);   // 0500: the barrage's plant tell — the red ring at his feet for the 0.55 s before the slugs fly
@@ -90417,6 +90501,9 @@ window.GVT = {
   // throw. Always answers false (never armed); ⚠ GVT.momBoot(true) CANNOT
   // re-arm an ambush — the machinery is gone, not gated (the v1.28 law).
   momBoot(){ return false; },
+  cd2(){ const b=S.foes.find(q=>q.type==='kingcroak'&&!q.dead)||null;   // 0710 CROAK DODGE — the rig's one read (read-only): the dials, the live king's dodge state, the tape
+    const hs=f=>f? { id:f.id, foN:f.foN|0, x:+f.x.toFixed(2), y:+f.y.toFixed(2), z:+(f.hopZ||0).toFixed(2), st:(f.duel? f.duel.st : null), burrow:!!f.burrow, hp:+f.hp.toFixed(2), hpMax:f.hpMax, n:f.ckdN|0, rolls:f.ckdRolls|0, dodges:f.ckdDodges|0, cd:+(f.ckdCd||0).toFixed(3), wind:+(f.ckdW||0).toFixed(3), fly:+(f.ckdT||0).toFixed(3), lastRoll:(f.ckdLastRoll==null? null : +f.ckdLastRoll.toFixed(4)), lastT:(f.ckdLastT==null? null : +f.ckdLastT.toFixed(2)), side:(f.ckdSide||0), from:(f.ckdY0==null? null : +f.ckdY0.toFixed(1)), to:(f.ckdY1==null? null : +f.ckdY1.toFixed(1)), seen:Object.keys(f.ckdSeen||{}).length } : null;
+    return { on:CKD_ON, odds:CKD_ODDS, cd:CKD_CD, tell:CKD_TELL, t:CKD_T, h:CKD_H, dy:CKD_DY, readX:CKD_READ_X, lane:CKD_LANE, door:rxDoorKey(), tier:(S.raid&&S.raid.cfg===S.cfg)? S.raid.t : null, live:hs(b), tape:TDLOG.filter(r=>r.type==='kingcroak').slice(-80) }; },
   bn(){ return { cv:GVT_CV, lairEggX:LAIR_EGG_X, lairHatch0:LAIR_EGG_HATCH0, lairHatch:LAIR_EGG_HATCH, lairStep:LAIR_HATCH_STEP, rexFight:rexFight(), rowHatch:FDEF.eggling.hatch, snowReflX:SNOW_REFL_X, stegoBoulX:STEGO_BOUL_X, reflC:UDEF.mortar.dmg, coldHp:FDEF.sgtcold.hp, snowHp:FDEF.sgtsnow.hp, stegoHp:FDEF.stego.hp, momHp:MOM_HP, momHpX:MOM_HP_X, momRowHp:FDEF.mom.hp, momPour:MOM_POUR, momPourT:MOM_POUR_T, momOn:momOnRug(), pourT:+(S.momPourT||0).toFixed(3), momBounty:MOM_BOUNTY, momTags:MOM_TAGS }; },   // 0906 THE BOSS NUMBERS PASS: the seven cells + the doors, read off the page (the rig's one read)
   momFight(){ startMomRaid(); return true; },
   momState(){ const f=S.foes.find(x=>x.type==='mom');
