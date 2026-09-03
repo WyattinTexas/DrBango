@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.73.0';
+const BUILD = 'STARSPELL v0.74.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4851,14 +4851,17 @@ class Home extends Phaser.Scene {
     };
     this.campRow = campRow;
     const cr = campRow();
-    /* THE ENDLESS DOOR's sub-line (v0.68.0, Skylar): the climb that stands
-       ("level 7 · the climb holds"), else the best ever reached, else the
-       mode's own verb — a brand-new player is told what the door IS. */
+    /* THE ENDLESS DOOR's sub-line (v0.68.0, Skylar; v0.74.0 the high score):
+       the climb that stands ("level 7 · the climb holds"), else the high
+       score — the pair, ranked the way endless ranks itself: level first,
+       then the score — else the mode's own verb: a brand-new player is told
+       what the door IS. */
     const endRow = () => {
       const ck = this.endlessCheckpoint();
       if (ck) return SS_T('endlessCont', (ck.fightIdx | 0) + 1);
-      const b = (SS.prof.endless && SS.prof.endless.bestLevel) | 0;
-      return b > 0 ? SS_T('endlessBest', b) : SS_T('endlessSub');
+      const e = SS.prof.endless || {};
+      const b = e.bestLevel | 0;
+      return b > 0 ? SS_T('endlessBest', b, e.bestScore | 0) : SS_T('endlessSub');
     };
     this.endRow = endRow;
     const rows = [

@@ -329,6 +329,17 @@ screenshots lie; and wake-check's cast helper is capped at SEVEN letters
 now, because a board whose longest word is a real 8-letter one would also
 wake NOVA (w8 n1) and break any tally that budgeted three wakings.
 
+v0.74.0 (Skylar 9/2) — the door's post-play line became the HIGH SCORE
+pair: `endlessBest` now carries %1 (level) AND %2 (score) — "high score ·
+L 120 · 98156", level first then score, the way endless ranks itself; the
+fresh verb and the mid-climb line are untouched, and the checkpoint still
+wins the slot. §9 proves it: checkpoint-over-pair priority, the abandon
+path flipping the line LIVE (refreshEndDoor, no reload), the exact pair in
+all five tongues at the shipped size on one line, and a monstrous best
+(999 · 999999) dealt through `refreshEndDoor(true)` still fitting the
+300-wide door; §6 asserts the wake path speaks the pair the moment a fall
+hands the meadow back.
+
 ## wake-check.mjs — unlock progress you can track, a waking you can watch (v0.67.0)
 
 Skylar's call (9/1): "we need to have a way that they can track it. Maybe in

@@ -408,6 +408,12 @@ ok('HOME leaves the reckoning for the meadow', await tapUntil(
   `!!game.scene.getScene('home') && game.scene.getScene('home').sys.isActive()`));
 await until(HOME, 20000);
 await sleep(1800);
+// v0.74.0 (Skylar): the door the battle hands you back is already speaking
+// the HIGH SCORE pair — no reload stood between the fall and this line
+// (refreshEndDoor on the wake path re-reads endRow)
+ok('home again with no reload — the door already speaks the high score',
+  await ev(`${H}.rowSubs.endless.text === SS_T('endlessBest', SS.prof.endless.bestLevel, SS.prof.endless.bestScore)`),
+  await ev(`${H}.rowSubs.endless.text`));
 await tapUntil(`${H}.profileChip`, `!!game.scene.getScene('profile') && game.scene.getScene('profile').sys.isActive()`);
 await until(`game.scene.getScene('profile') && game.scene.getScene('profile').sys.isActive()`, 20000);
 await sleep(1200);
@@ -507,7 +513,7 @@ await until(HOME, 30000);
 await sleep(1200);
 const menu4 = await evj(`JSON.stringify(${H}.menuRows.filter((m) => m.b.visible).map((m) => ({ k: m.key, y: Math.round(m.lab.rowY) })))`);
 ok('a standing campaign makes four doors — 62 apart, 429..615', JSON.stringify(menu4) === JSON.stringify([{ k: 'campaign', y: 429 }, { k: 'newcamp', y: 491 }, { k: 'endless', y: 553 }, { k: 'versus', y: 615 }]), JSON.stringify(menu4));
-ok('the endless door remembers the best', await ev(`${H}.rowSubs.endless.text === SS_T('endlessBest', SS.prof.endless.bestLevel)`), await ev(`${H}.rowSubs.endless.text`));
+ok('the endless door remembers the high score — level first, then score', await ev(`${H}.rowSubs.endless.text === SS_T('endlessBest', SS.prof.endless.bestLevel, SS.prof.endless.bestScore)`), await ev(`${H}.rowSubs.endless.text`));
 await shot('meadow-four-doors');
 // the Spanish dress fits the door and the tab
 await ev(`localStorage.setItem('beta3.lang', 'es'); 'ok'`);
@@ -522,6 +528,53 @@ await sleep(1200);
 ok('the Spanish tab fits its pill', await evj(`(() => { const t = ${BD}.tabBtns.endless; const l = { u: (n) => n * (game.scale.width / 420) };
   return JSON.stringify({ txt: t.lab.text, fits: t.lab.width * t.lab.scaleX <= l.u(104) }) })()`).then((r) => r.txt === 'SIN FIN' && r.fits));
 ok('no page errors (the column)', errs.length === 0, errs.join(' | ').slice(0, 200));
+
+/* ================= 9. the high-score door (v0.74.0) ================= */
+console.log('\n— THE HIGH-SCORE DOOR (the pair, five tongues, one line) —');
+errs.length = 0;
+// Skylar (9/2): "after someone has played Endless it should show underneath
+// it 'High score' and then what their high score is". The line carries the
+// pair the way endless ranks itself — level first, then score — and the
+// mid-climb line still wins the slot while a checkpoint stands.
+const BIG = `localStorage.setItem('beta3.profile', JSON.stringify({ rating: 1000, endless: { bestLevel: 120, bestScore: 98156, runs: 4 } }));`;
+// a standing climb outranks the high score…
+await boot('', BIG + ` localStorage.setItem('beta3.endless', JSON.stringify({ fightIdx: 6, eseed: 12345, hp: 40, hpMax: 50, sigils: [], words: 5, longest: 'moth', totalDmg: 120, scried: false, featherUsed: false, letters: 20, bigHit: 20, playMs: 60000, clockV: 2 })); localStorage.setItem('beta3.endsign', 'none');`);
+await until(HOME, 30000);
+await sleep(1200);
+ok('a standing climb still wins the slot over the high score', await ev(`${H}.rowSubs.endless.text === SS_T('endlessCont', 7)`), await ev(`${H}.rowSubs.endless.text`));
+// …and abandoning it flips the line to the pair LIVE — no reload, just the
+// refreshEndDoor call on the abandon path re-reading endRow
+await tap(`${H}.rowBtns.endless`);
+ok('the CONTINUE/BEGIN sheet stands', await until(`!!${H}.confirmC`, 15000));
+await tap(`(() => { const h = ${H}; let r = null; const scan = (ls) => ls.forEach((o) => { if (!r && o.text === SS_T('endNewBtn')) r = o; if (o.list) scan(o.list); }); scan(h.confirmC.list); return r })()`);
+ok('BEGIN ANEW spends the climb — the door speaks the high score live', await until(`!!${H}.signC && ${H}.rowSubs.endless.text === SS_T('endlessBest', 120, 98156)`, 15000), await ev(`${H}.rowSubs.endless.text`));
+await shot('endless-high-score-door');
+// the five tongues: the exact pair, one line, at the shipped size, on the
+// 300-wide door — first at the live sky's own top mark (a real iPhone hit
+// L120 · 98,156 on the mode's first morning — review 0902), then at a
+// monstrous best dealt through refreshEndDoor so the LIVE re-read is what
+// is measured
+let langsOk = true, fitsOk = true;
+for (const L of ['en', 'es', 'fr', 'pt', 'de']) {
+  await boot('', BIG + ` localStorage.setItem('beta3.lang', '${L}');`);
+  if (!(await until(HOME, 30000))) { langsOk = false; console.log('    · ' + L + ' never stood'); continue; }
+  await sleep(900);
+  const d = await evj(`(() => { const h = ${H}; const s = h.rowSubs.endless; const bw = h.rowBtns.endless.displayWidth;
+    const read = () => JSON.parse(JSON.stringify({ txt: s.text, vis: s.visible, one: s.text.indexOf('\\n') < 0, w: s.width * s.scaleX,
+      szOk: Math.abs(parseFloat(s.style.fontSize) - bw / 30) < 0.5 }));
+    const a = read(); a.expect = SS_T('endlessBest', 120, 98156);
+    SS.prof.endless.bestLevel = 999; SS.prof.endless.bestScore = 999999;
+    h.refreshEndDoor(true);
+    const b = read(); b.expect = SS_T('endlessBest', 999, 999999);
+    return JSON.stringify({ a, b, bw }) })()`);
+  const fine = (x) => x.txt === x.expect && x.vis && x.one && x.szOk && x.txt.indexOf('%') < 0 && x.w <= d.bw * 0.96;
+  if (!(fine(d.a) && d.a.txt.includes('120') && d.a.txt.includes('98156'))) { langsOk = false; console.log('    · ' + L + ' ' + JSON.stringify(d.a)); }
+  if (!fine(d.b)) { fitsOk = false; console.log('    · ' + L + ' monster ' + JSON.stringify(d.b)); }
+  console.log('    · ' + L + ' "' + d.a.txt + '" ' + Math.round(d.a.w) + 'px · "' + d.b.txt + '" ' + Math.round(d.b.w) + 'px of ' + Math.round(d.bw));
+}
+ok('all five tongues speak the pair — the exact numbers, one line, shipped size', langsOk);
+ok('…and a monstrous best (999 · 999999) still fits, dealt live through refreshEndDoor', fitsOk);
+ok('no page errors (the high-score door)', errs.length === 0, errs.join(' | ').slice(0, 200));
 
 /* ================= the verdict ================= */
 console.log('\n' + pass + ' passed · ' + fail + ' failed');
