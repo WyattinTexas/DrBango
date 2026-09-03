@@ -1,6 +1,58 @@
 # beta3 dev tools
 
-Thirty scripts, all dev-only — nothing here ships to the browser.
+Thirty-one scripts, all dev-only — nothing here ships to the browser.
+
+## tap-sign-check.mjs — tappable sky signs: the horse rears (v0.76.0)
+
+Skylar's call (9/2): "if you tap on the horse star sign when it's on the
+screen, it does a little animation where the horse is rearing." The game
+side: `SS_SKY_TAPS` (game.js, beside ssBeastFx) maps beast id →
+flourish(scene, fx) — today exactly one entry, **monoceros, THE GLASS
+UNICORN** (the sky's only horse-bodied sign; the centaurs are one registry
+line away). The meadow showcase's cycle (buildMeadowUi) arms ONE tap zone
+while a registered sign stands — sized to that sign's star bounds (+10
+design px of aura), 44-pt law via the setInteractive auto-pad, gated by
+`!this.ftueBare` (the wordless first open keeps zero interactive chrome)
+and at tap time by busy() + every open sheet + the fx's own ready/attacking
+flags. The rear (`ssSkyRearHorse`) pivots the container on the hind hooves
+(local [29,45]·sc): crouch → Back-ease rise to +0.34 rad with a hitFlash
+flare → two pawing rocks with hoof-glint flicks → drop and soft-land
+shimmer, ~1.8s, all in the sky — no camera shake, no dive, the breath
+yields through `fx.attacking` exactly as battle attacks do. Cleanup is
+`fx.skyDone()` — restores the transform and sweeps the glints; the 9s
+cycle calls `fx.skyDone(true)` before tearing the sign down, so a fade
+catching a rear mid-beat can never orphan fx or hand the next fx a
+deformed home capture. `?show=<id>` is the dev seam pinning the showcase
+deal (the raw rotation is random). Beacon: `window.__SSSKY` {armed, taps,
+blocked, rears, done, cut}.
+
+Self-launching (server :8899 if nothing serves, Chrome on :9476,
+`/tmp/cdp-tapsign` wiped first, `--disable-gpu`), Firebase blocked at the
+network layer, real DPR-3 taps, every wait a poll.
+
+```
+perl -e 'alarm 580; exec @ARGV' node tools/tap-sign-check.mjs   # 41 checks, ~4 min
+```
+
+The paper (release ritual, the registry's single entry); the horse pinned
+and standing (zone armed, 44-pt, star coverage, a live census that nothing
+interactive shares the showcase band); a REAL tap rearing it (rotation
+watched frame by frame, no camera shake, the figure never leaves the sky,
+the transform restored EXACT); mid-rear taps ignored and later taps
+playing again; the guards under a real sheet (the sheet's window/veil owns
+the sky above the zone, the chip/lantern still open their doors, the veil
+still closes); the 9s cycle cutting a mid-beat rear clean (tapped under
+the closing fade for real, next deal undeformed + re-armed, no orphans); a
+scene restart mid-rear; vulpes pinned = no zone, no beacon movement, a
+dead tap doing nothing; the wordless first open never arming the zone.
+
+Rig lesson (A/B-proven on v0.75 bytes, pre-existing, left alone): a COLD
+boot's create-time `cycle()` call bails on its `!this.scene.isActive()`
+guard (the scene is still CREATING), so every cold-boot sky stands EMPTY
+until the first 9s tick deals a sign — on device the intro masks most of
+that window; battle/defeat returns build deferred and populate at once.
+The zone simply arms with whatever deal actually happens; suites must WAIT
+for `__SSSKY.armed` rather than assume a beast at boot.
 
 ## ftue-check.mjs — the first open: a wordless rise and the friendly finger (v0.75.0)
 

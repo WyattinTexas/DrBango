@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.75.0';
+const BUILD = 'STARSPELL v0.76.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2659,6 +2659,89 @@ function ssBeastFx(scene, cont, beast, unitScale, asm, opts) {
   return fx;
 }
 
+/* ---- tappable sky signs (v0.76.0) -----------------------------------------
+   Skylar (9/2): "if you tap on the horse star sign when it's on the screen,
+   it does a little animation where the horse is rearing." SS_SKY_TAPS maps
+   beast id → flourish(scene, fx); the meadow showcase (buildMeadowUi's
+   cycle) arms ONE tap zone while a registered sign stands, so another sign
+   becomes tappable by adding an entry here. A flourish is a sky gesture,
+   not an attack: it stays in the sky, never dives at the meadow, never
+   shakes the camera. It borrows the container the way battle attacks do
+   (fx.attacking parks the breath) and leaves through fx.skyDone(), which
+   always restores the transform — the 9s cycle calls fx.skyDone(true)
+   before tearing the standing sign down, so a fade that catches a flourish
+   mid-beat can neither orphan its sprites nor hand the next sign's fx a
+   deformed home capture. */
+function ssSkyRearHorse(scene, fx) {
+  const c = fx.cont, sc = fx.sc;
+  // the rear pivots on the hind hooves — monoceros' hind-leg chain bottoms
+  // out at [28,46] — and positive rotation swings the head side (the left)
+  // up at the sky. Everything is container-local, so stars, edges, eyes and
+  // aura ride as one figure while the idle keeps breathing through the
+  // stars — which is what keeps it a living thing and not a turning decal.
+  const px = 29 * sc, py = 45 * sc;
+  const live = [], glints = [];
+  const pose = (r) => {   // rotate about the pivot: home + p − R(r)·p
+    const cos = Math.cos(r), sin = Math.sin(r);
+    c.setRotation(r);
+    c.x = fx.homeX + px - (px * cos - py * sin);
+    c.y = fx.homeY + py - (px * sin + py * cos);
+  };
+  const done = fx.skyDone = (cut) => {
+    if (fx.skyDone !== done) return;   // once — natural end and cycle cut may race
+    fx.skyDone = null;
+    for (const t of live) { try { t.stop(); } catch (e) { } }
+    for (const g of glints) { try { g.destroy(); } catch (e) { } }
+    if (!fx.dead) { c.setPosition(fx.homeX, fx.homeY); c.setRotation(0); }
+    fx.attacking = false;
+    if (cut) window.__SSSKY.cut++; else window.__SSSKY.done++;
+  };
+  // a forehoof paws: one glint flicks down-forward off the raised leg
+  const flick = (hx, hy) => {
+    const gi = scene.add.image(hx * sc, hy * sc, 'dot').setBlendMode('ADD').setScale(0.55).setAlpha(0.95);
+    c.add(gi); glints.push(gi);
+    live.push(scene.tweens.add({
+      targets: gi, x: (hx - 17) * sc, y: (hy + 14) * sc, alpha: 0, scale: 0.2,
+      duration: 210, ease: 'Cubic.easeOut',
+    }));
+    SFX.noise(0.1, 1600, 1, 0.025, 2600);
+  };
+  const pr = { r: 0 };
+  const tw = (to, dur, ease, extra, cb) => {
+    const t = scene.tweens.add(Object.assign({
+      targets: pr, r: to, duration: dur, ease, onUpdate: () => pose(pr.r), onComplete: cb,
+    }, extra || {}));
+    live.push(t);
+    return t;
+  };
+  fx.attacking = true;
+  SFX.noise(0.3, 260, 1, 0.04, 700);              // hooves gather
+  tw(-0.05, 150, 'Sine.easeOut', null, () => {    // a breath of crouch — anticipation
+    fx.hitFlash();                                 // the glass flares as it goes up
+    SFX.noise(0.55, 190, 1.1, 0.06, 640);          // the rise
+    tw(0.34, 430, 'Back.easeOut', null, () => {
+      // at the top the body rocks and the forelegs paw at the sky — the
+      // visible foreleg (knee [-34,16], hoof [-30,44]) throws a spark at
+      // each stroke, its unseen twin a beat behind
+      tw(0.27, 200, 'Sine.easeInOut', {
+        yoyo: true, repeat: 1,
+        onYoyo: () => { flick(-30, 44); scene.time.delayedCall(90, () => { if (fx.skyDone === done) flick(-19, 40); }); },
+      }, () => {
+        tw(-0.028, 240, 'Quad.easeIn', null, () => {   // the forehooves drop…
+          SFX.noise(0.18, 130, 1, 0.05, 70);           // …and land, softly
+          fx.bright = Math.max(fx.bright, 0.5);        // touchdown shimmer
+          tw(0, 190, 'Sine.easeOut', null, () => done());
+        });
+      });
+    });
+  });
+}
+// the registry — ship the horse; a new line here is a new tappable sign
+const SS_SKY_TAPS = { monoceros: ssSkyRearHorse };
+// what the harness reads: the armed sign, raw zone contacts, taps the guards
+// turned away, rears played, natural finishes, cycle cuts
+window.__SSSKY = { armed: null, taps: 0, blocked: 0, rears: 0, done: 0, cut: 0 };
+
 /* ---- tile glyph cache ----------------------------------------------------
    Board tiles used to carry two live Text objects each — 32 fresh canvas
    rasters + GPU uploads landing in the single frame that builds a board,
@@ -4715,6 +4798,7 @@ class Home extends Phaser.Scene {
     // otherwise leave these truthy forever and the sheets could never reopen
     this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null;
     this.streakC = null; this.riteC = null; this.riteTimer = null; this.sigTimer = null; this.signLvTimer = null;
+    this.showZone = null; this.showFx = null;   // last run's showcase died with its scene
     this.ftueBare = false;   // the wordless first open re-arms it below if owed
     this.lanternShown = null; this.lanternSwell = null;   // a restart re-renders, it does not celebrate
 
@@ -4821,15 +4905,58 @@ class Home extends Phaser.Scene {
 
     // beast showcase — tonight's hunt, rising in the dusk sky
     this.showC = this.add.container(l.x(0), l.y(150));
-    const ids = Object.keys(SS_BEASTS);
+    // dev seam (harness door): ?show=<id> pins the showcase to one sign —
+    // the rotation then deals that sign every turn. The 9s cycle is random
+    // and untestable raw; the pin makes "the horse is standing" a boot flag.
+    const showPin = QS.get('show');
+    const ids = showPin && SS_BEASTS[showPin] ? [showPin] : Object.keys(SS_BEASTS);
     let showIdx = Math.floor(Math.random() * ids.length);
     const cycle = () => {
       if (!this.scene.isActive()) return;
-      if (this.showFx) { this.showFx.destroy(); this.showFx = null; }
+      if (this.showFx) {
+        if (this.showFx.skyDone) this.showFx.skyDone(true);   // a flourish mid-beat leaves cleanly
+        this.showFx.destroy(); this.showFx = null;
+      }
+      if (this.showZone) { this.showZone.destroy(); this.showZone = null; }
+      window.__SSSKY.armed = null;
       const b = SS_BEASTS[ids[showIdx % ids.length]];
       const asm = ssAssembleBeast(this, this.showC, b, l.u(0.8));
       this.showFx = ssBeastFx(this, this.showC, b, l.u(0.8), asm, { lite: true });
       showIdx++;
+      /* tappable sky signs (SS_SKY_TAPS, v0.76.0): while a registered sign
+         stands on an interactive meadow, one zone sized to its stars waits
+         for a tap. Never on the wordless first open (ftueBare: zero
+         interactive chrome is that meadow's law), and never over another
+         control — nothing else lives in the showcase band (the lantern ends
+         ~50 design px above the topmost star; tap-sign-check proves the
+         census live). Unregistered signs stay pure presence: no zone, no
+         hint, no dead-tap feedback. */
+      const flourish = SS_SKY_TAPS[b.id];
+      if (flourish && !this.ftueBare) {
+        const sc = l.u(0.8) * (b.boss ? 1.15 : b.tier === 'mini' ? 1.06 : 1);
+        let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+        for (const p of b.stars) {
+          x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]);
+          y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);
+        }
+        const pad = l.u(10);   // the aura breathes a little past the stars
+        const z = this.showZone = this.add.zone(
+          this.showC.x + ((x0 + x1) / 2) * sc, this.showC.y + ((y0 + y1) / 2) * sc,
+          (x1 - x0) * sc + pad * 2, (y1 - y0) * sc + pad * 2).setInteractive({ useHandCursor: true });
+        z.on('pointerdown', () => {
+          window.__SSSKY.taps++;
+          const fx = this.showFx;
+          // the meadow-door guards (busy + every open sheet), then the
+          // sign's own: mid-assembly and mid-rear taps are the horse's
+          // business — ignored, never queued, never stacked
+          if (this.busy() || this.streakC || this.dailyC || this.langC || this.mapC || this.confirmC || this.signC || this.riteC
+            || !fx || fx.dead || !fx.ready || fx.attacking) { window.__SSSKY.blocked++; return; }
+          SFX.ensure();
+          window.__SSSKY.rears++;
+          flourish(this, fx);
+        });
+        window.__SSSKY.armed = b.id;
+      }
     };
     cycle();
     this.time.addEvent({ delay: 9000, loop: true, callback: () => { this.tweens.add({ targets: this.showC, alpha: 0, duration: 500, onComplete: () => { this.showC.setAlpha(1); cycle(); } }); } });
