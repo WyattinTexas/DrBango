@@ -67,7 +67,7 @@
     --uii:Impact,'Arial Narrow','PT Sans Narrow','Helvetica Neue',Arial,sans-serif;
     --hand:'Comic Sans MS','Marker Felt','Segoe Print','Helvetica Neue',Arial,cursive;
   }
-  html, body { margin:0; padding:0; background:#1a1512; height:100%; overflow:hidden; touch-action:none; -webkit-user-select:none; user-select:none; font-family:var(--ui); }
+  html, body { margin:0; padding:0; background:#1a1512; height:100%; overflow:hidden; touch-action:none; overscroll-behavior:none; -webkit-user-select:none; user-select:none; font-family:var(--ui); }
   #wrap { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
     padding-bottom:var(--chin,0px); box-sizing:border-box; }   /* 0395 THE CHIN: the canvas centres in the box above the chin (identity at 0) */
   canvas { display:block; }
@@ -1706,7 +1706,8 @@
   /* 0604 THE FREE SCROLL (§4 D3): once the ladder deals, the board IS the scroller — the big rows keep the exact
      height the caged flex resolved (--wrRH, measured at the gesture, so the window's block is byte-tall and the
      keep-your-place correction lands Δ ≤ 1 px); the compact rows are the muster's own; THE TOP rides sticky. */
-  #worldrank .wr-board.free { overflow-y:auto; }
+  #worldrank .wr-board.free { overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y; }   /* THE LEADERBOARD SWIPE (FM-GVT-LEADERBOARD-SCROLL-01 §3, 9/2): the ladder's end never hands the gesture to the page or the shell's scroll view; the pan is the scroller's own (the #win/#lose precedent) */
+  #worldrank .wr-board.free .wr-row, #worldrank .wr-board.free .wr-mrow { contain:layout paint; }   /* a row's layout and paint stay inside the row — a repaint of one never reflows the hundred */
   #worldrank .wr-board.free .wr-row { flex:0 0 var(--wrRH,34px); }
   #worldrank .wr-board.free .wr-mrow { flex:0 0 auto; }
   .wr-btop { position:sticky; top:0; z-index:3; align-self:flex-end; flex:0 0 auto; background:rgba(12,10,7,0.85);
@@ -1837,7 +1838,7 @@
      card takes margin:auto: a tall card centred with align-items:center clips
      its own top and the ✕ with it (v1.2.2 lesson). */
   .wr-mback { position:absolute; inset:0; z-index:9; background:rgba(8,7,4,0.66); display:flex;
-    overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px; box-sizing:border-box; }
+    overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px; box-sizing:border-box; overscroll-behavior:contain; touch-action:pan-y; }   /* THE LEADERBOARD SWIPE (§3): ALL 100's scroller owns the gesture too */
   .wr-mcard { margin:auto; width:min(660px,94vw); background:#1B2014; border:3px solid rgba(127,163,92,0.45);
     border-radius:18px; padding:clamp(8px,1.8vh,20px) clamp(10px,2vw,22px); box-shadow:0 18px 60px rgba(0,0,0,0.6); }
   .wr-mcard h3 { display:flex; align-items:center; font-size:clamp(14px,2.8vh,22px); letter-spacing:0.1em; margin-bottom:8px; }
@@ -39709,7 +39710,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.65';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.66';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -82511,9 +82512,31 @@ function wrFreeGo(tab){
   const r0=a0.getBoundingClientRect();
   (WR.freeRH=WR.freeRH||{})[tab]=Math.max(20, Math.round(r0.height));
   WR.free[tab]=1;
-  renderWorldRank();
-  const bd2=el.querySelector('.wr-board'), a2=bd2&&bd2.querySelector('.wr-row');
-  if(bd2&&a2) bd2.scrollTop=Math.max(0, bd2.scrollTop + (a2.getBoundingClientRect().top - r0.top));
+  // THE LEADERBOARD SWIPE (FM-GVT-LEADERBOARD-SCROLL-01 §3, 9/2): THE DEAL IN PLACE — the compact rows are dealt AROUND the rows that
+  // stand (the band, the eleven / the eight, the you-splice); the overlay is never rebuilt under the finger (v7.09 re-minted the whole
+  // board — the backdrop, the wall's seven faces, the flankers, every figure — inside the touchmove; measured on the real WebKit at
+  // ~3 MB of footprint a repaint, and the row under the finger died with it). The dealt DOM is byte-what renderWorldRank's free path
+  // builds, so every later repaint reads the same board; the place is corrected against the SAME anchor node.
+  const list=wrList(tab), near=(tab==='rating')? chalNear() : null;
+  const bigs=[...bd.querySelectorAll('.wr-row')], band=bd.querySelector('.wr-band');
+  const win8=(tab==='rating'&&chalBandLo()>0), wl8=chalBandLo(), wh8=chalBandHi();
+  if(near&&near.length){
+    const lo8=parseInt(bigs[0].querySelector('.wr-rk').textContent,10)|0, hi8=parseInt(bigs[bigs.length-1].querySelector('.wr-rk').textContent,10)|0;
+    (band||bigs[0]).insertAdjacentHTML('beforebegin', list.filter(r=>(r.rank|0)<lo8).map(r=>wrMRow(r,tab,win8,wl8,wh8)).join(''));
+    bigs[bigs.length-1].insertAdjacentHTML('afterend', list.filter(r=>(r.rank|0)>hi8).map(r=>wrMRow(r,tab,win8,wl8,wh8)).join(''));
+  } else {
+    // the top-8 tabs: the eight keep their big grammar in rank place (the spliced you-row too) — the identity walk, the compact rows
+    // flushed before each standing big row and after the last (the same order the free path deals)
+    const on9=new Set(wrTop(list)); let k=0, buf='';
+    for(const r of list){
+      if(on9.has(r)){ if(buf&&bigs[k]) bigs[k].insertAdjacentHTML('beforebegin', buf); buf=''; k++; }
+      else buf+=wrMRow(r,tab,false,0,0);
+    }
+    if(buf) bigs[bigs.length-1].insertAdjacentHTML('afterend', buf);
+  }
+  bd.insertAdjacentHTML('afterbegin', '<button type="button" class="wr-btop" onclick="UI.wrBTop()">'+t('THE TOP')+'</button>');
+  bd.style.setProperty('--wrRH', ((WR.freeRH||{})[tab]||34)+'px'); bd.classList.add('free');
+  bd.scrollTop=Math.max(0, bd.scrollTop + (a0.getBoundingClientRect().top - r0.top));
 }
 function renderWorldRank(){
   const el=document.getElementById('worldrank'); if(!el) return;
