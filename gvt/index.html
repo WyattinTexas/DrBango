@@ -39861,7 +39861,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.77';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.78';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -52542,6 +52542,104 @@ function kyUnitCluster(u){
   }
   return best? best.f : null;
 }
+// ═══ 0706 KING REX HOPS (FM-GVT-REX-HOP-01; the Go Machine's card 9/2 20:26:13; Wyatt 9/2 ~6:45 pm ET, voice: "King rex needs to
+// occasionally hop to a different spot damage enemies he lands on." + ~8:45 pm: "King Rex Hop is both your king rex and the Boss King
+// Rex.") — THE HERO'S HALF: your King Rex (the playable king of 0357, the breath of 0461/0462b/0464) LEAPS. On his own clock (RXH_CD_MIN..
+// RXH_CD_MAX s, rolled on a die seeded off facts every sim shares — the level, the door, his wire id and the hop's ordinal: the 0575 juke's
+// grammar, never Math.random, never a position — so a co-op twin sim rolls the same clock) he picks THE CLUSTER inside his hop range (the
+// yeti hero's kyUnitCluster grammar at his own cells: the foe with the most neighbours inside the landing ring, beyond a pace, at least
+// RXH_MIN_N of them — a boss counts as a cluster alone; nobody → no hop, a short retry), crouches RXH_WIND (the tell), flies RXH_T s on a
+// DRAW-ONLY lift (u.rxHopZ — the ptero / sdino / Larson channel: his feet, his shadow, the medic's cross and every scan read the ground; he
+// is HITTABLE the whole hop — the flyer law; never jetT), lands through jetLandSpot (never a pit, a rock, the river, off the mat — THE BONK
+// LAW: the landing is tested before it is taken) and STOMPS: every foe inside RXH_R (+ his own width's 0.3, the kit's law) takes his breath's
+// own damage (the fire loop's dmg product captured at his last fire — vet / rank / soul / the beam all inherit; before his first breath the
+// same product rebuilt) × RXH_DMG_X through hurt() — the kill is his; his own men are never touched (TGT is the foe list). Then the brain
+// resumes: the breath, the 0464 picks, the 0480 pace. The tell and the flight are a SHELF on the units loop (no march, no gun — the jet's
+// law; the cd freezes with him; a standing tongue never holds the launch — the region outlives him); a knock, a shove, the finger or the long drop end the flight where he is, no stomp. Kings are not
+// battleground units — the seat never runs on the BF carpet (the Nemesis mirror king keeps HEAD). RXH_ON=false = HEAD verbatim.
+const RXH_ON=true,            // the kill switch (false = HEAD's hero verbatim)
+      RXH_CD_MIN=8, RXH_CD_MAX=14,   // ⚑ Q4 the clock, s — every hop rolls once inside [min,max] on the seeded die (the first hop too)
+      RXH_RNG=420,            // ⚑ Q5 the hop range, px (the foe cluster must stand inside it)
+      RXH_MIN_D=110,          // ...and beyond this (no hop at a man under his feet)
+      RXH_R=Math.round(TK_PURPLE_R*1.4),   // the landing ring, px (118 — the yeti hero's own royal ring, ×1.4 the Sarge's 84)
+      RXH_MIN_N=2,            // a CLUSTER = at least this many foes inside the ring around the picked man (a boss counts alone)
+      RXH_T=0.5, RXH_H=64,    // the flight, s · its apex on the draw-only lift, px (the sdino's w·0.5 at his 128)
+      RXH_WIND=0.3,           // the tell (the crouch), s — planted, the gun holds
+      RXH_DMG_X=1;            // ⚑ Q2 the stomp's currency: × his breath's own dmg product per foe in the ring (1 = one breath beat)
+function rxRoll(key){ let h=2166136261>>>0; for(let i=0;i<key.length;i++){ h^=key.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return dice9(h)(); }   // 0706 THE ONE DIE: FNV-1a of a key every sim shares → a dice9 (the 0575 kcJukeRoll grammar) — one draw per key
+function rxDoorKey(){ return (S.raid && S.raid.cfg===S.cfg)? 'r'+S.raid.k+':'+S.raid.t : (S.park && S.park.cfg===S.cfg)? 'p'+S.park.id+':'+(S.park.n|0) : 'c'+(S.levelN|0); }   // the door: the raid at its tier, the park at its rung, the campaign at its level
+function rxHeroKey(u){ return 'rxh:'+rxDoorKey()+':'+(u.cid||('u'+(u.id|0)))+':'+(u.rxHopN|0); }   // level:cid:ordinal (the juke's seed): u.cid = coopPlaced's stamp on every seat's copy; solo = his placement id
+function rxHeroCd(u){ u.rxHopN=(u.rxHopN|0)+1; return RXH_CD_MIN+rxRoll(rxHeroKey(u))*(RXH_CD_MAX-RXH_CD_MIN); }
+function rxHeroCluster(u){   // the yeti hero's kyUnitCluster at the rex's cells: inside RXH_RNG, beyond RXH_MIN_D, the most neighbours inside RXH_R (ties: the nearer); a boss is a cluster by himself
+  const cand=[];
+  for(const f of TGT(u)){
+    if(f.dead || (f.hp!=null&&f.hp<=0) || f.burrow || f.jetT>0 || f.falling || f.pendDie) continue;
+    if(!bfCanTarget(u,f)) continue;
+    if(f.x>W-10 || f.x<-40) continue;   // nobody off the mat (the fire loop's own rim)
+    const d=Math.hypot(f.x-u.x,f.y-u.y);
+    if(d<=RXH_RNG) cand.push({f:f,d:d});
+  }
+  let best=null,bn=-1;
+  for(const c of cand){
+    if(c.d<RXH_MIN_D) continue;
+    let n=0; for(const o of cand) if(Math.hypot(o.f.x-c.f.x,o.f.y-c.f.y)<=RXH_R) n++;
+    if(c.f.boss) n=Math.max(n,RXH_MIN_N);
+    if(n>bn || (n===bn && c.d<best.d)){ best=c; bn=n; }
+  }
+  return (best && bn>=RXH_MIN_N)? best.f : null;
+}
+function rxHeroLand(u,m){   // the spot: ON the cluster, clamped to the carpet (jetResolve's own campaign bounds), tested by jetLandSpot (never a pit / a rock / the river — THE BONK LAW); walled in = no hop
+  const tx=Math.max(58,Math.min(W-24,m.x)), ty=Math.max(70,Math.min(WORLD_H-92,m.y));
+  const to=jetLandSpot(u,tx,ty);
+  if(Math.hypot(to.x-u.x,to.y-u.y)<RXH_MIN_D*0.5) return null;
+  return to;
+}
+function rxHeroDmg(u){ return (u.rxDmg!=null)? u.rxDmg*RXH_DMG_X : (UDEF.kingrex.dmg+bakDmg(u)+pickDmg(u)+medrDmg(u))*(u.vet?1.5:1)*lzDmgMul(u)*(u.coopUM!=null? u.coopUM : upMul(u.type))*soulDmgMulU(u)*RXH_DMG_X; }   // the fire loop's own product captured at his last fire (G4); before his first breath the same line rebuilt for a king (no tube, no mustache, no laid shell)
+function rxHeroStomp(u){   // THE LANDING: the yeti hero's royal landing dress in the rex's gold, then every foe in the ring takes the breath's blow through hurt() — the kill is his; zero dice (the dust is hash-phased)
+  const prm=reducedMotion();
+  SFX.stomp(); if(!prm) S.shake=Math.max(S.shake,0.5);
+  S.fx.push({k:'ring',x:u.x,y:u.y-8,r:8,R:RXH_R+16,t:0,dur:0.32,col:'#FFD24A'});
+  S.fx.push({k:'ring',x:u.x,y:u.y-8,r:4,R:RXH_R*0.6,t:0,dur:0.24,col:'rgba(255,255,255,0.9)'});
+  S.fx.push({k:'puff',x:u.x,y:u.y-6,t:0,dur:0.32,R:RXH_R});
+  if(!prm) for(let dj=0;dj<6;dj++){ const da=((u.x|0)*0.91+(u.y|0)*1.31+dj*1.0472)%6.283;
+    S.fx.push({k:'wisp',x:u.x+Math.cos(da)*10,y:u.y-8+Math.sin(da)*6,vx:Math.cos(da)*(44+((dj*31)%15)),vy:Math.sin(da)*20-14,up:18+(dj%3)*6,r0:2.2+(dj%2),r1:6+(dj%2)*1.5,t:0,dur:0.38}); }
+  const dmg=rxHeroDmg(u); let n=0;
+  for(const f of TGT(u)){
+    if(f.dead || (f.hp!=null&&f.hp<=0) || f.burrow || f.jetT>0 || f.falling) continue;
+    if(!bfCanTarget(u,f)) continue;
+    if(Math.hypot(f.x-u.x,f.y-u.y)<=RXH_R+((f.def&&f.def.w)||50)*0.3){ hurt(f,dmg,u); n++; }
+  }
+  u.rxLastHit=n; u.rxLastLand=S.t; u.rxHops=(u.rxHops|0)+1;
+}
+function rexUnitTick(u,dt){   // true = the hop owns this frame (the tell or the flight): the units loop `continue`s — no march, no gun, HITTABLE
+  if(u.rxHopCd==null){ u.rxHopN=0; u.rxHopCd=rxHeroCd(u); u.rxHopW=0; u.rxHopT=0; u.rxHopZ=0; u.rxHops=0; }
+  const off=!!(u.dead || u.falling || u.shv || (S.drag && S.drag.unit===u));   // a knock, the long drop, a hurl or the finger: the hop ends where he is — no stomp
+  if(u.rxHopT>0){   // THE FLIGHT
+    if(off){ u.rxHopT=0; u.rxHopZ=0; return false; }
+    u.rxHopT-=dt; const k=Math.max(0,Math.min(1,1-u.rxHopT/RXH_T));
+    u.x=u.rxHx0+(u.rxHx1-u.rxHx0)*k; u.y=u.rxHy0+(u.rxHy1-u.rxHy0)*k; u.rxHopZ=RXH_H*4*k*(1-k);
+    cmdWkStamp(u,(u.rxHx1-u.rxHx0)/RXH_T);   // he faces the way he flies (the 0517 stride stamp — presentation only)
+    if(u.rxHopT<=0){ u.rxHopT=0; u.rxHopZ=0; u.x=u.rxHx1; u.y=u.rxHy1; rxHeroStomp(u); u.rxHopCd=rxHeroCd(u); }
+    return true;
+  }
+  if(u.rxHopW>0){   // THE TELL: planted, the gun holds; the man is re-picked at the launch (the boss re-validates his man the same way)
+    if(off){ u.rxHopW=0; return false; }
+    u.rxHopW-=dt;
+    if(u.rxHopW<=0){ u.rxHopW=0;
+      const m=rxHeroCluster(u), to=m? rxHeroLand(u,m) : null;
+      if(!to){ u.rxHopCd=2.5; return false; }   // the cluster walked off — the kit's short retry, never a hop at nothing
+      u.rxHx0=u.x; u.rxHy0=u.y; u.rxHx1=to.x; u.rxHy1=to.y; u.rxHopT=RXH_T; bfSfx(SFX.jet, u.x, u.y); }
+    return true;
+  }
+  u.rxHopCd-=dt;   // the clock runs through everything below; only the LAUNCH waits
+  if(off || u.dropT>0) return false;   // (the sprue wobble never holds the launch either: a relayed copy's settle snap re-arms it — parity)
+  if(u.tkChanT>0 || u.cloakT>0 || u.kyHeldT>0 || u.duckT>0) return false;
+  if(u.rxHopCd>0) return false;   // (a standing tongue never holds the launch: the region outlives its breather in S.breaths, and the seats' gun clocks are per-sim — a co-op twin must launch on the seeded clock alone)
+  const m=rxHeroCluster(u); if(!m || !rxHeroLand(u,m)){ u.rxHopCd=2.5; return false; }   // no cluster inside his range — no leaping at nothing
+  u.rxHopW=RXH_WIND;
+  S.fx.push({k:'ring',x:u.x,y:u.y-6,r:6,R:44,t:0,dur:0.4,col:'#FFD24A'}); SFX.roar();   // the tell: a gold ring at his feet + the roar (existing SFX, zero words)
+  return true;
+}
 function kingUnitTick(u,dt){
   if(u.kyAbR==null){ u.kyAbR=2.5; u.kyAbB=3.5; u.kyAbP=5; u.kySwCd=2.6; u.kySwing=0; u.kyLpW=0;   // first-cast seeds — the kit SHOWS inside the first wave (⚑ dials, one literal each)
     u.kyWG=KY_U_TK_SEED.green; u.kyWO=KY_U_TK_SEED.orange; u.kyWT=KY_U_TK_SEED.teal; u.kyWS=KY_U_TK_SEED.silver; }   // 0463: the four crystal wheels seed beside them
@@ -54650,6 +54748,101 @@ function drawTeddyDie(e,k){   // the death beats (draw-only, the fx's own clock 
 // SPRINT rides his own door beside the pounce dispatch (chain cap 2 in the
 // bag); the two cooldowns interleave — no inhale mid-sprint, no sprint
 // mid-inhale (the doors gate each other).
+// ═══ 0706 KING REX HOPS — THE BOSS'S HALF (the addendum: "both your king rex and the Boss King Rex"): the LAIR's king at E / M / H / MEGA
+// (the court and the angry return), Dino Park rung 20's finale and rung 50's rex court — every seat kingRexTick runs (the BF lava hatchling
+// king is nemBreathTick's and stays HEAD). On his own seeded clock (RXB_CD_MIN..RXB_CD_MAX s, MEGA ×RXB_MEGA_X; the die off the door, the tier,
+// his muster number and the hop's ordinal — the party's twin sims roll alike) he picks THE CLUSTER of YOUR men inside RXB_RNG (kbMen's filter;
+// the man with the most neighbours inside RXB_R, beyond RXB_MIN_D, at least RXB_MIN_N of them), crouches RXB_WIND (the tell — a gold ring, the
+// roar), flies RXB_T s on f.hopZ (the v2.53 body-lift channel: targetable the whole hop, the shadow grounded) and lands with a stomp. THE LEAK
+// GUARD: the landing never west of RXB_XMIN, never west of the westmost man (toward the line, never past it), never inside the toy box's
+// LEAK_R, never off the band; THE BONK LAW: a pit (voidAt — the lair's magma bowls, the park's pits), a mesa / rock, the river refused, the
+// eight-ring search (jetLandSpot's grammar) finds the nearest legal ground or the hop is not taken. THE CURRENCY (⚑ Q9): in a RAID one grit
+// pip per man through tanHit (the King Bear trample's seat — a grit-out fells him, the save chain has its say); in a PARK the parks' law —
+// knock(), the 10 s stand-up; a garage unit rides through untouched (the trample's exemption); his own dinos are never touched (S.units alone).
+// THE DANCE (⚑ Q10): the hop is its own beat — never mid-inhale (aW), never through his standing jet (brT), never mid-sprint; no inhale and no
+// sprint start mid-hop (kingRexTick and the sprint door wait; the mover plants him); rexTurn is never written. ⚑ Q11 none at the ret floor
+// (the flee — the sweep takes him). RXB_ON=false = HEAD's boss verbatim.
+const RXB_ON=true,            // the kill switch
+      RXB_CD_MIN=10, RXB_CD_MAX=16,        // ⚑ Q7 the clock, s (every hop after the first)
+      RXB_FIRST_MIN=6, RXB_FIRST_MAX=10,   // ...the first hop's window after his walk-on
+      RXB_MEGA_X=0.8,         // ⚑ Q12 MEGA's clock factor (his breath's own 0.8 — the D2 grammar)
+      RXB_RNG=520,            // ⚑ Q8 his hop range, px
+      RXB_MIN_D=140,          // ...and beyond this (never at a man under his feet)
+      RXB_R=118,              // the landing ring, px (the hero's ring — one king, one ring)
+      RXB_MIN_N=2,            // a CLUSTER = at least this many of your men inside the ring around the picked man
+      RXB_T=0.55, RXB_H=70,   // the flight, s · its apex on f.hopZ, px
+      RXB_WIND=0.5,           // the tell (the crouch + the ring + the roar), s
+      RXB_XMIN=300,           // THE LEAK GUARD's floor (the croak hunt's 300 / KB_FOOT_XMIN — the toy box sits at x 120 with LEAK_R 64)
+      RXB_RAID_PIP=1;         // ⚑ Q9 a raid's landing: 1 = one pip per man via tanHit (a grit-out knocks), 0 = knock() (the parks always knock)
+function rxBossKey(f){ return 'rxb:'+rxDoorKey()+':'+(f.foN|0)+':'+(f.rxHopN|0); }   // the door : the tier / the rung : his muster number (spawnFoe's per-type ordinal — every sim spawns the same stream) : the hop's ordinal
+function rxBossCd(f,first){ f.rxHopN=(f.rxHopN|0)+1; const r=rxRoll(rxBossKey(f)), a=first? RXB_FIRST_MIN : RXB_CD_MIN, b=first? RXB_FIRST_MAX : RXB_CD_MAX; return (a+r*(b-a))*(f.megaK? RXB_MEGA_X : 1); }
+function rxBossMen(f){ const out=[]; for(const u of S.units){ if(u.dead||u.jetT>0||u.falling||u.dropT>0||u.cloakT>0) continue; if(S.drag&&S.drag.unit===u) continue; if(u.x<-40||u.x>W-10) continue; const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<=RXB_RNG) out.push({u:u,d:d}); } return out; }
+function rxBossCluster(f){ const men=rxBossMen(f); let best=null,bn=-1;
+  for(const c of men){ if(c.d<RXB_MIN_D) continue; let n=0; for(const o of men) if(Math.hypot(o.u.x-c.u.x,o.u.y-c.u.y)<=RXB_R) n++; if(n>bn || (n===bn && c.d<best.d)){ best=c; bn=n; } }
+  return (best && bn>=RXB_MIN_N)? best.u : null; }
+function rxLineX(){ let x=null; for(const u of S.units){ if(u.dead||u.falling||u.dropT>0) continue; if(u.x<-40||u.x>W-10) continue; if(x==null || u.x<x) x=u.x; } return x; }   // the westmost man = the line's own west edge
+function rxBossLandOK(x,y,lx){
+  if(x<RXB_XMIN || x>W-40 || y<FOE_TOP+30 || y>FOE_BOT-30) return false;   // the band (kbBand's), the floor (THE LEAK GUARD), never off the east rim
+  if(lx!=null && x<lx) return false;                                        // toward the line, never past it
+  if(Math.hypot(T.x-x,T.y-y)<LEAK_R+40) return false;                       // never the toy box
+  if(voidAt(x,y)) return false;                                             // THE BONK LAW: a pit / a gap
+  for(const rk of (S.cfg.terrain.rocks||[])){ if(Math.hypot(rk.x-x,rk.y-y)<rk.r+14) return false; }   // a mesa / a rock (jetLandOK's own pad)
+  const RV=S.cfg.terrain.river; if(RV && x>RV.x-14 && x<RV.x+RV.w+14) return false;                     // the river
+  for(const p of (S.cfg.terrain.ponds||[])){ const nx=(x-p.x)/(p.rx+12), ny=(y-p.y)/(p.ry+12); if(nx*nx+ny*ny<1) return false; }
+  return true;
+}
+function rxBossLand(f,m){   // ON the cluster, clamped, tested; illegal ground probes outward in jetLandSpot's deterministic ring (fixed radii, fixed 8-angle order, no RNG); nowhere legal = null (the hop is not taken)
+  const lx=rxLineX(); const x=Math.max(RXB_XMIN, m.x), y=Math.max(FOE_TOP+30,Math.min(FOE_BOT-30,m.y));
+  if(rxBossLandOK(x,y,lx)) return {x:x,y:y};
+  for(let r=20;r<=160;r+=20){ for(let a=0;a<8;a++){ const nx=x+Math.cos(a*Math.PI/4)*r, ny=y+Math.sin(a*Math.PI/4)*r; if(rxBossLandOK(nx,ny,lx)) return {x:nx,y:ny}; } }
+  return null;
+}
+function rxBossStomp(f){   // THE LANDING: the dress (gold + white rings, the puff, the dust, the stomp, the shake) then every man in the ring — a raid: a pip through tanHit (pipN 1, the trample's seat); a park: knock(); a machine rides through
+  const prm=reducedMotion();
+  SFX.stomp(); if(!prm) S.shake=Math.max(S.shake,0.55);
+  S.fx.push({k:'ring',x:f.x,y:f.y-8,r:8,R:RXB_R+16,t:0,dur:0.32,col:'#FFD24A'});
+  S.fx.push({k:'ring',x:f.x,y:f.y-8,r:4,R:RXB_R*0.6,t:0,dur:0.24,col:'rgba(255,255,255,0.9)'});
+  S.fx.push({k:'puff',x:f.x,y:f.y-6,t:0,dur:0.32,R:RXB_R});
+  if(!prm) for(let dj=0;dj<6;dj++){ const da=((f.x|0)*0.91+(f.y|0)*1.31+dj*1.0472)%6.283;
+    S.fx.push({k:'wisp',x:f.x+Math.cos(da)*10,y:f.y-8+Math.sin(da)*6,vx:Math.cos(da)*(44+((dj*31)%15)),vy:Math.sin(da)*20-14,up:18+(dj%3)*6,r0:2.2+(dj%2),r1:6+(dj%2)*1.5,t:0,dur:0.38}); }
+  const raid=!!(S.raid && S.raid.cfg===S.cfg); let n=0;
+  for(const u of S.units){
+    if(u.dead||u.jetT>0||u.falling||u.dropT>0) continue;
+    if(S.drag&&S.drag.unit===u) continue;
+    if(u.def&&u.def.vehicle) continue;
+    if(Math.hypot(u.x-f.x,u.y-f.y)>RXB_R+((u.def&&u.def.w)||54)*0.3) continue;
+    if(raid && RXB_RAID_PIP){ f.pipN=1; tanHit(u,f.x,f.y,f); f.pipN=0; } else knock(u,f.x,f.y);
+    n++;
+  }
+  f.rxLastHit=n; f.rxLastLand=S.t; f.rxHops=(f.rxHops|0)+1; tdLog(f,'land',n);
+}
+function rexHopTick(f,dt){   // true = the hop owns this frame (the tell or the flight); kingRexTick waits, the sprint door and the mover read the flags
+  if(f.rxHopCd==null){ f.rxHopN=0; f.rxHopCd=rxBossCd(f,true); f.rxHopW=0; f.rxHopT=0; f.rxHops=0; }
+  if(f.rxHopT>0){   // THE FLIGHT
+    f.rxHopT-=dt; const k=Math.max(0,Math.min(1,1-f.rxHopT/RXB_T));
+    f.x=f.rxHx0+(f.rxHx1-f.rxHx0)*k; f.y=f.rxHy0+(f.rxHy1-f.rxHy0)*k; f.hopZ=RXB_H*4*k*(1-k);
+    { const dxs=f.rxHx1-f.rxHx0; if(Math.abs(dxs)>20){ f.wkX=dxs>0?1:-1; f.wkT=S.t; } }   // he faces the way he flies (the 0307 stride stamp — presentation)
+    if(f.rxHopT<=0){ f.rxHopT=0; f.hopZ=0; f.x=f.rxHx1; f.y=f.rxHy1; rxBossStomp(f); f.rxHopCd=rxBossCd(f,false); }
+    return true;
+  }
+  if(f.rxHopW>0){   // THE TELL: the man re-picked at the launch; the cluster gone or the ground illegal → the short retry
+    f.rxHopW-=dt;
+    if(f.rxHopW<=0){ f.rxHopW=0;
+      const m=rxBossCluster(f), to=m? rxBossLand(f,m) : null;
+      if(!to){ f.rxHopCd=2.5; return false; }
+      f.rxHx0=f.x; f.rxHy0=f.y; f.rxHx1=to.x; f.rxHy1=to.y; f.rxHopT=RXB_T; bfSfx(SFX.jet, f.x, f.y); tdLog(f,'hop',[Math.round(to.x),Math.round(to.y)]); }
+    return true;
+  }
+  f.rxHopCd-=dt;   // the clock runs; only the LAUNCH waits
+  if(f.aW>0 || f.brT>0 || (f.pounceState && f.pounceState!=='idle') || f.shv || f.falling || f.kyHeldT>0 || f.pendDie || f.retreat) return false;   // never mid-inhale, never through his jet, never mid-sprint, never mid-hurl
+  if(f.x>=W-60) return false;   // his whole figure on the carpet first (the roll-in law)
+  if(f.retFloor!=null && f.hp<=f.hpMax*f.retFloor+0.001) return false;   // at the ret floor: the flee is the sweep's (⚑ Q11)
+  if(f.rxHopCd>0) return false;
+  const m=rxBossCluster(f); if(!m || !rxBossLand(f,m)){ f.rxHopCd=2.5; return false; }   // no cluster in range / no legal ground — no leaping at nothing
+  f.rxHopW=RXB_WIND;
+  S.fx.push({k:'ring',x:f.x,y:f.y-6,r:6,R:60,t:0,dur:0.5,col:'#FFD24A'}); SFX.roar(); tdLog(f,'tell');   // the tell: a gold ring at his feet + the roar (existing SFX, zero words)
+  return true;
+}
 function kingRexTick(f,dt){
   if(f.aW>0){
     f.aW-=dt;
@@ -57766,7 +57959,7 @@ function unitImg(k,u){
 // SVG molds at their viewBox ratio) — so a badge can clear the crown of a 128 px king or the 176 px yeti as surely as a rifleman's
 // hat. The base mold by TYPE (a pose/skin mold shares its viewBox); before decode the viewBox ratio the molds are authored at.
 function unitH(t){ const im=IMG[t], w=unitW(t); return (im && im.width>0)? w*(im.height/im.width) : w*(150/129); }
-function medBadgeY(u){ return u.y-unitH(u.type)*0.92-6; }   // the '+' seat: 6 px over the DRAWN top (drawSprite seats the mold at −h+h·0.08, so the top is y−0.92h): a rifleman lands at y−63.8 — within a pixel of the 0365 y−64; King Croak/Rex y−123.8, King Yeti over his crown the same way
+function medBadgeY(u){ return u.y-(u.rxHopZ||0)-unitH(u.type)*0.92-6; }   // 0706: the cross rides the hero king's draw-only lift (u.rxHopZ) — it tracks him in the air   // the '+' seat: 6 px over the DRAWN top (drawSprite seats the mold at −h+h·0.08, so the top is y−0.92h): a rifleman lands at y−63.8 — within a pixel of the 0365 y−64; King Croak/Rex y−123.8, King Yeti over his crown the same way
 function unitW(t){ return t==='kingyeti'? KY_UNIT_W : (t==='kingrex'||t==='kingcroak')? 128 : t==='kingbear'? KB_UNIT_W : t==='kingcroaklil'? CK_LIL_W : t==='wlady'? CK_LAD_W : (t==='bftank'||t==='tank2')? 92 : (t==='bfjeep'||t==='jeep2')? 76 : t==='mortar'? 58 : t==='commando'? 58 : 54; }   // 0357: both kings dwarf the motor pool   // 0341: the king dwarfs the motor pool   // 0316: the V2 draws at the jeep family's width — the slot's machine, not a 54px infantryman (a 0278e miss)
 // the veteran stripe has to contrast with whatever colour that army is wearing
 function vetStripe(){ const h=dyeHex(); return (h&&h.toUpperCase()==='#E8E8E8')?'#4A4A4A':'#fff'; }
@@ -60876,7 +61069,7 @@ function update(dt){
     else if(f.retreat){ const sp9=f.def.spd*LR_ROUT_X, RV9=S.cfg.terrain.river; let gx9=W+120, gy9=f.y;
       if(RV9 && f.x<RV9.x+RV9.w+4){ gy9=rvBridge(RV9,f.y); if(f.x<RV9.x-4 && Math.abs(f.y-gy9)>RV9.bw*0.3) gx9=RV9.x-30; }   // 0594a: a survivor west of the water runs for the NEARER bridge mouth first, then straight over the planks — the men's own bank-first funnel, never a wade home
       const dx9=gx9-f.x, dy9=gy9-f.y, d9=Math.hypot(dx9,dy9)||1, st9=rockSteer(f.x,f.y,gx9,gy9,ROCK_PAD_FOE); f.x+=(st9? st9.x : dx9/d9)*sp9*dt; f.y+=(st9? st9.y : dy9/d9)*sp9*dt; }   // 0594 THE ROUT: a survivor of Larson's fall runs for the east edge on his own pace × LR_ROUT_X, steering round the furniture like every walker (rockSteer — a straight push against a boulder's shoulder stood a man there forever, measured); the walk-flip stamp below turns him east; the mover chain never owns him again
-    else if(f.aimT>0 || f.mgRootT>0 || f.aW>0 || f.brT>0 || f.lrBmT>0 || f.lrJmpT>0 || foeHolds(f)){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; }   // 0478: + THE SHOWDOWN — a `hold` boss stands where the line can answer (foeHolds)   // stopped to shoot — your window (0278a: a halted air-stepper stands planted, never frozen mid-hop; 0278b: f.aW = the bruiser's rear-up + the king's inhale, the same planted read; 0396: f.brT = a breather stands through his own standing jet — ⚑ BR_PLANT)
+    else if(f.aimT>0 || f.mgRootT>0 || f.aW>0 || f.brT>0 || f.lrBmT>0 || f.lrJmpT>0 || f.rxHopW>0 || f.rxHopT>0 || foeHolds(f)){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; }   // 0706: the hop's tell + flight plant the king's feet (rexHopTick writes his x/y through the flight)   // 0478: + THE SHOWDOWN — a `hold` boss stands where the line can answer (foeHolds)   // stopped to shoot — your window (0278a: a halted air-stepper stands planted, never frozen mid-hop; 0278b: f.aW = the bruiser's rear-up + the king's inhale, the same planted read; 0396: f.brT = a breather stands through his own standing jet — ⚑ BR_PLANT)
     else {
     // 0278a THE AIR-STEP GATE: airMv() integrates this frame's airborne
     // overlap for the gait types (snowfig · gsnowman · the king's footwork)
@@ -61243,7 +61436,7 @@ function update(dt){
     // ram / swoop / non-boss stomp / halt-and-hurl / hatch licences follow,
     // each a bag or cell on its row (the same capability law).
     if((f.def.pounce||f.def.sprint) && !f.boss && f.x<W-10 && !f.tdSleep) updateFoePounce(f,dt);   // 0523: tdSleep — dormant Buttons (and a patting teddy) pounce on nobody
-    if(f.def.sprint && f.boss && !(f.aW>0) && !(f.plT>0||f.plWind>0) && f.x<W-10 && !(f.type==='kingrex' && f.rexTurn===0)) updateFoePounce(f,dt);   // 0305 BF-01 (D2 strict): after a charge, the BREATH takes its turn (kingrex only — every other sprint boss keeps the shipped dance; 0341: never mid-leap)
+    if(f.def.sprint && f.boss && !(f.aW>0) && !(f.plT>0||f.plWind>0) && !(f.rxHopW>0||f.rxHopT>0) && f.x<W-10 && !(f.type==='kingrex' && f.rexTurn===0)) updateFoePounce(f,dt);   // 0706: no sprint starts mid-hop (the plT/plWind grammar)   // 0305 BF-01 (D2 strict): after a charge, the BREATH takes its turn (kingrex only — every other sprint boss keeps the shipped dance; 0341: never mid-leap)
     if(f.def.ram && !f.boss && f.x<W-10) updateFoeTrike(f,dt);
     if(f.def.swoop && !f.boss && f.x<W-10) updateFoeSwoop(f,dt);
     if(f.def.boulder && !f.boss && f.x<W-10){ f.shot+=dt; gsnowTick(f,dt); }
@@ -61340,7 +61533,7 @@ function update(dt){
         // 0278b THE ROYAL RESHAPE (D9): the king left YETI_SHOOTERS — his
         // breath arm works here (kingRexTick: inhale → tanMulti's aimed
         // cone); the sprint rides his own door beside the pounce dispatch.
-        kingRexTick(f,dt);
+        if(!(RXB_ON && rexHopTick(f,dt))) kingRexTick(f,dt);   // 0706 KING REX HOPS: the hop's tell + flight own the frame (no inhale mid-hop); the breath's brain runs every other frame verbatim
       }
       // 0278a THE CAPED COURT — the king's kit rides ON TOP of the one-big-
       // shot above (D6: the big shot stays his baseline threat). KING-GATED
@@ -61547,6 +61740,7 @@ function update(dt){
     // ABOVE the step functions (he casts ON THE MARCH — the walk-up was
     // Wyatt's complaint). Foe-side kingKitTick stays the boss's, byte-still.
     if(u.type==='kingyeti') kingUnitTick(u,dt);
+    if(u.type==='kingrex' && RXH_ON && !S.bf && rexUnitTick(u,dt)) continue;   // 0706 KING REX HOPS: the hero's leap beside the yeti's kit (the same shelf — below every standing shelf, above the step functions); the tell + the flight own the frame (the jet's law: no march, no gun, HITTABLE); never on the battleground (kings are not BF units — the mirror king keeps HEAD)
     // BATTLEFIELD pre-step: drop-in gate, march, halt, setup wind-up, free leak.
     // Falls THROUGH into the untouched weapon code when he's dug in with a target.
     if(S.bf && !bfUnitStep(u,dt)) continue;
@@ -61857,6 +62051,7 @@ function update(dt){
     // is his (hurt's own credit).
     if(u.type==='kingrex'){
       bfSfx(SFX.jet, u.x, u.y);
+      u.rxDmg=dmg;   // 0706 KING REX HOPS: the stomp's currency = this very product (vet / rank / soul / the beam), captured at every fire
       const kDur=0.65;
       u.brFc=(best.x>u.x)?1:-1; u.brTo=S.t+kDur;   // 0462b THE KING FACES HIS FIGHT: he turns to the man he burns and holds it for the tongue's life (unitFaceW reads it — presentation only, nothing in the sim reads it back)
       const kfl=u.brFc, kx=u.x+34*kfl, ky=u.y-40;   // the jaw on the side he now SHOWS (+34 east / −34 west)
@@ -66731,7 +66926,8 @@ function drawUnit(u){
   if(u.type==='jane') drawJane(u,kyl);   // 0434 THE SHAPE-STORE JANE → 0537 THE PART RIG: her own draw (six parts on a joint rig + the entrance rig above; every other figure keeps the shared line below byte-what-it-was)
   else if(u.type==='kingyeti') drawKing(u,u.x,u.y-kyl,w,unitWob(u),false,unitFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase (one helper, four seats) — 0435 THE SHAPE-STORE KING, playable seat — the same pose reader as the boss (his wave arcs + seize lift keep their shipped seats around this fork)
   else if(isCroakU(u) && (crFire(u)||crFlinch(u))) drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u)+croakRc(u),(u.kySwing>0? -0.14 : unitWob(u)),crFire(u)||crFlinch(u),unitFl(u));   // 8/25 THE FIRING FACE: the storm stance outranks the flinch + the volley rock (croakRc) in the rot slot — 0494 THE WOBBLE: unitWob, the integrated phase — 0454: the playable outlaw king — ONLY the flinch forks (the hurt mold on the shared transform); every other frame falls to the generic line below, the old waddle byte-what-it-was
-  else drawSprite(u.type,u.x,u.y-kyl,w,cmdoRecoil(u),(u.kySwing>0? -0.14 : unitWob(u)),im,unitDrawFl(u));   // 0494 THE WOBBLE: unitWob, the integrated phase (one helper, four seats) — v2.78: the recoil, campaign edition — v3.61: + the walk-flip seat — 0424: the king's swing lean (the boss's own -0.14) — 0462b: the facing XOR the mold's authored face (UNIT_WEST) + the breather's turn
+  else { if(u.rxHopT>0){ cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(u.x,u.y+3,w*0.16,w*0.045,0,0,7); cx.fill(); }   // 0706 KING REX HOPS: the ground shadow under the flight (the jump-in's own) — the body lifts on u.rxHopZ, the feet stay the truth
+    drawSprite(u.type,u.x,u.y-kyl-(u.rxHopZ||0),w,cmdoRecoil(u),(u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : u.kySwing>0? -0.14 : unitWob(u)),im,unitDrawFl(u)); }   // 0706: + the lift, the flight's head-down lean, the tell's crouch (zero for everyone else)   // 0494 THE WOBBLE: unitWob, the integrated phase (one helper, four seats) — v2.78: the recoil, campaign edition — v3.61: + the walk-flip seat — 0424: the king's swing lean (the boss's own -0.14) — 0462b: the facing XOR the mold's authored face (UNIT_WEST) + the breather's turn
   if(u.type==='radioman') drawRadioCall(u);
   if(u.type==='sarge'){ drawSargeOutfit(u); drawSargeWeapon(u); if(cl) cx.restore(); drawAbsorbPips(u); drawCmdBlkPips(u); }   // v3.11: a vanished Sarge's kit ghosts WITH him — the alpha holds through the extras · 0508: the lean wrapper closes before the pips (they ride the helmet, never the lean)
   if(u.type==='commando') drawCmdoPip(u);
@@ -67284,9 +67480,10 @@ function drawFoe(f){
       // 0278b THE SHADES KING: sprint lean (the head-down read), the inhale
       // tell (gold glow swelling at the mouth — the wordless fairness
       // window), else the heavy royal sway. Grass park — no snow floor.
-      const kro=(f.pounceState==='out')? -0.14 : (f.aW>0? 0.08 : Math.sin(S.t*3.4+f.wob)*0.028);
+      const kro=(f.rxHopT>0)? -0.2 : (f.rxHopW>0)? 0.12 : (f.pounceState==='out')? -0.14 : (f.aW>0? 0.08 : Math.sin(S.t*3.4+f.wob)*0.028);   // 0706: the flight's head-down lean, the tell's crouch
       const kfl9=(f.pounceState!=='out'&&(f.aW>0||f.brT>0))? f.brFc===1 : wbk;   // 0396 R4: inhale + his standing jet face his man (+x mirrors); the sprint keeps its own read
-      drawSprite(f.type,f.x,f.y,f.def.w,0,kro,foeImg(f.type),kfl9);
+      if(f.rxHopT>0){ cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(f.x,f.y+3,f.def.w*0.16,f.def.w*0.045,0,0,7); cx.fill(); }   // 0706: the ground shadow under the flight (the jump-in's own)
+      drawSprite(f.type,f.x,f.y-(f.hopZ||0),f.def.w,0,kro,foeImg(f.type),kfl9);   // 0706: the body lifts on f.hopZ (the v2.53 channel) — the feet, the shadow and every scan keep the ground
       if(f.aW>0){ const g9=breathGeo(f); cx.globalAlpha=0.5+0.4*Math.sin(S.t*18); cx.fillStyle='#FFD24A';
         cx.beginPath(); cx.arc(g9.x,g9.y,8+3*Math.sin(S.t*14),0,7); cx.fill(); cx.globalAlpha=1; }
       return;
@@ -90639,6 +90836,9 @@ window.GVT = {
     return { pick:META.cmdSpec|0, pick2:META.cs2|0, cs:cmdSpec(), cs2:cmdSpec2(), owned:[0,1,2,3].map(i=>csOwned(i)?1:0), tester:csTester()?1:0, teddy:teddyBeat()?1:0, camp:META.campaign|0, bag:sargeStats() }; },
   // THE BLADE IN YOUR FACE test rig: the whole saber state machine in one call,
   // plus how many tan are close enough to stop presenting arms and just shoot him
+  kh(){ const h=S.units.find(q=>q.type==='kingrex'&&!q.dead)||null, b=S.foes.find(q=>q.type==='kingrex'&&!q.dead)||null;   // 0706 KING REX HOPS — the rig's one read (read-only): the dials, the live hero / boss hop state, the boss tape
+    const hs=u=>u? { id:u.id, x:+u.x.toFixed(2), y:+u.y.toFixed(2), cd:(u.rxHopCd==null? null : +u.rxHopCd.toFixed(3)), wind:+(u.rxHopW||0).toFixed(3), fly:+(u.rxHopT||0).toFixed(3), z:+((u.rxHopZ!=null? u.rxHopZ : u.hopZ)||0).toFixed(2), n:u.rxHopN|0, hops:u.rxHops|0, last:(u.rxLastLand==null? null : +u.rxLastLand.toFixed(2)), hit:u.rxLastHit|0, from:(u.rxHx0==null? null : [+u.rxHx0.toFixed(1),+u.rxHy0.toFixed(1)]), to:(u.rxHx1==null? null : [+u.rxHx1.toFixed(1),+u.rxHy1.toFixed(1)]), dmg:(u.rxDmg==null? null : +u.rxDmg.toFixed(3)), hp:(u.hp==null? null : +u.hp.toFixed(2)), cid:u.cid||null, foN:u.foN|0 } : null;
+    return { hero:{ on:RXH_ON, cdMin:RXH_CD_MIN, cdMax:RXH_CD_MAX, rng:RXH_RNG, minD:RXH_MIN_D, r:RXH_R, minN:RXH_MIN_N, t:RXH_T, h:RXH_H, wind:RXH_WIND, dmgX:RXH_DMG_X, live:hs(h) }, boss:{ on:RXB_ON, cdMin:RXB_CD_MIN, cdMax:RXB_CD_MAX, firstMin:RXB_FIRST_MIN, firstMax:RXB_FIRST_MAX, megaX:RXB_MEGA_X, rng:RXB_RNG, minD:RXB_MIN_D, r:RXB_R, minN:RXB_MIN_N, t:RXB_T, h:RXB_H, wind:RXB_WIND, xmin:RXB_XMIN, raidPip:RXB_RAID_PIP, live:hs(b) }, door:rxDoorKey(), tape:TDLOG.filter(r=>r.type==='kingrex').slice(-60) }; },
   ss(){ return { on:SAB2_ON, cad:SAB2_CAD, step:SAB2_STEP, nextCd:SAB2_NEXT_CD, reach:SAB2_REACH, guard:SAB2_GUARD, up:SAB2_POSE_UP, dn:SAB2_POSE_DN, sweepT:SAB2_SWEEP_T, backT:SAB2_BACK_T }; },   // 0904 the two-step's dials, read off the page
   saberState(){ const u=S.units.find(x=>x.type==='sarge'); if(!u) return null;
     const sw=unitSargeStats(u);
