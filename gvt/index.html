@@ -5866,7 +5866,7 @@
     <div class="strip stripR" id="titleStripG"></div>
     <div class="strip stripL" id="titleStripT"></div>
   </div>
-  <div class="coinop">INSERT DOG TAG TO CONTINUE · v3.86</div>
+  <div class="coinop"></div><!-- 0902: the version comes from GVT_CV (fillStrip), never a typed number -->
   <div class="scanlines"></div>
 </div>
 
@@ -39751,7 +39751,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.67';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.68';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -89188,17 +89188,31 @@ document.getElementById('title').addEventListener('pointerdown', ()=>{
   if(META.campaign>0 || coopJoinPend) showMenu();
   else adGate('camp', ()=>startCampaign(1));   // v2.60: routed through the gate so it COUNTS — necessarily game 1, so always free
 });
-(function fillStrip(){
+// 0902 THE MIRROR SHOWS THE TITLE SCREEN (FM-GVT-MIRROR-01 §3 B; Wyatt 9/2, verbatim: "the dog tags are appearing not
+// fully across"): the rows were 28 figures × 44 px = 1232 px anchored left, marching a 176 px lap — a phone is covered,
+// a 1280 desk misses the right edge by up to 224 px and a 1920 TV stops at 64%. The count now comes from the viewport:
+// enough figures to cover the width PLUS the lap (a row is never short at any phase of its march) plus one of overflow,
+// never fewer than the 28 every phone already marches (those stay pixel-still). Re-dealt only when the count changes (a
+// rotation, a window drag) — the march rides the row, not the figures, so the pass/lap cadence never restarts; the walk,
+// the waddle and the colours are byte-still. The footer reads GVT_CV — its markup had carried a typed v3.86 since v3.86.
+const TITLE_FIG_W=44, TITLE_LAP_PX=176, TITLE_FIG_MIN=28;   // the figure's CSS width · marchL/marchR's travel · the count every phone marched
+function titleStripN(){ return Math.max(TITLE_FIG_MIN, Math.ceil((window.innerWidth+TITLE_LAP_PX)/TITLE_FIG_W)+1); }
+let TITLE_STRIP_N=0;
+function fillStrip(){
   // two armies marching past each other, waddling like they own the carpet
+  const n=titleStripN(); if(n===TITLE_STRIP_N) return; TITLE_STRIP_N=n;
   let g='', t='';
-  for(let i=0;i<28;i++){
+  for(let i=0;i<n;i++){
     const d=(-(i%4)*0.12).toFixed(2);
     g+='<img src="'+sprURI('sarge','#7FA35C')+'" style="animation-delay:'+d+'s" alt="">';
     t+='<img src="'+sprURI('tanrifle','#C09E6C')+'" style="animation-delay:'+(-(i%3)*0.16).toFixed(2)+'s" alt="">';
   }
   document.getElementById('titleStripG').innerHTML=g;
   document.getElementById('titleStripT').innerHTML=t;
-})();
+}
+fillStrip();
+window.addEventListener('resize', fillStrip);
+setHTML(document.querySelector('#title .coinop'), 'INSERT DOG TAG TO CONTINUE · v'+GVT_CV);
 // ===== v2.82 ONE SCREEN LAW (Wyatt 8/8 eve, verbatim: "everyone needs to see
 // the same screen when they finish… either back in the battlefield screen or
 // in the campaign… but with all your buddies still") — a squad game's every
