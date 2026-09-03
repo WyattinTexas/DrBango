@@ -1173,6 +1173,8 @@
   #pkRoller svg { display:block; width:100%; transform-origin:50% 51%; animation:pkrollspin 1s linear infinite; }
   #pkRoller .sh { position:absolute; left:50%; bottom:-2px; width:82%; height:8px; border-radius:50%;
     background:rgba(0,0,0,.16); transform:translateX(-50%); }
+  #pigHot { position:absolute; z-index:3; left:0; background:transparent; border:none; padding:0; cursor:pointer; animation:pkrollpath 15s linear infinite; }   /* 0903 THE PIG PAYS: the roller's own tap box - a z:3 sibling riding the SAME path animation (the z:2 chrome eats in-scene taps, and a transformed roller would trap a child box in its own stacking context); parkSceneLayout seats it on the pig, a kid's thumb wide */
+  #pkRoller.zip svg { animation-duration:.35s; }   /* 0903: the tapped pig zips - the spin alone speeds up for PIG_ZIP_MS (a duration change on the path animation would jump its seat) */
   @keyframes pkrollpath { from{transform:translateX(-14vw)} to{transform:translateX(112vw)} }
   @keyframes pkrollspin { to{transform:rotate(360deg)} }
   /* THE DOORS IN THE SCENE — invisible z:3 tap targets over the z:2 chrome
@@ -1237,13 +1239,13 @@
     #dfk .dfire, #dfk .crest, #dfk .dbody, #dfk .dbob,
     #pkSnow i, #pkChoir .hopper, #pkChoir .hopper.h1, #pkChoir .hopper.h2,
     #pkChoir .hopper svg, #pkChoir .hopper .sh, #pkChoir .note,
-    #pkRoller, #pkRoller svg, #castleHot::after,
+    #pkRoller, #pkRoller svg, #pkRoller.zip svg, #pigHot, #castleHot::after,
     #parkBg circle.twk, #parkBg .mtr, #parkBg .whRip, #parkBg .whShine, #parkBg .whGlint,
     #parkBg .whReed, #parkBg .brhead, #parkBg circle.ffk,
     #parkBg .wlrip, #parkBg .wlrip.w2, #parkBg .wlfish { animation:none; }
     #pkRod, #pkLasso { transition:none; }
     #parkFlyer { transform:translateX(58vw) translateY(3vh); }
-    #pkRoller { transform:translateX(30vw); }
+    #pkRoller, #pigHot { transform:translateX(30vw); }
   }
   /* 0392: THE METEOR EXCEPTION — the 0359 dmeteor secret died under reduce by
      the identical pattern (base opacity 0 + the .mtr kill row above; measured:
@@ -26809,7 +26811,7 @@ const META_DEFAULT = {
   // shooting meteor caught mid-flight (100★ once). The comet law both:
   // Object.assign migrates older saves to 0 free; truthy blocks the grant
   // forever, so garbage can only ever under-grant. BANK ONLY.
-  wstar:0, dmeteor:0, moonStar:0, fmeteor:0, elderSab:0,   // 0611: + elderSab — BEAR PARK's relic taken once ever (the comet law; the mod itself rides META.enh through trophyGrant)   // 0608: + the elite moon's first-ever tap and the fields' shooting star's first-ever catch (the same law)
+  wstar:0, dmeteor:0, moonStar:0, fmeteor:0, elderSab:0, pigStar:0,   // 0611: + elderSab — BEAR PARK's relic taken once ever (the comet law; the mod itself rides META.enh through trophyGrant)   // 0608: + the elite moon's first-ever tap and the fields' shooting star's first-ever catch (the same law)
   // 0363 THE FREE UNLOCKS (Wyatt 8/16): byGift = THE BACKYARD handed over
   // FREE (the first Nemesis defeat, or a battlegrounds battle played on THE
   // BACKYARD map — or, 0494c, campaign level BY_FREE_LVL beaten; one gift,
@@ -36722,7 +36724,7 @@ function locNow(){
   // (showMenu's room, the 0341 park landing's gate, the throne's ✕ onto its
   // park) — the bed comes back where you stand, a fresh pass from the top (the
   // one-buffer law lets the PCM go for the fight, as every other door does).
-  if(locBattle()) return null;
+  if(locBattle() && !(parkSceneOpen()||raidSceneOpen())) return null;   // 0903 THE PARKS SOUND ON THE WALK IN (FM-GVT-YETI-EARLY-01; Wyatt 9/2: "arrivate at Dino Park & yeti park (When auto taken to there) music didnt play first time"): 0625's flow deals the gift road's cards OVER the win face with S.mode still 'win', and the DINO PARK / YETI PARK card's IT'S MINE opened the park under this mute (the door path lands at the menu and never met it) - a park or throne scene standing over a folded verdict is where the kid stands; a live fight hides every scene at its door, so the mute is byte-what-it-was there
   if(bbUp()) return 'snow';   // GW-01 (Wyatt 8/26): THE BEAR BARRICADE plays the winter wind — "use the Wind track we use for the snow menu"; the standing overlay outranks the glass under it (the 'snow' row and the winter room's own arm below are byte-still)
   // 0444 — at the menu, the place you STAND. A throne scene opens OVER a park
   // scene, a park scene opens over its room, and the rooms answer by roomCur().
@@ -39791,7 +39793,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.71';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.72';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -70327,7 +70329,8 @@ function lakeSVG(){
 const WCACTUS_STARS=20;   // 0346: each western saguaro's first-ever tap (per-cactus bit in META.wcacti)
 const WSTAR_STARS=20, DMETEOR_STARS=100;   // 0359: the saloon pediment star + the dino meteor catch — once-ever hidden purses (bank only)
 const DMETEOR_R=110;      // 0359: the catch radius (scene px) around the meteor's interpolated head — generous for a kid's finger on a ~0.9s streak
-const MOON_STARS=100, FMETEOR_STARS=100;   // 0608: the elite moon's first-ever tap + the fields' shooting star's first-ever catch — once-ever hidden purses (bank only, the 0359 law; the comet flats moonStar/fmeteor)
+const MOON_STARS=100, FMETEOR_STARS=100;
+const PIG_STARS=100, PIG_ZIP_MS=1500;   // 0903 THE PIG PAYS (Wyatt 9/2: "the rolling blue pig in the yeti park screen needs to grant 100 stars the first time its clicked"): the yeti lobby's roller - the first tap ever pays 100 stars into the bank alone (the comet flat META.pigStar; the 0359 hidden-purse law), every later tap squeaks and zips (PIG_ZIP_MS of the faster spin). Zero medal, zero card, zero words   // 0608: the elite moon's first-ever tap + the fields' shooting star's first-ever catch — once-ever hidden purses (bank only, the 0359 law; the comet flats moonStar/fmeteor)
 // 0608 spkBurst — ONE sparkle burst for every scene secret (the moon, the fields' star; the next relic reuses it):
 // n motes flung from the tap point on CSS keyframes (~0.9s, gold/white, the starfloat idiom), deterministic seats
 // (zero dice — the same burst on every tap). RM: the CSS block swaps the motes for one static twinkle ring.
@@ -77359,18 +77362,21 @@ const PARK_EDITS={
   50:{ hpMulX:1.6158, rateMulX:0.8461 },
  },
  yeti:{
-  2:{ waves:[   // SNOWBALL PRACTICE — the snowfig range: the pitchers premiere BEFORE the melee
+  1:{ w1x:3, plus:{ 0:[{f:'column',t:'byeti',n:2,e:'right-bottom',at:1.5}], 1:[{f:'column',t:'byeti',n:2,e:'right-bottom',at:1.5}] } },   // 0903 YETI EARLY RUNGS (FM-GVT-YETI-EARLY-01; Wyatt 9/2, verbatim: "Add in Yeti Park level 1 too easy. Add in a few big yetis to wave 1 & 2. ... For the first 5 levels tripple the amount of units in the wave 1's"): WELCOME TO THE PARK keeps the factory's five waves; wave 1's built count x3 (w1x, split under the laws: 4 munchkins become 6 + 6, THE BREATH apart) and a column of big yetis lumbers in behind waves 1 AND 2 (plus: raw counts, the byeti's rung-1 premiere - the ladder's debut band stays 11)
+  2:{ w1x:3, waves:[   // SNOWBALL PRACTICE — the snowfig range: the pitchers premiere BEFORE the melee
     { name:'TARGET PRACTICE', groups:[ {f:'line',t:'snowfig',n:2,raw:1,e:'right',at:0} ] },
     { name:'THE THROWING LINE', groups:[ {f:'line',t:'snowfig',n:3,e:'right',at:0},{f:'guerrilla',t:'syeti',n:3,e:'right-top',at:3} ] },
     { name:'SNOWBALL DRILL', groups:[ {f:'pincer',t:'syeti',n:3,e:'right-top',at:0},{f:'column',t:'snowfig',n:2,e:'right-bottom',at:2.5} ] },
     { name:'THE SNOW PARADE', groups:[ {f:'line',t:'syeti',n:5,e:'right',at:0},{f:'guerrilla',t:'syeti',n:3,e:'right-bottom',at:3} ] },
     { name:'EVERYONE OUT OF THE POOL', groups:[ {f:'push',t:'syeti',n:6,e:'right',at:0},{f:'line',t:'snowfig',n:2,e:'right-top',at:2.5} ] } ] },
-  3:{ waves:[   // THE TICKET BOOTH — the queue: everything arrives in FILES
+  3:{ w1x:3, waves:[   // THE TICKET BOOTH — the queue: everything arrives in FILES
     { name:'THE QUEUE FORMS', groups:[ {f:'column',t:'syeti',n:3,e:'right',at:0},{f:'column',t:'syeti',n:2,e:'right-bottom',at:2} ] },
     { name:'SNOWMEN AT WORK', groups:[ {f:'line',t:'snowfig',n:3,e:'right',at:0},{f:'guerrilla',t:'syeti',n:3,e:'right-top',at:3} ] },
     { name:'NO CUTTING IN LINE', groups:[ {f:'column',t:'syeti',n:3,e:'right-top',at:0},{f:'column',t:'snowfig',n:2,e:'right-bottom',at:2.5} ] },
     { name:'THE SNOW PARADE', groups:[ {f:'line',t:'syeti',n:5,e:'right',at:0},{f:'guerrilla',t:'syeti',n:3,e:'right-bottom',at:3} ] },
     { name:'EVERYONE OUT OF THE POOL', groups:[ {f:'push',t:'syeti',n:6,e:'right',at:0},{f:'line',t:'snowfig',n:2,e:'right-top',at:2.5} ] } ] },
+  4:{ w1x:3 },   // 0903 YETI EARLY RUNGS: FREE HAT DAY and the giant's rung keep the factory's waves; wave 1 (THE WELCOME PARTY, c(4) munchkins) lands x3 in landings of at most 8, THE BREATH apart
+  5:{ w1x:3 },
   7:{ waves:[   // DO NOT FEED THE PIGGIES — the piggy rung: leak pressure in herds
     { name:'THE WELCOME PARTY', groups:[ {f:'column',t:'syeti',n:4,e:'right',at:0} ] },
     { name:'THE PIGGY STAMPEDE', groups:[ {f:'column',t:'bluepig',n:4,e:'right-bottom',at:0},{f:'column',t:'syeti',n:3,e:'right',at:2.5} ] },
@@ -78107,6 +78113,8 @@ function parkApplyEdits(cfg, park, n){
       if(w.piece) q.piece=true; if(w.herd) q.herd=Object.assign({},w.herd);   // 0500: a park piece keeps its authored breaths + arms the buffalo (a copy — the 11055 law)
       return q; });
   }
+  if(o.w1x>1 && cfg.waves[0]) parkWave1X(cfg.waves[0], o.w1x);   // 0903 YETI EARLY RUNGS (Wyatt 9/2: "tripple the amount of units in the wave 1's"): wave 1's BUILT counts x w1x, every group, sum-preserved, split under the landing / picket laws (rows 1-5 of the yeti table)
+  if(o.plus){ for(const wi in o.plus){ const w=cfg.waves[wi|0]; if(!w) continue; for(const g of o.plus[wi]) w.groups.push({f:g.f,t:g.t,n:g.n||1,e:g.e,at:g.at}); } }   // 0903: extra groups appended to a factory wave AFTER the multiply (raw counts - row 1's big yetis); the wave's authored cast and timing stand
   return parkLandingLaw(cfg);
 }
 // THE LANDING LAW (0278j, MEASURED): every collapse in the pricing runs was
@@ -78130,6 +78138,21 @@ function parkApplyEdits(cfg, park, n){
 // seam, so co-op rebuilds agree byte-for-byte. Tan keeps its shipped landing
 // (the campaign's own texture, proven at L100); the heavies walk too slow to
 // spike; the eggs are flat by their own law.
+// 0903 YETI EARLY RUNGS - THE WAVE-1 MULTIPLIER (Wyatt 9/2, verbatim: "The wave amounts are aybmsmal in the first few yeti levels,
+// especially the wave 1s. For the first 5 levels tripple the amount of units in the wave 1's"): a PARK_EDITS row's w1x multiplies wave
+// 1's BUILT counts (after c(), so x3 is exact whatever the rung's cntMul) group by group, sum-preserved, and splits each group under the
+// laws below by construction - closers in landings of at most 8, snowball pickets in groups of at most 4 (the PICKET LAW truncates, so
+// the split is authored here), each extra landing THE BREATH (3.5 s) after the one before, in the group's own order; the cast, the
+// formation, the edge and the first landing's second stand as authored. Deterministic, zero R() draws, in-file (co-op sims agree).
+function parkWave1X(w, x){
+  const CAP={ syeti:8, sdino:8, bluepig:8, snowfig:4 };
+  const out=[];
+  for(const g of w.groups){
+    const n=Math.round(g.n*x), cap=CAP[g.t]||8, k=Math.max(1,Math.ceil(n/cap));
+    for(let i=0;i<k;i++){ const q=Object.assign({}, g); q.n=Math.floor(n/k)+(i<(n%k)?1:0); q.at=+(g.at+i*3.5).toFixed(2); out.push(q); }
+  }
+  w.groups=out;
+}
 function parkLandingLaw(cfg){
   const CLOSERS={ syeti:1, sdino:1, bluepig:1 };
   for(const w of cfg.waves){
@@ -82057,6 +82080,7 @@ function paintParkScene(dpk){
         +'<div class="note n3"><svg viewBox="-8 -28 26 34">'+PK_NOTE+'</svg></div>'
       +'</div>'
       +'<div id="pkRoller"><svg viewBox="0 0 140 140">'+SPRITES_SRC.bluepig+'</svg><i class="sh"></i></div>'
+      +'<button type="button" id="pigHot" onclick="UI.pigTap(event)"></button>'   // 0903 THE PIG PAYS: the roller's tap box (UI.pigTap; parkSceneLayout seats it on the pig's own top, a kid's thumb wide; the path animation carries both)
       +'<button type="button" id="castleHot" onclick="UI.castleTap()">'+(META.silverKey? '<span class="key"><svg viewBox="0 0 36 36" style="display:block;width:100%">'+PK_KEYGLYPH+'</svg></span>' : '')+'</button>';   // 0278k Wyatt 8/13: the door stands keyless too — a locked tap speaks the hunt hint (castleTap); only the key glyph stays keyed
   }
   parkSceneLayout();
@@ -82098,6 +82122,8 @@ function parkSceneLayout(){
   Q('#pkChoir .note.n1',760,552,24); Q('#pkChoir .note.n2',792,536,19); Q('#pkChoir .note.n3',826,554,22);
   const ro=document.getElementById('pkRoller');
   if(ro){ ro.style.top=((594-oy)*s2)+'px'; ro.style.width=(56*s2)+'px'; }
+  const ph=document.getElementById('pigHot');   // 0903 THE PIG PAYS: the box rides the pig's seat - the pig's width padded to a kid's thumb (never under 60 px), the same top less the pad, the same left less the pad; the shared path animation moves both
+  if(ph){ const pw=56*s2, box=Math.max(pw+16, 60), pad=(box-pw)/2; ph.style.top=((594-oy)*s2-pad)+'px'; ph.style.width=box+'px'; ph.style.height=box+'px'; ph.style.marginLeft=(-pad)+'px'; }
 }
 window.addEventListener('resize', function(){ if(parkSceneOpen()){ parkSceneLayout(); if(PARK_CUR==='teddy') teddyBitmaps(document.getElementById('parkBg')); } });   // 0554d: the planes follow the device size
 function renderParkScene(){
@@ -88317,6 +88343,28 @@ window.UI = {
   // 0608 THE MOON PAYS — the elite door's disc: sparkles on EVERY tap (spkBurst + the sounds), the FIRST tap
   // ever pays MOON_STARS into the bank alone (the 0359 hidden-purse law; META.moonStar the comet flat; later
   // taps sparkle + blip, no stars). The box is campSceneLayout's furniture — this handler never reads the art.
+  // 0903 THE PIG PAYS (FM-GVT-YETI-EARLY-01 cell 5; Wyatt 9/2, verbatim: "the rolling blue pig in the yeti park screen needs to grant 100 stars the first
+  // time its clicked") - the yeti lobby's ROLLER: sparkles on EVERY tap (spkBurst + the pig's zip), the FIRST tap ever pays PIG_STARS into the bank alone
+  // (the 0359 hidden-purse law, moonTap's own grammar; META.pigStar the comet flat), every later tap squeaks - just a pig. The box is parkSceneLayout's
+  // furniture riding the roller's own path animation; this handler never reads the art. Co-op: the lobby is per-client, the bank the local one (as every
+  // scene secret pays). No medal, no card, no new words (the float is the shipped +N star float).
+  pigTap(ev){ audio();
+    const bg=document.getElementById('parkBg'); if(!bg || PARK_CUR!=='yeti') return;
+    const r=bg.getBoundingClientRect(); if(!r.width||!r.height) return;
+    if(ev.stopPropagation) ev.stopPropagation();
+    const x=ev.clientX-r.left, y=ev.clientY-r.top;
+    spkBurst(bg,x,y,12);
+    const ro=document.getElementById('pkRoller'); if(ro){ ro.classList.add('zip'); clearTimeout(UI._pzT); UI._pzT=setTimeout(()=>{ const q=document.getElementById('pkRoller'); if(q) q.classList.remove('zip'); }, PIG_ZIP_MS); }
+    if(META.pigStar){ SFX.squeak(); return; }
+    META.pigStar=1; META.starBank+=PIG_STARS;
+    saveMeta();
+    SFX.twink();
+    const f=document.createElement('div');
+    f.className='starfloat big'; f.textContent='+'+PIG_STARS+'\u2605';
+    f.style.left=Math.round(x)+'px'; f.style.top=Math.round(y)+'px';
+    bg.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120);
+    if(S.mode==='menu') renderMenu();   // the room under the park repaints its bank (the scene itself is never re-minted under a rolling pig)
+  },
   moonTap(ev){ audio();
     const bg=document.getElementById('campBg'); if(!bg) return;
     const r=bg.getBoundingClientRect(); if(!r.width||!r.height) return;
