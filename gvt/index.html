@@ -36044,8 +36044,9 @@ let AC=null, soundOn=true;
 // it watches the clock and swaps out corpses, and it only auto-recreates one
 // when the browser itself says the page holds sticky user activation (the
 // same test the autoplay policy runs), so it can never trip the policy.
-const SFXW={ gen:0, t0:-1, frozen:0, strikes:0, sT:0, touched:false, pv:0 };   // 0462a: pv = the return proof's own token (sfxProve — one proof at a time)
+const SFXW={ gen:0, t0:-1, frozen:0, strikes:0, sT:0, touched:false, pv:0, rp:null };   // 0462a: pv = the return proof's own token (sfxProve — one proof at a time) · 0719: rp = the resume() the put-away's release asked for — the proof's window opens when it settles
 function audio(){
+  if(qtHeld()) return null;                // 0719 THE HOLD: a put-away page never creates, resumes or plays a thing (no SFX from a pocket) — the release (takeOut → qtRelease → sfxWake) is the one road back
   if(AC && AC.state==='closed') AC=null;   // a closed context never comes back — drop the corpse
   if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); SFXW.gen++; SFXW.t0=-1; SFXW.frozen=0; }catch(e){} }
   if(AC && AC.state!=='running'){          // 'suspended' AND iOS's 'interrupted'
@@ -36103,7 +36104,11 @@ function sfxPoke(){
 const SFX_PROVE=250;   // ⚑ the proof window, ms — inside "right away"; the dial
 function sfxProve(){
   if(!AC) return;                                    // a virgin page: nothing to prove, and a return never creates
-  const my=++SFXW.pv, gen=SFXW.gen, t0=performance.now();
+  const my=++SFXW.pv, gen=SFXW.gen;
+  const rp=SFXW.rp;                                  // 0719: the resume() the put-away's release asked for — the window opens when it settles (a slow but honest resume is no corpse), or at QT_RESUME_MAX; every listener's proof on one return waits on the same promise, the newest wins (pv)
+  const go=()=>{
+  if(SFXW.pv!==my) return;                           // a newer return took the proof
+  const t0=performance.now();
   let ct=-1;
   const step=()=>{
     if(SFXW.pv!==my || SFXW.gen!==gen || !AC) return;   // a newer return, a tap or the ward already did the work
@@ -36119,8 +36124,10 @@ function sfxProve(){
     if(!SHAKE) locSync();                               // the knock for where we stand: a pass the gates were holding starts NOW, not at the next tap (never over the victory dance — its exclusivity law)
   };
   requestAnimationFrame(step);
+  };
+  if(rp && rp.then){ let d=false; const once=()=>{ if(d) return; d=true; go(); }; rp.then(once, once); setTimeout(once, QT_RESUME_MAX); } else go();
 }
-function sfxWake(){ SFXW.t0=-1; SFXW.frozen=0; if(AC) audio(); locMedic(); sfxProve(); }   // 0432c: coming back to the page heals the music too; 0462a: and PROVES the context (sfxProve)
+function sfxWake(){ SFXW.t0=-1; SFXW.frozen=0; if(qtHeld()) return; if(AC) audio(); locMedic(); sfxProve(); }   // 0432c: coming back to the page heals the music too; 0462a: and PROVES the context (sfxProve) · 0719: a return the put-away seam has not released yet waits for it — takeOut → qtRelease walks this same road a beat later, the flag already down
 window.addEventListener('pointerdown', sfxPoke, {capture:true, passive:true});
 // v2.48 (Wyatt 8/5, fresh save silent until the main menu): WebKit historically
 // counts the tap's RELEASE (touchend / click), not its press, as the gesture
@@ -36147,6 +36154,66 @@ setInterval(()=>{
   else SFXW.frozen=0;
   SFXW.t0=AC.currentTime;
 }, 3000);
+// ═══ 0719 THE GAME GOES QUIET WHEN IT IS PUT AWAY (FM-GVT-QUIET-01; the Go Machine's card 9/2 21:32; Wyatt 9/2 ~21:27, verbatim: "Music is
+// continuing to play in both the gvt & favor app when minimized. Please fix this" · ~21:38: "1) Yes in campaign; no in Battlefields or
+// Raid/pvp events."). THE READING ON HEAD: nothing listened for the page going HIDDEN with audio in mind — the three listeners above act
+// on the RETURN (sfxWake → sfxProve), the ward's hidden ticks only reset its freeze count, and every bed loops on a BufferSource that
+// needs neither rAF nor a timer, so a page put away kept singing (the Android shell's onPause never suspends the context; a browser
+// tab the same). THE HOLD hangs on the ONE put-away seam v7.69 built for it (putAway / takeOut on visibilitychange + pagehide /
+// pageshow, in THE BATTLE OF THE DESERT's section): QT.held is the one flag, written by those two alone — the sound hold and the frozen
+// fight can never disagree. (a) THE HOLD: qtHold suspends a RUNNING context (one hide = one suspend; a context that is not running is
+// left to the medic's own roads; a page with no context creates none — v1.49's autoplay law), ends any fade in flight (nothing that
+// should be silent sings on return) and tells the scheduling side: audio() answers null while held (no pocket SFX, no create, no
+// resume); a bed (locTry), the theme (themeTry / themeStart) and the dance (shakeMusicTry) hold instead of arming or dying. (b) THE
+// RETURN: qtRelease lifts the page's own suspend and walks the shipped road (sfxWake → audio · locMedic · sfxProve); the proof's window
+// opens when the resume promise settles (SFXW.rp — a slow but honest resume is no corpse; QT_RESUME_MAX caps the wait, then the 0462a
+// fallbacks stand exactly as today: the swap, the three strikes at the next tap); a pass the hold merely suspended plays on FROM WHERE
+// it stood (the bed, the theme — Wyatt's own FAVOR ruling); a bed or theme the hold kept from STARTING is knocked once the resume
+// settles (qtKnock); the dance re-enters IN TIME (the 0462a offset) or is let go past its end. (c) THE MEDIC STAYS HONEST: no strike,
+// no swap, gen unchanged across a return whose resume lands. (e) THE FROZEN FIGHT (the addendum): a SOLO campaign fight (the road,
+// the parks, mom's raid at home, the range — no battlefield, no raid, no party, no rival sortie) holds every clock while put away:
+// frame() ticks nothing while held and reads the first frame back as NO gap (QT.skip), so the sim, the wave clock, the lull, the
+// fight timer, the flag and the coach resume from the exact moment they left; the one wall-clock timer a solo fight owns (the crate's
+// 900 ms KO beat, campCrateFall) is held with its remainder (qtTimer) — a battlefield, a raid, a party fight and the room's clocks run
+// exactly as today (one capped catch-up frame, 0559 C). QT_ON=false = HEAD by trace. ⚑ QT_FREEZE · QT_RESUME_MAX · a TAP
+// TO CONTINUE on return (not built) — the doc's §4. ═══
+const QT_ON=true;            // the kill switch
+const QT_FREEZE=true;         // cell (e): a solo campaign fight freezes while put away (⚑ Wyatt's dial; false = the clocks run as before this card)
+const QT_RESUME_MAX=800;      // ms — the longest the return proof waits for the page's own resume() to settle before its 250 ms window opens (⚑ dial)
+const QT={ held:0, wait:0, sus:0, had:0, skip:0, n:0, rel:0, t0:0, out:[], late:[] };   // held = THE flag (putAway / takeOut alone write it) · wait = the release's resume in flight · sus = this page suspended the context · had = a context stood at the hide · skip = the first frame back reads no gap · out = passes fading on the clock · late = a frozen fight's own timers, held with their remainder
+function qtHeld(){ return !!(QT_ON && QT.held); }
+function qtWait(){ return !!(QT_ON && (QT.held || QT.wait)); }   // held, or the release's resume not yet settled — a bed, the theme and the dance wait for the knock instead of arming to a tap or dying
+function qtFreezes(){ return !!(QT_ON && QT_FREEZE && S.mode==='play' && !S.bf && !S.raid && !S.coop && !S.rival); }   // the solo campaign family: the road, the parks, mom's raid at home, the range — never a battlefield, a raid, a party fight or a rival sortie (their clocks are shared, 0394 / 0322 own them)
+function qtOut(s){ if(!s) return; QT.out.push(s); if(QT.out.length>6) QT.out.shift(); }   // a pass fading out on the context's clock — ended at once if the page is put away mid-fade
+function qtTimer(fn, ms){   // cell (e): a wall-clock timer a SOLO campaign fight owns (the crate's 900 ms KO beat) — fired in the pocket it is held with its REMAINDER and lands after the release; anywhere else it is a setTimeout
+  const t0=performance.now();
+  return setTimeout(()=>{ if(qtHeld() && qtFreezes()){ QT.late.push({ fn, ms:Math.max(0, ms-(QT.t0-t0)) }); return; } fn(); }, ms);
+}
+function qtHold(why){
+  if(!QT_ON || QT.held) return false;                 // one hide = one hold; a hide during a hold is nothing
+  QT.held=1; QT.n++; QT.t0=performance.now(); QT.had=AC? 1 : 0; QT.sus=0; QT.wait=0;
+  if(qtFreezes()) QT.skip=1;                          // cell (e): the first frame back reads NO gap
+  for(const s of QT.out){ try{ s.stop(); }catch(e){} } QT.out.length=0;   // a fade in flight ends held — nothing that should be silent sings on return
+  if(AC && AC.state==='running'){ try{ const p=AC.suspend(); if(p&&p.catch) p.catch(()=>{}); QT.sus=1; }catch(e){} }   // the whole context goes quiet — every bed, the theme, the dance, every SFX; a context that is not running (interrupted, closed, a pass the gates hold) is left to the medic's roads; no context = nothing to do (never creates)
+  return true;
+}
+function qtRelease(why){
+  if(!QT_ON || !QT.held) return false;
+  QT.held=0; QT.rel++; const sus=QT.sus; QT.sus=0;
+  if(!AC && QT.had && sfxCanAuto()) audio();          // the ward's own law: a context the pocket closed comes back where activation stands — never on a virgin page (QT.had)
+  let rp=null;
+  if(AC && AC.state!=='running' && AC.state!=='closed'){ try{ rp=AC.resume(); if(rp&&rp.catch) rp.catch(()=>{}); }catch(e){ rp=null; } }   // the page's own suspend is its own to lift — and iOS parks a backgrounded context on 'interrupted' by itself (measured on the Simulator), so ANY sleeping context is asked once here and the proof waits for the answer; a platform that refuses falls to the shipped roads (the proof's swap, the three strikes at the next tap)
+  if(!(rp && rp.then)) rp=null;
+  SFXW.rp=rp; QT.wait=rp? 1 : 0;
+  if(SHAKE && SHAKE.src){ const s0=SHAKE.src; SHAKE.src=null; SHAKE.g=null; s0.onended=null; try{ s0.stop(); }catch(e){} SHAKE.qt=1; }   // the dance: its held node is let go; shakeFrame re-enters the track IN TIME (the 0462a offset) or lets it go past the end
+  sfxWake();                                          // the shipped return road: audio() · locMedic() · sfxProve() (the proof opens when rp settles)
+  const my=QT.rel; let done=false;
+  const k=()=>{ if(done) return; done=true; if(SFXW.rp===rp) SFXW.rp=null; if(QT.rel!==my) return; QT.wait=0; if(qtHeld()) return; qtKnock(); };
+  if(rp){ rp.then(k, k); setTimeout(k, QT_RESUME_MAX+50); } else k();
+  const late=QT.late; QT.late=[]; for(const L of late) setTimeout(L.fn, L.ms);   // cell (e): the fight's held timers land after the release, each with the remainder it had when the page was put away
+  return true;
+}
+function qtKnock(){ if(SHAKE) return; if(THEME.want){ THEME.want=false; themeTry(); } locTry(); }   // what the hold kept from starting: a theme or a bed knocked while the page was away (never over the dance — its exclusivity law)
 function tone(f0,f1,dur,type,vol){ if(!soundOn) return; const ac=audio(); if(!ac) return; try{
   const o=ac.createOscillator(), g=ac.createGain(); o.type=type||'square';
   o.frequency.setValueAtTime(f0,ac.currentTime); o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),ac.currentTime+dur);
@@ -36299,6 +36366,7 @@ if(META.themeOn && roomCur()==='bedroom') themeDecode();
 // one knock at every showMenu — the guards make it once per session
 function themeTry(){
   if(THEME.started||THEME.dead||S.mode!=='menu'||!META.themeOn||locNow()) return;   // 0444: a place with a bed of its own owns the speaker — the theme is the BEDROOM's
+  if(qtWait()){ THEME.want=true; return; }                   // 0719: put away (or its resume in flight) — wanted, knocked at the release (qtKnock); never armed to a tap by a put-away
   if(!THEMEB.buf){ THEME.want=true; return; }               // decode in flight — its callback re-knocks
   if(AC && AC.state==='running'){ themeStart(); return; }   // the title tap's own context
   if(!THEME.probed){ THEME.probed=true; themeProbe(); return; }
@@ -36322,6 +36390,7 @@ function themeArm(){
 function themeDisarm(){ if(THEME.armed){ window.removeEventListener('click',THEME.armed); THEME.armed=null; } }
 function themeStart(){
   if(THEME.started||THEME.dead||S.mode!=='menu'||!THEMEB.buf||!META.themeOn||locNow()) return;   // 0444: the late roads (the probe's promise, the armed click) obey the same law
+  if(qtWait()){ THEME.want=true; return; }                   // 0719: the late roads (the probe's promise, a decode landing in the pocket) hold too
   const ac=audio(); if(!ac||ac.state!=='running') return themeArm();
   try{
     const s=ac.createBufferSource(), g=ac.createGain();
@@ -36350,7 +36419,7 @@ function themeKill(){
       if(g&&ac&&ac.state==='running'){
         g.gain.setValueAtTime(Math.max(0.001,g.gain.value), ac.currentTime);
         g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+THEME_FADE);
-        s.stop(ac.currentTime+THEME_FADE);
+        s.stop(ac.currentTime+THEME_FADE); qtOut(s);   // 0719: on record — a put-away mid-fade ends it at once
       } else { s.stop(); }
     }catch(e){ try{ s.stop(); }catch(e2){} }
     THEME.g=null;
@@ -36376,7 +36445,7 @@ function themeHand(){
         g.gain.cancelScheduledValues(ac.currentTime);
         g.gain.setValueAtTime(Math.max(0.001,g.gain.value), ac.currentTime);
         g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+THEME_HAND);
-        s.stop(ac.currentTime+THEME_HAND);
+        s.stop(ac.currentTime+THEME_HAND); qtOut(s);   // 0719: on record — a put-away mid-handoff ends it at once
       } else { s.stop(); }
     }catch(e){ try{ s.stop(); }catch(e2){} }
     THEME.g=null;
@@ -36904,7 +36973,7 @@ function locStop(fd){
       g.gain.cancelScheduledValues(ac.currentTime);
       g.gain.setValueAtTime(Math.max(0.0001,g.gain.value), ac.currentTime);
       g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+fd);
-      s.stop(ac.currentTime+fd);
+      s.stop(ac.currentTime+fd); qtOut(s);   // 0719: the outgoing pass is on record — a put-away mid-fade ends it at once (the new place's own pass keeps its ramp on the held clock)
     } else s.stop();
   }catch(e){ try{ s.stop(); }catch(e2){} }
 }
@@ -36929,6 +36998,7 @@ function locTry(){
   const t=LOC_TRACKS[id]; if(!t) return;
   if(!(soundOn && META.themeOn)) return;   // a switch OFF gates the DECODE too — a silent fight costs no memory
   if(!LOC.buf||LOC.bid!==id){ locDecode(id); return; }
+  if(qtWait()) return;                     // 0719: put away (or its resume in flight) — the release knocks (qtKnock); never armed to a tap by a put-away, never a pass started into a pocket
   const ac=AC;
   if(!ac||ac.state!=='running'){ locArm(); return; }   // never a context outside a gesture
   try{
@@ -37097,6 +37167,7 @@ function shakeMusicTry(){
   // STANDS byte-still: a non-running context must still die here — never arm
   // a later start (the stop law forbids revival).
   if(!SHAKEB.buf) return;                      // decode in flight — the frame loop re-knocks
+  if(qtWait()) return;                         // 0719: put away (or its resume in flight) — the frame loop re-knocks at the release; the stop law below is not touched (no revival after the show)
   const ac=AC; if(!ac||ac.state!=='running'){ K.mdead=true; return; }   // never arm a later start — the stop law forbids revival
   try{
     const s=ac.createBufferSource(), g=ac.createGain();
@@ -37117,7 +37188,7 @@ function shakeMusicStop(){
     if(g&&ac&&ac.state==='running'){
       g.gain.setValueAtTime(Math.max(0.001,g.gain.value||0.001), ac.currentTime);
       g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+THEME_FADE);
-      s.stop(ac.currentTime+THEME_FADE);
+      s.stop(ac.currentTime+THEME_FADE); qtOut(s);   // 0719: on record — a put-away mid-cut ends it at once
     } else s.stop();
   }catch(e){ try{ s.stop(); }catch(e2){} } }
   K.g=null; SHAKEB.buf=null;   // fresh nodes AND a fresh decode per show — the buffer goes back to the phone
@@ -37233,7 +37304,7 @@ function shakeShow(id,o){
           held:held, rev:rev, src:null, g:null, raf:0, cur:null, frz:false, mdead:false, gen:-1, off:0,   // 0462a: gen = the track's context · off = its re-entry offset (shakeFrame's medic line)
           gold:(id==='lv100'), shLen:shLen, nemSal:false, fell:-1,   // 0319: fell = which routine loop has landed its pratfall thud
           snow:(id==='kingyeti'), sand:(id==='kingcroak'||id==='outlaws'), prince:shakePrince(id), rexSal:false, roared:false, croaked:false,   // 0366: the western shows throw SAND; the frog's own sting latch   // SH-03: the snow palette + the clap/roar latches (0354: + which royal the line names)
-          cap:!!o.cap, capN:0, capStop:null };   // SH-03 CAPTURE: the ad factory's frame-counted clock (rig-only door — GVT.dance({capture:1}))
+          cap:!!o.cap, capN:0, capStop:null, qt:0 };   // SH-03 CAPTURE: the ad factory's frame-counted clock (rig-only door — GVT.dance({capture:1})) · 0719: qt = the put-away let the track's node go — re-enter in time at the next frame
   shakeBuild(root, RM);
   root.className=RM? 'shk-rm shk-camon shk-lite' : (o.short? 'shk-lite' : '');   // SH-02: the RM tableau includes the cameo STATIC; short shows take the lite treatment
   root.classList.remove('hidden');
@@ -37598,6 +37669,7 @@ function shakeFrame(){
     // conductor's own clock less that cut. No loop, no revival after the show —
     // the stop law stands: a show already over never gets here.
     if(K.src && K.gen!==SFXW.gen){ const s0=K.src; s0.onended=null; K.src=null; K.g=null; K.off=Math.max(0, t-(K.ph[0][0]==='cut'? K.ph[0][1]*K.spb : 0)); }
+    if(K.qt){ K.qt=0; K.off=Math.max(0, t-(K.ph[0][0]==='cut'? K.ph[0][1]*K.spb : 0)); }   // 0719: a track the put-away held (qtRelease let its node go) re-enters IN TIME — the same offset; past the end = silent (shakeMusicTry's own law)
     if(K.cur && K.cur!=='cut') shakeMusicTry();   // the track enters ON THE DROP; decode-in-flight re-knocks here (0462a: and a swapped-out track re-enters here)
     if(!K.short){
       const sb=b-4;   // beats into the shake phase (cut 2 + drop 2)
@@ -39930,7 +40002,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.83';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.84';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -42986,8 +43058,8 @@ function bdTitleAlpha(){
 // never freezes for him (Wyatt 9/2 21:38: only a SOLO campaign fight freezes while hidden), his army fights on under the relay laws.
 let PUTAWAY={ hidden:0, t0:0, n:0, why:'' };
 let BD_AWAY_LOG=[];   // the rig's ledger of the words this page sent {on, why, t} — runtime, never saved
-function putAway(why){ if(PUTAWAY.hidden) return false; PUTAWAY.hidden=1; PUTAWAY.t0=Date.now(); PUTAWAY.n++; PUTAWAY.why=String(why||''); bdAwayWord(1, why); return true; }
-function takeOut(why){ if(!PUTAWAY.hidden) return false; PUTAWAY.hidden=0; PUTAWAY.why=''; bdAwayWord(0, why); return true; }
+function putAway(why){ if(PUTAWAY.hidden) return false; PUTAWAY.hidden=1; PUTAWAY.t0=Date.now(); PUTAWAY.n++; PUTAWAY.why=String(why||''); qtHold(why); bdAwayWord(1, why); return true; }   // 0719: the sound hold + the frozen fight ride this one seam (qtHold, the AUDIO block)
+function takeOut(why){ if(!PUTAWAY.hidden) return false; PUTAWAY.hidden=0; PUTAWAY.why=''; qtRelease(why); bdAwayWord(0, why); return true; }   // 0719: ...and come back through it (qtRelease)
 function bdInRoom(){ return !!(COOP && COOP.code && COOP.plc==='bd' && S.bf && S.bf.bd && S.mode==='play'); }   // a desert chair, hold or battle
 function bdInShell(){ try{ return !!((window.webkit&&webkit.messageHandlers)||/GVTShell|; wv\)/.test(navigator.userAgent)); }catch(e){ return false; } }   // the iOS bridge · the Android WebView's UA
 function bdAwayOnHide(ev){ return bdInRoom() && (bdInShell() || !!(ev&&ev.persisted)); }   // a pagehide that is a PUT-AWAY (a shell page never navigates; a bfcache trip comes back) — a browser's unload keeps the 0292 LEAVE farewell = CLOSED
@@ -43003,6 +43075,7 @@ function bdAwayWord(on, why){
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) putAway('hidden'); else takeOut('visible'); });
 window.addEventListener('pagehide', (ev)=>{ if(!document.hidden || bdAwayOnHide(ev)) putAway((ev&&ev.persisted)? 'bfcache' : 'pagehide'); });
 window.addEventListener('pageshow', ()=>{ if(!document.hidden) takeOut('pageshow'); });
+if(document.hidden) putAway('boot');   // 0719: a page that opens hidden is put away from its first breath — the flag is honest before the first event (no context stands yet: nothing to suspend, nothing created)
 let EVD={ t:0, pollT:0, sig:'', lastPoll:0, annWk:'', popBell:0 };   // the door's own clocks + the render signature · 0506: annWk = the launch card's session latch (the wk it dealt for), popBell = the T−5 card's (the bell it dealt for) — runtime flats, never saved
 // the clock in the player's own language first (LANG), the phone's region when it agrees
 // (an en-GB phone keeps its 24 h; a ja phone playing in English reads English day names)
@@ -49905,7 +49978,7 @@ function campCrateFall(word){
   S.shake=1.0; S.slowmo=0.35; SFX.boom();
   for(let i=0;i<3;i++) S.fx.push({k:'puff',x:b.x+(Math.random()-0.5)*70,y:b.y-30-Math.random()*60,t:0,dur:0.6,R:26});
   S.fx.push({k:'ring',x:b.x,y:b.y-30,r:12,R:110,t:0,dur:0.6,col:'rgba(255,210,74,0.9)'});
-  setTimeout(()=>{ S.slowmo=1;
+  qtTimer(()=>{ S.slowmo=1;   // 0719: the one wall-clock timer a solo campaign fight owns — put away mid-beat, it is held with its remainder (a battlefield's KO beat, endBattlefield's, is not this timer)
     // v1.47: as the smoke clears, the tan colours come down and the green
     // flag runs up their pole — the verdict rides the ceremony's fuse now,
     // same guarded call as ever (guests see the flag, the referee speaks)
@@ -90280,6 +90353,8 @@ const FRAME_STATS={ frames:0, steps:0, multi:0, maxSteps:1, lagS:0 };   // the r
 function frame(ts){
   requestAnimationFrame(frame);
   if(!ready) return;
+  if(qtHeld() && qtFreezes()){ last=ts; return; }   // 0719 THE FROZEN FIGHT (Wyatt 9/2: "Yes in campaign; no in Battlefields or Raid/pvp events"): a solo campaign fight put away ticks NOTHING — no sim, no wall clock, no draw (where a platform runs rAF hidden at all)
+  if(QT.skip){ QT.skip=0; last=ts; return; }        // ...and the first frame back reads the hidden span as NO gap: every clock resumes from the moment it left. A battlefield, a raid, a party fight and the room run as today — one capped catch-up frame (0559 C)
   const gap=(ts-last)/1000||0.016; last=ts;
   const dt=Math.min(SIM_STEP_S,gap);   // the per-frame wall-clock tick every clock below reads — byte-what-it-was
   if(S.hitStop>0) S.hitStop=Math.max(0,S.hitStop-dt);   // drains on the WALL clock, so it always lets go
@@ -90529,6 +90604,14 @@ window.GVT = {
   S, UDEF, FDEF, PATH_LEN,
   skipTitle(){ document.getElementById('title').classList.add('hidden'); S.mode='play'; },
   vflag(){ const v=S.vflag; return v? {x:v.x,t:+v.t.toFixed(2),dur:v.dur,burst:v.burst,pending:!!v.done,hex:v.hex,old:v.old,foeWin:!!v.foeWin} : null; },
+  // 0719 QUIET WHEN PUT AWAY rig (read-only): the hold, the freeze, the clocks — one read
+  quiet(){ return { cv:GVT_CV, on:QT_ON, freeze:QT_FREEZE, resumeMax:QT_RESUME_MAX, held:qtHeld(), wait:!!QT.wait, freezes:qtFreezes(), skip:QT.skip, n:QT.n, rel:QT.rel, had:QT.had, sus:QT.sus, out:QT.out.length,
+    putaway:{ hidden:PUTAWAY.hidden, n:PUTAWAY.n, why:PUTAWAY.why }, vis:document.visibilityState,
+    ac:{ ok:!!AC, state:AC? AC.state:'none', t:AC? +AC.currentTime.toFixed(3):0, gen:SFXW.gen, strikes:SFXW.strikes, pv:SFXW.pv, rp:!!SFXW.rp },
+    loc:{ id:LOC.id, live:!!LOC.src, gen:LOC.gen, armed:!!LOC.armed, fade:LOC.fade, bid:LOC.bid, busy:LOC.busy, vol:LOC.g? +LOC.g.gain.value.toFixed(3) : -1 },
+    theme:{ live:!!THEME.src, want:THEME.want, started:THEME.started, dead:THEME.dead, armed:!!THEME.armed, gen:THEME.gen, buf:!!THEMEB.buf },
+    dance:SHAKE? { music:!!SHAKE.src, qt:SHAKE.qt|0, off:SHAKE.off, mdead:SHAKE.mdead, cur:SHAKE.cur, t:+((performance.now()-SHAKE.t0)/1000).toFixed(3) } : null,
+    sim:{ mode:S.mode, t:+S.t.toFixed(3), sqt:S.sq? +S.sq.t.toFixed(3) : -1, wave:S.wave, waveT:+S.waveT.toFixed(3), interT:+S.interT.toFixed(3), foes:S.foes.length, units:S.units.length, lives:S.lives, frames:FRAME_STATS.frames, steps:FRAME_STATS.steps, lagS:+FRAME_STATS.lagS.toFixed(3), bf:!!S.bf, raid:!!S.raid, coop:!!S.coop, rival:!!S.rival, hitStop:+(S.hitStop||0).toFixed(3), vflag:!!S.vflag, crate:S.tanBase? S.tanBase.hp : null } }; },
   // v1.49 SOUND MEDIC rig: the audio context's pulse, for soaks + field debugging
   sfx(){ return { ok:!!AC, state:AC? AC.state:'none', t:AC? +AC.currentTime.toFixed(3):0,
                   gen:SFXW.gen, strikes:SFXW.strikes, frozen:SFXW.frozen,
