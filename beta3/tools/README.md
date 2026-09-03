@@ -2,6 +2,48 @@
 
 Thirty-three scripts, all dev-only — nothing here ships to the browser.
 
+## sign-check.mjs grows — CHOOSE YOUR SIGN goes full-bleed (v0.79.0)
+
+Skylar's call (9/2): keep the two arrows, remove everything else around the
+inner card, and "make these images as big as we can." The sheet side: the
+framed `endpanel` window, the CHOOSE YOUR SIGN headline, the subtitle and
+the 'n / 13' pager are GONE (`zpTitle`/`zpSub` culled from all five
+tongues); the card IS the sheet now — 404×706 of the 420×800 design box
+(was 272×424), the 2:3 plate cover-filling the whole card (height-true,
+the horizontal spill trimmed by `setCrop` so a sliding neighbor never
+overlaps; the deck window's geometry mask went `fillRoundedRect` and
+shapes the corners, so no texture is re-baked). Name/epithet ride the
+plate's crown and the power cluster (HARD box · levelled desc · LEVEL+XP
+bar · record) rides its foot, both over `ssZodScrimTex` — ONE baked alpha
+gradient worn straight at the foot, flipped and faded at the crown (the
+Canvas setTint law). The ‹ › arrows overlay the card's waist on dark
+halos; the ✕ rides the card's top-right corner and closes on the UP under
+an 8u drag threshold (a swipe brushing the corner can never dismiss); a
+quiet catch zone under the card absorbs near-misses around BEGIN so a
+finger aiming for the button never falls through to the veil. The v0.70
+topOnly law holds: swipe zone over the cards, every tappable overlay
+(arrows, ✕, hardZone, BEGIN) added AFTER it. Both doors (campaign with
+the HARD box, endless without) wear the same full-bleed dress.
+
+sign-check.mjs 69→77: the counter pin became the full-bleed section — the
+dead chrome proven gone (no endpanel, no headline/subtitle text, no pager),
+`zpTitle`/`zpSub` proven culled from the table, the card ≥400×700 with the
+plate ≥700 design units tall (was 240), a real swipe STARTING on the HARD
+box turning the deck without flipping it, the tap toggle round-trip at the
+new position, the near-miss band above BEGIN absorbed with the sheet
+standing. Its Graphics-count pins survived unchanged (pane + rim + hard
+box [+ fallback glyph] = the old pane + art-frame + box counts).
+signlevel-check (86) and hard-check (108) passed with ZERO edits — their
+picker reads are data-tag-driven and their band/overlap judges hold at the
+new geometry. ⚠ zod-art-check.mjs stays a documented STALE suite (11/25
+since the review-0902 ledger): its v0.58 snapshotPixel points and Graphics
+pins predate v0.70's box AND this redesign; the same surfaces are proven
+green by sign/signlevel/hard.
+
+```
+perl -e 'alarm 580; exec @ARGV' node tools/sign-check.mjs   # 77 checks, ~4 min
+```
+
 ## profile-check.mjs — the profile page redesign (v0.78.0)
 
 Skylar's call (9/2): "get rid of the rating button and the text underneath

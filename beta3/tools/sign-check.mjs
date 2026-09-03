@@ -1,7 +1,10 @@
-// SIGN-CHECK — the sign picker as CARDS (v0.57.0, task 46).
-// One full-size card at a time (THE OPEN SKY first, then the twelve), ‹ ›
-// arrows in the margins, a real swipe on the card with a settle tween and
-// wrap at both ends, BEGIN always live. Everything here is REAL input at
+// SIGN-CHECK — the sign picker as CARDS (v0.57.0, task 46; FULL-BLEED
+// since v0.79.0: the frame/headline/subtitle/pager are gone, the card
+// takes the whole design box with the plate cover-filling it, and the
+// ‹ › arrows + ✕ ride ON the card over the swipe zone — topOnly law).
+// One full-size card at a time (THE OPEN SKY first, then the twelve), a
+// real swipe on the card with a settle tween and wrap at both ends,
+// BEGIN always live. Everything here is REAL input at
 // DPR 3 through Input.dispatchTouchEvent (taps) and dispatchMouseEvent
 // (drags — a pressed pointer moved in steps, then released), never a call
 // into the scene. Walks the iPhone 16 geometry for the behaviour, then the
@@ -188,7 +191,38 @@ const al = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === 
 ok('a real tap on › from the last card WRAPS to the open sky', await touchUntil(ar, `${STILL} && ${H}.signPeek().id === 'none'`, 6), JSON.stringify(await peek()));
 ok('a real tap on ‹ wraps back to PISCES', await touchUntil(al, `${STILL} && ${H}.signPeek().id === 'pisces'`, 6), JSON.stringify(await peek()));
 ok('only three card containers live in the strip', await ev(`(() => { let n = 0; ${H}.signC.list.forEach(o => { if (o.list) o.list.forEach(k => { if (k.getData && k.getData('zodCard')) n++; }); }); return n === 3 })()`));
-ok('the counter reads 13 / 13', await ev(`${H}.signC.list.some(o => o.type === 'Text' && o.text === '13 / 13')`));
+
+/* ---------- v0.79.0 FULL-BLEED: the chrome is dead, the card is the sheet ---------- */
+console.log('\n━━ FULL-BLEED (v0.79.0) — the frame, headline, subtitle and pager are gone; the card takes the safe band');
+const fb = await evj(`JSON.stringify((() => { const s = ${H}; const l = ssLayout(s); const p = s.signPeek();
+  const cb = p.card.getBounds();
+  const art = p.card.list.find(o => o.texture && (o.texture.key.indexOf('zod_') === 0 || o.texture.key === 'zodsky'));
+  const texts = []; const w = (ls) => ls.forEach(o => { if (o.type === 'Text') texts.push(o.text); if (o.list) w(o.list); }); w(s.signC.list);
+  return { cw: Math.round(cb.width / l.u(1)), chh: Math.round(cb.height / l.u(1)),
+    ah: art ? Math.round(art.displayHeight / l.u(1)) : 0,
+    win: s.signC.list.some(o => o.texture && o.texture.key === 'endpanel'),
+    pager: texts.some(t => /\\d+ \\/ 13/.test(t)),
+    title: texts.some(t => /CHOOSE YOUR SIGN|born beneath one sky/.test(t)),
+    zpT: typeof SS_STR.en.zpTitle, zpS: typeof SS_STR.es.zpSub, zpTde: typeof SS_STR.de.zpTitle } })())`);
+ok('the dead chrome is gone — no framed window, no headline/subtitle, no pager', !fb.win && !fb.pager && !fb.title, JSON.stringify(fb));
+ok('zpTitle/zpSub are culled from the table (no tongue carries them)', fb.zpT === 'undefined' && fb.zpS === 'undefined' && fb.zpTde === 'undefined');
+ok('the card takes the design box (≥400×700 of 420×800) and the plate stands ≥700 tall (was 240)', fb.cw >= 400 && fb.chh >= 700 && fb.ah >= 700, `card ${fb.cw}×${fb.chh} · art h ${fb.ah}`);
+// the HARD control at the new geometry: a swipe ACROSS the box turns the
+// deck and never flips it; a tap toggles it both ways (still on PISCES)
+const hz = await css(`${H}.signC.list.find(o => o.getData && o.getData('hardBox'))`);
+const hp0 = await ev(`JSON.stringify(SS.prof.hardPick || {})`);
+await drag(hz.x, hz.y, -150);
+ok('a real swipe STARTING on the HARD box turns the deck (pisces → open sky)', await until(`${STILL} && ${H}.signPeek().id === 'none'`, 4000), JSON.stringify(await peek()));
+ok('…and the swipe never flips the box', await ev(`JSON.stringify(SS.prof.hardPick || {}) === '${hp0}'`), await ev(`JSON.stringify(SS.prof.hardPick)`));
+ok('a real tap on HARD ticks the standing card (none)', await touchUntil(hz, `SS.prof.hardPick.none === 1`, 5));
+ok('a second tap unticks it clean', await touchUntil(hz, `!SS.prof.hardPick.none`, 5));
+// the quiet band above BEGIN: a near-miss lands on the catch zone, never the veil
+const nearMiss = await evj(`JSON.stringify((() => { const l = ssLayout(${H}); const D = game.scale.width / innerWidth;
+  return { x: l.x(0) / D, y: l.y(723) / D } })())`);
+await touch(nearMiss.x, nearMiss.y);
+await sleep(350);
+ok('a near-miss just above BEGIN is absorbed — the sheet stands', await ev(SHEET));
+ok('…and back on top: ‹ returns to PISCES for the walk ahead', await touchUntil(al, `${STILL} && ${H}.signPeek().id === 'pisces'`, 6), JSON.stringify(await peek()));
 // --- walk to TAURUS (2) by arrows: the art seam ---
 for (let i = 0; i < 3; i++) { await touch(ar.x, ar.y); await until(STILL, 3000); }
 p = await peek();

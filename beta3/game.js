@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.78.0';
+const BUILD = 'STARSPELL v0.79.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4240,6 +4240,25 @@ function ssZodSkyTex(scene) {
   t.refresh();
   return key;
 }
+/* the full-bleed card's reading scrims (v0.79.0): ONE baked alpha gradient —
+   deep navy rising from clear — worn straight at the card's foot under the
+   power cluster and flipped, faded, at the crown under the name. Baked
+   because setTint is a Canvas no-op (the lantern's law). */
+function ssZodScrimTex(scene) {
+  const key = 'zodscrim';
+  if (scene.textures.exists(key)) return key;
+  const R = Math.max(2, ssTexRes(scene));
+  const W = Math.round(8 * R), H = Math.round(252 * R);
+  const t = scene.textures.createCanvas(key, W, H);
+  const c = t.context;
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, 'rgba(7,10,26,0)');
+  g.addColorStop(0.45, 'rgba(7,10,26,0.44)');
+  g.addColorStop(1, 'rgba(7,10,26,0.94)');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  t.refresh();
+  return key;
+}
 
 function ssStarChart(scene, opts) {
   const l = ssLayout(scene);
@@ -6325,16 +6344,28 @@ class Home extends Phaser.Scene {
     veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
     c.add(veil);
 
+    /* v0.79.0 — the sheet went FULL-BLEED on Skylar's call: the framed
+       window, the CHOOSE YOUR SIGN headline, the subtitle and the pager all
+       died so the card itself can take the whole safe band and the plates
+       can be as big as the phone allows. What lives: the card, the two
+       arrows, BEGIN — and one ✕ riding the card's top corner (the frame
+       that carried it is gone; the veil's margins are gone with it). */
     const items = [];
-    const win = this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(384), l.u(664)).setInteractive();
-    items.push(win);
-    const xB = ssTxt(this, l.x(170), l.y(96), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
-    xB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    const xB = ssTxt(this, l.x(182), l.y(44), '✕', l.u(16), '#c3cae6').setOrigin(0.5)
+      .setShadow(0, 0, '#0a0e1f', l.u(7), true, true).setInteractive({ useHandCursor: true });
+    ssHitPad(xB, 48);
+    // it rides the card now, so it closes on the UP under a drag threshold —
+    // a swipe that brushes the corner can never dismiss the sheet
+    let xArm = null;
+    xB.on('pointerdown', (p) => { xArm = { x: p.x, y: p.y }; });
+    xB.on('pointerup', (p) => {
+      if (!xArm) return;
+      const moved = Math.abs(p.x - xArm.x) > l.u(8) || Math.abs(p.y - xArm.y) > l.u(8);
+      xArm = null;
+      if (moved) return;
+      SFX.ui(); closeSheet();
+    });
     items.push(xB);
-    const hk = ssGoldTex(this, SS_T('zpTitle'), 20);
-    const hsc = Math.min(1, 300 / hk.w);
-    items.push(this.add.image(l.x(0), l.y(106), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
-    items.push(ssTxt(this, l.x(0), l.y(132), SS_T('zpSub'), l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
 
     /* the deck: THE OPEN SKY first, then the twelve. Each entry is what a
        card needs — id, name, title, desc, tint, and the sign (null = open) */
@@ -6346,51 +6377,58 @@ class Home extends Phaser.Scene {
         return { id: z.id, z, name: z.name, title: t.title, desc: t.desc, tint: SS_ELEMENTS[z.el] };
       }));
     const N = deck.length;
-    // geometry (design units): the card, its stride, and the window the
-    // deck shows through — the margins either side belong to the arrows
-    const CW = 272, CH = 424, CY = 362, STRIDE = 300, ART_W = 160, ART_H = 240;
+    /* geometry (design units): the card IS the sheet now — the full design
+       box less a hair of margin, the arrows and ✕ riding on top of it. The
+       plate cover-fills the whole card (2:3 art scaled to the card's height,
+       the spill either side cropped away); the deck window's mask rounds
+       the corners, so no texture is ever re-baked for the shape. */
+    const CW = 404, CH = 706, CY = 365, STRIDE = 428;
+    const ART_W = CH * (2 / 3);   // the 2:3 plate at cover height
     const hex = (n) => '#' + ('000000' + n.toString(16)).slice(-6);
 
     const mkCard = (i) => {
       const d = deck[((i % N) + N) % N];
       const k = this.add.container(0, 0);
       const tint = d.tint;
-      // the card's face: a dark pane with the element's rim
+      // the dark pane under the plate — it only shows before the art lands
+      // (and through the wash's baked corner cutouts)
       const g = this.add.graphics();
-      g.fillStyle(0x0a0e1f, 0.78);
-      g.fillRoundedRect(-l.u(CW / 2), -l.u(CH / 2), l.u(CW), l.u(CH), l.u(14));
-      g.lineStyle(l.u(1.4), tint, 0.7);
-      g.strokeRoundedRect(-l.u(CW / 2), -l.u(CH / 2), l.u(CW), l.u(CH), l.u(14));
-      g.lineStyle(l.u(0.7), tint, 0.28);
-      g.strokeRoundedRect(-l.u(CW / 2 - 4), -l.u(CH / 2 - 4), l.u(CW - 8), l.u(CH - 8), l.u(11));
+      g.fillStyle(0x0a0e1f, 0.9);
+      g.fillRoundedRect(-l.u(CW / 2), -l.u(CH / 2), l.u(CW), l.u(CH), l.u(16));
       k.add(g);
-      // name + title
-      k.add(ssTxt(this, 0, -l.u(CH / 2 - 26), d.name, l.u(19), hex(tint)).setOrigin(0.5)
-        .setShadow(0, 0, hex(tint), l.u(8), true, true));
-      k.add(ssTxt(this, 0, -l.u(CH / 2 - 47), d.title, l.u(10.5), '#c9c3ae', 'italic').setOrigin(0.5));
-      // the art region: 2:3 portrait. The real card art when it is loaded,
-      // else the sign's own stars drawn large over a night-sky wash
-      const ay = -l.u(CH / 2 - 62 - ART_H / 2);
+      // the art, wall to wall: the plate covers the whole card. Real art is
+      // cover-cropped (height-true, the horizontal spill trimmed by setCrop
+      // so a sliding neighbor never overlaps); the fallback is the sign's
+      // own stars drawn large over the night-sky wash, stretched to fit.
       const artKey = ssZodArtKey(this, d.id);
       if (artKey) {
-        k.add(this.add.image(0, ay, artKey).setDisplaySize(l.u(ART_W), l.u(ART_H)));
+        const art = this.add.image(0, 0, artKey).setDisplaySize(l.u(ART_W), l.u(CH));
+        const fw = art.frame.realWidth || art.frame.width, fh = art.frame.realHeight || art.frame.height;
+        const cw = fw * (CW / ART_W);
+        art.setCrop((fw - cw) / 2, 0, cw, fh);
+        k.add(art);
       } else {
-        k.add(this.add.image(0, ay, ssZodSkyTex(this)).setDisplaySize(l.u(ART_W), l.u(ART_H)));
+        k.add(this.add.image(0, 0, ssZodSkyTex(this)).setDisplaySize(l.u(CW), l.u(CH)));
         if (d.z) {
-          k.add(this.add.image(0, ay, 'glowbig').setDisplaySize(l.u(ART_W * 1.2), l.u(ART_H * 0.8)).setTint(tint).setBlendMode('ADD').setAlpha(0.16));
-          k.add(ssZodiacGlyph(this, d.z, l.u(0.6), 0, ay));
+          k.add(this.add.image(0, -l.u(40), 'glowbig').setDisplaySize(l.u(CW * 1.15), l.u(CH * 0.62)).setTint(tint).setBlendMode('ADD').setAlpha(0.16));
+          k.add(ssZodiacGlyph(this, d.z, l.u(1.2), 0, -l.u(40)));
         }
       }
-      const af = this.add.graphics();
-      af.lineStyle(l.u(0.9), tint, 0.45);
-      af.strokeRoundedRect(-l.u(ART_W / 2), ay - l.u(ART_H / 2), l.u(ART_W), l.u(ART_H), l.u(6));
-      k.add(af);
+      /* the scrims: a deep foot for the power cluster to read on, a whisper
+         at the crown under the name — baked alpha gradients (one texture,
+         flipped for the crown; setTint stays away, the Canvas law) */
+      k.add(this.add.image(0, l.u(CH / 2), ssZodScrimTex(this)).setOrigin(0.5, 1).setDisplaySize(l.u(CW), l.u(252)));
+      k.add(this.add.image(0, -l.u(CH / 2), ssZodScrimTex(this)).setOrigin(0.5, 0).setDisplaySize(l.u(CW), l.u(148)).setFlipY(true).setAlpha(0.72));
+      // name + title, riding the crown of the plate
+      k.add(ssTxt(this, 0, -l.u(CH / 2 - 40), d.name, l.u(24), hex(tint)).setOrigin(0.5)
+        .setShadow(0, 0, hex(tint), l.u(9), true, true));
+      k.add(ssTxt(this, 0, -l.u(CH / 2 - 72), d.title, l.u(12.5), '#d8d2bd', 'italic').setOrigin(0.5));
       // the power, at the card's bottom — one Text per line (ssTextBlock),
       // GENERATED at card build from the def's own dials at the held level
       // (v0.69.0 no-drift law: a dial that moves reaches the next build)
-      const desc = ssTextBlock(this, 0, l.u(CH / 2 - 92), d.z ? SS_ZOD(d.z, ssSignLv(d.id)).desc : d.desc, {
-        fontSize: l.u(11) + 'px', color: '#e6dfc8', fontStyle: 'italic', shadow: true,
-        wrapW: l.u(CW - 36), align: 'center', ox: 0.5, oy: 0,
+      const desc = ssTextBlock(this, 0, l.u(CH / 2 - 106), d.z ? SS_ZOD(d.z, ssSignLv(d.id)).desc : d.desc, {
+        fontSize: l.u(11.5) + 'px', color: '#e6dfc8', fontStyle: 'italic', shadow: true,
+        wrapW: l.u(CW - 56), align: 'center', ox: 0.5, oy: 0,
       });
       desc.setData('zodDesc', d.id);
       k.add(desc);
@@ -6404,16 +6442,16 @@ class Home extends Phaser.Scene {
         const atMax = lv >= SS_SIGNLV.max;
         const frac = atMax ? 1
           : clamp((xp - SS_SIGNLV.cum[lv]) / Math.max(1, SS_SIGNLV.cum[lv + 1] - SS_SIGNLV.cum[lv]), 0, 1);
-        const ly = l.u(CH / 2 - 34);
-        const lvT = ssTxt(this, 0, ly, atMax ? SS_T('svLevelMax') : SS_T('svLevel', lv), l.u(9.5), '#d7b45c').setOrigin(1, 0.5);
-        if (lvT.width > l.u(104)) lvT.setScale(l.u(104) / lvT.width);
-        const BW = 108, GAP = 9;
+        const ly = l.u(CH / 2 - 46);
+        const lvT = ssTxt(this, 0, ly, atMax ? SS_T('svLevelMax') : SS_T('svLevel', lv), l.u(10.5), '#d7b45c').setOrigin(1, 0.5);
+        if (lvT.width > l.u(120)) lvT.setScale(l.u(120) / lvT.width);
+        const BW = 150, GAP = 10;
         const lw = (lvT.width * lvT.scaleX) / l.u(1);
         const left = -(lw + GAP + BW) / 2;
         lvT.setX(l.u(left + lw));
         lvT.setData('signLvRow', d.id);
-        const trough = this.add.image(l.u(left + lw + GAP), ly, 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(BW), l.u(5.5));
-        const fill = this.add.image(l.u(left + lw + GAP + 1), ly, 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(BW - 2), l.u(3.5));
+        const trough = this.add.image(l.u(left + lw + GAP), ly, 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(BW), l.u(6.5));
+        const fill = this.add.image(l.u(left + lw + GAP + 1), ly, 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(BW - 2), l.u(4.5));
         fill.setCrop(0, 0, fill.frame.width * frac, fill.frame.height);
         fill.setData('signLvFill', frac);
         k.add([lvT, trough, fill]);
@@ -6421,7 +6459,7 @@ class Home extends Phaser.Scene {
       // the record under this sign, styled in
       const sr = d.z ? SS.prof.signs[d.id] : null;
       if (sr && sr.clears > 0) {
-        k.add(ssTxt(this, 0, l.u(CH / 2 - 18), '★ ' + SS_T('zpRec', sr.clears, sr.best), l.u(9.5), '#d7b45c').setOrigin(0.5));
+        k.add(ssTxt(this, 0, l.u(CH / 2 - 24), '★ ' + SS_T('zpRec', sr.clears, sr.best), l.u(10.5), '#d7b45c').setOrigin(0.5));
       }
       /* HARD MODE's tick box (v0.70.0, Skylar: "under each sign in the new
          campaign there should be a box that lets you tick off if you want
@@ -6435,14 +6473,14 @@ class Home extends Phaser.Scene {
          zone below, because Phaser's topOnly input hands every event to
          the topmost object — a zone inside the card would never hear it. */
       if (this.signFor === 'campaign') {
-        const hy = l.u(CH / 2 - 108);
-        const lab = ssTxt(this, 0, hy, SS_T('hardLbl'), l.u(9.5), '#8a94c4').setOrigin(0, 0.5).setLetterSpacing(l.u(1));
-        const BOX = 12, GAP2 = 7;
+        const hy = l.u(CH / 2 - 126);
+        const lab = ssTxt(this, 0, hy, SS_T('hardLbl'), l.u(11), '#9aa3cc').setOrigin(0, 0.5).setLetterSpacing(l.u(1));
+        const BOX = 15, GAP2 = 8;
         const w = BOX + GAP2 + lab.width / l.u(1);
         const bx = -w / 2 + BOX / 2;
         lab.setX(l.u(-w / 2 + BOX + GAP2));
         const hg = this.add.graphics();
-        const tick = ssTxt(this, l.u(bx), hy, '✓', l.u(10), '#ff8a70').setOrigin(0.5)
+        const tick = ssTxt(this, l.u(bx), hy, '✓', l.u(12), '#ff8a70').setOrigin(0.5)
           .setShadow(0, 0, '#e05e2a', l.u(5), true, true);
         tick.setData('hardTick', d.id);
         const drawBox = (flare) => {
@@ -6453,7 +6491,7 @@ class Home extends Phaser.Scene {
           hg.lineStyle(l.u(1.2), on ? 0xff5e4d : 0x8a94c4, on ? 0.95 : 0.5);
           hg.strokeRoundedRect(l.u(bx - BOX / 2), hy - l.u(BOX / 2), l.u(BOX), l.u(BOX), l.u(3));
           tick.setVisible(on);
-          lab.setColor(on ? '#ff8a70' : '#8a94c4');
+          lab.setColor(on ? '#ff8a70' : '#9aa3cc');
           if (flare && on) {   // one ember breath as the challenge is taken
             const fl = this.add.image(l.u(bx), hy, 'glowbig').setDisplaySize(l.u(40), l.u(40))
               .setTint(0xff5e4d).setBlendMode('ADD').setAlpha(0.5);
@@ -6465,6 +6503,13 @@ class Home extends Phaser.Scene {
         k.setData('hardDraw', drawBox);
         k.add([hg, tick, lab]);
       }
+      // the element's rim, over the art so the plate wears it
+      const rim = this.add.graphics();
+      rim.lineStyle(l.u(1.5), tint, 0.75);
+      rim.strokeRoundedRect(-l.u(CW / 2 - 0.75), -l.u(CH / 2 - 0.75), l.u(CW - 1.5), l.u(CH - 1.5), l.u(15));
+      rim.lineStyle(l.u(0.7), tint, 0.25);
+      rim.strokeRoundedRect(-l.u(CW / 2 - 5), -l.u(CH / 2 - 5), l.u(CW - 10), l.u(CH - 10), l.u(11));
+      k.add(rim);
       k.setData('zodCard', d.id);
       return k;
     };
@@ -6473,7 +6518,10 @@ class Home extends Phaser.Scene {
        a geometry mask keeps neighbors to a peek at the card's edges */
     const strip = this.add.container(l.x(0), l.y(CY));
     const mg = this.make.graphics();
-    mg.fillRect(l.x(-(CW / 2 + 8)), l.y(CY - CH / 2 - 6), l.u(CW + 16), l.u(CH + 12));
+    // the window IS the card slot, rounded — full-bleed art slides through
+    // it and the mask alone shapes the corners
+    mg.fillStyle(0xffffff, 1);
+    mg.fillRoundedRect(l.x(-CW / 2), l.y(CY - CH / 2), l.u(CW), l.u(CH), l.u(16));
     strip.setMask(mg.createGeometryMask());
     let cur = 0, moving = false;
     const cards = { prev: null, cur: null, next: null };
@@ -6489,10 +6537,6 @@ class Home extends Phaser.Scene {
       place();
     };
     build();
-    const counter = ssTxt(this, l.x(0), l.y(CY + CH / 2 + 14), '', l.u(9), '#5a6390').setOrigin(0.5);
-    const setCounter = () => counter.setText((cur + 1) + ' / ' + N);
-    setCounter();
-    items.push(counter);
 
     // a move: the strip slides one stride (settle tween), then the three
     // cards are recycled around the new index and the strip snaps home
@@ -6506,7 +6550,7 @@ class Home extends Phaser.Scene {
         onComplete: () => {
           if (this.signC !== c) return;
           cur = ((cur + dir) % N + N) % N;
-          build(); setCounter();
+          build();
           moving = false;
         },
       });
@@ -6520,20 +6564,21 @@ class Home extends Phaser.Scene {
     this.signGo = (dir) => go(dir);
     this.signPeek = () => ({ id: deck[cur].id, cur, n: N, moving, x: strip.x - l.x(0), card: cards.cur });
 
-    // the arrows, in the margins the card leaves free (44-pt law via ssHitPad)
+    // the arrows live on (Skylar's call) — riding the card's edges now,
+    // gold on a dark halo so they read on any plate (44-pt law via ssHitPad)
     const mkArrow = (dx, glyph, dir) => {
       const a = ssTxt(this, l.x(dx), l.y(CY), glyph, l.u(30), '#d7b45c').setOrigin(0.5)
-        .setShadow(0, 0, '#c9a94f', l.u(8), true, true).setInteractive({ useHandCursor: true });
+        .setShadow(0, 0, '#0a0e1f', l.u(8), true, true).setInteractive({ useHandCursor: true });
       ssHitPad(a, 48);
       a.on('pointerdown', () => { if (moving) return; SFX.ui(); go(dir); });
       return a;
     };
-    const arrowL = mkArrow(-168, '‹', -1), arrowR = mkArrow(168, '›', 1);
+    const arrowL = mkArrow(-180, '‹', -1), arrowR = mkArrow(180, '›', 1);
     items.push(arrowL, arrowR);
 
     // the swipe: a real drag anywhere on the card. Past a third of the card
     // (or a quick flick) it commits to the neighbor; short of that it settles
-    const zone = this.add.zone(l.x(0), l.y(CY), l.u(CW + 16), l.u(CH + 12)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const zone = this.add.zone(l.x(0), l.y(CY), l.u(CW), l.u(CH)).setOrigin(0.5).setInteractive({ useHandCursor: true });
     let drag = null;
     zone.on('pointerdown', (p) => { if (moving) return; drag = { x: p.x, t: performance.now() }; cards.prev.setVisible(true); cards.next.setVisible(true); });
     const mv = (p) => {
@@ -6576,11 +6621,15 @@ class Home extends Phaser.Scene {
       closeSheet();
       this.mapSheet();
     };
-    const beginB = this.add.image(l.x(0), l.y(650), ssBtn(this, false, 260, 50)).setDisplaySize(l.u(260), l.u(50))
+    // the band under the card is BEGIN's own ground: a quiet catch zone
+    // soaks up near-misses so a finger aiming for the button can never
+    // fall through to the veil and lose the sheet
+    const catchB = this.add.zone(l.x(0), l.y(759), l.u(420), l.u(82)).setOrigin(0.5).setInteractive();
+    const beginB = this.add.image(l.x(0), l.y(755), ssBtn(this, false, 330, 54)).setDisplaySize(l.u(330), l.u(54))
       .setInteractive({ useHandCursor: true });
-    const beginT = ssTxt(this, l.x(0), l.y(650), SS_T('zpBegin'), l.u(15), BTN_INK()).setOrigin(0.5);
+    const beginT = ssTxt(this, l.x(0), l.y(755), SS_T('zpBegin'), l.u(16), BTN_INK()).setOrigin(0.5);
     beginB.on('pointerover', () => beginB.setScale(beginB.scaleX * 1.03, beginB.scaleY * 1.03));
-    beginB.on('pointerout', () => beginB.setDisplaySize(l.u(260), l.u(50)));
+    beginB.on('pointerout', () => beginB.setDisplaySize(l.u(330), l.u(54)));
     beginB.on('pointerdown', () => { if (moving) return; SFX.ui(); enter(deck[cur].id); });
     items.push(beginB, beginT);
 
@@ -6592,7 +6641,7 @@ class Home extends Phaser.Scene {
        only under a drag threshold — a real swipe never flips the box. */
     let hardZone = null;
     if (this.signFor === 'campaign') {
-      hardZone = this.add.zone(l.x(0), l.y(CY + CH / 2 - 108), l.u(150), l.u(30)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      hardZone = this.add.zone(l.x(0), l.y(CY + CH / 2 - 126), l.u(190), l.u(34)).setOrigin(0.5).setInteractive({ useHandCursor: true });
       ssHitPad(hardZone, 44);
       hardZone.setData('hardBox', 1);
       let harm = null;
@@ -6616,10 +6665,14 @@ class Home extends Phaser.Scene {
         if (dr) dr(true);
       });
     }
-    c.add(items);
+    /* display order IS the input order under topOnly: the swipe zone rides
+       the cards, and every tappable thing that overlays the card (arrows,
+       ✕, the HARD zone) must sit ABOVE it or it never hears a tap */
     c.add(strip);
     c.add(zone);
     if (hardZone) c.add(hardZone);
+    c.add(catchB);
+    c.add(items);
     // entrance: the sky of signs settles up into place like the other sheets.
     // Zones are pure hit areas (no alpha component) — they stay where they are.
     for (const it of items.concat([strip])) {
