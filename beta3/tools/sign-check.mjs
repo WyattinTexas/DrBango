@@ -1,7 +1,11 @@
 // SIGN-CHECK — the sign picker as CARDS (v0.57.0, task 46; FULL-BLEED
 // since v0.79.0: the frame/headline/subtitle/pager are gone, the card
 // takes the whole design box with the plate cover-filling it, and the
-// ‹ › arrows + ✕ ride ON the card over the swipe zone — topOnly law).
+// ‹ › arrows + ✕ ride ON the card over the swipe zone — topOnly law;
+// LIVING SKY since v0.84.0: the unsigned card's wash carries a seeded
+// twinkle field + occasional card-local shooting star — sprites only,
+// the Graphics census stays pinned, sign cards stay dead still, and
+// ?twinkle=0 / reduced motion freeze the layer).
 // One full-size card at a time (THE OPEN SKY first, then the twelve), a
 // real swipe on the card with a settle tween and wrap at both ends,
 // BEGIN always live. Everything here is REAL input at
@@ -137,10 +141,10 @@ const open = async () => {
   await sleep(450);   // the entrance settles
   return r;
 };
-const boot = async (dv, inset) => {
+const boot = async (dv, inset, extra) => {
   await send('Emulation.setDeviceMetricsOverride', { width: dv.w, height: dv.h, deviceScaleFactor: dv.dpr, mobile: true, screenWidth: dv.w, screenHeight: dv.h, screenOrientation: { type: 'portraitPrimary', angle: 0 } });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
-  await send('Page.navigate', { url: BASE + `?rend=cv&fps=0&diag=1&mpuid=sign${Math.floor(Math.random() * 1e6)}&inset=${inset}` });
+  await send('Page.navigate', { url: BASE + `?rend=cv&fps=0&diag=1&mpuid=sign${Math.floor(Math.random() * 1e6)}&inset=${inset}` + (extra || '') });
   await sleep(1500);
   const up = await until(HOME_REST, 90000);
   if (!up) return false;
@@ -260,6 +264,113 @@ ok('a real tap on ✕ closes the sheet', await touchUntil(xp, `!${H}.signC`, 6))
 ok('the sheet opens (4)', await open());
 ok('a real touch on the veil closes the sheet', await touchUntil({ x: 20, y: 30 }, `!${H}.signC`, 6));
 ok('no page exceptions', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+/* ---------- v0.84.0 THE LIVING SKY: the open sky twinkles, a star crosses ---------- */
+console.log('\n━━ THE LIVING SKY (v0.84.0) — the unsigned card breathes; sign cards stay dead still');
+ok('the sheet opens on THE OPEN SKY (living-sky walk)', await open() && (await peek()).id === 'none');
+const SKY = `JSON.stringify(window.__ssopensky)`;
+let sky = await evj(SKY);
+ok('the layer beacon stands: 25 seeded sprites, live (not stilled), the manual door open', sky.stars === 25 && sky.still === false && sky.builds >= 1 && await ev(`typeof window.__ssopensky.poke === 'function'`), JSON.stringify(sky));
+// ⚠ under ?rend=cv the tint shim (ssCanvasTintShim) swaps a tinted image's
+// texture to a cached '<base>#<hex>' copy and stamps __ssBaseTex — read the
+// BASE key, or every tinted star is invisible to a raw key match
+const BK = `const bk = (o) => o.__ssBaseTex || (o.texture && o.texture.key);`;
+const COUNT = `(() => { ${BK} const k = ${H}.signPeek().card; let dots = 0, sparks = 0; const w = (ls) => ls.forEach(o => { if (o.list) w(o.list); if (bk(o) === 'dot') dots++; if (bk(o) === 'spark4') sparks++; }); w(k.list); return { dots, sparks, gfx: k.list.filter(o => o.type === 'Graphics').length } })()`;
+let cnt = await evj(`JSON.stringify(${COUNT})`);
+ok('the field hangs on the card — 22 dots + 3 hero sparks, Graphics census still 3', cnt.dots >= 22 && cnt.dots <= 30 && cnt.sparks === 3 && cnt.gfx === 3, JSON.stringify(cnt));
+const order = await evj(`JSON.stringify((() => { const k = ${H}.signPeek().card;
+  const pi = k.list.findIndex(o => o.texture && o.texture.key === 'zodsky');
+  const li = k.list.findIndex(o => o.list && o.list.some(ch => ch.texture && ch.texture.key === 'spark4'));
+  const si = k.list.findIndex(o => o.texture && o.texture.key === 'zodscrim');
+  return { pi, li, si } })())`);
+ok('the layer rides between the wash plate and the reading scrims', order.pi >= 0 && order.li === order.pi + 1 && order.si > order.li, JSON.stringify(order));
+// the breathing: deal a baseline of the field's 25 alphas, then poll until
+// enough of them have moved off it (the batched start lands 400ms after the
+// build, each star on its own rhythm and delay)
+const ALPHAS = `JSON.stringify((() => { ${BK} const k = ${H}.signPeek().card; const out = []; const w = (ls) => ls.forEach(o => { if (o.list) w(o.list); if (bk(o) === 'dot' || bk(o) === 'spark4') out.push(Math.round(o.alpha * 1000)); }); w(k.list); return out.slice(0, 25) })())`;
+await sleep(900);
+const a0 = await evj(ALPHAS);
+ok('the stars breathe on their own rhythms (≥8 of 25 alphas move off the deal)', await until(`(() => { const a = JSON.parse(${ALPHAS}); const p = JSON.parse(${JSON.stringify(JSON.stringify(a0))}); let m = 0; for (let i = 0; i < 25; i++) if (a[i] !== p[i]) m++; return m >= 8 })()`, 9000, 300));
+// the shooting star, deterministically: wait for a clear sky, poke the
+// manual door, watch the head + chained trail live and sweep themselves
+ok('the sky sits clear between crossings', await until(`(${COUNT}).dots === 22`, 12000));
+sky = await evj(SKY);
+await ev(`(window.__ssopensky.poke(), 1)`);
+ok('a poked shooting star crosses the card (head + chained trail live)', await until(`(${COUNT}).dots >= 30`, 2500, 60), JSON.stringify(await evj(`JSON.stringify(${COUNT})`)));
+ok('…and burns out clean (the flight sweeps itself)', await until(`(${COUNT}).dots === 22`, 12000), JSON.stringify(await evj(`JSON.stringify(${COUNT})`)));
+ok('the beacon counted the crossing', (await evj(SKY)).shots >= sky.shots + 1);
+sky = await evj(SKY);
+ok('the sky looses one on its OWN clock (natural cadence ≤ ~15s + flight)', await until(`window.__ssopensky.shots >= ${sky.shots + 1}`, 22000, 500));
+// deck turns rebuild all three cards — the tween ledger must sit flat or
+// the twinkles are orphaned on every turn. Scope the count to tweens whose
+// targets live under the SHEET: the meadow keeps cycling its showcase
+// constellation beneath the veil, so the scene-wide total drifts on its own
+await until(`(${COUNT}).dots === 22`, 12000);
+const TWN = `(() => { const s = ${H}; const inSheet = (o) => { for (let p = o && o.parentContainer; p; p = p.parentContainer) if (p === s.signC) return true; return false; };
+  return s.tweens.getTweens().filter(t => { try { return (t.targets || []).some(inSheet); } catch (e) { return false; } }).length })()`;
+const stableTw = async () => { let prev = -1; for (let i = 0; i < 16; i++) { const v = await ev(TWN); if (v === prev) return v; prev = v; await sleep(450); } return prev; };
+await drag(cp.x, cp.y, -150);
+await until(`${STILL} && ${H}.signPeek().id === 'aries'`, 4000);
+await drag(cp.x, cp.y, 150);
+await until(`${STILL} && ${H}.signPeek().id === 'none'`, 4000);
+await sleep(900);
+const t1 = await stableTw();
+await drag(cp.x, cp.y, -150);
+await until(`${STILL} && ${H}.signPeek().id === 'aries'`, 4000);
+await drag(cp.x, cp.y, 150);
+await until(`${STILL} && ${H}.signPeek().id === 'none'`, 4000);
+await sleep(900);
+const t2 = await stableTw();
+ok('two more deck turns leave the sheet\'s tween ledger flat (~28 twinkles, no orphans across rebuilds)', t1 >= 26 && Math.abs(t2 - t1) <= 4, t1 + ' → ' + t2);
+// the gate: sign cards stay dead still — ARIES rides the SAME shared wash
+// (its plate is blocked in this boot) and hangs nothing; TAURUS (real art)
+// hangs nothing either
+await drag(cp.x, cp.y, -150);
+await until(`${STILL} && ${H}.signPeek().id === 'aries'`, 4000);
+cnt = await evj(`JSON.stringify(${COUNT})`);
+ok('ARIES (the shared-wash fallback) hangs NO living layer — its wash stays dead still', cnt.dots === 0 && cnt.sparks === 0 && cnt.gfx === 4, JSON.stringify(cnt));
+const ar2 = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '›')`);
+await touch(ar2.x, ar2.y); await until(STILL, 3000);
+cnt = await evj(`JSON.stringify(${COUNT})`);
+ok('TAURUS (the real-art plate) hangs NO living layer either', (await peek()).id === 'taurus' && cnt.dots === 0 && cnt.sparks === 0, JSON.stringify(cnt));
+ok('…and with no open-sky card among the three, the manual door is closed (cleanup proof)', await ev(`window.__ssopensky.poke === null`));
+// close the sheet with a flight mid-air: the layer's destroy sweeps it
+const al2 = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
+await touch(al2.x, al2.y); await until(STILL, 3000);
+await touch(al2.x, al2.y);
+await until(`${STILL} && ${H}.signPeek().id === 'none'`, 4000);
+await ev(`(window.__ssopensky.poke(), 1)`);
+const xp2 = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '✕')`);
+ok('✕ closes the sheet with a star mid-flight — swept clean, the door nulled', await touchUntil(xp2, `!${H}.signC`, 6) && await until(`window.__ssopensky.poke === null`, 2000));
+// ⚠ scoped to the layer's own __ssAlive mark: the MEADOW leaks orphan
+// twinkle tweens on every showcase-constellation turnover (~14-24 each
+// ~10s, pre-existing, surfaced with v0.84.0) — a scene-wide scan reds on
+// ambient behaviour this suite does not own
+ok('…and no tween anywhere rides a destroyed layer sprite (the orphan scan)', await until(`(() => { const s = ${H}; return s.tweens.getTweens().filter(t => { try { return (t.targets || []).some(o => o && o.active === false && o.__ssAlive); } catch (e) { return false; } }).length === 0 })()`, 4000));
+ok('no page exceptions through the living walk', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+/* ---------- the seams: ?twinkle=0 and reduced motion still the layer ---------- */
+console.log('\n━━ THE STILLED SKY — ?twinkle=0 and reduced motion keep the field, drop the movement');
+ok('home stands (?twinkle=0)', await boot({ w: 393, h: 852, dpr: 3 }, '59,34', '&twinkle=0'));
+ok('the sheet opens on THE OPEN SKY (stilled)', await open() && (await peek()).id === 'none');
+sky = await evj(SKY);
+cnt = await evj(`JSON.stringify(${COUNT})`);
+ok('the field survives the stilling — 25 sprites, still flag up, no door, no crossings', sky.stars === 25 && sky.still === true && sky.shots === 0 && await ev(`window.__ssopensky.poke === null`) && cnt.dots === 22 && cnt.sparks === 3 && cnt.gfx === 3, JSON.stringify(sky) + ' ' + JSON.stringify(cnt));
+const f0 = await evj(ALPHAS);
+await sleep(1400);
+const f1 = await evj(ALPHAS);
+ok('…and the sky is FROZEN (25 alphas byte-equal across 1.4s)', JSON.stringify(f0) === JSON.stringify(f1) && f0.length === 25);
+await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+ok('home stands (reduced motion)', await boot({ w: 393, h: 852, dpr: 3 }, '59,34'));
+ok('the sheet opens on THE OPEN SKY (reduced)', await open() && (await peek()).id === 'none');
+sky = await evj(SKY);
+ok('reduced motion stills the layer the same way (field up, movement gone)', sky.stars === 25 && sky.still === true && await ev(`window.__ssopensky.poke === null`), JSON.stringify(sky));
+const r0 = await evj(ALPHAS);
+await sleep(1400);
+const r1 = await evj(ALPHAS);
+ok('…frozen under reduced motion too', JSON.stringify(r0) === JSON.stringify(r1) && r0.length === 25);
+await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: '' }] });
+ok('no page exceptions through the stilled walks', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ---------- the geometries: SE and iPad, layout only ---------- */
 for (const dv of [{ name: 'iPhone SE', w: 375, h: 667, dpr: 2, inset: '0,0' }, { name: 'iPad portrait', w: 820, h: 1180, dpr: 2, inset: '24,20' }]) {

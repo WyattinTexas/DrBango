@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.83.0';
+const BUILD = 'STARSPELL v0.84.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4346,6 +4346,108 @@ function ssZodScrimTex(scene) {
   t.refresh();
   return key;
 }
+/* THE OPEN SKY comes alive (v0.84.0, Skylar 9/3): the unsigned card's night
+   was a stale static wash — this hangs a small living layer over it, card-
+   local so the deck's mask clips it and a slide carries it: a seeded field
+   of stars breathing on their own rhythms, and every so often a shooting
+   star crossing the card (the meadow's own head-and-chained-trail, quoted
+   in the card's coordinates). Sprites only — the per-card Graphics census
+   is pinned by suite — all parented into the returned container, so a deck
+   turn or the sheet's close sweeps the lot; tweens and timers are tracked
+   and stopped on the layer's destroy. The field is SEEDED: every rebuild
+   (each deck turn recycles all three cards) deals the very same sky. The
+   shared 'zodsky' texture is never re-baked — a sign card whose art fails
+   borrows it and stays exactly as still as before. ?twinkle=0 (the ?ride=0
+   pattern) or reduced motion keeps the field and drops all the movement.
+   Beacon: window.__ssopensky. */
+function ssOpenSkyAlive(scene, l, CW, CH) {
+  const lay = scene.add.container(0, 0);
+  const still = QS.get('twinkle') === '0' || ssReduceMotion();
+  const bcn = window.__ssopensky;
+  const tws = [], evs = [];
+  const tw = (cfg) => { const t = scene.tweens.add(cfg); tws.push(t); return t; };
+  let sd = 13;
+  const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+  // the field: 22 small stars + 3 slow-turning hero sparks, clear of the
+  // baked ridge at the foot; the reading scrims ride above the whole layer,
+  // so the name and the power bands keep their ground. The breathing starts
+  // in ONE batch a beat after the build (the ascent sky's recipe — a card
+  // is built mid-swipe-settle, and tween setup is a real slice of that).
+  const breathe = [];
+  let n = 0;
+  for (let i = 0; i < 22; i++, n++) {
+    const sz = l.u(2.2 + rnd() * 3.2);
+    const x = l.u((rnd() - 0.5) * (CW - 24)), y = l.u(-CH / 2 + 16 + rnd() * (CH - 96));
+    const baseA = 0.3 + rnd() * 0.5;
+    const tint = SS_STAR_COLORS[Math.floor(rnd() * SS_STAR_COLORS.length)];
+    const dim = baseA * (0.2 + rnd() * 0.35), dur = 1300 + rnd() * 2600, dly = rnd() * 2400;
+    const st = scene.add.image(x, y, 'dot').setDisplaySize(sz, sz).setAlpha(baseA).setTint(tint);
+    st.__ssAlive = 1;   // the layer's own mark — the suite's orphan scan reads it
+    lay.add(st);
+    breathe.push(() => tw({ targets: st, alpha: dim, duration: dur, yoyo: true, repeat: -1, delay: dly }));
+  }
+  for (let i = 0; i < 3; i++, n++) {
+    const hsz = l.u(11 + rnd() * 6);
+    const x = l.u((rnd() - 0.5) * (CW - 60)), y = l.u(-CH / 2 + 40 + rnd() * CH * 0.62);
+    const baseA = 0.4 + rnd() * 0.18;
+    const spin = 46000 + rnd() * 34000, dur = 2200 + rnd() * 1800, dly = rnd() * 2000;
+    const hs = scene.add.image(x, y, 'spark4').setDisplaySize(hsz, hsz).setAlpha(baseA).setBlendMode('ADD');
+    hs.__ssAlive = 1;
+    lay.add(hs);
+    breathe.push(() => { tw({ targets: hs, angle: 360, duration: spin, repeat: -1 }); tw({ targets: hs, alpha: baseA * 0.72, duration: dur, yoyo: true, repeat: -1, delay: dly }); });
+  }
+  // one shooting star, card-local: the flight sprites join the layer, so the
+  // card's mask clips the crossing and a mid-flight rebuild sweeps it
+  const loose = () => {
+    if (!lay.active || !scene.scene.isActive()) return;
+    bcn.shots++;
+    const sx = l.u((-0.42 + Math.random() * 0.5) * CW), sy = l.u((-0.46 + Math.random() * 0.34) * CH);
+    const head = scene.add.image(sx, sy, 'dot').setDisplaySize(l.u(8.5), l.u(8.5)).setTint(0xfff2c9).setBlendMode('ADD');
+    head.__ssAlive = 1;
+    lay.add(head);
+    const trail = [];
+    for (let i = 0; i < 7; i++) {
+      const ts = l.u(6.4 - i * 0.6);
+      const tr = scene.add.image(sx, sy, 'dot').setDisplaySize(ts, ts).setAlpha(0.62 - i * 0.07).setTint(0xcfe0ff).setBlendMode('ADD');
+      tr.__ssAlive = 1;
+      lay.add(tr); trail.push(tr);
+    }
+    // per-property eases: the travel front-loads (easeOut) while the shine
+    // holds and dies late (easeIn) — one ease for both leaves the head dim
+    // for most of its crossing over this brighter wash
+    const t = tw({
+      targets: head, duration: 800,
+      x: { value: sx + l.u(200 + Math.random() * 140), ease: 'Cubic.easeOut' },
+      y: { value: sy + l.u(80 + Math.random() * 80), ease: 'Cubic.easeOut' },
+      alpha: { value: 0, ease: 'Quad.easeIn' },
+      onUpdate: () => { for (let i = trail.length - 1; i > 0; i--) { trail[i].x = trail[i - 1].x; trail[i].y = trail[i - 1].y; } trail[0].x = head.x; trail[0].y = head.y; },
+      onComplete: () => { const ix = tws.indexOf(t); if (ix >= 0) tws.splice(ix, 1); head.destroy(); trail.forEach((g) => g.destroy()); },
+    });
+  };
+  // the cadence: a surprise, not a screensaver — a first crossing a few
+  // breaths after the card lands, then one every 8-15s
+  let nextEv = null;
+  const arm = (ms) => { nextEv = scene.time.delayedCall(ms, () => { if (!lay.active) return; loose(); arm(8000 + Math.random() * 7000); }); };
+  if (!still) {
+    evs.push(scene.time.delayedCall(400, () => { if (!lay.active) return; for (const b of breathe) b(); }));
+    arm(3800 + Math.random() * 3200);
+  }
+  bcn.builds++; bcn.stars = n; bcn.still = still;
+  bcn.poke = still ? null : loose;
+  const kill = () => {
+    for (const t of tws) { try { t.stop(); } catch (e) { } }
+    for (const e2 of evs) { try { e2.remove(false); } catch (e) { } }
+    if (nextEv) { try { nextEv.remove(false); } catch (e) { } }
+    tws.length = evs.length = 0;
+    if (bcn.poke === loose) bcn.poke = null;
+  };
+  lay.once('destroy', kill);
+  return lay;
+}
+// what the harness reads: sprites dealt on the last-built layer, layer
+// builds, stars loosed (poked or natural), the stilled state, and the
+// manual door (null while stilled or while no open-sky card stands)
+window.__ssopensky = { stars: 0, builds: 0, shots: 0, still: false, poke: null };
 
 /* The chart's own night — a baked vertical gradient stretched over the whole
    screen (setTint is a Canvas no-op, so the hues live in the texture). Dark
@@ -6681,6 +6783,10 @@ class Home extends Phaser.Scene {
         if (d.z) {
           k.add(this.add.image(0, -l.u(40), 'glowbig').setDisplaySize(l.u(CW * 1.15), l.u(CH * 0.62)).setTint(tint).setBlendMode('ADD').setAlpha(0.16));
           k.add(ssZodiacGlyph(this, d.z, l.u(1.2), 0, -l.u(40)));
+        } else {
+          // THE OPEN SKY alone comes alive (v0.84.0) — a living layer over
+          // the shared wash, between the plate and the reading scrims
+          k.add(ssOpenSkyAlive(this, l, CW, CH));
         }
       }
       /* the scrims: a deep foot for the power cluster to read on, a whisper
