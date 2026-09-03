@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.84.0';
+const BUILD = 'STARSPELL v0.85.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -527,7 +527,7 @@ const SS = {
     p.bestCampaign = p.bestCampaign | 0;
     p.vsWords = p.vsWords | 0; p.vsWins = p.vsWins | 0;
     p.daily = p.daily || {}; p.ach = p.ach || {};
-    p.signs = p.signs || {};   // per-zodiac records: id → {best, clears, runs, eBest, xp, ack}
+    p.signs = p.signs || {};   // per-zodiac records: id → {best, clears, runs, eBest, xp, ack, hardClears, eScore, eRuns, word, hit}
     /* SIGN LEVELS (v0.69.0): each record grows lifetime `xp` and `ack` (the
        highest level already ANNOUNCED). THE VETERAN'S SEED, once: the
        records already earned buy a head start — capped at the FOOT of the
@@ -547,6 +547,15 @@ const SS = {
       sr.xp = Math.max(0, sr.xp | 0);
       sr.ack = Math.max(1, sr.ack | 0);
       sr.hardClears = Math.max(0, sr.hardClears | 0);   // hard-mode clears under this sign (v0.70.0)
+      /* THE SIGN PAGE's own columns (v0.85.0) — LOCAL-ONLY by Skylar's
+         stamp (nothing new syncs until the fossil verdict lands), and
+         HONEST: no veteran seed can truthfully attribute a lifetime word
+         or blow to one sign, so all four start empty and are tracked from
+         now on — the page shows an em-dash where nothing stands yet. */
+      sr.eScore = Math.max(0, sr.eScore | 0);   // endless best SCORE under this sign
+      sr.eRuns = Math.max(0, sr.eRuns | 0);     // endless climbs begun under this sign
+      sr.hit = Math.max(0, sr.hit | 0);         // mightiest single blow under this sign
+      sr.word = typeof sr.word === 'string' ? sr.word : '';   // longest word cast under this sign
     }
     // hard mode's per-sign tick memory (v0.70.0): the picker's box remembers
     // each sign's choice across campaigns ('none' = THE OPEN SKY's own)
@@ -8511,6 +8520,16 @@ class Battle extends Phaser.Scene {
     if (letters > this.run.longest.length) this.run.longest = word;
     if (word.length > SS.prof.longest.length) SS.prof.longest = word;
     if (dmg > SS.prof.bigHit) SS.prof.bigHit = dmg;
+    /* the sign's own ledger takes the word and the blow (v0.85.0, Skylar:
+       "longest word played with that sign"). Only campaign and endless
+       carry a sign — quick, the daily and versus run unsigned and write
+       nothing by construction. LOCAL-ONLY fields (the Q2 stamp): they ride
+       beta3.profile and are never sent by sync(). */
+    if (this.sign) {
+      const zr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
+      if (word.length > (zr.word || '').length) zr.word = word;
+      if (dmg > (zr.hit | 0)) zr.hit = dmg;
+    }
     // the drip's word counters. Length is counted in LETTERS (a digraph tile
     // spells two), which is the same figure the score and the share card pay
     // on — never tiles, or a Qu word would be short-changed.
@@ -9581,6 +9600,10 @@ class Battle extends Phaser.Scene {
       if (this.sign) {
         const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
         if (level > (sr.eBest | 0)) sr.eBest = level;
+        // …and the sign page's own columns (v0.85.0, local-only): the
+        // ladder's best score and how many climbs began under this sign
+        sr.eRuns = (sr.eRuns | 0) + 1;
+        if (score > (sr.eScore | 0)) sr.eScore = score;
       }
       ssClearEndless();
     }
@@ -10001,6 +10024,7 @@ class Profile extends Phaser.Scene {
     this.statsP = null;
     this.achP = null;
     this.flagP = null;
+    this.signP = null;
     this.rowFlag = null;
 
     ssMakeTextures(this);
@@ -10051,7 +10075,7 @@ class Profile extends Phaser.Scene {
        the second. The Board is told where it was opened from so its back
        link returns HERE, never to the meadow; the other three open sheets
        over this page. One sheet at a time — every door checks the field. */
-    this.anySheet = () => !!(this.skiesP || this.statsP || this.achP || this.flagP);
+    this.anySheet = () => !!(this.skiesP || this.statsP || this.achP || this.flagP || this.signP);
     const gDoor = (col, row, label, withSub, open) => {
       const x = l.x(col ? 95 : -95), y = l.y(194 + row * 54);
       const b = this.add.image(x, y, ssBtn(this, true, 182, 44)).setDisplaySize(l.u(182), l.u(44))
@@ -10132,6 +10156,14 @@ class Profile extends Phaser.Scene {
         ssTxt(this, x + l.u(41), y - l.u(36), String(ssSignLv(z.id)), l.u(10), cleared ? '#ffd77a' : '#8a94c4')
           .setOrigin(0.5).setShadow(0, 0, '#0a0e1f', l.u(4), true, true).setData('signWheelLv', z.id);
       }
+      /* THE DOOR (v0.85.0, Skylar 9/3: "when you click the sign … each
+         sign needs to open up its own page"): every badge — played or not
+         — opens the sign's page. One zone the size of the whole cell rides
+         ABOVE the shield and its dress (topOnly: display order IS input
+         order), 118×106 units, far past the 44-pt law. */
+      const bz = this.add.zone(x, y, l.u(118), l.u(106)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      bz.setData('signDoor', z.id);
+      bz.on('pointerdown', () => this.zodSheet(z));
     });
 
     ssTxt(this, l.x(0), l.y(784), 'seal: ' + SSNET.uid().slice(0, 12) + ' · ' + (SSNET.mode === 'local' ? 'offline' : 'synced'), l.u(9), '#39406b').setOrigin(0.5);
@@ -10398,6 +10430,156 @@ class Profile extends Phaser.Scene {
     zones.forEach((z) => c.add(z));
     items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
     this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+  }
+  /* ---------- THE SIGN PAGE (v0.85.0, Skylar 9/3) ----------
+     "When you click the sign on the Profile Page … each sign needs to open
+     up its own page." Every badge is a door now, and this sheet is the
+     sign's home: its painted plate across the crown, its LEVEL with the XP
+     bar toward the next (the picker's own SS_SIGNLV math — the summit
+     renders a full, celebratory bar, never a broken fraction), what the
+     sign does in game at the HELD level (SS_ZOD — generated from the
+     dials, never hand-copied), the ledger of what was done under it, and
+     one fun fact in Q3's blend voice (SS_ZFACT). The four new ledger
+     columns (eScore / eRuns / word / hit) are LOCAL-ONLY by Q2's stamp and
+     start honest — an em-dash stands where nothing is recorded yet. One
+     sheet at a time (anySheet); ✕ closes; statsSheet's dress throughout. */
+  zodSheet(z) {
+    if (this.anySheet()) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.signP = this.add.container(0, 0).setDepth(600);
+    const close = () => { if (this.signP !== c) return; this.signP = null; c.destroy(); };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.7, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    c.add(veil);
+    const sr = SS.prof.signs[z.id] || null;
+    const lv = ssSignLv(z.id);
+    const tint = SS_ELEMENTS[z.el];
+    const hexC = '#' + ('000000' + tint.toString(16)).slice(-6);
+    const t = SS_ZOD(z, lv);
+    const PH = 656, py = (d) => l.y(400 - PH / 2 + d);   // 72..728, the ach sheet's proven band
+    const items = [];
+    items.push(this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(372), l.u(PH)).setInteractive());
+    /* the crown: the sign's own painted plate, cover-cropped into a wide
+       band — width-true, the vertical spill trimmed by setCrop with the
+       visible slice aimed at the plate's upper third, where the figure
+       lives (the picker's cover-fill law turned on its side). Fallback is
+       the night-sky wash with the asterism drawn over it. The name rides
+       the band's foot on the baked scrim; the element rim frames it. */
+    const BW = 336, BH = 170, bandC = 14 + BH / 2;
+    const artKey = ssZodArtKey(this, z.id);
+    if (artKey) {
+      const art = this.add.image(l.x(0), 0, artKey);
+      const fw = art.frame.realWidth || art.frame.width, fh = art.frame.realHeight || art.frame.height;
+      const k = l.u(BW) / fw;                      // display px per frame px, width-true
+      art.setDisplaySize(l.u(BW), fh * k);
+      const cropH = l.u(BH) / k;                   // the band, in frame px
+      const cropY = Math.max(0, fh * 0.38 - cropH / 2);
+      art.setCrop(0, cropY, fw, cropH);
+      art.y = py(bandC) - (cropY + cropH / 2 - fh / 2) * k;
+      items.push(art);
+    } else {
+      items.push(this.add.image(l.x(0), py(bandC), ssZodSkyTex(this)).setDisplaySize(l.u(BW), l.u(BH)));
+      items.push(this.add.image(l.x(0), py(bandC - 6), 'glowbig').setDisplaySize(l.u(BW * 0.7), l.u(BH * 0.85))
+        .setTint(tint).setBlendMode('ADD').setAlpha(0.16));
+      items.push(ssZodiacGlyph(this, z, l.u(0.55), l.x(0), py(bandC - 10)));
+    }
+    items.push(this.add.image(l.x(0), py(14 + BH), ssZodScrimTex(this)).setOrigin(0.5, 1).setDisplaySize(l.u(BW), l.u(96)));
+    items.push(ssTxt(this, l.x(0), py(bandC + 52), z.name, l.u(21), hexC).setOrigin(0.5)
+      .setShadow(0, 0, hexC, l.u(9), true, true));
+    items.push(ssTxt(this, l.x(0), py(bandC + 74), t.title, l.u(10.5), '#d8d2bd', 'italic').setOrigin(0.5));
+    const rim = this.add.graphics();
+    rim.lineStyle(Math.max(1, l.u(1.4)), tint, 0.7);
+    rim.strokeRect(l.x(-BW / 2), py(14), l.u(BW), l.u(BH));
+    items.push(rim);
+    // the ✕ rides the art's corner — dark halo, the full-bleed picker's dress
+    const xB = ssTxt(this, l.x(164), py(29), '✕', l.u(15), '#c3cae6').setOrigin(0.5)
+      .setShadow(0, 0, '#0a0e1f', l.u(7), true, true).setInteractive({ useHandCursor: true });
+    ssHitPad(xB, 46);
+    xB.on('pointerdown', () => { SFX.ui(); close(); });
+    items.push(xB);
+    /* the level moment — the gold plate with a breathing halo in the
+       element's own light; at the summit the halo burns gold and the bar
+       stands full under LEVEL 50 · AT ITS HEIGHT */
+    const atMax = lv >= SS_SIGNLV.max;
+    const ga = atMax ? 0.3 : 0.14;
+    const glow = this.add.image(l.x(0), py(210), 'glowbig').setDisplaySize(l.u(240), l.u(64))
+      .setTint(atMax ? 0xffd77a : tint).setBlendMode('ADD').setAlpha(ga);
+    items.push(glow);
+    const lk = ssGoldTex(this, atMax ? SS_T('svLevelMax') : SS_T('svLevel', lv), 15);
+    const lsc = Math.min(1, 250 / lk.w);
+    items.push(this.add.image(l.x(0), py(210), lk.key).setDisplaySize(l.u(lk.w * lsc), l.u(lk.h * lsc)));
+    const xp = sr ? (sr.xp | 0) : 0;
+    const frac = atMax ? 1
+      : clamp((xp - SS_SIGNLV.cum[lv]) / Math.max(1, SS_SIGNLV.cum[lv + 1] - SS_SIGNLV.cum[lv]), 0, 1);
+    const BARW = 220;
+    items.push(this.add.image(l.x(-BARW / 2), py(234), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(BARW), l.u(8)));
+    const fill = this.add.image(l.x(-BARW / 2 + 1), py(234), 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(BARW - 2), l.u(6));
+    fill.setCrop(0, 0, fill.frame.width * frac, fill.frame.height);
+    fill.setData('zsBar', frac);
+    items.push(fill);
+    if (!atMax) {
+      items.push(ssTxt(this, l.x(0), py(250), SS_T('zsToNext', SS_SIGNLV.cum[lv + 1] - xp), l.u(8.5), '#8a94c4', 'italic').setOrigin(0.5));
+    }
+    // what the sign does in game, at the held level — generated, no drift
+    const desc = ssTextBlock(this, l.x(0), py(268), t.desc, {
+      fontSize: l.u(11) + 'px', color: '#e6dfc8', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(320), align: 'center', ox: 0.5, oy: 0,
+    });
+    desc.setData('zsDesc', z.id);
+    items.push(desc);
+    items.push(this.add.rectangle(l.x(0), py(322), l.u(300), Math.max(1, l.u(1)), 0x2b3157, 0.6));
+    /* the ledger — what this sign has actually done. Empty records read as
+       an em-dash beat, never a fake zero (the honest-columns law). */
+    const dash = '—';
+    const eB = sr ? sr.eBest | 0 : 0, eS = sr ? sr.eScore | 0 : 0;
+    const hardOn = !!(sr && (sr.hardClears | 0) > 0);
+    const rowsZ = [
+      ['zsClears', sr && sr.clears > 0 ? String(sr.clears) : dash],
+      ['zsBest', sr && sr.best > 0 ? String(sr.best) : dash],
+      ['stEndless', eB > 0 ? SS_T('endLvlShort', eB) + (eS > 0 ? ' · ' + eS : '') : dash],
+      ['stFinest', sr && sr.word ? sr.word.toUpperCase() : dash],
+      ['stBigHit', sr && (sr.hit | 0) > 0 ? String(sr.hit) : dash],
+      ['zsHard', hardOn ? String(sr.hardClears) : dash],
+      ['stRuns', sr && ((sr.runs | 0) + (sr.eRuns | 0)) > 0 ? String((sr.runs | 0) + (sr.eRuns | 0)) : dash],
+    ];
+    rowsZ.forEach(([k2, v], i) => {
+      const y = py(344 + i * 27);
+      const lab = ssTxt(this, l.x(-150), y, SS_T(k2), l.u(12), '#8a94c4').setOrigin(0, 0.5);
+      if (lab.width > l.u(150)) lab.setScale(l.u(150) / lab.width);
+      const val = ssTxt(this, l.x(150), y, String(v), l.u(12), k2 === 'zsHard' && hardOn ? '#ff8a70' : '#f0e8d2')
+        .setOrigin(1, 0.5).setData('zsVal', k2);
+      if (val.width > l.u(130)) val.setScale(l.u(130) / val.width);
+      items.push(lab, val);
+    });
+    items.push(this.add.rectangle(l.x(0), py(528), l.u(300), Math.max(1, l.u(1)), 0x2b3157, 0.6));
+    // one fun fact — the stars' own voice at the page's foot
+    items.push(ssTxt(this, l.x(0), py(548), '— ' + SS_T('zsFact') + ' —', l.u(10), '#c9b676')
+      .setOrigin(0.5).setLetterSpacing(l.u(2)));
+    const fact = ssTextBlock(this, l.x(0), py(566), SS_ZFACT(z), {
+      fontSize: l.u(10.5) + 'px', color: '#c9c3ae', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(330), align: 'center', ox: 0.5, oy: 0,
+    });
+    fact.setData('zsFactOf', z.id);
+    items.push(fact);
+    c.add(items);
+    /* the entrance — statsSheet's rise, except the halo, which fades to
+       its own resting alpha and then breathes (two tweens on one alpha
+       would fight; the breath waits for the entrance, and the sweep on
+       destroy keeps a repeat-forever tween from outliving the sheet —
+       the meadow's orphan-tween lesson) */
+    const rise = items.filter((it) => it !== glow);
+    rise.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: rise, y: '-=' + l.u(12), alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+    glow.y += l.u(12); glow.alpha = 0;
+    this.tweens.add({ targets: glow, y: '-=' + l.u(12), alpha: ga, duration: 240, ease: 'Cubic.easeOut' });
+    const breath = this.tweens.add({
+      targets: glow, alpha: ga + 0.08, delay: 500, duration: 1600,
+      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+    c.once('destroy', () => { try { breath.stop(); } catch (e) { } });
+    ssHealBlankTexts(this, 'zod-sheet');
   }
   editName(l) {
     SFX.ui();

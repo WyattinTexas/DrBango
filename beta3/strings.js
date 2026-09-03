@@ -97,6 +97,8 @@ const SS_STR = {
     zpOpenName: 'THE OPEN SKY', zpOpenTitle: 'THE UNSIGNED CLIMB',
     zpOpenDesc: 'No sign, no power — the classic climb, as the first stars saw it.', zpRec: 'cleared ×%1 · best %2',
     svLevel: 'LEVEL %1', svLevelMax: 'LEVEL 50 · AT ITS HEIGHT', svHead: 'YOUR SIGN RISES',
+    zsClears: 'campaign clears', zsBest: 'best campaign score', zsHard: 'hard-mode clears',
+    zsToNext: '%1 ✦ to the next level', zsFact: 'THE STARS SAY',
     svReward: 'THE LEVEL BEARS A GIFT', svRwVessel: '+%1 starting health under this sign', svRwGilded: 'a gilded tile opens the climb',
     rating: 'star rating', rVeilRow: 'veil my rating from others', rVeiled: 'veiled', rShown: 'shown',
     rHiddenCard: 'veiled in starlight', rYourVeil: 'others see your rating veiled',
@@ -232,6 +234,8 @@ const SS_STR = {
     zpOpenName: 'EL CIELO ABIERTO', zpOpenTitle: 'EL ASCENSO SIN SIGNO',
     zpOpenDesc: 'Sin signo, sin poder — el ascenso clásico, como lo vieron las primeras estrellas.', zpRec: 'superado ×%1 · mejor %2',
     svLevel: 'NIVEL %1', svLevelMax: 'NIVEL 50 · EN SU CENIT', svHead: 'TU SIGNO ASCIENDE',
+    zsClears: 'campañas superadas', zsBest: 'mejor campaña', zsHard: 'victorias en difícil',
+    zsToNext: '%1 ✦ para el siguiente nivel', zsFact: 'DICEN LAS ESTRELLAS',
     svReward: 'EL NIVEL TRAE UN DON', svRwVessel: '+%1 de salud inicial bajo este signo', svRwGilded: 'una ficha dorada abre el ascenso',
     rating: 'clasificación estelar', rVeilRow: 'velar mi clasificación ante los demás', rVeiled: 'velada', rShown: 'visible',
     rHiddenCard: 'velada por la luz de las estrellas', rYourVeil: 'los demás ven tu clasificación velada',
@@ -285,6 +289,20 @@ const SS_STR = {
       aquarius: ['EL AGUADOR', 'Una vez por combate, caer bajo la mitad de salud vierte las aguas: cura %1.',
         'Dos veces por combate, caer bajo la mitad de salud vierte las aguas: cura %1.'],
       pisces: ['LOS PECES GEMELOS', 'La corriente profunda: las palabras tejidas a un lance del golpe hacen +%1%.'],
+    },
+    zfact: {
+      aries: 'Primero en la rueda, la chispa del año entero — los astrólogos dicen que el Carnero actúa antes de pensar. Este cielo está de acuerdo, y asesta el primer golpe por ti.',
+      taurus: 'El Toro es tierra fija, el suelo más firme bajo las estrellas. Nacer bajo Tauro, dicen, es resistir lo que no se puede esquivar — el ascenso te da más con qué resistir.',
+      gemini: 'Los Gemelos son Cástor y Pólux, dos estrellas unidas en una. De los Géminis se dice que todo lo hacen dos veces — aquí hasta una letra repetida habla con dos voces.',
+      cancer: 'El Cangrejo lleva su casa a cuestas y solo cede terreno de lado. Cáncer es el guardián de la rueda — un caparazón que recibe el primer golpe fue siempre su promesa.',
+      leo: 'En el corazón del León arde Régulo, el pequeño rey, una de las cuatro estrellas reales. Los Leo nacen para el gran gesto — a palabra más larga, rugido más fuerte.',
+      virgo: 'La Doncella sostiene a Spica, la espiga, estrella de la cosecha. El arte de Virgo es separar el trigo de la paja y guardar solo lo que sirve — una ficha vuelta pura, vuelta nueva.',
+      libra: 'El único signo que no es criatura sino instrumento: la Balanza. El equilibrio no es algo que Libra practique — es aquello de lo que Libra está hecha.',
+      scorpio: 'El Escorpión fue puesto entre las estrellas por derribar al gran Orión — aún hoy guardan cielos opuestos. Los Escorpio golpean tarde y rematan seguro; el veneno hace la espera.',
+      sagittarius: 'El Arquero es un centauro, mitad salvaje, mitad sabio, siempre apuntando a Antares, el corazón rojo del Escorpión. Un Sagitario nunca lee el cielo sin soltarle una flecha.',
+      capricorn: 'La Cabra Marina sube la montaña con cola de pez — nacida del agua honda, destinada a la cumbre. A los Capricornio los hace el propio camino: cada paso arriba golpea más fuerte.',
+      aquarius: 'El Aguador vierte un río de estrellas sobre la noche. Sanador y rebelde de la rueda a la vez — lo que Acuario lleva, lo lleva para derramarlo.',
+      pisces: 'Dos peces nadando en sentidos opuestos, unidos por un cordón de plata — el último signo, el más cercano a lo hondo. Los Piscis son más fuertes al borde, a un suspiro del golpe.',
     },
     sig: {
       quill: ['PLUMA DE ASCUAS', 'Cada palabra inflige +%1 de daño.'],
@@ -425,6 +443,8 @@ const SS_STR = {
     zpOpenName: 'LE CIEL OUVERT', zpOpenTitle: 'L\'ASCENSION SANS SIGNE',
     zpOpenDesc: 'Sans signe, sans pouvoir — l\'ascension classique, telle que les premières étoiles l\'ont vue.', zpRec: 'réussi ×%1 · record %2',
     svLevel: 'NIVEAU %1', svLevelMax: 'NIVEAU 50 · À SON APOGÉE', svHead: 'TON SIGNE S\'ÉLÈVE',
+    zsClears: 'campagnes réussies', zsBest: 'meilleure campagne', zsHard: 'victoires en difficile',
+    zsToNext: '%1 ✦ avant le niveau suivant', zsFact: 'LES ÉTOILES DISENT',
     svReward: 'LE NIVEAU PORTE UN DON', svRwVessel: '+%1 de santé de départ sous ce signe', svRwGilded: 'une tuile dorée ouvre l\'ascension',
     rating: 'cote stellaire', rVeilRow: 'voiler ma cote aux autres', rVeiled: 'voilée', rShown: 'visible',
     rHiddenCard: 'voilée dans la lumière des étoiles', rYourVeil: 'les autres voient ta cote voilée',
@@ -478,6 +498,20 @@ const SS_STR = {
       aquarius: ['LE PORTEUR D\'EAU', 'Une fois par combat, tomber sous la moitié de sa santé verse les eaux : soigne %1.',
         'Deux fois par combat, tomber sous la moitié de sa santé verse les eaux : soigne %1.'],
       pisces: ['LES POISSONS JUMEAUX', 'Le courant profond : les mots tissés à un lancer du coup font +%1 %.'],
+    },
+    zfact: {
+      aries: 'Premier sur la roue, l\'étincelle de l\'année entière — les astrologues disent que le Bélier agit avant de penser. Ce ciel est d\'accord, et porte le premier coup pour toi.',
+      taurus: 'Le Taureau est terre fixe, le sol le plus sûr sous les étoiles. Naître Taureau, dit-on, c\'est endurer ce qu\'on ne peut esquiver — l\'ascension te donne de quoi endurer davantage.',
+      gemini: 'Les Gémeaux sont Castor et Pollux, deux étoiles liées en une. On dit des Gémeaux qu\'ils font tout en double — ici même une lettre reprise parle à deux voix.',
+      cancer: 'Le Crabe porte sa maison sur le dos et ne cède le terrain que de côté. Le Cancer est le gardien de la roue — une carapace qui prend le premier coup, c\'était sa promesse.',
+      leo: 'Au cœur du Lion brûle Régulus, le petit roi, l\'une des quatre étoiles royales. Les Lions sont nés pour le grand geste — plus le mot est long, plus fort est le rugissement.',
+      virgo: 'La Vierge tient Spica, l\'épi de blé, l\'étoile des moissons. Le vieil art de la Vierge : séparer le grain de l\'ivraie et garder ce qui sert — une tuile rendue pure, rendue neuve.',
+      libra: 'Le seul signe qui ne soit pas une créature mais un instrument : la Balance. L\'équilibre n\'est pas une vertu que la Balance pratique — c\'est ce dont elle est faite.',
+      scorpio: 'Le Scorpion fut mis au ciel pour avoir terrassé le grand Orion — ils gardent encore des cieux opposés. Le Scorpion frappe tard et achève sûrement ; le venin fait l\'attente.',
+      sagittarius: 'L\'Archer est un centaure, mi-sauvage, mi-sage, visant à jamais Antarès, le cœur rouge du Scorpion. Un Sagittaire ne lit jamais le ciel sans y décocher quelque chose.',
+      capricorn: 'La Chèvre-de-Mer gravit la montagne avec une queue de poisson — née des eaux profondes, vouée au sommet. Le chemin lui-même forge les Capricornes : chaque pas frappe plus fort.',
+      aquarius: 'Le Verseau déverse un fleuve d\'étoiles sur la nuit. Guérisseur et rebelle de la roue à la fois — ce que le Verseau porte, il le porte pour le verser.',
+      pisces: 'Deux poissons nageant en sens contraires, liés par un fil d\'argent — le dernier signe, le plus proche du fond. Les Poissons sont plus forts au bord, à un souffle du coup.',
     },
     sig: {
       quill: ['PLUME DE BRAISE', 'Chaque mot inflige +%1 dégâts.'],
@@ -618,6 +652,8 @@ const SS_STR = {
     zpOpenName: 'O CÉU ABERTO', zpOpenTitle: 'A SUBIDA SEM SIGNO',
     zpOpenDesc: 'Sem signo, sem poder — a subida clássica, como as primeiras estrelas a viram.', zpRec: 'concluída ×%1 · melhor %2',
     svLevel: 'NÍVEL %1', svLevelMax: 'NÍVEL 50 · NO SEU AUGE', svHead: 'O TEU SIGNO ASCENDE',
+    zsClears: 'campanhas concluídas', zsBest: 'melhor campanha', zsHard: 'vitórias no difícil',
+    zsToNext: '%1 ✦ para o próximo nível', zsFact: 'DIZEM AS ESTRELAS',
     svReward: 'O NÍVEL TRAZ UM DOM', svRwVessel: '+%1 de vida inicial sob este signo', svRwGilded: 'uma peça dourada abre a subida',
     rating: 'classificação estelar', rVeilRow: 'velar minha classificação dos outros', rVeiled: 'velada', rShown: 'visível',
     rHiddenCard: 'velada na luz das estrelas', rYourVeil: 'os outros veem sua classificação velada',
@@ -671,6 +707,20 @@ const SS_STR = {
       aquarius: ['O AGUADEIRO', 'Uma vez por combate, cair abaixo de metade da vida verte as águas: cura %1.',
         'Duas vezes por combate, cair abaixo de metade da vida verte as águas: cura %1.'],
       pisces: ['OS PEIXES GÉMEOS', 'A corrente profunda: palavras tecidas a um lance do golpe causam +%1%.'],
+    },
+    zfact: {
+      aries: 'Primeiro na roda, a centelha do ano inteiro — os astrólogos dizem que o Carneiro age antes de pensar. Este céu concorda, e desfere o primeiro golpe por ti.',
+      taurus: 'O Touro é terra fixa, o chão mais firme sob as estrelas. Nascer sob Touro, dizem, é resistir ao que não se pode evitar — a subida dá-te mais com que resistir.',
+      gemini: 'Os Gémeos são Castor e Pólux, duas estrelas unidas numa só. Dos Gémeos diz-se que fazem tudo em dobro — aqui até uma letra repetida fala com duas vozes.',
+      cancer: 'O Caranguejo leva a casa às costas e só cede terreno de lado. Caranguejo é o guardião da roda — uma carapaça que recebe o primeiro golpe foi sempre a sua promessa.',
+      leo: 'No coração do Leão arde Régulo, o pequeno rei, uma das quatro estrelas reais. Os Leão nascem para o grande gesto — quanto mais longa a palavra, mais alto o rugido.',
+      virgo: 'A Donzela segura Spica, a espiga de trigo, a estrela das colheitas. A velha arte de Virgem é separar o trigo do joio e guardar o que serve — uma peça feita pura, feita nova.',
+      libra: 'O único signo que não é criatura mas instrumento: a Balança. O equilíbrio não é algo que a Balança pratique — é aquilo de que é feita.',
+      scorpio: 'O Escorpião foi posto entre as estrelas por derrubar o grande Oríon — ainda hoje guardam céus opostos. Os Escorpião golpeiam tarde e acabam certeiros; o veneno faz a espera.',
+      sagittarius: 'O Arqueiro é um centauro, meio selvagem, meio sábio, sempre a apontar a Antares, o coração vermelho do Escorpião. Um Sagitário nunca lê o céu sem lhe soltar algo.',
+      capricorn: 'A Cabra Marinha sobe a montanha com cauda de peixe — nascida da água funda, destinada ao cume. O próprio caminho faz os Capricórnio: cada passo acima golpeia mais forte.',
+      aquarius: 'O Aguadeiro verte um rio de estrelas sobre a noite. Curador e rebelde da roda ao mesmo tempo — o que Aquário carrega, carrega-o para o derramar.',
+      pisces: 'Dois peixes a nadar em sentidos opostos, unidos por um cordão de prata — o último signo, o mais perto do fundo. Os Peixes são mais fortes à beira, a um sopro do golpe.',
     },
     sig: {
       quill: ['PENA DE BRASA', 'Cada palavra causa +%1 de dano.'],
@@ -811,6 +861,8 @@ const SS_STR = {
     zpOpenName: 'DER OFFENE HIMMEL', zpOpenTitle: 'DER AUFSTIEG OHNE ZEICHEN',
     zpOpenDesc: 'Kein Zeichen, keine Kraft — der klassische Aufstieg, wie ihn die ersten Sterne sahen.', zpRec: 'geschafft ×%1 · Bestwert %2',
     svLevel: 'STUFE %1', svLevelMax: 'STUFE 50 · AUF SEINER HÖHE', svHead: 'DEIN ZEICHEN STEIGT AUF',
+    zsClears: 'geschaffte Kampagnen', zsBest: 'beste Kampagne', zsHard: 'Siege auf Schwer',
+    zsToNext: '%1 ✦ bis zur nächsten Stufe', zsFact: 'DIE STERNE SAGEN',
     svReward: 'DIE STUFE TRÄGT EIN GESCHENK', svRwVessel: '+%1 Startgesundheit unter diesem Zeichen', svRwGilded: 'ein vergoldeter Stein eröffnet den Aufstieg',
     rating: 'Sternenwertung', rVeilRow: 'meine Wertung vor anderen verhüllen', rVeiled: 'verhüllt', rShown: 'sichtbar',
     rHiddenCard: 'im Sternenlicht verhüllt', rYourVeil: 'andere sehen deine Wertung verhüllt',
@@ -864,6 +916,20 @@ const SS_STR = {
       aquarius: ['DER WASSERTRÄGER', 'Einmal pro Kampf: fällst du unter die halbe Gesundheit, strömen die Wasser — heilt %1.',
         'Zweimal pro Kampf: fällst du unter die halbe Gesundheit, strömen die Wasser — heilt %1.'],
       pisces: ['DIE ZWILLINGSFISCHE', 'Die tiefe Strömung: Wörter, einen Wurf vor dem Schlag gewoben, machen +%1%.'],
+    },
+    zfact: {
+      aries: 'Erster auf dem Rad, der Funke des ganzen Jahres — Astrologen sagen, der Widder handelt, bevor er denkt. Dieser Himmel stimmt zu und führt den ersten Schlag für dich.',
+      taurus: 'Der Stier ist festes Erdreich, der sicherste Boden unter den Sternen. Als Stier, heißt es, überdauerst du, was du nicht meiden kannst — der Aufstieg gibt dir mehr dafür.',
+      gemini: 'Die Zwillinge sind Kastor und Pollux, zwei Sterne in einem Bund. Zwillingen sagt man nach, alles doppelt zu tun — hier spricht selbst ein doppelter Buchstabe mit zwei Stimmen.',
+      cancer: 'Der Krebs trägt sein Haus auf dem Rücken und weicht nur zur Seite. Der Krebs ist der Wächter des Rades — ein Panzer, der den ersten Schlag nimmt, war immer sein Versprechen.',
+      leo: 'Im Herzen des Löwen brennt Regulus, der kleine König, einer der vier Königssterne. Löwen sind für die große Geste geboren — je länger das Wort, desto lauter das Brüllen.',
+      virgo: 'Die Jungfrau hält Spica, die Kornähre, den Stern der Ernte. Ihre alte Kunst: die Spreu vom Weizen trennen und behalten, was dient — ein Stein rein gemacht, neu gemacht.',
+      libra: 'Das einzige Zeichen, das kein Wesen ist, sondern ein Instrument: die Waage. Gleichgewicht ist nichts, das die Waage übt — es ist das, woraus sie gemacht ist.',
+      scorpio: 'Der Skorpion kam an den Himmel, weil er den großen Orion fällte — noch heute meiden sie einander. Skorpione schlagen spät und enden sicher; das Gift übernimmt das Warten.',
+      sagittarius: 'Der Schütze ist ein Zentaur, halb wild, halb weise, ewig auf Antares zielend, das rote Herz des Skorpions. Ein Schütze liest den Himmel nie, ohne etwas loszuschießen.',
+      capricorn: 'Der Steinbock erklimmt den Berg mit einem Fischschwanz — aus tiefem Wasser geboren, dem Gipfel bestimmt. Der Weg selbst formt den Steinbock: jeder Schritt hinauf schlägt härter.',
+      aquarius: 'Der Wassermann gießt einen Fluss aus Sternen über die Nacht. Heiler und Rebell des Rades zugleich — was der Wassermann trägt, trägt er, um es auszugießen.',
+      pisces: 'Zwei Fische schwimmen einander entgegen, durch ein Silberband vereint — das letzte Zeichen, der Tiefe am nächsten. Fische sind am stärksten am Rand, einen Atemzug vor dem Schlag.',
     },
     sig: {
       quill: ['GLUTFEDER', 'Jedes Wort verursacht +%1 Schaden.'],
@@ -992,6 +1058,16 @@ function SS_ZOD(z, lv) {
   else desc = band > 0 && z.dvs ? z.dvs[Math.min(band - 1, z.dvs.length - 1)] : z.desc;
   if (z.dvf) for (let i = 0; i < z.dvf.length; i++) desc = desc.replace('%' + (i + 1), ssSignVal(z.id, z.dvf[i], L));
   return { title: t ? t[0] : z.title, desc };
+}
+
+// One fun fact per sign (v0.85.0) — what it means to be born under it, in
+// Q3's stamped blend voice: real-sky astrology woven with the game's own
+// lore. English lives in data.js (`fact` on the def, the canonical copy);
+// other languages carry a `zfact` map of id → fact with per-sign fallback.
+// Flavor only, never rules — no number in a fact is a dial.
+function SS_ZFACT(z) {
+  const m = (SS_STR[SS_LANG] && SS_STR[SS_LANG].zfact) || {};
+  return m[z.id] || z.fact || '';
 }
 
 // Act display name — acts carry a nameKey into the strings table.

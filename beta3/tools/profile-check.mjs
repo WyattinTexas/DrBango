@@ -19,6 +19,15 @@
 // its endless row (flag sheet opens ABOVE it); ACHIEVEMENTS is a masked
 // drag-scroll sheet — one BIG row per achievement, the hard family still
 // ONE evolving row, the tally counting display rows.
+// v0.85.0 (Skylar 9/3): every badge is a DOOR — "when you click the sign …
+// each sign needs to open up its own page". The sign page is a sheet
+// (Q1's stamp): the painted plate across the crown, LEVEL + the XP bar at
+// its honest fraction (full and celebratory at 50), the power at the HELD
+// level via SS_ZOD, a seven-row ledger (campaign clears/best, endless
+// climb, finest word, mightiest hit, hard clears, runs begun) whose four
+// NEW columns (word/hit/eScore/eRuns) are LOCAL-ONLY (Q2's stamp) and
+// start honest — em-dash grace, tracked from real play only — and one fun
+// fact per sign in Q3's stamped blend voice (SS_ZFACT, ×5 tongues).
 // Self-launching like flag-check: serves beta3 on :8899 if nothing does,
 // headless Chrome on :9478 (/tmp/cdp-profile, --disable-gpu), Firebase
 // blocked at the network layer throughout (local sky, no cleanup owed).
@@ -82,6 +91,32 @@ ok('the achievements sheet scrolls the sigil panel\'s own way (mask + drag + thu
   const s = src.game.slice(i, j);
   return i > 0 && /createGeometryMask/.test(s) && /pointermove/.test(s) && /thumb/.test(s);
 })());
+// ---- the sign pages (v0.85.0) on paper ----
+const SS_Z_IDS = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
+  'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
+const ZKEYS = ['zsClears', 'zsBest', 'zsHard', 'zsToNext', 'zsFact'];
+let zmiss = '';
+for (const l2 of ['en', 'es', 'fr', 'pt', 'de']) for (const k of ZKEYS) if (!keyOf(l2, k)) zmiss = l2 + '.' + k;
+ok('the five sign-page keys ride in all five tongues', !zmiss, zmiss);
+const dataSrc = readFileSync('data.js', 'utf8');
+const zodSlice = dataSrc.slice(dataSrc.indexOf('const SS_ZODIAC = ['), dataSrc.indexOf('const SS_ZODIAC_BY'));
+ok('twelve fun facts in the canon (data.js) and twelve in every tongue\'s zfact map',
+  (zodSlice.match(/\bfact: '/g) || []).length === 12 &&
+  ['es', 'fr', 'pt', 'de'].every((l2) => {
+    const m = blocks[l2].match(/zfact: \{([\s\S]*?)\n    \}/);
+    return m && SS_Z_IDS.every((id) => new RegExp('\\b' + id + ": '").test(m[1]));
+  }));
+ok('the new columns are LOCAL-ONLY — sync() never ships the sign ledger', (() => {
+  const i = src.game.indexOf('sync() {');
+  const j = src.game.indexOf('has(id)');
+  const s = src.game.slice(i, j);
+  return i > 0 && j > i && !/signs|eScore|eRuns/.test(s);
+})());
+ok('the cast site writes the sign\'s word and blow; the endless reckoning books its columns (source)',
+  /if \(word\.length > \(zr\.word \|\| ''\)\.length\) zr\.word = word;/.test(src.game) &&
+  /if \(dmg > \(zr\.hit \| 0\)\) zr\.hit = dmg;/.test(src.game) &&
+  /sr\.eRuns = \(sr\.eRuns \| 0\) \+ 1;/.test(src.game) &&
+  /if \(score > \(sr\.eScore \| 0\)\) sr\.eScore = score;/.test(src.game));
 
 /* ---------- server + browser ---------- */
 const kids = [];
@@ -162,10 +197,10 @@ const PROF = JSON.stringify({
   signs: { leo: { best: 1234, clears: 2, runs: 3, eBest: 0, xp: 1560, ack: 13 },
            aries: { best: 0, clears: 0, runs: 1, eBest: 0, xp: 40, ack: 1 } },
 });
-const boot = async (q, seed) => {
+const boot = async (q, seed, prof) => {
   await send('Page.navigate', { url: 'http://localhost:' + SRV + '/ascent.html' }); await sleep(500);
-  await ev(`localStorage.clear(); sessionStorage.setItem('beta3.skipIntro', '1');
-    localStorage.setItem('beta3.profile', '${PROF.replace(/'/g, "\\'")}'); ${seed || ''} 'ok'`);
+  await ev("localStorage.clear(); sessionStorage.setItem('beta3.skipIntro', '1');\n" +
+    "localStorage.setItem('beta3.profile', '" + (prof || PROF).replace(/'/g, "\\'") + "'); " + (seed || '') + " 'ok'");
   await send('Page.navigate', { url: BASE + '?fps=0' + (q ? '&' + q : '') }); await sleep(2500);
   await until(`!!window.game && typeof SSNET !== 'undefined'`, 30000);
 };
@@ -267,6 +302,97 @@ ok('the rating line still opens the rating card', await tapUntil(
   `${P}.children.list.find((o) => o.text && o.text.indexOf(String(SS.prof.rating)) >= 0 && o.input)`,
   `!!${P}.__rcC`));
 await ev(`(() => { if (${P}.__rcC) { ${P}.__rcC.destroy(); ${P}.__rcC = null; } return 'ok' })()`);
+
+/* ================= 3.5 the sign pages (v0.85.0) ================= */
+console.log('— THE SIGN PAGES (every badge a door) —');
+const doorX = async (sheetRef) => tapUntil(
+  `(() => { let x = null; const scan = (ls) => ls.forEach((o) => { if (o.text === '✕') x = o; if (o.list) scan(o.list); }); scan(${P}.${sheetRef}.list); return x })()`,
+  `!${P}.${sheetRef}`);
+const doors = await evj(`JSON.stringify((() => { const p = ${P}; const D = game.scale.width / innerWidth;
+  const zs = p.children.list.filter((o) => o.getData && o.getData('signDoor'));
+  return { n: zs.length, ids: [...new Set(zs.map((o) => o.getData('signDoor')))].length,
+    minW: Math.min(...zs.map((o) => o.input.hitArea.width * Math.abs(o.scaleX) / D)),
+    minH: Math.min(...zs.map((o) => o.input.hitArea.height * Math.abs(o.scaleY) / D)) } })())`);
+ok('twelve doors ride the twelve badges, every one past the 44-pt law',
+  doors.n === 12 && doors.ids === 12 && doors.minW >= 43.5 && doors.minH >= 43.5,
+  doors.n + ' doors · ' + Math.round(doors.minW) + 'x' + Math.round(doors.minH));
+ok('a real tap on LEO\'s badge opens the sign page', await tapUntil(
+  `${P}.children.list.find((o) => o.getData && o.getData('signDoor') === 'leo')`, `!!${P}.signP`));
+await sleep(800);
+const readSheet = `(() => { const p = ${P}; const out = { vals: {}, gold: [], factHead: false, bar: null, desc: '', fact: '' };
+  const scan = (ls) => ls.forEach((o) => {
+    if (o.getData && o.getData('zsVal')) out.vals[o.getData('zsVal')] = o.text;
+    if (o.getData && o.getData('zsBar') != null) out.bar = o.getData('zsBar');
+    if (o.texture && /^gold@15@/.test(o.texture.key)) out.gold.push(o.texture.key.slice(8));
+    if (o.text && o.text.indexOf(SS_T('zsFact')) >= 0) out.factHead = true;
+    if (o.getData && o.getData('zsDesc')) { out.desc = o.list.map((t) => t.text).join(' '); return; }
+    if (o.getData && o.getData('zsFactOf')) { out.fact = o.list.map((t) => t.text).join(' '); return; }
+    if (o.list) scan(o.list); });
+  scan(p.signP.list); return JSON.stringify(out) })()`;
+const sheet = await evj(readSheet);
+const wantBar = await ev(`(1560 - SS_SIGNLV.cum[13]) / (SS_SIGNLV.cum[14] - SS_SIGNLV.cum[13])`);
+ok('the level moment: LEVEL 13 in baked gold, the bar at its honest fraction',
+  sheet.gold.includes('LEVEL 13') && sheet.bar != null && Math.abs(sheet.bar - wantBar) < 1e-6,
+  sheet.gold.join('·') + ' bar ' + (sheet.bar == null ? '?' : sheet.bar.toFixed(3)));
+ok('the power speaks at the held level — generated from the dials, never hand-copied',
+  (sheet.desc || '').replace(/\s+/g, ' ').trim() === (await ev(`SS_ZOD(SS_ZODIAC_BY.leo, 13).desc`)), sheet.desc);
+const wantRows = { zsClears: '2', zsBest: '1234', stEndless: '—', stFinest: '—', stBigHit: '—', zsHard: '—', stRuns: '3' };
+ok('the ledger: campaign truth, an em-dash beat on every empty column',
+  Object.keys(wantRows).every((k) => sheet.vals[k] === wantRows[k]) && Object.keys(sheet.vals).length === 7,
+  JSON.stringify(sheet.vals));
+ok('one fun fact stands at the foot, word for word (THE STARS SAY)',
+  sheet.factHead && (sheet.fact || '').replace(/\s+/g, ' ').trim() === (await ev(`SS_ZFACT(SS_ZODIAC_BY.leo)`)),
+  (sheet.fact || '').slice(0, 60));
+await shot('sign-page-leo');
+ok('one sheet at a time: STATS under an open sign page is refused', await (async () => {
+  await tap(`${P}.statsB`).catch(() => { });
+  await sleep(500);
+  return ev(`!${P}.statsP && !!${P}.signP`);
+})());
+ok('…and a second badge under it is refused too', await (async () => {
+  await tap(`${P}.children.list.find((o) => o.getData && o.getData('signDoor') === 'taurus')`).catch(() => { });
+  await sleep(500);
+  const s2 = await evj(readSheet);
+  return s2.gold.includes('LEVEL 13');
+})());
+ok('the ✕ closes the page', await doorX('signP'));
+ok('an unplayed sign still opens its page — LEVEL 1, every column an em-dash', await (async () => {
+  if (!(await tapUntil(`${P}.children.list.find((o) => o.getData && o.getData('signDoor') === 'taurus')`, `!!${P}.signP`))) return false;
+  await sleep(700);
+  const s2 = await evj(readSheet);
+  return s2.gold.includes('LEVEL 1') && Object.keys(s2.vals).length === 7 && Object.values(s2.vals).every((v) => v === '—');
+})());
+ok('…and closes clean', await doorX('signP'));
+ok('the summit is celebratory — LEVEL 50 wears its crown over a FULL bar', await (async () => {
+  await ev(`(() => { const sr = SS.prof.signs.leo; sr.xp = SS_SIGNLV.cum[50]; sr.ack = 50; SS.save(); ${P}.scene.restart(); return 'ok' })()`);
+  if (!(await until(PON, 10000))) return false;
+  await sleep(900);
+  if (!(await tapUntil(`${P}.children.list.find((o) => o.getData && o.getData('signDoor') === 'leo')`, `!!${P}.signP`))) return false;
+  await sleep(700);
+  const s2 = await evj(readSheet);
+  const maxLbl = await ev(`SS_T('svLevelMax')`);
+  return s2.gold.includes(maxLbl) && s2.bar === 1;
+})());
+await shot('sign-page-summit');
+// the fixture restored, then the persistence walk: the four new columns
+// are WRITTEN, the page is torn down by a full reload, and the sign page
+// reads them back through SS.load's own normalize
+await ev(`(() => { const sr = SS.prof.signs.leo; sr.xp = 1560; sr.ack = 13; SS.save(); ${P}.scene.restart(); return 'ok' })()`);
+await until(PON, 10000); await sleep(800);
+ok('the new columns survive the night — written, reloaded, read back', await (async () => {
+  await ev(`(() => { const sr = SS.prof.signs.leo; sr.word = 'sparkles'; sr.hit = 77; sr.eBest = 4; sr.eScore = 999; sr.eRuns = 2; SS.save(); return 'ok' })()`);
+  await send('Page.navigate', { url: BASE + '?fps=0' }); await sleep(2500);
+  if (!(await until(HOME, 60000))) return false;
+  if (!(await tapUntil(`${H}.profileChip`, PON))) return false;
+  await sleep(700);
+  if (!(await tapUntil(`${P}.children.list.find((o) => o.getData && o.getData('signDoor') === 'leo')`, `!!${P}.signP`))) return false;
+  await sleep(700);
+  const s2 = await evj(readSheet);
+  const endLbl = await ev(`SS_T('endLvlShort', 4)`);
+  return s2.vals.stFinest === 'SPARKLES' && s2.vals.stBigHit === '77'
+    && s2.vals.stEndless === endLbl + ' · 999' && s2.vals.stRuns === '5';
+})());
+await doorX('signP');
 
 /* ================= 4. the stats sheet ================= */
 console.log('— STATS (nine rows, the flag door riding along) —');
@@ -417,6 +543,69 @@ ok('es: the stats sheet speaks the ledger (partidas iniciadas · 14)', await (as
     scan(p.statsP.list); return lab && val })()`);
 })());
 await shot('stats-es');
+ok('es: the sign page speaks — campañas superadas, the es fact word for word', await (async () => {
+  // the stats sheet from the check above still stands — close it first
+  await tapUntil(
+    `(() => { let x = null; const scan = (ls) => ls.forEach((o) => { if (o.text === '✕') x = o; if (o.list) scan(o.list); }); scan(${P}.statsP.list); return x })()`,
+    `!${P}.statsP`);
+  if (!(await tapUntil(`${P}.children.list.find((o) => o.getData && o.getData('signDoor') === 'leo')`, `!!${P}.signP`))) return false;
+  await sleep(700);
+  const s2 = await evj(readSheet);
+  const esFact = await ev(`SS_ZFACT(SS_ZODIAC_BY.leo)`);
+  const esKeys = await evj(`JSON.stringify({ c: SS_T('zsClears'), f: SS_T('zsFact') })`);
+  return s2.factHead && (s2.fact || '').replace(/\s+/g, ' ').trim() === esFact
+    && esKeys.c === 'campañas superadas' && esKeys.f === 'DICEN LAS ESTRELLAS'
+    && s2.vals.zsClears === '2' && (s2.desc || '').indexOf('+5') >= 0;
+})());
+await shot('sign-page-es');
+
+/* ================= 9. the living ledger (the hooks, real play) ================= */
+console.log('— THE LIVING LEDGER (real play writes the sign\'s columns) —');
+ok('a signed campaign cast writes the sign\'s word and blow (demo, real casts)', await (async () => {
+  await boot('demo=1&mode=campaign', `localStorage.setItem('beta3.campsign', 'leo');`);
+  if (!(await until(`!!SS.prof.signs.leo && (SS.prof.signs.leo.word || '').length > 0`, 90000, 500))) return false;
+  const d = await evj(`JSON.stringify((() => { const b = game.scene.getScene('battle');
+    const sr = SS.prof.signs.leo;
+    return { w: sr.word, h: sr.hit, rl: b.run.longest, rb: b.run.bigHit, sign: b.sign, mode: b.mode } })())`);
+  return d.sign === 'leo' && d.mode === 'campaign' && d.w === d.rl && d.h === d.rb && d.h > 0;
+})());
+ok('an unsigned quick run writes NO sign column (the ledger stays empty)', await (async () => {
+  await boot('demo=1', '', JSON.stringify({ rating: 1000 }));
+  if (!(await until(`(() => { const b = game.scene.getScene('battle'); return !!b && b.sys.isActive() && b.run && b.run.words > 0 })()`, 90000, 500))) return false;
+  return ev(`Object.keys(SS.prof.signs).length === 0`);
+})());
+ok('the endless reckoning books eRuns · eScore · eBest in one honest motion', await (async () => {
+  await boot('demo=1&mode=endless', `localStorage.setItem('beta3.endsign', 'aries');`, JSON.stringify({ rating: 1000 }));
+  if (!(await until(`!!SS.prof.signs.aries && (SS.prof.signs.aries.word || '').length > 0`, 90000, 500))) return false;
+  const d = await evj(`JSON.stringify((() => { const b = game.scene.getScene('battle');
+    const sc = Math.round(b.runScore() * (b.hasSigil('tome') ? 1 - b.sigVal('tome', 'tax') / 100 : 1));
+    const lvl = b.run.fightIdx + 1;
+    b.endRun(false);
+    const sr = SS.prof.signs.aries;
+    return { sc, lvl, eScore: sr.eScore, eRuns: sr.eRuns, eBest: sr.eBest } })())`);
+  return d.eRuns === 1 && d.eScore === d.sc && d.eBest === d.lvl && d.sc > 0;
+})());
+/* the exact eRuns count is pinned by the atomic check above; here the demo
+   may still be driving (its next tick can legitimately end-and-restart the
+   climb before the navigate lands), so this check pins RENDER truth: the
+   page prints exactly what the reloaded ledger holds, nothing an em-dash */
+let livedX = '';
+ok('…and the reckoned columns render on the sign page after a fresh boot', await (async () => {
+  await send('Page.navigate', { url: BASE + '?fps=0' }); await sleep(2500);
+  if (!(await until(HOME, 60000))) return livedX = 'no home', false;
+  if (!(await tapUntil(`${H}.profileChip`, PON))) return livedX = 'no profile', false;
+  await sleep(700);
+  if (!(await tapUntil(`${P}.children.list.find((o) => o.getData && o.getData('signDoor') === 'aries')`, `!!${P}.signP`))) return livedX = 'no sheet', false;
+  await sleep(700);
+  const s2 = await evj(readSheet);
+  const want = await evj(`JSON.stringify((() => { const sr = SS.prof.signs.aries;
+    return { e: SS_T('endLvlShort', sr.eBest) + ' · ' + sr.eScore,
+      r: String((sr.runs | 0) + (sr.eRuns | 0)) } })())`);
+  livedX = JSON.stringify(s2.vals);
+  return s2.vals.stEndless === want.e && s2.vals.stFinest !== '—' && s2.vals.stBigHit !== '—'
+    && s2.vals.stRuns === want.r && want.r !== '0';
+})(), livedX.slice(0, 160));
+await shot('sign-page-lived');
 
 // ---------------------------------------------------------------- wrap
 ok('no page errors', errs.length === 0, errs.join(' | ').slice(0, 300));
