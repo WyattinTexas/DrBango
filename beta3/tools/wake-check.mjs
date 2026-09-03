@@ -280,14 +280,15 @@ const ORDER = await evj(`JSON.stringify(ssSigilAsleep().map((s) => s.id))`);
 ok('the sleeping sort: closest first, ties in the roster\'s own order',
   ORDER.join() === 'gilded,comet,eclipse,longbow,forge,blood,tome,storm,echo,nova,verse,meteor', ORDER.join(' '));
 ok('the profile opens', await tapUntil(195, 26, `game.scene.isActive('profile')`));
-const door1 = await ev(`(() => { const t = game.scene.getScene('profile').children.list
-  .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); return t ? t.text : 'no door' })()`);
+// v0.78.0: the sigils door is a 2x2-grid button — the count rides its own
+// sub-line (profile.skiesSubT), the label carries the (renamed) title
+const door1 = await ev(`(() => { const t = game.scene.getScene('profile').skiesSubT; return t ? t.text : 'no door' })()`);
 ok('the door says how close: "12 awake · 2 nearly there"',
   door1.indexOf(await ev(`SS_T('skiesNear', 12, 2)`)) >= 0 && door1.indexOf('12 / 24') < 0, door1);
-ok('…and the longer line fits its button (scaled, never clipped)', await ev(`(() => { const t = game.scene.getScene('profile').children.list
-  .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); const l = ssLayout(t.scene);
-  return t.scaleX <= 1.001 && t.width * t.scaleX <= l.u(218) })()`));
-ok('the door opens the gallery', await tapUntil(0, 412, `!!game.scene.getScene('profile').skiesP`));
+ok('…and the longer line fits its button (scaled, never clipped)', await ev(`(() => { const t = game.scene.getScene('profile').skiesSubT;
+  const l = ssLayout(t.scene);
+  return t.scaleX <= 1.001 && t.width * t.scaleX <= l.u(160) })()`));
+ok('the door opens the gallery', await tapUntil(95, 194, `!!game.scene.getScene('profile').skiesP`));
 await sleep(900);
 const drawn = await evj(`(() => { const p = game.scene.getScene('profile').skiesP; if (!p) return '[]';
   const rows = []; const w = (ls) => ls.forEach((o) => { if (o.getData && o.getData('sigilHow')) rows.push({ id: o.getData('sigilHow'), y: o.y }); if (o.list) w(o.list); });
@@ -301,15 +302,13 @@ await tapUntil(0, 60, `!game.scene.getScene('profile').skiesP`);
 await ev(`SS.prof.sig.c.scry = 20; SS.save(); ssSigilCheck(); SS.prof.sig.pend = []; SS.save(); 'ok'`);
 await ev(`game.scene.getScene('profile').scene.restart(); 'ok'`);
 await sleep(1200);
-const door2 = await ev(`(() => { const t = game.scene.getScene('profile').children.list
-  .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); return t ? t.text : 'no door' })()`);
+const door2 = await ev(`(() => { const t = game.scene.getScene('profile').skiesSubT; return t ? t.text : 'no door' })()`);
 ok('a waking re-counts the door: "13 awake · 1 nearly there"',
   door2.indexOf(await ev(`SS_T('skiesNear', 13, 1)`)) >= 0, door2);
 ok('…and the woken sigil left the sleeping sort', await ev(`ssSigilAsleep().every((s) => s.id !== 'comet') && ssSigilAsleep()[0].id === 'gilded'`));
 await ev(`SS.prof.sig.c = {}; SS.save(); game.scene.getScene('profile').scene.restart(); 'ok'`);
 await sleep(1200);
-const door3 = await ev(`(() => { const t = game.scene.getScene('profile').children.list
-  .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); return t ? t.text : 'no door' })()`);
+const door3 = await ev(`(() => { const t = game.scene.getScene('profile').skiesSubT; return t ? t.text : 'no door' })()`);
 ok('with nothing near, the plain fraction returns: 13 / 24', door3.indexOf('13 / 24') >= 0, door3);
 
 /* ================= 6. the door speaks Spanish ================= */
@@ -318,8 +317,7 @@ ok('es boot', await boot('lang=es', `localStorage.setItem('beta3.profile', JSON.
   sig: { u: {}, c: { frg: 24 }, pend: [], gf: 0 } }));`));
 ok('meadow at rest', await until(HOME_REST, 45000));
 ok('the profile opens', await tapUntil(195, 26, `game.scene.isActive('profile')`));
-const doorEs = await ev(`(() => { const t = game.scene.getScene('profile').children.list
-  .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); return t ? t.text : 'no door' })()`);
+const doorEs = await ev(`(() => { const t = game.scene.getScene('profile').skiesSubT; return t ? t.text : 'no door' })()`);
 ok('the door counts in Spanish: "12 despiertos · 1 a punto"',
   doorEs.indexOf('12 despiertos') >= 0 && doorEs.indexOf('1 a punto') >= 0, doorEs);
 

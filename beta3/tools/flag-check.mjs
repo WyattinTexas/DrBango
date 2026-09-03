@@ -347,17 +347,23 @@ await ev(`(() => { SS.prof.rhide = false; SS.save(); SS.sync(); SSNET.dressFlag(
 await reboot('');
 ok('home stands', await until(HOME, 60000));
 await ev(`${H}.scene.start('profile'); 'ok'`);
-ok('the profile stands', await until(`!!${P} && ${P}.sys.isActive() && !!${P}.rowFlag`, 30000));
+ok('the profile stands', await until(`!!${P} && ${P}.sys.isActive() && !!${P}.statsB`, 30000));
+// v0.78.0: the ledger lives behind the STATS door now — the flag row rides
+// its endless row inside the stats sheet, dress and door unchanged
+ok('STATS opens the ledger sheet (real tap)', await tapUntil(`${P}.statsB`, `!!${P}.statsP && !!${P}.rowFlag`));
+await sleep(500);
 let pr = await evj(`JSON.stringify((() => { const p = ${P};
   const img = p.rowFlag.list.find((o) => o.texture && /^flag-/.test(o.texture.key));
-  const zone = p.children.list.find((o) => o.getData && o.getData('flagRow'));
+  let zone = null; const scan = (ls) => ls.forEach((o) => { if (o.getData && o.getData('flagRow')) zone = o; if (o.list) scan(o.list); });
+  scan(p.statsP.list);
   const D = game.scale.width / innerWidth;
   return { tex: img ? img.texture.key : null, zone: !!zone,
     hitH: zone ? zone.input.hitArea.height / D : 0 } })())`);
 ok('the endless row wears the little flag in this mage\'s jar', pr.tex === 'flag-orange', pr.tex);
 ok('…and the row is a 44-pt door', pr.zone && pr.hitH >= 43.5, Math.round(pr.hitH) + 'pt');
 ok('a real tap opens the flag sheet', await tapUntil(
-  `${P}.children.list.find((o) => o.getData && o.getData('flagRow'))`, `!!${P}.flagP`));
+  `(() => { let z = null; const scan = (ls) => ls.forEach((o) => { if (o.getData && o.getData('flagRow')) z = o; if (o.list) scan(o.list); }); scan(${P}.statsP.list); return z })()`,
+  `!!${P}.flagP`));
 await sleep(600);
 let sh = await evj(`JSON.stringify((() => { const p = ${P}; const D = game.scale.width / innerWidth;
   const jars = []; const scan = (ls) => ls.forEach((o) => { if (o.getData && o.getData('flagJar')) jars.push({

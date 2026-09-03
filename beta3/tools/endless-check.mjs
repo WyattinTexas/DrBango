@@ -417,14 +417,25 @@ ok('home again with no reload — the door already speaks the high score',
 await tapUntil(`${H}.profileChip`, `!!game.scene.getScene('profile') && game.scene.getScene('profile').sys.isActive()`);
 await until(`game.scene.getScene('profile') && game.scene.getScene('profile').sys.isActive()`, 20000);
 await sleep(1200);
-// v0.77.0: once a flag stands the row is the flag sheet's door and says so ('  ›')
+// v0.78.0: the ledger lives behind the STATS door (the '  ›' flag dress
+// unchanged on its endless row), the rungs behind the ACHIEVEMENTS sheet
+ok('STATS opens the ledger (real tap)', await tapUntil(`game.scene.getScene('profile').statsB`,
+  `!!game.scene.getScene('profile').statsP`));
 ok('the profile ledger reads the endless high-water mark', await ev(`(() => { const p = game.scene.getScene('profile');
-  let hit = false; p.children.list.forEach((o) => { if (o.text === SS_T('endLvlShort', SS.prof.endless.bestLevel) + ' · ' + SS.prof.endless.bestScore + '  ›') hit = true; });
-  return hit })()`));
-ok('…and the 25-deep achievement grid holds the climb\'s rungs above the seal', await evj(`(() => { const p = game.scene.getScene('profile');
-  let ten = null, seal = null; p.children.list.forEach((o) => { if (o.text === 'TEN RUNGS UP') ten = o.y; if (o.text && /^seal:/.test(o.text)) seal = o.y; });
-  const ys = []; p.children.list.forEach((o) => { if (o.text && o.y > (seal || 1e9) - 5) ys.push(o.text); });
-  return JSON.stringify({ ten: ten !== null, below: p.children.list.filter((o) => o.text && seal && o.y > seal + 5).length }) })()`).then((r) => r.ten && r.below === 0));
+  let hit = false; const scan = (ls) => ls.forEach((o) => { if (o.text === SS_T('endLvlShort', SS.prof.endless.bestLevel) + ' · ' + SS.prof.endless.bestScore + '  ›') hit = true; if (o.list) scan(o.list); });
+  scan(p.statsP.list); return hit })()`));
+ok('…and the 26-deep achievements sheet holds the climb\'s rungs', await (async () => {
+  await tapUntil(`(() => { let x = null; const scan = (ls) => ls.forEach((o) => { if (o.text === '✕') x = o; if (o.list) scan(o.list); }); scan(game.scene.getScene('profile').statsP.list); return x })()`,
+    `!game.scene.getScene('profile').statsP`);
+  if (!(await tapUntil(`game.scene.getScene('profile').achB`, `!!game.scene.getScene('profile').achP`))) return false;
+  return ev(`(() => { const p = game.scene.getScene('profile');
+    let ten = false; const scan = (ls) => ls.forEach((o) => { if (o.text === 'TEN RUNGS UP') ten = true; if (o.list) scan(o.list); });
+    scan(p.achP.list); return ten })()`);
+})());
+// leave the page bare again — the board walk below taps the leaderboard door
+await tapUntil(`(() => { const p = game.scene.getScene('profile'); const l = ssLayout(p); let z = null;
+  const scan = (ls) => ls.forEach((o) => { if (o.type === 'Zone' && o.input && o.width < l.u(60)) z = o; if (o.list) scan(o.list); });
+  scan(p.achP.list); return z })()`, `!game.scene.getScene('profile').achP`);
 ok('no page errors (the sign)', errs.length === 0, errs.join(' | ').slice(0, 200));
 
 /* ================= 7. the board: level first, score the tiebreak ================= */

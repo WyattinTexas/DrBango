@@ -866,29 +866,22 @@ async function main() {
     reboot.tex === 'lantern-m3' && reboot.count === '120' && reboot.mk === 100 && reboot.g === 0 && reboot.gp === 3,
     JSON.stringify(reboot));
 
-  // the ledger grew by three and still has to fit one screen
+  // the roster lives in the v0.78.0 achievements sheet now — a scrolling
+  // list behind the profile's own door, sized for any count
   await c.ev(`(() => { SS.prof.daily = {}; SS.prof.streak = { n:0,last:0,best:0,g:1,gp:0,gd:[],mk:0,pend:0 }; SS.save();
     game.scene.getScene('home').scene.start('profile'); return 'go' })()`);
   ok('the profile ledger stands up', await until(`game.scene.isActive('profile')`));
-  /* ⚠ measure the LEDGER, not the scene: ssStarfield sprinkles stars to the
-     very bottom edge, so a max-bounds-of-everything sweep just re-measures
-     the starfield and passes or fails at random. */
+  await sleep(600);
   const led = JSON.parse(await c.ev(`(() => { const p = game.scene.getScene('profile');
-    const names = new Set(SS_ACH.map(a => a.name)), descs = new Set(SS_ACH.map(a => a.desc));
-    let rows = 0, hi = -1e9, seal = 1e9, shown = [];
-    p.children.list.forEach(o => {
-      if (o.type !== 'Text') return;
-      if (names.has(o.text)) { shown.push(o.text); rows++; hi = Math.max(hi, o.getBounds().bottom); }
-      else if (descs.has(o.text)) hi = Math.max(hi, o.getBounds().bottom);
-      else if (/^seal: /.test(o.text)) seal = o.getBounds().top;
-    });
-    return JSON.stringify({ rows, hi, seal, total: SS_ACH.length, screenH: game.scale.height,
+    if (!p.achP) p.achSheet();
+    const names = new Set(SS_ACH.map(a => a.name));
+    let rows = 0; const shown = [];
+    const scan = (ls) => ls.forEach(o => { if (o.type === 'Text' && names.has(o.text)) { shown.push(o.text); rows++; } if (o.list) scan(o.list); });
+    scan(p.achP.list);
+    return JSON.stringify({ rows, total: SS_ACH.length,
       marks: ['SEVEN NIGHTS','THE LONG BURN','THE COMET CROWN'].every(n => shown.includes(n)) }) })()`));
-  ok('all 23 achievements are listed, the lantern’s three marks among them',
-    led.total === 23 && led.rows === 23 && led.marks, led.rows + '/' + led.total);
-  ok('and the grown ledger still clears the seal at the foot of the page',
-    led.hi <= led.seal && led.seal < led.screenH,
-    Math.round(led.hi) + ' → seal ' + Math.round(led.seal) + ' of ' + led.screenH);
+  ok('all 26 achievements list in the sheet, the lantern’s three marks among them',
+    led.total === 26 && led.rows === 26 && led.marks, led.rows + '/' + led.total);
   ok('all 5 languages carry the grace + marks copy',
     await c.ev(`Object.keys(SS_STR).every(k => ['stkSheet','stkWeekHead','stkLegend','stkCold','stkColdSub','stkBest','stkNextMark','stkGraceHeld','stkGraceBridge','stkGraceSpent','stkGraceSpent1','stkGraced','stkMsHead','stkMs7','stkMs30','stkMs100','stkMsSub7','stkMsSub30','stkMsSub100'].every(s => !!SS_STR[k][s]))`) === true);
   await c.ev(`(() => { SS.prof.daily = {}; SS.prof.ach = {}; SS.prof.streak = { n:0,last:0,best:0,g:1,gp:0,gd:[],mk:0,pend:0 }; SS.save(); return 'reset' })()`);

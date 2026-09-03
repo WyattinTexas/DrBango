@@ -317,29 +317,22 @@ const mig2 = JSON.parse(await ev(`JSON.stringify(SS.prof.streak)`));
 ok('a profile predating the lantern still reads 0 — and still gets its net',
   mig2.n === 0 && mig2.last === 0 && mig2.g === 1 && mig2.mk === 0, JSON.stringify(mig2));
 
-// ---- the profile ledger holds 23 achievements ----
+// ---- the achievements sheet holds the whole 26-row roster (v0.78.0: the
+// always-on grid became a scrolling sheet behind the profile's own door) ----
 await ev(`(() => { SS.prof.daily = {}; SS.prof.streak = { n:0,last:0,best:0,g:1,gp:0,gd:[],mk:0,pend:0 }; SS.save();
   game.scene.getScene('home').scene.start('profile'); return 'go' })()`);
 ok('the profile scene stands up', await until(`game.scene.isActive('profile')`));
-/* ⚠ measure the LEDGER, not the scene: ssStarfield sprinkles stars to the very
-   bottom edge, so a max-bounds-of-everything sweep just re-measures the
-   starfield and passes or fails at random. */
+await sleep(600);
 const prof = JSON.parse(await ev(`(() => { const p = game.scene.getScene('profile');
-  const names = new Set(SS_ACH.map(a => a.name)), descs = new Set(SS_ACH.map(a => a.desc));
-  let rows = 0, hi = -1e9, seal = 1e9; const shown = [];
-  p.children.list.forEach(o => {
-    if (o.type !== 'Text') return;
-    if (names.has(o.text)) { shown.push(o.text); rows++; hi = Math.max(hi, o.getBounds().bottom); }
-    else if (descs.has(o.text)) hi = Math.max(hi, o.getBounds().bottom);
-    else if (/^seal: /.test(o.text)) seal = o.getBounds().top;
-  });
-  return JSON.stringify({ rows, hi, seal, total: SS_ACH.length, screenH: game.scale.height,
+  if (!p.achP) p.achSheet();
+  const names = new Set(SS_ACH.map(a => a.name));
+  let rows = 0; const shown = [];
+  const scan = (ls) => ls.forEach(o => { if (o.type === 'Text' && names.has(o.text)) { shown.push(o.text); rows++; } if (o.list) scan(o.list); });
+  scan(p.achP.list);
+  return JSON.stringify({ rows, total: SS_ACH.length,
     hasMarks: ['SEVEN NIGHTS','THE LONG BURN','THE COMET CROWN'].every(n => shown.includes(n)) }) })()`));
-ok('all 23 achievements are listed, the three marks among them',
-  prof.total === 23 && prof.rows === 23 && prof.hasMarks, prof.rows + '/' + prof.total);
-ok('and the grown ledger still clears the seal at the foot of the page',
-  prof.hi <= prof.seal && prof.seal < prof.screenH,
-  Math.round(prof.hi) + ' → seal ' + Math.round(prof.seal) + ' of ' + prof.screenH);
+ok('all 26 achievements list in the sheet, the three marks among them',
+  prof.total === 26 && prof.rows === 26 && prof.hasMarks, prof.rows + '/' + prof.total);
 
 // ================================================================
 // 4. THE REAL FLOW — play a daily that crosses a mark, tap HOME,

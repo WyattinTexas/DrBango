@@ -148,9 +148,11 @@ const shot = async (name) => {
 const B = `game.scene.getScene('battle')`;
 const H = `game.scene.getScene('home')`;
 const PICK = `!!window.game && ${B} && ${B}.scene.isActive() && ${B}.state === 'pick' && ${B}.board.filter(Boolean).length === 16`;
-// the FULL meadow: doors, chips, lantern, footer — what a bare open must not have
+// the FULL meadow: doors, chips, lantern, footer — what a bare open must not
+// have (the rating pill left the meadow in v0.78.0: the chip stands alone,
+// so full chrome is now proven by the chip and never the pill)
 const CHROME_FULL = `!!window.game && ${H} && ${H}.sys.isActive() && !!${H}.menuRows && ${H}.menuRows.length >= 3
-  && !!${H}.dailyChipB && !!${H}.lanternB && !!${H}.langB && !!${H}.ratingPill`;
+  && !!${H}.dailyChipB && !!${H}.lanternB && !!${H}.langB && !!${H}.profileChip && !${H}.ratingPill`;
 // wipe = a genuinely-first device: every key gone (starspellUid included)
 const wipe = async (seed) => {
   await send('Page.navigate', { url: 'http://localhost:' + SRV + '/ascent.html' }); await sleep(400);

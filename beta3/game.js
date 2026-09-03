@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.77.0';
+const BUILD = 'STARSPELL v0.78.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -3876,10 +3876,11 @@ function ssLayout(scene) {
    axis (local space, origin handled by the input plugin; the first rect is
    kept on the object so a re-pad is never cumulative). Custom shapes and
    pixel-perfect areas are left alone. ssHitPad(o, css, anchor) re-pads a
-   single object with an anchor — 'up' keeps the bottom edge and grows
-   upward, 'down' the reverse — for a stacked pair like the profile chip over
-   the rating pill, where centred growth would let the lower one steal the
-   upper one's taps. */
+   single object, optionally with an anchor — 'up' keeps the bottom edge and
+   grows upward, 'down' the reverse — for stacked pairs where centred growth
+   would let the lower one steal the upper one's taps (the meadow's old
+   chip-over-rating-pill stack was the shape that earned it; the pill left
+   in v0.78.0 and today every caller pads centred). */
 function ssHitPad(o, minCss, anchor) {
   try {
     const ha = o && o.input && o.input.hitArea;
@@ -4153,6 +4154,32 @@ function ssZodiacGlyph(scene, z, k, x, y, tint, alpha) {
     g.fillCircle(src.stars[i][0] * k, src.stars[i][1] * k, Math.max(0.8, k * (i % 3 === 0 ? 10 : 7)));
   }
   return g;
+}
+
+/* A sign badge's glass shield (v0.78.0): midnight glass in a rounded
+   escutcheon, rimmed gold once the sign is cleared, dim iron while it
+   waits — baked once per dress like every other card chrome (setTint is
+   a Canvas no-op; two keys, not a tint). */
+function ssZodBadgeTex(scene, gold) {
+  const key = 'zbadge' + (gold ? '-g' : '');
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), w = 118, h = 106;
+  const t = scene.textures.createCanvas(key, Math.round(w * R), Math.round(h * R));
+  const c = t.context;
+  c.scale(R, R);
+  c.beginPath(); c.roundRect(1.5, 1.5, w - 3, h - 3, 14);
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, 'rgba(24,31,66,0.88)'); g.addColorStop(0.55, 'rgba(15,20,44,0.9)'); g.addColorStop(1, 'rgba(10,14,31,0.92)');
+  c.fillStyle = g; c.fill();
+  c.lineWidth = 1.3;
+  c.strokeStyle = gold ? 'rgba(201,168,76,0.62)' : 'rgba(74,84,128,0.4)';
+  c.stroke();
+  if (gold) {   // a hairline inner halo so a cleared shield reads lit, not loud
+    c.beginPath(); c.roundRect(4, 4, w - 8, h - 8, 11);
+    c.lineWidth = 1; c.strokeStyle = 'rgba(255,215,122,0.16)'; c.stroke();
+  }
+  t.refresh();
+  return key;
 }
 
 /* ---- zodiac card art: the seam (v0.57.0) ------------------------------
@@ -5122,7 +5149,6 @@ class Home extends Phaser.Scene {
       this.setRowSub = () => { };
       this.refreshCampDoor = () => { };
       this.refreshEndDoor = () => { };
-      this.refreshRatingPill = () => { };
       DIAG('meadow ui built (bare — first open)');
       return;
     }
@@ -5287,35 +5313,16 @@ class Home extends Phaser.Scene {
     const CW = 152, CH = 30;
     const chip = this.profileChip = ui(this.add.image(l.x(195), l.y(26), ssBtn(this, true, CW, CH))
       .setDisplaySize(l.u(CW), l.u(CH)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }));
-    ssHitPad(chip, 44, 'up');       // the pill sits 26 beneath: grow toward the sky, never over the pill
     const chipT = ui(ssTxt(this, l.x(195 - CW / 2), l.y(26), '✦ ' + SSNET.myName(), l.u(11), '#9fb0e8').setOrigin(0.5));
     let nm = SSNET.myName();
     while (chipT.width > l.u(CW - 18) && nm.length > 2) { nm = nm.slice(0, -1); chipT.setText('✦ ' + nm + '…'); }
     chip.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); SFX.ui(); this.scene.start('profile'); });
     chip.on('pointerover', () => chip.setScale(chip.scaleX * 1.04, chip.scaleY * 1.04));
     chip.on('pointerout', () => chip.setDisplaySize(l.u(CW), l.u(CH)));
-
-    // Star rating — the standing beside the stargazer's name: a small pill
-    // under the chip wearing the tier's glyph and color, the star-class named
-    // beneath it. Tap → your own rating card (always visible to yourself,
-    // veiled or not). Refreshed on wake — a battle can move the number.
-    const RW = 108, RH = 22;
-    const rpill = this.ratingPill = ui(this.add.image(l.x(195), l.y(52), ssBtn(this, true, RW, RH))
-      .setDisplaySize(l.u(RW), l.u(RH)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }));
-    ssHitPad(rpill, 44, 'down');    // and the pill grows toward the meadow
-    this.ratingT = ui(ssTxt(this, l.x(195 - RW / 2), l.y(52), '', l.u(11), '#cfd8ff').setOrigin(0.5));
-    this.ratingTierT = ui(ssTxt(this, l.x(195), l.y(68), '', l.u(8.5), '#cfd8ff', 'italic').setOrigin(1, 0.5).setAlpha(0.85));
-    this.refreshRatingPill = () => {
-      if (!this.ratingT || !this.ratingT.active) return;
-      const tier = ssRatingTier(SS.prof.rating);
-      this.ratingT.setText(tier.glyph + ' ' + SS.prof.rating).setColor(tier.color)
-        .setShadow(0, 0, tier.color, l.u(5), true, true);
-      this.ratingTierT.setText(SS_T(tier.key)).setColor(tier.color);
-    };
-    this.refreshRatingPill();
-    rpill.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); ssRatingCard(this, { own: true }); });
-    rpill.on('pointerover', () => rpill.setScale(rpill.scaleX * 1.04, rpill.scaleY * 1.04));
-    rpill.on('pointerout', () => rpill.setDisplaySize(l.u(RW), l.u(RH)));
+    /* The star-rating pill that hung beneath the chip left the meadow in
+       v0.78.0 (Skylar 9/2: "get rid of the rating button and the text
+       underneath it") — the chip stands alone, and the rating lives on
+       inside the profile (its line, the rating card, the veil toggle). */
 
     // Daily hunt herald — a small red chip in the top-left corner, counting
     // tonight's sky down second by second. Alive while the hunt is unplayed
@@ -6792,7 +6799,6 @@ class Home extends Phaser.Scene {
     this.milestoneCheck();       // the hunt we just came home from may have grown the lamp
     this.sigilNotice();
     this.signNotice();           // a sign level the climb earned may be unsaid
-    if (this.refreshRatingPill) this.refreshRatingPill();   // the battle may have moved the number
     const l = ssLayout(this);
     if (this.ascVeil) {          // reduce-motion rise → reduce-motion return
       this.sky.setP(0, 0);
@@ -9560,7 +9566,12 @@ class Profile extends Phaser.Scene {
   constructor() { super('profile'); }
   create() {
     const l = ssLayout(this);
-    this.skiesP = null;          // scene instances persist across restarts
+    // scene instances persist across restarts — every sheet ref starts null
+    this.skiesP = null;
+    this.statsP = null;
+    this.achP = null;
+    this.flagP = null;
+    this.rowFlag = null;
 
     ssMakeTextures(this);
     ssStarfield(this, 90);
@@ -9582,8 +9593,19 @@ class Profile extends Phaser.Scene {
     const ratingT = ssTxt(this, l.x(0), l.y(139), rTier.glyph + ' ' + p.rating + ' · ' + SS_T(rTier.key), l.u(12.5), rTier.color).setOrigin(0.5)
       .setShadow(0, 0, rTier.color, l.u(6), true, true).setInteractive({ useHandCursor: true });
     ratingT.on('pointerdown', () => ssRatingCard(this, { own: true }));
+    /* the rating and the veil sit 17 apart — a stacked pair, so their 44-pt
+       pads take the meadow's old chip-over-pill anchors: the rating grows
+       toward the sky, the veil toward the doors. And setText WIPES a text's
+       padded hit rect (Phaser re-sizes it to the new frame), so the veil
+       re-pads inside its dress — without it the toggle's real target was 8
+       css pt tall and its stale rect stole taps aimed at the rating line
+       (v0.78.0, found by profile-check's judge). */
+    ssHitPad(ratingT, 44, 'up');
     const veilT = ssTxt(this, l.x(0), l.y(156), '', l.u(8.5), '#5a6390', 'italic').setOrigin(0.5).setInteractive({ useHandCursor: true });
-    const dressVeil = () => veilT.setText(SS_T('rVeilRow') + ':  ' + (SS.prof.rhide ? '☾ ' + SS_T('rVeiled') : '✦ ' + SS_T('rShown')));
+    const dressVeil = () => {
+      veilT.setText(SS_T('rVeilRow') + ':  ' + (SS.prof.rhide ? '☾ ' + SS_T('rVeiled') : '✦ ' + SS_T('rShown')));
+      ssHitPad(veilT, 44, 'down');
+    };
     dressVeil();
     veilT.on('pointerdown', () => {
       SFX.ui(); SS.prof.rhide = !SS.prof.rhide; SS.save(); SS.sync(); dressVeil();
@@ -9591,131 +9613,280 @@ class Profile extends Phaser.Scene {
       SSNET.dressFlag(SS.prof.flag, !!SS.prof.rhide);
     });
 
-    /* THE DOOR TO THE NIGHT'S FINEST (v0.52.0, Wyatt 8/25): the leaderboard
-       left the meadow's column and lives here, right under your standing —
-       the same dress as the sky door below. The Board is told where it was
-       opened from so its back link returns HERE, never to the meadow. */
-    const lbB = this.leaderB = this.add.image(l.x(0), l.y(179), ssBtn(this, true, 236, 34)).setDisplaySize(l.u(236), l.u(34))
-      .setInteractive({ useHandCursor: true });
-    const lbT = this.leaderT = ssTxt(this, l.x(0), l.y(179), '✦  ' + SS_T('board') + '  ›', l.u(12.5), '#e8c86a')
-      .setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(7), true, true);
-    // a long word for it (CLASIFICACIÓN, لوحة الصدارة) fits the door, never spills it
-    if (lbT.width > l.u(216)) lbT.setScale(l.u(216) / lbT.width);
-    const openBoard = () => { SFX.ui(); this.scene.start('board', { from: 'profile' }); };
-    lbB.on('pointerdown', openBoard);
-    lbT.setInteractive({ useHandCursor: true }).on('pointerdown', openBoard);
+    /* THE FOUR DOORS (v0.78.0, Skylar 9/2: "put the leaderboard button, the
+       Your Skies button, the new stats button, and the new achievement
+       buttons in a 2x2 grid that is underneath Veil My Rating"). Everything
+       the page used to spread down its column now stands behind these four:
+       LEADERBOARD · YOUR SIGILS on the first rank, STATS · ACHIEVEMENTS on
+       the second. The Board is told where it was opened from so its back
+       link returns HERE, never to the meadow; the other three open sheets
+       over this page. One sheet at a time — every door checks the field. */
+    this.anySheet = () => !!(this.skiesP || this.statsP || this.achP || this.flagP);
+    const gDoor = (col, row, label, withSub, open) => {
+      const x = l.x(col ? 95 : -95), y = l.y(194 + row * 54);
+      const b = this.add.image(x, y, ssBtn(this, true, 182, 44)).setDisplaySize(l.u(182), l.u(44))
+        .setInteractive({ useHandCursor: true });
+      const t = ssTxt(this, x, y - (withSub ? l.u(8) : 0), '✦  ' + label, l.u(12), '#e8c86a')
+        .setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(7), true, true);
+      // a long word (CLASIFICACIÓN, ESTADÍSTICAS) fits its door, never spills
+      if (t.width > l.u(158)) t.setScale(l.u(158) / t.width);
+      const s = withSub ? ssTxt(this, x, y + l.u(11), '', l.u(8), '#8a94c4', 'italic').setOrigin(0.5) : null;
+      const go = () => { if (this.anySheet()) return; open(); };
+      b.on('pointerdown', go);
+      t.setInteractive({ useHandCursor: true }).on('pointerdown', go);
+      return { b, t, s };
+    };
+    const lbD = gDoor(0, 0, SS_T('board'), false, () => { SFX.ui(); this.scene.start('board', { from: 'profile' }); });
+    this.leaderB = lbD.b; this.leaderT = lbD.t;
+    const skD = gDoor(1, 0, SS_T('skiesTitle'), true, () => this.openSkies());
+    this.skiesB = skD.b; this.skiesSubT = skD.s;
+    const stD = gDoor(0, 1, SS_T('pfStats'), false, () => this.statsSheet());
+    this.statsB = stD.b;
+    const acD = gDoor(1, 1, SS_T('pfAch'), true, () => this.achSheet());
+    this.achB = acD.b; this.achSubT = acD.s;
+    // the sigils sub keeps the door's old voice (v0.67.0): while something
+    // sleeping is NEARLY THERE it says so instead of the plain fraction —
+    // dressed, never baked, and re-dressed when the gallery closes (a rite
+    // can hand a sigil over while this scene is alive)
+    this.dressSkies = () => {
+      const n = ssSigilOpen().length, m = ssSigilNearCount();
+      this.skiesSubT.setText(m > 0 ? SS_T('skiesNear', n, m) : n + ' / ' + SS_SIGILS.length);
+      this.skiesSubT.setScale(Math.min(1, l.u(158) / Math.max(1, this.skiesSubT.width)));
+    };
+    this.dressSkies();
+    /* the tally counts DISPLAY rows: hard mode's twelve ember signs live
+       behind ONE evolving family row (v0.70.0) that counts once, lit by
+       its first member — so the fraction always matches the sheet's list */
+    const achGot = SS_ACH.reduce((n, a) => n + (a.famIds ? (a.famIds.some((id) => p.ach[id]) ? 1 : 0) : (p.ach[a.id] ? 1 : 0)), 0);
+    this.achSubT.setText(achGot + ' / ' + SS_ACH.length);
 
-    const rows = [
-      ['runs begun', p.runs], ['runs won', p.wins], ['beasts felled', p.beasts],
-      ['words woven', p.words], ['finest word', p.longest ? p.longest.toUpperCase() : '—'],
-      ['mightiest hit', p.bigHit || '—'], ['best quick play', p.bestQuick || '—'],
-      // the endless climb's high-water mark (v0.68.0): level first, the
-      // score beside it — the same order the endless board ranks by. Once a
-      // flag stands the row is the door to it (v0.77.0), and says so.
-      ['endless climb', p.endless.bestLevel ? SS_T('endLvlShort', p.endless.bestLevel) + ' · ' + p.endless.bestScore + '  ›' : '—'],
-      ['versus victories', p.vsWins || '—'],
-    ];
-    // 21 apart now (23 before the endless row, 26 before the leaderboard's
-    // door): every squeeze came out of this ledger, the only slack above
-    // the sky door
-    rows.forEach(([k, v], i) => {
-      const y = l.y(205 + i * 21);
-      ssTxt(this, l.x(-150), y, k, l.u(13), '#8a94c4').setOrigin(0, 0.5);
-      ssTxt(this, l.x(150), y, String(v), l.u(13), '#f0e8d2').setOrigin(1, 0.5);
-    });
-    /* THE FRONTIER FLAG's door (v0.77.0, Skylar 9/3): endless ever played ⇒
-       the row wears the little flag in your jar and opens the flag sheet —
-       the big flag, how far it stands, and the ten troop-colour jars. The
-       packed grid takes a dressed row over a fourteenth full-width one (the
-       v0.70 layout judge's law). No flag yet ⇒ the row stays a plain stat. */
-    this.flagP = null;
-    this.rowFlag = null;
-    if (p.endless.bestLevel > 0) {
-      const fy = l.y(205 + 7 * 21);
-      this.rowFlag = ssFlag(this, { name: '', color: p.flag, w: 30, x: l.x(-44), y: fy + l.u(10) });
-      const fz = this.add.zone(l.x(0), fy, l.u(360), l.u(21)).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      fz.setData('flagRow', 1);
-      fz.on('pointerdown', () => this.flagSheet());
-    }
-
-    // the zodiac strip: every campaign sign, burning gold once cleared under.
-    // Cleared glyphs wear their element color's glow; the rest hang dim.
-    // A PLAYED sign wears its level as a tiny numeral tucked in the glyph
-    // cell's lower-right (v0.69.0 — the strip sits 9u above the skies
-    // door, so a numeral inside the cell is the only thing that fits;
-    // unplayed signs stay quiet).
+    /* THE SIGN BADGES (v0.78.0): the twelve campaign signs take the rest of
+       the page as a 3×4 grid of true badges — the drawn constellations at
+       badge size in glass shields, replacing the one-row strip that drew
+       them at l.u(0.085) ("incredibly tiny"). Everything the strip said
+       still reads here: cleared signs burn gold and unplayed hang dim
+       (v0.23.0's inks), and a played sign wears its level in a roundel at
+       the badge's crown instead of the old tucked numeral (v0.69.0's
+       signWheelLv tag rides the numeral for the suites). Each asterism is
+       fitted to its own badge box — one global scale left the wide signs
+       tiny, which is the strip's whole disease. */
     SS_ZODIAC.forEach((z, i) => {
-      const x = l.x(-165 + i * 30), y = l.y(386);
+      const col = i % 3, row = Math.floor(i / 3);
+      const x = l.x(-128 + col * 128), y = l.y(336 + row * 114);
       const sr = p.signs[z.id];
       const cleared = !!(sr && sr.clears > 0);
-      ssZodiacGlyph(this, z, l.u(0.085), x, y, cleared ? 0xffd77a : 0x39406b, cleared ? 1 : 0.8);
-      if (sr && ((sr.xp | 0) > 0 || (sr.runs | 0) > 0 || (sr.clears | 0) > 0 || (sr.eBest | 0) > 0)) {
-        ssTxt(this, x + l.u(8), y + l.u(5.5), String(ssSignLv(z.id)), l.u(7), cleared ? '#ffd77a' : '#8a94c4')
+      const played = !!(sr && ((sr.xp | 0) > 0 || (sr.runs | 0) > 0 || (sr.clears | 0) > 0 || (sr.eBest | 0) > 0));
+      this.add.image(x, y, ssZodBadgeTex(this, cleared)).setDisplaySize(l.u(118), l.u(106));
+      if (cleared) {
+        this.add.image(x, y - l.u(8), 'glowbig').setDisplaySize(l.u(132), l.u(96))
+          .setTint(0xffd77a).setAlpha(0.1).setBlendMode('ADD');
+      }
+      const src = z.stars ? z : SS_BEASTS[z.beast];
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const pt of src.stars) {
+        x0 = Math.min(x0, pt[0]); x1 = Math.max(x1, pt[0]);
+        y0 = Math.min(y0, pt[1]); y1 = Math.max(y1, pt[1]);
+      }
+      const k = Math.min(86 / Math.max(1, x1 - x0), 58 / Math.max(1, y1 - y0), 0.55);
+      // centre the asterism's own bounding box in the glyph cell — several
+      // signs are authored off-centre and would lean out of a small badge
+      const gx = x - l.u(((x0 + x1) / 2) * k), gy = y - l.u(10) - l.u(((y0 + y1) / 2) * k);
+      ssZodiacGlyph(this, z, l.u(k), gx, gy, cleared ? 0xffd77a : 0x39406b, cleared ? 1 : 0.8);
+      const nm = ssTxt(this, x, y + l.u(38), z.name, l.u(9.5), cleared ? '#ffd77a' : '#5a6390')
+        .setOrigin(0.5).setLetterSpacing(l.u(1.5));
+      if (cleared) nm.setShadow(0, 0, '#c9a94f', l.u(5), true, true);
+      if (nm.width > l.u(106)) nm.setScale(l.u(106) / nm.width);
+      if (played) {
+        this.add.circle(x + l.u(41), y - l.u(36), l.u(11), 0x141a33, 0.92)
+          .setStrokeStyle(Math.max(1, l.u(1.2)), cleared ? 0xc9a84c : 0x4a5480, 1);
+        ssTxt(this, x + l.u(41), y - l.u(36), String(ssSignLv(z.id)), l.u(10), cleared ? '#ffd77a' : '#8a94c4')
           .setOrigin(0.5).setShadow(0, 0, '#0a0e1f', l.u(4), true, true).setData('signWheelLv', z.id);
       }
     });
 
-    /* THE DOOR TO THE SKY (v0.43.0). The gallery has to be reachable from
-       somewhere that is not a battle, because the whole point of the sleeping
-       list is the bar you are chasing between runs. It reads out how much of
-       the sky you hold, and opens the same panel the inspector does — held
-       above, STILL SLEEPING below. */
-    const doorB = this.add.image(l.x(0), l.y(412), ssBtn(this, true, 236, 34)).setDisplaySize(l.u(236), l.u(34))
-      .setInteractive({ useHandCursor: true });
-    const doorT = ssTxt(this, l.x(0), l.y(412), '', l.u(12.5), '#e8c86a')
-      .setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(7), true, true);
-    // the count is DRESSED, never baked: a rite can hand a sigil over while
-    // this scene is alive, and a door still reading 12 / 24 would be a lie.
-    // While something sleeping is NEARLY THERE the door says so instead of
-    // the plain fraction (v0.67.0) — and the longer line fits by scaling,
-    // since German runs past the button at full size.
-    const dressDoor = () => {
-      const n = ssSigilOpen().length, m = ssSigilNearCount();
-      doorT.setText(m > 0
-        ? '✦  ' + SS_T('skiesTitle') + ' · ' + SS_T('skiesNear', n, m) + '  ›'
-        : '✦  ' + SS_T('skiesTitle') + '  ' + n + ' / ' + SS_SIGILS.length + '  ›');
-      doorT.setScale(Math.min(1, l.u(216) / Math.max(1, doorT.width)));
+    ssTxt(this, l.x(0), l.y(784), 'seal: ' + SSNET.uid().slice(0, 12) + ' · ' + (SSNET.mode === 'local' ? 'offline' : 'synced'), l.u(9), '#39406b').setOrigin(0.5);
+  }
+  /* ---------- THE SIGIL GALLERY (v0.43.0, door re-cut v0.78.0) ----------
+     The gallery has to be reachable from somewhere that is not a battle,
+     because the whole point of the sleeping list is the bar you are chasing
+     between runs. The door reads the sky as it stands RIGHT NOW — what the
+     drip handed over since this scene was built belongs above the STILL
+     SLEEPING rule, not under it. */
+  openSkies() {
+    if (this.anySheet()) return;
+    SFX.ui();
+    this.skiesP = ssSigilPanel(this, {
+      sigils: ssSigilOpen().map((s) => s.id), sleeping: true, title: 'skiesTitle', depth: 120,
+      onClose: () => { this.skiesP = null; this.dressSkies(); },
+    });
+  }
+  /* ---------- THE STATS SHEET (v0.78.0, Skylar 9/2) ----------
+     "We also want to put the stats from runs begun all the way down to
+     versus victories into a button that says Stats." The nine-row ledger,
+     the same values in the same formats the page always printed — and the
+     endless row is still the frontier flag's door (v0.77.0): the little
+     flag in your jar, the '  ›', and a 44-pt zone onto the flag sheet,
+     which opens ABOVE this one. Zones and the flag land AFTER c.add(items)
+     — the topOnly law. */
+  statsSheet() {
+    if (this.anySheet()) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.statsP = this.add.container(0, 0).setDepth(600);
+    const close = () => { if (this.statsP !== c) return; this.statsP = null; this.rowFlag = null; c.destroy(); };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    c.add(veil);
+    const p = SS.prof;
+    const PH = 380, py = (d) => l.y(400 - PH / 2 + d);
+    const items = [];
+    items.push(this.add.image(l.x(0), py(PH / 2), 'endpanel').setDisplaySize(l.u(372), l.u(PH)).setInteractive());
+    const xB = ssTxt(this, l.x(164), py(28), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); close(); });
+    items.push(xB);
+    const tk = ssGoldTex(this, SS_T('pfStats'), 17);
+    const tsc = Math.min(1, 280 / tk.w);
+    items.push(this.add.image(l.x(0), py(46), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    const rows = [
+      ['stRuns', p.runs], ['stRunsWon', p.wins], ['stBeasts', p.beasts],
+      ['stWords', p.words], ['stFinest', p.longest ? p.longest.toUpperCase() : '—'],
+      ['stBigHit', p.bigHit || '—'], ['stBestQuick', p.bestQuick || '—'],
+      // the endless climb's high-water mark (v0.68.0): level first, the
+      // score beside it — the same order the endless board ranks by. Once a
+      // flag stands the row is the door to it (v0.77.0), and says so.
+      ['stEndless', p.endless.bestLevel ? SS_T('endLvlShort', p.endless.bestLevel) + ' · ' + p.endless.bestScore + '  ›' : '—'],
+      ['stVsWins', p.vsWins || '—'],
+    ];
+    let labEnd = -150;
+    rows.forEach(([k, v], i) => {
+      const y = py(88 + i * 30);
+      const lab = ssTxt(this, l.x(-150), y, SS_T(k), l.u(13), '#8a94c4').setOrigin(0, 0.5);
+      if (lab.width > l.u(140)) lab.setScale(l.u(140) / lab.width);
+      const val = ssTxt(this, l.x(150), y, String(v), l.u(13), '#f0e8d2').setOrigin(1, 0.5).setData('stVal', k);
+      if (val.width > l.u(140)) val.setScale(l.u(140) / val.width);
+      items.push(lab, val);
+      if (k === 'stEndless') labEnd = -150 + (lab.width * lab.scaleX) / l.s;
+    });
+    c.add(items);
+    /* the frontier flag rides its row — added AFTER the interactive window
+       (display order IS the law), stood in the gap the localized label
+       actually leaves. this.rowFlag keeps its v0.77.0 name: the flag sheet
+       repaints it live on a jar pick. */
+    if (p.endless.bestLevel > 0) {
+      const fy = py(88 + 7 * 30);
+      this.rowFlag = ssFlag(this, { name: '', color: p.flag, w: 30, x: l.x(labEnd + 16), y: fy + l.u(10) });
+      c.add(this.rowFlag);
+      const fz = this.add.zone(l.x(0), fy, l.u(360), l.u(30)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      fz.setData('flagRow', 1);
+      fz.on('pointerdown', () => this.flagSheet());
+      c.add(fz);
+    }
+    items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+    ssHealBlankTexts(this, 'stats-sheet');
+  }
+  /* ---------- THE ACHIEVEMENTS SHEET (v0.78.0, Skylar 9/2) ----------
+     "When you open up the achievements, they could be much bigger and you
+     can scroll through them, especially if we add more. Right now they're
+     incredibly tiny and very hard to read." One BIG row per achievement —
+     icon, name and story at half again the old grid's size — in the sigil
+     panel's own masked drag-scroll dress, sized for any roster the sky
+     grows. The hard family keeps its ONE evolving row (n / 12, the crown's
+     whole dress at twelve) and the tally counts display rows, so the
+     fraction always matches the list. */
+  achSheet() {
+    if (this.anySheet()) return;
+    SFX.ui();
+    const l = ssLayout(this);
+    const c = this.achP = this.add.container(0, 0).setDepth(600);
+    const close = () => {
+      if (this.achP !== c || c.getData('closed')) return;
+      c.setData('closed', true);
+      this.achP = null;
+      this.tweens.add({ targets: c, alpha: 0, duration: 150, onComplete: () => { if (c.active) c.destroy(); } });
     };
-    dressDoor();
-    const openSkies = () => {
-      if (this.skiesP) return;
-      SFX.ui();
-      // read the sky as it stands RIGHT NOW — what the drip handed over since
-      // this scene was built belongs above the STILL SLEEPING rule, not under
-      this.skiesP = ssSigilPanel(this, {
-        sigils: ssSigilOpen().map((s) => s.id), sleeping: true, title: 'skiesTitle', depth: 120,
-        onClose: () => { this.skiesP = null; dressDoor(); },
-      });
-    };
-    doorB.on('pointerdown', openSkies);
-    doorT.setInteractive({ useHandCursor: true }).on('pointerdown', openSkies);
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.72, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    c.add(veil);
+    const p = SS.prof;
+    const RH = 64, GAP = 8, HEAD = 76, FOOT = 28;
+    const n = SS_ACH.length;
+    const contentH = n * RH + (n - 1) * GAP;
+    const viewH = Math.min(contentH, 552);
+    const winH = HEAD + viewH + FOOT;
+    const top = 400 - winH / 2;
+    const wc = this.add.container(0, 0);
+    const win = this.add.image(l.x(0), l.y(top + winH / 2), 'endpanel')
+      .setDisplaySize(l.u(372), l.u(winH)).setInteractive();
+    wc.add(win);
+    const tk = ssGoldTex(this, SS_T('pfAch'), 16);
+    const tsc = Math.min(1, 250 / tk.w);
+    wc.add(this.add.image(l.x(-6), l.y(top + 28), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    const achGot = SS_ACH.reduce((g, a) => g + (a.famIds ? (a.famIds.some((id) => p.ach[id]) ? 1 : 0) : (p.ach[a.id] ? 1 : 0)), 0);
+    wc.add(ssTxt(this, l.x(-6), l.y(top + 52), achGot + ' / ' + SS_ACH.length, l.u(10), '#c9b676')
+      .setOrigin(0.5).setLetterSpacing(l.u(2)).setData('achTally', 1));
+    const xT = ssTxt(this, l.x(164), l.y(top + 29), '✕', l.u(17), '#8a94c4').setOrigin(0.5);
+    const xZ = this.add.zone(l.x(164), l.y(top + 29), l.u(46), l.u(46)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xZ.on('pointerdown', () => { SFX.ui(); close(); });
+    wc.add([xT, xZ]);
+    wc.add(ssTxt(this, l.x(0), l.y(top + winH - 15), SS_T('inspSub'), l.u(9.5), '#5a6390', 'italic').setOrigin(0.5));
 
-    /* the header counts DISPLAY rows: hard mode's twelve ember signs live
-       behind ONE evolving family row (v0.70.0) that counts once, lit by
-       its first member — so the fraction always matches the grid below */
-    const achGot = SS_ACH.reduce((n, a) => n + (a.famIds ? (a.famIds.some((id) => p.ach[id]) ? 1 : 0) : (p.ach[a.id] ? 1 : 0)), 0);
-    ssTxt(this, l.x(0), l.y(441), '— ACHIEVEMENTS  ' + achGot + ' / ' + SS_ACH.length + ' —', l.u(13), '#c9b676').setOrigin(0.5);
-    // the grid is 26 deep now (hard mode's family row joined the endless
-    // rungs) — still 13 rows at 25 apart, the proven fit above the seal
-    // (a 14th row cannot fit: the signlevel layout judge showed 23-apart
-    // rows overlapping). A famIds row lights on its FIRST member, prints
-    // the family's running count, and wears its crown's whole dress once
-    // every member is earned (THE EMBER ZODIAC — its own awarded id).
-    SS_ACH.forEach((a, i) => {
-      const col = i % 2, row = Math.floor(i / 2);
-      const x = l.x(col === 0 ? -100 : 100), y = l.y(466 + row * 25);
+    // rows live in a masked container; dragging the window scrolls them.
+    // A famIds row lights on its FIRST member, prints the family's running
+    // count, and wears its crown's whole dress once every member is earned.
+    const rc = this.add.container(0, 0);
+    SS_ACH.forEach((a, k) => {
+      const yk = top + HEAD + k * (RH + GAP) + RH / 2;
       const famN = a.famIds ? a.famIds.filter((id) => p.ach[id]).length : 0;
       const crowned = !!(a.crown && p.ach[a.crown.id]);
       const got = a.famIds ? famN > 0 : !!p.ach[a.id];
       const icon = crowned ? a.crown.icon : a.icon;
       const name = crowned ? a.crown.name : a.name;
       const desc = crowned ? a.crown.desc : a.famIds ? a.desc + '  ' + famN + ' / ' + a.famIds.length : a.desc;
-      ssTxt(this, x - l.u(88), y, icon, l.u(14), got ? '#ffd77a' : '#39406b').setOrigin(0.5);
-      ssTxt(this, x - l.u(68), y - l.u(7.5), name, l.u(10.5), got ? '#f0e8d2' : '#4a5480').setOrigin(0, 0.5);
-      ssTxt(this, x - l.u(68), y + l.u(8.5), desc, l.u(8), got ? '#8a94c4' : '#39406b', 'italic').setOrigin(0, 0.5);
+      if (k < n - 1) rc.add(this.add.rectangle(l.x(0), l.y(yk + RH / 2 + GAP / 2), l.u(330), Math.max(1, l.u(1)), 0x2b3157, 0.55));
+      rc.add(ssTxt(this, l.x(-148), l.y(yk), icon, l.u(24), got ? '#ffd77a' : '#39406b').setOrigin(0.5)
+        .setShadow(0, 0, got ? '#c9a94f' : '#0a0e1f', l.u(got ? 8 : 4), true, true));
+      const nmT = ssTxt(this, l.x(-116), l.y(yk - 13), name, l.u(14), got ? '#f0e8d2' : '#4a5480')
+        .setOrigin(0, 0.5).setData('achName', a.id);
+      if (nmT.width > l.u(240)) nmT.setScale(l.u(240) / nmT.width);
+      rc.add(nmT);
+      const dsT = ssTxt(this, l.x(-116), l.y(yk + 12), desc, l.u(11), got ? '#8a94c4' : '#39406b', 'italic')
+        .setOrigin(0, 0.5).setData('achDesc', a.id);
+      if (dsT.width > l.u(292)) dsT.setScale(l.u(292) / dsT.width);
+      rc.add(dsT);
     });
+    wc.add(rc);
 
-    ssTxt(this, l.x(0), l.y(784), 'seal: ' + SSNET.uid().slice(0, 12) + ' · ' + (SSNET.mode === 'local' ? 'offline' : 'synced'), l.u(9), '#39406b').setOrigin(0.5);
+    const maxOff = Math.max(0, l.u(contentH - viewH));
+    if (maxOff > 0) {
+      const mg = this.make.graphics();
+      mg.fillRect(l.x(-186), l.y(top + HEAD), l.u(372), l.u(viewH));
+      rc.setMask(mg.createGeometryMask());
+      // a slim gold thumb tracks where you are in the list
+      const trackH = l.u(viewH), thumbH = trackH * (l.u(viewH) / l.u(contentH));
+      const thumb = this.add.rectangle(l.x(172), l.y(top + HEAD) + thumbH / 2, l.u(3), thumbH, 0xd7b45c, 0.45).setOrigin(0.5);
+      wc.add(thumb);
+      let drag = null, off = 0;
+      win.on('pointerdown', (pt) => { drag = { y: pt.y, off }; });
+      const mv = (pt) => {
+        if (!drag) return;
+        if (!pt.isDown) { drag = null; return; }
+        off = clamp(drag.off + (drag.y - pt.y), 0, maxOff);
+        rc.y = -off;
+        thumb.y = l.y(top + HEAD) + thumbH / 2 + (off / maxOff) * (trackH - thumbH);
+      };
+      const up = () => { drag = null; };
+      this.input.on('pointermove', mv);
+      this.input.on('pointerup', up);
+      c.once('destroy', () => { this.input.off('pointermove', mv); this.input.off('pointerup', up); mg.destroy(); });
+    }
+
+    c.add(wc);
+    wc.y = l.u(14); wc.alpha = 0;
+    this.tweens.add({ targets: wc, y: 0, alpha: 1, duration: 240, ease: 'Cubic.easeOut' });
+    ssHealBlankTexts(this, 'ach-sheet');
   }
   /* ---------- THE FLAG SHEET (v0.77.0, Skylar 9/3) ----------
      "Allow the player in the character's profile screen to change the color
@@ -9727,7 +9898,9 @@ class Profile extends Phaser.Scene {
      veil + ✕ close, ref nulled at create (stale-ref law). Zones stay OUT of
      the entrance tween — a Zone has no alpha and detaches from its cell. */
   flagSheet() {
-    if (this.flagP || this.skiesP) return;
+    // opens ABOVE the stats sheet (its door since v0.78.0) — only another
+    // veil-owning sheet blocks it
+    if (this.flagP || this.skiesP || this.achP) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.flagP = this.add.container(0, 0).setDepth(700);
@@ -9765,10 +9938,12 @@ class Profile extends Phaser.Scene {
         SSNET.dressFlag(jc.id, !!SS.prof.rhide);   // the standing row repaints for every climber's sky
         ring.setPosition(x, y);
         plant();
-        if (this.rowFlag && this.rowFlag.scene) {  // the profile row's little flag follows
+        if (this.rowFlag && this.rowFlag.scene) {  // the stats row's little flag follows
           const rx = this.rowFlag.x, ry = this.rowFlag.y;
+          const parent = this.rowFlag.parentContainer;   // it lives in the stats sheet (v0.78.0)
           this.rowFlag.destroy();
           this.rowFlag = ssFlag(this, { name: '', color: jc.id, w: 30, x: rx, y: ry });
+          if (parent && parent.scene) parent.add(this.rowFlag);
         }
       });
       zones.push(z);

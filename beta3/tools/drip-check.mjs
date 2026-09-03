@@ -458,12 +458,10 @@ await nav(BASE + '?fps=0', 12000);
 await until(HOME_REST);
 ok('the profile carries a door to the sky, and — with STAR FORGE 19/25 nearly there — it says so (v0.67.0)',
   await tapUntil(195, 26, `game.scene.isActive('profile')`)
-  && await ev(`(() => { const t = game.scene.getScene('profile').children.list
-      .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0);
+  && await ev(`(() => { const t = game.scene.getScene('profile').skiesSubT;
     return !!t && t.text.indexOf(SS_T('skiesNear', 12, 1)) >= 0 && t.text.indexOf('12 / 24') < 0 })()`) === true,
-  await ev(`(() => { const t = game.scene.getScene('profile').children.list
-    .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); return t ? t.text : 'no door' })()`));
-ok('the door opens the gallery', await tapUntil(0, 398, `!!game.scene.getScene('profile').skiesP`));
+  await ev(`(() => { const t = game.scene.getScene('profile').skiesSubT; return t ? t.text : 'no door' })()`));
+ok('the door opens the gallery', await tapUntil(95, 194, `!!game.scene.getScene('profile').skiesP`));
 await sleep(900);
 for (let i = 0; i < 12; i++) await dragUp();     // all the way to the bottom
 await sleep(600);
@@ -502,7 +500,7 @@ ok('a silhouette gives away the rarity dress and NOTHING else — no name, no gl
    opened — this is the rule the whole surface lives or dies by. */
 await tapUntil(0, 60, `!game.scene.getScene('profile').skiesP`);
 await ev(`(() => { SS.prof.sig.c.scry = 20; SS.save(); ssSigilCheck(); SS.prof.sig.pend = []; SS.save(); return 'forged' })()`);
-await tapUntil(0, 398, `!!game.scene.getScene('profile').skiesP`);
+await tapUntil(95, 194, `!!game.scene.getScene('profile').skiesP`);
 await sleep(900);
 for (let i = 0; i < 12; i++) await dragUp();
 await sleep(600);
@@ -516,11 +514,9 @@ ok('and the count above the list came down with it',
     w(p.c.list); return txt.includes(SS_T('slpSub', 11)) })()`) === true);
 ok('…and the door itself re-counts the sky on the way out (13 awake, the forge still near)',
   await tapUntil(0, 60, `!game.scene.getScene('profile').skiesP`)
-  && await ev(`(() => { const t = game.scene.getScene('profile').children.list
-      .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0);
+  && await ev(`(() => { const t = game.scene.getScene('profile').skiesSubT;
     return !!t && t.text.indexOf(SS_T('skiesNear', 13, 1)) >= 0 })()`) === true,
-  await ev(`(() => { const t = game.scene.getScene('profile').children.list
-    .find(o => o.type === 'Text' && o.text.indexOf(SS_T('skiesTitle')) >= 0); return t ? t.text : 'no door' })()`));
+  await ev(`(() => { const t = game.scene.getScene('profile').skiesSubT; return t ? t.text : 'no door' })()`));
 
 // the in-battle inspector carries the same section — the bar to chase is
 // readable from inside the fight that is filling it
@@ -545,7 +541,7 @@ await ev(`localStorage.setItem('beta3.profile', JSON.stringify({ runs: 5, words:
 await nav(BASE + '?fps=0', 12000);
 await until(HOME_REST);
 await tapUntil(195, 26, `game.scene.isActive('profile')`);
-await tapUntil(0, 398, `!!game.scene.getScene('profile').skiesP`);
+await tapUntil(95, 194, `!!game.scene.getScene('profile').skiesP`);
 await sleep(900);
 const full = await evj(GALLERY);
 ok('a grandfathered sky lists all 24 held and none asleep',
@@ -569,7 +565,9 @@ ok('and the two plural forms of the sleeping count really differ',
 await nav(BASE + '?fps=0&lang=de', 12000);
 const de = await evj(`JSON.stringify({ head: SS_T('unlHead'), skies: SS_T('unlSkies'), sleep: SS_T('slpHead'), door: SS_T('skiesTitle') })`);
 ok('a German boot reads the whole rite in German',
-  /SIGEL/.test(de.head) && /Himmel/.test(de.skies) && /SCHLAFEND/.test(de.sleep) && /HIMMEL/.test(de.door),
+  // the gallery door is DEINE SIGEL since v0.78.0; the unlock line keeps its
+  // poetic Himmel ("es leuchtet nun an deinem Himmel")
+  /SIGEL/.test(de.head) && /Himmel/.test(de.skies) && /SCHLAFEND/.test(de.sleep) && /SIGEL/.test(de.door),
   [de.head, de.sleep, de.door].join(' · '));
 await nav(BASE + '?fps=0&lang=en', 12000);
 

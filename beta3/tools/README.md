@@ -1,6 +1,73 @@
 # beta3 dev tools
 
-Thirty-two scripts, all dev-only — nothing here ships to the browser.
+Thirty-three scripts, all dev-only — nothing here ships to the browser.
+
+## profile-check.mjs — the profile page redesign (v0.78.0)
+
+Skylar's call (9/2): "get rid of the rating button and the text underneath
+it that says 'Rising Star' … put the achievements into an achievement
+button … they could be much bigger and you can scroll through them … Your
+Skies needs to be renamed to your Sigils … put the stats from runs begun
+all the way down to versus victories into a button that says 'Stats' …
+the leaderboard button, the Your Skies button, the new stats button, and
+the new achievement buttons in a 2x2 grid that is underneath Veil My
+Rating … the rest of the screen to be taken up by all the different signs
+in a 3x4 grid … bigger and they look more like badges." The game side:
+the meadow's rating pill + tier text are GONE (the chip stands alone; the
+rating lives on inside the profile — its line, `ssRatingCard`, the veil
+toggle); the profile page is name + rating + veil, the 2×2 door grid
+(LEADERBOARD · YOUR SIGILS / STATS · ACHIEVEMENTS — `leaderB`/`skiesB`/
+`statsB`/`achB`, the sigils door's counting sub-line on `skiesSubT`, the
+ach tally on `achSubT`), and twelve sign badges in 3×4 (`ssZodBadgeTex`
+glass shields baked per dress, each asterism FITTED to its own badge box,
+gold when cleared, the level in a roundel wearing the `signWheelLv` tag).
+STATS (`statsSheet`) carries the nine-row ledger — same values, same
+formats, labels now proper SS_T keys ×5 — with the v0.77.0 frontier-flag
+door on its endless row (`rowFlag` + the `flagRow` zone live in the sheet;
+the flag sheet opens ABOVE it at depth 700 and its jar-pick repaint
+re-parents the row flag). ACHIEVEMENTS (`achSheet`) is the sigil panel's
+own masked drag-scroll dress — one BIG row per achievement (icon u24,
+name u14, story u11 vs the old grid's u14/u10.5/u8), the hard family
+still ONE evolving row, the tally counting display rows. One sheet at a
+time (`anySheet`); the rating/veil pair wears anchored 44-pt pads
+('up'/'down' — setText wipes a text's padded hit rect, so the veil
+re-pads inside its dress; its real target was 8 css pt tall before, and
+its stale rect stole taps aimed at the rating line).
+
+Self-launching (server :8899 if nothing serves, Chrome on :9478,
+`/tmp/cdp-profile` wiped first, `--disable-gpu`), Firebase blocked at the
+network layer, real DPR-3 taps; `SHOTS=<dir>` keeps screenshots.
+
+```
+perl -e 'alarm 580; exec @ARGV' node tools/profile-check.mjs   # 53 checks, ~4 min
+```
+
+The paper (release ritual, YOUR SIGILS ×5 with the old titles gone, the
+seven new keys ×5, no pill symbols anywhere, the ledger labels as SS_T
+keys, the flag row's sheet plumbing, the badge bake's Canvas law, the
+scroll machinery); the meadow (no pill, no tier text, nothing interactive
+in the old pill band, the chip alone opening the profile by real tap);
+the page (the 2×2 under the veil row, 44-pt doors, the sigils sub's
+counting voice, the ach tally, NO always-on ledger or grid, twelve
+badges in 3×4 with the cleared/dim dress + level roundels, the layout
+judge, the rating line still opening the card); the stats sheet (all
+nine values exact from a seeded profile, the endless row's little flag +
+44-pt door, the flag sheet opening ABOVE and closing back, the ✕ sweep);
+the achievements sheet (26 rows + tally, the size floor vs v0.70, the
+earned/unearned inks, EMBER-SWORN · n / 12, a REAL drag scrolling the
+far rows up, the one-sheet guard, the crown dress + the family counting
+once); the renamed gallery behind its door; the roads out (Board told
+`from: 'profile'`, its back link returning, ‹ HOME); the five tongues
+(door labels ×5, the Spanish ledger deep-read).
+
+Suite fallout absorbed elsewhere (v0.78.0): ftue-check's full-chrome
+census flipped to `!ratingPill`; wake/drip read `skiesSubT` and tap the
+grid button at (95, 194); flag-check walks STATS first; hard/endless
+open the sheets for their grid reads; streak/fps's stale 23-ach ledger
+sections became 26-row sheet reads (the review-0902 standing reds are
+green again). ⚠ wake-check never wiped `/tmp/cdp-wake` — a stale profile
+from its last run fails its FIRST quick boot before anything else runs;
+wipe the dir when it reds out on its opening checks.
 
 ## flag-check.mjs — the endless frontier flags (v0.77.0)
 

@@ -473,23 +473,31 @@ ok('the profile opens by its chip', await tapUntil(`${H}.profileChip`,
   `game.scene.getScene('profile').sys.isActive()`, 6));
 const P = `game.scene.getScene('profile')`;
 await sleep(800);
+// v0.78.0: the always-on grid became the ACHIEVEMENTS sheet — open it by its
+// own door and read the rows inside; the tally text wears the achTally tag
+ok('the ACHIEVEMENTS door opens its sheet (real tap)', await tapUntil(`${P}.achB`, `!!${P}.achP`, 6));
+await sleep(600);
 const gridRead = `JSON.stringify((() => { const p = ${P};
-  const texts = p.children.list.filter((o) => o.text).map((o) => ({ t: o.text, y: o.y / (game.scale.width / innerWidth) }));
-  const head = texts.find((x) => x.t.indexOf('ACHIEVEMENTS') >= 0);
-  const famRow = texts.find((x) => x.t.indexOf(' / 12') >= 0);
-  const crownRow = texts.find((x) => x.t.indexOf('EMBER ZODIAC') >= 0);
-  const swornRow = texts.find((x) => x.t.indexOf('EMBER-SWORN') >= 0);
-  const low = Math.max(...texts.filter((x) => x.t.length > 2).map((x) => x.y));
-  return { head: head && head.t, fam: famRow && famRow.t, crown: !!crownRow, sworn: !!swornRow, low } })())`;
+  const texts = []; let tally = null, rows = 0;
+  const scan = (ls) => ls.forEach((o) => { if (o.text) texts.push(o.text);
+    if (o.getData && o.getData('achTally')) tally = o.text;
+    if (o.getData && o.getData('achName')) rows++;
+    if (o.list) scan(o.list); });
+  scan(p.achP.list);
+  const famRow = texts.find((t) => t.indexOf(' / 12') >= 0);
+  return { tally, rows, fam: famRow,
+    crown: texts.some((t) => t.indexOf('EMBER ZODIAC') >= 0),
+    sworn: texts.some((t) => t.indexOf('EMBER-SWORN') >= 0) } })())`;
 let grid = await evj(gridRead);
-ok('the grid header counts DISPLAY rows (never 13 loose embers)', /26/.test(grid.head || ''), grid.head);
+ok('the tally counts DISPLAY rows (never 13 loose embers)', /26/.test(grid.tally || '') && grid.rows === 26, grid.tally + ' · ' + grid.rows);
 ok('all twelve earned: the family row wears THE EMBER ZODIAC crown', grid.crown && !grid.sworn, JSON.stringify({ c: grid.crown, s: grid.sworn }));
-ok('the grid keeps its 13 rows above the seal', grid.low <= 786, grid.low);
 await shot('profile-hard-achs');
 // un-crown two embers and rebuild: the row returns to EMBER-SWORN · 11 / 12
 await ev(`delete SS.prof.ach['hard-zodiac']; delete SS.prof.ach['hard-pisces']; SS.save(); ${P}.scene.restart(); 'ok'`);
 await until(`${P}.sys.isActive()`, 10000);
 await sleep(700);
+ok('…the sheet reopens on the rebuilt page', await tapUntil(`${P}.achB`, `!!${P}.achP`, 6));
+await sleep(600);
 grid = await evj(gridRead);
 ok('short of the crown the row reads EMBER-SWORN with its 11 / 12 progress',
   grid.sworn && !grid.crown && /11 \/ 12/.test(grid.fam || ''), JSON.stringify({ s: grid.sworn, fam: grid.fam }));
