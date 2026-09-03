@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.80.0';
+const BUILD = 'STARSPELL v0.81.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -2666,88 +2666,162 @@ function ssBeastFx(scene, cont, beast, unitScale, asm, opts) {
   return fx;
 }
 
-/* ---- tappable sky signs (v0.76.0) -----------------------------------------
+/* ---- tappable sky signs (v0.76.0, re-aimed v0.81.0) -----------------------
    Skylar (9/2): "if you tap on the horse star sign when it's on the screen,
-   it does a little animation where the horse is rearing." SS_SKY_TAPS maps
+   it does a little animation where the horse is rearing." — and (9/3): the
+   horse signs he meant are CENTAURUS and SAGITTARIUS, and "Sagittarius
+   should shoot a shooting star when you click on his constellation if it
+   pops up on the main page." So: CENTAURUS rears, SAGITTARIUS looses a
+   shooting star, and monoceros returns to pure presence. SS_SKY_TAPS maps
    beast id → flourish(scene, fx); the meadow showcase (buildMeadowUi's
-   cycle) arms ONE tap zone while a registered sign stands, so another sign
-   becomes tappable by adding an entry here. A flourish is a sky gesture,
-   not an attack: it stays in the sky, never dives at the meadow, never
-   shakes the camera. It borrows the container the way battle attacks do
-   (fx.attacking parks the breath) and leaves through fx.skyDone(), which
-   always restores the transform — the 9s cycle calls fx.skyDone(true)
-   before tearing the standing sign down, so a fade that catches a flourish
-   mid-beat can neither orphan its sprites nor hand the next sign's fx a
-   deformed home capture. */
-function ssSkyRearHorse(scene, fx) {
-  const c = fx.cont, sc = fx.sc;
-  // the rear pivots on the hind hooves — monoceros' hind-leg chain bottoms
-  // out at [28,46] — and positive rotation swings the head side (the left)
-  // up at the sky. Everything is container-local, so stars, edges, eyes and
-  // aura ride as one figure while the idle keeps breathing through the
-  // stars — which is what keeps it a living thing and not a turning decal.
-  const px = 29 * sc, py = 45 * sc;
-  const live = [], glints = [];
-  const pose = (r) => {   // rotate about the pivot: home + p − R(r)·p
-    const cos = Math.cos(r), sin = Math.sin(r);
-    c.setRotation(r);
-    c.x = fx.homeX + px - (px * cos - py * sin);
-    c.y = fx.homeY + py - (px * sin + py * cos);
-  };
+   cycle) arms ONE tap zone while a registered sign stands, so another
+   sign becomes tappable by adding an entry here. A flourish is a sky
+   gesture, not an attack: it stays in the sky, never dives at the meadow,
+   never shakes the camera. It borrows the container the way battle
+   attacks do (fx.attacking parks the breath) and leaves through
+   fx.skyDone(), which always restores the transform — the 9s cycle calls
+   fx.skyDone(true) before tearing the standing sign down, so a fade that
+   catches a flourish mid-beat can neither orphan its sprites nor hand the
+   next sign's fx a deformed home capture. */
+// shared plumbing: the tween/sprite ledgers and the skyDone contract
+function ssSkyBeat(scene, fx) {
+  const live = [], sprites = [];
   const done = fx.skyDone = (cut) => {
     if (fx.skyDone !== done) return;   // once — natural end and cycle cut may race
     fx.skyDone = null;
     for (const t of live) { try { t.stop(); } catch (e) { } }
-    for (const g of glints) { try { g.destroy(); } catch (e) { } }
-    if (!fx.dead) { c.setPosition(fx.homeX, fx.homeY); c.setRotation(0); }
+    for (const g of sprites) { try { g.destroy(); } catch (e) { } }
+    if (!fx.dead) { fx.cont.setPosition(fx.homeX, fx.homeY); fx.cont.setRotation(0); }
     fx.attacking = false;
     if (cut) window.__SSSKY.cut++; else window.__SSSKY.done++;
   };
-  // a forehoof paws: one glint flicks down-forward off the raised leg
+  // rotate the figure about a container-local pivot: home + p − R(r)·p —
+  // stars, edges, eyes and aura ride as one, and the idle keeps breathing
+  // through the stars, which is what keeps it a living thing and not a
+  // turning decal
+  const pose = (px, py, r) => {
+    const cos = Math.cos(r), sin = Math.sin(r);
+    fx.cont.setRotation(r);
+    fx.cont.x = fx.homeX + px - (px * cos - py * sin);
+    fx.cont.y = fx.homeY + py - (px * sin + py * cos);
+  };
+  const tw = (pr, px, py, to, dur, ease, extra, cb) => {
+    const t = scene.tweens.add(Object.assign({
+      targets: pr, r: to, duration: dur, ease, onUpdate: () => pose(px, py, pr.r), onComplete: cb,
+    }, extra || {}));
+    live.push(t);
+    return t;
+  };
+  fx.attacking = true;
+  return { live, sprites, done, pose, tw };
+}
+// THE FIRSTBORN CENTAUR rears: the horse-half pivots up on the hind hooves
+// (the hind-leg chain bottoms out at [46,54]); positive rotation swings the
+// head side — the left — up at the sky, and BOTH drawn forelegs (hooves
+// [-36,52] and [-16,54]) paw sparks on the way.
+function ssSkyRearCentaur(scene, fx) {
+  const c = fx.cont, sc = fx.sc;
+  const B = ssSkyBeat(scene, fx), px = 48 * sc, py = 52 * sc;
+  // a forehoof paws: one glint flicks down-forward off the striking leg
   const flick = (hx, hy) => {
     const gi = scene.add.image(hx * sc, hy * sc, 'dot').setBlendMode('ADD').setScale(0.55).setAlpha(0.95);
-    c.add(gi); glints.push(gi);
-    live.push(scene.tweens.add({
+    c.add(gi); B.sprites.push(gi);
+    B.live.push(scene.tweens.add({
       targets: gi, x: (hx - 17) * sc, y: (hy + 14) * sc, alpha: 0, scale: 0.2,
       duration: 210, ease: 'Cubic.easeOut',
     }));
     SFX.noise(0.1, 1600, 1, 0.025, 2600);
   };
   const pr = { r: 0 };
-  const tw = (to, dur, ease, extra, cb) => {
-    const t = scene.tweens.add(Object.assign({
-      targets: pr, r: to, duration: dur, ease, onUpdate: () => pose(pr.r), onComplete: cb,
-    }, extra || {}));
-    live.push(t);
-    return t;
-  };
-  fx.attacking = true;
-  SFX.noise(0.3, 260, 1, 0.04, 700);              // hooves gather
-  tw(-0.05, 150, 'Sine.easeOut', null, () => {    // a breath of crouch — anticipation
-    fx.hitFlash();                                 // the glass flares as it goes up
-    SFX.noise(0.55, 190, 1.1, 0.06, 640);          // the rise
-    tw(0.34, 430, 'Back.easeOut', null, () => {
+  const tw = (to, dur, ease, extra, cb) => B.tw(pr, px, py, to, dur, ease, extra, cb);
+  SFX.noise(0.3, 230, 1, 0.04, 650);              // hooves gather — a boss's weight
+  tw(-0.05, 160, 'Sine.easeOut', null, () => {    // a breath of crouch — anticipation
+    fx.hitFlash();                                 // the figure flares as it goes up
+    SFX.noise(0.6, 170, 1.1, 0.06, 600);           // the rise
+    tw(0.32, 450, 'Back.easeOut', null, () => {
       // at the top the body rocks and the forelegs paw at the sky — the
-      // visible foreleg (knee [-34,16], hoof [-30,44]) throws a spark at
-      // each stroke, its unseen twin a beat behind
-      tw(0.27, 200, 'Sine.easeInOut', {
+      // two drawn legs strike in turn
+      tw(0.26, 200, 'Sine.easeInOut', {
         yoyo: true, repeat: 1,
-        onYoyo: () => { flick(-30, 44); scene.time.delayedCall(90, () => { if (fx.skyDone === done) flick(-19, 40); }); },
+        onYoyo: () => { flick(-36, 52); scene.time.delayedCall(90, () => { if (fx.skyDone === B.done) flick(-16, 54); }); },
       }, () => {
-        tw(-0.028, 240, 'Quad.easeIn', null, () => {   // the forehooves drop…
-          SFX.noise(0.18, 130, 1, 0.05, 70);           // …and land, softly
+        tw(-0.026, 250, 'Quad.easeIn', null, () => {   // the forehooves drop…
+          SFX.noise(0.2, 110, 1, 0.05, 60);            // …and land, softly
           fx.bright = Math.max(fx.bright, 0.5);        // touchdown shimmer
-          tw(0, 190, 'Sine.easeOut', null, () => done());
+          tw(0, 200, 'Sine.easeOut', null, () => B.done());
         });
       });
     });
   });
 }
-// the registry — ship the horse; a new line here is a new tappable sign
-const SS_SKY_TAPS = { monoceros: ssSkyRearHorse };
+// THE ZENITH ARCHER looses a shooting star: his own chart draws the bow
+// (stars [-44,-58]·[-56,-38]·[-48,-16]) and the nocked arrow (the line from
+// [-30,-38] out to the head at [-70,-44]) — the aim lifts as he leans back
+// on the hind hooves, a glint draws the string, and the star flies his
+// authored arrow line: one of the meadow sky's own shooting stars
+// (ssShootingStar's head-and-chained-trail, quoted exactly) made deliberate.
+function ssSkyLooseStar(scene, fx) {
+  const c = fx.cont, sc = fx.sc;
+  const B = ssSkyBeat(scene, fx), px = 64 * sc, py = 56 * sc;
+  const pr = { r: 0 };
+  const tw = (to, dur, ease, extra, cb) => B.tw(pr, px, py, to, dur, ease, extra, cb);
+  fx.hitFlash();                                   // the tap is answered at once
+  SFX.noise(0.5, 340, 1.2, 0.035, 130);            // the draw — tension, falling pitch
+  // the drawstring glint: the nock pulls back along the arrow's own line
+  const nock = scene.add.image(-30 * sc, -38 * sc, 'dot').setBlendMode('ADD').setScale(0.5).setAlpha(0);
+  c.add(nock); B.sprites.push(nock);
+  B.live.push(scene.tweens.add({ targets: nock, x: -16 * sc, y: -36 * sc, alpha: 0.95, duration: 430, ease: 'Sine.easeOut' }));
+  let waits = 2;   // the archer's settle AND the star's flight both land before done
+  const part = () => { if (--waits === 0) B.done(); };
+  tw(0.06, 480, 'Sine.easeOut', null, () => {      // the aim lifts skyward…
+    tw(0.06, 160, 'Linear', null, () => {          // …and steadies. loose!
+      const r0 = 0.06, cos = Math.cos(r0), sin = Math.sin(r0);
+      // arrowhead + aim line in world space, under the lifted pose
+      const ax = -70 * sc, ay = -44 * sc;
+      const sx = c.x + ax * cos - ay * sin, sy = c.y + ax * sin + ay * cos;
+      const dx = -0.976, dy = -0.146;               // the chart's own arrow direction
+      const ndx = dx * cos - dy * sin, ndy = dx * sin + dy * cos;
+      const l = ssLayout(scene), D = l.u(370);
+      SFX.noise(0.25, 900, 1, 0.06, 3200);          // the whoosh
+      fx.bright = Math.max(fx.bright, 0.7);         // the constellation flares as it leaves
+      nock.setAlpha(0);
+      window.__SSSKY.stars++; window.__SSSKY.sx = sx;   // the beacon sees the spawn, not just the frames
+      const head = scene.add.image(sx, sy, 'dot').setScale(1.25).setTint(0xfff2c9).setBlendMode('ADD').setDepth(1);
+      const trail = [];
+      for (let i = 0; i < 7; i++) trail.push(scene.add.image(sx, sy, 'dot').setScale(0.75 - i * 0.08).setAlpha(0.55 - i * 0.06).setTint(0xcfe0ff).setBlendMode('ADD').setDepth(1));
+      B.sprites.push(head); for (const t of trail) B.sprites.push(t);
+      B.live.push(scene.tweens.add({
+        targets: head, x: sx + ndx * D, y: sy + ndy * D, alpha: 0, duration: 700, ease: 'Cubic.easeOut',
+        onUpdate: () => {
+          window.__SSSKY.sx = head.x;
+          for (let i = trail.length - 1; i > 0; i--) { trail[i].x = trail[i - 1].x; trail[i].y = trail[i - 1].y; }
+          trail[0].x = head.x; trail[0].y = head.y;
+        },
+        onComplete: () => {                          // burnout — a small wish of sparks
+          SFX.noise(0.25, 2400, 1, 0.02, 500);
+          for (let i = 0; i < 3; i++) {
+            const w = scene.add.image(head.x, head.y, 'dot').setBlendMode('ADD').setScale(0.5).setAlpha(0.9).setDepth(1);
+            B.sprites.push(w);
+            B.live.push(scene.tweens.add({
+              targets: w, x: head.x + (i - 1) * l.u(9), y: head.y + (i % 2 ? -1 : 1) * l.u(7),
+              alpha: 0, scale: 0.15, duration: 300, ease: 'Cubic.easeOut',
+            }));
+          }
+          scene.time.delayedCall(320, () => { if (fx.skyDone === B.done) part(); });
+        },
+      }));
+      tw(0.075, 90, 'Sine.easeOut', null, () => {   // the string's kick…
+        tw(0, 330, 'Sine.easeOut', null, () => part());   // …and the archer settles
+      });
+    });
+  });
+}
+// the registry — Skylar's two horse signs; a new line here is a new tappable sign
+const SS_SKY_TAPS = { centaurus: ssSkyRearCentaur, sagittarius: ssSkyLooseStar };
 // what the harness reads: the armed sign, raw zone contacts, taps the guards
-// turned away, rears played, natural finishes, cycle cuts
-window.__SSSKY = { armed: null, taps: 0, blocked: 0, rears: 0, done: 0, cut: 0 };
+// turned away, flourishes played, natural finishes, cycle cuts, stars loosed
+// (sx = the flying star's live x, sampled by the suite to prove travel)
+window.__SSSKY = { armed: null, taps: 0, blocked: 0, plays: 0, done: 0, cut: 0, stars: 0, sx: 0 };
 
 /* ---- tile glyph cache ----------------------------------------------------
    Board tiles used to carry two live Text objects each — 32 fresh canvas
@@ -5303,7 +5377,7 @@ class Home extends Phaser.Scene {
           if (this.busy() || this.streakC || this.dailyC || this.langC || this.mapC || this.confirmC || this.signC || this.riteC
             || !fx || fx.dead || !fx.ready || fx.attacking) { window.__SSSKY.blocked++; return; }
           SFX.ensure();
-          window.__SSSKY.rears++;
+          window.__SSSKY.plays++;
           flourish(this, fx);
         });
         window.__SSSKY.armed = b.id;

@@ -181,57 +181,65 @@ carrying no flag); the Spanish dress (the pass beat + sheet words).
 boot()/reboot() — the v0.75 first-open tutorial fires under any virgin
 boot that forgets.
 
-## tap-sign-check.mjs — tappable sky signs: the horse rears (v0.76.0)
+## tap-sign-check.mjs — tappable sky signs: the centaur rears, the archer looses (v0.76.0, re-aimed v0.81.0)
 
 Skylar's call (9/2): "if you tap on the horse star sign when it's on the
-screen, it does a little animation where the horse is rearing." The game
-side: `SS_SKY_TAPS` (game.js, beside ssBeastFx) maps beast id →
-flourish(scene, fx) — today exactly one entry, **monoceros, THE GLASS
-UNICORN** (the sky's only horse-bodied sign; the centaurs are one registry
-line away). The meadow showcase's cycle (buildMeadowUi) arms ONE tap zone
-while a registered sign stands — sized to that sign's star bounds (+10
-design px of aura), 44-pt law via the setInteractive auto-pad, gated by
-`!this.ftueBare` (the wordless first open keeps zero interactive chrome)
-and at tap time by busy() + every open sheet + the fx's own ready/attacking
-flags. The rear (`ssSkyRearHorse`) pivots the container on the hind hooves
-(local [29,45]·sc): crouch → Back-ease rise to +0.34 rad with a hitFlash
-flare → two pawing rocks with hoof-glint flicks → drop and soft-land
-shimmer, ~1.8s, all in the sky — no camera shake, no dive, the breath
-yields through `fx.attacking` exactly as battle attacks do. Cleanup is
-`fx.skyDone()` — restores the transform and sweeps the glints; the 9s
-cycle calls `fx.skyDone(true)` before tearing the sign down, so a fade
-catching a rear mid-beat can never orphan fx or hand the next fx a
-deformed home capture. `?show=<id>` is the dev seam pinning the showcase
-deal (the raw rotation is random). Beacon: `window.__SSSKY` {armed, taps,
-blocked, rears, done, cut}.
+screen, it does a little animation where the horse is rearing" — and (9/3):
+the horse signs meant are CENTAURUS and SAGITTARIUS, and "Sagittarius
+should shoot a shooting star when you click on his constellation if it
+pops up on the main page." The game side: `SS_SKY_TAPS` (game.js, beside
+ssBeastFx) maps beast id → flourish(scene, fx) — exactly two entries:
+**centaurus → ssSkyRearCentaur** (the rear: pivot on the hind hooves at
+[48,52]·sc, crouch → Back-ease rise to +0.32 rad with a hitFlash flare →
+two pawing rocks with hoof-glint flicks off BOTH drawn forelegs → drop and
+soft-land shimmer, ~1.9s) and **sagittarius → ssSkyLooseStar** (the loose:
+his chart already draws the bow and the nocked arrow, so the aim lifts
++0.06 rad on the hind-hoof pivot, a glint draws the string back along the
+arrow's own line, and a shooting star — ssShootingStar's exact
+head-and-chained-trail — flies the authored aim, l.u(370) leftward, wish-
+spark burnout; the archer's settle AND the star's flight must both land
+before skyDone). Monoceros (v0.76.0's first target) is pure presence
+again. Shared plumbing is `ssSkyBeat`: the tween/sprite ledgers, the
+container-pivot pose math (home + p − R(r)·p), and the `fx.skyDone()`
+contract — the 9s cycle calls `fx.skyDone(true)` before tearing the
+standing sign down, so a fade catching a flourish mid-beat can neither
+orphan sprites nor hand the next fx a deformed home capture. The showcase
+cycle (buildMeadowUi) arms ONE tap zone while a registered sign stands —
+sized to that sign's star bounds (+10 design px of aura), 44-pt law via
+the setInteractive auto-pad, gated by `!this.ftueBare` and at tap time by
+busy() + every open sheet + the fx's own ready/attacking flags. A
+flourish is a sky gesture, not an attack: no dive, no camera shake.
+`?show=<id>` pins the showcase deal (the raw rotation is random). Beacon:
+`window.__SSSKY` {armed, taps, blocked, plays, done, cut, stars, sx — the
+flying star's live x, seeded at spawn}.
 
-Self-launching (server :8899 if nothing serves, Chrome on :9476,
-`/tmp/cdp-tapsign` wiped first, `--disable-gpu`), Firebase blocked at the
-network layer, real DPR-3 taps, every wait a poll.
+Self-launching (server :8899 if nothing serves — `SRV=<port>` overrides
+for a busy rig — Chrome on :9476, `/tmp/cdp-tapsign` wiped first,
+`--disable-gpu`), Firebase blocked at the network layer, real DPR-3 taps,
+every wait a poll.
 
 ```
-perl -e 'alarm 580; exec @ARGV' node tools/tap-sign-check.mjs   # 41 checks, ~4 min
+perl -e 'alarm 580; exec @ARGV' node tools/tap-sign-check.mjs   # 57 checks, ~5 min
+SRV=8901 node tools/tap-sign-check.mjs                          # private port
 ```
 
-The paper (release ritual, the registry's single entry); the horse pinned
-and standing (zone armed, 44-pt, star coverage, a live census that nothing
-interactive shares the showcase band); a REAL tap rearing it (rotation
-watched frame by frame, no camera shake, the figure never leaves the sky,
-the transform restored EXACT); mid-rear taps ignored and later taps
-playing again; the guards under a real sheet (the sheet's window/veil owns
-the sky above the zone, the chip/lantern still open their doors, the veil
-still closes); the 9s cycle cutting a mid-beat rear clean (tapped under
-the closing fade for real, next deal undeformed + re-armed, no orphans); a
-scene restart mid-rear; vulpes pinned = no zone, no beacon movement, a
-dead tap doing nothing; the wordless first open never arming the zone.
+The paper (release ritual, the registry's two entries exactly); each boss
+pinned and standing (zone armed, 44-pt — centaurus 147×113 css pt class —
+star coverage, a live census that nothing interactive shares the showcase
+band); a REAL tap rearing the centaur (rotation watched frame by frame to
+its peak, no camera shake, the figure never leaves the sky, the transform
+restored EXACT) and loosing the archer's star (the draw lean seen, one
+star per tap, the flight sampled strictly-leftward down the aim line for
+hundreds of design px, settle + flight both landing before done);
+mid-flourish taps ignored and later taps playing again; the guards under
+a real sheet; the 9s cycle cutting a mid-beat rear clean; a scene restart
+mid-rear; monoceros pinned = no zone, a dead tap doing nothing (the
+re-aim proof); the wordless first open never arming the zone.
 
-Rig lesson (A/B-proven on v0.75 bytes, pre-existing, left alone): a COLD
-boot's create-time `cycle()` call bails on its `!this.scene.isActive()`
-guard (the scene is still CREATING), so every cold-boot sky stands EMPTY
-until the first 9s tick deals a sign — on device the intro masks most of
-that window; battle/defeat returns build deferred and populate at once.
-The zone simply arms with whatever deal actually happens; suites must WAIT
-for `__SSSKY.armed` rather than assume a beast at boot.
+Rig lessons: the cold-boot empty-sky law (below, unchanged — WAIT for
+`__SSSKY.armed`); and the star-flight assert must ride the spawn-seeded
+`sx` beacon — Cubic.easeOut front-loads the travel, so frame sampling
+alone starts mid-flight and undercounts by half.
 
 ## ftue-check.mjs — the first open: a wordless rise and the friendly finger (v0.75.0)
 
