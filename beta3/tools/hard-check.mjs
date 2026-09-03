@@ -536,7 +536,9 @@ const stripped = await ev(`(() => { const ck = JSON.parse(localStorage.getItem('
 await reboot('');
 await until(HOME, 60000);
 await tapUntil(`${H}.rowBtns.campaign`, `!!${H}.mapC`, 6);
-await tapUntil(mapNode(`${H}.mapC`), PICK, 6);
+// v0.80.0: the entry ride runs before the zone is born — the taps above may
+// spend their early tries on the ride, so give the ascent its own wait
+await tapUntil(mapNode(`${H}.mapC`), PICK, 6) || await until(PICK, 60000);
 ok('a checkpoint without the field resumes NORMAL (pre-v0.70 save)',
   await ev(`${B}.hard === false && ${B}.hardG === undefined && ${B}.hardLeft === undefined`));
 

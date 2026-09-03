@@ -259,7 +259,9 @@ await snap('campaign-checkpoint');
 // a REAL tap on CONTINUE → the star chart at fight 3 → the node → the ascent resumes THAT fight
 await tap(`${H}.rowLabels.campaign`);
 ok('a real tap on CONTINUE GAME opens the star chart (no sign sheet — the sign is pinned)', await until(`!!${H}.mapC && !${H}.signC`, 5000));
-await sleep(600);
+// v0.80.0: the entry ride runs first — wait for the camera to land (the
+// zone is born at settle), then tap the settled node
+await until(`!!(${H}.mapC && ${H}.mapC.list.find(o => o.type === 'Container' && o.getData('mapZone')))`, 15000);
 await tap(`${H}.mapC.list.find(o => o.type === 'Container' && o.getData('mapZone')).getData('mapZone')`);
 ok('tapping the glowing node resumes the climb', await until(`${H}.ascending === true || game.scene.isActive('battle')`, 8000));
 ok('…at the checkpoint\'s own fight (fightIdx 2 = fight 3 of 5)', await until(`(() => { const b = game.scene.getScene('battle');
@@ -342,7 +344,9 @@ await sleep(400);
 // (this suite slept through that release; endless-check taps the same door)
 await tap(`(() => { const h = ${H}; let r = null; const scan = (ls) => ls.forEach((o) => { if (!r && o.text === SS_T('zpBegin')) r = o; if (o.list) scan(o.list); }); scan(h.signC.list); return r })()`);
 ok('…BEGIN on THE OPEN SKY → the star chart', await until(`!!${H}.mapC && !${H}.signC`, 5000));
-await sleep(600);
+// v0.80.0: the entry ride runs first — wait for the camera to land (the
+// zone is born at settle), then tap the settled node
+await until(`!!(${H}.mapC && ${H}.mapC.list.find(o => o.type === 'Container' && o.getData('mapZone')))`, 15000);
 await tap(`${H}.mapC.list.find(o => o.type === 'Container' && o.getData('mapZone')).getData('mapZone')`);
 ok('…the glowing node → NEW GAME boots the climb for real', await until(`(() => { const b = game.scene.getScene('battle');
   return (${H}.ascending === true) || (game.scene.isActive('battle') && !!b && !!b.run && b.mode === 'campaign') })()`, 30000));

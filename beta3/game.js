@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.79.0';
+const BUILD = 'STARSPELL v0.80.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -3910,15 +3910,28 @@ function ssHitPad(o, minCss, anchor) {
 })();
 
 /* ---- the campaign star chart --------------------------------------------
-   The whole long night on one window of sky: every fight of every act is a
-   constellation node on a winding path that climbs from the meadow's edge
-   (bottom) to the crown of dawn (top). Felled beasts burn gold, the next one
-   breathes under a glow and waits for a tap, the ones ahead hang dim in their
-   own colors, and the final boss stands haloed at the summit as the visible
-   destination. Data-driven: pass any acts array (SS_ACTS today; more acts or
-   whole alternate campaigns later just work). Returns { c, zone } — zone is
-   the tappable current node (null when the campaign is complete); the
-   container carries it as data 'mapZone' for the demo driver. */
+   v0.80.0 (Skylar, 9/2): the chart is its OWN ENTIRE SCREEN — no window, no
+   meadow showing through. A full-bleed night holds one uncompressed
+   serpentine road, big enough that it no longer fits one screen (that is
+   the point): it scrolls freely, and the camera knows two rides. At
+   campaign entry it opens on the final boss at the summit and travels the
+   road down past every waiting beast to the fight you are up to; between
+   fights it glides from the felled beast up to the next one. Beasts not yet
+   felled hang NAMELESS in the dark; the one you face next stands bigger
+   with its name beneath it (the name pops in as the camera lands); felled
+   beasts keep their names for the scroll back down — "this run" rides
+   fightIdx, so a resumed climb keeps its history and a new campaign starts
+   nameless. The header (mapTitle · act · fight) anchors to the top of the
+   screen on the topmost layer over a semi-black band, invisible until the
+   camera settles. Data-driven off any acts array. Returns { c }; the
+   container carries the tappable current-node zone as data 'mapZone' — the
+   zone is BORN when the camera settles (the demo driver and the harnesses
+   poll for it), enters on the pointer UP under an 8-unit drag threshold so
+   a scroll starting on the beast never enters the fight, and a bare
+   synthetic emit('pointerdown') (the demo driver's voice) enters at once.
+   A tap mid-ride skips to the landing (armed 380ms — the launching tap
+   must never skip its own ride); ?ride=0 and prefers-reduced-motion snap
+   straight to the settled frame. Beacon: window.__ssmap. */
 /* Campaign roster — the drawn sky. Each campaign rolls its acts' open slots
    from the tier pools in SS_ACTS (fixed ids stay fixed) and the draw is
    pinned in localStorage, so the chart, the battles, and a resumed
@@ -4260,59 +4273,100 @@ function ssZodScrimTex(scene) {
   return key;
 }
 
+/* The chart's own night — a baked vertical gradient stretched over the whole
+   screen (setTint is a Canvas no-op, so the hues live in the texture). Dark
+   zenith at the top falling to a faint indigo glow at the foot: the same
+   family as the battle sky, one shade deeper so gold reads. */
+function ssMapSkyTex(scene) {
+  const key = 'mapsky';
+  if (scene.textures.exists(key)) return key;
+  const t = scene.textures.createCanvas(key, 4, 512);
+  const g = t.context.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0, '#05081a'); g.addColorStop(0.38, '#0b102a');
+  g.addColorStop(0.74, '#131a3c'); g.addColorStop(1, '#1a2350');
+  t.context.fillStyle = g; t.context.fillRect(0, 0, 4, 512);
+  t.refresh();
+  return key;
+}
+
 function ssStarChart(scene, opts) {
   const l = ssLayout(scene);
   const acts = opts.acts || SS_ACTS;
   const roster = opts.roster || ssCampaignRoster();
   const fightIdx = opts.fightIdx | 0;
+  const home = opts.door === 'home';
   const c = scene.add.container(0, 0);
   const fights = [];   // flattened in the exact order Battle marches them
   let ri = 0;
   acts.forEach((act, ai) => act.slots.forEach((sl, fi) => fights.push({ id: roster[ri++], actIdx: ai, fi, len: act.slots.length, umbral: act.umbral, boss: fi === act.slots.length - 1 })));
   const N = fights.length;
-
-  // the window + header
-  c.add(scene.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(384), l.u(664)).setInteractive());
-  const hk = ssGoldTex(scene, SS_T('mapTitle'), 20);
-  const hsc = Math.min(1, 300 / hk.w);
-  c.add(scene.add.image(l.x(0), l.y(106), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
   const complete = fightIdx >= N;
   const cur = complete ? null : fights[fightIdx];
-  c.add(ssTxt(scene, l.x(0), l.y(132), complete ? SS_T('endWinSub') : SS_ACT_N(acts[cur.actIdx]) + '  ·  ' + SS_T('fightN', cur.fi + 1),
-    l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
 
-  // node positions: a serpentine sweep per act, mirrored on alternate acts so
-  // the path braids left-right-left as it climbs; act bosses stand centered.
-  // Step adapts to the fight count so a four-act road still fits the window.
-  const pos = [];
+  // THE NIGHT ITSELF — an opaque full-bleed sky: the chart owns the whole
+  // screen, and the interactive plate keeps taps off whatever lies beneath
+  c.add(scene.add.image(l.W / 2, l.H / 2, ssMapSkyTex(scene)).setDisplaySize(l.W, l.H).setInteractive());
+
+  // the road: one uncompressed serpentine, summit at the top. Nothing is
+  // squeezed to fit — the road is ~three screens tall and the camera walks it.
+  const STEP = 96, ACT_GAP = 64, TOP = 190, SETTLE = 430;
   const wob = [0, 22, -16, 10];                       // organic jitter on the sweep
-  let y = 632;
-  const step = Math.min(29, (632 - 172) / Math.max(1, (N - 1) + (acts.length - 1) * 0.86));
-  const actGap = Math.round(step * 0.86);
-  const cramp = clamp(step / 29, 0.72, 1);           // nodes shrink with the tighter road
+  const pos = [];
+  let ry = 0;
   for (let i = 0; i < N; i++) {
     const f = fights[i];
-    if (i > 0 && f.actIdx !== fights[i - 1].actIdx) {
-      y -= actGap;                                    // breathing room for the act label
-    }
+    if (i > 0 && f.actIdx !== fights[i - 1].actIdx) ry -= ACT_GAP;   // breathing room for the act label
     const dir = f.actIdx % 2 === 0 ? 1 : -1;
     let x = 0;
     if (!f.boss) {
       const t = f.len > 2 ? f.fi / (f.len - 2) : 0;
-      x = (-118 + t * 218 + wob[f.fi % 4]) * dir;
+      x = (-112 + t * 206 + wob[f.fi % 4]) * dir;
     }
-    pos.push({ x, y });
-    y -= step;
+    pos.push({ x, y: ry });
+    ry -= STEP;
   }
-  // act labels sit in the gaps, offset off the path's diagonal
-  acts.forEach((act, ai) => {
-    if (ai === 0) return;
-    const first = fights.findIndex((f) => f.actIdx === ai);
-    const gy = (pos[first].y + pos[first - 1].y) / 2;
-    const gx = -Math.sign(pos[first].x || 1) * 62;
-    c.add(ssTxt(scene, l.x(gx), l.y(gy), SS_ACT_N(act), l.u(8.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
+  const shift = TOP - pos[N - 1].y;
+  pos.forEach((p) => { p.y += shift; });
+
+  // the camera's book: offMin frames the summit, offMax hugs the road's
+  // foot (a fresh campaign's settle frame may reach a little further so the
+  // first beast can hold the settle line), and the settle line seats the
+  // current fight with its name beneath
+  const offMin = pos[N - 1].y - 300;
+  const rawSettle = complete ? offMin : pos[fightIdx].y - SETTLE;
+  const offMax = Math.max(offMin, Math.max(rawSettle, pos[0].y - 570));
+  const settleOff = clamp(rawSettle, offMin, offMax);
+  const bea = window.__ssmap = {
+    door: home ? 'home' : 'battle', settled: false, skipped: false, off: 0,
+    offMin: Math.round(offMin), offMax: Math.round(offMax), settleOff: Math.round(settleOff), zone: false,
+  };
+
+  // parallax dust: two thin star fields drifting slower than the road
+  const span = Math.max(1, offMax - offMin);
+  const rnd = ssMulberry(7);
+  const dustB = scene.add.container(0, 0), dustA = scene.add.container(0, 0);
+  [[dustB, 0.14, 16], [dustA, 0.32, 20]].forEach(([dc, f, n]) => {
+    const reach = l.H + l.u(span * f);
+    for (let i = 0; i < n; i++) {
+      const sz = l.u(1.2 + rnd() * 2.0);
+      const d = scene.add.image(rnd() * l.W, rnd() * reach, 'dot').setDisplaySize(sz, sz).setAlpha(0.08 + rnd() * 0.22);
+      if (i % 3 === 0) d.setBlendMode('ADD');
+      dc.add(d);
+    }
   });
-  c.add(ssTxt(scene, l.x(0), l.y(656), SS_ACT_N(acts[0]), l.u(8.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
+  c.add(dustB); c.add(dustA);
+
+  // the road container — everything that scrolls
+  const rc = scene.add.container(0, 0);
+  c.add(rc);
+
+  // one number moves the road and both dust fields
+  const setOff = (v) => {
+    bea.off = Math.round(v);
+    rc.y = -l.u(v);
+    dustA.y = -l.u((v - offMin) * 0.32);
+    dustB.y = -l.u((v - offMin) * 0.14);
+  };
 
   // the path: dotted starlight between nodes — gold where you have walked
   const pathG = scene.add.graphics();
@@ -4321,18 +4375,32 @@ function ssStarChart(scene, opts) {
     const walked = i < fightIdx;
     pathG.fillStyle(walked ? 0xd7b45c : 0x4a5480, walked ? 0.5 : 0.28);
     const dist = Math.hypot(b.x - a.x, b.y - a.y);
-    const n = Math.max(3, Math.round(dist / 9));
-    for (let k = 2; k <= n - 2; k++) {
+    const n = Math.max(4, Math.round(dist / 12));
+    for (let k = 1; k <= n - 1; k++) {
       const t = k / n;
-      pathG.fillCircle(l.x(a.x + (b.x - a.x) * t), l.y(a.y + (b.y - a.y) * t), l.u(1.2));
+      pathG.fillCircle(l.x(a.x + (b.x - a.x) * t), l.y(a.y + (b.y - a.y) * t), l.u(1.6));
     }
   }
-  c.add(pathG);
+  rc.add(pathG);
 
-  // the nodes: little constellations in the beasts' own stars
+  // act names ride the gaps where the road crosses into a new act
+  acts.forEach((act, ai) => {
+    if (ai === 0) return;
+    const first = fights.findIndex((f) => f.actIdx === ai);
+    const gy = (pos[first].y + pos[first - 1].y) / 2;
+    const gx = -Math.sign(pos[first].x || 1) * 92;
+    rc.add(ssTxt(scene, l.x(gx), l.y(gy), SS_ACT_N(act), l.u(10.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
+  });
+  // act I signs the road's foot — low enough that the first fight's own
+  // name (beneath its beast at the settle line) never collides with it
+  rc.add(ssTxt(scene, l.x(0), l.y(pos[0].y + 96), SS_ACT_N(acts[0]), l.u(10.5), '#6a74a4').setOrigin(0.5).setAlpha(0.9));
+
+  // the nodes: constellations in the beasts' own stars, drawn big.
+  // Names obey the run: felled beasts keep theirs, the beast you face next
+  // waits for the camera, and everything above hangs nameless in the dark.
   const staticG = scene.add.graphics();
-  c.add(staticG);
-  let zone = null;
+  rc.add(staticG);
+  let zone = null, curName = null, curGeom = null;
   for (let i = 0; i < N; i++) {
     const f = fights[i], p = pos[i];
     const b = SS_BEASTS[f.id];
@@ -4340,72 +4408,204 @@ function ssStarChart(scene, opts) {
     const name = (um ? SS_UMBRAL.prefix : '') + b.name;
     const state = i < fightIdx ? 'won' : i === fightIdx ? 'now' : 'far';
     const last = i === N - 1;
-    const sc = (b.boss ? 0.20 : b.tier === 'mini' ? 0.165 : 0.145) * (last ? 1.3 : 1) * cramp;
+    // the one you face next renders BIGGER than the rest (the ×1.5)
+    const sc = (b.boss ? 0.52 : b.tier === 'mini' ? 0.44 : 0.38) * (last ? 1.35 : 1) * (state === 'now' ? 1.5 : 1);
     const k = l.u(sc);
     const tint = state === 'won' ? 0xd7b45c : state === 'now' ? 0xffe9a8 : (um ? SS_UMBRAL.tint : b.tint);
     const aLine = state === 'won' ? 0.4 : state === 'now' ? 0.85 : 0.2;
     const aStar = state === 'won' ? 0.85 : state === 'now' ? 1 : 0.5;
+    // star bounds → where names, rings and zones sit, whatever the shape
+    let mxX = 0, mxY = 0;
+    for (const s of b.stars) { mxX = Math.max(mxX, Math.abs(s[0])); mxY = Math.max(mxY, Math.abs(s[1])); }
 
-    // the summit halo: the destination is visible from the very first step
+    // the summit halo: the destination is lit from the very first frame
     if (last) {
-      c.add(scene.add.image(l.x(p.x), l.y(p.y), 'glowbig').setDisplaySize(l.u(120), l.u(96))
+      rc.add(scene.add.image(l.x(p.x), l.y(p.y), 'glowbig').setDisplaySize(l.u(210), l.u(168))
         .setTint(state === 'won' ? 0xffd77a : 0xffc46b).setAlpha(0.13).setBlendMode('ADD'));
     }
     const drawInto = (g, gx, gy) => {
-      g.lineStyle(l.u(0.9), tint, aLine);
+      g.lineStyle(l.u(Math.max(1.1, sc * 3.2)), tint, aLine);
       for (const [e1, e2] of b.edges) {
         g.lineBetween(gx + b.stars[e1][0] * k, gy + b.stars[e1][1] * k, gx + b.stars[e2][0] * k, gy + b.stars[e2][1] * k);
       }
       g.fillStyle(tint, aStar);
       for (let s = 0; s < b.stars.length; s++) {
-        g.fillCircle(gx + b.stars[s][0] * k, gy + b.stars[s][1] * k, l.u(s % 3 === 0 ? 1.5 : 1.0));
+        g.fillCircle(gx + b.stars[s][0] * k, gy + b.stars[s][1] * k, l.u(sc * (s % 3 === 0 ? 9.5 : 6.4)));
       }
     };
     if (state === 'now') {
-      // the breathing node: its own container so it can pulse and be tapped
+      // the breathing beast: its own container so it can pulse
       const nc = scene.add.container(l.x(p.x), l.y(p.y));
-      nc.add(scene.add.image(0, 0, 'glowbig').setDisplaySize(l.u(96), l.u(78)).setTint(0xffd77a).setAlpha(0.17).setBlendMode('ADD'));
+      nc.add(scene.add.image(0, 0, 'glowbig').setDisplaySize(l.u(mxX * sc * 2 + 96), l.u(mxY * sc * 2 + 76))
+        .setTint(0xffd77a).setAlpha(0.17).setBlendMode('ADD'));
       const ng = scene.add.graphics();
       drawInto(ng, 0, 0);
       for (const e of b.eyes) {
-        const eye = scene.add.image(e[0] * k, e[1] * k, 'dot').setScale(0.32).setTint(b.eye).setBlendMode('ADD');
+        const eye = scene.add.image(e[0] * k, e[1] * k, 'dot').setScale(clamp(sc * 1.9, 0.35, 1.2)).setTint(b.eye).setBlendMode('ADD');
         scene.tweens.add({ targets: eye, alpha: 0.4, duration: 700, yoyo: true, repeat: -1 });
         nc.add(eye);
       }
       nc.add(ng);
-      scene.tweens.add({ targets: nc, scaleX: 1.09, scaleY: 1.09, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-      c.add(nc);
+      scene.tweens.add({ targets: nc, scaleX: 1.06, scaleY: 1.06, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      rc.add(nc);
       // the waiting ring, swelling like a held breath
       const ring = scene.add.graphics({ x: l.x(p.x), y: l.y(p.y) });
-      ring.lineStyle(l.u(1.4), 0xffd77a, 0.55);
-      ring.strokeCircle(0, 0, l.u(b.boss ? 27 : 23));
-      scene.tweens.add({ targets: ring, scaleX: 1.16, scaleY: 1.16, alpha: 0.15, duration: 1100, repeat: -1, ease: 'Sine.easeOut' });
-      c.add(ring);
-      zone = scene.add.zone(l.x(p.x), l.y(p.y), l.u(88), l.u(66)).setOrigin(0.5).setInteractive({ useHandCursor: true });
-      let entered = false;
-      zone.on('pointerdown', () => { if (entered) return; entered = true; SFX.ensure(); SFX.ui(); opts.onEnter(); });
-      c.add(zone);
+      ring.lineStyle(l.u(1.6), 0xffd77a, 0.55);
+      ring.strokeCircle(0, 0, Math.max(l.u(34), l.u(mxX * sc + 16)));
+      scene.tweens.add({ targets: ring, scaleX: 1.14, scaleY: 1.14, alpha: 0.15, duration: 1100, repeat: -1, ease: 'Sine.easeOut' });
+      rc.add(ring);
+      // its name waits BENEATH it, born silent — it pops as the camera lands
+      curName = ssTxt(scene, l.x(p.x), l.y(p.y + mxY * sc + 26), name, l.u(13.5), '#ffe9a8')
+        .setOrigin(0.5, 0).setAlpha(0);
+      curName.setShadow(0, 0, '#c9b676', l.u(6), true, true);
+      rc.add(curName);
+      curGeom = { p, mxX, mxY, sc };
     } else {
       drawInto(staticG, l.x(p.x), l.y(p.y));
+      if (state === 'won') {
+        // felled beasts keep their names — the scroll back down reads the tale
+        const off = mxX * sc + 14;
+        const nx = p.x > 8 ? p.x - off : p.x + off;
+        rc.add(ssTxt(scene, l.x(nx), l.y(p.y), name, l.u(10), '#8f7f4e').setOrigin(p.x > 8 ? 1 : 0, 0.5));
+      }
     }
-
-    // the name beside each node, hugging the path's inside edge
-    const off = b.boss ? 32 : 27;
-    const nx = p.x > 8 ? p.x - off : p.x + off;
-    const t = ssTxt(scene, l.x(nx), l.y(p.y), name,
-      l.u(state === 'now' ? 9.5 : 8.5),
-      state === 'won' ? '#8f7f4e' : state === 'now' ? '#ffe9a8' : '#5a6390')
-      .setOrigin(p.x > 8 ? 1 : 0, 0.5);
-    if (state === 'now') t.setShadow(0, 0, '#c9b676', l.u(6), true, true);
-    c.add(t);
     if (last) {
-      c.add(ssTxt(scene, l.x(nx), l.y(p.y + 12), SS_T('mapDest'), l.u(7.5), '#c98f4d', 'italic')
-        .setOrigin(p.x > 8 ? 1 : 0, 0.5));
+      rc.add(ssTxt(scene, l.x(p.x), l.y(p.y - (mxY * sc + 18)), SS_T('mapDest'), l.u(9.5), '#c98f4d', 'italic')
+        .setOrigin(0.5, 1));
     }
   }
-  if (!complete) c.add(ssTxt(scene, l.x(0), l.y(680), SS_T('mapHint'), l.u(10), '#c9b676', 'italic').setOrigin(0.5).setAlpha(0.9));
-  c.setData('mapZone', zone);
-  return { c, zone };
+
+  // THE ANCHORED HEADER — top of the screen, topmost layer, over a
+  // semi-black band that parts the words from art scrolling beneath them.
+  // Invisible until the camera ride lands (the land() below fades it in).
+  const hdr = scene.add.container(0, 0);
+  const bandB = l.y(64);
+  const hg = scene.add.graphics();
+  hg.fillStyle(0x000000, 0.55).fillRect(0, 0, l.W, bandB);
+  hg.fillStyle(0x000000, 0.3).fillRect(0, bandB, l.W, l.u(7));
+  hg.fillStyle(0x000000, 0.13).fillRect(0, bandB + l.u(7), l.W, l.u(7));
+  // …and the foot wears its mirror so the hint reads over anything
+  hg.fillStyle(0x000000, 0.13).fillRect(0, l.y(742), l.W, l.u(7));
+  hg.fillStyle(0x000000, 0.3).fillRect(0, l.y(749), l.W, l.u(7));
+  hg.fillStyle(0x000000, 0.45).fillRect(0, l.y(756), l.W, Math.max(0, l.H - l.y(756)));
+  hdr.add(hg);
+  const hk = ssGoldTex(scene, SS_T('mapTitle'), 20);
+  const hsc = Math.min(1, 300 / hk.w);
+  hdr.add(scene.add.image(l.x(0), l.y(30), hk.key).setDisplaySize(l.u(hk.w * hsc), l.u(hk.h * hsc)));
+  hdr.add(ssTxt(scene, l.x(0), l.y(52), complete ? SS_T('endWinSub') : SS_ACT_N(acts[cur.actIdx]) + '  ·  ' + SS_T('fightN', cur.fi + 1),
+    l.u(10.5), '#8a94c4', 'italic').setOrigin(0.5));
+  if (!complete) hdr.add(ssTxt(scene, l.x(0), l.y(770), SS_T('mapHint'), l.u(10), '#c9b676', 'italic').setOrigin(0.5).setAlpha(0.9));
+  hdr.setAlpha(0);
+  c.add(hdr);
+
+  // the way back to the meadow (campaign entry only; between fights the road
+  // runs forward). Fires on the UP under the drag threshold — and only once
+  // the camera has settled: mid-ride a top-corner tap skips like any other.
+  let settled = false, rideTw = null, armed = false;
+  if (home) {
+    const xB = ssTxt(scene, l.x(186), l.y(30), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    let xdn = null;
+    xB.on('pointerdown', (p) => { xdn = p ? { x: p.x, y: p.y } : { x: 0, y: 0 }; });
+    xB.on('pointerup', (p) => {
+      if (!xdn) return;
+      const d = p ? Math.hypot(p.x - xdn.x, p.y - xdn.y) : 0;
+      xdn = null;
+      if (d > l.u(8) || !settled) return;
+      if (opts.onClose) opts.onClose();
+    });
+    hdr.add(xB);
+  }
+
+  // THE SETTLED MOMENT — the name pops, the header fades in, the zone is born
+  const land = (fast) => {
+    if (settled || !c.active) return;
+    settled = true;
+    bea.settled = true;
+    setOff(settleOff);
+    scene.tweens.add({ targets: hdr, alpha: 1, duration: fast ? 240 : 460, ease: 'Sine.easeOut' });
+    if (curName) {
+      curName.setScale(0.6);
+      scene.tweens.add({ targets: curName, alpha: 1, scaleX: 1, scaleY: 1, duration: 320, ease: 'Back.easeOut' });
+    }
+    if (curGeom) {
+      const { p, mxX, mxY, sc } = curGeom;
+      zone = scene.add.zone(l.x(p.x), l.y(p.y), Math.max(l.u(100), l.u(mxX * sc * 2 + 28)), Math.max(l.u(80), l.u(mxY * sc * 2 + 28)))
+        .setOrigin(0.5).setInteractive({ useHandCursor: true });
+      let entered = false, zdn = null;
+      const fire = () => { if (entered || !c.active) return; entered = true; SFX.ensure(); SFX.ui(); opts.onEnter(); };
+      // a bare synthetic emit (the demo driver) enters at once; a real pointer
+      // decides on the UP so a scroll starting on the beast never enters
+      zone.on('pointerdown', (p2) => { if (!p2) { fire(); return; } zdn = { x: p2.x, y: p2.y }; });
+      zone.on('pointerup', (p2) => {
+        if (!zdn) return;
+        const d = p2 ? Math.hypot(p2.x - zdn.x, p2.y - zdn.y) : 0;
+        zdn = null;
+        if (d <= l.u(8)) fire();
+      });
+      rc.add(zone);
+      c.setData('mapZone', zone);
+      bea.zone = true;
+    }
+    if (opts.onSettle) opts.onSettle();
+  };
+
+  // the two rides share one glide. The opening frame is the camera's own
+  // (the summit, or the beast just felled) — it may sit past the free-scroll
+  // stops, so it is NOT clamped; the landing is always in range, and the
+  // drag clamps on the first touch.
+  const glide = (from, hold) => {
+    setOff(from);
+    const dist = Math.abs(settleOff - bea.off);
+    if (dist < 1) { scene.time.delayedCall(hold, () => land(true)); return; }
+    const o = { v: bea.off };
+    const dur = home ? clamp(dist * 1.2, 700, 2400) : clamp(dist * 4.5, 550, 900);
+    rideTw = scene.tweens.add({
+      targets: o, v: settleOff, duration: dur, delay: hold, ease: 'Sine.easeInOut',
+      onUpdate: () => { if (c.active) setOff(o.v); },
+      onComplete: () => { rideTw = null; land(false); },
+    });
+  };
+  const skip = () => {
+    if (settled) return;
+    bea.skipped = true;
+    if (rideTw) { rideTw.stop(); rideTw = null; }
+    land(true);
+  };
+  scene.time.delayedCall(380, () => { armed = true; });   // the launching tap must never skip its own ride
+
+  if (QS.get('ride') === '0' || ssReduceMotion() || complete) {
+    setOff(settleOff);
+    land(true);
+  } else if (home) {
+    // the entry ride: open on the final boss, hold a breath, travel down the
+    // road past every beast you will face, land on the fight you are up to
+    glide(offMin, 620);
+  } else {
+    // the victory glide: from the beast just felled up to the next in line
+    glide(pos[Math.max(0, fightIdx - 1)].y - SETTLE, 260);
+  }
+
+  // free scrolling: drag anywhere on the sky; a drag beginning mid-ride
+  // first skips the ride, then the same gesture keeps scrolling
+  let drag = null;
+  const dn = (p) => {
+    if (!c.active) return;
+    if (!settled) { if (armed) skip(); else return; }
+    drag = { y: p.y, off: bea.off };
+  };
+  const mv = (p) => {
+    if (!drag || !p.isDown) return;
+    setOff(clamp(drag.off + (drag.y - p.y) / l.s, offMin, offMax));
+  };
+  const up = () => { drag = null; };
+  scene.input.on('pointerdown', dn);
+  scene.input.on('pointermove', mv);
+  scene.input.on('pointerup', up);
+  c.once('destroy', () => {
+    scene.input.off('pointerdown', dn); scene.input.off('pointermove', mv); scene.input.off('pointerup', up);
+    if (rideTw) { rideTw.stop(); rideTw = null; }
+  });
+  return { c };
 }
 
 /* ---- THE FORGE CEREMONY --------------------------------------------------
@@ -6151,33 +6351,28 @@ class Home extends Phaser.Scene {
   mapSheet() {
     if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC || this.signC) return;
     SFX.ensure(); SFX.ui();
-    const l = ssLayout(this);
     const c = this.mapC = this.add.container(0, 0).setDepth(700);
     const closeSheet = () => {
       if (this.mapC !== c) return;
       this.mapC = null;
       c.destroy();
     };
-    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
-    this.tweens.add({ targets: veil, alpha: 0.72, duration: 220 });
-    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
-    c.add(veil);
     const ck = this.campaignCheckpoint();
     const chart = ssStarChart(this, {
+      door: 'home',
       fightIdx: ck ? ck.fightIdx : 0,
       onEnter: () => {
         closeSheet();
         this.bloomBtn = this.rowBtns && this.rowBtns.campaign;
         this.startMode('campaign');
       },
+      onClose: () => { SFX.ui(); closeSheet(); },
     });
-    const xB = ssTxt(this, l.x(170), l.y(96), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
-    xB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
-    chart.c.add(xB);
     c.add(chart.c);
-    // entrance: the chart settles up into place like the other sheets
-    chart.c.y = l.u(14); chart.c.alpha = 0;
-    this.tweens.add({ targets: chart.c, y: 0, alpha: 1, duration: 300, ease: 'Back.easeOut' });
+    // the sky owns the whole screen; it fades up and the camera ride inside
+    // it opens on the summit — the entrance IS the ride, no sliding sheet
+    chart.c.alpha = 0;
+    this.tweens.add({ targets: chart.c, alpha: 1, duration: 240 });
   }
 
   /* NEW CAMPAIGN — with a checkpoint standing, warn first (v0.47.0, Wyatt's
@@ -9133,23 +9328,25 @@ class Battle extends Phaser.Scene {
     else this.startFight();
   }
   showMap() {
-    const l = this.L;
-    this.state = 'map';
+    // 'map' now means SETTLED and tappable — the victory glide (from the
+    // beast just felled up to the next) runs under 'anim' first, so the demo
+    // driver and the harnesses only ever tap a camera that has landed
+    this.state = 'anim';
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
-    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
-    this.tweens.add({ targets: veil, alpha: 0.86, duration: 300 });
     const chart = ssStarChart(this, {
+      door: 'battle',
       fightIdx: this.run.fightIdx,
+      onSettle: () => { if (this.state === 'anim') this.state = 'map'; },
       onEnter: () => {
         if (this.state !== 'map') return;
         this.state = 'anim';
-        this.tweens.add({ targets: [veil, chart.c], alpha: 0, duration: 220 });
-        this.time.delayedCall(240, () => { veil.destroy(); chart.c.destroy(); this.startFight(); });
+        this.tweens.add({ targets: chart.c, alpha: 0, duration: 220 });
+        this.time.delayedCall(240, () => { chart.c.destroy(); this.startFight(); });
       },
     });
-    this.overlayC.add([veil, chart.c]);
-    chart.c.y = l.u(16); chart.c.alpha = 0;
-    this.tweens.add({ targets: chart.c, y: 0, alpha: 1, duration: 320, ease: 'Back.easeOut' });
+    this.overlayC.add(chart.c);
+    chart.c.alpha = 0;
+    this.tweens.add({ targets: chart.c, alpha: 1, duration: 300 });
   }
 
   // ---------- run end ----------
