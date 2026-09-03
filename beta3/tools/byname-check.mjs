@@ -1,14 +1,19 @@
-// BYNAME-CHECK — challenge by name (v0.54.0, task 43).
+// BYNAME-CHECK — the by-name surface + the summons manners (v0.54.0 task 43;
+// re-aimed v0.83.0 when Skylar's 9/3 card cleared the page's BY NAME / seal
+// floor band — reaching a mage by typed name now lives in the social
+// sheet's +, and the challenge lands through a friend row).
 // Two REAL throwaway uids (test_ identities never enter the registry) in two
-// headless Chromes. A opens VERSUS, taps BY NAME with a REAL tap, types B's
-// name sloppily (case, spacing) into the floating input and presses Enter;
-// the registry resolves it, the summons rings through invites/<B>/<A>, B's
-// banner appears and a real tap on ACCEPT starts the duel. Then the honest
-// miss (what was typed comes back in the field), your own name (a gentle
-// no), and the offline path: B is closed, the bell lands and survives, the
-// lobby says the summons waits under their stars, the two-minute re-ring
-// keeps it fresh, and B arriving later finds and answers it. The crisp
-// sentinel is read after the input flows. Everything written is deleted.
+// headless Chromes. A opens VERSUS → the sheet, taps + with a REAL tap,
+// types B's name sloppily (case, spacing) into the floating input and
+// presses Enter; the registry resolves it, the friendship lands both sides,
+// and a real tap on the row's CHALLENGE rings the summons through
+// invites/<B>/<A> — B's banner appears and a real tap on ACCEPT starts the
+// duel. Then the honest miss (what was typed comes back in the field),
+// Escape closing without adding, your own name (a gentle no), and the
+// offline path: B is closed, the bell lands and survives, the lobby says
+// the summons waits under their stars, the two-minute re-ring keeps it
+// fresh, and B arriving later finds and answers it. The crisp sentinel is
+// read after the input flows. Everything written is deleted.
 //
 //   python3 -m http.server 8899 &
 //   for p in a:9450 b:9451; do "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
@@ -86,10 +91,30 @@ const BOOT = (uid, name) => `navigator.share = undefined; navigator.clipboard = 
     localStorage.setItem('starspellUid', '${uid}'); localStorage.setItem('starspellName', ${JSON.stringify(name)}); localStorage.setItem('beta3.vsmode', 'turns'); } } catch (e) {}`;
 const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').lanternB`;
 const ensured = (c) => c.until(`(async () => { await SSNET.ensureName(); return true })()`, 30000);
-const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').nameB`;
+const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').chFriendB`;
 const toMenu = async (c) => { await c.ev(`game.scene.getScene('home').scene.start('vsmenu'); 1`); const r = await c.until(MENU, 20000); await sleep(500); return r; };
+const SHEET = `!!game.scene.getScene('vsmenu').socialC && !!game.scene.getScene('vsmenu').frRows`;
+// the sheet is where names are typed now — CHALLENGE A FRIEND is tapped for
+// real; a tap fired the instant a surface appears can be lost (README), so
+// both doors retry until their surface answers
+const toSheet = async (c) => {
+  if (!await toMenu(c)) return false;
+  for (let i = 0; i < 5; i++) {
+    await c.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChFriend'))`);
+    if (await c.until(SHEET, 4000)) { await sleep(500); return true; }
+  }
+  return false;
+};
 const INPUT = `!!document.getElementById('ss-overlay-input') && document.activeElement === document.getElementById('ss-overlay-input')`;
-const tapByName = async (c) => { await c.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsByName'))`); return c.until(INPUT, 6000); };
+const tapPlus = async (c) => {
+  for (let i = 0; i < 4; i++) {
+    await c.tap(`game.scene.getScene('vsmenu').addB`);
+    if (await c.until(INPUT, 4000)) return true;
+  }
+  return false;
+};
+// the sheet's own feedback line — note() routes there while it stands
+const sheetNote = (c) => c.ev(`(() => { const s = game.scene.getScene('vsmenu'); return (s.shNoteT && s.shNoteT.active) ? s.shNoteT.text : null })()`);
 const lobby = (c) => c.ev(`(() => { const s = game.scene.getScene('vsbattle'); if (!s || !s.scene.isActive() || !s.room) return null;
   return JSON.stringify({ code: s.code, status: s.room.status, ch: s.challenged, sub: s.lobbySub && s.lobbySub.text, players: Object.keys(s.room.players || {}) }) })()`).then((v) => v ? JSON.parse(v) : null);
 const banner = (c) => c.ev(`(() => { const s = game.scene.getScene('summons'); return !!(s && s.bannerC && s.shown) ? JSON.stringify(s.shown) : null })()`).then((v) => v ? JSON.parse(v) : null);
@@ -131,13 +156,28 @@ ok('SSNET.findByName misses honestly', await A.ev(`SSNET.findByName('Nobody Here
 ok('A sees B online', await A.until(`SSNET.FR.isOnline(${JSON.stringify(UB)})`, 20000));
 errs.length = 0;   // a dropped/aborted first navigate (nav above) leaves a half-loaded document's noise behind
 
-// ---- 1. A challenges B by typed name (sloppy case), B accepts, the duel starts ----
-ok('A opens VERSUS (BY NAME door built)', await toMenu(A));
-ok('a real tap on BY NAME opens the input, focused', await tapByName(A));
+// ---- 1. A adds B by typed name (sloppy case), the row's CHALLENGE rings, B accepts ----
+ok('A opens VERSUS and the sheet', await toSheet(A));
+ok('a real tap on + opens the input, focused', await tapPlus(A));
 ok('the input carries the mage-name placeholder', await A.ev(`document.getElementById('ss-overlay-input').placeholder === SS_T('vsNamePh')`));
 const sloppy = '  ' + NB.split(' ')[0].toUpperCase().slice(0, 3) + NB.split(' ')[0].toLowerCase().slice(3) + '   ' + NB.split(' ')[1].toLowerCase() + ' ';
 await A.type(sloppy); await A.key('Enter', 'Enter');
-ok('A lands in a challenge lobby aimed at B', await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} })()`, 25000), sloppy);
+ok('the sloppy name resolves — the friendship lands on BOTH sides of the sky', await (async () => {
+  for (let i = 0; i < 25; i++) {
+    const a = await rt('friends/' + UA + '/' + UB), b = await rt('friends/' + UB + '/' + UA);
+    if (a && a.name === NB && b && b.name === NA) return true;
+    await sleep(400);
+  }
+  return false;
+})(), sloppy);
+ok('a real tap on the row\'s CHALLENGE lands a lobby aimed at B', await (async () => {
+  const COND = `(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} })()`;
+  for (let i = 0; i < 4; i++) {
+    try { await A.tap(`((game.scene.getScene('vsmenu').frRows || []).find(r => r.id === ${JSON.stringify(UB)}) || {}).cb`); } catch (e) { }
+    if (await A.until(COND, 6000)) return true;
+  }
+  return false;
+})());
 let lb = await lobby(A); if (lb) codes.add(lb.code);
 ok('lobby wears B\'s name as B wears it, and waits for an answer', lb && lb.ch.name === NB && !lb.ch.away && lb.sub === await A.ev(`SS_T('vsWaitAnswer', ${JSON.stringify(NB)})`), lb && lb.sub);
 ok('the input is gone from the page', await A.ev(`!document.getElementById('ss-overlay-input')`));
@@ -153,23 +193,24 @@ ok('the bell is answered (invite row gone)', await (async () => { for (let i = 0
 const cr1 = await crisp(A);
 ok('crisp sentinel green after the typed challenge', cr1.ok && cr1.heals === 0 && cr1.crisp !== false, JSON.stringify(cr1));
 
-// ---- 2. the honest miss keeps what was typed; your own name is a gentle no ----
+// ---- 2. the honest miss keeps what was typed; Escape adds no one; your own name is a gentle no ----
 await Promise.all([A.nav(BASE + '?diag=1'), B.nav(BASE + '?diag=1')]);
 ok('both back on the meadow', await A.until(READY, 60000) && await B.until(READY, 60000));
-ok('A opens VERSUS again', await toMenu(A));
-ok('BY NAME opens the input', await tapByName(A));
+ok('A opens VERSUS and the sheet again', await toSheet(A));
+ok('+ opens the input', await tapPlus(A));
 const nobody = 'Nobody Here ' + rnd().toUpperCase();
 await A.type('  ' + nobody.toLowerCase() + '  '); await A.key('Enter', 'Enter');
-ok('the miss is named honestly', await A.until(`game.scene.getScene('vsmenu').noteT.text === SS_T('vsNameNone', ${JSON.stringify(nobody.toLowerCase())})`, 15000), await A.ev(`game.scene.getScene('vsmenu').noteT.text`));
+ok('the miss is named honestly, on the sheet\'s own line', await A.until(`(() => { const s = game.scene.getScene('vsmenu'); return !!(s.shNoteT && s.shNoteT.text === SS_T('vsNameNone', ${JSON.stringify(nobody.toLowerCase())})) })()`, 15000), await sheetNote(A));
 ok('the field comes back holding what was typed (retry)', await A.until(INPUT, 5000) && await A.ev(`document.getElementById('ss-overlay-input').value === ${JSON.stringify(nobody.toLowerCase())}`), await A.ev(`(document.getElementById('ss-overlay-input')||{}).value`));
 ok('still on the versus menu, nothing sealed', await A.ev(`game.scene.isActive('vsmenu') && !game.scene.isActive('vsbattle') && !game.scene.getScene('vsmenu').busyC`));
 await A.key('Escape', 'Escape');
-ok('Escape closes the field without ringing anyone', await A.until(`!document.getElementById('ss-overlay-input')`, 4000) && (await rt('invites/' + UB)) === null);
-ok('BY NAME reopens prefilled with the last try', await tapByName(A) && await A.ev(`document.getElementById('ss-overlay-input').value === ${JSON.stringify(nobody.toLowerCase())}`));
-await A.type(' ' + NA.toUpperCase() + ' '); await A.key('Enter', 'Enter');   // the selection is replaced
-ok('your own name is a gentle no', await A.until(`game.scene.getScene('vsmenu').noteT.text === SS_T('vsNameSelf')`, 10000), await A.ev(`game.scene.getScene('vsmenu').noteT.text`));
+ok('Escape closes the field without adding anyone', await A.until(`!document.getElementById('ss-overlay-input')`, 4000)
+  && JSON.stringify(Object.keys((await rt('friends/' + UA)) || {})) === JSON.stringify([UB]));
+ok('+ reopens EMPTY — the miss prefill does not linger past its own retry', await tapPlus(A) && await A.ev(`document.getElementById('ss-overlay-input').value === ''`));
+await A.type(' ' + NA.toUpperCase() + ' '); await A.key('Enter', 'Enter');
+ok('your own name is a gentle no', await A.until(`(() => { const s = game.scene.getScene('vsmenu'); return !!(s.shNoteT && s.shNoteT.text === SS_T('vsAddSelf')) })()`, 10000), await sheetNote(A));
 await sleep(800);
-ok('own name: no lobby, no input, menu free', await A.ev(`game.scene.isActive('vsmenu') && !game.scene.isActive('vsbattle') && !document.getElementById('ss-overlay-input') && !game.scene.getScene('vsmenu').busyC`));
+ok('own name: no lobby, no input, the sheet still standing, menu free', await A.ev(`game.scene.isActive('vsmenu') && !game.scene.isActive('vsbattle') && !document.getElementById('ss-overlay-input') && !!game.scene.getScene('vsmenu').socialC && !game.scene.getScene('vsmenu').busyC`));
 
 // ---- 3. offline: B is closed, the bell lands and stands, B arrives later and answers ----
 // a parked headless tab keeps its socket for a minute or more (the server's
@@ -179,9 +220,23 @@ await B.ev(`firebase.database().goOffline(); 1`).catch(() => { });
 await sleep(800);
 await B.park();
 ok('A sees B leave the sky', await A.until(`!SSNET.FR.isOnline(${JSON.stringify(UB)})`, 40000));
-ok('BY NAME opens the input', await tapByName(A));
-await A.type(NB.toLowerCase()); await A.key('Enter', 'Enter');
-ok('A lands in a lobby aimed at the absent B', await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} })()`, 25000));
+ok('the away row still wears CHALLENGE — a real tap lands a lobby aimed at the absent B', await (async () => {
+  // fresh rows for the away dress: close and reopen the standing sheet
+  await A.ev(`game.scene.getScene('vsmenu').closeSocial(); 1`);
+  let open = false;
+  for (let i = 0; i < 5 && !open; i++) {
+    await A.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChFriend'))`);
+    open = await A.until(SHEET, 4000);
+  }
+  if (!open) return false;
+  await sleep(500);
+  const COND = `(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} && s.challenged.away })()`;
+  for (let i = 0; i < 4; i++) {
+    try { await A.tap(`((game.scene.getScene('vsmenu').frRows || []).find(r => r.id === ${JSON.stringify(UB)}) || {}).cb`); } catch (e) { }
+    if (await A.until(COND, 6000)) return true;
+  }
+  return false;
+})());
 lb = await lobby(A); if (lb) codes.add(lb.code);
 ok('the seeker is told the summons waits under their stars', lb && lb.ch.away && lb.sub === await A.ev(`SS_T('vsWaitAway', ${JSON.stringify(NB)})`), lb && lb.sub);
 inv = await rt('invites/' + UB + '/' + UA);
@@ -202,12 +257,15 @@ ok('B answers and the duel starts', await A.until(`(() => { const s = game.scene
 const cr2 = await crisp(A);
 ok('crisp sentinel still green', cr2.ok && cr2.heals === 0 && cr2.crisp !== false, JSON.stringify(cr2));
 
-// ---- 4. the words exist in every tongue and the door label fits ----
+// ---- 4. the words exist in every tongue — and the floor band's words are gone ----
 const langs = JSON.parse(await A.ev(`JSON.stringify(Object.keys(SS_STR))`));
 for (const lang of langs) {
-  const r = JSON.parse(await A.ev(`JSON.stringify((() => { const t = SS_STR['${lang}']; const K = ['vsOrReach','vsByName','vsNamePh','vsNameSeek','vsNameNone','vsNameSelf','vsWaitAway','vsWaitBusy'];
-    return { miss: K.filter(k => !t[k]), pct: K.filter(k => /%1/.test('vsNameSeek vsNameNone vsWaitAway vsWaitBusy'.includes(k) ? t[k] : '%1')).length } })())`));
-  ok(lang + ': all 8 strings present, %1 kept where a name goes', r.miss.length === 0 && r.pct === 8, JSON.stringify(r));
+  const r = JSON.parse(await A.ev(`JSON.stringify((() => { const t = SS_STR['${lang}'];
+    const K = ['vsNamePh', 'vsNameSeek', 'vsNameNone', 'vsAddSelf', 'vsWaitAway', 'vsWaitBusy'];
+    const PCT = ['vsNameSeek', 'vsNameNone', 'vsWaitAway', 'vsWaitBusy'];
+    const GONE = ['vsAs', 'vsOrSeal', 'vsOrReach', 'vsByName', 'vsSeal', 'vsNameSelf', 'vsColdSeal'];
+    return { miss: K.filter(k => !t[k]), pct: PCT.filter(k => /%1/.test(t[k] || '')).length, ghosts: GONE.filter(k => t[k]) } })())`));
+  ok(lang + ': all 6 by-name strings present, %1 where a name goes, the floor band\'s 7 gone', r.miss.length === 0 && r.pct === 4 && r.ghosts.length === 0, JSON.stringify(r));
 }
 ok('no page exceptions', errs.length === 0, errs.join(' | ').slice(0, 300));
 

@@ -68,9 +68,13 @@ const vsSeat = (seat) => ({
 });
 
 /* ============================================================
-   Menu — challenge-first (v0.73.0): the crest, two primaries
-   (CHALLENGE A FRIEND → the social sheet · CHALLENGE WORLDWIDE →
-   quick match), the BY NAME / seal fallback doors. Turns only.
+   Menu — challenge-first (v0.73.0, floor cleared v0.83.0): the
+   hero crest, then two primaries (CHALLENGE A FRIEND → the social
+   sheet · CHALLENGE WORLDWIDE → quick match) centred between the
+   crest and the safe band's foot. Turns only. The BY NAME / seal
+   doors left with Skylar's 9/3 call — friends are reached through
+   the sheet, new mages through the app invite, rooms through
+   summons bells and ?join deep links.
    ============================================================ */
 class VsMenu extends Phaser.Scene {
   constructor() { super('vsmenu'); }
@@ -93,17 +97,23 @@ class VsMenu extends Phaser.Scene {
     }
     try { localStorage.removeItem('beta3.vsmode'); } catch (e) { }   // the mode choice is retired — sweep the dead key
 
-    // the crest: drawn crossed blades over a slow gold breath — the page's
-    // one emblem now that the heading is gone, and the name friends type
-    // into BY NAME / the sheet's + right beneath it
-    const crestGlow = this.add.image(l.x(0), l.y(168), 'glowbig').setDisplaySize(l.u(250), l.u(250)).setTint(0xc9a94f).setAlpha(0.1).setBlendMode('ADD');
+    // the hero crest (Skylar 9/3, stamped 2.5×): drawn crossed blades over a
+    // slow gold breath, no words beneath — the page's one emblem, baked big
+    // enough to stay crisp at this size (the setDisplaySize-only upscale of
+    // the 96px bake was the v0.3.4 blur). Glow rides the same 2.5×.
+    const crestGlow = this.add.image(l.x(0), l.y(168), 'glowbig').setDisplaySize(l.u(625), l.u(625)).setTint(0xc9a94f).setAlpha(0.1).setBlendMode('ADD');
     this.tweens.add({ targets: crestGlow, alpha: 0.045, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.add.image(l.x(0), l.y(168), vsSwordsTex(this)).setDisplaySize(l.u(84), l.u(84)).setAlpha(0.96);
-    ssTxt(this, l.x(0), l.y(232), SS_T('vsAs', vsName()), l.u(11), '#8a94c4', 'italic').setOrigin(0.5);
+    this.add.image(l.x(0), l.y(168), vsSwordsTex(this, 210)).setDisplaySize(l.u(210), l.u(210)).setAlpha(0.96);
 
     // the two primaries — and only these (Skylar 9/2). Every door on this
-    // page seals a turn-based room; the caption says the mode once.
-    ssTxt(this, l.x(0), l.y(376), SS_T('vsAsync'), l.u(10.5), '#c9b676', 'italic').setOrigin(0.5);
+    // page seals a turn-based room; the caption says the mode once. The pair
+    // centres between the crest's bottom edge and the safe band's bottom
+    // (Skylar 9/3, "right in the middle") — the design box runs to y 800,
+    // but a width-limited phone floats it, so the true foot is computed.
+    const crestB = 168 + 105;
+    const safeB = 400 + (l.H - (SS_INSET.top + SS_INSET.bottom) * DPR) / (2 * l.s);
+    const friendY = Math.round((crestB + safeB) / 2 - 36);   // buttons span friendY−30 … friendY+102
+    ssTxt(this, l.x(0), l.y(friendY - 38), SS_T('vsAsync'), l.u(10.5), '#c9b676', 'italic').setOrigin(0.5);
     const prim = (y, key, subKey, cb) => {
       const b = this.add.image(l.x(0), l.y(y), ssBtn(this, false, 320, 60)).setDisplaySize(l.u(320), l.u(60)).setInteractive({ useHandCursor: true });
       const t = ssTxt(this, l.x(0), l.y(y - 10), SS_T(key), l.u(17), BTN_INK()).setOrigin(0.5);
@@ -113,23 +123,11 @@ class VsMenu extends Phaser.Scene {
       b.on('pointerdown', cb);
       return b;
     };
-    this.chFriendB = prim(414, 'vsChFriend', 'vsChFriendSub', () => { SFX.ensure(); SFX.ui(); this.openSocial(); });
-    this.chWorldB = prim(486, 'vsChWorld', 'vsChWorldSub', () => { SFX.ensure(); SFX.ui(); this.match('turns'); });
+    this.chFriendB = prim(friendY, 'vsChFriend', 'vsChFriendSub', () => { SFX.ensure(); SFX.ui(); this.openSocial(); });
+    this.chWorldB = prim(friendY + 72, 'vsChWorld', 'vsChWorldSub', () => { SFX.ensure(); SFX.ui(); this.match('turns'); });
 
-    // reaching a mage yourself: BY NAME (task 43 — the unique-name registry
-    // resolves whoever you type) beside the seal code, still the cross-device
-    // fallback that needs no friend setup
-    ssTxt(this, l.x(0), l.y(556), SS_T('vsOrReach'), l.u(11), '#5a6390').setOrigin(0.5);
-    const door = (x, key, cb) => {
-      const b = this.add.image(l.x(x), l.y(588), ssBtn(this, true, 166, 44)).setDisplaySize(l.u(166), l.u(44)).setInteractive({ useHandCursor: true });
-      const t = ssTxt(this, l.x(x), l.y(588), SS_T(key), l.u(12), '#9fb0e8').setOrigin(0.5);
-      for (let fs = 12; t.width > l.u(150) && fs > 8; fs -= 0.5) t.setFontSize(l.u(fs));
-      b.on('pointerdown', cb);
-      return b;
-    };
-    this.nameB = door(-88, 'vsByName', () => this.namePrompt(l));
-    door(88, 'vsSeal', () => this.codePrompt(l));
-    this.noteT = ssTextBlock(this, l.x(0), l.y(642), '', {
+    // the feedback line keeps the foot's old breathing room under the pair
+    this.noteT = ssTextBlock(this, l.x(0), l.y(friendY + 134), '', {
       fontSize: l.u(11) + 'px', color: '#c9b676', fontStyle: 'italic', shadow: true,
       wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
     });
@@ -364,7 +362,7 @@ class VsMenu extends Phaser.Scene {
     });
   }
 
-  /* ---------- the three doors ---------- */
+  /* ---------- the challenge doors ---------- */
   // a RECENT row tapped: the same challenge a friend CHALLENGE / BY NAME rides.
   // A mage of the circle has no phone to ring — the room is sealed the same
   // way and the rival engine seats them in it (they answer, as they answer
@@ -391,48 +389,6 @@ class VsMenu extends Phaser.Scene {
       this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name, away: !!f.away, busy: !!f.busy, circle: f.circle || null } });
     } catch (e) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; }
   }
-  /* CHALLENGE BY NAME (task 43): type a mage's name, the registry finds them
-     (case and spacing fold through nameKey), and the summons rings through
-     the same invites/ bell a friend CHALLENGE uses. Online: they answer like
-     any invite. Away: the bell waits under their stars while this lobby
-     stands. A miss keeps what was typed for a second try. */
-  namePrompt(l, prefill) {
-    if (this.busyC) return;
-    SFX.ui();
-    if (SSNET.mode !== 'firebase') { this.note(SS_T('vsNoSky'), 3000); return; }
-    const inp = document.createElement('input');
-    inp.type = 'text'; inp.maxLength = 24; inp.placeholder = SS_T('vsNamePh');
-    inp.setAttribute('autocapitalize', 'words'); inp.setAttribute('autocorrect', 'off');
-    inp.setAttribute('autocomplete', 'off'); inp.setAttribute('enterkeyhint', 'go'); inp.spellcheck = false;
-    inp.value = prefill != null ? prefill : (this.lastTyped || '');
-    inp.style.cssText = 'position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:9999;font:700 ' +
-      Math.round(l.u(20)) + 'px Georgia,serif;text-align:center;background:#141a33;color:#f3e5b4;border:2px solid #c9a94f;border-radius:10px;padding:10px 14px;outline:none;width:70%;max-width:320px;';
-    // no commitOnShutdown: leaving the menu mid-type must not ring anyone
-    ssDomInput(this, inp, (v) => this.seekByName(v, l));
-    if (inp.value) inp.select();
-  }
-  async seekByName(v, l) {
-    const typed = String(v || '').trim().replace(/\s+/g, ' ');
-    this.lastTyped = typed;
-    if (!typed || !this.sys.isActive() || this.busyC) return;
-    if (SSNET.nameKey(typed) === SSNET.nameKey(vsName())) { this.note(SS_T('vsNameSelf'), 3500); return; }
-    this.busyC = true;
-    this.note(SS_T('vsNameSeek', typed));
-    let hit = null;
-    try { hit = await SSNET.findByName(typed); } catch (e) { hit = null; }
-    if (!this.sys.isActive()) return;
-    this.busyC = false;
-    if (!hit || hit.uid === vsUid()) {
-      if (hit) { this.note(SS_T('vsNameSelf'), 3500); return; }
-      // an honest miss — and the field comes back holding what they typed
-      this.note(SS_T('vsNameNone', typed), 4000);
-      this.namePrompt(l, typed);
-      return;
-    }
-    this.lastTyped = '';
-    const FR = SSNET.FR;
-    this.challenge({ id: hit.uid, name: hit.name, away: !FR.isOnline(hit.uid), busy: FR.isOnline(hit.uid) && FR.isBusy(hit.uid) });
-  }
   // ?frdemo=invite: seal a private room and stand in its lobby — the deep-link
   // recipe (the lobby's own ✶ SHARE INVITE LINK button carries the ?join link)
   sealLobby() {
@@ -443,22 +399,6 @@ class VsMenu extends Phaser.Scene {
       if (!this.sys.isActive()) return;
       if (!ok) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
       this.scene.start('vsbattle', { code });
-    });
-  }
-  codePrompt(l) {
-    SFX.ui();
-    const inp = document.createElement('input');
-    inp.type = 'text'; inp.maxLength = 4; inp.placeholder = 'SEAL';
-    inp.style.cssText = 'position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:9999;font:700 ' +
-      Math.round(l.u(26)) + 'px Georgia,serif;text-align:center;letter-spacing:0.3em;text-transform:uppercase;background:#141a33;color:#f3e5b4;border:2px solid #c9a94f;border-radius:10px;padding:10px;outline:none;width:52%;max-width:220px;';
-    // no commitOnShutdown: leaving the menu mid-type must not join a room
-    ssDomInput(this, inp, async (v) => {
-      const code = v.trim().toUpperCase();
-      if (code.length !== 4 || !this.sys.isActive()) return;
-      const ok = await vsJoinRoom(code);
-      if (!this.sys.isActive()) return;   // the scene moved on while we were joining
-      if (ok) this.scene.start('vsbattle', { code });
-      else this.note(SS_T('vsColdSeal'), 2000);
     });
   }
   async match(mode) {
@@ -530,16 +470,21 @@ function vsOnTap(obj, fn) {
    Drawn art, never an emoji (the no-emoji-as-game-art law): two gold blades
    crossed on a transparent square, baked once per scene at the texture
    factory's resolution through ssBake (wipe + fallback + DIAG on a painter
-   throw). The page crest and every friend row's challenge glyph wear the
-   same texture; consumers use setDisplaySize, per the R-scaled-texture rule. */
-function vsSwordsTex(scene) {
-  const key = 'vsswords';
+   throw). Consumers use setDisplaySize, per the R-scaled-texture rule.
+   Two bakes since v0.83.0: the friend rows keep the byte-identical 96px
+   'vsswords' for their 20u glyphs, and the hero crest asks for its own
+   width (210 → 'vsswords210', ~630 device px at DPR 3) so 2.5× never
+   upscale-blurs — the painter stays in its hand-tuned 96-space and the
+   context scale carries it up, shadow softness riding the same factor. */
+function vsSwordsTex(scene, w) {
+  const W = w || 96, D = 96, k = W / D;
+  const key = W === D ? 'vsswords' : 'vsswords' + W;
   if (scene.textures.exists(key)) return key;
-  const R = ssTexRes(scene), W = 96;
-  const t = scene.textures.createCanvas(key, W * R, W * R);
-  t.context.scale(R, R);
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(W * R), Math.round(W * R));
+  t.context.scale(R * k, R * k);
   const blade = (c, a) => {
-    c.save(); c.translate(W / 2, W / 2); c.rotate(a);
+    c.save(); c.translate(D / 2, D / 2); c.rotate(a);
     // tapered body with a bright face, a dark edge and a fuller line
     c.beginPath(); c.moveTo(-4.6, 26); c.lineTo(-1.7, -40); c.lineTo(0, -45); c.lineTo(1.7, -40); c.lineTo(4.6, 26); c.closePath();
     c.fillStyle = '#ead9a4'; c.fill();
@@ -556,17 +501,18 @@ function vsSwordsTex(scene) {
     c.lineWidth = 1; c.strokeStyle = '#7a5c1a'; c.stroke();
     c.restore();
   };
-  ssBake(t, key, W, W, (c) => {
-    c.clearRect(0, 0, W, W);
+  ssBake(t, key, D, D, (c) => {
+    c.clearRect(0, 0, D, D);
     c.save();
-    c.shadowColor = 'rgba(255,215,122,0.5)'; c.shadowBlur = 5;
+    // shadowBlur lives in device px, outside the transform — scale it by hand
+    c.shadowColor = 'rgba(255,215,122,0.5)'; c.shadowBlur = 5 * k;
     blade(c, -0.66); blade(c, 0.66);
     c.restore();
   }, (c) => {
     // fallback: two plain crossed bars — still blades, no curves, no shadows
-    c.clearRect(0, 0, W, W);
+    c.clearRect(0, 0, D, D);
     c.fillStyle = '#e0c878';
-    c.save(); c.translate(W / 2, W / 2);
+    c.save(); c.translate(D / 2, D / 2);
     for (const a of [-0.66, 0.66]) { c.save(); c.rotate(a); c.fillRect(-2.5, -44, 5, 84); c.fillRect(-10, 24, 20, 4); c.restore(); }
     c.restore();
   });

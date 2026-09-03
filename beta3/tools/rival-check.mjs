@@ -135,7 +135,10 @@ function seatChecks(tag, r, uid) {
   ok(tag + ' casts carry only a cast\'s fields', casts.every((c) => Object.keys(c).every((k) => CAST.includes(k))));
   ok(tag + ' casts counted on the seat', (seat.casts | 0) === casts.length, seat.casts + ' vs ' + casts.length);
   ok(tag + ' dealt = sum of casts', (seat.dealt | 0) === casts.reduce((a, c) => a + c.dmg, 0));
-  const flat = JSON.stringify(r).toLowerCase();
+  // cast words and lastWord are dictionary words the human sees on screen
+  // (BOTHIES tripped /bot/ on 2026-09-03; ROBOT/ARRIVAL/SKILLET would too) —
+  // blank their VALUES so the grep reads only the room's own vocabulary
+  const flat = JSON.stringify(r).toLowerCase().replace(/"(last)?word":"[^"]*"/g, '"$1word":""');
   ok(tag + ' nothing in the room says bot/ai/engine', !/bot|"ai"|engine|rival|skill|target"/.test(flat.replace(/"target":/g, '')));
   return casts;
 }

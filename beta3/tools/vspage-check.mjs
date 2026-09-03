@@ -1,4 +1,5 @@
-// VSPAGE-CHECK — the challenge-first versus page (v0.73.0).
+// VSPAGE-CHECK — the challenge-first versus page (v0.73.0, floor cleared
+// v0.83.0).
 // Skylar (9/2): no 'Versus' heading, no timed, no battlegrounds — async
 // battle only; INVITE A FRIEND becomes CHALLENGE A FRIEND and opens the
 // friends + recent-rivals sheet with an invite-a-new-friend row pinned at
@@ -6,11 +7,19 @@
 // page); FIND A RIVAL becomes CHALLENGE WORLDWIDE; a + by the FRIENDS
 // heading adds a friend by their unique name; every friend row wears the
 // drawn crossed-blades glyph + CHALLENGE (an away friend takes a standing
-// summons). This suite proves the page in all five languages, the sheet's
-// shape and pinned invite, the share payload, the + add-by-name flow on two
-// REAL uids against the live registry, a real friend-row challenge landing a
-// TURNS room through the summons bell, the away-row standing invite, and
-// CHALLENGE WORLDWIDE seeding a turns room with a queue clock.
+// summons). Skylar (9/3, card 02): the crest is the 2.5× hero (210u,
+// stamped) from its own crisp bake, nothing written under it, the
+// BY NAME / ENTER A SEAL CODE floor band gone with its '— or reach a mage
+// yourself —' line, and the primaries (caption riding above) centred
+// between the crest's bottom and the safe band's foot. This suite proves
+// the page in all five languages IS exactly its six texts (home · caption ·
+// two primaries with subs — the absence assertion for heading, pills,
+// caption-under-crest and doors alike), the hero crest's size + bake px +
+// centred spacing, the sheet's shape and pinned invite, the share payload,
+// the + add-by-name flow on two REAL uids against the live registry, a real
+// friend-row challenge landing a TURNS room through the summons bell, the
+// away-row standing invite, and CHALLENGE WORLDWIDE seeding a turns room
+// with a queue clock.
 // Self-launching: serves beta3 on :8899 if nothing does, TWO headless
 // Chromes on :9471/:9472 (/tmp/cdp-vspa|b, wiped first — the stale-profile
 // law), the LIVE sky (registry + FR need it; every row this run writes is
@@ -44,11 +53,25 @@ ok("every menu door seals turns: match('turns') + three 'turns' seals",
 ok('VS_APP_URL is the TestFlight door', /VS_APP_URL = 'https:\/\/testflight\.apple\.com\/join\/Hxs8e7fU'/.test(vsSrc));
 ok('the app invite rides VS_APP_URL, and no friend-link URL builder survives',
   /vsShare\(SS_T\('vsAppText', vsName\(\), vsName\(\)\), VS_APP_URL\)/.test(vsSrc) && !/vsFriendUrl/.test(vsSrc));
-ok('the drawn crossed-blades glyph is baked art (vsSwordsTex through ssBake), on crest and rows',
-  /function vsSwordsTex/.test(vsSrc) && /ssBake\(t, key, W, W/.test(vsSrc) && (vsSrc.match(/vsSwordsTex\(this\)/g) || []).length >= 2);
+ok('the drawn crossed-blades glyph is baked art (vsSwordsTex through ssBake), hero crest + rows',
+  /function vsSwordsTex/.test(vsSrc) && /ssBake\(t, key, D, D/.test(vsSrc)
+  && /vsSwordsTex\(this, 210\)/.test(vsSrc) && (vsSrc.match(/vsSwordsTex\(this\)/g) || []).length >= 1);
+// 9/3 feedback card 02: the hero crest, the caption gone, the floor cleared
+ok('the crest renders 210u from its OWN 210-wide bake (never a setDisplaySize upscale of the 96px art)',
+  /vsSwordsTex\(this, 210\)\)\.setDisplaySize\(l\.u\(210\), l\.u\(210\)\)/.test(vsSrc));
+ok("the 'as %1' caption is gone from the page source", !/'vsAs'/.test(vsSrc));
+ok('the floor band is gone: no vsOrReach, no door(), no namePrompt/codePrompt/seekByName',
+  !/vsOrReach|namePrompt|codePrompt|seekByName|const door =/.test(vsSrc));
+ok('the pair centres by computation between the crest bottom and the safe band foot',
+  /const crestB = 168 \+ 105/.test(vsSrc)
+  && /safeB = 400 \+ \(l\.H - \(SS_INSET\.top \+ SS_INSET\.bottom\) \* DPR\) \/ \(2 \* l\.s\)/.test(vsSrc)
+  && /\(crestB \+ safeB\) \/ 2/.test(vsSrc));
 const strSrc = readFileSync('strings.js', 'utf8');
 const NEW_KEYS = ['vsAsync', 'vsChFriend', 'vsChFriendSub', 'vsChWorld', 'vsChWorldSub', 'vsInviteNew', 'vsInviteNewSub', 'vsAppText', 'vsAddSelf', 'vsShareFail'];
-const OLD_KEYS = ['vsInvite', 'vsInviteSub', 'vsFind', 'vsFindSub', 'vsTurnsSub', 'vsTimedSub', 'vsBgSub', 'vsFriendLink', 'vsFriendText'];
+const OLD_KEYS = ['vsInvite', 'vsInviteSub', 'vsFind', 'vsFindSub', 'vsTurnsSub', 'vsTimedSub', 'vsBgSub', 'vsFriendLink', 'vsFriendText',
+  // 9/3 card 02 — the floor band's family (vsOrSeal was already an orphan;
+  // vsNameSelf/vsColdSeal orphaned with the deleted prompt methods)
+  'vsAs', 'vsOrSeal', 'vsOrReach', 'vsByName', 'vsSeal', 'vsNameSelf', 'vsColdSeal'];
 ok('all ten new keys ship exactly five times (one per language)',
   NEW_KEYS.every((k) => (strSrc.match(new RegExp(k + ':', 'g')) || []).length === 5),
   NEW_KEYS.map((k) => k + '×' + (strSrc.match(new RegExp(k + ':', 'g')) || []).length).join(' '));
@@ -152,7 +175,7 @@ const BOOT = (uid, name) => `navigator.share = undefined; navigator.clipboard = 
   try { sessionStorage.setItem('beta3.skipIntro', '1'); if (localStorage.getItem('vp.seeded') !== '${uid}') { localStorage.clear(); localStorage.setItem('vp.seeded', '${uid}');
     localStorage.setItem('starspellUid', '${uid}'); ${name ? `localStorage.setItem('starspellName', ${JSON.stringify(name)});` : ''} } } catch (e) {}`;
 const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').lanternB`;
-const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').nameB`;
+const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').chFriendB`;
 const SHEET = `!!game.scene.getScene('vsmenu').socialC && !!game.scene.getScene('vsmenu').recentRows && !!game.scene.getScene('vsmenu').frRows`;
 const toMenu = async (c) => { await c.ev(`game.scene.getScene('home').scene.start('vsmenu'); 1`); const r = await c.until(MENU, 20000); await sleep(600); return r; };
 const openSheet = async (c) => c.tapUntil(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChFriend'))`, SHEET, 12000);
@@ -171,14 +194,16 @@ for (const lang of LANGS) {
   const up = await A.nav(BASE + '?mpuid=' + VPU + '&fps=0&lang=' + lang) && await A.until(READY, 60000) && await toMenu(A);
   if (!up) { ok(lang + ': the page', false, 'boot failed'); continue; }
   const tx = await sceneTexts(A);
-  const T = await A.ev(`JSON.stringify({ vs: SS_T('versus'), cf: SS_T('vsChFriend'), cw: SS_T('vsChWorld'), as: SS_T('vsAsync'),
-    mt: SS_T('vsModeTurns'), md: SS_T('vsModeTimed'), mb: SS_T('vsModeBg'), fr: SS_T('vsFriends'), rh: SS_T('vsRecentHead'),
-    bn: SS_T('vsByName'), sl: SS_T('vsSeal') })`).then(JSON.parse);
-  const good = !tx.includes(T.vs) && tx.includes(T.cf) && tx.includes(T.cw) && tx.includes(T.as)
-    && !tx.includes(T.mt) && !tx.includes(T.md) && !tx.includes(T.mb)
-    && !tx.includes(T.fr) && !tx.includes(T.rh) && tx.includes(T.bn) && tx.includes(T.sl)
+  const T = await A.ev(`JSON.stringify({ cf: SS_T('vsChFriend'), cfs: SS_T('vsChFriendSub'),
+    cw: SS_T('vsChWorld'), cws: SS_T('vsChWorldSub'), as: SS_T('vsAsync') })`).then(JSON.parse);
+  // the whole page IS these six texts — one exact set carries every absence
+  // at once: no heading, no pills, no 'as %1' under the crest, no
+  // '— or reach a mage yourself —', no BY NAME, no ENTER A SEAL CODE
+  const want = JSON.stringify(['‹ HOME', T.as, T.cf, T.cfs, T.cw, T.cws].sort());
+  const got = JSON.stringify(tx.filter((t) => t !== '').sort());
+  const good = got === want
     && await A.ev(`game.scene.getScene('vsmenu').recentRows === null && game.scene.getScene('vsmenu').socialC === null`);
-  ok(lang + ': no heading, no pills, no panel — the two primaries + caption + doors', good, tx.join(' | ').slice(0, 160));
+  ok(lang + ': the page is exactly its six texts — crest wordless, floor cleared, no heading, no pills', good, tx.join(' | ').slice(0, 160));
 }
 // the booted key tables (readable from the standing de boot)
 for (const lang of LANGS) {
@@ -187,9 +212,38 @@ for (const lang of LANGS) {
   ok(lang + ': all ten new keys present, every retired key gone', r.miss.length === 0 && r.old.length === 0, JSON.stringify(r));
 }
 
+/* ---------- 1b. the hero crest + the centred pair (9/3 card 02) ---------- */
+console.log('— THE HERO CREST + THE CENTRED PAIR —');
+ok('en boot back up', await A.nav(BASE + '?mpuid=' + VPU + '&fps=0&lang=en') && await A.until(READY, 60000) && await toMenu(A));
+const geo = await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsmenu'); const l = ssLayout(s);
+  const crest = s.children.list.find(o => o.texture && o.texture.key === 'vsswords210');
+  if (!crest) return { missing: 1 };
+  const fb = s.chFriendB.getBounds(), wb = s.chWorldB.getBounds(), cb = crest.getBounds();
+  const cap = s.children.list.find(o => o.text === SS_T('vsAsync'));
+  return { u210: l.u(210), u3: l.u(3), dw: crest.displayWidth, dh: crest.displayHeight,
+    texW: game.textures.get('vsswords210').getSourceImage().width,
+    crestBottom: cb.bottom, fTop: fb.top, wBottom: wb.bottom,
+    safeBpx: s.scale.height - SS_INSET.bottom * DPR,
+    capY: cap ? cap.getBounds().centerY : -1,
+    fX: fb.centerX, wX: wb.centerX, W: s.scale.width, noteY: s.noteT.y } })())`).then(JSON.parse);
+ok('the crest is the 2.5× hero — 210u square on screen (the 9/3 stamp)',
+  !geo.missing && Math.abs(geo.dw - geo.u210) < 1 && Math.abs(geo.dh - geo.u210) < 1,
+  geo.missing ? 'no vsswords210 image' : geo.dw + ' vs ' + geo.u210);
+ok('…baked at full device px — the texture covers the drawn size, no upscale blur',
+  !geo.missing && geo.texW >= geo.dw - 1, geo.texW + ' px for ' + geo.dw);
+ok('the pair sits dead-centre between the crest bottom and the safe band foot',
+  !geo.missing && Math.abs((geo.fTop - geo.crestBottom) - (geo.safeBpx - geo.wBottom)) <= geo.u3,
+  'above ' + Math.round(geo.fTop - geo.crestBottom) + ' vs below ' + Math.round(geo.safeBpx - geo.wBottom));
+ok('the vsAsync caption rides above the pair, below the wordless crest',
+  !geo.missing && geo.capY > geo.crestBottom && geo.capY < geo.fTop,
+  Math.round(geo.crestBottom) + ' < ' + Math.round(geo.capY) + ' < ' + Math.round(geo.fTop));
+ok('the pair keeps the page centreline', !geo.missing && Math.abs(geo.fX - geo.W / 2) < 1 && Math.abs(geo.wX - geo.W / 2) < 1);
+ok('the feedback line keeps the foot: under the pair, inside the safe band',
+  !geo.missing && geo.noteY > geo.wBottom && geo.noteY < geo.safeBpx,
+  Math.round(geo.wBottom) + ' < ' + Math.round(geo.noteY) + ' < ' + Math.round(geo.safeBpx));
+
 /* ---------- 2. the sheet: shape, pinned invite, close/reopen ---------- */
 console.log('— THE SHEET —');
-ok('en boot back up', await A.nav(BASE + '?mpuid=' + VPU + '&fps=0&lang=en') && await A.until(READY, 60000) && await toMenu(A));
 ok('CHALLENGE A FRIEND opens the sheet', await openSheet(A));
 let stx = await sheetTexts(A);
 const ST = await A.ev(`JSON.stringify({ fr: SS_T('vsFriends'), rh: SS_T('vsRecentHead'), nf: SS_T('vsNoFriends'), nr: SS_T('vsNoRecent'),
@@ -273,6 +327,9 @@ ok('the roll repaints itself: B\'s row, the drawn glyph, CHALLENGE ready',
   await A.until(`(() => { const s = game.scene.getScene('vsmenu'); if (!s.frRows || !s.frRows.length) return false;
     const r = s.frRows.find(r => r.id === ${JSON.stringify(UB)});
     return !!(r && r.nameT.text === ${JSON.stringify(NB)} && r.glyph.texture.key === 'vsswords' && r.cb.input && r.cb.input.enabled) })()`, 15000));
+ok('two bakes stand apart: the rows keep the 96px vsswords, the crest its bigger 210',
+  await A.ev(`game.textures.exists('vsswords') && game.textures.exists('vsswords210')
+    && game.textures.get('vsswords').getSourceImage().width < game.textures.get('vsswords210').getSourceImage().width`));
 ok('…and says so', await A.until(`(() => { const s = game.scene.getScene('vsmenu'); return s.shNoteT && s.shNoteT.text === SS_T('frAdded', ${JSON.stringify(NB)}) })()`, 8000));
 // the honest miss re-offers the typed text
 const nobody = 'Nobody ' + rnd().toUpperCase();

@@ -1,7 +1,9 @@
 // RECENT-CHECK — recent rivals in VERSUS (v0.55.0, task 44; the roll lives
 // in the v0.73.0 social sheet — CHALLENGE A FRIEND opens it).
 // Two REAL throwaway uids in two headless Chromes. A first-night sheet shows
-// the quiet empty line; A challenges B by name, the duel writes recent/ on
+// the quiet empty line; A adds B through the sheet's + and challenges from
+// the friend row (the page's BY NAME door left with v0.83.0) — the duel
+// writes recent/ on
 // BOTH sides live (no reload — the FR listener fires mid-duel); back in the
 // sheet the RECENT roll shows B newest-first with "tonight" and the online
 // glint; a REAL tap on AGAIN rings B, B accepts, the rematch lands. Then B
@@ -78,7 +80,7 @@ const BOOT = (uid, name) => `navigator.share = undefined; navigator.clipboard = 
     localStorage.setItem('starspellUid', '${uid}'); localStorage.setItem('starspellName', ${JSON.stringify(name)}); localStorage.setItem('beta3.vsmode', 'turns'); } } catch (e) {}`;
 const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').lanternB`;
 const ensured = (c) => c.until(`(async () => { await SSNET.ensureName(); return true })()`, 30000);
-const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').nameB`;
+const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').chFriendB`;
 const toMenu = async (c) => { await c.ev(`game.scene.getScene('home').scene.start('vsmenu'); 1`); const r = await c.until(MENU, 20000); await sleep(600); return r; };
 // the roll lives in the social sheet now (v0.73.0): recentRows exists only
 // while the sheet stands, so CHALLENGE A FRIEND is tapped for real first
@@ -131,11 +133,27 @@ ok('RECENT heading stands', tx.includes(await A.ev(`SS_T('vsRecentHead')`)));
 ok('a first-night player sees the quiet empty line', tx.includes(await A.ev(`SS_T('vsNoRecent')`)) && (await rows(A)).length === 0, tx.join(' | ').slice(0, 200));
 
 // ---- 2. a duel feeds recent/ on both sides, live ----
-await A.ev(`game.scene.getScene('vsmenu').closeSocial(); 1`);   // BY NAME is a page door, under the sheet's veil
-await A.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsByName'))`);
-ok('BY NAME input opens', await A.until(INPUT, 6000));
+// the page's BY NAME door left with v0.83.0 — the duel is seeded the
+// surviving way: the sheet's + adds B by typed name, then a real tap on
+// the friend row's CHALLENGE rings the same bell
+ok('the + opens the add-by-name input', await (async () => {
+  for (let i = 0; i < 4; i++) {
+    await A.tap(`game.scene.getScene('vsmenu').addB`);
+    if (await A.until(INPUT, 4000)) return true;
+  }
+  return false;
+})());
 await A.type(NB); await A.key('Enter', 'Enter');
-ok('A lands in a lobby aimed at B', await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} })()`, 25000));
+ok('the friendship lands and B\'s row wears CHALLENGE', await A.until(`(() => { const s = game.scene.getScene('vsmenu');
+  const r = (s.frRows || []).find(r => r.id === ${JSON.stringify(UB)}); return !!(r && r.cb.input && r.cb.input.enabled) })()`, 20000));
+ok('A lands in a lobby aimed at B', await (async () => {
+  const COND = `(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} })()`;
+  for (let i = 0; i < 4; i++) {
+    try { await A.tap(`((game.scene.getScene('vsmenu').frRows || []).find(r => r.id === ${JSON.stringify(UB)}) || {}).cb`); } catch (e) { }
+    if (await A.until(COND, 6000)) return true;
+  }
+  return false;
+})());
 let lb = await lobby(A); if (lb) codes.add(lb.code);
 ok('B\'s banner rings', await B.until(`(() => { const s = game.scene.getScene('summons'); return !!(s && s.bannerC && s.shown && s.shown.from === ${JSON.stringify(UA)}) })()`, 20000));
 await acceptBanner(B);
