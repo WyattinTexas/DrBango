@@ -70,9 +70,10 @@ async function client(port, tag) {
     await until(`game.scene.isActive('vsmenu') && SSNET.mode === 'firebase'`, 30000);
     await sleep(600);
   };
-  // a REAL tap on FIND A RIVAL (the gold button under the label)
+  // a REAL tap on CHALLENGE WORLDWIDE (FIND A RIVAL until v0.73.0 — the
+  // queue behind the button is unchanged)
   c.find = async () => {
-    await tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsFind'))`);
+    await tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChWorld'))`);
   };
   c.room = () => ev(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room ? s.code : null; })()`);
   c.park = async () => { await send('Page.navigate', { url: 'about:blank' }); await sleep(500); };

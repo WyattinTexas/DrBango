@@ -1,13 +1,15 @@
-// RECENT-CHECK — recent rivals in VERSUS (v0.55.0, task 44).
-// Two REAL throwaway uids in two headless Chromes. A first-night VERSUS shows
+// RECENT-CHECK — recent rivals in VERSUS (v0.55.0, task 44; the roll lives
+// in the v0.73.0 social sheet — CHALLENGE A FRIEND opens it).
+// Two REAL throwaway uids in two headless Chromes. A first-night sheet shows
 // the quiet empty line; A challenges B by name, the duel writes recent/ on
-// BOTH sides live (no reload — the FR listener fires mid-duel); back in
-// VERSUS the RECENT roll shows B newest-first with "tonight" and the online
+// BOTH sides live (no reload — the FR listener fires mid-duel); back in the
+// sheet the RECENT roll shows B newest-first with "tonight" and the online
 // glint; a REAL tap on AGAIN rings B, B accepts, the rematch lands. Then B
 // parked: the same tap becomes a standing invite and the lobby says so. Then
-// the circle: A searches alone, a circle mage answers, the row appears; a
-// real tap on that row routes through the rival engine (no invites/ row) and
-// a live duel begins. Nights-ago clock, 10 tongues, layout, cleanup.
+// the circle: A searches alone (CHALLENGE WORLDWIDE), a circle mage answers,
+// the row appears; a real tap on that row routes through the rival engine
+// (no invites/ row) and a live duel begins. Nights-ago clock, the five
+// tongues, layout, cleanup.
 //
 //   python3 -m http.server 8899 &
 //   for p in a:9452 b:9453; do "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
@@ -76,8 +78,18 @@ const BOOT = (uid, name) => `navigator.share = undefined; navigator.clipboard = 
     localStorage.setItem('starspellUid', '${uid}'); localStorage.setItem('starspellName', ${JSON.stringify(name)}); localStorage.setItem('beta3.vsmode', 'turns'); } } catch (e) {}`;
 const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').lanternB`;
 const ensured = (c) => c.until(`(async () => { await SSNET.ensureName(); return true })()`, 30000);
-const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').nameB && !!game.scene.getScene('vsmenu').recentRows`;
+const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').nameB`;
 const toMenu = async (c) => { await c.ev(`game.scene.getScene('home').scene.start('vsmenu'); 1`); const r = await c.until(MENU, 20000); await sleep(600); return r; };
+// the roll lives in the social sheet now (v0.73.0): recentRows exists only
+// while the sheet stands, so CHALLENGE A FRIEND is tapped for real first
+const toSheet = async (c) => {
+  if (!await toMenu(c)) return false;
+  for (let i = 0; i < 5; i++) {
+    await c.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChFriend'))`);
+    if (await c.until(`!!game.scene.getScene('vsmenu').recentRows`, 4000)) { await sleep(500); return true; }
+  }
+  return false;
+};
 const home = async (c) => { await c.nav(BASE + '?diag=1'); return c.until(READY, 60000); };
 const INPUT = `!!document.getElementById('ss-overlay-input') && document.activeElement === document.getElementById('ss-overlay-input')`;
 const rows = (c) => c.ev(`JSON.stringify(game.scene.getScene('vsmenu').recentRows.map(r => ({ id: r.id, name: r.name, circle: r.circle, ago: r.agoT.text, lit: r.nameT.style.color, y: r.row.y })))`).then(JSON.parse);
@@ -113,12 +125,13 @@ ok('A sees B online', await A.until(`SSNET.FR.isOnline(${JSON.stringify(UB)})`, 
 errs.length = 0;   // a dropped/aborted first navigate (README) leaves a half-loaded document's noise behind
 
 // ---- 1. the empty state: one quiet line, no hole ----
-ok('A opens VERSUS', await toMenu(A));
+ok('A opens VERSUS and the sheet', await toSheet(A));
 let tx = await menuTexts(A);
 ok('RECENT heading stands', tx.includes(await A.ev(`SS_T('vsRecentHead')`)));
 ok('a first-night player sees the quiet empty line', tx.includes(await A.ev(`SS_T('vsNoRecent')`)) && (await rows(A)).length === 0, tx.join(' | ').slice(0, 200));
 
 // ---- 2. a duel feeds recent/ on both sides, live ----
+await A.ev(`game.scene.getScene('vsmenu').closeSocial(); 1`);   // BY NAME is a page door, under the sheet's veil
 await A.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsByName'))`);
 ok('BY NAME input opens', await A.until(INPUT, 6000));
 await A.type(NB); await A.key('Enter', 'Enter');
@@ -134,15 +147,15 @@ ok('the row is live in memory mid-duel, no reload (FR listener)', await A.until(
 
 // ---- 3. RECENT shows B: newest first, tonight, glint; AGAIN → rematch lands ----
 ok('both back on the meadow', await home(A) && await home(B));
-ok('A opens VERSUS', await toMenu(A));
+ok('A opens VERSUS', await toSheet(A));
 let rs = await rows(A);
 ok('RECENT roll: B is the first row', rs.length === 1 && rs[0].id === UB && rs[0].name === NB && !rs[0].circle, JSON.stringify(rs));
 ok('…"tonight"', rs[0] && rs[0].ago === await A.ev(`SS_T('vsAgoTonight')`), rs[0] && rs[0].ago);
 ok('…lit — B is online', rs[0] && rs[0].lit === '#f0e8d2', rs[0] && rs[0].lit);
 ok('the empty line is gone', !(await menuTexts(A)).includes(await A.ev(`SS_T('vsNoRecent')`)));
-const flY = await A.ev(`game.scene.getScene('vsmenu').frC.list.find(o => o.text === SS_T('vsFriendLink')).getBounds().top`);
+const invTop = await A.ev(`game.scene.getScene('vsmenu').invB.getBounds().top`);
 const rowBottom = await A.ev(`Math.max(...game.scene.getScene('vsmenu').recentRows.map(r => r.again.getBounds().bottom))`);
-ok('the roll sits above the friend link', rowBottom < flY, rowBottom + ' < ' + flY);
+ok('the roll sits above the pinned invite', rowBottom < invTop, rowBottom + ' < ' + invTop);
 await tapRow(A, 0);
 ok('a real tap on AGAIN opens a challenge lobby aimed at B (live)', await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} && !s.challenged.away && !s.challenged.circle })()`, 25000));
 lb = await lobby(A); if (lb) codes.add(lb.code);
@@ -162,7 +175,7 @@ await sleep(800);
 await B.park();
 ok('A back on the meadow', await home(A));
 ok('A sees B leave the sky', await A.until(`!SSNET.FR.isOnline(${JSON.stringify(UB)})`, 40000));
-ok('A opens VERSUS', await toMenu(A));
+ok('A opens VERSUS', await toSheet(A));
 rs = await rows(A);
 ok('B still first, now unlit', rs.length === 1 && rs[0].id === UB && rs[0].lit === '#a9a99a', JSON.stringify(rs));
 await tapRow(A, 0);
@@ -177,8 +190,8 @@ const stale = (await rt('mp/rooms')) || {};
 for (const [k, r] of Object.entries(stale)) if (r && r.status === 'waiting' && !r.private && r.createdAt < Date.now() - 120000) await rtDel('mp/rooms/' + k);
 ok('A back on the meadow', await home(A));
 ok('A opens VERSUS', await toMenu(A));
-await A.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsFind'))`);
-ok('FIND A RIVAL opens a searching room', await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.room.seekAt })()`, 25000));
+await A.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChWorld'))`);
+ok('CHALLENGE WORLDWIDE opens a searching room', await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.room.seekAt })()`, 25000));
 lb = await lobby(A); if (lb) codes.add(lb.code);
 ok('the quiet sky answers — a circle mage arrives and the duel starts', await A.until(ACTIVE, 30000));
 const circ = JSON.parse(await A.ev(`JSON.stringify(SS_RIVAL.circle())`));
@@ -189,7 +202,7 @@ ok('the opponent is one of the circle', !!cp, CU);
 if (cp) { toDelete.add('players/' + cp.uid); toDelete.add('names/' + await A.ev(`SSNET.nameKey(${JSON.stringify(cp.name)})`)); }
 ok('recent/<A>/<mage> lands (the engine\'s seat is an ordinary row)', await (async () => { for (let i = 0; i < 20; i++) { const r = await rt('recent/' + UA + '/' + CU); if (r && r.name === cp.name) return true; await sleep(400); } return false; })());
 ok('A back on the meadow', await home(A));
-ok('A opens VERSUS', await toMenu(A));
+ok('A opens VERSUS', await toSheet(A));
 rs = await rows(A);
 ok('the circle mage is the newest row, marked of the circle, lit ready', rs.length === 2 && rs[0].id === CU && rs[0].circle && rs[0].lit === '#f0e8d2' && rs[1].id === UB, JSON.stringify(rs));
 await tapRow(A, 0);

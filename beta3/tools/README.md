@@ -1,6 +1,65 @@
 # beta3 dev tools
 
-Twenty-seven scripts, all dev-only — nothing here ships to the browser.
+Twenty-eight scripts, all dev-only — nothing here ships to the browser.
+
+## vspage-check.mjs — the challenge-first versus page (v0.73.0)
+
+Skylar's call (9/2): "Right now Versus at the top should be gone. We want to
+just have: Async battle (just this). No timed. No battlegrounds. The 'Invite
+a friend' button should be 'Challenge a friend' … When you hit the
+'Challenge a Friend' button … your friends list and your recent rivals
+should pop up. At the very bottom of it it should say [invite a new friend]
+… an invite link … that will invite them to play the Star Spell app not go
+to drbango.com … right next to Friends, there should be a plus button to add
+a friend … next to each of your friends … the [crossed-swords glyph] with a
+challenge button next to it … INSTEAD OF 'FIND A RIVAL': 'Challenge
+Worldwide'." The game side: the heading, the mode pills and the always-on
+friends panel left the page; every door the menu seals is a TURNS room (the
+timed/bg engine under versus.js stays fenced, so an old client's room still
+resolves — the page just never mints one) and the dead `beta3.vsmode` key is
+swept; the crest and every friend row wear `vsSwordsTex` — crossed blades
+DRAWN in canvas through ssBake (the no-emoji-as-game-art law), consumed via
+setDisplaySize; CHALLENGE A FRIEND opens the social sheet (`openSocial`,
+`frC`/`frRows`/`recentRows`, the FR listener + a 15s ager alive only while
+it stands, nulled at create — the stale-ref law); every friend row carries
+glyph + CHALLENGE (ready = gold, away/busy = the dark dress, the tap landing
+the standing summons the by-name door already speaks); the + beside FRIENDS
+adds a friend by unique name (`addPrompt`/`seekAdd` — findByName + FR.add,
+the by-name manners kept: an honest miss re-offers the typed text, yourself
+is refused); pinned at the sheet's foot, ✶ INVITE A NEW FRIEND shares
+`VS_APP_URL` (the TestFlight door — a store link can't carry ?friend=, so
+the share names the sender for the add-by-name bridge; the old
+`vsFriendUrl` friend-link is retired); FIND A RIVAL is CHALLENGE WORLDWIDE,
+the queue beneath unchanged. `?frdemo=invite` now rides `sealLobby` (a
+private turns lobby, no share — the lobby's own button carries the link).
+
+Self-launching (server :8899 if nothing serves, TWO Chromes on :9471/:9472,
+`/tmp/cdp-vspa|b` wiped first), the LIVE sky — the registry and FR flows
+need it; every row the run writes is deleted and proven gone.
+
+```
+perl -e 'alarm 580; exec @ARGV' node tools/vspage-check.mjs   # 61 checks, ~6 min
+```
+
+The source audit (no heading literal, no pills/saved mode, the sweep, turns
+at every seal, VS_APP_URL, the ten new keys ×5 langs and every retired key
+gone), the page in all five languages by real boots (primaries + caption +
+doors present; heading, pill labels and panel heads absent; sheet refs null
+pre-tap), the sheet by real DPR-3 taps (heads, +, ✕, both empty lines, the
+invite row under everything, the 44-pt law on the new targets, ✕/veil close
++ reopen), the share payload through a capturing clipboard (the app link,
+the sender's name, never drbango.com/localhost/?join/?friend — and the v0.41
+lesson again: navigator.clipboard's getter cannot be assigned over, define
+an OWN property), the + flow on two REAL uids against the live registry
+(both sides of the friendship land, the roll repaints through the FR
+listener, miss re-offers, self refused), a real row CHALLENGE ringing the
+summons into a private TURNS room and a real ACCEPT starting the duel, the
+away row keeping the affordance and landing the standing invite, CHALLENGE
+WORLDWIDE seeding a public turns room with a queue clock (parked before the
+quiet sky answers — rival-check owns that path), the frdemo=invite recipe,
+and the es dress. Harness lesson: an eval must never bare-`remove()` the
+focused DOM input — the blur race throws NotFoundError (ssDomInput's own
+removal is the guarded path; just open the next prompt).
 
 ## lang-check.mjs — the cut to five languages is total (v0.71.0)
 
@@ -806,9 +865,10 @@ What TestFlight v0.43.0 taught, in three lines:
 
 The rival queue, matched by rating (v0.48.0). Wyatt: "searching for a rival
 should queue you up against someone close to your rating." The UX did not
-move — a searcher still IS a waiting public room (FIND A RIVAL takes a seat
-or opens one), so the queue entry is the room: `seekAt` is the moment FIND
-was pressed (`now - seekAt` is the wait, for the 12s-fallback task to read),
+move — a searcher still IS a waiting public room (CHALLENGE WORLDWIDE, the
+FIND A RIVAL of old, takes a seat or opens one), so the queue entry is the
+room: `seekAt` is the moment the button was pressed (`now - seekAt` is the
+wait, for the 12s-fallback task to read),
 the host seat already carries the true `rating` (rhide is display-only).
 `vsPickRoom` takes the CLOSEST host within a tolerance that opens with the
 pair's COMBINED wait (±75 at once, +75 per 3s between them — `vsTolerance`),
@@ -1480,10 +1540,11 @@ with the dead key swept). `SHOTS=<dir>` keeps the snapshots.
 - `Runtime.evaluate` with `returnByValue` on a Phaser game object comes back `undefined`,
   not truthy — always wrap finders in `!!(...)`.
 - Friends recipes: `?frdemo=host&mpuid=a` (befriend test_b, wait online, CHALLENGE),
-  `?frdemo=guest&mpuid=b` (auto-ACCEPT the summons), `?frdemo=invite&mpuid=a` (INVITE A
-  FRIEND → private lobby), `?frdemo=join&mpuid=x` (solver on, nothing automatic — the
-  real-click harness drives it). Beacons: `beta3.summons`, `beta3.deeplink`,
-  `beta3.vsresult`. Clean up `friends|recent|invites|presence|players/test_*` after.
+  `?frdemo=guest&mpuid=b` (auto-ACCEPT the summons), `?frdemo=invite&mpuid=a` (sealLobby
+  → private turns lobby; the lobby's own share button carries the ?join link),
+  `?frdemo=join&mpuid=x` (solver on, nothing automatic — the real-click harness drives
+  it). Beacons: `beta3.summons`, `beta3.deeplink`, `beta3.vsresult`. Clean up
+  `friends|recent|invites|presence|players/test_*` after.
 
 ## names-check.mjs — unique player names (v0.53.0) + the preset rollover (v0.72.0)
 
@@ -1580,7 +1641,8 @@ seed guards key on the uid so a reused `/tmp/cdp-*` profile re-seeds.
 
 ## recent-check.mjs — recent rivals in VERSUS (v0.55.0)
 
-The RECENT roll (task 44): the friends panel now holds three friend rows, a
+The RECENT roll (task 44; since v0.73.0 it lives in the social sheet that
+CHALLENGE A FRIEND opens — the suite taps its way in): three friend rows, a
 `— RECENT RIVALS —` heading and the last three mages you crossed swords
 with, newest first (`SSNET.FR.recentList(n)` — friends included, unlike the
 older `rivals(n)`), each with the coarse night clock (`vsNightsAgo`:

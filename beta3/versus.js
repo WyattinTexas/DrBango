@@ -1,23 +1,35 @@
 'use strict';
 /* ============================================================
-   STARSPELL versus — three modes on one RTDB room system
+   STARSPELL versus — the async battle, on the RTDB room system
    (pattern lifted from BoO raids: single room listener, txn
    join, multi-path turn handoff, onDisconnect presence).
 
-   · DUEL  · TURNS — alternate casts, no clock, wait your turn
-   · DUEL  · TIMED — both weave at once, 3:00, KO or higher HP
-   · BATTLEGROUND  — 2–4 mages, turns rotate, hits find the leader
+   THE PAGE (v0.73.0, Skylar 9/2): challenge-first. No heading, no
+   mode pills — every door on this page seals a TURNS room (the
+   async battle is the only duel offered). Two primaries:
+   · CHALLENGE A FRIEND — opens the social sheet: the friends roll
+     (drawn crossed-blades glyph + CHALLENGE on every row; an away
+     friend takes a standing summons), the recent rivals beneath,
+     a + that adds a friend by their unique name, and — pinned at
+     the sheet's foot — the invite that sends a NEW friend the
+     STARSPELL app itself (VS_APP_URL, never a drbango.com page).
+   · CHALLENGE WORLDWIDE — quick match (the rival queue + the
+     quiet sky, unchanged beneath the new name).
+   BY NAME and the 4-letter seal stay as small fallback doors.
+
+   The room ENGINE below still speaks turns/timed/bg — a room's
+   mode rules its battle, so an old client's timed room resolves —
+   but this page mints turns only, and nothing saves a mode choice.
 
    Every 3rd cast of your own → sigil pick-3.
    Boards start identical (shared seed) then diverge.
 
-   Connections (v0.25): the front door is FRIENDS — a mutual list in
-   RTDB (SSNET.FR), presence dots, one-tap CHALLENGE that seals a
-   private room and rings a summons banner on the friend's screen
-   (VsSummons overlay scene, any screen), and native INVITE links
-   (?join=CODE&from=UID via navigator.share / clipboard) that
-   auto-join on boot. The 4-letter seal stays as the fallback.
-   Testing: ?vsdemo=1&vsmode=turns|timed|bg&mpuid=a — solver plays.
+   Connections (v0.25): FRIENDS — a mutual list in RTDB (SSNET.FR),
+   presence dots, one-tap CHALLENGE that seals a private room and
+   rings a summons banner on the friend's screen (VsSummons overlay
+   scene, any screen). ?join=CODE&from=UID deep links auto-join on
+   boot (minted by the lobby's share button).
+   Testing: ?vsdemo=1&mpuid=a — solver plays.
    ?frdemo=host|guest|invite|join&mpuid=x — friends recipes (see
    frDemo / VsSummons.create).
    ============================================================ */
@@ -35,9 +47,17 @@ if (FRDEMO) window.__VSDEMO_REMATCHED = true;                 // friends recipes
 // friends, presence, invites and seats all key by the same uid
 const vsUid = () => SSNET.uid();
 const vsName = () => SSNET.myName();
+// the ENGINE's mode vocabulary (rooms still speak all three — an old
+// client's timed/bg room resolves; rival.js's ?botduel seam validates its
+// ?vsmode against this list). The MENU offers none of them: it mints turns.
 const VS_MODES = ['turns', 'timed', 'bg'];
+// the summons banner still names an old client's timed/bg challenge honestly
 const VS_MODE_KEY = { turns: 'vsModeTurns', timed: 'vsModeTimed', bg: 'vsModeBg' };
-const VS_MODE_SUB = { turns: 'vsTurnsSub', timed: 'vsTimedSub', bg: 'vsBgSub' };
+// where a NEW friend is sent: the STARSPELL app itself (the TestFlight door
+// today — swap this one constant when the App Store page exists). A store
+// link cannot carry a ?friend= deep link, so the share names the sender and
+// the new mage adds them by their unique name after installing.
+const VS_APP_URL = 'https://testflight.apple.com/join/Hxs8e7fU';
 // every seat carries its rating into the room: the Elo exchange at the end
 // reads the rival's number from here, and rhide keeps a veiled rating out of
 // the opponent's VIEW (the math still needs the true value — client-
@@ -48,8 +68,9 @@ const vsSeat = (seat) => ({
 });
 
 /* ============================================================
-   Menu — friends first: who's online, one-tap CHALLENGE, native
-   INVITE links; then quick match, then the seal code as fallback
+   Menu — challenge-first (v0.73.0): the crest, two primaries
+   (CHALLENGE A FRIEND → the social sheet · CHALLENGE WORLDWIDE →
+   quick match), the BY NAME / seal fallback doors. Turns only.
    ============================================================ */
 class VsMenu extends Phaser.Scene {
   constructor() { super('vsmenu'); }
@@ -57,111 +78,145 @@ class VsMenu extends Phaser.Scene {
     const l = ssLayout(this);
     ssMakeTextures(this);
     ssStarfield(this, 90);
+    // scene instances persist across restarts — stale truthy refs from a
+    // previous life could keep the sheet from ever opening again
+    this.socialC = null; this.frC = null; this.shNoteT = null;
+    this.recentRows = null; this.frRows = null;
+    this.frOff = null; this.frTimer = null;
+    this.busyC = false;
     const back = ssTxt(this, l.x(-195), l.y(24), '‹ HOME', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     back.on('pointerdown', () => { SFX.ui(); this.scene.start('home'); });
-    ssTxt(this, l.x(0), l.y(62), '⚔ VERSUS ⚔', l.u(22), '#f3e5b4').setOrigin(0.5).setShadow(0, 0, '#c9a94f', l.u(14), true, true);
-    ssTxt(this, l.x(0), l.y(90), SS_T('vsAs', vsName()), l.u(11), '#8a94c4', 'italic').setOrigin(0.5);
-    this.busyC = false;
 
     if (SSNET.mode === 'local') {
       ssTxt(this, l.x(0), l.y(300), SS_T('vsNoSky'), l.u(14), '#8c5a5a', 'italic').setOrigin(0.5).setAlign('center');
       return;
     }
-    this.mode = VS_MODES.includes(localStorage.getItem('beta3.vsmode')) ? localStorage.getItem('beta3.vsmode') : 'turns';
-    if (QS.get('vsmode') && VS_MODES.includes(QS.get('vsmode'))) this.mode = QS.get('vsmode');
+    try { localStorage.removeItem('beta3.vsmode'); } catch (e) { }   // the mode choice is retired — sweep the dead key
 
-    this.buildFriends(l);
+    // the crest: drawn crossed blades over a slow gold breath — the page's
+    // one emblem now that the heading is gone, and the name friends type
+    // into BY NAME / the sheet's + right beneath it
+    const crestGlow = this.add.image(l.x(0), l.y(168), 'glowbig').setDisplaySize(l.u(250), l.u(250)).setTint(0xc9a94f).setAlpha(0.1).setBlendMode('ADD');
+    this.tweens.add({ targets: crestGlow, alpha: 0.045, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.add.image(l.x(0), l.y(168), vsSwordsTex(this)).setDisplaySize(l.u(84), l.u(84)).setAlpha(0.96);
+    ssTxt(this, l.x(0), l.y(232), SS_T('vsAs', vsName()), l.u(11), '#8a94c4', 'italic').setOrigin(0.5);
 
-    // the mode picker — three pills, the chosen one wears the gold button;
-    // CHALLENGE, INVITE and FIND all seal a room of this mode
-    this.pills = {};
-    VS_MODES.forEach((m, i) => {
-      const x = l.x(-124 + i * 124);
-      const b = this.add.image(x, l.y(440), ssBtn(this, true, 116, 32)).setDisplaySize(l.u(116), l.u(32)).setInteractive({ useHandCursor: true });
-      const t = ssTxt(this, x, l.y(440), SS_T(VS_MODE_KEY[m]), l.u(10.5), '#9fb0e8').setOrigin(0.5);
-      b.on('pointerdown', () => { SFX.ui(); this.setMode(m); });
-      this.pills[m] = { b, t };
-    });
-    this.modeSubT = ssTxt(this, l.x(0), l.y(466), '', l.u(9.5), '#8a94c4', 'italic').setOrigin(0.5);
-    this.setMode(this.mode, true);
+    // the two primaries — and only these (Skylar 9/2). Every door on this
+    // page seals a turn-based room; the caption says the mode once.
+    ssTxt(this, l.x(0), l.y(376), SS_T('vsAsync'), l.u(10.5), '#c9b676', 'italic').setOrigin(0.5);
+    const prim = (y, key, subKey, cb) => {
+      const b = this.add.image(l.x(0), l.y(y), ssBtn(this, false, 320, 60)).setDisplaySize(l.u(320), l.u(60)).setInteractive({ useHandCursor: true });
+      const t = ssTxt(this, l.x(0), l.y(y - 10), SS_T(key), l.u(17), BTN_INK()).setOrigin(0.5);
+      for (let fs = 17; t.width > l.u(296) && fs > 11; fs -= 0.5) t.setFontSize(l.u(fs));
+      const s = ssTxt(this, l.x(0), l.y(y + 12), SS_T(subKey), l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
+      for (let fs = 9.5; s.width > l.u(300) && fs > 7; fs -= 0.5) s.setFontSize(l.u(fs));
+      b.on('pointerdown', cb);
+      return b;
+    };
+    this.chFriendB = prim(414, 'vsChFriend', 'vsChFriendSub', () => { SFX.ensure(); SFX.ui(); this.openSocial(); });
+    this.chWorldB = prim(486, 'vsChWorld', 'vsChWorldSub', () => { SFX.ensure(); SFX.ui(); this.match('turns'); });
 
-    // INVITE A FRIEND — the modern door: seals a private room and opens the
-    // share sheet with a link that joins it. Wired on pointerUP: iOS grants
-    // navigator.share/clipboard only inside a user activation, and Phaser's
-    // pointerdown comes from touchstart, which is not one — touchend is.
-    const invB = this.add.image(l.x(0), l.y(512), ssBtn(this, false, 320, 60)).setDisplaySize(l.u(320), l.u(60)).setInteractive({ useHandCursor: true });
-    ssTxt(this, l.x(0), l.y(502), SS_T('vsInvite'), l.u(17), BTN_INK()).setOrigin(0.5);
-    ssTxt(this, l.x(0), l.y(524), SS_T('vsInviteSub'), l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
-    vsOnTap(invB, () => { SFX.ensure(); SFX.ui(); this.inviteFriend(); });
-    // FIND A RIVAL — quick match, as before
-    const findB = this.add.image(l.x(0), l.y(580), ssBtn(this, false, 320, 60)).setDisplaySize(l.u(320), l.u(60)).setInteractive({ useHandCursor: true });
-    ssTxt(this, l.x(0), l.y(570), SS_T('vsFind'), l.u(17), BTN_INK()).setOrigin(0.5);
-    ssTxt(this, l.x(0), l.y(592), SS_T('vsFindSub'), l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
-    findB.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.match(this.mode); });
     // reaching a mage yourself: BY NAME (task 43 — the unique-name registry
     // resolves whoever you type) beside the seal code, still the cross-device
     // fallback that needs no friend setup
-    ssTxt(this, l.x(0), l.y(632), SS_T('vsOrReach'), l.u(11), '#5a6390').setOrigin(0.5);
+    ssTxt(this, l.x(0), l.y(556), SS_T('vsOrReach'), l.u(11), '#5a6390').setOrigin(0.5);
     const door = (x, key, cb) => {
-      const b = this.add.image(l.x(x), l.y(664), ssBtn(this, true, 166, 44)).setDisplaySize(l.u(166), l.u(44)).setInteractive({ useHandCursor: true });
-      const t = ssTxt(this, l.x(x), l.y(664), SS_T(key), l.u(12), '#9fb0e8').setOrigin(0.5);
+      const b = this.add.image(l.x(x), l.y(588), ssBtn(this, true, 166, 44)).setDisplaySize(l.u(166), l.u(44)).setInteractive({ useHandCursor: true });
+      const t = ssTxt(this, l.x(x), l.y(588), SS_T(key), l.u(12), '#9fb0e8').setOrigin(0.5);
       for (let fs = 12; t.width > l.u(150) && fs > 8; fs -= 0.5) t.setFontSize(l.u(fs));
       b.on('pointerdown', cb);
       return b;
     };
     this.nameB = door(-88, 'vsByName', () => this.namePrompt(l));
     door(88, 'vsSeal', () => this.codePrompt(l));
-    this.noteT = ssTextBlock(this, l.x(0), l.y(708), '', {
+    this.noteT = ssTextBlock(this, l.x(0), l.y(642), '', {
       fontSize: l.u(11) + 'px', color: '#c9b676', fontStyle: 'italic', shadow: true,
       wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
     });
 
-    this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
-    if (VSAUTO) this.time.delayedCall(600, () => this.match(this.mode));
+    this.events.once('shutdown', () => this.closeSocial());
+    if (VSAUTO) this.time.delayedCall(600, () => this.match('turns'));
     if (FRDEMO === 'host' || FRDEMO === 'invite') this.time.delayedCall(800, () => this.frDemo());
   }
+  // feedback lands where the eye is: on the sheet's own line while it is
+  // open, on the page line otherwise
   note(s, ms) {
-    if (!this.noteT || !this.noteT.active) return;
-    this.noteT.setText(s || '');
+    const t = (this.socialC && this.shNoteT && this.shNoteT.active) ? this.shNoteT : this.noteT;
+    if (!t || !t.active) return;
+    t.setText(s || '');
     if (this.noteTimer) { this.noteTimer.remove(false); this.noteTimer = null; }
-    if (s && ms) this.noteTimer = this.time.delayedCall(ms, () => { if (this.noteT.active) this.noteT.setText(''); });
-  }
-  setMode(m, silent) {
-    this.mode = m;
-    try { localStorage.setItem('beta3.vsmode', m); } catch (e) { }
-    const l = ssLayout(this);
-    for (const k of VS_MODES) {
-      const sel = k === m;
-      this.pills[k].b.setTexture(ssBtn(this, !sel, 116, 32)).setDisplaySize(l.u(116), l.u(32));
-      this.pills[k].t.setColor(sel ? BTN_INK() : '#9fb0e8');
-    }
-    this.modeSubT.setText(SS_T(VS_MODE_SUB[m]));
-    if (!silent) this.refreshFriends();
+    if (s && ms) this.noteTimer = this.time.delayedCall(ms, () => { if (t.active) t.setText(''); });
   }
 
-  /* ---------- the friends panel ----------
-     Live from SSNET.FR: friends online first (dot lit, CHALLENGE ready),
-     then the rest with when they were last seen; below the roll, recent
-     rivals as one-tap "+ ADD" links and the friend-link share. */
-  buildFriends(l) {
-    const PH = 296, top = 118;
-    this.frTop = top;
-    this.add.image(l.x(0), l.y(top + PH / 2), 'endpanel').setDisplaySize(l.u(372), l.u(PH));
-    ssTxt(this, l.x(0), l.y(top + 22), SS_T('vsFriends'), l.u(12), '#c9b676').setOrigin(0.5);
+  /* ---------- the social sheet (v0.73.0) ----------
+     CHALLENGE A FRIEND opens this over the page: the friends roll live from
+     SSNET.FR (presence dot, the drawn crossed-blades glyph + CHALLENGE on
+     EVERY row — an away friend takes a standing summons, a busy one a
+     waiting bell, exactly the by-name manners), the recent rivals beneath
+     (AGAIN + befriend, the circle answering through the engine), a + by the
+     heading that adds a friend by their unique STARSPELL name, and — pinned
+     at the very bottom — the invite that sends a NEW friend the app itself. */
+  openSocial() {
+    if (this.socialC || this.busyC) return;
+    if (SSNET.mode !== 'firebase') { this.note(SS_T('vsNoSky'), 3000); return; }
+    const l = ssLayout(this);
+    const c = this.socialC = this.add.container(0, 0).setDepth(600);
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.62).setInteractive();
+    veil.on('pointerdown', () => this.closeSocial());
+    const PH = 380, top = this.shTop = 400 - PH / 2;
+    c.add(veil);
+    c.add(this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(372), l.u(PH)));
+    const head = ssTxt(this, l.x(0), l.y(top + 26), SS_T('vsFriends'), l.u(12), '#c9b676').setOrigin(0.5);
+    // + — add a friend by their unique name, right next to FRIENDS
+    const addB = this.add.image(l.x(0) + head.width / 2 + l.u(26), l.y(top + 26), ssBtn(this, true, 34, 26))
+      .setDisplaySize(l.u(34), l.u(26)).setInteractive({ useHandCursor: true });
+    const addT = ssTxt(this, 0, l.y(top + 26) - l.u(1), '+', l.u(15), '#9fb0e8').setOrigin(0.5).setX(addB.x);
+    addB.on('pointerdown', () => { SFX.ui(); this.addPrompt(l); });
+    this.addB = addB;
+    const xb = ssTxt(this, l.x(166), l.y(top + 26), '✕', l.u(14), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xb.on('pointerdown', () => { SFX.ui(); this.closeSocial(); });
+    c.add([head, addB, addT, xb]);
     this.frC = this.add.container(0, 0);
+    c.add(this.frC);
+    // pinned at the sheet's foot: invite a NEW friend to challenge — the
+    // share carries the STARSPELL app link (VS_APP_URL), never a web page.
+    // pointerUP law: iOS grants share/clipboard only inside a user activation.
+    const invB = this.add.image(l.x(0), l.y(top + PH - 44), ssBtn(this, false, 320, 54)).setDisplaySize(l.u(320), l.u(54)).setInteractive({ useHandCursor: true });
+    const invT = ssTxt(this, l.x(0), l.y(top + PH - 53), SS_T('vsInviteNew'), l.u(13.5), BTN_INK()).setOrigin(0.5);
+    for (let fs = 13.5; invT.width > l.u(296) && fs > 9; fs -= 0.5) invT.setFontSize(l.u(fs));
+    const invS = ssTxt(this, l.x(0), l.y(top + PH - 33), SS_T('vsInviteNewSub'), l.u(9), BTN_INK2(), 'italic').setOrigin(0.5);
+    for (let fs = 9; invS.width > l.u(300) && fs > 7; fs -= 0.5) invS.setFontSize(l.u(fs));
+    vsOnTap(invB, () => { SFX.ensure(); SFX.ui(); this.inviteNew(); });
+    this.invB = invB;
+    c.add([invB, invT, invS]);
+    this.shNoteT = ssTextBlock(this, l.x(0), l.y(top + PH + 22), '', {
+      fontSize: l.u(10.5) + 'px', color: '#c9b676', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
+    });
+    c.add(this.shNoteT);
+    this.refreshFriends();
     this.frOff = SSNET.FR.on(() => this.refreshFriends());
-    // "seen 2h ago" and online dots age while the menu sits open
-    this.time.addEvent({ delay: 15000, loop: true, callback: () => this.refreshFriends() });
+    // "seen 2h ago" and online dots age while the sheet sits open
+    this.frTimer = this.time.addEvent({ delay: 15000, loop: true, callback: () => this.refreshFriends() });
+    c.setAlpha(0);
+    this.tweens.add({ targets: c, alpha: 1, duration: 180 });
+  }
+  closeSocial() {
+    if (this.frOff) { this.frOff(); this.frOff = null; }
+    if (this.frTimer) { this.frTimer.remove(false); this.frTimer = null; }
+    if (this.socialC) { const c = this.socialC; this.socialC = null; c.destroy(); }
+    this.frC = null; this.shNoteT = null; this.recentRows = null; this.frRows = null;
   }
   refreshFriends() {
-    if (!this.frC || !this.frC.scene) return;   // (not isActive: the first paint happens inside create)
-    const l = ssLayout(this), top = this.frTop, FR = SSNET.FR;
+    if (!this.socialC || !this.frC || !this.frC.scene) return;
+    const l = ssLayout(this), top = this.shTop, FR = SSNET.FR;
     this.frC.removeAll(true);
     const items = [];
     const friends = FR.list();
-    const ROWS = 3, rowY = (i) => l.y(top + 52 + i * 36);   // three rows: RECENT lives below (task 44)
+    const ROWS = 3, rowY = (i) => l.y(top + 62 + i * 38);
+    this.frRows = [];
     if (!friends.length) {
-      items.push(ssTextBlock(this, l.x(0), l.y(top + 88), SS_T('vsNoFriends'), {
+      items.push(ssTextBlock(this, l.x(0), l.y(top + 100), SS_T('vsNoFriends'), {
         fontSize: l.u(11) + 'px', color: '#5a6390', fontStyle: 'italic', shadow: true,
         wrapW: l.u(320), align: 'center', ox: 0.5, oy: 0.5,
       }));
@@ -176,24 +231,31 @@ class VsMenu extends Phaser.Scene {
       }
       items.push(dot);
       const nm = ssTxt(this, l.x(-146), y - l.u(7), f.name, l.u(13), f.online ? '#f0e8d2' : '#a9a99a').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-      while (nm.width > l.u(150) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+      while (nm.width > l.u(118) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+      ssHitPad(nm, 30);
       nm.on('pointerdown', () => ssRatingCard(this, { uid: f.id, name: f.name }));
       items.push(nm);
       const p = FR.presence[f.id];
       const status = f.online ? (f.busy ? SS_T('vsInDuel') : SS_T('vsOnline'))
         : (p && p.at ? SS_T('vsSeen', vsAgo(Date.now() - p.at)) : SS_T('vsOffline'));
       items.push(ssTxt(this, l.x(-146), y + l.u(9), status, l.u(9), f.online ? (f.busy ? '#e8a87f' : '#7fe0a0') : '#5a6390', 'italic').setOrigin(0, 0.5));
-      if (f.online && !f.busy) {
-        const cb = this.add.image(l.x(96), y, ssBtn(this, false, 104, 30)).setDisplaySize(l.u(104), l.u(30)).setInteractive({ useHandCursor: true });
-        const ct = ssTxt(this, l.x(96), y, SS_T('vsChallenge'), l.u(10.5), BTN_INK()).setOrigin(0.5);
-        cb.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.challenge(f); });
-        cb.on('pointerover', () => cb.setScale(cb.scaleX * 1.03, cb.scaleY * 1.03));
-        cb.on('pointerout', () => cb.setDisplaySize(l.u(104), l.u(30)));
-        items.push(cb, ct);
-      }
+      // every friend row carries the challenge (Skylar 9/2): the drawn glyph
+      // + the button. Ready = gold; away or mid-duel = the dark dress, and
+      // the tap lands the standing summons the by-name door already speaks.
+      const ready = f.online && !f.busy;
+      const glyph = this.add.image(l.x(36), y, vsSwordsTex(this)).setDisplaySize(l.u(20), l.u(20)).setAlpha(ready ? 1 : 0.55);
+      items.push(glyph);
+      const cb = this.add.image(l.x(102), y, ssBtn(this, !ready, 96, 30)).setDisplaySize(l.u(96), l.u(30)).setInteractive({ useHandCursor: true });
+      ssHitPad(cb, 30);
+      const ct = ssTxt(this, l.x(102), y, SS_T('vsChallenge'), l.u(10), ready ? BTN_INK() : '#9fb0e8').setOrigin(0.5);
+      for (let fs = 10; ct.width > l.u(88) && fs > 7; fs -= 0.5) ct.setFontSize(l.u(fs));
+      cb.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.challenge({ id: f.id, name: f.name, away: !f.online, busy: f.online && f.busy }); });
+      items.push(cb, ct);
       const rm = ssTxt(this, l.x(176), y, '✕', l.u(11), '#39406b').setOrigin(0.5).setInteractive({ useHandCursor: true });
+      ssHitPad(rm, 30);
       rm.on('pointerdown', () => { SFX.ui(); FR.remove(f.id); });
       items.push(rm);
+      this.frRows.push({ id: f.id, name: f.name, cb, ct, glyph, rm, nameT: nm, online: f.online, busy: f.busy });
     });
     if (friends.length > ROWS) {
       items.push(ssTxt(this, l.x(0), rowY(ROWS - 1), SS_T('vsMore', friends.length - shown.length), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5));
@@ -206,18 +268,18 @@ class VsMenu extends Phaser.Scene {
        summons, away = a standing invite (the lobby says so); a mage of THE
        CIRCLE answers through the rival engine. A first-night player sees one
        quiet line. `+` befriends without a duel. */
-    items.push(ssTxt(this, l.x(0), l.y(top + 158), SS_T('vsRecentHead'), l.u(10.5), '#c9b676').setOrigin(0.5));
+    items.push(ssTxt(this, l.x(0), l.y(top + 170), SS_T('vsRecentHead'), l.u(10.5), '#c9b676').setOrigin(0.5));
     const recent = FR.recentList(3);
     this.recentRows = [];
     if (!recent.length) {
-      items.push(ssTextBlock(this, l.x(0), l.y(top + 212), SS_T('vsNoRecent'), {
+      items.push(ssTextBlock(this, l.x(0), l.y(top + 228), SS_T('vsNoRecent'), {
         fontSize: l.u(11) + 'px', color: '#5a6390', fontStyle: 'italic', shadow: true,
         wrapW: l.u(320), align: 'center', ox: 0.5, oy: 0.5,
       }));
     }
     const circle = (typeof SS_RIVAL !== 'undefined') ? SS_RIVAL.circle() : [];
     recent.forEach((r, i) => {
-      const y = l.y(top + 182 + i * 30);
+      const y = l.y(top + 196 + i * 32);
       const ofCircle = circle.some((c) => c.uid === r.id);
       const lit = r.online || ofCircle;   // a mage of the circle always answers — it glints ready
       const dot = this.add.circle(l.x(-160), y, l.u(4), lit ? (r.busy ? 0xe8a87f : 0x7fe0a0) : 0x39406b);
@@ -250,17 +312,56 @@ class VsMenu extends Phaser.Scene {
       }
       this.recentRows.push({ id: r.id, name: r.name, row: zone, again: ab, nameT: nm, agoT: ago, circle: ofCircle });
     });
-    // your friend link — the way to add someone without a duel first
-    const fl = ssTxt(this, l.x(0), l.y(top + 278), SS_T('vsFriendLink'), l.u(10), '#c9b676').setOrigin(0.5).setInteractive({ useHandCursor: true });
-    vsOnTap(fl, () => {
-      SFX.ui();
-      vsShare(SS_T('vsFriendText', vsName()), vsFriendUrl()).then((r) => {
-        if (r === 'copied') this.note(SS_T('vsCopied'), 2500);
-        else if (r === 'failed') this.note(SS_T('vsCopyFail'), 2500);
-      });
-    });
-    items.push(fl);
     this.frC.add(items);
+  }
+  // + on the sheet: add a friend by their unique STARSPELL name. The registry
+  // resolves it (case and spacing fold through nameKey), FR.add writes both
+  // sides, and the roll repaints itself through the FR listener. The by-name
+  // manners hold: an honest miss re-offers what was typed, yourself is
+  // refused gently.
+  addPrompt(l, prefill) {
+    if (this.busyC) return;
+    SFX.ui();
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.maxLength = 24; inp.placeholder = SS_T('vsNamePh');
+    inp.setAttribute('autocapitalize', 'words'); inp.setAttribute('autocorrect', 'off');
+    inp.setAttribute('autocomplete', 'off'); inp.setAttribute('enterkeyhint', 'go'); inp.spellcheck = false;
+    inp.value = prefill != null ? prefill : '';
+    inp.style.cssText = 'position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:9999;font:700 ' +
+      Math.round(l.u(20)) + 'px Georgia,serif;text-align:center;background:#141a33;color:#f3e5b4;border:2px solid #c9a94f;border-radius:10px;padding:10px 14px;outline:none;width:70%;max-width:320px;';
+    // no commitOnShutdown: leaving the menu mid-type must not add anyone
+    ssDomInput(this, inp, (v) => this.seekAdd(v, l));
+    if (inp.value) inp.select();
+  }
+  async seekAdd(v, l) {
+    const typed = String(v || '').trim().replace(/\s+/g, ' ');
+    if (!typed || !this.sys.isActive() || this.busyC || !this.socialC) return;
+    if (SSNET.nameKey(typed) === SSNET.nameKey(vsName())) { this.note(SS_T('vsAddSelf'), 3500); return; }
+    this.busyC = true;
+    this.note(SS_T('vsNameSeek', typed));
+    let hit = null;
+    try { hit = await SSNET.findByName(typed); } catch (e) { hit = null; }
+    if (!this.sys.isActive()) return;
+    this.busyC = false;
+    if (hit && hit.uid === vsUid()) { this.note(SS_T('vsAddSelf'), 3500); return; }
+    if (!hit) {
+      // an honest miss — and the field comes back holding what they typed
+      this.note(SS_T('vsNameNone', typed), 4000);
+      if (this.socialC) this.addPrompt(l, typed);
+      return;
+    }
+    const ok = await SSNET.FR.add(hit.uid, hit.name);
+    if (!this.sys.isActive()) return;
+    this.note(ok ? SS_T('frAdded', hit.name) : SS_T('vsRefused'), 3000);
+  }
+  // the pinned invite: a NEW friend gets the STARSPELL app itself (VS_APP_URL
+  // — the TestFlight door today), never a drbango.com page. The share names
+  // the sender twice over so the new mage can add them by name after install.
+  inviteNew() {
+    vsShare(SS_T('vsAppText', vsName(), vsName()), VS_APP_URL).then((r) => {
+      if (r === 'copied') this.note(SS_T('vsCopied'), 2500);
+      else if (r === 'failed') this.note(SS_T('vsShareFail'), 2500);
+    });
   }
 
   /* ---------- the three doors ---------- */
@@ -282,9 +383,9 @@ class VsMenu extends Phaser.Scene {
       const conn = await SSNET.connect();
       if (conn !== 'firebase') { this.note(SS_T('vsNoSky'), 3000); this.busyC = false; return; }
       const code = vsCode();
-      const ok = await vsSealRoom(code, this.mode, { private: true, invited: f.id });
+      const ok = await vsSealRoom(code, 'turns', { private: true, invited: f.id });
       if (!ok || !this.sys.isActive()) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
-      if (!f.circle) await SSNET.FR.challenge(f.id, code, this.mode);   // the circle has no bell to ring
+      if (!f.circle) await SSNET.FR.challenge(f.id, code, 'turns');   // the circle has no bell to ring
       if (!this.sys.isActive()) return;
       // away/busy ride along so the lobby can say where the summons waits
       this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name, away: !!f.away, busy: !!f.busy, circle: f.circle || null } });
@@ -332,17 +433,16 @@ class VsMenu extends Phaser.Scene {
     const FR = SSNET.FR;
     this.challenge({ id: hit.uid, name: hit.name, away: !FR.isOnline(hit.uid), busy: FR.isOnline(hit.uid) && FR.isBusy(hit.uid) });
   }
-  inviteFriend() {
+  // ?frdemo=invite: seal a private room and stand in its lobby — the deep-link
+  // recipe (the lobby's own ✶ SHARE INVITE LINK button carries the ?join link)
+  sealLobby() {
     if (this.busyC || SSNET.mode !== 'firebase') { if (SSNET.mode !== 'firebase') this.note(SS_T('vsNoSky'), 3000); return; }
     this.busyC = true;
-    // the code is minted locally, so the link exists BEFORE the room write
-    // lands — the share sheet opens inside the tap's activation window
     const code = vsCode();
-    const sharing = vsShare(SS_T('vsShareText', vsName()), vsInviteUrl(code));
-    vsSealRoom(code, this.mode, { private: true }).then((ok) => {
+    vsSealRoom(code, 'turns', { private: true }).then((ok) => {
       if (!this.sys.isActive()) return;
       if (!ok) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
-      this.scene.start('vsbattle', { code, sharing });
+      this.scene.start('vsbattle', { code });
     });
   }
   codePrompt(l) {
@@ -375,12 +475,12 @@ class VsMenu extends Phaser.Scene {
   /* ---------- test recipes (?frdemo=) ----------
      host:   befriend test_b, wait for them online, CHALLENGE (their tab runs
              ?frdemo=guest and auto-accepts the summons)
-     invite: INVITE A FRIEND → private lobby; a third tab boots with
+     invite: sealLobby → private lobby; a third tab boots with
              ?join=<code>&from=test_a to prove the deep link */
   async frDemo() {
     await SSNET.connect();
     if (!this.sys.isActive()) return;
-    if (FRDEMO === 'invite') { this.inviteFriend(); return; }
+    if (FRDEMO === 'invite') { this.sealLobby(); return; }
     const other = QS.get('frwith') || 'b';
     await SSNET.FR.add('test_' + other, 'Wisp ' + other.toUpperCase());
     let tries = 0;
@@ -425,6 +525,53 @@ function vsOnTap(obj, fn) {
   obj.on('pointerout', () => { armed = false; });
   obj.on('pointerup', () => { if (!armed) return; armed = false; fn(); });
 }
+
+/* ---------- the crossed-blades glyph ----------
+   Drawn art, never an emoji (the no-emoji-as-game-art law): two gold blades
+   crossed on a transparent square, baked once per scene at the texture
+   factory's resolution through ssBake (wipe + fallback + DIAG on a painter
+   throw). The page crest and every friend row's challenge glyph wear the
+   same texture; consumers use setDisplaySize, per the R-scaled-texture rule. */
+function vsSwordsTex(scene) {
+  const key = 'vsswords';
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), W = 96;
+  const t = scene.textures.createCanvas(key, W * R, W * R);
+  t.context.scale(R, R);
+  const blade = (c, a) => {
+    c.save(); c.translate(W / 2, W / 2); c.rotate(a);
+    // tapered body with a bright face, a dark edge and a fuller line
+    c.beginPath(); c.moveTo(-4.6, 26); c.lineTo(-1.7, -40); c.lineTo(0, -45); c.lineTo(1.7, -40); c.lineTo(4.6, 26); c.closePath();
+    c.fillStyle = '#ead9a4'; c.fill();
+    c.lineWidth = 1.4; c.strokeStyle = '#8a6210'; c.stroke();
+    c.beginPath(); c.moveTo(0, 22); c.lineTo(0, -40);
+    c.lineWidth = 1.2; c.strokeStyle = 'rgba(138,98,16,0.55)'; c.stroke();
+    // crossguard, grip, pommel
+    c.beginPath(); c.roundRect(-11, 24, 22, 5, 2.5);
+    c.fillStyle = '#c9a94f'; c.fill();
+    c.lineWidth = 1; c.strokeStyle = '#7a5c1a'; c.stroke();
+    c.fillStyle = '#8a6210'; c.fillRect(-2.1, 29, 4.2, 10);
+    c.beginPath(); c.arc(0, 42, 3.4, 0, Math.PI * 2);
+    c.fillStyle = '#c9a94f'; c.fill();
+    c.lineWidth = 1; c.strokeStyle = '#7a5c1a'; c.stroke();
+    c.restore();
+  };
+  ssBake(t, key, W, W, (c) => {
+    c.clearRect(0, 0, W, W);
+    c.save();
+    c.shadowColor = 'rgba(255,215,122,0.5)'; c.shadowBlur = 5;
+    blade(c, -0.66); blade(c, 0.66);
+    c.restore();
+  }, (c) => {
+    // fallback: two plain crossed bars — still blades, no curves, no shadows
+    c.clearRect(0, 0, W, W);
+    c.fillStyle = '#e0c878';
+    c.save(); c.translate(W / 2, W / 2);
+    for (const a of [-0.66, 0.66]) { c.save(); c.rotate(a); c.fillRect(-2.5, -44, 5, 84); c.fillRect(-10, 24, 20, 4); c.restore(); }
+    c.restore();
+  });
+  return key;
+}
 function vsLinkBase() {
   const u = new URL(location.href);
   u.search = ''; u.hash = '';
@@ -433,11 +580,6 @@ function vsLinkBase() {
 function vsInviteUrl(code) {
   const u = vsLinkBase();
   u.searchParams.set('join', code); u.searchParams.set('from', vsUid());
-  return u.toString();
-}
-function vsFriendUrl() {
-  const u = vsLinkBase();
-  u.searchParams.set('friend', vsUid());
   return u.toString();
 }
 // share sheet where there is one (iOS/Android/desktop Chrome+Safari), the
