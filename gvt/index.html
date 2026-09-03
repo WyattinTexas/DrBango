@@ -26647,6 +26647,7 @@ const META_DEFAULT = {
   campaign:0, levelStars:{},                          // highest level beaten, stars per level
   lossRun:{},                                         // 0098 QUIET MERCY: consecutive solo losses per level — 'l36':3; reset on that level's win; device-local (the levelStars precedent — never crosses the wire)
   replays:{},                                         // 0495a THE REPLAY TAX: paid replays per campaign rung — 'l25':k (0..REPLAY_PAID_MAX); device-local like levelStars/lossRun (never crosses the wire; ⚑ a v35 column); the parks' twin is parks[id].rp
+  form:{ camp:{b:0,n:0}, yeti:{b:0,n:0}, dino:{b:0,n:0}, western:{b:0,n:0}, teddy:{b:0,n:0} },   // 0903 THE 80% DIAL: THE FORM BOOK — the last ten SOLO frontier verdicts per ladder (b = a bitmask, the newest bit lowest, 1 = a win; n = how many it holds, at most ten); device-local like lossRun (never crosses the wire); TOP-LEVEL on purpose (the parks normalizer rebuilds parks[id] from its own mk and would drop a cell there — 0495a's trap); NESTED, rebuilt fresh at load (the v1.22 alias law)
   starBank:0, starsLifetime:0,                        // spendable + lifetime (rating later)
   unlocked:['rifleman','mgunner','bazooka','mortar','sarge'],
   lasers:[], laserOn:null, dyes:[], dyeOn:null, dyeGift:null,   // 0529: the paint day's stamp — the gifted jar's id, or 'green' (KEEP MY GREEN, no jar). FLAT scalar (Object.assign-safe, the comet law); dyePaid() below excludes it from the shelf's read
@@ -26963,6 +26964,14 @@ if(!META.crownV2){ META.crownV2=1;
   // same alias reason — paid replays per campaign rung ('l25':k); the parks'
   // twin (parks[id].rp) rides the parks rebuild below.
   META.replays = Object.assign({}, META.replays||{});
+  // 0903 THE 80% DIAL: THE FORM BOOK — top-level (never inside the parks
+  // normalizer's mk), rebuilt FRESH row by row (the alias law): the five
+  // ladders, b a ten-bit mask, n 0..10; an older save boots to empty books;
+  // junk can only ever under-record. Literals on purpose (FORM_WIN / FORM_MASK
+  // live far below — the TDZ law; the battery asserts they agree).
+  (function(){ const src=META.form||{}, out={};
+    for(const k of ['camp','yeti','dino','western','teddy']){ const r=(src[k]&&typeof src[k]==='object')? src[k] : {}; out[k]={ b:(r.b|0)&1023, n:Math.max(0,Math.min(10,r.n|0)) }; }
+    META.form=out; })();
   // 0393: the away ledger is nested — build it FRESH (the alias law), maps
   // rebuilt plain, numbers coerced; garbage can only ever under-record.
   (function(){ const src=META.away||{}, done={}, rec={};
@@ -29663,6 +29672,7 @@ function awayRecord(aw, won){
 // branch — if one grows a write, the other must.
 function nemParkBank(){
   const pk=META.parks && META.parks[S.park.id]; if(!pk) return;
+  formNote(1);   // 0903 THE 80% DIAL: the withheld rung-20 verdict is a WIN in the park's book — before the ladder write below (the replay test reads pk.lv as it stood); a later verdict on the same rung reads it as a replay
   // 0327 SPLIT LEDGER: pd = rungs 1-30 (bits 0-29; 30/31 fenced forever — the
   // 32-bit-signed wipe trap), pd2 = rungs 31-50. LOCKSTEP with the verdict
   // branch (this door only ever fires at rung 20 today; the shape stays twinned).
@@ -38482,13 +38492,15 @@ function startCampaign(n){
   // read hpMul at spawn (spawnFoe; bosses through 1+(hpMul·mr−1)×bossF, a
   // touch gentler — they are the set dressing), and the regroup/sally patrols
   // inherit it too. Identity at ×1: the guard leaves the float untouched.
-  const mr=mercyRelief(S.levelN);
-  if(mr<1) S.cfg.hpMul*=mr;
+  const mr=formSeat('camp', S.levelN, mercyRelief(S.levelN));   // 0903 THE 80% DIAL: mercy and the dial, ONE seat — the softer of the two under mercy, the dial's bite or ease otherwise; identity at ×1 (the guard leaves the float untouched)
+  if(mr!==1) S.cfg.hpMul*=mr;
+  if(mr>1 && FORM_RATE>1) S.cfg.rateMul=(S.cfg.rateMul||1)/Math.min(FORM_RATE, mr);   // ⚑ Q3 the cadence share of the bite — OFF at FORM_RATE 1 (hp alone ships)
   S.sq={ p:1, t:0, nextT:SQ_GRACE };
   S.sq.bite=biteDue(S.levelN)? 1 : 0;   // 0552a THE PROVEN PLAYER — the solo door's own stamp (biteDue, at mercyRelief): the alarm's earlier mark + Sarge's one line
+  S.sq.fbite=(FORM_TELL && mr>1)? 1 : 0;   // 0903 THE 80% DIAL: the bite side's tell — the same shipped line, once at the first push; the soft side says nothing
   spdInit();   // the ladder rung this progress earns — or the slow-down this device already chose (v2.14)
   // v1.31: the crate the Tan walk out of. Smash it to win — it is the ONLY win.
-  const bh=Math.round(CAMP_BASE_HP(S.levelN)*mr);   // ×1 → the identical integer
+  const bh=Math.round(CAMP_BASE_HP(S.levelN)*Math.min(1,mr));   // ×1 → the identical integer (0903: the crate eases on the soft side only — it never grows on the bite side)
   S.tanBase={ x:W-130, y:WORLD_H/2, hp:bh, hpMax:bh, hitT:0 };   // 0197: the crate holds the waist (WORLD_H/2===300 on every flat rug — byte-still)
   // v1.32: the announce finally says what the mode IS (v1.31 shipped the crate
   // but the line still said HOLD THE LINE — and, composed by +, it dodged the
@@ -39830,7 +39842,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.74';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.75';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41753,6 +41765,64 @@ function mercyRelief(n){
 // meet on the same attempt. ⚑ Wyatt's cells.
 const BOX_ALARM_BITE=0.6, BITE_FROM=2, BITE_TO=5;
 function biteDue(n){ return n>=BITE_FROM && n<=BITE_TO && !(((META.lossRun||{})['l'+n])|0) && ((((META.levelStars||{})['l'+(n-1)])|0)>=3); }
+// ===== 0903 THE 80% DIAL (FM-GVT-FORM-01; jumpr 0703c, the Go Machine's card
+// 9/2 20:49:52 — Wyatt 9/2 ~20:25 ET, verbatim: "We want the player to win 80%
+// of the time they play. Thats the golden number. This may require having a
+// different difficulty percentage based on somebody's victory percentage in
+// campaigns."). QUIET MERCY grown into a two-sided dial with a memory.
+// THE FORM BOOK (META.form) keeps the last FORM_WIN SOLO verdicts per ladder
+// (the road, YETI PARK, DINO PARK, OUTLAW TOWN; BEAR PARK recorded, not dialed
+// — FORM_LADDERS, ⚑ Q5), written at the ONE verdict door (formNote at
+// endBattle's telLv line, both branches; formNote(1) at nemParkBank for the
+// withheld rung-20 verdicts) for a FRONTIER fight only: never co-op (the v1.23
+// mirrored-sim law), the battleground, raids, rivals, MOM, the range, the
+// event room, the bench (window.__BENCH_STAMP), L1 / the coach, a quit (a quit
+// never reaches endBattle), or a REPLAY by the replay tax's own definition (a
+// rung the record already said you beat before the battle began) — a kid
+// farming an easy rung never heats his own book.
+// THE DIAL (formMul): identity until the book holds FORM_MIN verdicts and
+// inside the dead band |p − 0.80| ≤ FORM_BAND; then 1 + (p − 0.80)·FORM_K
+// clamped to [FORM_FLOOR, FORM_CAP]: 10/10 ×1.15 · 9/10 ×1.075 · 8/10 ×1 ·
+// 7/10 ×0.925 · 6/10 ×0.85 · ≤5/10 ×0.80.
+// THE SEAT (formSeat, at the two SOLO doors right where mercy sits): the tan's
+// hp through S.cfg.hpMul (every foe, the bosses through their half curve, the
+// sallies and the regroups — the live-read seat); the crate eases by the same
+// factor on the SOFT side only and never grows on the bite side (mercy's own
+// law); the counts, the waves and the cadence untouched (FORM_RATE 1 = the
+// cadence share of the bite OFF; ⚑ Q3). MERCY AND THE DIAL, ONE SEAT: a rung
+// under QUIET MERCY (two straight losses) takes the SOFTER of the two and
+// never the bite — a kid stuck on a level never meets it there. The soft side
+// says NOTHING, ever (the mercy law); the bite side may speak the shipped
+// PROVEN PLAYER line once at the first push (FORM_TELL → S.sq.fbite — one
+// call, never twice in one start). Stars, medals, XP and the park purse pay in
+// full at every multiplier; the replay tax reads what it always read.
+// FORM_ON=false = identity everywhere (Wyatt's kill switch); every other number
+// is his to re-dial (design/form-dial-0902/00-FORM.md §4).
+const FORM_ON=true, FORM_WIN=10, FORM_MASK=(1<<FORM_WIN)-1, FORM_MIN=4, FORM_TARGET=0.80, FORM_BAND=0.05, FORM_K=0.75, FORM_FLOOR=0.80, FORM_CAP=1.15, FORM_TO=200, FORM_RATE=1, FORM_TELL=true;
+const FORM_LADDERS={ camp:1, yeti:1, dino:1, western:1, teddy:0 };   // the ladders the dial reads (1); the book records all five — ⚑ Q5 BEAR PARK
+function formWins(f){ let b=((f&&f.b)|0)&FORM_MASK, w=0; while(b){ w+=b&1; b>>>=1; } return w; }
+function formMul(lad){
+  if(!FORM_ON || !FORM_LADDERS[lad]) return 1;
+  const f=META.form && META.form[lad]; if(!f || (f.n|0)<FORM_MIN) return 1;
+  const d=formWins(f)/f.n-FORM_TARGET; if(Math.abs(d)<=FORM_BAND+1e-9) return 1;
+  return +Math.max(FORM_FLOOR, Math.min(FORM_CAP, 1+d*FORM_K)).toFixed(4);
+}
+function formSeat(lad, n, mercy){   // the one multiplier a SOLO door applies: mercy (identity unless two straight losses) and the dial — the softer of the two under mercy, the dial alone otherwise
+  if(lad==='camp' && (n<2 || n>FORM_TO)) return mercy;   // L1 is the coach's; FORM_TO scopes the road (⚑ Q4)
+  const f=formMul(lad); return mercy<1? Math.min(mercy, f) : f;
+}
+function formLadder(){   // the book THIS sim's verdict belongs to, or null (read BEFORE the win writes: the replay test is the record as it stood when the battle began)
+  if(S.coop || S.bf || S.rival || S.train || S.momRaid || (S.raid && S.raid.cfg===S.cfg) || window.__BENCH_STAMP) return null;
+  if(S.park && S.park.cfg===S.cfg){
+    const pk=META.parks && META.parks[S.park.id], r=S.park.n|0; if(!pk || !S.park.mine || r<1 || !META.form || !META.form[S.park.id]) return null;
+    const rp=!!((r<=30)? (pk.pd>>(r-1))&1 : (pk.pd2>>(r-31))&1) || r<=pk.lv;   // 0495a's park replay
+    return rp? null : S.park.id;
+  }
+  if(!S.sq || (S.levelN|0)<2 || !META.form || !META.form.camp) return null;
+  const rp=(((META.levelStars||{})['l'+S.levelN])|0)>0 || S.levelN<=META.campaign;   // 0495a's campaign replay
+  return rp? null : 'camp';
+}
+function formNote(win){ const lad=formLadder(); if(!lad) return null; const f=META.form[lad]; f.b=((f.b<<1)|(win?1:0))&FORM_MASK; f.n=Math.min(FORM_WIN, (f.n|0)+1); return lad; }
 // ⚠ THE SUB-LINEAR CALL (Wyatt: "a LITTLE easier with 10 — I want a
 // ten-people-together-win situation"). The tan army grows as players^0.82,
 // deliberately slower than the lobby: ten commanders against 6.63× the enemy.
@@ -43478,7 +43548,7 @@ function sqPushWave(n,remote){
   // 0552a THE PROVEN PLAYER (D13): on a solo rung entered on three stars with no
   // loss on it yet (biteDue, stamped at startCampaign) Sarge speaks the ONE line
   // of the bite at the first push; wave one is otherwise as silent as ever.
-  else if(n===1){ if(S.sq && S.sq.bite) commSay('bite'); }
+  else if(n===1){ if(S.sq && (S.sq.bite || S.sq.fbite)) commSay('bite'); }   // 0903 THE 80% DIAL: the dial's bite side speaks the same line (fbite, stamped at the solo doors) — ONE call, never twice in one start
   else commSay('wave');
   // 0355 THE RUNG-10 CAMEO ARM (Wyatt: "On level 10, should be the first
   // appearance of Jane"): the posse wave's own push starts the clock — she
@@ -59504,6 +59574,7 @@ function endBattle(win){
   }
   S.mode = win?'win':'lose';
   telLv(win? 1 : 0);   // 0624 P12: ['lv', rung, 1 win · 0 loss] for a SOLO campaign rung (a loss stamps lossN/lossRung) — after the first-battle mercy above, so the verdict the player sees is the one recorded
+  formNote(win);   // 0903 THE 80% DIAL: THE FORM BOOK's one door — a SOLO frontier verdict on the road (n≥2) or a park rung, win or loss, BEFORE any win write below (the replay test reads the record as it stood); co-op / bf / rival / MOM / raid / the bench / a replay write nothing; rides this verdict's own saveMeta on both branches
   sqNoteClear();   // 0322: a verdict on this sim means no battle is waiting — the rejoin note dies here (win, lose, solo alike)
   sqGameTick();   // v2.82 SQUAD AD LAW: a finished 2+-human game counts, win or lose (S.sq.sqAdT latches it once)
   PGV=pgOrigin();   // v2.84 POST-GAME LANDING LAW: the verdict itself remembers where this game was launched from — a party that dies on the verdict screen (iPad suspended past the box's 45s prune → 'no party' → dissolve) must not rob the exit taps of their squad landing
@@ -78887,10 +78958,14 @@ function startPark(park, n){
   startParkBattle(park, n);
   W=CAMP_W; resize();          // the campaign's own long front
   sqScaleCfg(S.cfg, 1);        // identity at one commander — solo and a lobby of one can never drift
+  const mr=formSeat(S.park.id, S.park.n, 1);   // 0903 THE 80% DIAL: the park's own book at the SOLO door (the co-op park door never comes here); no per-rung mercy in the parks (⚑ Q7); identity at ×1
+  if(mr!==1) S.cfg.hpMul*=mr;
+  if(mr>1 && FORM_RATE>1) S.cfg.rateMul=(S.cfg.rateMul||1)/Math.min(FORM_RATE, mr);   // ⚑ Q3 (OFF at FORM_RATE 1)
   S.sq={ p:1, t:0, nextT:SQ_GRACE };
+  S.sq.fbite=(FORM_TELL && mr>1)? 1 : 0;   // 0903: the bite side's tell (the shipped line, once at the first push)
   spdInit();
   if(!parkFinaleRung(S.park.id,S.park.n)){   // 0327: the finale-set law {20,50}/{20} — see the squad door
-    const bh=PARK_BASE_HP(S.park.n);
+    const bh=mr<1? Math.round(PARK_BASE_HP(S.park.n)*mr) : PARK_BASE_HP(S.park.n);   // 0903: the crate eases on the soft side only (a finale rung has no crate: the full clear is the win — nothing to ease)
     S.tanBase={ x:W-130, y:WORLD_H/2, hp:bh, hpMax:bh, hitT:0 };
   }
   // the finale has NO crate: the win is the update() no-crate full-clear door
@@ -89986,6 +90061,10 @@ window.GVT = {
   speedSet(i){ const R=spdRungs(); S.spdI=Math.max(0,Math.min(R.length-1,i|0));
     if(!S.coop) S.speed=R[S.spdI]; return this.speed(); },
   mercySet(n,k){ META.lossRun['l'+n]=k|0; saveMeta(); return Object.assign({},META.lossRun); },
+  // 0903 THE 80% DIAL rig (read-only but formSet): the five books, p and the multiplier per ladder, the merged seat for a given rung of the road
+  form(n){ const books={}; for(const k in META.form){ const f=META.form[k]; books[k]={ b:f.b, n:f.n, bits:(f.b>>>0).toString(2).padStart(f.n||1,'0'), wins:formWins(f), p:f.n? +(formWins(f)/f.n).toFixed(3) : null, mul:formMul(k) }; }
+    const r=Math.max(0,n|0); return { cv:GVT_CV, on:FORM_ON, win:FORM_WIN, min:FORM_MIN, target:FORM_TARGET, band:FORM_BAND, k:FORM_K, floor:FORM_FLOOR, cap:FORM_CAP, to:FORM_TO, rate:FORM_RATE, tell:FORM_TELL, ladders:Object.assign({},FORM_LADDERS), books, rung:r, mercy:mercyRelief(r), camp:formSeat('camp', r, mercyRelief(r)), parks:{ yeti:formSeat('yeti',r,1), dino:formSeat('dino',r,1), western:formSeat('western',r,1), teddy:formSeat('teddy',r,1) }, ladder:formLadder(), fbite:!!(S.sq&&S.sq.fbite) }; },
+  formSet(lad, bits, n){ if(!META.form || !META.form[lad]) return null; META.form[lad]={ b:(bits|0)&FORM_MASK, n:Math.max(0,Math.min(FORM_WIN,n|0)) }; saveMeta(); return this.form(S.levelN|0); },
   // v1.38 FORMATIONS + SET PIECES rig: spawn any shape to inspect its geometry
   // (needs a battle on; n overrides every group's count), read a level's final
   // wave, and read THEIR SARGE's state machine off the live carpet
