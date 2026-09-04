@@ -40296,7 +40296,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.91';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.92';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -41868,6 +41868,7 @@ function coopApply(cm){
     if(GLIDE_FACE && Math.abs(nx-u.x)>6){ u.wkX=(nx>u.x)? 1 : -1; u.wkT=S.t; }   // 0585 F4: a real jump (past the settle pulse's 6 px) faces its way — the same draw-side stamp the glide makes (0652: the aim's clear retired — faceX is a sim field now, the muzzle law; the fresh stride still outranks it in the picture)
     u.x=nx; u.y=ny; if(big) u.sprue=0.2;
     u.laneY=u.y; u.wp=null; u.wade=null;           // the ally set his lane — he marches on in it
+    raidRetakeStamp(u);   // 0744 THE RETAKE BY PLACEMENT: a re-drop re-stamps (the 0318 law), on every sim alike
     if(u.type==='sarge'){ u.home={x:u.x,y:u.y}; u.saberState='idle'; sgDashEnd(u); cmdDashEnd(u); }   // moved post cancels a blade run AND a gap-close (v1.67; v1.73 a cancelled dash arms the hidden five)
     return;
   }
@@ -49311,7 +49312,13 @@ function bfSfx(fn,x,y){ if(bfVis(x,y)) fn(); }
 // the rank-40 combustion popcorn by construction (the combustion root is a
 // {combStub, type:'flame'} stub through this same funnel); tanflame is not
 // 'flame', and battlefield units carry no sno — both inert by construction.
-const FLAME_SNOW_X=2;
+// 0744 KING YETI ROUND TWO, cell C (Wyatt 9/3 ~9:50 pm ET verbatim: "Flame unit should have 50% damage bonus increase against all yeti & snowman
+// units."): the ×2 he already had grows by half again — ×3 (a lick on a yeti or a snowman = three licks on a tan rifleman; ⚑ F-Q1 the other
+// readings, ×2.5 and a flat ×1.5, are one cell each). The roster audit on HEAD v7.91: every yeti / snowman FDEF row already wears sno:1 (yeti ·
+// syeti · byeti · snowfig · yetiboss1/2/3 · gsnowman · sgtcold · sgtsnow · kingyeti = 11 rows; the rung-20 Prince rides the kingyeti row, the ULTRA
+// room fields these same rows through EV_HPX), so zero FDEF bytes move; the bluepig stays a pig (⚑ F-Q2). The seam below is the licks AND the
+// combustion stub by construction (both come through hurt with a type:'flame' source); the counter table's snow terms live in counterDmg, fenced.
+const FLAME_SNOW_X=3;
 function hurt(f,dmg,src){
   if(S.bf && f.side && (f.jetT>0||f.falling)) return;   // airborne (v1.39) — and v2.76's fallers — untouchable on the battlefield too
   if(f.def && f.def.kb && f.gnSt==='snap') return;   // 0901 Card A P5b (⚑ Q5) THE KEEL'S SNAP: the empty charger's 0.8 s keel makes the king INVULNERABLE — nothing lands on life two before he stands (the strikes thrown into the snap used to land at once and then the 4% floor went up: "the bar filled back up and now it won't move"); the keeling strike's overkill is neither carried nor refunded — the readable choice; the shell door (splash) keeps the same law
@@ -50459,12 +50466,39 @@ function campNearestFoe(u){
 // dig-in IS his identity). ICE only — the bone lair keeps its shipped
 // routing (one word to extend). The in-reach halt above the goal chain is
 // untouched: he fights whatever stands in his own reach on the way.
+// 0744 KING YETI ROUND TWO, cell A — THE RETAKE BY PLACEMENT (FM-GVT-KING-YETI-R2-01;
+// Wyatt 9/3 ~9:50 pm ET verbatim: "Bottom turret in king yeti fight; once you lose it
+// our units arent prioritizing it even if we place them toward the bottom of the
+// screen. Top turret as well."): the 8/15 race above stands down the moment EITHER
+// side holds a flag, so a LOST post was exactly the case nobody raced — a man placed
+// at the bottom edge marched the middle war while the yeti-held turret behind him
+// gunned his squad; retakes happened only by accident. Placement means intent now:
+// a man PLACED (placeUnit's campaign branch, the relay's mv, the local drag drop — the
+// three seats that write laneY) with his laneY in a post's OUTER THIRD of the mat
+// (RAID_RT_BAND: top < 400, bottom > 800 on the 1,200 mat; the middle third marches
+// as today) while that post is NOT OURS (uncontrolled or yeti-held) is stamped with
+// it (u.rtI) and steers to its capture ring — to take it OR take it back; the turret's
+// arc guns him on the way in (the cost Wyatt chose: "even if we place them toward the
+// bottom"). The moment the post is ours (by him or anyone) the stamp clears and he
+// marches as today; a man already on the rug never re-aims at a post that falls
+// behind him (the placement is the order; re-aiming is the 8/15 conscription — ⚑ T-Q2).
+// The uncontrolled case is the shipped race, byte-behaviour (the band lies inside the
+// half). Every sim stamps from the same relayed placement (deterministic by
+// construction); rcI / capI, the king's court, authored cap: squads, the vehicles' bomb
+// run and the cannon halt keep their laws. ICE only, like the race (S.raid fenced).
 function raidHalfPost(u){
   const rd=S.raid;
   if(!rd || rd.k!=='ice' || rd.cfg!==S.cfg || S.mode!=='play') return null;
   if(u.def.vehicle) return null;
+  if(u.rtI!=null){ const R=rd.posts[u.rtI]; if(R && R.o!==1) return R; u.rtI=null; }   // 0744 THE RETAKE: his placed order stands while the post is not ours; ours = released, the shipped chain below
   const P=rd.posts[((u.laneY!=null?u.laneY:u.y) < T.y)? 0 : 1];
   return (P && !P.o)? P : null;
+}
+function raidRetakeStamp(u){   // 0744: read at PLACEMENT (the three laneY seats) — the man's band and the post's state the moment he lands; never re-read for a man already on the rug
+  const rd=S.raid; u.rtI=null;
+  if(!rd || rd.k!=='ice' || rd.cfg!==S.cfg || S.mode!=='play' || u.def.vehicle) return;
+  const ly=(u.laneY!=null?u.laneY:u.y), i=(ly < WORLD_H*RAID_RT_BAND)? 0 : (ly > WORLD_H*(1-RAID_RT_BAND))? 1 : -1;
+  if(i<0) return; const P=rd.posts[i]; if(P && P.o!==1) u.rtI=i;
 }
 function campUnitStep(u,dt){
   if(u.falling){ unitFallStep(u,dt); u.marching=false; return false; }   // 8/8 v2.76 the long drop
@@ -51713,6 +51747,7 @@ function placeUnit(type,x,y,side,seat){
     u.def=Object.assign({}, UDEF[type], { moveSpd:(CAMP_SPD[type]||26)*((HEROES.indexOf(type)>=0 && heroMine(u) && enhOn('stride'))? STRIDE_X : 1) });   // 0486 D24 THE ROYAL STRIDE: ×1.2 on MY hero's placement-time def copy — multiplies the cell 0480 left (44/44/40, jane 26), written ONCE (the jump-tank law: never per frame, never into the shared tables); heroMine keeps the enemy kings, park bosses and every mirror at their own pace (heroes never relay today — the 0341/0357 co-op TRAY filter — so the bench read is the owner's by construction; §6.4's mo path becomes real the day a hero crosses the wire)
     if(type==='tank2') u.def.moveSpd=T2_SPD;   // 0547 THE V2 TANK: the campaign carpet reads the raw dial (CAMP_SPD's own column — 30 against the tank's 22); the loaner's engine multiplies it in emgVehicle
     u.laneY=y; u.gait=0.92+Math.random()*0.16; u.wp=null; u.wpT=0; u.pauseT=0; u.marching=false;
+    raidRetakeStamp(u);   // 0744 THE RETAKE BY PLACEMENT: his band + the post's state the moment he lands (my drop, an ally's relayed drop, a computer's — all through here)
     // v2.42 THE SPY lands cloaked on the campaign carpet too — my drop reads
     // my rank; a relayed ally's re-stamps at coopApply off his own um.
     if(type==='spy') u.cloakT=spyCloakRk(rankUnits(META.up.spy||0));
@@ -53460,13 +53495,23 @@ function heroDeflB(B,u){   // a rolling S.gboul ball off the king: spent vs him,
 // boulder (usually reflected)" · 9/2 ~9:38 pm "yes & yes" = ANY boulder): ONE seat. gboulTick's reflected-ball victim loop is the only path on
 // HEAD where a rolling ball damages a FOE — the un-reflected roll knocks UNITS alone, a hatchling's rock (B.nem) hits the armies' units alone,
 // a hero king's bounce (heroDeflB) is spent, the blue crystal's wall negates a knock and returns nothing — so both terms sit there, fenced by
-// victim: SERGEANT SNOWMAN ×SNOW_REFL_X (a reflected snowball by construction of the loop), the STEGOSAURUS ×STEGO_BOUL_X (any boulder — the
+// victim: EVERY SNOWMAN ×REFL_SNOWMAN_X (0744; was the Sergeant alone ×SNOW_REFL_X 2 — a reflected snowball by construction of the loop), the STEGOSAURUS ×STEGO_BOUL_X (any boulder — the
 // reflected one is the only one that reaches him on HEAD; a tan rock never touches a tan). Every other victim ×1: UDEF.mortar.dmg 1.5, the
 // reflect currency, byte-still. The knock / pass-through / once-per-man registry, the launch, the roll, BONK, the pits and the reflect's own
 // mechanics (cmdoIntercept, B.refl / B.rby, the re-aim at B.src) untouched.
-const SNOW_REFL_X=2;    // "100% more damage" — Sergeant Snowman's intake from a reflected snowball (⚑ B-Q1: he is fielded by the ice castle's W2 alone on HEAD — no park / valley row; a King Yeti fight gate is one clause if a park ever fields him)
+// 0744 KING YETI ROUND TWO, cell B (FM-GVT-KING-YETI-R2-01; the Go Machine's card 9/3 22:04:57; Wyatt 9/3 ~9:50 pm ET verbatim: "Reflected snowballs
+// should be damaging Segent snowman and any snowman in general. Not nearly enough. 500% more damage he should taken when you reflect one of the
+// snowballs."): 0906's SNOW_REFL_X 2 retires into REFL_SNOWMAN_X 6 (×6 of the base intake REPLACES the ×2, it never stacks — ⚑ R-Q1) and the victim
+// widens from the Sergeant alone to EVERY snowman-SHAPED row, REFL_SNOWMAN_T: sgtsnow (the Sergeant) · snowfig (the carrot-nose figures — the
+// Sergeant's and the giant's death-split minis are snowfig rows too) · gsnowman (the Yeti Park's giant). NOT Sergeant Cold (0567: cut from the YETI
+// mold — a yeti with a rifle), not the yetis, not the king (⚑ R-Q2), not the bluepig: those read ×1 as before. A type set beside the factor (one
+// reading at one seat), never a FDEF flag: the flame's sno:1 roster is a DIFFERENT set (Cold and every yeti are sno; none of them is a snowman). The
+// un-reflected ball still damages no foe (this loop is the reflect's by construction); the volley (sbn separate balls, each its own catch), the
+// death split, the catch (cmdoIntercept), B.refl / B.rby and the re-aim at B.src untouched.
+const REFL_SNOWMAN_X=6;    // "500% more damage" = ×6 of the reflect currency on every snowman (UDEF.mortar.dmg 1.5 → 9.0 per reflected snowball; the pristine's Sergeant read 3.0, a figure 1.5)
+const REFL_SNOWMAN_T={ sgtsnow:1, snowfig:1, gsnowman:1 };   // the snowman-shaped rows: the Sergeant, the figures (+ the death-split minis), the Yeti Park's giant
 const STEGO_BOUL_X=3;   // "200% extra damage" = ×3 total — the stego's intake from any boulder (C-Q1 RULED any; ⚑ C-Q2 a HATCHLING stego is never a rock's victim on HEAD — 0389's hatchlings-never-hit law — so nothing to build there)
-function boulFoeX(f){ return (f.type==='sgtsnow')? SNOW_REFL_X : (f.type==='stego')? STEGO_BOUL_X : 1; }   // the victim's factor at the one seat
+function boulFoeX(f){ return REFL_SNOWMAN_T[f.type]? REFL_SNOWMAN_X : (f.type==='stego')? STEGO_BOUL_X : 1; }   // the victim's factor at the one seat · 0744: every snowman ×6 (was the Sergeant alone ×2)
 const SB_FAN=0.20;   // 0305 BF-0S: radians between adjacent volley boulders (5-wide = 0.80 rad ≈ 46°, just inside the king's own breath cone)
 function gsnowTick(f,dt){
   const sb=f.def.snowboulder||f.def.boulder;
@@ -53619,7 +53664,7 @@ function gboulTick(dt){
         if(f2.dead || f2.burrow || f2.falling) continue;
         if(B.hit[f2.id]) continue;
         if(Math.hypot(f2.x-B.x,f2.y-B.y)<B.r+f2.def.w*0.3){ B.hit[f2.id]=1;
-          f2.hp -= UDEF.mortar.dmg*boulFoeX(f2);   // the reflect currency — foeSplash's own return law · 0906 BOSS NUMBERS Parts B + C: ×boulFoeX — the Snowman doubles a reflected snowball, the stego triples any boulder, everyone else ×1
+          f2.hp -= UDEF.mortar.dmg*boulFoeX(f2);   // the reflect currency — foeSplash's own return law · 0906 BOSS NUMBERS Parts B + C: ×boulFoeX — 0744: every SNOWMAN takes six times a reflected snowball (was the Sergeant alone, twice), the stego triples any boulder, everyone else ×1
           hitCheck(f2, B.rby); }
       }
     } else if(B.nem) for(const u of S.units){
@@ -70168,7 +70213,7 @@ cv.addEventListener('pointerup', e=>{
   // (sortie/raid/rig door) — the campaign never lifts a placed man — so this
   // branch is byte-what-it-was where it survives.
   if(canPlace(p.x,dy,d.type) && (d.unit || !sqAtCap())){
-    if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; d.unit.laneY=dy; d.unit.wp=null; d.unit.wade=null;   // he marches on in the lane you set him
+    if(d.unit){ d.unit.x=p.x; d.unit.y=dy; d.unit.sprue=0.2; d.unit.laneY=dy; d.unit.wp=null; d.unit.wade=null; raidRetakeStamp(d.unit);   // he marches on in the lane you set him · 0744: a re-drop re-stamps his post order (the relayed mv stamps the same on every other sim)
       if(d.unit.type==='sarge'){ d.unit.home={x:p.x,y:dy}; d.unit.saberState='idle'; sgDashEnd(d.unit); cmdDashEnd(d.unit); } SFX.thock();
       if(S.coop && d.unit.cid) coopSend({k:'mv', id:d.unit.cid, x:p.x|0, y:dy|0}); }
     else { S.plastic-=COSTS[d.type]; const nu=placeUnit(d.type,p.x,dy);
@@ -80245,7 +80290,7 @@ const RAID_TAGS=240;                           // opening dog tags — three pha
 const ELITE_RAID_TAGS=60;                      // 0539 THE ELITE SHELF (elite 160; Wyatt: "+60 Dogtags when you play Raids at the start"): the opening purse's gift once rung 160 is on the ledger — every raid family here + the two nightly bells (D24); the bots' EV_BOT_F math never reads it
 const EV_TAGS_ADD=100;                         // 0824-NIGHT THE DEEPER PURSE (Wyatt 8/24 night, after the recorded battle: "let us start with 40 more dog tags") · 0565 THE ULTRA MEGA TUNE (Wyatt 8/25 ~21:25 ET: "give the players 60 more dogtags to use while in the raid as well" — the opening purse is where the 40 landed; +60 = 100): the ULTRA MEGA KING YETI room (tier 'u') opens on RAID_TAGS+100 = 340 (400 with the elite-160 gift) — every other raid/park/campaign purse byte-still; the computers keep RAID_TAGS×EV_BOT_F (120), the faucet its +10. ⚑ 100 (default) · 40 (0824-NIGHT) · 0 (0506) · alt: leave 40 and put the 60 on the faucet (EV_TICK_ADD 10 → 28)
 const EV_TICK_ADD=10;                          // 0824-NIGHT: "ten more dog tags per dog tag tick" — the campaign faucet pours CAMP_TICK+10 = 30 every 10/3 s in the 'u' room only (the float says +30); BF_TICK/CAMP_TICK untouched everywhere else. ⚑ 10 (default) · 0 (0506)
-const EV_HPX={ snowfig:0.5, sgtcold:0.5, syeti:0.25, byeti:0.25, bluepig:0.5, sgtsnow:0.5, kingyeti:0.7 };   // 0565 THE ULTRA MEGA TUNE (FM-GVT-NIGHT-01 §2, design/night-pair-0825/00-DESIGN.md; Wyatt 8/25 ~21:10-21:25 ET verbatim: "in the Ultra Mega Yeti fight, the snowmen mob reduced their HP by 50%. And reduce the first boss, the Sergeant Cold (I think his name is), his HP by 50%." · "Little yetis & big yetis 75% less hp. Piggy banks 50% hp."): the ULTRA MEGA KING YETI room's per-type hp cells — raidCfg's 'u' block stamps each as g.hpX on EVERY group of every wave (the columns/lines/redcoats/guerrillas, the 24 pre-scheduled trk landings AND the boss groups; the count loop's exemptions do not apply) and spawnGroup's shipped hpX seats (the boss/guerrilla/solo branch · the formless second body · the formation groups, 0384) price it POST-CURVE: snowfig 79 → 40 · sgtcold 1,109 → 555 · syeti 12 → 3 (column and landing) · byeti 95 → 24 · bluepig 63 → 32. Sergeant Snowman's five flat-2 split minis carry no cell (0574 THE ULTRA MEGA TUNE II — FM-GVT-ULTRA-TUNE-02 design/ultra-tune2-0826/00-DESIGN.md, Wyatt 8/26 ~21:30 ET verbatim: "The second guys need to have about half as much HP" · "the Ultra Mega King Yeti needs to have 30% less HP": sgtsnow 0.5 = 1,109 → 555; kingyeti 0.7 on his WHOLE bar — the pass scales the row's hpAdd by the same cell, 3,010+1,200 = 4,210 → 2,107+840 = 2,947 = ×0.7 exactly, where hpX alone would read −21%); RAID_HP_MUL.u / bossF / spawnFoe / FDEF untouched, e/m/h/g cfgs byte-what-they-were. ⚑ one cell each (default; 0574 spent the sgtsnow:0.5 alt on Wyatt's own word and added the king's 0.7) · every ice tier = an FDEF cut instead (the 0278k/0278l precedent)
+const EV_HPX={ snowfig:0.5, sgtcold:0.5, syeti:0.25, byeti:0.25, bluepig:0.5, sgtsnow:0.5, kingyeti:0.56 };   // 0744 KING YETI ROUND TWO, cell D (Wyatt 9/3 ~9:50 pm ET: "Ultra mega king yet reduce HP by 20%"): kingyeti 0.7 → 0.56 = ×0.8 of the WHOLE bar he played (the 'u' block below scales the row's hpX AND its hpAdd copy by this cell — 0574's law: 3,010 × 0.56 = 1,686 + 1,200 × 0.56 = 672 → 2,358; was 2,107 + 840 = 2,947). ONLY the ULTRA king (⚑ K-Q1 MEGA); the six other cells, RAID_HP_MUL, ICE_KING_HPADD and the e/m/h/g cfgs byte-still · 0565 THE ULTRA MEGA TUNE (FM-GVT-NIGHT-01 §2, design/night-pair-0825/00-DESIGN.md; Wyatt 8/25 ~21:10-21:25 ET verbatim: "in the Ultra Mega Yeti fight, the snowmen mob reduced their HP by 50%. And reduce the first boss, the Sergeant Cold (I think his name is), his HP by 50%." · "Little yetis & big yetis 75% less hp. Piggy banks 50% hp."): the ULTRA MEGA KING YETI room's per-type hp cells — raidCfg's 'u' block stamps each as g.hpX on EVERY group of every wave (the columns/lines/redcoats/guerrillas, the 24 pre-scheduled trk landings AND the boss groups; the count loop's exemptions do not apply) and spawnGroup's shipped hpX seats (the boss/guerrilla/solo branch · the formless second body · the formation groups, 0384) price it POST-CURVE: snowfig 79 → 40 · sgtcold 1,109 → 555 · syeti 12 → 3 (column and landing) · byeti 95 → 24 · bluepig 63 → 32. Sergeant Snowman's five flat-2 split minis carry no cell (0574 THE ULTRA MEGA TUNE II — FM-GVT-ULTRA-TUNE-02 design/ultra-tune2-0826/00-DESIGN.md, Wyatt 8/26 ~21:30 ET verbatim: "The second guys need to have about half as much HP" · "the Ultra Mega King Yeti needs to have 30% less HP": sgtsnow 0.5 = 1,109 → 555; kingyeti 0.7 on his WHOLE bar — the pass scales the row's hpAdd by the same cell, 3,010+1,200 = 4,210 → 2,107+840 = 2,947 = ×0.7 exactly, where hpX alone would read −21%); RAID_HP_MUL.u / bossF / spawnFoe / FDEF untouched, e/m/h/g cfgs byte-what-they-were. ⚑ one cell each (default; 0574 spent the sgtsnow:0.5 alt on Wyatt's own word and added the king's 0.7) · every ice tier = an FDEF cut instead (the 0278k/0278l precedent)
 const EV_SNOW_CD_ADD=6;                        // 0574 THE ULTRA MEGA TUNE II (FM-GVT-ULTRA-TUNE-02; Wyatt 8/26 ~21:30 ET: "they need about a 6-second longer cooldown on their snowball throw"): seconds ADDED to SERGEANT SNOWMAN's volley cooldown in the ULTRA ('u') room only — raidCfg's 'u' block stamps W2's sgtsnow boss row g.cdAdd, spawnGroup copies it to f.cdAdd beside the sbn stamp, gsnowTick's ONE read adds it (fireCd 4.5 → 10.5 s between volleys; the volley of RAID_SB_N.u 6 and the 0.7 statue re-ask untouched). NEVER a FDEF edit — f.def IS the shared row (every other room's Sergeant, the giant and the stego read +0, byte-behaviour). ⚑ 6 (default — "6-second longer" taken literally) · 0 (0565) · a flat number = fireCd on a per-foe def copy instead
 const EV_W3_F=0.5;                             // 0574 THE ULTRA MEGA TUNE II (Wyatt 8/26: "there are just too many mobs … that final wave was just way too big. It needs to be about half the size."): the 'u' room's W3 (⚠ KING YETI COMES DOWN THE MOUNTAIN ⚠ — asserted by NAME in the block, never by index) count factor on every NON-boss group INCLUDING the 24 pre-scheduled trk landings (the count loop's kx exempts them; this pass does not): byeti 2 → 1, each landing RAID_TRK_N.u 7 → 4 (Math.round(3.5)) = 96 syeti over the 120 s vs 168; the king's row stands (a party's min(bs,2) stays sqScaleCfg's law, × sqEnemyMul on the rest); W1/W2 byte-what-they-were; e/m/h/g never enter the block. ⚑ 0.5 (default, landing 4) · 0.43 (landing 3, −57%) · 1 (0565)
 const RAID_KING_FCX={ e:1, m:0.8, h:0.65, g:1.25, u:1.25 };    // the per-tier boss mechanic: his one-big-snowball clock tightens (M/H) — 0357 MEGA REX: 3.2×1.25 = a flat 4.0s breath clock (Wyatt: "the cooldown on his flame breath should only be about 4 seconds"; the D2 turn-wait is waived at mega so the clock IS the felt cadence, and the angry return x0.8 lands 3.2s)
@@ -80364,6 +80409,7 @@ const RAID_P2_K=8;                             // 0648 D1: details per fight —
 const ICE_P3_TAGX=1.5;                         // 0648 D2 (Wyatt 8/31 verbatim: "In Phase 3 give the player 1.5x dogtags."): the castle's third act pays every dog tag ×this — the kill blob + the faucet, per-sim, all tiers; iceP3TagX() is the one door; phases 1-2 and the opening purse never move ⚑ §4 Q4
 const TUR_TRACK=9;                             // 0648 D3: the barrel's tracking ease (rad/s) — raidTick turns it onto the mark every frame now, not only at the trigger ⚑ §4 Q5
 const RAID_CAP_R=110;                          // the capture ring (sug ~110px)
+const RAID_RT_BAND=1/3;                        // 0744 THE RETAKE BY PLACEMENT (cell A): a man PLACED in a post's OUTER THIRD of the mat's height (top post: laneY < WORLD_H/3 = 400 on the 1,200 mat; bottom post: laneY > 800) while that post is NOT OURS goes for it — raidRetakeStamp / raidHalfPost. ⚑ T-Q1 the halves (0.5) = every placed man races an enemy post = the 8/15 conscription; not recommended
 const RAID_CAP_T=3;                            // uncontested seconds to flip
 const RAID_TUR_RNG=230;                        // the mini turret's reach
 const TUR_BEAM_W=5;                            // 0413 ⚑: the silver beam's width (the laser mods fire w:4 — wider so a bolt READS across 230px; Wyatt: "quite obvious")
@@ -91468,7 +91514,14 @@ window.GVT = {
   cd2(){ const b=S.foes.find(q=>q.type==='kingcroak'&&!q.dead)||null;   // 0710 CROAK DODGE — the rig's one read (read-only): the dials, the live king's dodge state, the tape
     const hs=f=>f? { id:f.id, foN:f.foN|0, x:+f.x.toFixed(2), y:+f.y.toFixed(2), z:+(f.hopZ||0).toFixed(2), st:(f.duel? f.duel.st : null), burrow:!!f.burrow, hp:+f.hp.toFixed(2), hpMax:f.hpMax, n:f.ckdN|0, rolls:f.ckdRolls|0, dodges:f.ckdDodges|0, cd:+(f.ckdCd||0).toFixed(3), wind:+(f.ckdW||0).toFixed(3), fly:+(f.ckdT||0).toFixed(3), lastRoll:(f.ckdLastRoll==null? null : +f.ckdLastRoll.toFixed(4)), lastT:(f.ckdLastT==null? null : +f.ckdLastT.toFixed(2)), side:(f.ckdSide||0), from:(f.ckdY0==null? null : +f.ckdY0.toFixed(1)), to:(f.ckdY1==null? null : +f.ckdY1.toFixed(1)), seen:Object.keys(f.ckdSeen||{}).length } : null;
     return { on:CKD_ON, odds:CKD_ODDS, cd:CKD_CD, tell:CKD_TELL, t:CKD_T, h:CKD_H, dy:CKD_DY, readX:CKD_READ_X, lane:CKD_LANE, door:rxDoorKey(), tier:(S.raid&&S.raid.cfg===S.cfg)? S.raid.t : null, live:hs(b), tape:TDLOG.filter(r=>r.type==='kingcroak').slice(-80) }; },
-  bn(){ return { cv:GVT_CV, lairEggX:LAIR_EGG_X, lairHatch0:LAIR_EGG_HATCH0, lairHatch:LAIR_EGG_HATCH, lairStep:LAIR_HATCH_STEP, rexFight:rexFight(), rowHatch:FDEF.eggling.hatch, snowReflX:SNOW_REFL_X, stegoBoulX:STEGO_BOUL_X, reflC:UDEF.mortar.dmg, coldHp:FDEF.sgtcold.hp, snowHp:FDEF.sgtsnow.hp, stegoHp:FDEF.stego.hp, momHp:MOM_HP, momHpX:MOM_HP_X, momRowHp:FDEF.mom.hp, momPour:MOM_POUR, momPourT:MOM_POUR_T, momOn:momOnRug(), pourT:+(S.momPourT||0).toFixed(3), momBounty:MOM_BOUNTY, momTags:MOM_TAGS }; },   // 0906 THE BOSS NUMBERS PASS: the seven cells + the doors, read off the page (the rig's one read)
+  ky2(){ const rd=(S.raid&&S.raid.k==='ice'&&S.raid.cfg===S.cfg)? S.raid : null;   // 0744 KING YETI ROUND TWO — the read door: the four cells' dials, the posts, every live man's laneY / stamp / the post he steers to, the sno roster, the turret's numbers
+    const RP=u=>{ const P=(typeof raidHalfPost==='function' && rd)? raidHalfPost(u) : null; return P? rd.posts.indexOf(P) : null; };
+    return { cv:GVT_CV, flameSnowX:FLAME_SNOW_X, reflSnowmanX:(typeof REFL_SNOWMAN_X==='undefined')? null : REFL_SNOWMAN_X, reflSnowmanT:(typeof REFL_SNOWMAN_T==='undefined')? null : Object.keys(REFL_SNOWMAN_T), stegoBoulX:STEGO_BOUL_X, reflC:UDEF.mortar.dmg, hpxKing:EV_HPX.kingyeti, hpx:Object.assign({},EV_HPX),
+      rtBand:(typeof RAID_RT_BAND==='undefined')? null : RAID_RT_BAND, bands:(typeof RAID_RT_BAND==='undefined')? null : [Math.round(WORLD_H*RAID_RT_BAND), Math.round(WORLD_H*(1-RAID_RT_BAND))], WH:WORLD_H, Ty:T.y,
+      posts:rd? rd.posts.map(P=>({ o:P.o, pr:+P.pr.toFixed(2), x:P.x, y:P.y })) : null,
+      men:(S.mode==='play')? S.units.filter(u=>!u.dead).map(u=>({ id:u.id, t:u.type, x:Math.round(u.x), y:Math.round(u.y), ly:Math.round(u.laneY!=null?u.laneY:u.y), rtI:(u.rtI==null? null : u.rtI), rp:RP(u) })) : [],
+      sno:Object.keys(FDEF).filter(k=>FDEF[k].sno), tur:{ dmg:RAID_TUR_DMG, cd:Object.assign({},RAID_TUR_CD), cdg:Object.assign({},RAID_TUR_CDG), rng:RAID_TUR_RNG, capR:RAID_CAP_R, capT:RAID_CAP_T, crush:Object.assign({},RAID_CRUSH_CD) } }; },
+  bn(){ return { cv:GVT_CV, lairEggX:LAIR_EGG_X, lairHatch0:LAIR_EGG_HATCH0, lairHatch:LAIR_EGG_HATCH, lairStep:LAIR_HATCH_STEP, rexFight:rexFight(), rowHatch:FDEF.eggling.hatch, snowReflX:REFL_SNOWMAN_X, stegoBoulX:STEGO_BOUL_X, reflC:UDEF.mortar.dmg, coldHp:FDEF.sgtcold.hp, snowHp:FDEF.sgtsnow.hp, stegoHp:FDEF.stego.hp, momHp:MOM_HP, momHpX:MOM_HP_X, momRowHp:FDEF.mom.hp, momPour:MOM_POUR, momPourT:MOM_POUR_T, momOn:momOnRug(), pourT:+(S.momPourT||0).toFixed(3), momBounty:MOM_BOUNTY, momTags:MOM_TAGS }; },   // 0906 THE BOSS NUMBERS PASS: the seven cells + the doors, read off the page (the rig's one read)
   momFight(){ startMomRaid(); return true; },
   momState(){ const f=S.foes.find(x=>x.type==='mom');
     return { raid:!!S.momRaid, wave:S.wave, lives:S.lives, plastic:S.plastic,
