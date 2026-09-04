@@ -129,7 +129,7 @@
   @keyframes waddle { from { transform:rotate(-4.5deg);} to { transform:rotate(4.5deg);} }
   .coinop { position:absolute; bottom:3%; width:100%; text-align:center; font-family:var(--ui); font-weight:bold; font-size:0.75rem; letter-spacing:0.22em; color:#5A5D4C; text-transform:uppercase; pointer-events:none; }
   .scanlines { position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(transparent 0 2px, rgba(0,0,0,0.16) 2px 4px); }
-  @media (prefers-reduced-motion: reduce){ .press,.strip,.rivsquad,.rivfig,.vicfig,.roomtag.alarm,.roomtag.beacon,.pigwrap.hop,.starfloat,.wt-flank,.wt-play,.accard img,.promobanner,.wr-flank,.wr-act,.pkn.tick,.pickcard.ppwin,.pp-ring,.pp-star,.pp-rank{ animation:none; } }
+  @media (prefers-reduced-motion: reduce){ .press,.strip,.rivfig,.vicfig,.roomtag.alarm,.roomtag.beacon,.pigwrap.hop,.starfloat,.wt-flank,.wt-play,.accard img,.promobanner,.wr-flank,.wr-act,.pkn.tick,.pickcard.ppwin,.pp-ring,.pp-star,.pp-rank{ animation:none; } }
   @media (orientation: portrait) {
     #rotate { display:flex; z-index:50; }
   }
@@ -3321,7 +3321,19 @@
      stage-space px, so they scale with the room and clip nowhere. The three
      pill lanes the bump outgrew (promo/board/piggy lx·ly) moved in ROOM_SPOTS,
      re-measured against every decor anchor in all six locales. */
-  .roomtag { position:absolute; transform:translate(-50%,-50%); background:rgba(38,40,31,0.9); color:#fff; font-weight:bold; font-size:18px; letter-spacing:0.06em; padding:3px 12px; border-radius:12px; cursor:pointer; white-space:nowrap; text-transform:uppercase; }
+  .roomtag { position:absolute; z-index:4; transform:translate(-50%,-50%); background:rgba(38,40,31,0.9); color:#fff; font-weight:bold; font-size:18px; letter-spacing:0.06em; padding:3px 12px; border-radius:12px; cursor:pointer; white-space:nowrap; text-transform:uppercase; }   /* 0904 THE LOOP ROW: z 4 — a pill is always its own door (over the tiles' z 2, the park doors' z 3 and every toy anchor) */
+  /* 0904 THE LOOP ROW — THE BADGES (bfBadgeHTML / noAdsBadgeHTML): the duel/crew badge on the BATTLEFIELD tile's top-right corner (a
+     round dog tag: gold with the came-for-you count, green blinking for a filling match, purple blinking for an invite, quiet dark
+     with the pennant for the standing squad door) and the NO ADS badge on the crate's corner (the 0636 chip's glyph + word). z 5:
+     a badge wins its corner over the tile under it. The blink is the alarm's own. */
+  .bfbadge { position:absolute; left:852px; top:398px; width:46px; height:46px; border-radius:50%; border:3px solid #D9A544; background:#8a6d1c; color:#FFF3C4; font-weight:bold; font-size:17px; font-family:inherit; letter-spacing:0.02em; display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer; z-index:5; box-shadow:0 3px 8px rgba(0,0,0,0.45); }
+  .bfbadge .gly { width:22px; height:22px; }
+  .bfbadge.quiet { background:rgba(38,40,31,0.92); border-color:#7C8FAC; color:#EDEADF; }
+  .bfbadge.fill { background:#2E4A22; border-color:#7FA35C; animation:blink 1.25s linear infinite; }
+  .bfbadge.invite { background:#4a3d78; border-color:#9A6FC8; animation:blink 1.25s linear infinite; }
+  .nabadge { position:absolute; left:372px; top:80px; height:24px; padding:0 8px; border-radius:12px; border:2px solid #7C8FAC; background:rgba(38,40,31,0.92); color:#EDEADF; font-weight:bold; font-size:11px; font-family:inherit; letter-spacing:0.04em; display:inline-flex; align-items:center; gap:4px; cursor:pointer; z-index:5; text-transform:uppercase; }
+  .nabadge .gly { width:14px; height:14px; }
+  @media (prefers-reduced-motion: reduce){ .bfbadge.fill, .bfbadge.invite { animation:none; } }
   .roomtag:hover { background:#4A6B35; }
   .roomhead { position:absolute; top:0; left:0; right:0; height:46px; background:rgba(20,16,12,0.85); display:flex; align-items:center; padding:0 14px; color:#EDEADF; font-weight:bold; font-size:19px; letter-spacing:0.04em; }
   /* 0409 §3 THE PIGGY ALWAYS KNOWS THE WAY (FM-GVT-FEEDBACK-0819, Wyatt 8/19:
@@ -3669,11 +3681,9 @@
   /* ---- THE RIVAL AT THE DOOR ----
      renderMenu() rebuilds the room with innerHTML on every purchase, so every
      bit of this has to be declarative CSS. No rAF, no timers, nothing to leak. */
-  .rivsquad { transform-box:view-box; animation:rivpace 6.4s ease-in-out infinite alternate; }
-  @keyframes rivpace { from { transform:translateX(3px);} to { transform:translateX(-9px);} }
   /* the tan army on tan floorboards is near-invisible without a rim — this dark
      halo is what makes ALL ten army colours read against the wood */
-  .rivfig,.rivdown,.vicfig { filter:drop-shadow(0 0 2.5px rgba(26,18,10,0.95)) drop-shadow(3px 5px 5px rgba(0,0,0,0.4)); }
+  .rivfig,.rivdown,.vicfig,.rivflag { filter:drop-shadow(0 0 2.5px rgba(26,18,10,0.95)) drop-shadow(3px 5px 5px rgba(0,0,0,0.4)); }
   .rivfig { transform-box:fill-box; transform-origin:50% 94%; animation:waddle 0.48s ease-in-out infinite alternate; }
   /* your lot aren't marching — they're bobbing about enjoying the place */
   .vicfig { transform-box:fill-box; transform-origin:50% 94%; animation:bobble 1.7s ease-in-out infinite alternate; }
@@ -3685,7 +3695,7 @@
      order — the tricky part of the card). Four hard offset shadows = a true
      contour ring, then the soft ground shadow; the base .rivfig/.vicfig rule
      above stays tuned for wood in every other room. */
-  .rs-winter .rivfig, .rs-winter .rivdown, .rs-winter .vicfig {
+  .rs-winter .rivfig, .rs-winter .rivdown, .rs-winter .vicfig, .rs-winter .rivflag {
     filter:drop-shadow(1.6px 0 0 rgba(20,30,44,0.92)) drop-shadow(-1.6px 0 0 rgba(20,30,44,0.92))
            drop-shadow(0 1.6px 0 rgba(20,30,44,0.92)) drop-shadow(0 -1.6px 0 rgba(20,30,44,0.92))
            drop-shadow(3px 5px 5px rgba(0,0,0,0.3)); }
@@ -3918,7 +3928,7 @@
   .roomtag.alarm { background:#A63B2A; box-shadow:0 0 15px rgba(166,59,42,0.8); animation:blink 1.25s linear infinite; }
   .roomtag.alarm:hover { background:#C34A36; }
   /* piggy bank: tapping it should pay you back in joy, not a menu */
-  .pigwrap { transform-box:view-box; transform-origin:148px 206px; }
+  .pigwrap { transform-box:fill-box; transform-origin:50% 100%; }   /* 0904 THE LOOP ROW: the hop pivots on the pig's own feet wherever she is seated (the shelf's scale wrapper) */
   .pigwrap.hop { animation:piggyhop 0.42s ease-out; }
   @keyframes piggyhop { 0% { transform:translateY(0) scaleY(1);} 20% { transform:translateY(0) scaleY(0.86);}
     48% { transform:translateY(-19px) scaleY(1.07);} 76% { transform:translateY(0) scaleY(0.93);} 100% { transform:translateY(0) scaleY(1);} }
@@ -4129,11 +4139,13 @@
   @keyframes beaconhalo { 0%,100% { filter:drop-shadow(0 0 6px rgba(255,210,74,0.55)); }
     50% { filter:drop-shadow(0 0 16px rgba(255,214,74,0.95)); } }
   #rtag-bf.beacon, #ro-bf.beacon { animation-delay:0.4s; }
+  #ro-raid.beacon { filter:drop-shadow(0 0 9px rgba(255,210,74,0.7)); animation:beaconhalo 1.7s ease-in-out infinite; }   /* 0904 THE LOOP ROW: THE RAID tile joins the family (the same halo on the stoop's group) while an invader is unbeaten; its pill wears .roomtag.beacon like the others */
+  #rtag-raid.beacon, #ro-raid.beacon { animation-delay:0.2s; }
   #ro-board.beacon { filter:drop-shadow(0 0 9px rgba(255,210,74,0.7)); animation:beaconhalo 1.7s ease-in-out infinite; }   /* 0632 THE DAILY DOORS BLIP: the trophy joins the family — the same halo on the cup's own group (the 0503 art law) while today's away fight waits; its pill wears .roomtag.beacon like the others */
   #rtag-board.beacon, #ro-board.beacon { animation-delay:0.8s; }   /* 0632: the campaign leads, the battlefield 0.4 s behind, the trophy 0.8 s behind */
   #ro-ship.nudge, #ro-warplane.nudge, #ro-hook.nudge { filter:drop-shadow(0 0 9px rgba(255,210,74,0.7)); animation:beaconhalo 1.7s ease-in-out infinite; }   /* 0630 THE ROOF AFTER THE KING: the hookshot pulses on the roof until the drop */   /* 0568 D9: the halo rides whichever ride is out */   /* 0546 THE SHIP'S NUDGE — the idle beacon's own halo on the ferry */
   @media (prefers-reduced-motion: reduce){
-    .roomtag.beacon, #ro-campaign.beacon, #ro-bf.beacon, #ro-ship.nudge, #ro-warplane.nudge, #ro-hook.nudge { animation:none; }
+    .roomtag.beacon, #ro-campaign.beacon, #ro-bf.beacon, #ro-raid.beacon, #ro-ship.nudge, #ro-warplane.nudge, #ro-hook.nudge { animation:none; }
     #ro-board.beacon { animation:none; }   /* 0632 THE DAILY DOORS BLIP: the trophy's breath parked with the family's (its pill is .roomtag.beacon, on the line above); the 9 px shadow stands */
   }
   /* ---- THE LANGUAGE PICKER (v1.29). Native labels only: a child who cannot
@@ -4328,18 +4340,6 @@
   @keyframes robupb { 0% { transform:rotate(0); } 28% { transform:rotate(158deg); }
     66% { transform:rotate(142deg); } 100% { transform:rotate(0); } }
   .dec-robot.react .robled { animation:robled 0.12s steps(1,end) infinite; }
-  /* THE TOWER'S RED EYE (v2.10) — ROBO-SARGE's LED moved to the top of the
-     block radar: a calm ~1s watch-blink while the invading army is at the
-     door (the robot's 0.12s strobe is a TAP reaction, not a watch). Own
-     keyframes on purpose: retuning the robot must never retune the tower.
-     The beaten state carries no class at all — a plain attribute
-     opacity="0.35" on the circle, dim and steady. Reduced motion: the kill
-     sits BELOW the rule it cancels (the v1.11 law — the line-102 list is
-     ABOVE its targets and loses the cascade tie); animation:none hands the
-     eye back its attribute opacity (1) — a static LIT dot. */
-  .radeye { animation:radeye 1.05s steps(1,end) infinite; }
-  @keyframes radeye { 0%,32% { opacity:1; } 33%,100% { opacity:0.22; } }
-  @media (prefers-reduced-motion: reduce){ .radeye { animation:none; } }
   /* v2.38 GOLD LIGHTS (Wyatt 8/4: "those lights shining bright on the
      promotions board. The three of them need to light up after another.
      Make them gold. Make it beautiful.") — the v2.12 climb rested the
@@ -4358,7 +4358,7 @@
      Every ATTRIBUTE is the calm lit state (core #D9A544 w6 · halo 0.2 ·
      wash 0.32 · glints 0): kill the animations (reduced motion, the list
      below) and the board sits statically GOLD and glowing — the
-     indicator survives as information, exactly like the tower's eye.
+     indicator survives as information (the way the block tower's eye did, till 0904).
      And because the 0% keyframe EQUALS the rest attributes, the staggered
      paths sit lit during their own delay windows too (the v2.12 version
      snapped attribute-gold→dark at each delay boundary). */
@@ -4387,6 +4387,12 @@
   @keyframes rwalkA { 0%,100% { transform:translate(0,0); } 30% { transform:translate(12px,6px); } 55% { transform:translate(2px,12px); } 78% { transform:translate(-8px,5px); } }
   @keyframes rwalkB { 0%,100% { transform:translate(0,0); } 26% { transform:translate(-10px,8px); } 52% { transform:translate(5px,14px); } 76% { transform:translate(11px,4px); } }
   @keyframes rwalkC { 0%,100% { transform:translate(0,0); } 34% { transform:translate(9px,-7px); } 62% { transform:translate(-6px,7px); } }
+  /* 0904 THE LOOP ROW — THE WHITE FLAGS (rivFlagMen): after the win five of the beaten army stand on THE RAID tile's stoop each
+     holding a drawn flag. The cloth waves slowly on its own class (transform-box pinned at the pole side; the placement translate
+     lives on the group above it — the v1.21 layer law); it dies in the corner kill list below (the v1.11 law) — under reduced
+     motion the flags simply stand. Art, never a door: the tile's tap is the rematch. */
+  .rivflagc { transform-box:fill-box; transform-origin:0% 50%; animation:rivflagwave 3s ease-in-out infinite; }
+  @keyframes rivflagwave { 0%,100% { transform:skewY(0deg) scaleX(1); } 50% { transform:skewY(-7deg) scaleX(0.92); } }
   /* v2.11 THE BLOCKS ARE YOURS: data-ci walks the four letter-block hexes
      one step per tap (each block reads its own --cN slot, so all three stay
      distinct by construction); the stroke TRANSITION is the color-swap
@@ -4410,7 +4416,7 @@
      under reduced motion the invaders STAND still, your victory men stand,
      the door light holds steady, and the blocks still swap colors on tap
      (the transition above) but nothing hops. */
-  @media (prefers-reduced-motion: reduce){ .rwA,.rwB,.rwC,.ptfig,.ptbob,.ptface,.rivsquad,.rivfig,.vicfig,.nemfig,.nemann-card,.acv,.acvh,.acvw,.acvt,#tblocks.react .tb0,#tblocks.react .tb1,#tblocks.react .tb2 { animation:none; } }
+  @media (prefers-reduced-motion: reduce){ .rwA,.rwB,.rwC,.ptfig,.ptbob,.ptface,.rivfig,.rivflagc,.vicfig,.nemfig,.nemann-card,.acv,.acvh,.acvw,.acvt,#tblocks.react .tb0,#tblocks.react .tb1,#tblocks.react .tb2 { animation:none; } }
   /* THE GIANT BANANA — leans in the corner, wobbles on its base when you poke it */
   .nanaw { transform-box:fill-box; transform-origin:38% 98%; animation:nanasway 5.6s ease-in-out infinite alternate; }
   @keyframes nanasway { from { transform:rotate(-1.1deg); } to { transform:rotate(1.5deg); } }
@@ -4554,7 +4560,7 @@
      every frame re-walks the svg render tree and re-rasterises the stage under the plane (floorboards, rug, every model the dirty
      tiles overlap) while frame() draws the canvas behind the room — and the phone drops frames = the lag. (Chrome composites an
      animated svg element on its own — measured: LayerTree lists .wpw mid-flight — which is why the desktop never showed it.) So the
-     flight moves OUT of the svg for its two legs: #wpfly is an HTML twin of the seat (the wrapper's drag delta + translate(56,250)
+     flight moves OUT of the svg for its two legs: #wpfly is an HTML twin of the seat (the wrapper's drag delta + translate(WP_SEAT — the sill since 0904)
      scale(0.78) rotate(-4) as ONE inline style on .wps), the art in its own 116×64 svg inside .wpa — a real 116×64 box at (-60,-31)
      whose transform-origin (60px 31px) IS the art's own 0,0, will-change:transform — so BOTH engines hand her to the compositor and
      the room is never repainted for a frame of it. The SAME keyframes, in the SAME local units (a px inside .wpa = a px inside .wpw =
@@ -4959,13 +4965,13 @@
   .rugcomet, .rugzip { opacity:0; }
   .rugcomet.a { animation:rugfly1 7.4s ease-in infinite 1.1s; }
   .rugcomet.b { animation:rugfly2 9.6s ease-in infinite 4.7s; }
-  @keyframes rugfly1 { 0% { opacity:0; transform:translate(30px,116px); } 5% { opacity:1; }
-    30% { opacity:1; } 38%,100% { opacity:0; transform:translate(700px,392px); } }
-  @keyframes rugfly2 { 0% { opacity:0; transform:translate(40px,500px); } 4% { opacity:1; }
-    26% { opacity:1; } 34%,100% { opacity:0; transform:translate(690px,150px); } }
+  @keyframes rugfly1 { 0% { opacity:0; transform:translate(30px,346px); } 5% { opacity:1; }
+    30% { opacity:1; } 38%,100% { opacity:0; transform:translate(910px,388px); } }   /* 0904 THE LOOP ROW: the comets cross the rug's top margin (the tiles stand on the rest) */
+  @keyframes rugfly2 { 0% { opacity:0; transform:translate(920px,382px); } 4% { opacity:1; }
+    26% { opacity:1; } 34%,100% { opacity:0; transform:translate(40px,344px); } }
   .dec-space.react .rugzip { animation:rugzip 1s ease-out; }
-  @keyframes rugzip { 0% { opacity:0; transform:translate(56px,138px); } 8% { opacity:1; }
-    78% { opacity:1; } 100% { opacity:0; transform:translate(704px,436px); } }
+  @keyframes rugzip { 0% { opacity:0; transform:translate(56px,350px); } 8% { opacity:1; }
+    78% { opacity:1; } 100% { opacity:0; transform:translate(900px,386px); } }
   .dec-space.react .rugplanet { animation:rugpop 0.9s ease-out; }
   @keyframes rugpop { 0%,100% { transform:scale(1); } 26% { transform:scale(1.13); } }
   /* THE UNICORN (v2.61) — a happy bounce on her seat, the mane flips, and
@@ -27332,6 +27338,10 @@ if(!META.crownV2){ META.crownV2=1;
   // at 0555's staged seat [604,-74] (written by the arrival ceremony and never dragged) moves back to [478,-74]; a dragged ship
   // keeps its place (any other pair). 478/-74 = SHIP_BED, a TDZ literal here (the v1.26 law — staticA asserts they agree).
   (function(){ const bp=META.roomPosR && META.roomPosR.bedroom; if(bp && Array.isArray(bp.ship) && bp.ship[0]===604 && bp.ship[1]===-74) bp.ship=[478,-74]; })();
+  // 0904 THE LOOP ROW: the ship's berth moved (252,124 → 100,96) and the bed went to the east wall — a ship still parked exactly at the
+  // old staged seat [478,-74] (the arrival ceremony's, never dragged) moves to the new pillow end [700,108] (SHIP_BED, a TDZ literal
+  // here); a dragged ship keeps its delta (its home shifted with the berth).
+  (function(){ const bp=META.roomPosR && META.roomPosR.bedroom; if(bp && Array.isArray(bp.ship) && bp.ship[0]===478 && bp.ship[1]===-74) bp.ship=[700,108]; })();
   // 0340 THE HOOKSHOT'S MOVING DAY (one-shot, hookRoofV): every save that
   // kept it on the bedroom nail wakes with it seated on THE ROOFTOP instead
   // — stripped from every other room's floor list, dealt to the roof's, the
@@ -28028,6 +28038,7 @@ function starPopPaint(){
     +'<button type="button" class="mb-x" onclick="UI.starPopClose()">✕</button>'
     +'<span class="mb-band">STAR SHIPMENTS</span>'
     +'<span class="sp-bank" data-notr>'+SH_PIG+'<b>'+META.starBank+'★</b></span>'
+    +'<span class="sp-tier">'+t(tierName(META.starsLifetime))+'</span>'   // 0904 THE LOOP ROW (⚑ Q5): the tier word lives on the piggy's card now (it left the head)
     +(SPOP.door==='deny'? '<span class="mb-line sp-poor">'+t('NOT ENOUGH STARS? GET SOME HERE!')+'</span>' : '')
     +'<div class="sh-pkrow">'+packsShown().map(p=>shopPackStarHTML(p,'spop-')).join('')+'</div>'
     +'<div class="sh-counsel">'+iapCounsel()+'</div>'
@@ -40296,7 +40307,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.93';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.94';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -40439,19 +40450,21 @@ function roomQuiet(x){   // 0559: x = one body-parented card that may stand (the
 // law — the campaign beacon wins, on its own 12 s clock); at and above it the trophy joins on the veteran clock.
 let DD_MIN_CAMP=10;          // ⚑ the rung the trophy's light needs (META.campaign at/above): 10 = ROOM_BEACON_NEWBIE_LV's own cut · 0 = every rung · 100 = never
 const DD_DOOR='board';       // the WORLD RANKINGS door's ROOM_SPOTS mv key (#ro-board = the cup, #rtag-board = its pill)
+const RAID_DOOR='raid';      // 0904 THE LOOP ROW: THE RAID tile's mv key (#ro-raid = the stoop and the swarm, #rtag-raid = the invasion pill) — lit with the family only while an invader is unbeaten (the pill shows), the 0632 trophy grammar
+function raidDue(){ return momDue() || nemesisDue() || !META.rivalDays[todayStr()]; }   // the invader's door has news: Mom's day, his day, or today's army unbeaten (= the raid row's pill shows)
 function ddAwayOpen(){       // today's away fight unclaimed — a READ of the away ledger: no ledger / another day's stamp = nothing claimed today; one serve (done[uid]=0 at the door), verdict or forfeit = claimed
   const A=META.away; if(!A || A.day!==todayStr()) return true;
   if(A.done) for(const k in A.done) return false;
   return true;
 }
 function ddDue(){ return (META.campaign|0)>=DD_MIN_CAMP && ddAwayOpen(); }   // the trophy calls: past the rung, the fight unclaimed
-function ddFamily(){ return ROOM_BEACON.concat([DD_DOOR]); }                 // the doors one sweep touches (ROOM_BEACON byte-still — the rig's own read of it stands)
+function ddFamily(){ return ROOM_BEACON.concat([DD_DOOR, RAID_DOOR]); }      // the doors one sweep touches (ROOM_BEACON byte-still — the rig's own read of it stands); 0904: + THE RAID tile
 function ddLabel(){ return ddDue()? 'A COMMANDER WAITS' : 'RANKINGS'; }     // the pill's word for the day (renderMenu paints it; a claim lands through the room's own repaint)
 function roomBeaconS(){ return META.campaign<ROOM_BEACON_NEWBIE_LV ? ROOM_IDLE_S : ROOM_IDLE_VET_S; }   // 0503 THE NEWBIE GATE: the live clock — the first ten rungs on 12 s, everyone above on 30 s AFK
 function roomBeaconSet(on){   // the four elements (two doors × art group + pill), painted by renderMenu — toggled, never baked (0503: #ro-<mv> = the crate / the tablet, never the hotspot box)
   IDLE.beacon=on?1:0;
-  const dd=!!on && ddDue();   // 0632 THE DAILY DOORS BLIP: the trophy's own call, read once a sweep
-  for(const mv of ddFamily()) for(const pre of ['ro-','rtag-']){ const el=document.getElementById(pre+mv); if(el) el.classList.toggle('beacon', mv===DD_DOOR? dd : !!on); }   // 0632: the trophy rides the same sweep — lit with the family only while today's away fight waits, cleared with it always (a claim mid-glow goes dark on the next second)
+  const dd=!!on && ddDue(), rd=!!on && raidDue();   // 0632 THE DAILY DOORS BLIP: the trophy's own call, read once a sweep · 0904: the raid tile's
+  for(const mv of ddFamily()) for(const pre of ['ro-','rtag-']){ const el=document.getElementById(pre+mv); if(el) el.classList.toggle('beacon', mv===DD_DOOR? dd : mv===RAID_DOOR? rd : !!on); }   // 0632: the trophy rides the same sweep — lit with the family only while today's away fight waits, cleared with it always (a claim mid-glow goes dark on the next second)
 }
 // ===== 0546 THE SHIP'S NUDGE (FM-GVT-GIFTS-01 §12 — Wyatt: "If the player has the
 // magnifying glass and they have the soccer field and they haven't found it
@@ -65709,7 +65722,7 @@ function draw(){
   // and UDEF.radioman.auraR quoted, never copied — the picture cannot drift
   // from the math), tinted in his army's read (the drop-ring pair's hexes).
   // Ground layer on purpose: corpses, mines and men all stand ON it. Static —
-  // zero reduced-motion surface (the towerSquad law). `radioLive` also arms
+  // zero reduced-motion surface (the old towerSquad law — the swarm's now). `radioLive` also arms
   // the buff chevrons after the actor pass; no radioman ⇒ both passes draw
   // nothing and a game without him renders exactly as it always has.
   let radioLive=false;
@@ -70288,6 +70301,11 @@ const CLASSINFO = {
 // noId: the shop's bank shelf draws the very same pig, and two #piggyG in one
 // document would have piggyHop() animating whichever the DOM found first
 function pigSvg(noId){
+  // 0904 THE LOOP ROW (cell S, Wyatt: "Sad face on the piggy while hes being invaded"): pigSvg({sad:1}) — the two eyes stay,
+  // the brows tilt down toward the snout (two short strokes), a small mouth turned down under the snout; no tear. Only the STOLEN
+  // piggy in THE RAID tile wears it while unbeaten; the bank piggy, SH_PIG, the shop's pig and the PIG_COLORS tiers never do.
+  // 0761 THE PLUSH PASS redraws the face: carry both moods. The object form {noId, sad}; a bare true = noId (the shop's shelf).
+  let sad=false; if(noId && typeof noId==='object'){ sad=!!noId.sad; noId=noId.noId===undefined? true : !!noId.noId; }
   pigCheck();
   const t=pigTier(), c=PIG_COLORS[t], rain=(t===9);
   const body=rain?'url(#pigrain)':c.body;
@@ -70302,7 +70320,9 @@ function pigSvg(noId){
     +'<rect x="72" y="74" width="10" height="12" rx="4" fill="'+c.dark+'"/>'
     +'<ellipse cx="14" cy="54" rx="10" ry="8" fill="'+(rain?'#E48FB4':c.body)+'"/>'
     +'<circle cx="11" cy="53" r="2" fill="'+c.eye+'"/><circle cx="17" cy="53" r="2" fill="'+c.eye+'"/>'
-    +'<rect x="48" y="20" width="16" height="4" rx="2" fill="'+c.eye+'"/></g></g>';
+    +'<rect x="48" y="20" width="16" height="4" rx="2" fill="'+c.eye+'"/>'
+    +(sad? '<g class="pigsad" fill="none" stroke="'+c.eye+'" stroke-width="2" stroke-linecap="round"><path d="M5 46 L10 49 M23 46 L18 49"/><path d="M8 65 Q14 61 20 65"/></g>' : '')
+    +'</g></g>';
 }
 // a five-pointed star, centered on 0,0 — drop it in a translate()
 const STAR5='<path d="M0 -5.5 L1.35 -1.86 L5.23 -1.7 L2.19 0.71 L3.23 4.45 L0 2.3 L-3.23 4.45 L-2.19 0.71 L-5.23 -1.7 L-1.35 -1.86 z"';
@@ -70314,86 +70334,18 @@ function medal(cx, on, disc, ribbon){
     +(on? '<g transform="translate('+cx+',42)">'+STAR5+' fill="#FFF3C4" opacity="0.9"/></g>'
          +'<path d="M'+(cx-6)+' 39 a 8 8 0 0 1 5 -4.6" stroke="#fff" stroke-width="2" fill="none" opacity="0.5" stroke-linecap="round"/>' : '');
 }
-// TONIGHT'S INVADER. Not one figure standing politely outside — a squad already
-// over the threshold and marching on your toy box. Beat them and they retreat.
-// Every figure faces left by construction (the tan models are MIRROR()'d, the
-// officer and crawler are drawn facing left) so the whole squad reads as coming IN.
-function towerSquad(riv, rivDone){
-  // v2.17 THE SQUAD LEFT THE DOORWAY (Wyatt 8/3: "It's hard to look at a
-  // door with invading troops. Maybe it would be better to just have
-  // invading troops around the broadcast tower") — the five wanderers moved
-  // to the radar tower's quarter, which has been the rival's own tap door
-  // since v2.10 and whose red eye is the room's threat light: they are after
-  // the ALARM now, the story v2.11's lone tamperer already started (his slot
-  // is absorbed here — six men at one tower would rebuild the pile Wyatt is
-  // deleting). Same five patrol loops (.rwA/.rwB/.rwC, per-figure duration
-  // + NEGATIVE delay longhands so nothing ever syncs), same own-shadow law,
-  // but each shadow sits CENTERED under its man — the door's long light
-  // throw stayed at the door. The whole group renders INSIDE #ro-rival, so
-  // the squad rides the tower's drag delta live: move the alarm and the men
-  // trying to reach it come along (the piggy's show-rides-the-delta law).
-  // Posts are surveyed against the neighbors' REAL ink (getBBox, not table
-  // rects): elephant ends x727 · teddy starts x869 · tower stack 766-822
-  // over ground 314 · blocks pocket 845+/y303-349 · rival pill band
-  // 349-376 · trophy 652-720×139-209. The NW scout keeps every excursion
-  // shy of the tilted LED (x777-789), the front pair straddles the base so
-  // the stack and its eye stay readable between them, and the forecourt
-  // pair patrols BELOW the pill band with real gaps — spread is the point.
-  const fig=(k,x,y,w,d)=>'<image class="rivfig" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
-  const sh=(x,y,w,r)=>'<ellipse cx="'+(x+w/2)+'" cy="'+(y+w*7/6).toFixed(1)+'" rx="'+r+'" ry="'+(r*0.11).toFixed(1)+'" fill="#000" opacity="0.15"/>';
-  const walk=(cls,dur,del,inner)=>'<g class="'+cls+'" style="animation-duration:'+dur+'s;animation-delay:'+del+'s">'+inner+'</g>';
-  // v2.45 (Wyatt 8/5): beaten ⇒ GONE. The v2.11 "knocked down is fine" pile
-  // (five bodies flat around the tower, kept through v2.17's move) retired —
-  // "after you defeat the invader of the day… the UI needs to be dismissed,
-  // it's unnecessary to see after you just defeated them." Nothing of the
-  // invader is left to advertise until tomorrow's army walks on; the pile's
-  // markup lives in git history if a victory tableau ever comes back.
-  if(rivDone) return '';
-  return '<g class="rivsquad">'
-    +walk('rwA',7.6,-2.1, sh(700,178,56,30)+fig('tanrifle',700,178,56,-0.07))
-    +walk('rwB',9.3,-5.4, sh(734,258,52,27)+fig('tanmg',734,258,52,-0.31))
-    +walk('rwC',8.1,-3.2, sh(796,254,62,33)+fig('officer',796,254,62,0))
-    +walk('rwB',11.2,-7.6,sh(700,382,64,36)+fig('crawler',700,382,64,-0.24))
-    +walk('rwC',6.7,-1.5, sh(800,392,54,29)+fig('tanrifle',800,392,54,-0.19))
-    +'</g>';
-}
 // THE OCCUPATION. They are not waiting politely by the door — they are IN the
-// room: asleep in your bed, standing on your toy box, going through the piggy
-// bank, blocks knocked everywhere. Beat them and every last bit of this is gone.
-// A clean room IS the reward.
+// room: on your toy box, all over your piggy. Beat them and every last bit of
+// this is gone. A clean room IS the reward.
+// 0904 THE LOOP ROW: the piggy-bank heist moved into THE RAID tile (stolenPiggySVG
+// — the same four men at the same posts round the stolen pig, plus the tower's
+// five and the bed's standing squatter), so this is the toy-box lid man alone: he
+// stands on the crate (the CAMPAIGN tile's lid) and paints late, over the toys.
 function roomRuckus(riv){
   const fig=(k,x,y,w,d)=>'<image class="rivfig" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
-  const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
-    return '<image class="rivdown" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/>'; };
-  // v2.17: the two bed squatters moved into bedRuckus (they render inside the
-  // bed's drag wrapper now and ride wherever it's dragged), and v2.11's lone
-  // tower tamperer is absorbed by the relocated squad — towerSquad IS the
-  // going-through-your-alarm story, five men strong.
   return '<g>'
-    +fig('tanrifle',224,200,56,-0.29)        // on top of the toy box, like they own it
-    // THE PIGGY-BANK HEIST: a whole crew trying to make off with your savings —
-    // one shoving from the left, one hauling from the right, a crawler dragging
-    // it out from underneath. The piggy stays visible between them: you can see
-    // it being stolen, which is the joke.
-    +fig('tanrifle',196,138,58,-0.05)        // heaving from the right
-    +fig('tanrifle',58,150,54,-0.42)         // shoving from the left
-    +fig('tanmg',150,120,46,-0.6)            // reaching over the top
-    +flat('crawler',104,206,58,4)            // one flat underneath, dragging it out
+    +fig('tanrifle',196,338,56,-0.29)        // on top of the toy box, like they own it (the lid at y 398)
     +'</g>';
-}
-// the bed's own squatters (rival-active): one sprawled on the pillow, one
-// stood on the blanket. Split out of roomRuckus in v2.17 so they render
-// INSIDE #ro-bed and share the bed's whole fate (the piggy's bank-and-pig
-// one-wrapper law — v2.18 made the bed plain fixed furniture again).
-// v3.17: the bed is BEDROOM-ONLY, so the pair squat only where the bed is —
-// in the outside rooms the occupation is roomRuckus's five men alone (their
-// bit is YOUR bed; a bedless yard gives them nothing to squat on).
-function bedRuckus(riv){
-  const fig=(k,x,y,w,d)=>'<image class="rivfig" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
-  const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
-    return '<image class="rivdown" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/>'; };
-  return flat('tanmg',745,70,58,82)          // sprawled out in YOUR bed
-    +fig('tanrifle',712,48,56,-0.17);        // and one more standing on it — 0826 card A: at the pillow end (the foot is the fortress's now; it draws after him)
 }
 // AFTER THE WIN: the room is yours again, and your own army is loose in it —
 // bobbing about, feet up on the bed they just won back, Sarge stood on the toy
@@ -70434,20 +70386,18 @@ function roomVictoryMen(){
   // 0335 PART E: the men are DEPTH-BELT entries now — same four, same
   // seats, same draggable wrappers; feet read the VTROOPS grab table + the
   // saved delta, and ycharsSVG interleaves them with the standing toys.
-  const men=[ [1,'sarge',236,198,58,-0.5, menuSargeURI(hex)],
-              [2,'rifleman',196,146,54,-0.9],      // keeping the piggy bank company
-              [3,'mgunner',534,300,52,-0.2],       // and a couple just enjoying the rug
-              [4,'rifleman',470,392,54,-1.3] ];
+  const men=[ [1,'sarge',196,334,58,-0.5, menuSargeURI(hex)],   // 0904 THE LOOP ROW: on the toy box's lid (the CAMPAIGN tile) — VTROOPS's seats, in step by hand
+              [2,'rifleman',250,290,54,-0.9],      // on the floor under the shelf
+              [3,'mgunner',534,300,52,-0.2],       // and a couple just enjoying the rug's edge
+              [4,'rifleman',300,296,54,-1.3] ];
   return men.map(m=>{ const tb=VTROOPS.find(t=>t.k==='vt'+m[0]);
     return { fy: tb.y+tb.h+rpXY('vt'+m[0])[1], s: vt(m[0],m[1],m[2],m[3],m[4],m[5],m[6]) };
   }).filter(e=>e.s);
 }
 // ================= MOM DAYS (v1.79) =================
 // While momDue(), the invaders' slots swap for momDoor()'s staging. No colored
-// squad, no ruckus — the room says CLEANING is coming: her supplies staged on
-// the east floor, one giant slipper already on your boards (v2.23: the door
-// they used to lean against is gone and the medal case owns that corner, so
-// the cluster lives one translate west — see momDoor). (The suspiciously-neat
+// squad, no ruckus — the room says CLEANING is coming: her supplies staged in
+// THE RAID tile (0904), one giant slipper already on your boards. (The suspiciously-neat
 // blocks moved into tblocksSVG below in v2.11 — they're the room's own toy
 // now, and mom days just show them TIDIED.)
 // v2.11 THE BLOCKS ARE YOURS (Wyatt 8/2: "no longer associated with invading
@@ -70460,14 +70410,14 @@ function roomVictoryMen(){
 // <text>: nothing for the l10n walk to offer or miss.
 // THE FLOOR: x845-958 × y305-350 is div-free floor in the east corner, measured
 // against every neighbor: teddy hotspot ends y304/x946 (bake-crop ink y300),
-// the tower's door ends x840/y322, the DAILY RIVAL pill band sits ~349-375,
+// (0904: the block tower and its pill band left the east wall; the bed stands there now and the pocket dropped to y336-382),
 // and below, the medal case's hotspot starts y456 (v2.23: the door gap is
 // gone and ro-ach took its corner; the corner tap row stayed retired with
 // v2.17's squad move) — so the group's OWN pointer-events tap (the
 // comet's idiom) really lands. Grounded shadows sit OUTSIDE the hop groups
 // so no block's shadow ever jumps with it (the v2.08 airborne-shadow law),
 // and each block keeps its own or the scatter floats (v1.0.2).
-function tblocksSVG(momD){
+function tblocksSVG(){
   const sh=(cx,cy)=>'<ellipse cx="'+cx+'" cy="'+cy+'" rx="16" ry="4.2" fill="#000" opacity="0.18"/>';
   const G='M17.5 9.5 Q13 6 9.5 9 Q6.5 12.5 9 16.5 Q12.5 20 17 17.5 L17 13.5 L13.5 13.5';
   const V='M8.5 8 L13 19 L17.5 8';
@@ -70479,31 +70429,25 @@ function tblocksSVG(momD){
     +'<rect x="3" y="3" width="20" height="20" rx="2" fill="none" stroke-width="2.6" style="stroke:var(--c'+k+')"/>'
     +'<path d="'+ltr+'" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--c'+k+')"/>'
     +'</g></g>';
-  const art = momD
-    // mom due: the same three blocks in a suspiciously NEAT row, sparkle and
-    // all — her tidiness, your toys
-    ? bk(856,318,0,0,G)+bk(888,318,0,1,V)+bk(920,318,0,2,T)
-      +'<path d="M948 304 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 z" fill="#FFF3C4" opacity="0.8"/>'
-    : bk(850,314,16,0,G)+bk(890,317,-21,1,V)+bk(926,308,8,2,T);
+  // 0904 THE LOOP ROW: the tidy-stack pose (Mom's day) retired with the block tower — her staging stands in THE RAID tile now
+  // (momDoor); the scatter is the blocks' one pose, every day. The pocket moved under the bed's FOOT (845..958 × 336..382:
+  // below the BEAR PARK pill's band, above the BATTLEFIELD tile's 392, east of the bed's foot rail) — the bed took the east wall.
+  const art = bk(852,346,16,0,G)+bk(890,350,-21,1,V)+bk(924,342,8,2,T);
   // ⚠ the base --c vars live in the #tblocks CSS rule, NEVER inline here —
   // inline style outranks every selector, so baked-in vars would make the
   // [data-ci] overrides unreachable (measured: the swap went dead)
   return '<g id="tblocks" data-ci="0" pointer-events="all" onclick="UI.blocksTap(event)">'
-    +'<rect x="845" y="303" width="113" height="46" fill="none"/>'
+    +'<rect x="845" y="336" width="113" height="46" fill="none"/>'
     +art+'</g>';
 }
 function momDoor(){
-  // v2.23: the door this staging leaned against is GONE and the medal case
-  // owns its corner (ro-ach art 832..932 × 468..539, pill band 541-571 from
-  // lx 856) — the whole cluster translates west onto the floor the case
-  // vacated, ONE wrapper transform so the props' tuned arrangement and every
-  // grounded shadow ride together (the v1.21 layer law). Surveyed at
-  // (-158,-26): everything lands 600..810 × 370..540 — slipper east edge 802
-  // stays 22px shy of the case hotspot's 824, the broom tip's cap (~372) and
-  // the dustpan shadow's last px (~542) tuck under the MOM pill / bf pill
-  // divs (pills paint over the room everywhere), and the bf map's shadow
-  // ends x594 < the bucket's 600.
-  return '<g transform="translate(-158,-26)">'
+  // 0904 THE LOOP ROW (⚑ Q12 of 0756y): her staging stands in THE RAID tile on
+  // her day — the tile is the invader's door and she is the day's invader. The
+  // cluster is v2.23's arrangement VERBATIM under ONE wrapper transform (the
+  // v1.21 layer law: every prop and every grounded shadow rides together),
+  // scaled 0.75 onto the stoop: raw 752..961 × 398..568 lands at 402..559 ×
+  // 406..534 — inside the tile (345..615 × 392..578), above its pill band (542+).
+  return '<g class="momlurk" transform="translate(-162,107.75) scale(0.75)">'
     // the bucket, soap bubbles drifting off it
     +'<ellipse cx="782" cy="546" rx="30" ry="6" fill="#000" opacity="0.18"/>'
     +'<path d="M758 500 L806 500 L800 544 L764 544 z" fill="#4A6B8A"/>'
@@ -70977,7 +70921,7 @@ function warplaneArt(){
 }
 const PLANE_VB='-60 -31 116 64';
 function warplaneSVG(){
-  return '<g id="ro-warplane"'+rpT('warplane')+'><g class="dec dec-plane" id="decPlane" transform="translate(56,250) scale(0.78) rotate(-4)">'+warplaneArt()+'</g></g>';   // 0824-LATE III: draggable (the 0315 grammar — delta on the wrapper, the prop strain on the inner group)
+  return '<g id="ro-warplane"'+rpT('warplane')+'><g class="dec dec-plane" id="decPlane" transform="translate('+WP_SEAT[0]+','+WP_SEAT[1]+') scale(0.78) rotate(-4)">'+warplaneArt()+'</g></g>';   // 0904: the seat is WP_SEAT (the window sill)   // 0824-LATE III: draggable (the 0315 grammar — delta on the wrapper, the prop strain on the inner group)
 }
 // THE TEDDY BEAR (v1.76) — a honey-brown plush sat on the floorboards at the
 // foot of the bed, paws out, wearing the army's own green bow. Banana-family
@@ -71607,7 +71551,7 @@ const UNI_VB='-42 -112 86 146';
 // inside the bed's 700-930 × 34-174 rect) so the daily sprawler keeps his
 // half; draggable like the rest of the plush family.
 function uniSVG(){
-  return '<g id="ro-unicorn"'+rpT('unicorn')+'><g class="dec dec-unicorn" id="decUni" transform="translate(788,150) scale(0.8)">'+uniArt()+'</g></g>';
+  return '<g id="ro-unicorn"'+rpT('unicorn')+'><g class="dec dec-unicorn" id="decUni" transform="translate(832,280) scale(0.8)">'+uniArt()+'</g></g>';
 }
 // THE SPACE RUG — the same rug, only now it is deep space. Stars twinkle on
 // staggered delays, a ringed planet turns, and a comet crosses every few
@@ -71617,10 +71561,10 @@ function rugStarField(){
   let x=20250725, out='';                        // fixed seed: the stars must NOT
   const R=()=>{ x=(x*1103515245+12345)&0x7fffffff; return x/0x7fffffff; };  // move on every buy
   for(let i=0;i<58;i++)
-    out+='<circle class="rugstar" cx="'+(72+R()*536).toFixed(1)+'" cy="'+(108+R()*396).toFixed(1)
+    out+='<circle class="rugstar" cx="'+(52+R()*856).toFixed(1)+'" cy="'+(348+R()*230).toFixed(1)
       +'" r="'+(0.8+R()*1.9).toFixed(2)+'" fill="#FFF6DC" style="animation-delay:'+(R()*4.2).toFixed(2)+'s"/>';
   for(let i=0;i<7;i++){
-    const px=(96+R()*488).toFixed(1), py=(124+R()*364).toFixed(1);
+    const px=(76+R()*808).toFixed(1), py=(360+R()*206).toFixed(1);
     out+='<g class="rugstar big" transform="translate('+px+','+py+')" style="animation-delay:'+(R()*3.4).toFixed(2)+'s">'
       +'<path d="M0 -7 L1.7 -1.7 L7 0 L1.7 1.7 L0 7 L-1.7 1.7 L-7 0 L-1.7 -1.7 z" fill="#FFF6DC"/></g>';
   }
@@ -71863,30 +71807,30 @@ function roofGapSVG(){
 }
 function roomRugSVG(){
   if(!decorOn('spacerug'))
-    return '<rect x="60" y="96" width="560" height="420" rx="18" fill="#5F7290"/>'
-      +'<rect x="78" y="114" width="524" height="384" rx="12" fill="none" stroke="#7C8FAC" stroke-width="7"/>';
+    return '<rect x="40" y="336" width="880" height="254" rx="18" fill="#5F7290"/>'
+      +'<rect x="58" y="354" width="844" height="218" rx="12" fill="none" stroke="#7C8FAC" stroke-width="7"/>';   // 0904 THE LOOP ROW: the rug is the loop's band at the bottom of the room
   return '<defs>'
     +'<radialGradient id="rugneb" cx="0.32" cy="0.3" r="0.85">'
       +'<stop offset="0" stop-color="#42307E"/><stop offset="0.42" stop-color="#211F55"/>'
       +'<stop offset="1" stop-color="#0F1030"/></radialGradient>'
-    +'<clipPath id="rugclip"><rect x="60" y="96" width="560" height="420" rx="18"/></clipPath>'
+    +'<clipPath id="rugclip"><rect x="40" y="336" width="880" height="254" rx="18"/></clipPath>'
     +'</defs>'
     +'<g class="dec-space" id="decSpace">'
-    +'<rect x="60" y="96" width="560" height="420" rx="18" fill="url(#rugneb)"/>'
+    +'<rect x="40" y="336" width="880" height="254" rx="18" fill="url(#rugneb)"/>'
     +'<g clip-path="url(#rugclip)">'
-      +'<ellipse cx="196" cy="430" rx="230" ry="96" fill="#4A2E7A" opacity="0.3"/>'
-      +'<ellipse cx="486" cy="176" rx="180" ry="82" fill="#1E4C7A" opacity="0.28"/>'
+      +'<ellipse cx="236" cy="540" rx="260" ry="70" fill="#4A2E7A" opacity="0.3"/>'
+      +'<ellipse cx="700" cy="400" rx="220" ry="62" fill="#1E4C7A" opacity="0.28"/>'
       +rugStarField()
       // the planet you tap, rings and all
-      +'<g class="rugplanet"><ellipse cx="300" cy="152" rx="58" ry="15" fill="none" stroke="#C8A05A" stroke-width="5" opacity="0.85"/>'
-        +'<circle cx="300" cy="152" r="34" fill="#C56A45"/>'
-        +'<path d="M270 142 q28 -9 58 -2" stroke="#E0906A" stroke-width="6" fill="none" opacity="0.75"/>'
-        +'<path d="M272 164 q30 8 56 -2" stroke="#9E4E33" stroke-width="7" fill="none" opacity="0.7"/>'
-        +'<circle cx="288" cy="140" r="7" fill="rgba(255,255,255,0.16)"/>'
-        +'<path d="M300 118 a34 34 0 0 0 0 68" fill="rgba(0,0,0,0.22)"/>'
-        +'<ellipse cx="300" cy="152" rx="58" ry="15" fill="none" stroke="#E8C878" stroke-width="2.4" opacity="0.9"/></g>'
-      +'<circle class="rugmoon" cx="176" cy="278" r="13" fill="#C9CDD4"/>'
-      +'<circle cx="171" cy="274" r="3.4" fill="#A8AEB8"/><circle cx="180" cy="283" r="2.4" fill="#A8AEB8"/>'
+      +'<g class="rugplanet"><ellipse cx="480" cy="360" rx="58" ry="15" fill="none" stroke="#C8A05A" stroke-width="5" opacity="0.85"/>'
+        +'<circle cx="480" cy="360" r="34" fill="#C56A45"/>'
+        +'<path d="M450 350 q28 -9 58 -2" stroke="#E0906A" stroke-width="6" fill="none" opacity="0.75"/>'
+        +'<path d="M452 372 q30 8 56 -2" stroke="#9E4E33" stroke-width="7" fill="none" opacity="0.7"/>'
+        +'<circle cx="468" cy="348" r="7" fill="rgba(255,255,255,0.16)"/>'
+        +'<path d="M480 326 a34 34 0 0 0 0 68" fill="rgba(0,0,0,0.22)"/>'
+        +'<ellipse cx="480" cy="360" rx="58" ry="15" fill="none" stroke="#E8C878" stroke-width="2.4" opacity="0.9"/></g>'
+      +'<circle class="rugmoon" cx="150" cy="366" r="13" fill="#C9CDD4"/>'
+      +'<circle cx="145" cy="362" r="3.4" fill="#A8AEB8"/><circle cx="154" cy="371" r="2.4" fill="#A8AEB8"/>'
       // two comets on the house, and a third that only flies when you tap.
       // 0099: each carries the secret's handler + an invisible hit pad (the
       // head alone is a ~5px target at phone scale; r=30 ≈ a 38px thumb pad
@@ -71906,8 +71850,8 @@ function roomRugSVG(){
         +'<path d="M0 0 L-86 -34" stroke="#FFF3C4" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>'
         +'<circle cx="0" cy="0" r="6" fill="#FFFFFF"/></g>'
     +'</g>'
-    +'<rect x="78" y="114" width="524" height="384" rx="12" fill="none" stroke="#5A4EA8" stroke-width="7"/>'
-    +'<rect x="60" y="96" width="560" height="420" rx="18" fill="none" stroke="#2A2450" stroke-width="4"/>'
+    +'<rect x="58" y="354" width="844" height="218" rx="12" fill="none" stroke="#5A4EA8" stroke-width="7"/>'
+    +'<rect x="40" y="336" width="880" height="254" rx="18" fill="none" stroke="#2A2450" stroke-width="4"/>'
     +'</g>';
 }
 // THE PIGGY'S BANK. Bigger and more serious every tier, drawn BEHIND the pig so
@@ -72512,7 +72456,7 @@ function shipArt(){
 }
 function shipSVG(){
   return '<g id="ro-ship"'+rpT('ship')+'>'
-    +'<g transform="translate(252,124) scale(0.9)">'
+    +'<g transform="translate(100,88) scale(0.9)">'
     +'<ellipse cx="50" cy="112" rx="32" ry="5" fill="#000" opacity="0.12"/>'
     +'<g class="dec dec-ship" id="decShip"><g class="shw"><g class="shb">'+shipArt()+'</g></g></g>'
     +'</g></g>';
@@ -72822,7 +72766,7 @@ function wlSweep(){
 // SVG group itself, which tracks him wherever he has wandered to.
 const DECOR_SPOTS={
   train:    { x:240, y:514, w:186, h:82 },
-  spacerug: { x:258, y:110, w:86,  h:86  },   // the planet — the rest of the rug is other people's hotspots
+  spacerug: { x:437, y:317, w:86,  h:86  },   // the planet — 0904: on the rug's top margin (the rug is the loop's band now); the rest of the rug is other people's hotspots
   elephant: { x:624, y:232, w:110, h:106 },
   banana:   { x:4,   y:288, w:96,  h:274 },
   // v1.71: both prizes park in hotspot-free floor — the duck between the shop
@@ -72844,7 +72788,7 @@ const DECOR_SPOTS={
   // v2.61: the unicorn's rectangle on the bed's west end — her ink (754-823 ×
   // 60-176 at the 0.8 park) padded a hair. The spy door underneath stays
   // safe: the glass fly pointer-captures its own drag and never taps this.
-  unicorn:  { x:752, y:58,  w:74,  h:118 },
+  unicorn:  { x:796, y:186, w:74,  h:118 },   // 0904 THE LOOP ROW: she sits on the sketch bed's head end (her old seat is the window now)
   // v1.80: the co-op prizes — the helmet in the gap between the shop hotspot
   // (ends x528) and (v2.10) the trophy's door (starts x646), above the ducky (y166) and
   // clear of the mom-day staging (y370+ since v2.23) — the shop pill left this band in
@@ -72854,7 +72798,7 @@ const DECOR_SPOTS={
   // is under the HUD bar (room y<~47 hides behind it, measured). Both
   // surveyed by screenshot, not rectangle math (the v1.71 law).
   helmet:   { x:620, y:46,  w:80,  h:64 },   // 0341: nudged east — the big yeti takes the north-center pocket
-  warplane: { x:8,   y:218, w:96,  h:68 },
+  warplane: { x:748, y:104, w:96,  h:68 },   // 0904 THE LOOP ROW: THE TOY WARPLANE parks ON the window sill (the art seat WP_SEAT 796,136 at 0.78 → ink ~749..840 × 116..166); every floor; still a GLOBAL ride, still draggable, tap = the ferry (0568)
   // 0824-LATE III THE WHOLE FLOOR DRAGS (Wyatt 8/24 late: "allow all decor to be draggable around, except for the
   // rugs … the plane, the keys, the pufferfish"): the keys' grab rects = their pegs on the rack (gold 736 · silver 760
   // · bronze 784 at scale 0.56 → ~21 px of ink each, 24 apart; ink centres ≈ 770 / 794 / 818), the rack's full height
@@ -72888,7 +72832,7 @@ const DECOR_SPOTS={
   // 0315: the pirate ship's hover pocket over the rug's NW corner — below
   // the piggy pill's worst-case band (~127), above the campaign door (200),
   // east of vt2's grab rect (250), west of the shop's 372
-  ship:     { x:256, y:128, w:88, h:72 },   // 0335: nudged 4 east for the resailed hull's ink; probe-surveyed again (battery leg H)
+  ship:     { x:104, y:92,  w:88, h:72 },   // 0904 THE LOOP ROW: the hover pocket moved to the top-left (the piggy's old corner — below the event band's 74, west of the shelf's 196, above the piggy pill's band 170); the old NW-rug pocket is the shelf's crate now
   // 0331: the boss parade — dino seven on the south-east floorboards, yeti
   // five on the west-center rug edge. Grab rect = home ink (0315 grammar),
   // SCREENSHOT-SURVEYED with the whole 35-toy floor placed (the v1.71 law);
@@ -73857,7 +73801,7 @@ function nemFigSVG(){
 }
 // his tap zone — a dspot-shaped div seated AFTER decorSpots() in the join,
 // so the later DOM wins an overlapped tap (the v2.10 law); the door is the
-// tower's own UI.room('rival') — the intro card, FIGHT NEMESIS and all
+// invader card's own UI.room('rival') (THE RAID tile's since 0904) — the intro card, FIGHT NEMESIS and all
 function nemSpotHTML(){
   if(!nemesisDue()) return '';
   const n=NEM||{x:985,y:430};
@@ -74099,8 +74043,8 @@ function bronzekeySVG(){
 // floor on the lane). The route is re-read per paint from both doors' deltas (rpXY) and the keyframes are minted per paint
 // (renderMenu rebuilds the room), so a paint change or a drag follows for free. Reduced motion: the three stand at the mouth.
 // The rifleman always, then the next two STANDING classes the save owns (the machine gunner's sprite is prone, v1.22/v2.17,
-// so he never marches; a short roster repeats the rifleman). Zero strings, zero save bytes, zero server bytes. FORT GREEN's
-// gate takes P0 when it lands (today the promotions easel's west foot).
+// so he never marches; a short roster repeats the rifleman). Zero strings, zero save bytes, zero server bytes. 0904 THE LOOP
+// ROW: the route runs from the fort seat's foot on the shelf (PT_GATE) — FORT GREEN's gate takes that seat when it lands.
 const BOX_HOLE='<g class="boxhole">'
   +'<path d="M25 122 V114 A10 10 0 0 1 45 114 V122 Z" fill="#1a1410"/>'                                                 // the opening: 20 x 18 in the mold = 27 x 24 on the floor
   +'<path d="M27 122 V114.5 A8 8 0 0 1 43 114.5 V122" fill="none" stroke="#000" stroke-width="2.6" opacity="0.45"/>'   // the inner shadow under the crown
@@ -74108,16 +74052,20 @@ const BOX_HOLE='<g class="boxhole">'
   +'</g>';
 const PT_W=28;                                  // ⚑ a man's width on the floor (33 tall; the victory men are 52-58; 22 read as a dot on a phone)
 const PT_DUR=[9,11,13], PT_DL=[0,-3.7,-7.3];    // ⚑ seconds per lap · the negative delays (never bunch, never in step)
-const PT_LANE=66;                               // ⚑ the west-wall lane (west of the promo pill's widest state and the campaign pill)
-const PT_MOUTH=[197,372];                       // the arch's mouth on the floor, in the crate's frame (150+35*1.35, 210+120*1.35)
+const PT_GATE=[424,158];                        // ⚑ the fort seat's west foot on the shelf (the easel at translate(412,100) scale(0.62): its west leg's foot) — FORT GREEN's gate takes this seat when it lands
+const PT_FLOOR=352;                             // ⚑ the floor band the men cross (between the shelf pills' lane and the tiles' 392)
+const PT_LANE=96;                               // ⚑ the campaign tile's west margin (west of the crate's ink at 128, inside the tile)
+const PT_MOUTH=[156,501];                       // the arch's mouth on the floor, in the crate's frame (114+35*1.2, 355+122*1.2)
+// 0904 THE LOOP ROW re-routes THE PATROL (v7.93): out of the fort seat's foot on the shelf, down the wall, west along the floor band,
+// down the campaign tile's west margin, and east into the toy box's arch — four legs; the men face the way they walk (ptface flips
+// them on the westward leg). Still INSIDE #ro-campaign (they wear the beacon's glow with the crate), still art (pointer-events none),
+// reduced motion = the three stand at the mouth. The rifleman always, then the next two STANDING classes the save owns.
 function patrolSVG(){
   const hex=dyeHex()||GREEN;
-  const dc=rpXY('campaign'), dp=rpXY('promo');
-  const ox=dp[0]-dc[0], oy=dp[1]-dc[1];                       // the easel's foot, read in the crate's frame
-  const P0=[130+ox,538+oy], P1=[PT_LANE,538+oy-42], P2=[PT_LANE,366], P3=PT_MOUTH;
+  const P0=PT_GATE, P1=[PT_GATE[0],PT_FLOOR], P2=[PT_LANE,PT_FLOOR], P3=[PT_LANE,PT_MOUTH[1]], P4=PT_MOUTH;
   const L=(a,b)=>Math.hypot(b[0]-a[0],b[1]-a[1]);
-  const l1=L(P0,P1), l2=L(P1,P2), l3=L(P2,P3), tot=(l1+l2+l3)||1;
-  const k1=+(100*l1/tot).toFixed(1), k2=+(100*(l1+l2)/tot).toFixed(1);
+  const l1=L(P0,P1), l2=L(P1,P2), l3=L(P2,P3), l4=L(P3,P4), tot=(l1+l2+l3+l4)||1;
+  const k1=+(100*l1/tot).toFixed(1), k2=+(100*(l1+l2)/tot).toFixed(1), k3=+(100*(l1+l2+l3)/tot).toFixed(1);
   const tr=p=>'transform:translate('+p[0].toFixed(1)+'px,'+p[1].toFixed(1)+'px)';
   const trio=['rifleman'].concat(TRAY_ORDER.filter(k=>k!=='sarge'&&k!=='mgunner'&&k!=='rifleman'&&unitOwned(k)).slice(0,2));
   while(trio.length<3) trio.push('rifleman');
@@ -74127,17 +74075,205 @@ function patrolSVG(){
     +'.ptfig{animation:ptwalk var(--d) linear var(--dl) infinite;opacity:0}'
     +'.ptface{transform-box:fill-box;transform-origin:50% 50%;animation:ptface var(--d) step-end var(--dl) infinite}'
     +'.ptbob{animation:ptbob .42s ease-in-out infinite alternate}'
-    +'@keyframes ptwalk{0%{'+tr(P0)+';opacity:0}5%{opacity:1}'+k1+'%{'+tr(P1)+'}'+k2+'%{'+tr(P2)+'}93%{opacity:1}100%{'+tr(P3)+';opacity:0}}'
-    +'@keyframes ptface{0%{transform:scaleX(-1)}'+k1+'%{transform:scaleX(1)}100%{transform:scaleX(1)}}'
+    +'@keyframes ptwalk{0%{'+tr(P0)+';opacity:0}4%{opacity:1}'+k1+'%{'+tr(P1)+'}'+k2+'%{'+tr(P2)+'}'+k3+'%{'+tr(P3)+'}94%{opacity:1}100%{'+tr(P4)+';opacity:0}}'
+    +'@keyframes ptface{0%{transform:scaleX(1)}'+k1+'%{transform:scaleX(-1)}'+k2+'%{transform:scaleX(1)}100%{transform:scaleX(1)}}'
     +'@keyframes ptbob{from{transform:translateY(0)}to{transform:translateY(-1.6px)}}'
     +'@media (prefers-reduced-motion:reduce){.ptfig,.ptface,.ptbob{animation:none}.ptfig{opacity:1}'
-    +'.ptfig:nth-of-type(1){'+tr([P3[0]-54,P3[1]])+'}.ptfig:nth-of-type(2){'+tr([P3[0]-27,P3[1]])+'}.ptfig:nth-of-type(3){'+tr([P3[0],P3[1]])+'}}'
+    +'.ptfig:nth-of-type(1){'+tr([P4[0]-54,P4[1]])+'}.ptfig:nth-of-type(2){'+tr([P4[0]-27,P4[1]])+'}.ptfig:nth-of-type(3){'+tr([P4[0],P4[1]])+'}}'
     +'</style>';
   for(let i=0;i<3;i++){
     s+='<g class="ptfig" style="--d:'+PT_DUR[i]+'s;--dl:'+PT_DL[i]+'s"><g class="ptbob"><g class="ptface">'
       +'<image href="'+sprURI(trio[i],hex)+'" x="'+(-PT_W/2)+'" y="-'+h+'" width="'+PT_W+'" height="'+h+'"/></g></g></g>';
   }
   return s+'</g>';
+}
+// ═══ 0904 THE LOOP ROW (FM-GVT-LOOP-ROW-01; design/room-menu-0904/01-LOOP-ROW.md; jumpr plan 20260904-145122 = card 0756x; Wyatt 9/4:
+// "We need a redesign of the room menu … not overwhelm players and add a more ergonomic experience … The Campgin, the daily raider,
+// and battlefields are the general loop of the game; with the occasional visit to the shop & Fort" · "I'm going to go with layout 1,
+// and let's make the bed look more like the sketch" · "Sad face on the piggy while hes being invaded. extend the shelp slightly to
+// the left so we can show the piggy bank also on the shelf to the left of sarges surplus. When the an army gets defeated. Will
+// remove the piggy bank from the invading button" · "good to ship."). THE ROOM IS THE LOOP ROW NOW: the rug at the bottom carries
+// exactly three doors, the same size, in the order of the day — CAMPAIGN (the toy box) · THE RAID (the stolen piggy under the
+// swarm; the invader's own door — the block tower is GONE, 0756y's move re-landed here) · BATTLEFIELD (the war table) — three FIXED
+// 270×186 tiles at x 60 / 345 / 630, y 392, each with its pill at the tile's foot (y 556). Everything occasional went small and
+// quiet on a SHELF at y 160 (x 196..712): the BANK PIGGY (the stars door, her pill only while the day's stars wait) · the CRATE
+// (SARGE'S SURPLUS, its sign on the art; the NO ADS badge rides its corner) · the FORT seat (the promotions easel, its pill only
+// with a pick or ⚔NEW — FORT GREEN swaps its box in here) · the TROPHY (a pill only while today's away fight waits) · the TV ·
+// the MEDAL CASE (wordless). The window top-right with THE TOY WARPLANE parked on its sill; the bed side-on under it from Wyatt's
+// sketch (the FOOT left, the HEAD right, the pillow on a rounded headboard, the bedpost's brass ball, the starry blanket) with the
+// bear fort on the mattress → BEAR PARK; the toys on the floor, draggable as ever; THE PATROL from the fort seat's foot down the
+// wall and across the floor into the toy box's hole. The art below is the room's OWN, lifted byte-same from its old seats and
+// re-seated (a scale on the inner group; the wrapper keeps the #ro-<mv> id the beacon and the rig read). Zero strings, zero save
+// bytes, zero server bytes; every pill an existing key ×7. ═══
+const LR_TILE=[{x:60,y:392},{x:345,y:392},{x:630,y:392}], LR_TILE_W=270, LR_TILE_H=186;   // ⚑ the three seats on the rug (the wireframe Wyatt approved)
+const PIG_SEAT={ x:162, y:28, s:0.6 };                                                  // ⚑ the bank piggy's seat on the shelf (the pair's 74..222 × 112..220 → 206..295 × 95..160)
+const WP_SEAT=[796,136];                                                                // ⚑ THE TOY WARPLANE's art seat = the window sill (DECOR_SPOTS.warplane 748,104 rides it; the flight layer reads it too)
+function pigPt(x,y){ return [PIG_SEAT.x+x*PIG_SEAT.s, PIG_SEAT.y+y*PIG_SEAT.s]; }   // a point of the piggy's old frame (the pig at translate(96,120), scale 1) on the shelf — the floats, the stars and the puffs ride it
+function warTableArt(){ return ''
+  +'<ellipse cx="76" cy="106" rx="80" ry="8" fill="#000" opacity="0.22"/>'
+  +'<rect x="0" y="0" width="152" height="100" rx="5" fill="#0E161C" stroke="#2A3A42" stroke-width="3"/>'
+  +'<rect x="6" y="6" width="140" height="88" rx="3" fill="#16262E"/>'
+  +'<g stroke="#22343C" stroke-width="1"><path d="M6 28 H146 M6 50 H146 M6 72 H146 M34 6 V94 M62 6 V94 M90 6 V94 M118 6 V94"/></g>'
+  +'<path d="M6 20 Q20 12 30 20 Q38 26 30 32 Q16 36 6 30 z" fill="#26414A"/>'
+  +'<path d="M120 80 Q132 70 146 76 L146 94 L112 94 Q110 84 120 80 z" fill="#26414A"/>'
+  +'<path d="M70 44 Q80 38 88 46 Q92 54 82 58 Q70 58 68 50 z" fill="#2C4A54"/>'
+  +'<circle cx="44" cy="62" r="21" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="5 4"/>'
+  +'<circle cx="106" cy="34" r="17" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="5 4"/>'
+  +'<g fill="#4FE07A"><path d="M22 78 l5 -9 5 9 z"/><path d="M38 84 l5 -9 5 9 z"/><path d="M30 62 l5 -9 5 9 z"/><path d="M52 72 l5 -9 5 9 z"/><rect x="18" y="86" width="10" height="3"/></g>'
+  +'<g fill="#FF5A3C"><path d="M112 18 l5 9 5 -9 z"/><path d="M126 32 l5 9 5 -9 z"/><path d="M118 46 l5 9 5 -9 z"/><rect x="128" y="14" width="10" height="3"/></g>'
+  +'<path d="M76 42 L82 56 L76 52 L70 56 z" fill="#EDEADF"/>'; }
+function crateArt(){ return ''
+  +'<ellipse cx="60" cy="96" rx="54" ry="8" fill="#000" opacity="0.25"/>'
+  +'<rect x="10" y="36" width="100" height="58" rx="4" fill="#B48A54" stroke="#8a683e" stroke-width="3"/>'
+  +'<rect x="17" y="42" width="7" height="49" fill="#8a683e" opacity="0.35"/>'
+  +'<rect x="96" y="42" width="7" height="49" fill="#8a683e" opacity="0.35"/>'
+  +'<rect x="5" y="24" width="110" height="15" rx="4" fill="#C69A62" stroke="#8a683e" stroke-width="3"/>'
+  +'<rect x="30" y="40" width="2.5" height="9" fill="#6b6152"/><rect x="87.5" y="40" width="2.5" height="9" fill="#6b6152"/>'
+  +'<rect x="22" y="50" width="80" height="24" rx="3" fill="#000" opacity="0.3"/>'
+  +'<rect x="20" y="48" width="80" height="24" rx="3" fill="#7B5836" stroke="#3A2A14" stroke-width="2.5"/>'
+  +'<rect x="22" y="50" width="76" height="3.5" fill="#FFF3C4" opacity="0.18"/><rect x="22" y="66.5" width="76" height="3.5" fill="#000" opacity="0.28"/>'
+  +'<text x="60" y="63.5" text-anchor="middle" font-family="Arial Narrow" font-weight="bold" font-size="9.5" fill="#F5E7C6" textLength="70" lengthAdjust="spacingAndGlyphs">SARGE\'S SURPLUS</text>'; }
+function easelArt(pend){ return ''
+  +'<ellipse cx="66" cy="90" rx="60" ry="7" fill="#000" opacity="0.25"/>'
+  +'<path d="M20 88 L36 30 M112 88 L96 30" stroke="#8a683e" stroke-width="7" stroke-linecap="round" fill="none"/>'
+  +'<rect x="22" y="16" width="88" height="58" rx="4" fill="#3E4A33" stroke="#A87C4F" stroke-width="5"/>'
+  +(pend
+    ? '<defs><radialGradient id="pvglo" cx="0.5" cy="0.55" r="0.72"><stop offset="0" stop-color="#FFE9A8"/><stop offset="0.55" stop-color="#E8C25A" stop-opacity="0.5"/><stop offset="1" stop-color="#E8C25A" stop-opacity="0"/></radialGradient></defs>'
+      +'<rect x="26" y="20" width="80" height="50" rx="3" fill="url(#pvglo)" class="acvw" opacity="0.32"/>'
+      +'<g fill="none" stroke="#FFD24A" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">'
+      +'<path class="acvh" style="animation-delay:0s" opacity="0.2" d="M40 66 L66 54 L92 66"/>'
+      +'<path class="acvh" style="animation-delay:0.28s" opacity="0.2" d="M40 52 L66 40 L92 52"/>'
+      +'<path class="acvh" style="animation-delay:0.56s" opacity="0.2" d="M40 38 L66 26 L92 38"/></g>'
+      +'<g fill="none" stroke="#D9A544" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">'
+      +'<path class="acv" style="animation-delay:0s" d="M40 66 L66 54 L92 66"/>'
+      +'<path class="acv" style="animation-delay:0.28s" d="M40 52 L66 40 L92 52"/>'
+      +'<path class="acv" style="animation-delay:0.56s" d="M40 38 L66 26 L92 38"/></g>'
+      +'<g fill="#FFFDF2"><g transform="translate(66,54)"><path class="acvt" style="animation-delay:0s" opacity="0" d="M0 -5.5 L1.5 -1.5 L5.5 0 L1.5 1.5 L0 5.5 L-1.5 1.5 L-5.5 0 L-1.5 -1.5 z"/></g>'
+      +'<g transform="translate(66,40)"><path class="acvt" style="animation-delay:0.28s" opacity="0" d="M0 -5.5 L1.5 -1.5 L5.5 0 L1.5 1.5 L0 5.5 L-1.5 1.5 L-5.5 0 L-1.5 -1.5 z"/></g>'
+      +'<g transform="translate(66,26)"><path class="acvt" style="animation-delay:0.56s" opacity="0" d="M0 -5.5 L1.5 -1.5 L5.5 0 L1.5 1.5 L0 5.5 L-1.5 1.5 L-5.5 0 L-1.5 -1.5 z"/></g></g>'
+    : '<g fill="none" stroke="#7d7048" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">'
+      +'<path d="M40 66 L66 54 L92 66"/><path d="M40 52 L66 40 L92 52"/></g>'
+      +'<path d="M40 38 L66 26 L92 38" fill="none" stroke="#5d5540" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>'); }
+function trophyArt(){ return ''
+  +'<ellipse cx="34" cy="78" rx="34" ry="6" fill="#000" opacity="0.25"/><rect x="10" y="58" width="48" height="18" rx="3" fill="#8a683e"/>'
+  +'<path d="M20 14 h28 v14 a14 14 0 0 1 -28 0 z" fill="#FFD24A"/>'
+  +'<path d="M23 19 q10 -4 22 0" stroke="#FFE38A" stroke-width="3" fill="none" opacity="0.8"/>'
+  +'<path d="M41 17 q5 10 -3 22" stroke="#E0AC28" stroke-width="2.6" fill="none" opacity="0.7"/>'
+  +'<path d="M18 16 q-12 2 -2 14" stroke="#F0B92E" stroke-width="4" fill="none"/><path d="M50 16 q12 2 2 14" stroke="#F0B92E" stroke-width="4" fill="none"/>'
+  +'<rect x="28" y="40" width="12" height="10" fill="#F0B92E"/><rect x="20" y="50" width="28" height="8" rx="2" fill="#E0AC28"/>'
+  +'<path d="M15 32 L10 47 L15 44 z" fill="#4A6B8A"/><path d="M20 34 L18 48 L24 45 z" fill="#6B8CAB"/>'
+  +'<circle cx="17" cy="29" r="6" fill="#4A6B8A"/><circle cx="17" cy="29" r="2.6" fill="#6B8CAB"/>'; }
+function caseArt(achDone){ return ''
+  +'<ellipse cx="52" cy="70" rx="50" ry="7" fill="#000" opacity="0.25"/>'
+  +'<rect x="2" y="6" width="100" height="60" rx="7" fill="#6e5130"/>'
+  +'<rect x="9" y="13" width="86" height="46" rx="4" fill="#3B2F3E"/>'
+  +medal(27, achDone>=1, '#D9A544', '#A63B2A')
+  +medal(52, achDone>=20, '#CFCFCF', '#4A6B8A')
+  +medal(77, achDone>=40,'#C08A4A', '#4A6B35')
+  +'<path d="M9 59 L46 13 L62 13 L25 59 z" fill="#fff" opacity="0.06"/>'; }
+// THE WINDOW (the bedroom's): top-right on the wall, a sill at its foot for the plane — art, never a door
+function windowSVG(){
+  return '<g id="ro-window" pointer-events="none">'
+    +'<rect x="740" y="60" width="150" height="92" rx="4" fill="#BFE3FF"/>'
+    +'<rect x="740" y="60" width="150" height="40" rx="4" fill="#DDF0FF" opacity="0.8"/>'
+    +'<circle cx="864" cy="86" r="12" fill="#FFF3C4" opacity="0.95"/>'
+    +'<ellipse cx="786" cy="112" rx="26" ry="9" fill="#fff" opacity="0.85"/><ellipse cx="804" cy="106" rx="18" ry="9" fill="#fff" opacity="0.85"/>'
+    +'<path d="M815 60 V152 M740 106 H890" stroke="#8a683e" stroke-width="5"/>'
+    +'<rect x="740" y="60" width="150" height="92" rx="4" fill="none" stroke="#8a683e" stroke-width="7"/>'
+    +'<rect x="734" y="150" width="162" height="12" rx="3" fill="#B48A54" stroke="#6e5130" stroke-width="2.5"/>'
+    +'</g>';
+}
+// THE SHELF (every floor): one plank on two brackets at y 158..168 — the occasional sits on it
+function shelfSVG(){
+  return '<g id="ro-shelf" pointer-events="none">'
+    +'<rect x="196" y="167" width="516" height="6" fill="#000" opacity="0.14"/>'
+    +'<rect x="196" y="158" width="516" height="10" rx="3" fill="#B48A54" stroke="#6e5130" stroke-width="2.5"/>'
+    +'<path d="M216 168 l-8 18 M692 168 l8 18" stroke="#6e5130" stroke-width="4" stroke-linecap="round"/>'
+    +'</g>';
+}
+// THE BED (the bedroom's; Wyatt's sketch IMG_6933 read rotated -90°): side-on under the window, the FOOT at the left and the HEAD at
+// the right — a long mattress, a starry blanket (⚑ Q10 pale sky blue, three four-point white stars, one fold mark) whose hem hangs
+// in a STEP along the bottom edge, two short legs, a foot rail, the pillow standing at the right leaning back on a ROUNDED HEADBOARD
+// (an arch taller than the mattress), and behind it a tall BEDPOST with a round brass BALL. The room's own line weight, never a
+// photo, never emoji. The bear fort rides INSIDE #ro-bed on the mattress toward the foot (the bed's whole-fate law) — its tap is
+// the bearfort row (BEAR PARK). The bed's old squatters (v2.17's pair) retired: the swarm is THE RAID tile's now.
+function bedSVG(){
+  const star=(x,y)=>'<path transform="translate('+x+','+y+')" d="M0 -5 L1.4 -1.4 L5 0 L1.4 1.4 L0 5 L-1.4 1.4 L-5 0 L-1.4 -1.4 Z" fill="#fff" opacity="0.95"/>';
+  return '<g id="ro-bed">'
+    +'<ellipse cx="806" cy="318" rx="104" ry="8" fill="#000" opacity="0.18"/>'
+    +'<rect x="892" y="192" width="9" height="112" rx="3" fill="#8a683e" stroke="#5a4320" stroke-width="2"/>'
+    +'<circle cx="896.5" cy="188" r="8" fill="#D9A544" stroke="#8a6a1d" stroke-width="2"/><circle cx="894" cy="185.5" r="2.4" fill="#FFF3C4" opacity="0.85"/>'
+    +'<path d="M866 302 V232 A22 22 0 0 1 910 232 V302 Z" fill="#B48A54" stroke="#6e5130" stroke-width="3"/>'
+    +'<path d="M874 296 V236 A14 14 0 0 1 902 236 V296" fill="none" stroke="#8a683e" stroke-width="2" opacity="0.6"/>'
+    +'<rect x="722" y="300" width="10" height="16" rx="2" fill="#8a683e" stroke="#5a4320" stroke-width="2"/>'
+    +'<rect x="856" y="300" width="10" height="16" rx="2" fill="#8a683e" stroke="#5a4320" stroke-width="2"/>'
+    +'<rect x="710" y="252" width="8" height="52" rx="3" fill="#B48A54" stroke="#6e5130" stroke-width="2.5"/>'
+    +'<rect x="714" y="262" width="184" height="40" rx="6" fill="#E8E4D4" stroke="#B8B4A4" stroke-width="2.5"/>'
+    +'<g transform="rotate(-8 863 255)"><rect x="846" y="234" width="34" height="42" rx="9" fill="#fff" stroke="#C9C4B4" stroke-width="2"/></g>'
+    +'<path d="M716 262 H842 V292 H782 V302 H716 Z" fill="#BFE3FF" stroke="#7FB2E5" stroke-width="2.2" stroke-linejoin="round"/>'
+    +'<path d="M722 277 H836" stroke="#7FB2E5" stroke-width="1.6" opacity="0.6"/>'
+    +star(744,273)+star(778,289)+star(814,272)
+    +bearFortSVG()
+    +'</g>';
+}
+// THE RAID TILE — the invader's own door on every floor (⚑ Q14): the bank's stoop; while today's army is unbeaten the STOLEN PIGGY
+// (a second pig, her paint, no bank — carried off, wearing THE SAD FACE) under the swarm (the heist four + the tower's five + the
+// bed's standing squatter, in the army's hex); once beaten, five of the beaten army stand on the stoop each holding a drawn white
+// flag (no pill — v2.45's dismissal law; the tap is the +1★ rematch, ⚑ Q3/Q13); Mom's day = her props on the stoop (momDoor);
+// the Nemesis's day = the empty stoop under his pill (his figure stalks the room and is his door too).
+function raidStoopSVG(){
+  return '<g class="stoop"><ellipse cx="480" cy="514" rx="106" ry="9" fill="#000" opacity="0.2"/>'
+    +'<rect x="380" y="496" width="200" height="18" rx="4" fill="#D8D2C4" stroke="#A79F8C" stroke-width="2"/>'
+    +'<rect x="392" y="480" width="176" height="18" rx="4" fill="#EDE7D8" stroke="#A79F8C" stroke-width="2"/></g>';
+}
+function stolenPiggySVG(riv){
+  const fig=(k,x,y,w,d)=>'<image class="rivfig" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*7/6).toFixed(1)+'" style="animation-delay:'+d+'s"/>';
+  const flat=(k,x,y,w,rot)=>{ const h=w*7/6, cx=x+w/2, cy=y+h*0.9;
+    return '<image class="rivdown" href="'+sprURI(k,riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h.toFixed(1)+'" transform="rotate('+rot+' '+cx.toFixed(1)+' '+cy.toFixed(1)+')"/>'; };
+  const sh=(x,y,w,r)=>'<ellipse cx="'+(x+w/2)+'" cy="'+(y+w*7/6).toFixed(1)+'" rx="'+r+'" ry="'+(r*0.11).toFixed(1)+'" fill="#000" opacity="0.15"/>';
+  const walk=(cls,dur,del,inner)=>'<g class="'+cls+'" style="animation-duration:'+dur+'s;animation-delay:'+del+'s">'+inner+'</g>';
+  return '<g class="stolen">'
+    // THE PIGGY-BANK HEIST (v2.11's four at their four posts, byte-same relative to the pig — the pig's old frame translated whole)
+    +'<g transform="translate(324,274)">'+pigSvg({noId:1,sad:1})
+    +fig('tanrifle',196,138,58,-0.05)        // heaving from the right
+    +fig('tanrifle',58,150,54,-0.42)         // shoving from the left
+    +fig('tanmg',150,120,46,-0.6)            // reaching over the top
+    +flat('crawler',104,206,58,4)            // one flat underneath, dragging it out
+    +'</g>'
+    // THE TOWER'S FIVE + the bed's squatter (v2.17's loops, re-posted round the stoop; ⚑ every post, loop and pace)
+    +walk('rwB',9.3,-5.4, sh(352,396,44,24)+fig('tanrifle',352,396,44,-0.07))      // NW
+    +walk('rwC',8.1,-3.2, sh(348,470,48,26)+fig('tanmortar',348,470,48,-0.31))     // SW
+    +walk('rwC',11.2,-7.6,sh(560,392,52,28)+fig('tanbazooka',560,392,52,-0.24))    // NE
+    +walk('rwA',7.6,-2.1, sh(552,462,56,30)+fig('officer',552,462,56,0))           // E
+    +walk('rwC',6.7,-1.5, sh(490,476,48,26)+fig('tanrifle',490,476,48,-0.19))      // S, east of the crawler
+    +walk('rwB',8.7,-4.1, sh(516,392,44,24)+fig('tanrifle',516,392,44,-0.33))      // N (the bed's standing squatter — the bed has no bed-sitters now)
+    +'</g>';
+}
+// THE WHITE FLAGS (Wyatt: "the invading army just has one unit there, and they'll have a white flag"; the card: five of the tower's
+// men, ⚑ Q13): each man of the beaten army with a pole from his shoulder and a drawn cloth (rimmed for the tan-on-tan law — NEVER an
+// emoji); the cloth waves slowly on its own wrapper-pinned class (.rivflagc — the placement translate sits on the group above it, the
+// v1.21 layer law; parked under reduced motion by the corner kill list). Two rows on the stoop; art, never a door.
+function rivFlagMan(riv,x,y,w){
+  const h=+(w*7/6).toFixed(1), px=+(x+w*0.70).toFixed(1), top=y-16;
+  return '<g class="rivflagm">'
+    +'<ellipse cx="'+(x+w/2)+'" cy="'+(y+h).toFixed(1)+'" rx="'+(w*0.55).toFixed(1)+'" ry="3.2" fill="#000" opacity="0.15"/>'
+    +'<image class="rivflag" href="'+sprURI('tanrifle',riv.hex)+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'"/>'
+    +'<path d="M'+px+' '+(y+h*0.62).toFixed(1)+' V'+top+'" stroke="#5A4634" stroke-width="2.6" stroke-linecap="round"/>'
+    +'<g transform="translate('+px+','+top+')"><g class="rivflagc">'
+      +'<path d="M0 0 L28 3 Q24 10 28 17 L0 21 Z" fill="#F4F1E8" stroke="#7A6F5E" stroke-width="1.4" stroke-linejoin="round"/>'
+      +'<path d="M6 3.5 Q9 11 6 18.5" stroke="#CFC8B8" stroke-width="2" fill="none" stroke-linecap="round"/>'
+    +'</g></g></g>';
+}
+function rivFlagMen(riv){
+  return '<g class="rivflags">'
+    +rivFlagMan(riv,402,416,44)+rivFlagMan(riv,486,416,44)                                // the back row
+    +rivFlagMan(riv,360,452,44)+rivFlagMan(riv,444,452,44)+rivFlagMan(riv,528,452,44)      // the front row
+    +'</g>';
+}
+function raidTileSVG(riv, rivDone, momD, nemD){
+  return '<g id="ro-raid">'+raidStoopSVG()
+    +(momD? momDoor() : nemD? '' : rivDone? rivFlagMen(riv) : stolenPiggySVG(riv))
+    +'</g>';
 }
 function roomSVG(){
   const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()], momD=momDue(), nemD=nemesisDue();   // v1.79: computed once — every branch below agrees (v3.21: + his day)
@@ -74162,78 +74298,24 @@ function roomSVG(){
   // winter snow, rooftop shingles and backyard grass are their own floors,
   // no blanket on top. Both skins gate together (blue wool AND the owned
   // SPACE RUG), so the comet secret is bedroom furniture by design.
-  +(roomCur()==='bedroom'? roomRugSVG() : '')   /* 0524's pillow door RETIRED by 0555 — the little bear fortress rides the bed (bearFortSVG inside #ro-bed above) */
+  +(roomCur()==='bedroom'? roomRugSVG() : '')   /* 0524's pillow door RETIRED by 0555 — the little bear fortress rides the bed (bearFortSVG inside #ro-bed above) · 0904 THE LOOP ROW: the rug is the loop's band at the bottom (40,336 880×254) */
   // v3.06 THE ROOFTOP'S GAP — painted before everything that stands (the
   // level's own hole, re-authored). v3.41: no rug reaches this floor anymore
   // (bedroom-only above), so the old eats-the-rug's-middle ordering note is
   // moot — geometry byte-still, rdragEnd's fall test agrees as ever.
   +(roomCur()==='rooftop'? roofGapSVG() : '')
   +storeSVG()   // 0551a THE PARK STORES: the store front on the backyard / winter / western floors — after the floor, before everything that stands (the tap is its ROOM_SPOTS row)
-  // THE TACTICAL MAP (Wyatt 7/24: "make it look like a battlefield") — a dark
-  // war-room chart on the rug: grid, landmasses, dashed capture rings, green
-  // friendlies pushing from the southwest, red hostiles holding the northeast,
-  // and your white pointer in the middle of it all.
-  // v2.12: every draggable object rides an #ro-<mv> wrapper — the saved
-  // [dx,dy] lands on the WRAPPER so the art's own transform underneath
-  // (translate/rotate/scale) never has to be rewritten (the v1.21 layer law).
-  +'<g id="ro-bf"'+rpT('bf')+'><g transform="translate(438,430) rotate(-4)">'
-  +'<ellipse cx="76" cy="106" rx="80" ry="8" fill="#000" opacity="0.22"/>'
-  +'<rect x="0" y="0" width="152" height="100" rx="5" fill="#0E161C" stroke="#2A3A42" stroke-width="3"/>'
-  +'<rect x="6" y="6" width="140" height="88" rx="3" fill="#16262E"/>'
-  +'<g stroke="#22343C" stroke-width="1"><path d="M6 28 H146 M6 50 H146 M6 72 H146 M34 6 V94 M62 6 V94 M90 6 V94 M118 6 V94"/></g>'
-  +'<path d="M6 20 Q20 12 30 20 Q38 26 30 32 Q16 36 6 30 z" fill="#26414A"/>'
-  +'<path d="M120 80 Q132 70 146 76 L146 94 L112 94 Q110 84 120 80 z" fill="#26414A"/>'
-  +'<path d="M70 44 Q80 38 88 46 Q92 54 82 58 Q70 58 68 50 z" fill="#2C4A54"/>'
-  +'<circle cx="44" cy="62" r="21" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="5 4"/>'
-  +'<circle cx="106" cy="34" r="17" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-dasharray="5 4"/>'
-  +'<g fill="#4FE07A"><path d="M22 78 l5 -9 5 9 z"/><path d="M38 84 l5 -9 5 9 z"/><path d="M30 62 l5 -9 5 9 z"/><path d="M52 72 l5 -9 5 9 z"/><rect x="18" y="86" width="10" height="3"/></g>'
-  +'<g fill="#FF5A3C"><path d="M112 18 l5 9 5 -9 z"/><path d="M126 32 l5 9 5 -9 z"/><path d="M118 46 l5 9 5 -9 z"/><rect x="128" y="14" width="10" height="3"/></g>'
-  +'<path d="M76 42 L82 56 L76 52 L70 56 z" fill="#EDEADF"/>'
-  +'</g></g>'
-  // v2.59 THE REWARDED TV — the little set beside the war map on the rug's
-  // south edge. Paints right after the map (same shelf of floor); nothing else
-  // reaches this pocket (survey on the ROOM_SPOTS row), so order among later
-  // siblings is moot. Armed/asleep is recomposed per repaint — the piggy's own
-  // refresh law, no live class flipping.
-  +tvSVG()
-  // bed top-right — BEDROOM-ONLY since v3.17 (Wyatt 8/11: "in the outside
-  // backgrounds, the bed should be removed"): backyard/winter/rooftop are all
-  // outdoors, so the whole group — frame, sheets, pillow AND whoever is ON it
-  // (the piggy's bank-and-pig one-wrapper law) — renders only at home. The
-  // gate IS the restore: roomSVG rebuilds per repaint, so switching back
-  // re-seats the bed with nothing to undo. On a rival day outside, the
-  // occupation still speaks through roomRuckus's five men — the bed pair's
-  // whole bit is squatting YOUR bed, so no bed, no bed squatters (the v3.17
-  // ruling; see bedRuckus). Base y34 sits above the 48px header floor by
-  // architecture — rdragClamp's band only binds objects that start BELOW it.
-  +(roomCur()==='bedroom'
-    ? '<g id="ro-bed"'+rpT('bed')+'>'
-      +'<rect x="700" y="34" width="230" height="140" rx="10" fill="#8FA98F"/><rect x="700" y="34" width="56" height="140" rx="10" fill="#E8E4D4"/><rect x="710" y="62" width="38" height="84" rx="8" fill="#fff"/>'
-      +((momD||rivDone||nemD)? '' : bedRuckus(riv))
-      +bearFortSVG()   // 0555 BEAR PARK: the little bear fortress — 0826 card A: at the bed's FOOT, above the BEAR PARK pill — INSIDE #ro-bed, after the squatters (the fortress wins the bed on a rival day, ⚑), riding the bed's transform (the piggy's bank-and-pig one-wrapper law)
-      +'</g>'
-    : '')
-  // v2.23 THE CORNER IS THE MEDAL CASE'S NOW (Wyatt 8/3: "Remove whatever is
-  // on the bottom right of the main menu. It looks like an opening door.
-  // Let's just remove it so we can move the medals over to the right and
-  // take up that space.") — the v2.09 dark door gap (905,415 55×120) and its
-  // breathing doorlight spill are DELETED (with them: the spillg gradient
-  // def, the .doorlight CSS + spill keyframes, and both reduced-motion list
-  // entries — dead code goes, the v1.28 law), and ro-ach below moved into
-  // the freed corner. Mom's raid canvas still paints its own door in HER
-  // scene (that is her stage, not the menu), and momDoor's mom-day staging
-  // translated west with the props' new floor (see momDoor). The corner
-  // rival tap row stays retired (v2.17) — nothing tappable lived here.
-  // toy box (campaign)
-  +'<g id="ro-campaign"'+rpT('campaign')+'><g transform="translate(150,210) scale(1.35)">'+(efBoxOn()? EF_BOX : SPRITES_SRC.toybox.replace(/viewBox[^>]*>/,''))+BOX_HOLE+'</g>'+patrolSVG()+'</g>'   // 0656 THE ELITE FORCES BOX (Card G): past the summit the crate wears the set's camo (EF_BOX — the same seat, the same size, the same tap; the wooden toy box below L100)
-  // piggy bank — wearing whatever colour its survival streak has earned, stood
-  // in front of whatever bank she's been upgraded into (one wrapper for the
-  // pair: the bank building and the pig on its stoop drag as one possession)
-  +'<g id="ro-piggy"'+rpT('piggy')+'>'
+  // ═══ 0904 THE LOOP ROW — the room's middle, back to front: the window (the bedroom's), the shelf and the six occasional things
+  // on it, the bed (the bedroom's), then the three tiles on the rug, then the toys. Every door's art wears #ro-<mv> (the beacon +
+  // the rig's read); the hotspots and pills are ROOM_SPOTS rows. See the painters above roomSVG. ═══
+  +(roomCur()==='bedroom'? windowSVG() : '')
+  +shelfSVG()
+  // the BANK PIGGY on the shelf — the bank building and the pig on its stoop, one wrapper, at PIG_SEAT (0.6)
+  +'<g id="ro-piggy"><g transform="translate('+PIG_SEAT.x+','+PIG_SEAT.y+') scale('+PIG_SEAT.s+')">'
   +bankSVG()
   +pigSvg()
-  +'</g>'
-  // v2.42 THE LITTLE GLASS — really small, on the floor by the piggy vault,
+  +'</g></g>'
+  // v2.42 THE LITTLE GLASS — really small, on the floor by the west wall (the piggy's old corner),
   // lower to the left, just lying on the ground (Wyatt's own words). Only
   // while the lens is owned and the spy still hides; the day he's found this
   // line renders nothing, forever. Not a button — the quiet hotspot div
@@ -74243,162 +74325,45 @@ function roomSVG(){
     ? '<g id="ro-glass"><ellipse cx="66" cy="262" rx="26" ry="6" fill="#000" opacity="0.18"/>'
       +'<g transform="translate(46,230) scale(0.30) rotate(62 60 84)">'+lensArt()+'</g></g>'
     : '')
-  // ARMY CRATE (shop) — v2.25 (Wyatt 8/3: the SHOP pill below is removed,
-  // and the composition gets SLEEK while staying "just a box with a little
-  // sign"): the v2.09 open-flap crate + its SHOP stencil + the tilted
-  // two-line plaque read as three things fighting on one prop, so the crate
-  // CLOSES into a clean footlocker (proud lid, two batten shadows — same
-  // tans #B48A54/#C69A62 in the same #8a683e line weight, same translate
-  // slot, same ground line 182 + shadow) and ONE small straight sign hangs
-  // off the lid's front on two short straps: the v2.22 walnut #7B5836 in
-  // its #3A2A14 bevel, offset shadow (the drop-shadow law), cream
-  // lettering, ONE line — "SARGE'S SURPLUS" on its EXISTING plain key ×7
-  // (literal text node, the DOM door translates; zero new keys; the
-  // stencil's "SHOP" rows and the aisle's "FINE PLASTIC GOODS · EST. {0}"
-  // stay in the tables — the aisle .sh-sign still speaks the small line).
-  // textLength pins the lettering inside the board on EVERY platform
-  // (Android ships no Arial Narrow — glyphs squish to the measured lane;
-  // 70 inside the 80 board seats es's EXCEDENTES DE SARGE at the same
-  // px-per-glyph the old 76/plaque did). v3.03 (Wyatt 8/10: "Sarge's
-  // Surplus 20% bigger in the main menu"): the inner g wears scale(1.2),
-  // its translate rebased 390,86 → 378,66.8 so the crate grows IN PLACE —
-  // centre x450 and the 182 ground line hold (shadow bottom 190 → 191.6).
-  // Art ink spans world 384..516 × 95.6..191.6 now — 36px shy of the
-  // ducky's x552 band, every pixel inside the crate's own grown
-  // 372..532 × 76..200 hotspot (the ROOM_SPOTS row moved with the art).
-  // No pill: the crate IS the door (tap unchanged; corridor survey lives
-  // in git history with the retired lane).
-  // v2.86 THE SHOP INTRO: while the introduction is live (comms.shop===1) the
-  // crate wears .beckon — baked into every paint, so crew repaints and buys
-  // can't shake it off; openShop retires it for good.
-  +'<g id="ro-shop"'+(shopBeckonOn()?' class="beckon"':'')+rpT('shop')+'>'
-  +'<g transform="translate(378,66.8) scale(1.2)">'
-  +'<ellipse cx="60" cy="96" rx="54" ry="8" fill="#000" opacity="0.25"/>'
-  +'<rect x="10" y="36" width="100" height="58" rx="4" fill="#B48A54" stroke="#8a683e" stroke-width="3"/>'
-  +'<rect x="17" y="42" width="7" height="49" fill="#8a683e" opacity="0.35"/>'
-  +'<rect x="96" y="42" width="7" height="49" fill="#8a683e" opacity="0.35"/>'
-  +'<rect x="5" y="24" width="110" height="15" rx="4" fill="#C69A62" stroke="#8a683e" stroke-width="3"/>'
-  +'<rect x="30" y="40" width="2.5" height="9" fill="#6b6152"/><rect x="87.5" y="40" width="2.5" height="9" fill="#6b6152"/>'
-  +'<rect x="22" y="50" width="80" height="24" rx="3" fill="#000" opacity="0.3"/>'
-  +'<rect x="20" y="48" width="80" height="24" rx="3" fill="#7B5836" stroke="#3A2A14" stroke-width="2.5"/>'
-  +'<rect x="22" y="50" width="76" height="3.5" fill="#FFF3C4" opacity="0.18"/><rect x="22" y="66.5" width="76" height="3.5" fill="#000" opacity="0.28"/>'
-  +'<text x="60" y="63.5" text-anchor="middle" font-family="Arial Narrow" font-weight="bold" font-size="9.5" fill="#F5E7C6" textLength="70" lengthAdjust="spacingAndGlyphs">SARGE\'S SURPLUS</text>'
-  +'</g>'+(surpNewIs()? surpBannerSVG() : '')+'</g>'   // 0723 NEW! OVER THE STOREFRONT: the ribbon rides the crate's rpT wrapper in every room, baked off surpNewIs() at every paint (the beckon's own grammar); openShop takes it down live
-  // block radar (daily rival) — SWAPPED EAST onto the trophy's old block spot
-  // (v2.10, Wyatt): same ground line (314) and same center (794) the trophy
-  // held, so the teddy's foot-of-the-bed survey holds (this door now ends
-  // x840 ≤ the old trophy door's 842). The top of the stack sits knocked
-  // askew while they're in the room, and straightens up the moment they're
-  // gone — and the antenna wears ROBO-SARGE's red LED now (#FF5A3C, the
-  // robot's own hex): .radeye watch-blink while the invading army is at the
-  // door (mom counts — her fight is the room's live threat, so momD ||
-  // !rivDone, not the old !rivDone alone), dim steady ember once they're
-  // beaten. The rival's army color moved OFF the light — the door squad and
-  // the pill still wear the army's own hex.
-  // 0355 (Wyatt 8/16: "Remove the Toy Tower that is appearing in every
-  // room. It should only be in the regular kid's bedroom.") — the whole
-  // tower (invading squad included) gates on the bedroom, the bed/rug's own
-  // v3.17/v3.41 room-gate grammar; the rival ROOM_SPOTS row wears the
-  // matching due() so pill + tap die with the art.
-  +(roomCur()!=='bedroom'? '' :
-  '<g id="ro-rival"'+rpT('rival')+'><g transform="translate(754,196)"><ellipse cx="40" cy="118" rx="38" ry="7" fill="#000" opacity="0.25"/><rect x="12" y="84" width="56" height="30" rx="4" fill="#C85A4A"/><rect x="18" y="56" width="44" height="28" rx="4" fill="#4A6B8A"/>'
-  +'<g'+(rivDone?'':' transform="rotate(-13 40 56)"')+'><rect x="24" y="32" width="32" height="24" rx="4" fill="#D9A544"/><path d="M40 32 L40 8" stroke="#555" stroke-width="3"/><circle cx="40" cy="6" r="6" fill="#FF5A3C"'+((momD||!rivDone)?' class="radeye"':' opacity="0.35"')+'/></g></g>'
-  // v2.17: the invading squad renders INSIDE the tower's wrapper — around
-  // the alarm they came for, riding its drag delta live (mom days field no
-  // squad at all; her staging keeps the doorway, momDoor below)
-  +((momD||nemD)? '' : towerSquad(riv, rivDone))   // v3.21: his day is HIS — no daily-army tower party under his rampage
-  +'</g>')
-  // TRAINING ACADEMY (promotions) — an easel of chevrons, not a workbench.
-  // v2.38 GOLD LIGHTS (Wyatt 8/4: "those lights shining bright on the
-  // promotions board... The three of them need to light up after another.
-  // Make them gold. Make it beautiful."): with a promotion waiting the board
-  // is LIT — a warm gold wash pooled on the slate (pvglo, the rugneb inline-
-  // defs idiom), every stripe resting bright gold under a soft wide-stroke
-  // halo, and the v2.12 climb now a real bloom running bottom→top with a
-  // white glint popping at each apex as its light ignites. Layers are
-  // CSS-clocked (.acvw wash / .acvh halos / .acv cores / .acvt glints) via
-  // opacity + stroke ONLY — no CSS transform anywhere, so the glints'
-  // placement groups keep their SVG translate untouched (the v1.21 layer
-  // law); stagger = inline animation-delay LONGHANDS, bottom first. Reduced
-  // motion (the kill list beside .rwA): the attributes ARE the calm lit
-  // state — static gold, softly glowing, no cascade, still unmistakably
-  // "promotion waiting". No promotion = the same dim board it always was,
-  // byte-true.
-  +'<g id="ro-promo"'+rpT('promo')+'><g transform="translate(104,452)"><ellipse cx="66" cy="90" rx="60" ry="7" fill="#000" opacity="0.25"/>'
-  +'<path d="M20 88 L36 30 M112 88 L96 30" stroke="#8a683e" stroke-width="7" stroke-linecap="round" fill="none"/>'
-  +'<rect x="22" y="16" width="88" height="58" rx="4" fill="#3E4A33" stroke="#A87C4F" stroke-width="5"/>'
-  +(pend
-    ? '<defs><radialGradient id="pvglo" cx="0.5" cy="0.55" r="0.72"><stop offset="0" stop-color="#FFE9A8"/><stop offset="0.55" stop-color="#E8C25A" stop-opacity="0.5"/><stop offset="1" stop-color="#E8C25A" stop-opacity="0"/></radialGradient></defs>'
-      +'<rect x="26" y="20" width="80" height="50" rx="3" fill="url(#pvglo)" class="acvw" opacity="0.32"/>'
-      +'<g fill="none" stroke="#FFD24A" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">'
-      +'<path class="acvh" style="animation-delay:0s" opacity="0.2" d="M40 66 L66 54 L92 66"/>'
-      +'<path class="acvh" style="animation-delay:0.28s" opacity="0.2" d="M40 52 L66 40 L92 52"/>'
-      +'<path class="acvh" style="animation-delay:0.56s" opacity="0.2" d="M40 38 L66 26 L92 38"/></g>'
-      +'<g fill="none" stroke="#D9A544" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">'
-      +'<path class="acv" style="animation-delay:0s" d="M40 66 L66 54 L92 66"/>'
-      +'<path class="acv" style="animation-delay:0.28s" d="M40 52 L66 40 L92 52"/>'
-      +'<path class="acv" style="animation-delay:0.56s" d="M40 38 L66 26 L92 38"/></g>'
-      +'<g fill="#FFFDF2"><g transform="translate(66,54)"><path class="acvt" style="animation-delay:0s" opacity="0" d="M0 -5.5 L1.5 -1.5 L5.5 0 L1.5 1.5 L0 5.5 L-1.5 1.5 L-5.5 0 L-1.5 -1.5 z"/></g>'
-      +'<g transform="translate(66,40)"><path class="acvt" style="animation-delay:0.28s" opacity="0" d="M0 -5.5 L1.5 -1.5 L5.5 0 L1.5 1.5 L0 5.5 L-1.5 1.5 L-5.5 0 L-1.5 -1.5 z"/></g>'
-      +'<g transform="translate(66,26)"><path class="acvt" style="animation-delay:0.56s" opacity="0" d="M0 -5.5 L1.5 -1.5 L5.5 0 L1.5 1.5 L0 5.5 L-1.5 1.5 L-5.5 0 L-1.5 -1.5 z"/></g></g>'
-    : '<g fill="none" stroke="#7d7048" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">'
-      +'<path d="M40 66 L66 54 L92 66"/><path d="M40 52 L66 40 L92 52"/></g>'
-      +'<path d="M40 38 L66 26 L92 38" fill="none" stroke="#5d5540" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>')
-  +'</g></g>'
-  // trophy (leaderboard) — SWAPPED WEST onto the block tower's old floor
-  // (v2.10, Wyatt): center 686 = the tower's own old axis, ground raised
-  // 226→203 so the WORLD RANKINGS pill (ly 219) fits ABOVE the elephant's
-  // hotspot (top 232) — decor anchors render AFTER the pills and win the
-  // tap, so a pill below the old ground line would die under the elephant.
-  // The cup wears THE RUBBER DUCKY's own yellows (#FFD24A body / #F0B92E
-  // wing / #E0AC28 belly-line / #FFE38A head-glint — read out of duckyArt,
-  // not invented; the family is floor-proven, the duck stands on these very
-  // boards) with a BLUE prize ribbon (rosette + tails) tied to the left
-  // handle — blues are the room's own (#4A6B8A blocks / #6B8CAB bucket).
-  +'<g id="ro-board"'+rpT('board')+'><g transform="translate(652,125)"><ellipse cx="34" cy="78" rx="34" ry="6" fill="#000" opacity="0.25"/><rect x="10" y="58" width="48" height="18" rx="3" fill="#8a683e"/>'
-  +'<path d="M20 14 h28 v14 a14 14 0 0 1 -28 0 z" fill="#FFD24A"/>'
-  +'<path d="M23 19 q10 -4 22 0" stroke="#FFE38A" stroke-width="3" fill="none" opacity="0.8"/>'
-  +'<path d="M41 17 q5 10 -3 22" stroke="#E0AC28" stroke-width="2.6" fill="none" opacity="0.7"/>'
-  +'<path d="M18 16 q-12 2 -2 14" stroke="#F0B92E" stroke-width="4" fill="none"/><path d="M50 16 q12 2 2 14" stroke="#F0B92E" stroke-width="4" fill="none"/>'
-  +'<rect x="28" y="40" width="12" height="10" fill="#F0B92E"/><rect x="20" y="50" width="28" height="8" rx="2" fill="#E0AC28"/>'
-  +'<path d="M15 32 L10 47 L15 44 z" fill="#4A6B8A"/><path d="M20 34 L18 48 L24 45 z" fill="#6B8CAB"/>'
-  +'<circle cx="17" cy="29" r="6" fill="#4A6B8A"/><circle cx="17" cy="29" r="2.6" fill="#6B8CAB"/></g>'
-  // 0411 (§5.8): the trophy wears the came-for-you count — the door badge
-  // idiom; renderMenu redraws it whenever the inbox moves (duelSig beats).
-  +(chalBadgeN()? '<g transform="translate(716,132)"><rect x="-19" y="-11" width="38" height="22" rx="11" fill="#B8462F" stroke="#FFB08A" stroke-width="2.5"/><text y="5" text-anchor="middle" font-size="13" font-weight="bold" fill="#FFF3C4">⚔'+chalBadgeN()+'</text></g>':'')+'</g>'
-  // MEDAL CASE (achievements) — ribbon-and-disc medals in a velvet case, so you
-  // can count what you've won without reading the tag. v2.23 (Wyatt 8/3):
-  // moved INTO the bottom-right corner the door left behind — art 832..932 ×
-  // 468..539 against the east wall (28px gutter to the 960 edge). Surveyed
-  // against every corner neighbor: tblocks pocket ends y349, the rival pill
-  // band sits ~349-375, towerSquad's forecourt posts bottom out at y462 even
-  // at full patrol excursion (rwB/rwC max +14y) and the beaten pile's felled
-  // bodies at ~y465 — all shy of the case top 468, and ro-ach paints AFTER
-  // ro-rival, so a wanderer grazing the case slips BEHIND it (the crawler's
-  // own old depth trick, now the whole forecourt's).
-  +'<g id="ro-ach"'+rpT('ach')+'><g transform="translate(830,462)"><ellipse cx="52" cy="70" rx="50" ry="7" fill="#000" opacity="0.25"/>'
-  +'<rect x="2" y="6" width="100" height="60" rx="7" fill="#6e5130"/>'
-  +'<rect x="9" y="13" width="86" height="46" rx="4" fill="#3B2F3E"/>'
-  +medal(27, achDone>=1, '#D9A544', '#A63B2A')
-  +medal(52, achDone>=20, '#CFCFCF', '#4A6B8A')
-  +medal(77, achDone>=40,'#C08A4A', '#4A6B35')
-  +'<path d="M9 59 L46 13 L62 13 L25 59 z" fill="#fff" opacity="0.06"/></g></g>'
+  // the CRATE (SARGE'S SURPLUS) on the shelf — v2.25's closed footlocker with its ONE sign, byte-same art at 0.8 (crateArt);
+  // v2.86 .beckon while the introduction is live; 0723's NEW! ribbon over the lid (surpBannerSVG)
+  +'<g id="ro-shop"'+(shopBeckonOn()?' class="beckon"':'')+'>'
+  +'<g transform="translate(300,77) scale(0.8)">'+crateArt()+'</g>'+(surpNewIs()? surpBannerSVG() : '')+'</g>'
+  // the FORT seat on the shelf — the promotions easel (v2.38's gold lights while a pick waits) until FORT GREEN swaps its box in
+  +'<g id="ro-fort"><g transform="translate(412,100) scale(0.62)">'+easelArt(pend)+'</g></g>'
+  // the TROPHY on the shelf (WORLD RANKINGS; 0632's beacon rides #ro-board) — the came-for-you badge at its top-right corner
+  +'<g id="ro-board"><g transform="translate(500,89) scale(0.85)">'+trophyArt()+'</g>'
+  +(chalBadgeN()? '<g transform="translate(556,94)"><rect x="-19" y="-11" width="38" height="22" rx="11" fill="#B8462F" stroke="#FFB08A" stroke-width="2.5"/><text y="5" text-anchor="middle" font-size="13" font-weight="bold" fill="#FFF3C4">⚔'+chalBadgeN()+'</text></g>':'')+'</g>'
+  // the TV on the shelf (v2.59 THE REWARDED TV; not on the Steam shell — its row stands down with it)
+  +tvSVG()
+  // the MEDAL CASE, small, at the shelf's right end, wordless (0757f's fort takes it in)
+  +'<g id="ro-ach"><g transform="translate(640,112) scale(0.62)">'+caseArt(achDone)+'</g></g>'
+  // the bed (the bedroom's) — the bear fort rides inside it
+  +(roomCur()==='bedroom'? bedSVG() : '')
+  // ═══ THE THREE TILES on the rug ═══
+  // CAMPAIGN: the toy box (0656: the ELITE FORCES box past L100 — the same seat, the same tap); 0904's arch at its bottom-left and
+  // THE PATROL inside the wrapper (the men wear the beacon's glow with the crate)
+  +'<g id="ro-campaign"><g transform="translate(114,355) scale(1.2)">'+(efBoxOn()? EF_BOX : SPRITES_SRC.toybox.replace(/viewBox[^>]*>/,''))+BOX_HOLE+'</g>'+patrolSVG()+'</g>'
+  // THE RAID: the stoop, the stolen piggy under the swarm / the white flags / Mom's props / the empty stoop on his day
+  +raidTileSVG(riv, rivDone, momD, nemD)
+  // BATTLEFIELD: the war table (v2.12's art, byte-same) — the duel/crew badge is an HTML badge on the tile's corner (renderMenu)
+  +'<g id="ro-bf"><g transform="translate(700,424) rotate(-4)">'+warTableArt()+'</g></g>'
   // ROOM DECORATIONS: the loose ones — train, banana, elephant, robot. Before
   // the invaders, who are always in front of your furniture.
   +decorSVG()
-  // v2.11: your letter blocks by the open door — EVERY state (they stopped
-  // being the invasion's props); mom days show them tidied into a neat row
-  +tblocksSVG(momD)
-  // today's rival: the run of your room (the squad itself wanders the tower,
-  // inside #ro-rival above) — or, once they're beaten, your own men enjoying
-  // the quiet. v1.79 MOM DAYS: no colored army at all — her supplies instead.
+  // v2.11: your letter blocks by the east wall — EVERY state (they stopped
+  // being the invasion's props); 0904: under the bed's foot, one scatter every day
+  +tblocksSVG()
+  // today's rival: the run of your room (the swarm on the stolen piggy, inside
+  // #ro-raid above; the toy-box lid man here) — or, once they're beaten, your
+  // own men enjoying the quiet. v1.79 MOM DAYS: no colored army at all — her
+  // supplies instead (in THE RAID tile since 0904).
   // v3.21: while the NEMESIS is due the room fields YOUR men (roomVictory —
   // they are what he is here to knock down) instead of the daily army's
   // ruckus, and the embodied Nemesis himself paints LAST of the movers
   +ycharsSVG(momD, (rivDone||nemD))
   +(momD||rivDone||nemD? '' : roomRuckus(riv))
   +(nemD? nemFigSVG() : '')
-  +(momD? momDoor() : '')
   // 0335: THE SHIP paints OVER the whole room (it FLIES — the depth belt is
   // for feet, and the ferry crosses everyone's airspace). Same gate, same
   // wrapper ids; the NEM ghost's own appendChild law still outranks it.
@@ -74416,205 +74381,82 @@ function roomSVG(){
 // are in their original places"): `mv` no longer makes a row draggable — it
 // survives as the row's ID KEY (#ro-/#rspot-/#rtag-<mv> in roomSVG and
 // renderMenu), and the load path purges every mv key out of META.roomPos, so
-// each button renders at exactly the x/y/lx/ly written here. (v2.17's note
-// stands: the doorway corner row is gone, the rival's whole identity lives on
-// the tower's own row — just a FIXED row again, like the rest.)
+// each button renders at exactly the x/y/lx/ly written here. (0904 THE LOOP
+// ROW: the tower's row is gone with the tower — the rival's whole identity
+// lives on THE RAID tile's row now; every door is a FIXED row.)
 const ROOM_SPOTS=[
-  { id:'campaign', x:150, y:200, w:220, h:180, mv:'campaign',
+  // ═══ 0904 THE LOOP ROW — THE THREE TILES on the rug: FIXED architecture (out of every rdrag family — rdragPick never answers for a
+  // row; toys and men still drag), each 270×186 at LR_TILE, each with its pill at the tile's foot (y 556), each in the idle
+  // beacon's set (ROOM_BEACON + RAID_DOOR: the campaign and the battlefield breathe; the raid tile only while an invader is unbeaten).
+  // z 2: a DOOR wins its tap over a toy anchor dragged (or seated) onto it (the 0555 doors-beat-furniture law; the drag itself is
+  // geometry and still works). The pills wear z 4 in CSS: a pill is always its own door. ═══
+  { id:'campaign', x:LR_TILE[0].x, y:LR_TILE[0].y, w:LR_TILE_W, h:LR_TILE_H, mv:'campaign', z:2,
     // a mustering squad shows on the card itself — the room says "your buddies
     // are gathering" before a single tap
     label:()=>(COOP && COOP.mode==='squad' && COOP.code)
       ? 'CAMPAIGN · SQUAD '+Math.max(1,(COOP.members||[]).length)+'/'+SQ_MAX
       : (META.campaign|0)>=100? 'ELITE FORCES · LV '+Math.min(META.campaign+1,ELITE_TOP)   // 0497 D2 THE DOOR (Wyatt: "on the campaign box it reads 'Elite Forces'") — the L100 finisher's box; a {0}-form key ×7 (the CAMPAIGN · LV shape); at the second summit the box holds 200
       : 'CAMPAIGN · LV '+(META.campaign+1),
-    cls:()=>(COOP && COOP.mode==='squad' && COOP.code)?'gold':'', lx:250, ly:392 },
-  // v2.20 THE CRATE AGAIN: geometry back to the v2.09 row exactly (h 150→120
-  // — the storefront's taller doorstep strip retires with the storefront
-  // art; crate ink ends at the 182 ground + shadow 190, so the 120 hotspot
-  // still covers every painted pixel). v2.25 (Wyatt 8/3): NO PILL — "the
-  // Shop currently has text below it that says shop. That can be removed."
-  // The row keeps its hotspot and mv (the crate itself is the door and the
-  // draggable possession); label/lx/ly retire with the pill (renderMenu
-  // renders a pill only when a row HAS a label — the sign on the crate
-  // carries the branding alone now). The SHOP key and its six translations
-  // stay in the tables; v2.13's doorstep-corridor survey (lx494/ly244, the
-  // 244 cap) lives in git history if a pill ever comes back. v3.03: the
-  // crate wears scale(1.2) (Wyatt: 20% bigger) — the row grows with the art
-  // (372..532 × 76..200 over ink 384..516 × 95.6..191.6), still shy of the
-  // ducky anchor's x552 west edge; the south edge stays 200 exactly, so the
-  // campaign row's shared border resolves the way it always has (the shop
-  // div renders LATER, so it wins the edge — unchanged since v2.09).
-  { id:'shop',     x:372, y:76,  w:160, h:124, mv:'shop' },
-  // v2.17 ONE RIVAL DOOR (Wyatt 8/3): the doorway corner row is GONE — the
-  // squad wanders the TOWER now (towerSquad, inside #ro-rival), so the tap,
-  // the art AND the pill are one draggable possession. This is also the fix
-  // for "the text of the broadcast tower needs to follow it around": the old
-  // split kept the label on the mv-less corner row, so rdragApply had no
-  // #rtag-rival to move — merged, the pill rides the drag like every other.
-  // Pill lane unchanged (788,362 — the surveyed band under the tower, below
-  // the blocks' y349 floor); tap door = the tower's own (art 756-832 ×
-  // 196-321, ends x840 so the teddy's x846+ patch keeps its gutter).
-  // ⚠ v1.36: translated at the point of composition (the v1.29.2 law) — the
-  // old concatenation left nine of ten armies' invasion lines English in
-  // every language, because only the audit-day army ever got a table row.
-  // v1.79/0140: while she's due the pill is HERS — raw key, the DOM door
-  // translates. (0140 killed the day-gate, so rivalDays[today] CAN be set
-  // while she's due — beat the colored rival, then place the 7th toy. momDue
-  // winning the pill is still right: her fight is the room's live threat,
-  // and rivalDayWin('mom') on an already-won day just pays the +1★ drill —
-  // the allowance still starts because done=1 is written before the call in
-  // endBattle's mom branch. Beating HER mid-day flips momDue false at once,
-  // so the colored rival is reachable again the SAME day.)
-  { id:'rival',    x:748, y:190, w:92,  h:132, mv:'rival',
-    // 0355 (Wyatt: the Toy Tower "should only be in the regular kid's
-    // bedroom"): the row gates WITH the tower art — renderMenu's due()
-    // filter (the yetipark grammar), so no dead pill or invisible tap
-    // survives on the other floors. NEMESIS keeps his own wandering-figure
-    // door (ro-nem) everywhere; rival/mom fights start from the bedroom.
-    due:()=>roomCur()==='bedroom',
-    // v2.45 (Wyatt 8/5: "after you defeat the invader of the day… the UI needs
-    // to be dismissed"): beaten today ⇒ NO pill at all — an empty label and
-    // renderMenu skips the tag (the v2.25 no-label idiom, per-state). The
-    // tower's own tap stays live, so the +1★ rematch drill is still reachable
-    // without the room advertising a fight that's already won.
-    // v3.12: NEMESIS outranks the colored pill (and survives a beaten day —
-    // he IS the next serve); mom outranks everything, exactly as she always has.
-    label:()=>momDue()? 'MOM IS COMING TO CLEAN!' : nemesisDue()? 'NEMESIS IS IN YOUR ROOM!' : META.rivalDays[todayStr()]? '' : tf('%1 IS INVADING', t(todaysRival().name)),   // v3.21: he is not AT the door any more — he is embodied on the rug
-    cls:()=>(momDue()||nemesisDue())? 'alarm' : META.rivalDays[todayStr()]? '' : 'alarm', lx:788, ly:362 },
-  // v2.12: promo pill lx 170→206 — at 18px the longest localized label
-  // ('PROMOTIONS (n) ⚔NEW') reached left past the banana's anchor (ends
-  // x100, renders after pills, wins the tap — the v2.10 law); re-centered
-  // over the easel's east side so every locale's pill stays fully live.
-  { id:'promo',    x:98,  y:446, w:140, h:100, mv:'promo',
-    label:()=>'PROMOTIONS'+(META.pendingPicks>0?' ('+META.pendingPicks+')':'')+((META.sargeUnlocked.some(w=>META.sargeSeen.indexOf(w)<0)||META.gearUnlocked.some(g=>META.gearSeen.indexOf(g)<0))?' ⚔NEW':''),
-    // v2.38: with a pick pending (and no ⚔NEW alarm outranking it) the pill
-    // goes .roomtag.gold — the squad pill's own class — so the gold on the
-    // board and the gold on the tag are one statement. ⚔NEW keeps its red
-    // (Wyatt's screenshot state, unchanged); neither-state stays plain.
-    cls:()=>(META.sargeUnlocked.some(w=>META.sargeSeen.indexOf(w)<0)||META.gearUnlocked.some(g=>META.gearSeen.indexOf(g)<0))?'alarm':(META.pendingPicks>0?'gold':''), lx:206, ly:440 },
-  // v2.10 SWAP: the trophy's door rode west (art 662-720 × 139-209). Pill at
-  // ly 219 sits in the one lane that survives every neighbor: below it the
-  // elephant's anchor (top 232, renders after pills, wins the tap) — above,
-  // the bed figures (ruckus sprawler bottoms ~165). lx 700 clears the ducky
-  // hotspot's right edge (618) in EVERY locale — measured pill left: EN 628 ·
-  // ru 623 (widest) · es 627 · ja/de/ko/zh narrower.
-  // v2.12: board pill lx 700→720 · ly 219→214 — the 18px pill's left edge
-  // crossed the ducky anchor's 618 in the wide locales (ru worst) and its
-  // bottom kissed the elephant's 232 (the CJK faces render the pill ~2px
-  // taller, ja proved it by measurement); two nudges reopen both gutters
-  // (re-measured per locale in the battery, the v2.10 survey method).
-  { id:'board',    x:646, y:132, w:86,  h:80,  mv:'board', label:()=>ddLabel(), lx:720, ly:214 },   // 0632 THE DAILY DOORS BLIP: A COMMANDER WAITS while today's away fight is unclaimed (past DD_MIN_CAMP), RANKINGS otherwise — byte-what-it-was
-  // v2.23 (Wyatt 8/3): the case took the door's corner — hotspot rides the
-  // art (824..934 × 456..536, same −6 frame as the old spot), and the pill
-  // drops onto the bf pill's own 541-571 band (ly 556) OFFSET WEST of the
-  // case center (lx 856, case center 882 — the shop's doorstep-lane
-  // precedent): centered on the case, de's 18px label would cross the 960
-  // east wall. The lane's corridor is bf-pill-east (ja widest ~690) →
-  // board edge 954; renderMenu caps this pill at 196 so any locale that
-  // outgrows the corridor steps to 14px instead of hanging off the boards.
-  { id:'ach',      x:824, y:456, w:110, h:80,  mv:'ach', label:()=>'MEDALS '+ACH.filter(a=>META.ach[a.id]).length+'/'+achCase().length, lx:856, ly:556 },   // 0563 THE ATLAS SWEEPS: the denominator is the case's own count (achCase — a retired row the save never earned is out); the numerator is the same under the filter
-  // v2.12: bf pill lx 514→562 — at 18px the wide locales' label (ja
-  // バトルフィールド · 3しょう measured ~256px, de SCHLACHTFELD) reached left
-  // past the railway anchor's x426 (decor renders after pills and wins, the
-  // v2.10 law); centered on the map's east half every locale clears it, and
-  // the east edge stays shy of the MEDALS pill's lane — v2.23 moved that
-  // pill into this same 541-571 band, so the gutter is horizontal now: bf's
-  // widest east edge (ja ~690) vs medals' widest west edge (de ~766).
-  { id:'bf',       x:434, y:426, w:162, h:110, mv:'bf',
-    label:()=>'BATTLEFIELD'+(META.bfWins?' · '+META.bfWins+'W':''), lx:562, ly:556 },
-  // v2.59 THE REWARDED TV — the pocket between the campaign pill's lane and
-  // the train loop: campaign pill's ja band bottoms ~409 (badge top sits at
-  // 425), promo pill's widest east ~316 (set west edge 352), train ballast ink
-  // tops ~522 (feet at 512) and its anchor starts y514, bf hotspot starts
-  // x434 (east edge 430), the robot's wander ceiling is y400, vt4's home box
-  // starts x470, mom-day staging starts x600. No label — the +30★ badge in
-  // the art IS the pill (the v2.25 shop idiom). mv gives the battery its
-  // deterministic #rspot-tv; 'tv' stays out of RDRAG_DECOR so the set is
-  // fixed architecture (a grab claims nothing), and the load purge's
-  // whitelist eats any era's junk roomPos.tv delta.
-  { id:'tv',       x:352, y:424, w:78,  h:90,  mv:'tv' },
-  // v2.12: piggy lx STAYS 148 — the maxed bank line ('★ N · THE BANK OF
-  // SARGE · DAY 12/15') is the game's one overstuffed pill and already ran
-  // past both the board's west edge and the spacerug anchor at 14px on
-  // v2.11; renderMenu's width guard steps any pill past 360px back to its
-  // shipped 14px, so that lane is byte-identical to v2.11's, and every
-  // SHORT piggy string wears the new 18px with its left edge on the boards.
-  { id:'piggy',    x:88,  y:112, w:130, h:100, mv:'piggy',
-    // v1.87: the run stays on the pill at EVERY painted tier (DAY n/m — m is
-    // the day the next coat lands; plain DAY n at rainbow), not just before
-    // the first coat. Composes its own translation, so it wears notr:1.
-    label:()=>{ const pay=pigPayout(), s=META.piggy.streak||0, tr=pigTier();
-      if(pay>0 && META.piggy.claimed!==todayStr()) return TXT('TAP THE PIGGY! +'+pay+'★');
-      let base='★ '+META.starBank;
-      if(pay>0) base+=' · '+(bankTier()? TXT(BANK_TIERS[bankTier()-1].name) : tf('%1 PIGGY', TXT(PIG_COLORS[tr].name)));
-      if(s>0) base+=' · '+(tr===9? tf('DAY %1', s) : pay>0? tf('DAY %1/%2', s, 5*(tr+1)) : tf('PIGGY DAY %1/%2', s, 5));
-      return base; },
+    cls:()=>(COOP && COOP.mode==='squad' && COOP.code)?'gold':'', lx:195, ly:556 },
+  // THE RAID = the invading button (0756y's move, re-landed here): the old rival row's label and class, byte-same, on EVERY floor
+  // (⚑ Q14 — the loop is the loop wherever you stand; the invasion's state is shared). v2.45: beaten today ⇒ NO pill (an empty
+  // label renders no tag; the tap = the +1★ rematch, ⚑ Q3). v3.12: NEMESIS outranks the coloured pill (and survives a beaten day);
+  // mom outranks everything. ⚠ v1.36: composed at the point of composition (the v1.29.2 law).
+  { id:'raid',     x:LR_TILE[1].x, y:LR_TILE[1].y, w:LR_TILE_W, h:LR_TILE_H, mv:'raid', z:2,
+    label:()=>momDue()? 'MOM IS COMING TO CLEAN!' : nemesisDue()? 'NEMESIS IS IN YOUR ROOM!' : META.rivalDays[todayStr()]? '' : tf('%1 IS INVADING', t(todaysRival().name)),
+    cls:()=>(momDue()||nemesisDue())? 'alarm' : META.rivalDays[todayStr()]? '' : 'alarm', lx:480, ly:556 },
+  { id:'bf',       x:LR_TILE[2].x, y:LR_TILE[2].y, w:LR_TILE_W, h:LR_TILE_H, mv:'bf', z:2,
+    label:()=>'BATTLEFIELD'+(META.bfWins?' · '+META.bfWins+'W':''), lx:765, ly:556 },
+  // ═══ THE SHELF (y 160, x 196..712) — the occasional and the bank, small and quiet; every hit rect ≥ 70 each way; a pill only
+  // with news (the piggy's while the day's stars wait, the fort's while a pick or ⚔NEW waits, the trophy's while today's away
+  // fight waits); the pills hang UNDER the plank (ly 184 / 218). ═══
+  // the BANK PIGGY: the stars door — her tap pays the day's stars and the streak exactly as ever (piggyHop); her pill ONLY while
+  // unclaimed (⚑ Q12: the ★ bank · tier · DAY n/m line is off the room — the head's ★ is the balance, the streak shows on her card)
+  { id:'piggy',    x:200, y:86,  w:96,  h:78,  mv:'piggy',
+    label:()=>{ const pay=pigPayout(); return (pay>0 && META.piggy.claimed!==todayStr())? TXT('TAP THE PIGGY! +'+pay+'★') : ''; },
     notr:1,
-    cls:()=>(pigPayout()>0 && META.piggy.claimed!==todayStr())?'gold':'', lx:148, ly:106 },
-  // v3.33 TP-02: THE YETI PARK DOOR — the found castle on the winter pond.
-  // The table's first PER-STATE row: renderMenu's filter reads due() (the
-  // Steam-TV precedent, per-room edition), so the door exists only on the
-  // winter floor after the find. Pill south of the pond (lx672/ly442):
-  // clears the rival pill band (353-371), the ach hotspot (y456+, x824+)
-  // and the bf/medals pill lane (541-571); its 18px west edge may kiss the
-  // bf hotspot's east 596 by ~11px and renders later, so its own tap wins
-  // (the v2.10 later-wins law). mv gives the battery a deterministic
-  // #rspot-yetipark; the id is NOT in the roomPos whitelist, so no era's
-  // save can drag the door (the tv row's own architecture).
-  { id:'yetipark', x:608, y:332, w:120, h:94, mv:'yetipark',
-    due:()=>roomCur()==='winter' && !!META.parkYeti,
-    label:()=>t('YETI PARK'),   // 0278k Wyatt 8/13: the tablet sits just west of this pill and covered the LV n/n — the door wears its NAME only; progress lives inside the park ladder
-    notr:1, lx:672, ly:442 },
-  // v3.35 TP-03: THE DINO PARK DOOR — the found bone gate in the backyard
-  // grass. Same slot + pill lane the winter row proved (the rows are
-  // room-gated, so they can never co-exist on one floor); the id is NOT in
-  // the roomPos whitelist, so no era's save can drag the door.
-  { id:'dinopark', x:608, y:332, w:120, h:94, mv:'dinopark',
-    due:()=>roomCur()==='backyard' && !!META.parkDino,
-    label:()=>t('DINO PARK'),   // 0278k Wyatt 8/13: same law as the yeti row — name only (the LV rows above stand as orphans per the EN-is-key law)
-    notr:1, lx:672, ly:442 },
-  // 0555 BEAR PARK — THE FORTRESS ON THE BED (design/gift-wave-0824/00-DESIGN.md §6; Wyatt 8/25: "Bear Park should be
-  // accessed through clicking on the little bear fortress that's located on top of your bed"): the tap rect over the fortress.
-  // 0826 card A (design/feedback-0826-noon/00-FEEDBACK.md §2; Wyatt 8/26: "Have it at the end of the bed… That way it will be
-  // right above Bear Park"): the fortress moved to the bed's FOOT — bearFortSVG draws it INSIDE #ro-bed (translate 806,62; the
-  // bed's whole-fate law), the rect 808-926 × 66-158 sits inside the bed (700-930 × 34-174), under the 48px header floor, clear
-  // of the RANKINGS spot (646-732 × 132+) and of the rival's spot at 190+; the BEAR PARK pill centred right under it (lx 868 ·
-  // ly 172). THE FLYING PIRATE SHIP's staged berth went back to the pillow end (SHIP_BED [478,-74] + the reversed boot
-  // migration) — the head is the ship's again, the foot is the fort's. Due on EVERY bedroom floor — no find, no name: THE BEAR
-  // BARRICADE inside openParkScene('teddy') is the gate (the one-door law). z 2: a DOOR wins its tap over a furniture anchor
-  // dragged onto it (the v2.10 doors-beat-furniture law — decor anchors render after the rows). The id is NOT in the roomPos
-  // whitelist, so no era's save can drag the door; the art never owns the tap (the dino-door law); the drill's floor pillow
-  // (0524's ro-pillow at 608,380 + its pillowpark row) is RETIRED — one entrance.
-  { id:'bearfort', x:808, y:66, w:118, h:92, mv:'bearfort',
+    cls:()=>(pigPayout()>0 && META.piggy.claimed!==todayStr())?'gold':'', lx:248, ly:184 },
+  // the CRATE: no pill (v2.25 — the sign on the art carries the branding); the NO ADS badge rides its corner (renderMenu)
+  { id:'shop',     x:298, y:86,  w:100, h:78,  mv:'shop' },
+  // the FORT seat: the promotions easel (the academy behind it — panelHTML('promo')) until FORT GREEN swaps its box in; its pill
+  // = the head's old PROMOTION! ×n + the ⚔NEW alarm (v2.38 gold with a pick, red with ⚔NEW), ONLY while either waits
+  { id:'fort',     x:404, y:84,  w:90,  h:80,  mv:'fort',
+    label:()=>{ const nw=(META.sargeUnlocked.some(w=>META.sargeSeen.indexOf(w)<0)||META.gearUnlocked.some(g=>META.gearSeen.indexOf(g)<0)); return (META.pendingPicks>0 || nw)? 'PROMOTIONS'+(META.pendingPicks>0?' ('+META.pendingPicks+')':'')+(nw?' ⚔NEW':'') : ''; },
+    cls:()=>(META.sargeUnlocked.some(w=>META.sargeSeen.indexOf(w)<0)||META.gearUnlocked.some(g=>META.gearSeen.indexOf(g)<0))?'alarm':(META.pendingPicks>0?'gold':''), lx:480, ly:184 },
+  // the TROPHY (WORLD RANKINGS): a pill ONLY while today's away fight is unclaimed (0632: A COMMANDER WAITS — 0757d renames it;
+  // its beacon glow may stay); RANKINGS is wordless on the shelf (⚑ Q6)
+  { id:'board',    x:494, y:86,  w:72,  h:78,  mv:'board', label:()=>ddDue()? 'A COMMANDER WAITS' : '', lx:566, ly:218 },   // ly 218: the row under the piggy's + the fort's (ly 184) — a CJK pill runs 31 px tall, an Arabic one 33 (measured in the battery's lane survey)
+  // the TV (v2.59 THE REWARDED TV): no label — the +30★ badge in the art IS the pill; filtered out on STEAM_SHELL (v3.31)
+  { id:'tv',       x:566, y:82,  w:70,  h:80,  mv:'tv' },
+  // the MEDAL CASE, small, wordless at the shelf's right end (0757f's fort takes it in; till then MEDALS opens from the art)
+  { id:'ach',      x:636, y:88,  w:72,  h:74,  mv:'ach' },
+  // 0555 BEAR PARK — the little bear fortress ON the sketch bed's mattress toward the FOOT (bearFortSVG inside #ro-bed), its pill
+  // under the bed's foot (lx 804 · ly 328 — east of the elephant's anchor 734, above the BATTLEFIELD tile's 392). Due on every
+  // bedroom floor; THE BEAR BARRICADE inside openParkScene('teddy') is the gate (the one-door law). z 2: a DOOR wins its tap.
+  { id:'bearfort', x:722, y:200, w:92, h:70, mv:'bearfort',
     due:()=>roomCur()==='bedroom',
     label:()=>t('BEAR PARK'),
-    notr:1, lx:868, ly:172, z:2 },
-  // 0346 THE BANK — the western floor's own door (the park rows' per-state
-  // grammar; always due on its floor — the building is painted scenery and
-  // this row is its tap + pill; the id is NOT in the roomPos whitelist, so
-  // no era's save can drag the door). Same proven pill lane the park doors
-  // ride (the rows are room-gated, so they can never co-exist on one floor).
-  { id:'bank', x:600, y:300, w:140, h:126, mv:'bank',
+    notr:1, lx:804, ly:328, z:2 },
+  // ═══ THE PARK FLOORS' own doors keep their seats (⚑ Q8); their pills moved to the door's foot (lx 650 · ly 404 — the lane
+  // between the floor band and the war table's ink); z 3: a park door wins its old rect where the BATTLEFIELD tile's z 2 overlaps it ═══
+  { id:'yetipark', x:608, y:332, w:120, h:94, mv:'yetipark', z:3,
+    due:()=>roomCur()==='winter' && !!META.parkYeti,
+    label:()=>t('YETI PARK'),   // 0278k Wyatt 8/13: the door wears its NAME only; progress lives inside the park ladder
+    notr:1, lx:650, ly:404 },
+  { id:'dinopark', x:608, y:332, w:120, h:94, mv:'dinopark', z:3,
+    due:()=>roomCur()==='backyard' && !!META.parkDino,
+    label:()=>t('DINO PARK'),
+    notr:1, lx:650, ly:404 },
+  { id:'bank', x:600, y:300, w:140, h:126, mv:'bank', z:3,
     due:()=>roomCur()==='western',
     label:()=>t('THE BANK'),
-    notr:1, lx:672, ly:442 },
-  // 0339 OUTLAW TOWN — the western park door. 0355 (Wyatt): the row moved
-  // to the TOP-RIGHT with the arch (the railroad crossing's old pocket) —
-  // rect covers the 0.85-scale art (823.7..956.3 × 73.7..175.7), ends 32px
-  // above cactus 1's tap pad, pill lx890/ly180 clears the teddy ink's y196.
-  // The room deed IS the gate (roomOwns reads META.wmap); the id is NOT in
-  // the roomPos whitelist, so no era's save can drag the door.
-  { id:'wpark', x:824, y:74, w:132, h:100, mv:'wpark',
+    notr:1, lx:650, ly:404 },
+  { id:'wpark', x:824, y:74, w:132, h:100, mv:'wpark', z:3,
     due:()=>roomCur()==='western',
     label:()=>t('OUTLAW TOWN'),
-    notr:1, lx:890, ly:180 },
-  // 0551a THE PARK STORES — one store front per park room, the east-wall pocket {748,236,90,140}: the ONLY ≥90×140
-  // pocket free in all three rooms with the WHOLE toy floor placed (design/park-stores-0825/00-DESIGN.md §3 — the
-  // survey rig probed every door, pill, decor home rect, troop, tappable scenery, the robot's home box and the dog's
-  // stops; the first-draft pocket under the crate sat ON the robot's home and was rejected). Beside the park gate on
-  // the winter/backyard floors, beside THE BANK on the western main street. NO label — the art carries the name and,
-  // shut, the lock line on its own plank (the crate idiom; the pocket has no pill lane — D7). The ids are NOT in the
-  // roomPos whitelist, so no era's save can drag a store; the rows are room-gated, so they never co-exist.
+    notr:1, lx:870, ly:185 },   // 0904: lx 890 ran the pill 4-15 px off the east edge in en/de/ru/es (HEAD's own lane); 870/185 keeps every tongue on the boards, under the plane's sill seat (ends 172) and above the teddy's (196)
+  // 0551a THE PARK STORES — one store front per park room, the east-wall pocket {748,236,90,140}; NO label (the art carries the
+  // name and, shut, the lock line on its own plank). The ids are NOT in the roomPos whitelist; the rows are room-gated.
   { id:'store-dino',   x:748, y:236, w:90, h:140, mv:'store-dino',   due:()=>roomCur()==='backyard' },
   { id:'store-yeti',   x:748, y:236, w:90, h:140, mv:'store-yeti',   due:()=>roomCur()==='winter' },
   { id:'store-outlaw', x:748, y:236, w:90, h:140, mv:'store-outlaw', due:()=>roomCur()==='western' }
@@ -74654,10 +74496,10 @@ const RDRAG_TT=26;
 // every other man's saved delta stays his own; an old save's vt0 pair is a
 // harmless orphan the loader keeps and nothing reads.
 const VTROOPS=[
-  {k:'vt1', x:236, y:198, w:58, h:68},
-  {k:'vt2', x:196, y:146, w:54, h:63},
+  {k:'vt1', x:196, y:334, w:58, h:68},   // 0904 THE LOOP ROW: Sarge stands on the toy box's lid in the CAMPAIGN tile (the lid at y 398)
+  {k:'vt2', x:250, y:290, w:54, h:63},   // 0904: on the floor under the shelf (the piggy is on the shelf now; east of the wind-up horse's patch 232)
   {k:'vt3', x:534, y:300, w:52, h:61},
-  {k:'vt4', x:470, y:392, w:54, h:63}
+  {k:'vt4', x:300, y:296, w:54, h:63}    // 0904: on the floor band west of the rider's patch (372) — his old seat is THE RAID tile's corner
 ];
 // v2.18 (Wyatt 8/3): the five loose toys — "The elephant, little rubber
 // ducky, teddy bear, and car can be dragged around" + "The train set should
@@ -74735,7 +74577,7 @@ function rdragPick(p){
 // v2.85: the TAP-ONLY react family — the fixed toys (the space-rug planet;
 // 0824-LATE III: the banana, helmet, warplane, keys and pufferfish LEFT this
 // family for RDRAG_DECOR — every toy but the rugs drags now), the wandering
-// robot and the block tower never drag, but their taps died the same iOS
+// robot never drags (nor did the block tower, till 0904), but their taps died the same iOS
 // death the draggable six did
 // (touch-action:none + a rolled finger = no click synthesized, ever).
 // Claimed off the browser's OWN hit test (e.target), never geometry, so an
@@ -76336,7 +76178,7 @@ function bearFortArt(){
     +merlons(104,25,L,[-9,0,9]);
 }
 function bearFortSVG(){
-  return '<g id="ro-fort" pointer-events="none" transform="translate(806,62)">'+bearFortArt()+'</g>';   // 0826 card A: the bed's FOOT (the art's ink 812-928 × 83-158), right above the BEAR PARK pill
+  return '<g id="ro-bearfort" pointer-events="none" transform="translate(720,196) scale(0.72)">'+bearFortArt()+'</g>';   // 0904 THE LOOP ROW: on the sketch bed's mattress toward the FOOT (the art's ink 724-808 × 211-265), right above the bearfort row (722,200 92×70) — the group wears its row's mv (#ro-bearfort); #ro-fort is the shelf's FORT seat   // 0826 card A: the bed's FOOT (the art's ink 812-928 × 83-158), right above the BEAR PARK pill
 }
 // THE BEAR BARRICADE — the door to BEAR PARK (D11: one-time, the first paid door in the game) on the rite overlay (#icerite, the
 // silver key's own frame; one ceremony at a time). 0826 THE DOOR WITH THE NUMBER (design/feedback-0826-barricade/00-FEEDBACK.md §2;
@@ -76810,7 +76652,7 @@ function rideTop(){ const ro=document.getElementById('ro-warplane'); const p=ro 
 // the stage re-rasterised under her every frame, and the phone dropped frames; Chrome composites it, so the desktop never showed it);
 // wpFly(kind) builds #wpfly, an HTML twin of the seat, right AFTER
 // the room svg inside #roomStage (the svg's own layer order — under the header band and the tags, over every model), the wrapper's drag
-// delta + the seat's own translate(56,250) scale(0.78) rotate(-4) as ONE inline style on .wps, the art (warplaneArt — the shop's, the
+// delta + the seat's own translate(WP_SEAT) scale(0.78) rotate(-4) as ONE inline style on .wps, the art (warplaneArt — the shop's, the
 // bake's, 0587's paint for free) in its own small svg, and the leg's class on the layer so the CSS moves .wpa — will-change:transform,
 // the compositor's own thread. The room's .wpw hides by CSS while the layer stands (the ground stays in the svg: the shadow fade, the
 // puffs, the dust); the layer's first frame is the parked plane and the landing's last frame is the seat, so the swap is pixel-still.
@@ -76823,7 +76665,7 @@ function wpFly(kind){
   const st=document.getElementById('roomStage'), p=document.getElementById('decPlane'); if(!st || !p) return null;
   const svg=st.querySelector('svg'), d=rpXY('warplane');
   const f=document.createElement('div'); f.id='wpfly'; f.className=kind+((kind==='travel' && PLANE_LOOP)? ' loop' : '');
-  f.innerHTML='<div class="wps" style="transform:translate('+(56+d[0])+'px,'+(250+d[1])+'px) scale(0.78) rotate(-4deg)"><div class="wpa"><svg viewBox="'+PLANE_VB+'" xmlns="http://www.w3.org/2000/svg">'+warplaneArt()+'</svg></div></div>';
+  f.innerHTML='<div class="wps" style="transform:translate('+(WP_SEAT[0]+d[0])+'px,'+(WP_SEAT[1]+d[1])+'px) scale(0.78) rotate(-4deg)"><div class="wpa"><svg viewBox="'+PLANE_VB+'" xmlns="http://www.w3.org/2000/svg">'+warplaneArt()+'</svg></div></div>';
   if(svg && svg.parentNode===st) svg.insertAdjacentElement('afterend', f); else st.appendChild(f);
   return f;
 }
@@ -77025,7 +76867,7 @@ function mvDayGo(id){
 // is the stage. Three doors call here: the room-visit card chain, the
 // shop's own close (walk out of the store into the arrival), and the ferry
 // teardown above (sail home, the clouds part, the ship lands on the bed).
-const SHIP_BED=[478,-74];   // base seat (252,124) + this = resting on the mattress — the pillow end (the hull ~688-824 × 49-155): 0335's seat, back since 0826 card A (the fortress moved to the FOOT — design/feedback-0826-noon/00-FEEDBACK.md D-A4; 0555 had parked it at [604,-74], the foot, while the fortress held the head; the boot migration moves a ship still parked at 0555's staged seat; a dragged ship keeps its place)
+const SHIP_BED=[700,108];   // 0904 THE LOOP ROW: the berth moved to (100,88) and the bed to the east wall — this delta rests the hull on the sketch bed's pillow end (the anchor at 804,200)   // base seat (252,124) + this = resting on the mattress — the pillow end (the hull ~688-824 × 49-155): 0335's seat, back since 0826 card A (the fortress moved to the FOOT — design/feedback-0826-noon/00-FEEDBACK.md D-A4; 0555 had parked it at [604,-74], the foot, while the fortress held the head; the boot migration moves a ship still parked at 0555's staged seat; a dragged ship keeps its place)
 function shipCineSweep(){
   if(!DECOR_EARN.ship.due()) return false;
   if(!decOwns('ship')){ META.decor.own.push('ship'); saveMeta();
@@ -77221,6 +77063,32 @@ function sizeRoom(){
   st.style.transform='scale('+s+')';
 }
 window.addEventListener('resize', sizeRoom);
+const RTAG_CAP={ 'rtag-campaign':250, 'rtag-raid':250, 'rtag-bf':250, 'rtag-piggy':214, 'rtag-fort':236, 'rtag-board':300, 'rtag-bearfort':160, 'rtag-yetipark':240, 'rtag-dinopark':240, 'rtag-bank':240, 'rtag-wpark':170 };   // 0904 THE LOOP ROW: the pill lanes (stage px at 18 px; over the cap a pill steps to 14 px)
+// 0904 THE LOOP ROW — THE BADGES (⚑ Q5). The duel + crew chips left the head for ONE badge on the BATTLEFIELD tile's top-right corner:
+// a filling match (JOIN THEIR TEAM — crewJoinBf) · an invite (crewPanelOpen) · the came-for-you count (⚔n — UI.duelOpen) · the
+// standing squad door (the pennant — crewPanelOpen), in that order; the taps open exactly what the chips opened. A drawn glyph,
+// never emoji (⚔ is the room's own typographic mark — the trophy's badge, the ⚔NEW pill). z 5 so the badge wins its corner over
+// the tile. The NO ADS chip (0636) became a small badge on the crate's corner — the same gate, the same door (UI.noAdsChip), the
+// same impression event (na_imp@chip). Both are painted by renderMenu like the chips were (the duelSig / crew-sig beats repaint).
+function bfBadgeHTML(){
+  try{
+    const fills=(CREW.members||[]).filter(m=>m.uid!==CREW.me && m.st==='bfFill' && m.info && m.info.room && (m.info.size|0)>=CREW_BF_MIN);
+    if(CREW.crew && fills.length && (!crewCoopLive() || crewIdleLobby()) && !BFQ){ const f=fills[0];
+      return '<button type="button" id="bfBadge" class="bfbadge fill" onclick="crewJoinBf(\''+escH(f.info.room)+'\')">'+gly('pennant')+'</button>'; }
+    if(CREW.invites.length && !CREW.crew)
+      return '<button type="button" id="bfBadge" class="bfbadge invite" onclick="crewPanelOpen()">'+gly('pennant')+'</button>';
+    const rows=awayRows();
+    if(rows.length) return '<button type="button" id="bfBadge" class="bfbadge duel" onclick="UI.duelOpen()"><span data-notr>⚔'+rows.length+'</span></button>';
+    return '<button type="button" id="bfBadge" class="bfbadge quiet"'+(CREW.crew? '' : ' title="YOUR SQUAD"')+' onclick="crewPanelOpen()">'+gly('pennant')+'</button>';
+  }catch(e){ return ''; }
+}
+function noAdsBadgeHTML(){
+  try{
+    if(!spOn() || !noAdsCanOccur() || adFree()) return '';
+    telMon('na_imp','chip',1);   // 0624 D4: the icon on the main menu (once per sitting)
+    return '<button type="button" id="rhNoAds" class="nabadge" title="NO ADS" onclick="UI.noAdsChip()">'+gly('noentry')+'<span>NO ADS</span></button>';
+  }catch(e){ return ''; }
+}
 function renderMenu(){
   pigCheck();   // settle the piggy BEFORE labels read it — a missed day drops it here
   rdecSweep();  // 0330a: deal any newly-granted toy onto THIS floor (and the ship into new rooms) before the paint reads the lists
@@ -77243,7 +77111,7 @@ function renderMenu(){
     const lb=sp.label? sp.label() : '';
     return '<div'+(sp.mv?' id="rspot-'+sp.mv+'"':'')+' onclick="UI.room(\''+sp.id+'\')" style="position:absolute;left:'+(sp.x+d[0])+'px;top:'+(sp.y+d[1])+'px;width:'+sp.w+'px;height:'+sp.h+'px;cursor:pointer'+(sp.z? ';z-index:'+sp.z : '')+'"></div>'
     +(lb? '<div'+(sp.mv?' id="rtag-'+sp.mv+'"':'')+' class="roomtag'+(sp.cls&&sp.cls()?' '+sp.cls():'')+'"'+(sp.notr?' data-notr':'')+' onclick="UI.room(\''+sp.id+'\')" style="left:'+(sp.lx+d[0])+'px;top:'+(sp.ly+d[1])+'px">'+lb+'</div>' : '');
-  }).join('') + glassSpot() + decorSpots() + nemSpotHTML();   // ...one hand for the little glass (v2.42), one anchor per decoration you own — and the Nemesis's own tap (v3.21; renders last so HIS tap wins an overlap)
+  }).join('') + glassSpot() + decorSpots() + nemSpotHTML() + bfBadgeHTML() + noAdsBadgeHTML();   // ...one hand for the little glass (v2.42), one anchor per decoration you own — the Nemesis's own tap (v3.21; renders last of the taps so HIS wins an overlap) — and 0904's two badges (z 5: the duel/crew badge on the BATTLEFIELD tile's corner, the NO ADS badge on the crate's)
   document.getElementById('menuBody').innerHTML =
     '<div class="roomstage'+(roomCur()==='bedroom'?'':' rs-'+roomCur())+'" id="roomStage">'   // v3.06: the stage wears its room
     + roomSVG()
@@ -77251,15 +77119,16 @@ function renderMenu(){
     + '<div class="roomhead"><img src="'+(META.avatar==='sarge'? menuSargeURI(dyeHex()||undefined) : sprURI(META.avatar, dyeHex()||undefined))+'" style="width:34px;margin-right:8px">'
       +'<b>COMMANDER · LV '+META.lvl+'</b>'
       +'<div class="xpbar" style="flex:1;max-width:220px;margin:0 12px"><div style="width:'+Math.min(100,Math.round(100*META.xp/xpNeed()))+'%"></div>'+trSignHTML()+'</div>'   // 0589 THE TREASURE ROAD: THE SIGN rides inside the track (NEXT UP AT LEVEL %1: %2 — the road's next rung; none past the last)
-      +(META.pendingPicks>0?'<button class="mbtn alt" style="padding:0.2rem 2.6rem 0.2rem 0.7rem;font-size:1.1rem;position:relative" onclick="UI.promote()">PROMOTION!<span class="pkn" data-notr>×'+META.pendingPicks+'</span></button>':'')
-      +duelChipHTML()+crewChipHTML()
+      // 0904 THE LOOP ROW — THE HEAD, SLIMMED (⚑ Q5): PROMOTION! ×n left the head for the FORT seat's pill (PROMOTIONS (n) ⚔NEW, the
+      // academy behind it); the duel + crew chips (duelChipHTML / crewChipHTML, still defined) became ONE badge on the BATTLEFIELD
+      // tile's corner (bfBadgeHTML); the NO ADS chip became a badge on the crate (noAdsBadgeHTML); the tier word shows on the piggy's
+      // card (starPopPaint). What stays: the avatar · COMMANDER · LV · the XP road + THE SIGN · the ★ balance · MUSIC · LANGUAGE · RESET ROOM.
       // 0409 §3: the readout is the register's sibling — one door law (0097):
       // a packs aisle in the store means the piggy walks you to it; no aisle
       // (plain web / Steam) keeps the dead readout, now wearing the pig (D6).
       +(IAP.avail()
-        ? '<button type="button" id="rhPig" class="rh-pig" onclick="UI.pigShop()">'+t(tierName(META.starsLifetime))+' · '+SH_PIG+'<b>'+META.starBank+'★</b></button>'
-        : '<span id="rhPig" class="rh-pig">'+t(tierName(META.starsLifetime))+' · '+SH_PIG+'<b>'+META.starBank+'★</b></span>')
-      +noAdsChipHTML()   // 0636 MONETISATION SURFACES: THE NO ADS CHIP — the piggy's neighbour, a door to the star pop-up scrolled to the tiers; nothing while ad-free / where ads cannot occur / without a store bridge
+        ? '<button type="button" id="rhPig" class="rh-pig" onclick="UI.pigShop()">'+SH_PIG+'<b>'+META.starBank+'★</b></button>'
+        : '<span id="rhPig" class="rh-pig">'+SH_PIG+'<b>'+META.starBank+'★</b></span>')   // 0904: the tier word left the head for the star pop-up (starPopPaint) — the head's ★ is the balance
       +'<button class="mbtn alt langchip" title="MUSIC" onclick="UI.themeChip()">'+(META.themeOn?gly('speaker'):gly('muted'))+'</button>'
       +'<button class="mbtn alt langchip" title="LANGUAGE" onclick="UI.langPanel()">'+gly('globe')+'</button>'
       // 0904 RESET ROOM (FM-GVT-RESET-ROOM-01, jumpr 0743; Wyatt 9/3: "We need a
@@ -77296,8 +77165,10 @@ function renderMenu(){
   // 954 east margin, and de's label is the long pole (~180 at 18px).
   // (v2.25: the shop pill retired with its 244 cap — the crate row has no
   // label now, so no #rtag-shop ever renders.)
+  // 0904 THE LOOP ROW: every lane re-surveyed — the caps are the lanes (RTAG_CAP: a tile's pill inside its 270; the shelf pills
+  // shy of each other; BEAR PARK east of the elephant's anchor; the park pills at the door's foot); a wider pill steps to 14 px
   for(const el of document.querySelectorAll('#roomStage .roomtag'))
-    if(el.offsetWidth > (el.id==='rtag-piggy'? 220 : el.id==='rtag-ach'? 196 : 360)) el.style.fontSize='14px';
+    if(el.offsetWidth > (RTAG_CAP[el.id]||360)) el.style.fontSize='14px';
   roofSweep();   // v3.29: the roof holds nobody — the paint that would show a man flying drops him instead
   sizeRoom();
 }
@@ -77329,13 +77200,13 @@ function pigRunAdvance(){
       // parked over the pig HERSELF, not at the one-shot float's 96px — the
       // gold TAP-THE-PIGGY pill lives up there and would sit right on top of
       // a counter that stays put (measured in the 0099 battery's screenshots)
-      f.style.left=(126+pd[0])+'px'; f.style.top=(150+pd[1])+'px'; st.appendChild(f); }
+      const q9=pigPt(126,150); f.style.left=(q9[0]+pd[0])+'px'; f.style.top=(q9[1]+pd[1])+'px'; st.appendChild(f); }   // 0904: over the pig on the shelf
     f.textContent='+'+PIGRUN.paid+'★';
     f.classList.remove('tick'); void f.getBoundingClientRect(); f.classList.add('tick');
     for(let i=0;i<Math.min(PIGRUN.chunks[k],3);i++){
       const s=document.createElement('div');
       s.className='starfloat'; s.textContent='★';
-      s.style.left=(120+pd[0]+Math.random()*56)+'px'; s.style.top=(104+pd[1]+Math.random()*14)+'px';
+      const q8=pigPt(120+Math.random()*56,104+Math.random()*14); s.style.left=(q8[0]+pd[0])+'px'; s.style.top=(q8[1]+pd[1])+'px';
       s.style.animationDelay=(0.06+i*0.09)+'s';
       st.appendChild(s); setTimeout(()=>{ try{ s.remove(); }catch(e){} }, 1150+i*90);
     }
@@ -77379,12 +77250,12 @@ function piggyHop(){
       if(st){
         const f=document.createElement('div');
         f.className='starfloat big'; f.textContent='+'+t+'★';
-        f.style.left=(126+pd[0])+'px'; f.style.top=(96+pd[1])+'px';
+        const q7=pigPt(126,96); f.style.left=(q7[0]+pd[0])+'px'; f.style.top=(q7[1]+pd[1])+'px';   // 0904: over the pig on the shelf
         st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120);
         for(let i=0;i<Math.min(t,4);i++){
           const s=document.createElement('div');
           s.className='starfloat'; s.textContent='★';
-          s.style.left=(120+pd[0]+Math.random()*56)+'px'; s.style.top=(104+pd[1]+Math.random()*14)+'px';
+          const q6=pigPt(120+Math.random()*56,104+Math.random()*14); s.style.left=(q6[0]+pd[0])+'px'; s.style.top=(q6[1]+pd[1])+'px';
           s.style.animationDelay=(0.08+i*0.09)+'s';
           st.appendChild(s); setTimeout(()=>{ try{ s.remove(); }catch(e){} }, 1150+i*90);
         }
@@ -77406,7 +77277,7 @@ function piggyHop(){
       for(let i=0;i<3;i++){
         const p=document.createElement('div');
         p.className='pigpuff';
-        p.style.left=(188+pd[0]+i*8)+'px'; p.style.top=(166+pd[1]-i*6)+'px';
+        const q5=pigPt(188+i*8,166-i*6); p.style.left=(q5[0]+pd[0])+'px'; p.style.top=(q5[1]+pd[1])+'px';   // 0904: out of the pig's back on the shelf
         p.style.animationDelay=(i*0.08)+'s';
         st.appendChild(p); setTimeout(()=>{ try{ p.remove(); }catch(e){} }, 900+i*90);
       }
@@ -77538,7 +77409,7 @@ function tvArt(on,o){
 function tvSVG(){
   if(STEAM_SHELL) return '';   // v3.31: no set on Steam at all — not even asleep (its ROOM_SPOTS row stands down with it; the pocket is bare floor, nothing reflows)
   const on=tvArmed();
-  return '<g id="tvSet" transform="translate(352,424)">'
+  return '<g id="ro-tv"><g id="tvSet" transform="translate(570,88) scale(0.8)">'   // 0904 THE LOOP ROW: on the shelf at 0.8 (ink 570..632 × 88..160), inside the tv row (566,82 70×80)
     +tvArt(on,{clip:'tvclip'})
     // the badge IS the pill (the v2.25 no-label idiom): gold like every
     // claimable in the room, digits and symbols only, data-notr so the l10n
@@ -77549,7 +77420,7 @@ function tvSVG(){
       +'<rect x="-29" y="-10" width="58" height="20" rx="10" fill="#FFD75E" stroke="#8a683e" stroke-width="2"/>'
       +'<text y="4.5" text-anchor="middle" font-family="Arial Narrow" font-weight="bold" font-size="13" fill="#3A2A14">+'+TV_STARS+' ★</text>'
       +'</g></g>' : '')
-    +'</g>';
+    +'</g></g>';
 }
 function tvTap(){
   if(!tvArmed()){
@@ -77572,12 +77443,12 @@ function tvGrant(){
   if(st){
     const f=document.createElement('div');
     f.className='starfloat big'; f.textContent='+'+TV_STARS+'★';
-    f.style.left='368px'; f.style.top='420px';
+    f.style.left='584px'; f.style.top='86px';   // 0904: over the set on the shelf
     st.appendChild(f); setTimeout(()=>{ try{ f.remove(); }catch(e){} }, 1120);
     for(let i=0;i<6;i++){
       const s=document.createElement('div');
       s.className='starfloat'; s.textContent='★';
-      s.style.left=(346+Math.random()*82)+'px'; s.style.top=(430+Math.random()*16)+'px';
+      s.style.left=(566+Math.random()*66)+'px'; s.style.top=(96+Math.random()*14)+'px';
       s.style.animationDelay=(0.08+i*0.09)+'s';
       st.appendChild(s); setTimeout(()=>{ try{ s.remove(); }catch(e){} }, 1150+i*90);
     }
@@ -86393,7 +86264,7 @@ function surpMark(){ META.surpSeen={ ids:surpForSale(), mods:surpMods() }; saveM
 // (textLength pins a long tongue — the v2.20 law; the CJK and Cyrillic faces one size down)
 function surpBannerSVG(){
   const fs=(LANG==='ja'||LANG==='ko'||LANG==='zh-Hans')? 11 : (LANG==='ru'||LANG==='ar')? 12 : 15;
-  return '<g id="ro-shopnew" transform="translate(450,89) rotate(-2)"><g class="ssnew">'
+  return '<g id="ro-shopnew" transform="translate(348,92) rotate(-2) scale(0.78)"><g class="ssnew">'   // 0904 THE LOOP ROW: over the shelf crate's lid (the crate at translate(300,77) scale(0.8))
     +'<path d="M -50 -11 L 50 -11 L 44 0 L 50 11 L -50 11 L -44 0 Z" fill="#D63C28" stroke="#FFD24A" stroke-width="2.2" stroke-linejoin="round"/>'
     +'<path d="M -44 -7.4 L 44 -7.4" stroke="#F27A62" stroke-width="1.8" opacity="0.5"/>'
     +'<text x="0" y="5.3" text-anchor="middle" font-family="Arial Narrow" font-weight="bold" font-size="'+fs+'" fill="#FFF3C4" textLength="58" lengthAdjust="spacingAndGlyphs">NEW!</text>'
@@ -90387,6 +90258,8 @@ window.UI = {
   },
   room(id){
     if(id==='piggy'){ piggyHop(); return; }
+    if(id==='raid') id='rival';              // 0904 THE LOOP ROW: THE RAID tile is the invader's door — MOM's card / NEMESIS's card / the army card (FIGHT · REMATCH), the tower's old door byte-still inside (panelHTML('rival') → UI.rival)
+    if(id==='fort') id='promo';              // 0904: the FORT seat opens the academy (FORT GREEN's panel takes this seat when it lands)
     if(id==='tv'){ tvTap(); return; }        // v2.59: the rewarded set — never a modal
     if(id==='campaign'){ openCampScene(); return; }  // v1.42: the campaign door is a scene now, not a card
     if(id==='yetipark'){ openParkScene(); return; }  // v3.33 TP-02: the found castle IS a door — the park scene, the campaign's little sibling
@@ -92232,7 +92105,7 @@ window.GVT = {
   // ===== 0526 THE PILLOW FIELDS — rig doors =====
   fieldsSeed(){ META.teddyDeed=1; META.teddyKey=1; META.parkTeddy=1; META.parkTeddySeen=1; if(!META.parks.teddy) META.parks.teddy={ lv:0, stars:0, pd:0 }; META.parks.teddy.lv=20; saveMeta(); return { deed:META.teddyDeed, key:META.teddyKey, lv:META.parks.teddy.lv, open:fieldsOpenFor()?1:0 }; },   // 0555: the deed + THE PLUSH KEY + the 20-rung clear, seeded (the croakSeed grammar; the name is gone)
   toll(){ return { deed:META.teddyDeed?1:0, bank:META.starBank|0, toll:TEDDY_DEED, up:barricadeIsOpen()?1:0, ask:!!document.getElementById('shConfirm'), key:META.teddyKey?1:0, keySeen:META.teddyKeySeen?1:0, mega:teddyMegaOpen()?1:0, megaAnn:META.teddyMegaAnn?1:0, cap:parkCap('teddy'), levels:parkLevels('teddy'), open50:teddy50Open()?1:0, adv:advCount(), advMax:ADV_MAX,
-      fort:!!document.getElementById('ro-fort'), spot:!!document.getElementById('rspot-bearfort'), tag:((document.getElementById('rtag-bearfort')||{}).textContent||''), sign:[...document.querySelectorAll('#bbSign text')].map(t9=>t9.textContent), ask:BB_ASK, door:!!document.getElementById('bbDoor'), x:!!document.querySelector('#icerite .bb-x'), num:((document.getElementById('bbNum')||{}).textContent||''), fell:!!(document.getElementById('bbStage')&&document.getElementById('bbStage').classList.contains('open')), parted:!!(document.getElementById('bbStage')&&document.getElementById('bbStage').classList.contains('parted')), text:(function(){ const el=document.getElementById('icerite'); return el? String(el.innerText||'').replace(/\s+/g,' ').trim() : ''; })() }; },   // 0555 THE BEAR BARRICADE's read-back (read-only) · 0826: the door, the ✕, the number, the fall, the parting, every visible word
+      fort:!!document.getElementById('ro-bearfort'), spot:!!document.getElementById('rspot-bearfort'), tag:((document.getElementById('rtag-bearfort')||{}).textContent||''), sign:[...document.querySelectorAll('#bbSign text')].map(t9=>t9.textContent), ask:BB_ASK, door:!!document.getElementById('bbDoor'), x:!!document.querySelector('#icerite .bb-x'), num:((document.getElementById('bbNum')||{}).textContent||''), fell:!!(document.getElementById('bbStage')&&document.getElementById('bbStage').classList.contains('open')), parted:!!(document.getElementById('bbStage')&&document.getElementById('bbStage').classList.contains('parted')), text:(function(){ const el=document.getElementById('icerite'); return el? String(el.innerText||'').replace(/\s+/g,' ').trim() : ''; })() }; },   // 0555 THE BEAR BARRICADE's read-back (read-only) · 0826: the door, the ✕, the number, the fall, the parting, every visible word
   fields(){   // the read-back (0555: every save answers)
     const rs=document.getElementById('raidscene'); return { open:fieldsOpenFor()?1:0, lv:(META.parks&&META.parks.teddy&&META.parks.teddy.lv)|0, led:Object.assign({},META.fields||{}), scene:raidSceneOpen()?1:0, cur:RAID_CUR, cls:rs.classList.contains('fields')?1:0, hero:document.querySelector('#raidBg svg.rhero #fieldsWrap')?1:0, sel:RAID_SEL, tiers:RAID_TIERS.map(k2=>k2+':'+(raidTierOpenFor('fields',k2)?1:0)).join(' ') }; },
   prizes556(){   // 0556 BEAR PARK — THE PRIZES — the rig's one read (read-only)
