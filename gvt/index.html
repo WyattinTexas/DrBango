@@ -4410,7 +4410,7 @@
      under reduced motion the invaders STAND still, your victory men stand,
      the door light holds steady, and the blocks still swap colors on tap
      (the transition above) but nothing hops. */
-  @media (prefers-reduced-motion: reduce){ .rwA,.rwB,.rwC,.rivsquad,.rivfig,.vicfig,.nemfig,.nemann-card,.acv,.acvh,.acvw,.acvt,#tblocks.react .tb0,#tblocks.react .tb1,#tblocks.react .tb2 { animation:none; } }
+  @media (prefers-reduced-motion: reduce){ .rwA,.rwB,.rwC,.ptfig,.ptbob,.ptface,.rivsquad,.rivfig,.vicfig,.nemfig,.nemann-card,.acv,.acvh,.acvw,.acvt,#tblocks.react .tb0,#tblocks.react .tb1,#tblocks.react .tb2 { animation:none; } }
   /* THE GIANT BANANA — leans in the corner, wobbles on its base when you poke it */
   .nanaw { transform-box:fill-box; transform-origin:38% 98%; animation:nanasway 5.6s ease-in-out infinite alternate; }
   @keyframes nanasway { from { transform:rotate(-1.1deg); } to { transform:rotate(1.5deg); } }
@@ -40296,7 +40296,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.92';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.93';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -74087,6 +74087,58 @@ function bronzekeySVG(){
     +'<g class="dec dec-gkey" id="decBkey"><g transform="translate(0,4)">'+bronzekeyArt()+'</g></g>'
     +'</g></g>';
 }
+// 0904 THE PATROL (FM-GVT-PATROL-01; design/patrol-0904/00-PATROL.md; Wyatt 9/4: "add a little hole on the bottom of the box so
+// that we can path units to be consistently patrolling from Fort Green to the campaign box ... the troops are marching over
+// there. I should probably click it."): three of your men in your army's colour walk out of the promotions door's foot, up the
+// west wall, and into an arch cut into the crate's front-bottom-left, on a loop that never stops while the room is up.
+// BOX_HOLE is appended AT THE SEAT, after the mold, inside the crate's scaled group (the mold has a second user, the shaken box
+// of the wrap party, and keeps its face whole); the same line serves both molds (the wooden crate and EF_BOX share the body
+// rect). The patrol group rides INSIDE #ro-campaign after the crate's art: it wears the box's drag delta, paints OVER the face
+// so the men stay visible to the arch's mouth, and wears the idle beacon's glow with the crate. ART, never a door:
+// pointer-events none, so a tap on a marching man lands on whatever stands under him (the crate's hotspot at the hole, the
+// floor on the lane). The route is re-read per paint from both doors' deltas (rpXY) and the keyframes are minted per paint
+// (renderMenu rebuilds the room), so a paint change or a drag follows for free. Reduced motion: the three stand at the mouth.
+// The rifleman always, then the next two STANDING classes the save owns (the machine gunner's sprite is prone, v1.22/v2.17,
+// so he never marches; a short roster repeats the rifleman). Zero strings, zero save bytes, zero server bytes. FORT GREEN's
+// gate takes P0 when it lands (today the promotions easel's west foot).
+const BOX_HOLE='<g class="boxhole">'
+  +'<path d="M25 122 V114 A10 10 0 0 1 45 114 V122 Z" fill="#1a1410"/>'                                                 // the opening: 20 x 18 in the mold = 27 x 24 on the floor
+  +'<path d="M27 122 V114.5 A8 8 0 0 1 43 114.5 V122" fill="none" stroke="#000" stroke-width="2.6" opacity="0.45"/>'   // the inner shadow under the crown
+  +'<path d="M25 121.4 H45" stroke="#3a2c20" stroke-width="1.2" opacity="0.8"/>'                                        // the sill
+  +'</g>';
+const PT_W=28;                                  // ⚑ a man's width on the floor (33 tall; the victory men are 52-58; 22 read as a dot on a phone)
+const PT_DUR=[9,11,13], PT_DL=[0,-3.7,-7.3];    // ⚑ seconds per lap · the negative delays (never bunch, never in step)
+const PT_LANE=66;                               // ⚑ the west-wall lane (west of the promo pill's widest state and the campaign pill)
+const PT_MOUTH=[197,372];                       // the arch's mouth on the floor, in the crate's frame (150+35*1.35, 210+120*1.35)
+function patrolSVG(){
+  const hex=dyeHex()||GREEN;
+  const dc=rpXY('campaign'), dp=rpXY('promo');
+  const ox=dp[0]-dc[0], oy=dp[1]-dc[1];                       // the easel's foot, read in the crate's frame
+  const P0=[130+ox,538+oy], P1=[PT_LANE,538+oy-42], P2=[PT_LANE,366], P3=PT_MOUTH;
+  const L=(a,b)=>Math.hypot(b[0]-a[0],b[1]-a[1]);
+  const l1=L(P0,P1), l2=L(P1,P2), l3=L(P2,P3), tot=(l1+l2+l3)||1;
+  const k1=+(100*l1/tot).toFixed(1), k2=+(100*(l1+l2)/tot).toFixed(1);
+  const tr=p=>'transform:translate('+p[0].toFixed(1)+'px,'+p[1].toFixed(1)+'px)';
+  const trio=['rifleman'].concat(TRAY_ORDER.filter(k=>k!=='sarge'&&k!=='mgunner'&&k!=='rifleman'&&unitOwned(k)).slice(0,2));
+  while(trio.length<3) trio.push('rifleman');
+  const h=(PT_W*7/6).toFixed(1);
+  let s='<g class="patrol"><style>'
+    +'.patrol{pointer-events:none}'
+    +'.ptfig{animation:ptwalk var(--d) linear var(--dl) infinite;opacity:0}'
+    +'.ptface{transform-box:fill-box;transform-origin:50% 50%;animation:ptface var(--d) step-end var(--dl) infinite}'
+    +'.ptbob{animation:ptbob .42s ease-in-out infinite alternate}'
+    +'@keyframes ptwalk{0%{'+tr(P0)+';opacity:0}5%{opacity:1}'+k1+'%{'+tr(P1)+'}'+k2+'%{'+tr(P2)+'}93%{opacity:1}100%{'+tr(P3)+';opacity:0}}'
+    +'@keyframes ptface{0%{transform:scaleX(-1)}'+k1+'%{transform:scaleX(1)}100%{transform:scaleX(1)}}'
+    +'@keyframes ptbob{from{transform:translateY(0)}to{transform:translateY(-1.6px)}}'
+    +'@media (prefers-reduced-motion:reduce){.ptfig,.ptface,.ptbob{animation:none}.ptfig{opacity:1}'
+    +'.ptfig:nth-of-type(1){'+tr([P3[0]-54,P3[1]])+'}.ptfig:nth-of-type(2){'+tr([P3[0]-27,P3[1]])+'}.ptfig:nth-of-type(3){'+tr([P3[0],P3[1]])+'}}'
+    +'</style>';
+  for(let i=0;i<3;i++){
+    s+='<g class="ptfig" style="--d:'+PT_DUR[i]+'s;--dl:'+PT_DL[i]+'s"><g class="ptbob"><g class="ptface">'
+      +'<image href="'+sprURI(trio[i],hex)+'" x="'+(-PT_W/2)+'" y="-'+h+'" width="'+PT_W+'" height="'+h+'"/></g></g></g>';
+  }
+  return s+'</g>';
+}
 function roomSVG(){
   const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()], momD=momDue(), nemD=nemesisDue();   // v1.79: computed once — every branch below agrees (v3.21: + his day)
   const achDone=ACH.filter(a=>META.ach[a.id]).length;
@@ -74173,7 +74225,7 @@ function roomSVG(){
   // translated west with the props' new floor (see momDoor). The corner
   // rival tap row stays retired (v2.17) — nothing tappable lived here.
   // toy box (campaign)
-  +'<g id="ro-campaign"'+rpT('campaign')+'><g transform="translate(150,210) scale(1.35)">'+(efBoxOn()? EF_BOX : SPRITES_SRC.toybox.replace(/viewBox[^>]*>/,''))+'</g></g>'   // 0656 THE ELITE FORCES BOX (Card G): past the summit the crate wears the set's camo (EF_BOX — the same seat, the same size, the same tap; the wooden toy box below L100)
+  +'<g id="ro-campaign"'+rpT('campaign')+'><g transform="translate(150,210) scale(1.35)">'+(efBoxOn()? EF_BOX : SPRITES_SRC.toybox.replace(/viewBox[^>]*>/,''))+BOX_HOLE+'</g>'+patrolSVG()+'</g>'   // 0656 THE ELITE FORCES BOX (Card G): past the summit the crate wears the set's camo (EF_BOX — the same seat, the same size, the same tap; the wooden toy box below L100)
   // piggy bank — wearing whatever colour its survival streak has earned, stood
   // in front of whatever bank she's been upgraded into (one wrapper for the
   // pair: the bank building and the pig on its stoop drag as one possession)
