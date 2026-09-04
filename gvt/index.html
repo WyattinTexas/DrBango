@@ -40433,7 +40433,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.96';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.97';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -42495,6 +42495,52 @@ function sqAtCap(){ return false; }
 // Alone there is nobody else to be referee; in a party it is whoever holds the
 // chair. (`S.coop` is the party, not the mode — solo leaves it null.)
 function sqRef(){ return !S.coop || coopIsHost(); }
+// ===== 0904 REX MEGA STALL - THE BELT (FM-GVT-REX-STALL-01; design/rex-mega-stall-0904/00-STALL.md; Wyatt 9/4: "we had a playthrough
+// where Kingrex never came out. We were stuck at Wave 5/7. Nothing would come out."). STEP 0 named the survivor on the pristine: a STEGO
+// hatched from EGGS ON PARADE's random pool parks at his 400 reach (the 0117 tube law in the foes loop) - beyond every gun but the mortar -
+// and the king's actGate waits on him for as long as nobody can answer him. Two seats: (1) THE UNANSWERED TUBE WALKS (tubeWalks, the tube
+// law's one new term): in a KING REX FIGHT a parked tube whose hp has not moved for TUBE_UNANS_S walks on until someone hits him again -
+// he parks again the frame a round lands; every other rug byte-what-it-was. (2) THE BELT (gateHold, the four gate clauses' one seat): a
+// gated wave (actGate / retreatGate / bossGate / hpGate) held for GATE_MAX_S while EVERY survivor can hold no gate honestly - off the rug
+// (the targeting loops' own rim), an egg that has not moved in GATE_EGG_S, a parked tube nobody has hit for TUBE_UNANS_S - and the spawn
+// queue is empty RELEASES: the survivors are swept with the retreat theater's own grammar (the puff, the ember ring, the rumble; no
+// bounty), one telemetry line (tel 'gatebelt': the wave, the kinds, the held seconds) and the push lands through the clause's own re-read
+// next frame. The clock restarts the moment any survivor is answerable again, so a fight that is merely slow never trips it; a BOSS on
+// the field (the king under the retreatGate, a named bossGate / hpGate boss) restarts it too - his own law stands (he bolts at his
+// fraction or falls). Referee only by construction (the block sits under sqRef()); a guest follows the relayed push as it follows every
+// push. The stamps ride sq (rebuilt every battle) keyed on the wave index. Zero strings, zero wire, zero server bytes.
+const GATE_MAX_S=25;      // a gate held this long on unanswerable survivors alone releases (the belt)
+const GATE_EGG_S=10;      // an egg that has not moved for this long counts as unanswerable
+const TUBE_UNANS_S=10;    // a parked tube nobody has hit for this long: walks on (a King Rex fight) / counts as unanswerable (the belt)
+function tubeIdleT(f,k){ if(f[k+'Hp']!==f.hp){ f[k+'Hp']=f.hp; f[k+'T']=S.t; } return S.t-f[k+'T']; }   // seconds since a foe's hp last moved, on the caller's own stamp pair (self-seeding - the raw-'yeti' clock law; the walk's clock counts PARKED frames alone, the belt's counts held seconds)
+function tubeWalks(f){ return rexFight() && tubeIdleT(f,'tw')>=TUBE_UNANS_S; }   // THE UNANSWERED TUBE WALKS - a King Rex fight alone; read only where the tube law would park him (flagged: one clause widens it to every rug)
+function gateSurvivorOff(f){   // true = this living foe can hold no gate honestly
+  if(f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30) return true;
+  if(f.def.hatch && !f.hatched){ if(f.geT==null || Math.hypot(f.x-f.geX,f.y-f.geY)>2){ f.geX=f.x; f.geY=f.y; f.geT=S.t; } return S.t-f.geT>=GATE_EGG_S; }
+  if(f.def.minRng && !f.boss) return tubeIdleT(f,'gb')>=TUBE_UNANS_S;
+  return false;
+}
+function gateHold(nw,sq){   // the four gate clauses' hold: sq.t+1 as shipped, or THE BELT's release (sq.t - the clause re-reads next frame with the field empty)
+  if(sq.gateW!==S.wave || sq.gateAt==null){ sq.gateW=S.wave; sq.gateAt=sq.t; }
+  if(S.queue.length){ sq.gateAt=sq.t; return sq.t+1; }
+  const kinds={};
+  for(const f of S.foes){ if(f.dead) continue; if(f.boss || !gateSurvivorOff(f)){ sq.gateAt=sq.t; return sq.t+1; } kinds[f.type]=(kinds[f.type]|0)+1; }
+  const held=sq.t-sq.gateAt;
+  if(held<GATE_MAX_S) return sq.t+1;
+  let swept=0;
+  for(let i2=S.foes.length-1;i2>=0;i2--){ const f2=S.foes[i2];
+    if(!f2.dead){ swept++;
+      S.fx.push({k:'smoke',x:f2.x,y:f2.y-30,t:0,dur:0.6});
+      S.fx.push({k:'ring',x:f2.x,y:f2.y-24,r:8,R:60,t:0,dur:0.4,col:(S.raid&&S.raid.k==='bone')?'#FF8A3A':'#BFE3F2'}); }
+    S.foes.splice(i2,1); }
+  if(swept){ S.shake=Math.max(S.shake,0.5); SFX.rumble(); }
+  const word=Object.keys(kinds).map(k=>k+kinds[k]).join('+');
+  const rec={ wave:S.wave+1, name:nw.name, held:+held.toFixed(1), kinds:word, t:+S.t.toFixed(1) };
+  (sq.belt||(sq.belt=[])).push(rec);
+  tel('gatebelt', String(S.wave+1)+':'+word, held);
+  sq.gateAt=null;
+  return sq.t;
+}
 // the referee's ticker. ⚠ It runs on its OWN clock, not S.waveT — that one stops
 // dead between waves, and the whole point of this mode is that nothing stops.
 function sqTick(dt){
@@ -42528,15 +42574,15 @@ function sqTick(dt){
     // only the referee pushes and every guest follows the relay (kills
     // splice foes out whole, so the check is live truth).
     const nw=S.cfg.waves[S.wave];
-    if(nw && nw.actGate && (S.foes.length || S.queue.length)) sq.nextT=sq.t+1;
-    else if(nw && nw.retreatGate && raidKingStands()) sq.nextT=sq.t+1;   // v3.39: P3 waits for the referee's king to dip to 40% (or fall) — the scripted retreat
-    else if(nw && nw.bossGate && (S.foes.some(f2=>f2.type===nw.bossGate && !f2.dead) || S.queue.some(q=>q.t===nw.bossGate))) sq.nextT=sq.t+1;
+    if(nw && nw.actGate && (S.foes.length || S.queue.length)) sq.nextT=gateHold(nw,sq);   // 0904 REX MEGA STALL: the belt's seat (gateHold = sq.t+1 as shipped, or the release)
+    else if(nw && nw.retreatGate && raidKingStands()) sq.nextT=gateHold(nw,sq);   // v3.39: P3 waits for the referee's king to dip to 40% (or fall) — the scripted retreat
+    else if(nw && nw.bossGate && (S.foes.some(f2=>f2.type===nw.bossGate && !f2.dead) || S.queue.some(q=>q.t===nw.bossGate))) sq.nextT=gateHold(nw,sq);
     else if(nw && nw.hpGate && (function(g9){   // 0340: the DUEL gate — the wave holds while the named boss stands ABOVE the fraction (or hasn't walked on yet); his fall opens every gate (moot — the croak fork flushes the tail)
       const b9=S.foes.find(f9=>f9.type===g9.t && !f9.dead);
       if(b9){ if(g9.clk){ if(nw.clkAt==null) nw.clkAt=sq.t; if(sq.t-nw.clkAt>=g9.clk) return false; }   // 0612 D1b THE GATE CLOCK — an OPT-IN row key (never an engine law: croak D.gates, KING BEAR's life cell and every keyless king ride this block exactly as before): the wave releases at its gate OR clk s after it first became the next wave with the named boss STANDING (the b9 scan — while he is only in S.queue the gate holds regardless, else a gate could release before its boss exists); the stamp rides the per-battle wave row
         return g9.life? ((b9.kbLife|0)<g9.life) : b9.hp>b9.hpMax*g9.k; }   // 0595: a `life` cell holds the wave while the named boss has not yet reached that life (KING BEAR's ground duel — his mounted bar runs 100 → 0 and refills; a raw fraction would read life two as "still above")
       return S.queue.some(q9=>q9.t===g9.t);
-    })(nw.hpGate)) sq.nextT=sq.t+1;   // 0305 BF-02: the PHASE gate — the next act waits for the NAMED boss to fall (or leak through), never for his army (actGate's whole-field wait would contradict "when he is defeated, it moves to the next phase"); the queue clause closes the not-yet-spawned race (the win door's own idiom)
+    })(nw.hpGate)) sq.nextT=gateHold(nw,sq);   // 0305 BF-02: the PHASE gate — the next act waits for the NAMED boss to fall (or leak through), never for his army (actGate's whole-field wait would contradict "when he is defeated, it moves to the next phase"); the queue clause closes the not-yet-spawned race (the win door's own idiom)
     // 0552a THE HOLD (D1): the measured half-mark lands at 41-48 s and the
     // drum's W4 at 47-50 s, so on some runs the two landed together (L3's
     // newbie: 47.8 vs 48). While the box is inside the last stretch before the
@@ -62065,7 +62111,7 @@ function update(dt){
       ? { x:RV.x+RV.w/2, y:rvBridge(RV,f.y) }   // 0594a: the bridge nearer his own y (two on level 30's crossing)
       : WLs? canyonGoal(f,WLs) : T;   // 0570: the funnel without the water — NO crawler exemption (R2: the cubs don't squeeze under), NO boss exemption (⚑), no wade (the stall re-picks below)
     if(RV && f.x<=RV.x-4) f.crossed=true;
-    if(f.def.minRng && !f.boss && !(f.rimIn && f.x>=W-60) && !(teddyGun(f) && f.x>gunLineX()) && hasGreenTarget(f)){   // 0586 THE GUN LINE: a bear cannon EAST of gunLineX() (W×0.80 = 992) may not park — born at W+60 with the line already at the crate he froze OFF the bed (invisible, untargetable, silent) or parked BEHIND the box; he rolls on instead (teddyGunRoll / teddyFormRoll) and the shipped shelf takes him at the line. rim:1 on every teddy cannon group makes the 0519 clause his too — belt and braces
+    if(f.def.minRng && !f.boss && !(f.rimIn && f.x>=W-60) && !(teddyGun(f) && f.x>gunLineX()) && hasGreenTarget(f) && !tubeWalks(f)){   // 0904 REX MEGA STALL: THE UNANSWERED TUBE WALKS (a King Rex fight; the belt's block above sqTick)   // 0586 THE GUN LINE: a bear cannon EAST of gunLineX() (W×0.80 = 992) may not park — born at W+60 with the line already at the crate he froze OFF the bed (invisible, untargetable, silent) or parked BEHIND the box; he rolls on instead (teddyGunRoll / teddyFormRoll) and the shipped shelf takes him at the line. rim:1 on every teddy cannon group makes the 0519 clause his too — belt and braces
       // 0519 THE RIM LAW (the 0514 word, for a stamped tube alone — L90's added
       // mortars ride `rim:1`): born at the rim with a green already inside its
       // 404, an unstamped tube parks OFF-WORLD (invisible, untargetable, silent
@@ -92641,6 +92687,7 @@ window.GVT = {
       men:S.units.filter(u=>!u.dead).map(u=>({ cid:u.cid||null, t:u.type, x:u.x|0, y:u.y|0, by:u.coopBy||null, hex:u.coopHex||null })),
       roster:(S.sq&&S.sq.ev)? evRoster() : [], ann:S.ann? S.ann.txt : null, pgv:PGV }; },
   evJoin(){ return evJoin(); },
+  gatebelt(){ const sq=S.sq; return { cv:GVT_CV, max:GATE_MAX_S, egg:GATE_EGG_S, tube:TUBE_UNANS_S, held:(sq && sq.gateAt!=null && sq.gateW===S.wave)? +(sq.t-sq.gateAt).toFixed(2) : null, rel:(sq && sq.belt)? sq.belt.slice() : [], wave:S.wave, ref:sqRef()?1:0, off:S.foes.filter(f=>!f.dead && !f.boss && (f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30)).length, foes:S.foes.length, q:S.queue.length, rex:rexFight()?1:0 }; },   // 0904 REX MEGA STALL: the belt's read (the rig; read-only)
   swarmCap(n){ if(n!=null) EV_SWARM_CAP=Math.max(0,n|0); return { cap:EV_SWARM_CAP, foes:S.foes.length, queue:S.queue.length, due:S.queue.filter(q=>q.at<=S.waveT).length, waveT:+(S.waveT||0).toFixed(2), evb:(typeof evBattle==='function' && evBattle())?1:0 }; },   // 0490 THE BRAKE rig: the ceiling + what it holds
   evState(){ return evState(); },
   evBell(){ evBell(); return GVT.evRoom(); },
