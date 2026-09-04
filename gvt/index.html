@@ -33843,10 +33843,8 @@ const CMD={
   blk:3,        // Wyatt: "a few blocks, maybe three" — counted absorbs, per figure per battle
   aoeR:74,      // THE BLADE: every swing hits EVERYTHING inside this circle at full damage · 0522c: the circle is the SWEEP's reach now — everything inside the drawn sweep on his FACING side at this radius, never behind him (cmdCutLand; ⚑ the 0488 360° circle was Wyatt's own word, 8/24's "if it connects, then that should hit" wins)
   pace:0.55,    // moveSpd ×0.55 (40→22) — "pretty slow-moving", between the MG's 20 and the rifleman's 44
-  grit:3        // campaign: grit ×3 (4→12 pips; saber is ×2=8) — "a lot of HP"
-  // hpMul RETIRED v3.01: the battleground plate is FLAT now
-  // (SARGE_WPN_HP.commander 8 — 10+8 lands the same 18 the ×3 bought at the
-  // summit). Campaign grit above is untouched.
+  grit:4.75,    // campaign: grit ×4.75 (4→19 pips; saber is ×2=8) — "a lot of HP" · 0736 THE COMMANDER BUFF (Wyatt 9/3: "increase his health x1.55"): was ×3 = 12 pips; 12 × 1.55 = 18.6 → 19, the nearest WHOLE pip (the pip funnel is fractional and dice-free, a fractional cap is legal, a picture of 18.6 is not). Every reader follows gritCap live: the knockdown at 19, Seat E's gritCap/6 (3.17 pips a whole knock), the Wall's ×1/6 and the sign's ×2 as fractions of the new pool, the rigs.
+  hpMul:1.55    // 0736 THE COMMANDER BUFF: REVIVED — a commander-only ×1.55 on his WHOLE battleground pool (the rank row bfHpAt(sarge, r) + the FLAT plate SARGE_WPN_HP.commander 8, rounded to a whole plastic), seated in placeUnit right after the plate: 14 → 22 at rank 0 · 16 → 25 at rank 10 · 18 → 28 at the summit (v3.01's "sums to the ×3's old 18" law is broken here on Wyatt's word). Retired v3.01 (the plate was FLAT), revived 0736; the plate itself and the other four bags byte-still.
 };
 // 0488 THE HIGH COMMANDER'S BLADE (FM-GVT-PRIMETIME-01 §8, D19/D20/D26;
 // Wyatt 8/21: "If you win, you get The High Commander's Blade, which is for
@@ -33925,8 +33923,14 @@ const CMD_WALL={ soak:1/6, t:7, cd:18, eye:280, n:2 };
 // tube at the rim can reach a man this far from him). The picture is the
 // planted sword ALONE — NO ARM, NO POINTING POSE, NO CHIN-UP LEAN (D22
 // VOID, the 8/23 ruling; the board and the steel circle stay).
+// 0736 THE COMMANDER BUFF (Wyatt 9/3: "buff the ability he has of giving attack speed to siege units near him by 100%"): SP_RATE 1.69 -> 3.38 =
+// x2 on the charged tubes' CURRENT rate, the 0522d law ("increase the fire rate by 30% of who he's charging up" was built as x1.3 on the
+// current rate: 1.30 x 1.3 = 1.69). Measured: the laid drum = the unlaid's / 3.3800 on the bazooka AND the mortar. The reader (spLay ->
+// sp.rate, one factor in the tubes' shared cooldown denominator), the circle, the 10 s / 20 s clocks and ACC . DMG . T . CD . R . TUBES are
+// byte-still. The stack (radio + V2 + INSPIRE + the sign) is measured and flagged, never floored here. Wyatt's other readings: 2.69 (+100
+// points on the base) . 2.00 (a flat +100%) - one cell each (00-BUFF.md section 4 Q1).
 const SP_TUBES={ bazooka:1, mortar:1 };
-const SP_R=5*TK_M, SP_T=10, SP_CD=20, SP_WORK=SP_R+UDEF.bazooka.rng, SP_ACC=0.45, SP_DMG=1.35, SP_RATE=1.69, SIGN_SOAK=2;   // 0517a: SP_CD is its own const now — the 20 s quiet after the 10 s channel (Wyatt 8/23: "Needs to be a 10 second channel. 20 second cooldown."; it was CMD_DASH.cd's 6) · 0522d THE CHARGE (FM-GVT-FEEDBACK-0824-DAY §4; Wyatt 8/24: "The men without fear passive is okay, but it's not good enough yet. Let's increase the fire rate by 30% of who he's charging up."): SP_RATE 1.30 → 1.69 = ×1.3 on the charged tubes' CURRENT rate — every bazooka and mortar inside SP_R while the sword stands (⚑ 1.60 = +30 points on the base); ACC · DMG · T · CD · R · TUBES untouched
+const SP_R=5*TK_M, SP_T=10, SP_CD=20, SP_WORK=SP_R+UDEF.bazooka.rng, SP_ACC=0.45, SP_DMG=1.35, SP_RATE=3.38, SIGN_SOAK=2;   // 0517a: SP_CD is its own const now — the 20 s quiet after the 10 s channel (Wyatt 8/23: "Needs to be a 10 second channel. 20 second cooldown."; it was CMD_DASH.cd's 6) · 0522d THE CHARGE (FM-GVT-FEEDBACK-0824-DAY §4; Wyatt 8/24: "The men without fear passive is okay, but it's not good enough yet. Let's increase the fire rate by 30% of who he's charging up."): SP_RATE 1.30 → 1.69 = ×1.3 on the charged tubes' CURRENT rate — every bazooka and mortar inside SP_R while the sword stands (⚑ 1.60 = +30 points on the base); ACC · DMG · T · CD · R · TUBES untouched
 const SP_NONE={ acc:1, dmg:1, rate:1 };
 // ⚠ TDZ (the v1.26 law): coopBeat is a const ~5,900 lines below — these only
 // ever RUN lazily (render/battle/endBattle time), never at load. CMD_LVL itself
@@ -40242,7 +40246,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.87';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.88';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -51566,6 +51570,7 @@ function placeUnit(type,x,y,side,seat){
     // AI default at placement (his own sim carries his true rig; the
     // referee's verdict is the truth — R5/D8, inherited).
     if(type==='sarge'){ const wf=SARGE_WPN_HP[unitSargeStats(u).w]||0; if(wf){ u.hpMax+=wf; u.hp=u.hpMax; } }
+    if(type==='sarge' && CMD.hpMul && unitSargeStats(u).w==='commander'){ u.hpMax=Math.round(u.hpMax*CMD.hpMul); u.hp=u.hpMax; }   // 0736 THE COMMANDER BUFF (Wyatt 9/3: "increase his health x1.55"): the class multiplier on his WHOLE pool (the rank row + the plate above), rounded to a whole plastic — HERE beside the plate: above the soul/outfit/rookie/hard multipliers (a rookie carpet still halves it, the v2.43 law), below the rank delta; the same unitSargeStats reading as the plate (MY loadout / the away captain's snapshot / an AI seat's kit, never a commander), so the other four bags never enter and read byte-equal hp
     // 0093 THE SOUL: my souled type's men land with the gift on their plate.
     // (An ally's man collects his at the relay-apply door; machines never —
     // the pool excludes them by name, so this is a no-op for vehicles.)
@@ -61790,7 +61795,7 @@ function update(dt){
       if(f.falling.t>=f.falling.dur){ const fk=f.falling.kind; f.falling=null; f.fellVoid={kind:fk}; }
       if(dt>0){ f.vx=0; f.vy=0; } }
     else if(f.shv){ ggShoveStep(f,dt); if(dt>0){ f.vx=0; f.vy=0; } }   // 8/8 gravity gun: the flight owns his feet this frame
-    else if(f.retreat){ const sp9=f.def.spd*LR_ROUT_X*fzWalk(f), RV9=S.cfg.terrain.river;   // 0735: a frozen survivor's rout crawls too let gx9=W+120, gy9=f.y;
+    else if(f.retreat){ const sp9=f.def.spd*LR_ROUT_X*fzWalk(f), RV9=S.cfg.terrain.river; let gx9=W+120, gy9=f.y;   // 0735: a frozen survivor's rout crawls too · 0736: the declaration back in code (0735's comment had swallowed it — `gx9 is not defined` on every routing foe)
       if(RV9 && f.x<RV9.x+RV9.w+4){ gy9=rvBridge(RV9,f.y); if(f.x<RV9.x-4 && Math.abs(f.y-gy9)>RV9.bw*0.3) gx9=RV9.x-30; }   // 0594a: a survivor west of the water runs for the NEARER bridge mouth first, then straight over the planks — the men's own bank-first funnel, never a wade home
       const dx9=gx9-f.x, dy9=gy9-f.y, d9=Math.hypot(dx9,dy9)||1, st9=rockSteer(f.x,f.y,gx9,gy9,ROCK_PAD_FOE); f.x+=(st9? st9.x : dx9/d9)*sp9*dt; f.y+=(st9? st9.y : dy9/d9)*sp9*dt; }   // 0594 THE ROUT: a survivor of Larson's fall runs for the east edge on his own pace × LR_ROUT_X, steering round the furniture like every walker (rockSteer — a straight push against a boulder's shoulder stood a man there forever, measured); the walk-flip stamp below turns him east; the mover chain never owns him again
     else if(f.aimT>0 || f.mgRootT>0 || f.aW>0 || f.brT>0 || f.lrBmT>0 || f.lrJmpT>0 || f.rxHopW>0 || f.rxHopT>0 || foeHolds(f)){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; }   // 0706: the hop's tell + flight plant the king's feet (rexHopTick writes his x/y through the flight)   // 0478: + THE SHOWDOWN — a `hold` boss stands where the line can answer (foeHolds)   // stopped to shoot — your window (0278a: a halted air-stepper stands planted, never frozen mid-hop; 0278b: f.aW = the bruiser's rear-up + the king's inhale, the same planted read; 0396: f.brT = a breather stands through his own standing jet — ⚑ BR_PLANT)
@@ -92146,6 +92151,11 @@ window.GVT = {
   // ===== 0092 THE COMMANDER — read-only probe. The honest test GRANT is
   // seeding META.coopLevels=[20] (or [20,95]) — the record itself; there is
   // deliberately NO synthetic grant door (the bomber's own law). =====
+  cmdBuff(){ const u=(S.mode==='play')? S.units.find(x=>x.type==='sarge'&&!x.dead&&!x.coopBy&&(!S.bf||x.seat===bfMySeat())) : null;   // 0736 THE COMMANDER BUFF — the read door: the three cells, his hp at rank 0/10/100 (the placeUnit arithmetic quoted), every standing tube's drum + laid flag (the battery reads the laid/unlaid ratio off the real firing loop), the fielded man's grit/hp/sign
+    const drums=(S.mode==='play')? S.units.filter(x=>SP_TUBES[x.type]&&!x.dead).map(x=>({ id:x.id, type:x.type, laid:(spLay(x).rate!==1)?1:0, cd:+(x.cd||0).toFixed(4) })) : [];
+    const bf=r=>Math.round((bfHpAt('sarge',r)+SARGE_WPN_HP.commander)*CMD.hpMul);
+    return { spRate:SP_RATE, spAcc:SP_ACC, spDmg:SP_DMG, spR:SP_R, spT:SP_T, spCd:SP_CD, grit:CMD.grit, gritCap:u? gritCap(u) : UDEF.sarge.grit*CMD.grit, hpMul:CMD.hpMul, plate:SARGE_WPN_HP.commander, bfHp:{ r0:bf(0), r10:bf(10), r100:bf(RANK_MAX) }, drums,
+      fielded:u? { hits:+(u.hits||0).toFixed(3), hp:(u.hp!=null?u.hp:null), hpMax:(u.hpMax!=null?u.hpMax:null), signT:+(u.cmdSignT||0).toFixed(3), signW:+(u.cmdSignW||0).toFixed(3), cs:csU(u), blkN:u.cmdBlkN|0 } : null }; },
   cmd(){ const u=(S.mode==='play')? S.units.find(x=>x.type==='sarge'&&!x.dead&&!x.coopBy&&(!S.bf||x.seat===bfMySeat())) : null;   // fielded reads the LIVE battle only — null at menu, never a stale figure
     return { owned:cmdOwned(), blade:bladeOwned(), seen:!!META.cmdSeen, bladeSeen:!!META.bladeSeen,
       lvl:CMD_LVL, bladeLvl:CMD_BLADE_LVL, rank:Math.min(RANK_MAX,(META.sargeUp||{}).commander|0),
