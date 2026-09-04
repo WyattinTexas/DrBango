@@ -31167,6 +31167,8 @@ const CAMP_DRESS={
   // river (544–600, bridge y 205–281): every spot ≥ r+14 from the crossing
   // corridor (the v1.72 law), every pairwise pinch ≥ 80px (2×ROCK_PAD_FORM),
   // the front line's east-bank stand (x 636) and the crate untouched.
+  // 0757b: this row is RUNG 2's dress now (CAMP_EDITS.dress[2] copies it field for field) - rung 3 wears CAMP_EDITS.dress[3] (the overlay
+  // replaces this row at boot); the table row stands byte-still as the record of v2.37's furniture.
   3:{ rocks:[{x:720,y:178,r:24},{x:710,y:420,r:26},{x:350,y:200,r:22},
              {x:395,y:340,r:16,art:'bags',row:'a'},{x:421,y:358,r:16,art:'bags',row:'a'},{x:447,y:376,r:16,art:'bags',row:'a'}] },
   // v2.39 (Wyatt 8/4, verbatim: "Level seven: add jacks mines to the map and
@@ -31741,6 +31743,8 @@ function levelCfg(n){
   const R=(seed=>{ let s=seed; return ()=>{ s=(s*9301+49297)%233280; return s/233280; }; })(n*7919+13);
   // terrain: L1 bare · L2 rocks · L3 river · L4 rocks · L5 river+rocks · beyond: seeded mix
   // (rolled FIRST, so nothing below can ever move a seed — the v1.40 law)
+  // 0757b: the seed still rolls 2 and 3 exactly as before (the same R() draws); the CAMP_EDITS wrapper re-dresses both AFTER the roll
+  // (rung 2 = rung 3's map, rung 3 = THE TWO BRIDGES - design/maps-2-3-0904), zero R() - every other rung's deal stands.
   if(n===2||n===4||(n>5&&R()<0.5)) cfg.terrain.rocks=[{x:520+R()*180,y:160+R()*90,r:40+R()*14},{x:420+R()*160,y:380+R()*110,r:36+R()*16}].concat(n>=4?[{x:680+R()*120,y:300+R()*80,r:30+R()*12}]:[]);
   if(n===3||n===5||(n>5&&R()<0.5)) cfg.terrain.river={x:470+((R()*80)|0), w:56, bridgeY:170+((R()*260)|0), bw:76};
   // v1.72 (Wyatt 7/29: "there was a rock on the bridge and it made it kind of
@@ -33691,7 +33695,24 @@ const CAMP_EDITS = { v:1, levels:{
   // 0594a's cell; every walker takes the nearer one), the campaign's plank width. Elite 130 wears it whole (levelCfg's elite branch reads
   // the base rung through this wrapper) under the night carpet. The dress row below keeps the sandbags and the two stones; the ball is gone.
   30:{ terrain:{ river:{ x:598, w:56, bridgeY:172, bridgeY2:428, bw:76 } } },
-  72:{ bossF:1.54 }, 78:{ bossF:1.70 }, 84:{ bossF:1.87 }, 96:{ bossF:2.19 } } };
+  72:{ bossF:1.54 }, 78:{ bossF:1.70 }, 84:{ bossF:1.87 }, 96:{ bossF:2.19 },
+  // 0757b LEVEL 2 WEARS LEVEL 3'S MAP, AND LEVEL 3 GETS A NEW ONE (design/maps-2-3-0904/00-MAPS.md; Wyatt 9/4 ~10:35: "the level 3 layout is
+  // very superior to the level 2 layout. Let's replace the level 2 layout with the level 3 layout and learn from this. For the new level 3
+  // layout, please use an engaging layout map"). MAPS ONLY - the waves, the names, the hp / count / boss rows of both rungs byte-still (0703's).
+  // Rung 2 wears rung 3's dealt map VERBATIM: the seed's two rocks REPLACED by the empty list (one of them sat inside the drop zone), rung 3's
+  // seeded river (544, one bridge at 243) authored as the wrapper's own row, and v2.37's dress row (the dress table below) copied field for
+  // field. Rung 3 is NEW - THE TWO BRIDGES: the channel 60 px further east (604-660, still inside campFrontX's window so the forward line
+  // lands on the east bank at 696), TWO plank spans at THE CROSSING's rows 172 / 428 (bridgeY2 - every walker takes the nearer one), three
+  // stones on the near bank between the deploy line and the water, one sandbag row on the far bank between the two bridge exits; the Big
+  // Shot's lane (1310,430 → the toy box) clear of every mound. Post-roll, zero R() draws - every other rung's seed stands (the v1.40 law);
+  // the elite twins 102 / 103 wear these fields through this wrapper (0497 D7). Why 3 beat 2 is written in the doc's §1.
+  2:{ terrain:{ river:{ x:544, w:56, bridgeY:243, bw:76 }, rocks:[] } },
+  3:{ terrain:{ river:{ x:604, w:56, bridgeY:172, bridgeY2:428, bw:76 } } } },
+  // the dress rows (E.dress replaces CAMP_DRESS[n] at boot - 0193's seat): rung 2 = CAMP_DRESS[3]'s v2.37 row verbatim; rung 3 = the new
+  // furniture (the three near-bank stones, the far-bank bag row). Authored in the 1240 span (the rung's live span; neither rung is grand).
+  dress:{
+  2:{ rocks:[{x:720,y:178,r:24},{x:710,y:420,r:26},{x:350,y:200,r:22},{x:395,y:340,r:16,art:'bags',row:'a'},{x:421,y:358,r:16,art:'bags',row:'a'},{x:447,y:376,r:16,art:'bags',row:'a'}] },
+  3:{ rocks:[{x:520,y:118,r:18},{x:516,y:292,r:20},{x:524,y:482,r:18},{x:704,y:282,r:16,art:'bags',row:'a'},{x:730,y:300,r:16,art:'bags',row:'a'},{x:756,y:318,r:16,art:'bags',row:'a'}] } } };
 if(CAMP_EDITS && CAMP_EDITS.v){
   const E = CAMP_EDITS;
   if(E.fdef)     for(const k in E.fdef)     FDEF[k]    = Object.assign({}, FDEF[k]||{}, E.fdef[k]);
@@ -40412,7 +40433,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='7.95';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='7.96';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
