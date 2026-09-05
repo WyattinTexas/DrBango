@@ -28896,7 +28896,7 @@ function wrLoad(force){
     if(wrIsOpen()) renderWorldRank();
     return Promise.resolve(WR.data);
   }
-  return netFetch(NET+'/board?device='+META.deviceId).then(r=>r.json()).then(d=>{
+  return netFetch(NET+'/board?device='+META.deviceId+'&n='+WR_N).then(r=>r.json()).then(d=>{   // 0905 THE TOP FIVE HUNDRED: the depth named on the ask (v55 answers the first WR_N of every ladder in the ONE answer; every older client that names none keeps its hundred)
     if(!d||!d.ok) throw new Error('board');
     WR.err=false; WR.t=Date.now();
     WR.data={ board:d.board||[], bf1:d.bf1||[], bf2:d.bf2||[], rat:d.rat||[], squads:d.squads||[], adv:d.adv||[] };   // v2.65: the SQUAD tab rides the same fetch; 0398: ADVENTURE too — an old box serves none and the tab shows its empty face
@@ -40847,7 +40847,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.22';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.23';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -85310,6 +85310,7 @@ const WR_CTA = { bf1:'⚔ PLAY 1v1', bf2:'⚔ PLAY 2v2', adv:'TO THE CAMPAIGN' }
 const WR_REWARD = { rating:'⚔ TAP A COMMANDER · ONCE A DAY · FULL STRENGTH', bf1:'★ WIN = +25★ + XP', bf2:'★ GRAB AN ALLY · +25★ + XP', squad:'FIFTEEN OF YOU. ONE CARPET.' };
 const WR_EMPTY = { rating:'FIGHT A BATTLE TO GET RATED', bf1:'WIN A 1v1 TO GET ON THE BOARD', bf2:'WIN A 2v2 TO GET ON THE BOARD', adv:'BEAT A LEVEL TO GET ON THE BOARD', squad:'WIN A BATTLE WITH YOUR SQUAD TO GET ON THE BOARD' };
 const WR_TITLE = { rating:'LEADERBOARD · RATING', bf1:'LEADERBOARD · 1v1', bf2:'LEADERBOARD · 2v2', adv:'LEADERBOARD · ADVENTURE', squad:'LEADERBOARD · SQUADS' };
+const WR_N=500;   // 0905 THE TOP FIVE HUNDRED (FM-GVT-TOP500-0905; Wyatt 9/5: "extend the number of players you can view on the leaderboard to 500"): THE ONE DIAL — the depth this client asks HQ for (?n=, server v55's BOARD_N) and the number on the ALL n -> door (the tokenised "ALL {0} ->" key: zero new strings); a v54 box ignores the ask and serves its hundred; a ladder shorter than n ends where it ends (2v2 today)
 let WR = { tab:'rating', data:null, err:false, muster:false, mine:null, view:null, free:{}, freeRH:{} };   // 0442: view = the uid of the ADVENTURE row whose boss wall the side column shows (page-lifetime, never persisted); null = MY wall · 0494b: the rename flag is gone — the pencil opens a card, never the hundred · 0604: free = per-tab THE FREE SCROLL latch (page-lifetime), freeRH = the caged flex row height each tab resolved (the keep-your-place ruler)
 // THE RATING's display form: the raw wire int is 0..7000, the player only ever
 // sees the /1000 reading — "4.35". Two decimals everywhere, same as FAVOR.
@@ -85609,9 +85610,10 @@ function chalPosterOpen(uid, name){
   if(!row){
     const rat=wrList('rating').find(r=>r.uid===uid);
     const aw=(DUEL.away||[]).find(a=>a.frm===uid);
-    row={ uid:uid, name:(rat&&rat.name)||(aw&&aw.name)||name||'COMMANDER',
-          rank:(rat&&rat.rank)|0, rating:null, val:(rat&&rat.val)||'', color:(rat&&rat.color)||null };
-    if(rat&&rat.a!=null) row.a=rat.a;   // v27 rat rows carry the D4 bit
+    const raw9=((WR.data&&WR.data.rat)||[]).find(r=>r.uid===uid), gb9=(window.__gvtBoard||[]).find(r=>r.uid===uid);   // 0905 THE TOP FIVE HUNDRED: the WIRE row (wrList's rating map never carried the a bit) + the merged roster (a 1v1 / 2v2 commander the RATING list lacks still gets his name and colour on the poster)
+    row={ uid:uid, name:(rat&&rat.name)||(aw&&aw.name)||(gb9&&gb9.name)||name||'COMMANDER',
+          rank:(rat&&rat.rank)|0, rating:null, val:(rat&&rat.val)||'', color:(rat&&rat.color)||(gb9&&gb9.color)||null };
+    if(raw9&&raw9.a!=null) row.a=raw9.a;   // v27 rat rows carry the D4 bit — 0905 THE TOP FIVE HUNDRED: read off the wire row, so a sleeper's far poster paints its no-army face at once (no /defense fetch spent on a row HQ already says has no army)
     const c9=CHAL.lo[uid];
     if(c9){ row.a=c9.a; row.w=c9.w; row.sb=c9.sb; row.of=c9.of; if(c9.color) row.color=c9.color; }
     else if(row.a!==0){   // 0417: personas dress-fetch like anybody — a:0 is the only sleeper
@@ -85727,7 +85729,7 @@ function renderWorldRank(){
     color:r.color, you:!!r.you, rank:r.rank|0, rating:r.rating, a:r.a, w:r.w, sb:r.sb, of:r.of })) : wrTop(list);
   const riv=todaysRival(), mine=dyeHex()||'#7FA35C';
   const rowH=r=>'<button type="button" class="wr-row'+(r.you?' you':'')+(((tab==='rating'&&CHAL.pos&&CHAL.pos.uid===r.uid)||(tab==='adv'&&!r.you&&!!WR.view&&WR.view===r.uid))?' hot':'')+'"'   // 0442: the viewed ADVENTURE row lights gold, the poster row's own grammar
-        +((tab==='adv')? ' onclick="UI.wrView(\''+(r.uid||'')+'\','+(r.you?1:0)+')"' : (r.you||tab!=='rating')?'':' onclick="UI.wrRow(\''+r.uid+'\')"')+'>'   // 0442: ADVENTURE rows tap to THEIR boss wall (UI.wrView — never the challenge poster); your own row = MY wall back
+        +((tab==='adv')? ' onclick="UI.wrView(\''+(r.uid||'')+'\','+(r.you?1:0)+')"' : (r.you||tab==='squad')?'':' onclick="UI.wrRow(\''+r.uid+'\')"')+'>'   // 0905 THE TOP FIVE HUNDRED (⚑ Q5): a 1v1 / 2v2 row is a door to THE POSTER too (chalPosterOpen hops to RATING, where the poster lives — the face is always honest; chips stay RATING-only, R6); SQUAD rows carry no uid · 0442: ADVENTURE rows tap to THEIR boss wall (UI.wrView — never the challenge poster); your own row = MY wall back
         +'<span class="wr-rk'+(r.rank<=3?' m'+r.rank:'')+'">'+r.rank+'</span>'
         +(tab==='squad'? wrCrowdHTML(r) : '<img src="'+sprURI(wrKind(r), wrHex(r))+'" alt="">')
         +'<span class="wr-nm"><span data-notr>'+escH(tab==='squad'? r.name : wrDress(r.name,r.uid,r.you))+'</span>'+(r.you?' <small>· YOU</small>':'')+'</span>'
@@ -85792,7 +85794,7 @@ function renderWorldRank(){
           return '<button type="button" class="pill2" onclick="UI.duelOpen()">'+tf('⚔ %1 CAME FOR YOUR ARMY','<b>'+chalBadgeN()+'</b>')+(f9? ' · '+tf('%1 FELL','<b>'+f9+'</b>'):'')+'</button>'; })() : '')
         +rec
         +((tab==='rating')? wrBossWallHTML(null, '', false) : '')   // 0494a THE BOSS STRIP: YOUR six faces right under the RATING line — the live renderer (taps + rings exactly as the ADVENTURE tab's; 0561c: a king's face answers with the ship hint here too — the strip never walks)
-        +'<button type="button" class="wr-all" onclick="UI.wrMuster()">ALL 100 →</button>'
+        +'<button type="button" class="wr-all" onclick="UI.wrMuster()">ALL '+WR_N+' →</button>'   // 0905 THE TOP FIVE HUNDRED: the one number, the tokenised "ALL {0} ->" key x7 (zero new strings)
       +'</div>')+'</div>'
     +(WR.muster? wrMusterHTML(list) : '');
   // 0604 THE FREE SCROLL: the place restored on the same tab's repaint, and a caged board arms the ONE gesture door
@@ -85810,8 +85812,8 @@ function renderWorldRank(){
 // ladder read the SAME builder (win = the rating window law: .near lit inside, .far dimmed outside, the chip only
 // inside, ⚑ report on every stranger).
 function wrMRow(r,tab,win,lo9,hi9){
-  return '<div class="wr-mrow'+(r.you?' you':'')+((win&&!r.you)? ((r.rank>=lo9&&r.rank<=hi9)?' near':' far') : '')+((tab==='adv'&&!r.you&&!!WR.view&&WR.view===r.uid)?' hot':'')+'"'   // 0902 THE BOSS WALL GOES 3×3 (§2 D5; Wyatt: "view all players badges, not just the players around you"): on ADVENTURE the viewed commander's dealt / muster row lights gold (the caged row's own .hot grammar)
-      +((tab==='adv')? ' onclick="UI.wrViewM(event,\''+(r.uid||'')+'\','+(r.you?1:0)+')"' : '')+'><span class="rk">'+r.rank+'.</span>'   // 0902 (§2 D5): every dealt row and every ALL 100 → row on ADVENTURE is a door to THEIR wall — the ONE viewer (UI.wrViewM → UI.wrView); RATING's rows stay report-only (the poster is the caged window's), the other tabs untouched
+  return '<div class="wr-mrow'+(r.you?' you':'')+((win&&!r.you)? ((r.rank>=lo9&&r.rank<=hi9)?' near':' far') : '')+(((tab==='adv'&&!r.you&&!!WR.view&&WR.view===r.uid)||(tab==='rating'&&!r.you&&!!CHAL.pos&&CHAL.pos.uid===r.uid))?' hot':'')+'"'   // 0905 THE TOP FIVE HUNDRED (⚑ Q2): on RATING the dealt / muster row whose poster stands lights gold — dimmed .far and chipless as ever outside the window · 0902 THE BOSS WALL GOES 3×3 (§2 D5; Wyatt: "view all players badges, not just the players around you"): on ADVENTURE the viewed commander's dealt / muster row lights gold (the caged row's own .hot grammar)
+      +((tab==='adv')? ' onclick="UI.wrViewM(event,\''+(r.uid||'')+'\','+(r.you?1:0)+')"' : (r.you||tab==='squad'||!r.uid)? '' : ' onclick="UI.wrRowM(event,\''+r.uid+'\')"')+'><span class="rk">'+r.rank+'.</span>'   // 0905 THE TOP FIVE HUNDRED (§2; Wyatt: "click to challenge them, or at least just see their progress and check them out"): every dealt row and every ALL n -> row on RATING, 1v1 and 2v2 is a door to THE POSTER (UI.wrRowM -> UI.wrRow -> chalPosterOpen: the sword inside the window, the OUT OF RANGE face beyond it, the no-army face for a sleeper; the pennant's and the chip's own taps let through); SQUAD rows carry no uid, YOUR row is its own · 0902 (§2 D5): every dealt row and every ALL n -> row on ADVENTURE is a door to THEIR wall — the ONE viewer (UI.wrViewM → UI.wrView)
       +'<span class="dot" style="background:'+(tab==='squad'? ((r.colors&&r.colors[0])||'#7FA35C') : wrHex(r))+'"></span>'
       +'<span class="nm" data-notr>'+escH(tab==='squad'? r.name : wrDress(r.name,r.uid,r.you))+'</span>'+(r.you?'<span class="nm"> · YOU</span>':'')
       +'<span class="tr">'+(tab==='adv'? '' : (r.w+'W · '+r.l+'L'))+'</span>'
@@ -90892,6 +90894,7 @@ window.UI = {
   wrView(uid, you){ audio(); SFX.blip(); WR.muster=false; WR.view=(you||!uid)? null : String(uid); renderWorldRank(); },
   wrViewX(){ SFX.clack(); WR.view=null; renderWorldRank(); },
   wrViewM(ev,uid,you){ if(ev&&ev.target&&ev.target.closest&&ev.target.closest('.rep')) return; UI.wrView(uid,you); },   // 0902 THE BOSS WALL GOES 3×3 (§2 D5): a dealt / muster row's tap on ADVENTURE = THEIR wall in the side column through the ONE viewer (wrView folds the muster first — ⚑ Q6, one grammar); the ⚑ report pennant inside the row keeps its own tap (repWR) — the row never swallows it
+  wrRowM(ev,uid){ if(ev&&ev.target&&ev.target.closest&&ev.target.closest('.rep,.ch2')) return; UI.wrRow(uid); },   // 0905 THE TOP FIVE HUNDRED (§2, ⚑ Q2 / Q5): a dealt / muster row's tap on RATING, 1v1 or 2v2 = THE POSTER through the ONE door (UI.wrRow folds the muster; chalPosterOpen hops to RATING where the poster lives); the ⚑ report pennant and the state chip inside the row keep their own taps — the row never swallows them (wrViewM's grammar)
   chalX(){ SFX.clack(); CHAL.pos=null; renderWorldRank(); },
   chalPty(uid,name){ ptyInvMate(uid,name); setTimeout(()=>{ if(CHAL.pos&&wrIsOpen()) renderWorldRank(); },600); },   // 0411 (C5/R4): live 1v1 = THE PARTY, any range — the button flips to INVITE SENT!
   // ⚔ BATTLE BACK / ⚔ BATTLE THEM BACK — the sheet row and the came-for-you
@@ -93237,7 +93240,7 @@ window.GVT = {
   duelPoll(){ duelTick(); return awayRows().length; },   // 0411: the away rows are the inbox now
   // WORLD RANKINGS test rig: GVT.wr('bf1') opens a tab, GVT.wrState() reads it
   wr(tab){ openWorldRank(); if(tab) UI.wrTab(tab); return WR.tab; },
-  wrState(){ return { open:wrIsOpen(), tab:WR.tab, muster:WR.muster, err:WR.err,
+  wrState(){ return { open:wrIsOpen(), tab:WR.tab, muster:WR.muster, err:WR.err, n:WR_N,   // 0905 THE TOP FIVE HUNDRED: the depth this client asks for
     rows:wrTop(wrList(WR.tab)).map(r=>r.rank+' '+r.name+' '+r.val),
     counts:WR.data? {board:WR.data.board.length,bf1:WR.data.bf1.length,bf2:WR.data.bf2.length,rat:(WR.data.rat||[]).length,adv:(WR.data.adv||[]).length} : null }; },
   // 0398 THE ADVENTURE COUNT rig: the arithmetic cell by cell — n must equal
