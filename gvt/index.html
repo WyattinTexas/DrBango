@@ -3832,6 +3832,7 @@
     animation:waddle 0.48s ease-in-out infinite alternate; }
   /* the wind-up: he rears back over a piece before the swing lands */
   .nemflip.nemwind .nemfig { animation:nemwindk 0.9s ease-in forwards; }
+  .nemflip.nemtwind .nemfig { animation:nemwindk 0.4s ease-in forwards; }   /* 0751 THE NEMESIS TOY RAMPAGES: the toy's quicker wind (NEMT_WIND) on the daily's own keyframes; the reduced-motion kill list already parks .nemfig */
   @keyframes nemwindk { from { transform:rotate(4deg); } 70% { transform:rotate(-19deg) scale(1.07); } to { transform:rotate(-16deg) scale(1.06); } }
   /* the wreck ghost — the toy topples and fades where it stood (roofFall's
      ghost grammar: fresh svg, ids shed, origin inline, JS-gated on reduced
@@ -40817,7 +40818,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.18';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.19';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -72979,7 +72980,7 @@ function ycharFeet(k){ const b=DECOR_SPOTS[k]||NEM_XSPOT[k]; return b.y+b.h+rpXY
 function ycharsSVG(momD, vic){
   const ent=[];
   if(vic && !momD) for(const e of roomVictoryMen()) ent.push(e);
-  for(const k of YCHAR_DECOR){ if(!decorHome(k)) continue;
+  for(const k of YCHAR_DECOR){ if(!decorHome(k)) continue; if(k==='tsnem'&&nemtLive()) continue;   // 0751 THE NEMESIS TOY RAMPAGES: the toy's art leaves the floor while HE walks it (one figure, not two; his tap zone stays and the latch answers it)
     ent.push({ fy:ycharFeet(k), s: k==='elephant'? elephSVG() : k==='robot'? roboSVG()
       : k==='yeti'? yetiToySVG() : k==='dino'? dinoToySVG() : k==='pdino'? petDinoSVG() : k==='whorse'? whorseSVG() : k==='bluedragon'? bdragSVG() : TS_TOYS[k]? tsToySVG(k) : bossToySVG(k) });
   }
@@ -74154,6 +74155,8 @@ function decorReact(id){
   if(id==='pdino' && !META.deggH){ dpEggCrack(); return; }   // 0332: the egg's tap is the HATCH CHAIN — the roar row wakes only once the baby stands
   if(id==='whorse'){ if(WH_RUN) return;   // 0368: solo — the racecar law (a mid-wind or mid-run tap does nothing at all)
     if(whCanRun()){ whGallop(); return; } }   // the wind-up tap is a REAL RUN now; reduced motion / Mom's day fall through to the shipped jitter
+  if(id==='tsnem'){ if(nemtLive()) return;   // 0751 THE NEMESIS TOY RAMPAGES (FM-GVT-NEMESIS-TOY-01): a tap on the placed war toy brings him alive (nemtRun; the whorse idiom: a running toy = the latch, so the 0330a twin tap is harmless); Mom's day and a held toy fall through to the shipped sway (nemtCan); reduced motion RUNS (the falls without the walk)
+    if(nemtCan()){ nemtRun(); return; } }
   if(id==='tsradio') tsRadioCall(d.ms);   // TR-03 THE WALKIE-TALKIE (⚑ Q6): Sarge radios in — the stage class puts every soldier on the floor at the salute; the tap's own SFX + class follow below (one shared noise, never one per man)
   if(d.fx){ bossReact(id,d); return; }   // 0567 THE MODELS COME ALIVE (FM-GVT-MODELS-01): the 21 store models + the two shelf leaders play their own §3 reaction — bossReact owns the SFX, the class flips, the FX-layer beats and the movers; RM / Mom's day fall to the shipped wobble (.wob), the room leaves end the rigs (the ball's rule)
   if(d.solo){ const g=document.getElementById(d.el);
@@ -74797,12 +74800,12 @@ function nemBurst(cx,cy){
   st.appendChild(gh);
   setTimeout(()=>{ try{ gh.remove(); }catch(e){} }, 700);
 }
-function nemSmash(tg){
-  const n=NEM;
+function nemSmash(tg, n9, led9){   // 0751 THE NEMESIS TOY RAMPAGES: the ONE wreck door for both Nemeses. n9 = the walker whose face the fall follows (the daily's NEM when absent); led9 = write the daily's own ledgers (true when absent, so the shipped call reads exactly as it did; the toy passes false: ROOF_GONE / BALL_DOWN through their own doors, NO daily ledger, his win heals only what HE broke)
+  const n=(n9===undefined)? NEM : n9, led=(led9===undefined)? true : !!led9;
   if(tg.kind==='troop'){
     if(BALL_DOWN.has(tg.k)||roofGone(tg.k)||!document.getElementById('ro-'+tg.k)) return false;
     BALL_DOWN.set(tg.k, (n&&n.face<0)? -1 : 1);            // he goes down the way the saber was travelling (render owns the angle)
-    NEM_DOWNS.add(tg.k);
+    if(led) NEM_DOWNS.add(tg.k);
     SFX.thump(); SFX.smash();
     renderMenu();                                           // the rebuild law — the flat render is card 02's own
     nemBurst(tg.cx,tg.cy-14);
@@ -74812,7 +74815,7 @@ function nemSmash(tg){
   const src=document.getElementById('ro-'+tg.k)||(DECOR_REACT[tg.k]? document.getElementById(DECOR_REACT[tg.k].el):null);
   const art=src? src.outerHTML.replace(/ id="/g,' data-gid="') : '';   // the ghost sheds its ids (roofFall's law)
   ROOF_GONE.add(tg.k);                                      // the session law VERBATIM — decorHome goes false, the save untouched
-  NEM_WRECKED.add(tg.k);
+  if(led) NEM_WRECKED.add(tg.k);
   SFX.smash();
   renderMenu();
   const st=document.getElementById('roomStage');
@@ -74916,6 +74919,130 @@ function nemStep(now){
   }
   nemPaint();
   requestAnimationFrame(nemStep);
+}
+// ═══ 0751 THE NEMESIS TOY RAMPAGES (FM-GVT-NEMESIS-TOY-01; the Go Machine's card 9/4 00:45:36; Wyatt 9/4 ~12:30 am ET verbatim: "When the
+// player plays the Nemesis decoration, little does he know, but he is in for a treat; the Nemesis decoration will immediately start attacking
+// and destroying all decorations in the scene, including all of the troops that you have that are standing around the scene. After doing so,
+// the Nemesis then walks off the scene."). A TAP on the placed war toy (tsnem, ARMY DECORATIONS' rung 70) brings him alive: a SECOND walker in
+// v3.21's own grammar (its own state NEMT, its own figure ro-nemt, its own rAF; the daily's NEM byte-still beside it, both may run) at a
+// RAMPAGE pace, born at the toy's own feet, hopping down off the shelf to the floor line, then nearest-first through EVERY floor toy on this
+// floor's placed list (the classics, the ts toys, the store models, the boss toys; the rides, the ball in flight and a drag-held toy per
+// v3.21's own skips; the spacerug is a rug skin whose render never asks ROOF_GONE and the hookshot has no seat, so neither is ever a target;
+// himself never) and every standing man (VTROOPS), each wrecked through nemSmash's ONE door with led=false: ROOF_GONE / BALL_DOWN exactly as
+// shipped (the session laws: the save untouched, a relaunch stands everything back up), NO daily ledger (NEM_WRECKED / NEM_DOWNS are the
+// daily's; his win heals only what HE broke). The swing lands on the target and on every target inside NEMT_R of him (a crowded shelf falls
+// in one blow). When nothing stands he gloats once, walks off the east edge and the toy goes IN THE CHEST through the switch's own one-key
+// removal (his delta kept, the dealt ledger left; take him out again and the treat repeats). Reduced motion: the falls on the same timers,
+// no figure, no walk. Zero new words: the show is the words. Rig: GVT.nemToy() (read-only). ═══
+const NEMT_SPD=132;                    // the rampage stride, room px/s (the daily's NEM_WALK 66 doubled)
+const NEMT_DROP=600;                   // the hop down off the shelf to the floor line, px/s
+const NEMT_FLOOR=430;                  // the floor line he drops to (the daily's own walk-in y); a toy already lower starts where it stands
+const NEMT_WIND=0.4;                   // the wind-up over a piece (the .nemtwind row = the daily's keyframes, quicker)
+const NEMT_GLOAT=0.5;                  // the beat between victims, and the one gloat before he leaves
+const NEMT_R=80;                       // the swing lands on every target inside this reach of him
+const NEMT_EXIT_X=985;                 // off the east edge (the daily's own offstage x)
+let NEMT=null;                         // { live, room, x, y, face, phase, t, tg, px, py, prev, n, t0, t1 } session-only, never saved
+function nemtLive(){ return !!(NEMT&&NEMT.live); }
+function nemtCan(){ return S.mode==='menu' && !momDue() && !nemtLive() && decorHome('tsnem') && !(RDRAG&&RDRAG.k==='tsnem'); }   // Mom's day and a held toy fall through to the shipped sway (the horse's own law)
+function nemtFigSVG(){
+  const n=NEMT; if(!n||!n.live||reducedMotion()) return '';   // reduced motion: no figure, the falls alone
+  const r=nemesisRival();
+  return '<g id="ro-nemt" transform="translate('+n.x.toFixed(1)+','+n.y.toFixed(1)+')">'
+    +'<ellipse cx="0" cy="2" rx="26" ry="5" fill="#000" opacity="0.28"/>'
+    +'<g class="nemflip"'+(n.face<0?' transform="scale(-1,1)"':'')+'>'
+    +'<image class="nemfig" href="'+sargeWepURI('lightsaber',r.hex,NEMESIS_SABER)+'" x="-33" y="-77" width="66" height="77"/>'
+    +'</g></g>';
+}
+function nemtTargets(){
+  const out=[];
+  if(document.querySelector('[id^="ro-vt"]'))               // the men must actually be on stage (the ball's own law)
+    for(const tb of VTROOPS){
+      if(BALL_DOWN.has(tb.k)||roofGone(tb.k)) continue;
+      if(!document.getElementById('ro-'+tb.k)) continue;
+      const d=rpXY(tb.k);
+      out.push({kind:'troop', k:tb.k, cx:tb.x+tb.w/2+d[0], cy:tb.y+tb.h+d[1]-6});
+    }
+  for(const k of rdecList(roomCur())){                     // EVERY floor toy on THIS floor's placed list (the chest's own family test)
+    if(k==='tsnem'||k==='spacerug'||!chestFloorToy(k)) continue;
+    if(rideIs(k)) continue;                                 // a RIDE is never smashed (v3.21's own guard)
+    if(!decorHome(k)) continue;                             // gone is gone
+    if(k==='soccer'&&SOC_FLY) continue;                     // mid-flight the ball isn't at its spot
+    if(RDRAG&&RDRAG.k===k) continue;                        // never the toy in the player's hand
+    const b=DECOR_SPOTS[k]||NEM_XSPOT[k]; if(!b) continue;
+    const d=rpXY(k);
+    out.push({kind:'decor', k:k, cx:b.x+b.w/2+d[0], cy:b.y+b.h+d[1]-4});
+  }
+  return out;
+}
+function nemtRun(){
+  const b=DECOR_SPOTS.tsnem, d=rpXY('tsnem'), fx=b.x+b.w/2+d[0], fy=b.y+b.h+d[1];
+  NEMT={ live:true, room:roomCur(), x:fx, y:fy, face:-1, phase:'drop', t:0, tg:null, px:fx, py:Math.max(fy,NEMT_FLOOR), prev:performance.now(), n:0, t0:performance.now(), t1:0 };
+  SFX.nemarr();                                             // the sting alone (the daily's card, shake and wash are the daily's sentence)
+  renderMenu();                                             // the toy's art leaves the floor, the figure joins the render string (the rebuild law: every wreck repaints)
+  requestAnimationFrame(nemtStep);
+}
+function nemtSwing(){
+  const n=NEMT; if(!n||!n.tg) return 0;
+  const list=nemtTargets(); let k=0;
+  const first=list.find(t=>t.kind===n.tg.kind&&t.k===n.tg.k);
+  if(first&&nemSmash(first,n,false)) k++;
+  for(const t of list){ if(t===first) continue; if(Math.hypot(t.cx-n.x,t.cy-n.y)<=NEMT_R&&nemSmash(t,n,false)) k++; }   // the reach: everything beside the piece falls with it
+  n.n+=k; return k;
+}
+function nemtDone(){
+  const n=NEMT; if(!n) return; n.live=false; n.t1=performance.now();
+  const l=META.rdec&&META.rdec[n.room]; if(l){ const i=l.indexOf('tsnem'); if(i>=0){ l.splice(i,1); saveMeta(); } }   // the switch's own one-key removal: IN THE CHEST, his delta kept, the dealt ledger left (nothing re-deals)
+  SFX.thock();
+  if(S.mode==='menu') renderMenu();
+  shopRefresh(); chestSync();
+}
+function nemtPaint(){
+  const n=NEMT; if(!n) return;
+  const g=document.getElementById('ro-nemt'); if(!g) return;
+  g.setAttribute('transform','translate('+n.x.toFixed(1)+','+n.y.toFixed(1)+')');
+  const fl=g.querySelector('.nemflip');
+  if(fl){ if(n.face<0) fl.setAttribute('transform','scale(-1,1)'); else fl.removeAttribute('transform');
+    const w=n.phase==='wind';
+    if(w!==fl.classList.contains('nemtwind')) fl.classList.toggle('nemtwind',w); }
+  const p=g.parentNode, last=p? p.lastElementChild : null;
+  if(p&&last!==g&&!(last&&last.id==='ro-nem')) p.appendChild(g);   // he stalks in front of the room; the daily's own paint-last law outranks him (two paint-last figures would trade places every frame)
+}
+function nemtStep(now){
+  const n=NEMT; if(!n||!n.live) return;
+  if(S.mode!=='menu'||roomCur()!==n.room||!decOwns('tsnem')){ n.live=false; n.t1=performance.now(); return; }   // the room left him: the show simply ends (the horse's rule); the toy stays where it stood
+  const dt=Math.min(0.05, Math.max(0,(now-n.prev)/1000)); n.prev=now;
+  const rm=reducedMotion();
+  if(n.phase==='drop'||n.phase==='walk'||n.phase==='exit'){
+    let gx=n.px, gy=n.py, go=true;
+    if(n.phase==='walk'){
+      const cur=n.tg? nemtTargets().find(t=>t.kind===n.tg.kind&&t.k===n.tg.k) : null;
+      if(!cur){ n.tg=null; n.phase='pause'; n.t=NEMT_GLOAT; go=false; }   // it left the floor mid-walk: pick again at once
+      else { n.tg=cur; gx=cur.cx+(n.x>=cur.cx?NEM_STAND:-NEM_STAND); gy=cur.cy; }
+    }
+    if(go){
+      const dx=gx-n.x, dy=gy-n.y, d=Math.hypot(dx,dy);
+      const stp=rm? d : Math.min(d,(n.phase==='drop'?NEMT_DROP:NEMT_SPD)*dt);   // reduced motion: no walk, he is simply there
+      if(d<5||stp>=d){ n.x=gx; n.y=gy;
+        if(n.phase==='exit'){ nemtDone(); return; }
+        if(n.phase==='walk'&&n.tg){ n.phase='wind'; n.t=0; n.face=(n.tg.cx>=n.x)?1:-1; }
+        else { n.phase='pause'; n.t=0; } }
+      else { n.x+=dx/d*stp; n.y+=dy/d*stp; if(Math.abs(dx)>2) n.face=dx>=0?1:-1; }
+    }
+  } else if(n.phase==='wind'){
+    n.t+=dt;
+    if(n.t>=NEMT_WIND){ nemtSwing(); n.tg=null; n.phase='pause'; n.t=0; }
+  } else {
+    n.t+=dt;
+    if(n.t>=NEMT_GLOAT){
+      const list=nemtTargets();
+      if(list.length){ let best=null,bd=1e9;
+        for(const t of list){ const dd=Math.hypot(t.cx-n.x,t.cy-n.y); if(dd<bd){bd=dd;best=t;} }
+        n.tg=best; n.phase='walk';
+      } else { n.tg=null; n.phase='exit'; n.px=NEMT_EXIT_X; n.py=n.y; }   // nothing stands: the one gloat is spent, off the east edge
+    }
+  }
+  nemtPaint();
+  requestAnimationFrame(nemtStep);
 }
 // ===== v3.32 TP-01: THE GOLDEN KEY (Wyatt: "a golden key, which doesn't do
 // anything yet but is to intrigue mystery and gets added to your decor list
@@ -75576,6 +75703,7 @@ function roomSVG(){
   +ycharsSVG(momD, (rivDone||nemD))
   +(momD||rivDone||nemD? '' : roomRuckus(riv))
   +(nemD? nemFigSVG() : '')
+  +nemtFigSVG()   // 0751 THE NEMESIS TOY RAMPAGES: the toy's walker joins the render string behind the daily's (the rebuild law: every wreck repaints, and a figure outside the string dies at the first one); empty unless he runs
   // 0335: THE SHIP paints OVER the whole room (it FLIES — the depth belt is
   // for feet, and the ferry crosses everyone's airspace). Same gate, same
   // wrapper ids; the NEM ghost's own appendChild law still outranks it.
@@ -75788,6 +75916,7 @@ function rdragPick(p){
   for(const k of RDRAG_DECOR){
     if(!decorHome(k)) continue;   // v3.06: a fallen toy can't be grabbed again
     if(k==='soccer' && SOC_FLY) continue;   // v3.16: mid-flight the ball isn't at its parked spot to grab
+    if(k==='tsnem' && nemtLive()) continue;   // 0751 THE NEMESIS TOY RAMPAGES: the toy is not at his spot while he rampages (the horse's own law)
     if(k==='whorse' && WH_RUN) continue;   // 0368: mid-gallop the horse isn't at his spot either (the ball's own law); his HOME — the drag's word — never moves
     if(k==='warplane' && PLANE_LAND) continue;   // 0568 D10: a LANDING plane is not a toy (the horse's WH_RUN law) — the grab waits for the wheels
     const b=DECOR_SPOTS[k], d=rpXY(k);
@@ -93752,6 +93881,10 @@ window.GVT = {
     phase:NEM?NEM.phase:null, tgt:(NEM&&NEM.tg)? NEM.tg.kind+':'+NEM.tg.k : null,
     wrecked:Array.from(NEM_WRECKED), downs:Array.from(NEM_DOWNS) }; },
   nemWarp(x,y){ if(!NEM) return false; NEM.x=x; NEM.y=y; NEM.phase='pause'; NEM.t=99; NEM.tg=null; return true; },
+  nemToy(){   // 0751 THE NEMESIS TOY RAMPAGES: the toy's walker, read-only (the state, the roster, the two session ledgers, the daily's own ledgers beside them, the seconds of the last run)
+    const n=NEMT; return { on:nemtLive(), room:n?n.room:null, x:n?+n.x.toFixed(1):null, y:n?+n.y.toFixed(1):null, face:n?n.face:null, phase:n?n.phase:null, tgt:(n&&n.tg)? n.tg.kind+':'+n.tg.k : null, n:n?n.n:0, secs:(n&&n.t1)? +((n.t1-n.t0)/1000).toFixed(2) : null,
+      targets:(S.mode==='menu')? nemtTargets().map(t=>t.kind+':'+t.k) : [], dials:{ spd:NEMT_SPD, drop:NEMT_DROP, floor:NEMT_FLOOR, wind:NEMT_WIND, gloat:NEMT_GLOAT, r:NEMT_R, exit:NEMT_EXIT_X },
+      gone:Array.from(ROOF_GONE), down:Array.from(BALL_DOWN.keys()), nemWrecked:Array.from(NEM_WRECKED), nemDowns:Array.from(NEM_DOWNS), placed:rdecList(roomCur()).indexOf('tsnem')>=0, fig:!!document.getElementById('ro-nemt'), art:!!document.getElementById('ro-tsnem'), daily:!!(NEM&&NEM.live) }; },
   nemesis(){ const n=META.nemesis||{};
     return { w:n.w|0, l:n.l|0, st:n.st|0, eff:+nemEff().toFixed(2), due:nemesisDue(),
       trigger:NEMESIS_TRIGGER, days:NEMESIS_DAYS.slice(), counter:(NEM_COUNTER[META.dyeOn]||'red'),
