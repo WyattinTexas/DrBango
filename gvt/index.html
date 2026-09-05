@@ -26251,6 +26251,7 @@ function dogOn(u){
 function unitSkin(k,u){
   if(k==='rifleman' && bakOn(u)) k='riflemanbaker';   // 0481 THE BAKER RIFLE in his hands (D7)
   if(dogOn(u) && DOG_OF[k]) k=DOG_OF[k];               // 0543 DOG GLASSES: the whole army, by size class (the Baker's dog is the infantry dog)
+  if(dgCrawl(k)) k='tanmg';   // 0770 THE CRAWLER CARRIES A GUN: the crawler's corpse (the ghost, the hop, the drag) lies as the gunner he was
   if(k==='mortar' && enhU(u,'cannon')) k='mortarcannon';   // 0571 THE CANNON: the fitted tube wears its own mold (the sim's own predicate — the man, his corpse, his ghost, the hop and the drag inherit; after the dog line, so the glasses still win)
   return k;
 }
@@ -27010,7 +27011,7 @@ function sargeOfU(u,id){
 function hatSoakM(u,src){
   if(!src || !u || u.type!=='sarge') return 1;
   const st=src.type, a=srcArm(src);
-  if(sargeOfU(u,'advhat') && (st==='tanrifle'||st==='tanmg'||st==='rifleman'||st==='mgunner'||a==='lightsaber')) return OF_ADVHAT_X;
+  if(sargeOfU(u,'advhat') && (st==='tanrifle'||st==='tanmg'||dgCrawl(st)||st==='rifleman'||st==='mgunner'||a==='lightsaber')) return OF_ADVHAT_X;
   if(sargeOfU(u,'furryhat') && (st==='tanmortar'||st==='mortar'||st==='tansniper'||st==='wsniper'||st==='larson'||a==='sniper')) return OF_FURHAT_X;   // 0594: COMMANDER LARSON's long rifle is a sniper's (THE LAST SHOT's 6 pips halve under the fur too)
   return 1;
 }
@@ -33924,11 +33925,16 @@ const FDEF = {
 // seats (dgMg), the counter table's target list (mgCtr), the river funnel (the exemption gated off), the rifleman's discount retired.
 // The crescendo sort weighs a crawler group at DG_SORT_HP (his one-hp weight on HEAD) so every rung's wave ORDER is byte-still (⚑).
 // DG_ON=false = HEAD verbatim (proven byte-equal by trace).
+// ═══ 0770 THE CRAWLER CARRIES A GUN (FM-GVT-CRAWLER-MG-01, the re-land of 0745; Wyatt 9/3 ~9:55 pm ET: "He needs to be replaced with a Tan machine gun.
+// Currently the crawler isnt doing anything, just walking forward. he needs to function as the machine gun unit. Formidable. Firing at range. Looking
+// like the machine gun unit. Currently its missing its gun."): 0716's Q1 (the prone crawling mold kept) is OVERRULED — the tanmg's picture at every
+// rug lookup (dgKey: foeImg / foeImgF / unitSkin), his draw width (DG_MG + 'w'), the MG's walk-on clock (SHOT_SEED), the hat and the spy seats.
 const DG_ON=true,                                          // the kill switch
-      DG_MG=['hp','spd','rng','fireCd','burst'],           // the tanmg cells the crawler's row reads (⚑ Q2: the fight's cells — hp, the pace, the reach, the rate, the burst; his BOUNTY stays his own 4: twenty-seven MG seats at the tanmg's 8 on L5 were a purse faucet for a rifle spammer, measured)
+      DG_MG=['hp','spd','rng','fireCd','burst','w'],           // the tanmg cells the crawler's row reads (⚑ Q2: the fight's cells — hp, the pace, the reach, the rate, the burst; his BOUNTY stays his own 4: twenty-seven MG seats at the tanmg's 8 on L5 were a purse faucet for a rifle spammer, measured)
       DG_SORT_HP=1;                                        // ⚑ the crescendo sort's weight for a crawler body (HEAD's hp 1: the wave order of every rung byte-still)
 function dgCrawl(t){ return DG_ON && t==='crawler'; }       // the crawler under the new law
 function dgMg(f){ return f.type==='tanmg' || dgCrawl(f.type); }   // a tan machine gunner: the row's own, or the crawler
+function dgKey(k){ return dgCrawl(k)? 'tanmg' : k; }   // 0770 THE CRAWLER CARRIES A GUN: the crawler's PICTURE is the tanmg's — one key at the three image lookups (foeImg / foeImgF / unitSkin); the room's toys and the rival card read sprURI = SPRITES_SRC and keep the prone mold (⚑ C-Q2)
 if(DG_ON){ for(const k of DG_MG) FDEF.crawler[k]=FDEF.tanmg[k]; }   // the crawler's row = the tanmg's numbers (the read happens once, at load, before any spawn)
 // ===== 0554c TEDDY PARK — THE BEARS BITE (design/feedback-0825-pm/00-FEEDBACK.md §6 · card E; Wyatt 8/25: "They're just too
 // weak right now. The campaigns are too easy. … the bears need to rush charging and then when they're in range they stop and
@@ -40799,7 +40805,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.15';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.16';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -50026,11 +50032,11 @@ function counterDmg(tgt,dmg,src){
   // classes, both carpets (the SPY_VS const carries the whole roster note)
   if(src && src.type==='spy'){
     const spw=(tgt.type==='sarge')? unitSargeStats(tgt).w : null;
-    if(tgt.type==='mgunner'||tgt.type==='tanmg'||tgt.type==='bazooka'||tgt.type==='tanbazooka'
+    if(tgt.type==='mgunner'||tgt.type==='tanmg'||dgCrawl(tgt.type)||tgt.type==='bazooka'||tgt.type==='tanbazooka'
      ||tgt.type==='mortar'||tgt.type==='tanmortar'||tgt.type==='tansniper'||tgt.type==='tansarge'
      ||spw==='sniper'||spw==='lightsaber') dmg*=SPY_VS;
     // v2.61: the extra lean — the MG class and the drawn blade only
-    if(tgt.type==='mgunner'||tgt.type==='tanmg'||tgt.type==='tansarge'||spw==='lightsaber') dmg*=SPY_VS2;
+    if(tgt.type==='mgunner'||tgt.type==='tanmg'||dgCrawl(tgt.type)||tgt.type==='tansarge'||spw==='lightsaber') dmg*=SPY_VS2;
   }
   // v2.36 THE PURPLE BEAM: +2% into the enemy Sarge HIMSELF — the campaign's
   // tansarge boss, or any battlefield Sarge across the line (a bullet only
@@ -59323,6 +59329,7 @@ const SHOT_SEED={ officer:3, tanrifle:2.4, tanmg:1.8, tansniper:3.4, tanpistol2:
                   tanshotgun:1.8, tanflame:1.4, tanbazooka:3, tanmortar:3.5, tank:6, tankv2:6,
                   stego:2.2, dilo:1.0, wbandit:2.4, wsniper:3.4, wteddy:1.2,
                   wladyx:3.4, bbill:1.2, mcath:2.0, bbillx:1.2, mcathx:2.0 };   // 0500: the park twins walk on as charged as the road's (bbillx 1.2 of 4.0 · mcathx 2.0 of 4.5)   // 0478: the road ladies walk on like the sniper (3.4 of 4.5); Bill's first fan waits most of his drum, Cathrine's first round too — a boss never shoots in a wave's first breath   // 0339: the outlaws walk on part-charged like their tan cousins (wmouse charges from the decloak, wrider/wsnake own their clocks)   // v2.53: the tank walks on three-quarters charged — first shell ~2s after a green is in reach (0278b: the stego + dilo walk on part-charged too — "he opens first" needs the first rock/jet prompt)
+if(DG_ON) SHOT_SEED.crawler=SHOT_SEED.tanmg;   // 0770 THE CRAWLER CARRIES A GUN: he walks on with the MG's clock — a crawler born inside reach (a ripple over the rim, a dust pop) fires when a tanmg would (0716 Q9 ruled by "function as the machine gun unit")
 // v2.53 (Wyatt 8/5): the campaign tank's gun — reach just under the
 // rifleman's 198, and the shell is AREA fire (everyone in the circle goes
 // over). Both consts are the whole dial.
@@ -59431,7 +59438,7 @@ function buildFoeRim(hex){
 // his rimmed twin (factory foes bake TAN at load, so the default bucket is
 // keyed TAN); tint → IMG fallbacks stay verbatim — one frame of the plain
 // sprite while a rim decodes is the shipped v1.27 law.
-function foeImg(k){
+function foeImg(k){ k=dgKey(k);   // 0770 THE CRAWLER CARRIES A GUN: a crawler draws the tanmg's row of every bucket (plain, the rival's tint, the snow rim)
   const hex = (S.rival&&S.rival.hex) || (S.park&&S.park.hex) || foeSkinHex();   // v3.33: the park finale's NEMESIS act marches in THE RED ARMY's molds (fixed — identical on every sim; the yeti cast has no tint rows and stays factory)
   if(hex&&!IMGT[hex]) buildFoeTint(hex);   // lazy: every door into a foe draw self-heals
   if(lightField()){   // 0303: pale grounds rim — snow or deck
@@ -59444,7 +59451,7 @@ function foeImg(k){
 // 0522 GREEN VS TAN: the per-FOE image — THE NEMESIS wears his own counter dye
 // (f.nemHex, the tint bucket buildFoeTint filled at his spawn); every other
 // foe answers foeImg exactly as before (the falls through keep the rim law).
-function foeImgF(f){ return (f.nemHex && IMGT[f.nemHex] && IMGT[f.nemHex][f.type]) || foeImg(f.type); }
+function foeImgF(f){ return (f.nemHex && IMGT[f.nemHex] && IMGT[f.nemHex][dgKey(f.type)]) || foeImg(f.type); }
 // DYE KITS: your whole army repainted in a rival's color (shop, DYE_BASE★ a jar and climbing PAINT_ESCALATOR a jar owned — 0563 THE ATLAS SWEEPS)
 const IMGU={};
 const GREEN_UNITS=['rifleman','mgunner','bazooka','mortar','sarge','minesweeper','flame','radioman','medic','commando','spy','bfjeep','bftank','jeep2','tank2','riflemanbaker','mortarcannon','dogsmall','dogcrew','dogbig'];   // 0571: the fitted cannon dyes and rims with the army (the Baker's law)   // 0481: the Baker rifleman dyes and rims with the army (unitImg swaps the key on enhU; miss this list and a dyed army's Baker men paint factory green)   // 0365: the medic dyes and rims with the army (unitImg's seat tints ride this list too)   // 0278e: the V2 dyes and rims with the army   // v2.42: the spy dyes and rims with the rest of the army
@@ -71742,7 +71749,7 @@ function warplaneArt(){
 }
 const PLANE_VB='-60 -31 116 64';
 function warplaneSVG(){
-  return '<g id="ro-warplane"'+rpT('warplane')+'><g class="dec dec-plane" id="decPlane" transform="translate('+WP_SEAT[0]+','+WP_SEAT[1]+') scale(0.78) rotate(-4)">'+warplaneArt()+'</g></g>';   // 0904: the seat is WP_SEAT (the window sill)   // 0824-LATE III: draggable (the 0315 grammar — delta on the wrapper, the prop strain on the inner group)
+  return '<g id="ro-warplane"'+rpT('warplane')+'><g class="dec dec-plane" id="decPlane" transform="translate('+wpSeat()[0]+','+wpSeat()[1]+') scale(0.78) rotate(-4)">'+warplaneArt()+'</g></g>';   // 0904: the seat is WP_SEAT (the window sill)   // 0824-LATE III: draggable (the 0315 grammar — delta on the wrapper, the prop strain on the inner group)
 }
 // THE TEDDY BEAR (v1.76; redrawn by 0904 THE PLUSH PASS, see teddyArt) — a honey-brown plush sat on the floorboards at the
 // foot of the bed, paws out, wearing the army's own green bow. Banana-family
@@ -73700,7 +73707,7 @@ const DECOR_SPOTS={
   // is under the HUD bar (room y<~47 hides behind it, measured). Both
   // surveyed by screenshot, not rectangle math (the v1.71 law).
   helmet:   { x:620, y:46,  w:80,  h:64 },   // 0341: nudged east — the big yeti takes the north-center pocket
-  warplane: { x:748, y:104, w:96,  h:68 },   // 0904 THE LOOP ROW: THE TOY WARPLANE parks ON the window sill (the art seat WP_SEAT 796,136 at 0.78 → ink ~749..840 × 116..166); every floor; still a GLOBAL ride, still draggable, tap = the ferry (0568)
+  warplane: { get x(){ return 748+wpDX(); }, y:104, w:96,  h:68 },   // 0770 THE WESTERN PLANE RIDER: x rides the floor's nudge live (a getter: decorSpots, rdragClamp and every reader see the moved pad; nothing writes this row)   // 0904 THE LOOP ROW: THE TOY WARPLANE parks ON the window sill (the art seat WP_SEAT 796,136 at 0.78 → ink ~749..840 × 116..166); every floor; still a GLOBAL ride, still draggable, tap = the ferry (0568)
   // 0824-LATE III THE WHOLE FLOOR DRAGS (Wyatt 8/24 late: "allow all decor to be draggable around, except for the
   // rugs … the plane, the keys, the pufferfish"): the keys' grab rects = their pegs on the rack (gold 736 · silver 760
   // · bronze 784 at scale 0.56 → ~21 px of ink each, 24 apart; ink centres ≈ 770 / 794 / 818), the rack's full height
@@ -75055,6 +75062,9 @@ function patrolSVG(){
 const LR_TILE=[{x:60,y:392},{x:345,y:392},{x:630,y:392}], LR_TILE_W=270, LR_TILE_H=186;   // ⚑ the three seats on the rug (the wireframe Wyatt approved)
 const PIG_SEAT={ x:162, y:28, s:0.6 };                                                  // ⚑ the bank piggy's seat on the shelf (the pair's 74..222 × 112..220 → 206..295 × 95..160)
 const WP_SEAT=[796,136];                                                                // ⚑ THE TOY WARPLANE's art seat = the window sill (DECOR_SPOTS.warplane 748,104 rides it; the flight layer reads it too)
+const WP_SEAT_DX={ western:-15 };                                                       // 0770 THE WESTERN PLANE RIDER (Wyatt 9/5 ~9:15 am ET: "slide the airplane that's in Western World slightly to the left. I'd say about 15 pixels. Currently, it's a little too close to Outlaw Town. This is the only plane location we want to slide"): a per-floor x nudge in room px — his 15: the plane's visible ink (754..835.5 at rest) ends 3.5 px short of OUTLAW TOWN's rect (824) where it overlapped by 11.5 (⚑ Q1); every other floor 0
+function wpDX(){ try{ return WP_SEAT_DX[roomCur()]||0; }catch(e){ return 0; } }         // the nudge for the floor under the player (0 before META lives)
+function wpSeat(){ return [WP_SEAT[0]+wpDX(), WP_SEAT[1]]; }                             // THE ONE READER of the plane's seat: the art (warplaneSVG), the flight layer (both legs) and the tap/drag rect ride it — never META.roomPosR (the player's own drag delta)
 function pigPt(x,y){ return [PIG_SEAT.x+x*PIG_SEAT.s, PIG_SEAT.y+y*PIG_SEAT.s]; }   // a point of the piggy's old frame (the pig at translate(96,120), scale 1) on the shelf — the floats, the stars and the puffs ride it
 function warTableArt(){ return ''
   +'<ellipse cx="76" cy="106" rx="80" ry="8" fill="#000" opacity="0.22"/>'
@@ -77857,7 +77867,7 @@ function wpFly(kind){
   const st=document.getElementById('roomStage'), p=document.getElementById('decPlane'); if(!st || !p) return null;
   const svg=st.querySelector('svg'), d=rpXY('warplane');
   const f=document.createElement('div'); f.id='wpfly'; f.className=kind+((kind==='travel' && PLANE_LOOP)? ' loop' : '');
-  f.innerHTML='<div class="wps" style="transform:translate('+(WP_SEAT[0]+d[0])+'px,'+(WP_SEAT[1]+d[1])+'px) scale(0.78) rotate(-4deg)"><div class="wpa"><svg viewBox="'+PLANE_VB+'" xmlns="http://www.w3.org/2000/svg">'+warplaneArt()+'</svg></div></div>';
+  f.innerHTML='<div class="wps" style="transform:translate('+(wpSeat()[0]+d[0])+'px,'+(wpSeat()[1]+d[1])+'px) scale(0.78) rotate(-4deg)"><div class="wpa"><svg viewBox="'+PLANE_VB+'" xmlns="http://www.w3.org/2000/svg">'+warplaneArt()+'</svg></div></div>';
   if(svg && svg.parentNode===st) svg.insertAdjacentElement('afterend', f); else st.appendChild(f);
   return f;
 }
@@ -92921,6 +92931,11 @@ window.GVT = {
       raidCap:{ ice:ptyRaidCap('ice'), bone:ptyRaidCap('bone'), croak:ptyRaidCap('croak'), fields:ptyRaidCap('fields') },
       keys:{ ice:raidDoorKey('ice'), bone:raidDoorKey('bone'), croak:raidDoorKey('croak'), fields:raidDoorKey('fields') }, parks:{ yeti:parkDoorOpen('yeti'), dino:parkDoorOpen('dino'), western:parkDoorOpen('western'), teddy:parkDoorOpen('teddy') },
       newPlc:PTY.newPlc||null, wire:ptyPkWire() }; },
+  crawlermg(){   // 0770 THE CRAWLER CARRIES A GUN — the rig's one read (read-only): the picture key, the row beside the tanmg's, the walk-on clocks, the live crawlers' rooted / aiming counts and width, the plane's seat on this floor
+    const row=k=>JSON.parse(JSON.stringify(FDEF[k])); const cr=S.foes.filter(f=>f.type==='crawler'&&!f.dead); let skin=null; try{ skin=unitSkin('crawler', cr[0]||{ type:'crawler', side:'foe' }); }catch(e){ skin='ERR '+e.message; }
+    return { cv:GVT_CV, on:DG_ON, cells:DG_MG, key:dgKey('crawler'), sameImg:foeImg('crawler')===foeImg('tanmg'), plainKept:IMG.crawler!==IMG.tanmg, skin, row:row('crawler'), mg:row('tanmg'), seed:{ crawler:SHOT_SEED.crawler, tanmg:SHOT_SEED.tanmg },
+      live:{ n:cr.length, rooted:cr.filter(f=>f.mgRootT>0).length, aiming:cr.filter(f=>f.aimT>0).length, w:cr.length? cr[0].def.w : null },
+      plane:{ room:roomCur(), dx:wpDX(), seat:wpSeat(), rect:{ x:DECOR_SPOTS.warplane.x, y:DECOR_SPOTS.warplane.y, w:DECOR_SPOTS.warplane.w, h:DECOR_SPOTS.warplane.h } } }; },
   digger(){   // 0722 THE DIGGER IS GONE — the rig's one read (read-only): the dials, the crawler's live row beside the tanmg's, the live crawlers' mover state, the exemptions ruled, the rig's own burrow-frame tape
     const row=k=>JSON.parse(JSON.stringify(FDEF[k])); const cr=S.foes.filter(f=>f.type==='crawler'&&!f.dead);
     return { cv:GVT_CV, on:DG_ON, cells:DG_MG, sortHp:DG_SORT_HP, row:row('crawler'), mg:row('tanmg'), ctr:{ bazooka:mgCtr('bazooka','crawler'), mortar:mgCtr('mortar','crawler'), flame:mgCtr('flame','crawler'), snowfig:mgCtr('snowfig','crawler'), rifleman:mgCtr('rifleman','crawler') },
