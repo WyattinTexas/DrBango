@@ -4431,7 +4431,7 @@
      under reduced motion the invaders STAND still, your victory men stand,
      the door light holds steady, and the blocks still swap colors on tap
      (the transition above) but nothing hops. */
-  @media (prefers-reduced-motion: reduce){ .rwA,.rwB,.rwC,.ptfig,.ptbob,.ptface,.ptdrop,.ptsway,.ptshadow,.rivfig,.rivflagc,.vicfig,.nemfig,.nemann-card,.acv,.acvh,.acvw,.acvt,#tblocks.react .tb0,#tblocks.react .tb1,#tblocks.react .tb2 { animation:none; } }
+  @media (prefers-reduced-motion: reduce){ .rwA,.rwB,.rwC,.ptfig,.ptbob,.ptface,.ptdrop,.ptsway,.ptshadow,.nwswT,.nwswS,.nwcdT,.nwcdF,.nwcdB,.nwcdH,.nwcdW,.rivfig,.rivflagc,.vicfig,.nemfig,.nemann-card,.acv,.acvh,.acvw,.acvt,#tblocks.react .tb0,#tblocks.react .tb1,#tblocks.react .tb2 { animation:none; } }
   /* THE GIANT BANANA — leans in the corner, wobbles on its base when you poke it */
   .nanaw { transform-box:fill-box; transform-origin:38% 98%; animation:nanasway 5.6s ease-in-out infinite alternate; }
   @keyframes nanasway { from { transform:rotate(-1.1deg); } to { transform:rotate(1.5deg); } }
@@ -29435,6 +29435,18 @@ function medicSeat(L){ const ri=L.indexOf('radioman'); if(ri>=0) return ri+1;
   return L.length; }
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function dayBack(n){ const d=new Date(Date.now()-n*864e5); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+// ═══ 0904 THE ROOM NOTES, PART TWO (FM-GVT-ROOM-NOTES-02; design/room-notes-two-0904/00-NIGHT.md; jumpr 0756w; Wyatt 9/4 4:25 pm: "At the
+// player's local time, when it's 6:30 pm, please add a moon and a dark sky" · "when it is nighttime again (6:30 local time for the player) …
+// a little nightlight that switches on in the kid's room") — THE NIGHT PREDICATE: night = 18:30 ≤ the DEVICE's local time < 06:30 on
+// new Date() (todayStr's own clock, the piggy's day — never evNow() / EV_TZ, the sieges' Eastern bells: every displayed time stays the
+// player's own zone). Read at every room paint (roomSVG stamps the verdict on the bedroom's svg as data-rn), re-checked once a minute
+// while the room is open (NW_TICK) and on every return to the tab (takeOut → roomNightSync). No save field, no server byte, no string.
+// The preview pin: ?night=1 / ?night=0 on the URL (dev-only, read once at boot; nbGo drops it like every key but lang) or GVT.night(v)
+// from the console — null = the clock. Bedroom only (the park floors keep their own skies). ⚑ Q1 the end hour (06:30; Wyatt may prefer 7). ═══
+const NW_NIGHT=[18*60+30, 6*60+30];   // ⚑ Q1 [from, to] in minutes of the device's day: 18:30 → 06:30
+let NW_PIN=null;                       // the preview pin: 1 · 0 · null = the clock
+try{ const m9=location.search.match(/[?&]night=([01])/); if(m9) NW_PIN=+m9[1]; }catch(e){}
+function roomNight(){ if(NW_PIN!==null) return !!NW_PIN; const d=new Date(), m=d.getHours()*60+d.getMinutes(); return m>=NW_NIGHT[0] || m<NW_NIGHT[1]; }
 
 // ================= THE PIGGY BANK =================
 // It starts pink. Every day you beat the invaders of the day, it survives; five
@@ -40484,7 +40496,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.00';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.01';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -43593,7 +43605,7 @@ function bdTitleAlpha(){
 let PUTAWAY={ hidden:0, t0:0, n:0, why:'' };
 let BD_AWAY_LOG=[];   // the rig's ledger of the words this page sent {on, why, t} — runtime, never saved
 function putAway(why){ if(PUTAWAY.hidden) return false; PUTAWAY.hidden=1; PUTAWAY.t0=Date.now(); PUTAWAY.n++; PUTAWAY.why=String(why||''); qtHold(why); bdAwayWord(1, why); return true; }   // 0719: the sound hold + the frozen fight ride this one seam (qtHold, the AUDIO block)
-function takeOut(why){ if(!PUTAWAY.hidden) return false; PUTAWAY.hidden=0; PUTAWAY.why=''; qtRelease(why); bdAwayWord(0, why); return true; }   // 0719: ...and come back through it (qtRelease)
+function takeOut(why){ if(!PUTAWAY.hidden) return false; PUTAWAY.hidden=0; PUTAWAY.why=''; qtRelease(why); bdAwayWord(0, why); try{ roomNightSync(); }catch(e){} return true; }   // 0719: ...and come back through it (qtRelease) · 0904 PART TWO: the room re-reads the night on the return (the one hook — foregrounding repainted nothing before)
 function bdInRoom(){ return !!(COOP && COOP.code && COOP.plc==='bd' && S.bf && S.bf.bd && S.mode==='play'); }   // a desert chair, hold or battle
 function bdInShell(){ try{ return !!((window.webkit&&webkit.messageHandlers)||/GVTShell|; wv\)/.test(navigator.userAgent)); }catch(e){ return false; } }   // the iOS bridge · the Android WebView's UA
 function bdAwayOnHide(ev){ return bdInRoom() && (bdInShell() || !!(ev&&ev.persisted)); }   // a pagehide that is a PUT-AWAY (a shell page never navigates; a bfcache trip comes back) — a browser's unload keeps the 0292 LEAVE farewell = CLOSED
@@ -74473,15 +74485,127 @@ function caseArt(achDone){ return ''
   +medal(52, achDone>=20, '#CFCFCF', '#4A6B8A')
   +medal(77, achDone>=40,'#C08A4A', '#4A6B35')
   +'<path d="M9 59 L46 13 L62 13 L25 59 z" fill="#fff" opacity="0.06"/>'; }
-// THE WINDOW (the bedroom's): top-right on the wall, a sill at its foot for the plane — art, never a door
-function windowSVG(){
+// ═══ 0904 THE ROOM NOTES, PART TWO (FM-GVT-ROOM-NOTES-02; design/room-notes-two-0904/00-NIGHT.md; jumpr 0756w; Wyatt 9/4 4:25 pm: "Add a bird
+// occasionally flying by the window. Let's go with the basic swallow and use the shapes store for the basic shapes. I think a red cardinal
+// would be great to fly by, maybe land on the sill for a second, look around, and then fly off. At the player's local time, when it's 6:30
+// pm, please add a moon and a dark sky … some curtains … just pulled to either side, not blocking much of the window at all … Brown, green.
+// Maybe green, like a light green" · "a little nightlight that switches on in the kid's room … the lighting, will change slightly at night")
+// — THE WINDOW COMES ALIVE. THE BIRDS are two SHAPE STORE works (design/room-notes-two-0904/shapestore/works-wn.mjs: the app's own parts on
+// its 140 board, rendered THROUGH the app; works.json's code strings ARE these bytes, the importable JSON beside them — never 0761's sheet
+// grammar): the swallow's seven pieces in one string, the cardinal's sixteen split at the piece seams into BODY · WING · HEAD so the wing
+// beats and the head turns on their own wrappers (the 0592 grammar). The swallow flies EAST; the cardinal perches facing WEST. ═══
+const NW_SWALLOW='<g transform="translate(37 65) rotate(-21) scale(0.42 0.42)"><g transform="translate(0 0)"><path d="M-12 -14 L10 12" fill="none" stroke-width="11" stroke-linecap="round" stroke="#2B3138"/></g></g><g transform="translate(37 80) rotate(-84) scale(0.42 0.42)"><g transform="translate(0 0)"><path d="M-12 -14 L10 12" fill="none" stroke-width="11" stroke-linecap="round" stroke="#2B3138"/></g></g><g transform="translate(60 82) rotate(-135) scale(0.85 0.85)"><g transform="translate(0 0)"><path d="M-11 12 L0 -16 L11 12 z" fill="#2B3138"/></g></g><g transform="translate(66 72) rotate(-8) scale(1 1)"><g transform="translate(0 0)"><ellipse rx="22" ry="14" fill="#2B3138"/></g></g><g transform="translate(57 58) rotate(-50) scale(1.15 1.15)"><g transform="translate(0 0)"><path d="M-11 12 L0 -16 L11 12 z" fill="#2B3138"/></g></g><g transform="translate(92 65) rotate(0) scale(0.42 0.42)"><g transform="translate(0 0)"><circle r="20" fill="#2B3138"/></g></g><g transform="translate(102 65) rotate(90) scale(0.22 0.22)"><g transform="translate(0 0)"><path d="M-11 12 L0 -16 L11 12 z" fill="#2B3138"/></g></g>';
+const NW_CARDINAL_BODY='<g transform="translate(63 110) rotate(-139.8) scale(0.24 0.24)"><g transform="translate(0 0)"><path d="M-12 -14 L10 12" fill="none" stroke-width="11" stroke-linecap="round" stroke="#54606C"/></g></g><g transform="translate(73 112) rotate(-139.8) scale(0.24 0.24)"><g transform="translate(0 0)"><path d="M-12 -14 L10 12" fill="none" stroke-width="11" stroke-linecap="round" stroke="#54606C"/></g></g><g transform="translate(60 117) rotate(-49.8) scale(0.22 0.22)"><g transform="translate(0 0)"><path d="M-12 -14 L10 12" fill="none" stroke-width="11" stroke-linecap="round" stroke="#54606C"/></g></g><g transform="translate(70 119) rotate(-49.8) scale(0.22 0.22)"><g transform="translate(0 0)"><path d="M-12 -14 L10 12" fill="none" stroke-width="11" stroke-linecap="round" stroke="#54606C"/></g></g><g transform="translate(99 102) rotate(-32) scale(0.46 0.46)"><g transform="translate(0 0)"><rect x="-18" y="-14" width="36" height="28" rx="7" fill="#8A2F26"/></g></g><g transform="translate(70 92) rotate(-28) scale(1.05 1.05)"><g transform="translate(0 0)"><ellipse rx="22" ry="14" fill="#C0473A"/></g></g><g transform="translate(64 100) rotate(-28) scale(0.6 0.6)"><g transform="translate(0 0)"><ellipse rx="22" ry="14" fill="#D96B4A"/></g></g>';
+const NW_CARDINAL_WING='<g transform="translate(74 82) rotate(58) scale(0.85 0.85)"><g transform="translate(0 0)"><path d="M-18 14 Q-6 -18 22 -16 Q8 -6 2 14 z" fill="#8A2F26"/></g></g>';
+const NW_CARDINAL_HEAD='<g transform="translate(46 72) rotate(0) scale(0.5 0.5)"><g transform="translate(0 0)"><circle r="20" fill="#C0473A"/></g></g><g transform="translate(48 57) rotate(22) scale(0.45 0.45)"><g transform="translate(0 0)"><path d="M-11 12 L0 -16 L11 12 z" fill="#C0473A"/></g></g><g transform="translate(55 61) rotate(44) scale(0.34 0.34)"><g transform="translate(0 0)"><path d="M-11 12 L0 -16 L11 12 z" fill="#C0473A"/></g></g><g transform="translate(37 75) rotate(0) scale(0.22 0.22)"><g transform="translate(0 0)"><circle r="20" fill="#1a1208"/></g></g><g transform="translate(41 80) rotate(0) scale(0.16 0.16)"><g transform="translate(0 0)"><circle r="20" fill="#1a1208"/></g></g><g transform="translate(30 73) rotate(-90) scale(0.28 0.28)"><g transform="translate(0 0)"><path d="M-18 14 L0 -18 L18 14 z" fill="#E0A05C"/></g></g><g transform="translate(41 69) rotate(0) scale(0.09 0.09)"><g transform="translate(0 0)"><circle r="20" fill="#FFFFFF"/></g></g><g transform="translate(40.5 69) rotate(0) scale(0.05 0.05)"><g transform="translate(0 0)"><circle r="20" fill="#1a1208"/></g></g>';
+const NW_SKY='#26304E', NW_SKY_HI='#1E2643';   // ⚑ the night pane + its darker top band (the ROOMS postcard's #2E3A5C family, deepened so the plane's olive edge stays legible over it)
+const NW_LAMP=[711,144];                      // ⚑ Q8 THE NIGHTLIGHT's seat: the wall pocket above the shelf's east end, west of the curtain (00-NIGHT.md §1 — the card's 712..736 × 112..150 collides with its own curtain panel and two default toy seats)
+const NW_WASH={ hex:'#2A3450', a:0.15 };      // ⚑ Q9 THE WASH: ONE cool navy-grey over the ground, the rug and the window, under everything that stands (a 0–20% dial)
+// THE CURTAINS (⚑ Q5 beside the frame · Q6 the rod + the tie-backs in brown): two tied-back panels ON THE WALL beside the frame's outer
+// edges (the left 722..742 — over the frame's 736.5 by 5.5 px, never the glass at 743.5, clear of x≥749 where the plane's ink begins; the
+// right mirrored about the window's centre 815), hung from a thin brown rod at y 53 (under the head band's 46) to the sill line 161,
+// gathered to a waist at 108 by a brown tie-back; pale SAGE cloth with a darker sage stroke for the outline and three fold lines (apart
+// from dyeHex()'s greens and the sky's #BFE3FF). STATIC; the same by night (only the wash touches them); inside #ro-window so they
+// follow the window; painted after the sky / the birds / the frame, before the sill; the plane (decorSVG) stays on top.
+function curtainsSVG(){
+  const cloth='#C5D5B0', fold='#A3B88E', rod='#8a683e', tie='#6e5130';
+  const panel=m=>{ const X=x=>m? (1630-x) : x;   // the right panel mirrors the left about x 815
+    return '<path d="M'+X(722)+' 56 H'+X(742)+' Q'+X(741.5)+' 84 '+X(739)+' 108 Q'+X(741)+' 136 '+X(742)+' 161 H'+X(722)+' Q'+X(724)+' 136 '+X(731)+' 108 Q'+X(727)+' 84 '+X(722)+' 56 Z" fill="'+cloth+'" stroke="'+fold+'" stroke-width="1.6" stroke-linejoin="round"/>'
+      +'<path d="M'+X(729)+' 58 Q'+X(731)+' 84 '+X(735)+' 108 Q'+X(731)+' 136 '+X(729)+' 159 M'+X(736)+' 57 Q'+X(736.5)+' 84 '+X(737.5)+' 106 Q'+X(736.5)+' 136 '+X(736)+' 158" fill="none" stroke="'+fold+'" stroke-width="1.3" opacity="0.8"/>'
+      +'<path d="M'+X(729)+' 103.5 Q'+X(735)+' 100.5 '+X(741)+' 103.5 V109.5 Q'+X(735)+' 112.5 '+X(729)+' 109.5 Z" fill="'+rod+'" stroke="'+tie+'" stroke-width="1.2" stroke-linejoin="round"/>'; };
+  return '<g class="nwcurt">'
+    +'<path d="M719 53 H911" stroke="'+rod+'" stroke-width="3" stroke-linecap="round"/><circle cx="718" cy="53" r="3.2" fill="'+tie+'"/><circle cx="912" cy="53" r="3.2" fill="'+tie+'"/>'
+    +panel(0)+panel(1)+'</g>';
+}
+// THE SWALLOW behind the glass (day only): clipped to the pane rect, under the mullions, the frame and the curtains; ONE direction (east),
+// nose-first, ~3 s every 84 s (delay -60 s: the first pass 24 s after the paint) — THE HAWK's law: a travel wrapper (.nwswT) + a teeter
+// wrapper (.nwswS); the rest seat stands WEST of the pane (clipped away), so under reduced motion he never exists; the return leg is
+// routed OUTSIDE the clip (up, west, down). No sound, nothing to tap. ⚑ Q3 a swallow (the forked tail), not a sparrow.
+function swallowSVG(){
+  return '<clipPath id="nwpane"><rect x="740" y="60" width="150" height="92" rx="4"/></clipPath>'
+    +'<g clip-path="url(#nwpane)"><style>'
+    +'.nwswT{animation:nwswfly 84s linear -60s infinite}'
+    +'.nwswS{transform-box:fill-box;transform-origin:50% 50%;animation:nwswteeter .46s ease-in-out infinite alternate}'
+    +'@keyframes nwswfly{0%{transform:translate(0px,8px)}1.2%{transform:translate(80px,-6px)}2.4%{transform:translate(158px,6px)}3.5%{transform:translate(232px,-8px)}3.6%{transform:translate(232px,-70px)}3.7%{transform:translate(0px,-70px)}3.8%,100%{transform:translate(0px,8px)}}'
+    +'@keyframes nwswteeter{from{transform:rotate(-6deg)}to{transform:rotate(6deg)}}'
+    +'@media (prefers-reduced-motion:reduce){.nwswT,.nwswS{animation:none}}'
+    +'</style>'
+    +'<g transform="translate(704,96)"><g class="nwswT"><g class="nwswS"><g transform="translate(-19.0,-18.9) scale(0.28)">'+NW_SWALLOW+'</g></g></g></g>'
+    +'</g>';
+}
+// THE CARDINAL (day only; painted AFTER the bed, before the tiles — the plane in decorSVG stays on top): swoops in from off-canvas above
+// the east edge, lands on the sill's EAST end (the feet at 868,150 — east of the plane's tail at 840, west of the sill's end at 896,
+// under the sun's seat), looks around (two head turns on .nwcdH), flips (.nwcdF) and flies off east — ~5 s every 108 s (delay -66 s:
+// the first visit 42 s after the paint; 84k+24 vs 108m+42 never coincide). The travel wrapper (.nwcdT) starts and ends OFF-CANVAS at the
+// seat 1008,-10, so under reduced motion he never exists; the wing (.nwcdW) beats in flight; the body (.nwcdB) tilts into the swoop.
+function cardinalSVG(nt){
+  if(nt) return '';
+  return '<g id="ro-cardinal" pointer-events="none"><style>'
+    +'.nwcdT{animation:nwcdfly 108s linear -66s infinite}'
+    +'.nwcdF{transform-box:fill-box;transform-origin:50% 50%;animation:nwcdface 108s step-end -66s infinite}'
+    +'.nwcdB{transform-box:fill-box;transform-origin:50% 60%;animation:nwcdtilt 108s linear -66s infinite}'
+    +'.nwcdH{transform-box:fill-box;transform-origin:60% 85%;animation:nwcdlook 108s ease-in-out -66s infinite}'
+    +'.nwcdW{transform-box:fill-box;transform-origin:20% 30%;animation:nwcdbeat 108s ease-in-out -66s infinite}'
+    +'@keyframes nwcdfly{0%{transform:translate(0px,0px)}0.55%{transform:translate(-82px,96px)}1.1%,3.7%{transform:translate(-140px,160px)}4.2%{transform:translate(-60px,90px)}4.63%,100%{transform:translate(12px,4px)}}'
+    +'@keyframes nwcdface{0%,3.69%{transform:scaleX(1)}3.7%,100%{transform:scaleX(-1)}}'
+    +'@keyframes nwcdtilt{0%{transform:rotate(16deg)}1.1%,3.7%{transform:rotate(0deg)}4.63%,100%{transform:rotate(-14deg)}}'
+    +'@keyframes nwcdlook{0%,1.5%{transform:rotate(0deg)}1.9%,2.3%{transform:rotate(-14deg)}2.7%,3.1%{transform:rotate(12deg)}3.5%,100%{transform:rotate(0deg)}}'
+    +'@keyframes nwcdbeat{0%{transform:rotate(-34deg)}0.28%{transform:rotate(18deg)}0.56%{transform:rotate(-34deg)}0.84%{transform:rotate(18deg)}1.1%,3.7%{transform:rotate(0deg)}3.95%{transform:rotate(-34deg)}4.2%{transform:rotate(18deg)}4.45%{transform:rotate(-34deg)}4.63%,100%{transform:rotate(0deg)}}'
+    +'@media (prefers-reduced-motion:reduce){.nwcdT,.nwcdF,.nwcdB,.nwcdH,.nwcdW{animation:none}}'
+    +'</style>'
+    +'<g transform="translate(1008,-10)"><g class="nwcdT"><g class="nwcdF"><g class="nwcdB"><g transform="translate(-19.5,-36.0) scale(0.3)">'+NW_CARDINAL_BODY+'<g class="nwcdW">'+NW_CARDINAL_WING+'</g><g class="nwcdH">'+NW_CARDINAL_HEAD+'</g></g></g></g></g></g>'
+    +'</g>';
+}
+// THE NIGHTLIGHT (bedroom, always): a plug-in wall nightlight — an outlet plate with a half-dome shade in the upper socket — in the wall
+// pocket above the shelf's east end (NW_LAMP; 16×22, the room's line weight, art never a door: pointer-events none, outside every
+// ROOM_SPOTS and DECOR_SPOTS rect). At night the shade lights: a cream bulb and its halo; the room's wash and pool (roomNightSVG) follow.
+function nightlightSVG(nt){
+  return '<g id="ro-nightlight" pointer-events="none" transform="translate('+NW_LAMP[0]+','+NW_LAMP[1]+')">'
+    +'<rect x="-7" y="-11" width="14" height="22" rx="2.5" fill="#EDE4CC" stroke="#8a683e" stroke-width="2"/>'
+    +'<rect x="-2.6" y="4" width="1.8" height="4.2" rx="0.6" fill="#3d2f16"/><rect x="0.8" y="4" width="1.8" height="4.2" rx="0.6" fill="#3d2f16"/>'
+    +(nt? '<circle cx="0" cy="-3" r="13" fill="#FFD98A" opacity="0.35"/>' : '')
+    +'<path d="M-8 -2 A8 8 0 0 1 8 -2 V1.5 H-8 Z" fill="'+(nt? '#FFF3C4' : '#F5E7C6')+'" stroke="#8a683e" stroke-width="1.8" stroke-linejoin="round"/>'
+    +(nt? '<ellipse cx="0" cy="-3.5" rx="4.2" ry="3" fill="#FFFDF2" opacity="0.9"/>' : '')
+    +'</g>';
+}
+// THE WASH AND THE POOL (bedroom, night only; painted after the window, before the shelf): ONE cool wash (NW_WASH) over PART ONE's wall /
+// molding / floor groups, the rug and the window (the curtains dim with the wall), UNDER everything that stands, the pills and the head;
+// the lamp's pool cut out of it by a luminance mask with a radial hole, the warm pool painted over it. The porthole clone copies the
+// string whole. Mom's fight canvas (drawRoomFloor) is its own bake — day-lit (a night bake is a ⚑ follow-on). A crossing while the room
+// is open fades this in once over 600 ms (roomNightSync; the .nw0 class; no rAF); reduced motion: no fade.
+let NW_FADE=0;   // set by roomNightSync before the crossing's paint: the wrapper is dealt at opacity 0 (the nw0 class) and released after the paint's own layout — the transition runs 0 → 1
+function roomNightSVG(nt){
+  if(!nt) return '';
+  const x=NW_LAMP[0], y=NW_LAMP[1]+4, fade=NW_FADE; NW_FADE=0;
+  return '<g id="nw-night"'+(fade? ' class="nw0"' : '')+'><style>#nw-night{transition:opacity .6s ease}#nw-night.nw0{opacity:0}@media (prefers-reduced-motion:reduce){#nw-night{transition:none}}</style>'
+    +'<defs><radialGradient id="nwhole" gradientUnits="userSpaceOnUse" cx="'+x+'" cy="'+y+'" r="96"><stop offset="0" stop-color="#000"/><stop offset="0.4" stop-color="#000" stop-opacity="0.5"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>'
+    +'<mask id="nwmask"><rect width="960" height="600" fill="#fff"/><circle cx="'+x+'" cy="'+y+'" r="96" fill="url(#nwhole)"/></mask>'
+    +'<radialGradient id="nwpool" gradientUnits="userSpaceOnUse" cx="'+x+'" cy="'+y+'" r="84"><stop offset="0" stop-color="#FFD98A" stop-opacity="0.5"/><stop offset="0.45" stop-color="#FFC966" stop-opacity="0.2"/><stop offset="1" stop-color="#FFC966" stop-opacity="0"/></radialGradient></defs>'
+    +'<rect width="960" height="600" fill="'+NW_WASH.hex+'" opacity="'+NW_WASH.a+'" mask="url(#nwmask)"/>'
+    +'<circle cx="'+x+'" cy="'+y+'" r="84" fill="url(#nwpool)"/>'
+    +'</g>';
+}
+// THE WINDOW (the bedroom's): top-right on the wall, a sill at its foot for the plane — art, never a door. 0904 PART TWO: by DAY the shipped
+// pane / haze / sun / clouds byte-equal + the swallow behind the glass; by NIGHT (roomNight) the pane goes deep navy with a darker top
+// band, a cream CRESCENT stands in the sun's seat (the postcard's disc-and-bite grammar, r 12), four small four-point stars echo the
+// blanket's (clear of the mullions, the moon, the plane's ink and the sill), the haze, the sun, the clouds and the birds retire — fully
+// static, nothing to kill under reduced motion. The curtains hang in both; pointer-events stays none.
+function windowSVG(nt){
+  const star=(x,y)=>'<path transform="translate('+x+','+y+') scale(0.7)" d="M0 -5 L1.4 -1.4 L5 0 L1.4 1.4 L0 5 L-1.4 1.4 L-5 0 L-1.4 -1.4 Z" fill="#fff" opacity="0.9"/>';   // the blanket's star, small
   return '<g id="ro-window" pointer-events="none">'
-    +'<rect x="740" y="60" width="150" height="92" rx="4" fill="#BFE3FF"/>'
-    +'<rect x="740" y="60" width="150" height="40" rx="4" fill="#DDF0FF" opacity="0.8"/>'
-    +'<circle cx="864" cy="86" r="12" fill="#FFF3C4" opacity="0.95"/>'
-    +'<ellipse cx="786" cy="112" rx="26" ry="9" fill="#fff" opacity="0.85"/><ellipse cx="804" cy="106" rx="18" ry="9" fill="#fff" opacity="0.85"/>'
+    +(nt
+      ? '<rect x="740" y="60" width="150" height="92" rx="4" fill="'+NW_SKY+'"/>'
+        +'<rect x="740" y="60" width="150" height="40" rx="4" fill="'+NW_SKY_HI+'"/>'
+        +'<circle cx="864" cy="86" r="12" fill="#FFF3C4"/><circle cx="868.5" cy="82.5" r="10" fill="'+NW_SKY_HI+'"/>'
+        +star(768,74)+star(799,93)+star(843,70)+star(879,121)
+      : '<rect x="740" y="60" width="150" height="92" rx="4" fill="#BFE3FF"/>'
+        +'<rect x="740" y="60" width="150" height="40" rx="4" fill="#DDF0FF" opacity="0.8"/>'
+        +'<circle cx="864" cy="86" r="12" fill="#FFF3C4" opacity="0.95"/>'
+        +'<ellipse cx="786" cy="112" rx="26" ry="9" fill="#fff" opacity="0.85"/><ellipse cx="804" cy="106" rx="18" ry="9" fill="#fff" opacity="0.85"/>'
+        +swallowSVG())
     +'<path d="M815 60 V152 M740 106 H890" stroke="#8a683e" stroke-width="5"/>'
     +'<rect x="740" y="60" width="150" height="92" rx="4" fill="none" stroke="#8a683e" stroke-width="7"/>'
+    +curtainsSVG()
     +'<rect x="734" y="150" width="162" height="12" rx="3" fill="#B48A54" stroke="#6e5130" stroke-width="2.5"/>'
     +'</g>';
 }
@@ -74626,10 +74750,10 @@ function raidTileSVG(riv, rivDone, momD, nemD){
     +'</g>';
 }
 function roomSVG(){
-  const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()], momD=momDue(), nemD=nemesisDue();   // v1.79: computed once — every branch below agrees (v3.21: + his day)
+  const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()], momD=momDue(), nemD=nemesisDue(), nt=roomNight();   // v1.79: computed once — every branch below agrees (v3.21: + his day · 0904 PART TWO: + the night)
   // 0904 FORT GREEN: the easel's v2.51 gold cascade and the case's three discs left the shelf with their art — the fort wears the
   // ×N badge while picks wait (fortSVG) and its pill carries the count + ⚔NEW; both read META at the paint, as the pill does.
-  return '<svg viewBox="0 0 960 600" style="position:absolute;inset:0;width:100%;height:100%">'
+  return '<svg viewBox="0 0 960 600"'+(roomCur()==='bedroom'? ' data-rn="'+(nt?1:0)+'"' : '')+' style="position:absolute;inset:0;width:100%;height:100%">'   // 0904 PART TWO: the bedroom's svg wears the night's verdict (roomNightSync reads it)
   // the ground — v3.06: roomFloorSVG branches per active room (the bedroom
   // branch is the old wood floor + planks verbatim)
   +roomFloorSVG()
@@ -74649,7 +74773,7 @@ function roomSVG(){
   // ═══ 0904 THE LOOP ROW — the room's middle, back to front: the window (the bedroom's), the shelf and the six occasional things
   // on it, the bed (the bedroom's), then the three tiles on the rug, then the toys. Every door's art wears #ro-<mv> (the beacon +
   // the rig's read); the hotspots and pills are ROOM_SPOTS rows. See the painters above roomSVG. ═══
-  +(roomCur()==='bedroom'? windowSVG() : '')
+  +(roomCur()==='bedroom'? windowSVG(nt)+roomNightSVG(nt)+nightlightSVG(nt) : '')   // 0904 PART TWO: the window by day or night, then the night's wash + pool over the ground and the window (under everything that stands), then the nightlight lit or quiet
   +shelfSVG()
   // the BANK PIGGY on the shelf — the bank building and the pig on its stoop, one wrapper, at PIG_SEAT (0.6)
   +'<g id="ro-piggy"><g transform="translate('+PIG_SEAT.x+','+PIG_SEAT.y+') scale('+PIG_SEAT.s+')">'
@@ -74680,7 +74804,7 @@ function roomSVG(){
   +tvSVG()
   // (the MEDAL CASE that stood at the shelf's right end hangs in FORT GREEN's MEDALS tab now — the slot is bare plank, ⚑ Q15)
   // the bed (the bedroom's) — the bear fort rides inside it
-  +(roomCur()==='bedroom'? bedSVG() : '')
+  +(roomCur()==='bedroom'? bedSVG()+cardinalSVG(nt) : '')   // 0904 PART TWO: the cardinal's visits on the sill's east end (day only), over the sill, under the plane
   // ═══ THE THREE TILES on the rug ═══
   // CAMPAIGN: the toy box (0656: the ELITE FORCES box past L100 — the same seat, the same tap); 0904's arch at its bottom-left and
   // THE PATROL inside the wrapper (the men wear the beacon's glow with the crate)
@@ -77406,6 +77530,25 @@ function sizeRoom(){
   st.style.transform='scale('+s+')';
 }
 window.addEventListener('resize', sizeRoom);
+// ═══ 0904 THE ROOM NOTES, PART TWO — THE NIGHT'S CLOCK IN THE ROOM: roomSVG stamps the verdict on the bedroom's svg (data-rn); this
+// re-reads it once a minute while the room is open (a plain interval — the v1.21 "no timers" law is scoped to decor movement; a hidden
+// tab waits for its return through takeOut) and repaints the room on a crossing (renderMenu — the innerHTML-rebuild law, under
+// starPopClose's own guard): INTO the night the wash + the pool fade in once over 600 ms (#nw-night's transition — the fresh wrapper is
+// dealt at opacity 0 by the nw0 class through NW_FADE, then released after the paint's layout; no rAF); back to DAY the wash fades out first, then the paint. Reduced
+// motion: the transition is off in CSS. Nothing here writes a save byte or a wire byte. ═══
+let NW_T=0;
+function roomOpenNow(){ const mn=document.getElementById('menu'); return S.mode==='menu' && !!mn && !mn.classList.contains('hidden') && !shopIsOpen() && !!document.querySelector('#roomStage > svg'); }
+function roomNightSync(){
+  if(document.hidden || !roomOpenNow() || roomCur()!=='bedroom') return false;
+  const svg=document.querySelector('#roomStage > svg'), now=roomNight(), was=svg.getAttribute('data-rn')==='1';
+  if(now===was) return false;
+  const w=document.getElementById('nw-night');
+  if(!now && w && !reducedMotion()){ if(!NW_T){ w.classList.add('nw0'); NW_T=setTimeout(()=>{ NW_T=0; if(roomOpenNow()) renderMenu(); }, 650); } return true; }   // dawn: the wash fades out, then the day's paint
+  NW_FADE=(now && !reducedMotion())? 1 : 0; renderMenu(); NW_FADE=0;
+  if(now && !reducedMotion()){ const w2=document.getElementById('nw-night'); if(w2){ void w2.getBoundingClientRect(); w2.classList.remove('nw0'); } }   // dusk: the fresh paint dealt the wash at opacity 0 (its own layout committed it); releasing the class runs the transition 0 → 1
+  return true;
+}
+const NW_TICK=setInterval(roomNightSync, 60000);
 const RTAG_CAP={ 'rtag-campaign':250, 'rtag-raid':250, 'rtag-bf':250, 'rtag-piggy':214, 'rtag-fort':236, 'rtag-board':300, 'rtag-bearfort':160, 'rtag-yetipark':240, 'rtag-dinopark':240, 'rtag-bank':240, 'rtag-wpark':170 };   // 0904 THE LOOP ROW: the pill lanes (stage px at 18 px; over the cap a pill steps to 14 px)
 // 0904 THE LOOP ROW — THE BADGES (⚑ Q5). The duel + crew chips left the head for ONE badge on the BATTLEFIELD tile's top-right corner.
 // 0904 THE ROOM NOTES PART ONE (Wyatt 9/4 4:25 pm: "The white flag that's on the right of the battlefield is currently showing everyone
@@ -91634,7 +91777,8 @@ window.GVT = {
       st[k]={ own:decOwns(k), out:decorHome(k), due:rideDue(k), cls:el? String(el.className.baseVal||el.className) : null, top:!!(ro && ro.parentNode && ro.parentNode.lastElementChild===ro), nudge:!!(ro && ro.classList.contains('nudge')) }; }
     return { cv:GVT_CV, trv:SHIPTRV, land:PLANE_LAND, loop:PLANE_LOOP, pin:PLANE_LOOP_NEXT, fly:!!document.getElementById('wpfly'), odds:WP_LOOP_ODDS, loopMs:WP_LOOP_MS, next:shipNextStop(), pinned:SHIP_DEST||null, hand:mvDayRide(), out:rideOut(), rooms:ownedRooms(), cur:roomCur(), off:(META.decor.off||[]).slice(), rideV:META.rideV|0, wipe:!!document.getElementById('cloudwipe'), rides:st }; },   // 0584: + loop/pin/fly/odds/loopMs
   wp(){ return { cv:GVT_CV, key:wpKey(), cols:wpCols().slice(), spark:wpSpark(), saved:(META.decor&&typeof META.decor.wp==='string')? META.decor.wp : null, own:decOwns('warplane'), rows:PLANE_PALETTE.map(p=>p[0]), names:PLANE_PALETTE.map(p=>p[1]), def:WP_DEF.slice(), n:WP_SPARK_N, seats:WP_SPARK_SEATS.map(q=>q.slice()) }; },   // 0587 THE WARPLANE'S PAINT rig door — read-only: the effective key, its ten hexes, the twinkle, the saved pick, the palette
-  planeLoop(n){ PLANE_LOOP_NEXT=(n===undefined||n===null)? null : (n? 1 : 0); return PLANE_LOOP_NEXT; },   // 0584 rig door: pin the NEXT flight (1 loop · 0 plain · null = the dice)   // 0568 D11 rig door — read-only (next = the PURE read; the pin is never consumed here)
+  planeLoop(n){ PLANE_LOOP_NEXT=(n===undefined||n===null)? null : (n? 1 : 0); return PLANE_LOOP_NEXT; },
+  night(v){ NW_PIN=(v===undefined||v===null)? null : (v? 1 : 0); if(roomOpenNow()) renderMenu(); return { pin:NW_PIN, night:roomNight(), from:NW_NIGHT[0], to:NW_NIGHT[1], tick:!!NW_TICK }; },   // 0904 PART TWO rig door: pin the night (1 · 0 · null = the clock) and repaint the open room   // 0584 rig door: pin the NEXT flight (1 loop · 0 plain · null = the dice)   // 0568 D11 rig door — read-only (next = the PURE read; the pin is never consumed here)
   dogFreeze(on){ DOGRIG.frozen=on?1:0; DOG_LAST=0; return DOGRIG.frozen; },
   dogStep(s){ if(!DOGT) dogArm(); let r=Math.max(0,+s||0);
     while(r>0){ const d=Math.min(0.1,r); dogAdvance(d); r-=d; }
