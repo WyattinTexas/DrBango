@@ -40798,7 +40798,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.12';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.13';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -74824,6 +74824,8 @@ const BOX_HOLE='<g class="boxhole">'
 const PT_W=28;                                  // ⚑ a man's width on the floor (33 tall; the victory men are 52-58; 22 read as a dot on a phone)
 const PT_DUR=[9,11,13], PT_DL=[0,-3.7,-7.3];    // ⚑ seconds per lap · the negative delays (never bunch, never in step)
 const PT_GATE=[449,158];                        // ⚑ THE GATE's foot on the plank (0904 FORT GREEN: #ro-fort-gate, the arch at the fort's bottom-centre — fortSVG at translate(404,84), the arch 37..53 → x 449; the plank's top 158): the three men step OUT of the gate
+const PT_SKY=-60;                               // ⚑ 0904 THE SHELF IS THE BEDROOM'S (Q2): on a LAND there is no fort — the drop starts here, above the stage's top (the canopy's dome sits 48 above the feet: at -60 it opens off-stage in the 0..4 % fade-in and comes into view under the head band), at the gate's own x
+function patrolP0(){ return roomCur()==='bedroom'? PT_GATE : [PT_GATE[0],PT_SKY]; }   // the drop's start: the fort's gate on the bedroom (the shelf is the bedroom's), the sky on a land — the same lap after the landing
 const PT_FLOOR=352;                             // ⚑ the floor band the men cross (between the shelf pills' lane and the tiles' 392) — 0904 PART ONE: ON the floor (the seam RN_SEAM 316 is above it): the boots land on the floor, never on the wall
 const PT_LANE=96;                               // ⚑ the campaign tile's west margin (west of the crate's ink at 128, inside the tile)
 const PT_MOUTH=[155.4,501.4];                   // the arch's mouth on the floor, in the crate's frame (114+34.5*1.2, 355+122*1.2)
@@ -74848,11 +74850,12 @@ const PT_R=16.5;                                // the canopy's radius on the 28
 // (#ptclip = the world minus the box's face, plus the arch's opening) so the man is swallowed by the dark (visible only inside the
 // opening for the last 4.5% of the lap, ~0.4 s), then the lap restarts; BOX_HOLE above grew to a man's height at the SAME corner on
 // both molds (the lid, the star and the hotspot untouched; ⚑ Q9 not moved — option A). Wyatt's KEEP rulings stand: the hole, the three
-// men, the route and the lap timing. Reduced motion: no drops, no canopy, the three parked at the mouth. Every floor has the shelf and
-// the fort, so the drop plays on every floor. ═══
+// men, the route and the lap timing. Reduced motion: no drops, no canopy, the three parked at the mouth. 0904 THE SHELF IS THE BEDROOM'S:
+// the shelf and the fort are the bedroom's now — on a land the drop starts in the SKY (patrolP0 → PT_SKY) at the gate's x and plays the same
+// lap from the landing on; the box, the hole and the route are on every floor. ═══
 function patrolSVG(){
   const hex=dyeHex()||GREEN, ink='rgba(38,40,31,0.5)';
-  const P0=PT_GATE, P1=[PT_GATE[0],PT_FLOOR], P2=[PT_LANE,PT_FLOOR], P3=[PT_LANE,PT_MOUTH[1]], P4=PT_MOUTH, P5=PT_IN;
+  const P0=patrolP0(), P1=[PT_GATE[0],PT_FLOOR], P2=[PT_LANE,PT_FLOOR], P3=[PT_LANE,PT_MOUTH[1]], P4=PT_MOUTH, P5=PT_IN;
   const L=(a,b)=>Math.hypot(b[0]-a[0],b[1]-a[1]);
   const l1=L(P0,P1), l2=L(P1,P2), l3=L(P2,P3), l4=L(P3,P4), tot=(l1+l2+l3+l4)||1, walk=95.5;   // the four legs share 0..95.5% of the lap; the swallow = the last 4.5% (~0.4 s of the 9 s lap)
   const k1=+(walk*l1/tot).toFixed(1), k2=+(walk*(l1+l2)/tot).toFixed(1), k3=+(walk*(l1+l2+l3)/tot).toFixed(1), k1b=+(k1+0.1).toFixed(1);
@@ -75125,7 +75128,7 @@ function windowSVG(nt){
     +'<rect x="734" y="150" width="162" height="12" rx="3" fill="#B48A54" stroke="#6e5130" stroke-width="2.5"/>'
     +'</g>';
 }
-// THE SHELF (every floor): one plank on two brackets at y 158..168 — the occasional sits on it
+// THE SHELF (the bedroom's — 0904 THE SHELF IS THE BEDROOM'S; on every floor from THE LOOP ROW to v8.12): one plank on two brackets at y 158..168 — the occasional sits on it (shelfRowSVG)
 function shelfSVG(){
   return '<g id="ro-shelf" pointer-events="none">'
     +'<rect x="196" y="167" width="516" height="6" fill="#000" opacity="0.14"/>'
@@ -75290,6 +75293,29 @@ function chestTap(){   // the door's tap (UI.room): the toy's own react on the d
   if(g){ g.classList.remove('react'); void g.getBoundingClientRect(); g.classList.add('react'); setTimeout(()=>{ try{ g.classList.remove('react'); }catch(e){} }, DECOR_REACT.tschest.ms); }
   SFX.coin(); chestOpen();
 }
+// THE SHELF ROW (0904 THE SHELF IS THE BEDROOM'S): the plank and the five occasional things on it — the six painters lifted VERBATIM out of
+// roomSVG's body (their seats, art and badges byte-still) so the composer can seat the whole row behind the bedroom's one gate.
+function shelfRowSVG(){
+  return ''
+  +shelfSVG()
+  // the BANK PIGGY on the shelf — the bank building and the pig on its stoop, one wrapper, at PIG_SEAT (0.6)
+  +'<g id="ro-piggy"><g transform="translate('+PIG_SEAT.x+','+PIG_SEAT.y+') scale('+PIG_SEAT.s+')">'
+  +bankSVG()
+  +pigSvg()
+  +'</g></g>'
+  // the CRATE (SARGE'S SURPLUS) on the shelf — v2.25's closed footlocker with its ONE sign, byte-same art at 0.8 (crateArt);
+  // v2.86 .beckon while the introduction is live; 0723's NEW! ribbon over the lid (surpBannerSVG)
+  +'<g id="ro-shop"'+(shopBeckonOn()?' class="beckon"':'')+'>'
+  +'<g transform="translate(300,77) scale(0.8)">'+crateArt()+'</g>'+(surpNewIs()? surpBannerSVG() : '')+'</g>'
+  // FORT GREEN (0904, FM-GVT-FORT-01) on the shelf in the fort seat — the toy castle in the army's colour, the ×N badge while picks
+  // wait, THE GATE (#ro-fort-gate) the patrol steps out of; the easel and the medal case retired (easelArt / caseArt stand inert)
+  +fortSVG(META.pendingPicks|0)
+  // the TROPHY on the shelf (WORLD RANKINGS; 0632's beacon rides #ro-board) — the came-for-you badge at its top-right corner
+  +'<g id="ro-board"><g transform="translate(500,89) scale(0.85)">'+trophyArt()+'</g>'
+  +(chalBadgeN()? '<g transform="translate(556,94)"><rect x="-19" y="-11" width="38" height="22" rx="11" fill="#B8462F" stroke="#FFB08A" stroke-width="2.5"/><text y="5" text-anchor="middle" font-size="13" font-weight="bold" fill="#FFF3C4">⚔'+chalBadgeN()+'</text></g>':'')+'</g>'
+  // the TV on the shelf (v2.59 THE REWARDED TV; not on the Steam shell — its row stands down with it)
+  +tvSVG();
+}
 function roomSVG(){
   const riv=todaysRival(), rivDone=!!META.rivalDays[todayStr()], momD=momDue(), nemD=nemesisDue(), nt=roomNight();   // v1.79: computed once — every branch below agrees (v3.21: + his day · 0904 PART TWO: + the night)
   // 0904 FORT GREEN: the easel's v2.51 gold cascade and the case's three discs left the shelf with their art — the fort wears the
@@ -75315,12 +75341,6 @@ function roomSVG(){
   // on it, the bed (the bedroom's), then the three tiles on the rug, then the toys. Every door's art wears #ro-<mv> (the beacon +
   // the rig's read); the hotspots and pills are ROOM_SPOTS rows. See the painters above roomSVG. ═══
   +(roomCur()==='bedroom'? windowSVG(nt)+roomNightSVG(nt)+nightlightSVG(nt) : '')   // 0904 PART TWO: the window by day or night, then the night's wash + pool over the ground and the window (under everything that stands), then the nightlight lit or quiet
-  +shelfSVG()
-  // the BANK PIGGY on the shelf — the bank building and the pig on its stoop, one wrapper, at PIG_SEAT (0.6)
-  +'<g id="ro-piggy"><g transform="translate('+PIG_SEAT.x+','+PIG_SEAT.y+') scale('+PIG_SEAT.s+')">'
-  +bankSVG()
-  +pigSvg()
-  +'</g></g>'
   // v2.42 THE LITTLE GLASS — really small, on the floor by the west wall (the piggy's old corner),
   // lower to the left, just lying on the ground (Wyatt's own words). Only
   // while the lens is owned and the spy still hides; the day he's found this
@@ -75331,18 +75351,14 @@ function roomSVG(){
     ? '<g id="ro-glass"><ellipse cx="66" cy="262" rx="26" ry="6" fill="#000" opacity="0.18"/>'
       +'<g transform="translate(46,230) scale(0.30) rotate(62 60 84)">'+lensArt()+'</g></g>'
     : '')
-  // the CRATE (SARGE'S SURPLUS) on the shelf — v2.25's closed footlocker with its ONE sign, byte-same art at 0.8 (crateArt);
-  // v2.86 .beckon while the introduction is live; 0723's NEW! ribbon over the lid (surpBannerSVG)
-  +'<g id="ro-shop"'+(shopBeckonOn()?' class="beckon"':'')+'>'
-  +'<g transform="translate(300,77) scale(0.8)">'+crateArt()+'</g>'+(surpNewIs()? surpBannerSVG() : '')+'</g>'
-  // FORT GREEN (0904, FM-GVT-FORT-01) on the shelf in the fort seat — the toy castle in the army's colour, the ×N badge while picks
-  // wait, THE GATE (#ro-fort-gate) the patrol steps out of; the easel and the medal case retired (easelArt / caseArt stand inert)
-  +fortSVG(META.pendingPicks|0)
-  // the TROPHY on the shelf (WORLD RANKINGS; 0632's beacon rides #ro-board) — the came-for-you badge at its top-right corner
-  +'<g id="ro-board"><g transform="translate(500,89) scale(0.85)">'+trophyArt()+'</g>'
-  +(chalBadgeN()? '<g transform="translate(556,94)"><rect x="-19" y="-11" width="38" height="22" rx="11" fill="#B8462F" stroke="#FFB08A" stroke-width="2.5"/><text y="5" text-anchor="middle" font-size="13" font-weight="bold" fill="#FFF3C4">⚔'+chalBadgeN()+'</text></g>':'')+'</g>'
-  // the TV on the shelf (v2.59 THE REWARDED TV; not on the Steam shell — its row stands down with it)
-  +tvSVG()
+  // ═══ 0904 THE SHELF IS THE BEDROOM'S (FM-GVT-SHELF-BEDROOM-ONLY-0904; design/shelf-bedroom-only-0904/00-SHELF.md; jumpr 0757j; Wyatt 9/4 ~8:35 pm:
+  // "let's just not have the shelf items in the other rooms. It will only be the bedroom that has all the shelf items. That way, we can
+  // leave the other rooms as is") — THE SHELF ROW (the plank, the BANK PIGGY, the CRATE / Sarge's Surplus, FORT GREEN, the TROPHY, the TV,
+  // every sign, ribbon and badge that rides their art) is composed behind ONE gate: the rug's own predicate (v3.41 — "Rug should be hidden on
+  // rooms that are not the bedroom"), the bed's and the window's. On a land the group is ABSENT (no DOM, no ghost seat); their ROOM_SPOTS
+  // rows carry the same gate as due(), so no hotspot, pill or lane survives there either. The little glass above kept its own per-room
+  // gate and moved one seat ahead of this one (its ink ends at x 110; the row begins at 196 — the paint order is invisible, ⚑ Q6). ═══
+  +(roomCur()==='bedroom'? shelfRowSVG() : '')
   // (the MEDAL CASE that stood at the shelf's right end hangs in FORT GREEN's MEDALS tab now — the slot is bare plank, ⚑ Q15)
   // the bed (the bedroom's) — the bear fort rides inside it
   +(roomCur()==='bedroom'? bedSVG()+cardinalSVG(nt) : '')   // 0904 PART TWO: the cardinal's visits on the sill's east end (day only), over the sill, under the plane
@@ -75415,29 +75431,31 @@ const ROOM_SPOTS=[
   { id:'bf',       x:LR_TILE[2].x, y:LR_TILE[2].y, w:LR_TILE_W, h:LR_TILE_H, mv:'bf', z:2,
     label:()=>'BATTLEFIELD'+(META.bfWins?' · '+META.bfWins+'W':''), lx:765, ly:556 },
   // ═══ THE SHELF (y 160, x 196..712) — the occasional and the bank, small and quiet; every hit rect ≥ 70 each way; a pill only
+  // (0904 THE SHELF IS THE BEDROOM'S: every row of the shelf carries due:()=>roomCur()==='bedroom' — the rug's gate, the bearfort row's
+  // grammar — so on a land there is no hotspot, no pill and no lane for any of them; the art leaves with them in roomSVG's composer)
   // with news (the piggy's while the day's stars wait, the fort's while a pick or ⚔NEW waits, the trophy's while today's away
   // fight waits); the pills hang UNDER the plank (ly 184 / 218). ═══
   // the BANK PIGGY: the stars door — her tap pays the day's stars and the streak exactly as ever (piggyHop); her pill ONLY while
   // unclaimed (⚑ Q12: the ★ bank · tier · DAY n/m line is off the room — the head's ★ is the balance, the streak shows on her card)
-  { id:'piggy',    x:200, y:86,  w:96,  h:78,  mv:'piggy',
+  { id:'piggy',    x:200, y:86,  w:96,  h:78,  mv:'piggy', due:()=>roomCur()==='bedroom',
     label:()=>{ const pay=pigPayout(); return (pay>0 && META.piggy.claimed!==todayStr())? TXT('TAP THE PIGGY! +'+pay+'★') : ''; },
     notr:1,
     cls:()=>(pigPayout()>0 && META.piggy.claimed!==todayStr())?'gold':'', lx:248, ly:184 },
   // the CRATE: no pill (v2.25 — the sign on the art carries the branding); the NO ADS badge rides its corner (renderMenu). 0904 THE
   // ROOM NOTES PART ONE: the storefront grew UP onto the crate (the fascia's top at stage 59.4) — the hotspot grows up with it (y 60,
   // 104 tall; the same width), so a tap on the sign opens the store; the fort's rect (404,84) and the piggy's (200,86) untouched
-  { id:'shop',     x:298, y:60,  w:100, h:104, mv:'shop' },
+  { id:'shop',     x:298, y:60,  w:100, h:104, mv:'shop', due:()=>roomCur()==='bedroom' },
   // FORT GREEN (0904, FM-GVT-FORT-01): the one box where the army lives — the picks (PROMOTIONS), the academy (ROSTER) and the medal
   // case (MEDALS) behind three tabs (UI.fort); its pill = FORT <colour> composed on data-notr (fortPill: the worn jar's word, GREEN
   // undyed) + the pending count + ⚔NEW, ONLY while a pick or ⚔NEW waits (the quiet-shelf law); gold with a pick, red with ⚔NEW
-  { id:'fort',     x:404, y:84,  w:90,  h:80,  mv:'fort',
+  { id:'fort',     x:404, y:84,  w:90,  h:80,  mv:'fort', due:()=>roomCur()==='bedroom',
     label:()=>fortPill(), notr:1,
     cls:()=>(META.sargeUnlocked.some(w=>META.sargeSeen.indexOf(w)<0)||META.gearUnlocked.some(g=>META.gearSeen.indexOf(g)<0))?'alarm':(META.pendingPicks>0?'gold':''), lx:480, ly:184 },
   // the TROPHY (THE LEADERBOARD): a pill ONLY while today's away fight is unclaimed (0632's word renamed LEADERBOARD by 0757d;
   // its beacon glow stays); the trophy is wordless on the shelf otherwise (the loop row's ⚑ Q6) — ddLabel() is the one source
-  { id:'board',    x:494, y:86,  w:72,  h:78,  mv:'board', label:()=>ddLabel(), lx:566, ly:218 },   // ly 218: the row under the piggy's + the fort's (ly 184) — a CJK pill runs 31 px tall, an Arabic one 33 (measured in the battery's lane survey)
+  { id:'board',    x:494, y:86,  w:72,  h:78,  mv:'board', due:()=>roomCur()==='bedroom', label:()=>ddLabel(), lx:566, ly:218 },   // ly 218: the row under the piggy's + the fort's (ly 184) — a CJK pill runs 31 px tall, an Arabic one 33 (measured in the battery's lane survey)
   // the TV (v2.59 THE REWARDED TV): no label — the +30★ badge in the art IS the pill; filtered out on STEAM_SHELL (v3.31)
-  { id:'tv',       x:566, y:82,  w:70,  h:80,  mv:'tv' },
+  { id:'tv',       x:566, y:82,  w:70,  h:80,  mv:'tv', due:()=>roomCur()==='bedroom' },
   // (the MEDAL CASE row retired by FORT GREEN — the case hangs in the fort's MEDALS tab; the shelf slot at 636,88 is bare, ⚑ Q15)
   // 0555 BEAR PARK — the little bear fortress ON the sketch bed's mattress toward the FOOT (bearFortSVG inside #ro-bed), its pill
   // under the bed's foot (lx 804 · ly 328 — east of the elephant's anchor 734, above the BATTLEFIELD tile's 392). Due on every
@@ -78036,6 +78054,7 @@ function tourDayOne(){   // ⚑ Q5 / Q11: the tour's FIRST landing stamps today 
 }
 function tourQuiet(){   // the quiet room (mvDayQuiet's recipe + the tour's own pieces): the next stop deals only here
   if(S.mode!=='menu' || TOUR.up || TOUR.walk || SHIPTRV || shopIsOpen()) return false;
+  if(roomCur()!=='bedroom') return false;                 // 0904 THE SHELF IS THE BEDROOM'S (⚑ Q5): the tour's doors are the shelf's — on a land (a plane tap mid-tour) the tour waits for the flight home; the stamp keeps the place
   if(Date.now()<TOUR.hold) return false;                  // the piggy's rest — the hop and the float are seen before stop 4 deals
   if(ptyPlaceNow()) return false;                          // a scene stands over the room (the campaign map, a park, a raid, the war table)
   if(ptyLobby() || PTY.open || PTY_POP) return false;      // a lobby / the party sheet / a knock
@@ -93853,6 +93872,11 @@ window.GVT = {
       head:(h=>h? { n:h.querySelectorAll('button.langchip').length, t:Array.from(h.querySelectorAll('button.langchip')).map(b=>b.textContent).join('') } : null)(document.querySelector('#roomStage .roomhead')),
       pop:!document.getElementById('milePop').classList.contains('hidden'), popBand:(b=>b? b.textContent : null)(document.querySelector('#milePop .mb-band')), lang:LANG, mode:S.mode, hold:S.evHold? +(S.evHold.bell-evNow()).toFixed(1) : null }; },
   evForce(bell, open, wk, daily, alt, days){ EV.bell=+bell||0; EV.open=(open!=null)? +open : (EV.bell? EV.bell-600 : 0); if(wk) EV.wk=String(wk); else if(!EV.wk) EV.wk='2026-08-22'; if(daily!=null) EV.daily=daily?1:0; if(alt!=null) EV.alt=alt?1:0; if(days!==undefined) EV.days=days; evDoorTick(); return GVT.evDoor(); },   // a forced truth for the band (no server) — the rig's bell (0506: + daily; 0640: + alt)
+  shelf(){ const g=id=>document.getElementById(id), R=e=>{ if(!e) return null; const b=e.getBoundingClientRect(); return { x:+b.x.toFixed(1), y:+b.y.toFixed(1), w:+b.width.toFixed(1), h:+b.height.toFixed(1) }; };   // 0904 THE SHELF IS THE BEDROOM'S — the rig's read door (read-only): the row's art, hotspots and pills on THIS floor, the patrol's start, the beacon family present
+    const mvs=['piggy','shop','fort','board','tv']; const art={}, spot={}, tag={}; for(const mv of mvs){ art[mv]=!!g('ro-'+mv); spot[mv]=R(g('rspot-'+mv)); tag[mv]=g('rtag-'+mv)? { t:g('rtag-'+mv).textContent.replace(/\s+/g,' ').trim(), cls:g('rtag-'+mv).className } : null; }
+    return { cv:GVT_CV, room:roomCur(), home:roomCur()==='bedroom', plank:!!g('ro-shelf'), art, spot, tag, ribbon:!!g('ro-shopnew'), gate:!!g('ro-fort-gate'), tvSet:!!g('tvSet'), window:!!g('ro-window'), bed:!!g('ro-bed'), chest:!!g('ro-chest'), plane:!!g('decPlane'),
+      patrol:{ p0:patrolP0().slice(), sky:PT_SKY, gate:PT_GATE.slice(), floor:PT_FLOOR, men:document.querySelectorAll('#roomStage .patrol .ptfig').length, drops:document.querySelectorAll('#roomStage .patrol .ptdrop').length },
+      family:ddFamily().map(mv=>({ mv, art:!!g('ro-'+mv), tag:!!g('rtag-'+mv), lit:!!(g('ro-'+mv)&&g('ro-'+mv).classList.contains('beacon')) })), tourQuiet:tourQuiet(), scale:roomScale(), stage:R(g('roomStage')) }; },
   evPill(){ const el=document.getElementById('evDoor'), slot=document.getElementById('rhEv'), h=document.querySelector('#roomStage .roomhead'), xp=h&&h.querySelector('.xpbar'), pig=document.getElementById('rhPig'), na=document.getElementById('rhNoAds'), bell=document.getElementById('bfBell');
     const R=e=>{ if(!e) return null; const b=e.getBoundingClientRect(); return { x:+b.x.toFixed(1), y:+b.y.toFixed(1), w:+b.width.toFixed(1), h:+b.height.toFixed(1) }; }; const fs=e=>e? parseFloat(getComputedStyle(e).fontSize) : null; const cl=id=>{ const e=document.getElementById(id); return !!(e && e.classList.contains('evlive')); };
     return { band:evBandState(), el:!!el, tag:el? el.tagName : null, cls:el? el.className : null, onclick:el? (el.getAttribute('onclick')||'') : '', text:el? el.textContent.replace(/\s+/g,' ').trim() : null, name:el? (n=>n? n.textContent : null)(el.querySelector('.ev-name')) : null, time:el? (n=>n? n.textContent.replace(/\s+/g,' ').trim() : null)(el.querySelector('.ev-time')) : null,
