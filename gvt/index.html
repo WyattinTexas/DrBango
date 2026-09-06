@@ -41185,7 +41185,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.31';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.32';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -43610,8 +43610,10 @@ function botTick(sq){
 // every reply). This side: the join → coopStartBattle's ice fork at band 5 → 'u'
 // → THE HOLD (frame() skips update until the bell; placement + the relay live)
 // → the bell on each sim's own synced clock → THE COMPUTERS (the referee alone
-// shops for EV_MAX − pc seats and relays every order with b; every other screen
-// mirrors) → the raid's own verdict → evSpoils (card 7's door) → the teardown.
+// shops for EV_FILL − pc seats — 0905 THE FIVE-COMMANDER FILL: five commanders in
+// all, computers included; 0484 shopped EV_MAX − pc — and relays every order with
+// b; every other screen mirrors) → the raid's own verdict → evSpoils (card 7's
+// door) → the teardown.
 // ⚠ the 0313a `ev*` family (evSeated / evTick / evKillByWord / S.evRef) is the
 // owner's-word protocol — unrelated; this door's vocabulary is the design's:
 // EV / evSync / evNow / evIn / evJoin / evLaunch / evBell / S.evHold / S.sq.ev.
@@ -43620,6 +43622,7 @@ const EV_BAND=5;              // the ice band's 5th rung = tier 'u' (server EV_L
 const EV_MAX=10;              // the room's rim (the server's EV_MAX, quoted — the pitcher's law)
 const EV_PIN_P=10;            // D4: the swarm scales for TEN always (never preal) — computers are commanders in every way a kid can see
 const EV_BOTS_MAX=9;          // the 0387 4-cap lifted for event rooms only (the pad law stands everywhere else)
+const EV_FILL=5;              // 0905 THE FIVE-COMMANDER FILL (Wyatt 9/5 ~10:30 pm ET: "If there are already five human commanders, there should be no computers that help on the players' team. The computer will help fill it up to 5 players, but that's it. If one player is in there by himself, he should get 4 computers that help him out … if there are two human players, there should only be three computers that help. It should be that way for any Ultra Mega fight."): the computers pad the players' side up to THIS many commanders and no further — computers = EV_FILL − HQ's frozen pc, floor 0 (one → four · two → three · three → two · four → one · five and up → NONE), ONE arithmetic (evBotsN) read by the shop, the roster, the HUD and the rig; the room's rim (EV_MAX — the pitcher's ten, the 11th opens room 2) and the crowd's scale (EV_PIN_P, ⚑ Q15) untouched; EV_BOTS_MAX stands above it, inert. ⚑ 5 (Wyatt 9/5) · 10 = the shipped fill
 const EV_BOT_SARGE=1;         // ⚑ one stock pistol Sarge per computer, FIRST — a computer reads as a commander, not a rifle squad
 const EV_BOT_F=0.5;           // 0506 HALF AND HALF (Wyatt 8/23: "let's reduce our own CPU units by half"): in EVENT rooms ONLY (sq.evBots) each computer's opening purse RAID_TAGS×F (240 → 120), its drip BOT_DRIP×F (8 → 4 /s), its ceiling round(BOT_CAP×F) (20 → 10 men); the pad-law buddies (campaign/park/BF queue bots) never read it. ⚑ purse alone · 0.5 (default)
 const EV_ARM_GRACE=5;         // s past the bell a sim waits for HQ's rung pc before arming the computers off the live roster (never fires on a live relay)
@@ -43759,10 +43762,14 @@ function evBotHex(bi,used){   // the seeded palette walk (roomSeatFallbackHex's 
   }
   return BOT_HEX;
 }
+// 0905 THE FIVE-COMMANDER FILL — ONE arithmetic for the computers' count: the referee's shop (evBotsArm), the HUD's sub-line, the roster
+// along the top band and the rig (GVT.evFeel) all read THIS, so no screen can disagree with the referee. pc = the commanders (HQ's frozen
+// pc once the bell rang; the live roster before it), clamped to the room's rim; the count = EV_FILL − pc, floor 0, under EV_BOTS_MAX.
+function evBotsN(pc){ pc=Math.max(1,Math.min(EV_MAX,(pc|0)||1)); return Math.max(0,Math.min(EV_BOTS_MAX, EV_FILL-pc)); }
 function evBotsArm(pc){
   const sq=S.sq; if(!sq || !sq.ev || sq.bots) return (sq&&sq.bots)? sq.bots.length : 0;
   pc=Math.max(1,Math.min(EV_MAX,(pc|0)||1));
-  const nb=Math.max(0,Math.min(EV_BOTS_MAX, EV_MAX-pc));
+  const nb=evBotsN(pc);   // 0905 THE FIVE-COMMANDER FILL: EV_FILL − pc (0484 shopped EV_MAX − pc — a lone commander got nine); the frozen pc at the bell is the count, so a human who joins during the hold takes a computer's chair exactly as before
   sq.evPc=pc;
   const used=evBotUsed();
   sq.bots=Array.from({length:nb},(_,bi)=>({ purse:RAID_TAGS*EV_BOT_F, t:bi*0.4, n:0, last:sq.t, hex:evBotHex(bi,used), name:evBotName(bi), sg:0 }));   // 0506: an event computer opens on half the raid purse (120)
@@ -43778,7 +43785,7 @@ function evRefInherit(){ const sq=S.sq; if(!sq || !sq.bots) return; for(const b 
 function evRoster(){
   const out=[], mem=((COOP&&COOP.members)||[]).slice().sort((a,b)=>(a.seat|0)-(b.seat|0));
   for(const m of mem){ const h=m&&m.hex; out.push({ n:String((m&&m.name)||'COMMANDER').toUpperCase().slice(0,12), h:(typeof h==='string' && /^#[0-9A-Fa-f]{6}$/.test(h))? h : GREEN, bot:0 }); }
-  const sq=S.sq, nb=(sq&&sq.bots)? sq.bots.length : Math.max(0,EV_MAX-Math.max(1,mem.length));
+  const sq=S.sq, nb=(sq&&sq.bots)? sq.bots.length : evBotsN(mem.length);   // 0905 THE FIVE-COMMANDER FILL: the live roster before the arm reads the shop's own arithmetic
   const used=evBotUsed();
   for(let bi=0;bi<nb;bi++){ const b=sq&&sq.bots&&sq.bots[bi]; out.push({ n:String(b? b.name : evBotName(bi)).toUpperCase().slice(0,12), h:b? b.hex : evBotHex(bi,used), bot:1 }); }
   return out;
@@ -70170,7 +70177,7 @@ function drawHUD(){
       // lime it always wore.
       cx.font=cf('bold 14px'); cx.fillStyle=lightField()? '#1E5A2E' : '#BFE39A';
       let sub=(n>1? tf('%1 COMMANDERS',n) : '');
-      if(S.sq.ev){ const pc=S.sq.evPc||n, nb=S.sq.bots? S.sq.bots.length : Math.max(0,EV_MAX-pc);   // 0484: the room is always ten strong — commanders + computers (the server's frozen pc once the bell rang; the live roster before)
+      if(S.sq.ev){ const pc=S.sq.evPc||n, nb=S.sq.bots? S.sq.bots.length : evBotsN(pc);   // 0484: commanders + computers (the server's frozen pc once the bell rang; the live roster before) · 0905 THE FIVE-COMMANDER FILL: the computers pad to EV_FILL, one arithmetic (evBotsN) — a full room reads N COMMANDERS · 0 COMPUTERS
         sub=tf('%1 COMMANDERS · %2 COMPUTERS', pc, nb); }
       if(sub) fitText(cx, sub, VW/2-60, 56, VW-120, 'bold', 14, 9);
       if(S.sq.ev) evDrawRoster();   // 0484: the seat roster along the top band — every name in its colour, the computers by seeded callsign
@@ -95116,7 +95123,7 @@ window.GVT = {
   nbForce(stamp){ stamp=String(stamp||'forced'); if(!NB.base) NB.base='(rig)'; NB.stamp=stamp; NB.newer=(stamp!==NB.base); NB.last=Date.now(); nbTick(); return GVT.nb(); },
   nbCheck(){ return nbCheck().then(()=>GVT.nb()); },
   bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), band:evBandState(), fielded:(S.bf&&S.bf.bd)? (S.bf.bdN|0) : 0, teamMin:BD_TEAM_MIN, live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, popT:BDD.popT, redealMs:BD_REDEAL_MS, popS:BD_POP_S, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, e:s.empty?1:0, k:s.kit?1:0, n:s.name, cpu:s.cpu?1:0, away:s.away?1:0, purse:Math.round(s.purse||0), bdPourT:+((s.bdPourT||0).toFixed(3)), diff:s.brain? s.brain.diff : null, hex:s.hex })) : null, note:BD.note, hull:S.bf? [S.bf.base.you.hp, S.bf.base.you.hpMax, S.bf.base.foe.hp, S.bf.base.foe.hpMax] : null, aiDiff:S.bf? S.bf.ai.diff : null, hard:!!(S.bf&&S.bf.hard), hq:!!btnRects.hq, pour:[BD_POUR, BD_POUR_T], baseHp:BD_BASE_HP, diffDial:BD_DIFF, titleY:BD_TITLE_Y, titleAlpha:(S.bf&&S.bf.bd)? +bdTitleAlpha().toFixed(3) : null, bellAt:(S.bdBellAt==null)? null : S.bdBellAt, simT:+((S.t||0).toFixed(3)), rosters:(S.bf&&S.bf.bd)? [bdRosterRows(0), bdRosterRows(1)] : null, putAway:Object.assign({},PUTAWAY), awayLog:BD_AWAY_LOG.slice(), inRoom:bdInRoom(), shell:bdInShell(), annS:BD_ANN_S, annAfterYeti:BD_ANN_AFTER_YETI, plastic:S.plastic, ot:!!(S.bf&&S.bf.ot) }; },   // 0902: + the round-two reads
-  evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, hpx:Object.assign({},EV_HPX), snowCdAdd:EV_SNOW_CD_ADD, w3F:EV_W3_F, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read · 0565 THE ULTRA MEGA TUNE: hpx = EV_HPX, the ULTRA room's per-type hp cells (a read-only copy) · 0574 THE ULTRA MEGA TUNE II: hpx shows seven cells; + snowCdAdd (EV_SNOW_CD_ADD) and w3F (EV_W3_F)
+  evFeel(){ return { fill:EV_FILL, botsMax:EV_BOTS_MAX, botsN:Array.from({length:EV_MAX},(_,i)=>evBotsN(i+1)), botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, hpx:Object.assign({},EV_HPX), snowCdAdd:EV_SNOW_CD_ADD, w3F:EV_W3_F, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read · 0565 THE ULTRA MEGA TUNE: hpx = EV_HPX, the ULTRA room's per-type hp cells (a read-only copy) · 0574 THE ULTRA MEGA TUNE II: hpx shows seven cells; + snowCdAdd (EV_SNOW_CD_ADD) and w3F (EV_W3_F)
   evSeen(v){ if(v===0||v===false) delete META.evSeen; else if(v!=null) META.evSeen=String(v); saveMeta(); return META.evSeen||null; },
   nightGate(){ return { open:nightGateOpen(), lvl:NIGHT_MIN_LVL, cmd:META.lvl|0, camp:META.campaign|0, band:evBandState(), door:evDoorState(), bd:bdDoorState(), seen:META.evSeen||null, annWk:EVD.annWk||null, popBell:EVD.popBell|0, bdAnnWk:BDD.annWk||null, bdPopBell:BDD.popBell|0, el:!!document.getElementById('evDoor'), spots:!!document.getElementById('evSpots'), snow:!!document.getElementById('evSnow'), pop:!document.getElementById('milePop').classList.contains('hidden'), band0:(b=>b? b.textContent : null)(document.querySelector('#milePop .mb-band')), head:(h=>h? h.textContent : null)(document.querySelector('#milePop .mb-h')), mode:S.mode }; },   // 0530 THE NIGHT GATE — the rig's one read: the gate, the two door states, the band, the four latches, the DOM
   giftRoad(){ const nx=ptyPickParse('c').nx, b=document.querySelector('.ptySheet:not(.hidden) .pts-toprow .pts-next'); return { camp:META.campaign|0, nx:nx, sign:giftRoadSign(nx), road:GIFT_ROAD.map(r=>({ lvl:r.lvl()|0, key:r.key, owned:!!r.owned() })), card:b? { nu:b.querySelector('.nu').textContent, b:b.querySelector('b').textContent, small:b.querySelector('small').textContent, on:b.classList.contains('on') } : null, lang:LANG }; },   // 0531 THE ROAD SIGNS — the rig's one read: the pick, the sign, every row's rung + owned, the open door's card
