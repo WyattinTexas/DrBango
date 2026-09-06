@@ -24595,6 +24595,7 @@ const TREASURE_ROAD=[
   { id:'teddy',      lvl:4,  kind:'stock', fam:'decor' },   // 0905 THE REWARD ROAD RE-CUT (cell 3, ⚑ Q3): gift → STOCK at the same rung — the stock card at 4 (PROMOTED TO LEVEL 4! · TAKE ME THERE), the verdict's surplus ticket, the NEW! chip, the crate's glow, the sign NEXT UP AT LEVEL 4; 20★ at the counter
   { id:'train',      lvl:10, kind:'stock', fam:'decor' },   // 0668: 6 → 10 (⚑ 10 approved) — the first shop ad comes when there are stars in pocket
   { id:'tan',        lvl:8,  kind:'stock', fam:'laser' },
+  { id:'bells',      lvl:9,  kind:'event', fam:'night' },   // 0905 THE NIGHT BELLS RING AT COMMANDER LEVEL 9 (Wyatt 9/5 9:24 pm: "When your commander level is level 9, that's when you can do any of the night events"): THE NIGHT WAR's door — NIGHT_MIN_LVL reads this cell (nightGateOpen: the yeti + the desert pitch from here), the level bar's sign says NEXT UP AT LEVEL 9: THE NIGHT BELLS till then (trName · trOwned know the family); kind 'event' = no shelf, no stock card, no NEW! chip (stockSweep / the heals / the verdict's prizes read kind 'stock'). ⚑ 9 · 0 = off
   { id:'soccer',     lvl:10, kind:'gift',  fam:'decor' },
   { id:'robot',      lvl:28, kind:'stock', fam:'decor' },   // 0903 ROBO ROAD (FM-GVT-ROBO-ROAD-01; Wyatt 9/2: "Delay Robo/SARGE to level 28"): 12 → 28 — the road's robot waits for the late twenties; a save already past 12 keeps him (the trV4 heal at the boot's foot + 0668's fence)
   { id:'gold',       lvl:14, kind:'stock', fam:'laser' },
@@ -24647,11 +24648,11 @@ const TREASURE_ROAD=[
 ];   // always: BLUE · RED = the counter's two starters (Wyatt 12:55); the rungs ⚑ Q2
 function trRow(id){ for(const r of TREASURE_ROAD) if(r.id===id) return r; return null; }
 function trLvl(id){ const r=trRow(id); return r? r.lvl : 0; }
-function trOwned(r){ return r.fam==='laser'? (Array.isArray(META.lasers) && META.lasers.indexOf(r.id)>=0) : decOwns(r.id); }
+function trOwned(r){ return r.fam==='night'? nightGateOpen() : r.fam==='laser'? (Array.isArray(META.lasers) && META.lasers.indexOf(r.id)>=0) : decOwns(r.id); }   // 0905: the bells are 'owned' once the night gate stands open (the sign walks on)
 function trStocked(id){ const r=trRow(id); if(!r) return true; if(trOwned(r)) return true; if(stockSeen(id)) return true; return (META.lvl|0)>=r.lvl; }   // no row → sold as ever · owned → yours · 0668: its card dealt → on the shelf it stays (a rung that moves UP never re-locks a veteran's shelf) · else the promotion put it on the shelf
 function trNext(){ const L=META.lvl|0; let best=null; for(const r of TREASURE_ROAD){ if(r.lvl<=L || trOwned(r) || stockSeen(r.id)) continue; if(!best || r.lvl<best.lvl) best=r; } return best; }   // THE SIGN's row: the lowest rung still ahead whose thing is not yet yours (an owned one is skipped — 0668: a dealt one too, it is already on the shelf; past the last, none)
 function trCrown(){ return !!(META.bone&&META.bone.h) && !!(META.ice&&META.ice.h) && (META.campaign|0)>=20; }   // 0341's TRIPLE CROWN — the dragon's first door, byte-what-it-was
-function trName(id){ const r=trRow(id); if(r && r.fam==='laser') return tf('THE %1 LASER', TXT(id.toUpperCase())); return TXT(DECOR_INFO[id]? DECOR_INFO[id].name : id); }   // PRE-TRANSLATED (the mystery box's own grammar) — every seat that prints it wears data-notr
+function trName(id){ const r=trRow(id); if(r && r.fam==='night') return TXT('THE NIGHT BELLS'); if(r && r.fam==='laser') return tf('THE %1 LASER', TXT(id.toUpperCase())); return TXT(DECOR_INFO[id]? DECOR_INFO[id].name : id); }   // 0905: the bells wear 0531's own key ×7   // PRE-TRANSLATED (the mystery box's own grammar) — every seat that prints it wears data-notr
 function trArt(id){ const r=trRow(id); if(r && r.fam==='laser'){ const a=ARMIES.find(x=>x.id===id); return '<img src="'+rayURI(a? a.hex : '#FFFFFF')+'" alt="">'; } return decShopArt(id); }   // the box art: the ray gun on the beam, or the toy's own decShopArt
 function trNewIs(id){ const r=trRow(id); return !!r && META.stockNew===id && !trOwned(r); }   // the NEW! chip: the newest stocked, still-unowned thing (cleared on its buy, replaced by the next rung)
 function stockSeen(id){ return Array.isArray(META.stockSeen) && META.stockSeen.indexOf(id)>=0; }
@@ -27150,13 +27151,14 @@ function roomGiftLine(id){ return id==='rooftop'? 'THE ROOFTOP IS YOURS. A whole
 // ⚠ THE LENS STAYS OFF THE ROAD (LENS_FREE_CAMP): hidden means hidden (v2.42) — Wyatt's own little secret; a secret
 // advertised in advance is no secret. It still announces on arrival exactly as today (lensGift + the verdict line).
 // 0903 NEW COMMANDER FIXES: the three weapon rows LEFT this road (Sarge's guns read the COMMANDER level now; a campaign sign that
-// promised the shotgun at campaign 5 would lie — the academy's REACH COMMANDER LEVEL line is their sign). THE WORD FREE NEVER APPEARS
+// promised the shotgun at campaign 5 would lie — the academy's REACH COMMANDER LEVEL line is their sign). 0905: THE NIGHT BELLS' row left
+// the same way (Wyatt 9/5 9:24 pm: the night war opens at COMMANDER level 9 — the treasure road's level-bar sign is its sign). THE WORD FREE NEVER APPEARS
 // ON THE ROAD, neither do prices — in any of the seven tongues (the announce lines' law, message two). A future
 // gift = one row. ⚑ a dial on any const moves its sign with it (the walk takes the LOWEST unowned rung ≥ the pick).
 const GIFT_ROAD=[
   // 0905 THE REWARD ROAD RE-CUT (cell 5): THE RUBBER DUCKY's row LEFT this road — he is sold at the counter now (15★, from day one); a sign must never promise a gift that is merchandise
   { lvl:()=>PAINT_GIFT_LVL,                   key:'PAINT DAY',                 owned:()=>(Array.isArray(META.dyes)&&META.dyes.some(id=>!dyeIsPrize(id)))||!!META.dyeGift },   // the CHOICE (0539: a prize jar is not the choice) — a jar ever in the ledger, or the 0529 stamp (KEEP MY GREEN is a choice made); never !paintRiteOwed(): its rung clause reads false on every rung still ahead
-  { lvl:()=>NIGHT_MIN_LVL,                    key:'THE NIGHT BELLS',           owned:()=>nightGateOpen() },   // rung-passed: the bells ring for everyone once the gate opens (0530)
+  // 0905 THE NIGHT BELLS RING AT COMMANDER LEVEL 9 (Wyatt 9/5 9:24 pm: "When your commander level is level 9, that's when you can do any of the night events"): THE NIGHT BELLS' row LEFT this road — the night gate reads the COMMANDER level now, and the treasure road's sign in the level bar (NEXT UP AT LEVEL 9: THE NIGHT BELLS) is its sign, the guns' own precedent (0903)
 ];
 // the sign for a pick: the LOWEST unowned rung at or past nx (nx = the next rung to play), or null = the plain corner
 function giftRoadSign(nx){
@@ -41181,7 +41183,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.28';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.29';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -43930,7 +43932,7 @@ function evClaim(){
 // HALL_STARS on both ledgers OUTSIDE RAID_DAY_CAP (evSpoils' D9 grammar), marks the ceremony owed (ann) and stashes the roster (last);
 // an equal or older key deals nothing — one card and one purse per defeat, on the NEXT landing after it, never on a plain login; a
 // player who missed several defeats meets the latest once (⚑ Q2/Q3). The winners get it too (⚑ Q1; their own plate reads YOU WERE
-// THERE). Under the night gate like every night-war pitch (0530; ⚑ Q-D: the latch stays unwritten below rung 9). THE SEAT: hallSweep
+// THERE). Under the night gate like every night-war pitch (0530; ⚑ Q-D: the latch stays unwritten below COMMANDER level 9 — 0905). THE SEAT: hallSweep
 // rides ceremonyChain directly after evSweep (a winner's own spoils card first, ⚑ Q4); a poll that lands on a quiet room deals at once
 // through ceremonyNext (the fold's own door — never over a standing card, never mid-battle). THE CARD (hallCard): THE MARQUEE — the
 // invasion door's ice skin on the milePop grammar: the band THE INVASION · <evDaysLine>, the head, a stage (the winter sky, the snow,
@@ -43944,7 +43946,7 @@ const HALL_STARS=50;           // ⚑ Q3: the purse per defeat, both ledgers, ou
 const HALL_SEATS_MAX=10;       // the dancers drawn (HQ caps the wire at ten + `more`)
 function hallOwe(h){
   if(!h || typeof h!=='object' || typeof h.wk!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(h.wk) || !Array.isArray(h.seats)) return false;
-  if(!nightGateOpen()) return false;   // ⚑ Q-D THE NIGHT GATE (0530): the pitch waits for rung 9 — the latch stays unwritten below it
+  if(!nightGateOpen()) return false;   // ⚑ Q-D THE NIGHT GATE (0530): the pitch waits for COMMANDER level 9 (0905) — the latch stays unwritten below it
   if(!META.hall || typeof META.hall!=='object') META.hall={ wk:'', ann:0, last:null };
   const H=META.hall;
   if(!(h.wk>H.wk)) return false;   // the night key in string order: equal or older = already paid (or never owed) — ONCE PER DEFEAT
@@ -44092,18 +44094,26 @@ const EV_AFK_S=30;             // D13: the you-there window before the bell (0 =
 const EV_POP_S=300;            // 0506 THE T−5 CARD (Wyatt 8/23: "5 minutes before, it should show up"): the PRIME TIME card deals a second time at evIn()<=EV_POP_S, once per bell per launch, the menu only (0 = off). ⚑ 300 (default) · 600 · a battle toast at T−5 too
 const EV_SNOW=1;               // the winter skin's snowfall while live (two sheets — "doubles")
 // ═══ 0530 THE NIGHT GATE (FM-GVT-NEWBIE-01 §4; Wyatt 8/24: "3) Yes hold off night events until they are
-// level 9") — until NIGHT_MIN_LVL campaign rungs are beaten the night war does not PITCH: the launch card
-// (evAnnTry), the T−5 card (evPopTry), the desert's announce + JOIN cards (bdAnnTry / bdPopTry) and the band
-// the two events light on the room (evBandState → 'none': no chip, no INVASION door, no cones, no dusk, no
-// snow) all deal nothing. ⚠ THE 0522b SEQUENCE LAW: the gate sits ABOVE both the deal and the once-ever
-// latch — META.evSeen and EVD.annWk stay unwritten below the rung, so a cradled player's once is not burned;
-// their first pitch lands the first night at rung 9+. HQ, evSync and the state reads on the menu beat
-// (evState / bdState) are untouched — the events run for everyone else on the same bells, and the clock
-// truth keeps flowing so the band paints the moment the rung is beaten. A room code from a friend still
-// opens its door: the gate holds the PITCHES, it never polices a door a friend opens (evJoin / bdJoin / the
-// lobby untouched — zero wire). ⚑ 9 (default: nine rungs beaten) · 8 = "while playing rung 9" · 0 = off
-const NIGHT_MIN_LVL=9;
-function nightGateOpen(){ return (META.campaign|0)>=NIGHT_MIN_LVL; }   // the one read every pitch makes first (the roomGiftDue idiom)
+// level 9" · 0905 THE NIGHT BELLS RING AT COMMANDER LEVEL 9 — Wyatt 9/5 ~8:34 pm: "We had a level 9 account on
+// Android, and we noticed that they couldn't enter the Battle of the Desert. They didn't get the notification or
+// anything." and his 9:24 pm RULING: "No, so the commander level is level 9. When your commander level is level 9,
+// that's when you can do any of the night events.") — THE LEVEL IS THE COMMANDER LEVEL (META.lvl, the XP ladder the
+// level bar and the academy call COMMANDER LEVEL — the 0903 gun doors' own read; 0530 had read the campaign rung,
+// which is why a commander-9 account on campaign rung 5 heard nothing on 9/5). Until the commander level reaches
+// NIGHT_MIN_LVL the night war does not PITCH: the launch card (evAnnTry), the T−5 card (evPopTry), the desert's
+// announce + JOIN cards (bdAnnTry / bdPopTry), the King's Hall ceremony (hallOwe) and the band the two events light
+// on the room (evBandState → 'none': no chip, no INVASION door, no dusk, no snow) all deal nothing. ⚠ THE 0522b
+// SEQUENCE LAW: the gate sits ABOVE both the deal and the once-ever latch — META.evSeen and EVD.annWk stay
+// unwritten below the level, so a cradled player's once is not burned; their first pitch lands the first night at
+// commander level 9. HQ, evSync and the state reads on the menu beat (evState / bdState) are untouched — the events
+// run for everyone else on the same bells, and the clock truth keeps flowing so the band paints the moment the
+// promotion lands. A room code from a friend still opens its door: the gate holds the PITCHES, it never polices a
+// door a friend opens (evJoin / bdJoin / the lobby untouched — zero wire). THE SIGN: the number lives on the
+// treasure road (TREASURE_ROAD's bells row — ONE owner per number, the soccer/football precedent) and the level
+// bar's NEXT UP AT LEVEL 9: THE NIGHT BELLS is its sign (the guns' own precedent, 0903); the campaign road's row
+// left with this card. ⚑ the row's lvl 9 (Wyatt 9/5 9:24 pm) · 0 = off
+const NIGHT_MIN_LVL=trLvl('bells');   // 9 — read off the treasure road's row (the ONE owner of every commander-level number)
+function nightGateOpen(){ return (META.lvl|0)>=NIGHT_MIN_LVL; }   // the one read every pitch makes first — the COMMANDER level (0905; the roomGiftDue idiom stood on the campaign rung until Wyatt's 9/5 ruling)
 // ═══ 0516 THE BATTLE OF THE DESERT (design/feedback-0823-eve/00-FEEDBACK.md §2; Wyatt 8/23 note 10 +
 // the 20:16 ruling "Make sure the Battle of the Desert is top priority so we can play it tonight") — the
 // SECOND event door, on the BATTLEGROUND room family. HQ (server v37) rings a nightly bell at 22:00 ET
@@ -44747,7 +44757,7 @@ function evNextBellDayLong(raw){ const e=evNextBellEpoch(); if(!e) return evBell
 // night; the desert JOIN card (bdAnnTry) keeps 0516's own law. ⚑ alt: once per NIGHT (META.evSeen===EV.wk).
 // Reversal for a rig / for Wyatt: GVT.evSeen(0).
 function evAnnTry(){
-  if(!nightGateOpen()) return false;   // 0530 THE NIGHT GATE — ABOVE the deal AND the 0522b once-ever latch: below the rung neither META.evSeen nor EVD.annWk is written, the once is kept for the first night at rung 9+
+  if(!nightGateOpen()) return false;   // 0530 THE NIGHT GATE — ABOVE the deal AND the 0522b once-ever latch: below the level neither META.evSeen nor EVD.annWk is written, the once is kept for the first night at COMMANDER level 9 (0905)
   const st=evDoorState();
   if(!EV.wk || !(EV.bell>0) || st==='none' || st==='sealed' || EVD.annWk===EV.wk || META.evSeen) return false;   // 0522b: META.evSeen = seen once, seen for good
   if(!evBellToday()) return false;   // 0905 THE KING FELL (⚑ Q9): the once-ever card waits for a BELL DAY (a Friday or a Sunday at HQ's clock) — META.evSeen stays unburned on the other five; the T−5 card is bell-night by construction
@@ -95050,7 +95060,7 @@ window.GVT = {
   bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), band:evBandState(), fielded:(S.bf&&S.bf.bd)? (S.bf.bdN|0) : 0, teamMin:BD_TEAM_MIN, live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, popT:BDD.popT, redealMs:BD_REDEAL_MS, popS:BD_POP_S, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, e:s.empty?1:0, k:s.kit?1:0, n:s.name, cpu:s.cpu?1:0, away:s.away?1:0, purse:Math.round(s.purse||0), bdPourT:+((s.bdPourT||0).toFixed(3)), diff:s.brain? s.brain.diff : null, hex:s.hex })) : null, note:BD.note, hull:S.bf? [S.bf.base.you.hp, S.bf.base.you.hpMax, S.bf.base.foe.hp, S.bf.base.foe.hpMax] : null, aiDiff:S.bf? S.bf.ai.diff : null, hard:!!(S.bf&&S.bf.hard), hq:!!btnRects.hq, pour:[BD_POUR, BD_POUR_T], baseHp:BD_BASE_HP, diffDial:BD_DIFF, titleY:BD_TITLE_Y, titleAlpha:(S.bf&&S.bf.bd)? +bdTitleAlpha().toFixed(3) : null, bellAt:(S.bdBellAt==null)? null : S.bdBellAt, simT:+((S.t||0).toFixed(3)), rosters:(S.bf&&S.bf.bd)? [bdRosterRows(0), bdRosterRows(1)] : null, putAway:Object.assign({},PUTAWAY), awayLog:BD_AWAY_LOG.slice(), inRoom:bdInRoom(), shell:bdInShell(), annS:BD_ANN_S, annAfterYeti:BD_ANN_AFTER_YETI, plastic:S.plastic, ot:!!(S.bf&&S.bf.ot) }; },   // 0902: + the round-two reads
   evFeel(){ return { botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickAdd:EV_TICK_ADD, hpx:Object.assign({},EV_HPX), snowCdAdd:EV_SNOW_CD_ADD, w3F:EV_W3_F, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read · 0565 THE ULTRA MEGA TUNE: hpx = EV_HPX, the ULTRA room's per-type hp cells (a read-only copy) · 0574 THE ULTRA MEGA TUNE II: hpx shows seven cells; + snowCdAdd (EV_SNOW_CD_ADD) and w3F (EV_W3_F)
   evSeen(v){ if(v===0||v===false) delete META.evSeen; else if(v!=null) META.evSeen=String(v); saveMeta(); return META.evSeen||null; },
-  nightGate(){ return { open:nightGateOpen(), lvl:NIGHT_MIN_LVL, camp:META.campaign|0, band:evBandState(), door:evDoorState(), bd:bdDoorState(), seen:META.evSeen||null, annWk:EVD.annWk||null, popBell:EVD.popBell|0, bdAnnWk:BDD.annWk||null, bdPopBell:BDD.popBell|0, el:!!document.getElementById('evDoor'), spots:!!document.getElementById('evSpots'), snow:!!document.getElementById('evSnow'), pop:!document.getElementById('milePop').classList.contains('hidden'), band0:(b=>b? b.textContent : null)(document.querySelector('#milePop .mb-band')), head:(h=>h? h.textContent : null)(document.querySelector('#milePop .mb-h')), mode:S.mode }; },   // 0530 THE NIGHT GATE — the rig's one read: the gate, the two door states, the band, the four latches, the DOM
+  nightGate(){ return { open:nightGateOpen(), lvl:NIGHT_MIN_LVL, cmd:META.lvl|0, camp:META.campaign|0, band:evBandState(), door:evDoorState(), bd:bdDoorState(), seen:META.evSeen||null, annWk:EVD.annWk||null, popBell:EVD.popBell|0, bdAnnWk:BDD.annWk||null, bdPopBell:BDD.popBell|0, el:!!document.getElementById('evDoor'), spots:!!document.getElementById('evSpots'), snow:!!document.getElementById('evSnow'), pop:!document.getElementById('milePop').classList.contains('hidden'), band0:(b=>b? b.textContent : null)(document.querySelector('#milePop .mb-band')), head:(h=>h? h.textContent : null)(document.querySelector('#milePop .mb-h')), mode:S.mode }; },   // 0530 THE NIGHT GATE — the rig's one read: the gate, the two door states, the band, the four latches, the DOM
   giftRoad(){ const nx=ptyPickParse('c').nx, b=document.querySelector('.ptySheet:not(.hidden) .pts-toprow .pts-next'); return { camp:META.campaign|0, nx:nx, sign:giftRoadSign(nx), road:GIFT_ROAD.map(r=>({ lvl:r.lvl()|0, key:r.key, owned:!!r.owned() })), card:b? { nu:b.querySelector('.nu').textContent, b:b.querySelector('b').textContent, small:b.querySelector('small').textContent, on:b.classList.contains('on') } : null, lang:LANG }; },   // 0531 THE ROAD SIGNS — the rig's one read: the pick, the sign, every row's rung + owned, the open door's card
   lossNudge(){ const ov=document.getElementById('lose'), nl=document.getElementById('loseNudge'), bb=document.getElementById('bfBtn'), R=el=>{ if(!el) return null; const r=el.getBoundingClientRect(); return { x:Math.round(r.x), y:Math.round(r.y), r:Math.round(r.right), b:Math.round(r.bottom), w:Math.round(r.width), h:Math.round(r.height) }; }, V=el=>!!el && getComputedStyle(el).display!=='none';
     return { cv:GVT_CV, on:LOSE_NUDGE_ON, at:LOSE_NUDGE_AT, mode:S.mode, rung:S.levelN|0, count:(((META.lossRun||{})['l'+S.levelN])|0), run:Object.assign({},META.lossRun||{}), pred:lossNudgeDue(), kind:ov.classList.contains('kind'), shown:!ov.classList.contains('hidden') && ov.classList.contains('nudge'), line:nl? nl.textContent : null, lineKey:NUDGE_LINE, button:bb? bb.textContent : null, buttonKey:NUDGE_BTN, lineShown:V(nl), buttonShown:V(bb), rects:{ line:R(nl), button:R(bb), retry:R(document.getElementById('retryBtn')), hq:R(document.getElementById('hqBtn')) }, fit:{ sh:ov.scrollHeight, ch:ov.clientHeight }, landing:{ menu:!document.getElementById('menu').classList.contains('hidden'), wartable:!document.getElementById('wartable').classList.contains('hidden'), lose:!ov.classList.contains('hidden'), bf:!!S.bf, coop:!!S.coop, sq:!!S.sq }, lang:LANG }; },   // 0715 LOSE TWICE — the rig's one read: predicate · rung · count · shown · line · button label · rects · landing
