@@ -28068,8 +28068,10 @@ if(!META.crownV2){ META.crownV2=1;
     META.chest=c;
   })();
   // ═══ 0905 THE KING FELL — the hall's latch rebuilt fresh (the chest shape): wk = the night key of the last defeat this save was paid for ('' = never),
-  // ann = the card owed, last = the roster it deals (HQ's seats, ≤ ten). Anything else on the field is dropped; nothing here pays or deals.
-  (function(){ const h0=META.hall; META.hall={ wk:(h0 && typeof h0==='object' && typeof h0.wk==='string')? h0.wk : '', ann:(h0 && typeof h0==='object' && h0.ann)? 1 : 0, last:(h0 && typeof h0==='object' && h0.last && typeof h0.last==='object' && Array.isArray(h0.last.seats))? h0.last : null }; })();
+  // ann = the card owed, last = the roster it deals (HQ's seats, ≤ ten); took = the player's LOCAL day the card was first dealt ('' = not yet, or
+  // before 0905 KING FELL FOR EVERYONE), day2 = the night key the morning-after showing was dealt for (cell C). Anything else on the field is
+  // dropped; nothing here pays or deals.
+  (function(){ const h0=META.hall; META.hall={ wk:(h0 && typeof h0==='object' && typeof h0.wk==='string')? h0.wk : '', ann:(h0 && typeof h0==='object' && h0.ann)? 1 : 0, last:(h0 && typeof h0==='object' && h0.last && typeof h0.last==='object' && Array.isArray(h0.last.seats))? h0.last : null, took:(h0 && typeof h0==='object' && typeof h0.took==='string')? h0.took : '', day2:(h0 && typeof h0==='object' && typeof h0.day2==='string')? h0.day2 : '' }; })();
   // 0348: a DELIVERED hookshot (META.hookDrop — dropped down the rooftop
   // hole, Wyatt 8/16) stays down for good on every device: strip it from
   // every floor list and every saved drag delta, every boot (idempotent —
@@ -41183,7 +41185,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.30';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.31';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -43930,9 +43932,19 @@ function evClaim(){
 // last night the king fell: the won night's HUMAN claimants dressed from their players rows, ≤ ten + more, `you:1` on my own seat.
 // THE LATCH (hallOwe): META.hall.wk = the night key of the last defeat this save was paid for — a NEWER key latches FIRST, then pays
 // HALL_STARS on both ledgers OUTSIDE RAID_DAY_CAP (evSpoils' D9 grammar), marks the ceremony owed (ann) and stashes the roster (last);
-// an equal or older key deals nothing — one card and one purse per defeat, on the NEXT landing after it, never on a plain login; a
+// an equal or older key deals nothing — one card and one purse per defeat, dealt on the landing that carries it, a plain login
+// included (0905 KING FELL FOR EVERYONE, cell B: the poll's reply on a quiet menu deals at once; under a standing card it deals the
+// moment that card folds — every take's ceremonyNext; under a panel, a modal, the age gate or a comm window it deals on the first
+// QUIET second at home — hallTick on the room's 1 s beat; never over Sarge's tour — the tour's close runs the held chain); a
 // player who missed several defeats meets the latest once (⚑ Q2/Q3). The winners get it too (⚑ Q1; their own plate reads YOU WERE
-// THERE). Under the night gate like every night-war pitch (0530; ⚑ Q-D: the latch stays unwritten below COMMANDER level 9 — 0905). THE SEAT: hallSweep
+// THERE). NO NIGHT GATE HERE (0905 KING FELL FOR EVERYONE, cell A — Wyatt 9/5 ~10:05 pm ET: "I just logged in on a browser on an alt
+// account, and they didn't get to see the winners of the ULTRA Mega King Yeti fight that just happened tonight. They should have
+// gotten that awesome popup"): every account latches and is paid, at any campaign rung and any commander level — the night gate
+// (0530; ⚑ Q-D reversed) stays on the pitches that lead to a door a low-level player cannot open; the hall leads nowhere. THE MORNING
+// AFTER (cell C, Wyatt 9/5 ~10:20 pm: "when every player opens the app tomorrow, they see the announcement of who won from tonight.
+// including the winners. make them feel important."): an account that took the card sees it ONCE MORE on its first quiet landing of
+// a later LOCAL day (took = the player's own yyyy-mm-dd at the first deal; day2 = the key it was re-shown for; HALL_DAY2 0 = off), no
+// second purse. THE SEAT: hallSweep
 // rides ceremonyChain directly after evSweep (a winner's own spoils card first, ⚑ Q4); a poll that lands on a quiet room deals at once
 // through ceremonyNext (the fold's own door — never over a standing card, never mid-battle). THE CARD (hallCard): THE MARQUEE — the
 // invasion door's ice skin on the milePop grammar: the band THE INVASION · <evDaysLine>, the head, a stage (the winter sky, the snow,
@@ -43944,26 +43956,42 @@ function evClaim(){
 // pack — never menuSargeURI); a seat with no loadout = the plain Sarge in his army's hex.
 const HALL_STARS=50;           // ⚑ Q3: the purse per defeat, both ledgers, outside the day cap (Wyatt: "50 stars complimentary")
 const HALL_SEATS_MAX=10;       // the dancers drawn (HQ caps the wire at ten + `more`)
+const HALL_DAY2=1;             // 0905 KING FELL FOR EVERYONE ⚑ C-Q1: 1 = THE MORNING AFTER — the card once more on the first quiet landing of a later local day (no second purse); 0 = once per defeat, as 0797 shipped
 function hallOwe(h){
   if(!h || typeof h!=='object' || typeof h.wk!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(h.wk) || !Array.isArray(h.seats)) return false;
-  if(!nightGateOpen()) return false;   // ⚑ Q-D THE NIGHT GATE (0530): the pitch waits for COMMANDER level 9 (0905) — the latch stays unwritten below it
-  if(!META.hall || typeof META.hall!=='object') META.hall={ wk:'', ann:0, last:null };
+  // 0905 KING FELL FOR EVERYONE (cell A): the night gate line LEFT this seat — it stood here from 0797 (⚑ Q-D: the latch waited for COMMANDER level 9). Wyatt 9/5 ~10:05 pm ET:
+  // "they didn't get to see the winners of the ULTRA Mega King Yeti fight that just happened tonight. They should have gotten that awesome popup" — every account
+  // latches and is paid below, whatever the gate reads; the five pitches that lead to a door keep it (evAnnTry · evPopTry · bdAnnTry · bdPopTry · evBandState).
+  if(!META.hall || typeof META.hall!=='object') META.hall={ wk:'', ann:0, last:null, took:'', day2:'' };
   const H=META.hall;
   if(!(h.wk>H.wk)) return false;   // the night key in string order: equal or older = already paid (or never owed) — ONCE PER DEFEAT
-  H.wk=h.wk;   // THE LATCH FIRST (flag-first: nothing below can pay twice, whatever happens to the tab)
+  H.wk=h.wk; H.took='';   // THE LATCH FIRST (flag-first: nothing below can pay twice, whatever happens to the tab) · 0905 cell C: the new key starts the morning-after over (took is stamped at the deal; day2 compares against wk)
   META.starBank+=HALL_STARS; META.starsLifetime+=HALL_STARS;   // the purse on BOTH ledgers, OUTSIDE RAID_DAY_CAP (the evSpoils grammar)
   H.ann=1;
   H.last={ wk:h.wk, at:h.at|0, n:h.n|0, more:h.more|0, seats:h.seats.slice(0,HALL_SEATS_MAX).map(s=>({ uid:String((s&&s.uid)||''), name:String((s&&s.name)||'').slice(0,24), color:(s&&typeof s.color==='string')? s.color:null, w:(s&&typeof s.w==='string')? s.w:null, r:(s&&s.r)|0, sb:(s&&typeof s.sb==='string')? s.sb:null, of:(s&&Array.isArray(s.of))? s.of.filter(x=>typeof x==='string').slice(0,16):[], hb:(s&&s.hb)?1:0, aoe:+((s&&s.aoe)||0)||0, jet:(s&&s.jet)?1:0, you:(s&&s.you)?1:0 })) };
   saveMeta();
-  if(S.mode==='menu' && evAnnQuiet()) ceremonyNext();   // the room is up and quiet: deal now (the PRIME TIME card's own late-landing seat) — else the next landing's chain
+  if(hallQuiet()) ceremonyNext();   // the room is up and QUIET: deal now — else the standing card's fold (every take's ceremonyNext), the first quiet second (hallTick) or the next landing's chain · 0905 KING FELL FOR EVERYONE (cell B): the quiet law is roomQuiet's (no card, no panel, no modal, no age gate, no Sarge window) and never over Sarge's tour — a fresh save's first landing polls DURING the tour; the tour's close runs the held chain (⚑ Q2); 0797 read evAnnQuiet here (the PRIME TIME card's law)
   return true;
 }
+function hallDay2Due(){   // 0905 KING FELL FOR EVERYONE (cell C): THE MORNING AFTER is owed — the card was dealt (wk + last, nothing banked) on an EARLIER local day (took < today; '' = before this build = "before today"), and not yet re-shown for this key
+  const H=META.hall; if(!HALL_DAY2 || !H || !H.wk || !H.last || H.ann) return false;
+  if(H.day2===H.wk) return false;
+  return !H.took || H.took<todayStr();   // the player's own calendar (todayStr, the piggy's daily clock) — never HQ's wk
+}
+function hallDue(){ const H=META.hall; return !!(H && H.last && (H.ann || hallDay2Due())); }   // a hall card owed right now: the banked deal or the morning-after showing
 function hallSweep(){
-  const H=META.hall; if(!H || !H.ann || !H.last) return false;
-  H.ann=0; saveMeta();
-  if(S.mode==='menu') renderMenu();   // the v1.70 paint-before-sweep law (the piggy already shows the 50★)
+  const H=META.hall; if(!H || !H.last) return false;
+  if(H.ann){
+    H.ann=0; H.took=todayStr(); saveMeta();   // 0905 cell C: the first deal's local day, stamped flag-first with the sweep
+    if(S.mode==='menu') renderMenu();   // the v1.70 paint-before-sweep law (the piggy already shows the 50★)
+    hallCard(H.last); return true;
+  }
+  if(!hallDay2Due()) return false;
+  H.day2=H.wk; saveMeta();   // THE MORNING AFTER, flag-first: once per key, no purse (the 50★ is per defeat, paid at the latch)
   hallCard(H.last); return true;
 }
+function hallQuiet(){ return S.mode==='menu' && roomQuiet() && !tourLive(); }   // 0905 KING FELL FOR EVERYONE (cell B): the hall's quiet law — the room's own (roomQuiet: no card, no panel, no modal, no age gate, no Sarge window, no scene) and never over Sarge's tour (its walk and tick have no window)
+function hallTick(){ const H=META.hall; if(H && H.ann && H.last && hallQuiet()) ceremonyNext(); }   // 0905 KING FELL FOR EVERYONE (cell B): the room's 1 s beat — a hall BANKED while a panel, a modal, the age gate, a comm window or the tour stood deals on the first QUIET second at home (the dinoSargeTick grammar; the take's fold deals it first when a card stood). The morning-after showing (cell C) is NOT on the beat: it deals at a LANDING's chain (or a take) — a same-landing re-deal of the same markup would meet the chain's D4 repeat-fold and spend the latch (⚑ a menu left open across midnight meets it at its next landing)
 function hallHex(s){ return chalHexOf({ color:(s&&s.color)||null }); }   // the seat's army hex (the dyeRowOf jar; Sarge's own green when undyed — the 0527a default)
 function hallSargeURI(s){
   const c={ a:1, w:s.w, r:s.r|0, sb:s.sb, of:Array.isArray(s.of)? s.of:[], color:s.color||null, hb:s.hb|0, aoe:+s.aoe||0, jet:s.jet|0 };
@@ -44101,8 +44129,9 @@ const EV_SNOW=1;               // the winter skin's snowfall while live (two she
 // level bar and the academy call COMMANDER LEVEL — the 0903 gun doors' own read; 0530 had read the campaign rung,
 // which is why a commander-9 account on campaign rung 5 heard nothing on 9/5). Until the commander level reaches
 // NIGHT_MIN_LVL the night war does not PITCH: the launch card (evAnnTry), the T−5 card (evPopTry), the desert's
-// announce + JOIN cards (bdAnnTry / bdPopTry), the King's Hall ceremony (hallOwe) and the band the two events light
-// on the room (evBandState → 'none': no chip, no INVASION door, no dusk, no snow) all deal nothing. ⚠ THE 0522b
+// announce + JOIN cards (bdAnnTry / bdPopTry) and the band the two events light
+// on the room (evBandState → 'none': no chip, no INVASION door, no dusk, no snow) all deal nothing (the King's Hall ceremony,
+// hallOwe, LEFT the gate 9/5 late — 0905 KING FELL FOR EVERYONE: the hall leads to no door, every account meets it). ⚠ THE 0522b
 // SEQUENCE LAW: the gate sits ABOVE both the deal and the once-ever latch — META.evSeen and EVD.annWk stay
 // unwritten below the level, so a cradled player's once is not burned; their first pitch lands the first night at
 // commander level 9. HQ, evSync and the state reads on the menu beat (evState / bdState) are untouched — the events
@@ -44547,6 +44576,7 @@ function evDoorTick(){
   shipNudgeTick();   // 0546 THE SHIP'S NUDGE: the same second — the class rides the ship's own group, never baked by a repaint
   hookNudgeTick();   // 0630 THE ROOF AFTER THE KING: the hookshot's pulse on the same second (+ the landing's word on its first quiet second)
   dinoSargeTick();   // 0905 THE REWARD ROAD RE-CUT (cell 2): SARGE'S PLANE PROMPT owed from a mid-flow take (or a window a door tore down) deals on the first QUIET second at home
+  hallTick();   // 0905 KING FELL FOR EVERYONE (cell B): a banked hall / the morning-after showing deals on the first QUIET second at home — the same second, zero new timers
   grpBtnSync();   // 0515 G1: the GROUP button rides the room's own second (§5.1 — the searching countdown, zero new timers)
 }
 function evDoorDeny(){ const d=document.getElementById('evDoor'); if(!d) return; d.classList.remove('deny'); void d.offsetWidth; d.classList.add('deny'); setTimeout(()=>{ try{ d.classList.remove('deny'); }catch(e){} }, 500); }
@@ -95058,7 +95088,7 @@ window.GVT = {
       one:!!(el && el.classList.contains('ev-one')), short:!!(el && el.classList.contains('ev-short')), overflow:el? +(el.scrollWidth-el.clientWidth).toFixed(1) : null, dir:el? getComputedStyle(el).direction : null, glow:{ bf:cl('ro-bf'), tag:cl('rtag-bf') }, bell:bell? { r:R(bell), cls:bell.className, face:bell.getAttribute('data-face'), onclick:bell.getAttribute('onclick')||'', gly:!!bell.querySelector('svg.gly-bell') } : null, duel:R(document.getElementById('bfBadge')), scale:roomScale(), stage:R(document.getElementById('roomStage')) }; },   // 0904 THE BAND MOVES INTO THE HEAD's rig door — read-only
   bdForce(bell, open, wk){ BD.bell=+bell||0; BD.open=(open!=null)? +open : (BD.bell? BD.bell-BD_POP_S : 0); if(wk) BD.wk=String(wk); else if(!BD.wk) BD.wk='bd:2026-08-23'; evDoorTick(); return bdDoorState(); },   // 0516: a rig's desert clock
   na(){ return { alt:EV.alt|0, evBell:EV.bell|0, bdBell:BD.bell|0, band:evBandState(), door:evDoorState(), bdDoor:bdDoorState(), yetiRung:bdYetiRung()?1:0, annS:BD_ANN_S, wakeEv:evBandWakeAt(EV.bell), wakeBd:evBandWakeAt(BD.bell) }; },   // 0640 ONE BELL A NIGHT — read-only: the alternation truth + the band's word
-  hall(h){ if(h){ hallCard(h); return true; } return META.hall? JSON.parse(JSON.stringify(META.hall)) : null; },   // 0905 THE KING FELL: deal the card with any roster (the proof + Wyatt's screenshots) · no arg = the latch as saved
+  hall(h){ if(h){ hallCard(h); return true; } return META.hall? Object.assign(JSON.parse(JSON.stringify(META.hall)), { due:hallDue(), day2Due:hallDay2Due(), today:todayStr(), on:HALL_DAY2 }) : null; },   // 0905 THE KING FELL: deal the card with any roster (the proof + Wyatt's screenshots) · no arg = the latch as saved (+ 0905 KING FELL FOR EVERYONE: took · day2 · due · day2Due · today · on)
   evDays(){ return { days:EV.days, set:evDaysSet(), friSun:evDaysIsFriSun(), line:evDaysLine(), today:evBellToday(), tzDay:evTZDay(evNow()), wk:EV.wk, nextDay:evNextBellDayLong(), nextEpoch:evNextBellEpoch(), ann:evAnnLine(), daily:EV.daily|0, alt:EV.alt|0, stars:HALL_STARS }; },   // 0905: the schedule words, read-only
   bdJoin(){ return bdJoin(); },
   bdSpoils(){ const bd=META.bd||{}; return { cv:GVT_CV, levels:BD_LEVELS, full:BD_FULL_STARS, wk:bd.wk||'', night:bdWk(), played:bd.played|0, won:bd.won|0, last:bd.last||null, ann:bd.ann?1:0, pend:bd.claimPend||null, claimed:bd.claimed?1:0, claimErr:bd.claimErr||null, pool:bdPool(), roll:bdRoll(bdWk()||'x', META.deviceId), lvl:META.lvl, xp:META.xp, stars:META.starBank, decor:((META.decor&&META.decor.own)||[]).slice(), wr:WR.mine }; },   // 0548 THE DESERT SPOILS: the ledger, the pool, the roll
