@@ -41308,7 +41308,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.37';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.38';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -42244,6 +42244,7 @@ function coopOnPoll(r, sentWant){
   if(!CREW.crew && Array.isArray(r.pinv)){ CREW.pinv=r.pinv; partyPopSync(); }
   const wasState=COOP.state;
   COOP.state=r.state; if(r.level!=null) COOP.level=r.level;
+  if(wasState!=='battle' && r.state==='battle' && coopSquad() && !S.coop) COOP.parkPend=null;   // 0906 ONE CARPET (cell A, F2): the open->battle flip clears a stash from before it (a re-join's replayed word, a beacon's leftover) — this reply's own cmds run below with the state already 'battle' and re-seat the fresh word
   if(S.coop && r.state==='battle') sqNoteBeat();   // 0322: the chair rents off LAST SEEN — keep the note's ts honest through the battle
   if(coopMulti()){
     // ⚠ role is the wire IDENTITY and the cmds filter below reads it — set it
@@ -42331,7 +42332,7 @@ function coopOnPoll(r, sentWant){
   S.cenQ=(S.cenQ|0)+1;   // FIX-B: one census beat per poll reply (the formation translate's guard)
   (r.cmds||[]).forEach(cm=>{
     if(cm.q>COOP.seq) COOP.seq=cm.q;
-    if(cm.p===COOP.role) return;
+    if(cm.p===COOP.role && cm.k!=='park') return;   // 0906 ONE CARPET (FM-GVT-ONE-CARPET-01 cell A): my OWN park word is never skipped — a seat whose flip reply was lost and whose re-sent order read LATE (flip 0, its pick dropped) re-reads the log and must find its own order there (the word is idempotent: coopApply's park branch only stashes it off the carpet)
     // ⚠ wave tickers COALESCE. A reconnecting client replays the battle's whole
     // command log from seq 0 (that is the v1.9 rejoin story), and applying five
     // of these in a row would rebase all five waves onto the same instant and
@@ -42379,6 +42380,8 @@ function coopOnPoll(r, sentWant){
   if(r.state!=='battle' && sentWant){ COOP.wantBattle=false; COOP.wantLvl=0; COOP.wantPark=null; }
   if(r.state==='battle' && sentWant && r.flip===1) COOP.wantBattle=false;   // 0634 THE QUEUE PULLS THE GROUP (server v51): my order FLIPPED the lobby — it is placed: the next polls carry no second set (a member's launch waits one beat on the seam's re-read, 0826 D9 — a repeated set would read LATE and drop his pick); my pick stays for the launch
   if(r.state==='battle' && sentWant && r.flip===0){ COOP.wantPark=null; COOP.wantLvl=0; }   // 0634: my order was LATE — another commander's order won the beat: my own pick dies here; the relayed park word (the log — 0826 D7/D9's seams) / the box's level is my launch
+  if(r.state==='battle' && sentWant && r.flip!==0) COOP.own9=1;   // 0906 ONE CARPET (cell A): my order is THE order (flip 1, or an old box that answers no flip) — the seam launches me at once off my own pick; every seat that holds no order re-reads (coopSeamRe) and never guesses (coopWordHold)
+  if(r.state!=='battle'){ COOP.own9=0; COOP.wordWait=0; }   // the seam's stamps die with the battle
   if(r.state==='battle' && !S.coop && !coopLaunching && S.mode==='menu' && coopSquad() && evPollIsEv(r)){
     // 0484 THE EVENT ROOM launches through ITS door (§4.2 — a reconnect / the
     // rejoin note / a seat re-taken from the room): never the squad lanes below
@@ -42391,13 +42394,14 @@ function coopOnPoll(r, sentWant){
   }
   else if(r.state==='battle' && !S.coop && !coopLaunching && S.mode==='menu'){
     coopParkFromBeacon(r);   // 0826 D7 THE PARK RIDES THE BEACON: a late launch (CATCH UP · late join · reconnect) seats the battle's park before any lane below starts the sim
-    const re9=coopSeamRe(r);   // 0826 D9 THE SEAM RE-READS THE LOG: a member whose request asked past seq 0 (COOP.sentSeq) and got no park word re-reads the referee's log from 0 ONCE before any lane below starts the sim
+    const re9=coopSeamRe(r, sentWant);   // 0826 D9 THE SEAM RE-READS THE LOG: a seat whose request asked past seq 0 (COOP.sentSeq) and got no park word re-reads the referee's log from 0 ONCE before any lane below starts the sim · 0906 ONE CARPET (cell A): EVERY seat that holds no order — the host included; only a seat launching off its OWN order (sentWant on this request, flip 1) is excused
     // v2.70 (Wyatt: "if one of them has to see an ad, the other one will as
     // well") — the relayed start of a CREW campaign is the ungated mate's own
     // ad seam. Whoever already paid a gate for this launch (the clicker, the
     // goer, the leader) starts straight; the mate who never tapped watches
     // their break HERE, starts a beat late, and the wave catch-up seats them.
     if(re9){ }   // 0826 D9: the re-read is in flight — this reply starts nothing; the next one carries the flip's words
+    else if(coopWordHold(r)){ }   // 0906 ONE CARPET (cell A, THE HOLD): no order in hand yet and the log's head out of reach — this reply starts nothing; a seat never guesses a campaign rung while the party stands at a park or a throne
     else if(!coopRoom() && COOP.crewCamp && !CREW.gatedLaunch && !CREW.adPend){
       // v2.82 SQUAD AD LAW: a muster of 2+ humans enters FREE — the squad
       // interstitial rides the verdict exit now. A crew lobby that somehow
@@ -42593,9 +42597,9 @@ function coopApply(cm){
   // ignored. And the park's own verdict word (the /lobby/end dodge): 'pend'
   // ends a live park battle on every guest sim.
   if(cm.k==='park'){
-    if(COOP && !S.coop && S.mode!=='play' && (cm.t==='yeti'||cm.t==='dino'||cm.t==='western'||cm.t==='teddy') && (cm.n|0)>=1 && (cm.n|0)<=parkLevels(cm.t))   // 0339: the outlaw door rides the same word
+    if(COOP && COOP.state==='battle' && !S.coop && S.mode!=='play' && (cm.t==='yeti'||cm.t==='dino'||cm.t==='western'||cm.t==='teddy') && (cm.n|0)>=1 && (cm.n|0)<=parkLevels(cm.t))   // 0906 ONE CARPET (cell A, F1): ONLY while the lobby is in battle — a re-joined seat replays the OPEN lobby's old log (the last battle's park word at q 1) and used to stash it as the next battle's order (the 8/24 rig's n3: the STALE rung launched beside the referee's) · 0339: the outlaw door rides the same word
       COOP.parkPend={ id:cm.t, n:cm.n|0 };   // v3.35: the cmd names the park now — both lanes ride one wire word
-    else if(COOP && !S.coop && S.mode!=='play' && (cm.t==='ice'||cm.t==='bone'||cm.t==='croak'||cm.t==='fields') && (cm.n|0)>=1 && (cm.n|0)<=3)
+    else if(COOP && COOP.state==='battle' && !S.coop && S.mode!=='play' && (cm.t==='ice'||cm.t==='bone'||cm.t==='croak'||cm.t==='fields') && (cm.n|0)>=1 && (cm.n|0)<=3)   // 0906 ONE CARPET (cell A, F1): the thrones' word the same
       COOP.parkPend={ id:cm.t, n:cm.n|0 };   // v3.39 TP-04: the raid rides the SAME word — t names the door, n the tier (0278e: the bone door speaks it too — an existing key's new VALUE, the v1.84 wire law; 0406: the HIDEOUT joins — found by the theatrical cut's two-page proof: a hideout party's guest had been falling to startBattle(COOP.level), a campaign level beside the host's duel, since 0340)
     return;
   }
@@ -43034,15 +43038,31 @@ function coopParkFromBeacon(r){
 // campaign battle re-reads the same way and starts one beat later, byte-identical). A host launches off his own order; a room launches
 // through its own door. An OPEN lobby keeps serving the old log to a seq-0 poll, so a reset there is bumped straight back — this seam is
 // the one true moment.
-function coopSeamRe(r){
-  if(!COOP || COOP.host || coopRoom() || COOP.parkPend || (r && r.beacon && r.beacon.pk)) return false;
+// 0906 ONE CARPET (FM-GVT-ONE-CARPET-01 cell A; design/one-carpet-0905/00-DESIGN.md; Wyatt 9/5: "one of us would go to the campaign level, and one of us would go to Bear Park" · 9/5: "whatever one gets through, we have to just make sure that they get into the same game" · 9/6: "I was in the main menu, and then she queued us up, so not me"): EVERY SEAT THAT HOLDS NO ORDER RE-READS — the host included. Since 0634 (server v51) a seated MEMBER may give the order, so the referee himself can be the seat with the stale cursor: on the flip reply his cursor sat past the fresh log's head, no park word came, and — excused above as "a host launches off his own order" — he fell to startBattle(COOP.level) while the member fought the park (the 8/24 split through a new door; the rig: legs 2, 3b, 4a, 7, 9). A LATE order (flip 0) is no order either. The one exclusion that stays: a seat launching off ITS OWN order in hand — the flip reply to the request that carried it (flip 1, or an old box that answers no flip). The hold below (coopWordHold) keeps a wordless seat from guessing after the re-read.
+function coopSeamRe(r, sentWant){
+  if(!COOP || coopRoom() || COOP.parkPend || (r && r.beacon && r.beacon.pk)) return false;
   if(!((COOP.sentSeq|0)>0) || COOP.seamRe) return false;   // sentSeq = the seq THIS request asked from (stamped at the post — the reply handler's closure is the short .then, the request body is out of its reach)
-  COOP.seamRe=1; COOP.seq=0; clearTimeout(COOP.pollT); coopTick();
+  if(sentWant && r && r.flip!==0 && (COOP.wantPark || COOP.wantLvl || COOP.host)) return false;   // 0906: my own order in hand — launch now (a host's plain campaign order carries no pick: his sentWant IS the order; a member's plain campaign order re-reads one beat as it has since 0826)
+  COOP.seamRe=1; COOP.seq=0; COOP.wordWait=0; clearTimeout(COOP.pollT); coopTick();
   return true;
+}
+// 0906 ONE CARPET (cell A, THE HOLD — the card's §10.3 + §11.2): after the seam's re-read a seat that still holds no order decides off what the reply carries, never off a guess. The log's head in hand (q 1 present, or an empty fresh log = seq 0) with no park word = a campaign order: launch. A referee's beacon with no park word = a campaign referee (every park referee has beaconed its park since v6.58): launch. Otherwise the head is out of reach (a late arrival past the ring's trim): hold this beat and ask again, up to WORD_WAIT_MAX replies; past that a party standing at a park or a throne keeps asking (a printed count — never a campaign rung; the ally-gone dissolve stays the only exit) and a party standing at the campaign, or nowhere, falls to the campaign as before.
+const WORD_WAIT_MAX=3;
+function coopWordHold(r){
+  if(!COOP || coopRoom() || COOP.own9 || COOP.parkPend || COOP.wantPark || !r) return false;
+  if(r.beacon && r.beacon.pk) return false;
+  const cm9=r.cmds||[];
+  if(cm9.some(c=>c && (c.q|0)===1) || (r.seq|0)===0){ COOP.wordWait=0; return false; }
+  if(r.beacon && typeof r.beacon.lives==='number'){ COOP.wordWait=0; return false; }
+  COOP.wordWait=(COOP.wordWait|0)+1;
+  if(COOP.wordWait<=WORD_WAIT_MAX) return true;
+  if(/^(yeti|dino|west|teddy|ice|hide|lair|fields)$/.test(String(ptyPlace()||''))){ if(COOP.wordWait===WORD_WAIT_MAX+1 || COOP.wordWait%10===0) console.log('ONE CARPET: waiting for the order at '+ptyPlace()+' ('+COOP.wordWait+' beats)'); return true; }
+  COOP.wordWait=0;
+  return false;
 }
 function coopStartBattle(){
   UI.closeModal();
-  COOP.ended=false; COOP.wantBattle=false; COOP.cnt=1; COOP.seq=0; COOP.outQ.length=0; COOP.seamRe=0;   // 0826 D9: the seam's one re-read is spent per battle
+  COOP.ended=false; COOP.wantBattle=false; COOP.cnt=1; COOP.seq=0; COOP.outQ.length=0; COOP.seamRe=0; COOP.own9=0; COOP.wordWait=0;   // 0826 D9: the seam's one re-read is spent per battle · 0906 ONE CARPET: the own-order stamp + the hold's count too
   // v3.33 TP-02: a relayed (or the host's own) park order outranks the lobby's
   // level — the level column was the deploy clamp's cannon fodder; the cmd is
   // the truth. Consumed here so a later campaign deploy starts clean.
