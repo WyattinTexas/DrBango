@@ -2068,8 +2068,22 @@
   #travelMap, #travelMap * { -webkit-tap-highlight-color:rgba(0,0,0,0); }
   #travelMap.pre { visibility:hidden; pointer-events:none; }
   #travelMap .sh-bar { justify-content:center; }
-  #travelMap .tm-wrap { position:relative; flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; padding:0 0 clamp(4px,1vh,10px); }
+  #travelMap .tm-wrap { --tmpad:clamp(4px,1vh,10px); position:relative; flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; padding:0 0 var(--tmpad); }
   #travelMap .tm-wrap svg { display:block; width:100%; height:auto; max-height:100%; }
+  /* 0853z THE MAP LAG (FM-GVT-MAP-LAG-01; design/map-lag-0907/00-DESIGN.md; Wyatt 9/7: "The map is insanely laggy … a big FPS loss"): THE MAP IN THREE
+     LAYERS. Measured on HEAD v8.58: every animation on the map lived inside a blur-masked land, and WebKit (the iPhone shell) re-renders a masked
+     group WHOLE — its gaussian mask re-applied — whenever anything inside it moves: 32 fps with 30 ms frames on a Mac, worse on a phone (the masks
+     off → 60). Now THE PAPER (the lands with the rooms' scenes, the drifts, rails, river) is one svg on its own compositor layer, painted ONCE at
+     the mount and never invalidated (its animations frozen at their base pose — the still postcard); THE MOVERS (the kickabout, the grazers, the
+     yetis, the train) ride a second, mask-free svg stacked over it (pointer-events none), the only thing that ever repaints; THE DESK (the tunnel
+     hill, the rim trees, the ribbons, the stamp, the hit paths) a third on top. The overlays are absolute over the wrap's CONTENT box (the wrap's
+     bottom padding subtracted) with the paper's own viewBox and letterbox — pixel-aligned by construction (the proof reads the three CTMs equal).
+     Under .pre the movers wait (the CSS movers by this rule, the train's SMIL by tmapMoversPause) and start at the reveal. */
+  #travelMap .tm-wrap > svg.tm-paper { will-change:transform; }
+  #travelMap .tm-wrap > svg.tm-over { position:absolute; left:0; top:0; width:100%; height:calc(100% - var(--tmpad)); max-height:none; will-change:transform; }   /* the wrap's CONTENT box (an absolute svg left to auto sizes itself by its own ratio — measured 338 px tall on a 326 px box) */
+  #travelMap .tm-wrap > svg.tm-movers { pointer-events:none; }
+  #travelMap .tm-paper * { animation:none !important; }
+  #travelMap.pre .tm-movers * { animation-play-state:paused !important; }
   #travelMap .tm-hit { cursor:pointer; }
   #travelMap .tm-rib.lit path.tm-band { animation:tmRibLit 0.45s ease-out; }   /* ⚑ Q13: the press = the land's ribbon brightens a beat (+ the thock) */
   @keyframes tmRibLit { 0% { fill:#C0392B; } 25% { fill:#FF8A66; } 100% { fill:#C0392B; } }
@@ -42351,7 +42365,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.58';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.59';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -80496,6 +80510,11 @@ function planeTravel(){
 // every model the game's own art, THE KICKABOUT (matchScript15 → matchCSS15: declarative keyframes, nothing per frame in JS), the train on SMIL;
 // hitZones14's five polygons TILE the ground (no gap, no overlap; the paper margin is dead) and lie OVER the art (pointer-events none) in the same
 // svg so they scale with it. Nothing new is drawn but the frame, and the map follows every future room change for free.
+// 0853z THE MAP LAG: the map stands as THREE SVGS in the wrap (kingdomSVG15 returns { paper, movers, desk }; travelMapHTML stacks them) — THE PAPER
+// on its own compositor layer, painted once (its animations frozen by the .tm-paper rule), THE MOVERS mask-free over it (the only repaint per
+// frame: the movers' own small rects), THE DESK on top (the pieces that stood over the movers on HEAD: the tunnel hill the train rides through, the
+// rim trees, the ribbons, the stamp, the hit paths). Measured on v8.58: WebKit 32.7 fps (30 ms frames), Chrome 38 fps at ×4 CPU — every animation
+// lived inside a blur-masked land, re-rendered whole every frame. The movers wait under .pre (tmapMoversPause) and start at the reveal.
 const TMAP_DEAD=400;   // the dead time after the mount (ms): the tap that opened the map cannot pick; the kid's NEXT tap does
 function tmapPaint(room, painter, lake){   // THE PIN: one room painter run with the room pinned (MAPPIN) and the night pinned day (NW_PIN 0); every pin restored — never a room switch, never a save write
   const nw=NW_PIN; MAPPIN={ room:room, lake:!!lake }; NW_PIN=0;
@@ -80862,10 +80881,11 @@ function ball15(){ const ball=noShadow('<g transform="scale(1.4)">'+soccerArt()+
 return `<g transform="translate(${R.x},${R.y})"><g class="tj-bp"><g class="tj-bh"><g class="tj-bq"><g class="tj-br">${ball}</g></g></g></g></g>`;
 }
 function match15(){ const K=KICK15; return player15(K.A,'A')+player15(K.B,'B')+player15(K.C,'C')+ball15(); }
-function kingdomSVG15(){
+function landBox(x,y,w,h,vb,scene){ return `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="${vb}" preserveAspectRatio="none">${scene}</svg>`; }   // 0853z: a land's box as softLand draws it, without the mask — the movers' seat in the same coordinates
+function kingdomSVG15(){   // 0853z THE MAP LAG: three svgs — THE PAPER (static, painted once), THE MOVERS (mask-free, the only thing that ever repaints), THE DESK (the pieces that stand over the movers) — every piece at its HEAD depth; the wrap stacks them pixel-aligned (the same viewBox, the same letterbox)
 const R=rnd(31);
-let s=`<svg viewBox="0 0 1200 500" xmlns="${SVGNS}" font-family="'Arial Narrow',Impact,sans-serif">`;
-s+=juiceCSS15();
+const open=cls=>`<svg viewBox="0 0 1200 500" xmlns="${SVGNS}" class="${cls}" font-family="'Arial Narrow',Impact,sans-serif">`;
+let s=open('tm-lay tm-paper');
 s+=paperSVG();
 s+=`<rect x="24" y="24" width="1152" height="452" rx="10" fill="#E9CF6E" stroke="#3A2A14" stroke-width="1.2"/>`;
 s+=zone('snow','M448 62 Q640 30 800 40 Q890 44 926 88 Q944 160 926 250 Q860 288 740 274 Q640 276 560 262 Q470 252 446 236 Z','#E9EEF4',18);
@@ -80879,11 +80899,12 @@ const yardExtra=match15()
 +men4([[700,400]]);
 const westExtra=saguaro(120,300,2.2)+saguaro(300,520,1.9)+saguaro(560,250,1.6)+saguaro(740,520,2.1)+skull4(420,470,2)+wheel4(200,540,2.2)+tumble4(640,420,2)+wagon4(240,420,2.4)
 +men4([[300,300],[520,380]])+bandits5([[720,300],[600,470]])+`<g fill="#7A3418" opacity=".7"><ellipse cx="480" cy="560" rx="26" ry="8"/><ellipse cx="860" cy="470" rx="20" ry="7"/></g>`;
-const winterExtra=men4([[300,420]])+yetiTroop(520,330,1.0,'a',false)+yetiTroop(870,318,0.95,'b',true)
+const winterStill=men4([[300,420]])   // 0853z: the field's still pieces stay in THE PAPER under the snow tongue and the drifts exactly as on HEAD (measured: the man stands under the tongue, the snowmen's feet behind the drift row)
 +snowman(420,480,1.7)+snowman(700,140,1.4)+snowman(200,470,1.6);
-s+=softLand('win',600,70,312,195,5,roomScene('winter',lands)+winterExtra,18);
+const winterMovers=yetiTroop(520,330,1.0,'a',false)+yetiTroop(870,318,0.95,'b',true);   // 0853z: the two troops ride THE MOVERS in the field's own box (they touch no still piece — overlapML)
+s+=softLand('win',600,70,312,195,5,roomScene('winter',lands)+winterStill,18);   // 0853z: the yetis ride THE MOVERS in this same box
 s+=softLand('west',838,258,290,176,6,roomScene('western',lands)+westExtra,18);
-s+=softLand('yard',486,230,328,205,4,roomScene('backyard',lands)+yardExtra,22,'0 72 960 528');
+s+=softLand('yard',486,230,328,205,4,roomScene('backyard',lands),22,'0 72 960 528');   // 0853z: the extras (the kickabout, the grazers, the man) ride THE MOVERS in this same box
 const bearWall='<g transform="translate(4,56) scale(0.52)">'+barricadeArt()+'</g>'+men4([[300,470],[560,500]]);   // 0825: the sill plane is the room's own (decorSVG paints it aboard since 0755) — the frame's second plane dropped
 s+=houseSoft(64,70,380,132,232,roomSceneFlat('rooftop',lands)+men4([[300,470],[620,380]]),roomScene('bedroom',[])+bearWall,'34 150 892 310');
 s+=drift(480,100,60,18)+drift(540,84,50,16)+drift(470,180,54,16)+drift(560,206,46,14)+drift(520,150,40,12);
@@ -80893,7 +80914,7 @@ s+=snowman(486,140,0.9)+snowman(566,176,0.8);
 s+=snowTongue();
 s+=frozenLake(704,156,0.82,0.6);
 s+=drift(626,258,66,16)+drift(760,270,54,14)+drift(834,268,46,12)+drift(884,258,58,16)+drift(690,282,40,10);
-s+=knoll(470,268,60,18)+knoll(496,246,52,16)+knoll(534,238,46,14)+knoll(574,236,44,12)+knoll(616,240,40,12)+drift(506,228,44,12)+drift(650,238,36,10)+knoll(716,300,44,12)+knoll(800,300,54,16)+knoll(806,380,48,14)+knoll(812,340,40,12)+knoll(462,330,40,12)+knoll(466,392,36,10);
+s+=knoll(470,268,60,18)+knoll(496,246,52,16)+knoll(534,238,46,14)+knoll(574,236,44,12)+knoll(616,240,40,12)+drift(506,228,44,12)+drift(650,238,36,10)+knoll(716,300,44,12)+knoll(800,300,54,16)+knoll(806,380,48,14)+knoll(462,330,40,12)+knoll(466,392,36,10);   // 0853z: knoll(812,340) rides THE MOVERS — it leans on the yard and covers the rex's shoulder (measured: the one paper piece a mover touches)
 s+=dune(960,258,56,16)+dune(940,100,40,12)+dune(946,140,44,12)+dune(936,180,40,12)+dune(950,220,44,12);
 s+=butte(870,262,60,18)+butte(930,270,50,14)+butte(1000,262,70,20)+butte(1060,268,56,16)+butte(1120,270,56,16)+butte(842,340,40,14);
 s+=`<g fill="#F4F7FA" opacity=".85"><ellipse cx="820" cy="250" rx="16" ry="4"/></g>`+posterPine(640,266,0.66);
@@ -80901,19 +80922,27 @@ s+=saguaro(986,286,0.7)+saguaro(1096,282,0.55);
 s+=railroad6();
 s+=riverSVG11(); s+=trestle(834,440); s+=trestle(920,60);
 const rm=(typeof matchMedia==='function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
-s+= rm? gameTrain8(1010,350,0.62) : trainLoop(0.62,48);
-s+=tunnelHill8(196,66,36);
-s+=crossbuck(1052,322);
+let mv=open('tm-lay tm-over tm-movers');   // THE MOVERS: no mask, no filter — the yard's extras and the field's yetis in their own land boxes (the same x/y/width/height/viewBox softLand gave them), the leaning knoll, the train
+mv+=juiceCSS15();
+mv+=landBox(600,70,312,195,'0 0 960 600',winterMovers);
+mv+=landBox(486,230,328,205,'0 72 960 528',yardExtra);
+mv+=knoll(812,340,40,12);
+mv+= rm? gameTrain8(1010,350,0.62) : trainLoop(0.62,48);
+mv+=`</svg>`;
+let dk=open('tm-lay tm-over tm-desk');   // THE DESK: what the train rides UNDER on HEAD — the tunnel hill, the crossbuck, the trees on the tunnel's hill — and the ribbons (their press beat repaints this small layer, never the paper); travelMapHTML adds the hit paths. Everything else still (the rim trees, the wheat, the compass, the corners, the stamp) stays in THE PAPER at its HEAD depth — trackNear keeps the rim off the rails (trainML: the train grazes no tree but the tunnel's)
+dk+=tunnelHill8(196,66,36);
+dk+=crossbuck(1052,322);
 const rim=[]; for(let x=44;x<=1156;x+=34){ rim.push([x+R()*8-4, 38+R()*4]); rim.push([x+R()*8-4, 462+R()*3]); } for(let y=72;y<=430;y+=34){ rim.push([38+R()*4, y+R()*8-4]); rim.push([1162+R()*4-4, y+R()*8-4]); }
 for(const [cx,cy] of [[46,46],[1154,46],[46,458],[1154,458]]) for(let i=0;i<4;i++) rim.push([Math.min(1164,Math.max(36,cx+(R()-.5)*28)), Math.min(464,Math.max(36,cy+(R()-.5)*24))]);
-for(const [x,y] of rim){ const sc=0.3+R()*0.05; const cold=(x>440 && x<960 && y<50); if(trackNear(x,y+(cold?4:36*sc),13) || trackNear(x,y-24*sc,13)) continue; if(Math.abs(x-922)<20 && y<52) continue; if(Math.abs(x-826)<20 && y>450) continue; s+= cold? posterPine(x,y+6,0.5+R()*0.12) : posterTree(x,y,sc); }
+for(const [x,y] of rim){ const sc=0.3+R()*0.05; const cold=(x>440 && x<960 && y<50); if(trackNear(x,y+(cold?4:36*sc),13) || trackNear(x,y-24*sc,13)) continue; if(Math.abs(x-922)<20 && y<52) continue; if(Math.abs(x-826)<20 && y>450) continue; const tree= cold? posterPine(x,y+6,0.5+R()*0.12) : posterTree(x,y,sc); if(x>1080 && y>150 && y<235) dk+=tree; else s+=tree; }   // 0853z: the rim stands in THE PAPER but for the trees on the tunnel's hill (1092-1173 × 177-225), which stand over it in THE DESK as on HEAD
 const W=[[1160,300],[1150,340],[1000,460],[1060,462],[700,462],[420,466],[300,464],[160,464],[560,466],[200,464],[880,462],[470,464]];
 for(const [x,y] of W){ if(trackNear(x,y,14)) continue; s+=wheat(x,y,0.8+R()*0.5); }
-s+=ribbon(372,176,110,'rooftop','rb14-r'); s+=ribbon(254,412,112,'bedroom','rb14-h'); s+=ribbon(650,412,116,'backyard','rb14-b'); s+=ribbon(786,246,130,'winter','rb14-s'); s+=ribbon(1016,414,118,'western','rb14-w');   // 0825: the five lands by ROOM_ORDER id — the ribbon reads ROOM_INFO's name in the player's tongue
+dk+=ribbon(372,176,110,'rooftop','rb14-r'); dk+=ribbon(254,412,112,'bedroom','rb14-h'); dk+=ribbon(650,412,116,'backyard','rb14-b'); dk+=ribbon(786,246,130,'winter','rb14-s'); dk+=ribbon(1016,414,118,'western','rb14-w');   // 0825: the five lands by ROOM_ORDER id — the ribbon reads ROOM_INFO's name in the player's tongue
+dk+=`</svg>`;
 s+=compass(1118,412);
 s+=cornerSVG();
 s+=`</svg>`;
-return s;
+return { paper:s, movers:mv, desk:dk };
 }
 const men4=(pts,col,w)=>pts.map(([x,y])=>`<image href="${realSpr('rifleman',col)}" x="${x}" y="${y}" width="${w||44}" height="${(w||44)*1.17}"/>`).join('');
 const bandits5=(pts,w)=>pts.map(([x,y])=>`<image href="${banditSpr()}" x="${x}" y="${y}" width="${w||44}" height="${(w||44)*1.17}"/>`).join('');
@@ -80938,10 +80967,11 @@ function tmapStampSVG(){   // the desk's rubber stamp over the paper's top-right
 }
 function travelMapHTML(kind){   // the screen's markup: the store's bar with the ONE sign (⚑ Q10: one small line per ride), the map (the art under pointer-events none) + the stamp + the five hit paths
   const small=(kind==='ship')? 'PICK A LAND · YOUR SHIP SAILS YOU THERE' : 'PICK A LAND · YOUR PLANE FLIES YOU THERE';
-  const m=TMAP_ART.map(); const i=m.indexOf('>')+1, j=m.lastIndexOf('</svg>');
+  const Ly=TMAP_ART.map(); const cut=m=>{ const i=m.indexOf('>')+1, j=m.lastIndexOf('</svg>'); return [m.slice(0,i), m.slice(i,j)]; };   // 0853z: { paper, movers, desk } — three svgs stacked in the wrap
+  const [po,pb]=cut(Ly.paper), [ko,kb]=cut(Ly.desk);
   const hits='<g class="tm-hits">'+TMAP_ART.zones().map(z=>'<path class="tm-hit" data-room="'+z.room+'" d="'+z.d+'" fill="transparent" pointer-events="all"/>').join('')+'</g>';
   return '<div class="sh-bar"><div class="sh-sign"><b>SEE THE TERRITORIES!</b><small>'+small+'</small></div></div>'
-    +'<div class="tm-wrap">'+m.slice(0,i)+'<g pointer-events="none">'+m.slice(i,j)+'</g>'+tmapStampSVG()+hits+'</svg></div>';
+    +'<div class="tm-wrap">'+po+'<g pointer-events="none">'+pb+'</g>'+tmapStampSVG()+'</svg>'+Ly.movers+ko+'<g pointer-events="none">'+kb+'</g>'+hits+'</svg></div>';   // the stamp on THE PAPER (its multiply ink needs the paper under it — a composited layer is an isolated group), the hit paths on THE DESK
 }
 function tmapFitRibbons(el){   // a tongue longer than its arc is squeezed onto it (a textPath drops what runs past the path's end) — once, at the mount
   el.querySelectorAll('.tm-rib').forEach(g=>{ try{ const tp=g.querySelector('textPath'), tx=g.querySelector('text'), p=g.querySelector('defs path'); if(!tp||!tx||!p) return;
@@ -80953,7 +80983,7 @@ function travelMapMount(kind){   // built + laid out (unpainted, .pre) — the p
   TMAP.kind=kind; TMAP.dest=null; TMAP.pick=0; TMAP.pd=null; TMAP.pdLast=null; TMAP.eat=0; TMAP.up=0; TMAP.t0=Date.now();   // t0: the tap that OPENED the map can never pick (its own trailing click lands on the map under reduced motion, where no glass covers it — measured) — TMAP_DEAD ms of dead time
   const t0=performance.now();
   el.className='pre'; setHTML(el, travelMapHTML(kind));
-  tmapFitRibbons(el); void el.offsetHeight;   // the layout paid here
+  tmapFitRibbons(el); void el.offsetHeight; tmapMoversPause(el,1);   // the layout paid here; the movers wait under .pre (0853z)
   TMAP.ms=Math.round(performance.now()-t0);
   el.onpointerdown=e=>{ if(e.isPrimary===false) return; TMAP.pd={ x:e.clientX, y:e.clientY, id:e.pointerId }; TMAP.pdLast=TMAP.pd; };
   el.onpointerup=e=>{ const d=TMAP.pd; TMAP.pd=null; if(!d || d.id!==e.pointerId || Date.now()-TMAP.t0<TMAP_DEAD) return;
@@ -80968,7 +80998,8 @@ function travelMapMount(kind){   // built + laid out (unpainted, .pre) — the p
     travelPick(h.getAttribute('data-room')); };
   return el;
 }
-function travelMapShow(){ if(!TMAP.kind) return; const el=document.getElementById('travelMap'); if(!el) return; el.classList.remove('pre'); el.classList.add('up'); TMAP.up=1; }   // revealed under full cover (a flight folded meanwhile shows nothing)
+function travelMapShow(){ if(!TMAP.kind) return; const el=document.getElementById('travelMap'); if(!el) return; el.classList.remove('pre'); el.classList.add('up'); tmapMoversPause(el,0); TMAP.up=1; }   // revealed under full cover (a flight folded meanwhile shows nothing)
+function tmapMoversPause(el,on){ try{ el.querySelectorAll('svg.tm-movers').forEach(sv=>{ if(on) sv.pauseAnimations(); else sv.unpauseAnimations(); }); }catch(e){} }   // 0853z: the train's SMIL waits under .pre (the CSS movers wait by the .pre rule) and starts at the reveal — the hidden map costs the takeoff nothing
 function travelMapClose(){ const el=document.getElementById('travelMap'); if(el){ el.className='hidden'; el.innerHTML=''; el.onpointerdown=el.onpointerup=el.onpointercancel=el.onclick=null; } TMAP.up=0; TMAP.pd=null; }
 function travelMapOpen(kind){ travelMapMount(kind); travelMapShow(); }   // reduced motion (and the rig): the map at once
 function travelMapClear(){   // hideAllOverlays' door: something else navigated while a flight stood — the map folds and the ride's latch releases (a strand is impossible); a pinned port is left alone
@@ -96157,9 +96188,10 @@ window.GVT = {
   // ---- 0825 SARGE'S TRAVEL DESK rig: the map screen's state (read-only) + its doors ----
   travel(){ const el=document.getElementById('travelMap'); const svg=el? el.querySelector('svg') : null; const R=e=>{ const b=e.getBoundingClientRect(); return { l:+b.left.toFixed(1), t:+b.top.toFixed(1), r:+b.right.toFixed(1), b:+b.bottom.toFixed(1), w:+b.width.toFixed(1), h:+b.height.toFixed(1) }; };
     return { cv:GVT_CV, up:TMAP.up, kind:TMAP.kind, dest:TMAP.dest, pick:TMAP.pick, ms:TMAP.ms, trv:SHIPTRV, land:PLANE_LAND, pinned:SHIP_DEST||null, cls:el? el.className : null, room:roomCur(), own:ownedRooms(), pin:MAPPIN, nw:NW_PIN,
-      zones:TMAP_ART.zones().map(z=>z.room), hits:svg? [...svg.querySelectorAll('.tm-hit')].map(p=>({ room:p.getAttribute('data-room'), box:R(p) })) : [],
-      ribs:svg? [...svg.querySelectorAll('.tm-rib')].map(g=>({ room:g.getAttribute('data-room'), txt:String(g.textContent||'').trim(), fit:g.querySelector('textPath')? g.querySelector('textPath').getAttribute('textLength') : null, lit:g.classList.contains('lit'), no:g.classList.contains('no') })) : [],
-      stamp:svg? [...svg.querySelectorAll('.tm-stamp text')].map(t9=>String(t9.textContent||'')) : [], svg:svg? R(svg) : null, wrap:el&&el.querySelector('.tm-wrap')? R(el.querySelector('.tm-wrap')) : null,
+      zones:TMAP_ART.zones().map(z=>z.room), hits:svg? [...el.querySelectorAll('.tm-hit')].map(p=>({ room:p.getAttribute('data-room'), box:R(p) })) : [],
+      ribs:svg? [...el.querySelectorAll('.tm-rib')].map(g=>({ room:g.getAttribute('data-room'), txt:String(g.textContent||'').trim(), fit:g.querySelector('textPath')? g.querySelector('textPath').getAttribute('textLength') : null, lit:g.classList.contains('lit'), no:g.classList.contains('no') })) : [],
+      stamp:svg? [...el.querySelectorAll('.tm-stamp text')].map(t9=>String(t9.textContent||'')) : [], svg:svg? R(svg) : null,
+      layers:el? [...el.querySelectorAll('.tm-wrap > svg')].map(sv=>{ const m=sv.getScreenCTM(); return { cls:sv.getAttribute('class'), box:R(sv), ctm:m? [+m.a.toFixed(4),+m.d.toFixed(4),+m.e.toFixed(2),+m.f.toFixed(2)] : null, els:sv.querySelectorAll('*').length, masks:sv.querySelectorAll('mask').length, filters:sv.querySelectorAll('filter').length, smil:sv.querySelectorAll('animate,animateMotion,animateTransform').length, paused:(typeof sv.animationsPaused==='function')? sv.animationsPaused() : null }; }) : [],   // 0853z: the three layers — class · box · the CTM (equal across the three = pixel-aligned) · the census wrap:el&&el.querySelector('.tm-wrap')? R(el.querySelector('.tm-wrap')) : null,
       bar:el&&el.querySelector('.sh-bar')? R(el.querySelector('.sh-bar')) : null, sign:el&&el.querySelector('.sh-sign')? { txt:String(el.querySelector('.sh-sign').textContent||'').replace(/\s+/g,' ').trim(), box:R(el.querySelector('.sh-sign')), bBox:R(el.querySelector('.sh-sign b')), sBox:R(el.querySelector('.sh-sign small')) } : null,
       wipe:!!document.getElementById('cloudwipe'), wipeCls:(document.getElementById('cloudwipe')||{className:null}).className, fly:!!document.getElementById('wpfly'), flyCls:(document.getElementById('wpfly')||{className:null}).className, ship:(document.getElementById('decShip')||{}).className? String(document.getElementById('decShip').className.baseVal) : null, plane:(document.getElementById('decPlane')||{}).className? String(document.getElementById('decPlane').className.baseVal) : null }; },
   travelOpen(kind){ travelMapOpen(kind||'warplane'); return GVT.travel(); },
