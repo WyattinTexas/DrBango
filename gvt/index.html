@@ -42262,16 +42262,45 @@ function roofFallAt(y){ return roofField() && (y<74 || y>WORLD_H-96) ? {kind:'ea
 // Gaps are authored at the TOP of both roof carpets, so the safe lane is the
 // south rim; jets overfly (u.jetT exempts every void), and the exempt classes
 // (bosses, swoopers, the burrowed) never consulted a lane anyway.
+// 0865y THE TANK ON THE ROOF CORNER (FM-GVT-TANK-CORNER-01; a player's report
+// relayed by Wyatt 9/7: level 137's tanks "get stuck on roof corner and troops
+// get stuck with them so you have to advance on them to finish the level"):
+// the seat this rewrite handed out sat ON the `y<safe` line, and both movers
+// that consume it stop SHORT of a goal on the side they came from (the tan
+// walker inside 1 px, the formation slot spring inside 2 — the dead-bands in
+// the foes loop), so every man arriving from the north parked 0.4-2 px NORTH
+// of the lane, still `y<safe`, and was re-aimed at the very seat he stood on
+// every frame forever. Nothing re-plans: the squeeze shrinks a rock shoulder
+// he is not touching, and a block that dissolves west of him leaves him a
+// walker with the 1 px band. THE BIG PUSH's wedge is the loudest case — the
+// tank's slot IS the block's anchor, and rung 37's skylight well at (980,250)
+// steers the anchor's 40 px shoulder north and down onto the rim exactly there
+// (measured on v8.66: three V2 wedges on 137, a tank + its north wing parked
+// at (821,224) in 3/3 natural runs, 165-224 s each; a lone rifleman from
+// (900,150) parks at (821.7,225.3) every time). THE SEAT lands GAP_SEAT px
+// INSIDE the lane now — past both bands — so a north-comer stops at y ≥ safe
+// and the next frame's read walks him on. Pure geometry still: one constant,
+// zero RNG, zero state, every sim the same detour; a rug without gaps never
+// enters (the null below is byte-what-it-was). ⚑ GAP_SEAT 4 = the 2 px band
+// + a 2 px margin.
 const GAP_KEEP=26;
+const GAP_SEAT=4;   // the rim seat's depth inside the safe lane (> the slot spring's 2 px dead-band > the walker's 1 px)
 function aiGapGoal(x,y,gx,gy){
   for(const g of (S.cfg.terrain.gaps||[])){
-    const L=g.x-g.w/2-GAP_KEEP, R=g.x+g.w/2+GAP_KEEP, safe=g.y1+GAP_KEEP;
+    const L=g.x-g.w/2-GAP_KEEP, R=g.x+g.w/2+GAP_KEEP, safe=g.y1+GAP_KEEP, seat=safe+GAP_SEAT;   // 0865y: the seat sits inside the lane the test draws
     if(Math.min(x,gx)>=R || Math.max(x,gx)<=L) continue;   // the walk never spans the hole
-    if(y<safe) return { x: x<g.x? L : R, y:safe };         // north of the safe lane: round the near rim first
-    if(gy<safe) return { x:gx, y:safe };                   // already safe: never re-aim INTO the band
+    if(y<safe) return { x: x<g.x? L : R, y:seat };         // north of the safe lane: round the near rim first (0865y: to a seat INSIDE the lane, never on its line)
+    if(gy<safe) return { x:gx, y:seat };                   // already safe: never re-aim INTO the band (0865y: along the seat's line, so a lane walker never dips back across `safe`)
   }
   return null;
 }
+// 0865y (cell B): the band the roof law re-aims OUT of — north of a gap's safe lane, inside its rims — as one read for the rock steer:
+// rockSteer scored a tangent by its distance to the goal alone (+900 off the carpet's rim), so on rung 39 a walker on the lane at
+// (758,221) with the vent (654,237,r40) on his line to the toy box took the NORTH tangent (646,175) — inside the hole's band — by 0.7 px
+// of score; the next frame's aiGapGoal read (y<safe) aimed him back at the rim seat, the frame after the steer aimed him north again:
+// a flip-flop on the line, frozen for 70 s once the rim seat itself stopped catching him (measured on 139, v8.67-pre). A tangent in
+// the band costs the carpet-edge's own +900 now, so the steer rounds a vent on the lane's side; a rug without gaps never reads it.
+function gapBandAt(x,y){ for(const g of (S.cfg.terrain.gaps||[])){ if(x>g.x-g.w/2-GAP_KEEP && x<g.x+g.w/2+GAP_KEEP && y<g.y1+GAP_KEEP) return true; } return false; }
 // 0420 THE SMART MARCH (FM-GVT-HARDBOT-01 §2.5) [WYATT 8/18: "No just
 // sending units to their death by walking into lava pits. We need to be
 // smart. We aren't walking right into a mine."] — the hard bot stops
@@ -42557,7 +42586,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.66';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.67';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -52266,6 +52295,7 @@ function rockSteer(x,y,gx,gy,pad,xtra){
     const px=blk.x-dy*s*R, py=blk.y+dx*s*R;
     let sc=Math.hypot(gx-px,gy-py);
     if(py<80||py>WORLD_H-100) sc+=900;                // don't steer off the carpet (WORLD_H === H everywhere but the tall map)
+    if(S.cfg.terrain.gaps && gapBandAt(px,py)) sc+=900;   // 0865y THE TANK ON THE ROOF CORNER (cell B): nor INTO THE HOLE's band — the roof law would only re-aim him straight back (the flip-flop measured at rung 39's vent); every rug without gaps reads nothing here
     // 0197: don't steer a man to WAIT on the grand ring's rails either — the
     // same penalty as the carpet's edge, TRK_BAN's own margin. Marching ACROSS
     // stays free (this only scores which way round a rock); one truthy test on
