@@ -41565,7 +41565,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.43';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.44';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -71044,7 +71044,7 @@ function drawHUD(){
 
   // 0248 THE TRAINING RANGE: the DOM strip is the picker — no tray, no
   // economy. Rects zeroed so a stale card can never ghost-fire a drag.
-  if(S.training){ trayRects.length=0; return; }
+  if(S.training){ trayRects.length=0; btnRects.vet=null; return; }   // 0806nz: the pill's rect follows the selection through the range too (this early return sat above the reset)
   // tray — sized and lifted for thumbs (phone bottom edge steals touches).
   // v2.04: sized and centered on VW, never W — a grand rug (v1.98) widens the
   // WORLD, but the shelf is furniture and sits on the SCREEN, the same law the
@@ -72165,6 +72165,7 @@ function evPos(e){ const r=cv.getBoundingClientRect(); return { x:(e.clientX-r.l
 function evPosW(e){ const p=evPos(e); const cm=S.bf? S.bf.cam : cCamOn(); if(cm){ p.x+=cm.x; p.y+=cm.y||0; } return p; }   // v1.98: the grand campaign rug maps fingers through its camera too
 cv.addEventListener('pointerdown', e=>{
   if(S.mode!=='play') return;
+  if(e.isPrimary===false) return;   // 0806nz THE VETERAN PILL'S NULL TAP: a second finger never places or presses; the canvas has no two-finger gesture (the menu's rug drag already bails on non-primary)
   // an open briefing owns every tap (v1.41). The DOM backdrop swallows them
   // before they ever reach the canvas — this guard is the belt to that brace,
   // so no pointer path can place a unit or press a button under the window.
@@ -72182,9 +72183,14 @@ cv.addEventListener('pointerdown', e=>{
     else spawnWave();
     return;
   }
-  if(btnRects.vet && inRect(p.x,p.y,btnRects.vet)){
-    if(btnRects.vet[5]){ S.plastic-=btnRects.vet[4]; S.sel.vet=true; META.stats.vets++; SFX.blip(); S.floats.push({x:S.sel.x,y:S.sel.y-70,txt:'VETERAN!',t:0,col:'#fff'});
-      if(S.coop && S.sel.cid) coopSend({k:'vet', id:S.sel.cid}); }
+  // 0806nz THE VETERAN PILL'S NULL TAP: the rect is one frame old (drawHUD sets it), and a second finger or a fast double tap can land
+  // on it AFTER an earlier tap in the same frame nulled the selection: "Cannot set properties of null (setting 'vet')", the plastic gone
+  // before the throw. The branch reads a LIVE selection once, stripes BEFORE it debits (the debit is never the last thing that ran), and
+  // the !u.vet belt means a double press never pays twice. The honest press is what it was: the cost, the float, the stat, the co-op word.
+  if(btnRects.vet && S.sel && inRect(p.x,p.y,btnRects.vet)){
+    const u=S.sel;
+    if(btnRects.vet[5] && !u.vet){ u.vet=true; META.stats.vets++; S.plastic-=btnRects.vet[4]; SFX.blip(); S.floats.push({x:u.x,y:u.y-70,txt:'VETERAN!',t:0,col:'#fff'});
+      if(S.coop && u.cid) coopSend({k:'vet', id:u.cid}); }
     return;
   }
   // THE JET PACK (v1.39): tap the button = the forward hop; press-and-drag off
