@@ -30957,7 +30957,7 @@ function awayLoadout(){
   const own=ownedUnits().filter(k=>BF_TYPES.indexOf(k)>=0);
   const up={}; for(const k of own) up[k]=Math.min(RANK_MAX, META.up[k]|0);
   return { v:1,
-    sw:Object.assign({}, sargeStats(), { saber:saberHex(), of:(META.outfit&&META.outfit.wear||[]).slice(0,16) }, jetOwned()? {jet:1} : {}),
+    sw:Object.assign({}, sargeStats(), { saber:saberHex(), of:sargeOfList() }, jetOwned()? {jet:1} : {}),   // 0906 THE PETS ON THE BATTLEGROUND (C6): the snapshot's worn list gains the pet at heel ('pet:<k>:<rank>' at the head, the BF place word's own list) — the away captain fields the pet the real commander had out when he last reported
     mo:awayMods(), lz:META.laserOn||null, up:up, own:own };   // 0735: one of each rival pair   // 0411 (C3/D2): THEIR BEST — every OWNED mod lit, not the switched-on bench (Wyatt: "they use their best layout possible"); server _away_lo_clean caps 15 under v27 (a v26 box clips one — accepted)
 }
 // their `own` types at their `up` ranks, UNSHUFFLED — the 0317 "he is you"
@@ -41565,7 +41565,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.44';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.45';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -50992,7 +50992,7 @@ function hurt(f,dmg,src,fire9){   // 0906 THE FLAME BLADE: fire9 = this beat is 
   // lands while it holds: the round is negated AND goes back up the lane at
   // its own full weight (TK_REFL: one bounce ever, the buddyshield
   // ping-pong law).
-  if(petShieldOn(f)) return;   // 0905 THE PETS · PATCH'S SHIELD at the hp funnel's head (the same seat as the blue wall; a no-op on the battleground this card — petStitchOn is campaign-only)
+  if(petShieldOn(f)) return;   // 0905 THE PETS · PATCH'S SHIELD at the hp funnel's head (the same seat as the blue wall; live on the battleground since 0906 THE PETS ON THE BATTLEGROUND — a Sarge Patch is sewing shrugs every round of the other army, Wyatt's own "cannot take damage from any opposing players")
   if(S.bf && f.side && !TK_REFL && f.tkDeflT>0){
     tkDeflPop(f);
     if(FZ_BEAM){ if((FZ_BEAM.bounce|0)<FZ_BOUNCE_MAX) fzThrow(FZ_BEAM,f); return; }   // 0735 THE MIRROR LAW: the wall throws the whole freeze BEAM back (a fresh shot, bounce+1); at the cap the wall still negates and the cold lands
@@ -58175,8 +58175,9 @@ function cmdoBeamHit(sh,f){
   // bolt meant for a man across the water dies on the toy instead, and the
   // storm coil's chain never starts from a hit that never landed. Checked at
   // LANDING time (the queue is a schedule, the duck is a moving thing).
-  const dkb=duckBlock(sh.x,sh.y,f.x,f.y-18);
+  const dkb=duckBlock(sh.x,sh.y,f.x,f.y-18), wkb=dkb? null : petWallBlock(sh.x,sh.y,f.x,f.y-18,u);
   if(dkb){ duckBlockFx(dkb); return; }
+  if(wkb){ petWallPuff(wkb); return; }   // 0906 THE PETS ON THE BATTLEGROUND (C4): the beam dies in the enemy's snow bank the duck's own way (no hop, no catch, no cold)
   S.fx.push({k:'flash',x:f.x,y:f.y-18,ang:Math.atan2((f.y-18)-sh.y,f.x-sh.x),R:12,lw:2.2,t:0,dur:0.12});
   if(sh.frz && fzCatch(sh,f)) return;   // 0735 THE MIRROR LAW: a live reflect in the funnel (the commando's charge with THE BUDDY SHIELD's circle · King Bear's arm) catches the whole beam — no damage, no cold, no hop; the wall / the teal / the hat catch inside hurt() through the latch
   FZ_BEAM=sh.frz? sh : null; hurt(f,sh.dmg,u); FZ_BEAM=null;
@@ -64349,7 +64350,7 @@ function update(dt){
   S.crewN=S.crew||{};  // v1.72: last frame's FINISHED siege census — campSmash's damage share reads this, never the half-built count below
   S.crew={};  // the census re-forms every frame — every attacker in reach counts himself in (the share does the capping now)
   medicPass(dt);   // 0365 THE MEDIC PASS — its own walk down S.units BESIDE the loop, never inside a step: a marching man heals like a halted one, and the 4s quiet clock below keeps its own recovery on top
-  if(!S.bf) petPass(dt);   // 0905 THE PETS: the pet pass — its own walk beside the medic pass, never inside a man's step (the campaign rug, the parks, the boss rooms, the raids; the battleground is a later door)
+  petPass(dt);   // 0905 THE PETS: the pet pass — its own walk beside the medic pass, never inside a man's step (the campaign rug, the parks, the boss rooms, the raids; the battleground too since 0906 THE PETS ON THE BATTLEGROUND)
   tkChanPass(dt);  // 0462c THE ORANGE CHANNEL — the medic pass's twin walk: the plant's clock, the break law, the fractional heal and the +2 window (u.tkOrIn) for every man a standing channel reaches this frame
   for(const u of S.units){
     if(u.dead) continue;             // a casualty is out of the fight the frame he falls (swept below)
@@ -64593,8 +64594,8 @@ function update(dt){
             let da=Math.abs(Math.atan2(f.y-u.y,f.x-u.x)-ang); if(da>Math.PI) da=2*Math.PI-da;
             // v2.15: each pellet is aimed fire, so each pellet can die on the
             // duck — the man behind him is safe, the man beside him is not
-            if(da<=pcone){ const dkb=duckBlock(u.x+35*wdir,u.y-34,f.x,f.y-18);   // 0486: the popped cone (capped π)
-              if(dkb) duckBlockFx(dkb); else hurt(f,sw.dmg*vm*cm*shfX(u,f,d)+scoutX(sw,d),u); } }   // 0556 THE SHERIFF HAT's near term (percent, before the flat) · v3.27: the longshot plate — flat, after every multiplier, per qualifying pellet
+            if(da<=pcone){ const dkb=duckBlock(u.x+35*wdir,u.y-34,f.x,f.y-18), wkb=dkb? null : petWallBlock(u.x+35*wdir,u.y-34,f.x,f.y-18,u);   // 0486: the popped cone (capped π)
+              if(dkb) duckBlockFx(dkb); else if(wkb) petWallPuff(wkb); else hurt(f,sw.dmg*vm*cm*shfX(u,f,d)+scoutX(sw,d),u); } }   // 0556 THE SHERIFF HAT's near term (percent, before the flat) · v3.27: the longshot plate — flat, after every multiplier, per qualifying pellet
           // v1.50: the blast leaves the MUZZLE now (the fan used to start in his
           // chest) — a star flash over it, a wisp or two, and the forend racks.
           u.pumpT=PUMP_T;
@@ -64650,8 +64651,8 @@ function update(dt){
           // v2.15: even the long gun's round dies on the duck — "including
           // Sniper Shots", Wyatt's first-named. The whole show (tracer, slug,
           // dust, rings) lands where the round actually stopped.
-          const dkb=duckBlock(mzx,mzy,best.x,best.y-18);
-          const htx=dkb?dkb.x:best.x, hty=dkb?dkb.y:best.y-18;
+          const dkb=duckBlock(mzx,mzy,best.x,best.y-18), wkb=dkb? null : petWallBlock(mzx,mzy,best.x,best.y-18,u), kb9=dkb||wkb;   // 0906 THE PETS ON THE BATTLEGROUND (C4): the enemy's snow bank stops the long round the duck's own way
+          const htx=kb9?kb9.x:best.x, hty=kb9?kb9.y:best.y-18;
           const ang=Math.atan2(hty-mzy,htx-mzx);
           // 0397 THE FLAMESTRIKE ROUND: charged (u.fsN — armed by MY tap
           // on MY Sarge, or 0419 by the HARD captain's own brain on HIS)
@@ -64659,7 +64660,7 @@ function update(dt){
           // stopped on the sandbags — nobody was hit, nothing burns, no
           // charge spent). The wild-eye miss continued out above; the
           // red-button round is snpFire's own theater — neither reaches here.
-          const fsRd=(u.fsN|0)>0 && !dkb;
+          const fsRd=(u.fsN|0)>0 && !kb9;
           // 7/25: the armory roll means a 10v10 can field a dozen snipers. The
           // whole visual read (flash, tracer, slug, rings, dust) stays on every
           // one of them — but SHAKE and HIT-STOP are player feedback, and are
@@ -64692,7 +64693,7 @@ function update(dt){
           S.fx.push({k:'flash',x:htx,y:hty,ang:ang+Math.PI,R:RM?12:20,lw:3,t:0,dur:0.14});
           S.fx.push({k:'ring',x:htx,y:hty,r:4, R:32,t:0,dur:0.22,col:'#FFFFFF'});
           S.fx.push({k:'ring',x:htx,y:hty,r:10,R:54,t:0,dur:0.34,col:'#FFD24A'});
-          if(dkb) duckBlockFx(dkb); else { hurt(best,sw.dmg*vm*cm*shfX(u,best,Math.hypot(best.x-u.x,best.y-u.y))+scoutX(sw,Math.hypot(best.x-u.x,best.y-u.y)),u);   // 0556 THE SHERIFF HAT's near term · v3.27: the longshot plate — flat, after every multiplier
+          if(dkb) duckBlockFx(dkb); else if(wkb) petWallPuff(wkb); else { hurt(best,sw.dmg*vm*cm*shfX(u,best,Math.hypot(best.x-u.x,best.y-u.y))+scoutX(sw,Math.hypot(best.x-u.x,best.y-u.y)),u);   // 0556 THE SHERIFF HAT's near term · v3.27: the longshot plate — flat, after every multiplier
             if(fsRd){ u.fsN--; const tw9=enhU(u,'flamestrike2')?1:0; fsIgnite(best.x,best.y, mine? u : null, 0, 0, 0, tw9); if(tw9 && FS2_BOTH) fsIgnite(best.x,best.y, mine? u : null); } }   // 0906 THE KING'S HOARD 5/6 · THE FLAMESTRIKE RIFLE V2 (D17): the SHOOTER wearing V2 — enhU: my own bench for my Sarge (= fs2On(): a charged round already means V1 racked and ON), the away captain's lo.mo for his (the 0393 law) — lights a TWISTER instead of the patch; FS2_BOTH 1 = the patch as well   // 0397: the ground catches fire at the victim's FEET where he stood when the round hit; the 4th round is plain lead. 0419: the HARD CAPTAIN's patch is OWNERLESS (null src → null side → bfEnemies(null) answers EVERY figure, the jax neutrality law) — both sides burn, nobody is paid (no dog tag, no kills++, no AI purse: hurt/hitCheck's own src doors); MY patch keeps the standing credit door
         }
         continue;
@@ -64981,11 +64982,11 @@ function update(dt){
         S.fx.push({k:'puff',x:wx9,y:wy9+6,t:0,dur:0.35,R:9});
         continue;
       }
-      const dkb=duckBlock(mox,moy,tgt.x,tgt.y-18);
+      const dkb=duckBlock(mox,moy,tgt.x,tgt.y-18), wkb=dkb? null : petWallBlock(mox,moy,tgt.x,tgt.y-18,u), kb9=dkb||wkb;   // 0906 THE PETS ON THE BATTLEGROUND (C4): the enemy's snow bank stops the round the duck's own way
       const hv9=ultHvOn(u);   // 0605/0607 HEAVY SHOTS: HIS rounds only through the ONE predicate (the window rides HIS figure, never the class — the storm's wave reads the same door)
-      if(dkb) duckBlockFx(dkb); else { if(hv9) HV_RD=true; hurt(tgt,dmgF*shfX(u,tgt,Math.hypot(tgt.x-u.x,tgt.y-u.y))+scoutX(ssw,Math.hypot(tgt.x-u.x,tgt.y-u.y))+(hv9?ULT_PI_DMG:0),u); HV_RD=false; }   // 0556 THE SHERIFF HAT's near term (shfX answers 1 for every man but a Sarge in the hat) · v3.27 SCOUT ARMOR's longshot plate (ssw gates it to the SARGE's own trigger — null for every other man on this path) · 0605: +ULT_PI_DMG FLAT after every multiplier (the longshot plate's own seat law — "+10 damage per shot" is ten points, never ten times the rank curve) and HV_RD = the round's armour-pen latch in hurt() (the TK_REFL grammar)
-      if(!dkb && ecFireOn(u)) ecIgnite(tgt,u);   // 0550 RAPID FIRE — SCORCHED EARTH: the round that landed lights the ground under the target (one patch per spot per shooter)
-      const tex=dkb?dkb.x:tgt.x, tey=dkb?dkb.y:tgt.y-18;
+      if(dkb) duckBlockFx(dkb); else if(wkb) petWallPuff(wkb); else { if(hv9) HV_RD=true; hurt(tgt,dmgF*shfX(u,tgt,Math.hypot(tgt.x-u.x,tgt.y-u.y))+scoutX(ssw,Math.hypot(tgt.x-u.x,tgt.y-u.y))+(hv9?ULT_PI_DMG:0),u); HV_RD=false; }   // 0556 THE SHERIFF HAT's near term (shfX answers 1 for every man but a Sarge in the hat) · v3.27 SCOUT ARMOR's longshot plate (ssw gates it to the SARGE's own trigger — null for every other man on this path) · 0605: +ULT_PI_DMG FLAT after every multiplier (the longshot plate's own seat law — "+10 damage per shot" is ten points, never ten times the rank curve) and HV_RD = the round's armour-pen latch in hurt() (the TK_REFL grammar)
+      if(!kb9 && ecFireOn(u)) ecIgnite(tgt,u);   // 0550 RAPID FIRE — SCORCHED EARTH: the round that landed lights the ground under the target (one patch per spot per shooter)
+      const tex=kb9?kb9.x:tgt.x, tey=kb9?kb9.y:tgt.y-18;
       if(u.type==='sarge'){ if(off) u.pist2T=PISTOL_KICK; else u.pistT=PISTOL_KICK;
         if(!lz){ const RM=reducedMotion();
           const fxx=u.x+(off?18:17.5)*mzl, fxy=off? u.y-31 : u.y-41.5;
@@ -65249,19 +65250,23 @@ function medicPass(dt){
 // own two-currency primitive; the + at medBadgeY for the stitch's life) → WHILE HE SEWS NOTHING HURTS SARGE (petShieldOn at tanHit · hurt · the CQ vent · the wall bonk · knock(): one
 // predicate, five doors, the enhSoakM precedent; the tell = a faint cream stitch-ring, ⚑ Q13) → he STOPS the moment Sarge is back at the floor → a breather (ST_CD, shrinking on the
 // Medic's own ladder — ⚑ Q6 the 0.1 slope) → ready again. Sarge DOWN = no stitch, no revive (the Medic's own non-goal): he sits by him with a whimper till the fresh Sarge walks on.
-function petOfU(u){   // which pet THIS Sarge fields (null = none): mine off META.pet (petSel), a relayed ally's off his worn list — never on the battleground this card
-  if(!u || u.type!=='sarge' || S.bf) return null;
+function petOfU(u){   // which pet THIS Sarge fields (null = none): mine off META.pet (petSel), a relayed ally's off his worn list — and on the battleground (0906 THE PETS ON THE BATTLEGROUND) every commander's by the chair
+  if(!u || u.type!=='sarge') return null;
+  if(S.bf){ if(u.dropT>0) return null; if(bfHumanU(u)) return petSel(); const w=sargeWearU(u); if(!w) return null; for(const s of w){ if(typeof s==='string' && s.slice(0,4)==='pet:'){ const k=s.slice(4).split(':')[0]; if(PET_MOLD[k]) return k; } } return null; }   // 0906 THE PETS ON THE BATTLEGROUND (FM-GVT-PETS-BF-01 C1; Wyatt 9/6: "players need to have their appropriate pet inside. Other players need to see the other players' pets"): on the battleground MINE is the chair (bfHumanU — never "no coopSW": the census can birth a relayed Sarge with no worn list, and MY pet must never heel HIS), every other commander's pet is the worn string his place word carried (sargeWearU: a relayed human's coopSW.of, the away captain's kit.of), a computer seat's none; a Sarge still dropping in fields nothing (the enemy screens draw nothing of him yet)
   if(u.coopSW || u.coopMods){ const w=sargeWearU(u); if(!w) return null; for(const s of w){ if(typeof s==='string' && s.slice(0,4)==='pet:'){ const k=s.slice(4).split(':')[0]; if(PET_MOLD[k]) return k; } } return null; }
   return petSel();
 }
 function petRankU(u,k){   // the pet's rank for the twin clocks: mine live off META.up, an ally's off the worn string — both sims read ONE number, so the stitch and the breather agree
-  if(u && (u.coopSW || u.coopMods)){ const w=sargeWearU(u)||[]; for(const s of w){ if(typeof s==='string' && s.slice(0,4)==='pet:'){ const q=s.slice(4).split(':'); if(q[0]===k) return Math.max(0, Math.min(RANK_MAX, (+q[1]|0))); } } return 0; }
+  if(u && (u.coopSW || u.coopMods || (S.bf && !bfHumanU(u)))){ const w=sargeWearU(u)||[]; for(const s of w){ if(typeof s==='string' && s.slice(0,4)==='pet:'){ const q=s.slice(4).split(':'); if(q[0]===k) return Math.max(0, Math.min(RANK_MAX, (+q[1]|0))); } } return 0; }
   return META.up[k]||0;
 }
-function petKeyU(u){ return (u.coopSW||u.coopMods)? 'c:'+(u.coopBy==null? '?' : u.coopBy) : 'me'; }   // the owner key: the fresh Sarge after a knock carries the same key, so his pet re-heels
-function petLive(){ return !S.bf && S.pets.length>0; }
-function petStitchWant(u){ return !!u && u.type==='sarge' && !S.bf && medPatient(u) && u.hits>0 && (gritCap(u)-u.hits)<ST_FLOOR; }   // THE FLOOR (⚑ Q2 / Q14): grit pips LEFT under ST_FLOOR = he sews; back at the floor = he stops (a stock 4-grit Sarge lives under it — every hit mended; the Commander's 12 and the Saber's 8 meet Patch only when it gets ugly); medPatient's guards gate it (dead / down / dropT / jetT / falling = no stitch)
-function petStitchOn(u){ if(!u || S.bf || u.type!=='sarge') return false; for(const p of S.pets){ if(p.own===u && p.k==='patch' && p.phase==='stitch') return true; } return false; }   // the + and the ring read THIS one call
+function petKeyU(u){ if(S.bf) return 's:'+(u.seat|0); return (u.coopSW||u.coopMods)? 'c:'+(u.coopBy==null? '?' : u.coopBy) : 'me'; }   // the owner key: the fresh Sarge after a knock carries the same key, so his pet re-heels
+function petDir(u){ return (S.bf && u && u.side==='foe')? -1 : 1; }   // 0906 THE PETS ON THE BATTLEGROUND (C2): which way this Sarge's army marches — the heel seat, Patch's side seat, Slush's bank and the facing at heel all read it; +1 on the rug and for the 'you' side (byte-what-they-were), -1 for the 'foe' side (the heel EAST of him, facing west)
+function petEdgeE(){ return (S.bf? WORLD_W : W)-10; }   // 0906 THE PETS ON THE BATTLEGROUND (C2): the east cull — the rug's W (the 960 view) as shipped; the battleground's WORLD_W (1920+), or every pet would be blind to the east half of the carpet
+function petTgtOk(u,f){ return !S.bf || bfCanTarget(u,f); }   // 0906 THE PETS ON THE BATTLEGROUND (C2): THE LIP LAW on the battleground only (the cloak, the fall, the fog, the wall sight, the trench — what every gun asks); the rug never asked it at these seats, so it stays unasked there (byte-same)
+function petLive(){ return S.pets.length>0; }
+function petStitchWant(u){ if(!u || u.type!=='sarge' || !medPatient(u)) return false; if(S.bf) return u.hp<ST_FLOOR; return u.hits>0 && (gritCap(u)-u.hits)<ST_FLOOR; }   // THE FLOOR (⚑ Q2 / Q14): grit pips LEFT under ST_FLOOR = he sews; back at the floor = he stops (a stock 4-grit Sarge lives under it — every hit mended; the Commander's 12 and the Saber's 8 meet Patch only when it gets ugly); medPatient's guards gate it (dead / down / dropT / jetT / falling = no stitch)
+function petStitchOn(u){ if(!u || u.type!=='sarge') return false; for(const p of S.pets){ if(p.own===u && p.k==='patch' && p.phase==='stitch') return true; } return false; }   // the + and the ring read THIS one call
 function petShieldOn(u){ return ST_SHIELD>0 && petStitchOn(u); }   // THE SHIELD (Wyatt 4:45 pm; ⚑ Q12 the direct knockdowns wait too; pits and magma still kill — they are falls, not damage): a turned round spends nothing and pops nothing
 function petStitchT(p){ return Math.max(ST_T_MIN, ST_T/petMul(p.r|0)); }   // ⚑ Q7: 2.0 s → the 1.5 s floor (reached by rank ~11 on the pets' 0.03 slope, ⚑ Q6)
 function petCd(p){ return ST_CD/petMul(p.r|0); }   // the breather shrinks with rank: 6 s → 3.4 s at rank 100 (petMul); the floor stays 5 (⚑ alt: rank raises the floor)
@@ -65285,18 +65290,18 @@ function petCd(p){ return ST_CD/petMul(p.r|0); }   // the breather shrinks with 
 // (the truth = the heel seat at idle; the body's lift = p.alt); still not a unit — never targeted, never dies, no tray. Sarge DOWN: he holds his circle where he is (no
 // whimper, ⚑ Q9), the lock dropped, till the fresh Sarge walks on. THE TWIN LAW: dt-based, dice-free, the lock and the approach from positions both sims hold — never
 // seeded; an ally's Sarge reads HIS reach off the wire bag (unitSargeStats → coopSW), so both sims lock the same man.
-function petFlLive(f){ return !(f.dead || f.burrow || f.pendDie || f.fellVoid || f.jetT>0 || f.shv || (f.hp!=null&&f.hp<=0) || f.x>W-10 || f.x<-40 || f.y<-30 || f.y>WORLD_H+30 || (S.drag&&S.drag.unit===f)); }   // the ONE skip list the lock, the re-aim and the pass read: dead · burrowed · dying · fallen · jetting · mid-slide (⚑ Q6) · off the carpet (the W-10 east cull) · in the player's hand (the foe's own courtesy — inert today: only a Green figure rides the hand)
+function petFlLive(f){ return !(f.dead || f.burrow || f.pendDie || f.fellVoid || f.jetT>0 || f.shv || (f.hp!=null&&f.hp<=0) || (S.bf && (f.dropT>0 || f.falling)) || f.x>petEdgeE() || f.x<-40 || f.y<-30 || f.y>WORLD_H+30 || (S.drag&&S.drag.unit===f)); }   // the ONE skip list the lock, the re-aim and the pass read: dead · burrowed · dying · fallen · jetting · mid-slide (⚑ Q6) · off the carpet (the W-10 east cull) · in the player's hand (the foe's own courtesy — inert today: only a Green figure rides the hand)
 function petSargeRng(u){ const sw=unitSargeStats(u); return (sw.rng||u.def.rng)*radioAura(u).rng*lzRngMul(u)+tkSilvRng(u); }   // Sarge's OWN gun reach as the march halts him (the pistol's spRng, the long rifle's 408 / 469 / +longeye, the commander's blade; a saber's aggro has no rng → the sidearm's 108); the aura, the lens and the silver ride it as the halt's own line does
 function petFlReach(u){ return FL_GUN? Math.max(FL_R, petSargeRng(u)+FL_PAD) : FL_R; }   // THE REACH (⚑ Q1 / Q1b): sixteen metres, or as far as Sarge shoots plus a pace — the man he halted for stands AT his reach
 function petFlNear(u){   // THE LOCK's finder: the nearest live Tan man inside the reach OF SARGE (⚑ Q4; foeSaberNext's pet edition)
   let best=null, bd=petFlReach(u);
-  for(const f of S.foes){ if(!petFlLive(f)) continue;
+  for(const f of TGT(u)){ if(!petFlLive(f) || !petTgtOk(u,f)) continue;
     const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){ bd=d; best=f; } }
   return best;
 }
 function petFlSwing(p){   // THE ONE RE-AIM (⚑ Q5): the locked man gone mid-flight → the nearest live Tan man inside FL_SWING of FLAPPY's own position, else null (home)
   let best=null, bd=FL_SWING;
-  for(const f of S.foes){ if(!petFlLive(f)) continue;
+  for(const f of TGT(p.own)){ if(!petFlLive(f) || !petTgtOk(p.own,f)) continue;
     const d=Math.hypot(f.x-p.x,f.y-p.y); if(d<bd){ bd=d; best=f; } }
   return best;
 }
@@ -65306,7 +65311,7 @@ function petFlDmg(p){ return FL_DMG*petMul(p.r|0); }   // the bite grows with ra
 function petFlTick(p,u,dt){   // THE BEAT: returns true when the machine owns the frame (fly · pass · climb), false at heel so the shared heel walk runs
   if(p.alt==null) p.alt=1;
   if(p.state==='fly'){   // THE APPROACH: homing on the locked man's CURRENT position at the dive's own speed
-    if(!p.tgt || !petFlLive(p.tgt) || S.foes.indexOf(p.tgt)<0){ const n=(!p.swung)? petFlSwing(p) : null; if(n){ p.tgt=n; p.swung=1; } else { petFlHome(p); return true; } }   // the man died, left, or was swept off the field (a retreat sweep splices without a death flag): one swing onto a neighbour inside FL_SWING, else the sortie is abandoned — home
+    if(!p.tgt || !petFlLive(p.tgt) || TGT(u).indexOf(p.tgt)<0){ const n=(!p.swung)? petFlSwing(p) : null; if(n){ p.tgt=n; p.swung=1; } else { petFlHome(p); return true; } }   // the man died, left, or was swept off the field (a retreat sweep splices without a death flag): one swing onto a neighbour inside FL_SWING, else the sortie is abandoned — home
     const m=p.tgt, dx=m.x-p.x, dy=m.y-p.y, d=Math.hypot(dx,dy);
     if(d<=FL_STRIKE){   // THE STRIKE: inside a pace the approach becomes the foe's own straight pass THROUGH him, aimed once; the screech here (⚑ Q12)
       const ex=(d>0.5? dx/d : p.fx), ey=(d>0.5? dy/d : 0);
@@ -65319,20 +65324,20 @@ function petFlTick(p,u,dt){   // THE BEAT: returns true when the machine owns th
   if(p.state==='pass'){   // THE PASS: the foe's own strafe (updateFoeSwoop's dive), flown straight out past the man
     p.alt=Math.max(0,p.alt-dt*3.2);
     const step=FL_DIVE*dt; p.x+=p.dir.x*step; p.y+=p.dir.y*step; p.run-=step; p.fx=p.dir.x>0? 1 : -1;
-    for(const f of S.foes){
-      if(!petFlLive(f)) continue;   // ⚑ Q6: the one skip list (mid-slide, underground, falling, dead, in the hand)
+    for(const f of TGT(u)){
+      if(!petFlLive(f) || !petTgtOk(u,f)) continue;   // ⚑ Q6: the one skip list (mid-slide, underground, falling, dead, in the hand)
       if(f.def && f.def.vehicle) continue;   // ⚑ Q3 (0807b): machines are strafed for nothing
       if(p.hits[f.id]) continue;
-      if(Math.hypot(f.x-p.x,f.y-p.y)<FL_LANE+10){ p.hits[f.id]=1; hurt(f, petFlDmg(p), p); if(FL_KNOCK && !f.dead && f.hp>0) ggShove(f, p.x-p.dir.x*40, p.y-p.dir.y*40, p, null, FL_SHOVE); }   // the bite through the one funnel, then the bowl-over along the pass (the slide's ray from a point 40 px back up the line); the lane still takes bystanders (⚑ Q7)
+      if(Math.hypot(f.x-p.x,f.y-p.y)<FL_LANE+10){ p.hits[f.id]=1; hurt(f, petFlDmg(p), S.bf? u : p); if(FL_KNOCK && !f.dead && f.hp>0) ggShove(f, p.x-p.dir.x*40, p.y-p.dir.y*40, S.bf? u : p, null, FL_SHOVE); }   // the bite through the one funnel, then the bowl-over along the pass (the slide's ray from a point 40 px back up the line); the lane still takes bystanders (⚑ Q7)
     }
-    if(p.run<=0 || p.x<20 || p.x>W+60 || p.y<FOE_TOP-30 || p.y>FOE_BOT+30) petFlHome(p);   // the pass is flown: out past the man or off the carpet (the foe's own ends) → right back to Sarge
+    if(p.run<=0 || p.x<20 || p.x>petEdgeE()+70 || p.y<(S.bf? -30 : FOE_TOP-30) || p.y>(S.bf? WORLD_H+30 : FOE_BOT+30)) petFlHome(p);   // the pass is flown: out past the man or off the carpet (the foe's own ends) → right back to Sarge
     return true;
   }
   if(p.state==='climb'){   // THE FLIGHT HOME: the rise over FL_CLIMB and the straight line to the heel seat at FL_HOME; it ends when he is HOME
     p.t+=dt; p.alt=Math.min(1, p.alt+dt/FL_CLIMB);
-    const hx=u.x-PET_HEEL_DX, hy=u.y+PET_HEEL_DY, dx=hx-p.x, dy=hy-p.y, d=Math.hypot(dx,dy), sp=FL_HOME*dt;
+    const hx=u.x-PET_HEEL_DX*petDir(u), hy=u.y+PET_HEEL_DY, dx=hx-p.x, dy=hy-p.y, d=Math.hypot(dx,dy), sp=FL_HOME*dt;
     if(Math.abs(dx)>0.5) p.fx=dx>0? 1 : -1;
-    if(d<=sp){ p.x=hx; p.y=hy; p.state='idle'; p.alt=1; p.phase='heel'; p.t=0; p.cd=petFlCd(p); p.fx=1; return true; }   // HOME: back on his circle facing the way the men march; the wait starts here (⚑ Q8)
+    if(d<=sp){ p.x=hx; p.y=hy; p.state='idle'; p.alt=1; p.phase='heel'; p.t=0; p.cd=petFlCd(p); p.fx=petDir(u); return true; }   // HOME: back on his circle facing the way the men march; the wait starts here (⚑ Q8)
     p.x+=dx/d*sp; p.y+=dy/d*sp;
     if(p.t>=FL_CLIMB*3){ p.state='idle'; p.alt=1; p.phase='sprint'; p.t=0; p.cd=petFlCd(p); return false; }   // ⚑ Q11: a Sarge outrunning him — the shared leash walk takes the feet this frame
     return true;
@@ -65356,8 +65361,8 @@ function petFlTick(p,u,dt){   // THE BEAT: returns true when the machine owns th
 // dt-based, dice-free, the seat from positions both sims hold — never seeded.
 function petSlNear(u){   // the nearest Tan man inside SL_R of SARGE (petFlNear's skips, the wall's own reach)
   let best=null, bd=SL_R;
-  for(const f of S.foes){ if(f.dead || f.burrow || f.pendDie || f.fellVoid || f.jetT>0 || (f.hp!=null&&f.hp<=0)) continue;
-    if(f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30) continue;
+  for(const f of TGT(u)){ if(f.dead || f.burrow || f.pendDie || f.fellVoid || f.jetT>0 || (f.hp!=null&&f.hp<=0) || (S.bf && (f.dropT>0 || f.falling || !bfCanTarget(u,f)))) continue;
+    if(f.x>petEdgeE()||f.x<-40||f.y<-30||f.y>WORLD_H+30) continue;
     const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){ bd=d; best=f; } }
   return best;
 }
@@ -65365,7 +65370,7 @@ function petSlT(p){ return SL_T*petMul(p.r|0); }   // the wall stands longer wit
 function petWallUp(p,x,y){   // THE LANDING: the chain of round solids into the rock table (the canyon grammar), the wall on the pet, the thump + the snow
   if(!S.cfg.terrain.rocks) S.cfg.terrain.rocks=[];
   const rk=[]; for(let i=0;i<SL_RK;i++){ const r={ x:x, y:y+(i-(SL_RK-1)/2)*(SL_W/SL_RK), r:SL_W/(2*SL_RK), art:'snow', snow:1 }; rk.push(r); S.cfg.terrain.rocks.push(r); }
-  const T=petSlT(p); p.wall={ x, y, w:SL_THK, h:SL_W, t:T, T, by:p.key, rk };
+  const T=petSlT(p); p.wall={ x, y, w:SL_THK, h:SL_W, t:T, T, by:p.key, rk, side:(S.bf && p.own)? p.own.side : null };
   for(let i=0;i<4;i++) S.fx.push({k:'puff',x:x+((i%2)? 9 : -9),y:y-SL_W/2+i*(SL_W/3),t:0,dur:0.4,R:14,col:'#ffffff'});   // dice-free: the puffs seated along the span
   bfSfx(SFX.thump, x, y); S.shake=Math.max(S.shake,0.12);
 }
@@ -65379,11 +65384,12 @@ function petWallDown(p,how){   // THE MELT ('melt') or THE PLOUGH ('plough'): th
 }
 function petWallTick(p,dt){   // the clock + the plough, every frame the wall stands
   const w=p.wall; if(!w) return;
-  if(SL_PLOUGH){ for(const f of S.foes){ if(f.dead || !(f.def&&f.def.vehicle)) continue; if(Math.abs(f.x-w.x)<w.w/2+30 && Math.abs(f.y-w.y)<w.h/2+24){ petWallDown(p,'plough'); return; } } }   // ⚑ Q2: the jeep and the tank plough through — a snow spray, the wall gone
+  if(SL_PLOUGH){ for(const f of (S.bf? S.units : S.foes)){ if(f.dead || (S.bf && f.dropT>0) || !(f.def&&f.def.vehicle)) continue; if(Math.abs(f.x-w.x)<w.w/2+30 && Math.abs(f.y-w.y)<w.h/2+24){ petWallDown(p,'plough'); return; } } }   // ⚑ Q2: the jeep and the tank plough through — a snow spray, the wall gone
   w.t-=dt; if(w.t<=0) petWallDown(p,'melt');
 }
-function petWallBlock(x1,y1,x2,y2){   // THE COVER (the duck's contract): the first standing wall the line crosses at wall height → the point the round dies at, else null
+function petWallBlock(x1,y1,x2,y2,who){   // THE COVER (the duck's contract): the first standing wall the line crosses at wall height → the point the round dies at, else null
   for(const p of (S.pets||[])){ const w=p.wall; if(!w || x1===x2) continue;
+    if(who? (!S.bf || who.side===w.side) : S.bf) continue;   // 0906 THE PETS ON THE BATTLEGROUND (C4): who = the shooter — on the battleground a wall is cover against the OTHER army only (a round from its own side flies over; a sideless caller there is nobody); on the rug a Green shooter never meets a Tan wall (the three Tan seats pass nothing and are blocked as shipped)
     if((x1-w.x)*(x2-w.x)>0) continue;   // both ends on one side: the line never crosses its face
     const t=(w.x-x1)/(x2-x1), yc=y1+t*(y2-y1);
     if(yc>=w.y-w.h/2-SL_TALL && yc<=w.y+w.h/2) return { x:w.x, y:yc }; }   // between the bank's top and its south foot; above the top the round flies over (a wall, not a roof)
@@ -65399,7 +65405,7 @@ function petSlTick(p,u,dt){   // THE BEAT: true while the machine owns the feet 
   }
   p.state='idle'; p.hop=0;
   if(p.cd<=0 && !p.wall){ const m=petSlNear(u);   // THE TRIGGER: rested, no wall standing, a Tan man inside 6 m of Sarge
-    if(m){ p.state='leap'; p.phase='leap'; p.tx=u.x+SL_AT; p.ty=u.y; p.d0=Math.max(1,Math.hypot(p.tx-p.x,p.ty-p.y)); p.t=0; p.fx=1; return true; } }
+    if(m){ p.state='leap'; p.phase='leap'; p.tx=u.x+SL_AT*petDir(u); p.ty=u.y; p.d0=Math.max(1,Math.hypot(p.tx-p.x,p.ty-p.y)); p.t=0; p.fx=petDir(u); return true; } }
   return false;
 }
 // ═══ 0906 THE KING'S HOARD 2/6 · PUFF (FM-GVT-HOARD-PUFF-01 on FM-GVT-REX-HOARD-01 rev 2 §3.3 D11–D15; jumpr 0806j; Wyatt 9/6 ~9:07 am: "… Little cute fire breather pet
@@ -65415,16 +65421,16 @@ function petSlTick(p,u,dt){   // THE BEAT: true while the machine owns the feet 
 // Sarge DOWN: the machine parks, a mid-inhale is cancelled (no tongue), no whimper (Flappy's rule); a standing tongue outlives him (the region's own law). Not a unit: never
 // targeted, never dies, no tray (the pets' six rules). THE TWIN LAW: dt-based, dice-free — the seat, the aim and the clocks from positions both sims hold; a partner's Puff rides
 // his worn string (sw.of, petOfU) and breathes on my sim from the same state.
-function petPfLive(f){ return !(f.dead || f.burrow || f.pendDie || f.fellVoid || f.jetT>0 || (f.hp!=null&&f.hp<=0) || (f.def&&f.def.vehicle) || f.x>W-10 || f.x<-40 || f.y<-30 || f.y>WORLD_H+30); }   // the ONE skip list the trigger, the re-aim and the burn read: dead · burrowed · dying · fallen · jetting · a MACHINE (he breathes at men) · off the carpet (the W-10 east cull)
-function petPfNear(x,y,R){   // the nearest live Tan MAN inside R of (x,y) — the trigger reads SARGE's feet (PF_AGGRO), the fire's re-aim Puff's own jaw
+function petPfLive(f){ return !(f.dead || f.burrow || f.pendDie || f.fellVoid || f.jetT>0 || (f.hp!=null&&f.hp<=0) || (f.def&&f.def.vehicle) || (S.bf && (f.dropT>0 || f.falling)) || f.x>petEdgeE() || f.x<-40 || f.y<-30 || f.y>WORLD_H+30); }   // the ONE skip list the trigger, the re-aim and the burn read: dead · burrowed · dying · fallen · jetting · a MACHINE (he breathes at men) · off the carpet (the W-10 east cull)
+function petPfNear(u,x,y,R){   // the nearest live Tan MAN inside R of (x,y) — the trigger reads SARGE's feet (PF_AGGRO), the fire's re-aim Puff's own jaw
   let best=null, bd=R;
-  for(const f of S.foes){ if(!petPfLive(f)) continue; const d=Math.hypot(f.x-x,f.y-y); if(d<bd){ bd=d; best=f; } }
+  for(const f of TGT(u)){ if(!petPfLive(f) || !petTgtOk(u,f)) continue; const d=Math.hypot(f.x-x,f.y-y); if(d<bd){ bd=d; best=f; } }
   return best;
 }
 function petPfCd(p){ return PF_CD/petMul(p.r|0); }   // the rest shrinks with rank on the pets' own slope (6 s → 3.45 s at 100) — the academy's +N% FIRE RATE reads petMul too
 function petPfJaw(p){ return { x:p.x+PF_JAW_X*(p.fx>0? 1 : -1), y:p.y+PF_JAW_Y }; }   // the jaw = the dilo's own seat (breathMo's ±25/−24 at w 70) at pet size, on the side he faces
 function petPfFire(p,u){   // THE PUFF: the aim re-read NOW (the locked man if live, else the nearest live man inside the cone's reach of the jaw, else the point he inhaled at), the region + the fx
-  const j0=petPfJaw(p); const m=(p.tgt && petPfLive(p.tgt) && S.foes.indexOf(p.tgt)>=0)? p.tgt : petPfNear(j0.x, j0.y, PF_R+PF_AGGRO);
+  const j0=petPfJaw(p); const m=(p.tgt && petPfLive(p.tgt) && TGT(u).indexOf(p.tgt)>=0)? p.tgt : petPfNear(u, j0.x, j0.y, PF_R+PF_AGGRO);
   const ax=m? m.x : p.ax, ay=m? m.y : p.ay;
   if(m) p.fx=(m.x>p.x)? 1 : -1;   // he faces the man he burns (0396 R4) — the jaw follows the facing
   const g=petPfJaw(p), ang=Math.atan2(ay-g.y, ax-g.x);
@@ -65438,12 +65444,12 @@ function petPfTick(p,u,dt){   // THE BEAT: true while the machine owns the feet 
   if(p.state==='step'){
     const dx=p.tx-p.x, dy=p.ty-p.y, d=Math.hypot(dx,dy), sp=PET_WALK*dt;
     if(d<=sp){ p.x=p.tx; p.y=p.ty; p.state='inhale'; p.phase='inhale'; p.t=0; } else { p.x+=dx/d*sp; p.y+=dy/d*sp; }
-    if(p.tgt && S.foes.indexOf(p.tgt)>=0) p.fx=(p.tgt.x>p.x)? 1 : -1;   // he walks facing his man
+    if(p.tgt && TGT(u).indexOf(p.tgt)>=0) p.fx=(p.tgt.x>p.x)? 1 : -1;   // he walks facing his man
     return true;
   }
   if(p.state==='inhale'){
     p.t+=dt;
-    if(p.tgt && S.foes.indexOf(p.tgt)>=0){ p.fx=(p.tgt.x>p.x)? 1 : -1; p.ax=p.tgt.x; p.ay=p.tgt.y; }   // the last place his man stood — the fallback aim if he is gone at the fire
+    if(p.tgt && TGT(u).indexOf(p.tgt)>=0){ p.fx=(p.tgt.x>p.x)? 1 : -1; p.ax=p.tgt.x; p.ay=p.tgt.y; }   // the last place his man stood — the fallback aim if he is gone at the fire
     if(p.t>=PF_INHALE){ petPfFire(p,u); p.state='fire'; p.phase='fire'; p.t=0; }
     return true;
   }
@@ -65453,7 +65459,7 @@ function petPfTick(p,u,dt){   // THE BEAT: true while the machine owns the feet 
     return true;
   }
   p.state='idle';
-  if(p.cd<=0){ const m=petPfNear(u.x, u.y, PF_AGGRO);   // THE TRIGGER: rested, and a Tan man inside 4 m of SARGE
+  if(p.cd<=0){ const m=petPfNear(u, u.x, u.y, PF_AGGRO);   // THE TRIGGER: rested, and a Tan man inside 4 m of SARGE
     if(m){ const dx=m.x-u.x, dy=m.y-u.y, d=Math.hypot(dx,dy)||1;
       p.tgt=m; p.tx=u.x+dx/d*PF_STEP; p.ty=u.y+PET_HEEL_DY+dy/d*PF_STEP; p.ax=m.x; p.ay=m.y; p.state='step'; p.phase='step'; p.t=0; p.fx=(m.x>p.x)? 1 : -1; return true; } }   // a pace ahead OF SARGE toward the man (on the heel's row so he draws before Sarge), fixed here
   return false;
@@ -65461,7 +65467,7 @@ function petPfTick(p,u,dt){   // THE BEAT: true while the machine owns the feet 
 function petPass(dt){
   for(const u of S.units){ if(u.type!=='sarge' || u.dead) continue; const k=petOfU(u); if(!k) continue; const key=petKeyU(u);
     let p=null; for(const q of S.pets){ if(q.key===key){ p=q; break; } }
-    if(!p){ p={ key, k, r:petRankU(u,k), x:u.x-PET_HEEL_DX, y:u.y+PET_HEEL_DY, fx:1, phase:'heel', t:0, cd:0, bob:S.pets.length*1.7, own:u }; S.pets.push(p); }   // seated at heel on the first frame (the bob's phase off his seat, never a die)
+    if(!p){ p={ key, k, r:petRankU(u,k), x:u.x-PET_HEEL_DX*petDir(u), y:u.y+PET_HEEL_DY, fx:petDir(u), phase:'heel', t:0, cd:0, bob:S.pets.length*1.7, own:u }; S.pets.push(p); }   // seated at heel on the first frame (the bob's phase off his seat, never a die)
     else { if(p.own!==u){ p.own=u; if(p.phase==='whimper'){ p.phase='heel'; p.t=0; } } if(p.k!==k){ p.k=k; p.phase='heel'; p.t=0; p.cd=0; p.state='idle'; p.alt=1; p.tgt=null; } p.r=petRankU(u,k); }   // the fresh Sarge walks on → his pet re-heels (the whimper ends)
   }
   for(const p of S.pets){ const u=p.own, alive=!!u && !u.dead && S.units.indexOf(u)>=0;
@@ -65475,18 +65481,18 @@ function petPass(dt){
       if(!petStitchWant(u)){ p.phase='heel'; p.t=0; p.cd=petCd(p); continue; }   // THE STOP: Sarge back at the floor (or no longer a patient) — the breather starts
       p.t+=dt; const T=petStitchT(p);
       if(p.t>=T){ p.t-=T; tkLeech(u,1); bfSfx(SFX.stitch, u.x, u.y); if(!petStitchWant(u)){ p.phase='heel'; p.t=0; p.cd=petCd(p); } }   // one pip a stitch through the Medic's own primitive; the plush squeak at its end (nothing per turned round)
-      p.x=u.x-ST_REACH; p.y=u.y+4; p.fx=1; continue;   // at his side for the stitch's life
+      p.x=u.x-ST_REACH*petDir(u); p.y=u.y+4; p.fx=petDir(u); continue;   // at his side for the stitch's life
     }
-    const sx=u.x-ST_REACH, sy=u.y+4;
+    const sx=u.x-ST_REACH*petDir(u), sy=u.y+4;
     if(p.phase==='run'){ const dx=sx-p.x, dy=sy-p.y, d=Math.hypot(dx,dy), sp=ST_RUN*dt;
       if(!petStitchWant(u) || p.k!=='patch'){ p.phase='heel'; p.t=0; continue; }   // mended on his own (the quiet clock, the Medic's circle) before Patch arrived: back to heel, no breather spent
       if(d<=sp){ p.x=sx; p.y=sy; p.phase='stitch'; p.t=0; } else { p.x+=dx/d*sp; p.y+=dy/d*sp; if(Math.abs(dx)>0.5) p.fx=dx>0? 1 : -1; }
       continue; }
     if(p.k==='patch' && p.cd<=0 && petStitchWant(u)){ p.phase='run'; p.t=0; continue; }   // THE TRIGGER: under the floor and rested → he sprints in
-    const hx=u.x-PET_HEEL_DX, hy=u.y+PET_HEEL_DY, dx=hx-p.x, dy=hy-p.y, d=Math.hypot(dx,dy);
+    const hx=u.x-PET_HEEL_DX*petDir(u), hy=u.y+PET_HEEL_DY, dx=hx-p.x, dy=hy-p.y, d=Math.hypot(dx,dy);
     if(d>PET_LEASH || p.phase==='sprint'){ const sp=(p.k==='flappy'? FL_GLIDE : ST_RUN)*dt; if(d<=sp){ p.x=hx; p.y=hy; p.phase='heel'; } else { p.x+=dx/d*sp; p.y+=dy/d*sp; p.phase='sprint'; } }   // past the leash (a drag, a jet, a charge, a hurl) he sprints after him — the cubs' own 140 — and falls back in at heel
     else if(d>0.5){ const sp=Math.min(d, PET_WALK*dt); p.x+=dx/d*sp; p.y+=dy/d*sp; }   // inside the leash he pads along behind
-    if(Math.abs(dx)>0.5) p.fx=dx>0? 1 : -1; else if(p.phase==='heel') p.fx=1;   // at heel he faces the way the men march (east)
+    if(Math.abs(dx)>0.5) p.fx=dx>0? 1 : -1; else if(p.phase==='heel') p.fx=petDir(u);   // at heel he faces the way the men march (east)
   }
 }
 function drawPetAir(p){   // 0905 THE PETS 2/3 · FLAPPY — the foe pterodactyl's own draw grammar (drawFoe's swoop branch): the shadow sits on the TRUTH (the heel seat at idle; the body's own seat on a sortie), the body rides p.alt up the circle and down the approach (0806b: the ring parks while he is OUT — fly · pass · climb; the tilt on the PASS only; the strafe facing off p.fx);
@@ -65508,6 +65514,7 @@ function drawPetWall(w){   // 0905 THE PETS 3/3 · SLUSH — the snow bank in th
   cx.restore();
 }
 function drawPet(p){   // the unit layer's y-sorted pass (an actor, not wallpaper); the cub is west-authored → mirrored to face east (UNIT_WEST's own law, pet edition); his shadow is the mold's own
+  if(S.bf && p.own && p.own.side!==bfMyTeam() && (p.own.cloakT>0 || p.own.dropT>0)) return;   // 0906 THE PETS ON THE BATTLEGROUND (C5): drawBFUnit's invisibility law, pet edition — while the OTHER team's Sarge is cloaked (the spy's cloak, the smuggler's vanish) or still dropping in, his pet draws nothing on my screen either
   if(p.k==='flappy'){ drawPetAir(p); return; }   // 0905 THE PETS 2/3: the only pet in the air — drawPetAir (the foe pterodactyl's own grammar)
   const st=p.phase==='stitch', im=(st && IMG[p.k+'stitch'])||IMG[p.k]; if(!im) return;
   const w=unitW(p.k), RM9=reducedMotion(), pf9=(p.k==='puff' && (p.state==='inhale'||p.state==='fire'));   // 0906 PUFF: the dilo's own lean through the inhale and his standing jet
@@ -68100,8 +68107,8 @@ function draw(){
   // actors sorted by y
   const actors=[];
   for(const u of S.units) if(!u.dead && !(S.drag&&S.drag.unit===u)) actors.push({y:kbHurlY(u),f:()=>drawUnit(u)});   // 0901 Card C P7: a man mid-hurl inside a mounted king's box sorts a hair below the rider (kbHurlY) — drawn OVER the charger, never hidden behind the 148-wide sprite
-  if(!S.bf) for(const p9 of S.pets) actors.push({y:p9.y+0.5, f:()=>drawPet(p9)});   // 0905 THE PETS: a pet sorts WITH the men (an actor, not wallpaper) — a hair below his own y so he stands in front of the Sarge he heels
-  if(!S.bf) for(const p9 of S.pets) if(p9.wall) actors.push({y:p9.wall.y+p9.wall.h/2, f:()=>drawPetWall(p9.wall)});   // 0905 THE PETS 3/3 · SLUSH: the snow bank sorts at its south foot — a man round the north end is behind it, round the south end in front
+  for(const p9 of S.pets) actors.push({y:p9.y+0.5, f:()=>drawPet(p9)});   // 0905 THE PETS: a pet sorts WITH the men (an actor, not wallpaper) — a hair below his own y so he stands in front of the Sarge he heels
+  for(const p9 of S.pets) if(p9.wall) actors.push({y:p9.wall.y+p9.wall.h/2, f:()=>drawPetWall(p9.wall)});   // 0905 THE PETS 3/3 · SLUSH: the snow bank sorts at its south foot — a man round the north end is behind it, round the south end in front
   for(const f of S.foes) actors.push({y:f.y,f:()=>drawFoe(f)});
   if(S.gboul) for(const B of S.gboul) actors.push({y:B.y,f:()=>drawGBoulder(B)});   // 0278a: a rolling snow-boulder sorts WITH the men — it rolls through the line, not over it
   // 0374 THE STAMPEDE: the herd sorts WITH the men too (the train's own law
@@ -95102,11 +95109,11 @@ window.GVT = {
       n:PIGRUN.chunks.length, chunks:PIGRUN.chunks.slice(),
       paid:PIGRUN.paid, total:PIGRUN.total } : { active:false }; },
   // ---- 0905 THE PETS 1/3 · PATCH: the rig (read-only reads + two testing doors) ----
-  pet(){ const ps=S.pets.map(p=>({ key:p.key, k:p.k, r:p.r|0, x:+p.x.toFixed(2), y:+p.y.toFixed(2), fx:p.fx, phase:p.phase, t:+p.t.toFixed(3), cd:+p.cd.toFixed(3), T:+petStitchT(p).toFixed(3), cdFull:+(p.k==='flappy'? petFlCd(p) : p.k==='puff'? petPfCd(p) : petCd(p)).toFixed(3), state:p.state||null, aim:(p.k==='puff' && p.tgt)? p.tgt.id : null, ax:p.ax==null? null : +p.ax.toFixed(2), ay:p.ay==null? null : +p.ay.toFixed(2), puffs:p.puffs|0, burned:p.burned|0, jaw:(p.k==='puff')? petPfJaw(p) : null, dir:p.dir? [+p.dir.x.toFixed(4),+p.dir.y.toFixed(4)] : null, run:p.run==null? null : +p.run.toFixed(2), hits:p.hits? Object.keys(p.hits).map(Number) : [], lane:FL_LANE, alt:p.alt==null? null : +p.alt.toFixed(3), tgt:(p.tgt? p.tgt.id : null), dist:(p.tgt? +Math.hypot(p.tgt.x-p.x,p.tgt.y-p.y).toFixed(2) : null), home:(p.own? +Math.hypot(p.own.x-PET_HEEL_DX-p.x, p.own.y+PET_HEEL_DY-p.y).toFixed(2) : null), sorties:p.sorties|0, swung:p.swung|0, reach:(p.own && p.k==='flappy' && !p.own.dead)? +petFlReach(p.own).toFixed(1) : null, dmg:+petFlDmg(p).toFixed(3), wall:p.wall? { x:+p.wall.x.toFixed(2), y:+p.wall.y.toFixed(2), w:p.wall.w, h:p.wall.h, t:+p.wall.t.toFixed(3), T:+p.wall.T.toFixed(3), rk:p.wall.rk.length } : null, leaps:p.leaps|0, hop:+(p.hop||0).toFixed(2), tx:p.tx==null? null : +p.tx.toFixed(2), ty:p.ty==null? null : +p.ty.toFixed(2), wallT:+petSlT(p).toFixed(3), own:p.own? { id:p.own.id, dead:!!p.own.dead, x:+p.own.x.toFixed(2), y:+p.own.y.toFixed(2), hits:+(p.own.hits||0).toFixed(3), cap:+gritCap(p.own).toFixed(3), floor:petStitchWant(p.own), stitch:petStitchOn(p.own), shield:petShieldOn(p.own), inUnits:S.units.indexOf(p.own)>=0 } : null }));
+  pet(){ const ps=S.pets.map(p=>({ key:p.key, k:p.k, r:p.r|0, side:(p.own&&p.own.side)||null, seat:(p.own&&p.own.seat!=null)? p.own.seat : null, pdir:petDir(p.own), own:(p.own&&p.own.id!=null)? p.own.id : null, x:+p.x.toFixed(2), y:+p.y.toFixed(2), fx:p.fx, phase:p.phase, t:+p.t.toFixed(3), cd:+p.cd.toFixed(3), T:+petStitchT(p).toFixed(3), cdFull:+(p.k==='flappy'? petFlCd(p) : p.k==='puff'? petPfCd(p) : petCd(p)).toFixed(3), state:p.state||null, aim:(p.k==='puff' && p.tgt)? p.tgt.id : null, ax:p.ax==null? null : +p.ax.toFixed(2), ay:p.ay==null? null : +p.ay.toFixed(2), puffs:p.puffs|0, burned:p.burned|0, jaw:(p.k==='puff')? petPfJaw(p) : null, dir:p.dir? [+p.dir.x.toFixed(4),+p.dir.y.toFixed(4)] : null, run:p.run==null? null : +p.run.toFixed(2), hits:p.hits? Object.keys(p.hits).map(Number) : [], lane:FL_LANE, alt:p.alt==null? null : +p.alt.toFixed(3), tgt:(p.tgt? p.tgt.id : null), dist:(p.tgt? +Math.hypot(p.tgt.x-p.x,p.tgt.y-p.y).toFixed(2) : null), home:(p.own? +Math.hypot(p.own.x-PET_HEEL_DX-p.x, p.own.y+PET_HEEL_DY-p.y).toFixed(2) : null), sorties:p.sorties|0, swung:p.swung|0, reach:(p.own && p.k==='flappy' && !p.own.dead)? +petFlReach(p.own).toFixed(1) : null, dmg:+petFlDmg(p).toFixed(3), wall:p.wall? { x:+p.wall.x.toFixed(2), y:+p.wall.y.toFixed(2), w:p.wall.w, h:p.wall.h, t:+p.wall.t.toFixed(3), T:+p.wall.T.toFixed(3), rk:p.wall.rk.length } : null, leaps:p.leaps|0, hop:+(p.hop||0).toFixed(2), tx:p.tx==null? null : +p.tx.toFixed(2), ty:p.ty==null? null : +p.ty.toFixed(2), wallT:+petSlT(p).toFixed(3), own:p.own? { id:p.own.id, dead:!!p.own.dead, x:+p.own.x.toFixed(2), y:+p.own.y.toFixed(2), hits:+(p.own.hits||0).toFixed(3), cap:+gritCap(p.own).toFixed(3), floor:petStitchWant(p.own), stitch:petStitchOn(p.own), shield:petShieldOn(p.own), inUnits:S.units.indexOf(p.own)>=0 } : null }));
     return { sel:petSel(), own:Object.keys(META.pet.own), seen:Object.keys(META.pet.seen), earn:Object.assign({},PET_EARN), park:Object.assign({},PET_EARN_PARK), mold:Object.keys(PET_MOLD), pets:ps, of:sargeOfList(), live:petLive() }; },
   petOwn(k){ if(!petGrant(k)) return null; saveMeta(); return { own:Object.keys(META.pet.own), sel:petSel() }; },   // the testing door: the card's own grant path (petGrant — the mold gate holds: an unbuilt pet is never owned)
   petSel(k){ if(!petOwns(k)) return null; META.pet.sel=k; saveMeta(); return petSel(); },
-  petWall(){ return S.pets.filter(p=>p.wall).map(p=>({ by:p.key, k:p.k, x:+p.wall.x.toFixed(2), y:+p.wall.y.toFixed(2), w:p.wall.w, h:p.wall.h, t:+p.wall.t.toFixed(3), T:+p.wall.T.toFixed(3), rk:p.wall.rk.length, inRocks:p.wall.rk.every(r=>S.cfg.terrain.rocks.indexOf(r)>=0), snowRocks:S.cfg.terrain.rocks.filter(r=>r.snow).length })); },   // 0905 THE PETS 3/3 · SLUSH: every standing wall
+  petWall(){ return S.pets.filter(p=>p.wall).map(p=>({ by:p.key, k:p.k, side:p.wall.side||null, x:+p.wall.x.toFixed(2), y:+p.wall.y.toFixed(2), w:p.wall.w, h:p.wall.h, t:+p.wall.t.toFixed(3), T:+p.wall.T.toFixed(3), rk:p.wall.rk.length, inRocks:p.wall.rk.every(r=>S.cfg.terrain.rocks.indexOf(r)>=0), snowRocks:S.cfg.terrain.rocks.filter(r=>r.snow).length })); },   // 0905 THE PETS 3/3 · SLUSH: every standing wall
   breaths(){ return (S.breaths||[]).map(b=>({ lane:b.lane||'camp', src:b.src? (b.src.type||b.src.k||b.src.kind||null) : null, x:+b.x.toFixed(2), y:+b.y.toFixed(2), ang:+b.ang.toFixed(4), sp:b.sp, rng:b.rng, t:+b.t.toFixed(3), dur:b.dur, hit:b.hit? b.hit.size : 0, dmg:b.dmg==null? null : b.dmg, cap:b.cap==null? null : b.cap })); },   // 0906 THE KING'S HOARD 2/6 · PUFF: every standing tongue — the lane, the breather, the geometry, the beat Map's size
   petDials(){ return { puff:{ r:PF_R, aggro:PF_AGGRO, cd:PF_CD, multi:PF_MULTI, step:PF_STEP, inhale:PF_INHALE, dur:PF_DUR, dmg:PF_DMG, sp:PF_SP, sc:PF_SC, jawX:PF_JAW_X, jawY:PF_JAW_Y, tick:BR_TICK, body:BR_BODY, cutHead:PF_CUT_HEAD, cutEye:PF_CUT_EYE, cutFrill:PF_CUT_FRILL, cd100:+(PF_CD/petMul(100)).toFixed(4) }, slush:{ r:SL_R, leap:SL_LEAP, at:SL_AT, w:SL_W, thk:SL_THK, tall:SL_TALL, t:SL_T, cd:SL_CD, oneway:SL_ONEWAY, plough:SL_PLOUGH, rk:SL_RK, t100:+(SL_T*petMul(100)).toFixed(4) }, flappy:{ r:FL_R, dive:FL_DIVE, lane:FL_LANE, climb:FL_CLIMB, dmg:FL_DMG, cd:FL_CD, knock:FL_KNOCK, shove:FL_SHOVE, glide:FL_GLIDE, alt:FL_ALT, ringR:FL_RING_R, ringW:FL_RING_W, home:FL_HOME, strike:FL_STRIKE, sink:FL_SINK, swing:FL_SWING, gun:FL_GUN, pad:FL_PAD, dmg100:+(FL_DMG*petMul(100)).toFixed(4), cd100:+(FL_CD/petMul(100)).toFixed(4) }, heelDx:PET_HEEL_DX, heelDy:PET_HEEL_DY, leash:PET_LEASH, walk:PET_WALK, run:ST_RUN, t:ST_T, tMin:ST_T_MIN, floor:ST_FLOOR, shield:ST_SHIELD, cd:ST_CD, reach:ST_REACH, ring:[ST_RING_W,ST_RING_H,ST_RING_A], w:Object.assign({},PET_W), rank:PET_RANK, mul100:+petMul(100).toFixed(4), cd100:+(ST_CD/petMul(100)).toFixed(3), t100:+Math.max(ST_T_MIN, ST_T/petMul(100)).toFixed(3) }; },
   rug(){ const sp=id=>{ const e=document.getElementById('dspot-'+id); if(!e) return null; const r=e.getBoundingClientRect(); return [Math.round(r.left),Math.round(r.top),Math.round(r.width),Math.round(r.height)]; };   // 0905 THE RUGS: the rig's read — the ONE skin on the floor, the bedroom's list, the floor-toy law, the pads, the room's elements, the raid's bakes, this floor's count
