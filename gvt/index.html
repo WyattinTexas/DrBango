@@ -42457,7 +42457,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.62';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.63';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -43186,7 +43186,7 @@ function coopFresh(ui,mode){
 // RE-ARMS it at max(0, beat − elapsed) + jitter — a poll that took longer
 // than the beat is followed at once, never after the timer comes round again.
 const EV_BEAT_MS=500;
-function coopBeatBase(){ return S.coop? (evBattle()? EV_BEAT_MS : 1000) : 2000; }
+function coopBeatBase(){ return S.coop? ((evBattle() || (coopSquad() && coopHumans()>=2))? EV_BEAT_MS : 1000) : 2000; }   // 0907 THE FAST BEAT (FM-GVT-SYNC3-01 §4.1): every squad battle with company rides the event room's 500 ms beat — the pins half as old, the census twice as often (RL_POLL room: 625 ms mean = 96/min under the 150 lid; RAM-served); a party of one, the pair shim and the rooms keep 1000
 function coopBeatMs(){ return nxBeat(coopBeatBase(), COOP.nx, COOP.nxD||2000)*Math.min(4, 1+(COOP.misses||0)*0.5); }
 function coopChain(t0){ if(!COOP) return; clearTimeout(COOP.pollT); COOP.pollT=setTimeout(coopTick, Math.max(0, coopBeatMs()-(Date.now()-t0)) + Math.random()*250); }
 // one heartbeat for everything: pairing, matchmaking, and the in-battle relay
@@ -43777,15 +43777,37 @@ function coopApply(cm){
   // still in flight, skipped without a word.
   if(cm.k==='cen'){
     if(S.bf || String(cm.p||'')===String(COOP.role) || !Array.isArray(cm.mo)) return;
+    const age8=(typeof cm.t==='number' && isFinite(cm.t))? Math.max(0,Math.min(1.5,S.t-cm.t)) : 0;   // 0907 THE ALLY'S CLOCK (FM-GVT-SYNC3-01 §4.5): the owner's sim clock rides the word (FIX-D's law) — the pin is aged forward along the man's pace below; an old build's word carries none (age 0 = today)
+    const own8=String(cm.p||''), seen8=S.cenMiss||(S.cenMiss={});
     for(const r9 of cm.mo){ const p9=String(r9).split(':'); if(p9.length<3) continue;
-      const u9=S.units.find(v9=>v9.cid===p9[0] && v9.coopBy && v9.coopBy!=='bot');
-      if(!u9 || u9.dead || u9.para || u9.emgV || (u9.dropT>0) || u9.falling) continue;   // a down twin slides level too — he stands up where his owner truly is
+      let u9=S.units.find(v9=>v9.cid===p9[0] && v9.coopBy && v9.coopBy!=='bot');
       const nx=Math.max(58,Math.min(W-24,parseInt(p9[1],36)|0)), ny=Math.max(70,Math.min(WORLD_H-92,parseInt(p9[2],36)|0));
-      if(Math.abs(nx-u9.x)<=CEN_TOL && Math.abs(ny-u9.y)<=CEN_TOL) continue;
-      const big9=Math.abs(nx-u9.x)>7 || Math.abs(ny-u9.y)>7;
-      glStart(u9,nx,ny); if(big9) u9.sprue=0.2;   // 0343 (item 2): a correction must never read as a teleport
-      u9.laneY=ny; u9.wp=null; u9.wade=null;
-      if(u9.type==='sarge'){ u9.home={x:nx,y:ny}; u9.saberState='idle'; sgDashEnd(u9); cmdDashEnd(u9); }
+      if(!u9){
+        // 0907 THE CENSUS SPAWN DOOR (§4.4): a cid the census names on TWO beats running with no place word between them
+        // is a man whose order fell off the relay's ring (a rejoin past its horizon, a long-hidden tab — the brake that
+        // stretched the ring is retired). He walks on here at stock strength in his owner's colour (the room census's own
+        // spawn law, roomAdoptSeat). An in-flight placement always lands first — its word rides the same poll AHEAD of the
+        // census (outQ order) — so one sighting only ARMS the door; the owner must hold a live seat; bots never ride cen.
+        if(p9.length<4 || !coopSquad()) continue;
+        const ty8=(UDEF_KEYS||(UDEF_KEYS=Object.keys(UDEF)))[parseInt(p9[3],36)|0];
+        if(!ty8 || !UDEF[ty8] || !(COOP.members||[]).some(m8=>String(m8.seat)===own8)) continue;
+        const k8=own8+'/'+p9[0];
+        if(seen8[k8]==null){ seen8[k8]=S.cenQ|0; continue; }
+        if(seen8[k8]===(S.cenQ|0)) continue;   // the same reply's second word
+        delete seen8[k8];
+        u9=placeUnit(ty8,nx,ny); if(!u9) continue;
+        u9.cid=p9[0]; u9.coopBy=own8; u9.coopHex=COOP.seatHex[own8]||'#5B84C4'; buildUnitTint(u9.coopHex);
+        u9.coopMods=[]; u9.coopSoul=0; u9.evOwner=1; u9.pinX=nx; u9.pinY=ny; u9.pinT=(typeof cm.t==='number')? cm.t : null;
+        continue;
+      }
+      if(u9.dead || u9.para || u9.emgV || (u9.dropT>0) || u9.falling) continue;   // a down twin slides level too — he stands up where his owner truly is
+      pinVel(u9,nx,ny,cm.t);   // 0907 THE PIN'S OWN PACE: two pins a beat apart = the owner's pace; the aged pin and the glide's target walk along it
+      const ax=nx+bodyVx(u9)*age8, ay=ny+bodyVy(u9)*age8;
+      if(Math.abs(ax-u9.x)<=CEN_TOL && Math.abs(ay-u9.y)<=CEN_TOL) continue;
+      const big9=Math.abs(ax-u9.x)>7 || Math.abs(ay-u9.y)>7;
+      glStart(u9,ax,ay); if(big9) u9.sprue=0.2;   // 0343 (item 2): a correction must never read as a teleport
+      u9.laneY=ay; u9.wp=null; u9.wade=null;
+      if(u9.type==='sarge'){ u9.home={x:ax,y:ay}; u9.saberState='idle'; sgDashEnd(u9); cmdDashEnd(u9); }
     }
     return;
   }
@@ -43837,11 +43859,13 @@ function coopApply(cm){
         // evidence) and the pose is re-fitted below as an ABSOLUTE seat.
         const fo9=f9.form;
         if(!fo9._cenR || fo9._cenR.q!==S.cenQ || Math.abs(fo9._cenR.age-age9)>0.25) fo9._cenR={q:S.cenQ, age:age9, rows:[]};   // one pool per beat — a reply that carries TWO of the referee's beats (the ages tell them apart) fits each on its own rows, the newer seat standing
+        pinVel(f9,nx,ny,cm.t);   // 0907: a formed man's pace off two pins — his slot glide's target walks along it
         fo9._cenR.rows.push({x:nx, y:ny, fx:+f9.off.fx||0, fy:+f9.off.fy||0, m:f9});
         fm9.set(fo9,1);
         continue;
       }
-      const dx=nx+(f9.vx9||0)*age9-f9.x, dy=ny+(f9.vy9||0)*age9-f9.y;   // FIX-D: the pin, aged forward along the twin's own walk
+      pinVel(f9,nx,ny,cm.t);   // 0907 THE PIN'S OWN PACE (§4.6)
+      const dx=nx+bodyVx(f9)*age9-f9.x, dy=ny+bodyVy(f9)*age9-f9.y;   // FIX-D: the pin, aged forward — along the referee's own pace off two pins (0907), else the twin's walk
       if(Math.abs(dx)<=FCN_TOL && Math.abs(dy)<=FCN_TOL) continue;
       glStart(f9,f9.x+dx,f9.y+dy);   // 0343 (item 2)
     }
@@ -43898,7 +43922,7 @@ function coopApply(cm){
         if(dg<115 || (RV && A.x<RV.x+RV.w+80 && A.x>RV.x-20)) brk9=true; }
       if(brk9 || (resT>FORM_RES_MAX && (res==null || res>FORM_RES_MAX))){
         for(const m of fo9.members){ if(m) m.form=null; } const fi=S.forms.indexOf(fo9); if(fi>=0) S.forms.splice(fi,1);
-        for(const r of R){ const m=r.m; if(!m||m.dead||m.pendDie) continue; const tx=r.x+(m.vx9||0)*age9, ty=r.y+(m.vy9||0)*age9;
+        for(const r of R){ const m=r.m; if(!m||m.dead||m.pendDie) continue; const tx=r.x+bodyVx(m)*age9, ty=r.y+bodyVy(m)*age9;   // 0907: the referee's pace
           if(Math.abs(tx-m.x)<=FCN_TOL && Math.abs(ty-m.y)<=FCN_TOL) continue; glStart(m,tx,ty); }
         continue;
       }
@@ -50158,6 +50182,7 @@ const SNAP_TOL=48, BCN_MAX=480;
 // dispatch tails and keep yesterday's game byte-exact; rubber-banding the
 // laggard level is the card's own approved mechanism.
 const CEN_TOL=14, FCN_TOL=48, CEN_ROWS=16, CEN_LOGWIN=1200;
+const FCN_ROWS=40;   // 0907 THE WIDE CENSUS (FM-GVT-SYNC3-01 §4.2): the referee's fcn word carries 40 rows — the server's own lid since v57 (clamp_cmd mo v[:40], strings ≤16) — 80 a beat in the same two log rows: a three-commander army (×2.46, 60-100 standing) fits every beat where 32 swept it in three. cen keeps CEN_ROWS (a commander fields ≤10)
 // ===== 0343 (items 2+3) THE GLIDE & THE OVERRUN AGREEMENT (design/
 // mp-sync-trio-0343/00-DESIGN.md). (2) A census adopt that would MOVE a
 // standing figure further than GL_MIN slides him to the pin over ~GL_T on
@@ -50177,26 +50202,44 @@ const CEN_TOL=14, FCN_TOL=48, CEN_ROWS=16, CEN_LOGWIN=1200;
 // man in the log, so a death is never double-booked).
 const GL_MIN=24, GL_T=0.16, GL_OVER=420;
 const FORM_RES_MAX=40, FORM_SEAT=100, FORM_BRK_MIRROR=0;   // FIX-B: (⚑ FORM_BRK_MIRROR=1 breaks my block on the referee's own 115/river rule read off the fitted pose — measured within noise of the misfit door, OFF by default) past this RMS misfit under both models the referee's ranks have broken · a block inside FORM_SEAT of its pose is nudged, never re-seated
-const GL_SPD=260, GL_TMAX=0.6;   // FIX-E: a FOE's correction is paced — ~260px/s, never longer than 0.6s (a unit keeps GL_T: his pin is a re-seat, not a march)
+const GL_SPD=120, GL_TMAX=0.8, GL_T_MIN=0.25, GL_SET=8;   // 0907 THE LONG GLIDE (§4.6, ⚑ Wyatt's cells): EVERY correction — a foe's, an ally's man's — closes at ~120 px/s, 0.25..0.8 s (was 260 / 0.16..0.6 for foes and a flat 0.16 s for men: a 40 px pull at 250 px/s was the hop); the instant set shrinks to GL_SET 8 px (was GL_MIN 24 — a 20 px hop was a hop); GL_OVER 420 stands. The target walks with the body for the glide's whole life (glideTick), so a marcher is never pulled back to where the pin WAS
 function glStart(b,nx,ny){
   const d9=Math.hypot(nx-b.x,ny-b.y);
-  if(d9<=GL_MIN || d9>GL_OVER){ b.x=nx; b.y=ny; b.glT=0; return; }
-  b.glX=nx; b.glY=ny; b.glT=(b.foN!=null)? Math.max(GL_T,Math.min(GL_TMAX,d9/GL_SPD)) : GL_T;
+  if(d9<=GL_SET || d9>GL_OVER){ b.x=nx; b.y=ny; b.glT=0; return; }   // 0907 (§4.6): the instant set is the sprue's own wobble now (GL_SET 8) — above it every pull glides
+  b.glX=nx; b.glY=ny; b.glT=Math.max(GL_T_MIN,Math.min(GL_TMAX,d9/GL_SPD));   // 0907 THE LONG GLIDE: foe or ally's man alike, paced at GL_SPD — a correction reads as a hurried step, never a re-seat
   if(!b.glOn){ b.glOn=1; (S.glid||(S.glid=[])).push(b); }
 }
-function velTick(dt){   // FIX-D: every standing foe's own velocity (px/s), smoothed — what an aged pin is moved along
+// 0907 THE PIN'S OWN PACE (FM-GVT-SYNC3-01 §4.6): two pins of one body a beat apart give the SENDER's velocity — what the
+// aged pin (FIX-D) and the glide's target walk along. Until a second pin lands, the twin's own smoothed walk stands in
+// (bodyVx/bodyVy). A gap under 0.2 s is the same beat's second word; over 2.5 s the body sat out the window; a jump past
+// 400 px/s is the sender's own re-seat, not a pace — all three leave the last pace standing.
+function pinVel(b,nx,ny,t){
+  if(!(typeof t==='number' && isFinite(t))) return;
+  if(b.pinT!=null && t>b.pinT){ const g=t-b.pinT;
+    if(g>=0.2 && g<=2.5){ const vx=(nx-b.pinX)/g, vy=(ny-b.pinY)/g;
+      if(Math.abs(vx)<=400 && Math.abs(vy)<=400){ b.pvx=vx; b.pvy=vy; b.pvT=S.t; } } }
+  b.pinX=nx; b.pinY=ny; b.pinT=t;
+}
+function bodyVx(b){ return (b.pvT!=null && S.t-b.pvT<2.5)? b.pvx : (b.vx9||0); }
+function bodyVy(b){ return (b.pvT!=null && S.t-b.pvT<2.5)? b.pvy : (b.vy9||0); }
+function velOne(f,dt){
+  if(f.lx9!=null){ const vx=(f.x-f.lx9)/dt, vy=(f.y-f.ly9)/dt;
+    if(Math.abs(vx)<600 && Math.abs(vy)<600){ f.vx9=(f.vx9||0)*0.7+vx*0.3; f.vy9=(f.vy9||0)*0.7+vy*0.3; } }
+  f.lx9=f.x; f.ly9=f.y;
+}
+function velTick(dt){   // FIX-D: every standing foe's own velocity (px/s), smoothed — what an aged pin is moved along · 0907: and every ally's man (THE ALLY'S CLOCK §4.5); glideTick re-stamps lx9 so the glide's own displacement never inflates the measure
   if(!(dt>0)) return;
-  for(const f of S.foes){ if(f.dead) continue;
-    if(f.lx9!=null){ const vx=(f.x-f.lx9)/dt, vy=(f.y-f.ly9)/dt;
-      if(Math.abs(vx)<600 && Math.abs(vy)<600){ f.vx9=(f.vx9||0)*0.7+vx*0.3; f.vy9=(f.vy9||0)*0.7+vy*0.3; } }
-    f.lx9=f.x; f.ly9=f.y; }
+  for(const f of S.foes){ if(f.dead) continue; velOne(f,dt); }
+  if(S.coop) for(const u of S.units){ if(u.dead || !u.coopBy) continue; velOne(u,dt); }
 }
 function glideTick(dt){
   const L=S.glid; if(!L || !L.length) return;
   for(let i=L.length-1;i>=0;i--){ const b=L[i];
     if(!(b.glT>0) || b.dead){ b.glOn=0; b.glT=0; L.splice(i,1); continue; }
+    b.glX+=bodyVx(b)*dt; b.glY+=bodyVy(b)*dt;   // 0907: the target walks at the body's pace — the sender's own off two pins, else the twin's — so a long glide lands on where the man IS, not where the pin was
     const k=Math.min(1, dt/b.glT);
     const gx0=b.x; b.x+=(b.glX-b.x)*k; b.y+=(b.glY-b.y)*k; b.glT-=dt;
+    b.lx9=b.x; b.ly9=b.y;   // 0907: velTick measures the body's OWN walk from here
     if(b.coopBy && GLIDE_FACE && dt>0){ const gvx=(b.x-gx0)/dt; if(gvx>=GLIDE_FACE){ b.wkX=1; b.wkT=S.t; } else if(gvx<=-GLIDE_FACE){ b.wkX=-1; b.wkT=S.t; } }   // 0585 F4 THE GLIDE FACES ITS SLIDE (0652: the aim's per-screen clear retired — the muzzle law): an ally's man (coopBy — a foe never carries it) faces the way the glide moves him on MY screen — draw-side fields, zero wire; bfMarch's own stamp stands down while the glide lives
     if(b.glT<=0){ b.x=b.glX; b.y=b.glY; b.glOn=0; L.splice(i,1); }
   }
@@ -50242,13 +50285,13 @@ function fcnSweep(seen9, hi9){
     S.fx.push({k:'smoke',x:f9.x,y:f9.y-14,t:0,dur:0.5});
   }
 }
-let FCN_KEYS=null;
+let FCN_KEYS=null, UDEF_KEYS=null;   // 0907: the unit table's key order, both ends' shared const (the FCN_KEYS law)
 function cenBeat(){
   if(!S.coop || !COOP || COOP.ended || S.mode!=='play' || coopHumans()<2) return;
   // marathon brake: past this many log rows the replay window (LCMD_CAP 1600,
   // pair-family CMD_CAP 400) is the scarcer resource — pin every third beat
   S.cenB=(S.cenB|0)+1;
-  if(COOP.seq>((coopSquad()||coopRoom())? CEN_LOGWIN : 300) && (S.cenB%3)) return;
+  if(!coopSquad() && COOP.seq>(coopRoom()? CEN_LOGWIN : 300) && (S.cenB%3)) return;   // 0907 THE BRAKE RETIRED for the squad family (FM-GVT-SYNC3-01 §4.3): three commanders reached 1200 rows mid-level and the census thinned to every third beat — the 'jumps every few seconds' Wyatt named. The ring's rejoin horizon shrinks to ~3 min of battle; THE CENSUS SPAWN DOOR (coopApply cen) heals the men it loses. Rooms keep 1200, the pair shim 300
   if(roomBattle()){
     const bf=S.bf, sMe=bfMySeat(); if(!bf || bf.resolved || !bf.seats[sMe]) return;
     const all=[];
@@ -50284,8 +50327,9 @@ function cenBeat(){
     // 7-beat sweep on an 83-foe flood under a +13 stride)
     S.cenUR=((S.cenUR|0)+CEN_ROWS)%el.length;
     const w9=el.slice(S.cenUR).concat(el.slice(0,S.cenUR)).slice(0,CEN_ROWS), rows=[];
-    for(const u of w9) rows.push(String(u.cid)+':'+Math.round(u.x).toString(36)+':'+Math.round(u.y).toString(36));
-    coopSend({k:'cen', mo:rows});
+    UDEF_KEYS||(UDEF_KEYS=Object.keys(UDEF));
+    for(const u of w9) rows.push(String(u.cid)+':'+Math.round(u.x).toString(36)+':'+Math.round(u.y).toString(36)+':'+Math.max(0,UDEF_KEYS.indexOf(u.type)).toString(36));   // 0907 §4.4: the 4th field names the man's type (the FCN_KEYS idiom) — THE CENSUS SPAWN DOOR's key; ≤13 chars, an old receiver reads fields 0-2
+    coopSend({k:'cen', t:+S.t.toFixed(2), mo:rows});   // 0907 THE ALLY'S CLOCK (§4.5): the owner stamps his sim clock like the referee's fcn (FIX-D) — CMD_KEYS has t, a number passes clamp_cmd
   }
   // the referee deals the foe census — the WHOLE standing army through a
   // rotating two-word window (32 rows a beat; a 40-foe wave sweeps in 2).
@@ -50301,13 +50345,13 @@ function cenBeat(){
       act.push(f);
     }
     if(!act.length) return;
-    S.fcnR=((S.fcnR|0)+CEN_ROWS*2)%act.length;   // stride = the two-word window (the overlap-starvation law above)
-    const win=act.slice(S.fcnR).concat(act.slice(0,S.fcnR)).slice(0,CEN_ROWS*2), mo=[];
+    S.fcnR=((S.fcnR|0)+FCN_ROWS*2)%act.length;   // stride = the two-word window (the overlap-starvation law above) · 0907: FCN_ROWS 40 — 80 a beat, a three-commander army every beat
+    const win=act.slice(S.fcnR).concat(act.slice(0,S.fcnR)).slice(0,FCN_ROWS*2), mo=[];
     for(const f of win)
       mo.push(FCN_KEYS.indexOf(f.type).toString(36)+','+(f.foN|0).toString(36)+','+
               Math.round(f.x).toString(36)+','+Math.round(f.y).toString(36));
-    coopSend({k:'fcn', n:act.length, t:+S.t.toFixed(2), mo:mo.slice(0,CEN_ROWS)});   // 0343 (item 3): n = the true standing count — absence becomes evidence on a complete census · FIX-D: t = the referee's sim clock at the sample (CMD_KEYS carries t; a number passes clamp_cmd)
-    if(mo.length>CEN_ROWS) coopSend({k:'fcn', t:+S.t.toFixed(2), mo:mo.slice(CEN_ROWS)});
+    coopSend({k:'fcn', n:act.length, t:+S.t.toFixed(2), mo:mo.slice(0,FCN_ROWS)});   // 0343 (item 3): n = the true standing count — absence becomes evidence on a complete census · FIX-D: t = the referee's sim clock at the sample (CMD_KEYS carries t; a number passes clamp_cmd)
+    if(mo.length>FCN_ROWS) coopSend({k:'fcn', t:+S.t.toFixed(2), mo:mo.slice(FCN_ROWS)});
   }
 }
 // THE HOST'S FIELD, one seat per beat. Census rows index into BF_TYPES (a
