@@ -42557,7 +42557,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.65';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.66';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -42699,6 +42699,7 @@ function roomQuiet(x){   // 0559: x = one body-parented card that may stand (the
 // = the alternative, not built). ⚑ DD_MIN_CAMP: under the newbie rung the newbie's light stays the campaign's (0503's precision
 // law — the campaign beacon wins, on its own 12 s clock); at and above it the trophy joins on the veteran clock.
 let DD_MIN_CAMP=10;          // ⚑ the rung the trophy's light needs (META.campaign at/above): 10 = ROOM_BEACON_NEWBIE_LV's own cut · 0 = every rung · 100 = never
+let DD_PILL_WORD=0;          // ⚑ 0865y THE QUIET TROPHY (FM-GVT-DOG-ON-TOP-01; Wyatt 9/7: "remove the leaderboard text below the trophy for the time being. It's the only item on the shelf that really has an upfront name, and it's not currently looking great being the only text out there"): 0 = the shelf trophy wears NO word in any state (the cup's beacon glow while today's away fight waits STAYS — the word goes, not the light) · 1 = 0757d's LEADERBOARD-while-due comes back with this one flip; the war table's LEADERBOARD door and the board's wordmark never read this
 const DD_DOOR='board';       // the WORLD RANKINGS door's ROOM_SPOTS mv key (#ro-board = the cup, #rtag-board = its pill)
 const RAID_DOOR='raid';      // 0904 THE LOOP ROW: THE RAID tile's mv key (#ro-raid = the stoop and the swarm, #rtag-raid = the invasion pill) — lit with the family only while an invader is unbeaten (the pill shows), the 0632 trophy grammar
 function raidDue(){ return momDue() || nemesisDue() || !META.rivalDays[todayStr()]; }   // the invader's door has news: Mom's day, his day, or today's army unbeaten (= the raid row's pill shows)
@@ -42709,7 +42710,7 @@ function ddAwayOpen(){       // today's away fight unclaimed — a READ of the a
 }
 function ddDue(){ return (META.campaign|0)>=DD_MIN_CAMP && ddAwayOpen(); }   // the trophy calls: past the rung, the fight unclaimed
 function ddFamily(){ return ROOM_BEACON.concat([DD_DOOR, RAID_DOOR, CHEST_DOOR]); }   // 0904 THE TREASURE CHEST: + the chest's door (lit with the family only while a NEW! mark waits on its lid)      // the doors one sweep touches (ROOM_BEACON byte-still — the rig's own read of it stands); 0904: + THE RAID tile
-function ddLabel(){ return ddDue()? 'LEADERBOARD' : ''; }     // the pill's word for the day: LEADERBOARD only while today's away fight waits, nothing otherwise (0757d THREE FIXES, Wyatt 9/4: never A COMMANDER WAITS; the loop row's quiet shelf); renderMenu paints it through the spot's label; a claim lands through the room's own repaint
+function ddLabel(){ return (DD_PILL_WORD && ddDue())? 'LEADERBOARD' : ''; }     // the pill's word for the day: '' in every state while DD_PILL_WORD is 0 (0865y THE QUIET TROPHY — renderMenu's empty-label idiom renders no #rtag-board, roomBeaconSet's if(el) guard stands, the cup #ro-board still glows while due); at 1 = LEADERBOARD only while today's away fight waits, nothing otherwise (0757d THREE FIXES, Wyatt 9/4: never A COMMANDER WAITS; the loop row's quiet shelf); renderMenu paints it through the spot's label; a claim lands through the room's own repaint
 function roomBeaconS(){ return META.campaign<ROOM_BEACON_NEWBIE_LV ? ROOM_IDLE_S : ROOM_IDLE_VET_S; }   // 0503 THE NEWBIE GATE: the live clock — the first ten rungs on 12 s, everyone above on 30 s AFK
 function roomBeaconSet(on){   // the four elements (two doors × art group + pill), painted by renderMenu — toggled, never baked (0503: #ro-<mv> = the crate / the tablet, never the hotspot box)
   IDLE.beacon=on?1:0;
@@ -79596,10 +79597,18 @@ function dogPaint(){
   if((DOGD.zc=(DOGD.zc+1))%3===0) dogZSeat(false);
 }
 function dogPick(p,e){
-  if(!dogTappable()) return false;
-  const t9=e && e.target;
-  if(t9 && t9.closest){ const dv=t9.closest('div[onclick]');
-    if(dv && !/^dspot-/.test(dv.id||'')) return false; }   // doors, pills and the Nemesis keep the taps they already won (the v2.10 later-wins law); furniture anchors lose (TG's piggy→dog→furniture order)
+  // 0865y THE DOG ON TOP (FM-GVT-DOG-ON-TOP-01; Wyatt 9/7: "when you click on the dog and he's in front of
+  // Battlefields, it will just click Battlefields … Instead, it needs to click on the dog"): the claim is
+  // GEOMETRY alone now — a finger inside his box is his wherever he walks (over THE BATTLEFIELD / CAMPAIGN /
+  // RAID tiles, every door, every pill, the duel badge, the Nemesis's box, a toy's anchor). The 0376
+  // div[onclick] decline (doors / pills / the Nemesis kept the taps they had already won — the v2.10 later-wins
+  // law) is retired: since 0904 seated the loop row's tiles on the rug his whole walk crosses them and both
+  // sniff stops sit ON a tile, so the decline had become "every pat opens the tile". Gated on dogVisible, not
+  // dogTappable: his untappable segs (the gate climb, the fade) claim too, and dogTap SWALLOWS that tap — no
+  // pat, and no door under him either (⚑ Q6). dogEat's eater (geometric, once, 350 ms) already swallows the
+  // browser's late click on whatever lies under him. A finger outside his box is untouched: the doors, the
+  // tiles, the pills, the toys, the glass and the Nemesis keep their taps byte-for-byte.
+  if(!dogVisible()) return false;
   const q=dogPos();
   return Math.abs(p.x-q.x)<48 && p.y>q.y-104 && p.y<q.y+10;
 }
@@ -79613,7 +79622,9 @@ function dogEat(q){
   setTimeout(()=>document.removeEventListener('click', eat, {capture:true}), 350);
 }
 function dogTap(){
-  if(!dogTappable()) return;
+  if(!dogTappable()){   // 0865y THE DOG ON TOP (⚑ Q6): a finger on him mid-climb / mid-fade is SWALLOWED — no yip, no hop, no stars, and the DINO PARK door under the gate seat never opens: the browser's late click is eaten at his live seat (at the DOGD cache if he vanished under a held press)
+    if(dogVisible()) dogEat(dogPos()); else if(DOGD.x!==null) dogEat({ x:DOGD.x, y:DOGD.y+38 });
+    return; }
   const q=dogPos();
   dogEat(q);
   SFX.yip(); setTimeout(()=>{ if(dogVisible()) SFX.yip(); },150);   // the happy double-yip (TG's own beat)
@@ -79702,7 +79713,7 @@ document.addEventListener('pointerdown', e=>{
   if(RDRAG || !e.isPrimary || S.mode!=='menu') return;
   const st=document.getElementById('roomStage'); if(!st || !st.contains(e.target)) return;
   const p=rdragPt(e); if(!p) return;
-  if(dogPick(p,e)){   // 0376: THE GOOD DOG answers before the furniture (TG's tap-order law; dogPick itself declines doors/pills/the Nemesis)
+  if(dogPick(p,e)){   // 0376: THE GOOD DOG answers first · 0865y THE DOG ON TOP: before the doors, the tiles, the pills, the badge and the Nemesis too — his box is his wherever he walks (dogPick is geometry alone now; his untappable segs claim and swallow)
     RDRAG={ k:'gooddog', tapOnly:true, pid:e.pointerId,
             sl:(e.pointerType==='touch'? RDRAG_TT : RDRAG_T),
             x0:e.clientX, y0:e.clientY, d0:[0,0], moved:false };
@@ -96852,7 +96863,7 @@ window.GVT = {
   dd(){ const g=id=>document.getElementById(id); const cl=id=>{ const el=g(id); return el? el.classList.contains('beacon') : null; }; const A=META.away||{};
     const R=el=>{ if(!el) return null; const b=el.getBoundingClientRect(); return { l:+b.left.toFixed(1), t:+b.top.toFixed(1), r:+b.right.toFixed(1), b:+b.bottom.toFixed(1), w:+b.width.toFixed(1), h:+b.height.toFixed(1) }; };
     const cs=(id,p)=>{ const el=g(id); if(!el) return null; const c=getComputedStyle(el); return { name:c.animationName, delay:c.animationDelay, filter:c.filter, bg:c.backgroundColor, fs:c.fontSize }; };
-    return { cv:GVT_CV, minCamp:DD_MIN_CAMP, door:DD_DOOR, camp:META.campaign|0, open:ddAwayOpen(), due:ddDue(), label:ddLabel(), family:ddFamily().slice(), beacon:ROOM_BEACON.slice(), day:A.day||'', today:todayStr(), done:Object.assign({}, A.done||{}), pend:A.pend||null,
+    return { cv:GVT_CV, minCamp:DD_MIN_CAMP, door:DD_DOOR, camp:META.campaign|0, open:ddAwayOpen(), due:ddDue(), label:ddLabel(), pillWord:DD_PILL_WORD, family:ddFamily().slice(), beacon:ROOM_BEACON.slice(), day:A.day||'', today:todayStr(), done:Object.assign({}, A.done||{}), pend:A.pend||null,
       lit:{ campaign:cl('ro-campaign'), campaignTag:cl('rtag-campaign'), bf:cl('ro-bf'), bfTag:cl('rtag-bf'), board:cl('ro-board'), boardTag:cl('rtag-board') }, tag:(g('rtag-board')||{}).textContent||'', tagBox:R(g('rtag-board')), stage:R(g('roomStage')), rivalBox:R(g('rspot-rival')), boardBox:R(g('rspot-board')), cup:cs('ro-board'), pill:cs('rtag-board'), crate:cs('ro-campaign'),
       beaconOn:!!IDLE.beacon, quiet:roomQuiet(), idle:+idleQuiet().toFixed(1), clock:roomBeaconS(), mode:S.mode, wr:wrIsOpen(), scr:telScreen(), room:roomCur() }; },   // 0632 THE DAILY DOORS BLIP — the rig's one read (read-only)
   ddCfg(p){ p=p||{}; if(p.minCamp!=null) DD_MIN_CAMP=+p.minCamp; return GVT.dd(); },   // 0632: the one dial (⚑ DD_MIN_CAMP)
