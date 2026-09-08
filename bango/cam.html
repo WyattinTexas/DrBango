@@ -1,6 +1,6 @@
 <title>Rugbeat Camera</title>
 <meta charset="utf-8">
-<meta name="build" content="v=20260908173453">
+<meta name="build" content="v=20260908173738">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%AA%B6%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,600;1,700&family=Barlow:wght@500;700;800&display=swap">
 <style>
@@ -71,7 +71,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   <label>Mirror the picture <input type="checkbox" id="flip"></label>
   <label>Players <select id="players"><option value="1">1</option><option value="2">2</option></select></label>
   <label>Tracker <select id="model"><option value="full">full · accurate</option><option value="lite">lite · fast</option></select></label>
-  <label>Camera delay <span><input type="range" id="lag" min="0" max="400" step="10"> <b id="lagv">140</b> ms</span></label>
+  <label>Camera delay <span><input type="range" id="lag" min="0" max="400" step="10"> <b id="lagv">170</b> ms</span></label>
   <label>Timing windows <select id="win"><option value="feet">feet · wide</option><option value="hands">taps · tight</option></select></label>
   <div class="btn-row"><button id="projbtn" class="mini">Open projector window</button><button id="resetcal" class="mini ghost">Reset corners</button></div>
 </div>
@@ -307,7 +307,7 @@ const $ = id => document.getElementById(id);
 const stage = $('stage'), video = $('vid'), glow = $('glow'), dark = $('dark'), feet = $('feet'), lane = $('lane');
 const gctx = glow.getContext('2d'), dctx = dark.getContext('2d'), fctx = feet.getContext('2d'), lctx = lane.getContext('2d');
 const DEF_QUAD = [[0.2, 0.12], [0.8, 0.12], [0.88, 0.92], [0.12, 0.92]];
-const settings = Object.assign({ deviceId: '', flip: false, players: 1, model: 'full', lag: 140, win: 'feet' }, JSON.parse(localStorage.getItem('rugbeat.cam.settings') || '{}'));
+const settings = Object.assign({ deviceId: '', flip: false, players: 1, model: 'full', lag: 170, win: 'feet' }, JSON.parse(localStorage.getItem('rugbeat.cam.settings') || '{}'));
 let quad = JSON.parse(localStorage.getItem('rugbeat.cam.quad') || 'null'), calibrated = !!quad; if (!quad) quad = DEF_QUAD.map(p => p.slice());
 const saveSettings = () => localStorage.setItem('rugbeat.cam.settings', JSON.stringify(settings));
 const saveQuad = () => { localStorage.setItem('rugbeat.cam.quad', JSON.stringify(quad)); calibrated = true; };
@@ -361,23 +361,24 @@ async function loadPose() {
   try { landmarker = await MP.PoseLandmarker.createFromOptions(vision, opts('GPU')); } catch (e) { landmarker = await MP.PoseLandmarker.createFromOptions(vision, opts('CPU')); }
   return landmarker;
 }
-const V_MOVE = 420, V_STOP = 140;   // rug px/s: a step travels, then plants
+const V_MOVE = 420, V_STOP = 180, ALPHA = 0.7;   // rug px/s: a step travels fast, then plants; the first still frame after fast motion is the landing
 const tracker = {
   tracks: [],
   update(list, now) {
     const used = new Set();
     for (const tr of this.tracks) {
-      let best = null, bd = 170; list.forEach((f, i) => { if (used.has(i)) return; const d = Math.hypot(f.x - tr.x, f.y - tr.y); if (d < bd) { bd = d; best = i; } });
+      let best = null, bd = 220; list.forEach((f, i) => { if (used.has(i)) return; const d = Math.hypot(f.x - tr.x, f.y - tr.y); if (d < bd) { bd = d; best = i; } });
       if (best == null) { tr.miss++; continue; }
-      used.add(best); const f = list[best], dt = Math.max(1e-3, now - tr.t), nx = tr.x + (f.x - tr.x) * 0.6, ny = tr.y + (f.y - tr.y) * 0.6, sp = Math.hypot(nx - tr.x, ny - tr.y) / dt;
-      tr.speed = tr.speed * 0.5 + sp * 0.5; tr.x = nx; tr.y = ny; tr.t = now; tr.miss = 0;
-      if (tr.speed > V_MOVE) { tr.moving = true; tr.still = 0; } else if (tr.speed < V_STOP) { tr.still++; if (tr.moving && tr.still >= 2) { tr.moving = false; this.land(tr, now); } }
+      used.add(best); const f = list[best], dt = Math.max(1e-3, Math.min(0.1, now - tr.t));
+      const nx = tr.x + (f.x - tr.x) * ALPHA, ny = tr.y + (f.y - tr.y) * ALPHA; tr.speed = Math.hypot(nx - tr.x, ny - tr.y) / dt; tr.x = nx; tr.y = ny; tr.t = now; tr.miss = 0;
+      if (tr.speed > V_MOVE) tr.movedAt = now;
+      else if (tr.speed < V_STOP && tr.movedAt != null && now - tr.movedAt < 0.5 && now - tr.lastStep > 0.3) { tr.movedAt = null; this.land(tr, now); }
     }
     this.tracks = this.tracks.filter(tr => tr.miss < 15);
-    list.forEach((f, i) => { if (!used.has(i)) this.tracks.push({ id: ++tid, x: f.x, y: f.y, t: now, speed: 0, moving: false, still: 0, miss: 0, lastStep: -9, flash: -9, res: '' }); });
+    list.forEach((f, i) => { if (!used.has(i)) this.tracks.push({ id: ++tid, x: f.x, y: f.y, t: now, speed: 0, movedAt: null, miss: 0, lastStep: -9, flash: -9, res: '' }); });
   },
   land(tr, now) {
-    if (now - tr.lastStep < 0.25) return; tr.lastStep = now; const id = RB.hit(tr.x, tr.y); if (!id) return;
+    tr.lastStep = now; const id = RB.hit(tr.x, tr.y); if (!id) return;
     const r = RB.step(id, tr.x, tr.y, RB.heard() - settings.lag / 1000); tr.flash = now; tr.res = r.res;
   }
 };
@@ -394,7 +395,7 @@ function poseFrame() {
   poseCount++; const el = performance.now() - poseT0; if (el > 1000) { poseFps = Math.round(poseCount * 1000 / el); poseCount = 0; poseT0 = performance.now(); }
 }
 window.__feet = list => tracker.update(list.map(([x, y]) => ({ x, y })), performance.now() / 1000);
-window.__tracks = () => tracker.tracks.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y), moving: t.moving, res: t.res }));
+window.__tracks = () => tracker.tracks.map(t => ({ id: t.id, x: Math.round(t.x), y: Math.round(t.y), speed: Math.round(t.speed), moved: t.movedAt != null, res: t.res }));
 function drawFeet(now) {
   fctx.setTransform(dpr, 0, 0, dpr, 0, 0); fctx.clearRect(0, 0, feet.width, feet.height); if (!Hover) return;
   const pal = ['255,205,110', '150,235,170', '255,150,205', '140,200,255'];
