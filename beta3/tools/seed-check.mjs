@@ -239,9 +239,13 @@ await until(`game.scene.getScene('profile') && game.scene.getScene('profile').sy
 await tap(`game.scene.getScene('profile').leaderB`);
 const BD = `game.scene.getScene('board')`;
 ok('the profile\'s leaderboard door opens the ceremony (real tap)', await until(`${BD} && ${BD}.sys.isActive()`, 15000));
+// the board opens on the WEEKLY tab since v0.87.0 (daily lives on its own
+// sheet) — the visible walk reads the weekly cast, merged with lang null
+// exactly as getBoard does for the global weekly board
 ok('the podium stands on a cold sky — a seeded champion', await until(`${BD}.rowsC.list.length > 8`, 20000));
-const champ = await ev(`SSNET.getBoard('daily', 'en').then((b) => b.rows[0].name)`);
-ok('the champion is one of ours', cast0.includes(champ), champ);
+const castW = await evj(`JSON.stringify(SS_SEED.ghosts('weekly', SSNET.weekKey(), null, Date.now()).map((g) => g.name))`);
+const champ = await ev(`SSNET.getBoard('weekly', 'en').then((b) => b.rows[0].name)`);
+ok('the champion is one of ours', castW.includes(champ), champ);
 await until(`(() => { const o = ${BD}.rowsC.list.find((x) => x.text === ${JSON.stringify(champ)}); return !!o && o.alpha === 1 })()`, 10000);
 for (let t = 0; t < 5 && !(await ev(`!!${BD}.__rcC`)); t++) { await tap(`${BD}.rowsC.list.find((x) => x.text === ${JSON.stringify(champ)})`); await sleep(600); }
 ok('tapping a ghost\'s name opens their rating card (real tap)', await ev(`!!${BD}.__rcC`));
@@ -252,21 +256,27 @@ ok('the card is filled, never stuck loading', !cardTexts.includes(await ev(`SS_T
   && (cardTexts.some((t) => /—/.test(t)) || cardTexts.includes(await ev(`SS_T('rHiddenCard')`))), cardTexts.join(' · ').slice(0, 90));
 await tap(`${BD}.__rcC.list[0]`, -300);   // the veil, above the little window
 ok('the veil closes the card', await until(`!${BD}.__rcC`, 8000));
-// a real run lands while the board stands — refresh ranks it over every ghost
+// a real run lands while the board stands — refresh ranks it over every
+// ghost (a daily submit writes the weekly board too, and the cap law holds
+// every weekly ghost strictly below the best real row)
 await ev(`SSNET.submitScore(300, 'lantern', 'en', 'daily').then(() => 'ok')`);
-await tap(`${BD}.tabBtns.weekly.bg`); await until(`${BD}.rowsC.list.length > 8`, 15000);
-await tap(`${BD}.tabBtns.daily.bg`); await until(`${BD}.rowsC.list.length > 8`, 15000);
-const bNow = await board('daily');
+await tap(`${BD}.tabBtns.endless.bg`); await until(`${BD}.tab === 'endless'`, 10000);
+await tap(`${BD}.tabBtns.weekly.bg`); await until(`${BD}.tab === 'weekly' && ${BD}.rowsC.list.length > 8`, 15000);
+const bNow = await board('weekly');
 const youLine = await ev(`SS_T('lbYouRank', 1, ${bNow.total})`);
 const boardTexts = async () => evj(`(() => { const out = [];
   const walk = (l) => l.forEach((o) => { if (o.list) walk(o.list); if (o.text != null) out.push(String(o.text)); });
   walk(${BD}.rowsC.list); return JSON.stringify(out) })()`);
-ok('after a real 300, the podium crowns YOU as #1 of the merged field',
+ok('after a real 300, the weekly podium crowns YOU as #1 of the merged field',
   await until(`(() => { const out = []; const walk = (l) => l.forEach((o) => { if (o.list) walk(o.list); if (o.text != null) out.push(String(o.text)); });
     walk(${BD}.rowsC.list); return out.includes(${JSON.stringify(youLine)}) && out.some((t) => t.includes(${JSON.stringify(await ev(`SS_T('lbYou')`))})) })()`, 15000),
   (await boardTexts()).slice(0, 6).join(' · '));
-const wkNow = await board('weekly');
-ok('the weekly tab carries the run + its ghosts too', wkNow.me >= 0 && wkNow.total > 1 && wkNow.total === wkNow.rows.length);
+// the daily board is off the main row now, but its well still takes the run
+// untouched — the Daily Hunt sheet reads this exact board
+const dNow = await board('daily');
+ok('the daily board still takes the run — the Daily Hunt sheet\'s well',
+  dNow.me === 0 && dNow.total > 1 && dNow.rows[0].score === 300 && dNow.total === dNow.rows.length,
+  JSON.stringify({ me: dNow.me, total: dNow.total, top: dNow.rows[0] && dNow.rows[0].score }));
 ok('no page exceptions across the surfaces', errs.length === 0, errs.join(' | ').slice(0, 200));
 
 /* ================= THE REGISTRY STAYS UNTOUCHED ================= */

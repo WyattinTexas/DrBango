@@ -607,7 +607,8 @@ ok('the leaderboard door opens the Board', await tapUntil(`game.scene.getScene('
   `game.scene.getScene('board').sys.isActive()`, 6));
 const BD = `game.scene.getScene('board')`;
 await sleep(900);
-ok('four pills: daily · weekly · endless · hard', await ev(`Object.keys(${BD}.tabBtns).join() === 'daily,weekly,endless,hard'`),
+ok('three pills: weekly · endless · hard (daily lives on its own sheet since v0.87.0)',
+  await ev(`Object.keys(${BD}.tabBtns).join() === 'weekly,endless,hard'`),
   await ev(`Object.keys(${BD}.tabBtns).join()`));
 const tabFit = await evj(`(() => { const t = ${BD}.tabBtns.hard.bg; const D = game.scale.width / innerWidth;
   const a = t.input.hitArea; return JSON.stringify({ w: Math.round(a.width * t.scaleX / D), h: Math.round(a.height * t.scaleY / D) }) })()`);

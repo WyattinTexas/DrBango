@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.86.0';
+const BUILD = 'STARSPELL v0.87.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -10532,30 +10532,31 @@ class Board extends Phaser.Scene {
         .setShadow(0, 0, '#c9b676', l.u(6), true, true);
     }
 
-    // tabs: four pills now — the active board wears the gold (ENDLESS joined
-    // daily/weekly in v0.68.0; HARD, the all-time ledger of campaign hard
-    // clears, joined in v0.70.0 — the row narrows to seat four)
-    this.tab = 'daily';
+    // tabs: three pills — the active board wears the gold (ENDLESS joined in
+    // v0.68.0; HARD, the all-time ledger of campaign hard clears, in v0.70.0;
+    // DAILY left the row in v0.87.0 — the Daily Hunt sheet is the daily
+    // board's one home now, so the row breathes back to the v0.68.0 width
+    // and the board opens on the week)
+    this.tab = 'weekly';
     this.tabBtns = {};
-    this.tabW = 90;
+    this.tabW = 118;
     const mkTab = (key, dx, label) => {
       const bg = this.add.image(l.x(dx), l.y(104), ssBtn(this, true, this.tabW, 38)).setDisplaySize(l.u(this.tabW), l.u(38)).setInteractive({ useHandCursor: true });
       ssHitPad(bg, 44);   // a 38-tall pill alone is under the 44-pt law
       const lab = ssTxt(this, l.x(dx), l.y(104), label, l.u(12.5), '#5a6390').setOrigin(0.5);
       // a long word for the pill (WÖCHENTLICH, CLASSEMENT kin) fits, never spills
-      if (lab.width > l.u(this.tabW - 14)) lab.setScale(l.u(this.tabW - 14) / lab.width);
+      if (lab.width > l.u(this.tabW - 16)) lab.setScale(l.u(this.tabW - 16) / lab.width);
       bg.on('pointerdown', () => this.setTab(key));
       this.tabBtns[key] = { bg, lab };
     };
-    mkTab('daily', -144, SS_T('lbDaily'));
-    mkTab('weekly', -48, SS_T('lbWeekly'));
-    mkTab('endless', 48, SS_T('endless'));
-    mkTab('hard', 144, SS_T('hardLbl'));
+    mkTab('weekly', -125, SS_T('lbWeekly'));
+    mkTab('endless', 0, SS_T('endless'));
+    mkTab('hard', 125, SS_T('hardLbl'));
     this.dressTabs(l);
 
-    // the reset clock, ticking every second. Both flips are UTC (daily 00:00,
-    // weekly Monday 00:00) so the countdown is the same for the whole planet,
-    // worded in the player's own units.
+    // the reset clock, ticking every second. The weekly flip is Monday 00:00
+    // UTC so the countdown is the same for the whole planet, worded in the
+    // player's own units.
     this.cdT = ssTxt(this, l.x(0), l.y(138), '', l.u(11.5), '#c9b676').setOrigin(0.5);
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.tickCd() });
     this.tickCd();
@@ -10584,9 +10585,7 @@ class Board extends Phaser.Scene {
     // words (v0.70.0: "the endless ledger" would be a lie on this tab)
     if (this.tab === 'endless') { this.cdT.setText('✦ ' + SS_T('lbAllTime')); return; }
     if (this.tab === 'hard') { this.cdT.setText('✦ ' + SS_T('lbHardTime')); return; }
-    const daily = this.tab === 'daily';
-    const ms = daily ? SSNET.msToNextDay() : SSNET.msToNextWeek();
-    this.cdT.setText((daily ? '☾ ' : '✦ ') + SS_T(daily ? 'lbNewSky' : 'lbWeekEnds', ssCountdownLive(ms)));
+    this.cdT.setText('✦ ' + SS_T('lbWeekEnds', ssCountdownLive(SSNET.msToNextWeek())));
   }
   setTab(t) {
     if (this.tab === t) return;
