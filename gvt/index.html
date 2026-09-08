@@ -42668,7 +42668,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.74';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.75';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -46094,13 +46094,13 @@ function evBandState(){
   return (evNow()<evBandWake())? 'none' : 'quiet';
 }
 function evDoorSig(){ return evBandState()+'|'+(EV.bell|0)+'|'+(BD.bell|0)+'|'+LANG+'|'+(EV.wk||'')+'|'+(EV.rk||'')+'|'+roomCur(); }   // 0905 THE TALL LAIR: the king's name re-paints the pill when HQ's rk moves (the Sunday three-bell flip)
-function evDoorHTML(){   // 0904 THE BAND MOVES INTO THE HEAD: the pill's four faces — the SAME states (evBandState), the SAME translated pieces the band composed, split at its ` · ` joints: line 1 the event's NAME, line 2 the time line
+function evDoorHTML(){   // 0904 THE BAND MOVES INTO THE HEAD: the pill's four faces — the SAME states (evBandState), the SAME translated pieces the band composed, split at its ` · ` joints: line 1 the event's NAME, line 2 the time line · 0872 THE BANNER OPENS THE CARD: the two QUIET faces are buttons too — a tap deals the event's own card (UI.evInfo); the live faces keep the JOIN (⚑ Q1)
   const st=evBandState(); if(st==='none') return '';   // 0824-LATE: the band's own law (the door states stand for the cards)
   const rtl=(LANG==='ar')? ' dir="rtl"' : '';
   if(st==='quiet')   // the yeti chip: the bell in the player's own clock (Intl, the weekday kept — a Friday / Sunday bell, ⚑ Q2) · the countdown
-    return '<div id="evDoor" class="quiet"'+rtl+'><span class="ev-name">'+evKingName()+'</span><span class="ev-time"><b class="ev-opt" data-notr>'+escH(evBellDT())+'</b><span class="ev-sep ev-opt">·</span><span id="evDoorIn" data-notr>'+escH(tf('IN %1', evDur(evIn())))+'</span></span></div>';
+    return '<button type="button" id="evDoor" class="quiet"'+rtl+' onclick="UI.evInfo()"><span class="ev-name">'+evKingName()+'</span><span class="ev-time"><b class="ev-opt" data-notr>'+escH(evBellDT())+'</b><span class="ev-sep ev-opt">·</span><span id="evDoorIn" data-notr>'+escH(tf('IN %1', evDur(evIn())))+'</span></span></button>';
   if(st==='bd-quiet')   // the desert chip: TONIGHT + the bell (0902 2.8 — never a weekday, the desert is nightly; ⚑ Q2) · the countdown
-    return '<div id="evDoor" class="quiet bd"'+rtl+'><span class="ev-name">THE BATTLE OF THE DESERT</span><span class="ev-time"><span class="ev-opt"><span>TONIGHT</span> <b data-notr>'+escH(bdBellTime())+'</b></span><span class="ev-sep ev-opt">·</span><span id="evDoorIn" data-notr>'+escH(tf('IN %1', evDur(bdIn())))+'</span></span></div>';
+    return '<button type="button" id="evDoor" class="quiet bd"'+rtl+' onclick="UI.evInfo()"><span class="ev-name">THE BATTLE OF THE DESERT</span><span class="ev-time"><span class="ev-opt"><span>TONIGHT</span> <b data-notr>'+escH(bdBellTime())+'</b></span><span class="ev-sep ev-opt">·</span><span id="evDoorIn" data-notr>'+escH(tf('IN %1', evDur(bdIn())))+'</span></span></button>';
   if(st==='bd-live')   // the desert's door — the whole pill = JOIN THE BATTLE → UI.bdJoin (the JOIN card's own door); the JOIN words = the gold chip at the end of line 2 (⚑ Q12)
     return '<button type="button" id="evDoor" class="live bd"'+rtl+' onclick="UI.bdJoin()">'
       +'<span class="ev-name">THE BATTLE OF THE DESERT</span>'
@@ -46242,6 +46242,20 @@ function evAnnQuiet(){
   const p=document.getElementById('milePop'); if(!p || !p.classList.contains('hidden')) return false;
   if(document.querySelector('#roomModal .rmback')) return false;
   return true;
+}
+// 0872 THE BANNER OPENS THE CARD (FM-GVT-BANNER-MAP-EYES; Wyatt 9/7 ~9:15 pm ET: "When someone clicks the banner up top for an
+// event, the event pop-ups should come up so they can see about the event"): a tap on the QUIET pill (the yeti's / King Rex's chip,
+// the desert's chip — plain divs until now, a tap did nothing) deals the SAME card the try-chain deals, on demand, as many times as he
+// taps: the desert's announcement (bdAnnCard, GOT IT — ⚑ Q4: the bell is hours away, the live face carries the JOIN) or THE PRIME TIME
+// card (evAnnCard, evAnnLine's schedule words). A tap that lands after the face flipped live between two ticks (⚑ Q6) deals the
+// try-chain's own choice (the T−5 line / the JOIN card). NEVER a latch (⚑ Q3): META.evSeenK / META.evSeen / EVD.annWk / EVD.popBell /
+// BDD.* untouched — the once-ever PRIME TIME still deals itself on its own law. The quiet guard is the cards' own (evAnnQuiet);
+// under the night gate there is no pill, nothing to tap. The live faces keep the JOIN (⚑ Q1: the chip is a verb).
+function evInfo(){
+  if(!evAnnQuiet()) return false;
+  const st=evBandState(); if(st==='none') return false;
+  if(st==='bd-quiet' || st==='bd-live') return bdAnnCard(st==='bd-live'? bdPopLine() : bdAnnLine(), st==='bd-live');
+  return evAnnCard(st==='live'? evPopLine() : evAnnLine());
 }
 // ═══ 0559 THE NEW BUILD (design/feedback-0824-late/00-FEEDBACK.md §2 — card A; Wyatt 8/24 ~22:40 ET after the first
 // Battle of the Desert: "on our phones we could only join from the prompt pop-up … We didn't have the option to join
@@ -82120,7 +82134,7 @@ s+=softLand('win',600,70,312,195,5,roomScene('winter',lands)+winterStill,18);   
 s+=softLand('west',838,258,290,176,6,roomScene('western',lands)+westExtra,18);
 s+=softLand('yard',486,230,328,205,4,roomScene('backyard',lands),22,'0 72 960 528');   // 0853z: the extras (the kickabout, the grazers, the man) ride THE MOVERS in this same box
 const bearWall='<g transform="translate(4,56) scale(0.52)">'+barricadeArt()+'</g>'+men4([[300,470],[560,500]]);   // 0825: the sill plane is the room's own (decorSVG paints it aboard since 0755) — the frame's second plane dropped
-s+=houseSoft(64,70,380,132,232,roomSceneFlat('rooftop',lands)+men4([[300,470],[620,380]]),roomScene('bedroom',[])+bearWall,'34 150 892 310');
+s+=houseSoft(64,70,380,132,232,noShadow(roomSceneFlat('rooftop',lands),'rf-eyes')+men4([[300,470],[620,380]]),roomScene('bedroom',[])+bearWall,'34 150 892 310');   // 0872 THE MAP'S ROOF WEARS NO EYES (Wyatt 9/7 ~9:30 pm: "in the map screen, don't show the eyes that come out of the hole in the roof"): the hatch's .rf-eyes group off the paper (⚑ Q2 the frame's own stripper — the nodes gone, not hidden); the hole, the red, the ladder, the breath and the motes stay; the ROOM keeps the eyes
 s+=drift(480,100,60,18)+drift(540,84,50,16)+drift(470,180,54,16)+drift(560,206,46,14)+drift(520,150,40,12);
 s+=posterPine(500,128,0.8)+posterPine(470,224,0.7)+posterPine(576,102,0.66)+posterPine(456,156,0.6);
 s+=`<g transform="translate(524,196)"><ellipse cx="0" cy="0" rx="18" ry="6" fill="#BFD9E8" stroke="#8FB2C8" stroke-width="1.2"/><path d="M-9 -1 h8 M2 2 h9" stroke="#DCEBF4" stroke-width="1.2" stroke-linecap="round"/></g>`;
@@ -95176,6 +95190,7 @@ window.UI = {
   // other room panel is. It is a door of its own and sits in nobody's path:
   // no existing flow gained a step, and no existing chip moved.
   evJoin(){ audio(); SFX.horn(); return evJoin(); },
+  evInfo(){ audio(); if(!evInfo()) SFX.thock(); },   // 0872 THE BANNER OPENS THE CARD: the quiet pill's tap — the event's own card (its fanfare is the card's); a tap the quiet guard refuses (a card already standing, a modal) is a thock, never silence
   bdJoin(){ audio(); SFX.horn(); return bdJoin(); },   // 0516: the desert's JOIN (the card's button)
   evTouch(){ audio(); SFX.blip(); evTouch(); },   // 0485 D13: the you-there card's tap — "I'm here" (the card is the whole screen; no close button)   // 0484 THE EVENT DOOR — §5.2: the band IS the button (card 3 wires it); no modal, no panel, no confirm
   // 0904 RESET ROOM (jumpr 0743): the chip (a dim chip is a thock and nothing else — no dead buttons), CLEAR IT (one thock, ONE save, ONE
@@ -98805,6 +98820,7 @@ window.GVT = {
       men:S.units.filter(u=>!u.dead).map(u=>({ cid:u.cid||null, t:u.type, x:u.x|0, y:u.y|0, by:u.coopBy||null, hex:u.coopHex||null })),
       roster:(S.sq&&S.sq.ev)? evRoster() : [], ann:S.ann? S.ann.txt : null, pgv:PGV }; },
   evJoin(){ return evJoin(); },
+  evInfo(){ const dealt=evInfo(); return Object.assign({ dealt:dealt?1:0 }, GVT.evDoor()); },   // 0872 THE BANNER OPENS THE CARD: the quiet pill's tap by the rig — dealt + the pill read (tag · onclick · pop · popBand)
   lairU(rk){ const rk9=(rk==='ice')? 'ice' : 'bone', c=raidCfg('u',rk9), T=c.terrain, cells=[]; for(const w of c.waves) for(const g of w.groups) if(g.f==='spout' && g.t==='eggling') for(const p of g.pts) cells.push(p);   // 0905 THE TALL LAIR: the tall table + the census (read-only) · 0869: + the ice room's table on request (lairU('ice') — the chase's byte-still proof; the castle's ground has no nests / pits / mouths)
     const near=(p,q)=>Math.hypot(p[0]-q.x,p[1]-q.y); let minClr=1e9, lava=0, band=0; for(const p of cells){ for(const q of (T.pits||[])){ const d=near(p,q); minClr=Math.min(minClr,d); if(d<q.r) lava++; } for(const q of (T.spouts||[])){ minClr=Math.min(minClr,near(p,q)); } if(p[1]<56||p[1]>1144) band++; }
     return { rk:rk9, p2n:c.p2n, hm:raidHmul(rk9,'u'), h:Math.round(H*raidHmul(rk9,'u')), nests:(T.props||[]).filter(p=>p.art==='nest').length, cells:cells.length, pits:(T.pits||[]).length, mouths:(T.spouts||[]).length, mesas:T.rocks.length, minClr:+minClr.toFixed(1), lava, band, count:LAIR_U_NESTS, step:LAIR_HATCH_STEP_U, hatch:LAIR_EGG_HATCH, pools:LAIR_U_POOLS.map(p=>p.join('/')), waves:c.waves.map(w=>({ name:w.name, groups:w.groups.map(g=>({ f:g.f, t:g.t, n:g.n===undefined? null : g.n, per:g.per===undefined? null : g.per, pts:g.pts? g.pts.length : null, at:g.at, hpX:g.hpX===undefined? null : +g.hpX.toFixed(3), hpAdd:g.hpAdd===undefined? null : g.hpAdd, pin:g.pin|0, beat:g.beat|0, step:g.hatchStep===undefined? null : g.hatchStep })) })) }; },
