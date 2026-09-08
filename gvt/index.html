@@ -42586,7 +42586,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.68';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.69';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -56337,8 +56337,9 @@ function heroDeflFx(u,fx,fy){   // the bounce read at a hitscan-ball arrival: a 
   S.fx.push({k:'snowb',x1:u.x,y1:u.y-30,x2:u.x+(fx-u.x)/dq*120,y2:u.y-8+(fy-u.y)/dq*40,t:0,dur:0.34});
   bfSfx(SFX.thock,u.x,u.y);
 }
-function heroDeflB(B,u){   // a rolling S.gboul ball off the king: spent vs him, flight re-aimed off his body (reads as a bounce at any approach angle), inert both ways back
+function heroDeflB(B,u){   // a rolling S.gboul ball off the king: spent vs him, flight re-aimed off his body (reads as a bounce at any approach angle) · 0865b BOULDERS BITE BACK: the other army's ball rolls back LIVE (the stamp below); my own ball off THEIR king and the third side's rock stay inert both ways
   B.hit[u.id]=1; B.kref=1;
+  if(!B.mine && !B.nem){ B.refl=1; B.rby=u; }   // 0865b BOULDERS BITE BACK (FM-GVT-BOULDER-RETURN-01; Wyatt 9/7: "Reflected boulders are currently not hitting enemies … it should be hitting them, dealing strong damage"): a FOE's ball (the stego's rock, the snowmen's balls, the giant's) off YOUR king is a RETURNED ball now — gboulTick's refl branch walks S.foes on its way out (REFL_BOUL_DMG × the rung's hpMul × boulFoeX, each foe once, the king's owner credited through hitCheck(f2,B.rby); the catch gate's !B.refl keeps a commando from re-catching it). B.hit stands (one idc counter serves men and foes, so no foe wears a knocked man's id, and a green knocked on the way in is never re-knocked on a kl way out — 0842). THE GATE: heroDeflB is ALSO the seat where THEIR king bounces MY iron ball / a pet's ball (cannonRoll ×2) and where the hatchling's nem rock bounces — those keep 0518's spent bounce (⚑ Q3: the aim stays the radial re-aim, his picture)
   const dq=Math.hypot(B.x-u.x,B.y-u.y)||1;
   B.dx=(B.x-u.x)/dq; B.dy=(B.y-u.y)/dq;
   B.run=Math.max(B.run,260);   // enough roll to READ as a bounce before it crumbles
@@ -56366,6 +56367,7 @@ function heroDeflB(B,u){   // a rolling S.gboul ball off the king: spent vs him,
 const REFL_SNOWMAN_X=6;    // "500% more damage" = ×6 of the reflect currency on every snowman (UDEF.mortar.dmg 1.5 → 9.0 per reflected snowball; the pristine's Sergeant read 3.0, a figure 1.5)
 const REFL_SNOWMAN_T={ sgtsnow:1, snowfig:1, gsnowman:1 };   // the snowman-shaped rows: the Sergeant, the figures (+ the death-split minis), the Yeti Park's giant
 const STEGO_BOUL_X=3;   // "200% extra damage" = ×3 total — the stego's intake from any boulder (C-Q1 RULED any; ⚑ C-Q2 a HATCHLING stego is never a rock's victim on HEAD — 0389's hatchlings-never-hit law — so nothing to build there)
+const REFL_BOUL_DMG=8;   // ⚑ 0865b BOULDERS BITE BACK (FM-GVT-BOULDER-RETURN-01, Q1; Wyatt 9/7: "dealing strong damage"): a RETURNED ball's bite per foe it meets — × the fight's hpMul (S.cfg) × boulFoeX below — so at ANY rung a raptor / spitter / dilo / stego / eggling / ptero fall to one ball, a trike or a bruiser keeps a third, a boss (the half curve) shrugs it; the SAME const for a king's bounce and the commando's catch (⚑ Q2 one law; both read UDEF.mortar.dmg 1.5 flat before); alts 6 / 12, or 0.5 × f2.hpMax for a fraction-of-the-bar law — one line either way
 function boulFoeX(f){ return REFL_SNOWMAN_T[f.type]? REFL_SNOWMAN_X : (f.type==='stego')? STEGO_BOUL_X : 1; }   // the victim's factor at the one seat · 0744: every snowman ×6 (was the Sergeant alone ×2)
 const SB_FAN=0.20;   // 0305 BF-0S: radians between adjacent volley boulders (5-wide = 0.80 rad ≈ 46°, just inside the king's own breath cone)
 function gsnowTick(f,dt){
@@ -56523,7 +56525,8 @@ function gboulTick(dt){
         if(f2.dead || f2.burrow || f2.falling) continue;
         if(B.hit[f2.id]) continue;
         if(Math.hypot(f2.x-B.x,f2.y-B.y)<B.r+f2.def.w*0.3){ B.hit[f2.id]=1;
-          f2.hp -= UDEF.mortar.dmg*boulFoeX(f2);   // the reflect currency — foeSplash's own return law · 0906 BOSS NUMBERS Parts B + C: ×boulFoeX — 0744: every SNOWMAN takes six times a reflected snowball (was the Sergeant alone, twice), the stego triples any boulder, everyone else ×1
+          const bd9=REFL_BOUL_DMG*((S.cfg&&S.cfg.hpMul)||1)*boulFoeX(f2); f2.hp -= bd9;   // 0865b BOULDERS BITE BACK: the returned ball's bite = REFL_BOUL_DMG × the fight's hpMul × boulFoeX — ONE law for a king's bounce and the commando's catch (⚑ Q2; was UDEF.mortar.dmg 1.5 flat: the reflect currency, foeSplash's own return law) · 0906 BOSS NUMBERS Parts B + C: ×boulFoeX — 0744: every SNOWMAN takes six times a returned snowball (was the Sergeant alone, twice), the stego triples any boulder, everyone else ×1
+          S.floats.push({x:f2.x,y:f2.y-64,txt:'−'+Math.round(bd9),t:0,col:'#BFE39A'}); S.fx.push({k:'ring',x:f2.x,y:f2.y-16,r:4,R:22,t:0,dur:0.22,col:(B.rock?'#B8A888':'#FFFFFF')}); bfSfx(SFX.thock,f2.x,f2.y);   // THE TELL (⚑ Q6): the number in the shipped −dmg hue (digits alone never miss the audit — l10nMiss's letter gate; zero keys), the ring in the rock's / the snow's colour, the thock — the cannon's own foe-hit grammar
           hitCheck(f2, B.rby); }
       }
     } else if(B.nem) for(const u of S.units){
@@ -56540,7 +56543,7 @@ function gboulTick(dt){
         S.fx.push({k:'ring',x:u.x,y:u.y-16,r:4,R:22,t:0,dur:0.22,col:'#B8A888'});
         bfSfx(SFX.thock,u.x,u.y); }
     } else if(B.mine){ cannonRoll(B);   // 0542 THE CANNON's own roll — foes once each for the shell's damage, friends knocked once, the enemy's commandos and kings answer
-    } else for(const u of S.units){
+    } if(!B.nem && !B.mine && (!B.refl || (B.kref && B.kl))) for(const u of S.units){   // 0865b BOULDERS BITE BACK: the men's branch stands for every plain foe ball; a caught ball (refl, no kref) walks the men no more than it did; a king-bounced ball walks them ONLY while it wears kl (the 'u' room's snowball — 0842 C2: refl now, it hits the snowmen it meets above AND keeps knocking the men it passes on its way out, ⚑ Q4); a king-bounced ball without kl is skipped outright (the break below stands as the belt)
       if(B.kref && !B.kl) break;   // 0518: a king-bounced ball is spent — inert on its way out · 0842 THE ULTRA MEGA KING YETI, ROUND THREE (cell C2): unless the ball wears kl (the 'u' room's snowball, stamped at its push) — it stays live and keeps knocking the men it passes on its way out; the king took no bite and the bounce read (heroDeflB byte-still)
       if(u.dead || u.jetT>0 || u.dropT>0 || u.falling) continue;
       if(S.drag && S.drag.unit===u) continue;
@@ -97499,6 +97502,7 @@ window.GVT = {
   petLv(k){ return PET_INFO[k]? petLv(k) : null; },
   petLvAt(x){ return petLvOf(x); },
   petRung(k){ if(!PET_INFO[k]) return null; const led=petRungLed(k); return { n:led.n|0, pend:led.pend|0, due:Math.floor(petLv(k)/HERO_MILE_EVERY), rows:(PET_RUNGS[k]||[]).map(r9=>r9.lv+':'+r9.id), wired:!!PET_RUNGS_WIRED[k] }; },
+  boul(){ return { cv:GVT_CV, dmg:(typeof REFL_BOUL_DMG==='undefined')? null : REFL_BOUL_DMG, hpMul:(S.cfg&&S.cfg.hpMul)||1, mortar:UDEF.mortar.dmg, refl:Object.assign({},HERO_REFL), balls:(S.gboul||[]).map(B=>({ x:+B.x.toFixed(2), y:+B.y.toFixed(2), dx:+B.dx.toFixed(4), dy:+B.dy.toFixed(4), r:+B.r.toFixed(2), run:+B.run.toFixed(1), refl:B.refl?1:0, kref:B.kref?1:0, kl:B.kl?1:0, nem:B.nem?1:0, mine:B.mine?1:0, pet:B.pet?1:0, rock:B.rock?1:0, little:B.little?1:0, side:B.side||null, rby:B.rby? { type:B.rby.type, id:B.rby.id } : null, src:B.src? { type:B.src.type, id:B.src.id } : null, hits:Object.keys(B.hit||{}).length })) }; },   // 0865b BOULDERS BITE BACK: the rolling balls' records, read-only (the battery's door)
   petBall(){ return (S.gboul||[]).filter(B=>B.pet).map(B=>({ by:B.pet.key, k:B.pet.k, side:B.side, x:+B.x.toFixed(2), y:+B.y.toFixed(2), dx:+B.dx.toFixed(4), dy:+B.dy.toFixed(4), r:+B.r.toFixed(2), rMax:+B.rMax.toFixed(2), run:+B.run.toFixed(2), run0:B.run0, dmg:B.dmg, little:B.little|0, grow:+(B.grow||0.02).toFixed(4), kref:B.kref|0, srcPet:B.src===B.pet, srcOwn:B.src===B.pet.own, hits:Object.keys(B.hit).length })); },   // 0806r SLUSH'S SNOWBALL: every live pet ball
   chill(){ return S.units.concat(S.foes).filter(o=>o.chillT>0).map(o=>({ type:o.type, id:o.id==null? null : o.id, side:o.side||null, t:+o.chillT.toFixed(3), x:o.chillX, walk:+petChillX(o).toFixed(3) })); },   // 0806r THE COLD: every chilled figure
   breaths(){ return (S.breaths||[]).map(b=>({ lane:b.lane||'camp', src:b.src? (b.src.type||b.src.k||b.src.kind||null) : null, x:+b.x.toFixed(2), y:+b.y.toFixed(2), ang:+b.ang.toFixed(4), sp:b.sp, rng:b.rng, t:+b.t.toFixed(3), dur:b.dur, hit:b.hit? b.hit.size : 0, dmg:b.dmg==null? null : b.dmg, cap:b.cap==null? null : b.cap })); },   // 0906 THE KING'S HOARD 2/6 · PUFF: every standing tongue — the lane, the breather, the geometry, the beat Map's size
