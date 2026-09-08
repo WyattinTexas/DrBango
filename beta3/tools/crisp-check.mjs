@@ -275,7 +275,7 @@ function LIB() {
   return 'lib';
 }
 const lib = async () => ev(`(${LIB.toString()})()`);
-const HOME_REST = `!!window.game && game.scene.isActive('home') && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB && !!window.__ssdev && !!window.__ssdev.last`;
+const HOME_REST = `!!window.game && game.scene.isActive('home') && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').dailyChipB && !!window.__ssdev && !!window.__ssdev.last`;
 
 /* ---- one device, four surfaces ------------------------------------------ */
 const rows = [];

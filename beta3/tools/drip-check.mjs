@@ -51,7 +51,7 @@ const until = async (e, cap = 45000) => {
   return false;
 };
 const HOME_REST = `!!window.game && game.scene.isActive('home')
-  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB`;
+  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').dailyChipB`;
 // a fresh profile, from nothing — the only way into the drip
 const wipe = async () => { await ev(`(()=>{ localStorage.removeItem('beta3.profile'); localStorage.removeItem('beta3.campaign'); return 'wiped' })()`); };
 /* THE CEREMONY, found by the id its container stamps on itself. `RITE` is

@@ -95,7 +95,7 @@ const tapUntil = async (dx, dy, done, tries = 10) => {
 const B = `game.scene.getScene('battle')`;
 const PICK = `!!window.game && ${B} && ${B}.scene.isActive() && ${B}.state === 'pick' && ${B}.board.filter(Boolean).length === 16`;
 const HOME_REST = `!!window.game && game.scene.isActive('home')
-  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB`;
+  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').dailyChipB`;
 const RITE = `(() => { const o = game.scene.getScenes(true).flatMap(s => s.children.list)
   .find(x => x.getData && x.getData('sigilRite')); return o ? o.getData('sigilRite') : 'none' })()`;
 const RITES = `game.scene.getScenes(true).flatMap(s => s.children.list).filter(x => x.getData && x.getData('sigilRite')).length`;

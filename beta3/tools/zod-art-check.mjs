@@ -62,7 +62,7 @@ const until = async (e, cap = 45000, step = 200) => {
   return false;
 };
 const H = `game.scene.getScene('home')`;
-const HOME_REST = `!!window.game && game.scene.isActive('home') && !${H}.introPlaying && !!${H}.lanternB`;
+const HOME_REST = `!!window.game && game.scene.isActive('home') && !${H}.introPlaying && !!${H}.dailyChipB`;
 const SHEET = `!!${H}.signC && !!${H}.signPeek`;
 const STILL = `${SHEET} && !${H}.signPeek().moving`;
 const ARTLOADED = `typeof SSART !== 'undefined' && SS_ZOD_ART.every((i) => !!SSART.img['zod_' + i])`;

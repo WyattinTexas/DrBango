@@ -1,12 +1,15 @@
-// LAMP-CHECK — the streak lantern's PIXELS (v0.45.0). streak-check.mjs pins
-// what the lamp IS (texture key, count, halo); this pins what it LOOKS LIKE,
-// which is the only thing a phone can complain about. TestFlight v0.43.0:
-// Wyatt's first daily lit the end screen's "the lantern is lit" and the
-// meadow then wore the COLD lamp — half-transparent dark iron against the
-// dusk at 26x36 CSS px, i.e. a gray rectangle. This suite snapshots the
-// lamp's on-screen rect in every dress and asserts it is a LAMP: a warm
-// glass in the lit dresses, visible iron in the cold one, and nothing
-// missing.
+// LAMP-CHECK — the streak lantern's PIXELS (v0.45.0; re-aimed v0.86.0).
+// streak-check.mjs pins what the lamp IS (texture key, count, halo); this
+// pins what it LOOKS LIKE, which is the only thing a phone can complain
+// about. TestFlight v0.43.0: Wyatt's first daily lit the end screen's "the
+// lantern is lit" and the game then wore the COLD lamp — half-transparent
+// dark iron at phone size, i.e. a gray rectangle. Since v0.86.0 the meadow
+// carries NO lamp (Skylar) — the STREAK SHEET is where the lamp renders now
+// (the mark rite quotes the same textures at a bigger scale), so this suite
+// opens the sheet in every dress, snapshots the lamp's on-screen rect there
+// and asserts it is a LAMP: warm glass in the lit dresses, visible iron in
+// the cold one, and nothing missing. The three roundRect boots still prove
+// every lantern BAKE survives iOS 15 and a throwing painter.
 //
 // It runs the same checks on three boots:
 //   1. as shipped (native roundRect — Safari 16.4+ / Chrome 99+)
@@ -14,7 +17,7 @@
 //      floor; compat's polyfill must carry every bake
 //   3. roundRect killed AFTER compat.js, so every painter that calls it
 //      THROWS — ssBake must wipe, fall back, DIAG and carry on; no texture
-//      may be missing and the meadow must still show a lamp
+//      may be missing and the sheet must still show a lamp
 //
 // Run from beta3/ with the folder served on :8899. Pass the CDP port and the
 // renderer; run it ONCE PER RENDERER with a Chrome that can honour it:
@@ -59,23 +62,35 @@ const until = async (e, cap = 90000) => {
   return false;
 };
 const HOME_REST = `!!window.game && game.scene.isActive('home')
-  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB`;
+  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').dailyChipB`;
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
-// the lamp's on-screen rect, read off the renderer. Pixels are sorted into
-// WARM (the lit glass and brass: red over green over blue), IRON (cool, pale
-// — the cold pewter: lighter than the sky and bluish) and SKY (whatever the
-// dusk is at that corner, sampled from the crop's own border).
+// the lamp's on-screen rect INSIDE THE STREAK SHEET, read off the renderer.
+// Pixels are sorted into WARM (the lit glass and brass: red over green over
+// blue), IRON (cool, pale — the cold pewter: lighter than the ground and
+// bluish) and GROUND (the sheet's midnight window behind the lamp, sampled
+// from the crop's own border). The sheet is opened fresh per dress and its
+// entrance tween is waited out — the lamp must ARRIVE before it is read.
 const peek = (n, tag) => ev(`new Promise(res => { const h = game.scene.getScene('home');
-  SS.prof.streak = { n:${n}, last: SSNET.dayKey(), best:${n}, g:1, gp:0, gd:[], mk:0, pend:0 }; h.updateLantern();
-  const go = () => { const b = h.lanternB.getBounds(), cam = h.cameras.main;
+  if (h.streakC) { h.streakC.destroy(); h.streakC = null; }
+  SS.prof.streak = { n:${n}, last: SSNET.dayKey(), best:${n}, g:1, gp:0, gd:[], mk:0, pend:0 };
+  h.streakSheet();
+  let lamp = null; const walk = (ls) => ls.forEach(o => { if (o.texture && /^lantern-/.test(o.texture.key)) lamp = o; if (o.list) walk(o.list); });
+  walk(h.streakC.list);
+  const target = ${n} >= 1 ? 1 : 0.82;
+  const go = () => { const b = lamp.getBounds(), cam = h.cameras.main;
     const x0 = Math.max(0, Math.floor(b.left - cam.scrollX) - 4), y0 = Math.max(0, Math.floor(b.top - cam.scrollY) - 4);
     const w = Math.ceil(b.width) + 8, hh = Math.ceil(b.height) + 8;
+    let count = '';
+    const wt = (ls) => ls.forEach(o => { if (o.type === 'Text' && o.text) { const tb = o.getBounds();
+      if (tb.centerX >= b.left && tb.centerX <= b.right && tb.centerY >= b.top && tb.centerY <= b.bottom) count = o.text; }
+      if (o.list) wt(o.list); });
+    wt(h.streakC.list);
     game.renderer.snapshotArea(x0, y0, w, hh, img => {
       const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
       const x = c.getContext('2d'); x.drawImage(img, 0, 0);
       const d = x.getImageData(0, 0, c.width, c.height).data;
-      // the sky: the crop's outer 2px ring
+      // the ground: the crop's outer 2px ring
       let sr = 0, sg = 0, sb = 0, sn = 0;
       for (let py = 0; py < c.height; py++) for (let px = 0; px < c.width; px++) {
         if (px > 1 && px < c.width - 2 && py > 1 && py < c.height - 2) continue;
@@ -88,10 +103,16 @@ const peek = (n, tag) => ev(`new Promise(res => { const h = game.scene.getScene(
         if (dl > 60) diff++;
         if (R > G + 25 && G > B + 15 && R > 170) warm++;
         if (B > R + 8 && (R + G + B) > (sr + sg + sb) + 90) iron++; }
-      res(JSON.stringify({ tex: h.lanternB.texture.key, alpha: h.lanternB.alpha, count: h.lanternT.text, frameW: h.lanternB.frame.width,
-        tot, warm, iron, diff, opaque, sky: [sr, sg, sb].map(Math.round), png: ${SHOTS ? 'c.toDataURL()' : '""'} })); }); };
-  // give the renderer a frame with the new dress on it before reading it back
-  let f = 0; const tick = () => { if (++f >= 3) go(); else requestAnimationFrame(tick); }; requestAnimationFrame(tick); })`).then(JSON.parse).then(r => {
+      const out = JSON.stringify({ tex: lamp.texture.key, alpha: lamp.alpha, count, frameW: lamp.frame.width,
+        tot, warm, iron, diff, opaque, sky: [sr, sg, sb].map(Math.round), png: ${SHOTS ? 'c.toDataURL()' : '""'} });
+      h.streakC.destroy(); h.streakC = null;
+      res(out); }); };
+  // wait out the entrance tween (alpha rises to its resting value), then give
+  // the renderer a frame with the dress on it before reading it back
+  const arm = () => { if (lamp.alpha >= target - 0.005) { let f = 0;
+      const tick = () => { if (++f >= 3) go(); else requestAnimationFrame(tick); }; requestAnimationFrame(tick); }
+    else setTimeout(arm, 120); };
+  arm(); })`).then(JSON.parse).then(r => {
     if (SHOTS && r.png) writeFileSync(`${SHOTS}/${tag}-n${n}.png`, Buffer.from(r.png.split(',')[1], 'base64'));
     delete r.png; return r;
   });
@@ -100,11 +121,11 @@ const dresses = async (tag) => {
   const L = {};
   for (const n of [0, 1, 2, 7, 30, 100]) L[n] = await peek(n, tag);
   const brief = (n) => `${L[n].tex} warm=${L[n].warm} iron=${L[n].iron} diff=${L[n].diff}/${L[n].tot}`;
-  // the cold lamp: enough pale iron against the sky to read as a thing with a shape
+  // the cold lamp: enough pale iron against the window to read as a thing with a shape
   ok(`${tag}: no streak — a COLD lamp that still reads as a lamp (iron, not a gray box)`,
     L[0].tex === 'lantern-cold' && L[0].iron >= 400 && L[0].diff >= 1200 && L[0].alpha > 0.75, brief(0));
-  // THE bug: night one is LIT — warm glass on the meadow, not the cold dress
-  ok(`${tag}: the FIRST night lights it — warm glass on the grass, no number yet`,
+  // THE bug: night one is LIT — warm glass on the sheet, not the cold dress
+  ok(`${tag}: the FIRST night lights it — warm glass on the sheet, no number yet`,
     L[1].tex === 'lantern-lit' && L[1].warm >= 800 && L[1].count === '' && L[1].alpha === 1, brief(1) + ' count=' + JSON.stringify(L[1].count));
   ok(`${tag}: night two carries the count`, L[2].tex === 'lantern-lit' && L[2].warm >= 800 && L[2].count === '2', brief(2));
   for (const [n, k] of [[7, 'lantern-m1'], [30, 'lantern-m2'], [100, 'lantern-m3']])
@@ -165,12 +186,27 @@ await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: pre });
 // ================================================================
 console.log(`\n— ${REND}: roundRect killed after compat.js (every bake that uses it throws) —`);
 const { identifier: post } = await send('Page.addScriptToEvaluateOnNewDocument', { source: `
-  document.addEventListener('DOMContentLoaded', () => { CanvasRenderingContext2D.prototype.roundRect = function () { throw new TypeError('roundRect is not a function (harness)'); }; });` });
+  document.addEventListener('DOMContentLoaded', () => { CanvasRenderingContext2D.prototype.roundRect = function () { throw new TypeError('roundRect is not a function (harness)'); }; });
+  // record every line the overlay is told — the on-screen box is a rolling
+  // 14-line window by design, so 'did DIAG say it' must be read from a
+  // witness, not from whatever happens to still be visible when we look
+  window.__diagLines = [];
+  (function () { let real = undefined;
+    Object.defineProperty(window, 'SSDIAG', {
+      configurable: true,
+      get() { return real; },
+      set(fn) { real = function (msg) { try { window.__diagLines.push(String(msg)); } catch (e) { } return fn.apply(this, arguments); }; },
+    }); })();` });
 await send('Page.navigate', { url: `${BASE}?rend=${REND}&fps=0&diag=1` }); await sleep(8000);
 ok('the meadow still stands up when painters throw', await until(HOME_REST));
 const fails = await ev(`JSON.stringify(window.__ssBakeFail || [])`).then(JSON.parse);
 ok('the failures are counted and named', fails.length >= 5 && fails.some(f => /^lantern-lit/.test(f)) && fails.every(f => /roundRect/.test(f)), fails.length + ' · ' + fails.slice(0, 3).join(' | '));
-ok('…and DIAG said so on the phone-debug overlay', await ev(`/bake failed: lantern/.test(document.getElementById('diagbox') ? document.getElementById('diagbox').textContent : '') || (JSON.parse(localStorage.getItem('beta3.diaglog') || '[]').some(l => /bake failed/.test(l)))`) === true);
+// ⚠ the visible box is a rolling 14-line window (compat.js caps it) and later
+// boot chatter scrolls the bake lines off on a slow settle — the overlay is
+// proven through the recorded SSDIAG calls, not the box's current residue
+ok('…and DIAG said so on the phone-debug overlay (every lantern bake named)',
+  await ev(`(window.__diagLines || []).filter(l => /^bake failed: lantern-/.test(l)).length === 5 && !!document.getElementById('diagbox')`) === true,
+  await ev(`(window.__diagLines || []).filter(l => /^bake failed/.test(l)).length + ' bake lines told'`));
 b = await bakes();
 ok('no texture is missing — every failed bake was finished by a fallback or a wipe', !Object.values(b).includes('MISSING'), JSON.stringify(b));
 const T = {};

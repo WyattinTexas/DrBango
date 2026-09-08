@@ -85,7 +85,7 @@ const tap = async (expr) => {
   await tapXY(p.x, p.y);
 };
 const HOME_REST = `!!window.game && game.scene.isActive('home')
-  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB && !game.scene.getScene('home').busy()`;
+  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').dailyChipB && !game.scene.getScene('home').busy()`;
 const H = `game.scene.getScene('home')`;
 // the rows, in design units — rowY is the layout's own truth (layoutMenu
 // stamps it), vis carries the v0.51.0 render-or-not law

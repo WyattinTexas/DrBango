@@ -63,7 +63,7 @@ const until = async (e, cap = 60000) => {
   return false;
 };
 const HOME_REST = `!!window.game && game.scene.isActive('home')
-  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB`;
+  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').dailyChipB`;
 // a real press on a design point; on the 1-fps GL box the press is HELD so a
 // frame actually sees the pointer down (a 60 ms tap lands inside one frame)
 const tapD = async (dx, dy, hold) => {

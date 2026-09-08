@@ -78,7 +78,7 @@ const toDelete = new Set(['players/' + UA, 'players/' + UB, 'devices/' + UA, 'de
 const BOOT = (uid, name) => `navigator.share = undefined; navigator.clipboard = undefined;
   try { sessionStorage.setItem('beta3.skipIntro', '1'); if (localStorage.getItem('rc.seeded') !== '${uid}') { localStorage.clear(); localStorage.setItem('rc.seeded', '${uid}');
     localStorage.setItem('starspellUid', '${uid}'); localStorage.setItem('starspellName', ${JSON.stringify(name)}); localStorage.setItem('beta3.vsmode', 'turns'); } } catch (e) {}`;
-const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').lanternB`;
+const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').dailyChipB`;
 const ensured = (c) => c.until(`(async () => { await SSNET.ensureName(); return true })()`, 30000);
 const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').chFriendB`;
 const toMenu = async (c) => { await c.ev(`game.scene.getScene('home').scene.start('vsmenu'); 1`); const r = await c.until(MENU, 20000); await sleep(600); return r; };

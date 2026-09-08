@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.85.0';
+const BUILD = 'STARSPELL v0.86.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1253,16 +1253,14 @@ function ssLanternTier(n) {
   return t;
 }
 const SS_LANTERN_TEX = ['lantern-cold', 'lantern-lit', 'lantern-m1', 'lantern-m2', 'lantern-m3'];
-/* How the lamp is worn. The texture is 60x84 with the lamp body itself drawn
-   into a 44x62 box at (8, 22); 35x49 puts that body back at exactly the 26x36
-   it has been since v0.39.0, and the 13 units above it are the crowns' room.
-   SS_LANTERN_TY is where the glass pane's middle sits relative to the IMAGE's
-   centre, which is where the night count rides at any scale.
-   ⚠ SS_LANTERN_Y (the meadow's anchor) is 25 — exactly half the height, so
-   the sprite's top edge lands ON the design box's top and never above it. The
-   box centres in the phone's SAFE band, and a lamp hanging even half a unit
-   proud of it would be wearing its comet under the notch on a real handset. */
-const SS_LANTERN_W = 35, SS_LANTERN_H = 49, SS_LANTERN_Y = 25, SS_LANTERN_TY = 8.75;
+/* How the lamp is worn (the streak sheet and the mark rite draw it — the
+   meadow no longer does, v0.86.0). The texture is 60x84 with the lamp body
+   itself drawn into a 44x62 box at (8, 22); 35x49 puts that body back at
+   exactly the 26x36 it has been since v0.39.0, and the 13 units above it are
+   the crowns' room. SS_LANTERN_TY is where the glass pane's middle sits
+   relative to the IMAGE's centre, which is where the night count rides at any
+   scale. */
+const SS_LANTERN_W = 35, SS_LANTERN_H = 49, SS_LANTERN_TY = 8.75;
 /* THE LAST SEVEN NIGHTS, oldest first — what the week strip draws.
    Each entry is {k, state} with state 'lit' (the daily log holds a score for
    that day), 'grace' (a grace night bridged it), 'open' (tonight, still
@@ -5336,7 +5334,6 @@ class Home extends Phaser.Scene {
     this.streakC = null; this.riteC = null; this.riteTimer = null; this.sigTimer = null; this.signLvTimer = null;
     this.showZone = null; this.showFx = null;   // last run's showcase died with its scene
     this.ftueBare = false;   // the wordless first open re-arms it below if owed
-    this.lanternShown = null; this.lanternSwell = null;   // a restart re-renders, it does not celebrate
 
     // Everything at the meadow (showcase, title, buttons, chip, footer) is a
     // full frame's work on a slow phone, and a descent-by-create (the dawn
@@ -5425,7 +5422,7 @@ class Home extends Phaser.Scene {
   }
   buildMeadowUi(l) {
     /* THE FIRST OPEN's meadow is WORDLESS (v0.75.0): the scene and the
-       wordmark only — no buttons, no chips, no lantern, no footer, no
+       wordmark only — no buttons, no chips, no footer, no
        doors, nothing interactive at all. The flag lives on the scene so
        playIntro's call lands here unchanged; onWake restarts a bare
        meadow outright (the return from the first game deserves the full
@@ -5463,10 +5460,9 @@ class Home extends Phaser.Scene {
          stands on an interactive meadow, one zone sized to its stars waits
          for a tap. Never on the wordless first open (ftueBare: zero
          interactive chrome is that meadow's law), and never over another
-         control — nothing else lives in the showcase band (the lantern ends
-         ~50 design px above the topmost star; tap-sign-check proves the
-         census live). Unregistered signs stay pure presence: no zone, no
-         hint, no dead-tap feedback. */
+         control — nothing else lives in the showcase band (tap-sign-check
+         proves the census live). Unregistered signs stay pure presence: no
+         zone, no hint, no dead-tap feedback. */
       const flourish = SS_SKY_TAPS[b.id];
       if (flourish && !this.ftueBare) {
         const sc = l.u(0.8) * (b.boss ? 1.15 : b.tier === 'mini' ? 1.06 : 1);
@@ -5529,9 +5525,6 @@ class Home extends Phaser.Scene {
         this.dailyGlow.setAlpha(0.13);
         this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       }
-      // the lantern owns its own breath (it depends on whether it's lit at
-      // all), so the wake path just asks it to redress itself
-      if (this.lanternB) this.updateLantern();
     };
     this.idleTweens();
     const bk = ssBraidTex(this);
@@ -5744,30 +5737,11 @@ class Home extends Phaser.Scene {
     dchip.on('pointerout', () => dchip.setDisplaySize(l.u(DW), l.u(DH)));
     this.tweens.add({ targets: this.dailyGlow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
-    /* THE STREAK LANTERN — it hangs beside the herald, and it is the only
-       thing on this screen the player made themselves. Cold and quiet with no
-       streak; lit from the first night, and from the second it carries the
-       count in its glass and breathes. Never louder than the chip: the halo tops out well under the
-       daily's ember, and nothing here moves fast. */
-    // 35x49 of texture, of which the lamp body is the same 26x36 it has been
-    // since v0.39.0 — the margin is the crowns' room (see ssMakeTextures).
-    const LW = SS_LANTERN_W, LH = SS_LANTERN_H, lx = -62;
-    this.lanternGlow = ui(this.add.image(l.x(lx), l.y(SS_LANTERN_Y + 5), 'glowbig')
-      .setDisplaySize(l.u(52), l.u(52)).setTint(0xffb457).setAlpha(0).setBlendMode('ADD'));
-    const lamp = this.lanternB = ui(this.add.image(l.x(lx), l.y(SS_LANTERN_Y), 'lantern-cold')
-      .setDisplaySize(l.u(LW), l.u(LH)).setInteractive({ useHandCursor: true }));
-    // the count rides in the pane itself, shrunk to fit rather than clipped —
-    // a hundred-night flame is a problem worth rendering properly
-    this.lanternT = ui(ssTxt(this, l.x(lx), l.y(SS_LANTERN_Y + SS_LANTERN_TY), '', l.u(11), '#3a2408').setOrigin(0.5));
-    // the honest mark: a dashed ring under the glass while the flame is
-    // standing on its grace night and nothing else
-    this.lanternG = ui(ssTxt(this, l.x(lx), l.y(SS_LANTERN_Y + 26), '◌', l.u(9), '#ffb457').setOrigin(0.5).setAlpha(0));
-    // the lantern's own door now: the streak sheet, where the week of nights
-    // and the grace night are read (a HUNT button there keeps the daily one
-    // tap away, the way tapping the lamp used to be)
-    lamp.on('pointerdown', () => { if (this.busy()) return; SFX.ensure(); this.streakSheet(); });
-    lamp.on('pointerover', () => lamp.setScale(lamp.scaleX * 1.06, lamp.scaleY * 1.06));
-    lamp.on('pointerout', () => lamp.setDisplaySize(l.u(LW), l.u(LH)));
+    /* The streak lantern hung beside the herald here from v0.39.0 until
+       v0.86.0 (Skylar: "just remove the lantern"). The streak itself keeps
+       counting underneath — the engine, the grace night, the marks and the
+       ceremony all stand; its sheet now opens from the daily sheet's own
+       streak/grace lines. */
     this.updateDailyChip();
 
     // the VERSUS door knows who's waiting behind it: with friends online a
@@ -5979,78 +5953,6 @@ class Home extends Phaser.Scene {
       this.dailyChipT.setText((played ? '✓ ' : '☀ ') + ssClock(SSNET.msToNextDay()));
       if (this.dailyGlow && this.dailyGlow.active) this.dailyGlow.setVisible(!played);
     }
-    // the lantern rides the herald's clock: when midnight UTC turns under a
-    // player standing in the grass, a flame that just went cold must go dark
-    // on the same tick the chip lights back up
-    this.updateLantern();
-  }
-  // the lantern's whole state, in one place: cold glass with no streak, warm
-  // glass from the first night, the count from the second. Idempotent — every
-  // caller (build, the 1s tick, the wake from a finished hunt) runs it whole.
-  updateLantern() {
-    if (!this.lanternB || !this.lanternB.active) return;
-    const l = ssLayout(this);
-    const st = ssStreakState();
-    const n = st.n;
-    const lit = n >= 1;
-    const tier = ssLanternTier(n);
-    const grew = this.lanternShown != null && n > this.lanternShown;
-    this.lanternShown = n;
-    // setTexture resets the frame size, so the display size is re-asserted.
-    // A cold lantern steps back a little (it must not outweigh the herald
-    // beside it) but no further: at 0.5 its iron vanished into the dusk and
-    // only the dark pane survived — a gray box, not a lamp.
-    this.lanternB.setTexture(SS_LANTERN_TEX[tier + 1])
-      .setDisplaySize(l.u(SS_LANTERN_W), l.u(SS_LANTERN_H));
-    ssHitPad(this.lanternB, 44);     // the new frame's scale: re-pad to the 44-pt law
-    this.lanternB.baseAlpha = lit ? 1 : 0.82;
-    const g = this.lanternGlow;
-    // the halo grows with the marks but still never reaches the daily chip's
-    // own ember at its brightest (0.13) — the herald leads this corner
-    if (g && g.active) {
-      g.baseAlpha = lit ? [0.12, 0.125, 0.13, 0.13][tier] : 0;
-      g.setDisplaySize(l.u(lit ? [52, 58, 64, 72][tier] : 52), l.u(lit ? [52, 58, 64, 72][tier] : 52));
-      g.setTint(tier >= 2 ? 0xffd77a : 0xffb457);
-    }
-    // a flame standing on its grace night says so, right on the meadow
-    const gm = this.lanternG;
-    if (gm && gm.active) gm.baseAlpha = st.grace ? 0.9 : 0;
-    const t = this.lanternT;
-    if (t && t.active) {
-      t.setFontSize(l.u(11));                  // start from full size every time…
-      t.setText(n >= 2 ? String(n) : '');      // the flame shows at one, the count from two
-      // …then shrink to the pane rather than spill over its iron posts
-      let fs = 11;
-      while (t.width > l.u(12.5) && fs > 6) { fs -= 0.75; t.setFontSize(l.u(fs)); }
-    }
-    /* ⚠ The herald tick keeps running through the ascent and the opening, and
-       both of those own every ui item's alpha for their duration. Writing
-       alpha here mid-flight would pop the lantern back over the rising sky —
-       and killTweensOf() below would take the whole group fade with it, since
-       that fade is ONE tween over all of uiItems. So: record the resting
-       alphas above (the restore paths read baseAlpha) and touch nothing else
-       until the meadow is standing still. */
-    if (this.ascending || this.introPlaying) return;
-    this.lanternB.setAlpha(this.lanternB.baseAlpha);
-    if (gm && gm.active) gm.setAlpha(gm.baseAlpha);
-    if (g && g.active) {
-      // The wake path runs this twice (idleTweens re-arms the breathers, then
-      // the herald tick refreshes both heralds). A swell already in flight for
-      // this same count must survive the second call, or the celebration is
-      // killed 0ms after it starts.
-      if (lit && !grew && this.lanternSwell && this.lanternSwell.isPlaying()) return;
-      this.tweens.killTweensOf(g);
-      g.setAlpha(g.baseAlpha);
-      // a lantern breathes; it does not blink. Slower and dimmer than the
-      // daily chip's ember (0.13↔0.05 over a far bigger sprite) on purpose —
-      // the herald still leads this corner.
-      const breathe = () => { if (g.active) this.tweens.add({ targets: g, alpha: 0.04, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }); };
-      if (!lit) return;
-      // one soft swell the first time you come home with a longer flame,
-      // and the steady breath picks up where it lands
-      if (grew) this.lanternSwell = this.tweens.add({ targets: g, alpha: 0.30, duration: 420, yoyo: true, ease: 'Sine.easeOut', onComplete: breathe });
-      else breathe();
-    }
   }
   /* ---------- THE MARKS: the lantern grows ----------
      Crossing 7 / 30 / 100 nights re-dresses the lamp, and a change that big
@@ -6067,7 +5969,7 @@ class Home extends Phaser.Scene {
     if (this.riteTimer) { this.riteTimer.remove(false); this.riteTimer = null; }
     let tries = 0;
     const settled = () => !this.busy() && !this.streakC && !this.dailyC && !this.langC
-      && !this.mapC && !this.confirmC && !this.signC && !!this.lanternB && this.lanternB.active;
+      && !this.mapC && !this.confirmC && !this.signC;
     const armed = () => {
       if (!this.scene.isActive()) return;
       if (settled()) { this.riteTimer = null; this.milestoneRite(m); return; }
@@ -6144,9 +6046,6 @@ class Home extends Phaser.Scene {
         targets: c, alpha: 0, duration: 520, ease: 'Sine.easeIn',
         onComplete: () => { if (this.riteC === c) this.riteC = null; c.destroy(); },
       });
-      // and the corner lamp takes its new dress, with one swell of its own
-      this.lanternShown = null;
-      this.updateLantern();
     };
 
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H)
@@ -6219,11 +6118,12 @@ class Home extends Phaser.Scene {
   }
 
   /* ---------- THE LANTERN SHEET ----------
-     Tapping the lamp opens its own story rather than the daily's: the lantern
-     at whatever size it has grown to, the number of nights, THE WEEK STRIP —
+     The streak's own story, opened from the daily sheet's streak/grace lines
+     (the meadow lamp that used to open it left in v0.86.0): the lantern at
+     whatever size it has grown to, the number of nights, THE WEEK STRIP —
      the last seven nights as small rings, lit ✓, grace ◌, dark for a miss —
      and the plain truth about the grace night. The daily is still one tap
-     away at the bottom, which is the door the lamp used to be. */
+     away at the bottom. */
   streakSheet() {
     if (this.busy() || this.streakC || this.dailyC || this.langC || this.mapC || this.confirmC || this.signC || this.riteC) return;
     SFX.ensure(); SFX.ui();

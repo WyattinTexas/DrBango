@@ -209,10 +209,9 @@ ok('a real tap under the sheet never plays — the layer above owns it',
   await ev(`${SKY}.plays === ${rr0} && !!${H}.dailyC`));
 await tapAt(0, 60);   // the veil above the window top — the sheet's own close door
 ok('…and the sheet still closes by its veil', await until(`!${H}.dailyC`, 4000));
-await tapObj(`${H}.lanternB`);
-ok('the lantern still opens the streak sheet', await until(`!!${H}.streakC`, 5000));
-await tapAt(0, 60);
-ok('streak sheet closes, no flourish underneath', await until(`!${H}.streakC`, 4000) && await ev(`${SKY}.plays === ${rr0}`));
+// (the streak lantern left the meadow in v0.86.0 — the daily chip above is
+// the corner control that proves the sheets-over-zone law now)
+ok('no lantern stands on the meadow to steal a tap', await ev(`!${H}.lanternB`) === true);
 await freshTurn('centaurus');
 const rr1 = await ev(`${SKY}.plays`);
 await tapObj(`${H}.showZone`);

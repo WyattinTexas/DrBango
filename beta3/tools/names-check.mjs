@@ -65,7 +65,7 @@ const BOOT = (uid, name, fresh) => `navigator.share = undefined; navigator.clipb
   try { sessionStorage.setItem('beta3.skipIntro', '1'); if (!localStorage.getItem('nc.seeded')) { localStorage.clear(); localStorage.setItem('nc.seeded', '1');
     localStorage.setItem('starspellUid', '${uid}'); localStorage.setItem('starspellName', ${JSON.stringify(name)}); ${fresh ? "localStorage.setItem('starspellNameFresh','1');" : ''} } } catch (e) {}
   window.__ren = []; window.addEventListener('ss-renamed', (e) => window.__ren.push(e.detail));`;
-const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').lanternB`;
+const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').dailyChipB`;
 const ensured = (c) => c.until(`(async () => { await SSNET.ensureName(); return true })()`, 30000);
 
 // ---- 1. the standing-name race at connect: two existing players, one name ----

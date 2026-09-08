@@ -1,7 +1,8 @@
-// STREAK-CHECK — the Daily Hunt streak lantern, end to end (v0.39.0 core +
-// v0.40.0 grace night and marks). fps-check.mjs pins the LAWS; this pins the
-// SURFACES and the real player flow, which is too long to bolt onto that
-// suite. Run from beta3/ with the folder served on :8899 and a headless
+// STREAK-CHECK — the Daily Hunt streak, end to end (v0.39.0 core + v0.40.0
+// grace night and marks; v0.86.0 took the lantern OFF the meadow — Skylar —
+// while the streak keeps counting underneath). fps-check.mjs pins the LAWS;
+// this pins the SURFACES and the real player flow, which is too long to bolt
+// onto that suite. Run from beta3/ with the folder served on :8899 and a headless
 // Chrome on :9444 (see README.md — a different port from fps-check's 9333 on
 // purpose, so the two suites can run side by side; --disable-gpu is fine here
 // because nothing in this file forces the WebGL renderer):
@@ -62,12 +63,12 @@ const tap = async (expr) => {
   await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: 1 });
 };
 const HOME_REST = `!!window.game && game.scene.isActive('home')
-  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB`;
+  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').dailyChipB`;
 
 
 // ---------------------------------------------------------------- boot
 await nav(BASE + '?fps=0', 12000);
-ok('the meadow stands up with a lantern beside the daily herald', await until(HOME_REST));
+ok('the meadow stands up with the daily herald', await until(HOME_REST));
 
 // ================================================================
 // 1. THE RULES — pure, no pixels. The whole grace + marks law.
@@ -147,45 +148,34 @@ ok('a broken streak clears its marks and may earn them again', r.mkAfterReset ==
 ok('the lamp dresses by the marks, lit from night one', r.tiers === '-1,0,0,0,1,1,2,2,3,3', r.tiers);
 
 // ================================================================
-// 2. THE LAMP AND ITS SHEET — the surfaces the rules drive
+// 2. NO LANTERN ON THE MEADOW — AND THE SHEET THE RULES STILL DRIVE
 // ================================================================
-// ---- the lamp's five dresses on the meadow ----
-const lamp = (n, extra) => ev(`(() => { const h = game.scene.getScene('home');
-  SS.prof.streak = Object.assign({ n:${n}, last: SSNET.dayKey(), best:${n}, g:1, gp:0, gd:[], mk:0, pend:0 }, ${extra || '{}'});
-  h.updateLantern();
-  return JSON.stringify({ tex: h.lanternB.texture.key, count: h.lanternT.text, glow: h.lanternGlow.baseAlpha,
-    lamp: h.lanternB.alpha, grace: h.lanternG.baseAlpha,
-    fits: h.lanternT.width <= ssLayout(h).u(12.5) + 0.5,
-    beside: h.lanternB.getBounds().left > h.dailyChipB.getBounds().right,
-    clearOfChip: h.lanternB.getBounds().right < h.profileChip.getBounds().left,
-    onScreen: h.lanternB.getBounds().top > 0 }) })()`).then(JSON.parse);
+// ---- the meadow carries no lamp in any streak state (v0.86.0) ----
+const bare = (n) => ev(`(() => { const h = game.scene.getScene('home');
+  SS.prof.streak = { n:${n}, last: SSNET.dayKey(), best:${n}, g:1, gp:0, gd:[], mk:0, pend:0 };
+  h.updateDailyChip();
+  let lamps = 0; h.children.list.forEach(o => { if (o.texture && /^lantern-/.test(o.texture.key)) lamps++; });
+  return JSON.stringify({ b: !!h.lanternB, up: typeof h.updateLantern, lamps,
+    chip: !!h.dailyChipB && h.dailyChipB.active, read: ssStreakState().n }) })()`).then(JSON.parse);
 const L = {};
-for (const n of [0, 1, 2, 6, 7, 30, 100, 365]) L[n] = await lamp(n);
-ok('cold with no streak, and still legible (alpha never below 0.8)', L[0].tex === 'lantern-cold' && L[0].count === '' && L[0].glow === 0 && L[0].lamp >= 0.8, JSON.stringify(L[0]));
-ok('LIT from the first night, with its halo and no number yet', L[1].tex === 'lantern-lit' && L[1].count === '' && L[1].glow > 0 && L[1].lamp === 1, JSON.stringify(L[1]));
-ok('numbered from night two', L[2].tex === 'lantern-lit' && L[2].count === '2' && L[6].count === '6' && L[6].glow > 0, JSON.stringify(L[6]));
-ok('night 7 → the ember crown', L[7].tex === 'lantern-m1', L[7].tex);
-ok('night 30 → the true lantern', L[30].tex === 'lantern-m2', L[30].tex);
-ok('night 100 → comet-crowned, and it stays there', L[100].tex === 'lantern-m3' && L[365].tex === 'lantern-m3', L[100].tex + '/' + L[365].tex);
-ok('a three-digit flame still fits the pane', L[365].count === '365' && L[365].fits, JSON.stringify(L[365]));
-ok('the halo never outshines the daily ember (0.13)', Math.max(...[2,6,7,30,100,365].map(n => L[n].glow)) <= 0.13);
-ok('the grown lamp still stands clear of both corner chips and the status bar',
-  L[365].beside && L[365].clearOfChip && L[365].onScreen, JSON.stringify([L[365].beside, L[365].clearOfChip, L[365].onScreen]));
+for (const n of [0, 1, 7, 100]) L[n] = await bare(n);
+ok('no lantern object, method or texture stands on the meadow in any streak state',
+  [0, 1, 7, 100].every(n => !L[n].b && L[n].up === 'undefined' && L[n].lamps === 0), JSON.stringify(L[100]));
+ok('the herald tick runs clean without it, and the streak still reads underneath',
+  [0, 1, 7, 100].every(n => L[n].chip && L[n].read === n), [0, 1, 7, 100].map(n => L[n].read).join(','));
 
-// the grace mark on the meadow: only while the net is actually holding it
-const gm1 = await lamp(6, `{ last: ssDayKeyStep(SSNET.dayKey(), -2), g: 1 }`);
-const gm2 = await lamp(6, `{ last: ssDayKeyStep(SSNET.dayKey(), -1), g: 1 }`);
-ok('a flame standing on its grace night wears the ◌ mark, and only then',
-  gm1.grace > 0 && gm1.tex === 'lantern-lit' && gm2.grace === 0, gm1.grace + '/' + gm2.grace);
-
-// ---- the lantern sheet, opened by a REAL tap on the lamp ----
+// ---- the lantern sheet, opened by a REAL tap through its surviving door:
+// the daily sheet's own grace line (the meadow lamp is gone) ----
 await ev(`(() => { const h = game.scene.getScene('home');
   SSNET.setDayKey('20260620');
   SS.prof.daily = { 20260615: 300, 20260616: 250, 20260618: 410, 20260619: 500 };
   SS.prof.streak = { n: 9, last: 20260619, best: 21, g: 0, gp: 2, gd: [20260617], mk: 7, pend: 0 };
   h.updateDailyChip(); return 'set' })()`);
-await tap(`game.scene.getScene('home').lanternB`);
-ok('a real tap on the lamp opens the lantern sheet', await until(`!!game.scene.getScene('home').streakC`));
+await tap(`game.scene.getScene('home').dailyChipB`);
+ok('the daily chip opens its sheet', await until(`!!game.scene.getScene('home').dailyC`));
+await sleep(900);   // the sheet's items rise in on a 300ms entrance tween — let them land (slow renderers stretch it)
+await tap(`game.scene.getScene('home').dailyC.list.find(o => o.type === 'Text' && /◌/.test(o.text || '') && o.input && o.input.enabled)`);
+ok('a real tap on the daily sheet grace line opens the lantern sheet', await until(`!!game.scene.getScene('home').streakC && !game.scene.getScene('home').dailyC`));
 const sheet = JSON.parse(await ev(`(() => { const h = game.scene.getScene('home'), c = h.streakC;
   const txt = [], imgs = [], gfx = [];
   const w = (ls) => ls.forEach(o => { if (o.type === 'Text') txt.push(o.text); if (o.texture && o.texture.key) imgs.push(o.texture.key);
@@ -217,7 +207,7 @@ await ev(`(() => { const h = game.scene.getScene('home'); if (h.dailyC) { h.dail
 // ---- the ceremony ----
 await ev(`(() => { const h = game.scene.getScene('home');
   SS.prof.streak = { n: 30, last: SSNET.dayKey(), best: 30, g: 1, gp: 0, gd: [], mk: 30, pend: 30 };
-  h.lanternShown = null; h.milestoneCheck(); return 'armed' })()`);
+  h.milestoneCheck(); return 'armed' })()`);
 ok('a pending mark holds a ceremony on the meadow', await until(`!!game.scene.getScene('home').riteC`, 25000));
 const rite = JSON.parse(await ev(`(() => { const h = game.scene.getScene('home'), c = h.riteC;
   const txt = [], imgs = [];
@@ -233,9 +223,8 @@ ok('it rides above the meadow', rite.depth >= 660, String(rite.depth));
 /* ⚠ 45s, not 20: the rite holds for 5.2s on the SCENE clock, and a software
    renderer running this at ~12fps stretches that ~5x. */
 ok('the ceremony lets the meadow back', await until(`!game.scene.getScene('home').riteC`, 45000));
-ok('and the corner lamp is wearing the new dress',
-  await ev(`game.scene.getScene('home').lanternB.texture.key === 'lantern-m2'`) === true,
-  await ev(`game.scene.getScene('home').lanternB.texture.key`));
+ok('and its close leaves a clean meadow — no corner lamp, no page exception',
+  await ev(`!game.scene.getScene('home').lanternB && ssLanternTier(SS.prof.streak.n) === 2`) === true);
 
 // ================================================================
 // 3. THE DAILY END SCREEN, MIGRATION, AND THE LEDGER
@@ -343,10 +332,10 @@ await ev(`(() => { const p = JSON.parse(localStorage.getItem('beta3.profile') ||
   p.streak = { n:6, last:20260811, best:6, g:1, gp:0, gd:[], mk:0, pend:0 }; p.daily = {}; p.ach = {};
   localStorage.setItem('beta3.profile', JSON.stringify(p)); return 1 })()`);
 await nav(BASE + '?fps=0&daykey=20260811', 11000);
-ok('the meadow stands, lamp lit at six nights',
+ok('the meadow stands lampless, the six-night streak alive underneath',
   await until(`!!window.game && game.scene.isActive('home') && !game.scene.getScene('home').introPlaying
-    && game.scene.getScene('home').lanternB.texture.key === 'lantern-lit'`),
-  await ev(`game.scene.getScene('home').lanternB.texture.key`));
+    && !game.scene.getScene('home').lanternB && ssStreakState().n === 6`),
+  await ev(`String(ssStreakState().n)`));
 await ev(`(() => { SSNET.submitScore = () => Promise.resolve(); SSNET.setDayKey('20260812');
   game.scene.getScene('home').scene.start('battle', { mode:'daily', resume:null }); return 1 })()`);
 ok('the daily stands up', await until(`(() => { const b = game.scene.getScene('battle');
@@ -370,10 +359,10 @@ const flowRite = JSON.parse(await ev(`(() => { const c = game.scene.getScene('ho
 ok('it is the SEVEN NIGHTS rite, with the grown lamp, and the mark is spent',
   flowRite.im.includes('lantern-m1') && flowRite.im.some(x => /SEVEN NIGHTS/.test(x)) && flowRite.pend === 0 && flowRite.ach.includes('flame-7'),
   JSON.stringify(flowRite.t) + ' ' + flowRite.im.filter(x => /gold@/.test(x)));
-ok('the meadow comes back with the grown lamp in the corner',
-  await until(`!game.scene.getScene('home').riteC && game.scene.getScene('home').lanternB.texture.key === 'lantern-m1'
-    && game.scene.getScene('home').lanternB.alpha === 1`, 30000),
-  await ev(`game.scene.getScene('home').lanternB.texture.key`));
+ok('the meadow comes back clean — no corner lamp, the grown streak stored',
+  await until(`!game.scene.getScene('home').riteC && !game.scene.getScene('home').lanternB
+    && SS.prof.streak.mk === 7 && ssLanternTier(SS.prof.streak.n) === 1`, 30000),
+  await ev(`JSON.stringify({ mk: SS.prof.streak.mk, n: SS.prof.streak.n })`));
 // a second visit must NOT re-run the ceremony
 await ev(`SSNET.setDayKey('')`);
 await nav(BASE + '?fps=0', 11000);

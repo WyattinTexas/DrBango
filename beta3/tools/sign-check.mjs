@@ -67,7 +67,7 @@ const until = async (e, cap = 45000, step = 200) => {
   return false;
 };
 const H = `game.scene.getScene('home')`;
-const HOME_REST = `!!window.game && game.scene.isActive('home') && !${H}.introPlaying && !!${H}.lanternB && !!window.__ssdev && !!window.__ssdev.last`;
+const HOME_REST = `!!window.game && game.scene.isActive('home') && !${H}.introPlaying && !!${H}.dailyChipB && !!window.__ssdev && !!window.__ssdev.last`;
 const SHEET = `!!${H}.signC && !!${H}.signPeek`;
 const STILL = `${SHEET} && !${H}.signPeek().moving`;
 // css point of a game object (bounds centre, camera-corrected)

@@ -1149,12 +1149,14 @@ Palette-quantised PNG is smaller too but adds visible dither to the dark face.
 
 ## streak-check.mjs
 
-The streak lantern's own harness (v0.40.0), and the companion to
+The streak's own harness (v0.40.0; re-aimed v0.86.0 — the lantern LEFT the
+meadow, the streak counts on underneath), and the companion to
 `fps-check.mjs`: that suite pins the LAWS in a handful of checks, this one
-walks the SURFACES — the five lamp dresses on the meadow, the lantern sheet's
-week strip opened by a real tap, the daily end screen's two lines, the profile
-ledger, the migration paths, and the full player flow (play a daily that
-crosses a mark → tap HOME → the ceremony arrives on the grass by itself).
+walks the SURFACES — the lampless meadow in every streak state, the lantern
+sheet's week strip opened by real taps through its surviving door (the daily
+sheet's grace line), the daily end screen's two lines, the profile ledger,
+the migration paths, and the full player flow (play a daily that crosses a
+mark → tap HOME → the ceremony arrives on the grass by itself).
 Same CDP shape as `click-test.js`; `--disable-gpu` is fine here because
 nothing in it forces the WebGL renderer.
 
@@ -1164,9 +1166,11 @@ node tools/streak-check.mjs      # served on :8899, headless Chrome on :9444
 
 ## lamp-check.mjs
 
-The lantern's PIXELS (v0.45.0). streak-check pins what the lamp IS; this one
-snapshots the lamp's on-screen rect in all five dresses and asserts it LOOKS
-like a lamp — warm glass when lit, visible pewter when cold — on three boots:
+The lantern's PIXELS (v0.45.0; re-aimed v0.86.0 — the meadow carries no lamp
+now, so the STREAK SHEET is where the dresses render). streak-check pins what
+the lamp IS; this one opens the sheet and snapshots the lamp's on-screen rect
+in all five dresses, asserting it LOOKS like a lamp — warm glass when lit,
+visible pewter when cold — on three boots:
 as shipped, with `roundRect` deleted before compat.js (iOS 15, the shell's
 floor: the polyfill must carry every bake), and with `roundRect` killed AFTER
 compat.js so every painter that calls it throws (`ssBake` must wipe, fall
@@ -1645,7 +1649,8 @@ Two things to know before using it:
   delete them yourself: `curl -X DELETE .../starspell/daily/<key>.json`, plus the
   `players/test_*` and `weekly/<week>/test_*` rows the run leaves behind.
 - **Mid-session moves are the only way to test rollover.** The meadow's daily
-  chip and lantern re-check on a 1s tick; `setDayKey` then waiting ~2.6s proves
+  chip re-checks on a 1s tick (the streak reads move with `ssStreakState` the
+  moment the key turns); `setDayKey` then waiting ~2.6s proves
   midnight lands without a reload. Do not use a 1.6s wait — under load the scene
   clock stretches and a single tick may not have fired yet, which reads as a bug
   that isn't there.
@@ -1683,10 +1688,10 @@ Three things that are easy to get wrong when testing this:
 
 The lamp is five baked textures (`lantern-cold`, `lantern-lit`,
 `lantern-m1..m3`) rather than one tinted image — `setTint` is a silent no-op
-under the Canvas renderer and this game boots either. `SS_LANTERN_W/H/Y/TY`
-are the display constants; the texture carries 13 units of transparent crown
-margin above the lamp body, and `SS_LANTERN_Y` is exactly half the height so
-the sprite's top edge lands ON the safe band and never under a notch.
+under the Canvas renderer and this game boots either. `SS_LANTERN_W/H/TY`
+are the display constants (the sheet and the rite draw the lamp; the meadow
+stopped in v0.86.0, which also retired the old `SS_LANTERN_Y` anchor); the
+texture carries 13 units of transparent crown margin above the lamp body.
 
 ## The sigil drip: the profile IS the seam (v0.42.0)
 

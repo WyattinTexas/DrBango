@@ -109,7 +109,7 @@ const tapUntil = async (expr, done, tries = 8) => {
   return false;
 };
 const HOME_REST = `!!window.game && game.scene.isActive('home')
-  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').lanternB`;
+  && !game.scene.getScene('home').introPlaying && !!game.scene.getScene('home').dailyChipB`;
 const H = `game.scene.getScene('home')`;
 const boot = async (q, seed) => {
   await send('Page.navigate', { url: 'http://localhost:' + SRV + '/ascent.html' }); await sleep(500);
