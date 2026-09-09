@@ -239,6 +239,24 @@ const SS_RIVAL = (() => {
      tile) and the press on CAST. Clamped to ≥ MIN_MS and ≤ the mode's stall
      limit; under a running-out clock the read collapses to a rush.        */
   const PACE = { MIN_MS: 1600, MAX_TURNS: 15000, MAX_TIMED: 11000, FIRST_MIN: 2200, RUSH_AT: 15000 };
+  /* ---------- the busy-human rhythm (9/3 card 03) ----------
+     A worldwide rival is a person with a life: the reply comes 1:30–5:00
+     after the turn arrives — every turn, the first included. The answer
+     time is rolled the moment the turn starts and persisted beside the
+     duel (SS_NEAR's note), so the rhythm survives the app closing: open
+     when it lands and the turn plays live; away, and it is computed at
+     the next boot, stamped with the minute it was truly played.
+     ?botpace=MIN,MAX (ms) is the harness's shrink-seam (?ride=0 pattern). */
+  const BOT_PACE = (() => {
+    try {
+      const q = (typeof QS !== 'undefined') ? QS.get('botpace') : null;
+      if (q) {
+        const [a, b] = String(q).split(',').map(Number);
+        if (Number.isFinite(a) && a >= 0) return { MIN: a, MAX: Number.isFinite(b) && b >= a ? b : a };
+      }
+    } catch (e) { }
+    return { MIN: 90000, MAX: 300000 };
+  })();
   function thinkMs(prof, pick, rnd, ctx) {
     const letters = pick && pick.cast ? pick.cast.letters : 3;
     let read = 1400 + 220 * letters;
@@ -317,11 +335,13 @@ const SS_RIVAL = (() => {
       // number is never a round hundred for long
       this.rating = Number.isFinite(o.seatRating) ? o.seatRating : Math.max(SS_RATING.FLOOR, Math.round(o.rating + this.rnd.gauss() * 14));
       this.persona = o.persona || null;   // one of the circle: its profile row follows the duel
+      this.pace = o.pace || null;         // 'busy' = the worldwide 1:30–5:00 rhythm
       this.timers = new Set();
       this.alive = true;
       this.duels = 0;
-      this.db = SSNET.side('rival');   // my own door to the sky — see SSNET.side
-      if (!this.db) { this.alive = false; note('nosky'); return; }
+      this.db = SSNET.side('rival');      // my own door to the sky — see SSNET.side
+      this.rdb = o.roomDb || this.db;     // where THIS room lives (the near sky, or that same door)
+      if (!this.rdb) { this.alive = false; note('nosky'); return; }
       // a rival arrives a breath after the door opens, never in the same instant
       this.after(o.delay == null ? 1200 + this.rnd() * 1800 : o.delay, () => this.attach(o.code));
     }
@@ -333,10 +353,13 @@ const SS_RIVAL = (() => {
     seat(n) {
       return { name: this.name, hp: VS_HP, seat: n, casts: 0, dealt: 0, gone: false, joinedAt: Date.now(), rating: this.rating, rhide: 0 };
     }
+    // the live sky's door, acquired late if it wasn't open at construction
+    // (a near duel woken at boot may outrun the connection)
+    liveDb() { return this.db || (this.db = SSNET.side('rival')); }
     // the same seat-claim transaction a newcomer's client runs
     async join(code) {
       try {
-        const r = await this.db.txn('mp/rooms/' + code, (cur) => {
+        const r = await this.rdb.txn('mp/rooms/' + code, (cur) => {
           if (!cur) return cur;
           if (cur.status !== 'waiting') return cur;
           const players = cur.players || {};
@@ -358,14 +381,15 @@ const SS_RIVAL = (() => {
       this.room = null; this.board = null; this.state = 'join';
       this.pending = null; this.scryAt = 0; this.turnSince = 0; this.answered = false;
       // one of the circle answers under a name the registry knows is its own
-      if (this.persona) { await claimCircleName(this.db, this.persona); if (!this.alive) return; this.name = this.persona.name; }
+      // (offline, the standing claim from the duel's first evening holds)
+      if (this.persona && this.liveDb()) { await claimCircleName(this.liveDb(), this.persona); if (!this.alive) return; this.name = this.persona.name; }
       if (!(await this.join(code))) { note('cold', Object.assign({ code }, this.lastJoin)); this.stop(); return; }
       if (!this.alive) return;
       this.duels++;
       note('seated', { code, name: this.name, rating: this.rating, target: this.prof.rating });
-      if (this.persona && this.duels === 1) syncCircleRow(this.db, this.persona, { rating: this.rating });
-      this.roomRef = this.db.ref('mp/rooms/' + code);
-      this.meRef = this.db.ref('mp/rooms/' + code + '/players/' + this.uid);
+      if (this.persona && this.duels === 1) syncCircleRow(this.liveDb(), this.persona, { rating: this.rating });
+      this.roomRef = this.rdb.ref('mp/rooms/' + code);
+      this.meRef = this.rdb.ref('mp/rooms/' + code + '/players/' + this.uid);
       if (!this.roomRef || !this.meRef) { this.stop(); return; }
       try { this.meRef.child('gone').onDisconnect().set(true); } catch (e) { }
       this.state = 'wait';
@@ -444,6 +468,18 @@ const SS_RIVAL = (() => {
       const pk = packFor(lang);
       this.pack = pk.pack; this.root = pk.root;
       this.board = new Board(this.pack, this.room.seed || 1);
+      // a busy duel resumed: re-live my own recorded moves — the same
+      // deterministic deal, so the board stands exactly where it stood
+      if (this.pace === 'busy' && typeof SS_NEAR !== 'undefined') {
+        const n = SS_NEAR.note(this.code) || {};
+        for (const p of n.plays || []) {
+          try {
+            if (p.c) this.board.cast(p.c);
+            else if (p.s) this.board.scry();
+            else if (p.g) this.board.sigils.push(p.g);
+          } catch (e) { break; }
+        }
+      }
       this.state = 'play';
       this.first = true;
       // the human is still rising through the sky; nobody casts before they land
@@ -455,6 +491,11 @@ const SS_RIVAL = (() => {
     // something changed — is it time to think?
     consider() {
       if (this.state !== 'play' || this.pending || this.busy) return;
+      // a near room's store is synchronous truth — refresh before reading the
+      // turn, or a tick landing between our own writes and the listener's
+      // beat sees the PRE-FLIP snapshot and rolls a reply clock for a turn
+      // that is not ours (the phantom stands unspent and lies at the resume)
+      if (this.pace === 'busy' && typeof SS_NEAR !== 'undefined') { const r = SS_NEAR.room(this.code); if (r) this.room = r; }
       if (!this.myTurn()) { this.turnSince = 0; return; }
       const me = this.me();
       if (!me || me.hp <= 0 || me.gone) return;
@@ -467,6 +508,19 @@ const SS_RIVAL = (() => {
       const cands = candidates(this.board, this.root);
       const pick = choose(cands, this.prof, this.rnd, ctx);
       let wait = thinkMs(this.prof, pick, this.rnd, ctx);
+      if (this.pace === 'busy' && !timed) {
+        // the busy-human rhythm: the answer time is rolled ONCE per turn and
+        // written beside the duel — an app restart finds it and keeps faith;
+        // an overdue one plays at once, stamped with its appointed minute
+        const n = (typeof SS_NEAR !== 'undefined' && SS_NEAR.note(this.code)) || {};
+        let at = Number(n.answerAt) || 0;   // never |0 — an epoch-ms stamp shears at 32 bits
+        if (!(at > 0)) {
+          at = Math.round(Date.now() + BOT_PACE.MIN + this.rnd() * (BOT_PACE.MAX - BOT_PACE.MIN));
+          if (typeof SS_NEAR !== 'undefined') SS_NEAR.setNote(this.code, { answerAt: at });
+        }
+        this.answerFor = at;
+        wait = Math.max(280 + this.rnd() * 500, at - Date.now());
+      }
       // the first read starts when the human lands, not when the seal flipped
       wait = Math.max(wait, this.readyAt - Date.now() + PACE.MIN_MS);
       if (timed) wait = Math.min(wait, Math.max(PACE.MIN_MS, left - 400));
@@ -478,6 +532,7 @@ const SS_RIVAL = (() => {
     async act() {
       const p = this.pending;
       this.pending = null;
+      if (this.pace === 'busy' && typeof SS_NEAR !== 'undefined') { const r = SS_NEAR.room(this.code); if (r) this.room = r; }
       if (!p || this.state !== 'play' || !this.myTurn() || this.busy) return;
       const me = this.me();
       if (!me || me.hp <= 0 || me.gone) return;
@@ -491,9 +546,15 @@ const SS_RIVAL = (() => {
         if (p.pick.scry) await this.doScry();
         else await this.doCast(p.pick.cast);
       } finally { this.busy = false; }
+      // the turn is answered: the standing clock is spent
+      if (this.pace === 'busy' && typeof SS_NEAR !== 'undefined') { SS_NEAR.setNote(this.code, { answerAt: 0 }); this.answerFor = 0; }
       this.turnSince = 0;
       this.checkEnd();
-      if (this.state === 'play') this.consider();
+      // timed keeps thinking (no turns to flip); turns mode waits for the room
+      // listener's beat — an immediate consider() here reads the PRE-FLIP
+      // snapshot (our own turnUid write lands a beat later) and, under the
+      // busy pace, rolls a phantom reply clock for a turn that is not ours
+      if (this.state === 'play' && this.room && this.room.mode === 'timed') this.consider();
     }
     nextTurn() {
       const alive = this.alivePlayers().sort((a, b) => a.seat - b.seat);
@@ -507,6 +568,10 @@ const SS_RIVAL = (() => {
     }
     async doScry() {
       this.board.scry();
+      if (this.pace === 'busy' && typeof SS_NEAR !== 'undefined') {
+        const n = SS_NEAR.note(this.code) || {};
+        SS_NEAR.setNote(this.code, { plays: [...(n.plays || []), { s: 1 }] });
+      }
       note('scry', { board: this.board.letters() });
       if (this.room.mode === 'timed') { this.scryAt = Date.now() + 6000; return; }
       try { await this.roomRef.update({ turnUid: this.nextTurn(), turnCount: (this.room.turnCount | 0) + 1 }); } catch (e) { }
@@ -518,13 +583,26 @@ const SS_RIVAL = (() => {
       const word = c.word.toUpperCase();
       const dmg = c.dmg;
       try {
-        // authoritative writes, in a client's order: the cast, the wound, my seat, the turn
-        await this.db.ref('mp/rooms/' + this.code + '/casts').push({ uid: this.uid, name: this.name, word, dmg, target: target.id, at: Date.now() });
-        await this.db.txn('mp/rooms/' + this.code + '/players/' + target.id + '/hp', (cur) => Math.max(0, (cur == null ? VS_HP : cur) - dmg));
+        // authoritative writes, in a client's order: the cast, the wound, my seat, the turn.
+        // A busy reply is stamped with its appointed minute — computed late,
+        // it still reads as played on time.
+        const at = (this.pace === 'busy' && this.answerFor) ? this.answerFor : Date.now();
+        await this.rdb.ref('mp/rooms/' + this.code + '/casts').push({ uid: this.uid, name: this.name, word, dmg, target: target.id, at });
+        await this.rdb.txn('mp/rooms/' + this.code + '/players/' + target.id + '/hp', (cur) => Math.max(0, (cur == null ? VS_HP : cur) - dmg));
         const myCasts = ((this.me() || {}).casts | 0) + 1;
         await this.meRef.update({ lastWord: word, casts: myCasts, dealt: ((this.me() || {}).dealt | 0) + dmg });
         if (this.room.mode !== 'timed') await this.roomRef.update({ turnUid: this.nextTurn(), turnCount: (this.room.turnCount | 0) + 1 });
         this.board.cast(c.idx);
+        if (this.pace === 'busy' && typeof SS_NEAR !== 'undefined') {
+          const n = SS_NEAR.note(this.code) || {};
+          SS_NEAR.setNote(this.code, { plays: [...(n.plays || []), { c: c.idx }] });
+          // the reply landed while the app is open but the duel screen is
+          // not up: one quiet toast points back at the standing duel
+          try {
+            const vb = window.game && game.scene.getScene('vsbattle');
+            if (!(vb && vb.sys.isActive() && vb.code === this.code)) vsNotify(SS_T('vsBotAnswered', this.name));
+          } catch (e) { }
+        }
         note('cast', { word, dmg, letters: c.letters, target: target.name, board: this.board.letters() });
         // every VS_CASTS-th cast: the pick-3, read for a few seconds before choosing
         if (myCasts % VS_CASTS === 0) {
@@ -534,6 +612,10 @@ const SS_RIVAL = (() => {
           const sg = chooseSigil(offer, this.prof, this.rnd);
           if (sg) {
             this.board.sigils.push(sg);
+            if (this.pace === 'busy' && typeof SS_NEAR !== 'undefined') {
+              const n2 = SS_NEAR.note(this.code) || {};
+              SS_NEAR.setNote(this.code, { plays: [...(n2.plays || []), { g: sg }] });
+            }
             const wait = 1400 + this.rnd() * 2600;
             this.sigilUntil = Date.now() + wait;
             await new Promise((res) => this.after(wait, res));
@@ -568,7 +650,7 @@ const SS_RIVAL = (() => {
     leave() {
       const code = this.code;
       try { if (this.meRef) this.meRef.child('gone').onDisconnect().cancel(); } catch (e) { }
-      this.db.txn('mp/rooms/' + code, (cur) => {
+      this.rdb.txn('mp/rooms/' + code, (cur) => {
         if (!cur || !cur.players || !cur.players[this.uid]) return cur;
         if (cur.status !== 'waiting') { cur.players[this.uid].gone = true; return cur; }
         const players = { ...cur.players };
@@ -595,7 +677,7 @@ const SS_RIVAL = (() => {
       const longest = casts.reduce((a, c) => Math.max(a, (c.word || '').length), this.persona.longest | 0);
       const bigHit = casts.reduce((a, c) => Math.max(a, c.dmg | 0), this.persona.bigHit | 0);
       this.rating = rating;
-      syncCircleRow(this.db, this.persona, {
+      syncCircleRow(this.liveDb(), this.persona, {
         rating, runs: (this.persona.runs | 0) + 1, words: (this.persona.words | 0) + casts.length,   // the cast list, not the seat: my own casts update may still be in flight when `done` lands
         wins: (this.persona.wins | 0) + (won ? 1 : 0), vsWins: (this.persona.vsWins | 0) + (won ? 1 : 0), longest, bigHit,
       });
@@ -692,14 +774,16 @@ const SS_RIVAL = (() => {
     delete row.uid;
     return row;
   }
-  // the profile row, written the way syncProfile writes one (merge + at)
+  // the profile row, written the way syncProfile writes one (merge + at).
+  // The circle's own ledger updates even with no sky (an offline near duel);
+  // the row in the sky follows when the door is open.
   function syncCircleRow(db, p, patch) {
-    if (!db) return;
     Object.assign(p, patch || {});
     const pool = circle();
     const i = pool.findIndex((x) => x.uid === p.uid);
     if (i >= 0) pool[i] = p; else pool.push(p);
     saveCircle(pool);
+    if (!db) return;
     db.txn('players/' + p.uid, (cur) => Object.assign({}, cur || {}, rowOf(p), { at: Date.now() })).catch(() => { });
   }
 
@@ -712,8 +796,61 @@ const SS_RIVAL = (() => {
   }
   function sweep() { for (let i = live.length - 1; i >= 0; i--) if (!live[i].alive) live.splice(i, 1); }
   setInterval(sweep, 30000);
+  function stopFor(code) { for (const d of live) if (d.alive && d.code === code) d.stop(); }
 
-  return { spawn, sim, paceSample, profile, thinkMs, choose, candidates, Board, packFor, mkRng, PACE, live, log, persona, spreadRating, circle, claimCircleName };
+  /* ---------- the near sky's keepers (9/3 card 03) ---------- */
+  // rebuild a board from its play script (the resume): the same
+  // deterministic deal, every recorded cast/scry/sigil applied in order
+  function replayBoard(pack, seed, plays) {
+    const b = new Board(pack, seed);
+    for (const p of plays || []) {
+      if (p.c) b.cast(p.c);
+      else if (p.s) b.scry();
+      else if (p.g) b.sigils.push(p.g);
+    }
+    return { slots: b.slots, pendingTier: b.pendingTier, sigils: b.sigils };
+  }
+  // a standing near duel gets its mage back — idempotent per room
+  function ensure(code) {
+    if (typeof SS_NEAR === 'undefined') return null;
+    for (const d of live) if (d.alive && d.code === code) return d;
+    const n = SS_NEAR.note(code) || {};
+    const p = circle().find((x) => x.uid === n.uid);
+    if (!p) return null;
+    return spawn({ code, rating: p.rating, seatRating: p.rating, uid: p.uid, name: p.name, persona: p,
+      pace: 'busy', roomDb: SS_NEAR.api, delay: 350 + Math.random() * 400 });
+  }
+  /* waking the near sky at boot: every standing worldwide duel gets its
+     rival back — an overdue reply is computed and lands stamped with its
+     appointed minute; a live one keeps its schedule. Decided duels too old
+     to revisit settle their rating honestly and leave; half-made rooms are
+     swept. */
+  function wake() {
+    if (typeof SS_NEAR === 'undefined') return;
+    for (const code of SS_NEAR.codes()) {
+      const r = SS_NEAR.room(code);
+      const n = SS_NEAR.note(code) || {};
+      if (!r || r.status === 'waiting' || !n.uid) { SS_NEAR.purge(code); continue; }
+      if (r.status === 'done') {
+        if (Date.now() - (r.endedAt || 0) > 48 * 3600000) {
+          if (!n.settled && r.winnerUid && typeof SS_RATING !== 'undefined') {
+            const me = SSNET.uid();
+            const foes = Object.entries(r.players || {}).filter(([id]) => id !== me).map(([, pl]) => pl);
+            if (foes.length) {
+              const oppAvg = foes.reduce((a, pl) => a + (Number.isFinite(pl.rating) ? pl.rating : SS_RATING.BASE), 0) / foes.length;
+              SS_RATING.duel(oppAvg, r.winnerUid === me ? 1 : 0);
+              SS.save(); SS.sync();
+            }
+          }
+          SS_NEAR.purge(code);
+        }
+        continue;
+      }
+      ensure(code);
+    }
+  }
+
+  return { spawn, sim, paceSample, profile, thinkMs, choose, candidates, Board, packFor, mkRng, PACE, BOT_PACE, live, log, persona, spreadRating, circle, claimCircleName, replayBoard, ensure, stopFor, wake };
 })();
 
 /* ---------- ?botduel=<rating>: seal a room, seat a rival, rise ----------

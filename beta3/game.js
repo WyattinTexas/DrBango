@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.87.0';
+const BUILD = 'STARSPELL v0.88.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -5411,6 +5411,12 @@ class Home extends Phaser.Scene {
     // the summons overlay rides above every screen for the whole visit — a
     // friend's challenge banner and the friends-layer toasts live there
     if (this.scene.get('summons') && !this.scene.isActive('summons')) { this.scene.launch('summons'); this.scene.bringToTop('summons'); }
+    // the near sky wakes with the app (9/3 card 03): standing worldwide
+    // duels get their rivals back, overdue replies land, stale rooms sweep
+    if (!window.__ssNearWoke && typeof SS_RIVAL !== 'undefined' && SS_RIVAL.wake) {
+      window.__ssNearWoke = 1;
+      this.time.delayedCall(900, () => { try { SS_RIVAL.wake(); } catch (e) { } });
+    }
     if (deep) this.time.delayedCall(300, () => vsDeepRun(this));
     else if (QS.get('botduel') && typeof ssBotDuelBoot === 'function') this.time.delayedCall(500, () => ssBotDuelBoot(this));   // the rival engine's dev seam (rival.js) — before vsdemo, which may ride along to play the human seat
     else if (QS.get('vsdemo') === '1' || QS.get('frdemo') === 'host' || QS.get('frdemo') === 'invite') this.time.delayedCall(500, () => this.scene.start('vsmenu'));

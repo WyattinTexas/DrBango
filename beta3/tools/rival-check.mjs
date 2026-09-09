@@ -6,7 +6,7 @@
 //   node tools/rival-check.mjs            # everything, ~8 minutes
 //   node tools/rival-check.mjs brain      # the sim + pacing pins only (seconds)
 //   node tools/rival-check.mjs play       # just the duel the harness taps out itself
-//   node tools/rival-check.mjs queue      # the quiet sky: the 12-second rival (v0.49.0)
+//   node tools/rival-check.mjs queue      # the quiet sky under the searching theater (v0.88.0)
 //
 // What it pins:
 //   BRAIN  — mean damage per cast over 60 seeded boards climbs 800 < 1200 < 1600;
@@ -22,13 +22,17 @@
 //            settles the room `done` with itself the winner, no stall
 //   PLAY   — the harness is the human: real taps on tiles and CAST, sigil cards
 //            by tap, to completion; the rival's transcript printed for a read
-//   QUEUE  — ?vsdemo=1 presses FIND A RIVAL alone: one of the circle arrives
-//            11–17s after seekAt with a seat cut like a person's, rated 40–90
-//            off the player's; a forced WIN then (rematch) a forced LOSS both
-//            move the player's rating (+ then −); the persona's profile row
-//            carries only SS.sync's fields and grows with the duel; no persona
-//            on any board or in presence; no bot/ai word in the room, the row,
-//            the on-screen text or the console; the spread over 20 draws
+//   QUEUE  — ?vsdemo=1 presses CHALLENGE WORLDWIDE alone: the searching
+//            theater's clock ticks up on screen, the roll T lands in [8,15]s,
+//            the live room LEAVES the sky (the local swap) and one of the
+//            circle answers on this device with a seat cut like a person's,
+//            rated 40–90 off the player's; OPPONENT FOUND flips on the rolled
+//            beat, never before 8s; a forced WIN then (rematch) a forced LOSS
+//            both move the player's rating (+ then −); the persona's profile
+//            row carries only SS.sync's fields and grows with the duel; no
+//            persona on any board or in presence; no bot/ai word in the room,
+//            the row, the on-screen text or the console; the spread over 20
+//            draws. ?botpace shrinks only the reply rhythm, never the roll.
 import { spawn } from 'node:child_process';
 
 const PORT = 9470, SRV = 8899;
@@ -293,23 +297,50 @@ if (ONLY === 'all' || ONLY === 'play') {
 
 /* ======================= QUEUE (the quiet sky) ======================= */
 if (ONLY === 'all' || ONLY === 'queue') {
-  console.log('QUEUE · the 12-second rival');
+  console.log('QUEUE · the searching theater answered by the quiet sky');
   errs.length = 0; logs.length = 0;
-  await cleanRooms();   // a stale room of test_rc's (an unanswered rematch) would be reclaimed by FIND
+  await cleanRooms();   // a stale room of test_rc's (an unanswered rematch) would be reclaimed by the search
   const ROOT = DB.replace(/\/mp\/rooms$/, '');
   const fields = ['name', 'runs', 'wins', 'words', 'beasts', 'longest', 'bigHit', 'bestQuick', 'vsWins', 'achCount', 'rating', 'rhide', 'streak', 'streakDay', 'streakBest', 'streakGrace', 'streakMark', 'at'];
-  await boot('vsdemo=1&vsmode=turns');   // VSAUTO: the solver presses FIND from the menu by itself
+  // botpace shrinks the busy reply rhythm for the play-through; the theater's
+  // 8–15s roll is deliberately UNPINNED — its timing is this section's story
+  await boot('vsdemo=1&vsmode=turns&botpace=1500,3000');   // VSAUTO: the solver presses CHALLENGE WORLDWIDE by itself
   const mine = await ev(`SS.prof.rating`);
   const seated = await until(`!!${VS} && ${VS}.scene.isActive() && !!${VS}.room && !!${VS}.room.seekAt`, 40000);
-  ok('FIND opened a queued room (seekAt stamped)', seated);
+  ok('the search opened a queued room (seekAt stamped)', seated);
   const code = await ev(`${VS}.code`);
-  const met = await until(`!!${VS}.room && Object.keys(${VS}.room.players || {}).length === 2`, 25000, 250);
-  let r = await room(code);
+  const th = JSON.parse(await ev(`JSON.stringify(${VS}.theater || null)`));
+  ok('the searching theater stands with a rolled beat T in [8s, 15s]', !!th && th.T >= 8000 && th.T <= 15000, th && (th.T / 1000).toFixed(1) + 's');
+  ok('under the searching line, no seal code and no roster on screen (every text walked, containers too)', await ev(`(() => {
+    const walk = (list, out) => { for (const o of list) { if (o.text != null) out.push(o.text); if (o.list) walk(o.list, out); } return out; };
+    const texts = walk(${VS}.children.list, []);
+    return texts.includes(SS_T('vsSearching')) && !texts.some(t => t === ${VS}.code || t.endsWith(' ' + ${VS}.code)) && !texts.some(t => /mages answered/.test(t)); })()`));
+  ok('the search wears a ticking clock (Skylar 9/8)', await (async () => {
+    const a = await ev(`${VS}.searchClockT && ${VS}.searchClockT.text`);
+    if (!/^\d+:\d\d$/.test(a || '')) return false;
+    await sleep(1300);
+    const b = await ev(`${VS}.searchClockT && ${VS}.searchClockT.text`);
+    return /^\d+:\d\d$/.test(b || '') && b !== a;
+  })());
+  // the local swap: nobody came, the live room leaves the sky and the duel
+  // forms on this device — a rival seated before the beat ever lands
+  const met = await until(`!!${VS}.room && ${VS}.near === true && Object.keys(${VS}.room.players || {}).length === 2`, 25000, 250);
+  let r = JSON.parse(await ev(`JSON.stringify(SS_NEAR.room(${JSON.stringify(code)}))`));
   const other = Object.keys((r && r.players) || {}).find((k) => k !== 'test_rc');
   const seat = other && r.players[other];
-  ok('a rival arrived while the searcher waited alone', met && !!seat, other);
-  const reveal = seat ? (seat.joinedAt - r.seekAt) / 1000 : -1;
-  ok('…between 11s and 17s after FIND (jittered)', reveal >= 11 && reveal <= 17, reveal.toFixed(1) + 's');
+  ok('a rival arrived while the searcher waited alone — on THIS device (the local swap)', met && !!seat, other);
+  ok('the live sky no longer holds the room', (await room(code)) === null);
+  const foundAt = await (async () => {
+    const cap = th ? th.t0 + th.T + 4000 - Date.now() : 20000;
+    for (let i = 0; i < Math.max(1, cap / 200); i++) {
+      if (await ev(`${VS}.searchT && ${VS}.searchT.text === SS_T('vsFound')`)) return Date.now();
+      await sleep(200);
+    }
+    return 0;
+  })();
+  const reveal = th && foundAt ? (foundAt - th.t0) / 1000 : -1;
+  ok('OPPONENT FOUND flips on the rolled beat — inside [8s, 16s], never early', foundAt > 0 && reveal >= 7.8 && reveal <= 16.5 && foundAt >= th.t0 + th.T - 500, reveal.toFixed(1) + 's of ' + (th.T / 1000).toFixed(1) + 's rolled');
+  ok('…and the rival was seated BEFORE the reveal (the theater never lies)', !!seat && seat.joinedAt < foundAt);
   ok('uid cut like a device uid, no test_ prefix', /^u[a-z0-9]{8,}$/.test(other || ''), other);
   ok('name cut like a generated name', !!seat && /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(seat.name), seat && seat.name);
   const gap = seat ? Math.abs(seat.rating - mine) : 0;
@@ -319,14 +350,14 @@ if (ONLY === 'all' || ONLY === 'queue') {
   ok('the persona has an ordinary profile row', !!row1 && row1.name === seat.name && row1.rating === seat.rating, JSON.stringify(row1).slice(0, 120));
   ok('…with only the fields SS.sync writes', !!row1 && Object.keys(row1).every((k) => fields.includes(k)), row1 && Object.keys(row1).filter((k) => !fields.includes(k)).join(','));
   ok('the duel rose on the ordinary path (host auto-start)', await until(`!!${VS}.room && !!${VS}.room.startedAt`, 20000, 250));
-  ok('the searching screen saw the rival as a person: lobby roster named them', await ev(`${VS}.lobbyRoster && ${VS}.lobbyRoster.text.includes(${JSON.stringify(seat ? seat.name : '')})`));
+  ok('the theater stood down with the reveal (no searching text over the duel)', await until(`!${VS}.waitC.visible || ${VS}.waitC.alpha < 0.05`, 8000, 200));
   // the on-screen text of the battle, every Text object alive
   const screen = await ev(`${VS}.children.list.filter(o => o.text != null).map(o => o.text).join(' | ')`);
   ok('nothing on screen says bot/ai', !/\bbot\b|\bai\b|robot|engine|persona/i.test(screen), screen.slice(0, 80));
   ok('the opponent nameplate shows the persona with a star-class glyph', await ev(`!!${VS}.oppPanels && !!${VS}.oppPanels[${JSON.stringify(other)}] && ${VS}.oppPanels[${JSON.stringify(other)}].nm.text.endsWith(${JSON.stringify(seat ? seat.name : '')})`));
   // ---- forced WIN: the rival's hp to 1 before anyone casts — the solver is quick, and the first blow ends it
   const rating0 = await ev(`SS.prof.rating`);
-  await ev(`SSNET.dbSet('mp/rooms/${code}/players/${other}/hp', 1)`);
+  await ev(`SS_NEAR.api.set('mp/rooms/${code}/players/${other}/hp', 1)`);
   // tapping the name opens the rating card from the seat — the real rating, never 1000-by-default
   ok('the board opened', await until(`${VS}.state === 'pick' || ${VS}.state === 'anim'`, 30000, 100));
   await tap(`${VS}.oppPanels[${JSON.stringify(other)}].nm`);
@@ -338,7 +369,7 @@ if (ONLY === 'all' || ONLY === 'queue') {
   await ev(`${VS}.__rcC && ${VS}.__rcC.destroy(); ${VS}.__rcC = null; 'ok'`);
   const done1 = await until(`${VS}.room && ${VS}.room.status === 'done' && ${VS}.code === '${code}' && ${VS}.state === 'done'`, 120000, 300);
   ok('WIN: duel 1 reached the end screen (state done, REMATCH live)', done1);
-  r = await room(code);
+  r = JSON.parse(await ev(`JSON.stringify(SS_NEAR.room(${JSON.stringify(code)}))`));
   ok('WIN: the searcher is the winner', !!r && r.winnerUid === 'test_rc');
   const res1 = JSON.parse(await ev(`localStorage.getItem('beta3.vsresult') || 'null'`));
   const rating1 = await ev(`SS.prof.rating`);
@@ -349,11 +380,12 @@ if (ONLY === 'all' || ONLY === 'queue') {
   ok('ADD AS FRIEND lands the persona in my friends, offline and quiet', add === 'tapped' && await ev(`!!SSNET.FR.friends[${JSON.stringify(other)}] && !SSNET.FR.isOnline(${JSON.stringify(other)}) && SSNET.FR.onlineCount() === 0`));
   // ---- the demo's rematch (2–4s after the end): the persona answers; forced LOSS
   const rose2 = await until(`${VS}.code !== '${code}' && !!${VS}.room && ${VS}.room.status === 'active'`, 60000, 250);
-  ok('REMATCH: the persona answered and the second duel rose', rose2);
+  ok('REMATCH: the persona answered and the second duel rose — on this device again', rose2 && await ev(`${VS}.near === true`));
   const code2 = await ev(`${VS}.code`);
-  await ev(`SSNET.dbSet('mp/rooms/${code2}/players/test_rc/hp', 1)`);
+  ok('REMATCH: the old duel left with us (near store swept)', await ev(`SS_NEAR.room(${JSON.stringify(code)}) === null`));
+  await ev(`SS_NEAR.api.set('mp/rooms/${code2}/players/test_rc/hp', 1)`);
   ok('LOSS: duel 2 reached the end screen', await until(`${VS}.room && ${VS}.room.status === 'done' && ${VS}.code === '${code2}' && ${VS}.state === 'done'`, 120000, 300));
-  const r2 = await room(code2);
+  const r2 = JSON.parse(await ev(`JSON.stringify(SS_NEAR.room(${JSON.stringify(code2)}))`));
   const res2 = JSON.parse(await ev(`localStorage.getItem('beta3.vsresult') || 'null'`));
   const rating2 = await ev(`SS.prof.rating`);
   ok('LOSS: the persona is the winner of the rematch', !!r2 && r2.winnerUid === other, r2 && r2.winnerUid);

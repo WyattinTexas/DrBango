@@ -6,12 +6,14 @@
 // writes recent/ on
 // BOTH sides live (no reload — the FR listener fires mid-duel); back in the
 // sheet the RECENT roll shows B newest-first with "tonight" and the online
-// glint; a REAL tap on AGAIN rings B, B accepts, the rematch lands. Then B
-// parked: the same tap becomes a standing invite and the lobby says so. Then
-// the circle: A searches alone (CHALLENGE WORLDWIDE), a circle mage answers,
-// the row appears; a real tap on that row routes through the rival engine
-// (no invites/ row) and a live duel begins. Nights-ago clock, the five
-// tongues, layout, cleanup.
+// glint; a REAL tap on AGAIN rings B (the summons stands as a pending row —
+// 9/3 card 03, no waiting screen), B accepts and A's page steps into the
+// duel by itself. Then B parked: the same tap becomes a standing invite and
+// the row says so. Then the circle: A searches alone (CHALLENGE WORLDWIDE —
+// the searching theater), a circle mage answers on A's own device, the
+// RECENT row appears; a real tap on that row routes through the rival
+// engine (no invites/ row) and a LIVE arcade-paced duel begins. Nights-ago
+// clock, the five tongues, layout, cleanup.
 //
 //   python3 -m http.server 8899 &
 //   for p in a:9452 b:9453; do "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
@@ -97,7 +99,10 @@ const INPUT = `!!document.getElementById('ss-overlay-input') && document.activeE
 const rows = (c) => c.ev(`JSON.stringify(game.scene.getScene('vsmenu').recentRows.map(r => ({ id: r.id, name: r.name, circle: r.circle, ago: r.agoT.text, lit: r.nameT.style.color, y: r.row.y })))`).then(JSON.parse);
 const menuTexts = (c) => c.ev(`JSON.stringify(game.scene.getScene('vsmenu').frC.list.filter(o => o.text !== undefined).map(o => o.text))`).then(JSON.parse);
 const lobby = (c) => c.ev(`(() => { const s = game.scene.getScene('vsbattle'); if (!s || !s.scene.isActive() || !s.room) return null;
-  return JSON.stringify({ code: s.code, status: s.room.status, ch: s.challenged, sub: s.lobbySub && s.lobbySub.text, players: Object.keys(s.room.players || {}) }) })()`).then((v) => v ? JSON.parse(v) : null);
+  return JSON.stringify({ code: s.code, status: s.room.status, ch: s.challenged, sub: s.waitT && s.waitT.text, players: Object.keys(s.room.players || {}) }) })()`).then((v) => v ? JSON.parse(v) : null);
+// the pending rows on the versus page (9/3 card 03) + their backing records
+const pendRec = (c, uid) => c.ev(`JSON.stringify(VS_PEND.list().find(p => p.to.id === ${JSON.stringify(uid)}) || null)`).then((v) => JSON.parse(v || 'null'));
+const pendStatus = (c, code) => c.ev(`(() => { const r = (game.scene.getScene('vsmenu').pendRows || []).find(r => r.code === ${JSON.stringify(code)}); return r ? r.statusT.text : null })()`).catch(() => null);
 const ACTIVE = `(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.room.status === 'active' })()`;
 const boot = async (c, uid, name) => {
   await c.seed(BOOT(uid, name));
@@ -146,18 +151,19 @@ ok('the + opens the add-by-name input', await (async () => {
 await A.type(NB); await A.key('Enter', 'Enter');
 ok('the friendship lands and B\'s row wears CHALLENGE', await A.until(`(() => { const s = game.scene.getScene('vsmenu');
   const r = (s.frRows || []).find(r => r.id === ${JSON.stringify(UB)}); return !!(r && r.cb.input && r.cb.input.enabled) })()`, 20000));
-ok('A lands in a lobby aimed at B', await (async () => {
-  const COND = `(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} })()`;
+ok('A\'s challenge stands as a pending row aimed at B (no waiting screen)', await (async () => {
+  const COND = `(() => { const s = game.scene.getScene('vsmenu'); return s.scene.isActive() && !game.scene.isActive('vsbattle')
+    && !!VS_PEND.list().find(p => p.to.id === ${JSON.stringify(UB)}) })()`;
   for (let i = 0; i < 4; i++) {
     try { await A.tap(`((game.scene.getScene('vsmenu').frRows || []).find(r => r.id === ${JSON.stringify(UB)}) || {}).cb`); } catch (e) { }
     if (await A.until(COND, 6000)) return true;
   }
   return false;
 })());
-let lb = await lobby(A); if (lb) codes.add(lb.code);
+let rec = await pendRec(A, UB); if (rec) codes.add(rec.code);
 ok('B\'s banner rings', await B.until(`(() => { const s = game.scene.getScene('summons'); return !!(s && s.bannerC && s.shown && s.shown.from === ${JSON.stringify(UA)}) })()`, 20000));
 await acceptBanner(B);
-ok('the duel starts on both sides', await A.until(ACTIVE, 25000) && await B.until(ACTIVE, 25000));
+ok('the duel starts on both sides — A\'s page steps in by itself', await B.until(ACTIVE, 25000) && await A.until(ACTIVE, 25000));
 ok('recent/<A>/<B> lands with name + at', await (async () => { for (let i = 0; i < 20; i++) { const r = await rt('recent/' + UA + '/' + UB); if (r && r.name === NB && r.at > 0) return true; await sleep(400); } return false; })());
 ok('recent/<B>/<A> lands too (both sides of every duel)', await (async () => { for (let i = 0; i < 20; i++) { const r = await rt('recent/' + UB + '/' + UA); if (r && r.name === NA && r.at > 0) return true; await sleep(400); } return false; })());
 ok('the row is live in memory mid-duel, no reload (FR listener)', await A.until(`!!(SSNET.FR.recent[${JSON.stringify(UB)}]) && SSNET.FR.recentList(3)[0].id === ${JSON.stringify(UB)}`, 10000)
@@ -175,14 +181,15 @@ const invTop = await A.ev(`game.scene.getScene('vsmenu').invB.getBounds().top`);
 const rowBottom = await A.ev(`Math.max(...game.scene.getScene('vsmenu').recentRows.map(r => r.again.getBounds().bottom))`);
 ok('the roll sits above the pinned invite', rowBottom < invTop, rowBottom + ' < ' + invTop);
 await tapRow(A, 0);
-ok('a real tap on AGAIN opens a challenge lobby aimed at B (live)', await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} && !s.challenged.away && !s.challenged.circle })()`, 25000));
-lb = await lobby(A); if (lb) codes.add(lb.code);
-ok('lobby waits for an answer', lb && lb.sub === await A.ev(`SS_T('vsWaitAnswer', ${JSON.stringify(NB)})`), lb && lb.sub);
+ok('a real tap on AGAIN stands a pending row aimed at B (live, no waiting screen)', await A.until(`(() => { const s = game.scene.getScene('vsmenu');
+  return s.scene.isActive() && !game.scene.isActive('vsbattle') && !!VS_PEND.list().find(p => p.to.id === ${JSON.stringify(UB)} && !p.away) })()`, 25000));
+rec = await pendRec(A, UB); if (rec) codes.add(rec.code);
+ok('the row waits for an answer', rec && await pendStatus(A, rec.code) === await A.ev(`SS_T('vsWaitAnswer', ${JSON.stringify(NB)})`), JSON.stringify(rec));
 let inv = await rt('invites/' + UB + '/' + UA);
-ok('the bell rings for B', inv && inv.code === lb.code, JSON.stringify(inv));
-ok('B\'s banner rings with A\'s name', await B.until(`(() => { const s = game.scene.getScene('summons'); return !!(s && s.bannerC && s.shown && s.shown.from === ${JSON.stringify(UA)} && s.shown.code === ${JSON.stringify(lb.code)}) })()`, 20000));
+ok('the bell rings for B', inv && inv.code === rec.code, JSON.stringify(inv));
+ok('B\'s banner rings with A\'s name', await B.until(`(() => { const s = game.scene.getScene('summons'); return !!(s && s.bannerC && s.shown && s.shown.from === ${JSON.stringify(UA)} && s.shown.code === ${JSON.stringify(rec.code)}) })()`, 20000));
 await acceptBanner(B);
-ok('the rematch lands — both in a live duel', await A.until(ACTIVE, 25000) && await B.until(ACTIVE, 25000));
+ok('the rematch lands — both in a live duel, A stepping in by itself', await B.until(ACTIVE, 25000) && await A.until(ACTIVE, 25000));
 
 // ---- 4. offline: the same tap becomes a standing invite, said honestly ----
 // a parked headless tab keeps its socket for a minute or more (the server's
@@ -197,11 +204,27 @@ ok('A opens VERSUS', await toSheet(A));
 rs = await rows(A);
 ok('B still first, now unlit', rs.length === 1 && rs[0].id === UB && rs[0].lit === '#a9a99a', JSON.stringify(rs));
 await tapRow(A, 0);
-ok('the tap lands a lobby aimed at the absent B', await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} && s.challenged.away })()`, 25000));
-lb = await lobby(A); if (lb) codes.add(lb.code);
-ok('the lobby says the summons waits under their stars', lb && lb.sub === await A.ev(`SS_T('vsWaitAway', ${JSON.stringify(NB)})`), lb && lb.sub);
+ok('the tap stands a pending row for the absent B', await A.until(`(() => { const s = game.scene.getScene('vsmenu');
+  return s.scene.isActive() && !game.scene.isActive('vsbattle') && !!VS_PEND.list().find(p => p.to.id === ${JSON.stringify(UB)} && p.away) })()`, 25000));
+rec = await pendRec(A, UB); if (rec) codes.add(rec.code);
+ok('the row says the summons waits under their stars', await (async () => {
+  if (!rec) return false;
+  const got = await pendStatus(A, rec.code), want = await A.ev(`SS_T('vsWaitAway', ${JSON.stringify(NB)})`);
+  return got === want || (!!got && got.endsWith('…') && want.startsWith(got.slice(0, -1)));   // the row's width clamp may ellipsize the long line
+})(), JSON.stringify(rec));
 inv = await rt('invites/' + UB + '/' + UA);
-ok('the standing invite lands', inv && inv.code === lb.code && inv.name === NA, JSON.stringify(inv));
+ok('the standing invite lands', inv && inv.code === rec.code && inv.name === NA, JSON.stringify(inv));
+// take the summons back before the circle walk — ✕ sweeps the row, the bell and the room
+await A.ev(`(() => { const s = game.scene.getScene('vsmenu'); const r = (s.pendRows || []).find(r => r.code === ${JSON.stringify(rec.code)});
+  if (r && r.cancel) r.cancel.emit('pointerdown'); return 1 })()`);
+ok('✕ takes the summons back: row, bell and room all gone', await (async () => {
+  for (let i = 0; i < 15; i++) {
+    const gone = (await rt('invites/' + UB + '/' + UA)) === null && (await rt('mp/rooms/' + rec.code)) === null;
+    if (gone && !(await pendRec(A, UB))) return true;
+    await sleep(500);
+  }
+  return false;
+})());
 
 // ---- 5. the circle: a searcher alone is met; the row routes through the engine ----
 const stale = (await rt('mp/rooms')) || {};
@@ -210,7 +233,7 @@ ok('A back on the meadow', await home(A));
 ok('A opens VERSUS', await toMenu(A));
 await A.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChWorld'))`);
 ok('CHALLENGE WORLDWIDE opens a searching room', await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.room.seekAt })()`, 25000));
-lb = await lobby(A); if (lb) codes.add(lb.code);
+let lb = await lobby(A); if (lb) codes.add(lb.code);
 ok('the quiet sky answers — a circle mage arrives and the duel starts', await A.until(ACTIVE, 30000));
 const circ = JSON.parse(await A.ev(`JSON.stringify(SS_RIVAL.circle())`));
 lb = await lobby(A);
@@ -232,7 +255,8 @@ ok('the mage takes the seat through the engine and the duel goes LIVE', await A.
 lb = await lobby(A);
 ok('both seats: A and the mage', lb && lb.players.includes(UA) && lb.players.includes(CU), lb && lb.players.join(','));
 ok('the engine log shows the seat', await A.ev(`window.__ssRivalLog.some(e => e.ev === 'seated' && e.code === ${JSON.stringify(lb.code)})`));
-ok('the lobby never said "declined"', await A.ev(`!game.scene.getScene('vsbattle').lobbySub || game.scene.getScene('vsbattle').lobbySub.text !== SS_T('vsDeclined', ${JSON.stringify(cp.name)})`));
+ok('a circle challenge is lived, never pended — no row, no "declined"', await A.ev(`VS_PEND.list().every(p => p.to.id !== ${JSON.stringify(CU)})`)
+  && await A.ev(`(() => { const s = game.scene.getScene('vsbattle'); return !s.waitT || !s.waitT.active || s.waitT.text !== SS_T('vsDeclined', ${JSON.stringify(cp.name)}) })()`));
 
 // ---- 6. the coarse clock, ten tongues, layout in every tongue ----
 const H = 3600000;

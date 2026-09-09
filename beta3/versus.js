@@ -13,9 +13,16 @@
      a + that adds a friend by their unique name, and — pinned at
      the sheet's foot — the invite that sends a NEW friend the
      STARSPELL app itself (VS_APP_URL, never a drbango.com page).
-   · CHALLENGE WORLDWIDE — quick match (the rival queue + the
-     quiet sky, unchanged beneath the new name).
-   BY NAME and the 4-letter seal stay as small fallback doors.
+   · CHALLENGE WORLDWIDE — a searching theater (9/3 card 03): a
+     rolled 8–15s "searching for an opponent…", then OPPONENT
+     FOUND, then straight into the turns duel. Humans first under
+     the veil (the rival queue runs unchanged); a quiet sky is
+     answered by THE CIRCLE at the roll's end — and that duel
+     moves to THIS device (SS_NEAR) so it can breathe at a busy
+     human's rhythm and survive the app closing. Friend summonses
+     no longer wait at a screen either: they stand as pending rows
+     on this page (VS_PEND), the roaming watcher in VsSummons
+     keeping them honest. The summons-sealed lobby is gone.
 
    The room ENGINE below still speaks turns/timed/bg — a room's
    mode rules its battle, so an old client's timed room resolves —
@@ -131,6 +138,13 @@ class VsMenu extends Phaser.Scene {
       fontSize: l.u(11) + 'px', color: '#c9b676', fontStyle: 'italic', shadow: true,
       wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
     });
+
+    // the standing duels (9/3 card 03) — friend summonses waiting or
+    // declined, worldwide duels mid-rhythm — as quiet rows under the crest
+    this.pendC = this.add.container(0, 0);
+    this.pendKey = '';
+    this.refreshPend();
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.refreshPend() });
 
     this.events.once('shutdown', () => this.closeSocial());
     if (VSAUTO) this.time.delayedCall(600, () => this.match('turns'));
@@ -362,6 +376,98 @@ class VsMenu extends Phaser.Scene {
     });
   }
 
+  /* ---------- the pending rows (9/3 card 03) ----------
+     Standing duels live HERE now, not at a waiting screen: a friend summons
+     waits as a row (✶ shares the invite link, ✕ takes the summons back), a
+     declined one says so once, and a worldwide duel mid-rhythm shows whose
+     move it is — tap the row to step back under those stars. */
+  pendList() {
+    const rows = [];
+    for (const p of VS_PEND.list()) rows.push({ kind: p.declined ? 'declined' : 'wait', code: p.code, name: p.to.name, at: p.at, p });
+    for (const code of SS_NEAR.codes()) {
+      const r = SS_NEAR.room(code);
+      if (!r || !r.players) continue;
+      const foe = Object.entries(r.players).find(([id]) => id !== vsUid());
+      const name = foe ? foe[1].name : '…';
+      if (r.status === 'done') rows.push({ kind: 'done', code, name, at: r.endedAt || r.createdAt || 0 });
+      else if (r.status === 'active') rows.push({ kind: r.turnUid === vsUid() ? 'move' : 'theirs', code, name, at: r.startedAt || r.createdAt || 0 });
+    }
+    return rows.sort((a, b) => b.at - a.at).slice(0, 4);
+  }
+  refreshPend() {
+    if (!this.pendC || !this.pendC.scene) return;
+    // a friend answered while this page stood: step into the duel at once
+    const live = VS_PEND.list().find((p) => p.active);
+    if (live) { VS_PEND.remove(live.code); this.scene.start('vsbattle', { code: live.code }); return; }
+    const rows = this.pendList();
+    const key = JSON.stringify(rows.map((r) => r.kind + r.code + r.name));
+    if (key === this.pendKey) return;
+    this.pendKey = key;
+    const l = ssLayout(this);
+    this.pendC.removeAll(true);
+    this.pendRows = [];
+    rows.forEach((r, i) => {
+      const y = l.y(300 + i * 36);
+      const items = [];
+      items.push(this.add.image(l.x(-166), y, vsSwordsTex(this)).setDisplaySize(l.u(18), l.u(18)).setAlpha(r.kind === 'move' ? 1 : 0.6));
+      const nm = ssTxt(this, l.x(-148), y - l.u(7), r.name, l.u(12), r.kind === 'move' ? '#ffe9a8' : '#d8d2bd').setOrigin(0, 0.5);
+      while (nm.width > l.u(150) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+      items.push(nm);
+      const status = r.kind === 'move' ? SS_T('vsYourMove') : r.kind === 'theirs' ? SS_T('vsTheirMove', r.name)
+        : r.kind === 'done' ? SS_T('vsPendDone')
+          : r.kind === 'declined' ? SS_T('vsDeclined', r.name)
+            : SS_T(r.p && r.p.away ? 'vsWaitAway' : r.p && r.p.busy ? 'vsWaitBusy' : 'vsWaitAnswer', r.name);
+      const st = ssTxt(this, l.x(-148), y + l.u(8), status, l.u(8.5), r.kind === 'move' ? '#ffd77a' : r.kind === 'declined' ? '#e8a87f' : '#8a94c4', 'italic').setOrigin(0, 0.5);
+      while (st.width > l.u(240) && st.text.length > 4) st.setText(st.text.slice(0, -2) + '…');
+      items.push(st);
+      const row = { kind: r.kind, code: r.code, name: r.name, nameT: nm, statusT: st };
+      if (r.kind === 'wait') {
+        const sh = ssTxt(this, l.x(140), y, '✶', l.u(14), '#c9b676').setOrigin(0.5).setInteractive({ useHandCursor: true });
+        ssHitPad(sh, 30);
+        vsOnTap(sh, () => {
+          SFX.ui();
+          vsShare(SS_T('vsShareText', vsName()), vsInviteUrl(r.code)).then((res) => {
+            if (res === 'copied') this.note(SS_T('vsCopied'), 2500);
+            else if (res === 'failed') this.note(SS_T('vsCopyFail'), 2500);
+          });
+        });
+        items.push(sh);
+        row.share = sh;
+      }
+      if (r.kind === 'wait' || r.kind === 'declined') {
+        const xb = ssTxt(this, l.x(172), y, '✕', l.u(13), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+        ssHitPad(xb, 30);
+        xb.on('pointerdown', () => { SFX.ui(); this.cancelPend(r); });
+        items.push(xb);
+        row.cancel = xb;
+      } else {
+        items.push(ssTxt(this, l.x(166), y, '›', l.u(16), r.kind === 'move' ? '#ffd77a' : '#8a94c4').setOrigin(0.5));
+        const zone = this.add.zone(l.x(-10), y, l.u(340), l.u(32)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        zone.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.scene.start('vsbattle', { code: r.code }); });
+        items.push(zone);
+        row.zone = zone;
+      }
+      this.pendRows.push(row);
+      this.pendC.add(items);
+    });
+  }
+  cancelPend(r) {
+    VS_PEND.remove(r.code);
+    if (r.kind === 'wait' && r.p) {
+      SSNET.FR.cancelChallenge(r.p.to.id);
+      // take the room back the way LEAVE would — mine alone, so it seals
+      SSNET.dbTxn('mp/rooms/' + r.code, (cur) => {
+        if (!cur || !cur.players || !cur.players[vsUid()]) return cur;
+        if (cur.status !== 'waiting') return cur;
+        const players = { ...cur.players };
+        delete players[vsUid()];
+        if (!Object.keys(players).length) return null;
+        return { ...cur, players };
+      }).catch(() => { });
+    }
+    this.refreshPend();
+  }
+
   /* ---------- the challenge doors ---------- */
   // a RECENT row tapped: the same challenge a friend CHALLENGE / BY NAME rides.
   // A mage of the circle has no phone to ring — the room is sealed the same
@@ -383,10 +489,19 @@ class VsMenu extends Phaser.Scene {
       const code = vsCode();
       const ok = await vsSealRoom(code, 'turns', { private: true, invited: f.id });
       if (!ok || !this.sys.isActive()) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
-      if (!f.circle) await SSNET.FR.challenge(f.id, code, 'turns');   // the circle has no bell to ring
+      // a mage of the circle answers in moments — that duel is lived, not
+      // pended: enter, and the engine seats them (the arcade-paced AGAIN)
+      if (f.circle) { this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name, circle: f.circle } }); return; }
+      await SSNET.FR.challenge(f.id, code, 'turns');
       if (!this.sys.isActive()) return;
-      // away/busy ride along so the lobby can say where the summons waits
-      this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name, away: !!f.away, busy: !!f.busy, circle: f.circle || null } });
+      // the summons STANDS (9/3 card 03): no waiting screen — a pending row
+      // on this page carries the wait, the roaming watcher rings the moment
+      // they answer, and the invite link still travels from the row's ✶
+      VS_PEND.add({ code, to: { id: f.id, name: f.name }, away: !!f.away, busy: !!f.busy, at: Date.now(), rung: Date.now() });
+      this.busyC = false;
+      this.closeSocial();
+      this.note(SS_T('vsSent', f.name), 3500);
+      this.refreshPend();
     } catch (e) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; }
   }
   // ?frdemo=invite: seal a private room and stand in its lobby — the deep-link
@@ -405,11 +520,16 @@ class VsMenu extends Phaser.Scene {
     if (this.busyC) return;
     this.busyC = true;
     this.note(SS_T('vsConsult'));
+    // the searching theater's clock starts at the tap — the whole hunt
+    // (reads, joins, the quiet sky) plays out under one rolled 8–15s beat.
+    // ?vsfind=MS pins the roll for the harnesses (the ?ride=0 pattern).
+    const pin = parseInt(QS.get('vsfind'), 10);
+    const theater = { t0: Date.now(), T: Number.isFinite(pin) ? Math.max(1200, pin) : Math.round(VS_FB.T_MIN + Math.random() * VS_FB.T_SPREAD) };
     const conn = await SSNET.connect();
     if (conn !== 'firebase') { this.note(SS_T('vsNoSky')); this.busyC = false; return; }
     const code = await vsQuickMatch(mode);
     if (!this.sys.isActive()) return;
-    if (code) this.scene.start('vsbattle', { code });
+    if (code) this.scene.start('vsbattle', { code, theater });
     else { this.note(SS_T('vsRefused'), 3000); this.busyC = false; }
   }
   /* ---------- test recipes (?frdemo=) ----------
@@ -593,12 +713,13 @@ async function vsDeepRun(scene) {
         else friendName = null;   // already friends, or no such stargazer — nothing to announce
       }
       if (VS_DEEP.join) joined = await vsJoinRoom(VS_DEEP.join);
+      if (joined) await vsStartIfFull(VS_DEEP.join);   // the challenger roams now — the arriving seat lights the duel
     }
   } catch (e) { }
   localStorage.setItem('beta3.deeplink', JSON.stringify({ join: VS_DEEP.join, joined, friend: VS_DEEP.friend, friendName, t: Date.now() }));
   if (!scene.sys.isActive()) return;
   if (joined) {
-    scene.scene.start('vsbattle', { code: VS_DEEP.join });
+    scene.scene.start('vsbattle', { code: VS_DEEP.join, joining: true });
     if (friendName) scene.time.delayedCall(700, () => vsNotify(SS_T('frAdded', friendName)));
     return;
   }
@@ -613,6 +734,174 @@ function vsCode() {
   let s = '';
   for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
   return s;
+}
+
+/* ============================================================
+   THE NEAR SKY (9/3 feedback card 03) — a worldwide duel lives on
+   THIS device once the quiet sky answers it: the room record is
+   byte-shaped like a live room and every write goes through the
+   same ref/txn grammar, but the tree lives in localStorage and
+   survives app restarts — the busy-human rhythm (a reply every
+   1:30–5:00) needs a duel that outlives the tab. The driver fires
+   its listeners a beat later, the way the sky does; writes apply
+   synchronously inside one JS turn, so a reload can never catch
+   half a cast. Beside each room rides a NOTE (the pacing clock,
+   both players' play scripts for board replay, the seen
+   watermark) — outside the room record on purpose: the record
+   stays a room, nothing more.
+   ============================================================ */
+const SS_NEAR = (() => {
+  const KEY = 'starspellDuels';
+  let store = null;
+  function load() {
+    if (store) return store;
+    try { store = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { store = {}; }
+    if (!store.rooms || typeof store.rooms !== 'object') store.rooms = {};
+    if (!store.notes || typeof store.notes !== 'object') store.notes = {};
+    return store;
+  }
+  function persist() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { } }
+  // paths arrive as 'mp/rooms/CODE[/…]' — the near tree holds only rooms
+  const parts = (path) => String(path).split('/').filter(Boolean).slice(2);
+  function read(path) {
+    const p = parts(path);
+    let n = load().rooms;
+    for (const k of p) { if (n == null || typeof n !== 'object') return null; n = n[k]; }
+    return n === undefined ? null : n;
+  }
+  function write(path, v) {
+    const p = parts(path);
+    if (!p.length) return;
+    const s = load();
+    let n = s.rooms;
+    for (let i = 0; i < p.length - 1; i++) {
+      if (typeof n[p[i]] !== 'object' || n[p[i]] == null) n[p[i]] = {};
+      n = n[p[i]];
+    }
+    if (v === null) delete n[p[p.length - 1]]; else n[p[p.length - 1]] = v;
+    persist();
+    fire(p[0]);
+  }
+  // listeners fire asynchronously and coalesced, exactly one beat after the
+  // write — the grammar every scene already speaks
+  const listeners = [];   // {code, path, type, cb, seen:Set}
+  let firing = null;
+  const snap = (v, k) => ({ val: () => (v === undefined ? null : v), key: k });
+  function deliver(l) {
+    try {
+      if (l.type === 'value') l.cb(snap(read(l.path)));
+      else if (l.type === 'child_added') {
+        const kids = read(l.path) || {};
+        for (const k of Object.keys(kids).sort()) {
+          if (l.seen.has(k)) continue;
+          l.seen.add(k);
+          l.cb(snap(kids[k], k));
+        }
+      }
+    } catch (e) { }
+  }
+  function fire(code) {
+    if (firing) { firing.add(code); return; }
+    firing = new Set([code]);
+    setTimeout(() => {
+      const codes = firing;
+      firing = null;
+      for (const l of [...listeners]) if (codes.has(l.code) && listeners.includes(l)) deliver(l);
+    }, 0);
+  }
+  function ref(path) {
+    return {
+      on(type, cb) {
+        const l = { code: parts(path)[0], path, type, cb, seen: new Set() };
+        listeners.push(l);
+        // the sky fires value once on attach, and child_added for what stands
+        setTimeout(() => { if (listeners.includes(l)) deliver(l); }, 0);
+        return cb;
+      },
+      off(type, cb) {
+        for (let i = listeners.length - 1; i >= 0; i--) {
+          const l = listeners[i];
+          if (l.path === path && (!type || l.type === type) && (!cb || l.cb === cb)) listeners.splice(i, 1);
+        }
+      },
+      child(k) { return ref(path + '/' + k); },
+      set(v) { write(path, v); return Promise.resolve(); },
+      update(v) {
+        const cur = read(path);
+        write(path, Object.assign({}, (cur && typeof cur === 'object') ? cur : {}, v));
+        return Promise.resolve();
+      },
+      push(v) {
+        const k = '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        write(path + '/' + k, v);
+        return Promise.resolve({ key: k });
+      },
+      get() { return Promise.resolve(snap(read(path))); },
+      onDisconnect() { return { set: () => Promise.resolve(), cancel: () => Promise.resolve(), remove: () => Promise.resolve() }; },
+    };
+  }
+  async function txn(path, fn) {
+    const cur = read(path);
+    const next = fn(cur);
+    if (next === undefined) return { committed: true, value: cur };
+    write(path, next);
+    return { committed: true, value: next };
+  }
+  const api = {
+    ref, txn,
+    set: (p, v) => { write(p, v); return Promise.resolve(); },
+    update: (p, v) => ref(p).update(v),
+    get: async (p) => read(p),
+  };
+  return {
+    api,
+    has: (code) => !!load().rooms[code],
+    room: (code) => load().rooms[code] || null,
+    codes: () => Object.keys(load().rooms),
+    note: (code) => load().notes[code] || null,
+    setNote(code, patch) {
+      const s = load();
+      s.notes[code] = Object.assign({}, s.notes[code] || {}, patch || {});
+      persist();
+      return s.notes[code];
+    },
+    // seal a fresh near room + its note in one stroke
+    seal(code, rec, noteRec) {
+      const s = load();
+      s.rooms[code] = rec;
+      s.notes[code] = noteRec || {};
+      persist();
+      fire(code);
+    },
+    purge(code) {
+      const s = load();
+      delete s.rooms[code];
+      delete s.notes[code];
+      persist();
+      fire(code);
+    },
+  };
+})();
+
+/* the standing friend summonses — the versus page's pending rows (Q3) */
+const VS_PEND = (() => {
+  const KEY = 'starspellPending';
+  function list() { try { const a = JSON.parse(localStorage.getItem(KEY)); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function save(a) { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch (e) { } }
+  return {
+    list,
+    add(rec) { const a = list().filter((r) => r.code !== rec.code); a.unshift(rec); save(a.slice(0, 6)); },
+    mark(code, patch) { const a = list(); const r = a.find((x) => x.code === code); if (r) { Object.assign(r, patch); save(a); } return r; },
+    remove(code) { save(list().filter((r) => r.code !== code)); },
+    get(code) { return list().find((r) => r.code === code) || null; },
+  };
+})();
+
+// one grammar, two skies: a near code's writes land in localStorage, any
+// other room speaks to the live sky exactly as before
+function vsDb(code) {
+  if (SS_NEAR.has(code)) return SS_NEAR.api;
+  return { ref: (p) => SSNET.ref(p), txn: SSNET.dbTxn, set: SSNET.dbSet, update: SSNET.dbUpdate, get: SSNET.dbGet };
 }
 /* ---------- the rival queue: matched by rating (v0.48.0) ----------
    A searcher IS a waiting public room — pressing FIND A RIVAL either takes a
@@ -631,17 +920,26 @@ function vsCode() {
    transaction as before: the rating preference chooses WHICH door to try,
    the transaction decides who got through it. */
 const VS_MM = { TOL: 75, STEP: 75, STEP_MS: 3000, RESCAN_MS: 2500 };
-/* ---------- the quiet sky (v0.49.0) ----------
-   A searcher the queue has not served ~12s after FIND is met by one of the
-   circle (rival.js): a mage of this device's acquaintance, rated a believable
+/* ---------- the quiet sky (v0.49.0, retimed by the theater 9/3 card 03) ----------
+   A searcher the queue has not served is met by one of the circle
+   (rival.js): a mage of this device's acquaintance, rated a believable
    distance from the player, who comes in through the same door as anyone.
-   The moment is jittered (AT + up to SPREAD after seekAt, then a breath for
-   the arrival) — the same instant every time would be a tell. People always
-   win the race: the last instant before the door opens the queue is read once
-   more, an ELDER room takes me whatever its rating, and a YOUNGER room already
-   on its way (within tolerance, or past its own clock — it will read the queue
-   the same way and find me) holds the door up to HOLD_MS. */
-const VS_FB = { AT: 11200, SPREAD: 3200, HOLD_MS: 6000, ARRIVE_MS: 500, ARRIVE_SPREAD: 800, RETRY_MS: 9000 };
+   The clock is the searching theater's own roll — T_MIN + up to T_SPREAD,
+   rolled at the tap — and the answer is staged SETUP_MS before the beat
+   lands so OPPONENT FOUND arrives on time. People always win the race: the
+   last instant before the door opens the queue is read once more, an ELDER
+   room takes me whatever its rating, and a YOUNGER room already on its way
+   (within tolerance, or old enough that its own last look has begun) holds
+   the door — but never past the beat. */
+// HOLD_MS bridges two theaters' rolls: the elder's hold (fbAt + HOLD) must
+// reach the youngest possible last look (their T up to 15s, staged −2.4s) —
+// 8s covers the full 7s roll spread, so two real searchers ALWAYS pair, and
+// the beat runs a breath long only when a person is genuinely inbound.
+// COMING_MS is the younger's proof of life: ANY public searcher who has
+// waited a breath will reach their own last look inside the elder's hold —
+// gating the hold on a longer wait let an early-rolling elder swap local
+// while a person was mid-theater (both got the circle; Q1 says people first)
+const VS_FB = { T_MIN: 8000, T_SPREAD: 7000, SETUP_MS: 2400, HOLD_MS: 8000, COMING_MS: 1500, ARRIVE_MS: 500, ARRIVE_SPREAD: 800 };
 // a younger public room of `mode`, host alone, that is about to migrate into mine
 function vsYoungerComing(rooms, mode, now, own, seekAt) {
   for (const [id, r] of Object.entries(rooms || {})) {
@@ -655,7 +953,7 @@ function vsYoungerComing(rooms, mode, now, own, seekAt) {
     if (age < own.createdAt || (age === own.createdAt && id < own.code)) continue;   // an elder: vsPickRoom's business
     const theirWait = now - vsRoomSeekAt(r, now);
     const diff = Math.abs(SS.prof.rating - vsRoomRating(r));
-    if (diff <= vsTolerance(now - seekAt, theirWait) || theirWait >= VS_FB.AT) return true;
+    if (diff <= vsTolerance(now - seekAt, theirWait) || theirWait >= VS_FB.COMING_MS) return true;
   }
   return false;
 }
@@ -759,6 +1057,19 @@ async function vsJoinRoom(code) {
     return !!(r.value && r.value.players && r.value.players[vsUid()]);
   } catch (e) { return false; }
 }
+// the joiner lights a private room when their seat fills it (9/3 card 03):
+// the challenge host no longer waits at a screen, so the accepting side
+// starts the duel — a transaction, so a racing starter cannot double-light
+async function vsStartIfFull(code) {
+  try {
+    await SSNET.dbTxn('mp/rooms/' + code, (cur) => {
+      if (!cur || cur.status !== 'waiting' || !cur.private) return undefined;
+      const seats = Object.entries(cur.players || {}).map(([id, p]) => ({ id, seat: p.seat })).sort((a, b) => a.seat - b.seat);
+      if (seats.length < VS_MAX[cur.mode || 'turns']) return undefined;
+      return { ...cur, status: 'active', startedAt: Date.now(), turnUid: seats[0].id, turnCount: 0 };
+    });
+  } catch (e) { }
+}
 
 /* ============================================================
    The versus battlefield (lobby + fight + end in one scene)
@@ -768,7 +1079,12 @@ class VsBattle extends Phaser.Scene {
   init(d) {
     this.code = d.code;
     this.challenged = d.challenged || null;   // {id,name} when this room was sealed by a CHALLENGE
-    this.sharing = d.sharing || null;         // the INVITE share promise, for lobby feedback
+    this.sharing = d.sharing || null;         // the INVITE share promise, for wait-beat feedback
+    this.joining = !!d.joining;               // arrived through a summons/deep link
+    this.theater = d.theater || null;         // the worldwide searching beat {t0, T}
+    this.near = SS_NEAR.has(d.code);          // this duel lives on this device
+    this.revealed = !this.theater;            // the found gate holds beginBattle under the theater
+    this.beginQueued = false; this.revealTimer = null; this.swapping = false;
     // the scene instance outlives a room: the quiet sky's clock must start
     // fresh with every seal, or the NEXT search would be answered at once
     this.fbAt = 0; this.fbRival = null; this.fbSpawnAt = 0; this.fbBusy = false;
@@ -792,29 +1108,22 @@ class VsBattle extends Phaser.Scene {
     this.scryCooldown = 0;
     this.buildUi();
 
-    this.roomRef = SSNET.ref('mp/rooms/' + this.code);
+    // one grammar, two skies (9/3 card 03): a near room's refs write to this
+    // device; a live room's to the sky — the scene cannot tell, by design
+    this.db = vsDb(this.code);
+    this.roomRef = this.db.ref('mp/rooms/' + this.code);
     if (!this.roomRef) { this.scene.start('vsmenu'); return; }
     SSNET.FR.setBusy(true);   // friends see "in a duel" and can't ring me mid-fight
-    // a CHALLENGE lobby watches its own bell: if the friend removes it without
-    // taking a seat, they declined
-    if (this.challenged && !this.challenged.circle) {   // the circle rings no bell (task 44)
-      this.invRef = SSNET.ref('invites/' + this.challenged.id + '/' + vsUid());
-      this.onInvCb = (snap) => {
-        if (snap.val() != null) { this.bellSeen = true; return; }
-        if (this.bellSeen) this.bellDeclined = true;   // keepBell must not ring a mage who said no
-        this.time.delayedCall(1500, () => {
-          if (!this.sys.isActive() || !this.room || this.room.status !== 'waiting') return;
-          if ((this.room.players || {})[this.challenged.id]) return;
-          if (this.lobbySub && this.lobbySub.active) this.lobbySub.setText(SS_T('vsDeclined', this.challenged.name)).setColor('#e8a87f');
-        });
-      };
-      if (this.invRef) this.invRef.on('value', this.onInvCb);
+    // a near duel re-entered gets its mage back (idempotent — the boot wake
+    // usually already has) and remembers what has been read
+    if (this.near) {
+      if (typeof SS_RIVAL !== 'undefined' && SS_RIVAL.ensure) SS_RIVAL.ensure(this.code);
     }
     this.onRoomCb = (snap) => this.onRoom(snap.val());
     this.roomRef.on('value', this.onRoomCb);
-    this.meRef = SSNET.ref('mp/rooms/' + this.code + '/players/' + vsUid());
-    if (this.meRef) this.meRef.child('gone').onDisconnect().set(true);
-    this.castsRef = SSNET.ref('mp/rooms/' + this.code + '/casts');
+    this.meRef = this.db.ref('mp/rooms/' + this.code + '/players/' + vsUid());
+    if (this.meRef && !this.near) this.meRef.child('gone').onDisconnect().set(true);
+    this.castsRef = this.db.ref('mp/rooms/' + this.code + '/casts');
     this.onCastCb = (snap) => { this.onCast(snap.key, snap.val()); };
     if (this.castsRef) this.castsRef.on('child_added', this.onCastCb);
 
@@ -824,10 +1133,13 @@ class VsBattle extends Phaser.Scene {
       this.game.events.off('ss-ach', this.onAchCb);
       if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
       if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
-      if (this.invRef) this.invRef.off('value', this.onInvCb);
       SSNET.FR.setBusy(false);
-      // walking out of a challenge lobby takes the bell back
-      if (this.challenged && (!this.room || this.room.status === 'waiting')) SSNET.FR.cancelChallenge(this.challenged.id);
+      if (this.near) {
+        // the duel stands when you step away — no gone-mark, no desertion;
+        // a decided duel you have SEEN leaves with you
+        if (this.room && this.room.status === 'done' && this.state === 'done') SS_NEAR.purge(this.code);
+        return;
+      }
       // this.left: leaveRoom already deleted the seat — update() on the dead
       // path would write players/<uid>/{gone:true} back, resurrecting a ghost
       if (!this.left && this.meRef && this.room && this.room.status !== 'done') this.meRef.update({ gone: true }).catch(() => { });
@@ -850,11 +1162,24 @@ class VsBattle extends Phaser.Scene {
   buildUi() {
     const l = this.L;
     const txt = (x, y, s, size, color, style) => ssTxt(this, x, y, s, l.u(size), color, style);
-    this.headT = txt(l.x(0), l.y(24), 'SEAL ' + this.code, 14, '#c9b676').setOrigin(0.5);
+    // the worldwide path never speaks a seal (9/3 card 03) — a searching
+    // theater's room, and a near duel, wear no code; friend rooms keep theirs
+    this.headT = txt(l.x(0), l.y(24), (this.near || this.theater) ? '' : 'SEAL ' + this.code, 14, '#c9b676').setOrigin(0.5);
     this.clockT = txt(l.x(190), l.y(24), '', 15, '#ffe9a8').setOrigin(1, 0.5);
     const back = txt(l.x(-195), l.y(24), '‹', 22, '#5a6390').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     back.on('pointerdown', () => {
       SFX.ui();
+      // a near duel keeps when you step out mid-rhythm — that IS the design
+      // (the reply comes in its own time): no desertion, no gone-mark, the
+      // pending row holds the door open. Said once, the first time.
+      if (this.near) {
+        if (this.room && this.room.status === 'active' && this.state !== 'done' && !localStorage.getItem('beta3.duelStands')) {
+          try { localStorage.setItem('beta3.duelStands', '1'); } catch (e) { }
+          vsNotify(SS_T('vsDuelStands'));
+        }
+        this.scene.start('vsmenu');
+        return;
+      }
       // deserting a live battle settles as a loss — fleeing can't dodge the
       // Elo exchange (endBattle never runs for a seat that walked out)
       if (this.room && this.room.status === 'active' && this.state !== 'done') {
@@ -907,41 +1232,90 @@ class VsBattle extends Phaser.Scene {
     }).setDepth(60);
     this.overlayC = this.add.container(0, 0).setDepth(100);
 
-    // lobby veil — the battle HUD lives at the zenith, but the camera waits
-    // down at the meadow, so the lobby is parked AT the camera's resting
-    // scroll. It was scrollFactor(0) once: that renders in the right corner
-    // but hit-tests in world space (a Container's scrollFactor affects
-    // rendering only, never input), so every lobby tap — LEAVE included —
-    // landed a full sky-height away from the text that drew it.
+    // the waiting screen (9/3 card 03: the summons-sealed lobby is GONE) —
+    // parked AT the camera's resting scroll, never scrollFactor(0): a
+    // Container's scrollFactor affects rendering only, never input, so a
+    // factor-0 wait screen hit-tests a full sky-height away from its text.
     const cam = this.cameras.main;
-    this.lobbyC = this.add.container(cam.scrollX, cam.scrollY).setDepth(90);
+    this.waitC = this.add.container(cam.scrollX, cam.scrollY).setDepth(90);
+    if (this.theater) this.buildTheater(l);
+    else this.buildWaitBeat(l);
+  }
+
+  /* ---------- the searching theater (worldwide, 9/3 card 03) ----------
+     Skylar: tap CHALLENGE WORLDWIDE → "searching for an opponent" for a
+     rolled 8–15s → OPPONENT FOUND → straight into the duel. No seal code,
+     no share, no roster. Under the veil the real hunt runs unchanged
+     (humans first — Q1's stamp): the queue can seat a person at any beat;
+     the quiet sky answers at the roll's end. The dress is the game's own —
+     the crossed-blades crest breathing over a slow orbit of star motes,
+     never a spinner. */
+  buildTheater(l) {
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.88).setInteractive();
+    const leave = ssTxt(this, l.x(-195), l.y(24), '‹ LEAVE', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    leave.on('pointerdown', () => this.leaveRoom());
+    const still = ssReduceMotion();
+    const glow = this.add.image(l.x(0), l.y(330), 'glowbig').setDisplaySize(l.u(360), l.u(360)).setTint(0xc9a94f).setAlpha(0.1).setBlendMode('ADD');
+    if (!still) this.tweens.add({ targets: glow, alpha: 0.05, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const crest = this.add.image(l.x(0), l.y(330), vsSwordsTex(this, 210)).setDisplaySize(l.u(120), l.u(120)).setAlpha(0.95);
+    // six star motes on a slow elliptic orbit, each with its own phase
+    this.thMotes = [];
+    if (!still) {
+      for (let i = 0; i < 6; i++) {
+        const m = this.add.image(l.x(0), l.y(330), i % 2 ? 'spark4' : 'dot').setScale(i % 2 ? 0.5 : 0.8).setTint(0xffe9a8).setAlpha(0.85).setBlendMode('ADD');
+        m.__ph = (i / 6) * Math.PI * 2;
+        m.__r = l.u(92 + (i % 3) * 10);
+        this.thMotes.push(m);
+      }
+    }
+    this.searchT = ssTxt(this, l.x(0), l.y(470), SS_T('vsSearching'), l.u(15), '#ffe9a8').setOrigin(0.5)
+      .setShadow(0, 0, '#c9b676', l.u(10), true, true);
+    for (let fs = 15; this.searchT.width > l.u(360) && fs > 10; fs -= 0.5) this.searchT.setFontSize(l.u(fs));
+    if (!still) this.tweens.add({ targets: this.searchT, alpha: 0.55, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // the search wears a clock (Skylar 9/8): elapsed time counting up under
+    // the line, so the wait READS as a search — it ticks under reduce-motion
+    // too (information, not ornament) and stands down at OPPONENT FOUND
+    this.searchClockT = ssTxt(this, l.x(0), l.y(505), '0:00', l.u(21), '#d8c98f').setOrigin(0.5)
+      .setShadow(0, 0, '#c9b676', l.u(8), true, true);
+    const tick = () => {
+      if (this.revealed || !this.searchClockT || !this.searchClockT.active) return;
+      const s = Math.max(0, Math.floor((Date.now() - this.theater.t0) / 1000));
+      const txt = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+      if (this.searchClockT.text !== txt) this.searchClockT.setText(txt);
+    };
+    tick();
+    this.thClockEv = this.time.addEvent({ delay: 250, loop: true, callback: tick });
+    this.waitT = null;
+    this.waitC.add([veil, glow, crest, ...this.thMotes, this.searchT, this.searchClockT, leave]);
+  }
+  /* ---------- the minimal wait-beat ----------
+     Every other waiting moment — a circle rematch forming, a summons/deep
+     link joining, the ?frdemo=invite recipe's shared room — gets one quiet
+     line and the LEAVE door. A private room minted to be SHARED keeps its
+     one ✶ (the link is the only key it has). */
+  buildWaitBeat(l) {
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.55);
     const leave = ssTxt(this, l.x(-195), l.y(24), '‹ LEAVE', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     leave.on('pointerdown', () => this.leaveRoom());
     const ch = this.challenged;
-    this.lobbyTitle = txt(l.x(0), l.y(206), ch ? SS_T('vsSent', ch.name) : SS_T('lobbyTitle'), ch ? 17 : 20, '#f3e5b4').setOrigin(0.5)
-      .setShadow(0, 0, '#c9a94f', l.u(12), true, true);
-    while (this.lobbyTitle.width > l.u(360) && this.lobbyTitle.text.length > 8) this.lobbyTitle.setText(this.lobbyTitle.text.slice(0, -2) + '…');
-    this.lobbyCode = txt(l.x(0), l.y(262), this.code, 44, '#ffe9a8').setOrigin(0.5)
-      .setShadow(0, 0, '#c9a94f', l.u(18), true, true);
-    const waitKey = ch ? (ch.away ? 'vsWaitAway' : ch.busy ? 'vsWaitBusy' : 'vsWaitAnswer') : null;
-    this.lobbySub = ssTextBlock(this, l.x(0), l.y(308), ch ? SS_T(waitKey, ch.name) : SS_T('lobbySub'), {
-      fontSize: l.u(11) + 'px', color: '#8a94c4', fontStyle: 'italic', shadow: true,
+    const line = ch ? (ch.circle ? SS_T('vsWaitDuel') : SS_T(ch.away ? 'vsWaitAway' : ch.busy ? 'vsWaitBusy' : 'vsWaitAnswer', ch.name))
+      : SS_T(this.joining ? 'smJoining' : 'vsWaitDuel');
+    this.waitT = ssTextBlock(this, l.x(0), l.y(330), line, {
+      fontSize: l.u(13) + 'px', color: '#d8d2bd', fontStyle: 'italic', shadow: true,
       wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
     });
-    // native invite from the lobby too — same link, same pointerUP rule
-    this.shareB = this.add.image(l.x(0), l.y(360), ssBtn(this, false, 250, 46)).setDisplaySize(l.u(250), l.u(46)).setInteractive({ useHandCursor: true });
-    this.shareT = txt(l.x(0), l.y(360), SS_T('vsShareInvite'), 13, BTN_INK()).setOrigin(0.5);
-    vsOnTap(this.shareB, () => {
-      SFX.ui();
-      vsShare(SS_T('vsShareText', vsName()), vsInviteUrl(this.code)).then((r) => this.shareNote(r));
-    });
-    if (this.sharing) this.sharing.then((r) => this.shareNote(r)).catch(() => { });
-    this.lobbyRoster = txt(l.x(0), l.y(440), '', 14, '#d8d2bd').setOrigin(0.5).setAlign('center');
-    this.beginB = this.add.image(l.x(0), l.y(548), ssBtn(this, false, 220, 56)).setDisplaySize(l.u(220), l.u(56)).setInteractive({ useHandCursor: true }).setVisible(false);
-    this.beginT = txt(l.x(0), l.y(548), 'BEGIN THE BATTLE', 15, BTN_INK()).setOrigin(0.5).setVisible(false);
-    this.beginB.on('pointerdown', () => this.hostStart());
-    this.lobbyC.add([veil, this.lobbyTitle, this.lobbyCode, this.lobbySub, this.shareB, this.shareT, this.lobbyRoster, this.beginB, this.beginT, leave]);
+    if (!ssReduceMotion()) this.tweens.add({ targets: this.waitT, alpha: 0.6, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.waitC.add([veil, this.waitT, leave]);
+    if (!ch && !this.near) {
+      this.shareB = this.add.image(l.x(0), l.y(420), ssBtn(this, false, 250, 46)).setDisplaySize(l.u(250), l.u(46)).setInteractive({ useHandCursor: true });
+      this.shareT = ssTxt(this, l.x(0), l.y(420), SS_T('vsShareInvite'), l.u(13), BTN_INK()).setOrigin(0.5);
+      vsOnTap(this.shareB, () => {
+        SFX.ui();
+        vsShare(SS_T('vsShareText', vsName()), vsInviteUrl(this.code)).then((r) => this.shareNote(r));
+      });
+      if (this.sharing) this.sharing.then((r) => this.shareNote(r)).catch(() => { });
+      this.waitC.add([this.shareB, this.shareT]);
+    }
   }
   shareNote(r) {
     if (!this.shareT || !this.shareT.active) return;
@@ -949,6 +1323,12 @@ class VsBattle extends Phaser.Scene {
     else if (r === 'failed') this.shareT.setText(SS_T('vsCopyFail'));
     else return;
     this.time.delayedCall(2600, () => { if (this.shareT.active) this.shareT.setText(SS_T('vsShareInvite')); });
+  }
+  killTheater() {
+    if (this.revealTimer) { this.revealTimer.remove(false); this.revealTimer = null; }
+    if (this.thClockEv) { this.thClockEv.remove(false); this.thClockEv = null; }
+    this.revealed = true;
+    if (this.thMotes) { for (const m of this.thMotes) m.destroy(); this.thMotes = null; }
   }
 
   /* ---------- room snapshots drive everything ---------- */
@@ -969,15 +1349,14 @@ class VsBattle extends Phaser.Scene {
   }
 
   onRoom(room) {
-    if (!room) { if (this.migrating) return; if (this.state !== 'done') { this.scene.start('vsmenu'); } return; }
+    if (!room) { if (this.migrating || this.swapping) return; if (this.state !== 'done') { this.scene.start('vsmenu'); } return; }
     const first = !this.room;
-    const prevStatus = this.room && this.room.status;
     this.room = room;
     // start pulling the room's dictionary the moment its tongue is known, so
     // the beginBattle gate almost never actually has to wait
     if (first && room.lang && room.lang !== 'en') SS_DICT.load(room.lang);
-    if (room.status === 'waiting') { this.updateLobby(); this.maybeAutoStart(); return; }
-    if (room.status === 'active' && (first || prevStatus === 'waiting')) this.beginBattle();
+    if (room.status === 'waiting') { this.maybeAutoStart(); return; }
+    if (room.status === 'active' && this.state === 'wait') this.queueBegin();
     if (room.status === 'active') {
       this.updatePanels();
       this.checkEnd();
@@ -986,17 +1365,33 @@ class VsBattle extends Phaser.Scene {
     else if (room.status === 'done' && room.rematch && !this.rematchBusy) this.showRematchCall();
   }
 
-  updateLobby() {
-    const n = Object.keys(this.room.players || {}).length;
-    const names = Object.values(this.room.players || {}).sort((a, b) => a.seat - b.seat)
-      .map((p, i) => (i + 1) + '.  ' + p.name + (p.name === vsName() ? '   (you)' : ''));
-    // a duel sealed in another tongue says so before you rise into it
-    const langLine = (this.room.lang && this.room.lang !== ssGameLang() && SS_PACKS[this.room.lang])
-      ? '\n' + SS_T('vsLang', SS_LANGS[this.room.lang] || this.room.lang) : '';
-    this.lobbyRoster.setText(names.join('\n') + '\n\n' + n + ' / ' + VS_MAX[this.room.mode] + ' mages answered' + langLine);
-    const host = this.room.hostUid === vsUid();
-    const canBegin = this.room.mode === 'bg' && host && n >= VS_MIN.bg;
-    this.beginB.setVisible(canBegin); this.beginT.setVisible(canBegin);
+  /* ---------- the FOUND GATE (9/3 card 03) ----------
+     Under the theater the duel may form early (a person!) — the reveal
+     holds until the rolled beat lands, then OPPONENT FOUND, then the rise.
+     Without a theater this is beginBattle, as ever. */
+  queueBegin() {
+    if (this.state !== 'wait' || this.beginQueued) return;
+    this.beginQueued = true;
+    if (!this.theater) { this.beginBattle(); return; }
+    const wait = Math.max(0, this.theater.t0 + this.theater.T - Date.now());
+    this.revealTimer = this.time.delayedCall(wait, () => this.foundBeat());
+  }
+  foundBeat() {
+    this.revealTimer = null;
+    if (this.state !== 'wait' || !this.room || this.room.status !== 'active') { this.beginQueued = false; return; }
+    this.revealed = true;
+    const l = this.L;
+    if (this.searchT && this.searchT.active) {
+      this.tweens.killTweensOf(this.searchT);
+      this.searchT.setText(SS_T('vsFound')).setAlpha(1).setColor('#ffd77a').setScale(0.7)
+        .setShadow(0, 0, '#c9a94f', l.u(14), true, true);
+      this.tweens.add({ targets: this.searchT, scale: 1, duration: 260, ease: 'Back.easeOut' });
+    }
+    // the clock's search is over — the notice takes the stage
+    if (this.searchClockT && this.searchClockT.active) this.tweens.add({ targets: this.searchClockT, alpha: 0, duration: 360 });
+    this.cameras.main.flash(300, 240, 210, 120, false);
+    SFX.forge();
+    this.time.delayedCall(1100, () => { if (this.state === 'wait') this.beginBattle(); });
   }
   maybeAutoStart() {
     const n = Object.keys(this.room.players || {}).length;
@@ -1014,27 +1409,22 @@ class VsBattle extends Phaser.Scene {
     this.roomRef.update({ status: 'active', startedAt: Date.now(), turnUid: seats[0].id, turnCount: 0 }).catch(() => { });
   }
 
-  // a summons ages out of the bell after INVITE_MS (a summons from someone
-  // who gave up must not ring an hour later) — but while THIS lobby still
-  // stands the challenge is live, so the bell is re-rung every two minutes:
-  // a mage who arrives after a long wait still finds it under their stars
-  keepBell() {
-    const ch = this.challenged;
-    if (!ch || ch.circle || this.bellDeclined || this.room.hostUid !== vsUid()) return;
-    if ((this.room.players || {})[ch.id]) return;
-    const now = Date.now();
-    if (!this.bellAt) this.bellAt = now;
-    if (now - this.bellAt < 120000) return;
-    this.bellAt = now;
-    SSNET.FR.challenge(ch.id, this.code, this.room.mode);
-  }
-
   /* ---------- leave: surrender the seat, not just the screen ---------- */
   leaveRoom() {
     SFX.ui();
     this.left = true;
+    if (this.near) {
+      // a near search cancelled before it was ever seen = never happened:
+      // sweep the room, the note and the answering mage together
+      if (typeof SS_RIVAL !== 'undefined' && SS_RIVAL.stopFor) SS_RIVAL.stopFor(this.code);
+      if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
+      if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
+      SS_NEAR.purge(this.code);
+      this.scene.start('vsmenu');
+      return;
+    }
     try { if (this.meRef) this.meRef.child('gone').onDisconnect().cancel(); } catch (e) { }
-    SSNET.dbTxn('mp/rooms/' + this.code, (cur) => {
+    this.db.txn('mp/rooms/' + this.code, (cur) => {
       if (!cur || !cur.players || !cur.players[vsUid()]) return cur;
       if (cur.status !== 'waiting') { cur.players[vsUid()].gone = true; return cur; }   // battle began mid-tap — bow out like a disconnect
       const players = { ...cur.players };
@@ -1056,7 +1446,7 @@ class VsBattle extends Phaser.Scene {
      and stays put, so we can never swap rooms under each other. */
   rescan() {
     const r = this.room;
-    if (this.rescanning || this.migrating || !r || r.status !== 'waiting') return;
+    if (this.rescanning || this.migrating || this.swapping || this.near || !r || r.status !== 'waiting') return;
     if (r.private || !r.seekAt || r.hostUid !== vsUid() || this.challenged) return;
     if (Object.keys(r.players || {}).length !== 1) return;
     if (Date.now() - (this.lastScan || 0) < VS_MM.RESCAN_MS) return;
@@ -1103,15 +1493,19 @@ class VsBattle extends Phaser.Scene {
   /* ---------- the quiet sky, from the host's chair (VS_FB above) ---------- */
   quietSky() {
     const r = this.room;
-    if (this.fbBusy || this.migrating || this.rescanning || !r || r.status !== 'waiting') return;
+    if (this.fbBusy || this.migrating || this.rescanning || this.swapping || this.near || !r || r.status !== 'waiting') return;
     if (r.private || !r.seekAt || r.hostUid !== vsUid() || this.challenged) return;
     if (VS_MAX[r.mode] !== 2) return;   // the battlegrounds fill by hand
     if (Object.keys(r.players || {}).length !== 1) return;
     if (typeof SS_RIVAL === 'undefined' || SSNET.mode !== 'firebase') return;
-    if (!this.fbAt) this.fbAt = r.seekAt + VS_FB.AT + Math.random() * VS_FB.SPREAD;
+    // the theater's roll governs: the answer is staged so OPPONENT FOUND
+    // lands on the rolled beat, never the old fixed clock
+    if (!this.fbAt) {
+      const end = this.theater ? this.theater.t0 + this.theater.T : r.seekAt + VS_FB.T_MIN + Math.random() * VS_FB.T_SPREAD;
+      this.fbAt = end - VS_FB.SETUP_MS;
+    }
     const now = Date.now();
     if (now < this.fbAt) return;
-    if (this.fbRival && (this.fbRival.alive || now - this.fbSpawnAt < VS_FB.RETRY_MS)) return;   // on the way (or a door that stayed cold: once more, later)
     this.fbBusy = true;
     (async () => {
       try {
@@ -1122,14 +1516,55 @@ class VsBattle extends Phaser.Scene {
         // the last look: an elder room takes me whatever the gap
         const pick = vsPickRoom(rooms, r.mode, t, t - 1e7, own, null);
         if (pick) { await this.migrate(pick.id); return; }
-        // a younger room on its way holds the door
-        if (t - this.fbAt < VS_FB.HOLD_MS && vsYoungerComing(rooms, r.mode, t, own, r.seekAt)) return;
-        const who = SS_RIVAL.persona(SS.prof.rating);
-        this.fbSpawnAt = Date.now();
-        this.fbRival = SS_RIVAL.spawn({ code: this.code, rating: who.rating, seatRating: who.rating, uid: who.uid, name: who.name, persona: who,
-          delay: VS_FB.ARRIVE_MS + Math.random() * VS_FB.ARRIVE_SPREAD });
+        // a younger room on its way holds the door (humans first — the beat
+        // runs a breath long rather than seat a mage over a real searcher)
+        if (t < this.fbAt + VS_FB.HOLD_MS && vsYoungerComing(rooms, r.mode, t, own, r.seekAt)) return;
+        await this.goNear();
       } catch (e) { } finally { this.fbBusy = false; }
     })();
+  }
+  /* ---------- the local swap (9/3 card 03) ----------
+     Nobody came: the search leaves the live sky. My waiting room is deleted
+     (atomically — a person landing in that same instant WINS, and the live
+     duel proceeds), the same code is re-sealed on THIS device, and one of
+     the circle is seated to answer at a busy human's rhythm. The room
+     record is byte-identical in shape; the sky simply no longer holds it. */
+  async goNear() {
+    this.swapping = true;
+    try {
+      if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
+      if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
+      try { if (this.meRef) this.meRef.child('gone').onDisconnect().cancel(); } catch (e) { }
+      const shut = await SSNET.dbTxn('mp/rooms/' + this.code, (cur) => {
+        if (!cur) return cur;
+        if (cur.status !== 'waiting' || !cur.players || !cur.players[vsUid()] || Object.keys(cur.players).length !== 1) return cur;
+        return null;
+      });
+      if (shut.value) {
+        // taken — a person got the seat as the door was closing; play THEM
+        try { if (this.meRef) this.meRef.child('gone').onDisconnect().set(true); } catch (e) { }
+        this.roomRef.on('value', this.onRoomCb);
+        this.castsRef.on('child_added', this.onCastCb);
+        return;
+      }
+      const who = SS_RIVAL.persona(SS.prof.rating);
+      SS_NEAR.seal(this.code, {
+        mode: this.room.mode, status: 'waiting', createdAt: this.room.createdAt || Date.now(), hostUid: vsUid(),
+        seed: this.room.seed || Math.floor(Math.random() * 1e9), lang: this.room.lang || ssGameLang(),
+        private: false, seekAt: this.room.seekAt || Date.now(),   // the shape a live worldwide room wears
+        players: { [vsUid()]: vsSeat(0) },
+      }, { uid: who.uid, myPlays: [], plays: [], seen: 0 });
+      this.near = true;
+      this.db = SS_NEAR.api;
+      this.room = null;   // re-primed by the near listener's first fire
+      this.roomRef = this.db.ref('mp/rooms/' + this.code);
+      this.meRef = this.db.ref('mp/rooms/' + this.code + '/players/' + vsUid());
+      this.castsRef = this.db.ref('mp/rooms/' + this.code + '/casts');
+      this.roomRef.on('value', this.onRoomCb);
+      this.castsRef.on('child_added', this.onCastCb);
+      this.fbRival = SS_RIVAL.spawn({ code: this.code, rating: who.rating, seatRating: who.rating, uid: who.uid, name: who.name, persona: who,
+        pace: 'busy', roomDb: SS_NEAR.api, delay: VS_FB.ARRIVE_MS + Math.random() * VS_FB.ARRIVE_SPREAD });
+    } finally { this.swapping = false; }
   }
 
   beginBattle() {
@@ -1148,12 +1583,26 @@ class VsBattle extends Phaser.Scene {
       return;
     }
     ssUsePack(SS_DICT.ready(rl) ? rl : 'en');
-    this.tweens.add({ targets: this.lobbyC, alpha: 0, duration: 400, onComplete: () => this.lobbyC.setVisible(false) });
+    this.tweens.add({ targets: this.waitC, alpha: 0, duration: 400, onComplete: () => { this.waitC.setVisible(false); this.killTheater(); } });
     // everyone I cross swords with becomes a recent rival (one-tap add later)
     for (const p of this.others()) SSNET.FR.noteRival(p.id, p.name);
     if (this.challenged) SSNET.FR.cancelChallenge(this.challenged.id);   // the bell is answered
     setSeed(this.room.seed || 1);
     this.board = []; this.sel = [];
+    // a near duel re-entered mid-rhythm: my sigils ride my seat, and my board
+    // is replayed move-for-move from the note's script (the same
+    // deterministic deal the rival engine mirrors) — the exact tiles I left
+    // stand waiting, not a fresh opening deal
+    this.restored = null;
+    if (this.near) {
+      const seatMe = this.me();
+      this.mySigils = (seatMe && Array.isArray(seatMe.sigils)) ? [...seatMe.sigils] : [];
+      const n = SS_NEAR.note(this.code) || {};
+      if ((n.myPlays || []).length && typeof SS_RIVAL !== 'undefined' && SS_RIVAL.replayBoard) {
+        try { this.restored = SS_RIVAL.replayBoard(PACK, this.room.seed || 1, n.myPlays); } catch (e) { this.restored = null; }
+      }
+      this.refreshSigChip();
+    }
     this.buildOpponentPanels();
     this.state = 'rise';
     // rise together: both clients see status flip to active within moments of
@@ -1171,6 +1620,16 @@ class VsBattle extends Phaser.Scene {
     });
   }
   update(time) {
+    // the theater's star motes on their slow orbit
+    if (this.thMotes) {
+      const l = this.L;
+      for (const m of this.thMotes) {
+        const a = m.__ph + time / 2400;
+        m.x = l.x(0) + Math.cos(a) * m.__r;
+        m.y = l.y(330) + Math.sin(a) * m.__r * 0.55;
+        m.alpha = 0.5 + 0.4 * (0.5 + 0.5 * Math.sin(a * 3 + m.__ph * 5));
+      }
+    }
     if (this.state !== 'rise' || !this.riseStart) return;
     try {
       let ms = time - this.riseStart;
@@ -1189,7 +1648,12 @@ class VsBattle extends Phaser.Scene {
     if (!instant) SFX.arriveChime();
     SFX.victory();
     const l = this.L;
-    this.fillBoard(true);
+    if (this.restored) {
+      // the standing board, tile for tile (the near-sky resume)
+      this.pendingTier = 0;
+      this.restored.slots.forEach((s, i) => { if (s) this.spawnTile(i, s.ch, s.tier, true); });
+      this.restored = null;
+    } else this.fillBoard(true);
     this.state = 'pick';
     this.updatePanels();
     const go = ssTxt(this, l.x(0), l.y(400), 'WEAVE!', l.u(30), '#2fe0d0').setOrigin(0.5).setDepth(80).setScale(0.5);
@@ -1260,7 +1724,7 @@ class VsBattle extends Phaser.Scene {
 
   secondTick() {
     if (this.scryCooldown > 0) this.scryCooldown--;
-    if (this.room && this.room.status === 'waiting') { this.rescan(); this.quietSky(); this.keepBell(); }
+    if (this.room && this.room.status === 'waiting') { this.rescan(); this.quietSky(); }
     if (!this.room || this.room.status !== 'active') return;
     if (this.room.mode === 'timed') {
       const left = Math.max(0, VS_TIME_MS - (Date.now() - this.room.startedAt));
@@ -1463,7 +1927,7 @@ class VsBattle extends Phaser.Scene {
     // authoritative writes: the caster deals the damage
     try {
       await this.castsRef.push({ uid: vsUid(), name: vsName(), word: word.toUpperCase(), dmg, target: target.id, at: Date.now() });
-      await SSNET.dbTxn('mp/rooms/' + this.code + '/players/' + target.id + '/hp', (cur) => Math.max(0, (cur == null ? VS_HP : cur) - dmg));
+      await this.db.txn('mp/rooms/' + this.code + '/players/' + target.id + '/hp', (cur) => Math.max(0, (cur == null ? VS_HP : cur) - dmg));
       const myCasts = ((this.me() || {}).casts | 0) + 1;
       const up = { lastWord: word.toUpperCase(), casts: myCasts, dealt: ((this.me() || {}).dealt | 0) + dmg };
       await this.meRef.update(up);
@@ -1477,6 +1941,12 @@ class VsBattle extends Phaser.Scene {
           if (cand.hp > 0 && !cand.gone) { next = cand.id; break; }
         }
         await this.roomRef.update({ turnUid: next, turnCount: (this.room.turnCount | 0) + 1 });
+      }
+      // a near duel writes its move into the note's script — the board replay
+      // on the next visit re-lives exactly these indices
+      if (this.near) {
+        const n = SS_NEAR.note(this.code) || {};
+        SS_NEAR.setNote(this.code, { myPlays: [...(n.myPlays || []), { c: used }] });
       }
       for (const i of used) { if (this.board[i]) { this.board[i].c.destroy(); this.board[i] = null; } }
       this.expireSpecials();               // unspent bonuses fade before the new reward drops
@@ -1507,6 +1977,10 @@ class VsBattle extends Phaser.Scene {
     this.unselectFrom(0);
     for (let i = 0; i < 16; i++) { if (this.board[i]) { this.board[i].c.destroy(); this.board[i] = null; } }
     this.fillBoard(false);
+    if (this.near) {
+      const n = SS_NEAR.note(this.code) || {};
+      SS_NEAR.setNote(this.code, { myPlays: [...(n.myPlays || []), { s: 1 }] });
+    }
     if (this.room.mode === 'timed') { this.scryCooldown = 6; return; }
     // turn modes: the reroll is your action
     const alive = this.alivePlayers().sort((a, b) => a.seat - b.seat);
@@ -1519,6 +1993,16 @@ class VsBattle extends Phaser.Scene {
     if (!cast || this.seenCasts[key]) return;
     this.seenCasts[key] = true;
     if (cast.uid === vsUid()) return;
+    // a near duel re-entered: everything under the seen watermark is history
+    // and stays quiet; a truly-new reply floats once and moves the mark
+    if (this.near && cast.at) {
+      const n = SS_NEAR.note(this.code) || {};
+      if (cast.at <= (Number(n.seen) || 0)) return;   // never |0 — an epoch-ms stamp shears at 32 bits
+      SS_NEAR.setNote(this.code, { seen: cast.at });
+    }
+    // under the theater the sky is covered — the panels tell the truth at
+    // the reveal; no flash for a blow you were never shown
+    if (!this.revealed) return;
     const l = this.L;
     if (cast.target === vsUid()) {
       SFX.hurt();
@@ -1603,6 +2087,8 @@ class VsBattle extends Phaser.Scene {
 
   endBattle() {
     this.state = 'done';
+    this.killTheater();   // a duel decided under the searching veil still ends honestly
+    if (this.waitC && this.waitC.visible) { this.waitC.setVisible(false); }
     if (this.inspectP) this.inspectP.close();   // the end screen owes the reader nothing
     if (this.sky) this.sky.setP(1, 0);   // if the duel dies mid-rise, land at the zenith where the overlay lives
     const l = this.L;
@@ -1622,12 +2108,16 @@ class VsBattle extends Phaser.Scene {
     // settling its own ledger from the same room record (so a duel's two
     // deltas mirror). No winner (everyone faded) = no exchange.
     let rd = 0;
-    if (this.room.winnerUid) {
+    // a near duel settles its Elo exactly once — the note remembers (a
+    // decided duel left unread for days settles at the boot sweep instead)
+    const nearNote = this.near ? (SS_NEAR.note(this.code) || {}) : null;
+    if (this.room.winnerUid && !(nearNote && nearNote.settled)) {
       const foes = Object.entries(this.room.players || {}).filter(([id]) => id !== vsUid()).map(([, p]) => p);
       if (foes.length) {
         const oppAvg = foes.reduce((a, p) => a + (Number.isFinite(p.rating) ? p.rating : SS_RATING.BASE), 0) / foes.length;
         rd = SS_RATING.duel(oppAvg, won ? 1 : 0);
       }
+      if (nearNote) SS_NEAR.setNote(this.code, { settled: 1 });
     }
     SS.prof.runs++; SS.save(); SS.sync();
     if (won) {
@@ -1703,6 +2193,27 @@ class VsBattle extends Phaser.Scene {
     this.rematchBusy = true;
     this.rematchT && this.rematchT.setText('SEALING…');
     try {
+      if (this.near) {
+        // the same rival answers on this device: a fresh near room, the old
+        // one (seen, decided) swept behind us — the busy rhythm carries over
+        const n = SS_NEAR.note(this.code) || {};
+        const persona = (typeof SS_RIVAL !== 'undefined') ? SS_RIVAL.circle().find((p) => p.uid === n.uid) : null;
+        if (!persona) throw new Error('cold');
+        const code = vsCode();
+        SS_RIVAL.stopFor(this.code);
+        if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
+        if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
+        SS_NEAR.purge(this.code);
+        SS_NEAR.seal(code, {
+          mode: 'turns', status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
+          seed: Math.floor(Math.random() * 1e9), lang: this.room.lang || 'en',
+          players: { [vsUid()]: vsSeat(0) },
+        }, { uid: persona.uid, myPlays: [], plays: [], seen: 0 });
+        SS_RIVAL.spawn({ code, rating: persona.rating, seatRating: persona.rating, uid: persona.uid, name: persona.name, persona,
+          pace: 'busy', roomDb: SS_NEAR.api, delay: 1600 + Math.random() * 2400 });
+        this.scene.start('vsbattle', { code });
+        return;
+      }
       let dest = this.room.rematch;
       if (!dest) {
         const code = vsCode();
@@ -1762,13 +2273,133 @@ class VsSummons extends Phaser.Scene {
   constructor() { super('summons'); }
   create() {
     ssMakeTextures(this);
-    this.bannerC = null; this.shown = null; this.accepting = false;
+    this.bannerC = null; this.shown = null; this.accepting = false; this.bannerKind = null;
     this.toastY = 0;
+    this.pendWatch = {};
     this.frOff = SSNET.FR.on(() => this.refresh());
-    // banners age out and "suppressed" flips as scenes come and go
-    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.refresh() });
-    this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
+    // banners age out and "suppressed" flips as scenes come and go; the
+    // standing summonses are kept honest on the same beat
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => { this.refresh(); this.watchPending(); } });
+    this.events.once('shutdown', () => {
+      if (this.frOff) { this.frOff(); this.frOff = null; }
+      for (const code of Object.keys(this.pendWatch)) this.unwatchPend(code);
+    });
     if (FRDEMO === 'guest') this.time.addEvent({ delay: 1500, loop: true, callback: () => { const inv = SSNET.FR.pending()[0]; if (inv && !this.accepting) this.accept(inv); } });
+  }
+
+  /* ---------- the standing summonses (9/3 card 03) ----------
+     A challenge no longer waits at a screen — it stands in a pending row
+     while the challenger roams, and THIS overlay is the row's keeper
+     wherever they are: it re-rings the bell every two minutes, lights the
+     room the moment the friend takes the seat (a txn, so a racing starter
+     cannot double-light it), banners "%1 answers", and marks a summons
+     declined when the bell is taken down unanswered. */
+  watchPending() {
+    if (SSNET.mode !== 'firebase') return;
+    const pend = VS_PEND.list();
+    for (const code of Object.keys(this.pendWatch)) {
+      if (!pend.some((p) => p.code === code)) this.unwatchPend(code);
+    }
+    for (const p of pend) {
+      if (this.pendWatch[p.code]) continue;
+      const w = this.pendWatch[p.code] = { seenBell: false };
+      w.roomRef = SSNET.ref('mp/rooms/' + p.code);
+      if (!w.roomRef) { delete this.pendWatch[p.code]; continue; }
+      w.roomCb = (snap) => this.onPendRoom(p.code, snap.val());
+      w.roomRef.on('value', w.roomCb);
+      if (!p.declined) {
+        w.invRef = SSNET.ref('invites/' + p.to.id + '/' + vsUid());
+        if (w.invRef) {
+          w.invCb = (snap) => {
+            if (snap.val() != null) { w.seenBell = true; return; }
+            if (!w.seenBell) return;
+            w.seenBell = false;
+            // taken down without a seat claimed = declined (a beat of grace
+            // for the join racing the removal)
+            this.time.delayedCall(1500, () => {
+              const rec = VS_PEND.get(p.code);
+              if (!rec || rec.declined || rec.active) return;
+              VS_PEND.mark(p.code, { declined: 1 });
+              this.toast(SS_T('vsDeclined', p.to.name));
+            });
+          };
+          w.invRef.on('value', w.invCb);
+        }
+      }
+    }
+    const now = Date.now();
+    for (const p of pend) {
+      if (p.declined || p.active) continue;
+      // the bell ages out of RTDB after 5 minutes — the standing summons
+      // re-rings it, so a friend arriving late still finds it
+      // (the answered-while-roaming banner is onPendRoom's moment)
+      if (now - (p.rung || p.at) >= 120000) {
+        VS_PEND.mark(p.code, { rung: now });
+        SSNET.FR.challenge(p.to.id, p.code, 'turns');
+      }
+    }
+  }
+  unwatchPend(code) {
+    const w = this.pendWatch[code];
+    if (!w) return;
+    if (w.roomRef && w.roomCb) w.roomRef.off('value', w.roomCb);
+    if (w.invRef && w.invCb) w.invRef.off('value', w.invCb);
+    delete this.pendWatch[code];
+  }
+  onPendRoom(code, room) {
+    const rec = VS_PEND.get(code);
+    if (!rec) { this.unwatchPend(code); return; }
+    if (!room) {
+      // the room is gone (swept, or cancelled elsewhere) — the row follows
+      this.unwatchPend(code);
+      VS_PEND.remove(code);
+      return;
+    }
+    if (room.status === 'waiting' && Object.keys(room.players || {}).length >= VS_MAX[room.mode || 'turns']) {
+      vsStartIfFull(code);
+      return;
+    }
+    if ((room.status === 'active' || room.status === 'done') && !rec.active) {
+      VS_PEND.mark(code, { active: 1 });
+      if (!this.scene.isActive('vsmenu') && !this.suppressed() && !rec.bannered) {
+        VS_PEND.mark(code, { bannered: 1 });
+        this.answerBanner(code, rec.to.name);
+      }
+    }
+  }
+  answerBanner(code, name) {
+    if (this.bannerC) return;   // a challenge banner holds the stage — the row still stands under VERSUS
+    this.bannerKind = 'answer';
+    const l = ssLayout(this);
+    const c = this.bannerC = this.add.container(l.x(0), l.y(120)).setDepth(900);
+    const W = 356, H = 62;
+    const glow = this.add.image(0, 0, 'glowbig').setDisplaySize(l.u(W * 1.5), l.u(H * 2.6)).setTint(0xffd77a).setAlpha(0.16).setBlendMode('ADD');
+    this.tweens.add({ targets: glow, alpha: 0.05, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const bg = this.add.image(0, 0, ssBtn(this, true, W, H)).setDisplaySize(l.u(W), l.u(H)).setInteractive();
+    const t1 = ssTxt(this, -l.u(W / 2 - 16), 0, SS_T('vsAnswered', name), l.u(12.5), '#ffe9a8').setOrigin(0, 0.5)
+      .setShadow(0, 0, '#c9b676', l.u(6), true, true);
+    while (t1.width > l.u(200) && t1.text.length > 6) t1.setText(t1.text.slice(0, -2) + '…');
+    const ab = this.add.image(l.u(W / 2 - 74), 0, ssBtn(this, false, 88, 32)).setDisplaySize(l.u(88), l.u(32)).setInteractive({ useHandCursor: true });
+    const at = ssTxt(this, l.u(W / 2 - 74), 0, SS_T('smAccept'), l.u(11), BTN_INK()).setOrigin(0.5);
+    this.tweens.add({ targets: [ab, at], alpha: 0.7, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    ab.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.enterPending(code); });
+    const xb = ssTxt(this, l.u(W / 2 - 16), 0, '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xb.on('pointerdown', () => { SFX.ui(); this.hide(); });
+    c.add([glow, bg, t1, ab, at, xb]);
+    c.y = l.y(120) - l.u(90); c.alpha = 0;
+    this.tweens.add({ targets: c, y: l.y(120), alpha: 1, duration: 420, ease: 'Back.easeOut' });
+    SFX.forge();
+  }
+  enterPending(code) {
+    VS_PEND.remove(code);
+    PENDING_ASCENT = null;
+    for (const s of this.game.scene.getScenes(false)) {
+      if (s === this) continue;
+      if (s.sys.isActive() || s.sys.isSleeping() || s.sys.isPaused()) s.scene.stop();
+    }
+    this.hide();
+    this.scene.launch('vsbattle', { code });
+    this.scene.bringToTop();
   }
   // no bell while a versus scene is up: a fresh challenge waits in RTDB (5 min)
   // and rings the moment you're back on a menu
@@ -1778,6 +2409,7 @@ class VsSummons extends Phaser.Scene {
   }
   refresh() {
     if (!this.sys.isActive()) return;
+    if (this.bannerC && this.bannerKind === 'answer') return;   // the answers banner holds until entered or waved off
     const list = SSNET.FR.pending();
     const inv = list[0];
     if (!inv || this.suppressed()) { if (this.bannerC && !this.accepting) this.hide(); return; }
@@ -1818,7 +2450,7 @@ class VsSummons extends Phaser.Scene {
   }
   hide() {
     const c = this.bannerC;
-    this.bannerC = null; this.shown = null; this.moreT = null; this.acceptT = null;
+    this.bannerC = null; this.shown = null; this.moreT = null; this.acceptT = null; this.bannerKind = null;
     if (!c) return;
     this.tweens.add({ targets: c, alpha: 0, y: c.y - ssLayout(this).u(30), duration: 220, onComplete: () => c.destroy() });
   }
@@ -1828,6 +2460,7 @@ class VsSummons extends Phaser.Scene {
     if (this.acceptT && this.acceptT.active) this.acceptT.setText('…');
     let ok = false;
     try { ok = await vsJoinRoom(inv.code); } catch (e) { ok = false; }
+    if (ok) await vsStartIfFull(inv.code);   // the challenger roams now — the accepting seat lights the duel
     SSNET.FR.decline(inv.from);   // the bell is answered either way
     if (!this.sys.isActive()) { this.accepting = false; return; }
     if (!ok) { this.accepting = false; this.hide(); this.toast(SS_T('smCold')); return; }
@@ -1840,7 +2473,7 @@ class VsSummons extends Phaser.Scene {
     }
     this.hide();
     this.accepting = false;
-    this.scene.launch('vsbattle', { code: inv.code });
+    this.scene.launch('vsbattle', { code: inv.code, joining: true });
     this.scene.bringToTop();
   }
   toast(text) {

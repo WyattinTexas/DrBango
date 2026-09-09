@@ -14,10 +14,12 @@
 // What it pins: the near rival is chosen over the far one; a lone searcher
 // still meets anyone once the tolerance has opened (and a veiled rating
 // queues by its true number); three simultaneous searchers never
-// double-claim or orphan a room, over repeated runs; since v0.49.0 the one
-// left alone is met by a circle mage ~12–16s in, and two far-apart searchers
-// who both reach the 12s mark pair with EACH OTHER (the last look beats the
-// rating gap — nobody gets a circle mage while a person waits). Every wait POLLS —
+// double-claim or orphan a room, over repeated runs; since v0.86.0 the one
+// left alone is answered INSIDE the searching theater's 8–15s roll: the live
+// room leaves the sky (the local swap) and a circle mage duels them on their
+// own device — and two far-apart searchers who both outlast their tolerance
+// still pair with EACH OTHER (the last look + the younger-coming hold beat
+// the rating gap — nobody gets a circle mage while a person waits). Every wait POLLS —
 // three software-rendered tabs share one CPU and nothing here is quick.
 const BASE = 'http://localhost:8899/index.html';
 const DB = 'https://testroom-75200-default-rtdb.firebaseio.com/starspell/mp/rooms';
@@ -137,7 +139,8 @@ ok('C (1050) takes the seat in A\'s room, not B\'s', await poll(async () => {
   const rs = await testRooms(); const b = seatsOf(rs, B.uid);
   ok('B is still alone in their own room', b.length === 1 && Object.keys(rs[b[0]].players).length === 1);
   ok('A\'s room rose into the duel', await poll(async () => { const rs = await testRooms(); const a = seatsOf(rs, A.uid); return a.length === 1 && rs[a[0]].status === 'active'; }, 30000));
-  ok('the searching screen is the lobby as before — B\'s tab sits in vsbattle waiting', await B.ev(`game.scene.isActive('vsbattle') && game.scene.getScene('vsbattle').room.status === 'waiting'`));
+  ok('the searching screen is the THEATER (9/3 card 03) — B\'s tab waits under it, no lobby', await B.ev(`(() => { const s = game.scene.getScene('vsbattle');
+    return game.scene.isActive('vsbattle') && s.room.status === 'waiting' && !!s.theater && !!s.searchT && s.searchT.text === SS_T('vsSearching') && !s.revealed })()`));
 }
 await A.park(); await B.park(); await C.park(); await sweep();
 
@@ -182,18 +185,25 @@ for (let run = 1; run <= 3; run++) {
   ok('run ' + run + ': one pair and one lone searcher, every uid seated exactly once', settled, 'rooms ' + sizes);
   ok('run ' + run + ': no room holds more than two, none is orphaned (every room has its host seated)',
     Object.values(rs).every((r) => Object.keys(r.players || {}).length <= 2 && !!(r.players || {})[r.hostUid]));
-  // the quiet sky: the one left alone is met by a circle mage, never by a test uid
+  // the quiet sky (9/3 card 03): the one left alone is met by a circle mage
+  // on THIS device — the live room leaves the sky (the local swap) and the
+  // duel forms in the tab's near store, never as an RTDB seat
+  const loneUid = (() => { const r = Object.values(rs).find((x) => Object.keys(x.players || {}).length === 1); return r && r.hostUid; })();
+  const loneC = [A, B, C].find((c) => c.uid === loneUid);
   const metAt = Date.now();
-  const met = await poll(async () => { rs = await testRooms(); return Object.values(rs).every((r) => Object.keys(r.players || {}).length === 2); }, 22000);
-  const lone = Object.values(rs).find((r) => Object.keys(r.players || {}).some((k) => !/^test_/.test(k)));
-  const guest = lone && Object.keys(lone.players).find((k) => !/^test_/.test(k));
-  ok('run ' + run + ': the lone searcher was met by one of the circle (uid cut like a device uid)', met && !!guest && /^u[a-z0-9]{8,}$/.test(guest), guest + ' after ' + Math.round((Date.now() - metAt) / 1000) + 's');
-  ok('run ' + run + ': exactly one such seat across the sky', Object.values(rs).reduce((n, r) => n + Object.keys(r.players || {}).filter((k) => !/^test_/.test(k)).length, 0) === 1);
+  const met = await poll(async () => { rs = await testRooms(); return Object.keys(rs).length === 1 && Object.keys(Object.values(rs)[0].players || {}).length === 2; }, 25000);
+  ok('run ' + run + ': the lone room LEFT the sky (the local swap) — only the pair remains', met, Object.keys(rs).length + ' rooms after ' + Math.round((Date.now() - metAt) / 1000) + 's');
+  const nearDuel = loneC ? await loneC.until(`(() => { const s = game.scene.getScene('vsbattle');
+    if (!s || !s.scene.isActive() || !s.near || !s.room) return false;
+    const foe = Object.keys(s.room.players || {}).find((k) => k !== '${loneUid}');
+    return !!foe && /^u[a-z0-9]{8,}$/.test(foe) && (s.room.status === 'active' || s.room.status === 'waiting'); })()`, 20000) : false;
+  ok('run ' + run + ': the lone searcher duels one of the circle on their own device (uid cut like a device uid)', nearDuel, loneUid);
+  ok('run ' + run + ': the circle holds NO seat in the sky — RTDB rooms are test-only', Object.values(rs).every((r) => Object.keys(r.players || {}).every((k) => /^test_/.test(k))));
   await A.park(); await B.park(); await C.park(); await sweep();
 }
 
-// ---------------------------------------------------------------- two reach the 12s mark together, far apart
-console.log('-- two at 12s, 700 apart: each other, never the circle');
+// ------------------------------------------------------- two theaters, far apart: the last look pairs them
+console.log('-- two searching at once, 700 apart: each other, never the circle');
 await A.boot({ rating: 1000 }); await B.boot({ rating: 1700 });
 await Promise.all([A.find(), B.find()]);
 ok('A (1000) and B (1700) each open a room — 700 apart is beyond any early tolerance', await poll(async () => { const rs = await testRooms(); return seatsOf(rs, A.uid).length === 1 && seatsOf(rs, B.uid).length === 1 && seatsOf(rs, A.uid)[0] !== seatsOf(rs, B.uid)[0]; }, 15000));
@@ -201,7 +211,7 @@ ok('A (1000) and B (1700) each open a room — 700 apart is beyond any early tol
   const t0 = Date.now();
   const paired = await poll(async () => { const rs = await testRooms(); const a = seatsOf(rs, A.uid), b = seatsOf(rs, B.uid); return a.length === 1 && b.length === 1 && a[0] === b[0]; }, 30000);
   const rs = await testRooms();
-  ok('at the 12s mark the younger crossed the gap into the elder: A and B share a room', paired, 'after ' + Math.round((Date.now() - t0) / 1000) + 's');
+  ok('at the last look the younger crossed the gap into the elder (the hold kept the door): A and B share a room', paired, 'after ' + Math.round((Date.now() - t0) / 1000) + 's');
   ok('no circle mage anywhere — only the two of them', Object.values(rs).every((r) => Object.keys(r.players || {}).every((k) => /^test_/.test(k))) && Object.keys(rs).length === 1, Object.keys(rs).length + ' rooms');
   ok('the duel rises', await poll(async () => Object.values(await testRooms()).some((r) => r.status === 'active'), 20000));
 }

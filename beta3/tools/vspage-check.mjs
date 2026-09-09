@@ -17,15 +17,18 @@
 // caption-under-crest and doors alike), the hero crest's size + bake px +
 // centred spacing, the sheet's shape and pinned invite, the share payload,
 // the + add-by-name flow on two REAL uids against the live registry, a real
-// friend-row challenge landing a TURNS room through the summons bell, the
-// away-row standing invite, and CHALLENGE WORLDWIDE seeding a turns room
-// with a queue clock.
+// friend-row challenge STANDING AS A PENDING ROW (9/3 card 03 — no waiting
+// screen) answered through the summons bell, the away-row standing invite,
+// and CHALLENGE WORLDWIDE's searching theater: the ticking clock, the rolled
+// 8–15s beat, OPPONENT FOUND, straight into a turns duel against a circle
+// mage on this device, the busy reply rhythm under the ?botpace seam, the
+// duel surviving a cold reload, and every registry row cleaned.
 // Self-launching: serves beta3 on :8899 if nothing does, TWO headless
 // Chromes on :9471/:9472 (/tmp/cdp-vspa|b, wiped first — the stale-profile
 // law), the LIVE sky (registry + FR need it; every row this run writes is
 // deleted and proven gone at the end).
 //
-//   perl -e 'alarm 580; exec @ARGV' node tools/vspage-check.mjs   # ~6 min
+//   perl -e 'alarm 720; exec @ARGV' node tools/vspage-check.mjs   # ~8 min (the theater's real 8–15s roll rides §6)
 //
 import { spawn, execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -67,14 +70,26 @@ ok('the pair centres by computation between the crest bottom and the safe band f
   && /safeB = 400 \+ \(l\.H - \(SS_INSET\.top \+ SS_INSET\.bottom\) \* DPR\) \/ \(2 \* l\.s\)/.test(vsSrc)
   && /\(crestB \+ safeB\) \/ 2/.test(vsSrc));
 const strSrc = readFileSync('strings.js', 'utf8');
-const NEW_KEYS = ['vsAsync', 'vsChFriend', 'vsChFriendSub', 'vsChWorld', 'vsChWorldSub', 'vsInviteNew', 'vsInviteNewSub', 'vsAppText', 'vsAddSelf', 'vsShareFail'];
+const NEW_KEYS = ['vsAsync', 'vsChFriend', 'vsChFriendSub', 'vsChWorld', 'vsChWorldSub', 'vsInviteNew', 'vsInviteNewSub', 'vsAppText', 'vsAddSelf', 'vsShareFail',
+  // 9/3 card 03 — the searching theater + the pending rows
+  'vsSearching', 'vsFound', 'vsWaitDuel', 'vsYourMove', 'vsTheirMove', 'vsPendDone', 'vsBotAnswered', 'vsAnswered', 'vsDuelStands'];
 const OLD_KEYS = ['vsInvite', 'vsInviteSub', 'vsFind', 'vsFindSub', 'vsTurnsSub', 'vsTimedSub', 'vsBgSub', 'vsFriendLink', 'vsFriendText',
   // 9/3 card 02 — the floor band's family (vsOrSeal was already an orphan;
   // vsNameSelf/vsColdSeal orphaned with the deleted prompt methods)
-  'vsAs', 'vsOrSeal', 'vsOrReach', 'vsByName', 'vsSeal', 'vsNameSelf', 'vsColdSeal'];
-ok('all ten new keys ship exactly five times (one per language)',
+  'vsAs', 'vsOrSeal', 'vsOrReach', 'vsByName', 'vsSeal', 'vsNameSelf', 'vsColdSeal',
+  // 9/3 card 03 — the summons-sealed screen's own words leave with it
+  'lobbyTitle', 'lobbySub'];
+ok('all nineteen new keys ship exactly five times (one per language)',
   NEW_KEYS.every((k) => (strSrc.match(new RegExp(k + ':', 'g')) || []).length === 5),
   NEW_KEYS.map((k) => k + '×' + (strSrc.match(new RegExp(k + ':', 'g')) || []).length).join(' '));
+// 9/3 card 03 — the worldwide path's source truth
+ok('the searching theater is real: the rolled beat, the found gate, the ticking clock',
+  /T_MIN: 8000, T_SPREAD: 7000/.test(vsSrc) && /buildTheater/.test(vsSrc) && /foundBeat/.test(vsSrc) && /searchClockT/.test(vsSrc));
+ok('the harness seams stand: ?vsfind pins the roll, ?botpace shrinks the reply rhythm',
+  /QS\.get\('vsfind'\)/.test(vsSrc) && /QS\.get\('botpace'\)/.test(readFileSync('rival.js', 'utf8')));
+ok('the summons-sealed screen is gone from versus.js: no roster line, no lobby code, no BEGIN THE BATTLE',
+  !/mages answered/.test(vsSrc) && !/lobbyRoster|lobbyCode|lobbyTitle|lobbySub/.test(vsSrc) && !/BEGIN THE BATTLE/.test(vsSrc));
+ok('the near sky + the pending rows are in the served set', /SS_NEAR/.test(vsSrc) && /VS_PEND/.test(vsSrc) && /pendRows/.test(vsSrc));
 ok('no retired key survives in any language',
   OLD_KEYS.every((k) => !new RegExp('[^a-zA-Z]' + k + ':').test(strSrc)),
   OLD_KEYS.filter((k) => new RegExp('[^a-zA-Z]' + k + ':').test(strSrc)).join(','));
@@ -345,25 +360,31 @@ ok('+ once more, for your own name', await A.tapUntil(`game.scene.getScene('vsme
 await A.type(NA); await A.key('Enter', 'Enter');
 ok('your own name is a gentle no', await A.until(`(() => { const s = game.scene.getScene('vsmenu'); return s.shNoteT && s.shNoteT.text === SS_T('vsAddSelf') })()`, 10000));
 
-/* ---------- 5. a friend row's CHALLENGE lands a TURNS room ---------- */
-console.log('— THE ROW CHALLENGE —');
-ok('a real tap on the row\'s CHALLENGE opens a lobby aimed at B',
+/* ---------- 5. a friend row's CHALLENGE stands a pending row (9/3 card 03) ---------- */
+console.log('— THE ROW CHALLENGE · THE PENDING ROW —');
+ok('a real tap on the row\'s CHALLENGE stands a pending row aimed at B — no waiting screen',
   await A.tapUntil(`((game.scene.getScene('vsmenu').frRows || []).find(r => r.id === ${JSON.stringify(UB)}) || {}).cb`,
-    `(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} && !s.challenged.away })()`, 25000));
-let room = await A.ev(`(() => { const s = game.scene.getScene('vsbattle'); return JSON.stringify({ code: s.code, mode: s.room.mode, priv: s.room.private, inv: s.room.invited }) })()`).then(JSON.parse);
-codes.add(room.code);
-ok('the room is TURNS, private, sealed for B', room.mode === 'turns' && room.priv === true && room.inv === UB, JSON.stringify(room));
+    `(() => { const s = game.scene.getScene('vsmenu'); return s.scene.isActive() && !game.scene.isActive('vsbattle')
+      && !!VS_PEND.list().find(p => p.to.id === ${JSON.stringify(UB)} && !p.away) })()`, 25000));
+let rec = JSON.parse(await A.ev(`JSON.stringify(VS_PEND.list().find(p => p.to.id === ${JSON.stringify(UB)}) || null)`) || 'null');
+codes.add(rec.code);
+ok('the row wears B\'s name and waits for an answer', await A.until(`(() => { const s = game.scene.getScene('vsmenu');
+  const r = (s.pendRows || []).find(r => r.code === ${JSON.stringify(rec.code)});
+  return !!r && r.kind === 'wait' && r.name === ${JSON.stringify(NB)} && r.statusT.text === SS_T('vsWaitAnswer', ${JSON.stringify(NB)}) })()`, 10000));
+const room5 = await rt('mp/rooms/' + rec.code);
+ok('the room behind it is TURNS, private, sealed for B', !!room5 && room5.mode === 'turns' && room5.private === true && room5.invited === UB, JSON.stringify(room5).slice(0, 140));
 ok('B\'s banner rings', await B.until(`(() => { const s = game.scene.getScene('summons'); return !!(s && s.bannerC && s.shown && s.shown.from === ${JSON.stringify(UA)}) })()`, 20000));
-ok('a real ACCEPT starts the duel on both sides', await (async () => {
+ok('a real ACCEPT lights the room from B\'s side — and A\'s page steps into the duel by itself', await (async () => {
   await sleep(900);
   for (let i = 0; i < 3; i++) {
     await B.tap(`game.scene.getScene('summons').bannerC.list.find(o => o.text === SS_T('smAccept'))`);
     if (await B.until(`game.scene.getScene('summons').accepting || game.scene.isActive('vsbattle')`, 3000)) break;
   }
   const ACT = `(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.room.status === 'active' })()`;
-  return await A.until(ACT, 25000) && await B.until(ACT, 25000);
+  return await B.until(ACT, 25000) && await A.until(ACT, 25000);
 })());
-// away: the friend keeps the affordance, the tap lands the standing summons
+ok('the pending row left with the entrance', await A.until(`VS_PEND.list().length === 0`, 8000));
+// away: the friend keeps the affordance, the tap stands the summons in a row
 await B.ev(`firebase.database().goOffline(); 1`).catch(() => { });
 await sleep(800);
 await B.park();
@@ -372,28 +393,129 @@ ok('A sees B leave the sky', await A.until(`!SSNET.FR.isOnline(${JSON.stringify(
 ok('the sheet still gives the away friend the challenge', await toMenu(A) && await openSheet(A)
   && await A.ev(`(() => { const s = game.scene.getScene('vsmenu'); const r = (s.frRows || []).find(r => r.id === ${JSON.stringify(UB)});
     return !!(r && !r.online && r.cb.input && r.cb.input.enabled && r.glyph.texture.key === 'vsswords') })()`));
-ok('…and the tap lands a lobby that says the summons waits',
+ok('…and the tap stands a pending row that says the summons waits under their stars',
   await A.tapUntil(`((game.scene.getScene('vsmenu').frRows || []).find(r => r.id === ${JSON.stringify(UB)}) || {}).cb`,
-    `(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.challenged && s.challenged.id === ${JSON.stringify(UB)} && s.challenged.away
-      && s.lobbySub && s.lobbySub.text === SS_T('vsWaitAway', ${JSON.stringify(NB)}) })()`, 25000));
-room = await A.ev(`(() => { const s = game.scene.getScene('vsbattle'); return JSON.stringify({ code: s.code, mode: s.room.mode }) })()`).then(JSON.parse);
-codes.add(room.code);
-ok('the standing invite waits under B\'s stars, a turns room behind it', room.mode === 'turns' && await (async () => {
-  for (let i = 0; i < 15; i++) { const inv = await rt('invites/' + UB + '/' + UA); if (inv && inv.code === room.code && inv.mode === 'turns') return true; await sleep(400); }
+    `(() => { const s = game.scene.getScene('vsmenu'); if (!s.scene.isActive() || game.scene.isActive('vsbattle')) return false;
+      const p = VS_PEND.list().find(p => p.to.id === ${JSON.stringify(UB)} && p.away); if (!p) return false;
+      const r = (s.pendRows || []).find(r => r.code === p.code); if (!r) return false;
+      const want = SS_T('vsWaitAway', ${JSON.stringify(NB)}), got = r.statusT.text;
+      return got === want || (got.endsWith('…') && want.startsWith(got.slice(0, -1))) })()`, 25000));
+rec = JSON.parse(await A.ev(`JSON.stringify(VS_PEND.list().find(p => p.to.id === ${JSON.stringify(UB)}) || null)`) || 'null');
+codes.add(rec.code);
+ok('the standing invite waits under B\'s stars, a turns room behind it', await (async () => {
+  for (let i = 0; i < 15; i++) { const inv = await rt('invites/' + UB + '/' + UA); if (inv && inv.code === rec.code && inv.mode === 'turns') return true; await sleep(400); }
+  return false;
+})() && (await rt('mp/rooms/' + rec.code + '/mode')) === 'turns');
+ok('the row\'s ✶ shares the invite link for the waiting summons', await (async () => {
+  // the capture from §3 died with that document — re-arm it on this one
+  await A.ev(`window.__cap = null;
+    Object.defineProperty(navigator, 'clipboard', { configurable: true,
+      value: { writeText: (t) => { window.__cap = t; return Promise.resolve(); } } }); 1`);
+  await A.tap(`((game.scene.getScene('vsmenu').pendRows || []).find(r => r.code === ${JSON.stringify(rec.code)}) || {}).share`);
+  for (let i = 0; i < 20; i++) { const c = await A.ev(`window.__cap`); if (c && c.includes('join=' + rec.code)) return true; await sleep(300); }
   return false;
 })());
 
-/* ---------- 6. CHALLENGE WORLDWIDE seeds a turns room with a queue clock ---------- */
-console.log('— CHALLENGE WORLDWIDE —');
+/* ---------- 6. CHALLENGE WORLDWIDE — the searching theater (9/3 card 03) ---------- */
+console.log('— CHALLENGE WORLDWIDE · THE SEARCHING THEATER —');
 const stale = (await rt('mp/rooms')) || {};
-for (const [k, r] of Object.entries(stale)) if (r && r.status === 'waiting' && !r.private && r.createdAt < Date.now() - 120000) await rtDel('mp/rooms/' + k);
-ok('A back on the meadow', await A.nav(BASE + '?fps=0') && await A.until(READY, 60000) && await toMenu(A));
+for (const [k, r] of Object.entries(stale)) {
+  if (!r || r.status !== 'waiting' || r.private) continue;
+  if (r.createdAt < Date.now() - 120000 || /^test_/.test(r.hostUid || '')) await rtDel('mp/rooms/' + k);
+}
+// ?botpace shrinks only the busy reply rhythm (the ?ride=0 pattern) — the
+// theater's own 8–15s roll runs REAL here: its duration IS the story
+ok('A boots with the reply rhythm shrunk', await A.nav(BASE + '?fps=0&botpace=1500,3000') && await A.until(READY, 60000) && await toMenu(A));
 await A.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChWorld'))`);
-ok('the tap opens a searching TURNS room, queue clock running',
-  await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.room.seekAt > 0 && s.room.mode === 'turns' && !s.room.private })()`, 25000));
-room = await A.ev(`(() => { const s = game.scene.getScene('vsbattle'); return JSON.stringify({ code: s.code }) })()`).then(JSON.parse);
-codes.add(room.code);
-await A.park();   // park before the quiet sky answers — rival-check owns that path
+ok('the tap raises the searching theater over a queued TURNS room',
+  await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.room.seekAt > 0
+    && s.room.mode === 'turns' && !s.room.private && !!s.theater && !s.revealed })()`, 25000));
+const th = JSON.parse(await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsbattle'); return { code: s.code, t0: s.theater.t0, T: s.theater.T } })())`));
+codes.add(th.code);
+ok('the beat is rolled inside [8s, 15s]', th.T >= 8000 && th.T <= 15000, (th.T / 1000).toFixed(1) + 's');
+ok('no seal, no share, no roster under the theater — the summons-sealed screen never appears on this path',
+  await A.ev(`(() => { const s = game.scene.getScene('vsbattle');
+    const walk = (list, out) => { for (const o of list) { if (o.text != null) out.push(o.text); if (o.list) walk(o.list, out); } return out; };
+    const texts = walk(s.children.list, []);
+    return !texts.some(t => t === s.code || t.endsWith(' ' + s.code)) && !texts.some(t => /mages answered/i.test(t)) && !texts.includes(SS_T('vsShareInvite')) && !s.shareB })()`));
+ok('SEARCHING stands and the clock ticks the wait up (Skylar 9/8: "some kind of timer")', await (async () => {
+  const a = await A.ev(`(() => { const s = game.scene.getScene('vsbattle');
+    return s.searchT.text === SS_T('vsSearching') && s.searchClockT ? s.searchClockT.text : null })()`);
+  if (!/^\d+:\d\d$/.test(a || '')) return false;
+  await sleep(1300);
+  const b = await A.ev(`game.scene.getScene('vsbattle').searchClockT.text`);
+  return /^\d+:\d\d$/.test(b || '') && b !== a;
+})());
+const found = await (async () => {
+  const cap = Math.max(3000, th.t0 + th.T + 5000 - Date.now());
+  for (let i = 0; i < cap / 250; i++) {
+    if (await A.ev(`game.scene.getScene('vsbattle').searchT.text === SS_T('vsFound')`)) return Date.now();
+    await sleep(250);
+  }
+  return 0;
+})();
+const beat = found ? (found - th.t0) / 1000 : -1;
+ok('OPPONENT FOUND lands on the rolled beat — inside the 8–15s window, never early',
+  found > 0 && beat >= 7.8 && beat <= 16.5 && found >= th.t0 + th.T - 600, beat.toFixed(1) + 's of ' + (th.T / 1000).toFixed(1) + 's rolled');
+ok('…then straight into the turns duel — no waiting screen between', await A.until(`(() => { const s = game.scene.getScene('vsbattle');
+  return s.state === 'pick' && s.room.status === 'active' && (!s.waitC.visible || s.waitC.alpha < 0.05) })()`, 20000));
+const foe = JSON.parse(await A.ev(`JSON.stringify((() => { const s = game.scene.getScene('vsbattle');
+  const e = Object.entries(s.room.players).find(([id]) => id !== SSNET.uid()); return { id: e[0], name: e[1].name, rating: e[1].rating, near: s.near } })())`));
+ok('the rival is of the circle, dressed as a person: minted mage name, device-cut uid, seated on THIS device',
+  /^u[a-z0-9]{8,}$/.test(foe.id) && /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(foe.name) && foe.near === true, JSON.stringify(foe));
+toDelete.add('players/' + foe.id);
+toDelete.add('names/' + await A.ev(`SSNET.nameKey(${JSON.stringify(foe.name)})`));
+ok('the live sky no longer holds the room (the local swap)', (await rt('mp/rooms/' + th.code)) === null);
+ok('nothing on screen says bot or ai', await A.ev(`!/\\bbot\\b|\\bai\\b|robot|engine|persona/i.test(game.scene.getScene('vsbattle').children.list.filter(o => o.text != null).map(o => o.text).join(' '))`));
+// the busy-human rhythm under the seam: hand the mage the turn and clock the
+// reply — rolled ONCE, WRITTEN beside the duel, then spent when it lands.
+// The write itself reports (a poll could miss a short shrunk window)
+await A.ev(`window.__sawAt = 0; window.__setNote = SS_NEAR.setNote;
+  SS_NEAR.setNote = (c, patch) => { if (patch && patch.answerAt > 0) window.__sawAt = patch.answerAt; return window.__setNote(c, patch); }; 1`);
+const handed = Date.now();
+await A.ev(`SS_NEAR.api.ref('mp/rooms/' + ${JSON.stringify(th.code)}).update({ turnUid: ${JSON.stringify(foe.id)}, turnCount: 1 })`);
+ok('the reply clock is rolled once and written beside the duel (a closed app keeps the schedule)',
+  await A.until(`window.__sawAt > 0`, 15000));
+const sawAt = await A.ev(`window.__sawAt`);
+ok('…rolled inside the seam\'s window', sawAt - handed >= 1000 && sawAt - handed <= 4500, ((sawAt - handed) / 1000).toFixed(1) + 's out');
+ok('the reply lands, stamped with its appointed minute', await (async () => {
+  if (!(await A.until(`(() => { const s = game.scene.getScene('vsbattle');
+    return ((s.room.players[${JSON.stringify(foe.id)}] || {}).casts | 0) >= 1 })()`, 25000))) return false;
+  return A.ev(`(() => { const casts = SS_NEAR.room(${JSON.stringify(th.code)}).casts || {};
+    return Object.values(casts).some(c => c.uid === ${JSON.stringify(foe.id)} && c.at === ${sawAt}) })()`);
+})(), ((Date.now() - handed) / 1000).toFixed(1) + 's after the turn was handed');
+await A.ev(`SS_NEAR.setNote = window.__setNote; 1`);
+ok('…and the spent clock is wiped', await A.until(`!((Number((SS_NEAR.note(${JSON.stringify(th.code)}) || {}).answerAt) || 0) > 0)`, 8000));
+ok('the board replay is deterministic — the same script re-lives the same tiles', await A.ev(`(() => {
+  const a = SS_RIVAL.replayBoard(PACK, 12345, [{ c: [0, 1, 2] }, { s: 1 }]);
+  const b = SS_RIVAL.replayBoard(PACK, 12345, [{ c: [0, 1, 2] }, { s: 1 }]);
+  return a.slots.length === 16 && JSON.stringify(a.slots.map(t => t && t.ch)) === JSON.stringify(b.slots.map(t => t && t.ch)) })()`));
+// the phone goes in the pocket MID-DUEL: the page reloads cold; the duel and
+// the circle ride localStorage, so the harness carries the pocket verbatim
+// (its own boot seeds wipe storage — a real phone keeps it for free)
+const pocket = await A.ev(`JSON.stringify({ d: localStorage.getItem('starspellDuels'), c: localStorage.getItem('starspellCircle'), p: localStorage.getItem('beta3.profile') })`).then(JSON.parse);
+// replant exactly once (the reopen) — sessionStorage outlives the boot
+// seeds' localStorage wipe, so later sections boot clean
+await A.seed(`try { if (!sessionStorage.getItem('vp.pocket')) { sessionStorage.setItem('vp.pocket', '1');
+  localStorage.setItem('starspellDuels', ${JSON.stringify(pocket.d)}); localStorage.setItem('starspellCircle', ${JSON.stringify(pocket.c)});
+  ${pocket.p ? `localStorage.setItem('beta3.profile', ${JSON.stringify(pocket.p)});` : ''} } } catch (e) {}`);
+ok('the app reopens on the duel standing by — a pending row, my move, the rival re-seated at boot', await (async () => {
+  if (!(await A.nav(BASE + '?fps=0&botpace=1500,3000') && await A.until(READY, 60000) && await toMenu(A))) return false;
+  return A.until(`(() => { const s = game.scene.getScene('vsmenu');
+    const r = (s.pendRows || []).find(r => r.code === ${JSON.stringify(th.code)});
+    return !!r && r.kind === 'move' && r.name === ${JSON.stringify(foe.name)} && r.statusT.text === SS_T('vsYourMove') })()`, 25000);
+})());
+ok('a tap on the row steps back under those stars — the same duel, the reply still standing, my turn', await (async () => {
+  await A.tap(`((game.scene.getScene('vsmenu').pendRows || []).find(r => r.code === ${JSON.stringify(th.code)}) || {}).zone`);
+  return A.until(`(() => { const s = game.scene.getScene('vsbattle'); if (!s || !s.scene.isActive() || s.code !== ${JSON.stringify(th.code)}) return false;
+    if (s.state !== 'pick' || !s.near) return false;
+    const p = s.room.players[${JSON.stringify(foe.id)}] || {}; const tiles = (s.board || []).filter(Boolean).length;
+    return (p.casts | 0) >= 1 && (p.lastWord || '') !== '' && tiles === 16 && s.room.turnUid === SSNET.uid() })()`, 35000);
+})());
+// tidy: the near duel and its mage leave with us (a fresh boot's seeds wipe
+// the store anyway — this keeps the story honest on ITS page)
+await A.ev(`SS_RIVAL.stopFor(${JSON.stringify(th.code)}); SS_NEAR.purge(${JSON.stringify(th.code)}); 1`);
+await A.park();
 
 /* ---------- 6b. the ?frdemo=invite recipe still stands (sealLobby) ---------- */
 ok('?frdemo=invite still lands a private turns lobby', await (async () => {
