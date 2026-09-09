@@ -38,13 +38,14 @@ moaners moans naked nip nips nob pawn pig sadist sidle smut spots spunk suck
 sucker suckers sucking tighten willies
 """.split()
 
-# Skylar's ruling (2026-09-02, reviewing the full 165-word screen vs ENABLE):
-# these profanities are playable — slurs stay banned, always. Exactly his list;
-# near-siblings he did not name (bitches, pussies, porno, shithead…) stay out.
+# Skylar's rulings (2026-09-02 restore, then 2026-09-09 trim ahead of his
+# wife's full review): these profanities are playable — slurs stay banned,
+# always. 9/9 removed again: asshole(s) bitching boner cum dildo(s) goddamn
+# shagging shit/shits/shitting/shitty slut(s); porn KEEPS its variations
+# (valid Scrabble play), so porno/pornos joined the survivors.
 RESTORE += """
-asshole assholes bastard bitch bitching boner cum dildo dildos goddamn pecker
-piss pissed pisser pissers pisses pissing porn pussy shag shagging shit shits
-shitting shitty slut sluts tosser vibrator
+bastard bitch pecker piss pissed pisser pissers pisses pissing porn porno
+pornos pussy shag tosser vibrator
 """.split()
 
 LINK = re.compile(r'<a[^>]+href=["\']/word-description/([a-z]+)["\'][^>]*>([A-Za-z]+)</a>')
