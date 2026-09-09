@@ -40223,6 +40223,12 @@ function locSync(){
 // the hard cut — the victory shake's exclusivity law, and any moment that must
 // own the speaker. Leaves no place behind, so nothing revives without a knock.
 function locKill(){ locStop(LOC_FADE); LOC.id=null; locFree(); }
+// REV 2 THE HUSH (FM-GVT-PROP-SFX-01; Wyatt 9/9/2026: "When clicked; we should note that it will turn off whatever the menu music was
+// playing"): the ride's tap takes the speaker — the menu theme (themeKill, the 0.12 s cut) and the place's bed (locKill, the same cut) go
+// silent so THE CALL plays alone; the landing's own roomSwitch (locSync + themeRevive) brings the destination's music back, as every landing
+// does. With the travel map up between, the desk is quiet until the pick. Called at the four TAP seats (the ship's and the warplane's
+// theatre + RM branches); the arrival cinema, the field's bombers and the shop's crate never hush.
+function rideHush(){ try{ themeKill(); locKill(); }catch(e){} }
 
 // ==================== THE VICTORY SHAKE (SH-01 · FM-GVT-SHAKE-01) ====================
 // THE PANTHEON: when you do something truly great, your army dances. A wordless,
@@ -41084,7 +41090,9 @@ const SFX = {
   }catch(e){} },
   // THE CALL — THE PROPELLER'S NEW VOICE, REV 1 (FM-GVT-PROP-SFX-01, design/prop-sfx-0909; Wyatt 9/9/2026 on the audition: "I want the
   // hairs on my arms to stand up. We need a flute or a ocarina. Like the opening notes of [the Ocarina of Time] or the sfx in super mario
-  // 3 when you play the magic flute"): the sound that SUMMONS the ride — an ORIGINAL ocarina phrase (no borrowed notes), voice F1 THE CALL.
+  // 3 when you play the magic flute"): the sound that SUMMONS the ride — an ORIGINAL ocarina phrase (no borrowed notes), voice G1 THE ANTHEM
+  // (REV 2, Wyatt on v9.01: "a more catchy tune. The instrument is pleasant but we need a more meaningful note arrangement" — the same
+  // instrument, a motif stated, sequenced and resolved; F1 THE CALL, the first phrase, stays on the audition sheet for comparison).
   // Each note a sine with a faint 2nd and 3rd partial and a breath of band-passed air under it, a scoop into the pitch, vibrato blooming
   // on the held ones, the whole phrase in a small synthesized room (a decaying-noise impulse through one convolver, a third wet). Heard
   // at the TRAVEL seats — the toy warplane's takeoff (planeTravel), the pirate ship's sail (shipTravel), the ship's arrival (shipCineOpen)
@@ -41101,8 +41109,8 @@ const SFX = {
         if(dep){ const hd=ac.createGain(); hd.gain.value=h; dep.connect(hd); hd.connect(o.frequency); } o.connect(og).connect(g); o.start(at); o.stop(end+0.1); });
       const n=Math.round(sr*(len+0.1)), b=ac.createBuffer(1,n,sr), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
       const s=ac.createBufferSource(); s.buffer=b; const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f*2; bp.Q.value=2.5; const bg=ac.createGain(); bg.gain.value=0.16; s.connect(bp).connect(bg).connect(g); s.start(at); };
-    // THE PHRASE (D pentatonic, the ocarina's fifth octave): A4 · D5 · F#5 · A5 held · G5 · F#5 · B5 held — the leap of a fourth to the sixth, unresolved
-    [[440,0,0.13,0.05,0],[587,0.13,0.13,0.055,0],[740,0.26,0.13,0.06,0],[880,0.39,0.30,0.065,1],[784,0.69,0.11,0.06,0],[740,0.80,0.11,0.058,0],[988,0.91,0.62,0.065,1]].forEach(([f,at,len,v,vib])=>note(f,t+at,len,v,vib));
+    // THE PHRASE (D major): D5 A5· G5 F#5 E5 | D5 B5· A5 F#5 | A5 D6 held — "da-DAA-da-da-da, da-DAA-da-da, da-DAAAA"
+    [[587,0,0.11,0.055,0],[880,0.11,0.26,0.065,1],[784,0.37,0.09,0.06,0],[740,0.46,0.09,0.058,0],[659,0.55,0.12,0.056,0],[587,0.67,0.11,0.055,0],[988,0.78,0.28,0.065,1],[880,1.06,0.09,0.06,0],[740,1.15,0.09,0.058,0],[880,1.24,0.12,0.06,0],[1175,1.36,0.52,0.065,1]].forEach(([f,at,len,v,vib])=>note(f,t+at,len,v,vib));
   }catch(e){} },
   // 0091 the bomber's falling stick — a quiet ~0.5s descending whistle per
   // bomb (the bursts themselves are splash()'s own boom)
@@ -43244,7 +43252,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.01';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.02';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -82955,9 +82963,9 @@ function shipTravel(){
   // a decor tap reaches decorReact TWICE by design (the dspot's onclick +
   // the RDRAG tap path), and a synchronous reset would let the twin call
   // ferry straight back (measured: bedroom->backyard->bedroom in one tap)
-  if(reducedMotion()){ SFX.flute(); if(!direct){ travelMapOpen('ship'); return; } go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // 0825: no theatre — the map at once (the latch holds till the pick), the pick switches the room directly
+  if(reducedMotion()){ rideHush(); SFX.flute(); if(!direct){ travelMapOpen('ship'); return; } go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // 0825: no theatre — the map at once (the latch holds till the pick), the pick switches the room directly
   if(!direct) travelMapMount('ship');   // 0825: THE MAP built + laid out NOW, unpainted (.pre) — its cost paid before the takeoff's first frame, never under the clouds
-  SFX.flute();   // REV 1: THE CALL — the ocarina summons the sail (was SFX.prop, the engine)
+  rideHush(); SFX.flute();   // REV 1: THE CALL — the ocarina summons the sail (was SFX.prop, the engine); REV 2: THE HUSH first — the music off, the call alone
   const g=document.getElementById('decShip'); if(g) g.classList.add('travel');
   const w=document.createElement('div'); w.id='cloudwipe';
   w.innerHTML='<div class="cwb">'+cloudWipeSVG()+'</div>';
@@ -83009,10 +83017,10 @@ function planeTravel(){
   SHIPTRV=1;
   const direct=!!SHIP_DEST;   // 0825 SARGE'S TRAVEL DESK: a port pinned BEFORE the press (MOVING DAY's own door, 0528) flies straight there as ever — one sail; otherwise the flight ends at THE MAP and the pick lands her (travelPick)
   const go=()=>{ roomSwitch(rideNextRoom(), true); SFX.thock(); };
-  if(reducedMotion()){ SFX.flute(); if(!direct){ travelMapOpen('warplane'); return; } go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // the ship's RM branch verbatim: no class, no seat, no landing, no layer (travel is information; the theatre is not) — 0825: the map at once, the pick switches directly
+  if(reducedMotion()){ rideHush(); SFX.flute(); if(!direct){ travelMapOpen('warplane'); return; } go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // the ship's RM branch verbatim: no class, no seat, no landing, no layer (travel is information; the theatre is not) — 0825: the map at once, the pick switches directly
   PLANE_LOOP=planeLoopRoll(); const L=PLANE_LOOP? WP_LOOP_MS : 0;   // 0584 THE LOOP-DE-LOOP: every beat past the takeoff waits for it
   if(!direct) travelMapMount('warplane');   // 0825: THE MAP built + laid out NOW, unpainted (.pre) — its cost paid before the takeoff's first frame, never under the clouds
-  SFX.flute();   // REV 1: THE CALL — the ocarina summons the takeoff (was SFX.prop, the engine)
+  rideHush(); SFX.flute();   // REV 1: THE CALL — the ocarina summons the takeoff (was SFX.prop, the engine); REV 2: THE HUSH first — the music off, the call alone
   rideTop(); const g=document.getElementById('decPlane'); if(g) g.classList.add('travel'); wpFly('travel');   // seat first, class second — then THE FLIGHT LAYER lifts her out of the svg (0584)
   const w=document.createElement('div'); w.id='cloudwipe';
   w.innerHTML='<div class="cwb">'+cloudWipeSVG()+'</div>';
