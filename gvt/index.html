@@ -43265,7 +43265,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.07';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.08';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -76198,6 +76198,56 @@ const ROOF_BURP_N=6, ROOF_BURP_STARS=50;
 let ROOF_FED=0;
 const ROOF_FED_K=new Set();   // 0862 THE RETURN (⚑ Q3 ON): the toys fed to the hole this session — roofBurp gives them back
 const RN_SEAM=316;   // ⚑ Q1 0904 THE ROOM NOTES PART ONE: THE SEAM between the wall and the floor = the bed's feet (the legs' bottom 316); the molding cap stands in the 14 px above it
+// ═══ 0905 THE FLOOR LAW — GRAVITY FOR THE DECORATIONS ON EVERY FLOOR (FM-GVT-FLOOR-LAW-01; design/gravity-0908/00-DESIGN.md §2 THE LAW · §3 THE FALL · §4 THE SWEEP; Wyatt 9/8 ~22:05 ET:
+// "when a decoration / a treasure gets placed on the wall, it should fall down to the floor and land on the floor. That way, objects won't be able to be floating anymore" — the bedroom,
+// the soccer field, the roof, the Snowfields, the Western World; APPROVED 9/9 ~00:25 ET "Looks good. Approved"; the ⚑ recs = the law). THE LAW: a toy's FEET never rest above the room's
+// SEAM — let go in the air it FALLS (gravPark: the landing delta WRITTEN at the drop, then a rAF tween on the drag's own seat with ONE knock at the touchdown) until something CATCHES it
+// (a shelf plank, the bed, the helmet's nail — GRAV_SURF, the bedroom's alone, ⚑ Q13) or the floor's seam (GRAV_SEAM: one polyline per room, stage px — the bedroom's molding RN_SEAM ·
+// the yard's BY_LAWN_TOP · the roof's ridge cap foot · the buttes' bases DERIVED from wlRidgeSVG's own list WL_BUTTES · the winter treeline's foot DERIVED from wfCoverSVG's own list
+// WF_COVER, ⚑ Q11); painted in the air (an old arrangement, an authored wall home, a wall deal, a dead fling) it is SET DOWN silently at the paint (gravSweep, ⚑ Q2). The feet = the box's
+// bottom (the robot's = his HOME foot, GRAV_FEET); the rides fly, the rod casts, the dog, the hookshot and the tap-only toys never drag — exempt; the roof's hole and eaves keep their
+// session-gone law (they test first). Zero words, zero server bytes, zero wire keys, zero save-schema bytes (the write is the room's own arrangement map — the kid's own drag's write), zero CSS. ═══
+const GRAV_G=2400, GRAV_BOUNCE=0.28, GRAV_BOUNCES=2, GRAV_VMIN=90, GRAV_DT=1/30;   // ⚑ Q5 THE DIALS: px/s² (a 200 px fall lands in 0.41 s) · the bounce's restitution (a 200 px fall's bounce rises ~15 px) · at most two · a touchdown slower than this rests · the frame's dt cap (a hidden tab's giant dt can't tunnel)
+const GRAV_HOLD=16;   // a plank's hold: its top face + its shadow (158..174 · 270..286) — feet inside it REST on the plank
+const GRAV_FEET={ get robot(){ return NEM_XSPOT.robot.h; } };   // (a getter: NEM_XSPOT is declared under this block — read at the first drop, never at the boot) the feet's offset under the drag base's top where it is not the box's height: the robot's drag base is his WANDER ENVELOPE (rdragTapPick), his feet = his HOME foot (214+76 = 290, the highest he walks)
+const GRAV_FALLING=new Map();   // k → { dx, y, v, n, hit, land, t, done } — the toys mid-fall (session-only: the theater, never the truth — the save holds the landing from the drop)
+let GRAV_RAF=0;
+function gravEnvelope(list, foot, bare){   // the seam under a row of shapes [cx, cy, w, h]: at x the LOWEST foot among the shapes covering it; a gap between two shapes carries the western neighbour's foot (the treeline's pines / the mesa's skirt fill it); `bare` only west of the first shape — ONE function for the buttes and the drifts
+  const S=list.map(s=>[s[0]-s[2]/2, s[0]+s[2]/2, foot(s)]);
+  const xs=[...new Set([0,960].concat(S.map(s=>s[0]), S.map(s=>s[1])).map(x=>Math.max(0, Math.min(960, x))))].sort((a,b)=>a-b);
+  const P=[]; let y=bare;
+  for(let i=0;i+1<xs.length;i++){ const xa=xs[i], xb=xs[i+1]; if(xb<=xa) continue;
+    let m=-1; for(const s of S){ if(s[0]<=xa && s[1]>=xb) m=Math.max(m, s[2]); }
+    if(m>=0) y=m;
+    if(!P.length) P.push([xa,y]); else if(P[P.length-1][1]!==y){ P.push([xa,P[P.length-1][1]]); P.push([xa,y]); } }
+  P.push([960,y]); return P;
+}
+function gravRidgeSeam(){ return gravEnvelope(WL_BUTTES, b=>b[1]+b[3]/2, 228); }   // WESTERN LAND: each butte's flat base cy+h/2 (the room's level base — roomArt's HILL_ROOM) → 228 · 254 · 236 · 232 (0900's four buttes, the knob retired); the horizon 228 bare
+function gravTreelineSeam(){ return gravEnvelope(WF_COVER, d=>Math.round(d[1]+d[3]*0.5+d[3]*0.09), 316); }   // THE WINTER FIELD: each cover drift's lowest point = y + h/2 + 0.09·h (the sag's midpoint) → 343 · 341 · 339 · 331 (⚑ Q11: the treeline's foot — the field's molding — not the horizon); the far snow's own bottom 316 bare
+const GRAV_SEAM={ get bedroom(){ return [[0,RN_SEAM],[960,RN_SEAM]]; }, get backyard(){ return [[0,BY_LAWN_TOP],[960,BY_LAWN_TOP]]; }, get rooftop(){ return [[0,RF_CAP.y+RF_CAP.h],[960,RF_CAP.y+RF_CAP.h]]; }, get western(){ return gravRidgeSeam(); }, get winter(){ return gravTreelineSeam(); } };   // ⚑ Q1 the seam per room — GETTERS: every number read LIVE off the painters' own constants (declared under this block; nothing typed twice)
+let GRAV_PLANKS=null;
+function gravPlanks(){   // THE BEDROOM'S CATCHES 1 + 2: the shelf planks read off shelfSVG's own markup at first use (never typed twice) — each plank rect (rx 3) → { x0, x1, y, hold } (0904's top plank 196..712 at 158 · 0903's second plank at 270 — "players like to place their treasures on top of the shelf")
+  if(GRAV_PLANKS) return GRAV_PLANKS; const out=[], re=/<g id="(ro-shelf2?)"[^>]*>([\s\S]*?)<\/g>/g, sh=shelfSVG(); let m;
+  while((m=re.exec(sh))){ const r=/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="3"/.exec(m[2]); if(r) out.push({ id:m[1], x0:+r[1], x1:+r[1]+ +r[3], y:+r[2], hold:GRAV_HOLD }); }
+  return (GRAV_PLANKS=out);
+}
+const GRAV_SURF={ get bedroom(){ const h=DECOR_SPOTS.helmet; return gravPlanks().concat([{ id:'bed', x0:702, x1:910, y:240, hold:76 }, { id:'nail', x0:h.x, x1:h.x+h.w, y:h.y+h.h, hold:6 }]); } };   // THE BED (the mattress 702..910 — the shadow's span: resting anywhere with the feet 240..316, the teddy's and the unicorn's seats; a drop from above lands at 240, against the headboard) · ⚑ Q3 THE HELMET'S NAIL = his authored home's feet (0904's wall trophy hangs; anything dropped on the nail hangs there too). No catches on the other four floors (⚑ Q13)
+function gravFeetOff(k, base){ return GRAV_FEET[k]!==undefined? GRAV_FEET[k] : base.h; }
+function gravExempt(k){ return rideIs(k) || k==='lakerod' || k==='gooddog' || k==='hook' || (k!=='robot' && !/^vt\d$/.test(k) && RDRAG_DECOR.indexOf(k)<0) || (k==='soccer' && !!SOC_FLY) || GRAV_FALLING.has(k); }   // the rides fly · the rod casts · the dog and the hookshot keep their own laws · a tap-only toy never drags · the ball mid-flight · a toy mid-fall
+function seamY(room, x){   // the seam's y at x: linear along a segment; ON a vertical step the LOWER y (the larger); off the polyline's ends its end values
+  const P=GRAV_SEAM[room]; if(!P || !P.length) return 600;
+  if(x<=P[0][0]) return P[0][1]; if(x>=P[P.length-1][0]) return P[P.length-1][1];
+  let y=-1e9; for(let i=1;i<P.length;i++){ const a=P[i-1], b=P[i]; if(x<a[0] || x>b[0]) continue; y=Math.max(y, a[0]===b[0]? Math.max(a[1],b[1]) : a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0])); }
+  return y;
+}
+function gravLand(k, base, dx, dy){   // THE VERDICT: { cx, feet, seam, land (the feet's landing y = the nearest catch at or below the feet in the toy's x, else the seam), on (the catch's id | 'floor'), falls }
+  const r=roomCur(), cx=base.x+base.w/2+dx, feet=base.y+gravFeetOff(k, base)+dy, seam=seamY(r, cx);
+  let land=seam, on='floor';
+  for(const c of (GRAV_SURF[r]||[])){ if(cx<c.x0 || cx>c.x1) continue;
+    if(feet>=c.y && feet<=c.y+c.hold) return { cx:cx, feet:feet, seam:seam, land:feet, on:c.id, falls:false };   // RESTING on the catch
+    if(feet<c.y && c.y<land){ land=c.y; on=c.id; } }
+  return { cx:cx, feet:feet, seam:seam, land:land, on:on, falls:feet<land-0.5 };
+}
 // ═══ 0866 THE BACKYARD MAKEOVER — THE BACK OF THE HOUSE (FM-GVT-BACKYARD-01; design/backyard-0907/00-DESIGN.md §2 THE LAW · §3 THE SEATS · §10 REV 2 ·
 // §11 REV 3; Wyatt 9/7 ~1:15 pm ET: "a little whimsical and exciting...and mysterious. That hole in the roof is special"; 9/7 ~14:45 "Pretty darn good.
 // Let's go with your suggestions here"). THE PICTURE = build-by/mock-v13.js, ported — nothing redrawn by eye. The soccer field's menu, whole: the back
@@ -76455,8 +76505,9 @@ const DECOR_SEAT_R={ western:{
   tsjack:[200,438], tssub:[180,460], tsrocket:[196,438], tsmusic:[104,450], tsgold:[190,440], wsnake:[356,246], dino:[368,254], ptero:[376,262], trike:[380,264], stego:[372,250], ducky:[96,536], train:[470,518],
   goldkey:[480,530], silverkey:[504,530], bronzekey:[528,530], football:[560,536], soccer:[620,540], pdino:[740,540], tsdrum:[760,536], tscastle:[740,534], tsradio:[790,536], tstop:[780,538], tsyoyo:[740,534], wmouse:[750,556],
   wbandit:[790,548], snowfig:[745,548], syeti:[775,556], sdino:[744,550], dilo:[770,548], bdino:[736,540], wsniper:[740,556] },
+  // 0905 THE FLOOR LAW: seven of these rows RE-SEATED onto the treeline's foot (tsyoyo · tstop · helmet at x 30 → the feet at 343; kingcroaklil · wbandit · snowfig · sdino at x 296 → 341 — the same pockets, the feet on the seam; derived by build-gv/applyGV.py from WF_COVER + DECOR_SPOTS) so a fresh save deals them on the floor; every other row already stands below the treeline (the rig asserts all 59)
   // 0890 THE WINTER FIELD MAKEOVER (cell 4): the field's pockets — the big molds on the chest's rise, the mid ones by the treeline's foot / the east rise / under the lake, the small ones south of the game and on the far west; every seat surveyed against the park's rect + pill, the lake's ice, the fishers, the players, the snowmen, the family's home, the secret's rect, the chest's door + drop pad (the centre law), the rides' pockets, the pole's seat and GROUP (build-wf/seatsWF.py); the kite and the snow globe have NO winter seat (R1e/R1g — bedroom toys; 0890a)
-  winter:{ banana:[100,300], bass:[836,318], bluedragon:[480,540], bronzekey:[76,500], byeti:[102,392], dilo:[300,540], dino:[340,320], doghouse:[742,520], doghouse2:[188,340], ducky:[300,540], elephant:[86,392], football:[480,540], goldkey:[20,500], gsnowman:[102,392], helmet:[30,224], kingcroak:[102,392], kingcroaklil:[296,236], kingrex:[92,392], kingyeti:[76,392], pdino:[480,540], ptero:[340,320], puffer:[836,318], racecar:[20,500], sdino:[296,236], silverkey:[48,500], snowfig:[296,236], soccer:[480,540], stego:[340,320], teddy:[20,500], train:[300,540], trike:[340,320], tscastle:[340,320], tschest:[340,320], tscrew:[300,540], tsdrum:[480,540], tsdummy:[748,536], tsgfort:[300,540], tsgiant:[102,392], tsgold:[196,340], tsgvol:[480,540], tshorse:[196,340], tsjack:[340,320], tsmap:[748,536], tsmusic:[340,320], tsnem:[836,318], tsradio:[748,536], tsrocket:[480,540], tssub:[300,540], tstop:[30,224], tsyoyo:[30,224], unicorn:[836,318], wbandit:[296,236], whorse:[196,340], wlady:[836,318], wrider:[748,536], wsnake:[480,540], wsniper:[480,540], wteddy:[748,536], yeti:[196,340] } };
+  winter:{ banana:[100,300], bass:[836,318], bluedragon:[480,540], bronzekey:[76,500], byeti:[102,392], dilo:[300,540], dino:[340,320], doghouse:[742,520], doghouse2:[188,340], ducky:[300,540], elephant:[86,392], football:[480,540], goldkey:[20,500], gsnowman:[102,392], helmet:[30,279], kingcroak:[102,392], kingcroaklil:[296,281], kingrex:[92,392], kingyeti:[76,392], pdino:[480,540], ptero:[340,320], puffer:[836,318], racecar:[20,500], sdino:[296,301], silverkey:[48,500], snowfig:[296,297], soccer:[480,540], stego:[340,320], teddy:[20,500], train:[300,540], trike:[340,320], tscastle:[340,320], tschest:[340,320], tscrew:[300,540], tsdrum:[480,540], tsdummy:[748,536], tsgfort:[300,540], tsgiant:[102,392], tsgold:[196,340], tsgvol:[480,540], tshorse:[196,340], tsjack:[340,320], tsmap:[748,536], tsmusic:[340,320], tsnem:[836,318], tsradio:[748,536], tsrocket:[480,540], tssub:[300,540], tstop:[30,285], tsyoyo:[30,281], unicorn:[836,318], wbandit:[296,301], whorse:[196,340], wlady:[836,318], wrider:[748,536], wsnake:[480,540], wsniper:[480,540], wteddy:[748,536], yeti:[196,340] } };
 // the path sampler (M · L · C · Z) — the room's own track path into points every `step` px (the map's catmull sampler is for its closed spline)
 function wlSample(d,step){
   const toks=d.match(/[MLCZ][^MLCZ]*/g)||[]; let cur=[0,0], first=null; const out=[];
@@ -76485,7 +76536,8 @@ function wlSandSVG(){ const AR=TMAP_ART.art;
     +'<g stroke="#D3AB5E" stroke-width="1.6" fill="none" opacity=".9"><path d="M170 80 q22 -9 44 0 t44 0 t44 0 M540 68 q22 -9 44 0 t44 0 M330 100 q18 -7 36 0 t36 0 M780 92 q18 -7 36 0 t36 0"/></g>'
     +AR.dune(300,104,150,34)+AR.dune(640,88,150,30)+'</g>'; }
 // THE RIDGE — four overlapping buttes making one skyline: the west butte (the ship over its crown; the west shell under its foot), THE BIG BUTTE (the snake on top, cactus 0 on its shoulder), the filler, THE EAST MESA (the plane on its slope, cactus 1 on its east face; OUTLAW TOWN at its foot). The east knob RETIRED (§REV 1.1): the corner shell takes the east portal.
-function wlRidgeSVG(){ const AR=TMAP_ART.art; return '<g id="wl-ridge">'+AR.butte(110,182,300,92)+AR.butte(430,180,320,148)+AR.butte(640,208,170,56)+AR.butte(790,192,300,80)+'</g>'; }
+const WL_BUTTES=[[110,182,300,92],[430,180,320,148],[640,208,170,56],[790,192,300,80]];   // 0905 THE FLOOR LAW: the ridge's four buttes (cx, cy, w, h) — ONE list the painter and the seam law (gravRidgeSeam) read, so the ridge you see and the floor that catches can never drift
+function wlRidgeSVG(){ const AR=TMAP_ART.art; return '<g id="wl-ridge">'+WL_BUTTES.map(b=>AR.butte(b[0],b[1],b[2],b[3])).join('')+'</g>'; }
 // THE WATER HOLE alone (§9: the creek out; §REV 2.3: the ducky off it) — the pool at 238,548 rx 40 on a sand rim with two reed tufts; the id wl-creek stays (the lands strip names it; the paper never carries it)
 function wlCreekSVG(){ return '<g id="wl-creek"><ellipse cx="238" cy="552" rx="46" ry="23" fill="#D9B27A" opacity=".9"/><ellipse cx="238" cy="548" rx="40" ry="20" fill="#3A7DAA"/><ellipse cx="238" cy="548" rx="34" ry="15" fill="#5DA9D6"/><ellipse cx="228" cy="542" rx="11" ry="3" fill="#8FC4E8" opacity=".8"/><g stroke="#6b5a2e" stroke-width="2" fill="none" stroke-linecap="round"><path d="M282 540 q2 -10 5 -14 M287 541 q0 -12 2 -16 M196 560 q2 -9 5 -12 M201 561 q0 -11 2 -14"/></g></g>'; }
 // THE TRAIN (0866b cell E, byte-still) — the game's own three cars ×1.15 on ONE SMIL clock along the closed mpath (the visible U + the hidden return leg), keyPoints /
@@ -77062,9 +77114,10 @@ function wfMoversSVG(nt){
     +wfFamilySVG()+(nt? '' : wfBirdSVG())+wfPolesSVG()+wfFootPlayersSVG()+wfFootBallSVG(0.55)+'</g>'
     +wfCoverSVG(nt);
 }
+const WF_COVER=[[120,326,340,28],[410,326,220,26],[660,322,260,28],[860,300,240,52]];   // 0905 THE FLOOR LAW: the treeline's four cover drifts (x, y, w, h) — ONE list the painter and the seam law (gravTreelineSeam) read: the molding you see IS the floor's seam (each drift's foot y + h/2 + 0.09·h → 343 · 341 · 339 · 331)
 function wfCoverSVG(nt){
   return '<g id="wf-cover" pointer-events="none">'
-    +wfDrift(120,326,340,28,nt)+wfDrift(410,326,220,26,nt)+wfDrift(660,322,260,28,nt)+wfDrift(860,300,240,52,nt)   // the woods' drift LOW (312..340); the seam under the far park and east of it; the east drift the family walks behind
+    +WF_COVER.map(d=>wfDrift(d[0],d[1],d[2],d[3],nt)).join('')   // the woods' drift LOW (312..340); the seam under the far park and east of it; the east drift the family walks behind
     +[[110,336,1.6],[226,330,2.0],[380,330,1.2],[580,326,1.3],[760,318,1.2],[860,298,2.0],[920,290,1.5],[340,292,.9],[600,294,.85]].map(p=>wfPine(p[0],p[1],p[2],nt)).join('')   // the woods' lit pines flank the dark clump; the seam's pines clear the far park; R1e's two sparse trees in front of the walkers
     +'</g>';
 }
@@ -77376,7 +77429,7 @@ function roofSkySweep(){
   const taken=[{ x:CHEST_SEAT.x, y:CHEST_SEAT.y, w:CHEST_SEAT.w, h:CHEST_SEAT.h }, { x:378, y:216, w:166, h:202 }, { x:HOOK_BASE.x, y:HOOK_BASE.y, w:HOOK_BASE.w, h:HOOK_BASE.h }], ids=[]; let moved=0;
   for(const tb of VTROOPS){ if(document.getElementById('ro-'+tb.k)){ const d=rpXY(tb.k); taken.push({ x:tb.x+d[0], y:tb.y+d[1], w:tb.w, h:tb.h }); } }
   for(const sp of ROOM_SPOTS){ if(sp.act && (!sp.due || sp.due())) taken.push({ x:sp.x, y:sp.y, w:sp.w, h:sp.h }); }   // the roof's own tap rows (the puddle, the pigeons, the ladder, the well) keep their taps — a toy's anchor painted later would win them
-  for(const k in DECOR_SPOTS){ if(!decorHome(k) || rideIs(k)) continue; const b=DECOR_SPOTS[k], d=rpXY(k), bx={ x:b.x+d[0], y:b.y+d[1], w:b.w, h:b.h }; if(bx.y<ROOF_SKY_Y) ids.push(k); else taken.push(bx); }
+  for(const k in DECOR_SPOTS){ if(!decorHome(k) || rideIs(k)) continue; const b=DECOR_SPOTS[k], d=rpXY(k), bx={ x:b.x+d[0], y:b.y+d[1], w:b.w, h:b.h }; if(bx.y+bx.h<RF_CAP.y+RF_CAP.h) ids.push(k); else taken.push(bx); }   // 0905 THE FLOOR LAW: sky-hung = the FEET above the ridge's foot (a toy standing on the ridge is ON the roof — gravSweep set it there; the top-of-box test against ROOF_SKY_Y would re-seat it to the slope at every paint); ROOF_SKY_Y still bounds the candidates' band
   for(const k of ids){ if(roofSkySeat(k, taken)) moved++; }
   const m9=META.roomPosR && META.roomPosR.rooftop; if(m9 && m9.hook && (roofFallZone(HOOK_BASE, m9.hook[0], m9.hook[1]) || HOOK_BASE.y+m9.hook[1]<ROOF_SKY_Y)){ delete m9.hook; moved++; }   // cell 3b: a veteran's parked delta is relative to the SEAT — at the new west-rim seat a westward park would drop the hookshot off the eave at load-in
   if(moved) saveMeta();
@@ -79065,9 +79118,7 @@ function socSettle(){
   // unwritten so relaunch restores the spot it was pushed from (v3.06)
   if(roomCur()==='rooftop'){ const z=roofFallZone(b, d[0], d[1]);
     if(z){ roofFall('soccer', b, d[0], d[1], z); return; } }
-  if(d[0]||d[1]) rpMap().soccer=[d[0],d[1]]; else delete rpMap().soccer;   // 0330a: THIS room's arrangement
-  saveMeta(); SFX.blip();
-  renderMenu();
+  gravPark('soccer', b, d[0], d[1], { done:renderMenu });   // 0905 THE FLOOR LAW (⚑ Q8): a flight that dies on the wall / the house / the sky takes the fall (the theater), the repaint at the rest; a flight that dies on the ground = 0330a's park + the repaint byte-for-byte
 }
 // ===== 0368 THE WIND-UP GALLOP (Wyatt 8/16 late, verbatim: "when we got
 // the horse decoration, it was also a bit underwhelming. It looks super
@@ -80753,7 +80804,7 @@ function rdragPick(p){
   // off the roof (the porthole clone dupes ids but this is existence-only)
   if(document.querySelector('[id^="ro-vt"]'))
     for(let i=VTROOPS.length-1;i>=0;i--){ const tb=VTROOPS[i], d=rpXY(tb.k);
-      if(roofGone(tb.k) || BALL_DOWN.has(tb.k)) continue;   // v3.16: a man the ball put down is not draggable while down
+      if(roofGone(tb.k) || BALL_DOWN.has(tb.k) || GRAV_FALLING.has(tb.k)) continue;   // v3.16: a man the ball put down is not draggable while down · 0905 THE FLOOR LAW: nor a man mid-fall
       if(p.x>=tb.x+d[0] && p.x<=tb.x+tb.w+d[0] && p.y>=tb.y+d[1] && p.y<=tb.y+tb.h+d[1])
         return { k:tb.k, base:tb }; }
   // the named toys — after the troops (a man on the rug outranks the toy
@@ -80764,6 +80815,7 @@ function rdragPick(p){
     if(p.x>=b.x+d[0] && p.x<=b.x+b.w+d[0] && p.y>=b.y+d[1] && p.y<=b.y+b.h+d[1]) return { k:'lakerod', base:b }; }
   for(const k of RDRAG_DECOR){
     if(!decorHome(k)) continue;   // v3.06: a fallen toy can't be grabbed again
+    if(GRAV_FALLING.has(k)) continue;   // 0905 THE FLOOR LAW: a toy mid-fall is not at its seat to grab — it lands in under a second (the ball's own SOC_FLY law)
     if(k==='soccer' && SOC_FLY) continue;   // v3.16: mid-flight the ball isn't at its parked spot to grab
     if(k==='tsnem' && nemtLive()) continue;   // 0751 THE NEMESIS TOY RAMPAGES: the toy is not at his spot while he rampages (the horse's own law)
     if(k==='whorse' && WH_RUN) continue;   // 0368: mid-gallop the horse isn't at his spot either (the ball's own law); his HOME — the drag's word — never moves
@@ -80793,7 +80845,7 @@ function rdragTapPick(e){
   // drag moves his WANDER HOME, saved per room (rpMap — the decor-drag
   // law), and the walk resumes from the new home. A sub-slop release still
   // bleeps him (tap ≠ drag — the RDRAG_T/RDRAG_TT line, untouched).
-  if(t.closest('#decRobot'))  return { k:'robot',  base:{ x:robHomeX()-34, y:214, w:216, h:214 } };
+  if(t.closest('#decRobot'))  return GRAV_FALLING.has('robot')? null : { k:'robot',  base:gravRobotBase() };   // 0905 THE FLOOR LAW: his base through gravRobotBase (one truth — the same envelope, verbatim); mid-fall he is not at his home to grab
   // 0348 (Wyatt 8/16): THE HOOKSHOT DRAGS — pick it up, drop it down the
   // hole. The claim is its own sprite (the browser's hit test, the robot's
   // law); the base is the seated art box at (700,285)*0.56 so rdragClamp and
@@ -81059,6 +81111,61 @@ function roofSweep(){
     if(z) roofFall(k, b, d[0], d[1], z);
   }
   ROOF_SWEEPING=false;
+}
+// ═══ 0905 THE FLOOR LAW — THE FALL + THE SWEEP (§3 · §4): gravPark = rdragEnd's park line (and socSettle's, ⚑ Q8) — the verdict at the drop; gravTick = the rAF tween on the
+// drag's own seat (rdragApply on the #ro-<k> wrapper's transform ATTRIBUTE — the tap anchor rides, no CSS transform is fought, ZERO CSS); gravSweep = renderMenu's head, right after
+// yardSweep. The roof's own two laws sit just above (roofSafeSeat · roofSweep) and keep their gap: a drop in the hole or flush on an eave tests FIRST in rdragEnd and stays
+// session-gone; the sky above the ridge is this law's (roofSkySweep reads the feet against the ridge's foot now — a toy standing on the ridge is on the roof). ═══
+function gravRobotBase(){ return { x:robHomeX()-34, y:214, w:216, h:214 }; }   // the wanderer's drag base = his WANDER ENVELOPE (rdragTapPick's, one truth): the home box + every waypoint; his feet = NEM_XSPOT.robot.h under its top
+function gravPark(k, base, dx, dy, opt){
+  opt=opt||{};
+  const L=gravExempt(k)? null : gravLand(k, base, dx, dy);
+  if(!L || !L.falls){   // resting on a catch, on the floor, or exempt → THE PLAIN PARK, byte-for-byte today's: the write · the save · the blip
+    if(dx||dy) rpMap()[k]=[dx, dy]; else delete rpMap()[k];   // 0330a: THIS room's arrangement
+    saveMeta(); SFX.blip();
+    if(opt.done) opt.done();
+    return false;
+  }
+  const land=Math.round(L.land-(base.y+gravFeetOff(k, base)));   // the landing delta: the feet on the catch / the seam
+  if(dx||land) rpMap()[k]=[dx, land]; else delete rpMap()[k];   // THE TRUTH FIRST (v1.25's law): the save never depends on the theater — a repaint, a poll or a relaunch mid-fall paints the toy settled
+  saveMeta();
+  if(reducedMotion()){ rdragApply(k, dx, land); SFX.thock(); if(opt.done) opt.done(); return true; }   // the calm run: the snap + the knock
+  GRAV_FALLING.set(k, { dx:dx, y:dy, v:0, n:0, hit:0, land:land, t:performance.now(), done:opt.done||null });
+  if(!GRAV_RAF) GRAV_RAF=requestAnimationFrame(gravTick);
+  return true;
+}
+function gravTick(now){
+  GRAV_RAF=0;
+  for(const [k,f] of GRAV_FALLING){
+    const el=document.getElementById(k==='robot'? 'decRobot' : 'ro-'+k);
+    if(!el || !el.isConnected || S.mode!=='menu'){ GRAV_FALLING.delete(k); continue; }   // a repaint painted the landing (the save already holds it) — the theater dies with its node; nothing jumps back up
+    const dt=Math.min(Math.max(0, (now-f.t)/1000), GRAV_DT); f.t=now;
+    f.v+=GRAV_G*dt; f.y+=f.v*dt;
+    if(f.y>=f.land){
+      f.y=f.land;
+      if(!f.hit){ f.hit=1; SFX.thock(); }   // ⚑ Q6 ONE knock at the first touchdown (the chest's wooden voice, zero new sounds); no blip — the blip is a park's
+      if(f.n<GRAV_BOUNCES && f.v>GRAV_VMIN){ f.v=-f.v*GRAV_BOUNCE; f.n++; }
+      else { rdragApply(k, f.dx, f.land); GRAV_FALLING.delete(k); if(f.done) f.done(); continue; }   // REST: the seat = the saved delta exactly
+    }
+    rdragApply(k, f.dx, Math.round(f.y));
+  }
+  if(GRAV_FALLING.size) GRAV_RAF=requestAnimationFrame(gravTick);
+}
+function gravSweep(){   // §4 NOTHING FLOATS AT A PAINT: every draggable on THIS floor (the toys out, the robot, the four men) whose feet stand above its landing — the landing delta written, ONE save; SILENT (⚑ Q2: the room loads at rest, only a live drop falls); idempotent (the second paint writes nothing); never under the map's pin (THE TERRITORIES paints rooms at ×0.3 through MAPPIN)
+  if(S.mode!=='menu' || MAPPIN) return 0;
+  const r=roomCur(), list=[]; let n=0;
+  for(const k of rdecList(r)){ if(RDRAG_DECOR.indexOf(k)>=0 && DECOR_SPOTS[k] && decorHome(k)) list.push([k, DECOR_SPOTS[k]]); }
+  if(decorHome('robot')) list.push(['robot', gravRobotBase()]);
+  for(const tb of VTROOPS){ if(!roofGone(tb.k)) list.push([tb.k, tb]); }
+  for(const [k,b] of list){
+    if(gravExempt(k)) continue;
+    const d=rpXY(k), L=gravLand(k, b, d[0], d[1]); if(!L.falls) continue;   // rpXY folds DECOR_SEAT_R in — the live seat, never the arrangement map raw
+    const land=Math.round(L.land-(b.y+gravFeetOff(k, b)));
+    if(d[0]||land) rpMap()[k]=[d[0], land]; else delete rpMap()[k];
+    n++;
+  }
+  if(n) saveMeta();
+  return n;
 }
 // THE ROBOT (his own clause in Wyatt's ruling): no anchor, no saved delta —
 // he WANDERS on CSS keyframes, and his home translate(440,250) plus half
@@ -81614,8 +81721,7 @@ function rdragEnd(e){
     const z=(roomCur()==='rooftop' && !rideIs(d.k) && d.k!=='robot')? roofFallZone(d.base, d.dx, d.dy) : '';   // 0568 D6: a RIDE never falls — the ship since 0335, THE TOY WARPLANE now (it FLIES; a gap drop just parks it)   // 0335: the flying ship never falls — a gap drop just parks it (0341: the robot's LIVE gap check answers for him — robRoofCheck)
     if(z){ if(d.k==='hook' && z==='gap'){ hookDeliver(d.base, d.dx, d.dy); return; }   // 0348: the GAP is her mail slot — the edge stays v3.06's session fall (no delivery, back on relaunch)
       roofFall(d.k, d.base, d.dx, d.dy, z); return; }
-    if(d.dx||d.dy) rpMap()[d.k]=[d.dx, d.dy]; else delete rpMap()[d.k];   // 0330a: THIS room's arrangement
-    saveMeta(); SFX.blip();
+    gravPark(d.k, d.base, d.dx, d.dy);   // 0905 THE FLOOR LAW: the park's verdict — resting (a catch, the floor) = today's park byte-for-byte (0330a's write into THIS room's arrangement · the save · the blip); let go in the air = the landing delta written NOW, then the fall (gravTick) with the knock at the touchdown; the chest, the push, the cast, the roof's hole and eaves above keep their turn
   }
 }
 document.addEventListener('pointerdown', e=>{
@@ -84708,6 +84814,7 @@ function renderMenu(){
   pigCheck();   // settle the piggy BEFORE labels read it — a missed day drops it here
   rdecSweep();  // 0330a: deal any newly-granted toy onto THIS floor (and the ship into new rooms) before the paint reads the lists
   yardSweep();  // 0866 THE LAWN LAW's load-in pass: on the real yard a never-dragged toy whose seat top stands above the house's foot comes down to the grass once (a toy with a saved delta is the kid's and never moves)
+  gravSweep();  // 0905 THE FLOOR LAW's load-in pass: nothing floats at a paint — every toy, the robot and the men on THIS floor whose feet stand above their landing (an old arrangement on the wall, an authored wall home, a wall deal, a dead fling) come down to the first catch below / the seam, silently, ONE save; a live drop falls instead (gravPark)
   // v2.42: a repaint wipes the flying glass with the rest of the innerHTML —
   // drop its hand-state with it, or a stale pointer id grabs at a dead node
   // (the renderShop/LENS lesson, verbatim)
@@ -100691,6 +100798,9 @@ window.GVT = {
   ticketGive(n){ META.ticket=Math.max(0,(META.ticket|0)+(n==null?1:(n|0))); saveMeta(); shopRefresh(); return META.ticket; },   // 0544 rig door — the ledger's own grant, by hand
   lakeDrop(dx,dy){ if(!lakeRodDue()) return false; lakeDrop(LAKE_ROD, dx|0, dy|0); return true; },   // 0540: the drop by hand (the pointer path is rdragPick → rdragEnd; the battery drives both)
   chestDrop(k,dx,dy){ const b=DECOR_SPOTS[k]; if(!b) return null; const d={ k:k, base:b, dx:dx|0, dy:dy|0 }; const hit=chestDropHit(d); if(hit) chestSwallow(d); const g=document.getElementById('ro-chest'); return { hit:hit, out:chestOutN(roomCur()), on:decorOn(k), pad:CHEST_DROP_PAD, ms:CHEST_DROP_MS, hover:!!(g && g.classList.contains('tcover')), ghost:!!document.querySelector('#roomStage svg.chestghost') }; },   // 0907 THE CHEST TAKES A DROP: the drop by hand (lakeDrop's door — the pointer path is rdragPick → rdragEnd; the battery drives both)
+  grav(k,dx,dy){ const r=roomCur(), o={ cv:GVT_CV, room:r, seam:GRAV_SEAM[r]||null, holds:GRAV_SURF[r]||[], falling:[...GRAV_FALLING.keys()], dials:{ g:GRAV_G, bounce:GRAV_BOUNCE, bounces:GRAV_BOUNCES, vmin:GRAV_VMIN, dt:GRAV_DT, hold:GRAV_HOLD }, seams:{ bedroom:GRAV_SEAM.bedroom, backyard:GRAV_SEAM.backyard, rooftop:GRAV_SEAM.rooftop, western:GRAV_SEAM.western, winter:GRAV_SEAM.winter }, buttes:WL_BUTTES.map(b=>b.slice()), cover:WF_COVER.map(d=>d.slice()), feet:Object.assign({}, GRAV_FEET) };
+    if(k){ const b=k==='robot'? gravRobotBase() : (VTROOPS.find(t=>t.k===k) || DECOR_SPOTS[k]); if(!b) return o; const d=(dx===undefined)? rpXY(k) : [dx|0, dy|0]; const L=gravLand(k, b, d[0], d[1]); Object.assign(o, { k:k, base:{ x:b.x, y:b.y, w:b.w, h:b.h }, d:d, feetOff:gravFeetOff(k, b), land:L, landDy:Math.round(L.land-(b.y+gravFeetOff(k, b))), exempt:gravExempt(k) }); } return o; },   // 0905 THE FLOOR LAW: the verdict by hand (read-only — the pointer path is rdragPick → rdragEnd → gravPark; the battery drives both) + the seams, the catches, the dials, the two derived lists
+  gravSweep(){ return gravSweep(); },   // 0905 THE FLOOR LAW: the paint's sweep by hand (writes the landing deltas exactly as renderMenu's head does; returns the count)
   eliteShelf(){ return { cv:GVT_CV, led:Object.assign({},eliteLed()), rungs:Object.keys(ELITE_PRIZES).map(Number).sort((a,b)=>a-b), promo:ELITE_PROMO_RUNGS.slice(), hero:ELITE_HERO_RUNGS.slice(), purse:[ELITE_PURSE,ELITE_PURSE_BOSS], raidTags:ELITE_RAID_TAGS, raidNow:eliteRaidTags(), dye:ELITE_DYES.map(d=>({ id:d.id, hex:d.hex, own:META.dyes.indexOf(d.id)>=0, on:META.dyeOn===d.id })), dyeHex:dyeHex(), dyePaid:dyePaid(), price:dyePrice(), riteOwed:paintRiteOwed(), outfits:Object.keys(OUTFIT_EARN_CAMP).map(id=>({ id, rung:OUTFIT_EARN_CAMP[id], earn:OUTFIT_EARN[id], own:outfitOwns(id), on:outfitOn(id), lens:lensLines2(id), excl:OUTFIT_EXCL[id].slice() })), def:[OF_EFHELM_DEF,OF_EFARMOR_DEF], picks:META.pendingPicks|0, heroSel:heroSel(), heroLed:heroSel()? Object.assign({},heroMileLed(heroSel())) : null, camp:META.campaign|0, stars:Object.assign({},META.levelStars), plastic:S.plastic, medal:(document.getElementById('medalRow').dataset.stars||document.getElementById('medalRow').textContent), msg:(document.getElementById('medalText').dataset.v||document.getElementById('medalText').textContent) }; },   // 0539 THE ELITE SHELF — the rig's one read (0552c: dataset.stars / dataset.v on a campaign win)
   elite(n){ n=n|0; const cfg=levelCfg(n), last=cfg.waves[cfg.waves.length-1], b=campBaseRung(n);   // 0497: the elite law's probe surface — product-inert
     return { n, elite:n>100, k:n>100? n-100:0, base:b, top:ELITE_TOP, up:+eliteUpAvg().toFixed(4), axes:{ hpMul:+cfg.hpMul.toFixed(4), cntMul:+cfg.cntMul.toFixed(4), bossF:+cfg.bossF.toFixed(4), rateMul:+cfg.rateMul.toFixed(4), hpX:cfg.hpX||1, rifleRng:cfg.rifleRng||0 },
