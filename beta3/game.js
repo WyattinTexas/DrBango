@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.92.0';
+const BUILD = 'STARSPELL v0.93.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -3744,7 +3744,8 @@ function ssSigilPanel(scene, opts) {
   const win = scene.add.image(l.x(0), l.y(top + winH / 2), 'endpanel')
     .setDisplaySize(l.u(372), l.u(winH)).setInteractive();
   wc.add(win);
-  const tk = ssGoldTex(scene, SS_T(opts.title || 'inspTitle'), 16);
+  // a caller may name someone in the title (the rival's powers, 9/8 card 03)
+  const tk = ssGoldTex(scene, SS_T(opts.title || 'inspTitle', opts.titleArg), 16);
   const tsc = Math.min(1, 250 / tk.w);
   wc.add(scene.add.image(l.x(-6), l.y(top + 30), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
   const xT = ssTxt(scene, l.x(164), l.y(top + 29), '✕', l.u(17), '#8a94c4').setOrigin(0.5);

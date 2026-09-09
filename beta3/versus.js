@@ -1348,6 +1348,15 @@ class VsBattle extends Phaser.Scene {
     this.corr = this.near && SS_NEAR.room(d.code) ? !!SS_NEAR.room(d.code).corr : false;   // learned from the first sky snapshot otherwise
     this.recapQ = [];                         // the story of the turns I missed, told at the landing
     this.seenHigh = 0;                        // the highest cast stamp met this life (flushed to the ledger)
+    // seeing the rival whole (9/8 card 03) — reset every visit, like the
+    // rematch affair: the scene instance persists across duels
+    this.histMine = [];                       // my own casts off the feed (the story's opening verse)
+    this.foeLast = {};                        // uid → {word, dmg}: the price worn beside their last word
+    this.foeSeenAt = 0;                       // the latest ALREADY-SEEN foreign cast (the story's left edge)
+    this.myHpD = null;                        // my bar's display state (shown value + running tween)
+    this.storyC = null; this.storyEv = null; this.storyLand = null;
+    this.storyTold = false;                   // a corr landing tells its tale exactly once
+    this.storyPend = null;                    // the telling's one-breath timer (cancellable)
     this.deal = null;                         // the duel's private deal stream (beginBattle seats it)
     this.revealed = !this.theater;            // the found gate holds beginBattle under the theater
     this.beginQueued = false; this.revealTimer = null; this.swapping = false;
@@ -1497,7 +1506,7 @@ class VsBattle extends Phaser.Scene {
     this.oppC = this.add.container(0, 0);          // opponents row
     this.turnT = txt(l.x(0), l.y(320), '', 14, '#ffe9a8').setOrigin(0.5);
 
-    txt(l.x(-190), l.y(352), 'YOU', 11, '#c9b676').setOrigin(0, 0.5);
+    this.youT = txt(l.x(-190), l.y(352), 'YOU', 11, '#c9b676').setOrigin(0, 0.5);
     this.myName = txt(l.x(-150), l.y(352), vsName(), 12, '#f0e8d2').setOrigin(0, 0.5);
     this.hpBarBg = this.add.rectangle(l.x(-150), l.y(370), l.u(300), l.u(9), 0x1a2038).setOrigin(0, 0.5);
     this.hpBar = this.add.rectangle(l.x(-150), l.y(370), l.u(300), l.u(9), 0xd7b45c).setOrigin(0, 0.5);
@@ -2057,15 +2066,16 @@ class VsBattle extends Phaser.Scene {
       this.restored = null;
     } else this.fillBoard(true);
     this.state = 'pick';
+    this.playRecap();   // the story of the turns you missed — the corr story sheet pre-sets my bar
     this.updatePanels();
     // the landing beat: YOUR TURN gets the old WEAVE!; a duel standing on
-    // the rival's turn lands quietly (the board is a window, not a summons)
-    if (this.isMyTurn() || this.room.mode === 'timed') {
+    // the rival's turn lands quietly (the board is a window, not a summons) —
+    // and a landing with a tale to tell lets the story be the beat instead
+    if (!(this.corr && this.recapQ.length) && (this.isMyTurn() || this.room.mode === 'timed')) {
       const go = ssTxt(this, l.x(0), l.y(400), 'WEAVE!', l.u(30), '#2fe0d0').setOrigin(0.5).setDepth(80).setScale(0.5);
       this.tweens.add({ targets: go, scale: 1, duration: 200, ease: 'Back.easeOut' });
       this.tweens.add({ targets: go, alpha: 0, delay: 900, duration: 300, onComplete: () => go.destroy() });
     }
-    this.playRecap();   // the story of the turns you missed, then the board is yours
     // arriving into a duel woven in another tongue — say so over the board,
     // for joiners who rose past the lobby too fast to read it there
     if (this.room.lang && this.room.lang !== ssGameLang() && SS_PACKS[this.room.lang]) {
@@ -2095,12 +2105,25 @@ class VsBattle extends Phaser.Scene {
       const nm = ssTxt(this, l.u(n === 1 ? -40 : -30), -l.u(22), (hidden ? '' : ssRatingTier(pr).glyph + ' ') + p.name, l.u(n === 1 ? 15 : 12), '#f0e8d2').setOrigin(0, 0.5)
         .setInteractive({ useHandCursor: true });
       nm.on('pointerdown', () => ssRatingCard(this, { name: p.name, rating: pr, rhide: hidden }));
-      const barBg = this.add.rectangle(l.u(n === 1 ? -40 : -30), 0, l.u(n === 1 ? 200 : 110), l.u(8), 0x1a2038).setOrigin(0, 0.5);
-      const bar = this.add.rectangle(l.u(n === 1 ? -40 : -30), 0, l.u(n === 1 ? 200 : 110), l.u(8), 0xe66a6a).setOrigin(0, 0.5);
-      const sub = ssTxt(this, l.u(n === 1 ? -40 : -30), l.u(20), '', l.u(10), '#8a94c4', 'italic').setOrigin(0, 0.5);
-      c.add([av, nm, barBg, bar, sub]);
+      const bx = n === 1 ? -40 : -30, bw = n === 1 ? 200 : 110;
+      const barBg = this.add.rectangle(l.u(bx), 0, l.u(bw), l.u(8), 0x1a2038).setOrigin(0, 0.5);
+      const bar = this.add.rectangle(l.u(bx), 0, l.u(bw), l.u(8), 0xe66a6a).setOrigin(0, 0.5);
+      // their health, always readable (9/8 card 03): the number wears the same
+      // dress as your own row's, above the bar's far end — never a value to hunt
+      const hpT = ssTxt(this, l.u(bx + bw), -l.u(n === 1 ? 22 : 20), '', l.u(n === 1 ? 12 : 10), '#f0e8d2').setOrigin(1, 0.5);
+      const sub = ssTxt(this, l.u(bx), l.u(20), '', l.u(10), '#8a94c4', 'italic').setOrigin(0, 0.5);
+      // their held sigils, worn openly: the house chip (your own sigChipB's
+      // dress) — tap opens the same inspector, read from THEIR seat. A bot's
+      // seat carries the very same array a phone writes, so the chip cannot
+      // tell them apart, by construction.
+      const chx = bx + bw - (n === 1 ? 26 : 20), chy = n === 1 ? 24 : 22;
+      const chipB = this.add.rectangle(l.u(chx), l.u(chy), l.u(n === 1 ? 52 : 40), l.u(n === 1 ? 30 : 24), 0x151b33)
+        .setStrokeStyle(l.u(1.5), 0x8c7a4a).setInteractive({ useHandCursor: true }).setVisible(false);
+      const chipT = ssTxt(this, l.u(chx), l.u(chy), '', l.u(n === 1 ? 12 : 10), '#ffd77a').setOrigin(0.5).setVisible(false);
+      chipB.on('pointerdown', () => this.openInspectFoe(p.id));
+      c.add([av, nm, barBg, bar, hpT, sub, chipB, chipT]);
       this.oppC.add(c);
-      this.oppPanels[p.id] = { c, bar, sub, nm, w: l.u(n === 1 ? 200 : 110) };
+      this.oppPanels[p.id] = { c, bar, sub, nm, hpT, chipB, chipT, w: l.u(bw), bx: l.u(bx), shown: null, hpTween: null };
     });
   }
 
@@ -2108,16 +2131,23 @@ class VsBattle extends Phaser.Scene {
     if (!this.room || !this.oppPanels) return;
     const HP = vsRoomHp(this.room);   // a correspondence duel breathes at 150 — the room record rules
     const me = this.me();
-    if (me) {
-      this.hpBar.width = this.L.u(300) * clamp(me.hp / HP, 0, 1);
-      this.hpT.setText(Math.max(0, me.hp) + ' / ' + HP);
-    }
+    // every bar speaks through the display engine (a drop plays as a strike);
+    // while the turn story retells the missed blows it drives my bar itself
+    if (me && !this.storyC) this.showHp('me', me.hp, HP);
     for (const p of this.others()) {
       const pan = this.oppPanels[p.id];
       if (!pan) continue;
-      pan.bar.width = pan.w * clamp(p.hp / HP, 0, 1);
+      this.showHp(p.id, p.hp, HP);
+      // their last word wears its price (the cast feed's dmg, matched by word
+      // so a lagging feed can never mislabel a strike)
+      const fl = this.foeLast && this.foeLast[p.id];
+      const priced = p.lastWord ? ('· ' + p.lastWord + (fl && fl.word === p.lastWord ? '  −' + fl.dmg : '')) : '';
       // a correspondence seat is a standing chair — never "faded away"
-      pan.sub.setText((p.gone && !this.corr) ? 'faded away' : p.hp <= 0 ? 'defeated' : p.lastWord ? '· ' + p.lastWord : '');
+      pan.sub.setText((p.gone && !this.corr) ? 'faded away' : p.hp <= 0 ? 'defeated' : priced);
+      // their held sigils on the chip, live from the seat
+      const sn = Array.isArray(p.sigils) ? p.sigils.length : 0;
+      pan.chipB.setVisible(sn > 0);
+      pan.chipT.setVisible(sn > 0).setText(sn ? '✦ ' + sn : '');
       pan.c.setAlpha(p.hp <= 0 || (p.gone && !this.corr) ? 0.35 : 1);
     }
     if (this.room.mode === 'timed') this.turnT.setText(this.state === 'sigil' ? 'choose your sigil' : 'weave freely — the clock burns');
@@ -2138,6 +2168,72 @@ class VsBattle extends Phaser.Scene {
     const canAct = this.state === 'pick' && this.isMyTurn();
     this.castB.setAlpha(canAct ? (this.validWord() ? 1 : 0.45) : 0.25);
     this.scryB.setAlpha(canAct && this.scryCooldown <= 0 ? 1 : 0.25);
+  }
+
+  /* ---------- health you can read, wounds you can FEEL (9/8 card 03) ----------
+     One display engine for every bar, yours included: the shown value chases
+     the seat's truth, and a drop plays as a strike — the bar sinks eased, the
+     lost slice ghosts pale before it fades, the number rolls down, the price
+     speaks beside it — instead of teleporting on the next snapshot. The turn
+     story drives your own bar through the same door when it retells a missed
+     turn. Rectangles and text only: no new bakes, nothing tinted (the Canvas
+     renderer's law). */
+  hpState(id) {
+    if (id === 'me') return (this.myHpD = this.myHpD || { shown: null, hpTween: null });
+    return this.oppPanels ? this.oppPanels[id] : null;
+  }
+  showHp(id, hp, max) {
+    const st = this.hpState(id);
+    if (!st) return;
+    const target = Math.max(0, Math.min(max, hp | 0));
+    // equal: the running telling (if any) owns the paint; first sight or a
+    // rebuilt panel (shown null) and any rise settle silently
+    if (target === st.shown) { if (!st.hpTween) this.paintHp(id, target, max); return; }
+    if (st.shown == null || target > st.shown) { st.shown = target; this.paintHp(id, target, max); return; }
+    const from = st.shown;
+    st.shown = target;   // the truth at once — the tween is only the telling
+    if (st.hpTween) { st.hpTween.stop(); st.hpTween = null; }
+    const o = { v: from };
+    st.hpTween = this.tweens.add({
+      targets: o, v: target, duration: 560, ease: 'Cubic.easeOut',
+      onUpdate: () => this.paintHp(id, o.v, max),
+      onComplete: () => { st.hpTween = null; this.paintHp(id, target, max); },
+    });
+    this.strikeFx(id, from, target, max);
+  }
+  paintHp(id, v, max) {
+    const l = this.L, val = Math.max(0, Math.round(v));
+    if (id === 'me') {
+      if (!this.hpBar || !this.hpBar.active) return;
+      this.hpBar.width = l.u(300) * clamp(v / max, 0, 1);
+      this.hpT.setText(val + ' / ' + max);
+      return;
+    }
+    const pan = this.oppPanels ? this.oppPanels[id] : null;
+    if (!pan || !pan.bar.active) return;
+    pan.bar.width = pan.w * clamp(v / max, 0, 1);
+    pan.hpT.setText(val + ' / ' + max);
+  }
+  strikeFx(id, from, to, max) {
+    const l = this.L, mine = id === 'me';
+    const pan = mine ? null : (this.oppPanels ? this.oppPanels[id] : null);
+    if (!mine && !pan) return;
+    const bw = mine ? l.u(300) : pan.w;
+    // the pale ghost of the slice just lost — it lingers a breath, then goes
+    const gx = (mine ? this.hpBar.x : pan.bx) + bw * clamp(to / max, 0, 1);
+    const gw = Math.max(l.u(1.5), bw * clamp((from - to) / max, 0, 1));
+    const ghost = this.add.rectangle(gx, mine ? this.hpBar.y : 0, gw, l.u(mine ? 9 : 8), 0xfff0d0).setOrigin(0, 0.5).setAlpha(0.9);
+    if (mine) ghost.setDepth(97); else pan.c.add(ghost);   // 97: above the story veil, above the lifted bar
+    this.tweens.add({ targets: ghost, alpha: 0, duration: 700, delay: 140, onComplete: () => ghost.destroy() });
+    // the bar flinches (its own tween, its own target — never a shared one)
+    const bar = mine ? this.hpBar : pan.bar;
+    this.tweens.add({ targets: bar, alpha: { from: 0.35, to: 1 }, duration: 320, ease: 'Quad.easeOut' });
+    // …and the price speaks beside the number
+    const px = mine ? this.hpT.x : pan.c.x + pan.bx + pan.w;
+    const py = (mine ? this.hpT.y : pan.c.y - l.u(22)) - l.u(4);
+    const t = ssTxt(this, px, py, '−' + Math.max(1, Math.round(from - to)), l.u(mine ? 15 : 14), '#ff8a8a').setOrigin(1, 1).setDepth(97)
+      .setShadow(0, 0, '#802020', l.u(6), true, true);
+    this.tweens.add({ targets: t, y: py - l.u(22), alpha: 0, duration: 1150, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
   }
 
   secondTick() {
@@ -2313,6 +2409,8 @@ class VsBattle extends Phaser.Scene {
   }
 
   async tryCast() {
+    if (this.storyC) this.storyDone(true);   // a cast takes up the duel — the tale yields
+    this.storyWaive();                       // …and acting waives one still forming
     if (this.state !== 'pick' || !this.isMyTurn()) return;
     const l = this.L;
     if (!this.validWord()) {
@@ -2412,6 +2510,8 @@ class VsBattle extends Phaser.Scene {
     this.tweens.add({ targets: t, alpha: 0, delay: 2800, duration: 500, onComplete: () => t.destroy() });
   }
   scry() {
+    if (this.storyC) this.storyDone(true);   // the reroll takes up the duel too
+    this.storyWaive();
     if (this.state !== 'pick' || !this.isMyTurn() || this.scryCooldown > 0) return;
     SFX.ensure(); SFX.noise(0.4, 600, 1, 0.12, 1800);
     this.unselectFrom(0);
@@ -2452,7 +2552,11 @@ class VsBattle extends Phaser.Scene {
   onCast(key, cast) {
     if (!cast || this.seenCasts[key]) return;
     this.seenCasts[key] = true;
-    if (cast.uid === vsUid()) return;
+    // my own casts off the feed: the turn story's opening verse (the three I
+    // wove before stepping away) is retold from these at the landing
+    if (cast.uid === vsUid()) { this.histMine.push(cast); return; }
+    // their last word wears its price on the panel (matched by word there)
+    this.foeLast[cast.uid] = { word: cast.word, dmg: cast.dmg | 0 };
     // a correspondence duel re-entered: everything under the seen watermark
     // is history and stays quiet; the truly-new replies move the mark — and
     // when they land before the board does (the landing, the theater), they
@@ -2464,10 +2568,13 @@ class VsBattle extends Phaser.Scene {
     // know the truth by the time they run (setNote/VS_GAMES guard themselves;
     // playRecap runs at the landing, when this.corr is set)
     if (cast.at) {
-      if (cast.at <= this.seenMark()) return;
+      if (cast.at <= this.seenMark()) { this.foeSeenAt = Math.max(this.foeSeenAt || 0, cast.at); return; }
       this.setSeenMark(cast.at);
     }
-    if (!this.revealed || this.state === 'wait' || this.state === 'rise') {
+    // a correspondence landing keeps buffering until its tale is told — the
+    // casts feed syncs on its own clock, and an instant re-entry can land
+    // before the history drains (the story sheet must miss nothing)
+    if (!this.revealed || this.state === 'wait' || this.state === 'rise' || (this.corr && !this.storyTold)) {
       this.recapQ.push(cast);   // told at the landing IF this is correspondence (playRecap gates)
       return;   // under the theater the sky is covered — no flash for a blow you were never shown
     }
@@ -2486,13 +2593,165 @@ class VsBattle extends Phaser.Scene {
       this.tweens.add({ targets: t, alpha: 0, duration: 1600, onComplete: () => t.destroy() });
     }
   }
-  // the landing tells the missed story, one blow at a time
+  // the landing tells the missed story: a correspondence duel gets the STORY
+  // SHEET (every word whole, every price, staged — 9/8 card 03); a live
+  // room's rise-buffered blows keep the old floats (the arcade grammar)
   playRecap() {
+    if (this.corr && !this.storyTold && this.state !== 'done') {
+      // one breath for the feed to drain (child_added syncs on its own
+      // clock — an instant re-entry can land ahead of the history), then
+      // the whole tale in one telling
+      this.storyPend = this.time.delayedCall(450, () => {
+        this.storyPend = null;
+        this.storyTold = true;   // from here, live blows speak as floats
+        const q = this.recapQ;
+        this.recapQ = [];
+        if (!q.length || this.state === 'done' || !this.sys.isActive()) return;
+        q.sort((a, b) => (a.at || 0) - (b.at || 0));
+        this.turnStory(q);
+      });
+      return;
+    }
     const q = this.recapQ;
     this.recapQ = [];
     if (!q.length) return;
     q.sort((a, b) => (a.at || 0) - (b.at || 0));
     q.forEach((cast, i) => this.time.delayedCall(500 + i * 950, () => { if (this.sys.isActive() && this.state !== 'done') this.castStory(cast); }));
+  }
+
+  /* ---------- the turn story (9/8 card 03) ----------
+     A correspondence duel re-entered retells the turn you missed as a story,
+     not a blink: every word the rival cast, whole, with the price it took —
+     staged one strike at a time onto your own bar, which opens where the
+     turn found it and sinks to the truth. Your own last turn opens the tale
+     (dim), so the exchange reads whole. It stands until tapped: a tap
+     mid-telling completes it, the next takes up the duel. tryCast/scry/
+     demoStep sweep it themselves, so every existing door still opens. */
+  turnStory(q) {
+    const l = this.L;
+    const me = this.me() || {};
+    const HP = vsRoomHp(this.room);
+    const t0 = q[0].at || 0;
+    // my last turn: my casts between their last already-seen word and their
+    // first untold one — the three I wove before stepping away
+    const mine = this.histMine.filter((c) => (c.at || 0) > (this.foeSeenAt || 0) && (c.at || 0) < t0).slice(-VS_TURN_CASTS);
+    const foeName = (q[0] && q[0].name) || ((this.others()[0] || {}).name) || '';
+    const inc = q.reduce((a, c) => a + (c.target === vsUid() ? (c.dmg | 0) : 0), 0);
+    // rewind my bar to where the turn found it — the story sinks it back
+    const pre = Math.min(HP, Math.max(0, me.hp | 0) + inc);
+    if (this.myHpD && this.myHpD.hpTween) this.myHpD.hpTween.stop();
+    this.myHpD = { shown: pre, hpTween: null };
+    this.paintHp('me', pre, HP);
+    // the window sits BELOW your hp row (the story's whole point is watching
+    // that bar sink — the lift keeps it lit above the veil); tall tales
+    // tighten their rows rather than crowd the CAST button
+    const TH = q.length > 4 ? 26 : 34;
+    const winH = 52 + (mine.length ? 26 : 0) + 26 + q.length * TH + 12 + 24 + 22;
+    const top = Math.max(396, Math.min(430, 764 - winH));
+    const c = this.storyC = this.add.container(0, 0).setDepth(95);
+    this.storyEv = [];
+    this.storyLift(true);
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.78, duration: 250 });
+    const win = this.add.image(l.x(0), l.y(top + winH / 2), 'endpanel').setDisplaySize(l.u(372), l.u(winH)).setInteractive();
+    const tk = ssGoldTex(this, SS_T('vsStoryTitle'), 16);
+    const tsc = Math.min(1, 300 / tk.w);
+    c.add([veil, win, this.add.image(l.x(0), l.y(top + 30), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc))]);
+    let y = top + 52;
+    if (mine.length) {
+      // your own three, one dim self-labeled line — the exchange reads whole
+      const ml = ssTxt(this, l.x(0), l.y(y + 13), SS_T('vsStoryYours') + '  ·  ' + mine.map((cast) => (cast.word || '') + ' −' + (cast.dmg | 0)).join('  ·  '),
+        l.u(10.5), '#8a94c4').setOrigin(0.5);
+      for (let fs = 10.5; ml.width > l.u(336) && fs > 8; fs -= 0.5) ml.setFontSize(l.u(fs));
+      c.add(ml);
+      y += 26;
+    }
+    const th = ssTxt(this, l.x(0), l.y(y + 13), '—  ' + SS_T('vsStoryTheirs', foeName) + '  —', l.u(11), '#c9b676').setOrigin(0.5).setLetterSpacing(l.u(1.5))
+      .setShadow(0, 0, '#c9b676', l.u(6), true, true);
+    for (let fs = 11; th.width > l.u(330) && fs > 8; fs -= 0.5) th.setFontSize(l.u(fs));
+    c.add(th);
+    y += 26;
+    let run = pre;
+    const rows = [];
+    for (const cast of q) {
+      const ry = y + TH / 2;
+      const w = ssTxt(this, l.x(-140), l.y(ry), cast.word || '', l.u(15), '#f0e8d2').setOrigin(0, 0.5).setAlpha(0);
+      const d = ssTxt(this, l.x(140), l.y(ry), '−' + (cast.dmg | 0), l.u(15), '#ff8a8a').setOrigin(1, 0.5).setAlpha(0)
+        .setShadow(0, 0, '#802020', l.u(5), true, true);
+      const toMe = cast.target === vsUid();
+      if (toMe) run = Math.max(0, run - (cast.dmg | 0));
+      rows.push({ w, d, toMe, after: run });
+      c.add([w, d]);
+      y += TH;
+    }
+    y += 12;
+    const took = ssTxt(this, l.x(0), l.y(y + 8), SS_T('vsStoryTook', inc), l.u(11.5), '#d8d2bd', 'italic').setOrigin(0.5).setAlpha(0);
+    const go = ssTxt(this, l.x(0), l.y(top + winH - 15), SS_T('vsStoryGo'), l.u(9.5), '#5a6390', 'italic').setOrigin(0.5).setAlpha(0);
+    c.add([took, go]);
+    this.storyLand = { rows, took, go, HP };
+    // the strikes land one at a time, a breath after the window rises
+    rows.forEach((r, i) => this.storyEv.push(this.time.delayedCall(650 + i * 820, () => this.storyRow(i))));
+    this.storyEv.push(this.time.delayedCall(650 + rows.length * 820 + 100, () => this.storyRest()));
+    const dismiss = () => { SFX.ui(); this.storyDone(false); };
+    veil.on('pointerdown', dismiss);
+    win.on('pointerdown', dismiss);
+  }
+  storyRow(i) {
+    const s = this.storyLand;
+    if (!s || !this.storyC) return;
+    const r = s.rows[i];
+    if (!r || r.done) return;
+    r.done = true;
+    const l = this.L;
+    for (const o of [r.w, r.d]) { o.setAlpha(1); o.y += l.u(8); this.tweens.add({ targets: o, y: o.y - l.u(8), duration: 260, ease: 'Back.easeOut' }); }
+    SFX.impact();
+    if (r.toMe) { this.showHp('me', r.after, s.HP); this.cameras.main.shake(130, 0.004); }
+  }
+  storyRest() {
+    const s = this.storyLand;
+    if (!s || !this.storyC) return;
+    this.tweens.add({ targets: [s.took, s.go], alpha: 1, duration: 300 });
+  }
+  // while the tale is told, your hp row stays LIT above the veil — the sheet
+  // sits below it, so the sinking bar and the words read as one scene
+  storyLift(on) {
+    const d = on ? 96 : 0;
+    for (const o of [this.hpBarBg, this.hpBar, this.hpT, this.myName, this.youT]) { if (o && o.active) o.setDepth(d); }
+  }
+  // acting before the tale is told waives it (the harness and the solver
+  // reach the doors under the veil; a finger never can) — the watermark
+  // already stands, so nothing is lost but the telling
+  storyWaive() {
+    this.storyTold = true;
+    if (this.storyPend) { this.storyPend.remove(false); this.storyPend = null; this.recapQ = []; }
+  }
+  // fast = sweep it whole (a cast, the demo, the end): land everything and go
+  storyDone(fast) {
+    const s = this.storyLand;
+    if (!this.storyC) return;
+    const pending = s && s.rows.some((r) => !r.done);
+    if (pending) {
+      // complete the telling in one stroke — no repeated shakes, just truth
+      for (const ev of this.storyEv || []) ev.remove(false);
+      this.storyEv = [];
+      for (const r of s.rows) { if (!r.done) { r.done = true; r.w.setAlpha(1); r.d.setAlpha(1); } }
+      this.storyRest();
+      if (this.myHpD && this.myHpD.hpTween) { this.myHpD.hpTween.stop(); }
+      this.myHpD = { shown: null, hpTween: null };
+      const me0 = this.me();
+      if (me0) this.showHp('me', me0.hp, s.HP);
+      if (!fast) return;   // the tale stands, told whole — the next tap closes
+    }
+    for (const ev of this.storyEv || []) ev.remove(false);
+    this.storyEv = [];
+    const c = this.storyC;
+    this.storyC = null; this.storyLand = null;
+    this.storyLift(false);
+    const me = this.me();
+    if (me && this.room) this.showHp('me', me.hp, vsRoomHp(this.room));   // the truth owns the bar again
+    if (fast) c.destroy();
+    else this.tweens.add({ targets: c, alpha: 0, duration: 200, onComplete: () => { if (c.active) c.destroy(); } });
+    this.updatePanels();
   }
 
   showSigilPick() {
@@ -2561,6 +2820,20 @@ class VsBattle extends Phaser.Scene {
       onClose: () => { this.inspectP = null; },
     });
   }
+  // the rival's powers, inspected through the very same window (9/8 card 03):
+  // read live from THEIR seat — name, glyph, what each one does. A bot's seat
+  // carries the same array a phone writes, so the door cannot tell them apart.
+  openInspectFoe(id) {
+    if (this.inspectP || this.state !== 'pick' || this.storyC) return;
+    const p = ((this.room && this.room.players) || {})[id];
+    const sigils = (p && Array.isArray(p.sigils)) ? p.sigils : [];
+    if (!sigils.length) return;
+    SFX.ensure(); SFX.ui();
+    this.inspectP = ssSigilPanel(this, {
+      sigils, title: 'vsTheirSigils', titleArg: p.name,
+      onClose: () => { this.inspectP = null; },
+    });
+  }
 
   checkEnd(timeUp) {
     if (!this.room || this.room.status !== 'active') return;
@@ -2581,6 +2854,8 @@ class VsBattle extends Phaser.Scene {
     this.state = 'done';
     this.killTheater();   // a duel decided under the searching veil still ends honestly
     if (this.waitC && this.waitC.visible) { this.waitC.setVisible(false); }
+    if (this.storyC) this.storyDone(true);      // a decided duel outranks the tale
+    this.storyWaive();
     if (this.inspectP) this.inspectP.close();   // the end screen owes the reader nothing
     if (this.sky) this.sky.setP(1, 0);   // if the duel dies mid-rise, land at the zenith where the overlay lives
     const l = this.L;
@@ -2814,6 +3089,8 @@ class VsBattle extends Phaser.Scene {
 
   /* ---------- demo: the solver duels itself ---------- */
   demoStep() {
+    if (this.storyC) this.storyDone(true);   // the solver reads fast
+    this.storyWaive();
     if (this.state === 'sigil') {
       const cards = this.overlayC.list.filter((o) => o.getData && o.getData('sigilCard'));
       if (cards.length) cards[Math.floor(Math.random() * cards.length)].emit('pointerdown');
