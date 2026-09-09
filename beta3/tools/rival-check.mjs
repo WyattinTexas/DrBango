@@ -383,7 +383,10 @@ if (ONLY === 'all' || ONLY === 'queue') {
   ok('REMATCH: the persona answered and the second duel rose — on this device again', rose2 && await ev(`${VS}.near === true`));
   const code2 = await ev(`${VS}.code`);
   ok('REMATCH: the old duel left with us (near store swept)', await ev(`SS_NEAR.room(${JSON.stringify(code)}) === null`));
-  await ev(`SS_NEAR.api.set('mp/rooms/${code2}/players/test_rc/hp', 1)`);
+  // force the LOSS: the searcher on 1 hp AND the turn handed to the mage
+  // (correspondence turns are three casts — left to move first, the human's
+  // own turn could fell the 150-hp mage before it ever replies)
+  await ev(`SS_NEAR.api.ref('mp/rooms/${code2}').update({ turnUid: '${other}', turnCount: 1, turnCasts: 0 }); SS_NEAR.api.set('mp/rooms/${code2}/players/test_rc/hp', 1)`);
   ok('LOSS: duel 2 reached the end screen', await until(`${VS}.room && ${VS}.room.status === 'done' && ${VS}.code === '${code2}' && ${VS}.state === 'done'`, 120000, 300));
   const r2 = JSON.parse(await ev(`JSON.stringify(SS_NEAR.room(${JSON.stringify(code2)}))`));
   const res2 = JSON.parse(await ev(`localStorage.getItem('beta3.vsresult') || 'null'`));

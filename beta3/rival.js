@@ -350,8 +350,8 @@ const SS_RIVAL = (() => {
       this.timers.add(t);
       return t;
     }
-    seat(n) {
-      return { name: this.name, hp: VS_HP, seat: n, casts: 0, dealt: 0, gone: false, joinedAt: Date.now(), rating: this.rating, rhide: 0 };
+    seat(n, hp) {
+      return { name: this.name, hp: hp || VS_HP, seat: n, casts: 0, dealt: 0, gone: false, joinedAt: Date.now(), rating: this.rating, rhide: 0 };
     }
     // the live sky's door, acquired late if it wasn't open at construction
     // (a near duel woken at boot may outrun the connection)
@@ -368,7 +368,7 @@ const SS_RIVAL = (() => {
           const seats = Object.values(players).map((p) => p.seat);
           let n = 0;
           while (seats.includes(n)) n++;
-          players[this.uid] = this.seat(n);
+          players[this.uid] = this.seat(n, cur.hp);   // a correspondence room's seats breathe at its own hp
           return { ...cur, players };
         });
         this.lastJoin = { committed: r.committed, status: r.value && r.value.status, seats: r.value && r.value.players ? Object.keys(r.value.players) : null };
@@ -410,13 +410,17 @@ const SS_RIVAL = (() => {
       note('gone', { code: this.code });
     }
     me() { return this.room && this.room.players ? this.room.players[this.uid] : null; }
+    // in correspondence a gone-mark means "away", never "dead" — the duel
+    // stands however long the human's chair sits empty (9/8 card 04)
     foes() {
+      const corr = this.room && this.room.corr;
       return Object.entries((this.room && this.room.players) || {})
-        .filter(([id, p]) => id !== this.uid && p.hp > 0 && !p.gone).map(([id, p]) => ({ id, ...p }));
+        .filter(([id, p]) => id !== this.uid && p.hp > 0 && (corr ? true : !p.gone)).map(([id, p]) => ({ id, ...p }));
     }
     alivePlayers() {
+      const corr = this.room && this.room.corr;
       return Object.entries((this.room && this.room.players) || {})
-        .filter(([, p]) => p.hp > 0 && !p.gone).map(([id, p]) => ({ id, ...p }));
+        .filter(([, p]) => p.hp > 0 && (corr ? true : !p.gone)).map(([id, p]) => ({ id, ...p }));
     }
     myTurn() {
       if (!this.room || this.room.status !== 'active') return false;
@@ -508,10 +512,13 @@ const SS_RIVAL = (() => {
       const cands = candidates(this.board, this.root);
       const pick = choose(cands, this.prof, this.rnd, ctx);
       let wait = thinkMs(this.prof, pick, this.rnd, ctx);
-      if (this.pace === 'busy' && !timed) {
+      if (this.pace === 'busy' && !timed && (this.room.turnCasts | 0) === 0) {
         // the busy-human rhythm: the answer time is rolled ONCE per turn and
         // written beside the duel — an app restart finds it and keeps faith;
-        // an overdue one plays at once, stamped with its appointed minute
+        // an overdue one plays at once, stamped with its appointed minute.
+        // Only the turn's FIRST cast waits for the appointment: a person who
+        // sits down answers all three in the one sitting (9/8 card 04's
+        // 3-cast turns), so casts two and three follow at reading pace.
         const n = (typeof SS_NEAR !== 'undefined' && SS_NEAR.note(this.code)) || {};
         let at = Number(n.answerAt) || 0;   // never |0 — an epoch-ms stamp shears at 32 bits
         if (!(at > 0)) {
@@ -519,6 +526,7 @@ const SS_RIVAL = (() => {
           if (typeof SS_NEAR !== 'undefined') SS_NEAR.setNote(this.code, { answerAt: at });
         }
         this.answerFor = at;
+        this.stampAt = at;   // the sitting's clock: each cast stamped a stride past the last, never past now
         wait = Math.max(280 + this.rnd() * 500, at - Date.now());
       }
       // the first read starts when the human lands, not when the seal flipped
@@ -542,12 +550,14 @@ const SS_RIVAL = (() => {
       // busy holds every snapshot-driven consider() off until the writes land —
       // the word chosen was read off THIS board, and only our own casts move it
       this.busy = true;
+      this.handed = false;
       try {
         if (p.pick.scry) await this.doScry();
         else await this.doCast(p.pick.cast);
       } finally { this.busy = false; }
-      // the turn is answered: the standing clock is spent
-      if (this.pace === 'busy' && typeof SS_NEAR !== 'undefined') { SS_NEAR.setNote(this.code, { answerAt: 0 }); this.answerFor = 0; }
+      // the standing clock is spent only when the TURN is answered whole —
+      // a 3-cast turn's middle casts keep the sitting going (9/8 card 04)
+      if (this.handed && this.pace === 'busy' && typeof SS_NEAR !== 'undefined') { SS_NEAR.setNote(this.code, { answerAt: 0 }); this.answerFor = 0; this.stampAt = 0; }
       this.turnSince = 0;
       this.checkEnd();
       // timed keeps thinking (no turns to flip); turns mode waits for the room
@@ -574,7 +584,15 @@ const SS_RIVAL = (() => {
       }
       note('scry', { board: this.board.letters() });
       if (this.room.mode === 'timed') { this.scryAt = Date.now() + 6000; return; }
-      try { await this.roomRef.update({ turnUid: this.nextTurn(), turnCount: (this.room.turnCount | 0) + 1 }); } catch (e) { }
+      // the reroll is the whole turn, in correspondence as ever — one txn
+      // counts it out exactly as a client's scry does (vsTurnStep, versus.js)
+      try {
+        const r = await this.rdb.txn('mp/rooms/' + this.code, (cur) => {
+          if (!cur || cur.status !== 'active') return undefined;
+          return vsTurnStep(cur, this.uid, true);
+        });
+        this.handed = !!(r && r.value && r.value.turnUid !== this.uid);
+      } catch (e) { }
     }
     async doCast(c) {
       const foes = this.foes().sort((a, b) => b.hp - a.hp);
@@ -585,22 +603,31 @@ const SS_RIVAL = (() => {
       try {
         // authoritative writes, in a client's order: the cast, the wound, my seat, the turn.
         // A busy reply is stamped with its appointed minute — computed late,
-        // it still reads as played on time.
-        const at = (this.pace === 'busy' && this.answerFor) ? this.answerFor : Date.now();
+        // it still reads as played on time; a 3-cast sitting's later casts
+        // stamp a stride past the last, never past the true clock.
+        const at = (this.pace === 'busy' && this.stampAt) ? Math.min(Date.now(), Math.round(this.stampAt)) : Date.now();
+        if (this.pace === 'busy' && this.stampAt) this.stampAt = at + 25000 + this.rnd() * 45000;
+        const roomHp = (this.room && this.room.hp) || VS_HP;
         await this.rdb.ref('mp/rooms/' + this.code + '/casts').push({ uid: this.uid, name: this.name, word, dmg, target: target.id, at });
-        await this.rdb.txn('mp/rooms/' + this.code + '/players/' + target.id + '/hp', (cur) => Math.max(0, (cur == null ? VS_HP : cur) - dmg));
+        await this.rdb.txn('mp/rooms/' + this.code + '/players/' + target.id + '/hp', (cur) => Math.max(0, (cur == null ? roomHp : cur) - dmg));
         const myCasts = ((this.me() || {}).casts | 0) + 1;
         await this.meRef.update({ lastWord: word, casts: myCasts, dealt: ((this.me() || {}).dealt | 0) + dmg });
-        if (this.room.mode !== 'timed') await this.roomRef.update({ turnUid: this.nextTurn(), turnCount: (this.room.turnCount | 0) + 1 });
+        if (this.room.mode !== 'timed') {
+          const r = await this.rdb.txn('mp/rooms/' + this.code, (cur) => {
+            if (!cur || cur.status !== 'active') return undefined;
+            return vsTurnStep(cur, this.uid);   // three casts to a correspondence turn — the shared law
+          });
+          this.handed = !!(r && r.value && r.value.turnUid !== this.uid);
+        }
         this.board.cast(c.idx);
         if (this.pace === 'busy' && typeof SS_NEAR !== 'undefined') {
           const n = SS_NEAR.note(this.code) || {};
           SS_NEAR.setNote(this.code, { plays: [...(n.plays || []), { c: c.idx }] });
-          // the reply landed while the app is open but the duel screen is
-          // not up: one quiet toast points back at the standing duel
+          // the whole reply landed while the app is open but the duel screen
+          // is not up: ONE quiet toast, at the turn's last word, points back
           try {
             const vb = window.game && game.scene.getScene('vsbattle');
-            if (!(vb && vb.sys.isActive() && vb.code === this.code)) vsNotify(SS_T('vsBotAnswered', this.name));
+            if (this.handed && !(vb && vb.sys.isActive() && vb.code === this.code)) vsNotify(SS_T('vsBotAnswered', this.name));
           } catch (e) { }
         }
         note('cast', { word, dmg, letters: c.letters, target: target.name, board: this.board.letters() });
@@ -630,6 +657,7 @@ const SS_RIVAL = (() => {
     }
     checkEnd() {
       if (!this.room || this.room.status !== 'active') return;
+      if (Object.values(this.room.players || {}).some((p) => p && p.held)) return;   // a held chair: nobody wins an unanswered summons
       const alive = this.alivePlayers();
       const timedOut = this.room.mode === 'timed' && Date.now() - this.room.startedAt > VS_TIME_MS;
       if (alive.length <= 1 || timedOut) {
@@ -808,7 +836,9 @@ const SS_RIVAL = (() => {
       else if (p.s) b.scry();
       else if (p.g) b.sigils.push(p.g);
     }
-    return { slots: b.slots, pendingTier: b.pendingTier, sigils: b.sigils };
+    // the stream rides along AT ITS TRUE POSITION: the resuming scene deals
+    // its next refill from here, so a later replay re-deals the very same
+    return { slots: b.slots, pendingTier: b.pendingTier, sigils: b.sigils, rng: b.rng };
   }
   // a standing near duel gets its mage back — idempotent per room
   function ensure(code) {
@@ -832,6 +862,8 @@ const SS_RIVAL = (() => {
       const n = SS_NEAR.note(code) || {};
       if (!r || r.status === 'waiting' || !n.uid) { SS_NEAR.purge(code); continue; }
       if (r.status === 'done') {
+        // an end already SEEN (or abandoned) has no row left to hold — sweep
+        if (n.myEnd) { SS_NEAR.purge(code); continue; }
         if (Date.now() - (r.endedAt || 0) > 48 * 3600000) {
           if (!n.settled && r.winnerUid && typeof SS_RATING !== 'undefined') {
             const me = SSNET.uid();
@@ -867,8 +899,11 @@ async function ssBotDuelBoot(scene) {
   const code = vsCode();
   // sealed WITHOUT seekAt: a queued host rescans and would migrate into any
   // elder stranger's room mid-test; the seam's room is its own (the queue
-  // task decides how a real searcher's room meets the engine)
-  if (!(await vsSealRoom(code, mode, { seed: Number.isFinite(seed) ? seed : 0 }))) { DIAG('botduel: seal failed'); return; }
+  // task decides how a real searcher's room meets the engine). And sealed
+  // WITHOUT the correspondence dress (corr:false): ?botduel is the live-sky
+  // ARCADE seam — cast-and-pass turns at 60 hp, exactly as it always played
+  // (the harness families pin that; correspondence has its own doors).
+  if (!(await vsSealRoom(code, mode, { seed: Number.isFinite(seed) ? seed : 0, corr: false }))) { DIAG('botduel: seal failed'); return; }
   if (!scene.sys.isActive()) return;
   scene.scene.start('vsbattle', { code });
   const d = SS_RIVAL.spawn({ code, rating });

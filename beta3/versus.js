@@ -45,6 +45,20 @@ const VS_MAX = { turns: 2, timed: 2, bg: 4 };
 const VS_MIN = { turns: 2, timed: 2, bg: 2 };
 const VS_TIME_MS = 180000;
 const VS_HP = 60;
+/* ---------- correspondence (9/8 card 04, Skylar) ----------
+   A turns duel is CORRESPONDENCE now: turns of exactly 3 casts each,
+   alternating — you weave your three whenever you like, your rival weaves
+   theirs whenever THEY open the app. Rooms wear `corr: 1`, live long, and a
+   step out is never desertion (abandoning is its own confirmed door, and a
+   rated loss). At 60 hp a single strong turn could end a duel before it ever
+   breathed — correspondence hp is 150 so the duel goes rounds, the way a
+   week-long game should. `turnCasts` counts the standing turn's casts on the
+   room record itself; legacy rooms (no corr) keep the old cast-and-pass. */
+const VS_CORR_HP = 150;
+const VS_TURN_CASTS = 3;
+const VS_CAP = 5;   // ongoing duels at most, friend + worldwide together (Skylar's five)
+function vsTurnSize(room) { return room && room.corr ? VS_TURN_CASTS : 1; }
+function vsRoomHp(room) { return (room && room.hp) || VS_HP; }
 const VS_EMBLEMS = ['vulpes', 'strix', 'serpens', 'draco'];
 const FRDEMO = QS.get('frdemo');                              // friends-flow test recipes
 const VSDEMO = QS.get('vsdemo') === '1' || !!FRDEMO;          // the solver plays the duel
@@ -69,9 +83,14 @@ const VS_APP_URL = 'https://testflight.apple.com/join/Hxs8e7fU';
 // reads the rival's number from here, and rhide keeps a veiled rating out of
 // the opponent's VIEW (the math still needs the true value — client-
 // authoritative, same caveat as every score in this game)
-const vsSeat = (seat) => ({
-  name: vsName(), hp: VS_HP, seat, casts: 0, dealt: 0, gone: false, joinedAt: Date.now(),
+const vsSeat = (seat, hp) => ({
+  name: vsName(), hp: hp || VS_HP, seat, casts: 0, dealt: 0, gone: false, joinedAt: Date.now(),
   rating: SS.prof.rating, rhide: SS.prof.rhide ? 1 : 0,
+});
+// a seat HELD for a rival who has not yet answered: the challenger weaves
+// their first three into it, the claim (vsJoinRoom) fills the person in
+const vsHeldSeat = (seat, hp, name) => ({
+  name: name || '…', hp: hp || VS_HP, seat, casts: 0, dealt: 0, gone: false, joinedAt: 0, held: 1,
 });
 
 /* ============================================================
@@ -381,19 +400,9 @@ class VsMenu extends Phaser.Scene {
      waits as a row (✶ shares the invite link, ✕ takes the summons back), a
      declined one says so once, and a worldwide duel mid-rhythm shows whose
      move it is — tap the row to step back under those stars. */
-  pendList() {
-    const rows = [];
-    for (const p of VS_PEND.list()) rows.push({ kind: p.declined ? 'declined' : 'wait', code: p.code, name: p.to.name, at: p.at, p });
-    for (const code of SS_NEAR.codes()) {
-      const r = SS_NEAR.room(code);
-      if (!r || !r.players) continue;
-      const foe = Object.entries(r.players).find(([id]) => id !== vsUid());
-      const name = foe ? foe[1].name : '…';
-      if (r.status === 'done') rows.push({ kind: 'done', code, name, at: r.endedAt || r.createdAt || 0 });
-      else if (r.status === 'active') rows.push({ kind: r.turnUid === vsUid() ? 'move' : 'theirs', code, name, at: r.startedAt || r.createdAt || 0 });
-    }
-    return rows.sort((a, b) => b.at - a.at).slice(0, 4);
-  }
+  // one truth for every standing duel (9/8 card 04): the shared row list —
+  // summonses, near duels AND live-sky correspondence — calls first
+  pendList() { return vsGameRows().slice(0, 4); }
   refreshPend() {
     if (!this.pendC || !this.pendC.scene) return;
     // a friend answered while this page stood: step into the duel at once
@@ -441,30 +450,30 @@ class VsMenu extends Phaser.Scene {
         items.push(xb);
         row.cancel = xb;
       } else {
-        items.push(ssTxt(this, l.x(166), y, '›', l.u(16), r.kind === 'move' ? '#ffd77a' : '#8a94c4').setOrigin(0.5));
-        const zone = this.add.zone(l.x(-10), y, l.u(340), l.u(32)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        items.push(ssTxt(this, l.x(150), y, '›', l.u(16), r.kind === 'move' ? '#ffd77a' : '#8a94c4').setOrigin(0.5));
+        const zone = this.add.zone(l.x(-24), y, l.u(312), l.u(32)).setOrigin(0.5).setInteractive({ useHandCursor: true });
         zone.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.scene.start('vsbattle', { code: r.code }); });
         items.push(zone);
         row.zone = zone;
+        // an ongoing duel's way out (9/8 card 04): ✕ → the confirmed abandon
+        // (a rated loss once words were exchanged; a decided duel just ends)
+        if (r.kind !== 'done') {
+          const ab = ssTxt(this, l.x(178), y, '✕', l.u(13), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+          ssHitPad(ab, 30);
+          ab.on('pointerdown', () => { SFX.ui(); vsAbandon(this, r, () => { this.pendKey = ''; this.refreshPend(); }); });
+          items.push(ab);
+          row.abandon = ab;
+        }
       }
       this.pendRows.push(row);
       this.pendC.add(items);
     });
   }
   cancelPend(r) {
-    VS_PEND.remove(r.code);
-    if (r.kind === 'wait' && r.p) {
-      SSNET.FR.cancelChallenge(r.p.to.id);
-      // take the room back the way LEAVE would — mine alone, so it seals
-      SSNET.dbTxn('mp/rooms/' + r.code, (cur) => {
-        if (!cur || !cur.players || !cur.players[vsUid()]) return cur;
-        if (cur.status !== 'waiting') return cur;
-        const players = { ...cur.players };
-        delete players[vsUid()];
-        if (!Object.keys(players).length) return null;
-        return { ...cur, players };
-      }).catch(() => { });
-    }
+    // one takeback for every unexchanged duel: the bell, the room (guarded
+    // by its own txn — a claim landing this instant wins), the rows
+    vsAbandonNow(r, null, false);
+    this.pendKey = '';
     this.refreshPend();
   }
 
@@ -481,27 +490,36 @@ class VsMenu extends Phaser.Scene {
   }
   async challenge(f) {
     if (this.busyC) return;
+    if (vsCapSheet(this)) return;   // five duels stand — the way through is finish or abandon
     this.busyC = true;
     this.note(SS_T('vsConsult'));
     try {
       const conn = await SSNET.connect();
       if (conn !== 'firebase') { this.note(SS_T('vsNoSky'), 3000); this.busyC = false; return; }
       const code = vsCode();
-      const ok = await vsSealRoom(code, 'turns', { private: true, invited: f.id });
-      if (!ok || !this.sys.isActive()) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
       // a mage of the circle answers in moments — that duel is lived, not
       // pended: enter, and the engine seats them (the arcade-paced AGAIN)
-      if (f.circle) { this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name, circle: f.circle } }); return; }
+      if (f.circle) {
+        const ok = await vsSealRoom(code, 'turns', { private: true, invited: f.id });
+        if (!ok || !this.sys.isActive()) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
+        this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name, circle: f.circle } });
+        return;
+      }
+      // CORRESPONDENCE (9/8 card 04): the challenge seals the duel ACTIVE
+      // with the friend's seat held, and the challenger steps straight in to
+      // weave their first three — the friend answers whenever they open the
+      // app. The summons row + roaming watcher carry the wait exactly as
+      // before; the bell rings them, the ?join link still lands them here.
+      const ok = await vsSealRoom(code, 'turns', { private: true, invited: f.id, hold: { id: f.id, name: f.name } });
+      if (!ok || !this.sys.isActive()) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; return; }
+      // the one I challenged is a recent rival from this moment — I weave and
+      // leave before they claim, so beginBattle (which skips the held seat)
+      // never notes them; do it here so the RECENT roll remembers the summons
+      SSNET.FR.noteRival(f.id, f.name);
       await SSNET.FR.challenge(f.id, code, 'turns');
       if (!this.sys.isActive()) return;
-      // the summons STANDS (9/3 card 03): no waiting screen — a pending row
-      // on this page carries the wait, the roaming watcher rings the moment
-      // they answer, and the invite link still travels from the row's ✶
       VS_PEND.add({ code, to: { id: f.id, name: f.name }, away: !!f.away, busy: !!f.busy, at: Date.now(), rung: Date.now() });
-      this.busyC = false;
-      this.closeSocial();
-      this.note(SS_T('vsSent', f.name), 3500);
-      this.refreshPend();
+      this.scene.start('vsbattle', { code, challenged: { id: f.id, name: f.name, away: !!f.away, busy: !!f.busy } });
     } catch (e) { this.note(SS_T('vsRefused'), 3000); this.busyC = false; }
   }
   // ?frdemo=invite: seal a private room and stand in its lobby — the deep-link
@@ -518,6 +536,7 @@ class VsMenu extends Phaser.Scene {
   }
   async match(mode) {
     if (this.busyC) return;
+    if (vsCapSheet(this)) return;   // the worldwide door respects the five too
     this.busyC = true;
     this.note(SS_T('vsConsult'));
     // the searching theater's clock starts at the tap — the whole hunt
@@ -729,6 +748,26 @@ async function vsDeepRun(scene) {
 }
 
 /* ---------- room helpers ---------- */
+/* one cast (or a scry, `pass`) lands on the room record: count it against
+   the standing turn, flip to the next living seat when the turn's three are
+   woven (legacy rooms flip on every cast — vsTurnSize). Runs INSIDE a
+   transaction on both skies, so two writes can never read the same count.
+   The rival engine steps its turns through this very function. */
+function vsTurnStep(cur, me, pass) {
+  const size = vsTurnSize(cur);
+  const tc = (cur.turnCasts | 0) + 1;
+  const next = { ...cur, movedAt: Date.now() };
+  if (pass || tc >= size) {
+    const alive = Object.entries(cur.players || {})
+      .filter(([, p]) => p.hp > 0 && (cur.corr ? true : !p.gone))
+      .map(([id, p]) => ({ id, seat: p.seat })).sort((a, b) => a.seat - b.seat);
+    const idx = alive.findIndex((p) => p.id === me);
+    let to = me;
+    for (let i = 1; i <= alive.length; i++) { const cand = alive[(idx + i) % alive.length]; if (cand) { to = cand.id; break; } }
+    next.turnUid = to; next.turnCount = (cur.turnCount | 0) + 1; next.turnCasts = 0;
+  } else next.turnCasts = tc;
+  return next;
+}
 function vsCode() {
   const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   let s = '';
@@ -897,6 +936,188 @@ const VS_PEND = (() => {
   };
 })();
 
+/* ---------- the ledger of my ongoing sky duels (9/8 card 04) ----------
+   A correspondence duel in the LIVE sky outlives every visit, so this device
+   keeps its own ledger — code, rival, whose turn it stands on, what I have
+   seen — the way SS_NEAR's notes carry a near duel. The roaming watcher
+   (VsSummons) keeps each entry honest against its room; the home strip and
+   the versus page render from here synchronously. An identity is a device in
+   this game (starspellUid), so the ledger travels exactly as far as the
+   player does. */
+const VS_GAMES = (() => {
+  const KEY = 'starspellGames';
+  function list() { try { const a = JSON.parse(localStorage.getItem(KEY)); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function save(a) { try { localStorage.setItem(KEY, JSON.stringify(a)); } catch (e) { } }
+  return {
+    list,
+    add(rec) { const a = list().filter((r) => r.code !== rec.code); a.unshift(rec); save(a.slice(0, 8)); },
+    mark(code, patch) { const a = list(); const r = a.find((x) => x.code === code); if (r) { Object.assign(r, patch); save(a); } return r; },
+    remove(code) { save(list().filter((r) => r.code !== code)); },
+    get(code) { return list().find((r) => r.code === code) || null; },
+  };
+})();
+
+/* every standing duel as one row list — the home strip and the versus page
+   read the same truth: friend summonses waiting (VS_PEND), near duels
+   breathing on this device (SS_NEAR), and live-sky correspondence duels
+   (VS_GAMES). One row per code; calls-to-action first. */
+function vsGameRows() {
+  const rows = [], seen = new Set();
+  const put = (r) => { if (!seen.has(r.code)) { seen.add(r.code); rows.push(r); } };
+  for (const p of VS_PEND.list()) put({ kind: p.declined ? 'declined' : 'wait', code: p.code, name: p.to.name, at: p.at, p });
+  for (const code of SS_NEAR.codes()) {
+    const r = SS_NEAR.room(code), n = SS_NEAR.note(code) || {};
+    if (!r || !r.players) continue;
+    const foe = Object.entries(r.players).find(([id]) => id !== SSNET.uid());
+    const name = foe ? foe[1].name : '…';
+    if (r.status === 'done') { if (!n.myEnd) put({ kind: 'done', code, name, at: r.endedAt || r.createdAt || 0, near: 1 }); }
+    else if (r.status === 'active') put({ kind: r.turnUid === SSNET.uid() ? 'move' : 'theirs', code, name, at: r.startedAt || r.createdAt || 0, near: 1 });
+  }
+  for (const g of VS_GAMES.list()) {
+    if (g.status === 'done') { if (!g.myEnd) put({ kind: 'done', code: g.code, name: g.foe.name, at: g.at || 0, g }); }
+    else put({ kind: g.held ? 'wait' : g.turn === SSNET.uid() ? 'move' : 'theirs', code: g.code, name: g.foe.name, at: g.at || 0, g });
+  }
+  const RANK = { move: 0, done: 1, theirs: 2, wait: 3, declined: 4 };
+  return rows.sort((a, b) => (RANK[a.kind] - RANK[b.kind]) || (b.at - a.at));
+}
+// the five-game cap counts what is truly ONGOING: waiting summonses, active
+// near duels, active sky duels — decided and declined rows hold no slot
+function vsOngoingCount() {
+  const codes = new Set();
+  for (const p of VS_PEND.list()) if (!p.declined) codes.add(p.code);
+  for (const code of SS_NEAR.codes()) { const r = SS_NEAR.room(code); if (r && r.status !== 'done') codes.add(code); }
+  for (const g of VS_GAMES.list()) if (g.status !== 'done') codes.add(g.code);
+  return codes.size;
+}
+/* the cap, spoken honestly (Skylar: five ongoing games, then finish or
+   abandon one). One window, one door out. Returns true when the cap held. */
+function vsCapSheet(scene) {
+  if (vsOngoingCount() < VS_CAP) return false;
+  SFX.ui();
+  const l = ssLayout(scene);
+  const c = scene.add.container(0, 0).setDepth(760);
+  const veil = scene.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.7).setInteractive();
+  const pane = scene.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(340), l.u(220));
+  const head = ssTxt(scene, l.x(0), l.y(330), SS_T('vsCapTitle'), l.u(16), '#ffe9a8').setOrigin(0.5)
+    .setShadow(0, 0, '#c9b676', l.u(8), true, true);
+  for (let fs = 16; head.width > l.u(300) && fs > 11; fs -= 0.5) head.setFontSize(l.u(fs));
+  const body = ssTextBlock(scene, l.x(0), l.y(392), SS_T('vsCapBody'), {
+    fontSize: l.u(12) + 'px', color: '#d8d2bd', fontStyle: 'italic', shadow: true,
+    wrapW: l.u(300), align: 'center', ox: 0.5, oy: 0.5,
+  });
+  const ok = scene.add.image(l.x(0), l.y(468), ssBtn(scene, false, 220, 48)).setDisplaySize(l.u(220), l.u(48)).setInteractive({ useHandCursor: true });
+  const okT = ssTxt(scene, l.x(0), l.y(468), SS_T('vsCapOk'), l.u(13), BTN_INK()).setOrigin(0.5);
+  const close = () => { SFX.ui(); c.destroy(); };
+  veil.on('pointerdown', close);
+  ok.on('pointerdown', close);
+  c.add([veil, pane, head, body, ok, okT]);
+  c.setAlpha(0);
+  scene.tweens.add({ targets: c, alpha: 1, duration: 180 });
+  return true;
+}
+
+/* ---------- abandoning a duel (9/8 card 04, Q3 stamped) ----------
+   A real door with a confirm: abandoning an exchanged duel settles as a
+   RATED LOSS (the desertion convention — SS_RATING.duel at 0) and the rival
+   inherits the win; the room is marked done so THEIR side ends honorably.
+   A duel the rival never wove into (no cast of theirs, a summons unclaimed)
+   is simply taken back — nothing was exchanged, nothing is lost, the room
+   dissolves on both sides. `row` is a vsGameRows() row; done() runs after
+   either resolution so the caller can repaint. */
+function vsAbandon(scene, row, done) {
+  const db = vsDb(row.code);
+  const finish = () => { try { if (done) done(); } catch (e) { } };
+  (async () => {
+    let room = null;
+    try { room = await db.get('mp/rooms/' + row.code); } catch (e) { room = null; }
+    // the summons rows (wait/declined) never exchanged anything — and a room
+    // already decided settles at its end screen, not here
+    const me = SSNET.uid();
+    const foeE = room && room.players ? Object.entries(room.players).find(([id]) => id !== me) : null;
+    const foeCast = !!(room && foeE && Object.values(room.casts || {}).some((cst) => cst && cst.uid === foeE[0]));
+    const rated = !!(room && room.status === 'active' && foeE && !foeE[1].held && foeCast);
+    if (!scene.sys.isActive()) return;
+    const l = ssLayout(scene);
+    const c = scene.add.container(0, 0).setDepth(760);
+    const veil = scene.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0.7).setInteractive();
+    const pane = scene.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(340), l.u(250));
+    const head = ssTxt(scene, l.x(0), l.y(318), SS_T('vsQuitTitle'), l.u(16), '#ffe9a8').setOrigin(0.5)
+      .setShadow(0, 0, '#c9b676', l.u(8), true, true);
+    for (let fs = 16; head.width > l.u(300) && fs > 11; fs -= 0.5) head.setFontSize(l.u(fs));
+    const body = ssTextBlock(scene, l.x(0), l.y(372), SS_T(rated ? 'vsQuitBody' : 'vsQuitFree', row.name), {
+      fontSize: l.u(12) + 'px', color: rated ? '#e8b09a' : '#d8d2bd', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(300), align: 'center', ox: 0.5, oy: 0.5,
+    });
+    const keepB = scene.add.image(l.x(0), l.y(432), ssBtn(scene, false, 250, 48)).setDisplaySize(l.u(250), l.u(48)).setInteractive({ useHandCursor: true });
+    const keepT = ssTxt(scene, l.x(0), l.y(432), SS_T('vsQuitKeep'), l.u(13), BTN_INK()).setOrigin(0.5);
+    for (let fs = 13; keepT.width > l.u(230) && fs > 9; fs -= 0.5) keepT.setFontSize(l.u(fs));
+    const goB = scene.add.image(l.x(0), l.y(488), ssBtn(scene, true, 220, 42)).setDisplaySize(l.u(220), l.u(42)).setInteractive({ useHandCursor: true });
+    const goT = ssTxt(scene, l.x(0), l.y(488), SS_T('vsQuitGo'), l.u(12), '#e66a6a').setOrigin(0.5);
+    for (let fs = 12; goT.width > l.u(200) && fs > 9; fs -= 0.5) goT.setFontSize(l.u(fs));
+    const close = () => c.destroy();
+    veil.on('pointerdown', () => { SFX.ui(); close(); });
+    keepB.on('pointerdown', () => { SFX.ui(); close(); });
+    goB.on('pointerdown', () => {
+      SFX.ui();
+      close();
+      vsAbandonNow(row, room, rated);
+      finish();
+    });
+    c.add([veil, pane, head, body, keepB, keepT, goB, goT]);
+    c.setAlpha(0);
+    scene.tweens.add({ targets: c, alpha: 1, duration: 180 });
+  })();
+}
+// the confirmed abandon itself — also the ✕ path for wait/declined rows
+function vsAbandonNow(row, room, rated) {
+  const me = SSNET.uid();
+  const db = vsDb(row.code);
+  if (rated && room) {
+    const foeE = Object.entries(room.players || {}).find(([id]) => id !== me);
+    const foeR = foeE && Number.isFinite(foeE[1].rating) ? foeE[1].rating : SS_RATING.BASE;
+    SS_RATING.duel(foeR, 0);
+    SS.save(); SS.sync();
+    db.txn('mp/rooms/' + row.code, (cur) => {
+      if (!cur || cur.status !== 'active') return undefined;
+      return { ...cur, status: 'done', winnerUid: foeE ? foeE[0] : null, endedAt: Date.now(), resigned: me };
+    }).catch(() => { });
+    if (row.near || SS_NEAR.has(row.code)) {
+      // the near mage's own ledger settles on its done-beat; then the duel
+      // leaves this device — decided, seen, and abandoned all at once
+      SS_NEAR.setNote(row.code, { settled: 1, myEnd: 1 });
+      setTimeout(() => {
+        try { if (typeof SS_RIVAL !== 'undefined' && SS_RIVAL.stopFor) SS_RIVAL.stopFor(row.code); SS_NEAR.purge(row.code); } catch (e) { }
+      }, 700);
+    } else VS_GAMES.remove(row.code);
+  } else {
+    // nothing exchanged: take the whole duel back, both sides dissolve. The
+    // txn re-proves it — a rival's cast or claim landing this instant wins,
+    // and the duel stands (the row repaints on the next beat)
+    if (row.near || SS_NEAR.has(row.code)) {
+      try { if (typeof SS_RIVAL !== 'undefined' && SS_RIVAL.stopFor) SS_RIVAL.stopFor(row.code); } catch (e) { }
+      SS_NEAR.purge(row.code);
+    } else {
+      SSNET.dbTxn('mp/rooms/' + row.code, (cur) => {
+        if (!cur || !cur.players || !cur.players[me]) return cur;
+        if (cur.corr && cur.status === 'active') {
+          const foe = Object.entries(cur.players).find(([id]) => id !== me);
+          if (foe && !foe[1].held && Object.values(cur.casts || {}).some((cst) => cst && cst.uid === foe[0])) return cur;
+          return null;
+        }
+        if (cur.status !== 'waiting') return cur;
+        const players = { ...cur.players };
+        delete players[me];
+        if (!Object.keys(players).length) return null;
+        return { ...cur, players };
+      }).catch(() => { });
+      VS_GAMES.remove(row.code);
+    }
+  }
+  const p = VS_PEND.get(row.code);
+  if (p && p.to) SSNET.FR.cancelChallenge(p.to.id);
+  VS_PEND.remove(row.code);
+}
+
 // one grammar, two skies: a near code's writes land in localStorage, any
 // other room speaks to the live sky exactly as before
 function vsDb(code) {
@@ -998,8 +1219,16 @@ async function vsQuickMatch(mode) {
     // housekeeping: clear stale rooms as we pass by. No createdAt = a skeleton
     // (an armed onDisconnect writing players/<uid>/gone into a deleted room
     // re-creates it as junk) — sweep those too, they'd otherwise live forever.
+    // Correspondence rooms (corr) are LONG-LIVED by design: an active one
+    // lives while anyone still weaves (30 idle days), a decided one lingers a
+    // week so both seats can read the end. Everything else keeps the 40-min law.
     for (const [id, r] of Object.entries(rooms)) {
-      if (r && (!r.createdAt || now - r.createdAt > 40 * 60000)) SSNET.dbSet('mp/rooms/' + id, null).catch(() => { });
+      if (!r) continue;
+      const stale = !r.createdAt
+        || (!r.corr && now - r.createdAt > 40 * 60000)
+        || (r.corr && r.status === 'done' && now - (r.endedAt || r.createdAt) > 7 * 86400000)
+        || (r.corr && r.status !== 'done' && now - (r.movedAt || r.createdAt) > 30 * 86400000);
+      if (stale) SSNET.dbSet('mp/rooms/' + id, null).catch(() => { });
     }
     // a seat I already hold (a reload mid-wait) is mine to return to — and
     // FIND is FIND: a room that had no queue clock (a rematch nobody answered)
@@ -1027,16 +1256,29 @@ async function vsQuickMatch(mode) {
 // seal a fresh room under a known code (minted by vsCode() beforehand, so an
 // invite link can exist before the write lands). private rooms are skipped
 // by quick match; invited names the friend a CHALLENGE was rung for.
+// Every turns room this build mints is CORRESPONDENCE (corr: 1, hp 150,
+// 3-cast turns) — opts.corr === false is the legacy seam (?botduel arcade).
+// opts.hold = {id, name} seals the room ACTIVE at birth with the rival's
+// seat held: the challenger weaves their first three at once, and the claim
+// comes whenever the rival answers (Skylar's 9/8 friend flow).
 async function vsSealRoom(code, mode, opts) {
   try {
-    await SSNET.dbSet('mp/rooms/' + code, {
+    const corr = mode === 'turns' && !(opts && opts.corr === false);
+    const hold = (opts && opts.hold) || null;
+    const rec = {
       mode, status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
       seed: (opts && opts.seed) || Math.floor(Math.random() * 1e9),   // ?botduel&seed= pins a board for the harness
       lang: ssGameLang(),   // the creator's tongue rules the duel — both bags and dictionaries follow it
       private: !!(opts && opts.private), invited: (opts && opts.invited) || null,
       seekAt: (opts && opts.seekAt) || null,   // set = this host is in the rival queue, since then
-      players: { [vsUid()]: vsSeat(0) },
-    });
+      players: { [vsUid()]: vsSeat(0, corr ? VS_CORR_HP : 0) },
+    };
+    if (corr) { rec.corr = 1; rec.hp = VS_CORR_HP; rec.turnCasts = 0; rec.movedAt = Date.now(); }
+    if (hold) {
+      rec.players[hold.id] = vsHeldSeat(1, rec.hp, hold.name);
+      rec.status = 'active'; rec.startedAt = Date.now(); rec.turnUid = vsUid(); rec.turnCount = 0;
+    }
+    await SSNET.dbSet('mp/rooms/' + code, rec);
     return true;
   } catch (e) { return false; }
 }
@@ -1044,17 +1286,32 @@ async function vsJoinRoom(code) {
   try {
     const r = await SSNET.dbTxn('mp/rooms/' + code, (cur) => {
       if (!cur) return cur; // room unknown (or first-pass null guess) — leave it be
-      if (cur.status !== 'waiting') return cur;
       const players = cur.players || {};
-      if (players[vsUid()]) return cur;
+      if (players[vsUid()] && !players[vsUid()].held) return cur;
+      // a correspondence room holds its rival's seat — the arriving mage
+      // CLAIMS it: the seat's story (hp, the wounds already dealt) survives,
+      // the person fills in. Keyed to them by the challenge, or '_open' when
+      // the room was sealed for a link; a forwarded link claims like any.
+      if (cur.status === 'active' && cur.corr) {
+        const heldKey = players[vsUid()] && players[vsUid()].held ? vsUid()
+          : Object.keys(players).find((id) => players[id] && players[id].held);
+        if (!heldKey) return cur;
+        const seatRec = { ...players[heldKey] };
+        delete players[heldKey];
+        delete seatRec.held;
+        players[vsUid()] = { ...seatRec, name: vsName(), joinedAt: Date.now(), gone: false,
+          rating: SS.prof.rating, rhide: SS.prof.rhide ? 1 : 0 };
+        return { ...cur, players };
+      }
+      if (cur.status !== 'waiting') return cur;
       if (Object.keys(players).length >= VS_MAX[cur.mode]) return cur;
       const seats = Object.values(players).map((p) => p.seat);
       let seat = 0;
       while (seats.includes(seat)) seat++;
-      players[vsUid()] = vsSeat(seat);
+      players[vsUid()] = vsSeat(seat, cur.hp);
       return { ...cur, players };
     });
-    return !!(r.value && r.value.players && r.value.players[vsUid()]);
+    return !!(r.value && r.value.players && r.value.players[vsUid()] && !r.value.players[vsUid()].held);
   } catch (e) { return false; }
 }
 // the joiner lights a private room when their seat fills it (9/3 card 03):
@@ -1083,6 +1340,10 @@ class VsBattle extends Phaser.Scene {
     this.joining = !!d.joining;               // arrived through a summons/deep link
     this.theater = d.theater || null;         // the worldwide searching beat {t0, T}
     this.near = SS_NEAR.has(d.code);          // this duel lives on this device
+    this.corr = this.near && SS_NEAR.room(d.code) ? !!SS_NEAR.room(d.code).corr : false;   // learned from the first sky snapshot otherwise
+    this.recapQ = [];                         // the story of the turns I missed, told at the landing
+    this.seenHigh = 0;                        // the highest cast stamp met this life (flushed to the ledger)
+    this.deal = null;                         // the duel's private deal stream (beginBattle seats it)
     this.revealed = !this.theater;            // the found gate holds beginBattle under the theater
     this.beginQueued = false; this.revealTimer = null; this.swapping = false;
     // the scene instance outlives a room: the quiet sky's clock must start
@@ -1140,6 +1401,9 @@ class VsBattle extends Phaser.Scene {
         if (this.room && this.room.status === 'done' && this.state === 'done') SS_NEAR.purge(this.code);
         return;
       }
+      // a correspondence duel simply STANDS when you go — no gone-mark: the
+      // seat is a standing chair, not a presence, and the strip holds the door
+      if (this.corr) return;
       // this.left: leaveRoom already deleted the seat — update() on the dead
       // path would write players/<uid>/{gone:true} back, resurrecting a ghost
       if (!this.left && this.meRef && this.room && this.room.status !== 'done') this.meRef.update({ gone: true }).catch(() => { });
@@ -1169,10 +1433,12 @@ class VsBattle extends Phaser.Scene {
     const back = txt(l.x(-195), l.y(24), '‹', 22, '#5a6390').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     back.on('pointerdown', () => {
       SFX.ui();
-      // a near duel keeps when you step out mid-rhythm — that IS the design
-      // (the reply comes in its own time): no desertion, no gone-mark, the
-      // pending row holds the door open. Said once, the first time.
-      if (this.near) {
+      // a correspondence duel KEEPS when you step out mid-rhythm — that IS
+      // the design (each side weaves in their own time): no desertion, no
+      // gone-mark, the home strip and the pending row hold the door open.
+      // Said once, the first time. Abandoning is its own confirmed door and
+      // a rated loss (Q3's stamp) — never an accident of the back arrow.
+      if (this.near || this.corr) {
         if (this.room && this.room.status === 'active' && this.state !== 'done' && !localStorage.getItem('beta3.duelStands')) {
           try { localStorage.setItem('beta3.duelStands', '1'); } catch (e) { }
           vsNotify(SS_T('vsDuelStands'));
@@ -1180,8 +1446,8 @@ class VsBattle extends Phaser.Scene {
         this.scene.start('vsmenu');
         return;
       }
-      // deserting a live battle settles as a loss — fleeing can't dodge the
-      // Elo exchange (endBattle never runs for a seat that walked out)
+      // deserting a live legacy battle settles as a loss — fleeing can't
+      // dodge the Elo exchange (endBattle never runs for a walked-out seat)
       if (this.room && this.room.status === 'active' && this.state !== 'done') {
         const foes = Object.entries(this.room.players || {}).filter(([id]) => id !== vsUid()).map(([, p]) => p);
         if (foes.length) {
@@ -1339,8 +1605,11 @@ class VsBattle extends Phaser.Scene {
       .map(([id, p]) => ({ id, ...p })).sort((a, b) => a.seat - b.seat);
   }
   alivePlayers() {
+    // in correspondence a gone-mark means "away", never "dead" — the duel
+    // stands however long a seat sits empty; legacy rooms keep the old law
+    const corr = this.room && this.room.corr;
     return Object.entries((this.room && this.room.players) || {})
-      .filter(([, p]) => p.hp > 0 && !p.gone).map(([id, p]) => ({ id, ...p }));
+      .filter(([, p]) => p.hp > 0 && (corr ? true : !p.gone)).map(([id, p]) => ({ id, ...p }));
   }
   isMyTurn() {
     if (!this.room || this.room.status !== 'active') return false;
@@ -1352,6 +1621,19 @@ class VsBattle extends Phaser.Scene {
     if (!room) { if (this.migrating || this.swapping) return; if (this.state !== 'done') { this.scene.start('vsmenu'); } return; }
     const first = !this.room;
     this.room = room;
+    if (room.corr && !this.corr) {
+      // a correspondence room: the seat is a standing chair — a dropped
+      // connection must never write it gone (the duel stands, by design)
+      this.corr = true;
+      if (!this.near) { try { if (this.meRef) this.meRef.child('gone').onDisconnect().cancel(); } catch (e) { } }
+    }
+    // the ledger shadows a live-sky correspondence room: whose turn it
+    // stands on, whether the held seat was claimed — the home strip's truth
+    if (this.corr && !this.near && VS_GAMES.get(this.code)) {
+      const foe = Object.entries(room.players || {}).find(([id]) => id !== vsUid());
+      VS_GAMES.mark(this.code, { status: room.status, turn: room.turnUid || null,
+        held: foe && foe[1].held ? 1 : 0, foe: foe ? { id: foe[0], name: foe[1].name } : (VS_GAMES.get(this.code) || {}).foe });
+    }
     // start pulling the room's dictionary the moment its tongue is known, so
     // the beginBattle gate almost never actually has to wait
     if (first && room.lang && room.lang !== 'en') SS_DICT.load(room.lang);
@@ -1548,12 +1830,15 @@ class VsBattle extends Phaser.Scene {
         return;
       }
       const who = SS_RIVAL.persona(SS.prof.rating);
-      SS_NEAR.seal(this.code, {
+      const nearRec = {
         mode: this.room.mode, status: 'waiting', createdAt: this.room.createdAt || Date.now(), hostUid: vsUid(),
         seed: this.room.seed || Math.floor(Math.random() * 1e9), lang: this.room.lang || ssGameLang(),
         private: false, seekAt: this.room.seekAt || Date.now(),   // the shape a live worldwide room wears
-        players: { [vsUid()]: vsSeat(0) },
-      }, { uid: who.uid, myPlays: [], plays: [], seen: 0 });
+        players: { [vsUid()]: vsSeat(0, this.room.hp) },
+      };
+      // the correspondence dress travels with the duel (3-cast turns, 150 hp)
+      if (this.room.corr) { nearRec.corr = 1; nearRec.hp = this.room.hp || VS_CORR_HP; nearRec.turnCasts = 0; nearRec.movedAt = Date.now(); }
+      SS_NEAR.seal(this.code, nearRec, { uid: who.uid, myPlays: [], plays: [], seen: 0 });
       this.near = true;
       this.db = SS_NEAR.api;
       this.room = null;   // re-primed by the near listener's first fire
@@ -1583,25 +1868,56 @@ class VsBattle extends Phaser.Scene {
       return;
     }
     ssUsePack(SS_DICT.ready(rl) ? rl : 'en');
+    // the duel's deal rides a PRIVATE stream (the rival engine's own
+    // mulberry, same seed, same draw grammar — byte-identical boards): a
+    // resumed board hands the stream back AT ITS TRUE POSITION, so the
+    // refill after a resume deals the very tile a fresh replay would
+    // (the global rng()'s position is lost across restarts — reading it
+    // post-resume dealt off-stream tiles that a later reload re-dealt)
+    this.deal = (typeof SS_RIVAL !== 'undefined' && SS_RIVAL.mkRng) ? SS_RIVAL.mkRng(this.room.seed || 1) : null;
     this.tweens.add({ targets: this.waitC, alpha: 0, duration: 400, onComplete: () => { this.waitC.setVisible(false); this.killTheater(); } });
     // everyone I cross swords with becomes a recent rival (one-tap add later)
-    for (const p of this.others()) SSNET.FR.noteRival(p.id, p.name);
-    if (this.challenged) SSNET.FR.cancelChallenge(this.challenged.id);   // the bell is answered
+    // — but a HELD seat is a rival not yet arrived: no note until they claim
+    for (const p of this.others()) { if (!p.held) SSNET.FR.noteRival(p.id, p.name); }
+    // the bell is answered — unless the challenged seat still stands held:
+    // the challenger enters at once now (their first three), and the summons
+    // must keep ringing until the friend truly claims (the accepting side
+    // takes the bell down itself; the watcher stops re-ringing at the claim)
+    if (this.challenged) {
+      const chSeat = (this.room.players || {})[this.challenged.id];
+      if (!chSeat || !chSeat.held) SSNET.FR.cancelChallenge(this.challenged.id);
+    }
     setSeed(this.room.seed || 1);
     this.board = []; this.sel = [];
-    // a near duel re-entered mid-rhythm: my sigils ride my seat, and my board
-    // is replayed move-for-move from the note's script (the same
+    // a correspondence duel re-entered mid-rhythm: my sigils ride my seat,
+    // and my board is replayed move-for-move from my play script (the same
     // deterministic deal the rival engine mirrors) — the exact tiles I left
-    // stand waiting, not a fresh opening deal
+    // stand waiting, not a fresh opening deal. A near duel's script lives in
+    // the note; a live-sky duel's rides my own seat (players/<me>/plays).
     this.restored = null;
-    if (this.near) {
-      const seatMe = this.me();
+    const seatMe = this.me();
+    if (this.near || this.corr) {
       this.mySigils = (seatMe && Array.isArray(seatMe.sigils)) ? [...seatMe.sigils] : [];
-      const n = SS_NEAR.note(this.code) || {};
-      if ((n.myPlays || []).length && typeof SS_RIVAL !== 'undefined' && SS_RIVAL.replayBoard) {
-        try { this.restored = SS_RIVAL.replayBoard(PACK, this.room.seed || 1, n.myPlays); } catch (e) { this.restored = null; }
+      const script = this.near ? ((SS_NEAR.note(this.code) || {}).myPlays || [])
+        : ((seatMe && Array.isArray(seatMe.plays)) ? seatMe.plays : []);
+      if (script.length && typeof SS_RIVAL !== 'undefined' && SS_RIVAL.replayBoard) {
+        try {
+          this.restored = SS_RIVAL.replayBoard(PACK, this.room.seed || 1, script);
+          if (this.restored && this.restored.rng) this.deal = this.restored.rng;   // the stream, at its true position
+        } catch (e) { this.restored = null; }
       }
       this.refreshSigChip();
+    }
+    if (this.corr && !this.near) {
+      // the duel enters the device's ledger — the home strip's row, the
+      // cap's count, the seen watermark all live here from this moment
+      if (seatMe && seatMe.gone) this.meRef.update({ gone: false }).catch(() => { });
+      const foe = Object.entries(this.room.players || {}).find(([id]) => id !== vsUid());
+      if (!VS_GAMES.get(this.code)) {
+        VS_GAMES.add({ code: this.code, foe: foe ? { id: foe[0], name: foe[1].name } : { id: '', name: '…' },
+          at: this.room.createdAt || Date.now(), turn: this.room.turnUid || null, status: 'active',
+          held: foe && foe[1].held ? 1 : 0, seen: this.seenHigh || 0, settled: 0 });
+      } else if (this.seenHigh) this.setSeenMark(this.seenHigh);   // casts that landed before the entry stood
     }
     this.buildOpponentPanels();
     this.state = 'rise';
@@ -1649,16 +1965,22 @@ class VsBattle extends Phaser.Scene {
     SFX.victory();
     const l = this.L;
     if (this.restored) {
-      // the standing board, tile for tile (the near-sky resume)
-      this.pendingTier = 0;
+      // the standing board, tile for tile (the correspondence resume) — and
+      // the pending bonus exactly where the replay left it
+      this.pendingTier = this.restored.pendingTier || 0;
       this.restored.slots.forEach((s, i) => { if (s) this.spawnTile(i, s.ch, s.tier, true); });
       this.restored = null;
     } else this.fillBoard(true);
     this.state = 'pick';
     this.updatePanels();
-    const go = ssTxt(this, l.x(0), l.y(400), 'WEAVE!', l.u(30), '#2fe0d0').setOrigin(0.5).setDepth(80).setScale(0.5);
-    this.tweens.add({ targets: go, scale: 1, duration: 200, ease: 'Back.easeOut' });
-    this.tweens.add({ targets: go, alpha: 0, delay: 900, duration: 300, onComplete: () => go.destroy() });
+    // the landing beat: YOUR TURN gets the old WEAVE!; a duel standing on
+    // the rival's turn lands quietly (the board is a window, not a summons)
+    if (this.isMyTurn() || this.room.mode === 'timed') {
+      const go = ssTxt(this, l.x(0), l.y(400), 'WEAVE!', l.u(30), '#2fe0d0').setOrigin(0.5).setDepth(80).setScale(0.5);
+      this.tweens.add({ targets: go, scale: 1, duration: 200, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: go, alpha: 0, delay: 900, duration: 300, onComplete: () => go.destroy() });
+    }
+    this.playRecap();   // the story of the turns you missed, then the board is yours
     // arriving into a duel woven in another tongue — say so over the board,
     // for joiners who rose past the lobby too fast to read it there
     if (this.room.lang && this.room.lang !== ssGameLang() && SS_PACKS[this.room.lang]) {
@@ -1699,20 +2021,31 @@ class VsBattle extends Phaser.Scene {
 
   updatePanels() {
     if (!this.room || !this.oppPanels) return;
+    const HP = vsRoomHp(this.room);   // a correspondence duel breathes at 150 — the room record rules
     const me = this.me();
     if (me) {
-      this.hpBar.width = this.L.u(300) * clamp(me.hp / VS_HP, 0, 1);
-      this.hpT.setText(Math.max(0, me.hp) + ' / ' + VS_HP);
+      this.hpBar.width = this.L.u(300) * clamp(me.hp / HP, 0, 1);
+      this.hpT.setText(Math.max(0, me.hp) + ' / ' + HP);
     }
     for (const p of this.others()) {
       const pan = this.oppPanels[p.id];
       if (!pan) continue;
-      pan.bar.width = pan.w * clamp(p.hp / VS_HP, 0, 1);
-      pan.sub.setText(p.gone ? 'faded away' : p.hp <= 0 ? 'defeated' : p.lastWord ? '· ' + p.lastWord : '');
-      pan.c.setAlpha(p.hp <= 0 || p.gone ? 0.35 : 1);
+      pan.bar.width = pan.w * clamp(p.hp / HP, 0, 1);
+      // a correspondence seat is a standing chair — never "faded away"
+      pan.sub.setText((p.gone && !this.corr) ? 'faded away' : p.hp <= 0 ? 'defeated' : p.lastWord ? '· ' + p.lastWord : '');
+      pan.c.setAlpha(p.hp <= 0 || (p.gone && !this.corr) ? 0.35 : 1);
     }
     if (this.room.mode === 'timed') this.turnT.setText(this.state === 'sigil' ? 'choose your sigil' : 'weave freely — the clock burns');
-    else {
+    else if (this.corr) {
+      // three casts to a turn (Skylar's 9/8 stamp): the line counts them out
+      const who = this.room.players && this.room.players[this.room.turnUid];
+      const tc = this.room.turnCasts | 0;
+      this.turnT.setText(this.isMyTurn() ? SS_T(tc >= VS_TURN_CASTS - 1 ? 'vsTurnLast' : 'vsTurnOf', tc + 1)
+        : (who ? SS_T(who.held ? 'vsWaitAnswer' : 'vsWeaving', who.name) : ''));
+      this.turnT.setColor(this.isMyTurn() ? '#ffe9a8' : '#5a6390');
+      if (this.turnT.width > this.L.u(380)) this.turnT.setFontSize(this.L.u(11.5));
+      else this.turnT.setFontSize(this.L.u(14));
+    } else {
       const who = this.room.players && this.room.players[this.room.turnUid];
       this.turnT.setText(this.isMyTurn() ? '✦ YOUR TURN ✦' : (who ? who.name + ' is weaving…' : ''));
       this.turnT.setColor(this.isMyTurn() ? '#ffe9a8' : '#5a6390');
@@ -1738,10 +2071,13 @@ class VsBattle extends Phaser.Scene {
   /* ---------- board (mirror of solo board, PvP damage) ---------- */
   boardVowels() { return this.board.filter((s) => s && VOWELS.includes(s.ch[0])).length; }
   fillBoard(initial) {
+    // the private deal stream when one stands (correspondence resume law);
+    // the global seeded stream as ever otherwise — same mulberry, same draws
+    const draw = (arr) => (this.deal ? this.deal.pick(arr) : rpick(arr));
     for (let i = 0; i < 16; i++) {
       if (this.board[i]) continue;
-      let ch = rpick(BAG);
-      if (this.boardVowels() < 5 && !VOWELS.includes(ch)) ch = rpick(['a', 'e', 'i', 'o', 'u']);
+      let ch = draw(BAG);
+      if (this.boardVowels() < 5 && !VOWELS.includes(ch)) ch = draw(['a', 'e', 'i', 'o', 'u']);
       ch = PACK.digraph[ch] || ch;
       const tier = this.pendingTier || 0;
       this.pendingTier = 0;
@@ -1926,28 +2262,35 @@ class VsBattle extends Phaser.Scene {
 
     // authoritative writes: the caster deals the damage
     try {
+      const seatHp = vsRoomHp(this.room);
       await this.castsRef.push({ uid: vsUid(), name: vsName(), word: word.toUpperCase(), dmg, target: target.id, at: Date.now() });
-      await this.db.txn('mp/rooms/' + this.code + '/players/' + target.id + '/hp', (cur) => Math.max(0, (cur == null ? VS_HP : cur) - dmg));
+      await this.db.txn('mp/rooms/' + this.code + '/players/' + target.id + '/hp', (cur) => Math.max(0, (cur == null ? seatHp : cur) - dmg));
       const myCasts = ((this.me() || {}).casts | 0) + 1;
       const up = { lastWord: word.toUpperCase(), casts: myCasts, dealt: ((this.me() || {}).dealt | 0) + dmg };
+      // a live-sky correspondence seat carries its own play script — the
+      // board replay on the next visit re-lives exactly these indices
+      if (this.corr && !this.near) up.plays = [...(((this.me() || {}).plays) || []), { c: used }];
       await this.meRef.update(up);
-      // turn handoff (turns + battleground)
+      // turn bookkeeping (turns + battleground): a transaction counts the
+      // cast against the standing turn and flips it when the three are woven
+      let handed = false;
       if (this.room.mode !== 'timed') {
-        const alive = this.alivePlayers().sort((a, b) => a.seat - b.seat);
-        const idx = alive.findIndex((p) => p.id === vsUid());
-        let next = vsUid();
-        for (let i = 1; i <= alive.length; i++) {
-          const cand = alive[(idx + i) % alive.length];
-          if (cand.hp > 0 && !cand.gone) { next = cand.id; break; }
-        }
-        await this.roomRef.update({ turnUid: next, turnCount: (this.room.turnCount | 0) + 1 });
+        const tr = await this.db.txn('mp/rooms/' + this.code, (cur) => {
+          if (!cur || cur.status !== 'active') return undefined;
+          return vsTurnStep(cur, vsUid());
+        });
+        handed = !!(tr && tr.value && tr.value.turnUid && tr.value.turnUid !== vsUid());
       }
-      // a near duel writes its move into the note's script — the board replay
-      // on the next visit re-lives exactly these indices
+      // a near duel writes its move into the note's script — and its store is
+      // synchronous truth while the listener lands a beat later: refresh, so
+      // the next tap reads the turn as it truly stands
       if (this.near) {
         const n = SS_NEAR.note(this.code) || {};
         SS_NEAR.setNote(this.code, { myPlays: [...(n.myPlays || []), { c: used }] });
+        const fresh = SS_NEAR.room(this.code);
+        if (fresh) this.room = fresh;
       }
+      if (handed && this.corr) this.turnDoneBeat();
       for (const i of used) { if (this.board[i]) { this.board[i].c.destroy(); this.board[i] = null; } }
       this.expireSpecials();               // unspent bonuses fade before the new reward drops
       if (letters >= 7) this.pendingTier = 2;
@@ -1971,6 +2314,18 @@ class VsBattle extends Phaser.Scene {
     this.updatePanels();
   }
 
+  // the turn's three are woven: one gold beat says the duel now waits on
+  // them — cast in their own time, answered in theirs (said in five tongues)
+  turnDoneBeat() {
+    const l = this.L;
+    const foe = this.others()[0];
+    const t = ssTxt(this, l.x(0), l.y(342), SS_T('vsTurnDone', foe ? foe.name : ''), l.u(12.5), '#ffe9a8', 'italic').setOrigin(0.5).setDepth(80)
+      .setShadow(0, 0, '#c9b676', l.u(8), true, true);
+    for (let fs = 12.5; t.width > l.u(370) && fs > 9; fs -= 0.5) t.setFontSize(l.u(fs));
+    t.setAlpha(0).setY(t.y + l.u(10));
+    this.tweens.add({ targets: t, alpha: 1, y: t.y - l.u(10), duration: 320, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: t, alpha: 0, delay: 2800, duration: 500, onComplete: () => t.destroy() });
+  }
   scry() {
     if (this.state !== 'pick' || !this.isMyTurn() || this.scryCooldown > 0) return;
     SFX.ensure(); SFX.noise(0.4, 600, 1, 0.12, 1800);
@@ -1980,29 +2335,60 @@ class VsBattle extends Phaser.Scene {
     if (this.near) {
       const n = SS_NEAR.note(this.code) || {};
       SS_NEAR.setNote(this.code, { myPlays: [...(n.myPlays || []), { s: 1 }] });
+    } else if (this.corr) {
+      const me = this.me() || {};
+      this.meRef.update({ plays: [...(me.plays || []), { s: 1 }] }).catch(() => { });
     }
     if (this.room.mode === 'timed') { this.scryCooldown = 6; return; }
-    // turn modes: the reroll is your action
-    const alive = this.alivePlayers().sort((a, b) => a.seat - b.seat);
-    const idx = alive.findIndex((p) => p.id === vsUid());
-    const next = alive.length > 1 ? alive[(idx + 1) % alive.length].id : vsUid();
-    this.roomRef.update({ turnUid: next, turnCount: (this.room.turnCount | 0) + 1 }).catch(() => { });
+    // turn modes: the reroll is your whole turn — in correspondence too, the
+    // three casts go with it (the reroll is your action, as it always was)
+    this.db.txn('mp/rooms/' + this.code, (cur) => {
+      if (!cur || cur.status !== 'active') return undefined;
+      return vsTurnStep(cur, vsUid(), true);
+    }).then(() => {
+      if (this.near) { const fresh = SS_NEAR.room(this.code); if (fresh) this.room = fresh; }
+      if (this.corr) this.turnDoneBeat();
+      this.updatePanels();
+    }).catch(() => { });
   }
 
+  // the seen watermark, one voice for two skies: a near duel's rides its
+  // note, a live correspondence duel's rides the device ledger
+  seenMark() {
+    if (this.near) return Number((SS_NEAR.note(this.code) || {}).seen) || 0;   // never |0 — an epoch-ms stamp shears at 32 bits
+    const g = VS_GAMES.get(this.code);
+    return g ? Number(g.seen) || 0 : 0;
+  }
+  setSeenMark(at) {
+    this.seenHigh = Math.max(this.seenHigh || 0, at);   // casts can land before the ledger entry exists (a joiner's first attach) — beginBattle flushes
+    if (this.near) SS_NEAR.setNote(this.code, { seen: at });
+    else if (VS_GAMES.get(this.code)) VS_GAMES.mark(this.code, { seen: at });
+  }
   onCast(key, cast) {
     if (!cast || this.seenCasts[key]) return;
     this.seenCasts[key] = true;
     if (cast.uid === vsUid()) return;
-    // a near duel re-entered: everything under the seen watermark is history
-    // and stays quiet; a truly-new reply floats once and moves the mark
-    if (this.near && cast.at) {
-      const n = SS_NEAR.note(this.code) || {};
-      if (cast.at <= (Number(n.seen) || 0)) return;   // never |0 — an epoch-ms stamp shears at 32 bits
-      SS_NEAR.setNote(this.code, { seen: cast.at });
+    // a correspondence duel re-entered: everything under the seen watermark
+    // is history and stays quiet; the truly-new replies move the mark — and
+    // when they land before the board does (the landing, the theater), they
+    // queue as the RECAP: the story of the turn you missed, told at arrival.
+    // ⚠ this.corr is learned from the first room snapshot, which can land
+    // AFTER these historical casts (child_added fires on attach, this.room
+    // may still be null) — so the watermark and the buffer never gate on it;
+    // only the LEDGER write (setSeenMark) and the recap PLAYBACK do, and both
+    // know the truth by the time they run (setNote/VS_GAMES guard themselves;
+    // playRecap runs at the landing, when this.corr is set)
+    if (cast.at) {
+      if (cast.at <= this.seenMark()) return;
+      this.setSeenMark(cast.at);
     }
-    // under the theater the sky is covered — the panels tell the truth at
-    // the reveal; no flash for a blow you were never shown
-    if (!this.revealed) return;
+    if (!this.revealed || this.state === 'wait' || this.state === 'rise') {
+      this.recapQ.push(cast);   // told at the landing IF this is correspondence (playRecap gates)
+      return;   // under the theater the sky is covered — no flash for a blow you were never shown
+    }
+    this.castStory(cast);
+  }
+  castStory(cast) {
     const l = this.L;
     if (cast.target === vsUid()) {
       SFX.hurt();
@@ -2014,6 +2400,14 @@ class VsBattle extends Phaser.Scene {
       const t = ssTxt(this, l.x(0), l.y(88), cast.name + ' → ' + cast.word + ' −' + cast.dmg, l.u(11), '#8a94c4', 'italic').setOrigin(0.5).setDepth(80);
       this.tweens.add({ targets: t, alpha: 0, duration: 1600, onComplete: () => t.destroy() });
     }
+  }
+  // the landing tells the missed story, one blow at a time
+  playRecap() {
+    const q = this.recapQ;
+    this.recapQ = [];
+    if (!q.length) return;
+    q.sort((a, b) => (a.at || 0) - (b.at || 0));
+    q.forEach((cast, i) => this.time.delayedCall(500 + i * 950, () => { if (this.sys.isActive() && this.state !== 'done') this.castStory(cast); }));
   }
 
   showSigilPick() {
@@ -2050,6 +2444,15 @@ class VsBattle extends Phaser.Scene {
         this.mySigils.push(sg.id);
         this.repaintChips();   // the duel board persists — a letter bonus shows at once
         if (this.meRef) this.meRef.update({ sigils: this.mySigils }).catch(() => { });
+        // the pick joins the play script: a resumed board replays the deal
+        // with the sigil held (a forge-lifted refill must re-deal as a star)
+        if (this.near) {
+          const n = SS_NEAR.note(this.code) || {};
+          SS_NEAR.setNote(this.code, { myPlays: [...(n.myPlays || []), { g: sg.id }] });
+        } else if (this.corr && this.meRef) {
+          const me = this.me() || {};
+          this.meRef.update({ plays: [...(me.plays || []), { g: sg.id }] }).catch(() => { });
+        }
         for (const it of items) it.destroy();
         this.state = 'pick';
         this.refreshSigChip();
@@ -2076,6 +2479,10 @@ class VsBattle extends Phaser.Scene {
 
   checkEnd(timeUp) {
     if (!this.room || this.room.status !== 'active') return;
+    // a HELD seat is a rival not yet arrived — nothing settles while a chair
+    // stands empty-but-promised (a duel cannot be won against an unanswered
+    // summons; the abandon door takes such a duel back for free instead)
+    if (Object.values(this.room.players || {}).some((p) => p && p.held)) return;
     const alive = this.alivePlayers();
     const timedOut = this.room.mode === 'timed' && (timeUp || Date.now() - this.room.startedAt > VS_TIME_MS);
     if (alive.length <= 1 || timedOut) {
@@ -2108,17 +2515,25 @@ class VsBattle extends Phaser.Scene {
     // settling its own ledger from the same room record (so a duel's two
     // deltas mirror). No winner (everyone faded) = no exchange.
     let rd = 0;
-    // a near duel settles its Elo exactly once — the note remembers (a
-    // decided duel left unread for days settles at the boot sweep instead)
+    // a correspondence duel settles its Elo exactly once — the note (near) or
+    // the ledger (live sky) remembers: the scene is reborn on every visit, so
+    // the record must carry the guard, not the scene (a decided duel left
+    // unread for days settles at the boot/watcher sweep instead)
     const nearNote = this.near ? (SS_NEAR.note(this.code) || {}) : null;
-    if (this.room.winnerUid && !(nearNote && nearNote.settled)) {
+    const ledger = (!this.near && this.corr) ? VS_GAMES.get(this.code) : null;
+    if (this.room.winnerUid && !(nearNote && nearNote.settled) && !(ledger && ledger.settled)) {
       const foes = Object.entries(this.room.players || {}).filter(([id]) => id !== vsUid()).map(([, p]) => p);
       if (foes.length) {
         const oppAvg = foes.reduce((a, p) => a + (Number.isFinite(p.rating) ? p.rating : SS_RATING.BASE), 0) / foes.length;
         rd = SS_RATING.duel(oppAvg, won ? 1 : 0);
       }
       if (nearNote) SS_NEAR.setNote(this.code, { settled: 1 });
+      if (ledger) VS_GAMES.mark(this.code, { settled: 1 });
     }
+    // the end is SEEN: the strip row leaves, the slot frees, the summons dies
+    if (nearNote) SS_NEAR.setNote(this.code, { myEnd: 1 });
+    if (this.corr && !this.near) VS_GAMES.remove(this.code);
+    VS_PEND.remove(this.code);
     SS.prof.runs++; SS.save(); SS.sync();
     if (won) {
       SS.award('rival-star', this.game);
@@ -2190,6 +2605,8 @@ class VsBattle extends Phaser.Scene {
   }
   async doRematch() {
     if (this.rematchBusy || this.state !== 'done' || !this.room) return;
+    // a rematch seals a fresh ongoing duel — the five-game cap holds here too
+    if (this.room.corr && vsCapSheet(this)) return;
     this.rematchBusy = true;
     this.rematchT && this.rematchT.setText('SEALING…');
     try {
@@ -2207,7 +2624,8 @@ class VsBattle extends Phaser.Scene {
         SS_NEAR.seal(code, {
           mode: 'turns', status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
           seed: Math.floor(Math.random() * 1e9), lang: this.room.lang || 'en',
-          players: { [vsUid()]: vsSeat(0) },
+          corr: 1, hp: VS_CORR_HP, turnCasts: 0, movedAt: Date.now(),
+          players: { [vsUid()]: vsSeat(0, VS_CORR_HP) },
         }, { uid: persona.uid, myPlays: [], plays: [], seen: 0 });
         SS_RIVAL.spawn({ code, rating: persona.rating, seatRating: persona.rating, uid: persona.uid, name: persona.name, persona,
           pace: 'busy', roomDb: SS_NEAR.api, delay: 1600 + Math.random() * 2400 });
@@ -2217,12 +2635,14 @@ class VsBattle extends Phaser.Scene {
       let dest = this.room.rematch;
       if (!dest) {
         const code = vsCode();
-        await SSNET.dbSet('mp/rooms/' + code, {
+        const rec = {
           mode: this.room.mode, status: 'waiting', createdAt: Date.now(), hostUid: vsUid(),
           seed: Math.floor(Math.random() * 1e9),
           lang: this.room.lang || 'en',   // a rematch keeps the tongue the duel began in
-          players: { [vsUid()]: vsSeat(0) },
-        });
+          players: { [vsUid()]: vsSeat(0, this.room.corr ? VS_CORR_HP : 0) },
+        };
+        if (this.room.corr) { rec.corr = 1; rec.hp = VS_CORR_HP; rec.turnCasts = 0; rec.movedAt = Date.now(); }
+        await SSNET.dbSet('mp/rooms/' + code, rec);
         // one rematch room per battle — a transaction settles simultaneous pressers
         const r = await SSNET.dbTxn('mp/rooms/' + this.code + '/rematch', (cur) => (cur == null ? code : undefined));
         dest = (r && r.value) || code;
@@ -2297,17 +2717,20 @@ class VsSummons extends Phaser.Scene {
   watchPending() {
     if (SSNET.mode !== 'firebase') return;
     const pend = VS_PEND.list();
+    const games = VS_GAMES.list();   // live-sky correspondence duels ride the same watcher (9/8 card 04)
+    const want = new Set([...pend.map((p) => p.code), ...games.map((g) => g.code)]);
     for (const code of Object.keys(this.pendWatch)) {
-      if (!pend.some((p) => p.code === code)) this.unwatchPend(code);
+      if (!want.has(code)) this.unwatchPend(code);
     }
-    for (const p of pend) {
-      if (this.pendWatch[p.code]) continue;
-      const w = this.pendWatch[p.code] = { seenBell: false };
-      w.roomRef = SSNET.ref('mp/rooms/' + p.code);
-      if (!w.roomRef) { delete this.pendWatch[p.code]; continue; }
-      w.roomCb = (snap) => this.onPendRoom(p.code, snap.val());
+    for (const code of want) {
+      if (this.pendWatch[code]) continue;
+      const p = pend.find((x) => x.code === code) || null;
+      const w = this.pendWatch[code] = { seenBell: false };
+      w.roomRef = SSNET.ref('mp/rooms/' + code);
+      if (!w.roomRef) { delete this.pendWatch[code]; continue; }
+      w.roomCb = (snap) => this.onPendRoom(code, snap.val());
       w.roomRef.on('value', w.roomCb);
-      if (!p.declined) {
+      if (p && !p.declined) {
         w.invRef = SSNET.ref('invites/' + p.to.id + '/' + vsUid());
         if (w.invRef) {
           w.invCb = (snap) => {
@@ -2317,9 +2740,9 @@ class VsSummons extends Phaser.Scene {
             // taken down without a seat claimed = declined (a beat of grace
             // for the join racing the removal)
             this.time.delayedCall(1500, () => {
-              const rec = VS_PEND.get(p.code);
+              const rec = VS_PEND.get(code);
               if (!rec || rec.declined || rec.active) return;
-              VS_PEND.mark(p.code, { declined: 1 });
+              VS_PEND.mark(code, { declined: 1 });
               this.toast(SS_T('vsDeclined', p.to.name));
             });
           };
@@ -2338,6 +2761,21 @@ class VsSummons extends Phaser.Scene {
         SSNET.FR.challenge(p.to.id, p.code, 'turns');
       }
     }
+    // a decided sky duel left unread two days settles honestly and leaves —
+    // the mirror of the near sky's boot sweep (the room itself lingers for
+    // the week-long sweep so the other seat can still read the end)
+    for (const g of games) {
+      if (g.status !== 'done' || !(g.endedAt > 0) || now - g.endedAt <= 48 * 3600000) continue;
+      const w = this.pendWatch[g.code];
+      const room = w && w.room;
+      if (!g.settled && room && room.winnerUid) {
+        const foeE = Object.entries(room.players || {}).find(([id]) => id !== vsUid());
+        const foeR = foeE && Number.isFinite(foeE[1].rating) ? foeE[1].rating : SS_RATING.BASE;
+        SS_RATING.duel(foeR, room.winnerUid === vsUid() ? 1 : 0);
+        SS.save(); SS.sync();
+      }
+      VS_GAMES.remove(g.code);
+    }
   }
   unwatchPend(code) {
     const w = this.pendWatch[code];
@@ -2347,24 +2785,66 @@ class VsSummons extends Phaser.Scene {
     delete this.pendWatch[code];
   }
   onPendRoom(code, room) {
+    const w = this.pendWatch[code];
+    if (w) w.room = room;   // the settle sweep reads the last snapshot
     const rec = VS_PEND.get(code);
-    if (!rec) { this.unwatchPend(code); return; }
+    const g = VS_GAMES.get(code);
+    if (!rec && !g) { this.unwatchPend(code); return; }
     if (!room) {
-      // the room is gone (swept, or cancelled elsewhere) — the row follows
+      // the room is gone (swept, cancelled, or dissolved) — the rows follow
       this.unwatchPend(code);
       VS_PEND.remove(code);
+      VS_GAMES.remove(code);
       return;
     }
     if (room.status === 'waiting' && Object.keys(room.players || {}).length >= VS_MAX[room.mode || 'turns']) {
       vsStartIfFull(code);
       return;
     }
-    if ((room.status === 'active' || room.status === 'done') && !rec.active) {
+    const me = vsUid();
+    const foeE = Object.entries(room.players || {}).find(([id]) => id !== me);
+    // the device ledger shadows the room — the home strip's synchronous truth
+    if (g) {
+      VS_GAMES.mark(code, { status: room.status, turn: room.turnUid || null, endedAt: room.endedAt || 0,
+        held: foeE && foeE[1].held ? 1 : 0, foe: foeE ? { id: foeE[0], name: foeE[1].name } : g.foe });
+    }
+    // a correspondence summons is ANSWERED when the held seat is claimed —
+    // the room was active from birth, so activity alone proves nothing there
+    const claimed = room.corr ? !!(foeE && !foeE[1].held) : (room.status === 'active' || room.status === 'done');
+    if (rec && claimed && !rec.active) {
+      if (room.corr) {
+        // the summons row retires — the game's own ledger row carries the
+        // duel from here (whose move, the strip, the abandon door); the
+        // banner still announces the answer wherever you roam
+        if (!VS_GAMES.get(code)) {
+          VS_GAMES.add({ code, foe: foeE ? { id: foeE[0], name: foeE[1].name } : rec.to, at: Date.now(),
+            turn: room.turnUid || null, status: room.status, held: 0, seen: 0, settled: 0 });
+        }
+        VS_PEND.remove(code);
+        if (!this.scene.isActive('vsmenu') && !this.suppressed() && !rec.bannered) this.answerBanner(code, rec.to.name);
+        return;
+      }
       VS_PEND.mark(code, { active: 1 });
       if (!this.scene.isActive('vsmenu') && !this.suppressed() && !rec.bannered) {
         VS_PEND.mark(code, { bannered: 1 });
         this.answerBanner(code, rec.to.name);
       }
+    }
+    // the turn came home while you roam: one quiet ring per turn — and one
+    // when the duel is decided (never at attach; only on a true flip)
+    if (g && room.corr && w) {
+      const foeName = foeE ? foeE[1].name : '';
+      if (w.lastTurn === undefined) { w.lastTurn = room.turnUid; w.lastStatus = room.status; return; }
+      const vb = this.scene.get('vsbattle');
+      const inIt = vb && vb.sys.isActive() && vb.code === code;
+      if (room.status === 'active' && room.turnUid !== w.lastTurn) {
+        w.lastTurn = room.turnUid;
+        if (room.turnUid === me && !inIt && foeE && !foeE[1].held) this.toast(SS_T('vsBotAnswered', foeName));
+      }
+      if (room.status === 'done' && w.lastStatus !== 'done') {
+        w.lastStatus = 'done';
+        if (!inIt) this.toast(foeName + ' — ' + SS_T('vsPendDone'));
+      } else w.lastStatus = room.status;
     }
   }
   answerBanner(code, name) {

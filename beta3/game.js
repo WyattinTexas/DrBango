@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.88.0';
+const BUILD = 'STARSPELL v0.89.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -5552,6 +5552,7 @@ class Home extends Phaser.Scene {
       this.setRowSub = () => { };
       this.refreshCampDoor = () => { };
       this.refreshEndDoor = () => { };
+      this.refreshDuelStrip = () => { };
       DIAG('meadow ui built (bare — first open)');
       return;
     }
@@ -5759,6 +5760,98 @@ class Home extends Phaser.Scene {
       this.setRowSub('versus', n > 0 ? SS_T('vsFriendsOn', n) : '', '#ffe9a8');
     });
     this.events.once('shutdown', () => { if (this.frOff) { this.frOff(); this.frOff = null; } });
+
+    /* ---------- THE DUEL STRIP (9/8 card 04, Skylar) ----------
+       The ongoing duels, at the bottom of the home screen: one quiet row per
+       standing game — friend and worldwide, one system — whose turn it is
+       told honestly. A your-move row CALLS (gold name, breathing blades —
+       unopened mail); a their-move row waits; a decided one asks to be read;
+       a summons still out says so. Tap a row → straight into the duel; ✕ →
+       the confirmed abandon (a rated loss once words were exchanged, per
+       the 9/8 stamp — a duel nobody answered is simply taken back). With
+       nothing ongoing the strip is NOTHING: no header, no ghost chrome —
+       the meadow keeps its calm. Rows rebuild only when the truth changes;
+       repeat-forever breathers are killed before every rebuild (the
+       orphan-tween law); the band lies under the deepest menu column
+       (foot 644) and clear of the version line (784). */
+    this.duelC = ui(this.add.container(0, 0));
+    this.duelKey = '';
+    this.duelTweens = [];
+    this.refreshDuelStrip = () => {
+      if (!this.duelC || !this.duelC.scene || this.ftueBare) return;
+      const rows = (typeof vsGameRows === 'function' && SSNET.mode !== 'local') ? vsGameRows().slice(0, 5) : [];
+      const key = JSON.stringify(rows.map((r) => r.kind + r.code + r.name));
+      if (key === this.duelKey) return;
+      this.duelKey = key;
+      for (const tw of this.duelTweens) tw.remove();
+      this.duelTweens = [];
+      this.duelC.removeAll(true);
+      this.duelRows = [];
+      if (!rows.length) return;
+      // bottom-anchored, but held clear of the version footer (y784): the
+      // last row sits at 744, so five rows run 648…744 — above the footer and
+      // below the deepest door column
+      const sp = rows.length >= 5 ? 24 : rows.length === 4 ? 28 : 30;
+      const y0 = 744 - (rows.length - 1) * sp;
+      rows.forEach((r, i) => {
+        const y = l.y(y0 + i * sp);
+        const items = [];
+        const glyph = this.add.image(l.x(-168), y, vsSwordsTex(this)).setDisplaySize(l.u(16), l.u(16)).setAlpha(r.kind === 'move' ? 1 : 0.55);
+        items.push(glyph);
+        const nm = ssTxt(this, l.x(-152), y, r.name, l.u(11.5), r.kind === 'move' ? '#ffe9a8' : r.kind === 'done' ? '#f0e8d2' : '#a9a99a').setOrigin(0, 0.5);
+        while (nm.width > l.u(118) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+        items.push(nm);
+        const status = r.kind === 'move' ? SS_T('vsYourMove') : r.kind === 'theirs' ? SS_T('vsTheirMove', r.name)
+          : r.kind === 'done' ? SS_T('vsPendDone') : r.kind === 'declined' ? SS_T('vsDeclined', r.name)
+            : SS_T(r.p && r.p.away ? 'vsWaitAway' : r.p && r.p.busy ? 'vsWaitBusy' : 'vsWaitAnswer', r.name);
+        const st = ssTxt(this, l.x(-26), y, status, l.u(9), r.kind === 'move' ? '#ffd77a' : r.kind === 'done' ? '#d8c98f' : '#5a6390', 'italic').setOrigin(0, 0.5);
+        while (st.width > l.u(168) && st.text.length > 4) st.setText(st.text.slice(0, -2) + '…');
+        items.push(st);
+        // the call: a your-move row breathes — quiet, but unmistakably mail
+        if (r.kind === 'move' && !ssReduceMotion()) {
+          this.duelTweens.push(this.tweens.add({ targets: [glyph, st], alpha: 0.55, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));
+        }
+        const row = { kind: r.kind, code: r.code, name: r.name, nameT: nm, statusT: st };
+        if (r.kind === 'declined' || r.kind === 'wait') {
+          const xb = ssTxt(this, l.x(176), y, '✕', l.u(12), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+          ssHitPad(xb, 30);
+          xb.on('pointerdown', () => {
+            if (this.busy() || this.ascending) return;
+            SFX.ensure(); SFX.ui();
+            vsAbandonNow(r, null, false);
+            this.refreshDuelStrip();
+          });
+          items.push(xb);
+          row.cancel = xb;
+        } else {
+          items.push(ssTxt(this, l.x(152), y, '›', l.u(14), r.kind === 'move' ? '#ffd77a' : '#8a94c4').setOrigin(0.5));
+          const zone = this.add.zone(l.x(-24), y, l.u(300), l.u(sp)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+          zone.on('pointerdown', () => {
+            if (this.busy() || this.ascending) return;
+            SFX.ensure(); SFX.ui();
+            this.scene.start('vsbattle', { code: r.code });
+          });
+          items.push(zone);
+          row.zone = zone;
+          if (r.kind !== 'done') {
+            const ab = ssTxt(this, l.x(176), y, '✕', l.u(12), '#39406b').setOrigin(0.5).setInteractive({ useHandCursor: true });
+            ssHitPad(ab, 30);
+            ab.on('pointerdown', () => {
+              if (this.busy() || this.ascending) return;
+              SFX.ensure(); SFX.ui();
+              vsAbandon(this, r, () => { this.duelKey = ''; this.refreshDuelStrip(); });
+            });
+            items.push(ab);
+            row.abandon = ab;
+          }
+        }
+        this.duelRows.push(row);
+        this.duelC.add(items);
+      });
+    };
+    this.refreshDuelStrip();
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => { if (!this.ascending) this.refreshDuelStrip(); } });
+
     const verT = ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5);
     ui(verT);
     this.muteB = ui(ssTxt(this, l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
@@ -7139,6 +7232,7 @@ class Home extends Phaser.Scene {
     this.refreshCampDoor(true);  // battle moved (or cleared) the campaign checkpoint
     this.refreshEndDoor(true);   // …and the endless climb's own line follows it
     this.updateDailyChip();
+    if (this.refreshDuelStrip) { this.duelKey = ''; this.refreshDuelStrip(); }   // a duel fought (or stood up) just now moves its row
     this.milestoneCheck();       // the hunt we just came home from may have grown the lamp
     this.sigilNotice();
     this.signNotice();           // a sign level the climb earned may be unsaid
