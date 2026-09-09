@@ -2150,11 +2150,15 @@
   #travelMap .tm-hit { cursor:pointer; }
   #travelMap .tm-rib.lit path.tm-band { animation:tmRibLit 0.45s ease-out; }   /* ⚑ Q13: the press = the land's ribbon brightens a beat (+ the thock) */
   @keyframes tmRibLit { 0% { fill:#C0392B; } 25% { fill:#FF8A66; } 100% { fill:#C0392B; } }
-  #travelMap .tm-rib.no { animation:tmRibNo 0.4s ease-in-out; }   /* a land the save does not hold: a shake and a no (SFX.thump), never a door */
+  #travelMap .tm-rib.no { animation:tmRibNo 0.4s ease-in-out; }
+  #travelMap .tm-veil { pointer-events:none; transition:opacity 1.4s ease; }   /* 0904z THE DARK LAND (Wyatt 9/9: "darken the Western World area until it's unlocked, in which it would brighten up"): a land the save does not hold wears THE VEIL — #1B1410 @ .55 through the land's own soft-edged zone, on THE DESK (over the movers, under the ribbons + the hits); .lift = THE REVEAL's fade (1.4 s) once the land is won */
+  #travelMap .tm-veil.lift { opacity:0; }
+  #travelMap .tm-rib { transition:opacity 1.4s ease; }   /* the dark land's ribbon: dim (.dark, .62), still legible (a kid reads where he is going); .dark leaves at the reveal's end and the ribbon brightens with the veil (a transition reads the DESTINATION rule — it lives on the base) */
+  #travelMap .tm-rib.dark { opacity:.62; }   /* a land the save does not hold: a shake and a no (SFX.thump), never a door */
   @keyframes tmRibNo { 0%,100% { transform:translateX(0); } 25% { transform:translateX(-5px); } 75% { transform:translateX(5px); } }
   body:has(#travelMap.up) #roomStage { visibility:hidden; }
   body:has(#travelMap.up) #roomStage * { animation-play-state:paused !important; }
-  @media (prefers-reduced-motion:reduce){ #travelMap .tm-rib.lit path.tm-band, #travelMap .tm-rib.no { animation:none; } }
+  @media (prefers-reduced-motion:reduce){ #travelMap .tm-rib.lit path.tm-band, #travelMap .tm-rib.no { animation:none; } #travelMap .tm-veil, #travelMap .tm-rib { transition:none; } }   /* 0904z: reduced motion — no fade, the veil simply absent */
   /* v1.75: a department is a vertical scroller — when its goods won't fit at
      reading size the shelf runs DOWN instead of squeezing (Wyatt named DECOR
      and MODS). The aisle still owns the x axis: overflow-x stays hidden here,
@@ -26454,6 +26458,7 @@ function roomNightDue(){ return !!NIGHT_ROOMS[roomCur()]; }
 // 0330a: every room you hold, shelf order — the rail, the ferry's cycle and
 // the ship's per-room deal all walk this one list
 function ownedRooms(){ return ROOM_ORDER.filter(roomOwns); }
+function landLitList(){ return Array.isArray(META.landLit)? META.landLit : []; }   // 0904z THE DARK LAND: the lands whose reveal has played (absent = none)
 // 0363: THE ONE DOOR INTO rooms.own — roomBuy's till side and THE FREE
 // BACKYARD both walk it (push · save · repaint if you are standing in the
 // room; a verdict-time grant repaints on the way home — showMenu paints the
@@ -29485,7 +29490,7 @@ const META_DEFAULT = {
   // pulled from the pond fish (roomOwns('western') reads it — the deed),
   // wmapSeen = that milePop dealt. The three v3.40 flags above are LEGACY
   // (roof-era saves keep them; GONE FISHING banks on fishTease OR wmap).
-  baited:0, wmap:0, wmapSeen:0,
+  baited:0, wmap:0, wmapSeen:0, landLit:null,   // 0904z THE DARK LAND: the lands whose veil has LIFTED on the map (the reveal played) — flat null here, a fresh array at the boot's normalise (never the default's own object — the alias law); the ONE declared save key of the card (⚑ Q2)
   // 0332 THE POND'S SECOND SECRET — the egg chain's flats (same comet law):
   // degg = THE DINO EGG came up on the line (the SECOND catch; the grant and
   // this flag land in ONE save — decorSweep is the hand-rolled-save door),
@@ -29770,6 +29775,7 @@ if(!META.crownV2){ META.crownV2=1;
     // this build (wmapSeen stays 0: wlSweep deals her card next visit).
     if(!META.wmap) META.wmap=1;
   }
+  if(!Array.isArray(META.landLit)) META.landLit=ROOM_ORDER.filter(r=>r!=='bedroom' && roomOwns(r));   // 0904z THE DARK LAND (⚑ Q11): a save from before the veil (or a fresh one) starts with every land it already HOLDS lit — the reveal plays only for a land won from now on; a fresh save = [] (the yard, the field, the roof, the west all dark until earned — ⚑ Q1 the GENERAL rule)
   // v3.33 TP-02: the parks ledger is NESTED — fresh-build (the decor/enh alias
   // law) with clamps: lv 0..cap, INLINED PER PARK (PARK_LEVELS/parkLevels are
   // TDZ down here, the v1.26 law — 0327 THE DEEP LADDER: yeti 50, dino 20;
@@ -43259,7 +43265,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.06';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.07';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -83039,7 +83045,7 @@ function planeTravel(){
 // frame: the movers' own small rects), THE DESK on top (the pieces that stood over the movers on HEAD: the tunnel hill the train rides through, the
 // rim trees, the ribbons, the stamp, the hit paths). Measured on v8.58: WebKit 32.7 fps (30 ms frames), Chrome 38 fps at ×4 CPU — every animation
 // lived inside a blur-masked land, re-rendered whole every frame. The movers wait under .pre (tmapMoversPause) and start at the reveal.
-const TMAP_DEAD=400;   // the dead time after the mount (ms): the tap that opened the map cannot pick; the kid's NEXT tap does
+const TMAP_DEAD=400; const LAND_REVEAL_MS=1600, LAND_FADE_MS=1400;   /* 0904z THE DARK LAND: the reveal starts 400 ms after the last cloud leaves (the wipe is gone at show+1210 — ⚑ Q12) and fades 1.4 s (⚑ Q5) */   // the dead time after the mount (ms): the tap that opened the map cannot pick; the kid's NEXT tap does
 function tmapPaint(room, painter, lake){   // THE PIN: one room painter run with the room pinned (MAPPIN) and the night pinned day (NW_PIN 0); every pin restored — never a room switch, never a save write
   const nw=NW_PIN, mp=MAPPIN; MAPPIN={ room:room, lake:!!lake }; NW_PIN=0;   // 0862 (cell 14, the yard's ask): the PREVIOUS pin is restored, never nulled — a nested pin (the yard painting the roof inside its own paint) leaves the outer paint pinned
   try{ return painter(); } finally{ MAPPIN=mp; NW_PIN=nw; }
@@ -83459,6 +83465,19 @@ return '<g'+(META.parkYeti?'':' class="rgonly"')+' pointer-events="none"><ellips
 function plainFamily15(){ return '<g transform="translate(18.95,-121.9) scale(0.55)">'+wfFamilySVG()+'</g>'; }   // THE FAMILY on the map's own plain (the room's four holding hands — wfFamilySVG's still markup; the classes are inert on the paper): x 476-544 × y 118-163, between the plain's upper drifts and the crest drifts (⚑ Q7)
 let HILL_ROOM=0;   // R24 THE ROOMS' LEVEL BASE (0890c's reconciliation of r5 C6 with 0866b): THE WESTERN LAND's own floor borrows hill/butte/dune through TMAP_ART.art (wlRidgeSVG's five buttes, wlSandSVG's dunes) — r5's convex foot is the MAP's ("map-wide"); a room's picture stays byte-identical to HEAD's (the byte-still law of both cards), on the field and under the pin
 function roomArt(f){ return function(){ HILL_ROOM=1; try{ return f.apply(null,arguments); } finally{ HILL_ROOM=0; } }; }   // the export's hill/butte/dune wrapped: a room's call paints the level base; the map's own calls (drift · knoll · dune · butte inside kingdomSVG15) wear the foot
+// ═══ 0904z THE DARK LAND (design/map-second-look-0909 §3; Wyatt 9/9: "darken the Western World area until it's unlocked, in which it would brighten up"): a land the save does not hold wears THE VEIL — a warm ink dusk (#1B1410 @ .55, the paper's grain reading through) over the land's OWN zone (the blurred blob the paper paints it with — the same soft edge), cut where the land's box is cut (the crest+3, the river's centreline); on THE DESK over the movers (the train and the posse dim as they cross), under the ribbons + the hits; the tap = travelNo's shake as ever. THE REVEAL: a land HELD whose veil never lifted (landLit) is painted veiled with data-reveal — travelMapShow lifts it (landReveal). ⚑ Q1 the rule is GENERAL (every un-held land), Q3 no padlock / no caption / zero keys, Q7 the zone, never the box ═══
+const VEIL_INK='#1B1410', VEIL_OP=.55;   // ⚑ Q4: darker than the game's night, the grain still reads
+const VEIL_ZONES={   // each land's paper footprint (map units): the zone paths (white, blurred as the paper blurs them), the blur, the black cut piece (unblurred) — the same recipe as softLandR's masks
+  rooftop:{ paths:['M78 70 L430 70 L444 202 L64 202 Z'], blur:5, cut:null },   // the roof's own shape (houseSoft's roof half, its own blur 5)
+  backyard:{ paths:['M440 262 Q520 248 640 262 Q760 268 830 258 Q866 254 872 272 C852 296 838 330 832 372 C830 400 828 404 828 404 Q800 452 720 448 L470 448 Q430 400 440 262 Z'], blur:18, cut:null },   // r5's lawn zone (its north edge the range's feet, its east edge the river's centreline)
+  winter:{ paths:['M448 62 Q640 30 800 40 Q890 44 926 88 Q944 160 926 250 Q880 262 800 256 Q740 264 640 258 Q560 250 446 236 Z','M584 30 L928 30 L928 118 Q900 124 872 118 Q844 114 816 126 Q788 132 760 120 Q732 110 704 118 Q676 126 648 118 Q620 112 600 120 L584 118 Z'], blur:18, cut:'win' },   // r5's snow zone + THE FAR SNOW; the cut = ridgeCutWin(): everything under the crest+3 stays lit (the range is the border, not the land)
+  western:{ paths:['M862 290 Q960 240 1120 254 Q1170 292 1160 380 Q1146 444 1060 444 L866 444 Q826 404 862 290 Z','M930 66 Q1020 34 1150 58 Q1176 130 1162 236 Q1080 290 980 268 Q938 236 930 170 Q924 110 930 66 Z'], blur:18, cut:'river' } };   // the terra + the sand zones' union; the cut = westCutRiver(): west of the river's centreline stays lit
+function landVeils15(){   // THE VEIL per un-lit land: one <g class="tm-veil" data-room> (+ data-reveal when the land is held — the reveal is owed)
+  let o=''; const lit=landLitList();
+  for(const id of ROOM_ORDER){ if(id==='bedroom') continue; const held=roomOwns(id); if(held && lit.indexOf(id)>=0) continue; const z=VEIL_ZONES[id]; if(!z) continue;
+    const cut= z.cut==='win'? ridgeCutWin() : z.cut==='river'? westCutRiver() : null;
+    o+=`<g class="tm-veil" data-room="${id}"${held? ' data-reveal="1"' : ''} pointer-events="none"><defs><filter id="fv-${id}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${z.blur}"/></filter><mask id="mv-${id}"><rect x="0" y="0" width="1200" height="500" fill="#000"/>`+z.paths.map(d=>`<path d="${d}" fill="#fff" filter="url(#fv-${id})"/>`).join('')+(cut? `<path d="${cut}" fill="#000"/>` : '')+`</mask></defs><rect x="0" y="0" width="1200" height="500" fill="${VEIL_INK}" opacity="${VEIL_OP}" mask="url(#mv-${id})"/></g>`; }
+  return o; }
 function kingdomSVG15(){   // 0853z THE MAP LAG: three svgs — THE PAPER (static, painted once), THE MOVERS (mask-free, the only thing that ever repaints), THE DESK (the pieces that stand over the movers) — every piece at its HEAD depth; the wrap stacks them pixel-aligned (the same viewBox, the same letterbox)
 const R=rnd(31);
 const open=cls=>`<svg viewBox="0 0 1200 500" xmlns="${SVGNS}" class="${cls}" font-family="'Arial Narrow',Impact,sans-serif">`;
@@ -83517,6 +83536,7 @@ for(const [cx,cy] of [[46,46],[1154,46],[46,458],[1154,458]]) for(let i=0;i<4;i+
 for(const [x,y] of rim){ const sc=0.3+R()*0.05; const cold=(x>440 && x<960 && y<50); if(trackNear(x,y+(cold?4:36*sc),13) || trackNear(x,y-24*sc,13)) continue; if(Math.abs(x-922)<20 && y<52) continue; if(Math.abs(x-826)<20 && y>450) continue; const tree= cold? posterPine(x,y+6,0.5+R()*0.12) : posterTree(x,y,sc); if(x>1080 && y>150 && y<235) dk+=tree; else s+=tree; }   // 0853z: the rim stands in THE PAPER but for the trees on the tunnel's hill (1092-1173 × 177-225), which stand over it in THE DESK as on HEAD
 const W=[[1160,300],[1150,340],[1000,466],[1060,468],[700,468],[420,472],[300,470],[160,470],[560,472],[200,470],[880,468],[470,470]];   // THE WHEAT: the ten bottom seats +6 — the tufts' feet among the rim trees' trunks (foot-to-foot, 'shorter than a tree')
 for(const [x,y] of W){ if(trackNear(x,y,14)) continue; const sc=0.5+R()*0.14; s+=wheat(x,y,sc)+wheat(x+8,y+1.5,sc*0.8); }   // THE WHEAT: 0.50-0.64 = 14-18 u tall (a rim tree 25-29), each seat a clump of two (one R() per seat as HEAD)
+dk+=landVeils15();   /* 0904z THE DARK LAND: the veils on THE DESK — over the movers, the tunnel hill and the rim trees; under the five ribbons + the hit paths travelMapHTML appends (⚑ Q6) */
 dk+=ribbon(372,176,110,'rooftop','rb14-r'); dk+=ribbon(254,412,112,'bedroom','rb14-h'); dk+=ribbon(650,412,116,'backyard','rb14-b'); dk+=ribbon(RIB_WIN.x,RIB_WIN.y,RIB_WIN.w,'winter','rb14-s'); dk+=ribbon(1016,414,118,'western','rb14-w'); /* THE SNOWLINE: the winter ribbon 14 px lower (≤ 20 allowed) — the whole snowline shows above it; the western ribbon's call verbatim, on HEAD's own line (the repair round: r3's // comment swallowed it) */   // 0825: the five lands by ROOM_ORDER id — the ribbon reads ROOM_INFO's name in the player's tongue
 dk+=`</svg>`;
 s+=compass(1118,412);
@@ -83560,9 +83580,10 @@ function tmapFitRibbons(el){   // a tongue longer than its arc is squeezed onto 
 }
 function travelMapMount(kind){   // built + laid out (unpainted, .pre) — the pointer doors bound; the cost measured (TMAP.ms)
   const el=document.getElementById('travelMap'); if(!el) return null;
-  TMAP.kind=kind; TMAP.dest=null; TMAP.pick=0; TMAP.pd=null; TMAP.pdLast=null; TMAP.eat=0; TMAP.up=0; TMAP.t0=Date.now();   // t0: the tap that OPENED the map can never pick (its own trailing click lands on the map under reduced motion, where no glass covers it — measured) — TMAP_DEAD ms of dead time
+  TMAP.kind=kind; TMAP.dest=null; TMAP.pick=0; TMAP.pd=null; TMAP.pdLast=null; TMAP.eat=0; TMAP.up=0; TMAP.t0=Date.now(); TMAP.reveal=[];   // t0: the tap that OPENED the map can never pick (its own trailing click lands on the map under reduced motion, where no glass covers it — measured) — TMAP_DEAD ms of dead time
   const t0=performance.now();
   el.className='pre'; setHTML(el, travelMapHTML(kind));
+  TMAP.reveal=[...el.querySelectorAll('.tm-veil[data-reveal]')].map(v=>v.getAttribute('data-room')); el.querySelectorAll('.tm-veil').forEach(v=>{ const g=el.querySelector('.tm-rib[data-room="'+v.getAttribute('data-room')+'"]'); if(g) g.classList.add('dark'); });   /* 0904z THE DARK LAND: the reveal owed = the held lands painted veiled (landVeils15's data-reveal); every veiled land's ribbon wears .dark (dim, legible) — BEFORE the first layout below, so the ribbon is born dim (no fade-in) */
   tmapFitRibbons(el); void el.offsetHeight; tmapMoversPause(el,1);   // the layout paid here; the movers wait under .pre (0853z)
   TMAP.ms=Math.round(performance.now()-t0);
   el.onpointerdown=e=>{ if(e.isPrimary===false) return; TMAP.pd={ x:e.clientX, y:e.clientY, id:e.pointerId }; TMAP.pdLast=TMAP.pd; };
@@ -83578,7 +83599,16 @@ function travelMapMount(kind){   // built + laid out (unpainted, .pre) — the p
     travelPick(h.getAttribute('data-room')); };
   return el;
 }
-function travelMapShow(){ if(!TMAP.kind) return; const el=document.getElementById('travelMap'); if(!el) return; el.classList.remove('pre'); el.classList.add('up'); tmapMoversPause(el,0); TMAP.up=1; }   // revealed under full cover (a flight folded meanwhile shows nothing)
+function travelMapShow(){ if(!TMAP.kind) return; const el=document.getElementById('travelMap'); if(!el) return; el.classList.remove('pre'); el.classList.add('up'); tmapMoversPause(el,0); TMAP.up=1; landReveal(el); }   // revealed under full cover (a flight folded meanwhile shows nothing)
+function landReveal(el){   // 0904z THE DARK LAND — THE REVEAL: the held lands painted veiled at the mount (TMAP.reveal) lift once the clouds are gone — SFX.twink at the start, the fade (.lift, LAND_FADE_MS) with the ribbon brightening in step (.dark off — its own 1.4 s transition), the ribbon's own lit beat at the end; landLit written at the START (the ceremony was seen — a pick or a fold mid-fade never replays it, never writes twice); reduced motion: the veil simply goes, landLit written, no beat (⚑ Q5)
+  const ids=(TMAP.reveal||[]).slice(); TMAP.reveal=[]; if(!ids.length || !el) return;
+  const veils=ids.map(id=>el.querySelector('.tm-veil[data-room="'+id+'"]')).filter(Boolean); if(!veils.length) return;
+  const write=()=>{ const cur=landLitList(); const add=ids.filter(id=>cur.indexOf(id)<0); if(add.length){ META.landLit=cur.concat(add); saveMeta(); } };
+  const undark=()=>ids.forEach(id=>{ const g=el.querySelector('.tm-rib[data-room="'+id+'"]'); if(g) g.classList.remove('dark'); });
+  if(reducedMotion()){ veils.forEach(v=>v.remove()); undark(); write(); return; }
+  setTimeout(()=>{ if(TMAP.up!==1 || !veils.some(v=>v.isConnected)) return; SFX.twink(); veils.forEach(v=>v.classList.add('lift')); undark(); write();
+    setTimeout(()=>{ if(!veils.some(v=>v.isConnected)) return; veils.forEach(v=>v.remove()); ids.forEach(id=>travelLit(id,'lit')); }, LAND_FADE_MS); }, LAND_REVEAL_MS);
+}
 function tmapMoversPause(el,on){ try{ el.querySelectorAll('svg.tm-movers').forEach(sv=>{ if(on) sv.pauseAnimations(); else sv.unpauseAnimations(); }); }catch(e){} }   // 0853z: the train's SMIL waits under .pre (the CSS movers wait by the .pre rule) and starts at the reveal — the hidden map costs the takeoff nothing
 function travelMapClose(){ const el=document.getElementById('travelMap'); if(el){ el.className='hidden'; el.innerHTML=''; el.onpointerdown=el.onpointerup=el.onpointercancel=el.onclick=null; } TMAP.up=0; TMAP.pd=null; }
 function travelMapOpen(kind){ travelMapMount(kind); travelMapShow(); }   // reduced motion (and the rig): the map at once
@@ -99278,6 +99308,7 @@ window.GVT = {
   // ---- 0825 SARGE'S TRAVEL DESK rig: the map screen's state (read-only) + its doors ----
   travel(){ const el=document.getElementById('travelMap'); const svg=el? el.querySelector('svg') : null; const R=e=>{ const b=e.getBoundingClientRect(); return { l:+b.left.toFixed(1), t:+b.top.toFixed(1), r:+b.right.toFixed(1), b:+b.bottom.toFixed(1), w:+b.width.toFixed(1), h:+b.height.toFixed(1) }; };
     return { cv:GVT_CV, up:TMAP.up, kind:TMAP.kind, dest:TMAP.dest, pick:TMAP.pick, ms:TMAP.ms, trv:SHIPTRV, land:PLANE_LAND, pinned:SHIP_DEST||null, cls:el? el.className : null, room:roomCur(), own:ownedRooms(), pin:MAPPIN, nw:NW_PIN,
+      veils:el? [...el.querySelectorAll('.tm-veil')].map(v=>({ room:v.getAttribute('data-room'), reveal:v.hasAttribute('data-reveal'), lift:v.classList.contains('lift'), op:+getComputedStyle(v).opacity })) : [], reveal:(TMAP.reveal||[]).slice(), lit:landLitList().slice(), dark:el? [...el.querySelectorAll('.tm-rib.dark')].map(g=>g.getAttribute('data-room')) : [],   /* 0904z THE DARK LAND: the veils (room · reveal owed · lifting · computed opacity), the reveal list, landLit, the dim ribbons */
       zones:TMAP_ART.zones().map(z=>z.room), hits:svg? [...el.querySelectorAll('.tm-hit')].map(p=>({ room:p.getAttribute('data-room'), box:R(p) })) : [],
       ribs:svg? [...el.querySelectorAll('.tm-rib')].map(g=>({ room:g.getAttribute('data-room'), txt:String(g.textContent||'').trim(), fit:g.querySelector('textPath')? g.querySelector('textPath').getAttribute('textLength') : null, lit:g.classList.contains('lit'), no:g.classList.contains('no') })) : [],
       stamp:svg? [...el.querySelectorAll('.tm-stamp text')].map(t9=>String(t9.textContent||'')) : [], svg:svg? R(svg) : null,
@@ -99285,6 +99316,7 @@ window.GVT = {
       bar:el&&el.querySelector('.sh-bar')? R(el.querySelector('.sh-bar')) : null, sign:el&&el.querySelector('.sh-sign')? { txt:String(el.querySelector('.sh-sign').textContent||'').replace(/\s+/g,' ').trim(), box:R(el.querySelector('.sh-sign')), bBox:R(el.querySelector('.sh-sign b')), sBox:R(el.querySelector('.sh-sign small')) } : null,
       wipe:!!document.getElementById('cloudwipe'), wipeCls:(document.getElementById('cloudwipe')||{className:null}).className, fly:!!document.getElementById('wpfly'), flyCls:(document.getElementById('wpfly')||{className:null}).className, ship:(document.getElementById('decShip')||{}).className? String(document.getElementById('decShip').className.baseVal) : null, plane:(document.getElementById('decPlane')||{}).className? String(document.getElementById('decPlane').className.baseVal) : null }; },
   travelOpen(kind){ travelMapOpen(kind||'warplane'); return GVT.travel(); },
+  landLitReset(){ META.landLit=[]; saveMeta(); return landLitList(); },   // 0904z THE DARK LAND rig door: every held land's reveal owed again (the proof's seed)
   travelPick(room){ travelPick(room); return GVT.travel(); },
   travelMapHTML(kind){ return travelMapHTML(kind||'warplane'); },
   travelScript(){ return TMAP_ART.script(); },
