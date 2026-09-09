@@ -25605,6 +25605,7 @@ const BRAID_EDGE={ braidrug:'#5A4632', creamrug:'#C9C0AE', armyrug:'#3E4A2A' };
 const BRAID_GID={ braidrug:'decBraid', creamrug:'decCream', armyrug:'decArmy' };
 function rugIs(id){ return RUG_SKINS.indexOf(id)>=0; }   // 0905 THE RUGS: a rug skin (the space rug too) — the floor, never a toy (⚑ Q9 / Q14)
 function rugSolo(l, id){ for(let i=l.length-1; i>=0; i--){ if(l[i]!==id && rugIs(l[i])) l.splice(i,1); } }   // 0905 THE RUGS (⚑ Q8): ONE rug on the floor — the newest ON drops every other skin from the list in the same write (their cards read IN THE CHEST on the same paint)
+const BEDROOM_ONLY={ tskite:1, tsgice:1 };   // 0890a THE KITE OFF THE LANDS (Wyatt 9/8 ~7:35 pm on the winter boards: "for honestly all of these maps, I don't know why there's a kite in all of them. I know the kite is a treasure you can unlock, but why is it in each one of these scenes? Let's get rid of this kite. It doesn't fit in." · ~7:42 pm "yes" to one rule for the lands): THE KITE (flown indoors) and THE ICE CASTLE SNOW GLOBE (⚑ Q1 — his ~7:15 pm "remove the snow globe from the scene"; the winter row already seats neither, R1e/R1g) are BEDROOM toys — their floor is the bedroom wherever you stand (the rugs' 0905 idiom: decorOn reads the bedroom's list, the deal and the chest card's switch write it), never HOME on a land (decorHome — so no land paints, seats, grabs, sweeps or loads one in), no range seat, and a stray one walks home at boot (the load path's 0348 grammar). The chest, the reward road, the names, the react and the art byte-still.
 const DECOR_COST={ /* 0905 THE REWARD ROAD RE-CUT: the duck 15★ and the bear 20★ — Wyatt's own stickers (cells 5 + 3) */ ducky:15, teddy:20, elephant:80, train:110, robot:140, spacerug:170, sunrug:200, braidrug:180, creamrug:160, armyrug:180, banana:350, unicorn:200, sdino:90, ptero:100, trike:120, bdino:130, stego:140, dilo:160, kingrex:300, syeti:80, snowfig:90, byeti:120, gsnowman:180, kingyeti:300, wbandit:80, wmouse:90, wsniper:110, wteddy:140, wrider:150, wsnake:170, wlady:180, kingcroaklil:300, kingcroak:300, tsdummy:240, tscrew:300, tsnem:320, tsgiant:340, tsgice:360, tsgvol:380, tsgfort:400, tsmap:420, tschest:750, tshorse:450, tsjack:480, tssub:500, tsdrum:520, tsrocket:560, tsmusic:600, tskite:620, tstop:650, tsyoyo:680, tsradio:720, tscastle:800, tsgold:1500 };   // TR-03 THE CLASSICS: 450 to 800, the golden man's 1,500 the road's capstone (§2 D7 — the whole shelf 12,090★; ⚑ Q8 every price one cell)   // TR-02 THE TOP SHELF: prices climb with the level (§2 D7 — 220 to 420, the chest's 750 the row's capstone; ⚑ Q8 every price one cell)   // 0552 CROAK'S SURPLUS: the outlaw cast on D18's ladder — smalls 80–180★, kings 300★ (⚑ prices; the little king rides the kings' row)   // v3.04: the balls = Wyatt's own stickers (8/10 night, verbatim: "the football is 180 and the Soccer Ball is 170")   // v2.53 (Wyatt 8/5): every decor +50★ (the lens rode along, 100→150; the piggy BANK TIERS are economy, not decor — untouched, flagged). v2.61: unicorn 200★ = Wyatt's own sticker, no rider
 // ===== EARNED DECORATIONS (v1.71) — prizes, never sold. Wyatt 7/29, verbatim:
 // "Please add two more decorative items that you can [earn] from beating level
@@ -26107,7 +26108,7 @@ function rideIs(k){ return RIDES.indexOf(k)>=0; }
 function rdecList(r){ const m=META.rdec; const l=m && m[r]; return Array.isArray(l)? l : []; }
 function decorOn(id){ const d=META.decor; if(!decOwns(id)) return false;
   if(DECOR_GLOBAL.indexOf(id)>=0) return !(d.off && d.off.indexOf(id)>=0);
-  if(rugIs(id)) return rdecList('bedroom').indexOf(id)>=0;   // 0905 THE RUGS (⚑ Q15): a rug's floor is the BEDROOM wherever you stand (the hookshot's own idiom) — its card, the room's paint and the raid's floor read one truth
+  if(rugIs(id) || BEDROOM_ONLY[id]) return rdecList('bedroom').indexOf(id)>=0;   // 0905 THE RUGS (⚑ Q15): a rug's floor is the BEDROOM wherever you stand (the hookshot's own idiom) — its card, the room's paint and the raid's floor read one truth · 0890a THE KITE OFF THE LANDS: a BEDROOM toy's floor too (its chest card reads the bedroom's truth on every land)
   return rdecList(roomCur()).indexOf(id)>=0; }
 // placed on ANY room's floor — placedCount/momDue's read, so the per-room
 // deal preserves the trigger's meaning exactly (union at deal == old on-set)
@@ -26256,6 +26257,7 @@ function decorHome(id){
   // — never stowable, never roof-fallen (it FLIES). The ferry may not
   // strand its sailor: with the rail retired this read is the travel door.
   if(rideIs(id)) return decorOn(id);   // 0568 D4: a RIDE is aboard every room while it is out (the off-list is its toy box — D5 keeps the LAST ride out of it; ROOF_GONE never asked — it FLIES)
+  if(BEDROOM_ONLY[id] && roomCur()!=='bedroom') return false;   // 0890a THE KITE OFF THE LANDS: a bedroom toy is never HOME on a land — THE READER IS THE LAW (the treasure painter, rdragPick, the roof's sky loops, the yard's walk and the rigs' seat census all walk this door); the load path corrects the save
   return decorOn(id) && !ROOF_GONE.has(id); }
 function bankTier(){ return Math.max(0, Math.min(BANK_TIERS.length, (META.bankTier)|0)); }
 function bankNextCost(){ const r=bankTier(); return r>=BANK_TIERS.length? 0 : BANK_TIERS[r].cost; }
@@ -29419,6 +29421,21 @@ if(!META.crownV2){ META.crownV2=1;
       for(const r9 in (META.roomPosR||{})){ const m9=META.roomPosR[r9]; if(m9 && Array.isArray(m9.banana) && m9.banana.length===2) m9.banana=[(m9.banana[0]|0)-856, m9.banana[1]|0]; }
     }
     META.chest=c;
+  })();
+  // ═══ 0890a THE KITE OFF THE LANDS — THE WALK HOME (every boot, idempotent — the 0348 grammar: the set is the truth, the lists just follow it; Wyatt 9/8
+  // ~7:35 pm "I don't know why there's a kite in all of them … Let's get rid of this kite. It doesn't fit in." · ~7:42 pm "yes" to one rule for the lands):
+  // a BEDROOM toy (the kite; ⚑ Q1 the ice castle's snow globe) standing on any LAND's floor list walks home — stripped from every room's list but the
+  // bedroom's, its parked delta there forgotten (an emptied list or map dropped — the load path's own shape), dealt onto the bedroom's floor (a full
+  // bedroom keeps it IN THE CHEST with the NEW! mark — the 0904/0836 law; nothing un-owns it; ⚑ Q2 at boot, not on touch); one save if anything moved.
+  // BEDROOM_ONLY and the chest's predicates stand ABOVE this load path (the families' idiom — the TDZ law binds only consts declared BELOW).
+  (function(){
+    const rdK=META.rdec||(META.rdec={}), rpK=META.roomPosR||{}; let mv=0;
+    for(const id in BEDROOM_ONLY){ let out=false;
+      for(const rK in rdK){ if(rK==='bedroom') continue; const lK=rdK[rK]; if(!Array.isArray(lK)) continue; const iK=lK.indexOf(id); if(iK<0) continue; lK.splice(iK,1); out=true; mv++; if(!lK.length) delete rdK[rK]; }
+      for(const rK in rpK){ if(rK==='bedroom') continue; const mK=rpK[rK]; if(mK && typeof mK==='object' && mK[id]){ delete mK[id]; mv++; if(!Object.keys(mK).length) delete rpK[rK]; } }
+      if(out && (rdK.bedroom||[]).indexOf(id)<0){ if(chestFloorToy(id) && chestFull('bedroom')) chestNewAdd(id); else (rdK.bedroom||(rdK.bedroom=[])).push(id); }
+    }
+    if(mv) saveMeta();
   })();
   // ═══ 0905 THE KING FELL — the hall's latch rebuilt fresh (the chest shape): wk = the night key of the last defeat this save was paid for ('' = never),
   // ann = the card owed, last = the roster it deals (HQ's seats, ≤ ten); took = the player's LOCAL day the card was first dealt ('' = not yet, or
@@ -42843,7 +42860,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.88';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.89';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -75860,13 +75877,14 @@ const WL_MOUTH={ x:378, y:180, w:104, h:72 };   // the mine's doorway in the big
 // mine — read by rpXY() ONLY where META.roomPosR.western[k] is unset (a veteran keeps his own arrangement; the first drag saves an absolute delta —
 // rdragStart seeds d0 from rpXY, so there is no double count and no jump). The ducky floats in the water hole, the teddy rides in the wagon, the keys
 // hang by the blocks in the SW corner, the outlaw cast spreads over the open floor; the rare shelf toys and the park bosses take the six spill pockets.
+// 0890a THE KITE OFF THE LANDS: the kite and the ice castle's snow globe have NO range seat (bedroom toys — BEDROOM_ONLY; the winter row never seated them, R1e/R1g).
 const DECOR_SEAT_R={ western:{
   ducky:[200,506], whorse:[100,296], wsniper:[100,378], elephant:[110,416], racecar:[100,500], goldkey:[14,486], silverkey:[38,486], bronzekey:[62,486],
   kingcroak:[256,228], unicorn:[512,336], wlady:[232,398], wbandit:[524,278], wsnake:[590,238], dino:[668,238], helmet:[578,536], wrider:[424,352], wmouse:[368,398],
   kingcroaklil:[600,428], puffer:[752,386], football:[690,426], soccer:[652,430], yeti:[236,440], doghouse:[740,506], doghouse2:[240,230], bass:[356,336], bluedragon:[368,336],
   wteddy:[497,490], train:[282,516], teddy:[296,494], banana:[100,300],
   trike:[600,254], stego:[536,278], ptero:[520,290], byeti:[110,394], gsnowman:[100,292], pdino:[596,546], kingrex:[104,392], kingyeti:[110,394], snowfig:[232,232], sdino:[232,400], syeti:[232,400], bdino:[110,394], dilo:[360,340],
-  tsdummy:[540,340], tscrew:[232,234], tsnem:[360,340], tsgiant:[110,300], tsgice:[232,232], tsgvol:[470,420], tsmap:[590,427], tschest:[292,270], tshorse:[104,300], tsjack:[356,336], tssub:[596,246], tsrocket:[520,344], tskite:[300,272], tstop:[232,232], tsradio:[600,427], tscastle:[236,440], tsgold:[526,330], tsmusic:[236,440], tsdrum:[652,428], tsyoyo:[232,232],
+  tsdummy:[540,340], tscrew:[232,234], tsnem:[360,340], tsgiant:[110,300], tsgvol:[470,420], tsmap:[590,427], tschest:[292,270], tshorse:[104,300], tsjack:[356,336], tssub:[596,246], tsrocket:[520,344], tstop:[232,232], tsradio:[600,427], tscastle:[236,440], tsgold:[526,330], tsmusic:[236,440], tsdrum:[652,428], tsyoyo:[232,232],
   spacerug:[250,232], sunrug:[250,232], braidrug:[250,232], creamrug:[250,232], armyrug:[250,232] },
   // 0890 THE WINTER FIELD MAKEOVER (cell 4): the field's pockets — the big molds on the chest's rise, the mid ones by the treeline's foot / the east rise / under the lake, the small ones south of the game and on the far west; every seat surveyed against the park's rect + pill, the lake's ice, the fishers, the players, the snowmen, the family's home, the secret's rect, the chest's door + drop pad (the centre law), the rides' pockets, the pole's seat and GROUP (build-wf/seatsWF.py); the kite and the snow globe have NO winter seat (R1e/R1g — bedroom toys; 0890a)
   winter:{ banana:[100,300], bass:[836,318], bluedragon:[480,540], bronzekey:[76,500], byeti:[102,392], dilo:[300,540], dino:[340,320], doghouse:[742,520], doghouse2:[188,340], ducky:[300,540], elephant:[86,392], football:[480,540], goldkey:[20,500], gsnowman:[102,392], helmet:[30,224], kingcroak:[102,392], kingcroaklil:[296,236], kingrex:[92,392], kingyeti:[76,392], pdino:[480,540], ptero:[340,320], puffer:[836,318], racecar:[20,500], sdino:[296,236], silverkey:[48,500], snowfig:[296,236], soccer:[480,540], stego:[340,320], teddy:[20,500], train:[300,540], trike:[340,320], tscastle:[340,320], tschest:[340,320], tscrew:[300,540], tsdrum:[480,540], tsdummy:[748,536], tsgfort:[300,540], tsgiant:[102,392], tsgold:[196,340], tsgvol:[480,540], tshorse:[196,340], tsjack:[340,320], tsmap:[748,536], tsmusic:[340,320], tsnem:[836,318], tsradio:[748,536], tsrocket:[480,540], tssub:[300,540], tstop:[30,224], tsyoyo:[30,224], unicorn:[836,318], wbandit:[296,236], whorse:[196,340], wlady:[836,318], wrider:[748,536], wsnake:[480,540], wsniper:[480,540], wteddy:[748,536], yeti:[196,340] } };
@@ -75993,7 +76011,7 @@ function wlRig(){
   return { cv:GVT_CV, room:roomCur(), loop:roomLoopDue(), paper:!!MAPPIN, ids:ids.filter(g), cls:cls.filter(c=>!!(st && st.querySelector('.'+c))), rows:ROOM_SPOTS.filter(sp=>!sp.due||sp.due()).map(sp=>sp.id),
     spots:st? [...st.querySelectorAll('[id^="rspot-"]')].map(e=>e.id.slice(6)) : [], tags:st? [...st.querySelectorAll('.roomtag')].map(e=>({ id:e.id, t:e.textContent, r:R(e) })) : [],
     plane:wpSeat(), wpd:wpD().slice(), seat:Object.fromEntries(Object.keys(DECOR_SPOTS).filter(k=>decorHome(k)).map(k=>[k, rpXY(k)])), placed:((META.rdec&&META.rdec[roomCur()])||[]).slice(),
-    anims:document.getAnimations({subtree:true}).length, smil:svg? svg.querySelectorAll('animateMotion').length : 0, clip, cap:RTAG_CAP['rtag-wpark'], cacti:META.wcacti|0, family:ddFamily().slice(), stage:R(st), mouth:Object.assign({},WL_MOUTH) };
+    anims:document.getAnimations({subtree:true}).length, smil:svg? svg.querySelectorAll('animateMotion').length : 0, clip, cap:RTAG_CAP['rtag-wpark'], cacti:META.wcacti|0, family:ddFamily().slice(), stage:R(st), mouth:Object.assign({},WL_MOUTH), bedroomOnly:Object.keys(BEDROOM_ONLY) };   // 0890a THE KITE OFF THE LANDS: the set (the census)
 }
 // ═══ 0890 THE WINTER FIELD MAKEOVER — THE SNOW FIELD ALONE (FM-GVT-WINTER-01 rev 2k = rev 2c + R1…R1g + R2; design/winter-0907/00-DESIGN.md §3 the picture ·
 // §4 the cells · §13–§15 the football and the field's life; the boards build-wf/mkmock.mjs rev 2k + foot.mjs = THE SCRIPT; Wyatt 9/7 ~3:35 pm "Remove the
@@ -82212,7 +82230,7 @@ function rdecSweep(){
     META.rdecSeen.push(id);
     // 0340: THE HOOKSHOT deals to THE ROOFTOP wherever you stand (the roof
     // is its only floor now); everything else keeps the current-room deal.
-    const rm9=(id==='hook')? 'rooftop' : rugIs(id)? 'bedroom' : cur;   // 0905 THE RUGS (⚑ Q15): a rug's floor is the bedroom wherever you stand
+    const rm9=(id==='hook')? 'rooftop' : (rugIs(id) || BEDROOM_ONLY[id])? 'bedroom' : cur;   // 0905 THE RUGS (⚑ Q15): a rug's floor is the bedroom wherever you stand · 0890a THE KITE OFF THE LANDS: a bedroom toy deals to the bedroom wherever it was won or bought
     if(rm9==='backyard' && BY_CHESTED[id]){ chestNewAdd(id); ch=true; continue; }   // 0866 THE ONE BALL LAW (REV 2, ⚑ Q19): the soccer ball and the teddy are never DEALT onto the yard — they wait in the chest there with the NEW! mark (one ball on the field: the dinos'; two is the kid's own choice)
     if(chestFloorToy(id) && chestFull(rm9)){ chestNewAdd(id); ch=true; continue; }   // 0904 THE TREASURE CHEST (cell 3): a full floor takes no ninth toy (0836: eight per floor; a fifth till then) — the new one lands IN THE CHEST with a NEW! mark on the lid (the beacon breathes till the panel opens); under eight it lands on this floor as ever; nothing placed is bumped (⚑ Q5)
     const l=META.rdec[rm9]||(META.rdec[rm9]=[]);
@@ -96413,7 +96431,7 @@ window.UI = {
           const d=DECOR_REACT[id]; if(d && d.fx) setTimeout(()=>decorReact(id), 260); else if(d && SFX[d.sfx]) setTimeout(()=>SFX[d.sfx](), 260); }   // 0567 D6: a store model's summon plays its REAL reaction in the room behind the shop
         else { off.push(id); SFX.thock(); }
       } else {
-        const rm8=(id==='hook')? 'rooftop' : rugIs(id)? 'bedroom' : roomCur();   // 0340: the hookshot's card works the ROOF's floor list wherever you stand · 0905 THE RUGS (⚑ Q15): a rug's card works the BEDROOM's
+        const rm8=(id==='hook')? 'rooftop' : (rugIs(id) || BEDROOM_ONLY[id])? 'bedroom' : roomCur();   // 0340: the hookshot's card works the ROOF's floor list wherever you stand · 0905 THE RUGS (⚑ Q15): a rug's card works the BEDROOM's · 0890a THE KITE OFF THE LANDS: a bedroom toy's card works the BEDROOM's on every land
         const l=META.rdec[rm8]||(META.rdec[rm8]=[]);
         const i=l.indexOf(id);
         if(i>=0){ l.splice(i,1); SFX.thock(); }
@@ -99715,7 +99733,8 @@ window.GVT = {
     const mvs=['piggy','shop','fort','board','tv']; const art={}, spot={}, tag={}; for(const mv of mvs){ art[mv]=!!g('ro-'+mv); spot[mv]=R(g('rspot-'+mv)); tag[mv]=g('rtag-'+mv)? { t:g('rtag-'+mv).textContent.replace(/\s+/g,' ').trim(), cls:g('rtag-'+mv).className } : null; }
     return { cv:GVT_CV, room:roomCur(), home:roomCur()==='bedroom', plank:!!g('ro-shelf'), art, spot, tag, ribbon:!!g('ro-shopnew'), gate:!!g('ro-fort-gate'), tvSet:!!g('tvSet'), window:!!g('ro-window'), bed:!!g('ro-bed'), chest:!!g('ro-chest'), plane:!!g('decPlane'),
       patrol:{ p0:patrolP0().slice(), sky:PT_SKY, gate:PT_GATE.slice(), floor:PT_FLOOR, w:PT_W, r:PT_R, arch:PT_ARCH.slice(), mouth:PT_MOUTH.slice(), lid:PT_LID, men:document.querySelectorAll('#roomStage .patrol .ptfig').length, drops:document.querySelectorAll('#roomStage .patrol .ptdrop').length },
-      family:ddFamily().map(mv=>({ mv, art:!!g('ro-'+mv), tag:!!g('rtag-'+mv), lit:!!(g('ro-'+mv)&&g('ro-'+mv).classList.contains('beacon')) })), tourQuiet:tourQuiet(), scale:roomScale(), stage:R(g('roomStage')) }; },
+      family:ddFamily().map(mv=>({ mv, art:!!g('ro-'+mv), tag:!!g('rtag-'+mv), lit:!!(g('ro-'+mv)&&g('ro-'+mv).classList.contains('beacon')) })), tourQuiet:tourQuiet(), scale:roomScale(), stage:R(g('roomStage')),
+      bedroomOnly:Object.keys(BEDROOM_ONLY).map(k=>({ k, own:decOwns(k), on:decorOn(k), home:decorHome(k), seat:rpXY(k), el:!!g('ro-'+k), floors:Object.keys(META.rdec||{}).filter(r=>rdecList(r).indexOf(k)>=0), deltas:Object.keys(META.roomPosR||{}).filter(r=>!!(META.roomPosR[r]||{})[k]), nw:((META.chest&&META.chest.nw)||[]).indexOf(k)>=0 })) }; },   // 0890a THE KITE OFF THE LANDS: the bedroom toys' census on THIS floor (the battery's read door)
   evPill(){ const el=document.getElementById('evDoor'), slot=document.getElementById('rhEv'), h=document.querySelector('#roomStage .roomhead'), xp=h&&h.querySelector('.xpbar'), pig=document.getElementById('rhPig'), na=document.getElementById('rhNoAds'), bell=document.getElementById('bfBell');
     const R=e=>{ if(!e) return null; const b=e.getBoundingClientRect(); return { x:+b.x.toFixed(1), y:+b.y.toFixed(1), w:+b.width.toFixed(1), h:+b.height.toFixed(1) }; }; const fs=e=>e? parseFloat(getComputedStyle(e).fontSize) : null; const cl=id=>{ const e=document.getElementById(id); return !!(e && e.classList.contains('evlive')); };
     return { band:evBandState(), el:!!el, tag:el? el.tagName : null, cls:el? el.className : null, onclick:el? (el.getAttribute('onclick')||'') : '', text:el? el.textContent.replace(/\s+/g,' ').trim() : null, name:el? (n=>n? n.textContent : null)(el.querySelector('.ev-name')) : null, time:el? (n=>n? n.textContent.replace(/\s+/g,' ').trim() : null)(el.querySelector('.ev-time')) : null,
