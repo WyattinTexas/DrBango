@@ -28361,7 +28361,7 @@ function petMul(r){ return 1+PET_RANK*rankUnits(r|0); }   // the ONE curve the b
 // 12.8; both inside the design's 10–14 (⚑ Q1: the design's 3 / 1 read 9.4 / 2.1). Slush's 2 a KO is card B's ball (his wall pays nothing on this build); Tiptoe's and
 // Puff's rows wait on their builds. A king felled by a pet's own last blow pays PET_XP_KING flat (⚑ Q6). ═══
 const PET_LV_MAX=100;
-const PET_XP={ patch:{heal:4}, flappy:{ko:6}, slush:{ko:10}, tiptoe:{bite:1,ko:2}, puff:{burn:1,ko:2} };   // the deed weights (one row a pet; the rig's numbers above) · 0806r SLUSH'S SNOWBALL: ko 10 — his ball's blow is the killing one ~1.25 times a 90 s fight at level 1 (build-sb/logs/measure-table.md: 10–15 throws, 3–46 men hit, the squad finishes most men first, as with Flappy's bite) → 10 lands 12.5 (the design's 2 read 2.5)
+const PET_XP={ patch:{heal:4}, flappy:{ko:6}, slush:{hit:1,ko:5}, tiptoe:{bite:1,ko:2}, puff:{burn:1,ko:2} };   // 0901 SLUSH'S SNOWBALL XP — THE HIT PAYS (FM-GVT-SLUSH-XP-01; Wyatt 9/8: "if he hits someone with a snowball, he should get a little bit of XP, and if he gets a KO, he gets a lot"): hit 1 for a THROW that lands (the first man a ball touches pays, B.paid; THE BURST's little balls each carry their own) · ko 5 a knockout (a man the ball KOs pays hit + ko) — THE RIG'S PICK (measureSX cand-a, 16 seeded 90 s level-1 fights): a ball touches 25.8 men a fight but 10.6 throws land, 1.06 KOs; count (a) per MAN at 1:10 = 36.4 points ≈ 2.9 × par (12.5) → count (b) per THROW; at hit 1 the ko floor 5 gives 15.9 points ≈ 1.27 × par = 1.12 levels a game (the median fight 14.5 → 1.07); ⚑ the fractional alt hit 0.5 · ko 5 = 10.6 at par · the deed weights (one row a pet; the rig's numbers above) · 0806r SLUSH'S SNOWBALL: ko 10 — his ball's blow is the killing one ~1.25 times a 90 s fight at level 1 (build-sb/logs/measure-table.md: 10–15 throws, 3–46 men hit, the squad finishes most men first, as with Flappy's bite) → 10 lands 12.5 (the design's 2 read 2.5)
 const PET_XP_KING=20;   // ⚑ Q6: a king felled by a pet's own last blow — a rare and glorious line
 // ═══ 0908 THE PETS' PACE (Wyatt 9/8 ~22:45, dictated: "Slush is leveling up a little too fast … I only played two levels with him, and now he's almost level 26 … He actually just hit level 44 the
 // next game. It got out of hand; I want pets to be gaining 0.5-2 levels per game really depending what happens") — THE CAUSE: a deed's FLAT XP × a deed COUNT that grows with the level (a bigger ball, more pips,
@@ -43194,7 +43194,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='8.96';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='8.97';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -57108,7 +57108,7 @@ function cannonRoll(B){
       if(u.side!==B.side){
         if(HERO_REFL[u.type]){ if(!(B.pet && petHas(B.pet,'boulder'))){ heroDeflB(B,u); return; } petShoveKing(u, B.x-B.dx*40, B.y-B.dy*40, B.src, SNB_SHOVE); }   // 0806r THE BOULDER (100, ⚑ Q12): a level-100 pet's ball bowls a king a pace and its blow lands below — every other ball keeps the 0518 hide law
         if(cmdoCharged(u) && cmdoCovers(u,B.x,B.y,B.r+11,0)){ cannonCaught(B,u); return; }
-        B.hit[u.id]=1; if(B.pet && B.src===B.pet.own) B.src.petBy=B.pet; hurt(u, B.dmg, B.src); if(B.pet && B.src) B.src.petBy=null; if(B.pet) petSbHit(B,u);   // 0806r: the OWNER's Sarge is the src on the battleground (v8.45 C3 — the tag pays the seat) and carries the pet's stamp for A's XP door while the ball is still HIS (a caught ball's src is the catcher: no stamp, no XP); then THE COLD / THE BOWL-OVER
+        B.hit[u.id]=1; if(B.pet && B.src===B.pet.own) B.src.petBy=B.pet; hurt(u, B.dmg, B.src); if(B.pet && B.src) B.src.petBy=null; if(B.pet && B.src===B.pet.own && !B.paid){ B.paid=1; petXp(B.pet,'hit'); } if(B.pet) petSbHit(B,u);   // 0901 THE HIT PAYS: the hit ON B.pet (never the src — the Sarge) while the ball is still the owner's (the stamp's own gate: a caught ball pays nothing); the KO rode hurt's death tail through the stamp; MINE only through petMine (the twin seat's Slush banks nothing on my sim) · 0806r: the OWNER's Sarge is the src on the battleground (v8.45 C3 — the tag pays the seat) and carries the pet's stamp for A's XP door while the ball is still HIS (a caught ball's src is the catcher: no stamp, no XP); then THE COLD / THE BOWL-OVER
         S.fx.push({k:'ring',x:u.x,y:u.y-16,r:4,R:22,t:0,dur:0.22,col:'#2A2A30'});
         bfSfx(SFX.thock,u.x,u.y);
       } else if(!B.pet){ B.hit[u.id]=1; knock(u,B.x,B.y); }   // 0806r: a pet's snowball passes its own army
@@ -57124,6 +57124,7 @@ function cannonRoll(B){
     B.hit[f.id]=1;
     f.hp -= B.dmg;                                       // the reflect currency's own grammar — ordnance bypasses blocks (v1.38)
     hitCheck(f, B.src);
+    if(B.pet && !B.paid){ B.paid=1; petXp(B.pet,'hit'); }   // 0901 THE HIT PAYS: a THROW that lands (once a ball — the first man it touches) pays Slush 'hit' (PET_XP.slush.hit; MINE only through petMine — a partner's Slush pays nothing here); when this blow was the killing one the KO already rode hitCheck's death tail (HOOK 2 through petBy) — hit + ko both land; zero bytes on the wire, in the save, in the words
     if(B.pet) petSbHit(B,f);   // 0806r: THE COLD (30) / THE DEEP COLD (90) · THE BOWL-OVER (70) on a pet's ball — after the credit line, byte-what-it-was
     S.fx.push({k:'ring',x:f.x,y:f.y-16,r:4,R:22,t:0,dur:0.22,col:'#2A2A30'});
     bfSfx(SFX.thock,f.x,f.y);
