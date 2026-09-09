@@ -41050,11 +41050,60 @@ const SFX = {
   // a bright tick, the dome's own ring, and a duller second knock
   clank: ()=>{ noise(0.07,0.16,2600); tone(1250,900,0.09,'square',0.06); tone(2100,1500,0.14,'sine',0.05);
                setTimeout(()=>{ noise(0.05,0.1,2200); tone(980,760,0.08,'square',0.04); },130); },
-  // ...and the warplane's engine run-up: a sawtooth flutter climbing to full
-  // song, wobbling there, winding back down — ~1.3s, the react's own length
-  prop:  ()=>{ [90,125,150,165,172,167,174,152,122,96].forEach((f,i)=>setTimeout(()=>
-                 tone(f,f*1.5,0.15,'sawtooth',0.05), i*130));
-               noise(0.16,0.04,600); },
+  // ...and the warplane's engine run-up — THE PROPELLER'S NEW VOICE (FM-GVT-PROP-SFX-01, design/prop-sfx-0909; Wyatt 9/9/2026:
+  // "more utopian to hear than the current one (which sounds clumsy & depressing)"). Was v1.21's ten sawtooth chirps every 130 ms,
+  // each restarting a fifth low, the ladder 90 → 174 → 96 Hz falling an octave at the end. Now ONE breath, voice A THE SUNRISE: a soft
+  // catch-puff, a warm purr (a triangle and the 2nd · 3rd · 5th partials = a major chord) gliding 92 → 184 Hz and still climbing as
+  // it fades — up and away, never a fall — under the blades' flutter (a tremolo winding 11 → 36 Hz) and the slipstream (a noise
+  // swell opening 240 → 1900 Hz). ~1.34 s, the crest before 0.9 s (the climb's zoom lands there), the tail under the twinkle; every
+  // node a throwaway straight into ac.destination (the SFXW rebuild law); scheduled on the audio clock, so it renders offline
+  // (build-ps/batteryPS) and two bombers stack cleanly. The same gate as tone(): soundOn · audio() · try/catch; t = the clock. No new asset.
+  // REV 1 (Wyatt on the audition: "We need a flute or a ocarina"): the TRAVEL seats — the warplane's takeoff, the pirate ship's sail and
+  // arrival — call SFX.flute below; this engine stays on the field's bombers (bmbSpawn ×3) and the shop's crate (bmbShelf).
+  prop:  ()=>{ if(!soundOn) return; const ac=audio(); if(!ac) return; try{ const t=ac.currentTime;
+    const D=ac.destination, sr=ac.sampleRate;
+    // THE CATCH: one soft puff as the prop kicks over
+    { const n=Math.round(sr*0.09), b=ac.createBuffer(1,n,sr), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+      const s=ac.createBufferSource(); s.buffer=b; const f=ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=420; const g=ac.createGain(); g.gain.value=0.035; s.connect(f).connect(g).connect(D); s.start(t); }
+    // THE BLADES: the flutter that winds up with the engine — a tremolo 11 → 30 → 36 Hz, a third deep
+    const lfo=ac.createOscillator(), dep=ac.createGain(), trem=ac.createGain();
+    lfo.frequency.setValueAtTime(11,t); lfo.frequency.exponentialRampToValueAtTime(30,t+0.8); lfo.frequency.exponentialRampToValueAtTime(36,t+1.35);
+    dep.gain.value=0.36; trem.gain.value=1; lfo.connect(dep).connect(trem.gain); trem.connect(D);
+    // THE PURR: one envelope over four partials (1 · 2 · 3 · 5 = a major chord) gliding 92 → 184 Hz, still climbing as it fades — up and away
+    const env=ac.createGain(); env.gain.value=0.0001; env.gain.setValueAtTime(0.0001,t+0.06); env.gain.exponentialRampToValueAtTime(0.06,t+0.5); env.gain.setValueAtTime(0.06,t+0.8); env.gain.exponentialRampToValueAtTime(0.0008,t+1.35); env.connect(trem);
+    [[1,'triangle',0.55],[2,'sine',0.32],[3,'sine',0.18],[5,'sine',0.09]].forEach(([h,ty,v])=>{ const o=ac.createOscillator(), g=ac.createGain(); o.type=ty; g.gain.value=v;
+      o.frequency.setValueAtTime(92*h,t+0.06); o.frequency.exponentialRampToValueAtTime(184*h,t+0.8); o.frequency.exponentialRampToValueAtTime(200*h,t+1.35);
+      o.connect(g).connect(env); o.start(t+0.06); o.stop(t+1.36); });
+    lfo.start(t); lfo.stop(t+1.36);
+    // THE SLIPSTREAM: the air opening under the wings — a noise swell, its low-pass sweeping 240 → 1900 Hz
+    { const n=Math.round(sr*1.3), b=ac.createBuffer(1,n,sr), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+      const s=ac.createBufferSource(); s.buffer=b; const f=ac.createBiquadFilter(); f.type='lowpass'; f.Q.value=0.9;
+      f.frequency.setValueAtTime(240,t+0.06); f.frequency.exponentialRampToValueAtTime(1900,t+0.85); f.frequency.exponentialRampToValueAtTime(1400,t+1.35);
+      const g=ac.createGain(); g.gain.value=0.0001; g.gain.setValueAtTime(0.0001,t+0.06); g.gain.exponentialRampToValueAtTime(0.021,t+0.75); g.gain.setValueAtTime(0.021,t+0.85); g.gain.exponentialRampToValueAtTime(0.0005,t+1.35);
+      s.connect(f).connect(g).connect(D); s.start(t+0.06); s.stop(t+1.36); }
+  }catch(e){} },
+  // THE CALL — THE PROPELLER'S NEW VOICE, REV 1 (FM-GVT-PROP-SFX-01, design/prop-sfx-0909; Wyatt 9/9/2026 on the audition: "I want the
+  // hairs on my arms to stand up. We need a flute or a ocarina. Like the opening notes of [the Ocarina of Time] or the sfx in super mario
+  // 3 when you play the magic flute"): the sound that SUMMONS the ride — an ORIGINAL ocarina phrase (no borrowed notes), voice F1 THE CALL.
+  // Each note a sine with a faint 2nd and 3rd partial and a breath of band-passed air under it, a scoop into the pitch, vibrato blooming
+  // on the held ones, the whole phrase in a small synthesized room (a decaying-noise impulse through one convolver, a third wet). Heard
+  // at the TRAVEL seats — the toy warplane's takeoff (planeTravel), the pirate ship's sail (shipTravel), the ship's arrival (shipCineOpen)
+  // — where SFX.prop (the engine) spoke before; the zoom at 900 and the twinkle at 1150 land on the held note (⚑ "move the zoom").
+  // Every node a throwaway into ac.destination (the SFXW rebuild law); on the audio clock; the same gate as tone(). No new asset.
+  flute: ()=>{ if(!soundOn) return; const ac=audio(); if(!ac) return; try{ const t=ac.currentTime;
+    const D=ac.destination, sr=ac.sampleRate;
+    // THE ROOM: a small hall, synthesized — four damped comb loops (29 · 37 · 41 · 44 ms, feedback ~0.6 under a 3.5 kHz damping) on a third-wet send; deterministic, no impulse buffer
+    const dry=ac.createGain(), wet=ac.createGain(); dry.gain.value=1; wet.gain.value=0.11; dry.connect(D); wet.connect(D);
+    [[0.0297,0.62],[0.0371,0.60],[0.0411,0.58],[0.0437,0.56]].forEach(([dt,fb])=>{ const dl=ac.createDelay(0.1), g=ac.createGain(), lp=ac.createBiquadFilter(); dl.delayTime.value=dt; g.gain.value=fb; lp.type='lowpass'; lp.frequency.value=3500; dry.connect(dl); dl.connect(lp); lp.connect(g); g.connect(dl); dl.connect(wet); });
+    const note=(f,at,len,v,vib)=>{ const end=at+len, g=ac.createGain(); g.gain.value=0.0005; g.gain.setValueAtTime(0.0005,at); g.gain.exponentialRampToValueAtTime(v,at+0.035); g.gain.setValueAtTime(v,end); g.gain.exponentialRampToValueAtTime(0.0005,end+0.09); g.connect(dry);
+      let dep=null; if(vib){ const lfo=ac.createOscillator(); dep=ac.createGain(); lfo.frequency.value=5.2; dep.gain.setValueAtTime(0,at); dep.gain.linearRampToValueAtTime(f*0.007,at+0.2); lfo.connect(dep); lfo.start(at); lfo.stop(end+0.1); }
+      [[1,1],[2,0.12],[3,0.04]].forEach(([h,w])=>{ const o=ac.createOscillator(), og=ac.createGain(); o.type='sine'; og.gain.value=w; o.frequency.setValueAtTime(f*h*0.985,at); o.frequency.exponentialRampToValueAtTime(f*h,at+0.04);
+        if(dep){ const hd=ac.createGain(); hd.gain.value=h; dep.connect(hd); hd.connect(o.frequency); } o.connect(og).connect(g); o.start(at); o.stop(end+0.1); });
+      const n=Math.round(sr*(len+0.1)), b=ac.createBuffer(1,n,sr), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+      const s=ac.createBufferSource(); s.buffer=b; const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=f*2; bp.Q.value=2.5; const bg=ac.createGain(); bg.gain.value=0.16; s.connect(bp).connect(bg).connect(g); s.start(at); };
+    // THE PHRASE (D pentatonic, the ocarina's fifth octave): A4 · D5 · F#5 · A5 held · G5 · F#5 · B5 held — the leap of a fourth to the sixth, unresolved
+    [[440,0,0.13,0.05,0],[587,0.13,0.13,0.055,0],[740,0.26,0.13,0.06,0],[880,0.39,0.30,0.065,1],[784,0.69,0.11,0.06,0],[740,0.80,0.11,0.058,0],[988,0.91,0.62,0.065,1]].forEach(([f,at,len,v,vib])=>note(f,t+at,len,v,vib));
+  }catch(e){} },
   // 0091 the bomber's falling stick — a quiet ~0.5s descending whistle per
   // bomb (the bursts themselves are splash()'s own boom)
   fallw: ()=>{ tone(1400,500,0.5,'sine',0.04); tone(2100,750,0.5,'sine',0.018); },
@@ -43195,7 +43244,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.00';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.01';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -82906,9 +82955,9 @@ function shipTravel(){
   // a decor tap reaches decorReact TWICE by design (the dspot's onclick +
   // the RDRAG tap path), and a synchronous reset would let the twin call
   // ferry straight back (measured: bedroom->backyard->bedroom in one tap)
-  if(reducedMotion()){ SFX.prop(); if(!direct){ travelMapOpen('ship'); return; } go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // 0825: no theatre — the map at once (the latch holds till the pick), the pick switches the room directly
+  if(reducedMotion()){ SFX.flute(); if(!direct){ travelMapOpen('ship'); return; } go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // 0825: no theatre — the map at once (the latch holds till the pick), the pick switches the room directly
   if(!direct) travelMapMount('ship');   // 0825: THE MAP built + laid out NOW, unpainted (.pre) — its cost paid before the takeoff's first frame, never under the clouds
-  SFX.prop();
+  SFX.flute();   // REV 1: THE CALL — the ocarina summons the sail (was SFX.prop, the engine)
   const g=document.getElementById('decShip'); if(g) g.classList.add('travel');
   const w=document.createElement('div'); w.id='cloudwipe';
   w.innerHTML='<div class="cwb">'+cloudWipeSVG()+'</div>';
@@ -82960,10 +83009,10 @@ function planeTravel(){
   SHIPTRV=1;
   const direct=!!SHIP_DEST;   // 0825 SARGE'S TRAVEL DESK: a port pinned BEFORE the press (MOVING DAY's own door, 0528) flies straight there as ever — one sail; otherwise the flight ends at THE MAP and the pick lands her (travelPick)
   const go=()=>{ roomSwitch(rideNextRoom(), true); SFX.thock(); };
-  if(reducedMotion()){ SFX.prop(); if(!direct){ travelMapOpen('warplane'); return; } go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // the ship's RM branch verbatim: no class, no seat, no landing, no layer (travel is information; the theatre is not) — 0825: the map at once, the pick switches directly
+  if(reducedMotion()){ SFX.flute(); if(!direct){ travelMapOpen('warplane'); return; } go(); setTimeout(()=>{ SHIPTRV=0; shipCineSweep(); }, 600); return; }   // the ship's RM branch verbatim: no class, no seat, no landing, no layer (travel is information; the theatre is not) — 0825: the map at once, the pick switches directly
   PLANE_LOOP=planeLoopRoll(); const L=PLANE_LOOP? WP_LOOP_MS : 0;   // 0584 THE LOOP-DE-LOOP: every beat past the takeoff waits for it
   if(!direct) travelMapMount('warplane');   // 0825: THE MAP built + laid out NOW, unpainted (.pre) — its cost paid before the takeoff's first frame, never under the clouds
-  SFX.prop();
+  SFX.flute();   // REV 1: THE CALL — the ocarina summons the takeoff (was SFX.prop, the engine)
   rideTop(); const g=document.getElementById('decPlane'); if(g) g.classList.add('travel'); wpFly('travel');   // seat first, class second — then THE FLIGHT LAYER lifts her out of the svg (0584)
   const w=document.createElement('div'); w.id='cloudwipe';
   w.innerHTML='<div class="cwb">'+cloudWipeSVG()+'</div>';
@@ -83701,7 +83750,7 @@ function shipCineOpen(){
   SHIPTRV=1;                               // no ferry mid-arrival (the 0330a latch)
   const g=document.getElementById('decShip');
   if(g) g.classList.add('shipcine');
-  SFX.prop(); setTimeout(()=>SFX.twink(), 900);
+  SFX.flute(); setTimeout(()=>SFX.twink(), 900);   // REV 1: THE CALL at the arrival too
   setTimeout(()=>{ try{ const h=document.getElementById('decShip'); if(h) h.classList.remove('shipcine'); }catch(e){}
     SHIPTRV=0; shipCineCard(); }, 1900);
 }
