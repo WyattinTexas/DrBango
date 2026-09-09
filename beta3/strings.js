@@ -12,7 +12,6 @@ const SS_STR = {
   en: {
     rotate: 'turn your phone upright to play',
     title: 'STARSPELL',
-    tagline: 'weave words · fell the star-beasts',
     campaign: 'CAMPAIGN',
     act1: 'ACT I · THE MEADOW SKY', act2: 'ACT II · THE DEEP NIGHT',
     act3: 'ACT III · THE CROWN OF DAWN', act4: 'ACT IV · THE ENDLESS HUNT',
@@ -148,7 +147,6 @@ const SS_STR = {
   es: {
     rotate: 'gira el teléfono en vertical para jugar',
     title: 'STARSPELL',
-    tagline: 'teje palabras · derriba a las bestias estelares',
     campaign: 'CAMPAÑA',
     act1: 'ACTO I · EL CIELO DEL PRADO', act2: 'ACTO II · LA NOCHE PROFUNDA',
     act3: 'ACTO III · LA CORONA DEL ALBA', act4: 'ACTO IV · LA CACERÍA SIN FIN',
@@ -365,7 +363,6 @@ const SS_STR = {
   fr: {
     rotate: 'tourne ton téléphone à la verticale pour jouer',
     title: 'STARSPELL',
-    tagline: 'tisse des mots · terrasse les bêtes stellaires',
     campaign: 'CAMPAGNE',
     act1: 'ACTE I · LE CIEL DU PRÉ', act2: 'ACTE II · LA NUIT PROFONDE',
     act3: 'ACTE III · LA COURONNE DE L\'AUBE', act4: 'ACTE IV · LA CHASSE SANS FIN',
@@ -582,7 +579,6 @@ const SS_STR = {
   pt: {
     rotate: 'gire o celular na vertical para jogar',
     title: 'STARSPELL',
-    tagline: 'teça palavras · derrube as feras estelares',
     campaign: 'CAMPANHA',
     act1: 'ATO I · O CÉU DO PRADO', act2: 'ATO II · A NOITE PROFUNDA',
     act3: 'ATO III · A COROA DA ALVORADA', act4: 'ATO IV · A CAÇADA SEM FIM',
@@ -799,7 +795,6 @@ const SS_STR = {
   de: {
     rotate: 'dreh dein Handy ins Hochformat, um zu spielen',
     title: 'STARSPELL',
-    tagline: 'webe Worte · fälle die Sternenbestien',
     campaign: 'KAMPAGNE',
     act1: 'AKT I · DER WIESENHIMMEL', act2: 'AKT II · DIE TIEFE NACHT',
     act3: 'AKT III · DIE KRONE DER MORGENRÖTE', act4: 'AKT IV · DIE ENDLOSE JAGD',

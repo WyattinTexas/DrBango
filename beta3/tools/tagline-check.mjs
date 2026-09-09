@@ -23,11 +23,11 @@
 //   only the door is gone, and the column reflows over the hole.
 // - The campaign wording became game wording: NEW GAME / CONTINUE GAME and
 //   the restart sheet's copy, in all five languages (the v0.71.0 cut).
-// - The tagline ('weave words · fell the star-beasts') is no longer #8a94c4
-//   grey lost in the rose band: parchment-gold ink over a soft navy
-//   letterpress glow. MEASURED here — rendered pixels sampled on the dusk
-//   AND the dawn meadow, asserted against the old grey's contrast on the
-//   same background, not eyeballed.
+// - The tagline ('weave words · fell the star-beasts') is GONE (v0.90.0,
+//   Skylar 9/8: phones disagreed about the line only because caches
+//   disagreed — the honest fix was removing it for real). The v0.51.0 dress
+//   measurements left with it; this suite now asserts ABSENCE — no tagline
+//   key in any language, no tagline text on either sky, no raw-key leak.
 // - The v0.46.0 laws still hold: labels dead-centre, only LIVE sub-lines
 //   (campaign progress, friends online), labels glide 9 for them.
 //
@@ -108,55 +108,21 @@ const ROWS = `(() => { const h = ${H};
 const column = (g) => ['campaign', 'newcamp', 'endless', 'board', 'versus'].filter(k => g[k] && g[k].vis).map(k => g[k].rowY);
 const COLN = [454, 522, 590], COLC = [429, 491, 553, 615];
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
-/* ---- the tagline, measured -------------------------------------------------
-   game.renderer.snapshot → the text's rect + two side strips of pure band on
-   the same rows (the band's colour runs vertically; rows beside the text are
-   its exact background). bright/dark = mean of the top/bottom 4% luminances
-   in the rect (WCAG-linearized); bg = mean of the side strips. */
-const TAG = `new Promise(res => { const h = ${H};
-  const t = h.children.list.find(o => o.type === 'Text' && o.text === SS_T('tagline'));
-  if (!t) return res('null');
-  const cam = h.cameras.main, b = t.getBounds();
-  game.renderer.snapshot(img => { try {
-    const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
-    const c = cv.getContext('2d'); c.drawImage(img, 0, 0);
-    const X = Math.round(b.x - cam.scrollX), Y = Math.round(b.y - cam.scrollY),
-          W = Math.round(b.width), Hh = Math.round(b.height);
-    const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-    const grab = (x, y, w, hh) => { const d = c.getImageData(x, y, w, hh).data; const out = [];
-      for (let i = 0; i < d.length; i += 4) out.push(0.2126 * f(d[i]) + 0.7152 * f(d[i + 1]) + 0.0722 * f(d[i + 2])); return out; };
-    const side = Math.max(20, Math.round(Hh * 0.8));
-    const strip = grab(Math.max(0, X - side - 8), Y, side, Hh).concat(grab(Math.min(cv.width - side, X + W + 8), Y, side, Hh));
-    const bg = strip.reduce((a, v) => a + v, 0) / strip.length;
-    const px = grab(X, Y, W, Hh).sort((a, v) => a - v);
-    const n = px.length, take = Math.max(8, Math.round(n * 0.04));
-    const dark = px.slice(0, take).reduce((a, v) => a + v, 0) / take;
-    const bright = px.slice(n - take).reduce((a, v) => a + v, 0) / take;
-    res(JSON.stringify({ bg: +bg.toFixed(4), bright: +bright.toFixed(4), dark: +dark.toFixed(4), n }));
-  } catch (e) { res(JSON.stringify(String(e).slice(0, 120))); } }) })`;
-const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-const GREY = 0.3058;   // the old ink, #8a94c4, WCAG-linearized — the bar to clear
-/* What legibility actually is here, on ANY band: the glyph must be DEFINED
-   against itself (bright gold core vs navy rim — the span) and at least one
-   of its two sides must pop from the band (the gold on dusk, the rim on
-   dawn). The old grey had neither: no rim at all, and on the dusk band it
-   MEASURED 1.04:1 against the rose — which is exactly Wyatt's complaint. Its
-   whole span was its ink/bg ratio; the new dress must beat that span on the
-   same background, by a real margin, on BOTH skies. Pins sit under the
-   2026-08-25 measurements (dusk: ink pops 2.05, rim 5.54, span 11.4 · dawn:
-   rim pops 9.56, span 10.9) with margin, and above the old grey's numbers
-   (1.04 dusk / 1.87 dawn) with room — re-pin from the printed line if the
-   ink or the sky changes. */
-const judgeTag = async (sky, minPop, minSpan) => {
-  const m = JSON.parse(await ev(TAG));
-  if (!m || typeof m === 'string') { ok(`tagline measured on the ${sky} meadow`, false, String(m)); return; }
-  const rInk = ratio(m.bright, m.bg), rRim = ratio(m.bg, m.dark), rOld = ratio(GREY, m.bg), span = ratio(m.bright, m.dark);
-  const pop = Math.max(rInk, rRim);
-  const det = `bg ${m.bg} bright ${m.bright} dark ${m.dark} · ink/bg ${rInk.toFixed(2)} rim/bg ${rRim.toFixed(2)} · old grey ${rOld.toFixed(2)} · span ${span.toFixed(2)}`;
-  ok(`${sky}: one side of the glyph pops from the band (${pop.toFixed(2)} ≥ ${minPop}) and the rim is darker than it`,
-    pop >= minPop && m.dark < m.bg, det);
-  ok(`${sky}: glyph definition beats the old grey on the SAME band (span ${span.toFixed(2)} ≥ ${minSpan}, ≥ 1.5× the grey's ${rOld.toFixed(2)})`,
-    span >= minSpan && span >= rOld * 1.5, det);
+/* ---- the tagline, gone -----------------------------------------------------
+   v0.90.0: the line under the braid retired for real. The five old phrases
+   are pinned HERE (they left strings.js with the key) so the assertion can
+   never rot into vacuity: no tagline key survives in any language, SS_T
+   falls through to the raw key (nothing anywhere still feeds it a string),
+   and no meadow Text carries the old copy OR a leaked raw 'tagline'. */
+const OLD_TAGLINES = ['weave words · fell the star-beasts', 'teje palabras · derriba a las bestias estelares',
+  'tisse des mots · terrasse les bêtes stellaires', 'teça palavras · derrube as feras estelares',
+  'webe Worte · fälle die Sternenbestien'];
+const noTag = async (sky) => {
+  const r = JSON.parse(await ev(`(() => { const h = ${H}; const old = ${JSON.stringify(OLD_TAGLINES)};
+    return JSON.stringify({ keyIn: Object.keys(SS_STR).filter(L => 'tagline' in SS_STR[L]), fb: SS_T('tagline'),
+      txt: h.children.list.filter(o => o.type === 'Text' && (old.includes(o.text) || o.text === 'tagline')).map(o => o.text) }) })()`));
+  ok(`${sky}: the tagline is gone — no key in any language, no line under the braid, no raw-key leak`,
+    r.keyIn.length === 0 && r.fb === 'tagline' && r.txt.length === 0, JSON.stringify(r));
 };
 
 // ---------------------------------------------------------------- before
@@ -204,14 +170,14 @@ await tapXY(empty.x, empty.y);
 await sleep(900);
 ok('a REAL tap where CONTINUE GAME once stood opens nothing (no sheet, no map, no ascent)',
   await ev(`!${H}.signC && !${H}.mapC && !${H}.confirmC && !${H}.ascending`) === true);
-await judgeTag('dusk', 2.5, 6.0);
+await noTag('dusk');
 await snap('meadow-after');
 
 // ---------------------------------------------------------------- the strings law
 const keys = JSON.parse(await ev(`JSON.stringify(Object.keys(SS_STR).map(L => [L,
-  ['campaignSub','newCampSub','quickSub','versusSub'].filter(k => k in SS_STR[L]), 'vsFriendsOn' in SS_STR[L], 'fightN' in SS_STR[L]]))`));
+  ['campaignSub','newCampSub','quickSub','versusSub','tagline'].filter(k => k in SS_STR[L]), 'vsFriendsOn' in SS_STR[L], 'fightN' in SS_STR[L]]))`));
 ok('five languages loaded (en/es/fr/pt/de — the v0.71.0 cut)', keys.length === 5, String(keys.length));
-ok('campaignSub / newCampSub / quickSub / versusSub pruned from every language', keys.every(k => k[1].length === 0), JSON.stringify(keys.filter(k => k[1].length)));
+ok('campaignSub / newCampSub / quickSub / versusSub / tagline pruned from every language', keys.every(k => k[1].length === 0), JSON.stringify(keys.filter(k => k[1].length)));
 ok('vsFriendsOn and fightN kept in every language', keys.every(k => k[2] && k[3]));
 // the rename is total: the two doors and the restart sheet never say the old
 // campaign word again, in any language
@@ -312,8 +278,9 @@ await ev(`localStorage.setItem('beta3.campaign', ${CK}); 1`);
 await nav(BASE + '?fps=0', 12000);
 ok('the meadow stands for the win', await until(HOME_REST)); await sleep(600);
 // hold every sigil and clear the queues first: a discovery's forge ceremony
-// (veil 0.985) arriving a beat after the dawn grass would black out the
-// tagline measurement below (it did, 2026-08-25)
+// (veil 0.985) arriving a beat after the dawn grass holds Home.busy() — the
+// HOME_REST wait below would time out and the dawn snapshot would go black
+// (it did, 2026-08-25, back when the tagline was measured here)
 await ev(`(() => { if (SS.prof.sig) { SS.prof.sig.pend = []; for (const s of SS_SIGILS) SS.prof.sig.u[s.id] = SS.prof.sig.u[s.id] || 1; }
   if (SS.prof.streak) SS.prof.streak.pend = 0; SS.save && SS.save(); return 1 })()`);
 ok('the door heads the column before the win', JSON.parse(await ev(ROWS)).campaign.vis);
@@ -328,7 +295,7 @@ await ev(`(() => { const b = game.scene.getScene('battle'); b.goHome({ from: 'ba
 ok('home again after the win', await until(HOME_REST, 40000)); await sleep(1200);
 g = JSON.parse(await ev(ROWS));
 ok('…and CONTINUE GAME is gone, the column closed: nothing left to continue', !g.campaign.vis && !g.campaign.hit && same(column(g), COLN), JSON.stringify(column(g)));
-await judgeTag('dawn', 2.5, 6.0);
+await noTag('dawn');
 await snap('dawn-meadow');
 
 // ---------------------------------------------------------------- the doors, real taps at the label
@@ -364,7 +331,7 @@ ok('the German meadow stands', await until(HOME_REST)); await sleep(600);
 g = JSON.parse(await ev(ROWS));
 ok('de, no checkpoint: NEUES SPIEL heads a three-row column, CONTINUE not rendered',
   !g.campaign.vis && g.newcamp.label === 'NEUES SPIEL' && same(column(g), COLN), JSON.stringify({ label: g.newcamp.label, col: column(g) }));
-ok('de: the tagline is one line (one-line law)', await ev(`(() => { const t = ${H}.children.list.find(o => o.type === 'Text' && o.text === SS_T('tagline')); return !!t && !t.text.includes('\\n') })()`) === true);
+await noTag('de');
 await ev(`localStorage.setItem('beta3.campaign', ${CK}); 1`);
 await nav(BASE + '?fps=0&lang=es', 12000);
 ok('the Spanish meadow stands', await until(HOME_REST)); await sleep(600);
@@ -372,7 +339,7 @@ g = JSON.parse(await ev(ROWS));
 ok('es, with checkpoint: CONTINUAR PARTIDA heads the four-row column, alive with its progress line',
   g.campaign.vis && g.campaign.hit && g.campaign.label === 'CONTINUAR PARTIDA' && g.newcamp.label === 'NUEVA PARTIDA' && !!g.campaign.sub && same(column(g), COLC),
   JSON.stringify({ cont: g.campaign.label, neu: g.newcamp.label, col: column(g) }));
-ok('es: the tagline is one line', await ev(`(() => { const t = ${H}.children.list.find(o => o.type === 'Text' && o.text === SS_T('tagline')); return !!t && !t.text.includes('\\n') })()`) === true);
+await noTag('es');
 await ev(`localStorage.removeItem('beta3.campaign'); localStorage.removeItem('beta3.campsign'); localStorage.removeItem('beta3.lang'); 1`);
 
 ok('the whole run threw no page exceptions', errs.length === 0, errs.join(' | ').slice(0, 300));

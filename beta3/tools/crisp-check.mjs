@@ -323,7 +323,9 @@ async function device(dv, control) {
     await snap(`${tag}-${surface}`);
   };
   // --- HOME ---
-  await judge('home', `window.__cc.rectsOf(window.__cc.texts(game.scene.getScene('home'), [SS_T('versus'), SS_T('newCamp'), SS_T('tagline')]).concat([game.scene.getScene('home').profileChip]))`);
+  // ENDLESS replaced the tagline as the third home anchor (the tagline
+  // retired in v0.90.0; the ENDLESS door is always rendered)
+  await judge('home', `window.__cc.rectsOf(window.__cc.texts(game.scene.getScene('home'), [SS_T('versus'), SS_T('newCamp'), SS_T('endless')]).concat([game.scene.getScene('home').profileChip]))`);
   // --- a real touch on NEW GAME opens the sign sheet (QUICK PLAY left the
   //     meadow in v0.51.0 — the quick RUN below boots through the mode's own
   //     door, the same one ?quick=1 uses) ---

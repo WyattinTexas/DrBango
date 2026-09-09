@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.89.0';
+const BUILD = 'STARSPELL v0.90.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -5533,17 +5533,12 @@ class Home extends Phaser.Scene {
       }
     };
     this.idleTweens();
+    // the braid closes the wordmark on its own — the tagline that hung under
+    // it ("weave words · fell the star-beasts") retired in v0.90.0 (Skylar,
+    // 9/8: phones showing different things; the honest fix was removal).
+    // tools/tagline-check.mjs now asserts its ABSENCE on both skies.
     const bk = ssBraidTex(this);
     ui(this.add.image(l.x(0), l.y(300 + tk.h * tScale * 0.5 + 6), bk.key).setDisplaySize(l.u(bk.w), l.u(bk.h)).setAlpha(0.9));
-    // the tagline wears the crest's own dress in miniature (v0.51.0, Wyatt:
-    // the old #8a94c4 vanished into the rose band — measured at 1.04:1, i.e.
-    // invisible): parchment-gold ink in the crest's navy rim over a soft navy
-    // letterpress glow — never flat white, never a box. The RIM is what
-    // carries it on the bright dawn band, where gold ink alone melts in;
-    // tools/tagline-check.mjs measures both skies.
-    ui(ssTxt(this, l.x(0), l.y(358), SS_T('tagline'), l.u(12), '#f2e0a8', 'italic').setOrigin(0.5)
-      .setStroke('#241c40', l.u(1.25))
-      .setShadow(0, l.u(1.2), 'rgba(16,12,34,0.92)', l.u(4), true, true));
 
     if (bare) {
       // nothing below is built; the refreshers other paths call become

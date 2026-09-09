@@ -1300,7 +1300,8 @@ before your cast animation landed let the animation's tail write `state =
 ## tagline-check.mjs
 
 THE HOME MENU's own harness (v0.46.0 flavour cull · v0.47.0 campaign doors ·
-v0.51.0 HOME RESHAPE · v0.52.0 leaderboard into the profile — 68 checks). The
+v0.51.0 HOME RESHAPE · v0.52.0 leaderboard into the profile · v0.90.0 the
+tagline retired — 67 checks). The
 column since v0.52.0, top to bottom:
 `[CONTINUE GAME while a climb stands] · NEW GAME · VERSUS`.
 
@@ -1330,17 +1331,15 @@ column since v0.52.0, top to bottom:
   `restartTitle`/`restartBody` say game, not campaign, in all five languages
   (the suite scans for each language's old campaign word). The `quick` string
   key deliberately SURVIVES in every language.
-- **The tagline is MEASURED, not eyeballed** (v0.51.0: parchment-gold ink,
-  the crest's navy rim + letterpress glow — the old `#8a94c4` measured
-  1.04:1 against the dusk rose band, i.e. invisible, which was exactly the
-  complaint). `game.renderer.snapshot` → the text rect + two side strips of
-  pure band on the same rows; bright/dark = top/bottom 4% of WCAG-linearized
-  luminances. Asserted on BOTH skies: one side of the glyph pops from the
-  band (the gold on dusk ~2.1, the rim on dawn ~8-9 — gold ink alone MELTS
-  into the bright dawn band at 1.14, the rim is what carries it) and the
-  core-vs-rim span beats the old grey's whole contrast by ≥1.5×. Pins sit
-  under the 2026-08-25 measurements with margin; re-pin from the printed
-  line if the ink or the sky changes.
+- **The tagline is GONE** (v0.90.0, Skylar 9/8: "weave words · fell the
+  star-beasts" retired for real — phones only ever disagreed about it
+  because their caches disagreed, and the honest fix was removal). The
+  v0.51.0 pixel measurements left with it; the suite now asserts ABSENCE on
+  both skies and in de/es: the `tagline` key survives in NO language (the
+  five old phrases are pinned in the harness so the check cannot rot),
+  `SS_T('tagline')` falls through to the raw key, and no meadow Text
+  carries the old copy or a leaked raw `tagline`. The braid ornament stays
+  — it closes the wordmark on its own.
 - The v0.46.0 laws still hold: labels dead-centre in 58-tall buttons, only
   LIVE sub-lines (campaign progress, friends online) via
   `home.setRowSub(key, text, color, snap)`, the label gliding 9 for them;
