@@ -57,6 +57,11 @@ const VS_HP = 60;
 const VS_CORR_HP = 150;
 const VS_TURN_CASTS = 3;
 const VS_CAP = 5;   // ongoing duels at most, friend + worldwide together (Skylar's five)
+// a rematch wait is freed by the rival's word (rematchNo on the old room) or,
+// when no word can ever come (network death, a force-quit), by this belt —
+// no waiting screen in versus may be unescapable (9/8 card 02). ?rmbelt=MS
+// pins it for the harnesses (the ?vsfind pattern).
+const VS_RM_BELT_MS = (() => { const p = parseInt(QS.get('rmbelt'), 10); return Number.isFinite(p) && p > 0 ? p : 90000; })();
 function vsTurnSize(room) { return room && room.corr ? VS_TURN_CASTS : 1; }
 function vsRoomHp(room) { return (room && room.hp) || VS_HP; }
 const VS_EMBLEMS = ['vulpes', 'strix', 'serpens', 'draco'];
@@ -1350,6 +1355,12 @@ class VsBattle extends Phaser.Scene {
     // fresh with every seal, or the NEXT search would be answered at once
     this.fbAt = 0; this.fbRival = null; this.fbSpawnAt = 0; this.fbBusy = false;
     this.migrating = false; this.rescanning = false; this.lastScan = 0; this.left = false;
+    // the rematch affair, reset every visit — the scene instance persists,
+    // so a stale rematchBusy/pulse would dead-lock the NEXT end screen's door
+    this.rematchWait = d.rematchWait || null;   // {from, foe:{id,name}}: this room was sealed by my rematch press
+    this.rematchBusy = false; this.rematchPulse = null; this.rematchDead = false;
+    this.rmDeclB = null; this.rmDeclT = null; this.rmGone = false; this.rmGoneT = null;
+    this.rmNoRef = null; this.rmNoCb = null; this.rmNoDisc = null; this.rmBelt = null; this.rmDone = false;
   }
 
   create() {
@@ -1388,12 +1399,36 @@ class VsBattle extends Phaser.Scene {
     this.onCastCb = (snap) => { this.onCast(snap.key, snap.val()); };
     if (this.castsRef) this.castsRef.on('child_added', this.onCastCb);
 
+    // a rematch wait can be REFUSED (9/8 card 02): the OLD room carries the
+    // rival's word (rematchNo — spoken by their ✕, their leaving the end
+    // screen, or their app closing), and this side resolves within a breath.
+    // The belt frees the wait even if no word ever comes.
+    if (this.rematchWait && !this.near) {
+      this.rmNoRef = SSNET.ref('mp/rooms/' + this.rematchWait.from + '/rematchNo');
+      if (this.rmNoRef) {
+        this.rmNoCb = (snap) => { const v = snap.val(); if (v && v.by !== vsUid()) this.rematchRefused(v); };
+        this.rmNoRef.on('value', this.rmNoCb);
+      }
+      this.rmBelt = this.time.delayedCall(VS_RM_BELT_MS, () => this.rematchRefused(null));
+    }
+
     this.onAchCb = (def) => ssAchToast(this, def);
     this.game.events.on('ss-ach', this.onAchCb);
     this.events.once('shutdown', () => {
       this.game.events.off('ss-ach', this.onAchCb);
       if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
       if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
+      if (this.rmNoRef && this.rmNoCb) { this.rmNoRef.off('value', this.rmNoCb); this.rmNoCb = null; }
+      // leaving the end screen is a DECLINE (Skylar's 9/8 stamp: walking
+      // away counts) — one honest word on the room frees a waiting rival at
+      // once, and a rematch pressed later learns the seat has moved on. The
+      // presser's own restart (rematchBusy) and an affair already spoken
+      // for (rematchNo standing / the door already faded) are exempt.
+      if (!this.near && this.state === 'done' && !this.rematchBusy && !this.rmGone
+        && this.room && this.room.status === 'done' && !this.room.rematchNo) {
+        SSNET.dbSet('mp/rooms/' + this.code + '/rematchNo', { by: vsUid(), name: vsName(), at: Date.now() }).catch(() => { });
+      }
+      try { if (this.rmNoDisc) { this.rmNoDisc.cancel(); this.rmNoDisc = null; } } catch (e) { }
       SSNET.FR.setBusy(false);
       if (this.near) {
         // the duel stands when you step away — no gone-mark, no desertion;
@@ -1572,7 +1607,8 @@ class VsBattle extends Phaser.Scene {
     });
     if (!ssReduceMotion()) this.tweens.add({ targets: this.waitT, alpha: 0.6, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.waitC.add([veil, this.waitT, leave]);
-    if (!ch && !this.near) {
+    // a rematch wait is for a KNOWN rival — no invite link to share there
+    if (!ch && !this.near && !this.rematchWait) {
       this.shareB = this.add.image(l.x(0), l.y(420), ssBtn(this, false, 250, 46)).setDisplaySize(l.u(250), l.u(46)).setInteractive({ useHandCursor: true });
       this.shareT = ssTxt(this, l.x(0), l.y(420), SS_T('vsShareInvite'), l.u(13), BTN_INK()).setOrigin(0.5);
       vsOnTap(this.shareB, () => {
@@ -1644,7 +1680,12 @@ class VsBattle extends Phaser.Scene {
       this.checkEnd();
     }
     if (room.status === 'done' && this.state !== 'done') this.endBattle();
-    else if (room.status === 'done' && room.rematch && !this.rematchBusy) this.showRematchCall();
+    else if (room.status === 'done') {
+      // the rival's moved-on word outranks the rematch call — the door
+      // fades honestly instead of ringing for a seat that left
+      if (room.rematchNo && room.rematchNo.by !== vsUid()) this.showRematchGone(room.rematchNo);
+      else if (room.rematch && !this.rematchBusy) this.showRematchCall();
+    }
   }
 
   /* ---------- the FOUND GATE (9/3 card 03) ----------
@@ -1689,6 +1730,47 @@ class VsBattle extends Phaser.Scene {
     if (!this.room || this.room.status !== 'waiting' || this.room.hostUid !== vsUid()) return;
     const seats = Object.entries(this.room.players).map(([id, p]) => ({ id, seat: p.seat })).sort((a, b) => a.seat - b.seat);
     this.roomRef.update({ status: 'active', startedAt: Date.now(), turnUid: seats[0].id, turnCount: 0 }).catch(() => { });
+  }
+
+  /* ---------- a rematch refused sets you free (9/8 card 02) ----------
+     The rival's word (rematchNo on the old room) — or the belt, when no
+     word can ever come — resolves the "duel is forming…" wait: a gentle
+     notice, the fresh room dissolved like any dead invite (the FIND
+     scavenger's last-one-out law), and back to the versus page freed. */
+  rematchRefused(v) {
+    if (this.rmDone || this.state !== 'wait') return;
+    if (this.room && this.room.status !== 'waiting') return;   // the duel formed in the same breath — it wins
+    this.rmDone = true;
+    if (this.rmBelt) { this.rmBelt.remove(false); this.rmBelt = null; }
+    if (this.rmNoRef && this.rmNoCb) { this.rmNoRef.off('value', this.rmNoCb); this.rmNoCb = null; }
+    // detach before the seat leaves — the null snapshot must not slam the door
+    if (this.roomRef) this.roomRef.off('value', this.onRoomCb);
+    if (this.castsRef) this.castsRef.off('child_added', this.onCastCb);
+    try { if (this.meRef) this.meRef.child('gone').onDisconnect().cancel(); } catch (e) { }
+    this.left = true;
+    this.db.txn('mp/rooms/' + this.code, (cur) => {
+      if (!cur || !cur.players || !cur.players[vsUid()]) return cur;
+      if (cur.status !== 'waiting') { cur.players[vsUid()].gone = true; return cur; }   // claimed mid-word — bow out like a disconnect
+      const players = { ...cur.players };
+      delete players[vsUid()];
+      const rest = Object.entries(players).sort((a, b) => a[1].seat - b[1].seat);
+      if (!rest.length) return null;   // last one out seals the room behind them
+      const next = { ...cur, players };
+      if (cur.hostUid === vsUid()) next.hostUid = rest[0][0];
+      return next;
+    }).catch(() => { });
+    // the gentle notice where the wait line stood, then the page, freed
+    const name = (v && v.name) || (this.rematchWait && this.rematchWait.foe && this.rematchWait.foe.name) || '';
+    if (this.waitT) { this.tweens.killTweensOf(this.waitT); this.waitT.destroy(); }
+    const l = this.L;
+    this.waitT = ssTextBlock(this, l.x(0), l.y(330), SS_T('vsRmMoved', name), {
+      fontSize: l.u(13) + 'px', color: '#ffe9a8', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
+    });
+    this.waitC.add(this.waitT);
+    SFX.ui();
+    try { localStorage.setItem('beta3.rmfree', JSON.stringify({ code: this.code, from: this.rematchWait && this.rematchWait.from, name, belt: !v, t: Date.now() })); } catch (e) { }
+    this.time.delayedCall(2400, () => { if (this.sys.isActive() && this.state === 'wait') this.scene.start('vsmenu'); });
   }
 
   /* ---------- leave: surrender the seat, not just the screen ---------- */
@@ -1853,6 +1935,9 @@ class VsBattle extends Phaser.Scene {
   }
 
   beginBattle() {
+    // the duel formed — the rematch-refusal story (watch + belt) stands down
+    if (this.rmBelt) { this.rmBelt.remove(false); this.rmBelt = null; }
+    if (this.rmNoRef && this.rmNoCb) { this.rmNoRef.off('value', this.rmNoCb); this.rmNoCb = null; }
     // the room's tongue rules the duel: both clients must hold its dictionary
     // BEFORE the shared-seed deal, or their identical boards diverge. The
     // dictionary was prefetched at the first room snapshot, so this gate is
@@ -2587,7 +2672,17 @@ class VsBattle extends Phaser.Scene {
       lock.forEach((o) => { o.input.enabled = false; });
       this.time.delayedCall(fanWait, () => lock.forEach((o) => { if (o.active && o.input) o.input.enabled = true; }));
     }
-    if (this.room.rematch) this.showRematchCall();
+    // the app closing at this screen is a decline too (the 9/8 stamp) — the
+    // armed word lands by itself and frees a waiting rival; pressing either
+    // rematch door cancels the arm (doRematch)
+    if (!this.near && this.roomRef) {
+      try {
+        this.rmNoDisc = this.roomRef.child('rematchNo').onDisconnect();
+        this.rmNoDisc.set({ by: vsUid(), name: vsName(), at: Date.now() });
+      } catch (e) { this.rmNoDisc = null; }
+    }
+    if (this.room.rematchNo && this.room.rematchNo.by !== vsUid()) this.showRematchGone(this.room.rematchNo);
+    else if (this.room.rematch) this.showRematchCall();
     if (VSDEMO) {
       localStorage.setItem('beta3.vsresult', JSON.stringify({ won, mode: this.room.mode, dealt: me.dealt | 0, casts: me.casts | 0, rematch: !!window.__VSDEMO_REMATCHED, rating: SS.prof.rating, rd, t: Date.now() }));
       if (!window.__VSDEMO_REMATCHED) {
@@ -2599,15 +2694,72 @@ class VsBattle extends Phaser.Scene {
 
   /* ---------- rematch: first presser seals a fresh room on the old one ---------- */
   showRematchCall() {
-    if (!this.rematchT || this.rematchPulse) return;
+    if (!this.rematchT || this.rmGone || this.rematchDead || this.rematchPulse) return;
     this.rematchT.setText('⚔ ANSWER THE REMATCH');
-    this.rematchPulse = this.tweens.add({ targets: [this.rematchB, this.rematchT], alpha: 0.55, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // the call can land during the winner's fanfare entrance (the pair still
+    // rising at alpha 0) — the pulse pins its own range (from 1) so it never
+    // breathes around the entrance's zero. NEVER killTweensOf here: the
+    // entrance is ONE shared tween, and killing it for this pair freezes
+    // every other end-screen item (RETURN included) at alpha 0.
+    this.rematchPulse = this.tweens.add({ targets: [this.rematchB, this.rematchT], alpha: { from: 1, to: 0.55 }, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // the quieter door beside it (9/8 card 02): a rematch can be REFUSED —
+    // the ✕ says so out loud, and the waiting rival is freed at once
+    if (!this.near && !this.rmDeclB) {
+      const l = this.L;
+      this.rmDeclB = this.add.image(l.x(152), l.y(455), ssBtn(this, true, 48, 48)).setDisplaySize(l.u(48), l.u(48)).setInteractive({ useHandCursor: true }).setDepth(151).setAlpha(0);
+      this.rmDeclT = ssTxt(this, l.x(152), l.y(455), '✕', l.u(16), '#8a94c4').setOrigin(0.5).setDepth(151).setAlpha(0);
+      ssHitPad(this.rmDeclB, 44);
+      this.rmDeclB.on('pointerdown', () => this.declineRematch());
+      this.overlayC.add([this.rmDeclB, this.rmDeclT]);
+      this.tweens.add({ targets: [this.rmDeclB, this.rmDeclT], alpha: 1, duration: 300 });
+    }
+  }
+  // the ✕ beside ANSWER THE REMATCH: one honest word on the room — the
+  // waiting side watches it and is freed the moment it lands
+  declineRematch() {
+    if (this.state !== 'done' || this.rematchBusy || this.rmGone || this.rematchDead || !this.room) return;
+    SFX.ui();
+    this.rematchDead = true;
+    SSNET.dbSet('mp/rooms/' + this.code + '/rematchNo', { by: vsUid(), name: vsName(), at: Date.now() }).catch(() => { });
+    try { if (this.rmNoDisc) { this.rmNoDisc.cancel(); this.rmNoDisc = null; } } catch (e) { }
+    if (this.rematchPulse) { this.rematchPulse.stop(); this.rematchPulse = null; }
+    this.rmFadeDoors();
+  }
+  // the doors leave: input off at once, a 400ms fade, then hidden — never
+  // destroyed mid-screen and never killTweensOf (both would break the
+  // fanfare's ONE shared entrance tween for every other end-screen item)
+  rmFadeDoors() {
+    const dead = [this.rematchB, this.rematchT, this.rmDeclB, this.rmDeclT].filter(Boolean);
+    dead.forEach((o) => { if (o.input) o.input.enabled = false; });
+    this.tweens.add({ targets: dead, alpha: 0, duration: 400, onComplete: () => dead.forEach((o) => { if (o.active) o.setVisible(false); }) });
+    this.rematchB = null; this.rematchT = null; this.rmDeclB = null; this.rmDeclT = null;
+  }
+  /* the rival moved on (their ✕, their leaving, their app closing) — the
+     rematch door fades honestly instead of sealing a wait nobody will ever
+     answer (Skylar 9/8: "no indication that they refused") */
+  showRematchGone(v) {
+    if (this.rmGone || this.state !== 'done' || !this.rematchB) return;
+    this.rmGone = true;
+    if (this.rematchPulse) { this.rematchPulse.stop(); this.rematchPulse = null; }
+    this.rmFadeDoors();
+    const l = this.L;
+    const name = (v && v.name) || ((this.others()[0] || {}).name) || '';
+    this.rmGoneT = ssTextBlock(this, l.x(0), l.y(455), SS_T('vsRmMoved', name), {
+      fontSize: l.u(12) + 'px', color: '#d8d2bd', fontStyle: 'italic', shadow: true,
+      wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
+    }).setDepth(151).setAlpha(0);
+    this.overlayC.add(this.rmGoneT);
+    // the line waits out most of the door's fade — a dissolve, not a collision
+    this.tweens.add({ targets: this.rmGoneT, alpha: 1, duration: 400, delay: 300 });
   }
   async doRematch() {
-    if (this.rematchBusy || this.state !== 'done' || !this.room) return;
+    if (this.rematchBusy || this.state !== 'done' || !this.room || this.rematchDead || this.rmGone) return;
+    // the rival already moved on — say so instead of sealing a doomed wait
+    if (this.room.rematchNo && this.room.rematchNo.by !== vsUid()) { this.showRematchGone(this.room.rematchNo); return; }
     // a rematch seals a fresh ongoing duel — the five-game cap holds here too
     if (this.room.corr && vsCapSheet(this)) return;
     this.rematchBusy = true;
+    try { if (this.rmNoDisc) { this.rmNoDisc.cancel(); this.rmNoDisc = null; } } catch (e) { }
     this.rematchT && this.rematchT.setText('SEALING…');
     try {
       if (this.near) {
@@ -2650,7 +2802,10 @@ class VsBattle extends Phaser.Scene {
       }
       const mine = await vsJoinRoom(dest); // idempotent — true if we are already seated
       if (!mine) { this.rematchBusy = false; this.rematchT && this.rematchT.setText('THE SEAL IS COLD'); return; }
-      this.scene.start('vsbattle', { code: dest });
+      // the wait ahead knows whom it waits for: the old room carries the
+      // refusal word, the foe's name dresses the freed-notice, the belt arms
+      const foe0 = this.others()[0] || null;
+      this.scene.start('vsbattle', { code: dest, rematchWait: { from: this.code, foe: foe0 ? { id: foe0.id, name: foe0.name } : null } });
     } catch (e) {
       this.rematchBusy = false;
       this.rematchT && this.rematchT.setText('⚔ REMATCH');

@@ -125,7 +125,7 @@ const SS_STR = {
     vsWaitAnswer: 'waiting for %1 to answer…', vsDeclined: '%1 declined the summons — challenge another', vsShareInvite: '✶ SHARE INVITE LINK',
     vsCopied: '✶ LINK COPIED — SEND IT', vsCopyFail: '✶ COPY FAILED — try again', vsShareText: '%1 summons you to a STARSPELL duel ✨ tap ✨',
     // the searching theater + the pending-duel rows (9/3 feedback card 03)
-    vsSearching: 'SEARCHING FOR AN OPPONENT…', vsFound: 'OPPONENT FOUND', vsWaitDuel: 'the duel is forming…',
+    vsSearching: 'SEARCHING FOR AN OPPONENT…', vsFound: 'OPPONENT FOUND', vsWaitDuel: 'the duel is forming…', vsRmMoved: '%1 has moved on — the rematch fades',
     vsYourMove: '✦ your move', vsTheirMove: '%1 weaves…', vsPendDone: 'the duel is decided',
     vsBotAnswered: '⚔ %1 has answered — your move', vsAnswered: '⚔ %1 answers your summons', vsDuelStands: 'the duel stands — return under VERSUS anytime',
     // correspondence turns · the cap · the abandon door (9/8 card 04)
@@ -270,7 +270,7 @@ const SS_STR = {
     vsWaitAnswer: 'esperando la respuesta de %1…', vsDeclined: '%1 rechazó la llamada — reta a otro', vsShareInvite: '✶ COMPARTIR ENLACE',
     vsCopied: '✶ ENLACE COPIADO — ENVÍALO', vsCopyFail: '✶ ERROR AL COPIAR — inténtalo de nuevo', vsShareText: '%1 te reta a un duelo de STARSPELL ✨ toca ✨',
     // the searching theater + the pending-duel rows (9/3 feedback card 03)
-    vsSearching: 'BUSCANDO UN OPONENTE…', vsFound: 'OPONENTE ENCONTRADO', vsWaitDuel: 'el duelo se está formando…',
+    vsSearching: 'BUSCANDO UN OPONENTE…', vsFound: 'OPONENTE ENCONTRADO', vsWaitDuel: 'el duelo se está formando…', vsRmMoved: '%1 siguió su camino — la revancha se desvanece',
     vsYourMove: '✦ tu turno', vsTheirMove: '%1 teje…', vsPendDone: 'el duelo está decidido',
     vsBotAnswered: '⚔ %1 ha respondido — te toca', vsAnswered: '⚔ %1 responde a tu llamada', vsDuelStands: 'el duelo sigue en pie — vuelve por VERSUS cuando quieras',
     vsTurnOf: '✦ TU TURNO · palabra %1 de 3', vsTurnLast: '✦ TU TURNO · la última palabra', vsWeaving: '%1 está tejiendo…',
@@ -486,7 +486,7 @@ const SS_STR = {
     vsWaitAnswer: 'en attente de la réponse de %1…', vsDeclined: '%1 a décliné l\'appel — défiez quelqu\'un d\'autre', vsShareInvite: '✶ PARTAGER LE LIEN',
     vsCopied: '✶ LIEN COPIÉ — ENVOYEZ-LE', vsCopyFail: '✶ COPIE ÉCHOUÉE — réessayez', vsShareText: '%1 vous appelle à un duel STARSPELL ✨ touchez ✨',
     // the searching theater + the pending-duel rows (9/3 feedback card 03)
-    vsSearching: 'RECHERCHE D\'UN ADVERSAIRE…', vsFound: 'ADVERSAIRE TROUVÉ', vsWaitDuel: 'le duel se prépare…',
+    vsSearching: 'RECHERCHE D\'UN ADVERSAIRE…', vsFound: 'ADVERSAIRE TROUVÉ', vsWaitDuel: 'le duel se prépare…', vsRmMoved: '%1 a repris sa route — la revanche s\'efface',
     vsYourMove: '✦ à vous de jouer', vsTheirMove: '%1 tisse…', vsPendDone: 'le duel est décidé',
     vsBotAnswered: '⚔ %1 a répondu — à vous de jouer', vsAnswered: '⚔ %1 répond à votre appel', vsDuelStands: 'le duel tient toujours — revenez par VERSUS quand vous voulez',
     vsTurnOf: '✦ VOTRE TOUR · mot %1 sur 3', vsTurnLast: '✦ VOTRE TOUR · le dernier mot', vsWeaving: '%1 est en train de tisser…',
@@ -702,7 +702,7 @@ const SS_STR = {
     vsWaitAnswer: 'à espera da resposta de %1…', vsDeclined: '%1 recusou o chamado — desafie outro', vsShareInvite: '✶ PARTILHAR O LINK',
     vsCopied: '✶ LINK COPIADO — ENVIE-O', vsCopyFail: '✶ FALHA AO COPIAR — tenta de novo', vsShareText: '%1 chama-te para um duelo de STARSPELL ✨ toca ✨',
     // the searching theater + the pending-duel rows (9/3 feedback card 03)
-    vsSearching: 'PROCURANDO UM OPONENTE…', vsFound: 'OPONENTE ENCONTRADO', vsWaitDuel: 'o duelo está se formando…',
+    vsSearching: 'PROCURANDO UM OPONENTE…', vsFound: 'OPONENTE ENCONTRADO', vsWaitDuel: 'o duelo está se formando…', vsRmMoved: '%1 seguiu em frente — a revanche se desfaz',
     vsYourMove: '✦ tua vez', vsTheirMove: '%1 tece…', vsPendDone: 'o duelo está decidido',
     vsBotAnswered: '⚔ %1 respondeu — tua vez', vsAnswered: '⚔ %1 responde ao teu chamado', vsDuelStands: 'o duelo continua de pé — volta por VERSUS quando quiseres',
     vsTurnOf: '✦ TUA VEZ · palavra %1 de 3', vsTurnLast: '✦ TUA VEZ · a última palavra', vsWeaving: '%1 está a tecer…',
@@ -918,7 +918,7 @@ const SS_STR = {
     vsWaitAnswer: 'warte auf die Antwort von %1…', vsDeclined: '%1 hat den Ruf abgelehnt — fordere jemand anderen', vsShareInvite: '✶ EINLADUNGSLINK TEILEN',
     vsCopied: '✶ LINK KOPIERT — SCHICK IHN', vsCopyFail: '✶ KOPIEREN FEHLGESCHLAGEN — versuch es erneut', vsShareText: '%1 ruft dich zu einem STARSPELL-Duell ✨ tippe ✨',
     // the searching theater + the pending-duel rows (9/3 feedback card 03)
-    vsSearching: 'GEGNER WIRD GESUCHT…', vsFound: 'GEGNER GEFUNDEN', vsWaitDuel: 'das Duell formt sich…',
+    vsSearching: 'GEGNER WIRD GESUCHT…', vsFound: 'GEGNER GEFUNDEN', vsWaitDuel: 'das Duell formt sich…', vsRmMoved: '%1 ist weitergezogen — die Revanche verblasst',
     vsYourMove: '✦ dein Zug', vsTheirMove: '%1 webt…', vsPendDone: 'das Duell ist entschieden',
     vsBotAnswered: '⚔ %1 hat geantwortet — dein Zug', vsAnswered: '⚔ %1 folgt deinem Ruf', vsDuelStands: 'das Duell steht — kehre jederzeit über VERSUS zurück',
     vsTurnOf: '✦ DEIN ZUG · Wort %1 von 3', vsTurnLast: '✦ DEIN ZUG · das letzte Wort', vsWeaving: '%1 webt gerade…',
