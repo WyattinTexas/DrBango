@@ -389,10 +389,17 @@ async function main() {
   // removal is total: no gesture target, no persistence, and the stale sticky
   // key is purged on boot — a phone that toggled the readout on during the
   // check must not wear it forever now that no gesture can turn it off.
-  ok('the version footer is INERT (the five-tap gesture is gone)',
+  // v0.96.0: the version line left the meadow footer for the settings sheet —
+  // the assertion follows it there, exact as ever: the line exists and is INERT
+  ok('the version line is INERT, off the meadow, in the settings sheet (five-tap gesture gone)',
     await c.ev(`(() => { const h = game.scene.getScene('home');
-      const t = h.children.list.find(o => o.text && /Corkscrew Games/.test(o.text));
-      return !!t && !(t.input && t.input.enabled) })()`) === true);
+      if (h.children.list.find(o => o.text && /Corkscrew Games/.test(o.text))) return 'meadow still carries it';
+      h.settingsSheet(); if (!h.setC) return 'sheet refused';
+      let t = null; const scan = (ls) => ls.forEach((o) => { if (!t && o.text && /Corkscrew Games/.test(o.text)) t = o; if (o.list) scan(o.list); });
+      scan(h.setC.list);
+      const good = !!t && !(t.input && t.input.enabled);
+      h.setC.destroy(); h.setC = null;
+      return good ? true : 'missing or live' })()`) === true);
   ok('ssArmFpsTap no longer exists',
     await c.ev(`typeof ssArmFpsTap === 'undefined'`) === true);
   ok('ssFpsShow never persists',

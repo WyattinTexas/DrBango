@@ -306,7 +306,7 @@ ok('no zone, nothing armed — the old horse is pure presence again', await ev(`
 await until(`${H}.showFx.ready === true`, 9000, 100);
 await tapShow();
 await sleep(700);
-const vs = await evj(`JSON.stringify({ t: ${SKY}.taps, p: ${SKY}.plays, sheets: !!(${H}.dailyC || ${H}.streakC || ${H}.langC || ${H}.mapC || ${H}.signC),
+const vs = await evj(`JSON.stringify({ t: ${SKY}.taps, p: ${SKY}.plays, sheets: !!(${H}.dailyC || ${H}.streakC || ${H}.langC || ${H}.setC || ${H}.mapC || ${H}.signC),
   rot: ${H}.showC.rotation, home: ${H}.scene.isActive() })`);
 ok('a tap on it does nothing at all', vs.t === 0 && vs.p === 0 && !vs.sheets && vs.rot === 0 && vs.home, JSON.stringify(vs));
 

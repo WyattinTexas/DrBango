@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.95.0';
+const BUILD = 'STARSPELL v0.96.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -3996,6 +3996,43 @@ function ssLayout(scene) {
    would let the lower one steal the upper one's taps (the meadow's old
    chip-over-rating-pill stack was the shape that earned it; the pill left
    in v0.78.0 and today every caller pads centred). */
+/* the settings gear — the meadow footer's one door (v0.96.0). Baked canvas
+   art in the swords' palette (no-emoji-as-game-art law: the face is drawn,
+   never a glyph). Eight teeth on a ring, a hub the night shows through. */
+function ssGearTex(scene) {
+  const key = 'ssgear', D = 44;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(D * R), Math.round(D * R));
+  t.context.scale(R, R);
+  ssBake(t, key, D, D, (c) => {
+    c.clearRect(0, 0, D, D);
+    c.save(); c.translate(D / 2, D / 2);
+    const teeth = 8, ro = 17.4, ri = 13.6, hub = 5.4, step = Math.PI * 2 / teeth;
+    c.beginPath();
+    for (let i = 0; i < teeth; i++) {
+      const a = i * step;
+      c.arc(0, 0, ro, a, a + step * 0.46);          // the tooth's crown
+      c.arc(0, 0, ri, a + step * 0.54, a + step);   // the valley between
+    }
+    c.closePath();
+    c.moveTo(hub, 0);
+    c.arc(0, 0, hub, 0, Math.PI * 2, true);         // reverse winding: the hub is a hole
+    c.fillStyle = '#ead9a4'; c.fill('evenodd');
+    c.lineWidth = 1.4; c.strokeStyle = '#8a6210'; c.stroke();
+    // a quiet inner ring line, the way the blades carry a fuller
+    c.beginPath(); c.arc(0, 0, (ri + hub) / 2, 0, Math.PI * 2);
+    c.lineWidth = 1; c.strokeStyle = 'rgba(138,98,16,0.45)'; c.stroke();
+    c.restore();
+  }, (c) => {
+    // fallback: a plain ring — still drawn, no teeth, no tricks
+    c.clearRect(0, 0, D, D);
+    c.beginPath(); c.arc(D / 2, D / 2, 15, 0, Math.PI * 2);
+    c.moveTo(D / 2 + 6, D / 2); c.arc(D / 2, D / 2, 6, 0, Math.PI * 2, true);
+    c.fillStyle = '#e0c878'; c.fill('evenodd');
+  });
+  return key;
+}
 function ssHitPad(o, minCss, anchor) {
   try {
     const ha = o && o.input && o.input.hitArea;
@@ -5378,7 +5415,7 @@ class Home extends Phaser.Scene {
     this.ascending = false; this.descending = false; this.arrived = false; this.introPlaying = false;
     // scene instances persist across restarts — a rotation mid-sheet would
     // otherwise leave these truthy forever and the sheets could never reopen
-    this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null;
+    this.langC = null; this.dailyC = null; this.mapC = null; this.confirmC = null; this.signC = null; this.setC = null;
     this.streakC = null; this.riteC = null; this.riteTimer = null; this.sigTimer = null; this.signLvTimer = null;
     this.showZone = null; this.showFx = null;   // last run's showcase died with its scene
     this.ftueBare = false;   // the wordless first open re-arms it below if owed
@@ -5535,7 +5572,7 @@ class Home extends Phaser.Scene {
           // the meadow-door guards (busy + every open sheet), then the
           // sign's own: mid-assembly and mid-rear taps are the horse's
           // business — ignored, never queued, never stacked
-          if (this.busy() || this.streakC || this.dailyC || this.langC || this.mapC || this.confirmC || this.signC || this.riteC
+          if (this.busy() || this.streakC || this.dailyC || this.langC || this.setC || this.mapC || this.confirmC || this.signC || this.riteC
             || !fx || fx.dead || !fx.ready || fx.attacking) { window.__SSSKY.blocked++; return; }
           SFX.ensure();
           window.__SSSKY.plays++;
@@ -5895,13 +5932,14 @@ class Home extends Phaser.Scene {
     this.refreshDuelStrip();
     this.time.addEvent({ delay: 1000, loop: true, callback: () => { if (!this.ascending) this.refreshDuelStrip(); } });
 
-    const verT = ssTxt(this, l.x(0), l.y(784), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#39406b').setOrigin(0.5);
-    ui(verT);
-    this.muteB = ui(ssTxt(this, l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
-    this.muteB.on('pointerdown', () => { SFX.ensure(); SFX.setMuted(!SFX.muted); this.muteB.setText(SFX.muted ? '🔇' : '🔊'); });
-    // language switcher — opposite the mute toggle; opens the sheet of native names
-    this.langB = ui(ssTxt(this, l.x(195), l.y(784), '🌐', l.u(14)).setOrigin(1, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7));
-    this.langB.on('pointerdown', () => this.langSheet());
+    /* the footer's one small door (v0.96.0 — Skylar, 9/10: "move the
+       languages, version and sound into one small settings button"). The
+       three quiet targets that lived on this band — 🔊 mute left, 🌐
+       language right, the version line centre — folded into one drawn gear;
+       their surfaces live on inside settingsSheet(). */
+    this.setB = ui(this.add.image(l.x(0), l.y(784), ssGearTex(this))
+      .setDisplaySize(l.u(20), l.u(20)).setAlpha(0.7).setInteractive({ useHandCursor: true }));
+    this.setB.on('pointerdown', () => this.settingsSheet());
     DIAG('meadow ui built ' + Math.round(performance.now() - tUi) + 'ms');
   }
 
@@ -6111,7 +6149,7 @@ class Home extends Phaser.Scene {
     if (this.riteTimer) { this.riteTimer.remove(false); this.riteTimer = null; }
     let tries = 0;
     const settled = () => !this.busy() && !this.streakC && !this.dailyC && !this.langC
-      && !this.mapC && !this.confirmC && !this.signC;
+      && !this.setC && !this.mapC && !this.confirmC && !this.signC;
     const armed = () => {
       if (!this.scene.isActive()) return;
       if (settled()) { this.riteTimer = null; this.milestoneRite(m); return; }
@@ -6131,7 +6169,7 @@ class Home extends Phaser.Scene {
     if (this.sigTimer || !ssSigilPending().length) return;
     let tries = 0;
     const settled = () => !this.busy() && !this.riteC && !this.riteTimer && !this.streakC
-      && !this.dailyC && !this.langC && !this.mapC && !this.confirmC && !this.signC;
+      && !this.dailyC && !this.langC && !this.setC && !this.mapC && !this.confirmC && !this.signC;
     const armed = () => {
       if (!this.scene.isActive()) return;
       const pend = ssSigilPending();
@@ -6151,7 +6189,7 @@ class Home extends Phaser.Scene {
     if (this.signLvTimer || !ssSignPending().length) return;
     let tries = 0;
     const settled = () => !this.busy() && !this.riteC && !this.riteTimer && !this.streakC
-      && !this.dailyC && !this.langC && !this.mapC && !this.confirmC && !this.signC
+      && !this.dailyC && !this.langC && !this.setC && !this.mapC && !this.confirmC && !this.signC
       && !SS_RITE.busy && !ssSigilPending().length;
     const armed = () => {
       if (!this.scene.isActive()) return;
@@ -6267,7 +6305,7 @@ class Home extends Phaser.Scene {
      and the plain truth about the grace night. The daily is still one tap
      away at the bottom. */
   streakSheet() {
-    if (this.busy() || this.streakC || this.dailyC || this.langC || this.mapC || this.confirmC || this.signC || this.riteC) return;
+    if (this.busy() || this.streakC || this.dailyC || this.langC || this.setC || this.mapC || this.confirmC || this.signC || this.riteC) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.streakC = this.add.container(0, 0).setDepth(700);
@@ -6403,7 +6441,7 @@ class Home extends Phaser.Scene {
   // (rather than only saving) matters because a ?lang= already in the address
   // would out-rank the saved preference on the next load.
   langSheet() {
-    if (this.busy() || this.langC || this.dailyC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
+    if (this.busy() || this.langC || this.setC || this.dailyC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.langC = this.add.container(0, 0).setDepth(700);
@@ -6429,6 +6467,67 @@ class Home extends Phaser.Scene {
       c.add(t);
     });
   }
+  /* ---------- the settings sheet (v0.96.0) ----------
+     Skylar (9/10): "Bottom of the home screen move the languages, version
+     and sound into one small settings button." The meadow's foot keeps one
+     drawn-gear door; this small sheet is where the three retired footer
+     surfaces live now: the sound toggle (the same SFX singleton —
+     setMuted writes beta3.mute itself), the language row (the parchment
+     langSheet itself, unforked — this sheet steps aside and it opens),
+     and the version line at the foot, its ' · offline' suffix rule intact. */
+  settingsSheet() {
+    if (this.busy() || this.setC || this.langC || this.dailyC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
+    SFX.ensure(); SFX.ui();
+    const l = ssLayout(this);
+    const c = this.setC = this.add.container(0, 0).setDepth(700);
+    const closeSheet = () => {
+      if (this.setC !== c) return;
+      this.setC = null;
+      c.destroy();
+    };
+    const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
+    this.tweens.add({ targets: veil, alpha: 0.66, duration: 200 });
+    veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    c.add(veil);
+    const PH = 248, top = 400 - PH / 2;
+    const items = [];
+    // the window swallows its own taps so a press inside never falls through
+    items.push(this.add.image(l.x(0), l.y(400), 'endpanel').setDisplaySize(l.u(300), l.u(PH)).setInteractive());
+    const xB = ssTxt(this, l.x(128), l.y(top + 28), '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+    xB.on('pointerdown', () => { SFX.ui(); closeSheet(); });
+    items.push(xB);
+    const tk = ssGoldTex(this, SS_T('setTitle'), 17);
+    const tsc = Math.min(1, 220 / tk.w);
+    items.push(this.add.image(l.x(0), l.y(top + 34), tk.key).setDisplaySize(l.u(tk.w * tsc), l.u(tk.h * tsc)));
+    // one row, one truth: the label left, the live state right, the whole
+    // band tappable (44-pt law rides the zone's setInteractive)
+    const row = (y, label, valueT, fn) => {
+      items.push(ssTxt(this, l.x(-124), l.y(y), label, l.u(13.5), '#f0e8d2').setOrigin(0, 0.5));
+      const z = this.add.zone(l.x(0), l.y(y), l.u(280), l.u(46)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      z.on('pointerdown', fn);
+      items.push(valueT, z);
+      return z;
+    };
+    // sound — the glyph IS the state, exactly as the old footer told it
+    const sndT = ssTxt(this, l.x(124), l.y(top + 96), SFX.muted ? '🔇' : '🔊', l.u(14)).setOrigin(1, 0.5);
+    c.sndT = sndT;
+    c.sndZone = row(top + 96, SS_T('setSound'), sndT, () => {
+      SFX.ensure(); SFX.setMuted(!SFX.muted);
+      sndT.setText(SFX.muted ? '🔇' : '🔊');
+    });
+    // language — the current tongue's own name points at the picker
+    const lnT = ssTxt(this, l.x(124), l.y(top + 148), (SS_LANGS[SS_LANG] || SS_LANG) + '  ›', l.u(12), '#c9b676').setOrigin(1, 0.5);
+    c.langZone = row(top + 148, SS_T('setLang'), lnT, () => {
+      closeSheet();
+      this.langSheet();
+    });
+    // the version line, quiet at the sheet's foot
+    c.verT = ssTxt(this, l.x(0), l.y(top + PH - 26), BUILD + ' · Corkscrew Games' + (SSNET.mode === 'local' ? ' · offline' : ''), l.u(9), '#5a6390').setOrigin(0.5);
+    items.push(c.verT);
+    c.add(items);
+    items.forEach((it) => { it.y += l.u(12); it.alpha = 0; });
+    this.tweens.add({ targets: items, y: '-=' + l.u(12), alpha: 1, duration: 260, ease: 'Back.easeOut' });
+  }
   /* ---------- the daily pre-screen ----------
      Tapping DAILY opens tonight's notice board instead of dropping straight
      into the game: today's top hunters (live from RTDB), the reset countdown
@@ -6439,7 +6538,7 @@ class Home extends Phaser.Scene {
      list IS the completion list, and RTDB prunes past days, so the streak
      shown here is the player's own, kept in the local profile log.) */
   dailySheet() {
-    if (this.busy() || this.dailyC || this.langC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
+    if (this.busy() || this.dailyC || this.langC || this.setC || this.mapC || this.confirmC || this.signC || this.streakC || this.riteC) return;
     SFX.ensure(); SFX.ui();
     const l = ssLayout(this);
     const c = this.dailyC = this.add.container(0, 0).setDepth(700);
@@ -6576,7 +6675,7 @@ class Home extends Phaser.Scene {
      the glowing constellation closes the sheet and rides the full ascent into
      that fight. Fresh campaigns enter the same way, at the first node. */
   mapSheet() {
-    if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC || this.signC) return;
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.setC || this.confirmC || this.signC) return;
     SFX.ensure(); SFX.ui();
     const c = this.mapC = this.add.container(0, 0).setDepth(700);
     const closeSheet = () => {
@@ -6608,7 +6707,7 @@ class Home extends Phaser.Scene {
      runs the normal fresh-campaign flow, sign choice included. With no
      checkpoint there is nothing to lose: it is simply the door. */
   newCampaign() {
-    if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC || this.signC) return;
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.setC || this.confirmC || this.signC) return;
     const ck = this.campaignCheckpoint();
     // no checkpoint → nothing to abandon: wipe any half-made choice (a rolled
     // roster, a pinned sign never entered) and offer the stars afresh
@@ -6678,7 +6777,7 @@ class Home extends Phaser.Scene {
     return ck;
   }
   endlessDoor() {
-    if (this.busy() || this.mapC || this.dailyC || this.langC || this.confirmC || this.signC) return;
+    if (this.busy() || this.mapC || this.dailyC || this.langC || this.setC || this.confirmC || this.signC) return;
     const ck = this.endlessCheckpoint();
     // nothing standing: wipe any half-made choice (a pinned sign never
     // entered) and ask the stars afresh
@@ -6751,7 +6850,7 @@ class Home extends Phaser.Scene {
      in prof (ssRememberSign), so the next fresh climb's deck opens standing
      on the sign the last one was begun under. */
   signSheet(forMode) {
-    if (this.busy() || this.signC || this.mapC || this.dailyC || this.langC || this.confirmC) return;
+    if (this.busy() || this.signC || this.mapC || this.dailyC || this.langC || this.setC || this.confirmC) return;
     // the picker serves two climbs (v0.68.0): the campaign pins its sign and
     // opens the chart; the endless ladder pins its own and rises at once
     this.signFor = forMode === 'endless' ? 'endless' : 'campaign';

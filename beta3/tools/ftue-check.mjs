@@ -151,9 +151,11 @@ const PICK = `!!window.game && ${B} && ${B}.scene.isActive() && ${B}.state === '
 // the FULL meadow: doors, chips, footer — what a bare open must not
 // have (the rating pill left the meadow in v0.78.0: the chip stands alone,
 // so full chrome is now proven by the chip and never the pill; the streak
-// lantern left the meadow in v0.86.0 and must stay gone on BOTH meadows)
+// lantern left the meadow in v0.86.0 and must stay gone on BOTH meadows;
+// the footer's three targets folded into the one settings gear in v0.96.0
+// — full chrome carries setB, and muteB/langB must stay gone everywhere)
 const CHROME_FULL = `!!window.game && ${H} && ${H}.sys.isActive() && !!${H}.menuRows && ${H}.menuRows.length >= 3
-  && !!${H}.dailyChipB && !${H}.lanternB && !!${H}.langB && !!${H}.profileChip && !${H}.ratingPill`;
+  && !!${H}.dailyChipB && !${H}.lanternB && !!${H}.setB && !${H}.langB && !${H}.muteB && !!${H}.profileChip && !${H}.ratingPill`;
 // wipe = a genuinely-first device: every key gone (starspellUid included)
 const wipe = async (seed) => {
   await send('Page.navigate', { url: 'http://localhost:' + SRV + '/ascent.html' }); await sleep(400);
@@ -194,7 +196,7 @@ ok('a genuinely-first boot arms the flow', await ev(`window.__ssftue.on === true
 const chromeDuringOpen = await interactiveChrome();
 ok('the open is wordless: ZERO interactive chrome on the meadow', chromeDuringOpen === 0, 'count ' + chromeDuringOpen);
 ok('no doors, chips or footer exist at all', await ev(`(() => { const h = ${H};
-  return !h.menuRows && !h.dailyChipB && !h.lanternB && !h.langB && !h.muteB && !h.profileChip })()`) === true);
+  return !h.menuRows && !h.dailyChipB && !h.lanternB && !h.setB && !h.langB && !h.muteB && !h.profileChip })()`) === true);
 ok('the wordmark stands (logo + meadow, nothing else)', await ev(`(() => { const h = ${H}; return !!h.titleT && h.titleT.active })()`) === true);
 ok('the first-open decision is already written down', await ev(`JSON.parse(localStorage.getItem('beta3.profile')).ftue === 0`) === true);
 await shot('open');

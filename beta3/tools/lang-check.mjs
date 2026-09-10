@@ -137,7 +137,13 @@ ok('every kept pack keeps its bag, vals, digraph and vowels', packShape.every(([
 
 /* ================= THE SHEET ================= */
 console.log('\n— THE PARCHMENT SHEET: FIVE ROWS, BY REAL TAPS —');
-ok('a real tap on 🌐 opens the language sheet', await tapUntil(`${H}.langB`, `!!${H}.langC`));
+/* v0.96.0: the 🌐 footer button folded into the settings gear — the door is
+   now two real taps: the gear, then the sheet's LANGUAGE row (which closes
+   settings and opens the unforked langSheet). The tap expression self-heals:
+   with settings open it aims the row, otherwise the gear. */
+ok('a real tap on the footer gear opens the settings sheet', await tapUntil(`${H}.setB`, `!!${H}.setC`));
+ok('a real tap on its LANGUAGE row opens the language sheet — settings steps aside',
+  await tapUntil(`(${H}.setC && ${H}.setC.langZone) || ${H}.setB`, `!!${H}.langC`) && await ev(`!${H}.setC`) === true);
 const sheet = await evj(`JSON.stringify((() => { const c = ${H}.langC, l = ssLayout(${H});
   const rows = c.list.filter((o) => o.type === 'Text');
   const panel = c.list.find((o) => o.texture && o.texture.key === 'panel');
@@ -157,7 +163,7 @@ const es = await evj(`JSON.stringify({ lang: SS_LANG, saved: localStorage.getIte
   dict: SS_DICT.ready('es'), door: SS_T('newCamp') })`);
 ok('the pick saved (beta3.lang = es), the es pack + dictionary rode along, the meadow speaks Spanish',
   es.lang === 'es' && es.saved === 'es' && es.gl === 'es' && es.dict && es.door === 'NUEVA PARTIDA', JSON.stringify(es));
-ok('reopened, the ✦ marker moved to Español', await tapUntil(`${H}.langB`, `!!${H}.langC`) &&
+ok('reopened, the ✦ marker moved to Español', await tapUntil(`(${H}.setC && ${H}.setC.langZone) || ${H}.setB`, `!!${H}.langC`) &&
   await ev(`${H}.langC.list.filter((o) => o.type === 'Text')[1].text.includes('✦')`) === true);
 
 /* ================= THE FALLBACKS ================= */

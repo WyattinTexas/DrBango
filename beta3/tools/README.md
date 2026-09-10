@@ -2,6 +2,34 @@
 
 Thirty-three scripts, all dev-only — nothing here ships to the browser.
 
+## four suites re-aim — ONE SMALL SETTINGS DOOR AT THE MEADOW FOOT (v0.96.0)
+
+Skylar's call (9/10): "Bottom of the home screen move the languages, version
+and sound into one small settings button." The game side: the meadow footer's
+three targets — 🔊 mute (left), 🌐 language (right), the version line
+(centre) — folded into ONE drawn-gear button (`setB`, baked `ssgear` canvas
+art — the no-emoji-as-game-art law) that opens `settingsSheet()` (`setC`):
+a small endpanel with a gold SETTINGS title, a SOUND row (same `SFX.setMuted`
++ `beta3.mute` persistence, the 🔊/🔇 glyph as the live state), a LANGUAGE
+row (closes settings and opens the UNFORKED langSheet; the value names the
+current tongue), and the version line at the sheet's foot with its
+` · offline` suffix rule intact. `setC` joined every home sheet guard
+(sky-tap, settled(), streak/lang/daily/map/confirm/sign doors + the
+create() nulls). Strings ×5: `setTitle`/`setSound`/`setLang`.
+
+The re-aims, all honest: **ftue-check** CHROME_FULL proves full chrome by
+`setB` now (and muteB/langB stay gone everywhere); the bare-meadow census
+adds `!h.setB`. **lang-check** 33→34: the sheet-open walk is two real taps
+(gear → LANGUAGE row, the tap expression self-healing), everything after
+unchanged. **fps-check**: the version-INERT assert follows the line into the
+settings sheet (no /Corkscrew Games/ text on the meadow, the sheet's line
+never interactive). **tap-sign-check**: the sheets census gains the `setC`
+token (the guard family grew, the census mirrors it). A scratchpad
+settings-probe (39 checks, real DPR-3 taps) proved the door end to end:
+footer census exactly one target, sound toggle persisting a cold reload,
+the Español round trip, one-sheet-at-a-time, the veil owning a sky tap
+while the sheet stands, the dawn meadow dressing the same footer.
+
 ## sign-check.mjs grows — THE DECK REMEMBERS YOUR SIGN (v0.95.0)
 
 Skylar's call (9/10): "When the players finishes a campaign and opens a new
