@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.93.1';
+const BUILD = 'STARSPELL v0.94.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1886,6 +1886,27 @@ function ssSkyWorld(scene, opts) {
 
 // Assemble a constellation inside a container: stars fly in, lines fade up.
 function ssAssembleBeast(scene, cont, beast, unitScale, onDone) {
+  /* the assembly's tween ledger: every tween and timer minted below is
+     registered and dies with its sprites — swept when the next assembly
+     claims this container (the meadow showcase turns over every ~9s) or
+     when the container itself is destroyed. Without the sweep a star's
+     repeat-forever twinkle keeps ticking its destroyed target in the
+     manager for the life of the scene. */
+  let swept = false;
+  const reg = [];
+  const sweep = () => {
+    if (swept) return;
+    swept = true;
+    for (const t of reg) { try { if (t.stop) t.stop(); else t.remove(false); } catch (e) { } }
+    reg.length = 0;
+    if (cont.__ssAsmSweep === sweep) cont.__ssAsmSweep = null;
+  };
+  if (cont.__ssAsmSweep) cont.__ssAsmSweep();
+  cont.__ssAsmSweep = sweep;
+  if (!cont.__ssAsmHooked) {   // one destroy hook for the container's life, not one per assembly
+    cont.__ssAsmHooked = 1;
+    cont.once('destroy', () => { if (cont.__ssAsmSweep) cont.__ssAsmSweep(); });
+  }
   cont.removeAll(true);
   // scale must match ssBeastFx's, which owns star homes once it arms
   const sc = unitScale * (beast.boss ? 1.15 : beast.tier === 'mini' ? 1.06 : 1);
@@ -1903,27 +1924,31 @@ function ssAssembleBeast(scene, cont, beast, unitScale, onDone) {
     const st = scene.add.image(p[0] * sc + Math.cos(ang) * d, p[1] * sc + Math.sin(ang) * d, 'dot')
       .setScale(0.1).setAlpha(0).setTint(beast.tint).setBlendMode('ADD');
     cont.add(st); stars.push(st);
-    scene.tweens.add({
+    reg.push(scene.tweens.add({
       targets: st, x: p[0] * sc, y: p[1] * sc, alpha: 1, scale: mag,
       delay: i * 40, duration: 620, ease: 'Cubic.easeOut',
-      onComplete: () => scene.tweens.add({
-        targets: st, scale: mag * (mag < 0.8 ? 0.6 : 0.78), alpha: mag < 0.8 ? 0.55 : 0.85,
-        duration: 700 + (i * 137) % 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-      }),
-    });
+      onComplete: () => {
+        if (swept) return;
+        reg.push(scene.tweens.add({
+          targets: st, scale: mag * (mag < 0.8 ? 0.6 : 0.78), alpha: mag < 0.8 ? 0.55 : 0.85,
+          duration: 700 + (i * 137) % 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        }));
+      },
+    }));
   });
   const eyes = [];
-  scene.time.delayedCall(beast.stars.length * 40 + 500, () => {
-    scene.tweens.add({ targets: g, alpha: 1, duration: 500 });
+  reg.push(scene.time.delayedCall(beast.stars.length * 40 + 500, () => {
+    if (swept) return;
+    reg.push(scene.tweens.add({ targets: g, alpha: 1, duration: 500 }));
     for (const e of beast.eyes) {
       const eye = scene.add.image(e[0] * sc, e[1] * sc, 'dot').setScale(0.9).setTint(beast.eye).setBlendMode('ADD').setAlpha(0);
       cont.add(eye); eyes.push(eye);
-      scene.tweens.add({ targets: eye, alpha: 1, duration: 400 });
-      scene.tweens.add({ targets: eye, alpha: 0.5, duration: 700, yoyo: true, repeat: -1, delay: 500 });
+      reg.push(scene.tweens.add({ targets: eye, alpha: 1, duration: 400 }));
+      reg.push(scene.tweens.add({ targets: eye, alpha: 0.5, duration: 700, yoyo: true, repeat: -1, delay: 500 }));
     }
     if (SFX.ok) SFX.noise(0.7, 800, 2, 0.05, 2600);
     if (onDone) onDone();
-  });
+  }));
   return { lines: g, stars, eyes };
 }
 
