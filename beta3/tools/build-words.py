@@ -48,6 +48,14 @@ bastard bitch pecker piss pissed pisser pissers pisses pissing porn porno
 pornos pussy shag tosser vibrator
 """.split()
 
+# Slurs the SOURCE's own filter missed (found 2026-09-10, ahead of the App
+# Store submission): plurals and variants of already-banned words. Per the
+# standing ruling above — slurs stay banned, always.
+REMOVE = """
+kike kikes tranny trannies dykes coons squaw squaws sambo sambos honky honkie
+honkies honkeys honkey retarded faggots whores
+""".split()
+
 LINK = re.compile(r'<a[^>]+href=["\']/word-description/([a-z]+)["\'][^>]*>([A-Za-z]+)</a>')
 HEAD = re.compile(r'<h3[^>]*>(\d) letter words that start with the letters ([a-z])</h3>')
 
@@ -99,6 +107,7 @@ def main():
         print('note: RESTORE entries absent from the previous list:', missing)
 
     words |= restored
+    words -= set(REMOVE)
     bad = [w for w in words if not re.fullmatch(r'[a-z]{2,8}', w)]
     if bad:
         sys.exit('bad tokens: %s' % bad[:10])
