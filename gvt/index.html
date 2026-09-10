@@ -43631,7 +43631,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.21';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.22';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -62116,7 +62116,8 @@ function rpStep(u,dt){
   // pist2T, the v1.67 pair); the playable king rides his mold's two tips at
   // the unit lane's 128 (croakMz — the boss's own measure), no kick param.
   const mzl=unitFaceX(u);   // 0652: the irons on the side he faces
-  const mz=u.rpKC? croakMz(u.x,u.y,unitW(u.type)) : [{x:u.x+17.5*mzl,y:u.y-41.5},{x:u.x+18*mzl,y:u.y-31}];
+  const jk=Math.max(0,Math.min(1,1-(u.jetT||0)/(u.jetAir||(u.jbHop? JB_T : JET_AIR)))), jl=!(u.jetT>0)? 0 : u.jbHop? JB_H*4*jk*(1-jk) : (u.tkJump||u.kyLeap)? JET_H*4*jk*(1-jk) : u.jv2H? JV2_H*Math.min(1,(u.jv2El||0)/JV2_RISE) : u.jv2Fall? JV2_H*(1-jk)*(1-jk) : JET_H*(u.jv2Arc? JV2_BOOST_AIR : 1)*4*jk*(1-jk);   // 0926 REV 3 FIRE FROM THE AIR: the LIFT the draw applies to an airborne Sarge — the jet boots' hop (drawJbHop: JB_H over JB_T), the purple leap (drawTkLeap: JET_H's arc), the pack's hold / fall / arc with the boost (drawJetFlight's own three branches) — read off the same clocks the draw reads, 0 on the ground (a Sarge never wears the drop's canopy)
+  const mz=u.rpKC? croakMz(u.x,u.y,unitW(u.type)) : [{x:u.x+17.5*mzl,y:u.y-41.5-jl},{x:u.x+18*mzl,y:u.y-31-jl}];   // 0926: the irons' seats rise with him — the flash and the bolts leave the AIRBORNE irons (presentation only: brgWave's wedge test reads o.x/o.y = the ground plane)
   if(u.rpSt===0){
     if(u.rpT<=BSTX){ u.rpSt=1; u.rpWt=GAPX; u.rpWn=0; if(!u.rpKC && aimLive(u)) u.faceTo=Math.max(u.faceTo,S.t+BSTX+AIM_HOLD); }   // 0652: the pull's turn holds through the whole channel (the king puppet has no facing — 0462b) · 0373: the flashing cone tell RETIRED (Wyatt: "it should not show the cone") — the plant stance is the tell (0410: owner-keyed clocks; the 0.55 plant is the same for both by construction)
     return;
@@ -67115,7 +67116,7 @@ function update(dt){
     // THE JET PACK (v1.39): airborne is a traversal state — the green burrow.
     // No gun, no saber, no march, no siege; the skip sits ABOVE both step
     // functions (the foxhole law) so he cannot keep marching in the air.
-    if(u.jetT>0){ jetStep(u,dt); continue; }
+    if(u.jetT>0){ jetStep(u,dt); if(u.rpT>0 && !u.rpKC) rpStep(u,dt); continue; }   // 0926 REV 3 FIRE FROM THE AIR (Wyatt 9/10: "you'd be able to move him while he continues to fire" — "Yes, fix it. Make it a Firewolf line"): the renegade's storm keeps its clock THROUGH the flight — rpStep steps HERE, after the flight's own step, so the volley reads the frame's final seat (the x/y/jetT the draw reads: the flash sits ON the drawn iron; the landing frame fires from the ground); the wedge on the sim's ground plane along the aim he tapped; the overlay below never runs on an airborne frame (the continue), so the clock steps ONCE a frame; on landing rpRooted plants him for the rest; the playable king (rpKC) never flies
     // 0278a THE KING'S RED SEIZE: a held man can't fight — no march, no
     // gun, for as long as the king renews the 0.25s lease (kingKitTick
     // writes it every frame; the king falling mid-hold just lets it
