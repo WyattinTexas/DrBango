@@ -40009,7 +40009,7 @@ function themeMedic(){ try{
 //     -5.2dB at v4.98 -> +11.6dB here. Set 1 for no duck at all.
 const MIX_MUSIC=-33.0,        // a music cue at the speaker, LUFS (0.20 on a -19 LUFS file — his 0.18-0.22)
       MIX_AMB=-41.0,          // an ambience bed                 (0.08 on the same — his 0.06-0.10)
-      MIX_TRIM={},            // per-place nudge in dB, e.g. {snow:-2}
+      MIX_TRIM={ map:-3 },    // per-place nudge in dB, e.g. {snow:-2} — 0911: the map's bed three dB under the floors' winds ("something very light")
       MIX_HP_MUS=100,         // the phone-speaker high-pass on the cues, Hz (0 = off)
       MIX_HP_AMB=100,         // ...and on the beds, which is the one he asked for
       MIX_LP_AMB=0,           // the hiss lid on the beds, Hz (8000 arms it; measured not needed)
@@ -40302,7 +40302,8 @@ const LOC_TRACKS={
   croak:    { b64:CROAK_M4A, band:'m', raw:-19.03, hp1:-19.15 },   // KING CROAK'S HIDEOUT — 0492 8/22: the whole 0432a loop from zero (the v5.29 9.7 s trim retired)
   fields:   { b64:HVYI_M4A, band:'m', raw:-19.03, hp1:-19.87 },   // THE PILLOW FIELDS — Heavy Interlude · Kevin MacLeod (GW-04: the boss room Wyatt hunted the violin for; moved from Bear Park whole)
   icecastle:{ b64:ICEK_M4A , band:'m', raw:-19.04, hp1:-19.98 },   // KING YETI'S ICE CASTLE
-  rexlair:  { b64:REXL_M4A , band:'m', raw:-19.89, hp1:-25.45 }   // KING REX'S LAIR
+  rexlair:  { b64:REXL_M4A , band:'m', raw:-19.89, hp1:-25.45 },  // KING REX'S LAIR
+  map:      { gen:mapBedGen, band:'a', raw:-30.0, hp1:-30.0, fin:1.2 }   // 0911 THE MAP'S OWN THEME — THE TRAVEL DESK: a bed the page SYNTHESIZES (mapBedGen, the section after rideHush; no file, no credit line); raw/hp1 = ffmpeg ebur128 on the rendered loop (design/map-theme-0909/build-mb/logs/measure.json); fin = its own arrival, MAPBED_IN
 };
 // THE MIX, APPLIED — the ONE place a location's gain is ever set. Each row lands
 // on its own band's target at the speaker, so no two places can step against
@@ -40357,6 +40358,7 @@ function locNow(){
   // park) — the bed comes back where you stand, a fresh pass from the top (the
   // one-buffer law lets the PCM go for the fight, as every other door does).
   if(locBattle() && !(parkSceneOpen()||raidSceneOpen())) return null;   // 0903 THE PARKS SOUND ON THE WALK IN (FM-GVT-YETI-EARLY-01; Wyatt 9/2: "arrivate at Dino Park & yeti park (When auto taken to there) music didnt play first time"): 0625's flow deals the gift road's cards OVER the win face with S.mode still 'win', and the DINO PARK / YETI PARK card's IT'S MINE opened the park under this mute (the door path lands at the menu and never met it) - a park or throne scene standing over a folded verdict is where the kid stands; a live fight hides every scene at its door, so the mute is byte-what-it-was there
+  if(TMAP.up) return 'map';   // 0911 THE MAP'S OWN THEME (jumpr 0911; Wyatt 9/9: "when you're in the map screen, that's going to need to have its own theme fade in, something very light"): the travel desk standing over the room is where the player stands — its bed outranks the barricade, the scenes and the floor under it; travelMapShow knocks (mapBedKnock), travelMapClose lets go (mapBedOut)
   if(bbUp()) return 'snow';   // GW-01 (Wyatt 8/26): THE BEAR BARRICADE plays the winter wind — "use the Wind track we use for the snow menu"; the standing overlay outranks the glass under it (the 'snow' row and the winter room's own arm below are byte-still)
   // 0444 — at the menu, the place you STAND. A throne scene opens OVER a park
   // scene, a park scene opens over its room, and the rooms answer by roomCur().
@@ -40408,6 +40410,7 @@ function locStop(fd){
 function locDecode(id){ try{
   if(LOC.busy||(LOC.bid===id&&LOC.buf)) return;   // one decode at a time, never a second buffer
   const t=LOC_TRACKS[id]; if(!t) return;
+  if(t.gen){ LOC.busy=id; t.gen(buf=>{ LOC.busy=null; if(LOC.id!==id){ if(LOC.id) locTry(); return; } LOC.buf=buf; LOC.bid=id; locTry(); }, ()=>{ LOC.busy=null; }); return; }   // 0911: a bed the page SYNTHESIZES (the map's) — rendered offline on demand under the same one-buffer law, the same landing as a decode ("we left while it rendered")
   const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; if(!OAC) return;
   LOC.busy=id;
   const b=atob(t.b64), a=new Uint8Array(b.length);
@@ -40445,7 +40448,7 @@ function locTry(){
     let head=s;
     if(t.hp){ const f=ac.createBiquadFilter(); f.type='highpass'; f.frequency.value=t.hp; f.Q.value=MIX_Q; head=head.connect(f); }
     if(t.lp){ const f=ac.createBiquadFilter(); f.type='lowpass';  f.frequency.value=t.lp; f.Q.value=MIX_Q; head=head.connect(f); }
-    const v=locVol(id), fd=LOC.fade||MIX_IN; LOC.fade=0;   // 0432c: an ARRIVAL fades in over MIX_IN; a CHANGE keeps LOC_XFADE
+    const v=locVol(id), fd=LOC.fade||t.fin||MIX_IN; LOC.fade=0;   // 0432c: an ARRIVAL fades in over MIX_IN; a CHANGE keeps LOC_XFADE; 0911: a row's own arrival (the map's fin, MAPBED_IN)
     if(fd>0 && v>0){ g.gain.setValueAtTime(0.0001, ac.currentTime);
                      g.gain.exponentialRampToValueAtTime(v, ac.currentTime+fd); }
     else g.gain.value=v;                   // arriving muted, or MIX_IN dialled to 0
@@ -40520,6 +40523,39 @@ function locKill(){ locStop(LOC_FADE); LOC.id=null; locFree(); }
 // does. With the travel map up between, the desk is quiet until the pick. Called at the four TAP seats (the ship's and the warplane's
 // theatre + RM branches); the arrival cinema, the field's bombers and the shop's crate never hush.
 function rideHush(){ try{ themeKill(); locKill(); }catch(e){} }
+
+// ==================== 0911 THE MAP'S OWN THEME (jumpr 0911; FM-GVT-MAP-BED-01) ====================
+// Wyatt 9/9/2026: "when you're in the map screen, that's going to need to have its own theme fade in, something very light." The travel desk is
+// a place you stand (locNow's 'map' clause) with a bed of its own — one the page SYNTHESIZES: a 24 s loop rendered offline on demand (no file,
+// no base64, no credit line; ~150 ms of work, ~4 MB of PCM under the one-buffer law) with a 2 s seam walked in from the tail, then played
+// through the beds' own pass (locTry: the loop, the 100 Hz high-pass, the duck, both switches, the medic, the put-away law) at
+// MIX_AMB + MIX_TRIM.map = -44 LUFS at the speaker — fading in over its own MAPBED_IN once the map stands (travelMapShow → mapBedKnock, never
+// inside MAPBED_AT of the tap: the call has its say first) and out over LOC_XFADE when the map goes (travelMapClose → mapBedOut: the pick under
+// the closing clouds, or a fold). The landing's own roomSwitch (locSync + themeRevive) brings the destination's music, as every landing does;
+// the land you never left (travelPick's same-room branch) gets the same knock. The body = design/map-theme-0909/build-mb/voices.js M2 THE COMPASS
+// VERBATIM (the audition sheet's exact loop): a thin pad in D under a breathing low-pass + a music box on the D pentatonic; every pitch a
+// multiple of 1/24 Hz so the seam is a true continuation; its dice its own (Math.random never touched — twin renders agree to a millionth).
+const MAPBED_LEN=24, MAPBED_X=2, MAPBED_AT=1500, MAPBED_IN=1.2;   // the loop (s) · the seam (s) · the earliest knock after the tap (ms) · the fade in (s)
+function mapBedBody(ac,t){ const D=ac.destination, sr=ac.sampleRate, L=ac.length/sr, LOOP=24, XF=2, q=f=>Math.round(f*LOOP)/LOOP; let rs=911; const rnd=()=>{ rs=(rs*1664525+1013904223)>>>0; return rs/4294967296; };
+    const lp=ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1200; lp.Q.value=0.2; const tide=ac.createOscillator(), td=ac.createGain(); tide.frequency.value=1/LOOP; td.gain.value=420; tide.connect(td).connect(lp.frequency); tide.start(t); lp.connect(D);
+    const pad=(f,v,swF,swAt,det)=>{ const g=ac.createGain(); g.gain.value=v; const lfo=ac.createOscillator(), dep=ac.createGain(); lfo.frequency.value=swF; dep.gain.value=v*0.38; lfo.connect(dep).connect(g.gain); lfo.start(t+swAt);
+      [[q(f*Math.pow(2,-det/1200)),1],[q(f*Math.pow(2,det/1200)),1],[q(f*2),0.11]].forEach(([fr,w])=>{ const o=ac.createOscillator(), og=ac.createGain(); o.type='sine'; o.frequency.value=fr; og.gain.value=w*0.5; o.connect(og).connect(g); o.start(t); }); g.connect(lp); };
+    pad(293.66,0.050,1/LOOP,0,4); pad(440,0.036,1/12,6,5);
+    const n=Math.round(sr*L), b=ac.createBuffer(1,n,sr), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=rnd()*2-1; const s=ac.createBufferSource(); s.buffer=b; const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1000; bp.Q.value=0.7;
+    const ag=ac.createGain(); ag.gain.value=0.004; const alf=ac.createOscillator(), ad=ac.createGain(); alf.frequency.value=1/12; ad.gain.value=0.0018; alf.connect(ad).connect(ag.gain); alf.start(t+4); s.connect(bp).connect(ag).connect(D); s.start(t);
+    const tine=(f,at,v)=>{ [[1,1],[2.76,0.14],[5.4,0.045]].forEach(([h,w])=>{ const o=ac.createOscillator(), g=ac.createGain(); o.type='sine'; o.frequency.value=f*h; g.gain.setValueAtTime(0.0005,at); g.gain.linearRampToValueAtTime(v*w,at+0.004); g.gain.exponentialRampToValueAtTime(0.0005,at+0.9/(h>1?2:1)); o.connect(g).connect(D); o.start(at); o.stop(at+1.0); }); };
+    const NOTES=[587.33,659.26,739.99,880,987.77,1174.66,1318.51]; let at=1.5, last=-1; while(at<LOOP-XF-1.0){ let k=Math.floor(rnd()*NOTES.length); if(k===last) k=(k+1)%NOTES.length; last=k; tine(NOTES[k], t+at, 0.030+rnd()*0.012); at+=1.2+rnd()*1.2; } }
+function mapBedLoop(buf){   // THE SEAM: the render is LEN + X seconds; the loop = the first LEN with its first X walked in from the tail (a linear crossfade — the tail IS the head, phase for phase, by the body's law)
+  const sr=buf.sampleRate, n=Math.round(sr*MAPBED_LEN), xf=Math.round(sr*MAPBED_X), x=buf.getChannelData(0), OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext, out=new OAC(1,1,sr).createBuffer(1,n,sr), d=out.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=x[i]; for(let i=0;i<xf;i++){ const w=i/xf; d[i]=x[n+i]*(1-w)+x[i]*w; } return out; }
+function mapBedGen(ok,bad){ try{   // the render: an OfflineAudioContext of LEN + X seconds; oncomplete AND the promise (whichever a WebKit has), once
+  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; if(!OAC){ bad(); return; }
+  const sr=44100, oc=new OAC(1, Math.round(sr*(MAPBED_LEN+MAPBED_X)), sr); mapBedBody(oc, 0);
+  let done=false; const fin=b=>{ if(done) return; done=true; try{ ok(mapBedLoop(b)); }catch(e){ bad(); } };
+  oc.oncomplete=e=>fin(e.renderedBuffer); const p=oc.startRendering(); if(p&&p.then) p.then(fin, ()=>{ if(!done){ done=true; bad(); } });
+}catch(e){ bad(); } }
+function mapBedKnock(){ const d=Math.max(0, MAPBED_AT-(Date.now()-(TMAP.t0||0))); setTimeout(()=>{ if(TMAP.up) locSync(); }, d); }   // the map stands: the door's knock — at once past MAPBED_AT of the tap (the theatre's show at 2050 ms), else once the call has had its say (reduced motion's show at the tap); a map gone meanwhile knocks nothing
+function mapBedOut(){ if(LOC.id!=='map') return; locStop(LOC_XFADE); LOC.id=null; locFree(); }   // the map goes: the bed out over LOC_XFADE (locKill's shape at the crossfade's length), no place left behind — the pick's landing or the fold's own door brings the next music
 
 // ==================== THE VICTORY SHAKE (SH-01 · FM-GVT-SHAKE-01) ====================
 // THE PANTHEON: when you do something truly great, your army dances. A wordless,
@@ -43545,7 +43581,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.14';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.15';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -84177,7 +84213,7 @@ function travelMapMount(kind){   // built + laid out (unpainted, .pre) — the p
     travelPick(h.getAttribute('data-room')); };
   return el;
 }
-function travelMapShow(){ if(!TMAP.kind) return; const el=document.getElementById('travelMap'); if(!el) return; el.classList.remove('pre'); el.classList.add('up'); tmapMoversPause(el,0); TMAP.up=1; landReveal(el); }   // revealed under full cover (a flight folded meanwhile shows nothing)
+function travelMapShow(){ if(!TMAP.kind) return; const el=document.getElementById('travelMap'); if(!el) return; el.classList.remove('pre'); el.classList.add('up'); tmapMoversPause(el,0); TMAP.up=1; landReveal(el); mapBedKnock(); }   // revealed under full cover (a flight folded meanwhile shows nothing); 0911: the map's bed knocks
 function landReveal(el){   // 0904z THE DARK LAND — THE REVEAL: the held lands painted veiled at the mount (TMAP.reveal) lift once the clouds are gone — SFX.twink at the start, the fade (.lift, LAND_FADE_MS) with the ribbon brightening in step (.dark off — its own 1.4 s transition), the ribbon's own lit beat at the end; landLit written at the START (the ceremony was seen — a pick or a fold mid-fade never replays it, never writes twice); reduced motion: the veil simply goes, landLit written, no beat (⚑ Q5)
   const ids=(TMAP.reveal||[]).slice(); TMAP.reveal=[]; if(!ids.length || !el) return;
   const veils=ids.map(id=>el.querySelector('.tm-veil[data-room="'+id+'"]')).filter(Boolean); if(!veils.length) return;
@@ -84188,7 +84224,7 @@ function landReveal(el){   // 0904z THE DARK LAND — THE REVEAL: the held lands
     setTimeout(()=>{ if(!veils.some(v=>v.isConnected)) return; veils.forEach(v=>v.remove()); ids.forEach(id=>travelLit(id,'lit')); }, LAND_FADE_MS); }, LAND_REVEAL_MS);
 }
 function tmapMoversPause(el,on){ try{ el.querySelectorAll('svg.tm-movers').forEach(sv=>{ if(on) sv.pauseAnimations(); else sv.unpauseAnimations(); }); }catch(e){} }   // 0853z: the train's SMIL waits under .pre (the CSS movers wait by the .pre rule) and starts at the reveal — the hidden map costs the takeoff nothing
-function travelMapClose(){ const el=document.getElementById('travelMap'); if(el){ el.className='hidden'; el.innerHTML=''; el.onpointerdown=el.onpointerup=el.onpointercancel=el.onclick=null; } TMAP.up=0; TMAP.pd=null; }
+function travelMapClose(){ const el=document.getElementById('travelMap'); if(el){ el.className='hidden'; el.innerHTML=''; el.onpointerdown=el.onpointerup=el.onpointercancel=el.onclick=null; } TMAP.up=0; TMAP.pd=null; mapBedOut(); }   // 0911: the map's bed lets go over LOC_XFADE
 function travelMapOpen(kind){ travelMapMount(kind); travelMapShow(); }   // reduced motion (and the rig): the map at once
 function travelMapClear(){   // hideAllOverlays' door: something else navigated while a flight stood — the map folds and the ride's latch releases (a strand is impossible); a pinned port is left alone
   if(!TMAP.kind) return;
@@ -84203,7 +84239,7 @@ function travelPick(dest){
   if(!TMAP.up || TMAP.pick || !ROOM_INFO[dest]) return;   // one pick per flight (the twin-tap law); the map must stand
   if(!roomOwns(dest)){ travelNo(dest); return; }
   const kind=TMAP.kind; TMAP.pick=1; TMAP.dest=dest; travelLit(dest,'lit'); SFX.thock();
-  const go=()=>{ travelMapClose(); if(dest!==roomCur()){ SHIP_DEST=dest; roomSwitch(rideNextRoom(), true); } else renderMenu(); SFX.thock(); };   // THE PICK RIDES THE 0528 PINNED PORT (one code path — the moving-day card's own; the cycle resumes after); the land you left = a fresh paint of home (roomSwitch refuses a same-room move)
+  const go=()=>{ travelMapClose(); if(dest!==roomCur()){ SHIP_DEST=dest; roomSwitch(rideNextRoom(), true); } else { renderMenu(); locSync(); themeRevive(); /* 0911: the land you never left gets its music back — the tap's hush lifted here as a landing lifts it */ } SFX.thock(); };   // THE PICK RIDES THE 0528 PINNED PORT (one code path — the moving-day card's own; the cycle resumes after); the land you left = a fresh paint of home (roomSwitch refuses a same-room move)
   if(reducedMotion()){ go(); setTimeout(()=>{ TMAP.kind=null; SHIPTRV=0; shipCineSweep(); }, 600); return; }   // the ship's RM branch verbatim: no theatre, the latch holds a beat
   const w=document.createElement('div'); w.id='cloudwipe';
   w.innerHTML='<div class="cwb">'+cloudWipeSVG()+'</div>';
