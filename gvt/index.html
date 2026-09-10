@@ -31774,6 +31774,7 @@ function heroMine(u){ return !(u.coopMR!=null || u.coopMods || u.nrk!=null || (S
 function heroMileHP(u){   // the +HP milestones (the yeti's capstone: +HERO_MILE_HP per milestone past his set) — campaign GRIT (gritCap) and the battleground pool (placeUnit) both read here
   if(!u || HEROES.indexOf(u.type)<0 || !HERO_MILES[u.type]) return 0;
   if(heroMine(u)){ heroMileSync(u.type); const h9=HERO_MILES[u.type]; return (heroMileLed(u.type).hp|0)+(h9.hpPicks? h9.hpPicks(u) : 0); }   // 0909: + MORE STUFFING's picks (the bear's seat alone carries hpPicks)
+  if(u.coopHM && HERO_MILES[u.type].hpX) return HERO_MILES[u.type].hpX(heroMileDue(perkRank(u)),u);   // 0910 REV 2: the token's exact pips (the bear's seat alone carries hpX)
   return HERO_MILES[u.type].hpAt? HERO_MILES[u.type].hpAt(heroMileDue(perkRank(u))) : 0;
 }
 // the academy card's milestone row — INFORMATION ONLY, zero words, zero digits
@@ -31820,6 +31821,7 @@ const HERO_PICKS={};          // k → { band, line, vb, opts:[{id,name,sub,art,
 function heroPickN(u,id){     // how many times this figure's owner picked `id` — MINE off the persisted ledger (synced first; a choice still pending counts nothing); a mirrored/relayed chair derives off the wire's rank through the seat's mirror law
   if(!u || !HERO_PICKS[u.type]) return 0;
   if(heroMine(u)){ heroMileSync(u.type); return (heroMileLed(u.type).pk||[]).filter(x9=>x9===id).length; }
+  if(u.coopHM) return (u.coopHM.pk||[]).filter(x9=>x9===id).length;   // 0910 REV 2: a relayed chair whose owner's ledger rode the wire (kbWireTok) — the exact picks; the mirror law below stands for a token-less relay
   const hp9=HERO_PICKS[u.type]; return hp9.mirror? hp9.mirror(heroMileDue(perkRank(u)), id) : 0;
 }
 function heroPickPend(k){ return HERO_PICKS[k]? (heroMileLed(k).pend|0) : 0; }   // choices the hook banked and the prompt has not yet paid out
@@ -31955,7 +31957,7 @@ function ckSpawn(k,u,dx,dy){   // one companion beside the king through placeUni
   if(!c) return null;
   c.x=x; c.y=y; c.laneY=y;
   if(S.bf) c.dropT=0;   // no drop ghost — he hops in beside the king, landed (dropT<=0 = targetable + marching, the bf law)
-  if(u.coopHex) c.coopHex=u.coopHex;   // a relayed king's family wears the ally's colour (co-op deals no hero today — the seat stands)
+  if(u.coopHex) c.coopHex=u.coopHex; if(u.coopMods){ c.coopBy=u.coopBy; c.coopMods=[]; }   // 0910 REV 2: a relayed king's courtier is the ally's man (coopBy + the relay marker — the bench/laser/sweeper readers' own law) and NEVER evOwner: he dies by local dice on every screen, no cid = no 'ud' word, exactly like the owner's own copy   // a relayed king's family wears the ally's colour (co-op deals no hero today — the seat stands)
   if(u.nrk!=null) c.nrk=u.nrk;         // a mirrored king's family wears his rank stamp (perkRank → hp/perks) — ownership stays the mirror's
   c.ckOf=u.id; c.ckAt=S.t; c.ckGift=1;
   return c;
@@ -32115,13 +32117,20 @@ const KB_MILE_HP=10,        // ⚑ Q7/Q8 MORE STUFFING: +10 grit pips a pick (th
       KB_CAV_TROT=90,       // the horseman's lane pace between marks (half the Duke's gallop)
       KB_COURT_HOLD=120,    // ⚑ Q12 THE GUARD'S PACE: inside this of him they hold to his 44; beyond it the Bluecoats' 64
       KB_ALLY_SLEEVE='#E8C24A';   // ⚑ Q13 the ally editions' GOLD sleeve on the same blue coat (the emperor's colour) — a glance tells the sides
+const KB_GUARD_BLADE=1,     // 0910 REV 2 THE GUARD FIGHTS (Wyatt 9/10: "Emperor Bear's two royal guards that he gets at level 20 are not helping him fight. They need to function like the royal bears do and target enemies, attack them, and march forward."): THE ROYAL GUARD fights with the Emperor's OWN dash-slash machine (kbHeroU covers him — the hunt, the wind, the flight, the three cuts through hurt at his row's dmg 2: a tan rifleman falls to a cut, a MG man / an officer to two; the kill credits the guard); the musket stays in the art (the Bluecoats' own law); 0 = v9.13's cork at 3.2 s
+      KB_GUARD_HUNT_X=1.5,  // ⚑ G-Q3 the hunt pace inside his eye: × his row's 64 (the Bluecoats' own KB_ROY_RUSH) on the court gait (44 near the Emperor · 64 beyond — kbCourtPace)
+      KB_GUARD_CUT=2.0;     // ⚑ G-Q2 the strike-in-range clock: a guard standing at his man cuts this long after his last lunge (the Emperor's KB_HUNT_CUT 0.8 is the hunter's); out of reach the window lunge on the Bluecoats' KB_ROY_DASH_CD 6 s (⚑ G-Q1), the window and the eye KB_ROY_DASH_R 330
 function kbHpPicks(u){ return heroPickN(u,'hp')*KB_MILE_HP; }                                 // MORE STUFFING → gritCap (live) + the mat's pool (placeUnit) through heroMileHP's one door
 function kbSwordMul(u){ return heroPickMul(heroPickN(u,'dmg'), KB_MILE_DMG_PCT); }            // A HEAVIER SWORD → kbHeroDmg
-function kbDashROf(u){ return KB_DASH_R+heroPickN(u,'dash')*KB_MILE_DASH_M*TK_M; }             // THE LONG DASH → the dash window (kbDashPick's hero branch)
-function kbEyeOf(u){ return KB_HERO_EYE+heroPickN(u,'dash')*KB_MILE_DASH_M*TK_M; }             // …and the eye (kbHeroPick / kbHuntFoot) — ⚑ Q10: the eye is what makes him hunt
-function kbHas(u,id){ if(!u || u.type!=='kingbear') return false; if(heroMine(u)){ heroMileSync('kingbear'); return (heroMileLed('kingbear').tk||[]).indexOf(id)>=0; } return false; }   // the learned list (battery · cavalry · guard · guard2 · steed · iron) — MINE only: the court never mirrors (§3.5)
-function kbSteedOn(u){ if(!u || u.type!=='kingbear') return false; if(heroMine(u)) return kbHas(u,'steed'); return heroMileDue(perkRank(u))>=KB_STEED_AT; }   // ⚑ Q5/§4.7 the steed for a mirror = a pure rank read
-function kbIronOn(u){ if(!u || u.type!=='kingbear') return false; if(heroMine(u)) return kbHas(u,'iron'); return heroMileDue(perkRank(u))>=KB_IRON_AT; }
+function kbDashROf(u){ return (u && u.type==='kbguard')? KB_ROY_DASH_R : KB_DASH_R+heroPickN(u,'dash')*KB_MILE_DASH_M*TK_M; }   // 0910 REV 2: a guard's window = the Bluecoat's 330             // THE LONG DASH → the dash window (kbDashPick's hero branch)
+function kbEyeOf(u){ return (u && u.type==='kbguard')? KB_ROY_DASH_R : KB_HERO_EYE+heroPickN(u,'dash')*KB_MILE_DASH_M*TK_M; }   // 0910 REV 2: a guard's eye = his window 330 (≥ his row's 260 — the brain pre-empts the campaign halt whenever a man is in reach)             // …and the eye (kbHeroPick / kbHuntFoot) — ⚑ Q10: the eye is what makes him hunt
+const KB_WIRE_TK={ battery:'b', cavalry:'c', guard:'g', guard2:'G', steed:'s', iron:'i' }, KB_WIRE_PK={ hp:'h', dmg:'d', dash:'a', guard:'g' };   // 0910 REV 2 THE COURT CROSSES THE WIRE (Wyatt 9/10: the ally "weren't able to see the royalist troops that got spawned by Emperor Bear"): the ledger's letters — one mo token 'kb:<tk>.<pk>' ≤ 14 chars (the server's clamp_cmd cuts every mo string at 16 and the list at 40; ⚑ W-Q3)
+function kbWireTok(){ heroMileSync('kingbear'); const led=heroMileLed('kingbear'), L=(a,T)=>(a||[]).map(x=>T[x]||'').join(''); return 'kb:'+L(led.tk,KB_WIRE_TK)+'.'+L(led.pk,KB_WIRE_PK); }   // MY Emperor's ledger as one placement token (the 'cg' / 'mr' / 'lz:' idiom — the relay passes mo opaque; an old client's ENH filter drops it with zero errors)
+function kbWireParse(s){ const inv=T=>{ const o={}; for(const k in T) o[T[k]]=k; return o; }, tI=inv(KB_WIRE_TK), pI=inv(KB_WIRE_PK), b=String(s||'').slice(3).split('.'), rd=(q,I)=>(q||'').split('').map(ch=>I[ch]).filter(x=>!!x); return { tk:rd(b[0],tI), pk:rd(b[1],pI) }; }   // the receiver's read (an unknown letter is skipped)
+function kbTkOf(u){ if(!u || u.type!=='kingbear') return []; if(heroMine(u)){ heroMileSync('kingbear'); return heroMileLed('kingbear').tk||[]; } return (u.coopHM && u.coopHM.tk)||[]; }   // the learned list by ownership: MINE off the synced ledger; a relayed chair off the wire's token (coopHM); a token-less relay (an older build's ally) and every nrk / AI mirror = nothing (yesterday's game)
+function kbHas(u,id){ return kbTkOf(u).indexOf(id)>=0; }   // the learned list (battery · cavalry · guard · guard2 · steed · iron) — 0910 REV 2: the court MIRRORS through the token (§3.5's "never mirrors" retired on his word)
+function kbSteedOn(u){ if(!u || u.type!=='kingbear') return false; if(heroMine(u) || u.coopHM) return kbHas(u,'steed'); return heroMileDue(perkRank(u))>=KB_STEED_AT; }   // ⚑ Q5/§4.7 the steed for a mirror = a pure rank read
+function kbIronOn(u){ if(!u || u.type!=='kingbear') return false; if(heroMine(u) || u.coopHM) return kbHas(u,'iron'); return heroMileDue(perkRank(u))>=KB_IRON_AT; }
 function kbSaddleHP(u){ return kbIronOn(u)? KB_SADDLE_HP100 : KB_SADDLE_HP; }
 const KB_ART_HP='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><path d="M30 62 C14 62 12 40 28 38 C26 22 48 16 56 30 C62 12 90 16 88 36 C106 36 108 60 90 62 C92 76 66 80 60 68 C50 82 26 78 30 62 Z" fill="#F4EBD3" stroke="#D9C9A0" stroke-width="2.5"/><path d="M60 64 C50 56 40 50 40 42 A9 9 0 0 1 60 40 A9 9 0 0 1 80 42 C80 50 70 56 60 64 Z" fill="#C0473A"/></svg>');   // MORE STUFFING: a heart in a tuft of stuffing
 const KB_ART_DMG='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><path d="M22 74 L86 18 L96 14 L92 24 L30 80 Z" fill="#D8DEE6" stroke="#8C949A" stroke-width="2"/><path d="M28 78 L34 72" stroke="#fff" stroke-width="2"/><path d="M18 58 L38 78" stroke="#E8C24A" stroke-width="6" stroke-linecap="round"/><path d="M14 80 L26 68" stroke="#6b3d1e" stroke-width="7" stroke-linecap="round"/><circle cx="12" cy="82" r="4" fill="#E8C24A"/></svg>');   // A HEAVIER SWORD: the sabre
@@ -32142,6 +32151,7 @@ HERO_MILES.kingbear={   // his seat on the 0463 hook (§2.1): 1 · 2 · 6 · 8 B
     else if(n===7) learn('guard2'); else if(n===KB_STEED_AT) learn('steed'); else if(n===KB_IRON_AT) learn('iron'); },
   hpAt(due){ return (due>=1? KB_MILE_HP : 0)+(due>=4? KB_MILE_HP40 : 0)+(due>=8? KB_MILE_HP : 0); },   // ⚑ Q5 the mirror takes STUFFING at 10 and 80
   hpPicks(u){ return kbHpPicks(u); },
+  hpX(due,u){ return (due>=4? KB_MILE_HP40 : 0)+kbHpPicks(u); },   // 0910 REV 2: a relayed chair WITH the token = the exact banked pips (+5 at 40) + MORE STUFFING's picks off the wire (heroMileHP's relayed branch); the mirror's hpAt guess stands for a token-less relay
   take(id,led){ if(id==='guard'){ const tk=led.tk||(led.tk=[]); if(tk.indexOf('guard')<0) tk.push('guard'); } }   // THE ROYAL GUARD's pick learns into led.tk at take time, so the court reads ONE list
 };
 function heroPickDeal(k,led){ const hp9=HERO_PICKS[k]; if(!hp9 || !hp9.deal) return null; const pq=led.pq||[]; return pq.length? hp9.deal(pq[0]) : null; }   // 0909 THE PENDING QUEUE: the ids the head ordinal deals (null = the whole list — Rex/Croak/Jane, or a pend with no queue)
@@ -43618,7 +43628,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.19';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.20';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -44897,6 +44907,7 @@ function coopPlaceCmd(u, bot, bi, re){
   // receivers may hold his men for his 'ud' (the coopSoul mo-seat idiom: an
   // old build's ENH filter drops the token with zero errors, and its men
   // keep the loose-sim law on every screen).
+  if(u.type==='kingbear') cm.mo=(cm.mo||[]).concat(kbWireTok());   // 0910 REV 2 THE COURT CROSSES THE WIRE: MY Emperor's ledger rides his placement (before 'ev1' — inside the clamp's first entries, the 0486 law: a clip eats bench ids, never a protocol word)
   cm.mo=(cm.mo||[]).concat('ev1');
   { const mo=enhWire(u); if(mo) cm.mo=cm.mo.concat(mo); }   // 0735 THE RIM: his own ids alone   // 0486: the bench ids LAST (see above — ⚑ the server cell RL 'mo' 24→32 is the next server card's one-liner)
   return cm;
@@ -45163,6 +45174,8 @@ function coopApply(cm){
     // 0242: the ally's hidden-stripe rank — raw read before the ENH filter
     { const mr=Array.isArray(cm.mo)? cm.mo.find(m=>/^mr\d{1,3}$/.test(String(m))) : null;
       if(mr) u.coopMR=Math.min(RANK_MAX,+String(mr).slice(2)||0); }
+    { const kt=(cm.t==='kingbear' && Array.isArray(cm.mo))? cm.mo.find(m=>typeof m==='string' && m.slice(0,3)==='kb:') : null;   // 0910 REV 2 THE COURT CROSSES THE WIRE: the owner's Emperor ledger — raw read before the ENH filter (the coopSoul law); absent on an old build's orders = yesterday's mirror
+      u.coopHM=kt? kbWireParse(kt) : null; }
     // 0100 THE ENGINE — the ally's emg loaner arrives at the pace THEY paid
     // for. Raw read before the ENH filter (the coopSoul law); the campaign def
     // copy exists (placeUnit's else branch), so nothing shared moves.
@@ -58964,8 +58977,8 @@ const KBH_ON=1,            // the hero's brain (0 = the shipped stroll + the tra
       KB_HERO_HUE='#E8C24A',   // YOUR emperor's wake, rings and floats in gold (⚑ Q6; the foe king's steel and the Bluecoats' royal blue stand)
       KB_HERO_WKF=10,      // THE CLEAN WALK (cell F): his walk-stamp floor (px/s on the axis) — a diagonal step at 44 stamps (Jane's 12, the Commander's 7; ⚑ Q7)
       KB_HERO_FACE_HOLD=0.5;   // …and no face flip inside this of the last (the boss's own |dx| > 20 rule as the hero's)
-function kbHeroU(o){ return !!(o && o.type==='kingbear' && KBH_ON); }   // the side switch every borrowed function reads (a unit's type is never a foe's)
-function kbDashCdOf(f){ return f.def.kb? KB_DASH_CD : kbHeroU(f)? kbHeroDashCd(f) : KB_ROY_DASH_CD; }   // ONE reader for the dash clock's three owners (the king · the emperor · a Bluecoat) — the boss's number byte-what-it-was
+function kbHeroU(o){ return !!(o && (o.type==='kingbear' || (KB_GUARD_BLADE && o.type==='kbguard')) && KBH_ON); }   // 0910 REV 2: + THE ROYAL GUARD — the ally row rides the whole machine on this one switch   // the side switch every borrowed function reads (a unit's type is never a foe's)
+function kbDashCdOf(f){ return f.def.kb? KB_DASH_CD : (f.type==='kbguard')? KB_ROY_DASH_CD : kbHeroU(f)? kbHeroDashCd(f) : KB_ROY_DASH_CD; }   // 0910 REV 2: a ROYAL GUARD (ally) keeps the Bluecoats' 6 s (⚑ G-Q1); the Emperor's ladder 4.5 → 3.0 byte-still   // ONE reader for the dash clock's three owners (the king · the emperor · a Bluecoat) — the boss's number byte-what-it-was
 function kbHeroDashCd(u){ const n=Math.min(RANK_MAX/HERO_MILE_EVERY, heroMileDue(perkRank(u))); return KB_HERO_DASH_CD-(KB_HERO_DASH_CD-KB_HERO_DASH_MIN)*n/(RANK_MAX/HERO_MILE_EVERY); }   // THE LADDER (⚑ Q9): 4.5 → 3.0 s across the ten milestones (rank 10 … 100), off the rank every sim shares (perkRank — a relayed chair's nrk)
 function kbHeroDmg(u){ return u.def.dmg*upMulR(u.type,perkRank(u))*(u.vet?1.5:1)*lzDmgMul(u)*soulDmgMulU(u)*kbSwordMul(u); }   // 0909: × A HEAVIER SWORD (+20 % a pick, linear)   // one cut's number: his def's 2.5 on the heroes' rank ladder (the yeti sword's own shape, kySwordDmg)
 function kbHeroOk(u,f){ return !!(f && !f.dead && !(f.hp!=null && f.hp<=0) && !f.burrow && !f.pendDie && !(f.jetT>0) && !f.falling && f.x<=(S.bf?WORLD_W:W)-10 && f.x>=-40 && f.y>=-30 && f.y<=WORLD_H+30 && TGT(u).indexOf(f)>=0 && bfCanTarget(u,f)); }   // a foe still worth hunting — the campaign halt's own validity (campFoeInReach) + the yeti's (tkNearFoe)
@@ -58976,7 +58989,7 @@ function kbHeroWalk(u,dt,f){   // THE WALK inside the eye — the campaign march
   let goal=kbRvGoal(u.x,u.y,f.x,f.y);
   const CW=S.cfg.terrain.walls;
   if(CW && CW.length){ for(let i=CW.length-1;i>=0;i--){ const wl=CW[i]; if(u.x<wl.x+wl.w+4 && goal.x>wl.x){ let g9=wl.gaps[0], bd=1e9; for(const g8 of wl.gaps){ const d=Math.abs(g8.y-u.y); if(d<bd){ bd=d; g9=g8; } } goal=(u.x<wl.x-34 && Math.abs(u.y-g9.y)>g9.h*0.3)? { x:wl.x-30, y:g9.y } : { x:wl.x+wl.w+30, y:g9.y }; break; } } }
-  const g=u.gait||1; u.gait=g*(KB_HERO_SPD/(CAMP_SPD.kingbear||KB_HERO_SPD)); bfMarch(u,dt,goal); u.gait=g; u.marching=true;   // the hunt pace as a gait on his own cell (the STRIDE mod's ×1.2 rides through)
+  const g=u.gait||1; u.gait=g*((u.type==='kbguard')? KB_GUARD_HUNT_X : KB_HERO_SPD/(CAMP_SPD.kingbear||KB_HERO_SPD)); bfMarch(u,dt,goal); u.gait=g; u.marching=true;   // 0910 REV 2: a guard hunts at KB_GUARD_HUNT_X × his row on the court gait   // the hunt pace as a gait on his own cell (the STRIDE mod's ×1.2 rides through)
 }
 function kbHeroFace(u,dx){   // THE CLEAN WALK (cell F): the face follows the HUNT's heading — the latched man — through the aim seat (faceX / faceTo, the 0652 picture reader on both carpets), never a pull; no flip inside KB_HERO_FACE_HOLD of the last, and only past the boss's own |dx| > 20 (the rock shoulder's nudge never reaches this)
   const want=(dx>=0)? 1 : -1;
@@ -58985,7 +58998,7 @@ function kbHeroFace(u,dx){   // THE CLEAN WALK (cell F): the face follows the HU
 }
 function kbHeroTick(u,dt){   // true = the brain owns his feet and hands this frame (the units loop `continue`s past the march and the fire loop); false = the eye is empty — the stock march (campUnitStep at CAMP_SPD.kingbear: the lane, the crate) with the tracer retired behind it
   if(u.falling || u.shv || u.jetT>0 || u.duckT>0 || u.dropT>0 || u.cloakT>0 || (S.drag && S.drag.unit===u)){ u.kbWind=null; u.kbDash=null; u.kbWalkTo=null; return false; }   // down, thrown, airborne, landing, vanished, held in the hand: no hunt this frame (the boss's own exemptions, unit-side)
-  if(u.kbDashCd==null) u.kbDashCd=1.0;   // the first clock: a beat after the drop (the boss's 2.5 at the keel)
+  if(u.kbDashCd==null) u.kbDashCd=(u.type==='kbguard' && KB_ROY_STAG>0)? kbRnd(u)*KB_ROY_STAG : 1.0;   // 0910 REV 2: a guard's first clock rolled 0..KB_ROY_STAG on his own die (a file never dashes as one) · the first clock: a beat after the drop (the boss's 2.5 at the keel)
   if(u.kbMount && !S.bf){ kbSteedTick(u,dt); u.marching=false; return true; }   // 0909 THE STEED (§4): while he rides the ride owns his feet and hands (no sabre from the saddle — ⚑ Q17)
   if(u.kbWind){ kbWindTick(u,dt); if(u.kbWind) kbHeroFace(u,u.kbWind.u.x-u.x); u.marching=false; return true; }   // THE WIND-UP owns the frame (the boss's own; the flight at its end)
   if(u.kbDash){ const L=u.kbDash; if(L.left>0) kbDashStep(u,dt); kbDashTick(u,dt); kbHeroFace(u,L.hx); u.marching=false; return true; }   // THE FLIGHT, then the three cuts where he lands (the boss's own)
@@ -59059,11 +59072,11 @@ function kbAllyBrain(u,dt){   // the units loop's door for the court's own brain
 }
 function kbCourtSpawn(k,u,dx,dy,col){ const c=ckSpawn(k,u,dx,dy); if(!c) return null; c.kbOf=u.id; c.kbGait0=c.gait; ckArrive(c,col); tdLog(u,'court',k); return c; }   // one courtier beside the Emperor (ckSpawn: placeUnit, the lane, ckGift off the loss books) + the arrive ring
 function kbCourtIn(u){   // ONE DOOR at his spawn (§3.2): the guard's file (a battalion of four at 70 — THE GUARD GROWS) behind him in a column, the battery on his flanks 60 px behind; the horseman waits on the kills (kbEmpTick)
-  if(u.kbCourt) return 0; u.kbCourt=1; if(!heroMine(u)) return 0;
-  const tk=heroMileLed('kingbear').tk||[]; let n=0;
+  if(u.kbCourt) return 0; u.kbCourt=1;
+  const tk=kbTkOf(u); let n=0;   // 0910 REV 2: the list by ownership — a relayed Emperor's court spawns beside his copy on THIS screen too (the token; the ally sees the royalist troops)
   if(tk.indexOf('guard')>=0 || tk.indexOf('guard2')>=0){ const nG=(tk.indexOf('guard2')>=0)? KB_ROY_BAT_ALLY : KB_ROY_FILE_ALLY; for(let i=0;i<nG;i++){ if(kbCourtSpawn('kbguard',u,36*(i+1),((i%2)? 1 : -1)*10*((i>>1)+1),KB_ALLY_SLEEVE)) n++; } }
   if(tk.indexOf('battery')>=0){ for(let i=0;i<KB_BAT_N_ALLY;i++){ if(kbCourtSpawn('kbcannon',u,60,(i? 1 : -1)*44,'#ffffff')) n++; } }
-  if(n) commSayAs(bearSpeaker(),'THE COURT IS IN SESSION!',{rank:3,hz:KB_HZ});
+  if(n && heroMine(u)) commSayAs(bearSpeaker(),'THE COURT IS IN SESSION!',{rank:3,hz:KB_HZ});   // 0910 REV 2: a mirror's king keeps quiet (Croak's law)
   return n;
 }
 function kbCourtPace(u){ for(const c of S.units){ if(c.type!=='kbguard' || c.dead || c.kbOf!==u.id) continue; const near=Math.hypot(c.x-u.x,c.y-u.y)<=KB_COURT_HOLD; c.gait=(c.kbGait0||1)*(near? (CAMP_SPD.kingbear||44)/(CAMP_SPD.kbguard||64) : 1); } }   // ⚑ Q12 THE GUARD'S PACE: inside KB_COURT_HOLD of him they hold to his 44 (a gait on their own cell), beyond it the Bluecoats' 64
@@ -59071,7 +59084,7 @@ function kbEmpTick(u,dt){   // alive is the only condition (the radio clock's sh
   if(!u || u.dead || u.type!=='kingbear') return;
   if(S.bf) return;
   if(!u.kbBorn){ u.kbBorn=1; kbCourtIn(u); if(kbSteedOn(u)) kbSteedStart(u); }
-  if(!u.kbCav && (u.kills|0)>=KB_CAV_KILLS && kbHas(u,'cavalry')){ u.kbCav=1; if(kbCourtSpawn('kbcavalry',u,-70,30,KB_HERO_HUE)){ SFX.horn(); commSayAs(bearSpeaker(),'THE CAVALRY IS HERE!',{rank:3,hz:KB_HZ}); } }   // REV 1 ⚑ R1
+  if(!u.kbCav && (u.kills|0)>=KB_CAV_KILLS && kbHas(u,'cavalry')){ u.kbCav=1; if(kbCourtSpawn('kbcavalry',u,-70,30,KB_HERO_HUE)){ SFX.horn(); if(heroMine(u)) commSayAs(bearSpeaker(),'THE CAVALRY IS HERE!',{rank:3,hz:KB_HZ}); } }   // REV 1 ⚑ R1
   kbCourtPace(u);
 }
 function kbSteedStart(u){ u.kbMount=1; u.kbSaddle=kbSaddleHP(u); u.kbWind=null; u.kbDash=null; kbAllyRideStart(u,KB_STEED_P); tdLog(u,'saddle',u.kbSaddle); }   // §4.1 THE SPAWN: placed MOUNTED — the saddle refills every battle
@@ -59313,7 +59326,7 @@ function kbHuntFoot(f,dt){   // 0904 RE-LAND (0747-7) THE HUNTER on foot ("Same 
   f.kbWalkTo=u; if(!u){ if(hero9) return false; if(KB_ROAM_T>0){ const L9=f.kbLoop||(f.kbLoop={ st:'stalk', t:0, x:0, y:0 }); kbFootRoam(f,dt,L9); } else f.kbWalk=0; return; }   // 0906 cell E NEVER A POST: no pick (nobody east of KB_FOOT_XMIN) → the 0902 roam (kbWalk 2 walks the loop's own mark: his nearest gun, then a lane band; never across the water, never west of the guard) instead of a park
   const d=Math.hypot(u.x-f.x,u.y-f.y); if(d>(hero9? KB_HERO_STOP : KB_CUT_R)){ f.kbWalk=1; f.kbHuntW=0; if(hero9){ kbHeroFace(f,u.x-f.x); kbHeroWalk(f,dt,u); return true; } return; }   // 0876: the hero walks the campaign's legs at the hunt pace, facing his man, in to KB_HERO_STOP (the king's stop is the sword's reach)
   f.kbWalk=0; if(hero9){ kbHeroFace(f,u.x-f.x); f.marching=false; }
-  if(KB_HUNT_CUT>0 && f.kbDashCd>0 && f.kbDashCd<=kbDashCdOf(f)-KB_HUNT_CUT && !f.kbWind && !f.kbDash) f.kbDashCd=0;   // 0876: the clock's own owner (kbDashCdOf — the king's KB_DASH_CD byte-what-it-was)   // THE STRIKE IN RANGE: the cut on its own clock (KB_HUNT_CUT) where he stands — the flight keeps the dash clock
+  { const hc9=(f.type==='kbguard')? KB_GUARD_CUT : KB_HUNT_CUT; if(hc9>0 && f.kbDashCd>0 && f.kbDashCd<=kbDashCdOf(f)-hc9 && !f.kbWind && !f.kbDash) f.kbDashCd=0; }   // 0910 REV 2: a guard's own clock in reach (KB_GUARD_CUT)   // 0876: the clock's own owner (kbDashCdOf — the king's KB_DASH_CD byte-what-it-was)   // THE STRIKE IN RANGE: the cut on its own clock (KB_HUNT_CUT) where he stands — the flight keeps the dash clock
   if(KB_HUNT_WAIT>0){ f.kbHuntW=(f.kbHuntW||0)+dt; if(f.kbHuntW>=KB_HUNT_WAIT && f.kbDashCd>0.25){ f.kbHuntDone=1; tdLog(f,'hunt-next',u.type); } }
   if(hero9) return true;   // 0876: a man stands in his reach — the frame is his   // ⚑ H-Q6 KB_HUNT_WAIT: inside the reach with the clock not ready — the next pick, never a park
 }
@@ -59577,6 +59590,13 @@ function drawKbHero(u,w,im,kyl){   // 0876 THE EMPEROR BEAR cell D — THE SWORD
   drawSprite(u.type,u.x,u.y-kyl,w,0,(lean? lean*sg : unitWob(u)),im,flip);
   if((fly||cut) && !RM) kbDrawSabre(u.x+L.fs*18, u.y-54-kyl, L.fs*(cut? 1.5 : 1.15), KB_HERO_SABRE);   // the sabre forward through the flight and the cut (in front of the body)
   if(fly && !RM){ const bx=-L.hx; cx.strokeStyle='rgba(234,244,255,0.55)'; cx.lineWidth=1.8; cx.lineCap='round'; cx.beginPath(); cx.moveTo(u.x+bx*22,u.y-48); cx.lineTo(u.x+bx*46,u.y-49); cx.stroke(); cx.beginPath(); cx.moveTo(u.x+bx*18,u.y-34); cx.lineTo(u.x+bx*42,u.y-35); cx.stroke(); cx.lineCap='butt'; }   // the 0517a speed lines
+}
+function drawKbGuard(u,w,im,kyl){   // 0910 REV 2 THE GUARD FIGHTS — the Bluecoat FOE's own picture unit-side (drawTeddy's troyal branch): THE CHARGE POSE (the musket levelled, the bayonet fixed) through the wind, the flight and the cuts; the wind's steel ring at a Bluecoat's size (KB_ROY_WIND_R — information, RM keeps it); the flight's forward lean + the 0517a speed lines; the cut's set; the crescent and the rings come from kbCut's own fx in the Emperor's gold
+  const L=u.kbDash, fly=!!(L && L.left>0), cut=!!(L && !fly), wd9=u.kbWind||null, wq9=wd9? Math.max(0,Math.min(1,wd9.t/KB_DASH_WIND)) : 0, act=!!(L||wd9), RM=reducedMotion(), flip=unitDrawFl(u), sg=flip? -1 : 1;
+  if(wd9){ const wr=10+(KB_ROY_WIND_R-10)*wq9; cx.save(); cx.strokeStyle='rgba(234,244,255,'+(0.4+0.5*wq9).toFixed(2)+')'; cx.lineWidth=2+1.6*wq9; cx.beginPath(); cx.ellipse(u.x,u.y+4,wr,wr*0.36,0,0,7); cx.stroke(); cx.restore(); }
+  const lean=RM? 0 : (fly? 0.28*L.fs : cut? 0.12*L.fs : wd9? -KB_WIND_LEAN*wd9.fs*wq9 : 0);   // the world lean (drawKbHero's own): forward into the flight, a nod into the cut, back off the target in the wind
+  drawSprite(u.type,u.x,u.y-kyl-(fly?6:0),w,0,(lean? lean*sg : unitWob(u)),(act && IMG.kbguardcharge)? IMG.kbguardcharge : im,flip);
+  if(fly && !RM){ const bx=-L.hx; cx.strokeStyle='rgba(234,244,255,0.55)'; cx.lineWidth=1.6; cx.lineCap='round'; cx.beginPath(); cx.moveTo(u.x+bx*12,u.y-26); cx.lineTo(u.x+bx*26,u.y-27); cx.stroke(); cx.beginPath(); cx.moveTo(u.x+bx*10,u.y-18); cx.lineTo(u.x+bx*24,u.y-19); cx.stroke(); cx.lineCap='butt'; }   // the speed lines at his size
 }
 function kbCrownPath(s){ cx.save(); cx.scale(s,s); cx.fillStyle='#E8C24A'; cx.strokeStyle='#B8922E'; cx.lineWidth=1.3; cx.lineJoin='round'; cx.beginPath(); cx.moveTo(-13,0); cx.lineTo(-13,-11); cx.lineTo(-7,-5); cx.lineTo(0,-14); cx.lineTo(7,-5); cx.lineTo(13,-11); cx.lineTo(13,0); cx.closePath(); cx.fill(); cx.stroke();
   cx.fillStyle='#C0473A'; cx.beginPath(); cx.arc(-7,-5,1.6,0,7); cx.fill(); cx.beginPath(); cx.arc(7,-5,1.6,0,7); cx.fill(); cx.fillStyle='#4A8CA0'; cx.beginPath(); cx.arc(0,-13,1.8,0,7); cx.fill(); cx.restore(); }
@@ -67142,8 +67162,9 @@ function update(dt){
     // Tan, halt in reach, fight, press on. False = the frame was spent walking.
     if(!S.bf && (u.def.rider || u.def.bur) && kbAllyBrain(u,dt)) continue;   // 0909: the ally horseman's ride / the ally Rattler's burrow own the frame (no march, no fire)
     if(u.type==='kingbear' && KBH_ON && !S.bf && kbHeroTick(u,dt)) continue;   // 0876 THE EMPEROR BEAR — THE HERO'S BRAIN (cell C): beside the yeti's kit and the rex hop — the boss's foot arm side-flipped owns his frame whenever a foe stands in his eye (the hunt, the wind, the flight, the cuts); the eye empty = the campaign march below
+    if(u.type==='kbguard' && kbHeroU(u) && !S.bf && kbHeroTick(u,dt)) continue;   // 0910 REV 2 THE GUARD FIGHTS: THE ROYAL GUARD's brain — the Emperor's door, the Emperor's machine (his eye 330 = the Bluecoat's window; the eye empty = the lane march below — "march forward")
     if(!S.bf && !campUnitStep(u,dt)) continue;
-    if(u.type==='kingbear' && KBH_ON) continue;   // 0877 HEROES ON THE BATTLEGROUND: on the mat too — an emperor dug in by bfUnitStep with a man his brain refused (the water, a burrow) stands rather than shoots · 0876 cell C: THE TRACER RETIRED — a sabre bear never reaches the fire loop (his eye is wider than the gun's 96, so the halt above never finds a man his brain did not; this is the law's belt)
+    if(kbHeroU(u)) continue;   // 0910 REV 2: + the ROYAL GUARD — his musket stays in the art (the Bluecoats' own law: the blade is the attack) · 0877 HEROES ON THE BATTLEGROUND: on the mat too — an emperor dug in by bfUnitStep with a man his brain refused (the water, a burrow) stands rather than shoots · 0876 cell C: THE TRACER RETIRED — a sabre bear never reaches the fire loop (his eye is wider than the gun's 96, so the halt above never finds a man his brain did not; this is the law's belt)
     // ===== SARGE'S ARSENAL: specials get their own handling; the pistol falls
     // through to the default path below (and keeps its SARGE-unit upgrade). =====
     if(u.type==='sarge'){
@@ -72931,6 +72952,7 @@ function drawUnit(u){
   else if(u.type==='kingbear' && u.kbMount) drawKbSteed(u,w,kyl);   // 0909 THE STEED: mounted, the charger + the rider
   else if(u.type==='kbcavalry') drawKbCav(u,w,kyl);   // 0909 THE CAVALRY, ally edition
   else if(u.type==='cksnake') drawCkSnake(u,w,im,kyl);   // 0909 REV 1 THE RATTLER, ally edition
+  else if(u.type==='kbguard' && kbHeroU(u)) drawKbGuard(u,w,im,kyl);   // 0910 REV 2 THE GUARD FIGHTS: his own picture — the charge pose, the wind's ring, the flight's lean + lines
   else if(u.type==='kingbear' && KBH_ON) drawKbHero(u,w,im,kyl);   // 0877 HEROES ON THE BATTLEGROUND: his picture on the mat too   // 0876 THE EMPEROR BEAR cell D: his own picture — the wind's steel ring + the sabre back over the shoulder, the flight's lean + speed lines, the cut's nod (drawKbHero; every other figure keeps the shared line below byte-what-it-was)
   else { if(u.rxHopT>0){ cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(u.x,u.y+3,w*0.16,w*0.045,0,0,7); cx.fill(); }   // 0706 KING REX HOPS: the ground shadow under the flight (the jump-in's own) — the body lifts on u.rxHopZ, the feet stay the truth
     drawSprite(u.type,u.x,u.y-kyl-(u.rxHopZ||0),w,cmdoRecoil(u),(u.rxHopT>0? -0.2 : u.rxHopW>0? 0.12 : u.kySwing>0? -0.14 : unitWob(u)),im,unitDrawFl(u)); }   // 0706: + the lift, the flight's head-down lean, the tell's crouch (zero for everyone else)   // 0494 THE WOBBLE: unitWob, the integrated phase (one helper, four seats) — v2.78: the recoil, campaign edition — v3.61: + the walk-flip seat — 0424: the king's swing lean (the boss's own -0.14) — 0462b: the facing XOR the mold's authored face (UNIT_WEST) + the breather's turn
@@ -76548,6 +76570,7 @@ const MUSKET_LEVEL='<path d="M92 106 L46 101" stroke="#8a5a30" stroke-width="4.5
 const T_ROYAL_CHARGE=ted({hat:'bearskin',coat:COAT_GUARD,sleeve:FR_BLUE,boots:1,arms:'hold',prop:MUSKET_LEVEL});   // 0829 cell C: THE ROYALIST's charge pose — the walk mold's own dress with the musket levelled and the bayonet fixed (the wind-up, the flight and the cuts wear it)
 const T_ROYAL_LEAD_CHARGE=ted({hat:'bearskin',coat:COAT_GUARD,sleeve:FR_BLUE,boots:1,arms:'hold',prop:MUSKET_LEVEL+STANDARD(false),s:1.06});   // 0829 cell C: THE SQUAD LEADER's charge pose — the standard still planted beside him
 const T_ROYAL_LEAD=ted({hat:'bearskin',coat:COAT_GUARD,sleeve:FR_BLUE,boots:1,arms:'hold',prop:MUSKET+STANDARD(false),s:1.06});   // ...THE SQUAD LEADER: the paw-print standard planted beside the slung musket (prop concatenation — the SWAGGER+WHISTLE precedent), a size up
+const T_ROYAL_ALLY_CHARGE=ted({hat:'bearskin',coat:COAT_GUARD,sleeve:KB_ALLY_SLEEVE,boots:1,arms:'hold',prop:MUSKET_LEVEL});   // 0910 REV 2 THE GUARD FIGHTS: THE ROYAL GUARD's charge pose — the gold sleeve + the musket levelled, the bayonet fixed (T_ROYAL_CHARGE's own dress) through the wind, the flight and the cuts
 const T_ROYAL_ALLY=ted({hat:'bearskin',coat:COAT_GUARD,sleeve:KB_ALLY_SLEEVE,boots:1,arms:'hold',prop:MUSKET});   // 0909 ⚑ Q13 THE ROYAL GUARD, ally edition: the same blue coat, the emperor's GOLD sleeve
 const T_CAVALRY_ALLY=ted({hat:'bearskin',coat:COAT_GUARD,arms:'reins',sleeve:KB_ALLY_SLEEVE,boots:1,prop:SABRE_HANG,s:1.06,cheek:1});   // 0909 THE CAVALRY, ally edition (the gold sleeve)
 const T_CAVALRY_ALLY_POINT=ted({hat:'bearskin',coat:COAT_GUARD,arms:'point',sleeve:KB_ALLY_SLEEVE,boots:1,prop:SABRE_HANG,s:1.06,cheek:1});
@@ -76567,7 +76590,7 @@ return {
         troyoff:T_ROYAL_OFF, troyoffcall:T_ROYAL_OFF_CALL,   // 0902 Card 2: THE BLUECOAT OFFICER + his call
         tcavalry:T_CAVALRY, tcavalryup:T_CAVALRY_POINT,   // 0902 Card 2: THE CAVALRYMAN — the seated rider · the point (the prance + the charge)
         tcannon:POPCANNON,
-        kbguard:T_ROYAL_ALLY, kbcannon:POPCANNON, kbcavalry:T_CAVALRY_ALLY, kbcavalryup:T_CAVALRY_ALLY_POINT, kbsteed:T_STEED_EB, kbsteedup:T_STEED_EB_POINT,   // 0909 THE EMPEROR'S COURT + THE STEED (the ally editions)
+        kbguard:T_ROYAL_ALLY, kbguardcharge:T_ROYAL_ALLY_CHARGE, kbcannon:POPCANNON, kbcavalry:T_CAVALRY_ALLY, kbcavalryup:T_CAVALRY_ALLY_POINT, kbsteed:T_STEED_EB, kbsteedup:T_STEED_EB_POINT,   // 0909 THE EMPEROR'S COURT + THE STEED (the ally editions)
         tcaptain:T_CAPTAIN, tcaptainbare:T_CAPTAIN_BARE, tcaptainhat:BICORNE_BIG,
         tbrig:T_BRIG, tbrigup:T_GENERAL_FR_BARE,
         tgen:T_GEN_STD, tgenup:T_GENERAL_FR_POINT, tgencape:T_GENERAL_FR,
@@ -76580,7 +76603,7 @@ return {
         tguardbear:'0 -20 120 160', tguardbeartat:'0 -20 120 160', tguardbearsalute:'0 -20 120 160',
         troyal:'0 -20 120 160', troyallead:'0 -20 120 160', troyalcharge:'0 -20 120 160', troyalleadcharge:'0 -20 120 160',   // 0829 cell C: the charge poses share the box · 0651: the bearskin's plume headroom
         tcavalry:'0 -20 120 160', tcavalryup:'0 -20 120 160',
-        kbguard:'0 -20 120 160', kbcavalry:'0 -20 120 160', kbcavalryup:'0 -20 120 160' },   // 0909: the ally editions share the bearskin's box
+        kbguard:'0 -20 120 160', kbguardcharge:'0 -20 120 160', kbcavalry:'0 -20 120 160', kbcavalryup:'0 -20 120 160' },   // 0909: the ally editions share the bearskin's box
   pb:{ coat:PB_BLUE, fur:PB_FUR, belly:PB_BELLY, plume:PB_PLUME, kingCoat:FR_BLUE, kingFur:FUR, kingBelly:CREAM, dukeCoat:DUKE_PLUM, crown:'#E8C24A', coronet:'#D9DEE6' }   // 0902 Card 3: the three riders' palette, read-only (GVT.bb().k3)   // 0902 Card 2: the cavalryman's bearskin (the same headroom on the saddle) (the guard's own crop)   // 0526: 20 units of headroom for the bearskin's plume (the feet stay seated — drawSprite anchors at the bottom, the width sets the scale)
 };
 })();
@@ -100997,10 +101020,10 @@ window.GVT = {
   tkCd2(v){ S.tkCd2=Math.max(0,+v||0); return S.tkCd2; },
   // ===== 0909 THE EMPEROR'S LADDER — the read door (the seat's one writer is heroMileSync; the court's one door kbCourtIn; the steed's kbSteedStart) =====
   em(id){ const u=(id!=null? S.units.find(q=>q.id===id) : S.units.find(q=>q.type==='kingbear'&&!q.dead))||null, led=heroMileLed('kingbear');
-    const court=S.units.filter(q=>q.kbOf!=null).map(q=>({ id:q.id, type:q.type, x:+q.x.toFixed(2), y:+q.y.toFixed(2), of:q.kbOf, dead:!!q.dead, hits:q.hits||0, cap:(S.bf?null:gritCap(q)), gift:!!q.ckGift, gait:+(q.gait||1).toFixed(4), ride:q.kbRide? { leg:q.kbRide.leg, mv:q.kbRide.mv, way:q.kbRide.way? [Math.round(q.kbRide.way.x),Math.round(q.kbRide.way.y),q.kbRide.way.charge] : null } : null, snake:q.snakeState||null, burrow:!!q.burrow }));
-    return { led:{ n:led.n|0, tk:(led.tk||[]).slice(), hp:led.hp|0, pk:(led.pk||[]).slice(), pend:led.pend|0, pq:(led.pq||[]).slice() }, deal:heroPickDeal('kingbear',led), seats:Object.keys(HERO_MILES), court:court,
-      u:u? { id:u.id, x:+u.x.toFixed(2), y:+u.y.toFixed(2), kills:u.kills|0, hits:u.hits||0, cap:(S.bf?null:gritCap(u)), hp:(u.hp==null?null:u.hp), hpMax:(u.hpMax==null?null:u.hpMax), mine:heroMine(u), mileHP:heroMileHP(u), hpPicks:kbHpPicks(u), sword:+kbSwordMul(u).toFixed(4), dmg:+kbHeroDmg(u).toFixed(4), dashR:kbDashROf(u), eye:kbEyeOf(u), has:{ battery:kbHas(u,'battery'), cavalry:kbHas(u,'cavalry'), guard:kbHas(u,'guard'), guard2:kbHas(u,'guard2'), steed:kbHas(u,'steed'), iron:kbHas(u,'iron') }, steedOn:kbSteedOn(u), ironOn:kbIronOn(u), born:!!u.kbBorn, court:!!u.kbCourt, cav:!!u.kbCav, mount:!!u.kbMount, saddle:u.kbSaddle||0, saddleHP:kbSaddleHP(u), unhorsed:u.kbUnhorsed|0, ride:u.kbRide? { leg:u.kbRide.leg, mv:u.kbRide.mv, rest:+(u.kbRide.rest||0).toFixed(3), pr:+(u.kbRide.pr||0).toFixed(3), way:u.kbRide.way? [Math.round(u.kbRide.way.x),Math.round(u.kbRide.way.y),u.kbRide.way.charge] : null } : null } : null,
-      consts:{ hp:KB_MILE_HP, hp40:KB_MILE_HP40, dmgPct:KB_MILE_DMG_PCT, dashM:KB_MILE_DASH_M, saddle:KB_SADDLE_HP, saddle100:KB_SADDLE_HP100, cavKills:KB_CAV_KILLS, steedAt:KB_STEED_AT, ironAt:KB_IRON_AT, file:KB_ROY_FILE_ALLY, bat:KB_ROY_BAT_ALLY, batN:KB_BAT_N_ALLY, tram:KB_ALLY_TRAM, trot:KB_STEED_TROT, cavTrot:KB_CAV_TROT, hold:KB_COURT_HOLD, sleeve:KB_ALLY_SLEEVE, dashR:KB_DASH_R, eye:KB_HERO_EYE, m:TK_M, ladKills:CK_LAD_KILLS, snakeKills:CK_SNAKE_KILLS, snakeAt:CK_SNAKE_AT, pickAt:CK_PICK_AT, bite:CK_SNAKE_BITE, snakeW:CK_SNAKE_W } }; },
+    const court=S.units.filter(q=>q.kbOf!=null).map(q=>({ id:q.id, type:q.type, x:+q.x.toFixed(2), y:+q.y.toFixed(2), of:q.kbOf, dead:!!q.dead, hits:q.hits||0, cap:(S.bf?null:gritCap(q)), gift:!!q.ckGift, gait:+(q.gait||1).toFixed(4), kills:q.kills|0, dashCd:(q.kbDashCd==null? null : +q.kbDashCd.toFixed(3)), hunt:q.kbHuntU? q.kbHuntU.type : null, wind:!!q.kbWind, dash:!!q.kbDash, by:q.coopBy||null, mods:!!q.coopMods, hex:q.coopHex||null, hero:kbHeroU(q), cd:kbDashCdOf(q), eye:kbEyeOf(q), win:kbDashROf(q), ride:q.kbRide? { leg:q.kbRide.leg, mv:q.kbRide.mv, way:q.kbRide.way? [Math.round(q.kbRide.way.x),Math.round(q.kbRide.way.y),q.kbRide.way.charge] : null } : null, snake:q.snakeState||null, burrow:!!q.burrow }));
+    return { wire:kbWireTok(), led:{ n:led.n|0, tk:(led.tk||[]).slice(), hp:led.hp|0, pk:(led.pk||[]).slice(), pend:led.pend|0, pq:(led.pq||[]).slice() }, deal:heroPickDeal('kingbear',led), seats:Object.keys(HERO_MILES), court:court,
+      u:u? { id:u.id, x:+u.x.toFixed(2), y:+u.y.toFixed(2), kills:u.kills|0, hits:u.hits||0, cap:(S.bf?null:gritCap(u)), hp:(u.hp==null?null:u.hp), hpMax:(u.hpMax==null?null:u.hpMax), mine:heroMine(u), mileHP:heroMileHP(u), hpPicks:kbHpPicks(u), sword:+kbSwordMul(u).toFixed(4), dmg:+kbHeroDmg(u).toFixed(4), dashR:kbDashROf(u), eye:kbEyeOf(u), has:{ battery:kbHas(u,'battery'), cavalry:kbHas(u,'cavalry'), guard:kbHas(u,'guard'), guard2:kbHas(u,'guard2'), steed:kbHas(u,'steed'), iron:kbHas(u,'iron') }, coopHM:u.coopHM||null, tkOf:kbTkOf(u).slice(), by:u.coopBy||null, hex:u.coopHex||null, steedOn:kbSteedOn(u), ironOn:kbIronOn(u), born:!!u.kbBorn, court:!!u.kbCourt, cav:!!u.kbCav, mount:!!u.kbMount, saddle:u.kbSaddle||0, saddleHP:kbSaddleHP(u), unhorsed:u.kbUnhorsed|0, ride:u.kbRide? { leg:u.kbRide.leg, mv:u.kbRide.mv, rest:+(u.kbRide.rest||0).toFixed(3), pr:+(u.kbRide.pr||0).toFixed(3), way:u.kbRide.way? [Math.round(u.kbRide.way.x),Math.round(u.kbRide.way.y),u.kbRide.way.charge] : null } : null } : null,
+      consts:{ guardBlade:KB_GUARD_BLADE, guardHuntX:KB_GUARD_HUNT_X, guardCut:KB_GUARD_CUT, royCd:KB_ROY_DASH_CD, royR:KB_ROY_DASH_R, royStag:KB_ROY_STAG, huntCut:KB_HUNT_CUT, heroSpd:KB_HERO_SPD, hp:KB_MILE_HP, hp40:KB_MILE_HP40, dmgPct:KB_MILE_DMG_PCT, dashM:KB_MILE_DASH_M, saddle:KB_SADDLE_HP, saddle100:KB_SADDLE_HP100, cavKills:KB_CAV_KILLS, steedAt:KB_STEED_AT, ironAt:KB_IRON_AT, file:KB_ROY_FILE_ALLY, bat:KB_ROY_BAT_ALLY, batN:KB_BAT_N_ALLY, tram:KB_ALLY_TRAM, trot:KB_STEED_TROT, cavTrot:KB_CAV_TROT, hold:KB_COURT_HOLD, sleeve:KB_ALLY_SLEEVE, dashR:KB_DASH_R, eye:KB_HERO_EYE, m:TK_M, ladKills:CK_LAD_KILLS, snakeKills:CK_SNAKE_KILLS, snakeAt:CK_SNAKE_AT, pickAt:CK_PICK_AT, bite:CK_SNAKE_BITE, snakeW:CK_SNAKE_W } }; },
   // ===== 0463 the milestone hook + the king's progression — read doors (the
   // grant door is heroMileSync, reached through rank()/the real pick) =====
   heroMile(k){ k=k||'kingyeti'; const led=heroMileLed(k);
