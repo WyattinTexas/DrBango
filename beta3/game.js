@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.94.0';
+const BUILD = 'STARSPELL v0.95.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -560,6 +560,11 @@ const SS = {
     // hard mode's per-sign tick memory (v0.70.0): the picker's box remembers
     // each sign's choice across campaigns ('none' = THE OPEN SKY's own)
     p.hardPick = (p.hardPick && typeof p.hardPick === 'object') ? p.hardPick : {};
+    // the deck's memory (v0.95.0): the sign each door's last climb was BEGUN
+    // under — a zodiac id or 'none' (THE OPEN SKY); anything else (a retired
+    // id, a hand-edited profile) forgets rather than breaks
+    if (!(p.lastSign === 'none' || SS_ZODIAC_BY[p.lastSign])) delete p.lastSign;
+    if (!(p.lastSignEnd === 'none' || SS_ZODIAC_BY[p.lastSignEnd])) delete p.lastSignEnd;
     // star rating: every profile that predates it starts at the baseline
     p.rating = Number.isFinite(p.rating) ? Math.round(p.rating) : 1000;
     p.rhide = !!p.rhide;                                   // veil my rating from others
@@ -655,6 +660,9 @@ const SS = {
       // flag's jar (v0.77.0) — the rating card reads both off this row
       endlessBest: this.prof.endless.bestLevel, endlessScore: this.prof.endless.bestScore,
       flagColor: this.prof.flag,
+      // the deck's memory (v0.95.0) rides with the rest of prof, so the sky
+      // row keeps the last sign each door was begun under (null = never)
+      lastSign: this.prof.lastSign || null, lastSignEnd: this.prof.lastSignEnd || null,
     });
   },
   has(id) { return !!this.prof.ach[id]; },
@@ -4208,6 +4216,20 @@ function ssCampSign() {
   return SS_ZODIAC_BY[v] ? v : null;
 }
 function ssCampSignChosen() { return localStorage.getItem('beta3.campsign') != null; }
+/* THE DECK REMEMBERS (v0.95.0, Skylar 9/10): the sign a climb is BEGUN under
+   outlives the climb. endRun's books wipe the door pins with the checkpoint
+   (ssClearCampaign / ssClearEndless) — which is exactly why a finished
+   campaign used to forget — so the memory lives in prof instead: one small
+   field per door (lastSign / lastSignEnd), written at the picker's BEGIN,
+   riding the normal profile sync. The picker OPENS standing on the
+   remembered card; 'none' (THE OPEN SKY) is a remembered choice too and
+   simply opens the deck at slot 0, exactly as a never-begun profile does. */
+function ssRememberSign(forMode, id) {
+  const key = forMode === 'endless' ? 'lastSignEnd' : 'lastSign';
+  if (SS.prof[key] === id) return;
+  SS.prof[key] = id;
+  SS.save();
+}
 
 /* ---- HARD MODE (v0.70.0) -------------------------------------------------
    The campaign's hard pin — set by the picker's tick box at BEGIN, living
@@ -6725,7 +6747,9 @@ class Home extends Phaser.Scene {
      art, ZODIAC-ART.md) and falls back to the asterism drawn large on a
      night-sky wash, so the real art drops in per sign with no relayout.
      The choice is pinned for the whole campaign (beta3.campsign) and
-     cleared with it. */
+     cleared with it — and since v0.95.0 ALSO remembered past the campaign
+     in prof (ssRememberSign), so the next fresh climb's deck opens standing
+     on the sign the last one was begun under. */
   signSheet(forMode) {
     if (this.busy() || this.signC || this.mapC || this.dailyC || this.langC || this.confirmC) return;
     // the picker serves two climbs (v0.68.0): the campaign pins its sign and
@@ -6927,7 +6951,14 @@ class Home extends Phaser.Scene {
     mg.fillStyle(0xffffff, 1);
     mg.fillRoundedRect(l.x(-CW / 2), l.y(CY - CH / 2), l.u(CW), l.u(CH), l.u(16));
     strip.setMask(mg.createGeometryMask());
-    let cur = 0, moving = false;
+    /* THE DECK REMEMBERS (v0.95.0): a fresh climb's picker stands on the
+       sign the LAST climb was begun under (per door — the campaign and
+       endless memories are separate fields). THE OPEN SKY keeps slot 0 and
+       only the OPENING index moves, so arrows/swipe/wrap are untouched; a
+       memory of 'none' — or no memory at all — opens at slot 0 as ever. */
+    const remembered = this.signFor === 'endless' ? SS.prof.lastSignEnd : SS.prof.lastSign;
+    const remIdx = remembered ? deck.findIndex((d) => d.id === remembered) : -1;
+    let cur = remIdx > 0 ? remIdx : 0, moving = false;
     const cards = { prev: null, cur: null, next: null };
     const place = () => {
       cards.prev.x = -l.u(STRIDE); cards.cur.x = 0; cards.next.x = l.u(STRIDE);
@@ -7008,6 +7039,7 @@ class Home extends Phaser.Scene {
         // pin the endless climb's sign and rise at once — the ladder has no
         // chart; its map is the level counter itself
         try { localStorage.setItem('beta3.endsign', id); } catch (e) { }
+        ssRememberSign('endless', id);   // the choice outlives the climb (v0.95.0)
         closeSheet();
         this.bloomBtn = this.rowBtns && this.rowBtns.endless;
         this.startMode('endless');
@@ -7022,6 +7054,7 @@ class Home extends Phaser.Scene {
         if (SS.prof.hardPick[id]) localStorage.setItem('beta3.camphard', '1');
         else localStorage.removeItem('beta3.camphard');
       } catch (e) { }
+      ssRememberSign('campaign', id);    // the choice outlives the campaign (v0.95.0)
       closeSheet();
       this.mapSheet();
     };
@@ -9897,8 +9930,8 @@ class Battle extends Phaser.Scene {
       // NEW CAMPAIGN asks the stars again — and CLIMB AGAIN keeps the
       // endless sign the same way (endRun's books wiped the pin with the
       // checkpoint, so the retry re-pins the identity it climbed under)
-      if (this.mode === 'campaign' && this.sign) { try { localStorage.setItem('beta3.campsign', this.sign); } catch (e) { } }
-      if (isEnd && this.sign) { try { localStorage.setItem('beta3.endsign', this.sign); } catch (e) { } }
+      if (this.mode === 'campaign' && this.sign) { try { localStorage.setItem('beta3.campsign', this.sign); } catch (e) { } ssRememberSign('campaign', this.sign); }
+      if (isEnd && this.sign) { try { localStorage.setItem('beta3.endsign', this.sign); } catch (e) { } ssRememberSign('endless', this.sign); }
       // …and a hard climb retries HARD (the books wiped the pin with the
       // checkpoint; the retry keeps the challenge it was taken under)
       if (this.mode === 'campaign' && this.hard) { try { localStorage.setItem('beta3.camphard', '1'); } catch (e) { } }

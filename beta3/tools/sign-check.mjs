@@ -153,7 +153,8 @@ const boot = async (dv, inset, extra) => {
   // exists() precedence), and — since v0.58.0 ships real art for all 12 —
   // ARIES's plate BLOCKED once it lands, so the asterism fallback still walks
   await until(`typeof SSART !== 'undefined' && !!SSART.img.zod_aries`, 20000);
-  await ev(`(() => { ssClearCampaign(); SS.prof.signs = SS.prof.signs || {}; SS.prof.signs.leo = { best: 1234, clears: 2, runs: 3 }; SS.save();
+  await ev(`(() => { ssClearCampaign(); SS.prof.signs = SS.prof.signs || {}; SS.prof.signs.leo = { best: 1234, clears: 2, runs: 3 };
+    delete SS.prof.lastSign; delete SS.prof.lastSignEnd; SS.save();   // v0.95.0: each boot deals a memory-less deck (the MEMORY section writes its own)
     const s = ${H}; if (!s.textures.exists('zod_taurus')) { const t = s.textures.createCanvas('zod_taurus', 40, 60); t.context.fillStyle = '#ff00aa'; t.context.fillRect(0, 0, 40, 60); t.refresh(); }
     delete SSART.img.zod_aries; if (s.textures.exists('zod_aries')) s.textures.remove('zod_aries'); return 1 })()`);
   await sleep(600);
@@ -249,7 +250,13 @@ await ev(`game.scene.getScene('battle').scene.start('home')`);
 ok('home stands again', await until(HOME_REST, 60000));
 await ev(`ssClearCampaign()`);
 await sleep(400);
-ok('NEW GAME opens the sheet again, on THE OPEN SKY', await open() && (await peek()).id === 'none');
+// v0.95.0 THE DECK REMEMBERS: the LEO begun above outlives its own wipe —
+// the reopened sheet STANDS on the remembered card (settled), and the walk
+// back to slot 0 is five real ‹ taps (the deck itself is unchanged)
+ok('NEW GAME reopens the sheet STANDING on LEO (the deck remembers the begun sign)', await open() && await ev(`(() => { const p = ${H}.signPeek(); return p.id === 'leo' && p.cur === 5 && !p.moving && Math.abs(p.x) < 1 })()`), JSON.stringify(await peek()));
+const alm = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
+for (let i = 0; i < 5; i++) { await touch(alm.x, alm.y); await until(STILL, 3000); }
+ok('five ‹ taps walk home to THE OPEN SKY (slot 0 kept)', (await peek()).id === 'none' && (await peek()).cur === 0, JSON.stringify(await peek()));
 const bp2 = await css(`${H}.signC.list.find(o => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`);
 ok('BEGIN on the first card pins none and opens the chart', await touchUntil(bp2, `!${H}.signC && !!${H}.mapC && localStorage.getItem('beta3.campsign') === 'none'`, 6), await ev(`localStorage.getItem('beta3.campsign')`));
 await ev(`${H}.scene.start('battle', { mode: 'campaign', resume: null })`);
@@ -388,6 +395,87 @@ for (const dv of [{ name: 'iPhone SE', w: 375, h: 667, dpr: 2, inset: '0,0' }, {
   await judge(dv.name + ' · virgo');
   ok('no page exceptions', errs.length === 0, errs.slice(0, 2).join(' | '));
 }
+
+/* ---------- v0.95.0 THE DECK REMEMBERS YOUR SIGN ---------- */
+// The sign a climb is BEGUN under is written to prof at the picker's BEGIN
+// (lastSign / lastSignEnd, one per door) and outlives endRun's books —
+// ssClearCampaign wipes the PIN, never the memory — so a finished
+// campaign's NEW GAME opens the deck standing on the sign you played.
+// 'none' and no-memory both open slot 0; the two doors remember apart.
+console.log('\n━━ THE DECK REMEMBERS (v0.95.0) — a finished climb\'s next picker stands on the sign it was begun under');
+ok('home stands (memory walk)', await boot({ w: 393, h: 852, dpr: 3 }, '59,34'));
+ok('a never-begun profile opens on THE OPEN SKY', await open() && (await peek()).id === 'none' && (await peek()).cur === 0, JSON.stringify(await peek()));
+const arM = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '›')`);
+for (let i = 0; i < 5; i++) { await touch(arM.x, arM.y); await until(STILL, 3000); }
+ok('five › land on LEO', (await peek()).id === 'leo', JSON.stringify(await peek()));
+const bpM = await css(`${H}.signC.list.find(o => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`);
+ok('BEGIN pins leo AND writes the memory (prof.lastSign = leo)', await touchUntil(bpM, `!${H}.signC && !!${H}.mapC && localStorage.getItem('beta3.campsign') === 'leo' && SS.prof.lastSign === 'leo'`, 6), await ev(`SS.prof.lastSign`));
+// drive the run to a REAL endRun (a defeat): the books wipe the pin with
+// the checkpoint — the memory must ride through them untouched. endRun and
+// the after-state read in ONE atomic eval (the double-book law).
+await ev(`${H}.scene.start('battle', { mode: 'campaign', resume: null })`);
+ok('the LEO run stands for its fall', await until(`(() => { const b = game.scene.getScene('battle'); return game.scene.isActive('battle') && b.state === 'pick' && b.sign === 'leo' })()`, 60000));
+const books = await evj(`JSON.stringify((() => { const b = game.scene.getScene('battle'); b.endRun(false);
+  return { pin: localStorage.getItem('beta3.campsign'), mem: SS.prof.lastSign, memEnd: SS.prof.lastSignEnd || null } })())`);
+ok('endRun\'s books wipe the pin, the memory survives (campsign gone · lastSign leo · endless side untouched)', books.pin === null && books.mem === 'leo' && books.memEnd === null, JSON.stringify(books));
+await ev(`game.scene.getScene('battle').scene.start('home')`);
+ok('home stands after the fall', await until(HOME_REST, 60000));
+ok('NEW GAME opens the picker STANDING on LEO — settled, not mid-slide', await open() && await ev(`(() => { const p = ${H}.signPeek(); return p.id === 'leo' && p.cur === 5 && !p.moving && Math.abs(p.x) < 1 })()`), JSON.stringify(await peek()));
+await judge('16 · remembered leo');
+ok('the remembered deck is the same deck — ‹ steps to CANCER, › returns to LEO (wrapless walk intact)', await (async () => {
+  const alx = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
+  await touch(alx.x, alx.y); await until(STILL, 3000);
+  if ((await peek()).id !== 'cancer') return false;
+  const arx = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '›')`);
+  await touch(arx.x, arx.y); await until(STILL, 3000);
+  return (await peek()).id === 'leo';
+})(), JSON.stringify(await peek()));
+const bpM2 = await css(`${H}.signC.list.find(o => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`);
+ok('BEGIN on the remembered card re-pins leo', await touchUntil(bpM2, `!${H}.signC && !!${H}.mapC && localStorage.getItem('beta3.campsign') === 'leo'`, 6));
+// a cold reload: the memory lives in beta3.profile, so a fresh boot keeps it
+await send('Page.navigate', { url: BASE + `?rend=cv&fps=0&diag=1&mpuid=sign${Math.floor(Math.random() * 1e6)}&inset=59,34` });
+await sleep(1500);
+ok('home stands after a cold reload', await until(HOME_REST, 90000));
+ok('…and the reopened picker STILL stands on LEO (the memory rode the reboot)', await open() && (await peek()).id === 'leo' && await ev(`SS.prof.lastSign === 'leo'`), JSON.stringify(await peek()));
+// an open-sky begin is remembered as the open sky — and opens at slot 0
+const alM = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
+for (let i = 0; i < 5; i++) { await touch(alM.x, alM.y); await until(STILL, 3000); }
+const bpM3 = await css(`${H}.signC.list.find(o => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`);
+ok('BEGIN on THE OPEN SKY writes the memory as none', await touchUntil(bpM3, `!${H}.signC && !!${H}.mapC && localStorage.getItem('beta3.campsign') === 'none' && SS.prof.lastSign === 'none'`, 6), await ev(`SS.prof.lastSign`));
+await ev(`(() => { const h = ${H}; if (h.mapC) { h.mapC.destroy(); h.mapC = null; } ssClearCampaign(); return 'ok' })()`);
+await sleep(400);
+ok('a remembered open sky opens at slot 0, exactly as before', await open() && (await peek()).id === 'none' && (await peek()).cur === 0, JSON.stringify(await peek()));
+// THE ENDLESS MIRROR: the ladder's door keeps its OWN memory (lastSignEnd)
+const xM = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '✕')`);
+ok('✕ closes the campaign sheet for the endless walk', await touchUntil(xM, `!${H}.signC`, 6));
+ok('the ENDLESS picker opens on THE OPEN SKY (its memory still unwritten)', await (async () => {
+  const ep = await css(`${H}.rowBtns.endless`);
+  if (!(await touchUntil(ep, SHEET, 8))) return false;
+  await until(STILL, 5000); await sleep(450);
+  return (await peek()).id === 'none';
+})(), JSON.stringify(await peek()));
+const arE = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '›')`);
+await touch(arE.x, arE.y); await until(STILL, 3000);
+const bpE = await css(`${H}.signC.list.find(o => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`);
+ok('BEGIN on ARIES rises at once and writes the ENDLESS memory apart (lastSignEnd aries · lastSign still none)', await touchUntil(bpE, `(() => { const b = game.scene.getScene('battle'); return !!b && b.scene.isActive() && b.mode === 'endless' && SS.prof.lastSignEnd === 'aries' && SS.prof.lastSign === 'none' })()`, 6), await ev(`JSON.stringify([SS.prof.lastSign, SS.prof.lastSignEnd])`));
+ok('the climb stands for its fall', await until(`(() => { const b = game.scene.getScene('battle'); return game.scene.isActive('battle') && b.state === 'pick' })()`, 60000));
+const ebooks = await evj(`JSON.stringify((() => { const b = game.scene.getScene('battle'); b.endRun(false);
+  return { pin: localStorage.getItem('beta3.endsign'), mem: SS.prof.lastSignEnd } })())`);
+ok('the endless books wipe endsign, the endless memory survives', ebooks.pin === null && ebooks.mem === 'aries', JSON.stringify(ebooks));
+await ev(`game.scene.getScene('battle').scene.start('home')`);
+ok('home stands (after the endless fall)', await until(HOME_REST, 60000));
+ok('the ENDLESS door reopens STANDING on ARIES — and the campaign door still opens on its own memory (the open sky)', await (async () => {
+  const ep = await css(`${H}.rowBtns.endless`);
+  if (!(await touchUntil(ep, SHEET, 8))) return false;
+  await until(STILL, 5000); await sleep(450);
+  const pe = await peek();
+  if (!(pe.id === 'aries' && pe.cur === 1 && !pe.moving)) return false;
+  const xr = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '✕')`);
+  if (!(await touchUntil(xr, `!${H}.signC`, 6))) return false;
+  if (!(await open())) return false;
+  return (await peek()).id === 'none' && (await peek()).cur === 0;
+})(), JSON.stringify(await peek()));
+ok('no page exceptions through the memory walk', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 for (const k of kids) { try { k.kill(); } catch (e) { } }

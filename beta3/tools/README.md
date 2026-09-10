@@ -2,6 +2,44 @@
 
 Thirty-three scripts, all dev-only — nothing here ships to the browser.
 
+## sign-check.mjs grows — THE DECK REMEMBERS YOUR SIGN (v0.95.0)
+
+Skylar's call (9/10): "When the players finishes a campaign and opens a new
+campaign it should open on the last sign that they played with." The game
+side: the sign a climb is BEGUN under is written to prof at the picker's
+BEGIN (`ssRememberSign` — `lastSign` for the campaign door, `lastSignEnd`
+for the endless door, both riding the normal `SS.sync()` row), and endRun's
+books wipe only the door PINS (`ssClearCampaign`/`ssClearEndless`), never
+the memory — so a fresh climb's picker opens standing on the remembered
+card. THE OPEN SKY keeps slot 0 and only the OPENING index moves ('none'
+and no-memory both open slot 0); the end-screen retry re-pin sites mirror
+the memory too, healing pre-v0.95 runs.
+
+sign-check.mjs 103→129: one re-aim + the DECK REMEMBERS section. The
+re-aim is the flow the card predicted: after §1's BEGIN under LEO, the
+"opens again on THE OPEN SKY" pin became "reopens STANDING on LEO" plus
+five real ‹ taps walking home before the pins-none check. The new section
+walks the whole law by real DPR-3 taps: a never-begun profile opens slot 0
+→ BEGIN under LEO writes the memory → a REAL `endRun(false)` (books read
+in the SAME atomic eval — the double-book law) wipes campsign while the
+memory survives → NEW GAME stands settled on LEO (id/cur/x/moving pinned,
+layout judged) → the deck walks normally from the remembered index →
+BEGIN re-pins leo → a cold reload keeps it (beta3.profile) → an open-sky
+BEGIN is remembered as 'none' and opens slot 0 → the ENDLESS door writes
+its memory APART (aries beside the campaign's none), survives its own
+books, reopens standing on ARIES while the campaign door still opens on
+its own. Every boot() now deals a memory-less deck (`delete
+SS.prof.lastSign/lastSignEnd` in the seed) so aborted-run leftovers can
+never fabricate a red. signlevel-check (86), hard-check (108),
+endless-check (95) and ftue-check (73) passed with ZERO edits — every
+id-sensitive picker open in those suites follows a `localStorage.clear()`
+or whole-profile overwrite, and the per-door field split keeps
+signlevel's endless-door check on slot 0.
+
+```
+node tools/sign-check.mjs   # 129 checks, ~7 min
+```
+
 ## sign-check.mjs grows — CHOOSE YOUR SIGN goes full-bleed (v0.79.0)
 
 Skylar's call (9/2): keep the two arrows, remove everything else around the
