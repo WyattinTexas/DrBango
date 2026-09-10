@@ -43004,6 +43004,9 @@ function hardBotDue(team){ const r=wrRec(team), n=r.w+r.l;
 // card C's. A type the player never owned has no row and fields at stock
 // rank (there is no "your rank" to promote — the muscle muls still land).
 function hardRanks(){ const up={}; for(const k of ownedUnits()) up[k]=Math.min(RANK_MAX,(META.up[k]|0)+HARD_RANK_UP); return up; }
+// 0917 THE BRASS ON THE TORCH'S COMPUTER (design/gauntlet-0907/00-DESIGN.md §9.3; Wyatt 9/10: "raise the difficulty of the cpu opponents. Make sure the units the cpu attacks you with are mostly higher level"): the Gauntlet's own brass table — EVERY type the computer can field walks on at max(your rank in it, your average owned rank) + GA_RANK_UP, capped RANK_MAX (a type you never ranked is never stock); the torch's computer rides the whole 0417/0418 hard package through startBattlefield's gate (gaCpu). ⚑ Q4 10 = 0418's original number (0421 measured the FARMER's bot down to 3; the arena is where the cheat is sanctioned) · ⚑ Q5 the floor = the average.
+const GA_RANK_UP=10;
+function gaRanks(){ const own=ownedUnits(), avg=own.length? Math.round(own.reduce((s,k)=>s+(META.up[k]|0),0)/own.length) : 0, up={}; for(const k of BF_TYPES) up[k]=Math.min(RANK_MAX, Math.max(META.up[k]|0, avg)+GA_RANK_UP); return up; }
 // 0411: the embargo predicate — hardSmartU's sibling in seat form. Answers
 // "is THIS seat's hand quiet right now": the hard cell's foe seats, and
 // (⚑ HARD_VEH_T0_AWAY) the away captain's one chair — the only wallets
@@ -43628,7 +43631,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.20';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.21';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -44639,6 +44642,7 @@ function coopOnPoll(r, sentWant){
       if(typeof r.map==='string' && r.map && !COOP.wantMap) COOP.map=r.map;
       const mine=(COOP.members||[]).find(m=>m.seat===COOP.seat);
       if(mine && !COOP.wantSide){ COOP.side=mine.side||'y'; COOP.slot=mine.slot|0; }
+      if(r.ga && typeof r.ga==='object' && !COOP.ga && COOP.code){ COOP.ga={ code:COOP.code, name:String(r.ga.name||'A COMMANDER'), uid:r.ga.uid||null, pd:1 }; COOP.duelOpp=r.ga.uid||null; if(S.coop && S.mode==='play' && S.bf && S.bf.room && !S.bf.torch){ S.bf.torch=1; S.ann=GA.hold? gaBanner(COOP.ga.name) : gaBannerChal(COOP.ga.name); SFX.horn(); } }   // 0909 THE PARTY DUEL IS A TORCH FIGHT (design/gauntlet-0907/CARD-PARTY-DUEL.md; Wyatt 9/9 21:34: "Someone in my party just challenged me for the torch, and they won… it didn't give them the torch"): HQ v65 flags the torch's own room on the room poll {name, uid, hold} — adopted ONCE into COOP.ga (the 0896 seat law's door: gaTorchFight → the loser's face without retry, the cards, the beat, the away word) + duelOpp for /rated; the belt: a flag landing mid-fight stamps the torch + says the banner then (the flip's reply lands before the launch — roomStartBattle says it); an older HQ sends none
       // 0328 (item 3): the party keeps one free chair ahead of the next
       // accept (the shipped optimistic stepper, automated) and repaints its
       // rectangle when the roster or the table moves — never over a queue.
@@ -51444,7 +51448,7 @@ function roomStartBattle(){
   const ppl=Math.max(1,(COOP.members||[]).length);
   if(COOP.bd) S.ann={ txt:tf(ppl===1? 'THE BATTLE OF THE DESERT · %1 v %1 · %2 REAL COMMANDER'   // 0824-LATE II: the desert says its own name, at its fielded size
                                    : 'THE BATTLE OF THE DESERT · %1 v %1 · %2 REAL COMMANDERS', bdFielded(S.bf), ppl), t:3.0 };
-  else if(COOP.ga) S.ann=gaBanner(COOP.ga.name);   // 0879 THE GAUNTLET: the torch's banner (the other's name)
+  else if(COOP.ga) S.ann=GA.hold? gaBanner(COOP.ga.name) : gaBannerChal(COOP.ga.name);   // 0879 THE GAUNTLET: the torch's banner (the other's name) · 0909 (⚑ Q2): the seat that does not hold says CHALLENGING %1 FOR THE TORCH (0904's key) — the party duel's member and the tile road's challenger alike
   else S.ann={ txt:tf(ppl===1? 'PRIVATE BATTLE · %1 v %1 · %2 REAL COMMANDER'
                         : 'PRIVATE BATTLE · %1 v %1 · %2 REAL COMMANDERS', team, ppl), t:3.0 };
   SFX.horn();
@@ -52243,8 +52247,9 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   // exclusion note missed that door; verified at fire). !rookie is
   // arithmetic (HARD_GAMES 10 > BF_ROOKIE_GAMES 4) — asserted anyway, per
   // the contract.
-  const hard=!diffOverride && !coopLaunching && !rookie && (team===1||team===2)
-    && riv.id!=='nemesis' && seats.every(st=>!st.human||st.me) && hardBotDue(team);
+  const gaCpu=!!(rivX && rivX.id==='ga');   // 0917 THE BRASS ON THE TORCH'S COMPUTER: the Gauntlet's knock and the challenge to a computer holder (gaFightCPU's rival alone) take the hard package below — the explicit 'hard' had bypassed this gate since 0879, so the torch's computer fielded stock men
+  const hard=gaCpu || (!diffOverride && !coopLaunching && !rookie && (team===1||team===2)
+    && riv.id!=='nemesis' && seats.every(st=>!st.human||st.me) && hardBotDue(team));
   if(hard) diff='hard';
   for(const st of seats){ st.purse=BF_START; st.tagT=0; st.mir=(st.team==='you');
     buildUnitTint(st.hex);
@@ -52315,7 +52320,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   if(hard){
     const duel=Math.random()<0.5;
     const hcol=duel? HARD_CRYSTALS[(Math.random()*HARD_CRYSTALS.length)|0] : null;
-    S.bf.hard={ up:hardRanks(), kitW:(duel?'lightsaber':'sniper'), col:hcol,
+    S.bf.hard={ up:(gaCpu? gaRanks() : hardRanks()), kitW:(duel?'lightsaber':'sniper'), col:hcol,   // 0917: the torch's computer wears the Gauntlet's own brass table
       mo:(duel? ['telekinesis'] : ['outlawsniper','flamestrike']),
       tkCd:HARD_T0, snpCd:HARD_T0, gsCd:HARD_T0, rpCd:HARD_T0, fsCd:HARD_T0, sgId:0 };
     const hcap=S.bf.seats[team];
@@ -85064,7 +85069,7 @@ function torchSVG(state, extra){
     + '<g class="ga-fl"><g transform="translate(0,-4) scale(2)"><path d="' + GA_FLAME + '" fill="#FFD24A"/><path d="' + GA_CORE + '" fill="#FFF3C4" opacity=".85"/></g></g>'
     + '</svg>';
 }
-const GA_POLL_MS=3000, GA_STARS=10, GA_WAIT_MS=90000, GA_LOBBY_MS=60000, GA_CHAMP=200;   // the holder's beat (HQ's GA_POLL_MS; nx stretches it) · the pay (HQ's GA_STARS — the tile's word) · the challenger's wait (HQ's GA_WAIT) · 0896: the pulled holder's lobby hold (ROOM_STALE 45 + the beat + slack — it outlives the prune window, ⚑ Q2)
+const GA_POLL_MS=3000, GA_STARS=20, GA_WAIT_MS=90000, GA_LOBBY_MS=60000, GA_CHAMP=200;   // the holder's beat (HQ's GA_POLL_MS; nx stretches it) · the pay (HQ's GA_STARS — the tile's word; 0917 TWENTY, Wyatt 9/10: "raise the stars amount to 20 stars per hour" — was 10 since 0879) · the challenger's wait (HQ's GA_WAIT) · 0896: the pulled holder's lobby hold (ROOM_STALE 45 + the beat + slack — it outlives the prune window, ⚑ Q2)
 let GA={ hold:0, pend:null, wait:null, t:0, wt:0, busy:false, nx:0, flash:0, title:'', head:'', after:null, asked:0, fol:null, say:0, waitMs:0, lobbyT:0, q:null, qt:0, game0:0, quiet:10, left:0 };   // 0898: q = the line's window (the pill without a room), qt = the wait beat's timer, game0 = my own game's start (the beat's `game`), quiet = HQ's OFFLINE window, left = the hide beacons sent (the rig)   // 0896: lobbyT = when the pulled holder's hold lapses (the rig reads it)
 function gaShell(){ return bdInShell(); }
 function gaWaitMs(){ return GA.waitMs||GA_WAIT_MS; }
@@ -85216,6 +85221,10 @@ function gaRand(seed){ let s=(seed>>>0)||1; return ()=>{ s=(s*1664525+1013904223
 // ═══ 0904 THE COMPUTER HOLDS THE TORCH (design/gauntlet-0907/CARD-CPU-HOLDS.md; Wyatt 9/8 ~22:00 ET: "if defeated by a cpu; the cpu should hold the torch; acting like a
 // real person"): server v63 owns the truth (the computer takes the torch on the knock's win, holds it like anyone, answers a challenge with the fight AT ONCE, rolls its 30 %
 // log-off, logs off at its session's end); the client fights the same hard brain on its own screen either way — as the HOLDER (the knock) or as the CHALLENGER. ═══
+// ═══ 0917 THE THREE DIALS (design/gauntlet-0907/CARD-THREE-DIALS.md + 00-DESIGN.md §9; Wyatt 9/10/2026 ~13:35 ET, typed: "it shows you how many total wins they have. Instead, they need to
+// show you how many wins they have this day … raise the stars amount to 20 stars per hour & raise the difficulty of the cpu opponents. Make sure the units the cpu attacks you with are
+// mostly higher level"): THE DAY'S WINS on the square (gaNumsHTML + the MINE face: N WINS TODAY — hw, THE CHAMPION's column), TWENTY (GA_STARS 20 with HQ v66), THE BRASS (the fight
+// below rides startBattlefield's hard package + gaRanks — every man the computer fields ten ranks above yours). 0909's party-duel client cells ride this bump (coopOnPoll · roomStartBattle). ═══
 function gaFightCPU(cpu, asChal){   // the knock (asChal false: the holder defends) or the challenge to a computer holder (asChal true); HQ's persona when present, minted off the seed when absent (a v62 HQ)
   if(!cpu || S.mode!=='menu' || BFQ || S.coop || coopLaunching || GA.wait || (asChal? GA.hold : !GA.hold)) return false;
   const rnd=gaRand(cpu.seed|0); const mn=mintCallsign(rnd); const ar=ARMIES[(rnd()*ARMIES.length)|0];
@@ -85299,7 +85308,7 @@ function gaTileHTML(){   // THE SQUARE (⚑ Q1 A THE HEARTH · Q7 two lines, the
   const g=EV.ga; if(!g) return '';   // no `ga` on the reply (an older HQ) → no square: byte-what-it-was
   const st=gaState(), nm=escH(String(g.name||'').toUpperCase().slice(0,12));
   let cls, art, n, small, who='';
-  if(st==='mine'){ cls='mine'; art='mine'; n='<span id="gaClock">'+gaClockTxt()+'</span>'; small=escH(TXT('TORCH VICTORIES'))+' '+Math.max(META.tv|0, g.tv|0, g.htv|0)+(typeof g.hw==='number'? ' · '+escH(tf('%1 WINS TODAY', g.hw|0)) : '')+((g.q|0)>0? ' · '+escH(tf('%1 WAITING', g.q|0)) : ''); who=menuSargeURI(dyeHex()||'#7FA35C'); }   // ⚑ Q12 my own Sarge off the save (always current, nothing on the wire)
+  if(st==='mine'){ cls='mine'; art='mine'; n='<span id="gaClock">'+gaClockTxt()+'</span>'; small=escH(tf('%1 WINS TODAY', g.hw|0))+((g.q|0)>0? ' · '+escH(tf('%1 WAITING', g.q|0)) : ''); who=menuSargeURI(dyeHex()||'#7FA35C'); }   // ⚑ Q12 my own Sarge off the save (always current, nothing on the wire) · 0917 THE DAY'S WINS (⚑ Q1): MINE reads N WINS TODAY too — the lifetime count left the square (the RECORD line beside it keeps it)
   else if(st==='held'){ cls=g.beaten? 'held beaten' : 'held'; art='live'; n=escH(tf('HELD BY %1', nm)); small=(g.beaten? escH(tf('%1 BEAT YOU · CHALLENGE THE NEXT HOLDER', nm)) : '⚔ '+escH(TXT('CHALLENGE FOR THE TORCH'))+gaNumsHTML(g)); who=gaWhoURI(g.look); }   // H ⚑ J1: the BEATEN face = the contract's TWO lines (§6.1.4; the sheet measured 3 small lines at 96) — the 0898 numbers ride HELD, not BEATEN (six lines ate the hearth at the phone size)   // 0896's sixth reading · REV 2 the holder's Sarge off the bag
   else if(st==='busy'){ cls='busy'; art='live'; n=escH(TXT('A TORCH FIGHT IS ON')); small=escH(tf('HELD BY %1', nm))+gaNumsHTML(g); who=gaWhoURI(g.look); }
   else if(st==='off'){ cls='off'; art='ash'; n=escH(TXT('OUT FOR TODAY')); small=escH(tf('BACK AT %1', gaHourTxt(g.ends))); }
@@ -85333,6 +85342,10 @@ function drawTorch(cx,x,y,h,t){
 // walk-out laws, THE REMATCH BAN's 409 beaten + `beaten` on the bag); the client's five laws ride here.
 let AD_LAST=null;   // the rig's window on the verdict gate's last decision {brk, immune, hold, t} — runtime, never saved
 function adImmune(){ return adFree() || !!GA.hold; }   // THE HOLDER'S IMMUNITY: the GATES read this (the verdict exit's break; the rewarded set); the shop's NO ADS faces keep adFree() — a holder is still offered the purchase. Ends the tick the torch is lost (gaHold(0)), nothing persisted
+// ═══ 0909 THE PARTY DUEL IS A TORCH FIGHT (design/gauntlet-0907/CARD-PARTY-DUEL.md + 00-DESIGN.md §8; Wyatt 9/9 21:34 ET: "Someone in my party just challenged me for the torch, and
+// they won. For some reason, it didn't give them the torch when they won, and it should have" · ~21:36 "when you lose, you shouldn't be able to retry against them. There's no running it
+// back" · ~22:00 "The answer is yes. Just get it done cleanly."): HQ v65 registers a private 1v1 that seats the holder as the torch's own room at the flip and flags it on the room poll
+// (`ga` {name, uid, hold}); coopOnPoll adopts it into COOP.ga (+ pd:1) so every 0896 face + card + beat below fires for the party duel exactly as for the tile's challenge. ═══
 function torchRoom(){ return !!(COOP && COOP.code && COOP.ga && S.bf && S.bf.room && S.mode==='play'); }   // a torch fight's chair — the away word's twin seat (bdInRoom's grammar: the hide/pagehide seats send HQ the AWAY word, the page's own poll says BACK)
 function gaTorchFight(bf){ return !!(bf && (bf.ga || (bf.room && COOP && COOP.ga))); }   // the CPU knock or a torch room — read at the verdict, BEFORE showMenu / coopMiss can tear COOP down (stamped as bf.torch)
 function gaShake(){ const el=document.getElementById('gaSq'); if(el){ el.classList.remove('deny'); void el.offsetWidth; el.classList.add('deny'); setTimeout(()=>{ try{ const e2=document.getElementById('gaSq'); if(e2) e2.classList.remove('deny'); }catch(e){} }, 500); } SFX.clack(); }   // the deny's shake alone — THE REMATCH BAN's tap (the small line already says why; no request)
@@ -85424,7 +85437,7 @@ function gaHideLeave(){   // THE QUEUE'S DOOR (⚑ Q13; Wyatt: "If they leave th
 }
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) gaHideLeave(); });
 window.addEventListener('pagehide', ()=>{ gaHideLeave(); });
-function gaNumsHTML(g){ return (g && typeof g.htv==='number')? '<br><span>'+escH(TXT('TORCH VICTORIES'))+' '+(g.htv|0)+' · '+escH(tf('%1 WINS TODAY', g.hw|0))+((g.q|0)>0? ' · '+escH(tf('%1 WAITING', g.q|0)) : '')+'</span>' : ''; }   // THE TILE'S NUMBERS (law 5): the holder's TORCH VICTORIES + WINS TODAY, the line's length — the second line of the HELD / BUSY faces (a v61 HQ carries none: the faces byte-what-they-were)
+function gaNumsHTML(g){ return (g && typeof g.hw==='number')? '<br><span>'+escH(tf('%1 WINS TODAY', g.hw|0))+((g.q|0)>0? ' · '+escH(tf('%1 WAITING', g.q|0)) : '')+'</span>' : ''; }   // THE TILE'S NUMBERS (law 5) · 0917 THE DAY'S WINS (Wyatt 9/10: "they need to show you how many wins they have this day. That's what gets measured for whoever is the gauntlet champion of the day"): the holder's WINS TODAY (hw = the day's book, THE CHAMPION's own column) + the line's length — the lifetime TORCH VICTORIES left the square (the RECORD line, the TORCH tab and the rules card keep it); a bag without hw → no line (byte-what-it-was)
 function wrTorchLoad(force){   // THE GAUNTLET tab (law 6, D7 lifted): its own ask (/board?k=torch — HQ's own reply; the five tabs' answer byte-still), a minute's cache like the board's
   if(!force && WR.data && WR.data.torch && Date.now()-(WR.torchT||0)<60000){ if(wrIsOpen()) renderWorldRank(); return Promise.resolve(WR.data.torch); }
   return netFetch(NET+'/board?device='+META.deviceId+'&k=torch').then(r=>r.json()).then(d=>{
