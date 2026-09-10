@@ -43336,7 +43336,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.11';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.12';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -45472,6 +45472,7 @@ function sqRef(){ return !S.coop || coopIsHost(); }
 // fraction or falls). Referee only by construction (the block sits under sqRef()); a guest follows the relayed push as it follows every
 // push. The stamps ride sq (rebuilt every battle) keyed on the wave index. Zero strings, zero wire, zero server bytes.
 const GATE_MAX_S=25;      // a gate held this long on unanswerable survivors alone releases (the belt)
+const KING_UNANS_S=45;    // 0909 THE UNANSWERED KING BOLTS (rex-stall2, ⚑ K-Q1): the referee's court king, walked on, whose bar has not moved for this long under the retreatGate bolts as if floored (the sweep's own puff, P3's push) — the second King Rex stall (Wed 9/9, room RQ9EJ pc 2): the guest's king floored and waiting on the push, the referee's king above his floor with nobody left on that sim who could hurt him (the twin sims' damage is per-sim), the gate held four minutes, no verdict ever booked
 const GATE_EGG_S=10;      // an egg that has not moved for this long counts as unanswerable
 const TUBE_UNANS_S=10;    // a parked tube nobody has hit for this long: walks on (a King Rex fight) / counts as unanswerable (the belt)
 function tubeIdleT(f,k){ if(f[k+'Hp']!==f.hp){ f[k+'Hp']=f.hp; f[k+'T']=S.t; } return S.t-f[k+'T']; }   // seconds since a foe's hp last moved, on the caller's own stamp pair (self-seeding - the raw-'yeti' clock law; the walk's clock counts PARKED frames alone, the belt's counts held seconds)
@@ -45480,6 +45481,15 @@ function gateSurvivorOff(f){   // true = this living foe can hold no gate honest
   if(f.x>W-10||f.x<-40||f.y<-30||f.y>WORLD_H+30) return true;
   if(f.def.hatch && !f.hatched){ if(f.geT==null || Math.hypot(f.x-f.geX,f.y-f.geY)>2){ f.geX=f.x; f.geY=f.y; f.geT=S.t; } return S.t-f.geT>=GATE_EGG_S; }
   if(f.def.minRng && !f.boss) return tubeIdleT(f,'gb')>=TUBE_UNANS_S;
+  return false;
+}
+function raidKingUnanswered(sq){   // 0909 THE UNANSWERED KING BOLTS — referee only (the clause sits under sqRef()); the stamp pair rides the king (rebuilt every battle); true = the retreatGate clause stands aside this frame and the push lands through the drum's own else
+  if(!S.raid) return false; const bt=raidBossT();
+  for(const f of S.foes){ if(f.type!==bt || f.dead) continue;
+    if(f.x>=W-10){ f.kuHp=f.hp; f.kuT=S.t; return false; }   // not yet on the carpet — untouchable by design; his clock starts at the walk-on
+    if(tubeIdleT(f,'ku')<KING_UNANS_S) return false;
+    const rec={ wave:S.wave+1, hp:+f.hp.toFixed(1), max:f.hpMax, x:Math.round(f.x), held:+(S.t-f.kuT).toFixed(1), t:+S.t.toFixed(1) }; (sq.kingBolt||(sq.kingBolt=[])).push(rec); tel('kingbolt', String(S.wave+1), rec.held|0); f.kuT=S.t;   // one record, one line (the box drops the name); the sweep is the push's own theater
+    return true; }
   return false;
 }
 function gateHold(nw,sq){   // the four gate clauses' hold: sq.t+1 as shipped, or THE BELT's release (sq.t - the clause re-reads next frame with the field empty)
@@ -45537,7 +45547,7 @@ function sqTick(dt){
     // splice foes out whole, so the check is live truth).
     const nw=S.cfg.waves[S.wave];
     if(nw && nw.actGate && (S.foes.length || S.queue.length)) sq.nextT=gateHold(nw,sq);   // 0904 REX MEGA STALL: the belt's seat (gateHold = sq.t+1 as shipped, or the release)
-    else if(nw && nw.retreatGate && raidKingStands()) sq.nextT=gateHold(nw,sq);   // v3.39: P3 waits for the referee's king to dip to 40% (or fall) — the scripted retreat
+    else if(nw && nw.retreatGate && raidKingStands() && !raidKingUnanswered(sq)) sq.nextT=gateHold(nw,sq);   // v3.39: P3 waits for the referee's king to dip to 40% (or fall) — the scripted retreat · 0909 THE UNANSWERED KING BOLTS: a king nobody has hurt for KING_UNANS_S stands aside too (the drum's else pushes; the sweep puffs him — as if floored)
     else if(nw && nw.bossGate && (S.foes.some(f2=>f2.type===nw.bossGate && !f2.dead) || S.queue.some(q=>q.t===nw.bossGate))) sq.nextT=gateHold(nw,sq);
     else if(nw && nw.hpGate && (function(g9){   // 0340: the DUEL gate — the wave holds while the named boss stands ABOVE the fraction (or hasn't walked on yet); his fall opens every gate (moot — the croak fork flushes the tail)
       const b9=S.foes.find(f9=>f9.type===g9.t && !f9.dead);
@@ -46127,9 +46137,9 @@ function evBladeGrant(r){
 }
 function evBoneNight(){ return !!((S.raid && S.raid.k==='bone' && S.raid.cfg===S.cfg) || (COOP && COOP.ev && COOP.ev.rk==='bone') || (S.sq && S.sq.ev && S.sq.ev.rk==='bone')); }   // 0905 THE TALL LAIR: the night just fought was King Rex's (the fight's own kind first, the party's word after)
 function evCrownMark(){ const L=META.ev && META.ev.last; if(L && L.rk==='bone' && evBattle()) L.crown=1; }   // 0905 THE WORDS OF THE ERUPTION (cell 4): the bone 'u' arm says the crown landed on this verdict (evSpoils ran before it and cannot know) — the spoils card's KING REX JOINS YOUR ARMY line reads it
-function evSpoils(win){
+function evSpoils(win,o9){   // 0909 THE LATE VERDICT: o9 = { wk, rk, code } — a verdict HQ booked after the night (evLateWin); every shipped caller passes nothing (byte-behaviour)
   if(!META.ev || typeof META.ev!=='object') META.ev={ wk:'', played:0, won:0, last:null };
-  const ev=META.ev, wk=evWk();
+  const ev=META.ev, wk=(o9&&o9.wk)? String(o9.wk) : evWk(); const bone9=(o9&&o9.rk)? (o9.rk==='bone') : evBoneNight();   // 0909: the night's key and its king come from the caller when the verdict is late — the room is long swept, EV.wk already names the next bell
   if(ev.wk===wk) return null;   // THE LATCH (D28): this week already paid — the second room of one evening pays nothing (HQ's evclaim PK is the other lock)
   ev.wk=wk; ev.played=(ev.played|0)+1;   // the latch FIRST (flag-first: nothing below can pay twice, whatever happens to the tab)
   const r={ wk, won:win?1:0, lvl:1, stars:0, drop:null, blade:0, owed:0, full:0, grows:0 };
@@ -46137,7 +46147,7 @@ function evSpoils(win){
   if(win){
     ev.won=(ev.won|0)+1;
     { const w9=starX(EV_STARS); META.starBank+=w9; META.starsLifetime+=w9; r.stars=w9; }   // 0875 THE ONE PIPE (the spoils card speaks r.stars) · D9: the purse on BOTH ledgers, OUTSIDE RAID_DAY_CAP (the L37788 grammar)
-    if(evBoneNight()){   // 0906 THE KING'S HOARD (cell C1): the Rex night's OWN table — no Blade (the yeti's named first-win prize), the hoard's roll instead; the Rex night's named first-win prize is PUFF (card 2)
+    if(bone9){   // 0906 THE KING'S HOARD (cell C1): the Rex night's OWN table — no Blade (the yeti's named first-win prize), the hoard's roll instead; the Rex night's named first-win prize is PUFF (card 2)
       const id=evRoll(wk, META.deviceId, 'bone');   // D24: ONE of the hoard's four, unowned-first, the same wk:uid hash (zero dice; an id not yet on the bench never rolls)
       if(id){ trophyGrant(id); r.drop=id; }   // own + ON through the one trophy door (0366) — on the bench before the verdict paints
       else if(evHoardBuilt()){ r.full=1; if(EV_FULLSET_STARS>0){ const w9=starX(EV_FULLSET_STARS); META.starBank+=w9; META.starsLifetime+=w9; r.stars+=w9; } }   // D25 FULL SET · THE KING FEARS YOU (all four exist AND are held)
@@ -46151,11 +46161,11 @@ function evSpoils(win){
     else { r.full=1; if(EV_FULLSET_STARS>0){ const w9=starX(EV_FULLSET_STARS); META.starBank+=w9; META.starsLifetime+=w9; r.stars+=w9; } }   // D12 FULL SET
     }
   }
-  r.rk=evBoneNight()? 'bone' : 'ice';
+  r.rk=bone9? 'bone' : 'ice';
   ev.last={ wk, won:r.won, drop:r.drop, blade:r.blade, owed:r.owed, full:r.full, stars:r.stars, rk:r.rk };   // 0905: + which king (card C's spoils card reads it)
   if(r.grows) ev.last.grows=1;   // 0906 THE KING'S HOARD: the GROWS line on the spoils card (a bone night only — the ice ledger byte-what-it-was)
   ev.ann=1;   // the ceremony owed — evSweep deals the card on the next room visit
-  ev.claimPend={ code:String((COOP&&COOP.code)||EV.code||'').slice(0,16), won:r.won, drop:r.drop||'', t:Date.now() };
+  ev.claimPend={ code:String((o9&&o9.code)||(COOP&&COOP.code)||EV.code||'').slice(0,16), won:r.won, drop:r.drop||'', t:Date.now() };   // 0909: the late verdict names its room
   saveMeta();
   clearTimeout(EV_CLAIM_T); EV_CLAIM_T=setTimeout(evClaim, EV_CLAIM_MS);   // §9.3: the claim AFTER the grants — a beat later so the referee's own /lobby/end (built in a .then) lands at HQ first
   return r;
@@ -46180,6 +46190,28 @@ function evClaim(){
     else if(r && (r.err==='not seated' || r.err==='mismatch')){ delete ev.claimPend; ev.claimErr=String(r.err); saveMeta(); }   // HQ refused for good — the grants stand
     return r;
   }).catch(()=>null);
+}
+// ═══ 0909 THE LATE VERDICT — a night HQ booked after the fight (the referee's end never landed: the second King Rex stall, room RQ9EJ, Wed 9/9): HQ plants
+// a gift whose note reads ev:<wk>:<code> (stars 0) and giftAdopt hands it here. The spoils are the verdict's own — evSpoils with the night's key, its king and
+// the room passed in (the purse, the roll, PUFF, the promotion, the ceremony card at the room, the claim to HQ → evclaim → the hall) — plus the ULTRA lair's
+// ledger and the hero exactly as the raid verdict writes them (bone.u · KING REX joins the army, the 0357 grammar without the ticket). ONCE per night key:
+// evSpoils' own latch (ev.wk) and the gift ledger's (giftLast) both refuse a second deal. A note without the grammar is the gift it always was.
+const EV_LATE_RE=/^ev:((?:bone:)?\d{4}-\d{2}-\d{2}):([A-Z0-9]{4,8})$/;
+function evLateNote(note){ const m=EV_LATE_RE.exec(String(note||'').trim()); return m? { wk:m[1], code:m[2] } : null; }
+function evLateWin(wk,code){
+  if(!META.ev || typeof META.ev!=='object') META.ev={ wk:'', played:0, won:0, last:null };
+  if(META.ev.wk===wk) return null;   // paid already — the verdict landed after all, or the note came twice
+  const bone=/^bone:/.test(String(wk));
+  const r=evSpoils(true, { wk:String(wk), rk:bone? 'bone' : 'ice', code:String(code||'') });
+  if(!r) return null;
+  if(bone){
+    if(!META.bone || typeof META.bone!=='object') META.bone={};
+    META.bone.u=1;   // the ULTRA lair beaten — the raid verdict's own first-clear line for the 'u' tier
+    if(META.unlocked.indexOf('kingrex')<0){ META.unlocked.push('kingrex'); META.heroSel='kingrex'; if(META.ev && META.ev.last) META.ev.last.crown=1; }   // KING REX joins the army (0357 MEGA'S SPOILS, lair edition; the card's KING REX JOINS YOUR ARMY line reads crown)
+  }
+  saveMeta();
+  try{ tel('evlate', String(wk)+':'+String(code||''), r.drop? 1 : 0); }catch(e){}
+  return r;
 }
 // ═══ 0905 THE KING FELL — ULTRA MEGA KING YETI DEFEATED (FM-GVT-KING-FELL-0905-01 cells 2-5; Wyatt 9/4 ~23:15 ET: "Mace Windu, huge
 // jazz, and Zorgy bababa from GVT defeated Ultra Mega King Yeti tonight. We want to implement this starting the next time players open
@@ -82761,8 +82793,10 @@ function giftAdopt(d){
   const g=d&&d.ok&&d.gift; if(!g || !((g.id|0)>0)) return false;
   const id=g.id|0, n=Math.max(0,Math.min(100000,g.stars|0));
   if(id<=(META.giftLast|0)){ giftClaim(id); return false; }   // banked already — the claim was lost; answer it again, bank nothing
-  META.giftLast=id; META.starBank+=n; /* 0875: HQ's GIFT — never doubled */ META.giftPend=(META.giftPend|0)+n; META.giftNote=String(g.note||'').slice(0,80); saveMeta();
+  const late9=evLateNote(g.note);   // 0909 THE LATE VERDICT: a note that names a night and a room deals the verdict's own spoils (the stars, if any, still bank; the gift card stays folded — the spoils card is the ceremony)
+  META.giftLast=id; META.starBank+=n; /* 0875: HQ's GIFT — never doubled */ META.giftPend=(META.giftPend|0)+(late9? 0 : n); META.giftNote=late9? '' : String(g.note||'').slice(0,80); saveMeta();
   giftClaim(id);
+  if(late9){ evLateWin(late9.wk, late9.code); if(S.mode==='menu'){ renderMenu(); if(roomQuiet()) evSweep(); } return true; }   // 0909: the verdict's card at a quiet room now, else on the ceremony chain's next seat (ev.ann)
   if(S.mode==='menu'){ renderMenu(); if(roomQuiet()) giftSweep(); }   // the HUD's bank now; the card now if the room is quiet, else on the chain's next seat
   return true;
 }
