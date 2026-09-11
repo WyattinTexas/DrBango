@@ -44562,7 +44562,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.48';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.49';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -89978,13 +89978,48 @@ function parkCfgTeddy(n){
 // two-act ambush (authored whole, never banded).
 // 0947a THE MOON GARDEN — THE PLACEHOLDER MUSTER: tan rifles on the garden's grass so the door works end to end tonight (card 01's licence); cards 02-04 author the court
 // (the gnomes, the sky, the three fights) and replace this body rung by rung. The axes = the teddy's desert band (the 0907 D14 default); no rocks, no river, no beats.
+// 0947c THE SKY, THE FAIRY, THE LADDER (card 03) — THE LADDER, PART ONE: the twenty rung cfgs on the shipped court (gnome · gslinger · gsage · gknight, card 02);
+// the level's own dice (the yeti LCG — both co-op sims rebuild the identical cfg from n); the garden stones (rung 6 THE CHARGE OF THE LAWN = open ground);
+// the nests' SEEDED SPOTS as data (terrain.nests: one from 11, two from 18 — the wnest foe sits on them when THE SKY lands, HANDOFF § CARD 03); the dark
+// ground (terrain.night — the 0583 night carpet's wash). Every sky/fairy slot is a court stand-in tonight, marked /* sky: … */ — the re-fire swaps the unit
+// word. The bosses at 10/15/20 are card 04's (tonight those rungs run their musters); rung 19's pond (a terrain.pits void) is the re-fire's.
 function parkCfgMoon(n){
   n=Math.max(1,Math.min(parkLevels('moon'),n|0));
   const ax=parkCampAxes(Math.min(80, 40+(n-1)*14/19));
-  const cfg={ n:0, hpMul:ax.hpMul, cntMul:ax.cntMul, bossF:ax.bossF, rateMul:ax.rateMul, waves:[], terrain:{rocks:[],river:null,ground:'grass'} };
+  const cfg={ n:0, hpMul:ax.hpMul, cntMul:ax.cntMul, bossF:ax.bossF, rateMul:ax.rateMul, waves:[], terrain:{rocks:[],river:null,ground:'grass',night:1,nests:[]} };
+  const R=(seed=>{ let s=seed; return ()=>{ s=(s*9301+49297)%233280; return s/233280; }; })(n*7919+913);
+  if(n>=2 && n!==6) cfg.terrain.rocks=[
+    { x:Math.round(520+R()*180), y:Math.round(150+R()*90),  r:Math.round(30+R()*12) },
+    { x:Math.round(430+R()*160), y:Math.round(360+R()*110), r:Math.round(28+R()*14) }];
+  const nN=n>=18? 2 : n>=11? 1 : 0;
+  for(let i=0;i<nN;i++){ let q; for(let k=0;k<12;k++){ q={ x:Math.round(560+R()*300), y:Math.round(140+R()*320) };
+      if(!cfg.terrain.rocks.some(r=>Math.hypot(r.x-q.x,r.y-q.y)<r.r+46) && !cfg.terrain.nests.some(o=>Math.hypot(o.x-q.x,o.y-q.y)<80)) break; }
+    cfg.terrain.nests.push(q); }
   const c=x=>Math.max(1,Math.round(x*cfg.cntMul));
-  cfg.waves.push({ name:'THE SILVER FILE', groups:[ {f:'column',t:'gnome',n:c(3),e:'right',at:0}, {f:'guerrilla',t:'gslinger',n:c(2),e:'right-bottom',at:3} ] });   // 0947b THE GNOMES: the dev muster at every rung tonight (card 03 deals the twenty)
-  cfg.waves.push({ name:'THE CHARGE OF THE LAWN', groups:[ {f:'column',t:'gknight',n:c(2),e:'right-top',at:0}, {f:'column',t:'gnome',n:c(3),e:'right',at:2}, {f:'guerrilla',t:'gsage',n:1,e:'right-bottom',at:4} ] });
+  const G=(f,t,k,e,at)=>({f,t,n:c(k),e,at});
+  const NM=MPARK_NAMES, wv=cfg.waves, W=(name,groups)=>wv.push({name,groups});
+  switch(n){
+    case 1: W(NM[0],[G('column','gnome',3,'right',0)]); break;
+    case 2: W(NM[1],[G('column','gnome',3,'right',0),G('line','gslinger',2,'right-bottom',2.5)]); break;
+    case 3: W(NM[2],[G('column','gnome',3,'right',0),G('guerrilla','gslinger',2,'right-top',2.5) /* sky: wasp ×2 */]); break;
+    case 4: W(NM[3],[G('column','gnome',4,'right',0),G('guerrilla','gslinger',2,'right-bottom',2.5),G('line','gslinger',1,'right-top',4) /* sky: wasp ×2 */]); break;
+    case 5: W(NM[4],[G('column','gnome',3,'right',0),G('line','gslinger',2,'right-bottom',2.5) /* fairy ×1 */]); break;
+    case 6: W(NM[5],[G('column','gnome',3,'right',0)]); W(NM[5],[G('pincer','gnome',3,'right-top',0),G('column','gnome',2,'right-bottom',2.5)]); break;
+    case 7: W(NM[6],[G('column','gnome',2,'right',0),G('guerrilla','gslinger',3,'right-top',2) /* sky: wasp swarm ×2 */]); W(NM[6],[G('line','gslinger',3,'right-bottom',0)]); break;
+    case 8: W(NM[7],[G('column','gnome',4,'right',0),G('column','gknight',1,'right-top',3) /* fairy ×1 */]); break;
+    case 9: W(NM[8],[G('column','gnome',3,'right',0),G('line','gslinger',2,'right-top',1.5),G('guerrilla','gsage',1,'right-bottom',3)]); break;
+    case 10: W(NM[9],[G('column','gnome',2,'right',0),G('line','gslinger',2,'right-bottom',2.5) /* boss: THE ANGLER (card 04) */]); break;
+    case 11: W(NM[10],[G('column','gnome',3,'right',0),G('guerrilla','gslinger',2,'right-top',2.5) /* wnest ×1 at terrain.nests[0] */]); break;
+    case 12: W(NM[11],[G('column','gnome',4,'right',0),G('guerrilla','gsage',2,'right-bottom',3)]); break;
+    case 13: W(NM[12],[G('column','gknight',2,'right',0),G('column','gnome',3,'right',2),G('line','gslinger',2,'right-bottom',4)]); break;
+    case 14: W(NM[13],[G('line','gslinger',6,'right',0),G('column','gnome',2,'right-top',3) /* fairy ×2 */]); break;
+    case 15: W(NM[14],[G('column','gnome',3,'right',0),G('guerrilla','gslinger',3,'right-top',2.5),G('column','gknight',1,'right-bottom',4) /* boss: THE QUEEN WASP (card 04) · wasps · wnest ×1 */]); break;
+    case 16: W(NM[15],[G('column','gknight',3,'right',0),G('guerrilla','gsage',2,'right-bottom',3)]); break;
+    case 17: W(NM[16],[G('column','gknight',2,'right',0),G('guerrilla','gslinger',3,'right-top',2),G('column','gnome',2,'right-bottom',4) /* sky: hornet ×2 · wasp ×3 · wnest ×1 */]); break;
+    case 18: W(NM[17],[G('column','gnome',4,'right',0),G('guerrilla','gslinger',3,'right-top',2.5),G('column','gknight',2,'right-bottom',4)]); W(NM[17],[G('guerrilla','gsage',2,'right-bottom',0),G('column','gnome',3,'right',2),G('line','gslinger',2,'right-top',4)]); break;
+    case 19: W(NM[18],[G('column','gknight',3,'right',0),G('column','gnome',3,'right-top',2.5)]); W(NM[18],[G('guerrilla','gsage',1,'right-bottom',0),G('line','gslinger',4,'right',2.5) /* the pond (pits) · the sky */]); break;
+    default: W(NM[19],[G('column','gnome',5,'right',0),G('line','gslinger',3,'right-top',2.5)]); W(NM[19],[G('column','gknight',3,'right',0),G('guerrilla','gsage',2,'right-bottom',3)]); W(NM[19],[G('column','gnome',4,'right',0),G('column','gknight',2,'right-top',2),G('guerrilla','gslinger',3,'right-bottom',4) /* card 04: the claim door */]); break;
+  }
   return cfg;
 }
 function parkCfg(park, n){
