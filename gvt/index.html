@@ -35842,6 +35842,8 @@ function levelCfg(n){
     { name:'THE IRON COLUMN', groups:[{f:'convoy',t:'tank',n:3,e:'right',at:0,escort:12,officer:true,radio:true},{f:'guerrilla',t:'crawler',n:12,e:'right-bottom',at:4}] },
     { name:BOSSDEF.tancommander.wave, boss:'tancommander', groups:[
         {f:'boss',t:'tancommander',n:1,e:'right',at:0},
+        {f:'line',t:'tanmortar',n:2,e:'right',at:0.5},   // 0943 MEN WITHOUT FEAR FOR THE COMMANDERS (⚑ Q2): HIS BATTERY — no shipped wave stood a tube beside him, so the sign never had work; two mortars + two bazookas on his lane (they halt at their range, he walks on through them and plants beside them)
+        {f:'line',t:'tanbazooka',n:2,e:'right',at:0.5},
         {f:'convoy',t:'tank',n:2,e:'right',at:2.4,escort:10},
         {f:'wedge',t:'tank',n:1,e:'right-top',at:4.0,escort:5},
         {f:'wedge',t:'tank',n:1,e:'right-bottom',at:5.6,escort:5},
@@ -37525,7 +37527,8 @@ const CMD_WALL={ soak:1/6, t:7, cd:18, eye:280, n:2 };
 // sp.rate, one factor in the tubes' shared cooldown denominator), the circle, the 10 s / 20 s clocks and ACC . DMG . T . CD . R . TUBES are
 // byte-still. The stack (radio + V2 + INSPIRE + the sign) is measured and flagged, never floored here. Wyatt's other readings: 2.69 (+100
 // points on the base) . 2.00 (a flat +100%) - one cell each (00-BUFF.md section 4 Q1).
-const SP_TUBES={ bazooka:1, mortar:1 };
+const SP_TUBES={ bazooka:1, mortar:1, kbcannon:1 };   // 0943 MEN WITHOUT FEAR FOR THE COMMANDERS (FM-GVT-MWF-COMMANDERS-01; Wyatt 9/10: "Make sure that it works with Emperor Bear's cannons as well, because that should count as a siege unit"): + THE EMPEROR'S CANNON (kbcannon, the court's battery) — the ONE grouping spTubesIn, spHold, spLay, the threads and the drums audit walk by; its lob branch reads sp.acc below (the dmg ×sp.dmg and the drum ×sp.rate were already on the shared lines)
+const FOE_TUBES={ tanbazooka:1, tanmortar:1, tcannon:1 };   // 0943: THE ENEMY'S SIEGE SET — the tan tubes + the bear cannon (a king's kbMwf tube included; the park's guns keep the point): what a planted enemy commander lays (the aura pass stamps f.mwf; tanLaunch / cannonTick / foeSplash read it off the SAME dials SP_ACC · SP_DMG · SP_RATE)
 const SP_R=5*TK_M, SP_T=10, SP_CD=20, SP_WORK=SP_R+UDEF.bazooka.rng, SP_ACC=0.45, SP_DMG=1.35, SP_RATE=3.38, SIGN_SOAK=2;   // 0517a: SP_CD is its own const now — the 20 s quiet after the 10 s channel (Wyatt 8/23: "Needs to be a 10 second channel. 20 second cooldown."; it was CMD_DASH.cd's 6) · 0522d THE CHARGE (FM-GVT-FEEDBACK-0824-DAY §4; Wyatt 8/24: "The men without fear passive is okay, but it's not good enough yet. Let's increase the fire rate by 30% of who he's charging up."): SP_RATE 1.30 → 1.69 = ×1.3 on the charged tubes' CURRENT rate — every bazooka and mortar inside SP_R while the sword stands (⚑ 1.60 = +30 points on the base); ACC · DMG · T · CD · R · TUBES untouched
 const SP_NONE={ acc:1, dmg:1, rate:1 };
 // ⚠ TDZ (the v1.26 law): coopBeat is a const ~5,900 lines below — these only
@@ -44157,7 +44160,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.40';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.41';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -59217,9 +59220,9 @@ function cannonTick(f,dt){
   if(f.gsWind>0){ f.gsWind-=dt;
     if(f.gsWind<=0){ f.gsWind=0; f.shot=0; const m=f.ctAim;
       if(m && !m.dead){ const d=Math.hypot(m.x-f.x,m.y-f.y)||1;
-        S.shots.push({k:'lob',x:f.x+30*foeFaceX(f),y:f.y-26,tx:m.x,ty:m.y,t:0,dur:Math.min(1.4,Math.max(0.6,d/cb.spd)),dmg:0,splash:cb.splashR,foe:true,src:f,cot:1,r:cb.r});   // 0652: the muzzle on the side it faces
+        S.shots.push({k:'lob',x:f.x+30*foeFaceX(f),y:f.y-26,tx:m.x,ty:m.y,t:0,dur:Math.min(1.4,Math.max(0.6,d/cb.spd)),dmg:0,splash:cb.splashR,foe:true,src:f,cot:1,r:cb.r,mwf:f.mwf|0});   // 0943: the bear cannon's ball remembers a laid tube too   // 0652: the muzzle on the side it faces
         f.kickT=0.25; bfSfx(SFX.thock,f.x,f.y); S.fx.push({k:'ring',x:f.x+30*foeFaceX(f),y:f.y-16,r:5,R:26,t:0,dur:0.24,col:'#ffffff'});
-        if(f.kbMwf && KB_COT_SCAT>0){ const sh9=S.shots[S.shots.length-1]; if(sh9 && sh9.cot && sh9.src===f){ const a9=Math.random()*6.283, r9=Math.random()*(f.laid? 0 : KB_COT_SCAT); sh9.tx=Math.max(20,Math.min(W-20,m.x+Math.cos(a9)*r9)); sh9.ty=Math.max(20,Math.min(WORLD_H-20,m.y+Math.sin(a9)*r9)); } }   // 0902 Card 2 THE SCATTER: a king's tube's lob lands inside KB_COT_SCAT of its man (tanLaunch's own two dice and clamp; laid fire lands on the point as every tube's does); the park's guns keep the point
+        if(f.kbMwf && KB_COT_SCAT>0){ const sh9=S.shots[S.shots.length-1]; if(sh9 && sh9.cot && sh9.src===f){ const a9=Math.random()*6.283, r9=Math.random()*(f.laid? 0 : KB_COT_SCAT*(f.mwf? SP_ACC : 1)); sh9.tx=Math.max(20,Math.min(W-20,m.x+Math.cos(a9)*r9)); sh9.ty=Math.max(20,Math.min(WORLD_H-20,m.y+Math.sin(a9)*r9)); } }   // 0902 Card 2 THE SCATTER: a king's tube's lob lands inside KB_COT_SCAT of its man (tanLaunch's own two dice and clamp; laid fire lands on the point as every tube's does); the park's guns keep the point
         if(KB_CAN_VOICE && f.kbMwf){ const mx9=f.x+30*foeFaceX(f), fz9=foeFaceX(f); bfSfx(SFX.boom,f.x,f.y); S.fx.push({k:'ring',x:mx9,y:f.y-18,r:8,R:44,t:0,dur:0.3,col:'#FFE9A8'}); if(!reducedMotion()){ for(let j=0;j<3;j++) S.fx.push({k:'puff',x:mx9+fz9*(6+j*10),y:f.y-20-(j%2)*8,t:0,dur:0.7,R:10+j*3,col:'#ffffff'}); } S.shake=Math.max(S.shake,0.12); }   // 0902 Card 2 THE REPORT ("Cannons need to be firing like they do in some of the campaign levels"): a KING'S tube (kbMwf) fires with the campaign cannon's own voice — SFX.boom (the tank's cannon, the tan tubes' landing), a muzzle flash ring, three smoke puffs rolling off the muzzle (RM keeps the flash, drops the smoke), a touch of shake; the park's guns keep the thock alone
         tdLog(f,'pop',[Math.round(m.x),Math.round(m.y)]); } }
     return; }
@@ -60966,12 +60969,12 @@ function tanMulti(f){
 // foe:true so the landing resolves through foeSplash below, never splash()
 function tanLaunch(f){
   const best=tanPick(f); if(!best) return false; foeAim(f,best);   // 0652: the pull turns him (no dice here — the two rolls below stand in their order)
-  const d=f.def, a=Math.random()*6.283, r=Math.random()*(f.laid? 0 : d.scatter);   // 0595 MEN WITHOUT FEAR: a tube inside KING BEAR's circle fires LAID — the scatter zeroed (the two dice still roll: twin sims stay in step)
+  const d=f.def, a=Math.random()*6.283, r=Math.random()*(f.laid? 0 : d.scatter*(f.mwf? SP_ACC : 1));   // 0943: inside a planted commander's circle the throw tightens ×SP_ACC — the same two dice (an unlaid trace is byte-identical)   // 0595 MEN WITHOUT FEAR: a tube inside KING BEAR's circle fires LAID — the scatter zeroed (the two dice still roll: twin sims stay in step)
   const tx=Math.max(20,Math.min(W-20,best.x+Math.cos(a)*r)), ty=Math.max(20,Math.min(WORLD_H-20,best.y+Math.sin(a)*r));   // 0197: the live height (===H flat; the tan tubes never fire on a battlefield)
   bfSfx(SFX.rocket, f.x, f.y);
   // (0121: the shell remembers its battery — foeSplash's reflect check reads it)
-  if(d.minRng) S.shots.push({k:'lob',x:f.x,y:f.y-30,tx,ty,t:0,dur:1.0,dmg:0,splash:d.splashR,foe:true,src:f});
-  else S.shots.push({k:'rocket',x:f.x+14*foeFaceX(f),y:f.y-30,tx,ty,spd:280,dmg:0,splash:d.splashR,vx2:true,foe:true,src:f});   // 0652: the tube on the side he faces
+  if(d.minRng) S.shots.push({k:'lob',x:f.x,y:f.y-30,tx,ty,t:0,dur:1.0,dmg:0,splash:d.splashR,foe:true,src:f,mwf:f.mwf|0});   // 0943: the shell remembers it left a laid tube (foeSplash's pip seats read it)
+  else S.shots.push({k:'rocket',x:f.x+14*foeFaceX(f),y:f.y-30,tx,ty,spd:280,dmg:0,splash:d.splashR,vx2:true,foe:true,src:f,mwf:f.mwf|0});   // 0652: the tube on the side he faces
   return true;
 }
 // ONE dispatch for every tan trigger pull — the volley clock, the aim
@@ -60998,7 +61001,7 @@ const TAN_MORTAR_F=0.5;
 // green in R, ring + boom, zero blame. (splash() would knock them too, but
 // through the FRIENDLY FIRE! ledger — that is the massacre-your-own-line
 // trap this function exists to avoid.)
-function foeSplash(x,y,R,src){
+function foeSplash(x,y,R,src,mwf9){   // 0943: mwf9 = the shell left a tube laid by a planted enemy commander — the three pip seats below land ×SP_DMG (the whole-knock seats are already the maximum: a knock is a knock)
   // 0121: a charged commando catches a SHELL whole — only the shell callers
   // pass src (tanLaunch's tubes ride it on the shot); the pig's tumble, the
   // rex stomp and the commander's swing call bare and stay unreflectable by
@@ -61030,11 +61033,11 @@ function foeSplash(x,y,R,src){
       // saves, flinch and recovery). The tan bazooka's rocket keeps the whole
       // knock (the ask is its reach), and a MACHINE keeps the hull dent
       // (knock()'s vehicle branch — a pip law would hit a hull harder).
-      if(cot9 && KB_COT_PIP>0 && saberArm(u)){ if(u.cmdSignT>0) cmdSignEnd(u); src.pipN=KB_COT_PIP; tanHit(u,x,y,src); src.pipN=0; continue; }
-      if(cot9 && src.kbMwf && KB_COT_F<1 && !(u.def&&u.def.vehicle)){ if(u.cmdSignT>0) cmdSignEnd(u); src.pipN=gritCap(u)*KB_COT_F; tanHit(u,x,y,src); src.pipN=0; continue; }   // 0902 Card 2 THE COTTON LANDS THE CAMPAIGN'S OWN BLOW (Wyatt 9/2: "Cannons need to be firing like they do in some of the campaign levels"): a KING'S tube's lob (kbMwf) on a man = KB_COT_F of a knock through tanHit's pip seat — the 0502 tan mortar's own law, verbatim (the saves, the flinch, the 4 s recovery; two landings inside it fell anyone; the campaign's tubes never special-case Sarge) — a blade-in-hand Sarge included: with a battery that fires 16 lobs a minute the whole knock felled the duelist twice a fight before the king's answer (measured), so the king's answer ends the duelist, not his guns (⚑ Wyatt's gate: KB_COT_PIP above = a pip count; KB_COT_F 1 = Card 1's whole knock); a machine keeps the hull dent, the park's guns the whole knock   // 0902 Card 1 THE COTTON (⚑ Wyatt's gate): a cotton cannon's lob landing on a DUELIST is KB_COT_PIP pips through tanHit (the blade's block, the plate and the wall have their say; a grit-out still knocks) — the king's answer ends the duelist, not his own guns (0679's flag: the cotton knocked a melee Sarge every ~15 s once a tube parked); everyone else keeps the campaign knock below
+      if(cot9 && KB_COT_PIP>0 && saberArm(u)){ if(u.cmdSignT>0) cmdSignEnd(u); src.pipN=KB_COT_PIP*(mwf9? SP_DMG : 1); tanHit(u,x,y,src); src.pipN=0; continue; }
+      if(cot9 && src.kbMwf && KB_COT_F<1 && !(u.def&&u.def.vehicle)){ if(u.cmdSignT>0) cmdSignEnd(u); src.pipN=gritCap(u)*KB_COT_F*(mwf9? SP_DMG : 1); tanHit(u,x,y,src); src.pipN=0; continue; }   // 0902 Card 2 THE COTTON LANDS THE CAMPAIGN'S OWN BLOW (Wyatt 9/2: "Cannons need to be firing like they do in some of the campaign levels"): a KING'S tube's lob (kbMwf) on a man = KB_COT_F of a knock through tanHit's pip seat — the 0502 tan mortar's own law, verbatim (the saves, the flinch, the 4 s recovery; two landings inside it fell anyone; the campaign's tubes never special-case Sarge) — a blade-in-hand Sarge included: with a battery that fires 16 lobs a minute the whole knock felled the duelist twice a fight before the king's answer (measured), so the king's answer ends the duelist, not his guns (⚑ Wyatt's gate: KB_COT_PIP above = a pip count; KB_COT_F 1 = Card 1's whole knock); a machine keeps the hull dent, the park's guns the whole knock   // 0902 Card 1 THE COTTON (⚑ Wyatt's gate): a cotton cannon's lob landing on a DUELIST is KB_COT_PIP pips through tanHit (the blade's block, the plate and the wall have their say; a grit-out still knocks) — the king's answer ends the duelist, not his own guns (0679's flag: the cotton knocked a melee Sarge every ~15 s once a tube parked); everyone else keeps the campaign knock below
       if(src && src.type==='tanmortar' && TAN_MORTAR_F<1 && !(u.def&&u.def.vehicle)){
         if(u.cmdSignT>0) cmdSignEnd(u);   // 0511 W-c (D25): the shell pulls the sword FIRST — this seat bypasses knock(), so it carries its own line; the pip conversion below then runs with his saves and WITHOUT the sign's ×2
-        src.pipN=gritCap(u)*TAN_MORTAR_F; tanHit(u,x,y,src); src.pipN=0; continue; }
+        src.pipN=gritCap(u)*TAN_MORTAR_F*(mwf9? SP_DMG : 1); tanHit(u,x,y,src); src.pipN=0; continue; }
       knock(u,x,y);
     }
   }
@@ -62778,6 +62781,31 @@ function sweepTick(u,dt){
 // out during the wind-up is missed, one who walks in is cut). A swing in flight refuses a second arm. The parry
 // beat (f.cmdBlkT — hurt()'s counted absorb) burns here too. Sim dt, per-figure fields, zero dice, zero wire keys
 // (foes are rebuilt every battle). LARSON's slam rides the same pair on his own cmdT clock (his rifle stays).
+// ═══ 0943 MEN WITHOUT FEAR FOR THE COMMANDERS (FM-GVT-MWF-COMMANDERS-01, design/mwf-commanders-0910/00-DESIGN.md; Wyatt 9/10:
+// "Add in, for the commanders, the Men Without Fear ability. Make sure that it works with Emperor Bear's cannons as well, because
+// that should count as a siege unit."). THEIR COMMANDER — a bare-handed cmd foe (Larson keeps his rifle and his own standing aura)
+// — runs the player's sign whole: THE PLANT when his guns have work (a FOE_TUBES foe inside SP_R, a green inside SP_WORK, nobody at
+// the sword — updateCmd's own three, mirrored), SP_T seconds with the sword in the rug (the halt chain holds his feet, updateFoeCmd
+// refuses the arm, drawFoeCmdSword eases the blade into the rug at the post), THE END-CHECK (the clock, a green at the sword — D17,
+// he pulls the blade and fights with his 0942 swing), the SP_CD quiet. THE GIFT rides the aura pass (f.mwf + fireAura off the SAME
+// dials); the readers sit on tanLaunch / cannonTick / foeSplash. The fx are cmdSignPlant's own (the steel cast ring, the puffs, the
+// thock; the pull puff). Zero dice here; zero wire (foes are local, rebuilt every battle).
+function foeAtSword(f){ const cb=f.def.cmd, r=cb? cb.reach : 52; for(const u of S.units){ if(u.dead||u.jetT>0||(S.drag&&S.drag.unit===u)) continue; if(Math.hypot(u.x-f.x,u.y-f.y)<r) return true; } return false; }   // a live, grounded, un-dragged green inside his reach (a cloaked spy stands at the sword too — he IS there)
+function foeTubesIn(f,r){ let n=0; for(const o of S.foes){ if(!FOE_TUBES[o.type]||o.dead||o===f) continue; if(Math.hypot(o.x-f.x,o.y-f.y)<=r) n++; } return n; }
+function foeGreenIn(f,r){ for(const u of S.units){ if(u.dead||u.jetT>0) continue; if(Math.hypot(u.x-f.x,u.y-f.y)<=r) return true; } return false; }
+function foeSignPlant(f){ f.cmdSignT=SP_T; f.cmdSignFl=foeCmdFl(f,foeFl(f))? 1 : 0;   // the stand + the facing the planted steel keeps (world geometry — the man beside it may turn; the threads and the sword read this one stamp)
+  S.fx.push({k:'ring',x:f.x,y:f.y-8,r:8,R:SP_R,t:0,dur:0.4,col:'#C9D2D8'});   // cmdSignPlant's cast ring — the grow-in, in steel
+  S.fx.push({k:'puff',x:f.x+14,y:f.y-2,t:0,dur:0.3,R:17});
+  S.fx.push({k:'puff',x:f.x+2,y:f.y-1,t:0,dur:0.3,R:13});
+  bfSfx(SFX.thock,f.x,f.y); }
+function foeSignEnd(f){ f.cmdSignT=0; f.cmdSignW=SP_CD; S.fx.push({k:'puff',x:f.x+16,y:f.y-4,t:0,dur:0.3,R:14}); }   // the pull: the quiet arms (SP_CD), one puff at the sword
+function foeSignTick(f,dt){
+  if(f.cmdSignW>0){ f.cmdSignW-=dt; if(f.cmdSignW<0) f.cmdSignW=0; }
+  if(f.cmdSignT>0){ f.cmdSignT-=dt; if(f.cmdSignT<=0 || foeAtSword(f)) foeSignEnd(f); return; }   // the stand burns; the clock or a green at the sword pulls it
+  const cb=f.def.cmd; if(!cb || f.def.gun || f.cmdFx>0 || f.cmdSignW>0 || f.x>=W-10 || f.retreat) return;   // a bare-handed commander on the carpet, no swing in flight, no quiet
+  if(foeAtSword(f) || foeTubesIn(f,SP_R)<1 || !foeGreenIn(f,SP_WORK)) return;   // the guns have work: nobody at the sword, a tube inside the circle, a green inside SP_WORK
+  foeSignPlant(f);
+}
 function foeCmdTick(f,dt){
   if(f.cmdBlkT>0) f.cmdBlkT-=dt;
   if(!(f.cmdFx>0)) return;
@@ -62794,6 +62822,7 @@ function foeCmdCutLand(f){   // THE CUT FRAME: the 0117 knock byte-what-it-was, 
 }
 function updateFoeCmd(f,ck){
   const cb=f.def.cmd; if(!cb) return; ck=ck||'shot';   // 0594: the clock key — THEIR COMMANDER's slam rides f.shot (no gun), a gun boss keeps f.shot for his drum and hands the slam its own (Larson: cmdT)
+  if(f.cmdSignT>0) return;   // 0943 MEN WITHOUT FEAR: THE SWORD IS IN THE RUG — no arm while the sign stands (foeSignTick's end-check pulls it when a green reaches the sword; the swing follows on his own clock)
   if(f.cmdFx>0) return;   // 0942: a swing in flight owns the arm — its cut is owed to the CUT frame (foeCmdTick)
   let best=null, bd=cb.reach;
   for(const u of S.units){
@@ -66989,10 +67018,11 @@ function update(dt){
   // officer-on-officer rule, generalized), and a foe with no caster near him
   // costs exactly the empty loop below.
   const casters=[]; for(const o of S.foes){ if(o.def.auraR) casters.push(o); }
+  const signs=[]; for(const o of S.foes){ if(o.cmdSignT>0 && !o.dead) signs.push(o); }   // 0943 MEN WITHOUT FEAR FOR THE COMMANDERS: the planted enemy commanders, collected once a frame like the casters (a corpse keeps cmdSignT>0 — the dead filter is what stops a fallen commander laying guns)
   const healers=[]; for(const o of S.foes){ if(o.def.healR>0 && !o.dead) healers.push(o); }   // 0594 THE ENEMY MEDIC (tanmedic): the foe-side heal pass — collected once a frame like the casters
   for(let i=S.foes.length-1;i>=0;i--){
     const f=S.foes[i];
-    let aura=1; f.fireAura=1; f.rngAura=1; f.laid=0;   // 0595: + the laid stamp (KING BEAR's circle)
+    let aura=1; f.fireAura=1; f.rngAura=1; f.laid=0; f.mwf=0;   // 0943: + the MWF stamp (a planted commander's circle) · 0595: + the laid stamp (KING BEAR's circle)
     for(const o of casters){
       if(o.type===f.type) continue;
       const ad=o.def;
@@ -67003,6 +67033,7 @@ function update(dt){
         if(ad.laid) f.laid=1;   // 0595 MEN WITHOUT FEAR: every tube inside KING BEAR's circle fires laid (tanLaunch zeroes the scatter; his auraFire ×0.7 rides the line above)
       }
     }
+    if(signs.length && FOE_TUBES[f.type]){ for(const c of signs){ if(Math.hypot(c.x-f.x,c.y-f.y)<=SP_R){ f.mwf=1; if(1/SP_RATE<f.fireAura) f.fireAura=1/SP_RATE; break; } } }   // 0943 MEN WITHOUT FEAR: a siege foe inside a planted commander's circle fires LAID — straighter (tanLaunch / cannonTick's dice ×SP_ACC), harder (foeSplash's pip seats ×SP_DMG, the shot stamped mwf at birth), faster (the drum ÷SP_RATE through fireAura — the aura's own non-stacking law, strongest wins; his standing auraFire 0.7 yields). The SAME dials as the player's sign
     if(healers.length && f.hp<f.hpMax){ let hb=0; for(const o of healers){ if(o===f) continue; if(o.def.healPS>hb && Math.hypot(o.x-f.x,o.y-f.y)<o.def.healR) hb=o.def.healPS; } if(hb>0) f.hp=Math.min(f.hpMax, f.hp+hb*dt); }   // 0594 THE ENEMY MEDIC: every foe inside a medic's circle regains healPS a second up to his hpMax (the green medic's own law mirrored — never himself, two circles don't stack, bosses too: Larson heals under his medic, kill the medic first)
     const px=f.x, py=f.y;
     aura*=(f.spdMul||1)*fzWalk(f)*petChillX(f)*petPoisonX(f);   // 0899 TIPTOE — THE SLOW POISON (70): a burning man walks at half pace (petPoisonX — the same one seat)   // 0806r THE COLD (30) / THE DEEP COLD (90): a man Slush's ball chilled walks at half / a quarter pace — the one seat every walker reads   // 0735 THE FREEZE BEAM: the frozen feet — every f.def.spd*aura read inherits it (the walkers, the rushes, the park's bears through teddyFeet / kbWalkStep)
@@ -67042,7 +67073,7 @@ function update(dt){
     else if(f.retreat){ const sp9=f.def.spd*LR_ROUT_X*fzWalk(f), RV9=S.cfg.terrain.river; let gx9=W+120, gy9=f.y;   // 0735: a frozen survivor's rout crawls too · 0736: the declaration back in code (0735's comment had swallowed it — `gx9 is not defined` on every routing foe)
       if(RV9 && f.x<RV9.x+RV9.w+4){ gy9=rvBridge(RV9,f.y); if(f.x<RV9.x-4 && Math.abs(f.y-gy9)>RV9.bw*0.3) gx9=RV9.x-30; }   // 0594a: a survivor west of the water runs for the NEARER bridge mouth first, then straight over the planks — the men's own bank-first funnel, never a wade home
       const dx9=gx9-f.x, dy9=gy9-f.y, d9=Math.hypot(dx9,dy9)||1, st9=rockSteer(f.x,f.y,gx9,gy9,ROCK_PAD_FOE); f.x+=(st9? st9.x : dx9/d9)*sp9*dt; f.y+=(st9? st9.y : dy9/d9)*sp9*dt; }   // 0594 THE ROUT: a survivor of Larson's fall runs for the east edge on his own pace × LR_ROUT_X, steering round the furniture like every walker (rockSteer — a straight push against a boulder's shoulder stood a man there forever, measured); the walk-flip stamp below turns him east; the mover chain never owns him again
-    else if(foeHalted(f,dt) /* 0806q: a halted man (THE BIG BOWL-OVER's second, THE SCREECH) plants his feet — first in the chain so its clock burns every frame */ || f.aimT>0 || f.mgRootT>0 || f.aW>0 || f.brT>0 || f.lrBmT>0 || f.lrJmpT>0 || f.rxHopW>0 || f.rxHopT>0 || f.rxSwpW>0 || foeHolds(f)){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; }   // 0905: + the sweep's wind-up plants him   // 0706: the hop's tell + flight plant the king's feet (rexHopTick writes his x/y through the flight)   // 0478: + THE SHOWDOWN — a `hold` boss stands where the line can answer (foeHolds)   // stopped to shoot — your window (0278a: a halted air-stepper stands planted, never frozen mid-hop; 0278b: f.aW = the bruiser's rear-up + the king's inhale, the same planted read; 0396: f.brT = a breather stands through his own standing jet — ⚑ BR_PLANT)
+    else if(foeHalted(f,dt) /* 0806q: a halted man (THE BIG BOWL-OVER's second, THE SCREECH) plants his feet — first in the chain so its clock burns every frame */ || f.aimT>0 || f.mgRootT>0 || f.aW>0 || f.brT>0 || f.lrBmT>0 || f.lrJmpT>0 || f.rxHopW>0 || f.rxHopT>0 || f.rxSwpW>0 || f.cmdSignT>0 /* 0943: a planted commander's feet stay with the sword */ || foeHolds(f)){ if(dt>0){ f.vx=0; f.vy=0; } f.airB=0; }   // 0905: + the sweep's wind-up plants him   // 0706: the hop's tell + flight plant the king's feet (rexHopTick writes his x/y through the flight)   // 0478: + THE SHOWDOWN — a `hold` boss stands where the line can answer (foeHolds)   // stopped to shoot — your window (0278a: a halted air-stepper stands planted, never frozen mid-hop; 0278b: f.aW = the bruiser's rear-up + the king's inhale, the same planted read; 0396: f.brT = a breather stands through his own standing jet — ⚑ BR_PLANT)
     else {
     // 0278a THE AIR-STEP GATE: airMv() integrates this frame's airborne
     // overlap for the gait types (snowfig · gsnowman · the king's footwork)
@@ -67488,7 +67519,7 @@ function update(dt){
       } else if(f.type==='tancommander'){
         // 0117 THE WALL: no dash, no feet of his own — the march walks him in
         // and the steel saber swings from where he stands (updateFoeCmd)
-        foeCmdTick(f,dt); updateFoeCmd(f);   // 0942: the swing's clock + the owed cut every carpet frame, then the arm
+        foeSignTick(f,dt); foeCmdTick(f,dt); updateFoeCmd(f);   // 0943: the sign's clocks + the plant first (the arm below refuses while it stands) · 0942: the swing's clock + the owed cut every carpet frame, then the arm
       } else if(f.type==='mom'){
         // v1.79 MOM'S STOMP — the rex recipe on a per-round clock: she stomps
         // the whole fight through, and round 3 stomps near twice as often.
@@ -68115,7 +68146,7 @@ function update(dt){
       if(big1) S.fx.push({k:'flash',x:u.x+14*mzl,y:u.y-30,ang:Math.atan2(ty-(u.y-30),tx-(u.x+14*mzl)),R:26,lw:4,t:0,dur:0.16});
       S.shots.push({k:'rocket',x:u.x+14*mzl,y:u.y-30,tx,ty,spd:280,dmg,splash:def.splash*(big1?MILE_BAZ_RMUL:1),big:big1?1:0,vx2:true,src:u});
     } else if(u.def.lob){   // 0909 THE EMPEROR'S CANNON: the pop-cannon's cotton ball on the mortar's lob — a k:'lob' shot with the cotton picture, the row's own scatter, the splash on the tan men
-      const a9=Math.random()*6.283, r9=Math.random()*def.scatter, tx9=Math.max(20,Math.min(WX-20,best.x+Math.cos(a9)*r9)), ty9=Math.max(20,Math.min((S.bf?H:WORLD_H)-20,best.y+Math.sin(a9)*r9)), d9=Math.hypot(tx9-u.x,ty9-u.y)||1, fx9=(best.x>=u.x)? 1 : -1;
+      const a9=Math.random()*6.283, r9=Math.random()*def.scatter*sp.acc /* 0943: THE EMPEROR'S CANNON fires laid inside a standing sign — the SAME two dice, scaled (an unlaid trace is byte-identical); the dmg ×sp.dmg above and the drum ×sp.rate ride already */, tx9=Math.max(20,Math.min(WX-20,best.x+Math.cos(a9)*r9)), ty9=Math.max(20,Math.min((S.bf?H:WORLD_H)-20,best.y+Math.sin(a9)*r9)), d9=Math.hypot(tx9-u.x,ty9-u.y)||1, fx9=(best.x>=u.x)? 1 : -1;
       S.shots.push({k:'lob',x:u.x+30*fx9,y:u.y-26,tx:tx9,ty:ty9,t:0,dur:Math.min(1.4,Math.max(0.6,d9/190)),dmg,splash:def.splash,src:u,cot:1,r:24});
       bfSfx(SFX.thock,u.x,u.y); S.fx.push({k:'ring',x:u.x+30*fx9,y:u.y-16,r:5,R:26,t:0,dur:0.24,col:'#ffffff'}); tdLog(u,'pop',[Math.round(tx9),Math.round(ty9)]);
     } else if(u.type==='mortar'){
@@ -68244,7 +68275,7 @@ function update(dt){
     const sh=S.shots[i];
     if(sh.k==='rocket'){
       const dx=sh.tx-sh.x, dy=(sh.ty-14)-sh.y, d=Math.hypot(dx,dy);
-      if(d<10){ S.shots.splice(i,1); if(sh.refl) cmdoReflLand(sh); else if(sh.foe) foeSplash(sh.tx,sh.ty,sh.splash,sh.src); else splash(sh.tx,sh.ty,sh.splash,sh.dmg,true,sh.src,false,false,sh.big); }
+      if(d<10){ S.shots.splice(i,1); if(sh.refl) cmdoReflLand(sh); else if(sh.foe) foeSplash(sh.tx,sh.ty,sh.splash,sh.src,sh.mwf); else splash(sh.tx,sh.ty,sh.splash,sh.dmg,true,sh.src,false,false,sh.big); }
       else { sh.x+=dx/d*sh.spd*dt; sh.y+=dy/d*sh.spd*dt;
         // v2.15 THE CROSSING's duck swallows a rocket WHOLE — "Bazooka" is
         // Wyatt's own list, and the tank's shell rides the same pipeline (a
@@ -68259,7 +68290,7 @@ function update(dt){
     } else if(sh.k==='lob'){
       sh.t+=dt;
       if(sh.t>=sh.dur){ S.shots.splice(i,1); if(sh.refl) cmdoReflLand(sh);
-        else if(sh.foe){ const c9=foeSplash(sh.tx,sh.ty,sh.splash,sh.src);
+        else if(sh.foe){ const c9=foeSplash(sh.tx,sh.ty,sh.splash,sh.src,sh.mwf);
           // FM-GVT-ROBO-01: the robot's shell LEAVES FIRE where it lands
           // (Wyatt 8/19) — the flamestrike patch through the one fire door
           // (fsIgnite at fireR/fireLife; fire belongs to nobody, 0404). A
@@ -71496,10 +71527,10 @@ function draw(){
   // a dead man's circle must vanish with him. spSignLive arms the threads
   // after the actor pass.
   let spSignLive=false;
-  for(const r of S.units){
+  for(const L9 of [S.units,S.foes]) for(const r of L9){   // 0943: + a planted ENEMY commander's circle (the same steel at the foe-side alphas — the class law: fixed greys, no glow)
     if(!(r.cmdSignT>0) || r.dead) continue;
     spSignLive=true;
-    const foeS9=S.bf && r.side==='foe';
+    const foeS9=(S.bf && r.side==='foe') || L9===S.foes;
     cx.beginPath(); cx.arc(r.x,r.y,SP_R,0,7);
     cx.fillStyle=foeS9?'rgba(201,210,216,0.07)':'rgba(201,210,216,0.09)';   // 0517a: a notch stronger (Wyatt: "isn't showing the aura" — the plant never fired; the circle itself reads a touch louder now)
     cx.fill();
@@ -71706,12 +71737,12 @@ function draw(){
   // orange channel's own grammar; under reduced motion the pip rests
   // mid-thread — information, not motion). After the actor pass so the
   // thread reads over the figures.
-  if(spSignLive) for(const r of S.units){
+  if(spSignLive) for(const L9 of [S.units,S.foes]) for(const r of L9){   // 0943: + a planted ENEMY commander's threads to HIS laid tubes (the very FOE_TUBES filter the gift walks by)
     if(!(r.cmdSignT>0) || r.dead) continue;
-    const RM9=reducedMotion(), sx9=(r.home?r.home.x:r.x)+16, sy9=(r.home?r.home.y:r.y)-34;
-    for(const o of S.units){
-      if(!SP_TUBES[o.type] || o.dead || o.dropT>0) continue;
-      if(S.bf && o.side!==r.side) continue;
+    const foe9=L9===S.foes, RM9=reducedMotion(), sx9=foe9? r.x+(r.cmdSignFl? 16 : -16) : (r.home?r.home.x:r.x)+16, sy9=foe9? r.y-34 : (r.home?r.home.y:r.y)-34;
+    for(const o of (foe9? S.foes : S.units)){
+      if(foe9? (!FOE_TUBES[o.type] || o.dead) : (!SP_TUBES[o.type] || o.dead || o.dropT>0)) continue;
+      if(!foe9 && S.bf && o.side!==r.side) continue;
       if(Math.hypot(o.x-r.x,o.y-r.y)>SP_R) continue;
       const ox9=o.x, oy9=o.y-26;
       cx.save(); cx.globalAlpha=0.45; cx.strokeStyle='#C9D2D8'; cx.lineWidth=1.6; cx.lineCap='round';
@@ -74112,8 +74143,10 @@ function drawFoeCmdSword(f,fl){
   let ang=-0.52, flash=false, glint=false;
   if(f.cmdBlkT>0){ const pb=1-f.cmdBlkT/CMD_DASH.blkT, q=pb<0.1667? 1-Math.pow(1-pb/0.1667,2.4) : pb<0.7333? 1 : Math.pow(1-(pb-0.7333)/0.2667,2); ang=-0.52+(-1.9+0.52)*q; }
   else if(sp){ ang=sp.a; flash=!!sp.flash; glint=!!sp.glint; }
+  const sgP9=(f.cmdSignT>0)? 1-Math.pow(1-Math.min(1,(SP_T-f.cmdSignT)/0.18),2) : 0;   // 0943 MEN WITHOUT FEAR: the blade eased vertical into the rug at his post over 0.18 s (the player's own sgP curve — the planted steel is world geometry; the facing it keeps is the plant's stamp)
+  if(sgP9>0){ ang=ang+(1.57-ang)*sgP9; flash=false; glint=false; fl=!!f.cmdSignFl; }
   if(!fl){ cx.save(); cx.translate(f.x*2,0); cx.scale(-1,1); }
-  const hx=f.x+8, hy=f.y-22, len=30;
+  const len=30, hx=(f.x+8)+((f.x+16)-(f.x+8))*sgP9, hy=(f.y-22)+((f.y-len+3)-(f.y-22))*sgP9;   // 0943: the hand → the planted hilt (x+16, the point 3 px in the rug)
   const gx=hx-Math.cos(ang)*5.5, gy=hy-Math.sin(ang)*5.5, bx=hx+Math.cos(ang)*2.5, by=hy+Math.sin(ang)*2.5, tx=hx+Math.cos(ang)*len, ty=hy+Math.sin(ang)*len;
   const pxx=Math.cos(ang+Math.PI/2), pyy=Math.sin(ang+Math.PI/2);
   cx.lineCap='butt';
