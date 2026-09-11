@@ -177,7 +177,9 @@ const BOOT = (uid) => `navigator.share = undefined; navigator.clipboard = undefi
   try { sessionStorage.setItem('beta3.skipIntro', '1'); if (localStorage.getItem('rm.seeded') !== '${uid}') { localStorage.clear(); localStorage.setItem('rm.seeded', '${uid}');
     localStorage.setItem('starspellUid', '${uid}'); } } catch (e) {}`;
 const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').dailyChipB`;
-const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').chFriendB`;
+// the world door stands in every online state (v0.97.0: the funnel promotes
+// it, the full ground keeps it) — the page sentinel for these friendless boots
+const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').chWorldB`;
 const VB = `game.scene.getScene('vsbattle')`;
 // deep-walk census incl. wrapped text blocks (container children never
 // appear in scene.children.list; a textBlock's lines reconstruct wrapped)
@@ -232,7 +234,9 @@ toDelete.add('names/' + await A.ev(`SSNET.nameKey(${JSON.stringify(NA)})`));
 toDelete.add('names/' + await B.ev(`SSNET.nameKey(${JSON.stringify(NB)})`));
 const R1 = await mintDone(NA, NB);
 ok('both land on the decided duel\'s end screen', (await enterEnd(A, R1)) && (await enterEnd(B, R1)));
-ok('A\'s door reads ⚔ REMATCH', (await A.ev(TEXTS('vsbattle'))).includes('⚔ REMATCH'));
+ok('A\'s door reads REMATCH (emoji-free since the 9/10 sweep) with the drawn glyph beside it',
+  (await A.ev(TEXTS('vsbattle'))).includes('REMATCH')
+  && await A.ev(`(() => { const s = game.scene.getScene('vsbattle'); return !!(s.rematchG && s.rematchG.visible && s.rematchG.texture.key === 'vsswords') })()`));
 ok('A presses it and waits — "the duel is forming…"',
   await A.tapTil(`${VB}.rematchB`, `game.scene.isActive('vsbattle') && ${VB}.code !== ${JSON.stringify(R1)} && ${VB}.state === 'wait'`, 20000)
   && await A.until(`(${TEXTS('vsbattle')}).includes(SS_T('vsWaitDuel'))`, 8000));
@@ -246,7 +250,7 @@ ok('the wait offers LEAVE but shares no invite link', await A.ev(`(() => { const
 ok('no ledger row, no cap slot for a wait nobody answered',
   await A.ev(`!VS_GAMES.get(${JSON.stringify(D1)}) && vsOngoingCount() === 0`));
 ok('B\'s door pulses ANSWER THE REMATCH and grows the quieter ✕',
-  await B.until(`(${TEXTS('vsbattle')}).includes('⚔ ANSWER THE REMATCH') && !!${VB}.rmDeclB`, 20000));
+  await B.until(`(${TEXTS('vsbattle')}).includes('ANSWER THE REMATCH') && !!${VB}.rmDeclB`, 20000));
 await sleep(400);
 await B.shot('decline-door');
 await B.tapTil(`${VB}.rmDeclB`, `!${VB}.rmDeclB`, 12000);
@@ -301,7 +305,7 @@ ok('A presses REMATCH and waits',
 const r4 = await restUntil(R4, (r) => r && r.rematch);
 const D4 = r4 && r4.rematch;
 codes.add(D4); toDelete.add('mp/rooms/' + D4);
-ok('B answers the call', await B.until(`(${TEXTS('vsbattle')}).includes('⚔ ANSWER THE REMATCH')`, 15000)
+ok('B answers the call', await B.until(`(${TEXTS('vsbattle')}).includes('ANSWER THE REMATCH')`, 15000)
   && await B.tapTil(`${VB}.rematchB`, `game.scene.isActive('vsbattle') && ${VB}.code === ${JSON.stringify(D4)}`, 20000));
 ok('the duel forms — room active, both seated, first turn the presser\'s',
   !!(await restUntil(D4, (r) => r && r.status === 'active' && r.players && r.players[UA] && r.players[UB] && r.turnUid === UA, 20000)));

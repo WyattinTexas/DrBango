@@ -99,74 +99,108 @@ const vsHeldSeat = (seat, hp, name) => ({
 });
 
 /* ============================================================
-   Menu — challenge-first (v0.73.0, floor cleared v0.83.0): the
-   hero crest, then two primaries (CHALLENGE A FRIEND → the social
-   sheet · CHALLENGE WORLDWIDE → quick match) centred between the
-   crest and the safe band's foot. Turns only. The BY NAME / seal
-   doors left with Skylar's 9/3 call — friends are reached through
-   the sheet, new mages through the app invite, rooms through
-   summons bells and ?join deep links.
+   Menu — THE DUELING GROUND (v0.97.0, the 9/9 UNDER ONE SKY
+   review built on Skylar's 9/10 go; challenge-first bones from
+   v0.73.0/v0.83.0 kept). The page stands on the shipped
+   sky-world in its versus dress, wears the VERSUS wordmark and
+   THE DUELISTS hero (two mage asterisms sharing one zenith
+   star), promotes the duel ledger to seal-plaques with cap pips
+   and a summons plate, seats the people the systems know on a
+   presence strip, gives a fresh device the first-visit funnel
+   and a blocked sky the ghost ledger. Turns only; friends are
+   reached through the sheet, new mages through the app invite,
+   rooms through summons bells and ?join deep links.
    ============================================================ */
 class VsMenu extends Phaser.Scene {
   constructor() { super('vsmenu'); }
   create() {
     const l = ssLayout(this);
     ssMakeTextures(this);
-    ssStarfield(this, 90);
+    // the dueling ground: the same world the searching theater and the
+    // rise-together already run — menu → search → rise is one place now.
+    // A fixed seed keeps the page's own starfield grade its own.
+    this.sky = ssSkyWorld(this, { versus: true, seed: 0x1701 });
     // scene instances persist across restarts — stale truthy refs from a
-    // previous life could keep the sheet from ever opening again
+    // previous life could keep the sheet (or a band rebuild) from ever
+    // happening again
     this.socialC = null; this.frC = null; this.shNoteT = null;
     this.recentRows = null; this.frRows = null;
     this.frOff = null; this.frTimer = null;
     this.busyC = false;
+    this.pendC = null; this.pendRows = null; this.pendKey = '';
+    this.doorsC = null; this.doorsMode = null; this.stripC = null; this.chipRows = null; this.stripHeadT = null;
+    this.chFriendB = null; this.chWorldB = null; this.addDoorB = null; this.invDoorB = null; this.retryB = null;
+    this.noteT = null; this.whisperT = null; this.idChipT = null; this.idChipB = null;
+    this.zenith = null; this.zenithHalo = null; this.zenBreath = null; this.zenFlare = 0;
     const back = ssTxt(this, l.x(-195), l.y(24), '‹ HOME', l.u(14), '#9fb0e8').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     back.on('pointerdown', () => { SFX.ui(); this.scene.start('home'); });
 
-    if (SSNET.mode === 'local') {
-      ssTxt(this, l.x(0), l.y(300), SS_T('vsNoSky'), l.u(14), '#8c5a5a', 'italic').setOrigin(0.5).setAlign('center');
-      return;
-    }
-    try { localStorage.removeItem('beta3.vsmode'); } catch (e) { }   // the mode choice is retired — sweep the dead key
+    // the wordmark — the home door's word in the gold letterpress bake, the
+    // drawn blades flanking it (the U+2694 text emblem died in the 9/10 sweep;
+    // no sixth string: SS_T('versus') localizes the mark for free)
+    const wm = ssGoldTex(this, SS_T('versus'), 23);
+    const wsc = Math.min(1, 210 / wm.w);
+    this.wordmark = this.add.image(l.x(0), l.y(62), wm.key).setDisplaySize(l.u(wm.w * wsc), l.u(wm.h * wsc));
+    const woff = (wm.w * wsc) / 2 + 21;
+    this.add.image(l.x(-woff), l.y(62), vsSwordsTex(this)).setDisplaySize(l.u(20), l.u(20)).setAlpha(0.95);
+    this.add.image(l.x(woff), l.y(62), vsSwordsTex(this)).setDisplaySize(l.u(20), l.u(20)).setAlpha(0.95);
+    ssTxt(this, l.x(0), l.y(94), SS_T('vsAsync'), l.u(10.5), '#c9b676', 'italic').setOrigin(0.5);
 
-    // the hero crest (Skylar 9/3, stamped 2.5×): drawn crossed blades over a
-    // slow gold breath, no words beneath — the page's one emblem, baked big
-    // enough to stay crisp at this size (the setDisplaySize-only upscale of
-    // the 96px bake was the v0.3.4 blur). Glow rides the same 2.5×.
-    const crestGlow = this.add.image(l.x(0), l.y(168), 'glowbig').setDisplaySize(l.u(625), l.u(625)).setTint(0xc9a94f).setAlpha(0.1).setBlendMode('ADD');
-    this.tweens.add({ targets: crestGlow, alpha: 0.045, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.add.image(l.x(0), l.y(168), vsSwordsTex(this, 210)).setDisplaySize(l.u(210), l.u(210)).setAlpha(0.96);
+    const offline = SSNET.mode === 'local';
+    this.buildHero(l, offline);
 
-    // the two primaries — and only these (Skylar 9/2). Every door on this
-    // page seals a turn-based room; the caption says the mode once. The pair
-    // centres between the crest's bottom edge and the safe band's bottom
-    // (Skylar 9/3, "right in the middle") — the design box runs to y 800,
-    // but a width-limited phone floats it, so the true foot is computed.
-    const crestB = 168 + 105;
+    // the design box runs to y 800, but a width-limited phone floats it, so
+    // the true foot is computed — doors, whisper and note all anchor to it
     const safeB = 400 + (l.H - (SS_INSET.top + SS_INSET.bottom) * DPR) / (2 * l.s);
-    const friendY = Math.round((crestB + safeB) / 2 - 36);   // buttons span friendY−30 … friendY+102
-    ssTxt(this, l.x(0), l.y(friendY - 38), SS_T('vsAsync'), l.u(10.5), '#c9b676', 'italic').setOrigin(0.5);
-    const prim = (y, key, subKey, cb) => {
-      const b = this.add.image(l.x(0), l.y(y), ssBtn(this, false, 320, 60)).setDisplaySize(l.u(320), l.u(60)).setInteractive({ useHandCursor: true });
-      const t = ssTxt(this, l.x(0), l.y(y - 10), SS_T(key), l.u(17), BTN_INK()).setOrigin(0.5);
-      for (let fs = 17; t.width > l.u(296) && fs > 11; fs -= 0.5) t.setFontSize(l.u(fs));
-      const s = ssTxt(this, l.x(0), l.y(y + 12), SS_T(subKey), l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
-      for (let fs = 9.5; s.width > l.u(300) && fs > 7; fs -= 0.5) s.setFontSize(l.u(fs));
-      b.on('pointerdown', cb);
-      return b;
-    };
-    this.chFriendB = prim(friendY, 'vsChFriend', 'vsChFriendSub', () => { SFX.ensure(); SFX.ui(); this.openSocial(); });
-    this.chWorldB = prim(friendY + 72, 'vsChWorld', 'vsChWorldSub', () => { SFX.ensure(); SFX.ui(); this.match('turns'); });
-
-    // the feedback line keeps the foot's old breathing room under the pair
-    this.noteT = ssTextBlock(this, l.x(0), l.y(friendY + 134), '', {
+    this.safeB = safeB;
+    // the feedback line and the record whisper share the foot line — a live
+    // note steps in front of the whisper, and gives it back when it clears
+    this.noteT = ssTextBlock(this, l.x(0), l.y(safeB - 44), '', {
       fontSize: l.u(11) + 'px', color: '#c9b676', fontStyle: 'italic', shadow: true,
       wrapW: l.u(340), align: 'center', ox: 0.5, oy: 0.5,
     });
 
-    // the standing duels (9/3 card 03) — friend summonses waiting or
-    // declined, worldwide duels mid-rhythm — as quiet rows under the crest
+    if (offline) {
+      // STILL A PLACE (the review's offline state): the sky is local, so it
+      // still builds — the Duelists dimmed, the shared star unlit, the
+      // shipped couplet in its rose ink, then the ghost ledger: the standing
+      // duels this device remembers, at low alpha, waiting on the connection.
+      ssTxt(this, l.x(0), l.y(330), SS_T('vsNoSky'), l.u(14), '#8c5a5a', 'italic').setOrigin(0.5).setAlign('center');
+      const ghosts = [...new Set(vsGameRows().map((r) => r.name))].slice(0, 4);
+      if (ghosts.length) {
+        this.ghostT = ssTxt(this, l.x(0), l.y(408), ghosts.join(' · '), l.u(10.5), '#8a94c4').setOrigin(0.5).setAlpha(0.55);
+        while (this.ghostT.width > l.u(340) && this.ghostT.text.length > 4) this.ghostT.setText(this.ghostT.text.slice(0, -3) + '…');
+        ssTxt(this, l.x(0), l.y(428), SS_T('vsGhost'), l.u(8.5), '#5a6390', 'italic').setOrigin(0.5);
+      }
+      // TRY THE SKY AGAIN — the one honest retry is a fresh boot (connect()
+      // is once-per-load by design), so the door reloads the page in place
+      const rb = this.retryB = this.add.image(l.x(0), l.y(496), ssBtn(this, true, 300, 54)).setDisplaySize(l.u(300), l.u(54)).setInteractive({ useHandCursor: true });
+      ssTxt(this, l.x(0), l.y(496), SS_T('vsRetry'), l.u(12.5), '#c9d0f0').setOrigin(0.5);
+      rb.on('pointerdown', () => { SFX.ui(); try { location.reload(); } catch (e) { } });
+      return;
+    }
+    try { localStorage.removeItem('beta3.vsmode'); } catch (e) { }   // the mode choice is retired — sweep the dead key
+
+    // the identity chip — stakes in the corner: tier glyph, name, rating
+    // (a first-night mage wears ✧ and no number yet); tap → your rating card
+    const fresh0 = !vsGameRows().length && !SSNET.FR.list().length && !SSNET.FR.recentList(1).length;
+    const idT = this.idChipT = ssTxt(this, 0, l.y(24),
+      fresh0 ? '✧ ' + vsName() : ssRatingTier(SS.prof.rating).glyph + ' ' + vsName() + ' · ' + SS.prof.rating,
+      l.u(10), '#c9b676').setOrigin(0.5);
+    while (idT.width > l.u(150) && idT.text.length > 6) idT.setText(idT.text.slice(0, -2) + '…');
+    const bw = Math.ceil((idT.width / l.u(1) + 24) / 10) * 10;   // coarse pill buckets, the toast law
+    const idB = this.idChipB = this.add.image(0, l.y(24), ssBtn(this, true, bw, 26)).setDisplaySize(l.u(bw), l.u(26)).setInteractive({ useHandCursor: true });
+    idB.setX(l.x(198) - idB.displayWidth / 2); idT.setX(idB.x); idT.setDepth(1);
+    ssHitPad(idB, 44);
+    idB.on('pointerdown', () => { SFX.ui(); ssRatingCard(this, { uid: vsUid(), name: vsName() }); });
+
+    // the record whisper over the fireflies — the one synced record the game
+    // keeps; at zero wins the fireflies own the foot alone
+    this.whisperT = ssTxt(this, l.x(0), l.y(safeB - 44), '', l.u(9.5), '#c9b676').setOrigin(0.5).setAlpha(0.85);
+
+    // the middle of the page — plaques, strip, doors — rebuilds itself when
+    // its truth changes; the 1s tick also redresses chips and the zenith star
     this.pendC = this.add.container(0, 0);
-    this.pendKey = '';
     this.refreshPend();
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.refreshPend() });
 
@@ -175,13 +209,17 @@ class VsMenu extends Phaser.Scene {
     if (FRDEMO === 'host' || FRDEMO === 'invite') this.time.delayedCall(800, () => this.frDemo());
   }
   // feedback lands where the eye is: on the sheet's own line while it is
-  // open, on the page line otherwise
+  // open, on the page line otherwise (the whisper steps aside for a note)
   note(s, ms) {
     const t = (this.socialC && this.shNoteT && this.shNoteT.active) ? this.shNoteT : this.noteT;
     if (!t || !t.active) return;
     t.setText(s || '');
+    if (t === this.noteT && this.whisperT && this.whisperT.active) this.whisperT.setVisible(!s && !!this.whisperT.text);
     if (this.noteTimer) { this.noteTimer.remove(false); this.noteTimer = null; }
-    if (s && ms) this.noteTimer = this.time.delayedCall(ms, () => { if (t.active) t.setText(''); });
+    if (s && ms) this.noteTimer = this.time.delayedCall(ms, () => {
+      if (t.active) t.setText('');
+      if (t === this.noteT && this.whisperT && this.whisperT.active) this.whisperT.setVisible(!!this.whisperT.text);
+    });
   }
 
   /* ---------- the social sheet (v0.73.0) ----------
@@ -400,79 +438,192 @@ class VsMenu extends Phaser.Scene {
     });
   }
 
-  /* ---------- the pending rows (9/3 card 03) ----------
-     Standing duels live HERE now, not at a waiting screen: a friend summons
-     waits as a row (✶ shares the invite link, ✕ takes the summons back), a
-     declined one says so once, and a worldwide duel mid-rhythm shows whose
-     move it is — tap the row to step back under those stars. */
-  // one truth for every standing duel (9/8 card 04): the shared row list —
-  // summonses, near duels AND live-sky correspondence — calls first
-  pendList() { return vsGameRows().slice(0, 4); }
+  /* ---------- THE DUELISTS (the review's hero, option A ★) ----------
+     Two faceless mage asterisms — yours gold, the rival's moon-blue —
+     reaching for one shared zenith star: the duel's own fiction (both
+     players rise through one seeded sky) drawn in the game's native art
+     form, pure chart data through the shipped beast renderer. The stars
+     fly in on the session's first visit and stand assembled after;
+     reduced motion (and the offline page) skips every flight. The star
+     flares while a summons stands — the sky announcing the challenge. */
+  buildHero(l, dim) {
+    const still = dim || ssReduceMotion();
+    const fly = !still && !window.__ssVsHeroSeen;
+    window.__ssVsHeroSeen = 1;
+    this.heroFly = fly;   // verification beacon: did this visit fly the stars in?
+    const mk = (x, mirror, tint) => {
+      const cont = this.add.container(l.x(x), l.y(212));
+      if (mirror) cont.setScale(-1, 1);
+      if (dim) cont.setAlpha(0.45);
+      vsMageFigure(this, cont, tint, l.u(1.5), { fly, still });
+      return cont;
+    };
+    this.heroL = mk(-24, false, 0xd7b45c);   // yours, gold
+    this.heroR = mk(24, true, 0x9fb0e8);     // the rival's, moon-blue
+    const zx = l.x(0), zy = l.y(128);
+    if (dim) { this.zenith = this.add.image(zx, zy, 'dot').setScale(1.1).setTint(0x4a5480); return; }
+    this.zenithHalo = this.add.image(zx, zy, 'glowbig').setScale(l.u(0.5)).setTint(0xffe9c9).setAlpha(0.13).setBlendMode('ADD');
+    this.zenith = this.add.image(zx, zy, 'spark4').setDisplaySize(l.u(24), l.u(24)).setTint(0xfff2c9).setBlendMode('ADD');
+    if (!still) {
+      this.tweens.add({ targets: this.zenith, angle: 360, duration: 64000, repeat: -1 });
+      this.zenBreath = this.tweens.add({ targets: this.zenithHalo, alpha: 0.08, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+  }
+
+  /* ---------- the middle of the page ----------
+     One truth for every standing duel (9/8 card 04): vsGameRows() —
+     summonses, near duels AND live-sky correspondence, calls first — now
+     promoted from quiet text to seal-plaques (the review's band), with an
+     incoming challenge landing as a gold ACCEPT plate, cap pips on the band
+     head, the presence strip beneath, and the doors on the meadow. The band
+     rebuilds only when its truth changes; chips rank once per page open and
+     are only ever REDRESSED by the tick, never reordered. */
   refreshPend() {
     if (!this.pendC || !this.pendC.scene) return;
     // a friend answered while this page stood: step into the duel at once
     const live = VS_PEND.list().find((p) => p.active);
     if (live) { VS_PEND.remove(live.code); this.scene.start('vsbattle', { code: live.code }); return; }
-    const rows = this.pendList();
-    const key = JSON.stringify(rows.map((r) => r.kind + r.code + r.name));
-    if (key === this.pendKey) return;
-    this.pendKey = key;
+    const sums = (SSNET.FR.pending() || []).map((inv) => ({ kind: 'sum', code: inv.code, name: inv.name || SSNET.FR.nameOf(inv.from), inv }));
+    const games = vsGameRows().filter((g) => !sums.some((s) => s.code === g.code));
+    const rows = [...sums, ...games];
+    const funnel = !rows.length && !SSNET.FR.list().length && !SSNET.FR.recentList(1).length;
+    const key = JSON.stringify([funnel ? 'f' : 'd', vsOngoingCount(), rows.map((r) => r.kind + r.code + r.name)]);
+    if (key !== this.pendKey) { this.pendKey = key; this.buildBand(rows, funnel); }
+    this.tickDress();
+  }
+  buildBand(rows, funnel) {
     const l = ssLayout(this);
     this.pendC.removeAll(true);
     this.pendRows = [];
-    rows.forEach((r, i) => {
-      const y = l.y(300 + i * 36);
-      const items = [];
-      items.push(this.add.image(l.x(-166), y, vsSwordsTex(this)).setDisplaySize(l.u(18), l.u(18)).setAlpha(r.kind === 'move' ? 1 : 0.6));
-      const nm = ssTxt(this, l.x(-148), y - l.u(7), r.name, l.u(12), r.kind === 'move' ? '#ffe9a8' : '#d8d2bd').setOrigin(0, 0.5);
-      while (nm.width > l.u(150) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
-      items.push(nm);
-      const status = r.kind === 'move' ? SS_T('vsYourMove') : r.kind === 'theirs' ? SS_T('vsTheirMove', r.name)
+    if (this.doorsMode !== (funnel ? 'funnel' : 'duels')) this.buildDoors(funnel);
+    if (funnel) { if (this.stripC) this.stripC.setVisible(false); this.setWhisper(false); return; }
+    // the plaques — up to four; a fifth folds into the shipped '+%1 more'
+    const shown = rows.length > 4 ? rows.slice(0, 3) : rows;
+    let items = [];
+    if (rows.length) {
+      // the band head + five cap pips: one lit per standing duel, so the
+      // five-duel law teaches itself before the cap sheet ever scolds
+      const head = ssTxt(this, l.x(0), l.y(306), SS_T('vsDuelsHead'), l.u(10.5), '#c9b676').setOrigin(0.5);
+      items.push(head);
+      const lit = Math.min(5, vsOngoingCount());
+      this.capPips = [];
+      for (let i = 0; i < 5; i++) {
+        const p = this.add.circle(l.x(0) + head.width / 2 + l.u(14 + i * 9), l.y(306), l.u(2.2), i < lit ? 0xffd77a : 0x39406b);
+        this.capPips.push(p); items.push(p);
+      }
+    }
+    shown.forEach((r, i) => { items = items.concat(this.plaque(l, r, 336 + i * 58)); });
+    if (rows.length > 4) items.push(ssTxt(this, l.x(0), l.y(336 + 3 * 58 - 8), SS_T('vsMore', rows.length - 3), l.u(10.5), '#5a6390', 'italic').setOrigin(0.5));
+    this.pendC.add(items);
+    // the strip rides under the plaques and folds (head off) when four rows
+    // stand — it never vanishes: the players who duel most keep their rematch
+    const rowsEnd = rows.length ? 336 + (Math.min(shown.length, 4) - (rows.length > 4 ? 0 : 1)) * 58 + 29 : 306;
+    if (!this.stripC) this.buildStrip(l);
+    if (this.stripC) {
+      const fold = (rows.length > 4 ? 4 : shown.length) >= 4;
+      if (this.stripHeadT) this.stripHeadT.setVisible(!fold);
+      this.stripC.setVisible(true);
+      this.stripC.y = l.y(fold ? rowsEnd + 10 : rowsEnd + 10) - (fold ? l.u(26) : 0);
+    }
+    this.setWhisper(true);
+  }
+  // the record whisper: only with a number to say, never over a live note
+  setWhisper(onPage) {
+    if (!this.whisperT || !this.whisperT.active) return;
+    const n = SS.prof.vsWins | 0;
+    this.whisperT.setText(onPage && n > 0 ? SS_T('vsVict', n) : '');
+    this.whisperT.setVisible(!!this.whisperT.text && !(this.noteT && this.noteT.active && this.noteT.text));
+  }
+  /* one seal-plaque: nine-slice dark panel, drawn-blades glyph, the rival's
+     name over the shipped status fiction, the affair's own doors at the
+     right. A your-move plaque (and the summons plate) wears the pre-baked
+     breathing gold rim — alpha tween only, never a per-frame stroke. */
+  plaque(l, r, yD) {
+    const y = l.y(yD);
+    const items = [];
+    items.push(this.add.image(l.x(0), y, ssBtn(this, true, 344, 50)).setDisplaySize(l.u(344), l.u(50)));
+    if (r.kind === 'move' || r.kind === 'sum') {
+      const rim = this.add.image(l.x(0), y, vsPlaqRimTex(this)).setDisplaySize(l.u(344), l.u(50));
+      this.tweens.add({ targets: rim, alpha: { from: r.kind === 'sum' ? 0.95 : 0.9, to: 0.45 }, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      items.push(rim);
+    }
+    items.push(this.add.image(l.x(-150), y, vsSwordsTex(this)).setDisplaySize(l.u(18), l.u(18)).setAlpha(r.kind === 'move' || r.kind === 'sum' ? 1 : 0.6));
+    const nm = ssTxt(this, l.x(-132), y - l.u(8), r.name, l.u(12), r.kind === 'move' || r.kind === 'sum' ? '#ffe9a8' : '#d8d2bd').setOrigin(0, 0.5);
+    while (nm.width > l.u(150) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+    items.push(nm);
+    const status = r.kind === 'sum' ? SS_T('vsSumRow')
+      : r.kind === 'move' ? SS_T('vsYourMove') : r.kind === 'theirs' ? SS_T('vsTheirMove', r.name)
         : r.kind === 'done' ? SS_T('vsPendDone')
           : r.kind === 'declined' ? SS_T('vsDeclined', r.name)
             : SS_T(r.p && r.p.away ? 'vsWaitAway' : r.p && r.p.busy ? 'vsWaitBusy' : 'vsWaitAnswer', r.name);
-      const st = ssTxt(this, l.x(-148), y + l.u(8), status, l.u(8.5), r.kind === 'move' ? '#ffd77a' : r.kind === 'declined' ? '#e8a87f' : '#8a94c4', 'italic').setOrigin(0, 0.5);
-      while (st.width > l.u(240) && st.text.length > 4) st.setText(st.text.slice(0, -2) + '…');
-      items.push(st);
-      const row = { kind: r.kind, code: r.code, name: r.name, nameT: nm, statusT: st };
-      if (r.kind === 'wait') {
-        const sh = ssTxt(this, l.x(140), y, '✶', l.u(14), '#c9b676').setOrigin(0.5).setInteractive({ useHandCursor: true });
-        ssHitPad(sh, 30);
-        vsOnTap(sh, () => {
-          SFX.ui();
-          vsShare(SS_T('vsShareText', vsName()), vsInviteUrl(r.code)).then((res) => {
-            if (res === 'copied') this.note(SS_T('vsCopied'), 2500);
-            else if (res === 'failed') this.note(SS_T('vsCopyFail'), 2500);
-          });
+    const st = ssTxt(this, l.x(-132), y + l.u(9), status, l.u(8.5),
+      r.kind === 'move' || r.kind === 'sum' ? '#ffd77a' : r.kind === 'declined' ? '#e8a87f' : '#8a94c4', 'italic').setOrigin(0, 0.5);
+    while (st.width > l.u(r.kind === 'sum' ? 190 : 228) && st.text.length > 4) st.setText(st.text.slice(0, -2) + '…');
+    items.push(st);
+    const row = { kind: r.kind, code: r.code, name: r.name, nameT: nm, statusT: st };
+    if (r.kind === 'sum') {
+      // an incoming challenge lands HERE too (the review: young players miss
+      // sliding banners; the plaque waits) — one tap, the same claim the
+      // banner's ACCEPT makes
+      const ab = this.add.image(l.x(122), y, ssBtn(this, false, 76, 30)).setDisplaySize(l.u(76), l.u(30)).setInteractive({ useHandCursor: true });
+      ssHitPad(ab, 44);
+      const at = ssTxt(this, l.x(122), y, SS_T('smAccept'), l.u(9.5), BTN_INK()).setOrigin(0.5);
+      for (let fs = 9.5; at.width > l.u(68) && fs > 7; fs -= 0.5) at.setFontSize(l.u(fs));
+      ab.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.acceptSummons(r.inv); });
+      items.push(ab, at);
+      row.accept = ab;
+    } else if (r.kind === 'wait') {
+      const sh = ssTxt(this, l.x(118), y, '✶', l.u(14), '#c9b676').setOrigin(0.5).setInteractive({ useHandCursor: true });
+      ssHitPad(sh, 30);
+      vsOnTap(sh, () => {
+        SFX.ui();
+        vsShare(SS_T('vsShareText', vsName()), vsInviteUrl(r.code)).then((res) => {
+          if (res === 'copied') this.note(SS_T('vsCopied'), 2500);
+          else if (res === 'failed') this.note(SS_T('vsCopyFail'), 2500);
         });
-        items.push(sh);
-        row.share = sh;
+      });
+      items.push(sh);
+      row.share = sh;
+    }
+    if (r.kind === 'wait' || r.kind === 'declined') {
+      const xb = ssTxt(this, l.x(154), y, '✕', l.u(13), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+      ssHitPad(xb, 30);
+      xb.on('pointerdown', () => { SFX.ui(); this.cancelPend(r); });
+      items.push(xb);
+      row.cancel = xb;
+    } else if (r.kind !== 'sum') {
+      items.push(ssTxt(this, l.x(124), y, '›', l.u(16), r.kind === 'move' ? '#ffd77a' : '#8a94c4').setOrigin(0.5));
+      const zone = this.add.zone(l.x(-28), y, l.u(288), l.u(50)).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.scene.start('vsbattle', { code: r.code }); });
+      items.push(zone);
+      row.zone = zone;
+      // an ongoing duel's way out (9/8 card 04): ✕ → the confirmed abandon
+      // (a rated loss once words were exchanged; a decided duel just ends)
+      if (r.kind !== 'done') {
+        const ab = ssTxt(this, l.x(154), y, '✕', l.u(13), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
+        ssHitPad(ab, 30);
+        ab.on('pointerdown', () => { SFX.ui(); vsAbandon(this, r, () => { this.pendKey = ''; this.refreshPend(); }); });
+        items.push(ab);
+        row.abandon = ab;
       }
-      if (r.kind === 'wait' || r.kind === 'declined') {
-        const xb = ssTxt(this, l.x(172), y, '✕', l.u(13), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
-        ssHitPad(xb, 30);
-        xb.on('pointerdown', () => { SFX.ui(); this.cancelPend(r); });
-        items.push(xb);
-        row.cancel = xb;
-      } else {
-        items.push(ssTxt(this, l.x(150), y, '›', l.u(16), r.kind === 'move' ? '#ffd77a' : '#8a94c4').setOrigin(0.5));
-        const zone = this.add.zone(l.x(-24), y, l.u(312), l.u(32)).setOrigin(0.5).setInteractive({ useHandCursor: true });
-        zone.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.scene.start('vsbattle', { code: r.code }); });
-        items.push(zone);
-        row.zone = zone;
-        // an ongoing duel's way out (9/8 card 04): ✕ → the confirmed abandon
-        // (a rated loss once words were exchanged; a decided duel just ends)
-        if (r.kind !== 'done') {
-          const ab = ssTxt(this, l.x(178), y, '✕', l.u(13), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
-          ssHitPad(ab, 30);
-          ab.on('pointerdown', () => { SFX.ui(); vsAbandon(this, r, () => { this.pendKey = ''; this.refreshPend(); }); });
-          items.push(ab);
-          row.abandon = ab;
-        }
-      }
-      this.pendRows.push(row);
-      this.pendC.add(items);
-    });
+    }
+    this.pendRows.push(row);
+    return items;
+  }
+  // the plaque's ACCEPT — the same claim the banner makes: join, light the
+  // room, answer the bell, step in
+  async acceptSummons(inv) {
+    if (this.busyC) return;
+    this.busyC = true;
+    this.note(SS_T('smJoining'));
+    let ok = false;
+    try { ok = await vsJoinRoom(inv.code); } catch (e) { ok = false; }
+    if (ok) await vsStartIfFull(inv.code);
+    SSNET.FR.decline(inv.from);   // the bell is answered either way
+    if (!this.sys.isActive()) return;
+    this.busyC = false;
+    if (!ok) { this.note(SS_T('smCold'), 3000); this.pendKey = ''; this.refreshPend(); return; }
+    this.scene.start('vsbattle', { code: inv.code, joining: true });
   }
   cancelPend(r) {
     // one takeback for every unexchanged duel: the bell, the room (guarded
@@ -480,6 +631,162 @@ class VsMenu extends Phaser.Scene {
     vsAbandonNow(r, null, false);
     this.pendKey = '';
     this.refreshPend();
+  }
+  /* ---------- the doors ----------
+     The full ground keeps the two primaries, re-anchored to the true foot so
+     the meadow always survives beneath them. A fresh device gets the funnel
+     instead: no rivals yet, CHALLENGE WORLDWIDE promoted as the guaranteed
+     door (the circle seats an opponent inside the search's own beat), the
+     by-name add and the app invite beneath — empty of data, never an empty
+     place. */
+  buildDoors(funnel) {
+    const l = ssLayout(this);
+    this.doorsMode = funnel ? 'funnel' : 'duels';
+    if (this.doorsC) { this.doorsC.destroy(); this.doorsC = null; }
+    const c = this.doorsC = this.add.container(0, 0);
+    this.chFriendB = null; this.chWorldB = null; this.addDoorB = null; this.invDoorB = null;
+    const prim = (y, key, subKey, cb) => {
+      const b = this.add.image(l.x(0), l.y(y), ssBtn(this, false, 320, 60)).setDisplaySize(l.u(320), l.u(60)).setInteractive({ useHandCursor: true });
+      const t = ssTxt(this, l.x(0), l.y(y - 10), SS_T(key), l.u(17), BTN_INK()).setOrigin(0.5);
+      for (let fs = 17; t.width > l.u(296) && fs > 11; fs -= 0.5) t.setFontSize(l.u(fs));
+      const s = ssTxt(this, l.x(0), l.y(y + 12), SS_T(subKey), l.u(9.5), BTN_INK2(), 'italic').setOrigin(0.5);
+      for (let fs = 9.5; s.width > l.u(300) && fs > 7; fs -= 0.5) s.setFontSize(l.u(fs));
+      b.on('pointerdown', cb);
+      c.add([b, t, s]);
+      return b;
+    };
+    const dark = (y, key, subKey, cb, onUp) => {
+      const b = this.add.image(l.x(0), l.y(y), ssBtn(this, true, 320, 56)).setDisplaySize(l.u(320), l.u(56)).setInteractive({ useHandCursor: true });
+      const t = ssTxt(this, l.x(0), l.y(y - 9), SS_T(key), l.u(12.5), '#c9d0f0').setOrigin(0.5);
+      for (let fs = 12.5; t.width > l.u(296) && fs > 9; fs -= 0.5) t.setFontSize(l.u(fs));
+      const s = ssTxt(this, l.x(0), l.y(y + 11), SS_T(subKey), l.u(8.5), '#5a6390', 'italic').setOrigin(0.5);
+      for (let fs = 8.5; s.width > l.u(300) && fs > 7; fs -= 0.5) s.setFontSize(l.u(fs));
+      if (onUp) vsOnTap(b, cb); else b.on('pointerdown', cb);
+      c.add([b, t, s]);
+      return b;
+    };
+    if (funnel) {
+      const fic = ssTextBlock(this, l.x(0), l.y(330), SS_T('vsNoRecent'), {
+        fontSize: l.u(11) + 'px', color: '#5a6390', fontStyle: 'italic', shadow: true,
+        wrapW: l.u(320), align: 'center', ox: 0.5, oy: 0.5,
+      });
+      c.add(fic);
+      this.chWorldB = prim(414, 'vsChWorld', 'vsChWorldSub', () => { SFX.ensure(); SFX.ui(); this.match('turns'); });
+      this.addDoorB = dark(488, 'vsAddFriend', 'vsAddFriendSub', () => {
+        SFX.ensure(); SFX.ui();
+        // the by-name door opens the sheet AND the name field — after the
+        // add, the new friend stands on the roll behind the prompt
+        this.openSocial();
+        if (this.socialC) this.addPrompt(l);
+      });
+      // the share must fire on pointerUP (iOS user-activation law)
+      this.invDoorB = dark(562, 'vsInviteNew', 'vsInviteNewSub', () => { SFX.ensure(); SFX.ui(); this.inviteNew(); }, true);
+    } else {
+      const safeB = this.safeB;
+      this.chFriendB = prim(safeB - 158, 'vsChFriend', 'vsChFriendSub', () => { SFX.ensure(); SFX.ui(); this.openSocial(); });
+      this.chWorldB = prim(safeB - 90, 'vsChWorld', 'vsChWorldSub', () => { SFX.ensure(); SFX.ui(); this.match('turns'); });
+    }
+  }
+  /* ---------- UNDER THIS SKY TONIGHT — the presence strip ----------
+     Up to two pill chips + › ALL MAGES: friends online first (green pulse),
+     then recent rivals with the night-clock, then mages of the circle — who
+     glint ready but are NEVER labeled online (their quiet-player fiction
+     holds). Every action is dressed as a button (gold = a live duel starts
+     now, dark = a summons will wait) and routes through the same cap gate as
+     the doors. Ranked once per page open; the tick only redresses. */
+  buildStrip(l) {
+    const FR = SSNET.FR;
+    const circle = (typeof SS_RIVAL !== 'undefined') ? SS_RIVAL.circle() : [];
+    const inCircle = (id) => circle.some((p) => p.uid === id);
+    const picks = []; const seen = new Set();
+    for (const f of FR.list()) { if (picks.length >= 2) break; if (f.online && !seen.has(f.id)) { picks.push({ kind: 'friend', id: f.id, name: f.name }); seen.add(f.id); } }
+    for (const r of FR.recentList(6)) { if (picks.length >= 2) break; if (!seen.has(r.id)) { picks.push({ kind: 'recent', id: r.id, name: r.name, at: r.at, circle: inCircle(r.id) }); seen.add(r.id); } }
+    for (const p of circle) { if (picks.length >= 2) break; if (!seen.has(p.uid)) { picks.push({ kind: 'circle', id: p.uid, name: p.name, circle: true }); seen.add(p.uid); } }
+    if (!picks.length) return;   // nothing under this sky tonight — no strip
+    const c = this.stripC = this.add.container(0, 0);
+    this.stripHeadT = ssTxt(this, l.x(0), 0, SS_T('vsTonight'), l.u(9.5), '#8a94c4', 'italic').setOrigin(0.5);
+    c.add(this.stripHeadT);
+    this.chipRows = [];
+    const widths = picks.map(() => 118).concat([96]);
+    const total = widths.reduce((a, w) => a + w + 8, -8);
+    let cx = -total / 2;
+    picks.forEach((p, i) => {
+      const x = l.x(cx + 59); cx += 126;
+      const pill = this.add.image(x, l.u(26), ssBtn(this, true, 118, 36)).setDisplaySize(l.u(118), l.u(36)).setInteractive({ useHandCursor: true });
+      ssHitPad(pill, 44);
+      const dot = this.add.circle(x - l.u(45), l.u(26), l.u(4), 0x39406b);
+      const nm = ssTxt(this, x - l.u(36), l.u(26) - l.u(7), p.name, l.u(9), '#f0e8d2').setOrigin(0, 0.5);
+      while (nm.width > l.u(44) && nm.text.length > 2) nm.setText(nm.text.slice(0, -2) + '…');
+      const sub = ssTxt(this, x - l.u(36), l.u(26) + l.u(7), '', l.u(7), '#5a6390', 'italic').setOrigin(0, 0.5);
+      const tagB = this.add.image(x + l.u(36), l.u(26), ssBtn(this, true, 48, 20)).setDisplaySize(l.u(48), l.u(20));
+      const tagT = ssTxt(this, x + l.u(36), l.u(26), '', l.u(7.5), '#8a94c4').setOrigin(0.5);
+      c.add([pill, dot, nm, sub, tagB, tagT]);
+      const row = { kind: p.kind, id: p.id, name: p.name, at: p.at || 0, circle: !!p.circle, pill, dot, nameT: nm, subT: sub, tagB, tagT, pulse: null, lit: null };
+      pill.on('pointerdown', () => {
+        SFX.ensure(); SFX.ui();
+        if (row.kind === 'friend') this.challenge({ id: row.id, name: row.name, away: !SSNET.FR.isOnline(row.id), busy: SSNET.FR.isOnline(row.id) && SSNET.FR.isBusy(row.id) });
+        else this.rematch({ id: row.id, name: row.name }, row.circle);
+      });
+      this.chipRows.push(row);
+    });
+    const allB = this.add.image(l.x(cx + 48), l.u(26), ssBtn(this, true, 96, 36)).setDisplaySize(l.u(96), l.u(36)).setInteractive({ useHandCursor: true });
+    ssHitPad(allB, 44);
+    const allT = ssTxt(this, allB.x, l.u(26), SS_T('vsAllMages'), l.u(8.5), '#9fb0e8').setOrigin(0.5);
+    for (let fs = 8.5; allT.width > l.u(86) && fs > 6.5; fs -= 0.5) allT.setFontSize(l.u(fs));
+    allB.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.openSocial(); });
+    c.add([allB, allT]);
+    this.allMagesB = allB;
+    this.dressChips();
+  }
+  // the 1-second redress: dots recolor, words refresh, the zenith star
+  // flares while a summons stands — nothing ever reorders under a finger
+  dressChips() {
+    if (!this.chipRows) return;
+    const l0 = ssLayout(this);
+    const FR = SSNET.FR;
+    const pend = FR.pending() || [];
+    for (const r of this.chipRows) {
+      if (!r.dot.active) continue;
+      const online = FR.isOnline(r.id), busy = FR.isBusy(r.id);
+      // a circle mage glints ready, and is never labeled online (the law)
+      const lit = r.circle ? 'circle' : online ? (busy ? 'busy' : 'on') : 'off';
+      const called = pend.some((inv) => inv.from === r.id);
+      const state = lit + (called ? '!' : '');
+      if (state !== r.lit) {
+        r.lit = state;
+        if (r.pulse) { r.pulse.stop(); r.pulse = null; }
+        r.dot.setAlpha(1);
+        r.dot.setFillStyle(called ? 0xffd77a : r.circle ? 0xffd77a : online ? (busy ? 0xe8a87f : 0x7fe0a0) : 0x39406b);
+        if (r.circle || (online && !busy) || called) {
+          r.pulse = this.tweens.add({ targets: r.dot, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        }
+        const gold = r.circle || (online && !busy);
+        r.tagB.setTexture(ssBtn(this, !gold, 48, 20));
+        r.tagT.setText(SS_T(r.kind === 'recent' ? 'vsAgain' : 'vsDuelTag')).setColor(gold ? BTN_INK() : '#8a94c4');
+        for (let fs = 7.5; r.tagT.width > l0.u(44) && fs > 5.5; fs -= 0.5) r.tagT.setFontSize(l0.u(fs));
+      }
+      const sub = r.kind === 'friend' ? (online ? (busy ? SS_T('vsInDuel') : SS_T('vsOnline')) : SS_T('vsOffline'))
+        : r.kind === 'recent' ? vsNightsAgo(Date.now() - r.at) : '';
+      if (r.subT.active && r.subT.text !== sub) {
+        r.subT.setText(sub);
+        while (r.subT.width > l0.u(44) && r.subT.text.length > 3) r.subT.setText(r.subT.text.slice(0, -2) + '…');
+      }
+    }
+  }
+  tickDress() {
+    this.dressChips();
+    // the zenith star flares while a summons stands — the sky announcing it
+    const want = (SSNET.FR.pending() || []).length ? 1 : 0;
+    if (want !== this.zenFlare && this.zenith && this.zenith.active && this.zenithHalo) {
+      this.zenFlare = want;
+      const l = ssLayout(this);
+      if (this.zenBreath) { this.zenBreath.stop(); this.zenBreath = null; }
+      this.zenithHalo.setAlpha(want ? 0.3 : 0.13);
+      this.zenith.setDisplaySize(l.u(want ? 34 : 24), l.u(want ? 34 : 24));
+      if (!ssReduceMotion()) {
+        this.zenBreath = this.tweens.add({ targets: this.zenithHalo, alpha: want ? 0.16 : 0.08, duration: want ? 900 : 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      }
+    }
   }
 
   /* ---------- the challenge doors ---------- */
@@ -659,6 +966,82 @@ function vsSwordsTex(scene, w) {
     c.save(); c.translate(D / 2, D / 2);
     for (const a of [-0.66, 0.66]) { c.save(); c.rotate(a); c.fillRect(-2.5, -44, 5, 84); c.fillRect(-10, 24, 20, 4); c.restore(); }
     c.restore();
+  });
+  return key;
+}
+/* ---------- THE DUELISTS' chart ----------
+   The authored faceless mage asterism from the UNDER ONE SKY review (9/9),
+   verbatim: eleven stars, eleven edges, no eyes. One chart serves both
+   figures — the rival's container mirrors it — and the shipped renderer's
+   own magnitude classes dress the stars, exactly as every beast wears them. */
+const VS_MAGE = {
+  stars: [[-58, -56], [-72, -40], [-44, -42], [-74, -22], [-48, -24], [-34, -36], [-18, -50], [-64, 0], [-82, 42], [-58, 50], [-38, 40]],
+  edges: [[0, 1], [0, 2], [1, 3], [2, 4], [4, 5], [5, 6], [3, 7], [7, 8], [8, 9], [9, 10], [10, 4]],
+};
+/* one Duelist figure, drawn to the review's own dress: the authored
+   magnitudes, a soft halo under every star, the edges in the figure's tint,
+   hot centres on the anchors — all from chart data and the shipped 'dot'
+   texture (no new art). `fly` staggers the stars in on the assembly
+   grammar (the session's first visit); `still` (reduced motion, the
+   offline page) stands everything at once with no breath. */
+const VS_MAGE_MAG = [3.3, 2.2, 2.2, 2.6, 2.6, 2.2, 3.4, 2.6, 2.4, 2.9, 2.4];
+function vsMageFigure(scene, cont, tint, unitScale, opts) {
+  opts = opts || {};
+  cont.removeAll(true);
+  const sc = unitScale;
+  const g = scene.add.graphics();
+  g.lineStyle(unitScale * 1.1, tint, 0.5);
+  for (const [a, b] of VS_MAGE.edges) g.lineBetween(VS_MAGE.stars[a][0] * sc, VS_MAGE.stars[a][1] * sc, VS_MAGE.stars[b][0] * sc, VS_MAGE.stars[b][1] * sc);
+  cont.add(g);
+  if (opts.fly) { g.setAlpha(0); scene.tweens.add({ targets: g, alpha: 1, duration: 500, delay: VS_MAGE.stars.length * 40 + 520 }); }
+  VS_MAGE.stars.forEach((p, i) => {
+    const m = VS_MAGE_MAG[i];
+    const x = p[0] * sc, y = p[1] * sc;
+    const halo = scene.add.image(x, y, 'dot').setScale(m * 1.2).setAlpha(0.14).setTint(tint).setBlendMode('ADD');
+    const st = scene.add.image(x, y, 'dot').setScale(m * 0.62).setTint(tint).setBlendMode('ADD');
+    cont.add(halo); cont.add(st);
+    const hot = m >= 3 ? scene.add.image(x, y, 'dot').setScale(m * 0.24).setAlpha(0.6).setTint(0xfff6dd).setBlendMode('ADD') : null;
+    if (hot) cont.add(hot);
+    if (opts.fly) {
+      const ang = Math.random() * Math.PI * 2, d = 260 * unitScale + Math.random() * 200;
+      for (const o of [halo, st, hot]) {
+        if (!o) continue;
+        const fa = o.alpha;
+        o.setPosition(x + Math.cos(ang) * d, y + Math.sin(ang) * d).setAlpha(0);
+        scene.tweens.add({ targets: o, x, y, alpha: fa, delay: i * 40, duration: 620, ease: 'Cubic.easeOut' });
+      }
+    }
+    if (!opts.still) {
+      scene.tweens.add({
+        targets: st, scale: m * 0.48, alpha: 0.72, delay: opts.fly ? i * 40 + 640 : 0,
+        duration: 900 + (i * 137) % 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      });
+    }
+  });
+}
+/* the your-move plaque's gold rim: baked ONCE, breathed by alpha tween only
+   — never a per-frame stroke (the iOS renderer's law) */
+function vsPlaqRimTex(scene) {
+  const key = 'vsplaqrim';
+  if (scene.textures.exists(key)) return key;
+  const W = 344, H = 50, R = ssTexRes(scene);
+  const t = scene.textures.createCanvas(key, Math.round(W * R), Math.round(H * R));
+  t.context.scale(R, R);
+  ssBake(t, key, W, H, (c) => {
+    c.clearRect(0, 0, W, H);
+    c.save();
+    c.shadowColor = 'rgba(255,215,122,0.55)'; c.shadowBlur = 7;
+    c.strokeStyle = '#ffd77a'; c.lineWidth = 1.6;
+    c.beginPath(); c.roundRect(3, 3, W - 6, H - 6, 10); c.stroke();
+    c.shadowColor = 'transparent'; c.shadowBlur = 0;
+    c.strokeStyle = 'rgba(255,233,168,0.5)'; c.lineWidth = 0.8;
+    c.beginPath(); c.roundRect(4.2, 4.2, W - 8.4, H - 8.4, 9); c.stroke();
+    c.restore();
+  }, (c) => {
+    // fallback: a plain gold frame — still a rim, no curves, no shadows
+    c.clearRect(0, 0, W, H);
+    c.strokeStyle = '#ffd77a'; c.lineWidth = 2;
+    c.strokeRect(3, 3, W - 6, H - 6);
   });
   return key;
 }
@@ -1368,7 +1751,7 @@ class VsBattle extends Phaser.Scene {
     // so a stale rematchBusy/pulse would dead-lock the NEXT end screen's door
     this.rematchWait = d.rematchWait || null;   // {from, foe:{id,name}}: this room was sealed by my rematch press
     this.rematchBusy = false; this.rematchPulse = null; this.rematchDead = false;
-    this.rmDeclB = null; this.rmDeclT = null; this.rmGone = false; this.rmGoneT = null;
+    this.rmDeclB = null; this.rmDeclT = null; this.rmGone = false; this.rmGoneT = null; this.rematchG = null;
     this.rmNoRef = null; this.rmNoCb = null; this.rmNoDisc = null; this.rmBelt = null; this.rmDone = false;
   }
 
@@ -2912,11 +3295,28 @@ class VsBattle extends Phaser.Scene {
         .setShadow(0, 0, rd > 0 ? '#c9b676' : '#802020', l.u(6), true, true));
     }
     this.rematchB = this.add.image(l.x(0), l.y(455), ssBtn(this, false, 240, 56)).setDisplaySize(l.u(240), l.u(56)).setInteractive({ useHandCursor: true }).setDepth(151);
-    this.rematchT = ssTxt(this, l.x(0), l.y(455), '⚔ REMATCH', l.u(16), BTN_INK()).setOrigin(0.5).setDepth(151);
+    this.rematchT = ssTxt(this, l.x(0), l.y(455), '', l.u(16), BTN_INK()).setOrigin(0.5).setDepth(151);
+    // the U+2694 text died in the 9/10 sweep — the drawn blades ride beside the
+    // label instead, re-laid after EVERY setText (statuses hide the glyph)
+    this.rematchG = this.add.image(l.x(0), l.y(455), vsSwordsTex(this)).setDisplaySize(l.u(18), l.u(18)).setDepth(151);
+    this.dressRematch = (label, glyph) => {
+      if (!this.rematchT || !this.rematchT.active) return;
+      this.rematchT.setText(label);
+      let fs = 16;
+      for (; this.rematchT.width > l.u(glyph ? 176 : 200) && fs > 10; fs -= 0.5) this.rematchT.setFontSize(l.u(fs));
+      if (glyph && this.rematchG && this.rematchG.active) {
+        this.rematchT.setX(l.x(0) + l.u(11));
+        this.rematchG.setVisible(true).setPosition(this.rematchT.x - this.rematchT.width / 2 - l.u(13), l.y(455));
+      } else {
+        this.rematchT.setX(l.x(0));
+        if (this.rematchG && this.rematchG.active) this.rematchG.setVisible(false);
+      }
+    };
+    this.dressRematch('REMATCH', true);
     this.rematchB.on('pointerdown', () => { SFX.ui(); this.doRematch(); });
     const homeB = this.add.image(l.x(0), l.y(525), ssBtn(this, true, 220, 52)).setDisplaySize(l.u(220), l.u(52)).setInteractive({ useHandCursor: true }).setDepth(151);
     const homeT = ssTxt(this, l.x(0), l.y(525), 'RETURN', l.u(15), '#9fb0e8').setOrigin(0.5).setDepth(151);
-    items.push(this.rematchB, this.rematchT, homeB, homeT);
+    items.push(this.rematchB, this.rematchT, this.rematchG, homeB, homeT);
     homeB.on('pointerdown', () => { SFX.ui(); this.scene.start('vsmenu'); });
     // the rival you just fought is the friend you're most likely to want
     const foesL = this.others();
@@ -2970,13 +3370,13 @@ class VsBattle extends Phaser.Scene {
   /* ---------- rematch: first presser seals a fresh room on the old one ---------- */
   showRematchCall() {
     if (!this.rematchT || this.rmGone || this.rematchDead || this.rematchPulse) return;
-    this.rematchT.setText('⚔ ANSWER THE REMATCH');
+    this.dressRematch('ANSWER THE REMATCH', true);
     // the call can land during the winner's fanfare entrance (the pair still
     // rising at alpha 0) — the pulse pins its own range (from 1) so it never
     // breathes around the entrance's zero. NEVER killTweensOf here: the
     // entrance is ONE shared tween, and killing it for this pair freezes
     // every other end-screen item (RETURN included) at alpha 0.
-    this.rematchPulse = this.tweens.add({ targets: [this.rematchB, this.rematchT], alpha: { from: 1, to: 0.55 }, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.rematchPulse = this.tweens.add({ targets: [this.rematchB, this.rematchT, this.rematchG].filter(Boolean), alpha: { from: 1, to: 0.55 }, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     // the quieter door beside it (9/8 card 02): a rematch can be REFUSED —
     // the ✕ says so out loud, and the waiting rival is freed at once
     if (!this.near && !this.rmDeclB) {
@@ -3004,10 +3404,10 @@ class VsBattle extends Phaser.Scene {
   // destroyed mid-screen and never killTweensOf (both would break the
   // fanfare's ONE shared entrance tween for every other end-screen item)
   rmFadeDoors() {
-    const dead = [this.rematchB, this.rematchT, this.rmDeclB, this.rmDeclT].filter(Boolean);
+    const dead = [this.rematchB, this.rematchT, this.rematchG, this.rmDeclB, this.rmDeclT].filter(Boolean);
     dead.forEach((o) => { if (o.input) o.input.enabled = false; });
     this.tweens.add({ targets: dead, alpha: 0, duration: 400, onComplete: () => dead.forEach((o) => { if (o.active) o.setVisible(false); }) });
-    this.rematchB = null; this.rematchT = null; this.rmDeclB = null; this.rmDeclT = null;
+    this.rematchB = null; this.rematchT = null; this.rematchG = null; this.rmDeclB = null; this.rmDeclT = null;
   }
   /* the rival moved on (their ✕, their leaving, their app closing) — the
      rematch door fades honestly instead of sealing a wait nobody will ever
@@ -3035,7 +3435,7 @@ class VsBattle extends Phaser.Scene {
     if (this.room.corr && vsCapSheet(this)) return;
     this.rematchBusy = true;
     try { if (this.rmNoDisc) { this.rmNoDisc.cancel(); this.rmNoDisc = null; } } catch (e) { }
-    this.rematchT && this.rematchT.setText('SEALING…');
+    this.rematchT && this.dressRematch('SEALING…', false);
     try {
       if (this.near) {
         // the same rival answers on this device: a fresh near room, the old
@@ -3076,14 +3476,14 @@ class VsBattle extends Phaser.Scene {
         if (dest !== code) SSNET.dbSet('mp/rooms/' + code, null).catch(() => { });
       }
       const mine = await vsJoinRoom(dest); // idempotent — true if we are already seated
-      if (!mine) { this.rematchBusy = false; this.rematchT && this.rematchT.setText('THE SEAL IS COLD'); return; }
+      if (!mine) { this.rematchBusy = false; this.rematchT && this.dressRematch('THE SEAL IS COLD', false); return; }
       // the wait ahead knows whom it waits for: the old room carries the
       // refusal word, the foe's name dresses the freed-notice, the belt arms
       const foe0 = this.others()[0] || null;
       this.scene.start('vsbattle', { code: dest, rematchWait: { from: this.code, foe: foe0 ? { id: foe0.id, name: foe0.name } : null } });
     } catch (e) {
       this.rematchBusy = false;
-      this.rematchT && this.rematchT.setText('⚔ REMATCH');
+      this.rematchT && this.dressRematch('REMATCH', true);
     }
   }
 
@@ -3288,16 +3688,18 @@ class VsSummons extends Phaser.Scene {
     const glow = this.add.image(0, 0, 'glowbig').setDisplaySize(l.u(W * 1.5), l.u(H * 2.6)).setTint(0xffd77a).setAlpha(0.16).setBlendMode('ADD');
     this.tweens.add({ targets: glow, alpha: 0.05, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     const bg = this.add.image(0, 0, ssBtn(this, true, W, H)).setDisplaySize(l.u(W), l.u(H)).setInteractive();
-    const t1 = ssTxt(this, -l.u(W / 2 - 16), 0, SS_T('vsAnswered', name), l.u(12.5), '#ffe9a8').setOrigin(0, 0.5)
+    // the drawn blades here too — vsAnswered lost its U+2694 in the 9/10 sweep
+    const gl = this.add.image(-l.u(W / 2 - 28), 0, vsSwordsTex(this)).setDisplaySize(l.u(20), l.u(20)).setAlpha(0.95);
+    const t1 = ssTxt(this, -l.u(W / 2 - 46), 0, SS_T('vsAnswered', name), l.u(12.5), '#ffe9a8').setOrigin(0, 0.5)
       .setShadow(0, 0, '#c9b676', l.u(6), true, true);
-    while (t1.width > l.u(200) && t1.text.length > 6) t1.setText(t1.text.slice(0, -2) + '…');
+    while (t1.width > l.u(176) && t1.text.length > 6) t1.setText(t1.text.slice(0, -2) + '…');
     const ab = this.add.image(l.u(W / 2 - 74), 0, ssBtn(this, false, 88, 32)).setDisplaySize(l.u(88), l.u(32)).setInteractive({ useHandCursor: true });
     const at = ssTxt(this, l.u(W / 2 - 74), 0, SS_T('smAccept'), l.u(11), BTN_INK()).setOrigin(0.5);
     this.tweens.add({ targets: [ab, at], alpha: 0.7, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     ab.on('pointerdown', () => { SFX.ensure(); SFX.ui(); this.enterPending(code); });
     const xb = ssTxt(this, l.u(W / 2 - 16), 0, '✕', l.u(15), '#8a94c4').setOrigin(0.5).setInteractive({ useHandCursor: true });
     xb.on('pointerdown', () => { SFX.ui(); this.hide(); });
-    c.add([glow, bg, t1, ab, at, xb]);
+    c.add([glow, bg, gl, t1, ab, at, xb]);
     c.y = l.y(120) - l.u(90); c.alpha = 0;
     this.tweens.add({ targets: c, y: l.y(120), alpha: 1, duration: 420, ease: 'Back.easeOut' });
     SFX.forge();
@@ -3341,11 +3743,13 @@ class VsSummons extends Phaser.Scene {
     const glow = this.add.image(0, 0, 'glowbig').setDisplaySize(l.u(W * 1.5), l.u(H * 2.6)).setTint(0xffd77a).setAlpha(0.16).setBlendMode('ADD');
     this.tweens.add({ targets: glow, alpha: 0.05, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     const bg = this.add.image(0, 0, ssBtn(this, true, W, H)).setDisplaySize(l.u(W), l.u(H)).setInteractive();
+    // the drawn blades at the pill's left — the U+2694 left smTitle in the 9/10 sweep
+    const gl = this.add.image(-l.u(W / 2 - 28), 0, vsSwordsTex(this)).setDisplaySize(l.u(20), l.u(20)).setAlpha(0.95);
     const name = inv.name || SSNET.FR.nameOf(inv.from);
-    const t1 = ssTxt(this, -l.u(W / 2 - 16), -l.u(13), SS_T('smTitle', name), l.u(13), '#ffe9a8').setOrigin(0, 0.5)
+    const t1 = ssTxt(this, -l.u(W / 2 - 46), -l.u(13), SS_T('smTitle', name), l.u(13), '#ffe9a8').setOrigin(0, 0.5)
       .setShadow(0, 0, '#c9b676', l.u(6), true, true);
-    while (t1.width > l.u(220) && t1.text.length > 6) t1.setText(t1.text.slice(0, -2) + '…');
-    const t2 = ssTxt(this, -l.u(W / 2 - 16), l.u(11), SS_T(VS_MODE_KEY[inv.mode] || 'vsModeTurns') + '  ·  ' + inv.code, l.u(10), '#9fb0e8', 'italic').setOrigin(0, 0.5);
+    while (t1.width > l.u(196) && t1.text.length > 6) t1.setText(t1.text.slice(0, -2) + '…');
+    const t2 = ssTxt(this, -l.u(W / 2 - 46), l.u(11), SS_T(VS_MODE_KEY[inv.mode] || 'vsModeTurns') + '  ·  ' + inv.code, l.u(10), '#9fb0e8', 'italic').setOrigin(0, 0.5);
     const ab = this.add.image(l.u(W / 2 - 78), 0, ssBtn(this, false, 96, 32)).setDisplaySize(l.u(96), l.u(32)).setInteractive({ useHandCursor: true });
     const at = ssTxt(this, l.u(W / 2 - 78), 0, SS_T('smAccept'), l.u(11), BTN_INK()).setOrigin(0.5);
     this.tweens.add({ targets: [ab, at], alpha: 0.7, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -3354,7 +3758,7 @@ class VsSummons extends Phaser.Scene {
     xb.on('pointerdown', () => { SFX.ui(); SSNET.FR.decline(inv.from); this.hide(); });
     this.moreT = ssTxt(this, 0, l.u(H / 2 + 12), more > 0 ? SS_T('smMore', more) : '', l.u(9), '#8a94c4', 'italic').setOrigin(0.5);
     this.acceptT = at;
-    c.add([glow, bg, t1, t2, ab, at, xb, this.moreT]);
+    c.add([glow, bg, gl, t1, t2, ab, at, xb, this.moreT]);
     c.y = l.y(120) - l.u(90); c.alpha = 0;
     this.tweens.add({ targets: c, y: l.y(120), alpha: 1, duration: 420, ease: 'Back.easeOut' });
     SFX.forge();

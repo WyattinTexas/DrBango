@@ -133,7 +133,9 @@ function seatChecks(tag, r, uid) {
   const extra = Object.keys(seat).filter((k) => !PERSON.includes(k));
   ok(tag + " seat carries only a person's fields", extra.length === 0, extra.join(','));
   ok(tag + ' uid cut like a device uid', /^u[a-z0-9]{8,}$/.test(uid) && !/test_/.test(uid), uid);
-  ok(tag + ' name cut like a generated name', /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(seat.name), seat.name);
+  // the registry keeps names unique — a pool collision mints a numbered
+  // sibling ('Astral Raven 1'), still the persona shape
+  ok(tag + ' name cut like a generated name', /^[A-Z][a-z]+ [A-Z][a-z]+( \d+)?$/.test(seat.name), seat.name);
   const casts = Object.values(r.casts || {}).filter((c) => c.uid === uid);
   const CAST = ['uid', 'name', 'word', 'dmg', 'target', 'at'];
   ok(tag + ' casts carry only a cast\'s fields', casts.every((c) => Object.keys(c).every((k) => CAST.includes(k))));
@@ -342,7 +344,7 @@ if (ONLY === 'all' || ONLY === 'queue') {
   ok('OPPONENT FOUND flips on the rolled beat — inside [8s, 16s], never early', foundAt > 0 && reveal >= 7.8 && reveal <= 16.5 && foundAt >= th.t0 + th.T - 500, reveal.toFixed(1) + 's of ' + (th.T / 1000).toFixed(1) + 's rolled');
   ok('…and the rival was seated BEFORE the reveal (the theater never lies)', !!seat && seat.joinedAt < foundAt);
   ok('uid cut like a device uid, no test_ prefix', /^u[a-z0-9]{8,}$/.test(other || ''), other);
-  ok('name cut like a generated name', !!seat && /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(seat.name), seat && seat.name);
+  ok('name cut like a generated name', !!seat && /^[A-Z][a-z]+ [A-Z][a-z]+( \d+)?$/.test(seat.name), seat && seat.name);
   const gap = seat ? Math.abs(seat.rating - mine) : 0;
   ok('seat rating 40–90 off the player\'s (' + mine + ')', gap >= 40 && gap <= 90, seat && seat.rating);
   // the profile row, as a quiet player's — read while the rival is still fresh in the seat

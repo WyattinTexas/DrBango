@@ -67,8 +67,8 @@ async function client(port, tag) {
   };
   const type = (text) => send('Input.insertText', { text });
   const key = async (k, code) => {
-    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, windowsVirtualKeyCode: 13 });
-    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: 13 });
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, windowsVirtualKeyCode: code === 'Enter' ? 13 : 27 });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: code === 'Enter' ? 13 : 27 });
   };
   return { ev, seed, nav, park, until, tap, type, key, tag };
 }
@@ -82,15 +82,22 @@ const BOOT = (uid, name) => `navigator.share = undefined; navigator.clipboard = 
     localStorage.setItem('starspellUid', '${uid}'); localStorage.setItem('starspellName', ${JSON.stringify(name)}); localStorage.setItem('beta3.vsmode', 'turns'); } } catch (e) {}`;
 const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').dailyChipB`;
 const ensured = (c) => c.until(`(async () => { await SSNET.ensureName(); return true })()`, 30000);
-const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').chFriendB`;
+// the world door stands in every online state (v0.97.0: the funnel promotes
+// it, the full ground keeps it) — the page sentinel
+const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').chWorldB`;
 const toMenu = async (c) => { await c.ev(`game.scene.getScene('home').scene.start('vsmenu'); 1`); const r = await c.until(MENU, 20000); await sleep(600); return r; };
-// the roll lives in the social sheet now (v0.73.0): recentRows exists only
-// while the sheet stands, so CHALLENGE A FRIEND is tapped for real first
+// the roll lives in the social sheet: a fresh mage reaches it through the
+// funnel's ADD A FRIEND BY NAME door (v0.97.0; Escape leaves the sheet
+// standing), a mage with names through CHALLENGE A FRIEND
 const toSheet = async (c) => {
   if (!await toMenu(c)) return false;
   for (let i = 0; i < 5; i++) {
-    await c.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChFriend'))`);
-    if (await c.until(`!!game.scene.getScene('vsmenu').recentRows`, 4000)) { await sleep(500); return true; }
+    const funnel = await c.ev(`!!game.scene.getScene('vsmenu').addDoorB`);
+    await c.tap(funnel ? `game.scene.getScene('vsmenu').addDoorB` : `game.scene.getScene('vsmenu').chFriendB`);
+    if (await c.until(`!!game.scene.getScene('vsmenu').recentRows`, 4000)) {
+      if (funnel) { await c.key('Escape', 'Escape'); await c.until(`!document.getElementById('ss-overlay-input')`, 4000); }
+      await sleep(500); return true;
+    }
   }
   return false;
 };
@@ -243,7 +250,7 @@ const stale = (await rt('mp/rooms')) || {};
 for (const [k, r] of Object.entries(stale)) if (r && r.status === 'waiting' && !r.private && r.createdAt < Date.now() - 120000) await rtDel('mp/rooms/' + k);
 ok('A back on the meadow', await home(A));
 ok('A opens VERSUS', await toMenu(A));
-await A.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChWorld'))`);
+await A.tap(`game.scene.getScene('vsmenu').chWorldB`);   // the doors live in a container now (v0.97.0)
 ok('CHALLENGE WORLDWIDE opens a searching room', await A.until(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room && s.room.seekAt })()`, 25000));
 let lb = await lobby(A); if (lb) codes.add(lb.code);
 ok('the quiet sky answers — a circle mage arrives and the duel starts', await A.until(ACTIVE, 30000));

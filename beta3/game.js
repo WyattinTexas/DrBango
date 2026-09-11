@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.96.0';
+const BUILD = 'STARSPELL v0.97.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1751,7 +1751,12 @@ function ssSkyWorld(scene, opts) {
   const l = ssLayout(scene);
   ssSkyTextures(scene, opts.dawn);
   const T = 1600 * l.s;                                  // camera travel, px
-  const B = opts.zenithAtZero ? 1600 : 0;                // design-unit shift
+  // versus dress (9/9 UNDER ONE SKY, built 9/10): the menu frames this same
+  // world a touch deeper into the night — the meadow band sits 150 lower so
+  // only its crest holds the foot, the moon stays out of frame, the aurora
+  // runs colder, and six fireflies keep the crest. Home passes no flag and
+  // is byte-identical.
+  const B = opts.zenithAtZero ? 1600 : (opts.versus ? 150 : 0);   // design-unit shift
   const my = (m, f) => l.y(m + B * (f == null ? 1 : f)); // meadow-frame coord (factor-aware)
   const wy = (d) => l.y(d - 1600 + B);                   // worldY (0..2400) → scene y
   const rnd = opts.seed ? ssMulberry(opts.seed) : Math.random;
@@ -1759,10 +1764,17 @@ function ssSkyWorld(scene, opts) {
 
   // master gradient: spans the whole column, zenith top pinned to the game bg
   scene.add.image(l.W / 2, wy(0), opts.dawn ? 'skygrad-dawn' : 'skygrad').setOrigin(0.5, 0).setDisplaySize(l.W, 2400 * l.s);
+  // the versus hour: one navy veil deepens the same gradient into a later
+  // night (no second gradient bake — the same world, a darker hour); stars,
+  // aurora and meadow draw above it at full voice
+  if (opts.versus) scene.add.rectangle(l.W / 2, wy(0), l.W, 2400 * l.s + 240 * l.s, 0x0a0e1f, 0.58).setOrigin(0.5, 0);
   scene.add.rectangle(l.W / 2, my(800), l.W, Math.max(1, l.H - l.y(800)) + 120 * l.s, opts.dawn ? 0x0b0716 : 0x070510).setOrigin(0.5, 0);
 
-  // aurora — lives at the zenith; one faint teal tease bleeds into the meadow sky
-  for (const [tint, dx, dy, a] of [[0x2fe0d0, -120, 160, 0.055], [0x8a5ae0, 130, 120, 0.055], [0xd7b45c, 0, 640, 0.055], [0x2fe0d0, 40, 1660, 0.03]]) {
+  // aurora — lives at the zenith; one faint teal tease bleeds into the meadow
+  // sky. The versus frame swaps the warm gold mid-curtain for a cold blue.
+  for (const [tint, dx, dy, a] of (opts.versus
+    ? [[0x2fe0d0, -120, 160, 0.05], [0x8a5ae0, 130, 120, 0.05], [0x4a6ae0, 0, 640, 0.045], [0x2fe0d0, 40, 1660, 0.03]]
+    : [[0x2fe0d0, -120, 160, 0.055], [0x8a5ae0, 130, 120, 0.055], [0xd7b45c, 0, 640, 0.055], [0x2fe0d0, 40, 1660, 0.03]])) {
     const g = scene.add.image(l.x(dx), wy(dy), 'glowbig').setScale(l.u(2.6)).setTint(tint).setAlpha(a).setBlendMode('ADD');
     scene.tweens.add({ targets: g, x: g.x + l.u(30), y: g.y - l.u(20), scale: l.u(3.1), duration: 7000 + rnd() * 4000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
@@ -1804,8 +1816,9 @@ function ssSkyWorld(scene, opts) {
     scene.tweens.add({ targets: hs, alpha: 0.45 * starDim, duration: 2200 + rnd() * 1800, yoyo: true, repeat: -1, delay: rnd() * 2000 });
   }
 
-  // moon — low on the horizon's left shoulder; at dawn it has already set
-  if (!opts.dawn) {
+  // moon — low on the horizon's left shoulder; at dawn it has already set,
+  // and the versus frame keeps it out entirely (no moon over the duel)
+  if (!opts.dawn && !opts.versus) {
     const moon = scene.add.image(l.x(-140), my(425, 0.85), 'moon').setDisplaySize(l.u(104), l.u(104)).setAngle(24).setScrollFactor(1, 0.85);
     const halo = scene.add.image(moon.x, moon.y, 'glowbig').setScale(l.u(0.95)).setTint(0xf7e8c8).setAlpha(0.14).setBlendMode('ADD').setScrollFactor(1, 0.85);
     scene.tweens.add({ targets: halo, alpha: 0.1, duration: 4200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -1828,7 +1841,10 @@ function ssSkyWorld(scene, opts) {
   // just past the screen bottom so the anticipation dip can't peek under it);
   // width follows the screen, so very wide frames stretch the painting rather
   // than run out of it.
-  const artMeadow = ART && SSART.ready && !opts.dawn;
+  // the versus hour keeps the procedural silhouettes: the painted plate is
+  // graded for dusk (and its ridge rides too high for the crest-at-the-foot
+  // framing) — at this hour the hills are shapes against the deep sky
+  const artMeadow = ART && SSART.ready && !opts.dawn && !opts.versus;
   if (artMeadow) {
     if (!scene.textures.exists('meadowart')) scene.textures.addImage('meadowart', SSART.img.meadow);
     const src = scene.textures.get('meadowart').getSourceImage();
@@ -1853,8 +1869,8 @@ function ssSkyWorld(scene, opts) {
     scene.tweens.add({ targets: f, x: f.baseX + l.u(-14 + rnd() * 28), y: f.baseY - l.u(6 + rnd() * 10), duration: 2600 + rnd() * 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   };
   if (!opts.dawn) {
-    for (let i = 0; i < 12; i++) {
-      const f = scene.add.image(l.x(-180 + rnd() * 360), my(600 + rnd() * 165), 'dot')
+    for (let i = 0; i < (opts.versus ? 6 : 12); i++) {
+      const f = scene.add.image(l.x(-180 + rnd() * 360), opts.versus ? my(568 + rnd() * 120, 1) : my(600 + rnd() * 165), 'dot')
         .setScale(l.u(0.22 + rnd() * 0.14)).setTint(0xffdf8f).setBlendMode('ADD').setAlpha(0);
       f.baseX = f.x; f.baseY = f.y;
       flyTweens(f);
@@ -5710,6 +5726,13 @@ class Home extends Phaser.Scene {
         this.rowSubs[r.key] = sub;
       }
       if (r.key) { this.rowBtns[r.key] = b; this.rowLabels[r.key] = lab; }
+      if (r.key === 'versus') {
+        // the door's word lost its U+2694 emoji in the 9/10 sweep — small drawn
+        // blades flank the label instead, the versus wordmark's own treatment.
+        // They ride the label through every reflow (layoutMenu, setRowSub).
+        lab.vsGlyphs = [-1, 1].map((sgn) => ui(this.add.image(l.x(0) + sgn * (lab.width / 2 + l.u(15)), l.y(r.y), vsSwordsTex(this))
+          .setDisplaySize(l.u(14), l.u(14)).setAlpha(0.9)));
+      }
       this.menuRows.push({ key: r.key, b, lab, sub: this.rowSubs[r.key] });
       b.on('pointerdown', () => { if (this.busy() || (r.key === 'campaign' && !this.campAlive)) return; SFX.ensure(); this.bloomBtn = b; r.fn(); });
       b.on('pointerover', () => b.setScale(b.scaleX * 1.03, b.scaleY * 1.03));
@@ -5730,6 +5753,7 @@ class Home extends Phaser.Scene {
         m.lab.rowY = ry;
         const lift = m.sub && m.sub.visible ? 9 : 0;
         const move = [[m.b, l.y(ry)], [m.lab, l.y(ry - lift)]];
+        if (m.lab.vsGlyphs) for (const g of m.lab.vsGlyphs) move.push([g, l.y(ry - lift)]);
         if (m.sub) move.push([m.sub, l.y(ry + 13)]);
         for (const [o, ty] of move) {
           this.tweens.killTweensOf(o);
@@ -5750,9 +5774,11 @@ class Home extends Phaser.Scene {
       if (color) sub.setColor(color);
       sub.setVisible(live);
       const ty = l.y(lab.rowY - (live ? 9 : 0));
-      this.tweens.killTweensOf(lab);
-      if (snap || Math.abs(lab.y - ty) < 0.5) lab.setY(ty);
-      else this.tweens.add({ targets: lab, y: ty, duration: 200, ease: 'Sine.easeInOut' });
+      for (const o of [lab, ...(lab.vsGlyphs || [])]) {
+        this.tweens.killTweensOf(o);
+        if (snap || Math.abs(o.y - ty) < 0.5) o.setY(ty);
+        else this.tweens.add({ targets: o, y: ty, duration: 200, ease: 'Sine.easeInOut' });
+      }
     };
     /* the CONTINUE GAME door re-reads the checkpoint: alive (full dress,
        hand cursor, live progress line) or NOT RENDERED AT ALL (v0.51.0 —
@@ -10461,7 +10487,10 @@ class Profile extends Phaser.Scene {
       const name = crowned ? a.crown.name : a.name;
       const desc = crowned ? a.crown.desc : a.famIds ? a.desc + '  ' + famN + ' / ' + a.famIds.length : a.desc;
       if (k < n - 1) rc.add(this.add.rectangle(l.x(0), l.y(yk + RH / 2 + GAP / 2), l.u(330), Math.max(1, l.u(1)), 0x2b3157, 0.55));
-      rc.add(ssTxt(this, l.x(-148), l.y(yk), icon, l.u(24), got ? '#ffd77a' : '#39406b').setOrigin(0.5)
+      // '@blades' is the trophy grid's glyph seam (9/10 sweep): the versus
+      // trophy wears the drawn crossed blades, never the U+2694 emoji
+      if (icon === '@blades') rc.add(this.add.image(l.x(-148), l.y(yk), vsSwordsTex(this)).setDisplaySize(l.u(27), l.u(27)).setAlpha(got ? 1 : 0.35));
+      else rc.add(ssTxt(this, l.x(-148), l.y(yk), icon, l.u(24), got ? '#ffd77a' : '#39406b').setOrigin(0.5)
         .setShadow(0, 0, got ? '#c9a94f' : '#0a0e1f', l.u(got ? 8 : 4), true, true));
       const nmT = ssTxt(this, l.x(-116), l.y(yk - 13), name, l.u(14), got ? '#f0e8d2' : '#4a5480')
         .setOrigin(0, 0.5).setData('achName', a.id);

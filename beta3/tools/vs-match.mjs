@@ -75,7 +75,8 @@ async function client(port, tag) {
   // a REAL tap on CHALLENGE WORLDWIDE (FIND A RIVAL until v0.73.0 — the
   // queue behind the button is unchanged)
   c.find = async () => {
-    await tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChWorld'))`);
+    // the doors live in a container now (v0.97.0) — tap the ref, not the text
+    await tap(`game.scene.getScene('vsmenu').chWorldB`);
   };
   c.room = () => ev(`(() => { const s = game.scene.getScene('vsbattle'); return s && s.scene.isActive() && s.room ? s.code : null; })()`);
   c.park = async () => { await send('Page.navigate', { url: 'about:blank' }); await sleep(500); };

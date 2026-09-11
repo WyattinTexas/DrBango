@@ -94,17 +94,24 @@ const BOOT = (uid, name) => `navigator.share = undefined; navigator.clipboard = 
     localStorage.setItem('starspellUid', '${uid}'); localStorage.setItem('starspellName', ${JSON.stringify(name)}); localStorage.setItem('beta3.vsmode', 'turns'); } } catch (e) {}`;
 const READY = `SSNET.mode === 'firebase' && !!window.game && game.scene.isActive('home') && !!game.scene.getScene('home').dailyChipB`;
 const ensured = (c) => c.until(`(async () => { await SSNET.ensureName(); return true })()`, 30000);
-const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').chFriendB`;
+// the world door stands in every online state (v0.97.0: the funnel promotes
+// it, the full ground keeps it) — the page sentinel
+const MENU = `game.scene.isActive('vsmenu') && !!game.scene.getScene('vsmenu').chWorldB`;
 const toMenu = async (c) => { await c.ev(`game.scene.getScene('home').scene.start('vsmenu'); 1`); const r = await c.until(MENU, 20000); await sleep(500); return r; };
 const SHEET = `!!game.scene.getScene('vsmenu').socialC && !!game.scene.getScene('vsmenu').frRows`;
-// the sheet is where names are typed now — CHALLENGE A FRIEND is tapped for
-// real; a tap fired the instant a surface appears can be lost (README), so
-// both doors retry until their surface answers
+// the sheet is where names are typed now — a fresh mage reaches it through
+// the funnel's ADD A FRIEND BY NAME door (v0.97.0; Escape leaves the sheet
+// standing), a mage with names through CHALLENGE A FRIEND. A tap fired the
+// instant a surface appears can be lost (README), so both doors retry.
 const toSheet = async (c) => {
   if (!await toMenu(c)) return false;
   for (let i = 0; i < 5; i++) {
-    await c.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChFriend'))`);
-    if (await c.until(SHEET, 4000)) { await sleep(500); return true; }
+    const funnel = await c.ev(`!!game.scene.getScene('vsmenu').addDoorB`);
+    await c.tap(funnel ? `game.scene.getScene('vsmenu').addDoorB` : `game.scene.getScene('vsmenu').chFriendB`);
+    if (await c.until(SHEET, 4000)) {
+      if (funnel) { await c.key('Escape', 'Escape'); await c.until(`!document.getElementById('ss-overlay-input')`, 4000); }
+      await sleep(500); return true;
+    }
   }
   return false;
 };
@@ -243,7 +250,8 @@ ok('the away row still wears CHALLENGE — a real tap takes A into the duel and 
   await A.ev(`game.scene.getScene('vsmenu').closeSocial(); 1`);
   let open = false;
   for (let i = 0; i < 5 && !open; i++) {
-    await A.tap(`game.scene.getScene('vsmenu').children.list.find(o => o.text === SS_T('vsChFriend'))`);
+    // the doors live in a container now (v0.97.0) — tap the ref, not the text
+    await A.tap(`game.scene.getScene('vsmenu').chFriendB`);
     open = await A.until(SHEET, 4000);
   }
   if (!open) return false;
