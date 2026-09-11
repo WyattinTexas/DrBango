@@ -44180,7 +44180,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.43';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.44';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -48170,14 +48170,17 @@ const CRATE_HASTE_MIN=2.5;   // the drum can beat no faster than this
 //                    waits, so the finale is the wave after W3 by construction
 //   BOX_ALARM_BITE   THE PROVEN PLAYER's earlier mark (biteDue, at mercyRelief)
 const BOX_ALARM=0.5, BOX_ALARM_AFTER=3, BOX_ALARM_TO=5, BOX_ALARM_NEAR=0.65;
-// the band: a campaign crate on rungs 1..BOX_ALARM_TO — parks, raids, MOM, the
-// rival and the battleground never enter; elite 101-105 are out by levelN
-function campBoxAlarmBand(){ return !!(S.sq && S.tanBase && !S.bf && !S.raid && !S.park && !S.momRaid && S.levelN>=1 && S.levelN<=BOX_ALARM_TO); }
+// the band: a campaign crate on rungs 1..BOX_ALARM_TO, or BEAR PARK's box on any
+// crated rung (0945) — the other parks, raids, MOM, the rival and the
+// battleground never enter; elite 101-105 are out by levelN
+function campBoxAlarmBand(){ return !!(S.sq && S.tanBase && !S.bf && !S.raid && !S.momRaid && ((S.park && S.park.id==='teddy') || (!S.park && S.levelN>=1 && S.levelN<=BOX_ALARM_TO))); }   // 0945 THE BOX ALARM COMES TO BEAR PARK (Wyatt 9/10 21:45: "if the enemy is able to just defeat you so easily, that's a problem with waves" — never a shield): BEAR PARK's crated rungs join the band (teddy alone — dino/yeti/western byte-still), so the named bear's W4 pours at the half mark and must be FOUGHT before the box can fall (measured on v9.30: Captain 33.5 s → fall 51.5 where the shield-off base read 38 → 44); the crateless finales 20/50 field no S.tanBase; the campaign clause is the shipped expression verbatim
 // due: in the band, the crate standing, not yet alarmed, W3+ walked on, the
 // finale undealt, the box at or under its mark (the bite's mark on a proven run).
 // The mark is a FRACTION of hpMax, so QUIET MERCY's ×mr and the co-op
 // sqEnemyMul are invisible to it (both multiply hp and hpMax alike).
 function campBoxAlarmDue(){ const sq=S.sq, b=S.tanBase; return campBoxAlarmBand() && !b.dead && !sq.boxAlarm && S.wave>=BOX_ALARM_AFTER && S.wave<S.cfg.waves.length && b.hp<=b.hpMax*(sq.bite? BOX_ALARM_BITE : BOX_ALARM); }
+// 0945: the RUSH OUT float's key — the park's own cast (0278i's words, every one in the seven tables), the plain TAN word on the campaign rug; ONE helper for both seats (THE SURGE's haste float + THE BOX ALARM's pour float)
+function rushOutKey(){ const pk=S.park&&S.park.id; return pk==='dino'? 'THE DINOS RUSH OUT!' : pk==='yeti'? 'THE YETIS RUSH OUT!' : pk==='western'? 'THE OUTLAWS RUSH OUT!' : pk==='teddy'? 'THE BEARS RUSH OUT!' : 'THE TAN RUSH OUT!'; }
 // ===== v1.81 THE SURGE (Wyatt 7/29: "if the enemy base is losing health,
 // especially a little quickly, you need to expedite the next wave"). The v1.48
 // pull above hurries exactly ONE wave — then sqPushWave re-armed the FULL
@@ -48229,7 +48232,7 @@ function sqSiegeHaste(dmg){
   // the Tan sound their own alarm — once a level, and only for a real siege
   if(!sq.rushAnn && sq.hasteAcc>=4 && S.tanBase && !campBoxAlarmBand()){   // 0552a: on rungs 1-5 THE TAN RUSH OUT! rises ONCE, at the alarm (sqPushWave's alarm branch) — never at THE SURGE's ~38 s haste mark
     sq.rushAnn=true;
-    S.floats.push({x:S.tanBase.x, y:S.tanBase.y-118, txt:(S.park&&S.park.id==='dino'? 'THE DINOS RUSH OUT!' : S.park&&S.park.id==='yeti'? 'THE YETIS RUSH OUT!' : S.park&&S.park.id==='western'? 'THE OUTLAWS RUSH OUT!' : S.park&&S.park.id==='teddy'? 'THE BEARS RUSH OUT!' : 'THE TAN RUSH OUT!'), t:0, col:'#FFD24A'});   // raw key — floats translate at draw (0278i: park words)
+    S.floats.push({x:S.tanBase.x, y:S.tanBase.y-118, txt:rushOutKey(), t:0, col:'#FFD24A'});   // raw key — floats translate at draw (0278i: park words; 0945: the one helper both seats read)
     SFX.horn();
   }
 }
@@ -48265,8 +48268,9 @@ function sqPushWave(n,remote){
   // whole box comes out. Painted from the push itself so every sim (the
   // referee's own and every guest's relayed sqCatchUp) rises it over the
   // crate in the same frame; the horn is THE SURGE's own (its float is gated
-  // off on these rungs). A campaign rug: never a park, so the plain TAN word.
-  if(S.sq.boxAlarm && n===S.cfg.waves.length && S.tanBase){ S.floats.push({x:S.tanBase.x, y:S.tanBase.y-118, txt:'THE TAN RUSH OUT!', t:0, col:'#FFD24A'}); SFX.horn(); }   // raw key — floats translate at draw
+  // off on these rungs). The park's own word (0945: BEAR PARK rides the alarm —
+  // THE BEARS RUSH OUT!, the shipped 0278i key ×7), the plain TAN word on the rug.
+  if(S.sq.boxAlarm && n===S.cfg.waves.length && S.tanBase){ S.floats.push({x:S.tanBase.x, y:S.tanBase.y-118, txt:rushOutKey(), t:0, col:'#FFD24A'}); SFX.horn(); }   // raw key — floats translate at draw
   teddyFortFall();   // 0573a THE PILLOW FORT — the push case: the last wave walks on with no named bear standing and the box is finally his to lose (the boss case rides sqTick; one latch, one ceremony)
   // ORDINARY waves stay unannounced (v1.32, Wyatt) — the Tan just walk on. The
   // CINEMATIC beats speak (v1.38's two exceptions, widened by v1.40's brief —
