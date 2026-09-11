@@ -39888,6 +39888,7 @@ SPRITES_SRC.tancommando  = MIRROR(SPRITES_SRC.commando);
 SPRITES_SRC.tanpistol2   = MIRROR(SARGE_ART.pistol2);
 SPRITES_SRC.tanshotgun   = MIRROR(SARGE_ART.shotgun);
 SPRITES_SRC.tancommander = MIRROR(SARGE_ART.commander);
+SPRITES_SRC.tancommanderb = MIRROR(SPRITES_SRC.sarge);   // 0942 THEIR COMMANDER'S REAL SWING: the LIVE figure's body = the player's own in-game mold mirrored (the portrait mold above bakes a raised steel saber into the art — the painted sword (drawFoeCmdSword) swings alone in THIS hand); the portrait keeps every poster, card and bar (foeCmdImg picks this one on the carpet)
 // five rank slots, chevrons earned in gold — the academy speaks stripes, not
 // bars. Ranks run to 100 now and nobody can read a hundred chevrons, so the row
 // stops at five and a badge takes over the count past that: five gold stripes
@@ -39920,7 +39921,7 @@ function buildSprites(done){
     const vb = TEDDY_BOX[k] ? TEDDY_BOX[k] : PET_BOX[k] ? PET_BOX[k] : (k.slice(0,8)==='kingyeti') ? '-37 -26 194 168' : (k.slice(0,9)==='kingcroak') ? '0 0 140 140' : (k==='bomber') ? '0 0 170 100' : (k==='wsniper') ? '-12 0 132 140' : (k==='jeep'||k==='tank'||k==='tankv2'||k==='bfjeep'||k==='bftank'||k==='rex'||k==='rollpig'||k==='bluepig'||k==='sdino'||k==='bdino'||k==='spitter'||k==='dinoboss1'||k==='dinoboss2'||k==='dinoboss3'||k==='kingrex'||k==='trike'||k==='btrike'||k==='ptero'||k==='stego'||k==='dilo'||k==='jeep2'||k==='tank2'||k==='wrider'||k==='wmouse'||k==='wteddy'||k==='wsnake'||k==='stamph'||k==='stampb') ? '0 0 140 140' : (k==='mom') ? '0 0 160 530' : (k==='toybox') ? '0 0 160 140' : (k==='blob') ? '0 0 104 63' : '0 0 120 140';   // v3.33: the blue piggy rides his big brother's wide box — 120 slices the trotter curl
     // 0117: every new tan walks on painted TAN — miss this list and a perfect
     // FDEF row fields in GREEN, silently (the checklist's own warning)
-    const color = (k==='tanrifle'||k==='tanmg'||k==='crawler'||k==='officer'||k==='jeep'||k==='tank'||k==='tankv2'||k==='blob'||k==='giant'||k==='rollpig'||k==='tansarge'||k==='tanbazooka'||k==='tanmortar'||k==='tanradio'||k==='tanflame'||k==='tansniper'||k==='tanpistol2'||k==='tanshotgun'||k==='tancommander'||k==='larson'||k==='tanmedic'||k==='tancommando'||k==='wbandit'||k==='wsniper'||k==='bbill'||k==='bbillx') ? TAN : GREEN;   // 0478: BUFFALO BILL is a tan-bodied mold (0500: + his park twin; the madam's gown is fixed colour — no row)
+    const color = (k==='tanrifle'||k==='tanmg'||k==='crawler'||k==='officer'||k==='jeep'||k==='tank'||k==='tankv2'||k==='blob'||k==='giant'||k==='rollpig'||k==='tansarge'||k==='tanbazooka'||k==='tanmortar'||k==='tanradio'||k==='tanflame'||k==='tansniper'||k==='tanpistol2'||k==='tanshotgun'||k==='tancommander'||k==='tancommanderb'||k==='larson'||k==='tanmedic'||k==='tancommando'||k==='wbandit'||k==='wsniper'||k==='bbill'||k==='bbillx') ? TAN : GREEN;   // 0478: BUFFALO BILL is a tan-bodied mold (0500: + his park twin; the madam's gown is fixed colour — no row)
     jobs.push([k, vb, color]);
   }
   assetsLeft = jobs.length;
@@ -44156,7 +44157,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.39';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.40';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -53840,7 +53841,7 @@ function hurt(f,dmg,src,fire9){   // 0906 THE FLAME BLADE: fire9 = this beat is 
   // splash() bypasses on purpose, exactly like the saber line above: big
   // bangers are how a kid beats an armoured thing.
   if(!S.bf && f.def.cmd && (f.cmdBlkN||0)<f.def.cmd.blk){
-    f.cmdBlkN=(f.cmdBlkN||0)+1;
+    f.cmdBlkN=(f.cmdBlkN||0)+1; f.cmdBlkT=CMD_DASH.blkT;   // 0942: the parry pose — the blade snaps vertical for the block beat (drawFoeCmdSword reads it)
     S.fx.push({k:'ring',x:f.x,y:f.y-18,r:4,R:22,t:0,dur:0.2,col:'#C9D2D8'}); SFX.thock(); return; }
   if(src && src.type==='flame' && f.def.sno) dmg*=FLAME_SNOW_X;   // 0318: fire beats snow — the licks and the combustion stub alike
   const hvD0=HV_RD? dmg : 0;   // 0605 HEAVY SHOTS: the heavy round's weight BEFORE the armour doors — the pen below hands back nine tenths of whatever they take
@@ -62762,22 +62763,54 @@ function sweepTick(u,dt){
 // sword's reach → bail if cooling → everything in the swing circle takes the
 // knock. Steel ring, never a glow colour — the commander's visual identity.
 // (f.shot ticks at the boss-section head, the giant's own clock idiom.)
-function updateFoeCmd(f,ck){
-  const cb=f.def.cmd; if(!cb) return; ck=ck||'shot';   // 0594: the clock key — THEIR COMMANDER's slam rides f.shot (no gun), a gun boss keeps f.shot for his drum and hands the slam its own (Larson: cmdT)
-  let any=false;
-  for(const u of S.units){
-    if(u.dead||u.jetT>0||u.cloakT>0) continue;   // v2.42: a cloaked spy TRIGGERS no swing — but the AoE knock below still catches him if someone else does (area is area)
-    if(S.drag&&S.drag.unit===u) continue;
-    if(Math.hypot(u.x-f.x,u.y-f.y)<cb.reach){ any=true; break; }
-  }
-  if(!any || f[ck]<cb.cd) return;
-  f[ck]=0;
+// ═══ 0942 THE GREEN COMMANDER NEVER ATTACKS — THEIR COMMANDER'S REAL SWING (FM-GVT-GREEN-CMD-ATTACK-01,
+// design/commander-specs-0823/05-THEIR-COMMANDER-SWING.md; Wyatt 9/10: "He holds his sword up, but he never
+// attacks. He does a little area attack when you're really close to him, or if you touch him, you pretty much
+// die. We need him to have the regular animations of what the commander does."). The 0117 slam ran with no
+// clock for a draw: the knock landed the frame a green stood inside reach, a ring at t 0, and the raised hand
+// never moved — and it was EMPTY (SARGE_ART.commander = BASE; the player's sword is PAINTED by drawSargeWeapon,
+// nothing painted one on the tan mirror). Now he runs the player's own swing: THE ARM (updateFoeCmd) sets the
+// four-beat clock (f.cmdFx = CMD_SW_T — cmdSwingPose's own), the strike's facing (f.cmdFs, sim data) and OWES
+// the hurt (f.cmdCut); the fx are born below zero so the ring, the crescent and the tip ticks land on the POSE
+// frame (the 0508 stagger); foeCmdTick (both callers, every carpet frame) burns the clock and lands the knock
+// on the CUT frame (CMD_CUT_AT into the clock — the player's contact frame) on everyone inside aoeR: the SAME
+// circle, the same knock(), the same thock + shake — only the timing moved (⚑ t 0 → +0.15 s: a man who steps
+// out during the wind-up is missed, one who walks in is cut). A swing in flight refuses a second arm. The parry
+// beat (f.cmdBlkT — hurt()'s counted absorb) burns here too. Sim dt, per-figure fields, zero dice, zero wire keys
+// (foes are rebuilt every battle). LARSON's slam rides the same pair on his own cmdT clock (his rifle stays).
+function foeCmdTick(f,dt){
+  if(f.cmdBlkT>0) f.cmdBlkT-=dt;
+  if(!(f.cmdFx>0)) return;
+  f.cmdFx-=dt;
+  if(f.cmdCut && f.cmdFx<=CMD_SW_T-CMD_CUT_AT){ f.cmdCut=0; foeCmdCutLand(f); }
+}
+function foeCmdCutLand(f){   // THE CUT FRAME: the 0117 knock byte-what-it-was, on the frame the drawn blade arrives
+  const cb=f.def.cmd; if(!cb || f.dead) return;
   for(const u of S.units){
     if(u.dead||u.jetT>0) continue;
     if(Math.hypot(u.x-f.x,u.y-f.y)<cb.aoeR) knock(u,f.x,f.y);
   }
-  S.fx.push({k:'ring',x:f.x,y:f.y-16,r:6,R:cb.aoeR,t:0,dur:0.26,col:'#C9D2D8'});
   bfSfx(SFX.thock, f.x, f.y); S.shake=Math.max(S.shake,0.25);
+}
+function updateFoeCmd(f,ck){
+  const cb=f.def.cmd; if(!cb) return; ck=ck||'shot';   // 0594: the clock key — THEIR COMMANDER's slam rides f.shot (no gun), a gun boss keeps f.shot for his drum and hands the slam its own (Larson: cmdT)
+  if(f.cmdFx>0) return;   // 0942: a swing in flight owns the arm — its cut is owed to the CUT frame (foeCmdTick)
+  let best=null, bd=cb.reach;
+  for(const u of S.units){
+    if(u.dead||u.jetT>0||u.cloakT>0) continue;   // v2.42: a cloaked spy TRIGGERS no swing — but the AoE knock (the cut frame) still catches him if someone else does (area is area)
+    if(S.drag&&S.drag.unit===u) continue;
+    const d=Math.hypot(u.x-f.x,u.y-f.y); if(d<bd){ bd=d; best=u; }   // 0942: the NEAREST man sets the strike's facing (the player's cmdNearest law); the trigger is the same reach
+  }
+  if(!best || f[ck]<cb.cd) return;
+  f[ck]=0;
+  f.cmdFx=CMD_SW_T; f.cmdFs=(best.x>=f.x)?1:-1; f.cmdCut=1;   // 0942 THE ARM: the four-beat clock + the strike's facing (sim data); the hurt OWED to the CUT frame
+  S.fx.push({k:'ring',x:f.x,y:f.y-16,r:6,R:cb.aoeR,t:-0.195,dur:0.26,col:'#C9D2D8'});   // the steel ring at the circle's own radius, born on the POSE frame — never a glow colour
+  { const fs=f.cmdFs, bl=30, cl=Math.cos(0.18), sl=Math.sin(0.18);   // THE CRESCENT at the hand (the plain sword's 30; the pose's lean + hip step re-derived — cmdSwingFire's own seat, mirrored by the facing)
+    const rp=(px,py)=>[f.x+fs*(7+px*cl-py*sl), f.y+px*sl+py*cl], hs=rp(8,-22), tp=rp(8+Math.cos(0.70)*bl,-22+Math.sin(0.70)*bl);
+    S.fx.push({k:'cres',x:hs[0],y:hs[1],fs:fs,a0:-1.48,a1:0.70,R:42,t:-0.195,dur:0.22,hold:0});   // three fixed-steel arcs over the swept angle; they HANG while he recovers through them
+    if(!reducedMotion()) for(let ti=0;ti<6;ti++){ const th=(((f.x|0)*0.73+(f.y|0)*1.21+ti*0.897)%1), ta=0.70+1.5708+(th-0.5)*1.3, ca=Math.cos(ta)*fs, sa=Math.sin(ta), td=2+((ti*0.37+th)%1)*5, tl=td+5+th*6;   // six tip ticks along the tangent, keyed off his post (never dice); none under reduced motion
+      S.fx.push({k:'tracer',x1:tp[0]+ca*td,y1:tp[1]+sa*td,x2:tp[0]+ca*tl,y2:tp[1]+sa*tl,t:-0.195,dur:0.09,col:'#EAF4FF',w:1.6}); } }
+  bfSfx(SFX.swish, f.x, f.y);
 }
 // ===== 0594 COMMANDER LARSON (FM-GVT-LARSON-01 design/larson-0827/00-DESIGN.md §2 D1/D2/D6) — the brain: THE LINE on the nemesis latch
 // shape (once, the frame he crosses the rim, rank 3 over Sarge's mutter), THE SLAM on his own clock (updateFoeCmd's ck — his f.shot is the
@@ -62800,7 +62833,7 @@ function updateFoeLarson(f,dt){
     f.x=f.lrJx0+(f.lrJx1-f.lrJx0)*k9; f.hopZ=Math.sin(Math.min(1,k9)*Math.PI)*LR_JMP_H;
     if(f.lrJmpT<=0){ f.hopZ=0; f.lrBack=1; S.fx.push({k:'puff',x:f.x,y:f.y+2,t:0,dur:0.4,R:16}); SFX.thock(); if(!reducedMotion()) S.shake=Math.max(S.shake,0.25); }   // the landing: dust + a small shake (RM: none), existing SFX only; from here the showdown reads LR_BACK_HOLD (foeHolds)
     return; }
-  if(!(f.lrBmT>0)){ f.cmdT=(f.cmdT||0)+dt; updateFoeCmd(f,'cmdT'); }   // THEIR COMMANDER's slam from where he stands — on his OWN clock (the gun owns f.shot, the 0478 law); 0612 D4: the slam stands down while the channel burns — one thing at a time
+  foeCmdTick(f,dt); if(!(f.lrBmT>0)){ f.cmdT=(f.cmdT||0)+dt; updateFoeCmd(f,'cmdT'); }   // THEIR COMMANDER's slam from where he stands — on his OWN clock (the gun owns f.shot, the 0478 law); 0612 D4: the slam stands down while the channel burns — one thing at a time
   if(!f.lastShot){   // 0612: the jump and the beam live OUTSIDE the finale — larsonLastCall cancels a mid-burn channel dead, and while lastShot stands THE LAST SHOT's own machinery below owns the stage (the drum freezes with the field)
     if(!f.lrJmp && !(f.lrBmT>0) && f.x<=W*LR_MID_K){   // D2 the once-latch: the FIRST frame he crosses mid map walking west — ONE clean backward leap east ("once hes around mid map" is conditional by Wyatt's own phrasing)
       f.lrJmp=1; f.lrJmpT=LR_JMP_T; f.lrJx0=f.x;
@@ -63670,7 +63703,7 @@ function buildFoeTint(hex){
   if(IMGT[hex]) return;
   IMGT[hex]={};
   ['tanrifle','tanmg','crawler','officer','jeep','tank','tankv2','giant','rollpig','tansarge',
-   'tanbazooka','tanmortar','tanradio','tanflame','tansniper','tanpistol2','tanshotgun','tancommander','larson','tanmedic','tancommando','bbill','bbillx'].forEach(k=>{   // 0594: + Larson, the enemy medic, the enemy commando   // 0593: + the V2 foe tank   // 0117: the new roster rides both buckets (0478: + BUFFALO BILL) — miss this and a rival sortie fields factory tan
+   'tanbazooka','tanmortar','tanradio','tanflame','tansniper','tanpistol2','tanshotgun','tancommander','tancommanderb','larson','tanmedic','tancommando','bbill','bbillx'].forEach(k=>{   // 0594: + Larson, the enemy medic, the enemy commando   // 0593: + the V2 foe tank   // 0117: the new roster rides both buckets (0478: + BUFFALO BILL) — miss this and a rival sortie fields factory tan
     const vb=(k==='jeep'||k==='tank'||k==='tankv2'||k==='rollpig')?'0 0 140 140':'0 0 120 140';
     const body=SPRITES_SRC[k].split('currentColor').join(hex);
     const im=new Image();
@@ -63713,7 +63746,7 @@ function buildFoeRim(hex){
   if(!hex||IMGTR[hex]) return;
   IMGTR[hex]={};
   ['tanrifle','tanmg','crawler','officer','jeep','tank','tankv2','giant','rollpig','tansarge','rex',
-   'tanbazooka','tanmortar','tanradio','tanflame','tansniper','tanpistol2','tanshotgun','tancommander','larson','tanmedic','tancommando','bbill','bbillx'].forEach(k=>{   // 0594: + Larson, the enemy medic, the enemy commando   // 0593: + the V2 foe tank   // 0117: no rim (0478: + BUFFALO BILL) → a new tan dissolves at 2.1:1 on the winter stages
+   'tanbazooka','tanmortar','tanradio','tanflame','tansniper','tanpistol2','tanshotgun','tancommander','tancommanderb','larson','tanmedic','tancommando','bbill','bbillx'].forEach(k=>{   // 0594: + Larson, the enemy medic, the enemy commando   // 0593: + the V2 foe tank   // 0117: no rim (0478: + BUFFALO BILL) → a new tan dissolves at 2.1:1 on the winter stages
     const vb=(k==='jeep'||k==='tank'||k==='tankv2'||k==='rollpig'||k==='rex')?'0 0 140 140':'0 0 120 140';
     const body=SPRITES_SRC[k].split('currentColor').join(hex);
     const im=new Image();
@@ -67455,7 +67488,7 @@ function update(dt){
       } else if(f.type==='tancommander'){
         // 0117 THE WALL: no dash, no feet of his own — the march walks him in
         // and the steel saber swings from where he stands (updateFoeCmd)
-        updateFoeCmd(f);
+        foeCmdTick(f,dt); updateFoeCmd(f);   // 0942: the swing's clock + the owed cut every carpet frame, then the arm
       } else if(f.type==='mom'){
         // v1.79 MOM'S STOMP — the rex recipe on a per-round clock: she stomps
         // the whole fight through, and round 3 stomps near twice as often.
@@ -69194,7 +69227,7 @@ function foeFell(f,u){
       // BATTLEFIELD's law now (the f.side branch above, both armies). A
       // vehicle melts rolled onto its back (3.14 — its old corpse pose).
       const RM=reducedMotion();
-      S.fx.push({k:'fallen', type:f.type, img:(f.type==='kingyeti'&&IMG.kingyetiko)||foeImgF(f), w:f.def.w,   // 0522: foeImgF — THE NEMESIS falls in his own dye
+      S.fx.push({k:'fallen', type:f.type, img:(f.type==='kingyeti'&&IMG.kingyetiko)||foeCmdImg(f), w:f.def.w,   // 0522: foeImgF — THE NEMESIS falls in his own dye
                  x:f.x, y:f.y, t:0, dur:RM?0.4:1.1, rot:(f.def.vehicle?3.14:undefined)});
       fzShatter(f);   // 0735 THE SHATTER: a frozen man's fall (the rime never rides the corpse — it is drawn on the living alone)
       if(TEDDY_CAST[f.type]) teddyDie(f);   // 0523 TEDDY PARK: a plush deflates and POOFS (the tdie fx replaces the toy's tip-and-melt pushed above); the General's fall opens THE PATS
@@ -74057,8 +74090,46 @@ function drawFoeKit(f,wbk){ const K=f.kit, w=f.def.w, h=w*(140/120), dir=wbk?1:-
     cx.strokeStyle='#C05A4A'; cx.beginPath(); cx.moveTo(tx+dir*w*0.22,ty+1.2); cx.lineTo(tx+dir*w*0.29,ty+1.6); cx.stroke(); cx.lineCap='butt';
   }
 }
+// ═══ 0942 THE PICTURE — THEIR COMMANDER's sword and swing: the player's own frames on the tan body. foeCmdFl = the drawn facing (through a
+// swing or a parry he faces his man — the strike's own cmdFs, the 0517 law; else the walk-flip's wbk). foeCmdLeanIn = cmdLeanIn's wrapper (the lean
+// + the hip step about his boots, mirrored by the facing; opened round sprite + sword, closed by the caller). drawFoeCmdSword = drawSargeWeapon's
+// plain commander steel (the grip, the pommel, the crossguard, the body, the edge glint — fixed greys, no glow: the class law) at the hand
+// (x+8, y−22): the idle guard −0.52 · the parry −1.9 (CMD_DASH.blkT's snap · hold · home) · the swing off cmdSwingPose (the pose flash + the wind
+// glint); mirrored about his x when he faces west (the tan molds' own side). Bare-handed commanders only (the caller's !f.def.gun) — Larson keeps
+// his rifle and gets the beats, the lean and the fx. foeCmdImg = the live BODY: the player's in-game mold mirrored (SPRITES_SRC.tancommanderb) so the
+// sword sits in the hand as the player's does; the portrait mold (a raised saber baked in) keeps every poster, card and bar. Presentation only:
+// nothing in the sim reads these (the mvSm law).
+function foeCmdImg(f){ if(!(f.def&&f.def.cmd&&!f.def.gun) || !IMG.tancommanderb) return foeImgF(f); return (f.nemHex && IMGT[f.nemHex] && IMGT[f.nemHex].tancommanderb) || foeImg('tancommanderb'); }   // the live body: the in-game mold (the nemesis dye, the rival tint and the snow rim through the same buckets); every other foe answers foeImgF as before
+function foeCmdFl(f,wbk){ return (f.def&&f.def.cmd&&f.cmdFs&&(f.cmdFx>0||f.cmdBlkT>0))? (f.cmdFs>0) : wbk; }
+function foeCmdLeanIn(f){
+  if(!(f.def&&f.def.cmd) || !(f.cmdFx>0)) return false;
+  const p=cmdSwingPose(f.cmdFx), fs=f.cmdFs||-1;
+  cx.save(); cx.translate(f.x+fs*p.hip,f.y); cx.rotate(fs*p.lean); cx.translate(-f.x,-f.y);
+  return true;
+}
+function drawFoeCmdSword(f,fl){
+  const sp=(f.cmdFx>0)? cmdSwingPose(f.cmdFx) : null;
+  let ang=-0.52, flash=false, glint=false;
+  if(f.cmdBlkT>0){ const pb=1-f.cmdBlkT/CMD_DASH.blkT, q=pb<0.1667? 1-Math.pow(1-pb/0.1667,2.4) : pb<0.7333? 1 : Math.pow(1-(pb-0.7333)/0.2667,2); ang=-0.52+(-1.9+0.52)*q; }
+  else if(sp){ ang=sp.a; flash=!!sp.flash; glint=!!sp.glint; }
+  if(!fl){ cx.save(); cx.translate(f.x*2,0); cx.scale(-1,1); }
+  const hx=f.x+8, hy=f.y-22, len=30;
+  const gx=hx-Math.cos(ang)*5.5, gy=hy-Math.sin(ang)*5.5, bx=hx+Math.cos(ang)*2.5, by=hy+Math.sin(ang)*2.5, tx=hx+Math.cos(ang)*len, ty=hy+Math.sin(ang)*len;
+  const pxx=Math.cos(ang+Math.PI/2), pyy=Math.sin(ang+Math.PI/2);
+  cx.lineCap='butt';
+  cx.strokeStyle='#3a2c1c'; cx.lineWidth=4.5; cx.beginPath(); cx.moveTo(gx,gy); cx.lineTo(hx,hy); cx.stroke();   // the grip
+  cx.fillStyle='#26261f'; cx.beginPath(); cx.arc(gx,gy,1.8,0,7); cx.fill();                                     // the pommel
+  cx.strokeStyle='#26261f'; cx.lineWidth=2.6; cx.beginPath(); cx.moveTo(bx-pxx*4.5,by-pyy*4.5); cx.lineTo(bx+pxx*4.5,by+pyy*4.5); cx.stroke();   // the crossguard
+  cx.lineCap='round';
+  cx.strokeStyle='#8f979f'; cx.lineWidth=5; cx.beginPath(); cx.moveTo(bx,by); cx.lineTo(tx,ty); cx.stroke();   // the steel body
+  cx.strokeStyle=flash?'#F4F9FF':'#d8d8d8'; cx.lineWidth=flash?2.6:1.5; cx.beginPath();   // the edge glint — the pose's 50 ms flash, a light ON steel
+  cx.moveTo(bx+Math.cos(ang)*3+pxx*1.2, by+Math.sin(ang)*3+pyy*1.2); cx.lineTo(tx+pxx*1.2, ty+pyy*1.2); cx.stroke();
+  if(glint){ cx.fillStyle='#F4F9FF'; cx.beginPath(); cx.arc(tx,ty,2,0,7); cx.fill(); }   // the tip glint at the top of the wind
+  cx.lineCap='butt';
+  if(!fl) cx.restore();
+}
 function drawFoe(f){
-  if(f.falling){ drawFaller(f, foeImg(f.type), f.def.w, false); return; }   // 8/8 v2.76 the long drop, tan edition
+  if(f.falling){ drawFaller(f, foeCmdImg(f), f.def.w, false); return; }   // 8/8 v2.76 the long drop, tan edition
   const wbk=foeFl(f);   // v3.61 (0307 WALK-FLIP): the tan molds face -x — a fresh +x walk mirrors the figure · 0652 Card C: then THE AIM — a halted man faces the man he is shooting for his drum's length (foeFl; every mold, the teddy cast, the kit and the aim tell read this one seat)
   if(TEDDY_CAST[f.type] && drawTeddy(f,wbk)){ drawFz(f,f.x,f.y,f.def.w,foeImg(f.type),(f.hopZ||0)); return; }   // 0735 THE RIME on the cast   // 0523 TEDDY PARK: the cast's own draws (hops, the chute, the court, the rocker, the poses, the hp sliver)
   // 0424 THE ROYAL GRIP — a held man draws LIFTED (the drawUnit kyl recipe
@@ -74201,7 +74272,10 @@ function drawFoe(f){
       if(lightField()){ cx.fillStyle='rgba(74,90,120,0.30)';
         cx.beginPath(); cx.ellipse(f.x,f.y-1,f.def.w*0.30,8,0,0,7); cx.fill(); }
       if(f.ckdT>0){ cx.fillStyle='rgba(0,0,0,0.22)'; cx.beginPath(); cx.ellipse(f.x,f.y+3,f.def.w*0.16,f.def.w*0.045,0,0,7); cx.fill(); }   // 0710 CROAK DODGE: the ground shadow under the leap (the jump-in's own)
-      drawSprite(f.type,f.x,f.y-((f.ckdT>0)? (f.hopZ||0) : 0),f.def.w,0,Math.sin(S.t*3.4+f.wob)*0.028+croakRc(f)+((f.ckdW>0)? 0.12 : (f.ckdT>0)? -0.08 : 0),crFire(f)||crFlinch(f)||foeImgF(f),wbk);   // 0710: + the lift on f.hopZ through the dodge's flight alone, the tell's crouch, the flight's lean (zero for every other giant)   // 8/25 THE FIRING FACE: the king's storm stance outranks his flinch   // 0382: + the king's volley recoil rock (zero for every other giant)   // 0522: foeImgF — THE NEMESIS in his own dye, every other boss byte-what-it-was
+      const cl9=foeCmdLeanIn(f), fl9=foeCmdFl(f,wbk);   // 0942 THEIR COMMANDER: the swing's lean + hip wrapper (closed below) and the drawn facing (his man through a swing or a parry)
+      drawSprite(f.type,f.x,f.y-((f.ckdT>0)? (f.hopZ||0) : 0),f.def.w,0,Math.sin(S.t*3.4+f.wob)*0.028+croakRc(f)+((f.ckdW>0)? 0.12 : (f.ckdT>0)? -0.08 : 0),crFire(f)||crFlinch(f)||foeCmdImg(f),fl9);   // 0710: + the lift on f.hopZ through the dodge's flight alone, the tell's crouch, the flight's lean (zero for every other giant)   // 8/25 THE FIRING FACE: the king's storm stance outranks his flinch   // 0382: + the king's volley recoil rock (zero for every other giant)   // 0522: foeImgF — THE NEMESIS in his own dye, every other boss byte-what-it-was
+      if(f.def.cmd && !f.def.gun) drawFoeCmdSword(f,fl9);   // 0942: the sword in the raised hand — the idle guard, the parry, the four-beat swing (a bare-handed commander; Larson keeps his rifle)
+      if(cl9) cx.restore();
     }
     if(f.def.gun) tanAimTell(f);   // 0478: the madam's long wind-up shows (the line at the man she will shoot)
     if(f.def.fan) foeFanTell(f);   // 0500: the barrage's plant tell — the red ring at his feet for the 0.55 s before the slugs fly
