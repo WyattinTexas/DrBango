@@ -44180,7 +44180,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.44';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.45';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -54812,6 +54812,7 @@ function campCrateFall(word){
   // untouched: word is simply never needed there.
   if(!word && S.evRef && coopGuest()) return;
   b.hp=0; b.dead=true;
+  if(S.park && S.park.id==='teddy'){ for(const p9 of teddyFortPts(b)) S.fx.push({k:'puff',x:p9[0],y:p9[1]-10,t:0,dur:0.5,R:20,col:'#f1ecf7'}); SFX.horn(); }   // 0946 THE PILLOWS STAY — the six pillows poof the frame the box dies (teddyFortFall's own puffs + horn; NO float — the box's boom, crack-and-fall and the flag swap read the win); ONE seat for every door: campSmash's last blow, the jeep, the full clear, and a guest's crate on the referee's word (cr:0 → word) — b.dead above latches it once
   S.shake=1.0; S.slowmo=0.35; SFX.boom();
   for(let i=0;i<3;i++) S.fx.push({k:'puff',x:b.x+(Math.random()-0.5)*70,y:b.y-30-Math.random()*60,t:0,dur:0.6,R:26});
   S.fx.push({k:'ring',x:b.x,y:b.y-30,r:12,R:110,t:0,dur:0.6,col:'rgba(255,210,74,0.9)'});
@@ -71289,8 +71290,8 @@ function drawBase(side){
 function drawTanBase(){
   const b=S.tanBase, im=IMG.toybox;
   const bx=W-120, by=b.y+52, w=150, k=Math.max(0,b.hp/b.hpMax);   // 0197: drawBase's own latitude idiom — b.y+52===352 on every flat rug, the waist's own 652 on the tall mat
-  const fortUp9=teddyFortUp();   // 0573a THE PILLOW FORT — six pillows ring the box while it stands (drawPillowSlab, the floor's own brush; DRAW-ONLY, never a rock): back seats under the box, front seats over its foot
-  if(fortUp9) for(const p9 of teddyFortPts(b)){ if(p9[1]<=by) drawPillowSlab(p9[0]-p9[2]/2,p9[1]-p9[3]/2,p9[2],p9[3]); }
+  const pil9=teddyPillowsOn();   // 0946 THE PILLOWS STAY — six pillows ring the box as DECOR (0573a's ring: drawPillowSlab, the floor's own brush; DRAW-ONLY, never a rock; the shield 0939z retired never returns — teddyFortUp() is not read here): back seats under the box, front seats over its foot; they poof with the box (campCrateFall)
+  if(pil9) for(const p9 of teddyFortPts(b)){ if(p9[1]<=by) drawPillowSlab(p9[0]-p9[2]/2,p9[1]-p9[3]/2,p9[2],p9[3]); }
   if(im){
     const h=w*(im.height/im.width);
     cx.save(); cx.translate(bx,by); cx.scale(-1,1);
@@ -71298,7 +71299,7 @@ function drawTanBase(){
     cx.drawImage(im,-w/2,-h+h*0.08,w,h);
     cx.restore(); cx.globalAlpha=1;
   }
-  if(fortUp9) for(const p9 of teddyFortPts(b)){ if(p9[1]>by) drawPillowSlab(p9[0]-p9[2]/2,p9[1]-p9[3]/2,p9[2],p9[3]); }   // 0573a: the fort's front seats
+  if(pil9) for(const p9 of teddyFortPts(b)){ if(p9[1]>by) drawPillowSlab(p9[0]-p9[2]/2,p9[1]-p9[3]/2,p9[2],p9[3]); }   // 0573a: the fort's front seats (0946: decor over the box's foot — the cracks at by-34…by-72 and the flag pole sit above them, never covered)
   if(k<0.55){
     cx.globalAlpha=Math.min(0.9,(0.55-k)*1.8); cx.strokeStyle='#3a2a1c'; cx.lineWidth=3; cx.lineCap='round';
     cx.beginPath(); cx.moveTo(bx+32,by-34); cx.lineTo(bx+6,by-72); cx.lineTo(bx-20,by-40); cx.stroke();
@@ -87774,7 +87775,7 @@ const TT_R=280, TT_SNEAK=210, TT_REACH=26, TT_BITE=0, TT_BITE_DEEP=1, TT_DOT=0.3
 // rung 13 exempt — THE PARADE keeps the 15 s beat) · TEDDY_FORGE / TEDDY_SITTER 1 the doses · TEDDY_PARADE_AT [0,1.5,3]
 // (MEASURED on the 0570 canyon ground: [0,3,6] as first tabled reads 1/6 on the fixed line — the walls already meter the flood, the full spread un-jams the mouths; [0,1.5,3] 3/6 · [0,0.5,1] 2/6; heavy 5/6 at the ship) · TEDDY_DROP_SHIELD 0.5 (0601 THE CANOPY SHIELD, FM-GVT-BEAR-FEEDBACK-0827-NIGHT §2 D3: a SOAK now, not a blind — a bullet
 // on a dropping chute lands at ×(1−0.5) in hurt()'s funnel, the bags-soak grammar; 0 = off, NEVER 1 — immune is against the law; splash lands whole; 0573a's unshootable clause at bfCanTarget retired). THE FALL / THE THUMP / THE BAND ride FDEF.tpara.drop (alt 240 · r 60 · x). =====
-const TEDDY_BOX_X=2.0, TEDDY_FORT=0, TEDDY_FORT_BOSS=0, TEDDY_BITE2=1.15, TEDDY_BITE2_FROM=6, TEDDY_GAP_HI=13, TEDDY_FORGE=1, TEDDY_SITTER=1, TEDDY_PARADE_AT=[0,1.5,3.0], TEDDY_DROP_SHIELD=0.5;   // 0939z THE FORT LAW RETIRED (Wyatt 9/10 21:45: the fort holding waves 1-3 'is not a proper fix … that's a flaw that needs to be fixed … that's a problem with waves') — TEDDY_FORT + TEDDY_FORT_BOSS 0: the box takes the whack from wave 1 like every park; D2's 2× box + THE SURGE hold the last wave (measured on v9.31: a rank-30 sarge/tank/jeep line still razes at W4/4 on every rung 1-49); teddyFortUp() reads false everywhere — the pillows, the HUD's fort word and the fall ceremony sleep behind it, zero other bytes
+const TEDDY_BOX_X=2.0, TEDDY_FORT=0, TEDDY_FORT_BOSS=0, TEDDY_BITE2=1.15, TEDDY_BITE2_FROM=6, TEDDY_GAP_HI=13, TEDDY_FORGE=1, TEDDY_SITTER=1, TEDDY_PARADE_AT=[0,1.5,3.0], TEDDY_DROP_SHIELD=0.5;   // 0939z THE FORT LAW RETIRED (Wyatt 9/10 21:45: the fort holding waves 1-3 'is not a proper fix … that's a flaw that needs to be fixed … that's a problem with waves') — TEDDY_FORT + TEDDY_FORT_BOSS 0: the box takes the whack from wave 1 like every park; D2's 2× box + THE SURGE hold the last wave (measured on v9.31: a rank-30 sarge/tank/jeep line still razes at W4/4 on every rung 1-49); teddyFortUp() reads false everywhere — the HUD's fort word and the fall ceremony sleep behind it, zero other bytes (0946: the pillows are DECOR now — teddyPillowsOn, drawTanBase — and poof with the box in campCrateFall)
 // ===== 0586 THE GUNS COME ONTO THE BED (FM-GVT-BEAR-GUNS-01; Wyatt 8/27: "Sometimes the enemy cannons are off screen … they just
 // kind of stay back there … behind the box and the characters are hitting the box" · "fire a little quicker and be more significant
 // when they hit" · "the rainbow paratroopers … flank players" · "weird fart clouds because they're green"). THE BUG: every 'right'
@@ -87805,6 +87806,8 @@ function teddyFortUp(){ return !!(TEDDY_FORT && S.park && S.park.id==='teddy' &&
 // crew must reach the boards; bx/by = drawTanBase's own box anchor). [x,y,w,h] centres.
 function teddyFortPts(b){ const bx=W-120, by=b.y+52;
   return [[bx-118,by-64,66,42],[bx-128,by-6,72,46],[bx-112,by+52,66,42],[bx-38,by+72,72,44],[bx+52,by+58,64,40],[bx-52,by-148,64,40]]; }
+// 0946 THE PILLOWS STAY (the ⚑ Q2 of 0939z THE FORT LAW RETIRED; Wyatt 9/10 22:15 "Looks good. Are they queued up?"): the six pillows are DECOR — they ring Bear Park's box on every crated rung while it stands (rung 20/50 field no S.tanBase) and poof with it the frame it dies (campCrateFall); teddyFortUp() stays the retired shield's word (TEDDY_FORT 0 — its law seats and teddyFortFall sleep on)
+function teddyPillowsOn(){ return !!(S.park && S.park.id==='teddy' && S.tanBase && !S.tanBase.dead); }
 // THE FALL — one ceremony, latched on the PRESENTATION only (sq.fortAnn): the push case calls from sqPushWave (W4 walks on
 // with no named bear standing), the boss case from sqTick (the named bear's death; a caught-up guest lands here too). A dead
 // crate skips it — the full clear goes straight to the win.
