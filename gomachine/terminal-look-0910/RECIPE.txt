@@ -1,0 +1,142 @@
+TERMINAL LOOK 0910 — the COMPUTER look
+=======================================
+Published 2026-09-11 from the big Mac for the Go Machine.
+Live: https://drbango.com/gomachine/terminal-look-0910/   (unlisted path; nothing private in here)
+
+WHAT IT LOOKS LIKE
+------------------
+Before 9/10 every Terminal window was the stock "Basic" profile: black text on white, the small
+11-point stock font, and a title bar stuffed with the running command, its arguments, the tty and
+the window size ("caffeinate < claude --session-id ... --goal ...").  Since 9/10 every window uses
+a profile called COMPUTER: warm near-white text on an opaque dark-navy background, amber only for
+bold text and the block cursor, Atkinson Hyperlegible Mono at 14 point with the letters spaced a
+touch wider and the lines a touch taller, nothing blinks, nothing beeps (the screen flashes
+instead), 112 columns by 34 rows, and the window title and tab show ONLY what the app inside sets
+(Claude Code's "* Navigator") — Terminal adds nothing.  macOS Dark Mode is on so the window header
+is dark too.  Three sister profiles (Computer Green, Computer Red, Computer Day) switch with
+`computer green|red|day`; `computer on|off` toggles the whole look; bare `computer` plays a boot
+screen, then starts claude.
+
+Wyatt's rulings that shaped it (9/10): "a lot easier to read, a little less abrasive" -> "This is
+the text of our life; it needs to be even easier to read. Comprehension distraction at a minimum"
+-> "the most readable font in the world, data proven" -> headers "look so confusing... can't they
+just be simple?"
+
+APPLY IT (Go Machine: macOS 26, zsh, Terminal.app)
+--------------------------------------------------
+  mkdir -p ~/terminal-look-0910 && cd ~/terminal-look-0910
+  B=https://drbango.com/gomachine/terminal-look-0910
+  for f in $(curl -sf $B/FILES.txt); do mkdir -p "$(dirname "$f")"; curl -sf -o "$f" "$B/$f" || echo "FAILED $f"; done
+  bash apply-terminal-look.sh --dry-run      # prints the plan, writes nothing
+  bash apply-terminal-look.sh                # applies; then Cmd+Q Terminal and open it again
+  Then Dark Mode: System Settings > Appearance > Dark  (or `computer on` once, in a new shell;
+  macOS asks once to let Terminal control System Events — the script itself never asks anything).
+  Re-running the script is safe: it reports "already installed" and changes nothing.
+
+THE SETTINGS — GLOBAL (identical in every account window, A-J)
+---------------------------------------------------------------
+Terminal.app profile "Computer"
+  lives in  ~/Library/Preferences/com.apple.Terminal.plist  >  "Window Settings"  >  "Computer"
+  shipped here as  Computer.terminal  (a real Terminal export; `open` imports it)
+  Font                       AtkinsonHyperlegibleMono-Regular  14 pt
+  FontAntialias              true
+  FontWidthSpacing           1.06   letter spacing — the dyslexia lever with real evidence behind it
+  FontHeightSpacing          1.08   line spacing  — 1.15 left cursor residue with this font
+  BackgroundColor            #161a21  opaque (alpha 1.0)      BackgroundBlur 0
+  TextColor                  #e8e3d8
+  TextBoldColor              #f2c987  amber
+  CursorColor                #e8a94a  amber   CursorType 0 (block)   CursorBlink false
+  SelectionColor             #e8a94a at 25 %
+  ANSI normal   black #1e232b  red #e5736c  green #97c98a  yellow #e9c06a
+                blue #79aee0  magenta #cba3d6  cyan #7ccdc9  white #e8e3d8
+  ANSI bright   black #7d8794 (= dim text, kept legible)  red #f29088  green #b5e0a6  yellow #f3d48f
+                blue #9ac4ee  magenta #dfbfe6  cyan #9fe0dc  white #f7f3ea
+  BlinkText false   Bell false   VisualBell true   VisualBellOnlyWhenMuted false
+  columnCount 112   rowCount 34
+  BackgroundSettingsForInactiveWindows false   useOptionAsMetaKey true
+  Title bar + tab: EVERY addition off (false) —
+    ShowWindowSettingsNameInTitle  ShowActiveProcessInTitle  ShowActiveProcessArgumentsInTitle
+    ShowShellCommandInTitle  ShowTTYNameInTitle  ShowDimensionsInTitle
+    ShowRepresentedURLInTitle  ShowRepresentedURLPathInTitle
+    ShowActiveProcessInTabTitle  ShowActiveProcessArgumentsInTabTitle  ShowShellCommandInTabTitle
+    ShowTTYNameInTabTitle  ShowRepresentedURLInTabTitle  ShowRepresentedURLPathInTabTitle
+  Sister profiles (same keys, other palettes; full ANSI tables in kit/make-profiles.py):
+    Computer Green   bg #121a14  text #dde8d6  bold #a6e6a4  cursor #8fd18f   green phosphor
+    Computer Red     bg #1b1614  text #ece4d6  bold #ffffff  cursor #d9534f   cream and red
+    Computer Day     bg #f3ecdc  text #2b2a26  bold #7a4f00  cursor #c47f00   dark on cream, Dark Mode OFF
+
+Terminal.app app level   (defaults domain com.apple.Terminal)
+  "Default Window Settings"   Computer
+  "Startup Window Settings"   Computer
+  Shell "" (login shell), SecureKeyboardEntry false, tab bar — all stock, not part of the look
+
+macOS
+  Appearance   Dark   (defaults -g AppleInterfaceStyle = Dark). The window header and tab bar are
+               system chrome; Terminal cannot colour them; Dark Mode is the only lever.
+
+Fonts   ->  ~/Library/Fonts/     (Braille Institute, OFL; license file beside them)
+  AtkinsonHyperlegibleMono-Regular.ttf  -Bold.ttf  -Italic.ttf  -BoldItalic.ttf
+  (static instances cut from Google's variable TTF; Terminal archives the font by PostScript name,
+   so the profile only renders right once these are installed)
+
+Shell   ->  ~/.zshrc   (one block, marker "# terminal-look-0910", appended once)
+  [[ -f "$HOME/computer/computer.zsh" ]] && source "$HOME/computer/computer.zsh"
+  No prompt / PS1 change was part of the look. The big Mac's account badge and tab-title hook in
+  ~/.zshrc predate it and are not included.
+
+The kit   ->  ~/computer/
+  computer.zsh       the `computer` function: on | off | green | red | day | status | (bare) boot + claude
+  look.sh            applies a profile to every open tab + default + startup and flips Dark Mode
+                     (AppleScript to Terminal + System Events: macOS asks ONCE to allow it)
+  boot.sh            the boot screen (256-colour, block logo painted with background cells, seam-free)
+  make-profiles.py   regenerates the four .terminal files (colours + font archived through JXA)
+  install.sh         regen + re-import; deletes the old Computer* sets first because Terminal never
+                     replaces a same-named profile on import — it silently appends " 1"
+  Computer*.terminal  the four profiles   README.md   OFL-AtkinsonHyperlegibleMono.txt
+
+Claude Code   ->  every ~/.claude*/settings.json
+  "tui": "fullscreen"    the only display key the look depends on. The script merges it with
+                         python json and clobbers nothing: permissions, model, effortLevel, hooks,
+                         enabledPlugins, statusLine all stay. A one-time backup
+                         settings.json.bak-terminal-look-0910 is left beside any file it changes.
+  NOT part of the look: "theme" (on the big Mac it varies per account — dark / light /
+  light-daltonized / auto — and none of it changed 9/10; the script leaves theme alone) and the
+  status line (statusline-account.sh, the per-account bar, deliberately untouched 9/10).
+
+THE SETTINGS — PER ACCOUNT COLOUR (A-J)
+---------------------------------------
+Nothing here changed 9/10 and the script applies none of it (the Go Machine queues cards; it does
+not spawn lane windows). Listed so the picture is complete:
+  1. jumpr's window spawner tints each lane's window over the profile with AppleScript
+     ("set background color" / text, 16-bit RGB -> hex):
+       A   bg #0c1f4e   text #cae2fd
+       B   bg #130833   text #e2d6f5
+       C   bg #061f12   text #caf1d6
+       D   bg #330808   text #f5d2d2
+       E   bg #f1e2ca   text #231b13
+       F   bg #cee8f7   text #132336
+       G   bg #c6edd6   text #132f1f
+       H   bg #f6cdec   text #231323
+       I   bg #2b1b02   text #f9e2b3
+       J   bg #022125   text #c3f1f1
+  2. the zsh prompt badge (" A " .. " J ", ANSI background per account) in ~/.zshrc — predates 9/10
+  3. Claude Code's status line (statusline-account.sh) — the per-account bar, predates 9/10
+
+WHAT THE SCRIPT CANNOT DO, AND WHY
+----------------------------------
+  - Flip Dark Mode: needs AppleScript into System Events, which macOS gates behind a one-time
+    Allow click. The script reports it; `computer on` or System Settings does it.
+  - Restyle windows that are already open: a profile applies to new windows; open ones change only
+    through AppleScript (`computer on`) or a reopen.
+  - Replace an existing same-named profile through Terminal's importer (it appends " 1"): if a
+    profile exists but differs, the script writes the entry straight into the defaults domain and
+    asks for a relaunch.
+  - Colour the window header or tab bar: macOS chrome. Dark Mode is the only lever.
+  - Guarantee the look inside a window opened by another launcher that sets its own colours (jumpr
+    on the big Mac does): that launcher's tint wins over the profile background, by design.
+
+VERIFIED
+--------
+  big Mac, 2026-09-11: `bash apply-terminal-look.sh --dry-run` exits 0 and reports every item as
+  already applied except the ~/.zshrc marker (the big Mac sources the same file under its own
+  comment line). Every file here was md5-checked against the live URL after the push.
