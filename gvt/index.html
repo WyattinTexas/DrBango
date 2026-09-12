@@ -1835,6 +1835,13 @@
      brings that door's own hero). Kill row below matches the base rule's
      specificity exactly (the 0278c specificity law). */
   #raidBg svg.rhero { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  /* ---- 0974 MOON GARDENS AT FULL SPEED (the Go Machine card 2026-09-12 09:40:21; Wyatt 9/12: "Moon Garden needs to be animating at a faster rate; less laggy" ,
+     "Palace room needs to be less laggy as well, higher fps"): THE LAYER LAW for the two living paintings - heroSplit cuts the one inline svg at mount
+     into alternating STILL slices (painted once) and MOVER overlays (the only per-frame paint), every layer its own compositor layer (the teddy hub's
+     0554d recipe: will-change + contain; the map's 0907 tm-paper law). Under a full-screen panel or a hidden tab the overlays' clocks pause
+     (msPauseSync toggles ms-pause on the host - one class write when the answer changes). The paintings' strings and every mover rule above are byte-still. ---- */
+  #parkBg svg.phero.ms-l, #raidBg svg.rhero.ms-l { will-change:transform; contain:strict; }
+  #parkBg.ms-pause svg.ms-over *, #raidBg.ms-pause svg.ms-over * { animation-play-state:paused !important; }
   #raidBg .bflame { animation:bflame 1.35s ease-in-out infinite; }
   @keyframes bflame { 0%,100%{transform:scale(1,1) rotate(0deg)} 30%{transform:scale(1.05,0.9) rotate(2deg)}
     55%{transform:scale(0.94,1.12) rotate(-2deg)} 80%{transform:scale(1.03,0.95) rotate(1.5deg)} }
@@ -45077,7 +45084,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.68';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.69';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -91645,6 +91652,7 @@ function renderRaidScene(){
   document.getElementById('raidscene').classList.toggle('houndown', !!(META.dog&&META.dog.own2));   // 0413: the RIGHT bone's own flag, the same law
   if(RAID_CUR==='bone') lairBoneLayout();   // 0385: seat the tap box under the fresh innerHTML (every render re-mints it)
   if(RAID_CUR==='fields') fieldsSkyLayout();   // 0608: the meteor corridor seated the same way
+  if(RAID_CUR==='palace') heroSplit(document.getElementById('raidBg'), 'svg.rhero', 'lf-', ['.lf-moon','.lf-ring']);   // 0974 MOON GARDENS AT FULL SPEED: the palace painting cut into still slices + mover overlays (the moon's halo and the pool's rings ride under the strokes painted after them)
   document.getElementById('raidscene').classList.toggle('hideout', RAID_CUR==='croak');
   document.getElementById('raidscene').classList.toggle('palace', RAID_CUR==='palace');   // 0951 THE PALACE LIVES: the fields' chrome deltas (the flanks hidden — the scene owns the room; the mid-stack bottom-weighted under the princess)
   document.getElementById('raidscene').classList.toggle('fields', RAID_CUR==='fields');   // 0526: THE PILLOW FIELDS' chrome (the icehall deltas cloned)
@@ -93715,6 +93723,58 @@ function teddyClock(bg){
   let n=0; for(const a of w.getAnimations({subtree:true})){ try{ a.currentTime=now; n++; }catch(e){} }
   return n;
 }
+// ===== 0974 MOON GARDENS AT FULL SPEED (the Go Machine card 2026-09-12 09:40:21; Wyatt 9/12: "Moon Garden needs to be animating at a faster rate; less
+// laggy" , "Palace room needs to be less laggy as well, higher fps") - THE LAYER LAW for a living painting, at mount time (the map's 0907 law: never
+// animate inside the still art; the teddy hub's 0554d split, done here on the DOM instead of at build time so the paintings' strings stay byte-still).
+// THE COST (measured on v9.68): the Moon Garden hub was ONE inline svg of 6,416 elements with 62 CSS animations on wrapper <g>s and no compositor layer
+// of its own - every mover dirtied the whole 1600x650 painting, so each frame re-painted six thousand strokes; the palace lobby the same with 3,815
+// elements / 74 animations. THE FIX: the mounted svg is cut into ALTERNATING layers in document order - STILL slices (the strokes that never move; each
+// its own compositor layer, painted once, never invalidated) and OVERLAYS (the movers alone, each re-seated inside shallow copies of its ancestor <g>s so
+// transform , clip-path , filter , opacity , mask hold - the gnome's translate, a pour's clip, the door's blur) - so every stroke keeps its place above or
+// below every mover. A cut falls right after the top-level child holding the LAST match of each selector in `cuts`: the moon's halo and the door's daylight
+// are painted UNDER later strokes (the disc, the craters, the door's planks), so their overlays ride under the slice painted after them. Only the
+// overlays repaint per frame (a few hundred strokes). The <defs> and the wrap's id stay in the first slice alone (url(#id) is document-wide). Returns the
+// layer count; a host without the svg, or one already split, is left alone. Zero words, zero art. =====
+function heroSplit(bg, sel, pre, cuts){
+  const svg=bg&&bg.querySelector(sel); if(!svg || bg.querySelector('svg.ms-over')) return 0;
+  const wrap=svg.querySelector('g[id$="Wrap"]')||svg;   // the baked painting's one wrapper (#moonWrap / #palaceWrap)
+  const kids=Array.from(wrap.children), n=kids.length; const kidIx=new Map(); kids.forEach((k,i)=>kidIx.set(k,i));
+  const isM=e=>!!(e && e.nodeType===1 && e.getAttribute && (e.getAttribute('class')||'').indexOf(pre)===0);   // a mover wrapper: its class begins with the family prefix (mg- / lf-)
+  const topOf=e=>{ let t=e; while(t.parentNode && t.parentNode!==wrap) t=t.parentNode; return t; };
+  const movers=Array.from(wrap.querySelectorAll('[class^="'+pre+'"]')).filter(m=>{ let p=m.parentNode; while(p && p!==wrap){ if(isM(p)) return false; p=p.parentNode; } return true; });   // the TOP-LEVEL movers (a wing inside a fairy rides with her)
+  const cutAt=[]; for(const c of (cuts||[])){ const all=wrap.querySelectorAll(c); if(!all.length) continue; const i=kidIx.get(topOf(all[all.length-1])); if(i!=null && i+1<n) cutAt.push(i+1); }
+  cutAt.sort((a,b)=>a-b); const bounds=[0]; for(const c of cutAt) if(c>bounds[bounds.length-1]) bounds.push(c); bounds.push(n);
+  const segs=bounds.length-1; const NS='http://www.w3.org/2000/svg'; const vb=svg.getAttribute('viewBox'), par=svg.getAttribute('preserveAspectRatio'), cls=svg.getAttribute('class')||'';
+  const mk=c=>{ const s=document.createElementNS(NS,'svg'); s.setAttribute('class',cls+' ms-l '+c); if(vb) s.setAttribute('viewBox',vb); if(par) s.setAttribute('preserveAspectRatio',par); return s; };
+  const overs=[]; for(let s=0;s<segs;s++){ const o=mk('ms-over'); const g=document.createElementNS(NS,'g'); g.setAttribute('data-notr',''); o.appendChild(g); overs.push(o); }
+  const segOf=i=>{ let s=0; while(s+1<segs && i>=bounds[s+1]) s++; return s; };
+  // 1 , every mover leaves the painting for its segment's overlay, inside shallow copies of its ancestors
+  const KEEP=['transform','clip-path','filter','opacity','mask','style'];
+  for(const m of movers){ const s=segOf(kidIx.get(topOf(m))); let host=overs[s].firstChild;
+    const chain=[]; for(let a=m.parentNode; a && a!==wrap; a=a.parentNode) chain.unshift(a);
+    for(const a of chain){ const g=document.createElementNS(NS,'g'); for(const k of KEEP) if(a.hasAttribute(k)) g.setAttribute(k,a.getAttribute(k)); host.appendChild(g); host=g; }
+    host.appendChild(m); }
+  // 2 , the still slices: clones of the now mover-free painting, each keeping its own run of the wrap's children (no defs, no id - the first slice owns both)
+  const cur=Array.from(wrap.children); const stills=[svg];
+  for(let s=1;s<segs;s++){ const c=svg.cloneNode(true); c.setAttribute('class',cls+' ms-l ms-still'); const w=c.querySelector('g[id$="Wrap"]')||c; if(w!==c) w.removeAttribute('id');
+    const ck=Array.from(w.children); for(let j=0;j<ck.length;j++){ const i=kidIx.get(cur[j]); if(ck[j].tagName==='defs' || i<bounds[s] || i>=bounds[s+1]) w.removeChild(ck[j]); }
+    stills.push(c); }
+  for(let j=0;j<cur.length;j++){ const i=kidIx.get(cur[j]); if(cur[j].tagName!=='defs' && i>=bounds[1]) wrap.removeChild(cur[j]); }
+  svg.setAttribute('class',cls+' ms-l ms-still');
+  // 3 , the stack, in document order: still 0 , overlay 0 , still 1 , overlay 1 , ... (the host's buttons stay after, at their own z)
+  let after=svg; for(let s=0;s<segs;s++){ if(s>0){ after.after(stills[s]); after=stills[s]; } after.after(overs[s]); after=overs[s]; }
+  MS_PAUSED=null;   // a fresh mount re-reads the cover on the next tick
+  return segs*2;
+}
+// 0974 - PAUSE WHAT IS NOT SEEN: the overlays' clocks stop under a full-screen panel (the shop, the rank board, the war table, a rite) or a hidden tab
+// and run again when the painting shows; read twice a second from frame() - one class toggle when the answer changes, never a per-frame write.
+let MS_SYNC_T=0, MS_PAUSED=null;
+function msPauseSync(){
+  let cov=!!document.hidden;
+  if(!cov){ for(const id of ['toyshop','worldrank','wartable','icerite','sabrite','soulrite','paintrite']){ const el=document.getElementById(id); if(el && !el.classList.contains('hidden')){ cov=true; break; } } }
+  if(cov===MS_PAUSED) return; MS_PAUSED=cov;
+  for(const id of ['parkBg','raidBg']){ const el=document.getElementById(id); if(el) el.classList.toggle('ms-pause', cov); }
+}
 function parkHeroURI(id){
   const key=id+'URI';
   if(PARK_HERO[key]) return PARK_HERO[key];
@@ -94510,6 +94570,7 @@ function paintParkScene(dpk){
     bg.style.background='linear-gradient(180deg,#0E1A2E,#1B3050 50%,#24405F)';
     bg.innerHTML='<svg class="phero moon" viewBox="0 0 1600 650" preserveAspectRatio="xMidYMid slice">'+parkHeroSVG('moon')+'</svg>'
       +'<button type="button" id="palaceHot" onclick="UI.palaceTap()">'+(META.moonKey? '<span class="key"><svg viewBox="0 0 36 36" style="display:block;width:100%">'+PK_KEYGLYPH+'</svg></span>' : '')+'</button>';
+    heroSplit(bg, 'svg.phero.moon', 'mg-', ['.mg-moon','.mg-day']);   // 0974 MOON GARDENS AT FULL SPEED: the painting cut into still slices + mover overlays (the halo and the door's daylight ride under the strokes painted after them)
     parkSceneLayout();
     return;
   }
@@ -103037,6 +103098,7 @@ const FRAME_STATS={ frames:0, steps:0, multi:0, maxSteps:1, lagS:0 };   // the r
 function frame(ts){
   requestAnimationFrame(frame);
   if(!ready) return;
+  if(ts-MS_SYNC_T>500){ MS_SYNC_T=ts; msPauseSync(); }   // 0974: the living paintings' overlays pause under a covering panel / a hidden tab (one class write when the answer changes)
   if((qtHeld() && qtFreezes()) || premFrozen()){ last=ts; return; }   // 0904 THE PREMIERE CARD: a SOLO fight under the card stands still on this same seat (never QT.held — the music plays on; the next frame's gap is one frame, no catch-up) · 0719 THE FROZEN FIGHT (Wyatt 9/2: "Yes in campaign; no in Battlefields or Raid/pvp events"): a solo campaign fight put away ticks NOTHING — no sim, no wall clock, no draw (where a platform runs rAF hidden at all)
   if(QT.skip){ QT.skip=0; last=ts; return; }        // ...and the first frame back reads the hidden span as NO gap: every clock resumes from the moment it left. A battlefield, a raid, a party fight and the room run as today — one capped catch-up frame (0559 C)
   const gap=(ts-last)/1000||0.016; last=ts;
@@ -103168,6 +103230,7 @@ requestAnimationFrame(frame);
 
 // ================= DEBUG API =================
 window.GVT = {
+  msLayers(){ const o={ paused:MS_PAUSED }; for(const id of ['parkBg','raidBg']){ const h=document.getElementById(id); o[id]=h? { cls:h.className, layers:Array.from(h.querySelectorAll('svg')).map(s=>({ c:s.getAttribute('class'), els:s.querySelectorAll('*').length, movers:s.querySelectorAll('[class^="mg-"],[class^="lf-"]').length, anims:s.getAnimations({subtree:true}).length, running:s.getAnimations({subtree:true}).filter(a=>a.playState==='running').length, wc:getComputedStyle(s).willChange, contain:getComputedStyle(s).contain })) } : null; } return o; },   // 0974 MOON GARDENS AT FULL SPEED: the split's layers (read-only)
   // ---- 0523 TEDDY PARK rig: the cast's state (read-only) + the event tape ----
   teddy(){ return S.foes.filter(f=>TEDDY_CAST[f.type]).map(f=>({ id:f.id, type:f.type, x:Math.round(f.x), y:Math.round(f.y), hp:+f.hp.toFixed(2), hpMax:f.hpMax, w:f.def.w, spd:f.def.spd,
       st:f.paraSt||f.tbSt||f.gnSt||null, feet:f.tdFeet|0, sleep:f.tdSleep|0, pounce:f.pounceState||null, shot:+(f.shot||0).toFixed(2), wind:+(f.gsWind||0).toFixed(2), aim:+(f.aimT||0).toFixed(2),
