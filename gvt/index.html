@@ -45077,7 +45077,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.65';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.66';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -55618,7 +55618,7 @@ function vflagTick(dt){
   // (never fighting a live finger-pan, never after the whistle)
   if(S.bf && !S.bf.resolved && !S.pan){
     S.bf.cam.x=clampCam(S.bf.cam.x+((v.x-VW*0.55)-S.bf.cam.x)*Math.min(1,dt*3.2));
-    S.bf.cam.y=clampCamY((S.bf.cam.y||0)+((v.y-436)-(S.bf.cam.y||0))*Math.min(1,dt*3.2));   // ...and climbs to the pole on the tall map (clamps to 0 everywhere else)
+    S.bf.cam.y=clampCamZ((S.bf.cam.y||0)+((v.y-436)-(S.bf.cam.y||0))*Math.min(1,dt*3.2));   // THE FLOOR (cell 4): the walk's y through the view's own height when zoomed   // ...and climbs to the pole on the tall map (clamps to 0 everywhere else)
   }
   // v1.98: the grand campaign rug walks over the same way — the crate that
   // fell may be a world away from wherever the escort camera was looking
@@ -55626,7 +55626,7 @@ function vflagTick(dt){
   // — clampCamY pins it at 0 on every flat rug, byte-still)
   else if(!S.bf && W>VW/zoomZ() && S.cCam && !S.pan){   // 0963: a zoomed rug walks too
     S.cCam.x=clampCam(S.cCam.x+((v.x-VW*0.55)-S.cCam.x)*Math.min(1,dt*3.2));
-    S.cCam.y=clampCamY((S.cCam.y||0)+((v.y-436)-(S.cCam.y||0))*Math.min(1,dt*3.2));
+    S.cCam.y=clampCamZ((S.cCam.y||0)+((v.y-436)-(S.cCam.y||0))*Math.min(1,dt*3.2));   // THE FLOOR (cell 4)
   }
   if(!v.burst && v.t>=v.lag+v.rise){
     v.burst=true;
@@ -56178,6 +56178,7 @@ function clampCamY(y){ return Math.max(0, Math.min(WORLD_H-H, y)); }   // 0..0 o
 const RUG_PAN_S=130;   // ⚑ the south margin (world px): the 1.25× tray stands 123 tall with its lift — 130 lifts the whole south lane clear of it
 function panS(){ return (WORLD_H>H)? 0 : RUG_PAN_S; }
 function clampPanY(y){ const vis=H/zoomZ(), hi=WORLD_H-vis+panS(); return hi>=0? Math.max(0, Math.min(hi, y)) : (WORLD_H-vis)/2; }   // 0963: H/z tall; centred when the view is taller than the world
+function clampCamZ(y){ return zoomZ()===1? clampCamY(y) : clampPanY(y); }   // THE FLOOR BESIDE THE CARPET (cell 4): a camera WALK's y — the escort's focus walk, the victory flag's walk — clamps by the 100 % law at 100 % (clampCamY: 0..WORLD_H−H, byte-what-it-was) and by the view's own height when zoomed (clampPanY: centred below the fit); clampCamY alone walked a zoomed-out mat to the top of the view with pure floor below
 function cCamOn(){ return ((W>VW || panS()>0 || zoomZ()!==1) && S.cCam) || null; }   // 0963: a zoomed rug always has a camera
 // ===== v1.98 THE ESCORT CAMERA (campaign only) =====
 // The grand rugs (CAMP_GRAND) are wider than the screen, so the campaign
@@ -56233,10 +56234,10 @@ function campCamTick(dt){
     let mx=0, my=T.y; for(const u of S.units){ if(!u.dead && u.x>mx){ mx=u.x; my=u.y; } }
     let fx=1e9, fy=T.y; for(const f of S.foes){ if(!f.burrow && f.x<W-10 && f.x<fx){ fx=f.x; fy=f.y; } }
     tx=clampCam(Math.min(mx||T.x, fx)-VW*0.55);
-    ty=clampCamY((fx<(mx||T.x)? fy : my)-H*0.55);
+    ty=clampCamZ((fx<(mx||T.x)? fy : my)-H*0.55);   // THE FLOOR (cell 4): the escort's y target through the view's own height when zoomed — clampCamY alone walked a zoomed-out mat to the top of the view
   }
   if(Math.abs(tx-c.x)>2) c.x=clampCam(c.x+(tx-c.x)*Math.min(1,dt*2.2));
-  if(Math.abs(ty-c.y)>2) c.y=clampCamY(c.y+(ty-c.y)*Math.min(1,dt*2.2));
+  if(Math.abs(ty-c.y)>2) c.y=clampCamZ(c.y+(ty-c.y)*Math.min(1,dt*2.2));
 }
 // ===== 0129 THE WRECKING BALL, campaign edition — bfTick's own patrol math
 // VERBATIM (move, turn at the posts, roll, plow aside at r+16 on dt*10),
@@ -72801,7 +72802,43 @@ function drawFireworks(){
   }
 }
 
+// ═══ THE FLOOR BESIDE THE CARPET (the GO MACHINE card of 9/12 15:06 — Wyatt: "a player … zoomed out and they saw a very glitchy-looking
+// screen. You can see this on the side of Western World.") ═══ draw() never cleared the canvas: the frame's only clear was drawRug's
+// fillRect(0,0,WD,HT) — WORLD space, the world's size, under 0963's scale and the camera. Before the zoom no camera could look past the
+// world's edge, so that rect always covered the canvas; a big map zoomed out (0963-R) centres a view WIDER or TALLER than the world and the
+// margins were painted by nobody — every stale pixel there stayed (the 100 % frame the pinch started from, each pinch step's edge, the train
+// and the men walking off the carpet, a float): the torn strips beside Western Land. THE FLOOR: the bedroom floorboards the rug lies on —
+// 0628 rugSouth's own recipe (the boards under a flat rug's south edge), extended under the whole rug. drawFloor() paints the boards colour
+// over the WHOLE canvas in SCREEN space before the camera (the guarantee: nothing outside the world can hold a stale draw, at every zoom, on
+// every map, in every mode that paints through draw); rugShadow() lays the boards' grain in WORLD space over the visible world rect (the
+// planks zoom with the rug: rugSouth's 75-unit rows and 460-unit joints, phase-locked to its), the night wash after dark, the rug's shadow
+// just past its frame on all four sides (rugSouth's own gradient — rugSouth keeps the south's where it paints it), and CLIPS everything
+// world-side to the carpet (the world rect + its 28-unit frame stroke + the hand's south margin): the train, a foe walking in, a float —
+// none of it paints past the carpet's edge, the edge is the clip's line. At 100 % the rug covers the view and the floor lies under it
+// (pixel-identical to v9.65 — proven on the flat rug, the rug panned south, the western at both ends). ⚑ Q1 the floor is the boards.
+const FLOOR_BOARD='#C8A170', FLOOR_LINE='#B08A58', RUG_FRAME_OUT=28;   // rugSouth's boards (0628); the frame stroke's overhang past the world rect (lineWidth 56)
+function drawFloor(){ cx.fillStyle=FLOOR_BOARD; cx.fillRect(0,0,VW,H); }   // screen space, the canvas's size — the clear
+function rugShadow(camv){
+  const WD=S.bf? WORLD_W : W, HT=WORLD_H, z=zoomZ(), c=camv||{x:0,y:0}, F=RUG_FRAME_OUT, cy=c.y||0;
+  const pad=8/z, vx=c.x-pad, vy=cy-pad, vw=VW/z+2*pad, vh=H/z+2*pad;   // the visible world rect, padded for the shake
+  cx.save(); cx.beginPath(); cx.rect(vx,vy,vw,vh); cx.clip();
+  cx.strokeStyle=FLOOR_LINE; cx.globalAlpha=0.6; cx.lineWidth=2.5; cx.beginPath();
+  const y0=Math.floor(vy/75)*75, y1=vy+vh, x0=Math.floor(vx/460)*460-460, x1=vx+vw;
+  for(let y=y0;y<=y1;y+=75){ cx.moveTo(vx,y); cx.lineTo(x1,y); } cx.stroke();
+  cx.lineWidth=2; cx.beginPath();
+  for(let y=y0;y<y1;y+=75){ const off=((y/75)&1)? 240 : 0; for(let x=x0+180+off;x<x1;x+=460){ cx.moveTo(x,y); cx.lineTo(x,y+75); } } cx.stroke();
+  cx.globalAlpha=1;
+  if(nightField()){ cx.fillStyle='rgba(14,18,34,0.55)'; cx.fillRect(vx,vy,vw,vh); }   // 0583's night carpet: the boards under the same moon wash (rugSouth's line)
+  cx.restore();
+  const g=(ax,ay,bx,by)=>{ const gr=cx.createLinearGradient(ax,ay,bx,by); gr.addColorStop(0,'rgba(0,0,0,0.30)'); gr.addColorStop(1,'rgba(0,0,0,0)'); return gr; };   // rugSouth's shadow: 0.30 at the frame's edge to 0 over 26
+  cx.fillStyle=g(0,-F,0,-F-26); cx.fillRect(-F,-F-26,WD+2*F,26);
+  if(!(panS()>0 && cy>0)){ cx.fillStyle=g(0,HT+F,0,HT+F+26); cx.fillRect(-F,HT+F,WD+2*F,26); }   // the south: rugSouth's own when the hand has panned a flat rug down (0628, byte-still)
+  cx.fillStyle=g(-F,0,-F-26,0); cx.fillRect(-F-26,-F,26,HT+2*F);
+  cx.fillStyle=g(WD+F,0,WD+F+26,0); cx.fillRect(WD+F,-F,26,HT+2*F);
+  cx.beginPath(); cx.rect(-F,-F,WD+2*F,HT+F+Math.max(F,panS()+8)); cx.clip(); cx.beginPath();   // THE EDGE: nothing world-side paints past the carpet (the south margin stays the hand's, rugSouth's boards inside it); the path cleared behind the clip
+}
 function draw(){
+  drawFloor();   // THE FLOOR BESIDE THE CARPET: the whole canvas, screen space, every frame — no pixel outside the world can carry a stale draw
   cx.save();
   if(S.shake>0) cx.translate((Math.random()-0.5)*8*S.shake,(Math.random()-0.5)*8*S.shake);
   // ONE line pans the whole world. drawHUD runs after the restore below, so the
@@ -72810,6 +72847,7 @@ function draw(){
   const camv=S.bf? S.bf.cam : cCamOn();   // 0628 THE MAP PANS DOWN: a flat rug's camera rides the same line (x 0, y the hand's)
   { const z9=zoomZ(); if(z9!==1) cx.scale(z9,z9); }   // 0963 PINCH TO ZOOM: the view factor, before the camera — the HUD draws after the restore
   if(camv) cx.translate(-camv.x, -(camv.y||0));
+  rugShadow(camv);   // THE FLOOR BESIDE THE CARPET: the boards' grain + the rug's shadow in world space, then the clip to the carpet
   drawRug();
   if(S.bf){ drawBase('you'); drawBase('foe'); }
   else { drawSprite('toybox',120,T.y+52,150,0,0); if(S.tanBase) drawTanBase(); if(S.raid) drawRaidPosts(); if(S.evHold) drawEvSpots(); }   // 0197: the box rides its own live latitude (T.y+52===352 on every flat rug) · 0484: the spotlight cones on the snow while the room holds
