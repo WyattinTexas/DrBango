@@ -39672,15 +39672,27 @@ SPRITES_SRC.yetiboss3=SPRITES_SRC.yeti;
 // Molded-plastic read, the yeti cast palette (baked #54606C rims, snow-
 // legible, zero tint rows), NO currentColor (the rex law), no gradients,
 // no apostrophes (the utf8 data-URI law).
-// ⚠ THE BOX IS LAW: the custom '-37 -26 194 168' box rides FOUR
+// ⚠ THE BOX IS LAW: the custom '-55 -59 230 204' box rides FOUR
 // registries (buildSprites — the poses join via the kingyeti name prefix —
-// sprURI, and the two room-decor lists) and drawFoe still draws ×(194/120);
+// sprURI, and the two room-decor lists) and drawFoe still draws ×(230/120) (0912-8: the 194 box grew to 230);
 // every pose bbox stays inside it (measured, battery B) and the ink bottom
 // holds the old legs y=128 ground line (stomp lifts RISE, never dip),
 // so no other seat re-measures.
 // ⚠ THE MUZZLE LAW: the boss big-shot tracer leaves screen (-41.8,-57.6)
 // at his 239px draw — mold (26.1, 81.8) — so the HURL pose open mitt
 // sits exactly there BY CONSTRUCTION.
+// 0912-8 KING YETI'S SWORD, LONGER (Wyatt 9/12: "a little bit longer and more prominent … very dagger-like, very small"):
+// ONE blade length in every pose — KY_SAB_LEN 82 (guard to point 85.0 mold units = 1.54x the stand's 55.2; the swing's
+// high 39.7 / thru 49.7, the wave's 43.7, the brace's 39.7, the tuck's 41.7, the hurl's 33.7 and the KO's 29.7 were each
+// trimmed to the old box — the daggers) — a pointed blade with the cast rim, an edge light and a fuller, a rimmed
+// crossguard with gold ends, three wraps, a pommel. The angles re-dialed so every pose stays inside the box (up -43.1 → -49
+// · high -50 → -45 · thru 148 → 160 · tuck -96 → -80 · ko 55 → 160, the blade lowered across his legs · hurl -35 → -58;
+// wide -85 + brace -92 as they were). THE BOX GROWS 194x168 → 230x204 about the anchor: x centred on 60 (the flip
+// holds), the feet at 11/12 of the height (= the old 154/168 exactly, drawSprite's 0.92 anchor holds), so KY_UNIT_W
+// x(230/194) and drawFoe's x(230/120) keep the body pixel-still on both carpets; a DOM seat that fits the whole box (the
+// roster square, the cards, the trailer, the yard, the halls) shows the body at ~84 % with the sword the gain (⚑ Y-Q4).
+// KY_SWORD_R follows the drawn tip (71; was 64) — the damage, the cadence, the eye, the hold byte-still (⚑ Y-Q3).
+const KY_SAB_LEN=82;   // ⚑ Y-Q2: the blade, guard to point, in mold units — every pose carries this one length
 function kyArt(P){
   P=P||{};
   const g=(t,b)=>'<g stroke-linecap="round" stroke-linejoin="round"'+(t?' transform="'+t+'"':'')+'>'+b+'</g>';
@@ -39692,19 +39704,21 @@ function kyArt(P){
   const mitt=(x,y)=>'<circle cx="'+x+'" cy="'+y+'" r="6.5" fill="'+F+'" stroke="'+R+'" stroke-width="3.5"/>';
   const fist=(x,y)=>'<circle cx="'+x+'" cy="'+y+'" r="7.5" fill="'+F+'" stroke="'+R+'" stroke-width="3.5"/>';
   const saber=(x,y,deg,len)=>{ const r=deg*Math.PI/180, ux=Math.cos(r), uy=Math.sin(r), nx=-uy, ny=ux;
-    const A=(k)=>(x+ux*k).toFixed(1)+' '+(y+uy*k).toFixed(1);
-    const W=(k,n1,n2)=>'M'+(x+ux*k+nx*n1).toFixed(1)+' '+(y+uy*k+ny*n1).toFixed(1)+' L'+(x+ux*k+nx*n2).toFixed(1)+' '+(y+uy*k+ny*n2).toFixed(1);
-    const tx=x+ux*(12+len), ty=y+uy*(12+len);
-    return '<g transform="translate('+x+','+y+')"><g class="bsaber"><g transform="translate('+(-x)+','+(-y)+')" stroke-linecap="round">'
-     +'<circle cx="'+(x-ux*14.5).toFixed(1)+'" cy="'+(y-uy*14.5).toFixed(1)+'" r="3.4" fill="'+G1+'" stroke="'+G2+'" stroke-width="1.6"/>'
-     +'<path d="M'+A(-11)+' L'+A(5.5)+'" stroke="#3A434C" stroke-width="7"/>'
-     +'<path d="'+W(-6,-2.6,2.6)+' '+W(-0.5,-2.6,2.6)+'" stroke="'+G1+'" stroke-width="2.6"/>'
-     +'<path d="'+W(8.3,-5,5)+'" stroke="#B8C4D0" stroke-width="4.6"/>'
-     +'<path d="M'+A(12)+' L'+tx.toFixed(1)+' '+ty.toFixed(1)+'" stroke="'+SH+'" stroke-width="10" opacity="0.4"/>'
-     +'<path d="M'+A(12)+' L'+tx.toFixed(1)+' '+ty.toFixed(1)+'" stroke="#EAF0F5" stroke-width="5"/>'
-     +'<path d="M'+A(12)+' L'+tx.toFixed(1)+' '+ty.toFixed(1)+'" stroke="#FFFFFF" stroke-width="2.2"/>'
+    const X=(k,n)=>(x+ux*k+nx*(n||0)).toFixed(1), Y=(k,n)=>(y+uy*k+ny*(n||0)).toFixed(1), A=(k,n)=>X(k,n)+' '+Y(k,n);
+    const W=(k,n1,n2)=>'M'+A(k,n1)+' L'+A(k,n2);
+    const tk=12+len, bw=3.6, tp=tk-15, tx=x+ux*tk, ty=y+uy*tk;   // the blade runs k 12 → the point at 12+len; half-width 3.6; the point tapers over the last 15
+    return '<g transform="translate('+x+','+y+')"><g class="bsaber"><g transform="translate('+(-x)+','+(-y)+')" stroke-linecap="round" stroke-linejoin="round">'
+     +'<circle cx="'+X(-15)+'" cy="'+Y(-15)+'" r="4" fill="'+G1+'" stroke="'+G2+'" stroke-width="1.8"/>'
+     +'<path d="M'+A(-12)+' L'+A(6)+'" stroke="#3A434C" stroke-width="7.5"/>'
+     +'<path d="'+W(-8,-2.9,2.9)+' '+W(-2.5,-2.9,2.9)+' '+W(3,-2.9,2.9)+'" stroke="'+G1+'" stroke-width="2.4"/>'
+     +'<path d="'+W(9,-9.5,9.5)+'" stroke="'+R+'" stroke-width="8"/><path d="'+W(9,-9.5,9.5)+'" stroke="#B8C4D0" stroke-width="5"/>'
+     +'<circle cx="'+X(9,-9.5)+'" cy="'+Y(9,-9.5)+'" r="2.3" fill="'+G1+'" stroke="'+G2+'" stroke-width="1.4"/><circle cx="'+X(9,9.5)+'" cy="'+Y(9,9.5)+'" r="2.3" fill="'+G1+'" stroke="'+G2+'" stroke-width="1.4"/>'
+     +'<path d="M'+A(13)+' L'+A(tk-3)+'" stroke="'+SH+'" stroke-width="11" opacity="0.3"/>'
+     +'<path d="M'+A(12,-bw)+' L'+A(tp,-bw)+' L'+A(tk)+' L'+A(tp,bw)+' L'+A(12,bw)+' z" fill="#EAF0F5" stroke="'+R+'" stroke-width="2.6"/>'
+     +'<path d="M'+A(15,-1.7)+' L'+A(tp+5,-1.2)+'" stroke="#FFFFFF" stroke-width="1.7"/>'
+     +'<path d="M'+A(15,1.5)+' L'+A(tp-1,1.4)+'" stroke="'+SH+'" stroke-width="1.4" opacity="0.9"/>'
      +'<path d="M'+(tx-3.4).toFixed(1)+' '+(ty-3.4).toFixed(1)+' l6.8 6.8 M'+(tx+3.4).toFixed(1)+' '+(ty-3.4).toFixed(1)+' l-6.8 6.8" stroke="#FFFFFF" stroke-width="2" opacity="0.9"/>'
-     +'</g></g></g>'; };   // 0567: the saber named (bsaber) about the grip — parametric, every pose inherits
+     +'</g></g></g>'; };   // 0567: the saber named (bsaber) about the grip — parametric, every pose inherits · 0912-8 THE LONGSWORD: the pommel, the grip with three wraps, the rimmed crossguard with gold ends, the pointed blade (the cast rim, the edge light, the fuller), the glint at the point
   const cape='<path d="M34 34 Q28 70 20 112 Q52 100 66 116 Q84 98 104 118 Q112 74 96 34 Q66 22 34 34 z" fill="#C0473A" stroke="#8A2F26" stroke-width="4"/>'
     +'<path d="M40 44 Q36 76 30 104 M60 40 Q60 78 62 108 M84 42 Q90 76 96 106" stroke="#8A2F26" stroke-width="3" fill="none" opacity="0.55"/>'
     +'<path d="M34 34 Q66 24 96 34" stroke="'+G1+'" stroke-width="5" fill="none"/>'
@@ -39726,14 +39740,14 @@ function kyArt(P){
     drop:  armW('M30 56 Q18 70 15 88')+mitt(14,95)
   };
   const ANK={
-    up:   {arm:armE('M90 56 L112 32 M86 50 L104 24'), fist:[106,27], sab:[-43.1,51.5]},
-    high: {arm:armE('M90 56 L100 26 M86 50 L92 22'),  fist:[97,18],  sab:[-50,36]},
-    thru: {arm:armE('M90 56 L78 84 M86 52 L72 86'),   fist:[70,90],  sab:[148,46]},
-    wide: {arm:armE('M90 56 L122 48 M86 50 L116 40'), fist:[124,44], sab:[-85,40]},
-    braceN:{arm:armE('M90 56 L108 74 M86 52 L104 78'),fist:[110,84], sab:[-92,36]},
-    tuckN:{arm:'<path d="M90 56 Q94 66 88 76" stroke="'+SH+'" stroke-width="11" fill="none"/>', fist:[87,79], sab:[-96,38]},
-    down: {arm:armE('M90 56 L102 78 M86 52 L98 82'),  fist:[101,88], sab:[55,26]},
-    hurlN:{arm:armE('M90 56 L108 70 M86 52 L104 74'), fist:[110,76], sab:[-35,30]}
+    up:   {arm:armE('M90 56 L112 32 M86 50 L104 24'), fist:[106,27], sab:[-49,KY_SAB_LEN]},
+    high: {arm:armE('M90 56 L100 26 M86 50 L92 22'),  fist:[97,18],  sab:[-45,KY_SAB_LEN]},
+    thru: {arm:armE('M90 56 L78 84 M86 52 L72 86'),   fist:[70,90],  sab:[160,KY_SAB_LEN]},
+    wide: {arm:armE('M90 56 L122 48 M86 50 L116 40'), fist:[124,44], sab:[-85,KY_SAB_LEN]},
+    braceN:{arm:armE('M90 56 L108 74 M86 52 L104 78'),fist:[110,84], sab:[-92,KY_SAB_LEN]},
+    tuckN:{arm:'<path d="M90 56 Q94 66 88 76" stroke="'+SH+'" stroke-width="11" fill="none"/>', fist:[87,79], sab:[-80,KY_SAB_LEN]},
+    down: {arm:armE('M90 56 L102 78 M86 52 L98 82'),  fist:[101,88], sab:[160,KY_SAB_LEN]},
+    hurlN:{arm:armE('M90 56 L108 70 M86 52 L104 74'), fist:[110,76], sab:[-58,KY_SAB_LEN]}
   };
   const an=ANK[P.aNk||'up'];
   const armN=an.arm+fist(an.fist[0],an.fist[1])+saber(an.fist[0],an.fist[1],an.sab[0],an.sab[1]);
@@ -40813,7 +40827,7 @@ function buildSprites(done){
     // 0436/0454: KING CROAK, his son AND his flinch key (kingcroak*) all decode in the shipped 140 box — the same name-prefix law
     // 8/25 THE FIRING FACE: kingcroakfire (the storm stance) rides the same prefix — no row, no list to forget
     // 0537: JANE'S PARTS (janeP_*) decode in the default 120x140 box — the mold's own; no row, no list to forget (the same name-prefix law)
-    const vb = TEDDY_BOX[k] ? TEDDY_BOX[k] : PET_BOX[k] ? PET_BOX[k] : (k.slice(0,8)==='kingyeti') ? '-37 -26 194 168' : (k.slice(0,9)==='kingcroak') ? '0 0 140 140' : (k==='bomber') ? '0 0 170 100' : (k==='wsniper') ? '-12 0 132 140' : (k==='jeep'||k==='tank'||k==='tankv2'||k==='bfjeep'||k==='bftank'||k==='rex'||k==='rollpig'||k==='bluepig'||k==='sdino'||k==='bdino'||k==='spitter'||k==='dinoboss1'||k==='dinoboss2'||k==='dinoboss3'||k==='kingrex'||k==='trike'||k==='btrike'||k==='ptero'||k==='stego'||k==='dilo'||k==='jeep2'||k==='tank2'||k==='wrider'||k==='wmouse'||k==='wteddy'||k==='wsnake'||k==='stamph'||k==='stampb') ? '0 0 140 140' : (k==='mom') ? '0 0 160 530' : (k==='toybox') ? '0 0 160 140' : (k==='blob') ? '0 0 104 63' : '0 0 120 140';   // v3.33: the blue piggy rides his big brother's wide box — 120 slices the trotter curl
+    const vb = TEDDY_BOX[k] ? TEDDY_BOX[k] : PET_BOX[k] ? PET_BOX[k] : (k.slice(0,8)==='kingyeti') ? '-55 -59 230 204' : (k.slice(0,9)==='kingcroak') ? '0 0 140 140' : (k==='bomber') ? '0 0 170 100' : (k==='wsniper') ? '-12 0 132 140' : (k==='jeep'||k==='tank'||k==='tankv2'||k==='bfjeep'||k==='bftank'||k==='rex'||k==='rollpig'||k==='bluepig'||k==='sdino'||k==='bdino'||k==='spitter'||k==='dinoboss1'||k==='dinoboss2'||k==='dinoboss3'||k==='kingrex'||k==='trike'||k==='btrike'||k==='ptero'||k==='stego'||k==='dilo'||k==='jeep2'||k==='tank2'||k==='wrider'||k==='wmouse'||k==='wteddy'||k==='wsnake'||k==='stamph'||k==='stampb') ? '0 0 140 140' : (k==='mom') ? '0 0 160 530' : (k==='toybox') ? '0 0 160 140' : (k==='blob') ? '0 0 104 63' : '0 0 120 140';   // v3.33: the blue piggy rides his big brother's wide box — 120 slices the trotter curl
     // 0117: every new tan walks on painted TAN — miss this list and a perfect
     // FDEF row fields in GREEN, silently (the checklist's own warning)
     const color = (k==='tanrifle'||k==='tanmg'||k==='crawler'||k==='officer'||k==='jeep'||k==='tank'||k==='tankv2'||k==='blob'||k==='giant'||k==='rollpig'||k==='tansarge'||k==='tanbazooka'||k==='tanmortar'||k==='tanradio'||k==='tanflame'||k==='tansniper'||k==='tanpistol2'||k==='tanshotgun'||k==='tancommander'||k==='tancommanderb'||k==='larson'||k==='tanmedic'||k==='tancommando'||k==='wbandit'||k==='wsniper'||k==='bbill'||k==='bbillx') ? TAN : GREEN;   // 0478: BUFFALO BILL is a tan-bodied mold (0500: + his park twin; the madam's gown is fixed colour — no row)
@@ -45063,7 +45077,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.64';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.65';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -47632,7 +47646,7 @@ function evRk(){ return (EV.rk==='bone')? 'bone' : EV_RK; }
 function evKing(){ return (EV.rk==='bone')? 'bone' : 'ice'; }
 function evKingName(k){ return ((k||evKing())==='bone')? 'ULTRA MEGA KING REX' : 'ULTRA MEGA KING YETI'; }   // the pill's name (card 3 ships the rows ×7)
 function evNightName(k){ return ((k||evKing())==='bone')? 'THE ERUPTION' : 'THE INVASION'; }
-function evKingArt(k,cls,style){ const b=((k||evKing())==='bone'); return '<svg'+(cls? ' class="'+cls+'"' : '')+' viewBox="'+(b? '0 0 140 140' : '-37 -26 194 168')+'"'+(style? ' style="'+style+'"' : '')+'>'+(b? SPRITES_SRC.kingrex : SPRITES_SRC.kingyeti)+'</svg>'; }   // class · viewBox · style in the shipped order — the yeti's cards stay byte-identical
+function evKingArt(k,cls,style){ const b=((k||evKing())==='bone'); return '<svg'+(cls? ' class="'+cls+'"' : '')+' viewBox="'+(b? '0 0 140 140' : '-55 -59 230 204')+'"'+(style? ' style="'+style+'"' : '')+'>'+(b? SPRITES_SRC.kingrex : SPRITES_SRC.kingyeti)+'</svg>'; }   // class · viewBox · style in the shipped order — the yeti's cards stay byte-identical
 function evWkDate(wk){ return String(wk||'').replace(/^bone:/,''); }   // a night key's DATE — a Rex night's key wears bone: (server v56 ev_wk), the yeti's is bare
 function evSpotCols(){ return (S.raid && S.raid.k==='bone' && S.raid.cfg===S.cfg)? EV_SPOT_BONE : EV_SPOT; }   // the held mat's cones read the FIGHT's kind (the hold IS the battle mat)
 function evSync(r){
@@ -48049,7 +48063,7 @@ function hallCard(h){
   const cone=(c,a,cls)=>'<i class="hall-cone '+cls+'" style="background:conic-gradient(from '+a+'deg,'+c+'00 0deg,'+c+'99 8deg,'+c1+'CC 12deg,'+c+'99 16deg,'+c+'00 26deg,#00000000 360deg)"></i>';
   st+=cone(c0,118,'l')+cone(c1,216,'r');   // the marquee's own two lamps, hung at the stage's top corners, crossing over the dancers
   if(!bone) st+='<span class="hall-flakes"></span><span class="hall-flakes b"></span>';   // 0905: no snow sheets in the lair
-  st+=(bone? '<div class="hall-king bone">'+evKingArt('bone') : '<div class="hall-king"><svg viewBox="-37 -26 194 168">'+SPRITES_SRC.kingyetiko+'</svg>')+'<span class="hall-ko"><i style="--a:0deg">★</i><i style="--a:120deg">★</i><i style="--a:240deg">★</i></span></div>';
+  st+=(bone? '<div class="hall-king bone">'+evKingArt('bone') : '<div class="hall-king"><svg viewBox="-55 -59 230 204">'+SPRITES_SRC.kingyetiko+'</svg>')+'<span class="hall-ko"><i style="--a:0deg">★</i><i style="--a:120deg">★</i><i style="--a:240deg">★</i></span></div>';
   const me=(typeof CREW==='object' && CREW && CREW.me)? String(CREW.me) : '';
   let plates='';
   seats.forEach((s,i)=>{
@@ -50107,7 +50121,7 @@ const PTY_PLACES={ bf:'THE BATTLEFIELD', c:'THE CAMPAIGN', yeti:'YETI PARK',
 function raidDoorOf(plc){
   return plc==='hide'? { door:'croak', enc:6000, name:"KING CROAK'S HIDEOUT", king:'kingcroak', crop:'0 0 140 140' }
        : plc==='lair'? { door:'bone',  enc:4000, name:"KING REX'S LAIR",      king:'kingrex',   crop:'0 0 140 140' }
-       : plc==='ice' ? { door:'ice',   enc:3000, name:'THE ICE CASTLE',       king:'kingyeti',  crop:'-37 -26 194 168' }
+       : plc==='ice' ? { door:'ice',   enc:3000, name:'THE ICE CASTLE',       king:'kingyeti',  crop:'-55 -59 230 204' }
        : plc==='fields'? { door:'fields', enc:7000, name:'THE PILLOW FIELDS', king:'bearnaparte', crop:'0 0 120 140' }
        : plc==='palace'? { door:'palace', enc:8600, name:"PRINCESS CROAK'S PALACE", king:'princess', crop:'0 0 120 140' }   // 0947e: the fifth throne — band 8600+n (the shelf between the moon's 8501–8550 and the 9000 team words)   // 0526: the fourth throne — band 7000+n
        : null;
@@ -58481,7 +58495,7 @@ function kingKitTick(f,dt){
 // progression): kyTkHas gates each wheel below at ranks 10/20/30, and the
 // four crystal powers join at 40/50/60/70 through kyTkWheels (the set, the
 // order and the +50 capstone sit right under these consts).
-const KY_UNIT_W=176,       // D2 BIG — royal beside 54px infantry (the boss inks ~239; tray card is fixed-44 by its own draw)
+const KY_UNIT_W=176*(230/194),   // 0912-8: the 176 of the 194 box scaled to the 230 box — the body pixel-still on the carpet, the longer blade the gain · D2 BIG — royal beside 54px infantry (the boss inks ~239; tray card is fixed-44 by its own draw)
       KY_U_RED_CD=8,       // D4 — the seize's wheel (TK_CD red's own number)
       KY_U_RED_SEEK=300,   // the boss's eye (KING_TK_SEEK)
       KY_U_BLUE_CD=10,     // D4 — the wind-front's wheel
@@ -58489,7 +58503,7 @@ const KY_UNIT_W=176,       // D2 BIG — royal beside 54px infantry (the boss in
       KY_U_PURP_RNG=560,   // the leap's hunting reach (§4 ⚑)
       KY_U_PURP_R=Math.round(TK_PURPLE_R*1.4),   // his royal landing ring — ×1.4 the Sarge's 84 (§4 ⚑)
       KY_SWORD_DMG=6,      // 0750 KING YETI'S SWORD LANDS (Y-Q5): the blade's BASE per landed swipe (was KY_U_SW_DMG 6, flat at every rank — the D4 bite); the rank curve rides it (kySwordMul below)
-      KY_SWORD_R=64,       // 0750 (Y-Q1): the sword's REACH and, for the hero, its TRIGGER (was the boss's KING_SW_TRIG 130 vs KING_SW_REACH 64: a swing at air on every man in the ring between) — KING_SW_REACH's own number, one reach for both kings
+      KY_SWORD_R=71,       // 0912-8 (⚑ Y-Q3): the reach follows the drawn tip — the swing-through point sits 78.3 mold units ahead of his centre x 0.907 px = 71 px (was 64 on a tip that drew 36 px out) · 0750 (Y-Q1): the sword's REACH and, for the hero, its TRIGGER (was the boss's KING_SW_TRIG 130 vs KING_SW_REACH 64: a swing at air on every man in the ring between) — KING_SW_REACH's own number, one reach for both kings
       KY_SWORD_EYE=200,    // 0750 (Y-Q2): the hero's EYE — a foe inside it and outside the reach makes him WALK IN (campUnitStep's approach clause); his snowball rng's own number; the stride is CAMP_SPD's cell (44)
       KY_SWORD_CD=1.2,     // 0750 (Y-Q6): the sword's own re-arm — a closed king swipes about once a second (was the boss's KING_SW_CD 3.4, shared); tkSlowMul still rides it (the GREEN frenzy quickens, TEAL's concussion stretches)
       KY_SWORD_RANK=0.1,   // 0750 (Y-Q5b): the sword's rank LANE — the standard 0.1 slope through the v1.17 taper (the card's table: rank 10 x2.00 · 50 x3.10 · 100 x3.47); HERO_DMG_RANK (0.02) = one law with his snowballs, faint (rank 100 x1.49)
@@ -75690,13 +75704,13 @@ function drawFoe(f){
       return;
     }
     if(f.type==='kingyeti'){
-      // 0278a THE CAPED KING: his grown '-37 -26 194 168' box draws at
-      // ×(194/120) so the BODY still spans the w148 cell (the box grew for
+      // 0278a THE CAPED KING: his grown '-55 -59 230 204' box draws at
+      // ×(230/120) so the BODY still spans the w148 cell (0912-8: 194 → 230, the box grown for the longer sword) (the box grew for
       // the blade, not the man); the footwork bob lifts the body only; a
       // swing leans him in; the blue wind-front sweeps as travelling arcs.
       if(lightField()){ cx.fillStyle='rgba(74,90,120,0.30)';
         cx.beginPath(); cx.ellipse(f.x,f.y-1,f.def.w*0.30,8,0,0,7); cx.fill(); }
-      drawKing(f,f.x,f.y-(f.airB||0),f.def.w*(194/120),(f.kySwing>0? -0.05 : Math.sin(S.t*3.4+f.wob)*0.028),true,wbk);   // 0435: the pose reader replaces the single stance (the -0.14 swing lean lives in the swing molds now; a -0.05 motion lean rides along)
+      drawKing(f,f.x,f.y-(f.airB||0),f.def.w*(230/120),(f.kySwing>0? -0.05 : Math.sin(S.t*3.4+f.wob)*0.028),true,wbk);   // 0435: the pose reader replaces the single stance (the -0.14 swing lean lives in the swing molds now; a -0.05 motion lean rides along)
       if(f.kyWave){ const Wv=f.kyWave; cx.lineCap='round';
         cx.globalAlpha=0.55; cx.lineWidth=9; cx.strokeStyle='#7FB2E0';
         cx.beginPath(); cx.arc(Wv.cx,Wv.cy,Wv.r,Math.PI*0.62,Math.PI*1.38); cx.stroke();
@@ -77531,7 +77545,7 @@ function sprURI(k,color,vbox,body){   // 0894: body = a dyed mold string in plac
   // buildUnitTint hit in v1.14: box a jeep at 120 and the front wheel is sliced
   // clean off. bfjeep/bftank are the mirrored green twins and box the same.
   // vbox overrides both, for callers that want the art cropped to its own ink.
-  const vb=vbox||TEDDY_BOX[k]||PET_BOX[k]||(k==='kingyeti'?'-37 -26 194 168':k==='bomber'?'0 0 170 100':(k==='jeep'||k==='tank'||k==='bfjeep'||k==='bftank'||k==='tank2'||k==='trike'||k==='btrike'||k==='ptero'||k==='stego'||k==='dilo'||k==='kingrex'||k==='kingcroak'||k==='kingcroaklil')?'0 0 140 140':'0 0 120 140');   // 0465: the son rides his father's box here too (buildSprites already does by the name-prefix law) · 0278a: the caped king's grown box — BOTH lists carry it (the v1.20 two-list law; 0278b: the four dino species ride the 140 box in both)
+  const vb=vbox||TEDDY_BOX[k]||PET_BOX[k]||(k==='kingyeti'?'-55 -59 230 204':k==='bomber'?'0 0 170 100':(k==='jeep'||k==='tank'||k==='bfjeep'||k==='bftank'||k==='tank2'||k==='trike'||k==='btrike'||k==='ptero'||k==='stego'||k==='dilo'||k==='kingrex'||k==='kingcroak'||k==='kingcroaklil')?'0 0 140 140':'0 0 120 140');   // 0465: the son rides his father's box here too (buildSprites already does by the name-prefix law) · 0278a: the caped king's grown box — BOTH lists carry it (the v1.20 two-list law; 0278b: the four dino species ride the 140 box in both)
   return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+vb+'">'+(body||petMold(k)).split('currentColor').join(color||'#7FA35C')+'</svg>');
 }
 // The three unlockable figures. cost is the economy; name/band/tag are how the
@@ -80722,7 +80736,7 @@ function dinoToySVG(){
 const BOSS_INK={ sdino:[20,26,110,108], bdino:[20,26,110,108], kingrex:[20,26,110,108],
   trike:[4,42,132,88], ptero:[8,18,128,86], stego:[6,30,132,100], dilo:[8,20,124,110],
   syeti:[0,6,120,130], byeti:[0,6,120,130], snowfig:[8,10,106,126], gsnowman:[8,10,106,126],
-  kingyeti:[-37,-26,194,168],
+  kingyeti:[-55,-59,230,204],   // 0912-8: the grown box (the longer sword)
   // 0552: the outlaw molds' ink boxes — getBBox in each mold's own park viewBox (ink552.mjs; wsniper's box starts at -12, the lady's and the bandit's are the 120-wide soldier box; the son = his father's box)
   wbandit:[14,46,80,91], wmouse:[11,67,107,69], wsniper:[-7,81,117,56], wteddy:[28,12,82,126], wrider:[15,25,108,114], wsnake:[5,42,117,96], wlady:[2,22,84,115], kingcroaklil:[18,0,106,138], kingcroak:[18,0,106,138] };
 // 0552: two road molds are built on the tan rifleman's currentColor body (the bandit = tanrifle + the mask; the prone sniper) —
@@ -80745,7 +80759,7 @@ const BOSS_ART={ sdino:{vb:'0 0 140 140',fs:0.62,tx:26.6,ty:50.9}, bdino:{vb:'0 
   kingrex:{vb:'0 0 140 140',fs:1,tx:0,ty:0},
   syeti:{vb:'0 0 120 140',fs:0.55,tx:27,ty:61.2}, byeti:{vb:'0 0 120 140',fs:0.85,tx:9,ty:20.4},
   snowfig:{vb:'0 0 120 140',fs:0.75,tx:15,ty:34}, gsnowman:{vb:'0 0 120 140',fs:1,tx:0,ty:0},
-  kingyeti:{vb:'-37 -26 194 168',fs:1,tx:0,ty:0},
+  kingyeti:{vb:'-55 -59 230 204',fs:1,tx:0,ty:0},
   // 0552: the outlaws' box art — the size story off each unit's field width (the mouse small in frame, the rattler and the king filling it, the son at his father's 0.6); tx = the box's centring, ty = bottom-anchored at the ground line (134 in the 140 box, 136 in the 120 box — the shipped rows' own arithmetic)
   wbandit:{vb:'0 0 120 140',fs:0.62,tx:22.8,ty:51.7}, wmouse:{vb:'0 0 140 140',fs:0.5,tx:35,ty:67}, wsniper:{vb:'-12 0 132 140',fs:0.7,tx:16.2,ty:40.2}, wteddy:{vb:'0 0 140 140',fs:0.75,tx:17.5,ty:33.5},
   wrider:{vb:'0 0 140 140',fs:0.85,tx:10.5,ty:20.1}, wsnake:{vb:'0 0 140 140',fs:1,tx:0,ty:0}, wlady:{vb:'0 0 120 140',fs:0.85,tx:9,ty:20.4}, kingcroaklil:{vb:'0 0 140 140',fs:0.6,tx:28,ty:53.6}, kingcroak:{vb:'0 0 140 140',fs:1,tx:0,ty:0} };
@@ -91553,7 +91567,7 @@ function renderRaidScene(){
       +'<div class="wt-playwrap">'
       +'<img class="wt-flank" src="'+sargeWepURI(sargeArtW(META.sargeWeapon||'pistol'),dye)+'" alt="">'
       +'<button type="button" class="wt-play" onclick="UI.raidPlay()"><span class="big">⚔ DEPLOY!</span></button>'
-      +'<img class="wt-flank r" src="'+(RAID_CUR==='palace'? sprURI('princess',null,PRINCESS_PORT_VB) : RAID_CUR==='fields'? sprURI('bearnaparte') : RAID_CUR==='bone'? sprURI('kingrex',null,'0 0 140 140') : RAID_CUR==='croak'? sprURI('kingcroak',null,'0 0 140 140') : sprURI('kingyeti',null,'-37 -26 194 168'))+'" alt="">'
+      +'<img class="wt-flank r" src="'+(RAID_CUR==='palace'? sprURI('princess',null,PRINCESS_PORT_VB) : RAID_CUR==='fields'? sprURI('bearnaparte') : RAID_CUR==='bone'? sprURI('kingrex',null,'0 0 140 140') : RAID_CUR==='croak'? sprURI('kingcroak',null,'0 0 140 140') : sprURI('kingyeti',null,'-55 -59 230 204'))+'" alt="">'
       +'</div>'
       +(pLock&&pLead? '<div class="wt-ldhint" data-notr>'+tf('%1 STARTS THE BATTLE', escH(String(pLead.name||'ALLY').toUpperCase().slice(0,12)))+'</div>' : '')
       +'</div>'
@@ -94921,7 +94935,7 @@ function wrFaceURIs(){
   const nem='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 0 102 102">'
     +(SARGE_ART.lightsaber||SPRITES_SRC.sarge).split('currentColor').join(TAN).split('BLADEHEX').join(NEMESIS_SABER)+'</svg>');
   WR_FACES={ nemesis:nem, mom:sprURI('mom',null,'0 385 160 122'), robo:sprURI('robo',null,'10 2 100 100'),
-    rex:sprURI('kingrex',null,'6 2 130 130'), yeti:sprURI('kingyeti',null,'-37 -26 194 168'), croak:sprURI('kingcroak',null,'0 0 140 140'),
+    rex:sprURI('kingrex',null,'6 2 130 130'), yeti:sprURI('kingyeti',null,'-55 -59 230 204'), croak:sprURI('kingcroak',null,'0 0 140 140'),
     bear:sprURI('bearnapartefoot',null,'2 -18 116 116'),   // 0604 KING BEAR'S FACE: the CROWNED king on foot (0595's T_KING_BEAR_FOOT — crown over the bicorne, sabre aloft), the head-and-crown crop; never SPRITES_SRC.kingbear (the un-crowned hero mold)
     larson:sprURI('larson',TAN,'22 34 68 68') };   // 0902 THE BOSS WALL GOES 3×3 (§2 D2): COMMANDER LARSON's face — the shipped mold (SPRITES_SRC.larson, painted TAN, the advhat since 0612 — the comm portrait's reference look), a head-and-shoulders crop measured off his ink (the hat crown y 42 gets 8 px of headroom, the head x 35.5-72 centred, the cut at mid-body) the way King Bear's crop was; a vector URI — the 2× well draws it sharp at any DPR
   return WR_FACES;
@@ -98488,7 +98502,7 @@ function fhKingsArt(hex,ink,dye){
   king('kingbear', fhImg(sprURI('kingbear',dye),850,196,76,92,' data-fh="king" data-k="kingbear"'), fhCres(876,240,34,-3.4,-1.65,false));
   king('kingcroak', fhImg(sprURI('kingcroakfire',dye,'0 0 140 140',SPRITES_SRC.kingcroakfire),960,206,92,92,' data-fh="king" data-k="kingcroak"'), fhBolt(972,249,958,249,'#FFE0B8')+fhFlash(973,249,4,-1)+fhBolt(1034,241,1048,241,'#FFE0B8')+fhFlash(1033,241,4,1));
   king('kingrex', fhImg(sprURI('kingrex',dye,undefined,MIRROR_V(petMold('kingrex'))),1100,204,84,84,' data-fh="king" data-k="kingrex"'), '<g data-fx="roar" fill="none" stroke="#EDEADF" stroke-linecap="round"><path d="M1188 222 q10 14 0 28" stroke-width="3" opacity=".9"/><path d="M1198 216 q14 20 0 40" stroke-width="2.2" opacity=".6"/><path d="M1208 210 q18 26 0 52" stroke-width="1.6" opacity=".35"/></g>');
-  king('kingyeti', fhImg(sprURI('kingyetihurl',dye,'-37 -26 194 168',SPRITES_SRC.kingyetihurl),900,262,112,97,' data-fh="king" data-k="kingyeti"'), '<g data-fx="snowb"><path d="M912 290 Q898 260 884 272" stroke="#EDEADF" stroke-width="1.6" stroke-dasharray="4 5" fill="none" opacity=".6"/>'+fhSnowball(884,272,9)+'</g>');
+  king('kingyeti', fhImg(sprURI('kingyetihurl',dye,'-55 -59 230 204',SPRITES_SRC.kingyetihurl),900,262,112,97,' data-fh="king" data-k="kingyeti"'), '<g data-fx="snowb"><path d="M912 290 Q898 260 884 272" stroke="#EDEADF" stroke-width="1.6" stroke-dasharray="4 5" fill="none" opacity=".6"/>'+fhSnowball(884,272,9)+'</g>');
   king('jane', fhImg(sprURI('jane',dye),1150,266,76,92,' data-fh="king" data-k="jane"'), fhFlash(1228,300,8,1)+fhTracer(1236,300,1268,297,0.6));
   return v;
 }
@@ -99531,7 +99545,7 @@ function megaSweep(){
   p.innerHTML='<div class="mb-card">'
     +'<span class="mb-band">THE MOUNTAIN IS YOURS!</span>'
     +'<h2 class="mb-h">MEGA DIFFICULTY</h2>'
-    +'<span class="mb-win">'+MB_RAYS+'<svg viewBox="-37 -26 194 168">'+SPRITES_SRC.kingyeti+'</svg></span>'
+    +'<span class="mb-win">'+MB_RAYS+'<svg viewBox="-55 -59 230 204">'+SPRITES_SRC.kingyeti+'</svg></span>'
     +'<span class="mb-line">King Yeti has returned to the castle and awaits you. Mega difficulty unlocked.</span>'
     +'<button type="button" class="mb-take" onclick="UI.mileTake()">IT\'S MINE!</button>'
     +'</div>';
@@ -102368,7 +102382,7 @@ function mnImg(k){   // the mold in the player's dye — sprURI's own recipe (th
   const hex=dyeHex()||'#7FA35C', id=k+'|'+hex;
   if(MN_IMGS[id]) return MN_IMGS[id];
   const im=new Image();
-  const vb=(k.slice(0,8)==='kingyeti')? '-37 -26 194 168' : (k.slice(0,9)==='kingcroak')? '0 0 140 140' : undefined;   // the pose keys ride their family's box (buildSprites' name-prefix law)
+  const vb=(k.slice(0,8)==='kingyeti')? '-55 -59 230 204' : (k.slice(0,9)==='kingcroak')? '0 0 140 140' : undefined;   // the pose keys ride their family's box (buildSprites' name-prefix law)
   im.src=(k==='sarge')? menuSargeURI(hex) : sprURI(k,hex,vb);
   MN_IMGS[id]=im; return im;
 }
@@ -102645,7 +102659,7 @@ const MN_HERO={
       if(still) return;
       const kb=mnAt(p,1.15,0.55); if(kb>=0){ const x1=x+13, y1=MN_GY-41, x2=tx-4, y2=MN_GY-30, px=x1+(x2-x1)*kb, py=y1+(y2-y1)*kb-26*4*kb*(1-kb); c.fillStyle='#FFFFFF'; c.strokeStyle='rgba(46,62,84,0.8)'; c.lineWidth=1.5; c.beginPath(); c.arc(px,py,3.6,0,7); c.fill(); c.stroke(); }   // the snowball on its arc
       const ks=mnAt(p,1.7,0.35); if(ks>=0) mnPuff(c,tx-4,MN_GY-30,14,ks,'#ffffff');   // …bursts on the man
-      if(sw>=0){ const R=38, a0=-1.35, a1=0.95, swp=a0+(a1-a0)*Math.min(1,sw*2.2), px=x+16, py=MN_GY-44;   // the blade: the saber arc's own grammar in the sword's steel under the white core
+      if(sw>=0){ const R=46, a0=-1.35, a1=0.95, swp=a0+(a1-a0)*Math.min(1,sw*2.2), px=x+16, py=MN_GY-44;   // the blade: the saber arc's own grammar in the sword's steel under the white core
         c.globalAlpha=(1-sw)*0.9; c.lineCap='round'; c.lineWidth=7; c.strokeStyle=KY_SWORD_COL; c.beginPath(); c.arc(px,py,R,a0,swp); c.stroke(); c.lineWidth=3; c.strokeStyle='#fff'; c.beginPath(); c.arc(px,py,R,a0,swp); c.stroke(); c.lineCap='butt'; c.globalAlpha=1; }
       const kr=mnAt(p,2.5,0.25); if(kr>=0) mnRing(c,tx-6,MN_GY-16,4,22,kr,KY_SWORD_COL); } },   // kySwordHit's ring on the man
   kingrex:{ T:3.6, f(c,p,now,still){ const w=80, tx=150, mx=MN_FX+33, my=MN_GY-35, kd=mnAt(p,0.95,0.7), k=mnAt(p,0.5,1.1);   // THE BREATH at the man (the fire loop's kingrex tongue, cone-true), the man tumbles
