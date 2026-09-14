@@ -42305,7 +42305,15 @@ function shakeCast(){
   try{
     if(S.bf){ const tm=bfMyTeam(), ms=bfMySeat();
       mine=S.units.filter(u=>!u.dead&&u.side===tm).map(u=>({t:u.type,my:((u.seat|0)===ms&&!u.coopBy)?1:0})); }   // SH-02 D7: the whole team dances but only MY OWN figures wear my colors (the wardrobe law)
-    else mine=S.units.filter(u=>!u.dead&&!u.coopBy).map(u=>({t:u.type,my:1}));   // campaign: my own men (a knocked man stands up to dance)
+    else {   // 0985 THE PARTY'S DANCE (Wyatt 9/13: "it should show the co-op player and the regular player's troops"): the WHOLE PARTY dances — my own men first in S.units order (a knocked man stands up to dance), then the allies' men ROUND-ROBIN by commander (each commander's first man before anyone's second, so a ten-commander lobby shows every commander at least once under DANCERS_MAX), each in his commander's colour (u.coopHex = the relay's own stamp; the seat map for an old sender; the honest toy blue last). Solo: coopBy is never set, so the list is byte-identical to before. The bf branch above keeps SH-02 D7's own law.
+      const by={}, ord=[];
+      for(const u of S.units){ if(u.dead) continue;
+        if(!u.coopBy){ mine.push({t:u.type,my:1}); continue; }
+        const k=(u.coopBy==='bot')? 'bot'+(u.botIx|0) : String(u.coopBy);   // a computer's men are ITS commander's (every computer is a commander on the carpet)
+        if(!by[k]){ by[k]=[]; ord.push(k); }
+        by[k].push({t:u.type,my:0,hex:u.coopHex||(COOP&&COOP.seatHex&&COOP.seatHex[String(u.coopBy)])||'#5B84C4'}); }
+      for(let r=0, more=true; more; r++){ more=false; for(const k of ord){ if(r<by[k].length){ mine.push(by[k][r]); more=true; } } }
+    }
   }catch(e){}
   mine=mine.filter(e=>SPRITES_SRC[e.t]).slice(0,DANCERS_MAX);
   const pad=[];
@@ -42326,6 +42334,7 @@ function shakeBuild(root, RM){
   h+='<div class="shk-floor"></div><div id="shkConf"></div>';
   h+=shakeCamHTML(K? K.id:null, RM, !!(K&&K.short));   // SH-02: the cameo underpaints the line (walk-ons read behind the dancers)
   const others=[]; for(let i=0;i<types.length;i++) if(i!==solo) others.push(i);
+  { const a=others.findIndex(i=>types[i].t==='sarge'&&!types[i].my&&types[i].hex); if(a>0) others.unshift(others.splice(a,1)[0]); }   // 0985: the FIRST ally's Sarge takes the first front-row seat (x 41, facing the soloist) — the two commanders face off across the gap; an ally's Sarge carries his commander's hex (a battleground teammate's carries none: that stage is untouched)
   const front=others.slice(0,4), back=others.slice(4);
   // 0522b THE FRONT ROW ON TOP: z = the DEPTH seat — the back row 1, the front
   // row 2, the solo 3 (nearer paints over farther; .shk-d reads it as --z). The
@@ -42369,10 +42378,10 @@ const SHAKE_GOLD='#FFD24A',     // the muster's recolor — the game's own gold
 // D7: the dancers wear their OWNER'S look — MY figures ride my army dye, MY
 // Sarge walks out dressed (weapon + worn set + crystal) through menuSargeURI,
 // the game's one owned-by-you door; any other seat's figure stays factory
-// green (the wardrobe law: no other figure can ever borrow your wardrobe).
+// green (the wardrobe law: no other figure can ever borrow your wardrobe) — 0985: a co-op ally's figure wears the ALLY's own colour, still never yours.
 // Read-only by construction: nothing here writes a grant, a rack or a bag.
 function shakeDancerURI(e){
-  if(!e.my) return sprURI(e.t);
+  if(!e.my) return e.hex? sprURI(e.t, e.hex) : sprURI(e.t);   // 0985 THE PARTY'S DANCE: an ally's man wears HIS commander's colour — the plain mold in the ally's dye (his Sarge too: never menuSargeURI, that is MY wardrobe — the mirror law); a dancer with no hex (the battleground's other seats) stays factory plastic
   const dye=dyeHex()||undefined;
   return e.t==='sarge'? menuSargeURI(dye) : sprURI(e.t, dye);
 }
@@ -45114,7 +45123,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.74';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.75';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
