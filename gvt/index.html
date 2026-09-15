@@ -4798,6 +4798,7 @@
   /* piggy bank: tapping it should pay you back in joy, not a menu */
   .pigwrap { transform-box:fill-box; transform-origin:50% 100%; }   /* 0904 THE LOOP ROW: the hop pivots on the pig's own feet wherever she is seated (the shelf's scale wrapper) */
   .pigwrap.hop { animation:piggyhop 0.42s ease-out; }
+  #ro-piggy.held, #rspot-piggy.held, #rtag-piggy.held { display:none; }   /* 1002 THE PIGGY HIDES WHILE THE INVADER STANDS: the shelf's seat EMPTY (the art, the tap box, the pill) while today's invader stands at the door — toggled on the painted nodes by piggyHeldSet, never baked into the paint (the 0503 law) */
   @keyframes piggyhop { 0% { transform:translateY(0) scaleY(1);} 20% { transform:translateY(0) scaleY(0.86);}
     48% { transform:translateY(-19px) scaleY(1.07);} 76% { transform:translateY(0) scaleY(0.93);} 100% { transform:translateY(0) scaleY(1);} }
   .starfloat { position:absolute; color:#FFF3C4; font-weight:bold; font-size:24px; pointer-events:none; text-shadow:0 2px 5px rgba(0,0,0,0.6); animation:starup 0.9s ease-out forwards; }
@@ -45469,7 +45470,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.90';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.91';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -45616,6 +45617,7 @@ let DD_PILL_WORD=0;          // ⚑ 0865y THE QUIET TROPHY (FM-GVT-DOG-ON-TOP-01
 const DD_DOOR='board';       // the WORLD RANKINGS door's ROOM_SPOTS mv key (#ro-board = the cup, #rtag-board = its pill)
 const RAID_DOOR='raid';      // 0904 THE LOOP ROW: THE RAID tile's mv key (#ro-raid = the stoop and the swarm, #rtag-raid = the invasion pill) — lit with the family only while an invader is unbeaten (the pill shows), the 0632 trophy grammar
 function raidDue(){ return momDue() || nemesisDue() || !META.rivalDays[todayStr()]; }   // the invader's door has news: Mom's day, his day, or today's army unbeaten (= the raid row's pill shows)
+function piggyHeld(){ return raidDue(); }   // 1002 THE PIGGY HIDES WHILE THE INVADER STANDS (FM-GVT-PIGGY-RAID-01; Wyatt 9/14: "When you're being attacked, you shouldn't be able to tap your piggy bank to take the money out. It actually should temporarily disappear from the shelf since it's already on the bottom. After you defeat it, it's back up on the shelf, and then you can tap it and claim your stars."): ONE door — the shelf's piggy is HELD (off the shelf, her tap dead) exactly while THE RAID tile shows an attack: the invasion pill's own truth — today's army unbeaten (the swarm on the sad piggy), Mom's day (her props), his day (his pill) — ⚑ P-Q1 at the REC; beaten = back on the shelf (piggyHeldSet at renderMenu's tail)
 function ddAwayOpen(){       // today's away fight unclaimed — a READ of the away ledger: no ledger / another day's stamp = nothing claimed today; one serve (done[uid]=0 at the door), verdict or forfeit = claimed
   const A=META.away; if(!A || A.day!==todayStr()) return true;
   if(A.done) for(const k in A.done) return false;
@@ -88022,7 +88024,7 @@ function tourDeal(){   // 0905 TAKE TWO (FIX 1): Sarge speaks through his transm
   const i=META.tour|0, lines=TOUR_LINES[i]; if(!lines) return;
   const pages=lines.flatMap(x=>tourPages(TXT(x))), n=pages.length; if(!n) return;
   const h=commWin('tour', { pose:tourPoseFor(i,0,n), next:tourPoseFor(i,1,n) }); if(!h) return;
-  if(TOUR_STOPS[i]==='bf') h.el.classList.add('top');   // Q1: stop 4's door is the BATTLEFIELD tile, bottom-right: the console parks at the top (the stage's width, no tail) so it never covers the tile it points at; Sarge stays bottom-left pointing OUT at it (⚑ Q7)
+  if(TOUR_STOPS[i]==='bf' || tourDoor(i)===RAID_DOOR) h.el.classList.add('top');   // 1002 THE PIGGY HIDES: THE RAID tile is a bottom tile too — the console parks at the top for it   // Q1: stop 4's door is the BATTLEFIELD tile, bottom-right: the console parks at the top (the stage's width, no tail) so it never covers the tile it points at; Sarge stays bottom-left pointing OUT at it (⚑ Q7)
   COMM.brief={ kind:'tour', pages, i:0, h, always:true, done:()=>tourRead(i), onPage:(j)=>{ tourFigPose(tourPoseFor(i,j,n)); tourSeatFig(); } };   // always: META.comms never spends a flag for the tour (META.tour is its ledger); done = the last page's own tap; onPage = the pose rule + the console's seat for the page (0906)
   h.el.onpointerdown=(e)=>{ tourPortSeat(h); commAdvance(e); };   // the figure's seat read on every tap: the glove is born at the tip of his pointing arm when the last page folds (0906 — C5)
   tourSeatFig();   // 0906: the console beside him, pre-sized for page one (the figure itself is seated by tourFigNode)
@@ -88050,7 +88052,7 @@ function tourPages(str){   // 0906 BIG SARGE (C3) THE SENTENCE CUT — SHORT PAG
   if(cur) out.push(cur);
   return out;
 }
-function tourPoseFor(i, j, n){ if(i>=TOUR_STOPS.length) return 'salute'; if(j===0 && n>1) return 'salute'; return TOUR_STOPS[i]==='bf'? 'pointout' : 'pointup'; }   // 0906 BIG SARGE (C3, ⚑ Q4) THE POSE RULE, structural so it holds in every tongue: page one of a stop he SALUTES (the greeting), from page two he POINTS at the lit door (a one-page stop points at once), THE CLOSE salutes throughout; the battlefield tile is level with him (OUT), the shelf doors are above him (UP)
+function tourPoseFor(i, j, n){ if(i>=TOUR_STOPS.length) return 'salute'; if(j===0 && n>1) return 'salute'; return (TOUR_STOPS[i]==='bf' || tourDoor(i)===RAID_DOOR)? 'pointout' : 'pointup'; }   // 1002 THE PIGGY HIDES: he points OUT at the raid tile as at the war table   // 0906 BIG SARGE (C3, ⚑ Q4) THE POSE RULE, structural so it holds in every tongue: page one of a stop he SALUTES (the greeting), from page two he POINTS at the lit door (a one-page stop points at once), THE CLOSE salutes throughout; the battlefield tile is level with him (OUT), the shelf doors are above him (UP)
 function tourFigNode(pose, next){   // 0906 BIG SARGE (C1) THE FIGURE on the floor: #tourFig (fixed, z25 = the window's storey, over the spotlight, under the glove; pointer-events none — the root's swallow stands) › .cm-body › two stacked imgs (the pose he arrives in ON, the next pose preloaded OFF, so the swap is a 0.2 s cross-fade that never waits on a decode); seated by tourSeatFig on the stage's floor at its left wall, re-seated on resize / orientation like the spotlight; slides in from the left wall (.in). One figure on the floor at a time (a fading one is removed first — the orphan-hand law)
   tourFigKill();
   const f=document.createElement('div'); f.id='tourFig';
@@ -88135,15 +88137,16 @@ function tourPress(i){   // the tap: the door's OWN opener, exactly what a real 
   tourDark();
   tourFigOut();   // 0906 BIG SARGE (⚑ Q10): he leaves as the door opens — not on the fort card, in the surplus or at the war table
   if(S.mode!=='menu' || !tourDue()){ tourFold(); return; }
-  const id=TOUR_STOPS[i];
+  const id=tourDoor(i);   // 1002 THE PIGGY HIDES: the door, not the stop — the piggy's hold only for the piggy herself
   if(id==='piggy') TOUR.hold=Date.now()+TOUR_PIG_HOLD_MS;   // the glove rests on the piggy while the hop and the star land (Wyatt: the hand rests on the piggy)
   if(h) tourHandOut(h, id==='piggy'? TOUR_PIG_HOLD_MS-500 : TOUR_OUT_MS);
   UI.room(id);
 }
 // ── FIX 3 THE SPOTLIGHT (Wyatt 9/5: "when the object is highlighted that Sarge is talking about, it needs to be above the overlay ... they were behind the overlay"): the room dims EXCEPT the lit rects, a cut-out on an inline svg (one evenodd path: the screen minus the rounded holes), never a re-parent (the stage is a scaled transform; every rect is re-read from getBoundingClientRect on resize / orientation); the gold pulse ring around the door; both pointer-events none (the wander law: the dim never eats a tap); from Sarge's first word until the door opens
 const TOUR_DIM_A=0.38, TOUR_LIT_PAD=8, TOUR_LIT_R=14;   // the room's dim · the lit rect's pad around the hotspot (the ring's own rect) · its corner radius (the ring's)
+function tourDoor(i){ const id=TOUR_STOPS[i]; return (id==='piggy' && piggyHeld())? RAID_DOOR : id; }   // 1002 THE PIGGY HIDES WHILE THE INVADER STANDS (⚑ P-Q2 at the REC): the piggy's stop while she is off the shelf = THE RAID tile (the invader's door: the spotlight on it, the glove to it, the press = the invader card — the fight); TOUR.hold is the piggy's alone, never a wait on a hidden seat; the stamp (tourRead) is untouched, so the next stop deals on the quiet room after the fight
 function tourRects(i){   // the lit rects (screen px, the pad on): the door's hotspot; stop 3 adds the white-flag men on the raid tile's stoop (Q4: Sarge's second paragraph is about the invaders)
-  const id=TOUR_STOPS[i]; if(!id) return null;
+  const id=tourDoor(i); if(!id) return null;   // 1002 THE PIGGY HIDES: the door, not the stop
   const sp=document.getElementById('rspot-'+id); if(!sp) return null;
   const R=el=>{ const r=el.getBoundingClientRect(); return (r.width>0 && r.height>0)? { x:r.left-TOUR_LIT_PAD, y:r.top-TOUR_LIT_PAD, w:r.width+2*TOUR_LIT_PAD, h:r.height+2*TOUR_LIT_PAD } : null; };
   const out=[R(sp)]; if(!out[0]) return null;
@@ -88179,7 +88182,7 @@ function tourDark(){   // the spotlight folds
   for(const k of ['dim','ring']){ if(TOUR[k]){ try{ TOUR[k].remove(); }catch(e){} TOUR[k]=null; } }
 }
 function tourWalk(i){   // the glove (FIX 2): the ONE vector glove (gloveNode), born at Sarge's portrait as the window folds (TOUR.port; the screen's centre if no portrait was read), gliding to the door's drawn centre, then the press; the spotlight already stands since the deal
-  const id=TOUR_STOPS[i], sp=document.getElementById('rspot-'+id);
+  const id=tourDoor(i), sp=document.getElementById('rspot-'+id);   // 1002 THE PIGGY HIDES: the door, not the stop
   TOUR.walk=1;
   if(!sp || reducedMotion()){ setTimeout(()=>{ if(TOUR.walk) tourPress(i); }, TOUR_RM_BEAT_MS); return; }   // no hotspot on this floor / reduced motion: the door opens after a beat — the place itself is the lesson (v1.25's law)
   const r=sp.getBoundingClientRect(), tx=r.left+r.width/2, ty=r.top+r.height/2;
@@ -88931,6 +88934,7 @@ function renderMenu(){
     if(el.offsetWidth > (RTAG_CAP[el.id]||360)) el.style.fontSize='14px';
   evPillFit(); bfBellSync();   // 0904 THE BAND MOVES INTO THE HEAD: the pill's cap + fit on the fresh paint; the tile's glow + bell disc follow the face
   roofSweep();   // v3.29: the roof holds nobody — the paint that would show a man flying drops him instead
+  piggyHeldSet();   // 1002 THE PIGGY HIDES WHILE THE INVADER STANDS: the shelf's piggy off the shelf while today's invader stands (the three nodes wear .held), back on it — with her return beat — on the first paint after the win
   wrPosseArm();   // 0900 OUTLAW TOWN COMES TO THE RANGE (§REV 2.2): the posse's seat takes the global clock's phase; THE TRAIN WINS' rAF watch opens inside the gallop window (a no-op off the range)
   sizeRoom();
 }
@@ -88946,6 +88950,38 @@ function renderMenu(){
 // is lost. The run itself is session-only and never saved.
 const PIG_TAPS_MAX=5;   // Wyatt's own five booms — the biggest payout stays snappy
 let PIGRUN=null;        // the live run {day,chunks,i,total,paid,settleT} — never persisted
+// ═══ 1002 THE PIGGY HIDES WHILE THE INVADER STANDS (jumpr 1002): while piggyHeld() the shelf's three nodes — #ro-piggy (the bank and the pig), #rspot-piggy (the tap box) and #rtag-piggy
+// (TAP THE PIGGY! +N★) — wear .held (display:none: the seat empty, no ghost, no outline, no tap target); the sad piggy on the bottom of THE RAID tile is her now.
+// TOGGLED on the painted nodes at renderMenu's tail, never baked into the paint (the 0503 roomBeaconSet law). PIGHELD = the last paint's read (session-only, never
+// saved): the first paint that seats her again after a held one — the win's landing in the bedroom — plays THE RETURN (piggyBack: her own hop + the puff out of
+// her back, piggyHop's toot branch verbatim — no pay, no run, no new FX); a win on another floor pays the beat on the next bedroom paint. ═══
+let PIGHELD=null;       // true = she was off the shelf at the last paint
+const PIG_BACK_MS=350;  // the beat after the paint before she hops (the room standing first)
+function piggyHeldSet(){
+  const h=piggyHeld();
+  for(const pre of ['ro-','rspot-','rtag-']){ const el=document.getElementById(pre+'piggy'); if(el) el.classList.toggle('held', h); }
+  if(h){ PIGHELD=1; return; }
+  if(PIGHELD && S.mode==='menu' && document.getElementById('piggyG')){ PIGHELD=0; piggyBack(); }
+}
+function piggyBack(){   // THE RETURN: the node re-read at fire time (a repaint inside the beat mints a fresh #piggyG); nothing if the room left or the day turned meanwhile
+  setTimeout(()=>{
+    if(S.mode!=='menu' || piggyHeld()) return;
+    const g=document.getElementById('piggyG'); if(!g) return;
+    g.classList.remove('hop'); void g.getBoundingClientRect(); g.classList.add('hop');
+    const st=document.getElementById('roomStage');
+    const pd=rpXY('piggy');   // v2.12: the puffs ride her drag delta, as the hop's do
+    SFX.toot();
+    if(st){
+      for(let i=0;i<3;i++){
+        const p=document.createElement('div');
+        p.className='pigpuff';
+        const q5=pigPt(188+i*8,166-i*6); p.style.left=(q5[0]+pd[0])+'px'; p.style.top=(q5[1]+pd[1])+'px';   // out of the pig's back on the shelf (piggyHop's own seats)
+        p.style.animationDelay=(i*0.08)+'s';
+        st.appendChild(p); setTimeout(()=>{ try{ p.remove(); }catch(e){} }, 900+i*90);
+      }
+    }
+  }, PIG_BACK_MS);
+}
 // one tap of the run: hop already retriggered at piggyHop's head; pay the next
 // chunk into the counter, burst a few small stars, ding the next rung up
 function pigRunAdvance(){
@@ -103482,7 +103518,7 @@ window.UI = {
   },
   room(id){
     { const sp=ROOM_SPOTS.find(r=>r.id===id); if(sp&&sp.act){ sp.act(); return; } }   // 0862 THE ROOFTOP MAKEOVER (cell 6): a row with an act is its own door — the roof's taps, THE ATTIC's door
-    if(id==='piggy'){ piggyHop(); return; }
+    if(id==='piggy'){ if(piggyHeld()){ renderMenu(); return; } piggyHop(); return; }   // 1002 THE PIGGY HIDES WHILE THE INVADER STANDS: while today's invader stands the tap is DEAD (no hop, no TAP THE PIGGY, no pay, no PIGRUN) — the seat has no tap box at all after a paint; a paint older than the day (midnight rolled over with the room open) is repainted honest, nothing else
     if(id===CHEST_DOOR){ chestTap(); return; }   // 0904 THE TREASURE CHEST: the door in the corner — the lid leans, then the gallery
     if(id==='raid') id='rival';              // 0904 THE LOOP ROW: THE RAID tile is the invader's door — MOM's card / NEMESIS's card / the army card (FIGHT · REMATCH), the tower's old door byte-still inside (panelHTML('rival') → UI.rival)
     if(id==='fort'){ UI.fort(); return; }        // 0904 FORT GREEN: the fort's box — PROMOTIONS when a pick waits, else the tab last open
