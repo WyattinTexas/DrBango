@@ -2210,6 +2210,8 @@
   #npNote { font-size:0.9rem; opacity:0.6; margin-top:8px; }
   .np-row { display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
   .mbtn.np-keep { background:#2A3322; border:2px solid #4A6B35; }
+  .np-card { position:relative; }   /* 1009 THE ONE BUTTON: the rename card's ✕ sits in its own top-right corner (the game's .wt-x glyph, ≥ 44 px of tap) */
+  .np-card .np-x { position:absolute; top:8px; right:8px; min-width:44px; min-height:44px; }
   /* 0285 REPORT-NAME — the same one-card overlay idiom one layer up (z23:
      over the board AND over the room modal's sheet; the rites at 24 stay
      above). Veil tap = never mind — the kid-proof default does nothing. */
@@ -45628,7 +45630,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.99';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='10.00';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -97002,12 +97004,12 @@ function namePromptShow(rename){   // 0494b: rename = the pencil's card — the 
   const pet=(typeof rename==='string' && rename.slice(0,4)==='pet:')? rename.slice(4) : null;   // 0894 THE PETS TAB: 'pet:<k>' = the pet's card — the SAME markup, the head = his stock name, the box = his name today, SAVE / KEEP / Enter / the veil wired to the pet's handlers; EMPTY + SAVE = the stock name comes back (⚑ Q12)
   const head=(rename==='head'), fort=(rename==='fort');   // 0943 THE FORT HUB — THE INSIDE: 'fort' = the fort's name card — the FIFTH wiring (0894's 'pet:<k>' is the fourth)   // 0904 THREE SMALL FIXES (the second card): 'head' = the room head's card — the SAME markup, SAVE / KEEP / Enter / the veil wired to the head's handlers (the stamp on SAVE alone, ⚑ Q2)
   const save=fort? 'UI.fortNameSave()' : pet? 'UI.petNameSave()' : head? 'UI.headNameSave()' : (rename? 'UI.renameSave()' : 'UI.namePromptSave()'), keep=fort? 'UI.fortNameKeep()' : pet? 'UI.petNameKeep()' : head? 'UI.headNameKeep()' : (rename? 'UI.renameKeep()' : 'UI.namePromptKeep()');
-  el.innerHTML='<div class="np-card">'
+  el.innerHTML='<div class="np-card">'+(rename? '<button type="button" class="wt-x np-x" onclick="'+keep+'">✕</button>' : '')   // 1009 THE ONE BUTTON (§11 FA0-2; Wyatt 9/15: "there should just be one button to confirm your new name … you just click the X, or you click out of it"): the rename family's ✕ (the game's own close glyph) in the card's top-right corner = keep; the first-ever prompt gets none (a kid must choose)
     +(fort? '<h2 data-notr>'+escH(fortDefaultName())+'</h2>' : pet? '<h2 data-notr>'+escH(t(PET_INFO[pet].name))+'</h2>' : '<h2>CHOOSE YOUR NAME</h2>')   // 0943: the fort's card wears the composed default as the head (what you are renaming), on data-notr   // 0894: the pet's card wears his STOCK name as the head (PATCH ×7 ships) — the box carries the one he answers to
     +'<input id="npIn" maxlength="'+(fort? FORT_NAME_MAX : pet? PET_NAME_MAX : 18)+'" spellcheck="false" autocomplete="off">'
     +'<div id="npNote">'+(fort? '2 to 14 letters. Only you see it.' : pet? '2 to 12 letters. Only you see it.' : '3 to 18 characters. This is the name the whole world sees.')+'</div>'   // 0894: one key ×7 (the digits template to {0} to {1} — the shipped note's own law)
     +'<div class="np-row"><button class="mbtn" onclick="'+save+'">SAVE</button>'
-    +'<button class="mbtn np-keep" onclick="'+keep+'">KEEP THIS NAME</button></div>'
+    +(rename? '' : '<button class="mbtn np-keep" onclick="'+keep+'">KEEP THIS NAME</button>')+'</div>'   // 1009 THE ONE BUTTON: the rename family = SAVE alone (the ✕ + the veil keep); the first-ever CHOOSE YOUR NAME keeps its KEEP — a CHOICE that stamps wrName=2 (namePromptKeep)
     +'</div>';
   const i=document.getElementById('npIn');
   if(i){ i.value=fort? fortName() : pet? petName(pet) : META.name;   // a VALUE, never markup — untranslated, unescaped, unstyled by the caps rule (0894: the pet's name today — his own or the stock, selected whole so a keystroke replaces it)
@@ -100082,7 +100084,8 @@ function fhStationsMap(){ const st={}; document.querySelectorAll('#fortBg svg.fh
 function fhLifeWrap(){   // A1 THE LIFE PASS — REV 5's plan verbatim (design/fort-hub-0908/build-fl/captureFL.mjs wrapFL: the same selectors, the same --d staggers, the three added movers under data-add), one pass over the mounted yard after the set pass — the wrapper law: a class on a <g> with no transform of its own
   const sv=document.querySelector('#fortBg svg.fhero'); if(!sv) return null; const NS='http://www.w3.org/2000/svg'; const census={}; let nodes=0; const adds=[];
   const mk=(tag,attrs)=>{ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; };
-  const wrap=(sel,cls,st)=>{ const els=Array.from(sv.querySelectorAll(sel)); els.forEach((el,i)=>{ if(el.closest('[data-fl]')) return; const g=mk('g',{ class:cls, 'data-fl':cls }); const s=typeof st==='function'? st(i,el) : st; if(s) g.setAttribute('style',s); el.parentNode.insertBefore(g,el); g.appendChild(el); nodes++; census[cls]=(census[cls]||0)+1; }); return els.length; };
+  const board=el=>!!el.closest('[data-fh="wartable"]');   // 1009 THE BOARD GAME (FA0-1b): nothing under the war table ever gets a mover — a still of figurines; the guard at both seats a mover is born (wrap() and the duck's)
+  const wrap=(sel,cls,st)=>{ const els=Array.from(sv.querySelectorAll(sel)); els.forEach((el,i)=>{ if(el.closest('[data-fl]') || board(el)) return; const g=mk('g',{ class:cls, 'data-fl':cls }); const s=typeof st==='function'? st(i,el) : st; if(s) g.setAttribute('style',s); el.parentNode.insertBefore(g,el); g.appendChild(el); nodes++; census[cls]=(census[cls]||0)+1; }); return els.length; };
   const d=(i,step,base)=>'--d:'+(-(base||0)-i*step).toFixed(2)+'s';
   wrap('[data-fx="flash"]','fl-flash',i=>d(i,.17)); wrap('[data-fx="tracer"]','fl-tracer',i=>d(i,.13)); wrap('[data-fx="wisp"]','fl-wisp',i=>d(i,.7)); wrap('[data-fx="lob"] circle','fl-shell');
   wrap('[data-fx="puff"], [data-fx="ring"]:not([stroke="#9BE07A"]), [data-fx="burst"]','fl-hit',i=>d(i,.9)); wrap('[data-fx="rocket"]','fl-rocket'); wrap('[data-fx="heal"]','fl-heal'); wrap('[data-fx="ring"][stroke="#9BE07A"]','fl-aura');
@@ -100091,7 +100094,7 @@ function fhLifeWrap(){   // A1 THE LIFE PASS — REV 5's plan verbatim (design/f
   wrap('[data-fx="roar"]','fl-roar'); wrap('[data-fx="cres"]','fl-cres'); wrap('[data-fx="bolt"]','fl-flash',i=>d(i,.23,.1)); wrap('#fhKing-kingyeti [data-fx="snowb"] circle','fl-throw'); wrap('[data-fh="selmark"] ellipse[fill="url(#fhGlow)"]','fl-markglow');
   wrap('#fhPet-slush [data-fx="snowb"] circle','fl-roll'); wrap('#fhPet-flappy g[transform^="rotate"]','fl-dive'); wrap('[data-fx="dive"]','fl-lines'); wrap('[data-fx="stitch"]','fl-stitch');
   wrap('[data-fh="tank"]','fl-recoil',(i,el)=>d(i,.26)+';--k:'+(el.dataset.side==='green'? '-1px' : '1px'));
-  (()=>{ const duck=sv.querySelector('[data-fh="crossing"] circle[r="2.6"]'); if(duck){ const g=mk('g',{ class:'fl-duck', 'data-fl':'fl-duck' }); const n2=duck.nextElementSibling; duck.parentNode.insertBefore(g,duck); g.appendChild(duck); if(n2 && n2.tagName==='circle') g.appendChild(n2); nodes++; census['fl-duck']=1; } })();
+  (()=>{ const duck=sv.querySelector('[data-fh="crossing"] circle[r="2.6"]'); if(duck && !board(duck)){ const g=mk('g',{ class:'fl-duck', 'data-fl':'fl-duck' }); const n2=duck.nextElementSibling; duck.parentNode.insertBefore(g,duck); g.appendChild(duck); if(n2 && n2.tagName==='circle') g.appendChild(n2); nodes++; census['fl-duck']=1; } })();
   wrap('[data-fh="coin"]','fl-coin'); wrap('[data-fh="flag"] path[transform]','fl-flag'); wrap('circle[fill="#EDE6C8"][r="1.4"], circle[fill="#EDE6C8"][r="2.2"]','fl-star',i=>d(i,.37)+';--t:'+(3.12+(i%4)*.78)+'s');
   const sab=sv.querySelector('[data-fh="iron"][data-k="lightsaber"]'); if(sab){ const b=sab.dataset.box.split(',').map(Number); const rot=sab.closest('[data-rot]'); const host=rot? rot.parentNode : sab.parentNode, before=rot||sab; const hex=(typeof saberHex==='function')? saberHex() : '#4DA6FF';
     const g=mk('g',{ class:'fl-crystal', 'data-fl':'fl-crystal', 'data-add':'' }); g.appendChild(mk('ellipse',{ cx:b[0]+b[2]/2, cy:b[1]+b[3]/2, rx:b[2]*0.75, ry:b[3]*0.6, fill:hex })); host.insertBefore(g,before); nodes++; census['fl-crystal']=1; adds.push('crystal'); }
@@ -100138,6 +100141,8 @@ function fhCommandWrite(k){   // A5 / §3.5: TAKE COMMAND on the trailer = the m
   if(!g.querySelector(':scope > .fh-lift')){ const lift=document.createElementNS(NS,'g'); lift.setAttribute('class','fh-lift'); const kids=Array.from(g.children); g.appendChild(lift); kids.forEach(c=>lift.appendChild(c)); }
   const pn=document.createElementNS(NS,'path'); pn.setAttribute('d','M'+(x+w/2)+' '+(y-14)+' l6 6 h-12 z'); pn.setAttribute('fill','#FFD24A'); g.appendChild(pn);
   const nb=document.getElementById('fhKh-'+k); if(nb) nb.innerHTML=fhKingPlateHTML(k); return true; }
+function fhKingLunge(k){   // 1009 THE TAP LAW: the pick's lunge beat — REV 3's .atk (fhAtk .6 s toward his effect, --lunge his own) once on the king who just took command, then the class comes off so the in-command pulse resumes; nothing under reduced motion (the still), nothing when the yard is shut
+  const g=document.getElementById('fhKing-'+k); if(!g || !fortSceneOpen() || reducedMotion()) return false; g.classList.remove('atk'); void g.getBoundingClientRect(); g.classList.add('atk'); clearTimeout(g._lunge); g._lunge=setTimeout(()=>{ g.classList.remove('atk'); },640); return true; }
 function fhImg(uri,x,y,w,h,extra){ return '<image href="'+uri+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" preserveAspectRatio="xMidYMax meet"'+(extra||'')+'/>'; }
 function fhFoeHex(){ return foeSkinHex()||TAN; }   // THE SWITCH — read at paint time, never cached: null = the factory tan; GREEN for a tan-dyed player (v1.74); the party's chain (0908)
 function fhMirror(k){ const box=PET_BOX[k]||(k==='kingrex'||k==='kingcroak'||k==='kingcroakfire'? '0 0 140 140' : null); return (box && box.indexOf('140 140')>0? MIRROR_V : MIRROR)(petMold(k)); }   // the game's own body transform on the mold string (never on a rendered <image>); a 140-box mold takes MIRROR_V
@@ -100150,6 +100155,7 @@ function fhStar(cx,cy,s){ return '<path transform="translate('+cx+','+cy+') scal
 // ═══ THE EFFECTS — the battle painter's grammar, as svg stills (never a glyph, never an animation of their own)
 function fhFlash(x,y,s,dir){ const a=s*(dir||1); return '<g data-fx="flash"><path d="M'+(x-a*1.6)+' '+y+' L'+(x-a*0.35)+' '+(y-s*0.3)+' L'+x+' '+(y-s)+' L'+(x+a*0.35)+' '+(y-s*0.3)+' L'+(x+a*1.1)+' '+y+' L'+(x+a*0.35)+' '+(y+s*0.3)+' L'+x+' '+(y+s)+' L'+(x-a*0.35)+' '+(y+s*0.3)+' z" fill="#FFE27A" stroke="#FF9A3A" stroke-width="1"/><circle cx="'+x+'" cy="'+y+'" r="'+(s*0.28)+'" fill="#FF9A3A"/></g>'; }
 function fhTracer(x1,y1,x2,y2,op){ return '<path data-fx="tracer" d="M'+x1+' '+y1+' L'+x2+' '+y2+'" stroke="#FFF3C4" stroke-width="2.2" stroke-dasharray="6 9" opacity="'+(op||0.6)+'"/>'; }
+function fhBase(cx,cy,w){ return '<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+(w*0.6).toFixed(1)+'" ry="2.4" fill="#000" opacity="'+((typeof roomNight==='function' && roomNight())? '.14' : '.2')+'" data-fh="base"/>'; }   // 1009 THE BOARD GAME (FA0-1c, ⚑ FA0-Q1 keep): a figurine's base under a table piece — the yard shadow's own colour (the set pass's #000 at its OP, .2 by day / .14 by night), rx 0.6 × the piece's width, ry 2.4 units, centred on the feet, painted BEFORE the piece so it sits under him
 function fhWisp(x,y,dir){ return '<g data-fx="wisp" opacity=".42" fill="#b8b6ae"><circle cx="'+x+'" cy="'+y+'" r="3"/><circle cx="'+(x+dir*5)+'" cy="'+(y-4)+'" r="4"/><circle cx="'+(x+dir*11)+'" cy="'+(y-9)+'" r="5"/></g>'; }
 function fhRing(x,y,r,col,lw,op){ return '<circle data-fx="ring" cx="'+x+'" cy="'+y+'" r="'+r+'" fill="none" stroke="'+(col||'#FFF3C4')+'" stroke-width="'+(lw||3)+'" opacity="'+(op==null? 0.8 : op)+'"/>'; }
 function fhPuffs(x,y,R){ return '<g data-fx="puff" fill="#EDEADF"><circle cx="'+x+'" cy="'+y+'" r="'+R+'" opacity=".7"/><circle cx="'+(x-R*0.9)+'" cy="'+(y+R*0.3)+'" r="'+(R*0.7)+'" opacity=".55"/><circle cx="'+(x+R*0.95)+'" cy="'+(y+R*0.25)+'" r="'+(R*0.65)+'" opacity=".55"/><circle cx="'+(x+R*0.2)+'" cy="'+(y-R*0.8)+'" r="'+(R*0.5)+'" opacity=".45"/></g>'; }
@@ -100279,14 +100285,11 @@ function fhPostArt(hex,ink,dye,foe){
     +'<circle cx="1098" cy="484" r="3.2" fill="#8f8f8a" stroke="#5a5a55" stroke-width="1"/><circle cx="1098" cy="526" r="3.2" fill="#8f8f8a" stroke="#5a5a55" stroke-width="1"/>'
     +'<circle cx="1144" cy="503" r="2.6" fill="#FFD24A" stroke="#B8862F" stroke-width=".8"/><circle cx="1146.5" cy="502.5" r=".9" fill="#E8621E"/></g>'
     // the tanks: green on the left facing the spill, tan on the right facing it
-    +[[1074,486],[1080,506],[1098,496]].map(p=>fhImg(sprURI('bftank',dye),p[0]-4.5,p[1]-9,27,27,' data-fh="tank" data-side="green"')).join('')   // 0991 THE CAST SMALLS (item 15): the table's pieces ×1.5 about their own feet — the tanks 18 → 27 (18.7 px at the phone, over the 8-px floor); the table, the spill, the bridges, the pins untouched
-    +[[1194,484],[1200,508],[1176,498]].map(p=>fhImg(sprURI('tank',foe),p[0]-4.5,p[1]-9,27,27,' data-fh="tank" data-side="tan"')).join('')
+    +[[1074,486],[1080,506],[1098,496]].map(p=>fhBase(p[0]+9,p[1]+18,27)+fhImg(sprURI('bftank',dye),p[0]-4.5,p[1]-9,27,27,' data-fh="tank" data-side="green"')).join('')   // 0991 THE CAST SMALLS (item 15): the table's pieces ×1.5 about their own feet — the tanks 18 → 27 (18.7 px at the phone, over the 8-px floor); the table, the spill, the bridges, the pins untouched
+    +[[1194,484],[1200,508],[1176,498]].map(p=>fhBase(p[0]+9,p[1]+18,27)+fhImg(sprURI('tank',foe),p[0]-4.5,p[1]-9,27,27,' data-fh="tank" data-side="tan"')).join('')
     // THE MEN: two green beside the green tanks (authored facing east), two tan beside the tan tanks (authored facing west) — the fight in progress
-    +FH_TABLE_MEN.map(m=>fhImg(sprURI(m[0], m[1]==='green'? dye : foe),m[2]-3.5,m[3]-8,21,24,' data-fh="tableman" data-k="'+m[0]+'" data-side="'+m[1]+'" data-hex="'+(m[1]==='green'? (dye||'') : foe)+'"')).join('')
-    // two tracers each way (the tanks' + the men's), a burst on the near bridge with its smoke
-    +'<path data-fx="tracer" d="M1116 504 L1134 502" stroke="#FFF3C4" stroke-width="1.4" stroke-dasharray="3 3" opacity=".7"/><path data-fx="tracer" d="M1176 507 L1158 510" stroke="#FFF3C4" stroke-width="1.4" stroke-dasharray="3 3" opacity=".7"/>'
-    +'<path data-fx="tracer" d="M1122 522 L1155 519" stroke="#FFF3C4" stroke-width="1.2" stroke-dasharray="2 3" opacity=".75"/><path data-fx="tracer" d="M1160 494 L1133 500" stroke="#FFF3C4" stroke-width="1.2" stroke-dasharray="2 3" opacity=".75"/>'
-    +'<g data-fx="burst"><circle cx="1144" cy="490" r="4" fill="none" stroke="#FFF3C4" stroke-width="1.6" opacity=".8"/><circle cx="1144" cy="490" r="1.6" fill="#FF9A3A"/><g fill="#EDEADF" opacity=".5"><circle cx="1148" cy="485.5" r="2"/><circle cx="1151.5" cy="482" r="2.6"/></g></g>'
+    +FH_TABLE_MEN.map(m=>fhBase(m[2]+7,m[3]+16,21)+fhImg(sprURI(m[0], m[1]==='green'? dye : foe),m[2]-3.5,m[3]-8,21,24,' data-fh="tableman" data-k="'+m[0]+'" data-side="'+m[1]+'" data-hex="'+(m[1]==='green'? (dye||'') : foe)+'"')).join('')
+    // 1009 THE FORT ALIVE §11 FA0-1 THE BOARD GAME (Wyatt 9/15: "the battlefield that's displayed on the table shouldn't be animated. It should be set up like little figurines, like a little board game"): the fight left the art — no tracers, no burst, no smoke; the pieces stand on their bases (fhBase) and nothing under [data-fh="wartable"] ever takes a mover (fhLifeWrap's board guard)
     +'<path d="M1072 482 V472 M1216 482 V472" stroke="#2a2013" stroke-width="1.4"/><path d="M1072 472 l9 3.5 l-9 3.5 z" fill="'+hex+'" stroke="'+ink+'" stroke-width="0.8"/><path d="M1216 472 l9 3.5 l-9 3.5 z" fill="'+foe+'" stroke="'+hexShade(foe,0.6)+'" stroke-width="0.8" data-fh="foeflag"/>'
     +'<circle id="fhPoint" cx="'+FH_COUNCIL.pins[0][0]+'" cy="'+FH_COUNCIL.pins[0][1]+'" r="6" fill="none" stroke="#FFD24A" stroke-width="2" opacity="0"/></g>';   // the council's pointer, hidden until a king visits
   // THE WEAPONS BENCH — the plank on its trestle legs, the felt cloth with a hem, the five irons level in a row; the man under each crop painted the felt (fhWepURI) so only the iron reads; the two blades laid level by a −90° turn of the portrait crop (the tip to the left)
@@ -100436,7 +100439,7 @@ function fhSetPaint(svg,night){
     [[960,false],[1216,true]].forEach(s=>{ const u=mold('rifleman',dye,undefined,s[1]? mir : undefined); if(!u) return; S.appendChild(E('image',{ href:u, x:s[0]-26.5, y:41, width:53, height:62, preserveAspectRatio:'xMidYMax meet', 'data-fa':'sentry' })); });
     after(inkBand,S);
   }
-  // ═══ 5. THE GROUND — packed earth (Q2): the rows raked toward the wall (the plane), the specks, the pebbles, the tufts at the edges, the streaks; the vertical light (dark at the wall, warm near); the sun pool on the kings' corner; the foot occlusion; the flagstone road from the gate + the trodden ground at the post; the sand under the pen; the ruts ═══
+  // ═══ 5. THE GROUND — packed earth (Q2): the rows raked toward the wall (the plane), the specks, the pebbles, the tufts at the edges, the streaks; the vertical light (dark at the wall, warm near); the sun pool on the kings' corner; the foot occlusion; the flagstone road from the gate + the trodden ground at the post; the sand under the pen (1009: the ruts went with the jeep) ═══
   if(floor){
     defs.appendChild(E('pattern',{ id:'fa-specks', width:110, height:74, patternUnits:'userSpaceOnUse' },[
       E('ellipse',{ cx:18, cy:14, rx:7, ry:2.6, fill:'#000', opacity:.1 }), E('ellipse',{ cx:72, cy:40, rx:9, ry:3, fill:'#000', opacity:.09 }),
@@ -100473,9 +100476,8 @@ function fhSetPaint(svg,night){
     gndIns(E('rect',{ x:0, y:234, width:1600, height:416, fill:lin('fa-ground-y',0,0,0,1, night? [[0,'#141a2c',.36],[.45,'#141a2c',.12],[1,'#141a2c',.04]] : [[0,'#2a2418',.30],[.42,'#2a2418',.08],[.72,'#ffe0a4',.05],[1,'#ffe0a4',.18]]), 'data-fa':'ground-light' }));
     if(!night) gndIns(E('ellipse',{ cx:1200, cy:500, rx:640, ry:280, fill:rad('fa-pool',[[0,'#ffe0a0',.26],[.6,'#ffe0a0',.08],[1,'#ffe0a0',0]]), 'data-fa':'sun-pool' }));
     gndIns(E('rect',{ x:0, y:238, width:1600, height:44, fill:lin('fa-foot-ao',0,0,0,1,[[0,'#0e0e20',.34],[.5,'#0e0e20',.12],[1,'#0e0e20',0]]), 'data-fa':'foot-ao' }));
-    gndIns(E('path',{ d:'M1348 332 C1364 420 1428 500 1448 650 M1414 332 C1432 420 1490 500 1510 650', fill:'none', stroke:WOOD, 'stroke-width':3.4, opacity:.3, 'stroke-linecap':'round', 'data-fa':'ruts' }));
   }
-  // ═══ 6. THE WALL'S FOOT — west: the sandbag revetment at the tower's west foot, the ladder up the tower, two crate molds at its east foot; east: THE JEEP parked in front of the gatehouse ═══
+  // ═══ 6. THE WALL'S FOOT — west: the sandbag revetment at the tower's west foot, the ladder up the tower, two crate molds at its east foot; east: bare — 1009 THE FORT ALIVE §7 took the jeep and its ruts out (Wyatt 9/14: "I don't know what the Jeep is doing there") ═══
   const west=E('g',{ 'data-fa':'west-foot' },[shadow(136,251,46,4,.18)]);
   [96,122,148].forEach((x,i)=>west.appendChild(bag(x,234,24,16,i%2? BAG3 : BAG))); [109,135].forEach((x,i)=>west.appendChild(bag(x,220,24,15,i? BAG : BAG4)));
   let dR=''; for(let i=0;i<9;i++){ const y=240-i*19; dR+='M200 '+y+' H216 '; }
@@ -100485,8 +100487,6 @@ function fhSetPaint(svg,night){
   const crate=mold('crate',undefined,'10 34 140 92',EF_BOX);
   if(crate){ west.appendChild(shadow(322,329,34,5,.18)); west.appendChild(E('image',{ href:crate, x:296, y:296, width:52, height:34, preserveAspectRatio:'xMidYMax meet', 'data-fa':'crate' })); west.appendChild(E('image',{ href:crate, x:300, y:263, width:52, height:34, preserveAspectRatio:'xMidYMax meet', 'data-fa':'crate' })); }
   midIns(west);
-  const jeep=mold('bfjeep',dye);
-  if(jeep) midIns(E('g',{ 'data-fa':'jeep' },[shadow(1380,329,56,6,.2), E('image',{ href:jeep, x:1324, y:226, width:112, height:104, preserveAspectRatio:'xMidYMax meet' })]));
   // ═══ 7. THE SAME PIECE OVER AND OVER (item 12): the targets tilted, the range's bags in two shapes with a tone jitter, the pen's dummy mirrored and smaller, three picket shapes ═══
   qa('[data-fh="target"]').forEach((g,i)=>{ const r=g.querySelector('rect[width="34"]'); if(!r) return; g.setAttribute('transform','rotate('+[-3,2.5,3][i%3]+' '+(num(r,'x')+17)+' '+(num(r,'y')+20)+')'); });
   qa('rect[data-fh="sandbag"]').forEach((r,i)=>{ if(i%2){ r.setAttribute('height','15'); r.setAttribute('rx','5'); } r.setAttribute('fill',[BAG,BAG3,BAG4,BAG,BAG3][i%5]); });
@@ -104063,8 +104063,8 @@ window.UI = {
     fortDeal(tab); },
   fortTab(tab){ UI.fortArea(tab); },   // the old bar's door = an area's (0894's callers pass 'pets' — it lands on the pen's card)
   fortArea(id){ audio(); SFX.blip(); UI.fort(id); },   // a hotspot (or its pill): the area's card over the yard (no Surplus door — the helmet lives on the shelf)
-  fortKing(k){   // 0912-7 HERO TRAILERS: a tap on a king in the yard opens his trailer — the same page his square opens (⚑ Q1: command moves through its TAKE COMMAND). The figure holds its pose: no lunge, no repaint, the yard's clocks run on under the card as under every card (THE LIVING FORT design owns the actors' motion). REV 3's lunge-then-command tap retires here.
-    if(!unitOwned(k)) return; SFX.blip(); UI.classInfo(k); },
+  fortKing(k){   // 1009 THE FORT ALIVE §4.1 THE TAP LAW (Wyatt 9/14: "Clicking the different heroes should auto-select them as your choice, but if you click them twice, you should be able to see what they do and those kinds of details"): a tap on an owned king NOT in command = he takes command at once (UI.heroCmd's own one-reader write — the mark + the plate move with the svg never rebuilt, the pick's own SFX) + his lunge beat (fhKingLunge, 0.6 s); the king IN COMMAND's tap = his trailer (the details, 0912-7's page). 0912-7's every-tap-a-trailer retires here.
+    if(!unitOwned(k)) return; if(k===heroSel()){ SFX.blip(); UI.classInfo(k); return; } UI.heroCmd(k); fhKingLunge(k); },
   fortClose(){ SFX.clack(); UI.closeModal(); closeFortScene(); },   // the ✕ — home to the shelf
   fortName(){ SFX.blip(); fortNameOpen(); },   // the name on the wordmark: the game's own rename card, focused in the tap's stack
   fortNameSave(){   // cleanFortName's gate → the red note (the shipped rejection key with the fort's numbers) · EMPTY or the default typed back = '' = the composed name returns (the reset door, zero keys) · saveMeta at once · the wordmark, the shelf pill, a standing card follow; LOCAL ONLY — no netSync
@@ -104344,8 +104344,8 @@ window.UI = {
     }
     saveMeta(); renderMenu(); shopRefresh();
   },
-  heroTap(k){   // 0912-7 HERO TRAILERS (Wyatt 9/12: "When you click On a hero, it should give you a trailer of who they are, just like how we did when you click on a unit in the roster"): a tap on ANY hero's square = his trailer (the class manual's own machine — THE LIVING PORTRAIT, THE UPGRADE STORY, the number), owned or not (⚑ Q2: the mystery plays too, the earn line under him); command moves through the trailer's TAKE COMMAND (UI.heroCmd — the same one-reader write, ⚑ Q1). 0445's tap-to-select on the square retires here; nothing re-renders under the finger, so the v1.26 scroll hold has nothing to hold.
-    UI.classInfo(k); },
+  heroTap(k){   // 1009 THE FORT ALIVE §4.1 THE TAP LAW on the HEROES card: a tap on an owned square NOT in command = he takes command (UI.heroCmd — the IN COMMAND flag rides through fortSync's in-place re-deal, the yard's mark + plate move behind the veil, his lunge beat); the commanded square's tap = his trailer; the unowned silhouette's tap = his trailer with the earn line as before (0912-7 ⚑ Q2). 0912-7's every-tap-a-trailer retires here.
+    if(unitOwned(k) && k!==heroSel()){ UI.heroCmd(k); fhKingLunge(k); return; } UI.classInfo(k); },
   heroCmd(k){   // 0912-7 HERO TRAILERS (⚑ Q1): TAKE COMMAND on the trailer — heroTap's own write (the one-hero law: META.heroSel through the ONE reader heroSel; the tray deals only him), the yard + the shelf's fort tile follow (fortKing's own re-paints), the button becomes the flag in place through the l10n hook (the portrait's loop never restarts)
     if(!unitOwned(k) || k===heroSel()) return; META.heroSel=k; SFX.snap(); saveMeta();
     if(fortStands()) fortSync(); fhCommandWrite(k); if(S.mode==='menu') renderMenu();   // 0992 THE LIVING FORT A5 / §3.5: the mark + the plate + the pennant move to him, the old king dims (targeted writes) — the yard never rebuilt, the director's deck runs on
@@ -105710,7 +105710,7 @@ window.GVT = {
       r4:(()=>{ const sv=q('#fortBg svg.fhero'); if(!sv) return null; const A=sel=>Array.from(sv.querySelectorAll(sel)), c=sel=>sv.querySelectorAll(sel).length, br=g('fhFenceBreak'), rw=sv.querySelector('[data-fh="rankwall"]'), wb=sv.querySelector('[data-fh="wbench"]');   // REV 4's census: the rank board, the weapons bench + its irons (the level boxes + the RENDERED rects), the table's men, the jailbreak's state, the seats + the sitter, the reduced-motion stand
         return { rank:{ box:rw? rw.dataset.box : null, r:R(rw), badges:A('[data-fh="badge"]').map(e=>({ tier:+e.dataset.tier, box:e.dataset.box, r:R(e) })), crest:c('[data-fh="crest"]') },
           bench:{ n:c('[data-fh="wbench"]'), box:wb? wb.dataset.box : null, r:R(wb), irons:A('[data-fh="iron"]').map(e=>({ k:e.dataset.k, box:e.dataset.box, r:R(e), rot:!!e.closest('[data-rot]'), eq:!!e.dataset.eq, own:e.dataset.own!=='0', hh:(str=>{ let x=0; for(let i=0;i<str.length;i++) x=(x*31+str.charCodeAt(i))|0; return x; })(e.getAttribute('href')||'') })) },
-          table:{ tray:c('[data-fh="tray"]'), box:(sv.querySelector('[data-fh="wartable"]')||{}).dataset? sv.querySelector('[data-fh="wartable"]').dataset.box : null, men:A('[data-fh="tableman"]').map(e=>e.dataset.k+':'+e.dataset.side+':'+e.dataset.hex), tracers:c('[data-fh="wartable"] [data-fx="tracer"]'), burst:c('[data-fh="wartable"] [data-fx="burst"]') },
+          table:{ tray:c('[data-fh="tray"]'), box:(sv.querySelector('[data-fh="wartable"]')||{}).dataset? sv.querySelector('[data-fh="wartable"]').dataset.box : null, men:A('[data-fh="tableman"]').map(e=>e.dataset.k+':'+e.dataset.side+':'+e.dataset.hex), tracers:c('[data-fh="wartable"] [data-fx="tracer"]'), burst:c('[data-fh="wartable"] [data-fx="burst"]'), movers:c('[data-fh="wartable"] [data-fl]'), bases:c('[data-fh="wartable"] [data-fh="base"]') },
           jail:{ on:FH_JAILBREAK.on, down:!!(br && br.classList.contains('down')), pets:A('.fh-pet').map(e=>({ k:e.dataset.k, cls:e.getAttribute('class'), tf:e.style.transform||'' })), pks:A('.fh-break .fh-pk').map(e=>getComputedStyle(e).transform) },
           seats:{ bench:c('[data-fh="bench"]'), crates:c('[data-fh="ammocrate"]'), bags:c('[data-fh="bagseat"]'), sitter:FH_SIT.sitter, seat:FH_SIT.seat, rmStand:FH_RM_STAND } }; })(),
       r5:(()=>{ const sv=q('#fortBg svg.fhero'); if(!sv) return null; const c=sel=>sv.querySelectorAll(sel).length, pl=q('#fortBg .fh-plate'), hm=sv.querySelector('[data-fh="heelmark"]');   // 0947 THE SELECTION + THE STATS census: the mark under the king in command, the lift, the unselected opacity, the plate's lines + its seat, the heel mark, the iron glow + the ring, the rack's caption
@@ -105718,7 +105718,7 @@ window.GVT = {
           plate:pl? { k:pl.dataset.k, r:R(pl), inBtn:!!(pl.closest('.fh-king-hot') && pl.closest('.fh-king-hot').dataset.k===pl.dataset.k), name:(pl.querySelector('.fh-pname') && pl.querySelector('.fh-pname').firstChild)? pl.querySelector('.fh-pname').firstChild.textContent.trim() : '', flag:(pl.querySelector('.fh-pflag')||{}).textContent||'', stats:Array.from(pl.querySelectorAll('.fh-pstat')).map(e=>e.textContent.replace(/\s+/g,' ').trim()), pe:getComputedStyle(pl).pointerEvents } : null,
           stats:heroSel()? fhKingStats(heroSel()) : null, wcap:(()=>{ const e=q('#roomModal .fh-wcap'); return e? { wk:e.dataset.wk, name:(e.querySelector('b')||{}).textContent||'', flag:(e.querySelector('.fh-pflag')||{}).textContent||'', rank:(e.querySelector('.acrank')||{}).textContent||'' } : null; })() }; })(),
       tab:FORT_TAB, stands:fortStands(), night:roomNight(), shopOpen:shopIsOpen(), mode:S.mode, wep:META.sargeWeapon||'pistol', svgBytes:(q('#fortBg svg.fhero')||{}).innerHTML? q('#fortBg svg.fhero').innerHTML.length : 0, images:document.querySelectorAll('#fortBg svg.fhero image').length,
-      nameProm:(()=>{ const e=g('nameProm'); return e? { up:!e.classList.contains('hidden'), rename:e.classList.contains('np-rename'), head:(e.querySelector('h2')||{}).textContent||'', headNotr:!!(e.querySelector('h2')&&e.querySelector('h2').hasAttribute('data-notr')), val:(g('npIn')||{}).value, max:(g('npIn')||{}).maxLength, note:(g('npNote')||{}).textContent||'', noteColor:g('npNote')? g('npNote').style.color : '', focused:document.activeElement===g('npIn'), selAll:!!(g('npIn') && g('npIn').selectionStart===0 && g('npIn').selectionEnd===String(g('npIn').value).length && g('npIn').value.length>0), r:R(e.querySelector('.np-card')), inR:R(g('npIn')), btnR:R(e.querySelector('.np-row')) } : null; })(),
+      nameProm:(()=>{ const e=g('nameProm'); return e? { up:!e.classList.contains('hidden'), rename:e.classList.contains('np-rename'), head:(e.querySelector('h2')||{}).textContent||'', headNotr:!!(e.querySelector('h2')&&e.querySelector('h2').hasAttribute('data-notr')), val:(g('npIn')||{}).value, max:(g('npIn')||{}).maxLength, note:(g('npNote')||{}).textContent||'', noteColor:g('npNote')? g('npNote').style.color : '', focused:document.activeElement===g('npIn'), selAll:!!(g('npIn') && g('npIn').selectionStart===0 && g('npIn').selectionEnd===String(g('npIn').value).length && g('npIn').value.length>0), r:R(e.querySelector('.np-card')), inR:R(g('npIn')), btnR:R(e.querySelector('.np-row')), btns:e.querySelectorAll('.np-row .mbtn').length, keep:!!e.querySelector('.np-keep'), x:R(e.querySelector('.np-card .np-x')) } : null; })(),
       z:{ scene:g('fortscene')? getComputedStyle(g('fortscene')).zIndex : null, back:(()=>{ const e=q('#roomModal .rmback'); return e? getComputedStyle(e).zIndex : null; })(), shop:getComputedStyle(g('toyshop')).zIndex, name:getComputedStyle(g('nameProm')).zIndex },
       pill:fortPill(), tag:g('rtag-fort')? g('rtag-fort').textContent : null, heroSel:heroSel(), petSel:petSel(), wear:(META.outfit.wear||[]).slice(), picks:META.pendingPicks|0 }; },
   fortCouncil(k){ return fhCouncilVisit(k); },   // REV 3: the council on demand (the witness) — a king walks to the table now
