@@ -98,7 +98,7 @@ body.fx .ghost.vid>img{display:none}
 #g-left{left:7%;top:13%;height:12%}
 #g-center{left:50%;top:12.5%;height:15.5%;margin-left:-7.5%}
 #g-right{right:5%;top:12.5%;height:13%}
-#g-left>*{animation:bob 3.2s ease-in-out infinite}#g-center>*{animation:bob 2.6s ease-in-out infinite .4s}#g-right>*{animation:bob 3.5s ease-in-out infinite .9s}
+#g-left>img{animation:bob 3.2s ease-in-out infinite}#g-center>img{animation:bob 2.6s ease-in-out infinite .4s}#g-right>img{animation:bob 3.5s ease-in-out infinite .9s}
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8%)}}
 .ghost.hit{animation:hitShake .5s ease-out 1!important;filter:brightness(1.8) saturate(.3) drop-shadow(0 0 calc(var(--u)*3) #fff)}
 .ghost.ko{transition:opacity 1s,transform 1s;opacity:0!important;transform:translateY(-10%) scale(1.25)!important;filter:brightness(2.5)}
@@ -385,13 +385,13 @@ const FX=(function(){const ua=navigator.userAgent;
   const on=!!codec,ext=codec==='hevc'?'mp4':'webm';if(on)body.classList.add('fx');
   function src(v,name){v.src='assets/fx/'+name+'.'+ext;v.muted=true;v.defaultMuted=true;v.playsInline=true;v.setAttribute('playsinline','');return v;}
   function init(){if(!on)return;document.querySelectorAll('video[data-fx]').forEach(v=>{src(v,v.dataset.fx);
-    if(v.loop){v.addEventListener('canplay',()=>{v.classList.add('ready');v.parentNode.classList.add('vid');if(S.screen==='game'&&!v.parentNode.classList.contains('ko')&&!v.parentNode.classList.contains('flee'))v.play().catch(()=>{});},{once:true});}});}
+    if(v.loop){v.addEventListener('canplaythrough',()=>{v.classList.add('ready');v.parentNode.classList.add('vid');if(S.screen==='game'&&!v.parentNode.classList.contains('ko')&&!v.parentNode.classList.contains('flee')){v.play().catch(()=>{});if(!v.dataset.vq){v.dataset.vq=1;VQ.watch(v,v.dataset.fx);}}},{once:true});}});}
   /* fetch one clip at a time, in the order the flow needs them, so nothing fights the opener or the crew's loops for bandwidth */
   const ORDER=['kodako','ghostl','ghostr','burst','cardflip','rockfall','mkhand'];let warmed=false;
   function warm(){if(!on||warmed)return;warmed=true;let i=0;const next=()=>{if(i>=ORDER.length)return;const v=document.querySelector('video[data-fx="'+ORDER[i++]+'"]');if(!v){next();return;}
       let done=false;const go=()=>{if(done)return;done=true;clearTimeout(tm);next();};const tm=setTimeout(go,12000);
       v.addEventListener('canplaythrough',go,{once:true});v.addEventListener('error',go,{once:true});try{v.load();}catch(e){go();}if(v.readyState>=4)go();};next();}
-  function loops(){if(!on)return;document.querySelectorAll('.ghost>video.ready').forEach(v=>{try{v.play().catch(()=>{});}catch(e){}});}
+  function loops(){if(!on)return;document.querySelectorAll('.ghost>video.ready').forEach(v=>{try{v.play().catch(()=>{});if(!v.dataset.vq){v.dataset.vq=1;VQ.watch(v,v.dataset.fx);}}catch(e){}});}
   function pauseLoops(){document.querySelectorAll('.ghost>video').forEach(v=>{try{v.pause();}catch(e){}});}
   function pauseLoop(id){const v=$(id).querySelector('video');if(v){try{v.pause();}catch(e){}}}
   /* play a one-shot; resolves true at `at` seconds (or on end), false if the clip cannot play — the caller then runs the CSS version */
@@ -619,15 +619,18 @@ function reset(){S.round=0;S.scripted=!LIVE&&S.games===0;S.p.hp=S.p.max;S.e.hp=S
   $('rocks').innerHTML='';$('splash').classList.remove('on');}
 
 /* frame monitor: rolling fps + long frames (>34 ms) per phase — read by the rig (window.BOO.PERF) and the ?debug=1 overlay */
+const VQ=(function(){const R={};function watch(v,k){if(!('requestVideoFrameCallback' in v))return;let n=0,t0=performance.now();R[k]={fps:0};const cb=()=>{n++;const t=performance.now();if(t-t0>=1000){R[k].fps=Math.round(n*1000/(t-t0));n=0;t0=t;}v.requestVideoFrameCallback(cb);};v.requestVideoFrameCallback(cb);}
+  function line(){return Object.keys(R).map(k=>{const v=document.querySelector('video[data-fx="'+k+'"]');let d='';try{const q=v.getVideoPlaybackQuality();d=' drop '+q.droppedVideoFrames+'/'+q.totalVideoFrames;}catch(e){}return k+' '+R[k].fps+'fps'+d;}).join(' · ');}
+  return{watch,line};})();
 const PERF=(function(){const F=[];let last=0;const byPhase={};function loop(t){if(last){const d=t-last;F.push(d);if(F.length>120)F.shift();const k=S.screen+':'+S.phase;const b=byPhase[k]||(byPhase[k]={n:0,sum:0,long:0,max:0});b.n++;b.sum+=d;if(d>34)b.long++;if(d>b.max)b.max=d;}last=t;requestAnimationFrame(loop);}requestAnimationFrame(loop);
   return{fps(){if(!F.length)return 0;return Math.round(1000/(F.reduce((a,b)=>a+b,0)/F.length));},longs(){return F.filter(d=>d>34).length;},byPhase};})();
 /* on-page readout for browsers without a console (Safari window captures): ?debug=1 */
 if(Q.has('debug')){const d=document.createElement('div');d.id='dbg';d.style.cssText='position:absolute;left:0;top:0;z-index:999;background:rgba(0,0,0,.75);color:#0f0;font:11px/1.3 monospace;padding:4px;white-space:pre;pointer-events:none;max-width:100%';col.appendChild(d);const errs=[];
   addEventListener('error',e=>errs.push(String(e.message||e).slice(0,80)));addEventListener('unhandledrejection',e=>errs.push('rej '+String(e.reason).slice(0,80)));
-  setInterval(()=>{const g=$('p-gary'),cs=getComputedStyle(g);const pp=getComputedStyle($('p-power'));d.textContent=`fx=${FX.codec} scr=${S.screen} ph=${S.phase} r=${S.round} hp=${S.p.hp}/${S.e.hp}  FPS ${PERF.fps()} long/2s ${PERF.longs()}\ngary.class="${g.className}"\nfilter=${cs.filter.slice(0,60)}\nanim=${cs.animationName}\npower op=${pp.opacity} blend=${pp.mixBlendMode} pos=${pp.backgroundPosition}\nerrs=${errs.length} ${errs.slice(-3).join(' | ')}`;},250);}
+  setInterval(()=>{const g=$('p-gary'),cs=getComputedStyle(g);const pp=getComputedStyle($('p-power'));d.textContent=`fx=${FX.codec} scr=${S.screen} ph=${S.phase} r=${S.round} hp=${S.p.hp}/${S.e.hp}  FPS ${PERF.fps()} long/2s ${PERF.longs()}\ngary.class="${g.className}"\nfilter=${cs.filter.slice(0,60)}\nanim=${cs.animationName}\ncrew: ${VQ.line()}\nerrs=${errs.length} ${errs.slice(-3).join(' | ')}`;},250);}
 /* auto-drive for the verification rig */
 if(AUTO)setTimeout(()=>$('s-tap').click(),1500);
-window.BOO={S,onRoll,enterArena,endGame,reset,FX,PERF};
+window.BOO={S,onRoll,enterArena,endGame,reset,FX,PERF,VQ};
 })();
 </script>
 </body>
