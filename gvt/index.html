@@ -43951,7 +43951,7 @@ function startBattle(levelN, rival){
     const fs=foeSkinHex(); if(fs) buildFoeTint(fs);   // v1.74: bake the green re-mold before the first Tan walks on
   }
   hideAllOverlays();
-  S.mode='play';
+  S.mode='play'; rugRoom(true);   // 0998 THE CAMPAIGN RUG I (CELL 1): the bedroom floor behind the canvas — on at every battle door, off at showMenu
   telGo(rival? 'rival' : 'camp');   // 0624 D3: ['go', mode, humans] — solo 1, a party's roster (coopLaunching)
   // no boot-camp coach mid co-op — the ally IS the coach
   if(META.campaign===0 && levelN===1 && !coopLaunching) coachStart();
@@ -44115,7 +44115,7 @@ function startMomRaid(){
   themeKill();   // v2.27: the menu theme stops the instant a game starts
   reset();
   if(W!==BASE_W){ W=BASE_W; resize(); }   // the room is 960 wide — roomSVG's own viewBox
-  S.momRaid=true;
+  S.momRaid=true; rugRoom(false);   // 0998 THE CAMPAIGN RUG I: THE SKIP — the mom fight is fought on the boards (no rug, no hem)
   S.levelN=0; S.rival=null;
   S.cfg=levelCfg(1);
   S.cfg.terrain={rocks:[],river:null};    // the bedroom floor is bare BY CONSTRUCTION — never trust a seed
@@ -44137,7 +44137,7 @@ function startMomRaid(){
   momToysScatter(1);
   S.ann={txt:'MOM ALERT! SHE IS CLEANING THE ROOM!', t:2.8};   // raw key — the canvas door translates
   hideAllOverlays();
-  S.mode='play';
+  S.mode='play'; rugRoom(true);   // 0998 THE CAMPAIGN RUG I (CELL 1): the bedroom floor behind the canvas — on at every battle door, off at showMenu
   locSync();   // 0432: the LAST line of a game-start door — themeKill() ran first, so a location can never start over the menu theme
 }
 // ===== 0248 THE TRAINING RANGE (card 05, Wyatt 8/10 night): the academy's own
@@ -44165,7 +44165,7 @@ function startTraining(){
   S.ann={txt:'THE TRAINING RANGE', t:2.2};   // raw key — the canvas door translates
   hideAllOverlays();
   const tb=document.getElementById('trainbar'); if(tb) tb.classList.remove('hidden');
-  S.mode='play';
+  S.mode='play'; rugRoom(true);   // 0998 THE CAMPAIGN RUG I (CELL 1): the bedroom floor behind the canvas — on at every battle door, off at showMenu
   trainPlace(ownedUnits()[0]||'rifleman');   // the demo starts itself — first man off the shelf
   locSync();   // 0432: the LAST line of a game-start door — themeKill() ran first, so a location can never start over the menu theme
 }
@@ -45458,7 +45458,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.86';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.87';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -54216,7 +54216,7 @@ function startBattlefield(mapId,diffOverride,teamSize,plan,rivX){
   saveMeta();
   resize();                                    // the world just got wider — refit
   hideAllOverlays();
-  S.mode='play';
+  S.mode='play'; rugRoom(true);   // 0998 THE CAMPAIGN RUG I (CELL 1): the bedroom floor behind the canvas — on at every battle door, off at showMenu
   telGo(team>1? 'bf2' : 'bf1');   // 0624 D3
   spdInit();   // ×1 out of the box (v2.37: the ×0.9 default retired) — or the ×2 this device already chose
   S.ann={ txt:(team>1? tf('%1 v %1 · %2', team, t(map.name)) : tf('BATTLEFIELD · %1', t(map.name))), t:2.6 };
@@ -71275,6 +71275,7 @@ function resize(){
   const dpr=Math.min(2,window.devicePixelRatio||1);
   cv.width=VW*scale*dpr; cv.height=H*scale*dpr;
   cv.style.width=(VW*scale)+'px'; cv.style.height=(H*scale)+'px';
+  rugRoomVars();   // 0998 THE CAMPAIGN RUG I: --s (the scale) + --bar (the letterbox bar) for the page's floor behind the canvas
   cx.setTransform(scale*dpr,0,0,scale*dpr,0,0);
   if(S.bf){ S.bf.cam.x=clampCam(S.bf.cam.x); S.bf.cam.y=clampPanY(S.bf.cam.y||0); }   // 0628: a resize keeps the hand's pan (clampPanY = clampCamY wherever panS() is 0)
   else if(S.cCam){ S.cCam.x=clampCam(S.cCam.x); S.cCam.y=clampPanY(S.cCam.y||0); }
@@ -71874,8 +71875,11 @@ function drawRug(){
       cx.lineCap='round'; cx.globalAlpha=0.35;
       if(qlt&&!PF_PATCH){ const ta9=bayOn()? BAY_TRAIL : PF_TRAIL_A; if(ta9>0){ cx.globalAlpha=ta9; cx.strokeStyle=PF_C[1]; cx.lineWidth=70; pathStroke(); } }   // 0826 THE PILLOW FLOOR: the worn path — the sheet's own shade, one faint band (the tan runner smeared the cream; 00-FEEDBACK §2 D-P3) · 0573 THE BAY: the slept-in dent at BAY_TRAIL (the lit sheet wants a lighter foot)
       else {
+      const g9=(S.cfg.terrain.ground||'plain'), rg9=(!S.bf && !night && !qlt && (g9==='plain'||g9==='snow'||g9==='sand'))? RUN_GROOVE[g9] : null;   // 0998 THE CAMPAIGN RUG I (CELL 4): the plain / sand / snow runner is a groove now (runGroove — five strokes, the MID body opaque, the black-dye law); the grass, the night, the lair, the deck, the marble, the quilt and every battleground keep the served two strokes below
+      if(rg9) runGroove(rg9); else {
       cx.strokeStyle=snow?'rgba(90,110,134,0.45)':sand?'rgba(70,26,10,0.5)':grass?'rgba(38,52,28,0.55)':night?ELITE_NIGHT.runShade:'rgba(60,30,24,0.5)'; cx.lineWidth=84; pathStroke();   // 0583: the plain night rug's worn path is a moonlit path (the costume bands keep their own road)
       cx.strokeStyle=snow?'#D7E1EC':sand?'#7A3318':grass?'#B99B62':night?ELITE_NIGHT.run:'#D9C4A0'; cx.lineWidth=70; pathStroke();   // 8/8: the lawn wears a worn dirt track
+      }
       }
       cx.globalAlpha=1; cx.restore();
     }
@@ -71913,9 +71917,11 @@ function drawRug(){
     const y0=rv.y0!=null?rv.y0:56, y1=rv.y1!=null?rv.y1:WORLD_H-56;
     cx.fillStyle=rv.col||'#4E7FA8'; cx.fillRect(rv.x,y0,rv.w,y1-y0);
     cx.beginPath(); cx.ellipse(rv.x+rv.w/2,y0,rv.w/2,9,0,0,7); cx.fill();   // rounded spout
+    rvBanks(rv.x,rv.x+rv.w,y0,y1,rv.col||'#4E7FA8',snow);   // 0998 THE CAMPAIGN RUG I (CELL 6, the twin site): the core + the banks in the water's own dark (a juice river keeps its hue), under the ripples, the froth and the duck
     cx.fillStyle=rv.col2||'#6E9DC4'; cx.globalAlpha=0.6;
     for(let y=y0+14;y<y1-6;y+=44){ cx.beginPath(); cx.ellipse(rv.x+rv.w/2+10*Math.sin(y*0.14+S.t*1.4), y, 12, 4, 0, 0, 7); cx.fill(); }
     cx.globalAlpha=1;
+    rvGlint(rv.x+rv.w,y0,y1);   // 0998: the east glint
     if(rv.y1!=null){                                // froth where the pour lands
       cx.globalAlpha=0.75; cx.fillStyle='#EDEADF';
       for(let k=0;k<3;k++){ const ph=S.t*2+k*2.1;
@@ -71928,9 +71934,7 @@ function drawRug(){
     if(S.bf&&S.bf.duck && Math.abs(S.bf.duck.x-(rv.x+rv.w/2))<rv.w) drawCrossDuck(S.bf.duck);
     for(const br of rv.bridges){
       if(br.open) continue;
-      cx.fillStyle='#B48A54'; cx.fillRect(rv.x-10, br.y-br.bw/2, rv.w+20, br.bw);
-      cx.strokeStyle='#8a683e'; cx.lineWidth=3;
-      for(let k=0;k<5;k++){ const yy=br.y-br.bw/2+6+k*(br.bw-12)/4; cx.beginPath(); cx.moveTo(rv.x-8,yy); cx.lineTo(rv.x+rv.w+8,yy); cx.stroke(); }
+      rvPlanks(rv.x,rv.x+rv.w,br.y-br.bw/2,br.bw);   // 0998 THE CAMPAIGN RUG I (CELL 6): the dark planks at the twin site — the two bridges agree
     }
   }
   // the race track flank — bright plastic speedway; the dashes stream so it
@@ -71957,6 +71961,8 @@ function drawRug(){
     for(let k=0;k<4;k++){ const a=k*1.7+S.t*0.9;
       cx.beginPath(); cx.ellipse(p.x+Math.cos(a)*p.rx*0.45, p.y+Math.sin(a)*p.ry*0.45, 13, 4.5, 0, 0, 7); cx.fill(); }
     cx.globalAlpha=1;
+    cx.strokeStyle=rvDark(p.col||'#4E7FA8'); cx.lineWidth=3.5; cx.beginPath(); cx.ellipse(p.x,p.y,p.rx-1.75,p.ry-1.75,0,0,7); cx.stroke();   // 0998 THE CAMPAIGN RUG I (CELL 6): the pond's bank ring in the water's own dark, just inside the rim
+    cx.strokeStyle='rgba(220,235,245,0.55)'; cx.lineWidth=1.5; cx.beginPath(); cx.ellipse(p.x,p.y,p.rx-6,p.ry-6,0,-0.45,0.55); cx.stroke();   // 0998: the east glint
     cx.strokeStyle='rgba(237,234,223,0.5)'; cx.lineWidth=2;
     cx.beginPath(); cx.ellipse(p.x,p.y,p.rx,p.ry,0,0,7); cx.stroke();
     if(p.duck){ // strictly decorative, deeply important
@@ -72014,17 +72020,17 @@ function drawRug(){
   const RV=S.cfg.terrain.river;
   if(RV){
     cx.fillStyle='#4E7FA8'; cx.fillRect(RV.x,56,RV.w,WORLD_H-112);   // 0197: the channel runs the live height (===H on every flat rug)
+    rvBanks(RV.x,RV.x+RV.w,56,WORLD_H-56,'#4E7FA8',snow);   // 0998 THE CAMPAIGN RUG I (CELL 6): the lighter core + the banks (+ the snow's slush lip and rime) — under the ripples and the duck, cut where a mesa's foot crosses
     cx.fillStyle='#6E9DC4'; cx.globalAlpha=0.6;
     for(let y=70;y<WORLD_H-70;y+=44){ cx.beginPath(); cx.ellipse(RV.x+RV.w/2+10*Math.sin(y*0.14+S.t*1.4), y, 12, 4, 0, 0, 7); cx.fill(); }
     cx.globalAlpha=1;
+    rvGlint(RV.x+RV.w,56,WORLD_H-56);   // 0998: the east glint on the wet lip, over the ripples
     // v2.28 the campaign's duck sails HERE — after the water, before the
     // planks, so he slides UNDER the popsicle bridge exactly like a real
     // bath toy would (v2.15's own layering, the crossing's law).
     if(S.cduck) drawCrossDuck(S.cduck);
     for(const by of rvBridges(RV)){   // 0594a: every plank span the river carries (one — or level 30's two)
-    cx.fillStyle='#B48A54'; cx.fillRect(RV.x-10, by-RV.bw/2, RV.w+20, RV.bw);
-    cx.strokeStyle='#8a683e'; cx.lineWidth=3;
-    for(let k=0;k<5;k++){ const yy=by-RV.bw/2+6+k*(RV.bw-12)/4; cx.beginPath(); cx.moveTo(RV.x-8,yy); cx.lineTo(RV.x+RV.w+8,yy); cx.stroke(); }
+    rvPlanks(RV.x,RV.x+RV.w,by-RV.bw/2,RV.bw);   // 0998 THE CAMPAIGN RUG I (CELL 6): the dark planks with a highlight, the staggered ends, the shadow band on the water, the outline — the served tan slab (#B48A54, five hairlines) trapped the tan army at 1.25
     }
   }
   if(moonField()) drawMoonDressing(S.bf? WORLD_W : W);   // 0947c THE MOON GARDEN: the string lights + the pond, over the lawn, under the stones
@@ -72162,6 +72168,7 @@ function drawSnowTerrain(){
 // snowballs instead of one ploughed bank, which is what the first mockup did.
 // One crest highlight for the chain, not one per mound, for the same reason.
 function drawSnowBank(list){
+  if(list.length===1) return snowHeap(list[0]);   // 0998 THE CAMPAIGN RUG I (CELL 6 · c12): a chain of one is a heap, not a ball — the ridge recipe below stays for real chains
   cx.fillStyle='rgba(60,74,92,0.20)';
   for(const m of list){ cx.beginPath(); cx.ellipse(m.x+6,m.y+m.r*0.55,m.r*1.08,m.r*0.44,0,0,7); cx.fill(); }
   // ⚠ the three radii have to STEP DOWN, not just offset. Rim r+3 under a face
@@ -72184,6 +72191,7 @@ function drawSnowClod(rk){
   cx.fillStyle='rgba(60,74,92,0.22)'; cx.beginPath(); cx.arc(rk.x+2,rk.y+4,rk.r,0,7); cx.fill();
   cx.fillStyle='#F9FCFF'; cx.beginPath(); cx.arc(rk.x,rk.y,rk.r,0,7); cx.fill();
   cx.strokeStyle='#8C9AAD'; cx.lineWidth=2; cx.stroke();
+  cx.strokeStyle='rgba(60,74,92,0.28)'; cx.lineWidth=2.5; cx.beginPath(); cx.arc(rk.x,rk.y,rk.r-2.2,-Math.PI*0.15,Math.PI*0.75); cx.stroke();   // 0998 THE CAMPAIGN RUG I (CELL 6): the shade-side arc — the same NW sun as the heap
 }
 // ================= WESTERN LAND: the ground itself (v1.57) =================
 // Draw order is the reading order: the trench is CUT INTO the mat so it goes
@@ -73040,6 +73048,7 @@ function drawBase(side){
   // map) so the crate stands at mid-height on the tall map (v1.57)
   const dir=(side==='you'?1:-1), bx=b.x-10*dir, by=b.y+52, w=150;   // 0375: the drawn crate hangs off the base's own x (b.x−10 toward the wall = the shipped 120 / WORLD_W−120 on every map but the ship, whose baseX centres it in the doubled hangar)
   const k=Math.max(0,b.hp/b.hpMax);
+  boxSeat(bx,by);   // 0998 THE CAMPAIGN RUG I (PICK 12): the battleground's boxes take the same seat
   if(im){
     const h=w*(im.height/im.width);
     cx.save(); cx.translate(bx,by); cx.scale(dir,1);
@@ -73055,6 +73064,7 @@ function drawBase(side){
   const hex=(side==='you'? (bf.hex.you||GREEN) : bf.hex.foe), wav=Math.sin(S.t*3+(side==='you'?0:2))*4;
   cx.strokeStyle='#6e5130'; cx.lineWidth=4; cx.lineCap='butt';
   cx.beginPath(); cx.moveTo(bx,by-96); cx.lineTo(bx,by-176); cx.stroke();
+  poleFoot(bx,by);   // 0998 (PICK 12): the pole's foot line
   if(S.vflag && S.vflag.x===bx) return;   // the ceremony owns this pole (v1.47)
   cx.fillStyle=hex;
   cx.beginPath(); cx.moveTo(bx,by-176); cx.lineTo(bx+36*dir,by-166+wav); cx.lineTo(bx,by-150); cx.closePath(); cx.fill();
@@ -73066,6 +73076,7 @@ function drawBase(side){
 function drawTanBase(){
   const b=S.tanBase, im=IMG.toybox;
   const bx=W-120, by=b.y+52, w=150, k=Math.max(0,b.hp/b.hpMax);   // 0197: drawBase's own latitude idiom — b.y+52===352 on every flat rug, the waist's own 652 on the tall mat
+  boxSeat(bx,by);   // 0998 THE CAMPAIGN RUG I (PICK 12): the crate's one cast shadow — before the sprite, regardless of hp (a hurt crate no longer floats)
   const pil9=teddyPillowsOn();   // 0946 THE PILLOWS STAY — six pillows ring the box as DECOR (0573a's ring: drawPillowSlab, the floor's own brush; DRAW-ONLY, never a rock; the shield 0939z retired never returns — teddyFortUp() is not read here): back seats under the box, front seats over its foot; they poof with the box (campCrateFall)
   if(pil9) for(const p9 of teddyFortPts(b)){ if(p9[1]<=by) drawPillowSlab(p9[0]-p9[2]/2,p9[1]-p9[3]/2,p9[2],p9[3]); }
   if(im){
@@ -73084,6 +73095,7 @@ function drawTanBase(){
   const wav=Math.sin(S.t*3+2)*4;
   cx.strokeStyle='#6e5130'; cx.lineWidth=4; cx.lineCap='butt';
   cx.beginPath(); cx.moveTo(bx,by-96); cx.lineTo(bx,by-176); cx.stroke();
+  poleFoot(bx,by);   // 0998 (PICK 12): the pole's 2-px slanted foot line
   if(S.vflag && S.vflag.x===bx) return;   // the ceremony owns this pole (v1.47)
   cx.fillStyle=campFoeHex();   // the opposition's own colours (v1.56) — tan on the campaign, the park's own cloth in a park (0309), by the same resolver every flag reads
   cx.beginPath(); cx.moveTo(bx,by-176); cx.lineTo(bx-36,by-166+wav); cx.lineTo(bx,by-150); cx.closePath(); cx.fill();
@@ -73199,10 +73211,110 @@ function drawFireworks(){
 // none of it paints past the carpet's edge, the edge is the clip's line. At 100 % the rug covers the view and the floor lies under it
 // (pixel-identical to v9.65 — proven on the flat rug, the rug panned south, the western at both ends). ⚑ Q1 the floor is the boards.
 const FLOOR_BOARD='#C8A170', FLOOR_LINE='#B08A58', RUG_FRAME_OUT=28;   // rugSouth's boards (0628); the frame stroke's overhang past the world rect (lineWidth 56)
+// ═══ 0998 THE CAMPAIGN RUG I — THE ROOM, THE RUNNER, THE BRIDGE AND THE SNOW (FM-GVT-BACKDROPS-01 card I of three; design/campaign-backdrops-0914/01-RUG-I.md; Wyatt 9/14 20:57 ET on the design page: "Very good. I like what I see." … "Recommended on all. Build it. Add it to the queue now." → every ⚑ at the REC; paint only — the sim, the seeds, the camera, the deploy line and every hitbox byte-still) ═══
+// THE ROOM (direction C — the base every other card stands on): the picture is a rug in a bedroom, not a video frame. The bedroom floor lives on the PAGE behind the canvas — one class on #wrap set at every battle door
+// (rugRoom) and cleared at the hub (showMenu — the landing of every exit: win, lose, quit, a co-op drop, the raid/park/fort scenes open over it) — never a canvas byte. The pine tile is ONE SVG in world units built ONCE from
+// the FLOOR constants (rugShadow's own recipe: rows 75, joints 460, the odd row offset 240, FLOOR_LINE at 0.6, two plank tones, seeded grain streaks — an LCG run at the build, never per frame), sized by --s (= scale, written in
+// resize()) so the boards scale with the rug; over it the lamp's falloff toward the body's #1a1512 (a radial from the rug's centre, the edge ramp on --bar = the letterbox bar, the side ramp for a phone's pillars); the canvas
+// takes its hem (8u — the frame's cut-off outer half, in shadow) and its drop (10u down, 28u blur) by box-shadow, so the rug lies ON the boards. By night the same boards under rugShadow's own moon wash (rgba(14,18,34,.55)
+// → rgb(98,82,69)), the falloff cooler, the hem the day hem under the wash — the slate frame's hexes untouched (the elite tell), now with a floor to lie on. background-clip:content-box keeps a notched phone's chin (#wrap's
+// padding-bottom) the body's dark. THE SKIP: the mom fight is fought on the boards (drawRoomFloor — no rug, no hem) — startMomRaid clears the class. No object in the letterbox (PICK 11 parked). Nothing here moves: no
+// transition, no animation (CELL 8). The one canvas byte of C: rugShadow's early-out (below) — a frame cost that goes DOWN.
+const RUG_ROOM={ css:false };
+const RUG_ROOM_PAL={ day:{ base:'#C8A170', alt:'#C29A69', line:'#B08A58', grain:'#A9835A', fall:'26,21,18', hem:'#3A120C', drop:'rgba(0,0,0,0.55)' },
+  night:{ base:'#625245', alt:'#5D4E42', line:'#57483A', grain:'#4F4135', fall:'14,18,34', hem:'#221218', drop:'rgba(0,0,10,0.6)' } };   // the day = drawFloor's pine (FLOOR_BOARD / FLOOR_LINE, dark under the lamp so the crimson stays the picture — ⚑ Q2/Q14 at the REC); the night = the same boards under the wash
+function rugRoomTile(P){ let x9=20260914; const rnd=()=>{ x9=(Math.imul(x9,1103515245)+12345)&0x7fffffff; return x9/0x7fffffff; };   // the seeded LCG — the grain is baked into the tile ONCE
+  let b=''; const rows=[[0,[0,180,640,920]],[75,[0,420,880,920]]];
+  rows.forEach((row,r)=>{ const y=row[0], xs=row[1]; for(let i=0;i<xs.length-1;i++){ const x0=xs[i], x1=xs[i+1]; b+='<rect x="'+x0+'" y="'+y+'" width="'+(x1-x0)+'" height="75" fill="'+(((i+r)&1)? P.alt : P.base)+'"/>';
+    const n=Math.max(1,Math.round((x1-x0)/160)); for(let k=0;k<n;k++){ const gy=y+6+rnd()*63, len=Math.min(x1-x0-8,60+rnd()*220), gx=x0+4+rnd()*Math.max(1,x1-x0-8-len);
+      b+='<rect x="'+gx.toFixed(1)+'" y="'+gy.toFixed(1)+'" width="'+len.toFixed(0)+'" height="1.3" rx="0.6" fill="'+P.grain+'" opacity="'+(0.16+rnd()*0.16).toFixed(2)+'"/>'; } } });
+  b+='<g fill="'+P.line+'" opacity="0.6"><rect x="0" y="0" width="920" height="2.5"/><rect x="0" y="75" width="920" height="2.5"/><rect x="180" y="0" width="2" height="75"/><rect x="640" y="0" width="2" height="75"/><rect x="420" y="75" width="2" height="75"/><rect x="880" y="75" width="2" height="75"/></g>';
+  return 'url("data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="920" height="150" viewBox="0 0 920 150">'+b+'</svg>')+'")'; }
+function rugRoomCSS(sel,P){ const F=P.fall;
+  return sel+' { background-color:#1a1512; background-clip:content-box;'
+    +' background-image: radial-gradient(ellipse at 50% 50%, rgba('+F+',0) 48%, rgba('+F+',0.70) 100%),'
+    +' linear-gradient(to bottom, rgba('+F+',0.5) 0, rgba('+F+',0) max(80px, var(--bar,0px) * 1.6), rgba('+F+',0) calc(100% - max(80px, var(--bar,0px) * 1.6)), rgba('+F+',0.5) 100%),'
+    +' linear-gradient(to right, rgba('+F+',0.45) 0, rgba('+F+',0) 6%, rgba('+F+',0) 94%, rgba('+F+',0.45) 100%),'
+    +' '+rugRoomTile(P)+';'
+    +' background-size: auto, auto, auto, calc(920px * var(--s,1)) calc(150px * var(--s,1));'
+    +' background-position: 0 0, 0 0, 0 0, calc(-140px * var(--s,1)) calc(-37px * var(--s,1));'
+    +' background-repeat: no-repeat, no-repeat, no-repeat, repeat; }\n'
+    +sel+' > #cv { box-shadow: 0 0 0 calc(8px * var(--s,1)) '+P.hem+', 0 calc(10px * var(--s,1)) calc(28px * var(--s,1)) calc(8px * var(--s,1)) '+P.drop+'; }\n'; }
+function rugRoomVars(){ const R=document.documentElement.style; R.setProperty('--s', String(scale)); R.setProperty('--bar', Math.max(0,(window.innerHeight-chinPx()-H*scale)/2).toFixed(1)+'px'); }   // from resize(): --s phase-locks the page's boards to the rug's scale, --bar the lamp's edge ramp to the letterbox
+function rugRoom(on){ const w=document.getElementById('wrap'); if(!w) return; on=!!on && !S.momRaid;   // THE SKIP lives here: the mom fight is fought on the boards (startMomRaid stamps S.momRaid before its mode write — measured)
+  if(on && !RUG_ROOM.css){ const st=document.createElement('style'); st.id='rugroom'; st.textContent=rugRoomCSS('#wrap.onrug',RUG_ROOM_PAL.day)+rugRoomCSS('#wrap.onrug.onrug-night',RUG_ROOM_PAL.night); document.head.appendChild(st); RUG_ROOM.css=true; }   // the style block ONCE, the first time a rug is fought on
+  const nt=!!(on && nightField()); w.classList.toggle('onrug', !!on); w.classList.toggle('onrug-night', nt); }
+// THE BOXES (PICK 12 — the surviving rider of c09): ONE quiet cast shadow at 0.25 in the band's dark under the toy box, the crate and both battleground boxes, offset toward the lower-right like every rock's, painted BEFORE the
+// sprite regardless of hp (the served crate's own contact oval fades with its hit points — a hurt crate floated); no crushed-pile oval (the judges: a puddle, a hole); the crate's pole gets a 2-px slanted foot line.
+const BOX_SEAT_DARK={ plain:'#3A120C', snow:'#7E8FA6', sand:'#4A1A08', grass:'#2E4A24', roof:'#3A2620', night:'#05070F', other:'#100C0A' };
+function boxSeatDark(){ if(nightField()) return BOX_SEAT_DARK.night; const g=(S.cfg&&S.cfg.terrain&&S.cfg.terrain.ground)||'plain'; return BOX_SEAT_DARK[g]||BOX_SEAT_DARK.other; }
+function hexA(h,a){ const n=parseInt(h.slice(1),16); return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
+function boxSeat(x,y){ const ga=cx.globalAlpha; cx.globalAlpha=0.25; cx.fillStyle=boxSeatDark(); cx.beginPath(); cx.ellipse(x+6,y+7,80,13,0,0,7); cx.fill(); cx.globalAlpha=ga; }
+function poleFoot(bx,by){ cx.strokeStyle='rgba(26,18,10,0.5)'; cx.lineWidth=2; cx.lineCap='butt'; cx.beginPath(); cx.moveTo(bx+2,by-95); cx.lineTo(bx+14,by-90); cx.stroke(); }   // the pole's foot shadow on the lid, cast SE like everything else on the rug
+// THE RUNNER (CELL 4 — direction D's recipe, the biggest legibility win in the set): the served two strokes (an 84 shade + a 70 cream lightener, both at 0.35 — a pink pipe whose composite #885A49 read the green man at
+// 1.05:1, the v1.47 terracotta failure, on ~60 levels) become a groove pressed into the pile: the pressed-pile halo (92), the dark shade wall offset up-left (84 at −3,−4 — a groove lit from the upper left shades its own NW
+// wall), two cream rims (2 px each side; on the phone never thinner than 2 screen px — e = max(2, 2/scale)), the lit SE inner rim (the SE wall catches the light), and a MID-value body painted OPAQUE so the composite ON the
+// runner is the body hex itself: plain #78382B (green 1.44 · tan 3.5 · the field 1.32), sand #7B3418 (green 1.47 · tan 3.6), snow #D5DEE8 (tan 1.85). Grass, the night, the lair, the deck, the marble, the quilt and every
+// battleground keep the served strokes. The trade (⚑ Q12 at the REC): a weaker route cue than the pipe — the rims carry the route. THE BLACK-DYE LAW (⚑ RUG-1): THE BLACK ARMY dye (#4A4A4A) reads 1.01:1 on the MID body
+// (the design's 1.71 was the men's ink) — so, by the pale lawn's own v2.94 law (lawnPale: the recipe flips while any fielded army would hide), runDeep() paints the band's DEEP body (plain #42160E: black 1.75 · green 2.55;
+// sand #4A1A08: black 1.64) while any fielded army would hide (< 1.4) on the MID one. The default green army and every other dye see the MID pick. Cached per hex like LAWN_CRC; the dyes are fixed once a battle starts.
+const RUN_GROOVE={ plain:{ halo:'rgba(20,6,4,0.10)', shade:'rgba(38,10,6,0.55)', rim:'rgba(217,196,160,0.42)', lit:'rgba(255,236,210,0.30)', mid:'#78382B', deep:'#42160E' },
+  sand:{ halo:'rgba(30,8,2,0.10)', shade:'rgba(46,16,6,0.50)', rim:'rgba(232,172,110,0.32)', lit:'rgba(255,220,170,0.28)', mid:'#7B3418', deep:'#4A1A08' },
+  snow:{ halo:'rgba(90,110,134,0.10)', shade:'rgba(90,110,134,0.30)', rim:'rgba(255,255,255,0.65)', lit:'rgba(255,255,255,0.55)', mid:'#D5DEE8', deep:'#D5DEE8' } }, RUN_GROOVE_CR=1.4, RUN_CRC={};
+function runCR(hex,body){ const k=hex+body; if(RUN_CRC[k]!=null) return RUN_CRC[k];
+  const lum=h=>{ const c=[1,3,5].map(i=>parseInt(h.substr(i,2),16)/255).map(v=>v<=0.03928? v/12.92 : Math.pow((v+0.055)/1.055,2.4)); return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; };
+  const a=lum(body), b=lum(hex), hi=Math.max(a,b), lo=Math.min(a,b); return RUN_CRC[k]=(hi+0.05)/(lo+0.05); }
+function runHides(hex,body){ return typeof hex==='string' && /^#[0-9a-fA-F]{6}$/.test(hex) && runCR(hex,body)<RUN_GROOVE_CR; }
+function runDeep(R){ if(R.deep===R.mid) return false; const b=R.mid;
+  if(runHides(dyeHex()||GREEN, b)) return true;
+  if(S.coop && COOP){ if(coopSquad()){ const m=COOP.seatHex||{}; for(const k in m){ if(runHides(m[k],b)) return true; } } else if(runHides(COOP.mateHex||GREEN, b)) return true; }
+  return false; }
+function runGroove(R){ const body=runDeep(R)? R.deep : R.mid, e=Math.max(2, 2/(scale*(S.zoom>0? S.zoom : 1)));
+  cx.globalAlpha=1;
+  cx.strokeStyle=R.halo; cx.lineWidth=92; pathStroke();                                                        // the pressed pile around the groove
+  cx.save(); cx.translate(-3,-4); cx.strokeStyle=R.shade; cx.lineWidth=84; pathStroke(); cx.restore();          // the NW wall in shadow
+  cx.save(); cx.translate(e/2,e/2); cx.strokeStyle=R.rim; cx.lineWidth=70+3*e; pathStroke(); cx.restore();    // the cream rims: e on the NW, e past the lit rim on the SE
+  cx.save(); cx.translate(e,e); cx.strokeStyle=R.lit; cx.lineWidth=70; pathStroke(); cx.restore();            // the lit SE inner rim (the e-px band at the body's SE edge — the body covers the rest)
+  cx.strokeStyle=body; cx.lineWidth=70; pathStroke(); }                                                        // the body, opaque — the composite IS the hex
+// THE RIVER + THE BRIDGE (CELL 6 — direction D, live in the served painters at BOTH twin sites, cheap): the water was a strip of blue tape and the bridge a barcode sticker in the tan army's own colour (1.25:1 — a tan column
+// crossing melted into it). Now: 3.5-px banks in the water's own dark, the east glint (the north-west light on the wet lip), a lighter core down the middle (the bed — under the ripples and the duck), the snow's slush lip +
+// rime outside each bank (snow ONLY — no wet halo on the crimson or the lawn, THE ENGINEER's law); every bank stroke cut where a mesa's foot crosses (never paint over a prop). The planks re-toned #563E24 with #3E2C18 gaps
+// (green 1.63 · tan 3.96 — both dyes clear 1.5), a 1-px top highlight each, the ends staggered 0/+4, a 5-px shadow band on the water south, a pale line north, the outline in the band's dark. Ponds take the bank ring + glint.
+function rvDark(col){ const n=parseInt(String(col).slice(1),16); if(!(n>=0)) return '#35597A'; const f=v=>Math.round(v*0.7); return 'rgb('+f((n>>16)&255)+','+f((n>>8)&255)+','+f(n&255)+')'; }   // the bank = the water at 70 % (#4E7FA8 → #375976; a juice river keeps its hue)
+function rvCore(col){ const n=parseInt(String(col).slice(1),16); if(!(n>=0)) return '#5A8BB4'; const f=v=>Math.round(v+(255-v)*0.12); return 'rgb('+f((n>>16)&255)+','+f((n>>8)&255)+','+f(n&255)+')'; }   // the core = the water lifted 12 %
+function rvSegs(x,y0,y1,w,skips,style){ cx.fillStyle=style; let y=y0; for(const c of skips){ if(c[1]<=y || c[0]>=y1) continue; if(c[0]>y) cx.fillRect(x,y,w,c[0]-y); y=Math.max(y,c[1]); } if(y<y1) cx.fillRect(x,y,w,y1-y); }   // a vertical strip cut where a mesa's foot crosses it
+function rvSkips(x0,x1){ const out=[]; for(const rk of ((S.cfg.terrain&&S.cfg.terrain.rocks)||[])){ if(rk.art!=='mesa') continue; const R=rk.r*1.15; if(rk.x+R>x0-10 && rk.x-R<x1+10) out.push([rk.y-rk.r*1.35, rk.y+rk.r*0.85]); } out.sort((a,b)=>a[0]-b[0]); return out; }
+function rvBanks(x0,x1,y0,y1,col,snow){ const skips=rvSkips(x0,x1), w=x1-x0;
+  if(snow){ cx.globalAlpha=0.55; rvSegs(x0-7,y0,y1,7,skips,'#B7C2D1'); rvSegs(x1,y0,y1,7,skips,'#B7C2D1'); cx.globalAlpha=1; rvSegs(x0-9,y0,y1,2,skips,'rgba(249,252,255,0.8)'); rvSegs(x1+7,y0,y1,2,skips,'rgba(249,252,255,0.8)'); }   // the slush lip + the rime, outside the water
+  cx.globalAlpha=0.4; rvSegs(x0+w/3,y0,y1,w/3,skips,rvCore(col)); cx.globalAlpha=1;   // the lighter core — the bed
+  const d=rvDark(col); rvSegs(x0,y0,y1,3.5,skips,d); rvSegs(x1-3.5,y0,y1,3.5,skips,d); }   // the banks
+function rvGlint(x1,y0,y1){ rvSegs(x1-6,y0,y1,1.5,rvSkips(x1-6,x1),'rgba(220,235,245,0.55)'); }   // the east glint, over the ripples
+function rvPlanks(x0,x1,top,bw){ const L=x0-10, R=x1+10;
+  cx.fillStyle='rgba(20,40,60,0.35)'; cx.fillRect(x0,top+bw,x1-x0,5);                                       // the planks' shadow on the water, south
+  cx.fillStyle='rgba(220,235,245,0.4)'; cx.fillRect(x0,top-1,x1-x0,1);                                      // a pale line north
+  cx.fillStyle='#3E2C18'; cx.fillRect(L,top,R-L,bw);                                                        // the gaps' dark
+  const yy=[]; for(let k=0;k<5;k++) yy.push(top+6+k*(bw-12)/4);
+  for(let k=0;k<6;k++){ const a=k===0? top : yy[k-1]+1.5, z=k===5? top+bw : yy[k]-1.5, px0=L-(k%2? 4 : 0), px1=R+(k%2? 0 : 4);
+    cx.fillStyle='#563E24'; cx.fillRect(px0,a,px1-px0,z-a); cx.fillStyle='rgba(214,174,114,0.75)'; cx.fillRect(px0,a,px1-px0,1); }   // six planks, a 1-px top highlight each, the ends staggered 0/+4 (never −4: a shortened plank would show the water's edge)
+  cx.strokeStyle=hexA(boxSeatDark(),0.6); cx.lineWidth=1.5; cx.strokeRect(L-2,top,R-L+4,bw); }             // the outline in the band's dark
+// THE SNOW HEAP (CELL 6 · c12): every campaign mound is a chain of one, so the ridge recipe never ran and each mound was a ping-pong ball. The single-mound branch becomes a squashed heap — the cap still at y−r, the sides at
+// x±r (the round hitbox untouched): the ground shadow SE, the contact slush at the foot, the heap, the lit inner heap up-left (no clip), the shade wedge lower-right, the rim at 0.35 all round and full on the shade side, two
+// spilled clods at r ≥ 6. Chains of two or more (the winter field's ridges) keep the served three-pass recipe byte for byte.
+function snowHeap(m){ const x=m.x, y=m.y, r=m.r, ry=r*0.6, PI=Math.PI;
+  const heap=(hx,hy,hr,hry)=>{ cx.beginPath(); cx.arc(hx,hy,hr,PI,0); cx.ellipse(hx,hy,hr,hry,0,0,PI); cx.closePath(); };
+  cx.fillStyle='rgba(60,74,92,0.22)'; cx.beginPath(); cx.ellipse(x+r*0.35,y+r*0.62,r*1.1,r*0.36,0,0,7); cx.fill();   // the ground shadow, SE
+  cx.fillStyle='#B4C8DE'; cx.beginPath(); cx.ellipse(x,y+ry,r*0.95,r*0.2,0,0,7); cx.fill();                           // the contact slush under the foot
+  cx.fillStyle='#D6DFEA'; heap(x,y,r,ry); cx.fill();                                                                  // the heap's mid tone
+  cx.fillStyle='#F9FCFF'; heap(x-r*0.08,y-r*0.06,r*0.9,ry*0.75); cx.fill();                                           // the lit cap, up-left — an inner heap
+  cx.fillStyle='rgba(60,74,92,0.16)'; cx.beginPath(); cx.ellipse(x+r*0.35,y+r*0.22,r*0.5,r*0.28,0,0,7); cx.fill();   // the shade wedge, lower right
+  cx.strokeStyle='#8C9AAD'; cx.lineWidth=2; cx.globalAlpha=0.35; heap(x,y,r,ry); cx.stroke(); cx.globalAlpha=1;      // the rim all round…
+  cx.beginPath(); cx.ellipse(x,y,r,ry,0,0,PI); cx.stroke(); cx.beginPath(); cx.arc(x,y,r,PI*1.82,PI*2); cx.stroke();  // …and full on the shade side
+  if(r>=6) for(const c of [[x+r*1.05,y+r*0.45],[x-r*0.98,y+r*0.55]]){ cx.fillStyle='#F9FCFF'; cx.beginPath(); cx.arc(c[0],c[1],r*0.16,0,7); cx.fill(); cx.strokeStyle='#8C9AAD'; cx.lineWidth=1.5; cx.stroke(); } }   // two spilled clods
 function drawFloor(){ cx.fillStyle=FLOOR_BOARD; cx.fillRect(0,0,VW,H); }   // screen space, the canvas's size — the clear
 function rugShadow(camv){
   const WD=S.bf? WORLD_W : W, HT=WORLD_H, z=zoomZ(), c=camv||{x:0,y:0}, F=RUG_FRAME_OUT, cy=c.y||0;
   const pad=8/z, vx=c.x-pad, vy=cy-pad, vw=VW/z+2*pad, vh=H/z+2*pad;   // the visible world rect, padded for the shake
+  if(!S.momRaid && vx>=-F && vy>=-F && vx+vw<=WD+F && vy+vh<=HT+F){ cx.beginPath(); cx.rect(-F,-F,WD+2*F,HT+F+Math.max(F,panS()+8)); cx.clip(); cx.beginPath(); return; }   // 0998 THE CAMPAIGN RUG I (direction C): the view lies inside the carpet + its frame stroke — every board stroke, the night wash and the four shadow gradients fall under the rug's own opaque fill + 56-px frame or outside the view, so only THE EDGE (the clip below, verbatim) is needed; pixel-identical (measured), the frame cost goes DOWN; the mom fight (no frame) keeps the served painter
   cx.save(); cx.beginPath(); cx.rect(vx,vy,vw,vh); cx.clip();
   cx.strokeStyle=FLOOR_LINE; cx.globalAlpha=0.6; cx.lineWidth=2.5; cx.beginPath();
   const y0=Math.floor(vy/75)*75, y1=vy+vh, x0=Math.floor(vx/460)*460-460, x1=vx+vw;
@@ -73232,7 +73344,7 @@ function draw(){
   rugShadow(camv);   // THE FLOOR BESIDE THE CARPET: the boards' grain + the rug's shadow in world space, then the clip to the carpet
   drawRug();
   if(S.bf){ drawBase('you'); drawBase('foe'); }
-  else { drawSprite('toybox',120,T.y+52,150,0,0); if(S.tanBase) drawTanBase(); if(S.raid) drawRaidPosts(); if(S.evHold) drawEvSpots(); }   // 0197: the box rides its own live latitude (T.y+52===352 on every flat rug) · 0484: the spotlight cones on the snow while the room holds
+  else { boxSeat(120,T.y+52); /* 0998 THE CAMPAIGN RUG I (PICK 12): the toy box's one cast shadow, the same seat as the crate's — a BLOCK comment: the served line carries on (the 0651 swallowed-tail trap) */ drawSprite('toybox',120,T.y+52,150,0,0); if(S.tanBase) drawTanBase(); if(S.raid) drawRaidPosts(); if(S.evHold) drawEvSpots(); }   // 0197: the box rides its own live latitude (T.y+52===352 on every flat rug) · 0484: the spotlight cones on the snow while the room holds
   if(S.vflag) drawVFlag();   // the victory flag flies at the crate layer (v1.47)
 
   // selection / drag rings — v2.45: the radioman's rng is 0, so his ring is
@@ -87848,7 +87960,7 @@ function tourFinish(){   // THE CLOSE's GOT IT: done for this save; the held lan
 }
 function showMenu(){
   awayForfeit();   // 0393: an unresolved away battle folded at the door = the L on the record (the day burned at the serve; ⚑ forfeit rule)
-  S.mode='menu'; PGFLOW=0; BF_AGAIN=0;   // 0625 THE CONTINUOUS CAMPAIGN: any room landing ends the flow (HEADQUARTERS, a party's door, a rig's showMenu) · 0629 BATTLEGROUNDS: PLAY AGAIN — and the lane
+  S.mode='menu'; PGFLOW=0; BF_AGAIN=0; rugRoom(false); /* 0998 THE CAMPAIGN RUG I: the room comes off at the hub — every exit path lands here */   // 0625 THE CONTINUOUS CAMPAIGN: any room landing ends the flow (HEADQUARTERS, a party's door, a rig's showMenu) · 0629 BATTLEGROUNDS: PLAY AGAIN — and the lane
   S.bf=null; S.pan=null; S.speed=1; S.slowmo=1; S.vflag=null; W=BASE_W; resize();   // ...nor a battlefield, nor the long front, nor a mid-rise flag: the room is 960 wide again
   S.coop=null;                      // the battle flag only — the party (COOP) rides on
   S.sq=null;                        // ...and the streaming ticker stops at the door
@@ -91759,7 +91871,7 @@ function startParkBattle(park, n){
   S.plastic=PARK_TAGS;
   if(S.park.hex) buildFoeTint(S.park.hex);
   hideAllOverlays();
-  S.mode='play';
+  S.mode='play'; rugRoom(true);   // 0998 THE CAMPAIGN RUG I (CELL 1): the bedroom floor behind the canvas — on at every battle door, off at showMenu
   telGo('park:'+park);   // 0624 D3
   locSync();   // 0432: the LAST line of a game-start door — themeKill() ran first, so a location can never start over the menu theme
 }
@@ -92733,7 +92845,7 @@ function startRaidBattle(tier,rk){
   S.raid.cfg=S.cfg;   // the identity stamp — raidTick serves THIS battle only (a stale S.raid on a rigged next battle goes inert instead of running turrets on a park)
   S.plastic=RAID_TAGS+(tier==='u'? EV_TAGS_ADD : 0)+eliteRaidTags();   // 0824-NIGHT · 0565: the event room opens EV_TAGS_ADD deeper (100 → 340); e/m/h/g stand at 240 · 0539: +ELITE_RAID_TAGS once elite 160 is on the ledger (the yeti bell's 'u' tier rides this same seat)
   hideAllOverlays();
-  S.mode='play';
+  S.mode='play'; rugRoom(true);   // 0998 THE CAMPAIGN RUG I (CELL 1): the bedroom floor behind the canvas — on at every battle door, off at showMenu
   telGo('raid:'+rk);   // 0624 D3
   locSync();   // 0432: the LAST line of a game-start door — themeKill() ran first, so a location can never start over the menu theme
 }
