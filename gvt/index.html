@@ -37583,7 +37583,8 @@ const UDEF = {
 // Retune a hero's grit / price / pace and the mat follows. The reach stays the campaign's (no rng
 // override — ⚑ the mat's own reach ladder is a ruling of its own). =====
 const HERO_BF_HP_X=0.6;   // ⚑ Q2 the mat HP dial on the grit-ratio row (1.0 = the campaign's grit as plastic; 0.3 = the card's "eight riflemen" for the yeti)
-for(const k of HEROES){ BF_MOVE[k]={ moveSpd:Math.round((CAMP_SPD[k]||26)*BF_PACE), hp:Math.round(UDEF[k].grit*HERO_BF_HP_X) }; HP_RANK100[k]=Math.round((UDEF[k].grit+HERO_GRIT_CAP)*HERO_BF_HP_X); BF_BOUNTY[k]=Math.ceil(COSTS[k]/2); }   // 0877 HEROES ON THE BATTLEGROUND: the five rows, derived (one line — the mold is the comment above)
+for(const k of HEROES){ BF_MOVE[k]={ moveSpd:Math.round((CAMP_SPD[k]||26)*BF_PACE), hp:Math.round(UDEF[k].grit*HERO_BF_HP_X) }; HP_RANK100[k]=Math.round((UDEF[k].grit+HERO_GRIT_CAP)*HERO_BF_HP_X); BF_BOUNTY[k]=Math.ceil(COSTS[k]/2); }
+for(const k of ['kbguard','kbcannon','kbcavalry']) BF_MOVE[k]={ moveSpd:Math.round((CAMP_SPD[k]||26)*BF_PACE), hp:Math.round(UDEF[k].grit*HERO_BF_HP_X) };   // 1001 THE COURT ON EVERY FIELD (⚑ CF-Q1): the court's three ALLY rows on the mat through the heroes' own mold — the guard 109 px/s · 7 hp, the cannon 31 · 9, the cavalry 41 · 14 (the reach stays the campaign's — the heroes' own ⚑); never a cost, never a bounty row (bfBounty's fallback — ⚑ CF-Q2), never in BF_TYPES (never placeable, never in the census, never in the tray) — the ALLY editions' law stands   // 0877 HEROES ON THE BATTLEGROUND: the five rows, derived (one line — the mold is the comment above)
 // 0554c THE JUMP-IN: SERGEANT COLD's purple-leap dials (0341), seated above the roster so his row names them verbatim (the
 // tick reads the row's `leap` bag — see foeLeapTick). Dials one line, unchanged numbers.
 const LEAP_CD_SGT=15, LEAP_FIRST=8, LEAP_WIND=0.6, LEAP_T=0.75, LEAP_H=110, LEAP_MIN_D=180;
@@ -45468,7 +45469,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.89';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.90';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -48124,6 +48125,7 @@ function evHoldTick(dt){
   for(let i=S.floats.length-1;i>=0;i--){ const fl=S.floats[i]; fl.t+=dt; fl.y-=22*dt; if(fl.t>1.1) S.floats.splice(i,1); }
   for(let i=S.fx.length-1;i>=0;i--){ const e=S.fx[i]; e.t+=dt; if(e.t>e.dur) S.fx.splice(i,1); }
   for(const u of S.units){ if(u.dropT>0) u.dropT=Math.max(0,u.dropT-dt); if(u.sprue>0) u.sprue=Math.max(0,u.sprue-dt); }
+  for(let i9=S.units.length-1;i9>=0;i9--){ const u9=S.units[i9]; if(u9.type==='kingbear' && !u9.dead && !u9.kbBorn) kbEmpBorn(u9); }   // 1001 THE COURT ON EVERY FIELD (⚑ C-Q1): in the hold the sim is frozen — the Emperor's court is born on the hold's own tick (every door lands here: mine, a relayed chair's — its token stamped before this tick — a computer's), spawns at his placement and STANDS; the bell frees it (kbEmpTick sees the latch)
   if(!COMM.brief) campCamTick(dt);
   evAfkTick();   // 0485 D13: the you-there tap rides the hold's own tick (T−EV_AFK_S the card; T0 untouched → a computer takes the seat)
 }
@@ -53565,7 +53567,7 @@ function roomAdoptSeat(seat, rows, n){
   // mid-drop men sit this beat out ON BOTH ENDS: the host skips them (their
   // 'place' word is still in flight) and the guest must too — a fresh relayed
   // man has no census row yet, and an unmatched man here is a dead man.
-  const mine=S.units.filter(u=>!u.dead && u.seat===seat && !(u.dropT>0));
+  const mine=S.units.filter(u=>!u.dead && u.seat===seat && !(u.dropT>0) && BF_TYPES.indexOf(u.type)>=0);   // 1001 THE COURT ON EVERY FIELD: only a man the census CAN list is ever judged absent — a courtier (never in BF_TYPES, never a row) spawns by the token on both screens and is never swept
   const spawn=[];
   for(const r of rows){
     if(!Array.isArray(r) || r.length<4) continue;
@@ -53618,6 +53620,7 @@ function roomPlaced(seat,type,x,y,para){
     if(vehKind(type) && vehEng(type)) cm.mo=(cm.mo||[]).concat('ve');   // 0100 THE ENGINE rides INSIDE mo (the 'sl' law); old builds drop it at their ENH filter
     { const pr=META.up[type]||0; if(pr>0 && (HP_RANK100[type]||PERK_MARKS[type]||HEROES.indexOf(type)>=0)) cm.mo=(cm.mo||[]).concat('mr'+pr); }   // 0877 HEROES ON THE BATTLEGROUND: a hero's rank rides the room word too (the campaign door's 0826 clause word for word — the far side fields my king at MY rank: bfHpRk + his milestones at the apply door)   // 0242 stripe token; v3.01: every rank-plastic class sends it from rank one — the cg idiom, an old client's ENH filter drops it (R6)
     if(META.laserOn) cm.mo=(cm.mo||[]).concat('lz:'+META.laserOn);   // v2.36: the laser token, same seat, same law — your men fight at YOUR tune
+    if(type==='kingbear'){ let u9=null; for(let i9=S.units.length-1;i9>=0;i9--){ const q9=S.units[i9]; if(q9.type==='kingbear' && q9.seat===seat && !q9.dead){ u9=q9; break; } } if(u9){ if(u9.kbLine==null) u9.kbLine=(Math.random()<0.5)? 1 : 0; cm.mo=(cm.mo||[]).concat(kbWireTok(),'el:'+u9.kbLine); } }   // 1001 THE COURT ON EVERY FIELD — THE WIRE: MY Emperor's ledger + his one line roll ride the room's placement word exactly as the campaign's (coopPlaceCmd's 'kb:' + 'el:' — after 'lz:', before the bench; the server passes mo opaque, ≤ 40 × 16; an old client's ENH filter drops both with zero errors) — the far seat's copy seats the SAME court on their screen (the twin-sim law); ZERO new wire words
     { const mo=enhWire(type); if(mo) cm.mo=(cm.mo||[]).concat(mo); }   // 0735 THE RIM: his own ids alone   // 0486: the bench ids LAST (the campaign door's own clamp law)
   } else if(type==='sarge'){
     // an AI seat's Sarge drew his weapon out of the crate once, on the referee's
@@ -53761,6 +53764,9 @@ function roomApply(cm){
   // 0242: the ally's hidden-stripe rank — raw read before the ENH filter
   { const mr=Array.isArray(cm.mo)? cm.mo.find(m=>/^mr\d{1,3}$/.test(String(m))) : null;
     if(mr) u.coopMR=Math.min(RANK_MAX,+String(mr).slice(2)||0); }
+  { const kt=(cm.t==='kingbear' && Array.isArray(cm.mo))? cm.mo.find(m=>typeof m==='string' && m.slice(0,3)==='kb:') : null;   // 1001 THE COURT ON EVERY FIELD — THE WIRE (the campaign door's 0910 REV 2 read, word for word): the owner's Emperor ledger — raw read before the ENH filter; absent on an old build's orders = yesterday's mirror (no court on my screen)
+    u.coopHM=kt? kbWireParse(kt) : null;
+    const el=(cm.t==='kingbear' && Array.isArray(cm.mo))? cm.mo.find(m=>m==='el:0'||m==='el:1') : null; if(el) u.kbLine=+el.slice(3); }   // 0941 THE PLAY LINE: the owner's roll → this copy speaks the same line at its own birth latch
   // v3.01 THE RANK'S PLASTIC lands here for an ally's man — the commando cg
   // door's own law (placed THIS tick, hp===hpMax). Guarded off my own seat:
   // my men collected theirs at placeUnit, and a door echo must never double.
@@ -55184,6 +55190,7 @@ function hurt(f,dmg,src,fire9){   // 0906 THE FLAME BLADE: fire9 = this beat is 
   if(fire9 && fbU(f)){ dmg*=FB_SOAK; fbTell(f); }   // 0906 THE FLAME BLADE — FIREPROOF on the hp funnel: a fitted Commander takes FB_SOAK of every FIRE beat (seven in ten shrugged), below every save above, above the intake scalars; a bullet, a shell, a bite, a mine land whole ("bullets still bite"); the tell rides RM
   dmg*=enhSoakM(f)*hatSoakM(f,src);   // 0556 THE ADVENTURER'S / THE FURRY HAT: half from their classes (deterministic, D14) · 0408 THE INTAKE SCALAR: the BF hp funnel — the medic's plate pays half, the AMBUSH spy pays ×1.1; bullets, shells, mines, bites, fire beats and every dino kit machine land through THIS door
   if(HV_RD && !TK_REFL && dmg<hvD0) dmg=hvD0-(hvD0-dmg)*(1-ULT_PI_PEN);   // 0605 HEAVY SHOTS: "penetrate any armor by 90%" — every reduction the funnel took (the bags, a canopy, the wall's soak, a matchup resist) keeps only a TENTH of its bite on his rounds; a thrown-back round (TK_REFL) pays armour in full, and a boost is never touched (dmg<hvD0 gates)
+  if(S.bf && f.side && f.kbMount){ kbSaddleHit(f,src,f.x,f.y,dmg); return; }   // 1001 THE COURT ON EVERY FIELD: THE SADDLE on the mat — a mounted Emperor's rounds drain the saddle first (tanHit's own campaign seat, hp-funnel edition: the mat's dmg is the pip); empty → the unhorse; nothing lands on his bar
   f.hp-=dmg;
   if(f.type==='kingyeti') f.kyHitAt=S.t;   // 0435: the boss flinch stamp — presentation only, nothing in the sim reads it
   if(f.def&&(f.def.croak||f.def.harp)) f.crHitAt=S.t;   // 0947e: the princess flinches too (a live charge outranks it in the draw)   // 0436: the croak kings flinch too — BOTH via def.croak (presentation only, nothing in the sim reads it)
@@ -61102,7 +61109,7 @@ function kbHeroFace(u,dx){   // THE CLEAN WALK (cell F): the face follows the HU
 function kbHeroTick(u,dt){   // true = the brain owns his feet and hands this frame (the units loop `continue`s past the march and the fire loop); false = the eye is empty — the stock march (campUnitStep at CAMP_SPD.kingbear: the lane, the crate) with the tracer retired behind it
   if(u.falling || u.shv || u.jetT>0 || u.duckT>0 || u.dropT>0 || u.cloakT>0 || (S.drag && S.drag.unit===u)){ u.kbWind=null; u.kbDash=null; u.kbWalkTo=null; return false; }   // down, thrown, airborne, landing, vanished, held in the hand: no hunt this frame (the boss's own exemptions, unit-side)
   if(u.kbDashCd==null) u.kbDashCd=(u.type==='kbguard' && KB_ROY_STAG>0)? kbRnd(u)*KB_ROY_STAG : 1.0;   // 0910 REV 2: a guard's first clock rolled 0..KB_ROY_STAG on his own die (a file never dashes as one) · the first clock: a beat after the drop (the boss's 2.5 at the keel)
-  if(u.kbMount && !S.bf){ kbSteedTick(u,dt); u.marching=false; return true; }   // 0909 THE STEED (§4): while he rides the ride owns his feet and hands (no sabre from the saddle — ⚑ Q17)
+  if(u.kbMount){ kbSteedTick(u,dt); u.marching=false; return true; }   // 0909 THE STEED (§4): while he rides the ride owns his feet and hands (no sabre from the saddle — ⚑ Q17)   // 1001 THE COURT ON EVERY FIELD: the steed rides the mat too (the `!S.bf` retired; the saddle soaks at hurt's own funnel there)
   if(u.kbWind){ kbWindTick(u,dt); if(u.kbWind) kbHeroFace(u,u.kbWind.u.x-u.x); u.marching=false; return true; }   // THE WIND-UP owns the frame (the boss's own; the flight at its end)
   if(u.kbDash){ const L=u.kbDash; if(L.left>0) kbDashStep(u,dt); kbDashTick(u,dt); kbHeroFace(u,L.hx); u.marching=false; return true; }   // THE FLIGHT, then the three cuts where he lands (the boss's own)
   u.kbDashCd-=dt;
@@ -61117,16 +61124,17 @@ function kbHeroTick(u,dt){   // true = the brain owns his feet and hands this fr
 // kbUnhorseHero → today's foot brain), THE IRON SADDLE at 100 (20 pips + the hooves kill tan men). Zero save, zero wire; THE MAT STAYS HOME. =====
 const KB_STEED_P={ ride:KB_RIDE_SPD, charge:KB_CHARGE_SPD, turn:KB_TURN, prance:KB_PRANCE, hue:KB_HERO_HUE, trot:KB_STEED_TROT, R:70, horn:1 };   // the king's ride numbers verbatim (§4.4)
 function kbCavP(){ return { ride:DK_RIDE_SPD, charge:DK_CHARGE_SPD, turn:DK_TURN, prance:DK_PRANCE, hue:KB_HERO_HUE, trot:KB_CAV_TROT, R:60, horn:0, eye:0 }; }   // the Duke's numbers for the horseman (a getter — the DK_ consts are declared below this block; a top-level read would be a TDZ error at load)
-function kbAllyFoes(){ const out=[]; for(const f of S.foes){ if(f.dead||f.burrow||f.pendDie||(f.hp!=null&&f.hp<=0)||f.jetT>0||f.falling||f.x>W-10||f.x<-40) continue; out.push(f); } return out; }   // the tan men still worth riding at (kbMen's filters, foe-side)
-function kbAllyNear(u,R){ let b=null,bd=(R>0? R : 1e9)+1e-6; for(const f of kbAllyFoes()){ const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){ bd=d; b=f; } } return b; }
-function kbAllyCluster(u){ const men=kbAllyFoes(); let best=null,bn=-1,bd=1e9; for(const f of men){ let n=0; for(const o of men){ if(Math.hypot(o.x-f.x,o.y-f.y)<90) n++; } const d=Math.hypot(f.x-u.x,f.y-u.y); if(n>bn||(n===bn&&d<bd)){ bn=n; bd=d; best=f; } } return best; }   // kbCluster, foe-side
+function kbAllyFoes(u){ if(S.bf && u) return bfEnemies(u.side).filter(f=>kbHeroOk(u,f)); const out=[]; for(const f of S.foes){ if(f.dead||f.burrow||f.pendDie||(f.hp!=null&&f.hp<=0)||f.jetT>0||f.falling||f.x>W-10||f.x<-40) continue; out.push(f); } return out; }   // the tan men still worth riding at (kbMen's filters, foe-side)   // 1001 THE COURT ON EVERY FIELD: on the mat the marks are the ENEMY SIDE (bfEnemies) through the hero's own validity (kbHeroOk — the carpet's rim, bfCanTarget: the trench, the fog, a cloak); the campaign's list byte-what-it-was
+function kbAllyBand(x,y){ return S.bf? { x:Math.max(80,Math.min(WORLD_W-80,x)), y:Math.max(84,Math.min(WORLD_H-104,y)) } : kbBand(x,y); }   // 1001 THE COURT ON EVERY FIELD: the ally brains' band — on the mat the carpet's own span (bfUnitStep's lane clamp), on the campaign the boss's kbBand byte-what-it-was
+function kbAllyNear(u,R){ let b=null,bd=(R>0? R : 1e9)+1e-6; for(const f of kbAllyFoes(u)){ const d=Math.hypot(f.x-u.x,f.y-u.y); if(d<bd){ bd=d; b=f; } } return b; }
+function kbAllyCluster(u){ const men=kbAllyFoes(u); let best=null,bn=-1,bd=1e9; for(const f of men){ let n=0; for(const o of men){ if(Math.hypot(o.x-f.x,o.y-f.y)<90) n++; } const d=Math.hypot(f.x-u.x,f.y-u.y); if(n>bn||(n===bn&&d<bd)){ bn=n; bd=d; best=f; } } return best; }   // kbCluster, foe-side
 function kbAllyRideStart(u,P){ u.kbRide={ leg:0, next:2+Math.floor(kbRnd(u)*2), way:null, rest:0.4, mv:0, h:0, tram:{}, pr:0, trail:0, legT:0 }; S.fx.push({k:'ring',x:u.x,y:u.y-20,r:10,R:P.R,t:0,dur:0.5,col:P.hue}); if(P.horn) SFX.horn(); tdLog(u,'ride'); }
 function kbAllyPickWay(u,R,P){   // kbPickWay side-flipped: every 2nd–3rd leg THE CHARGE (through the nearest cluster and 120 px past it), else a plain leg to a horse-length short of the nearest man in the eye; nobody in the eye → null (the trot)
   const ch=(R.leg+1)>=R.next, eye=P.eye>0? P.eye : 0; let f=ch? (kbAllyCluster(u)||kbAllyNear(u,eye)) : kbAllyNear(u,eye);
   if(f && eye>0 && Math.hypot(f.x-u.x,f.y-u.y)>eye) f=null;
   if(!f){ R.way=null; return null; }   // nobody in the eye: no leg counted (the trot)
   R.leg++; R.legT=0;
-  const dx=f.x-u.x, dy=f.y-u.y, d=Math.hypot(dx,dy)||1, p=ch? kbBand(f.x+dx/d*120, f.y+dy/d*120) : kbBand(f.x-dx/d*Math.min(KB_HUNT_STOP,d*0.9), f.y-dy/d*Math.min(KB_HUNT_STOP,d*0.9));
+  const dx=f.x-u.x, dy=f.y-u.y, d=Math.hypot(dx,dy)||1, p=ch? kbAllyBand(f.x+dx/d*120, f.y+dy/d*120) : kbAllyBand(f.x-dx/d*Math.min(KB_HUNT_STOP,d*0.9), f.y-dy/d*Math.min(KB_HUNT_STOP,d*0.9));
   R.way={x:p.x,y:p.y,charge:ch? 1 : 0,u:f};
   if(ch){ R.next=R.leg+2+Math.floor(kbRnd(u)*2); R.pr=P.prance||0; S.fx.push({k:'ring',x:u.x,y:u.y-20,r:8,R:54,t:0,dur:0.4,col:P.hue}); bfSfx(SFX.thock,u.x,u.y); S.fx.push({k:'ring',x:f.x,y:f.y-10,r:8,R:60,t:0,dur:0.5,lw:4,col:KB_HUE_QUARRY}); if(P.prance) dkPranceFx(u); tdLog(u,'charge',[Math.round(p.x),Math.round(p.y)]); }
   else tdLog(u,'wheel',[Math.round(p.x),Math.round(p.y)]);
@@ -61138,24 +61146,24 @@ function kbAllyRideStep(u,dt,P){   // kbRideStep side-flipped: the prance, the r
   if(R.rest>0){ R.rest-=dt; R.mv=0; kbAllyTrample(u,P); return; }
   if(!R.way){ if(!kbAllyPickWay(u,R,P)){ kbAllyTrot(u,dt,P); return; } if(R.pr>0){ R.mv=0; return; } }
   const w=R.way;
-  if(w.u){ const f=w.u; if(!kbHeroOk(u,f) || Math.hypot(f.x-u.x,f.y-u.y)<=KB_TRACK_STOP) w.u=null; else { const cx9=f.x-u.x, cy9=f.y-u.y, cd9=Math.hypot(cx9,cy9)||1, p9=w.charge? kbBand(f.x+cx9/cd9*120, f.y+cy9/cd9*120) : kbBand(f.x-cx9/cd9*Math.min(KB_HUNT_STOP,cd9*0.9), f.y-cy9/cd9*Math.min(KB_HUNT_STOP,cd9*0.9)); w.x=p9.x; w.y=p9.y; } }   // the leg re-aims at the man's LIVE position until KB_TRACK_STOP (the boss's own)
+  if(w.u){ const f=w.u; if(!kbHeroOk(u,f) || Math.hypot(f.x-u.x,f.y-u.y)<=KB_TRACK_STOP) w.u=null; else { const cx9=f.x-u.x, cy9=f.y-u.y, cd9=Math.hypot(cx9,cy9)||1, p9=w.charge? kbAllyBand(f.x+cx9/cd9*120, f.y+cy9/cd9*120) : kbAllyBand(f.x-cx9/cd9*Math.min(KB_HUNT_STOP,cd9*0.9), f.y-cy9/cd9*Math.min(KB_HUNT_STOP,cd9*0.9)); w.x=p9.x; w.y=p9.y; } }   // the leg re-aims at the man's LIVE position until KB_TRACK_STOP (the boss's own)
   const g9=kbRvGoal(u.x,u.y,w.x,w.y), dx=g9.x-u.x, dy=g9.y-u.y, d=Math.hypot(w.x-u.x,w.y-u.y); R.legT=(R.legT||0)+dt;
   if(d<=KB_ARRIVE || R.legT>6){ R.rest=w.charge? KB_REST : KB_WHEEL; R.way=null; R.mv=0; if(w.charge) S.fx.push({k:'puff',x:u.x,y:u.y+4,t:0,dur:0.35,R:14}); tdLog(u,w.charge? 'rest' : 'turn'); return; }
   const want=Math.atan2(dy,dx); if(R.h==null) R.h=want;
   let rel=want-R.h; rel=Math.atan2(Math.sin(rel),Math.cos(rel)); const mx=P.turn*dt; R.h+=Math.max(-mx,Math.min(mx,rel));
-  const sp=w.charge? P.charge : P.ride; let hx=Math.cos(R.h), hy=Math.sin(R.h);
+  const sp=(w.charge? P.charge : P.ride)*(S.bf? bfGround(u) : 1); let hx=Math.cos(R.h), hy=Math.sin(R.h);   // 1001 THE COURT ON EVERY FIELD: on the mat the ride wears the ground like every marcher (bfGround — the drifts, the ponds, the ice); the campaign's pace byte-what-it-was
   const st=rockSteer(u.x,u.y,u.x+hx*90,u.y+hy*90,ROCK_PAD_FOE); if(st){ hx=st.x; hy=st.y; R.h=Math.atan2(hy,hx); }
   const nx=u.x+hx*sp*dt, ny=u.y+hy*sp*dt;
   if(voidAt(nx,ny)){ R.way=null; R.rest=0.3; R.mv=0; return; }
-  const p=kbBand(nx,ny); u.x=p.x; u.y=p.y; R.mv=1; kbAllyFace(u,hx);
+  const p=kbAllyBand(nx,ny); u.x=p.x; u.y=p.y; R.mv=1; kbAllyFace(u,hx);
   R.trail=(R.trail||0)+sp*dt; if(R.trail>26){ R.trail=0; S.fx.push({k:'puff',x:u.x-hx*22,y:u.y+4,t:0,dur:0.3,R:8}); }   // heel dust on a fixed stride (no dice)
   kbAllyTrample(u,P);
 }
-function kbAllyTrot(u,dt,P){ const R=u.kbRide; if(!(P.trot>0)){ R.mv=0; return; } const p=kbBand(Math.min(W-80,u.x+P.trot*dt),u.y); R.h=0; if(voidAt(p.x,p.y) || p.x<=u.x){ R.mv=0; return; } u.x=p.x; u.y=p.y; R.mv=1; kbAllyFace(u,1); kbAllyTrample(u,P); }   // ⚑ Q15 nobody in the eye: the trot east along the lane at half the gallop
+function kbAllyTrot(u,dt,P){ const R=u.kbRide; if(!(P.trot>0)){ R.mv=0; return; } const dr=(S.bf && u.side==='foe')? -1 : 1, tr9=P.trot*dt*(S.bf? bfGround(u) : 1), p=kbAllyBand((dr>0)? Math.min((S.bf? WORLD_W : W)-80,u.x+tr9) : Math.max(80,u.x-tr9),u.y); R.h=(dr>0)? 0 : Math.PI; if(voidAt(p.x,p.y) || ((dr>0)? p.x<=u.x : p.x>=u.x)){ R.mv=0; return; } u.x=p.x; u.y=p.y; R.mv=1; kbAllyFace(u,dr); kbAllyTrample(u,P); }   // 1001 THE COURT ON EVERY FIELD: on the mat the trot heads for the ENEMY base (a foe-side horseman trots west, faces west); the campaign's east trot byte-what-it-was   // ⚑ Q15 nobody in the eye: the trot east along the lane at half the gallop
 function kbAllyFace(u,dx){ const want=(dx>=0)? 1 : -1; if(u.faceX!==want){ u.faceX=want; u.kbFaceAt=S.t; } u.faceAt=S.t; u.faceTo=S.t+AIM_HOLD; }
 function kbAllyTrample(u,P){   // kbTrample side-flipped (§4.5): the tan men inside KB_RAM_R take a pip + the shove (once per man per KB_TRAM_CD); kings/bosses only shoved; THE IRON SADDLE's hooves (P.iron, a MOVING frame) fell a tan man that frame
   const R=u.kbRide; if(!R) return; const mv=!!(R.mv|0), iron=!!(P.iron && mv);
-  for(const f of S.foes.slice()){
+  for(const f of (S.bf? kbAllyFoes(u) : S.foes.slice())){   // 1001 THE COURT ON EVERY FIELD: on the mat the hooves find the enemy side (kbAllyFoes); the campaign's list byte-what-it-was
     if(f.dead||f.burrow||f.pendDie||(f.hp!=null&&f.hp<=0)||f.jetT>0||f.falling) continue;
     if(Math.hypot(f.x-u.x,f.y-u.y)>KB_RAM_R) continue;
     if(R.tram[f.id]!=null && S.t-R.tram[f.id]<KB_TRAM_CD) continue;
@@ -61179,21 +61187,21 @@ function kbCourtIn(u){   // ONE DOOR at his spawn (§3.2): the guard's file (a b
   const tk=kbTkOf(u); let n=0;   // 0910 REV 2: the list by ownership — a relayed Emperor's court spawns beside his copy on THIS screen too (the token; the ally sees the royalist troops)
   if(tk.indexOf('guard')>=0 || tk.indexOf('guard2')>=0){ const nG=(tk.indexOf('guard2')>=0)? KB_ROY_BAT_ALLY : KB_ROY_FILE_ALLY; for(let i=0;i<nG;i++){ if(kbCourtSpawn('kbguard',u,36*(i+1),((i%2)? 1 : -1)*10*((i>>1)+1),KB_ALLY_SLEEVE)) n++; } }
   if(tk.indexOf('battery')>=0){ for(let i=0;i<KB_BAT_N_ALLY;i++){ if(kbCourtSpawn('kbcannon',u,60,(i? 1 : -1)*44,'#ffffff')) n++; } }
-  { if(u.kbLine==null) u.kbLine=(Math.random()<0.5)? 1 : 0; commSayAs(bearSpeaker(), u.kbLine? 'TOGETHER WE MARCH!' : 'EN GARDE!', {rank:3,hz:KB_HZ}); }   // 0941 THE PLAY LINE (Wyatt 9/10: "he should either say 'En garde' or 'Together we march!' 50/50"): the same door, the same card, the same hold; the court line retired from the play quip (its rows stay)   // 0910 REV 2: a mirror's king keeps quiet (Croak's law)
+  if(!S.bf || heroMine(u) || u.coopHM){ if(u.kbLine==null) u.kbLine=(Math.random()<0.5)? 1 : 0; commSayAs(bearSpeaker(), u.kbLine? 'TOGETHER WE MARCH!' : 'EN GARDE!', {rank:3,hz:KB_HZ}); }   // 1001 THE COURT ON EVERY FIELD (⚑ CF-Q4): on the mat a HUMAN's copy alone speaks — mine, or a relayed chair whose 'kb:' token rode; a computer's / a mirror captain's Emperor keeps quiet (Croak's law); the campaign path byte-what-it-was   // 0941 THE PLAY LINE (Wyatt 9/10: "he should either say 'En garde' or 'Together we march!' 50/50"): the same door, the same card, the same hold; the court line retired from the play quip (its rows stay)   // 0910 REV 2: a mirror's king keeps quiet (Croak's law)
   return n;
 }
 function kbCourtPace(u){ for(const c of S.units){ if(c.type!=='kbguard' || c.dead || c.kbOf!==u.id) continue; const near=Math.hypot(c.x-u.x,c.y-u.y)<=KB_COURT_HOLD; c.gait=(c.kbGait0||1)*(near? (CAMP_SPD.kingbear||44)/(CAMP_SPD.kbguard||64) : 1); } }   // ⚑ Q12 THE GUARD'S PACE: inside KB_COURT_HOLD of him they hold to his 44 (a gait on their own cell), beyond it the Bluecoats' 64
-function kbEmpTick(u,dt){   // alive is the only condition (the radio clock's shelf): the court at his first tick, THE CAVALRY at his fifth kill (once per battle — the latch on the figure), the steed's latch; THE MAT STAYS HOME (⚑ Q6 — Croak's law, ckUnitTick's own line)
+function kbEmpBorn(u){ if(!u || u.dead || u.type!=='kingbear' || u.kbBorn) return 0; u.kbBorn=1; kbCourtIn(u); if(kbSteedOn(u)) kbSteedStart(u); return 1; }   // 1001 THE COURT ON EVERY FIELD: THE BIRTH — the latch on the figure; kbEmpTick's first tick on either carpet, or the hold's own tick on the desert (evHoldTick — the sim is frozen, the court spawns at his placement and stands; ⚑ C-Q1)
+function kbEmpTick(u,dt){   // alive is the only condition (the radio clock's shelf): the court at his first tick, THE CAVALRY at his fifth kill (once per battle — the latch on the figure), the steed's latch   // 1001 THE COURT ON EVERY FIELD (Wyatt 9/14: "I'm not seeing the summons that Emperor Bear gets when he fights, like the Royal Guard, even the cavalry, the cannons. He needs to work like normal in battlefields."): the mat's `if(S.bf) return;` — the 0909 design's ⚑ Q6 "the court stays home" — RETIRED on his word: the 1v1, the 2v2, the desert and the room's defense (the daily raid IS a CPU battleground) deal the same court as the campaign; ckSpawn already knew the mat (the side, the seat, the west-facing offsets for a foe-side king, no drop ghost); a computer's / a mirror captain's Emperor has no token → kbTkOf [] → no court (⚑ C-Q2); Croak's family keeps ckUnitTick's own mat line (not this card)
   if(!u || u.dead || u.type!=='kingbear') return;
-  if(S.bf) return;
-  if(!u.kbBorn){ u.kbBorn=1; kbCourtIn(u); if(kbSteedOn(u)) kbSteedStart(u); }
+  kbEmpBorn(u);
   if(!u.kbCav && (u.kills|0)>=KB_CAV_KILLS && kbHas(u,'cavalry')){ u.kbCav=1; if(kbCourtSpawn('kbcavalry',u,-70,30,KB_HERO_HUE)){ SFX.horn(); if(heroMine(u)) commSayAs(bearSpeaker(),'THE CAVALRY IS HERE!',{rank:3,hz:KB_HZ}); } }   // REV 1 ⚑ R1
   kbCourtPace(u);
 }
 function kbSteedStart(u){ u.kbMount=1; u.kbSaddle=kbSaddleHP(u); u.kbWind=null; u.kbDash=null; kbAllyRideStart(u,KB_STEED_P); tdLog(u,'saddle',u.kbSaddle); }   // §4.1 THE SPAWN: placed MOUNTED — the saddle refills every battle
 function kbSteedTick(u,dt){ kbAllyRideStep(u,dt,Object.assign({},KB_STEED_P,{ eye:kbDashROf(u), iron:kbIronOn(u) })); }   // the eye while mounted = the dash window (330, +84 with THE LONG DASH)
-function kbSaddleHit(u,src,fx,fy){   // §4.2 THE SADDLE: every pip that would land on him drains the saddle first; empty → the unhorse (his own bar untouched — "soaking 10hp before being demounted")
-  const pip=(src && src.pipN)? src.pipN*(src.dmgX||1) : 1; u.kbSaddle=(u.kbSaddle||0)-pip; u.hitT=0;
+function kbSaddleHit(u,src,fx,fy,pip9){   // §4.2 THE SADDLE: every pip that would land on him drains the saddle first; empty → the unhorse (his own bar untouched — "soaking 10hp before being demounted")   // 1001: pip9 = the mat's dmg through hurt's funnel (absent = the campaign's pip read)
+  const pip=(pip9!=null)? pip9 : ((src && src.pipN)? src.pipN*(src.dmgX||1) : 1); u.kbSaddle=(u.kbSaddle||0)-pip; u.hitT=0;
   S.fx.push({k:'ring',x:u.x,y:u.y-30,r:5,R:30,t:0,dur:0.25,col:KB_HERO_HUE}); S.fx.push({k:'tracer',x1:fx+14*((src && src.faceX!=null)? foeFaceX(src) : -1),y1:fy-26,x2:u.x,y2:u.y-30,t:0,dur:0.1,col:'#EDD9A8'}); bfSfx(SFX.thock,u.x,u.y);
   if(u.kbSaddle<=0) kbUnhorseHero(u);
 }
@@ -69335,7 +69343,8 @@ function update(dt){
     // Wyatt's complaint). Foe-side kingKitTick stays the boss's, byte-still.
     if(u.type==='kingyeti') kingUnitTick(u,dt);
     if(u.type==='kingrex' && RXH_ON && rexUnitTick(u,dt)) continue;   // 0877 HEROES ON THE BATTLEGROUND: the hop runs on the mat too (the `!S.bf` gate out — TGT + bfCanTarget already answer the mat; the rim and the landing clamp read the carpet's own width) · 0706 KING REX HOPS: the hero's leap beside the yeti's kit (the same shelf — below every standing shelf, above the step functions); the tell + the flight own the frame (the jet's law: no march, no gun, HITTABLE); on the battleground too since 0877
-    if(S.bf && u.type==='kingbear' && KBH_ON && !(u.haltT>0) && kbHeroTick(u,dt)) continue;   // 0877 HEROES ON THE BATTLEGROUND: THE EMPEROR'S BRAIN ON THE MAT — above bfUnitStep (the rex hook's own seat) so the hunt pre-empts the lane march the moment a man stands in his eye (kbHeroU / TGT / bfCanTarget already answer the mat; the flight's clamp and the eye's rim read the carpet); the eye empty = bfUnitStep's march and halt below; a bowl-over's halt (haltT) holds him like everyone; the campaign hook keeps its seat below, byte-still
+    if(S.bf && u.def.rider && !(u.haltT>0) && kbAllyBrain(u,dt)) continue;   // 1001 THE COURT ON EVERY FIELD: THE CAVALRY's ride on the mat — above bfUnitStep like the Emperor's own brain (the ride owns his feet and hands: the marks = the enemy side through kbAllyFoes, the band = the carpet's own through kbAllyBand, the trot = toward the enemy base); the Rattler (bur) stays home — Croak's family is not this card; the campaign's own door keeps its seat below, byte-still
+    if(S.bf && (u.type==='kingbear' || (u.type==='kbguard' && kbHeroU(u))) && KBH_ON && !(u.haltT>0) && kbHeroTick(u,dt)) continue;   // 1001 THE COURT ON EVERY FIELD: + THE ROYAL GUARD on the mat (the Emperor's door, the Emperor's machine — his eye 330 = the Bluecoat's window; the eye empty = bfUnitStep's march below; the fire loop's kbHeroU continue retires his musket on both carpets already)   // 0877 HEROES ON THE BATTLEGROUND: THE EMPEROR'S BRAIN ON THE MAT — above bfUnitStep (the rex hook's own seat) so the hunt pre-empts the lane march the moment a man stands in his eye (kbHeroU / TGT / bfCanTarget already answer the mat; the flight's clamp and the eye's rim read the carpet); the eye empty = bfUnitStep's march and halt below; a bowl-over's halt (haltT) holds him like everyone; the campaign hook keeps its seat below, byte-still
     // BATTLEFIELD pre-step: drop-in gate, march, halt, setup wind-up, free leak.
     // Falls THROUGH into the untouched weapon code when he's dug in with a target.
     if(S.bf && !bfUnitStep(u,dt)) continue;
