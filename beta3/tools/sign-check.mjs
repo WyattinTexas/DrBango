@@ -2,9 +2,12 @@
 // since v0.79.0: the frame/headline/subtitle/pager are gone, the card
 // takes the whole design box with the plate cover-filling it, and the
 // ‹ › arrows + ✕ ride ON the card over the swipe zone — topOnly law;
-// LIVING SKY since v0.84.0: the unsigned card's wash carries a seeded
-// twinkle field + occasional card-local shooting star — sprites only,
-// the Graphics census stays pinned, sign cards stay dead still, and
+// LIVING SKY since v0.84.0, re-dialed v0.98.0: the unsigned card stands
+// on its OWN painted plate (zod_none, ground born unlit; zodsky = the
+// not-loaded fallback) carrying a seeded twinkle field (44 dots + 6
+// heroes, confined to the sky band) + card-local shooting stars whose
+// flights are CLAMPED above the painted ridge — sprites only, the
+// Graphics census stays pinned, sign cards stay dead still, and
 // ?twinkle=0 / reduced motion freeze the layer).
 // One full-size card at a time (THE OPEN SKY first, then the twelve), a
 // real swipe on the card with a settle tween and wrap at both ends,
@@ -152,7 +155,7 @@ const boot = async (dv, inset, extra) => {
   // a history under LEO, a clean campaign, a fake TAURUS plate (the seam's
   // exists() precedence), and — since v0.58.0 ships real art for all 12 —
   // ARIES's plate BLOCKED once it lands, so the asterism fallback still walks
-  await until(`typeof SSART !== 'undefined' && !!SSART.img.zod_aries`, 20000);
+  await until(`typeof SSART !== 'undefined' && !!SSART.img.zod_aries && !!SSART.img.zod_none`, 20000);
   await ev(`(() => { ssClearCampaign(); SS.prof.signs = SS.prof.signs || {}; SS.prof.signs.leo = { best: 1234, clears: 2, runs: 3 };
     delete SS.prof.lastSign; delete SS.prof.lastSignEnd; SS.save();   // v0.95.0: each boot deals a memory-less deck (the MEMORY section writes its own)
     const s = ${H}; if (!s.textures.exists('zod_taurus')) { const t = s.textures.createCanvas('zod_taurus', 40, 60); t.context.fillStyle = '#ff00aa'; t.context.fillRect(0, 0, 40, 60); t.refresh(); }
@@ -277,42 +280,86 @@ console.log('\n━━ THE LIVING SKY (v0.84.0) — the unsigned card breathes; s
 ok('the sheet opens on THE OPEN SKY (living-sky walk)', await open() && (await peek()).id === 'none');
 const SKY = `JSON.stringify(window.__ssopensky)`;
 let sky = await evj(SKY);
-ok('the layer beacon stands: 25 seeded sprites, live (not stilled), the manual door open', sky.stars === 25 && sky.still === false && sky.builds >= 1 && await ev(`typeof window.__ssopensky.poke === 'function'`), JSON.stringify(sky));
+ok('the layer beacon stands: 50 seeded sprites, live (not stilled), the manual door open', sky.stars === 50 && sky.still === false && sky.builds >= 1 && await ev(`typeof window.__ssopensky.poke === 'function'`), JSON.stringify(sky));
 // ⚠ under ?rend=cv the tint shim (ssCanvasTintShim) swaps a tinted image's
 // texture to a cached '<base>#<hex>' copy and stamps __ssBaseTex — read the
 // BASE key, or every tinted star is invisible to a raw key match
 const BK = `const bk = (o) => o.__ssBaseTex || (o.texture && o.texture.key);`;
 const COUNT = `(() => { ${BK} const k = ${H}.signPeek().card; let dots = 0, sparks = 0; const w = (ls) => ls.forEach(o => { if (o.list) w(o.list); if (bk(o) === 'dot') dots++; if (bk(o) === 'spark4') sparks++; }); w(k.list); return { dots, sparks, gfx: k.list.filter(o => o.type === 'Graphics').length } })()`;
 let cnt = await evj(`JSON.stringify(${COUNT})`);
-ok('the field hangs on the card — 22 dots + 3 hero sparks, Graphics census still 3', cnt.dots >= 22 && cnt.dots <= 30 && cnt.sparks === 3 && cnt.gfx === 3, JSON.stringify(cnt));
+ok('the field hangs on the card — 44 dots + 6 hero sparks, Graphics census still 3', cnt.dots >= 44 && cnt.dots <= 52 && cnt.sparks === 6 && cnt.gfx === 3, JSON.stringify(cnt));
+// v0.98.0: the unsigned card stands on its OWN painted plate now — loaded
+// exactly the way the twelve load theirs — and the shared wash is retired
+// to the not-loaded fallback (walked below)
+ok('the open-sky card takes its own zod_none plate (the seam) and skips the shared wash', await ev(`(() => { const k = ${H}.signPeek().card; return k.list.some(o => o.texture && o.texture.key === 'zod_none') && !k.list.some(o => o.texture && o.texture.key === 'zodsky') })()`));
 const order = await evj(`JSON.stringify((() => { const k = ${H}.signPeek().card;
-  const pi = k.list.findIndex(o => o.texture && o.texture.key === 'zodsky');
+  const pi = k.list.findIndex(o => o.texture && o.texture.key === 'zod_none');
   const li = k.list.findIndex(o => o.list && o.list.some(ch => ch.texture && ch.texture.key === 'spark4'));
   const si = k.list.findIndex(o => o.texture && o.texture.key === 'zodscrim');
   return { pi, li, si } })())`);
-ok('the layer rides between the wash plate and the reading scrims', order.pi >= 0 && order.li === order.pi + 1 && order.si > order.li, JSON.stringify(order));
-// the breathing: deal a baseline of the field's 25 alphas, then poll until
+ok('the layer rides between the painted plate and the reading scrims', order.pi >= 0 && order.li === order.pi + 1 && order.si > order.li, JSON.stringify(order));
+// the 9/15 SKY-BAND law: the plate's unlit ridge starts ≈59.7% down the
+// card — the field deals clear of it (dot centres ≤54% of the card,
+// heroes ≤49%). Counts and maxima read in ONE eval so a crossing that
+// spawns mid-sample can never smear the read: dots ≠ 44 ⇒ re-poll.
+const BAND = `(() => { ${BK} const s = ${H}; const u1 = ssLayout(s).u(1); const k = s.signPeek().card;
+  let dots = 0, dmax = -1, smax = -1; const w = (ls) => ls.forEach(o => { if (o.list) w(o.list);
+    const fr = (o.y / u1 + 353) / 706;
+    if (bk(o) === 'dot') { dots++; if (fr > dmax) dmax = fr; }
+    if (bk(o) === 'spark4') { smax = Math.max(smax, fr); } }); w(k.list);
+  return dots === 44 ? JSON.stringify({ dmax: +dmax.toFixed(4), smax: +smax.toFixed(4) }) : 'null' })()`;
+const band = await (async () => { for (let i = 0; i < 40; i++) { const b = JSON.parse(await ev(BAND)); if (b) return b; await sleep(300); } return null; })();
+ok('the field keeps the sky band — dots ≤ 54% of the card, heroes ≤ 49% (ridge ≈ 59.7%)', !!band && band.dmax > 0 && band.dmax <= 0.5405 && band.smax > 0 && band.smax <= 0.4905, JSON.stringify(band));
+// the breathing: deal a baseline of the field's 50 alphas, then poll until
 // enough of them have moved off it (the batched start lands 400ms after the
 // build, each star on its own rhythm and delay)
-const ALPHAS = `JSON.stringify((() => { ${BK} const k = ${H}.signPeek().card; const out = []; const w = (ls) => ls.forEach(o => { if (o.list) w(o.list); if (bk(o) === 'dot' || bk(o) === 'spark4') out.push(Math.round(o.alpha * 1000)); }); w(k.list); return out.slice(0, 25) })())`;
+const ALPHAS = `JSON.stringify((() => { ${BK} const k = ${H}.signPeek().card; const out = []; const w = (ls) => ls.forEach(o => { if (o.list) w(o.list); if (bk(o) === 'dot' || bk(o) === 'spark4') out.push(Math.round(o.alpha * 1000)); }); w(k.list); return out.slice(0, 50) })())`;
 await sleep(900);
 const a0 = await evj(ALPHAS);
-ok('the stars breathe on their own rhythms (≥8 of 25 alphas move off the deal)', await until(`(() => { const a = JSON.parse(${ALPHAS}); const p = JSON.parse(${JSON.stringify(JSON.stringify(a0))}); let m = 0; for (let i = 0; i < 25; i++) if (a[i] !== p[i]) m++; return m >= 8 })()`, 9000, 300));
+ok('the stars breathe on their own rhythms (≥16 of 50 alphas move off the deal)', await until(`(() => { const a = JSON.parse(${ALPHAS}); const p = JSON.parse(${JSON.stringify(JSON.stringify(a0))}); let m = 0; for (let i = 0; i < 50; i++) if (a[i] !== p[i]) m++; return m >= 16 })()`, 9000, 300));
+// the DEEP twinkle (9/13: "the stars should twinkle more"): watch one
+// dot's whole cycle — its trough must fall at least .45 under its deal
+// (v0.84.0's shallow dip never dropped more than ~.3)
+await ev(`(() => { ${BK} window.__sstw = { min: 2, max: -1, on: 1 }; const s = ${H};
+  const rec = () => { if (!window.__sstw.on) return; const p = s.signPeek && s.signPeek(); if (p && p.card) { let first = null; const w = (ls) => ls.forEach(o => { if (o.list) w(o.list); if (!first && bk(o) === 'dot' && o.__ssAlive) first = o; }); w(p.card.list);
+    if (first) { if (first.alpha < window.__sstw.min) window.__sstw.min = first.alpha; if (first.alpha > window.__sstw.max) window.__sstw.max = first.alpha; } } requestAnimationFrame(rec); };
+  requestAnimationFrame(rec); return 1 })()`);
+await sleep(2600);   // longer than the longest 2.2s cycle
+const twd = await evj(`(window.__sstw.on = 0, JSON.stringify({ min: +window.__sstw.min.toFixed(3), max: +window.__sstw.max.toFixed(3) }))`);
+ok('the twinkle runs DEEP — the first dot swings ≥ .45 of alpha inside 2.6s', twd.max - twd.min >= 0.45 && twd.min <= 0.4, JSON.stringify(twd));
 // the shooting star, deterministically: wait for a clear sky, poke the
 // manual door, watch the head + chained trail live and sweep themselves
-ok('the sky sits clear between crossings', await until(`(${COUNT}).dots === 22`, 12000));
+ok('the sky sits clear between crossings', await until(`(${COUNT}).dots === 44`, 12000));
 sky = await evj(SKY);
 await ev(`(window.__ssopensky.poke(), 1)`);
-ok('a poked shooting star crosses the card (head + chained trail live)', await until(`(${COUNT}).dots >= 30`, 2500, 60), JSON.stringify(await evj(`JSON.stringify(${COUNT})`)));
-ok('…and burns out clean (the flight sweeps itself)', await until(`(${COUNT}).dots === 22`, 12000), JSON.stringify(await evj(`JSON.stringify(${COUNT})`)));
+ok('a poked shooting star crosses the card (head + chained trail live)', await until(`(${COUNT}).dots >= 52`, 2500, 60), JSON.stringify(await evj(`JSON.stringify(${COUNT})`)));
+ok('…and burns out clean (the flight sweeps itself)', await until(`(${COUNT}).dots === 44`, 12000), JSON.stringify(await evj(`JSON.stringify(${COUNT})`)));
 ok('the beacon counted the crossing', (await evj(SKY)).shots >= sky.shots + 1);
 sky = await evj(SKY);
-ok('the sky looses one on its OWN clock (natural cadence ≤ ~15s + flight)', await until(`window.__ssopensky.shots >= ${sky.shots + 1}`, 22000, 500));
+ok('the sky looses one on its OWN clock (natural cadence ≤ ~7s + flight)', await until(`window.__ssopensky.shots >= ${sky.shots + 1}`, 22000, 500));
+/* THE GROUND CLAMP — the law of this card (9/13: a crossing may NEVER
+   pass over the ground): a rAF recorder folds every living sprite's y
+   (as a fraction of the card, 0 = crown) into a running max across two
+   full poked flights — head, chained trail and field alike must stay
+   above the 56% cap line (the painted ridge itself starts ≈59.7%). */
+await until(`(${COUNT}).dots === 44`, 12000);
+await ev(`(() => { const s = ${H}; const u1 = ssLayout(s).u(1); window.__sscl = { max: -1, n: 0, on: 1 };
+  const rec = () => { if (!window.__sscl.on) return; const p = s.signPeek && s.signPeek(); if (p && p.card && p.card.list) {
+    const w = (ls) => ls.forEach(o => { if (o.list && o.list.length) w(o.list); if (o.__ssAlive && o.active) { const fr = (o.y / u1 + 353) / 706; if (fr > window.__sscl.max) window.__sscl.max = fr; window.__sscl.n++; } }); w(p.card.list); }
+    requestAnimationFrame(rec); };
+  requestAnimationFrame(rec); return 1 })()`);
+for (let i = 0; i < 2; i++) {
+  await ev(`(window.__ssopensky.poke(), 1)`);
+  await until(`(${COUNT}).dots >= 52`, 2500, 60);
+  await until(`(${COUNT}).dots === 44`, 12000);
+}
+const cl = await evj(`(window.__sscl.on = 0, JSON.stringify({ max: +window.__sscl.max.toFixed(4), n: window.__sscl.n }))`);
+ok('the ground clamp holds — two full crossings sampled every frame, nothing past the 56% line', cl.n > 200 && cl.max > 0 && cl.max <= 0.5605, JSON.stringify(cl));
 // deck turns rebuild all three cards — the tween ledger must sit flat or
 // the twinkles are orphaned on every turn. Scope the count to tweens whose
 // targets live under the SHEET: the meadow keeps cycling its showcase
 // constellation beneath the veil, so the scene-wide total drifts on its own
-await until(`(${COUNT}).dots === 22`, 12000);
+await until(`(${COUNT}).dots === 44`, 12000);
 const TWN = `(() => { const s = ${H}; const inSheet = (o) => { for (let p = o && o.parentContainer; p; p = p.parentContainer) if (p === s.signC) return true; return false; };
   return s.tweens.getTweens().filter(t => { try { return (t.targets || []).some(inSheet); } catch (e) { return false; } }).length })()`;
 const stableTw = async () => { let prev = -1; for (let i = 0; i < 16; i++) { const v = await ev(TWN); if (v === prev) return v; prev = v; await sleep(450); } return prev; };
@@ -328,7 +375,7 @@ await drag(cp.x, cp.y, 150);
 await until(`${STILL} && ${H}.signPeek().id === 'none'`, 4000);
 await sleep(900);
 const t2 = await stableTw();
-ok('two more deck turns leave the sheet\'s tween ledger flat (~28 twinkles, no orphans across rebuilds)', t1 >= 26 && Math.abs(t2 - t1) <= 4, t1 + ' → ' + t2);
+ok('two more deck turns leave the sheet\'s tween ledger flat (~56 twinkles, no orphans across rebuilds)', t1 >= 54 && Math.abs(t2 - t1) <= 4, t1 + ' → ' + t2);
 // the gate: sign cards stay dead still — ARIES rides the SAME shared wash
 // (its plate is blocked in this boot) and hangs nothing; TAURUS (real art)
 // hangs nothing either
@@ -354,6 +401,15 @@ ok('✕ closes the sheet with a star mid-flight — swept clean, the door nulled
 // ~10s, pre-existing, surfaced with v0.84.0) — a scene-wide scan reds on
 // ambient behaviour this suite does not own
 ok('…and no tween anywhere rides a destroyed layer sprite (the orphan scan)', await until(`(() => { const s = ${H}; return s.tweens.getTweens().filter(t => { try { return (t.targets || []).some(o => o && o.active === false && o.__ssAlive); } catch (e) { return false; } }).length === 0 })()`, 4000));
+// THE NOT-LOADED FALLBACK (v0.98.0 law): with the open-sky plate blocked,
+// the card borrows the shared zodsky wash exactly as before — never
+// re-baked — and the living layer STILL hangs between wash and scrims
+await ev(`(() => { delete SSART.img.zod_none; const s = ${H}; if (s.textures.exists('zod_none')) s.textures.remove('zod_none'); return 1 })()`);
+ok('the sheet reopens with the open-sky plate blocked', await open() && (await peek()).id === 'none');
+cnt = await evj(`JSON.stringify(${COUNT})`);
+ok('the blocked plate falls back to the shared zodsky wash — and the sky still breathes on it', await ev(`(() => { const k = ${H}.signPeek().card; return k.list.some(o => o.texture && o.texture.key === 'zodsky') && !k.list.some(o => o.texture && o.texture.key === 'zod_none') })()`) && cnt.dots >= 44 && cnt.sparks === 6 && cnt.gfx === 3, JSON.stringify(cnt));
+const xpF = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '✕')`);
+ok('✕ closes the fallback walk clean', await touchUntil(xpF, `!${H}.signC`, 6));
 ok('no page exceptions through the living walk', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ---------- the seams: ?twinkle=0 and reduced motion still the layer ---------- */
@@ -362,20 +418,20 @@ ok('home stands (?twinkle=0)', await boot({ w: 393, h: 852, dpr: 3 }, '59,34', '
 ok('the sheet opens on THE OPEN SKY (stilled)', await open() && (await peek()).id === 'none');
 sky = await evj(SKY);
 cnt = await evj(`JSON.stringify(${COUNT})`);
-ok('the field survives the stilling — 25 sprites, still flag up, no door, no crossings', sky.stars === 25 && sky.still === true && sky.shots === 0 && await ev(`window.__ssopensky.poke === null`) && cnt.dots === 22 && cnt.sparks === 3 && cnt.gfx === 3, JSON.stringify(sky) + ' ' + JSON.stringify(cnt));
+ok('the field survives the stilling — 50 sprites, still flag up, no door, no crossings', sky.stars === 50 && sky.still === true && sky.shots === 0 && await ev(`window.__ssopensky.poke === null`) && cnt.dots === 44 && cnt.sparks === 6 && cnt.gfx === 3, JSON.stringify(sky) + ' ' + JSON.stringify(cnt));
 const f0 = await evj(ALPHAS);
 await sleep(1400);
 const f1 = await evj(ALPHAS);
-ok('…and the sky is FROZEN (25 alphas byte-equal across 1.4s)', JSON.stringify(f0) === JSON.stringify(f1) && f0.length === 25);
+ok('…and the sky is FROZEN (50 alphas byte-equal across 1.4s)', JSON.stringify(f0) === JSON.stringify(f1) && f0.length === 50);
 await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
 ok('home stands (reduced motion)', await boot({ w: 393, h: 852, dpr: 3 }, '59,34'));
 ok('the sheet opens on THE OPEN SKY (reduced)', await open() && (await peek()).id === 'none');
 sky = await evj(SKY);
-ok('reduced motion stills the layer the same way (field up, movement gone)', sky.stars === 25 && sky.still === true && await ev(`window.__ssopensky.poke === null`), JSON.stringify(sky));
+ok('reduced motion stills the layer the same way (field up, movement gone)', sky.stars === 50 && sky.still === true && await ev(`window.__ssopensky.poke === null`), JSON.stringify(sky));
 const r0 = await evj(ALPHAS);
 await sleep(1400);
 const r1 = await evj(ALPHAS);
-ok('…frozen under reduced motion too', JSON.stringify(r0) === JSON.stringify(r1) && r0.length === 25);
+ok('…frozen under reduced motion too', JSON.stringify(r0) === JSON.stringify(r1) && r0.length === 50);
 await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: '' }] });
 ok('no page exceptions through the stilled walks', errs.length === 0, errs.slice(0, 2).join(' | '));
 

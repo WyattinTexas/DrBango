@@ -1497,6 +1497,14 @@ Six things this file learned the hard way:
   looks finished after 3 wall-clock seconds at 60 fps is still at veil 0.79
   and every word at alpha 0. Poll the display list's alphas; never sleep and
   shoot.
+- **A headless page's clock idles again the moment input goes quiet**
+  (v0.98.0 shot rig, the flip side of the v0.96.0 boot law): two
+  `Page.captureScreenshot`s taken 1.1 s apart with only sleeps between came
+  back BYTE-IDENTICAL — RAF froze after the last real tap, so a breathing
+  field "verified" as still on good bytes. Suites never see it (their
+  polling taps keep the page hot); a screenshot harness must dispatch a
+  throwaway `Input.dispatchMouseEvent` mouseMoved (and a short beat) before
+  every capture. Diff two captures when a shot exists to prove MOTION.
 
 ## device-rows.mjs + dev-check.mjs — the device report and the crisp sentinel (v0.50.0)
 

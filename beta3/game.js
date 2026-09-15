@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.97.0';
+const BUILD = 'STARSPELL v0.98.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -429,6 +429,10 @@ const SSART = { ready: false, img: {} };
 const SS_ZOD_ART = [
   'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
   'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces',
+  // THE OPEN SKY's own painted night (v0.98.0) — the deck's unsigned entry
+  // loads its plate exactly the way the twelve load theirs; if it fails,
+  // the shared 'zodsky' wash stays its fallback
+  'none',
 ];
 function ssLoadArt() {
   const names = ['btn', 'btndark', 'tile_face', 'tile_over', 'meadow'];
@@ -4454,20 +4458,29 @@ function ssZodScrimTex(scene) {
   t.refresh();
   return key;
 }
-/* THE OPEN SKY comes alive (v0.84.0, Skylar 9/3): the unsigned card's night
-   was a stale static wash — this hangs a small living layer over it, card-
-   local so the deck's mask clips it and a slide carries it: a seeded field
-   of stars breathing on their own rhythms, and every so often a shooting
-   star crossing the card (the meadow's own head-and-chained-trail, quoted
-   in the card's coordinates). Sprites only — the per-card Graphics census
-   is pinned by suite — all parented into the returned container, so a deck
-   turn or the sheet's close sweeps the lot; tweens and timers are tracked
-   and stopped on the layer's destroy. The field is SEEDED: every rebuild
-   (each deck turn recycles all three cards) deals the very same sky. The
-   shared 'zodsky' texture is never re-baked — a sign card whose art fails
-   borrows it and stays exactly as still as before. ?twinkle=0 (the ?ride=0
-   pattern) or reduced motion keeps the field and drops all the movement.
-   Beacon: window.__ssopensky. */
+/* THE OPEN SKY comes alive (v0.84.0, Skylar 9/3; re-dialed v0.98.0 to the
+   9/13 review's approved spec): the unsigned card's night was a stale
+   static wash — this hangs a small living layer over it, card-local so the
+   deck's mask clips it and a slide carries it: a seeded field of stars
+   breathing on their own rhythms, and every so often a shooting star
+   crossing the card (the meadow's own head-and-chained-trail, quoted in
+   the card's coordinates). Since v0.98.0 the card stands on its own
+   painted plate (art/zod_none.webp, ground born unlit) and the field is
+   DOUBLED (44 dots + 6 heroes) but confined to the plate's SKY BAND — the
+   painted ridge starts ≈59.7% down the frame, so dots keep above 54% of
+   the card and heroes above 49% — the twinkle breathes DEEP (bright to
+   near-gone on 0.9–2.2s cycles), crossings come oftener (first 2.2–4.8s,
+   then 3.5–7s), and every flight is CLAMPED above the ridge: the law of
+   this card is that a crossing may NEVER pass over the ground. Sprites
+   only — the per-card Graphics census is pinned by suite — all parented
+   into the returned container, so a deck turn or the sheet's close sweeps
+   the lot; tweens and timers are tracked and stopped on the layer's
+   destroy. The field is SEEDED: every rebuild (each deck turn recycles all
+   three cards) deals the very same sky. The shared 'zodsky' texture is
+   never re-baked — it stays the not-loaded fallback here, and a sign card
+   whose art fails borrows it exactly as still as before. ?twinkle=0 (the
+   ?ride=0 pattern) or reduced motion keeps the field and drops all the
+   movement. Beacon: window.__ssopensky. */
 function ssOpenSkyAlive(scene, l, CW, CH) {
   const lay = scene.add.container(0, 0);
   const still = QS.get('twinkle') === '0' || ssReduceMotion();
@@ -4476,27 +4489,33 @@ function ssOpenSkyAlive(scene, l, CW, CH) {
   const tw = (cfg) => { const t = scene.tweens.add(cfg); tws.push(t); return t; };
   let sd = 13;
   const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
-  // the field: 22 small stars + 3 slow-turning hero sparks, clear of the
-  // baked ridge at the foot; the reading scrims ride above the whole layer,
-  // so the name and the power bands keep their ground. The breathing starts
-  // in ONE batch a beat after the build (the ascent sky's recipe — a card
-  // is built mid-swipe-settle, and tween setup is a real slice of that).
+  // the field (9/13 spec — double v0.84.0's): 44 small stars + 6 slow-
+  // turning hero sparks, confined to the painted plate's SKY BAND — the
+  // unlit ridge starts ≈59.7% down the frame, so dots deal no lower than
+  // 54% of the card and heroes no lower than 49%. The reading scrims ride
+  // above the whole layer, so the name and the power bands keep their
+  // ground. The breathing starts in ONE batch a beat after the build (the
+  // ascent sky's recipe — a card is built mid-swipe-settle, and tween
+  // setup is a real slice of that).
   const breathe = [];
   let n = 0;
-  for (let i = 0; i < 22; i++, n++) {
+  for (let i = 0; i < 44; i++, n++) {
     const sz = l.u(2.2 + rnd() * 3.2);
-    const x = l.u((rnd() - 0.5) * (CW - 24)), y = l.u(-CH / 2 + 16 + rnd() * (CH - 96));
-    const baseA = 0.3 + rnd() * 0.5;
+    const x = l.u((rnd() - 0.5) * (CW - 24)), y = l.u(-CH / 2 + 16 + rnd() * (CH * 0.54 - 16));
+    // the deep twinkle — "the stars should twinkle more": bright deals
+    // (.45–.95) breathing down .55–.85 to near-gone, on quick 0.9–2.2s
+    // cycles; the .04 floor keeps every star faintly THERE at the trough
+    const baseA = 0.45 + rnd() * 0.5;
     const tint = SS_STAR_COLORS[Math.floor(rnd() * SS_STAR_COLORS.length)];
-    const dim = baseA * (0.2 + rnd() * 0.35), dur = 1300 + rnd() * 2600, dly = rnd() * 2400;
+    const dim = Math.max(0.04, baseA - 0.55 - rnd() * 0.3), dur = 900 + rnd() * 1300, dly = rnd() * 2200;
     const st = scene.add.image(x, y, 'dot').setDisplaySize(sz, sz).setAlpha(baseA).setTint(tint);
     st.__ssAlive = 1;   // the layer's own mark — the suite's orphan scan reads it
     lay.add(st);
     breathe.push(() => tw({ targets: st, alpha: dim, duration: dur, yoyo: true, repeat: -1, delay: dly }));
   }
-  for (let i = 0; i < 3; i++, n++) {
+  for (let i = 0; i < 6; i++, n++) {
     const hsz = l.u(11 + rnd() * 6);
-    const x = l.u((rnd() - 0.5) * (CW - 60)), y = l.u(-CH / 2 + 40 + rnd() * CH * 0.62);
+    const x = l.u((rnd() - 0.5) * (CW - 60)), y = l.u(-CH / 2 + 40 + rnd() * (CH * 0.49 - 40));
     const baseA = 0.4 + rnd() * 0.18;
     const spin = 46000 + rnd() * 34000, dur = 2200 + rnd() * 1800, dly = rnd() * 2000;
     const hs = scene.add.image(x, y, 'spark4').setDisplaySize(hsz, hsz).setAlpha(baseA).setBlendMode('ADD');
@@ -4509,7 +4528,16 @@ function ssOpenSkyAlive(scene, l, CW, CH) {
   const loose = () => {
     if (!lay.active || !scene.scene.isActive()) return;
     bcn.shots++;
-    const sx = l.u((-0.42 + Math.random() * 0.5) * CW), sy = l.u((-0.46 + Math.random() * 0.34) * CH);
+    /* THE GROUND CLAMP — the law of this card (Skylar 9/13: "The shooting
+       stars should never pass over the ground"): spawn in the upper sky,
+       fly right-and-down at 24–38°, and cap the distance so the ENTIRE
+       flight — head and chained trail — ends above the painted ridge
+       (≈59.7% down the card; the cap line is 56%, margin kept). */
+    const x0 = (0.02 + Math.random() * 0.45) * CW, y0 = (0.03 + Math.random() * 0.3) * CH;
+    const ang = (24 + Math.random() * 14) * Math.PI / 180;
+    let dist = CW * (0.5 + Math.random() * 0.35);
+    dist = Math.min(dist, (0.56 * CH - y0) / Math.sin(ang));
+    const sx = l.u(x0 - CW / 2), sy = l.u(y0 - CH / 2);
     const head = scene.add.image(sx, sy, 'dot').setDisplaySize(l.u(8.5), l.u(8.5)).setTint(0xfff2c9).setBlendMode('ADD');
     head.__ssAlive = 1;
     lay.add(head);
@@ -4524,21 +4552,22 @@ function ssOpenSkyAlive(scene, l, CW, CH) {
     // holds and dies late (easeIn) — one ease for both leaves the head dim
     // for most of its crossing over this brighter wash
     const t = tw({
-      targets: head, duration: 800,
-      x: { value: sx + l.u(200 + Math.random() * 140), ease: 'Cubic.easeOut' },
-      y: { value: sy + l.u(80 + Math.random() * 80), ease: 'Cubic.easeOut' },
+      targets: head, duration: 900 + Math.random() * 420,
+      x: { value: sx + l.u(Math.cos(ang) * dist), ease: 'Cubic.easeOut' },
+      y: { value: sy + l.u(Math.sin(ang) * dist), ease: 'Cubic.easeOut' },
       alpha: { value: 0, ease: 'Quad.easeIn' },
       onUpdate: () => { for (let i = trail.length - 1; i > 0; i--) { trail[i].x = trail[i - 1].x; trail[i].y = trail[i - 1].y; } trail[0].x = head.x; trail[0].y = head.y; },
       onComplete: () => { const ix = tws.indexOf(t); if (ix >= 0) tws.splice(ix, 1); head.destroy(); trail.forEach((g) => g.destroy()); },
     });
   };
-  // the cadence: a surprise, not a screensaver — a first crossing a few
-  // breaths after the card lands, then one every 8-15s
+  // the cadence (9/13: "more shooting stars in the sky"): a first crossing
+  // a couple of breaths after the card lands, then one every 3.5–7s —
+  // still Math.random, a rhythm and not a metronome
   let nextEv = null;
-  const arm = (ms) => { nextEv = scene.time.delayedCall(ms, () => { if (!lay.active) return; loose(); arm(8000 + Math.random() * 7000); }); };
+  const arm = (ms) => { nextEv = scene.time.delayedCall(ms, () => { if (!lay.active) return; loose(); arm(3500 + Math.random() * 3500); }); };
   if (!still) {
     evs.push(scene.time.delayedCall(400, () => { if (!lay.active) return; for (const b of breathe) b(); }));
-    arm(3800 + Math.random() * 3200);
+    arm(2200 + Math.random() * 2600);
   }
   bcn.builds++; bcn.stars = n; bcn.still = still;
   bcn.poke = still ? null : loose;
@@ -6961,12 +6990,13 @@ class Home extends Phaser.Scene {
         if (d.z) {
           k.add(this.add.image(0, -l.u(40), 'glowbig').setDisplaySize(l.u(CW * 1.15), l.u(CH * 0.62)).setTint(tint).setBlendMode('ADD').setAlpha(0.16));
           k.add(ssZodiacGlyph(this, d.z, l.u(1.2), 0, -l.u(40)));
-        } else {
-          // THE OPEN SKY alone comes alive (v0.84.0) — a living layer over
-          // the shared wash, between the plate and the reading scrims
-          k.add(ssOpenSkyAlive(this, l, CW, CH));
         }
       }
+      // THE OPEN SKY alone comes alive (v0.84.0; its own painted plate
+      // since v0.98.0) — the living layer rides between the plate (painted,
+      // or the zodsky fallback while the webp hasn't landed) and the
+      // reading scrims; sign cards stay dead still either way
+      if (d.id === 'none') k.add(ssOpenSkyAlive(this, l, CW, CH));
       /* the scrims: a deep foot for the power cluster to read on, a whisper
          at the crown under the name — baked alpha gradients (one texture,
          flipped for the crown; setTint stays away, the Canvas law) */

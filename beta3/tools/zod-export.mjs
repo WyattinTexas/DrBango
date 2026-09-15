@@ -104,6 +104,37 @@ for (const sign of SIGNS) {
   total += bytes;
   console.log(`  ${fresh ? '·' : '✚'} zod_${sign}.webp  ${(bytes / 1024).toFixed(1)}KB  (pick ${pick} = ${src})`);
 }
+
+// THE OPEN SKY plate (v0.98.0) — the unsigned card's own painted night: MJ
+// job ab88edc7 frame 2 (sref'd to the locked B2 anchor, the ground born
+// unlit), kept beside the 9/13 review page's art rather than ref/zodiac-mj.
+// Emits art/zod_none.webp; the deck's 'none' entry loads it exactly the way
+// the twelve load theirs, and 'zodsky' stays the not-loaded fallback.
+{
+  const srcPath = process.env.OPENSKY_SRC || join(HOME, 'starspell-art-sources/open-sky-sigils/sky_dark1.webp');
+  if (!existsSync(srcPath)) { console.error('MISSING source ' + srcPath); process.exit(2); }
+  const outPath = join(OUT, 'zod_none.webp');
+  const entry = { pick: 'sky_dark1', src: 'open-sky-sigils/sky_dark1.webp', w: W, h: H, q: QUALITY, srcMtime: statSync(srcPath).mtimeMs };
+  const fresh = existsSync(outPath) && manifest.none && JSON.stringify(manifest.none) === JSON.stringify(entry) && !process.env.FORCE;
+  if (!fresh) {
+    const meta = await sharp(srcPath).metadata();
+    let img = sharp(srcPath);
+    const want = meta.width / meta.height, target = 2 / 3;
+    if (Math.abs(want - target) > 0.002) {
+      const cw = Math.min(meta.width, Math.round(meta.height * target));
+      const ch = Math.min(meta.height, Math.round(meta.width / target));
+      img = img.extract({ left: (meta.width - cw) >> 1, top: (meta.height - ch) >> 1, width: cw, height: ch });
+      console.log(`  none: drifted ${meta.width}×${meta.height}, cropped to ${cw}×${ch}`);
+    }
+    await img.resize(W, H).webp({ quality: QUALITY }).toFile(outPath);
+    built++;
+  }
+  next.none = entry;
+  const bytes = statSync(outPath).size;
+  total += bytes;
+  console.log(`  ${fresh ? '·' : '✚'} zod_none.webp  ${(bytes / 1024).toFixed(1)}KB  (the open sky — ${entry.src})`);
+}
+
 writeFileSync(MANIFEST, JSON.stringify(next, null, 1) + '\n');
-console.log(`${built} built, ${12 - built} unchanged · set total ${(total / 1024).toFixed(1)}KB` +
+console.log(`${built} built, ${13 - built} unchanged · set total ${(total / 1024).toFixed(1)}KB` +
   (total > 2.5 * 1024 * 1024 ? '  ⚠ OVER the 2.5MB budget — lower QUALITY' : '  (budget 2560KB)'));
