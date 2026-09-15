@@ -4144,6 +4144,16 @@
   .zoomcls { margin:0.2rem 0 0.6rem; }   /* 0963-R: one class's row (the label shows at the menu, where both classes sit) */
   .zoomcls > b { display:block; text-align:left; font-size:0.95rem; letter-spacing:0.04em; opacity:0.85; margin-top:0.4rem; }
   .zoomcls .zoomrow { margin:0.3rem 0 0.5rem; }
+  /* 1004 THE DESERT HOLD — PAN + ZOOM: THE HOLD'S ZOOM PILL — the shipped panel's own row (the range with the class's live ends + RESET, no number) seated ON the held field while an event hold
+     stands (S.evHold: the desert, the yeti's and King Rex's nights), top-right under the roster column; a DOM seat, so a phone whose pinch misfires still has a zoom door while it waits;
+     hidden the frame the hold ends (the bell, the AFK leave, every battle door). Sized in screen px on purpose (readability: a thumb a kid can hit), placed by holdZoomPlace off the canvas rect. */
+  #holdZoom { position:fixed; z-index:9; display:none; align-items:center; gap:10px; padding:8px 12px 8px 10px; background:rgba(22,15,8,0.78); border:2px solid rgba(255,243,196,0.22); border-radius:999px; color:#F2E9D0; box-shadow:0 4px 14px rgba(0,0,0,0.35); }
+  #holdZoom.on { display:flex; }
+  #holdZoom > svg { width:24px; height:24px; flex:0 0 24px; color:#FFF3C4; }
+  #holdZoom .zoomcls { margin:0; display:flex; align-items:center; gap:10px; }
+  #holdZoom .zoomrow { margin:0; gap:0; }
+  #holdZoom .zoomrow input[type=range] { width:170px; min-width:0; height:28px; accent-color:#FFD24A; }
+  #holdZoom .zoombtns .mbtn { font-size:0.85rem; padding:0.32rem 0.7rem; }
   .mbtn.alt { background:#A63B2A; }
   .mbtn:disabled { opacity:0.45; }
   .mrow { display:flex; align-items:center; gap:14px; padding:12px 4px; border-bottom:1px solid rgba(255,255,255,0.1); font-size:1.18rem; }
@@ -45481,7 +45491,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.92';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.93';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -71266,6 +71276,28 @@ function zoomPanelHTML(){   // THE EXACT AMOUNT (the LANGUAGE panel's grammar; t
   return '<h3>'+t('ZOOM')+'</h3>'
     +'<p class="langhint">'+t('Pinch the field with two fingers, or set the exact amount here.')+'</p>'
     +rows.map(zoomRowHTML).join(''); }
+// ═══ 1004 THE DESERT HOLD — PAN + ZOOM (FM-GVT-DESERT-HOLD-CAM-01; Wyatt 9/14 ~20:45 EDT, verbatim: "In Battle for the Desert, when you're waiting, you should be able to pan around the map and zoom in and
+// out, not just be stuck at the fully zoomed-out look." · 9/15 ~08:03 live: "We're just asking for players to be able to zoom in and out and pan while they're zoomed in, instead of just being locked
+// in the full zoom-out until the match begins."). MEASURED on v9.92 (design/desert-hold-cam-0914/00-BUILD.md §0): the hold's own doors already answer in Chrome — the pinch, the wheel and the
+// one-finger pan move the camera in a staged hold AND in the real room hold (a local copy of the server, host + guest, polls running) and nothing snaps back (campCamTick returns on S.bf; no
+// launch-time zoomSet; PZ opens; the pan gate is open) — but a HELD FIELD HAS NO SLIDER: the ZOOM chip's panel is a menu seat (UI.zoomPanel → roomModal; the 0963 open "an in-match slider seat"),
+// so a phone whose pinch misfires while it waits has no zoom door at all, and at the remembered floor (WESTERN LAND 2560 × 1200: the fit is exactly 0.5 on a phone — the whole carpet, centred)
+// there is nothing to pan. THE HOLD'S ZOOM PILL: while an event hold stands on a played field (S.evHold — the desert, the yeti's and King Rex's nights: one law for every hold, D-Q3) the shipped
+// panel's own row (zoomRowHTML: the range with the class's live ends + RESET, no number — 0912-1) sits ON the field top-right under the roster column as a DOM pill; its drag drives zoomSet on
+// the live field through UI.zoomDrag exactly as the panel does, a pinch moves its thumb (zoomSlider syncs any open range), a hand on it counts as "I'm here" (D13 — D-Q2, with the wheel and
+// Safari's gesture). Toggled by ONE predicate at frame() — never baked (the 0503 law) — so the bell, the AFK leave and every battle door hide it the same frame; the bell itself writes no camera
+// and no zoom (D-Q1: the hand's view stays, the men where the kid put them). Untouched: the launch zoom (the device's own remembered one, 0964), the dials, the campaign's carpet (no hold there). ═══
+const HZ={ el:null, on:false, cls:null };   // the pill: its node, whether it stands, the class its row was built for
+const HZ_TOP=134, HZ_RIGHT=14;              // its seat in game units: under the desert's roster column (BD_ROSTER_Y 52 + six rows × 12 + a margin), inset from the right edge; the DRAG hint (y 108) and the title band (y 98) sit above it
+function holdZoomEnsure(){ if(HZ.el) return HZ.el; const el=document.createElement('div'); el.id='holdZoom'; el.setAttribute('data-notr',''); el.title=t('ZOOM');
+  el.addEventListener('pointerdown', ()=>{ if(S.evHold) S.evTouched=1; });   // D13: a hand on the pill is plainly here (the you-there card never deals to it)
+  document.body.appendChild(el); window.addEventListener('resize', holdZoomPlace); HZ.el=el; return el; }
+function holdZoomPlace(){ const el=HZ.el; if(!el || !HZ.on) return; const r=cv.getBoundingClientRect(); el.style.top=Math.round(r.top+HZ_TOP*scale)+'px'; el.style.right=Math.round((window.innerWidth-r.right)+HZ_RIGHT*scale)+'px'; }   // off the canvas rect, so a resize or the chin never strands it
+function holdZoomSync(){   // frame()'s one line: the pill stands exactly while an event hold stands on a played field — the row rebuilt only when the field's class changes
+  const on=!!(S.evHold && S.mode==='play' && zoomField());
+  if(!on){ if(HZ.on){ HZ.on=false; HZ.cls=null; if(HZ.el){ HZ.el.classList.remove('on'); HZ.el.innerHTML=''; } } return; }
+  const c=zoomCls(); if(HZ.on && HZ.cls===c) return;
+  const el=holdZoomEnsure(); el.innerHTML=gly('magnifier')+zoomRowHTML(c); HZ.on=true; HZ.cls=c; el.classList.add('on'); holdZoomPlace(); }
 function zoomSlider(){ const f=zoomField(); for(const c of ['big','reg']){ const r=document.getElementById('zoomRange-'+c); if(!r) continue; const p=Math.round(((f && zoomCls()===c)? zoomZ() : zoomLoad(c))*100); if(+r.value!==p) r.value=p; } }   // the open range follows every zoom (pinch ↔ slider = one value); 0912-1: no number beside it, no number on the chip
 // ===== 0395 THE CHIN — RESPECT THE HOME BAR (FM-GVT-EDGE-01 §6-A, Wyatt GO 8/17
 // late: "let's go with the chin"). iOS's Home / quick-switch gestures fire on
@@ -78322,8 +78354,8 @@ cv.addEventListener('pointerup', e=>{
 window.addEventListener('pointercancel', ()=>{ S.drag=null; S.pan=null; S.jetAim=null; jv2Cancel(); });   // 0913 Q14: a lost finger is never a fire — the fall where he is
 cv.addEventListener('pointercancel', e=>{ pzUp(e); });   // 0963: a lost finger leaves the pinch
 window.addEventListener('pointerup', e=>{ if(e.target!==cv) pzUp(e); }, true);   // 0963: a finger lifted off the canvas still leaves the ledger
-cv.addEventListener('wheel', e=>{ if(!(e.ctrlKey||e.metaKey) || S.mode!=='play') return; e.preventDefault(); const p=evPos(e), dy=e.deltaY, n=(e.deltaMode!==0 || Math.abs(dy)>=50)? Math.sign(dy) : dy/4; zoomTo(zoomZ()*Math.pow(1+WHEEL_STEP, -n), p.x, p.y); zoomSave(); }, {passive:false});   // 0963-R: WHEEL_STEP per notch — a discrete notch (a mouse click, a line/page delta) = one step; a trackpad's fine pixel deltas count 4 px per notch   // 0963 desktop parity: ctrl/cmd+wheel = Chrome's trackpad pinch, anchored under the cursor (a plain wheel keeps what it does today)
-cv.addEventListener('gesturestart', e=>{ if(S.mode!=='play' || PZ.pts.size) return; e.preventDefault(); PZ.gz=zoomZ(); }, {passive:false});   // 0963 Safari's trackpad pinch (no ctrl+wheel there; a touch pinch rides the pointers instead)
+cv.addEventListener('wheel', e=>{ if(!(e.ctrlKey||e.metaKey) || S.mode!=='play') return; e.preventDefault(); if(S.evHold) S.evTouched=1; /* 1004 THE DESERT HOLD (D-Q2): a wheel hand zooming in the hold is here */ const p=evPos(e), dy=e.deltaY, n=(e.deltaMode!==0 || Math.abs(dy)>=50)? Math.sign(dy) : dy/4; zoomTo(zoomZ()*Math.pow(1+WHEEL_STEP, -n), p.x, p.y); zoomSave(); }, {passive:false});   // 0963-R: WHEEL_STEP per notch — a discrete notch (a mouse click, a line/page delta) = one step; a trackpad's fine pixel deltas count 4 px per notch   // 0963 desktop parity: ctrl/cmd+wheel = Chrome's trackpad pinch, anchored under the cursor (a plain wheel keeps what it does today)
+cv.addEventListener('gesturestart', e=>{ if(S.mode!=='play' || PZ.pts.size) return; e.preventDefault(); if(S.evHold) S.evTouched=1; /* 1004 THE DESERT HOLD (D-Q2) */ PZ.gz=zoomZ(); }, {passive:false});   // 0963 Safari's trackpad pinch (no ctrl+wheel there; a touch pinch rides the pointers instead)
 cv.addEventListener('gesturechange', e=>{ if(S.mode!=='play' || !PZ.gz || PZ.pts.size) return; e.preventDefault(); const p=evPos(e); zoomTo(PZ.gz*e.scale, p.x, p.y); }, {passive:false});
 cv.addEventListener('gestureend', ()=>{ if(PZ.gz){ PZ.gz=0; zoomSave(); } });
 
@@ -104609,6 +104641,7 @@ function frame(ts){
   // beat); the computers arm off the server's rung pc (every sim alike) — or the
   // live roster EV_ARM_GRACE s past the bell if no ring ever lands.
   if(S.evHold && S.mode==='play'){ if(evNow()>=S.evHold.bell) evBell(); else evHoldTick(dt); }
+  holdZoomSync();   // 1004 THE DESERT HOLD: the hold's zoom pill stands exactly while the hold stands (toggled, never baked)
   if(S.mode==='play' && !S.evHold && S.sq && S.sq.ev && !S.sq.bots && S.coop && COOP && COOP.ev){
     if(COOP.ev.rung) evBotsArm(COOP.ev.pc||(COOP.members||[]).length);
     else if(evNow()>=S.sq.ev.bell+EV_ARM_GRACE) evBotsArm(Math.max(1,(COOP.members||[]).length)); }
@@ -106332,6 +106365,7 @@ window.GVT = {
   nb(){ return { cv:GVT_CV, base:NB.base||null, stamp:NB.stamp||null, newer:NB.newer?1:0, checks:NB.checks, fails:NB.fails, last:NB.last, beats:NB.beats, busy:!!NB.busy, chip:NB.chip?1:0, card:!!document.getElementById('nbCard'), snoozeT:NB.snoozeT, went:NB.went, auto:nbAutoOK()?1:0, quiet:nbQuiet()?1:0, idle:+idleQuiet().toFixed(1), bellFar:nbBellFar()?1:0, every:NB_EVERY, snoozeMs:NB_SNOOZE_MS, autoS:NB_AUTO_S, guardS:NB_BELL_GUARD_S, path:location.pathname, proto:location.protocol }; },
   nbForce(stamp){ stamp=String(stamp||'forced'); if(!NB.base) NB.base='(rig)'; NB.stamp=stamp; NB.newer=(stamp!==NB.base); NB.last=Date.now(); nbTick(); return GVT.nb(); },
   nbCheck(){ return nbCheck().then(()=>GVT.nb()); },
+  holdZoom(){ const el=HZ.el, r=(el&&HZ.on)? el.getBoundingClientRect() : null, i=el? el.querySelector('input[type=range]') : null, c=cv.getBoundingClientRect(); return { cv:GVT_CV, on:HZ.on, cls:HZ.cls, hold:!!S.evHold, z:+zoomZ().toFixed(4), touched:S.evTouched|0, rect:r? { x:r.left, y:r.top, w:r.width, h:r.height } : null, canvas:{ x:c.left, y:c.top, w:c.width, h:c.height, scale:scale }, val:i? +i.value : null, lo:i? +i.min : null, hi:i? +i.max : null, top:HZ_TOP, right:HZ_RIGHT }; },   // 1004 THE DESERT HOLD: the read-only rig
   bdFeel(){ return { bell:BD.bell, open:BD.open, wk:BD.wk, state:bdDoorState(), band:evBandState(), fielded:(S.bf&&S.bf.bd)? (S.bf.bdN|0) : 0, teamMin:BD_TEAM_MIN, live:BD.live, sealed:BD.sealed, rooms:BD.rooms, players:BD.players, mine:BD.mine, annWk:BDD.annWk, popBell:BDD.popBell, popT:BDD.popT, redealMs:BD_REDEAL_MS, popS:BD_POP_S, hold:!!S.evHold, holdBell:S.evHold? S.evHold.bell : 0, bd:!!(S.bf&&S.bf.bd), touched:!!S.evTouched, afk:!!S.evAfk, code:COOP&&COOP.code, seat:COOP&&COOP.seat, side:COOP&&COOP.side, host:!!(COOP&&COOP.host), map:S.bf&&S.bf.mapId, team:S.bf&&S.bf.team, seats:S.bf? S.bf.seats.map(s=>({ i:s.i, h:s.human?1:0, me:s.me?1:0, b:s.brain?1:0, e:s.empty?1:0, k:s.kit?1:0, n:s.name, cpu:s.cpu?1:0, away:s.away?1:0, purse:Math.round(s.purse||0), bdPourT:+((s.bdPourT||0).toFixed(3)), diff:s.brain? s.brain.diff : null, hex:s.hex })) : null, note:BD.note, hull:S.bf? [S.bf.base.you.hp, S.bf.base.you.hpMax, S.bf.base.foe.hp, S.bf.base.foe.hpMax] : null, aiDiff:S.bf? S.bf.ai.diff : null, hard:!!(S.bf&&S.bf.hard), hq:!!btnRects.hq, pour:[BD_POUR, BD_POUR_T], baseHp:BD_BASE_HP, diffDial:BD_DIFF, titleY:BD_TITLE_Y, titleAlpha:(S.bf&&S.bf.bd)? +bdTitleAlpha().toFixed(3) : null, bellAt:(S.bdBellAt==null)? null : S.bdBellAt, simT:+((S.t||0).toFixed(3)), rosters:(S.bf&&S.bf.bd)? [bdRosterRows(0), bdRosterRows(1)] : null, putAway:Object.assign({},PUTAWAY), awayLog:BD_AWAY_LOG.slice(), inRoom:bdInRoom(), shell:bdInShell(), annS:BD_ANN_S, annAfterYeti:BD_ANN_AFTER_YETI, plastic:S.plastic, ot:!!(S.bf&&S.bf.ot) }; },   // 0902: + the round-two reads
   evFeel(){ return { rk:EV.rk||'', evRk:evRk(), fcx:Object.assign({},RAID_KING_FCX), p1:Object.assign({},RAID_P1_WAVES), breathPips:REX_BREATH_PIPS, breathUOnly:REX_BREATH_U_ONLY, king:evKingName(), evKing:evKing(), night:evNightName(), seenK:Object.assign({ ice:'', bone:'' }, META.evSeenK||{}), seen:META.evSeen||null, sched:EV.sched? EV.sched.slice() : null, kingDows:evKingDows(), allDows:evAllDows(), kingDay:evKingDayLong(), kingDays:evKingDays(), annLine:evAnnLine(), popLine:evPopLine(), nextDay:evNextBellDayLong(), hpxBone:Object.assign({},EV_HPX_BONE), lairKing:Object.assign({},LAIR_U_KING), stegos:Object.assign({},LAIR_U_STEGO), nests:LAIR_U_NESTS, hatchStepU:LAIR_HATCH_STEP_U, hm:Object.assign({},RAID_HMUL_U), fend:{ on:RXS_ON?1:0, resist:REX_SABER_RESIST, mega:REX_FEND_MEGA, r:REX_SWEEP_R, after:REX_SWEEP_AFTER, wind:REX_SWEEP_WIND, push:REX_SWEEP_PUSH, cd:REX_SWEEP_CD, pip:REX_SWEEP_PIP }, spotBone:EV_SPOT_BONE.slice(), poolBone:evPoolFor('bone'), hoardBuilt:evHoardBuilt()?1:0, fill:EV_FILL, botsMax:EV_BOTS_MAX, botsN:Array.from({length:EV_MAX},(_,i)=>evBotsN(i+1)), botF:EV_BOT_F, foeF:EV_FOE_F, tagsAdd:EV_TAGS_ADD, tickU:EV_TICK_U, hpx:Object.assign({},EV_HPX), snowCdAdd:EV_SNOW_CD_ADD, snowRunAdd:EV_SNOW_RUN_ADD, krefLive:EV_SNOW_KREF_LIVE, w3F:EV_W3_F, purse:RAID_TAGS*EV_BOT_F, drip:BOT_DRIP*EV_BOT_F, cap:Math.round(BOT_CAP*EV_BOT_F), kx:+((RAID_CNT_MUL.u/RAID_CNT_MUL.g)*EV_FOE_F).toFixed(3), popS:EV_POP_S, daily:EV.daily|0, annWk:EVD.annWk||null, popBell:EVD.popBell|0, seen:META.evSeen||null }; },   // 0506 HALF AND HALF + the card latches — the rig's read · 0565 THE ULTRA MEGA TUNE: hpx = EV_HPX, the ULTRA room's per-type hp cells (a read-only copy) · 0574 THE ULTRA MEGA TUNE II: hpx shows seven cells; + snowCdAdd (EV_SNOW_CD_ADD) and w3F (EV_W3_F) · 0842 THE ULTRA MEGA KING YETI, ROUND THREE: tickAdd → tickU (EV_TICK_U, the faucet cut) · + snowRunAdd (EV_SNOW_RUN_ADD) and krefLive (EV_SNOW_KREF_LIVE)
   evSeen(v){ if(v===0||v===false){ delete META.evSeen; META.evSeenK={ ice:'', bone:'' }; } else if(v!=null){ META.evSeen=String(v); META.evSeenK={ ice:String(v), bone:String(v) }; } saveMeta(); return META.evSeen||null; },   // 0905 THE WORDS OF THE ERUPTION: 0 clears BOTH kings' latches, a value marks both
