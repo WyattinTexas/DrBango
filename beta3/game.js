@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.98.0';
+const BUILD = 'STARSPELL v0.98.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -5991,8 +5991,10 @@ class Home extends Phaser.Scene {
        languages, version and sound into one small settings button"). The
        three quiet targets that lived on this band — 🔊 mute left, 🌐
        language right, the version line centre — folded into one drawn gear;
-       their surfaces live on inside settingsSheet(). */
-    this.setB = ui(this.add.image(l.x(0), l.y(784), ssGearTex(this))
+       their surfaces live on inside settingsSheet(). Bottom-RIGHT corner
+       since v0.98.1 (Skylar, 9/15) — the exact seat the old 🌐 held
+       (right edge at x 195), clear of the duel strip's last row at y744. */
+    this.setB = ui(this.add.image(l.x(185), l.y(784), ssGearTex(this))
       .setDisplaySize(l.u(20), l.u(20)).setAlpha(0.7).setInteractive({ useHandCursor: true }));
     this.setB.on('pointerdown', () => this.settingsSheet());
     DIAG('meadow ui built ' + Math.round(performance.now() - tUi) + 'ms');
