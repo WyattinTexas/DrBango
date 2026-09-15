@@ -20,7 +20,12 @@
 // entering; a tap mid-ride skips to the landing while ✕ refuses to close
 // until settled; ?ride=0 snaps; and tapping the node (via the mapZone
 // VALUE, never its carrier) enters the fight from both doors. Plus the es
-// dress and a layout judge at SE/iPad metrics.
+// dress and a layout judge at SE/iPad metrics. §9 (sharp-sky round four,
+// slice 1) proves the six crispness laws live: one magnitude resolver
+// (line-degree + override door) grading every star, the 44→0 fused-pair
+// census, the r+2.5 served-line inset, the ADD-blend glow whitelist on
+// the settled tree, the state/grade tables, and the two 9/3-answer
+// amendments riding the gated design data.
 //
 //   node tools/sky-check.mjs   # self-launching: :8899 server if none, Chrome on :9480
 //
@@ -58,6 +63,22 @@ for (const k of ['mapTitle:', 'mapHint:', 'mapDest:']) {
   const n = (ssrc.match(new RegExp(k, 'g')) || []).length;
   ok('strings ×5 · ' + k.slice(0, -1) + ' rides every tongue', n === 5, String(n));
 }
+// — the sharp-sky paper (round four, slice 1: laws 1–6 on the chart) —
+ok('LAW 1 · the s%3 list-position size deal is GONE from the chart', !/9\.5 : 6\.4/.test(gsrc) && !/s % 3 === 0 \? 9\.5/.test(gsrc));
+ok('LAW 1+6 · one resolver, one radius table, one override door, one grades table',
+  /function ssStarMags\(/.test(gsrc) && /SS_MAG_R = \{ 1: 4\.2, 2: 2\.8, 3: 1\.9 \}/.test(gsrc)
+  && /const SS_MAG_OVR = /.test(gsrc) && /SS_STAR_GRADES = \{ versus: \[0\.20, 0\.35\], chart: \[0\.38, 0\.44, 0\.52\], showcase: 0\.80, battle: 1\.15 \}/.test(gsrc));
+ok('LAW 6 · the chart consumes the grade triple through the resolver and the served line',
+  /SS_STAR_GRADES\.chart/.test(chart) && /ssStarMags\(b\)/.test(chart) && /ssEdgeSeg\(b\.stars\[e1\], b\.stars\[e2\], SS_MAG_R\[mags\[e1\]\], SS_MAG_R\[mags\[e2\]\]/.test(chart));
+ok('LAW 3 · no raw-coord lineBetween survives in the chart draw', !/lineBetween\(gx \+ b\.stars/.test(chart));
+ok('LAW 5 · radii are state-blind: one SS_MAG_R read, no state term in a radius',
+  (chart.match(/SS_MAG_R\[m\] \* k/g) || []).length === 1 && !/state[^\n]*SS_MAG_R/.test(chart));
+ok('LAW 4 · source census: exactly the aura + the beacon wear ADD in the chart', (chart.match(/setBlendMode\('ADD'\)/g) || []).length === 2);
+ok('LAW 4 · won eyes close, far eyes are hard pinprick fills', /if \(state === 'far'\) for \(const e of b\.eyes\)/.test(chart) && !/setTint\(b\.eye\)/.test(chart));
+const dsn = JSON.parse(readFileSync('design/campaign-sky-redesign-2026-09-data.json', 'utf8'));
+ok('the two 9/3-answer amendments ride the gated data card (columba 8 · monoceros 17)',
+  JSON.stringify(dsn.find((x) => x.id === 'columba').stars[8]) === '[-32,-27]'
+  && JSON.stringify(dsn.find((x) => x.id === 'monoceros').stars[17]) === '[20,42]');
 
 /* ---------- server + browser ---------- */
 const kids = [];
@@ -338,7 +359,7 @@ ok('the es header: EL CIELO DE LA CAMPAÑA over ACTO II · combate 3 de 5', awai
   const scan = (ls) => ls.forEach((o) => { if (o.texture && o.texture.key === 'gold@20@EL CIELO DE LA CAMPAÑA') t = true;
     if (typeof o.text === 'string' && /ACTO II/.test(o.text) && /combate 3 de 5/.test(o.text)) s = true; if (o.list) scan(o.list); });
   scan(h.mapC.list); return t && s })()`));
-ok('…and the es hint at the foot', await evj(TEXTS(`${H}.mapC`)).then((t) => t.includes('toca la constelación que brilla para entrar en combate')));
+ok('…and the es hint at the foot (the v0.94 BEGIN wording)', await evj(TEXTS(`${H}.mapC`)).then((t) => t.includes('toca la constelación que brilla para comenzar')));
 await shot('es-dress');
 
 /* ---------- §8 the layout judge (SE + iPad metrics) ---------- */
@@ -364,6 +385,76 @@ for (const [name, w, h] of [['iPhone SE', 375, 667], ['iPad', 820, 1180]]) {
   await shot('judge-' + w + 'x' + h);
 }
 await send('Emulation.clearDeviceMetricsOverride', {});
+
+/* ---------- §9 the six laws, live (sharp-sky round four, slice 1) ---------- */
+console.log('\n— §9 THE SIX LAWS —');
+await boot('ride=0', `localStorage.setItem('beta3.campaign', '${CK7.replace(/'/g, "\\'")}');`);
+// laws 1–2 · the resolver and the gap law over every pair in the sky
+const res = await evj(`(() => { let n1 = 0, n2 = 0, n3 = 0, bad = 0, fusedOld = 0, fused = 0, worst = 1e9;
+  for (const id in SS_BEASTS) { const b = SS_BEASTS[id], m = ssStarMags(b);
+    if (m.length !== b.stars.length) bad++;
+    m.forEach((v) => v === 1 ? n1++ : v === 2 ? n2++ : v === 3 ? n3++ : bad++);
+    for (let i = 0; i < b.stars.length; i++) for (let j = i + 1; j < b.stars.length; j++) {
+      const d = Math.hypot(b.stars[i][0] - b.stars[j][0], b.stars[i][1] - b.stars[j][1]);
+      if (d < (i % 3 === 0 ? 9.5 : 6.4) + (j % 3 === 0 ? 9.5 : 6.4)) fusedOld++;
+      const g = d - (SS_MAG_R[m[i]] + SS_MAG_R[m[j]]); if (g < 0) fused++; if (g < worst) worst = g; } }
+  return JSON.stringify({ n1, n2, n3, bad, fusedOld, fused, worst: Math.round(worst * 100) / 100 }) })()`);
+ok('LAW 1 · every star resolves — 432 stars grade 99 anchors / 191 joints / 142 companions',
+  res.bad === 0 && res.n1 === 99 && res.n2 === 191 && res.n3 === 142, JSON.stringify(res));
+ok('LAW 2 · the fused-pair census reads 0 under magnitude radii (44 under the old deal — the whole round)',
+  res.fused === 0 && res.fusedOld === 44, JSON.stringify(res));
+ok('…worst rim gap on the live shapes ≈ 0.67 (TAURUS), the page\'s own number', res.worst === 0.67, String(res.worst));
+ok('LAW 1 · TAURUS resolves exactly as the round\'s machine-checked magsLive',
+  await ev(`JSON.stringify(ssStarMags(SS_BEASTS.taurus)) === '[1,2,2,1,2,2,3,2,3,1,2,2,2,3,2,3,2,3,3,3,3,3,3]'`));
+ok('…the Pleiades stay the tight CLUSTER-class m3 (question 4: edge-free micro-stars)',
+  await ev(`(() => { const b = SS_BEASTS.taurus, m = ssStarMags(b); const deg = b.stars.map(() => 0);
+    b.edges.forEach(([a, c]) => { deg[a]++; deg[c]++; });
+    const free = deg.map((d, i) => d === 0 ? i : -1).filter((i) => i >= 0);
+    return free.length >= 4 && free.every((i) => m[i] === 3) })()`));
+ok('LAW 1 · every authored override names an existing star of a real beast',
+  await ev(`(() => { for (const id in SS_MAG_OVR) { const b = SS_BEASTS[id]; if (!b) return false;
+    for (const k in SS_MAG_OVR[id]) if (+k >= b.stars.length || ![1, 2, 3].includes(SS_MAG_OVR[id][k])) return false; } return true })()`));
+const seg = await evj(`(() => { const s = ssEdgeSeg([0, 0], [30, 0], 4.2, 2.8);
+  const t = ssEdgeSeg([0, 0], [13, 0], 4.2, 4.2);
+  return JSON.stringify({ x1: Math.round(s.x1 * 10) / 10, x2: Math.round(s.x2 * 10) / 10, flat: s.y1 === 0 && s.y2 === 0, short: t === null }) })()`);
+ok('LAW 3 · the served line insets r+2.5 both ends and yields nothing on a too-short span',
+  seg.x1 === 6.7 && seg.x2 === 24.7 && seg.flat && seg.short, JSON.stringify(seg));
+ok('LAW 5+6 · the state, core, line and grade tables stand exactly as ruled', await ev(`JSON.stringify([SS_MAG_A, SS_MAG_CORE_A, SS_MAG_LINE_A, SS_STAR_GRADES, SS_MAG_OVR]) === JSON.stringify([
+  { won: { 1: 0.96, 2: 0.9, 3: 0.8 }, now: { 1: 1, 2: 0.96, 3: 0.86 }, far: { 1: 0.65, 2: 0.5, 3: 0.34 } },
+  { lit: { 1: 0.95, 2: 0.55 }, far: { 1: 0.55, 2: 0.3 } },
+  { won: 0.38, now: 0.55, far: 0.22 },
+  { versus: [0.20, 0.35], chart: [0.38, 0.44, 0.52], showcase: 0.80, battle: 1.15 }, {}])`));
+// law 4 · the glow census on the SETTLED chart tree: aura + beacon, nothing else
+await tapObj(`${H}.rowLabels.campaign`);
+await until(`!!${H}.mapC && ${MAP}.settled === true`, 9000, 100);
+// (the canvas-tint shim mints '#'-suffixed keys — glowbig#ffd77a — so judge
+// the BASE key; the alphas stay exact)
+const adds = await evj(`(() => { const h = ${H}; const adds = [];
+  const scan = (ls) => ls.forEach((o) => { if (o.blendMode === 1) adds.push({ k: o.texture ? String(o.texture.key).split('#')[0] : o.type, a: Math.round(o.alpha * 100) / 100 }); if (o.list) scan(o.list); });
+  scan(h.mapC.list); return JSON.stringify(adds.sort((x, y) => x.a - y.a)) })()`);
+ok('LAW 4 · the whitelist holds: the ADD census is the beacon (.13) + the aura (.17), nothing else',
+  JSON.stringify(adds) === '[{"k":"glowbig","a":0.13},{"k":"glowbig","a":0.17}]', JSON.stringify(adds));
+// the eyeball evidence: zoomed crops off the settled fight-8 road (SHOTS=1)
+const crop = async (n, r) => { if (!SHOTS) return; try { mkdirSync(SHOTS, { recursive: true });
+  const c = await send('Page.captureScreenshot', { format: 'png', clip: { x: Math.max(0, r.x), y: Math.max(0, r.y), width: r.w, height: r.h, scale: 3 } });
+  writeFileSync(SHOTS + '/' + n + '.png', Buffer.from(c.data, 'base64')); } catch (e) { } };
+if (SHOTS) {
+  await shot('laws-settled');
+  const zr = await evj(`(() => { const z = ${ZONE(`${H}.mapC`)}; const b = z.getBounds(); const D = game.scale.width / innerWidth;
+    return JSON.stringify({ x: b.x / D - 30, y: b.y / D - 30, w: b.width / D + 60, h: b.height / D + 60 }) })()`);
+  await crop('law-now-node', zr);
+  const wr = await evj(`(() => { const h = ${H}; let r = null; const D = game.scale.width / innerWidth;
+    const scan = (ls) => ls.forEach((o) => { if (o.text === 'STRIX' || (!r && o.text === 'CANCER')) { const b = o.getBounds();
+      const cx = b.centerX / D, cy = b.centerY / D;
+      r = { x: Math.max(0, cx - 150), y: Math.max(0, Math.min(cy - 100, innerHeight - 200)), w: 300, h: 200 }; } if (o.list) scan(o.list); });
+    scan(h.mapC.list); return JSON.stringify(r) })()`);
+  if (wr) await crop('law-won-gold', wr);
+  for (let i = 0; i < 14 && !(await ev(`${MAP}.off <= ${MAP}.offMin`)); i++) {
+    const v2 = await evj(`JSON.stringify({ w: innerWidth, h: innerHeight })`);
+    await drag(v2.w / 2, v2.h * 0.16, v2.h * 0.82);
+  }
+  await shot('laws-summit');
+}
 
 /* ---------- the verdict ---------- */
 console.log('\n— PAGE EXCEPTIONS —');

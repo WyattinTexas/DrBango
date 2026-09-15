@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.98.1';
+const BUILD = 'STARSPELL v0.99.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4602,6 +4602,69 @@ function ssMapSkyTex(scene) {
   return key;
 }
 
+/* ============================================================
+   THE SHARP SKY (sharp-sky round four, slice 1 of 3) — the crisp
+   chart render. The blob was the RENDER, not the shapes: discs were
+   dealt 9.5/6.4 star-units by list position (s%3) against pair
+   spacings down to 4.5 — 44 fused star-pairs on the live sky.
+   Magnitude radii fuse ZERO pairs on either shape set, so the crisp
+   render ships on the live shapes before any 9/3 shape verdict.
+   ONE magnitude system for every surface; this slice wires the
+   campaign chart. Slice 2 re-pitches the road; slice 3 retires the
+   battle/showcase/versus list-position deals (i%5) through the same
+   resolver. All sizes in star-units so every law is scale-invariant.
+   ============================================================ */
+// LAW 6 — the surface grades (star-unit × screen-unit). The chart consumes
+// its triple below; the other three surfaces re-aim here in slice 3.
+const SS_STAR_GRADES = { versus: [0.20, 0.35], chart: [0.38, 0.44, 0.52], showcase: 0.80, battle: 1.15 };
+// LAW 1 — disc radii by magnitude class: m1 anchor · m2 joint · m3 companion
+const SS_MAG_R = { 1: 4.2, 2: 2.8, 3: 1.9 };
+// …and the authored override table {beastId: {starIdx: mag}}. EMPTY today by
+// the round's own machine-checked data: on the LIVE shapes pure line-degree
+// IS the approved assignment (gen-data magsLive, proven equal for all 26).
+// The sharp-extras MAGS entries (Aldebaran/Elnath/Deneb/Regulus/Antares m1,
+// Orion's Belt locked m2, strix eye-rings receded, cancer demoted) index the
+// 9/3 PROPOSED shapes and ride in with that gated data card, through here.
+const SS_MAG_OVR = {};
+// LAW 5 — states speak in light, never size: per-state fill/alpha tables;
+// radii come from SS_MAG_R whatever the state
+const SS_MAG_A = {
+  won: { 1: 0.96, 2: 0.9, 3: 0.8 },
+  now: { 1: 1, 2: 0.96, 3: 0.86 },
+  far: { 1: 0.65, 2: 0.5, 3: 0.34 },
+};
+const SS_MAG_CORE_A = { lit: { 1: 0.95, 2: 0.55 }, far: { 1: 0.55, 2: 0.3 } };
+const SS_MAG_LINE_A = { won: 0.38, now: 0.55, far: 0.22 };
+const SS_MAG_CORE = 0xfff6dd;   // the white-hot heart — brightness reads as heat, not width
+
+// the resolver: line-degree (3+ lines → m1 · 2 → m2 · chain-end → m3) + the
+// authored overrides; cached on the beast (static data for the session)
+function ssStarMags(b) {
+  if (b.__mags && b.__mags.length === b.stars.length) return b.__mags;
+  const deg = b.stars.map(() => 0);
+  for (const [a, c] of b.edges) { deg[a]++; deg[c]++; }
+  const m = deg.map((d) => (d >= 3 ? 1 : d === 2 ? 2 : 3));
+  const ovr = SS_MAG_OVR[b.id];
+  if (ovr) for (const k in ovr) m[+k] = ovr[k];
+  return (b.__mags = m);
+}
+
+// LAW 3 — the served line: endpoints inset r+2.5 from each disc's center so
+// a segment never pierces a star; null when the span leaves nothing to draw.
+// The shared door: the chart strokes with it now, the assembly in slice 3.
+function ssEdgeSeg(a, b, ra, rb) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+  const i1 = ra + 2.5, i2 = rb + 2.5;
+  if (L <= i1 + i2 + 1) return null;
+  return { x1: a[0] + dx / L * i1, y1: a[1] + dy / L * i1, x2: b[0] - dx / L * i2, y2: b[1] - dy / L * i2 };
+}
+
+// class tints lean toward white, never a new palette (canvas-safe number math)
+function ssTintUp(c, t) {
+  const r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+  return (Math.round(r + (255 - r) * t) << 16) | (Math.round(g + (255 - g) * t) << 8) | Math.round(b + (255 - b) * t);
+}
+
 function ssStarChart(scene, opts) {
   const l = ssLayout(scene);
   const acts = opts.acts || SS_ACTS;
@@ -4662,8 +4725,9 @@ function ssStarChart(scene, opts) {
     const reach = l.H + l.u(span * f);
     for (let i = 0; i < n; i++) {
       const sz = l.u(1.2 + rnd() * 2.0);
+      // plain fills only — the glow whitelist (LAW 4) is the aura, the summit
+      // beacon and the eye pinpricks; the dust drifts unlit
       const d = scene.add.image(rnd() * l.W, rnd() * reach, 'dot').setDisplaySize(sz, sz).setAlpha(0.08 + rnd() * 0.22);
-      if (i % 3 === 0) d.setBlendMode('ADD');
       dc.add(d);
     }
   });
@@ -4722,11 +4786,21 @@ function ssStarChart(scene, opts) {
     const state = i < fightIdx ? 'won' : i === fightIdx ? 'now' : 'far';
     const last = i === N - 1;
     // the one you face next renders BIGGER than the rest (the ×1.5)
-    const sc = (b.boss ? 0.52 : b.tier === 'mini' ? 0.44 : 0.38) * (last ? 1.35 : 1) * (state === 'now' ? 1.5 : 1);
+    const gr = SS_STAR_GRADES.chart;   // LAW 6 — the chart's grade triple
+    const sc = (b.boss ? gr[2] : b.tier === 'mini' ? gr[1] : gr[0]) * (last ? 1.35 : 1) * (state === 'now' ? 1.5 : 1);
     const k = l.u(sc);
-    const tint = state === 'won' ? 0xd7b45c : state === 'now' ? 0xffe9a8 : (um ? SS_UMBRAL.tint : b.tint);
-    const aLine = state === 'won' ? 0.4 : state === 'now' ? 0.85 : 0.2;
-    const aStar = state === 'won' ? 0.85 : state === 'now' ? 1 : 0.5;
+    // LAW 5 — the state dresses fill and alpha; the figure keeps its magnitudes.
+    // WON turns the tale's gold but holds its three sizes and white cores; FAR
+    // dims by class so anchors still pierce the dark; NOW burns the beast's own
+    // tint. Lines stay dimmer than the discs they join in every state (LAW 3).
+    const mags = ssStarMags(b);
+    const ownTint = um ? SS_UMBRAL.tint : b.tint;
+    const base = state === 'won' ? 0xd7b45c : ownTint;
+    const discC = { 1: ssTintUp(base, 0.25), 2: ssTintUp(base, 0.12), 3: base };
+    const discA = SS_MAG_A[state];
+    const lineC = state === 'won' ? ssTintUp(0xd7b45c, 0.2) : ssTintUp(ownTint, 0.35);
+    const aLine = SS_MAG_LINE_A[state];
+    const coreA = SS_MAG_CORE_A[state === 'far' ? 'far' : 'lit'];
     // star bounds → where names, rings and zones sit, whatever the shape
     let mxX = 0, mxY = 0;
     for (const s of b.stars) { mxX = Math.max(mxX, Math.abs(s[0])); mxY = Math.max(mxY, Math.abs(s[1])); }
@@ -4737,13 +4811,39 @@ function ssStarChart(scene, opts) {
         .setTint(state === 'won' ? 0xffd77a : 0xffc46b).setAlpha(0.13).setBlendMode('ADD'));
     }
     const drawInto = (g, gx, gy) => {
-      g.lineStyle(l.u(Math.max(1.1, sc * 3.2)), tint, aLine);
+      // LAW 3 — 2.2u round-cap lines, inset r+2.5 from each disc: the figure
+      // reads star-to-star, a line never pierces a star
+      g.lineStyle(2.2 * k, lineC, aLine);
+      g.fillStyle(lineC, aLine);
       for (const [e1, e2] of b.edges) {
-        g.lineBetween(gx + b.stars[e1][0] * k, gy + b.stars[e1][1] * k, gx + b.stars[e2][0] * k, gy + b.stars[e2][1] * k);
+        const seg = ssEdgeSeg(b.stars[e1], b.stars[e2], SS_MAG_R[mags[e1]], SS_MAG_R[mags[e2]]);
+        if (!seg) continue;
+        g.lineBetween(gx + seg.x1 * k, gy + seg.y1 * k, gx + seg.x2 * k, gy + seg.y2 * k);
+        g.fillCircle(gx + seg.x1 * k, gy + seg.y1 * k, 1.1 * k);   // the round caps
+        g.fillCircle(gx + seg.x2 * k, gy + seg.y2 * k, 1.1 * k);
       }
-      g.fillStyle(tint, aStar);
+      // LAW 1 — three magnitudes; the lit anchor's hairline four-ray flare and
+      // the white-hot cores are FILL work, so the halo law stays honest (LAW 4)
       for (let s = 0; s < b.stars.length; s++) {
-        g.fillCircle(gx + b.stars[s][0] * k, gy + b.stars[s][1] * k, l.u(sc * (s % 3 === 0 ? 9.5 : 6.4)));
+        const m = mags[s], r = SS_MAG_R[m] * k, px = gx + b.stars[s][0] * k, py = gy + b.stars[s][1] * k;
+        if (m === 1 && state !== 'far') {
+          const fl = r * 2.6;
+          g.lineStyle(0.8 * k, SS_MAG_CORE, state === 'now' ? 0.55 : 0.4);
+          g.lineBetween(px - fl, py, px + fl, py);
+          g.lineBetween(px, py - fl, px, py + fl);
+        }
+        g.fillStyle(discC[m], discA[m]);
+        g.fillCircle(px, py, r);
+        if (m < 3) {
+          g.fillStyle(SS_MAG_CORE, coreA[m]);
+          g.fillCircle(px, py, r * (m === 1 ? 0.48 : 0.4));
+        }
+      }
+      // far eyes: still pinpricks in the dark — hard fills, no glow (LAW 4);
+      // a felled beast's eyes close (no eyes on won)
+      if (state === 'far') for (const e of b.eyes) {
+        g.fillStyle(b.eye, 0.35); g.fillCircle(gx + e[0] * k, gy + e[1] * k, 4.5 * k);
+        g.fillStyle(b.eye, 1); g.fillCircle(gx + e[0] * k, gy + e[1] * k, 2.2 * k);
       }
     };
     if (state === 'now') {
@@ -4753,24 +4853,30 @@ function ssStarChart(scene, opts) {
         .setTint(0xffd77a).setAlpha(0.17).setBlendMode('ADD'));
       const ng = scene.add.graphics();
       drawInto(ng, 0, 0);
-      for (const e of b.eyes) {
-        const eye = scene.add.image(e[0] * k, e[1] * k, 'dot').setScale(clamp(sc * 1.9, 0.35, 1.2)).setTint(b.eye).setBlendMode('ADD');
-        scene.tweens.add({ targets: eye, alpha: 0.4, duration: 700, yoyo: true, repeat: -1 });
-        nc.add(eye);
-      }
       nc.add(ng);
+      // the waking eyes: pinprick + soft iris as hard fills (r 2.2 + 4.5 —
+      // LAW 4 retires the soft dot blobs), breathing in alpha as before
+      const eyeG = scene.add.graphics();
+      for (const e of b.eyes) {
+        eyeG.fillStyle(b.eye, 0.35); eyeG.fillCircle(e[0] * k, e[1] * k, 4.5 * k);
+        eyeG.fillStyle(b.eye, 1); eyeG.fillCircle(e[0] * k, e[1] * k, 2.2 * k);
+      }
+      scene.tweens.add({ targets: eyeG, alpha: 0.55, duration: 700, yoyo: true, repeat: -1 });
+      nc.add(eyeG);
       scene.tweens.add({ targets: nc, scaleX: 1.06, scaleY: 1.06, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       rc.add(nc);
-      // the waiting ring, swelling like a held breath
+      // the waiting ring, swelling like a held breath — an affordance, not a
+      // halo (LAW 4 keeps it), dressed down to the sharp render's .45
       const ring = scene.add.graphics({ x: l.x(p.x), y: l.y(p.y) });
-      ring.lineStyle(l.u(1.6), 0xffd77a, 0.55);
+      ring.lineStyle(l.u(1.6), 0xffd77a, 0.45);
       ring.strokeCircle(0, 0, Math.max(l.u(34), l.u(mxX * sc + 16)));
       scene.tweens.add({ targets: ring, scaleX: 1.14, scaleY: 1.14, alpha: 0.15, duration: 1100, repeat: -1, ease: 'Sine.easeOut' });
       rc.add(ring);
       // its name waits BENEATH it, born silent — it pops as the camera lands
+      // the name keeps ssTxt's own crisp shadow — the soft gold blur retired
+      // with the halo pile-up (sharpest where it matters most)
       curName = ssTxt(scene, l.x(p.x), l.y(p.y + mxY * sc + 26), name, l.u(13.5), '#ffe9a8')
         .setOrigin(0.5, 0).setAlpha(0);
-      curName.setShadow(0, 0, '#c9b676', l.u(6), true, true);
       rc.add(curName);
       curGeom = { p, mxX, mxY, sc };
     } else {
