@@ -45458,7 +45458,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='9.87';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='9.88';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -71569,10 +71569,12 @@ function drawNightRug(WD,HT){ const N=ELITE_NIGHT;   // the plain rug's night ar
 function drawNightLight(WD,HT,ground){ const N=ELITE_NIGHT, fw=WD-112, fh=HT-112, wb=ground? N.washBy[ground] : null;   // after the arm, before the runner: the costume band's own wash + the window light on every night rung
   cx.save(); cx.beginPath(); cx.rect(56,56,fw,fh); cx.clip();
   if(wb){ cx.globalAlpha=wb[1]; cx.fillStyle=wb[0]; cx.fillRect(56,56,fw,fh); cx.globalAlpha=1; }
+  if(!rugPlateOn()){   // 0999 THE CAMPAIGN RUG II (CELL 7): on a plate rug the window light rides the plate (0.15, feathered, a foot fade, two mullions — baked once) and this per-frame gradient is RETIRED; it stays live only where no plate is baked (a night battleground, the moon garden's park battle)
   const w0=fw*N.lightW, sk=Math.tan(N.skew*Math.PI/180)*fh;
   const g=cx.createLinearGradient(56,0,56+w0+sk,0);
   g.addColorStop(0,'rgba('+N.light+','+N.lightA+')'); g.addColorStop(0.55,'rgba('+N.light+','+(N.lightA*0.5).toFixed(3)+')'); g.addColorStop(1,'rgba('+N.light+',0)');
   cx.fillStyle=g; cx.beginPath(); cx.moveTo(56,56); cx.lineTo(56+w0,56); cx.lineTo(56+w0+sk,56+fh); cx.lineTo(56+sk,56+fh); cx.closePath(); cx.fill();
+  }
   if(N.beam){   // the searchlights: two tapered beams sweeping slowly from lamps at the mat's foot (the diorama's beam(), on the battle clock — deterministic, never RNG in a draw call)
     for(const B of [[WD*0.86,HT-60,0.0],[WD*0.30,HT-60,2.1]]){ const a=-Math.PI/2+Math.sin(S.t*0.22+B[2])*0.5, L=Math.hypot(WD,HT), x1=B[0]+Math.cos(a)*L, y1=B[1]+Math.sin(a)*L, nx=-Math.sin(a), ny=Math.cos(a);
       const gb=cx.createLinearGradient(B[0],B[1],x1,y1); gb.addColorStop(0,'rgba(232,240,255,'+N.beamA+')'); gb.addColorStop(1,'rgba(201,218,255,0)');
@@ -72137,6 +72139,7 @@ function drawRug(){
   // on the floorboards — ground layer, under every figure and under the balls
   // (the momRaid branch at the top already returned, so this is the CAMPAIGN
   // door only; null on every rug she never walked, one truthy test).
+  rugPlateBlit();   // 0999 THE CAMPAIGN RUG II (CELL 2): THE PLATE — the lit field, the props' dressing, the bevel, the night's window — baked once, blitted 1:1 here: over every static thing on the rug, under the toys, the balls, the snowfall and every figure
   if(S.momToys) drawMomToys();
   // wrecking balls last — tallest thing on the carpet (0129: the mode gate is
   // gone — the dressed campaign rugs patrol too, and every undressed rug has
@@ -72208,16 +72211,18 @@ function pathPts(P){
 // Duckboards and the ladders stay plank-brown everywhere — planks are planks.
 // The shade entry is the below-grade re-stroke laid OVER the men (draw()).
 const TRENCH_PAL={
-  sand:  { lip:'#9A5A28', cut:'#5E2E14', floor:'#47200C', rim:'rgba(242,197,132,0.65)', shade:'#2A1408' },
-  carpet:{ lip:'#8F4634', cut:'#3E1610', floor:'#2E100B', rim:'rgba(214,140,108,0.55)', shade:'#1E0A06' },
-  snow:  { lip:'#D7E1EC', cut:'#8C9AAD', floor:'#5A6E86', rim:'rgba(249,252,255,0.8)',  shade:'#3C4A5C' }
+  sand:  { lip:'#9A5A28', cut:'#5E2E14', floor:'#47200C', rim:'rgba(242,197,132,0.65)', shade:'#2A1408', deep:'#331408', lit:'#7E4220' },   // 0999 THE CAMPAIGN RUG II (CELL 5 · c16): deep = the NW wall in shadow, lit = the SE wall under the one sun (D's WALL table)
+  carpet:{ lip:'#8F4634', cut:'#3E1610', floor:'#2E100B', rim:'rgba(214,140,108,0.55)', shade:'#1E0A06', deep:'#1E0A06', lit:'#5A2418' },
+  snow:  { lip:'#D7E1EC', cut:'#8C9AAD', floor:'#5A6E86', rim:'rgba(249,252,255,0.8)',  shade:'#3C4A5C', deep:'#46586E', lit:'#A8B6C8' }
 };
 function trenchPal(){ return TRENCH_PAL[S.cfg.terrain.ground]||TRENCH_PAL.carpet; }
 function drawTrenchCut(tr,pal){
   const P=tr.pts;
   cx.lineJoin='round'; cx.lineCap='round';
   cx.strokeStyle=pal.lip; cx.lineWidth=TRENCH_W+8; pathPts(P); cx.stroke();   // the spoil lip
-  cx.strokeStyle=pal.cut; cx.lineWidth=TRENCH_W;   pathPts(P); cx.stroke();   // the cut
+  const walls9=!S.bf && !!(pal.deep && pal.lit);   // 0999 THE CAMPAIGN RUG II (CELL 5 · c16): the campaign's cut goes DOWN under the one sun — the whole cut in the NW wall's deep tone, then the SE wall lit (TRENCH_W−8 at +4,+4); the floor, the rim, the duckboards and the ladders byte-still; WESTERN LAND's own trench (S.bf) keeps the served cut
+  cx.strokeStyle=walls9? pal.deep : pal.cut; cx.lineWidth=TRENCH_W;   pathPts(P); cx.stroke();   // the cut
+  if(walls9){ cx.save(); cx.translate(4,4); cx.strokeStyle=pal.lit; cx.lineWidth=TRENCH_W-8; pathPts(P); cx.stroke(); cx.restore(); }   // the lit SE wall
   cx.strokeStyle=pal.floor; cx.lineWidth=TRENCH_W-18; pathPts(P); cx.stroke();  // the floor, deepest at the middle
   // the sunlit north-west rim — the one line that says "below grade" at 54px
   cx.save(); cx.translate(-3,-3);
@@ -72623,28 +72628,30 @@ function drawCrateStack(rk){
   cx.restore();
 }
 function drawMesa(rk){
-  const r=rk.r;
+  const r=rk.r, M=mesaShapes(rk);   // 0999 THE CAMPAIGN RUG II (CELL 5): the ONE geometry — the plate's faces, strata and caprock read the same numbers
   cx.fillStyle='rgba(60,26,10,0.25)';
   cx.beginPath(); cx.ellipse(rk.x+r*0.22,rk.y+r*0.62,r*1.12,r*0.42,0,0,7); cx.fill();
-  cx.fillStyle='#A64B28'; cx.beginPath(); cx.ellipse(rk.x,rk.y+r*0.28,r,r*0.5,0,0,7); cx.fill();     // talus base
-  cx.fillStyle='#B4552E'; rr(rk.x-r*0.86,rk.y-r*0.62,r*1.72,r*0.95,r*0.2); cx.fill();               // lower band
-  cx.fillStyle='#C9713C'; rr(rk.x-r*0.78,rk.y-r*1.02,r*1.56,r*0.5,r*0.16); cx.fill();               // upper band
-  cx.fillStyle='#DB8B4C'; cx.beginPath(); cx.ellipse(rk.x,rk.y-r*1.02,r*0.8,r*0.26,0,0,7); cx.fill(); // caprock
+  cx.fillStyle='#A64B28'; cx.beginPath(); cx.ellipse(M.talus[0],M.talus[1],M.talus[2],M.talus[3],0,0,7); cx.fill();     // talus base
+  cx.fillStyle='#B4552E'; rr(M.lower[0],M.lower[1],M.lower[2],M.lower[3],M.lower[4]); cx.fill();               // lower band
+  cx.fillStyle='#C9713C'; rr(M.upper[0],M.upper[1],M.upper[2],M.upper[3],M.upper[4]); cx.fill();               // upper band
+  cx.fillStyle='#DB8B4C'; cx.beginPath(); cx.ellipse(M.cap[0],M.cap[1],M.cap[2],M.cap[3],0,0,7); cx.fill(); // caprock
+  if(!rugPlateOn()){   // 0999: on a plate rug the plate's three strata take the streaks' place (c13); WESTERN LAND (the battleground) keeps the served streaks byte-still
   cx.strokeStyle='rgba(90,38,16,0.5)'; cx.lineWidth=2;
   cx.beginPath(); cx.moveTo(rk.x-r*0.6,rk.y-r*0.28); cx.lineTo(rk.x-r*0.6,rk.y+r*0.2);
   cx.moveTo(rk.x+r*0.34,rk.y-r*0.44); cx.lineTo(rk.x+r*0.34,rk.y+r*0.24); cx.stroke();              // erosion streaks
+  }
 }
 // A saguaro off the toy shelf: trunk, two arms, moulding ridges.
 function drawCactus(rk){
-  const r=rk.r;
+  const r=rk.r, C=cactusLines(rk);   // 0999 THE CAMPAIGN RUG II (CELL 5): the ONE geometry — the plate's outline, shade, rim and ticks read the same lines
   cx.fillStyle='rgba(60,26,10,0.25)';
   cx.beginPath(); cx.ellipse(rk.x+2,rk.y+r*0.5,r*1.1,r*0.4,0,0,7); cx.fill();
   cx.strokeStyle='#4E7F46'; cx.lineCap='round';
-  cx.lineWidth=r*0.85;
-  cx.beginPath(); cx.moveTo(rk.x,rk.y+r*0.4); cx.lineTo(rk.x,rk.y-r*1.7); cx.stroke();              // trunk
-  cx.lineWidth=r*0.6;
-  cx.beginPath(); cx.moveTo(rk.x-r*0.75,rk.y-r*0.2); cx.lineTo(rk.x-r*0.75,rk.y-r*1.05); cx.stroke();
-  cx.beginPath(); cx.moveTo(rk.x+r*0.75,rk.y+r*0.1); cx.lineTo(rk.x+r*0.75,rk.y-r*0.75); cx.stroke();
+  cx.lineWidth=C.trunk[4];
+  cx.beginPath(); cx.moveTo(C.trunk[0],C.trunk[1]); cx.lineTo(C.trunk[2],C.trunk[3]); cx.stroke();              // trunk
+  cx.lineWidth=C.arms[0][4];
+  cx.beginPath(); cx.moveTo(C.arms[0][0],C.arms[0][1]); cx.lineTo(C.arms[0][2],C.arms[0][3]); cx.stroke();
+  cx.beginPath(); cx.moveTo(C.arms[1][0],C.arms[1][1]); cx.lineTo(C.arms[1][2],C.arms[1][3]); cx.stroke();
   cx.strokeStyle='rgba(34,64,30,0.6)'; cx.lineWidth=1.2;
   cx.beginPath(); cx.moveTo(rk.x-r*0.14,rk.y+r*0.2); cx.lineTo(rk.x-r*0.14,rk.y-r*1.5);
   cx.moveTo(rk.x+r*0.14,rk.y+r*0.2); cx.lineTo(rk.x+r*0.14,rk.y-r*1.5); cx.stroke();
@@ -73241,7 +73248,7 @@ function rugRoomCSS(sel,P){ const F=P.fall;
     +' background-repeat: no-repeat, no-repeat, no-repeat, repeat; }\n'
     +sel+' > #cv { box-shadow: 0 0 0 calc(8px * var(--s,1)) '+P.hem+', 0 calc(10px * var(--s,1)) calc(28px * var(--s,1)) calc(8px * var(--s,1)) '+P.drop+'; }\n'; }
 function rugRoomVars(){ const R=document.documentElement.style; R.setProperty('--s', String(scale)); R.setProperty('--bar', Math.max(0,(window.innerHeight-chinPx()-H*scale)/2).toFixed(1)+'px'); }   // from resize(): --s phase-locks the page's boards to the rug's scale, --bar the lamp's edge ramp to the letterbox
-function rugRoom(on){ const w=document.getElementById('wrap'); if(!w) return; on=!!on && !S.momRaid;   // THE SKIP lives here: the mom fight is fought on the boards (startMomRaid stamps S.momRaid before its mode write — measured)
+function rugRoom(on){ const w=document.getElementById('wrap'); if(!w) return; on=!!on && !S.momRaid; rugPlateDrop(); /* 0999 THE CAMPAIGN RUG II: the plate is the level's alone — dropped at every door and at the hub, re-baked on the next frame */   // THE SKIP lives here: the mom fight is fought on the boards (startMomRaid stamps S.momRaid before its mode write — measured)
   if(on && !RUG_ROOM.css){ const st=document.createElement('style'); st.id='rugroom'; st.textContent=rugRoomCSS('#wrap.onrug',RUG_ROOM_PAL.day)+rugRoomCSS('#wrap.onrug.onrug-night',RUG_ROOM_PAL.night); document.head.appendChild(st); RUG_ROOM.css=true; }   // the style block ONCE, the first time a rug is fought on
   const nt=!!(on && nightField()); w.classList.toggle('onrug', !!on); w.classList.toggle('onrug-night', nt); }
 // THE BOXES (PICK 12 — the surviving rider of c09): ONE quiet cast shadow at 0.25 in the band's dark under the toy box, the crate and both battleground boxes, offset toward the lower-right like every rock's, painted BEFORE the
@@ -73310,6 +73317,126 @@ function snowHeap(m){ const x=m.x, y=m.y, r=m.r, ry=r*0.6, PI=Math.PI;
   cx.strokeStyle='#8C9AAD'; cx.lineWidth=2; cx.globalAlpha=0.35; heap(x,y,r,ry); cx.stroke(); cx.globalAlpha=1;      // the rim all round…
   cx.beginPath(); cx.ellipse(x,y,r,ry,0,0,PI); cx.stroke(); cx.beginPath(); cx.arc(x,y,r,PI*1.82,PI*2); cx.stroke();  // …and full on the shade side
   if(r>=6) for(const c of [[x+r*1.05,y+r*0.45],[x-r*0.98,y+r*0.55]]){ cx.fillStyle='#F9FCFF'; cx.beginPath(); cx.arc(c[0],c[1],r*0.16,0,7); cx.fill(); cx.strokeStyle='#8C9AAD'; cx.lineWidth=1.5; cx.stroke(); } }   // two spilled clods
+// ═══ 0999 THE CAMPAIGN RUG II — THE PLATE: THE LIT FIELD, THE PROPS AND THE NIGHT (FM-GVT-BACKDROPS-01 card II of three; design/campaign-backdrops-0914/02-RUG-II.md; Wyatt 9/14 20:57 ET on the design page: "Very good. I like what I see." … "Recommended on all. Build it. Add it to the queue now." → every ⚑ at the REC; paint only — the sim, the seeds, the camera, the deploy line and every hitbox byte-still) ═══
+// THE PLATE LAW (00-DESIGN §1.4, measured on the rig: the same gradient live every frame +2.3 ms · a plate at world resolution blitted scaled +2.0 · a plate at the canvas's BACKING resolution blitted 1:1 +0.2): everything
+// static on the rug bakes ONCE — at the level's first frame, on a resize, on a settled zoom step (150 ms after the fingers rest; a pinch in flight keeps the old plate through the scaled blit) — into offscreen tiles at
+// k = scale·dpr·zoom (tiled past 4096 device px wide: the 1440@2 Mac on a grand rug) and blits 1:1 in screen space with the camera (and the shake) as an integer offset; nothing static is painted live. The plate is
+// transparent where it paints nothing and rides drawRug's own slot AFTER the static ground and the props (the props' dressing lies over their served bodies) and UNDER every mover (the toys, the balls, the snowfall, the men).
+// THE FIELD (CELL 3): B's three abrash dye pools on the plain wool (a warm centre, plum toward the frame — darker only, so the plain field's green stays ≥ 1.90 at the pool and every army colour stays above the field) ·
+// A's lamp — a darken-only vignette in the band's shade ink (0.10 at the top/left eased 120 in; the bottom/right at 0.055 eased 150 — PICK 3 THE CAP: the bottom-right corner, the deploy bar's, the enemy box's and the
+// flag's, darkens no more than the other two dark corners; one broad radial from the pool's heart) with THE WINDOW POOL cut back out (destination-out, feathered) as the undarkened zone; the snow takes 0.03 of a cool
+// slate at its edges only, the pale lawn none (c24's ceilings — the tan army's headroom) · A's bevelled binding, nothing entering 56..WD−56: the lit NW thread + roll, the dark SE thread + roll, the welt as a raised cord (its lit NW face,
+// its shadow on the reveal at the top and the left ONLY — no outward shadow), NO corner glow (PICK 12). THE PROPS (CELL 5 — A's dressing + D's rocks, in the men's own register: outline, a shade tinted by the band, one
+// rim from the upper left, no blur, no soft cast): painted with the served silhouettes ERASED (destination-out) so the served body paint shows through — the mesa's longer SE shadow, 1.5-px outline, lit west facet,
+// two-step shade east facet, three strata (the served erosion streaks retired), the caprock lit #E09A5A west / #C07A3E east with the west/talus seam closed; the cactus's 1.5-px outline, east shade, west rim, three spine
+// ticks per arm, the flower dot where the hash says so; the pit's inner NW crescent + lit SE lip; the plain rock's ground oval in the band's dark, field-tinted shade, 2-px outline, rim arc. The mesa's and the cactus's
+// numbers live in ONE place (mesaShapes · cactusLines), read by the painters AND the plate, so nothing can drift. (The trench's lit SE wall + dark NW wall go INLINE in drawTrenchCut — two live strokes; the floor, the
+// duckboards and the ladders untouched.) THE NIGHT (CELL 7): the window light at 0.15 crossing the frame band, the 36-px feather, the 44-px foot fade, two mullion bars in the field's ink at 0.4 (a sash window at a
+// glance); the served per-frame drawNightLight gradient RETIRED to the plate on every plate rug (the band wash and the beam branch stay live; a night battleground and the moon garden's park battle keep the served
+// gradient — no plate there); NO amber pool (PICK 7: all moon). The battleground, the mom raid, the park and raid mats (the quilt, the lair, the deck, the marble) take no plate. Dropped at every door and at the hub
+// (rugRoom) — the memory is the level's alone. The counters (bakes · bytes · tiles · w × h) are the rig's read.
+const RUG_PLATE={ tiles:null, key:'', k:1, z:1, zSeen:1, zAt:0, bakes:0, bytes:0, w:0, h:0 };
+const RUG_PLATE_TONE={ plain:{ dark:'#3A120C', shade:'#6A5450' }, snow:{ dark:'#8C9AAD', shade:'#7E8FA6' }, sand:{ dark:'#4A1A08', shade:'#7A4A34' }, grass:{ dark:'#2E3E22', shade:'#5F6A52' }, roof:{ dark:'#2E1C14', shade:'#5A4038' }, night:{ dark:'#141826', shade:'#3A4050' } };   // D's per-band tone table: the band's own shadow ink, the rock's shade tinted toward the field; a night row
+const RUG_PLATE_LAMP={ plain:['62,22,16',0.10,0.45], sand:['94,40,18',0.11,0.45], roof:['58,38,32',0.10,0.45], snow:['90,110,134',0.03,0,0.5], grass:null, ab:0.55 };   // per band: the lamp's shade ink, the edge alpha, the broad radial's share at the far corner, the edges' ease depth (1 = 120/150 px) — c04's ceilings: the snow a whisper of a cool slate at half-depth edges only (the eased bands under half the pale field, so its median, its tan and its green do not move); the pale lawn 0; ab = the bottom/right edges' share of the top/left's (PICK 3 THE CAP)
+const RUG_PLATE_POOLS={ day:[[110,30,14,0.10],[70,24,60,0.10]], night:[[14,18,36,0.10],[6,8,20,0.10]] };   // the abrash: the warm centre pools + the plum edge (r,g,b,alpha) — every tone at or under the field's luminance (darker only); each fade ends in ITS OWN colour at alpha 0 (a fade to transparent black darkens the whole pool)
+const RUG_PLATE_SK=Math.tan(18*Math.PI/180);   // the window's skew — drawNightLight's own 18°
+function rugPlateOn(){ if(S.mode==='menu' || S.bf || S.momRaid || !S.cfg || !S.cfg.terrain || !((S.levelN|0)>=1 || S.training)) return false; const g=S.cfg.terrain.ground||'plain'; return g==='plain'||g==='snow'||g==='sand'||g==='grass'||g==='roof'; }   // the campaign's rugs (+ the range): the plain wool, the snow, the sand, the lawn, the roof — by day or after dark; the verdict (win / lose) still stands over the lit rug
+function rugPlateKey(z){ const t=S.cfg.terrain; return [W,WORLD_H,t.ground||'plain',nightField()?1:0,(scale*Math.min(2,window.devicePixelRatio||1)*z).toFixed(4),S.gk||1,S.levelN|0,(t.rocks||[]).length,t.trench?1:0,(t.pits||[]).length,(t.props||[]).length].join('|'); }
+function rugPlateDrop(){ RUG_PLATE.tiles=null; RUG_PLATE.key=''; RUG_PLATE.bytes=0; RUG_PLATE.w=0; RUG_PLATE.h=0; }
+function rugPlateZoom(){ const z=zoomZ(), now=performance.now(); if(!RUG_PLATE.tiles){ RUG_PLATE.z=z; RUG_PLATE.zSeen=z; RUG_PLATE.zAt=now; return z; } if(z!==RUG_PLATE.zSeen){ RUG_PLATE.zSeen=z; RUG_PLATE.zAt=now; } if(z!==RUG_PLATE.z && now-RUG_PLATE.zAt>=150) RUG_PLATE.z=z; return RUG_PLATE.z; }   // the settled zoom: a pinch in flight keeps the old plate (the scaled blit); the re-bake waits until the fingers have rested 150 ms
+function rugPlatePool(g,WD,HT,y0,y1,dx){ const w0=(WD-112)*0.40, SK=RUG_PLATE_SK, L=y=>56+SK*(y-56), R=y=>56+w0+SK*(y-56); g.beginPath(); g.moveTo(L(y0)-dx,y0); g.lineTo(R(y0)+dx,y0); g.lineTo(R(y1)+dx,y1); g.lineTo(L(y1)-dx,y1); g.closePath(); }   // the window's parallelogram between y0 and y1, widened by dx each side
+function rugPlateErase(g,f){ g.globalCompositeOperation='destination-out'; f(); g.globalCompositeOperation='source-over'; }
+function rugPlatePools(g,WD,HT,band,night){ if(band!=='plain') return; const P=night? RUG_PLATE_POOLS.night : RUG_PLATE_POOLS.day, FI=56, fw=WD-2*FI, fh=HT-2*FI, c4=(c,a)=>'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';
+  g.save(); g.beginPath(); g.rect(FI,FI,fw,fh); g.clip();
+  for(const [x,y,r] of [[WD*0.3,HT*0.4,380],[WD*0.7,HT*0.6,420],[WD*0.5,HT*0.2,300]]){ const R=g.createRadialGradient(x,y,0,x,y,r); R.addColorStop(0,c4(P[0],P[0][3])); R.addColorStop(1,c4(P[0],0)); g.fillStyle=R; g.fillRect(FI,FI,fw,fh); }   // three warm pools
+  const E=g.createRadialGradient(WD/2,HT/2,HT*0.35,WD/2,HT/2,Math.max(WD,HT)*0.62); E.addColorStop(0,c4(P[1],0)); E.addColorStop(1,c4(P[1],P[1][3])); g.fillStyle=E; g.fillRect(FI,FI,fw,fh);   // plum toward the frame
+  if(!roofField()){ const k=S.gk||1; g.save(); g.translate(0,(WORLD_H-H)/2); g.lineCap='round'; g.lineJoin='round'; g.lineWidth=92; g.globalCompositeOperation='destination-out'; g.beginPath(); g.moveTo(PATH_PTS[0].x*k,PATH_PTS[0].y); for(let i=1;i<PATH_PTS.length;i+=3) g.lineTo(PATH_PTS[i].x*k,PATH_PTS[i].y); g.stroke(); g.restore(); }   // the dye never tints the groove (its halo's 92): CARD I's runner keeps its own composite — the deep groove's black-army numbers and the route's read stand
+  g.restore(); }
+function rugPlateLamp(g,WD,HT,band){ const L=RUG_PLATE_LAMP[band]; if(!L) return; const sh=L[0], a=L[1], rr=L[2]||0, es=L[3]||1, e1=120*es, e2=150*es, fx=56, fy=56, fw=WD-112, fh=HT-112, rgba=al=>'rgba('+sh+','+Math.max(0,al).toFixed(3)+')';
+  g.save(); g.beginPath(); g.rect(fx,fy,fw,fh); g.clip();
+  if(rr>0){ const px=fx+fw*0.22, py=fy+fh*0.30, Rr=Math.hypot(WD-px,HT-py), rad=g.createRadialGradient(px,py,Rr*0.28,px,py,Rr); rad.addColorStop(0,rgba(0)); rad.addColorStop(1,rgba(a*rr)); g.fillStyle=rad; g.fillRect(fx,fy,fw,fh); }   // the broad fall from the pool's heart — the whole field leans toward the lamp
+  const edge=(x0,y0,x1,y1,al)=>{ const gr=g.createLinearGradient(x0,y0,x1,y1); gr.addColorStop(0,rgba(al)); gr.addColorStop(0.3,rgba(al*0.45)); gr.addColorStop(0.65,rgba(al*0.14)); gr.addColorStop(1,rgba(0)); g.fillStyle=gr; };
+  edge(fx,fy,fx,fy+e1,a); g.fillRect(fx,fy,fw,e1); edge(fx,fy,fx+e1,fy,a); g.fillRect(fx,fy,e1,fh);   // the top and the left, eased 120 in
+  const ab=a*RUG_PLATE_LAMP.ab;   // PICK 3 THE CAP: the bottom and the right edges under the top/left's by the radial's far-corner share, so the bottom-right corner (the deploy bar's, the enemy box's, the flag's) darkens no more than the other two dark corners — level, measured 40 px inside each corner (the top-left is the pool)
+  edge(fx,fy+fh,fx,fy+fh-e2,ab); g.fillRect(fx,fy+fh-e2,fw,e2); edge(fx+fw,fy,fx+fw-e2,fy,ab); g.fillRect(fx+fw-e2,fy,e2,fh);
+  g.globalCompositeOperation='destination-out'; const cut=g.createLinearGradient(fx,0,fx+fw*0.40,0); cut.addColorStop(0,'rgba(0,0,0,1)'); cut.addColorStop(0.5,'rgba(0,0,0,0.8)'); cut.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=cut; rugPlatePool(g,WD,HT,fy,fy+fh,0); g.fill(); g.globalCompositeOperation='source-over';   // THE WINDOW POOL cut back out — the lamp's light is the undarkened zone, feathering to nothing at the pool's far edge
+  g.restore(); }
+function rugPlateNight(g,WD,HT){ const N=ELITE_NIGHT, fx=56, fy=56, fw=WD-112, fh=HT-112, w0=fw*N.lightW, A=0.15, beam=al=>{ const gr=g.createLinearGradient(fx,0,fx+w0,0); gr.addColorStop(0,'rgba('+N.light+','+al.toFixed(3)+')'); gr.addColorStop(0.55,'rgba('+N.light+','+(al*0.5).toFixed(3)+')'); gr.addColorStop(1,'rgba('+N.light+',0)'); return gr; };
+  g.save(); g.beginPath(); g.rect(0,0,WD,HT); g.clip();   // the light crosses the frame band
+  g.fillStyle=beam(A*0.4); rugPlatePool(g,WD,HT,0,HT,18); g.fill();     // the feather: 36 wider at a little under half
+  g.fillStyle=beam(A*0.75); rugPlatePool(g,WD,HT,0,HT,0); g.fill();     // the light itself (≈ 0.15 where both lie)
+  g.save(); rugPlatePool(g,WD,HT,0,HT,18); g.clip(); g.globalAlpha=0.4; g.fillStyle=N.field;   // the mullions — the sash's own shadow bars on the floor (the window's tell)
+  const mx=fx+w0*0.5, SK=RUG_PLATE_SK; g.beginPath(); g.moveTo(mx-5+SK*(0-fy),0); g.lineTo(mx+5+SK*(0-fy),0); g.lineTo(mx+5+SK*(HT-fy),HT); g.lineTo(mx-5+SK*(HT-fy),HT); g.closePath(); g.fill();
+  g.fillRect(0,HT*0.45-4,WD,8); g.globalAlpha=1; g.restore();
+  g.save(); rugPlatePool(g,WD,HT,fy,fy+fh,18); g.clip(); const ff=g.createLinearGradient(0,fy+fh-44,0,fy+fh); ff.addColorStop(0,'rgba(20,27,44,0)'); ff.addColorStop(1,'rgba(20,27,44,0.6)'); g.fillStyle=ff; g.fillRect(fx,fy+fh-44,fw,44); g.restore();   // the foot fade
+  g.restore(); }   // no amber pool at the box (PICK 7: all moon)
+function rugPlateBevel(g,WD,HT,band,night){ const shade=night? '5,7,15' : band==='snow'? '60,74,92' : band==='sand'? '60,26,10' : '23,13,8', litC=night? 'rgba(58,79,134,0.40)' : band==='snow'? 'rgba(150,170,196,0.40)' : 'rgba(150,76,58,0.55)', darkC=night? 'rgba(5,7,15,0.70)' : 'rgba(46,14,10,0.65)';
+  g.save(); g.lineCap='butt';
+  const roll=(x0,y0,x1,y1,c0)=>{ const gr=g.createLinearGradient(x0,y0,x1,y1); gr.addColorStop(0,c0); gr.addColorStop(1,c0.replace(/[\d.]+\)$/,'0)')); g.fillStyle=gr; };   // the binding's rolled edge
+  roll(0,0,0,8,litC); g.fillRect(0,0,WD,8); roll(0,0,8,0,litC); g.fillRect(0,0,8,HT);
+  roll(0,HT,0,HT-8,darkC); g.fillRect(0,HT-8,WD,8); roll(WD,0,WD-8,0,darkC); g.fillRect(WD-8,0,8,HT);
+  g.strokeStyle=litC; g.lineWidth=2.5; g.beginPath(); g.moveTo(0,1.5); g.lineTo(WD,1.5); g.moveTo(1.5,0); g.lineTo(1.5,HT); g.stroke();                 // the lit NW thread
+  g.strokeStyle=darkC; g.lineWidth=2.5; g.beginPath(); g.moveTo(0,HT-1.5); g.lineTo(WD,HT-1.5); g.moveTo(WD-1.5,0); g.lineTo(WD-1.5,HT); g.stroke();   // the dark SE thread
+  const wsh=(x0,y0,x1,y1,a0)=>{ const gr=g.createLinearGradient(x0,y0,x1,y1); gr.addColorStop(0,'rgba('+shade+','+a0+')'); gr.addColorStop(1,'rgba('+shade+',0)'); g.fillStyle=gr; };   // the welt (the 7-px line at 42) is a raised cord: its shadow falls SE onto the reveal at the top and the left (42..56) — no outward shadow on the bottom/right binding
+  wsh(0,45.5,0,56,0.55); g.fillRect(45.5,45.5,WD-91,10.5); wsh(45.5,0,56,0,0.55); g.fillRect(45.5,45.5,10.5,HT-91);
+  g.strokeStyle=night? 'rgba(90,120,190,0.35)' : band==='snow'? 'rgba(220,232,244,0.5)' : 'rgba(210,130,100,0.42)'; g.lineWidth=1.5;
+  g.beginPath(); g.moveTo(38.5,39.2); g.lineTo(WD-38.5,39.2); g.moveTo(39.2,38.5); g.lineTo(39.2,HT-38.5); g.stroke();   // the welt's lit NW face (top + left)
+  g.globalAlpha=0.6; g.beginPath(); g.moveTo(38.5,HT-45); g.lineTo(WD-38.5,HT-45); g.moveTo(WD-45,38.5); g.lineTo(WD-45,HT-38.5); g.stroke(); g.globalAlpha=1;   // and its lit lip on the bottom/right welts
+  g.restore(); }
+function mesaShapes(rk){ const r=rk.r, x=rk.x, y=rk.y; return { talus:[x,y+r*0.28,r,r*0.5], lower:[x-r*0.86,y-r*0.62,r*1.72,r*0.95,r*0.2], upper:[x-r*0.78,y-r*1.02,r*1.56,r*0.5,r*0.16], cap:[x,y-r*1.02,r*0.8,r*0.26] }; }   // THE MESA'S ONE GEOMETRY (v1.57's numbers): drawMesa paints it, the plate dresses it — nothing can drift
+function cactusLines(rk){ const r=rk.r, x=rk.x, y=rk.y; return { trunk:[x,y+r*0.4,x,y-r*1.7,r*0.85], arms:[[x-r*0.75,y-r*0.2,x-r*0.75,y-r*1.05,r*0.6],[x+r*0.75,y+r*0.1,x+r*0.75,y-r*0.75,r*0.6]] }; }   // THE CACTUS'S ONE GEOMETRY: the trunk + the two arms (x0,y0,x1,y1,width)
+function rugPlateMesa(g,rk){ const r=rk.r, x=rk.x, y=rk.y, M=mesaShapes(rk), rrA=(x,y,w,h,r)=>{ g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); };
+  const tx=M.talus[0], ty=M.talus[1], trx=M.talus[2], tryy=M.talus[3], cpx=M.cap[0], cpy=M.cap[1], crx=M.cap[2], cry=M.cap[3];
+  const sil=()=>{ g.beginPath(); g.ellipse(tx,ty,trx,tryy,0,0,7); rrA(...M.lower); rrA(...M.upper); g.moveTo(cpx+crx,cpy); g.ellipse(cpx,cpy,crx,cry,0,0,7); };
+  g.fillStyle='rgba(60,26,10,0.16)'; g.beginPath(); g.ellipse(x+r*0.6,y+r*0.62,r*1.4,r*0.4,0,0,7); g.fill();   // the longer SE shadow — one sun, the trench's
+  g.lineJoin='round'; g.strokeStyle='#5E2410'; g.lineWidth=3; sil(); g.stroke();                                 // the outline…
+  rugPlateErase(g,()=>{ sil(); g.fill(); });                                                                     // …its outer 1.5 px only: the served body shows through the plate
+  const facet=(x0,east)=>{ g.beginPath(); const t=Math.max(-1,Math.min(1,(x0-tx)/trx)), th=Math.acos(t);   // the part of every body shape east (or west) of x0, as one path — flat facets, a moulded toy
+    if(east) g.ellipse(tx,ty,trx,tryy,0,-th,th); else g.ellipse(tx,ty,trx,tryy,0,th,2*Math.PI-th); g.closePath();
+    for(const B of [M.lower,M.upper]){ const bx=B[0], by=B[1], bw=B[2], bh=B[3], cr=B[4], xr=bx+bw;
+      if(east){ if(x0>=xr) continue; g.moveTo(x0,by); g.lineTo(xr-cr,by); g.arcTo(xr,by,xr,by+bh,cr); g.arcTo(xr,by+bh,x0,by+bh,cr); g.lineTo(x0,by+bh); g.closePath(); }
+      else { if(x0<=bx) continue; g.moveTo(x0,by); g.lineTo(bx+cr,by); g.arcTo(bx,by,bx,by+bh,cr); g.arcTo(bx,by+bh,x0,by+bh,cr); g.lineTo(x0,by+bh); g.closePath(); } } };
+  const face=(x0,east,col)=>{ facet(x0,east); g.fillStyle=col; g.fill(); g.strokeStyle=col; g.lineWidth=0.8; g.stroke(); };   // the fill + a hairline of itself: the west/talus seam closed (the AA gap between the ellipse's arc and the band's rect at 2×)
+  face(x-r*0.05,true,'rgba(142,63,32,0.24)'); face(x+r*0.42,true,'rgba(120,50,26,0.26)');   // the shade face (east), two steps — a rounder terminator
+  face(x-r*0.58,false,'rgba(255,205,160,0.16)');                                            // the lit face (west)
+  g.strokeStyle='rgba(94,36,16,0.30)'; g.lineWidth=1; g.beginPath(); for(const k of [-0.5,-0.2,0.1]){ g.moveTo(x-r*0.84,y+r*k); g.lineTo(x+r*0.84,y+r*k); } g.stroke();   // three strata (in place of the served erosion streaks)
+  g.fillStyle='#E09A5A'; g.beginPath(); g.ellipse(cpx,cpy,crx,cry,0,0,7); g.fill();   // the caprock kept orange-brown: lit west…
+  const th9=Math.acos(0.18); g.fillStyle='rgba(192,122,62,0.85)'; g.beginPath(); g.ellipse(cpx,cpy,crx,cry,0,-th9,th9); g.closePath(); g.fill(); }   // …shade east (#C07A3E)
+function rugPlateCactus(g,rk){ const r=rk.r, x=rk.x, y=rk.y, C=cactusLines(rk), trunk=()=>{ g.beginPath(); g.moveTo(C.trunk[0],C.trunk[1]); g.lineTo(C.trunk[2],C.trunk[3]); }, arms=()=>{ g.beginPath(); for(const a of C.arms){ g.moveTo(a[0],a[1]); g.lineTo(a[2],a[3]); } };
+  g.lineCap='round'; g.strokeStyle='#294A26';
+  g.lineWidth=C.trunk[4]+3; trunk(); g.stroke(); g.lineWidth=C.arms[0][4]+3; arms(); g.stroke();                         // the outline…
+  rugPlateErase(g,()=>{ g.lineWidth=C.trunk[4]; trunk(); g.stroke(); g.lineWidth=C.arms[0][4]; arms(); g.stroke(); });   // …its outer 1.5 px only: the served green shows through
+  g.strokeStyle='rgba(24,52,22,0.42)'; g.lineWidth=r*0.3; g.beginPath(); g.moveTo(x+r*0.25,y+r*0.3); g.lineTo(x+r*0.25,y-r*1.6); g.stroke();   // the shade side (east) of the trunk…
+  g.lineWidth=r*0.2; g.beginPath(); g.moveTo(x-r*0.57,y-r*0.24); g.lineTo(x-r*0.57,y-r*1.0); g.moveTo(x+r*0.93,y+r*0.06); g.lineTo(x+r*0.93,y-r*0.7); g.stroke();   // …and of the arms
+  g.strokeStyle='rgba(190,225,160,0.32)'; g.lineWidth=r*0.12; g.beginPath(); g.moveTo(x-r*0.3,y+r*0.25); g.lineTo(x-r*0.3,y-r*1.55); g.stroke();   // the lit rim (west)
+  g.strokeStyle='rgba(34,64,30,0.7)'; g.lineWidth=1.2; g.lineCap='butt';   // three spine ticks per arm
+  for(const a of [[x-r*0.75,y-r*0.95,y-r*0.3],[x+r*0.75,y-r*0.65,y]]) for(let i=0;i<3;i++){ const ty=a[1]+(a[2]-a[1])*(i+0.5)/3; g.beginPath(); g.moveTo(a[0]-2,ty); g.lineTo(a[0]+2,ty); g.stroke(); }
+  if((Math.floor(x*7+y*13)%3)===0){ g.fillStyle='#E36A8A'; g.beginPath(); g.arc(x,y-r*1.7,2.5,0,7); g.fill(); } }   // a flower where the hash says so (never per frame — the plate)
+function rugPlatePits(g,pits){ for(const p of pits){ g.save(); g.beginPath(); g.ellipse(p.x,p.y,p.r,p.r*0.72,0,0,7); g.clip(); g.fillStyle='rgba(0,0,0,0.30)'; g.beginPath(); g.ellipse(p.x-3,p.y-4,p.r*0.92,p.r*0.66,0,0,7); g.fill(); g.restore();   // the inner NW wall in shadow (a crescent, clipped to the pit — a simple ellipse, at the bake)
+  g.strokeStyle='rgba(255,255,255,0.18)'; g.lineWidth=2; g.beginPath(); g.ellipse(p.x,p.y,p.r-1,p.r*0.72-1,0,0.15,1.65); g.stroke(); } }   // the lit SE lip (the far edge)
+function rugPlateRock(g,rk,t){ const r=rk.r, x=rk.x, y=rk.y, body=()=>{ g.beginPath(); g.ellipse(x,y,r,r*0.8,0.2,0,7); };
+  g.fillStyle=hexA(t.dark,0.6); g.beginPath(); g.ellipse(x+4,y+r*0.55,r*1.05,r*0.4,0,0,7); g.fill();   // the ground oval re-inked in the band's own dark (over the served black puddle)
+  g.strokeStyle='rgba(78,74,66,0.7)'; g.lineWidth=4; body(); g.stroke();                              // the outline (2 px outside, once the body is erased)…
+  rugPlateErase(g,()=>{ body(); g.fill(); });                                                        // …the served egg shows through
+  g.fillStyle=t.shade; g.beginPath(); g.ellipse(x+r*0.3,y+r*0.25,r*0.36,r*0.2,0.1,0,7); g.fill();     // the shade, tinted by the band (over the served grey)
+  g.strokeStyle='#C9C2B2'; g.lineWidth=1.5; g.beginPath(); g.ellipse(x,y,r-2,r*0.8-2,0.2,Math.PI*1.11,Math.PI*1.78); g.stroke(); }   // the rim arc, up-left
+function rugPlateProps(g,WD,HT,band,night){ const t=S.cfg.terrain, tone=night? RUG_PLATE_TONE.night : (RUG_PLATE_TONE[band]||RUG_PLATE_TONE.plain);
+  for(const rk of (t.rocks||[])){ if(rk.art==='mesa') rugPlateMesa(g,rk); else if(rk.art==='cactus') rugPlateCactus(g,rk); else if(!rk.art) rugPlateRock(g,rk,tone); }
+  for(const pr of (t.props||[])){ if(pr.x>WD-70) continue; if(pr.art==='cactus') rugPlateCactus(g,pr); }
+  if(t.pits && t.pits.length && !lairField() && !moonField()) rugPlatePits(g,t.pits); }
+function rugPlateBake(z,key){ const WD=W, HT=WORLD_H, dpr=Math.min(2,window.devicePixelRatio||1), k=scale*dpr*z, band=S.cfg.terrain.ground||'plain', night=nightField();
+  const totW=Math.ceil(WD*k), totH=Math.ceil(HT*k), n=Math.max(1,Math.ceil(totW/4096)), tw=Math.ceil(totW/n), tiles=[]; let bytes=0;
+  for(let i=0;i<n;i++){ const dx=tw*i, w=Math.min(tw,totW-dx), c=document.createElement('canvas'); c.width=w; c.height=totH; const g=c.getContext('2d');
+    const paint=(f,gg)=>{ gg.save(); gg.setTransform(k,0,0,k,-dx,0); f(gg,WD,HT,band,night); gg.restore(); };
+    paint(rugPlatePools,g); paint(rugPlateProps,g);                                                                                                       // the field's dye, then the props' dressing (their erasures never touch the light)
+    const c2=document.createElement('canvas'); c2.width=w; c2.height=totH; const g2=c2.getContext('2d'); paint(night? rugPlateNight : rugPlateLamp, g2); g.drawImage(c2,0,0);   // the light on its own offscreen, composited over: its pool cut is a cut in the light alone
+    paint(rugPlateBevel,g);
+    tiles.push({ c:c, dx:dx, x0:dx/k, w:w/k }); bytes+=w*totH*4; }
+  RUG_PLATE.tiles=tiles; RUG_PLATE.key=key; RUG_PLATE.k=k; RUG_PLATE.z=z; RUG_PLATE.bakes++; RUG_PLATE.bytes=bytes; RUG_PLATE.w=totW; RUG_PLATE.h=totH; }
+function rugPlateBlit(){ if(!rugPlateOn()) return; const z=rugPlateZoom(), key=rugPlateKey(z); if(!RUG_PLATE.tiles || RUG_PLATE.key!==key) rugPlateBake(z,key);
+  const P=RUG_PLATE, m=cx.getTransform();
+  if(Math.abs(m.a-P.k)<1e-3 && Math.abs(m.d-P.k)<1e-3 && Math.abs(m.b)<1e-6 && Math.abs(m.c)<1e-6){ cx.save(); cx.setTransform(1,0,0,1,0,0); const ex=Math.round(m.e), ey=Math.round(m.f); for(const t of P.tiles) cx.drawImage(t.c,ex+t.dx,ey); cx.restore(); }   // the fast blit: 1:1 in screen space, the camera (and the shake) as an integer offset, the tiles seamless at integer device seats
+  else for(const t of P.tiles) cx.drawImage(t.c,t.x0,0,t.w,WORLD_H); }   // the fallback: a pinch in flight or a capped density — the scaled blit in world space (the camera rides the transform)
 function drawFloor(){ cx.fillStyle=FLOOR_BOARD; cx.fillRect(0,0,VW,H); }   // screen space, the canvas's size — the clear
 function rugShadow(camv){
   const WD=S.bf? WORLD_W : W, HT=WORLD_H, z=zoomZ(), c=camv||{x:0,y:0}, F=RUG_FRAME_OUT, cy=c.y||0;
