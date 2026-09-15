@@ -25,7 +25,12 @@
 // (line-degree + override door) grading every star, the 44→0 fused-pair
 // census, the r+2.5 served-line inset, the ADD-blend glow whitelist on
 // the settled tree, the state/grade tables, and the two 9/3-answer
-// amendments riding the gated design data.
+// amendments riding the gated design data. §10 (slice 2) proves the road
+// laws live: the pitch law (rim gap ≥34u under both ×1.5 placements — the
+// page's exact 12-of-19 rows, +252u, camera book recomputed from pos), the
+// name law (felled names clear every other star-bound by 12u, clamped
+// on-screen, none on none — walked at fights 5/8/15/20), and the path law
+// (dot census: first-principles walk == the chart's own beacon, culled >0).
 //
 //   node tools/sky-check.mjs   # self-launching: :8899 server if none, Chrome on :9480
 //
@@ -79,6 +84,28 @@ const dsn = JSON.parse(readFileSync('design/campaign-sky-redesign-2026-09-data.j
 ok('the two 9/3-answer amendments ride the gated data card (columba 8 · monoceros 17)',
   JSON.stringify(dsn.find((x) => x.id === 'columba').stars[8]) === '[-32,-27]'
   && JSON.stringify(dsn.find((x) => x.id === 'monoceros').stars[17]) === '[20,42]');
+// — the road laws (round four, slice 2: pitch + name + path on the chart) —
+ok('PITCH LAW · the 34u floor, the 26-beast half-height table, and the widener ship',
+  /const SS_ROAD_GAP = 34/.test(gsrc) && /const SS_ROAD_HALF = \{/.test(gsrc) && /function ssRoadAdd\(/.test(gsrc)
+  && [...'vulpes lepus serpens delphinus columba lacerta cygnus pavo cancer corvus ursa aranea aquila lupus monoceros cassiopeia cetus orion strix leo taurus scorpius draco phoenix centaurus sagittarius'.split(' ')]
+    .every((id) => new RegExp(id + ': \\d+').test(gsrc.slice(gsrc.indexOf('SS_ROAD_HALF'), gsrc.indexOf('function ssRoadAdd')))));
+ok('PITCH LAW · worst case is BOTH ×1.5 placements; the summit wears its ×1.35 inside',
+  /Math\.max\(hA \* 1\.5 \+ hB, hA \+ hB \* 1\.5\)/.test(gsrc) && /j === fights\.length - 1 \? 1\.35 : 1/.test(gsrc));
+ok('PITCH LAW · pitch derives from the roster, never from progress (no state/fightIdx term in the widener)',
+  !/state|fightIdx/.test(gsrc.slice(gsrc.indexOf('function ssRoadAdd'), gsrc.indexOf('// the resolver'))));
+ok('PITCH LAW · STEP stays 96 and the chart widens through ssRoadAdd at build',
+  /const STEP = 96, ACT_GAP = 64, TOP = 190, SETTLE = 430/.test(chart) && /ssRoadAdd\(fights, i - 1, STEP \+ \(seam \? ACT_GAP : 0\)\)/.test(chart));
+ok('PATH LAW · dots r 1.3 α .35/.2, suppressed inside star-bounds +8; the old 1.6/.5/.28 deal is gone',
+  /l\.u\(1\.3\)/.test(chart) && /walked \? 0\.35 : 0\.2/.test(chart)
+  && /nb\[i\]\.hw \+ 8/.test(chart) && /nb\[i \+ 1\]\.hh \+ 8/.test(chart)
+  && !/l\.u\(1\.6\)\)/.test(chart) && !/walked \? 0\.5 : 0\.28/.test(chart));
+ok('PATH LAW · the dot stays under every m3 star (1.3 < 1.9 in star-units at any one grade)', 1.3 < 1.9);
+ok('NAME LAW · the seat clears neighbors by 12u, clamps at ±204, slides along its side',
+  /q\.x - m\.hw - 12/.test(chart) && /const EDGE = 204/.test(chart) && /for \(let step = 0; step <= 48; step \+= 8\)/.test(chart));
+ok('NAME LAW · the current name keeps its beneath-seat (reserved, never slid)',
+  /curGeom\.p\.y \+ curGeom\.mxY \* curGeom\.sc \+ 26/.test(chart) && /l\.x\(p\.x\), l\.y\(p\.y \+ mxY \* sc \+ 26\)/.test(chart));
+ok('the ride cap still absorbs the longer road (home clamp 700–2400 untouched)',
+  /clamp\(dist \* 1\.2, 700, 2400\)/.test(chart));
 
 /* ---------- server + browser ---------- */
 const kids = [];
@@ -454,6 +481,127 @@ if (SHOTS) {
     await drag(v2.w / 2, v2.h * 0.16, v2.h * 0.82);
   }
   await shot('laws-summit');
+}
+
+/* ---------- §10 the road laws, live (sharp-sky round four, slice 2) ---------- */
+console.log('\n— §10 THE ROAD LAWS —');
+// the page's machine-checked rows on the pinned roster: 12 of 19 gaps widen,
+// +5…+53, the road +252u; CENTAURUS→SAGITTARIUS wears the +53
+const PAGE_ADDS = [0, 0, 0, 21, 0, 8, 17, 15, 16, 0, 0, 15, 29, 31, 0, 5, 16, 26, 53];
+// one in-page recompute, shared by every boot below: rebuild fights/pos/nb
+// from SS_ACTS + the LIVE roster + the shipped tables, mirror the path walk,
+// and read every real name rect off the tree — first principles vs the tree
+const ROADEVAL = `(() => {
+  const h = game.scene.getScene('home'); const l = ssLayout(h);
+  const roster = JSON.parse(localStorage.getItem('beta3.camproster'));
+  const ck = JSON.parse(localStorage.getItem('beta3.campaign') || 'null');
+  const fightIdx = ck ? ck.fightIdx : 0;
+  const fights = []; let ri = 0;
+  SS_ACTS.forEach((act, ai) => act.slots.forEach((sl, fi) => fights.push({ id: roster[ri++], actIdx: ai, fi, len: act.slots.length, umbral: act.umbral })));
+  const N = fights.length, gr = SS_STAR_GRADES.chart;
+  const adds = [], pitches = [];
+  for (let i = 1; i < N; i++) {
+    const seam = fights[i].actIdx !== fights[i - 1].actIdx;
+    const base = 96 + (seam ? 64 : 0);
+    const a = ssRoadAdd(fights, i - 1, base);
+    adds.push(a); pitches.push(base + a);
+  }
+  // the law under BOTH ×1.5 placements, on the half-height table
+  const hh = (j, x) => { const b = SS_BEASTS[fights[j].id];
+    return SS_ROAD_HALF[b.id] * (b.boss ? gr[2] : b.tier === 'mini' ? gr[1] : gr[0]) * (j === N - 1 ? 1.35 : 1) * x; };
+  let viol = 0, worst = 1e9;
+  for (let i = 1; i < N; i++) {
+    const g = Math.min(pitches[i - 1] - hh(i - 1, 1.5) - hh(i, 1), pitches[i - 1] - hh(i - 1, 1) - hh(i, 1.5));
+    if (g < 34 - 1e-9) viol++; if (g < worst) worst = g;
+  }
+  // pos + drawn bounds, exactly as the chart builds them
+  const wob = [0, 22, -16, 10]; const pos = []; let ry = 0;
+  for (let i = 0; i < N; i++) {
+    const f = fights[i];
+    if (i > 0) ry -= pitches[i - 1] - 96;
+    const dir = f.actIdx % 2 === 0 ? 1 : -1; let x = 0;
+    if (!(f.fi === f.len - 1)) { const t = f.len > 2 ? f.fi / (f.len - 2) : 0; x = (-112 + t * 206 + wob[f.fi % 4]) * dir; }
+    pos.push({ x, y: ry }); ry -= 96;
+  }
+  const shift = 190 - pos[N - 1].y; pos.forEach((p) => { p.y += shift; });
+  const nb = fights.map((f, i) => { const b = SS_BEASTS[f.id];
+    const sc = (b.boss ? gr[2] : b.tier === 'mini' ? gr[1] : gr[0]) * (i === N - 1 ? 1.35 : 1) * (i === fightIdx ? 1.5 : 1);
+    let mx = 0, my = 0; for (const s of b.stars) { mx = Math.max(mx, Math.abs(s[0])); my = Math.max(my, Math.abs(s[1])); }
+    return { hw: mx * sc, hh: my * sc }; });
+  // the path census, mirrored
+  let dots = 0, culled = 0;
+  for (let i = 0; i < N - 1; i++) {
+    const a = pos[i], b = pos[i + 1];
+    const dist = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(4, Math.round(dist / 12));
+    for (let k = 1; k <= n - 1; k++) { const t = k / n, x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+      if ((Math.abs(x - a.x) < nb[i].hw + 8 && Math.abs(y - a.y) < nb[i].hh + 8)
+        || (Math.abs(x - b.x) < nb[i + 1].hw + 8 && Math.abs(y - b.y) < nb[i + 1].hh + 8)) culled++; else dots++; }
+  }
+  // every live name rect off the tree, in design units
+  const wonSet = {}; fights.forEach((f, i) => { if (i < fightIdx) wonSet[(f.umbral && f.id !== 'phoenix' ? SS_UMBRAL.prefix : '') + SS_BEASTS[f.id].name] = 1; });
+  const curTxt = fightIdx < N ? (fights[fightIdx].umbral && fights[fightIdx].id !== 'phoenix' ? SS_UMBRAL.prefix : '') + SS_BEASTS[fights[fightIdx].id].name : null;
+  // local coords: the texts sit directly in the scrolled road container, so
+  // o.x/o.y ARE the seated design-space positions (the scroll never moves them)
+  const names = [];
+  const scan = (ls) => ls.forEach((o) => { if (typeof o.text === 'string' && (wonSet[o.text] || o.text === curTxt)) {
+    const x0 = (o.x - o.width * o.originX - l.x(0)) / l.s, y0 = (o.y - o.height * o.originY - l.y(0)) / l.s;
+    names.push({ t: o.text, cur: o.text === curTxt, x0, x1: x0 + o.width / l.s, y0, y1: y0 + o.height / l.s }); }
+    if (o.list) scan(o.list); });
+  scan(h.mapC.list);
+  // the name law, judged on the live rects: 12u to every OTHER node's bound
+  // (the current name is exempt — its beneath-seat is the pitch law's), no
+  // name on name, everything inside ±204
+  const won = names.filter((n) => !n.cur).sort((a, b) => b.y0 - a.y0);
+  let nviol = 0, clampViol = 0, overlap = 0, minClear = 1e9;
+  won.forEach((r, wi) => {
+    const i = wi; // road order — one won name per felled fight, bottom-up
+    for (let j = 0; j < N; j++) { if (j === i) continue; const q = pos[j], m = nb[j];
+      const dx = Math.max(q.x - m.hw - r.x1, r.x0 - (q.x + m.hw)), dy = Math.max(q.y - m.hh - r.y1, r.y0 - (q.y + m.hh));
+      const c = Math.max(dx, dy); if (c < minClear) minClear = c; if (c < 12 - 0.5) nviol++; }
+    if (r.x0 < -204.5 || r.x1 > 204.5) clampViol++;
+    names.forEach((o) => { if (o !== r && r.x1 > o.x0 + 0.1 && r.x0 < o.x1 - 0.1 && r.y1 > o.y0 + 0.1 && r.y0 < o.y1 - 0.1) overlap++; });
+  });
+  const bea = window.__ssmap;
+  return JSON.stringify({ adds, viol, worst: Math.round(worst * 100) / 100, dots, culled,
+    beaAdds: bea.road.adds, beaDots: bea.road.dots, beaCulled: bea.road.culled,
+    total: adds.reduce((a, b) => a + b, 0), widened: adds.filter(a => a > 0).length,
+    span: bea.offMax - bea.offMin, roadLen: pos[0].y - pos[N - 1].y,
+    settleOff: bea.settleOff, wantSettle: fightIdx < N ? Math.max(bea.offMin, Math.min(pos[fightIdx].y - 430, bea.offMax)) : bea.offMin,
+    nWon: won.length, nviol, clampViol, overlap, minClear: Math.round(minClear * 10) / 10 })
+})()`;
+const roadBoot = async (fi) => {
+  const ck = JSON.stringify({ fightIdx: fi, actIdx: Math.min(3, Math.floor(fi / 5)), hp: 30, hpMax: 30, sigils: [], words: [], longest: '', totalDmg: 0, scried: 0, featherUsed: 0, letters: 0, bigHit: 0, playMs: 0, overkill: 0 });
+  await boot('ride=0', `localStorage.setItem('beta3.campaign', '${ck.replace(/'/g, "\\'")}');`);
+  await tapObj(`${H}.rowLabels.campaign`);
+  await until(`!!${H}.mapC && ${MAP}.settled === true`, 9000, 100);
+  return evj(ROADEVAL);
+};
+const r7 = await roadBoot(7);
+if (SHOTS) await shot('road-fight8');
+ok('PITCH · the built road wears the page\'s exact rows (12 of 19 widen, +5…+53, Σ +252)',
+  JSON.stringify(r7.adds) === JSON.stringify(PAGE_ADDS) && r7.total === 252 && r7.widened === 12 && r7.adds[18] === 53, JSON.stringify(r7.adds));
+ok('PITCH · the chart\'s own beacon carries the same rows (the build consumed ssRoadAdd)',
+  JSON.stringify(r7.beaAdds) === JSON.stringify(r7.adds), JSON.stringify(r7.beaAdds));
+ok('PITCH · the law holds under BOTH ×1.5 placements — 0 violations, worst rim gap 34.00',
+  r7.viol === 0 && r7.worst === 34, JSON.stringify({ viol: r7.viol, worst: r7.worst }));
+ok('PITCH · the camera book recomputes from pos as today (span = road − 270 · settle seats fight 8)',
+  r7.span === r7.roadLen - 270 && r7.roadLen === 2016 + 252 && r7.settleOff === r7.wantSettle,
+  JSON.stringify({ span: r7.span, roadLen: r7.roadLen, settleOff: r7.settleOff, want: r7.wantSettle }));
+ok('PATH · the live dot census equals the first-principles walk, and the road culls around every body',
+  r7.beaDots === r7.dots && r7.beaCulled === r7.culled && r7.culled > 0 && r7.dots > 0,
+  JSON.stringify({ beaDots: r7.beaDots, dots: r7.dots, beaCulled: r7.beaCulled, culled: r7.culled }));
+ok('NAME · fight 8: every felled name clears every other star-bound by 12u, clamped, none on none',
+  r7.nWon === 7 && r7.nviol === 0 && r7.clampViol === 0 && r7.overlap === 0 && r7.minClear >= 12,
+  JSON.stringify({ nWon: r7.nWon, nviol: r7.nviol, clamp: r7.clampViol, overlap: r7.overlap, minClear: r7.minClear }));
+// the full-roster walk: three more regions — early road, the umbral belt,
+// and the summit with EVERY felled name standing (the SAGITTARIUS case)
+for (const [fi, wantWon] of [[4, 4], [14, 14], [19, 19]]) {
+  const r = await roadBoot(fi);
+  ok('NAME+PITCH · fight ' + (fi + 1) + ': rows hold, 0 violations, ' + wantWon + ' names seated clear',
+    JSON.stringify(r.beaAdds) === JSON.stringify(PAGE_ADDS) && r.viol === 0 && r.settleOff === r.wantSettle
+    && r.nWon === wantWon && r.nviol === 0 && r.clampViol === 0 && r.overlap === 0,
+    JSON.stringify({ adds: r.beaAdds.join(''), viol: r.viol, settle: r.settleOff + '/' + r.wantSettle, nWon: r.nWon, nviol: r.nviol, clamp: r.clampViol, ov: r.overlap, minClear: r.minClear }));
+  if (SHOTS) await shot('road-fight' + (fi + 1));
 }
 
 /* ---------- the verdict ---------- */

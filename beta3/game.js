@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.99.0';
+const BUILD = 'STARSPELL v0.100.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4637,6 +4637,34 @@ const SS_MAG_CORE_A = { lit: { 1: 0.95, 2: 0.55 }, far: { 1: 0.55, 2: 0.3 } };
 const SS_MAG_LINE_A = { won: 0.38, now: 0.55, far: 0.22 };
 const SS_MAG_CORE = 0xfff6dd;   // the white-hot heart — brightness reads as heat, not width
 
+/* — THE ROAD LAWS (sharp-sky round four, slice 2 of 3) —
+   THE PITCH LAW: consecutive road nodes keep ≥34 star-units of open sky
+   between star-bounds, sized for the worst case — either neighbor may be
+   the ×1.5 current fight. Pitch derives from the roster, never from
+   progress, so the sky stays put between visits. Half-heights are the
+   round's machine-checked table (the proposed shapes' bounds — the road is
+   already roomy for the shapes the gated 9/3 data card will bring). */
+const SS_ROAD_GAP = 34;
+const SS_ROAD_HALF = {
+  vulpes: 50, lepus: 62, serpens: 64, delphinus: 58, columba: 66, lacerta: 72,
+  cygnus: 70, pavo: 74, cancer: 60, corvus: 68, ursa: 60, aranea: 74,
+  aquila: 74, lupus: 46, monoceros: 72, cassiopeia: 70, cetus: 56, orion: 75,
+  strix: 72, leo: 54, taurus: 66, scorpius: 72, draco: 64, phoenix: 74,
+  centaurus: 70, sagittarius: 74,
+};
+// how much a gap's base pitch must grow so the rim gap stays ≥34 with either
+// neighbor worn ×1.5 (the summit already wears its ×1.35): 12 of 19 gaps on
+// the pinned roster, +5…+53, the road +252u — the page's machine-checked rows
+function ssRoadAdd(fights, i, base) {
+  const gr = SS_STAR_GRADES.chart;
+  const hh = (j) => {
+    const b = SS_BEASTS[fights[j].id];
+    return SS_ROAD_HALF[b.id] * (b.boss ? gr[2] : b.tier === 'mini' ? gr[1] : gr[0]) * (j === fights.length - 1 ? 1.35 : 1);
+  };
+  const hA = hh(i), hB = hh(i + 1);
+  return Math.max(0, Math.ceil(SS_ROAD_GAP + Math.max(hA * 1.5 + hB, hA + hB * 1.5) - base));
+}
+
 // the resolver: line-degree (3+ lines → m1 · 2 → m2 · chain-end → m3) + the
 // authored overrides; cached on the beast (static data for the session)
 function ssStarMags(b) {
@@ -4688,10 +4716,19 @@ function ssStarChart(scene, opts) {
   const STEP = 96, ACT_GAP = 64, TOP = 190, SETTLE = 430;
   const wob = [0, 22, -16, 10];                       // organic jitter on the sweep
   const pos = [];
+  const roadAdds = [];   // per-gap widenings — the beacon carries them for the suites
   let ry = 0;
   for (let i = 0; i < N; i++) {
     const f = fights[i];
-    if (i > 0 && f.actIdx !== fights[i - 1].actIdx) ry -= ACT_GAP;   // breathing room for the act label
+    if (i > 0) {
+      // THE PITCH LAW — STEP stays 96 (plus the act gap at a seam); a gap
+      // widens only where its two beasts demand the 34u of open sky
+      const seam = f.actIdx !== fights[i - 1].actIdx;
+      if (seam) ry -= ACT_GAP;   // breathing room for the act label
+      const add = ssRoadAdd(fights, i - 1, STEP + (seam ? ACT_GAP : 0));
+      roadAdds.push(add);
+      ry -= add;
+    }
     const dir = f.actIdx % 2 === 0 ? 1 : -1;
     let x = 0;
     if (!f.boss) {
@@ -4715,6 +4752,7 @@ function ssStarChart(scene, opts) {
   const bea = window.__ssmap = {
     door: home ? 'home' : 'battle', settled: false, skipped: false, off: 0,
     offMin: Math.round(offMin), offMax: Math.round(offMax), settleOff: Math.round(settleOff), zone: false,
+    road: { adds: roadAdds, dots: 0, culled: 0 },   // the road-law census (slice 2)
   };
 
   // parallax dust: two thin star fields drifting slower than the road
@@ -4745,17 +4783,38 @@ function ssStarChart(scene, opts) {
     dustB.y = -l.u((v - offMin) * 0.14);
   };
 
-  // the path: dotted starlight between nodes — gold where you have walked
+  // every node's drawn star-bounds, one place: grade × summit × the current
+  // ×1.5 — the path and the name seats consult these, and the node loop
+  // below draws with the same numbers
+  const nb = fights.map((f, i) => {
+    const b = SS_BEASTS[f.id];
+    const state = i < fightIdx ? 'won' : i === fightIdx ? 'now' : 'far';
+    const gr = SS_STAR_GRADES.chart;   // LAW 6 — the chart's grade triple
+    // the one you face next renders BIGGER than the rest (the ×1.5)
+    const sc = (b.boss ? gr[2] : b.tier === 'mini' ? gr[1] : gr[0]) * (i === N - 1 ? 1.35 : 1) * (state === 'now' ? 1.5 : 1);
+    let mxX = 0, mxY = 0;
+    for (const s of b.stars) { mxX = Math.max(mxX, Math.abs(s[0])); mxY = Math.max(mxY, Math.abs(s[1])); }
+    return { sc, mxX, mxY, hw: mxX * sc, hh: mxY * sc };
+  });
+
+  // the path: dotted starlight between nodes — gold where you have walked.
+  // THE PATH LAW — dots r 1.3, α .35 walked / .2 ahead, and none inside any
+  // node's star-bounds +8: the road hands you from beast to beast, it never
+  // stitches through a body. The dot stays under every m3 star (1.3 < 1.9).
   const pathG = scene.add.graphics();
   for (let i = 0; i < N - 1; i++) {
     const a = pos[i], b = pos[i + 1];
     const walked = i < fightIdx;
-    pathG.fillStyle(walked ? 0xd7b45c : 0x4a5480, walked ? 0.5 : 0.28);
+    pathG.fillStyle(walked ? 0xd7b45c : 0x4a5480, walked ? 0.35 : 0.2);
     const dist = Math.hypot(b.x - a.x, b.y - a.y);
     const n = Math.max(4, Math.round(dist / 12));
     for (let k = 1; k <= n - 1; k++) {
       const t = k / n;
-      pathG.fillCircle(l.x(a.x + (b.x - a.x) * t), l.y(a.y + (b.y - a.y) * t), l.u(1.6));
+      const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+      if ((Math.abs(x - a.x) < nb[i].hw + 8 && Math.abs(y - a.y) < nb[i].hh + 8)
+        || (Math.abs(x - b.x) < nb[i + 1].hw + 8 && Math.abs(y - b.y) < nb[i + 1].hh + 8)) { bea.road.culled++; continue; }
+      bea.road.dots++;
+      pathG.fillCircle(l.x(x), l.y(y), l.u(1.3));
     }
   }
   rc.add(pathG);
@@ -4778,6 +4837,7 @@ function ssStarChart(scene, opts) {
   const staticG = scene.add.graphics();
   rc.add(staticG);
   let zone = null, curName = null, curGeom = null;
+  const wonNames = [];   // felled names seat AFTER the loop — the name law needs them all measured
   for (let i = 0; i < N; i++) {
     const f = fights[i], p = pos[i];
     const b = SS_BEASTS[f.id];
@@ -4785,9 +4845,7 @@ function ssStarChart(scene, opts) {
     const name = (um ? SS_UMBRAL.prefix : '') + b.name;
     const state = i < fightIdx ? 'won' : i === fightIdx ? 'now' : 'far';
     const last = i === N - 1;
-    // the one you face next renders BIGGER than the rest (the ×1.5)
-    const gr = SS_STAR_GRADES.chart;   // LAW 6 — the chart's grade triple
-    const sc = (b.boss ? gr[2] : b.tier === 'mini' ? gr[1] : gr[0]) * (last ? 1.35 : 1) * (state === 'now' ? 1.5 : 1);
+    const sc = nb[i].sc;   // grade × summit × the current ×1.5, from the shared table
     const k = l.u(sc);
     // LAW 5 — the state dresses fill and alpha; the figure keeps its magnitudes.
     // WON turns the tale's gold but holds its three sizes and white cores; FAR
@@ -4802,8 +4860,7 @@ function ssStarChart(scene, opts) {
     const aLine = SS_MAG_LINE_A[state];
     const coreA = SS_MAG_CORE_A[state === 'far' ? 'far' : 'lit'];
     // star bounds → where names, rings and zones sit, whatever the shape
-    let mxX = 0, mxY = 0;
-    for (const s of b.stars) { mxX = Math.max(mxX, Math.abs(s[0])); mxY = Math.max(mxY, Math.abs(s[1])); }
+    const mxX = nb[i].mxX, mxY = nb[i].mxY;
 
     // the summit halo: the destination is lit from the very first frame
     if (last) {
@@ -4882,16 +4939,59 @@ function ssStarChart(scene, opts) {
     } else {
       drawInto(staticG, l.x(p.x), l.y(p.y));
       if (state === 'won') {
-        // felled beasts keep their names — the scroll back down reads the tale
-        const off = mxX * sc + 14;
-        const nx = p.x > 8 ? p.x - off : p.x + off;
-        rc.add(ssTxt(scene, l.x(nx), l.y(p.y), name, l.u(10), '#8f7f4e').setOrigin(p.x > 8 ? 1 : 0, 0.5));
+        // felled beasts keep their names — the scroll back down reads the
+        // tale; the seat itself is the name law's, resolved below
+        const t = ssTxt(scene, 0, 0, name, l.u(10), '#8f7f4e');
+        rc.add(t);
+        wonNames.push({ t, i });
       }
     }
     if (last) {
       rc.add(ssTxt(scene, l.x(p.x), l.y(p.y - (mxY * sc + 18)), SS_T('mapDest'), l.u(9.5), '#c98f4d', 'italic')
         .setOrigin(0.5, 1));
     }
+  }
+
+  // THE NAME LAW — a name touches only its beast. The beside-seat holds by
+  // default, but it earns itself now: clamped inside the screen (flipping
+  // sides if the words would leave it), clear of every other beast's
+  // star-bounds by 12u and of every seated name outright — when the seat
+  // would collide, the name slides along its own side to the nearest clear
+  // seat. The current name's beneath-seat is reserved by the pitch law.
+  const placedR = [];
+  if (curName) {
+    const cw = curName.width / l.s / 2, ch = curName.height / l.s;
+    const cy = curGeom.p.y + curGeom.mxY * curGeom.sc + 26;
+    placedR.push({ x0: curGeom.p.x - cw, x1: curGeom.p.x + cw, y0: cy, y1: cy + ch });
+  }
+  const EDGE = 204;   // the design box holds ±210; six units of breath
+  for (const wn of wonNames) {
+    const p = pos[wn.i], g = nb[wn.i];
+    const w = wn.t.width / l.s, h = wn.t.height / l.s;
+    let side = p.x > 8 ? -1 : 1;
+    let nx = p.x + side * (g.hw + 14);
+    if (side < 0 ? nx - w < -EDGE : nx + w > EDGE) { side = -side; nx = p.x + side * (g.hw + 14); }
+    nx = side < 0 ? Math.max(nx, -EDGE + w) : Math.min(nx, EDGE - w);
+    const rect = (dy) => ({
+      x0: side < 0 ? nx - w : nx, x1: side < 0 ? nx : nx + w,
+      y0: p.y + dy - h / 2, y1: p.y + dy + h / 2,
+    });
+    const clear = (r) => {
+      for (let j = 0; j < N; j++) {
+        if (j === wn.i) continue;
+        const q = pos[j], m = nb[j];
+        if (r.x1 > q.x - m.hw - 12 && r.x0 < q.x + m.hw + 12 && r.y1 > q.y - m.hh - 12 && r.y0 < q.y + m.hh + 12) return false;
+      }
+      for (const o of placedR) if (r.x1 > o.x0 && r.x0 < o.x1 && r.y1 > o.y0 && r.y0 < o.y1) return false;
+      return true;
+    };
+    let dy = 0;
+    for (let step = 0; step <= 48; step += 8) {
+      if (clear(rect(step))) { dy = step; break; }
+      if (step && clear(rect(-step))) { dy = -step; break; }
+    }
+    placedR.push(rect(dy));
+    wn.t.setOrigin(side < 0 ? 1 : 0, 0.5).setPosition(l.x(nx), l.y(p.y + dy));
   }
 
   // THE ANCHORED HEADER — top of the screen, topmost layer, over a
