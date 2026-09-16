@@ -46031,7 +46031,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='10.12';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='10.13';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -89253,13 +89253,16 @@ function showMenuTail(){
   lensDemoTry();   // 0617 THE GLASS LESSON: its own quiet stager (self-guarded, once ever) — it yields the floor to MOVING DAY, so the ship's press still knocks last
   // 0904 THE NEW SAVE'S DEFAULTS: MOVING DAY's knock (mvDayTry) retired - no room is ever gifted now (the three are everyone's from the first boot); the stager stands inert above
 }
-function roomScale(){ return Math.min(window.innerWidth/960, (window.innerHeight-chinPx())/600); }   // 0395 THE CHIN: the shared chinPx(), never a resize()-local — #menu's own padding recentres the stage in what's left (the train/racecar drags land clear of the band) · 0566: sizeRoom's own expression, lifted byte-same so the moving-day glove sizes in the room's live scale
+function roomVH(){ const h=window.innerHeight, vv=window.visualViewport; if(!vv || !(vv.height>0)) return h; const vh=Math.round(vv.height*(vv.scale||1)); return (vh>0 && vh<h)? vh : h; }   // 1020 THE SMALL BEDROOM AFTER THE FORT (FM-GVT-FORT-SMALL-ROOM-01; ⚑ FR-Q2): the room's height = the smaller of the layout viewport (innerHeight) and the visual viewport's UNZOOMED height (height × scale) — on iOS the layout viewport lies while the keyboard / Safari's bars move, and the visual viewport is the one that tells the truth; × scale so a pinch zoom (Safari ignores user-scalable=no) never shrinks the room under the zoom; absent (an old engine) → innerHeight, byte-same as before
+function roomScale(){ return Math.min(window.innerWidth/960, (roomVH()-chinPx())/600); }   // 1020 THE SMALL BEDROOM AFTER THE FORT: the height through roomVH (the visual viewport's own resize below re-runs sizeRoom)   // 0395 THE CHIN: the shared chinPx(), never a resize()-local — #menu's own padding recentres the stage in what's left (the train/racecar drags land clear of the band) · 0566: sizeRoom's own expression, lifted byte-same so the moving-day glove sizes in the room's live scale
 function sizeRoom(){
   const st=document.getElementById('roomStage'); if(!st) return;
   const s=roomScale();
   st.style.transform='scale('+s+')';
 }
 window.addEventListener('resize', sizeRoom);
+if(window.visualViewport) window.visualViewport.addEventListener('resize', sizeRoom);   // 1020 THE SMALL BEDROOM AFTER THE FORT (⚑ FR-Q2): the visual viewport moves WITHOUT a window resize on iOS Safari (the keyboard, the bars) — the stage follows it too; the canvas keeps its own law (resize() reads innerHeight)
+function stageResync(){ chinApply(); sizeRoom(); }   // 1020 THE SMALL BEDROOM AFTER THE FORT (FM-GVT-FORT-SMALL-ROOM-01; Wyatt 9/15: "Upon entering and exiting the fort, sometimes the bedroom appears extra small. It goes away and is the correct size if you go anywhere else and come back"; ⚑ FR-Q1): THE GATE — sizeRoom keeps whatever the LAST resize measured, and a full-stage scene's ✕ never re-read it; WebKit fires resize while the frame is still moving (the keyboard's dismissal over the rename card, a rotation, Safari's bars) and the frame's return can fire nothing — a stage scaled to a transient height under the fort came back small and stayed so until the next renderMenu (a room change). The four full-stage scenes' closers (the fort, the parks, the lobbies, the campaign) call this: the chin re-measured (a change re-runs the whole chain itself), then the stage at the CURRENT roomScale(). One call on a close — no frame work.
 // ═══ 0904 THE ROOM NOTES, PART TWO — THE NIGHT'S CLOCK IN THE ROOM: roomSVG stamps the verdict on the bedroom's svg (data-rn); this
 // re-reads it once a minute while the room is open (a plain interval — the v1.21 "no timers" law is scoped to decor movement; a hidden
 // tab waits for its return through takeOut) and repaints the room on a crossing (renderMenu — the innerHTML-rebuild law, under
@@ -93610,7 +93613,7 @@ function openRaidScene(id){
   clearTimeout(CREW.pollT); crewTick();
   locSync('door');   // 0997: a scene door (the palace lobby keeps the garden's bed — a swell, not a crossfade) · 0444: the throne's bed plays IN THE DOORWAY — the park under it fades out ("hit the volcano — Dino Park fades out"); the fight itself is music-free
 }
-function closeRaidScene(){ document.getElementById('raidscene').classList.add('hidden'); grpBtnSync();   // 0561b: the GROUP button re-homes (the room, or the scene still standing under this one)
+function closeRaidScene(){ document.getElementById('raidscene').classList.add('hidden'); stageResync(); grpBtnSync();   // 1020 THE SMALL BEDROOM AFTER THE FORT (⚑ FR-Q1): the same family, the same hole   // 0561b: the GROUP button re-homes (the room, or the scene still standing under this one)
   if(COOP && COOP.campWish) COOP.campWish=null;   // the wish dies with the door (leave-truth)
   clearTimeout(CREW.pollT); crewTick();
   locSync('door'); }   // 0997: a scene door (the garden's bed keeps playing under the ✕ — a swell) · 0444: ...and the park comes back in when you are off it
@@ -96745,7 +96748,7 @@ function openParkScene(id){
   locSync();   // 0444: the park's bed fades in over the room's (the tap is the gesture; the autoplay law holds)
   if(PARK_CUR==='moon') mgEntryChord();   // 0997: THE MOON GARDEN's entry takes the hedge door's chord — one chord per arrival (the four-right's own chord counts; the code's fanfare has its say first)
 }
-function closeParkScene(){ document.getElementById('parkscene').classList.add('hidden'); grpBtnSync();   // 0561b: the GROUP button re-homes (the room, or the scene still standing under this one)
+function closeParkScene(){ document.getElementById('parkscene').classList.add('hidden'); stageResync(); grpBtnSync();   // 1020 THE SMALL BEDROOM AFTER THE FORT (⚑ FR-Q1): the same family, the same hole — the room re-reads its scale at every full-stage ✕   // 0561b: the GROUP button re-homes (the room, or the scene still standing under this one)
   if(COOP && COOP.campWish) COOP.campWish=null;   // the wish dies with the door (leave-truth)
   clearTimeout(CREW.pollT); crewTick();
   locSync(); }   // 0444: ...and the room's bed comes back when the gate closes
@@ -96839,7 +96842,7 @@ function openCampScene(){ wrPreload(); safeOnce();   // v3.60 (0297): first mult
   // the rail needs the squadless too)
   clearTimeout(CREW.pollT); crewTick();
 }
-function closeCampScene(){ document.getElementById('campscene').classList.add('hidden'); grpBtnSync();   // 0561b: the GROUP button re-homes (the room, or the scene still standing under this one)
+function closeCampScene(){ document.getElementById('campscene').classList.add('hidden'); stageResync(); grpBtnSync();   // 1020 THE SMALL BEDROOM AFTER THE FORT (⚑ FR-Q1): the same family, the same hole   // 0561b: the GROUP button re-homes (the room, or the scene still standing under this one)
   if(COOP && COOP.campWish) COOP.campWish=null;   // v3.20 (card 06): the wish dies with the door (leave-truth — coopMe stops speaking it the same beat)
   clearTimeout(CREW.pollT); crewTick(); }   // v3.10: ...and takes its leave the same way (the farewell rides within a beat)
 
@@ -101513,7 +101516,7 @@ function renderFortScene(){
 let FH_HINT_ON=false;   // 0991 THE FORT'S CHROME (REV 5 R-I): the rename hint shows on the FIRST open of the yard on a device, then the pencil alone — decided at the open, so a re-paint mid-visit keeps it
 function fhHintOnce(){ try{ if(localStorage.getItem('gvt_fhint')) return false; localStorage.setItem('gvt_fhint','1'); return true; }catch(e){ return false; } }   // a device key in the coach's own grammar (gvt_coach) — not the save
 function openFortScene(){ const sc=document.getElementById('fortscene'); if(!sc) return; FH_HINT_ON=fhHintOnce(); if(typeof mvDayDisarm==='function') mvDayDisarm(); const mh9=document.getElementById('mvHand'); if(mh9) mh9.classList.remove('in','press'); sc.classList.remove('hidden'); fhUnder(true); renderFortScene(); }   // 0992 THE LIVING FORT (F-Q13): the shelf's loops pause under the yard   // 0990 THE FORT'S SET (Q8): a MOVING DAY glove already in flight is put away too — it flew over the range for ~5 s on a young save   // REV 3: a staged MOVING DAY demonstration is disarmed as the yard opens (mvDayQuiet refuses to re-arm it while the yard stands)
-function closeFortScene(){ const sc=document.getElementById('fortscene'); fhScenesStop(); if(sc){ sc.classList.add('hidden'); sc.innerHTML=''; } fhUnder(false); }   // 0992: the shelf's loops run again
+function closeFortScene(){ const sc=document.getElementById('fortscene'); fhScenesStop(); if(sc){ sc.classList.add('hidden'); sc.innerHTML=''; } fhUnder(false); stageResync(); }   // 1020 THE SMALL BEDROOM AFTER THE FORT: the room re-reads its scale at the ✕ (stageResync — the gate of his report)   // 0992: the shelf's loops run again
 function fortSceneSync(){ if(fortSceneOpen()) renderFortScene(); }
 function fortDefaultName(){ return tf('FORT %1', t(fortColWord())); }
 function fortNameOpen(){ namePromptShow('fort'); const i=document.getElementById('npIn'); if(i){ i.focus(); i.select(); } }
@@ -106073,6 +106076,11 @@ window.GVT = {
   // ---- 0395 THE CHIN rig: force the chin (env() is 0 in headless); null clears
   // the override. Never persisted, never in saves. ----
   chin(px){ CHIN.ov=(px==null? null : Math.max(0,+px||0)); chinApply(); return CHIN.px; },
+  // ---- 1020 THE SMALL BEDROOM AFTER THE FORT rig: the stage's scale as WRITTEN vs the scale the viewport WANTS now, the two viewports' heights, the chin, the stage's animations' play states, the scenes standing, the fort's seats ----
+  stage(){ const st=document.getElementById('roomStage'), vv=window.visualViewport, m=document.getElementById('menu'), pr=document.getElementById('chinProbe'), sc=document.getElementById('fortscene'); const A=st? st.getAnimations({subtree:true}) : [];
+    return { tr:st? st.style.transform : null, want:'scale('+roomScale()+')', s:roomScale(), iw:window.innerWidth, ih:window.innerHeight, vh:roomVH(), vvh:vv? vv.height : null, vvs:vv? vv.scale : null, chin:CHIN.px, ov:CHIN.ov, probe:pr? pr.getBoundingClientRect().height : null,
+      anims:A.length, paused:A.filter(a=>a.playState==='paused').length, own:st? st.getAnimations().map(a=>(a.animationName||'?')+':'+a.playState) : [], under:!!(m && m.classList.contains('fh-under')), fort:fortSceneOpen(), park:parkSceneOpen(), raid:raidSceneOpen(), camp:campSceneOpen(),
+      seats:[...document.querySelectorAll('#fortBg [id^="fhHot-"], #fortBg [id^="fhIron-"], #fortBg [id^="fhKh-"], #fortBg [id^="fhPh-"]')].map(e=>e.id+'@'+e.style.left+','+e.style.top+','+e.style.width+','+e.style.height).join('|'), fhu:sc? sc.style.getPropertyValue('--fhu') : null }; },
   // ---- 0376 THE GOOD DOG rig: deterministic tour clock for batteries ----
   dog(){ const q=(DOGT&&DOGT.phase==='in')? dogPos():null;
     return { phase:DOGT? DOGT.phase:'unarmed', leg:DOGT? DOGT.leg:0,
