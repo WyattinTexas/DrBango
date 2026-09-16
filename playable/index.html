@@ -62,6 +62,9 @@ video.fill{background:#000}
 /* the strike clip IS the left claw leaving the rim — the static one goes while it plays */
 #mk-hand-l{transition:transform 1.5s cubic-bezier(.2,.8,.2,1),opacity .35s}
 #mk-hands.strike #mk-hand-l{opacity:0!important}
+#mk.ko #mk-head-w{opacity:0!important;transform:translate(-50%,-12%) scale(1.25)!important;transition:opacity 1.4s,transform 1.4s}
+#mk.ko>img{opacity:0!important;transition:opacity 1.2s,transform 1.4s}#mk.ko #mk-cloud-l{transform:translateX(-70%)!important}#mk.ko #mk-cloud-r{transform:translateX(70%)!important}
+#mk-hands.ko img{opacity:0!important;transform:translateY(70%) rotate(0)!important;transition:opacity .9s,transform 1.2s}
 #mk-cloud-l{left:50%;margin-left:calc(var(--v)*-26.8);top:25%;width:calc(var(--v)*30.5);transform:translateX(-40%)}
 #mk-cloud-r{left:50%;margin-left:calc(var(--v)*-3.7);top:25%;width:calc(var(--v)*30.5);transform:translateX(40%)}
 #mk.on #mk-cloud-l,#mk.on #mk-cloud-r{transform:translateX(0);opacity:1}
@@ -250,6 +253,8 @@ body.fx .ghost.vid>img{display:none}
 #again{position:absolute;left:50%;top:94.6%;transform:translateX(-50%);padding:.35em 1.4em;border-radius:2em;border:calc(var(--u)*.4) solid rgba(255,255,255,.5);background:rgba(10,6,24,.7);color:#fff;font-family:inherit;font-size:calc(var(--u)*4.2);letter-spacing:.06em;opacity:0;pointer-events:none;transition:opacity .5s;cursor:pointer}
 #again.on{opacity:1;pointer-events:auto}
 #cta-fallback{position:absolute;left:0;right:0;top:12%;text-align:center;font-size:calc(var(--u)*7);line-height:1.1;display:none}
+#win-tag{position:absolute;left:6%;width:88%;top:7.6%;height:5.2%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:calc(var(--u)*4.8);color:#ffe27a;letter-spacing:.06em;background:rgba(6,3,14,.94);border-radius:2em;opacity:0;pointer-events:none;transition:opacity .4s}/* sits over the outro's baked 'not strong enough… yet' line */
+#win-tag.on{opacity:1}
 </style>
 </head>
 <body data-screen="tap" data-phase="">
@@ -351,6 +356,7 @@ body.fx .ghost.vid>img{display:none}
   <div id="s-cta" class="screen">
     <img class="fill" src="assets/video/outro_end.webp" alt="">
     <video id="outro" class="fill" src="assets/video/outro.mp4" poster="assets/video/outro_end.webp" playsinline preload="auto"></video>
+    <div id="win-tag" class="lucky stroke">THE KING FALLS · GARY WINS!</div>
     <div id="cta-fallback" class="lucky stroke">NOT STRONG ENOUGH… YET.<br>BUILD YOUR ULTIMATE TEAM</div>
     <a id="cta-btn" href="https://www.BattleOfOrigins.com" target="_blank" rel="noopener" aria-label="Back it on Kickstarter"></a>
     <button id="again" class="lucky">PLAY AGAIN</button>
@@ -433,7 +439,7 @@ const DIE={n:96,cols:12,rows:8,fps:24,src:'assets/ui/die_sheet.webp'},FLAME_B={n
 
 /* ── state ── */
 const NAMES={p:LONG?'The Mountain King':'Gary',e:LONG?'The Mountain King':'Kodako',m:'The Mountain King'};
-const S={screen:'tap',phase:'',round:0,scripted:true,p:{hp:6,max:6},e:{hp:6,max:6},m:{hp:24,max:24},shards:0,games:+(localStorage.getItem('boo_pl_games')||0),busy:false,boss:false};
+const S={screen:'tap',phase:'',round:0,scripted:true,p:{hp:6,max:6},e:{hp:6,max:6},m:{hp:8,max:8},shards:0,strikes:0,games:+(localStorage.getItem('boo_pl_games')||0),busy:false,boss:false,bossWin:false,bossDeep:1,bossRound:0};
 S.scripted=!LIVE&&S.games===0;
 function setScreen(n){S.screen=n;body.dataset.screen=n;['tap','open','game','cta'].forEach(k=>$('s-'+k).classList.toggle('on',k===n));}
 function setPhase(p){S.phase=p;body.dataset.phase=p;}
@@ -472,16 +478,57 @@ function compare(a,b){if(a.rank!==b.rank)return a.rank>b.rank?1:-1;if(a.value!==
 const TYPE={singles:'SINGLES',doubles:'DOUBLES!',triples:'TRIPLES!'};
 /* hidden player-favouring boosts for live (replay) games */
 function rollPlayerLive(){let d=roll3();const desperate=S.p.hp<=2,finishing=S.e.hp<=1;
-  let pT=finishing?.03:.06,pD=finishing?.03:.08;if(desperate){pT+=.08;pD+=.08;}
+  let pT=finishing?.05:.10,pD=finishing?.06:.16;if(desperate){pT+=.08;pD+=.10;}
   const r=Math.random();if(r<pT){const v=4+rnd(3);d=[v,v,v];}else if(r<pT+pD){const v=3+rnd(4);let k=1+rnd(6);if(k===v)k=k%6+1;d=[v,v,k];}return d;}
 function rollEnemyLive(pr){let d=roll3();const er=analyze(d);
-  if(er.rank===2&&er.value>=4&&Math.random()<.2&&pr.rank<2){/* soften a high enemy pair now and then */const v=1+rnd(3);d=[v,v,er.dice[2]];}return d;}
+  if(er.rank===2&&er.value>=4&&Math.random()<.35&&pr.rank<2){/* soften a high enemy pair now and then */const v=1+rnd(3);d=[v,v,er.dice[2]];}return d;}
 /* scripted first play (values vary ±1 without changing any outcome) */
 const SCRIPT=[{p:[5,3,2],e:[4,2,1]},{p:[6,2,1],e:[3,3,5]},{p:[1,1,4],e:[6,3,2]},{p:[4,2,2],e:[5,5,3]},{p:[4,4,1],e:[6,5,2]}];
 function vary(mine,other){const base=analyze(mine),ob=analyze(other),cmp=compare(base,ob),ones=mine.filter(v=>v===1).length;
   for(let t=0;t<12;t++){const d=mine.slice(),i=rnd(3),v=d[i]+(Math.random()<.5?-1:1);if(v<1||v>6)continue;d[i]=v;const a=analyze(d);
     if(a.type===base.type&&a.value===base.value&&compare(a,ob)===cmp&&d.filter(x=>x===1).length===ones)return d;}
   return mine;}
+
+/* DIRECTOR — the dice stay dice, the outcomes are steered: never lose to Kodako, Ice Shards fires at least once a play, the King falls on the coin's say-so */
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;};
+const D={
+  ones(d,k){d=d.slice();const idx=d.map((v,i)=>[v,i]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);for(let j=0;j<k&&j<3;j++)d[idx[j]]=1;return d;},
+  singles(top){top=Math.max(3,Math.min(6,top));const a=top;let b=1+rnd(a-1),c;do{c=1+rnd(a-1);}while(c===b);return shuffle([a,b,c]);},
+  doubles(v,k){if(k==null||k===v){do{k=1+rnd(6);}while(k===v);}return shuffle([v,v,k]);},
+  triples(v){return[v,v,v];},
+  weak(){return D.singles(3+rnd(2));},
+  beat(er,one){if(er.rank===1)return one?D.doubles(2+rnd(5),1):D.doubles(2+rnd(5));
+    if(er.rank===2)return er.value<6?D.doubles(er.value+1+rnd(6-er.value),one?1:null):D.triples(2+rnd(5));
+    return er.value<6?D.triples(er.value+1+rnd(6-er.value)):null;},
+  /* the player wins this roll (keep a 1 in it when asked) */
+  playerWins(p,e,one){let pr=analyze(p),er=analyze(e);if(compare(pr,er)>0&&(!one||p.includes(1)))return[p,e];
+    let q=D.beat(er,one);if(!q){e=D.weak();er=analyze(e);q=D.beat(er,one);}return[q,e];},
+  /* the enemy wins this roll with the rank asked (2 = doubles, 3 = triples) and the player rolls under it */
+  enemyWins(p,e,rank){const v=4+rnd(3);e=rank>=3?D.triples(v):D.doubles(v);const er=analyze(e);let pr=analyze(p);
+    if(compare(pr,er)>=0)p=D.singles(3+rnd(4));return[p,e];},
+  /* the crew's fight */
+  kodako(p,e){let pr,er,cmp;const seed=S.strikes===0&&S.shards<4;
+    if(seed){p=D.ones(p,Math.min(2,Math.ceil((4-S.shards)/2)));}
+    pr=analyze(p);er=analyze(e);cmp=compare(pr,er);
+    const shardsAfter=S.shards+p.filter(v=>v===1).length*2;
+    if(cmp<0&&S.p.hp-er.damage<=0){[p,e]=D.playerWins(p,e,seed);pr=analyze(p);er=analyze(e);cmp=1;}
+    if(cmp>0&&S.strikes===0&&shardsAfter<4){const dmg=pr.damage;if(S.e.hp-dmg<=0){ /* no finishing blow before the first strike */
+        if(er.rank===1&&er.value<6&&S.e.hp>=2){p=D.singles(er.value+1+rnd(6-er.value));if(seed)p=D.ones(p,1);}
+        else{e=D.doubles(2+rnd(3));p=D.singles(3+rnd(3));if(seed)p=D.ones(p,1);if(S.p.hp-2<=0){e=D.weak();p=D.singles(6);}}}}
+    return[p,e];},
+  /* the King's fight: the coin says who takes it; the loser still gets a round or two */
+  boss(p,e){S.bossRound++;let pr=analyze(p),er=analyze(e);
+    if(S.bossWin){return D.playerWins(p,e,S.bossRound===1&&S.shards<4);}
+    if(S.bossRound<=S.bossDeep){ /* the player gets a little deep */
+      [p,e]=D.playerWins(p,e,false);pr=analyze(p);const dmg=pr.damage+(S.shards>=4?2:0);
+      if(S.m.hp-dmg<=0){return D.enemyWins(p,e,S.p.hp>4?3:2);} /* not so deep that he falls */
+      if(S.strikes===0&&S.shards<4&&S.bossRound===1){p=D.ones(p,1);if(compare(analyze(p),analyze(e))<=0)[p,e]=D.playerWins(p,e,true);}
+      return[p,e];}
+    return D.enemyWins(p,e,S.p.hp>4?3:2);}
+};
+const BOSS_WIN=[{p:[1,1,4],e:[5,3,2]},{p:[5,5,5],e:[4,2,1]},{p:[6,6,2],e:[5,3,1]}];
+const BOSS_LOSE=[{p:[5,5,2],e:[6,3,1]},{p:[4,3,1],e:[6,6,6]}];
+/* /DIRECTOR */
 
 /* ── 3D dice (the /hype CSS-3D system, resized for this column) ── */
 const Dice3D=(function(){
@@ -553,18 +600,19 @@ $('roll').addEventListener('click',onRoll);
 async function onRoll(){if(S.busy||!$('roll').classList.contains('ready'))return;S.busy=true;setReady(false);setPhase('rolling');
   sfx('click');sfx('shake');
   let p,e;
-  if(S.boss){p=vary([5,5,2],[6,3,1]);e=vary([6,3,1],[5,5,2]);}
+  if(S.boss){const sc=S.scripted?(S.bossWin?BOSS_WIN:BOSS_LOSE)[S.bossRound]:null;
+    if(sc){S.bossRound++;p=vary(sc.p,sc.e);e=vary(sc.e,sc.p);}else{p=rollPlayerLive();e=rollEnemyLive(analyze(p));[p,e]=D.boss(p,e);}}
   else if(S.scripted&&SCRIPT[S.round]){const sc=SCRIPT[S.round];p=vary(sc.p,sc.e);e=vary(sc.e,sc.p);}
-  else{p=rollPlayerLive();e=rollEnemyLive(analyze(p));}
+  else{p=rollPlayerLive();e=rollEnemyLive(analyze(p));[p,e]=D.kodako(p,e);}
   Dice3D.clearAll();hideBanner();
   Dice3D.showRolling('enemy',3);await wait(160);Dice3D.showRolling('player',3);
   await wait(950);stopSfx('shake');sfx('throw');
   await Promise.all([Dice3D.reveal('enemy',e),Dice3D.reveal('player',p)]);
   const pr=analyze(p),er=analyze(e),cmp=compare(pr,er);
   await wait(300);
-  if(S.boss){await bossRound(pr,er,cmp);return;}
   const ones=p.filter(v=>v===1).length;
   if(ones){await luckyNovice(ones);}
+  if(S.boss){await bossRound(pr,er,cmp);return;}
   if(cmp===0){banner('TIE!','tie');narr('TIE! <b>ROLL AGAIN</b>');await wait(1300);S.busy=false;setReady(true);return;}
   if(cmp>0){Dice3D.win('player',pr);Dice3D.lose('enemy');banner(TYPE[pr.type],pr.type==='triples'?'win big':'win');if(pr.type==='triples'){flash();sfx('shine');}
     let dmg=pr.damage;narr(`<b>${NAMES.p.toUpperCase()}</b> WINS THE ROLL · ${TYPE[pr.type].replace('!','')} · <b>${dmg} DAMAGE</b>`);
@@ -583,7 +631,7 @@ async function luckyNovice(ones){const n=ones*2;const sp=$('splash');sp.classNam
   $('sp-sub').innerHTML=`${NAMES.p.toUpperCase()} ROLLED ${ones===1?'A 1':ones+' ONES'} · <b>+${n} ICE SHARDS</b>`;
   sfx('water1');sp.classList.add('on');$('s-game').classList.add('splashing');setPhase('splash');await wait(1500);sp.classList.remove('on');$('s-game').classList.remove('splashing');
   powerAnim();sfx('water3');await wait(250);shards(S.shards+n,true);await wait(500);setPhase('rolling');}
-async function iceShards(){narr(`<b>ICE SHARDS!</b> ${NAMES.p.toUpperCase()} SPENDS 4 · <b>+2 DAMAGE</b>`);shards(S.shards-4,true);sfx('water2');
+async function iceShards(){S.strikes++;narr(`<b>ICE SHARDS!</b> ${NAMES.p.toUpperCase()} SPENDS 4 · <b>+2 DAMAGE</b>`);shards(S.shards-4,true);sfx('water2');
   if(FX.on){setPhase('splash');$('s-game').classList.add('flipping');sfx('shine');const ok=await FX.play('fx-card',{at:1.5,timeout:4000});$('s-game').classList.remove('flipping');setPhase('rolling');if(!ok)await wait(200);}
   powerAnim();
   for(let i=0;i<3;i++){const s=document.createElement('img');s.className='shot';s.src='assets/ui/ice_shards.webp';s.style.setProperty('--dx',`${(180+i*30)}%`);s.style.setProperty('--dy',`-${(560+i*40)}%`);s.style.animationDelay=(i*.08)+'s';$('s-game').appendChild(s);setTimeout(()=>s.remove(),900);}
@@ -599,41 +647,54 @@ async function koSequence(){setPhase('ko');narr(`<b>${NAMES.e.toUpperCase()} IS 
   const g=$('g-center');g.classList.add('ko');sparks(50,20,16);setTimeout(()=>FX.pauseLoop('g-center'),1000);await wait(500);$('g-left').classList.add('flee');$('g-right').classList.add('flee');setTimeout(()=>FX.pauseLoops(),900);
   await wait(900);banner('ROUND WON!','win big');narr(`<b>TEAM ${NAMES.p.toUpperCase()}</b> TAKES THE ROUND!`);$('hud-e').classList.remove('in');
   await wait(1900);hideBanner();Dice3D.clearAll();await bossRise();}
-async function bossRise(){S.boss=true;setPhase('mk');sfx('whoosh2');$('dark').classList.add('on');
+async function bossRise(){S.boss=true;S.bossRound=0;const f=Q.get('boss');S.bossWin=f==='win'?true:f==='lose'?false:Math.random()<.5;S.bossDeep=1+rnd(2);setPhase('mk');sfx('whoosh2');$('dark').classList.add('on');
   narr('THE GROUND SHAKES…');await wait(500);shake();sfx('rocks');
   const R=$('rocks');for(let i=0;i<3;i++){let r;if(FX.on){r=document.createElement('video');FX.src(r,'rockfall');}else{r=document.createElement('img');r.src='assets/fx/rocks_fall.webp';}
     r.style.left=(i*30-10)+'%';r.style.top=(8+i*9)+'%';r.style.animationDelay=(i*.25)+'s';R.appendChild(r);setTimeout(()=>{r.classList.add('fall');if(r.play){try{r.play().catch(()=>{});}catch(e){}}},20+i*250);setTimeout(()=>r.remove(),2600);}
   $('bg-mountains').classList.add('up');$('bg').classList.add('mkset');await wait(900);$('mk').classList.add('on');$('mk-hands').classList.add('on');
   await wait(900);banner(NAMES.m.toUpperCase(),'lose big');narr(`<b>${NAMES.m.toUpperCase()}</b> RISES!`);$('hud-mk').classList.add('in');shake();flash();
-  await wait(2000);hideBanner();narr(`YOU'VE GOT ONE SHOT · <b>TAP THE DIE</b>`);S.busy=false;setReady(true);}
+  await wait(2000);hideBanner();narr(`BEAT HIS ROLLS TO BRING HIM DOWN · <b>TAP THE DIE</b>`);S.busy=false;setReady(true);}
 async function bossRound(pr,er,cmp){
-  Dice3D.win('player',pr);Dice3D.lose('enemy');banner(TYPE[pr.type],'win');narr(`<b>${NAMES.p.toUpperCase()}</b> WINS THE ROLL · <b>${pr.damage} DAMAGE</b>`);
-  await wait(900);S.m.hp-=pr.damage;bar('m');hitEl($('mk-head'));pop(50,14,'-'+pr.damage);sfx('click');
-  await wait(900);hideBanner();narr('…BARELY A SCRATCH.');await wait(1300);
-  narr(`<b>${NAMES.m.toUpperCase()}</b> ROLLS…`);Dice3D.clearAll();sfx('shake');Dice3D.showRolling('enemy',3);await wait(950);stopSfx('shake');sfx('throw');
-  await Dice3D.reveal('enemy',[6,6,6]);await wait(300);Dice3D.win('enemy',{type:'triples',value:6});
-  $('mk').classList.add('beast');const sp=$('splash');sp.className='purple';$('sp-title').className='lucky stroke';$('sp-title').textContent='BEAST MODE';$('sp-sub').innerHTML='MATCHING DICE HIT <b>TWICE AS HARD</b> · TRIPLES = 6 DAMAGE';
-  $('sp-card').style.visibility='hidden';$('sp-shards').style.visibility='hidden';$('sp-ring').style.visibility='hidden';orb('orb-p');sfx('shine');sp.classList.add('on');$('s-game').classList.add('splashing');
+  if(cmp===0){banner('TIE!','tie');narr('TIE! <b>ROLL AGAIN</b>');await wait(1300);S.busy=false;setReady(true);return;}
+  if(cmp>0){Dice3D.win('player',pr);Dice3D.lose('enemy');banner(TYPE[pr.type],pr.type==='triples'?'win big':'win');if(pr.type==='triples'){flash();sfx('shine');}
+    let dmg=pr.damage;narr(`<b>${NAMES.p.toUpperCase()}</b> WINS THE ROLL · ${TYPE[pr.type].replace('!','')} · <b>${dmg} DAMAGE</b>`);
+    await wait(900);if(S.shards>=4){dmg+=2;await iceShards();}
+    S.m.hp-=dmg;bar('m');hitEl($('mk-head'));pop(50,22,'-'+dmg);shake();sfx(dmg>=3?'shine':'click');await wait(800);
+    if(S.m.hp<=0){await bossFalls();return;}
+    hideBanner();narr(dmg>=4?`<b>THE KING STAGGERS!</b> ${S.m.hp} TO GO`:dmg>=3?`<b>HE FEELS THAT ONE.</b> ${S.m.hp} TO GO`:`…HE BARELY FLINCHES. <b>${S.m.hp} TO GO</b>`);
+    await wait(1300);narr('KEEP BEATING HIS ROLLS · <b>TAP THE DIE</b>');S.busy=false;setReady(true);return;}
+  /* the King wins the roll: BEAST MODE — matching dice hit twice as hard */
+  Dice3D.win('enemy',er);Dice3D.lose('player');banner(TYPE[er.type],'lose big');
+  const dmg=er.rank>=2?er.damage*2:1;
+  const sp=$('splash');sp.className='purple';$('sp-title').className='lucky stroke';$('sp-title').textContent='BEAST MODE';$('sp-sub').innerHTML=`MATCHING DICE HIT <b>TWICE AS HARD</b> · ${TYPE[er.type].replace('!','')} = ${dmg} DAMAGE`;
+  $('sp-card').style.visibility='hidden';$('sp-shards').style.visibility='hidden';$('sp-ring').style.visibility='hidden';orb('orb-p');sfx('shine');sp.classList.add('on');$('s-game').classList.add('splashing');$('mk').classList.add('beast');
   await wait(1500);sp.classList.remove('on');$('s-game').classList.remove('splashing');$('sp-card').style.visibility='';$('sp-shards').style.visibility='';$('sp-ring').style.visibility='';
-  banner('TRIPLES!','lose big');narr(`<b>${NAMES.m.toUpperCase()}</b> · BEAST MODE · <b>6 DAMAGE</b>`);
+  narr(`<b>${NAMES.m.toUpperCase()}</b> · BEAST MODE · <b>${dmg} DAMAGE</b>`);
   $('mk-hands').classList.add('strike');let ok=false;if(FX.on){sfx('whoosh2');ok=await FX.play('fx-hand',{from:.9,at:3.55,timeout:5500});}
   if(!ok){const h=$('mk-swipe');h.classList.remove('go');void h.offsetWidth;h.classList.add('go');await wait(380);}sfx('rocks');
-  S.p.hp=0;bar('p');hitEl($('p-gary'));pop(50,69,'-6');flash();shake();await wait(600);$('p-gary').classList.add('down');$('c-gary').classList.add('off');
-  await wait(900);hideBanner();narr(`<b>${NAMES.p.toUpperCase()} IS DOWN!</b>`);setPhase('down');await wait(1600);endGame();}
+  S.p.hp=Math.max(0,S.p.hp-dmg);bar('p');hitEl($('p-gary'));pop(50,69,'-'+dmg);flash();shake();
+  setTimeout(()=>{$('mk-hands').classList.remove('strike');$('mk').classList.remove('beast');},1500); /* the claw settles back on the rim */
+  if(S.p.hp<=0){await wait(600);$('p-gary').classList.add('down');$('c-gary').classList.add('off');
+    await wait(900);hideBanner();narr(`<b>${NAMES.p.toUpperCase()} IS DOWN!</b>`);setPhase('down');await wait(1600);endGame(false);return;}
+  await wait(900);hideBanner();narr(`<b>${S.p.hp} HP LEFT.</b> BEAT HIS ROLL · <b>TAP THE DIE</b>`);await wait(400);S.busy=false;setReady(true);}
+async function bossFalls(){setPhase('ko');flash();sfx('shine');sfx('rocks');shake();
+  $('mk').classList.add('ko');$('mk-hands').classList.add('ko');sparks(50,30,22);
+  await wait(500);banner('THE KING FALLS!','win big');narr(`<b>TEAM ${NAMES.p.toUpperCase()}</b> TOPPLES THE MOUNTAIN KING!`);$('hud-mk').classList.remove('in');
+  await wait(2600);hideBanner();setPhase('down');endGame(true);}
 async function lossSequence(){setPhase('down');narr(`<b>${NAMES.p.toUpperCase()} IS DOWN!</b> ${NAMES.e.toUpperCase()} TAKES THIS ONE…`);flash();
   $('p-gary').classList.add('down');$('c-gary').classList.add('off');await wait(2000);endGame();}
 
 /* ── outro / CTA ── */
-function endGame(){S.games++;localStorage.setItem('boo_pl_games',S.games);setScreen('cta');setPhase('cta');FX.pauseLoops();['fl-tl','fl-tr','fl-bl','fl-br'].forEach(id=>Sprite.stop($(id)));
+function endGame(win){S.games++;localStorage.setItem('boo_pl_games',S.games);setScreen('cta');setPhase('cta');$('win-tag').classList.toggle('on',!!win);FX.pauseLoops();['fl-tl','fl-tr','fl-bl','fl-br'].forEach(id=>Sprite.stop($(id)));
   const v=$('outro');v.muted=false;v.currentTime=0;const p=v.play();if(p)p.catch(()=>{v.muted=true;v.play().catch(()=>{$('cta-fallback').style.display='block';});});
   setTimeout(()=>{$('cta-btn').classList.add('on');$('again').classList.add('on');},3200);
   v.onended=()=>{$('cta-btn').classList.add('on');$('again').classList.add('on');};}
 $('cta-btn').addEventListener('click',()=>sfx('click'));
 $('again').addEventListener('click',()=>{sfx('click');const v=$('outro');v.pause();reset();enterArena();});
-function reset(){S.round=0;S.scripted=!LIVE&&S.games===0;S.p.hp=S.p.max;S.e.hp=S.e.max;S.m.hp=S.m.max;S.shards=0;S.boss=false;S.busy=false;
+function reset(){S.round=0;S.scripted=!LIVE&&S.games===0;S.p.hp=S.p.max;S.e.hp=S.e.max;S.m.hp=S.m.max;S.shards=0;S.strikes=0;S.boss=false;S.bossRound=0;S.busy=false;$('win-tag').classList.remove('on');
   Dice3D.clearAll();hideBanner();$('narr').classList.remove('on');
   ['g-left','g-center','g-right','p-larry','p-gary','p-dealer','c-larry','c-gary','c-dealer','hud-e','hud-p','hud-mk'].forEach(id=>{$(id).className=$(id).className.replace(/\b(in|ko|flee|hit|down|off|power)\b/g,'').trim();});
-  $('mk').classList.remove('on');$('mk').classList.remove('beast');$('mk-hands').classList.remove('on');$('mk-hands').classList.remove('strike');$('dark').classList.remove('on');$('bg-mountains').classList.remove('up');$('bg').classList.remove('mkset');$('cta-btn').classList.remove('on');$('again').classList.remove('on');
+  ['on','beast','ko'].forEach(c=>$('mk').classList.remove(c));['on','strike','ko'].forEach(c=>$('mk-hands').classList.remove(c));$('dark').classList.remove('on');$('bg-mountains').classList.remove('up');$('bg').classList.remove('mkset');$('cta-btn').classList.remove('on');$('again').classList.remove('on');
   $('rocks').innerHTML='';$('splash').classList.remove('on');}
 
 /* frame monitor: rolling fps + long frames (>34 ms) per phase — read by the rig (window.BOO.PERF) and the ?debug=1 overlay */
@@ -652,7 +713,7 @@ if(Q.has('css')){const st=document.createElement('style');st.textContent=Q.get('
 if(Q.has('mk'))setTimeout(async()=>{unlock();FX.warm();setScreen('game');names();bar('p');bar('e');bar('m');S.p.hp=2;bar('p');['p-larry','p-gary','p-dealer','c-larry','c-gary','c-dealer','hud-p'].forEach(id=>$(id).classList.add('in'));await bossRise();},600);
 /* auto-drive for the verification rig */
 if(AUTO)setTimeout(()=>$('s-tap').click(),1500);
-window.BOO={S,onRoll,enterArena,endGame,reset,FX,PERF,VQ};
+window.BOO={S,onRoll,enterArena,endGame,reset,FX,PERF,VQ,D};
 })();
 </script>
 </body>
