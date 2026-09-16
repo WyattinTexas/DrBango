@@ -45640,7 +45640,7 @@ function bfQueueStart(size,opts){
 // the server clamps every commanded nx to ≤½ the stale/TTL window its poll
 // keeps alive, so the brake can never evict the seats it protects. The three
 // party-gone strings stay sacred: a stretch is a longer wait, never a miss.
-let GVT_CV='10.02';        // the `cv` version key the poll helpers stamp (0290's histogram)
+let GVT_CV='10.03';        // the `cv` version key the poll helpers stamp (0290's histogram)
 let NX_CAP_MUL=4;         // accepted-nx clamp: [class default, default × this]
 function nxMul(nx,srvDef){ nx=nx|0; if(!(nx>0)||!(srvDef>0)) return 1;
   return Math.max(1, Math.min(NX_CAP_MUL, nx/srvDef)); }
@@ -48517,6 +48517,8 @@ function evClaim(){
 // evSpoils' own latch (ev.wk) and the gift ledger's (giftLast) both refuse a second deal. A note without the grammar is the gift it always was.
 const EV_LATE_RE=/^ev:((?:bone:)?\d{4}-\d{2}-\d{2}):([A-Z0-9]{4,8})$/;
 function evLateNote(note){ const m=EV_LATE_RE.exec(String(note||'').trim()); return m? { wk:m[1], code:m[2] } : null; }
+const DG_NOTE_RE=/^decor:([a-z0-9_]{2,24})$/;   // 1011y THE DECOR GIFT (design/decor-gift-0915/00-BUILD.md): HQ's note grammar for a TREASURE by name — `decor:magicbone` — the client's own (the box carries the text; the plant door is server v45's, byte-still)
+function dgDecorId(note){ const m=DG_NOTE_RE.exec(String(note||'').trim()); return (m && Object.prototype.hasOwnProperty.call(DECOR_INFO, m[1]))? m[1] : null; }   // the id only when the client has that treasure's own row (DG-1: a save never carries a foreign id — a typo'd plant is the star gift it always was; own-property, so `constructor` and its kin are refused)
 function evLateWin(wk,code){
   if(!META.ev || typeof META.ev!=='object') META.ev={ wk:'', played:0, won:0, last:null };
   if(META.ev.wk===wk) return null;   // paid already — the verdict landed after all, or the note came twice
@@ -87105,6 +87107,7 @@ function giftAdopt(d){
   const id=g.id|0, n=Math.max(0,Math.min(100000,g.stars|0));
   if(id<=(META.giftLast|0)){ giftClaim(id); return false; }   // banked already — the claim was lost; answer it again, bank nothing
   const late9=evLateNote(g.note);   // 0909 THE LATE VERDICT: a note that names a night and a room deals the verdict's own spoils (the stars, if any, still bank; the gift card stays folded — the spoils card is the ceremony)
+  const dg9=dgDecorId(g.note); if(dg9){ if(!META.decor || !Array.isArray(META.decor.own)) META.decor={ own:[], off:[] }; if(!decOwns(dg9)) META.decor.own.push(dg9); }   // 1011y THE DECOR GIFT: a `decor:<id>` note hands the commander that treasure — owned from this line, saved by the bank line below (THE ONE-BONE LAW: never pushed twice, never un-owned; the stars, 1★ by the plant, still bank so the card has a number); the room's decorSweep deals the treasure's own card once off decorSeen and seats it, exactly as after a verdict's push (evSpoils' bone line)
   META.giftLast=id; META.starBank+=n; /* 0875: HQ's GIFT — never doubled */ META.giftPend=(META.giftPend|0)+(late9? 0 : n); META.giftNote=late9? '' : String(g.note||'').slice(0,80); saveMeta();
   giftClaim(id);
   if(late9){ evLateWin(late9.wk, late9.code); if(S.mode==='menu'){ renderMenu(); if(roomQuiet()) evSweep(); } return true; }   // 0909: the verdict's card at a quiet room now, else on the ceremony chain's next seat (ev.ann)
@@ -89158,7 +89161,7 @@ function gaTileHTML(){   // THE SQUARE (⚑ Q1 A THE HEARTH · Q7 two lines, the
 }
 function gaRecHTML(){ return (META.tv|0)>0? '<div class="wt-rec ga" data-notr>'+torchSVG('live')+' '+escH(TXT('TORCH VICTORIES'))+' <b>'+(META.tv|0)+'</b></div>' : ''; }
 function gaHeadHTML(){ return GA.hold? '<span class="rh-torch" onclick="UI.gaOpen()" data-notr>'+torchSVG('live')+'</span>' : ''; }
-function gaGiftNote(note){ if(String(note||'')==='ga:champ') return TXT('THE GAUNTLET CHAMPION'); if(String(note||'')==='ga:tie') return TXT('YOU TIED FOR THE DAY');   /* 0940 TIES PAY BOTH: the tied winner's note */ const m=/^ga:(\d+)$/.exec(String(note||'')); return m? tf('GAUNTLET TORCH · HOUR %1', m[1]|0) : note; }   // 0898 THE DAY'S CHAMPION: HQ's ga:champ note (200★ by the gift road) prints as THE GAUNTLET CHAMPION
+function gaGiftNote(note){ const dg9=dgDecorId(note); if(dg9) return TXT(DECOR_INFO[dg9].name || dg9.toUpperCase());   /* 1011y THE DECOR GIFT: a decor: note prints as the treasure's own name (its DECOR_INFO row's key ×7; the id upper-cased if the row has no name); ga:* below byte-still */ if(String(note||'')==='ga:champ') return TXT('THE GAUNTLET CHAMPION'); if(String(note||'')==='ga:tie') return TXT('YOU TIED FOR THE DAY');   /* 0940 TIES PAY BOTH: the tied winner's note */ const m=/^ga:(\d+)$/.exec(String(note||'')); return m? tf('GAUNTLET TORCH · HOUR %1', m[1]|0) : note; }   // 0898 THE DAY'S CHAMPION: HQ's ga:champ note (200★ by the gift road) prints as THE GAUNTLET CHAMPION
 function gaTvAdopt(d){ if(d && d.ok && typeof d.tv==='number' && (d.tv|0)>(META.tv|0)){ META.tv=d.tv|0; saveMeta(); } }
 // ── THE BANNER'S TORCH (the ann drawer's `torch` flag): the sheet's drawing in canvas — rr()/paths, the flicker off t (never an async mold) ──
 function drawTorch(cx,x,y,h,t){
