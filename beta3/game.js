@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.100.0';
+const BUILD = 'STARSPELL v0.101.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1938,16 +1938,29 @@ function ssAssembleBeast(scene, cont, beast, unitScale, onDone) {
   cont.removeAll(true);
   // scale must match ssBeastFx's, which owns star homes once it arms
   const sc = unitScale * (beast.boss ? 1.15 : beast.tier === 'mini' ? 1.06 : 1);
+  // star magnitudes by the one resolver (sharp-sky slice 3): three classes
+  // dealt by anatomy, radii riding this surface's grade — the i%5
+  // list-position deal is retired with its whole family. A beast's bright
+  // stars are the same stars on every surface.
+  const mags = ssStarMags(beast);
   const g = scene.add.graphics().setAlpha(0);
   g.lineStyle(unitScale * 1.25, 0xffffff, 0.35);
-  for (const [a, b] of beast.edges) g.lineBetween(beast.stars[a][0] * sc, beast.stars[a][1] * sc, beast.stars[b][0] * sc, beast.stars[b][1] * sc);
+  g.fillStyle(0xffffff, 0.35);
+  // LAW 3 — the served line: ssEdgeSeg in star-units (inset r+2.5 each end,
+  // never piercing a disc), scaled by sc on the way down; round caps close
+  // the inset ends (Phaser Graphics has no linecap)
+  for (const [a, b] of beast.edges) {
+    const seg = ssEdgeSeg(beast.stars[a], beast.stars[b], SS_MAG_R[mags[a]], SS_MAG_R[mags[b]]);
+    if (!seg) continue;
+    g.lineBetween(seg.x1 * sc, seg.y1 * sc, seg.x2 * sc, seg.y2 * sc);
+    g.fillCircle(seg.x1 * sc, seg.y1 * sc, unitScale * 0.625);
+    g.fillCircle(seg.x2 * sc, seg.y2 * sc, unitScale * 0.625);
+  }
   cont.add(g);
   const stars = [];
   beast.stars.forEach((p, i) => {
-    // star magnitudes: five brightness classes so the figure reads like a real
-    // constellation — a few blazing anchors, a scatter of faint companions.
-    // Faint stars twinkle in alpha as well as size; anchors burn steadier.
-    const mag = [1.18, 0.62, 0.88, 0.5, 0.98][i % 5];
+    const mag = SS_MAG_R[mags[i]] * sc / SS_DOT_READ;
+    const tw = SS_MAG_TWINK[mags[i]];
     const ang = Math.random() * Math.PI * 2, d = 260 * unitScale + Math.random() * 200;
     const st = scene.add.image(p[0] * sc + Math.cos(ang) * d, p[1] * sc + Math.sin(ang) * d, 'dot')
       .setScale(0.1).setAlpha(0).setTint(beast.tint).setBlendMode('ADD');
@@ -1958,7 +1971,7 @@ function ssAssembleBeast(scene, cont, beast, unitScale, onDone) {
       onComplete: () => {
         if (swept) return;
         reg.push(scene.tweens.add({
-          targets: st, scale: mag * (mag < 0.8 ? 0.6 : 0.78), alpha: mag < 0.8 ? 0.55 : 0.85,
+          targets: st, scale: mag * tw[0], alpha: tw[1],
           duration: 700 + (i * 137) % 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         }));
       },
@@ -2551,13 +2564,19 @@ function ssBeastFx(scene, cont, beast, unitScale, asm, opts) {
   const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
   const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
   const fx = {
-    scene, cont, beast, sc, def, k: sc, ready: false, dead: false, attacking: false,
+    scene, cont, beast, sc, stars, def, k: sc, ready: false, dead: false, attacking: false,
     threat: 0, bright: 0, charged: false, armT: Infinity,
     cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, topY: minY + (maxY - minY) * 0.3,
     homeX: cont.x, homeY: cont.y,
   };
   const idles = String(def.idle || '').split('+').map((n) => SS_IDLE_FX[n]).filter(Boolean);
   const lw = unitScale * 1.25;
+  // the served line rides the live redraw too (slice 3): px-space inset radii
+  // for ssEdgeSeg — the helper adds a flat 2.5, so the radius carries the
+  // rest of (SS_MAG_R + 2.5)·sc and the inset lands scaled, exactly the
+  // chart's unit-space law at this surface's grade
+  const mags = ssStarMags(beast);
+  const insR = mags.map((m) => SS_MAG_R[m] * sc + 2.5 * (sc - 1));
 
   // eyes ride the idle field of their nearest star
   const eyeMeta = beast.eyes.map((e) => {
@@ -2663,13 +2682,20 @@ function ssBeastFx(scene, cont, beast, unitScale, asm, opts) {
       eye.x = em.x0 + o.x * gain; eye.y = em.y0 + o.y * gain;
       if (fx.charged) eye.setScale(0.9 + Math.max(0, Math.sin(T * 7)) * 0.5);
     }
-    // edges redrawn from live star positions — starlight shimmer, per edge
+    // edges redrawn from live star positions — starlight shimmer, per edge,
+    // each segment still the served line: inset off the breathing endpoints
+    // every frame, round caps closing the ends (a line never pierces a star)
     g.clear();
     for (let ei = 0; ei < beast.edges.length; ei++) {
       const e = beast.edges[ei], a = stars[e[0]], b = stars[e[1]];
-      const al = 0.3 + Math.sin(T * 1.35 + ei * 1.71) * 0.13 + fx.threat * 0.18 + fx.bright * 0.6;
-      g.lineStyle(lw, 0xffffff, clamp(al, 0.12, 1));
-      g.lineBetween(a.x, a.y, b.x, b.y);
+      const seg = ssEdgeSeg([a.x, a.y], [b.x, b.y], insR[e[0]], insR[e[1]]);
+      if (!seg) continue;
+      const al = clamp(0.3 + Math.sin(T * 1.35 + ei * 1.71) * 0.13 + fx.threat * 0.18 + fx.bright * 0.6, 0.12, 1);
+      g.lineStyle(lw, 0xffffff, al);
+      g.lineBetween(seg.x1, seg.y1, seg.x2, seg.y2);
+      g.fillStyle(0xffffff, al);
+      g.fillCircle(seg.x1, seg.y1, lw / 2);
+      g.fillCircle(seg.x2, seg.y2, lw / 2);
     }
     // the body breathes (container scale) unless an attack owns the transform
     if (!fx.attacking) {
@@ -4349,8 +4375,14 @@ function ssZodiacGlyph(scene, z, k, x, y, tint, alpha) {
     g.lineBetween(src.stars[e1][0] * k, src.stars[e1][1] * k, src.stars[e2][0] * k, src.stars[e2][1] * k);
   }
   g.fillStyle(col, Math.min(1, 0.95 * a));
+  // the one magnitude system at icon grade (sharp-sky slice 3): the i%3
+  // list-position deal retires with its family. An icon at k ≈ 0.14 needs
+  // fatter discs than the sky's 4.2u to stay legible, so the anchor keeps
+  // the glyph's old 10u presence and the classes ride SS_MAG_R's own ratios
+  // beneath it — the same stars burn bright here as on every other surface.
+  const mags = ssStarMags(src);
   for (let i = 0; i < src.stars.length; i++) {
-    g.fillCircle(src.stars[i][0] * k, src.stars[i][1] * k, Math.max(0.8, k * (i % 3 === 0 ? 10 : 7)));
+    g.fillCircle(src.stars[i][0] * k, src.stars[i][1] * k, Math.max(0.8, k * SS_MAG_R[mags[i]] * (10 / SS_MAG_R[1])));
   }
   return g;
 }
@@ -4609,13 +4641,14 @@ function ssMapSkyTex(scene) {
    spacings down to 4.5 — 44 fused star-pairs on the live sky.
    Magnitude radii fuse ZERO pairs on either shape set, so the crisp
    render ships on the live shapes before any 9/3 shape verdict.
-   ONE magnitude system for every surface; this slice wires the
-   campaign chart. Slice 2 re-pitches the road; slice 3 retires the
-   battle/showcase/versus list-position deals (i%5) through the same
-   resolver. All sizes in star-units so every law is scale-invariant.
+   ONE magnitude system for every surface; slice 1 wired the campaign
+   chart, slice 2 re-pitched the road, and slice 3 retired the
+   battle/showcase/versus list-position deals (i%5, and the glyph's
+   i%3) through the same resolver — the whole accident family is gone.
+   All sizes in star-units so every law is scale-invariant.
    ============================================================ */
 // LAW 6 — the surface grades (star-unit × screen-unit). The chart consumes
-// its triple below; the other three surfaces re-aim here in slice 3.
+// its triple below; the assembly call sites read their own rows (slice 3).
 const SS_STAR_GRADES = { versus: [0.20, 0.35], chart: [0.38, 0.44, 0.52], showcase: 0.80, battle: 1.15 };
 // LAW 1 — disc radii by magnitude class: m1 anchor · m2 joint · m3 companion
 const SS_MAG_R = { 1: 4.2, 2: 2.8, 3: 1.9 };
@@ -4636,6 +4669,17 @@ const SS_MAG_A = {
 const SS_MAG_CORE_A = { lit: { 1: 0.95, 2: 0.55 }, far: { 1: 0.55, 2: 0.3 } };
 const SS_MAG_LINE_A = { won: 0.38, now: 0.55, far: 0.22 };
 const SS_MAG_CORE = 0xfff6dd;   // the white-hot heart — brightness reads as heat, not width
+// The assembly surfaces (battle · showcase · versus emblem) keep their soft
+// ADD sprites; only the SIZES change (slice 3). The 16px 'dot' texture reads
+// as a disc of ~4px at scale 1 on the night field (alpha .5 by 3.2px, gone
+// by 8), so a law-1 radius lands in sprite scale as SS_MAG_R·sc / SS_DOT_READ
+// — at the battle grade the envelope is the old deal's (m1 1.21 vs the old
+// 1.18 top · m3 0.55 vs the old 0.5 floor), and every surface rides its grade.
+const SS_DOT_READ = 4;
+// …and the twinkle amplitude runs by class, not by scale threshold: anchors
+// burn steadier (the old steady pair, kept), companions breathe deep (the
+// old deep pair), joints between. [scale factor at the trough, alpha there].
+const SS_MAG_TWINK = { 1: [0.78, 0.85], 2: [0.7, 0.7], 3: [0.6, 0.55] };
 
 /* — THE ROAD LAWS (sharp-sky round four, slice 2 of 3) —
    THE PITCH LAW: consecutive road nodes keep ≥34 star-units of open sky
@@ -5795,8 +5839,8 @@ class Home extends Phaser.Scene {
       if (this.showZone) { this.showZone.destroy(); this.showZone = null; }
       window.__SSSKY.armed = null;
       const b = SS_BEASTS[ids[showIdx % ids.length]];
-      const asm = ssAssembleBeast(this, this.showC, b, l.u(0.8));
-      this.showFx = ssBeastFx(this, this.showC, b, l.u(0.8), asm, { lite: true });
+      const asm = ssAssembleBeast(this, this.showC, b, l.u(SS_STAR_GRADES.showcase));
+      this.showFx = ssBeastFx(this, this.showC, b, l.u(SS_STAR_GRADES.showcase), asm, { lite: true });
       showIdx++;
       /* tappable sky signs (SS_SKY_TAPS, v0.76.0): while a registered sign
          stands on an interactive meadow, one zone sized to its stars waits
@@ -5807,7 +5851,7 @@ class Home extends Phaser.Scene {
          zone, no hint, no dead-tap feedback. */
       const flourish = SS_SKY_TAPS[b.id];
       if (flourish && !this.ftueBare) {
-        const sc = l.u(0.8) * (b.boss ? 1.15 : b.tier === 'mini' ? 1.06 : 1);
+        const sc = l.u(SS_STAR_GRADES.showcase) * (b.boss ? 1.15 : b.tier === 'mini' ? 1.06 : 1);
         let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
         for (const p of b.stars) {
           x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]);
@@ -8826,7 +8870,7 @@ class Battle extends Phaser.Scene {
     this.setBeastName(''); this.beastTitle.setText('');
     if (this.beastFx) this.beastFx.destroy();
     this.beastC.setPosition(l.x(0), l.y(170)).setScale(1).setRotation(0);
-    const asm = ssAssembleBeast(this, this.beastC, this.beast, l.u(1.15), () => {
+    const asm = ssAssembleBeast(this, this.beastC, this.beast, l.u(SS_STAR_GRADES.battle), () => {
       this.setBeastName(this.beast.name);
       const tag = this.beast.boss ? ' · ' + SS_T('tBoss') : this.beast.tier === 'mini' ? ' · ' + SS_T('tElite') : '';
       this.beastTitle.setText((SS_BEAST_T(this.beast) + tag).toUpperCase());
@@ -8834,7 +8878,7 @@ class Battle extends Phaser.Scene {
     this.beastLines = asm.lines; this.beastStars = asm.stars;
     // presence + attack fx (aura, idle, shimmer, telegraph, signature strikes);
     // it also owns the body's breathing, so no more breathTween here
-    this.beastFx = ssBeastFx(this, this.beastC, this.beast, l.u(1.15), asm);
+    this.beastFx = ssBeastFx(this, this.beastC, this.beast, l.u(SS_STAR_GRADES.battle), asm);
     // the frontier flags stand at the level's own beat (v0.77.0): whoever's
     // best this rung is, their flag is HERE — and entering the level above a
     // flag rings its pass ceremony, the frontier's the biggest of all

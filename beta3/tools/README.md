@@ -1617,6 +1617,13 @@ ceiling is 1.35. Re-pin from the printed table if the art changes. 242/242 on
 the first full run; the 2× devices (XR, iPad) score lowest because the shrink
 is only 2× — still 40 % clear of the floor.
 
+**Battle judge re-baselined 2026-09-15 (v0.101.0, sharp-sky slice 3 — the
+assembly renders by magnitude class now, the design said to re-measure
+deliberately):** battle column se 2.11 · 8plus 2.59 · xr 1.93 · 13mini 2.77 ·
+16 2.70 · 16max 2.14 · ipad 1.84 · droid 2.75 · control 1.25. Within ±0.03 of
+the v0.50.1 table except SE (2.28 → 2.11, still 62 % clear of its 1.3 floor);
+the floors stand unchanged. 250/250 on the full matrix.
+
 **No device profile reproduces Wyatt's blur.** Every one of the eight boots to
 a full-DPR buffer and a crisp frame in headless Chrome, so the blur is not in
 the game's scaling law for any phone geometry — it lives on his device / shell

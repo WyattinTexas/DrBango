@@ -2480,7 +2480,7 @@ class VsBattle extends Phaser.Scene {
       const cy = n === 1 ? 150 : (i < 2 ? 110 : 230);
       const c = this.add.container(l.x(cx), l.y(cy));
       const av = this.add.container(n === 1 ? -l.u(120) : -l.u(60), 0);
-      ssAssembleBeast(this, av, SS_BEASTS[VS_EMBLEMS[p.seat % VS_EMBLEMS.length]], l.u(n === 1 ? 0.35 : 0.2));
+      ssAssembleBeast(this, av, SS_BEASTS[VS_EMBLEMS[p.seat % VS_EMBLEMS.length]], l.u(SS_STAR_GRADES.versus[n === 1 ? 1 : 0]));
       // the rival's star-class glyph rides beside the name (veiled ratings show
       // no glyph); tapping the name opens their rating card from the room record
       const hidden = !!p.rhide;

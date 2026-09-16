@@ -106,6 +106,30 @@ ok('NAME LAW · the current name keeps its beneath-seat (reserved, never slid)',
   /curGeom\.p\.y \+ curGeom\.mxY \* curGeom\.sc \+ 26/.test(chart) && /l\.x\(p\.x\), l\.y\(p\.y \+ mxY \* sc \+ 26\)/.test(chart));
 ok('the ride cap still absorbs the longer road (home clamp 700–2400 untouched)',
   /clamp\(dist \* 1\.2, 700, 2400\)/.test(chart));
+// — the mag-retirement paper (round four, slice 3: the accident's whole family) —
+const vsrc = readFileSync('versus.js', 'utf8');
+ok('LAW 1 · no list-position radius deal survives on ANY star figure (i%5 assembly · i%3 glyph · s%3 chart)',
+  !/\[1\.18, 0\.62, 0\.88, 0\.5, 0\.98\]/.test(gsrc) && !/i % 3 === 0 \? 10 : 7/.test(gsrc)
+  && !/\[i % 5\]/.test(gsrc) && !/\[i % 5\]/.test(vsrc) && !/9\.5 : 6\.4/.test(gsrc));
+ok('LAW 1 · the assembly and the glyph both resolve through ssStarMags',
+  /const mags = ssStarMags\(beast\);/.test(gsrc) && /const mags = ssStarMags\(src\);/.test(gsrc));
+ok('LAW 1+6 · sprite scale = SS_MAG_R · sc / SS_DOT_READ, the dot read-radius pinned at 4',
+  /const SS_DOT_READ = 4/.test(gsrc) && /SS_MAG_R\[mags\[i\]\] \* sc \/ SS_DOT_READ/.test(gsrc));
+ok('the twinkle runs by class, never by scale threshold (anchors steadier kept · companions deep)',
+  /SS_MAG_TWINK = \{ 1: \[0\.78, 0\.85\], 2: \[0\.7, 0\.7\], 3: \[0\.6, 0\.55\] \}/.test(gsrc)
+  && /scale: mag \* tw\[0\], alpha: tw\[1\]/.test(gsrc) && !/mag < 0\.8 \?/.test(gsrc));
+ok('LAW 6 · all three assembly surfaces read their grades from the one table',
+  /l\.u\(SS_STAR_GRADES\.showcase\)/.test(gsrc) && /l\.u\(SS_STAR_GRADES\.battle\)/.test(gsrc)
+  && /l\.u\(SS_STAR_GRADES\.versus\[n === 1 \? 1 : 0\]\)/.test(vsrc));
+ok('LAW 3 · the assembly\'s initial draw serves through ssEdgeSeg with round caps; its raw star-coord lineBetween is gone',
+  /ssEdgeSeg\(beast\.stars\[a\], beast\.stars\[b\], SS_MAG_R\[mags\[a\]\], SS_MAG_R\[mags\[b\]\]\)/.test(gsrc)
+  && !/lineBetween\(beast\.stars\[a\]\[0\] \* sc/.test(gsrc));
+ok('LAW 3 · the fx live redraw serves too — px-space inset radii carry the grade ((r+2.5)·sc)',
+  /const insR = mags\.map\(\(m\) => SS_MAG_R\[m\] \* sc \+ 2\.5 \* \(sc - 1\)\)/.test(gsrc)
+  && /ssEdgeSeg\(\[a\.x, a\.y\], \[b\.x, b\.y\], insR\[e\[0\]\], insR\[e\[1\]\]\)/.test(gsrc)
+  && !/g\.lineBetween\(a\.x, a\.y, b\.x, b\.y\)/.test(gsrc));
+ok('the glyph rides SS_MAG_R\'s own ratios under its 10u anchor (icon grade)',
+  /SS_MAG_R\[mags\[i\]\] \* \(10 \/ SS_MAG_R\[1\]\)/.test(gsrc));
 
 /* ---------- server + browser ---------- */
 const kids = [];
@@ -603,6 +627,73 @@ for (const [fi, wantWon] of [[4, 4], [14, 14], [19, 19]]) {
     JSON.stringify({ adds: r.beaAdds.join(''), viol: r.viol, settle: r.settleOff + '/' + r.wantSettle, nWon: r.nWon, nviol: r.nviol, clamp: r.clampViol, ov: r.overlap, minClear: r.minClear }));
   if (SHOTS) await shot('road-fight' + (fi + 1));
 }
+
+/* ---------- §11 the magnitudes beyond the chart (slice 3), live ---------- */
+console.log('\n— §11 THE ASSEMBLY MAGNITUDES —');
+// one eval judges a standing assembly off its fx handles: every LIVE star
+// scale must sit inside its class's twinkle band (top = SS_MAG_R·sc/SS_DOT_READ,
+// trough = top·tw[0]) — the bands are disjoint at any one grade, so anatomy,
+// not list position, is readable straight off the tree. The resolver census
+// must equal pure line-degree (the override door ships empty), the sprite
+// count must equal the star count (fps: same sprites), and ssEdgeSeg's
+// px-space inset must land exactly (r+2.5)·sc.
+const ASMEVAL = (fxExpr) => `(() => {
+  const fx = ${fxExpr}; if (!fx || !fx.ready) return JSON.stringify({ err: 'no fx' });
+  const beast = fx.beast, sc = fx.sc, mags = ssStarMags(beast);
+  let out = 0, n = 0;
+  const counts = { 1: 0, 2: 0, 3: 0 };
+  fx.stars.forEach((st, i) => {
+    n++;
+    const m = mags[i], top = SS_MAG_R[m] * sc / SS_DOT_READ, lo = top * SS_MAG_TWINK[m][0];
+    counts[m]++;
+    if (st.scaleX > top + 0.02 || st.scaleX < lo - 0.02) out++;
+  });
+  const deg = beast.stars.map(() => 0);
+  for (const [a, c] of beast.edges) { deg[a]++; deg[c]++; }
+  const want = { 1: 0, 2: 0, 3: 0 };
+  deg.forEach((d) => want[d >= 3 ? 1 : d === 2 ? 2 : 3]++);
+  const disj = SS_MAG_R[1] * SS_MAG_TWINK[1][0] > SS_MAG_R[2] && SS_MAG_R[2] * SS_MAG_TWINK[2][0] > SS_MAG_R[3];
+  const seg = ssEdgeSeg([0, 0], [400, 0], SS_MAG_R[1] * sc + 2.5 * (sc - 1), SS_MAG_R[3] * sc + 2.5 * (sc - 1));
+  return JSON.stringify({ id: beast.id, n, stars: beast.stars.length, out, disj,
+    counts, want, segIn: Math.round(seg.x1 * 1000) / 1000, segWant: Math.round((SS_MAG_R[1] + 2.5) * sc * 1000) / 1000 });
+})()`;
+// — the battle assembly, at its grade —
+await boot('');
+await ev(`${H}.scene.start('battle', { mode: 'quick', resume: null }); 'ok'`);
+ok('a quick battle stands and its fx arms', await until(`(() => { const b = ${B}; return game.scene.isActive('battle') && !!b.beastFx && b.beastFx.ready === true && b.state === 'pick' })()`, 60000));
+const ba = await evj(ASMEVAL(`${B}.beastFx`));
+ok('BATTLE · every live star sits in its class band — the i%5 deal is dead, anatomy rules',
+  !ba.err && ba.out === 0 && ba.n === ba.stars && ba.n > 0, JSON.stringify(ba));
+ok('BATTLE · the resolver census equals pure line-degree (the override door is empty)',
+  JSON.stringify(ba.counts) === JSON.stringify(ba.want), JSON.stringify({ counts: ba.counts, want: ba.want }));
+ok('BATTLE · the class bands are disjoint and the px inset lands exactly (r+2.5)·sc',
+  ba.disj === true && ba.segIn === ba.segWant, JSON.stringify({ segIn: ba.segIn, segWant: ba.segWant }));
+// — the meadow showcase, at its grade, pinned to one sign —
+await boot('show=aquila');
+ok('the pinned showcase stands (aquila) and its fx arms', await until(`!!${H}.showFx && ${H}.showFx.ready === true && ${H}.showFx.beast.id === 'aquila'`, 20000, 100));
+let sa = await evj(ASMEVAL(`${H}.showFx`));
+if (sa.err) {   // the eval can land inside a 9s-cycle turnover — wait out the new claim and read again
+  await until(`!!${H}.showFx && ${H}.showFx.ready === true`, 16000, 100);
+  sa = await evj(ASMEVAL(`${H}.showFx`));
+}
+ok('SHOWCASE · every live star sits in its class band at the showcase grade',
+  !sa.err && sa.out === 0 && sa.n === sa.stars && sa.n > 0, JSON.stringify(sa));
+ok('SHOWCASE · the grades order holds off the live trees (battle 1.15 outweighs showcase 0.8 at ANY tier pair)',
+  ba.n > 0 && sa.n > 0 && sa.segWant < ba.segWant,
+  JSON.stringify({ showSeg: sa.segWant, battleSeg: ba.segWant }));
+// — the turnover ledger: three REAL 9s cycles, the tween manager plateaus —
+const tw0 = await ev(`${H}.tweens.getTweens().length`);
+let twLast = tw0, turns = 0;
+for (let t = 0; t < 3; t++) {
+  await ev(`${H}.showFx.__probeMark = 1; 'ok'`);
+  const turned = await until(`!!${H}.showFx && !${H}.showFx.__probeMark && ${H}.showFx.ready === true`, 16000, 200);
+  if (!turned) break;
+  turns++;
+  await sleep(700);
+  twLast = await ev(`${H}.tweens.getTweens().length`);
+}
+ok('SHOWCASE · three real turnovers, the assembly ledger sweeps each claim (census plateaus)',
+  turns === 3 && twLast <= tw0 + 8, JSON.stringify({ turns, tw0, twLast }));
 
 /* ---------- the verdict ---------- */
 console.log('\n— PAGE EXCEPTIONS —');
