@@ -261,7 +261,10 @@ await shot('meadow-endless-door');
 await tap(`${H}.rowBtns.endless`);
 ok('the door opens the sign picker', await until(`!!${H}.signC`, 15000), 'signC');
 ok('…the campaign\'s own picker, serving the endless climb', await ev(`${H}.signFor === 'endless'`));
-// BEGIN on THE OPEN SKY — the visible card is the choice
+// BEGIN on THE OPEN SKY — the visible card is the choice; since 9/17 the
+// open sky closes the deck, so one ‹ first wraps the fresh door onto it
+await tap(`(() => { const h = ${H}; let r = null; const scan = (ls) => ls.forEach((o) => { if (!r && o.text === '‹') r = o; if (o.list) scan(o.list); }); scan(h.signC.list); return r })()`);
+await until(`!!${H}.signPeek && ${H}.signPeek().moving === false && ${H}.signPeek().id === 'none'`, 6000);
 await tap(`(() => { const h = ${H}; let r = null; const scan = (ls) => ls.forEach((o) => { if (!r && o.text === SS_T('zpBegin')) r = o; if (o.list) scan(o.list); }); scan(h.signC.list); return r })()`);
 ok('BEGIN rises into the endless sky', await until(PICK, 60000));
 ok('level 1, the header speaking it', await ev(`${B}.mode === 'endless' && ${B}.run.fightIdx === 0 && ${B}.headT.text === SS_T('endlessTitle') + ' · ' + SS_T('endLvl', 1)`), await ev(`${B}.headT.text`));

@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.101.0';
+const BUILD = 'STARSPELL v0.102.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -4306,7 +4306,8 @@ function ssCampSignChosen() { return localStorage.getItem('beta3.campsign') != n
    field per door (lastSign / lastSignEnd), written at the picker's BEGIN,
    riding the normal profile sync. The picker OPENS standing on the
    remembered card; 'none' (THE OPEN SKY) is a remembered choice too and
-   simply opens the deck at slot 0, exactly as a never-begun profile does. */
+   opens on the open-sky card at the deck's far end (since 9/17 the twelve
+   lead and the sky closes the deck; a never-begun profile opens the front). */
 function ssRememberSign(forMode, id) {
   const key = forMode === 'endless' ? 'lastSignEnd' : 'lastSign';
   if (SS.prof[key] === id) return;
@@ -7197,15 +7198,16 @@ class Home extends Phaser.Scene {
     });
     items.push(xB);
 
-    /* the deck: THE OPEN SKY first, then the twelve. Each entry is what a
-       card needs — id, name, title, desc, tint, and the sign (null = open) */
-    const deck = [{ id: 'none', z: null, name: SS_T('zpOpenName'), title: SS_T('zpOpenTitle'), desc: SS_T('zpOpenDesc'), tint: 0xb9c2e6 }]
-      .concat(SS_ZODIAC.map((z) => {
-        // the desc speaks at the sign's HELD LEVEL (v0.69.0) — the numbers
-        // on the card are the numbers the climb will pay
-        const t = SS_ZOD(z, ssSignLv(z.id));
-        return { id: z.id, z, name: z.name, title: t.title, desc: t.desc, tint: SS_ELEMENTS[z.el] };
-      }));
+    /* the deck: the twelve first, THE OPEN SKY last (Skylar 9/17: a first
+       climb should meet the signs before the unsigned sky — "it should be
+       at the end of all the cards"). Each entry is what a card needs — id,
+       name, title, desc, tint, and the sign (null = open) */
+    const deck = SS_ZODIAC.map((z) => {
+      // the desc speaks at the sign's HELD LEVEL (v0.69.0) — the numbers
+      // on the card are the numbers the climb will pay
+      const t = SS_ZOD(z, ssSignLv(z.id));
+      return { id: z.id, z, name: z.name, title: t.title, desc: t.desc, tint: SS_ELEMENTS[z.el] };
+    }).concat([{ id: 'none', z: null, name: SS_T('zpOpenName'), title: SS_T('zpOpenTitle'), desc: SS_T('zpOpenDesc'), tint: 0xb9c2e6 }]);
     const N = deck.length;
     /* geometry (design units): the card IS the sheet now — the full design
        box less a hair of margin, the arrows and ✕ riding on top of it. The
@@ -7360,12 +7362,13 @@ class Home extends Phaser.Scene {
     strip.setMask(mg.createGeometryMask());
     /* THE DECK REMEMBERS (v0.95.0): a fresh climb's picker stands on the
        sign the LAST climb was begun under (per door — the campaign and
-       endless memories are separate fields). THE OPEN SKY keeps slot 0 and
-       only the OPENING index moves, so arrows/swipe/wrap are untouched; a
-       memory of 'none' — or no memory at all — opens at slot 0 as ever. */
+       endless memories are separate fields). Only the OPENING index moves,
+       so arrows/swipe/wrap are untouched. A remembered card — THE OPEN SKY
+       included, at the deck's far end since 9/17 — opens right there; no
+       memory at all opens the deck's front, the first sign. */
     const remembered = this.signFor === 'endless' ? SS.prof.lastSignEnd : SS.prof.lastSign;
     const remIdx = remembered ? deck.findIndex((d) => d.id === remembered) : -1;
-    let cur = remIdx > 0 ? remIdx : 0, moving = false;
+    let cur = remIdx >= 0 ? remIdx : 0, moving = false;
     const cards = { prev: null, cur: null, next: null };
     const place = () => {
       cards.prev.x = -l.u(STRIDE); cards.cur.x = 0; cards.next.x = l.u(STRIDE);

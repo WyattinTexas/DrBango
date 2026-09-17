@@ -622,8 +622,10 @@ await boot('', `localStorage.setItem('beta3.profile', JSON.stringify({ rating: 1
            leo: { best: 9000, clears: 40, runs: 40, eBest: 0, xp: 16286, ack: 50 } } }));`);
 ok('the meadow stands', await until(HOME, 60000));
 const SHEET = `!!${H}.signC && !!${H}.signPeek`;
-ok('a real tap on NEW GAME opens the picker on THE OPEN SKY', await tapUntil(`${H}.rowBtns.newcamp`, `${SHEET} && ${H}.signPeek().id === 'none'`, 8));
-ok('THE OPEN SKY carries NO level row and no bar', await ev(`(() => { const k = ${H}.signPeek().card;
+ok('a real tap on NEW GAME opens the picker on ARIES (the twelve lead; the open sky closes the deck, 9/17)', await tapUntil(`${H}.rowBtns.newcamp`, `${SHEET} && ${H}.signPeek().id === 'aries'`, 8));
+const arrowL = `${H}.signC.list.find((o) => o.type === 'Text' && o.text === '‹')`;
+ok('one ‹ wraps to THE OPEN SKY — it carries NO level row and no bar', await tapUntil(arrowL, `${SHEET} && !${H}.signPeek().moving && ${H}.signPeek().id === 'none'`, 6)
+  && await ev(`(() => { const k = ${H}.signPeek().card;
   return !k.list.some((o) => o.getData && o.getData('signLvRow')) && !k.list.some((o) => o.getData && o.getData('signLvFill')) })()`));
 const arrowR = `${H}.signC.list.find((o) => o.type === 'Text' && o.text === '›')`;
 ok('› lands on ARIES wearing LEVEL 4 and a bar at its true fraction (xp 250)', await (async () => {
@@ -666,8 +668,10 @@ ok('…and the ENDLESS door serves the same picker whose BEGIN rises at once', a
   await ev(`(() => { const h = ${H}; if (h.mapC) { h.mapC.destroy(); h.mapC = null; } ssClearCampaign(); ssClearEndless(); return 'ok' })()`);
   await sleep(600);
   if (!(await tapUntil(`${H}.rowBtns.endless`, SHEET, 8))) return false;
+  // the open sky closes the deck now (9/17) — one ‹ wraps the fresh endless door onto it
+  if (!(await tapUntil(`${H}.signC.list.find((o) => o.type === 'Text' && o.text === '‹')`, `${SHEET} && !${H}.signPeek().moving && ${H}.signPeek().id === 'none'`, 6))) return false;
   const okRow = await ev(`(() => { const k = ${H}.signPeek().card; return !k.list.some((o) => o.getData && o.getData('signLvRow')) })()`);
-  if (!okRow) return false;   // open sky leads the endless deck too
+  if (!okRow) return false;
   return tapUntil(`${H}.signC.list.find((o) => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`,
     `!!${B} && ${B}.scene.isActive() && ${B}.mode === 'endless'`, 6);
 })());
@@ -740,6 +744,8 @@ for (const dv of [{ name: 'iPhone 16', w: 393, h: 852, dpr: 3, inset: '59,34' },
   ok('home stands', await until(HOME, 90000));
   ok('the picker opens', await tapUntil(`${H}.rowBtns.newcamp`, SHEET, 8));
   await sleep(500);
+  // the deck opens on ARIES now (9/17) — one ‹ wraps to the open sky for its judge
+  ok('‹ wraps to THE OPEN SKY', await tapUntil(`${H}.signC.list.find((o) => o.type === 'Text' && o.text === '‹')`, `${SHEET} && !${H}.signPeek().moving && ${H}.signPeek().id === 'none'`, 6));
   await judge(dv.name + ' · open sky');
   ok('› to ARIES', await tapUntil(arrowR, `${SHEET} && !${H}.signPeek().moving && ${H}.signPeek().id === 'aries'`, 6));
   await judge(dv.name + ' · aries (level row on)');
@@ -761,7 +767,8 @@ for (const lang of ['es', 'de']) {
   ok(lang + ': home stands', await until(HOME, 90000));
   ok(lang + ': the picker card speaks the levelled desc with real numbers (no %1 residue)', await (async () => {
     if (!(await tapUntil(`${H}.rowBtns.newcamp`, SHEET, 8))) return false;
-    if (!(await tapUntil(arrowR, `${SHEET} && !${H}.signPeek().moving && ${H}.signPeek().id === 'aries'`, 6))) return false;
+    // the deck opens standing on ARIES now (9/17) — just wait for it to settle
+    if (!(await until(`${SHEET} && !${H}.signPeek().moving && ${H}.signPeek().id === 'aries'`, 8000))) return false;
     const d = await evj(`JSON.stringify((() => { const k = ${H}.signPeek().card;
       const b = k.list.find((o) => o.getData && o.getData('zodDesc'));
       const t = k.list.find((o) => o.getData && o.getData('signLvRow'));

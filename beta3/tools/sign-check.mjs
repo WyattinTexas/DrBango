@@ -169,7 +169,9 @@ console.log('\n━━ iPhone 15/16 — 393×852 @3 · inset 59/34');
 ok('home stands', await boot({ w: 393, h: 852, dpr: 3 }, '59,34'));
 ok('a real touch on NEW GAME opens the sign sheet', await open());
 let p = await peek();
-ok('the FIRST card is THE OPEN SKY (id none, 1 of 13)', p.id === 'none' && p.cur === 0 && p.n === 13, JSON.stringify(p));
+ok('the FIRST card is ARIES — the twelve lead, the open sky closes the deck (9/17)', p.id === 'aries' && p.cur === 0 && p.n === 13, JSON.stringify(p));
+const alw = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
+ok('one ‹ tap WRAPS to THE OPEN SKY at the deck\'s far end (13 of 13)', await touchUntil(alw, `${STILL} && ${H}.signPeek().id === 'none' && ${H}.signPeek().cur === 12`, 6), JSON.stringify(await peek()));
 let tx = await cardTexts();
 ok('the open-sky card carries its name, title and the plain desc', tx.includes('THE OPEN SKY') && tx.includes('THE UNSIGNED CLIMB') && tx.some(t => /classic climb/.test(t)), tx.join(' | ').slice(0, 160));
 // graphics counts carry +1 since v0.70.0: every campaign-picker card draws
@@ -190,13 +192,13 @@ mid = await drag(cp.x, cp.y, -40, 4);
 ok('a short drag settles back on the same card', await until(`${STILL} && ${H}.signPeek().id === 'aries' && Math.abs(${H}.signPeek().x) < 1`, 4000), JSON.stringify(await peek()));
 // --- swipe RIGHT twice: back to the open sky, then WRAP to pisces ---
 await drag(cp.x, cp.y, 150);
-ok('a swipe right returns to THE OPEN SKY', await until(`${STILL} && ${H}.signPeek().id === 'none'`, 4000), JSON.stringify(await peek()));
+ok('a swipe right from ARIES (the front) WRAPS back to THE OPEN SKY', await until(`${STILL} && ${H}.signPeek().id === 'none'`, 4000), JSON.stringify(await peek()));
 await drag(cp.x, cp.y, 150);
-ok('a swipe right from the first card WRAPS to PISCES (13 of 13)', await until(`${STILL} && ${H}.signPeek().id === 'pisces' && ${H}.signPeek().cur === 12`, 4000), JSON.stringify(await peek()));
-// --- the arrows: › from pisces wraps to the open sky; ‹ back to pisces ---
+ok('a swipe right from the open sky steps back to PISCES (12 of 13)', await until(`${STILL} && ${H}.signPeek().id === 'pisces' && ${H}.signPeek().cur === 11`, 4000), JSON.stringify(await peek()));
+// --- the arrows: › from pisces steps onto the open sky; ‹ back to pisces ---
 const ar = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '›')`);
 const al = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
-ok('a real tap on › from the last card WRAPS to the open sky', await touchUntil(ar, `${STILL} && ${H}.signPeek().id === 'none'`, 6), JSON.stringify(await peek()));
+ok('a real tap on › from PISCES steps onto the open sky (the last card)', await touchUntil(ar, `${STILL} && ${H}.signPeek().id === 'none'`, 6), JSON.stringify(await peek()));
 ok('a real tap on ‹ wraps back to PISCES', await touchUntil(al, `${STILL} && ${H}.signPeek().id === 'pisces'`, 6), JSON.stringify(await peek()));
 ok('only three card containers live in the strip', await ev(`(() => { let n = 0; ${H}.signC.list.forEach(o => { if (o.list) o.list.forEach(k => { if (k.getData && k.getData('zodCard')) n++; }); }); return n === 3 })()`));
 
@@ -254,14 +256,15 @@ ok('home stands again', await until(HOME_REST, 60000));
 await ev(`ssClearCampaign()`);
 await sleep(400);
 // v0.95.0 THE DECK REMEMBERS: the LEO begun above outlives its own wipe —
-// the reopened sheet STANDS on the remembered card (settled), and the walk
-// back to slot 0 is five real ‹ taps (the deck itself is unchanged)
-ok('NEW GAME reopens the sheet STANDING on LEO (the deck remembers the begun sign)', await open() && await ev(`(() => { const p = ${H}.signPeek(); return p.id === 'leo' && p.cur === 5 && !p.moving && Math.abs(p.x) < 1 })()`), JSON.stringify(await peek()));
+// the reopened sheet STANDS on the remembered card (settled). Since 9/17
+// the open sky waits at the deck's FAR END: from LEO (4) five real ‹ taps
+// wrap past the front onto it.
+ok('NEW GAME reopens the sheet STANDING on LEO (the deck remembers the begun sign)', await open() && await ev(`(() => { const p = ${H}.signPeek(); return p.id === 'leo' && p.cur === 4 && !p.moving && Math.abs(p.x) < 1 })()`), JSON.stringify(await peek()));
 const alm = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
 for (let i = 0; i < 5; i++) { await touch(alm.x, alm.y); await until(STILL, 3000); }
-ok('five ‹ taps walk home to THE OPEN SKY (slot 0 kept)', (await peek()).id === 'none' && (await peek()).cur === 0, JSON.stringify(await peek()));
+ok('five ‹ taps wrap past the front to THE OPEN SKY (the deck\'s far end)', (await peek()).id === 'none' && (await peek()).cur === 12, JSON.stringify(await peek()));
 const bp2 = await css(`${H}.signC.list.find(o => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`);
-ok('BEGIN on the first card pins none and opens the chart', await touchUntil(bp2, `!${H}.signC && !!${H}.mapC && localStorage.getItem('beta3.campsign') === 'none'`, 6), await ev(`localStorage.getItem('beta3.campsign')`));
+ok('BEGIN on the LAST card pins none and opens the chart', await touchUntil(bp2, `!${H}.signC && !!${H}.mapC && localStorage.getItem('beta3.campsign') === 'none'`, 6), await ev(`localStorage.getItem('beta3.campsign')`));
 await ev(`${H}.scene.start('battle', { mode: 'campaign', resume: null })`);
 ok('the unsigned classic run stands (b.sign null, no glyph)', await until(`(() => { const b = game.scene.getScene('battle'); return game.scene.isActive('battle') && b.state === 'pick' && b.sign === null && !b.signZ && !(b.signG && b.signG.active && b.signG.scene === b) })()`, 60000));
 // --- ✕ and the veil close ---
@@ -415,7 +418,10 @@ ok('no page exceptions through the living walk', errs.length === 0, errs.slice(0
 /* ---------- the seams: ?twinkle=0 and reduced motion still the layer ---------- */
 console.log('\n━━ THE STILLED SKY — ?twinkle=0 and reduced motion keep the field, drop the movement');
 ok('home stands (?twinkle=0)', await boot({ w: 393, h: 852, dpr: 3 }, '59,34', '&twinkle=0'));
-ok('the sheet opens on THE OPEN SKY (stilled)', await open() && (await peek()).id === 'none');
+ok('the sheet opens and one ‹ wraps to THE OPEN SKY (stilled)', await open() && await (async () => {
+  const alx = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
+  return touchUntil(alx, `${STILL} && ${H}.signPeek().id === 'none'`, 6);
+})(), JSON.stringify(await peek()));
 sky = await evj(SKY);
 cnt = await evj(`JSON.stringify(${COUNT})`);
 ok('the field survives the stilling — 50 sprites, still flag up, no door, no crossings', sky.stars === 50 && sky.still === true && sky.shots === 0 && await ev(`window.__ssopensky.poke === null`) && cnt.dots === 44 && cnt.sparks === 6 && cnt.gfx === 3, JSON.stringify(sky) + ' ' + JSON.stringify(cnt));
@@ -425,7 +431,10 @@ const f1 = await evj(ALPHAS);
 ok('…and the sky is FROZEN (50 alphas byte-equal across 1.4s)', JSON.stringify(f0) === JSON.stringify(f1) && f0.length === 50);
 await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
 ok('home stands (reduced motion)', await boot({ w: 393, h: 852, dpr: 3 }, '59,34'));
-ok('the sheet opens on THE OPEN SKY (reduced)', await open() && (await peek()).id === 'none');
+ok('the sheet opens and one ‹ wraps to THE OPEN SKY (reduced)', await open() && await (async () => {
+  const alx = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
+  return touchUntil(alx, `${STILL} && ${H}.signPeek().id === 'none'`, 6);
+})(), JSON.stringify(await peek()));
 sky = await evj(SKY);
 ok('reduced motion stills the layer the same way (field up, movement gone)', sky.stars === 50 && sky.still === true && await ev(`window.__ssopensky.poke === null`), JSON.stringify(sky));
 const r0 = await evj(ALPHAS);
@@ -439,7 +448,9 @@ ok('no page exceptions through the stilled walks', errs.length === 0, errs.slice
 for (const dv of [{ name: 'iPhone SE', w: 375, h: 667, dpr: 2, inset: '0,0' }, { name: 'iPad portrait', w: 820, h: 1180, dpr: 2, inset: '24,20' }]) {
   console.log(`\n━━ ${dv.name} — ${dv.w}×${dv.h} @${dv.dpr}`);
   ok('home stands', await boot(dv, dv.inset));
-  ok('NEW GAME opens the sheet', await open());
+  ok('NEW GAME opens the sheet on ARIES (the deck\'s front)', await open() && (await peek()).id === 'aries');
+  { const alg = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
+    await touch(alg.x, alg.y); await until(`${STILL} && ${H}.signPeek().id === 'none'`, 4000); }
   await judge(dv.name + ' · open sky');
   const c2 = await css(`${H}.signPeek().card`);
   await drag(c2.x, c2.y, -Math.round(dv.w * 0.4));
@@ -457,13 +468,15 @@ for (const dv of [{ name: 'iPhone SE', w: 375, h: 667, dpr: 2, inset: '0,0' }, {
 // (lastSign / lastSignEnd, one per door) and outlives endRun's books —
 // ssClearCampaign wipes the PIN, never the memory — so a finished
 // campaign's NEW GAME opens the deck standing on the sign you played.
-// 'none' and no-memory both open slot 0; the two doors remember apart.
+// Since 9/17 the twelve lead the deck and the open sky closes it: no-memory
+// opens the FRONT (aries); a remembered 'none' opens the far end. The two
+// doors still remember apart.
 console.log('\n━━ THE DECK REMEMBERS (v0.95.0) — a finished climb\'s next picker stands on the sign it was begun under');
 ok('home stands (memory walk)', await boot({ w: 393, h: 852, dpr: 3 }, '59,34'));
-ok('a never-begun profile opens on THE OPEN SKY', await open() && (await peek()).id === 'none' && (await peek()).cur === 0, JSON.stringify(await peek()));
+ok('a never-begun profile opens on ARIES — the deck\'s front (the open sky closed the deck 9/17)', await open() && (await peek()).id === 'aries' && (await peek()).cur === 0, JSON.stringify(await peek()));
 const arM = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '›')`);
-for (let i = 0; i < 5; i++) { await touch(arM.x, arM.y); await until(STILL, 3000); }
-ok('five › land on LEO', (await peek()).id === 'leo', JSON.stringify(await peek()));
+for (let i = 0; i < 4; i++) { await touch(arM.x, arM.y); await until(STILL, 3000); }
+ok('four › land on LEO', (await peek()).id === 'leo', JSON.stringify(await peek()));
 const bpM = await css(`${H}.signC.list.find(o => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`);
 ok('BEGIN pins leo AND writes the memory (prof.lastSign = leo)', await touchUntil(bpM, `!${H}.signC && !!${H}.mapC && localStorage.getItem('beta3.campsign') === 'leo' && SS.prof.lastSign === 'leo'`, 6), await ev(`SS.prof.lastSign`));
 // drive the run to a REAL endRun (a defeat): the books wipe the pin with
@@ -476,7 +489,7 @@ const books = await evj(`JSON.stringify((() => { const b = game.scene.getScene('
 ok('endRun\'s books wipe the pin, the memory survives (campsign gone · lastSign leo · endless side untouched)', books.pin === null && books.mem === 'leo' && books.memEnd === null, JSON.stringify(books));
 await ev(`game.scene.getScene('battle').scene.start('home')`);
 ok('home stands after the fall', await until(HOME_REST, 60000));
-ok('NEW GAME opens the picker STANDING on LEO — settled, not mid-slide', await open() && await ev(`(() => { const p = ${H}.signPeek(); return p.id === 'leo' && p.cur === 5 && !p.moving && Math.abs(p.x) < 1 })()`), JSON.stringify(await peek()));
+ok('NEW GAME opens the picker STANDING on LEO — settled, not mid-slide', await open() && await ev(`(() => { const p = ${H}.signPeek(); return p.id === 'leo' && p.cur === 4 && !p.moving && Math.abs(p.x) < 1 })()`), JSON.stringify(await peek()));
 await judge('16 · remembered leo');
 ok('the remembered deck is the same deck — ‹ steps to CANCER, › returns to LEO (wrapless walk intact)', await (async () => {
   const alx = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
@@ -493,25 +506,25 @@ await send('Page.navigate', { url: BASE + `?rend=cv&fps=0&diag=1&mpuid=sign${Mat
 await sleep(1500);
 ok('home stands after a cold reload', await until(HOME_REST, 90000));
 ok('…and the reopened picker STILL stands on LEO (the memory rode the reboot)', await open() && (await peek()).id === 'leo' && await ev(`SS.prof.lastSign === 'leo'`), JSON.stringify(await peek()));
-// an open-sky begin is remembered as the open sky — and opens at slot 0
+// an open-sky begin is remembered as the open sky — and reopens at the far
+// end (from LEO at 4, five ‹ wrap past the front onto the last card)
 const alM = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '‹')`);
 for (let i = 0; i < 5; i++) { await touch(alM.x, alM.y); await until(STILL, 3000); }
 const bpM3 = await css(`${H}.signC.list.find(o => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`);
 ok('BEGIN on THE OPEN SKY writes the memory as none', await touchUntil(bpM3, `!${H}.signC && !!${H}.mapC && localStorage.getItem('beta3.campsign') === 'none' && SS.prof.lastSign === 'none'`, 6), await ev(`SS.prof.lastSign`));
 await ev(`(() => { const h = ${H}; if (h.mapC) { h.mapC.destroy(); h.mapC = null; } ssClearCampaign(); return 'ok' })()`);
 await sleep(400);
-ok('a remembered open sky opens at slot 0, exactly as before', await open() && (await peek()).id === 'none' && (await peek()).cur === 0, JSON.stringify(await peek()));
+ok('a remembered open sky opens at the deck\'s far end — the memory hunts the card, not a slot', await open() && (await peek()).id === 'none' && (await peek()).cur === 12, JSON.stringify(await peek()));
 // THE ENDLESS MIRROR: the ladder's door keeps its OWN memory (lastSignEnd)
 const xM = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '✕')`);
 ok('✕ closes the campaign sheet for the endless walk', await touchUntil(xM, `!${H}.signC`, 6));
-ok('the ENDLESS picker opens on THE OPEN SKY (its memory still unwritten)', await (async () => {
+ok('the ENDLESS picker opens on ARIES (its memory still unwritten — the deck\'s front)', await (async () => {
   const ep = await css(`${H}.rowBtns.endless`);
   if (!(await touchUntil(ep, SHEET, 8))) return false;
   await until(STILL, 5000); await sleep(450);
-  return (await peek()).id === 'none';
+  const pe = await peek();
+  return pe.id === 'aries' && pe.cur === 0;
 })(), JSON.stringify(await peek()));
-const arE = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '›')`);
-await touch(arE.x, arE.y); await until(STILL, 3000);
 const bpE = await css(`${H}.signC.list.find(o => o.texture && /^btn/.test(o.texture.key) && o.displayWidth > 200)`);
 ok('BEGIN on ARIES rises at once and writes the ENDLESS memory apart (lastSignEnd aries · lastSign still none)', await touchUntil(bpE, `(() => { const b = game.scene.getScene('battle'); return !!b && b.scene.isActive() && b.mode === 'endless' && SS.prof.lastSignEnd === 'aries' && SS.prof.lastSign === 'none' })()`, 6), await ev(`JSON.stringify([SS.prof.lastSign, SS.prof.lastSignEnd])`));
 ok('the climb stands for its fall', await until(`(() => { const b = game.scene.getScene('battle'); return game.scene.isActive('battle') && b.state === 'pick' })()`, 60000));
@@ -525,11 +538,11 @@ ok('the ENDLESS door reopens STANDING on ARIES — and the campaign door still o
   if (!(await touchUntil(ep, SHEET, 8))) return false;
   await until(STILL, 5000); await sleep(450);
   const pe = await peek();
-  if (!(pe.id === 'aries' && pe.cur === 1 && !pe.moving)) return false;
+  if (!(pe.id === 'aries' && pe.cur === 0 && !pe.moving)) return false;
   const xr = await css(`${H}.signC.list.find(o => o.type === 'Text' && o.text === '✕')`);
   if (!(await touchUntil(xr, `!${H}.signC`, 6))) return false;
   if (!(await open())) return false;
-  return (await peek()).id === 'none' && (await peek()).cur === 0;
+  return (await peek()).id === 'none' && (await peek()).cur === 12;
 })(), JSON.stringify(await peek()));
 ok('no page exceptions through the memory walk', errs.length === 0, errs.slice(0, 2).join(' | '));
 

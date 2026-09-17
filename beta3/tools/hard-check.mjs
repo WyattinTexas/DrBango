@@ -275,7 +275,10 @@ await boot('');
 ok('the meadow stands', await until(HOME, 60000));
 ok('NEW GAME opens the sign picker', await tapUntil(`${H}.rowBtns.newcamp`, `!!${H}.signC && !!${H}.signPeek`, 6));
 let pk = await peek();
-ok('THE OPEN SKY leads the deck', pk && pk.id === 'none', pk && pk.id);
+ok('ARIES leads the deck — the open sky closes it now (9/17)', pk && pk.id === 'aries', pk && pk.id);
+await goCard(-1);
+pk = await peek();
+ok('one ‹ wraps onto THE OPEN SKY at the far end', pk && pk.id === 'none', pk && pk.id);
 ok('the open sky carries the box too (the challenge needs no sign)',
   await ev(`!!${find(`${H}.signC`, 'hardBox')} && !!${find(`${H}.signC`, 'hardTick', 'none')}`));
 ok('…unticked on a fresh profile', await ev(`(() => { const t = ${find(`${H}.signC`, 'hardTick', 'none')}; return !!t && !t.visible })()`));
@@ -334,7 +337,7 @@ ok('the drawn control is pixel-sharp at dpr 3 (ratio ≥ 1.4)',
 await reboot('');
 ok('meadow back (same sky)', await until(HOME, 60000));
 ok('the picker reopens', await tapUntil(`${H}.rowBtns.newcamp`, `!!${H}.signC && !!${H}.signPeek`, 6));
-await goCard(1);
+// since 9/17 the deck opens on ARIES already — no step needed
 ok('ARIES still ticked after the reload (prof.hardPick persists)',
   await ev(`(() => { const t = ${find(`${H}.signC`, 'hardTick', 'aries')}; return !!t && t.visible && SS.prof.hardPick.aries === 1 })()`));
 
@@ -508,7 +511,7 @@ console.log('\n— THE CHECKPOINT: A CLIMB BEGUN HARD STAYS HARD —');
 await boot('', `localStorage.setItem('beta3.profile', JSON.stringify({ rating: 1000, hardPick: { taurus: 1 } }));`);
 ok('meadow up', await until(HOME, 60000));
 ok('picker open', await tapUntil(`${H}.rowBtns.newcamp`, `!!${H}.signC && !!${H}.signPeek`, 6));
-await goCard(1); await goCard(1);
+await goCard(1);   // the deck opens on ARIES now (9/17) — one step reaches TAURUS
 pk = await peek();
 ok('TAURUS wears its remembered tick', pk && pk.id === 'taurus' && await ev(`(() => { const t = ${find(`${H}.signC`, 'hardTick', 'taurus')}; return !!t && t.visible })()`), pk && pk.id);
 ok('BEGIN → chart → hard battle', await tapUntil(
