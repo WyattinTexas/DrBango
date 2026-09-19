@@ -83,7 +83,7 @@ const VS_MODE_KEY = { turns: 'vsModeTurns', timed: 'vsModeTimed', bg: 'vsModeBg'
 // today — swap this one constant when the App Store page exists). A store
 // link cannot carry a ?friend= deep link, so the share names the sender and
 // the new mage adds them by their unique name after installing.
-const VS_APP_URL = 'https://testflight.apple.com/join/Hxs8e7fU';
+const VS_APP_URL = 'https://apps.apple.com/app/id6802801799';
 // every seat carries its rating into the room: the Elo exchange at the end
 // reads the rival's number from here, and rhide keeps a veiled rating out of
 // the opponent's VIEW (the math still needs the true value — client-
