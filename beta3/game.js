@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.102.2';
+const BUILD = 'STARSPELL v0.102.3';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -218,7 +218,11 @@ function ssRenderVerdict() {
       // v bump = every device re-probes on next load. REQUIRED this time: the
       // v3 records already cached on real phones hold the bad AUTO verdict for
       // up to 7 days, so shipping the fix without the bump fixes nobody.
-      if (c && c.v === 4 && Date.now() - c.t < 7 * 864e5) {
+      // an UNMEASURABLE verdict is a snapshot of one bad moment (Wyatt's phone,
+      // 9/21: WebGL 'nosample' pinned it to canvas for a week; a restart had
+      // it drawing crisp again) — it earns a day, a measured one a week
+      const ttl = /unmeasurable/.test(c.why || '') ? 864e5 : 7 * 864e5;
+      if (c && c.v === 4 && Date.now() - c.t < ttl) {
         SS_REND.mode = c.mode; SS_REND.why = c.why; SS_REND.p = c;
         return Promise.resolve(SS_REND);
       }
@@ -11316,6 +11320,7 @@ function ssBoot() {
   game.events.once('ready', fitCanvas);
   game.events.once('ready', () => ssPerfWatch(game));
   game.events.once('ready', () => ssDeviceBeat('ready'));
+  game.events.once('ready', ssBlankWatch);
 }
 function fitCanvas() {
   const c = game && game.canvas;
@@ -11409,6 +11414,8 @@ function ssDeviceReport(tag, m) {
   if (SS_DEV.found) rep.found = SS_DEV.found;   // the last miss as found, sticky for the session
   if (m.dprOff) rep.dprOff = m.dprOff;
   if (!m.ok) rep.miss = m.why;
+  if (SS_DEV.sd != null) rep.sd = SS_DEV.sd;
+  if (SS_SHARP.best) { rep.shp = [SS_SHARP.best.r, SS_SHARP.best.e, SS_SHARP.best.e2, SS_SHARP.best.w, SS_SHARP.best.h, SS_SHARP.best.x, SS_SHARP.best.y]; if (SS_SHARP.best.png) rep.shot = SS_SHARP.best.png; }
   return rep;
 }
 function ssDeviceDiag(rep) {
@@ -11440,24 +11447,35 @@ function ssDeviceSend(rep) {
    pushed through a 1/3 downscale, a crisp 3× frame ≫ 1, a stretched small
    buffer ≈ 1 — and the first two crops ride home as PNGs (devices/<uid>.shot)
    so we can SEE what the phone drew, not infer it. */
-const SS_SHARP = { shots: 0, pending: false };
-function ssSharpFrame() {
-  const c = game && game.canvas;
-  if (!c) return null;
+const SS_SHARP = { pending: false, best: null };
+function ssTextTarget() {
+  // the largest Text that is really on screen: visible up its parent chain and
+  // (near) opaque — the home's rise tweens alpha, and a crop taken mid-rise
+  // reads as blank (Wyatt's phone, 9/21: edge 0.22 / 0.77 on a crisp screen)
   let best = null, area = 0;
+  const opaque = (o) => { let a = 1, p = o; while (p) { if (p.visible === false) return 0; if (typeof p.alpha === 'number') a *= p.alpha; p = p.parentContainer; } return a; };
   const walk = (list) => {
     for (const o of list || []) {
-      if (o.type === 'Text' && o.visible && o.text && o.getBounds) {
-        const b = o.getBounds(), a = b.width * b.height;
-        if (a > area && b.width >= 40 && b.height >= 12) { area = a; best = b; }
+      if (o.type === 'Text' && o.text && o.getBounds && opaque(o) >= 0.95) {
+        const b = o.getBounds(), ar = b.width * b.height;
+        if (ar > area && b.width >= 40 && b.height >= 12) { area = ar; best = b; }
       }
       if (o.list) walk(o.list);
     }
   };
   try { for (const sc of game.scene.getScenes(true)) walk(sc.children.list); } catch (e) { }
-  if (!best) return null;
-  const x = Math.max(0, Math.floor(best.x)), y = Math.max(0, Math.floor(best.y));
-  const w = Math.min(Math.ceil(best.width), 480, c.width - x), h = Math.min(Math.ceil(best.height), 120, c.height - y);
+  return best;
+}
+function ssSharpFrame(prev) {
+  const c = game && game.canvas;
+  if (!c) return null;
+  const b = ssTextTarget();
+  if (!b) return null;
+  // the first sighting is a peek; the crop is taken only once the target has
+  // held still for the half second since (the rise, a battle's slide)
+  if (!prev || Math.abs(prev.x - b.x) > 1 || Math.abs(prev.y - b.y) > 1) return { moving: b };
+  const x = Math.max(0, Math.floor(b.x)), y = Math.max(0, Math.floor(b.y));
+  const w = Math.min(Math.ceil(b.width), 480, c.width - x), h = Math.min(Math.ceil(b.height), 120, c.height - y);
   if (w < 8 || h < 8) return null;
   const s = document.createElement('canvas'); s.width = w; s.height = h;
   const cx = s.getContext('2d', { willReadFrequently: true });
@@ -11477,30 +11495,93 @@ function ssSharpFrame() {
   const tx = t.getContext('2d'); tx.imageSmoothingEnabled = true; tx.drawImage(s, 0, 0, t.width, t.height);
   cx.imageSmoothingEnabled = true; cx.clearRect(0, 0, w, h); cx.drawImage(t, 0, 0, w, h);
   const e2 = lap(cx.getImageData(0, 0, w, h).data);
-  return { x, y, w, h, e: +e.toFixed(2), e2: +e2.toFixed(2), r: e2 > 0 ? +(e / e2).toFixed(2) : null, png: png.length < 300000 ? png : '' };
+  return { b, x, y, w, h, e: +e.toFixed(2), e2: +e2.toFixed(2), r: e2 > 0 ? +(e / e2).toFixed(2) : null, png: png.length < 300000 ? png : '' };
 }
 function ssSharpSchedule(rep) {
   if (SS_SHARP.pending || !game || !game.events) return;
   SS_SHARP.pending = true;
   // the ready/settle beats can land before any Text exists (the intro's
-  // wordless rise) — keep looking, half a second apart, for ~20s
-  let tries = 0;
+  // wordless rise) — keep looking, half a second apart, for ~30s; two crops
+  // 4s apart, the sharper one is the verdict and rides every report after
+  let tries = 0, prev = null, got = 0, best = null;
   const attempt = () => game.events.once('postrender', () => {
     try {
-      const f = ssSharpFrame();
-      if (!f) {
-        if (++tries < 40) { setTimeout(attempt, 500); return; }
-        SS_SHARP.pending = false; DIAG('sharp: no text to read'); return;
+      const f = ssSharpFrame(prev);
+      if (!f || f.moving) {
+        prev = f ? f.moving : null;
+        if (++tries < 60) { setTimeout(attempt, 500); return; }
+        SS_SHARP.pending = false; DIAG('sharp: no still text to read'); return;
       }
+      got++;
+      if (!best || f.e > best.e) best = f;
+      if (got < 2) { prev = f.b; setTimeout(attempt, 4000); return; }
       SS_SHARP.pending = false;
-      rep.shp = [f.r, f.e, f.e2, f.w, f.h, f.x, f.y];
-      if (SS_SHARP.shots < 2 && f.png) { rep.shot = f.png; SS_SHARP.shots++; }
-      DIAG('sharp ' + f.r + ' (edge ' + f.e + ' vs ' + f.e2 + ' at 1/3) ' + f.w + 'x' + f.h + (rep.shot ? ' · shot ' + Math.round(f.png.length / 1024) + 'k' : ''));
+      SS_SHARP.best = best;
+      DIAG('sharp ' + best.r + ' (edge ' + best.e + ' vs ' + best.e2 + ' at 1/3) ' + best.w + 'x' + best.h + ' @' + best.x + ',' + best.y + (best.png ? ' · shot ' + Math.round(best.png.length / 1024) + 'k' : ''));
+      rep.shp = [best.r, best.e, best.e2, best.w, best.h, best.x, best.y];
+      if (best.png) rep.shot = best.png;
+      if (SS_DEV.sd != null) rep.sd = SS_DEV.sd;
       SS_DEV.last = rep;
       ssDeviceSend(rep);
     } catch (e) { SS_SHARP.pending = false; DIAG('sharp failed: ' + ((e && e.message) || e)); }
   });
   attempt();
+}
+/* ---- the blank-canvas watch (v0.102.3) -----------------------------------
+   Wyatt, 9/21, first open after a phone restart: 'a black screen, I waited
+   like a minute, nothing happened' — yet his device row from that launch
+   shows the game RUNNING (settle beats, 9 texts, the buffer 1170x2532) while
+   the crop read back out of the canvas was flat (edge 0.22). Closing and
+   reopening the app drew it crisp on the very same canvas verdict. A dead
+   backing store under a live game is healed by one reload — here it heals
+   itself: five 48px patches (corners + centre) are read back every 3s for
+   the first ~40s after ready; a live frame has gradient and stars in some
+   of them, a dead one reads flat everywhere. Two flat reads in a row →
+   ONE reload per two minutes (sessionStorage guard), announced home first.
+   Every device report carries the last reading as `sd`. */
+function ssBlankStat() {
+  const c = game.canvas, N = 48;
+  const s = document.createElement('canvas'); s.width = N; s.height = N;
+  const cx = s.getContext('2d', { willReadFrequently: true });
+  const pts = [[0, 0], [c.width - N, 0], [0, c.height - N], [c.width - N, c.height - N], [(c.width - N) >> 1, (c.height - N) >> 1]];
+  let maxSd = 0;
+  for (const [x, y] of pts) {
+    cx.clearRect(0, 0, N, N); cx.drawImage(c, Math.max(0, x), Math.max(0, y), N, N, 0, 0, N, N);
+    const d = cx.getImageData(0, 0, N, N).data, n = N * N, L = new Float32Array(n);
+    let m = 0; for (let i = 0; i < n; i++) { L[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; m += L[i]; }
+    m /= n; let v = 0; for (let i = 0; i < n; i++) v += (L[i] - m) * (L[i] - m);
+    const sd = Math.sqrt(v / n); if (sd > maxSd) maxSd = sd;
+  }
+  return +maxSd.toFixed(2);
+}
+function ssBlankWatch() {
+  const K = 'beta3.blankReload';
+  let reads = 0, blanks = 0;
+  const tick = () => {
+    if (!game || !game.isBooted || !game.canvas) return;
+    game.events.once('postrender', () => {
+      let sd;
+      try { sd = ssBlankStat(); } catch (e) { DIAG('blank watch failed: ' + ((e && e.message) || e)); return; }
+      reads++;
+      SS_DEV.sd = sd;
+      blanks = sd < 0.5 ? blanks + 1 : 0;
+      if (blanks >= 2) {
+        let last = 0; try { last = +sessionStorage.getItem(K) || 0; } catch (e) { }
+        if (Date.now() - last > 120000) {
+          try { sessionStorage.setItem(K, String(Date.now())); } catch (e) { }
+          DIAG('blank canvas ×' + blanks + ' (sd ' + sd + ') — reloading');
+          try { if (typeof ssDiagLog === 'function') ssDiagLog('blank canvas (sd ' + sd + ') — self-reload'); } catch (e) { }
+          try { if (SS_DEV.last) { SS_DEV.last.blank = true; SS_DEV.last.sd = sd; ssDeviceSend(SS_DEV.last); } } catch (e) { }
+          setTimeout(() => location.reload(), 500);
+          return;
+        }
+      }
+      SS_DEV.sdMin = SS_DEV.sdMin == null ? sd : Math.min(SS_DEV.sdMin, sd);
+      if (reads < 13) setTimeout(tick, 3000);
+      else DIAG('blank watch: ' + reads + ' reads, sd min ' + SS_DEV.sdMin + ' last ' + sd + ' — canvas alive');
+    });
+  };
+  setTimeout(tick, 4000);
 }
 // `found` is the measure taken BEFORE the fit path ran (a settle measures
 // the canvas as the viewport left it); the beat measures again after it
@@ -11522,7 +11603,7 @@ function ssDeviceBeat(tag, found) {
   SS_DEV.last = rep;
   try {
     const K = 'beta3.devlog';
-    let a = JSON.parse(localStorage.getItem(K) || '[]'); a.push(rep);
+    let a = JSON.parse(localStorage.getItem(K) || '[]'); a.push(Object.assign({}, rep, { shot: undefined }));
     if (a.length > 5) a = a.slice(a.length - 5);
     localStorage.setItem(K, JSON.stringify(a));
   } catch (e) { }
