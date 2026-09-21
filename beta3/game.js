@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.102.0';
+const BUILD = 'STARSPELL v0.102.2';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -11429,6 +11429,79 @@ function ssDeviceSend(rep) {
   SS_DEV.sentSig = sig; SS_DEV.sentAt = rep.ts;
   SSNET.connect().then((m) => { if (m === 'firebase') return SSNET.dbSet('devices/' + SSNET.uid(), SS_DEV.last); }).catch(() => { });
 }
+/* ---- the sharpness readback (v0.102.2) ----------------------------------
+   The v0.50.0 sentinel proves the buffer is css×dpr — and Wyatt's iPhone 12
+   (9/21, iOS 26.6, the Canvas2D verdict) still shows every surface ~3× soft
+   while the iOS simulator draws the same build pixel-crisp on BOTH
+   renderers. Size was never the question; the FRAME is. So after a beat's
+   next postrender the largest live Text's bounds are copied straight out of
+   the game canvas (drawImage — valid for GL only inside the frame, hence
+   postrender), scored — mean |Laplacian| of luminance against the same crop
+   pushed through a 1/3 downscale, a crisp 3× frame ≫ 1, a stretched small
+   buffer ≈ 1 — and the first two crops ride home as PNGs (devices/<uid>.shot)
+   so we can SEE what the phone drew, not infer it. */
+const SS_SHARP = { shots: 0, pending: false };
+function ssSharpFrame() {
+  const c = game && game.canvas;
+  if (!c) return null;
+  let best = null, area = 0;
+  const walk = (list) => {
+    for (const o of list || []) {
+      if (o.type === 'Text' && o.visible && o.text && o.getBounds) {
+        const b = o.getBounds(), a = b.width * b.height;
+        if (a > area && b.width >= 40 && b.height >= 12) { area = a; best = b; }
+      }
+      if (o.list) walk(o.list);
+    }
+  };
+  try { for (const sc of game.scene.getScenes(true)) walk(sc.children.list); } catch (e) { }
+  if (!best) return null;
+  const x = Math.max(0, Math.floor(best.x)), y = Math.max(0, Math.floor(best.y));
+  const w = Math.min(Math.ceil(best.width), 480, c.width - x), h = Math.min(Math.ceil(best.height), 120, c.height - y);
+  if (w < 8 || h < 8) return null;
+  const s = document.createElement('canvas'); s.width = w; s.height = h;
+  const cx = s.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(c, x, y, w, h, 0, 0, w, h);
+  const png = s.toDataURL('image/png');
+  const L = (d, i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  const lap = (d) => {
+    let sum = 0, n = 0; const W4 = w * 4;
+    for (let j = 1; j < h - 1; j++) for (let i = 1; i < w - 1; i++) {
+      const k = (j * w + i) * 4;
+      sum += Math.abs(4 * L(d, k) - L(d, k - 4) - L(d, k + 4) - L(d, k - W4) - L(d, k + W4)); n++;
+    }
+    return n ? sum / n : 0;
+  };
+  const e = lap(cx.getImageData(0, 0, w, h).data);
+  const t = document.createElement('canvas'); t.width = Math.max(1, Math.round(w / 3)); t.height = Math.max(1, Math.round(h / 3));
+  const tx = t.getContext('2d'); tx.imageSmoothingEnabled = true; tx.drawImage(s, 0, 0, t.width, t.height);
+  cx.imageSmoothingEnabled = true; cx.clearRect(0, 0, w, h); cx.drawImage(t, 0, 0, w, h);
+  const e2 = lap(cx.getImageData(0, 0, w, h).data);
+  return { x, y, w, h, e: +e.toFixed(2), e2: +e2.toFixed(2), r: e2 > 0 ? +(e / e2).toFixed(2) : null, png: png.length < 300000 ? png : '' };
+}
+function ssSharpSchedule(rep) {
+  if (SS_SHARP.pending || !game || !game.events) return;
+  SS_SHARP.pending = true;
+  // the ready/settle beats can land before any Text exists (the intro's
+  // wordless rise) — keep looking, half a second apart, for ~20s
+  let tries = 0;
+  const attempt = () => game.events.once('postrender', () => {
+    try {
+      const f = ssSharpFrame();
+      if (!f) {
+        if (++tries < 40) { setTimeout(attempt, 500); return; }
+        SS_SHARP.pending = false; DIAG('sharp: no text to read'); return;
+      }
+      SS_SHARP.pending = false;
+      rep.shp = [f.r, f.e, f.e2, f.w, f.h, f.x, f.y];
+      if (SS_SHARP.shots < 2 && f.png) { rep.shot = f.png; SS_SHARP.shots++; }
+      DIAG('sharp ' + f.r + ' (edge ' + f.e + ' vs ' + f.e2 + ' at 1/3) ' + f.w + 'x' + f.h + (rep.shot ? ' · shot ' + Math.round(f.png.length / 1024) + 'k' : ''));
+      SS_DEV.last = rep;
+      ssDeviceSend(rep);
+    } catch (e) { SS_SHARP.pending = false; DIAG('sharp failed: ' + ((e && e.message) || e)); }
+  });
+  attempt();
+}
 // `found` is the measure taken BEFORE the fit path ran (a settle measures
 // the canvas as the viewport left it); the beat measures again after it
 function ssDeviceBeat(tag, found) {
@@ -11459,6 +11532,7 @@ function ssDeviceBeat(tag, found) {
   if (tag === 'ready' || dsig !== SS_DEV.diagSig) ssDeviceDiag(rep);
   SS_DEV.diagSig = dsig;
   ssDeviceSend(rep);
+  ssSharpSchedule(rep);
   return rep;
 }
 window.__ssDevBeat = ssDeviceBeat;
