@@ -64,12 +64,13 @@ const NEWKEYS = ['vsStoryTitle', 'vsStoryYours', 'vsStoryTheirs', 'vsStoryTook',
   }
   ok('the six story/power keys speak all five tongues', all, why.trim());
 }
-ok('one hp display engine serves every bar (showHp/paintHp/strikeFx)',
-  /hpState\(id\)/.test(vsSrc) && /showHp\(id, hp, max\)/.test(vsSrc) && /strikeFx\(id, from, target, max\)/.test(vsSrc));
+ok('one hp display engine serves every bar (showHp/paintHp/strikeFx + the v0.105 held-bar beats)',
+  /hpState\(id\)/.test(vsSrc) && /showHp\(id, hp, max, force\)/.test(vsSrc) && /strikeFx\(id, from, target, max\)/.test(vsSrc)
+  && /holdHp\(id\)/.test(vsSrc) && /releaseHp\(id, told\)/.test(vsSrc) && /strikeBeat\(id, dmg, sx, sy, gold\)/.test(vsSrc));
 ok('updatePanels routes BOTH sides through it (mine held back only for the story)',
   /if \(me && !this\.storyC\) this\.showHp\('me', me\.hp, HP\)/.test(vsSrc) && /this\.showHp\(p\.id, p\.hp, HP\)/.test(vsSrc));
-ok('the rival panel wears the readable number and the sigil chip',
-  /const hpT = ssTxt\(this, l\.u\(bx \+ bw\)/.test(vsSrc) && /chipB\.on\('pointerdown', \(\) => this\.openInspectFoe\(p\.id\)\)/.test(vsSrc));
+ok('the rival panel wears the readable number ON the bar (v0.105) and the sigil chip',
+  /const hpT = ssTxt\(this, l\.u\(bx \+ bw \/ 2\), 0,/.test(vsSrc) && /chipB\.on\('pointerdown', \(\) => this\.openInspectFoe\(p\.id\)\)/.test(vsSrc));
 ok('their last word wears its price, matched by word so a lagging feed cannot mislabel',
   /fl && fl\.word === p\.lastWord \? '  −' \+ fl\.dmg : ''/.test(vsSrc));
 ok('the turn story stands in the source (told once, drained first, swept by the doors)',
@@ -89,8 +90,9 @@ ok('…and the cast push shape too, both skies',
 ok('the bot already carries everything the surfaces read (lastWord · dealt · sigils on its seat)',
   rvSrc.includes("await this.meRef.update({ lastWord: word, casts: myCasts, dealt: ((this.me() || {}).dealt | 0) + dmg })") &&
   rvSrc.includes("await this.meRef.update({ sigils: [...this.board.sigils] })"));
-ok('the arcade float voice is kept (live blows still speak)',
-  vsSrc.includes("cast.name + ' cast ' + cast.word + '   −' + cast.dmg"));
+ok('a live blow speaks card 02\'s grammar (the word off the caster\'s panel, the number flying to the bar it lowers)',
+  /this\.holdHp\(barId\)/.test(vsSrc) && /this\.strikeBeat\(barId, cast\.dmg \| 0, sx, sy, false\)/.test(vsSrc)
+  && vsSrc.includes("atk.c.y - l.u(30), cast.word || ''"));
 
 /* ---------- server + browsers ---------- */
 const kids = [];
@@ -271,7 +273,7 @@ ok("A's sigil chip lights on B's view (✦ 1, the seat array)", await B.until(`(
   return pan && seat && Array.isArray(seat.sigils) && seat.sigils.length === 1 && pan.chipB.visible && pan.chipT.text === '✦ 1'; })()`, 8000));
 await B.shot('friend-story');
 ok('one tap on the told tale takes up the duel', await B.tapTil(`${VB}.storyC && ${VB}.storyC.list[0]`, `!${VB}.storyC`, 10000));
-ok('…and the lift comes back down', await B.ev(`${VB}.hpBar.depth === 0`));
+ok('…and the lift comes back down (to the column\'s resting height)', await B.ev(`${VB}.hpBar.depth === 6`));
 // a REAL tap on the rival chip opens the named inspector (44-pt law)
 ok('a REAL tap on the chip opens the inspector', await B.tapTil(`${VB}.oppPanels[${JSON.stringify(UA)}].chipB`, `!!${VB}.inspectP`, 12000));
 ok('…titled with the rival\'s name, showing the seat\'s own powers', await B.ev(`(() => { const s = ${VB}; if (!s.inspectP) return false;

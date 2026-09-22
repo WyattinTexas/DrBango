@@ -989,13 +989,14 @@ flares the pip as it cools), nothing at all when the sigil isn't held.
 Sagittarius' arrow rides every scry regardless of the charge, and a scry
 whose arrow FELLS the beast spends nothing (the death path returns first).
 Copy rewritten in data.js + all 9 strings.js sig maps ("your first SCRY
-each battle does not hasten the strike"); versus untouched (comet was
-never in VS_OK).
+each battle does not hasten the strike"); versus untouched (comet has
+never been in the versus pool — since v0.105.0 the `vs` flag on SS_SIGILS,
+which comet's def does not carry).
 
 Self-launching like dew-check (server on :8899 if nothing serves, Chrome
 on :9459, `/tmp/cdp-comet`, `--disable-gpu`), Firebase blocked at the
-network layer throughout — all PvE; VS_OK's exclusion is asserted from the
-versus.js source.
+network layer throughout — all PvE; comet's exclusion from the versus pool
+is asserted from the data.js + versus.js source.
 
 ```
 node tools/comet-check.mjs      # 44 checks, ~2 min
@@ -2140,3 +2141,33 @@ node tools/dew-check.mjs           # 60 checks, ~3 min
 node tools/dew-check.mjs --novs    # PvE only (53, ~1 min)
 node tools/dew-check.mjs --onlyvs  # the duel only
 ```
+
+## vs-sigil-check.mjs — only sigils that make sense may enter the duel (v0.105.0)
+
+Skylar (9/8): "Some sigils don't make any sense in the verses, like Blood
+Ink, where it says, 'your words +25% beast strikes +25%.'" The review
+stamp: EXCLUDE non-translating sigils from versus — never invent versus
+twin effects. A duel has no beasts, no acts, no run and no final score, so
+the law: a sigil enters the versus pick-3 only when its WHOLE effect is
+real in the duel engine on BOTH skies (versus.js wordDamage/tryCast +
+rival.js damage). The five survivors: quill · choir · runes · longbow ·
+forge — declared as `vs: 1` on SS_SIGILS (data.js), pooled ONCE as
+SS_VS_SIGILS, read by the human pick AND the mage. Blood Ink's
+beast-strike half was its COST; with no beasts it silently played as pure
+upside. A seat that already holds an excluded sigil (a pre-flag room)
+keeps it — the flag guards the door, every effect line still prices what a
+standing duel dealt. (Designed on the 9/8 card 04, parked unverified;
+re-landed and verified by the 9/22 card 03.)
+
+```
+perl -e 'alarm 720; exec @ARGV' node tools/vs-sigil-check.mjs   # 55 checks, ~6 min
+```
+
+§0 source audit (the whole 24-row table flagged exactly as audited, one
+declared pool, no literal list anywhere, the pre-flag belt, solo
+untouched) · §1 the pool exhaustive (400 seeded rolls of the pick's own
+arithmetic) · §2 a real correspondence duel's pick-3 on the live sky, both
+seats, REAL taps · §3 the worldwide mage picks from the same pool ({g}
+script proven) · §4 solo untouched (200 rolls deal every excluded basic +
+Blood Ink + a legendary). Three Chromes (:9481 blocked-net, :9482/:9483
+live), self-launching, every registry row swept.

@@ -238,12 +238,12 @@ ok('a board with nothing left rides on rather than hanging the run',
 console.log('\n3. versus');
 const vsrc = await (await fetch('http://localhost:8899/versus.js')).text();
 const vline = (vsrc.match(/const avail = SS_SIGILS[^\n]*/) || [''])[0];
-ok('the versus picker still draws from SS_SIGILS through its own VS_OK allowlist',
-  /VS_OK/.test(vline) && /SS_SIGILS/.test(vline) && !/ssSigilOpen|ssSigilUnlocked/.test(vsrc),
+ok('the versus picker still draws from SS_SIGILS through its own pool (the vs flag, 9/8 law)',
+  /s\.vs/.test(vline) && /SS_SIGILS/.test(vline) && !/ssSigilOpen|ssSigilUnlocked/.test(vsrc),
   vline.trim().slice(0, 96));
-ok('and its allowlist offers sigils that are LOCKED in solo — proof the locks never reached it',
-  /'forge'/.test(vsrc) && /'blood'/.test(vsrc) && /'longbow'/.test(vsrc)
-  && await ev(`['forge','blood','longbow'].every(i => !ssSigilUnlocked(i))`) === true);
+ok('and its pool offers sigils that are LOCKED in solo — proof the locks never reached it',
+  await ev(`typeof SS_VS_SIGILS !== 'undefined' && ['forge','longbow'].every(i => SS_VS_SIGILS.includes(i))`) === true
+  && await ev(`['forge','longbow'].every(i => !ssSigilUnlocked(i))`) === true);
 
 // ================================================================
 // 4. THE COUNTERS, UNDER REAL PLAY

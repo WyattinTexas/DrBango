@@ -731,11 +731,11 @@ function ssSignVal(id, field, lv) {
    the drip, the locks and the sleeping gallery know nothing of tiers. */
 const SS_SIGILS = [
   // ---- basic ----
-  { id: 'quill', icon: '❦', rarity: 0, name: 'EMBER QUILL', desc: 'Every word deals +%1 damage.', add: 4, dvf: ['add'],
+  { id: 'quill', icon: '❦', rarity: 0, name: 'EMBER QUILL', desc: 'Every word deals +%1 damage.', add: 4, dvf: ['add'], vs: 1,
     tl: [{ add: 6 }, { add: 8 }, { add: 11 }] },
-  { id: 'choir', icon: '♫', rarity: 0, name: 'VOWEL CHOIR', desc: 'Vowels are worth +%1 each.', lb: { vowels: true, add: 2 }, dvf: ['lb.add'],
+  { id: 'choir', icon: '♫', rarity: 0, name: 'VOWEL CHOIR', desc: 'Vowels are worth +%1 each.', lb: { vowels: true, add: 2 }, dvf: ['lb.add'], vs: 1,
     tl: [{ lb: { vowels: true, add: 3 } }, { lb: { vowels: true, add: 4 } }] },
-  { id: 'runes', icon: '✣', rarity: 0, name: 'RIVER RUNES', desc: 'S, R, E and T are worth +%1 each.', lb: { letters: 'sret', add: 2 }, dvf: ['lb.add'],
+  { id: 'runes', icon: '✣', rarity: 0, name: 'RIVER RUNES', desc: 'S, R, E and T are worth +%1 each.', lb: { letters: 'sret', add: 2 }, dvf: ['lb.add'], vs: 1,
     tl: [{ lb: { letters: 'sret', add: 3 } }, { lb: { letters: 'sret', add: 4 } }] },
   { id: 'salve', icon: '☾', rarity: 0, name: 'MOON SALVE', desc: 'Words of 5+ letters heal you %1.', heal: 4, dvf: ['heal'],
     tl: [{ heal: 6 }, { heal: 8 }] },
@@ -753,14 +753,14 @@ const SS_SIGILS = [
     tl: [{ blocks: 2, desc: 'Block the first two strikes of every battle.' }] },
   { id: 'leech', icon: '❉', rarity: 0, name: 'DEW DRINKER', desc: 'Every word heals you %1.', heal: 1, dvf: ['heal'],
     tl: [{ heal: 2 }, { heal: 3 }] },
-  { id: 'longbow', icon: '➳', rarity: 0, name: 'STARRY LONGBOW', desc: 'Words of 6+ letters deal +%1.', add: 12, dvf: ['add'],
+  { id: 'longbow', icon: '➳', rarity: 0, name: 'STARRY LONGBOW', desc: 'Words of 6+ letters deal +%1.', add: 12, dvf: ['add'], vs: 1,
     tl: [{ add: 18 }, { add: 26 }], lock: { s: 'w6', n: 8, how: 'Weave %1 words of six letters or more.' } },
   { id: 'gilded', icon: '✹', rarity: 0, name: 'GILDED DAWN', desc: 'Every battle begins with a gilded tile.', start: [1],
     tl: [{ start: [1, 1], desc: 'Every battle begins with two gilded tiles.' },
       { start: [2, 2], desc: 'Every battle begins with two star tiles.' }],
     lock: { s: 'frg', n: 25, how: 'Forge %1 tiles with long words.' } },
   // ---- rare ----
-  { id: 'forge', icon: '❂', rarity: 1, name: 'STAR FORGE', desc: 'Forged tiles come one tier higher.', low: 5,
+  { id: 'forge', icon: '❂', rarity: 1, name: 'STAR FORGE', desc: 'Forged tiles come one tier higher.', low: 5, vs: 1,
     tl: [{ low: 4, desc: 'Forged tiles come one tier higher, and words of 4 letters forge.' }],
     lock: { s: 'w7', n: 5, how: 'Weave %1 words of seven letters or more.' } },
   { id: 'blood', icon: '✠', rarity: 1, name: 'BLOOD INK', desc: 'Your words +%1%. Beast strikes +%2%.', mult: 25, smult: 25, dvf: ['mult', 'smult'],
@@ -796,6 +796,23 @@ const SS_SIGILS = [
 ];
 const SS_SIG_BY = {};
 for (const _s of SS_SIGILS) SS_SIG_BY[_s.id] = _s;
+/* ONLY SIGILS THAT MAKE SENSE MAY ENTER THE DUEL (v0.105.0; Skylar 9/8:
+   Blood Ink's "beast strikes +25%" reads as nonsense in versus — his review
+   stamp: EXCLUDE them, never invent versus twin effects). A duel has no
+   beasts, no acts, no run and no final score, so a sigil belongs only when
+   its WHOLE effect is real there — and "real" means implemented on both
+   skies (versus.js wordDamage/tryCast and rival.js damage), or the card is
+   dead weight in the pick (leech and gilded once leaked exactly so). Blood
+   Ink is the law's why: the beast-strike half was its COST, and with no
+   beasts it silently played as pure upside. `vs: 1` on the def marks a
+   survivor; ABSENCE excludes, so a new sigil stays OUT of the duel until
+   someone implements its effect on both skies and flags it deliberately.
+   SS_VS_SIGILS below is THE one pool both pickers draw from (human:
+   versus.js showSigilPick · mage: rival.js) — never a local id list. A
+   seat that already holds an excluded sigil (a room minted before this
+   build) keeps it: the flag guards the DOOR, every effect line still
+   honors what a standing duel dealt. */
+const SS_VS_SIGILS = SS_SIGILS.filter((_s) => _s.vs).map((_s) => _s.id);
 /* THE ONE TIER RESOLVER (v0.66.0). ssSigilVal(id, field, tier) hands back
    the tier's dial: the tl override when the tier carries that field, the
    base def's value otherwise (so a tier that moves only `charges` inherits

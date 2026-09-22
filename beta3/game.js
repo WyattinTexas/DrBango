@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.104.0';
+const BUILD = 'STARSPELL v0.105.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1405,8 +1405,8 @@ function ssSeedStreakFrom(p) {
    decision, so a grandfathered player who then wipes their stats keeps their
    sigils.
 
-   Versus is untouched by every line of this: it draws from its own VS_OK
-   allowlist in versus.js and always has. */
+   Versus is untouched by every line of this: it draws from its own pool
+   (the `vs` flag on SS_SIGILS — data.js) and always has. */
 
 // the stats a lock may name. Four are the profile's own lifetime figures; the
 // rest are counters this file keeps, fed at the moment the thing happens.
@@ -4654,7 +4654,9 @@ function ssMapSkyTex(scene) {
    ============================================================ */
 // LAW 6 — the surface grades (star-unit × screen-unit). The chart consumes
 // its triple below; the assembly call sites read their own rows (slice 3).
-const SS_STAR_GRADES = { versus: [0.20, 0.35], chart: [0.38, 0.44, 0.52], showcase: 0.80, battle: 1.15 };
+// versus grades grew with the v0.105.0 marquee panel (multi 0.20→0.22, 1v1
+// 0.35→0.56): the rival's figure stands tall in the filled top
+const SS_STAR_GRADES = { versus: [0.22, 0.56], chart: [0.38, 0.44, 0.52], showcase: 0.80, battle: 1.15 };
 // LAW 1 — disc radii by magnitude class: m1 anchor · m2 joint · m3 companion
 const SS_MAG_R = { 1: 4.2, 2: 2.8, 3: 1.9 };
 // …and the authored override table {beastId: {starIdx: mag}}. EMPTY today by

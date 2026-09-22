@@ -371,6 +371,9 @@ if (ONLY === 'all' || ONLY === 'queue') {
   await ev(`${VS}.__rcC && ${VS}.__rcC.destroy(); ${VS}.__rcC = null; 'ok'`);
   const done1 = await until(`${VS}.room && ${VS}.room.status === 'done' && ${VS}.code === '${code}' && ${VS}.state === 'done'`, 120000, 300);
   ok('WIN: duel 1 reached the end screen (state done, REMATCH live)', done1);
+  // v0.105.0: death READS — the end panel (and its vsresult record) waits for
+  // the killing blow's bar to land empty; read only once the doors stand
+  await until(`!!${VS}.rematchB && ${VS}.rematchB.active`, 30000, 250);
   r = JSON.parse(await ev(`JSON.stringify(SS_NEAR.room(${JSON.stringify(code)}))`));
   ok('WIN: the searcher is the winner', !!r && r.winnerUid === 'test_rc');
   const res1 = JSON.parse(await ev(`localStorage.getItem('beta3.vsresult') || 'null'`));
@@ -390,6 +393,9 @@ if (ONLY === 'all' || ONLY === 'queue') {
   // own turn could fell the 150-hp mage before it ever replies)
   await ev(`SS_NEAR.api.ref('mp/rooms/${code2}').update({ turnUid: '${other}', turnCount: 1, turnCasts: 0 }); SS_NEAR.api.set('mp/rooms/${code2}/players/test_rc/hp', 1)`);
   ok('LOSS: duel 2 reached the end screen', await until(`${VS}.room && ${VS}.room.status === 'done' && ${VS}.code === '${code2}' && ${VS}.state === 'done'`, 120000, 300));
+  // the deferred end panel again (v0.105.0) — the vsresult record follows it
+  // (duel 2 is the demo's rematch, so its record wears rematch:true)
+  await until(`!!${VS}.rematchB && ${VS}.rematchB.active && (JSON.parse(localStorage.getItem('beta3.vsresult') || '{}').rematch === true)`, 30000, 250);
   const r2 = JSON.parse(await ev(`JSON.stringify(SS_NEAR.room(${JSON.stringify(code2)}))`));
   const res2 = JSON.parse(await ev(`localStorage.getItem('beta3.vsresult') || 'null'`));
   const rating2 = await ev(`SS.prof.rating`);

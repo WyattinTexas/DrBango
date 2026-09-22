@@ -100,8 +100,15 @@ const SS_RIVAL = (() => {
      first deal needs 5 vowels, a bonus tile drops on the FIRST new slot only,
      unspent bonuses drain to plain before the next reward, 7+ letters forge a
      star tile, 5+ a gilded one (STAR FORGE lifts either to a star).          */
-  const VS_OK_SIGILS = ['quill', 'choir', 'runes', 'forge', 'longbow', 'blood'];
-  const SIGIL_WORTH = { blood: 9, longbow: 8, forge: 6, choir: 5, runes: 4, quill: 4 };
+  // the duel's sigil pool is the ONE declared law — the `vs` flag on
+  // SS_SIGILS (data.js, SS_VS_SIGILS): the mage may only ever hold what a
+  // human's pick could offer. Never a local id list (the 9/8 exclusion
+  // card); a standing board that replays an excluded sigil keeps it —
+  // damage() below still prices everything a pre-flag room dealt.
+  const VS_OK_SIGILS = (typeof SS_VS_SIGILS !== 'undefined') ? SS_VS_SIGILS : [];
+  // worth ranks only what the pool can offer — an excluded sigil (blood
+  // once ranked 9, highest) carries none, since no picker can reach it
+  const SIGIL_WORTH = { longbow: 8, forge: 6, choir: 5, runes: 4, quill: 4 };
   // the duel's sigil rhythm — the cadence table's versus row, the very
   // number versus.js plays by, so mage and human pick in the same measure
   const VS_CASTS = (typeof SS_CADENCE !== 'undefined' && SS_CADENCE.versus && SS_CADENCE.versus.casts) || 3;

@@ -78,8 +78,8 @@ ok('the plaque rim is a pre-baked texture breathed by alpha tween only (never a 
 ok('every menu door still seals turns only', /this\.match\('turns'\)/.test(vsSrc)
   && (vsSrc.match(/vsSealRoom\(code, 'turns'/g) || []).length >= 2 && /FR\.challenge\(f\.id, code, 'turns'\)/.test(vsSrc));
 ok('the dead beta3.vsmode key is still swept', /removeItem\('beta3\.vsmode'\)/.test(vsSrc));
-ok('VS_APP_URL is the TestFlight door and the app invite rides it',
-  /VS_APP_URL = 'https:\/\/testflight\.apple\.com\/join\/Hxs8e7fU'/.test(vsSrc)
+ok('VS_APP_URL is the App Store door (ffb2f5ba: a store build never shares a TestFlight link) and the app invite rides it',
+  /VS_APP_URL = 'https:\/\/apps\.apple\.com\/app\/id6802801799'/.test(vsSrc)
   && /vsShare\(SS_T\('vsAppText', vsName\(\), vsName\(\)\), VS_APP_URL\)/.test(vsSrc) && !/vsFriendUrl/.test(vsSrc));
 ok('the drawn crossed-blades glyph is baked art (vsSwordsTex through ssBake) and dresses rows, plaques, banners, rematch',
   /function vsSwordsTex/.test(vsSrc) && /ssBake\(t, key, D, D/.test(vsSrc) && (vsSrc.match(/vsSwordsTex\(this\)/g) || []).length >= 5);
@@ -356,7 +356,7 @@ ok('a real tap on the funnel INVITE door copies the summons', await A.tapUntil(`
   `typeof window.__cap === 'string' && window.__cap.length > 0`, 20000));
 const cap = await A.ev(`window.__cap`) || '';
 const myName = await A.ev(`SSNET.myName()`);
-ok('the payload carries the STARSPELL app link', cap.includes('https://testflight.apple.com/join/Hxs8e7fU'), cap.slice(0, 120));
+ok('the payload carries the STARSPELL app link', cap.includes('https://apps.apple.com/app/id6802801799'), cap.slice(0, 120));
 ok('…and the sender\'s name for the add-by-name bridge', cap.includes(myName), cap.slice(0, 120));
 ok('…and NEVER a web page: no drbango.com, no localhost, no join/friend deep link',
   !/drbango\.com|localhost|[?&]join=|[?&]friend=/.test(cap), cap);
@@ -365,7 +365,7 @@ ok('…and the live payload wears the sparkles: ✨ ×2, no dash, no colon, no "
   (capTxt.match(/✨/g) || []).length === 2 && !/[—:]/.test(capTxt) && !ANSWER_TAILS.test(capTxt) && /✨\s*$/.test(capTxt),
   cap.slice(0, 140));
 ok('…the payload is exactly vsAppText, the sender named twice, then the app link',
-  await A.ev(`window.__cap === SS_T('vsAppText', SSNET.myName(), SSNET.myName()) + ' https://testflight.apple.com/join/Hxs8e7fU'`));
+  await A.ev(`window.__cap === SS_T('vsAppText', SSNET.myName(), SSNET.myName()) + ' https://apps.apple.com/app/id6802801799'`));
 ok('the sheet\'s pinned invite row still shares the same summons', await (async () => {
   await A.ev(`window.__cap = null; 1`);
   if (!await openSheetFunnel(A)) return false;

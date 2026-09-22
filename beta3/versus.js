@@ -65,6 +65,11 @@ const VS_RM_BELT_MS = (() => { const p = parseInt(QS.get('rmbelt'), 10); return 
 function vsTurnSize(room) { return room && room.corr ? VS_TURN_CASTS : 1; }
 function vsRoomHp(room) { return (room && room.hp) || VS_HP; }
 const VS_EMBLEMS = ['vulpes', 'strix', 'serpens', 'draco'];
+// the duel column's ground (v0.105.0): the board rains BEHIND the word line,
+// and both run under the furniture — the sky (depth 0, added first) stays
+// beneath everything. The story lift (96) and the strike numbers (97) keep
+// their old heights above every veil.
+const VS_BOARD_D = 2, VS_LINE_D = 4, VS_UI_D = 6;
 const FRDEMO = QS.get('frdemo');                              // friends-flow test recipes
 const VSDEMO = QS.get('vsdemo') === '1' || !!FRDEMO;          // the solver plays the duel
 const VSAUTO = QS.get('vsdemo') === '1';                      // …and auto quick-matches from the menu
@@ -1019,6 +1024,37 @@ function vsMageFigure(scene, cont, tint, unitScale, opts) {
     }
   });
 }
+/* the rival's figure on the duel marquee (v0.105.0): the bare assembly
+   wireframe drowned against the field at panel grades — the 9/9 review's
+   own finding, met the review's own way: THE DUELISTS' dress (vsMageFigure's
+   halo-under-star grammar, hot centres on the bright anchors) laid on the
+   BEAST's true chart — mag-true discs by the one resolver, edges by
+   ssEdgeSeg so no line pierces a star. Still by design: panels rebuild on
+   room events, and a still portrait can never leak a twinkle tween. */
+function vsFoePortrait(scene, cont, beast, unitScale) {
+  cont.removeAll(true);
+  const sc = unitScale * (beast.boss ? 1.15 : beast.tier === 'mini' ? 1.06 : 1);
+  const tint = beast.tint || 0x9fb0e8;
+  const mags = ssStarMags(beast);
+  const g = scene.add.graphics();
+  g.lineStyle(unitScale * 1.25, tint, 0.55);
+  g.fillStyle(tint, 0.55);
+  for (const [a, b] of beast.edges) {
+    const seg = ssEdgeSeg(beast.stars[a], beast.stars[b], SS_MAG_R[mags[a]], SS_MAG_R[mags[b]]);
+    if (!seg) continue;
+    g.lineBetween(seg.x1 * sc, seg.y1 * sc, seg.x2 * sc, seg.y2 * sc);
+    g.fillCircle(seg.x1 * sc, seg.y1 * sc, unitScale * 0.625);
+    g.fillCircle(seg.x2 * sc, seg.y2 * sc, unitScale * 0.625);
+  }
+  cont.add(g);
+  beast.stars.forEach((p, i) => {
+    const m = SS_MAG_R[mags[i]] * sc / SS_DOT_READ;
+    const x = p[0] * sc, y = p[1] * sc;
+    cont.add(scene.add.image(x, y, 'dot').setScale(m * 2.6).setAlpha(0.16).setTint(tint).setBlendMode('ADD'));
+    cont.add(scene.add.image(x, y, 'dot').setScale(m * 1.4).setTint(tint).setBlendMode('ADD'));
+    if (mags[i] === 1) cont.add(scene.add.image(x, y, 'dot').setScale(m * 0.55).setAlpha(0.75).setTint(0xfff6dd).setBlendMode('ADD'));
+  });
+}
 /* the your-move plaque's gold rim: baked ONCE, breathed by alpha tween only
    — never a per-frame stroke (the iOS renderer's law) */
 function vsPlaqRimTex(scene) {
@@ -1736,7 +1772,8 @@ class VsBattle extends Phaser.Scene {
     this.histMine = [];                       // my own casts off the feed (the story's opening verse)
     this.foeLast = {};                        // uid → {word, dmg}: the price worn beside their last word
     this.foeSeenAt = 0;                       // the latest ALREADY-SEEN foreign cast (the story's left edge)
-    this.myHpD = null;                        // my bar's display state (shown value + running tween)
+    this.myHpD = null;                        // my bar's display state (shown value + running tween + strike-beat holds)
+    this.endWait = null;                      // the death-reads defer (endSoon) — a stale one would seal the NEXT end screen shut
     this.storyC = null; this.storyEv = null; this.storyLand = null;
     this.storyTold = false;                   // a corr landing tells its tale exactly once
     this.storyPend = null;                    // the telling's one-breath timer (cancellable)
@@ -1855,9 +1892,9 @@ class VsBattle extends Phaser.Scene {
     const txt = (x, y, s, size, color, style) => ssTxt(this, x, y, s, l.u(size), color, style);
     // the worldwide path never speaks a seal (9/3 card 03) — a searching
     // theater's room, and a near duel, wear no code; friend rooms keep theirs
-    this.headT = txt(l.x(0), l.y(24), (this.near || this.theater) ? '' : 'SEAL ' + this.code, 14, '#c9b676').setOrigin(0.5);
-    this.clockT = txt(l.x(190), l.y(24), '', 15, '#ffe9a8').setOrigin(1, 0.5);
-    const back = txt(l.x(-195), l.y(24), '‹', 22, '#5a6390').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+    this.headT = txt(l.x(0), l.y(24), (this.near || this.theater) ? '' : 'SEAL ' + this.code, 14, '#c9b676').setOrigin(0.5).setDepth(VS_UI_D);
+    this.clockT = txt(l.x(190), l.y(24), '', 15, '#ffe9a8').setOrigin(1, 0.5).setDepth(VS_UI_D);
+    const back = txt(l.x(-195), l.y(24), '‹', 22, '#5a6390').setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setDepth(VS_UI_D);
     back.on('pointerdown', () => {
       SFX.ui();
       // a correspondence duel KEEPS when you step out mid-rhythm — that IS
@@ -1886,36 +1923,50 @@ class VsBattle extends Phaser.Scene {
       this.scene.start('vsmenu');
     });
 
-    this.oppC = this.add.container(0, 0);          // opponents row
-    this.turnT = txt(l.x(0), l.y(320), '', 14, '#ffe9a8').setOrigin(0.5);
+    /* THE COLUMN, RESTACKED (v0.105.0 — Skylar 9/22: the dead top filled,
+       the bars BIG, the woven word never overlapped): rival panel owns the
+       marquee (y64-210 at 1v1), the turn line 272, YOUR row 296/318 with the
+       same big bar the rival wears, the word line 358 on ground of its OWN
+       (chips 336-380, 8 pts clear of the grid rim), the grid at solo's exact
+       seats (388-724), CAST/SCRY at solo's 766 with the card-01 air (14+ pts
+       off the rim). Depths split the ground for real: the board (2) rains
+       BEHIND the word line (4), and both run under the panels/rows (6) — a
+       refill can no longer bury the word you weave. */
+    this.oppC = this.add.container(0, 0).setDepth(VS_UI_D);   // opponents row
+    this.turnT = txt(l.x(0), l.y(272), '', 15, '#ffe9a8').setOrigin(0.5).setDepth(VS_UI_D);
 
-    this.youT = txt(l.x(-190), l.y(352), 'YOU', 11, '#c9b676').setOrigin(0, 0.5);
-    this.myName = txt(l.x(-150), l.y(352), vsName(), 12, '#f0e8d2').setOrigin(0, 0.5);
-    this.hpBarBg = this.add.rectangle(l.x(-150), l.y(370), l.u(300), l.u(9), 0x1a2038).setOrigin(0, 0.5);
-    this.hpBar = this.add.rectangle(l.x(-150), l.y(370), l.u(300), l.u(9), 0xd7b45c).setOrigin(0, 0.5);
-    this.hpT = txt(l.x(190), l.y(352), VS_HP + ' / ' + VS_HP, 12).setOrigin(1, 0.5);
+    this.youT = txt(l.x(-190), l.y(296), 'YOU', 12, '#c9b676').setOrigin(0, 0.5).setDepth(VS_UI_D);
+    this.myName = txt(l.x(-148), l.y(296), vsName(), 13, '#f0e8d2').setOrigin(0, 0.5).setDepth(VS_UI_D);
+    this.hpBarBg = this.add.rectangle(l.x(-152), l.y(318), l.u(304), l.u(20), 0x1a2038).setOrigin(0, 0.5)
+      .setStrokeStyle(l.u(1.5), 0x2a3354).setDepth(VS_UI_D);
+    this.hpBar = this.add.rectangle(l.x(-150), l.y(318), l.u(300), l.u(14), 0xd7b45c).setOrigin(0, 0.5).setDepth(VS_UI_D);
+    // the numeral lives ON the bar (solo's beast-bar law) — the flying number
+    // lands here, teaching where your health lives
+    this.hpT = txt(l.x(0), l.y(318), VS_HP + ' / ' + VS_HP, 16, '#fff6e0').setOrigin(0.5).setDepth(VS_UI_D)
+      .setShadow(0, l.u(1.5), 'rgba(16,4,12,0.95)', l.u(3));
 
-    this.lineC = this.add.container(l.x(0), l.y(408));
-    this.lineHint = txt(l.x(0), l.y(408), 'tap letters to weave a word', 12, '#5a6390').setOrigin(0.5);
+    this.lineC = this.add.container(l.x(0), l.y(358)).setDepth(VS_LINE_D);
+    this.lineHint = txt(l.x(0), l.y(358), 'tap letters to weave a word', 12, '#5a6390').setOrigin(0.5).setDepth(VS_LINE_D);
 
-    this.boardC = this.add.container(0, 0);
+    this.boardC = this.add.container(0, 0).setDepth(VS_BOARD_D);
     this.tileSize = l.u(78); this.tileGap = l.u(8);
     this.slotPos = (i) => ({
       x: l.x(0) + ((i % 4) - 1.5) * (this.tileSize + this.tileGap),
-      y: l.y(576) + (Math.floor(i / 4) - 1.5) * (this.tileSize + this.tileGap),
+      y: l.y(556) + (Math.floor(i / 4) - 1.5) * (this.tileSize + this.tileGap),
     });
 
-    this.castB = this.add.image(l.x(70), l.y(766), ssBtn(this, false, 180, 52)).setDisplaySize(l.u(180), l.u(52)).setInteractive({ useHandCursor: true });
-    this.castT = txt(l.x(70), l.y(766), 'CAST', 19, BTN_INK()).setOrigin(0.5);
+    this.castB = this.add.image(l.x(70), l.y(766), ssBtn(this, false, 180, 52)).setDisplaySize(l.u(180), l.u(52)).setInteractive({ useHandCursor: true }).setDepth(VS_UI_D);
+    this.castT = txt(l.x(70), l.y(766), 'CAST', 19, BTN_INK()).setOrigin(0.5).setDepth(VS_UI_D);
     this.castB.on('pointerdown', () => this.tryCast());
-    this.scryB = this.add.rectangle(l.x(-140), l.y(766), l.u(110), l.u(48), 0x151b33).setStrokeStyle(l.u(1.5), 0x4a5a8c).setInteractive({ useHandCursor: true });
-    this.scryT = txt(l.x(-140), l.y(766), 'SCRY ↻', 13, '#9fb0e8').setOrigin(0.5);
+    // SCRY finally wears the painted button (the last bare dev rectangle)
+    this.scryB = this.add.image(l.x(-140), l.y(766), ssBtn(this, true, 110, 48)).setDisplaySize(l.u(110), l.u(48)).setInteractive({ useHandCursor: true }).setDepth(VS_UI_D);
+    this.scryT = txt(l.x(-140), l.y(766), 'SCRY ↻', 13, '#9fb0e8').setOrigin(0.5).setDepth(VS_UI_D);
     this.scryB.on('pointerdown', () => this.scry());
     // held sigils fold into a chip between SCRY and CAST — tap = the inspector
     // window (a duel can't pause, but the box still reads and shields the board)
     this.sigChipB = this.add.rectangle(l.x(-52), l.y(766), l.u(58), l.u(48), 0x151b33)
-      .setStrokeStyle(l.u(1.5), 0x8c7a4a).setInteractive({ useHandCursor: true }).setVisible(false);
-    this.sigChipT = txt(l.x(-52), l.y(766), '', 14, '#ffd77a').setOrigin(0.5).setVisible(false);
+      .setStrokeStyle(l.u(1.5), 0x8c7a4a).setInteractive({ useHandCursor: true }).setVisible(false).setDepth(VS_UI_D);
+    this.sigChipT = txt(l.x(-52), l.y(766), '', 14, '#ffd77a').setOrigin(0.5).setVisible(false).setDepth(VS_UI_D);
     this.sigChipB.on('pointerdown', () => this.openInspect());
 
     this.fxC = this.add.container(0, 0).setDepth(50);
@@ -2071,8 +2122,8 @@ class VsBattle extends Phaser.Scene {
       this.updatePanels();
       this.checkEnd();
     }
-    if (room.status === 'done' && this.state !== 'done') this.endBattle();
-    else if (room.status === 'done') {
+    if (room.status === 'done' && this.state !== 'done') this.endSoon();
+    else if (room.status === 'done' && !this.endWait) {
       // the rival's moved-on word outranks the rematch call — the door
       // fades honestly instead of ringing for a seat that left
       if (room.rematchNo && room.rematchNo.by !== vsUid()) this.showRematchGone(room.rematchNo);
@@ -2455,58 +2506,71 @@ class VsBattle extends Phaser.Scene {
     // the rival's turn lands quietly (the board is a window, not a summons) —
     // and a landing with a tale to tell lets the story be the beat instead
     if (!(this.corr && this.recapQ.length) && (this.isMyTurn() || this.room.mode === 'timed')) {
-      const go = ssTxt(this, l.x(0), l.y(400), 'WEAVE!', l.u(30), '#2fe0d0').setOrigin(0.5).setDepth(80).setScale(0.5);
+      const go = ssTxt(this, l.x(0), l.y(540), 'WEAVE!', l.u(30), '#2fe0d0').setOrigin(0.5).setDepth(80).setScale(0.5);
       this.tweens.add({ targets: go, scale: 1, duration: 200, ease: 'Back.easeOut' });
       this.tweens.add({ targets: go, alpha: 0, delay: 900, duration: 300, onComplete: () => go.destroy() });
     }
     // arriving into a duel woven in another tongue — say so over the board,
     // for joiners who rose past the lobby too fast to read it there
     if (this.room.lang && this.room.lang !== ssGameLang() && SS_PACKS[this.room.lang]) {
-      const lt = ssTxt(this, l.x(0), l.y(438), SS_T('vsLang', SS_LANGS[this.room.lang] || this.room.lang),
+      const lt = ssTxt(this, l.x(0), l.y(588), SS_T('vsLang', SS_LANGS[this.room.lang] || this.room.lang),
         l.u(12), '#ffe9a8', 'italic').setOrigin(0.5).setDepth(80);
       this.tweens.add({ targets: lt, alpha: 0, delay: 2600, duration: 400, onComplete: () => lt.destroy() });
     }
   }
 
   buildOpponentPanels() {
+    /* THE MARQUEE (v0.105.0): the rival owns the top of the column. At 1v1
+       the panel fills the dead sky — the beast emblem stands tall at the
+       left, the name over a bar as big as your own (278×14 in a 20 trough)
+       with the numeral ON it, the priced last word and the sigil chip
+       beneath. Multi-foe keeps its 2×2 seats (±95 / 110·230) with the bars
+       grown tall (116×9 in a 14 trough, numeral on the fill) — both shapes
+       speak the one hp engine, and the cast beat aims at the emblem (ax/ay)
+       then flies its number to the bar's heart (nx). */
     const l = this.L;
     this.oppC.removeAll(true);
     this.oppPanels = {};
     const opps = this.others();
     const n = opps.length;
     opps.forEach((p, i) => {
-      const w = n === 1 ? 360 : 176;
-      const cx = n === 1 ? 0 : (i % 2 === 0 ? -95 : 95);
-      const cy = n === 1 ? 150 : (i < 2 ? 110 : 230);
+      const one = n === 1;
+      const cx = one ? 0 : (i % 2 === 0 ? -95 : 95);
+      const cy = one ? 136 : (i < 2 ? 110 : 230);
       const c = this.add.container(l.x(cx), l.y(cy));
-      const av = this.add.container(n === 1 ? -l.u(120) : -l.u(60), 0);
-      ssAssembleBeast(this, av, SS_BEASTS[VS_EMBLEMS[p.seat % VS_EMBLEMS.length]], l.u(SS_STAR_GRADES.versus[n === 1 ? 1 : 0]));
+      const ax = one ? -150 : -60, ay = one ? -6 : 0;
+      const av = this.add.container(l.u(ax), l.u(ay));
+      vsFoePortrait(this, av, SS_BEASTS[VS_EMBLEMS[p.seat % VS_EMBLEMS.length]], l.u(SS_STAR_GRADES.versus[one ? 1 : 0]));
       // the rival's star-class glyph rides beside the name (veiled ratings show
       // no glyph); tapping the name opens their rating card from the room record
       const hidden = !!p.rhide;
       const pr = Number.isFinite(p.rating) ? p.rating : SS_RATING.BASE;
-      const nm = ssTxt(this, l.u(n === 1 ? -40 : -30), -l.u(22), (hidden ? '' : ssRatingTier(pr).glyph + ' ') + p.name, l.u(n === 1 ? 15 : 12), '#f0e8d2').setOrigin(0, 0.5)
+      const nm = ssTxt(this, l.u(one ? -92 : -30), -l.u(one ? 44 : 26), (hidden ? '' : ssRatingTier(pr).glyph + ' ') + p.name, l.u(one ? 16.5 : 12.5), '#f0e8d2').setOrigin(0, 0.5)
         .setInteractive({ useHandCursor: true });
       nm.on('pointerdown', () => ssRatingCard(this, { name: p.name, rating: pr, rhide: hidden }));
-      const bx = n === 1 ? -40 : -30, bw = n === 1 ? 200 : 110;
-      const barBg = this.add.rectangle(l.u(bx), 0, l.u(bw), l.u(8), 0x1a2038).setOrigin(0, 0.5);
-      const bar = this.add.rectangle(l.u(bx), 0, l.u(bw), l.u(8), 0xe66a6a).setOrigin(0, 0.5);
-      // their health, always readable (9/8 card 03): the number wears the same
-      // dress as your own row's, above the bar's far end — never a value to hunt
-      const hpT = ssTxt(this, l.u(bx + bw), -l.u(n === 1 ? 22 : 20), '', l.u(n === 1 ? 12 : 10), '#f0e8d2').setOrigin(1, 0.5);
-      const sub = ssTxt(this, l.u(bx), l.u(20), '', l.u(10), '#8a94c4', 'italic').setOrigin(0, 0.5);
+      const bx = one ? -92 : -30, bw = one ? 278 : 116, bh = one ? 14 : 9, th = one ? 20 : 14;
+      const barBg = this.add.rectangle(l.u(bx - 2), 0, l.u(bw + 4), l.u(th), 0x1a2038).setOrigin(0, 0.5)
+        .setStrokeStyle(l.u(1.5), 0x2a3354);
+      const bar = this.add.rectangle(l.u(bx), 0, l.u(bw), l.u(bh), 0xe66a6a).setOrigin(0, 0.5);
+      // their health, always readable (9/8 card 03), and now ON the bar
+      // itself (solo's beast-bar law) — the flying number lands where the
+      // truth lives, never a value to hunt
+      const hpT = ssTxt(this, l.u(bx + bw / 2), 0, '', l.u(one ? 16 : 11), '#ffe9e0').setOrigin(0.5)
+        .setShadow(0, l.u(1.5), 'rgba(16,4,12,0.95)', l.u(3));
+      const sub = ssTxt(this, l.u(bx), l.u(one ? 28 : 20), '', l.u(one ? 11.5 : 10), '#8a94c4', 'italic').setOrigin(0, 0.5);
       // their held sigils, worn openly: the house chip (your own sigChipB's
       // dress) — tap opens the same inspector, read from THEIR seat. A bot's
       // seat carries the very same array a phone writes, so the chip cannot
       // tell them apart, by construction.
-      const chx = bx + bw - (n === 1 ? 26 : 20), chy = n === 1 ? 24 : 22;
-      const chipB = this.add.rectangle(l.u(chx), l.u(chy), l.u(n === 1 ? 52 : 40), l.u(n === 1 ? 30 : 24), 0x151b33)
+      const chx = one ? 160 : 64, chy = one ? 30 : 22;
+      const chipB = this.add.rectangle(l.u(chx), l.u(chy), l.u(one ? 52 : 40), l.u(one ? 30 : 24), 0x151b33)
         .setStrokeStyle(l.u(1.5), 0x8c7a4a).setInteractive({ useHandCursor: true }).setVisible(false);
-      const chipT = ssTxt(this, l.u(chx), l.u(chy), '', l.u(n === 1 ? 12 : 10), '#ffd77a').setOrigin(0.5).setVisible(false);
+      const chipT = ssTxt(this, l.u(chx), l.u(chy), '', l.u(one ? 12 : 10), '#ffd77a').setOrigin(0.5).setVisible(false);
       chipB.on('pointerdown', () => this.openInspectFoe(p.id));
       c.add([av, nm, barBg, bar, hpT, sub, chipB, chipT]);
       this.oppC.add(c);
-      this.oppPanels[p.id] = { c, bar, sub, nm, hpT, chipB, chipT, w: l.u(bw), bx: l.u(bx), shown: null, hpTween: null };
+      this.oppPanels[p.id] = { c, bar, sub, nm, hpT, chipB, chipT, w: l.u(bw), bx: l.u(bx), ax: l.u(ax), ay: l.u(ay),
+        nx: l.u(bx + bw / 2), fs: one ? 15 : 13, shown: null, hpTween: null, beats: 0, pend: null, told: false };
     });
   }
 
@@ -2562,13 +2626,32 @@ class VsBattle extends Phaser.Scene {
      turn. Rectangles and text only: no new bakes, nothing tinted (the Canvas
      renderer's law). */
   hpState(id) {
-    if (id === 'me') return (this.myHpD = this.myHpD || { shown: null, hpTween: null });
+    if (id === 'me') return (this.myHpD = this.myHpD || { shown: null, hpTween: null, beats: 0, pend: null, told: false });
     return this.oppPanels ? this.oppPanels[id] : null;
   }
-  showHp(id, hp, max) {
+  // card 02's held-bar law, spoken in versus: while a strike's number is
+  // still flying, the bar it will lower HOLDS — the truth waits at the door
+  // (pend) and the landing releases it into the drain. beats counts flights
+  // (chained casts overlap); secondTick sweeps a hold no landing ever freed.
+  holdHp(id) {
+    const st = this.hpState(id);
+    if (st) { st.beats = (st.beats | 0) + 1; st.heldAt = Date.now(); }
+  }
+  releaseHp(id, told) {
+    const st = this.hpState(id);
+    if (!st) return;
+    if (st.beats | 0) st.beats--;
+    if (told) st.told = true;   // the flyer already spoke this price
+    const p = st.pend;
+    if (p) { if (!st.beats) st.pend = null; this.showHp(id, p.hp, p.max, true); }
+  }
+  showHp(id, hp, max, force) {
     const st = this.hpState(id);
     if (!st) return;
     const target = Math.max(0, Math.min(max, hp | 0));
+    // a staged blow owns the bar: the number is still flying, so the truth
+    // waits (the release drains it) — rises never wait, nothing stages them
+    if (!force && (st.beats | 0) > 0 && st.shown != null && target < st.shown) { st.pend = { hp: target, max }; return; }
     // equal: the running telling (if any) owns the paint; first sight or a
     // rebuilt panel (shown null) and any rise settle silently
     if (target === st.shown) { if (!st.hpTween) this.paintHp(id, target, max); return; }
@@ -2601,25 +2684,87 @@ class VsBattle extends Phaser.Scene {
     const l = this.L, mine = id === 'me';
     const pan = mine ? null : (this.oppPanels ? this.oppPanels[id] : null);
     if (!mine && !pan) return;
+    const st = this.hpState(id);
     const bw = mine ? l.u(300) : pan.w;
+    const bar = mine ? this.hpBar : pan.bar;
     // the pale ghost of the slice just lost — it lingers a breath, then goes
     const gx = (mine ? this.hpBar.x : pan.bx) + bw * clamp(to / max, 0, 1);
     const gw = Math.max(l.u(1.5), bw * clamp((from - to) / max, 0, 1));
-    const ghost = this.add.rectangle(gx, mine ? this.hpBar.y : 0, gw, l.u(mine ? 9 : 8), 0xfff0d0).setOrigin(0, 0.5).setAlpha(0.9);
+    const ghost = this.add.rectangle(gx, mine ? this.hpBar.y : 0, gw, bar.height, 0xfff0d0).setOrigin(0, 0.5).setAlpha(0.9);
     if (mine) ghost.setDepth(97); else pan.c.add(ghost);   // 97: above the story veil, above the lifted bar
     this.tweens.add({ targets: ghost, alpha: 0, duration: 700, delay: 140, onComplete: () => ghost.destroy() });
     // the bar flinches (its own tween, its own target — never a shared one)
-    const bar = mine ? this.hpBar : pan.bar;
     this.tweens.add({ targets: bar, alpha: { from: 0.35, to: 1 }, duration: 320, ease: 'Quad.easeOut' });
-    // …and the price speaks beside the number
-    const px = mine ? this.hpT.x : pan.c.x + pan.bx + pan.w;
-    const py = (mine ? this.hpT.y : pan.c.y - l.u(22)) - l.u(4);
-    const t = ssTxt(this, px, py, '−' + Math.max(1, Math.round(from - to)), l.u(mine ? 15 : 14), '#ff8a8a').setOrigin(1, 1).setDepth(97)
+    // …and the price speaks off the bar's far end — unless the staged beat's
+    // flyer already spoke it on the way in (no double telling)
+    if (st && st.told) { st.told = false; return; }
+    const px = mine ? this.hpBar.x + bw : pan.c.x + pan.bx + pan.w;
+    const py = (mine ? this.hpBar.y : pan.c.y) - l.u(14);
+    const t = ssTxt(this, px, py, '−' + Math.max(1, Math.round(from - to)), l.u(mine ? 15 : pan.fs || 14), '#ff8a8a').setOrigin(1, 1).setDepth(97)
       .setShadow(0, 0, '#802020', l.u(6), true, true);
     this.tweens.add({ targets: t, y: py - l.u(22), alpha: 0, duration: 1150, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
   }
 
+  /* ---------- the strike beat (v0.105.0 — card 02's grammar in the duel) ----
+     The number pops at the point of contact, holds a beat, flies to the
+     health it lowers, and only then that bar drains (the hold armed at the
+     stage, released by the landing). Gold = your word landing on a rival
+     (ssGoldTex, solo's cast voice); crimson = a word landing on a bar you
+     watch wound (yours, or a rival's in a many-mage sky). */
+  strikeBeat(id, dmg, sx, sy, gold) {
+    const l = this.L, mine = id === 'me';
+    const pan = mine ? null : (this.oppPanels ? this.oppPanels[id] : null);
+    if (!mine && !pan) return this.releaseHp(id);
+    const dx = mine ? l.x(0) : pan.c.x + pan.nx;               // the numeral's seat — where the truth lives
+    const dy = mine ? l.y(318) : pan.c.y;
+    const big = dmg >= 25;
+    let nI, sxx = 1, syy = 1;
+    if (gold) {
+      // solo's cast voice exactly: the gold number is bare (crimson wears
+      // the minus) — one grammar across every battle
+      const gk = ssGoldTex(this, String(dmg), pan && this.others().length > 1 ? 32 : 40);
+      nI = this.add.image(sx, sy, gk.key).setDisplaySize(l.u(gk.w), l.u(gk.h)).setDepth(97);
+      sxx = nI.scaleX; syy = nI.scaleY;
+    } else {
+      nI = ssTxt(this, sx, sy, '−' + dmg, l.u(big ? 34 : 30), '#ff9a8a').setOrigin(0.5).setDepth(97)
+        .setShadow(0, 0, '#7a1420', l.u(10), true, true);
+    }
+    nI.setScale(sxx * 0.2, syy * 0.2).setAlpha(0);
+    const pop = big ? 1.45 : 1.18;
+    this.tweens.add({ targets: nI, scaleX: sxx * pop, scaleY: syy * pop, alpha: 1, duration: 120, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: nI, scaleX: sxx, scaleY: syy, delay: 120, duration: 110 });
+    const pt = { t: 0 };
+    this.tweens.add({
+      targets: pt, t: 1, delay: 400, duration: 320, ease: 'Cubic.easeIn',
+      onUpdate: () => {
+        nI.x = sx + (dx - sx) * pt.t;
+        nI.y = sy + (dy - sy) * pt.t;
+        const k = 1 - pt.t * 0.55;
+        nI.setScale(sxx * k, syy * k);
+        if (Math.random() < 0.3) this.starBurst.emitParticleAt(nI.x, nI.y, 1);
+      },
+      onComplete: () => {
+        nI.destroy();
+        this.starBurst.emitParticleAt(dx, dy, big ? 6 : 3);
+        this.releaseHp(id, true);   // the number has landed — drain now, price told
+      },
+    });
+  }
+  // a hold whose landing died (a panel rebuilt mid-flight, a tab hidden) is
+  // swept, and the waiting truth drains — the 2600ms watchdog, versus voice
+  sweepHolds() {
+    const all = [this.myHpD, ...Object.values(this.oppPanels || {})];
+    for (const st of all) {
+      if (st && (st.beats | 0) > 0 && Date.now() - (st.heldAt || 0) > 2600) {
+        st.beats = 0;
+        const p = st.pend;
+        if (p) { st.pend = null; const id = st === this.myHpD ? 'me' : Object.keys(this.oppPanels).find((k) => this.oppPanels[k] === st); if (id) this.showHp(id, p.hp, p.max, true); }
+      }
+    }
+  }
+
   secondTick() {
+    this.sweepHolds();   // a strike beat whose landing died frees its bar
     if (this.scryCooldown > 0) this.scryCooldown--;
     if (this.room && this.room.status === 'waiting') { this.rescan(); this.quietSky(); }
     if (!this.room || this.room.status !== 'active') return;
@@ -2813,9 +2958,11 @@ class VsBattle extends Phaser.Scene {
     SS.prof.words++; SS.prof.vsWords++; SS.save();
     if (SS.prof.vsWords >= 25) SS.award('war-weaver', this.game);
 
-    // fly tiles toward the target's panel
+    // fly tiles at the rival's FIGURE (the emblem takes the blow; the number
+    // then carries the price to their bar — card 02's grammar, duel voice)
     const pan = this.oppPanels[target.id];
-    const tx = (pan ? pan.c.x : l.x(0)) - this.lineC.x, ty = (pan ? pan.c.y : l.y(150)) - this.lineC.y;
+    const ex = pan ? pan.c.x + pan.ax : l.x(0), ey = pan ? pan.c.y + pan.ay : l.y(136);
+    const tx = ex - this.lineC.x, ty = ey - this.lineC.y;
     this.lineTiles.forEach((mc, k) => {
       this.tweens.add({
         targets: mc, x: tx, y: ty, scale: 0.2, alpha: 0.9, delay: k * 50, duration: 260, ease: 'Cubic.easeIn',
@@ -2824,7 +2971,14 @@ class VsBattle extends Phaser.Scene {
     });
     const used = [...this.sel];
     this.sel = []; this.lineTiles = [];
-    this.time.delayedCall(used.length * 50 + 300, () => SFX.impact());
+    // the bar HOLDS from the word's flight until the number lands on it —
+    // armed before any write, so the seat echo can never outrun the telling
+    this.holdHp(target.id);
+    this.time.delayedCall(used.length * 50 + 300, () => {
+      SFX.impact();
+      if (this.sys.isActive()) this.strikeBeat(target.id, dmg, ex, ey, true);
+      else this.releaseHp(target.id);
+    });
 
     // authoritative writes: the caster deals the damage
     try {
@@ -2885,7 +3039,7 @@ class VsBattle extends Phaser.Scene {
   turnDoneBeat() {
     const l = this.L;
     const foe = this.others()[0];
-    const t = ssTxt(this, l.x(0), l.y(342), SS_T('vsTurnDone', foe ? foe.name : ''), l.u(12.5), '#ffe9a8', 'italic').setOrigin(0.5).setDepth(80)
+    const t = ssTxt(this, l.x(0), l.y(430), SS_T('vsTurnDone', foe ? foe.name : ''), l.u(12.5), '#ffe9a8', 'italic').setOrigin(0.5).setDepth(80)
       .setShadow(0, 0, '#c9b676', l.u(8), true, true);
     for (let fs = 12.5; t.width > l.u(370) && fs > 9; fs -= 0.5) t.setFontSize(l.u(fs));
     t.setAlpha(0).setY(t.y + l.u(10));
@@ -2963,18 +3117,31 @@ class VsBattle extends Phaser.Scene {
     }
     this.castStory(cast);
   }
+  // a live blow speaks card 02's grammar now (v0.105.0): the rival's WORD
+  // rises off their panel, the crimson number pops at their figure, holds,
+  // flies to the bar it lowers — yours, or a rival's in a many-mage sky —
+  // and only then that bar drains (the hold armed HERE wins the race with
+  // the seat echo: the cast row is pushed before the hp txn on both skies)
   castStory(cast) {
     const l = this.L;
-    if (cast.target === vsUid()) {
+    const atk = this.oppPanels ? this.oppPanels[cast.uid] : null;
+    const toMe = cast.target === vsUid();
+    const barId = toMe ? 'me' : cast.target;
+    const tgt = toMe ? true : (this.oppPanels && this.oppPanels[cast.target]);
+    // the word itself gets its moment on the caster's panel
+    if (atk) {
+      const wt = ssTxt(this, atk.c.x + atk.bx, atk.c.y - l.u(30), cast.word || '', l.u(13), '#ff8a8a').setOrigin(0, 0.5).setDepth(97);
+      this.tweens.add({ targets: wt, y: wt.y - l.u(24), alpha: 0, duration: 1300, onComplete: () => wt.destroy() });
+    }
+    if (toMe) {
       SFX.hurt();
       this.cameras.main.shake(200, 0.01);
       this.cameras.main.flash(200, 120, 20, 30);
-      const t = ssTxt(this, l.x(0), l.y(370), cast.name + ' cast ' + cast.word + '   −' + cast.dmg, l.u(14), '#ff8a8a').setOrigin(0.5).setDepth(80);
-      this.tweens.add({ targets: t, y: t.y - l.u(26), alpha: 0, duration: 1400, onComplete: () => t.destroy() });
-    } else {
-      const t = ssTxt(this, l.x(0), l.y(88), cast.name + ' → ' + cast.word + ' −' + cast.dmg, l.u(11), '#8a94c4', 'italic').setOrigin(0.5).setDepth(80);
-      this.tweens.add({ targets: t, alpha: 0, duration: 1600, onComplete: () => t.destroy() });
     }
+    if (!tgt) return;   // a blow on a seat with no panel (a gone rival) has no bar to teach
+    this.holdHp(barId);
+    const sx = atk ? atk.c.x + atk.ax : l.x(0), sy = atk ? atk.c.y + atk.ay : l.y(136);
+    this.strikeBeat(barId, cast.dmg | 0, sx, sy, false);
   }
   // the landing tells the missed story: a correspondence duel gets the STORY
   // SHEET (every word whole, every price, staged — 9/8 card 03); a live
@@ -3098,7 +3265,7 @@ class VsBattle extends Phaser.Scene {
   // while the tale is told, your hp row stays LIT above the veil — the sheet
   // sits below it, so the sinking bar and the words read as one scene
   storyLift(on) {
-    const d = on ? 96 : 0;
+    const d = on ? 96 : VS_UI_D;
     for (const o of [this.hpBarBg, this.hpBar, this.hpT, this.myName, this.youT]) { if (o && o.active) o.setDepth(d); }
   }
   // acting before the tale is told waives it (the harness and the solver
@@ -3140,11 +3307,13 @@ class VsBattle extends Phaser.Scene {
   showSigilPick() {
     const l = this.L;
     this.state = 'sigil';
-    // Only sigils this engine actually implements (see wordDamage/tryCast) —
-    // the solo-only ones (battle timers, heals, revives) would be dead picks.
-    // The old exclusion list leaked leech and gilded, which did nothing here.
-    const VS_OK = ['quill', 'choir', 'runes', 'forge', 'longbow', 'blood'];
-    const avail = SS_SIGILS.filter((s) => !this.mySigils.includes(s.id) && VS_OK.includes(s.id));
+    // ONLY SIGILS THAT MAKE SENSE MAY ENTER THE DUEL (9/8): the pick draws
+    // from the ONE declared pool — the `vs` flag on SS_SIGILS (data.js),
+    // the very law the rival engine plays by — so a sigil whose effect is
+    // meaningless here (beast strikes, heals, run scoring) never appears.
+    // A seat already holding an excluded sigil (a pre-flag room) keeps its
+    // effect below; the flag only guards this door.
+    const avail = SS_SIGILS.filter((s) => s.vs && !this.mySigils.includes(s.id));
     const opts = [];
     while (opts.length < 3 && avail.length) opts.push(avail.splice(Math.floor(Math.random() * avail.length), 1)[0]);
     if (!opts.length) { this.state = 'pick'; return; }
@@ -3233,8 +3402,23 @@ class VsBattle extends Phaser.Scene {
     }
   }
 
+  // death READS (card 02's law, duel voice): a killing blow's number is
+  // still flying — the end screen waits for the bar to land empty (~1.9s
+  // covers pop→fly→drain under load) before it rises. Input is locked at
+  // once (state 'done'); a decided room re-entered cold has nothing in
+  // flight and ends on the spot. The rematch watch stands down while the
+  // wait runs and endBattle re-reads the room's word when it builds.
+  endSoon() {
+    if (this.endWait) return;
+    this.state = 'done';
+    const flying = [this.myHpD, ...Object.values(this.oppPanels || {})]
+      .some((st) => st && ((st.beats | 0) > 0 || st.hpTween));
+    if (!flying) { this.endBattle(); return; }
+    this.endWait = this.time.delayedCall(1900, () => { this.endWait = null; this.endBattle(); });
+  }
   endBattle() {
     this.state = 'done';
+    if (this.endWait) { this.endWait.remove(false); this.endWait = null; }
     this.killTheater();   // a duel decided under the searching veil still ends honestly
     if (this.waitC && this.waitC.visible) { this.waitC.setVisible(false); }
     if (this.storyC) this.storyDone(true);      // a decided duel outranks the tale

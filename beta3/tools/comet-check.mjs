@@ -144,8 +144,10 @@ const LIT = '#ffd77a', SPENT = '#5a6390';
 console.log('\nCOMET-CHECK · the limited free scry\n');
 console.log('— THE DEF IS THE DIAL —');
 const vsSrc = readFileSync(new URL('../versus.js', import.meta.url), 'utf8');
-const vsOk = vsSrc.match(/VS_OK = \[([^\]]*)\]/);
-ok('versus VS_OK never held comet (source)', !!vsOk && !vsOk[1].includes('comet'), vsOk && vsOk[1].replace(/['\s]/g, ''));
+const dtSrc = readFileSync(new URL('../data.js', import.meta.url), 'utf8');
+const cometDef = (dtSrc.match(/\{ id: 'comet'[\s\S]*?\},\n/) || [''])[0];
+ok('the versus pool never holds comet (no vs flag on its def; the pick draws by the flag)',
+  !!cometDef && !/vs: *1/.test(cometDef) && /const avail = SS_SIGILS\.filter\(\(s\) => s\.vs/.test(vsSrc));
 
 await send('Page.navigate', { url: 'http://localhost:' + SRV + '/ascent.html' }); await sleep(500);
 await ev(`localStorage.clear(); localStorage.setItem('beta3.profile', JSON.stringify({ rating: 1000 })); 'ok'`);
