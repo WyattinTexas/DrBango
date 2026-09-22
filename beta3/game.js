@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.102.3';
+const BUILD = 'STARSPELL v0.103.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -5809,7 +5809,14 @@ class Home extends Phaser.Scene {
     // button left the meadow (v0.51.0): the mode lives on, the meadow just
     // doesn't offer it
     // ?endless=1 boots straight into an endless climb the same way (v0.68.0)
-    else if (DEMO || QS.get('daily') === '1' || QS.get('quick') === '1' || QS.get('endless') === '1') this.time.delayedCall(400, () => this.startMode(DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : QS.get('mode') === 'endless' ? 'endless' : 'quick') : QS.get('quick') === '1' ? 'quick' : QS.get('endless') === '1' ? 'endless' : 'daily'));
+    else if (DEMO || QS.get('daily') === '1' || QS.get('quick') === '1' || QS.get('endless') === '1') {
+      const mode = DEMO ? (QS.get('mode') === 'campaign' ? 'campaign' : QS.get('mode') === 'endless' ? 'endless' : 'quick')
+        : QS.get('quick') === '1' ? 'quick' : QS.get('endless') === '1' ? 'endless' : 'daily';
+      // the door knocks until the meadow is free — a one-shot call landing
+      // mid-intro was eaten by busy() and stranded the boot on the meadow
+      const knock = () => { if (this.busy()) { this.time.delayedCall(250, knock); return; } this.startMode(mode); };
+      this.time.delayedCall(400, knock);
+    }
   }
   buildMeadowUi(l) {
     /* THE FIRST OPEN's meadow is WORDLESS (v0.75.0): the scene and the
@@ -8047,27 +8054,26 @@ class Battle extends Phaser.Scene {
       y: l.y(556) + (Math.floor(i / 4) - 1.5) * (this.tileSize + this.tileGap),
     });
 
-    this.castB = this.add.image(l.x(70), l.y(754), ssBtn(this, false, 180, 56)).setDisplaySize(l.u(180), l.u(56)).setInteractive({ useHandCursor: true });
-    this.castT = txt(l.x(70), l.y(754), 'CAST', 20, BTN_INK()).setOrigin(0.5)
+    // the row sits at 766, not against the grid: the board's bottom rim ends
+    // ~724, so open sky separates the letters from the buttons. The foot
+    // below is bare on purpose — in-fight mute and the version stamp live in
+    // the settings gear sheet now, not on the battle floor.
+    this.castB = this.add.image(l.x(70), l.y(766), ssBtn(this, false, 180, 56)).setDisplaySize(l.u(180), l.u(56)).setInteractive({ useHandCursor: true });
+    this.castT = txt(l.x(70), l.y(766), 'CAST', 20, BTN_INK()).setOrigin(0.5)
       .setShadow(0, l.u(1), ART && SSART.ready ? '#2a1c05' : '#ffe9b0', l.u(1));
     this.castB.on('pointerdown', () => this.tryCast());
     // scry + hint wear the painted dark button (aspect-correct via ssBtn), same
     // as the home screen's LEADERBOARD/PROFILE — no more bare dev rectangles
-    this.scryB = this.add.image(l.x(-150), l.y(754), ssBtn(this, true, 100, 50)).setDisplaySize(l.u(100), l.u(50)).setInteractive({ useHandCursor: true });
-    txt(l.x(-150), l.y(754), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
+    this.scryB = this.add.image(l.x(-150), l.y(766), ssBtn(this, true, 100, 50)).setDisplaySize(l.u(100), l.u(50)).setInteractive({ useHandCursor: true });
+    txt(l.x(-150), l.y(766), 'SCRY ↻', 14, '#9fb0e8').setOrigin(0.5);
     this.scryPips = [];   // COMET TRAIL's charge pips, built by updateScryPips
     this.scryB.on('pointerdown', () => this.scry());
-    this.hintB = this.add.image(l.x(-62), l.y(754), ssBtn(this, true, 50, 50)).setDisplaySize(l.u(50), l.u(50)).setInteractive({ useHandCursor: true }).setVisible(false);
-    this.hintT = txt(l.x(-62), l.y(754), '◉', 18, '#d7b45c').setOrigin(0.5).setVisible(false);
+    this.hintB = this.add.image(l.x(-62), l.y(766), ssBtn(this, true, 50, 50)).setDisplaySize(l.u(50), l.u(50)).setInteractive({ useHandCursor: true }).setVisible(false);
+    this.hintT = txt(l.x(-62), l.y(766), '◉', 18, '#d7b45c').setOrigin(0.5).setVisible(false);
     this.hintB.on('pointerdown', () => this.useHint());
 
     this.homeB = txt(l.x(-195), l.y(24), '‹', 22, '#5a6390').setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
     this.homeB.on('pointerdown', () => { SFX.ui(); this.goHome({ from: 'battle' }); });
-    this.muteB = txt(l.x(-195), l.y(784), SFX.muted ? '🔇' : '🔊', 14).setOrigin(0, 0.5).setInteractive({ useHandCursor: true }).setAlpha(0.7);
-    this.muteB.on('pointerdown', () => { SFX.ensure(); SFX.setMuted(!SFX.muted); this.muteB.setText(SFX.muted ? '🔇' : '🔊'); });
-    // version stamp lives beside the mute icon — right-aligned it collided with
-    // the widened painted CAST button
-    txt(l.x(-172), l.y(784), BUILD, 9, '#39406b').setOrigin(0, 0.5);
     // flying damage numbers mint one texture per distinct value; drop them when
     // the battle ends so a long session doesn't hoard canvases
     this.events.once('shutdown', () => {
@@ -8258,7 +8264,7 @@ class Battle extends Phaser.Scene {
     let pose;
     // CAST is approached MIRRORED, from the label's left, so the glove
     // never covers the damage preview it is pointing the player at
-    if (goal === 'cast') pose = { x: l.x(70) - l.u(58), y: l.y(754) - l.u(10), flip: true, dip: 9 };
+    if (goal === 'cast') pose = { x: this.castB.x - l.u(58), y: this.castB.y - l.u(10), flip: true, dip: 9 };
     else if (goal === 'wait') pose = { x: h.x, y: Math.min(h.y, l.y(700)) - l.u(44), flip: h.flipX, faded: true };
     else {
       const p = this.slotPos(goal);
@@ -9627,7 +9633,7 @@ class Battle extends Phaser.Scene {
       for (const p of this.scryPips) p.destroy();
       this.scryPips = [];
       for (let i = 0; i < total; i++) {
-        this.scryPips.push(ssTxt(this, l.x(-150) + l.u((i - (total - 1) / 2) * 15), l.y(769), '☄', l.u(13), '#ffd77a').setOrigin(0.5));
+        this.scryPips.push(ssTxt(this, l.x(-150) + l.u((i - (total - 1) / 2) * 15), l.y(781), '☄', l.u(13), '#ffd77a').setOrigin(0.5));
       }
     }
     // the cinder stays LEGIBLE on the dark button — a spent charge must read
