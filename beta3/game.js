@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.103.0';
+const BUILD = 'STARSPELL v0.104.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -8019,10 +8019,16 @@ class Battle extends Phaser.Scene {
     }
 
     txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);
-    // framed troughs + gradient fills; progress is a setCrop in updateBars
+    // framed troughs + gradient fills; progress is a setCrop in the draw fns
     this.add.image(l.x(-152), l.y(68), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(254), l.u(15));
     this.hpBar = this.add.image(l.x(-150), l.y(68), 'barfill-gold').setOrigin(0, 0.5).setDisplaySize(l.u(250), l.u(9));
     this.hpT = txt(l.x(190), l.y(68), '', 12).setOrigin(1, 0.5);
+    // what the player bar SHOWS — trails run.hp while a strike's number is in
+    // flight (playerHit holds it, then drains it slow), exactly the enemy
+    // bar's ehpShown law mirrored. hpHold marks that in-flight window.
+    this.hpShown = { v: this.run.hp };
+    this.hpHold = false;
+    this._php = null;
 
     // the frontier flags' ground (v0.77.0): built just under the beast so a
     // planted flag stands IN the sky, never over the constellation's face —
@@ -8034,15 +8040,24 @@ class Battle extends Phaser.Scene {
     // trough + fill + numbers live in one container so a heavy hit can shake
     // the whole bar as a unit
     this.ehpC = this.add.container(0, 0);
-    const eTrough = this.add.image(l.x(-112), l.y(322), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(224), l.u(13));
-    this.ehpBar = this.add.image(l.x(-110), l.y(322), 'barfill-rose').setOrigin(0, 0.5).setDisplaySize(l.u(220), l.u(8));
+    // the beast's health, unmissable (v0.104.0, Skylar 9/22): a wider, taller
+    // trough and a numeral a player reads at arm's length — the flying damage
+    // number lands HERE, teaching where the beast's health lives
+    const eTrough = this.add.image(l.x(-130), l.y(321), 'bartrough').setOrigin(0, 0.5).setDisplaySize(l.u(260), l.u(19));
+    this.ehpBar = this.add.image(l.x(-128), l.y(321), 'barfill-rose').setOrigin(0, 0.5).setDisplaySize(l.u(256), l.u(13));
     // numeric HP on the bar itself — players plan lethal ("15 left, build 15+")
-    this.ehpT = txt(l.x(0), l.y(321), '', 11, '#ffe9e0')
-      .setOrigin(0.5).setShadow(0, l.u(1), 'rgba(16,4,12,0.95)', l.u(2.5));
+    this.ehpT = txt(l.x(0), l.y(321), '', 16, '#ffe9e0')
+      .setOrigin(0.5).setShadow(0, l.u(1.5), 'rgba(16,4,12,0.95)', l.u(3));
     this._ehpStr = null;   // scene restarts reuse this instance — never let a stale cache mute the fresh text
     this.ehpC.add([eTrough, this.ehpBar, this.ehpT]);
-    this.strikeRib = this.add.image(l.x(0), l.y(342), 'ribbon').setAlpha(0);
-    this.strikeT = txt(l.x(0), l.y(342), '', 12, '#e6a2a2').setOrigin(0.5);
+    // the strike fuse: an ember glow breathes behind the ribbon while the
+    // NEXT cast is the strike (the count-1 alarm, run by updateBars)
+    this.strikeGlow = this.add.image(l.x(0), l.y(343), 'glowbig').setDisplaySize(l.u(240), l.u(52))
+      .setTint(0xff5a48).setBlendMode('ADD').setAlpha(0);
+    this.strikeRib = this.add.image(l.x(0), l.y(343), 'ribbon').setAlpha(0);
+    this.strikeT = txt(l.x(0), l.y(343), '', 15, '#e6a2a2').setOrigin(0.5);
+    this.strikeAlarm = null;
+    this._strikeCnt = null;
 
     this.lineC = this.add.container(l.x(0), l.y(372));
     this.lineHint = txt(l.x(0), l.y(372), 'tap letters to weave a word', 12, '#5a6390').setOrigin(0.5).setAlpha(0.9);
@@ -8858,6 +8873,7 @@ class Battle extends Phaser.Scene {
     // what the bar/numbers SHOW — trails hpNow, catching up when a flying
     // damage number lands on the bar
     this.ehpShown = { v: this.beast.hpNow };
+    this._strikeCnt = null;   // a fresh fight's first fuse paint never pulses
     this.dying = false;
     this.beast.count = this.beast.timer;
     this.run.firstUsed = false;
@@ -8921,16 +8937,39 @@ class Battle extends Phaser.Scene {
   }
   updateBars() {
     const l = this.L;
-    const crop = (bar, f) => bar.setCrop(0, 0, bar.frame.width * clamp(f, 0, 1), bar.frame.height);
-    crop(this.hpBar, this.run.hp / this.run.hpMax);
-    this.hpT.setText(this.run.hp + ' / ' + this.run.hpMax);
+    // the player bar renders the SHOWN hp: outside a staged strike beat the
+    // shown value follows truth silently (heals, fight resets, rebuilds);
+    // during one — hpHold up, or the drain tween running — the beat owns it
+    if (!this.hpHold && !this.tweens.isTweening(this.hpShown)) this.hpShown.v = this.run.hp;
+    this.drawPhp();
     this.drawEhp();
-    this.strikeT.setText(this.beast.hpNow > 0 ? '✦ strikes in ' + this.beast.count + (this.beast.count === 1 ? ' cast ✦' : ' casts ✦') : '');
-    this.strikeT.setColor(this.beast.count === 1 && this.beast.hpNow > 0 ? '#ff8a70' : '#e6a2a2');
+    const alive = this.beast.hpNow > 0;
+    this.strikeT.setText(alive ? SS_T(this.beast.count === 1 ? 'strikeIn1' : 'strikeIn', this.beast.count) : '');
+    this.strikeT.setColor(this.beast.count === 1 && alive ? '#ff8a70' : '#e6a2a2');
     this.strikeRib.setAlpha(this.strikeT.text ? 0.9 : 0);
-    if (this.strikeT.text) this.strikeRib.setDisplaySize(this.strikeT.width + l.u(26), l.u(19));
+    if (this.strikeT.text) {
+      this.strikeRib.setDisplaySize(this.strikeT.width + l.u(30), l.u(22));
+      this.strikeGlow.setDisplaySize(this.strikeT.width + l.u(70), l.u(52));
+    }
+    // the count-1 alarm: while the NEXT cast is the strike, an ember glow
+    // breathes behind the ribbon — killed on any other count so a fresh
+    // fight or a re-armed fuse never inherits it
+    const alarm = alive && this.beast.count === 1;
+    if (alarm && !this.strikeAlarm) {
+      this.strikeGlow.setAlpha(0.18);
+      this.strikeAlarm = this.tweens.add({ targets: this.strikeGlow, alpha: 0.6, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    } else if (!alarm && this.strikeAlarm) {
+      this.strikeAlarm.remove(); this.strikeAlarm = null;
+      this.strikeGlow.setAlpha(0);
+    }
+    // the fuse is FELT: any change of the counter pops the ribbon — hot when
+    // it burns down a step, cool when the beast re-arms after striking. The
+    // null sentinel keeps a fight's first paint (and a cleared line) quiet.
+    const cnt = alive ? this.beast.count : null;
+    if (cnt !== null && this._strikeCnt !== null && cnt !== this._strikeCnt) this.strikePulse(cnt < this._strikeCnt);
+    this._strikeCnt = cnt;
     // telegraph: the constellation charges as the strike counter fills
-    if (this.beastFx) this.beastFx.setThreat(this.beast.hpNow > 0
+    if (this.beastFx) this.beastFx.setThreat(alive
       ? (this.beast.timer - this.beast.count) / Math.max(1, this.beast.timer - 1) : 0);
     // while a damage number is in flight the tally animation owns the counter
     if (!this.scoreAnim) this.scoreT.setText(String(this.runScore()));
@@ -8951,6 +8990,57 @@ class Battle extends Phaser.Scene {
     if (!atRest && now - (this._ehpTextAt || 0) < 45) return;
     this._ehpStr = s; this._ehpTextAt = now;
     this.ehpT.setText(s);
+  }
+  // the player bar renders the same way — shown trails truth through a
+  // strike's staged beat, with the identical ~20Hz text-repaint economy
+  drawPhp() {
+    const shown = Math.max(0, Math.round(this.hpShown.v));
+    this.hpBar.setCrop(0, 0, this.hpBar.frame.width * clamp(shown / this.run.hpMax, 0, 1), this.hpBar.frame.height);
+    const s = shown + ' / ' + this.run.hpMax;
+    if (s === this._php) return;
+    const now = performance.now();
+    const atRest = shown === Math.max(0, this.run.hp) || shown === 0;
+    if (!atRest && now - (this._phpAt || 0) < 45) return;
+    this._php = s; this._phpAt = now;
+    this.hpT.setText(s);
+  }
+  /* the drain's body (v0.104.0 — the versus hp engine's dress, ported to the
+     cropped-image bars): the lost chunk stands on the bar as a pale ghost
+     slice and fades out, while the fill itself flinches — a lowering bar is
+     FELT, not just repainted. f0/f1 are fill fractions, old > new. */
+  barGhost(bar, f0, f1, tint) {
+    f0 = clamp(f0, 0, 1); f1 = clamp(f1, 0, 1);
+    if (f0 - f1 < 0.004) return;
+    const g = this.add.rectangle(bar.x + bar.displayWidth * f1, bar.y, bar.displayWidth * (f0 - f1), bar.displayHeight, tint, 0.5)
+      .setOrigin(0, 0.5).setDepth(30);
+    this.tweens.add({ targets: g, alpha: 0, duration: 700, ease: 'Sine.easeIn', onComplete: () => g.destroy() });
+    this.tweens.killTweensOf(bar);
+    bar.setAlpha(1);
+    this.tweens.add({ targets: bar, alpha: 0.55, duration: 90, yoyo: true });
+  }
+  /* every change of the strike counter pops the fuse so the burn-down is
+     never missed (Skylar 9/22). Ribbon rides displayWidth/Height — never
+     tween scale on a setDisplaySize'd image — sized from truth, not from a
+     possibly mid-pulse displayWidth. Fired only by updateBars, right after
+     it re-set the ribbon's base size. */
+  strikePulse(hot) {
+    if (!this.strikeT.text) return;
+    const l = this.L;
+    this.tweens.killTweensOf([this.strikeT, this.strikeRib]);
+    this.strikeT.setScale(1);
+    this.tweens.add({ targets: this.strikeT, scale: hot ? 1.45 : 1.2, duration: 160, ease: 'Back.easeOut', yoyo: true });
+    const rw = this.strikeT.width + l.u(30), rh = l.u(22);
+    this.strikeRib.setDisplaySize(rw, rh);
+    this.tweens.add({
+      targets: this.strikeRib, displayWidth: rw * 1.12, displayHeight: rh * 1.3, duration: 160, yoyo: true,
+      onComplete: () => this.strikeRib.setDisplaySize(rw, rh),
+    });
+    // a hot step flares the ember glow once (the count-1 alarm owns it then)
+    if (hot && !this.strikeAlarm) {
+      this.tweens.killTweensOf(this.strikeGlow);
+      this.strikeGlow.setAlpha(0.45);
+      this.tweens.add({ targets: this.strikeGlow, alpha: 0, duration: 420, ease: 'Sine.easeOut' });
+    }
   }
   runScore() { return this.run.totalDmg + this.run.longest.length * 15 + this.run.fightIdx * 50; }
   setBeastName(name) {
@@ -9035,17 +9125,20 @@ class Battle extends Phaser.Scene {
       this.tweens.add({ targets: st, alpha: 0, y: l.y(474), delay: 650, duration: 400, onComplete: () => st.destroy() });
     }
 
+    // the word rides to the beast a touch slower (v0.104.0, Skylar 9/22:
+    // "it needs to move slower") — 70ms stagger / 380ms flight, was 55/280;
+    // the impact gate below matches
     const tx = this.beastC.x - this.lineC.x, ty = this.beastC.y - this.lineC.y;
     this.lineTiles.forEach((mc, k) => {
       this.tweens.add({
         targets: mc, x: tx + (rng() - 0.5) * l.u(60), y: ty + (rng() - 0.5) * l.u(40),
-        scale: 0.25, alpha: 0.9, delay: k * 55, duration: 280, ease: 'Cubic.easeIn',
+        scale: 0.25, alpha: 0.9, delay: k * 70, duration: 380, ease: 'Cubic.easeIn',
         onUpdate: () => { if (Math.random() < 0.3) this.starBurst.emitParticleAt(this.lineC.x + mc.x, this.lineC.y + mc.y, 1); },
         onComplete: () => { this.starBurst.emitParticleAt(this.beastC.x + (rng() - 0.5) * l.u(60), this.beastC.y + (rng() - 0.5) * l.u(40), 4); mc.destroy(); },
       });
     });
 
-    this.time.delayedCall(this.sel.length * 55 + 320, () => {
+    this.time.delayedCall(this.sel.length * 70 + 420, () => {
       SFX.impact();
       this.cameras.main.shake(140, 0.006);
       if (this.hasSigil('salve') && letters >= 5) this.heal(this.sigVal('salve', 'heal'));
@@ -9099,19 +9192,21 @@ class Battle extends Phaser.Scene {
     // the hit beat: the damage pops big at center screen, slams up into the
     // enemy HP bar, and only when it lands does the bar drain + count down.
     // Then the same value arcs on from the bar to the score tally.
+    // v0.104.0 (Skylar 9/22): the pop far bigger (34 → 52) and quicker
+    // (190 → 120ms in), so the number is the beat's unmissable heart.
     const big = dmg >= 25;
-    const gk = ssGoldTex(this, String(dmg), 34);
+    const gk = ssGoldTex(this, String(dmg), 52);
     const nI = this.add.image(l.x(0), l.y(468), gk.key)
       .setDisplaySize(l.u(gk.w), l.u(gk.h)).setDepth(70);
     const sx = nI.scaleX, sy = nI.scaleY;
     nI.setScale(sx * 0.2, sy * 0.2).setAlpha(0);
     const pop = big ? 1.45 : 1.18;
-    this.tweens.add({ targets: nI, scaleX: sx * pop, scaleY: sy * pop, alpha: 1, duration: 190, ease: 'Back.easeOut' });
-    this.tweens.add({ targets: nI, scaleX: sx, scaleY: sy, delay: 190, duration: 130 });
-    const start = { x: nI.x, y: nI.y }, dst = { x: l.x(0), y: l.y(322) };
+    this.tweens.add({ targets: nI, scaleX: sx * pop, scaleY: sy * pop, alpha: 1, duration: 120, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: nI, scaleX: sx, scaleY: sy, delay: 120, duration: 110 });
+    const start = { x: nI.x, y: nI.y }, dst = { x: l.x(0), y: l.y(321) };
     const pt = { t: 0 };
     this.tweens.add({
-      targets: pt, t: 1, delay: 430, duration: 340, ease: 'Cubic.easeIn',
+      targets: pt, t: 1, delay: 400, duration: 320, ease: 'Cubic.easeIn',
       onUpdate: () => {
         nI.x = start.x + (dst.x - start.x) * pt.t;
         nI.y = start.y + (dst.y - start.y) * pt.t;
@@ -9129,10 +9224,12 @@ class Battle extends Phaser.Scene {
           this.tweens.add({ targets: this.ehpC, x: l.u(3), duration: 40, yoyo: true, repeat: 3, onComplete: () => this.ehpC.setX(0) });
         }
         // drain now — the number has landed. Landing always retargets the
-        // latest hpNow so chained casts stay truthful.
+        // latest hpNow so chained casts stay truthful. The drain runs slow
+        // enough to WATCH (300 → 560ms) and wears the ghost-slice dress.
+        this.barGhost(this.ehpBar, this.ehpShown.v / this.beast.hp, Math.max(0, this.beast.hpNow) / this.beast.hp, 0xffd0c9);
         this.tweens.killTweensOf(this.ehpShown);
         this.tweens.add({
-          targets: this.ehpShown, v: Math.max(0, this.beast.hpNow), duration: 300, ease: 'Cubic.easeOut',
+          targets: this.ehpShown, v: Math.max(0, this.beast.hpNow), duration: 560, ease: 'Cubic.easeOut',
           onUpdate: () => this.drawEhp(),
           onComplete: () => {
             this.drawEhp();
@@ -9140,6 +9237,49 @@ class Battle extends Phaser.Scene {
           },
         });
         this.flyScore(dst, dmg, from, to);
+      },
+    });
+  }
+
+  /* the blow lands ON the player (v0.104.0 — beastHit's grammar, mirrored):
+     a crimson number pops at the point of contact, holds a beat, flies up to
+     the player's health bar, and only when it lands does that bar drain —
+     560ms with the ghost-slice dress, so being struck is never ambiguous.
+     Runs AFTER the archetype's own animation delivered the hit (land()), so
+     every beast's signature motion keeps its character. onDone fires when
+     the drain settles — the death path rides it into endRun. */
+  playerHit(atk, mult, boss, onDone) {
+    const l = this.L;
+    const big = boss || atk >= 15;
+    const nT = ssTxt(this, l.x(0), l.y(468), '−' + atk, l.u(big ? 34 : 30), '#ff9a8a')
+      .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#7a1420', l.u(10), true, true);
+    nT.setScale(0.2).setAlpha(0);
+    this.tweens.add({ targets: nT, scale: big ? 1.3 : 1.15, alpha: 1, duration: 120, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: nT, scale: 1, delay: 120, duration: 110 });
+    const start = { x: nT.x, y: nT.y }, dst = { x: l.x(-25), y: l.y(68) };
+    const pt = { t: 0 };
+    this.tweens.add({
+      targets: pt, t: 1, delay: 400, duration: 320, ease: 'Cubic.easeIn',
+      onUpdate: () => {
+        nT.x = start.x + (dst.x - start.x) * pt.t;
+        nT.y = start.y + (dst.y - start.y) * pt.t;
+        nT.setScale(1 - pt.t * 0.45);
+      },
+      onComplete: () => {
+        nT.destroy();
+        this.starBurst.emitParticleAt(dst.x, dst.y, big ? 6 : 3);
+        this.barGhost(this.hpBar, this.hpShown.v / this.run.hpMax, Math.max(0, this.run.hp) / this.run.hpMax, 0xffe6b8);
+        this.hpHold = false;
+        this.tweens.killTweensOf(this.hpShown);
+        this.tweens.add({
+          targets: this.hpShown, v: Math.max(0, this.run.hp), duration: 560, ease: 'Cubic.easeOut',
+          onUpdate: () => this.drawPhp(),
+          onComplete: () => {
+            this.hpShown.v = Math.max(0, this.run.hp);
+            this.drawPhp();
+            if (onDone) onDone();
+          },
+        });
       },
     });
   }
@@ -9479,6 +9619,7 @@ class Battle extends Phaser.Scene {
       const vt = ssTxt(this, l.x(64), l.y(214), '−' + vd, l.u(15), '#9fe87a').setOrigin(0.5).setDepth(70)
         .setShadow(0, 0, '#3a8a2a', l.u(8), true, true);
       this.tweens.add({ targets: vt, alpha: 0, y: l.y(190), delay: 500, duration: 450, onComplete: () => vt.destroy() });
+      this.barGhost(this.ehpBar, this.ehpShown.v / this.beast.hp, Math.max(0, this.beast.hpNow) / this.beast.hp, 0xd9f2c9);
       this.tweens.killTweensOf(this.ehpShown);
       this.tweens.add({ targets: this.ehpShown, v: Math.max(0, this.beast.hpNow), duration: 240, onUpdate: () => this.drawEhp() });
       if (this.beast.hpNow <= 0) {
@@ -9543,9 +9684,10 @@ class Battle extends Phaser.Scene {
         this.tweens.add({ targets: st, alpha: 0, y: l.y(220), delay: 700, duration: 400, onComplete: () => st.destroy() });
       }
       if (this.hasSigil('ward')) atk = Math.max(1, atk - this.sigVal('ward', 'cut'));
+      // the bar HOLDS its value while the blow's number flies to it — the
+      // beast side's grammar mirrored (playerHit releases the hold)
+      this.hpHold = true;
       this.run.hp -= atk;
-      const dt = ssTxt(this, l.x(-160), l.y(68), '-' + atk, l.u(22), '#ff8a8a').setOrigin(0.5).setDepth(70);
-      this.tweens.add({ targets: dt, y: dt.y + l.u(30), alpha: 0, duration: 800, onComplete: () => dt.destroy() });
       if (this.run.hp <= 0 && this.hasSigil('feather') && !this.run.featherUsed) {
         this.run.featherUsed = true;
         this.run.hp = Math.min(this.sigVal('feather', 'revive'), this.run.hpMax);
@@ -9569,13 +9711,17 @@ class Battle extends Phaser.Scene {
         });
       }
       this.updateBars();
-      if (this.run.hp <= 0) this.endRun(false);
-      else {
-        // dew gathers where the blow fell — one plain tile greens, a beat
-        // after the hit reads (never in versus: VsBattle has its own strike)
-        this.time.delayedCall(260, () => { if (this.state !== 'end' && this.scene.isActive()) this.dewTile(); });
-        done();
-      }
+      // the blow LANDS on the player (v0.104.0, Skylar 9/22): its number
+      // pops at the point of contact, flies to the player's bar at the top,
+      // and only then does that bar drain — slow enough to watch
+      this.playerHit(atk, mult, boss, () => {
+        if (this.run.hp <= 0 && this.state !== 'end') this.endRun(false);
+      });
+      if (this.run.hp <= 0) return;   // the beat carries the death — endRun fires when the bar lands empty
+      // dew gathers where the blow fell — one plain tile greens, a beat
+      // after the hit reads (never in versus: VsBattle has its own strike)
+      this.time.delayedCall(260, () => { if (this.state !== 'end' && this.scene.isActive()) this.dewTile(); });
+      done();
     };
     if (this.beastFx && this.beastFx.ready) this.beastFx.attack(land);
     else {   // struck before the constellation finished assembling — plain lunge
