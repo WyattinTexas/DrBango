@@ -16,6 +16,7 @@ const SS_STR = {
     act1: 'ACT I · THE MEADOW SKY', act2: 'ACT II · THE DEEP NIGHT',
     act3: 'ACT III · THE CROWN OF DAWN', act4: 'ACT IV · THE ENDLESS HUNT',
     tBoss: 'BOSS', tElite: 'ELITE',
+    bossHerald: 'A MIGHTY BEAST APPEARS',
     strikeIn: '✦ strikes in %1 casts ✦', strikeIn1: '✦ strikes in 1 cast ✦',
     cont: 'CONTINUE', fightN: 'fight %1 of 5',
     quick: 'QUICK PLAY',
@@ -163,6 +164,7 @@ const SS_STR = {
     act1: 'ACTO I · EL CIELO DEL PRADO', act2: 'ACTO II · LA NOCHE PROFUNDA',
     act3: 'ACTO III · LA CORONA DEL ALBA', act4: 'ACTO IV · LA CACERÍA SIN FIN',
     tBoss: 'JEFE', tElite: 'ÉLITE',
+    bossHerald: 'APARECE UNA BESTIA PODEROSA',
     strikeIn: '✦ golpea en %1 palabras ✦', strikeIn1: '✦ golpea en 1 palabra ✦',
     beast: {
       vulpes: 'EL ZORRO DE ASCUAS', lepus: 'LA LIEBRE DE LUNA', serpens: 'LA SERPIENTE DE MAREA',
@@ -388,6 +390,7 @@ const SS_STR = {
     act1: 'ACTE I · LE CIEL DU PRÉ', act2: 'ACTE II · LA NUIT PROFONDE',
     act3: 'ACTE III · LA COURONNE DE L\'AUBE', act4: 'ACTE IV · LA CHASSE SANS FIN',
     tBoss: 'BOSS', tElite: 'ÉLITE',
+    bossHerald: 'UNE BÊTE PUISSANTE APPARAÎT',
     strikeIn: '✦ frappe dans %1 mots ✦', strikeIn1: '✦ frappe au prochain mot ✦',
     beast: {
       vulpes: 'LE RENARD DE BRAISE', lepus: 'LE LIÈVRE DE LUNE', serpens: 'LE SERPENT DES MARÉES',
@@ -613,6 +616,7 @@ const SS_STR = {
     act1: 'ATO I · O CÉU DO PRADO', act2: 'ATO II · A NOITE PROFUNDA',
     act3: 'ATO III · A COROA DA ALVORADA', act4: 'ATO IV · A CAÇADA SEM FIM',
     tBoss: 'CHEFE', tElite: 'ELITE',
+    bossHerald: 'UMA FERA PODEROSA SURGE',
     strikeIn: '✦ ataca em %1 palavras ✦', strikeIn1: '✦ ataca em 1 palavra ✦',
     beast: {
       vulpes: 'A RAPOSA DE BRASAS', lepus: 'A LEBRE ENLUARADA', serpens: 'A SERPENTE DAS MARÉS',
@@ -838,6 +842,7 @@ const SS_STR = {
     act1: 'AKT I · DER WIESENHIMMEL', act2: 'AKT II · DIE TIEFE NACHT',
     act3: 'AKT III · DIE KRONE DER MORGENRÖTE', act4: 'AKT IV · DIE ENDLOSE JAGD',
     tBoss: 'BOSS', tElite: 'ELITE',
+    bossHerald: 'EINE MÄCHTIGE BESTIE ERSCHEINT',
     strikeIn: '✦ schlägt in %1 Worten zu ✦', strikeIn1: '✦ schlägt beim nächsten Wort zu ✦',
     beast: {
       vulpes: 'DER GLUTFUCHS', lepus: 'DER MONDHASE', serpens: 'DIE GEZEITENSCHLANGE',

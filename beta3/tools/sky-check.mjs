@@ -72,7 +72,7 @@ for (const k of ['mapTitle:', 'mapHint:', 'mapDest:']) {
 ok('LAW 1 · the s%3 list-position size deal is GONE from the chart', !/9\.5 : 6\.4/.test(gsrc) && !/s % 3 === 0 \? 9\.5/.test(gsrc));
 ok('LAW 1+6 · one resolver, one radius table, one override door, one grades table',
   /function ssStarMags\(/.test(gsrc) && /SS_MAG_R = \{ 1: 4\.2, 2: 2\.8, 3: 1\.9 \}/.test(gsrc)
-  && /const SS_MAG_OVR = /.test(gsrc) && /SS_STAR_GRADES = \{ versus: \[0\.20, 0\.35\], chart: \[0\.38, 0\.44, 0\.52\], showcase: 0\.80, battle: 1\.15 \}/.test(gsrc));
+  && /const SS_MAG_OVR = /.test(gsrc) && /SS_STAR_GRADES = \{ versus: \[0\.22, 0\.56\], chart: \[0\.38, 0\.44, 0\.52\], showcase: 0\.80, battle: 1\.15 \}/.test(gsrc));
 ok('LAW 6 · the chart consumes the grade triple through the resolver and the served line',
   /SS_STAR_GRADES\.chart/.test(chart) && /ssStarMags\(b\)/.test(chart) && /ssEdgeSeg\(b\.stars\[e1\], b\.stars\[e2\], SS_MAG_R\[mags\[e1\]\], SS_MAG_R\[mags\[e2\]\]/.test(chart));
 ok('LAW 3 · no raw-coord lineBetween survives in the chart draw', !/lineBetween\(gx \+ b\.stars/.test(chart));
@@ -120,7 +120,7 @@ ok('the twinkle runs by class, never by scale threshold (anchors steadier kept �
   && /scale: mag \* tw\[0\], alpha: tw\[1\]/.test(gsrc) && !/mag < 0\.8 \?/.test(gsrc));
 ok('LAW 6 · all three assembly surfaces read their grades from the one table',
   /l\.u\(SS_STAR_GRADES\.showcase\)/.test(gsrc) && /l\.u\(SS_STAR_GRADES\.battle\)/.test(gsrc)
-  && /l\.u\(SS_STAR_GRADES\.versus\[n === 1 \? 1 : 0\]\)/.test(vsrc));
+  && /l\.u\(SS_STAR_GRADES\.versus\[one \? 1 : 0\]\)/.test(vsrc));
 ok('LAW 3 · the assembly\'s initial draw serves through ssEdgeSeg with round caps; its raw star-coord lineBetween is gone',
   /ssEdgeSeg\(beast\.stars\[a\], beast\.stars\[b\], SS_MAG_R\[mags\[a\]\], SS_MAG_R\[mags\[b\]\]\)/.test(gsrc)
   && !/lineBetween\(beast\.stars\[a\]\[0\] \* sc/.test(gsrc));
@@ -474,7 +474,7 @@ ok('LAW 5+6 · the state, core, line and grade tables stand exactly as ruled', a
   { won: { 1: 0.96, 2: 0.9, 3: 0.8 }, now: { 1: 1, 2: 0.96, 3: 0.86 }, far: { 1: 0.65, 2: 0.5, 3: 0.34 } },
   { lit: { 1: 0.95, 2: 0.55 }, far: { 1: 0.55, 2: 0.3 } },
   { won: 0.38, now: 0.55, far: 0.22 },
-  { versus: [0.20, 0.35], chart: [0.38, 0.44, 0.52], showcase: 0.80, battle: 1.15 }, {}])`));
+  { versus: [0.22, 0.56], chart: [0.38, 0.44, 0.52], showcase: 0.80, battle: 1.15 }, {}])`));
 // law 4 · the glow census on the SETTLED chart tree: aura + beacon, nothing else
 await tapObj(`${H}.rowLabels.campaign`);
 await until(`!!${H}.mapC && ${MAP}.settled === true`, 9000, 100);

@@ -119,6 +119,8 @@ class SynthAudio {
   impact() { this.noise(0.16, 300, 1, 0.2); this.tone(180, 0.18, 'sine', 0.18, 0, 70); }
   bigWord() { [784, 987.8, 1174.7, 1568].forEach((f, i) => this.tone(f, 0.5, 'sine', 0.08, i * 0.06)); this.noise(0.6, 2000, 2, 0.06, 5000); }
   forge() { this.tone(880, 0.3, 'sine', 0.1); this.tone(1318.5, 0.45, 'sine', 0.09, 0.09); }
+  // the boss herald (v0.106.0): a dark falling wind and a deep settling answer
+  herald() { this.sweep(420, 70, 1.15, 0.11, true); this.tone(92, 1.0, 'sine', 0.09, 0.1, 58); this.tone(46, 1.2, 'triangle', 0.05, 0.15); }
   // the forge's mirror: a quiet descending shimmer — an unspent bonus tile
   // drains back to plain (must never overpower the cast/impact it rides under)
   // the dew: two soft sines, a drop and its ring — the forge chime's gentler cousin

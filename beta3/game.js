@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.105.0';
+const BUILD = 'STARSPELL v0.106.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -5691,6 +5691,153 @@ function ssDomInput(scene, inp, commit, commitOnShutdown) {
    Entering a battle rises through the dusk to the zenith.
    A cold boot opens at the zenith and settles down (playIntro).
    ============================================================ */
+/* ---- A MIGHTY BEAST APPEARS (v0.106.0) -----------------------------------
+   The boss herald. Clicking a BOSS on the campaign star chart interposes one
+   full-screen beat before the battle: the night holds, the beast's own figure
+   looms dim in its tint — eyes lit, still veiled in dark — and the line lands
+   in gold. Then the screen fades away and the fight's own assembly (stars
+   flying in, the v0.21 boss halo) is the actual arrival: the herald announces,
+   the battle materializes. Both chart doors speak it — the home door at the
+   top of the rise (Battle.create defers startFight behind it), the
+   between-fights door in place of its straight cut to startFight.
+   Laws it keeps: it NEVER strands (try/catch → done at once; a watchdog force-
+   finishes; done is idempotent; a scene restart mid-beat re-creates into the
+   battle because the ascent's herald flag is consumed at init) · tap-to-skip
+   arms via delayedCall (the v0.3.3 launching-tap law) · the demo solver rides
+   a fast skip unaided · reduce-motion gets quiet fades, no breathing. */
+function ssBossHerald(scene, f, done, opts) {
+  opts = opts || {};
+  let fin = false, parting = false;
+  const bea = window.__ssherald = {
+    on: true, id: f && f.id, door: opts.door || '?', shown: false, skipped: false, done: false, t: Date.now(),
+  };
+  const finish = () => {
+    if (fin) return;
+    fin = true;
+    bea.done = true;
+    try { done(); } catch (e) { DIAG('herald done FAILED: ' + (e && e.message || '?')); }
+  };
+  let c = null;
+  try {
+    const l = ssLayout(scene);
+    const b = SS_BEASTS[f.id];
+    const um = !!f.umbral && f.id !== 'phoenix';        // beastFor's umbral rule
+    const name = (um ? SS_UMBRAL.prefix : '') + b.name;
+    const tint = um ? SS_UMBRAL.tint : b.tint;
+    const eye = um ? SS_UMBRAL.eye : b.eye;
+    const rm = ssReduceMotion();
+    c = scene.add.container(0, 0).setDepth(940);
+    c.once('destroy', () => { bea.on = false; });
+    // the night itself — opaque, and the plate eats every tap beneath the beat
+    const plate = scene.add.image(l.W / 2, l.H / 2, ssMapSkyTex(scene)).setDisplaySize(l.W, l.H)
+      .setScrollFactor(0).setInteractive();
+    c.add(plate);
+    // still star dust, unlit — the stage, not the show
+    for (let i = 0; i < 12; i++) {
+      const sz = l.u(1.2 + Math.random() * 1.8);
+      c.add(scene.add.image(Math.random() * l.W, Math.random() * l.H, 'dot')
+        .setDisplaySize(sz, sz).setScrollFactor(0).setAlpha(0.08 + Math.random() * 0.2));
+    }
+    // the figure LOOMS: every boss fills the stage — scaled off its own star
+    // bounds so a compact owl and a sprawling archer press equally close
+    let mxX = 0, mxY = 0;
+    for (const s of b.stars) { mxX = Math.max(mxX, Math.abs(s[0])); mxY = Math.max(mxY, Math.abs(s[1])); }
+    const sc = Math.max(0.9, Math.min(1.5, 130 / Math.max(1, mxX), 110 / Math.max(1, mxY)));
+    const k = l.u(sc);
+    // the beast's own nebula, breathing in its tint
+    const glow = scene.add.image(l.x(0), l.y(315), 'glowbig')
+      .setDisplaySize(l.u(mxX * sc * 2 + 190), l.u(mxY * sc * 2 + 170))
+      .setTint(tint).setAlpha(0).setBlendMode('ADD').setScrollFactor(0);
+    c.add(glow);
+    // the figure: the constellation drawn DIM — three magnitudes, served lines
+    // (LAW 3), no white-hot cores; the beast is here but not yet arrived. The
+    // assembly in the battle stays the one true materialization.
+    const mags = ssStarMags(b);
+    const fig = scene.add.graphics({ x: l.x(0), y: l.y(315) }).setScrollFactor(0).setAlpha(0);
+    const lineC = ssTintUp(tint, 0.35);
+    fig.lineStyle(2.2 * k, lineC, 0.3);
+    fig.fillStyle(lineC, 0.3);
+    for (const [e1, e2] of b.edges) {
+      const seg = ssEdgeSeg(b.stars[e1], b.stars[e2], SS_MAG_R[mags[e1]], SS_MAG_R[mags[e2]]);
+      if (!seg) continue;
+      fig.lineBetween(seg.x1 * k, seg.y1 * k, seg.x2 * k, seg.y2 * k);
+      fig.fillCircle(seg.x1 * k, seg.y1 * k, 1.1 * k);
+      fig.fillCircle(seg.x2 * k, seg.y2 * k, 1.1 * k);
+    }
+    const discC = { 1: ssTintUp(tint, 0.25), 2: ssTintUp(tint, 0.12), 3: tint };
+    for (let s = 0; s < b.stars.length; s++) {
+      const m = mags[s], px = b.stars[s][0] * k, py = b.stars[s][1] * k;
+      fig.fillStyle(discC[m], m === 1 ? 0.72 : m === 2 ? 0.55 : 0.4);
+      fig.fillCircle(px, py, SS_MAG_R[m] * k);
+    }
+    c.add(fig);
+    // the waking eyes — the one lit thing on the body, breathing
+    const eyeG = scene.add.graphics({ x: l.x(0), y: l.y(315) }).setScrollFactor(0).setAlpha(0);
+    for (const e of b.eyes) {
+      eyeG.fillStyle(eye, 0.35); eyeG.fillCircle(e[0] * k, e[1] * k, 4.5 * k);
+      eyeG.fillStyle(eye, 1); eyeG.fillCircle(e[0] * k, e[1] * k, 2.2 * k);
+    }
+    c.add(eyeG);
+    // the line, struck in gold — and the beast's name beneath it, in its tint
+    const gk = ssGoldTex(scene, SS_T('bossHerald'), 21);
+    const gsc = Math.min(1, 350 / gk.w);
+    const lineI = scene.add.image(l.x(0), l.y(492), gk.key)
+      .setDisplaySize(l.u(gk.w * gsc), l.u(gk.h * gsc)).setScrollFactor(0).setAlpha(0);
+    c.add(lineI);
+    const subT = ssTxt(scene, l.x(0), l.y(528), name, l.u(11.5), '#' + tint.toString(16).padStart(6, '0'), 'italic')
+      .setOrigin(0.5).setScrollFactor(0).setAlpha(0);
+    c.add(subT);
+
+    // the timeline — every step guards on the container's life and the part
+    const step = (ms, fn) => scene.time.delayedCall(ms, () => { if (c.active && !parting) fn(); });
+    const part = () => {
+      if (parting || !c.active) return;
+      parting = true;
+      finish();   // the battle wakes NOW — the assembly rises as the veil parts
+      scene.tweens.add({
+        targets: c, alpha: 0, duration: rm ? 300 : 480, ease: 'Sine.easeIn',
+        onComplete: () => { if (c.active) c.destroy(); },
+      });
+    };
+    if (opts.fadeIn) {   // the between-fights door: the herald rises over the fading chart
+      c.setAlpha(0);
+      scene.tweens.add({ targets: c, alpha: 1, duration: opts.fadeIn, ease: 'Sine.easeOut' });
+    }
+    step(rm ? 60 : 200, () => {
+      try { SFX.herald(); } catch (e) { }
+      const arriveMs = rm ? 240 : 460;
+      scene.tweens.add({ targets: [glow, fig, eyeG], alpha: { getEnd: (t) => t === glow ? 0.12 : 1 }, duration: arriveMs, ease: 'Sine.easeOut' });
+      if (!rm) {
+        scene.tweens.add({ targets: glow, alpha: 0.16, duration: 2000, yoyo: true, repeat: -1, delay: arriveMs, ease: 'Sine.easeInOut' });
+        scene.tweens.add({ targets: eyeG, alpha: 0.55, duration: 700, yoyo: true, repeat: -1, delay: arriveMs, ease: 'Sine.easeInOut' });
+      }
+    });
+    step(640, () => {
+      bea.shown = true;
+      try { SFX.forge(); } catch (e) { }
+      if (rm) { scene.tweens.add({ targets: lineI, alpha: 1, duration: 240 }); return; }
+      const bw = lineI.displayWidth, bh = lineI.displayHeight;   // never tween scale on setDisplaySize'd images
+      lineI.setDisplaySize(bw * 1.16, bh * 1.16).setAlpha(0);
+      scene.tweens.add({ targets: lineI, displayWidth: bw, displayHeight: bh, alpha: 1, duration: 340, ease: 'Back.easeOut' });
+    });
+    step(960, () => scene.tweens.add({ targets: subT, alpha: 0.95, duration: 300 }));
+    // the skip arms only after the entering tap has fully cleared (v0.3.3)
+    scene.time.delayedCall(380, () => {
+      if (!c.active || parting) return;
+      plate.on('pointerdown', () => { if (!parting) { bea.skipped = true; part(); } });
+    });
+    scene.time.delayedCall(DEMO ? 460 : 2350, part);       // the beat lets itself out
+    scene.time.delayedCall(4400, () => {                   // the watchdog: NEVER strand the run
+      if (!fin) { DIAG('herald watchdog fired'); finish(); }
+      if (c && c.active) c.destroy();
+    });
+  } catch (e) {
+    DIAG('herald FAILED: ' + (e && e.message || '?'));     // the beat must never cost the battle
+    if (c && c.active) c.destroy();
+    finish();
+  }
+}
+
 let PENDING_ASCENT = null;   // survives a mid-ascent resize-restart: finish to battle
 let INTRO_SEEN = false;      // once per page load — a rotation restart must not replay it
 // The language sheet reloads the page to re-render every baked string; sitting
@@ -7560,7 +7707,9 @@ class Home extends Phaser.Scene {
     SFX.ui();
     const resume = mode === 'campaign' ? this.campaignCheckpoint()
       : mode === 'endless' ? this.endlessCheckpoint() : null;
-    this.beginAscent({ mode, resume, ascended: true });
+    // campaign's one door is the chart — the herald flag marks "a node was
+    // clicked", and Battle heralds only when that node's beast is a boss
+    this.beginAscent({ mode, resume, ascended: true, herald: mode === 'campaign' ? 1 : 0 });
   }
 
   /* ---------- the rise (SKY-DESIGN §5) ---------- */
@@ -7741,7 +7890,15 @@ class Home extends Phaser.Scene {
 const SS_FTUE_TIP = { x: 0.0066, y: 0.7458 };
 class Battle extends Phaser.Scene {
   constructor() { super('battle'); }
-  init(data) { this.mode = data.mode || 'quick'; this.resume = data.resume || null; this.ascended = !!data.ascended; this.ftue = !!data.ftue; }
+  init(data) {
+    this.mode = data.mode || 'quick'; this.resume = data.resume || null; this.ascended = !!data.ascended; this.ftue = !!data.ftue;
+    // the boss herald rides the chart door's data and is CONSUMED here: a
+    // resize-restart mid-herald (or mid-fight) re-inits on the same data
+    // object and falls straight to the battle — the beat never replays and
+    // never strands (restart() with no args re-passes the original data)
+    this.heraldIn = !!(data && data.herald);
+    if (data && data.herald) data.herald = 0;
+  }
 
   create() {
     const tCr = performance.now();
@@ -7856,7 +8013,15 @@ class Battle extends Phaser.Scene {
     const tState = performance.now();
     this.buildUi();
     const tUi = performance.now();
-    this.startFight();
+    // A MIGHTY BEAST APPEARS (v0.106.0): a campaign entry that CLICKED a boss
+    // on the chart (the herald flag rode the ascent data) heralds at arrival —
+    // the fight itself wakes as the beat parts, so the assembly and the v0.21
+    // boss dress stay the one true materialization. Everything else fights at
+    // once, byte-for-byte the old way.
+    const hf = this.fights[this.run.fightIdx];
+    if (this.heraldIn && this.mode === 'campaign' && hf && SS_BEASTS[hf.id] && SS_BEASTS[hf.id].boss) {
+      ssBossHerald(this, hf, () => this.startFight(), { door: 'chart' });
+    } else this.startFight();
     const tEnd = performance.now();
     DIAG('battle create ' + Math.round(tEnd - tCr) + 'ms (sky ' + Math.round(tSky - tCr) +
       ' · state ' + Math.round(tState - tSky) + ' · ui ' + Math.round(tUi - tState) + ' · fight ' + Math.round(tEnd - tUi) + ')');
@@ -10162,7 +10327,13 @@ class Battle extends Phaser.Scene {
         if (this.state !== 'map') return;
         this.state = 'anim';
         this.tweens.add({ targets: chart.c, alpha: 0, duration: 220 });
-        this.time.delayedCall(240, () => { chart.c.destroy(); this.startFight(); });
+        // A MIGHTY BEAST APPEARS (v0.106.0): a boss node heralds — the beat
+        // rises over the dissolving chart and startFight waits for its part.
+        // Non-boss nodes keep the straight cut, byte-identical.
+        const nf = this.fights[this.run.fightIdx];
+        const boss = nf && SS_BEASTS[nf.id] && SS_BEASTS[nf.id].boss;
+        if (boss) ssBossHerald(this, nf, () => this.startFight(), { door: 'map', fadeIn: 320 });
+        this.time.delayedCall(240, () => { chart.c.destroy(); if (!boss) this.startFight(); });
       },
     });
     this.overlayC.add(chart.c);
