@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.106.0';
+const BUILD = 'STARSPELL v0.107.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -8192,9 +8192,12 @@ class Battle extends Phaser.Scene {
     this.hpT = txt(l.x(190), l.y(68), '', 12).setOrigin(1, 0.5);
     // what the player bar SHOWS — trails run.hp while a strike's number is in
     // flight (playerHit holds it, then drains it slow), exactly the enemy
-    // bar's ehpShown law mirrored. hpHold marks that in-flight window.
+    // bar's ehpShown law mirrored. hpHold COUNTS the blows in flight (the
+    // ~3s linger, v0.107.0, lets strikes overlap); hitPend books each one's
+    // damage so a landing drains only its own slice.
     this.hpShown = { v: this.run.hp };
-    this.hpHold = false;
+    this.hpHold = 0;
+    this.hitPend = [];
     this._php = null;
 
     // the frontier flags' ground (v0.77.0): built just under the beast so a
@@ -9408,25 +9411,38 @@ class Battle extends Phaser.Scene {
     });
   }
 
-  /* the blow lands ON the player (v0.104.0 — beastHit's grammar, mirrored):
-     a crimson number pops at the point of contact, holds a beat, flies up to
-     the player's health bar, and only when it lands does that bar drain —
-     560ms with the ghost-slice dress, so being struck is never ambiguous.
-     Runs AFTER the archetype's own animation delivered the hit (land()), so
-     every beast's signature motion keeps its character. onDone fires when
-     the drain settles — the death path rides it into endRun. */
+  /* the blow lands ON the player (v0.104.0 — beastHit's grammar, mirrored;
+     re-tuned v0.107.0, Skylar 9/23: "the amount it attacks for should be
+     visible and large for at least 2 seconds, then when it moves to the
+     player's health it needs to be slower"): a crimson number pops LARGE at
+     the point of contact, LINGERS readable — breathing faintly — for a full
+     two seconds, then flies up to the player's health bar slower than any
+     cast, and only when it lands does that bar drain — 560ms with the
+     ghost-slice dress. The long beat lets blows overlap (a queued strike,
+     hard's clock): each number is its own actor — a later blow seats its
+     number a step higher, the hold is counted, and a landing drains the bar
+     only to ITS truth (live hp plus every blow still in the air), so no
+     blow's damage ever shows before its own number has landed. Runs AFTER
+     the archetype's own animation delivered the hit (land()). onDone fires
+     when the drain settles — the death path rides the landing that empties
+     the bar into endRun. */
   playerHit(atk, mult, boss, onDone) {
     const l = this.L;
     const big = boss || atk >= 15;
-    const nT = ssTxt(this, l.x(0), l.y(468), '−' + atk, l.u(big ? 34 : 30), '#ff9a8a')
-      .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#7a1420', l.u(10), true, true);
+    const others = Math.max(0, (this.hitPend ? this.hitPend.length : 1) - 1);
+    const nT = ssTxt(this, l.x(0), l.y(468) - l.u(44) * Math.min(others, 2), '−' + atk, l.u(big ? 54 : 46), '#ff9a8a')
+      .setOrigin(0.5).setDepth(70).setShadow(0, 0, '#7a1420', l.u(12), true, true);
     nT.setScale(0.2).setAlpha(0);
     this.tweens.add({ targets: nT, scale: big ? 1.3 : 1.15, alpha: 1, duration: 120, ease: 'Back.easeOut' });
     this.tweens.add({ targets: nT, scale: 1, delay: 120, duration: 110 });
+    // the linger breathes so two held seconds read alive, never frozen
+    const breath = ssReduceMotion() ? null
+      : this.tweens.add({ targets: nT, scale: 1.05, delay: 260, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     const start = { x: nT.x, y: nT.y }, dst = { x: l.x(-25), y: l.y(68) };
     const pt = { t: 0 };
     this.tweens.add({
-      targets: pt, t: 1, delay: 400, duration: 320, ease: 'Cubic.easeIn',
+      targets: pt, t: 1, delay: 2200, duration: 780, ease: 'Cubic.easeIn',
+      onStart: () => { if (breath) breath.stop(); nT.setScale(1); },
       onUpdate: () => {
         nT.x = start.x + (dst.x - start.x) * pt.t;
         nT.y = start.y + (dst.y - start.y) * pt.t;
@@ -9435,14 +9451,23 @@ class Battle extends Phaser.Scene {
       onComplete: () => {
         nT.destroy();
         this.starBurst.emitParticleAt(dst.x, dst.y, big ? 6 : 3);
-        this.barGhost(this.hpBar, this.hpShown.v / this.run.hpMax, Math.max(0, this.run.hp) / this.run.hpMax, 0xffe6b8);
-        this.hpHold = false;
+        // this landing settles ONLY its own slice: later blows still in the
+        // air keep their damage off the bar until their numbers land
+        const gi = this.hitPend.indexOf(atk);
+        if (gi >= 0) this.hitPend.splice(gi, 1);
+        const still = this.hitPend.reduce((s, a) => s + a, 0);
+        const to = clamp(Math.max(0, this.run.hp) + still, 0, this.run.hpMax);
+        this.barGhost(this.hpBar, this.hpShown.v / this.run.hpMax, to / this.run.hpMax, 0xffe6b8);
+        this.hpHold = Math.max(0, (this.hpHold | 0) - 1);
         this.tweens.killTweensOf(this.hpShown);
         this.tweens.add({
-          targets: this.hpShown, v: Math.max(0, this.run.hp), duration: 560, ease: 'Cubic.easeOut',
+          targets: this.hpShown, v: to, duration: 560, ease: 'Cubic.easeOut',
           onUpdate: () => this.drawPhp(),
           onComplete: () => {
-            this.hpShown.v = Math.max(0, this.run.hp);
+            // free of the beat, settle on live truth (a mid-drain heal);
+            // under a still-flying blow keep this landing's own mark
+            const free = !(this.hpHold | 0) && !this.hitPend.length;
+            this.hpShown.v = free ? Math.max(0, this.run.hp) : to;
             this.drawPhp();
             if (onDone) onDone();
           },
@@ -9852,8 +9877,10 @@ class Battle extends Phaser.Scene {
       }
       if (this.hasSigil('ward')) atk = Math.max(1, atk - this.sigVal('ward', 'cut'));
       // the bar HOLDS its value while the blow's number flies to it — the
-      // beast side's grammar mirrored (playerHit releases the hold)
-      this.hpHold = true;
+      // beast side's grammar mirrored (playerHit releases the hold). The
+      // long linger lets blows overlap: count the hold, book the damage.
+      this.hpHold = (this.hpHold | 0) + 1;
+      this.hitPend.push(atk);
       this.run.hp -= atk;
       if (this.run.hp <= 0 && this.hasSigil('feather') && !this.run.featherUsed) {
         this.run.featherUsed = true;
@@ -9882,7 +9909,9 @@ class Battle extends Phaser.Scene {
       // pops at the point of contact, flies to the player's bar at the top,
       // and only then does that bar drain — slow enough to watch
       this.playerHit(atk, mult, boss, () => {
-        if (this.run.hp <= 0 && this.state !== 'end') this.endRun(false);
+        // ride the landing that EMPTIES the bar — a still-flying later blow
+        // keeps the death waiting for its own number to land
+        if (this.run.hp <= 0 && this.state !== 'end' && !this.hitPend.length) this.endRun(false);
       });
       if (this.run.hp <= 0) return;   // the beat carries the death — endRun fires when the bar lands empty
       // dew gathers where the blow fell — one plain tile greens, a beat
