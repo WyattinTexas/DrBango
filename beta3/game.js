@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.107.0';
+const BUILD = 'STARSPELL v0.108.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1296,6 +1296,93 @@ function ssStreakWeek(dk) {
   }
   return out;
 }
+/* ---- THE SKY WHEEL (v0.108.0) ---------------------------------------------
+   SEVEN SKIES FOR SEVEN DAYS (Skylar 9/22, build GO 9/24): each weekday the
+   daily wears a different sky — its own name, its one-line law, its own rule
+   — opening gently on Monday and climbing rung by rung to Sunday's summit.
+   THIS block is the spine the week stands on: the calendar resolver, the
+   registry, the sub-stream door, and the band/glyph dress. The seven skies
+   themselves land in their own wave cards, each seating its def below.
+   THE LAWS (the design page §II):
+   · A sky's IDENTITY is the calendar's — weekday(dayKey), pure UTC
+     arithmetic off the key itself, never the local clock (the ?daykey seam
+     steers it in tests, ssDayKeyMs already speaks pure UTC).
+   · INTERIM: a day whose sky card has not shipped resolves to NULL — the
+     stock daily, byte-for-byte; the wave cards flip their days live as they
+     land, and an unbuilt sky is never named or promised on any surface.
+   · SHARED-FAIR, UNTOUCHED: any roll a sky ever needs rides its OWN mulberry
+     stream off a dayKey-rooted seed ^ its constant (ssSkyRng — the
+     ssOfferTypes pattern); the main seeded stream is consumed exactly as
+     today, so the deal, the sigil schedule and the dew never move.
+   · ONE FLAG, ONE READER: Battle.create resolves `this.sky` ONCE beside
+     `this.hard`; the scene reads it where it reads its modifiers. No sky
+     adds a second battle scene.
+   A seated def carries: id · nameKey/lineKey (its two strings ×5, shipped
+   with ITS card) · glyph(c, s) — a canvas draw for the band's emblem, a
+   48-pt box — plus whatever rule fields its readers key on. */
+const SS_SKY_WHEEL = [null, null, null, null, null, null, null];   // Mon … Sun
+const SS_SKY_RIBBON_MS = 4000;   // how long the battle's herald ribbon speaks
+function ssSkyWeekday(dayKey) {
+  const dow = new Date(ssDayKeyMs(dayKey)).getUTCDay();   // 0 Sun … 6 Sat
+  return dow === 0 ? 7 : dow;                             // rung: 1 Mon … 7 Sun
+}
+function ssSkyToday() {
+  const rung = ssSkyWeekday(SSNET.dayKey());
+  const def = SS_SKY_WHEEL[rung - 1];
+  return def ? Object.assign({ rung }, def) : null;
+}
+// a sky's private dice: its own mulberry off the day itself — never the main
+// seeded stream (the rng-ORDER law: the shared deal must not move), never
+// Math.random (same-language hunters share one sky). Salt with the sky's own
+// constant; a per-language roll folds ssPackSeed(lang) into the salt too.
+function ssSkyRng(salt) { return ssMulberry(((SSNET.dayKey() ^ salt) >>> 0) || 1); }
+/* the band's emblem, drawn — the stock daily wears the shared sun; a seated
+   sky brings its own glyph(c, s) draw. R-scaled canvas texture, consumed via
+   setDisplaySize (the ssMedalTex rule). */
+function ssSkyGlyphTex(scene, sky) {
+  const key = 'skyglyph-' + (sky ? sky.id : 'stock');
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), S = 48;
+  const t = scene.textures.createCanvas(key, Math.round(S * R), Math.round(S * R));
+  const c = t.context;
+  c.scale(R, R);
+  if (sky && sky.glyph) sky.glyph(c, S);
+  else {
+    // the classic sky, one sun over all: gold disc, eight rays, a faint halo
+    const cx = S / 2, cy = S / 2;
+    c.strokeStyle = 'rgba(255,215,122,0.85)'; c.lineWidth = 1.6; c.lineCap = 'round';
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4 + Math.PI / 8;
+      c.beginPath(); c.moveTo(cx + Math.cos(a) * 13.5, cy + Math.sin(a) * 13.5);
+      c.lineTo(cx + Math.cos(a) * 19, cy + Math.sin(a) * 19); c.stroke();
+    }
+    const g = c.createLinearGradient(0, cy - 9, 0, cy + 9);
+    g.addColorStop(0, '#fff3c9'); g.addColorStop(0.55, '#ffd77a'); g.addColorStop(1, '#c9963f');
+    c.beginPath(); c.arc(cx, cy, 9, 0, Math.PI * 2); c.fillStyle = g; c.fill();
+    c.lineWidth = 1.2; c.strokeStyle = '#e6c87e'; c.stroke();
+    c.beginPath(); c.arc(cx, cy, 15.5, 0, Math.PI * 2);
+    c.strokeStyle = 'rgba(232,199,106,0.28)'; c.lineWidth = 1; c.stroke();
+  }
+  t.refresh();
+  return key;
+}
+// the sky band's ground — the sheet rules' 316 width, a whisper of gold
+function ssSkyBandTex(scene) {
+  const key = 'skyband';
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), W = 316, H = 56;
+  const t = scene.textures.createCanvas(key, Math.round(W * R), Math.round(H * R));
+  const c = t.context;
+  c.scale(R, R);
+  c.beginPath(); c.roundRect(1, 1, W - 2, H - 2, 10);
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, 'rgba(232,199,106,0.10)'); g.addColorStop(1, 'rgba(232,199,106,0.03)');
+  c.fillStyle = g; c.fill();
+  c.lineWidth = 1.4; c.strokeStyle = 'rgba(232,199,106,0.5)'; c.stroke();
+  t.refresh();
+  return key;
+}
+
 /* ---- THE SHARE CARD: the run as a spoiler-free sky -------------------------
    What the daily's SHARE button puts on the clipboard, and what lands in a
    group chat. Wordle's lesson is that the SHAPE of a result travels further
@@ -1317,7 +1404,13 @@ function ssShareCard(o) {
   const felled = Math.max(0, Math.min(beasts, o.felled | 0));
   const tiles = Math.max(0, o.wordLen | 0);
   const n = Math.max(0, o.streak | 0);
-  const lines = [SS_T('shHead', SSNET.dayKeyISO())];
+  // the head names tonight's sky when one is built (THE SKY WHEEL, v0.108.0)
+  // — 'STARSPELL Daily · THE COURT OF KINGS · 2026-09-27'; a stock-interim
+  // night keeps today's exact form
+  const sky = ssSkyToday();
+  const lines = [sky
+    ? SS_T('shHeadSky', SS_T(sky.nameKey), SSNET.dayKeyISO())
+    : SS_T('shHead', SSNET.dayKeyISO())];
   // the sky: one mark per beast, spaced so the narrow star and the wide moon
   // still read as a row of equals rather than a ragged line
   if (beasts) lines.push(Array.from({ length: beasts }, (_, i) => (i < felled ? '✶' : '🌑')).join(' '));
@@ -5838,6 +5931,47 @@ function ssBossHerald(scene, f, done, opts) {
   }
 }
 
+/* ---- THE SKY'S HERALD RIBBON (v0.108.0) -----------------------------------
+   THE SKY WHEEL's battle voice: on a daily battle-open under a BUILT sky,
+   one ribbon under the title chrome speaks the sky's one-line law for
+   ~4 seconds (SS_SKY_RIBBON_MS), then folds away. The fuse ribbon's own
+   dress — the 'ribbon' pill sized to its words — never interactive, never
+   gating anything: the fight starts beneath it (contrast ssBossHerald
+   above, full-screen and input-eating). SEAT + TIMING vs the v0.107 linger:
+   it stands at y94, between the player bar (y68) and the beast's sky, and
+   the earliest a strike's crimson can reach that bar is pop 120 + hold 2200
+   + fly 780 ≈ 3.1s AFTER a blow that itself needs a first cast (~2s+ of
+   weaving) — the ribbon is folding by ~4.4s, gone before any crimson lands
+   beside it. Reduce-motion: plain fades, no fold. Stock-interim days
+   (sky null) never ring it. */
+function ssSkyRibbon(scene) {
+  const sky = scene.sky;
+  if (!sky) return;
+  const bea = window.__ssskyrib = { on: true, id: sky.id, shown: false, gone: false, t: Date.now() };
+  try {
+    const l = ssLayout(scene);
+    const rm = ssReduceMotion();
+    const c = scene.add.container(0, 0).setDepth(30);
+    c.once('destroy', () => { bea.on = false; });
+    const t = ssTxt(scene, l.x(0), l.y(94), SS_T(sky.lineKey), l.u(10.5), '#ffe9a8', 'italic').setOrigin(0.5);
+    if (t.width > l.u(324)) t.setScale(l.u(324) / t.width);
+    const rib = scene.add.image(l.x(0), l.y(94), 'ribbon').setDisplaySize(t.displayWidth + l.u(26), l.u(22));
+    c.add([rib, t]);
+    c.setAlpha(0);
+    bea.shown = true;
+    scene.tweens.add({ targets: c, alpha: 1, duration: rm ? 220 : 320, ease: 'Sine.easeOut' });
+    scene.time.delayedCall(SS_SKY_RIBBON_MS, () => {
+      if (!c.active) return;
+      bea.gone = true;
+      if (!rm) scene.tweens.add({ targets: [rib, t], scaleY: 0.06, duration: 340, ease: 'Sine.easeIn' });
+      scene.tweens.add({
+        targets: c, alpha: 0, duration: rm ? 220 : 340, ease: 'Sine.easeIn',
+        onComplete: () => { if (c.active) c.destroy(); },
+      });
+    });
+  } catch (e) { DIAG('sky ribbon FAILED: ' + (e && e.message || '?')); }
+}
+
 let PENDING_ASCENT = null;   // survives a mid-ascent resize-restart: finish to battle
 let INTRO_SEEN = false;      // once per page load — a rotation restart must not replay it
 // The language sheet reloads the page to re-render every baked string; sitting
@@ -7022,7 +7156,9 @@ class Home extends Phaser.Scene {
     veil.on('pointerdown', () => { SFX.ui(); closeSheet(); });
     c.add(veil);
 
-    const PH = 560, top = 400 - PH / 2;
+    // 560 → 616 for THE SKY BAND (v0.108.0): top 92, foot 708 — inside every
+    // proven inset band; everything below the countdown's rule rides +56
+    const PH = 616, top = 400 - PH / 2;
     const py = (d) => l.y(top + d);
     const items = [];
     // the window swallows its own taps so a press inside never falls through to the veil
@@ -7055,9 +7191,45 @@ class Home extends Phaser.Scene {
     const rule = (d) => items.push(this.add.rectangle(l.x(0), py(d), l.u(316), Math.max(1, l.u(1)), 0xc9a84c, 0.35));
     rule(116);
 
+    /* THE SKY BAND (v0.108.0, the seven-skies spine): tonight's rule as
+       furniture between the countdown and your standing — the sky's drawn
+       glyph · its name in gold · its one-line law · THE WEEK'S RUNG, seven
+       ember pips filled to tonight's height, so the climb itself reads at a
+       glance. A day whose sky card has not shipped speaks the classic words
+       (the stock hunt's name + the shared-sky line) — never an unbuilt
+       sky's promise. */
+    const sky = ssSkyToday();
+    const rung = ssSkyWeekday(SSNET.dayKey());
+    items.push(this.add.image(l.x(0), py(152), ssSkyBandTex(this)).setDisplaySize(l.u(316), l.u(56)));
+    items.push(this.add.image(l.x(-134), py(152), ssSkyGlyphTex(this, sky)).setDisplaySize(l.u(30), l.u(30)));
+    const bandName = ssTxt(this, l.x(-112), py(141), sky ? SS_T(sky.nameKey) : SS_T('daily'), l.u(11.5), '#ffe9a8')
+      .setOrigin(0, 0.5).setLetterSpacing(l.u(1));
+    if (bandName.width > l.u(172)) bandName.setScale(l.u(172) / bandName.width);
+    items.push(bandName);
+    // the one-liner wraps the safe way — single-line children only (the
+    // one-line-per-text law: an italic multi-line bake goes blank on iOS) —
+    // and never past TWO lines: a long law steps down the ladder until it
+    // fits the band (the seven real one-liners run to ~90 chars ×5 tongues)
+    let bandLine = null;
+    for (const fs of [9, 8, 7.2]) {
+      if (bandLine) bandLine.destroy();
+      bandLine = ssTextBlock(this, l.x(-112), py(161), sky ? SS_T(sky.lineKey) : SS_T('dpOneSky'), {
+        fontSize: l.u(fs), color: '#c9b676', fontStyle: 'italic',
+        wrapW: l.u(172), lineSpacing: l.u(2), align: 'left', ox: 0, oy: 0.5,
+      });
+      if (bandLine.lines.length <= 2) break;
+    }
+    items.push(bandLine);
+    for (let i = 0; i < 7; i++) {
+      items.push(this.add.image(l.x(73 + i * 11), py(146), 'dot').setDisplaySize(l.u(6.5), l.u(6.5))
+        .setTint(i < rung ? 0xffb457 : 0x2a3160));
+    }
+    items.push(ssTxt(this, l.x(106), py(158), SS_T('skyRung', rung), l.u(7.5), '#8a94c4')
+      .setOrigin(0.5).setLetterSpacing(l.u(0.8)));
+
     // your standing under today's sky
     const played = SS.prof.daily[String(SSNET.dayKey())] | 0;
-    items.push(ssTxt(this, l.x(0), py(140), played ? SS_T('dpPlayed', played) : SS_T('dpAwait'),
+    items.push(ssTxt(this, l.x(0), py(196), played ? SS_T('dpPlayed', played) : SS_T('dpAwait'),
       l.u(13.5), played ? '#f0e8d2' : '#ffe9a8').setOrigin(0.5)
       .setShadow(0, 0, played ? 'rgba(0,0,0,0.45)' : '#c9b676', l.u(played ? 2 : 8), true, true));
     // the lantern's own number, in the same words the end screen uses, and —
@@ -7066,21 +7238,21 @@ class Home extends Phaser.Scene {
     const sState = ssStreakState();
     const streak = sState.n;
     if (streak >= 2) {
-      items.push(ssTxt(this, l.x(0), py(158), '🔥 ' + SS_T('stkNight', streak), l.u(11), '#ffb457').setOrigin(0.5)
+      items.push(ssTxt(this, l.x(0), py(214), '🔥 ' + SS_T('stkNight', streak), l.u(11), '#ffb457').setOrigin(0.5)
         .setShadow(0, 0, '#a8520d', l.u(6), true, true));
     }
     if (streak >= 1 || !sState.held) {
       const gl = ssGraceLine(sState);
-      const gT = ssTxt(this, l.x(0), py(streak >= 2 ? 176 : 164), gl.text, l.u(9.5), gl.color, 'italic')
+      const gT = ssTxt(this, l.x(0), py(streak >= 2 ? 232 : 220), gl.text, l.u(9.5), gl.color, 'italic')
         .setOrigin(0.5).setInteractive({ useHandCursor: true });
       gT.on('pointerdown', () => { SFX.ui(); closeSheet(); this.streakSheet(); });
       items.push(gT);
     }
-    rule(190);
+    rule(246);
 
     // today's board — live from RTDB while the sheet stands open
-    items.push(ssTxt(this, l.x(0), py(206), '— ' + SS_T('dpTop') + ' —', l.u(12), '#c9b676').setOrigin(0.5));
-    const loadT = ssTxt(this, l.x(0), py(300), SS_T('lbLoading'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5);
+    items.push(ssTxt(this, l.x(0), py(262), '— ' + SS_T('dpTop') + ' —', l.u(12), '#c9b676').setOrigin(0.5));
+    const loadT = ssTxt(this, l.x(0), py(356), SS_T('lbLoading'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5);
     items.push(loadT);
     SSNET.getBoard('daily', ssGameLang()).then((b) => {
       if (this.dailyC !== c || !this.scene.isActive()) return;
@@ -7088,10 +7260,10 @@ class Home extends Phaser.Scene {
       const meId = SSNET.uid();
       const rows = [];
       if (!b.rows.length) {
-        rows.push(ssTxt(this, l.x(0), py(300), SS_T('lbEmpty'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5));
+        rows.push(ssTxt(this, l.x(0), py(356), SS_T('lbEmpty'), l.u(11.5), '#5a6390', 'italic').setOrigin(0.5));
       }
       b.rows.slice(0, 6).forEach((r, i) => {
-        const y = py(230 + i * 34);
+        const y = py(286 + i * 34);
         const me = r.id === meId;
         if (me) rows.push(this.add.rectangle(l.x(0), y, l.u(324), l.u(28), 0xd7b45c, 0.13));
         if (i < 3) {
@@ -7111,15 +7283,15 @@ class Home extends Phaser.Scene {
         const mine = b.me >= 6 && b.rows[b.me]
           ? '#' + (b.me + 1) + ' · ' + b.rows[b.me].name + ' · ' + b.rows[b.me].score + '   ·   '
           : '';
-        rows.push(ssTxt(this, l.x(0), py(438), mine + SS_T('lbYouRank', b.me + 1, b.total), l.u(11), '#ffd77a').setOrigin(0.5));
+        rows.push(ssTxt(this, l.x(0), py(494), mine + SS_T('lbYouRank', b.me + 1, b.total), l.u(11), '#ffd77a').setOrigin(0.5));
       }
       rows.forEach((o, i) => { o.alpha = 0; this.tweens.add({ targets: o, alpha: 1, duration: 260, delay: i * 24 }); });
       c.add(rows);
     }).catch(() => { });
 
     // the big door: PLAY — closes the sheet and rides the ascent
-    const pb = this.add.image(l.x(0), py(492), ssBtn(this, false, 260, 58)).setDisplaySize(l.u(260), l.u(58)).setInteractive({ useHandCursor: true });
-    const pbT = ssTxt(this, l.x(0), py(492), played ? SS_T('dpAgain') : SS_T('dpPlay'), l.u(17), BTN_INK()).setOrigin(0.5);
+    const pb = this.add.image(l.x(0), py(548), ssBtn(this, false, 260, 58)).setDisplaySize(l.u(260), l.u(58)).setInteractive({ useHandCursor: true });
+    const pbT = ssTxt(this, l.x(0), py(548), played ? SS_T('dpAgain') : SS_T('dpPlay'), l.u(17), BTN_INK()).setOrigin(0.5);
     items.push(pb, pbT);
     pb.on('pointerover', () => pb.setScale(pb.scaleX * 1.03, pb.scaleY * 1.03));
     pb.on('pointerout', () => pb.setDisplaySize(l.u(260), l.u(58)));
@@ -7926,6 +8098,13 @@ class Battle extends Phaser.Scene {
        cadence, the boss knobs, the ×1.5 tally — so endless accepts it
        later by extending this expression by one clause. */
     this.hard = this.resume ? !!this.resume.hard : (this.mode === 'campaign' && ssCampHard());
+    /* THE SKY WHEEL (v0.108.0) — the daily's OWN modifier, seated beside
+       `hard` the same way: ONE rule object resolved here from the calendar
+       (weekday of SSNET.dayKey(), pure UTC — the ?daykey seam steers it),
+       read wherever the scene reads its modifiers. Null on every other
+       mode AND on a day whose sky card has not shipped — null IS the stock
+       daily, byte-for-byte. Never a second battle scene. */
+    this.sky = this.mode === 'daily' ? ssSkyToday() : null;
 
     // ---- build the fight list ----
     // daily: same-language hunters share one seeded sky; the pack salt keeps
@@ -8013,6 +8192,9 @@ class Battle extends Phaser.Scene {
     const tState = performance.now();
     this.buildUi();
     const tUi = performance.now();
+    // THE SKY WHEEL's ribbon (v0.108.0): a BUILT sky announces its law once
+    // as the daily opens — non-blocking, folds by itself; stock days silent
+    if (this.mode === 'daily' && this.sky) ssSkyRibbon(this);
     // A MIGHTY BEAST APPEARS (v0.106.0): a campaign entry that CLICKED a boss
     // on the chart (the herald flag rode the ascent data) heralds at arrival —
     // the fight itself wakes as the beat parts, so the assembly and the v0.21
@@ -8351,7 +8533,9 @@ class Battle extends Phaser.Scene {
   modeTitle() {
     if (this.mode === 'campaign') return SS_ACT_N(SS_ACTS[this.fights[this.run.fightIdx].actIdx]);
     if (this.mode === 'endless') return SS_T('endlessTitle') + ' · ' + SS_T('endLvl', this.run.fightIdx + 1);
-    if (this.mode === 'daily') return '☀ DAILY HUNT · ' + SSNET.dayKeyISO();
+    // the sky's name alone (THE SKY WHEEL, v0.108.0 — Q5: the date lives on
+    // the sheet and the share card); a stock-interim day keeps the classic
+    if (this.mode === 'daily') return '☀ ' + SS_T(this.sky ? this.sky.nameKey : 'daily');
     return 'QUICK PLAY';
   }
 
