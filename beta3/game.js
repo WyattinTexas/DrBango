@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.109.0';
+const BUILD = 'STARSPELL v0.110.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1385,8 +1385,8 @@ function ssSkyBandTex(scene) {
 
 /* ---- WAVE ONE · THE GENTLE HALF (v0.109.0) --------------------------------
    The week's first three skies take their seats — Monday's gift, Tuesday's
-   guest, Wednesday's discipline. Thursday through Sunday still resolve NULL
-   (the stock daily, byte-for-byte) until the harsh half lands. Each def is
+   guest, Wednesday's discipline. The harsh half (Thu–Sun) seats below in its
+   own wave block (v0.110.0) — the week is whole. Each def is
    read by the chrome above (band/ribbon/title/share) and by the battle's
    own modifier sites; the rule fields:
      gild    — Monday: ssSkyGildLetter() resolves the day's gold at Battle
@@ -1507,6 +1507,153 @@ SS_SKY_WHEEL[2] = {
     }
     c.fillStyle = '#ffd77a';
     c.beginPath(); c.arc(43, 14, 2.2, 0, Math.PI * 2); c.fill();
+  },
+};
+
+/* ---- WAVE TWO · THE HARSH HALF (v0.110.0) ---------------------------------
+   The climb's second half — Thursday's rationing, Friday's teeth, Saturday's
+   clock, Sunday's summit. The week is whole; no seat resolves NULL any more.
+   Rule fields the battle keys on:
+     ash     — Thursday: cast cells do not refill (they cool as ash,
+               skyAshSettle/fillBoard) until the fight's beast falls — the
+               next deal is 16 fresh — or the SCRY sweeps the whole board
+               (its price untouched: it still hastens the strike).
+     dying   — Friday: each felled beast blacks out the first letter of its
+               own name (already dark → the curse walks to the name's next
+               letter). The ladder is precomputed from the day's own fight
+               list at create — fight order, no rng — so the whole world
+               darkens in the same order; spawnTile births cursed letters
+               dark and the standing blk law pays them 0.
+     clockMs — Saturday: the v0.70 strike-clock ENGINE rides the daily at
+               the sky's OWN pace (SS_SKY_FALL_MS — never a re-dial of
+               SS_HARD): this.strikeMs is the one clock truth every engine
+               site reads; everything else hard does (the ×1.5 tally, the
+               sparser cadence, the boss knobs, the boards' ⚑) stays keyed
+               on this.hard and does not ride.
+     court   — Sunday: the deal replaced wholesale ON THE SAME main-stream
+               draws (same count, different pool): four kings drawn
+               tempered, then the fixed crown. The stream stays in step;
+               the whole world shares one court. */
+const SS_SKY_FALL_MS = 12000;   // Saturday's clock — its own dial (Q3 ★: a shade kinder than hard's 10s; SS_HARD is never re-dialed)
+/* Thursday's dress — what a burned cell keeps: a low heap of cooling ash
+   where the star stood, settled dust, two embers not quite dead. Drawn low
+   in the tile box so the cell reads EMPTY at a glance (never a castable
+   face) while the board plainly remembers the word that burned there.
+   R-scaled canvas texture consumed via setDisplaySize (the ssMedalTex
+   rule); the greys are the design page's own ash inks. */
+function ssSkyAshTex(scene) {
+  const key = 'skyash';
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), S = 128;
+  const t = scene.textures.createCanvas(key, Math.round(S * R), Math.round(S * R));
+  const c = t.context;
+  c.scale(R, R);
+  const mound = (x, y, w, h, ink) => {
+    c.beginPath(); c.moveTo(x - w / 2, y);
+    c.quadraticCurveTo(x - w * 0.22, y - h, x + w * 0.12, y - h * 0.72);
+    c.quadraticCurveTo(x + w * 0.34, y - h * 0.9, x + w / 2, y);
+    c.closePath(); c.fillStyle = ink; c.fill();
+  };
+  // the settled drift along the cell's floor, then the heaps upon it
+  c.globalAlpha = 0.85;
+  mound(64, 106, 92, 14, '#2e2940');
+  mound(46, 104, 46, 22, '#4a4358');
+  mound(80, 105, 40, 17, '#443d52');
+  mound(64, 103, 22, 26, '#57506a');
+  c.globalAlpha = 0.9; c.fillStyle = '#6a6378';
+  for (const [x, y, r] of [[34, 92, 1.6], [72, 86, 1.3], [92, 94, 1.5], [56, 82, 1.1], [83, 99, 1]]) {
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+  }
+  // two embers still breathing under the grey
+  for (const [x, y, r] of [[52, 98, 1.8], [76, 101, 1.4]]) {
+    c.beginPath(); c.arc(x, y, r * 2.4, 0, Math.PI * 2); c.fillStyle = 'rgba(255,110,60,0.18)'; c.fill();
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = '#c96a3a'; c.fill();
+  }
+  c.globalAlpha = 1;
+  t.refresh();
+  return key;
+}
+// THURSDAY · rung 4 · THE BOARD — the first genuinely thinky sky: rationing
+SS_SKY_WHEEL[3] = {
+  id: 'ash', nameKey: 'skyAshName', lineKey: 'skyAshLine', ash: true,
+  glyph: (c, s) => {
+    // the design page's own sigil: a board losing tiles, ash where they stood
+    c.strokeStyle = '#8a94c4'; c.lineWidth = 1.2; c.fillStyle = '#1a2142';
+    for (const [x, y] of [[8, 8], [20, 8], [32, 8], [8, 20], [32, 20], [20, 32]]) {
+      c.beginPath(); c.roundRect(x, y, 8, 8, 1.5); c.fill(); c.stroke();
+    }
+    c.fillStyle = '#4a4358';
+    c.beginPath(); c.moveTo(21, 21); c.lineTo(27, 21); c.lineTo(25.5, 24); c.lineTo(22, 25); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(9, 33); c.lineTo(15, 34); c.lineTo(13, 38); c.lineTo(10, 37); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(33, 33); c.lineTo(39, 33); c.lineTo(38, 37); c.lineTo(34, 37); c.closePath(); c.fill();
+    c.fillStyle = '#6a6378';
+    for (const [x, y, r] of [[24, 26.5, 0.9], [12, 38, 0.9], [36, 38.5, 0.9], [27, 23, 0.7]]) {
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    }
+  },
+};
+// FRIDAY · rung 5 · THE BEASTS — the week's teeth: the sky loses its letters
+SS_SKY_WHEEL[4] = {
+  id: 'name', nameKey: 'skyDyingName', lineKey: 'skyDyingLine', dying: true,
+  glyph: (c, s) => {
+    // a beast's asterism struck out, its letter dead beneath it
+    c.strokeStyle = '#8a94c4'; c.lineWidth = 1;
+    for (const [x1, y1, x2, y2] of [[10, 14, 22, 10], [22, 10, 34, 16], [22, 10, 26, 24]]) {
+      c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    }
+    c.fillStyle = '#ffe9c9';
+    for (const [x, y, r] of [[10, 14, 2.4], [34, 16, 2], [26, 24, 1.8]]) {
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    }
+    c.strokeStyle = '#ff9d88'; c.lineWidth = 1.6; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(18.5, 6.5); c.lineTo(25.5, 13.5); c.stroke();
+    c.beginPath(); c.moveTo(25.5, 6.5); c.lineTo(18.5, 13.5); c.stroke();
+    c.font = '15px Georgia'; c.textAlign = 'center'; c.fillStyle = '#5b6494';
+    c.fillText('V', 17, 42);
+    c.strokeStyle = '#5b6494'; c.lineWidth = 1.1;
+    c.beginPath(); c.moveTo(24, 34); c.lineTo(30, 42); c.stroke();
+    c.beginPath(); c.moveTo(30, 34); c.lineTo(24, 42); c.stroke();
+  },
+};
+// SATURDAY · rung 6 · THE CLOCK — hard's engine under the daily's fairness
+SS_SKY_WHEEL[5] = {
+  id: 'fall', nameKey: 'skyFallName', lineKey: 'skyFallLine', clockMs: SS_SKY_FALL_MS,
+  glyph: (c, s) => {
+    // a clock face under a falling star
+    c.strokeStyle = '#8a94c4'; c.lineWidth = 1.3;
+    c.beginPath(); c.arc(24, 26, 15, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = '#ffb066'; c.lineWidth = 1.8; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(24, 26); c.lineTo(24, 15); c.stroke();
+    c.beginPath(); c.moveTo(24, 26); c.lineTo(31, 30); c.stroke();
+    c.strokeStyle = '#ffd77a'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(43, 5); c.lineTo(33, 15); c.stroke();
+    c.globalAlpha = 0.7; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(46, 10); c.lineTo(38, 18); c.stroke();
+    c.globalAlpha = 1; c.fillStyle = '#ffd77a';
+    c.beginPath(); c.arc(32.5, 15.5, 2.6, 0, Math.PI * 2); c.fill();
+  },
+};
+// SUNDAY · rung 7 · THE COURT ITSELF — the summit: five kings, the Archer last
+SS_SKY_WHEEL[6] = {
+  id: 'court', nameKey: 'skyCourtName', lineKey: 'skyCourtLine',
+  court: {
+    kings: ['strix', 'leo', 'taurus', 'scorpius', 'draco', 'phoenix', 'centaurus'],
+    mults: [0.7, 0.8, 0.9, 1.0],   // the tempered court, fight order — Skylar's dial
+    crown: 'sagittarius',          // THE ZENITH ARCHER, fixed last (hp 200 · the five-bolt volley)
+  },
+  glyph: (c, s) => {
+    // the crown of the week
+    c.beginPath(); c.moveTo(8, 34); c.lineTo(8, 18); c.lineTo(16, 26); c.lineTo(24, 12);
+    c.lineTo(32, 26); c.lineTo(40, 18); c.lineTo(40, 34); c.closePath();
+    c.fillStyle = '#1a2142'; c.fill();
+    c.lineJoin = 'round'; c.lineWidth = 1.6; c.strokeStyle = '#e8c76a'; c.stroke();
+    c.fillStyle = '#ffd77a';
+    for (const [x, y, r] of [[8, 16, 2], [24, 9.5, 2.4], [40, 16, 2], [16, 24, 1.5], [32, 24, 1.5]]) {
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    }
+    c.globalAlpha = 0.8;
+    c.beginPath(); c.roundRect(8, 36, 32, 3.5, 1.5); c.fillStyle = '#e8c76a'; c.fill();
+    c.globalAlpha = 1;
   },
 };
 
@@ -8239,6 +8386,14 @@ class Battle extends Phaser.Scene {
        move). Null under every other sky and every other mode; wordDamage
        pays it ×3 and spawnTile lays the leaf. */
     this.skyGild = this.sky && this.sky.gild ? ssSkyGildLetter() : null;
+    /* THE FALLING SKY (v0.110.0): ONE clock truth, resolved beside the flags
+       it rides — hard mode's 10s or Saturday's own 12s (SS_SKY_FALL_MS; the
+       sky never re-dials SS_HARD), 0 everywhere else. Every strike-clock
+       ENGINE site (the ring's build, update's tick, the re-arms, the ring's
+       fraction) reads THIS and nothing else, so the two flags can never
+       disagree — while the ×1.5 tally, the sparser cadence, the boss knobs
+       and the boards' ⚑ stay keyed on this.hard and do not ride the sky. */
+    this.strikeMs = this.hard ? SS_HARD.strikeMs : (this.sky && this.sky.clockMs) || 0;
 
     // ---- build the fight list ----
     // daily: same-language hunters share one seeded sky; the pack salt keeps
@@ -8276,10 +8431,43 @@ class Battle extends Phaser.Scene {
         this.flagBeats();
       }).catch(() => { });
     } else {
-      const pool = [...SS_QUICK_POOL];
-      for (let i = 0; i < 4; i++) this.fights.push({ id: pool.splice(Math.floor(rng() * pool.length), 1)[0], actIdx: 0, mult: 1 + i * 0.12, atkAdd: Math.floor(i / 2), umbral: false });
-      this.fights.push({ id: SS_QUICK_BOSS, actIdx: 0, mult: 1, atkAdd: 0, umbral: false });
+      /* THE COURT OF KINGS (v0.110.0): Sunday's sky replaces the pool
+         wholesale ON THE SAME main-stream draws the stock deal makes —
+         four splice rolls, then the plan seed, exactly as below — so the
+         rng-order law holds by construction (the board's deal never moves)
+         and the whole world shares one court. The four drawn kings stand
+         tempered by the court's own mults in fight order; THE ZENITH
+         ARCHER is the fixed crown, seated exactly where DRACO stands on a
+         stock night — no draw for either. Signature attacks and the
+         kings' own fuses ride their bestiary rows untouched. */
+      const court = this.sky && this.sky.court;
+      const pool = court ? [...court.kings] : [...SS_QUICK_POOL];
+      for (let i = 0; i < 4; i++) this.fights.push({ id: pool.splice(Math.floor(rng() * pool.length), 1)[0], actIdx: 0, mult: court ? court.mults[i] : 1 + i * 0.12, atkAdd: court ? 0 : Math.floor(i / 2), umbral: false });
+      this.fights.push({ id: court ? court.crown : SS_QUICK_BOSS, actIdx: 0, mult: 1, atkAdd: 0, umbral: false });
       planSeed = Math.floor(rng() * 1e9);       // daily: seeded stream → every hunter shares the schedule
+    }
+    /* THE DYING NAMES (v0.110.0): the curse ladder — one letter per fight,
+       precomputed from the day's own fight list (fight order, no rng at
+       all), so the whole world darkens in the same order and two hunters
+       at the same fell always hold the same dark set. Each beast takes the
+       first letter of its OWN name; a letter already dark walks to the
+       name's next star (CORVUS after CANCER takes O); a name burned
+       through end to end passes the curse over (null — unreachable on a
+       five-fight night, kept lawful anyway). Letters map to tile glyphs
+       through the pack's digraph door (q → qu), the gilded letter's law. */
+    this.skyCursed = null;
+    this.skyCurseLadder = null;
+    if (this.sky && this.sky.dying) {
+      const dark = new Set();
+      this.skyCurseLadder = this.fights.map((f) => {
+        for (const c of SS_BEASTS[f.id].name.toLowerCase()) {
+          if (c < 'a' || c > 'z') continue;
+          const ch = PACK.digraph[c] || c;
+          if (!dark.has(ch)) { dark.add(ch); return ch; }
+        }
+        return null;
+      });
+      this.skyCursed = new Set();
     }
     this.sigPlan = ssSigilPlan(this.mode, this.fights, planSeed, this.hard);
     this.sigTypes = ssOfferTypes(this.mode, this.sigPlan, planSeed);
@@ -8329,6 +8517,7 @@ class Battle extends Phaser.Scene {
     }
     this.state = 'boot';
     this.board = []; this.sel = []; this.lineTiles = [];
+    this.skyAsh = [];    // THE ASHEN BOARD's cooling cells (v0.110.0) — markers by slot, empty under every other sky
     this.pending = [];   // bonus tiles owed to the next empty slots (forge drops, GILDED DAWN's start)
     SS.prof.runs++; SS.save();
 
@@ -8373,11 +8562,15 @@ class Battle extends Phaser.Scene {
     if (dt > SS_CLOCK_STEP_MAX) { DIAG('clock: dropped ' + Math.round(dt / 1000) + 's gap'); return; }
     if (dt <= 0 || !ssPageActive()) return;
     this.run.playMs += dt;
-    // hard mode's strike clock rides the SAME honest heartbeat — the gap
-    // drop and the visible+focused gates above already hold for it
-    if (this.hard) this.hardTick(dt);
+    // the strike clock rides the SAME honest heartbeat — the gap drop and
+    // the visible+focused gates above already hold for it (hard mode's
+    // 10s, or THE FALLING SKY's 12s — this.strikeMs is the one truth)
+    if (this.strikeMs) this.hardTick(dt);
   }
-  /* ---- HARD MODE's strike clock (v0.70.0) ----
+  /* ---- THE STRIKE CLOCK (v0.70.0; generalized v0.110.0) ----
+     One engine, two flags: hard mode dials it to SS_HARD.strikeMs, THE
+     FALLING SKY to its own SS_SKY_FALL_MS — this.strikeMs (resolved once at
+     create) is the only pace any site below reads.
      Counts down only while the board is the player's: state 'pick', beast
      alive, no death animation — so sigil picks, the map, scries, rites and
      cast animations all HOLD it (the plan's non-play beats), and the
@@ -8400,7 +8593,7 @@ class Battle extends Phaser.Scene {
   hardStrike() {
     if (this.state !== 'pick' || this.dying || !this.beast || this.beast.hpNow <= 0) return;
     this.state = 'anim';
-    this.hardLeft = SS_HARD.strikeMs;   // re-armed behind the blow
+    this.hardLeft = this.strikeMs;   // re-armed behind the blow, at the run's own pace
     this.strikeNow(() => { this.state = 'pick'; this.sigilMoment(); });
   }
   /* the ring: an ember arc draining from twelve o'clock, the seconds
@@ -8411,7 +8604,7 @@ class Battle extends Phaser.Scene {
     if (!this.hardG || !this.hardG.active) return;
     const l = this.L;
     const ms = Math.max(0, this.hardLeft | 0);
-    const f = Math.round((ms / SS_HARD.strikeMs) * 50) / 50;
+    const f = Math.round((ms / this.strikeMs) * 50) / 50;
     const s = Math.ceil(ms / 1000);
     const sh = this.hardShown;
     if (sh.f === f && sh.s === s && sh.live === !!live) return;
@@ -8483,18 +8676,19 @@ class Battle extends Phaser.Scene {
     for (let i = 0; i < nP; i++) this.pips.push(this.add.image(l.x(-40 + i * 20), l.y(46), 'dot').setScale(0.6).setTint(0x4a5480));
     this.scoreT = txt(l.x(190), l.y(24), '0', 15).setOrigin(1, 0.5);
 
-    /* HARD MODE's strike clock (v0.70.0) — the ember ring IS the badge: it
-       marks a hard run at a glance in any screenshot AND telegraphs the 10s
-       strike. An arc drains counter-clockwise from twelve o'clock with the
-       seconds inside it; in the last warnMs it burns brighter, breathes,
-       and ticks (SFX.tick). Dimmed whenever the clock is held (a sigil
-       pick, the map, a scry mid-flight, a rite, the cast's own animation).
-       Never built on a normal run — the harness pins hardG === undefined. */
-    if (this.hard) {
+    /* THE STRIKE CLOCK's ember ring (v0.70.0) — the badge AND the telegraph:
+       an arc drains counter-clockwise from twelve o'clock with the seconds
+       inside it; in the last warnMs it burns brighter, breathes, and ticks
+       (SFX.tick). Dimmed whenever the clock is held (a sigil pick, the map,
+       a scry mid-flight, a rite, the cast's own animation). Built wherever
+       a clock runs — hard mode's 10s, or THE FALLING SKY's own 12s
+       (v0.110.0; this.strikeMs is the one truth). Never built on a
+       clockless run — the harness pins hardG === undefined. */
+    if (this.strikeMs) {
       this.hardGlow = this.add.image(l.x(-160), l.y(45), 'glowbig').setDisplaySize(l.u(58), l.u(58))
         .setTint(0xff3860).setBlendMode('ADD').setAlpha(0);
       this.hardG = this.add.graphics().setDepth(20);
-      this.hardT = txt(l.x(-160), l.y(45), '10', 12.5, '#ff8a70').setOrigin(0.5)
+      this.hardT = txt(l.x(-160), l.y(45), String(Math.ceil(this.strikeMs / 1000)), 12.5, '#ff8a70').setOrigin(0.5)
         .setShadow(0, 0, '#e05e2a', l.u(6), true, true).setDepth(21);
       this.hardShown = { f: -1, s: -1, live: null };
     }
@@ -8856,6 +9050,11 @@ class Battle extends Phaser.Scene {
     const deal = initial && this.ftue && this.run.fightIdx === 0 ? ssFtueDeal(PACK.lang).board : null;
     for (let i = 0; i < 16; i++) {
       if (this.board[i]) continue;
+      // THE ASHEN BOARD (v0.110.0): a burned cell takes no star — the ash
+      // stands until the fell's fresh deal or the scry sweeps it (both
+      // clear the markers before calling here); every other sky sees an
+      // empty array and fills exactly as always
+      if (this.skyAsh[i]) continue;
       let ch;
       if (deal) ch = deal[i];
       else {
@@ -8873,20 +9072,28 @@ class Battle extends Phaser.Scene {
   }
   spawnTile(i, ch, tier, initial) {
     const l = this.L, p = this.slotPos(i);
+    /* THE DYING NAMES (v0.110.0): a cursed letter is BORN dark — the void
+       face, the pale letter, the flat 0 — and keeps dealing: dead weight
+       the hunt routes around. It rides the standing blk law whole, so
+       wordDamage pays nothing, the dew refuses the cell, the boss's own
+       volley passes over it, and the chip's 0 tells the truth at a
+       glance. Dark wins from birth: no tier, no leaf, no glow. */
+    const cursed = !!(this.skyCursed && this.skyCursed.has(ch));
+    if (cursed) tier = 0;
     const c = this.add.container(p.x, p.y - (initial ? l.u(500) + i * l.u(14) : l.u(420)));
-    const img = this.add.image(0, 0, 'tile' + tier).setDisplaySize(this.tileSize, this.tileSize);
+    const img = this.add.image(0, 0, cursed ? 'tileblk' : 'tile' + tier).setDisplaySize(this.tileSize, this.tileSize);
     // THE GILDED LETTER (v0.109.0): every tile of Monday's gold wears the
     // leaf — an overlay above the face, under the letter, so the tier
     // beneath keeps telling its own story
-    const leaf = this.skyGild && ch === this.skyGild
+    const leaf = !cursed && this.skyGild && ch === this.skyGild
       ? this.add.image(0, 0, ssSkyLeafTex(this)).setDisplaySize(this.tileSize, this.tileSize) : null;
-    const letter = this.add.image(0, -l.u(2), ssGlyph(this, ch, SS_TILE_INK[tier]))
+    const letter = this.add.image(0, -l.u(2), ssGlyph(this, ch, cursed ? SS_BLK_INK : SS_TILE_INK[tier]))
       .setDisplaySize(l.u(64), l.u(48));
-    const val = this.add.image(l.u(24), l.u(21), this.chipKey(ch, tier))
+    const val = this.add.image(l.u(24), l.u(21), cursed ? ssGlyphVal(this, 0, SS_BLK_VINK) : this.chipKey(ch, tier))
       .setDisplaySize(l.u(30), l.u(20));
     c.add(leaf ? [img, leaf, letter, val] : [img, letter, val]);
     let glow = null;
-    if (tier > 0) {
+    if (!cursed && tier > 0) {
       glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(tier === 2 ? 0.35 : 0.25)
         .setTint(SS_TIER_GLOW[tier]).setBlendMode('ADD');
       c.addAt(glow, 0);
@@ -8899,8 +9106,35 @@ class Battle extends Phaser.Scene {
     c.setSize(this.tileSize, this.tileSize).setInteractive({ useHandCursor: true });
     c.on('pointerdown', () => this.tapTile(i));
     this.boardC.add(c);
-    this.board[i] = { ch, tier, blk: false, c, img, letter, val, glow, leaf };
+    this.board[i] = { ch, tier, blk: cursed, c, img, letter, val, glow, leaf };
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
+  }
+  /* THE ASHEN BOARD's cooling cell (v0.110.0): where a cast star stood, its
+     ashes settle — a marker, never a tile: non-interactive, outside the
+     board array, so taps, the solver, the dew and the volley all read the
+     cell as simply EMPTY. Two sparks rise off the fresh burn and die (pure
+     cosmetics — Math.random, never rng()). */
+  skyAshSettle(i) {
+    const l = this.L, p = this.slotPos(i);
+    const a = this.add.image(p.x, p.y, ssSkyAshTex(this)).setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
+    this.boardC.add(a);
+    this.tweens.add({ targets: a, alpha: 0.92, duration: 340, ease: 'Sine.easeOut' });
+    for (let k = 0; k < 2; k++) {
+      const m = this.add.image(p.x + (Math.random() - 0.5) * l.u(26), p.y + l.u(12), 'dot')
+        .setScale(0.35 + Math.random() * 0.3).setTint(0xff8a50).setAlpha(0.65).setBlendMode('ADD').setDepth(60);
+      this.boardC.add(m);
+      this.tweens.add({ targets: m, y: m.y - l.u(24 + Math.random() * 14), alpha: 0, delay: 60 + k * 150, duration: 600, ease: 'Sine.easeOut', onComplete: () => m.destroy() });
+    }
+    this.skyAsh[i] = a;
+  }
+  // the sweep: the fell's fresh deal and the scry both blow the ash away
+  // (each then fills every cell); cheap and idempotent everywhere else
+  skyAshClear() {
+    for (const a of this.skyAsh) {
+      if (!a || !a.active) continue;
+      this.tweens.add({ targets: a, alpha: 0, duration: 260, onComplete: () => { if (a.active) a.destroy(); } });
+    }
+    this.skyAsh = [];
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
   // what a held sigil adds to this letter (0 when none apply) — at the HELD
@@ -9431,9 +9665,9 @@ class Battle extends Phaser.Scene {
     this.shieldLeft = this.hasSigil('shield') ? this.sigVal('shield', 'blocks') : 0;
     this.hintsLeft = this.hasSigil('tome') ? this.sigVal('tome', 'uses') : 0;
     this.cometLeft = this.hasSigil('comet') ? ssSigilCharges('comet', this.sigTier('comet')) : 0;
-    // hard mode's strike clock re-arms with every battle (fight-start
-    // semantics, derived never persisted — the cometLeft law)
-    if (this.hard) { this.hardLeft = SS_HARD.strikeMs; this.hardDraw(true); }
+    // the strike clock re-arms with every battle (fight-start semantics,
+    // derived never persisted — the cometLeft law); one truth, two flags
+    if (this.strikeMs) { this.hardLeft = this.strikeMs; this.hardDraw(true); }
     this.clearHintFx();
     this.headT.setText(this.modeTitle());
     const pipBase = this.mode === 'campaign' || this.mode === 'endless' ? Math.floor(this.run.fightIdx / 5) * 5 : 0;
@@ -9463,6 +9697,9 @@ class Battle extends Phaser.Scene {
     this.sel = [];
     for (const s of this.board) if (s) s.c.destroy();
     this.board = [];
+    // THE ASHEN BOARD (v0.110.0): the beast fell — the ash blows away and
+    // sixteen fresh stars deal in below (the board is reborn at the fell)
+    this.skyAshClear();
     this.tweens.killTweensOf([this.boardC, this.lineC]);
     this.boardC.setAlpha(1); this.lineC.setAlpha(1);
     this.layoutLine();
@@ -9615,10 +9852,11 @@ class Battle extends Phaser.Scene {
     // the first open's finger bows out on the player's first real cast —
     // both of its lessons (weave, then CAST) are now the player's own
     if (this.ftue && !this.ftueGone) this.ftueRetire(true);
-    // a successful cast winds hard mode's strike clock back to the top —
-    // "every time you spell a word and cast a word, that timer goes back
-    // up" (the clock itself is held through the cast's animation)
-    if (this.hard) this.hardLeft = SS_HARD.strikeMs;
+    // a successful cast winds the strike clock back to the top — "every
+    // time you spell a word and cast a word, that timer goes back up"
+    // (the clock itself is held through the cast's animation); hard's 10s
+    // and THE FALLING SKY's 12s ride the same law
+    if (this.strikeMs) this.hardLeft = this.strikeMs;
     this.clearHintFx(true);
     if (this.purifyArmed) this.setPurifyArmed(false);
     const tiles = this.sel.map((i) => this.board[i]);
@@ -9713,7 +9951,14 @@ class Battle extends Phaser.Scene {
       // (`low`); at tier I it is today's 5, held or not
       let tier = letters >= 7 ? 2 : letters >= (this.hasSigil('forge') ? this.sigVal('forge', 'low') : 5) ? 1 : 0;
       if (tier > 0 && this.hasSigil('forge')) tier = 2;
-      for (const i of used) { this.board[i].c.destroy(); this.board[i] = null; }
+      for (const i of used) {
+        this.board[i].c.destroy(); this.board[i] = null;
+        // THE ASHEN BOARD (v0.110.0): the cast star's cell cools as ash —
+        // no star returns here until the beast falls or the scry sweeps
+        // the whole board away (a forged reward keeps riding `pending`
+        // and lands with the next true deal)
+        if (this.sky && this.sky.ash) this.skyAshSettle(i);
+      }
       if (tier > 0) { this.pending.push(tier); SFX.forge(); }
       this.layoutLine();
       this.beastHit(dmg);
@@ -9925,6 +10170,22 @@ class Battle extends Phaser.Scene {
     // star-crossed means YOUR star — a borrowed Tuesday sign never rings it
     if (this.signZ && !this.signBorrowed && this.signZ.beast === this.fights[this.run.fightIdx].id) SS.award('star-crossed', this.game);
     if (!this.struckThisBattle) SS.award('untouched', this.game);
+    /* THE DYING NAMES (v0.110.0): the beast takes its letter with it — the
+       ladder's entry for THIS fight (precomputed at create: first letter
+       of its own name, walked past any already dark) joins the dark set,
+       and every standing star of that letter goes out with the beast, in
+       the very shatter of its fell. From here the letter deals dark
+       (spawnTile) for the rest of the night. */
+    if (this.skyCurseLadder) {
+      const cch = this.skyCurseLadder[this.run.fightIdx];
+      if (cch) {
+        this.skyCursed.add(cch);
+        const gone = [];
+        this.board.forEach((s, i) => { if (s && s.ch === cch && !s.blk) gone.push(i); });
+        gone.forEach((bi, k) => this.time.delayedCall(160 + k * 110, () => this.blackTile(bi)));
+        window.__sscurse = { ch: cch, fight: this.run.fightIdx, dark: [...this.skyCursed], tiles: gone.length, t: Date.now() };
+      }
+    }
     // the drip counts the surplus whether or not ECHO OF RUIN is there to
     // spend it, and counts a kill made on the brink BEFORE the fell's heal
     ssSigilBump('ovk', Math.max(0, -this.beast.hpNow));
@@ -10317,6 +10578,11 @@ class Battle extends Phaser.Scene {
     if (this.purifyArmed) this.setPurifyArmed(false);
     this.unselectFrom(0);
     for (let i = 0; i < 16; i++) { if (this.board[i]) { this.board[i].c.destroy(); this.board[i] = null; } }
+    // THE ASHEN BOARD (v0.110.0): the scry is the priced relief — it sweeps
+    // the ash with everything else, and sixteen fresh stars rain in (the
+    // strike still hastens below exactly as on any night: the board can
+    // never dead-end, and the fail state stays the fuse)
+    this.skyAshClear();
     this.fillBoard(false);
     // SAGITTARIUS: the scry is also a loosed arrow
     if (this.sign === 'sagittarius' && this.beast.hpNow > 0) {
