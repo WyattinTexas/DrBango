@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.108.0';
+const BUILD = 'STARSPELL v0.109.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1382,6 +1382,133 @@ function ssSkyBandTex(scene) {
   t.refresh();
   return key;
 }
+
+/* ---- WAVE ONE · THE GENTLE HALF (v0.109.0) --------------------------------
+   The week's first three skies take their seats — Monday's gift, Tuesday's
+   guest, Wednesday's discipline. Thursday through Sunday still resolve NULL
+   (the stock daily, byte-for-byte) until the harsh half lands. Each def is
+   read by the chrome above (band/ribbon/title/share) and by the battle's
+   own modifier sites; the rule fields:
+     gild    — Monday: ssSkyGildLetter() resolves the day's gold at Battle
+               create; wordDamage pays it ×3, spawnTile dresses it.
+     borrow  — Tuesday: ssSkyBorrowSign() lends the run this.sign at the
+               GUEST level (SS_SKY_SIGN_LV) — powers/emblem/toasts read it,
+               and every settle site is gated on signBorrowed (no sign XP,
+               no sign record: a guest, not a birth).
+     minLen  — Wednesday: the shortest word CAST will fly (castMinLen —
+               button, cast and solver share the one test).
+     fuseAdd — Wednesday: every beast's fuse runs this many casts longer. */
+const SS_SKY_SIGN_LV = 1;   // the borrowed sign's level — the same for every hunter (fairness IS the amendment's defense)
+// Monday's gold: one bag-weighted letter per language per day, rolled on the
+// sky's OWN stream (dayKey ^ pack salt ^ its constant — the shared deal never
+// moves). Picking a slot in the bag itself IS the bag-count weighting, so the
+// gilded letter is one you will actually meet; the digraph map keeps the roll
+// speaking the same glyphs the tiles do (q → qu).
+function ssSkyGildLetter() {
+  const r = ssSkyRng(ssPackSeed(PACK.lang) ^ 0x611d);
+  const ch = BAG[Math.floor(r() * BAG.length)];
+  return PACK.digraph[ch] || ch;
+}
+/* Tuesday's guest: ONE sign over the whole world — deliberately UNSALTED by
+   language, the communal beat is the point — walking the zodiac one sign per
+   week by pure UTC arithmetic off the dayKey itself. The walk, not a roll,
+   makes the card's promise structural: twelve DIFFERENT Tuesdays before one
+   repeats, in the wheel's own order, aries onward. (A rolled sign is one
+   line: SS_ZODIAC[Math.floor(ssSkyRng(0xb0a7)() * 12)].id — surprise over
+   certainty, repeats possible.) */
+function ssSkyBorrowSign() {
+  const w = Math.floor(ssDayKeyMs(SSNET.dayKey()) / 604800000);   // whole weeks since epoch
+  return SS_ZODIAC[((w % 12) + 12) % 12].id;
+}
+/* Monday's dress — gold leaf laid over the tile face: a warm wash, a double
+   gold ring hugging the face's own inset (roundRect(6,6,116,116) r24 is the
+   tile bake's geometry), a small pressed diamond at each edge's middle, and
+   light caught along the top. An OVERLAY, never a face: the tier beneath
+   (plain, gilded, star, dew) keeps telling its own story, and the blackout
+   simply fades the leaf away with the rest of the light. R-scaled canvas
+   texture consumed via setDisplaySize (the ssMedalTex rule). */
+function ssSkyLeafTex(scene) {
+  const key = 'skyleaf';
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene), S = 128;
+  const t = scene.textures.createCanvas(key, Math.round(S * R), Math.round(S * R));
+  const c = t.context;
+  c.scale(R, R);
+  c.beginPath(); c.roundRect(8, 8, 112, 112, 22);
+  const g = c.createLinearGradient(0, 8, 0, 120);
+  g.addColorStop(0, 'rgba(255,215,122,0.16)'); g.addColorStop(0.5, 'rgba(255,190,80,0.06)'); g.addColorStop(1, 'rgba(200,140,40,0.13)');
+  c.fillStyle = g; c.fill();
+  c.beginPath(); c.roundRect(10, 10, 108, 108, 21);
+  c.lineWidth = 5; c.strokeStyle = 'rgba(201,150,63,0.92)'; c.stroke();
+  c.beginPath(); c.roundRect(13.5, 13.5, 101, 101, 18);
+  c.lineWidth = 2; c.strokeStyle = 'rgba(255,233,168,0.9)'; c.stroke();
+  for (const [dx, dy] of [[64, 12], [64, 116], [12, 64], [116, 64]]) {
+    c.beginPath(); c.moveTo(dx, dy - 6); c.lineTo(dx + 6, dy); c.lineTo(dx, dy + 6); c.lineTo(dx - 6, dy); c.closePath();
+    c.fillStyle = '#c9963f'; c.fill();
+    c.beginPath(); c.moveTo(dx, dy - 3.2); c.lineTo(dx + 3.2, dy); c.lineTo(dx, dy + 3.2); c.lineTo(dx - 3.2, dy); c.closePath();
+    c.fillStyle = '#ffe9a8'; c.fill();
+  }
+  c.beginPath(); c.roundRect(18, 15, 92, 20, 10);
+  const g2 = c.createLinearGradient(0, 15, 0, 35);
+  g2.addColorStop(0, 'rgba(255,255,255,0.22)'); g2.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g2; c.fill();
+  t.refresh();
+  return key;
+}
+// MONDAY · rung 1 · THE LETTERS — a pure gift that teaches the week's grammar
+SS_SKY_WHEEL[0] = {
+  id: 'gild', nameKey: 'skyGildName', lineKey: 'skyGildLine', gild: true,
+  glyph: (c, s) => {
+    // the design page's own sigil: a gilded tile haloed by eight rays
+    c.strokeStyle = '#ffd77a'; c.lineWidth = 1.4; c.lineCap = 'round';
+    for (const [x1, y1, x2, y2] of [[24, 2, 24, 7], [24, 41, 24, 46], [2, 24, 7, 24], [41, 24, 46, 24],
+      [8, 8, 11.5, 11.5], [36.5, 36.5, 40, 40], [40, 8, 36.5, 11.5], [11.5, 36.5, 8, 40]]) {
+      c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    }
+    c.beginPath(); c.roundRect(10, 10, 28, 28, 6);
+    c.fillStyle = '#1a2142'; c.fill();
+    c.lineWidth = 1.6; c.strokeStyle = '#e8c76a'; c.stroke();
+    c.font = 'bold 17px Georgia'; c.textAlign = 'center'; c.fillStyle = '#ffe9a8';
+    c.fillText('A', 24, 31);
+  },
+};
+// TUESDAY · rung 2 · THE HUNTER — the whole world born under one sign
+SS_SKY_WHEEL[1] = {
+  id: 'sign', nameKey: 'skySignName', lineKey: 'skySignLine', borrow: true,
+  glyph: (c, s) => {
+    // the zodiac wheel, one tick lit: whose Tuesday is it?
+    c.strokeStyle = '#8a94c4'; c.lineWidth = 1.4;
+    c.beginPath(); c.arc(24, 24, 17, 0, Math.PI * 2); c.stroke();
+    c.lineWidth = 1.2;
+    for (let i = 0; i < 12; i++) {
+      const a = i * Math.PI / 6, ca = Math.cos(a), sa = Math.sin(a);
+      c.beginPath(); c.moveTo(24 + 14 * ca, 24 + 14 * sa); c.lineTo(24 + 17 * ca, 24 + 17 * sa); c.stroke();
+    }
+    c.strokeStyle = '#ffd77a'; c.lineWidth = 2.4; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(24, 10); c.lineTo(24, 7); c.stroke();
+    c.globalAlpha = 0.9; c.fillStyle = '#ffd77a';
+    c.beginPath(); c.arc(24, 24, 4.5, 0, Math.PI * 2); c.fill();
+    c.globalAlpha = 0.5; c.lineWidth = 0.8;
+    c.beginPath(); c.arc(24, 24, 8.5, 0, Math.PI * 2); c.stroke();
+    c.globalAlpha = 1;
+  },
+};
+// WEDNESDAY · rung 3 · WHAT MAY BE CAST — the first sky that says no
+SS_SKY_WHEEL[2] = {
+  id: 'road', nameKey: 'skyRoadName', lineKey: 'skyRoadLine', minLen: 5, fuseAdd: 1,
+  glyph: (c, s) => {
+    // five tiles rising along a dashed road toward one star
+    c.strokeStyle = '#8a94c4'; c.lineWidth = 1.2; c.setLineDash([2.5, 3]);
+    c.beginPath(); c.moveTo(5, 40); c.quadraticCurveTo(18, 34, 26, 37); c.quadraticCurveTo(34, 40, 45, 30); c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = '#1a2142'; c.strokeStyle = '#e8c76a'; c.lineWidth = 1.4;
+    for (const [x, y] of [[3, 26], [12, 24], [21, 22], [30, 20], [39, 18]]) {
+      c.beginPath(); c.roundRect(x, y, 8, 8, 2); c.fill(); c.stroke();
+    }
+    c.fillStyle = '#ffd77a';
+    c.beginPath(); c.arc(43, 14, 2.2, 0, Math.PI * 2); c.fill();
+  },
+};
 
 /* ---- THE SHARE CARD: the run as a spoiler-free sky -------------------------
    What the daily's SHARE button puts on the clipboard, and what lands in a
@@ -4011,7 +4138,8 @@ function ssSigilPanel(scene, opts) {
       const slv = (opts.signLv | 0) || ssSignLv(r.sign.id);
       const loc = SS_ZOD(r.sign, slv);
       name = r.sign.name + ' · ' + loc.title + ' · ' + SS_T('svLevel', slv); desc = loc.desc;
-      ribbon = SS_T('inspSign'); ribbonColor = '#ffdf8f';
+      // a borrowed sign is a guest, not a birth — its ribbon says which
+      ribbon = SS_T(opts.signBorrowed ? 'skyBorrowed' : 'inspSign'); ribbonColor = '#ffdf8f';
     }
     const lx = gx + tex.mr + 14, maxW = RW / 2 - lx - 12;
     const gk = ssGoldTex(scene, name, 13);
@@ -8105,6 +8233,12 @@ class Battle extends Phaser.Scene {
        mode AND on a day whose sky card has not shipped — null IS the stock
        daily, byte-for-byte. Never a second battle scene. */
     this.sky = this.mode === 'daily' ? ssSkyToday() : null;
+    /* THE GILDED LETTER (v0.109.0): Monday's gold, resolved ONCE beside the
+       sky itself — one bag-weighted letter per language per day, rolled on
+       the sky's own stream (never the main one — the deal below must not
+       move). Null under every other sky and every other mode; wordDamage
+       pays it ×3 and spawnTile lays the leaf. */
+    this.skyGild = this.sky && this.sky.gild ? ssSkyGildLetter() : null;
 
     // ---- build the fight list ----
     // daily: same-language hunters share one seeded sky; the pack salt keeps
@@ -8170,11 +8304,20 @@ class Battle extends Phaser.Scene {
     // for its whole climb (v0.68.0: zodiac powers apply to endless exactly
     // as to the campaign). TAURUS's endurance lands once at the run's start
     // and rides the checkpoint's hpMax.
-    this.sign = this.mode === 'campaign' ? ssCampSign() : this.mode === 'endless' ? ssEndSign() : null;
+    /* THE BORROWED SIGN (v0.109.0): Tuesday's sky lends the whole world one
+       sign — the SAME one everywhere, at the same guest level, so the
+       fairness the unsigned law protects is intact while its letter bends.
+       The run carries it in this.sign so every power, emblem and toast
+       reads exactly as in the campaign; signBorrowed gates every settle
+       site (signXp, the word/hit record, the star-crossed award): a
+       borrowed sign is a guest, not a birth — nothing may write home. */
+    this.signBorrowed = !!(this.sky && this.sky.borrow);
+    this.sign = this.mode === 'campaign' ? ssCampSign() : this.mode === 'endless' ? ssEndSign() : this.signBorrowed ? ssSkyBorrowSign() : null;
     this.signZ = this.sign ? SS_ZODIAC_BY[this.sign] : null;
     // the run's opening level (v0.69.0) — read here for the vessels below,
-    // refreshed per battle at startFight
-    this.signLv = ssSignLv(this.sign);
+    // refreshed per battle at startFight; a borrowed sign holds the guest
+    // level for the whole run (never the player's own ladder)
+    this.signLv = this.signBorrowed ? SS_SKY_SIGN_LV : ssSignLv(this.sign);
     if (this.sign && !this.resume) {
       // what lands once at a fresh climb's start and rides the checkpoint's
       // hpMax: the reward table's vessel rows (every sign) and TAURUS's own
@@ -8365,6 +8508,17 @@ class Battle extends Phaser.Scene {
       const zn = this.add.zone(l.x(172), l.y(48), l.u(52), l.u(42)).setOrigin(0.5).setInteractive({ useHandCursor: true });
       zn.on('pointerdown', () => this.signTap());
       this.updateSignGlow();
+      /* THE BORROWED SIGN's dress (v0.109.0): the guest wears one word on a
+         small ribbon beside the emblem — the fuse ribbon's own pill, seated
+         in the clear air between the fight pips and the glyph. */
+      if (this.signBorrowed) {
+        const bc = this.add.container(0, 0);
+        const bt = txt(l.x(150), l.y(48), SS_T('skyBorrowed'), 8.5, '#ffdf8f').setOrigin(1, 0.5).setLetterSpacing(l.u(1.2));
+        if (bt.width > l.u(86)) bt.setScale(l.u(86) / bt.width);
+        const rb = this.add.image(l.x(150) - bt.displayWidth / 2 - l.u(2), l.y(48), 'ribbon')
+          .setDisplaySize(bt.displayWidth + l.u(18), l.u(15));
+        bc.add([rb, bt]);
+      }
     }
 
     txt(l.x(-190), l.y(68), 'YOU', 12, '#c9b676').setOrigin(0, 0.5);
@@ -8522,7 +8676,7 @@ class Battle extends Phaser.Scene {
     this.state = 'inspect';
     this.dockC.setVisible(false);          // the compact form yields to the window
     this.inspectP = ssSigilPanel(this, {
-      sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, signLv: this.signLv, sleeping: true,
+      sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, signLv: this.signLv, signBorrowed: this.signBorrowed, sleeping: true,
       onClose: () => {
         this.inspectP = null;
         this.dockC.setVisible(true);
@@ -8721,21 +8875,31 @@ class Battle extends Phaser.Scene {
     const l = this.L, p = this.slotPos(i);
     const c = this.add.container(p.x, p.y - (initial ? l.u(500) + i * l.u(14) : l.u(420)));
     const img = this.add.image(0, 0, 'tile' + tier).setDisplaySize(this.tileSize, this.tileSize);
+    // THE GILDED LETTER (v0.109.0): every tile of Monday's gold wears the
+    // leaf — an overlay above the face, under the letter, so the tier
+    // beneath keeps telling its own story
+    const leaf = this.skyGild && ch === this.skyGild
+      ? this.add.image(0, 0, ssSkyLeafTex(this)).setDisplaySize(this.tileSize, this.tileSize) : null;
     const letter = this.add.image(0, -l.u(2), ssGlyph(this, ch, SS_TILE_INK[tier]))
       .setDisplaySize(l.u(64), l.u(48));
     const val = this.add.image(l.u(24), l.u(21), this.chipKey(ch, tier))
       .setDisplaySize(l.u(30), l.u(20));
-    c.add([img, letter, val]);
+    c.add(leaf ? [img, leaf, letter, val] : [img, letter, val]);
     let glow = null;
     if (tier > 0) {
       glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(tier === 2 ? 0.35 : 0.25)
         .setTint(SS_TIER_GLOW[tier]).setBlendMode('ADD');
       c.addAt(glow, 0);
+    } else if (leaf) {
+      // a plain tile's gold breathes behind it; a tiered one keeps its own
+      glow = this.add.image(0, 0, 'dot').setScale(this.tileSize / 9).setAlpha(0.22)
+        .setTint(SS_TIER_GLOW[1]).setBlendMode('ADD');
+      c.addAt(glow, 0);
     }
     c.setSize(this.tileSize, this.tileSize).setInteractive({ useHandCursor: true });
     c.on('pointerdown', () => this.tapTile(i));
     this.boardC.add(c);
-    this.board[i] = { ch, tier, blk: false, c, img, letter, val, glow };
+    this.board[i] = { ch, tier, blk: false, c, img, letter, val, glow, leaf };
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
   }
   tileVal(ch, tier) { return (VALS[ch] || VALS[ch[0]] || 1) + (tier === 1 ? 6 : 0); }
@@ -8950,6 +9114,12 @@ class Battle extends Phaser.Scene {
       this.tweens.killTweensOf(gg);
       this.tweens.add({ targets: gg, alpha: 0, duration: 260, onComplete: () => { if (gg.active) gg.destroy(); } });
     }
+    if (s.leaf) {
+      // blackout wins over the gold leaf too — it chars away with the light
+      const lf = s.leaf;
+      s.leaf = null;
+      this.tweens.add({ targets: lf, alpha: 0, duration: 260, onComplete: () => { if (lf.active) lf.destroy(); } });
+    }
     // the ink pools: the void face crossfades in under a pale letter and a flat 0
     const inked = this.add.image(0, 0, 'tileblk').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
     s.c.addAt(inked, s.c.list.indexOf(s.img) + 1);
@@ -9002,7 +9172,10 @@ class Battle extends Phaser.Scene {
     const n = this.sel.length;
     this.lineHint.setAlpha(n ? 0 : 0.9);
     const word = this.currentWord();
-    const valid = n >= 2 && WORDSET.has(word);
+    // THE LONG ROAD (v0.109.0): the weave stays free, but a word below the
+    // sky's floor reads exactly as an invalid one — the button dims, the
+    // worth is withheld — and the button's own seat says why (CAST 5+)
+    const valid = n >= 2 && word.length >= this.castMinLen() && WORDSET.has(word);
     const sz = l.u(44), gap = l.u(6);
     const w = n * sz + (n - 1) * gap;
     this.sel.forEach((bi, k) => {
@@ -9015,7 +9188,10 @@ class Battle extends Phaser.Scene {
       const gsc = s.ch.length > 1 ? 16 / 30 : 20 / 36;
       const letter = this.add.image(0, 0, ssGlyph(this, s.ch, s.blk ? SS_BLK_INK : valid ? SS_LINE_GREEN : SS_TILE_INK[0]))
         .setDisplaySize(l.u(64 * gsc), l.u(48 * gsc));
-      mc.add([img, letter]);
+      // Monday's gold keeps its leaf in the staged word (blackout excepted)
+      mc.add(!s.blk && this.skyGild && s.ch === this.skyGild
+        ? [img, this.add.image(0, 0, ssSkyLeafTex(this)).setDisplaySize(sz, sz), letter]
+        : [img, letter]);
       mc.setSize(sz, sz).setInteractive({ useHandCursor: true });
       mc.on('pointerdown', () => this.unselectFrom(k));
       this.lineC.add(mc);
@@ -9024,7 +9200,10 @@ class Battle extends Phaser.Scene {
     });
     this.castB.setAlpha(valid ? 1 : 0.45);
     this.castT.setAlpha(valid ? 1 : 0.5);
-    this.castT.setText(valid ? 'CAST ' + this.previewDamage() : 'CAST');
+    // a REAL word standing below the road's floor: the worth's own seat
+    // carries the reason it will not fly (language-neutral, no new words)
+    const short = !valid && n >= 2 && WORDSET.has(word) && word.length < this.castMinLen();
+    this.castT.setText(valid ? 'CAST ' + this.previewDamage() : short ? 'CAST ' + this.castMinLen() + '+' : 'CAST');
     // the first open's finger follows every selection change the moment it
     // lands (its own slow poll covers scries and refills)
     if (this.ftueHand) this.ftueRepoint();
@@ -9099,9 +9278,15 @@ class Battle extends Phaser.Scene {
   // the level refreshed per battle at startFight (a mid-climb level-up
   // strengthens the NEXT battle, never mid-fight)
   signVal(field) { return ssSignVal(this.sign, field, this.signLv || 1); }
+  /* THE LONG ROAD (v0.109.0): the shortest word CAST will let fly — 2
+     always, the sky's own floor under Wednesday's law. ONE test shared by
+     the button, the cast and the solver, so the three can never disagree. */
+  castMinLen() { return this.sky && this.sky.minLen ? this.sky.minLen : 2; }
   // XP settles the moment it is earned; the caller's own SS.save carries it
+  // — except under a BORROWED sign (v0.109.0), which may never write home:
+  // the unsigned daily's suppression is BUILT here, not assumed
   signXp(n) {
-    if (!this.sign || !n) return;
+    if (!this.sign || this.signBorrowed || !n) return;
     const sr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
     sr.xp = (sr.xp | 0) + n;
   }
@@ -9120,8 +9305,12 @@ class Battle extends Phaser.Scene {
       if (VOWELS.includes(c0)) vowelsN++;      // structural — LIBRA's balance sees even inked vowels
       if (s.blk) continue;                     // blackout: the letter spells, but pays NOTHING
       // the chip's own arithmetic — letter + tier + held-sigil letter bonuses
-      // (River Runes, the Choir) — so the board and the cast can never differ
-      base += this.tileVal(s.ch, s.tier) + this.sigilLetterAdd(s.ch);
+      // (River Runes, the Choir) — so the board and the cast can never differ.
+      // THE GILDED LETTER (v0.109.0): Monday's gold pays ×3 the very number
+      // its chip prints — the preview rides this same sum (the v0.62 law),
+      // so weaving the gold IS the lesson
+      const tv = this.tileVal(s.ch, s.tier) + this.sigilLetterAdd(s.ch);
+      base += this.skyGild && s.ch === this.skyGild ? tv * 3 : tv;
       if (s.tier === 2) starMult = 1.5;
     }
     let dmg = base * (LEN_MULT[Math.min(letters, 8)] || 2.3) * starMult;
@@ -9192,6 +9381,9 @@ class Battle extends Phaser.Scene {
     }
     this.beast = this.beastFor(f);
     if (this.hasSigil('hush')) this.beast.timer += this.sigVal('hush', 'delay');
+    // THE LONG ROAD (v0.109.0): in fairness to the slower rhythm, every
+    // beast's fuse runs one cast longer under Wednesday's sky
+    if (this.sky && this.sky.fuseAdd) this.beast.timer += this.sky.fuseAdd;
     this.beast.hpNow = this.beast.hp;
     if ((this.run.overkill | 0) > 0) {                 // ECHO OF RUIN carries the surplus
       const carve = Math.min(this.run.overkill | 0, this.beast.hp - 1);
@@ -9206,7 +9398,7 @@ class Battle extends Phaser.Scene {
     // resumed climb reads the same way, and the charge counters below are
     // per-battle grants at that level (fight-start semantics, derived
     // never persisted — the cometLeft law)
-    this.signLv = ssSignLv(this.sign);
+    this.signLv = this.signBorrowed ? SS_SKY_SIGN_LV : ssSignLv(this.sign);
     this.venom = 0;
     this.shellUsed = false;
     this.watersLeft = this.sign === 'aquarius' ? this.signVal('charges') : 0;
@@ -9411,7 +9603,9 @@ class Battle extends Phaser.Scene {
     if (this.state !== 'pick') return;
     const word = this.currentWord();
     const l = this.L;
-    if (this.sel.length < 2 || !WORDSET.has(word)) {
+    // THE LONG ROAD (v0.109.0): a word under the sky's floor is refused in
+    // the very grammar an invalid word uses — shake, wiggle, nothing spent
+    if (this.sel.length < 2 || word.length < this.castMinLen() || !WORDSET.has(word)) {
       SFX.invalid();
       this.cameras.main.shake(120, 0.004);
       this.tweens.add({ targets: this.lineC, x: this.lineC.x + l.u(8), duration: 50, yoyo: true, repeat: 3, onComplete: () => this.lineC.setX(l.x(0)) });
@@ -9441,9 +9635,11 @@ class Battle extends Phaser.Scene {
     /* the sign's own ledger takes the word and the blow (v0.85.0, Skylar:
        "longest word played with that sign"). Only campaign and endless
        carry a sign — quick, the daily and versus run unsigned and write
-       nothing by construction. LOCAL-ONLY fields (the Q2 stamp): they ride
-       beta3.profile and are never sent by sync(). */
-    if (this.sign) {
+       nothing by construction — and a BORROWED Tuesday sign (v0.109.0)
+       writes nothing by GATE: a guest, not a birth. LOCAL-ONLY fields
+       (the Q2 stamp): they ride beta3.profile and are never sent by
+       sync(). */
+    if (this.sign && !this.signBorrowed) {
       const zr = SS.prof.signs[this.sign] || (SS.prof.signs[this.sign] = { best: 0, clears: 0, runs: 0, xp: 0, ack: 1 });
       if (word.length > (zr.word || '').length) zr.word = word;
       if (dmg > (zr.hit | 0)) zr.hit = dmg;
@@ -9726,7 +9922,8 @@ class Battle extends Phaser.Scene {
     SS.award('first-blood', this.game);
     if (this.fights[this.run.fightIdx].id === 'draco') SS.award('dragonfall', this.game);
     if (this.fights[this.run.fightIdx].id === 'phoenix') SS.award('first-flame', this.game);
-    if (this.signZ && this.signZ.beast === this.fights[this.run.fightIdx].id) SS.award('star-crossed', this.game);
+    // star-crossed means YOUR star — a borrowed Tuesday sign never rings it
+    if (this.signZ && !this.signBorrowed && this.signZ.beast === this.fights[this.run.fightIdx].id) SS.award('star-crossed', this.game);
     if (!this.struckThisBattle) SS.award('untouched', this.game);
     // the drip counts the surplus whether or not ECHO OF RUIN is there to
     // spend it, and counts a kill made on the brink BEFORE the fell's heal
@@ -10809,7 +11006,7 @@ class Battle extends Phaser.Scene {
         if (this.endInspectP) return;
         SFX.ui();
         this.endInspectP = ssSigilPanel(this, {
-          sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, signLv: this.signLv, sleeping: true, depth: 130,
+          sigils: this.run.sigils, tiers: this.run.tiers, sign: this.signZ, signLv: this.signLv, signBorrowed: this.signBorrowed, sleeping: true, depth: 130,
           onClose: () => { this.endInspectP = null; },
         });
       });
@@ -10960,8 +11157,11 @@ class Battle extends Phaser.Scene {
     let best = null, bestScore = -1;
     const used = new Array(tiles.length).fill(false);
     const pick = [];
+    // the solver keeps the sky's law (THE LONG ROAD): a word the button
+    // would refuse is no candidate — hint and demo speak castable words only
+    const need = this.castMinLen();
     const dive = (node) => {
-      if (node.$ && pick.length >= 2) {
+      if (node.$ && pick.length >= 2 && (need <= 2 || pick.reduce((a, k) => a + tiles[k].s.ch.length, 0) >= need)) {
         const dmg = this.wordDamage(pick.map((k) => tiles[k].s));
         if (dmg > bestScore) { bestScore = dmg; best = pick.map((k) => tiles[k].i); }
       }
