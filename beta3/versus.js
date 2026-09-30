@@ -3326,12 +3326,14 @@ class VsBattle extends Phaser.Scene {
     const items = [veil, head];
     opts.forEach((sg, k) => {
       const tier = sg.rarity | 0;
-      const cy = l.y(486 + k * 94);
+      // v0.111.0: the painted frame rows are 2.45:1 — three 280x114 rows,
+      // first top edge 445 (a breath under the header), last bottom 799
+      const cy = l.y(502 + k * 120);
       if (tier > 0) {
-        items.push(this.add.image(l.x(0), cy, 'glowbig').setDisplaySize(l.u(430), l.u(150))
+        items.push(this.add.image(l.x(0), cy, 'glowbig').setDisplaySize(l.u(420), l.u(180))
           .setTint(SS_RARITY[tier].glow).setAlpha(tier === 2 ? 0.16 : 0.09).setBlendMode('ADD').setDepth(119));
       }
-      const card = ssSigilCard(this, l, sg, 330, 84).setPosition(l.x(0), cy).setDepth(120).setAlpha(0);
+      const card = ssSigilCard(this, l, sg, 280, 114).setPosition(l.x(0), cy).setDepth(120).setAlpha(0);
       this.tweens.add({ targets: card, alpha: 1, delay: 100 + k * 110, duration: 260 });
       items.push(card);
       card.on('pointerdown', () => {

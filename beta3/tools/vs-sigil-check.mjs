@@ -209,7 +209,7 @@ await L.seed(`try { sessionStorage.setItem('beta3.skipIntro', '1'); } catch (e) 
 ok('the local sky boots (Firebase blocked — no live rows from this client)',
   await L.nav(BASE + '?fps=0') && await L.until(`!!window.game && typeof SS_SIGILS !== 'undefined' && game.scene.isActive('home')`, 45000));
 ok('the game rides the local net', await L.ev(`SSNET.mode`) === 'local', await L.ev(`SSNET.mode`));
-ok('BUILD names this card\'s version', /v0\.105\.0/.test(await L.ev(`BUILD`)), await L.ev(`BUILD`));
+ok('BUILD names this card\'s version', /v0\.111\.0/.test(await L.ev(`BUILD`)), await L.ev(`BUILD`));   // re-pinned by the v0.111.0 pick-rows card (painted frames re-audit)
 ok('the live pool IS the five survivors (SS_VS_SIGILS, order-free)',
   await L.ev(`JSON.stringify([...SS_VS_SIGILS].sort())`) === JSON.stringify([...FIVE].sort()),
   await L.ev(`SS_VS_SIGILS.join(' ')`));

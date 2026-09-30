@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.110.0';
+const BUILD = 'STARSPELL v0.111.0';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -446,6 +446,9 @@ function ssLoadArt() {
   // …and the first-open tutorial's hand (v0.75.0, cut by tools/make-hand-asset.py)
   // rides the same never-required lane: absent, the finger draws procedurally
   zod.push('hand');
+  // …and the pick sheet's painted frame rows (v0.111.0, the open-sky-sigils
+  // verdicts): absent, ssSigilCard keeps its procedural chrome
+  zod.push('sigrow_basic', 'sigrow_rare', 'sigrow_legend');
   zod.forEach((n) => { const im = new Image(); im.onload = () => { SSART.img[n] = im; }; im.src = 'art/' + n + '.webp?v=' + encodeURIComponent(BUILD); });
   return Promise.all(names.map((n) => new Promise((res) => {
     const im = new Image();
@@ -4097,15 +4100,80 @@ function ssSleepCardTex(scene, w, h) {
   return { key, mx, mr };
 }
 
-// One ornate pick card: baked chrome, glyph in the medallion, gold-letterpress
-// nameplate, rarity ribbon, italic desc. Interactive container, w x h design
-// units; heights under 100 lay out as the compact (versus) one-liner.
+/* ---- the painted pick rows (v0.111.0) -------------------------------------
+   Skylar's open-sky-sigils verdicts (9/30): the pick sheet wears the MJ
+   banner frames — carved wood (basic) / THE SWIRL (rare) / the ember
+   legendary — as full-bleed 2.45:1 rows, NO glyph roundel, name + effect
+   centered in each frame's own dark panel. Plates ride ssLoadArt's
+   never-required lane; a missing plate returns null here and the card
+   falls back to the procedural chrome below (the zod-art law). The epic
+   (amethyst) frame waits for the grade surfaces — picks carry only the
+   three drop tiers. */
+const SS_ROW_INK = [
+  { ink: '#f4e6bd' },            // warm parchment on the carved wood
+  { ink: '#d9e7ff' },            // frost ink on the sapphire swirl
+  { ink: '#ffedc0' },            // ember ink, the page's ruling (not gold)
+];
+function ssSigilRowKey(scene, tier, w, h) {
+  const name = ['sigrow_basic', 'sigrow_rare', 'sigrow_legend'][tier];
+  const im = ART && SSART.img[name];
+  if (!im) return null;
+  const key = name + '@' + w + 'x' + h;
+  if (scene.textures.exists(key)) return key;
+  const R = ssTexRes(scene);
+  const W = Math.round(w * R), H = Math.round(h * R);
+  try {
+    const t = scene.textures.createCanvas(key, W, H);
+    const c = t.context;
+    const rad = Math.min(16, h * 0.2) * R;
+    c.beginPath(); c.roundRect(0, 0, W, H, rad); c.clip();
+    // cover-fit: plates are 2.45:1; crop any overflow evenly on both sides
+    const iw = im.naturalWidth || im.width, ih = im.naturalHeight || im.height;
+    const s = Math.max(W / iw, H / ih), dw = iw * s, dh = ih * s;
+    c.drawImage(im, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    t.refresh();
+  } catch (e) {
+    if (scene.textures.exists(key)) scene.textures.remove(key);
+    return null;
+  }
+  return key;
+}
+
+// One pick card: the painted frame row when its plate is home (name + effect
+// centered, no roundel), else the baked procedural chrome — glyph in the
+// medallion, gold-letterpress nameplate, rarity ribbon, italic desc.
+// Interactive container, w x h design units; on the procedural path heights
+// under 100 lay out as the compact (versus) one-liner.
 function ssSigilCard(scene, l, sg, w, h) {
   const tier = sg.rarity | 0;
   const RC = SS_RARITY[tier];
   const loc = SS_SIG(sg);
-  const tex = ssSigilCardTex(scene, tier, w, h);
   const c = scene.add.container(0, 0);
+  const rowKey = ssSigilRowKey(scene, tier, w, h);
+  if (rowKey) {
+    const IK = SS_ROW_INK[tier];
+    c.add(scene.add.image(0, 0, rowKey).setDisplaySize(l.u(w), l.u(h)));
+    const small = h < 120;                       // the versus rows
+    const panelW = w * 0.66;                     // inside every frame's glass
+    // the desc wraps at the OLD card's measure (0.63w ≈ the procedural card's
+    // 212.7u at solo size) — the phone-verified line splits desc-check pins
+    // (FIRST LIGHT / BLOOD INK / LEYLINE ROOTS / MOONWARD at 2 lines) ride
+    // the measure, not the dress
+    const wrapW = w * 0.63;
+    const nm = ssTxt(scene, 0, l.u(-h * 0.17), loc.name, l.u(small ? 12 : 15), IK.ink)
+      .setOrigin(0.5).setLetterSpacing(l.u(2));
+    const ns = Math.min(1, l.u(panelW) / Math.max(1, nm.width));
+    if (ns < 1) nm.setScale(ns);
+    c.add(nm);
+    c.add(ssTextBlock(scene, 0, l.u(small ? h * 0.04 : h * 0.03), loc.desc, {
+      fontSize: l.u(small ? 10 : 12.5) + 'px', color: IK.ink, fontStyle: 'italic',
+      wrapW: l.u(wrapW), lineSpacing: l.u(2), align: 'center', ox: 0.5,
+    }).setData('sigilDesc', sg.id));
+    c.setSize(l.u(w), l.u(h)).setInteractive({ useHandCursor: true });
+    c.setData('sigilCard', true);
+    return c;
+  }
+  const tex = ssSigilCardTex(scene, tier, w, h);
   c.add(scene.add.image(0, 0, tex.key).setDisplaySize(l.u(w), l.u(h)));
   const gx = -w / 2 + tex.mx;
   c.add(ssTxt(scene, l.u(gx), 0, sg.icon, l.u(tex.mr * 0.98), RC.ink).setOrigin(0.5)
@@ -10779,7 +10847,7 @@ class Battle extends Phaser.Scene {
       const tier = sg.rarity | 0;
       const glow = this.add.image(l.x(0), cy, 'glowbig').setDisplaySize(l.u(470), l.u(240))
         .setTint(SS_RARITY[tier].glow).setAlpha(0).setBlendMode('ADD');
-      const card = ssSigilCard(this, l, sg, 336, 146).setPosition(l.x(0), cy + l.u(26)).setAlpha(0);
+      const card = ssSigilCard(this, l, sg, 336, 137).setPosition(l.x(0), cy + l.u(26)).setAlpha(0);
       items.push(glow, card);
       const delay = 160 + k * 150;
       this.tweens.add({ targets: card, alpha: 1, y: cy, delay, duration: 320, ease: 'Cubic.easeOut' });

@@ -218,8 +218,12 @@ for (const rend of ['cv', 'gl']) {
       a.destroy();
       const b = ssSigilCard(s, l, sg, 336, 146).setPosition(l.x(0), l.y(400)).setDepth(999);
       const blk = D.blocks(b.list, 'sigilDesc')[0], o = blk.blockOpts;
+      // v0.111.0: the painted card centers its block — the legacy replica
+      // mirrors whatever geometry the block declares, so the equivalence
+      // stays apples-to-apples on either dress
+      const ctr = o.align === 'center';
       b.add(s.add.text(blk.x, blk.y, SS_SIG(sg).desc, { fontFamily: SERIF, fontSize: o.fontSize, color: o.color, fontStyle: o.fontStyle,
-        wordWrap: { width: o.wrapW }, lineSpacing: o.lineSpacing }).setOrigin(0, 0));
+        wordWrap: { width: o.wrapW }, lineSpacing: o.lineSpacing, align: ctr ? 'center' : 'left' }).setOrigin(ctr ? 0.5 : 0, 0));
       blk.destroy();
       window.__cmpCards = [b, ground];
       grab((B) => { let d = 0, inkA = 0;
