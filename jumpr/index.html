@@ -58,6 +58,15 @@
   .note button { background:none; border:none; color:var(--muted); font-size:16px; padding:2px 4px; cursor:pointer; }
   .padmeta { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-top:10px; display:flex; justify-content:space-between; }
   .padmeta button { background:none; border:none; color:var(--bad); font-family:var(--mono); font-size:11.5px; cursor:pointer; padding:0; }
+  /* 9/30 screenshots: five across, each with its own ✕ */
+  .shots { display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; margin-top:10px; }
+  .shot { position:relative; aspect-ratio:1 / 1; border-radius:10px; overflow:hidden;
+    border:1px solid var(--line); background:var(--panel2); }
+  .shot img { width:100%; height:100%; object-fit:cover; display:block; }
+  .shot button { position:absolute; top:0; right:0; width:30px; height:30px; border:none; border-radius:0 0 0 10px;
+    background:rgba(14,11,22,.84); color:var(--ink); font-size:14px; line-height:1; cursor:pointer; padding:0; }
+  .shotmeta { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin:8px 0 0; }
+  .btn.ghost:disabled { color:var(--muted); }
 
   .gobar { position:fixed; left:0; right:0; bottom:0; padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
     background: linear-gradient(to top, var(--bg) 70%, transparent); }
@@ -155,8 +164,12 @@
     <textarea id="pad" placeholder="Talk it out — Wispr Flow lands here. Paint the picture."></textarea>
     <div class="addrow">
       <button class="btn ghost" id="addnote">＋ Add note</button>
+      <button class="btn ghost hidden" id="addshot">🖼 Screenshots</button>
     </div>
+    <input type="file" id="shotin" accept="image/*" multiple class="hidden">
     <div id="notes"></div>
+    <div class="shots hidden" id="shots"></div>
+    <p class="shotmeta hidden" id="shotmeta"></p>
     <div class="padmeta">
       <span id="padcount"></span>
       <button id="scratch">scratch pad</button>
@@ -193,7 +206,7 @@ const DEFAULT_PROJECTS = [
 ];
 const LS = {
   key:"jr_key", model:"jr_model", proj:"jr_proj", pad:"jr_pad", outbox:"jr_outbox",
-  projmeta:"jr_projmeta", guest:"jr_guest"
+  projmeta:"jr_projmeta", guest:"jr_guest", shots:"jr_shots", imgmax:"jr_imgmax"
 };
 const $ = id => document.getElementById(id);
 const enc8 = s => new TextEncoder().encode(s);
@@ -241,6 +254,28 @@ async function decMsg(msg) {
   } catch (e) { return null; }
 }
 
+/* 9/30 screenshots: the same keystream over the image's RAW bytes, base64 on the
+   wire (1.33× the bytes; the notes' hex would be 2.67×), and a MAC with its own
+   prefix. Mirrors dec_img in jumpr-remote. */
+function b64(u8) {
+  let s = "";
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+async function encImg(bytes) {
+  const nonce = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(bytes.length), nb = Math.ceil(bytes.length / 32);
+  for (let s = 0; s < nb; s += 256) {
+    const ks = await Promise.all(Array.from({ length: Math.min(256, nb - s) }, (_, k) => hmac(cat(nonce, be32(s + k)))));
+    ks.forEach((blk, k) => {
+      const o = (s + k) * 32;
+      for (let j = 0; j < 32 && o + j < bytes.length; j++) ct[o + j] = bytes[o + j] ^ blk[j];
+    });
+  }
+  const mac = await hmac(cat(enc8("img"), nonce, ct));
+  return { v:1, n:hex(nonce), b:b64(ct), m:hex(mac) };
+}
+
 /* ---------- tiny state ---------- */
 const getJ = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch(e){ return d; } };
 const setJ = (k, v) => localStorage.setItem(k, JSON.stringify(v));
@@ -256,6 +291,146 @@ const GUEST_PROJECTS = [{ id:"gvt", label:"GVT" }];
 let projects = getJ(LS.projmeta, null) || (guest ? GUEST_PROJECTS : DEFAULT_PROJECTS);
 let proj = localStorage.getItem(LS.proj) || "gvt";
 let model = localStorage.getItem(LS.model) || "fable";
+
+/* ---------- screenshots (9/30) ----------
+   Wyatt: "Allow jumpr to take in images on mobile … let us upload up to five."
+   A pick is drawn to a canvas and kept as a JPEG (long edge ≤ 2000 px), so a
+   5 MB screenshot leaves the phone as ~300 KB. The draft's bytes live in
+   IndexedDB — they survive the pad being closed to go take the next screenshot —
+   and its list in localStorage. On GO each image is sealed and uploaded to its
+   own node, THEN the note goes, naming them by id + sha256. How many a note may
+   carry is the Mac's word (the heartbeat's img_max): no word, no row. */
+const IMG = { edge: 2000, bytes: 900000 };
+let imgMax = parseInt(localStorage.getItem(LS.imgmax), 10) || 0;
+let shots = getJ(LS.shots, []);                 // [{id, sha, n, w, h}]
+const MEM = new Map(), THUMB = new Map();        // id -> bytes · id -> object URL
+let shotBusy = false, idbP = null;
+function idb() {
+  if (!idbP) idbP = new Promise(res => {
+    try {
+      const rq = indexedDB.open("jumpr-pad", 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore("img");
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = rq.onblocked = () => res(null);
+    } catch (e) { res(null); }
+  });
+  return idbP;
+}
+function idbReq(mode, fn) {
+  return idb().then(db => db ? new Promise(res => {
+    try {
+      const rq = fn(db.transaction("img", mode).objectStore("img"));
+      rq.onsuccess = () => res(rq.result); rq.onerror = () => res(null);
+    } catch (e) { res(null); }
+  }) : null);
+}
+function imgPut(id, bytes) { MEM.set(id, bytes); return idbReq("readwrite", s => s.put(bytes.buffer, id)); }
+async function imgGet(id) {
+  if (MEM.has(id)) return MEM.get(id);
+  const b = await idbReq("readonly", s => s.get(id));
+  return b ? new Uint8Array(b) : null;
+}
+function imgDel(id) {
+  MEM.delete(id);
+  if (THUMB.has(id)) { URL.revokeObjectURL(THUMB.get(id)); THUMB.delete(id); }
+  return idbReq("readwrite", s => s.delete(id));
+}
+async function imgGC() {      // bytes nothing points at any more (a cleared history, a trimmed outbox)
+  const keys = await idbReq("readonly", s => s.getAllKeys());
+  if (!keys) return;
+  const keep = new Set(shots.map(s => s.id));
+  outbox.forEach(o => { if (o.state === "sending") (o.imgs || []).forEach(im => { if (!im.up) keep.add(im.id); }); });
+  keys.forEach(k => { if (!keep.has(k)) imgDel(k); });
+}
+function loadImg(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => res({ im, url });
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error("decode")); };
+    im.src = url;
+  });
+}
+async function shrink(file) {
+  const { im, url } = await loadImg(file);
+  try {
+    const W = im.naturalWidth, H = im.naturalHeight, long = Math.max(W, H), short = Math.min(W, H);
+    if (!W || !H) throw new Error("empty");
+    let s0 = Math.min(1, IMG.edge / long);
+    if (short * s0 < 600) s0 = Math.min(1, 600 / short, 6000 / long);   // a long scrolling capture keeps a readable width
+    let q = 0.85, f = 1, out = null, w = 0, h = 0;
+    for (let step = 0; step < 7; step++) {
+      w = Math.max(1, Math.round(W * s0 * f)); h = Math.max(1, Math.round(H * s0 * f));
+      const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+      const cx = cv.getContext("2d");
+      cx.fillStyle = "#fff"; cx.fillRect(0, 0, w, h); cx.drawImage(im, 0, 0, w, h);
+      const blob = await new Promise(res => cv.toBlob(res, "image/jpeg", q));
+      cv.width = cv.height = 0;                  // hand the canvas memory back (iOS keeps a tight budget)
+      if (!blob) throw new Error("encode");
+      out = new Uint8Array(await new Response(blob).arrayBuffer());
+      if (out.length <= IMG.bytes) break;
+      if (q > 0.6) q -= 0.15; else f *= 0.8;
+    }
+    return { bytes: out, w, h };
+  } finally { URL.revokeObjectURL(url); }
+}
+async function addShots(files) {
+  if (shotBusy || imgMax <= 0) return;
+  let list = [...files].filter(f => !f.type || /^image\//.test(f.type));
+  if (!list.length) return;
+  const room = imgMax - shots.length;
+  if (room <= 0) { toast(`${imgMax} screenshots is the limit for one task.`); return; }
+  if (list.length > room) {
+    toast(`Up to ${imgMax} screenshots a task — kept the first ${room}.`);
+    list = list.slice(0, room);
+  }
+  shotBusy = true; renderShots();
+  try {
+    for (const file of list) {
+      try {
+        const { bytes, w, h } = await shrink(file);
+        const id = hex(crypto.getRandomValues(new Uint8Array(8)));
+        const sha = hex(await crypto.subtle.digest("SHA-256", bytes));
+        await imgPut(id, bytes);
+        shots.push({ id, sha, n: bytes.length, w, h }); setJ(LS.shots, shots);
+        renderShots();
+      } catch (e) { toast("Couldn't read that image — try another."); }
+    }
+  } finally { shotBusy = false; renderShots(); }
+}
+function dropShot(id) {
+  shots = shots.filter(s => s.id !== id); setJ(LS.shots, shots);
+  imgDel(id); renderShots();
+}
+function renderShots() {
+  const on = imgMax > 0, full = shots.length >= imgMax, btn = $("addshot");
+  btn.classList.toggle("hidden", !on);
+  btn.disabled = shotBusy || full;
+  btn.textContent = shotBusy ? "Reading…" : full && on ? `🖼 ${shots.length} of ${imgMax}` : "🖼 Screenshots";
+  const el = $("shots"), show = on && shots.length > 0;
+  el.innerHTML = "";
+  el.classList.toggle("hidden", !show); $("shotmeta").classList.toggle("hidden", !show);
+  if (show) {
+    shots.forEach((s, i) => {
+      const d = document.createElement("div"); d.className = "shot";
+      const im = document.createElement("img"); im.alt = `screenshot ${i + 1}`;
+      const x = document.createElement("button"); x.textContent = "✕"; x.ariaLabel = `remove screenshot ${i + 1}`;
+      x.onclick = () => dropShot(s.id);
+      d.append(im, x); el.appendChild(d);
+      (async () => {
+        let u = THUMB.get(s.id);
+        if (!u) {
+          const bytes = await imgGet(s.id);
+          if (!bytes) { dropShot(s.id); return; }      // its bytes left this phone — the draft drops it
+          u = URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" })); THUMB.set(s.id, u);
+        }
+        im.src = u;
+      })();
+    });
+    const kb = Math.round(shots.reduce((t, s) => t + s.n, 0) / 1024);
+    $("shotmeta").textContent = `${shots.length} of ${imgMax} screenshots · ${kb} KB`;
+  }
+  updateGo();
+}
 
 function setGuest(name) {
   guest = (name || "").trim().slice(0, 24);
@@ -305,8 +480,9 @@ function renderPad() {
 }
 function updateGo() {
   const has = pad.length || $("pad").value.trim();
-  $("go").disabled = !has;
-  $("go").textContent = has ? "SEND TO JUMPR 🦘" : "ADD NOTES FIRST";
+  const n = imgMax > 0 ? Math.min(shots.length, imgMax) : 0;
+  $("go").disabled = !has || shotBusy;
+  $("go").textContent = has ? "SEND TO JUMPR 🦘" + (n ? ` · 🖼 ${n}` : "") : n ? "ADD A NOTE TOO" : "ADD NOTES FIRST";
 }
 function renderSent() {
   const el = $("sentlist");
@@ -319,7 +495,12 @@ function renderSent() {
     s.textContent = o.state === "queued" ? ("🦘 " + (o.task || "queued") + (o.fired ? " ⚡" : "")) :
                     o.state === "delivered" ? "☁️ delivered" :
                     o.state === "failed" ? "✕ failed" : "⏳ sending…";
-    const p = document.createElement("p"); p.textContent = o.preview;
+    const p = document.createElement("p");
+    const ni = (o.imgs || []).length;
+    const badge = !ni ? "" :
+      o.state === "sending" ? `🖼 ${o.imgs.filter(im => im.up === 1).length}/${ni} up · ` :
+      o.state === "queued" && o.imgGot != null && o.imgGot < ni ? `🖼 ${o.imgGot} of ${ni} arrived · ` : `🖼 ${ni} · `;
+    p.textContent = badge + o.preview;
     d.append(s, p); el.appendChild(d);
   });
 }
@@ -335,11 +516,18 @@ async function go() {
   const text = pad.join("\n\n");
   const payload = { kind:"task", text, project: proj, cwd: CWDS[proj], model,
                     ts: new Date().toISOString(), cid: Math.random().toString(36).slice(2,10) };
+  const riding = imgMax > 0 ? shots.slice(0, imgMax) : [];      // 9/30: the note names its screenshots
+  if (riding.length) payload.images = riding.map(s => ({ id: s.id, sha: s.sha, n: s.n }));
   const encd = await encMsg(payload);
   const entry = { id: payload.cid, state:"sending", preview: text.slice(0,90).replace(/\s+/g," "),
                   ts: Date.now(), enc: encd, pid: null, task: null };
+  if (riding.length) entry.imgs = riding.map(s => ({ id: s.id, up: 0 }));
   outbox.push(entry); outbox = outbox.slice(-30); setJ(LS.outbox, outbox);
   pad = []; setJ(LS.pad, pad);
+  if (riding.length) {                                           // their bytes stay in the phone's store till each is up
+    riding.forEach(s => { if (THUMB.has(s.id)) { URL.revokeObjectURL(THUMB.get(s.id)); THUMB.delete(s.id); } });
+    shots = shots.filter(s => !riding.includes(s)); setJ(LS.shots, shots); renderShots();
+  }
   renderPad(); renderSent();
   toast("Sending to jumpr…");
   flushOutbox();
@@ -351,6 +539,30 @@ async function flushOutbox() {
     for (const o of outbox) {
       if (o.state !== "sending") continue;
       try {
+        // 9/30: every screenshot goes up FIRST — a note the Mac can see has its pictures there.
+        // up: 1 = there · -1 = given up on (its bytes left this phone, or the server refused it
+        // four times): the note still goes and the Mac says "k of n arrived". A dead line
+        // throws and the whole entry waits for the next round, like a note always has.
+        let held = false;
+        for (const im of (o.imgs || [])) {
+          if (im.up) continue;
+          const bytes = await imgGet(im.id);
+          if (!bytes) { im.up = -1; setJ(LS.outbox, outbox); continue; }
+          const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 90000);
+          let ok = false;
+          try {
+            const r = await fetch(`${DB}/${CHAN}/img/${im.id}.json`,
+              { method:"PUT", body: JSON.stringify(await encImg(bytes)), signal: ctl.signal });
+            ok = r.ok;
+          } finally { clearTimeout(timer); }
+          if (!ok) {
+            im.tries = (im.tries || 0) + 1;
+            if (im.tries < 4) { setJ(LS.outbox, outbox); held = true; break; }
+            im.up = -1;
+          } else im.up = 1;
+          setJ(LS.outbox, outbox); renderSent(); imgDel(im.id);
+        }
+        if (held) continue;
         const r = await fetch(`${DB}/${CHAN}/outbox.json`, { method:"POST", body: JSON.stringify(o.enc) });
         if (r.ok) { const j = await r.json(); o.pid = j.name; o.state = "delivered"; setJ(LS.outbox, outbox); renderSent(); }
       } catch (e) { /* offline — retry later */ }
@@ -374,8 +586,10 @@ async function pollAcks() {
           o.state = a.error ? "failed" : "queued";
           o.task = a.error ? a.error : (a.task || "").replace(/\.md$/,"").slice(0,10);
           o.fired = a.fired ? 1 : 0;   // 8/29: the bridge turned an OFF jumpr on for this card
+          if (a.images != null) o.imgGot = a.images;   // 9/30: how many screenshots reached the card
           setJ(LS.outbox, outbox); renderSent();
-          if (!a.error) toast(`Queued as ${a.task} (#${a.pos} in line)` + (a.note ? ` · ${a.note}` : ""));
+          if (!a.error) toast(`Queued as ${a.task} (#${a.pos} in line)` +
+            (a.images ? ` · 🖼 ${a.images}` : "") + (a.note ? ` · ${a.note}` : ""));
           fetch(`${DB}/${CHAN}/acks/${o.pid}.json`, { method:"DELETE" }).catch(()=>{});
         }
       }
@@ -398,6 +612,8 @@ async function pollStatus() {
         projects = inc; setJ(LS.projmeta, projects); renderProjButtons();
       }
     }
+    const im = Math.max(0, Math.min(20, parseInt(s.img_max, 10) || 0));   // 9/30: how many screenshots a note may carry
+    if (im !== imgMax) { imgMax = im; localStorage.setItem(LS.imgmax, String(im)); renderShots(); }
     if (s.guest && s.guest.name) {            // 9/27: the Mac's word on whose link this is
       const nm = String(s.guest.name).slice(0, 24);
       if (nm !== guest) { setGuest(nm); applyGuest(); }
@@ -447,7 +663,7 @@ async function boot() {
   const ok = await initKey();
   showLock(!ok);
   renderProjButtons(); renderSeg($("modelseg"), "m", model); applyGuest();
-  renderPad(); renderSent();
+  renderPad(); renderSent(); renderShots(); imgGC();
   if (ok) { flushOutbox(); pollStatus(); pollAcks(); }
   $("keymask").textContent = KEYSTR ? KEYSTR.slice(0,4) + "…" + KEYSTR.slice(-4) : "—";
 }
@@ -461,7 +677,7 @@ $("gear").onclick = () => $("settings").classList.remove("hidden");
 $("settingsdone").onclick = () => $("settings").classList.add("hidden");
 $("keyclear").onclick = () => { if (confirm("Unlink this phone?")) {
   localStorage.removeItem(LS.key); localStorage.removeItem(LS.guest); localStorage.removeItem(LS.projmeta); location.reload(); } };
-$("clearsent").onclick = () => { outbox = []; setJ(LS.outbox, outbox); renderSent(); toast("Sent history cleared."); };
+$("clearsent").onclick = () => { outbox = []; setJ(LS.outbox, outbox); renderSent(); imgGC(); toast("Sent history cleared."); };
 $("projseg").onclick = e => { const b = e.target.closest("button"); if (!b) return;
   proj = b.dataset.p; localStorage.setItem(LS.proj, proj); renderSeg($("projseg"),"p",proj); };
 $("modelseg").onclick = e => { const b = e.target.closest("button"); if (!b) return;
@@ -469,6 +685,12 @@ $("modelseg").onclick = e => { const b = e.target.closest("button"); if (!b) ret
 $("addnote").onclick = () => { collectPadIntoNotes(); renderPad(); $("pad").focus(); };
 $("scratch").onclick = () => { if (confirm("Throw away all notes?")) { pad = []; setJ(LS.pad, pad); $("pad").value=""; renderPad(); } };
 $("pad").addEventListener("input", updateGo);
+$("addshot").onclick = () => $("shotin").click();
+$("shotin").onchange = e => { const files = [...e.target.files]; e.target.value = ""; addShots(files); };
+addEventListener("paste", e => {               // a copied screenshot pastes straight in
+  const files = [...((e.clipboardData && e.clipboardData.files) || [])].filter(f => /^image\//.test(f.type));
+  if (files.length && imgMax > 0) { e.preventDefault(); addShots(files); }
+});
 $("go").onclick = go;
 
 setInterval(() => { flushOutbox(); pollAcks(); }, 15000);
