@@ -166,7 +166,8 @@
       <button class="btn ghost" id="addnote">＋ Add note</button>
       <button class="btn ghost hidden" id="addshot">🖼 Screenshots</button>
     </div>
-    <input type="file" id="shotin" accept="image/*" multiple class="hidden">
+    <input type="file" id="shotin" accept="image/*" multiple tabindex="-1" aria-hidden="true"
+      style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;">
     <div id="notes"></div>
     <div class="shots hidden" id="shots"></div>
     <p class="shotmeta hidden" id="shotmeta"></p>
@@ -548,7 +549,7 @@ async function flushOutbox() {
           if (im.up) continue;
           const bytes = await imgGet(im.id);
           if (!bytes) { im.up = -1; setJ(LS.outbox, outbox); continue; }
-          const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 90000);
+          const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 120000 + bytes.length / 4);
           let ok = false;
           try {
             const r = await fetch(`${DB}/${CHAN}/img/${im.id}.json`,
@@ -654,6 +655,7 @@ async function boot() {
                        "…). Unlink this phone from its current jumpr and switch?")) {
       KEYSTR = incoming; localStorage.setItem(LS.key, KEYSTR);
       outbox = []; setJ(LS.outbox, outbox);
+      imgMax = 0; localStorage.removeItem(LS.imgmax);   // 9/30: the new Mac says for itself whether it takes screenshots
       setGuest(gname);
       projects = guest ? GUEST_PROJECTS : DEFAULT_PROJECTS; localStorage.removeItem(LS.projmeta);
       proj = projects[0].id; localStorage.setItem(LS.proj, proj);
@@ -676,7 +678,7 @@ $("keysave").onclick = async () => {
 $("gear").onclick = () => $("settings").classList.remove("hidden");
 $("settingsdone").onclick = () => $("settings").classList.add("hidden");
 $("keyclear").onclick = () => { if (confirm("Unlink this phone?")) {
-  localStorage.removeItem(LS.key); localStorage.removeItem(LS.guest); localStorage.removeItem(LS.projmeta); location.reload(); } };
+  localStorage.removeItem(LS.key); localStorage.removeItem(LS.guest); localStorage.removeItem(LS.projmeta); localStorage.removeItem(LS.imgmax); location.reload(); } };
 $("clearsent").onclick = () => { outbox = []; setJ(LS.outbox, outbox); renderSent(); imgGC(); toast("Sent history cleared."); };
 $("projseg").onclick = e => { const b = e.target.closest("button"); if (!b) return;
   proj = b.dataset.p; localStorage.setItem(LS.proj, proj); renderSeg($("projseg"),"p",proj); };
