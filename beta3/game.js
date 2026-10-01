@@ -8,7 +8,7 @@
    ?demo=1 — self-playing solver   ?daily=1 — jump into the Daily
    ============================================================ */
 
-const BUILD = 'STARSPELL v0.111.0';
+const BUILD = 'STARSPELL v0.111.1';
 // Full-DPR back-buffer: capping at 2 left 3x phones upscaling 1.5x — text
 // went soft (Runefall's v0.18 blur, same cause). MSAA off at retina instead.
 const QS = new URLSearchParams(location.search);
@@ -1966,6 +1966,20 @@ function ssShootingStar(scene) {
 
 function ssShootingStars(scene) {
   scene.time.addEvent({ delay: 4200 + Math.random() * 4000, loop: true, callback: () => ssShootingStar(scene) });
+}
+
+// v0.111.1: the pick veils dress as the night sky — the same stars the battle
+// wears, pushed into the pick's own items[] so they ride ABOVE the veil and
+// die with it (Skylar: "the background… should be the night sky screen")
+function ssVeilStars(scene, items, count, depth) {
+  const W = scene.scale.width, H = scene.scale.height;
+  for (let i = 0; i < count; i++) {
+    const st = scene.add.image(Math.random() * W, Math.random() * H, 'dot')
+      .setScale(0.3 + Math.random() * 0.8).setAlpha(0.15 + Math.random() * 0.5).setTint(0xcfd8ff);
+    if (depth !== undefined) st.setDepth(depth);
+    scene.tweens.add({ targets: st, alpha: 0.08 + Math.random() * 0.2, duration: 1200 + Math.random() * 2600, yoyo: true, repeat: -1, delay: Math.random() * 2000 });
+    items.push(st);
+  }
 }
 
 /* ============================================================
@@ -4109,10 +4123,15 @@ function ssSleepCardTex(scene, w, h) {
    falls back to the procedural chrome below (the zod-art law). The epic
    (amethyst) frame waits for the grade surfaces — picks carry only the
    three drop tiers. */
+/* v0.111.1: each frame's dark panel measured on its own plate (fractions of
+   the card): cx = panel center x, t = panel top, ph = panel height, pw =
+   usable width. The wood's panel sits LOW (y .33–.70) while the swirl's is
+   tall and a touch right of center — one shared position rode the wood's
+   top rail on Skylar's phone. Text lays out INSIDE these rects, self-fit. */
 const SS_ROW_INK = [
-  { ink: '#f4e6bd' },            // warm parchment on the carved wood
-  { ink: '#d9e7ff' },            // frost ink on the sapphire swirl
-  { ink: '#ffedc0' },            // ember ink, the page's ruling (not gold)
+  { ink: '#f4e6bd', cx: 0.500, t: 0.33, ph: 0.37, pw: 0.62 },   // warm parchment on the carved wood
+  { ink: '#d9e7ff', cx: 0.530, t: 0.26, ph: 0.48, pw: 0.66 },   // frost ink on the sapphire swirl
+  { ink: '#ffedc0', cx: 0.505, t: 0.28, ph: 0.43, pw: 0.63 },   // ember ink, the page's ruling (not gold)
 ];
 function ssSigilRowKey(scene, tier, w, h) {
   const name = ['sigrow_basic', 'sigrow_rare', 'sigrow_legend'][tier];
@@ -4154,21 +4173,42 @@ function ssSigilCard(scene, l, sg, w, h) {
     const IK = SS_ROW_INK[tier];
     c.add(scene.add.image(0, 0, rowKey).setDisplaySize(l.u(w), l.u(h)));
     const small = h < 120;                       // the versus rows
-    const panelW = w * 0.66;                     // inside every frame's glass
+    const px = (IK.cx - 0.5) * w;                // the panel's own center
+    const panelW = Math.min(0.66, IK.pw - 0.02) * w;
     // the desc wraps at the OLD card's measure (0.63w ≈ the procedural card's
-    // 212.7u at solo size) — the phone-verified line splits desc-check pins
+    // 212.7u at solo size) so the phone-verified line splits desc-check pins
     // (FIRST LIGHT / BLOOD INK / LEYLINE ROOTS / MOONWARD at 2 lines) ride
-    // the measure, not the dress
-    const wrapW = w * 0.63;
-    const nm = ssTxt(scene, 0, l.u(-h * 0.17), loc.name, l.u(small ? 12 : 15), IK.ink)
+    // the measure, not the dress — narrowed only where a panel demands it
+    const wrapW = Math.min(0.63, IK.pw - 0.02) * w;
+    const nm = ssTxt(scene, l.u(px), 0, loc.name, l.u(small ? 12 : 15), IK.ink)
       .setOrigin(0.5).setLetterSpacing(l.u(2));
     const ns = Math.min(1, l.u(panelW) / Math.max(1, nm.width));
     if (ns < 1) nm.setScale(ns);
+    // self-fit: build the desc, measure it, centre the name+desc stack inside
+    // THIS frame's panel; a stack the shallow wood can't hold rebuilds a notch
+    // smaller WITH THE WRAP SCALED ALONGSIDE — same characters per line, so
+    // the phone-verified splits (FIRST LIGHT's two-liner on the wood) survive
+    // the shrink instead of refolding to one line
+    const fs0 = small ? 10 : 12.5;
+    const mkDesc = (fs) => ssTextBlock(scene, l.u(px), 0, loc.desc, {
+      fontSize: l.u(fs) + 'px', color: IK.ink, fontStyle: 'italic',
+      wrapW: l.u(wrapW * (fs / fs0)), lineSpacing: l.u(1), align: 'center', ox: 0.5,
+    }).setData('sigilDesc', sg.id);
+    let desc = mkDesc(fs0);
+    let gap = l.u(small ? 3 : 4);
+    const avail = l.u(IK.ph * h) - l.u(4);
+    if (nm.displayHeight + gap + desc.height > avail) {
+      desc.destroy();
+      desc = mkDesc(small ? 9 : 11);
+      nm.setScale(Math.min(ns, 1) * 0.9);
+      gap = l.u(small ? 2 : 3);
+    }
+    const stackH = nm.displayHeight + gap + desc.height;
+    const top = l.u((IK.t + IK.ph / 2 - 0.5) * h) - stackH / 2;   // panel centre
+    nm.setY(top + nm.displayHeight / 2);
+    desc.setY(top + nm.displayHeight + gap);
     c.add(nm);
-    c.add(ssTextBlock(scene, 0, l.u(small ? h * 0.04 : h * 0.03), loc.desc, {
-      fontSize: l.u(small ? 10 : 12.5) + 'px', color: IK.ink, fontStyle: 'italic',
-      wrapW: l.u(wrapW), lineSpacing: l.u(2), align: 'center', ox: 0.5,
-    }).setData('sigilDesc', sg.id));
+    c.add(desc);
     c.setSize(l.u(w), l.u(h)).setInteractive({ useHandCursor: true });
     c.setData('sigilCard', true);
     return c;
@@ -10831,9 +10871,11 @@ class Battle extends Phaser.Scene {
     this.tweens.add({ targets: [this.boardC, this.lineC], alpha: 0.1, duration: 300 });
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive();
     this.tweens.add({ targets: veil, alpha: 0.86, duration: 300 });
+    const items = [veil];
+    ssVeilStars(this, items, 90);   // the veil wears the night sky, not a black wash
     const head = ssTxt(this, l.x(0), l.y(128), SS_T('sigilHead'), l.u(18), '#c9b676').setOrigin(0.5)
       .setShadow(0, 0, '#c9b676', l.u(10), true, true);
-    const items = [veil, head];
+    items.push(head);
     // pick-screen sparkles ride above the cards (added to overlayC last)
     const sparks = this.add.particles(0, 0, 'dot', {
       speed: { min: 40, max: 240 }, lifespan: { min: 300, max: 900 }, scale: { start: 0.8, end: 0 },

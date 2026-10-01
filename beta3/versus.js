@@ -3321,9 +3321,11 @@ class VsBattle extends Phaser.Scene {
     // header drowned; the veil also swallows stray taps
     const veil = this.add.image(l.W / 2, l.H / 2, 'veil').setDisplaySize(l.W, l.H).setAlpha(0).setInteractive().setDepth(118);
     this.tweens.add({ targets: veil, alpha: 0.72, duration: 250 });
+    const items = [veil];
+    ssVeilStars(this, items, 70, 119);   // the duel's pick wears the night sky too
     const head = ssTxt(this, l.x(0), l.y(428), SS_T('vsSigilHead'), l.u(14), '#c9b676').setOrigin(0.5).setDepth(120)
       .setShadow(0, 0, '#c9b676', l.u(8), true, true);
-    const items = [veil, head];
+    items.push(head);
     opts.forEach((sg, k) => {
       const tier = sg.rarity | 0;
       // v0.111.0: the painted frame rows are 2.45:1 — three 280x114 rows,
