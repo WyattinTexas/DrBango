@@ -58,6 +58,14 @@
   .note button { background:none; border:none; color:var(--muted); font-size:16px; padding:2px 4px; cursor:pointer; }
   .padmeta { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-top:10px; display:flex; justify-content:space-between; }
   .padmeta button { background:none; border:none; color:var(--bad); font-family:var(--mono); font-size:11.5px; cursor:pointer; padding:0; }
+  /* 10/4: an AI agent's held cards (Grok) wait here for Wyatt's tap */
+  .held { background:var(--panel2); border:1px solid var(--amber); border-radius:10px; padding:10px 12px; margin-top:8px; }
+  .held .from { font-family:var(--mono); font-size:11.5px; color:var(--amber); margin:0 0 6px; }
+  .held .txt { font-size:14.5px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere; margin:0 0 10px; }
+  .held .row { display:flex; gap:8px; }
+  .btn.rel { background:var(--ok); color:#0E0B16; flex:1; }
+  .btn.drop { background:var(--panel); color:var(--bad); border:1px solid var(--line); flex:1; }
+  .held .wait { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin:0; }
   /* 9/30 screenshots: five across, each with its own ✕ */
   .shots { display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; margin-top:10px; }
   .shot { position:relative; aspect-ratio:1 / 1; border-radius:10px; overflow:hidden;
@@ -175,6 +183,11 @@
       <span id="padcount"></span>
       <button id="scratch">scratch pad</button>
     </div>
+  </div>
+
+  <div class="card hidden" id="heldcard">
+    <p class="label">Waiting for your tap</p>
+    <div id="heldlist"></div>
   </div>
 
   <div class="card">
@@ -632,7 +645,70 @@ async function pollStatus() {
     if (s.guest_cap) rows.push(`<span class="chip">your notes today <b>${s.guest_today || 0}</b>/${s.guest_cap}</span>`);
     $("statrow").innerHTML = rows.join("");
     $("queuelines").textContent = (s.queue_lines || []).slice(0,6).join("\n");
+    const hl = Array.isArray(s.held) ? s.held : [];
+    for (const t of Object.keys(heldSent)) if (!hl.some(h => h.task === t) && !heldSent[t].pid) delete heldSent[t];
+    renderHeld(hl);
   } catch (e) { /* offline */ }
+}
+
+/* ---------- 10/4: an AI agent's held cards (Grok's link) ----------
+   The Mac's heartbeat on WYATT's channel lists the agent cards waiting in held/;
+   Release = kind "release" (back to the queue + the ⚡), Drop = kind "drop"
+   (kept in held/dropped/). A guest's heartbeat never carries the list, and the
+   Mac refuses both kinds on a guest's channel. The text is an AI's: textContent only. */
+const heldSent = {};          // task -> { pid, kind, at }
+function renderHeld(list) {
+  const card = $("heldcard"), box = $("heldlist");
+  if (guest || !list.length) { card.classList.add("hidden"); box.textContent = ""; return; }
+  card.classList.remove("hidden"); box.textContent = "";
+  list.slice(0, 8).forEach(h => {
+    const task = String(h.task || ""), row = document.createElement("div");
+    row.className = "held";
+    const from = document.createElement("p"); from.className = "from";
+    from.textContent = `🤖 ${String(h.from || "an agent").slice(0, 24)} · an AI, not a person` +
+      (h.ts ? ` · ${new Date(h.ts * 1000).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" })}` : "");
+    const txt = document.createElement("p"); txt.className = "txt";
+    txt.textContent = String(h.text || "").slice(0, 240) || "(no text)";
+    row.append(from, txt);
+    const sent = heldSent[task];
+    if (sent) {
+      const w = document.createElement("p"); w.className = "wait";
+      w.textContent = sent.kind === "release" ? "Releasing… the Mac picks it up within a minute." : "Dropping…";
+      row.append(w);
+    } else {
+      const btns = document.createElement("div"); btns.className = "row";
+      const rel = document.createElement("button"); rel.className = "btn rel"; rel.textContent = "Release ▶";
+      const drop = document.createElement("button"); drop.className = "btn drop"; drop.textContent = "Drop";
+      rel.onclick = () => heldTap(task, "release"); drop.onclick = () => heldTap(task, "drop");
+      btns.append(rel, drop); row.append(btns);
+    }
+    box.append(row);
+  });
+}
+async function heldTap(task, kind) {
+  if (kind === "drop" && !confirm("Drop this request? It is kept on the Mac (held/dropped), never run.")) return;
+  try {
+    const r = await fetch(`${DB}/${CHAN}/outbox.json`, { method:"POST",
+      body: JSON.stringify(await encMsg({ kind, task, ts: new Date().toISOString() })) });
+    if (!r.ok) throw new Error("http " + r.status);
+    heldSent[task] = { pid: (await r.json()).name, kind, at: Date.now() };
+    toast(kind === "release" ? "Released. The Mac queues it within a minute." : "Dropped.");
+  } catch (e) { toast("Not sent (offline?). Try again."); }
+  pollStatus();
+}
+async function pollHeldAcks() {
+  for (const [task, o] of Object.entries(heldSent)) {
+    if (!o.pid) continue;
+    try {
+      const r = await fetch(`${DB}/${CHAN}/acks/${o.pid}.json`); if (!r.ok) continue;
+      const raw = await r.json(); if (!raw) continue;
+      const a = await decMsg(raw);
+      fetch(`${DB}/${CHAN}/acks/${o.pid}.json`, { method:"DELETE" }).catch(()=>{});
+      if (a && a.error) { toast(`Not ${o.kind === "drop" ? "dropped" : "released"}: ${String(a.error).slice(0, 80)}`); delete heldSent[task]; }
+      else if (a && a.released) { toast(`Running: ${String(a.released).slice(0, 40)}` + (a.note ? ` · ${String(a.note).slice(0, 60)}` : "")); o.pid = null; }
+      else o.pid = null;
+    } catch (e) { /* offline */ }
+  }
 }
 
 /* ---------- wiring ---------- */
@@ -695,7 +771,7 @@ addEventListener("paste", e => {               // a copied screenshot pastes str
 });
 $("go").onclick = go;
 
-setInterval(() => { flushOutbox(); pollAcks(); }, 15000);
+setInterval(() => { flushOutbox(); pollAcks(); pollHeldAcks(); }, 15000);
 setInterval(pollStatus, 20000);
 addEventListener("online", flushOutbox);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { flushOutbox(); pollStatus(); pollAcks(); } });
