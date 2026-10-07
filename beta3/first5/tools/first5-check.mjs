@@ -41,6 +41,8 @@ ok('shim handles ?reset=1 and scrubs it from the URL', shim.includes("searchPara
 ok("game.js art repointed to ../art (2 sites)", (gameSrc.match(/im\.src = '\.\.\/art\//g) || []).length === 2 && !/im\.src = 'art\//.test(gameSrc));
 ok('packs.js dictionary writes ../words-<lang>.js', packSrc.includes('src="../words-'));
 for (let n = 1; n <= 7; n++) ok('F5-GRAFT-' + n + ' seam present in game.js', gameSrc.includes('F5-GRAFT-' + n));
+ok('F5-CARD-05 seams: prompt table + five triggers', ['SS_F5_PROMPTS', 'ssF5Prompt(', 'f5InkTaught', 'THE PLANTED GLOW'].every((t) => gameSrc.includes(t)) && (gameSrc.match(/F5-CARD-05/g) || []).length >= 6);
+ok('the en prompt table carries all five lessons', ['tile1', 'tile2', 'tile3', 'ink', 'scry'].every((k) => new RegExp(k + ':').test(gameSrc.slice(gameSrc.indexOf('SS_F5_PROMPTS'), gameSrc.indexOf('SS_F5_PROMPTS') + 900))));
 ok('F5-CARD-04 seams: the rig, the kind bag, the beats, the ember tune', ['SS_F5_RIG', 'SS_F5_FLOOR', 'SS_F5_EMBER_MULT', 'f5Kind(', 'f5CastBeats(', 'f5StarWrite(', 'f5Encore('].every((t) => gameSrc.includes(t)));
 const BUILD = (gameSrc.match(/const BUILD = '([^']+)'/) || [])[1];
 ok('game.js copy carries a BUILD', !!BUILD, BUILD);
@@ -153,6 +155,31 @@ await ev("(()=>{const b=game.scene.getScene('battle');b.f5CastBeats('zzzzzzz', 7
 await sleep(1200);
 ok('rungs 6 and 7 cue and draw clean (sky swell + gold rain)', ((await ev('window.__f5ladder6 | 0')) + (await ev('window.__f5ladder7 | 0'))) === 2);
 ok('zero exceptions through the leaning sky', errs.length === 0, errs.slice(0, 2).join(' | '));
+
+/* ======== §2d the teaching scripts (card 05) ======== */
+console.log('— §2d the teaching scripts —');
+// the dew and the ink ride their REAL functions — the same calls the game makes
+const dewed = await ev("(()=>{const b=game.scene.getScene('battle');let pi=-1;for(let i=0;i<16;i++){const s=b.board[i];if(s&&s.tier===0&&!s.blk&&s.c.active){pi=i;break}}if(pi<0)return 'no plain tile';b.dewTile(pi);return 'dewed'})()");
+ok('a dew tile blooms (real dewTile call)', dewed === 'dewed', String(dewed));
+let p3 = false;
+for (let i = 0; i < 8 && !p3; i++) { p3 = ((await ev("(window.__f5prompt||{}).tile3 | 0")) >= 1); if (!p3) await sleep(400); }
+ok('…and the GREEN lesson speaks once', p3);
+await ev("(()=>{const b=game.scene.getScene('battle');let pi=-1;for(let i=0;i<16;i++){const s=b.board[i];if(s&&s.tier===0&&!s.blk&&s.c.active){pi=i;break}}if(pi>=0)b.blackTile(pi);return 1})()");
+let pink = false;
+for (let i = 0; i < 8 && !pink; i++) { pink = ((await ev("(window.__f5prompt||{}).ink | 0")) >= 1); if (!pink) await sleep(400); }
+ok('an inked tile teaches the beast special (real blackTile call)', pink);
+await ev("(()=>{const b=game.scene.getScene('battle');ssF5Prompt(b,'scry',100,600);ssF5Prompt(b,'scry',100,600);return 1})()");
+ok('every prompt fires ONCE per run (scry asked twice, spoke once)', (await ev("(window.__f5prompt||{}).scry | 0")) === 1);
+// the ORANGE lesson rides the real forge chain: the 5-letter cast already
+// paid pending; march to the next refill (or through the sigil pick into
+// fight 2, where the PLANTED GLOW lands) and the prompt speaks
+let p1 = (await ev("(window.__f5prompt||{}).tile1 | 0")) >= 1;
+for (let round = 0; round < 6 && !p1; round++) {
+  const st = await ev("(()=>{const b=game.scene.getScene('battle');if(b.state==='sigil'||b.state==='upgrade'){const cards=[];const scan=(ls)=>ls.forEach(o=>{if(o.getData&&o.getData('sigilCard'))cards.push(o);else if(o.list)scan(o.list)});scan(b.overlayC.list);if(cards.length){cards[0].emit('pointerdown');return 'picked'}}if(b.state==='pick'&&!b.sel.length){const w=b.bestWord();if(w){w.forEach(i=>b.tapTile(i));b.tryCast();return 'cast'}}return b.state})()");
+  for (let i = 0; i < 12 && !p1; i++) { p1 = (await ev("(window.__f5prompt||{}).tile1 | 0")) >= 1; if (!p1) await sleep(700); }
+}
+ok('the ORANGE lesson speaks on the real forge/plant chain', p1);
+ok('zero exceptions through the lessons', errs.length === 0, errs.slice(0, 2).join(' | '));
 
 /* ================= §3 the run engine plays (demo solver) ================= */
 console.log('— §3 the run engine plays —');

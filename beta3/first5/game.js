@@ -1905,6 +1905,43 @@ function ssF5TomorrowCue(scene) { window.__f5tomorrow = (window.__f5tomorrow | 0
    native review at integration (the page's "single highest-leverage
    missing piece"). */
 const SS_F5_RIG = { en: ['m', 'o', 'n', 's'], es: ['m', 'a', 'r', 'e', 's'], fr: ['l', 'u', 'n', 'e', 's'], pt: ['c', 'a', 's', 'a', 's'], de: ['s', 't', 'e', 'r', 'n'] };
+/* ---- F5-CARD-05: THE TEACHING SCRIPTS — Skylar's verdict-1 notes, with
+   verdict 5 (WORDS ARE FINE) paying the copy. Ground truth held against the
+   shipping code: the special tiles ARE orange (+6, tier 1), blue (×1.5,
+   tier 2) and green (the dew, heals ♥6, tier 3) — exactly as Skylar
+   remembered — and the gray/black tile is the bosses' BLACKOUT curse
+   (tileblk, pays nothing). ONE declared table, shortest true sentence
+   each, en-first; the ×5 translation at integration is mechanical. Every
+   prompt fires ONCE per run, waits ~8s or one tap, pauses nothing. */
+const SS_F5_PROMPTS = {
+  en: {
+    tile1: 'An orange tile pays +6 extra.',
+    tile2: 'A blue tile makes the whole word ×1.5.',
+    tile3: 'A green dew tile heals ♥6 when cast.',
+    ink: 'An inked tile spells, but pays nothing.',
+    scry: 'Stuck? SCRY deals a fresh board — the beast still counts it.',
+  },
+};
+function ssF5Prompt(scene, key, x, y) {
+  const seen = scene.f5Prompted || (scene.f5Prompted = {});
+  if (seen[key] || !scene.scene.isActive()) return;
+  seen[key] = 1;
+  window.__f5prompt = Object.assign(window.__f5prompt || {}, { [key]: ((window.__f5prompt || {})[key] | 0) + 1 });
+  const l = scene.L;
+  const str = (SS_F5_PROMPTS[PACK.lang] || SS_F5_PROMPTS.en)[key] || SS_F5_PROMPTS.en[key];
+  const t = ssTxt(scene, 0, 0, str, l.u(14.5), '#f3e5b4', 'italic').setOrigin(0.5);
+  const w = t.width + l.u(28), h = t.height + l.u(18);
+  const g = scene.add.graphics();
+  g.fillStyle(0x15131f, 0.93); g.fillRoundedRect(-w / 2, -h / 2, w, h, l.u(9));
+  g.lineStyle(l.u(1.3), 0xd9b96a, 0.55); g.strokeRoundedRect(-w / 2, -h / 2, w, h, l.u(9));
+  const c = scene.add.container(0, 0, [g, t]).setDepth(950).setAlpha(0).setScale(0.92);
+  c.setPosition(Math.max(w / 2 + l.u(6), Math.min(l.W - w / 2 - l.u(6), x)),
+    Math.max(h / 2 + l.u(6), Math.min(l.H - h / 2 - l.u(6), y)));
+  scene.tweens.add({ targets: c, alpha: 1, scale: 1, duration: 220, ease: 'Back.easeOut' });
+  const close = () => { if (!c.active) return; scene.tweens.add({ targets: c, alpha: 0, duration: 240, onComplete: () => { if (c.active) c.destroy(); } }); };
+  scene.time.delayedCall(8000, close);
+  scene.time.delayedCall(500, () => scene.input.once('pointerdown', close));   // taps accelerate
+}
 const SS_F5_FLOOR = { en: ['m', 'o', 'o', 'n', 's'], es: ['l', 'u', 'n', 'a', 's'], fr: ['l', 'u', 'n', 'e', 's'], pt: ['c', 'a', 's', 'a', 's'], de: ['s', 't', 'e', 'r', 'n', 'e'] };
 const SS_F5_EMBER_MULT = 1.1;   // VULPES 30 → 33 hp: the ember minute always arrives (page §IV)
 function ssFtueDone() {
@@ -8826,6 +8863,9 @@ class Battle extends Phaser.Scene {
         this.f5Glinted = true;
         const best = this.bestWord();
         if (best && best.length) this.f5Glint(this.board[best[0]]);
+        /* F5-CARD-05: the stall is also SCRY's honest moment — the player
+           who is stuck is the one the button exists for. */
+        ssF5Prompt(this, 'scry', this.L.x(-150), this.L.y(706));
       }
       /* F5-CARD-04: the rescue's second rung — 30s of stall brings the
          gesture back once (the best word's tiles glint in walking order). */
@@ -9497,6 +9537,11 @@ class Battle extends Phaser.Scene {
     c.on('pointerdown', () => this.tapTile(i));
     this.boardC.add(c);
     this.board[i] = { ch, tier, blk: cursed, c, img, letter, val, glow, leaf };
+    /* F5-CARD-05: a special tile's FIRST arrival teaches itself — one
+       prompt, above the board, once per run (ssF5Prompt dedupes). */
+    if (this.mode === 'quick' && (tier === 1 || tier === 2)) {
+      this.time.delayedCall(460, () => { if (this.scene.isActive()) ssF5Prompt(this, 'tile' + tier, this.L.x(0), this.L.y(352)); });
+    }
     this.tweens.add({ targets: c, y: p.y, duration: initial ? 550 : 420, ease: 'Bounce.easeOut', delay: initial ? i * 45 : Math.random() * 90 });
   }
   /* THE ASHEN BOARD's cooling cell (v0.110.0): where a cast star stood, its
@@ -9566,6 +9611,8 @@ class Battle extends Phaser.Scene {
     if (!open.includes(i)) return -1;
     s.tier = 3;
     SFX.dew();
+    /* F5-CARD-05: the dew's first bloom explains itself */
+    if (this.mode === 'quick') this.time.delayedCall(520, () => { if (this.scene.isActive()) ssF5Prompt(this, 'tile3', this.L.x(0), this.L.y(352)); });
     // the settle: green glass crossfades in under cooling inks, the chip
     // turns to ♥6, a soft glow blooms and three droplets sink onto the face
     const g = this.add.image(0, 0, 'tile3').setDisplaySize(this.tileSize, this.tileSize).setAlpha(0);
@@ -9730,6 +9777,9 @@ class Battle extends Phaser.Scene {
     if (!s || !s.c.active || s.blk) return;
     const l = this.L;
     s.blk = true;
+    /* F5-CARD-05: the first inked tile explains itself (rides BOTH the
+       scripted fight-2 taste and DRACO's real volley — whichever first) */
+    if (this.mode === 'quick') this.time.delayedCall(560, () => { if (this.scene.isActive()) ssF5Prompt(this, 'ink', l.x(0), l.y(352)); });
     // blackout wins: a gilded or forged letter is simply dark now
     s.tier = 0;
     if (s.glow) {
@@ -9997,6 +10047,20 @@ class Battle extends Phaser.Scene {
   startFight() {
     const l = this.L;
     const f = this.fights[this.run.fightIdx];
+    /* F5-CARD-05: THE PLANTED GLOW — any special tile fight 1 never taught
+       opens fight 2 planted (the page's own beat: "one planted gilded tile
+       — the glow you now know how to chase"); and by fight 3 the SCRY
+       prompt has fired even for a player who never stalled. */
+    if (this.mode === 'quick') {
+      const seen = this.f5Prompted || {};
+      if (this.run.fightIdx >= 1) {
+        if (!seen.tile1) this.pending.push(1);
+        if (!seen.tile2) this.pending.push(2);
+      }
+      if (this.run.fightIdx >= 2 && !seen.scry) {
+        this.time.delayedCall(2600, () => { if (this.scene.isActive() && this.state === 'pick') ssF5Prompt(this, 'scry', l.x(-150), l.y(706)); });
+      }
+    }
     // the endless climb's rungs ring the moment they are REACHED (v0.68.0):
     // award() is idempotent, so a resumed climb settles up quietly
     if (this.mode === 'endless') {
@@ -11005,6 +11069,20 @@ class Battle extends Phaser.Scene {
       // dew gathers where the blow fell — one plain tile greens, a beat
       // after the hit reads (never in versus: VsBattle has its own strike)
       this.time.delayedCall(260, () => { if (this.state !== 'end' && this.scene.isActive()) this.dewTile(); });
+      /* F5-CARD-05: the beast special's EARLY TASTE — fight 2's first landed
+         strike inks one plain tile, a small preview of the boss curse, and
+         the prompt rides blackTile. FOR SKYLAR: only bosses own the blackout
+         in the shipping game; this scripted taste is the generous read of
+         "a script where a beast uses their special" — say the word to move
+         it later (or leave it to DRACO's real volley alone). */
+      if (this.mode === 'quick' && this.run.fightIdx === 1 && !this.f5InkTaught) {
+        this.f5InkTaught = true;
+        this.time.delayedCall(900, () => {
+          if (this.state === 'end' || !this.scene.isActive()) return;
+          const open = this.board.map((s, i) => s && !s.blk && s.tier === 0 && s.c.active ? i : -1).filter((i) => i >= 0);
+          if (open.length) this.blackTile(open[Math.floor(Math.random() * open.length)]);
+        });
+      }
       done();
     };
     if (this.beastFx && this.beastFx.ready) this.beastFx.attack(land);
